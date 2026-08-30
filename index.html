@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Kelo World — V2.5</title>
+  <title>Kelo World — V2.6</title>
   <style>
     *{box-sizing:border-box;margin:0;padding:0;user-select:none;-webkit-user-select:none;touch-action:none}
     html,body{width:100%;height:100%;overflow:hidden;background:#05070a;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
@@ -41,6 +41,7 @@
   <div class="top-bar">
     <div class="hud-badge" id="telemetry-bar">Oro: 1500 | KC: 200</div>
     <div>
+      <button class="btn-panel-toggle" onclick="inspectPlayer(localPlayer,true)">Yo</button>
       <button class="btn-panel-toggle" id="btn-toggle-editor" onclick="toggleBuildMode()">Casa</button>
       <button class="btn-panel-toggle" onclick="toggleMenu()">Menu</button>
     </div>
@@ -139,5 +140,6 @@
 <script src="engine-f.js"></script>
 <script src="engine-g.js"></script>
 <script src="engine-h.js"></script>
+<script src="engine-i.js"></script>
 </body>
 </html>
