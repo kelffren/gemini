@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Kelo World — 2D-A Movement Lab (V2)</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+    }
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #0b0d10;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    #game-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    #camera-lab {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      width: 290px;
+      max-height: 92vh;
+      overflow-y: auto;
+      background: rgba(14, 18, 24, 0.90);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 10px;
+      padding: 12px;
+      color: #e0e6ed;
+      font-size: 11px;
+      z-index: 100;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+    .lab-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      font-weight: 700;
+      color: #00d2ff;
+      letter-spacing: 0.5px;
+    }
+    .preset-group {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 4px;
+      margin-bottom: 10px;
+    }
+    .btn {
+      background: #1f2633;
+      border: 1px solid #333f54;
+      color: #fff;
+      padding: 6px 4px;
+      border-radius: 5px;
+      font-size: 10px;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.15s;
+    }
+    .btn:active {
+      transform: scale(0.97);
+    }
+    .btn.active {
+      background: #0070f3;
+      border-color: #3291ff;
+      box-shadow: 0 0 10px rgba(0,112,243,0.4);
+    }
+    .control-row {
+      margin-bottom: 6px;
+    }
+    .control-row label {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 2px;
+      color: #8fa0b5;
+    }
+    .control-row input[type=range] {
+      width: 100%;
+      height: 4px;
+      background: #252e3d;
+      border-radius: 2px;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+    .control-row input[type=range]::-webkit-slider-thumb {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #00d2ff;
+      cursor: pointer;
+    }
+    .telemetry {
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      font-family: monospace;
+      font-size: 10px;
+      color: #7ee787;
+      line-height: 1.4;
+    }
+    #touch-hint {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      color: rgba(255,255,255,0.4);
+      font-size: 12px;
+      pointer-events: none;
+      font-family: sans-serif;
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="game-canvas"></canvas>
+<div id="touch-hint">👈 Toca y arrastra aquí (mitad izquierda) o usa WASD</div>
+
+<div id="camera-lab">
+  <div class="lab-header">
+    <span>CAMERA & MOVE LAB V2</span>
+    <span id="lab-fps">60 FPS</span>
+  </div>
+
+  <div class="preset-group">
+    <button class="btn" id="preset-a" onclick="applyPreset('A')">A: DIRECTO</button>
+    <button class="btn active" id="preset-b" onclick="applyPreset('B')">B: VIVO</button>
+    <button class="btn" id="preset-c" onclick="applyPreset('C')">C: ESTABLE</button>
+  </div>
+
+  <div class="control-row">
+    <label>Movimiento: <span id="val-movetype">Micro-Acc</span></label>
+    <button class="btn" style="width:100%;" onclick="toggleMovementType()">Alternar Directo / Micro-Acc</button>
+  </div>
+  <div class="control-row">
+    <label>Curva Joystick: <span id="val-curve">Potencia 1.35</span></label>
+    <button class="btn" style="width:100%;" onclick="toggleJoystickCurve()">Alternar Lineal / Potencia</button>
+  </div>
+  <div class="control-row">
+    <label>Velocidad Máxima: <span id="val-speed">320 px/s</span></label>
+    <input type="range" id="input-speed" min="150" max="600" value="320" oninput="updateParam('speed', this.value)">
+  </div>
+  <div class="control-row">
+    <label>Camera Damping X (Decay): <span id="val-dampX">8.0</span></label>
+    <input type="range" id="input-dampX" min="1" max="25" step="0.5" value="8.0" oninput="updateParam('dampX', this.value)">
+  </div>
+  <div class="control-row">
+    <label>Camera Damping Y (Decay): <span id="val-dampY">8.0</span></label>
+    <input type="range" id="input-dampY" min="1" max="25" step="0.5" value="8.0" oninput="updateParam('dampY', this.value)">
+  </div>
+  <div class="control-row">
+    <label>Look-Ahead Dist: <span id="val-lookahead">60 px</span></label>
+    <input type="range" id="input-lookahead" min="0" max="150" value="60" oninput="updateParam('lookAhead', this.value)">
+  </div>
+  <div class="control-row">
+    <label>Deadzone X Ratio: <span id="val-deadX">0.10</span></label>
+    <input type="range" id="input-deadX" min="0.0" max="0.3" step="0.02" value="0.10" oninput="updateParam('deadX', this.value)">
+  </div>
+  <div class="control-row">
+    <label>Deadzone Y Ratio: <span id="val-deadY">0.08</span></label>
+    <input type="range" id="input-deadY" min="0.0" max="0.3" step="0.02" value="0.08" oninput="updateParam('deadY', this.value)">
+  </div>
+  <div class="control-row">
+    <label>Pixel Snapping: <span id="val-round">OFF</span></label>
+    <button class="btn" style="width:100%;" onclick="toggleRoundPixels()">Toggle Round Pixels</button>
+  </div>
+
+  <div class="telemetry" id="telemetry-info">
+    Pos: (0, 0)<br>
+    Input: (0.00, 0.00)<br>
+    Frame Time: 16.6ms<br>
+    Colisión: Libre
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('game-canvas');
+const ctx = canvas.getContext('2d', { alpha: false });
+
+const CONFIG = {
+  movementType: 'MICRO_ACC',
+  speed: 320,
+  accelDecay: 18.0,
+  decelDecay: 35.0,
+  joystickRadius: 60,
+  joystickDeadzone: 0.12,
+  joystickCurve: 'POWER',
+  dampX: 8.0,
+  dampY: 8.0,
+  deadXRatio: 0.10,
+  deadYRatio: 0.08,
+  lookAheadDist: 60,
+  lookAheadDecay: 4.0,
+  roundPixels: false,
+  worldWidth: 3200,
+  worldHeight: 3200
+};
+
+const PRESETS = {
+  A: { movementType: 'DIRECT', dampX: 22.0, dampY: 22.0, deadXRatio: 0.02, deadYRatio: 0.02, lookAheadDist: 20 },
+  B: { movementType: 'MICRO_ACC', dampX: 8.0, dampY: 8.0, deadXRatio: 0.10, deadYRatio: 0.08, lookAheadDist: 60 },
+  C: { movementType: 'MICRO_ACC', dampX: 4.5, dampY: 4.5, deadXRatio: 0.18, deadYRatio: 0.14, lookAheadDist: 0 }
+};
+
+const player = {
+  x: CONFIG.worldWidth / 2,
+  y: CONFIG.worldHeight / 2,
+  vx: 0,
+  vy: 0,
+  radius: 20,
+  color: '#00d2ff',
+  squashX: 1,
+  squashY: 1
+};
+
+const camera = {
+  x: player.x,
+  y: player.y,
+  targetX: player.x,
+  targetY: player.y,
+  lookOffsetX: 0,
+  lookOffsetY: 0
+};
+
+const obstacles = [
+  { x: CONFIG.worldWidth / 2 - 250, y: CONFIG.worldHeight / 2 - 200, w: 120, h: 400 },
+  { x: CONFIG.worldWidth / 2 + 130, y: CONFIG.worldHeight / 2 - 200, w: 120, h: 400 },
+  { x: CONFIG.worldWidth / 2 - 100, y: CONFIG.worldHeight / 2 - 350, w: 200, h: 80 },
+  { x: CONFIG.worldWidth / 2 - 100, y: CONFIG.worldHeight / 2 + 270, w: 200, h: 80 }
+];
+
+const input = {
+  normX: 0,
+  normY: 0,
+  keys: { w: false, a: false, s: false, d: false, ArrowUp: false, ArrowLeft: false, ArrowDown: false, ArrowRight: false },
+  touchId: null,
+  touchActive: false,
+  originX: 0,
+  originY: 0,
+  currentX: 0,
+  currentY: 0
+};
+
+let screenW = 0;
+let screenH = 0;
+function resize() {
+  screenW = window.innerWidth;
+  screenH = window.innerHeight;
+  canvas.width = screenW;
+  canvas.height = screenH;
+}
+window.addEventListener('resize', resize);
+resize();
+
+window.addEventListener('keydown', (e) => {
+  if (input.keys.hasOwnProperty(e.key)) input.keys[e.key] = true;
+});
+window.addEventListener('keyup', (e) => {
+  if (input.keys.hasOwnProperty(e.key)) input.keys[e.key] = false;
+});
+
+window.addEventListener('pointerdown', (e) => {
+  if (e.clientX > screenW * 0.55 || e.target.closest('#camera-lab')) return;
+  if (input.touchActive) return;
+
+  input.touchActive = true;
+  input.touchId = e.pointerId;
+  input.originX = e.clientX;
+  input.originY = e.clientY;
+  input.currentX = e.clientX;
+  input.currentY = e.clientY;
+  const hint = document.getElementById('touch-hint');
+  if (hint) hint.style.display = 'none';
+});
+
+window.addEventListener('pointermove', (e) => {
+  if (!input.touchActive || e.pointerId !== input.touchId) return;
+  input.currentX = e.clientX;
+  input.currentY = e.clientY;
+});
+
+function endTouch(e) {
+  if (e.pointerId === input.touchId) {
+    input.touchActive = false;
+    input.touchId = null;
+    input.normX = 0;
+    input.normY = 0;
+  }
+}
+window.addEventListener('pointerup', endTouch);
+window.addEventListener('pointercancel', endTouch);
+
+function processInput() {
+  let kx = 0;
+  let ky = 0;
+  if (input.keys.w || input.keys.ArrowUp) ky -= 1;
+  if (input.keys.s || input.keys.ArrowDown) ky += 1;
+  if (input.keys.a || input.keys.ArrowLeft) kx -= 1;
+  if (input.keys.d || input.keys.ArrowRight) kx += 1;
+
+  if (kx !== 0 || ky !== 0) {
+    const len = Math.hypot(kx, ky);
+    input.normX = kx / len;
+    input.normY = ky / len;
+  } else if (input.touchActive) {
+    const dx = input.currentX - input.originX;
+    const dy = input.currentY - input.originY;
+    const dist = Math.hypot(dx, dy);
+    
+    if (dist < CONFIG.joystickRadius * CONFIG.joystickDeadzone) {
+      input.normX = 0;
+      input.normY = 0;
+    } else {
+      const maxR = CONFIG.joystickRadius;
+      const deadR = maxR * CONFIG.joystickDeadzone;
+      const clampedDist = Math.min(dist, maxR);
+      let mag = (clampedDist - deadR) / (maxR - deadR);
+      
+      if (CONFIG.joystickCurve === 'POWER') {
+        mag = Math.pow(mag, 1.35);
+      }
+      
+      input.normX = (dx / dist) * mag;
+      input.normY = (dy / dist) * mag;
+    }
+  } else {
+    input.normX = 0;
+    input.normY = 0;
+  }
+}
+
+function resolveCircleAABB(cx, cy, r, box) {
+  const closestX = Math.max(box.x, Math.min(cx, box.x + box.w));
+  const closestY = Math.max(box.y, Math.min(cy, box.y + box.h));
+  const distX = cx - closestX;
+  const distY = cy - closestY;
+  const distSq = distX * distX + distY * distY;
+
+  if (distSq < r * r && distSq > 0) {
+    const dist = Math.sqrt(distSq);
+    const overlap = r - dist;
+    return {
+      collided: true,
+      pushX: (distX / dist) * overlap,
+      pushY: (distY / dist) * overlap
+    };
+  } else if (distSq === 0) {
+    return { collided: true, pushX: 0, pushY: -r };
+  }
+  return { collided: false, pushX: 0, pushY: 0 };
+}
+
+let isColliding = false;
+
+function updateMovement(dt) {
+  const targetVx = input.normX * CONFIG.speed;
+  const targetVy = input.normY * CONFIG.speed;
+
+  if (CONFIG.movementType === 'DIRECT') {
+    player.vx = targetVx;
+    player.vy = targetVy;
+  } else {
+    const isAcc = (targetVx !== 0 || targetVy !== 0);
+    const decay = isAcc ? CONFIG.accelDecay : CONFIG.decelDecay;
+    const factor = 1 - Math.exp(-decay * dt);
+    
+    player.vx += (targetVx - player.vx) * factor;
+    player.vy += (targetVy - player.vy) * factor;
+    
+    if (!isAcc && Math.hypot(player.vx, player.vy) < 2) {
+      player.vx = 0;
+      player.vy = 0;
+    }
+  }
+
+  const currentSpeed = Math.hypot(player.vx, player.vy);
+  const targetSquashX = 1 + (currentSpeed / CONFIG.speed) * 0.08;
+  const targetSquashY = 1 - (currentSpeed / CONFIG.speed) * 0.06;
+  player.squashX += (targetSquashX - player.squashX) * (1 - Math.exp(-15 * dt));
+  player.squashY += (targetSquashY - player.squashY) * (1 - Math.exp(-15 * dt));
+
+  player.x += player.vx * dt;
+  isColliding = false;
+  for (const b of obstacles) {
+    const res = resolveCircleAABB(player.x, player.y, player.radius, b);
+    if (res.collided) {
+      player.x += res.pushX;
+      isColliding = true;
+    }
+  }
+
+  player.y += player.vy * dt;
+  for (const b of obstacles) {
+    const res = resolveCircleAABB(player.x, player.y, player.radius, b);
+    if (res.collided) {
+      player.y += res.pushY;
+      isColliding = true;
+    }
+  }
+
+  player.x = Math.max(player.radius, Math.min(CONFIG.worldWidth - player.radius, player.x));
+  player.y = Math.max(player.radius, Math.min(CONFIG.worldHeight - player.radius, player.y));
+}
+
+function updateCamera(dt) {
+  const targetLookX = input.normX * CONFIG.lookAheadDist;
+  const targetLookY = input.normY * CONFIG.lookAheadDist;
+  const lookFactor = 1 - Math.exp(-CONFIG.lookAheadDecay * dt);
+  camera.lookOffsetX += (targetLookX - camera.lookOffsetX) * lookFactor;
+  camera.lookOffsetY += (targetLookY - camera.lookOffsetY) * lookFactor;
+
+  const deadW = screenW * CONFIG.deadXRatio;
+  const deadH = screenH * CONFIG.deadYRatio;
+  
+  const deltaX = (player.x + camera.lookOffsetX) - camera.targetX;
+  const deltaY = (player.y + camera.lookOffsetY) - camera.targetY;
+
+  if (Math.abs(deltaX) > deadW) {
+    camera.targetX += deltaX - Math.sign(deltaX) * deadW;
+  }
+  if (Math.abs(deltaY) > deadH) {
+    camera.targetY += deltaY - Math.sign(deltaY) * deadH;
+  }
+
+  const factorX = 1 - Math.exp(-CONFIG.dampX * dt);
+  const factorY = 1 - Math.exp(-CONFIG.dampY * dt);
+  camera.x += (camera.targetX - camera.x) * factorX;
+  camera.y += (camera.targetY - camera.y) * factorY;
+
+  const halfW = screenW / 2;
+  const halfH = screenH / 2;
+  camera.x = Math.max(halfW, Math.min(CONFIG.worldWidth - halfW, camera.x));
+  camera.y = Math.max(halfH, Math.min(CONFIG.worldHeight - halfH, camera.y));
+}
+
+function render() {
+  ctx.fillStyle = '#0f1318';
+  ctx.fillRect(0, 0, screenW, screenH);
+
+  let camX = camera.x - screenW / 2;
+  let camY = camera.y - screenH / 2;
+
+  if (CONFIG.roundPixels) {
+    camX = Math.round(camX);
+    camY = Math.round(camY);
+  }
+
+  ctx.save();
+  ctx.translate(-camX, -camY);
+
+  ctx.strokeStyle = '#1a222d';
+  ctx.lineWidth = 1;
+  const startX = Math.floor(camX / 80) * 80;
+  const endX = startX + screenW + 80;
+  const startY = Math.floor(camY / 80) * 80;
+  const endY = startY + screenH + 80;
+
+  ctx.beginPath();
+  for (let x = startX; x <= endX; x += 80) {
+    if (x >= 0 && x <= CONFIG.worldWidth) {
+      ctx.moveTo(x, Math.max(0, startY));
+      ctx.lineTo(x, Math.min(CONFIG.worldHeight, endY));
+    }
+  }
+  for (let y = startY; y <= endY; y += 80) {
+    if (y >= 0 && y <= CONFIG.worldHeight) {
+      ctx.moveTo(Math.max(0, startX), y);
+      ctx.lineTo(Math.min(CONFIG.worldWidth, endX), y);
+    }
+  }
+  ctx.stroke();
+
+  ctx.strokeStyle = '#e04040';
+  ctx.lineWidth = 4;
+  ctx.strokeRect(0, 0, CONFIG.worldWidth, CONFIG.worldHeight);
+
+  for (const b of obstacles) {
+    ctx.fillStyle = '#222b38';
+    ctx.fillRect(b.x, b.y, b.w, b.h);
+    ctx.strokeStyle = '#38465c';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(b.x, b.y, b.w, b.h);
+  }
+
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+  ctx.beginPath();
+  ctx.ellipse(player.x, player.y + 14, player.radius * 0.9, player.radius * 0.45, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.save();
+  ctx.translate(player.x, player.y);
+  
+  const moveAngle = Math.atan2(player.vy, player.vx);
+  if (Math.hypot(player.vx, player.vy) > 10) {
+    ctx.rotate(moveAngle);
+    ctx.scale(player.squashX, player.squashY);
+    ctx.rotate(-moveAngle);
+  }
+
+  ctx.fillStyle = player.color;
+  ctx.beginPath();
+  ctx.arc(0, 0, player.radius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.restore();
+
+  if (Math.hypot(input.normX, input.normY) > 0.05) {
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(player.x, player.y);
+    ctx.lineTo(player.x + input.normX * 28, player.y + input.normY * 28);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+
+  if (input.touchActive) {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+    ctx.lineWidth = 2;
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+    ctx.beginPath();
+    ctx.arc(input.originX, input.originY, CONFIG.joystickRadius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.strokeStyle = 'rgba(255, 50, 50, 0.4)';
+    ctx.beginPath();
+    ctx.arc(input.originX, input.originY, CONFIG.joystickRadius * CONFIG.joystickDeadzone, 0, Math.PI * 2);
+    ctx.stroke();
+
+    const dx = input.currentX - input.originX;
+    const dy = input.currentY - input.originY;
+    const dist = Math.hypot(dx, dy);
+    const clampedDist = Math.min(dist, CONFIG.joystickRadius);
+    const angle = Math.atan2(dy, dx);
+    const stickX = input.originX + Math.cos(angle) * clampedDist;
+    const stickY = input.originY + Math.sin(angle) * clampedDist;
+
+    ctx.fillStyle = '#00d2ff';
+    ctx.beginPath();
+    ctx.arc(stickX, stickY, 20, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+let lastTime = performance.now();
+let frameCount = 0;
+let fpsTimer = 0;
+
+function gameLoop(currentTime) {
+  const dt = Math.min((currentTime - lastTime) / 1000, 0.1);
+  lastTime = currentTime;
+
+  frameCount++;
+  fpsTimer += dt;
+  if (fpsTimer >= 0.5) {
+    const fps = Math.round(frameCount / fpsTimer);
+    document.getElementById('lab-fps').textContent = `${fps} FPS`;
+    frameCount = 0;
+    fpsTimer = 0;
+  }
+
+  processInput();
+  updateMovement(dt);
+  updateCamera(dt);
+  render();
+
+  document.getElementById('telemetry-info').innerHTML = `
+    Pos: (${Math.round(player.x)}, ${Math.round(player.y)})<br>
+    Input: (${input.normX.toFixed(2)}, ${input.normY.toFixed(2)})<br>
+    Frame Time: ${(dt * 1000).toFixed(1)} ms<br>
+    Colisión: <span style="color:${isColliding ? '#ff4d4d' : '#7ee787'}">${isColliding ? 'DESLIZANDO' : 'LIBRE'}</span>
+  `;
+
+  requestAnimationFrame(gameLoop);
+}
+requestAnimationFrame(gameLoop);
+
+function updateParam(param, value) {
+  const num = parseFloat(value);
+  switch (param) {
+    case 'speed':
+      CONFIG.speed = num;
+      document.getElementById('val-speed').textContent = `${num} px/s`;
+      break;
+    case 'dampX':
+      CONFIG.dampX = num;
+      document.getElementById('val-dampX').textContent = num.toFixed(1);
+      break;
+    case 'dampY':
+      CONFIG.dampY = num;
+      document.getElementById('val-dampY').textContent = num.toFixed(1);
+      break;
+    case 'lookAhead':
+      CONFIG.lookAheadDist = num;
+      document.getElementById('val-lookahead').textContent = `${num} px`;
+      break;
+    case 'deadX':
+      CONFIG.deadXRatio = num;
+      document.getElementById('val-deadX').textContent = num.toFixed(2);
+      break;
+    case 'deadY':
+      CONFIG.deadYRatio = num;
+      document.getElementById('val-deadY').textContent = num.toFixed(2);
+      break;
+  }
+}
+
+function toggleMovementType() {
+  CONFIG.movementType = (CONFIG.movementType === 'DIRECT') ? 'MICRO_ACC' : 'DIRECT';
+  document.getElementById('val-movetype').textContent = CONFIG.movementType === 'DIRECT' ? 'Directo' : 'Micro-Acc';
+}
+
+function toggleJoystickCurve() {
+  CONFIG.joystickCurve = (CONFIG.joystickCurve === 'POWER') ? 'LINEAR' : 'POWER';
+  document.getElementById('val-curve').textContent = CONFIG.joystickCurve === 'POWER' ? 'Potencia 1.35' : 'Lineal';
+}
+
+function toggleRoundPixels() {
+  CONFIG.roundPixels = !CONFIG.roundPixels;
+  document.getElementById('val-round').textContent = CONFIG.roundPixels ? 'ON' : 'OFF';
+}
+
+function applyPreset(name) {
+  document.querySelectorAll('.preset-group .btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(`preset-${name.toLowerCase()}`).classList.add('active');
+
+  const p = PRESETS[name];
+  CONFIG.movementType = p.movementType;
+  CONFIG.dampX = p.dampX;
+  CONFIG.dampY = p.dampY;
+  CONFIG.deadXRatio = p.deadXRatio;
+  CONFIG.deadYRatio = p.deadYRatio;
+  CONFIG.lookAheadDist = p.lookAheadDist;
+
+  document.getElementById('val-movetype').textContent = p.movementType === 'DIRECT' ? 'Directo' : 'Micro-Acc';
+  document.getElementById('input-dampX').value = p.dampX;
+  document.getElementById('val-dampX').textContent = p.dampX.toFixed(1);
+  document.getElementById('input-dampY').value = p.dampY;
+  document.getElementById('val-dampY').textContent = p.dampY.toFixed(1);
+  document.getElementById('input-deadX').value = p.deadXRatio;
+  document.getElementById('val-deadX').textContent = p.deadXRatio.toFixed(2);
+  document.getElementById('input-deadY').value = p.deadYRatio;
+  document.getElementById('val-deadY').textContent = p.deadYRatio.toFixed(2);
+  document.getElementById('input-lookahead').value = p.lookAheadDist;
+  document.getElementById('val-lookahead').textContent = `${p.lookAheadDist} px`;
+}
+</script>
+</body>
+</html>
