@@ -3,60 +3,54 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Kelo World — Master Engine V2.1</title>
+  <title>Kelo World — V2.2</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; touch-action: none; }
-    body, html { width: 100%; height: 100%; overflow: hidden; background-color: #05070a; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    #game-canvas { width: 100%; height: 100%; display: block; }
-    #ui-layer { position: absolute; inset: 0; pointer-events: none; z-index: 10; }
-    .top-bar { position: absolute; top: max(8px, env(safe-area-inset-top)); left: max(8px, env(safe-area-inset-left)); right: max(8px, env(safe-area-inset-right)); display: flex; justify-content: space-between; align-items: center; pointer-events: auto; }
-    .hud-badge { font-family: monospace; font-size: 11px; color: #7ee787; background: rgba(10, 13, 18, 0.88); padding: 6px 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.08); backdrop-filter: blur(8px); }
-    .hud-buttons { display: flex; gap: 5px; flex-wrap: wrap; }
-    .btn-panel-toggle { background: #1f2633; border: 1px solid #334460; color: #00d2ff; padding: 6px 9px; border-radius: 6px; font-size: 10px; font-weight: 700; cursor: pointer; }
-    .action-bar { position: absolute; bottom: max(16px, env(safe-area-inset-bottom)); right: max(16px, env(safe-area-inset-right)); display: grid; grid-template-columns: repeat(2, 54px) 64px; grid-template-rows: repeat(2, 54px); gap: 10px; align-items: center; justify-items: center; pointer-events: auto; }
-    .stone-slot { position: relative; width: 54px; height: 54px; border-radius: 50%; background: rgba(15, 20, 28, 0.88); border: 2px solid #2d3848; color: #00d2ff; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 8px; font-weight: 700; box-shadow: 0 4px 12px rgba(0,0,0,0.5); cursor: pointer; overflow: hidden; }
-    .stone-slot.ultimate { grid-column: 3; grid-row: 1 / span 2; width: 64px; height: 64px; border-color: #e5a93c; color: #ffd166; }
-    .cooldown-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.75); height: 0%; bottom: 0; top: auto; pointer-events: none; }
-    #build-mode-bar { position: absolute; bottom: max(16px, env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); display: none; background: rgba(13,17,23,0.95); border: 1px solid #30363d; border-radius: 12px; padding: 8px 14px; gap: 8px; pointer-events: auto; }
-    .build-tool-btn { background: #21262d; border: 1px solid #30363d; color: #c9d1d9; font-size: 11px; padding: 8px 12px; border-radius: 6px; cursor: pointer; display: flex; flex-direction: column; align-items: center; }
-    .build-tool-btn.active { background: #1f6feb; border-color: #58a6ff; color: #fff; }
-    .app-panel { position: absolute; top: 50px; left: 8px; width: min(350px, calc(100vw - 16px)); max-height: 84vh; background: rgba(13,17,23,0.96); border: 1px solid #30363d; border-radius: 10px; padding: 12px; color: #c9d1d9; font-size: 11px; z-index: 60; overflow-y: auto; pointer-events: auto; display: none; }
-    .panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid #21262d; padding-bottom: 6px; color: #58a6ff; font-weight: 700; }
-    .tier-Common { color: #8b949e; } .tier-Rare { color: #58a6ff; } .tier-Epic { color: #bc8cff; } .tier-Legendary { color: #d29922; } .tier-Mythic { color: #ff7b72; } .tier-Divine { color: #39d353; }
-    .item-card { background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 6px 8px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; }
-    .btn-sm { background: #21262d; border: 1px solid #30363d; color: #fff; padding: 4px 8px; border-radius: 4px; font-size: 10px; cursor: pointer; }
-    .btn-action-main { width: 100%; background: #238636; border: 1px solid #2ea043; color: #fff; padding: 8px; border-radius: 6px; font-weight: 700; margin-top: 8px; cursor: pointer; }
-    #social-modal { position: absolute; display: none; background: rgba(13,17,23,0.95); border: 1px solid #30363d; border-radius: 8px; padding: 8px; width: 170px; z-index: 50; pointer-events: auto; }
-    .social-btn { width: 100%; background: #21262d; border: 1px solid #30363d; color: #c9d1d9; font-size: 10px; padding: 5px 6px; border-radius: 4px; margin-bottom: 4px; cursor: pointer; text-align: left; }
-    #pvp-hud { position: absolute; top: 55px; left: 50%; transform: translateX(-50%); display: none; background: rgba(10,13,18,0.85); border: 2px solid #ef476f; border-radius: 10px; padding: 8px 16px; gap: 16px; align-items: center; pointer-events: auto; z-index: 30; }
-    .hp-bar-cont { width: 120px; height: 10px; background: #21262d; border-radius: 5px; overflow: hidden; }
-    .hp-fill { height: 100%; width: 100%; background: #39d353; }
-    #toast-container { position: absolute; bottom: 20px; left: 20px; display: flex; flex-direction: column; gap: 6px; pointer-events: none; z-index: 100; }
-    .toast { background: rgba(13,17,23,0.9); border-left: 3px solid #00d2ff; padding: 6px 12px; border-radius: 4px; font-size: 10px; color: #fff; }
+    *{box-sizing:border-box;margin:0;padding:0;user-select:none;-webkit-user-select:none;touch-action:none}
+    html,body{width:100%;height:100%;overflow:hidden;background:#05070a;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+    #game-canvas{width:100%;height:100%;display:block}
+    #ui-layer{position:absolute;inset:0;pointer-events:none;z-index:10}
+    .top-bar{position:absolute;top:max(8px,env(safe-area-inset-top));left:max(8px,env(safe-area-inset-left));right:max(8px,env(safe-area-inset-right));display:flex;justify-content:space-between;gap:8px;pointer-events:auto}
+    .hud-badge{font-family:ui-monospace,monospace;font-size:11px;color:#e7c56a;background:rgba(10,13,18,.92);padding:7px 12px;border-radius:999px;border:1px solid rgba(231,197,106,.28);white-space:nowrap}
+    .btn-panel-toggle{background:#1a2030;border:1px solid #3a465c;color:#f3d48b;padding:8px 10px;border-radius:10px;font-size:12px;font-weight:700}
+    .action-bar{position:absolute;bottom:max(16px,env(safe-area-inset-bottom));right:max(12px,env(safe-area-inset-right));display:grid;grid-template-columns:repeat(2,52px) 62px;grid-template-rows:repeat(2,52px);gap:8px;pointer-events:auto}
+    .stone-slot{position:relative;width:52px;height:52px;border-radius:50%;background:rgba(15,20,28,.92);border:2px solid #c9a24a;color:#f3d48b;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:8px;font-weight:700;overflow:hidden}
+    .stone-slot.ultimate{grid-column:3;grid-row:1/span 2;width:62px;height:62px;border-color:#e5a93c}
+    .cooldown-overlay{position:absolute;inset:0;background:rgba(0,0,0,.75);height:0%;bottom:0;top:auto;pointer-events:none}
+    #build-mode-bar{position:absolute;bottom:max(16px,env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);display:none;background:rgba(13,17,23,.95);border:1px solid #c9a24a;border-radius:12px;padding:8px;gap:8px;pointer-events:auto}
+    .build-tool-btn{background:#21262d;border:1px solid #30363d;color:#c9d1d9;font-size:11px;padding:8px 10px;border-radius:6px}
+    .build-tool-btn.active{background:#9e6a03;border-color:#e5a93c;color:#fff}
+    .app-panel,#menu-sheet{position:absolute;top:52px;left:8px;width:min(350px,calc(100vw - 16px));max-height:82vh;background:rgba(13,17,23,.96);border:1px solid #3a465c;border-radius:12px;padding:12px;color:#c9d1d9;font-size:11px;z-index:60;overflow-y:auto;pointer-events:auto;display:none}
+    .panel-header{display:flex;justify-content:space-between;margin-bottom:10px;border-bottom:1px solid #21262d;padding-bottom:6px;color:#e7c56a;font-weight:700}
+    .menu-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .menu-btn{background:#161b22;border:1px solid #30363d;color:#e6edf3;padding:12px 8px;border-radius:10px;font-size:12px;font-weight:700}
+    .item-card{background:#161b22;border:1px solid #30363d;border-radius:6px;padding:6px 8px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center}
+    .btn-sm{background:#21262d;border:1px solid #30363d;color:#fff;padding:4px 8px;border-radius:4px;font-size:10px}
+    .btn-action-main{width:100%;background:#9e6a03;border:1px solid #e5a93c;color:#fff;padding:8px;border-radius:6px;font-weight:700;margin-top:8px}
+    #social-modal{position:absolute;display:none;background:rgba(13,17,23,.95);border:1px solid #c9a24a;border-radius:8px;padding:8px;width:170px;z-index:50;pointer-events:auto}
+    .social-btn{width:100%;background:#21262d;border:1px solid #30363d;color:#c9d1d9;font-size:10px;padding:5px 6px;border-radius:4px;margin-bottom:4px;text-align:left}
+    #pvp-hud{position:absolute;top:52px;left:50%;transform:translateX(-50%);display:none;background:rgba(10,13,18,.9);border:2px solid #ef476f;border-radius:10px;padding:8px 16px;gap:16px;align-items:center;pointer-events:auto;z-index:30}
+    .hp-bar-cont{width:120px;height:10px;background:#21262d;border-radius:5px;overflow:hidden}
+    .hp-fill{height:100%;width:100%;background:#39d353}
+    #toast-container{position:absolute;bottom:20px;left:16px;display:flex;flex-direction:column;gap:6px;pointer-events:none;z-index:100}
+    .toast{background:rgba(13,17,23,.92);border-left:3px solid #e7c56a;padding:6px 12px;border-radius:4px;font-size:10px;color:#fff}
   </style>
 </head>
 <body>
 <canvas id="game-canvas"></canvas>
 <div id="ui-layer">
   <div class="top-bar">
-    <div class="hud-badge" id="telemetry-bar">Oro: 1,500 | KC: 200</div>
-    <div class="hud-buttons">
-      <button class="btn-panel-toggle" style="color:#ff7b72;" onclick="togglePanel('physlab')">Fisicas</button>
-      <button class="btn-panel-toggle" onclick="togglePanel('market')">Mercado</button>
-      <button class="btn-panel-toggle" onclick="togglePanel('exchange')">Exchange</button>
-      <button class="btn-panel-toggle" onclick="togglePanel('farm')">Granja</button>
-      <button class="btn-panel-toggle" onclick="togglePanel('build')">Build</button>
-      <button class="btn-panel-toggle" onclick="togglePanel('fusion')">Forja</button>
-      <button class="btn-panel-toggle" onclick="togglePanel('house')">Casa</button>
-      <button class="btn-panel-toggle" id="btn-toggle-editor" style="background:#238636;color:#fff;" onclick="toggleBuildMode()">Construir</button>
+    <div class="hud-badge" id="telemetry-bar">Oro: 1500 | KC: 200</div>
+    <div>
+      <button class="btn-panel-toggle" id="btn-toggle-editor" onclick="toggleBuildMode()">Casa</button>
+      <button class="btn-panel-toggle" onclick="toggleMenu()">Menu</button>
     </div>
   </div>
   <div class="action-bar" id="action-bar-container"></div>
   <div id="pvp-hud">
-    <div><div style="font-size:10px;color:#00d2ff;">TU</div><div class="hp-bar-cont"><div class="hp-fill" id="player-hp-fill"></div></div></div>
-    <div style="font-weight:900;color:#ef476f;">VS</div>
-    <div><div style="font-size:10px;color:#ef476f;" id="rival-name">Rival</div><div class="hp-bar-cont"><div class="hp-fill" id="rival-hp-fill"></div></div></div>
-    <button class="btn-sm" style="background:#da3633;" onclick="surrenderPvP()">Rendirse</button>
+    <div><div style="font-size:10px;color:#00d2ff">TU</div><div class="hp-bar-cont"><div class="hp-fill" id="player-hp-fill"></div></div></div>
+    <div style="font-weight:900;color:#ef476f">VS</div>
+    <div><div style="font-size:10px;color:#ef476f" id="rival-name">Rival</div><div class="hp-bar-cont"><div class="hp-fill" id="rival-hp-fill"></div></div></div>
+    <button class="btn-sm" style="background:#da3633" onclick="surrenderPvP()">Rendirse</button>
   </div>
   <div id="build-mode-bar">
     <button class="build-tool-btn active" id="tool-floor" onclick="selectTool('floor')">Suelo</button>
@@ -67,59 +61,78 @@
   </div>
   <div id="toast-container"></div>
 </div>
-<div class="app-panel" id="panel-physlab"><div class="panel-header"><span>FISICAS Y CAMARA LAB V2</span><span style="cursor:pointer;" onclick="togglePanel('physlab')">X</span></div>
-<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:10px;">
-<button class="btn-sm" onclick="applyPreset('A')">A DIRECTO</button>
-<button class="btn-sm" style="background:#0070f3;" onclick="applyPreset('B')">B VIVO</button>
-<button class="btn-sm" onclick="applyPreset('C')">C ESTABLE</button></div>
-<label>Movimiento: <strong id="val-movetype" style="color:#00d2ff;">Micro-Acc</strong></label>
-<button class="btn-sm" style="width:100%;margin:4px 0;" onclick="toggleMovementType()">Alternar Directo / Micro-Acc</button>
-<label>Curva Joystick: <strong id="val-curve" style="color:#00d2ff;">Potencia 1.35</strong></label>
-<button class="btn-sm" style="width:100%;margin:4px 0;" onclick="toggleJoystickCurve()">Alternar Lineal / Potencia</button>
-<label>Velocidad Maxima: <strong id="val-speed" style="color:#00d2ff;">320 px/s</strong></label>
-<input type="range" min="150" max="600" value="320" style="width:100%;" oninput="CONFIG.speed=parseFloat(this.value);document.getElementById('val-speed').textContent=this.value+' px/s';">
-<label>Look-Ahead Dist: <strong id="val-lookahead" style="color:#00d2ff;">60 px</strong></label>
-<input type="range" min="0" max="150" value="60" style="width:100%;" oninput="CONFIG.lookAheadDist=parseFloat(this.value);document.getElementById('val-lookahead').textContent=this.value+' px';">
+<div id="menu-sheet">
+  <div class="panel-header"><span>KELO WORLD</span><span style="cursor:pointer" onclick="toggleMenu()">X</span></div>
+  <div class="menu-grid">
+    <button class="menu-btn" onclick="quickTravel('plaza')">Plaza</button>
+    <button class="menu-btn" onclick="quickTravel('farm')">Granja</button>
+    <button class="menu-btn" onclick="quickTravel('house')">Parcela</button>
+    <button class="menu-btn" onclick="quickTravel('arena')">Arena</button>
+    <button class="menu-btn" onclick="openFromMenu('build')">Build</button>
+    <button class="menu-btn" onclick="openFromMenu('fusion')">Forja</button>
+    <button class="menu-btn" onclick="openFromMenu('market')">Mercado</button>
+    <button class="menu-btn" onclick="openFromMenu('exchange')">Exchange</button>
+    <button class="menu-btn" onclick="openFromMenu('farm')">Silo</button>
+    <button class="menu-btn" onclick="openFromMenu('house')">Casa</button>
+    <button class="menu-btn" onclick="openFromMenu('physlab')">Fisicas</button>
+    <button class="menu-btn" onclick="cycleZoom()">Zoom</button>
+  </div>
 </div>
-<div class="app-panel" id="panel-market"><div class="panel-header"><span>MARKETPLACE</span><span style="cursor:pointer;" onclick="togglePanel('market')">X</span></div>
-<div style="display:flex;gap:4px;margin-bottom:8px;">
+<div class="app-panel" id="panel-physlab"><div class="panel-header"><span>FISICAS</span><span style="cursor:pointer" onclick="togglePanel('physlab')">X</span></div>
+<button class="btn-sm" onclick="applyPreset('A')">A</button>
+<button class="btn-sm" style="background:#0070f3" onclick="applyPreset('B')">B</button>
+<button class="btn-sm" onclick="applyPreset('C')">C</button>
+<div>Movimiento: <strong id="val-movetype" style="color:#e7c56a">Micro-Acc</strong></div>
+<button class="btn-sm" style="width:100%;margin:6px 0" onclick="toggleMovementType()">Alternar movimiento</button>
+<div>Curva: <strong id="val-curve" style="color:#e7c56a">Potencia 1.35</strong></div>
+<button class="btn-sm" style="width:100%;margin:6px 0" onclick="toggleJoystickCurve()">Alternar curva</button>
+<div>Velocidad: <strong id="val-speed" style="color:#e7c56a">320 px/s</strong></div>
+<input type="range" min="150" max="600" value="320" style="width:100%" oninput="CONFIG.speed=parseFloat(this.value);document.getElementById('val-speed').textContent=this.value+' px/s'">
+<div>Look-Ahead: <strong id="val-lookahead" style="color:#e7c56a">60 px</strong></div>
+<input type="range" min="0" max="150" value="60" style="width:100%" oninput="CONFIG.lookAheadDist=parseFloat(this.value);document.getElementById('val-lookahead').textContent=this.value+' px'">
+</div>
+<div class="app-panel" id="panel-market"><div class="panel-header"><span>MERCADO</span><span style="cursor:pointer" onclick="togglePanel('market')">X</span></div>
 <button class="btn-sm" id="tab-mkt-buy" onclick="switchMarketTab('buy')">Comprar</button>
 <button class="btn-sm" id="tab-mkt-sell" onclick="switchMarketTab('sell')">Vender</button>
-<button class="btn-sm" id="tab-mkt-auction" onclick="switchMarketTab('auction')">Subastas</button></div>
+<button class="btn-sm" id="tab-mkt-auction" onclick="switchMarketTab('auction')">Subastas</button>
 <div id="market-content"></div></div>
-<div class="app-panel" id="panel-exchange"><div class="panel-header"><span>KELO EXCHANGE</span><span style="cursor:pointer;" onclick="togglePanel('exchange')">X</span></div>
-<div style="display:flex;justify-content:space-between;margin-bottom:8px;"><span id="investor-rank-text" style="color:#ffd166;">Inversor Rango I</span><span id="investor-accuracy" style="color:#7ee787;">Precision: 100%</span></div>
+<div class="app-panel" id="panel-exchange"><div class="panel-header"><span>EXCHANGE</span><span style="cursor:pointer" onclick="togglePanel('exchange')">X</span></div>
+<div id="investor-rank-text" style="color:#ffd166">Inversor</div>
+<span id="investor-accuracy"></span>
 <div id="markets-container"></div></div>
-<div class="app-panel" id="panel-farm"><div class="panel-header"><span>GRANJA</span><span style="cursor:pointer;" onclick="togglePanel('farm')">X</span></div>
-<div style="display:flex;justify-content:space-between;margin-bottom:8px;"><span id="farm-mastery-text">Granjero Nivel 1</span><button class="btn-sm" onclick="teleportToFarm()">Ir al Huerto</button></div>
+<div class="app-panel" id="panel-farm"><div class="panel-header"><span>GRANJA</span><span style="cursor:pointer" onclick="togglePanel('farm')">X</span></div>
+<div style="display:flex;justify-content:space-between"><span id="farm-mastery-text">Granjero</span><button class="btn-sm" onclick="teleportToFarm()">Ir</button></div>
 <div id="farm-resources"></div>
-<button class="btn-sm" style="width:100%;background:#238636;margin-top:6px;" onclick="sellAllHarvest()">Vender Silo</button>
-<button class="btn-sm" onclick="plantAll('wheat')">Sembrar Trigo</button>
-<button class="btn-sm" onclick="plantAll('carrot')">Sembrar Zanahoria</button>
-<button class="btn-sm" onclick="feedAnimals('chickens')">Alimentar Gallinas</button>
-<button class="btn-sm" onclick="feedAnimals('pigs')">Alimentar Cerdos</button>
+<button class="btn-sm" style="width:100%;background:#238636;margin-top:6px" onclick="sellAllHarvest()">Vender silo</button>
+<button class="btn-sm" onclick="plantAll('wheat')">Trigo</button>
+<button class="btn-sm" onclick="plantAll('carrot')">Zanahoria</button>
+<button class="btn-sm" onclick="feedAnimals('chickens')">Gallinas</button>
+<button class="btn-sm" onclick="feedAnimals('pigs')">Cerdos</button>
 </div>
-<div class="app-panel" id="panel-build"><div class="panel-header"><span>BUILD</span><span style="cursor:pointer;" onclick="togglePanel('build')">X</span></div>
+<div class="app-panel" id="panel-build"><div class="panel-header"><span>BUILD</span><span style="cursor:pointer" onclick="togglePanel('build')">X</span></div>
 <div id="equipped-list"></div>
-<button class="btn-sm" onclick="addTestStones()">+3 Piedras Test</button>
+<button class="btn-sm" onclick="addTestStones()">+3 piedras</button>
 <div id="inventory-list"></div></div>
-<div class="app-panel" id="panel-fusion"><div class="panel-header"><span>FORJA</span><span style="cursor:pointer;" onclick="togglePanel('fusion')">X</span></div>
-<div id="fusion-slots" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px;"></div>
-<div id="fusion-odds">Selecciona 3 piedras</div>
-<button class="btn-action-main" id="btn-fuse" onclick="executeFusion()" disabled>FUSIONAR (100 Oro)</button>
+<div class="app-panel" id="panel-fusion"><div class="panel-header"><span>FORJA</span><span style="cursor:pointer" onclick="togglePanel('fusion')">X</span></div>
+<div id="fusion-slots" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px"></div>
+<div id="fusion-odds">3 piedras</div>
+<button class="btn-action-main" id="btn-fuse" onclick="executeFusion()" disabled>FUSIONAR</button>
 <div id="fusion-log"></div></div>
-<div class="app-panel" id="panel-house"><div class="panel-header"><span>CASA</span><span style="cursor:pointer;" onclick="togglePanel('house')">X</span></div>
+<div class="app-panel" id="panel-house"><div class="panel-header"><span>CASA</span><span style="cursor:pointer" onclick="togglePanel('house')">X</span></div>
 <div>Parcela #104</div>
-<div id="decay-status">Segura (14 dias)</div>
-<button class="btn-sm" style="width:100%;background:#238636;" onclick="resetDecayTimer()">Pagar Mantenimiento</button>
-<button class="btn-sm" style="width:100%;" onclick="teleportToPlot()">Ir a mi Parcela</button></div>
-<div id="social-modal"><h4 id="social-target-name">Avatar</h4>
-<button class="social-btn" onclick="socialAction('Ver Perfil')">Ver Perfil</button>
-<button class="social-btn" onclick="socialAction('Comerciar')">Comerciar</button>
-<button class="social-btn" onclick="socialAction('Desafiar 1v1')">Desafiar 1v1</button>
-<button class="social-btn" onclick="socialAction('Visitar Casa')">Visitar Casa</button>
-<button class="social-btn" onclick="closeSocialModal()">Cerrar</button></div>
+<div id="decay-status">Segura</div>
+<button class="btn-sm" style="width:100%;background:#9e6a03;margin-top:6px" onclick="resetDecayTimer()">Mantenimiento</button>
+<button class="btn-sm" style="width:100%" onclick="teleportToPlot()">Ir a parcela</button></div>
+<div id="social-modal">
+  <h4 id="social-target-name">Avatar</h4>
+  <button class="social-btn" onclick="socialAction('Ver Perfil')">Perfil</button>
+  <button class="social-btn" onclick="socialAction('Comerciar')">Comerciar</button>
+  <button class="social-btn" onclick="socialAction('Desafiar 1v1')">1v1</button>
+  <button class="social-btn" onclick="socialAction('Visitar Casa')">Casa</button>
+  <button class="social-btn" onclick="closeSocialModal()">Cerrar</button>
+</div>
 <script src="engine-a.js"></script>
 <script src="engine-b.js"></script>
+<script src="engine-c.js"></script>
 </body>
 </html>
