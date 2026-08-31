@@ -18,9 +18,7 @@
     let minX = c.width, minY = c.height, maxX = 0, maxY = 0;
     for (let p = 0; p < d.length; p += 4) {
       const r = d[p], gv = d[p + 1], b = d[p + 2];
-      const light = r > 220 && gv > 220 && b > 220;
-      const nearBlack = r < 18 && gv < 18 && b < 18;
-      if (light || nearBlack) {
+      if ((r > 220 && gv > 220 && b > 220) || (r < 18 && gv < 18 && b < 18)) {
         d[p + 3] = 0;
       } else {
         const x = (p / 4) % c.width;
@@ -32,23 +30,14 @@
       }
     }
     g.putImageData(data, 0, 0);
-    if (maxX <= minX) {
-      sheet = c; FW = c.width / 4; FH = c.height / 4; ok = true; return;
-    }
-    const pad = 4;
-    minX = Math.max(0, minX - pad);
-    minY = Math.max(0, minY - pad);
-    maxX = Math.min(c.width - 1, maxX + pad);
-    maxY = Math.min(c.height - 1, maxY + pad);
-    const w = maxX - minX + 1;
-    const h = maxY - minY + 1;
+    if (maxX <= minX) { sheet = c; FW = c.width / 4; FH = c.height / 4; ok = true; return; }
+    minX = Math.max(0, minX - 4); minY = Math.max(0, minY - 4);
+    maxX = Math.min(c.width - 1, maxX + 4); maxY = Math.min(c.height - 1, maxY + 4);
+    const w = maxX - minX + 1, h = maxY - minY + 1;
     const cut = document.createElement('canvas');
     cut.width = w; cut.height = h;
     cut.getContext('2d').drawImage(c, minX, minY, w, h, 0, 0, w, h);
-    sheet = cut;
-    FW = w / 4;
-    FH = h / 4;
-    ok = true;
+    sheet = cut; FW = w / 4; FH = h / 4; ok = true;
   };
   raw.onerror = tryNext;
   tryNext();
@@ -56,30 +45,52 @@
   const dirRow = { down: 0, left: 1, right: 2, up: 3 };
   function faceOf(p) {
     const vx = p.vx || 0, vy = p.vy || 0;
+    if (Math.hypot(vx, vy) < 8 && p._dx != null) {
+      const ddx = p._dx, ddy = p._dy;
+      if (Math.hypot(ddx, ddy) < 0.4) return p._face || 'down';
+      const f = Math.abs(ddx) > Math.abs(ddy) ? (ddx > 0 ? 'right' : 'left') : (ddy > 0 ? 'down' : 'up');
+      p._face = f;
+      return f;
+    }
     if (Math.hypot(vx, vy) < 8) return p._face || 'down';
     const f = Math.abs(vx) > Math.abs(vy) ? (vx > 0 ? 'right' : 'left') : (vy > 0 ? 'down' : 'up');
     p._face = f;
     return f;
   }
 
+  function stepCol(p) {
+    if (p._lx == null) { p._lx = p.x; p._ly = p.y; p._step = 0; }
+    const dx = p.x - p._lx, dy = p.y - p._ly;
+    p._lx = p.x; p._ly = p.y;
+    p._dx = dx; p._dy = dy;
+    const dist = Math.hypot(dx, dy);
+    const spd = Math.hypot(p.vx || 0, p.vy || 0);
+    const gait = p._gait || (spd > 180 || dist > 4.2 ? 'run' : dist > 0.35 ? 'walk' : 'idle');
+    if (gait === 'idle' || dist < 0.2) {
+      p._step = 0;
+      return 0;
+    }
+    const stride = gait === 'run' ? 14 : 22;
+    p._step += dist;
+    return Math.floor(p._step / stride) % 4;
+  }
+
   const _av = renderAvatar;
   renderAvatar = function (p, isSelf) {
     if (!ok || !p || !sheet) return _av(p, isSelf);
-    const moving = Math.hypot(p.vx || 0, p.vy || 0) > 10;
+    const col = stepCol(p);
     const row = dirRow[faceOf(p)] || 0;
-    const col = moving ? (Math.floor(Date.now() / 140) % 4) : 0;
-    const dw = 36, dh = 54;
+    const dw = 38, dh = 56;
     ctx.save();
-    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.fillStyle = 'rgba(0,0,0,0.38)';
     ctx.beginPath();
-    ctx.ellipse(p.x, p.y + 16, 12, 5, 0, 0, Math.PI * 2);
+    ctx.ellipse(p.x, p.y + 18, 13, 4.5, 0, 0, Math.PI * 2);
     ctx.fill();
-    ctx.drawImage(sheet, col * FW, row * FH, FW, FH, Math.round(p.x - dw / 2), Math.round(p.y - dh + 16), dw, dh);
+    ctx.drawImage(sheet, col * FW, row * FH, FW, FH, Math.round(p.x - dw / 2), Math.round(p.y - dh + 18), dw, dh);
     ctx.fillStyle = isSelf ? '#e7c56a' : '#f3eee4';
     ctx.font = 'bold 11px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(p.name || 'Kelo', p.x, yName(p));
+    ctx.fillText(p.name || 'Kelo', p.x, p.y - 42);
     ctx.restore();
   };
-  function yName(p) { return p.y - 42; }
 })();
