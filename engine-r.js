@@ -13,16 +13,16 @@
     const list = [];
     if (window.keloNpcs) {
       window.keloNpcs.forEach(function (n) {
-        list.push({ x: n.x, y: n.y, r: 16 });
+        list.push({ x: n.x, y: n.y, r: 14 });
       });
     }
     if (typeof simulatedPlayers !== 'undefined') {
       simulatedPlayers.forEach(function (p) {
-        list.push({ x: p.x, y: p.y, r: p.radius || 18 });
+        list.push({ x: p.x, y: p.y, r: Math.min(p.radius || 18, 16) });
       });
     }
     if (window.trainingDummy && !trainingDummy.dead) {
-      list.push({ x: trainingDummy.x, y: trainingDummy.y, r: trainingDummy.radius || 20 });
+      list.push({ x: trainingDummy.x, y: trainingDummy.y, r: 16 });
     }
     return list;
   }
@@ -30,12 +30,16 @@
   const _move = updateMovement;
   updateMovement = function (dt) {
     _move(dt);
-    const pr = localPlayer.radius || 20;
+    if (window.keloZone === 'cafe') return;
+    const pr = Math.min(localPlayer.radius || 20, 22);
+    let hits = 0;
     bodies().forEach(function (b) {
+      if (hits >= 2) return;
       const res = pushOut(localPlayer.x, localPlayer.y, pr, b.x, b.y, b.r);
       if (res.hit) {
         localPlayer.x = res.x;
         localPlayer.y = res.y;
+        hits += 1;
       }
     });
     localPlayer.x = Math.max(pr, Math.min(CONFIG.worldWidth - pr, localPlayer.x));
