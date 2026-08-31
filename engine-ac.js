@@ -22,29 +22,11 @@
     const mag = stickMag();
     const gait = gaitFrom(mag);
     localPlayer.gait = gait;
+    localPlayer._gait = gait;
     if (gait === 'walk') CONFIG.speed = WALK_SPEED;
     else if (gait === 'run') CONFIG.speed = RUN_SPEED + (mag - WALK_MAX) * 90;
-    else CONFIG.speed = WALK_SPEED;
+    else CONFIG.speed = 0;
     _move(dt);
-  };
-
-  const _av = renderAvatar;
-  renderAvatar = function (p, isSelf) {
-    if (!p) return;
-    const spd = Math.hypot(p.vx || 0, p.vy || 0);
-    const gait = (isSelf && localPlayer.gait) ? localPlayer.gait : (spd > 180 ? 'run' : spd > 20 ? 'walk' : 'idle');
-    p._gait = gait;
-    const oldY = p.y;
-    if (gait === 'walk') p.y += Math.sin(Date.now() / 160) * 1.2;
-    else if (gait === 'run') p.y += Math.sin(Date.now() / 90) * 2.2;
-    _av(p, isSelf);
-    p.y = oldY;
-    ctx.save();
-    ctx.fillStyle = 'rgba(0,0,0,' + (gait === 'idle' ? 0.28 : 0.4) + ')';
-    ctx.beginPath();
-    ctx.ellipse(p.x, p.y + 20, gait === 'run' ? 16 : 13, 4.5, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
   };
 
   const _r = render;
