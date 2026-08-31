@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Kelo World — V4.0</title>
+  <title>Kelo World — V4.1</title>
   <style>
     *{box-sizing:border-box;margin:0;padding:0;user-select:none;-webkit-user-select:none;touch-action:none}
     html,body{width:100%;height:100%;overflow:hidden;background:#05070a;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
@@ -17,22 +17,10 @@
     .stone-slot.ultimate{grid-column:3;grid-row:1/span 2;width:62px;height:62px;border-color:#e5a93c}
     .cooldown-overlay{position:absolute;inset:0;background:rgba(0,0,0,.75);height:0%;bottom:0;top:auto;pointer-events:none}
     #build-mode-bar{position:absolute;bottom:max(16px,env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);display:none;background:rgba(13,17,23,.95);border:1px solid #c9a24a;border-radius:12px;padding:8px;gap:8px;pointer-events:auto}
-    .build-tool-btn{background:#21262d;border:1px solid #30363d;color:#c9d1d9;font-size:11px;padding:8px 10px;border-radius:6px}
-    .build-tool-btn.active{background:#9e6a03;border-color:#e5a93c;color:#fff}
     .app-panel,#menu-sheet{position:absolute;top:52px;left:8px;width:min(350px,calc(100vw - 16px));max-height:82vh;background:rgba(13,17,23,.96);border:1px solid #3a465c;border-radius:12px;padding:12px;color:#c9d1d9;font-size:11px;z-index:60;overflow-y:auto;pointer-events:auto;display:none}
     .panel-header{display:flex;justify-content:space-between;margin-bottom:10px;border-bottom:1px solid #21262d;padding-bottom:6px;color:#e7c56a;font-weight:700}
     .menu-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
     .menu-btn{background:#161b22;border:1px solid #30363d;color:#e6edf3;padding:12px 8px;border-radius:10px;font-size:12px;font-weight:700}
-    .item-card{background:#161b22;border:1px solid #30363d;border-radius:6px;padding:6px 8px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center}
-    .btn-sm{background:#21262d;border:1px solid #30363d;color:#fff;padding:4px 8px;border-radius:4px;font-size:10px}
-    .btn-action-main{width:100%;background:#9e6a03;border:1px solid #e5a93c;color:#fff;padding:8px;border-radius:6px;font-weight:700;margin-top:8px}
-    #social-modal{position:absolute;display:none;background:rgba(13,17,23,.95);border:1px solid #c9a24a;border-radius:8px;padding:8px;width:170px;z-index:50;pointer-events:auto}
-    .social-btn{width:100%;background: #21262d;border:1px solid #30363d;color:#c9d1d9;font-size:10px;padding:5px 6px;border-radius:4px;margin-bottom:4px;text-align:left}
-    #pvp-hud{position:absolute;top:52px;left:50%;transform:translateX(-50%);display:none;background:rgba(10,13,18,.9);border:2px solid #ef476f;border-radius:10px;padding:8px 16px;gap:16px;align-items:center;pointer-events:auto;z-index:30}
-    .hp-bar-cont{width:120px;height:10px;background:#21262d;border-radius:5px;overflow:hidden}
-    .hp-fill{height:100%;width:100%;background:#39d353}
-    #toast-container{position:absolute;bottom:20px;left:16px;display:flex;flex-direction:column;gap:6px;pointer-events:none;z-index:100}
-    .toast{background:rgba(13,17,23,.92);border-left:3px solid #e7c56a;padding:6px 12px;border-radius:4px;font-size:10px;color:#fff}
   </style>
 </head>
 <body>
@@ -40,13 +28,9 @@
 <div id="ui-layer">
   <div class="top-bar">
     <div class="hud-badge" id="telemetry-bar">Oro: 1500 | KC: 200</div>
-    <div>
-      <button class="btn-panel-toggle" onclick="toggleMenu()">Menu</button>
-    </div>
+    <div><button class="btn-panel-toggle" onclick="toggleMenu()">Menu</button></div>
   </div>
   <div class="action-bar" id="action-bar-container"></div>
-  <div id="pvp-hud"></div>
-  <div id="build-mode-bar"></div>
   <div id="toast-container"></div>
 </div>
 <div id="menu-sheet">
@@ -56,33 +40,33 @@
     <button class="menu-btn" onclick="cycleZoom()">Zoom</button>
   </div>
 </div>
-<script src="engine-a.js?v=41"></script>
-<script src="engine-b.js?v=41"></script>
-<script src="engine-c.js?v=41"></script>
-<script src="engine-d.js?v=41"></script>
-<script src="engine-e.js?v=41"></script>
-<script src="engine-f.js?v=41"></script>
-<script src="engine-g.js?v=41"></script>
-<script src="engine-h.js?v=41"></script>
-<script src="engine-i.js?v=41"></script>
-<script src="engine-j.js?v=41"></script>
-<script src="engine-k.js?v=41"></script>
-<script src="engine-l.js?v=41"></script>
-<script src="engine-m.js?v=41"></script>
-<script src="engine-n.js?v=41"></script>
-<script src="engine-o.js?v=41"></script>
-<script src="engine-p.js?v=41"></script>
-<script src="engine-q.js?v=41"></script>
-<script src="engine-r.js?v=41"></script>
-<script src="engine-s.js?v=41"></script>
-<script src="engine-t.js?v=41"></script>
-<script src="engine-u.js?v=41"></script>
-<script src="engine-v.js?v=41"></script>
-<script src="engine-w.js?v=41"></script>
-<script src="engine-x.js?v=41"></script>
-<script src="engine-y.js?v=41"></script>
-<script src="engine-z.js?v=41"></script>
-<script src="engine-aa.js?v=41"></script>
-<script src="engine-ab.js?v=41"></script>
+<script src="engine-a.js?v=42"></script>
+<script src="engine-b.js?v=42"></script>
+<script src="engine-c.js?v=42"></script>
+<script src="engine-d.js?v=42"></script>
+<script src="engine-e.js?v=42"></script>
+<script src="engine-f.js?v=42"></script>
+<script src="engine-g.js?v=42"></script>
+<script src="engine-h.js?v=42"></script>
+<script src="engine-i.js?v=42"></script>
+<script src="engine-j.js?v=42"></script>
+<script src="engine-k.js?v=42"></script>
+<script src="engine-l.js?v=42"></script>
+<script src="engine-m.js?v=42"></script>
+<script src="engine-n.js?v=42"></script>
+<script src="engine-o.js?v=42"></script>
+<script src="engine-p.js?v=42"></script>
+<script src="engine-q.js?v=42"></script>
+<script src="engine-r.js?v=42"></script>
+<script src="engine-s.js?v=42"></script>
+<script src="engine-t.js?v=42"></script>
+<script src="engine-u.js?v=42"></script>
+<script src="engine-v.js?v=42"></script>
+<script src="engine-w.js?v=42"></script>
+<script src="engine-x.js?v=42"></script>
+<script src="engine-y.js?v=42"></script>
+<script src="engine-z.js?v=42"></script>
+<script src="engine-aa.js?v=42"></script>
+<script src="engine-ab.js?v=42"></script>
 </body>
 </html>
