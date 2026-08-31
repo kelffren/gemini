@@ -6,8 +6,8 @@
   const cafeDoor = { x: cafeBox.x + cafeBox.w / 2, y: cafeBox.y + cafeBox.h };
   const cafeRoom = { x: 2360, y: 2360, w: 280, h: 220 };
   const cafeSpawn = { x: 2500, y: 2535 };
-  // Exit: 90px south of the door, outside the footprint, clear of walls.
-  const plazaReturn = { x: cafeDoor.x, y: cafeDoor.y + 90 };
+  // Exit: 130px south of the door, well clear of the building footprint and any walls.
+  const plazaReturn = { x: cafeDoor.x, y: cafeDoor.y + 130 };
   window.keloZone = 'plaza';
 
   function enterCafe() {
