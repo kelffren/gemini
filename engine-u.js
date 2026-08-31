@@ -46,9 +46,6 @@
     g.fillStyle = '#5a5044'; g.fillRect(0, 12, T, 8);
     g.strokeStyle = '#2a241c'; g.strokeRect(0.5, 0.5, T - 1, T - 1);
   });
-  cell(5, function (g) {
-    g.fillStyle = 'rgba(0,0,0,0.35)'; g.fillRect(0, 0, T, T);
-  });
   cell(6, function (g) {
     g.fillStyle = '#1a3048'; g.fillRect(0, 0, T, T);
     g.fillStyle = '#3d7ea6'; g.beginPath(); g.arc(16, 16, 10, 0, Math.PI * 2); g.fill();
@@ -75,26 +72,19 @@
     }
   }
 
-  function stampSolids() {
-    const boxes = [
-      { x: OX + 4 * T, y: OY + 2 * T, w: 5 * T, h: 3 * T },
-      { x: OX + 20 * T, y: OY + 5 * T, w: 4 * T, h: 3 * T },
-      { x: OX + 2 * T, y: OY + 8 * T, w: 4 * T, h: 3 * T }
-    ];
-    boxes.forEach(function (b) { obstacles.push(b); });
-  }
-  stampSolids();
+  obstacles.push(
+    { x: OX + 4 * T, y: OY + 2 * T, w: 5 * T, h: 3 * T },
+    { x: OX + 20 * T, y: OY + 5 * T, w: 4 * T, h: 3 * T },
+    { x: OX + 2 * T, y: OY + 8 * T, w: 4 * T, h: 3 * T }
+  );
 
   function blit(ctx, id, dx, dy) {
-    const sx = (id % 8) * T;
-    const sy = Math.floor(id / 8) * T;
-    ctx.drawImage(atlas, sx, sy, T, T, dx, dy, T, T);
+    ctx.drawImage(atlas, (id % 8) * T, Math.floor(id / 8) * T, T, T, dx, dy, T, T);
   }
 
   function drawMap(ctx) {
     const z = CONFIG.zoom || 1;
-    const viewW = screenW / z;
-    const viewH = screenH / z;
+    const viewW = screenW / z, viewH = screenH / z;
     const x0 = Math.max(0, Math.floor((camera.x - viewW / 2 - OX) / T));
     const y0 = Math.max(0, Math.floor((camera.y - viewH / 2 - OY) / T));
     const x1 = Math.min(MW - 1, Math.ceil((camera.x + viewW / 2 - OX) / T));
@@ -107,6 +97,14 @@
         blit(ctx, id, OX + x * T, OY + y * T);
       }
     }
+    ctx.fillStyle = '#1a161c';
+    ctx.fillRect(OX + 4 * T, OY + 2 * T, 5 * T, 3 * T);
+    ctx.fillRect(OX + 20 * T, OY + 5 * T, 4 * T, 3 * T);
+    ctx.fillRect(OX + 2 * T, OY + 8 * T, 4 * T, 3 * T);
+    ctx.strokeStyle = '#c9a24a';
+    ctx.strokeRect(OX + 4 * T, OY + 2 * T, 5 * T, 3 * T);
+    ctx.strokeRect(OX + 20 * T, OY + 5 * T, 4 * T, 3 * T);
+    ctx.strokeRect(OX + 2 * T, OY + 8 * T, 4 * T, 3 * T);
     ctx.fillStyle = '#c9a24a';
     ctx.font = '11px sans-serif';
     ctx.textAlign = 'center';
@@ -124,6 +122,13 @@
     ctx.scale(z, z);
     ctx.translate(-camera.x, -camera.y);
     drawMap(ctx);
+    if (typeof simulatedPlayers !== 'undefined') simulatedPlayers.forEach(function (p) { renderAvatar(p, false); });
+    if (window.keloNpcs) {
+      keloNpcs.forEach(function (n) {
+        renderAvatar({ name: n.name, x: n.x, y: n.y, gear: { bodyColor: n.color, armorColor: '#e7c56a' }, radius: 16 }, false);
+      });
+    }
+    renderAvatar(localPlayer, true);
     ctx.restore();
   };
 })();
