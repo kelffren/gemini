@@ -11,54 +11,29 @@
   }
 
   const atlas = document.createElement('canvas');
-  atlas.width = 256;
-  atlas.height = 128;
+  atlas.width = 512;
+  atlas.height = 512;
   const a = atlas.getContext('2d');
-
   function cell(id, fn) {
-    const x = (id % 8) * T;
-    const y = Math.floor(id / 8) * T;
-    a.save();
-    a.translate(x, y);
-    fn(a);
-    a.restore();
+    a.save(); a.translate((id % 8) * T, Math.floor(id / 8) * T); fn(a); a.restore();
   }
+  cell(1, function (g) { g.fillStyle = '#2a2c32'; g.fillRect(0, 0, T, T); g.fillStyle = '#3a3d46'; for (let i = 0; i < 10; i++) g.fillRect((i * 7) % 30, (i * 11) % 30, 6, 5); g.strokeStyle = '#1c1e24'; g.strokeRect(0.5, 0.5, T - 1, T - 1); });
+  cell(2, function (g) { g.fillStyle = '#262830'; g.fillRect(0, 0, T, T); g.fillStyle = '#4a4e58'; g.fillRect(4, 4, 10, 8); g.fillRect(18, 16, 9, 7); g.strokeStyle = '#181a20'; g.strokeRect(0.5, 0.5, T - 1, T - 1); });
+  cell(3, function (g) { g.fillStyle = '#2a2c32'; g.fillRect(0, 0, T, T); g.strokeStyle = '#c9a24a'; g.lineWidth = 3; g.strokeRect(2, 2, T - 4, T - 4); g.fillStyle = '#e7c56a'; g.fillRect(14, 14, 4, 4); });
+  cell(4, function (g) { g.fillStyle = '#3b342c'; g.fillRect(0, 0, T, T); g.fillStyle = '#5a5044'; g.fillRect(0, 12, T, 8); g.strokeStyle = '#2a241c'; g.strokeRect(0.5, 0.5, T - 1, T - 1); });
+  cell(6, function (g) { g.fillStyle = '#1a3048'; g.fillRect(0, 0, T, T); g.fillStyle = '#3d7ea6'; g.beginPath(); g.arc(16, 16, 10, 0, Math.PI * 2); g.fill(); });
+  cell(7, function (g) { g.fillStyle = '#163044'; g.fillRect(0, 0, T, T); g.fillStyle = '#5cb0d4'; g.beginPath(); g.arc(16, 14, 9, 0, Math.PI * 2); g.fill(); });
+  cell(8, function (g) { g.fillStyle = '#1a161c'; g.fillRect(0, 0, T, T); g.fillStyle = '#3a3238'; g.fillRect(0, 0, T, 6); g.strokeStyle = '#8a7040'; g.strokeRect(0.5, 0.5, T - 1, T - 1); });
 
-  cell(1, function (g) {
-    g.fillStyle = '#2a2c32'; g.fillRect(0, 0, T, T);
-    g.fillStyle = '#3a3d46';
-    for (let i = 0; i < 10; i++) g.fillRect((i * 7) % 30, (i * 11) % 30, 6, 5);
-    g.strokeStyle = '#1c1e24'; g.strokeRect(0.5, 0.5, T - 1, T - 1);
-  });
-  cell(2, function (g) {
-    g.fillStyle = '#262830'; g.fillRect(0, 0, T, T);
-    g.fillStyle = '#4a4e58';
-    g.fillRect(4, 4, 10, 8); g.fillRect(18, 16, 9, 7);
-    g.strokeStyle = '#181a20'; g.strokeRect(0.5, 0.5, T - 1, T - 1);
-  });
-  cell(3, function (g) {
-    g.fillStyle = '#2a2c32'; g.fillRect(0, 0, T, T);
-    g.strokeStyle = '#c9a24a'; g.lineWidth = 3; g.strokeRect(2, 2, T - 4, T - 4);
-    g.fillStyle = '#e7c56a'; g.fillRect(14, 14, 4, 4);
-  });
-  cell(4, function (g) {
-    g.fillStyle = '#3b342c'; g.fillRect(0, 0, T, T);
-    g.fillStyle = '#5a5044'; g.fillRect(0, 12, T, 8);
-    g.strokeStyle = '#2a241c'; g.strokeRect(0.5, 0.5, T - 1, T - 1);
-  });
-  cell(6, function (g) {
-    g.fillStyle = '#1a3048'; g.fillRect(0, 0, T, T);
-    g.fillStyle = '#3d7ea6'; g.beginPath(); g.arc(16, 16, 10, 0, Math.PI * 2); g.fill();
-  });
-  cell(7, function (g) {
-    g.fillStyle = '#163044'; g.fillRect(0, 0, T, T);
-    g.fillStyle = '#5cb0d4'; g.beginPath(); g.arc(16, 14, 9, 0, Math.PI * 2); g.fill();
-  });
-  cell(8, function (g) {
-    g.fillStyle = '#1a161c'; g.fillRect(0, 0, T, T);
-    g.fillStyle = '#3a3238'; g.fillRect(0, 0, T, 6);
-    g.strokeStyle = '#8a7040'; g.strokeRect(0.5, 0.5, T - 1, T - 1);
-  });
+  let sheet = atlas;
+  const img = new Image();
+  img.onload = function () { sheet = img; };
+  img.onerror = function () {
+    const img2 = new Image();
+    img2.onload = function () { sheet = img2; };
+    img2.src = 'assets/tileset.png';
+  };
+  img.src = 'assets/tileset.webp';
 
   const tiles = [];
   for (let y = 0; y < MH; y++) {
@@ -71,7 +46,6 @@
       tiles.push(id);
     }
   }
-
   obstacles.push(
     { x: OX + 4 * T, y: OY + 2 * T, w: 5 * T, h: 3 * T },
     { x: OX + 20 * T, y: OY + 5 * T, w: 4 * T, h: 3 * T },
@@ -79,7 +53,7 @@
   );
 
   function blit(ctx, id, dx, dy) {
-    ctx.drawImage(atlas, (id % 8) * T, Math.floor(id / 8) * T, T, T, dx, dy, T, T);
+    ctx.drawImage(sheet, (id % 8) * T, Math.floor(id / 8) * T, T, T, dx, dy, T, T);
   }
 
   function drawMap(ctx) {
@@ -123,11 +97,9 @@
     ctx.translate(-camera.x, -camera.y);
     drawMap(ctx);
     if (typeof simulatedPlayers !== 'undefined') simulatedPlayers.forEach(function (p) { renderAvatar(p, false); });
-    if (window.keloNpcs) {
-      keloNpcs.forEach(function (n) {
-        renderAvatar({ name: n.name, x: n.x, y: n.y, gear: { bodyColor: n.color, armorColor: '#e7c56a' }, radius: 16 }, false);
-      });
-    }
+    if (window.keloNpcs) keloNpcs.forEach(function (n) {
+      renderAvatar({ name: n.name, x: n.x, y: n.y, gear: { bodyColor: n.color, armorColor: '#e7c56a' }, radius: 16 }, false);
+    });
     renderAvatar(localPlayer, true);
     ctx.restore();
   };
