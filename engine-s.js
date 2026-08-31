@@ -11,9 +11,8 @@
   }
 
   const bubbles = [];
-  const BOT_LINES = ['esa vitrina', 'voy al caf\u00e9', 'qui\u00e9n es el Rey', 'bonita plaza', 'trade?'];
+  const BOT_LINES = ['esa vitrina', 'voy al cafe', 'quien es el Rey', 'bonita plaza', 'trade?'];
   let walkT = 0;
-  let nav = null;
   window.keloBubbles = bubbles;
 
   function worldFromEvent(e) {
@@ -29,23 +28,7 @@
         if (Math.hypot(w.x - bot.x, w.y - bot.y) < 22 && typeof inspectPlayer === 'function') inspectPlayer(bot, false);
       });
     }
-    if (e.clientX < screenW * 0.55) return;
-    nav = w;
   });
-
-  const _move = updateMovement;
-  updateMovement = function (dt) {
-    if (nav && !input.touchActive) {
-      const dx = nav.x - localPlayer.x, dy = nav.y - localPlayer.y;
-      const d = Math.hypot(dx, dy);
-      if (d < 10) nav = null;
-      else if (!input.keys.w && !input.keys.a && !input.keys.s && !input.keys.d) {
-        input.normX = dx / d;
-        input.normY = dy / d;
-      }
-    }
-    _move(dt);
-  };
 
   function say(who, text) {
     bubbles.push({ name: who, text: text, x: 0, y: 0, t: 3.2 });
@@ -64,14 +47,14 @@
     const wrap = document.createElement('div');
     wrap.id = 'kelo-chat';
     wrap.style.cssText = 'position:absolute;left:8px;bottom:10px;width:min(230px,48vw);z-index:90;pointer-events:auto;font-size:11px';
-    wrap.innerHTML = '<div id="kelo-chat-log" style="max-height:70px;overflow:auto;background:rgba(8,10,14,.55);color:#ddd;padding:4px 6px;border-radius:8px;margin-bottom:4px"></div><form id="kelo-chat-form" style="display:flex;gap:4px"><input id="kelo-chat-in" maxlength="80" placeholder="Escribir mensaje\u2026" style="flex:1;background:rgba(10,13,18,.85);border:1px solid #3a465c;color:#eee;border-radius:8px;padding:6px 8px"><button style="background:#9e6a03;border:0;color:#fff;border-radius:8px;padding:6px 8px">OK</button></form>';
+    wrap.innerHTML = '<div id="kelo-chat-log" style="max-height:70px;overflow:auto;background:rgba(8,10,14,.55);color:#ddd;padding:4px 6px;border-radius:8px;margin-bottom:4px"></div><form id="kelo-chat-form" style="display:flex;gap:4px"><input id="kelo-chat-in" maxlength="80" placeholder="Escribir mensaje..." style="flex:1;background:rgba(10,13,18,.85);border:1px solid #3a465c;color:#eee;border-radius:8px;padding:6px 8px"><button style="background:#9e6a03;border:0;color:#fff;border-radius:8px;padding:6px 8px">OK</button></form>';
     document.body.appendChild(wrap);
     document.getElementById('kelo-chat-form').addEventListener('submit', function (e) {
       e.preventDefault();
       const inp = document.getElementById('kelo-chat-in');
       const t = (inp.value || '').trim();
       if (!t) return;
-      say(localPlayer.name || 'T\u00fa', t);
+      say(localPlayer.name || 'Tu', t);
       inp.value = '';
     });
     const bag = document.createElement('button');
@@ -85,7 +68,7 @@
     const panel = document.createElement('div');
     panel.id = 'kelo-bag';
     panel.style.cssText = 'display:none;position:absolute;top:84px;right:8px;width:180px;z-index:91;background:rgba(13,17,23,.96);border:1px solid #c9a24a;border-radius:10px;padding:10px;color:#ddd;font-size:12px;pointer-events:auto';
-    panel.innerHTML = '<b style="color:#e7c56a">Inventario</b><div>Gema \u00d71</div><div>Reloj \u00d71</div>';
+    panel.innerHTML = '<b style="color:#e7c56a">Inventario</b><div>Gema x1</div><div>Reloj x1</div>';
     document.body.appendChild(panel);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ensureChat);
@@ -126,7 +109,7 @@
       let x = localPlayer.x, y = localPlayer.y - 38;
       const who = simulatedPlayers.find(function (p) { return p.name === bu.name; });
       if (who) { x = who.x; y = who.y - 38; }
-      if (bu.name === (localPlayer.name || 'T\u00fa') || (bu.name && bu.name.indexOf('Pioneer') >= 0)) {
+      if (bu.name === (localPlayer.name || 'Tu') || (bu.name && bu.name.indexOf('Pioneer') >= 0)) {
         x = localPlayer.x; y = localPlayer.y - 38;
       }
       ctx.fillStyle = 'rgba(255,255,255,0.92)';
