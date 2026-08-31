@@ -1,7 +1,7 @@
 (function () {
   const hero = new Image();
   let ok = false;
-  const paths = ['assets/hero.png', 'assets/hero.png.JPG', 'assets/hero.jpg', 'assets/hero.PNG'];
+  const paths = ['assets/hero.png', 'assets/hero.JPG', 'assets/hero.jpg', 'assets/hero.png.JPG', 'assets/hero.PNG'];
   let i = 0;
   function tryNext() {
     if (i >= paths.length) return;
@@ -24,9 +24,8 @@
   const _av = renderAvatar;
   renderAvatar = function (p, isSelf) {
     if (!ok || !p) return _av(p, isSelf);
-    const cols = 4, rows = 4;
-    const FW = hero.width / cols;
-    const FH = hero.height / rows;
+    const FW = hero.width / 4;
+    const FH = hero.height / 4;
     const moving = Math.hypot(p.vx || 0, p.vy || 0) > 10;
     const row = dirRow[faceOf(p)] || 0;
     const col = moving ? (Math.floor(Date.now() / 140) % 4) : 0;
