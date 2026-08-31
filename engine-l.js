@@ -30,10 +30,32 @@
   function landingPoint() {
     const range = skillAim.castRange || 120;
     return {
-      x: localPlayer.x + skillAim.dirX * range,
-      y: localPlayer.y + skillAim.dirY * range,
+      x: localPlayer.x + (skillAim.dirX || 1) * range,
+      y: localPlayer.y + (skillAim.dirY || 0) * range,
       range: range
     };
+  }
+
+  function burst(x, y, color, n, size) {
+    if (typeof spawnParticle !== 'function') return;
+    for (let i = 0; i < n; i++) {
+      spawnParticle(
+        x + (Math.random() - 0.5) * 28,
+        y + (Math.random() - 0.5) * 28,
+        color || '#ffd166',
+        size || 16,
+        0.35 + Math.random() * 0.5
+      );
+    }
+  }
+
+  function trailLine(x1, y1, x2, y2, color) {
+    const steps = 10;
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      burst(x1 + (x2 - x1) * t, y1 + (y2 - y1) * t, color, 2, 12);
+    }
+    if (typeof spawnDashTrail === 'function') spawnDashTrail(x1, y1, x2, y2, color);
   }
 
   const _cast = castAimedSkill;
@@ -41,8 +63,9 @@
     const stone = STATE.equipped[index];
     if (!stone || stone.currentCd > 0) return;
     const land = landingPoint();
-    stone.currentCd = stone.baseCd;
+    const color = stone.color || '#ffd166';
     if (typeId === 'dash') {
+      stone.currentCd = stone.baseCd;
       dashTween.active = true;
       dashTween.t = 0;
       dashTween.dur = 0.11 + 0.08 * (land.range / 170);
@@ -51,10 +74,13 @@
       dashTween.toX = Math.max(24, Math.min(CONFIG.worldWidth - 24, land.x));
       dashTween.toY = Math.max(24, Math.min(CONFIG.worldHeight - 24, land.y));
       aim.x = dirX; aim.y = dirY;
-      spawnDashTrail(dashTween.fromX, dashTween.fromY, dashTween.toX, dashTween.toY, stone.color);
+      trailLine(dashTween.fromX, dashTween.fromY, dashTween.toX, dashTween.toY, color);
+      burst(dashTween.toX, dashTween.toY, color, 14, 18);
       return;
     }
     _cast(index, typeId, dirX, dirY);
+    trailLine(localPlayer.x, localPlayer.y, land.x, land.y, color);
+    burst(land.x, land.y, color, typeId === 'meteor' ? 22 : 12, typeId === 'meteor' ? 22 : 14);
   };
 
   function drawLanding() {
