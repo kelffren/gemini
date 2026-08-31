@@ -2,10 +2,12 @@
   const T = window.KELO_TILE || 32;
   const OX = 1024, OY = 1216;
   const cafeBox = { x: OX + 18 * T, y: OY + 14 * T, w: 5 * T, h: 3 * T };
-  const cafeDoor = { x: cafeBox.x + cafeBox.w / 2, y: cafeBox.y + cafeBox.h + 24 };
+  // Door sits on the SOUTH face of the building (bottom edge).
+  const cafeDoor = { x: cafeBox.x + cafeBox.w / 2, y: cafeBox.y + cafeBox.h };
   const cafeRoom = { x: 2360, y: 2360, w: 280, h: 220 };
   const cafeSpawn = { x: 2500, y: 2535 };
-  const plazaReturn = { x: cafeDoor.x, y: cafeDoor.y + 40 };
+  // Exit just south of the door, outside the building footprint and clear of walls.
+  const plazaReturn = { x: cafeDoor.x, y: cafeDoor.y + 70 };
   window.keloZone = 'plaza';
 
   function enterCafe() {
