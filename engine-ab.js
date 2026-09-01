@@ -22,7 +22,9 @@
   raw.onerror = function () { raw.src = 'assets/hero.png'; };
   raw.src = 'assets/hero.PNG';
 
-  function movingOf(p) {
+  // Legacy fallback for actors that do not yet have update-side visual state.
+  // Local player locomotion is owned by engine-ac and must not mutate here.
+  function legacyMovingOf(p) {
     if (p._lx == null) { p._lx = p.x; p._ly = p.y; }
     const dx = p.x - p._lx;
     const dy = p.y - p._ly;
@@ -48,7 +50,17 @@
     return { dx: p._mdx || 0, dy: p._mdy || 0, on: (p._walkHold || 0) > 0 };
   }
 
+  function motionOf(p) {
+    const v = p && p._visualMotion;
+    if (v) return { dx: v.dx || 0, dy: v.dy || 0, on: !!v.on, face: v.face || p._face || 'down', frame: v.frame || 0 };
+    const m = legacyMovingOf(p);
+    m.face = p._face || 'down';
+    m.frame = null;
+    return m;
+  }
+
   function faceOf(p, m) {
+    if (m.face) return m.face;
     if (!m.on) return p._face || 'down';
     const side = Math.abs(m.dx) * 1.15 >= Math.abs(m.dy);
     const f = side ? (m.dx >= 0 ? 'right' : 'left') : (m.dy >= 0 ? 'down' : 'up');
@@ -56,18 +68,18 @@
     return f;
   }
 
-  function stepCol(p, on) {
-    if (!on) { p._step = 0; return 0; }
-    // Time-based so duplicate render in the same frame does not freeze on idle.
+  function stepCol(p, m) {
+    if (!m.on) return 0;
+    if (m.frame != null) return m.frame % COLS;
     return Math.floor(Date.now() / 130) % COLS;
   }
 
   const _av = renderAvatar;
   renderAvatar = function (p, isSelf) {
     if (!ok || !p || !sheet) return _av(p, isSelf);
-    const m = movingOf(p);
+    const m = motionOf(p);
     const face = faceOf(p, m);
-    const col = stepCol(p, m.on);
+    const col = stepCol(p, m);
     const side = face === 'left' || face === 'right';
     const row = face === 'up' ? 3 : (face === 'down' ? 0 : 2);
     const padX = Math.max(2, FW * 0.05);
