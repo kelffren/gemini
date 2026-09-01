@@ -1,6 +1,6 @@
 (function () {
   // MOV-001: one processed intent magnitude drives gait + speed.
-  // Keep the historical top speed (172.28) while removing the WALK->RUN speed step.
+  // MOV-004: visual stride advances from actual world distance, never render count.
   const WALK_MAX = 0.74;
   const WALK_SPEED = 96;
   const RUN_SPEED = 165;
@@ -8,13 +8,13 @@
   const SPEED_BLEND_START = 0.55;
   const GAIT_IDLE_MAX = 0.04;
   const GAIT_RUN_START = 0.74;
-  const VISUAL_FRAME_SEC = 0.130;
   const VISUAL_STOP_HOLD_SEC = 0.075;
+  const WALK_CYCLE_WORLD_PX = 50;
+  const RUN_CYCLE_WORLD_PX = 90;
+  const MIN_VISUAL_MOVE_PX = 0.12;
   CONFIG.speed = WALK_SPEED;
 
   function processedMag() {
-    // processInput() already applies the circular deadzone + POWER curve.
-    // Reading raw pointer radius here used to make animation and physics disagree.
     return Math.min(1, Math.hypot(input.normX || 0, input.normY || 0));
   }
 
@@ -40,16 +40,21 @@
     return Math.min(1, Math.hypot(input.currentX - input.originX, input.currentY - input.originY) / CONFIG.joystickRadius);
   }
 
-  function publishAudit(mag, gait, speedCap) {
+  function publishAudit(mag, gait, speedCap, visual) {
     window.KELO_MOVEMENT_AUDIT = {
-      version: 'MOV-001',
+      version: 'MOV-001+MOV-004',
       rawTouchMag: rawTouchMag(),
       processedMag: mag,
       gait,
       speedCap,
       targetSpeed: mag * speedCap,
       actualSpeed: Math.hypot(localPlayer.vx || 0, localPlayer.vy || 0),
-      colliderRadius: localPlayer.radius
+      colliderRadius: localPlayer.radius,
+      visualOn: !!(visual && visual.on),
+      visualFrame: visual ? visual.frame : 0,
+      stridePhase: visual ? visual.stridePhase : 0,
+      strideDistancePx: visual ? visual.strideDistancePx : 0,
+      lastStepDistancePx: visual ? visual.lastStepDistancePx : 0
     };
   }
 
@@ -64,8 +69,10 @@
         face: p._face || 'down',
         gait: 'idle',
         frame: 0,
-        frameElapsed: 0,
-        stopElapsed: VISUAL_STOP_HOLD_SEC
+        stopElapsed: VISUAL_STOP_HOLD_SEC,
+        stridePhase: 0,
+        strideDistancePx: 0,
+        lastStepDistancePx: 0
       };
     }
     return p._visualMotion;
@@ -78,8 +85,7 @@
     const dist = Math.hypot(dx, dy);
     const spd = Math.hypot(p.vx || 0, p.vy || 0);
     const hasIntent = gait !== 'idle';
-    const physicallyMoving = dist > 0.12 || spd > 16;
-    const wasOn = v.on;
+    const physicallyMoving = dist > MIN_VISUAL_MOVE_PX || spd > 16;
 
     if (hasIntent || physicallyMoving) {
       v.stopElapsed = 0;
@@ -89,7 +95,7 @@
       v.on = v.stopElapsed < VISUAL_STOP_HOLD_SEC;
     }
 
-    if (dist > 0.12) {
+    if (dist > MIN_VISUAL_MOVE_PX) {
       v.dx = dx;
       v.dy = dy;
     } else if (spd > 16) {
@@ -106,25 +112,24 @@
       p._face = v.face;
     }
 
-    if (v.on) {
-      if (!wasOn) {
-        v.frame = 0;
-        v.frameElapsed = 0;
-      } else {
-        v.frameElapsed += Math.max(0, dt || 0);
-        while (v.frameElapsed >= VISUAL_FRAME_SEC) {
-          v.frameElapsed -= VISUAL_FRAME_SEC;
-          v.frame = (v.frame + 1) % 4;
-        }
-      }
-    } else {
+    // Advance animation only from actual post-collision displacement.
+    // If Kelo pushes against a wall and does not move, the stride cannot treadmill.
+    v.lastStepDistancePx = dist > MIN_VISUAL_MOVE_PX ? dist : 0;
+    if (v.on && v.lastStepDistancePx > 0) {
+      const cyclePx = gait === 'run' ? RUN_CYCLE_WORLD_PX : WALK_CYCLE_WORLD_PX;
+      v.strideDistancePx += v.lastStepDistancePx;
+      v.stridePhase = (v.stridePhase + v.lastStepDistancePx / cyclePx) % 1;
+      v.frame = Math.floor(v.stridePhase * 4) % 4;
+    } else if (!v.on) {
+      v.stridePhase = 0;
+      v.strideDistancePx = 0;
       v.frame = 0;
-      v.frameElapsed = 0;
     }
 
     v.gait = gait;
     v.lastX = p.x;
     v.lastY = p.y;
+    return v;
   }
 
   const _move = updateMovement;
@@ -136,7 +141,7 @@
     localPlayer._gait = gait;
     CONFIG.speed = speedCap;
     _move(dt);
-    updateVisualMotion(localPlayer, dt, gait);
-    publishAudit(mag, gait, speedCap);
+    const visual = updateVisualMotion(localPlayer, dt, gait);
+    publishAudit(mag, gait, speedCap, visual);
   };
 })();
