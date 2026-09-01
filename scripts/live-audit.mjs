@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import { chromium } from 'playwright';
 
 const base = process.env.AUDIT_URL || 'https://kelffren.github.io/gemini/';
-const expected = process.env.EXPECTED_BUILD || 'V5.38';
+const expected = process.env.EXPECTED_BUILD || 'V5.39';
 fs.mkdirSync('artifacts', { recursive: true });
 
 const browser = await chromium.launch({
