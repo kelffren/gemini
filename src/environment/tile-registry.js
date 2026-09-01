@@ -26,7 +26,14 @@
   const families = Object.freeze({
     grass:Object.freeze([tiles.GRASS_A,tiles.GRASS_B,tiles.GRASS_C,tiles.GRASS_SOFT]),
     grassDetail:Object.freeze([tiles.GRASS_FLOWERS]),
-    marble:Object.freeze([tiles.MARBLE_A,tiles.MARBLE_B,tiles.MARBLE_CLEAN_A,tiles.MARBLE_CLEAN_B,tiles.MARBLE_CLEAN_C,tiles.MARBLE_CLEAN_D]),
+    // Weighted toward the quieter clean tiles so the plaza reads as material,
+    // not as a repeating wallpaper pattern. Patterned marble remains a sparse accent.
+    marble:Object.freeze([
+      tiles.MARBLE_CLEAN_A,tiles.MARBLE_CLEAN_B,tiles.MARBLE_CLEAN_C,tiles.MARBLE_CLEAN_D,
+      tiles.MARBLE_CLEAN_A,tiles.MARBLE_CLEAN_B,tiles.MARBLE_CLEAN_C,tiles.MARBLE_CLEAN_D,
+      tiles.MARBLE_A
+    ]),
+    marbleAccent:Object.freeze([tiles.MARBLE_A,tiles.MARBLE_B,tiles.MARBLE_DIAMOND]),
     marbleGold:Object.freeze([tiles.MARBLE_GOLD_A,tiles.MARBLE_GOLD_B])
   });
 
@@ -42,7 +49,7 @@
   });
 
   window.KELO_TILE_REGISTRY = Object.freeze({
-    version:'1.1.0',
+    version:'1.2.0',
     worldTileSize:TILE,
     atlases:Object.freeze({plaza:atlas}),
     tiles,
