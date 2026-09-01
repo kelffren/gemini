@@ -142,9 +142,11 @@ Refactor the environment renderer so it is no longer tied to a single hard-coded
 - LIVE mobile audit V5.43 validated the registry-driven architecture at 390x844 CSS / 780x1688 backing canvas.
 - LIVE mobile audit V5.44 validated a dedicated `transitionLayer` between ground and props, with registry-driven grass↔marble edge styling, `registryVersion=1.1.0`, `sourceMode=layered-registry-v2`, `assetLoaded=true`, and `fallbackActive=false`.
 - The V5.44 screenshot showed a materially clearer grass/marble boundary on mobile: the hard tile seam now has a pixel-clustered green edge plus a warm marble inset shadow. This is a valid intermediate visual improvement, but it does not replace the need for authored straight/inner/outer transition tiles in the premium environment kit.
-- The live-audit workflow was hardened so deployment readiness is checked against `window.KELO_PLAZA_AUDIT.version` rather than the HTML title. This prevents false-positive audits against a stale Pages deployment.
+- Registry `1.2.0` is now weighted toward the cleaner marble variants, keeping patterned marble sparse instead of selecting all marble variants uniformly. LIVE mobile validation confirmed the deployed registry and showed a quieter floor with more negative-space tiles, reducing wallpaper-like repetition without changing gameplay or map geometry.
+- `marbleAccent` now exists as a separate named family for future authored composition instead of forcing decorative patterns into the base material pool.
+- The live-audit workflow now validates both `KELO_PLAZA_AUDIT.version` and `KELO_PLAZA_AUDIT.registryVersion`. This caught a real stale-registry false positive during the 1.2.0 rollout; the registry script cache key was then bumped and the final audit confirmed `registryVersion=1.2.0` LIVE.
 - Current audit still reports four generic 404 resource errors and one unrelated `appendChild` page error. These remain outside the visual transition change and should be handled as a separate debugging pass rather than mixed into environment art work.
-- Current largest visual bottleneck after V5.44 is authored asset quality and variety: repeated marble pattern, simplistic/low-detail props, limited vegetation families, and lack of true atlas-based transition corners/curves.
+- Current largest visual bottleneck after registry 1.2.0 remains authored asset quality: the marble line motif is still visible across many supposedly clean tiles, props are simplistic, vegetation has limited families, and true atlas-authored transition corners/curves are still missing.
 
 ## Non-goals During Visual Passes
 Do not casually alter unrelated systems such as:
