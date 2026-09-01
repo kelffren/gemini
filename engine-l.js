@@ -18,7 +18,7 @@
   });
 
   window.KELO_PLAZA_AUDIT = {
-    version: 'V5.38',
+    version: 'V5.40',
     ready: false,
     assetLoaded: false,
     fallbackActive: true,
@@ -138,7 +138,7 @@
     bakeAtlas();
   };
   sheet.onerror=function(){ console.error('[Kelo plaza] tileset load failed; deterministic fallback remains active'); };
-  sheet.src='assets/tileset.png?v=89';
+  sheet.src='assets/tileset.png?v=91';
 
   function landingPoint(){
     const range=skillAim.castRange||120;
@@ -191,5 +191,5 @@
     drawLanding();
   };
 
-  window.KELO_PLAZA_TILESET=Object.freeze({sourceMode:'engine-l-production-v2',assetPath:'assets/tileset.png',atlasSize:512,atlasTileSize:TILE,worldTileSize:TILE,columns:COLS,plaza:Object.freeze({...PLAZA})});
+  window.KELO_PLAZA_TILESET=Object.freeze({sourceMode:'engine-l-production-v3',assetPath:'assets/tileset.png',atlasSize:512,atlasTileSize:TILE,worldTileSize:TILE,columns:COLS,plaza:Object.freeze({...PLAZA})});
 })();
