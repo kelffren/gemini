@@ -2,7 +2,7 @@
   const TILE = 32;
   const atlas = Object.freeze({
     id: 'plaza-core',
-    src: 'assets/tileset.png',
+    src: 'assets/tileset-vclean.png',
     width: 512,
     height: 512,
     tileWidth: TILE,
@@ -16,6 +16,7 @@
     MARBLE_GREEN_DIAMOND:8, MARBLE_GREEN_CENTER:9, MARBLE_DIAMOND:10,
     GRASS_SOFT:25, MARBLE_CLEAN_A:26, MARBLE_CLEAN_B:27,
     MARBLE_CLEAN_C:28, MARBLE_CLEAN_D:29,
+    MARBLE_IVORY_A:80, MARBLE_IVORY_B:81, MARBLE_IVORY_C:82, MARBLE_IVORY_D:83,
     FOUNTAIN:Object.freeze([32,33,34,48,49,50,64,65,66]),
     TREE:Object.freeze([35,36,51,52,67,68]), COLUMN:Object.freeze([37,53]),
     BUSH_A:38, BUSH_FLOWERS:39, FLOWERBED:Object.freeze([40,41]),
@@ -26,12 +27,11 @@
   const families = Object.freeze({
     grass:Object.freeze([tiles.GRASS_A,tiles.GRASS_B,tiles.GRASS_C,tiles.GRASS_SOFT]),
     grassDetail:Object.freeze([tiles.GRASS_FLOWERS]),
-    // Weighted toward the quieter clean tiles so the plaza reads as material,
-    // not as a repeating wallpaper pattern. Patterned marble remains a sparse accent.
+    // Authored low-noise ivory marble is now the default material. Older diagonal-vein
+    // tiles remain available only as accents so large plaza surfaces do not read as wallpaper.
     marble:Object.freeze([
-      tiles.MARBLE_CLEAN_A,tiles.MARBLE_CLEAN_B,tiles.MARBLE_CLEAN_C,tiles.MARBLE_CLEAN_D,
-      tiles.MARBLE_CLEAN_A,tiles.MARBLE_CLEAN_B,tiles.MARBLE_CLEAN_C,tiles.MARBLE_CLEAN_D,
-      tiles.MARBLE_A
+      tiles.MARBLE_IVORY_A,tiles.MARBLE_IVORY_B,tiles.MARBLE_IVORY_C,tiles.MARBLE_IVORY_D,
+      tiles.MARBLE_IVORY_A,tiles.MARBLE_IVORY_B,tiles.MARBLE_IVORY_C,tiles.MARBLE_IVORY_D
     ]),
     marbleAccent:Object.freeze([tiles.MARBLE_A,tiles.MARBLE_B,tiles.MARBLE_DIAMOND]),
     marbleGold:Object.freeze([tiles.MARBLE_GOLD_A,tiles.MARBLE_GOLD_B])
@@ -49,7 +49,7 @@
   });
 
   window.KELO_TILE_REGISTRY = Object.freeze({
-    version:'1.2.0',
+    version:'1.3.0',
     worldTileSize:TILE,
     atlases:Object.freeze({plaza:atlas}),
     tiles,
