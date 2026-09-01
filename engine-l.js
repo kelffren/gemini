@@ -12,9 +12,12 @@
   const COLS = ATLAS.columns;
   const T = REGISTRY.tiles;
   const F = REGISTRY.families;
+  const TRANSITION = REGISTRY.styles?.plazaTransition || {
+    marbleInsetShadow:'#d8cda9', grassEdgeDark:'#239d2b', grassEdgeMid:'#37bc35', grassEdgeLight:'#79e75d', tuftRate:5, edgeDepth:3
+  };
 
   window.KELO_PLAZA_AUDIT = {
-    version: 'V5.43',
+    version: 'V5.44',
     ready: false,
     assetLoaded: false,
     fallbackActive: true,
@@ -22,7 +25,8 @@
     atlas: ATLAS.src,
     atlasWidth: ATLAS.width,
     atlasHeight: ATLAS.height,
-    tileSize: TILE
+    tileSize: TILE,
+    layeredTransitions: true
   };
 
   function inPlaza(o) {
@@ -45,7 +49,7 @@
     ctx.imageSmoothingEnabled=false;
   }
 
-  let floorLayer=null, propLayer=null;
+  let floorLayer=null, transitionLayer=null, propLayer=null;
   const sheet=new Image();
   sheet.decoding='async';
 
@@ -87,7 +91,7 @@
     g.strokeRect((cx-5)*TILE,(cy-4)*TILE,11*TILE,9*TILE);
     g.fillStyle='#2db8e9'; g.beginPath(); g.arc((cx+.5)*TILE,(cy+.5)*TILE,42,0,Math.PI*2); g.fill();
     g.strokeStyle='#f0c552'; g.lineWidth=5; g.stroke();
-    floorLayer=c; propLayer=null;
+    floorLayer=c; transitionLayer=null; propLayer=null;
     window.KELO_PLAZA_AUDIT.ready=true;
   }
 
@@ -96,10 +100,18 @@
     const cx=Math.floor(cols/2), cy=Math.floor(rows/2);
     const floor=document.createElement('canvas'); floor.width=PLAZA.w; floor.height=PLAZA.h;
     const fg=floor.getContext('2d'); fg.imageSmoothingEnabled=false;
+    const marbleMask=Array.from({length:rows},()=>Array(cols).fill(false));
+
+    function isMarbleCell(gx,gy){
+      if(gx<0||gy<0||gx>=cols||gy>=rows) return false;
+      return marbleMask[gy][gx];
+    }
+
     for(let gy=0;gy<rows;gy++) for(let gx=0;gx<cols;gx++) {
       const dx=Math.abs(gx-cx), dy=Math.abs(gy-cy);
       const inSquare=dx<=5&&dy<=4;
       const marble=inSquare||dx<=1||dy<=1;
+      marbleMask[gy][gx]=marble;
       let id;
       if(marble){
         id=pick(gx,gy,F.marble);
@@ -114,6 +126,44 @@
     }
     drawTile(fg,T.MARBLE_GREEN_CENTER,cx*TILE,cy*TILE);
 
+    const transitions=document.createElement('canvas'); transitions.width=PLAZA.w; transitions.height=PLAZA.h;
+    const tg=transitions.getContext('2d'); tg.imageSmoothingEnabled=false;
+    const d=Math.max(2,Math.min(4,TRANSITION.edgeDepth|0));
+    const tuftRate=Math.max(3,TRANSITION.tuftRate|0);
+
+    function edgeSeed(gx,gy,side){
+      return Math.abs(((gx+11)*92837111)^((gy+7)*689287499)^(side*283923481));
+    }
+    function grassTuft(px,py,vertical,seed){
+      if(seed%tuftRate!==0) return;
+      tg.fillStyle=TRANSITION.grassEdgeDark;
+      if(vertical){
+        tg.fillRect(px,py+6+(seed%12),2,5); tg.fillRect(px+2,py+8+(seed%9),1,3);
+      } else {
+        tg.fillRect(px+6+(seed%12),py,5,2); tg.fillRect(px+8+(seed%9),py+2,3,1);
+      }
+      tg.fillStyle=TRANSITION.grassEdgeLight;
+      if(vertical) tg.fillRect(px+1,py+7+(seed%12),1,2);
+      else tg.fillRect(px+7+(seed%12),py+1,2,1);
+    }
+
+    for(let gy=0;gy<rows;gy++) for(let gx=0;gx<cols;gx++) {
+      if(!isMarbleCell(gx,gy)) continue;
+      const x=gx*TILE, y=gy*TILE;
+      const top=!isMarbleCell(gx,gy-1), right=!isMarbleCell(gx+1,gy), bottom=!isMarbleCell(gx,gy+1), left=!isMarbleCell(gx-1,gy);
+      tg.fillStyle=TRANSITION.marbleInsetShadow;
+      if(top){ tg.fillRect(x,y,TILE,d); grassTuft(x,y-1,false,edgeSeed(gx,gy,0)); }
+      if(right){ tg.fillRect(x+TILE-d,y,d,TILE); grassTuft(x+TILE-1,y,true,edgeSeed(gx,gy,1)); }
+      if(bottom){ tg.fillRect(x,y+TILE-d,TILE,d); grassTuft(x,y+TILE-1,false,edgeSeed(gx,gy,2)); }
+      if(left){ tg.fillRect(x,y,d,TILE); grassTuft(x-1,y,true,edgeSeed(gx,gy,3)); }
+
+      tg.fillStyle=TRANSITION.grassEdgeMid;
+      if(top){ for(let px=4;px<TILE;px+=8) if((edgeSeed(gx,gy,px)%3)!==0) tg.fillRect(x+px,y-1,3,2); }
+      if(bottom){ for(let px=2;px<TILE;px+=9) if((edgeSeed(gx,gy,px+31)%3)!==0) tg.fillRect(x+px,y+TILE-1,3,2); }
+      if(left){ for(let py=3;py<TILE;py+=9) if((edgeSeed(gx,gy,py+67)%3)!==0) tg.fillRect(x-1,y+py,2,3); }
+      if(right){ for(let py=5;py<TILE;py+=8) if((edgeSeed(gx,gy,py+97)%3)!==0) tg.fillRect(x+TILE-1,y+py,2,3); }
+    }
+
     const props=document.createElement('canvas'); props.width=PLAZA.w; props.height=PLAZA.h;
     const pg=props.getContext('2d'); pg.imageSmoothingEnabled=false;
     drawSprite(pg,T.FOUNTAIN,cx-1,cy-2,3,3);
@@ -123,7 +173,7 @@
     drawSprite(pg,T.BENCH,cx-9,cy-1,2,1); drawSprite(pg,T.BENCH,cx+7,cy-1,2,1);
     drawSprite(pg,T.FLOWERBED,cx-8,cy+6,2,1); drawSprite(pg,T.FLOWERBED,cx+6,cy-7,2,1);
     drawSprite(pg,T.LAMP,cx-3,1,1,2); drawSprite(pg,T.LAMP,cx+3,rows-3,1,2);
-    floorLayer=floor; propLayer=props;
+    floorLayer=floor; transitionLayer=transitions; propLayer=props;
     window.KELO_PLAZA_AUDIT.ready=true;
     window.KELO_PLAZA_AUDIT.assetLoaded=true;
     window.KELO_PLAZA_AUDIT.fallbackActive=false;
@@ -137,7 +187,7 @@
     bakeAtlas();
   };
   sheet.onerror=function(){ console.error('[Kelo plaza] tileset load failed; deterministic fallback remains active'); };
-  sheet.src=ATLAS.src+'?v=94';
+  sheet.src=ATLAS.src+'?v=95';
 
   function landingPoint(){
     const range=skillAim.castRange||120;
@@ -180,7 +230,9 @@
     if(floorLayer){
       const z=CONFIG.zoom||1;
       ctx.save(); ctx.translate(screenW/2,screenH/2); ctx.scale(z,z); ctx.translate(-camera.x,-camera.y); ctx.imageSmoothingEnabled=false;
-      ctx.drawImage(floorLayer,PLAZA.x,PLAZA.y); if(propLayer) ctx.drawImage(propLayer,PLAZA.x,PLAZA.y);
+      ctx.drawImage(floorLayer,PLAZA.x,PLAZA.y);
+      if(transitionLayer) ctx.drawImage(transitionLayer,PLAZA.x,PLAZA.y);
+      if(propLayer) ctx.drawImage(propLayer,PLAZA.x,PLAZA.y);
       if(typeof renderAvatar==='function'){
         if(typeof simulatedPlayers!=='undefined') simulatedPlayers.forEach(p=>renderAvatar(p,false));
         if(typeof localPlayer!=='undefined') renderAvatar(localPlayer,true);
@@ -190,5 +242,5 @@
     drawLanding();
   };
 
-  window.KELO_PLAZA_TILESET=Object.freeze({sourceMode:'registry-driven-v1',registryVersion:REGISTRY.version,assetPath:ATLAS.src,atlasWidth:ATLAS.width,atlasHeight:ATLAS.height,atlasTileSize:TILE,worldTileSize:TILE,columns:COLS,plaza:Object.freeze({...PLAZA})});
+  window.KELO_PLAZA_TILESET=Object.freeze({sourceMode:'layered-registry-v2',registryVersion:REGISTRY.version,assetPath:ATLAS.src,atlasWidth:ATLAS.width,atlasHeight:ATLAS.height,atlasTileSize:TILE,worldTileSize:TILE,columns:COLS,layeredTransitions:true,plaza:Object.freeze({...PLAZA})});
 })();
