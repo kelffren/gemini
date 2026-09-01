@@ -30,11 +30,23 @@
     marbleGold:Object.freeze([tiles.MARBLE_GOLD_A,tiles.MARBLE_GOLD_B])
   });
 
+  const styles = Object.freeze({
+    plazaTransition:Object.freeze({
+      marbleInsetShadow:'#d8cda9',
+      grassEdgeDark:'#239d2b',
+      grassEdgeMid:'#37bc35',
+      grassEdgeLight:'#79e75d',
+      tuftRate:5,
+      edgeDepth:3
+    })
+  });
+
   window.KELO_TILE_REGISTRY = Object.freeze({
-    version:'1.0.0',
+    version:'1.1.0',
     worldTileSize:TILE,
     atlases:Object.freeze({plaza:atlas}),
     tiles,
-    families
+    families,
+    styles
   });
 })();
