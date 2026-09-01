@@ -2,7 +2,7 @@
   const TILE = 32;
   const atlas = Object.freeze({
     id: 'plaza-core',
-    src: 'assets/tileset-vclean.png',
+    src: 'assets/tileset-vclean.png?art=131&',
     width: 512,
     height: 512,
     tileWidth: TILE,
@@ -49,7 +49,7 @@
   });
 
   window.KELO_TILE_REGISTRY = Object.freeze({
-    version:'1.3.0',
+    version:'1.3.1',
     worldTileSize:TILE,
     atlases:Object.freeze({plaza:atlas}),
     tiles,
