@@ -5,15 +5,17 @@ const PAGES = process.env.KELO_PAGES || 'https://kelffren.github.io/gemini/?v=69
 const EXPECT_TITLE = process.env.KELO_TITLE || 'V5.18';
 const EXPECT_CACHE = process.env.KELO_CACHE || 'v=69';
 
+function pos() {
+  return { x: localPlayer.x, y: localPlayer.y, vx: localPlayer.vx, vy: localPlayer.vy, zone: window.keloZone || null };
+}
+
 test.describe('Kelo World live Pages harness', () => {
-  test('boot, version, console/network, movement, cafe', async ({ page }) => {
+  test('boot, version, stick/keys movement, cafe button', async ({ page }) => {
     const consoleErrors = [];
     const pageErrors = [];
     const failed = [];
     const status400 = [];
-    page.on('console', (msg) => {
-      if (msg.type() === 'error') consoleErrors.push(msg.text());
-    });
+    page.on('console', (msg) => { if (msg.type() === 'error') consoleErrors.push(msg.text()); });
     page.on('pageerror', (err) => pageErrors.push(String(err)));
     page.on('requestfailed', (req) => {
       failed.push(req.url() + ' :: ' + (req.failure() && req.failure().errorText));
@@ -22,80 +24,92 @@ test.describe('Kelo World live Pages harness', () => {
       if (res.status() >= 400) status400.push(res.status() + ' ' + res.url());
     });
 
+    fs.mkdirSync('test-results', { recursive: true });
     const res = await page.goto(PAGES, { waitUntil: 'domcontentloaded', timeout: 30000 });
-    expect(res).toBeTruthy();
     expect(res.status()).toBeLessThan(400);
     await page.waitForTimeout(2500);
     await page.screenshot({ path: 'test-results/boot.png', fullPage: true });
 
     const title = await page.title();
-    const probe = await page.evaluate(() => {
-      const scripts = Array.from(document.scripts).map((s) => s.src);
-      const canvas = document.getElementById('game-canvas');
-      return {
-        title: document.title,
-        scripts,
-        canvasW: canvas ? canvas.width : 0,
-        canvasH: canvas ? canvas.height : 0,
-        px: typeof localPlayer !== 'undefined' ? localPlayer.x : null,
-        py: typeof localPlayer !== 'undefined' ? localPlayer.y : null,
-        zone: window.keloZone || null,
-        hasEnter: typeof window.enterCafe === 'function',
-        cafeBtn: !!document.getElementById('kelo-cafe-btn'),
-        ready: document.readyState,
-      };
-    });
-
-    fs.mkdirSync('test-results', { recursive: true });
+    const probe = await page.evaluate(() => ({
+      title: document.title,
+      scripts: Array.from(document.scripts).map((s) => s.src),
+      canvasW: document.getElementById('game-canvas') ? document.getElementById('game-canvas').width : 0,
+      px: localPlayer.x, py: localPlayer.y,
+      zone: window.keloZone || null,
+      cafeBtn: !!document.getElementById('kelo-cafe-btn'),
+      cafeBtnText: (document.getElementById('kelo-cafe-btn') || {}).textContent || null,
+    }));
     fs.writeFileSync('test-results/boot-report.json', JSON.stringify({
       url: page.url(), httpStatus: res.status(), title,
-      expectTitle: EXPECT_TITLE, titleMatch: title.includes(EXPECT_TITLE),
+      titleMatch: title.includes(EXPECT_TITLE),
       cacheHint: probe.scripts.some((s) => s.includes(EXPECT_CACHE)),
       probe, consoleErrors, pageErrors, failedRequests: failed, status400,
     }, null, 2));
-
     expect(probe.canvasW).toBeGreaterThan(0);
 
-    const before = await page.evaluate(() => ({ x: localPlayer.x, y: localPlayer.y }));
-    await page.evaluate(() => {
-      if (!window.input) return;
-      input.normX = 1;
-      input.normY = 0;
-      input.touchActive = true;
-    });
-    await page.waitForTimeout(700);
-    const mid = await page.evaluate(() => ({
-      x: localPlayer.x, y: localPlayer.y, vx: localPlayer.vx, vy: localPlayer.vy,
-    }));
-    await page.evaluate(() => {
-      if (!window.input) return;
-      input.normX = 0; input.normY = 0; input.touchActive = false;
-    });
-    fs.writeFileSync('test-results/move-report.json', JSON.stringify({
-      before, mid, moved: Math.hypot(mid.x - before.x, mid.y - before.y),
-    }, null, 2));
-    await page.screenshot({ path: 'test-results/after-move.png', fullPage: true });
+    const beforeKeys = await page.evaluate(pos);
+    await page.keyboard.down('d');
+    await page.waitForTimeout(800);
+    const afterKeys = await page.evaluate(pos);
+    await page.keyboard.up('d');
+    await page.waitForTimeout(200);
+    const keysMoved = Math.hypot(afterKeys.x - beforeKeys.x, afterKeys.y - beforeKeys.y);
+    await page.screenshot({ path: 'test-results/after-keys.png', fullPage: true });
 
-    const cafe = await page.evaluate(() => {
-      const out = {
-        zoneBefore: window.keloZone || null,
-        hasFn: typeof window.enterCafe === 'function',
-        btn: !!document.getElementById('kelo-cafe-btn'),
-        zoneAfterEnter: null, zoneAfterExit: null,
-        xIn: null, yIn: null, xOut: null, yOut: null, err: null,
-      };
-      try {
-        if (typeof window.enterCafe === 'function') window.enterCafe();
-        out.zoneAfterEnter = window.keloZone || null;
-        out.xIn = localPlayer.x; out.yIn = localPlayer.y;
-        if (typeof window.exitCafe === 'function') window.exitCafe();
-        out.zoneAfterExit = window.keloZone || null;
-        out.xOut = localPlayer.x; out.yOut = localPlayer.y;
-      } catch (e) { out.err = String(e); }
-      return out;
-    });
-    fs.writeFileSync('test-results/cafe-report.json', JSON.stringify(cafe, null, 2));
+    const box = page.locator('#game-canvas');
+    const beforePtr = await page.evaluate(pos);
+    const canvasBox = await box.boundingBox();
+    const sx = canvasBox.x + canvasBox.width * 0.22;
+    const sy = canvasBox.y + canvasBox.height * 0.62;
+    await page.mouse.move(sx, sy);
+    await page.mouse.down();
+    await page.mouse.move(sx + 80, sy, { steps: 8 });
+    await page.waitForTimeout(800);
+    const afterPtr = await page.evaluate(pos);
+    await page.mouse.up();
+    const ptrMoved = Math.hypot(afterPtr.x - beforePtr.x, afterPtr.y - beforePtr.y);
+    await page.screenshot({ path: 'test-results/after-pointer.png', fullPage: true });
+
+    fs.writeFileSync('test-results/move-report.json', JSON.stringify({
+      beforeKeys, afterKeys, keysMoved, beforePtr, afterPtr, ptrMoved,
+    }, null, 2));
+
+    const cafeCycles = [];
+    for (let i = 0; i < 3; i++) {
+      const before = await page.evaluate(pos);
+      const clicked = await page.evaluate(() => {
+        const b = document.getElementById('kelo-cafe-btn');
+        if (!b) return false;
+        b.click();
+        return true;
+      });
+      await page.waitForTimeout(400);
+      const inside = await page.evaluate(pos);
+      if (i === 0) await page.screenshot({ path: 'test-results/cafe-inside.png', fullPage: true });
+      await page.evaluate(() => {
+        const b = document.getElementById('kelo-cafe-btn');
+        if (b) b.click();
+      });
+      await page.waitForTimeout(400);
+      const after = await page.evaluate(pos);
+      cafeCycles.push({
+        clicked, before, inside, after,
+        entered: inside.zone === 'cafe',
+        exited: after.zone === 'plaza',
+        farRoom: inside.y > 2200 || inside.x > 2200,
+      });
+    }
     await page.screenshot({ path: 'test-results/after-cafe.png', fullPage: true });
+
+    const postBefore = await page.evaluate(pos);
+    await page.keyboard.down('s');
+    await page.waitForTimeout(700);
+    const postAfter = await page.evaluate(pos);
+    await page.keyboard.up('s');
+    const postMoved = Math.hypot(postAfter.x - postBefore.x, postAfter.y - postBefore.y);
+    fs.writeFileSync('test-results/cafe-report.json', JSON.stringify({ cafeCycles, postBefore, postAfter, postMoved }, null, 2));
+    await page.screenshot({ path: 'test-results/post-cafe-move.png', fullPage: true });
 
     expect(title.length).toBeGreaterThan(0);
   });
