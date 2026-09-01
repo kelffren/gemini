@@ -1,6 +1,6 @@
 (function () {
   const raw = new Image();
-  let sheet = null, ok = false, FW = 0, FH = 0;
+  let sheet = null, ok = false, FW = 0, FH = 0, single = true;
   const paths = ['assets/hero.PNG', 'assets/hero.png'];
   let i = 0;
   function tryNext() {
@@ -22,7 +22,7 @@
         d[p + 3] = 0;
       } else {
         const x = (p / 4) % c.width;
-        const y = Math.floor(p / 4 / c.width);
+        const y = Math.floor((p / 4) / c.width);
         if (x < minX) minX = x;
         if (y < minY) minY = y;
         if (x > maxX) maxX = x;
@@ -30,14 +30,20 @@
       }
     }
     g.putImageData(data, 0, 0);
-    if (maxX <= minX) { sheet = c; FW = c.width / 4; FH = c.height / 4; ok = true; return; }
+    if (maxX <= minX) {
+      sheet = c; FW = c.width; FH = c.height; single = true; ok = true; return;
+    }
     minX = Math.max(0, minX - 2); minY = Math.max(0, minY - 2);
     maxX = Math.min(c.width - 1, maxX + 2); maxY = Math.min(c.height - 1, maxY + 2);
     const w = maxX - minX + 1, h = maxY - minY + 1;
     const cut = document.createElement('canvas');
     cut.width = w; cut.height = h;
     cut.getContext('2d').drawImage(c, minX, minY, w, h, 0, 0, w, h);
-    sheet = cut; FW = w / 4; FH = h / 4; ok = true;
+    sheet = cut;
+    single = (w / h) < 0.9;
+    if (single) { FW = w; FH = h; }
+    else { FW = w / 4; FH = h / 4; }
+    ok = true;
   };
   raw.onerror = tryNext;
   tryNext();
@@ -51,35 +57,47 @@
     return f;
   }
 
-  function stepCol(p) {
+  function stepPhase(p) {
     if (p._lx == null) { p._lx = p.x; p._ly = p.y; p._step = 0; }
     const dx = p.x - p._lx, dy = p.y - p._ly;
     p._lx = p.x; p._ly = p.y;
     const dist = Math.hypot(dx, dy);
     const spd = Math.hypot(p.vx || 0, p.vy || 0);
-    const gait = p._gait || (spd > 180 ? 'run' : dist > 0.35 ? 'walk' : 'idle');
-    if (gait === 'idle' || dist < 0.2) {
-      p._step = 0;
-      return 0;
-    }
-    const stride = gait === 'run' ? 16 : 24;
+    const moving = dist > 0.2 || spd > 20;
+    if (!moving) { p._step = 0; return 0; }
     p._step += dist;
-    return Math.floor(p._step / stride) % 4;
+    return (p._step / 22) % 1;
   }
 
   const _av = renderAvatar;
   renderAvatar = function (p, isSelf) {
     if (!ok || !p || !sheet) return _av(p, isSelf);
-    const col = stepCol(p);
-    const row = dirRow[faceOf(p)] || 0;
+    const phase = stepPhase(p);
+    const moving = phase > 0;
+    const face = faceOf(p);
     const dw = 36, dh = 52;
     const footY = p.y;
+    const bob = moving ? Math.sin(phase * Math.PI * 2) * 1.1 : 0;
+    const squash = moving ? 1 - Math.abs(Math.sin(phase * Math.PI * 2)) * 0.04 : 1;
     ctx.save();
-    ctx.fillStyle = 'rgba(0,0,0,0.28)';
+    ctx.fillStyle = 'rgba(0,0,0,0.26)';
     ctx.beginPath();
-    ctx.ellipse(p.x, footY + 1, 11, 3.2, 0, 0, Math.PI * 2);
+    ctx.ellipse(p.x, footY + 1, 10.5, 3, 0, 0, Math.PI * 2);
     ctx.fill();
-    ctx.drawImage(sheet, col * FW, row * FH, FW, FH, Math.round(p.x - dw / 2), Math.round(footY - dh + 2), dw, dh);
+    let sx = 0, sy = 0, sw = FW, sh = FH;
+    if (!single) {
+      const col = Math.floor(phase * 4) % 4;
+      const row = dirRow[face] || 0;
+      sx = col * FW; sy = row * FH;
+    }
+    const drawH = dh * squash;
+    const drawY = Math.round(footY - drawH + 2 - bob);
+    if (face === 'left' && single) {
+      ctx.translate(p.x, 0);
+      ctx.scale(-1, 1);
+      ctx.translate(-p.x, 0);
+    }
+    ctx.drawImage(sheet, sx, sy, sw, sh, Math.round(p.x - dw / 2), drawY, dw, drawH);
     ctx.fillStyle = isSelf ? '#e7c56a' : '#f3eee4';
     ctx.font = 'bold 11px sans-serif';
     ctx.textAlign = 'center';
