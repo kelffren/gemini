@@ -22,49 +22,59 @@
   raw.onerror = function () { raw.src = 'assets/hero.png'; };
   raw.src = 'assets/hero.PNG';
 
-  function motion(p) {
+  function movingOf(p) {
     if (p._lx == null) { p._lx = p.x; p._ly = p.y; }
     const dx = p.x - p._lx;
     const dy = p.y - p._ly;
     const dist = Math.hypot(dx, dy);
-    const vx = p.vx || 0;
-    const vy = p.vy || 0;
-    const spd = Math.hypot(vx, vy);
-    return { dx: dist > 0.15 ? dx : vx, dy: dist > 0.15 ? dy : vy, dist: dist, spd: Math.max(spd, dist * 60) };
+    const spd = Math.hypot(p.vx || 0, p.vy || 0);
+    const toTarget = (p.targetX != null)
+      ? Math.hypot((p.targetX - p.x), (p.targetY - p.y))
+      : 0;
+    if (dist > 0.12 || spd > 16 || toTarget > 14) p._walkHold = 10;
+    else if (p._walkHold) p._walkHold -= 1;
+    if (dist > 0.12) {
+      p._mdx = dx;
+      p._mdy = dy;
+    } else if (spd > 16) {
+      p._mdx = p.vx;
+      p._mdy = p.vy;
+    } else if (toTarget > 14) {
+      p._mdx = p.targetX - p.x;
+      p._mdy = p.targetY - p.y;
+    }
+    p._lx = p.x;
+    p._ly = p.y;
+    return { dx: p._mdx || 0, dy: p._mdy || 0, on: (p._walkHold || 0) > 0 };
   }
 
   function faceOf(p, m) {
-    const mx = m.dx, my = m.dy;
-    if (Math.hypot(mx, my) < 0.2 && m.spd < 12) return p._face || 'down';
-    const side = Math.abs(mx) * 1.15 >= Math.abs(my);
-    const f = side ? (mx >= 0 ? 'right' : 'left') : (my >= 0 ? 'down' : 'up');
+    if (!m.on) return p._face || 'down';
+    const side = Math.abs(m.dx) * 1.15 >= Math.abs(m.dy);
+    const f = side ? (m.dx >= 0 ? 'right' : 'left') : (m.dy >= 0 ? 'down' : 'up');
     p._face = f;
     return f;
   }
 
-  function stepCol(p, m) {
-    p._lx = p.x;
-    p._ly = p.y;
-    const moving = m.dist > 0.2 || m.spd > 20;
-    if (!moving) { p._step = 0; return 0; }
-    p._step = (p._step || 0) + Math.max(m.dist, 0.35);
-    const stride = m.spd > 180 ? 14 : 22;
-    return Math.floor(p._step / stride) % COLS;
+  function stepCol(p, on) {
+    if (!on) { p._step = 0; return 0; }
+    // Time-based so duplicate render in the same frame does not freeze on idle.
+    return Math.floor(Date.now() / 130) % COLS;
   }
 
   const _av = renderAvatar;
   renderAvatar = function (p, isSelf) {
     if (!ok || !p || !sheet) return _av(p, isSelf);
-    const m = motion(p);
+    const m = movingOf(p);
     const face = faceOf(p, m);
-    const col = stepCol(p, m);
+    const col = stepCol(p, m.on);
     const side = face === 'left' || face === 'right';
     const row = face === 'up' ? 3 : (face === 'down' ? 0 : 2);
     const padX = Math.max(2, FW * 0.05);
-    const padY = Math.max(2, FH * 0.035);
+    const padY = Math.max(2, FH * 0.04);
     const dw = side ? 48 : 54;
     const dh = Math.round(54 * (FH / FW));
-    const footY = p.y;
+    const footY = p.y + 10;
     ctx.save();
     const prevSmooth = ctx.imageSmoothingEnabled;
     ctx.imageSmoothingEnabled = false;
@@ -76,7 +86,8 @@
     ctx.drawImage(
       sheet,
       col * FW + padX, row * FH + padY, FW - padX * 2, FH - padY * 2,
-      Math.round(p.x - dw / 2), Math.round(footY - dh + 3), dw, dh
+      Math.round(p.x - dw / 2), Math.round(footY - dh),
+      dw, dh
     );
     ctx.imageSmoothingEnabled = prevSmooth;
     ctx.restore();
@@ -84,7 +95,7 @@
     ctx.fillStyle = isSelf ? '#e7c56a' : '#f3eee4';
     ctx.font = 'bold 11px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(p.name || 'Kelo', Math.round(p.x), Math.round(footY - dh - 4));
+    ctx.fillText(p.name || 'Kelo', Math.round(p.x), Math.round(footY - dh - 6));
     ctx.restore();
   };
 })();
