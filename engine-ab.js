@@ -1,5 +1,4 @@
 (function () {
-  // LIVE owner: hero walk. Sheet is 1024x1536 = 4x4 cells of 256x384.
   const raw = new Image();
   let sheet = null, ok = false, FW = 256, FH = 384;
   const COLS = 4, ROWS = 4;
@@ -24,11 +23,11 @@
   raw.onerror = function () { raw.src = 'assets/hero.png'; };
   raw.src = 'assets/hero.PNG';
 
-  const dirRow = { down: 0, left: 1, right: 2, up: 3 };
   function faceOf(p) {
     const vx = p.vx || 0, vy = p.vy || 0;
     if (Math.hypot(vx, vy) < 12) return p._face || 'down';
-    const f = Math.abs(vx) > Math.abs(vy) ? (vx > 0 ? 'right' : 'left') : (vy > 0 ? 'down' : 'up');
+    const side = Math.abs(vx) * 1.15 >= Math.abs(vy);
+    const f = side ? (vx >= 0 ? 'right' : 'left') : (vy >= 0 ? 'down' : 'up');
     p._face = f;
     return f;
   }
@@ -46,10 +45,7 @@
     if (p._lx == null) { p._lx = p.x; p._ly = p.y; p._step = 0; }
     const dist = Math.hypot(p.x - p._lx, p.y - p._ly);
     p._lx = p.x; p._ly = p.y;
-    if (gait === 'idle') {
-      p._step = 0;
-      return 0;
-    }
+    if (gait === 'idle') { p._step = 0; return 0; }
     p._step += dist;
     const stride = gait === 'run' ? 12 : 20;
     return Math.floor(p._step / stride) % COLS;
@@ -58,20 +54,23 @@
   const _av = renderAvatar;
   renderAvatar = function (p, isSelf) {
     if (!ok || !p || !sheet) return _av(p, isSelf);
+    const face = faceOf(p);
     const col = stepCol(p);
-    const row = dirRow[faceOf(p)] || 0;
-    const padX = Math.max(2, FW * 0.04);
-    const padY = Math.max(2, FH * 0.03);
-    const dw = 36;
-    const dh = Math.round(dw * (FH / FW));
+    const side = face === 'left' || face === 'right';
+    const row = face === 'up' ? 3 : (face === 'down' ? 0 : 2);
+    const padX = Math.max(2, FW * 0.05);
+    const padY = Math.max(2, FH * 0.035);
+    const dw = side ? 32 : 36;
+    const dh = Math.round(36 * (FH / FW));
     const footY = p.y;
     ctx.save();
-    ctx.fillStyle = 'rgba(0,0,0,0.32)';
-    ctx.beginPath();
-    ctx.ellipse(p.x, footY + 1, dw * 0.28, 3.1, 0, 0, Math.PI * 2);
-    ctx.fill();
     const prevSmooth = ctx.imageSmoothingEnabled;
     ctx.imageSmoothingEnabled = false;
+    if (face === 'left') {
+      ctx.translate(p.x, 0);
+      ctx.scale(-1, 1);
+      ctx.translate(-p.x, 0);
+    }
     ctx.drawImage(
       sheet,
       col * FW + padX,
@@ -84,6 +83,8 @@
       dh
     );
     ctx.imageSmoothingEnabled = prevSmooth;
+    ctx.restore();
+    ctx.save();
     ctx.fillStyle = isSelf ? '#e7c56a' : '#f3eee4';
     ctx.font = 'bold 10px sans-serif';
     ctx.textAlign = 'center';
