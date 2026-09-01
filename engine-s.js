@@ -1,17 +1,15 @@
 (function () {
   const EXTRA = [
-    { id: 'b3', name: 'Andrea', x: 1460, y: 1500, targetX: 1460, targetY: 1500, hp: 100, maxHp: 100, radius: 16, gear: { bodyColor: '#d4a5c9', armorColor: '#fff', weaponColor: '#e7c56a' } },
-    { id: 'b4', name: 'Trader01', x: 1380, y: 1620, targetX: 1380, targetY: 1620, hp: 100, maxHp: 100, radius: 16, gear: { bodyColor: '#3d8b6e', armorColor: '#c9a24a', weaponColor: '#fff' } },
-    { id: 'b5', name: 'DiamondKing', x: 1550, y: 1570, targetX: 1550, targetY: 1570, hp: 100, maxHp: 100, radius: 16, gear: { bodyColor: '#2a2a32', armorColor: '#e7c56a', weaponColor: '#ef476f' } },
-    { id: 'b6', name: 'Kelo', x: 1490, y: 1710, targetX: 1490, targetY: 1710, hp: 100, maxHp: 100, radius: 16, gear: { bodyColor: '#4b6cb7', armorColor: '#d4af37', weaponColor: '#fff' } },
-    { id: 'b7', name: 'Nova', x: 1288, y: 1644, targetX: 1288, targetY: 1644, hp: 100, maxHp: 100, radius: 16, gear: { bodyColor: '#7b4b94', armorColor: '#eee', weaponColor: '#88f' } }
+    { id: 'b3', name: 'Andrea', x: 1460, y: 1500, targetX: 1460, targetY: 1500, hp: 100, maxHp: 100, radius: 16, gear: { bodyColor: '#d4a5c9', armorColor: '#fff', weaponColor: '#e7c56a' } }
   ];
   if (typeof simulatedPlayers !== 'undefined') {
+    simulatedPlayers.length = Math.min(simulatedPlayers.length, 1);
     EXTRA.forEach(function (p) { simulatedPlayers.push(p); });
+    if (simulatedPlayers.length > 2) simulatedPlayers.length = 2;
   }
 
   const bubbles = [];
-  const BOT_LINES = ['esa vitrina', 'voy al cafe', 'quien es el Rey', 'bonita plaza', 'trade?'];
+  const BOT_LINES = ['esa vitrina', 'voy al cafe', 'quien es el Rey'];
   let walkT = 0;
   window.keloBubbles = bubbles;
 
@@ -46,8 +44,8 @@
     if (document.getElementById('kelo-chat')) return;
     const wrap = document.createElement('div');
     wrap.id = 'kelo-chat';
-    wrap.style.cssText = 'position:absolute;left:8px;bottom:10px;width:min(230px,48vw);z-index:90;pointer-events:auto;font-size:11px';
-    wrap.innerHTML = '<div id="kelo-chat-log" style="max-height:70px;overflow:auto;background:rgba(8,10,14,.55);color:#ddd;padding:4px 6px;border-radius:8px;margin-bottom:4px"></div><form id="kelo-chat-form" style="display:flex;gap:4px"><input id="kelo-chat-in" maxlength="80" placeholder="Escribir mensaje..." style="flex:1;background:rgba(10,13,18,.85);border:1px solid #3a465c;color:#eee;border-radius:8px;padding:6px 8px"><button style="background:#9e6a03;border:0;color:#fff;border-radius:8px;padding:6px 8px">OK</button></form>';
+    wrap.style.cssText = 'position:absolute;left:8px;bottom:10px;width:min(210px,44vw);z-index:90;pointer-events:auto;font-size:11px';
+    wrap.innerHTML = '<div id="kelo-chat-log" style="max-height:54px;overflow:auto;background:rgba(8,10,14,.55);color:#ddd;padding:4px 6px;border-radius:8px;margin-bottom:4px"></div><form id="kelo-chat-form" style="display:flex;gap:4px"><input id="kelo-chat-in" maxlength="80" placeholder="Escribir..." style="flex:1;background:rgba(10,13,18,.85);border:1px solid #3a465c;color:#eee;border-radius:8px;padding:6px 8px"><button style="background:#9e6a03;border:0;color:#fff;border-radius:8px;padding:6px 8px">OK</button></form>';
     document.body.appendChild(wrap);
     document.getElementById('kelo-chat-form').addEventListener('submit', function (e) {
       e.preventDefault();
@@ -76,13 +74,24 @@
 
   const _upd = updateSimulation;
   updateSimulation = function (dt) {
+    if (simulatedPlayers) {
+      simulatedPlayers.forEach(function (b) { b._px = b.x; b._py = b.y; });
+    }
     _upd(dt);
+    if (simulatedPlayers) {
+      simulatedPlayers.forEach(function (b) {
+        const dx = b.x - (b._px || b.x);
+        const dy = b.y - (b._py || b.y);
+        b.x = (b._px || b.x) + dx * 0.32;
+        b.y = (b._py || b.y) + dy * 0.32;
+      });
+    }
     walkT += dt;
     for (let i = bubbles.length - 1; i >= 0; i--) {
       bubbles[i].t -= dt;
       if (bubbles[i].t <= 0) bubbles.splice(i, 1);
     }
-    if (Math.random() < 0.003 && simulatedPlayers.length) {
+    if (Math.random() < 0.0012 && simulatedPlayers.length) {
       const b = simulatedPlayers[Math.floor(Math.random() * simulatedPlayers.length)];
       say(b.name, BOT_LINES[Math.floor(Math.random() * BOT_LINES.length)]);
     }

@@ -10,22 +10,20 @@
     chip.id = 'kelo-online';
     chip.style.cssText = [
       'position:absolute',
-      'top:max(8px,env(safe-area-inset-top))',
-      'left:50%',
-      'transform:translateX(-50%)',
+      'top:max(44px, calc(env(safe-area-inset-top) + 36px))',
+      'left:max(8px, env(safe-area-inset-left))',
       'z-index:80',
       'pointer-events:none',
       'display:flex',
       'align-items:center',
       'gap:6px',
-      'padding:6px 12px',
+      'padding:5px 10px',
       'border-radius:999px',
       'background:rgba(10,13,18,.92)',
       'border:1px solid rgba(231,197,106,.35)',
       'color:#e7c56a',
-      'font:700 11px/1.2 -apple-system,sans-serif',
-      'white-space:nowrap',
-      'box-shadow:0 6px 18px rgba(0,0,0,.35)'
+      'font:700 10px/1.2 -apple-system,sans-serif',
+      'white-space:nowrap'
     ].join(';');
     document.body.appendChild(chip);
     return chip;
@@ -35,12 +33,11 @@
     const chip = ensureChip();
     const dot = state === 'on' ? '#3ddc84' : (state === 'wait' ? '#e7c56a' : '#8a9099');
     const label =
-      state === 'on' ? ('En línea  ·  ' + n) :
-      state === 'wait' ? 'Conectando…' :
-      state === 'err' ? 'Sin señal' :
-      'Solo local';
-    chip.innerHTML = '<span style="width:8px;height:8px;border-radius:50%;background:' + dot +
-      ';box-shadow:0 0 8px ' + dot + '"></span><span>' + label + '</span>';
+      state === 'on' ? ('Online ' + n) :
+      state === 'wait' ? 'Conectando' :
+      state === 'err' ? 'Sin senal' :
+      'Local';
+    chip.innerHTML = '<span style="width:7px;height:7px;border-radius:50%;background:' + dot + '"></span><span>' + label + '</span>';
   }
 
   function countOnline() {
