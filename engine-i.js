@@ -12,42 +12,30 @@
     g.fillRect(0, 0, c.width, c.height);
     for (let y = 0; y < c.height; y += T) {
       for (let x = 0; x < c.width; x += T) {
-        const cx = Math.floor(x / T);
-        const cy = Math.floor(y / T);
-        const checker = (cx + cy) % 2;
+        const checker = ((x + y) / T) % 2;
         g.fillStyle = checker ? '#1a1f29' : '#161b24';
         g.fillRect(x + 1, y + 1, T - 2, T - 2);
-        g.strokeStyle = 'rgba(201,162,74,0.18)';
-        g.strokeRect(x + 0.5, y + 0.5, T - 1, T - 1);
-        if (checker) {
-          g.fillStyle = 'rgba(231,197,106,0.06)';
-          g.fillRect(x + 8, y + 8, T - 16, T - 16);
-        }
       }
     }
-    const grd = g.createRadialGradient(c.width / 2, c.height / 2, 40, c.width / 2, c.height / 2, 280);
-    grd.addColorStop(0, 'rgba(231,197,106,0.16)');
-    grd.addColorStop(1, 'rgba(231,197,106,0)');
-    g.fillStyle = grd;
-    g.fillRect(0, 0, c.width, c.height);
-    g.strokeStyle = 'rgba(231,197,106,0.55)';
-    g.lineWidth = 3;
-    g.strokeRect(6, 6, c.width - 12, c.height - 12);
-    g.strokeStyle = 'rgba(231,197,106,0.28)';
-    g.lineWidth = 1;
-    g.beginPath();
-    g.moveTo(c.width / 2, 18);
-    g.lineTo(c.width / 2, c.height - 18);
-    g.moveTo(18, c.height / 2);
-    g.lineTo(c.width - 18, c.height / 2);
-    g.stroke();
     floor = c;
   }
   bakeFloor();
 
   const plazaArt = new Image();
-  plazaArt.onload = function () { /* photo wins if someone uploads it */ };
-  plazaArt.src = 'assets/plaza.jpg';
+  const paths = [
+    'assets/tileset .PNG',
+    'assets/tileset.PNG',
+    'assets/tileset.png',
+    'assets/plaza.jpg',
+    'assets/plaza.png'
+  ];
+  let pi = 0;
+  plazaArt.onload = function () {};
+  plazaArt.onerror = function () {
+    pi += 1;
+    if (pi < paths.length) plazaArt.src = paths[pi];
+  };
+  plazaArt.src = paths[0];
 
   function overlapsPlaza(x, y, w, h) {
     return x < PLAZA.x + PLAZA.w && x + w > PLAZA.x && y < PLAZA.y + PLAZA.h && y + h > PLAZA.y;
