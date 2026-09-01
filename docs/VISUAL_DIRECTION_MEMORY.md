@@ -135,6 +135,14 @@ For every meaningful visual implementation:
 ## Current Priority
 Refactor the environment renderer so it is no longer tied to a single hard-coded 512x512 atlas and scattered numeric IDs. Move toward TileRegistry + modular atlases + environment definitions + layered rendering, then rebuild the Roman garden plaza using a higher-quality environment kit.
 
+## Validated Architecture State — 2026-09-01
+- `src/environment/tile-registry.js` is now the live source of atlas metadata, named tile IDs, and reusable tile families for the plaza renderer.
+- `engine-l.js` now consumes `KELO_TILE_REGISTRY` instead of owning scattered tile IDs and hard-coded atlas dimensions.
+- The renderer remains on the current 512x512 production atlas for visual compatibility, but atlas width/height/columns/source are now registry data, so a future 1024x1024 or modular-atlas migration no longer requires rewriting the plaza selection logic.
+- LIVE mobile audit V5.43 validated `registry-driven-v1`, registry version 1.0.0, assetLoaded=true, fallbackActive=false at 390x844 CSS / 780x1688 backing canvas.
+- The live screenshot remained visually stable after the architecture migration; therefore the next visual bottleneck is the art kit itself: marble repetition, lack of grass↔marble transition tiles, low-detail props, and insufficient environment variation.
+- Current audit still reports four generic 404 resource errors and one unrelated `appendChild` page error. These were present outside the visual registry change and should be handled as a separate debugging pass rather than mixed into environment art work.
+
 ## Non-goals During Visual Passes
 Do not casually alter unrelated systems such as:
 - core movement feel;
