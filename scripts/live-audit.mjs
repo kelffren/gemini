@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import { chromium } from 'playwright';
 
+// audit trigger 2026-09-01T11:54-04:00
 const base = process.env.AUDIT_URL || 'https://kelffren.github.io/gemini/';
 const expected = process.env.EXPECTED_BUILD || 'V5.39';
 fs.mkdirSync('artifacts', { recursive: true });
