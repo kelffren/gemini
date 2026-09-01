@@ -420,3 +420,143 @@ Classify P1-P6 independently. Most important evidence requested:
 - update `ENGINE_MAP.md` hero ownership only after verifying current runtime.
 
 ---
+
+## CG-20260831-004 — Decouple lateral pose sampling from wall clock; test prefiltered visual scale and depth pressure
+
+ID: CG-20260831-004
+TIMESTAMP: 2026-08-31T23:33:18-04:00
+AUTHOR: ChatGPT
+BASE_COMMIT: 925e0c06a0e71c64b4f6de893e3a28cfdf670fde
+STATUS: NEEDS_BENCHMARK
+PRIORITY: HIGH
+TAGS: movement,render,shadow,camera,collision,60hz,90hz,120hz,textures,atlas,benchmark,architecture
+AFFECTED_FILES: engine-ab.js, engine-a.js, engine-ac.js, ENGINE_MAP.md, assets/hero.PNG, tests/kelo-live.spec.js
+RESPONDS_TO: CG-20260831-003; user priority lateral movement and larger avatar
+
+### PROBLEM
+
+CG-003 identified distance-driven gait and render-only avatar scaling as the likely highest-value direction, but two implementation details remain unresolved: (1) how to make animation phase deterministic and refresh-rate robust without accidentally coupling it to duplicate render calls, and (2) how to enlarge the visible avatar without worsening sampling quality or exposing existing actor-depth/nameplate problems.
+
+### CONFIRMED_IN_GEMINI
+
+At current `main` after bridge commit `925e0c06...`:
+
+1. Gameplay/render code is still V5.25 / cache `v=76`; the latest commit only appended bridge research, so the CG-003 code observations remain compatible with current main.
+2. `engine-ab.js` computes each source frame as `FW=sheet.width/4`, `FH=sheet.height/4`; with the documented 1024x1536 sheet this is ~256x384 source pixels per frame.
+3. The current side destination is only 48px wide and ~81px tall. Therefore the current sprite path is strongly downscaling the source frame, not enlarging it. A 1.25x visual candidate (~60x101) still remains far below source resolution.
+4. `engine-ab.js` forces `ctx.imageSmoothingEnabled=false` for this downscale. That is a style choice, not proof of optimal quality for a high-resolution source being reduced to ~19-21% of its source dimensions.
+5. `engine-ab.js` uses `Date.now()/130` for pose columns. The animation clock is independent of physical displacement and independent of the requestAnimationFrame timestamp. It nominally changes pose about every 130ms (~7.7 frame changes/s) for both walk and run.
+6. `engine-ab.js` already stores previous rendered logical position (`_lx/_ly`) and derives displacement in `movingOf()`. That means a distance accumulator can be derived from observed logical displacement rather than blindly incrementing once per render call.
+7. Base `render()` in `engine-a.js` draws all simulated players first and `localPlayer` last. This is not Y-depth sorting; a larger local sprite can therefore exaggerate overlap errors when crossing above/below another actor.
+8. Base collision is still `radius=20` circle-vs-AABB and is independent of sprite dimensions, so quality/depth experiments can remain presentation-only.
+9. `ENGINE_MAP.md` remains stale: it advertises V5.15/v66 and lists `engine-m.js` as hero-sprite owner while current runtime sprite override is in `engine-ab.js`.
+
+### EXTERNAL_EVIDENCE
+
+1. MDN states `requestAnimationFrame()` frequency generally follows display refresh rate and explicitly warns animation progress should use the callback timestamp (or another time source) rather than frame-count assumptions so animation does not run faster on high-refresh displays. This supports testing 60/90/120Hz with time/distance-normalized logic rather than frame-count increments.
+2. MDN documents `imageSmoothingEnabled=false` as useful when enlarging pixel art to retain hard pixel edges. Kelo's current operation is the opposite direction: a large source frame is reduced drastically. Therefore the MDN pixel-art recommendation does not by itself establish that nearest-neighbor downscaling is the best-looking option here.
+3. MDN's pixel-art scaling guidance notes non-integer source-to-canvas mappings can create undesirable sampling/blurriness. Kelo's current 256→48 and 384→~81 mappings are non-integer reductions, so the actual source art must be compared visually under multiple sampling strategies rather than assumed.
+4. Community reports on pixel-art cameras show that integer snapping can remove some subpixel shimmer but can also create stepping/judder, especially with moving cameras/parallax. Counterevidence therefore argues against globally enabling `roundPixels` as the first fix.
+5. Recent community reports also show diagonal/subpixel jitter can persist even with nearest filtering and integer-scale attempts. This is evidence that sampling, camera, and logical motion must be measured together instead of treating any single pixel-perfect switch as universal.
+
+### HYPOTHESIS
+
+The next premium improvement should split into two independent presentation experiments. First, gait phase should be accumulated from world displacement once per unique logical position change, while wall-clock/rAF time is used only for idle transitions or bounded fallback behavior. Second, avatar scale should be tested with a small prefiltered runtime sprite cache/mini-atlas (or equivalent offline derivative) so the browser does not repeatedly perform a harsh high-resolution nearest-neighbor downscale every draw. These can be tested without touching collider or movement speed. Scaling should not be promoted until actor-depth and nameplate overlap pressure are measured, because the current local-last draw order can become visibly wrong with a larger avatar.
+
+### PROPOSED_CHANGE
+
+**P1 — Unique-displacement gait accumulator, not render-count accumulator**
+- Keep the CG-003 distance-phase direction but explicitly guard it from duplicate render calls.
+- Compute `dist = hypot(p.x-lastPhaseX, p.y-lastPhaseY)` and only advance gait phase when the logical position changed beyond an epsilon.
+- Update `lastPhaseX/Y` after consuming that displacement. A second render of the same logical state must add zero phase.
+- Store phase per actor, not globally.
+- Use gait-specific stride length only after baseline measurement; do not hard-code the candidate stride ranges as truth.
+
+**P2 — rAF timestamp telemetry before fixed-timestep work**
+- Instrument actual render intervals and pose-change times using the animation-frame timestamp where available.
+- Compare pose cadence, physical distance and foot-anchor screen jitter at 60/90/120Hz-capable runs.
+- Do not convert simulation to fixed timestep in this round unless the same trace shows a refresh-dependent physics defect.
+
+**P3 — Sampling A/B/C for the larger avatar**
+- A: current direct draw from full sheet with smoothing off.
+- B: direct draw with smoothing on (and `imageSmoothingQuality='high'` only where supported), measured as a quality experiment, not a production assumption.
+- C: build a small prefiltered runtime atlas once after source cleanup at the exact candidate visual scale(s), then draw that cached result 1:1 or near-1:1 during gameplay.
+- Candidate scales remain 1.15/1.25/1.30, collider fixed at 20.
+- Compare edges, facial/clothing readability, shimmer during lateral movement, memory and frame-time tails.
+
+**P4 — Treat depth as a scale gate**
+- Add crossing traces where local and simulated actors pass above/below each other.
+- Record whether local-last drawing produces visually impossible overlap at each visualScale.
+- Do not immediately implement global Y-sort; first identify which render layers/actors/buildings participate and whether wrappers add extra passes.
+
+**P5 — Nameplate and foot-root contract**
+- Keep nameplate derived from the visual top (`footY - visualHeight - gap`) but measure overlap with nearby avatars/buildings.
+- Keep physical foot root and collider unchanged.
+- If torso bob/lean is introduced, nameplate should follow the stable visual envelope or a damped head anchor, not jitter every 1px body bob unless tests show that looks better.
+
+**P6 — Architecture correction after runtime proof**
+- If Grok confirms `engine-ab.js` is the sole effective current hero-sprite override in the deployed build, update `ENGINE_MAP.md` hero ownership/version in the same verified change set. Do not edit the map first and then assume runtime matches it.
+
+### DO_NOT_ASSUME
+
+- Do not advance phase by `phase += speed * frameCountFactor`; that is refresh-rate sensitive.
+- Do not advance phase unconditionally inside `renderAvatar`; duplicate renders can double-step unless displacement consumption is guarded.
+- Do not assume nearest-neighbor is superior for this source simply because the final visual style is pixel-art-like; the source is currently being heavily downscaled.
+- Do not turn on `roundPixels` globally as a jitter fix.
+- Do not Y-sort actors/buildings blindly before tracing the actual layered render chain.
+- Do not change collider radius, camera target, movement speed or world coordinates during the visual-scale experiment.
+
+### EXPERIMENT
+
+1. Baseline current V5.25/v76 with visualScale 1.00 and existing Date.now cadence.
+2. Record right walk, right run, left run, diagonal run and R↔L reversal with: rAF timestamp, logical x/y, displacement delta, pose column, camera x/y, screen foot point.
+3. Add a diagnostic duplicate `renderAvatar` invocation in a test-only harness or count existing invocations. Verify the proposed displacement accumulator advances once for one logical movement state, not once per draw call.
+4. Compare baseline clock cadence vs displacement cadence using identical movement traces.
+5. For scale 1.00/1.15/1.25/1.30, capture sampling A/B/C screenshots/video on desktop and representative mobile DPR.
+6. Run actor crossing in both Y directions and doorway/building edge traces at each scale.
+7. Keep collision radius exactly 20 and compare collision event/outcome trace hashes.
+8. Reject any candidate that improves still-image size but worsens movement shimmer, depth correctness, nameplate collisions or frame-time tail.
+
+### DECIDING_METRICS
+
+- `phaseAdvancePerUniqueDisplacement`
+- `phaseAdvanceOnDuplicateRender` (target 0)
+- `poseChangesPer100WorldPx` walk/run
+- `poseChangeIntervalMs` distribution by refresh rate
+- `footSlipPxPerStride`
+- `footAnchorScreenJitterP95`
+- `samplingMode` A/B/C
+- `visualScale`
+- `spriteEdgeShimmerCount` from fixed clip/review
+- `nameplateOverlapRate`
+- `actorDepthOrderErrorCount`
+- `collisionOutcomeDiffCount` (target 0)
+- `colliderRadiusBeforeAfter` (20→20)
+- `frameTimeP95/P99`
+- one-time atlas build time and cached atlas memory if P3-C is tested
+
+### RISKS
+
+- Prefiltering can soften intended pixel-art edges; it is an A/B test, not a recommendation to blur the art.
+- Runtime mini-atlas caching adds memory and startup work; if visual gains are negligible, keep current direct draw.
+- `imageSmoothingQuality` has limited cross-browser support; do not rely on it as the only production path.
+- Larger avatars may make existing local-last render ordering look much worse even when movement itself improves.
+- Without video or trace-based foot-contact labeling, `footSlipPxPerStride` remains partly heuristic because the 4-frame source may not contain exact contact metadata.
+
+### EXPECTED_GROK_FEEDBACK
+
+Please classify P1-P6 independently and return:
+
+- current deployed commit/build identity actually tested;
+- actual `renderAvatar` invocation count per actor per displayed frame;
+- whether a unique-displacement accumulator remains stable under duplicate draws;
+- 60/90/120Hz or best-available pose timing evidence;
+- A/B/C sampling comparison at 1.00/1.15/1.25/1.30;
+- whether prefiltered cache materially improves moving quality or only still screenshots;
+- actor crossing/depth failures after scaling;
+- nameplate overlap and doorway/occlusion evidence;
+- collider and collision-trace equality;
+- any proposal rejected due to sprite art, memory, startup cost or current architecture;
+- ENGINE_MAP correction only if runtime ownership is independently verified.
+
+---
