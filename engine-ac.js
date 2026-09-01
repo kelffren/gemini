@@ -1,22 +1,56 @@
 (function () {
+  // MOV-001: one processed intent magnitude drives gait + speed.
+  // Keep the historical top speed (172.28) while removing the WALK->RUN speed step.
   const WALK_MAX = 0.74;
   const WALK_SPEED = 96;
   const RUN_SPEED = 165;
+  const MAX_SPEED = RUN_SPEED + (1 - WALK_MAX) * 28; // 172.28, historical max
+  const SPEED_BLEND_START = 0.55;
+  const GAIT_IDLE_MAX = 0.04;
+  const GAIT_RUN_START = 0.74;
   const VISUAL_FRAME_SEC = 0.130;
   const VISUAL_STOP_HOLD_SEC = 0.075;
   CONFIG.speed = WALK_SPEED;
 
-  function stickMag() {
-    if (input.touchActive) {
-      return Math.min(1, Math.hypot(input.currentX - input.originX, input.currentY - input.originY) / CONFIG.joystickRadius);
-    }
+  function processedMag() {
+    // processInput() already applies the circular deadzone + POWER curve.
+    // Reading raw pointer radius here used to make animation and physics disagree.
     return Math.min(1, Math.hypot(input.normX || 0, input.normY || 0));
   }
 
+  function smoothstep01(t) {
+    t = Math.max(0, Math.min(1, t));
+    return t * t * (3 - 2 * t);
+  }
+
+  function speedFor(mag) {
+    if (mag <= SPEED_BLEND_START) return WALK_SPEED;
+    const t = (mag - SPEED_BLEND_START) / (1 - SPEED_BLEND_START);
+    return WALK_SPEED + (MAX_SPEED - WALK_SPEED) * smoothstep01(t);
+  }
+
   function gaitFrom(mag) {
-    if (mag < 0.14) return 'idle';
-    if (mag < WALK_MAX) return 'walk';
+    if (mag < GAIT_IDLE_MAX) return 'idle';
+    if (mag < GAIT_RUN_START) return 'walk';
     return 'run';
+  }
+
+  function rawTouchMag() {
+    if (!input.touchActive) return null;
+    return Math.min(1, Math.hypot(input.currentX - input.originX, input.currentY - input.originY) / CONFIG.joystickRadius);
+  }
+
+  function publishAudit(mag, gait, speedCap) {
+    window.KELO_MOVEMENT_AUDIT = {
+      version: 'MOV-001',
+      rawTouchMag: rawTouchMag(),
+      processedMag: mag,
+      gait,
+      speedCap,
+      targetSpeed: mag * speedCap,
+      actualSpeed: Math.hypot(localPlayer.vx || 0, localPlayer.vy || 0),
+      colliderRadius: localPlayer.radius
+    };
   }
 
   function visualStateOf(p) {
@@ -74,7 +108,6 @@
 
     if (v.on) {
       if (!wasOn) {
-        // Deterministic start: every new locomotion burst begins on contact frame 0.
         v.frame = 0;
         v.frameElapsed = 0;
       } else {
@@ -96,13 +129,14 @@
 
   const _move = updateMovement;
   updateMovement = function (dt) {
-    const mag = stickMag();
+    const mag = processedMag();
     const gait = gaitFrom(mag);
+    const speedCap = speedFor(mag);
     localPlayer.gait = gait;
     localPlayer._gait = gait;
-    if (gait === 'run') CONFIG.speed = RUN_SPEED + (mag - WALK_MAX) * 28;
-    else CONFIG.speed = WALK_SPEED;
+    CONFIG.speed = speedCap;
     _move(dt);
     updateVisualMotion(localPlayer, dt, gait);
+    publishAudit(mag, gait, speedCap);
   };
 })();
