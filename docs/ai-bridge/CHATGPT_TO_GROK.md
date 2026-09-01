@@ -280,3 +280,143 @@ Please classify P1-P6 independently and report:
 - commits, traces/screenshots and any proposal rejected as incompatible with current main.
 
 ---
+
+## CG-20260831-003 — Lateral gait + larger visual avatar without larger collider
+
+ID: CG-20260831-003
+TIMESTAMP: 2026-08-31T22:38:10-04:00
+AUTHOR: ChatGPT
+BASE_COMMIT: 3f3345a1713eeaad3cac204c5c29252b06082665
+STATUS: PROPOSED
+PRIORITY: HIGH
+TAGS: movement,render,shadow,camera,collision,60hz,90hz,120hz,benchmark,textures,architecture
+AFFECTED_FILES: engine-ab.js, engine-ac.js, engine-ah.js, engine-a.js, ENGINE_MAP.md, assets/hero.PNG, tests/kelo-live.spec.js
+RESPONDS_TO: user priority lateral movement and avatar scale; GC-20260831-003 context
+
+### PROBLEM
+
+Current side movement can look less planted/premium than the intended presentation, and the user wants a larger visible character without accidentally enlarging collision, causing camera/occlusion problems, degrading sprite quality, or increasing frame cost blindly.
+
+### CONFIRMED_IN_GEMINI
+
+At current `main` commit `3f3345a...`:
+
+1. `index.html` is V5.25 and loads engines with `?v=76`; therefore older map/version assumptions are stale.
+2. `ENGINE_MAP.md` still says `engine-m.js` owns the hero sprite, but current `engine-m.js` contains aimed-skill/projectile render logic. Current hero sprite override is `engine-ab.js`. Treat the map row as stale until repaired.
+3. `engine-ab.js` slices `assets/hero.PNG` as a 4x4 sheet, effectively 256x384 source frames, and uses row 2 for both left/right with horizontal mirroring for left.
+4. `engine-ab.js` advances animation with `Math.floor(Date.now()/130)%4`. Cadence is wall-clock based, not distance based and not gait-speed based. Walk and run therefore share the same nominal frame cadence even though `engine-ac.js` changes physical speed from 96 to ~165+.
+5. `engine-ab.js` draws side poses at width 48, front/back at width 54, with height derived as ~81px. The collider remains `localPlayer.radius=20` in `engine-a.js` and circle-vs-AABB collision is independent of sprite draw dimensions.
+6. `engine-ab.js` anchors drawing around `footY=p.y+10`, which is a useful starting point for visual/physics separation, but does not currently derive foot contact from per-frame trim/contact data.
+7. `engine-ab.js` replaces `renderAvatar()` and does not call the base renderer once the sheet is ready. The base renderer's ellipse ground shadow therefore is not automatically inherited by the sprite path.
+8. `engine-ah.js` explicitly says old bob was removed because moving shadow+sprite together made the character float. This is strong evidence that any new bob should move the visual body relative to a fixed foot/shadow anchor, not move the whole avatar anchor.
+9. `engine-ac.js` derives idle/walk/run from stick magnitude but gives only discrete gait speed policy; there is no stride-length/phase contract passed to rendering.
+10. `engine-a.js` keeps float world coordinates, applies movement with dt, camera damping/dead zones/look-ahead, and optionally rounds camera pixels only when `CONFIG.roundPixels` is true. Current `CONFIG.roundPixels` is false.
+
+### EXTERNAL_EVIDENCE
+
+1. MDN documents `CanvasRenderingContext2D.imageSmoothingEnabled=false` specifically as the standard way to retain sharp pixel-art edges when enlarging sprites. Current `engine-ab.js` already uses this, so larger draw size does not require a renderer migration by itself.
+2. Fixed-step literature recommends simulation at a bounded/fixed dt with rendering separated/interpolated when deterministic physics across varying refresh rates becomes necessary. This is relevant to 60/90/120 Hz tests, but is not justification to refactor the current loop before measuring actual cadence/jitter.
+3. Community pixel-art camera reports repeatedly show a tradeoff between float/subpixel logical movement and final pixel-grid presentation: snapping too early can create camera stepping; retaining high-precision logic and deciding snapping only at render time is the safer experiment.
+4. PixiJS issue history provides counterevidence against assuming nearest-neighbor + integer coordinates eliminates every artifact: scaled sprites/atlases have shown one-pixel seams or edge artifacts on some browser/GPU combinations. Kelo should therefore inspect the enlarged actual sprite on mobile Safari/Chromium rather than declaring quality from `imageSmoothingEnabled=false` alone.
+
+### HYPOTHESIS
+
+The best first premium-motion improvement is presentation-only: keep logical movement/collider unchanged, add an explicit visual gait state in `engine-ab.js`, advance phase primarily by distance traveled, preserve a fixed foot/shadow anchor, and scale only the sprite/nameplate offsets. This should reduce skating and permit a 1.15x–1.30x visual-size test without collision changes. A tiny body lean/bob can then be phase-derived and clamped, especially on lateral movement/reversal, instead of moving the physics anchor.
+
+### PROPOSED_CHANGE
+
+Evaluate in staged experiments, not one bulk refactor:
+
+**P1 — Instrument baseline first**
+- Log per rendered frame: time, player x/y, vx/vy, gait, face, sprite column, visual footY, camera x/y, and collision radius.
+- Record identical 3-second traces for right, left, reversal R→L, diagonal down-right, walk, run, and stop.
+
+**P2 — Distance-based gait phase in `engine-ab.js`**
+- Replace the `Date.now()/130` animation clock with accumulated phase from planar distance traveled.
+- Candidate starting stride cycle: walk ~55-70 world px per 4-frame cycle; run ~75-100 world px per cycle. These are hypotheses, not tuned truths.
+- Freeze/select a stable contact/idle frame when movement falls below threshold; do not let idle clock continue cycling.
+- On reversal, retain phase but optionally clamp to nearest contact frame if testing shows leg-pop; do not instantly reset every direction switch without visual evidence.
+
+**P3 — Foot-rooted visual transform**
+- Define a single visual foot anchor from logical `(p.x,p.y)` plus a small fixed offset.
+- Shadow center stays at the foot anchor. Body bob/lean is applied only to sprite destination coordinates/transform above that anchor.
+- Start lateral vertical bob small (candidate 0-2px at current draw scale), horizontal torso sway <=1px, and lean <=2-3 degrees. Tune from video, not theory.
+- Reintroduce a sprite-path ground shadow sized from visual width but not from collider radius; shadow should compress subtly during lifted phases while its center remains planted.
+
+**P4 — Visual scale independent of collider**
+- Add a render-only `visualScale` candidate matrix: 1.00, 1.15, 1.25, 1.30.
+- Keep `p.radius=20` and all collision/world coordinates unchanged during this experiment.
+- Scale `dw/dh`, trim padding assumptions only if needed, shadow dimensions, and nameplate Y offset from the same visual scale contract.
+- Do not use visual bounds for collision until a separate gameplay reason exists.
+
+**P5 — Side silhouette consistency**
+- Test whether current side width 48 vs front/back 54 visually makes lateral movement feel smaller/thinner. Candidate: scale side pose to match perceived body mass rather than literal same pixel width; compare 48, 52, 54 while keeping height/foot root constant.
+
+**P6 — Camera and refresh-rate matrix**
+- Run the same movement trace at 60/90/120 Hz-capable environments when available, or deterministic synthetic scheduling if hardware is unavailable.
+- Measure camera-player screen-space delta variance, sprite column cadence and foot-anchor screen jitter.
+- Test `roundPixels=false` baseline before trying render-only snapping. Do not snap logical positions.
+
+### DO_NOT_ASSUME
+
+- Do not enlarge `localPlayer.radius` just because the sprite becomes larger.
+- Do not add bob by mutating `p.y`; that would couple presentation to collision/camera and repeats the failure documented in `engine-ah.js`.
+- Do not make run animation merely faster by wall-clock constants; tie cadence to displacement or a measured gait phase.
+- Do not convert to fixed timestep, WebGL, Phaser, normal maps or new atlas tooling in this change unless baseline measurements show the current Canvas2D path is the bottleneck.
+- Do not assume row 2 has ideal lateral foot-contact artwork; inspect actual frames/screenshots.
+- Do not trust current `ENGINE_MAP.md` hero-owner row until updated against current main.
+
+### EXPERIMENT
+
+Baseline → candidate → identical trace:
+
+1. Capture 1080p desktop and a representative mobile viewport with current V5.25/v76.
+2. Right walk 3s, right run 3s, left run 3s, R→L reversal every 0.75s for 6s, diagonal run 3s, stop from run.
+3. Record logical distance, collision events, frame columns and player screen-space foot point.
+4. Apply presentation-only distance phase + fixed shadow/foot anchor behind a toggle.
+5. Repeat exact traces.
+6. Then test visualScale 1.15/1.25/1.30 with collider fixed at 20.
+7. Re-run obstacle-edge passes, doorway/café transitions, NPC overlap/nameplate readability and camera movement.
+8. Compare screenshot/video quality with smoothing disabled; inspect iOS/mobile browser if accessible.
+9. Reject any size/cadence candidate that worsens collision outcomes, occlusion, frame-time tail or foot jitter even if single screenshots look better.
+
+### DECIDING_METRICS
+
+- `footSlipPxPerStride` / visual foot drift while contact frame is active
+- `footAnchorScreenJitterP95`
+- `strideCyclesPer100WorldPx` for walk/run
+- `reversalLegPopCount` over fixed sequence
+- `idleResidualFrameChanges`
+- `visualScale`
+- `colliderRadiusBeforeAfter` (must remain 20 in presentation-only test)
+- `collisionOutcomeDiffCount` on identical traces (target 0)
+- `cameraScreenDeltaVariance`
+- `nameplateOverlapRate`
+- `avatarOcclusionRate` at doors/NPCs
+- `frameTimeP95/P99` and long-frame count
+- sprite screenshot inspection at mobile/desktop DPR targets
+
+### RISKS
+
+- The 4-frame sheet may not contain true contact/pass poses; distance timing cannot manufacture missing animation art.
+- Larger sprites can increase visual occlusion and nameplate collisions even when physics stays correct.
+- Nearest-neighbor enlargement can expose source-art defects/transparent-edge artifacts that are hidden at current size.
+- If render is called more than once per display frame by wrappers, advancing phase inside render would double-step; phase should be derived from measured position/distance or updated once per simulation/update path.
+- A fixed shadow can look disconnected if body bob amplitude is too large; keep bob deliberately small.
+
+### EXPECTED_GROK_FEEDBACK
+
+Classify P1-P6 independently. Most important evidence requested:
+
+- confirm actual runtime render/update call count and whether `engine-ab.js` is the sole effective sprite avatar owner;
+- baseline videos/screenshots or trace values for right/left/reversal/diagonal;
+- measured current stride cycles per distance and evidence of skating/leg-pop;
+- whether a distance-phase prototype improves foot slip without touching physics;
+- collider radius and collision outcome before/after visual scaling;
+- side-width and visualScale candidate comparison;
+- shadow/nameplate/door/NPC occlusion results;
+- 60/90/120 Hz or best available refresh evidence;
+- any rejection due to sprite-sheet artwork limits;
+- update `ENGINE_MAP.md` hero ownership only after verifying current runtime.
+
+---
