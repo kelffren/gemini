@@ -1,7 +1,7 @@
 (function () {
   const raw = new Image();
   let sheet = null, ok = false, FW = 0, FH = 0;
-  const paths = ['assets/hero.PNG', 'assets/hero.png', 'assets/hero.JPG', 'assets/hero.jpg'];
+  const paths = ['assets/hero.PNG', 'assets/hero.png'];
   let i = 0;
   function tryNext() {
     if (i >= paths.length) return;
@@ -31,8 +31,8 @@
     }
     g.putImageData(data, 0, 0);
     if (maxX <= minX) { sheet = c; FW = c.width / 4; FH = c.height / 4; ok = true; return; }
-    minX = Math.max(0, minX - 4); minY = Math.max(0, minY - 4);
-    maxX = Math.min(c.width - 1, maxX + 4); maxY = Math.min(c.height - 1, maxY + 4);
+    minX = Math.max(0, minX - 2); minY = Math.max(0, minY - 2);
+    maxX = Math.min(c.width - 1, maxX + 2); maxY = Math.min(c.height - 1, maxY + 2);
     const w = maxX - minX + 1, h = maxY - minY + 1;
     const cut = document.createElement('canvas');
     cut.width = w; cut.height = h;
@@ -45,13 +45,6 @@
   const dirRow = { down: 0, left: 1, right: 2, up: 3 };
   function faceOf(p) {
     const vx = p.vx || 0, vy = p.vy || 0;
-    if (Math.hypot(vx, vy) < 8 && p._dx != null) {
-      const ddx = p._dx, ddy = p._dy;
-      if (Math.hypot(ddx, ddy) < 0.4) return p._face || 'down';
-      const f = Math.abs(ddx) > Math.abs(ddy) ? (ddx > 0 ? 'right' : 'left') : (ddy > 0 ? 'down' : 'up');
-      p._face = f;
-      return f;
-    }
     if (Math.hypot(vx, vy) < 8) return p._face || 'down';
     const f = Math.abs(vx) > Math.abs(vy) ? (vx > 0 ? 'right' : 'left') : (vy > 0 ? 'down' : 'up');
     p._face = f;
@@ -62,15 +55,14 @@
     if (p._lx == null) { p._lx = p.x; p._ly = p.y; p._step = 0; }
     const dx = p.x - p._lx, dy = p.y - p._ly;
     p._lx = p.x; p._ly = p.y;
-    p._dx = dx; p._dy = dy;
     const dist = Math.hypot(dx, dy);
     const spd = Math.hypot(p.vx || 0, p.vy || 0);
-    const gait = p._gait || (spd > 180 || dist > 4.2 ? 'run' : dist > 0.35 ? 'walk' : 'idle');
+    const gait = p._gait || (spd > 180 ? 'run' : dist > 0.35 ? 'walk' : 'idle');
     if (gait === 'idle' || dist < 0.2) {
       p._step = 0;
       return 0;
     }
-    const stride = gait === 'run' ? 14 : 22;
+    const stride = gait === 'run' ? 16 : 24;
     p._step += dist;
     return Math.floor(p._step / stride) % 4;
   }
@@ -80,17 +72,18 @@
     if (!ok || !p || !sheet) return _av(p, isSelf);
     const col = stepCol(p);
     const row = dirRow[faceOf(p)] || 0;
-    const dw = 38, dh = 56;
+    const dw = 36, dh = 52;
+    const footY = p.y;
     ctx.save();
-    ctx.fillStyle = 'rgba(0,0,0,0.38)';
+    ctx.fillStyle = 'rgba(0,0,0,0.28)';
     ctx.beginPath();
-    ctx.ellipse(p.x, p.y + 18, 13, 4.5, 0, 0, Math.PI * 2);
+    ctx.ellipse(p.x, footY + 1, 11, 3.2, 0, 0, Math.PI * 2);
     ctx.fill();
-    ctx.drawImage(sheet, col * FW, row * FH, FW, FH, Math.round(p.x - dw / 2), Math.round(p.y - dh + 18), dw, dh);
+    ctx.drawImage(sheet, col * FW, row * FH, FW, FH, Math.round(p.x - dw / 2), Math.round(footY - dh + 2), dw, dh);
     ctx.fillStyle = isSelf ? '#e7c56a' : '#f3eee4';
     ctx.font = 'bold 11px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(p.name || 'Kelo', p.x, p.y - 42);
+    ctx.fillText(p.name || 'Kelo', p.x, footY - dh + 4);
     ctx.restore();
   };
 })();

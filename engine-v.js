@@ -1,5 +1,5 @@
 (function () {
-  const SCALE = 1.9;
+  const SCALE = 1.35;
   const _av = renderAvatar;
   renderAvatar = function (p, isSelf) {
     if (!p) return;
@@ -10,12 +10,4 @@
     _av(p, isSelf);
     ctx.restore();
   };
-  if (localPlayer) {
-    localPlayer.radius = Math.max(localPlayer.radius || 20, 26);
-  }
-  if (typeof simulatedPlayers !== 'undefined') {
-    simulatedPlayers.forEach(function (p) {
-      p.radius = Math.max(p.radius || 16, 24);
-    });
-  }
 })();
