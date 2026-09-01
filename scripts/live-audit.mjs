@@ -5,7 +5,11 @@ const base = process.env.AUDIT_URL || 'https://kelffren.github.io/gemini/';
 const expected = process.env.EXPECTED_BUILD || 'V5.38';
 fs.mkdirSync('artifacts', { recursive: true });
 
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({
+  headless: true,
+  executablePath: process.env.CHROME_BIN || '/usr/bin/google-chrome',
+  args: ['--no-sandbox', '--disable-dev-shm-usage']
+});
 const context = await browser.newContext({
   viewport: { width: 390, height: 844 },
   deviceScaleFactor: 2,
