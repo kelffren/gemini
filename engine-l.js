@@ -1,28 +1,27 @@
 (function () {
   // LIVE owner: plaza tiles + HiDPI + aimed-skill landing marker.
-  // The plaza always has a deterministic fallback, then upgrades to assets/tileset.png.
+  // Plaza art metadata is data-driven through KELO_TILE_REGISTRY.
   const PLAZA = { x: 1040, y: 1240, w: 800, h: 560 };
-  const TILE = 32;
-  const COLS = 16;
-  const T = Object.freeze({
-    GRASS_A:0, GRASS_B:1, GRASS_C:2, GRASS_FLOWERS:3,
-    MARBLE_A:4, MARBLE_B:5, MARBLE_GOLD_A:6, MARBLE_GOLD_B:7,
-    MARBLE_GREEN_DIAMOND:8, MARBLE_GREEN_CENTER:9, MARBLE_DIAMOND:10,
-    GRASS_SOFT:25, MARBLE_CLEAN_A:26, MARBLE_CLEAN_B:27,
-    MARBLE_CLEAN_C:28, MARBLE_CLEAN_D:29,
-    FOUNTAIN:[32,33,34,48,49,50,64,65,66],
-    TREE:[35,36,51,52,67,68], COLUMN:[37,53],
-    BUSH_A:38, BUSH_FLOWERS:39, FLOWERBED:[40,41],
-    STATUE:[42,58], LAMP:[43,59], BENCH:[44,45],
-    BUSH_B:54, BUSH_FLOWERS_B:55, PLANTER:56, PLANTER_FLOWERS:57
-  });
+  const REGISTRY = window.KELO_TILE_REGISTRY;
+  if (!REGISTRY?.atlases?.plaza || !REGISTRY?.tiles || !REGISTRY?.families) {
+    console.error('[Kelo plaza] visual tile registry missing');
+    return;
+  }
+  const ATLAS = REGISTRY.atlases.plaza;
+  const TILE = REGISTRY.worldTileSize;
+  const COLS = ATLAS.columns;
+  const T = REGISTRY.tiles;
+  const F = REGISTRY.families;
 
   window.KELO_PLAZA_AUDIT = {
-    version: 'V5.40',
+    version: 'V5.43',
     ready: false,
     assetLoaded: false,
     fallbackActive: true,
-    atlas: 'assets/tileset.png',
+    registryVersion: REGISTRY.version,
+    atlas: ATLAS.src,
+    atlasWidth: ATLAS.width,
+    atlasHeight: ATLAS.height,
     tileSize: TILE
   };
 
@@ -103,13 +102,13 @@
       const marble=inSquare||dx<=1||dy<=1;
       let id;
       if(marble){
-        id=pick(gx,gy,[T.MARBLE_A,T.MARBLE_B,T.MARBLE_CLEAN_A,T.MARBLE_CLEAN_B,T.MARBLE_CLEAN_C,T.MARBLE_CLEAN_D]);
+        id=pick(gx,gy,F.marble);
         const edge=inSquare&&((dx===5&&dy<=4)||(dy===4&&dx<=5));
-        if(edge&&((gx+gy)%4===0)) id=pick(gx,gy,[T.MARBLE_GOLD_A,T.MARBLE_GOLD_B]);
+        if(edge&&((gx+gy)%4===0)) id=pick(gx,gy,F.marbleGold);
         if((dx===0&&dy===4)||(dy===0&&dx===5)||(dx===4&&dy===3)) id=T.MARBLE_GREEN_DIAMOND;
       } else {
-        id=pick(gx,gy,[T.GRASS_A,T.GRASS_B,T.GRASS_C,T.GRASS_SOFT]);
-        if(((gx*11+gy*7)%29)===0) id=T.GRASS_FLOWERS;
+        id=pick(gx,gy,F.grass);
+        if(((gx*11+gy*7)%29)===0) id=pick(gx,gy,F.grassDetail);
       }
       drawTile(fg,id,gx*TILE,gy*TILE);
     }
@@ -132,13 +131,13 @@
 
   buildFallback();
   sheet.onload=function(){
-    if(sheet.naturalWidth!==512||sheet.naturalHeight!==512){
-      console.error('[Kelo plaza] invalid tileset dimensions',sheet.naturalWidth,sheet.naturalHeight); return;
+    if(sheet.naturalWidth!==ATLAS.width||sheet.naturalHeight!==ATLAS.height){
+      console.error('[Kelo plaza] invalid tileset dimensions',sheet.naturalWidth,sheet.naturalHeight,'expected',ATLAS.width,ATLAS.height); return;
     }
     bakeAtlas();
   };
   sheet.onerror=function(){ console.error('[Kelo plaza] tileset load failed; deterministic fallback remains active'); };
-  sheet.src='assets/tileset.png?v=91';
+  sheet.src=ATLAS.src+'?v=94';
 
   function landingPoint(){
     const range=skillAim.castRange||120;
@@ -191,5 +190,5 @@
     drawLanding();
   };
 
-  window.KELO_PLAZA_TILESET=Object.freeze({sourceMode:'engine-l-production-v3',assetPath:'assets/tileset.png',atlasSize:512,atlasTileSize:TILE,worldTileSize:TILE,columns:COLS,plaza:Object.freeze({...PLAZA})});
+  window.KELO_PLAZA_TILESET=Object.freeze({sourceMode:'registry-driven-v1',registryVersion:REGISTRY.version,assetPath:ATLAS.src,atlasWidth:ATLAS.width,atlasHeight:ATLAS.height,atlasTileSize:TILE,worldTileSize:TILE,columns:COLS,plaza:Object.freeze({...PLAZA})});
 })();
