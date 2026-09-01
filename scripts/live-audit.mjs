@@ -3,7 +3,7 @@ import { chromium } from 'playwright';
 
 const base = process.env.AUDIT_URL || 'https://kelffren.github.io/gemini/';
 const expected = process.env.EXPECTED_BUILD || 'V5.44';
-const expectedRegistry = process.env.EXPECTED_REGISTRY || '1.3.0';
+const expectedRegistry = process.env.EXPECTED_REGISTRY || '1.3.1';
 fs.mkdirSync('artifacts', { recursive: true });
 if (fs.existsSync('assets/tileset-vclean.png')) fs.copyFileSync('assets/tileset-vclean.png', 'artifacts/repo-tileset.png');
 else if (fs.existsSync('assets/tileset.png')) fs.copyFileSync('assets/tileset.png', 'artifacts/repo-tileset.png');
