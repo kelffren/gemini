@@ -1,9 +1,8 @@
 import fs from 'node:fs';
 import { chromium } from 'playwright';
 
-// audit trigger 2026-09-01T11:54-04:00
 const base = process.env.AUDIT_URL || 'https://kelffren.github.io/gemini/';
-const expected = process.env.EXPECTED_BUILD || 'V5.39';
+const expected = process.env.EXPECTED_BUILD || 'V5.44';
 fs.mkdirSync('artifacts', { recursive: true });
 if (fs.existsSync('assets/tileset.png')) fs.copyFileSync('assets/tileset.png', 'artifacts/repo-tileset.png');
 
@@ -23,7 +22,9 @@ for (let attempt = 1; attempt <= 24; attempt++) {
   try {
     await page.goto(`${base}?audit=${Date.now()}-${attempt}`, { waitUntil: 'networkidle', timeout: 45000 });
     title = await page.title();
-    if (title.includes(expected)) { loaded = true; break; }
+    const deployedVersion = await page.evaluate(() => window.KELO_PLAZA_AUDIT?.version || null);
+    if (deployedVersion === expected) { loaded = true; break; }
+    console.log(`attempt ${attempt}: deployed visual build ${deployedVersion || 'missing'}, waiting for ${expected}`);
   } catch (err) { console.log(`attempt ${attempt}: ${err.message}`); }
   await page.waitForTimeout(10000);
 }
@@ -36,11 +37,12 @@ const state = await page.evaluate(() => ({
   canvas: (() => { const c = document.getElementById('game-canvas'); return c ? { width:c.width,height:c.height,cssWidth:c.clientWidth,cssHeight:c.clientHeight } : null; })()
 }));
 await page.screenshot({ path: 'artifacts/live-mobile.png', fullPage: false });
-fs.writeFileSync('artifacts/report.json', JSON.stringify({ loaded, title, state, consoleErrors }, null, 2));
-console.log(JSON.stringify({ loaded, title, state, consoleErrors }, null, 2));
+fs.writeFileSync('artifacts/report.json', JSON.stringify({ loaded, title, expected, state, consoleErrors }, null, 2));
+console.log(JSON.stringify({ loaded, title, expected, state, consoleErrors }, null, 2));
 await browser.close();
 
-if (!loaded) throw new Error(`Live page never reached ${expected}`);
+if (!loaded) throw new Error(`Live page never reached visual build ${expected}`);
+if (state.audit?.version !== expected) throw new Error(`Visual audit version mismatch: ${state.audit?.version} !== ${expected}`);
 if (!state.audit?.ready) throw new Error('Plaza audit flag is not ready');
 if (!state.audit?.assetLoaded) throw new Error('Production tileset did not load');
 if (state.audit?.fallbackActive) throw new Error('Fallback remained active');
