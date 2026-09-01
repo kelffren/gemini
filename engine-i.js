@@ -1,13 +1,11 @@
 (function () {
-  // Kelo World plaza ground V3.
-  // Important: world tiles are ALWAYS 32x32. The map is painted tile-by-tile;
-  // no complete sprite sheet is ever stretched into the world.
+  // Kelo World plaza renderer V4.
+  // Production atlas: assets/tileset.png = 512x512, exact 16x16 grid, 32x32 cells.
   const PAD = { x: 1040, y: 1240, w: 800, h: 560 };
   const TILE = 32;
-  const ATLAS_COLS = 16;
-  const ATLAS_SIZE = 512;
+  const COLS = 16;
 
-  const TILES = Object.freeze({
+  const T = Object.freeze({
     GRASS_A: 0,
     GRASS_B: 1,
     GRASS_C: 2,
@@ -21,277 +19,255 @@
     MARBLE_DIAMOND: 10,
     GRASS_STONE_EDGE: 11,
     GRASS_STONE_CORNER: 12,
-    MARBLE_EDGE_A: 13,
-    MARBLE_EDGE_B: 14,
-    MARBLE_EDGE_C: 15
+    MARBLE_EDGE_TOP: 13,
+    MARBLE_EDGE_BOTTOM: 14,
+    MARBLE_EDGE_LEFT: 15,
+
+    TRANS_TOP: 16,
+    TRANS_BOTTOM: 17,
+    TRANS_LEFT: 18,
+    TRANS_RIGHT: 19,
+    TRANS_TL: 20,
+    TRANS_TR: 21,
+    TRANS_BL: 22,
+    TRANS_BR: 23,
+    GRASS_FLOWERS_RICH: 24,
+    GRASS_SOFT: 25,
+    MARBLE_CLEAN_A: 26,
+    MARBLE_CLEAN_B: 27,
+    MARBLE_CLEAN_C: 28,
+    MARBLE_CLEAN_D: 29,
+    MARBLE_FRAME_A: 30,
+    MARBLE_FRAME_B: 31,
+
+    FOUNTAIN: Object.freeze([32,33,34,48,49,50,64,65,66]),
+    TREE: Object.freeze([35,36,51,52,67,68]),
+    COLUMN: Object.freeze([37,53]),
+    BUSH_A: 38,
+    BUSH_FLOWERS: 39,
+    FLOWERBED: Object.freeze([40,41]),
+    STATUE: Object.freeze([42,58]),
+    LAMP: Object.freeze([43,59]),
+    BENCH: Object.freeze([44,45]),
+    RUG: Object.freeze([46,47,62,63]),
+    BUSH_B: 54,
+    BUSH_FLOWERS_B: 55,
+    PLANTER: 56,
+    PLANTER_FLOWERS: 57,
+    BRAZIER: 60,
+    POT: 61
   });
 
-  const COLORS = Object.freeze({
-    grassA: '#55c936',
-    grassB: '#62d93d',
-    grassC: '#46b934',
-    grassDark: '#33952e',
-    grassLight: '#82e85c',
-    marbleA: '#f7f2e0',
-    marbleB: '#eee7cf',
-    marbleLight: '#fffbed',
-    marbleVein: '#c6bda6',
-    gold: '#d7a631',
-    goldDark: '#a8781f',
-    goldLight: '#f4cf5b',
-    greenInset: '#43a54a'
-  });
+  let floorLayer = null;
+  let propLayer = null;
+  let atlasReady = false;
 
-  function makeRng(seed) {
-    let s = seed >>> 0;
-    return function () {
-      s = (s * 1664525 + 1013904223) >>> 0;
-      return s / 4294967296;
-    };
+  const sheet = new Image();
+  sheet.decoding = 'async';
+
+  function origin(id) {
+    return { x: (id % COLS) * TILE, y: Math.floor(id / COLS) * TILE };
   }
-
-  function tileOrigin(id) {
-    return { x: (id % ATLAS_COLS) * TILE, y: Math.floor(id / ATLAS_COLS) * TILE };
-  }
-
-  function buildRuntimeAtlas() {
-    const atlas = document.createElement('canvas');
-    atlas.width = ATLAS_SIZE;
-    atlas.height = ATLAS_SIZE;
-    const g = atlas.getContext('2d');
-    g.imageSmoothingEnabled = false;
-
-    function rectTile(id, color) {
-      const p = tileOrigin(id);
-      g.fillStyle = color;
-      g.fillRect(p.x, p.y, TILE, TILE);
-      return p;
-    }
-
-    function grassTile(id, base, seed, flowers) {
-      const p = rectTile(id, base);
-      const rnd = makeRng(seed);
-      for (let n = 0; n < 22; n++) {
-        const x = p.x + 2 + Math.floor(rnd() * 28);
-        const y = p.y + 2 + Math.floor(rnd() * 28);
-        g.fillStyle = rnd() > 0.45 ? COLORS.grassDark : COLORS.grassLight;
-        g.fillRect(x, y, 1 + (rnd() > 0.7 ? 1 : 0), 1);
-      }
-      if (flowers) {
-        const fs = [
-          [7, 8, '#fffdf2'],
-          [22, 19, '#ffe67e'],
-          [14, 26, '#ffb5d1']
-        ];
-        fs.forEach(function (f) {
-          g.fillStyle = f[2];
-          g.fillRect(p.x + f[0], p.y + f[1], 2, 2);
-          g.fillStyle = '#f4cf5b';
-          g.fillRect(p.x + f[0] + 1, p.y + f[1] + 1, 1, 1);
-        });
-      }
-    }
-
-    function marbleBase(id, base) {
-      const p = rectTile(id, base);
-      g.fillStyle = COLORS.marbleLight;
-      g.fillRect(p.x, p.y, TILE, 1);
-      g.fillStyle = '#ded5bd';
-      g.fillRect(p.x, p.y + TILE - 1, TILE, 1);
-      g.strokeStyle = COLORS.marbleVein;
-      g.lineWidth = 1;
-      g.beginPath();
-      g.moveTo(p.x + 3, p.y + 25);
-      g.lineTo(p.x + 10, p.y + 18);
-      g.lineTo(p.x + 15, p.y + 19);
-      g.lineTo(p.x + 21, p.y + 10);
-      g.lineTo(p.x + 29, p.y + 6);
-      g.stroke();
-      return p;
-    }
-
-    function addGoldFrame(p) {
-      g.strokeStyle = COLORS.gold;
-      g.lineWidth = 2;
-      g.strokeRect(p.x + 2, p.y + 2, 27, 27);
-      g.strokeStyle = COLORS.goldLight;
-      g.lineWidth = 1;
-      g.strokeRect(p.x + 5, p.y + 5, 21, 21);
-    }
-
-    function diamondTile(id, green) {
-      const p = marbleBase(id, COLORS.marbleA);
-      g.fillStyle = green ? COLORS.greenInset : COLORS.marbleB;
-      g.strokeStyle = COLORS.gold;
-      g.lineWidth = 1;
-      g.beginPath();
-      g.moveTo(p.x + 16, p.y + 4);
-      g.lineTo(p.x + 28, p.y + 16);
-      g.lineTo(p.x + 16, p.y + 28);
-      g.lineTo(p.x + 4, p.y + 16);
-      g.closePath();
-      g.fill(); g.stroke();
-      g.fillStyle = green ? COLORS.grassLight : COLORS.marbleLight;
-      g.beginPath();
-      g.moveTo(p.x + 16, p.y + 9);
-      g.lineTo(p.x + 23, p.y + 16);
-      g.lineTo(p.x + 16, p.y + 23);
-      g.lineTo(p.x + 9, p.y + 16);
-      g.closePath();
-      g.fill();
-    }
-
-    function medallionTile(id) {
-      const p = marbleBase(id, COLORS.marbleA);
-      g.fillStyle = COLORS.greenInset;
-      g.strokeStyle = COLORS.gold;
-      g.lineWidth = 2;
-      g.beginPath();
-      g.arc(p.x + 16, p.y + 16, 12, 0, Math.PI * 2);
-      g.fill(); g.stroke();
-      g.fillStyle = COLORS.goldLight;
-      g.strokeStyle = COLORS.goldDark;
-      g.lineWidth = 1;
-      const pts = [
-        [16, 6], [19, 13], [26, 10], [21, 16],
-        [26, 22], [19, 19], [16, 27], [13, 19],
-        [6, 22], [11, 16], [6, 10], [13, 13]
-      ];
-      g.beginPath();
-      pts.forEach(function (pt, i) {
-        if (i === 0) g.moveTo(p.x + pt[0], p.y + pt[1]);
-        else g.lineTo(p.x + pt[0], p.y + pt[1]);
-      });
-      g.closePath(); g.fill(); g.stroke();
-    }
-
-    grassTile(TILES.GRASS_A, COLORS.grassA, 101, false);
-    grassTile(TILES.GRASS_B, COLORS.grassB, 202, false);
-    grassTile(TILES.GRASS_C, COLORS.grassC, 303, false);
-    grassTile(TILES.GRASS_FLOWERS, COLORS.grassA, 404, true);
-
-    marbleBase(TILES.MARBLE_A, COLORS.marbleA);
-    marbleBase(TILES.MARBLE_B, COLORS.marbleB);
-    addGoldFrame(marbleBase(TILES.MARBLE_GOLD_A, COLORS.marbleA));
-    addGoldFrame(marbleBase(TILES.MARBLE_GOLD_B, COLORS.marbleB));
-    diamondTile(TILES.MARBLE_GREEN_DIAMOND, true);
-    medallionTile(TILES.MARBLE_GREEN_CENTER);
-    diamondTile(TILES.MARBLE_DIAMOND, false);
-
-    [TILES.GRASS_STONE_EDGE, TILES.GRASS_STONE_CORNER].forEach(function (id, i) {
-      const p = rectTile(id, i ? COLORS.grassA : COLORS.grassB);
-      g.fillStyle = COLORS.marbleA;
-      g.fillRect(p.x + 23, p.y, 9, TILE);
-      g.fillStyle = COLORS.gold;
-      g.fillRect(p.x + 22, p.y, 1, TILE);
-    });
-
-    [TILES.MARBLE_EDGE_A, TILES.MARBLE_EDGE_B, TILES.MARBLE_EDGE_C].forEach(function (id, i) {
-      const p = marbleBase(id, i === 1 ? COLORS.marbleB : COLORS.marbleA);
-      g.fillStyle = COLORS.gold;
-      g.fillRect(p.x + 1, p.y + 2, 30, 2);
-      g.fillStyle = COLORS.goldLight;
-      g.fillRect(p.x + 1, p.y + 5, 30, 1);
-    });
-
-    return atlas;
-  }
-
-  const sheet = buildRuntimeAtlas();
-  let floor = null;
 
   function drawTile(g, id, dx, dy) {
-    const p = tileOrigin(id);
+    const p = origin(id);
     g.drawImage(sheet, p.x, p.y, TILE, TILE, dx, dy, TILE, TILE);
   }
 
-  function seededPick(gx, gy, list) {
+  function drawGridSprite(g, ids, gx, gy, w, h) {
+    for (let row = 0; row < h; row++) {
+      for (let col = 0; col < w; col++) {
+        const id = ids[row * w + col];
+        if (id == null) continue;
+        drawTile(g, id, (gx + col) * TILE, (gy + row) * TILE);
+      }
+    }
+  }
+
+  function pick(gx, gy, list) {
     const n = Math.abs(((gx + 17) * 73856093) ^ ((gy + 29) * 19349663));
     return list[n % list.length];
   }
 
-  function geometry(cols, rows) {
-    return { cx: Math.floor(cols / 2), cy: Math.floor(rows / 2) };
-  }
-
-  function isMainMarble(gx, gy, cols, rows) {
-    const c = geometry(cols, rows);
-    const dx = Math.abs(gx - c.cx);
-    const dy = Math.abs(gy - c.cy);
-    return (dx <= 5 && dy <= 4) || dx <= 1 || dy <= 1;
-  }
-
-  function isCentralBorder(gx, gy, cols, rows) {
-    const c = geometry(cols, rows);
-    const dx = Math.abs(gx - c.cx);
-    const dy = Math.abs(gy - c.cy);
-    return (dx === 5 && dy <= 4) || (dy === 4 && dx <= 5);
-  }
-
-  function bake() {
-    const c = document.createElement('canvas');
-    c.width = PAD.w;
-    c.height = PAD.h;
-    const g = c.getContext('2d');
-    g.imageSmoothingEnabled = false;
-
-    const cols = Math.ceil(PAD.w / TILE);
-    const rows = Math.ceil(PAD.h / TILE);
-    const grass = [TILES.GRASS_A, TILES.GRASS_B, TILES.GRASS_C];
-    const marble = [TILES.MARBLE_A, TILES.MARBLE_B, TILES.MARBLE_DIAMOND];
+  function paintGround(g, cols, rows) {
+    const cx = Math.floor(cols / 2);
+    const cy = Math.floor(rows / 2);
+    const plazaHalfW = 5;
+    const plazaHalfH = 4;
 
     for (let gy = 0; gy < rows; gy++) {
       for (let gx = 0; gx < cols; gx++) {
+        const dx = Math.abs(gx - cx);
+        const dy = Math.abs(gy - cy);
+        const inSquare = dx <= plazaHalfW && dy <= plazaHalfH;
+        const inVerticalPath = dx <= 1;
+        const inHorizontalPath = dy <= 1;
+        const isMarble = inSquare || inVerticalPath || inHorizontalPath;
+
         let id;
-        if (isMainMarble(gx, gy, cols, rows)) {
-          id = isCentralBorder(gx, gy, cols, rows)
-            ? seededPick(gx, gy, [TILES.MARBLE_GOLD_A, TILES.MARBLE_GOLD_B])
-            : seededPick(gx, gy, marble);
+        if (!isMarble) {
+          id = pick(gx, gy, [T.GRASS_A, T.GRASS_B, T.GRASS_C, T.GRASS_SOFT]);
+          if (((gx * 11 + gy * 7) % 29) === 0) id = T.GRASS_FLOWERS;
+          if (((gx * 13 + gy * 5) % 47) === 0) id = T.GRASS_FLOWERS_RICH;
         } else {
-          id = seededPick(gx, gy, grass);
-          if (((gx * 7 + gy * 11) % 23) === 0) id = TILES.GRASS_FLOWERS;
+          id = pick(gx, gy, [
+            T.MARBLE_A, T.MARBLE_B, T.MARBLE_CLEAN_A,
+            T.MARBLE_CLEAN_B, T.MARBLE_CLEAN_C, T.MARBLE_CLEAN_D
+          ]);
+
+          const squareEdge =
+            inSquare &&
+            ((dx === plazaHalfW && dy <= plazaHalfH) ||
+             (dy === plazaHalfH && dx <= plazaHalfW));
+
+          if (squareEdge && ((gx + gy) % 2 === 0)) {
+            id = pick(gx, gy, [T.MARBLE_GOLD_A, T.MARBLE_GOLD_B]);
+          }
+
+          const entrance =
+            (dx === 0 && dy === plazaHalfH) ||
+            (dy === 0 && dx === plazaHalfW);
+          const innerCorner = dx === 4 && dy === 3;
+          if (entrance || innerCorner) id = T.MARBLE_GREEN_DIAMOND;
         }
+
         drawTile(g, id, gx * TILE, gy * TILE);
       }
     }
 
-    const c0 = geometry(cols, rows);
-    drawTile(g, TILES.MARBLE_GREEN_CENTER, c0.cx * TILE, c0.cy * TILE);
-    floor = c;
+    drawTile(g, T.MARBLE_GREEN_CENTER, cx * TILE, cy * TILE);
   }
 
-  bake();
+  function paintProps(g, cols, rows) {
+    const cx = Math.floor(cols / 2);
+    const cy = Math.floor(rows / 2);
+
+    drawGridSprite(g, T.FOUNTAIN, cx - 1, cy - 2, 3, 3);
+
+    [
+      [cx - 5, cy - 4],
+      [cx + 4, cy - 4],
+      [cx - 5, cy + 2],
+      [cx + 4, cy + 2]
+    ].forEach(function (p) {
+      drawGridSprite(g, T.COLUMN, p[0], p[1], 1, 2);
+    });
+
+    [
+      [1, 1],
+      [cols - 4, 1],
+      [1, rows - 4],
+      [cols - 4, rows - 4]
+    ].forEach(function (p) {
+      drawGridSprite(g, T.TREE, p[0], p[1], 2, 3);
+    });
+
+    [
+      [cx - 8, cy - 5, T.BUSH_FLOWERS],
+      [cx + 7, cy - 5, T.BUSH_A],
+      [cx - 8, cy + 4, T.BUSH_A],
+      [cx + 7, cy + 4, T.BUSH_FLOWERS_B],
+      [cx - 7, cy - 5, T.PLANTER],
+      [cx + 6, cy + 4, T.PLANTER_FLOWERS]
+    ].forEach(function (p) {
+      drawTile(g, p[2], p[0] * TILE, p[1] * TILE);
+    });
+
+    drawGridSprite(g, T.BENCH, cx - 9, cy - 1, 2, 1);
+    drawGridSprite(g, T.BENCH, cx + 7, cy - 1, 2, 1);
+    drawGridSprite(g, T.FLOWERBED, cx - 8, cy + 6, 2, 1);
+    drawGridSprite(g, T.FLOWERBED, cx + 6, cy - 7, 2, 1);
+
+    drawGridSprite(g, T.LAMP, cx - 3, 1, 1, 2);
+    drawGridSprite(g, T.LAMP, cx + 3, rows - 3, 1, 2);
+    drawTile(g, T.PLANTER, (cx - 2) * TILE, 2 * TILE);
+    drawTile(g, T.PLANTER_FLOWERS, (cx + 2) * TILE, (rows - 2) * TILE);
+  }
+
+  function bake() {
+    if (!atlasReady) return;
+
+    const cols = Math.ceil(PAD.w / TILE);
+    const rows = Math.ceil(PAD.h / TILE);
+
+    const floor = document.createElement('canvas');
+    floor.width = PAD.w;
+    floor.height = PAD.h;
+    const fg = floor.getContext('2d');
+    fg.imageSmoothingEnabled = false;
+    paintGround(fg, cols, rows);
+
+    const props = document.createElement('canvas');
+    props.width = PAD.w;
+    props.height = PAD.h;
+    const pg = props.getContext('2d');
+    pg.imageSmoothingEnabled = false;
+    paintProps(pg, cols, rows);
+
+    floorLayer = floor;
+    propLayer = props;
+  }
+
+  function fallback() {
+    const c = document.createElement('canvas');
+    c.width = PAD.w;
+    c.height = PAD.h;
+    const g = c.getContext('2d');
+    g.fillStyle = '#4fce38';
+    g.fillRect(0, 0, PAD.w, PAD.h);
+    floorLayer = c;
+    propLayer = null;
+  }
+
+  sheet.onload = function () {
+    if (sheet.naturalWidth !== 512 || sheet.naturalHeight !== 512) {
+      console.error('[Kelo tileset] Invalid atlas dimensions:', sheet.naturalWidth, sheet.naturalHeight);
+      fallback();
+      return;
+    }
+    atlasReady = true;
+    bake();
+  };
+
+  sheet.onerror = function () {
+    console.error('[Kelo tileset] assets/tileset.png failed to load.');
+    fallback();
+  };
+
+  sheet.src = 'assets/tileset.png?v=88';
 
   const _r = render;
   render = function () {
     _r();
-    if (!floor) return;
+    if (!floorLayer) return;
+
     const z = CONFIG.zoom || 1;
     ctx.save();
     ctx.translate(screenW / 2, screenH / 2);
     ctx.scale(z, z);
     ctx.translate(-camera.x, -camera.y);
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(floor, PAD.x, PAD.y);
 
-    // engine-i is still a render wrapper in the legacy stack, therefore actors
-    // are redrawn above the ground until the renderer is converted to layers.
+    ctx.drawImage(floorLayer, PAD.x, PAD.y);
+    if (propLayer) ctx.drawImage(propLayer, PAD.x, PAD.y);
+
     if (typeof renderAvatar === 'function') {
       if (typeof simulatedPlayers !== 'undefined') {
         simulatedPlayers.forEach(function (p) { renderAvatar(p, false); });
       }
       if (typeof localPlayer !== 'undefined') renderAvatar(localPlayer, true);
     }
+
     ctx.restore();
   };
 
   window.KELO_PLAZA_TILESET = Object.freeze({
-    sourceMode: 'runtime-procedural-v3',
+    sourceMode: 'asset-production-v1',
     assetPath: 'assets/tileset.png',
-    atlasSize: ATLAS_SIZE,
+    atlasSize: 512,
     atlasTileSize: TILE,
     worldTileSize: TILE,
-    columns: ATLAS_COLS,
+    columns: COLS,
     plaza: Object.freeze({ x: PAD.x, y: PAD.y, w: PAD.w, h: PAD.h })
   });
 })();
