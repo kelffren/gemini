@@ -8,6 +8,7 @@ on:
       - 'index.html'
       - 'engine-i.js'
       - 'engine-l.js'
+      - 'engine-u.js'
       - 'assets/tileset.png'
       - 'scripts/live-audit.mjs'
       - '.github/workflows/live-audit.yml'
@@ -26,7 +27,7 @@ jobs:
       - name: Audit deployed mobile page
         env:
           AUDIT_URL: https://kelffren.github.io/gemini/
-          EXPECTED_BUILD: V5.38
+          EXPECTED_BUILD: V5.39
           CHROME_BIN: /usr/bin/google-chrome
         run: node scripts/live-audit.mjs
       - name: Upload screenshot evidence
