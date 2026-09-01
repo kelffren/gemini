@@ -700,3 +700,759 @@ Please classify P1-P6 independently and report:
 - any incompatibility that makes this hypothesis obsolete.
 
 ---
+
+## CG-20260901-007 — Make foot phase a logical visual state, not a render side effect
+
+ID: CG-20260901-007
+TIMESTAMP: 2026-09-01T04:33:00-04:00
+AUTHOR: ChatGPT
+BASE_COMMIT: d16d5b454cc59ba589be92cf8304dec7aeb812f3
+STATUS: PROPOSED
+PRIORITY: HIGH
+TAGS: movement,render,shadow,canvas2d,60hz,90hz,120hz,architecture,benchmark,atlas,textures
+AFFECTED_FILES: engine-ab.js, engine-ac.js, engine-ah.js, engine-i.js, engine-l.js, ENGINE_MAP.md, assets/hero.PNG, assets/README.md
+RESPONDS_TO: user priority lateral locomotion + larger avatar; extends CG-20260901-005 and pending CG-20260901-006
+
+### PROBLEM
+Current side locomotion is still selected/rendered from mutable state inside renderAvatar(). movingOf() updates _lx/_ly/_walkHold/_mdx/_mdy; faceOf() updates _face; stepCol() uses wall-clock Date.now()/130. engine-i.js performs a second actor draw pass above plaza ground. The current time-based frame selection is duplicate-draw tolerant, but a naive future phase += distance inside renderAvatar() would make animation logic depend on how many render passes execute. The proposed larger 8-frame asset therefore needs its locomotion state advanced outside render calls before integration.
+
+### CONFIRMED_IN_GEMINI
+- main HEAD inspected: d16d5b454cc59ba589be92cf8304dec7aeb812f3; gameplay remains index V5.35 / cache v86.
+- engine-ab.js is the effective hero sheet renderer despite ENGINE_MAP.md still naming engine-m.js as Hero sprite owner.
+- engine-ab.js assumes 4 columns and 4 rows; side row is row 2, left mirrors right, and frame column is Math.floor(Date.now()/130)%4.
+- movingOf() mutates per-player historical state on every renderAvatar() call.
+- faceOf() mutates p._face on every moving render.
+- engine-i.js currently calls the wrapped render and then redraws simulatedPlayers and localPlayer above plaza ground, so renderAvatar() can execute more than once per visual frame for the same logical actor state.
+- engine-ac.js computes gait idle/walk/run with thresholds 0.14 and 0.74 and physical walk/run speeds 96 and ~165-172 px/s, but engine-ab does not select distinct walk/run animations.
+- engine-ah.js hard-stops velocity when movement input is absent; its prior visual bob was explicitly removed because moving shadow+sprite looked like floating.
+- engine-l.js owns HiDPI backing-store sizing, caps DPR at 3 and resets imageSmoothingEnabled=true before downstream render code; engine-ab locally disables smoothing only while drawing the hero.
+- assets/README.md still describes the old simple hero.png contract; no production 8-frame side asset/manifest contract is documented there.
+
+### EXTERNAL_EVIDENCE
+- MDN states requestAnimationFrame normally tracks display refresh, including 60/75/120/144 Hz, and warns animation progress must use time rather than assuming one fixed amount per callback. This supports state advancement from logical distance/time rather than render-call count.
+- MDN documents imageSmoothingEnabled=false as the standard Canvas2D control for retaining hard pixel edges when scaled, but imageSmoothingQuality is not Baseline across major browsers; it should not be a required quality dependency.
+- Community foot-sliding guidance consistently matches movement speed/animation speed to the distance traveled between planted-foot events; one practical method measures world distance between contact and lift frames and derives animation cadence from it.
+- Community Y-sort evidence supports using a bottom/pivot/foot contact reference rather than animated sprite center. Counterevidence: complex structures such as stairs/bridges cannot always be solved by one global Y sort and may need explicit layer/trigger rules.
+
+### HYPOTHESIS
+A small per-actor visual locomotion state updated once per logical movement step will unlock the premium side asset more safely than putting stride logic into renderAvatar(). It can preserve immediate physical response while stabilizing contact frames, reversal, diagonals and 60/90/120-Hz presentation. A fixed foot root can simultaneously serve sprite pivot, shadow anchor and future actor sortY without allowing bob/lean to alter collisions or depth.
+
+### PROPOSED_CHANGE
+Do not refactor blindly. Prototype behind a flag:
+1. Add/update one visual locomotion state per actor outside renderAvatar(), ideally after movement state for that logical step is known: {faceFamily, face, gait, phase01, distanceAccumulator, plantedFoot, reversalState, footRootX, footRootY}.
+2. Advance phase from actual world distance traveled. Renderer only samples phase -> frame; duplicate render calls must not change phase.
+3. Keep walk and run as different asset rows/cycles. Calibrate strideWorldPx from the final art rather than inventing values.
+4. Add diagonal family hysteresis around the current side-vs-vertical threshold so small joystick noise cannot flip rows every update.
+5. On left-right reversal, preserve/resolve to a contact-compatible pose visually while allowing physics direction to reverse immediately.
+6. Define footRootY from the existing p.y + 10 convention for the first experiment. Bob/lean affect sprite-local offsets only; shadow anchor, collider and future sortY stay tied to footRoot.
+7. New side asset contract remains 8 WALK RIGHT + 8 RUN RIGHT, 128x192 cells, alpha transparency, fixed pivot, contact frames 0/4, no baked shadow. LEFT may be mirrored only while the design is symmetric.
+8. Scale tests should alter destination sprite bounds only (1.15/1.25/1.30 candidates). Collider must remain radius 20.
+9. Do not remove engine-i's second actor pass until layer behavior is reproduced and measured; first make rendering idempotent.
+10. Update ENGINE_MAP/assets docs only after Grok independently verifies actual owner/contract.
+
+### DO_NOT_ASSUME
+- Do not assume 8 frames alone fixes foot sliding.
+- Do not use phase += distance inside renderAvatar().
+- Do not tie phase to requestAnimationFrame callback count.
+- Do not move p.x/p.y for visual bob/lean.
+- Do not enlarge collider with sprite scale.
+- Do not make imageSmoothingQuality a required browser feature.
+- Do not globally Y-sort roofs/stairs/bridges without object-specific depth semantics.
+- Do not delete the engine-i actor redraw merely because it is duplicate work; it currently establishes layering above the plaza floor.
+
+### EXPERIMENT
+Baseline -> flagged visual state -> same trace -> 8-frame asset -> same trace -> scale buckets -> same trace.
+Trace: idle -> walk right -> run right -> right/left reversals -> diagonal joystick near threshold -> stop -> repeat left -> NPC crossing -> building edge. Execute equivalent logical trace at 60/90/120-Hz-capable environments where possible.
+Instrument once per logical update and per render: x,y,vx,vy,gait,input magnitude,visual phase,frame,row,faceFamily,plantedFoot,footRoot,renderAvatarCallIndex,camera x/y,destination sprite bounds.
+Then compare current wall-clock 4-frame path against the new state-driven path without changing physical speed/collider.
+
+### DECIDING_METRICS
+- visualMotionUpdatesPerLogicalStep == 1
+- phaseDeltaOnDuplicateRender == 0
+- renderAvatarCallsPerActorPerRAF
+- worldPxPerWalkCycle / worldPxPerRunCycle
+- footSlipPxPerContact
+- footAnchorScreenJitterP95
+- falseDiagonalPoseSwitchCount
+- reversalPosePopCount
+- contactFrameContinuityRate
+- actorDepthOrderErrorCount
+- nameplateOverlapRate after scale
+- collisionOutcomeDiffCount == 0
+- colliderRadiusBeforeAfter == 20->20
+- frameTimeP95/P99 at 60/90/120-Hz targets
+- spriteEdgeShimmerCount at DPR 1/2/3 and scale candidates
+
+### RISKS
+- Updating visual state in another wrapper can worsen architecture if it becomes a second movement owner; prefer one clearly named presentation-state updater and benchmark call count.
+- Poor stride calibration can make an 8-frame asset look worse than the current 4-frame loop.
+- Mirroring LEFT will mirror asymmetric clothing/accessories.
+- Increasing visual height can raise occlusion/nameplate conflicts even with unchanged collider.
+- Pixel-hard sampling can shimmer under fractional camera/zoom/DPR combinations; test real mobile Safari/Chrome rather than assuming nearest-neighbor is sufficient.
+- Full actor Y-sort will not solve multi-level structures by itself.
+
+### EXPECTED_GROK_FEEDBACK
+Grok should classify each proposal VIABLE/NEEDS_TEST/NOT_VIABLE/DEFERRED and report:
+- exact current HEAD and whether code changed since this base;
+- actual final runtime count/order of renderAvatar calls per RAF;
+- best location for once-per-logical-step visual locomotion update without creating another movement owner;
+- baseline vs flagged-state traces showing duplicate renders do not advance phase;
+- measured stride/contact distance once production art is available;
+- 60/90/120-Hz and DPR/scale evidence where feasible;
+- whether the existing footY=p.y+10 is a stable enough root or needs an explicit asset manifest offset;
+- any architecture conflict with engine-i/l/ab wrappers;
+- whether ENGINE_MAP/assets README correction is independently verified.
+
+## CG-20260901-008 — Test device-pixel foot-root snapping before adding runtime squash/lean
+
+ID: CG-20260901-008
+TIMESTAMP: 2026-09-01T05:37:00-04:00
+AUTHOR: ChatGPT
+BASE_COMMIT: ecd41dfa959a6035cb5382b66ceeb01e54809fa1
+STATUS: NEEDS_BENCHMARK
+PRIORITY: HIGH
+TAGS: movement,render,canvas2d,60hz,90hz,120hz,camera,textures,benchmark,architecture
+AFFECTED_FILES: engine-ab.js, engine-a.js, engine-ac.js, engine-l.js, engine-i.js, engine-v.js, assets/hero.PNG, ENGINE_MAP.md
+RESPONDS_TO: CG-20260901-005; current user priority lateral movement + larger premium avatar
+
+### PROBLEM
+
+Current lateral research has focused on stride phase, foot anchoring, duplicate render purity and a better 8-frame asset. A separate presentation issue is now confirmed in current main: `engine-ab.js` rounds sprite destination X/Y to integer WORLD coordinates before the already-active camera/zoom/HiDPI transforms. At high refresh rates, WALK displacement per display frame can be below one world pixel, so world-integer snapping can create repeated-position/uneven-step patterns even when physics and camera state remain smooth. In parallel, `engine-a.js` already computes speed-responsive `squashX/squashY`, but the current PNG sprite override does not consume those values. Applying them naively to pixel art could disturb the fixed foot root and introduce resampling shimmer.
+
+### CONFIRMED_IN_GEMINI
+
+At `main` commit `ecd41dfa959a6035cb5382b66ceeb01e54809fa1`:
+
+1. `index.html` remains Kelo World V5.35 and loads engines with cache `v=86`.
+2. `ENGINE_MAP.md` remains stale at V5.15/v66 and still claims `engine-m.js` owns hero sprite rendering; current effective PNG override is `engine-ab.js`.
+3. `engine-ab.js` calculates the visible sprite destination with `Math.round(p.x - dw/2)` and `Math.round(footY - dh)`. This quantizes BODY placement to integer world coordinates before world-to-screen transforms.
+4. `engine-ab.js` also rounds nameplate X/Y separately. Its logical foot reference is `footY=p.y+10`.
+5. Current side visual width is 48 and height about 81; collider remains independent (`localPlayer.radius=20` in engine-a).
+6. `engine-ac.js` defines WALK speed 96 px/s and RUN speed `165 + (mag-0.74)*28`, giving ~172.28 px/s at full analog/key magnitude.
+7. Therefore ideal logical displacement per display refresh is approximately: WALK 1.60 px @60Hz, 1.07 @90Hz, 0.80 @120Hz; full RUN 2.87 @60Hz, 1.91 @90Hz, 1.44 @120Hz. Integer-world sprite rounding can therefore repeat the same sprite X on some high-refresh WALK frames even though player X changed.
+8. `engine-l.js` uses a HiDPI backing canvas and caps DPR at 3, so the renderer may have finer-than-1-CSS-pixel device resolution available even though `engine-ab.js` currently discards subpixel world placement before final transform.
+9. `engine-a.js` computes `squashX` toward `1 + speedRatio*0.08` and `squashY` toward `1 - speedRatio*0.06` with exponential smoothing. The sprite override in `engine-ab.js` does not use these values, so existing speed-responsive deformation is effectively absent from the PNG avatar path.
+10. `engine-v.js` intentionally performs no scale transform and notes that scale is absorbed in engine-ab draw size to keep feet planted.
+11. `engine-i.js` still redraws actors after the plaza ground pass; any new presentation state or snap calculation must remain idempotent across duplicate draws.
+
+### EXTERNAL_EVIDENCE
+
+1. MDN states `requestAnimationFrame()` normally follows display refresh rate, including 60, 75, 120 and 144 Hz, and warns animation progress must be time-normalized rather than frame-count based. High-refresh therefore materially changes per-frame displacement even when speed in px/s is unchanged.
+2. MDN's pixel-art guidance explicitly warns that mappings between image, canvas, CSS pixels and device pixels can become uneven when scale/DPR is non-integer. It also notes arbitrary `drawImage()` scaling may map source pixels to fractional canvas pixels and produce artifacts.
+3. MDN documents `imageSmoothingEnabled=false` as a hard-edge scaling control, not a guarantee that arbitrary non-integer scale/position mappings are artifact-free.
+4. PixiJS issue reports provide counterevidence that nearest filtering plus integer positions eliminates every artifact: one-pixel seams/offsets can still appear at particular scaled positions, including iOS browser reports. This reinforces the need for mobile A/B clips rather than assuming a universal snap rule.
+5. Community pixel-art experience with squash/stretch reports that runtime sprite scaling can disturb outlines/pixel alignment. This is not proof Kelo will fail, but it is enough counterevidence to avoid applying the already-computed 8%/6% squash blindly to the premium bitmap.
+
+### HYPOTHESIS
+
+For the premium larger avatar, the best lateral presentation may be: preserve float logical motion and the stable foot root, then compare current WORLD-integer body snapping against a DEVICE-pixel-aware presentation snap (or no pre-rounding) at the final camera/zoom/DPR mapping. Separately, encode most body lean/bob/squash into the new 8-frame artwork rather than anisotropically scaling the full bitmap at runtime. If runtime deformation is still useful, apply only a tiny bounded transform around the FOOT pivot, never around the frame center, and benchmark shimmer/foot drift.
+
+### PROPOSED_CHANGE
+
+**P1 — Instrument current quantization before changing it**
+- Record logical `p.x/p.y`, rounded destination X/Y, camera X/Y, zoom, DPR and resulting screen-space foot X/Y for the same lateral traces at best-available 60/90/120Hz.
+- Count consecutive displayed frames where logical X changes but rounded sprite destination X does not.
+
+**P2 — A/B/C presentation-position strategies behind a flag**
+- A: current `Math.round()` world-space destination.
+- B: remove pre-rounding and draw at float world coordinates; preserve `imageSmoothingEnabled=false` initially.
+- C: snap the final FOOT ROOT to the nearest physical device pixel after camera+zoom mapping, then derive body destination from that root. Do not snap logical `p.x/p.y` or collider/camera state.
+- Keep animation phase and gait unchanged for this experiment so only presentation quantization differs.
+
+**P3 — Keep foot root authoritative**
+- Any B/C body destination must be derived from the same `footY=p.y+10` logical root.
+- Nameplate may use a separate stable visual-top anchor; do not let body bob/squash change depth/collision.
+- Shadow, when reintroduced, should use the same snapped/unsnapped presentation root as the feet so it cannot visibly detach.
+
+**P4 — Do not blindly wire current `squashX/squashY` into the PNG renderer**
+- First test the clean new 8-frame asset with NO runtime anisotropic squash.
+- Prefer authored walk/run lean, compression and vertical change in the frames themselves.
+- If runtime deformation is tested, start much smaller than the existing theoretical 8% X / 6% Y extremes and transform around the foot pivot so contact remains fixed.
+- Compare outline stability, shimmer, perceived impact and foot-root error.
+
+**P5 — Scale experiment must include snap strategy**
+- Test visualScale 1.15/1.25/1.30 under A/B/C because a scale that looks best with world snapping may not be best with device-pixel snapping.
+- Keep collider 20 throughout.
+
+**P6 — Preserve render purity**
+- Snap calculation may occur during draw because it is a pure projection, but it must not mutate gait phase/contact/reversal/logical coordinates.
+- Duplicate `renderAvatar()` calls for one actor state must return the same projected root and pose.
+
+### DO_NOT_ASSUME
+
+- Do not enable `CONFIG.roundPixels` globally as a shortcut; that can change camera/world presentation broadly and mixes multiple variables.
+- Do not round `localPlayer.x/y` or collider coordinates.
+- Do not assume float drawing automatically looks better; nearest-filtered pixel art can shimmer at fractional mappings.
+- Do not assume integer-world rounding is correct merely because pixel art is desired; at DPR 2/3 the backing canvas has finer device-pixel resolution than 1 CSS/world pixel.
+- Do not apply current `squashX/squashY` to the full sprite before an A/B test around the foot pivot.
+- Do not rotate the whole premium pixel sprite for lean unless the actual moving clip beats authored-frame lean; arbitrary rotation can create resampling/edge instability.
+
+### EXPERIMENT
+
+1. Baseline current V5.35/v86, current 4-frame asset, current world rounding.
+2. Trace right WALK 4s, right RUN 4s, diagonal 4s, R↔L reversals, run→idle at desktop and representative mobile DPR.
+3. Capture logical displacement and `spriteDestinationRepeatCount` at available refresh rates.
+4. Implement only a feature-flagged projection strategy B; rerun identical trace.
+5. Implement pure device-pixel foot-root projection C; rerun identical trace.
+6. Compare screen-space foot velocity variance and subjective moving-video jitter/shimmer, not just still screenshots.
+7. Once the clean 8-frame asset exists, repeat A/B/C at 1.15/1.25/1.30.
+8. Test authored lean/bob only first. Then, if needed, tiny runtime foot-pivot deformation as a separate variable.
+9. Collision trace/collider must remain identical during every presentation-only stage.
+
+### DECIDING_METRICS
+
+- `logicalMoveButSameSpriteDestFrameCount`
+- `spriteDestinationRepeatRate`
+- `screenFootDeltaVariance`
+- `footAnchorScreenJitterP95`
+- `spriteEdgeShimmerCount`
+- `worldRoundVsFloatVsDeviceSnapPreference`
+- `visualScale`
+- `runtimeSquashEnabled`
+- `runtimeSquashFootRootErrorPx` (target 0 if tested)
+- `outlineArtifactCount`
+- `phaseDeltaOnDuplicateRender` (target 0)
+- `collisionOutcomeDiffCount` (target 0)
+- `colliderRadiusBeforeAfter` (20→20)
+- `frameTimeP95/P99`
+
+### RISKS
+
+- Float/no-rounding may improve temporal smoothness but worsen pixel shimmer.
+- Device-pixel snapping depends on correct transform/DPR accounting; snapping in the wrong coordinate space can be worse than the baseline.
+- Runtime anisotropic scaling can destabilize outlines and make a premium sprite look cheaper even if the motion technically feels springier.
+- High-DPR headless/browser emulation is not a substitute for a real iPhone/Android GPU/browser clip.
+- The existing 4-frame art may hide or exaggerate quantization problems differently than the planned 8-frame asset; final decision must be repeated with production art.
+
+### EXPECTED_GROK_FEEDBACK
+
+Please classify P1-P6 independently and return:
+
+- exact build/commit tested;
+- measured current `logicalMoveButSameSpriteDestFrameCount` for WALK/RUN at available refresh rates;
+- A/B/C moving-video comparison, not only screenshots;
+- whether device-pixel foot-root snapping is implementable cleanly with current transform chain;
+- any DPR/zoom combination where float/device snap is visibly worse;
+- whether the current engine-a squash values are used anywhere else before modifying them;
+- clean-asset authored lean/bob result before runtime deformation;
+- collider/collision trace equality;
+- duplicate-render idempotence;
+- any proposal rejected as incompatible with current Canvas2D layering.
+
+---
+
+## CG-20260901-009 — Make stop/start/reversal visual transitions time- and distance-based, not render-count-based
+
+ID: CG-20260901-009
+TIMESTAMP: 2026-09-01T06:38:51-04:00
+AUTHOR: ChatGPT
+BASE_COMMIT: cf135370898963c294e55c5108c819a5ff7fbf71
+STATUS: NEEDS_BENCHMARK
+PRIORITY: HIGH
+TAGS: movement,render,60hz,90hz,120hz,benchmark,architecture,canvas2d
+AFFECTED_FILES: engine-ab.js, engine-ac.js, engine-ah.js, engine-i.js, engine-a.js, assets/hero.PNG, ENGINE_MAP.md
+RESPONDS_TO: CG-20260901-005, CG-20260901-007, CG-20260901-008; current user priority lateral movement + premium larger avatar
+
+### PROBLEM
+
+Current main mixes a hard physical stop with a render-count-based visual hold. `engine-ah.js` forces `localPlayer.vx/vy=0` immediately when movement input is absent. `engine-ab.js::movingOf()` sets `_walkHold=10` while movement is detected and decrements `_walkHold` by 1 each time `renderAvatar()` calls it while stopped. `engine-i.js` currently redraws actors after the inner render, so `_walkHold` can be consumed more than once per displayed frame. The resulting idle transition duration depends on render-call count and display refresh rate instead of elapsed time/distance. This can make stop/start/reversal cadence visibly inconsistent across 60/90/120 Hz and can become more obvious with a larger 8-frame avatar.
+
+### CONFIRMED_IN_GEMINI
+
+At `main` commit `cf135370898963c294e55c5108c819a5ff7fbf71`:
+
+1. `index.html` remains Kelo World V5.35 and loads engines with cache `v=86`.
+2. `engine-ah.js` wraps `updateMovement(dt)` and after the wrapped call sets localPlayer `vx=0`, `vy=0`, `input.normX=0`, `input.normY=0` whenever `hasMoveInput()` is false.
+3. `engine-ab.js::movingOf()` assigns `_walkHold=10` if distance >0.12, speed >16, or target distance >14; otherwise it decrements `_walkHold` by one per call.
+4. `engine-ab.js::stepCol()` uses `Date.now()/130` while `_walkHold>0`, so once physics stops, the legs can continue cycling until `_walkHold` expires.
+5. `engine-i.js` calls the previous renderer and then redraws `simulatedPlayers` plus `localPlayer` over the plaza ground. Therefore `movingOf()` can execute multiple times for the same logical actor state during one RAF.
+6. With two avatar draws per RAF, a nominal `_walkHold=10` is roughly five displayed frames. That is about 83 ms at 60 Hz, 56 ms at 90 Hz and 42 ms at 120 Hz, before considering any additional wrappers/draws. The exact runtime count still needs instrumentation.
+7. The hold is therefore neither a stable 10-frame display transition nor a stable time transition.
+8. `engine-ac.js` already exposes logical gait (`idle`, `walk`, `run`) before the base movement call, so a dedicated visual locomotion state can use gait/input/velocity without relying on render-count mutation.
+9. `engine-ab.js` is still the effective PNG sprite override despite stale `ENGINE_MAP.md` ownership metadata.
+10. `engine-v.js` remains intentionally empty to preserve planted feet; collider is still independent from visual sprite size.
+
+### EXTERNAL_EVIDENCE
+
+1. MDN documents that `requestAnimationFrame()` normally follows display refresh rate (commonly 60 Hz, with 75/120/144 Hz also widespread) and warns animation progress must use elapsed time rather than assuming a fixed amount per callback. This directly argues against render-count-based transition timers.
+2. PixiJS documentation distinguishes sprite anchor/pivot from scale and positioning; a foot-root pivot is therefore a standard way to keep a visual contact point stable while poses/scale change above it. This supports keeping start/stop/reversal presentation around a fixed foot root rather than moving the logical body.
+3. Community game-animation guidance on foot sliding consistently favors matching animation phase/contact to actual displacement and preserving contact events rather than blindly advancing a looping clip by render frames.
+4. Counterevidence: a tiny authored follow-through after input release can improve perceived weight. Therefore the recommendation is not “snap immediately to idle”; it is “make any follow-through explicit and elapsed-time/contact-based.”
+
+### HYPOTHESIS
+
+Kelo will feel more planted if physical input response remains immediate while visual locomotion transitions are represented by a render-pure state machine updated once per logical step. On release, the state should finish or resolve toward a nearby contact pose over a short bounded elapsed-time/contact window, then enter idle. On start and reversal, phase should be initialized/preserved from foot-contact semantics rather than reset to frame zero. This should remove refresh-rate-dependent stop cadence without adding input latency.
+
+### PROPOSED_CHANGE
+
+**P1 — Instrument before changing behavior**
+- Count `renderAvatar()` calls per actor per RAF and `_walkHold` decrements per RAF.
+- Record release timestamp, physical velocity-zero timestamp, last locomotion frame timestamp and idle-enter timestamp.
+- Measure at best-available 60/90/120 Hz.
+
+**P2 — Remove render-count ownership from `movingOf()`**
+- Do not decrement a transition counter inside `renderAvatar()`.
+- Keep `renderAvatar()` projection-only: same logical state in -> same pose/root out.
+- Move visual locomotion state update to one logical update path.
+
+**P3 — Explicit stop transition**
+- When move intent becomes zero, keep physics policy unchanged for the first experiment (current hard stop) so only presentation changes.
+- Resolve visual phase toward the nearest valid contact/idle-compatible pose using elapsed time or contact distance, not number of renders.
+- Candidate test window: ~50–100 ms maximum, but do not ship a number until A/B clips and metrics choose it.
+- If already on a contact frame, allow immediate idle transition.
+
+**P4 — Start transition**
+- From idle to walk/run, choose a deterministic first-contact/anticipation phase rather than letting global `Date.now()` select an arbitrary leg pose.
+- Preserve foot root and shadow anchor.
+
+**P5 — Walk↔run transition**
+- With the future 8-frame asset, map walk phase to the nearest homologous run phase (contact/down/passing/up) instead of resetting animation.
+- Keep physical gait threshold unchanged during this test.
+
+**P6 — Reversal**
+- Preserve or resolve stride phase around a contact event when right↔left flips.
+- Do not delay physical direction change; only smooth presentation.
+- Add diagonal hysteresis as a separate flag so reversal and diagonal-family switching can be measured independently.
+
+**P7 — Larger avatar compatibility**
+- Run transitions at visualScale 1.15/1.25/1.30 once the clean asset exists.
+- Collider must remain 20.
+- Nameplate/shadow/depth anchors derive from foot root/visual bounds, not bob frame.
+
+### DO_NOT_ASSUME
+
+- Do not remove the hard physical stop in the same experiment; that would mix movement feel with animation transition policy.
+- Do not replace `_walkHold=10` with “10 RAF frames”; that remains refresh-rate dependent.
+- Do not use global `Date.now()` modulo as the final walk/run phase source for the new asset.
+- Do not reset walk/run/reversal to frame zero unless A/B evidence shows it is visually superior.
+- Do not mutate `p.x/y`, collider, camera or gait inside the renderer.
+- Do not interpret a still screenshot as evidence for transition quality; use moving clips and timing traces.
+
+### EXPERIMENT
+
+1. Baseline V5.35/v86 current 4-frame asset.
+2. Trace: idle 1s -> WALK/keyboard right 2s -> release 1s -> start right -> reversal left -> release; repeat with touch analog walk/run where available.
+3. Instrument current `_walkHold` decrements, avatar draw count and stop duration at 60/90/120 Hz.
+4. Implement only render-pure visual state with elapsed-time stop resolution; keep physics hard stop unchanged.
+5. Rerun exact trace and compare stop visual duration across refresh rates.
+6. Add deterministic idle->walk start phase and rerun.
+7. Add walk↔run phase mapping and reversal preservation separately, rerunning the same trace after each flag.
+8. Repeat with future 8-frame lateral asset and 1.15/1.25/1.30 visual scale.
+
+### DECIDING_METRICS
+
+- `renderAvatarCallsPerActorPerRAF`
+- `walkHoldDecrementsPerRAF`
+- `releaseToPhysicalStopMs`
+- `releaseToVisualIdleMs`
+- `releaseToVisualIdleVarianceAcrossHz`
+- `startPosePopCount`
+- `walkRunTransitionPosePopCount`
+- `reversalPosePopCount`
+- `phaseDeltaOnDuplicateRender` target 0
+- `footSlipPxPerContact`
+- `footAnchorScreenJitterP95`
+- `collisionOutcomeDiffCount` target 0
+- `colliderRadiusBeforeAfter` target 20->20
+- moving-video preference at 60/90/120 Hz
+
+### RISKS
+
+- A visual follow-through that lasts too long will feel like input lag even if physics already stopped.
+- Immediate idle can look robotic if the current frame is far from a contact/neutral pose.
+- Mapping phases between walk and run requires semantically authored frames; the current 4-frame sheet may not support a strong final solution.
+- Duplicate actor rendering remains an architectural cost; this proposal only makes locomotion safe under it, not a reason to keep duplicate passes forever.
+- Keyboard currently resolves to full input magnitude, while touch supports analog magnitudes; transition tests must distinguish those input modes.
+
+### EXPECTED_GROK_FEEDBACK
+
+Grok should independently classify P1-P7, then report:
+- exact current renderAvatar call count per actor/RAF;
+- measured current `_walkHold` lifetime at available refresh rates;
+- whether an update-side visual state is viable without adding another wrapper owner;
+- A/B timings and clips for current vs elapsed-time/contact stop transition;
+- start/walk-run/reversal pop counts when implemented;
+- any code ownership conflict with engine-a/ac/ah/ab/i;
+- whether the future 8-frame asset needs additional semantic metadata for transition mapping;
+- exact commits/tests/live verification and any proposal rejected or deferred.
+
+## CG-20260901-010 — Distance-matched WALK/RUN phase + contact-bounded stop for V5.36
+
+ID: CG-20260901-010
+TIMESTAMP: 2026-09-01T07:33:00-04:00
+AUTHOR: ChatGPT
+BASE_COMMIT: b2e13483946acbb603d58fef4ae57273b9c25fa1
+STATUS: NEEDS_BENCHMARK
+PRIORITY: HIGH
+TAGS: movement,render,60hz,90hz,120hz,benchmark,architecture,canvas2d,shadow,atlas
+AFFECTED_FILES: engine-ac.js, engine-ab.js, engine-ah.js, engine-i.js, engine-a.js, assets/hero.PNG, assets/README.md, ENGINE_MAP.md
+RESPONDS_TO: CG-20260901-005, CG-20260901-009; V5.36 visual locomotion implementation; current user priority lateral movement + larger premium avatar
+
+### PROBLEM
+
+V5.36 correctly moved the local player's visual locomotion state out of `renderAvatar()`, so duplicate actor draws no longer consume local gait state. However, pose phase is still advanced by a fixed `VISUAL_FRAME_SEC=0.130` for both WALK and RUN. That means the physical distance represented by one full 4-frame cycle changes dramatically with gait speed. The new `VISUAL_STOP_HOLD_SEC=0.075` is also shorter than one 130 ms pose interval, so a release can either cross a frame boundary or not depending on sub-frame timing, then resets to frame 0. This is not yet true contact-aware foot planting.
+
+### CONFIRMED_IN_GEMINI
+
+At `main` commit `b2e13483946acbb603d58fef4ae57273b9c25fa1`:
+
+1. `index.html` is `Kelo World — V5.36` and loads engines with cache `v=87`.
+2. `engine-ac.js` now owns `_visualMotion` for the local player and updates it once after wrapped movement. This is a substantial improvement over render-count mutation.
+3. `engine-ab.js` consumes `_visualMotion` when present and does not mutate the local player's phase/contact state during draw. Legacy actors still use render-side fallback state.
+4. `engine-i.js` still redraws actors above the plaza floor, so making local state render-pure was necessary; duplicate draw architecture itself remains.
+5. `engine-ac.js` still advances `v.frame` via `frameElapsed += dt` and one frame every `0.130s`, independent of actual distance traveled and independent of gait.
+6. Current 4-frame cycle duration is 4 × 0.130 = 0.520 s.
+7. WALK physical speed is 96 px/s, therefore a nominal cycle covers ~49.92 world px.
+8. RUN speed is 165 + `(mag-WALK_MAX)*28`; at full keyboard magnitude 1.0 this is ~172.28 px/s, therefore the same 0.520 s visual cycle covers ~89.59 world px.
+9. RUN therefore represents ~1.795× the world distance per visual cycle as WALK while using the same poses/cadence.
+10. `VISUAL_STOP_HOLD_SEC=0.075` is only ~57.7% of one pose interval. If frame elapsed at release is modeled as uniformly distributed, roughly 57.7% of releases can cross one frame boundary during hold and ~42.3% cannot; actual runtime distribution must be measured. Crossing a boundary is not equivalent to reaching a valid foot-contact frame.
+11. On visual stop, V5.36 resets `v.frame=0`; the code comment calls frame 0 a contact frame, but neither `assets/README.md` nor current repo metadata documents semantic contact frames for `hero.PNG`. Therefore “frame 0 = contact” is an unverified assumption for the current 4×4 art.
+12. `engine-ac.js` preserves the same `frame` across a gait change, which is better than resetting, but WALK/RUN still share one row/timing in `engine-ab.js`; no gait-specific stride contract exists yet.
+13. Keyboard still resolves to full normalized magnitude, so keyboard locomotion is effectively RUN whenever movement keys are held; touch can produce analog WALK.
+14. Collider remains independent at radius 20 in `engine-a.js`; no reason exists to enlarge it for the visual work.
+15. `ENGINE_MAP.md` remains stale: V5.15/v66 and hero owner `engine-m.js`, despite current effective sprite renderer being `engine-ab.js`.
+16. `assets/README.md` only lists filenames and contains no frame dimensions, pivots, rows, contact metadata or stride metadata.
+
+### EXTERNAL_EVIDENCE
+
+1. MDN documents that `requestAnimationFrame()` generally tracks display refresh rate, including 60/75/120/144 Hz, and warns animation progress must be based on elapsed time rather than callback count. V5.36 now satisfies the render-count part for local locomotion, but elapsed time alone does not solve foot sliding when movement speed changes.
+2. Community animation practice consistently identifies foot slide as a mismatch between the displacement implied by an animation and the character's actual world speed. A common remedy is to measure foot-contact travel and scale animation playback to movement speed, or author separate walk/run cycles for their intended speeds.
+3. Recent community feedback on 2D/2.5D run cycles continues to identify visible sliding specifically when animation cannot keep up with actual distance traveled. This supports treating distance matching as the next measurable problem rather than adding cosmetic bob first.
+4. Counterevidence: pure distance matching can look mechanical during acceleration, stop and very small analog input if every tiny displacement drives pose progression. Therefore phase should be distance-driven while locomoting, with explicit bounded start/stop/contact transition policy rather than no temporal policy at all.
+
+### HYPOTHESIS
+
+Kelo's lateral motion will look more planted if the local visual locomotion state changes from discrete time-frame ownership to a normalized continuous stride phase `phase01`, advanced primarily by actual planar world displacement divided by gait-specific measured `strideWorldPx`. WALK and RUN preserve homologous phase when crossing gait thresholds, but use distinct stride lengths/assets. Stop should resolve to a declared contact phase from the asset manifest within a short bounded time/distance window, rather than merely waiting 75 ms and resetting to frame 0. Reversal should preserve phase/contact-foot semantics while physical direction changes immediately.
+
+### PROPOSED_CHANGE
+
+**P1 — Keep the V5.36 render-pure architecture**
+- Do not move phase state back into `renderAvatar()`.
+- Repeated draws of one simulation state must keep `phaseDeltaOnDuplicateRender=0`.
+
+**P2 — Replace local `frame/frameElapsed` ownership with continuous `phase01`**
+- During locomotion, accumulate actual planar displacement after physics: `dist = hypot(p.x-lastX,p.y-lastY)`.
+- Advance `phase01 = (phase01 + dist/strideWorldPx[gait]) % 1`.
+- Derive frame index from phase only at render/sample time: current 4-frame fallback `floor(phase01*4)`; future lateral V2 `floor(phase01*8)`.
+- Do not invent final stride values before measuring the artwork.
+
+**P3 — Separate WALK and RUN stride contracts**
+- The future `hero-side-v2` manifest should declare at least `walk.strideWorldPx`, `run.strideWorldPx`, and semantic contact phases/frames.
+- Preserve normalized `phase01` when WALK↔RUN changes so homologous CONTACT/DOWN/PASSING/UP states remain aligned.
+- Do not simply run the same 8-frame art faster if WALK and RUN silhouettes are materially different.
+
+**P4 — Contact-bounded stop instead of fixed 75 ms reset**
+- On input release, physical hard-stop policy stays unchanged for this experiment.
+- Visual state determines nearest valid contact phase (for proposed 8-frame rows contacts at phase 0.0 and 0.5, corresponding to frames 0 and 4 only after asset verification).
+- Resolve toward that contact with a short max duration guard; candidate guard remains 50–100 ms for A/B only.
+- If already sufficiently near contact, enter idle immediately.
+- Never call current `hero.PNG` frame 0 a contact frame without inspecting/annotating it.
+
+**P5 — Reversal with phase preservation**
+- R↔L changes physical direction immediately.
+- Mirror/change face family without resetting `phase01`.
+- A/B an optional contact clamp only if `reversalPosePopCount` remains high.
+
+**P6 — Diagonal hysteresis after phase migration**
+- Keep the current side-vs-vertical threshold as baseline.
+- Add hysteresis separately; do not combine it with stride calibration in the first measurement.
+
+**P7 — Asset contract before scale-up**
+- Production lateral V2: true alpha, 128×192 cells, 8 WALK RIGHT + 8 RUN RIGHT, fixed foot pivot `(64,176)`, safe padding, no baked shadow, no labels.
+- Contact frames `[0,4]` are a desired authored contract, not a claim about the current generated draft or current `hero.PNG`.
+- Add manifest metadata before integrating.
+- Only after phase/contact test passes, evaluate render-only visualScale 1.15/1.25/1.30; collider stays 20.
+
+**P8 — Keep legacy NPC fallback isolated**
+- Current `engine-ab.js` still mutates `_walkHold/_lx/_ly` for actors without `_visualMotion`.
+- Do not refactor bots in the same first local-player experiment. Measure bot render duplication separately, then migrate them to the same visual-state model if safe.
+
+### DO_NOT_ASSUME
+
+- Do not assume V5.36 is visually verified; it was code-reviewed but no moving Pages clip/trace has yet proved stop quality.
+- Do not treat 75 ms as a contact transition merely because it is time-based.
+- Do not declare current frame 0 a planted-foot frame without asset evidence.
+- Do not hard-code 49.92 or 89.59 as desired stride lengths; they are measurements of the current time-based mismatch, not target art values.
+- Do not alter physical speed, hard stop, collider, camera or collision in the same stride-phase experiment.
+- Do not add bob/lean before foot-slip baseline; cosmetic motion can conceal rather than solve cadence mismatch.
+- Do not delete `engine-i` redraw until layer equivalence is proven.
+- Do not migrate Canvas2D/WebGL/Pixi merely to implement phase/pivots.
+
+### EXPERIMENT
+
+1. Baseline V5.36/v87 on current 4-frame art.
+2. Trace keyboard RIGHT RUN 3s and analog RIGHT WALK 3s; record dt, world displacement, gait, phase/frame, release moment, idle-enter moment and camera position.
+3. Measure actual `worldPxPerCycle` and `poseChangesPer100WorldPx` for both gaits.
+4. Instrument release phase and whether the 75 ms hold crosses a pose boundary; correlate with visible stop pop from video.
+5. Add `phase01` distance accumulation behind a flag while preserving all physics.
+6. Use provisional stride values only to establish the mechanism, then calibrate from annotated foot-contact artwork/video; rerun exact trace.
+7. Verify WALK↔RUN threshold crossing preserves phase and does not pop.
+8. Run RIGHT 1s → immediate LEFT 1s reversals repeatedly; compare preserve-phase vs optional contact-clamp.
+9. Integrate the clean 8+8 lateral asset/manifest only after the mechanism is stable.
+10. Re-run at 60/90/120 Hz or best available display/emulation; distance-based phase should produce equivalent cycles per world distance.
+11. Finally test 1.15/1.25/1.30 visual scale with collider fixed 20, actor crossing, doorway, nameplate and shimmer inspection.
+
+### DECIDING_METRICS
+
+- `worldPxPerCycleWalk`
+- `worldPxPerCycleRun`
+- `worldPxPerCycleRatio`
+- `poseChangesPer100WorldPx`
+- `phaseDeltaOnDuplicateRender` target 0
+- `releasePhase01`
+- `releaseCrossedPoseBoundaryDuringHold`
+- `releaseToVisualIdleMs`
+- `stopPosePopCount`
+- `walkRunTransitionPosePopCount`
+- `reversalPosePopCount`
+- `footSlipPxPerContact`
+- `footAnchorScreenJitterP95`
+- `cyclesPer100WorldPxVarianceAcrossHz`
+- `collisionOutcomeDiffCount` target 0
+- `colliderRadiusBeforeAfter` target 20→20
+- `nameplateOverlapRate`
+- `actorDepthOrderErrorCount`
+- `spriteEdgeShimmerCount`
+- `frameTimeP95/P99`
+
+### RISKS
+
+- Distance-based phase can stall while pushing against a wall; that may be correct for planted feet or may require a bounded intent fallback depending on desired animation style.
+- Very small analog movement can produce excessively slow pose changes; use gait/intent rules rather than forcing a minimum animation speed blindly.
+- Teleports/dash can create huge displacement deltas; visual stride accumulation must ignore or classify discontinuities so a 140 px dash does not spin walk frames unexpectedly.
+- The current 4-frame art may not contain reliable contact semantics; mechanism testing can proceed, but final foot-slip decisions require the clean 8-frame asset.
+- Phase preservation across mirrored LEFT/RIGHT assumes symmetric contact semantics; asymmetric clothing/accessories may later require authored left frames.
+- Larger sprites will magnify any residual pose pop, depth bug or sampling shimmer.
+
+### EXPECTED_GROK_FEEDBACK
+
+Grok should independently classify P1-P8 and report:
+- exact commit/Pages build tested;
+- whether V5.36 local phase is indeed stable under duplicate renders at runtime;
+- measured `worldPxPerCycle` WALK/RUN and current stop-boundary behavior;
+- whether `phase01 += dist/strideWorldPx` is viable in the existing `engine-ac` wrapper without creating another owner;
+- how dash/teleport/wall-push discontinuities should be gated;
+- A/B traces for time-based vs distance-based local phase;
+- stop pop counts with current 75 ms reset vs contact-bounded stop;
+- WALK↔RUN and reversal phase continuity results;
+- whether a clean 8+8 asset with trustworthy pivot/contact metadata is available;
+- exact collider equality and collision trace evidence;
+- any proposal rejected/deferred and why;
+- commits/tests/video/trace evidence if implementation occurs.
+
+---
+
+## CG-20260901-011 — Aspect-correct lateral scale, foot-pivot contract, and depth gate on current V5.39/V5.40 render stack
+
+ID: CG-20260901-011
+TIMESTAMP: 2026-09-01T08:38:37-04:00
+AUTHOR: ChatGPT
+BASE_COMMIT: 81d08dd46536375134f92830a1fdc430d519e6b6
+STATUS: NEEDS_BENCHMARK
+PRIORITY: HIGH
+TAGS: movement,render,shadow,camera,collision,60hz,90hz,120hz,benchmark,canvas2d,atlas,textures,architecture,hd2d
+AFFECTED_FILES: engine-l.js, engine-i.js, engine-ab.js, engine-ac.js, engine-ah.js, engine-a.js, assets/hero.PNG, assets/README.md, ENGINE_MAP.md, scripts/live-audit.mjs, index.html
+RESPONDS_TO: CG-20260901-005, CG-20260901-010; current user priority lateral movement + larger premium avatar; code changes after V5.36
+
+### PROBLEM
+
+The repo has changed materially since the V5.36 locomotion-state implementation and CG-010. The next useful step is not merely to connect an 8+8 lateral atlas. Current V5.39/V5.40 rendering creates three coupled risks for a larger hero: (1) the lateral sprite is currently drawn with a distorted aspect ratio, making the side silhouette artificially thin; (2) the effective PNG path has no grounded shadow; and (3) plaza props are flattened into one layer drawn entirely before actors, so every avatar is always visually in front of trees/columns/benches/fountain regardless of foot Y. Increasing visual size will magnify these issues even if collision remains correct.
+
+### CONFIRMED_IN_GEMINI
+
+At current `main` base commit `81d08dd46536375134f92830a1fdc430d519e6b6`:
+
+1. `index.html` is `Kelo World — V5.39` and loads engines with cache `v=90`.
+2. `engine-l.js` advertises `KELO_PLAZA_AUDIT.version='V5.40'` and loads `assets/tileset.png?v=91`. Build metadata is therefore already split across V5.39/v90 and V5.40/v91 internal plaza audit state; measurements must record exact source/asset identity rather than assume one version string is the whole build.
+3. `engine-i.js` is now intentionally empty. Any previous recommendation specifically targeting an `engine-i` actor redraw is obsolete.
+4. The duplicate/second actor pass now lives in `engine-l.js`: it calls the previous `render()`, then draws `floorLayer`, then `propLayer`, then redraws all simulated players and the local player through `renderAvatar()`.
+5. The local player's `_visualMotion` remains update-side in `engine-ac.js`, so repeated local draws do not consume local frame state. That V5.36 architecture remains valuable.
+6. NPCs without `_visualMotion` still go through `engine-ab.js::legacyMovingOf()`, which mutates `_lx/_ly/_walkHold` during rendering. Therefore duplicate actor draws can still alter NPC visual-state lifetime even though the local player is protected.
+7. `engine-ac.js` still advances local animation with fixed `VISUAL_FRAME_SEC=0.130` and fixed 4-frame phase timing; CG-010's proposed distance-matched `phase01` is not implemented in current main.
+8. `engine-ab.js` still uses the existing 4x4 `assets/hero.PNG`, with lateral destination width `48` and destination height approximately `81` for the documented 2:3 source-frame aspect.
+9. A 2:3 frame drawn at 48x81 has destination aspect 48/81=0.59259 while the authored source aspect is 2/3=0.66667. Relative width is therefore compressed to 88.89% of an aspect-correct draw: an ~11.11% horizontal squeeze. This can directly make lateral poses look thinner and less planted even before changing animation timing.
+10. An aspect-correct baseline at the same 81px height is 54x81. Therefore simply testing 54x81 versus current 48x81 is a clean silhouette experiment with no height, collider, physics, camera or stride change.
+11. `engine-ab.js` overrides `renderAvatar()` and, once its sheet is ready, does not call the base renderer. The base `engine-a.js` ellipse ground shadow is therefore absent from the effective PNG avatar path.
+12. `engine-ah.js` still documents that the previous bob implementation was removed because it moved shadow+sprite together and caused floating. Any restored shadow/bob contract must keep the shadow/root fixed and move only the body artwork above it.
+13. `engine-l.js` bakes trees, columns, benches, fountain, bushes, lamps and other decorative props into one `propLayer`, draws that complete layer before avatars, then draws every avatar above it. There is no per-prop Y-depth relationship with actor foot position in this plaza path.
+14. Base `engine-a.js` also renders simulated players before the local player rather than globally Y-sorting all actors, so actor-vs-actor depth can be wrong when the local player crosses above another character.
+15. Collider remains `localPlayer.radius=20` and circle-vs-AABB collision uses this logical radius, independent of PNG destination size. Visual scaling still does not require a collider change.
+16. `engine-ab.js` uses `footY=p.y+10` as an approximate root and computes the sprite destination from whole destination width/height, not from an authored per-frame pivot.
+17. `engine-ab.js` still performs near-white color-key alpha cleanup (`RGB >232 => alpha 0`) on the current sheet. A new true-alpha asset should bypass this cleanup or white/gold highlights can be damaged.
+18. `assets/` in current main contains `hero.PNG`, `plaza.PNG`, `tileset.png` and a minimal README. There is no committed `hero-side-v2.png` or manifest in current main.
+19. `assets/README.md` does not document frame size, rows, pivot, contact frames, stride metadata, alpha rules or sampling rules.
+20. `scripts/live-audit.mjs` now provides a useful mobile Chromium/DPR2 production-tileset gate, but it does not move the hero, inspect avatar frame/pivot/shadow/depth, test LEFT/RIGHT reversals or measure 60/90/120Hz locomotion. It is not yet a movement-quality benchmark.
+21. `ENGINE_MAP.md` remains materially stale: it still says V5.15/v66, identifies `engine-i` as the plaza redraw danger and names `engine-m.js` as hero sprite owner. Current `engine-i` is empty, current second actor pass is in `engine-l`, current `engine-m` is skill/projectile logic, and current PNG hero override is `engine-ab`.
+
+### EXTERNAL_EVIDENCE
+
+1. MDN `CanvasRenderingContext2D.imageSmoothingEnabled` documents that disabling smoothing is useful to keep pixel-art edges sharp when scaled. It does not promise ideal quality for arbitrary non-integer downscales, so Kelo should still A/B the actual atlas at its final destination sizes: https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/imageSmoothingEnabled
+2. MDN `requestAnimationFrame()` explicitly warns to use elapsed time/timestamps because display refresh commonly includes 60/75/120/144Hz. This continues to support update-side/time-or-distance-normalized locomotion instead of render-count stepping: https://developer.mozilla.org/en-US/docs/Web/API/Window/requestAnimationFrame
+3. PixiJS documentation distinguishes an authored sprite anchor/pivot from scale and position. Kelo does not need Pixi, but the same geometry applies directly in Canvas2D: map an authored foot pivot to one stable world foot root, then scale the artwork around that mapping: https://pixijs.com/7.x/guides/components/sprites
+4. PixiJS issue #6676 and Godot proposal #6995 provide counterevidence to the idea that nearest filtering automatically solves pixel-art presentation. Subpixel positioning/non-integer scale can still produce seams, distortion or jitter, so final scaling must be tested while moving and zooming, not only in a still frame: https://github.com/pixijs/pixijs/issues/6676 and https://github.com/godotengine/godot-proposals/issues/6995
+5. W3C CSSWG issue #5837 specifically discusses distortion from nearest-neighbor-like pixelated rendering at non-integer scaling factors. This supports using aspect-correct integer destination dimensions as one A/B candidate rather than arbitrary fractional destination sizes: https://github.com/w3c/csswg-drafts/issues/5837
+6. Gamedev community foot-slide guidance consistently recommends matching animation cadence to the distance implied by foot contacts; one highly upvoted answer describes choosing a target character speed and authoring/synchronizing the run to that speed. This supports CG-010's distance-phase direction after the asset is semantically validated: https://www.reddit.com/r/gamedev/comments/wofi7p
+7. 2D game-development community practice commonly keeps a blob/contact shadow as a separate object anchored at the character base/feet. This aligns with engine-ah's historical failure: shadow root stays fixed while body animation can move above it: https://www.reddit.com/r/godot/comments/pnef19
+
+### HYPOTHESIS
+
+Before increasing Kelo to an arbitrary 1.25x, the first lateral presentation win may come from removing the current 11.11% side-width distortion. Use an authored foot-pivot contract for the future 128x192 lateral atlas, then test aspect-correct integer destination sizes while collider remains 20. The scale experiment should be gated by depth/occlusion evidence because the current flattened plaza prop layer guarantees all avatars render above all props. A larger sprite without correcting/partitioning depth will look more wrong even if the sprite itself is better.
+
+For a proposed 128x192 cell with desired pivot `(64,176)`, define one uniform display scale and map the pivot to the world foot root rather than assuming bottom-center:
+
+`scaleX = drawW / 128`
+`scaleY = drawH / 192`
+`drawX = footX - 64 * scaleX`
+`drawY = footY - 176 * scaleY`
+
+For aspect-preserving output require `drawH = 1.5 * drawW` and preferably integer destination dimensions. Starting candidates around the current 54x81 aspect-correct baseline are:
+
+- 54x81 = 1.000 canonical aspect-correct baseline;
+- 62x93 = 1.148x canonical;
+- 68x102 = 1.259x canonical (closest integer 2:3 pair to nominal 1.25x);
+- 70x105 = 1.296x canonical.
+
+These are geometric test candidates, not shipped values. Note that relative to today's 48px side width, even 54x81 already increases lateral body width by 12.5% while keeping height unchanged.
+
+### PROPOSED_CHANGE
+
+**P1 — Extend the current live audit before visual promotion**
+- Reuse `scripts/live-audit.mjs` but add a movement-quality mode rather than creating another unrelated harness.
+- Trace RIGHT keyboard/run, LEFT, analog/touch walk, R↔L reversal, diagonal and stop.
+- Capture logical x/y, gait, `_visualMotion.frame/phase`, face, camera x/y, collider radius, draw destination bounds and actor draw count.
+- Add desktop and mobile viewports; record available refresh/timing rather than pretending a headless DPR2 mobile context proves 120Hz hardware.
+
+**P2 — Validate the 8+8 asset as data before integration**
+- The desired production contract remains 1024x384 overall, 8x2 cells, 128x192 each, true alpha, WALK RIGHT row 0, RUN RIGHT row 1, no baked shadow/text/grid.
+- Do NOT trust dimensions/transparency alone. Validate per-cell alpha bounds, edge touching/cross-cell bleed, frame uniqueness, consistent authored foot pivot and actual contact-frame semantics.
+- Desired pivot `(64,176)` and contacts `[0,4]` must be visually/semantically verified; a post-resize generated PNG is not automatically correct just because its pixel dimensions match.
+- Store the verified contract in a small manifest rather than hard-coded magic numbers.
+
+**P3 — Remove lateral aspect distortion before global enlargement**
+- Baseline A: current 48x81.
+- Candidate B: 54x81 with all other behavior identical.
+- Compare perceived body mass, edge quality, foot placement and actor/door occlusion.
+- If 54x81 is clearly better without regressions, use it as the canonical visualScale=1 baseline for the new lateral asset.
+
+**P4 — Pivot-rooted scale matrix**
+- After P2/P3, test 54x81, 62x93, 68x102 and 70x105 using the authored pivot mapping equations above.
+- Collider radius remains exactly 20.
+- The logical/world foot root remains `p.x` plus the chosen fixed foot-Y contract; do not resize or move physics to match artwork.
+- Body bob/lean, if later added, is an offset/rotation around the body relative to the foot root, never a mutation of logical `p.y`.
+
+**P5 — Restore a separate contact shadow**
+- Add a presentation-only ellipse/blob shadow under the effective PNG path, centered on the stable foot root.
+- Start static during the scale experiment. Do not phase-pulse it until foot planting is stable.
+- Measure draw count so the current second actor pass does not accidentally make visible shadow opacity darker through duplicate compositing.
+
+**P6 — Treat plaza depth as a hard scale gate**
+- Current monolithic `propLayer` means every avatar is always in front of every prop. Instrument crossings around tree/column/fountain/bench before promoting larger size.
+- Do not blindly global-Y-sort the entire game.
+- Minimal prototype should split truly depthable props from floor decoration and assign each depthable prop a `sortY`/footline. Compose actors and those props by Y only inside the relevant plaza layer.
+- Baseline → depth prototype → identical crossing traces → compare screenshots/frame time.
+- If a simpler back/front split matches the art, compare it against full Y-sort; choose the least complex layer model that fixes observed occlusion.
+
+**P7 — Actor-vs-actor depth check**
+- Base render draws simulated players then local player. Run two crossing directions and count impossible overlaps.
+- If scaling magnifies errors, test sorting actor presentation by stable footY. Do not change simulation order or collision.
+
+**P8 — Apply CG-010 distance phase only after asset semantics are trustworthy**
+- Keep the V5.36 update-side state.
+- Migrate fixed 130ms frame stepping to `phase01 += distance/strideWorldPx[gait]` only after contact frames/stride are annotated.
+- Preserve phase through WALK↔RUN and R↔L; keep hard physical stop unchanged for the first experiment.
+- Gate dash/teleport discontinuities so large jumps do not spin locomotion phase.
+
+**P9 — Migrate NPC presentation separately**
+- If all characters are enlarged, NPCs must eventually leave `legacyMovingOf()` because it is render-mutable under the `engine-l` second pass.
+- Do not combine NPC state migration with the first local hero asset integration. Measure local path first, then reproduce the same state model for bots using their own movement intent/target data rather than global player input.
+
+**P10 — Sampling A/B while moving**
+- For the verified 128x192 source cells at each destination pair, compare smoothing off versus a prefiltered/offline derivative where useful.
+- Do not rely on `imageSmoothingQuality` as a universal production contract because browser support remains incomplete.
+- Inspect edge shimmer and facial/clothing readability on mobile Chromium and, when accessible, iOS Safari.
+
+### DO_NOT_ASSUME
+
+- Do not assume removing `engine-i` solved duplicate actor drawing; the second pass moved to `engine-l`.
+- Do not assume the future/generated `hero-side-v2.png` is production-valid until pivot/contact/bleed are audited frame by frame.
+- Do not assume `64,176` and contact frames `[0,4]` are facts about any generated file; they are the desired contract until verified.
+- Do not enlarge collider radius from 20.
+- Do not keep current 48x81 lateral proportions by inertia; they distort a 2:3 source frame horizontally.
+- Do not add dynamic bob before foot cadence/pivot are stable.
+- Do not bake the shadow into the atlas.
+- Do not use current near-white alpha deletion on a true-alpha asset without explicit need.
+- Do not globally Y-sort buildings/UI/effects as a blind fix; first isolate observed depthable objects.
+- Do not claim 60/90/120Hz equivalence from a single headless mobile run.
+- Do not migrate Canvas2D to WebGL/Pixi merely for pivots or this scale experiment.
+
+### EXPERIMENT
+
+1. Baseline current V5.39/v90 at commit `81d08dd...`; record engine-l audit/tileset identity as well.
+2. Same trace: idle 1s → RIGHT run 3s → stop → LEFT run 3s → R↔L reversals → diagonal → tree/column/fountain/bench crossing → NPC crossing → doorway/building edge.
+3. Record collision radius/outcomes, avatar draw count, destination bounds, screen foot root, camera delta, gait/frame and prop/actor depth errors.
+4. A/B current 48x81 vs aspect-correct 54x81 only. No other behavioral change.
+5. Validate the proposed 8+8 atlas and manifest independently. Reject/repair asset if pivot/contact/bleed checks fail.
+6. Integrate the verified atlas behind fallback with the same 54x81 footprint first; rerun the exact trace.
+7. Apply the CG-010 distance-phase mechanism and calibrate stride from authored contact travel; rerun.
+8. Test 62x93, 68x102 and 70x105, collider fixed 20.
+9. For each size, repeat plaza prop and NPC crossing. If depth errors increase, prototype depthable-prop sorting/back-front partition and rerun the same trace before choosing scale.
+10. Add a fixed foot-root shadow and rerun to compare groundedness without dynamic bob.
+11. Compare smoothing/prefilter candidates while moving, including mobile DPR2 audit and available desktop/iOS evidence.
+12. Only promote a scale after collision equality, depth, nameplate, sampling and frame-time gates pass.
+
+### DECIDING_METRICS
+
+- `sideAspectRatioBeforeAfter` (0.59259 → target 0.66667 for aspect-correct cells)
+- `sideHorizontalCompressionPct` baseline ~11.11%
+- `drawW/drawH`
+- `pivotScreenErrorPx`
+- `opaquePixelsBelowDeclaredPivot`
+- `cellEdgeTouchCount`
+- `crossCellBleedCount`
+- `duplicateFrameHashCount`
+- `contactFrameVerified`
+- `renderAvatarCallsPerActorPerRAF`
+- `shadowVisibleCompositeCountPerActor`
+- `footSlipPxPerContact`
+- `footAnchorScreenJitterP95`
+- `worldPxPerCycleWalk/Run`
+- `reversalPosePopCount`
+- `walkRunTransitionPosePopCount`
+- `propDepthOrderErrorCount`
+- `actorDepthOrderErrorCount`
+- `nameplateOverlapRate`
+- `avatarOcclusionRate`
+- `collisionOutcomeDiffCount` target 0 for presentation-only stages
+- `colliderRadiusBeforeAfter` target 20→20
+- `spriteEdgeShimmerCount`
+- `frameTimeP95/P99`
+- decoded lateral-atlas memory: a 1024x384 RGBA atlas is ~1.5 MiB before browser/GPU overhead; record actual resource/memory evidence when available
+
+### RISKS
+
+- Correcting aspect ratio can make the hero feel wider before the new artwork is present; that is why 48x81→54x81 is an isolated A/B, not an automatic ship.
+- A generated/postprocessed 8+8 sheet can satisfy dimensions yet have drifting feet, inconsistent margins, duplicate poses or cropped limbs; mechanical PNG validation cannot prove contact semantics alone.
+- A larger avatar will expose the current monolithic prop-layer depth model much more strongly.
+- A contact shadow may double-darken if future layer changes make both actor passes visible; measure visible compositing, not just function calls.
+- Integer destination dimensions do not guarantee artifact-free sampling when source-to-destination scale is fractional.
+- Full Y-sort of large static layers can add complexity and CPU work unnecessarily; a small depthable-prop list or front/back partition may be superior.
+- Local and NPC presentation ownership currently differ; changing both at once would make regression attribution difficult.
+
+### EXPECTED_GROK_FEEDBACK
+
+Grok should independently classify P1-P10 and report:
+- exact current main/Pages/build/audit identity tested;
+- whether the second actor pass is confirmed in `engine-l` at runtime and whether both passes are visibly composited;
+- measured 48x81 vs 54x81 result with no physics change;
+- verified actual dimensions/pivot/contact/alpha/bleed status of any candidate 8+8 lateral asset committed for testing;
+- whether aspect-correct integer destination pairs improve lateral silhouette/sampling;
+- shadow grounding A/B and duplicate-composite evidence;
+- tree/column/fountain/bench and NPC crossing depth errors at each tested scale;
+- whether a back/front split or per-prop Y-sort is the smaller viable depth fix;
+- distance-phase results after asset semantics are verified;
+- collider equality and collision-trace equality;
+- frame-time/sampling/nameplate results on desktop/mobile and any iOS evidence;
+- any proposal rejected or deferred and why;
+- exact commits/tests/screenshots/traces for any implementation.
+
+---
