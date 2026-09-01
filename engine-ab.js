@@ -1,13 +1,8 @@
 (function () {
+  // LIVE owner: hero walk. Sheet is 1024x1536 = 4x4 cells of 256x384.
   const raw = new Image();
-  let sheet = null, ok = false, FW = 0, FH = 0;
+  let sheet = null, ok = false, FW = 256, FH = 384;
   const COLS = 4, ROWS = 4;
-  const paths = ['assets/hero.PNG', 'assets/hero.png'];
-  let i = 0;
-  function tryNext() {
-    if (i >= paths.length) return;
-    raw.src = paths[i++];
-  }
   raw.onload = function () {
     const c = document.createElement('canvas');
     c.width = raw.width;
@@ -18,7 +13,7 @@
     const d = data.data;
     for (let p = 0; p < d.length; p += 4) {
       const r = d[p], gv = d[p + 1], b = d[p + 2];
-      if ((r > 220 && gv > 220 && b > 220) || (r < 12 && gv < 12 && b < 12)) d[p + 3] = 0;
+      if (r > 232 && gv > 232 && b > 232) d[p + 3] = 0;
     }
     g.putImageData(data, 0, 0);
     sheet = c;
@@ -26,26 +21,38 @@
     FH = c.height / ROWS;
     ok = true;
   };
-  raw.onerror = tryNext;
-  tryNext();
+  raw.onerror = function () { raw.src = 'assets/hero.png'; };
+  raw.src = 'assets/hero.PNG';
 
   const dirRow = { down: 0, left: 1, right: 2, up: 3 };
   function faceOf(p) {
     const vx = p.vx || 0, vy = p.vy || 0;
-    if (Math.hypot(vx, vy) < 8) return p._face || 'down';
+    if (Math.hypot(vx, vy) < 12) return p._face || 'down';
     const f = Math.abs(vx) > Math.abs(vy) ? (vx > 0 ? 'right' : 'left') : (vy > 0 ? 'down' : 'up');
     p._face = f;
     return f;
   }
 
+  function gaitOf(p) {
+    if (p._gait && p._gait !== 'idle') return p._gait;
+    const spd = Math.hypot(p.vx || 0, p.vy || 0);
+    if (spd > 190) return 'run';
+    if (spd > 28) return 'walk';
+    return 'idle';
+  }
+
   function stepCol(p) {
+    const gait = gaitOf(p);
     if (p._lx == null) { p._lx = p.x; p._ly = p.y; p._step = 0; }
-    const dx = p.x - p._lx, dy = p.y - p._ly;
+    const dist = Math.hypot(p.x - p._lx, p.y - p._ly);
     p._lx = p.x; p._ly = p.y;
-    const dist = Math.hypot(dx, dy);
-    if (dist < 0.25) { p._step = 0; return 0; }
+    if (gait === 'idle') {
+      p._step = 0;
+      return 0;
+    }
     p._step += dist;
-    return Math.floor(p._step / 20) % COLS;
+    const stride = gait === 'run' ? 12 : 20;
+    return Math.floor(p._step / stride) % COLS;
   }
 
   const _av = renderAvatar;
@@ -53,24 +60,34 @@
     if (!ok || !p || !sheet) return _av(p, isSelf);
     const col = stepCol(p);
     const row = dirRow[faceOf(p)] || 0;
-    const pad = 1;
-    const dw = 28, dh = 40;
+    const padX = Math.max(2, FW * 0.04);
+    const padY = Math.max(2, FH * 0.03);
+    const dw = 36;
+    const dh = Math.round(dw * (FH / FW));
     const footY = p.y;
     ctx.save();
-    ctx.fillStyle = 'rgba(0,0,0,0.28)';
+    ctx.fillStyle = 'rgba(0,0,0,0.32)';
     ctx.beginPath();
-    ctx.ellipse(p.x, footY + 1, 9, 2.6, 0, 0, Math.PI * 2);
+    ctx.ellipse(p.x, footY + 1, dw * 0.28, 3.1, 0, 0, Math.PI * 2);
     ctx.fill();
+    const prevSmooth = ctx.imageSmoothingEnabled;
+    ctx.imageSmoothingEnabled = false;
     ctx.drawImage(
       sheet,
-      col * FW + pad, row * FH + pad, Math.max(1, FW - pad * 2), Math.max(1, FH - pad * 2),
-      Math.round(p.x - dw / 2), Math.round(footY - dh + 2),
-      dw, dh
+      col * FW + padX,
+      row * FH + padY,
+      FW - padX * 2,
+      FH - padY * 2,
+      Math.round(p.x - dw / 2),
+      Math.round(footY - dh + 3),
+      dw,
+      dh
     );
+    ctx.imageSmoothingEnabled = prevSmooth;
     ctx.fillStyle = isSelf ? '#e7c56a' : '#f3eee4';
-    ctx.font = 'bold 11px sans-serif';
+    ctx.font = 'bold 10px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(p.name || 'Kelo', p.x, footY - dh - 2);
+    ctx.fillText(p.name || 'Kelo', Math.round(p.x), Math.round(footY - dh - 4));
     ctx.restore();
   };
 })();
