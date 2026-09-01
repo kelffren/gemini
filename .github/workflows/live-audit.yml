@@ -21,14 +21,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - name: Install Playwright
-        run: |
-          npm install --no-save playwright@1.55.0
-          npx playwright install --with-deps chromium
+      - name: Install Playwright package
+        run: npm install --no-save playwright@1.55.0
       - name: Audit deployed mobile page
         env:
           AUDIT_URL: https://kelffren.github.io/gemini/
           EXPECTED_BUILD: V5.38
+          CHROME_BIN: /usr/bin/google-chrome
         run: node scripts/live-audit.mjs
       - name: Upload screenshot evidence
         if: always()
