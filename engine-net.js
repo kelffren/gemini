@@ -3,23 +3,53 @@
   const NET = params.get('net');
   window.keloNet = { on: false, id: null, peers: {}, url: NET };
 
-  function badge(text) {
-    const el = document.getElementById('telemetry-bar');
-    if (!el) return;
-    if (el.dataset.netHooked) {
-      el.dataset.net = text;
-      return;
-    }
-    el.dataset.netHooked = '1';
-    const orig = el.textContent;
-    setInterval(function () {
-      el.textContent = orig + ' | ' + (el.dataset.net || 'NET off');
-    }, 800);
-    el.dataset.net = text;
+  function ensureChip() {
+    let chip = document.getElementById('kelo-online');
+    if (chip) return chip;
+    chip = document.createElement('div');
+    chip.id = 'kelo-online';
+    chip.style.cssText = [
+      'position:absolute',
+      'top:max(8px,env(safe-area-inset-top))',
+      'left:50%',
+      'transform:translateX(-50%)',
+      'z-index:80',
+      'pointer-events:none',
+      'display:flex',
+      'align-items:center',
+      'gap:6px',
+      'padding:6px 12px',
+      'border-radius:999px',
+      'background:rgba(10,13,18,.92)',
+      'border:1px solid rgba(231,197,106,.35)',
+      'color:#e7c56a',
+      'font:700 11px/1.2 -apple-system,sans-serif',
+      'white-space:nowrap',
+      'box-shadow:0 6px 18px rgba(0,0,0,.35)'
+    ].join(';');
+    document.body.appendChild(chip);
+    return chip;
+  }
+
+  function paintChip(state, n) {
+    const chip = ensureChip();
+    const dot = state === 'on' ? '#3ddc84' : (state === 'wait' ? '#e7c56a' : '#8a9099');
+    const label =
+      state === 'on' ? ('En línea  ·  ' + n) :
+      state === 'wait' ? 'Conectando…' :
+      state === 'err' ? 'Sin señal' :
+      'Solo local';
+    chip.innerHTML = '<span style="width:8px;height:8px;border-radius:50%;background:' + dot +
+      ';box-shadow:0 0 8px ' + dot + '"></span><span>' + label + '</span>';
+  }
+
+  function countOnline() {
+    const others = Object.keys(window.keloNet.peers || {}).length;
+    return window.keloNet.on ? (1 + others) : 0;
   }
 
   if (!NET) {
-    badge('NET off');
+    paintChip('off', 0);
     return;
   }
 
@@ -30,21 +60,21 @@
 
   function connect() {
     try { ws = new WebSocket(NET); } catch (e) {
-      badge('NET fail');
+      paintChip('err', 0);
       return;
     }
-    badge('NET…');
+    paintChip('wait', 0);
     ws.onopen = function () {
       window.keloNet.on = true;
       ws.send(JSON.stringify({ t: 'hello', name: (localPlayer && localPlayer.name) || 'Kelo' }));
-      badge('NET on');
+      paintChip('on', countOnline());
     };
     ws.onclose = function () {
       window.keloNet.on = false;
-      badge('NET off');
+      paintChip('err', 0);
       setTimeout(connect, 1500);
     };
-    ws.onerror = function () { badge('NET err'); };
+    ws.onerror = function () { paintChip('err', 0); };
     ws.onmessage = function (ev) {
       let msg;
       try { msg = JSON.parse(ev.data); } catch (e) { return; }
@@ -52,11 +82,13 @@
         myId = msg.id;
         window.keloNet.id = myId;
         ingest(msg.players);
-        badge('NET ' + Object.keys(peers).length);
       }
       if (msg.t === 'state') ingest(msg.players);
       if (msg.t === 'join' && msg.player) upsert(msg.player);
-      if (msg.t === 'leave' && msg.id) delete peers[msg.id];
+      if (msg.t === 'leave' && msg.id) {
+        delete peers[msg.id];
+        paintChip(window.keloNet.on ? 'on' : 'err', countOnline());
+      }
     };
   }
 
@@ -74,6 +106,7 @@
     prev._face = p.face || prev._face;
     prev._gait = p.gait || 'walk';
     peers[p.id] = prev;
+    paintChip('on', countOnline());
   }
 
   function ingest(map) {
@@ -86,7 +119,7 @@
     Object.keys(peers).forEach(function (id) {
       if (!live[id]) delete peers[id];
     });
-    badge('NET ' + Object.keys(peers).length);
+    paintChip(window.keloNet.on ? 'on' : 'wait', countOnline());
   }
 
   connect();
