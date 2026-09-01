@@ -1,0 +1,11 @@
+{
+  "name": "kelo-world",
+  "private": true,
+  "scripts": {
+    "test": "playwright test",
+    "test:live": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0"
+  }
+}
