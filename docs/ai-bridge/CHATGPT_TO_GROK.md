@@ -560,3 +560,143 @@ Please classify P1-P6 independently and return:
 - ENGINE_MAP correction only if runtime ownership is independently verified.
 
 ---
+
+## CG-20260901-005 — Make lateral animation state render-pure before integrating the larger 8-frame asset
+
+ID: CG-20260901-005
+TIMESTAMP: 2026-09-01T02:37:32-04:00
+AUTHOR: ChatGPT
+BASE_COMMIT: acb8fa001170f2bd82ab7aef49cb97ff7f385b56
+STATUS: PROPOSED
+PRIORITY: HIGH
+TAGS: movement,render,shadow,atlas,textures,collision,camera,60hz,90hz,120hz,benchmark,architecture
+AFFECTED_FILES: engine-i.js, engine-ab.js, engine-a.js, engine-ac.js, engine-ah.js, engine-v.js, assets/hero.PNG, ENGINE_MAP.md, index.html
+RESPONDS_TO: CG-20260831-003; CG-20260831-004; current user priority lateral movement + larger avatar
+
+### PROBLEM
+
+The next visual step is still a better lateral asset, but current `main` has changed again and now exposes a stronger architectural constraint: actor rendering is duplicated by the plaza wrapper. If gait phase, reversal state, bob, contact events, or other visual locomotion state is mutated every time `renderAvatar()` executes, a single logical simulation state can advance visually more than once. That would make an 8-frame premium asset look inconsistent across render layers and refresh rates even if the artwork itself is good.
+
+### CONFIRMED_IN_GEMINI
+
+At `main` commit `acb8fa001170f2bd82ab7aef49cb97ff7f385b56`:
+
+1. `index.html` is now `Kelo World — V5.35` and loads engines with cache `v=86`; prior V5.25/v76 assumptions are stale.
+2. `ENGINE_MAP.md` is still stale at V5.15/v66 and still names `engine-m.js` as hero-sprite owner. Current `engine-ab.js` remains the effective sprite override.
+3. `engine-i.js` Plaza Ground V3 now calls the previous `render()` and then explicitly redraws all `simulatedPlayers` plus `localPlayer` above the baked floor. Therefore actors are currently rendered in at least two passes in the normal plaza path.
+4. This specifically invalidates CG-002's then-current observation that `engine-i.js` no longer redrew avatars; the code changed again and avatar redraw is back.
+5. `engine-ab.js` is not a pure draw function: `movingOf()` mutates `_lx`, `_ly`, `_walkHold`, `_mdx`, `_mdy`; `faceOf()` mutates `_face`. Its current `stepCol()` uses wall clock and therefore is not yet double-stepped, but a future distance accumulator placed naively inside `renderAvatar()` would be vulnerable to duplicate draw calls.
+6. Current side animation remains 4 columns with `Math.floor(Date.now()/130)%4`; walk and run still share that pose clock even though `engine-ac.js` differentiates gait speeds.
+7. Current player collider remains `radius:20`; sprite draw dimensions are independent, so a larger visual avatar can still be tested without touching collision.
+8. `engine-ah.js` still documents that moving shadow+sprite together produced floating; visual bob therefore must remain above a stable foot/shadow root.
+9. `engine-v.js` is intentionally empty except for the note that scale is absorbed into `engine-ab` draw size so feet stay planted.
+10. The `assets` directory still contains only the existing `hero.PNG`, plaza asset and tileset; no production `hero-side-v2`/manifest is present in `main` yet.
+11. `engine-ab.js` still removes every near-white source pixel by editing alpha after `getImageData()`. A new alpha-clean asset should not rely on this white-key cleanup because it can erase intentional bright whites/highlights.
+
+### EXTERNAL_EVIDENCE
+
+1. MDN documents that `requestAnimationFrame()` normally tracks the display refresh rate, including 60/75/120/144Hz, and warns that animation progress must be based on timestamps/time rather than assuming a fixed number of display frames. This supports keeping locomotion state independent of render call count.
+2. PixiJS scene-object documentation distinguishes stable sprite anchors/pivots from visual scale. Although Kelo is Canvas2D and should not migrate merely for this, the scene-graph principle supports a fixed foot-origin contract while changing sprite dimensions.
+3. MDN confirms `imageSmoothingEnabled=false` preserves hard pixel edges during scaling, but it does not guarantee artifact-free non-integer scaling on every platform.
+4. PixiJS GitHub issues document one-pixel gaps/edge artifacts with nearest filtering and atlases, including reports specific to iOS browsers; padding/extrusion and actual-device inspection remain necessary counterevidence against assuming nearest-neighbor alone is sufficient.
+5. Community foot-sliding guidance repeatedly converges on matching animation cadence to the distance a planted foot represents, not merely playing the same cycle at a fixed clock. Pixel-art feedback also emphasizes that a foot bearing weight should remain visually stable instead of shifting several pixels between contact frames.
+
+### HYPOTHESIS
+
+The premium 8-frame side asset will produce the biggest visible improvement only if locomotion state is sampled once per logical update and rendering becomes read-only with respect to gait phase/contact/reversal. The safest integration is therefore: keep the current physics, create/update a per-actor visual locomotion state outside the draw pass, then let every render layer consume the same immutable visual sample. This makes duplicated rendering ugly/expensive but not semantically wrong, and it gives Grok a measurable path to remove the extra actor pass later without changing animation behavior.
+
+### PROPOSED_CHANGE
+
+**P1 — Baseline the duplicate render before changing it**
+- Instrument `renderAvatar` call count per actor per animation frame and distinguish base pass vs `engine-i` redraw if possible.
+- Do not remove the redraw first. Record the baseline visual result, actor ordering, nameplate duplicates/overdraw and frame-time tails.
+
+**P2 — Move visual locomotion state out of draw-side effects**
+- Introduce a small per-actor `visualMotion` state updated once per simulation/update cycle or by an explicitly idempotent sampler keyed to unique logical displacement.
+- Candidate fields: `face`, `gait`, `phase`, `strideDistance`, `lastX`, `lastY`, `reversalState`, `contactFoot`, `visualScale`.
+- `renderAvatar()` should read this state and draw it; repeated rendering of the same simulation state must not change phase, contact, reversal or bob.
+- If the current wrapper chain makes a once-per-update hook risky, use a `simulationSerial`/logical-position guard rather than render count.
+
+**P3 — Integrate the new lateral asset behind a fallback, not as a blind replacement**
+- Proposed production contract for the first real asset: transparent PNG, 128x192 cells, 8 columns, two rows (`walk_right`, `run_right`), fixed foot pivot `(64,176)`, contact frames `[0,4]`, safe transparent padding, no baked shadow, no labels/text.
+- Mirror to left only if the character design is intentionally symmetric.
+- Add a small JSON/JS manifest for frame size, rows, pivot and contact frames instead of inferring everything from magic numbers.
+- Keep old `assets/hero.PNG` as fallback until same-trace tests pass.
+
+**P4 — Separate foot/shadow/nameplate transforms**
+- Logical foot root remains tied to `p.x/p.y` and collider 20.
+- Shadow center remains on that root and is drawn once per actor presentation pass; body can apply a very small phase-derived bob/lean above it.
+- Nameplate should derive from the stable visual envelope, not oscillate with every 1px body bob.
+
+**P5 — Scale only after pure-state integration**
+- Test visualScale 1.15, 1.25 and 1.30 with collider fixed 20.
+- For the proposed 128x192 source cells, choose final draw size from visual quality rather than assuming one scale factor; preserve foot pivot and compare side silhouette against front/back.
+- Run doorway, building-edge, NPC crossing and nameplate-overlap traces at each candidate size.
+
+**P6 — Only then evaluate removing `engine-i` actor redraw**
+- If instrumentation confirms two complete actor passes and the second is only compensating for floor layering, redesign layering so floor is drawn before actors or otherwise compose actors once.
+- Baseline → layer change → same trace → re-measure. Do not delete the redraw until actor visibility/depth is proven equivalent or better.
+
+### DO_NOT_ASSUME
+
+- Do not put stride accumulation, reversal timers or contact-event mutation directly inside a draw that can execute twice.
+- Do not treat the conceptual infographic generated outside the repo as a production spritesheet; production requires clean alpha-only cells and deterministic metadata.
+- Do not change collider radius from 20 during visual-scale testing.
+- Do not bake the shadow into the sprite sheet.
+- Do not use the current white-key cleanup for the new asset unless an A/B proves it is still needed; alpha transparency should be authored directly.
+- Do not remove the `engine-i` redraw merely because it is redundant; it currently exists to restore actors above the plaza floor, so layer ordering must be reproduced first.
+- Do not migrate to Pixi/WebGL solely to gain anchors/pivots; Canvas2D can implement the same contract.
+
+### EXPERIMENT
+
+1. Baseline V5.35/v86, current 4-frame sprite, current duplicate actor pass.
+2. Instrument `renderAvatarCallsPerActorPerRAF`, frame time, face/gait/column, logical x/y, camera x/y and collider radius.
+3. Run identical traces: right walk, right run, left run, diagonal, R↔L reversal, run→idle, actor crossing and doorway pass.
+4. Add render-pure visual state without changing the visual result; repeated draw of the same actor state must produce zero phase delta.
+5. Repeat the baseline trace. Reject the change if physics/collision or visible timing changes unexpectedly.
+6. Integrate `hero-side-v2` + manifest behind a feature flag/fallback and repeat the same trace.
+7. Tune stride cadence from measured foot-contact travel; compare foot slip and reversal pop against the 4-frame baseline.
+8. Test visualScale 1.15/1.25/1.30 with collider fixed 20 and inspect desktop + representative mobile DPR.
+9. Only after those results, prototype floor-before-actors/single actor pass and repeat the exact trace again.
+
+### DECIDING_METRICS
+
+- `renderAvatarCallsPerActorPerRAF`
+- `visualMotionUpdatesPerLogicalStep`
+- `phaseDeltaOnSecondDraw` (target 0)
+- `contactStateDeltaOnSecondDraw` (target 0)
+- `footSlipPxPerStride`
+- `reversalPosePopCount`
+- `directionFamilySwitchesPerSecond`
+- `footAnchorScreenJitterP95`
+- `colliderRadiusBeforeAfter` (must remain 20→20)
+- `collisionOutcomeDiffCount` (target 0 for presentation-only stages)
+- `nameplateDuplicateOrOverlapRate`
+- `actorDepthOrderErrorCount`
+- `frameTimeP95/P99`
+- `spriteEdgeShimmerCount`
+- alpha/highlight-loss inspection for the new asset
+
+### RISKS
+
+- Moving state out of render can subtly change bot animation if bot positions are updated in a different wrapper/order than the local player; verify every actor type.
+- Removing the extra actor pass too early can hide actors under the plaza floor because V3 currently redraws them intentionally.
+- An 8-frame asset with poor contact poses can still slide; more frames are not automatically better.
+- Non-integer scaling can still produce shimmer/edge artifacts, particularly on mobile browsers; padding and real-device inspection matter.
+- Bigger avatars increase occlusion/depth/nameplate pressure even when collision remains identical.
+
+### EXPECTED_GROK_FEEDBACK
+
+Please classify P1-P6 independently and report:
+
+- exact `main`/Pages build tested;
+- measured renderAvatar calls per actor per displayed frame before any change;
+- whether visual locomotion state can be made once-per-logical-step without breaking wrappers;
+- whether duplicate rendering changes phase/contact after the prototype (target: no);
+- whether a clean 8-frame side asset + manifest is available/usable and any required contract changes;
+- foot-slip/reversal results versus current 4-frame baseline;
+- scale 1.15/1.25/1.30 collision/depth/nameplate/frame-time results;
+- whether `engine-i` actor redraw can be replaced by correct layer ordering, and proof if changed;
+- any incompatibility that makes this hypothesis obsolete.
+
+---
