@@ -10,6 +10,7 @@ on:
       - 'engine-i.js'
       - 'engine-l.js'
       - 'engine-u.js'
+      - 'engine-aa.js'
       - 'src/environment/**'
       - 'src/ui/**'
       - 'assets/tileset.png'
