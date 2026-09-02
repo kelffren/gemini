@@ -332,6 +332,16 @@ Kelo World is no longer allowed to remain a single polished plaza floating in a 
 - Manual inspection of `live-commerce-arcade.png` confirms the new stepped end caps and alternating facade bays are legible on mobile and the arcade no longer reads as one completely uniform vertical rectangle. The large central roof mass is still visually heavy, so further improvement should come from modular courtyards/recesses or stronger side-volume segmentation rather than adding generic grass noise.
 - Next visual bottleneck: the Commerce Arcade still occupies a very large continuous roof area compared with Kelo Luxe and Banco. A safe next pass should test one or two registry-driven roof/courtyard modules or facade recesses that preserve the exact collider and renderer contract, then re-audit mobile composition.
 
+
+## Validated Commerce Arcade Courtyard — V5.83 / Registry 1.10.14 / 2026-09-02
+- Commerce Arcade keeps the exact 160x432 authored asset footprint and the existing registry prefab placement/collision contract `{x:1530,y:1400,w:120,h:400}`; no gameplay coordinates, movement, networking, combat, economy, chat or inventory systems changed.
+- Added a west-side stone-framed garden courtyard/recess in the central run, with restrained planting and a small water/fountain cue. The goal is to break the long continuous roof mass with one readable authored sub-space rather than add generic surface noise or another renderer special case.
+- The asset is served as `assets/commerce-arcade-v1.svg?v=3`; TileRegistry is `1.10.14`; the live page contract is V5.83 and continues to use `architecture-prefab-renderer-v1.3` / `authored-prefab-no-legacy-buildings-v1`.
+- LIVE mobile validation passed at 390x844 CSS / 780x1688 canvas. Commerce Arcade was ready, legacy replacement remained active, architecture and market occlusion remained active, and the final diagnostic report contained `consoleErrors=[]`, `failedRequests=[]`, and `httpErrors=[]`.
+- Manual inspection of `live-commerce-arcade.png` confirms that the central green/ivory courtyard reads clearly at mobile scale and creates a strong pause in the formerly continuous dark-green mass while the ivory/glass shop frontage stays legible. It currently reads more like an inset roof garden than true negative-space architecture, so further carving should be incremental rather than enlarging it blindly.
+- Research validation: Pixadom's current 2026 roadmap continues to prioritize environmental design/furnishing, decorative layout variety and mobile-facing improvements, while its June 27, 2026 update describes replacing an old placeholder interior with a fully authored destination. The transferable principle for Kelo World is to use small authored sub-spaces and clear landmarks to create density without noise, never copying Pixadom art or layouts.
+- Next bottleneck: the east ivory/glass frontage of Commerce Arcade still repeats five vertically similar shop bays and reads more mechanically than the new west-side courtyard. The next safe pass should vary 1–2 frontage modules or add a small entrance canopy/signage hierarchy through the existing asset/registry contract, without changing the collider or generic architecture renderer.
+
 ## Non-goals During Visual Passes
 Do not casually alter unrelated systems such as:
 - core movement feel;
