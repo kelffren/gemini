@@ -63,14 +63,20 @@ function auditMigration() {
 function auditLoadout() {
   const starter = stones.createStarterSet();
   assert.equal(starter.length, 5, 'starter loadout must contain five stones');
-  assert.equal(starter[4].abilityKey, 'fire_tornado', 'fifth starter slot must be the ultimate');
+  assert.equal(starter[4].abilityKey, 'fire_tornado', 'fifth starter stone must be the ultimate');
   assert.equal(stones.abilityByKey(starter[4].abilityKey).slotType, 'ultimate');
 
   const state = { inventory: [], equipped: starter, marketListings: [] };
   stones.migrateState(state);
   const snapshot = stones.exportLoadout(state);
   assert.equal(snapshot.slots.filter(Boolean).length, 5);
+  assert.equal(snapshot.slots[4].abilityKey, 'fire_tornado', 'ultimate must project into slot 5');
+  assert(snapshot.slots.slice(0, 4).every((slot) => slot && stones.abilityByKey(slot.abilityKey).slotType === 'normal'), 'slots 1-4 must be normal');
   assert(stones.validateLoadoutSnapshot(snapshot, state).valid, 'authoritative snapshot should validate');
+
+  const tampered = JSON.parse(JSON.stringify(snapshot));
+  tampered.slots[0].abilityKey = 'shadow_step';
+  assert.equal(stones.validateLoadoutSnapshot(tampered, state).reason, 'SNAPSHOT_TAMPERED', 'tampering must be detected before authority comparison');
   return { fingerprint: snapshot.fingerprint, slots: snapshot.slots.length };
 }
 
