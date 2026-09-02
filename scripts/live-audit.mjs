@@ -3,7 +3,7 @@ import { chromium } from 'playwright';
 
 const base = process.env.AUDIT_URL || 'https://kelffren.github.io/gemini/';
 const expected = process.env.EXPECTED_BUILD || 'V5.49';
-const expectedRegistry = process.env.EXPECTED_REGISTRY || '1.7.0';
+const expectedRegistry = process.env.EXPECTED_REGISTRY || '1.7.1';
 fs.mkdirSync('artifacts', { recursive: true });
 if (fs.existsSync('assets/tileset-vclean.png')) fs.copyFileSync('assets/tileset-vclean.png', 'artifacts/repo-tileset.png');
 else if (fs.existsSync('assets/tileset.png')) fs.copyFileSync('assets/tileset.png', 'artifacts/repo-tileset.png');
@@ -11,113 +11,61 @@ if (fs.existsSync('assets/plaza-transitions-v1.png')) fs.copyFileSync('assets/pl
 if (fs.existsSync('assets/rural-soil-v1.png')) fs.copyFileSync('assets/rural-soil-v1.png', 'artifacts/repo-rural-soil.png');
 if (fs.existsSync('assets/rural-props-v1.png')) fs.copyFileSync('assets/rural-props-v1.png', 'artifacts/repo-rural-props.png');
 
-const browser = await chromium.launch({
-  headless: true,
-  executablePath: process.env.CHROME_BIN || '/usr/bin/google-chrome',
-  args: ['--no-sandbox', '--disable-dev-shm-usage']
-});
-const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+const browser = await chromium.launch({headless:true,executablePath:process.env.CHROME_BIN||'/usr/bin/google-chrome',args:['--no-sandbox','--disable-dev-shm-usage']});
+const context = await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true});
 const page = await context.newPage();
-const consoleErrors = [];
-const failedRequests = [];
-const httpErrors = [];
-page.on('console', msg => { if (msg.type() === 'error') consoleErrors.push(msg.text()); });
-page.on('pageerror', err => consoleErrors.push(`PAGEERROR: ${err.stack || err.message}`));
-page.on('requestfailed', req => failedRequests.push({ url:req.url(), error:req.failure()?.errorText || 'failed' }));
-page.on('response', res => { if (res.status() >= 400) httpErrors.push({ status:res.status(), url:res.url() }); });
+const consoleErrors=[], failedRequests=[], httpErrors=[];
+page.on('console',m=>{if(m.type()==='error')consoleErrors.push(m.text());});
+page.on('pageerror',e=>consoleErrors.push(`PAGEERROR: ${e.stack||e.message}`));
+page.on('requestfailed',r=>failedRequests.push({url:r.url(),error:r.failure()?.errorText||'failed'}));
+page.on('response',r=>{if(r.status()>=400)httpErrors.push({status:r.status(),url:r.url()});});
 
-let title = '', loaded = false;
-for (let attempt = 1; attempt <= 24; attempt++) {
-  try {
-    await page.goto(`${base}?audit=${Date.now()}-${attempt}`, { waitUntil: 'networkidle', timeout: 45000 });
-    title = await page.title();
-    const deployed = await page.evaluate(() => ({
-      version: window.KELO_PLAZA_AUDIT?.version || null,
-      registryVersion: window.KELO_PLAZA_AUDIT?.registryVersion || null,
-      authoredTransitions: window.KELO_PLAZA_AUDIT?.authoredTransitions || false,
-      depthOcclusion: window.KELO_PLAZA_AUDIT?.depthOcclusion || false,
-      depthOccluderCount: window.KELO_PLAZA_AUDIT?.depthOccluderCount || 0,
-      worldReady: window.KELO_WORLD_AUDIT?.ready || false,
-      worldVersion: window.KELO_WORLD_AUDIT?.version || null,
-      districtCount: window.KELO_WORLD_AUDIT?.districtCount || 0,
-      districtStyleMode: window.KELO_WORLD_AUDIT?.districtStyleMode || null,
-      styledDistrictCount: window.KELO_WORLD_AUDIT?.styledDistrictCount || 0,
-      chunkSize: window.KELO_WORLD_AUDIT?.chunkSize || 0,
-      ruralReady: window.KELO_RURAL_GROUND_AUDIT?.ready || false,
-      ruralMode: window.KELO_RURAL_GROUND_AUDIT?.renderingMode || null
-    }));
-    if (deployed.version === expected && deployed.registryVersion === expectedRegistry && deployed.authoredTransitions && deployed.depthOcclusion && deployed.depthOccluderCount >= 8 && deployed.worldReady && deployed.worldVersion === 'world-v1.1' && deployed.districtCount >= 5 && deployed.districtStyleMode === 'district-profile-v1' && deployed.styledDistrictCount >= 5 && deployed.chunkSize === 512 && deployed.ruralReady && deployed.ruralMode === 'authored-nine-slice-v1') { loaded = true; break; }
-    console.log(`attempt ${attempt}: build ${deployed.version || 'missing'} / registry ${deployed.registryVersion || 'missing'} / world=${deployed.worldVersion || 'missing'} styles=${deployed.districtStyleMode || 'missing'}, waiting for ${expected}`);
-  } catch (err) { console.log(`attempt ${attempt}: ${err.message}`); }
+let title='',loaded=false;
+for(let attempt=1;attempt<=24;attempt++){
+  try{
+    await page.goto(`${base}?audit=${Date.now()}-${attempt}`,{waitUntil:'networkidle',timeout:45000});
+    title=await page.title();
+    const d=await page.evaluate(()=>({version:window.KELO_PLAZA_AUDIT?.version||null,registryVersion:window.KELO_PLAZA_AUDIT?.registryVersion||null,authoredTransitions:!!window.KELO_PLAZA_AUDIT?.authoredTransitions,depthOcclusion:!!window.KELO_PLAZA_AUDIT?.depthOcclusion,depthOccluderCount:window.KELO_PLAZA_AUDIT?.depthOccluderCount||0,worldReady:!!window.KELO_WORLD_AUDIT?.ready,worldVersion:window.KELO_WORLD_AUDIT?.version||null,ruralRoadMode:window.KELO_WORLD_AUDIT?.ruralRoadMode||null,districtCount:window.KELO_WORLD_AUDIT?.districtCount||0,districtStyleMode:window.KELO_WORLD_AUDIT?.districtStyleMode||null,styledDistrictCount:window.KELO_WORLD_AUDIT?.styledDistrictCount||0,chunkSize:window.KELO_WORLD_AUDIT?.chunkSize||0,ruralReady:!!window.KELO_RURAL_GROUND_AUDIT?.ready,ruralMode:window.KELO_RURAL_GROUND_AUDIT?.renderingMode||null,gateSide:window.KELO_RURAL_GROUND_AUDIT?.gateSide||null}));
+    if(d.version===expected&&d.registryVersion===expectedRegistry&&d.authoredTransitions&&d.depthOcclusion&&d.depthOccluderCount>=8&&d.worldReady&&d.worldVersion==='world-v1.1'&&d.ruralRoadMode==='farm-bypass-v1'&&d.districtCount>=5&&d.districtStyleMode==='district-profile-v1'&&d.styledDistrictCount>=5&&d.chunkSize===512&&d.ruralReady&&d.ruralMode==='authored-nine-slice-v1'&&d.gateSide==='north'){loaded=true;break;}
+    console.log(`attempt ${attempt}: build ${d.version||'missing'} / registry ${d.registryVersion||'missing'} / bypass=${d.ruralRoadMode||'missing'}, waiting for ${expected}`);
+  }catch(err){console.log(`attempt ${attempt}: ${err.message}`);}
   await page.waitForTimeout(10000);
 }
 
-consoleErrors.length=0; failedRequests.length=0; httpErrors.length=0;
-await page.goto(`${base}?audit=final-${Date.now()}`, { waitUntil:'networkidle', timeout:45000 });
+consoleErrors.length=0;failedRequests.length=0;httpErrors.length=0;
+await page.goto(`${base}?audit=final-${Date.now()}`,{waitUntil:'networkidle',timeout:45000});
 await page.waitForTimeout(4000);
-const state = await page.evaluate(() => ({
-  title: document.title,
-  audit: window.KELO_PLAZA_AUDIT || null,
-  world: window.KELO_WORLD_AUDIT || null,
-  rural: window.KELO_RURAL_GROUND_AUDIT || null,
-  tileset: window.KELO_PLAZA_TILESET || null,
-  depth: window.KELO_PLAZA_DEPTH || null,
-  canvas: (() => { const c = document.getElementById('game-canvas'); return c ? { width:c.width,height:c.height,cssWidth:c.clientWidth,cssHeight:c.clientHeight } : null; })()
-}));
-await page.screenshot({ path: 'artifacts/live-mobile.png', fullPage: false });
-
-// Capture a deterministic off-plaza frame and prove that the new rural prop colors
-// are actually present in rendered pixels, not merely reported as loaded assets.
-const ruralFrame = await page.evaluate(() => {
-  if (typeof camera === 'undefined' || typeof localPlayer === 'undefined' || typeof render !== 'function') return null;
-  const c = document.getElementById('game-canvas');
-  if (!c) return null;
-  localPlayer.x = 800; localPlayer.y = 1640;
-  camera.x = 800; camera.y = 1640;
-  camera.targetX = 800; camera.targetY = 1640;
-  render();
-  const g = c.getContext('2d');
-  const px = g.getImageData(0,0,c.width,c.height).data;
-  let woodPixels=0, dirtPixels=0;
-  for(let i=0;i<px.length;i+=4){
-    const r=px[i], gg=px[i+1], b=px[i+2], a=px[i+3];
-    if(a>200 && r>=135 && r<=205 && gg>=80 && gg<=145 && b>=35 && b<=90) woodPixels++;
-    if(a>200 && r>=120 && r<=190 && gg>=75 && gg<=135 && b>=40 && b<=90) dirtPixels++;
-  }
-  return { dataUrl:c.toDataURL('image/png'), woodPixels, dirtPixels };
+const state=await page.evaluate(()=>({title:document.title,audit:window.KELO_PLAZA_AUDIT||null,world:window.KELO_WORLD_AUDIT||null,rural:window.KELO_RURAL_GROUND_AUDIT||null,tileset:window.KELO_PLAZA_TILESET||null,depth:window.KELO_PLAZA_DEPTH||null,canvas:(()=>{const c=document.getElementById('game-canvas');return c?{width:c.width,height:c.height,cssWidth:c.clientWidth,cssHeight:c.clientHeight}:null;})()}));
+await page.screenshot({path:'artifacts/live-mobile.png',fullPage:false});
+const ruralFrame=await page.evaluate(()=>{
+  if(typeof camera==='undefined'||typeof localPlayer==='undefined'||typeof render!=='function')return null;
+  const c=document.getElementById('game-canvas');if(!c)return null;
+  localPlayer.x=800;localPlayer.y=1640;camera.x=800;camera.y=1640;camera.targetX=800;camera.targetY=1640;render();
+  const px=c.getContext('2d').getImageData(0,0,c.width,c.height).data;let woodPixels=0,dirtPixels=0;
+  for(let i=0;i<px.length;i+=4){const r=px[i],g=px[i+1],b=px[i+2],a=px[i+3];if(a>200&&r>=135&&r<=205&&g>=80&&g<=145&&b>=35&&b<=90)woodPixels++;if(a>200&&r>=120&&r<=190&&g>=75&&g<=135&&b>=40&&b<=90)dirtPixels++;}
+  return{dataUrl:c.toDataURL('image/png'),woodPixels,dirtPixels};
 });
-const ruralCaptureReady = !!ruralFrame?.dataUrl?.startsWith('data:image/png;base64,');
-const ruralVisualEvidence = ruralFrame ? { woodPixels:ruralFrame.woodPixels, dirtPixels:ruralFrame.dirtPixels } : null;
-if (ruralCaptureReady) fs.writeFileSync('artifacts/live-rural.png', Buffer.from(ruralFrame.dataUrl.split(',')[1], 'base64'));
-
-fs.writeFileSync('artifacts/report.json', JSON.stringify({ loaded, title, expected, expectedRegistry, ruralCaptureReady, ruralVisualEvidence, state, consoleErrors, failedRequests, httpErrors }, null, 2));
-console.log(JSON.stringify({ loaded, title, expected, expectedRegistry, ruralCaptureReady, ruralVisualEvidence, state, consoleErrors, failedRequests, httpErrors }, null, 2));
+const ruralCaptureReady=!!ruralFrame?.dataUrl?.startsWith('data:image/png;base64,');
+const ruralVisualEvidence=ruralFrame?{woodPixels:ruralFrame.woodPixels,dirtPixels:ruralFrame.dirtPixels}:null;
+if(ruralCaptureReady)fs.writeFileSync('artifacts/live-rural.png',Buffer.from(ruralFrame.dataUrl.split(',')[1],'base64'));
+fs.writeFileSync('artifacts/report.json',JSON.stringify({loaded,title,expected,expectedRegistry,ruralCaptureReady,ruralVisualEvidence,state,consoleErrors,failedRequests,httpErrors},null,2));
+console.log(JSON.stringify({loaded,title,expected,expectedRegistry,ruralCaptureReady,ruralVisualEvidence,state,consoleErrors,failedRequests,httpErrors},null,2));
 await browser.close();
 
-if (!loaded) throw new Error(`Live page never reached visual build ${expected} / registry ${expectedRegistry}`);
-if (state.audit?.version !== expected) throw new Error(`Visual audit version mismatch: ${state.audit?.version} !== ${expected}`);
-if (state.audit?.registryVersion !== expectedRegistry) throw new Error(`Registry version mismatch: ${state.audit?.registryVersion} !== ${expectedRegistry}`);
-if (!state.audit?.ready) throw new Error('Plaza audit flag is not ready');
-if (!state.audit?.assetLoaded) throw new Error('Production visual atlases did not load');
-if (state.audit?.fallbackActive) throw new Error('Fallback remained active');
-if (!state.audit?.authoredTransitions) throw new Error('Authored transition atlas is not active');
-if (!state.audit?.depthOcclusion) throw new Error('Depth occlusion layer is not active');
-if ((state.audit?.depthOccluderCount || 0) < 8) throw new Error('Depth occluder registry is unexpectedly small');
-if (!state.world?.ready || !state.world?.assetLoaded) throw new Error('Chunked world renderer did not become ready');
-if (state.world?.version !== 'world-v1.1') throw new Error('District-aware world renderer is not active');
-if (state.world?.districtStyleMode !== 'district-profile-v1' || (state.world?.styledDistrictCount || 0) < 5) throw new Error('District ground profiles are missing');
-if (state.world?.chunkSize !== 512) throw new Error('Unexpected world chunk size');
-if ((state.world?.districtCount || 0) < 5) throw new Error('World district graph is unexpectedly small');
-if ((state.world?.worldWidth || 0) < 3600 || (state.world?.worldHeight || 0) < 3200) throw new Error('World bounds regressed');
-if (!ruralCaptureReady) throw new Error('Could not capture Distrito Rural');
-if (!state.rural?.ready || !state.rural?.assetLoaded || !state.rural?.modularTiles || !state.rural?.propsLoaded) throw new Error('Modular rural renderers are not active');
-if (state.rural?.renderingMode !== 'authored-nine-slice-v1' || state.rural?.plotSize !== 96) throw new Error('Unexpected rural plot renderer contract');
-if (state.rural?.boundaryMode !== 'modular-fence-gate-v1') throw new Error('Rural fence/gate boundary is not active');
-if ((ruralVisualEvidence?.woodPixels || 0) < 100) throw new Error(`Rural wood pixels not visible: ${JSON.stringify(ruralVisualEvidence)}`);
-if ((ruralVisualEvidence?.dirtPixels || 0) < 100) throw new Error(`Rural dirt pixels not visible: ${JSON.stringify(ruralVisualEvidence)}`);
-if (!state.depth || state.depth.sourceMode !== 'y-occlusion-overlay-v1') throw new Error('Depth layer state missing or invalid');
-if (!state.tileset?.authoredTransitions) throw new Error('Tileset state did not expose authored transitions');
-if (!state.tileset?.transitionAssetPath) throw new Error('Transition atlas path missing from tileset state');
-if (httpErrors.length) throw new Error(`HTTP errors detected: ${JSON.stringify(httpErrors)}`);
-if (failedRequests.length) throw new Error(`Failed requests detected: ${JSON.stringify(failedRequests)}`);
-if (consoleErrors.length) throw new Error(`Console/page errors detected: ${JSON.stringify(consoleErrors)}`);
+if(!loaded)throw new Error(`Live page never reached visual build ${expected} / registry ${expectedRegistry}`);
+if(state.audit?.version!==expected)throw new Error(`Visual audit version mismatch: ${state.audit?.version} !== ${expected}`);
+if(state.audit?.registryVersion!==expectedRegistry)throw new Error(`Registry version mismatch: ${state.audit?.registryVersion} !== ${expectedRegistry}`);
+if(!state.audit?.ready||!state.audit?.assetLoaded||state.audit?.fallbackActive)throw new Error('Plaza visual state invalid');
+if(!state.audit?.authoredTransitions||!state.audit?.depthOcclusion||(state.audit?.depthOccluderCount||0)<8)throw new Error('Plaza transition/depth state invalid');
+if(!state.world?.ready||!state.world?.assetLoaded||state.world?.version!=='world-v1.1'||state.world?.ruralRoadMode!=='farm-bypass-v1')throw new Error('Rural farm-bypass world renderer is not active');
+if(state.world?.districtStyleMode!=='district-profile-v1'||(state.world?.styledDistrictCount||0)<5||state.world?.chunkSize!==512||(state.world?.districtCount||0)<5)throw new Error('World contract regressed');
+if((state.world?.worldWidth||0)<3600||(state.world?.worldHeight||0)<3200)throw new Error('World bounds regressed');
+if(!ruralCaptureReady)throw new Error('Could not capture Distrito Rural');
+if(!state.rural?.ready||!state.rural?.assetLoaded||!state.rural?.modularTiles||!state.rural?.propsLoaded)throw new Error('Modular rural renderers are not active');
+if(state.rural?.renderingMode!=='authored-nine-slice-v1'||state.rural?.plotSize!==96||state.rural?.boundaryMode!=='modular-fence-gate-v1'||state.rural?.gateSide!=='north')throw new Error('Unexpected rural boundary contract');
+if((ruralVisualEvidence?.woodPixels||0)<100)throw new Error(`Rural wood pixels not visible: ${JSON.stringify(ruralVisualEvidence)}`);
+if((ruralVisualEvidence?.dirtPixels||0)<100)throw new Error(`Rural dirt pixels not visible: ${JSON.stringify(ruralVisualEvidence)}`);
+if(!state.depth||state.depth.sourceMode!=='y-occlusion-overlay-v1'||!state.tileset?.authoredTransitions||!state.tileset?.transitionAssetPath)throw new Error('Depth/tileset state invalid');
+if(httpErrors.length)throw new Error(`HTTP errors detected: ${JSON.stringify(httpErrors)}`);
+if(failedRequests.length)throw new Error(`Failed requests detected: ${JSON.stringify(failedRequests)}`);
+if(consoleErrors.length)throw new Error(`Console/page errors detected: ${JSON.stringify(consoleErrors)}`);
