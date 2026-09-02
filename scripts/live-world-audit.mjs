@@ -3,7 +3,7 @@ import { chromium } from 'playwright';
 
 const base=process.env.AUDIT_URL||'https://kelffren.github.io/gemini/';
 const expectedWorld=process.env.EXPECTED_WORLD||'world-v1.2';
-const expectedRegistry=process.env.EXPECTED_REGISTRY||'1.10.0';
+const expectedRegistry=process.env.EXPECTED_REGISTRY||'1.10.1';
 fs.mkdirSync('artifacts',{recursive:true});
 
 const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_BIN||'/usr/bin/google-chrome',args:['--no-sandbox','--disable-dev-shm-usage']});
@@ -20,9 +20,9 @@ for(let attempt=1;attempt<=24;attempt++){
   try{
     await page.goto(`${base}?world-audit=${Date.now()}-${attempt}`,{waitUntil:'networkidle',timeout:45000});
     title=await page.title();
-    const d=await page.evaluate(()=>({world:window.KELO_WORLD_AUDIT||null,registry:window.KELO_TILE_REGISTRY?.version||null,compose:window.KELO_LUXE_COMPOSE||null}));
-    if(d.world?.ready&&d.world?.version===expectedWorld&&d.world?.assetLoaded&&d.world?.transitionAssetLoaded&&d.world?.roadTransitionMode==='authored-road-edge-overlay-v1'&&d.registry===expectedRegistry&&(!d.compose||d.compose.disabled===true)){loaded=true;break}
-    console.log(`attempt ${attempt}: world=${d.world?.version||'missing'} ready=${!!d.world?.ready} transitions=${d.world?.roadTransitionMode||'missing'} registry=${d.registry||'missing'}`);
+    const d=await page.evaluate(()=>({world:window.KELO_WORLD_AUDIT||null,registry:window.KELO_TILE_REGISTRY?.version||null,compose:window.KELO_LUXE_COMPOSE||null,kiosk:window.KELO_LUXE_KIOSK||null}));
+    if(d.world?.ready&&d.world?.version===expectedWorld&&d.world?.assetLoaded&&d.world?.transitionAssetLoaded&&d.world?.roadTransitionMode==='authored-road-edge-overlay-v1'&&d.registry===expectedRegistry&&d.kiosk?.ready&&d.kiosk?.depthWrapped&&d.kiosk?.depthOcclusion&&d.kiosk?.depthMode==='building-base-y-occlusion-v1'&&(!d.compose||d.compose.disabled===true)){loaded=true;break}
+    console.log(`attempt ${attempt}: world=${d.world?.version||'missing'} registry=${d.registry||'missing'} kiosk=${d.kiosk?.version||'missing'} depth=${d.kiosk?.depthMode||'missing'}`);
   }catch(err){console.log(`attempt ${attempt}: ${err.message}`)}
   await page.waitForTimeout(10000);
 }
@@ -34,30 +34,34 @@ const state=await page.evaluate(()=>({
   title:document.title,
   world:window.KELO_WORLD_AUDIT||null,
   registryVersion:window.KELO_TILE_REGISTRY?.version||null,
+  architecture:window.KELO_TILE_REGISTRY?.styles?.architecture||null,
   rural:window.KELO_RURAL_GROUND_AUDIT||null,
   landmarks:window.KELO_RURAL_LANDMARK_AUDIT||null,
+  kiosk:window.KELO_LUXE_KIOSK||null,
   compose:window.KELO_LUXE_COMPOSE||null,
   canvas:(()=>{const c=document.getElementById('game-canvas');return c?{width:c.width,height:c.height,cssWidth:c.clientWidth,cssHeight:c.clientHeight}:null})()
 }));
 await page.screenshot({path:'artifacts/live-mobile.png',fullPage:false});
-const roadFrame=await page.evaluate(()=>{
+const architectureFrame=await page.evaluate(()=>{
   if(typeof camera==='undefined'||typeof localPlayer==='undefined'||typeof render!=='function')return null;
   const c=document.getElementById('game-canvas');if(!c)return null;
-  localPlayer.x=1048;localPlayer.y=1480;camera.x=1048;camera.y=1480;camera.targetX=1048;camera.targetY=1480;render();
-  return c.toDataURL('image/png');
+  localPlayer.x=1440;localPlayer.y=1300;camera.x=1440;camera.y=1300;camera.targetX=1440;camera.targetY=1300;render();
+  return {dataUrl:c.toDataURL('image/png'),occluding:!!window.KELO_LUXE_KIOSK?.isOccluding?.(localPlayer)};
 });
-if(roadFrame?.startsWith('data:image/png;base64,'))fs.writeFileSync('artifacts/live-road.png',Buffer.from(roadFrame.split(',')[1],'base64'));
-fs.writeFileSync('artifacts/report.json',JSON.stringify({loaded,title,expectedWorld,expectedRegistry,state,consoleErrors,failedRequests,httpErrors},null,2));
-console.log(JSON.stringify({loaded,title,expectedWorld,expectedRegistry,state,consoleErrors,failedRequests,httpErrors},null,2));
+if(architectureFrame?.dataUrl?.startsWith('data:image/png;base64,'))fs.writeFileSync('artifacts/live-architecture.png',Buffer.from(architectureFrame.dataUrl.split(',')[1],'base64'));
+fs.writeFileSync('artifacts/report.json',JSON.stringify({loaded,title,expectedWorld,expectedRegistry,state,architectureOccluding:architectureFrame?.occluding||false,consoleErrors,failedRequests,httpErrors},null,2));
+console.log(JSON.stringify({loaded,title,expectedWorld,expectedRegistry,state,architectureOccluding:architectureFrame?.occluding||false,consoleErrors,failedRequests,httpErrors},null,2));
 await browser.close();
 
-if(!loaded)throw new Error(`LIVE never reached ${expectedWorld} / registry ${expectedRegistry}`);
+if(!loaded)throw new Error(`LIVE never reached ${expectedWorld} / registry ${expectedRegistry} with architecture depth`);
 if(!state.world?.ready||state.world?.version!==expectedWorld||!state.world?.assetLoaded||!state.world?.transitionAssetLoaded)throw new Error('World renderer or authored transition atlas not ready');
 if(state.world?.roadTransitionMode!=='authored-road-edge-overlay-v1')throw new Error(`Unexpected road transition mode: ${state.world?.roadTransitionMode}`);
 if(state.world?.chunkSize!==512||state.world?.districtCount<5||state.world?.ruralRoadMode!=='farm-bypass-v1')throw new Error('World geometry contract regressed');
 if(state.registryVersion!==expectedRegistry)throw new Error(`Registry mismatch ${state.registryVersion} !== ${expectedRegistry}`);
+if(state.architecture?.mode!=='authored-layered-raster-v1'||state.architecture?.depthMode!=='building-base-y-occlusion-v1')throw new Error('Architecture registry contract missing');
+if(!state.kiosk?.ready||state.kiosk?.failed||!state.kiosk?.rendererWrapped||!state.kiosk?.depthWrapped||!state.kiosk?.depthOcclusion||state.kiosk?.source!=='tile-registry-architecture-asset')throw new Error('Authored boutique architecture layer invalid');
+if(!architectureFrame?.dataUrl?.startsWith('data:image/png;base64,')||!architectureFrame?.occluding)throw new Error('Architecture depth screenshot capture failed');
 if(state.compose&&state.compose.disabled!==true)throw new Error('Rejected procedural environment art is active');
-if(!roadFrame?.startsWith('data:image/png;base64,'))throw new Error('Road screenshot capture failed');
 if(httpErrors.length)throw new Error(`HTTP errors: ${JSON.stringify(httpErrors)}`);
 if(failedRequests.length)throw new Error(`Failed requests: ${JSON.stringify(failedRequests)}`);
 if(consoleErrors.length)throw new Error(`Console/page errors: ${JSON.stringify(consoleErrors)}`);

@@ -26,6 +26,13 @@
     return;
   }
 
+  const architectureAssets = Object.freeze({
+    luxeBoutique:Object.freeze({
+      id:'luxe-boutique', src:'assets/kelo-luxe-boutique.svg?v=2', width:192, height:222,
+      worldWidth:384, worldHeight:444, family:'architecture'
+    })
+  });
+
   const tiles = Object.freeze({
     GRASS_A:0, GRASS_B:1, GRASS_C:2, GRASS_FLOWERS:3,
     MARBLE_A:4, MARBLE_B:5, MARBLE_GOLD_A:6, MARBLE_GOLD_B:7,
@@ -78,6 +85,7 @@
   const styles = Object.freeze({
     plazaTransition:Object.freeze({mode:'authored-overlay-atlas',neighbourMask:'TRBL',softenStickerAccents:true}),
     propDepth:Object.freeze({mode:'y-occlusion-overlay-v1',localActorIntersection:true,frontOccluders:Object.freeze(['fountain','column','tree','lamp'])}),
+    architecture:Object.freeze({mode:'authored-layered-raster-v1',depthMode:'building-base-y-occlusion-v1',actorClip:true}),
     districtGround:Object.freeze({mode:'district-profile-v1',profiles:districtGroundStyles}),
     ruralFarm:Object.freeze({
       mode:'authored-nine-slice-v1',
@@ -103,8 +111,9 @@
     })
   });
   window.KELO_TILE_REGISTRY = Object.freeze({
-    version:'1.10.0', worldTileSize:TILE,
+    version:'1.10.1', worldTileSize:TILE,
     atlases:Object.freeze({plaza:atlas,transitions:transitionAtlas,ruralSoil:ruralSoilAtlas,ruralProps:ruralPropsAtlas,ruralLandmarks:ruralLandmarksAtlas,ruralNature:ruralNatureAtlas}),
+    architectureAssets,
     tiles,ruralTiles,ruralPropTiles,ruralLandmarkTiles,ruralLandmarkSprites,ruralNatureTiles,ruralNatureSprites,families,transitionMasks,styles
   });
 })();

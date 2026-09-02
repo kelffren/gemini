@@ -1,24 +1,32 @@
 (function () {
   'use strict';
 
+  const REGISTRY = window.KELO_TILE_REGISTRY;
+  const ARCH = REGISTRY?.architectureAssets?.luxeBoutique;
+  if (!REGISTRY || !ARCH) {
+    console.error('[Kelo Luxe] architecture registry entry missing');
+    return;
+  }
+
   // Authored raster landmark: user-provided Kelo Luxe Boutique artwork.
   // Keep this file asset-driven. Do not replace it with procedural Canvas art.
   const SHOP = Object.freeze({
     x: 1248,
     y: 1050,
-    w: 384,
-    h: 444,
+    w: ARCH.worldWidth,
+    h: ARCH.worldHeight,
     frontX: 1440,
     frontY: 1532,
     interactRadius: 220
   });
   const COLLISION = Object.freeze({ x: 1272, y: 1362, w: 336, h: 132 });
-  const ASSET = 'assets/kelo-luxe-boutique.svg?v=2';
+  const ASSET = ARCH.src;
 
   const img = new Image();
   let ready = false;
   let failed = false;
   let wrapped = false;
+  let depthWrapped = false;
 
   function drawBoutique(g) {
     if (!ready) return;
@@ -47,6 +55,54 @@
       get ready() { return base.ready; }
     });
     wrapped = true;
+    return true;
+  }
+
+  function actorBehindShop(actor) {
+    if (!actor) return false;
+    const r = actor.radius || 20;
+    return actor.x + r > SHOP.x + 18 && actor.x - r < SHOP.x + SHOP.w - 18 &&
+      actor.y > SHOP.y + 76 && actor.y < COLLISION.y + 6;
+  }
+
+  function drawActorOcclusion(g, actor) {
+    if (!ready || !actorBehindShop(actor)) return false;
+    const r = actor.radius || 20;
+    g.save();
+    g.beginPath();
+    // Repaint only the actor-sized window of the authored building. This keeps
+    // other actors in front of the facade while correctly hiding this actor behind it.
+    g.rect(actor.x - r - 16, actor.y - r - 50, r * 2 + 32, r * 2 + 66);
+    g.clip();
+    drawBoutique(g);
+    g.restore();
+    return true;
+  }
+
+  function installDepthLayer() {
+    if (depthWrapped || typeof window.render !== 'function') return depthWrapped;
+    const baseRender = window.render;
+    if (baseRender.__keloLuxeDepth) { depthWrapped = true; return true; }
+    const layeredRender = function () {
+      baseRender();
+      if (!ready || typeof ctx === 'undefined' || typeof camera === 'undefined' || typeof screenW === 'undefined' || typeof screenH === 'undefined') return;
+      const actors = [];
+      if (typeof localPlayer !== 'undefined' && localPlayer) actors.push(localPlayer);
+      if (typeof simulatedPlayers !== 'undefined' && Array.isArray(simulatedPlayers)) actors.push(...simulatedPlayers);
+      const active = actors.filter(actorBehindShop);
+      if (!active.length) return;
+      const z = (typeof CONFIG !== 'undefined' && CONFIG.zoom) || 1;
+      ctx.save();
+      ctx.translate(screenW / 2, screenH / 2);
+      ctx.scale(z, z);
+      ctx.translate(-camera.x, -camera.y);
+      ctx.imageSmoothingEnabled = false;
+      active.forEach(actor => drawActorOcclusion(ctx, actor));
+      ctx.restore();
+    };
+    layeredRender.__keloLuxeDepth = true;
+    window.render = layeredRender;
+    depthWrapped = true;
     return true;
   }
 
@@ -124,6 +180,7 @@
     installWorldLayer();
     installCollision();
     installInteraction();
+    installDepthLayer();
   }
 
   img.onload = function () { ready = true; failed = false; };
@@ -136,15 +193,19 @@
 
   window.KELO_LUXE_KIOSK = Object.freeze({
     disabled: false,
-    version: 'authored-raster-v1.3',
+    version: 'authored-raster-v1.4',
     asset: ASSET,
-    source: 'user-authored-raster',
+    source: 'tile-registry-architecture-asset',
     shop: SHOP,
     collision: COLLISION,
     interaction: 'tap-building-or-E-nearby',
+    depthMode: REGISTRY.styles.architecture.depthMode,
+    depthOcclusion: true,
+    isOccluding: actorBehindShop,
     get ready() { return ready; },
     get failed() { return failed; },
     get rendererWrapped() { return wrapped; },
+    get depthWrapped() { return depthWrapped; },
     open: openBoutique
   });
 })();
