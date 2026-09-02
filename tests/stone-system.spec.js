@@ -57,10 +57,12 @@ test.describe('Kelo Stone System V3', () => {
     const snapshot = stones.exportLoadout(state);
     expect(snapshot.slots).toHaveLength(5);
     expect(snapshot.slots.filter(Boolean)).toHaveLength(5);
+    expect(snapshot.slots[4].abilityKey).toBe('fire_tornado');
+    expect(snapshot.slots.slice(0, 4).every((slot) => stones.abilityByKey(slot.abilityKey).slotType === 'normal')).toBe(true);
     expect(stones.validateLoadoutSnapshot(snapshot, state).valid).toBe(true);
 
     snapshot.slots[0].abilityKey = 'shadow_step';
-    expect(stones.validateLoadoutSnapshot(snapshot, state).valid).toBe(false);
+    expect(stones.validateLoadoutSnapshot(snapshot, state)).toMatchObject({ valid: false, reason: 'SNAPSHOT_TAMPERED' });
   });
 
   test('fusion only accepts three copies of the same ability and tier', () => {
