@@ -20,6 +20,7 @@ on:
       - 'assets/rural-landmarks-v1.png'
       - 'assets/market-pavilion-v1.png'
       - 'assets/commerce-arcade-v1.svg'
+      - 'assets/banco-hall-v1.svg'
       - 'scripts/live-world-audit.mjs'
       - 'scripts/live-pavilion-audit.mjs'
       - '.github/workflows/live-audit.yml'
