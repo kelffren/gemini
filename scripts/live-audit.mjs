@@ -3,7 +3,7 @@ import { chromium } from 'playwright';
 
 const base = process.env.AUDIT_URL || 'https://kelffren.github.io/gemini/';
 const expected = process.env.EXPECTED_BUILD || 'V5.47';
-const expectedRegistry = process.env.EXPECTED_REGISTRY || '1.4.1';
+const expectedRegistry = process.env.EXPECTED_REGISTRY || '1.5.0';
 fs.mkdirSync('artifacts', { recursive: true });
 if (fs.existsSync('assets/tileset-vclean.png')) fs.copyFileSync('assets/tileset-vclean.png', 'artifacts/repo-tileset.png');
 else if (fs.existsSync('assets/tileset.png')) fs.copyFileSync('assets/tileset.png', 'artifacts/repo-tileset.png');
@@ -34,11 +34,14 @@ for (let attempt = 1; attempt <= 24; attempt++) {
       depthOcclusion: window.KELO_PLAZA_AUDIT?.depthOcclusion || false,
       depthOccluderCount: window.KELO_PLAZA_AUDIT?.depthOccluderCount || 0,
       worldReady: window.KELO_WORLD_AUDIT?.ready || false,
+      worldVersion: window.KELO_WORLD_AUDIT?.version || null,
       districtCount: window.KELO_WORLD_AUDIT?.districtCount || 0,
+      districtStyleMode: window.KELO_WORLD_AUDIT?.districtStyleMode || null,
+      styledDistrictCount: window.KELO_WORLD_AUDIT?.styledDistrictCount || 0,
       chunkSize: window.KELO_WORLD_AUDIT?.chunkSize || 0
     }));
-    if (deployed.version === expected && deployed.registryVersion === expectedRegistry && deployed.authoredTransitions && deployed.depthOcclusion && deployed.depthOccluderCount >= 8 && deployed.worldReady && deployed.districtCount >= 5 && deployed.chunkSize === 512) { loaded = true; break; }
-    console.log(`attempt ${attempt}: build ${deployed.version || 'missing'} / registry ${deployed.registryVersion || 'missing'} / world=${deployed.worldReady} districts=${deployed.districtCount}, waiting for ${expected}`);
+    if (deployed.version === expected && deployed.registryVersion === expectedRegistry && deployed.authoredTransitions && deployed.depthOcclusion && deployed.depthOccluderCount >= 8 && deployed.worldReady && deployed.worldVersion === 'world-v1.1' && deployed.districtCount >= 5 && deployed.districtStyleMode === 'district-profile-v1' && deployed.styledDistrictCount >= 5 && deployed.chunkSize === 512) { loaded = true; break; }
+    console.log(`attempt ${attempt}: build ${deployed.version || 'missing'} / registry ${deployed.registryVersion || 'missing'} / world=${deployed.worldVersion || 'missing'} styles=${deployed.districtStyleMode || 'missing'}, waiting for ${expected}`);
   } catch (err) { console.log(`attempt ${attempt}: ${err.message}`); }
   await page.waitForTimeout(10000);
 }
@@ -53,8 +56,22 @@ const state = await page.evaluate(() => ({
   canvas: (() => { const c = document.getElementById('game-canvas'); return c ? { width:c.width,height:c.height,cssWidth:c.clientWidth,cssHeight:c.clientHeight } : null; })()
 }));
 await page.screenshot({ path: 'artifacts/live-mobile.png', fullPage: false });
-fs.writeFileSync('artifacts/report.json', JSON.stringify({ loaded, title, expected, expectedRegistry, state, consoleErrors, failedRequests }, null, 2));
-console.log(JSON.stringify({ loaded, title, expected, expectedRegistry, state, consoleErrors, failedRequests }, null, 2));
+
+// Visual evidence outside the plaza: move only the disposable audit session to Distrito Rural.
+const ruralCaptureReady = await page.evaluate(() => {
+  if (typeof camera === 'undefined' || typeof localPlayer === 'undefined') return false;
+  localPlayer.x = 800; localPlayer.y = 1640;
+  camera.x = 800; camera.y = 1640;
+  camera.targetX = 800; camera.targetY = 1640;
+  return true;
+});
+if (ruralCaptureReady) {
+  await page.waitForTimeout(1800);
+  await page.screenshot({ path: 'artifacts/live-rural.png', fullPage: false });
+}
+
+fs.writeFileSync('artifacts/report.json', JSON.stringify({ loaded, title, expected, expectedRegistry, ruralCaptureReady, state, consoleErrors, failedRequests }, null, 2));
+console.log(JSON.stringify({ loaded, title, expected, expectedRegistry, ruralCaptureReady, state, consoleErrors, failedRequests }, null, 2));
 await browser.close();
 
 if (!loaded) throw new Error(`Live page never reached visual build ${expected} / registry ${expectedRegistry}`);
@@ -67,9 +84,12 @@ if (!state.audit?.authoredTransitions) throw new Error('Authored transition atla
 if (!state.audit?.depthOcclusion) throw new Error('Depth occlusion layer is not active');
 if ((state.audit?.depthOccluderCount || 0) < 8) throw new Error('Depth occluder registry is unexpectedly small');
 if (!state.world?.ready || !state.world?.assetLoaded) throw new Error('Chunked world renderer did not become ready');
+if (state.world?.version !== 'world-v1.1') throw new Error('District-aware world renderer is not active');
+if (state.world?.districtStyleMode !== 'district-profile-v1' || (state.world?.styledDistrictCount || 0) < 5) throw new Error('District ground profiles are missing');
 if (state.world?.chunkSize !== 512) throw new Error('Unexpected world chunk size');
 if ((state.world?.districtCount || 0) < 5) throw new Error('World district graph is unexpectedly small');
 if ((state.world?.worldWidth || 0) < 3600 || (state.world?.worldHeight || 0) < 3200) throw new Error('World bounds regressed');
+if (!ruralCaptureReady) throw new Error('Could not position mobile audit in Distrito Rural');
 if (!state.depth || state.depth.sourceMode !== 'y-occlusion-overlay-v1') throw new Error('Depth layer state missing or invalid');
 if (!state.tileset?.authoredTransitions) throw new Error('Tileset state did not expose authored transitions');
 if (!state.tileset?.transitionAssetPath) throw new Error('Transition atlas path missing from tileset state');
