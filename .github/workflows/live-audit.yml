@@ -6,6 +6,7 @@ on:
     branches: [ main ]
     paths:
       - 'index.html'
+      - 'engine-c.js'
       - 'engine-i.js'
       - 'engine-l.js'
       - 'engine-u.js'
@@ -30,7 +31,7 @@ jobs:
       - name: Audit deployed mobile page
         env:
           AUDIT_URL: https://kelffren.github.io/gemini/
-          EXPECTED_BUILD: V5.46
+          EXPECTED_BUILD: V5.47
           EXPECTED_REGISTRY: 1.4.1
           CHROME_BIN: /usr/bin/google-chrome
         run: node scripts/live-audit.mjs
