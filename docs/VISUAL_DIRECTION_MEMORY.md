@@ -245,6 +245,17 @@ Kelo World is no longer allowed to remain a single polished plaza floating in a 
 - Manual inspection of `live-market-pavilion.png` confirms a readable building silhouette on mobile, a clear entrance aligned to the ivory route, no visible flat legacy bar over the facade, and correct character/building depth with the actor partially obscured by the roof when behind it.
 - Next bottleneck: architecture is still split between one TileRegistry-owned boutique and a second authored pavilion whose asset metadata remains local to its renderer. The next safe technical/visual pass should formalize a reusable `architectureAssets` family in TileRegistry for multiple prefab types, then migrate another remaining flat legacy obstacle through that data-driven path instead of adding more one-off wrappers.
 
+## Validated Architecture Prefab Registry — V5.68 / Registry 1.10.2 / 2026-09-02
+- `TileRegistry` now owns both the market pavilion asset metadata and its placement/collision metadata through `architectureAssets.marketPavilion` and `architecturePrefabs.marketPavilion`.
+- The architecture contract is now explicit as `registry-asset-placement-collision-v1`; the pavilion renderer consumes its asset path, world position, dimensions, base-Y and preserved gameplay collider from the registry instead of duplicating those values locally.
+- The visible building and gameplay footprint were intentionally unchanged. The preserved collider remains `{x:1300,y:1870,w:200,h:80}` and the authored raster remains 224x160 at world position `(1288,1790)`.
+- Kelo CI and GitHub Pages both passed for commit `7d6897443017933b5841e68a6c829ebb86d91655`.
+- LIVE mobile audit passed at 390x844 CSS / 780x1688 backing canvas with registry `1.10.2`, `world-v1.2`, architecture prefab contract active, pavilion source `tile-registry-architecture-prefab`, `prefabId='market-pavilion-south'`, `occluding=true`, `legacyHidden=true`, and no runtime geometry divergence from the registry.
+- Screenshot evidence remained identical in authored material coverage: 28,040 stone pixels, 23,320 roof pixels, 10,695 gold pixels and 14,477 glass pixels. Manual inspection confirms the pavilion remains crisp, centered on the ivory route and correctly occludes the actor behind its roofline.
+- Final diagnostics remained clean: `consoleErrors=[]`, `failedRequests=[]` and `httpErrors=[]`.
+- Validated technical direction: future authored buildings should be represented as TileRegistry asset + prefab placement/collision metadata rather than each renderer owning duplicated hard-coded geometry.
+- Next bottleneck: the Luxe boutique asset is registry-owned but its placement/collision/interact geometry is still local to `luxe-kiosk-atlas.js`. The next safe refactor is to migrate that boutique into the same prefab contract, then extract a generic architecture renderer/list so future legacy-building replacements do not each add another wrapper.
+
 ## Non-goals During Visual Passes
 Do not casually alter unrelated systems such as:
 - core movement feel;
