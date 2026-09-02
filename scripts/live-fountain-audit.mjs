@@ -18,7 +18,7 @@ for(let attempt=1;attempt<=24;attempt++){
   try{
     await page.goto(`${base}?fountain-audit=${Date.now()}-${attempt}`,{waitUntil:'networkidle',timeout:45000});
     const d=await page.evaluate(()=>({title:document.title,fountain:window.KELO_PLAZA_FOUNTAIN_AUDIT||null,plaza:window.KELO_PLAZA_AUDIT||null}));
-    if((!expectedTitle||d.title===expectedTitle)&&d.fountain?.ready&&!d.fountain?.failed&&d.fountain?.version==='plaza-fountain-v1.1'&&d.fountain?.worldWrapped&&d.fountain?.renderWrapped&&d.plaza?.fountainReady){loaded=true;break;}
+    if((!expectedTitle||d.title===expectedTitle)&&d.fountain?.ready&&!d.fountain?.failed&&d.fountain?.version==='plaza-fountain-v1.2'&&d.fountain?.renderWrapped&&d.plaza?.fountainReady){loaded=true;break;}
   }catch(e){console.log(`attempt ${attempt}: ${e.message}`)}
   await page.waitForTimeout(10000);
 }
@@ -31,10 +31,17 @@ async function capture(name,y){
   const result=await page.evaluate(({y})=>{
     const c=document.getElementById('game-canvas');
     localPlayer.x=1440;localPlayer.y=y;camera.x=1440;camera.y=1520;camera.targetX=1440;camera.targetY=1520;render();
-    const px=c.getContext('2d').getImageData(0,0,c.width,c.height).data;
+    const g=c.getContext('2d');
+    const z=CONFIG.zoom||1,dpr=c.width/c.clientWidth;
+    const f=window.KELO_PLAZA_FOUNTAIN_AUDIT;
+    const x0=Math.max(0,Math.floor((screenW/2+(f.x-camera.x)*z-8)*dpr));
+    const y0=Math.max(0,Math.floor((screenH/2+(f.y-camera.y)*z-8)*dpr));
+    const x1=Math.min(c.width,Math.ceil((screenW/2+(f.x+f.width-camera.x)*z+8)*dpr));
+    const y1=Math.min(c.height,Math.ceil((screenH/2+(f.y+f.height-camera.y)*z+8)*dpr));
+    const img=g.getImageData(x0,y0,x1-x0,y1-y0),px=img.data;
     let water=0,gold=0,ivory=0;
-    for(let i=0;i<px.length;i+=4){const r=px[i],g=px[i+1],b=px[i+2],a=px[i+3];if(a<200)continue;if(b>130&&g>105&&g>r*1.2)water++;if(r>160&&g>90&&g<210&&b<100)gold++;if(r>205&&g>190&&b>150)ivory++;}
-    return{dataUrl:c.toDataURL('image/png'),audit:{...window.KELO_PLAZA_FOUNTAIN_AUDIT},water,gold,ivory};
+    for(let i=0;i<px.length;i+=4){const r=px[i],gg=px[i+1],b=px[i+2],a=px[i+3];if(a<200)continue;if(r<95&&gg>135&&b>145&&b>r*1.5)water++;if(r>175&&gg>100&&gg<215&&b<105)gold++;if(r>210&&gg>195&&b>155)ivory++;}
+    return{dataUrl:c.toDataURL('image/png'),audit:{...f},roi:{x0,y0,x1,y1,width:x1-x0,height:y1-y0},water,gold,ivory};
   },{y});
   fs.writeFileSync(`artifacts/${name}.png`,Buffer.from(result.dataUrl.split(',')[1],'base64'));
   delete result.dataUrl;return result;
@@ -50,11 +57,12 @@ await browser.close();
 
 if(!loaded)throw new Error('LIVE never reached layered fountain contract');
 if(expectedTitle&&state.title!==expectedTitle)throw new Error(`Title mismatch ${state.title} !== ${expectedTitle}`);
-if(!state.fountain?.ready||state.fountain?.failed||!state.fountain?.backLoaded||!state.fountain?.frontLoaded||!state.fountain?.worldWrapped||!state.fountain?.renderWrapped)throw new Error('Fountain assets/depth wrappers not ready');
-if(state.fountain?.width!==200||state.fountain?.height!==140||state.fountain?.baseY!==1555)throw new Error('Fountain geometry contract invalid');
-if(behind.audit?.lastLocalDepth!=='behind-front-layer')throw new Error(`Behind depth failed: ${behind.audit?.lastLocalDepth}`);
+if(!state.fountain?.ready||state.fountain?.failed||!state.fountain?.backLoaded||!state.fountain?.frontLoaded||!state.fountain?.renderWrapped)throw new Error('Fountain assets/depth compositor not ready');
+if(state.fountain?.width!==200||state.fountain?.height!==140||state.fountain?.baseY!==1555||state.fountain?.depthMode!=='final-composite-back-actor-front-v2')throw new Error('Fountain geometry/depth contract invalid');
+if(behind.audit?.lastLocalDepth!=='behind-front-layer'||behind.audit?.lastActorRedraws<1)throw new Error(`Behind depth failed: ${JSON.stringify(behind.audit)}`);
 if(front.audit?.lastLocalDepth!=='in-front-of-front-layer'||front.audit?.lastFrontActorRedraws<1)throw new Error(`Front depth failed: ${JSON.stringify(front.audit)}`);
-if(behind.water<500||front.water<500||behind.gold<500||front.gold<500)throw new Error(`Fountain pixels not visible: ${JSON.stringify({behind,front})}`);
+if(behind.audit?.backDrawCount<1||behind.audit?.frontDrawCount<1||front.audit?.backDrawCount<1||front.audit?.frontDrawCount<1)throw new Error('Fountain draw counters did not advance');
+if(behind.water<900||front.water<900||behind.gold<500||front.gold<500)throw new Error(`Fountain pixels not visible in fountain ROI: ${JSON.stringify({behind,front})}`);
 if(consoleErrors.length)throw new Error(`Console/page errors: ${JSON.stringify(consoleErrors)}`);
 if(failedRequests.length)throw new Error(`Failed requests: ${JSON.stringify(failedRequests)}`);
 if(httpErrors.length)throw new Error(`HTTP errors: ${JSON.stringify(httpErrors)}`);
