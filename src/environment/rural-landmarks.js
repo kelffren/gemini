@@ -16,7 +16,9 @@
   function layout(farm){
     return Object.freeze({
       barn:Object.freeze({x:farm.x+264,y:farm.y+36,...SPRITES.barn,kind:'barn'}),
-      silo:Object.freeze({x:farm.x+424,y:farm.y+36,...SPRITES.silo,kind:'silo'})
+      // Keep the silo inside the rural parcel and away from the ivory bypass.
+      // Its lower base creates an L-shaped farmstead cluster and preserves crop clearance.
+      silo:Object.freeze({x:farm.x+360,y:farm.y+156,...SPRITES.silo,kind:'silo'})
     });
   }
   function origin(id){return{x:(id%ATLAS.columns)*TILE,y:Math.floor(id/ATLAS.columns)*TILE};}
@@ -29,7 +31,7 @@
     tile(g,T.HAY,farm.x+248,farm.y+204);
     tile(g,T.CRATE,farm.x+280,farm.y+212);
     tile(g,T.BUSH,farm.x+440,farm.y+208);
-    tile(g,T.FLOWERS,farm.x+408,farm.y+240);
+    tile(g,T.FLOWERS,farm.x+408,farm.y+284);
   }
 
   window.renderFarm=function(farm){
@@ -58,10 +60,11 @@
   window.render=function(){previousRender();drawFrontLandmarks();};
 
   window.KELO_RURAL_LANDMARK_AUDIT={
-    version:'rural-landmarks-v1',ready:false,assetLoaded:false,fallbackActive:true,
+    version:'rural-landmarks-v1.1',ready:false,assetLoaded:false,fallbackActive:true,
     atlas:ATLAS.src,atlasWidth:ATLAS.width,atlasHeight:ATLAS.height,tileSize:TILE,
     renderingMode:STYLE.mode,landmarkCount:2,detailCount:4,depthOcclusion:true,
-    gameplayFootprint:STYLE.gameplayFootprint,cropClearance:38,gateClearance:16,stateMutation:false
+    gameplayFootprint:STYLE.gameplayFootprint,cropClearance:38,gateClearance:16,stateMutation:false,
+    bypassClearance:64,composition:'farmstead-l-cluster-v1'
   };
   sheet.onload=function(){
     if(sheet.naturalWidth!==ATLAS.width||sheet.naturalHeight!==ATLAS.height){
@@ -73,5 +76,5 @@
     window.KELO_RURAL_LANDMARK_AUDIT.fallbackActive=false;
   };
   sheet.onerror=function(){console.error('[Kelo rural landmarks] atlas load failed');};
-  sheet.src=ATLAS.src+'&ruralLandmarks=180';
+  sheet.src=ATLAS.src+'&ruralLandmarks=181';
 })();
