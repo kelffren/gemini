@@ -1,6 +1,5 @@
 (function () {
   // LIVE owner: plaza tiles + HiDPI + aimed-skill landing marker.
-  // Plaza art metadata is data-driven through KELO_TILE_REGISTRY.
   const PLAZA = { x: 1040, y: 1240, w: 800, h: 560 };
   const REGISTRY = window.KELO_TILE_REGISTRY;
   if (!REGISTRY?.atlases?.plaza || !REGISTRY?.atlases?.transitions || !REGISTRY?.tiles || !REGISTRY?.families || !REGISTRY?.transitionMasks) {
@@ -16,7 +15,7 @@
   const TRANSITION_MASKS = REGISTRY.transitionMasks;
 
   window.KELO_PLAZA_AUDIT = {
-    version: 'V5.45',
+    version: 'V5.77-clean-map',
     ready: false,
     assetLoaded: false,
     fallbackActive: true,
@@ -25,11 +24,10 @@
     transitionAtlas: TRANSITION_ATLAS.src,
     atlasWidth: ATLAS.width,
     atlasHeight: ATLAS.height,
-    transitionAtlasWidth: TRANSITION_ATLAS.width,
-    transitionAtlasHeight: TRANSITION_ATLAS.height,
     tileSize: TILE,
     layeredTransitions: true,
-    authoredTransitions: true
+    authoredTransitions: true,
+    propsDisabled: true
   };
 
   function inPlaza(o) {
@@ -71,12 +69,6 @@
     const p=transitionOrigin(id);
     g.drawImage(transitionSheet,p.x,p.y,TILE,TILE,dx,dy,TILE,TILE);
   }
-  function drawSprite(g,ids,gx,gy,w,h){
-    for(let r=0;r<h;r++) for(let c=0;c<w;c++) {
-      const id=ids[r*w+c]; if(id==null) continue;
-      drawTile(g,id,(gx+c)*TILE,(gy+r)*TILE);
-    }
-  }
   function pick(gx,gy,list){
     const n=Math.abs(((gx+17)*73856093)^((gy+29)*19349663));
     return list[n%list.length];
@@ -92,18 +84,7 @@
       const marble=(dx<=5&&dy<=4)||dx<=1||dy<=1;
       g.fillStyle=marble ? (((gx+gy)&1)?'#f4efd9':'#fff9e9') : (((gx*3+gy)&1)?'#55d83c':'#49c934');
       g.fillRect(gx*TILE,gy*TILE,TILE,TILE);
-      if(marble){
-        g.strokeStyle='rgba(198,184,145,.42)'; g.lineWidth=1;
-        g.beginPath(); g.moveTo(gx*TILE+3,gy*TILE+25); g.lineTo(gx*TILE+14,gy*TILE+15); g.lineTo(gx*TILE+27,gy*TILE+7); g.stroke();
-      } else if(((gx*11+gy*7)%31)===0){
-        g.fillStyle='#fff'; g.fillRect(gx*TILE+10,gy*TILE+11,3,3);
-        g.fillStyle='#ffd34d'; g.fillRect(gx*TILE+11,gy*TILE+12,1,1);
-      }
     }
-    g.strokeStyle='#d9aa35'; g.lineWidth=3;
-    g.strokeRect((cx-5)*TILE,(cy-4)*TILE,11*TILE,9*TILE);
-    g.fillStyle='#2db8e9'; g.beginPath(); g.arc((cx+.5)*TILE,(cy+.5)*TILE,42,0,Math.PI*2); g.fill();
-    g.strokeStyle='#f0c552'; g.lineWidth=5; g.stroke();
     floorLayer=c; transitionLayer=null; propLayer=null;
     window.KELO_PLAZA_AUDIT.ready=true;
   }
@@ -127,11 +108,8 @@
       const marble=inSquare||dx<=1||dy<=1;
       marbleMask[gy][gx]=marble;
       let id;
-      if(marble){
-        // Keep the navigation material calm. Decorative gold/diagonal squares are no longer
-        // injected into the base floor; accents belong to authored decals/props.
-        id=pick(gx,gy,F.marble);
-      } else {
+      if(marble) id=pick(gx,gy,F.marble);
+      else {
         id=pick(gx,gy,F.grass);
         if(((gx*11+gy*7)%29)===0) id=pick(gx,gy,F.grassDetail);
       }
@@ -154,16 +132,7 @@
       drawTransitionTile(tg,transitionId,gx*TILE,gy*TILE);
     }
 
-    const props=document.createElement('canvas'); props.width=PLAZA.w; props.height=PLAZA.h;
-    const pg=props.getContext('2d'); pg.imageSmoothingEnabled=false;
-    drawSprite(pg,T.FOUNTAIN,cx-1,cy-2,3,3);
-    [[cx-5,cy-4],[cx+4,cy-4],[cx-5,cy+2],[cx+4,cy+2]].forEach(p=>drawSprite(pg,T.COLUMN,p[0],p[1],1,2));
-    [[1,1],[cols-4,1],[1,rows-4],[cols-4,rows-4]].forEach(p=>drawSprite(pg,T.TREE,p[0],p[1],2,3));
-    [[cx-8,cy-5,T.BUSH_FLOWERS],[cx+7,cy-5,T.BUSH_A],[cx-8,cy+4,T.BUSH_A],[cx+7,cy+4,T.BUSH_FLOWERS_B],[cx-7,cy-5,T.PLANTER],[cx+6,cy+4,T.PLANTER_FLOWERS]].forEach(p=>drawTile(pg,p[2],p[0]*TILE,p[1]*TILE));
-    drawSprite(pg,T.BENCH,cx-9,cy-1,2,1); drawSprite(pg,T.BENCH,cx+7,cy-1,2,1);
-    drawSprite(pg,T.FLOWERBED,cx-8,cy+6,2,1); drawSprite(pg,T.FLOWERBED,cx+6,cy-7,2,1);
-    drawSprite(pg,T.LAMP,cx-3,1,1,2); drawSprite(pg,T.LAMP,cx+3,rows-3,1,2);
-    floorLayer=floor; transitionLayer=transitions; propLayer=props;
+    floorLayer=floor; transitionLayer=transitions; propLayer=null;
     window.KELO_PLAZA_AUDIT.ready=true;
     window.KELO_PLAZA_AUDIT.assetLoaded=true;
     window.KELO_PLAZA_AUDIT.fallbackActive=false;
@@ -178,12 +147,12 @@
   };
   transitionSheet.onload=function(){
     if(transitionSheet.naturalWidth!==TRANSITION_ATLAS.width||transitionSheet.naturalHeight!==TRANSITION_ATLAS.height){
-      console.error('[Kelo plaza] invalid transition atlas dimensions',transitionSheet.naturalWidth,transitionSheet.naturalHeight,'expected',TRANSITION_ATLAS.width,TRANSITION_ATLAS.height); return;
+      console.error('[Kelo plaza] invalid transition atlas dimensions'); return;
     }
     transitionsLoaded=true; bakeAtlas();
   };
-  sheet.onerror=function(){ console.error('[Kelo plaza] tileset load failed; deterministic fallback remains active'); };
-  transitionSheet.onerror=function(){ console.error('[Kelo plaza] transition atlas load failed; deterministic fallback remains active'); };
+  sheet.onerror=function(){ console.error('[Kelo plaza] tileset load failed'); };
+  transitionSheet.onerror=function(){ console.error('[Kelo plaza] transition atlas load failed'); };
   sheet.src=ATLAS.src+'&v=100';
   transitionSheet.src=TRANSITION_ATLAS.src+'&v=100';
 
@@ -230,7 +199,6 @@
       ctx.save(); ctx.translate(screenW/2,screenH/2); ctx.scale(z,z); ctx.translate(-camera.x,-camera.y); ctx.imageSmoothingEnabled=false;
       ctx.drawImage(floorLayer,PLAZA.x,PLAZA.y);
       if(transitionLayer) ctx.drawImage(transitionLayer,PLAZA.x,PLAZA.y);
-      if(propLayer) ctx.drawImage(propLayer,PLAZA.x,PLAZA.y);
       if(typeof renderAvatar==='function'){
         if(typeof simulatedPlayers!=='undefined') simulatedPlayers.forEach(p=>renderAvatar(p,false));
         if(typeof localPlayer!=='undefined') renderAvatar(localPlayer,true);
