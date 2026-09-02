@@ -79,7 +79,11 @@ render = function() {
     ctx.fillStyle = '#49c934'; ctx.fillRect(0, 0, CONFIG.worldWidth, CONFIG.worldHeight);
   }
   ctx.strokeStyle = '#8b3a3a'; ctx.lineWidth = 4; ctx.strokeRect(0, 0, CONFIG.worldWidth, CONFIG.worldHeight);
-  for (const b of obstacles) { ctx.fillStyle = '#222b38'; ctx.fillRect(b.x, b.y, b.w, b.h); ctx.strokeStyle = '#38465c'; ctx.lineWidth = 2; ctx.strokeRect(b.x, b.y, b.w, b.h); }
+  for (const b of obstacles) {
+    if (b.noDraw === true) continue;
+    ctx.fillStyle = '#222b38'; ctx.fillRect(b.x, b.y, b.w, b.h);
+    ctx.strokeStyle = '#38465c'; ctx.lineWidth = 2; ctx.strokeRect(b.x, b.y, b.w, b.h);
+  }
   renderFarm(STATE.farm); renderPlot(STATE.plot, true); renderArena(arenaPvP);
   for (const pt of particles) { ctx.fillStyle = pt.color; ctx.globalAlpha = pt.life / pt.maxLife; ctx.beginPath(); ctx.arc(pt.x, pt.y, pt.size * (pt.life / pt.maxLife), 0, Math.PI * 2); ctx.fill(); }
   ctx.globalAlpha = 1;
