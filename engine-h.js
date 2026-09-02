@@ -1,19 +1,43 @@
 (function () {
   const dprCap = 3;
+  // Pixel-art HD mode: use the device backing store, but never blur authored pixels.
+  function activeDpr(){ return Math.min(window.devicePixelRatio || 1, dprCap); }
+  function pixelPerfectZoom(target){
+    const dpr = activeDpr();
+    const physicalScale = Math.max(1, Math.round((target || 1) * dpr));
+    return physicalScale / dpr;
+  }
+  if (typeof CONFIG !== 'undefined') {
+    CONFIG.zoom = pixelPerfectZoom(1);
+    CONFIG.roundPixels = true;
+  }
+  if (typeof cycleZoom === 'function') {
+    const zoomTargets = [0.55, 1, 1.45];
+    cycleZoom = function () {
+      const dpr = activeDpr();
+      const steps = [...new Set(zoomTargets.map(pixelPerfectZoom))];
+      let i = steps.findIndex(v => Math.abs(v - (CONFIG.zoom || 1)) < 0.001);
+      if (i < 0) i = 0;
+      CONFIG.zoom = steps[(i + 1) % steps.length];
+      if (typeof showToast === 'function') showToast('Zoom HD ' + CONFIG.zoom.toFixed(2));
+      if (typeof closeMenu === 'function') closeMenu();
+    };
+  }
+
   // The live plaza is atlas-owned by engine-l.js. Keep the procedural fallback here,
   // but never probe legacy JPG paths that are no longer part of the production build.
   let plazaReady = false;
   resize = function () {
     screenW = window.innerWidth;
     screenH = window.innerHeight;
-    const dpr = Math.min(window.devicePixelRatio || 1, dprCap);
+    const dpr = activeDpr();
     canvas.width = Math.floor(screenW * dpr);
     canvas.height = Math.floor(screenH * dpr);
     canvas.style.width = screenW + 'px';
     canvas.style.height = screenH + 'px';
+    canvas.style.imageRendering = 'pixelated';
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
+    ctx.imageSmoothingEnabled = false;
   };
   resize();
   const PLAZA = { x: 1040, y: 1240, w: 800, h: 560 };
@@ -53,8 +77,7 @@
   }
   const _renderC = render;
   render = function () {
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
+    ctx.imageSmoothingEnabled = false;
     const origFillRect = ctx.fillRect.bind(ctx);
     ctx.fillRect = function (x, y, w, h) {
       if (w === 520 && h === 520) { drawMarblePlaza(); return; }
@@ -62,6 +85,8 @@
     };
     _renderC();
     ctx.fillRect = origFillRect;
+    ctx.imageSmoothingEnabled = false;
   };
+  window.KELO_HD_RENDER = Object.freeze({mode:'hidpi-pixel-perfect-v1',dprCap,defaultZoom:CONFIG.zoom,smoothing:false});
   window.KELO_LEGACY_PLAZA_IMAGE_DISABLED = true;
 })();
