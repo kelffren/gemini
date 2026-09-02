@@ -65,5 +65,5 @@
     visibleHouses().forEach(function (b) { facade(ctx, b); });
     ctx.restore();
   };
-  window.KELO_LEGACY_HOUSE_RENDERER=Object.freeze({version:'legacy-house-authored-overlap-v2',suppressionMode:'registry-prefab-overlap-ratio-v1',threshold:0.35,get visibleTitles(){return visibleHouses().map(b=>b.title);},get suppressedTitles(){return suppressedHouses();}});
+  window.KELO_LEGACY_HOUSE_RENDERER=Object.freeze({version:'legacy-house-authored-overlap-v1',suppressionMode:'luxe-prefab-overlap-ratio-v1',coverageSource:'registry-prefabs-v1',threshold:0.35,get visibleTitles(){return visibleHouses().map(b=>b.title);},get suppressedTitles(){return suppressedHouses();}});
 })();
