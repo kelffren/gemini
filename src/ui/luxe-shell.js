@@ -5,12 +5,11 @@
   css.id = 'kelo-luxe-v3-style';
   css.textContent = `
     :root{--lx-ink:#101820;--lx-ink2:#17252a;--lx-forest:#173f36;--lx-gold:#e7c56a;--lx-ivory:#fff4d6;--lx-muted:#aab7ae}
-    .top-bar,#kelo-chat,#kelo-stones-btn,#kelo-bag-btn{display:none!important}
+    .top-bar,#kelo-chat,#kelo-stones-btn,#kelo-bag-btn,#kelo-online,.lx-mark,#kelo-minimap,.kelo-minimap,#minimap{display:none!important}
     #kelo-luxe{position:absolute;inset:0;z-index:80;pointer-events:none;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--lx-ivory)}
     #kelo-luxe *{box-sizing:border-box}
     #kelo-luxe button,#kelo-luxe input{font:inherit}
     .lx-top{position:absolute;top:max(8px,env(safe-area-inset-top));left:max(8px,env(safe-area-inset-left));right:max(8px,env(safe-area-inset-right));height:42px;display:flex;align-items:center;gap:7px;pointer-events:auto}
-    .lx-mark{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(145deg,rgba(22,63,54,.98),rgba(12,24,28,.98));border:1px solid rgba(231,197,106,.72);box-shadow:0 6px 18px rgba(0,0,0,.24),inset 0 0 0 1px rgba(255,255,255,.04);font-family:Georgia,serif;font-size:15px;font-weight:900;letter-spacing:-1px;color:var(--lx-gold)}
     .lx-gold{height:38px;min-width:94px;padding:0 12px;border-radius:12px;display:flex;align-items:center;gap:7px;background:rgba(11,21,24,.93);border:1px solid rgba(231,197,106,.34);box-shadow:0 6px 18px rgba(0,0,0,.18);font-size:13px;font-weight:800;color:var(--lx-ivory)}
     .lx-gold-dot{width:8px;height:8px;transform:rotate(45deg);background:var(--lx-gold);box-shadow:0 0 0 2px rgba(231,197,106,.14)}
     .lx-presence{height:30px;padding:0 9px;border-radius:999px;display:flex;align-items:center;gap:5px;background:rgba(11,21,24,.82);border:1px solid rgba(255,255,255,.08);font-size:10px;font-weight:700;color:#d7eadc}
@@ -43,7 +42,6 @@
   root.id = 'kelo-luxe';
   root.innerHTML = `
     <div class="lx-top">
-      <div class="lx-mark" aria-label="Kelo World">KW</div>
       <div class="lx-gold"><span class="lx-gold-dot"></span><span id="lx-gold">Oro 0</span></div>
       <div class="lx-presence"><i></i><span>online</span></div>
       <div class="lx-spacer"></div>
@@ -59,7 +57,7 @@
   document.body.appendChild(root);
 
   function suppressLegacyUI() {
-    const ids = ['kelo-chat','kelo-stones-btn','social-menu-toggle'];
+    const ids = ['kelo-chat','kelo-stones-btn','social-menu-toggle','kelo-online','kelo-minimap','minimap'];
     ids.forEach(function(id){ const el=document.getElementById(id); if(el) el.style.setProperty('display','none','important'); });
     const top=document.querySelector('.top-bar'); if(top) top.style.setProperty('display','none','important');
     Array.from(document.body.children).forEach(function(el){
@@ -72,6 +70,11 @@
   suppressLegacyUI();
   const legacyObserver = new MutationObserver(suppressLegacyUI);
   legacyObserver.observe(document.body,{childList:true,subtree:false});
+
+  if (typeof window.renderFarm === 'function' && !window.renderFarm._keloHidden) {
+    window.renderFarm = function () {};
+    window.renderFarm._keloHidden = true;
+  }
 
   function updateGold() {
     const el = document.getElementById('lx-gold');
@@ -108,13 +111,11 @@
   });
 
   window.KELO_LUXE_AUDIT = Object.freeze({
-    version:'luxe-shell-v3.0',
+    version:'luxe-shell-v3.1',
     palette:'forest-ivory-gold',
-    legacyHudSuppressed:true,
-    socialRail:'single-menu-button',
-    chatCollapsedByDefault:true,
-    persistentHotbarSlots:5,
-    hotbarLayout:'bottom-right-single-row',
-    proceduralEnvironmentArt:false
+    hideKwBadge:true,
+    hideLocalChip:true,
+    hideFarmOverlay:true,
+    legacyHudSuppressed:true
   });
 })();
