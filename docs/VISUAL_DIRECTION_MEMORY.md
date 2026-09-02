@@ -387,6 +387,18 @@ Kelo World is no longer allowed to remain a single polished plaza floating in a 
 - Manual inspection of `live-grass.png` confirms the field now reads as a calmer continuous lawn with small clustered blades/flowers instead of every tile carrying the same confetti-like detail. Manual inspection of `live-mobile.png` confirms paths and hero silhouettes remain highly legible; no chunk seam or road regression appeared.
 - Next bottleneck: after simplifying the grass, the remaining simple environmental props (especially the small round tree/sign family visible around Plaza Central) now stand out more strongly against the high-quality hero and Kelo Luxe art. The next safe visual pass should replace one of those prop families with authored transparent pixel-art assets through TileRegistry/prop layers rather than adding more ground noise.
 
+
+## Validated Plaza Nature Prop Family — V5.92 / Registry 1.10.20 / 2026-09-02
+- Current Pixadom/top-down research reinforces a useful Kelo World rule: dense social spaces remain readable when environmental detail is concentrated in authored prop clusters with distinct silhouettes and calm negative space, rather than by increasing uniform ground noise. This is a density/readability/consistency reference only; no external art or layout was copied.
+- Added original transparent `assets/plaza-nature-v1.svg`, a 192x96 authored atlas containing two 96x96 plaza tree variants. TileRegistry `1.10.20` owns the atlas, four visual-only Plaza Central placements and the explicit `actor-base-y-v1` depth contract; collision and movement are unchanged.
+- Added `src/environment/plaza-nature.js` as a dedicated prop render/depth layer. The tree family renders after the base world and re-renders only overlapping actors whose base-Y is in front, preserving the expected behind/in-front relationship without changing gameplay footprints.
+- Page contract advanced to `Kelo World — V5.92`; the authored asset is loaded with exact 192x96 dimension validation and exposes `KELO_PLAZA_NATURE_AUDIT` rather than silently falling back.
+- Implementation commits `76452fd2a8010a169439f84d902f1097880230a6`, `4d1c38e4324deb4656d4b444986ed8df29ca4943`, `1a658f52d3fb60a8e62c03703194c8c2c49ce175` and `31eb947f84b6c1fda9f1293c8155fd5c8b3eaa9f` reached main. Final validation/audit guard commit `537ac28f4a32aeb2128a81f5e9a6c5f6940de7ec` passed Kelo CI and the LIVE mobile workflow.
+- The first green LIVE capture did not actually frame a new tree, so it was not accepted as sufficient visual evidence. `scripts/live-world-audit.mjs` was hardened to require `plaza-nature-v1`, `assetLoaded=true`, four registry props and `depthMode='actor-base-y-v1'`, and now emits a dedicated `live-plaza-tree.png` frame.
+- Corrected LIVE validation passed at 390x844 CSS / 780x1688 backing canvas with `ready=true`, `assetLoaded=true`, `failed=false`, `propCount=4`, registry `1.10.20`, world `v1.3`, and `consoleErrors=[]`, `failedRequests=[]`, `httpErrors=[]`.
+- Manual inspection of `live-plaza-tree.png` confirms the new authored block-cluster tree renders crisply on grass and remains legible beside the high-detail hero/Kelo Luxe art. The same frame also proves the next bottleneck: a legacy small round tree and simple sign remain visible nearby and now look substantially weaker than the new family.
+- Next safe visual pass: remove/replace the remaining legacy round-tree/sign prop family through the same TileRegistry/prop-layer contract, or connect the approved authored plaza-ground asset as the next major floor upgrade. Do not add more uniform grass noise.
+
 ## Non-goals During Visual Passes
 Do not casually alter unrelated systems such as:
 - core movement feel;

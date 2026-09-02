@@ -16,6 +16,7 @@ on:
       - 'assets/tileset-vclean.png'
       - 'assets/plaza-transitions-v1.png'
       - 'assets/plaza-ground-v1.png'
+      - 'assets/plaza-nature-v1.svg'
       - 'assets/grass-variation-v1.png'
       - 'assets/rural-soil-v1.png'
       - 'assets/rural-props-v1.png'

@@ -16,7 +16,7 @@
   const TRANSITION_MASKS = REGISTRY.transitionMasks;
 
   window.KELO_PLAZA_AUDIT = {
-    version: 'V5.92-authored-ground',
+    version: 'V5.93-authored-ground',
     ready: false,
     assetLoaded: false,
     groundAssetLoaded: false,

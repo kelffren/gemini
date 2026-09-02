@@ -25,6 +25,7 @@ jobs:
           node --check src/environment/world-map.js
           node --check src/environment/rural-ground.js
           node --check src/environment/rural-landmarks.js
+          node --check src/environment/plaza-nature.js
           node --check src/environment/luxe-compose.js
           node --check src/environment/luxe-kiosk-atlas.js
           node --check scripts/live-world-audit.mjs
@@ -39,6 +40,7 @@ jobs:
           grep -q "mode:'luxe-only-v1'" src/environment/luxe-kiosk-atlas.js
           grep -q "grassVariation:grassVariationAtlas" src/environment/tile-registry.js
           grep -q "plazaGround:plazaGroundAtlas" src/environment/tile-registry.js
+          grep -q "plazaNature:plazaNatureAtlas" src/environment/tile-registry.js
           grep -q "grassMode:'authored-eight-variant-atlas-v1'" src/environment/tile-registry.js
           grep -q "grassVariationMode:'authored-eight-variant-atlas-v1'" src/environment/world-map.js
           if ! grep -q 'DISABLED_PROCEDURAL_ART' src/environment/luxe-compose.js; then
