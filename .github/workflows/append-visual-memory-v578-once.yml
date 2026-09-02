@@ -1,0 +1,41 @@
+name: Append validated V5.78 visual memory once
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/append-visual-memory-v578-once.yml'
+permissions:
+  contents: write
+jobs:
+  append:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Append validated V5.78 findings
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path=Path('docs/VISUAL_DIRECTION_MEMORY.md')
+          text=path.read_text(encoding='utf-8')
+          heading='## Validated Legacy Facade Ownership + LIVE Deployment Gate — V5.78 / 2026-09-02'
+          if heading in text:
+              raise SystemExit(0)
+          section='''\n\n## Validated Legacy Facade Ownership + LIVE Deployment Gate — V5.78 / 2026-09-02\n- Manual inspection of the genuinely deployed V5.77 architecture capture proved that `legacyBrownPlaceholdersRemoved=true` was insufficient: a brown `Mercado` facade was still visibly drawn behind Kelo Luxe even though the matching obstacle rectangles had been removed.\n- Repository-wide source inspection located the true visual owner in `engine-y.js`; it draws four late legacy facades (`Mercado`, `Banco`, `Atelier`, `Café Oro`) after the world renderer. Collision removal in `luxe-kiosk-atlas.js` therefore cannot remove these visuals.\n- V5.78 adds a visual-only authored-overlap rule in `engine-y.js`: legacy facades are suppressed only when at least 35% of their area is covered by the current Kelo Luxe prefab bounds from TileRegistry. This suppresses `Mercado` and `Atelier` while leaving `Banco` and `Café Oro` visible. Gameplay collision, movement, interaction and unrelated systems are unchanged.\n- The LIVE audit now explicitly certifies `KELO_LEGACY_HOUSE_RENDERER`, requiring `Mercado` and `Atelier` in `suppressedTitles` and absent from `visibleTitles`. The final V5.78 audit passed at 390x844 CSS / 780x1688 backing canvas with registry `1.10.10`, architecture renderer `v1.3`, boutique and market depth occlusion active, and zero console, failed-request or HTTP errors.\n- Manual inspection of `live-architecture.png` confirms the prior brown Mercado/Atelier geometry and labels are gone from behind Kelo Luxe; the authored boutique is now visually isolated and readable against grass/marble.\n- A separate QA defect was also validated and fixed: a LIVE run had previously passed while GitHub Pages still served V5.76 / architecture renderer v1.2. Both LIVE auditors now derive and require the source build title plus architecture renderer version/mode, in addition to TileRegistry, so stale Pages deployments cannot certify a newer visual change.\n- Current next architecture bottleneck: `Banco` and `Café Oro` remain late procedural/legacy facades. Replace one with a registry-driven authored prefab using the generic architecture renderer rather than broadening the suppression rule.\n'''
+          marker='\n## Non-goals During Visual Passes\n'
+          if marker in text:
+              text=text.replace(marker,section+marker,1)
+          else:
+              text=text.rstrip()+section+'\n'
+          path.write_text(text,encoding='utf-8')
+          PY
+      - name: Commit validated memory
+        run: |
+          if git diff --quiet -- docs/VISUAL_DIRECTION_MEMORY.md; then exit 0; fi
+          git config user.name 'kelo-visual-memory-bot'
+          git config user.email '68343904+kelffren@users.noreply.github.com'
+          git add docs/VISUAL_DIRECTION_MEMORY.md
+          git commit -m 'Record validated V5.78 facade ownership fix'
+          git push origin HEAD:main
