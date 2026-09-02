@@ -19,6 +19,7 @@ on:
       - 'assets/rural-props-v1.png'
       - 'assets/rural-landmarks-v1.png'
       - 'assets/market-pavilion-v1.png'
+      - 'assets/commerce-arcade-v1.svg'
       - 'scripts/live-world-audit.mjs'
       - 'scripts/live-pavilion-audit.mjs'
       - '.github/workflows/live-audit.yml'
@@ -38,13 +39,13 @@ jobs:
         env:
           AUDIT_URL: https://kelffren.github.io/gemini/
           EXPECTED_WORLD: world-v1.2
-          EXPECTED_REGISTRY: 1.10.4
+          EXPECTED_REGISTRY: 1.10.7
           CHROME_BIN: /usr/bin/google-chrome
         run: node scripts/live-world-audit.mjs
       - name: Audit authored architecture prefabs
         env:
           AUDIT_URL: https://kelffren.github.io/gemini/
-          EXPECTED_REGISTRY: 1.10.4
+          EXPECTED_REGISTRY: 1.10.7
           CHROME_BIN: /usr/bin/google-chrome
         run: node scripts/live-pavilion-audit.mjs
       - name: Upload screenshot evidence
