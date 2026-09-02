@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import { chromium } from 'playwright';
 
 const base = process.env.AUDIT_URL || 'https://kelffren.github.io/gemini/';
-const expected = process.env.EXPECTED_BUILD || 'V5.53';
+const expected = process.env.EXPECTED_BUILD || 'V5.56';
 const expectedRegistry = process.env.EXPECTED_REGISTRY || '1.10.0';
 const expectedLandmarks = process.env.EXPECTED_LANDMARKS || 'rural-landmarks-v1.3';
 fs.mkdirSync('artifacts', { recursive: true });
@@ -38,10 +38,11 @@ for(let attempt=1;attempt<=24;attempt++){
       worldReady:!!window.KELO_WORLD_AUDIT?.ready,worldVersion:window.KELO_WORLD_AUDIT?.version||null,ruralRoadMode:window.KELO_WORLD_AUDIT?.ruralRoadMode||null,districtCount:window.KELO_WORLD_AUDIT?.districtCount||0,districtStyleMode:window.KELO_WORLD_AUDIT?.districtStyleMode||null,styledDistrictCount:window.KELO_WORLD_AUDIT?.styledDistrictCount||0,chunkSize:window.KELO_WORLD_AUDIT?.chunkSize||0,
       ruralReady:!!window.KELO_RURAL_GROUND_AUDIT?.ready,ruralMode:window.KELO_RURAL_GROUND_AUDIT?.renderingMode||null,gateSide:window.KELO_RURAL_GROUND_AUDIT?.gateSide||null,
       landmarkReady:!!window.KELO_RURAL_LANDMARK_AUDIT?.ready,landmarkMode:window.KELO_RURAL_LANDMARK_AUDIT?.renderingMode||null,landmarkVersion:window.KELO_RURAL_LANDMARK_AUDIT?.version||null,
-      natureReady:!!window.KELO_RURAL_LANDMARK_AUDIT?.natureAssetLoaded,treeCount:window.KELO_RURAL_LANDMARK_AUDIT?.treeCount||0,treeFamilyCount:window.KELO_RURAL_LANDMARK_AUDIT?.treeFamilyCount||0,hedgeCount:window.KELO_RURAL_LANDMARK_AUDIT?.hedgeCount||0,natureDetailCount:window.KELO_RURAL_LANDMARK_AUDIT?.natureDetailCount||0,vegetationMode:window.KELO_RURAL_LANDMARK_AUDIT?.vegetationMode||null
+      natureReady:!!window.KELO_RURAL_LANDMARK_AUDIT?.natureAssetLoaded,treeCount:window.KELO_RURAL_LANDMARK_AUDIT?.treeCount||0,treeFamilyCount:window.KELO_RURAL_LANDMARK_AUDIT?.treeFamilyCount||0,hedgeCount:window.KELO_RURAL_LANDMARK_AUDIT?.hedgeCount||0,natureDetailCount:window.KELO_RURAL_LANDMARK_AUDIT?.natureDetailCount||0,vegetationMode:window.KELO_RURAL_LANDMARK_AUDIT?.vegetationMode||null,
+      activeProceduralCompose:!!(window.KELO_LUXE_COMPOSE && window.KELO_LUXE_COMPOSE.disabled!==true)
     }));
-    if(d.version===expected&&d.registryVersion===expectedRegistry&&d.authoredTransitions&&d.depthOcclusion&&d.depthOccluderCount>=8&&d.worldReady&&d.worldVersion==='world-v1.1'&&d.ruralRoadMode==='farm-bypass-v1'&&d.districtCount>=5&&d.districtStyleMode==='district-profile-v1'&&d.styledDistrictCount>=5&&d.chunkSize===512&&d.ruralReady&&d.ruralMode==='authored-nine-slice-v1'&&d.gateSide==='north'&&d.landmarkReady&&d.landmarkMode==='layered-rural-landmarks-v1'&&d.landmarkVersion===expectedLandmarks&&d.natureReady&&d.treeCount>=3&&d.treeFamilyCount>=2&&d.hedgeCount>=8&&d.natureDetailCount>=4&&d.vegetationMode==='authored-rural-nature-edge-clusters-v1'){loaded=true;break;}
-    console.log(`attempt ${attempt}: build ${d.version||'missing'} / registry ${d.registryVersion||'missing'} / landmarks=${d.landmarkVersion||'missing'} / trees=${d.treeCount}/${d.treeFamilyCount} / hedges=${d.hedgeCount}, waiting for ${expected} / ${expectedLandmarks}`);
+    if(d.version===expected&&d.registryVersion===expectedRegistry&&d.authoredTransitions&&d.depthOcclusion&&d.depthOccluderCount>=8&&d.worldReady&&d.worldVersion==='world-v1.1'&&d.ruralRoadMode==='farm-bypass-v1'&&d.districtCount>=5&&d.districtStyleMode==='district-profile-v1'&&d.styledDistrictCount>=5&&d.chunkSize===512&&d.ruralReady&&d.ruralMode==='authored-nine-slice-v1'&&d.gateSide==='north'&&d.landmarkReady&&d.landmarkMode==='layered-rural-landmarks-v1'&&d.landmarkVersion===expectedLandmarks&&d.natureReady&&d.treeCount>=3&&d.treeFamilyCount>=2&&d.hedgeCount>=8&&d.natureDetailCount>=4&&d.vegetationMode==='authored-rural-nature-edge-clusters-v1'&&!d.activeProceduralCompose){loaded=true;break;}
+    console.log(`attempt ${attempt}: build ${d.version||'missing'} / registry ${d.registryVersion||'missing'} / landmarks=${d.landmarkVersion||'missing'} / trees=${d.treeCount}/${d.treeFamilyCount} / hedges=${d.hedgeCount} / procedural=${d.activeProceduralCompose}, waiting for approved art contract`);
   }catch(err){console.log(`attempt ${attempt}: ${err.message}`);}
   await page.waitForTimeout(10000);
 }
@@ -49,12 +50,11 @@ for(let attempt=1;attempt<=24;attempt++){
 consoleErrors.length=0;failedRequests.length=0;httpErrors.length=0;
 await page.goto(`${base}?audit=final-${Date.now()}`,{waitUntil:'networkidle',timeout:45000});
 await page.waitForTimeout(4000);
-const state=await page.evaluate(()=>({title:document.title,audit:window.KELO_PLAZA_AUDIT||null,world:window.KELO_WORLD_AUDIT||null,rural:window.KELO_RURAL_GROUND_AUDIT||null,landmarks:window.KELO_RURAL_LANDMARK_AUDIT||null,tileset:window.KELO_PLAZA_TILESET||null,depth:window.KELO_PLAZA_DEPTH||null,canvas:(()=>{const c=document.getElementById('game-canvas');return c?{width:c.width,height:c.height,cssWidth:c.clientWidth,cssHeight:c.clientHeight}:null;})()}));
+const state=await page.evaluate(()=>({title:document.title,audit:window.KELO_PLAZA_AUDIT||null,world:window.KELO_WORLD_AUDIT||null,rural:window.KELO_RURAL_GROUND_AUDIT||null,landmarks:window.KELO_RURAL_LANDMARK_AUDIT||null,compose:window.KELO_LUXE_COMPOSE||null,tileset:window.KELO_PLAZA_TILESET||null,depth:window.KELO_PLAZA_DEPTH||null,canvas:(()=>{const c=document.getElementById('game-canvas');return c?{width:c.width,height:c.height,cssWidth:c.clientWidth,cssHeight:c.clientHeight}:null;})()}));
 await page.screenshot({path:'artifacts/live-mobile.png',fullPage:false});
 const ruralFrame=await page.evaluate(()=>{
   if(typeof camera==='undefined'||typeof localPlayer==='undefined'||typeof render!=='function')return null;
   const c=document.getElementById('game-canvas');if(!c)return null;
-  // Keep the complete farmstead and the irregular west/south nature frame visible together.
   localPlayer.x=900;localPlayer.y=1744;camera.x=900;camera.y=1660;camera.targetX=900;camera.targetY=1660;render();
   const px=c.getContext('2d').getImageData(0,0,c.width,c.height).data;
   let woodPixels=0,dirtPixels=0,barnPixels=0,roofPixels=0,metalPixels=0,natureDeepPixels=0,natureHighlightPixels=0,natureTrunkPixels=0;
@@ -78,11 +78,12 @@ fs.writeFileSync('artifacts/report.json',JSON.stringify({loaded,title,expected,e
 console.log(JSON.stringify({loaded,title,expected,expectedRegistry,expectedLandmarks,ruralCaptureReady,ruralVisualEvidence,state,consoleErrors,failedRequests,httpErrors},null,2));
 await browser.close();
 
-if(!loaded)throw new Error(`Live page never reached visual build ${expected} / registry ${expectedRegistry} / landmarks ${expectedLandmarks}`);
+if(!loaded)throw new Error(`Live page never reached approved art contract ${expected} / ${expectedRegistry} / ${expectedLandmarks}`);
 if(state.audit?.version!==expected)throw new Error(`Visual audit version mismatch: ${state.audit?.version} !== ${expected}`);
 if(state.audit?.registryVersion!==expectedRegistry)throw new Error(`Registry version mismatch: ${state.audit?.registryVersion} !== ${expectedRegistry}`);
 if(!state.audit?.ready||!state.audit?.assetLoaded||state.audit?.fallbackActive)throw new Error('Plaza visual state invalid');
 if(!state.audit?.authoredTransitions||!state.audit?.depthOcclusion||(state.audit?.depthOccluderCount||0)<8)throw new Error('Plaza transition/depth state invalid');
+if(state.compose && state.compose.disabled!==true)throw new Error(`Rejected procedural plaza art is active: ${JSON.stringify(state.compose)}`);
 if(!state.world?.ready||!state.world?.assetLoaded||state.world?.version!=='world-v1.1'||state.world?.ruralRoadMode!=='farm-bypass-v1')throw new Error('Rural farm-bypass world renderer is not active');
 if(state.world?.districtStyleMode!=='district-profile-v1'||(state.world?.styledDistrictCount||0)<5||state.world?.chunkSize!==512||(state.world?.districtCount||0)<5)throw new Error('World contract regressed');
 if((state.world?.worldWidth||0)<3600||(state.world?.worldHeight||0)<3200)throw new Error('World bounds regressed');
