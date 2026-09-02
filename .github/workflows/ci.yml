@@ -20,6 +20,7 @@ jobs:
         run: node --check server/index.js
       - name: Environment syntax and rural atlas contract
         run: |
+          node --check src/environment/rural-nature-atlas.js
           node --check src/environment/tile-registry.js
           node --check src/environment/world-map.js
           node --check src/environment/rural-ground.js
@@ -27,6 +28,7 @@ jobs:
           node --check engine-a.js
           node --check engine-h.js
           grep -q 'id="toast-container"' index.html
+          grep -q 'src/environment/rural-nature-atlas.js' index.html
           grep -q 'src/environment/rural-landmarks.js' index.html
           if grep -Eq "assets/plaza\.jpg|assets/plaza-sm\.jpg|'plaza\.jpg'" engine-h.js; then
             echo 'legacy missing plaza JPG request detected'
@@ -37,7 +39,7 @@ jobs:
             exit 1
           fi
           python3 - <<'PY'
-          import ast, struct
+          import ast, base64, re, struct
           ast.parse(open('scripts/generate_rural_landmarks.py',encoding='utf-8').read())
           for path in ('assets/rural-soil-v1.png','assets/rural-props-v1.png'):
               header=open(path,'rb').read(24)
@@ -53,4 +55,13 @@ jobs:
           assert (width,height)==(256,128),(path,width,height)
           assert width%32==0 and height%32==0
           print('PASS rural landmarks atlas',path,width,height,'tile=32 grid=8x4')
+          source=open('src/environment/rural-nature-atlas.js',encoding='utf-8').read()
+          match=re.search(r"data:image/png;base64,([^']+)",source)
+          assert match, 'embedded rural nature PNG missing'
+          raw=base64.b64decode(match.group(1))
+          assert raw[:8] == b'\x89PNG\r\n\x1a\n'
+          width,height=struct.unpack('>II',raw[16:24])
+          assert (width,height)==(256,128),(width,height)
+          assert width%32==0 and height%32==0
+          print('PASS embedded rural nature atlas',width,height,'tile=32 grid=8x4')
           PY
