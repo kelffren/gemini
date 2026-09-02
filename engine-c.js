@@ -21,6 +21,29 @@ function closeMenu() {
   if (el) el.style.display = 'none';
 }
 function openFromMenu(id) { closeMenu(); togglePanel(id); }
+function openSocialTool(tool) {
+  closeMenu();
+  if (tool === 'bag') {
+    if (window.KeloSocialUI && typeof window.KeloSocialUI.openBag === 'function') return window.KeloSocialUI.openBag();
+    showToast('Mochila no disponible');
+    return;
+  }
+  if (tool === 'stones' || tool === 'abilities') {
+    if (window.KeloAbilities && typeof window.KeloAbilities.openStonePanel === 'function') return window.KeloAbilities.openStonePanel();
+    showToast('Habilidades todavía cargando');
+    return;
+  }
+  if (tool === 'profile') {
+    if (typeof inspectPlayer === 'function') return inspectPlayer(localPlayer, true);
+    showToast('Perfil no disponible');
+    return;
+  }
+  if (tool === 'market') { showToast('Mercado · acceso social preparado'); return; }
+  if (tool === 'properties') { showToast('Propiedades · acceso social preparado'); return; }
+  if (tool === 'missions') { showToast('Misiones · acceso social preparado'); return; }
+  if (tool === 'friends') { showToast('Amigos · acceso social preparado'); return; }
+  if (tool === 'settings') { showToast('Ajustes · usa Zoom HD por ahora'); return; }
+}
 function quickTravel(dest) {
   closeMenu();
   if (dest === 'plaza') { localPlayer.x = 1400; localPlayer.y = 1600; camera.targetX = 1400; camera.targetY = 1600; showToast('Plaza Central'); }
