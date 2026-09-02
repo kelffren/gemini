@@ -8,6 +8,25 @@
   ];
   window.keloHouses = HOUSES;
 
+  function overlapArea(a,b) {
+    const w=Math.max(0,Math.min(a.x+a.w,b.x+b.w)-Math.max(a.x,b.x));
+    const h=Math.max(0,Math.min(a.y+a.h,b.y+b.h)-Math.max(a.y,b.y));
+    return w*h;
+  }
+  function authoredLuxeBounds() {
+    const r=window.KELO_TILE_REGISTRY;
+    const p=r?.architecturePrefabs?.luxeBoutique;
+    const a=p&&r?.architectureAssets?.[p.asset];
+    return p&&a?{x:p.x,y:p.y,w:a.worldWidth,h:a.worldHeight}:null;
+  }
+  function substantiallyCoveredByLuxe(b) {
+    const luxe=authoredLuxeBounds();
+    if(!luxe)return false;
+    return overlapArea(b,luxe)/(b.w*b.h)>=0.35;
+  }
+  function visibleHouses(){return HOUSES.filter(b=>!substantiallyCoveredByLuxe(b));}
+  function suppressedHouses(){return HOUSES.filter(substantiallyCoveredByLuxe).map(b=>b.title);}
+
   function facade(ctx, b) {
     const x = b.x, y = b.y, w = b.w, h = b.h;
     ctx.fillStyle = b.roof;
@@ -43,7 +62,8 @@
     ctx.translate(screenW / 2, screenH / 2);
     ctx.scale(z, z);
     ctx.translate(-camera.x, -camera.y);
-    HOUSES.forEach(function (b) { facade(ctx, b); });
+    visibleHouses().forEach(function (b) { facade(ctx, b); });
     ctx.restore();
   };
+  window.KELO_LEGACY_HOUSE_RENDERER=Object.freeze({version:'legacy-house-authored-overlap-v1',suppressionMode:'luxe-prefab-overlap-ratio-v1',threshold:0.35,get visibleTitles(){return visibleHouses().map(b=>b.title);},get suppressedTitles(){return suppressedHouses();}});
 })();
