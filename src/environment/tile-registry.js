@@ -44,6 +44,15 @@
     marbleGold:Object.freeze([tiles.MARBLE_GOLD_A,tiles.MARBLE_GOLD_B])
   });
 
+  const districtGroundStyles = Object.freeze({
+    central:Object.freeze({detailEvery:43, detailCluster:false, marbleAccentEvery:0}),
+    rural:Object.freeze({detailEvery:31, detailCluster:true, marbleAccentEvery:0}),
+    arena:Object.freeze({detailEvery:61, detailCluster:false, marbleAccentEvery:29}),
+    commerce:Object.freeze({detailEvery:67, detailCluster:false, marbleAccentEvery:23}),
+    gardens:Object.freeze({detailEvery:17, detailCluster:true, marbleAccentEvery:0}),
+    default:Object.freeze({detailEvery:53, detailCluster:false, marbleAccentEvery:0})
+  });
+
   // 4-neighbour mask: top=1, right=2, bottom=4, left=8.
   // Every combination maps to one authored transparent overlay tile.
   const transitionMasks = Object.freeze({
@@ -61,11 +70,15 @@
       mode:'y-occlusion-overlay-v1',
       localActorIntersection:true,
       frontOccluders:Object.freeze(['fountain','column','tree','lamp'])
+    }),
+    districtGround:Object.freeze({
+      mode:'district-profile-v1',
+      profiles:districtGroundStyles
     })
   });
 
   window.KELO_TILE_REGISTRY = Object.freeze({
-    version:'1.4.1',
+    version:'1.5.0',
     worldTileSize:TILE,
     atlases:Object.freeze({plaza:atlas, transitions:transitionAtlas}),
     tiles,
