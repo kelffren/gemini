@@ -1,40 +1,20 @@
 (function () {
   const TILE = 32;
   const atlas = Object.freeze({
-    id: 'plaza-core',
-    src: 'assets/tileset-vclean.png?art=131',
-    width: 512,
-    height: 512,
-    tileWidth: TILE,
-    tileHeight: TILE,
-    columns: 16
+    id:'plaza-core', src:'assets/tileset-vclean.png?art=131', width:512, height:512,
+    tileWidth:TILE, tileHeight:TILE, columns:16
   });
   const transitionAtlas = Object.freeze({
-    id: 'plaza-transitions',
-    src: 'assets/plaza-transitions-v1.png?art=140',
-    width: 128,
-    height: 128,
-    tileWidth: TILE,
-    tileHeight: TILE,
-    columns: 4
+    id:'plaza-transitions', src:'assets/plaza-transitions-v1.png?art=140', width:128, height:128,
+    tileWidth:TILE, tileHeight:TILE, columns:4
   });
   const ruralSoilAtlas = Object.freeze({
-    id: 'rural-soil',
-    src: 'assets/rural-soil-v1.png?art=160',
-    width: 128,
-    height: 128,
-    tileWidth: TILE,
-    tileHeight: TILE,
-    columns: 4
+    id:'rural-soil', src:'assets/rural-soil-v1.png?art=160', width:128, height:128,
+    tileWidth:TILE, tileHeight:TILE, columns:4
   });
   const ruralPropsAtlas = Object.freeze({
-    id: 'rural-props',
-    src: 'assets/rural-props-v1.png?art=170',
-    width: 128,
-    height: 128,
-    tileWidth: TILE,
-    tileHeight: TILE,
-    columns: 4
+    id:'rural-props', src:'assets/rural-props-v1.png?art=170', width:128, height:128,
+    tileWidth:TILE, tileHeight:TILE, columns:4
   });
 
   const tiles = Object.freeze({
@@ -50,27 +30,21 @@
     STATUE:Object.freeze([42,58]), LAMP:Object.freeze([43,59]), BENCH:Object.freeze([44,45]),
     BUSH_B:54, BUSH_FLOWERS_B:55, PLANTER:56, PLANTER_FLOWERS:57
   });
-
   const families = Object.freeze({
     grass:Object.freeze([tiles.GRASS_A,tiles.GRASS_B,tiles.GRASS_C,tiles.GRASS_SOFT]),
     grassDetail:Object.freeze([tiles.GRASS_FLOWERS]),
-    marble:Object.freeze([
-      tiles.MARBLE_IVORY_A,tiles.MARBLE_IVORY_B,tiles.MARBLE_IVORY_C,tiles.MARBLE_IVORY_D,
-      tiles.MARBLE_IVORY_A,tiles.MARBLE_IVORY_B,tiles.MARBLE_IVORY_C,tiles.MARBLE_IVORY_D
-    ]),
+    marble:Object.freeze([tiles.MARBLE_IVORY_A,tiles.MARBLE_IVORY_B,tiles.MARBLE_IVORY_C,tiles.MARBLE_IVORY_D,tiles.MARBLE_IVORY_A,tiles.MARBLE_IVORY_B,tiles.MARBLE_IVORY_C,tiles.MARBLE_IVORY_D]),
     marbleAccent:Object.freeze([tiles.MARBLE_A,tiles.MARBLE_B,tiles.MARBLE_DIAMOND]),
     marbleGold:Object.freeze([tiles.MARBLE_GOLD_A,tiles.MARBLE_GOLD_B])
   });
-
   const districtGroundStyles = Object.freeze({
-    central:Object.freeze({detailEvery:43, detailCluster:false, marbleAccentEvery:0}),
-    rural:Object.freeze({detailEvery:31, detailCluster:true, marbleAccentEvery:0}),
-    arena:Object.freeze({detailEvery:61, detailCluster:false, marbleAccentEvery:29}),
-    commerce:Object.freeze({detailEvery:67, detailCluster:false, marbleAccentEvery:23}),
-    gardens:Object.freeze({detailEvery:17, detailCluster:true, marbleAccentEvery:0}),
-    default:Object.freeze({detailEvery:53, detailCluster:false, marbleAccentEvery:0})
+    central:Object.freeze({detailEvery:43,detailCluster:false,marbleAccentEvery:0}),
+    rural:Object.freeze({detailEvery:31,detailCluster:true,marbleAccentEvery:0}),
+    arena:Object.freeze({detailEvery:61,detailCluster:false,marbleAccentEvery:29}),
+    commerce:Object.freeze({detailEvery:67,detailCluster:false,marbleAccentEvery:23}),
+    gardens:Object.freeze({detailEvery:17,detailCluster:true,marbleAccentEvery:0}),
+    default:Object.freeze({detailEvery:53,detailCluster:false,marbleAccentEvery:0})
   });
-
   const ruralTiles = Object.freeze({
     TOP_LEFT:0, TOP:1, TOP_RIGHT:2, CENTER_ALT_A:3,
     LEFT:4, CENTER:5, RIGHT:6, CENTER_ALT_B:7,
@@ -82,53 +56,24 @@
     DIRT_FULL:8, DIRT_VERTICAL:9, DIRT_HORIZONTAL:10, DIRT_CROSS:11,
     WEED_A:12, STONE_A:13, WEED_B:14, LOG_A:15
   });
-
-  // 4-neighbour mask: top=1, right=2, bottom=4, left=8.
-  // Every combination maps to one authored transparent overlay tile.
   const transitionMasks = Object.freeze({
-    0:15, 1:0, 2:1, 3:5, 4:2, 5:12, 6:6, 7:9,
-    8:3, 9:4, 10:13, 11:8, 12:7, 13:11, 14:10, 15:14
+    0:15,1:0,2:1,3:5,4:2,5:12,6:6,7:9,8:3,9:4,10:13,11:8,12:7,13:11,14:10,15:14
   });
-
   const styles = Object.freeze({
-    plazaTransition:Object.freeze({
-      mode:'authored-overlay-atlas',
-      neighbourMask:'TRBL',
-      softenStickerAccents:true
-    }),
-    propDepth:Object.freeze({
-      mode:'y-occlusion-overlay-v1',
-      localActorIntersection:true,
-      frontOccluders:Object.freeze(['fountain','column','tree','lamp'])
-    }),
-    districtGround:Object.freeze({
-      mode:'district-profile-v1',
-      profiles:districtGroundStyles
-    }),
+    plazaTransition:Object.freeze({mode:'authored-overlay-atlas',neighbourMask:'TRBL',softenStickerAccents:true}),
+    propDepth:Object.freeze({mode:'y-occlusion-overlay-v1',localActorIntersection:true,frontOccluders:Object.freeze(['fountain','column','tree','lamp'])}),
+    districtGround:Object.freeze({mode:'district-profile-v1',profiles:districtGroundStyles}),
     ruralFarm:Object.freeze({
-      mode:'authored-nine-slice-v2',
+      mode:'authored-nine-slice-v1',
       plotTiles:Object.freeze([0,1,2,4,5,6,8,9,10]),
       logicalPlotSize:96,
       cropAnchors:Object.freeze([[16,18],[48,18],[80,18],[16,50],[48,50],[80,50]]),
-      boundary:Object.freeze({
-        mode:'modular-fence-gate-v1',
-        padding:16,
-        gateSide:'south',
-        dirtApproachTiles:3,
-        propAtlas:'rural-props'
-      })
+      boundary:Object.freeze({mode:'modular-fence-gate-v1',padding:16,gateSide:'north',dirtApproachTiles:1,propAtlas:'rural-props'})
     })
   });
-
   window.KELO_TILE_REGISTRY = Object.freeze({
-    version:'1.7.0',
-    worldTileSize:TILE,
-    atlases:Object.freeze({plaza:atlas, transitions:transitionAtlas, ruralSoil:ruralSoilAtlas, ruralProps:ruralPropsAtlas}),
-    tiles,
-    ruralTiles,
-    ruralPropTiles,
-    families,
-    transitionMasks,
-    styles
+    version:'1.7.1', worldTileSize:TILE,
+    atlases:Object.freeze({plaza:atlas,transitions:transitionAtlas,ruralSoil:ruralSoilAtlas,ruralProps:ruralPropsAtlas}),
+    tiles,ruralTiles,ruralPropTiles,families,transitionMasks,styles
   });
 })();
