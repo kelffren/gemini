@@ -60,19 +60,27 @@
   <rect x="96" y="258" width="8" height="58"/>
   <rect x="92" y="334" width="8" height="54"/>
 </g>
-<!-- five shop bays with alternating widths/depths -->
+<!-- shop bays -->
 <g>
   <rect x="104" y="36" width="40" height="48" fill="#4b8790"/>
   <rect x="108" y="40" width="32" height="34" fill="#8fc8c7"/>
   <rect x="108" y="112" width="36" height="48" fill="#4b8790"/>
   <rect x="112" y="116" width="28" height="34" fill="#8fc8c7"/>
-  <rect x="104" y="188" width="40" height="48" fill="#4b8790"/>
-  <rect x="108" y="192" width="32" height="34" fill="#8fc8c7"/>
   <rect x="108" y="264" width="36" height="48" fill="#4b8790"/>
   <rect x="112" y="268" width="28" height="34" fill="#8fc8c7"/>
   <rect x="104" y="340" width="40" height="44" fill="#4b8790"/>
   <rect x="108" y="344" width="32" height="30" fill="#8fc8c7"/>
 </g>
+<!-- central main entrance: taller double doors + canopy establish hierarchy at mobile scale -->
+<rect x="102" y="180" width="44" height="60" fill="#b7aa86"/>
+<rect x="106" y="184" width="36" height="52" fill="#4b8790"/>
+<rect x="110" y="188" width="13" height="42" fill="#8fc8c7"/>
+<rect x="125" y="188" width="13" height="42" fill="#8fc8c7"/>
+<rect x="123" y="188" width="2" height="42" fill="#d8f0ea"/>
+<rect x="100" y="174" width="48" height="8" fill="#173b35"/>
+<rect x="104" y="170" width="40" height="6" fill="#d2a548"/>
+<rect x="110" y="166" width="28" height="4" fill="#e9dfc3"/>
+<rect x="104" y="238" width="40" height="4" fill="#d2a548"/>
 <!-- structural piers and lintels -->
 <g fill="#b7aa86">
   <rect x="96" y="28" width="6" height="364"/>
@@ -86,7 +94,6 @@
 <g fill="#d2a548">
   <rect x="110" y="80" width="30" height="4"/>
   <rect x="114" y="156" width="26" height="4"/>
-  <rect x="110" y="232" width="30" height="4"/>
   <rect x="114" y="308" width="26" height="4"/>
   <rect x="110" y="380" width="30" height="4"/>
 </g>
