@@ -289,6 +289,16 @@ Kelo World is no longer allowed to remain a single polished plaza floating in a 
 - QA rule validated: audit expectations should come from the deployed source contract where possible, because a stale expected-version constant can hide newer runtime regressions instead of certifying them.
 - Next largest visual bottleneck remains the flat brown legacy Mercado building directly beside/behind Kelo Luxe. It should be replaced through the existing `architectureAssets + architecturePrefabs` generic renderer while preserving its gameplay footprint.
 
+
+## Validated Legacy Facade Ownership + LIVE Deployment Gate — V5.78 / 2026-09-02
+- Manual inspection of the genuinely deployed V5.77 architecture capture proved that `legacyBrownPlaceholdersRemoved=true` was insufficient: a brown `Mercado` facade was still visibly drawn behind Kelo Luxe even though the matching obstacle rectangles had been removed.
+- Repository-wide source inspection located the true visual owner in `engine-y.js`; it draws four late legacy facades (`Mercado`, `Banco`, `Atelier`, `Café Oro`) after the world renderer. Collision removal in `luxe-kiosk-atlas.js` therefore cannot remove these visuals.
+- V5.78 adds a visual-only authored-overlap rule in `engine-y.js`: legacy facades are suppressed only when at least 35% of their area is covered by the current Kelo Luxe prefab bounds from TileRegistry. This suppresses `Mercado` and `Atelier` while leaving `Banco` and `Café Oro` visible. Gameplay collision, movement, interaction and unrelated systems are unchanged.
+- The LIVE audit now explicitly certifies `KELO_LEGACY_HOUSE_RENDERER`, requiring `Mercado` and `Atelier` in `suppressedTitles` and absent from `visibleTitles`. The final V5.78 audit passed at 390x844 CSS / 780x1688 backing canvas with registry `1.10.10`, architecture renderer `v1.3`, boutique and market depth occlusion active, and zero console, failed-request or HTTP errors.
+- Manual inspection of `live-architecture.png` confirms the prior brown Mercado/Atelier geometry and labels are gone from behind Kelo Luxe; the authored boutique is now visually isolated and readable against grass/marble.
+- A separate QA defect was also validated and fixed: a LIVE run had previously passed while GitHub Pages still served V5.76 / architecture renderer v1.2. Both LIVE auditors now derive and require the source build title plus architecture renderer version/mode, in addition to TileRegistry, so stale Pages deployments cannot certify a newer visual change.
+- Current next architecture bottleneck: `Banco` and `Café Oro` remain late procedural/legacy facades. Replace one with a registry-driven authored prefab using the generic architecture renderer rather than broadening the suppression rule.
+
 ## Non-goals During Visual Passes
 Do not casually alter unrelated systems such as:
 - core movement feel;
