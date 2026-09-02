@@ -58,7 +58,7 @@
   }
 
   function installCollision() {
-    if (!Array.isArray(window.obstacles)) return false;
+    if (typeof obstacles === 'undefined' || !Array.isArray(obstacles)) return false;
 
     // Remove superseded invisible plaza placeholder collisions only where the authored shop lives.
     for (let i = obstacles.length - 1; i >= 0; i--) {
@@ -80,31 +80,31 @@
   }
 
   function nearShop() {
-    if (typeof window.localPlayer === 'undefined' || !localPlayer) return false;
+    if (typeof localPlayer === 'undefined' || !localPlayer) return false;
     return Math.hypot(localPlayer.x - SHOP.frontX, localPlayer.y - SHOP.frontY) <= SHOP.interactRadius;
   }
 
   function openBoutique() {
     if (!nearShop()) {
-      if (typeof window.showToast === 'function') showToast('Acércate a Kelo Luxe');
+      if (typeof showToast === 'function') showToast('Acércate a Kelo Luxe');
       return false;
     }
     if (window.KELO_BOUTIQUE && typeof window.KELO_BOUTIQUE.open === 'function') {
       window.KELO_BOUTIQUE.open();
-      if (typeof window.showToast === 'function') showToast('Kelo Luxe Boutique');
+      if (typeof showToast === 'function') showToast('Kelo Luxe Boutique');
       return true;
     }
-    if (typeof window.showToast === 'function') showToast('Boutique cargando…');
+    if (typeof showToast === 'function') showToast('Boutique cargando…');
     return false;
   }
 
   function pointerToWorld(e) {
-    const canvas = document.getElementById('game-canvas');
-    if (!canvas || typeof window.screenToWorld !== 'function') return null;
-    const r = canvas.getBoundingClientRect();
+    const gameCanvas = document.getElementById('game-canvas');
+    if (!gameCanvas || typeof screenToWorld !== 'function') return null;
+    const r = gameCanvas.getBoundingClientRect();
     if (!r.width || !r.height) return null;
-    const sw = window.screenW || canvas.width || r.width;
-    const sh = window.screenH || canvas.height || r.height;
+    const sw = gameCanvas.width || r.width;
+    const sh = gameCanvas.height || r.height;
     const sx = (e.clientX - r.left) * (sw / r.width);
     const sy = (e.clientY - r.top) * (sh / r.height);
     return screenToWorld(sx, sy);
@@ -115,10 +115,10 @@
   }
 
   function installInteraction() {
-    const canvas = document.getElementById('game-canvas');
-    if (canvas && !canvas._keloLuxeBoutiqueTap) {
-      canvas._keloLuxeBoutiqueTap = true;
-      canvas.addEventListener('pointerdown', function (e) {
+    const gameCanvas = document.getElementById('game-canvas');
+    if (gameCanvas && !gameCanvas._keloLuxeBoutiqueTap) {
+      gameCanvas._keloLuxeBoutiqueTap = true;
+      gameCanvas.addEventListener('pointerdown', function (e) {
         const p = pointerToWorld(e);
         if (!insideShop(p)) return;
         e.preventDefault();
@@ -160,7 +160,7 @@
 
   window.KELO_LUXE_KIOSK = Object.freeze({
     disabled: false,
-    version: 'authored-raster-v1.0',
+    version: 'authored-raster-v1.1',
     asset: ASSET,
     source: 'user-authored-raster',
     shop: SHOP,
