@@ -36,8 +36,9 @@
       worldWidth:224, worldHeight:160, family:'architecture'
     }),
     commerceArcade:Object.freeze({
-      id:'commerce-arcade', src:'assets/commerce-arcade-v1.svg?v=5', width:160, height:432,
-      worldWidth:160, worldHeight:432, family:'architecture'
+      id:'commerce-arcade', src:'assets/commerce-arcade-v1.svg?v=6', width:160, height:432,
+      worldWidth:160, worldHeight:432, family:'architecture', variant:'north-corner-endcap-v1',
+      modules:Object.freeze(['courtyard','mainEntrance','secondaryBays','northCornerEndcap'])
     }),
     bancoHall:Object.freeze({
       id:'banco-hall', src:'assets/banco-hall-v1.svg?v=2', width:160, height:128,
@@ -150,7 +151,7 @@
     })
   });
   window.KELO_TILE_REGISTRY = Object.freeze({
-    version:'1.10.16', worldTileSize:TILE,
+    version:'1.10.17', worldTileSize:TILE,
     atlases:Object.freeze({plaza:atlas,transitions:transitionAtlas,ruralSoil:ruralSoilAtlas,ruralProps:ruralPropsAtlas,ruralLandmarks:ruralLandmarksAtlas,ruralNature:ruralNatureAtlas}),
     architectureAssets,architecturePrefabs,
     tiles,ruralTiles,ruralPropTiles,ruralLandmarkTiles,ruralLandmarkSprites,ruralNatureTiles,ruralNatureSprites,families,transitionMasks,styles

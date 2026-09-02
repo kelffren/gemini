@@ -40,6 +40,9 @@ jobs:
           grep -q "kelo-luxe-v3-style" src/ui/luxe-shell.js
           grep -q -- "--lx-forest:#173f36" src/ui/luxe-shell.js
           grep -q "authored-market-pavilion-v1" src/environment/luxe-kiosk-atlas.js
+          grep -q 'id="north-corner-endcap-v1"' assets/commerce-arcade-v1.svg
+          grep -q "variant:'north-corner-endcap-v1'" src/environment/tile-registry.js
+          grep -q "northCornerEndcap" src/environment/tile-registry.js
           if ! grep -q 'DISABLED_PROCEDURAL_ART' src/environment/luxe-compose.js; then
             echo 'rejected procedural plaza overlay was reactivated'
             exit 1
@@ -53,7 +56,7 @@ jobs:
             exit 1
           fi
           python3 - <<'PY'
-          import ast, base64, re, struct
+          import ast, base64, re, struct, xml.etree.ElementTree as ET
           ast.parse(open('scripts/generate_rural_landmarks.py',encoding='utf-8').read())
           for path in ('assets/rural-soil-v1.png','assets/rural-props-v1.png'):
               header=open(path,'rb').read(24)
@@ -75,6 +78,11 @@ jobs:
           width,height=struct.unpack('>II',header[16:24])
           assert (width,height)==(224,160),(path,width,height)
           print('PASS authored market pavilion',path,width,height)
+          arcade=ET.parse('assets/commerce-arcade-v1.svg').getroot()
+          assert arcade.attrib.get('width')=='160' and arcade.attrib.get('height')=='432', arcade.attrib
+          assert arcade.attrib.get('viewBox')=='0 0 160 432', arcade.attrib
+          assert any(node.attrib.get('id')=='north-corner-endcap-v1' for node in arcade.iter()), 'north corner end-cap missing'
+          print('PASS Commerce Arcade north corner end-cap 160x432')
           source=open('src/environment/rural-nature-atlas.js',encoding='utf-8').read()
           match=re.search(r"data:image/png;base64,([^']+)",source)
           assert match, 'embedded rural nature PNG missing'

@@ -22,7 +22,8 @@ for(let attempt=1;attempt<=24;attempt++){
     const s=await page.evaluate(()=>({p:window.KELO_MARKET_PAVILION||null,luxe:window.KELO_LUXE_KIOSK||null,architecture:window.KELO_ARCHITECTURE_RENDERER||null,world:window.KELO_WORLD_AUDIT||null,registry:window.KELO_TILE_REGISTRY||null,arcade:window.KELO_ARCHITECTURE_RENDERER?.getEntry?.('commerceArcade')||null}));
     const titleReady=!expectedTitle||title===expectedTitle;
     const architectureReady=(!expectedArchitecture||s.architecture?.version===expectedArchitecture)&&(!expectedArchitectureMode||s.architecture?.mode===expectedArchitectureMode);
-    if(titleReady&&s.world?.ready&&s.registry?.version===expectedRegistry&&s.registry?.styles?.architecture?.prefabContract==='registry-asset-placement-collision-v1'&&s.registry?.architectureAssets?.marketPavilion&&s.registry?.architecturePrefabs?.marketPavilion&&s.registry?.architectureAssets?.luxeBoutique&&s.registry?.architecturePrefabs?.luxeBoutique&&s.registry?.architectureAssets?.commerceArcade&&s.registry?.architecturePrefabs?.commerceArcade&&architectureReady&&s.architecture?.prefabCount>=3&&s.p?.ready&&s.p?.source==='tile-registry-architecture-prefab'&&s.p?.rendererWrapped&&s.p?.depthWrapped&&s.p?.legacyHidden&&!s.p?.failed&&s.luxe?.ready&&s.luxe?.source==='tile-registry-architecture-prefab'&&s.luxe?.rendererWrapped&&s.luxe?.depthWrapped&&!s.luxe?.failed&&s.arcade?.ready&&s.arcade?.legacyHidden&&!s.arcade?.failed){loaded=true;break}
+    const arcadeAsset=s.registry?.architectureAssets?.commerceArcade;
+    if(titleReady&&s.world?.ready&&s.registry?.version===expectedRegistry&&s.registry?.styles?.architecture?.prefabContract==='registry-asset-placement-collision-v1'&&s.registry?.architectureAssets?.marketPavilion&&s.registry?.architecturePrefabs?.marketPavilion&&s.registry?.architectureAssets?.luxeBoutique&&s.registry?.architecturePrefabs?.luxeBoutique&&arcadeAsset?.src?.includes('?v=6')&&arcadeAsset?.variant==='north-corner-endcap-v1'&&arcadeAsset?.modules?.includes('northCornerEndcap')&&s.registry?.architecturePrefabs?.commerceArcade&&architectureReady&&s.architecture?.prefabCount>=3&&s.p?.ready&&s.p?.source==='tile-registry-architecture-prefab'&&s.p?.rendererWrapped&&s.p?.depthWrapped&&s.p?.legacyHidden&&!s.p?.failed&&s.luxe?.ready&&s.luxe?.source==='tile-registry-architecture-prefab'&&s.luxe?.rendererWrapped&&s.luxe?.depthWrapped&&!s.luxe?.failed&&s.arcade?.ready&&s.arcade?.legacyHidden&&!s.arcade?.failed){loaded=true;break}
     console.log(`attempt ${attempt}: title=${JSON.stringify(title)} registry=${s.registry?.version||'missing'} architecture=${s.architecture?.version||'missing'} mode=${s.architecture?.mode||'missing'}`);
   }catch(e){console.log(`attempt ${attempt}: ${e.message}`)}
   await page.waitForTimeout(10000);
@@ -53,17 +54,18 @@ const arcade=await page.evaluate(()=>{
   localPlayer.x=testActor.x;localPlayer.y=testActor.y;camera.x=1580;camera.y=1600;camera.targetX=1580;camera.targetY=1600;render();
   const entry=window.KELO_ARCHITECTURE_RENDERER?.getEntry?.('commerceArcade')||null;
   const px=c.getContext('2d').getImageData(0,0,c.width,c.height).data;
-  let roof=0,ivory=0,glass=0,gold=0;
+  let roof=0,ivory=0,glass=0,gold=0,endcap=0;
   for(let i=0;i<px.length;i+=4){const r=px[i],g=px[i+1],b=px[i+2],a=px[i+3];if(a<200)continue;
     if(g>70&&g<140&&r<80&&b<125)roof++;
     if(r>185&&g>175&&b>135&&Math.abs(r-g)<55)ivory++;
     if(r<180&&g>105&&b>105&&Math.abs(g-b)<70)glass++;
     if(r>175&&g>120&&g<195&&b<115)gold++;
+    if(r===116&&g===208&&b===194)endcap++;
   }
-  return{dataUrl:c.toDataURL('image/png'),entry,occluding:!!entry?.isOccluding?.(testActor),registryVersion:window.KELO_TILE_REGISTRY?.version||null,prefab:window.KELO_TILE_REGISTRY?.architecturePrefabs?.commerceArcade||null,asset:window.KELO_TILE_REGISTRY?.architectureAssets?.commerceArcade||null,renderer:window.KELO_ARCHITECTURE_RENDERER||null,roof,ivory,glass,gold};
+  return{dataUrl:c.toDataURL('image/png'),entry,occluding:!!entry?.isOccluding?.(testActor),registryVersion:window.KELO_TILE_REGISTRY?.version||null,prefab:window.KELO_TILE_REGISTRY?.architecturePrefabs?.commerceArcade||null,asset:window.KELO_TILE_REGISTRY?.architectureAssets?.commerceArcade||null,renderer:window.KELO_ARCHITECTURE_RENDERER||null,roof,ivory,glass,gold,endcap};
 });
 if(arcade?.dataUrl?.startsWith('data:image/png;base64,'))fs.writeFileSync('artifacts/live-commerce-arcade.png',Buffer.from(arcade.dataUrl.split(',')[1],'base64'));
-const report={loaded,finalTitle,expectedTitle,expectedRegistry,expectedArchitecture,expectedArchitectureMode,pavilion:pavilion?{occluding:pavilion.occluding,state:pavilion.state,registryVersion:pavilion.registryVersion,prefab:pavilion.prefab,asset:pavilion.asset,stone:pavilion.stone,roof:pavilion.roof,gold:pavilion.gold,glass:pavilion.glass}:null,luxe:luxe?{occluding:luxe.occluding,state:luxe.state,prefab:luxe.prefab,asset:luxe.asset}:null,arcade:arcade?{occluding:arcade.occluding,entry:arcade.entry,prefab:arcade.prefab,asset:arcade.asset,rendererVersion:arcade.renderer?.version,rendererMode:arcade.renderer?.mode,prefabCount:arcade.renderer?.prefabCount,roof:arcade.roof,ivory:arcade.ivory,glass:arcade.glass,gold:arcade.gold}:null,consoleErrors,failedRequests,httpErrors};
+const report={loaded,finalTitle,expectedTitle,expectedRegistry,expectedArchitecture,expectedArchitectureMode,pavilion:pavilion?{occluding:pavilion.occluding,state:pavilion.state,registryVersion:pavilion.registryVersion,prefab:pavilion.prefab,asset:pavilion.asset,stone:pavilion.stone,roof:pavilion.roof,gold:pavilion.gold,glass:pavilion.glass}:null,luxe:luxe?{occluding:luxe.occluding,state:luxe.state,prefab:luxe.prefab,asset:luxe.asset}:null,arcade:arcade?{occluding:arcade.occluding,entry:arcade.entry,prefab:arcade.prefab,asset:arcade.asset,rendererVersion:arcade.renderer?.version,rendererMode:arcade.renderer?.mode,prefabCount:arcade.renderer?.prefabCount,roof:arcade.roof,ivory:arcade.ivory,glass:arcade.glass,gold:arcade.gold,endcap:arcade.endcap}:null,consoleErrors,failedRequests,httpErrors};
 fs.writeFileSync('artifacts/pavilion-report.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));
 await browser.close();
 if(!loaded)throw new Error(`Architecture prefabs did not become ready on LIVE for ${JSON.stringify(expectedTitle)} / ${expectedArchitecture} / ${expectedArchitectureMode}`);
@@ -82,9 +84,10 @@ if(!arcade?.dataUrl?.startsWith('data:image/png;base64,')||!arcade.occluding)thr
 if(arcade.entry?.prefab?.id!=='commerce-arcade-east'||arcade.entry?.asset?.id!=='commerce-arcade')throw new Error('Commerce arcade is not consuming registry prefab metadata');
 if(arcade.entry?.geometry?.x!==arcade.prefab?.x||arcade.entry?.geometry?.y!==arcade.prefab?.y||arcade.entry?.prefab?.collision?.x!==arcade.prefab?.collision?.x||arcade.entry?.prefab?.collision?.y!==arcade.prefab?.collision?.y)throw new Error('Commerce arcade runtime geometry diverged from TileRegistry prefab');
 if(!arcade.entry?.ready||arcade.entry?.failed||!arcade.entry?.legacyHidden||arcade.renderer?.prefabCount<3)throw new Error('Commerce arcade runtime contract invalid');
+if(arcade.asset?.src!=='assets/commerce-arcade-v1.svg?v=6'||arcade.asset?.variant!=='north-corner-endcap-v1'||!arcade.asset?.modules?.includes('northCornerEndcap'))throw new Error('Commerce arcade north end-cap metadata missing');
 if(expectedArchitecture&&arcade.renderer?.version!==expectedArchitecture)throw new Error(`Commerce arcade renderer version mismatch ${arcade.renderer?.version} !== ${expectedArchitecture}`);
 if(expectedArchitectureMode&&arcade.renderer?.mode!==expectedArchitectureMode)throw new Error(`Commerce arcade renderer mode mismatch ${arcade.renderer?.mode} !== ${expectedArchitectureMode}`);
-if(arcade.roof<300||arcade.ivory<250||arcade.glass<80||arcade.gold<40)throw new Error(`Commerce arcade authored pixels missing: ${JSON.stringify({roof:arcade.roof,ivory:arcade.ivory,glass:arcade.glass,gold:arcade.gold})}`);
+if(arcade.roof<300||arcade.ivory<250||arcade.glass<80||arcade.gold<40||arcade.endcap<40)throw new Error(`Commerce arcade authored pixels missing: ${JSON.stringify({roof:arcade.roof,ivory:arcade.ivory,glass:arcade.glass,gold:arcade.gold,endcap:arcade.endcap})}`);
 if(consoleErrors.length)throw new Error(`Console/page errors: ${JSON.stringify(consoleErrors)}`);
 if(failedRequests.length)throw new Error(`Failed requests: ${JSON.stringify(failedRequests)}`);
 if(httpErrors.length)throw new Error(`HTTP errors: ${JSON.stringify(httpErrors)}`);

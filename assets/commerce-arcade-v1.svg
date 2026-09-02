@@ -2,20 +2,20 @@
 <rect width="160" height="432" fill="none"/>
 <!-- soft footprint shadow -->
 <rect x="12" y="18" width="140" height="402" fill="#244535" opacity=".35"/>
-<!-- stepped roof silhouette: wider end-caps and recessed middle prevent a single slab read -->
-<rect x="4" y="8" width="144" height="68" fill="#173b35"/>
+<!-- stepped roof silhouette: the north end now bends into a distinct corner pavilion -->
+<path d="M20 0h92v4h24v8h16v64H4V20h8V8h8z" fill="#173b35"/>
 <rect x="8" y="76" width="136" height="72" fill="#173b35"/>
 <rect x="12" y="148" width="132" height="76" fill="#173b35"/>
 <rect x="8" y="224" width="136" height="76" fill="#173b35"/>
 <rect x="4" y="300" width="144" height="112" fill="#173b35"/>
-<rect x="8" y="12" width="136" height="60" fill="#25594f"/>
+<path d="M24 8h84v4h24v8h12v52H12V24h8V12h4z" fill="#25594f"/>
 <rect x="12" y="80" width="128" height="64" fill="#25594f"/>
 <rect x="16" y="152" width="124" height="68" fill="#25594f"/>
 <rect x="12" y="228" width="128" height="68" fill="#25594f"/>
 <rect x="8" y="304" width="136" height="104" fill="#25594f"/>
 <!-- inset roof planes add volume without changing footprint -->
 <g fill="#2f6c5d">
-  <rect x="16" y="18" width="112" height="46"/>
+  <path d="M28 16h76v4h24v8h8v36H20V28h8z"/>
   <rect x="20" y="86" width="104" height="50"/>
   <rect x="24" y="158" width="96" height="54"/>
   <rect x="20" y="234" width="104" height="54"/>
@@ -29,9 +29,21 @@
   <rect x="8" y="296" width="136" height="4"/>
   <rect x="8" y="376" width="136" height="4"/>
 </g>
-<!-- small crown caps make both ends read as architectural termini -->
-<g fill="#d7cdb0"><rect x="36" y="4" width="64" height="8"/><rect x="40" y="0" width="56" height="4"/><rect x="32" y="404" width="68" height="8"/></g>
-<g fill="#d2a548"><rect x="48" y="8" width="40" height="4"/><rect x="44" y="408" width="44" height="4"/></g>
+<!-- the south crown stays broad; the north crown belongs to its corner pavilion -->
+<g fill="#d7cdb0"><rect x="32" y="404" width="68" height="8"/></g>
+<g fill="#d2a548"><rect x="44" y="408" width="44" height="4"/></g>
+<!-- north corner end-cap: a compact glazed pavilion breaks the long vertical mass -->
+<g id="north-corner-endcap-v1">
+  <path d="M24 8h44l20 20v40H12V20z" fill="#173b35"/>
+  <path d="M28 12h36l16 16v32H20V24z" fill="#e9dfc3"/>
+  <path d="M32 16h28l12 12v24H24V28z" fill="#4b8790"/>
+  <rect x="32" y="28" width="32" height="16" fill="#74d0c2"/>
+  <rect x="36" y="28" width="4" height="16" fill="#d8f0ea"/>
+  <rect x="24" y="52" width="56" height="8" fill="#b7aa86"/>
+  <rect x="20" y="60" width="68" height="4" fill="#d2a548"/>
+  <rect x="32" y="4" width="32" height="4" fill="#d7cdb0"/>
+  <rect x="40" y="0" width="24" height="4" fill="#d2a548"/>
+</g>
 <!-- west-side open courtyard -->
 <rect x="16" y="188" width="72" height="68" fill="#173b35"/>
 <rect x="20" y="192" width="64" height="60" fill="#d7cdb0"/>
@@ -72,9 +84,9 @@
 <!-- restrained gold signage -->
 <g fill="#d2a548"><rect x="110" y="80" width="30" height="4"/><rect x="114" y="156" width="26" height="4"/><rect x="114" y="308" width="26" height="4"/><rect x="110" y="380" width="30" height="4"/></g>
 <!-- west garden pockets -->
-<g fill="#1d4e39"><rect x="12" y="40" width="22" height="18"/><rect x="24" y="116" width="24" height="18"/><rect x="28" y="278" width="24" height="18"/><rect x="12" y="350" width="22" height="18"/></g>
-<g fill="#76b95a"><rect x="16" y="36" width="12" height="8"/><rect x="30" y="112" width="12" height="8"/><rect x="34" y="274" width="12" height="8"/><rect x="16" y="346" width="12" height="8"/></g>
-<g fill="#d8a6d8"><rect x="22" y="42" width="4" height="4"/><rect x="38" y="118" width="4" height="4"/><rect x="42" y="280" width="4" height="4"/></g>
+<g fill="#1d4e39"><rect x="24" y="116" width="24" height="18"/><rect x="28" y="278" width="24" height="18"/><rect x="12" y="350" width="22" height="18"/></g>
+<g fill="#76b95a"><rect x="30" y="112" width="12" height="8"/><rect x="34" y="274" width="12" height="8"/><rect x="16" y="346" width="12" height="8"/></g>
+<g fill="#d8a6d8"><rect x="38" y="118" width="4" height="4"/><rect x="42" y="280" width="4" height="4"/></g>
 <!-- stone plinth -->
 <rect x="88" y="396" width="64" height="12" fill="#b7aa86"/><rect x="92" y="396" width="56" height="8" fill="#e5dcc1"/>
 </svg>
