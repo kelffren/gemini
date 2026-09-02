@@ -232,6 +232,19 @@ Kelo World is no longer allowed to remain a single polished plaza floating in a 
 - Manual inspection of `live-architecture.png` confirms that the player's body is correctly hidden by the boutique volume while the authored facade remains crisp and intact. The name label remains visible, which preserves multiplayer identification without flattening the building depth cue.
 - The same capture makes the next largest bottleneck unambiguous: the adjacent legacy brown building still reads as a flat placeholder rectangle with a simple window and roof, far below the authored boutique, hero and ground quality. The next safe pass should replace one legacy architecture family with an authored modular facade/prefab through the new architecture registry contract, rather than adding more ground decoration.
 
+## Validated Authored Market Pavilion — V5.67 / 2026-09-02
+- Added original `assets/market-pavilion-v1.png`, a 224x160 authored pixel-art architecture asset using an ivory-stone facade, dark green roof, restrained gold trim, teal glazing, striped awnings and small planters. It replaces one high-visibility flat south-plaza obstacle visually without copying any external reference art or layout.
+- The existing gameplay collider remains exactly `{x:1300,y:1870,w:200,h:80}`. The integration only marks overlapping legacy obstacle visuals `noDraw`; it does not resize, remove or relocate collision geometry and does not alter movement or other gameplay systems.
+- `src/environment/luxe-kiosk-atlas.js` renders the pavilion through the existing world architecture layer and applies `building-base-y-occlusion-v1` using actor-sized clipped repaint, matching the already validated boutique depth pattern.
+- The first dedicated LIVE check found a brittle certification bug: the pavilion was visible and occluding, but `legacyHidden` required an exact obstacle match and remained false. The integration was hardened to suppress any visible legacy obstacle overlapping the preserved pavilion collider while leaving its geometry untouched.
+- Deployment QA finding: changing a visual JS module without bumping its query key can make a long-lived mobile audit context observe an old cached script even after Pages updates. `index.html` now loads the hardened pavilion module with a new cache key; future visual module changes should bump their deployed query key deliberately.
+- Final Kelo CI for V5.67 succeeded, GitHub Pages deployment succeeded, and the dedicated LIVE mobile audit succeeded at 390x844 CSS / 780x1688 backing canvas.
+- LIVE runtime contract validated `authored-market-pavilion-v1.1`, `ready=true`, `rendererWrapped=true`, `depthWrapped=true`, `legacyHidden=true`, `failed=false`, and `depthMode='building-base-y-occlusion-v1'`.
+- Exact-color screenshot evidence recorded 28,040 stone pixels, 23,320 roof pixels, 10,695 gold pixels and 14,477 glass pixels, proving that the authored pavilion is actually rendered on mobile rather than only loaded.
+- Final diagnostics were clean: `consoleErrors=[]`, `failedRequests=[]` and `httpErrors=[]`.
+- Manual inspection of `live-market-pavilion.png` confirms a readable building silhouette on mobile, a clear entrance aligned to the ivory route, no visible flat legacy bar over the facade, and correct character/building depth with the actor partially obscured by the roof when behind it.
+- Next bottleneck: architecture is still split between one TileRegistry-owned boutique and a second authored pavilion whose asset metadata remains local to its renderer. The next safe technical/visual pass should formalize a reusable `architectureAssets` family in TileRegistry for multiple prefab types, then migrate another remaining flat legacy obstacle through that data-driven path instead of adding more one-off wrappers.
+
 ## Non-goals During Visual Passes
 Do not casually alter unrelated systems such as:
 - core movement feel;
