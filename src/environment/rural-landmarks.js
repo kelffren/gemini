@@ -1,14 +1,15 @@
 (function () {
   const REGISTRY=window.KELO_TILE_REGISTRY;
   const ATLAS=REGISTRY?.atlases?.ruralLandmarks;
-  const NATURE_ATLAS=REGISTRY?.atlases?.plaza;
+  const NATURE_ATLAS=REGISTRY?.atlases?.ruralNature;
   const T=REGISTRY?.ruralLandmarkTiles;
-  const N=REGISTRY?.tiles;
+  const NT=REGISTRY?.ruralNatureTiles;
+  const NS=REGISTRY?.ruralNatureSprites;
   const SPRITES=REGISTRY?.ruralLandmarkSprites;
   const STYLE=REGISTRY?.styles?.ruralLandmarks;
   const VEG=STYLE?.edgeVegetation;
   const originalRenderFarm=window.renderFarm;
-  if(!ATLAS||!NATURE_ATLAS||!T||!N||!SPRITES||!STYLE||!VEG||typeof originalRenderFarm!=='function'||typeof window.render!=='function'){
+  if(!ATLAS||!NATURE_ATLAS||!T||!NT||!NS||!SPRITES||!STYLE||!VEG||typeof originalRenderFarm!=='function'||typeof window.render!=='function'){
     console.error('[Kelo rural landmarks] registry or renderer missing'); return;
   }
 
@@ -23,27 +24,32 @@
       silo:Object.freeze({x:farm.x+360,y:farm.y+156,...SPRITES.silo,kind:'silo',source:'landmark'})
     });
   }
+  function treeEntry(family,x,y){
+    const sprite=NS[family];
+    return Object.freeze({x,y,...sprite,kind:'tree',family,source:'nature'});
+  }
   function vegetation(farm){
-    const tree=(x,y)=>Object.freeze({x,y,w:64,h:96,baseY:96,kind:'tree',source:'nature'});
     return Object.freeze({
       trees:Object.freeze([
-        tree(farm.x-124,farm.y-8),
-        tree(farm.x-116,farm.y+138),
-        tree(farm.x-128,farm.y+316),
-        tree(farm.x+104,farm.y+360),
-        tree(farm.x+300,farm.y+360)
+        treeEntry('oak',farm.x-94,farm.y+38),
+        treeEntry('fruit',farm.x-78,farm.y+214),
+        treeEntry('oak',farm.x+322,farm.y+340)
       ]),
       hedges:Object.freeze([
-        Object.freeze({id:N.BUSH_A,x:farm.x-56,y:farm.y+18}),
-        Object.freeze({id:N.BUSH_B,x:farm.x-56,y:farm.y+70}),
-        Object.freeze({id:N.BUSH_FLOWERS,x:farm.x-56,y:farm.y+208}),
-        Object.freeze({id:N.BUSH_A,x:farm.x-56,y:farm.y+260}),
-        Object.freeze({id:N.BUSH_B,x:farm.x+20,y:farm.y+382}),
-        Object.freeze({id:N.BUSH_A,x:farm.x+52,y:farm.y+382}),
-        Object.freeze({id:N.BUSH_FLOWERS_B,x:farm.x+196,y:farm.y+382}),
-        Object.freeze({id:N.BUSH_B,x:farm.x+228,y:farm.y+382}),
-        Object.freeze({id:N.BUSH_A,x:farm.x+396,y:farm.y+382}),
-        Object.freeze({id:N.BUSH_FLOWERS,x:farm.x+428,y:farm.y+382})
+        Object.freeze({id:NT.HEDGE_A,x:farm.x-48,y:farm.y+132}),
+        Object.freeze({id:NT.HEDGE_FLOWERS_A,x:farm.x-42,y:farm.y+172}),
+        Object.freeze({id:NT.HEDGE_B,x:farm.x+32,y:farm.y+356}),
+        Object.freeze({id:NT.HEDGE_FLOWERS_B,x:farm.x+66,y:farm.y+364}),
+        Object.freeze({id:NT.HEDGE_A,x:farm.x+190,y:farm.y+372}),
+        Object.freeze({id:NT.HEDGE_FLOWERS_A,x:farm.x+224,y:farm.y+366}),
+        Object.freeze({id:NT.HEDGE_B,x:farm.x+362,y:farm.y+354}),
+        Object.freeze({id:NT.HEDGE_FLOWERS_B,x:farm.x+398,y:farm.y+362})
+      ]),
+      details:Object.freeze([
+        Object.freeze({id:NT.TALL_GRASS,x:farm.x-18,y:farm.y+286}),
+        Object.freeze({id:NT.WILDFLOWERS,x:farm.x+138,y:farm.y+354}),
+        Object.freeze({id:NT.STUMP,x:farm.x+286,y:farm.y+354}),
+        Object.freeze({id:NT.STONE,x:farm.x+430,y:farm.y+304})
       ])
     });
   }
@@ -52,22 +58,19 @@
   function landmarkTile(g,id,x,y){const p=origin(id,ATLAS);g.drawImage(sheet,p.x,p.y,TILE,TILE,x,y,TILE,TILE);}
   function natureTile(g,id,x,y){const p=origin(id,NATURE_ATLAS);g.drawImage(natureSheet,p.x,p.y,TILE,TILE,x,y,TILE,TILE);}
   function landmarkSprite(g,entry){g.drawImage(sheet,entry.sx,entry.sy,entry.w,entry.h,entry.x,entry.y,entry.w,entry.h);}
-  function treeSprite(g,entry){
-    for(let r=0;r<3;r++)for(let c=0;c<2;c++){
-      const id=N.TREE[r*2+c],p=origin(id,NATURE_ATLAS);
-      g.drawImage(natureSheet,p.x,p.y,TILE,TILE,entry.x+c*TILE,entry.y+r*TILE,TILE,TILE);
-    }
-  }
+  function natureSprite(g,entry){g.drawImage(natureSheet,entry.sx,entry.sy,entry.w,entry.h,entry.x,entry.y,entry.w,entry.h);}
 
   function drawScene(g,farm){
     const L=layout(farm),V=vegetation(farm);
+    // Edge nature establishes the rural frame first; focal architecture stays visually dominant.
+    V.trees.forEach(entry=>natureSprite(g,entry));
+    V.hedges.forEach(entry=>natureTile(g,entry.id,entry.x,entry.y));
+    V.details.forEach(entry=>natureTile(g,entry.id,entry.x,entry.y));
     landmarkSprite(g,L.barn); landmarkSprite(g,L.silo);
     landmarkTile(g,T.HAY,farm.x+248,farm.y+204);
     landmarkTile(g,T.CRATE,farm.x+280,farm.y+212);
     landmarkTile(g,T.BUSH,farm.x+440,farm.y+208);
     landmarkTile(g,T.FLOWERS,farm.x+408,farm.y+284);
-    V.trees.forEach(entry=>treeSprite(g,entry));
-    V.hedges.forEach(entry=>natureTile(g,entry.id,entry.x,entry.y));
   }
 
   window.renderFarm=function(farm){
@@ -87,7 +90,7 @@
     if(!active.length)return;
     const z=CONFIG.zoom||1;
     ctx.save();ctx.translate(screenW/2,screenH/2);ctx.scale(z,z);ctx.translate(-camera.x,-camera.y);ctx.imageSmoothingEnabled=false;
-    active.sort((a,b)=>(a.y+a.baseY)-(b.y+b.baseY)).forEach(entry=>entry.source==='nature'?treeSprite(ctx,entry):landmarkSprite(ctx,entry));
+    active.sort((a,b)=>(a.y+a.baseY)-(b.y+b.baseY)).forEach(entry=>entry.source==='nature'?natureSprite(ctx,entry):landmarkSprite(ctx,entry));
     ctx.restore();
   }
 
@@ -95,12 +98,13 @@
   window.render=function(){previousRender();drawFrontScene();};
 
   window.KELO_RURAL_LANDMARK_AUDIT={
-    version:'rural-landmarks-v1.2',ready:false,assetLoaded:false,natureAssetLoaded:false,fallbackActive:true,
-    atlas:ATLAS.src,natureAtlas:NATURE_ATLAS.src,atlasWidth:ATLAS.width,atlasHeight:ATLAS.height,tileSize:TILE,
-    renderingMode:STYLE.mode,landmarkCount:2,detailCount:4,treeCount:5,hedgeCount:10,
+    version:'rural-landmarks-v1.3',ready:false,assetLoaded:false,natureAssetLoaded:false,fallbackActive:true,
+    atlas:ATLAS.src,natureAtlas:NATURE_ATLAS.id,atlasWidth:ATLAS.width,atlasHeight:ATLAS.height,
+    natureAtlasWidth:NATURE_ATLAS.width,natureAtlasHeight:NATURE_ATLAS.height,tileSize:TILE,
+    renderingMode:STYLE.mode,landmarkCount:2,detailCount:4,treeCount:3,treeFamilyCount:2,hedgeCount:8,natureDetailCount:4,
     vegetationMode:VEG.mode,centerClear:VEG.centerClear,roadClearance:VEG.roadClearance,
     depthOcclusion:true,gameplayFootprint:STYLE.gameplayFootprint,cropClearance:38,gateClearance:16,stateMutation:false,
-    bypassClearance:64,composition:'farmstead-l-cluster-with-edge-vegetation-v1'
+    bypassClearance:64,composition:'farmstead-l-cluster-with-authored-edge-nature-v2'
   };
   function markReady(){
     ready=landmarkReady&&natureReady;
@@ -115,11 +119,11 @@
     landmarkReady=true;markReady();
   };
   natureSheet.onload=function(){
-    if(natureSheet.naturalWidth!==NATURE_ATLAS.width||natureSheet.naturalHeight!==NATURE_ATLAS.height){console.error('[Kelo rural vegetation] invalid nature atlas dimensions');return;}
+    if(natureSheet.naturalWidth!==NATURE_ATLAS.width||natureSheet.naturalHeight!==NATURE_ATLAS.height){console.error('[Kelo rural vegetation] invalid authored nature atlas dimensions');return;}
     natureReady=true;markReady();
   };
   sheet.onerror=function(){console.error('[Kelo rural landmarks] atlas load failed');};
-  natureSheet.onerror=function(){console.error('[Kelo rural vegetation] nature atlas load failed');};
-  sheet.src=ATLAS.src+'&ruralLandmarks=182';
-  natureSheet.src=NATURE_ATLAS.src+'&ruralNature=182';
+  natureSheet.onerror=function(){console.error('[Kelo rural vegetation] authored nature atlas load failed');};
+  sheet.src=ATLAS.src+'&ruralLandmarks=183';
+  natureSheet.src=NATURE_ATLAS.src;
 })();
