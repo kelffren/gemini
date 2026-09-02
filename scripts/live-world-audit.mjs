@@ -19,17 +19,18 @@ let loaded=false;
 for(let attempt=1;attempt<=24;attempt++){
   try{
     await page.goto(`${base}?world-audit=${Date.now()}-${attempt}`,{waitUntil:'networkidle',timeout:45000});
-    const d=await page.evaluate(()=>({title:document.title,world:window.KELO_WORLD_AUDIT||null,registry:window.KELO_TILE_REGISTRY||null,architecture:window.KELO_ARCHITECTURE_RENDERER||null,kiosk:window.KELO_LUXE_KIOSK||null,market:window.KELO_MARKET_PAVILION||null}));
+    const d=await page.evaluate(()=>({title:document.title,world:window.KELO_WORLD_AUDIT||null,registry:window.KELO_TILE_REGISTRY||null,architecture:window.KELO_ARCHITECTURE_RENDERER||null,kiosk:window.KELO_LUXE_KIOSK||null,market:window.KELO_MARKET_PAVILION||null,nature:window.KELO_PLAZA_NATURE_AUDIT||null}));
     const okTitle=!expectedTitle||d.title===expectedTitle;
     const okArch=(!expectedArchitectureVersion||d.architecture?.version===expectedArchitectureVersion)&&(!expectedArchitectureMode||d.architecture?.mode===expectedArchitectureMode);
-    if(okTitle&&okArch&&d.world?.ready&&d.world?.version===expectedWorld&&d.world?.grassVariationAssetLoaded&&d.world?.grassVariationMode==='authored-eight-variant-atlas-v1'&&d.world?.grassVariationCount===8&&d.registry?.version===expectedRegistry&&d.registry?.atlases?.grassVariation?.src?.includes('grass-variation-v1.png')&&d.architecture?.prefabCount===1&&d.kiosk?.ready&&d.market?.disabled===true){loaded=true;break;}
+    const okNature=d.nature?.ready&&d.nature?.assetLoaded&&!d.nature?.failed&&d.nature?.version==='plaza-nature-v1'&&d.nature?.propCount===4&&d.nature?.depthMode==='actor-base-y-v1';
+    if(okTitle&&okArch&&okNature&&d.world?.ready&&d.world?.version===expectedWorld&&d.world?.grassVariationAssetLoaded&&d.world?.grassVariationMode==='authored-eight-variant-atlas-v1'&&d.world?.grassVariationCount===8&&d.registry?.version===expectedRegistry&&d.registry?.atlases?.grassVariation?.src?.includes('grass-variation-v1.png')&&d.registry?.atlases?.plazaNature?.src?.includes('plaza-nature-v1.svg')&&d.architecture?.prefabCount===1&&d.kiosk?.ready&&d.market?.disabled===true){loaded=true;break;}
   }catch(e){console.log(`attempt ${attempt}: ${e.message}`)}
   await page.waitForTimeout(10000);
 }
 consoleErrors.length=0;failedRequests.length=0;httpErrors.length=0;
 await page.goto(`${base}?world-audit=final-${Date.now()}`,{waitUntil:'networkidle',timeout:45000});
 await page.waitForTimeout(2500);
-const state=await page.evaluate(()=>({title:document.title,world:window.KELO_WORLD_AUDIT||null,registryVersion:window.KELO_TILE_REGISTRY?.version||null,architectureRenderer:window.KELO_ARCHITECTURE_RENDERER||null,kiosk:window.KELO_LUXE_KIOSK||null,market:window.KELO_MARKET_PAVILION||null,canvas:(()=>{const c=document.getElementById('game-canvas');return c?{width:c.width,height:c.height,cssWidth:c.clientWidth,cssHeight:c.clientHeight}:null})()}));
+const state=await page.evaluate(()=>({title:document.title,world:window.KELO_WORLD_AUDIT||null,registryVersion:window.KELO_TILE_REGISTRY?.version||null,architectureRenderer:window.KELO_ARCHITECTURE_RENDERER||null,kiosk:window.KELO_LUXE_KIOSK||null,market:window.KELO_MARKET_PAVILION||null,nature:window.KELO_PLAZA_NATURE_AUDIT||null,canvas:(()=>{const c=document.getElementById('game-canvas');return c?{width:c.width,height:c.height,cssWidth:c.clientWidth,cssHeight:c.clientHeight}:null})()}));
 await page.screenshot({path:'artifacts/live-mobile.png',fullPage:false});
 const grass=await page.evaluate(()=>{
   const c=document.getElementById('game-canvas');if(!c||typeof camera==='undefined'||typeof localPlayer==='undefined'||typeof render!=='function')return null;
@@ -39,15 +40,23 @@ const grass=await page.evaluate(()=>{
   return{dataUrl:c.toDataURL('image/png'),base,light,dark,pink,blue};
 });
 if(grass?.dataUrl?.startsWith('data:image/png;base64,'))fs.writeFileSync('artifacts/live-grass.png',Buffer.from(grass.dataUrl.split(',')[1],'base64'));
-const report={loaded,state,grass:grass?{base:grass.base,light:grass.light,dark:grass.dark,pink:grass.pink,blue:grass.blue}:null,consoleErrors,failedRequests,httpErrors};
+const plazaTree=await page.evaluate(()=>{
+  const c=document.getElementById('game-canvas');if(!c||typeof camera==='undefined'||typeof localPlayer==='undefined'||typeof render!=='function')return null;
+  localPlayer.x=1168;localPlayer.y=1406;camera.x=1168;camera.y=1388;camera.targetX=1168;camera.targetY=1388;render();
+  return{dataUrl:c.toDataURL('image/png'),nature:window.KELO_PLAZA_NATURE_AUDIT||null,registryNature:window.KELO_TILE_REGISTRY?.plazaNatureProps||null};
+});
+if(plazaTree?.dataUrl?.startsWith('data:image/png;base64,'))fs.writeFileSync('artifacts/live-plaza-tree.png',Buffer.from(plazaTree.dataUrl.split(',')[1],'base64'));
+const report={loaded,state,grass:grass?{base:grass.base,light:grass.light,dark:grass.dark,pink:grass.pink,blue:grass.blue}:null,plazaTree:plazaTree?{nature:plazaTree.nature,propCount:plazaTree.registryNature?.length||0}:null,consoleErrors,failedRequests,httpErrors};
 fs.writeFileSync('artifacts/report.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));
 await browser.close();
-if(!loaded)throw new Error('LIVE never reached current Luxe-only grass-atlas contract');
+if(!loaded)throw new Error('LIVE never reached current Luxe-only grass + plaza-nature contract');
 if(expectedTitle&&state.title!==expectedTitle)throw new Error(`Title mismatch ${state.title} !== ${expectedTitle}`);
 if(state.world?.version!==expectedWorld||!state.world?.grassVariationAssetLoaded||state.world?.grassVariationCount!==8)throw new Error('Grass variation renderer contract invalid');
 if(state.registryVersion!==expectedRegistry)throw new Error(`Registry mismatch ${state.registryVersion} !== ${expectedRegistry}`);
 if(state.architectureRenderer?.prefabCount!==1||state.architectureRenderer?.mode!=='luxe-only-v1')throw new Error('Luxe-only architecture contract invalid');
 if(!state.kiosk?.ready||state.kiosk?.failed||state.market?.disabled!==true)throw new Error('Luxe architecture state invalid');
+if(!state.nature?.ready||!state.nature?.assetLoaded||state.nature?.failed||state.nature?.propCount!==4||state.nature?.depthMode!=='actor-base-y-v1')throw new Error(`Plaza nature contract invalid: ${JSON.stringify(state.nature)}`);
+if(!plazaTree?.dataUrl?.startsWith('data:image/png;base64,')||plazaTree.registryNature?.length!==4)throw new Error('Plaza nature screenshot evidence missing');
 if(!grass?.dataUrl?.startsWith('data:image/png;base64,')||grass.base<1000||grass.light<20||grass.dark<20||(grass.pink+grass.blue)<2)throw new Error(`Authored grass pixels missing: ${JSON.stringify(grass)}`);
 if(consoleErrors.length)throw new Error(`Console/page errors: ${JSON.stringify(consoleErrors)}`);
 if(failedRequests.length)throw new Error(`Failed requests: ${JSON.stringify(failedRequests)}`);
