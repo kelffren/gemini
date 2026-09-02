@@ -133,7 +133,7 @@ For every meaningful visual implementation:
 10. update this memory only with validated discoveries/decisions.
 
 ## Current Priority
-Refactor the environment renderer so it is no longer tied to a single hard-coded 512x512 atlas and scattered numeric IDs. Move toward TileRegistry + modular atlases + environment definitions + layered rendering, then rebuild the Roman garden plaza using a higher-quality environment kit.
+Kelo World is no longer allowed to remain a single polished plaza floating in a dark test grid. The world renderer must support connected districts and chunk-based expansion while preserving the plaza quality bar. After the first world scaffold is validated, the next priority is authored district identity: modular nature/architecture props, stronger landmarks, irregular path edges and controlled environmental density outside the plaza.
 
 ## Validated Architecture State — 2026-09-01
 - `src/environment/tile-registry.js` is now the live source of atlas metadata, named tile IDs, reusable tile families, and transition-style metadata for the plaza renderer.
@@ -141,36 +141,35 @@ Refactor the environment renderer so it is no longer tied to a single hard-coded
 - The renderer remains on the current 512x512 production atlas for visual compatibility, but atlas width/height/columns/source are registry data, so a future 1024x1024 or modular-atlas migration no longer requires rewriting the plaza selection logic.
 - LIVE mobile audit V5.43 validated the registry-driven architecture at 390x844 CSS / 780x1688 backing canvas.
 - LIVE mobile audit V5.44 validated a dedicated `transitionLayer` between ground and props, with registry-driven grass↔marble edge styling, `registryVersion=1.1.0`, `sourceMode=layered-registry-v2`, `assetLoaded=true`, and `fallbackActive=false`.
-- The V5.44 screenshot showed a materially clearer grass/marble boundary on mobile: the hard tile seam now has a pixel-clustered green edge plus a warm marble inset shadow. This is a valid intermediate visual improvement, but it does not replace the need for authored straight/inner/outer transition tiles in the premium environment kit.
-- Registry `1.2.0` is now weighted toward the cleaner marble variants, keeping patterned marble sparse instead of selecting all marble variants uniformly. LIVE mobile validation confirmed the deployed registry and showed a quieter floor with more negative-space tiles, reducing wallpaper-like repetition without changing gameplay or map geometry.
-- `marbleAccent` now exists as a separate named family for future authored composition instead of forcing decorative patterns into the base material pool.
-- The live-audit workflow now validates both `KELO_PLAZA_AUDIT.version` and `KELO_PLAZA_AUDIT.registryVersion`. This caught a real stale-registry false positive during the 1.2.0 rollout; the registry script cache key was then bumped and the final audit confirmed `registryVersion=1.2.0` LIVE.
-- Registry `1.3.1` now uses a dedicated authored atlas variant, `assets/tileset-vclean.png`, with four low-noise ivory marble base tiles at IDs 80–83. Long-diagonal marble motifs remain available only in `marbleAccent` instead of being part of the broad base-floor pool.
-- LIVE mobile validation of registry `1.3.1` confirmed `V5.44`, `assetLoaded=true`, `fallbackActive=false`, 32x32 tiles, and 390x844 CSS / 780x1688 backing canvas. The plaza reads quieter and less wallpaper-like while retaining sparse gold/green accents.
-- Visual QA rule validated: `assetLoaded=true` and `fallbackActive=false` are necessary but not sufficient. A decodable but visually incorrect atlas passed readiness checks during this rollout; manual screenshot inspection caught it. Every meaningful art change must therefore include actual LIVE screenshot inspection, and future automation should add visual-regression/crop/hash checks where practical.
-- Deployment rule validated: when changing atlas content or registry definitions, bump both the authored asset query/cache key and the registry script cache key so GitHub Pages/CDN cannot mix old registry code with new art.
-- Current audit still reports four generic 404 resource errors and one unrelated `appendChild` page error. These remain outside the visual transition change and should be handled as a separate debugging pass rather than mixed into environment art work.
-- Current largest visual bottleneck after registry 1.3.1 is authored transition/composition quality: proper straight/inner/outer grass↔marble tiles are still missing, the remaining high-contrast diagonal/gold accent squares now look comparatively sticker-like, and props/vegetation remain simpler than the character art.
+- Registry `1.2.0` weighted the cleaner marble variants and separated `marbleAccent` from the broad base material pool.
+- Registry `1.3.1` introduced `assets/tileset-vclean.png` with four low-noise ivory marble base tiles at IDs 80–83.
+- Visual QA rule validated: asset readiness flags are necessary but not sufficient; manual LIVE screenshot inspection remains mandatory.
+- Deployment rule validated: when changing atlas content or registry definitions, bump the authored asset and registry cache keys together.
 
 ## Validated Visual State — V5.45 / Registry 1.4.0
-- The renderer now consumes a second modular atlas, `assets/plaza-transitions-v1.png`, independently from the 512x512 ground/prop atlas. This is the first production use of multiple environment atlases in the plaza pipeline.
+- The renderer consumes a second modular atlas, `assets/plaza-transitions-v1.png`, independently from the 512x512 ground/prop atlas.
 - `plaza-transitions-v1.png` is an original 128x128 transparent overlay atlas made from sixteen 32x32 cells. The registry maps all 4-neighbour top/right/bottom/left boundary masks to authored edge/corner/multi-edge tiles.
-- `engine-l.js` no longer draws grass↔marble seams with procedural `fillRect` strips and generated tufts. The transition layer now selects an authored overlay tile from neighbour topology and renders it between ground and props.
-- Automatic high-contrast gold/green decorative squares were removed from the broad marble floor composition. Premium accents should be authored as sparse decals or props instead of being injected into the navigation material.
-- LIVE mobile audit validated `V5.45`, `registryVersion=1.4.0`, `sourceMode=authored-transition-atlas-v1`, `authoredTransitions=true`, both atlases loaded, `fallbackActive=false`, 32x32 logical tiles, and a 390x844 CSS / 780x1688 backing canvas.
-- Manual LIVE screenshot inspection validated cleaner continuous ivory paths with visibly softer, more organic grass edges and corner joins. The previous sticker-like gold/diagonal floor interruptions are absent from the broad path surface.
-- QA finding: the first V5.45 audit failed despite the deployed page being correct because `.github/workflows/live-audit.yml` still overrode the script with `EXPECTED_BUILD=V5.44`. The workflow and script expectations must always be updated together; the corrected rerun passed.
-- The audit still shows four generic 404 resource errors plus the pre-existing unrelated `appendChild` page error. No new Kelo plaza/tileset/transition-atlas console error was introduced.
-- Current largest visual bottleneck is now prop and vegetation quality relative to the hero sprite: trees, lamps, columns and some plaza furniture still read flatter/simpler than the characters. The next high-impact visual pass should introduce a modular `nature_props`/`plaza_props` atlas with stronger silhouettes, richer shading, and front/back layering. If future paths become more irregular than the current plaza geometry, extend transition selection from 4-neighbour masks to diagonal-aware/8-neighbour inner-corner variants.
+- `engine-l.js` selects authored grass↔marble transition overlays from neighbour topology rather than procedural fill strips.
+- Automatic high-contrast gold/green decorative squares were removed from the broad marble floor composition.
+- LIVE mobile audit validated V5.45, registry 1.4.0, authored transitions, both atlases loaded and mobile 390x844 CSS / 780x1688 backing canvas.
 
 ## Validated Visual State — V5.46 / Registry 1.4.1
-- Added `src/environment/plaza-depth.js` as a dedicated front-occlusion pass instead of forcing more prop logic into `engine-l.js`.
-- Registry `1.4.1` now exposes `styles.propDepth` with `mode='y-occlusion-overlay-v1'` and identifies fountain, columns, trees and lamps as front-occluding prop families.
-- The new pass re-renders an occluding prop above the local actor only when the actor overlaps the prop footprint and is behind its base-Y. This creates the intended `props_back → actors → props_front` read for the current plaza without altering collisions, movement or gameplay systems.
-- LIVE mobile audit validated `V5.46`, `registryVersion=1.4.1`, `depthOcclusion=true`, `depthOccluderCount=11`, `assetLoaded=true`, `fallbackActive=false`, authored transitions still active, and a 390x844 CSS / 780x1688 backing canvas.
-- Manual screenshot inspection confirms the scene remains visually stable after the depth pass; the strongest remaining mismatch is still asset quality: tree/column/lamp art is materially flatter and simpler than the hero sprite, so the next high-impact pass should create a modular authored `nature_props` / `plaza_props` atlas rather than adding more procedural decoration.
-- Research validation: current Pixadom screenshots continue to use large multi-tile plants, columns, furniture and architectural props to create depth and focal hierarchy, reinforcing that prop silhouette/scale and overlap are more important now than adding more floor noise.
-- QA note: the final audit currently reports multiple generic 404 resource errors (10 in this run) plus the pre-existing `appendChild` page error. No error matched the Kelo plaza/tileset/transition/depth failure filters. A later non-art debugging pass should record failing resource URLs explicitly rather than relying on generic console text.
+- Added `src/environment/plaza-depth.js` as a dedicated front-occlusion pass.
+- Registry `1.4.1` exposes `styles.propDepth` with `mode='y-occlusion-overlay-v1'` and identifies fountain, columns, trees and lamps as front-occluding prop families.
+- The pass re-renders an occluding prop above the local actor only when the actor overlaps the footprint and is behind its base-Y.
+- LIVE mobile audit validated V5.46, registry 1.4.1, `depthOcclusion=true`, `depthOccluderCount=11`, authored transitions active, and mobile 390x844 CSS / 780x1688 backing canvas.
+
+## Validated World State — V5.47 / World Renderer v1
+- Added `src/environment/world-map.js` as the first expandable world-ground layer driven by the existing TileRegistry atlas families.
+- The previous dark test grid outside the plaza has been replaced by atlas-authored vivid grass and ivory marble navigation surfaces across the full existing 3600x3200 world bounds.
+- The world is rendered in cached 512x512 chunks, with only camera-adjacent chunks built/drawn and a 24-chunk cache cap. This establishes the first scalable map architecture without changing movement, combat, economy, networking, chat or inventory.
+- Five named districts are now represented in the world scaffold: Plaza Central, Distrito Rural, Distrito Arena, Distrito Comercio and Jardines del Sur, connected by four primary marble road corridors plus district pads.
+- `engine-c.js`, the documented LIVE owner of the base world/plaza rendering, now delegates the world ground to `KELO_WORLD_RENDERER` before drawing the existing farm, plot, arena, particles and actors. This preserves gameplay systems while replacing only the old dark background/grid.
+- LIVE audit V5.47 validated `world-v1`, `chunkSize=512`, `districtCount=5`, `roadCount=4`, `worldWidth=3600`, `worldHeight=3200`, `assetLoaded=true`, plaza registry 1.4.1, authored transitions and depth occlusion.
+- Manual inspection of the 390x844 LIVE screenshot confirms that the player is now surrounded by continuous vivid terrain and connected ivory paths rather than a plaza floating in darkness. Plaza composition remains intact.
+- The audit now records failed request URLs separately from console text. In the validated run there were no `requestfailed` entries, but the pre-existing generic 404 console messages and unrelated `appendChild` page error remain.
+- Research validation: current Pixadom material continues to show dense but readable environments where connected spaces, clear paths, large props and landmarks make the world feel continuous. Kelo World should use that principle without copying maps or assets.
+- Next largest bottleneck: district identity. The world scaffold is intentionally simple outside the plaza; Distrito Rural, Arena, Comercio and Jardines need authored landmark/prop kits and more irregular path edges so they stop reading as the same grass field with marble corridors.
 
 ## Non-goals During Visual Passes
 Do not casually alter unrelated systems such as:
