@@ -10,6 +10,7 @@
   const ATLAS = REGISTRY.atlases.plaza;
   const F = REGISTRY.families;
   const COLS = ATLAS.columns;
+  const GROUND_STYLES = REGISTRY.styles?.districtGround?.profiles || {};
   const sheet = new Image();
   sheet.decoding = 'async';
   const cache = new Map();
@@ -39,9 +40,18 @@
 
   function insideRect(x,y,r){ return x>=r.x && y>=r.y && x<r.x+r.w && y<r.y+r.h; }
   function isRoad(x,y){ return ROAD_RECTS.some(r=>insideRect(x,y,r)) || PLAZA_PADS.some(r=>insideRect(x,y,r)); }
-  function pick(gx,gy,list){
-    const n=Math.abs(((gx+17)*73856093)^((gy+29)*19349663));
-    return list[n%list.length];
+  function districtAt(x,y){ return DISTRICTS.find(d=>insideRect(x,y,d)) || null; }
+  function styleAt(x,y){
+    const district=districtAt(x,y);
+    return GROUND_STYLES[district?.id] || GROUND_STYLES.default || {detailEvery:53,detailCluster:false,marbleAccentEvery:0};
+  }
+  function hash(gx,gy,salt=0){ return Math.abs(((gx+17+salt)*73856093)^((gy+29+salt)*19349663)); }
+  function pick(gx,gy,list){ return list[hash(gx,gy)%list.length]; }
+  function detailCell(gx,gy,style){
+    if(!F.grassDetail?.length || !style.detailEvery) return false;
+    if(hash(gx,gy,5)%style.detailEvery===0) return true;
+    if(!style.detailCluster) return false;
+    return hash(gx-1,gy,5)%style.detailEvery===0 || hash(gx,gy-1,5)%style.detailEvery===0;
   }
   function origin(id){ return {x:(id%COLS)*TILE,y:Math.floor(id/COLS)*TILE}; }
   function drawTile(g,id,dx,dy){
@@ -58,12 +68,18 @@
     const cols=Math.ceil(CHUNK/TILE), rows=Math.ceil(CHUNK/TILE);
     for(let gy=0;gy<rows;gy++) for(let gx=0;gx<cols;gx++){
       const wx=worldX+gx*TILE, wy=worldY+gy*TILE;
+      const centerX=wx+TILE/2, centerY=wy+TILE/2;
       const globalGX=Math.floor(wx/TILE), globalGY=Math.floor(wy/TILE);
+      const style=styleAt(centerX,centerY);
       let id;
-      if(isRoad(wx+TILE/2,wy+TILE/2)) id=pick(globalGX,globalGY,F.marble);
-      else {
+      if(isRoad(centerX,centerY)) {
+        id=pick(globalGX,globalGY,F.marble);
+        if(style.marbleAccentEvery && F.marbleAccent?.length && hash(globalGX,globalGY,11)%style.marbleAccentEvery===0) {
+          id=pick(globalGX+3,globalGY+7,F.marbleAccent);
+        }
+      } else {
         id=pick(globalGX,globalGY,F.grass);
-        if(((globalGX*11+globalGY*7)%37)===0 && F.grassDetail?.length) id=pick(globalGX,globalGY,F.grassDetail);
+        if(detailCell(globalGX,globalGY,style)) id=pick(globalGX,globalGY,F.grassDetail);
       }
       drawTile(g,id,gx*TILE,gy*TILE);
     }
@@ -116,11 +132,13 @@
     window.KELO_WORLD_AUDIT.assetLoaded=true;
   };
   sheet.onerror=function(){ console.error('[Kelo world] atlas load failed'); };
-  sheet.src=ATLAS.src+'&world=147';
+  sheet.src=ATLAS.src+'&world=151';
 
   window.KELO_WORLD_AUDIT={
-    version:'world-v1', ready:false, assetLoaded:false, chunkSize:CHUNK,
+    version:'world-v1.1', ready:false, assetLoaded:false, chunkSize:CHUNK,
     districtCount:DISTRICTS.length, roadCount:ROAD_RECTS.length,
+    districtStyleMode:REGISTRY.styles?.districtGround?.mode || null,
+    styledDistrictCount:Object.keys(GROUND_STYLES).filter(k=>k!=='default').length,
     worldWidth:window.CONFIG?.worldWidth||3600, worldHeight:window.CONFIG?.worldHeight||3200
   };
   window.KELO_WORLD_RENDERER=Object.freeze({ draw, districts:DISTRICTS, chunkSize:CHUNK, get ready(){return ready;} });
