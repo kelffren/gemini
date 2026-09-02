@@ -13,7 +13,7 @@
     interactRadius: 220
   });
   const COLLISION = Object.freeze({ x: 1272, y: 1362, w: 336, h: 132 });
-  const ASSET = 'assets/kelo-luxe-boutique.svg?v=1';
+  const ASSET = 'assets/kelo-luxe-boutique.svg?v=2';
 
   const img = new Image();
   let ready = false;
@@ -136,7 +136,7 @@
 
   window.KELO_LUXE_KIOSK = Object.freeze({
     disabled: false,
-    version: 'authored-raster-v1.2',
+    version: 'authored-raster-v1.3',
     asset: ASSET,
     source: 'user-authored-raster',
     shop: SHOP,
