@@ -57,18 +57,19 @@ const state = await page.evaluate(() => ({
 }));
 await page.screenshot({ path: 'artifacts/live-mobile.png', fullPage: false });
 
-// Visual evidence outside the plaza: move only the disposable audit session to Distrito Rural.
-const ruralCaptureReady = await page.evaluate(() => {
-  if (typeof camera === 'undefined' || typeof localPlayer === 'undefined') return false;
+// Capture a deterministic off-plaza frame before the normal game loop can re-center the camera.
+const ruralFrame = await page.evaluate(() => {
+  if (typeof camera === 'undefined' || typeof localPlayer === 'undefined' || typeof render !== 'function') return null;
+  const c = document.getElementById('game-canvas');
+  if (!c) return null;
   localPlayer.x = 800; localPlayer.y = 1640;
   camera.x = 800; camera.y = 1640;
   camera.targetX = 800; camera.targetY = 1640;
-  return true;
+  render();
+  return c.toDataURL('image/png');
 });
-if (ruralCaptureReady) {
-  await page.waitForTimeout(1800);
-  await page.screenshot({ path: 'artifacts/live-rural.png', fullPage: false });
-}
+const ruralCaptureReady = typeof ruralFrame === 'string' && ruralFrame.startsWith('data:image/png;base64,');
+if (ruralCaptureReady) fs.writeFileSync('artifacts/live-rural.png', Buffer.from(ruralFrame.split(',')[1], 'base64'));
 
 fs.writeFileSync('artifacts/report.json', JSON.stringify({ loaded, title, expected, expectedRegistry, ruralCaptureReady, state, consoleErrors, failedRequests }, null, 2));
 console.log(JSON.stringify({ loaded, title, expected, expectedRegistry, ruralCaptureReady, state, consoleErrors, failedRequests }, null, 2));
@@ -89,7 +90,7 @@ if (state.world?.districtStyleMode !== 'district-profile-v1' || (state.world?.st
 if (state.world?.chunkSize !== 512) throw new Error('Unexpected world chunk size');
 if ((state.world?.districtCount || 0) < 5) throw new Error('World district graph is unexpectedly small');
 if ((state.world?.worldWidth || 0) < 3600 || (state.world?.worldHeight || 0) < 3200) throw new Error('World bounds regressed');
-if (!ruralCaptureReady) throw new Error('Could not position mobile audit in Distrito Rural');
+if (!ruralCaptureReady) throw new Error('Could not capture Distrito Rural');
 if (!state.depth || state.depth.sourceMode !== 'y-occlusion-overlay-v1') throw new Error('Depth layer state missing or invalid');
 if (!state.tileset?.authoredTransitions) throw new Error('Tileset state did not expose authored transitions');
 if (!state.tileset?.transitionAssetPath) throw new Error('Transition atlas path missing from tileset state');
