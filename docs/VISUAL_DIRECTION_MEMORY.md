@@ -267,6 +267,17 @@ Kelo World is no longer allowed to remain a single polished plaza floating in a 
 - Manual inspection of `live-luxe-prefab.png` confirms no visual regression: the large Kelo Luxe silhouette remains crisp and centered on the ivory route, the doorway/detail remains readable on mobile, and the player/depth relationship remains intact. The adjacent flat brown legacy building is still visibly below the authored architecture quality bar.
 - Current architecture bottleneck: boutique and market pavilion now share registry-owned prefab metadata, but rendering/depth installation is still duplicated as separate wrappers in `luxe-kiosk-atlas.js`. The next safe technical pass should extract a generic authored-architecture prefab renderer/list while preserving per-prefab interaction hooks; after that, migrate another visible legacy building through the common path.
 
+## Validated Generic Architecture Prefab Renderer — V5.70 / Registry 1.10.4 / 2026-09-02
+- `src/environment/luxe-kiosk-atlas.js` now renders all registered authored architecture prefabs through one list-driven world wrapper and one shared depth wrapper instead of nesting one wrapper per building.
+- `TileRegistry 1.10.4` owns the remaining per-prefab occlusion and actor-clip thresholds for both Kelo Luxe and the Market Pavilion; `styles.architecture.rendererMode='generic-prefab-list-v1'` makes the shared path explicit.
+- `window.KELO_ARCHITECTURE_RENDERER` validated `mode='generic-prefab-list-v1'`, `prefabCount=2`, `ready=true`, `rendererWrapped=true` and `depthWrapped=true`. Existing boutique interaction/collision hooks and both authored asset placements were preserved.
+- Implementation commit `c7b67bb892895ea35bfd77e038c0c912f1bebdfa` passed Kelo CI. The first LIVE run failed only because `.github/workflows/live-audit.yml` still forced `EXPECTED_REGISTRY=1.10.3`; runtime had already reached `V5.70 / 1.10.4` cleanly. Commit `573ae012925fc8acbc1bf8fb4d8b4af9b739f8f0` aligned that certification contract.
+- The corrected Kelo CI, GitHub Pages deployment and LIVE mobile audit all passed. LIVE validated `world-v1.2`, registry `1.10.4`, two active authored prefabs, boutique occlusion and market occlusion, plus `legacyHidden=true` for the pavilion.
+- Final diagnostics were clean: `consoleErrors=[]`, `failedRequests=[]` and `httpErrors=[]` at 390x844 CSS / 780x1688 backing canvas.
+- Manual inspection of `live-architecture.png` confirms Kelo Luxe remains crisp with its existing depth behavior. Manual inspection of `live-market-pavilion.png` confirms the market silhouette/entrance remain intact and the actor is correctly hidden behind the roof volume with only the upper head visible at the boundary; no legacy rectangle reappeared.
+- Validated technical direction: future authored architecture should be added primarily as `architectureAssets + architecturePrefabs` data, with interaction hooks only where needed, rather than installing new world/depth wrappers.
+- Next largest visual bottleneck: the flat brown legacy building still visible beside Kelo Luxe is now the clearest quality mismatch. The next safe pass should replace that one building/family with an original authored modular architecture prefab through the shared renderer, preserving its current gameplay footprint rather than adding more ground noise.
+
 ## Non-goals During Visual Passes
 Do not casually alter unrelated systems such as:
 - core movement feel;
