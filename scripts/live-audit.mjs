@@ -3,12 +3,13 @@ import { chromium } from 'playwright';
 
 const base = process.env.AUDIT_URL || 'https://kelffren.github.io/gemini/';
 const expected = process.env.EXPECTED_BUILD || 'V5.49';
-const expectedRegistry = process.env.EXPECTED_REGISTRY || '1.6.0';
+const expectedRegistry = process.env.EXPECTED_REGISTRY || '1.7.0';
 fs.mkdirSync('artifacts', { recursive: true });
 if (fs.existsSync('assets/tileset-vclean.png')) fs.copyFileSync('assets/tileset-vclean.png', 'artifacts/repo-tileset.png');
 else if (fs.existsSync('assets/tileset.png')) fs.copyFileSync('assets/tileset.png', 'artifacts/repo-tileset.png');
 if (fs.existsSync('assets/plaza-transitions-v1.png')) fs.copyFileSync('assets/plaza-transitions-v1.png', 'artifacts/repo-transitions.png');
 if (fs.existsSync('assets/rural-soil-v1.png')) fs.copyFileSync('assets/rural-soil-v1.png', 'artifacts/repo-rural-soil.png');
+if (fs.existsSync('assets/rural-props-v1.png')) fs.copyFileSync('assets/rural-props-v1.png', 'artifacts/repo-rural-props.png');
 
 const browser = await chromium.launch({
   headless: true,
@@ -51,8 +52,6 @@ for (let attempt = 1; attempt <= 24; attempt++) {
   await page.waitForTimeout(10000);
 }
 
-// Reload the confirmed deployment with clean error buckets. This prevents stale-deploy
-// retries from contaminating the final diagnostic report.
 consoleErrors.length=0; failedRequests.length=0; httpErrors.length=0;
 await page.goto(`${base}?audit=final-${Date.now()}`, { waitUntil:'networkidle', timeout:45000 });
 await page.waitForTimeout(4000);
@@ -67,7 +66,8 @@ const state = await page.evaluate(() => ({
 }));
 await page.screenshot({ path: 'artifacts/live-mobile.png', fullPage: false });
 
-// Capture a deterministic off-plaza frame before the normal game loop can re-center the camera.
+// Capture a deterministic off-plaza frame and prove that the new rural prop colors
+// are actually present in rendered pixels, not merely reported as loaded assets.
 const ruralFrame = await page.evaluate(() => {
   if (typeof camera === 'undefined' || typeof localPlayer === 'undefined' || typeof render !== 'function') return null;
   const c = document.getElementById('game-canvas');
@@ -76,13 +76,22 @@ const ruralFrame = await page.evaluate(() => {
   camera.x = 800; camera.y = 1640;
   camera.targetX = 800; camera.targetY = 1640;
   render();
-  return c.toDataURL('image/png');
+  const g = c.getContext('2d');
+  const px = g.getImageData(0,0,c.width,c.height).data;
+  let woodPixels=0, dirtPixels=0;
+  for(let i=0;i<px.length;i+=4){
+    const r=px[i], gg=px[i+1], b=px[i+2], a=px[i+3];
+    if(a>200 && r>=135 && r<=205 && gg>=80 && gg<=145 && b>=35 && b<=90) woodPixels++;
+    if(a>200 && r>=120 && r<=190 && gg>=75 && gg<=135 && b>=40 && b<=90) dirtPixels++;
+  }
+  return { dataUrl:c.toDataURL('image/png'), woodPixels, dirtPixels };
 });
-const ruralCaptureReady = typeof ruralFrame === 'string' && ruralFrame.startsWith('data:image/png;base64,');
-if (ruralCaptureReady) fs.writeFileSync('artifacts/live-rural.png', Buffer.from(ruralFrame.split(',')[1], 'base64'));
+const ruralCaptureReady = !!ruralFrame?.dataUrl?.startsWith('data:image/png;base64,');
+const ruralVisualEvidence = ruralFrame ? { woodPixels:ruralFrame.woodPixels, dirtPixels:ruralFrame.dirtPixels } : null;
+if (ruralCaptureReady) fs.writeFileSync('artifacts/live-rural.png', Buffer.from(ruralFrame.dataUrl.split(',')[1], 'base64'));
 
-fs.writeFileSync('artifacts/report.json', JSON.stringify({ loaded, title, expected, expectedRegistry, ruralCaptureReady, state, consoleErrors, failedRequests, httpErrors }, null, 2));
-console.log(JSON.stringify({ loaded, title, expected, expectedRegistry, ruralCaptureReady, state, consoleErrors, failedRequests, httpErrors }, null, 2));
+fs.writeFileSync('artifacts/report.json', JSON.stringify({ loaded, title, expected, expectedRegistry, ruralCaptureReady, ruralVisualEvidence, state, consoleErrors, failedRequests, httpErrors }, null, 2));
+console.log(JSON.stringify({ loaded, title, expected, expectedRegistry, ruralCaptureReady, ruralVisualEvidence, state, consoleErrors, failedRequests, httpErrors }, null, 2));
 await browser.close();
 
 if (!loaded) throw new Error(`Live page never reached visual build ${expected} / registry ${expectedRegistry}`);
@@ -101,8 +110,11 @@ if (state.world?.chunkSize !== 512) throw new Error('Unexpected world chunk size
 if ((state.world?.districtCount || 0) < 5) throw new Error('World district graph is unexpectedly small');
 if ((state.world?.worldWidth || 0) < 3600 || (state.world?.worldHeight || 0) < 3200) throw new Error('World bounds regressed');
 if (!ruralCaptureReady) throw new Error('Could not capture Distrito Rural');
-if (!state.rural?.ready || !state.rural?.assetLoaded || !state.rural?.modularTiles) throw new Error('Modular rural soil renderer is not active');
+if (!state.rural?.ready || !state.rural?.assetLoaded || !state.rural?.modularTiles || !state.rural?.propsLoaded) throw new Error('Modular rural renderers are not active');
 if (state.rural?.renderingMode !== 'authored-nine-slice-v1' || state.rural?.plotSize !== 96) throw new Error('Unexpected rural plot renderer contract');
+if (state.rural?.boundaryMode !== 'modular-fence-gate-v1') throw new Error('Rural fence/gate boundary is not active');
+if ((ruralVisualEvidence?.woodPixels || 0) < 100) throw new Error(`Rural wood pixels not visible: ${JSON.stringify(ruralVisualEvidence)}`);
+if ((ruralVisualEvidence?.dirtPixels || 0) < 100) throw new Error(`Rural dirt pixels not visible: ${JSON.stringify(ruralVisualEvidence)}`);
 if (!state.depth || state.depth.sourceMode !== 'y-occlusion-overlay-v1') throw new Error('Depth layer state missing or invalid');
 if (!state.tileset?.authoredTransitions) throw new Error('Tileset state did not expose authored transitions');
 if (!state.tileset?.transitionAssetPath) throw new Error('Transition atlas path missing from tileset state');
