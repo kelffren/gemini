@@ -73,14 +73,14 @@
     }
     ready = true;
     if (window.KELO_PLAZA_AUDIT) {
-      window.KELO_PLAZA_AUDIT.version = 'V5.50';
+      window.KELO_PLAZA_AUDIT.version = 'V5.51';
       window.KELO_PLAZA_AUDIT.registryVersion = REGISTRY.version;
       window.KELO_PLAZA_AUDIT.depthOcclusion = true;
       window.KELO_PLAZA_AUDIT.depthOccluderCount = OCCLUDERS.length;
     }
   };
   sheet.onerror = function () { console.error('[Kelo plaza depth] atlas load failed'); };
-  sheet.src = ATLAS.src + '&depth=147';
+  sheet.src = ATLAS.src + '&depth=151';
 
   const previousRender = window.render;
   window.render = function () {
