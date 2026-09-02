@@ -19,7 +19,7 @@
     FH = c.height / 4;
     ok = true;
   };
-  raw.onerror = function () { raw.src = 'assets/hero.png'; };
+  raw.onerror = function () { console.error('[Kelo hero] production sprite load failed'); };
   raw.src = 'assets/hero.PNG';
 
   // Legacy fallback for actors that do not yet have update-side visual state.

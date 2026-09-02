@@ -32,7 +32,7 @@ jobs:
       - name: Audit deployed mobile page
         env:
           AUDIT_URL: https://kelffren.github.io/gemini/
-          EXPECTED_BUILD: V5.48
+          EXPECTED_BUILD: V5.49
           EXPECTED_REGISTRY: 1.6.0
           CHROME_BIN: /usr/bin/google-chrome
         run: node scripts/live-audit.mjs

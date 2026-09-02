@@ -23,6 +23,17 @@ jobs:
           node --check src/environment/tile-registry.js
           node --check src/environment/world-map.js
           node --check src/environment/rural-ground.js
+          node --check engine-a.js
+          node --check engine-h.js
+          grep -q 'id="toast-container"' index.html
+          if grep -Eq "assets/plaza\.jpg|assets/plaza-sm\.jpg|'plaza\.jpg'" engine-h.js; then
+            echo 'legacy missing plaza JPG request detected'
+            exit 1
+          fi
+          if grep -q "assets/hero\.png" engine-ab.js; then
+            echo 'missing lowercase hero fallback detected'
+            exit 1
+          fi
           python3 - <<'PY'
           import struct
           path='assets/rural-soil-v1.png'

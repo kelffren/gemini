@@ -64,7 +64,13 @@ function loadState() {
   }
 }
 function showToast(msg) {
-  const cont = document.getElementById('toast-container');
+  let cont = document.getElementById('toast-container');
+  if (!cont) {
+    cont = document.createElement('div');
+    cont.id = 'toast-container';
+    cont.setAttribute('aria-live', 'polite');
+    document.body.appendChild(cont);
+  }
   const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg; cont.appendChild(t);
   setTimeout(() => t.remove(), 3500);
 }

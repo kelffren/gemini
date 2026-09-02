@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import { chromium } from 'playwright';
 
 const base = process.env.AUDIT_URL || 'https://kelffren.github.io/gemini/';
-const expected = process.env.EXPECTED_BUILD || 'V5.48';
+const expected = process.env.EXPECTED_BUILD || 'V5.49';
 const expectedRegistry = process.env.EXPECTED_REGISTRY || '1.6.0';
 fs.mkdirSync('artifacts', { recursive: true });
 if (fs.existsSync('assets/tileset-vclean.png')) fs.copyFileSync('assets/tileset-vclean.png', 'artifacts/repo-tileset.png');
@@ -19,9 +19,11 @@ const context = await browser.newContext({ viewport: { width: 390, height: 844 }
 const page = await context.newPage();
 const consoleErrors = [];
 const failedRequests = [];
+const httpErrors = [];
 page.on('console', msg => { if (msg.type() === 'error') consoleErrors.push(msg.text()); });
-page.on('pageerror', err => consoleErrors.push(`PAGEERROR: ${err.message}`));
+page.on('pageerror', err => consoleErrors.push(`PAGEERROR: ${err.stack || err.message}`));
 page.on('requestfailed', req => failedRequests.push({ url:req.url(), error:req.failure()?.errorText || 'failed' }));
+page.on('response', res => { if (res.status() >= 400) httpErrors.push({ status:res.status(), url:res.url() }); });
 
 let title = '', loaded = false;
 for (let attempt = 1; attempt <= 24; attempt++) {
@@ -49,6 +51,10 @@ for (let attempt = 1; attempt <= 24; attempt++) {
   await page.waitForTimeout(10000);
 }
 
+// Reload the confirmed deployment with clean error buckets. This prevents stale-deploy
+// retries from contaminating the final diagnostic report.
+consoleErrors.length=0; failedRequests.length=0; httpErrors.length=0;
+await page.goto(`${base}?audit=final-${Date.now()}`, { waitUntil:'networkidle', timeout:45000 });
 await page.waitForTimeout(4000);
 const state = await page.evaluate(() => ({
   title: document.title,
@@ -75,8 +81,8 @@ const ruralFrame = await page.evaluate(() => {
 const ruralCaptureReady = typeof ruralFrame === 'string' && ruralFrame.startsWith('data:image/png;base64,');
 if (ruralCaptureReady) fs.writeFileSync('artifacts/live-rural.png', Buffer.from(ruralFrame.split(',')[1], 'base64'));
 
-fs.writeFileSync('artifacts/report.json', JSON.stringify({ loaded, title, expected, expectedRegistry, ruralCaptureReady, state, consoleErrors, failedRequests }, null, 2));
-console.log(JSON.stringify({ loaded, title, expected, expectedRegistry, ruralCaptureReady, state, consoleErrors, failedRequests }, null, 2));
+fs.writeFileSync('artifacts/report.json', JSON.stringify({ loaded, title, expected, expectedRegistry, ruralCaptureReady, state, consoleErrors, failedRequests, httpErrors }, null, 2));
+console.log(JSON.stringify({ loaded, title, expected, expectedRegistry, ruralCaptureReady, state, consoleErrors, failedRequests, httpErrors }, null, 2));
 await browser.close();
 
 if (!loaded) throw new Error(`Live page never reached visual build ${expected} / registry ${expectedRegistry}`);
@@ -100,4 +106,6 @@ if (state.rural?.renderingMode !== 'authored-nine-slice-v1' || state.rural?.plot
 if (!state.depth || state.depth.sourceMode !== 'y-occlusion-overlay-v1') throw new Error('Depth layer state missing or invalid');
 if (!state.tileset?.authoredTransitions) throw new Error('Tileset state did not expose authored transitions');
 if (!state.tileset?.transitionAssetPath) throw new Error('Transition atlas path missing from tileset state');
-if (consoleErrors.some(x => /Kelo plaza|Kelo plaza depth|Kelo world|Kelo rural|tileset load|transition atlas|invalid tileset/i.test(x))) throw new Error('Visual world/atlas/depth/rural console error detected');
+if (httpErrors.length) throw new Error(`HTTP errors detected: ${JSON.stringify(httpErrors)}`);
+if (failedRequests.length) throw new Error(`Failed requests detected: ${JSON.stringify(failedRequests)}`);
+if (consoleErrors.length) throw new Error(`Console/page errors detected: ${JSON.stringify(consoleErrors)}`);

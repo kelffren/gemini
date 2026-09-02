@@ -1,16 +1,8 @@
 (function () {
   const dprCap = 3;
-  const plazaImg = new Image();
-  plazaImg.decoding = 'async';
-  const sources = ['assets/plaza.jpg', 'plaza.jpg', 'assets/plaza-sm.jpg'];
-  let srcIndex = 0;
+  // The live plaza is atlas-owned by engine-l.js. Keep the procedural fallback here,
+  // but never probe legacy JPG paths that are no longer part of the production build.
   let plazaReady = false;
-  plazaImg.onload = function () { plazaReady = true; };
-  plazaImg.onerror = function () {
-    srcIndex += 1;
-    if (srcIndex < sources.length) plazaImg.src = sources[srcIndex];
-  };
-  plazaImg.src = sources[0];
   resize = function () {
     screenW = window.innerWidth;
     screenH = window.innerHeight;
@@ -28,9 +20,7 @@
   function drawMarblePlaza() {
     const p = PLAZA;
     ctx.save();
-    if (plazaReady) {
-      ctx.drawImage(plazaImg, p.x, p.y, p.w, p.h);
-    } else {
+    if (!plazaReady) {
       const g = ctx.createLinearGradient(p.x, p.y, p.x + p.w, p.y + p.h);
       g.addColorStop(0, '#12141a');
       g.addColorStop(0.5, '#1c1a16');
@@ -73,4 +63,5 @@
     _renderC();
     ctx.fillRect = origFillRect;
   };
+  window.KELO_LEGACY_PLAZA_IMAGE_DISABLED = true;
 })();
