@@ -10,10 +10,20 @@ function cycleZoom() {
   showToast('Zoom ' + CONFIG.zoom);
   closeMenu();
 }
+function closeSocialOverlays() {
+  const bag = document.getElementById('kelo-bag');
+  if (bag) bag.style.display = 'none';
+  const stones = document.getElementById('kelo-builder');
+  if (stones) stones.style.display = 'none';
+  const chat = document.getElementById('lx-chat-drawer');
+  if (chat) chat.classList.remove('open');
+}
 function toggleMenu() {
   const el = document.getElementById('menu-sheet');
+  if (!el) return;
   const open = el.style.display === 'block';
   document.querySelectorAll('.app-panel').forEach(p => p.style.display = 'none');
+  if (!open) closeSocialOverlays();
   el.style.display = open ? 'none' : 'block';
 }
 function closeMenu() {
@@ -23,6 +33,10 @@ function closeMenu() {
 function openFromMenu(id) { closeMenu(); togglePanel(id); }
 function openSocialTool(tool) {
   closeMenu();
+  if (tool !== 'chat') {
+    const drawer = document.getElementById('lx-chat-drawer');
+    if (drawer) drawer.classList.remove('open');
+  }
   if (tool === 'bag') {
     if (window.KeloSocialUI && typeof window.KeloSocialUI.openBag === 'function') return window.KeloSocialUI.openBag();
     showToast('Mochila no disponible');
@@ -31,6 +45,19 @@ function openSocialTool(tool) {
   if (tool === 'stones' || tool === 'abilities') {
     if (window.KeloAbilities && typeof window.KeloAbilities.openStonePanel === 'function') return window.KeloAbilities.openStonePanel();
     showToast('Habilidades todavía cargando');
+    return;
+  }
+  if (tool === 'chat') {
+    const drawer = document.getElementById('lx-chat-drawer');
+    if (drawer) {
+      const bag = document.getElementById('kelo-bag');
+      if (bag) bag.style.display = 'none';
+      const stones = document.getElementById('kelo-builder');
+      if (stones) stones.style.display = 'none';
+      drawer.classList.add('open');
+      return;
+    }
+    showToast('Chat todavía cargando');
     return;
   }
   if (tool === 'profile') {
@@ -136,7 +163,7 @@ renderAvatar = function(p, isSelf) {
   if (isSelf) { ctx.fillStyle = '#e7c56a'; ctx.font = '9px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(p.title || 'Caballero', p.x, p.y - p.radius - 18); }
 };
 window.addEventListener('keydown', function(e) {
-  if (e.key === 'Escape') { closeMenu(); document.querySelectorAll('.app-panel').forEach(function(p){ p.style.display = 'none'; }); }
+  if (e.key === 'Escape') { closeMenu(); closeSocialOverlays(); document.querySelectorAll('.app-panel').forEach(function(p){ p.style.display = 'none'; }); }
 });
 const _feedAnimals = feedAnimals;
 feedAnimals = function(type) { _feedAnimals(type); if (type === 'chickens' && STATE.farm.coop) STATE.farm.coop.ready = false; if (type === 'pigs' && STATE.farm.pen) STATE.farm.pen.ready = false; };
