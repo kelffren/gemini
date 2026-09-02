@@ -2,11 +2,12 @@
   // LIVE owner: plaza tiles + HiDPI + aimed-skill landing marker.
   const PLAZA = { x: 1040, y: 1240, w: 800, h: 560 };
   const REGISTRY = window.KELO_TILE_REGISTRY;
-  if (!REGISTRY?.atlases?.plaza || !REGISTRY?.atlases?.transitions || !REGISTRY?.tiles || !REGISTRY?.families || !REGISTRY?.transitionMasks) {
-    console.error('[Kelo plaza] visual tile registry missing transition metadata');
+  if (!REGISTRY?.atlases?.plaza || !REGISTRY?.atlases?.plazaGround || !REGISTRY?.atlases?.transitions || !REGISTRY?.tiles || !REGISTRY?.families || !REGISTRY?.transitionMasks) {
+    console.error('[Kelo plaza] visual registry missing authored ground or transition metadata');
     return;
   }
   const ATLAS = REGISTRY.atlases.plaza;
+  const GROUND_ATLAS = REGISTRY.atlases.plazaGround;
   const TRANSITION_ATLAS = REGISTRY.atlases.transitions;
   const TILE = REGISTRY.worldTileSize;
   const COLS = ATLAS.columns;
@@ -15,12 +16,18 @@
   const TRANSITION_MASKS = REGISTRY.transitionMasks;
 
   window.KELO_PLAZA_AUDIT = {
-    version: 'V5.77-clean-map',
+    version: 'V5.93-authored-ground',
     ready: false,
     assetLoaded: false,
+    groundAssetLoaded: false,
     fallbackActive: true,
+    renderingMode: 'authored-plaza-ground-v1',
     registryVersion: REGISTRY.version,
     atlas: ATLAS.src,
+    groundAsset: GROUND_ATLAS.src,
+    groundWidth: GROUND_ATLAS.width,
+    groundHeight: GROUND_ATLAS.height,
+    worldLayerWrapped: false,
     transitionAtlas: TRANSITION_ATLAS.src,
     atlasWidth: ATLAS.width,
     atlasHeight: ATLAS.height,
@@ -51,10 +58,12 @@
   }
 
   let floorLayer=null, transitionLayer=null, propLayer=null;
-  let baseLoaded=false, transitionsLoaded=false;
+  let baseLoaded=false, transitionsLoaded=false, groundLoaded=false;
   const sheet=new Image();
+  const groundSheet=new Image();
   const transitionSheet=new Image();
   sheet.decoding='async';
+  groundSheet.decoding='async';
   transitionSheet.decoding='async';
 
   function origin(id){ return {x:(id%COLS)*TILE,y:Math.floor(id/COLS)*TILE}; }
@@ -132,10 +141,11 @@
       drawTransitionTile(tg,transitionId,gx*TILE,gy*TILE);
     }
 
+    if(groundLoaded) return;
     floorLayer=floor; transitionLayer=transitions; propLayer=null;
     window.KELO_PLAZA_AUDIT.ready=true;
     window.KELO_PLAZA_AUDIT.assetLoaded=true;
-    window.KELO_PLAZA_AUDIT.fallbackActive=false;
+    window.KELO_PLAZA_AUDIT.fallbackActive=true;
   }
 
   buildFallback();
@@ -151,10 +161,48 @@
     }
     transitionsLoaded=true; bakeAtlas();
   };
+  groundSheet.onload=function(){
+    if(groundSheet.naturalWidth!==GROUND_ATLAS.width||groundSheet.naturalHeight!==GROUND_ATLAS.height){
+      console.error('[Kelo plaza] invalid authored ground dimensions',groundSheet.naturalWidth,groundSheet.naturalHeight,'expected',GROUND_ATLAS.width,GROUND_ATLAS.height); return;
+    }
+    groundLoaded=true; floorLayer=groundSheet; transitionLayer=null; propLayer=null;
+    window.KELO_PLAZA_AUDIT.ready=true;
+    window.KELO_PLAZA_AUDIT.assetLoaded=true;
+    window.KELO_PLAZA_AUDIT.groundAssetLoaded=true;
+    window.KELO_PLAZA_AUDIT.fallbackActive=false;
+  };
   sheet.onerror=function(){ console.error('[Kelo plaza] tileset load failed'); };
   transitionSheet.onerror=function(){ console.error('[Kelo plaza] transition atlas load failed'); };
+  groundSheet.onerror=function(){ console.error('[Kelo plaza] authored ground load failed'); };
   sheet.src=ATLAS.src+'&v=100';
   transitionSheet.src=TRANSITION_ATLAS.src+'&v=100';
+  groundSheet.src=GROUND_ATLAS.src+'&v=100';
+
+  let worldLayerWrapped=false;
+  function installWorldGroundLayer(){
+    if(worldLayerWrapped)return true;
+    const base=window.KELO_WORLD_RENDERER;
+    if(!base||typeof base.draw!=='function') return false;
+    if(base.__keloPlazaGround){worldLayerWrapped=true;window.KELO_PLAZA_AUDIT.worldLayerWrapped=true;return true;}
+    window.KELO_WORLD_RENDERER=Object.freeze({
+      __keloPlazaGround:true,
+      draw(g){
+        const ok=base.draw(g);
+        if(ok===true&&floorLayer){
+          g.save();g.imageSmoothingEnabled=false;g.drawImage(floorLayer,PLAZA.x,PLAZA.y);
+          if(transitionLayer)g.drawImage(transitionLayer,PLAZA.x,PLAZA.y);
+          g.restore();
+        }
+        return ok;
+      },
+      districts:base.districts,
+      chunkSize:base.chunkSize,
+      get ready(){return base.ready;}
+    });
+    worldLayerWrapped=true;window.KELO_PLAZA_AUDIT.worldLayerWrapped=true;
+    return true;
+  }
+  installWorldGroundLayer();setTimeout(installWorldGroundLayer,120);setTimeout(installWorldGroundLayer,600);
 
   function landingPoint(){
     const range=skillAim.castRange||120;
@@ -194,19 +242,8 @@
   const _r=render;
   render=function(){
     applyHiDPI(); _r();
-    if(floorLayer){
-      const z=CONFIG.zoom||1;
-      ctx.save(); ctx.translate(screenW/2,screenH/2); ctx.scale(z,z); ctx.translate(-camera.x,-camera.y); ctx.imageSmoothingEnabled=false;
-      ctx.drawImage(floorLayer,PLAZA.x,PLAZA.y);
-      if(transitionLayer) ctx.drawImage(transitionLayer,PLAZA.x,PLAZA.y);
-      if(typeof renderAvatar==='function'){
-        if(typeof simulatedPlayers!=='undefined') simulatedPlayers.forEach(p=>renderAvatar(p,false));
-        if(typeof localPlayer!=='undefined') renderAvatar(localPlayer,true);
-      }
-      ctx.restore();
-    }
     drawLanding();
   };
 
-  window.KELO_PLAZA_TILESET=Object.freeze({sourceMode:'authored-transition-atlas-v1',registryVersion:REGISTRY.version,assetPath:ATLAS.src,transitionAssetPath:TRANSITION_ATLAS.src,atlasWidth:ATLAS.width,atlasHeight:ATLAS.height,atlasTileSize:TILE,worldTileSize:TILE,columns:COLS,layeredTransitions:true,authoredTransitions:true,plaza:Object.freeze({...PLAZA})});
+  window.KELO_PLAZA_TILESET=Object.freeze({sourceMode:'authored-raster-ground-v1',registryVersion:REGISTRY.version,assetPath:GROUND_ATLAS.src,fallbackAssetPath:ATLAS.src,transitionAssetPath:TRANSITION_ATLAS.src,atlasWidth:GROUND_ATLAS.width,atlasHeight:GROUND_ATLAS.height,atlasTileSize:TILE,worldTileSize:TILE,columns:COLS,layeredTransitions:true,authoredTransitions:true,authoredGround:true,plaza:Object.freeze({...PLAZA})});
 })();

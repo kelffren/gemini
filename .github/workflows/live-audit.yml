@@ -15,6 +15,8 @@ on:
       - 'assets/tileset.png'
       - 'assets/tileset-vclean.png'
       - 'assets/plaza-transitions-v1.png'
+      - 'assets/plaza-ground-v1.png'
+      - 'assets/plaza-nature-v1.svg'
       - 'assets/grass-variation-v1.png'
       - 'assets/rural-soil-v1.png'
       - 'assets/rural-props-v1.png'
@@ -36,19 +38,22 @@ jobs:
         shell: bash
         run: |
           REGISTRY_VERSION="$(node -e "const fs=require('fs');const s=fs.readFileSync('src/environment/tile-registry.js','utf8');const m=s.match(/version:'([^']+)'/);if(!m)process.exit(2);process.stdout.write(m[1]);")"
+          WORLD_VERSION="$(node -e "const fs=require('fs');const s=fs.readFileSync('src/environment/world-map.js','utf8');const m=s.match(/KELO_WORLD_AUDIT=\{version:'([^']+)'/);if(!m)process.exit(2);process.stdout.write(m[1]);")"
           PAGE_TITLE="$(node -e "const fs=require('fs');const s=fs.readFileSync('index.html','utf8');const m=s.match(/<title>([^<]+)<\\/title>/);if(!m)process.exit(2);process.stdout.write(m[1]);")"
           ARCH_VERSION="$(node -e "const fs=require('fs');const s=fs.readFileSync('src/environment/luxe-kiosk-atlas.js','utf8');const m=s.match(/KELO_ARCHITECTURE_RENDERER=Object\.freeze\(\{version:'([^']+)'/);if(!m)process.exit(2);process.stdout.write(m[1]);")"
           ARCH_MODE="$(node -e "const fs=require('fs');const s=fs.readFileSync('src/environment/luxe-kiosk-atlas.js','utf8');const m=s.match(/KELO_ARCHITECTURE_RENDERER=Object\.freeze\(\{version:'[^']+',mode:'([^']+)'/);if(!m)process.exit(2);process.stdout.write(m[1]);")"
+          PLAZA_VERSION="$(node -e "const fs=require('fs');const s=fs.readFileSync('engine-l.js','utf8');const m=s.match(/version: '([^']+)'/);if(!m)process.exit(2);process.stdout.write(m[1]);")"
           echo "EXPECTED_REGISTRY=$REGISTRY_VERSION" >> "$GITHUB_ENV"
+          echo "EXPECTED_WORLD=$WORLD_VERSION" >> "$GITHUB_ENV"
           echo "EXPECTED_TITLE=$PAGE_TITLE" >> "$GITHUB_ENV"
           echo "EXPECTED_ARCHITECTURE_VERSION=$ARCH_VERSION" >> "$GITHUB_ENV"
           echo "EXPECTED_ARCHITECTURE_MODE=$ARCH_MODE" >> "$GITHUB_ENV"
+          echo "EXPECTED_PLAZA=$PLAZA_VERSION" >> "$GITHUB_ENV"
       - name: Install Playwright package
         run: npm install --no-save playwright@1.55.0
       - name: Audit deployed mobile world
         env:
           AUDIT_URL: https://kelffren.github.io/gemini/
-          EXPECTED_WORLD: world-v1.3
           CHROME_BIN: /usr/bin/google-chrome
         run: node scripts/live-world-audit.mjs
       - name: Audit authored Luxe architecture

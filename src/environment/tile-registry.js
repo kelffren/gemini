@@ -12,6 +12,10 @@
     id:'grass-variation', src:'assets/grass-variation-v1.png?art=191', width:128, height:64,
     tileWidth:TILE, tileHeight:TILE, columns:4, tileCount:8
   });
+  const plazaGroundAtlas = Object.freeze({
+    id:'plaza-ground', src:'assets/plaza-ground-v1.png?art=193', width:800, height:560,
+    worldWidth:800, worldHeight:560, family:'ground'
+  });
   const plazaNatureAtlas = Object.freeze({
     id:'plaza-nature', src:'assets/plaza-nature-v1.svg?art=192', width:192, height:96,
     spriteWidth:96, spriteHeight:96, columns:2, spriteCount:2
@@ -136,8 +140,8 @@
     })
   });
   window.KELO_TILE_REGISTRY = Object.freeze({
-    version:'1.10.20', worldTileSize:TILE,
-    atlases:Object.freeze({plaza:atlas,transitions:transitionAtlas,grassVariation:grassVariationAtlas,plazaNature:plazaNatureAtlas,ruralSoil:ruralSoilAtlas,ruralProps:ruralPropsAtlas,ruralLandmarks:ruralLandmarksAtlas,ruralNature:ruralNatureAtlas}),
+    version:'1.10.21', worldTileSize:TILE,
+    atlases:Object.freeze({plaza:atlas,plazaGround:plazaGroundAtlas,transitions:transitionAtlas,grassVariation:grassVariationAtlas,plazaNature:plazaNatureAtlas,ruralSoil:ruralSoilAtlas,ruralProps:ruralPropsAtlas,ruralLandmarks:ruralLandmarksAtlas,ruralNature:ruralNatureAtlas}),
     architectureAssets,architecturePrefabs,plazaNatureProps,
     tiles,ruralTiles,ruralPropTiles,ruralLandmarkTiles,ruralLandmarkSprites,ruralNatureTiles,ruralNatureSprites,families,transitionMasks,styles
   });
