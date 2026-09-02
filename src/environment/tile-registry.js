@@ -30,6 +30,17 @@
     luxeBoutique:Object.freeze({
       id:'luxe-boutique', src:'assets/kelo-luxe-boutique.svg?v=2', width:192, height:222,
       worldWidth:384, worldHeight:444, family:'architecture'
+    }),
+    marketPavilion:Object.freeze({
+      id:'market-pavilion', src:'assets/market-pavilion-v1.png?art=220', width:224, height:160,
+      worldWidth:224, worldHeight:160, family:'architecture'
+    })
+  });
+  const architecturePrefabs = Object.freeze({
+    marketPavilion:Object.freeze({
+      id:'market-pavilion-south', asset:'marketPavilion', x:1288, y:1790, baseYOffset:160,
+      collision:Object.freeze({x:1300,y:1870,w:200,h:80}),
+      legacyVisualReplacement:true
     })
   });
 
@@ -85,7 +96,7 @@
   const styles = Object.freeze({
     plazaTransition:Object.freeze({mode:'authored-overlay-atlas',neighbourMask:'TRBL',softenStickerAccents:true}),
     propDepth:Object.freeze({mode:'y-occlusion-overlay-v1',localActorIntersection:true,frontOccluders:Object.freeze(['fountain','column','tree','lamp'])}),
-    architecture:Object.freeze({mode:'authored-layered-raster-v1',depthMode:'building-base-y-occlusion-v1',actorClip:true}),
+    architecture:Object.freeze({mode:'authored-layered-raster-v1',depthMode:'building-base-y-occlusion-v1',actorClip:true,prefabContract:'registry-asset-placement-collision-v1'}),
     districtGround:Object.freeze({mode:'district-profile-v1',profiles:districtGroundStyles}),
     ruralFarm:Object.freeze({
       mode:'authored-nine-slice-v1',
@@ -111,9 +122,9 @@
     })
   });
   window.KELO_TILE_REGISTRY = Object.freeze({
-    version:'1.10.1', worldTileSize:TILE,
+    version:'1.10.2', worldTileSize:TILE,
     atlases:Object.freeze({plaza:atlas,transitions:transitionAtlas,ruralSoil:ruralSoilAtlas,ruralProps:ruralPropsAtlas,ruralLandmarks:ruralLandmarksAtlas,ruralNature:ruralNatureAtlas}),
-    architectureAssets,
+    architectureAssets,architecturePrefabs,
     tiles,ruralTiles,ruralPropTiles,ruralLandmarkTiles,ruralLandmarkSprites,ruralNatureTiles,ruralNatureSprites,families,transitionMasks,styles
   });
 })();
