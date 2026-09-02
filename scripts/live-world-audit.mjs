@@ -3,7 +3,7 @@ import { chromium } from 'playwright';
 
 const base=process.env.AUDIT_URL||'https://kelffren.github.io/gemini/';
 const expectedWorld=process.env.EXPECTED_WORLD||'world-v1.2';
-const expectedRegistry=process.env.EXPECTED_REGISTRY||'1.10.1';
+const expectedRegistry=process.env.EXPECTED_REGISTRY||'1.10.3';
 fs.mkdirSync('artifacts',{recursive:true});
 
 const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_BIN||'/usr/bin/google-chrome',args:['--no-sandbox','--disable-dev-shm-usage']});
@@ -21,8 +21,8 @@ for(let attempt=1;attempt<=24;attempt++){
     await page.goto(`${base}?world-audit=${Date.now()}-${attempt}`,{waitUntil:'networkidle',timeout:45000});
     title=await page.title();
     const d=await page.evaluate(()=>({world:window.KELO_WORLD_AUDIT||null,registry:window.KELO_TILE_REGISTRY?.version||null,compose:window.KELO_LUXE_COMPOSE||null,kiosk:window.KELO_LUXE_KIOSK||null}));
-    if(d.world?.ready&&d.world?.version===expectedWorld&&d.world?.assetLoaded&&d.world?.transitionAssetLoaded&&d.world?.roadTransitionMode==='authored-road-edge-overlay-v1'&&d.registry===expectedRegistry&&d.kiosk?.ready&&d.kiosk?.depthWrapped&&d.kiosk?.depthOcclusion&&d.kiosk?.depthMode==='building-base-y-occlusion-v1'&&(!d.compose||d.compose.disabled===true)){loaded=true;break}
-    console.log(`attempt ${attempt}: world=${d.world?.version||'missing'} registry=${d.registry||'missing'} kiosk=${d.kiosk?.version||'missing'} depth=${d.kiosk?.depthMode||'missing'}`);
+    if(d.world?.ready&&d.world?.version===expectedWorld&&d.world?.assetLoaded&&d.world?.transitionAssetLoaded&&d.world?.roadTransitionMode==='authored-road-edge-overlay-v1'&&d.registry===expectedRegistry&&d.kiosk?.ready&&d.kiosk?.depthWrapped&&d.kiosk?.depthOcclusion&&d.kiosk?.depthMode==='building-base-y-occlusion-v1'&&d.kiosk?.source==='tile-registry-architecture-prefab'&&d.kiosk?.prefabId==='luxe-boutique-central'&&(!d.compose||d.compose.disabled===true)){loaded=true;break}
+    console.log(`attempt ${attempt}: world=${d.world?.version||'missing'} registry=${d.registry||'missing'} kiosk=${d.kiosk?.version||'missing'} source=${d.kiosk?.source||'missing'} depth=${d.kiosk?.depthMode||'missing'}`);
   }catch(err){console.log(`attempt ${attempt}: ${err.message}`)}
   await page.waitForTimeout(10000);
 }
@@ -58,8 +58,8 @@ if(!state.world?.ready||state.world?.version!==expectedWorld||!state.world?.asse
 if(state.world?.roadTransitionMode!=='authored-road-edge-overlay-v1')throw new Error(`Unexpected road transition mode: ${state.world?.roadTransitionMode}`);
 if(state.world?.chunkSize!==512||state.world?.districtCount<5||state.world?.ruralRoadMode!=='farm-bypass-v1')throw new Error('World geometry contract regressed');
 if(state.registryVersion!==expectedRegistry)throw new Error(`Registry mismatch ${state.registryVersion} !== ${expectedRegistry}`);
-if(state.architecture?.mode!=='authored-layered-raster-v1'||state.architecture?.depthMode!=='building-base-y-occlusion-v1')throw new Error('Architecture registry contract missing');
-if(!state.kiosk?.ready||state.kiosk?.failed||!state.kiosk?.rendererWrapped||!state.kiosk?.depthWrapped||!state.kiosk?.depthOcclusion||state.kiosk?.source!=='tile-registry-architecture-asset')throw new Error('Authored boutique architecture layer invalid');
+if(state.architecture?.mode!=='authored-layered-raster-v1'||state.architecture?.depthMode!=='building-base-y-occlusion-v1'||state.architecture?.prefabContract!=='registry-asset-placement-collision-v1')throw new Error('Architecture registry contract missing');
+if(!state.kiosk?.ready||state.kiosk?.failed||!state.kiosk?.rendererWrapped||!state.kiosk?.depthWrapped||!state.kiosk?.depthOcclusion||state.kiosk?.source!=='tile-registry-architecture-prefab'||state.kiosk?.prefabId!=='luxe-boutique-central')throw new Error('Authored boutique architecture prefab layer invalid');
 if(!architectureFrame?.dataUrl?.startsWith('data:image/png;base64,')||!architectureFrame?.occluding)throw new Error('Architecture depth screenshot capture failed');
 if(state.compose&&state.compose.disabled!==true)throw new Error('Rejected procedural environment art is active');
 if(httpErrors.length)throw new Error(`HTTP errors: ${JSON.stringify(httpErrors)}`);
