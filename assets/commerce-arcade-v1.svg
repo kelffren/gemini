@@ -30,16 +30,9 @@
   <rect x="8" y="376" width="136" height="4"/>
 </g>
 <!-- small crown caps make both ends read as architectural termini -->
-<g fill="#d7cdb0">
-  <rect x="36" y="4" width="64" height="8"/>
-  <rect x="40" y="0" width="56" height="4"/>
-  <rect x="32" y="404" width="68" height="8"/>
-</g>
-<g fill="#d2a548">
-  <rect x="48" y="8" width="40" height="4"/>
-  <rect x="44" y="408" width="44" height="4"/>
-</g>
-<!-- west-side open courtyard: a stone-framed garden recess breaks the long central roof mass -->
+<g fill="#d7cdb0"><rect x="36" y="4" width="64" height="8"/><rect x="40" y="0" width="56" height="4"/><rect x="32" y="404" width="68" height="8"/></g>
+<g fill="#d2a548"><rect x="48" y="8" width="40" height="4"/><rect x="44" y="408" width="44" height="4"/></g>
+<!-- west-side open courtyard -->
 <rect x="16" y="188" width="72" height="68" fill="#173b35"/>
 <rect x="20" y="192" width="64" height="60" fill="#d7cdb0"/>
 <rect x="24" y="196" width="56" height="52" fill="#6cae59"/>
@@ -50,69 +43,38 @@
 <g fill="#1d4e39"><rect x="28" y="202" width="8" height="12"/><rect x="68" y="202" width="8" height="12"/><rect x="28" y="230" width="8" height="12"/><rect x="68" y="230" width="8" height="12"/></g>
 <g fill="#d8a6d8"><rect x="30" y="202" width="4" height="4"/><rect x="70" y="204" width="4" height="4"/><rect x="30" y="234" width="4" height="4"/><rect x="70" y="232" width="4" height="4"/></g>
 <rect x="20" y="248" width="64" height="4" fill="#b7aa86"/>
-<!-- arcade frontage: alternating projections break the long east wall -->
+<!-- arcade frontage -->
 <rect x="92" y="24" width="60" height="372" fill="#c8b98f"/>
 <rect x="96" y="28" width="52" height="364" fill="#f0e8cf"/>
-<g fill="#e5dcc1">
-  <rect x="92" y="30" width="8" height="58"/>
-  <rect x="96" y="106" width="8" height="58"/>
-  <rect x="92" y="182" width="8" height="58"/>
-  <rect x="96" y="258" width="8" height="58"/>
-  <rect x="92" y="334" width="8" height="54"/>
-</g>
-<!-- shop bays -->
+<g fill="#e5dcc1"><rect x="92" y="30" width="8" height="58"/><rect x="96" y="106" width="8" height="58"/><rect x="92" y="182" width="8" height="58"/><rect x="96" y="258" width="8" height="58"/><rect x="92" y="334" width="8" height="54"/></g>
+<!-- secondary bay family A: broad teal vitrines -->
+<rect x="104" y="36" width="40" height="48" fill="#4b8790"/><rect x="108" y="40" width="32" height="34" fill="#8fc8c7"/>
+<rect x="104" y="340" width="40" height="44" fill="#4b8790"/><rect x="108" y="344" width="32" height="30" fill="#8fc8c7"/>
+<!-- secondary bay family B: inset shopfronts with ivory canopy and striped valance -->
 <g>
-  <rect x="104" y="36" width="40" height="48" fill="#4b8790"/>
-  <rect x="108" y="40" width="32" height="34" fill="#8fc8c7"/>
-  <rect x="108" y="112" width="36" height="48" fill="#4b8790"/>
-  <rect x="112" y="116" width="28" height="34" fill="#8fc8c7"/>
-  <rect x="108" y="264" width="36" height="48" fill="#4b8790"/>
-  <rect x="112" y="268" width="28" height="34" fill="#8fc8c7"/>
-  <rect x="104" y="340" width="40" height="44" fill="#4b8790"/>
-  <rect x="108" y="344" width="32" height="30" fill="#8fc8c7"/>
+  <rect x="106" y="108" width="40" height="54" fill="#b7aa86"/>
+  <rect x="110" y="116" width="32" height="34" fill="#4b8790"/>
+  <rect x="114" y="120" width="24" height="26" fill="#8fc8c7"/>
+  <rect x="104" y="106" width="42" height="8" fill="#e9dfc3"/>
+  <rect x="106" y="112" width="8" height="4" fill="#25594f"/><rect x="118" y="112" width="8" height="4" fill="#d2a548"/><rect x="130" y="112" width="8" height="4" fill="#25594f"/>
+  <rect x="106" y="260" width="40" height="54" fill="#b7aa86"/>
+  <rect x="110" y="268" width="32" height="34" fill="#4b8790"/>
+  <rect x="114" y="272" width="24" height="26" fill="#8fc8c7"/>
+  <rect x="104" y="258" width="42" height="8" fill="#e9dfc3"/>
+  <rect x="106" y="264" width="8" height="4" fill="#25594f"/><rect x="118" y="264" width="8" height="4" fill="#d2a548"/><rect x="130" y="264" width="8" height="4" fill="#25594f"/>
 </g>
-<!-- central main entrance: taller double doors + canopy establish hierarchy at mobile scale -->
-<rect x="102" y="180" width="44" height="60" fill="#b7aa86"/>
-<rect x="106" y="184" width="36" height="52" fill="#4b8790"/>
-<rect x="110" y="188" width="13" height="42" fill="#8fc8c7"/>
-<rect x="125" y="188" width="13" height="42" fill="#8fc8c7"/>
-<rect x="123" y="188" width="2" height="42" fill="#d8f0ea"/>
-<rect x="100" y="174" width="48" height="8" fill="#173b35"/>
-<rect x="104" y="170" width="40" height="6" fill="#d2a548"/>
-<rect x="110" y="166" width="28" height="4" fill="#e9dfc3"/>
-<rect x="104" y="238" width="40" height="4" fill="#d2a548"/>
+<!-- central main entrance -->
+<rect x="102" y="180" width="44" height="60" fill="#b7aa86"/><rect x="106" y="184" width="36" height="52" fill="#4b8790"/>
+<rect x="110" y="188" width="13" height="42" fill="#8fc8c7"/><rect x="125" y="188" width="13" height="42" fill="#8fc8c7"/><rect x="123" y="188" width="2" height="42" fill="#d8f0ea"/>
+<rect x="100" y="174" width="48" height="8" fill="#173b35"/><rect x="104" y="170" width="40" height="6" fill="#d2a548"/><rect x="110" y="166" width="28" height="4" fill="#e9dfc3"/><rect x="104" y="238" width="40" height="4" fill="#d2a548"/>
 <!-- structural piers and lintels -->
-<g fill="#b7aa86">
-  <rect x="96" y="28" width="6" height="364"/>
-  <rect x="144" y="28" width="6" height="364"/>
-  <rect x="98" y="92" width="48" height="5"/>
-  <rect x="98" y="168" width="48" height="5"/>
-  <rect x="98" y="244" width="48" height="5"/>
-  <rect x="98" y="320" width="48" height="5"/>
-</g>
+<g fill="#b7aa86"><rect x="96" y="28" width="6" height="364"/><rect x="144" y="28" width="6" height="364"/><rect x="98" y="92" width="48" height="5"/><rect x="98" y="168" width="48" height="5"/><rect x="98" y="244" width="48" height="5"/><rect x="98" y="320" width="48" height="5"/></g>
 <!-- restrained gold signage -->
-<g fill="#d2a548">
-  <rect x="110" y="80" width="30" height="4"/>
-  <rect x="114" y="156" width="26" height="4"/>
-  <rect x="114" y="308" width="26" height="4"/>
-  <rect x="110" y="380" width="30" height="4"/>
-</g>
-<!-- west garden pockets follow the stepped roof instead of repeating a straight edge -->
-<g fill="#1d4e39">
-  <rect x="12" y="40" width="22" height="18"/>
-  <rect x="24" y="116" width="24" height="18"/>
-  <rect x="28" y="278" width="24" height="18"/>
-  <rect x="12" y="350" width="22" height="18"/>
-</g>
-<g fill="#76b95a">
-  <rect x="16" y="36" width="12" height="8"/>
-  <rect x="30" y="112" width="12" height="8"/>
-  <rect x="34" y="274" width="12" height="8"/>
-  <rect x="16" y="346" width="12" height="8"/>
-</g>
-<!-- occasional flower pixels keep density controlled -->
+<g fill="#d2a548"><rect x="110" y="80" width="30" height="4"/><rect x="114" y="156" width="26" height="4"/><rect x="114" y="308" width="26" height="4"/><rect x="110" y="380" width="30" height="4"/></g>
+<!-- west garden pockets -->
+<g fill="#1d4e39"><rect x="12" y="40" width="22" height="18"/><rect x="24" y="116" width="24" height="18"/><rect x="28" y="278" width="24" height="18"/><rect x="12" y="350" width="22" height="18"/></g>
+<g fill="#76b95a"><rect x="16" y="36" width="12" height="8"/><rect x="30" y="112" width="12" height="8"/><rect x="34" y="274" width="12" height="8"/><rect x="16" y="346" width="12" height="8"/></g>
 <g fill="#d8a6d8"><rect x="22" y="42" width="4" height="4"/><rect x="38" y="118" width="4" height="4"/><rect x="42" y="280" width="4" height="4"/></g>
 <!-- stone plinth -->
-<rect x="88" y="396" width="64" height="12" fill="#b7aa86"/>
-<rect x="92" y="396" width="56" height="8" fill="#e5dcc1"/>
+<rect x="88" y="396" width="64" height="12" fill="#b7aa86"/><rect x="92" y="396" width="56" height="8" fill="#e5dcc1"/>
 </svg>
