@@ -20,6 +20,11 @@
     id:'rural-landmarks', src:'assets/rural-landmarks-v1.png?art=180', width:256, height:128,
     tileWidth:TILE, tileHeight:TILE, columns:8
   });
+  const ruralNatureAtlas = window.KELO_RURAL_NATURE_ATLAS;
+  if (!ruralNatureAtlas || ruralNatureAtlas.width!==256 || ruralNatureAtlas.height!==128) {
+    console.error('[Kelo registry] authored rural nature atlas missing or invalid');
+    return;
+  }
 
   const tiles = Object.freeze({
     GRASS_A:0, GRASS_B:1, GRASS_C:2, GRASS_FLOWERS:3,
@@ -65,6 +70,8 @@
     barn:Object.freeze({sx:0,sy:0,w:160,h:128,baseY:112}),
     silo:Object.freeze({sx:160,sy:0,w:64,h:128,baseY:116})
   });
+  const ruralNatureTiles = ruralNatureAtlas.tiles;
+  const ruralNatureSprites = ruralNatureAtlas.treeFamilies;
   const transitionMasks = Object.freeze({
     0:15,1:0,2:1,3:5,4:2,5:12,6:6,7:9,8:3,9:4,10:13,11:8,12:7,13:11,14:10,15:14
   });
@@ -85,18 +92,19 @@
       depthMode:'actor-base-y-v1',
       gameplayFootprint:'visual-only-v1',
       edgeVegetation:Object.freeze({
-        mode:'west-south-edge-clusters-v1',
-        sourceAtlas:'plaza',
-        treeSprite:'TREE',
-        hedgeTiles:Object.freeze(['BUSH_A','BUSH_B','BUSH_FLOWERS','BUSH_FLOWERS_B']),
+        mode:'authored-rural-nature-edge-clusters-v1',
+        sourceAtlas:'ruralNature',
+        treeFamilies:Object.freeze(['oak','fruit']),
+        hedgeTiles:Object.freeze(['HEDGE_A','HEDGE_B','HEDGE_FLOWERS_A','HEDGE_FLOWERS_B']),
+        detailTiles:Object.freeze(['TALL_GRASS','WILDFLOWERS','STUMP','STONE']),
         centerClear:true,
         roadClearance:32
       })
     })
   });
   window.KELO_TILE_REGISTRY = Object.freeze({
-    version:'1.9.0', worldTileSize:TILE,
-    atlases:Object.freeze({plaza:atlas,transitions:transitionAtlas,ruralSoil:ruralSoilAtlas,ruralProps:ruralPropsAtlas,ruralLandmarks:ruralLandmarksAtlas}),
-    tiles,ruralTiles,ruralPropTiles,ruralLandmarkTiles,ruralLandmarkSprites,families,transitionMasks,styles
+    version:'1.10.0', worldTileSize:TILE,
+    atlases:Object.freeze({plaza:atlas,transitions:transitionAtlas,ruralSoil:ruralSoilAtlas,ruralProps:ruralPropsAtlas,ruralLandmarks:ruralLandmarksAtlas,ruralNature:ruralNatureAtlas}),
+    tiles,ruralTiles,ruralPropTiles,ruralLandmarkTiles,ruralLandmarkSprites,ruralNatureTiles,ruralNatureSprites,families,transitionMasks,styles
   });
 })();
