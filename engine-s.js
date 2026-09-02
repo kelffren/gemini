@@ -41,34 +41,46 @@
   window.keloSay = say;
 
   function ensureChat() {
-    if (document.getElementById('kelo-chat')) return;
-    const wrap = document.createElement('div');
-    wrap.id = 'kelo-chat';
-    wrap.style.cssText = 'position:absolute;left:8px;bottom:10px;width:min(210px,44vw);z-index:90;pointer-events:auto;font-size:11px';
-    wrap.innerHTML = '<div id="kelo-chat-log" style="max-height:54px;overflow:auto;background:rgba(8,10,14,.55);color:#ddd;padding:4px 6px;border-radius:8px;margin-bottom:4px"></div><form id="kelo-chat-form" style="display:flex;gap:4px"><input id="kelo-chat-in" maxlength="80" placeholder="Escribir..." style="flex:1;background:rgba(10,13,18,.85);border:1px solid #3a465c;color:#eee;border-radius:8px;padding:6px 8px"><button style="background:#9e6a03;border:0;color:#fff;border-radius:8px;padding:6px 8px">OK</button></form>';
-    document.body.appendChild(wrap);
-    document.getElementById('kelo-chat-form').addEventListener('submit', function (e) {
-      e.preventDefault();
-      const inp = document.getElementById('kelo-chat-in');
-      const t = (inp.value || '').trim();
-      if (!t) return;
-      say(localPlayer.name || 'Tu', t);
-      inp.value = '';
-    });
-    const bag = document.createElement('button');
-    bag.textContent = 'Mochila';
-    bag.style.cssText = 'position:absolute;bottom:118px;right:10px;z-index:90;pointer-events:auto;background:rgba(16,20,28,.9);color:#e7c56a;border:1px solid #c9a24a;border-radius:10px;padding:7px 10px;font-size:11px';
-    bag.onclick = function () {
-      const p = document.getElementById('kelo-bag');
-      p.style.display = p.style.display === 'block' ? 'none' : 'block';
-    };
-    document.body.appendChild(bag);
-    const panel = document.createElement('div');
-    panel.id = 'kelo-bag';
-    panel.style.cssText = 'display:none;position:absolute;top:84px;right:8px;width:180px;z-index:91;background:rgba(13,17,23,.96);border:1px solid #c9a24a;border-radius:10px;padding:10px;color:#ddd;font-size:12px;pointer-events:auto';
-    panel.innerHTML = '<b style="color:#e7c56a">Inventario</b><div>Gema x1</div><div>Reloj x1</div>';
-    document.body.appendChild(panel);
+    if (!document.getElementById('kelo-chat')) {
+      const wrap = document.createElement('div');
+      wrap.id = 'kelo-chat';
+      wrap.style.cssText = 'position:absolute;left:8px;bottom:10px;width:min(210px,44vw);z-index:90;pointer-events:auto;font-size:11px';
+      wrap.innerHTML = '<div id="kelo-chat-log" style="max-height:54px;overflow:auto;background:rgba(8,10,14,.55);color:#ddd;padding:4px 6px;border-radius:8px;margin-bottom:4px"></div><form id="kelo-chat-form" style="display:flex;gap:4px"><input id="kelo-chat-in" maxlength="80" placeholder="Escribir..." style="flex:1;background:rgba(10,13,18,.85);border:1px solid #3a465c;color:#eee;border-radius:8px;padding:6px 8px"><button style="background:#9e6a03;border:0;color:#fff;border-radius:8px;padding:6px 8px">OK</button></form>';
+      document.body.appendChild(wrap);
+      document.getElementById('kelo-chat-form').addEventListener('submit', function (e) {
+        e.preventDefault();
+        const inp = document.getElementById('kelo-chat-in');
+        const t = (inp.value || '').trim();
+        if (!t) return;
+        say(localPlayer.name || 'Tu', t);
+        inp.value = '';
+      });
+    }
+
+    if (!document.getElementById('kelo-bag')) {
+      const panel = document.createElement('div');
+      panel.id = 'kelo-bag';
+      panel.style.cssText = 'display:none;position:absolute;top:max(74px,calc(env(safe-area-inset-top) + 62px));right:12px;width:min(300px,calc(100vw - 24px));z-index:121;background:rgba(13,17,23,.98);border:1px solid rgba(231,197,106,.5);border-radius:16px;padding:12px;color:#ddd;font-size:12px;pointer-events:auto;box-shadow:0 18px 50px rgba(0,0,0,.45)';
+      panel.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><b style="color:#e7c56a">MOCHILA</b><button id="kelo-bag-close" style="border:0;background:transparent;color:#8b949e;font-size:20px">×</button></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div style="border:1px solid #30363d;border-radius:10px;padding:10px">💎 Gema <b>x1</b></div><div style="border:1px solid #30363d;border-radius:10px;padding:10px">⌚ Reloj <b>x1</b></div></div>';
+      document.body.appendChild(panel);
+      document.getElementById('kelo-bag-close').onclick = closeBag;
+    }
   }
+
+  function openBag() {
+    ensureChat();
+    if (typeof closeMenu === 'function') closeMenu();
+    const panel = document.getElementById('kelo-bag');
+    if (panel) panel.style.display = 'block';
+  }
+
+  function closeBag() {
+    const panel = document.getElementById('kelo-bag');
+    if (panel) panel.style.display = 'none';
+  }
+
+  window.KeloSocialUI = Object.freeze({ openBag: openBag, closeBag: closeBag });
+
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ensureChat);
   else ensureChat();
 
