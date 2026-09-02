@@ -38,6 +38,7 @@ jobs:
           grep -q -- "--lx-forest:#173f36" src/ui/luxe-shell.js
           grep -q "mode:'luxe-only-v1'" src/environment/luxe-kiosk-atlas.js
           grep -q "grassVariation:grassVariationAtlas" src/environment/tile-registry.js
+          grep -q "plazaGround:plazaGroundAtlas" src/environment/tile-registry.js
           grep -q "grassMode:'authored-eight-variant-atlas-v1'" src/environment/tile-registry.js
           grep -q "grassVariationMode:'authored-eight-variant-atlas-v1'" src/environment/world-map.js
           if ! grep -q 'DISABLED_PROCEDURAL_ART' src/environment/luxe-compose.js; then
@@ -66,4 +67,9 @@ jobs:
           assert match
           raw=base64.b64decode(match.group(1)); assert raw[:8]==b'\x89PNG\r\n\x1a\n'
           assert struct.unpack('>II',raw[16:24])==(256,128)
+          header=open('assets/plaza-ground-v1.png','rb').read(26)
+          assert header[:8] == b'\x89PNG\r\n\x1a\n'
+          assert struct.unpack('>II',header[16:24])==(800,560)
+          assert header[25] in (4,6),('plaza ground must contain an alpha channel',header[25])
+          print('PASS authored plaza ground assets/plaza-ground-v1.png 800 560 alpha')
           PY
