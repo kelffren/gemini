@@ -2,12 +2,21 @@
   const TILE = 32;
   const atlas = Object.freeze({
     id: 'plaza-core',
-    src: 'assets/tileset-vclean.png?art=131&',
+    src: 'assets/tileset-vclean.png?art=131',
     width: 512,
     height: 512,
     tileWidth: TILE,
     tileHeight: TILE,
     columns: 16
+  });
+  const transitionAtlas = Object.freeze({
+    id: 'plaza-transitions',
+    src: 'assets/plaza-transitions-v1.png?art=140',
+    width: 128,
+    height: 128,
+    tileWidth: TILE,
+    tileHeight: TILE,
+    columns: 4
   });
 
   const tiles = Object.freeze({
@@ -27,8 +36,6 @@
   const families = Object.freeze({
     grass:Object.freeze([tiles.GRASS_A,tiles.GRASS_B,tiles.GRASS_C,tiles.GRASS_SOFT]),
     grassDetail:Object.freeze([tiles.GRASS_FLOWERS]),
-    // Authored low-noise ivory marble is now the default material. Older diagonal-vein
-    // tiles remain available only as accents so large plaza surfaces do not read as wallpaper.
     marble:Object.freeze([
       tiles.MARBLE_IVORY_A,tiles.MARBLE_IVORY_B,tiles.MARBLE_IVORY_C,tiles.MARBLE_IVORY_D,
       tiles.MARBLE_IVORY_A,tiles.MARBLE_IVORY_B,tiles.MARBLE_IVORY_C,tiles.MARBLE_IVORY_D
@@ -37,23 +44,28 @@
     marbleGold:Object.freeze([tiles.MARBLE_GOLD_A,tiles.MARBLE_GOLD_B])
   });
 
+  // 4-neighbour mask: top=1, right=2, bottom=4, left=8.
+  // Every combination maps to one authored transparent overlay tile.
+  const transitionMasks = Object.freeze({
+    0:15, 1:0, 2:1, 3:5, 4:2, 5:12, 6:6, 7:9,
+    8:3, 9:4, 10:13, 11:8, 12:7, 13:11, 14:10, 15:14
+  });
+
   const styles = Object.freeze({
     plazaTransition:Object.freeze({
-      marbleInsetShadow:'#d8cda9',
-      grassEdgeDark:'#239d2b',
-      grassEdgeMid:'#37bc35',
-      grassEdgeLight:'#79e75d',
-      tuftRate:5,
-      edgeDepth:3
+      mode:'authored-overlay-atlas',
+      neighbourMask:'TRBL',
+      softenStickerAccents:true
     })
   });
 
   window.KELO_TILE_REGISTRY = Object.freeze({
-    version:'1.3.1',
+    version:'1.4.0',
     worldTileSize:TILE,
-    atlases:Object.freeze({plaza:atlas}),
+    atlases:Object.freeze({plaza:atlas, transitions:transitionAtlas}),
     tiles,
     families,
+    transitionMasks,
     styles
   });
 })();
