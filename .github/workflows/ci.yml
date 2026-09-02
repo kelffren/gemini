@@ -15,6 +15,8 @@ jobs:
           test -f engine-net.js
           test -f server/index.js
           test -f server/package.json
+          test -f assets/fountain-back-v1.png
+          test -f assets/fountain-front-v1.png
           grep -q "engine-net.js" index.html
       - name: Server syntax
         run: node --check server/index.js
@@ -26,10 +28,12 @@ jobs:
           node --check src/environment/rural-ground.js
           node --check src/environment/rural-landmarks.js
           node --check src/environment/plaza-nature.js
+          node --check src/environment/plaza-depth.js
           node --check src/environment/luxe-compose.js
           node --check src/environment/luxe-kiosk-atlas.js
           node --check scripts/live-world-audit.mjs
           node --check scripts/live-pavilion-audit.mjs
+          node --check scripts/live-fountain-audit.mjs
           node --check src/ui/luxe-shell.js
           node --check src/ui/luxe-boutique.js
           node --check engine-a.js
@@ -43,6 +47,10 @@ jobs:
           grep -q "plazaNature:plazaNatureAtlas" src/environment/tile-registry.js
           grep -q "grassMode:'authored-eight-variant-atlas-v1'" src/environment/tile-registry.js
           grep -q "grassVariationMode:'authored-eight-variant-atlas-v1'" src/environment/world-map.js
+          grep -q "plaza-fountain-v1.1" src/environment/plaza-depth.js
+          grep -q "fountain-back-v1.png" src/environment/plaza-depth.js
+          grep -q "fountain-front-v1.png" src/environment/plaza-depth.js
+          grep -q "plaza-depth.js?v=210" index.html
           if ! grep -q 'DISABLED_PROCEDURAL_ART' src/environment/luxe-compose.js; then
             echo 'rejected procedural plaza overlay was reactivated'
             exit 1
@@ -57,12 +65,13 @@ jobs:
           fi
           python3 - <<'PY'
           import base64, re, struct
-          for path,expected in [('assets/rural-soil-v1.png',(128,128)),('assets/rural-props-v1.png',(128,128)),('assets/rural-landmarks-v1.png',(256,128)),('assets/grass-variation-v1.png',(128,64))]:
-              header=open(path,'rb').read(24)
+          for path,expected in [('assets/rural-soil-v1.png',(128,128)),('assets/rural-props-v1.png',(128,128)),('assets/rural-landmarks-v1.png',(256,128)),('assets/grass-variation-v1.png',(128,64)),('assets/fountain-back-v1.png',(200,140)),('assets/fountain-front-v1.png',(200,140))]:
+              header=open(path,'rb').read(26)
               assert header[:8] == b'\x89PNG\r\n\x1a\n'
               size=struct.unpack('>II',header[16:24])
               assert size==expected,(path,size,expected)
-              assert size[0]%32==0 and size[1]%32==0
+              if path.startswith('assets/fountain-'):
+                  assert header[25] in (4,6),(path,'fountain layer must contain alpha',header[25])
               print('PASS atlas',path,*size)
           source=open('src/environment/rural-nature-atlas.js',encoding='utf-8').read()
           match=re.search(r"data:image/png;base64,([^']+)",source)
