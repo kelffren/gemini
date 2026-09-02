@@ -1,30 +1,126 @@
 (function () {
   if (document.getElementById('kelo-luxe')) return;
+
   const css = document.createElement('style');
-  css.textContent = '#kelo-luxe{position:absolute;inset:0;z-index:70;pointer-events:none;font-family:-apple-system,sans-serif}#kelo-luxe *{pointer-events:auto}.lx-top{position:absolute;top:max(8px,env(safe-area-inset-top));left:8px;right:8px;display:flex;gap:6px;align-items:center}.lx-shop{background:linear-gradient(#ff4fa3,#c81e70);color:#fff;border:0;border-radius:14px;padding:8px 12px;font-weight:800;font-size:12px}.lx-pill{background:rgba(12,16,24,.92);border:1px solid rgba(255,255,255,.12);color:#fff;border-radius:14px;padding:7px 10px;font-weight:800;font-size:12px}.lx-side{position:absolute;top:max(58px,calc(env(safe-area-inset-top) + 50px));right:8px;display:flex;flex-direction:column;gap:8px}.lx-ico{width:44px;height:44px;border-radius:12px;border:1px solid rgba(231,197,106,.35);background:rgba(16,20,28,.92);color:#f3d48b;font-size:11px;font-weight:700}.lx-online{position:absolute;right:8px;bottom:max(118px,calc(env(safe-area-inset-bottom) + 110px));background:rgba(8,12,18,.88);color:#d7f7c2;border-radius:10px;padding:6px 8px;font-size:11px;font-weight:700}.lx-chat{position:absolute;left:8px;right:8px;bottom:max(8px,env(safe-area-inset-bottom));display:flex;gap:6px}.lx-chat input{flex:1;height:40px;border-radius:12px;border:1px solid #3a465c;background:rgba(10,13,18,.92);color:#eee;padding:0 12px}.lx-chat button{height:40px;border:0;border-radius:12px;background:#6c4cff;color:#fff;padding:0 12px;font-weight:800}.lx-log{position:absolute;left:8px;right:70px;bottom:max(54px,calc(env(safe-area-inset-bottom) + 46px));max-height:92px;overflow:auto;background:rgba(8,12,18,.78);border-radius:12px;padding:8px;color:#eee;font-size:11px}.top-bar,#kelo-chat{opacity:.15}';
+  css.id = 'kelo-luxe-v2-style';
+  css.textContent = `
+    :root{--lx-ink:#101820;--lx-ink2:#17252a;--lx-forest:#173f36;--lx-gold:#e7c56a;--lx-ivory:#fff4d6;--lx-muted:#aab7ae}
+    .top-bar,#kelo-chat,#kelo-stones-btn,#kelo-bag-btn{display:none!important}
+    #kelo-luxe{position:absolute;inset:0;z-index:80;pointer-events:none;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--lx-ivory)}
+    #kelo-luxe *{box-sizing:border-box}
+    #kelo-luxe button,#kelo-luxe input{font:inherit}
+    .lx-top{position:absolute;top:max(8px,env(safe-area-inset-top));left:max(8px,env(safe-area-inset-left));right:max(8px,env(safe-area-inset-right));height:42px;display:flex;align-items:center;gap:7px;pointer-events:auto}
+    .lx-mark{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(145deg,rgba(22,63,54,.98),rgba(12,24,28,.98));border:1px solid rgba(231,197,106,.72);box-shadow:0 6px 18px rgba(0,0,0,.24),inset 0 0 0 1px rgba(255,255,255,.04);font-family:Georgia,serif;font-size:15px;font-weight:900;letter-spacing:-1px;color:var(--lx-gold)}
+    .lx-gold{height:38px;min-width:94px;padding:0 12px;border-radius:12px;display:flex;align-items:center;gap:7px;background:rgba(11,21,24,.93);border:1px solid rgba(231,197,106,.34);box-shadow:0 6px 18px rgba(0,0,0,.18);font-size:13px;font-weight:800;color:var(--lx-ivory)}
+    .lx-gold-dot{width:8px;height:8px;transform:rotate(45deg);background:var(--lx-gold);box-shadow:0 0 0 2px rgba(231,197,106,.14)}
+    .lx-presence{height:30px;padding:0 9px;border-radius:999px;display:flex;align-items:center;gap:5px;background:rgba(11,21,24,.82);border:1px solid rgba(255,255,255,.08);font-size:10px;font-weight:700;color:#d7eadc}
+    .lx-presence i{width:6px;height:6px;border-radius:50%;background:#88d27c;box-shadow:0 0 8px rgba(136,210,124,.55)}
+    .lx-spacer{flex:1}
+    .lx-top-btn{height:38px;padding:0 11px;border-radius:12px;border:1px solid rgba(231,197,106,.38);background:rgba(14,28,29,.93);color:var(--lx-gold);font-size:11px;font-weight:800;letter-spacing:.2px;box-shadow:0 6px 18px rgba(0,0,0,.18)}
+    .lx-top-btn:active{transform:translateY(1px)}
+    .lx-menu{width:38px;padding:0;font-size:16px;letter-spacing:1px}
+    .lx-rail{position:absolute;top:max(62px,calc(env(safe-area-inset-top) + 54px));right:max(8px,env(safe-area-inset-right));display:flex;flex-direction:column;gap:7px;pointer-events:auto}
+    .lx-rail-btn{width:54px;min-height:44px;padding:5px 3px;border-radius:13px;border:1px solid rgba(231,197,106,.34);background:rgba(14,28,29,.91);color:var(--lx-ivory);font-size:9px;font-weight:800;line-height:1.05;box-shadow:0 6px 18px rgba(0,0,0,.18)}
+    .lx-rail-btn b{display:block;color:var(--lx-gold);font-size:15px;line-height:15px;margin-bottom:3px;font-family:Georgia,serif}
+    .lx-chat-drawer{display:none;position:absolute;left:max(8px,env(safe-area-inset-left));right:max(8px,env(safe-area-inset-right));bottom:max(70px,calc(env(safe-area-inset-bottom) + 62px));z-index:88;padding:9px;border-radius:14px;background:rgba(9,18,21,.96);border:1px solid rgba(231,197,106,.34);box-shadow:0 14px 34px rgba(0,0,0,.35);pointer-events:auto}
+    .lx-chat-drawer.open{display:block}
+    .lx-log{height:62px;overflow:auto;padding:2px 3px 7px;color:#e8ede8;font-size:11px;line-height:1.4}
+    .lx-log:empty:before{content:'El chat aparecerá aquí';color:#789188}
+    .lx-chat-form{display:flex;gap:6px}
+    .lx-chat-form input{min-width:0;flex:1;height:36px;border-radius:10px;border:1px solid rgba(255,255,255,.1);background:#111d21;color:#f6f2df;padding:0 10px;outline:none}
+    .lx-chat-form input:focus{border-color:rgba(231,197,106,.58)}
+    .lx-chat-form button{height:36px;min-width:48px;border-radius:10px;border:1px solid rgba(231,197,106,.52);background:var(--lx-forest);color:var(--lx-gold);font-weight:900}
+    .action-bar{left:auto!important;right:max(10px,env(safe-area-inset-right))!important;bottom:max(10px,env(safe-area-inset-bottom))!important;transform:none!important;display:grid!important;grid-template-columns:repeat(5,44px)!important;grid-template-rows:44px!important;gap:6px!important;width:auto!important;height:44px!important;z-index:84!important;pointer-events:auto!important}
+    .action-bar .stone-slot,.action-bar .stone-slot.ultimate{grid-column:auto!important;grid-row:auto!important;width:44px!important;height:44px!important;border-radius:13px!important;border:1px solid rgba(231,197,106,.56)!important;background:rgba(11,22,24,.92)!important;color:var(--lx-gold)!important;box-shadow:0 7px 18px rgba(0,0,0,.22),inset 0 0 0 1px rgba(255,255,255,.035)!important;font-size:7px!important}
+    .action-bar .stone-slot.ultimate{border-color:rgba(231,197,106,.88)!important;background:linear-gradient(145deg,rgba(25,55,45,.96),rgba(11,22,24,.96))!important}
+    .action-bar .stone-slot span[style*="opacity"]{font-size:13px!important;color:#69837b!important;opacity:.52!important}
+    #kelo-bag,#kelo-builder,#menu-sheet{border-color:rgba(231,197,106,.45)!important;background:rgba(9,18,21,.97)!important;box-shadow:0 16px 36px rgba(0,0,0,.34)!important;color:#e8ede8!important}
+    @media(max-width:360px){.lx-presence{display:none}.lx-top-btn{padding:0 8px}.action-bar{grid-template-columns:repeat(5,41px)!important;gap:5px!important}.action-bar .stone-slot,.action-bar .stone-slot.ultimate{width:41px!important;height:41px!important}}
+  `;
   document.head.appendChild(css);
+
   const root = document.createElement('div');
   root.id = 'kelo-luxe';
-  root.innerHTML = '<div class="lx-top"><button class="lx-shop" id="lx-shop">SHOP</button><div class="lx-pill" id="lx-gold">Oro</div></div><div class="lx-side"><button class="lx-ico" id="lx-stones">Piedras</button><button class="lx-ico" id="lx-menu">Menu</button></div><div class="lx-online">plaza</div><div class="lx-log" id="lx-log"></div><form class="lx-chat" id="lx-form"><input id="lx-in" maxlength="80" placeholder="Escribe..."><button>OK</button></form>';
+  root.innerHTML = `
+    <div class="lx-top">
+      <div class="lx-mark" aria-label="Kelo World">KW</div>
+      <div class="lx-gold"><span class="lx-gold-dot"></span><span id="lx-gold">Oro 0</span></div>
+      <div class="lx-presence"><i></i><span>online</span></div>
+      <div class="lx-spacer"></div>
+      <button class="lx-top-btn" id="lx-shop">Boutique</button>
+      <button class="lx-top-btn lx-menu" id="lx-menu" aria-label="Menu">≡</button>
+    </div>
+    <div class="lx-rail">
+      <button class="lx-rail-btn" id="lx-stones"><b>◇</b>Piedras</button>
+      <button class="lx-rail-btn" id="lx-bag"><b>▣</b>Bolsa</button>
+      <button class="lx-rail-btn" id="lx-chat-toggle"><b>···</b>Chat</button>
+    </div>
+    <div class="lx-chat-drawer" id="lx-chat-drawer">
+      <div class="lx-log" id="lx-log"></div>
+      <form class="lx-chat-form" id="lx-form"><input id="lx-in" maxlength="80" placeholder="Escribe un mensaje…" autocomplete="off"><button>OK</button></form>
+    </div>`;
   document.body.appendChild(root);
-  function gold() {
+
+  function suppressLegacyUI() {
+    const ids = ['kelo-chat','kelo-stones-btn'];
+    ids.forEach(function(id){ const el=document.getElementById(id); if(el) el.style.setProperty('display','none','important'); });
+    const top=document.querySelector('.top-bar'); if(top) top.style.setProperty('display','none','important');
+    Array.from(document.body.children).forEach(function(el){
+      if(el.tagName==='BUTTON' && (el.textContent||'').trim()==='Mochila'){
+        if(!el.id) el.id='kelo-bag-btn';
+        el.style.setProperty('display','none','important');
+      }
+    });
+  }
+  suppressLegacyUI();
+  const legacyObserver = new MutationObserver(suppressLegacyUI);
+  legacyObserver.observe(document.body,{childList:true,subtree:false});
+
+  function updateGold() {
     const el = document.getElementById('lx-gold');
     if (el && typeof STATE !== 'undefined') el.textContent = 'Oro ' + (STATE.gold || 0);
   }
-  gold();
-  setInterval(gold, 1200);
-  document.getElementById('lx-shop').onclick = function () { if (typeof showToast === 'function') showToast('Boutique pronto'); };
-  document.getElementById('lx-stones').onclick = function () { var b = document.getElementById('kelo-stones-btn'); if (b) b.click(); };
+  updateGold();
+  setInterval(updateGold, 1200);
+
+  function toggleDisplay(el){ if(!el)return; el.style.display = el.style.display === 'block' ? 'none' : 'block'; }
+  document.getElementById('lx-stones').onclick = function () {
+    const b = document.getElementById('kelo-stones-btn');
+    if (b && typeof b.onclick === 'function') b.onclick();
+    else { const p=document.getElementById('kelo-builder'); if(p) toggleDisplay(p); }
+  };
+  document.getElementById('lx-bag').onclick = function () { toggleDisplay(document.getElementById('kelo-bag')); };
   document.getElementById('lx-menu').onclick = function () { if (typeof toggleMenu === 'function') toggleMenu(); };
+  document.getElementById('lx-chat-toggle').onclick = function () { document.getElementById('lx-chat-drawer').classList.toggle('open'); };
+
+  function appendChat(who,text){
+    const log=document.getElementById('lx-log'); if(!log)return;
+    const row=document.createElement('div');
+    row.textContent=(who||'Tu')+': '+text;
+    log.appendChild(row); log.scrollTop=log.scrollHeight;
+    while(log.children.length>12) log.removeChild(log.firstChild);
+  }
+  const oldSay = window.keloSay;
+  if (typeof oldSay === 'function' && !oldSay._luxeWrapped) {
+    const wrapped=function(who,text){ oldSay(who,text); appendChat(who,text); };
+    wrapped._luxeWrapped=true;
+    window.keloSay=wrapped;
+  }
   document.getElementById('lx-form').addEventListener('submit', function (e) {
     e.preventDefault();
-    const inp = document.getElementById('lx-in');
-    const t = (inp.value || '').trim();
-    if (!t) return;
-    const log = document.getElementById('lx-log');
-    const row = document.createElement('div');
-    row.textContent = ((typeof localPlayer !== 'undefined' && localPlayer.name) || 'Tu') + ': ' + t;
-    log.appendChild(row);
-    inp.value = '';
+    const inp=document.getElementById('lx-in'); const text=(inp.value||'').trim(); if(!text)return;
+    const who=(typeof localPlayer!=='undefined'&&localPlayer.name)||'Tu';
+    if(typeof window.keloSay==='function') window.keloSay(who,text); else appendChat(who,text);
+    inp.value='';
+  });
+
+  window.KELO_LUXE_AUDIT = Object.freeze({
+    version:'luxe-shell-v2.0',
+    palette:'forest-ivory-gold',
+    legacyHudSuppressed:true,
+    chatCollapsedByDefault:true,
+    persistentHotbarSlots:5,
+    hotbarLayout:'bottom-right-single-row',
+    proceduralEnvironmentArt:false
   });
 })();
