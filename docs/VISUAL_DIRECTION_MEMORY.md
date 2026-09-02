@@ -212,6 +212,16 @@ Kelo World is no longer allowed to remain a single polished plaza floating in a 
 - Validated composition rule: roads and district props must be checked against existing gameplay footprints before approval; visual ground should route around established interactive areas rather than visually slicing through them.
 - Next rural bottleneck: the district now has a readable field boundary but still lacks a strong vertical landmark and layered edge density. A compact barn/silo cluster plus a restrained tree/hedge family is the next safe improvement; avoid adding generic noise to the central field.
 
+## Validated World Road Transitions — World v1.2 / Registry 1.10.0 / 2026-09-02
+- `src/environment/world-map.js` now reuses the existing authored `assets/plaza-transitions-v1.png` atlas and `TileRegistry.transitionMasks` for world-road edges instead of ending marble roads as hard binary rectangles against grass.
+- Each road tile computes the same top/right/bottom/left neighbour mask used by the plaza and draws the authored transition overlay after the base marble tile. The mask queries global world coordinates, so edge decisions remain coherent across cached 512px chunk boundaries.
+- The change is visual-only: road rectangles, district coordinates, movement, collisions, farm state, combat, economy, networking, chat and inventory were not changed.
+- The visual commit `8aa7d10828c8c4480f1f46129a774dfac9f701a9` passed Kelo CI. The audit infrastructure was then aligned with the current world contract in `c6c300dd233052597a73fd1e71e8d8471d6b89cb` because the previous LIVE gate still waited for the obsolete `V5.56`/depth contract.
+- GitHub Pages deployment for the aligned audit commit succeeded. LIVE mobile validation passed at 390x844 CSS / 780x1688 backing canvas with `world-v1.2`, `transitionAssetLoaded=true`, `roadTransitionMode='authored-road-edge-overlay-v1'`, five districts, 512px chunks and registry `1.10.0`.
+- Final LIVE diagnostics were clean: `consoleErrors=[]`, `failedRequests=[]` and `httpErrors=[]`.
+- Manual inspection of `live-road.png` confirms that horizontal and vertical ivory routes now have an authored grass↔marble pixel edge rather than a perfectly hard rectangular boundary. Intersections remain easy to read, the hero silhouette remains clear, and no visible chunk seam appears in the inspected frame.
+- The same screenshot exposes the next largest environment bottleneck: several legacy district buildings still read as large flat wall rectangles with simple polygon roofs/windows and labels, substantially below the hero and ground quality bar. The next safe pass should replace one high-visibility legacy building family with an authored modular architecture atlas/prefab and proper back/front depth layers rather than adding more grass noise.
+
 ## Non-goals During Visual Passes
 Do not casually alter unrelated systems such as:
 - core movement feel;
