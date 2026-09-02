@@ -181,6 +181,17 @@ Kelo World is no longer allowed to remain a single polished plaza floating in a 
 - The same capture exposes the next larger bottleneck: the farm/field rectangles are still large flat brown blocks and read as placeholder geometry beside the hero sprite. The next safe visual pass should replace that geometry with authored soil/crop-edge tiles or a modular rural ground/prop atlas before adding more generic grass noise.
 - The known page-level `appendChild` error and a small number of generic 404 console messages persist; the validated audit recorded zero `requestfailed` entries and no Kelo world/atlas/depth errors.
 
+## Validated Rural Soil — V5.48 / Registry 1.6.0 / Rural v1
+- Added the original modular atlas `assets/rural-soil-v1.png`: 128x128, sixteen 32x32 pixel-art cells, deterministic and reproducible through `scripts/generate_rural_soil.py`.
+- `TileRegistry 1.6.0` owns the rural atlas metadata, named rural tile IDs and the `authored-nine-slice-v1` plot contract instead of leaving soil colors and geometry scattered in `renderFarm()`.
+- Added `src/environment/rural-ground.js`. Each former 90x90 flat brown placeholder is now a 96x96 3x3 composition with authored grass lips, corner/edge tiles, continuous furrows, sparse soil variation and pixel-art crop rows.
+- Farming state and interactions remain unchanged: the same four crop records, planting timers, harvesting and rewards are used; this pass only replaces visual rendering and keeps the legacy renderer as an asset-loading fallback.
+- CI validates environment JavaScript plus the rural PNG signature and exact 128x128 / 4x4 / 32px contract.
+- LIVE audit validated V5.48, registry 1.6.0, `rural-v1`, `renderingMode='authored-nine-slice-v1'`, `plotSize=96`, atlas loaded, fallback disabled, existing world v1.1 and plaza transitions/depth preserved.
+- Manual inspection of the corrected 390x844 Distrito Rural capture confirms that the fields now read as cultivable modular soil rather than large flat rectangles. The hero remains legible over the darker plots and the road/grass contrast is intact.
+- Known unrelated state is unchanged: generic 404 console messages and the pre-existing `appendChild` page error remain; `failedRequests` is still zero and no Kelo rural/world/atlas error appeared.
+- Next largest rural bottleneck: the field art now works, but the surrounding district lacks spatial storytelling. The next safe pass should add a modular fence/gate perimeter, a barn or silo landmark, a dirt approach path and sparse rural vegetation before expanding other districts.
+
 ## Non-goals During Visual Passes
 Do not casually alter unrelated systems such as:
 - core movement feel;
