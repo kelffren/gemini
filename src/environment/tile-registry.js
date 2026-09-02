@@ -16,6 +16,10 @@
     id:'rural-props', src:'assets/rural-props-v1.png?art=170', width:128, height:128,
     tileWidth:TILE, tileHeight:TILE, columns:4
   });
+  const ruralLandmarksAtlas = Object.freeze({
+    id:'rural-landmarks', src:'assets/rural-landmarks-v1.png?art=180', width:256, height:128,
+    tileWidth:TILE, tileHeight:TILE, columns:8
+  });
 
   const tiles = Object.freeze({
     GRASS_A:0, GRASS_B:1, GRASS_C:2, GRASS_FLOWERS:3,
@@ -56,6 +60,11 @@
     DIRT_FULL:8, DIRT_VERTICAL:9, DIRT_HORIZONTAL:10, DIRT_CROSS:11,
     WEED_A:12, STONE_A:13, WEED_B:14, LOG_A:15
   });
+  const ruralLandmarkTiles = Object.freeze({HAY:7,CRATE:15,BUSH:23,FLOWERS:31});
+  const ruralLandmarkSprites = Object.freeze({
+    barn:Object.freeze({sx:0,sy:0,w:160,h:128,baseY:112}),
+    silo:Object.freeze({sx:160,sy:0,w:64,h:128,baseY:116})
+  });
   const transitionMasks = Object.freeze({
     0:15,1:0,2:1,3:5,4:2,5:12,6:6,7:9,8:3,9:4,10:13,11:8,12:7,13:11,14:10,15:14
   });
@@ -69,11 +78,17 @@
       logicalPlotSize:96,
       cropAnchors:Object.freeze([[16,18],[48,18],[80,18],[16,50],[48,50],[80,50]]),
       boundary:Object.freeze({mode:'modular-fence-gate-v1',padding:16,gateSide:'north',dirtApproachTiles:1,propAtlas:'rural-props'})
+    }),
+    ruralLandmarks:Object.freeze({
+      mode:'layered-rural-landmarks-v1',
+      authoredLandmarks:Object.freeze(['barn','silo']),
+      depthMode:'actor-base-y-v1',
+      gameplayFootprint:'visual-only-v1'
     })
   });
   window.KELO_TILE_REGISTRY = Object.freeze({
-    version:'1.7.1', worldTileSize:TILE,
-    atlases:Object.freeze({plaza:atlas,transitions:transitionAtlas,ruralSoil:ruralSoilAtlas,ruralProps:ruralPropsAtlas}),
-    tiles,ruralTiles,ruralPropTiles,families,transitionMasks,styles
+    version:'1.8.0', worldTileSize:TILE,
+    atlases:Object.freeze({plaza:atlas,transitions:transitionAtlas,ruralSoil:ruralSoilAtlas,ruralProps:ruralPropsAtlas,ruralLandmarks:ruralLandmarksAtlas}),
+    tiles,ruralTiles,ruralPropTiles,ruralLandmarkTiles,ruralLandmarkSprites,families,transitionMasks,styles
   });
 })();
