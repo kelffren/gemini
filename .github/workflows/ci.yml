@@ -25,11 +25,16 @@ jobs:
           node --check src/environment/world-map.js
           node --check src/environment/rural-ground.js
           node --check src/environment/rural-landmarks.js
+          node --check src/environment/luxe-compose.js
           node --check engine-a.js
           node --check engine-h.js
           grep -q 'id="toast-container"' index.html
           grep -q 'src/environment/rural-nature-atlas.js' index.html
           grep -q 'src/environment/rural-landmarks.js' index.html
+          if ! grep -q 'DISABLED_PROCEDURAL_ART' src/environment/luxe-compose.js; then
+            echo 'rejected procedural plaza overlay was reactivated'
+            exit 1
+          fi
           if grep -Eq "assets/plaza\.jpg|assets/plaza-sm\.jpg|'plaza\.jpg'" engine-h.js; then
             echo 'legacy missing plaza JPG request detected'
             exit 1
