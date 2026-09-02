@@ -1,14 +1,12 @@
 import fs from 'node:fs';
 import { chromium } from 'playwright';
-
 const base=process.env.AUDIT_URL||'https://kelffren.github.io/gemini/';
-const expectedWorld=process.env.EXPECTED_WORLD||'world-v1.2';
-const expectedRegistry=process.env.EXPECTED_REGISTRY||'1.10.7';
+const expectedWorld=process.env.EXPECTED_WORLD||'world-v1.3';
+const expectedRegistry=process.env.EXPECTED_REGISTRY||'';
 const expectedTitle=process.env.EXPECTED_TITLE||'';
 const expectedArchitectureVersion=process.env.EXPECTED_ARCHITECTURE_VERSION||'';
 const expectedArchitectureMode=process.env.EXPECTED_ARCHITECTURE_MODE||'';
 fs.mkdirSync('artifacts',{recursive:true});
-
 const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_BIN||'/usr/bin/google-chrome',args:['--no-sandbox','--disable-dev-shm-usage']});
 const context=await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true});
 const page=await context.newPage();
@@ -17,76 +15,40 @@ page.on('console',m=>{if(m.type()==='error')consoleErrors.push(m.text())});
 page.on('pageerror',e=>consoleErrors.push(`PAGEERROR: ${e.stack||e.message}`));
 page.on('requestfailed',r=>failedRequests.push({url:r.url(),error:r.failure()?.errorText||'failed'}));
 page.on('response',r=>{if(r.status()>=400)httpErrors.push({status:r.status(),url:r.url()})});
-
-let loaded=false,title='';
+let loaded=false;
 for(let attempt=1;attempt<=24;attempt++){
   try{
     await page.goto(`${base}?world-audit=${Date.now()}-${attempt}`,{waitUntil:'networkidle',timeout:45000});
-    title=await page.title();
-    const d=await page.evaluate(()=>({world:window.KELO_WORLD_AUDIT||null,registry:window.KELO_TILE_REGISTRY?.version||null,compose:window.KELO_LUXE_COMPOSE||null,kiosk:window.KELO_LUXE_KIOSK||null,market:window.KELO_MARKET_PAVILION||null,architectureRenderer:window.KELO_ARCHITECTURE_RENDERER||null,legacyHouses:window.KELO_LEGACY_HOUSE_RENDERER||null}));
-    const titleReady=!expectedTitle||title===expectedTitle;
-    const architectureReady=(!expectedArchitectureVersion||d.architectureRenderer?.version===expectedArchitectureVersion)&&(!expectedArchitectureMode||d.architectureRenderer?.mode===expectedArchitectureMode);
-    const legacyReady=d.legacyHouses?.version==='legacy-house-authored-overlap-v1'&&d.legacyHouses?.suppressedTitles?.includes('Mercado')&&d.legacyHouses?.suppressedTitles?.includes('Atelier')&&!d.legacyHouses?.visibleTitles?.includes('Mercado');
-    if(titleReady&&architectureReady&&legacyReady&&d.world?.ready&&d.world?.version===expectedWorld&&d.world?.assetLoaded&&d.world?.transitionAssetLoaded&&d.world?.roadTransitionMode==='authored-road-edge-overlay-v1'&&d.registry===expectedRegistry&&d.architectureRenderer?.ready&&d.architectureRenderer?.rendererWrapped&&d.architectureRenderer?.depthWrapped&&d.architectureRenderer?.prefabCount>=3&&d.kiosk?.ready&&d.kiosk?.depthWrapped&&d.kiosk?.depthOcclusion&&d.kiosk?.depthMode==='building-base-y-occlusion-v1'&&d.kiosk?.source==='tile-registry-architecture-prefab'&&d.kiosk?.prefabId==='luxe-boutique-central'&&d.market?.ready&&d.market?.legacyHidden&&(!d.compose||d.compose.disabled===true)){loaded=true;break}
-    console.log(`attempt ${attempt}: title=${JSON.stringify(title)} world=${d.world?.version||'missing'} registry=${d.registry||'missing'} architecture=${d.architectureRenderer?.version||'missing'} houses=${d.legacyHouses?.version||'missing'} suppressed=${JSON.stringify(d.legacyHouses?.suppressedTitles||[])}`);
-  }catch(err){console.log(`attempt ${attempt}: ${err.message}`)}
+    const d=await page.evaluate(()=>({title:document.title,world:window.KELO_WORLD_AUDIT||null,registry:window.KELO_TILE_REGISTRY||null,architecture:window.KELO_ARCHITECTURE_RENDERER||null,kiosk:window.KELO_LUXE_KIOSK||null,market:window.KELO_MARKET_PAVILION||null}));
+    const okTitle=!expectedTitle||d.title===expectedTitle;
+    const okArch=(!expectedArchitectureVersion||d.architecture?.version===expectedArchitectureVersion)&&(!expectedArchitectureMode||d.architecture?.mode===expectedArchitectureMode);
+    if(okTitle&&okArch&&d.world?.ready&&d.world?.version===expectedWorld&&d.world?.grassVariationAssetLoaded&&d.world?.grassVariationMode==='authored-eight-variant-atlas-v1'&&d.world?.grassVariationCount===8&&d.registry?.version===expectedRegistry&&d.registry?.atlases?.grassVariation?.src?.includes('grass-variation-v1.png')&&d.architecture?.prefabCount===1&&d.kiosk?.ready&&d.market?.disabled===true){loaded=true;break;}
+  }catch(e){console.log(`attempt ${attempt}: ${e.message}`)}
   await page.waitForTimeout(10000);
 }
-
 consoleErrors.length=0;failedRequests.length=0;httpErrors.length=0;
 await page.goto(`${base}?world-audit=final-${Date.now()}`,{waitUntil:'networkidle',timeout:45000});
-await page.waitForTimeout(3500);
-const state=await page.evaluate(()=>({
-  title:document.title,
-  world:window.KELO_WORLD_AUDIT||null,
-  registryVersion:window.KELO_TILE_REGISTRY?.version||null,
-  architecture:window.KELO_TILE_REGISTRY?.styles?.architecture||null,
-  architectureRenderer:window.KELO_ARCHITECTURE_RENDERER||null,
-  legacyHouses:window.KELO_LEGACY_HOUSE_RENDERER||null,
-  rural:window.KELO_RURAL_GROUND_AUDIT||null,
-  landmarks:window.KELO_RURAL_LANDMARK_AUDIT||null,
-  kiosk:window.KELO_LUXE_KIOSK||null,
-  market:window.KELO_MARKET_PAVILION||null,
-  compose:window.KELO_LUXE_COMPOSE||null,
-  canvas:(()=>{const c=document.getElementById('game-canvas');return c?{width:c.width,height:c.height,cssWidth:c.clientWidth,cssHeight:c.clientHeight}:null})()
-}));
+await page.waitForTimeout(2500);
+const state=await page.evaluate(()=>({title:document.title,world:window.KELO_WORLD_AUDIT||null,registryVersion:window.KELO_TILE_REGISTRY?.version||null,architectureRenderer:window.KELO_ARCHITECTURE_RENDERER||null,kiosk:window.KELO_LUXE_KIOSK||null,market:window.KELO_MARKET_PAVILION||null,canvas:(()=>{const c=document.getElementById('game-canvas');return c?{width:c.width,height:c.height,cssWidth:c.clientWidth,cssHeight:c.clientHeight}:null})()}));
 await page.screenshot({path:'artifacts/live-mobile.png',fullPage:false});
-const architectureFrame=await page.evaluate(()=>{
-  if(typeof camera==='undefined'||typeof localPlayer==='undefined'||typeof render!=='function')return null;
-  const c=document.getElementById('game-canvas');if(!c)return null;
-  localPlayer.x=1280;localPlayer.y=1400;camera.x=1280;camera.y=1400;camera.targetX=1280;camera.targetY=1400;render();
-  return {dataUrl:c.toDataURL('image/png'),occluding:!!window.KELO_LUXE_KIOSK?.isOccluding?.(localPlayer),legacyHouses:window.KELO_LEGACY_HOUSE_RENDERER||null};
+const grass=await page.evaluate(()=>{
+  const c=document.getElementById('game-canvas');if(!c||typeof camera==='undefined'||typeof localPlayer==='undefined'||typeof render!=='function')return null;
+  localPlayer.x=760;localPlayer.y=760;camera.x=760;camera.y=760;camera.targetX=760;camera.targetY=760;render();
+  const px=c.getContext('2d').getImageData(0,0,c.width,c.height).data;let base=0,light=0,dark=0,pink=0,blue=0;
+  for(let i=0;i<px.length;i+=4){const r=px[i],g=px[i+1],b=px[i+2],a=px[i+3];if(a<200)continue;if(r===72&&g===198&&b===55)base++;if(r===91&&g===218&&b===68)light++;if(r===50&&g===157&&b===44)dark++;if(r===242&&g===130&&b===178)pink++;if(r===104&&g===159&&b===229)blue++;}
+  return{dataUrl:c.toDataURL('image/png'),base,light,dark,pink,blue};
 });
-if(architectureFrame?.dataUrl?.startsWith('data:image/png;base64,'))fs.writeFileSync('artifacts/live-architecture.png',Buffer.from(architectureFrame.dataUrl.split(',')[1],'base64'));
-const marketFrame=await page.evaluate(()=>{
-  if(typeof camera==='undefined'||typeof localPlayer==='undefined'||typeof render!=='function')return null;
-  const c=document.getElementById('game-canvas');if(!c)return null;
-  localPlayer.x=1400;localPlayer.y=1900;camera.x=1400;camera.y=1900;camera.targetX=1400;camera.targetY=1900;render();
-  return {dataUrl:c.toDataURL('image/png'),occluding:!!window.KELO_MARKET_PAVILION?.isOccluding?.(localPlayer)};
-});
-if(marketFrame?.dataUrl?.startsWith('data:image/png;base64,'))fs.writeFileSync('artifacts/live-market.png',Buffer.from(marketFrame.dataUrl.split(',')[1],'base64'));
-const report={loaded,title,expectedTitle,expectedWorld,expectedRegistry,expectedArchitectureVersion,expectedArchitectureMode,state,architectureOccluding:architectureFrame?.occluding||false,marketOccluding:marketFrame?.occluding||false,consoleErrors,failedRequests,httpErrors};
-fs.writeFileSync('artifacts/report.json',JSON.stringify(report,null,2));
-console.log(JSON.stringify(report,null,2));
+if(grass?.dataUrl?.startsWith('data:image/png;base64,'))fs.writeFileSync('artifacts/live-grass.png',Buffer.from(grass.dataUrl.split(',')[1],'base64'));
+const report={loaded,state,grass:grass?{base:grass.base,light:grass.light,dark:grass.dark,pink:grass.pink,blue:grass.blue}:null,consoleErrors,failedRequests,httpErrors};
+fs.writeFileSync('artifacts/report.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));
 await browser.close();
-
-if(!loaded)throw new Error(`LIVE never reached title ${JSON.stringify(expectedTitle)} / ${expectedWorld} / registry ${expectedRegistry} / architecture ${expectedArchitectureVersion} ${expectedArchitectureMode} with authored legacy-facade suppression`);
-if(expectedTitle&&state.title!==expectedTitle)throw new Error(`Title mismatch ${JSON.stringify(state.title)} !== ${JSON.stringify(expectedTitle)}`);
-if(!state.world?.ready||state.world?.version!==expectedWorld||!state.world?.assetLoaded||!state.world?.transitionAssetLoaded)throw new Error('World renderer or authored transition atlas not ready');
-if(state.world?.roadTransitionMode!=='authored-road-edge-overlay-v1')throw new Error(`Unexpected road transition mode: ${state.world?.roadTransitionMode}`);
-if(state.world?.chunkSize!==512||state.world?.districtCount<5||state.world?.ruralRoadMode!=='farm-bypass-v1')throw new Error('World geometry contract regressed');
+if(!loaded)throw new Error('LIVE never reached current Luxe-only grass-atlas contract');
+if(expectedTitle&&state.title!==expectedTitle)throw new Error(`Title mismatch ${state.title} !== ${expectedTitle}`);
+if(state.world?.version!==expectedWorld||!state.world?.grassVariationAssetLoaded||state.world?.grassVariationCount!==8)throw new Error('Grass variation renderer contract invalid');
 if(state.registryVersion!==expectedRegistry)throw new Error(`Registry mismatch ${state.registryVersion} !== ${expectedRegistry}`);
-if(state.architecture?.mode!=='authored-layered-raster-v1'||state.architecture?.depthMode!=='building-base-y-occlusion-v1'||state.architecture?.prefabContract!=='registry-asset-placement-collision-v1'||state.architecture?.rendererMode!=='generic-prefab-list-v1')throw new Error('Architecture registry contract missing');
-if(!state.architectureRenderer?.ready||!state.architectureRenderer?.rendererWrapped||!state.architectureRenderer?.depthWrapped||state.architectureRenderer?.prefabCount<3)throw new Error('Generic architecture renderer invalid');
-if(expectedArchitectureVersion&&state.architectureRenderer?.version!==expectedArchitectureVersion)throw new Error(`Architecture renderer version mismatch ${state.architectureRenderer?.version} !== ${expectedArchitectureVersion}`);
-if(expectedArchitectureMode&&state.architectureRenderer?.mode!==expectedArchitectureMode)throw new Error(`Architecture renderer mode mismatch ${state.architectureRenderer?.mode} !== ${expectedArchitectureMode}`);
-if(state.legacyHouses?.version!=='legacy-house-authored-overlap-v1'||state.legacyHouses?.suppressionMode!=='luxe-prefab-overlap-ratio-v1')throw new Error('Legacy house renderer suppression contract missing');
-if(!state.legacyHouses?.suppressedTitles?.includes('Mercado')||!state.legacyHouses?.suppressedTitles?.includes('Atelier')||state.legacyHouses?.visibleTitles?.includes('Mercado')||state.legacyHouses?.visibleTitles?.includes('Atelier'))throw new Error(`Covered legacy facades still active: ${JSON.stringify(state.legacyHouses)}`);
-if(!state.kiosk?.ready||state.kiosk?.failed||!state.kiosk?.rendererWrapped||!state.kiosk?.depthWrapped||!state.kiosk?.depthOcclusion||state.kiosk?.source!=='tile-registry-architecture-prefab'||state.kiosk?.prefabId!=='luxe-boutique-central')throw new Error('Authored boutique architecture prefab layer invalid');
-if(!state.market?.ready||state.market?.failed||!state.market?.rendererWrapped||!state.market?.depthWrapped||!state.market?.legacyHidden||state.market?.source!=='tile-registry-architecture-prefab'||state.market?.prefabId!=='market-pavilion-south')throw new Error('Authored market architecture prefab layer invalid');
-if(!architectureFrame?.dataUrl?.startsWith('data:image/png;base64,')||!architectureFrame?.occluding)throw new Error('Boutique architecture depth screenshot capture failed');
-if(!marketFrame?.dataUrl?.startsWith('data:image/png;base64,')||!marketFrame?.occluding)throw new Error('Market architecture depth screenshot capture failed');
-if(state.compose&&state.compose.disabled!==true)throw new Error('Rejected procedural environment art is active');
-if(httpErrors.length)throw new Error(`HTTP errors: ${JSON.stringify(httpErrors)}`);
-if(failedRequests.length)throw new Error(`Failed requests: ${JSON.stringify(failedRequests)}`);
+if(state.architectureRenderer?.prefabCount!==1||state.architectureRenderer?.mode!=='luxe-only-v1')throw new Error('Luxe-only architecture contract invalid');
+if(!state.kiosk?.ready||state.kiosk?.failed||state.market?.disabled!==true)throw new Error('Luxe architecture state invalid');
+if(!grass?.dataUrl?.startsWith('data:image/png;base64,')||grass.base<1000||grass.light<20||grass.dark<20||(grass.pink+grass.blue)<2)throw new Error(`Authored grass pixels missing: ${JSON.stringify(grass)}`);
 if(consoleErrors.length)throw new Error(`Console/page errors: ${JSON.stringify(consoleErrors)}`);
+if(failedRequests.length)throw new Error(`Failed requests: ${JSON.stringify(failedRequests)}`);
+if(httpErrors.length)throw new Error(`HTTP errors: ${JSON.stringify(httpErrors)}`);
