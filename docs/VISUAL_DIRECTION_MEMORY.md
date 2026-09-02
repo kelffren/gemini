@@ -222,6 +222,16 @@ Kelo World is no longer allowed to remain a single polished plaza floating in a 
 - Manual inspection of `live-road.png` confirms that horizontal and vertical ivory routes now have an authored grass↔marble pixel edge rather than a perfectly hard rectangular boundary. Intersections remain easy to read, the hero silhouette remains clear, and no visible chunk seam appears in the inspected frame.
 - The same screenshot exposes the next largest environment bottleneck: several legacy district buildings still read as large flat wall rectangles with simple polygon roofs/windows and labels, substantially below the hero and ground quality bar. The next safe pass should replace one high-visibility legacy building family with an authored modular architecture atlas/prefab and proper back/front depth layers rather than adding more grass noise.
 
+## Validated Authored Architecture Depth — V5.65 / Registry 1.10.1 / 2026-09-02
+- `TileRegistry` now owns an `architectureAssets` family and the `styles.architecture` contract. The existing authored Kelo Luxe boutique raster is registered as architecture rather than being hard-coded only inside its renderer.
+- `src/environment/luxe-kiosk-atlas.js` keeps the same authored artwork, world footprint, interaction and collision, but adds actor-specific front occlusion with `depthMode='building-base-y-occlusion-v1'`. Only the actor-sized clipped region is repainted above actors that are physically behind the building, so foreground actors are not accidentally hidden.
+- The change is visual/render-layer only: movement, collision geometry, farming, combat, economy, networking, chat and inventory were not modified.
+- Commit `47e048f604bd036edc9ec7ff7037878852543cca` passed Kelo CI and GitHub Pages deployment.
+- LIVE mobile validation passed at 390x844 CSS / 780x1688 backing canvas with `world-v1.2`, registry `1.10.1`, architecture mode `authored-layered-raster-v1`, `depthWrapped=true`, `depthOcclusion=true` and `architectureOccluding=true` in the dedicated behind-building capture.
+- Final LIVE diagnostics were clean: `consoleErrors=[]`, `failedRequests=[]` and `httpErrors=[]`.
+- Manual inspection of `live-architecture.png` confirms that the player's body is correctly hidden by the boutique volume while the authored facade remains crisp and intact. The name label remains visible, which preserves multiplayer identification without flattening the building depth cue.
+- The same capture makes the next largest bottleneck unambiguous: the adjacent legacy brown building still reads as a flat placeholder rectangle with a simple window and roof, far below the authored boutique, hero and ground quality. The next safe pass should replace one legacy architecture family with an authored modular facade/prefab through the new architecture registry contract, rather than adding more ground decoration.
+
 ## Non-goals During Visual Passes
 Do not casually alter unrelated systems such as:
 - core movement feel;
