@@ -70,8 +70,6 @@
     const r = actor.radius || 20;
     g.save();
     g.beginPath();
-    // Repaint only the actor-sized window of the authored building. This keeps
-    // other actors in front of the facade while correctly hiding this actor behind it.
     g.rect(actor.x - r - 16, actor.y - r - 50, r * 2 + 32, r * 2 + 66);
     g.clip();
     drawBoutique(g);
@@ -213,13 +211,15 @@
 (function () {
   'use strict';
   const REGISTRY = window.KELO_TILE_REGISTRY;
-  if (!REGISTRY?.styles?.architecture || typeof window.KELO_WORLD_RENDERER?.draw !== 'function') {
-    console.error('[Kelo market pavilion] architecture layer unavailable');
+  const ARCH = REGISTRY?.architectureAssets?.marketPavilion;
+  const PREFAB = REGISTRY?.architecturePrefabs?.marketPavilion;
+  if (!REGISTRY?.styles?.architecture || !ARCH || !PREFAB || typeof window.KELO_WORLD_RENDERER?.draw !== 'function') {
+    console.error('[Kelo market pavilion] registry architecture prefab unavailable');
     return;
   }
-  const ASSET = 'assets/market-pavilion-v1.png?art=220';
-  const PAVILION = Object.freeze({x:1288,y:1790,w:224,h:160,baseY:1950});
-  const COLLISION = Object.freeze({x:1300,y:1870,w:200,h:80});
+  const ASSET = ARCH.src;
+  const PAVILION = Object.freeze({x:PREFAB.x,y:PREFAB.y,w:ARCH.worldWidth,h:ARCH.worldHeight,baseY:PREFAB.y+PREFAB.baseYOffset});
+  const COLLISION = PREFAB.collision;
   const img = new Image();
   let ready=false, failed=false, wrapped=false, depthWrapped=false, legacyHidden=false;
 
@@ -232,8 +232,6 @@
   }
   function installLegacyVisualReplacement(){
     if(typeof obstacles==='undefined'||!Array.isArray(obstacles))return false;
-    // The obstacle geometry remains gameplay-authoritative. Only suppress its old
-    // flat debug-style fill anywhere it overlaps this authored architecture footprint.
     for(const o of obstacles){
       if(!o||o._luxeBoutiqueCollision||!overlaps(o,COLLISION))continue;
       o.noDraw=true;o._marketPavilionVisual=true;
@@ -282,7 +280,7 @@
   img.src=ASSET;
   install();setTimeout(install,120);setTimeout(install,600);
   window.KELO_MARKET_PAVILION=Object.freeze({
-    version:'authored-market-pavilion-v1.1',asset:ASSET,source:'authored-raster-architecture-family',
+    version:'authored-market-pavilion-v1.2',asset:ASSET,source:'tile-registry-architecture-prefab',prefabId:PREFAB.id,
     geometry:PAVILION,collision:COLLISION,depthMode:REGISTRY.styles.architecture.depthMode,
     isOccluding:actorBehind,get ready(){return ready},get failed(){return failed},get rendererWrapped(){return wrapped},get depthWrapped(){return depthWrapped},get legacyHidden(){return legacyHidden}
   });
