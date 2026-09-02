@@ -152,6 +152,17 @@ Refactor the environment renderer so it is no longer tied to a single hard-coded
 - Current audit still reports four generic 404 resource errors and one unrelated `appendChild` page error. These remain outside the visual transition change and should be handled as a separate debugging pass rather than mixed into environment art work.
 - Current largest visual bottleneck after registry 1.3.1 is authored transition/composition quality: proper straight/inner/outer grass↔marble tiles are still missing, the remaining high-contrast diagonal/gold accent squares now look comparatively sticker-like, and props/vegetation remain simpler than the character art.
 
+## Validated Visual State — V5.45 / Registry 1.4.0
+- The renderer now consumes a second modular atlas, `assets/plaza-transitions-v1.png`, independently from the 512x512 ground/prop atlas. This is the first production use of multiple environment atlases in the plaza pipeline.
+- `plaza-transitions-v1.png` is an original 128x128 transparent overlay atlas made from sixteen 32x32 cells. The registry maps all 4-neighbour top/right/bottom/left boundary masks to authored edge/corner/multi-edge tiles.
+- `engine-l.js` no longer draws grass↔marble seams with procedural `fillRect` strips and generated tufts. The transition layer now selects an authored overlay tile from neighbour topology and renders it between ground and props.
+- Automatic high-contrast gold/green decorative squares were removed from the broad marble floor composition. Premium accents should be authored as sparse decals or props instead of being injected into the navigation material.
+- LIVE mobile audit validated `V5.45`, `registryVersion=1.4.0`, `sourceMode=authored-transition-atlas-v1`, `authoredTransitions=true`, both atlases loaded, `fallbackActive=false`, 32x32 logical tiles, and a 390x844 CSS / 780x1688 backing canvas.
+- Manual LIVE screenshot inspection validated cleaner continuous ivory paths with visibly softer, more organic grass edges and corner joins. The previous sticker-like gold/diagonal floor interruptions are absent from the broad path surface.
+- QA finding: the first V5.45 audit failed despite the deployed page being correct because `.github/workflows/live-audit.yml` still overrode the script with `EXPECTED_BUILD=V5.44`. The workflow and script expectations must always be updated together; the corrected rerun passed.
+- The audit still shows four generic 404 resource errors plus the pre-existing unrelated `appendChild` page error. No new Kelo plaza/tileset/transition-atlas console error was introduced.
+- Current largest visual bottleneck is now prop and vegetation quality relative to the hero sprite: trees, lamps, columns and some plaza furniture still read flatter/simpler than the characters. The next high-impact visual pass should introduce a modular `nature_props`/`plaza_props` atlas with stronger silhouettes, richer shading, and front/back layering. If future paths become more irregular than the current plaza geometry, extend transition selection from 4-neighbour masks to diagonal-aware/8-neighbour inner-corner variants.
+
 ## Non-goals During Visual Passes
 Do not casually alter unrelated systems such as:
 - core movement feel;
