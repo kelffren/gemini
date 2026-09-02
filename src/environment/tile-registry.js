@@ -56,11 +56,16 @@
       mode:'authored-overlay-atlas',
       neighbourMask:'TRBL',
       softenStickerAccents:true
+    }),
+    propDepth:Object.freeze({
+      mode:'y-occlusion-overlay-v1',
+      localActorIntersection:true,
+      frontOccluders:Object.freeze(['fountain','column','tree','lamp'])
     })
   });
 
   window.KELO_TILE_REGISTRY = Object.freeze({
-    version:'1.4.0',
+    version:'1.4.1',
     worldTileSize:TILE,
     atlases:Object.freeze({plaza:atlas, transitions:transitionAtlas}),
     tiles,
