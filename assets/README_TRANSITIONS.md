@@ -1,0 +1,1 @@
+plaza-transitions-v1.png is a transparent 32px modular transition overlay atlas used by the plaza renderer. It is original Kelo World art and is not copied from external references.
