@@ -47,10 +47,11 @@ jobs:
           grep -q "plazaNature:plazaNatureAtlas" src/environment/tile-registry.js
           grep -q "grassMode:'authored-eight-variant-atlas-v1'" src/environment/tile-registry.js
           grep -q "grassVariationMode:'authored-eight-variant-atlas-v1'" src/environment/world-map.js
-          grep -q "plaza-fountain-v1.1" src/environment/plaza-depth.js
+          grep -q "plaza-fountain-v1.2" src/environment/plaza-depth.js
+          grep -q "final-composite-back-actor-front-v2" src/environment/plaza-depth.js
           grep -q "fountain-back-v1.png" src/environment/plaza-depth.js
           grep -q "fountain-front-v1.png" src/environment/plaza-depth.js
-          grep -q "plaza-depth.js?v=210" index.html
+          grep -q "plaza-depth.js?v=211" index.html
           if ! grep -q 'DISABLED_PROCEDURAL_ART' src/environment/luxe-compose.js; then
             echo 'rejected procedural plaza overlay was reactivated'
             exit 1
