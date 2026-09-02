@@ -38,13 +38,7 @@
       const id = entry.ids[r * entry.w + c];
       if (id == null) continue;
       const p = atlasOrigin(id);
-      ctx.drawImage(
-        sheet,
-        p.x, p.y, TILE, TILE,
-        PLAZA.x + (entry.gx + c) * TILE,
-        PLAZA.y + (entry.gy + r) * TILE,
-        TILE, TILE
-      );
+      ctx.drawImage(sheet,p.x,p.y,TILE,TILE,PLAZA.x + (entry.gx + c) * TILE,PLAZA.y + (entry.gy + r) * TILE,TILE,TILE);
     }
   }
 
@@ -79,14 +73,14 @@
     }
     ready = true;
     if (window.KELO_PLAZA_AUDIT) {
-      window.KELO_PLAZA_AUDIT.version = 'V5.46';
+      window.KELO_PLAZA_AUDIT.version = 'V5.47';
       window.KELO_PLAZA_AUDIT.registryVersion = REGISTRY.version;
       window.KELO_PLAZA_AUDIT.depthOcclusion = true;
       window.KELO_PLAZA_AUDIT.depthOccluderCount = OCCLUDERS.length;
     }
   };
   sheet.onerror = function () { console.error('[Kelo plaza depth] atlas load failed'); };
-  sheet.src = ATLAS.src + '&depth=146';
+  sheet.src = ATLAS.src + '&depth=147';
 
   const previousRender = window.render;
   window.render = function () {
