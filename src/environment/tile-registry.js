@@ -30,19 +30,6 @@
     luxeBoutique:Object.freeze({
       id:'luxe-boutique', src:'assets/kelo-luxe-boutique.png?v=6', width:192, height:222,
       worldWidth:192, worldHeight:222, family:'architecture'
-    }),
-    marketPavilion:Object.freeze({
-      id:'market-pavilion', src:'assets/market-pavilion-v1.png?art=220', width:224, height:160,
-      worldWidth:224, worldHeight:160, family:'architecture'
-    }),
-    commerceArcade:Object.freeze({
-      id:'commerce-arcade', src:'assets/commerce-arcade-v1.svg?v=6', width:160, height:432,
-      worldWidth:160, worldHeight:432, family:'architecture', variant:'north-corner-endcap-v1',
-      modules:Object.freeze(['courtyard','mainEntrance','secondaryBays','northCornerEndcap'])
-    }),
-    bancoHall:Object.freeze({
-      id:'banco-hall', src:'assets/banco-hall-v1.svg?v=2', width:160, height:128,
-      worldWidth:160, worldHeight:128, family:'architecture'
     })
   });
   const architecturePrefabs = Object.freeze({
@@ -51,24 +38,6 @@
       collision:Object.freeze({x:1140,y:1488,w:136,h:52}),
       interaction:Object.freeze({x:1208,y:1552,radius:90}),
       occlusion:Object.freeze({sideInset:9,topInset:40,bottomPadding:4,clip:Object.freeze({xPadding:7,topPadding:24,bottomPadding:7})}),
-      legacyVisualReplacement:true
-    }),
-    marketPavilion:Object.freeze({
-      id:'market-pavilion-south', asset:'marketPavilion', x:1288, y:1790, baseYOffset:160,
-      collision:Object.freeze({x:1300,y:1870,w:200,h:80}),
-      occlusion:Object.freeze({sideInset:14,topInset:36,bottomPadding:80,clip:Object.freeze({xPadding:14,topPadding:52,bottomPadding:18})}),
-      legacyVisualReplacement:true
-    }),
-    commerceArcade:Object.freeze({
-      id:'commerce-arcade-east', asset:'commerceArcade', x:1510, y:1384, baseYOffset:416,
-      collision:Object.freeze({x:1530,y:1400,w:120,h:400}),
-      occlusion:Object.freeze({sideInset:12,topInset:20,bottomPadding:16,clip:Object.freeze({xPadding:12,topPadding:36,bottomPadding:16})}),
-      legacyVisualReplacement:true
-    }),
-    bancoHall:Object.freeze({
-      id:'banco-hall-central', asset:'bancoHall', x:1648, y:1344, baseYOffset:128,
-      collision:Object.freeze({x:1664,y:1376,w:128,h:96}),
-      occlusion:Object.freeze({sideInset:12,topInset:28,bottomPadding:10,clip:Object.freeze({xPadding:10,topPadding:24,bottomPadding:10})}),
       legacyVisualReplacement:true
     })
   });
@@ -151,7 +120,7 @@
     })
   });
   window.KELO_TILE_REGISTRY = Object.freeze({
-    version:'1.10.17', worldTileSize:TILE,
+    version:'1.10.18', worldTileSize:TILE,
     atlases:Object.freeze({plaza:atlas,transitions:transitionAtlas,ruralSoil:ruralSoilAtlas,ruralProps:ruralPropsAtlas,ruralLandmarks:ruralLandmarksAtlas,ruralNature:ruralNatureAtlas}),
     architectureAssets,architecturePrefabs,
     tiles,ruralTiles,ruralPropTiles,ruralLandmarkTiles,ruralLandmarkSprites,ruralNatureTiles,ruralNatureSprites,families,transitionMasks,styles
