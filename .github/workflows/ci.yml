@@ -37,8 +37,8 @@ jobs:
           grep -q 'src/environment/rural-landmarks.js' index.html
           grep -q 'src/ui/luxe-shell.js' index.html
           grep -q 'src/ui/luxe-boutique.js' index.html
-          grep -q "luxe-shell-v2.0" src/ui/luxe-shell.js
-          grep -q "forest-ivory-gold" src/ui/luxe-shell.js
+          grep -q "kelo-luxe-v3-style" src/ui/luxe-shell.js
+          grep -q -- "--lx-forest:#173f36" src/ui/luxe-shell.js
           grep -q "authored-market-pavilion-v1" src/environment/luxe-kiosk-atlas.js
           if ! grep -q 'DISABLED_PROCEDURAL_ART' src/environment/luxe-compose.js; then
             echo 'rejected procedural plaza overlay was reactivated'
