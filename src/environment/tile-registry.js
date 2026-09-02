@@ -18,6 +18,15 @@
     tileHeight: TILE,
     columns: 4
   });
+  const ruralSoilAtlas = Object.freeze({
+    id: 'rural-soil',
+    src: 'assets/rural-soil-v1.png?art=160',
+    width: 128,
+    height: 128,
+    tileWidth: TILE,
+    tileHeight: TILE,
+    columns: 4
+  });
 
   const tiles = Object.freeze({
     GRASS_A:0, GRASS_B:1, GRASS_C:2, GRASS_FLOWERS:3,
@@ -53,6 +62,12 @@
     default:Object.freeze({detailEvery:53, detailCluster:false, marbleAccentEvery:0})
   });
 
+  const ruralTiles = Object.freeze({
+    TOP_LEFT:0, TOP:1, TOP_RIGHT:2, CENTER_ALT_A:3,
+    LEFT:4, CENTER:5, RIGHT:6, CENTER_ALT_B:7,
+    BOTTOM_LEFT:8, BOTTOM:9, BOTTOM_RIGHT:10, CENTER_ALT_C:11
+  });
+
   // 4-neighbour mask: top=1, right=2, bottom=4, left=8.
   // Every combination maps to one authored transparent overlay tile.
   const transitionMasks = Object.freeze({
@@ -74,14 +89,21 @@
     districtGround:Object.freeze({
       mode:'district-profile-v1',
       profiles:districtGroundStyles
+    }),
+    ruralFarm:Object.freeze({
+      mode:'authored-nine-slice-v1',
+      plotTiles:Object.freeze([0,1,2,4,5,6,8,9,10]),
+      logicalPlotSize:96,
+      cropAnchors:Object.freeze([[16,18],[48,18],[80,18],[16,50],[48,50],[80,50]])
     })
   });
 
   window.KELO_TILE_REGISTRY = Object.freeze({
-    version:'1.5.0',
+    version:'1.6.0',
     worldTileSize:TILE,
-    atlases:Object.freeze({plaza:atlas, transitions:transitionAtlas}),
+    atlases:Object.freeze({plaza:atlas, transitions:transitionAtlas, ruralSoil:ruralSoilAtlas}),
     tiles,
+    ruralTiles,
     families,
     transitionMasks,
     styles

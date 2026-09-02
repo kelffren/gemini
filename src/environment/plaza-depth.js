@@ -73,7 +73,7 @@
     }
     ready = true;
     if (window.KELO_PLAZA_AUDIT) {
-      window.KELO_PLAZA_AUDIT.version = 'V5.47';
+      window.KELO_PLAZA_AUDIT.version = 'V5.48';
       window.KELO_PLAZA_AUDIT.registryVersion = REGISTRY.version;
       window.KELO_PLAZA_AUDIT.depthOcclusion = true;
       window.KELO_PLAZA_AUDIT.depthOccluderCount = OCCLUDERS.length;

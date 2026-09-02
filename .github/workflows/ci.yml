@@ -18,3 +18,18 @@ jobs:
           grep -q "engine-net.js" index.html
       - name: Server syntax
         run: node --check server/index.js
+      - name: Environment syntax and rural atlas contract
+        run: |
+          node --check src/environment/tile-registry.js
+          node --check src/environment/world-map.js
+          node --check src/environment/rural-ground.js
+          python3 - <<'PY'
+          import struct
+          path='assets/rural-soil-v1.png'
+          header=open(path,'rb').read(24)
+          assert header[:8] == b'\x89PNG\r\n\x1a\n'
+          width,height=struct.unpack('>II',header[16:24])
+          assert (width,height)==(128,128),(width,height)
+          assert width%32==0 and height%32==0
+          print('PASS rural soil atlas',width,height,'tile=32 grid=4x4')
+          PY

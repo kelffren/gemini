@@ -39,6 +39,7 @@ test.describe('Kelo World live Pages harness', () => {
       zone: window.keloZone || null,
       cafeBtn: !!document.getElementById('kelo-cafe-btn'),
       cafeBtnText: (document.getElementById('kelo-cafe-btn') || {}).textContent || null,
+      ruralAudit: window.KELO_RURAL_GROUND_AUDIT || null,
     }));
     fs.writeFileSync('test-results/boot-report.json', JSON.stringify({
       url: page.url(), httpStatus: res.status(), title,
@@ -47,6 +48,9 @@ test.describe('Kelo World live Pages harness', () => {
       probe, consoleErrors, pageErrors, failedRequests: failed, status400,
     }, null, 2));
     expect(probe.canvasW).toBeGreaterThan(0);
+    expect(probe.ruralAudit && probe.ruralAudit.ready).toBe(true);
+    expect(probe.ruralAudit.renderingMode).toBe('authored-nine-slice-v1');
+    expect(probe.ruralAudit.plotSize).toBe(96);
 
     const beforeKeys = await page.evaluate(pos);
     await page.keyboard.down('d');

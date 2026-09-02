@@ -2,12 +2,13 @@ import fs from 'node:fs';
 import { chromium } from 'playwright';
 
 const base = process.env.AUDIT_URL || 'https://kelffren.github.io/gemini/';
-const expected = process.env.EXPECTED_BUILD || 'V5.47';
-const expectedRegistry = process.env.EXPECTED_REGISTRY || '1.5.0';
+const expected = process.env.EXPECTED_BUILD || 'V5.48';
+const expectedRegistry = process.env.EXPECTED_REGISTRY || '1.6.0';
 fs.mkdirSync('artifacts', { recursive: true });
 if (fs.existsSync('assets/tileset-vclean.png')) fs.copyFileSync('assets/tileset-vclean.png', 'artifacts/repo-tileset.png');
 else if (fs.existsSync('assets/tileset.png')) fs.copyFileSync('assets/tileset.png', 'artifacts/repo-tileset.png');
 if (fs.existsSync('assets/plaza-transitions-v1.png')) fs.copyFileSync('assets/plaza-transitions-v1.png', 'artifacts/repo-transitions.png');
+if (fs.existsSync('assets/rural-soil-v1.png')) fs.copyFileSync('assets/rural-soil-v1.png', 'artifacts/repo-rural-soil.png');
 
 const browser = await chromium.launch({
   headless: true,
@@ -38,9 +39,11 @@ for (let attempt = 1; attempt <= 24; attempt++) {
       districtCount: window.KELO_WORLD_AUDIT?.districtCount || 0,
       districtStyleMode: window.KELO_WORLD_AUDIT?.districtStyleMode || null,
       styledDistrictCount: window.KELO_WORLD_AUDIT?.styledDistrictCount || 0,
-      chunkSize: window.KELO_WORLD_AUDIT?.chunkSize || 0
+      chunkSize: window.KELO_WORLD_AUDIT?.chunkSize || 0,
+      ruralReady: window.KELO_RURAL_GROUND_AUDIT?.ready || false,
+      ruralMode: window.KELO_RURAL_GROUND_AUDIT?.renderingMode || null
     }));
-    if (deployed.version === expected && deployed.registryVersion === expectedRegistry && deployed.authoredTransitions && deployed.depthOcclusion && deployed.depthOccluderCount >= 8 && deployed.worldReady && deployed.worldVersion === 'world-v1.1' && deployed.districtCount >= 5 && deployed.districtStyleMode === 'district-profile-v1' && deployed.styledDistrictCount >= 5 && deployed.chunkSize === 512) { loaded = true; break; }
+    if (deployed.version === expected && deployed.registryVersion === expectedRegistry && deployed.authoredTransitions && deployed.depthOcclusion && deployed.depthOccluderCount >= 8 && deployed.worldReady && deployed.worldVersion === 'world-v1.1' && deployed.districtCount >= 5 && deployed.districtStyleMode === 'district-profile-v1' && deployed.styledDistrictCount >= 5 && deployed.chunkSize === 512 && deployed.ruralReady && deployed.ruralMode === 'authored-nine-slice-v1') { loaded = true; break; }
     console.log(`attempt ${attempt}: build ${deployed.version || 'missing'} / registry ${deployed.registryVersion || 'missing'} / world=${deployed.worldVersion || 'missing'} styles=${deployed.districtStyleMode || 'missing'}, waiting for ${expected}`);
   } catch (err) { console.log(`attempt ${attempt}: ${err.message}`); }
   await page.waitForTimeout(10000);
@@ -51,6 +54,7 @@ const state = await page.evaluate(() => ({
   title: document.title,
   audit: window.KELO_PLAZA_AUDIT || null,
   world: window.KELO_WORLD_AUDIT || null,
+  rural: window.KELO_RURAL_GROUND_AUDIT || null,
   tileset: window.KELO_PLAZA_TILESET || null,
   depth: window.KELO_PLAZA_DEPTH || null,
   canvas: (() => { const c = document.getElementById('game-canvas'); return c ? { width:c.width,height:c.height,cssWidth:c.clientWidth,cssHeight:c.clientHeight } : null; })()
@@ -91,7 +95,9 @@ if (state.world?.chunkSize !== 512) throw new Error('Unexpected world chunk size
 if ((state.world?.districtCount || 0) < 5) throw new Error('World district graph is unexpectedly small');
 if ((state.world?.worldWidth || 0) < 3600 || (state.world?.worldHeight || 0) < 3200) throw new Error('World bounds regressed');
 if (!ruralCaptureReady) throw new Error('Could not capture Distrito Rural');
+if (!state.rural?.ready || !state.rural?.assetLoaded || !state.rural?.modularTiles) throw new Error('Modular rural soil renderer is not active');
+if (state.rural?.renderingMode !== 'authored-nine-slice-v1' || state.rural?.plotSize !== 96) throw new Error('Unexpected rural plot renderer contract');
 if (!state.depth || state.depth.sourceMode !== 'y-occlusion-overlay-v1') throw new Error('Depth layer state missing or invalid');
 if (!state.tileset?.authoredTransitions) throw new Error('Tileset state did not expose authored transitions');
 if (!state.tileset?.transitionAssetPath) throw new Error('Transition atlas path missing from tileset state');
-if (consoleErrors.some(x => /Kelo plaza|Kelo plaza depth|Kelo world|tileset load|transition atlas|invalid tileset/i.test(x))) throw new Error('Visual world/atlas/depth console error detected');
+if (consoleErrors.some(x => /Kelo plaza|Kelo plaza depth|Kelo world|Kelo rural|tileset load|transition atlas|invalid tileset/i.test(x))) throw new Error('Visual world/atlas/depth/rural console error detected');

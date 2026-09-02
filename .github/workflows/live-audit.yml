@@ -14,6 +14,7 @@ on:
       - 'assets/tileset.png'
       - 'assets/tileset-vclean.png'
       - 'assets/plaza-transitions-v1.png'
+      - 'assets/rural-soil-v1.png'
       - 'scripts/live-audit.mjs'
       - '.github/workflows/live-audit.yml'
 
@@ -31,8 +32,8 @@ jobs:
       - name: Audit deployed mobile page
         env:
           AUDIT_URL: https://kelffren.github.io/gemini/
-          EXPECTED_BUILD: V5.47
-          EXPECTED_REGISTRY: 1.5.0
+          EXPECTED_BUILD: V5.48
+          EXPECTED_REGISTRY: 1.6.0
           CHROME_BIN: /usr/bin/google-chrome
         run: node scripts/live-audit.mjs
       - name: Upload screenshot evidence
