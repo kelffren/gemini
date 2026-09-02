@@ -1,93 +1,21 @@
 import fs from 'node:fs';
 import { chromium } from 'playwright';
 const base=process.env.AUDIT_URL||'https://kelffren.github.io/gemini/';
-const expectedRegistry=process.env.EXPECTED_REGISTRY||'1.10.7';
+const expectedRegistry=process.env.EXPECTED_REGISTRY||'';
 const expectedTitle=process.env.EXPECTED_TITLE||'';
 const expectedArchitecture=process.env.EXPECTED_ARCHITECTURE_VERSION||'';
 const expectedArchitectureMode=process.env.EXPECTED_ARCHITECTURE_MODE||'';
 fs.mkdirSync('artifacts',{recursive:true});
 const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_BIN||'/usr/bin/google-chrome',args:['--no-sandbox','--disable-dev-shm-usage']});
 const context=await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true});
-const page=await context.newPage();
-const consoleErrors=[],failedRequests=[],httpErrors=[];
-page.on('console',m=>{if(m.type()==='error')consoleErrors.push(m.text())});
-page.on('pageerror',e=>consoleErrors.push(`PAGEERROR: ${e.stack||e.message}`));
-page.on('requestfailed',r=>failedRequests.push({url:r.url(),error:r.failure()?.errorText||'failed'}));
-page.on('response',r=>{if(r.status()>=400)httpErrors.push({status:r.status(),url:r.url()})});
+const page=await context.newPage();const consoleErrors=[],failedRequests=[],httpErrors=[];
+page.on('console',m=>{if(m.type()==='error')consoleErrors.push(m.text())});page.on('pageerror',e=>consoleErrors.push(`PAGEERROR: ${e.stack||e.message}`));page.on('requestfailed',r=>failedRequests.push({url:r.url(),error:r.failure()?.errorText||'failed'}));page.on('response',r=>{if(r.status()>=400)httpErrors.push({status:r.status(),url:r.url()})});
 let loaded=false;
 for(let attempt=1;attempt<=24;attempt++){
-  try{
-    await page.goto(`${base}?architecture-audit=${Date.now()}-${attempt}`,{waitUntil:'networkidle',timeout:45000});
-    const title=await page.title();
-    const s=await page.evaluate(()=>({p:window.KELO_MARKET_PAVILION||null,luxe:window.KELO_LUXE_KIOSK||null,architecture:window.KELO_ARCHITECTURE_RENDERER||null,world:window.KELO_WORLD_AUDIT||null,registry:window.KELO_TILE_REGISTRY||null,arcade:window.KELO_ARCHITECTURE_RENDERER?.getEntry?.('commerceArcade')||null}));
-    const titleReady=!expectedTitle||title===expectedTitle;
-    const architectureReady=(!expectedArchitecture||s.architecture?.version===expectedArchitecture)&&(!expectedArchitectureMode||s.architecture?.mode===expectedArchitectureMode);
-    const arcadeAsset=s.registry?.architectureAssets?.commerceArcade;
-    if(titleReady&&s.world?.ready&&s.registry?.version===expectedRegistry&&s.registry?.styles?.architecture?.prefabContract==='registry-asset-placement-collision-v1'&&s.registry?.architectureAssets?.marketPavilion&&s.registry?.architecturePrefabs?.marketPavilion&&s.registry?.architectureAssets?.luxeBoutique&&s.registry?.architecturePrefabs?.luxeBoutique&&arcadeAsset?.src?.includes('?v=6')&&arcadeAsset?.variant==='north-corner-endcap-v1'&&arcadeAsset?.modules?.includes('northCornerEndcap')&&s.registry?.architecturePrefabs?.commerceArcade&&architectureReady&&s.architecture?.prefabCount>=3&&s.p?.ready&&s.p?.source==='tile-registry-architecture-prefab'&&s.p?.rendererWrapped&&s.p?.depthWrapped&&s.p?.legacyHidden&&!s.p?.failed&&s.luxe?.ready&&s.luxe?.source==='tile-registry-architecture-prefab'&&s.luxe?.rendererWrapped&&s.luxe?.depthWrapped&&!s.luxe?.failed&&s.arcade?.ready&&s.arcade?.legacyHidden&&!s.arcade?.failed){loaded=true;break}
-    console.log(`attempt ${attempt}: title=${JSON.stringify(title)} registry=${s.registry?.version||'missing'} architecture=${s.architecture?.version||'missing'} mode=${s.architecture?.mode||'missing'}`);
-  }catch(e){console.log(`attempt ${attempt}: ${e.message}`)}
-  await page.waitForTimeout(10000);
+  try{await page.goto(`${base}?luxe-audit=${Date.now()}-${attempt}`,{waitUntil:'networkidle',timeout:45000});const s=await page.evaluate(()=>({title:document.title,registry:window.KELO_TILE_REGISTRY||null,architecture:window.KELO_ARCHITECTURE_RENDERER||null,luxe:window.KELO_LUXE_KIOSK||null,market:window.KELO_MARKET_PAVILION||null}));const okTitle=!expectedTitle||s.title===expectedTitle;const okArch=(!expectedArchitecture||s.architecture?.version===expectedArchitecture)&&(!expectedArchitectureMode||s.architecture?.mode===expectedArchitectureMode);if(okTitle&&okArch&&s.registry?.version===expectedRegistry&&s.architecture?.prefabCount===1&&s.luxe?.ready&&s.luxe?.source==='tile-registry-architecture-prefab'&&s.market?.disabled===true){loaded=true;break;}}catch(e){console.log(`attempt ${attempt}: ${e.message}`)}await page.waitForTimeout(10000);
 }
-consoleErrors.length=0;failedRequests.length=0;httpErrors.length=0;
-await page.goto(`${base}?architecture-audit=final-${Date.now()}`,{waitUntil:'networkidle',timeout:45000});
-await page.waitForTimeout(3500);
-const finalTitle=await page.title();
-const pavilion=await page.evaluate(()=>{
-  if(typeof camera==='undefined'||typeof localPlayer==='undefined'||typeof render!=='function')return null;
-  const c=document.getElementById('game-canvas');if(!c)return null;
-  localPlayer.x=1400;localPlayer.y=1860;camera.x=1400;camera.y=1870;camera.targetX=1400;camera.targetY=1870;render();
-  const px=c.getContext('2d').getImageData(0,0,c.width,c.height).data;
-  let stone=0,roof=0,gold=0,glass=0;
-  for(let i=0;i<px.length;i+=4){const r=px[i],g=px[i+1],b=px[i+2],a=px[i+3];if(a<200)continue;if((r===225&&g===214&&b===184)||(r===241&&g===232&&b===205))stone++;if((r===45&&g===84&&b===78)||(r===61&&g===111&&b===100))roof++;if(r===210&&g===165&&b===72)gold++;if((r===90&&g===176&&b===178)||(r===151&&g===220&&b===210))glass++;}
-  return{dataUrl:c.toDataURL('image/png'),occluding:!!window.KELO_MARKET_PAVILION?.isOccluding?.(localPlayer),state:window.KELO_MARKET_PAVILION||null,registryVersion:window.KELO_TILE_REGISTRY?.version||null,prefab:window.KELO_TILE_REGISTRY?.architecturePrefabs?.marketPavilion||null,asset:window.KELO_TILE_REGISTRY?.architectureAssets?.marketPavilion||null,stone,roof,gold,glass};
-});
-if(pavilion?.dataUrl?.startsWith('data:image/png;base64,'))fs.writeFileSync('artifacts/live-market-pavilion.png',Buffer.from(pavilion.dataUrl.split(',')[1],'base64'));
-const luxe=await page.evaluate(()=>{
-  const c=document.getElementById('game-canvas');if(!c||typeof camera==='undefined'||typeof localPlayer==='undefined'||typeof render!=='function')return null;
-  localPlayer.x=1280;localPlayer.y=1400;camera.x=1280;camera.y=1400;camera.targetX=1280;camera.targetY=1400;render();
-  return{dataUrl:c.toDataURL('image/png'),occluding:!!window.KELO_LUXE_KIOSK?.isOccluding?.(localPlayer),state:window.KELO_LUXE_KIOSK||null,prefab:window.KELO_TILE_REGISTRY?.architecturePrefabs?.luxeBoutique||null,asset:window.KELO_TILE_REGISTRY?.architectureAssets?.luxeBoutique||null};
-});
+consoleErrors.length=0;failedRequests.length=0;httpErrors.length=0;await page.goto(`${base}?luxe-audit=final-${Date.now()}`,{waitUntil:'networkidle',timeout:45000});await page.waitForTimeout(2500);
+const luxe=await page.evaluate(()=>{const c=document.getElementById('game-canvas');if(!c||typeof camera==='undefined'||typeof localPlayer==='undefined'||typeof render!=='function')return null;localPlayer.x=1208;localPlayer.y=1510;camera.x=1208;camera.y=1460;camera.targetX=1208;camera.targetY=1460;render();return{dataUrl:c.toDataURL('image/png'),occluding:!!window.KELO_LUXE_KIOSK?.isOccluding?.(localPlayer),state:window.KELO_LUXE_KIOSK||null,architecture:window.KELO_ARCHITECTURE_RENDERER||null,registryVersion:window.KELO_TILE_REGISTRY?.version||null,market:window.KELO_MARKET_PAVILION||null};});
 if(luxe?.dataUrl?.startsWith('data:image/png;base64,'))fs.writeFileSync('artifacts/live-luxe-prefab.png',Buffer.from(luxe.dataUrl.split(',')[1],'base64'));
-const arcade=await page.evaluate(()=>{
-  const c=document.getElementById('game-canvas');if(!c||typeof camera==='undefined'||typeof localPlayer==='undefined'||typeof render!=='function')return null;
-  const testActor={x:1580,y:1580,radius:20};
-  localPlayer.x=testActor.x;localPlayer.y=testActor.y;camera.x=1580;camera.y=1600;camera.targetX=1580;camera.targetY=1600;render();
-  const entry=window.KELO_ARCHITECTURE_RENDERER?.getEntry?.('commerceArcade')||null;
-  const px=c.getContext('2d').getImageData(0,0,c.width,c.height).data;
-  let roof=0,ivory=0,glass=0,gold=0,endcap=0;
-  for(let i=0;i<px.length;i+=4){const r=px[i],g=px[i+1],b=px[i+2],a=px[i+3];if(a<200)continue;
-    if(g>70&&g<140&&r<80&&b<125)roof++;
-    if(r>185&&g>175&&b>135&&Math.abs(r-g)<55)ivory++;
-    if(r<180&&g>105&&b>105&&Math.abs(g-b)<70)glass++;
-    if(r>175&&g>120&&g<195&&b<115)gold++;
-    if(r===116&&g===208&&b===194)endcap++;
-  }
-  return{dataUrl:c.toDataURL('image/png'),entry,occluding:!!entry?.isOccluding?.(testActor),registryVersion:window.KELO_TILE_REGISTRY?.version||null,prefab:window.KELO_TILE_REGISTRY?.architecturePrefabs?.commerceArcade||null,asset:window.KELO_TILE_REGISTRY?.architectureAssets?.commerceArcade||null,renderer:window.KELO_ARCHITECTURE_RENDERER||null,roof,ivory,glass,gold,endcap};
-});
-if(arcade?.dataUrl?.startsWith('data:image/png;base64,'))fs.writeFileSync('artifacts/live-commerce-arcade.png',Buffer.from(arcade.dataUrl.split(',')[1],'base64'));
-const report={loaded,finalTitle,expectedTitle,expectedRegistry,expectedArchitecture,expectedArchitectureMode,pavilion:pavilion?{occluding:pavilion.occluding,state:pavilion.state,registryVersion:pavilion.registryVersion,prefab:pavilion.prefab,asset:pavilion.asset,stone:pavilion.stone,roof:pavilion.roof,gold:pavilion.gold,glass:pavilion.glass}:null,luxe:luxe?{occluding:luxe.occluding,state:luxe.state,prefab:luxe.prefab,asset:luxe.asset}:null,arcade:arcade?{occluding:arcade.occluding,entry:arcade.entry,prefab:arcade.prefab,asset:arcade.asset,rendererVersion:arcade.renderer?.version,rendererMode:arcade.renderer?.mode,prefabCount:arcade.renderer?.prefabCount,roof:arcade.roof,ivory:arcade.ivory,glass:arcade.glass,gold:arcade.gold,endcap:arcade.endcap}:null,consoleErrors,failedRequests,httpErrors};
-fs.writeFileSync('artifacts/pavilion-report.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));
-await browser.close();
-if(!loaded)throw new Error(`Architecture prefabs did not become ready on LIVE for ${JSON.stringify(expectedTitle)} / ${expectedArchitecture} / ${expectedArchitectureMode}`);
-if(expectedTitle&&finalTitle!==expectedTitle)throw new Error(`Title mismatch ${JSON.stringify(finalTitle)} !== ${JSON.stringify(expectedTitle)}`);
-if(pavilion?.registryVersion!==expectedRegistry||arcade?.registryVersion!==expectedRegistry)throw new Error(`Registry mismatch ${pavilion?.registryVersion}/${arcade?.registryVersion} !== ${expectedRegistry}`);
-if(!pavilion?.dataUrl?.startsWith('data:image/png;base64,')||!pavilion.occluding)throw new Error('Pavilion depth capture failed');
-if(pavilion.state?.source!=='tile-registry-architecture-prefab'||pavilion.state?.prefabId!=='market-pavilion-south')throw new Error('Pavilion is not consuming registry prefab metadata');
-if(pavilion.state?.asset!==pavilion.asset?.src||pavilion.state?.geometry?.x!==pavilion.prefab?.x||pavilion.state?.geometry?.y!==pavilion.prefab?.y||pavilion.state?.collision?.x!==pavilion.prefab?.collision?.x||pavilion.state?.collision?.y!==pavilion.prefab?.collision?.y)throw new Error('Pavilion runtime geometry diverged from TileRegistry prefab');
-if(!pavilion.state?.legacyHidden||!pavilion.state?.rendererWrapped||!pavilion.state?.depthWrapped||pavilion.state?.failed)throw new Error('Pavilion runtime contract invalid');
-if(pavilion.stone<200||pavilion.roof<100||pavilion.gold<30||pavilion.glass<40)throw new Error(`Pavilion authored pixels missing: ${JSON.stringify({stone:pavilion.stone,roof:pavilion.roof,gold:pavilion.gold,glass:pavilion.glass})}`);
-if(!luxe?.dataUrl?.startsWith('data:image/png;base64,')||!luxe.occluding)throw new Error('Kelo Luxe depth capture failed');
-if(luxe.state?.source!=='tile-registry-architecture-prefab'||luxe.state?.prefabId!=='luxe-boutique-central')throw new Error('Kelo Luxe is not consuming registry prefab metadata');
-if(luxe.state?.asset!==luxe.asset?.src||luxe.state?.shop?.x!==luxe.prefab?.x||luxe.state?.shop?.y!==luxe.prefab?.y||luxe.state?.collision?.x!==luxe.prefab?.collision?.x||luxe.state?.collision?.y!==luxe.prefab?.collision?.y||luxe.state?.interaction?.x!==luxe.prefab?.interaction?.x||luxe.state?.interaction?.radius!==luxe.prefab?.interaction?.radius)throw new Error('Kelo Luxe runtime geometry diverged from TileRegistry prefab');
-if(!luxe.state?.rendererWrapped||!luxe.state?.depthWrapped||luxe.state?.failed)throw new Error('Kelo Luxe runtime contract invalid');
-if(!arcade?.dataUrl?.startsWith('data:image/png;base64,')||!arcade.occluding)throw new Error('Commerce arcade depth capture failed');
-if(arcade.entry?.prefab?.id!=='commerce-arcade-east'||arcade.entry?.asset?.id!=='commerce-arcade')throw new Error('Commerce arcade is not consuming registry prefab metadata');
-if(arcade.entry?.geometry?.x!==arcade.prefab?.x||arcade.entry?.geometry?.y!==arcade.prefab?.y||arcade.entry?.prefab?.collision?.x!==arcade.prefab?.collision?.x||arcade.entry?.prefab?.collision?.y!==arcade.prefab?.collision?.y)throw new Error('Commerce arcade runtime geometry diverged from TileRegistry prefab');
-if(!arcade.entry?.ready||arcade.entry?.failed||!arcade.entry?.legacyHidden||arcade.renderer?.prefabCount<3)throw new Error('Commerce arcade runtime contract invalid');
-if(arcade.asset?.src!=='assets/commerce-arcade-v1.svg?v=6'||arcade.asset?.variant!=='north-corner-endcap-v1'||!arcade.asset?.modules?.includes('northCornerEndcap'))throw new Error('Commerce arcade north end-cap metadata missing');
-if(expectedArchitecture&&arcade.renderer?.version!==expectedArchitecture)throw new Error(`Commerce arcade renderer version mismatch ${arcade.renderer?.version} !== ${expectedArchitecture}`);
-if(expectedArchitectureMode&&arcade.renderer?.mode!==expectedArchitectureMode)throw new Error(`Commerce arcade renderer mode mismatch ${arcade.renderer?.mode} !== ${expectedArchitectureMode}`);
-if(arcade.roof<300||arcade.ivory<250||arcade.glass<80||arcade.gold<40||arcade.endcap<40)throw new Error(`Commerce arcade authored pixels missing: ${JSON.stringify({roof:arcade.roof,ivory:arcade.ivory,glass:arcade.glass,gold:arcade.gold,endcap:arcade.endcap})}`);
-if(consoleErrors.length)throw new Error(`Console/page errors: ${JSON.stringify(consoleErrors)}`);
-if(failedRequests.length)throw new Error(`Failed requests: ${JSON.stringify(failedRequests)}`);
-if(httpErrors.length)throw new Error(`HTTP errors: ${JSON.stringify(httpErrors)}`);
+const report={loaded,luxe:luxe?{occluding:luxe.occluding,state:luxe.state,architecture:luxe.architecture,registryVersion:luxe.registryVersion,market:luxe.market}:null,consoleErrors,failedRequests,httpErrors};fs.writeFileSync('artifacts/pavilion-report.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));await browser.close();
+if(!loaded)throw new Error('Luxe-only architecture did not become ready on LIVE');if(!luxe?.dataUrl?.startsWith('data:image/png;base64,')||!luxe.occluding)throw new Error('Kelo Luxe depth capture failed');if(luxe.registryVersion!==expectedRegistry)throw new Error(`Registry mismatch ${luxe.registryVersion} !== ${expectedRegistry}`);if(luxe.architecture?.prefabCount!==1||luxe.architecture?.mode!=='luxe-only-v1')throw new Error('Unexpected architecture renderer state');if(luxe.state?.prefabId!=='luxe-boutique-central'||luxe.state?.failed||!luxe.state?.rendererWrapped||!luxe.state?.depthWrapped)throw new Error('Kelo Luxe runtime contract invalid');if(luxe.market?.disabled!==true)throw new Error('Removed market unexpectedly active');if(consoleErrors.length)throw new Error(`Console/page errors: ${JSON.stringify(consoleErrors)}`);if(failedRequests.length)throw new Error(`Failed requests: ${JSON.stringify(failedRequests)}`);if(httpErrors.length)throw new Error(`HTTP errors: ${JSON.stringify(httpErrors)}`);
