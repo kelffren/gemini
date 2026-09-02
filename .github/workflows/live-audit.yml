@@ -18,7 +18,7 @@ on:
       - 'assets/rural-soil-v1.png'
       - 'assets/rural-props-v1.png'
       - 'assets/rural-landmarks-v1.png'
-      - 'scripts/live-audit.mjs'
+      - 'scripts/live-world-audit.mjs'
       - '.github/workflows/live-audit.yml'
 
 jobs:
@@ -32,14 +32,13 @@ jobs:
           node-version: '20'
       - name: Install Playwright package
         run: npm install --no-save playwright@1.55.0
-      - name: Audit deployed mobile page
+      - name: Audit deployed mobile world
         env:
           AUDIT_URL: https://kelffren.github.io/gemini/
-          EXPECTED_BUILD: V5.56
+          EXPECTED_WORLD: world-v1.2
           EXPECTED_REGISTRY: 1.10.0
-          EXPECTED_LANDMARKS: rural-landmarks-v1.3
           CHROME_BIN: /usr/bin/google-chrome
-        run: node scripts/live-audit.mjs
+        run: node scripts/live-world-audit.mjs
       - name: Upload screenshot evidence
         if: always()
         uses: actions/upload-artifact@v4
