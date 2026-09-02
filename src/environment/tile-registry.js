@@ -37,6 +37,13 @@
     })
   });
   const architecturePrefabs = Object.freeze({
+    luxeBoutique:Object.freeze({
+      id:'luxe-boutique-central', asset:'luxeBoutique', x:1248, y:1050, baseYOffset:444,
+      collision:Object.freeze({x:1272,y:1362,w:336,h:132}),
+      interaction:Object.freeze({x:1440,y:1532,radius:220}),
+      occlusion:Object.freeze({sideInset:18,topInset:76,bottomPadding:6}),
+      legacyVisualReplacement:true
+    }),
     marketPavilion:Object.freeze({
       id:'market-pavilion-south', asset:'marketPavilion', x:1288, y:1790, baseYOffset:160,
       collision:Object.freeze({x:1300,y:1870,w:200,h:80}),
@@ -122,7 +129,7 @@
     })
   });
   window.KELO_TILE_REGISTRY = Object.freeze({
-    version:'1.10.2', worldTileSize:TILE,
+    version:'1.10.3', worldTileSize:TILE,
     atlases:Object.freeze({plaza:atlas,transitions:transitionAtlas,ruralSoil:ruralSoilAtlas,ruralProps:ruralPropsAtlas,ruralLandmarks:ruralLandmarksAtlas,ruralNature:ruralNatureAtlas}),
     architectureAssets,architecturePrefabs,
     tiles,ruralTiles,ruralPropTiles,ruralLandmarkTiles,ruralLandmarkSprites,ruralNatureTiles,ruralNatureSprites,families,transitionMasks,styles
