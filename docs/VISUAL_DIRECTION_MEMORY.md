@@ -256,6 +256,17 @@ Kelo World is no longer allowed to remain a single polished plaza floating in a 
 - Validated technical direction: future authored buildings should be represented as TileRegistry asset + prefab placement/collision metadata rather than each renderer owning duplicated hard-coded geometry.
 - Next bottleneck: the Luxe boutique asset is registry-owned but its placement/collision/interact geometry is still local to `luxe-kiosk-atlas.js`. The next safe refactor is to migrate that boutique into the same prefab contract, then extract a generic architecture renderer/list so future legacy-building replacements do not each add another wrapper.
 
+## Validated Luxe Architecture Prefab — V5.69 / Registry 1.10.3 / 2026-09-02
+- `TileRegistry` now owns Kelo Luxe placement, preserved collider, interaction anchor/radius and occlusion thresholds through `architecturePrefabs.luxeBoutique`, using the same `registry-asset-placement-collision-v1` architecture contract as the market pavilion.
+- `src/environment/luxe-kiosk-atlas.js` consumes the prefab instead of duplicating boutique world coordinates, collision geometry and interaction geometry locally. The authored asset, world position `(1248,1050)`, collider `{x:1272,y:1362,w:336,h:132}`, interaction anchor `(1440,1532)` / radius `220`, and existing depth behavior were intentionally preserved.
+- Kelo CI passed for the deployed migration. GitHub Pages deployment for the aligned final audit commit `42f175fa63f72d71daf07181528c56517a38b90c` also passed.
+- The first LIVE run correctly reached V5.69 / registry 1.10.3 with clean runtime diagnostics but failed because `scripts/live-world-audit.mjs` still required the obsolete boutique source string `tile-registry-architecture-asset`. The runtime was healthy; the certification contract was stale. The audit was corrected to require `tile-registry-architecture-prefab` and `prefabId='luxe-boutique-central'`, then rerun.
+- Final LIVE mobile validation passed at 390x844 CSS / 780x1688 backing canvas. Both world and dedicated architecture-prefab audit steps passed with registry `1.10.3`, `world-v1.2`, `source='tile-registry-architecture-prefab'`, `prefabId='luxe-boutique-central'`, `ready=true`, `rendererWrapped=true`, `depthWrapped=true`, and boutique `occluding=true`.
+- The dedicated audit additionally verifies that boutique runtime asset, position, collider and interaction geometry are identical to `TileRegistry` values; the market pavilion prefab remains valid in the same run.
+- Final diagnostics were clean: `consoleErrors=[]`, `failedRequests=[]` and `httpErrors=[]`.
+- Manual inspection of `live-luxe-prefab.png` confirms no visual regression: the large Kelo Luxe silhouette remains crisp and centered on the ivory route, the doorway/detail remains readable on mobile, and the player/depth relationship remains intact. The adjacent flat brown legacy building is still visibly below the authored architecture quality bar.
+- Current architecture bottleneck: boutique and market pavilion now share registry-owned prefab metadata, but rendering/depth installation is still duplicated as separate wrappers in `luxe-kiosk-atlas.js`. The next safe technical pass should extract a generic authored-architecture prefab renderer/list while preserving per-prefab interaction hooks; after that, migrate another visible legacy building through the common path.
+
 ## Non-goals During Visual Passes
 Do not casually alter unrelated systems such as:
 - core movement feel;
