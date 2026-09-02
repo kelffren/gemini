@@ -192,6 +192,15 @@ Kelo World is no longer allowed to remain a single polished plaza floating in a 
 - Known unrelated state is unchanged: generic 404 console messages and the pre-existing `appendChild` page error remain; `failedRequests` is still zero and no Kelo rural/world/atlas error appeared.
 - Next largest rural bottleneck: the field art now works, but the surrounding district lacks spatial storytelling. The next safe pass should add a modular fence/gate perimeter, a barn or silo landmark, a dirt approach path and sparse rural vegetation before expanding other districts.
 
+## Validated Error Cleanup — V5.49 / 2026-09-02
+- Root cause of the repeated HTTP 404 console noise was legacy `engine-h.js` probing three removed plaza JPG paths even though the live plaza is atlas-owned by `engine-l.js`. Those probes were removed while retaining the procedural fallback and HiDPI wrapper.
+- The remaining static missing path was a lowercase `assets/hero.png` retry while the production file is `assets/hero.PNG`; the nonexistent retry was removed and CI now rejects reintroducing it.
+- The page-level `appendChild` crash came from `showToast()` targeting a nonexistent `#toast-container`, commonly triggered when timed farm/animal rewards matured during audit. `index.html` now owns the styled live region and `showToast()` also creates it defensively if absent.
+- Added a data-URI favicon so browsers no longer request a missing `/favicon.ico`.
+- The LIVE audit now performs a clean final reload after deployment convergence, records exact HTTP status URLs, failed request URLs and full page-error stacks, and fails on any entry in those buckets rather than tolerating generic errors.
+- LIVE V5.49 validation passed with `consoleErrors=[]`, `failedRequests=[]` and `httpErrors=[]`; CI and Pages deployment also succeeded. The V5.48 rural rendering, registry 1.6.0, world v1.1 and plaza transition/depth contracts remain intact.
+- Quality gate: no future visual round is complete if the clean final LIVE diagnostic report contains any console, page, failed-request or HTTP error.
+
 ## Non-goals During Visual Passes
 Do not casually alter unrelated systems such as:
 - core movement feel;
