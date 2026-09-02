@@ -227,11 +227,19 @@
     if(!ready)return;
     g.save();g.imageSmoothingEnabled=false;g.drawImage(img,PAVILION.x,PAVILION.y,PAVILION.w,PAVILION.h);g.restore();
   }
+  function overlaps(a,b){
+    return a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;
+  }
   function installLegacyVisualReplacement(){
     if(typeof obstacles==='undefined'||!Array.isArray(obstacles))return false;
-    const target=obstacles.find(o=>o&&o.x===COLLISION.x&&o.y===COLLISION.y&&o.w===COLLISION.w&&o.h===COLLISION.h);
-    if(!target)return false;
-    target.noDraw=true;target._marketPavilionVisual=true;legacyHidden=true;return true;
+    // The obstacle geometry remains gameplay-authoritative. Only suppress its old
+    // flat debug-style fill anywhere it overlaps this authored architecture footprint.
+    for(const o of obstacles){
+      if(!o||o._luxeBoutiqueCollision||!overlaps(o,COLLISION))continue;
+      o.noDraw=true;o._marketPavilionVisual=true;
+    }
+    legacyHidden=!obstacles.some(o=>o&&!o.noDraw&&!o._luxeBoutiqueCollision&&overlaps(o,COLLISION));
+    return legacyHidden;
   }
   function installWorldLayer(){
     const base=window.KELO_WORLD_RENDERER;
@@ -274,7 +282,7 @@
   img.src=ASSET;
   install();setTimeout(install,120);setTimeout(install,600);
   window.KELO_MARKET_PAVILION=Object.freeze({
-    version:'authored-market-pavilion-v1',asset:ASSET,source:'authored-raster-architecture-family',
+    version:'authored-market-pavilion-v1.1',asset:ASSET,source:'authored-raster-architecture-family',
     geometry:PAVILION,collision:COLLISION,depthMode:REGISTRY.styles.architecture.depthMode,
     isOccluding:actorBehind,get ready(){return ready},get failed(){return failed},get rendererWrapped(){return wrapped},get depthWrapped(){return depthWrapped},get legacyHidden(){return legacyHidden}
   });
