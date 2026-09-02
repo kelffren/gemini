@@ -39,7 +39,8 @@
   function actorBehind(e,actor){
     if(!e||!actor)return false;
     const occ=e.prefab.occlusion,collision=e.prefab.collision,b=geometry(e),r=actor.radius||20;
-    return !!occ&&!!collision&&actor.x+r>b.x+occ.sideInset&&actor.x-r<b.x+b.w-occ.sideInset&&actor.y>b.y+occ.topInset&&actor.y<collision.y+occ.bottomPadding;
+    const collisionBottom=collision.y+(collision.h||0);
+    return !!occ&&!!collision&&actor.x+r>b.x+occ.sideInset&&actor.x-r<b.x+b.w-occ.sideInset&&actor.y>b.y+occ.topInset&&actor.y<collisionBottom+occ.bottomPadding;
   }
   function repaint(g,e,actor){
     if(!e?.ready||!actorBehind(e,actor))return false;
@@ -62,10 +63,9 @@
       const active=[];for(const actor of actors)for(const e of entries)if(e.ready&&actorBehind(e,actor))active.push([e,actor]);
       const z=(typeof CONFIG!=='undefined'&&CONFIG.zoom)||1;
       ctx.save();ctx.translate(screenW/2,screenH/2);ctx.scale(z,z);ctx.translate(-camera.x,-camera.y);ctx.imageSmoothingEnabled=false;
-      // Final architecture composition happens after legacy/plaza overlays. This keeps registry
-      // buildings visible inside Plaza Central while preserving actor readability: actors are
-      // repainted over the full building, then only the actor-sized region is re-occluded when
-      // that actor is physically behind the prefab.
+      // Compose registry architecture after plaza/legacy overlays so buildings inside Plaza Central
+      // cannot be painted away. Repaint actors for readability, then restore only the building
+      // pixels that must occlude actors standing physically behind a prefab.
       drawAll(ctx);
       if(typeof renderAvatar==='function')actors.forEach(actor=>renderAvatar(actor,actor===localPlayer));
       active.forEach(([e,a])=>repaint(ctx,e,a));
@@ -81,7 +81,7 @@
   function install(){installLegacyVisualReplacements();installWorldLayer();installDepthLayer();}
   install();setTimeout(install,120);setTimeout(install,600);
 
-  window.KELO_ARCHITECTURE_RENDERER=Object.freeze({version:'architecture-prefab-renderer-v1.1',mode:'generic-prefab-final-composite-v1',prefabCount:entries.length,depthMode:STYLE.depthMode,get ready(){return entries.every(e=>e.ready&&!e.failed);},get rendererWrapped(){return rendererWrapped;},get depthWrapped(){return depthWrapped;},getEntry});
+  window.KELO_ARCHITECTURE_RENDERER=Object.freeze({version:'architecture-prefab-renderer-v1.2',mode:'generic-prefab-final-composite-v1',prefabCount:entries.length,depthMode:STYLE.depthMode,get ready(){return entries.every(e=>e.ready&&!e.failed);},get rendererWrapped(){return rendererWrapped;},get depthWrapped(){return depthWrapped;},getEntry});
 
   const luxe=getState('luxeBoutique');
   const market=getState('marketPavilion');
