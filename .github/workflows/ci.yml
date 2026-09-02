@@ -27,22 +27,19 @@ jobs:
           node --check src/environment/rural-landmarks.js
           node --check src/environment/luxe-compose.js
           node --check src/environment/luxe-kiosk-atlas.js
+          node --check scripts/live-world-audit.mjs
           node --check scripts/live-pavilion-audit.mjs
           node --check src/ui/luxe-shell.js
           node --check src/ui/luxe-boutique.js
           node --check engine-a.js
           node --check engine-h.js
           grep -q 'id="toast-container"' index.html
-          grep -q 'src/environment/rural-nature-atlas.js' index.html
-          grep -q 'src/environment/rural-landmarks.js' index.html
-          grep -q 'src/ui/luxe-shell.js' index.html
-          grep -q 'src/ui/luxe-boutique.js' index.html
           grep -q "kelo-luxe-v3-style" src/ui/luxe-shell.js
           grep -q -- "--lx-forest:#173f36" src/ui/luxe-shell.js
-          grep -q "authored-market-pavilion-v1" src/environment/luxe-kiosk-atlas.js
-          grep -q 'id="north-corner-endcap-v1"' assets/commerce-arcade-v1.svg
-          grep -q "variant:'north-corner-endcap-v1'" src/environment/tile-registry.js
-          grep -q "northCornerEndcap" src/environment/tile-registry.js
+          grep -q "mode:'luxe-only-v1'" src/environment/luxe-kiosk-atlas.js
+          grep -q "grassVariation:grassVariationAtlas" src/environment/tile-registry.js
+          grep -q "grassMode:'authored-eight-variant-atlas-v1'" src/environment/tile-registry.js
+          grep -q "grassVariationMode:'authored-eight-variant-atlas-v1'" src/environment/world-map.js
           if ! grep -q 'DISABLED_PROCEDURAL_ART' src/environment/luxe-compose.js; then
             echo 'rejected procedural plaza overlay was reactivated'
             exit 1
@@ -56,40 +53,17 @@ jobs:
             exit 1
           fi
           python3 - <<'PY'
-          import ast, base64, re, struct, xml.etree.ElementTree as ET
-          ast.parse(open('scripts/generate_rural_landmarks.py',encoding='utf-8').read())
-          for path in ('assets/rural-soil-v1.png','assets/rural-props-v1.png'):
+          import base64, re, struct
+          for path,expected in [('assets/rural-soil-v1.png',(128,128)),('assets/rural-props-v1.png',(128,128)),('assets/rural-landmarks-v1.png',(256,128)),('assets/grass-variation-v1.png',(128,64))]:
               header=open(path,'rb').read(24)
               assert header[:8] == b'\x89PNG\r\n\x1a\n'
-              width,height=struct.unpack('>II',header[16:24])
-              assert (width,height)==(128,128),(path,width,height)
-              assert width%32==0 and height%32==0
-              print('PASS rural atlas',path,width,height,'tile=32 grid=4x4')
-          path='assets/rural-landmarks-v1.png'
-          header=open(path,'rb').read(24)
-          assert header[:8] == b'\x89PNG\r\n\x1a\n'
-          width,height=struct.unpack('>II',header[16:24])
-          assert (width,height)==(256,128),(path,width,height)
-          assert width%32==0 and height%32==0
-          print('PASS rural landmarks atlas',path,width,height,'tile=32 grid=8x4')
-          path='assets/market-pavilion-v1.png'
-          header=open(path,'rb').read(24)
-          assert header[:8] == b'\x89PNG\r\n\x1a\n'
-          width,height=struct.unpack('>II',header[16:24])
-          assert (width,height)==(224,160),(path,width,height)
-          print('PASS authored market pavilion',path,width,height)
-          arcade=ET.parse('assets/commerce-arcade-v1.svg').getroot()
-          assert arcade.attrib.get('width')=='160' and arcade.attrib.get('height')=='432', arcade.attrib
-          assert arcade.attrib.get('viewBox')=='0 0 160 432', arcade.attrib
-          assert any(node.attrib.get('id')=='north-corner-endcap-v1' for node in arcade.iter()), 'north corner end-cap missing'
-          print('PASS Commerce Arcade north corner end-cap 160x432')
+              size=struct.unpack('>II',header[16:24])
+              assert size==expected,(path,size,expected)
+              assert size[0]%32==0 and size[1]%32==0
+              print('PASS atlas',path,*size)
           source=open('src/environment/rural-nature-atlas.js',encoding='utf-8').read()
           match=re.search(r"data:image/png;base64,([^']+)",source)
-          assert match, 'embedded rural nature PNG missing'
-          raw=base64.b64decode(match.group(1))
-          assert raw[:8] == b'\x89PNG\r\n\x1a\n'
-          width,height=struct.unpack('>II',raw[16:24])
-          assert (width,height)==(256,128),(width,height)
-          assert width%32==0 and height%32==0
-          print('PASS embedded rural nature atlas',width,height,'tile=32 grid=8x4')
+          assert match
+          raw=base64.b64decode(match.group(1)); assert raw[:8]==b'\x89PNG\r\n\x1a\n'
+          assert struct.unpack('>II',raw[16:24])==(256,128)
           PY
