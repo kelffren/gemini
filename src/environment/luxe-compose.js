@@ -1,6 +1,11 @@
 (function () {
   const P = { x: 1040, y: 1240, w: 800, h: 560 };
   const kiosk = { x: P.x + 36, y: P.y + 48, w: 150, h: 128 };
+  const solid = { x: kiosk.x + 8, y: kiosk.y + 70, w: kiosk.w - 16, h: 50 };
+  if (typeof obstacles !== 'undefined') {
+    const exists = obstacles.some(function (o) { return o._luxeKiosk; });
+    if (!exists) obstacles.push({ x: solid.x, y: solid.y, w: solid.w, h: solid.h, _luxeKiosk: true });
+  }
 
   function booth() {
     ctx.fillStyle = '#1a1428';
@@ -28,37 +33,37 @@
 
   function pathAndWater() {
     const cx = P.x + P.w / 2, cy = P.y + P.h / 2;
-    ctx.fillStyle = 'rgba(210,198,170,0.55)';
-    ctx.fillRect(cx - 28, P.y + 20, 56, P.h - 40);
-    ctx.fillRect(P.x + 24, cy - 22, P.w - 48, 44);
-    ctx.fillStyle = 'rgba(70,150,190,0.35)';
+    ctx.fillStyle = 'rgba(210,198,170,0.22)';
+    ctx.fillRect(cx - 22, P.y + 28, 44, P.h - 56);
+    ctx.fillRect(P.x + 40, cy - 16, P.w - 80, 32);
+    ctx.fillStyle = 'rgba(70,150,190,0.22)';
     ctx.beginPath();
     ctx.ellipse(P.x + 90, P.y + P.h - 70, 70, 28, 0, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = 'rgba(231,197,106,0.45)';
+    ctx.strokeStyle = 'rgba(231,197,106,0.35)';
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.arc(cx + 10, cy + 8, 46, 0, Math.PI * 2);
     ctx.stroke();
-    ctx.fillStyle = 'rgba(120,190,220,0.25)';
-    ctx.beginPath();
-    ctx.arc(cx + 10, cy + 8, 28, 0, Math.PI * 2);
-    ctx.fill();
   }
 
   function draw() {
     if (typeof ctx === 'undefined' || typeof camera === 'undefined') return;
     const z = (CONFIG && CONFIG.zoom) || 1;
+    const foot = (typeof localPlayer !== 'undefined' && localPlayer) ? (localPlayer.y + (localPlayer.radius || 16)) : 0;
+    const boothBase = kiosk.y + kiosk.h;
     ctx.save();
     ctx.translate(screenW / 2, screenH / 2);
     ctx.scale(z, z);
     ctx.translate(-camera.x, -camera.y);
     pathAndWater();
-    booth();
+    const playerInFront = foot >= boothBase - 8;
+    if (!playerInFront) booth();
     if (typeof renderAvatar === 'function') {
       if (typeof simulatedPlayers !== 'undefined') simulatedPlayers.forEach(function (p) { renderAvatar(p, false); });
       if (typeof localPlayer !== 'undefined') renderAvatar(localPlayer, true);
     }
+    if (playerInFront) booth();
     ctx.restore();
   }
 
@@ -66,5 +71,5 @@
     const prev = render;
     render = function () { prev(); draw(); };
   }
-  window.KELO_LUXE_COMPOSE = { kiosk: kiosk };
+  window.KELO_LUXE_COMPOSE = { kiosk: kiosk, solid: solid };
 })();
