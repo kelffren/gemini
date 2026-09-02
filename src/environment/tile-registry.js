@@ -38,6 +38,10 @@
     commerceArcade:Object.freeze({
       id:'commerce-arcade', src:'assets/commerce-arcade-v1.svg?v=1', width:160, height:432,
       worldWidth:160, worldHeight:432, family:'architecture'
+    }),
+    bancoHall:Object.freeze({
+      id:'banco-hall', src:'assets/banco-hall-v1.svg?v=1', width:160, height:128,
+      worldWidth:160, worldHeight:128, family:'architecture'
     })
   });
   const architecturePrefabs = Object.freeze({
@@ -58,6 +62,12 @@
       id:'commerce-arcade-east', asset:'commerceArcade', x:1510, y:1384, baseYOffset:416,
       collision:Object.freeze({x:1530,y:1400,w:120,h:400}),
       occlusion:Object.freeze({sideInset:12,topInset:20,bottomPadding:16,clip:Object.freeze({xPadding:12,topPadding:36,bottomPadding:16})}),
+      legacyVisualReplacement:true
+    }),
+    bancoHall:Object.freeze({
+      id:'banco-hall-central', asset:'bancoHall', x:1648, y:1344, baseYOffset:128,
+      collision:Object.freeze({x:1664,y:1376,w:128,h:96}),
+      occlusion:Object.freeze({sideInset:12,topInset:28,bottomPadding:10,clip:Object.freeze({xPadding:10,topPadding:24,bottomPadding:10})}),
       legacyVisualReplacement:true
     })
   });
@@ -140,7 +150,7 @@
     })
   });
   window.KELO_TILE_REGISTRY = Object.freeze({
-    version:'1.10.10', worldTileSize:TILE,
+    version:'1.10.11', worldTileSize:TILE,
     atlases:Object.freeze({plaza:atlas,transitions:transitionAtlas,ruralSoil:ruralSoilAtlas,ruralProps:ruralPropsAtlas,ruralLandmarks:ruralLandmarksAtlas,ruralNature:ruralNatureAtlas}),
     architectureAssets,architecturePrefabs,
     tiles,ruralTiles,ruralPropTiles,ruralLandmarkTiles,ruralLandmarkSprites,ruralNatureTiles,ruralNatureSprites,families,transitionMasks,styles
