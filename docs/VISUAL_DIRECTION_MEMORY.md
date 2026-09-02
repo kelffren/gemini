@@ -171,6 +171,16 @@ Kelo World is no longer allowed to remain a single polished plaza floating in a 
 - Research validation: current Pixadom material continues to show dense but readable environments where connected spaces, clear paths, large props and landmarks make the world feel continuous. Kelo World should use that principle without copying maps or assets.
 - Next largest bottleneck: district identity. The world scaffold is intentionally simple outside the plaza; Distrito Rural, Arena, Comercio and Jardines need authored landmark/prop kits and more irregular path edges so they stop reading as the same grass field with marble corridors.
 
+## Validated District Ground Identity — 2026-09-02 / Registry 1.5.0 / World v1.1
+- `TileRegistry` now owns `styles.districtGround` with five named ground profiles plus a default profile; the world renderer no longer owns district-specific density constants as scattered rendering policy.
+- `world-map.js` applies deterministic, cache-stable ground rhythms per district while preserving the same atlas families and 512x512 chunk architecture: Rural and Gardens use clustered flower details; Arena and Commerce use sparser grass details and restrained marble accents; Central remains quieter.
+- This is intentionally a low-risk identity layer rather than a new art pack. It gives districts different visual rhythm without changing movement, collisions, economy, combat, networking, chat or inventory.
+- LIVE audit validated registry `1.5.0`, `world-v1.1`, `districtStyleMode='district-profile-v1'`, five styled districts, all visual assets loaded, no fallback, and the existing 3600x3200 / 512-chunk world contract.
+- QA finding validated: moving the audit player/camera and waiting before taking a screenshot can allow the live game loop to re-center the camera, producing a technically green but visually wrong capture. The audit now renders and serializes the off-plaza canvas immediately after positioning the camera.
+- Manual inspection of the corrected 390x844 Distrito Rural capture confirms that flower details appear in controlled small clusters and the ivory route remains highly legible against vivid grass on mobile.
+- The same capture exposes the next larger bottleneck: the farm/field rectangles are still large flat brown blocks and read as placeholder geometry beside the hero sprite. The next safe visual pass should replace that geometry with authored soil/crop-edge tiles or a modular rural ground/prop atlas before adding more generic grass noise.
+- The known page-level `appendChild` error and a small number of generic 404 console messages persist; the validated audit recorded zero `requestfailed` entries and no Kelo world/atlas/depth errors.
+
 ## Non-goals During Visual Passes
 Do not casually alter unrelated systems such as:
 - core movement feel;
