@@ -34,8 +34,9 @@ jobs:
       - name: Audit deployed mobile page
         env:
           AUDIT_URL: https://kelffren.github.io/gemini/
-          EXPECTED_BUILD: V5.50
+          EXPECTED_BUILD: V5.51
           EXPECTED_REGISTRY: 1.8.0
+          EXPECTED_LANDMARKS: rural-landmarks-v1.1
           CHROME_BIN: /usr/bin/google-chrome
         run: node scripts/live-audit.mjs
       - name: Upload screenshot evidence
