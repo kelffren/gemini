@@ -71,18 +71,15 @@ render = function() {
   ctx.fillStyle = '#07090d'; ctx.fillRect(0, 0, screenW, screenH);
   const z = CONFIG.zoom || 1;
   ctx.save(); ctx.translate(screenW / 2, screenH / 2); ctx.scale(z, z); ctx.translate(-camera.x, -camera.y);
-  ctx.fillStyle = '#12161d'; ctx.fillRect(0, 0, CONFIG.worldWidth, CONFIG.worldHeight);
-  ctx.fillStyle = '#1a1610'; ctx.fillRect(1180, 1380, 520, 520);
-  ctx.strokeStyle = 'rgba(231,197,106,0.35)'; ctx.lineWidth = 3; ctx.strokeRect(1180, 1380, 520, 520);
-  ctx.strokeStyle = '#1a222d'; ctx.lineWidth = 1 / z; ctx.beginPath();
-  for (let x = 0; x <= CONFIG.worldWidth; x += 80) { ctx.moveTo(x, 0); ctx.lineTo(x, CONFIG.worldHeight); }
-  for (let y = 0; y <= CONFIG.worldHeight; y += 80) { ctx.moveTo(0, y); ctx.lineTo(CONFIG.worldWidth, y); }
-  ctx.stroke();
+  let worldDrawn = false;
+  if (window.KELO_WORLD_RENDERER && typeof window.KELO_WORLD_RENDERER.draw === 'function') {
+    worldDrawn = window.KELO_WORLD_RENDERER.draw(ctx) === true;
+  }
+  if (!worldDrawn) {
+    ctx.fillStyle = '#49c934'; ctx.fillRect(0, 0, CONFIG.worldWidth, CONFIG.worldHeight);
+  }
   ctx.strokeStyle = '#8b3a3a'; ctx.lineWidth = 4; ctx.strokeRect(0, 0, CONFIG.worldWidth, CONFIG.worldHeight);
   for (const b of obstacles) { ctx.fillStyle = '#222b38'; ctx.fillRect(b.x, b.y, b.w, b.h); ctx.strokeStyle = '#38465c'; ctx.lineWidth = 2; ctx.strokeRect(b.x, b.y, b.w, b.h); }
-  ctx.fillStyle = '#e7c56a'; ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'left'; ctx.fillText('Plaza Kelo', 1200, 1370);
-  ctx.fillStyle = '#7ee787'; ctx.fillText('Distrito Rural', STATE.farm.x, STATE.farm.y - 10);
-  ctx.fillStyle = '#ef476f'; ctx.fillText('Arena', arenaPvP.x, arenaPvP.y - 10);
   renderFarm(STATE.farm); renderPlot(STATE.plot, true); renderArena(arenaPvP);
   for (const pt of particles) { ctx.fillStyle = pt.color; ctx.globalAlpha = pt.life / pt.maxLife; ctx.beginPath(); ctx.arc(pt.x, pt.y, pt.size * (pt.life / pt.maxLife), 0, Math.PI * 2); ctx.fill(); }
   ctx.globalAlpha = 1;
