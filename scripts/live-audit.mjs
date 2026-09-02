@@ -2,11 +2,12 @@ import fs from 'node:fs';
 import { chromium } from 'playwright';
 
 const base = process.env.AUDIT_URL || 'https://kelffren.github.io/gemini/';
-const expected = process.env.EXPECTED_BUILD || 'V5.44';
-const expectedRegistry = process.env.EXPECTED_REGISTRY || '1.3.1';
+const expected = process.env.EXPECTED_BUILD || 'V5.45';
+const expectedRegistry = process.env.EXPECTED_REGISTRY || '1.4.0';
 fs.mkdirSync('artifacts', { recursive: true });
 if (fs.existsSync('assets/tileset-vclean.png')) fs.copyFileSync('assets/tileset-vclean.png', 'artifacts/repo-tileset.png');
 else if (fs.existsSync('assets/tileset.png')) fs.copyFileSync('assets/tileset.png', 'artifacts/repo-tileset.png');
+if (fs.existsSync('assets/plaza-transitions-v1.png')) fs.copyFileSync('assets/plaza-transitions-v1.png', 'artifacts/repo-transitions.png');
 
 const browser = await chromium.launch({
   headless: true,
@@ -26,10 +27,11 @@ for (let attempt = 1; attempt <= 24; attempt++) {
     title = await page.title();
     const deployed = await page.evaluate(() => ({
       version: window.KELO_PLAZA_AUDIT?.version || null,
-      registryVersion: window.KELO_PLAZA_AUDIT?.registryVersion || null
+      registryVersion: window.KELO_PLAZA_AUDIT?.registryVersion || null,
+      authoredTransitions: window.KELO_PLAZA_AUDIT?.authoredTransitions || false
     }));
-    if (deployed.version === expected && deployed.registryVersion === expectedRegistry) { loaded = true; break; }
-    console.log(`attempt ${attempt}: deployed visual build ${deployed.version || 'missing'} / registry ${deployed.registryVersion || 'missing'}, waiting for ${expected} / ${expectedRegistry}`);
+    if (deployed.version === expected && deployed.registryVersion === expectedRegistry && deployed.authoredTransitions) { loaded = true; break; }
+    console.log(`attempt ${attempt}: deployed visual build ${deployed.version || 'missing'} / registry ${deployed.registryVersion || 'missing'} / authored=${deployed.authoredTransitions}, waiting for ${expected} / ${expectedRegistry}`);
   } catch (err) { console.log(`attempt ${attempt}: ${err.message}`); }
   await page.waitForTimeout(10000);
 }
@@ -50,6 +52,9 @@ if (!loaded) throw new Error(`Live page never reached visual build ${expected} /
 if (state.audit?.version !== expected) throw new Error(`Visual audit version mismatch: ${state.audit?.version} !== ${expected}`);
 if (state.audit?.registryVersion !== expectedRegistry) throw new Error(`Registry version mismatch: ${state.audit?.registryVersion} !== ${expectedRegistry}`);
 if (!state.audit?.ready) throw new Error('Plaza audit flag is not ready');
-if (!state.audit?.assetLoaded) throw new Error('Production tileset did not load');
+if (!state.audit?.assetLoaded) throw new Error('Production visual atlases did not load');
 if (state.audit?.fallbackActive) throw new Error('Fallback remained active');
-if (consoleErrors.some(x => /Kelo plaza|tileset load|invalid tileset/i.test(x))) throw new Error('Tileset console error detected');
+if (!state.audit?.authoredTransitions) throw new Error('Authored transition atlas is not active');
+if (!state.tileset?.authoredTransitions) throw new Error('Tileset state did not expose authored transitions');
+if (!state.tileset?.transitionAssetPath) throw new Error('Transition atlas path missing from tileset state');
+if (consoleErrors.some(x => /Kelo plaza|tileset load|transition atlas|invalid tileset/i.test(x))) throw new Error('Visual atlas console error detected');
