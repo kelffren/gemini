@@ -201,6 +201,17 @@ Kelo World is no longer allowed to remain a single polished plaza floating in a 
 - LIVE V5.49 validation passed with `consoleErrors=[]`, `failedRequests=[]` and `httpErrors=[]`; CI and Pages deployment also succeeded. The V5.48 rural rendering, registry 1.6.0, world v1.1 and plaza transition/depth contracts remain intact.
 - Quality gate: no future visual round is complete if the clean final LIVE diagnostic report contains any console, page, failed-request or HTTP error.
 
+## Validated Rural Boundary & Road Clearance — Registry 1.7.1 / Rural v2.1 / 2026-09-02
+- Added original `assets/rural-props-v1.png`, a 128x128 modular 32px atlas for wooden fence segments, corners, open/closed gates, field sign, damaged fence, dirt-path cells and sparse rural details. `TileRegistry` owns the atlas and named IDs rather than scattering prop coordinates through the renderer.
+- `rural-ground.js` now draws a modular fence perimeter around the existing farm without altering farm state, planting, harvesting, movement or collisions. The final gate faces north with a one-tile dirt threshold toward the navigation route.
+- Manual inspection of the first LIVE fence capture found a composition defect that readiness flags did not catch: the original 128px horizontal marble corridor crossed directly beneath the farm and the south dirt approach formed an oversized rigid T. That version was not accepted as final.
+- `world-map.js` now uses `ruralRoadMode='farm-bypass-v1'`: the rural ivory branch runs above the farm and turns around its east edge before rejoining the main corridor. This changes visual ground geometry only; gameplay coordinates remain unchanged.
+- The corrected LIVE 390x844 capture shows the four modular plots fully on grass, a legible wooden perimeter, a north-facing entrance adjacent to the ivory road and no marble running underneath crop beds.
+- LIVE pixel evidence recorded 15,165 wood-colored pixels and 25,345 dirt-colored pixels in the rural frame, proving the new prop family is actually rendered on mobile rather than merely loaded.
+- Registry `1.7.1`, rural `v2.1`, `world-v1.1`, 512px chunks, five districts, authored plaza transitions and depth occlusion all remained active. Final diagnostics again passed with `consoleErrors=[]`, `failedRequests=[]` and `httpErrors=[]`.
+- Validated composition rule: roads and district props must be checked against existing gameplay footprints before approval; visual ground should route around established interactive areas rather than visually slicing through them.
+- Next rural bottleneck: the district now has a readable field boundary but still lacks a strong vertical landmark and layered edge density. A compact barn/silo cluster plus a restrained tree/hedge family is the next safe improvement; avoid adding generic noise to the central field.
+
 ## Non-goals During Visual Passes
 Do not casually alter unrelated systems such as:
 - core movement feel;
