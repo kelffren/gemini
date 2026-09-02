@@ -278,6 +278,17 @@ Kelo World is no longer allowed to remain a single polished plaza floating in a 
 - Validated technical direction: future authored architecture should be added primarily as `architectureAssets + architecturePrefabs` data, with interaction hooks only where needed, rather than installing new world/depth wrappers.
 - Next largest visual bottleneck: the flat brown legacy building still visible beside Kelo Luxe is now the clearest quality mismatch. The next safe pass should replace that one building/family with an original authored modular architecture prefab through the shared renderer, preserving its current gameplay footprint rather than adding more ground noise.
 
+
+## Validated Architecture Depth Regression Guard — V5.76 / Registry 1.10.10 / 2026-09-02
+- The LIVE workflow now derives `EXPECTED_REGISTRY` directly from `src/environment/tile-registry.js` instead of carrying a hard-coded registry version. This prevents certification drift when TileRegistry advances.
+- The stricter gate immediately exposed a real Kelo Luxe regression introduced during the native-resolution PNG migration: the boutique prefab still advertised depth support, but its `occlusion` metadata had become `null`, so the shared architecture renderer loaded cleanly while `architectureOccluding=false`.
+- Restored scale-adjusted TileRegistry occlusion metadata for the current native 192x222 Kelo Luxe asset: `sideInset=9`, `topInset=40`, `bottomPadding=4`, with actor clip padding `7/24/7`. Placement, interaction and gameplay collider were not changed.
+- Registry advanced to `1.10.10` and the TileRegistry script cache key was bumped so GitHub Pages/mobile clients cannot retain the stale no-occlusion contract.
+- Final deployed runtime commit `97c347b9321bb56828c202afa6a6bcda8ce88aac` passed Kelo CI, GitHub Pages and the complete LIVE mobile audit at 390x844 CSS / 780x1688 backing canvas. The audit validated `architectureOccluding=true`, `marketOccluding=true`, three registry-driven architecture prefabs, and `consoleErrors=[]`, `failedRequests=[]`, `httpErrors=[]`.
+- Manual inspection of the LIVE architecture and Luxe captures confirms that the player is again partially hidden by the boutique volume when physically behind it while the authored PNG remains crisp and readable.
+- QA rule validated: audit expectations should come from the deployed source contract where possible, because a stale expected-version constant can hide newer runtime regressions instead of certifying them.
+- Next largest visual bottleneck remains the flat brown legacy Mercado building directly beside/behind Kelo Luxe. It should be replaced through the existing `architectureAssets + architecturePrefabs` generic renderer while preserving its gameplay footprint.
+
 ## Non-goals During Visual Passes
 Do not casually alter unrelated systems such as:
 - core movement feel;
