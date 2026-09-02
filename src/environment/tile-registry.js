@@ -45,7 +45,7 @@
       id:'luxe-boutique-central', asset:'luxeBoutique', x:1112, y:1318, baseYOffset:222,
       collision:Object.freeze({x:1140,y:1488,w:136,h:52}),
       interaction:Object.freeze({x:1208,y:1552,radius:90}),
-      occlusion:null,
+      occlusion:Object.freeze({sideInset:9,topInset:40,bottomPadding:4,clip:Object.freeze({xPadding:7,topPadding:24,bottomPadding:7})}),
       legacyVisualReplacement:true
     }),
     marketPavilion:Object.freeze({
@@ -140,7 +140,7 @@
     })
   });
   window.KELO_TILE_REGISTRY = Object.freeze({
-    version:'1.10.9', worldTileSize:TILE,
+    version:'1.10.10', worldTileSize:TILE,
     atlases:Object.freeze({plaza:atlas,transitions:transitionAtlas,ruralSoil:ruralSoilAtlas,ruralProps:ruralPropsAtlas,ruralLandmarks:ruralLandmarksAtlas,ruralNature:ruralNatureAtlas}),
     architectureAssets,architecturePrefabs,
     tiles,ruralTiles,ruralPropTiles,ruralLandmarkTiles,ruralLandmarkSprites,ruralNatureTiles,ruralNatureSprites,families,transitionMasks,styles
