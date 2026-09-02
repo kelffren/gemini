@@ -1,47 +1,43 @@
 (function () {
-  function wipeOldLoadout() {
-    if (typeof STATE === 'undefined') return;
-    STATE.equipped = [];
-  }
+  'use strict';
 
-  function stealActionBar() {
-    if (typeof renderActionBar !== 'function') return;
-    if (renderActionBar._keloOwned) return;
+  function handOffActionBar() {
+    if (typeof renderActionBar !== 'function' || renderActionBar._keloStoneV3) return;
     renderActionBar = function () {
-      wipeOldLoadout();
-      const bar = document.getElementById('action-bar-container');
-      if (!bar) return;
-      if (!bar.dataset.keloStones && window.KeloAbilities) {
-        bar.innerHTML = '';
+      if (window.KeloAbilities) {
+        window.KeloAbilities.syncFromWorldState(true);
       }
     };
-    renderActionBar._keloOwned = true;
+    renderActionBar._keloStoneV3 = true;
   }
 
-  function stealCast() {
-    if (typeof castStone === 'function' && !castStone._keloMuted) {
-      var prev = castStone;
-      castStone = function () { return; };
-      castStone._keloMuted = true;
-      castStone._prev = prev;
+  function muteLegacyTrigger() {
+    if (typeof triggerStone === 'function' && !triggerStone._keloMuted) {
+      const previous = triggerStone;
+      triggerStone = function (index) {
+        if (!window.KeloAbilities) return;
+        const slot = Number(index);
+        const instance = window.KeloAbilities.hotbar.get(slot);
+        if (!instance) return;
+        const vx = (typeof localPlayer !== 'undefined' && localPlayer.vx) || 1;
+        const vy = (typeof localPlayer !== 'undefined' && localPlayer.vy) || 0;
+        const len = Math.hypot(vx, vy) || 1;
+        return window.KeloAbilities.engine.cast({
+          slotIndex: slot,
+          direction: { x: vx / len, y: vy / len },
+        });
+      };
+      triggerStone._keloMuted = true;
+      triggerStone._legacy = previous;
     }
   }
 
-  function bootMute() {
-    wipeOldLoadout();
-    stealActionBar();
-    stealCast();
+  function bootHandoff() {
+    handOffActionBar();
+    muteLegacyTrigger();
   }
 
-  bootMute();
-  setTimeout(bootMute, 0);
-  setTimeout(bootMute, 250);
-
-  if (typeof updateSimulation === 'function') {
-    var _u = updateSimulation;
-    updateSimulation = function (dt) {
-      wipeOldLoadout();
-      _u(dt);
-    };
-  }
+  bootHandoff();
+  setTimeout(bootHandoff, 0);
+  setTimeout(bootHandoff, 250);
 })();
