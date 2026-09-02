@@ -41,7 +41,8 @@ await page.screenshot({path:'artifacts/live-mobile.png',fullPage:false});
 const ruralFrame=await page.evaluate(()=>{
   if(typeof camera==='undefined'||typeof localPlayer==='undefined'||typeof render!=='function')return null;
   const c=document.getElementById('game-canvas');if(!c)return null;
-  localPlayer.x=840;localPlayer.y=1744;camera.x=840;camera.y=1640;camera.targetX=840;camera.targetY=1640;render();
+  // Frame the authored barn+silo as one mobile landmark cluster rather than clipping the silo at the right edge.
+  localPlayer.x=900;localPlayer.y=1744;camera.x=900;camera.y=1640;camera.targetX=900;camera.targetY=1640;render();
   const px=c.getContext('2d').getImageData(0,0,c.width,c.height).data;let woodPixels=0,dirtPixels=0,barnPixels=0,roofPixels=0,metalPixels=0;
   for(let i=0;i<px.length;i+=4){const r=px[i],g=px[i+1],b=px[i+2],a=px[i+3];if(a>200&&r>=135&&r<=205&&g>=80&&g<=145&&b>=35&&b<=90)woodPixels++;if(a>200&&r>=120&&r<=190&&g>=75&&g<=135&&b>=40&&b<=90)dirtPixels++;if(a>200&&((r===145&&g===55&&b===49)||(r===91&&g===38&&b===40)||(r===186&&g===74&&b===56)))barnPixels++;if(a>200&&((r===27&&g===70&&b===73)||(r===38&&g===91&&b===91)||(r===61&&g===119&&b===108)))roofPixels++;if(a>200&&((r===101&&g===130&&b===127)||(r===166&&g===181&&b===163)||(r===51&&g===73&&b===76)))metalPixels++;}
   return{dataUrl:c.toDataURL('image/png'),woodPixels,dirtPixels,barnPixels,roofPixels,metalPixels};
