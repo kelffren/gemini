@@ -15,12 +15,10 @@ on:
       - 'assets/tileset.png'
       - 'assets/tileset-vclean.png'
       - 'assets/plaza-transitions-v1.png'
+      - 'assets/grass-variation-v1.png'
       - 'assets/rural-soil-v1.png'
       - 'assets/rural-props-v1.png'
       - 'assets/rural-landmarks-v1.png'
-      - 'assets/market-pavilion-v1.png'
-      - 'assets/commerce-arcade-v1.svg'
-      - 'assets/banco-hall-v1.svg'
       - 'scripts/live-world-audit.mjs'
       - 'scripts/live-pavilion-audit.mjs'
       - '.github/workflows/live-audit.yml'
@@ -45,16 +43,15 @@ jobs:
           echo "EXPECTED_TITLE=$PAGE_TITLE" >> "$GITHUB_ENV"
           echo "EXPECTED_ARCHITECTURE_VERSION=$ARCH_VERSION" >> "$GITHUB_ENV"
           echo "EXPECTED_ARCHITECTURE_MODE=$ARCH_MODE" >> "$GITHUB_ENV"
-          echo "Auditing title '$PAGE_TITLE', TileRegistry $REGISTRY_VERSION, architecture $ARCH_VERSION / $ARCH_MODE"
       - name: Install Playwright package
         run: npm install --no-save playwright@1.55.0
       - name: Audit deployed mobile world
         env:
           AUDIT_URL: https://kelffren.github.io/gemini/
-          EXPECTED_WORLD: world-v1.2
+          EXPECTED_WORLD: world-v1.3
           CHROME_BIN: /usr/bin/google-chrome
         run: node scripts/live-world-audit.mjs
-      - name: Audit authored architecture prefabs
+      - name: Audit authored Luxe architecture
         env:
           AUDIT_URL: https://kelffren.github.io/gemini/
           CHROME_BIN: /usr/bin/google-chrome
