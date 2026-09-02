@@ -79,6 +79,8 @@
     }
     ready = true;
     if (window.KELO_PLAZA_AUDIT) {
+      window.KELO_PLAZA_AUDIT.version = 'V5.46';
+      window.KELO_PLAZA_AUDIT.registryVersion = REGISTRY.version;
       window.KELO_PLAZA_AUDIT.depthOcclusion = true;
       window.KELO_PLAZA_AUDIT.depthOccluderCount = OCCLUDERS.length;
     }
@@ -92,11 +94,9 @@
     drawFrontOccluders();
   };
 
-  if (window.KELO_PLAZA_TILESET) {
-    window.KELO_PLAZA_DEPTH = Object.freeze({
-      sourceMode: 'y-occlusion-overlay-v1',
-      occluderCount: OCCLUDERS.length,
-      atlasPath: ATLAS.src
-    });
-  }
+  window.KELO_PLAZA_DEPTH = Object.freeze({
+    sourceMode: 'y-occlusion-overlay-v1',
+    occluderCount: OCCLUDERS.length,
+    atlasPath: ATLAS.src
+  });
 })();
