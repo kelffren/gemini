@@ -8,6 +8,10 @@
     id:'plaza-transitions', src:'assets/plaza-transitions-v1.png?art=140', width:128, height:128,
     tileWidth:TILE, tileHeight:TILE, columns:4
   });
+  const grassVariationAtlas = Object.freeze({
+    id:'grass-variation', src:'assets/grass-variation-v1.png?art=191', width:128, height:64,
+    tileWidth:TILE, tileHeight:TILE, columns:4, tileCount:8
+  });
   const ruralSoilAtlas = Object.freeze({
     id:'rural-soil', src:'assets/rural-soil-v1.png?art=160', width:128, height:128,
     tileWidth:TILE, tileHeight:TILE, columns:4
@@ -58,6 +62,7 @@
   const families = Object.freeze({
     grass:Object.freeze([tiles.GRASS_A,tiles.GRASS_B,tiles.GRASS_C,tiles.GRASS_SOFT]),
     grassDetail:Object.freeze([tiles.GRASS_FLOWERS]),
+    grassAuthored:Object.freeze([0,1,2,3,4,5,6,7]),
     marble:Object.freeze([tiles.MARBLE_IVORY_A,tiles.MARBLE_IVORY_B,tiles.MARBLE_IVORY_C,tiles.MARBLE_IVORY_D,tiles.MARBLE_IVORY_A,tiles.MARBLE_IVORY_B,tiles.MARBLE_IVORY_C,tiles.MARBLE_IVORY_D]),
     marbleAccent:Object.freeze([tiles.MARBLE_A,tiles.MARBLE_B,tiles.MARBLE_DIAMOND]),
     marbleGold:Object.freeze([tiles.MARBLE_GOLD_A,tiles.MARBLE_GOLD_B])
@@ -95,7 +100,7 @@
     plazaTransition:Object.freeze({mode:'authored-overlay-atlas',neighbourMask:'TRBL',softenStickerAccents:true}),
     propDepth:Object.freeze({mode:'y-occlusion-overlay-v1',localActorIntersection:true,frontOccluders:Object.freeze(['fountain','column','tree','lamp'])}),
     architecture:Object.freeze({mode:'authored-layered-raster-v1',depthMode:'building-base-y-occlusion-v1',actorClip:true,prefabContract:'registry-asset-placement-collision-v1',rendererMode:'generic-prefab-list-v1'}),
-    districtGround:Object.freeze({mode:'district-profile-v1',profiles:districtGroundStyles}),
+    districtGround:Object.freeze({mode:'district-profile-v1',profiles:districtGroundStyles,grassMode:'authored-eight-variant-atlas-v1'}),
     ruralFarm:Object.freeze({
       mode:'authored-nine-slice-v1',
       plotTiles:Object.freeze([0,1,2,4,5,6,8,9,10]),
@@ -120,8 +125,8 @@
     })
   });
   window.KELO_TILE_REGISTRY = Object.freeze({
-    version:'1.10.18', worldTileSize:TILE,
-    atlases:Object.freeze({plaza:atlas,transitions:transitionAtlas,ruralSoil:ruralSoilAtlas,ruralProps:ruralPropsAtlas,ruralLandmarks:ruralLandmarksAtlas,ruralNature:ruralNatureAtlas}),
+    version:'1.10.19', worldTileSize:TILE,
+    atlases:Object.freeze({plaza:atlas,transitions:transitionAtlas,grassVariation:grassVariationAtlas,ruralSoil:ruralSoilAtlas,ruralProps:ruralPropsAtlas,ruralLandmarks:ruralLandmarksAtlas,ruralNature:ruralNatureAtlas}),
     architectureAssets,architecturePrefabs,
     tiles,ruralTiles,ruralPropTiles,ruralLandmarkTiles,ruralLandmarkSprites,ruralNatureTiles,ruralNatureSprites,families,transitionMasks,styles
   });
