@@ -3,30 +3,33 @@
   // Plaza art metadata is data-driven through KELO_TILE_REGISTRY.
   const PLAZA = { x: 1040, y: 1240, w: 800, h: 560 };
   const REGISTRY = window.KELO_TILE_REGISTRY;
-  if (!REGISTRY?.atlases?.plaza || !REGISTRY?.tiles || !REGISTRY?.families) {
-    console.error('[Kelo plaza] visual tile registry missing');
+  if (!REGISTRY?.atlases?.plaza || !REGISTRY?.atlases?.transitions || !REGISTRY?.tiles || !REGISTRY?.families || !REGISTRY?.transitionMasks) {
+    console.error('[Kelo plaza] visual tile registry missing transition metadata');
     return;
   }
   const ATLAS = REGISTRY.atlases.plaza;
+  const TRANSITION_ATLAS = REGISTRY.atlases.transitions;
   const TILE = REGISTRY.worldTileSize;
   const COLS = ATLAS.columns;
   const T = REGISTRY.tiles;
   const F = REGISTRY.families;
-  const TRANSITION = REGISTRY.styles?.plazaTransition || {
-    marbleInsetShadow:'#d8cda9', grassEdgeDark:'#239d2b', grassEdgeMid:'#37bc35', grassEdgeLight:'#79e75d', tuftRate:5, edgeDepth:3
-  };
+  const TRANSITION_MASKS = REGISTRY.transitionMasks;
 
   window.KELO_PLAZA_AUDIT = {
-    version: 'V5.44',
+    version: 'V5.45',
     ready: false,
     assetLoaded: false,
     fallbackActive: true,
     registryVersion: REGISTRY.version,
     atlas: ATLAS.src,
+    transitionAtlas: TRANSITION_ATLAS.src,
     atlasWidth: ATLAS.width,
     atlasHeight: ATLAS.height,
+    transitionAtlasWidth: TRANSITION_ATLAS.width,
+    transitionAtlasHeight: TRANSITION_ATLAS.height,
     tileSize: TILE,
-    layeredTransitions: true
+    layeredTransitions: true,
+    authoredTransitions: true
   };
 
   function inPlaza(o) {
@@ -50,13 +53,23 @@
   }
 
   let floorLayer=null, transitionLayer=null, propLayer=null;
+  let baseLoaded=false, transitionsLoaded=false;
   const sheet=new Image();
+  const transitionSheet=new Image();
   sheet.decoding='async';
+  transitionSheet.decoding='async';
 
   function origin(id){ return {x:(id%COLS)*TILE,y:Math.floor(id/COLS)*TILE}; }
   function drawTile(g,id,dx,dy){
     const p=origin(id);
     g.drawImage(sheet,p.x,p.y,TILE,TILE,dx,dy,TILE,TILE);
+  }
+  function transitionOrigin(id){
+    return {x:(id%TRANSITION_ATLAS.columns)*TILE,y:Math.floor(id/TRANSITION_ATLAS.columns)*TILE};
+  }
+  function drawTransitionTile(g,id,dx,dy){
+    const p=transitionOrigin(id);
+    g.drawImage(transitionSheet,p.x,p.y,TILE,TILE,dx,dy,TILE,TILE);
   }
   function drawSprite(g,ids,gx,gy,w,h){
     for(let r=0;r<h;r++) for(let c=0;c<w;c++) {
@@ -96,6 +109,7 @@
   }
 
   function bakeAtlas() {
+    if(!baseLoaded || !transitionsLoaded) return;
     const cols=Math.ceil(PLAZA.w/TILE), rows=Math.ceil(PLAZA.h/TILE);
     const cx=Math.floor(cols/2), cy=Math.floor(rows/2);
     const floor=document.createElement('canvas'); floor.width=PLAZA.w; floor.height=PLAZA.h;
@@ -114,10 +128,9 @@
       marbleMask[gy][gx]=marble;
       let id;
       if(marble){
+        // Keep the navigation material calm. Decorative gold/diagonal squares are no longer
+        // injected into the base floor; accents belong to authored decals/props.
         id=pick(gx,gy,F.marble);
-        const edge=inSquare&&((dx===5&&dy<=4)||(dy===4&&dx<=5));
-        if(edge&&((gx+gy)%4===0)) id=pick(gx,gy,F.marbleGold);
-        if((dx===0&&dy===4)||(dy===0&&dx===5)||(dx===4&&dy===3)) id=T.MARBLE_GREEN_DIAMOND;
       } else {
         id=pick(gx,gy,F.grass);
         if(((gx*11+gy*7)%29)===0) id=pick(gx,gy,F.grassDetail);
@@ -128,40 +141,17 @@
 
     const transitions=document.createElement('canvas'); transitions.width=PLAZA.w; transitions.height=PLAZA.h;
     const tg=transitions.getContext('2d'); tg.imageSmoothingEnabled=false;
-    const d=Math.max(2,Math.min(4,TRANSITION.edgeDepth|0));
-    const tuftRate=Math.max(3,TRANSITION.tuftRate|0);
-
-    function edgeSeed(gx,gy,side){
-      return Math.abs(((gx+11)*92837111)^((gy+7)*689287499)^(side*283923481));
-    }
-    function grassTuft(px,py,vertical,seed){
-      if(seed%tuftRate!==0) return;
-      tg.fillStyle=TRANSITION.grassEdgeDark;
-      if(vertical){
-        tg.fillRect(px,py+6+(seed%12),2,5); tg.fillRect(px+2,py+8+(seed%9),1,3);
-      } else {
-        tg.fillRect(px+6+(seed%12),py,5,2); tg.fillRect(px+8+(seed%9),py+2,3,1);
-      }
-      tg.fillStyle=TRANSITION.grassEdgeLight;
-      if(vertical) tg.fillRect(px+1,py+7+(seed%12),1,2);
-      else tg.fillRect(px+7+(seed%12),py+1,2,1);
-    }
-
     for(let gy=0;gy<rows;gy++) for(let gx=0;gx<cols;gx++) {
       if(!isMarbleCell(gx,gy)) continue;
-      const x=gx*TILE, y=gy*TILE;
-      const top=!isMarbleCell(gx,gy-1), right=!isMarbleCell(gx+1,gy), bottom=!isMarbleCell(gx,gy+1), left=!isMarbleCell(gx-1,gy);
-      tg.fillStyle=TRANSITION.marbleInsetShadow;
-      if(top){ tg.fillRect(x,y,TILE,d); grassTuft(x,y-1,false,edgeSeed(gx,gy,0)); }
-      if(right){ tg.fillRect(x+TILE-d,y,d,TILE); grassTuft(x+TILE-1,y,true,edgeSeed(gx,gy,1)); }
-      if(bottom){ tg.fillRect(x,y+TILE-d,TILE,d); grassTuft(x,y+TILE-1,false,edgeSeed(gx,gy,2)); }
-      if(left){ tg.fillRect(x,y,d,TILE); grassTuft(x-1,y,true,edgeSeed(gx,gy,3)); }
-
-      tg.fillStyle=TRANSITION.grassEdgeMid;
-      if(top){ for(let px=4;px<TILE;px+=8) if((edgeSeed(gx,gy,px)%3)!==0) tg.fillRect(x+px,y-1,3,2); }
-      if(bottom){ for(let px=2;px<TILE;px+=9) if((edgeSeed(gx,gy,px+31)%3)!==0) tg.fillRect(x+px,y+TILE-1,3,2); }
-      if(left){ for(let py=3;py<TILE;py+=9) if((edgeSeed(gx,gy,py+67)%3)!==0) tg.fillRect(x-1,y+py,2,3); }
-      if(right){ for(let py=5;py<TILE;py+=8) if((edgeSeed(gx,gy,py+97)%3)!==0) tg.fillRect(x+TILE-1,y+py,2,3); }
+      let mask=0;
+      if(!isMarbleCell(gx,gy-1)) mask|=1;
+      if(!isMarbleCell(gx+1,gy)) mask|=2;
+      if(!isMarbleCell(gx,gy+1)) mask|=4;
+      if(!isMarbleCell(gx-1,gy)) mask|=8;
+      if(mask===0) continue;
+      const transitionId=TRANSITION_MASKS[mask];
+      if(transitionId==null) continue;
+      drawTransitionTile(tg,transitionId,gx*TILE,gy*TILE);
     }
 
     const props=document.createElement('canvas'); props.width=PLAZA.w; props.height=PLAZA.h;
@@ -184,10 +174,18 @@
     if(sheet.naturalWidth!==ATLAS.width||sheet.naturalHeight!==ATLAS.height){
       console.error('[Kelo plaza] invalid tileset dimensions',sheet.naturalWidth,sheet.naturalHeight,'expected',ATLAS.width,ATLAS.height); return;
     }
-    bakeAtlas();
+    baseLoaded=true; bakeAtlas();
+  };
+  transitionSheet.onload=function(){
+    if(transitionSheet.naturalWidth!==TRANSITION_ATLAS.width||transitionSheet.naturalHeight!==TRANSITION_ATLAS.height){
+      console.error('[Kelo plaza] invalid transition atlas dimensions',transitionSheet.naturalWidth,transitionSheet.naturalHeight,'expected',TRANSITION_ATLAS.width,TRANSITION_ATLAS.height); return;
+    }
+    transitionsLoaded=true; bakeAtlas();
   };
   sheet.onerror=function(){ console.error('[Kelo plaza] tileset load failed; deterministic fallback remains active'); };
-  sheet.src=ATLAS.src+'?v=95';
+  transitionSheet.onerror=function(){ console.error('[Kelo plaza] transition atlas load failed; deterministic fallback remains active'); };
+  sheet.src=ATLAS.src+'&v=100';
+  transitionSheet.src=TRANSITION_ATLAS.src+'&v=100';
 
   function landingPoint(){
     const range=skillAim.castRange||120;
@@ -242,5 +240,5 @@
     drawLanding();
   };
 
-  window.KELO_PLAZA_TILESET=Object.freeze({sourceMode:'layered-registry-v2',registryVersion:REGISTRY.version,assetPath:ATLAS.src,atlasWidth:ATLAS.width,atlasHeight:ATLAS.height,atlasTileSize:TILE,worldTileSize:TILE,columns:COLS,layeredTransitions:true,plaza:Object.freeze({...PLAZA})});
+  window.KELO_PLAZA_TILESET=Object.freeze({sourceMode:'authored-transition-atlas-v1',registryVersion:REGISTRY.version,assetPath:ATLAS.src,transitionAssetPath:TRANSITION_ATLAS.src,atlasWidth:ATLAS.width,atlasHeight:ATLAS.height,atlasTileSize:TILE,worldTileSize:TILE,columns:COLS,layeredTransitions:true,authoredTransitions:true,plaza:Object.freeze({...PLAZA})});
 })();
