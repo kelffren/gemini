@@ -83,11 +83,19 @@
       mode:'layered-rural-landmarks-v1',
       authoredLandmarks:Object.freeze(['barn','silo']),
       depthMode:'actor-base-y-v1',
-      gameplayFootprint:'visual-only-v1'
+      gameplayFootprint:'visual-only-v1',
+      edgeVegetation:Object.freeze({
+        mode:'west-south-edge-clusters-v1',
+        sourceAtlas:'plaza',
+        treeSprite:'TREE',
+        hedgeTiles:Object.freeze(['BUSH_A','BUSH_B','BUSH_FLOWERS','BUSH_FLOWERS_B']),
+        centerClear:true,
+        roadClearance:32
+      })
     })
   });
   window.KELO_TILE_REGISTRY = Object.freeze({
-    version:'1.8.0', worldTileSize:TILE,
+    version:'1.9.0', worldTileSize:TILE,
     atlases:Object.freeze({plaza:atlas,transitions:transitionAtlas,ruralSoil:ruralSoilAtlas,ruralProps:ruralPropsAtlas,ruralLandmarks:ruralLandmarksAtlas}),
     tiles,ruralTiles,ruralPropTiles,ruralLandmarkTiles,ruralLandmarkSprites,families,transitionMasks,styles
   });
