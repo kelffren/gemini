@@ -253,8 +253,29 @@
     state.inventory = migrateCollection(state.inventory, report, seen, quarantine);
     state.equipped = migrateCollection(state.equipped, report, seen, quarantine);
 
-    if (state.equipped.length > LOADOUT_SIZE) {
-      const overflow = state.equipped.splice(LOADOUT_SIZE);
+    const kept = [];
+    const overflow = [];
+    let normalCount = 0;
+    let ultimateCount = 0;
+    state.equipped.forEach((stone) => {
+      const def = abilityByKey(stone.abilityKey);
+      const isUltimate = def && def.slotType === 'ultimate';
+      if (isUltimate) {
+        if (ultimateCount < 1) {
+          kept.push(stone);
+          ultimateCount++;
+        } else {
+          overflow.push(stone);
+        }
+      } else if (normalCount < LOADOUT_SIZE - 1) {
+        kept.push(stone);
+        normalCount++;
+      } else {
+        overflow.push(stone);
+      }
+    });
+    state.equipped = kept;
+    if (overflow.length) {
       report.overflow += overflow.length;
       state.inventory.push.apply(state.inventory, overflow);
     }
@@ -383,20 +404,64 @@
     };
   }
 
-  function exportLoadout(state) {
+  function projectLoadout(state) {
     const equipped = state && Array.isArray(state.equipped) ? state.equipped : [];
-    const slots = Array.from({ length: LOADOUT_SIZE }, (_, slot) => snapshotStone(equipped[slot], slot));
+    const slots = Array(LOADOUT_SIZE).fill(null);
+    let normalSlot = 0;
+
+    equipped.forEach((stone) => {
+      const normalized = normalizeStone(stone);
+      if (!normalized) return;
+      const def = abilityByKey(normalized.abilityKey);
+      if (!def) return;
+      if (def.slotType === 'ultimate') {
+        if (!slots[LOADOUT_SIZE - 1]) slots[LOADOUT_SIZE - 1] = normalized;
+        return;
+      }
+      while (normalSlot < LOADOUT_SIZE - 1 && slots[normalSlot]) normalSlot++;
+      if (normalSlot < LOADOUT_SIZE - 1) {
+        slots[normalSlot] = normalized;
+        normalSlot++;
+      }
+    });
+
+    return slots;
+  }
+
+  function fingerprintPayload(payload) {
+    return hashString(JSON.stringify({
+      schemaVersion: payload.schemaVersion,
+      size: payload.size,
+      slots: payload.slots,
+    }));
+  }
+
+  function exportLoadout(state) {
+    const projected = projectLoadout(state);
+    const slots = projected.map((stone, slot) => snapshotStone(stone, slot));
     const payload = { schemaVersion: SCHEMA_VERSION, size: LOADOUT_SIZE, slots };
-    payload.fingerprint = hashString(JSON.stringify(payload));
+    payload.fingerprint = fingerprintPayload(payload);
     return payload;
   }
 
   function validateLoadoutSnapshot(snapshot, state) {
-    if (!snapshot || snapshot.schemaVersion !== SCHEMA_VERSION || !Array.isArray(snapshot.slots)) {
+    if (
+      !snapshot ||
+      snapshot.schemaVersion !== SCHEMA_VERSION ||
+      snapshot.size !== LOADOUT_SIZE ||
+      !Array.isArray(snapshot.slots) ||
+      snapshot.slots.length !== LOADOUT_SIZE
+    ) {
       return { valid: false, reason: 'INVALID_SCHEMA' };
     }
+
+    const candidateFingerprint = fingerprintPayload(snapshot);
+    if (candidateFingerprint !== snapshot.fingerprint) {
+      return { valid: false, reason: 'SNAPSHOT_TAMPERED' };
+    }
+
     const authoritative = exportLoadout(state);
-    if (snapshot.fingerprint !== authoritative.fingerprint) {
+    if (candidateFingerprint !== authoritative.fingerprint) {
       return { valid: false, reason: 'LOADOUT_MISMATCH', authoritative };
     }
     return { valid: true, authoritative };
@@ -444,6 +509,7 @@
     affixLabel,
     recipeLabel,
     stoneSummary,
+    projectLoadout,
     exportLoadout,
     validateLoadoutSnapshot,
     canFuse,
