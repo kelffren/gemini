@@ -33,19 +33,23 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
+      - name: Resolve visual contract from source
+        shell: bash
+        run: |
+          REGISTRY_VERSION="$(node -e "const fs=require('fs');const s=fs.readFileSync('src/environment/tile-registry.js','utf8');const m=s.match(/version:'([^']+)'/);if(!m)process.exit(2);process.stdout.write(m[1]);")"
+          echo "EXPECTED_REGISTRY=$REGISTRY_VERSION" >> "$GITHUB_ENV"
+          echo "Auditing TileRegistry $REGISTRY_VERSION"
       - name: Install Playwright package
         run: npm install --no-save playwright@1.55.0
       - name: Audit deployed mobile world
         env:
           AUDIT_URL: https://kelffren.github.io/gemini/
           EXPECTED_WORLD: world-v1.2
-          EXPECTED_REGISTRY: 1.10.7
           CHROME_BIN: /usr/bin/google-chrome
         run: node scripts/live-world-audit.mjs
       - name: Audit authored architecture prefabs
         env:
           AUDIT_URL: https://kelffren.github.io/gemini/
-          EXPECTED_REGISTRY: 1.10.7
           CHROME_BIN: /usr/bin/google-chrome
         run: node scripts/live-pavilion-audit.mjs
       - name: Upload screenshot evidence
