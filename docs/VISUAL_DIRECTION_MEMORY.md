@@ -410,6 +410,15 @@ Kelo World is no longer allowed to remain a single polished plaza floating in a 
 - Final validation: Kelo CI passed, Pages passed, mobile LIVE audit passed at 390x844 CSS / 780x1688 canvas, `world-v1.5` was active, and console errors, failed requests, and HTTP errors were all empty.
 - Next visual bottleneck visible in the validated Plaza capture: legacy round trees / debug-like world markers and NPC labels still contrast sharply with the authored plaza ground, Luxe boutique, and authored plaza-nature family. Replace or suppress these incrementally without touching gameplay semantics.
 
+
+## Validated World Placard Cleanup — World v1.6 / 2026-09-02
+- Current public Pixadom/browser MMO references reinforce a mobile readability rule: authored environment landmarks and focal props should carry place identity; persistent prototype-style labels drawn directly into the world compete with scenery at small viewports. This is a readability/density reference only; no external art or layout was copied.
+- `src/environment/world-map.js` no longer paints the active district's dark rectangular name placard into the world canvas. District detection remains intact for audit/navigation state; only the decorative world overlay was removed.
+- World audit advanced to `world-v1.6` with `districtLabelMode='world-placards-removed-v1'`; `index.html` cache-busts the renderer as `world-map.js?v=176`.
+- Final deployed visual commit `b8b0628b5373bb8d6df9c1cd2687abd4b21e65fd` passed Kelo CI, GitHub Pages and the LIVE mobile audit at 390x844 CSS / 780x1688 backing canvas.
+- LIVE runtime validated registry `1.10.21`, authored plaza ground loaded with no fallback, four plaza-nature props, and `consoleErrors=[]`, `failedRequests=[]`, `httpErrors=[]`.
+- Manual inspection of `live-plaza.png` confirms the district placard is gone with no regression to plaza/road readability. The next largest visual bottleneck is now clearer: legacy flat circular environment/NPC markers and primitive tree/dummy visuals still read as placeholders beside the authored plaza, nature and architecture. The next safe pass should replace or suppress one high-visibility placeholder family through data-driven props/layers rather than adding more ground noise.
+
 ## Non-goals During Visual Passes
 Do not casually alter unrelated systems such as:
 - core movement feel;
