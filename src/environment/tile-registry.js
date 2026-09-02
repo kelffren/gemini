@@ -28,8 +28,8 @@
 
   const architectureAssets = Object.freeze({
     luxeBoutique:Object.freeze({
-      id:'luxe-boutique', src:'assets/kelo-luxe-boutique.svg?v=3', width:192, height:222,
-      worldWidth:240, worldHeight:278, family:'architecture'
+      id:'luxe-boutique', src:'assets/kelo-luxe-boutique.svg?v=4', width:192, height:222,
+      worldWidth:384, worldHeight:444, family:'architecture'
     }),
     marketPavilion:Object.freeze({
       id:'market-pavilion', src:'assets/market-pavilion-v1.png?art=220', width:224, height:160,
@@ -38,10 +38,10 @@
   });
   const architecturePrefabs = Object.freeze({
     luxeBoutique:Object.freeze({
-      id:'luxe-boutique-central', asset:'luxeBoutique', x:1088, y:1288, baseYOffset:278,
-      collision:Object.freeze({x:1124,y:1488,w:168,h:52}),
-      interaction:Object.freeze({x:1208,y:1552,radius:90}),
-      occlusion:Object.freeze({sideInset:16,topInset:70,bottomPadding:8,clip:Object.freeze({xPadding:12,topPadding:40,bottomPadding:12})}),
+      id:'luxe-boutique-central', asset:'luxeBoutique', x:1088, y:1264, baseYOffset:444,
+      collision:Object.freeze({x:1140,y:1620,w:280,h:70}),
+      interaction:Object.freeze({x:1280,y:1710,radius:110}),
+      occlusion:Object.freeze({sideInset:18,topInset:80,bottomPadding:8,clip:Object.freeze({xPadding:14,topPadding:48,bottomPadding:14})}),
       legacyVisualReplacement:true
     }),
     marketPavilion:Object.freeze({
@@ -130,7 +130,7 @@
     })
   });
   window.KELO_TILE_REGISTRY = Object.freeze({
-    version:'1.10.5', worldTileSize:TILE,
+    version:'1.10.6', worldTileSize:TILE,
     atlases:Object.freeze({plaza:atlas,transitions:transitionAtlas,ruralSoil:ruralSoilAtlas,ruralProps:ruralPropsAtlas,ruralLandmarks:ruralLandmarksAtlas,ruralNature:ruralNatureAtlas}),
     architectureAssets,architecturePrefabs,
     tiles,ruralTiles,ruralPropTiles,ruralLandmarkTiles,ruralLandmarkSprites,ruralNatureTiles,ruralNatureSprites,families,transitionMasks,styles
