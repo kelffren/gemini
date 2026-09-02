@@ -32,7 +32,7 @@ jobs:
         env:
           AUDIT_URL: https://kelffren.github.io/gemini/
           EXPECTED_BUILD: V5.47
-          EXPECTED_REGISTRY: 1.4.1
+          EXPECTED_REGISTRY: 1.5.0
           CHROME_BIN: /usr/bin/google-chrome
         run: node scripts/live-audit.mjs
       - name: Upload screenshot evidence
