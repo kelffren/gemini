@@ -2,17 +2,23 @@
   // MOV-001: one processed intent magnitude drives gait + speed.
   // MOV-004: visual stride advances from actual world distance, never render count.
   const WALK_MAX = 0.74;
-  const WALK_SPEED = 96;
-  const RUN_SPEED = 165;
-  const MAX_SPEED = RUN_SPEED + (1 - WALK_MAX) * 28; // 172.28, historical max
-  const SPEED_BLEND_START = 0.55;
-  const GAIT_IDLE_MAX = 0.04;
-  const GAIT_RUN_START = 0.74;
+  const WALK_SPEED = 110;
+  const RUN_SPEED = 178;
+  const MAX_SPEED = RUN_SPEED + (1 - WALK_MAX) * 28;
+  const SPEED_BLEND_START = 0.48;
+  const GAIT_IDLE_MAX = 0.03;
+  const GAIT_RUN_START = 0.70;
   const VISUAL_STOP_HOLD_SEC = 0.075;
   const WALK_CYCLE_WORLD_PX = 50;
   const RUN_CYCLE_WORLD_PX = 90;
   const MIN_VISUAL_MOVE_PX = 0.12;
   CONFIG.speed = WALK_SPEED;
+  CONFIG.joystickDeadzone = 0.045;
+  CONFIG.joystickCurve = 'LINEAR';
+  CONFIG.joystickRadius = 72;
+  CONFIG.movementType = 'DIRECT';
+  CONFIG.accelDecay = 32;
+  CONFIG.decelDecay = 18;
 
   function processedMag() {
     return Math.min(1, Math.hypot(input.normX || 0, input.normY || 0));
@@ -42,7 +48,7 @@
 
   function publishAudit(mag, gait, speedCap, visual) {
     window.KELO_MOVEMENT_AUDIT = {
-      version: 'MOV-001+MOV-004',
+      version: 'MOV-smooth-stick-v1',
       rawTouchMag: rawTouchMag(),
       processedMag: mag,
       gait,
@@ -112,8 +118,6 @@
       p._face = v.face;
     }
 
-    // Advance animation only from actual post-collision displacement.
-    // If Kelo pushes against a wall and does not move, the stride cannot treadmill.
     v.lastStepDistancePx = dist > MIN_VISUAL_MOVE_PX ? dist : 0;
     if (v.on && v.lastStepDistancePx > 0) {
       const cyclePx = gait === 'run' ? RUN_CYCLE_WORLD_PX : WALK_CYCLE_WORLD_PX;
