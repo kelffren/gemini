@@ -11,6 +11,7 @@ on:
       - 'engine-l.js'
       - 'engine-u.js'
       - 'src/environment/**'
+      - 'src/ui/**'
       - 'assets/tileset.png'
       - 'assets/tileset-vclean.png'
       - 'assets/plaza-transitions-v1.png'
@@ -34,7 +35,7 @@ jobs:
       - name: Audit deployed mobile page
         env:
           AUDIT_URL: https://kelffren.github.io/gemini/
-          EXPECTED_BUILD: V5.53
+          EXPECTED_BUILD: V5.54
           EXPECTED_REGISTRY: 1.10.0
           EXPECTED_LANDMARKS: rural-landmarks-v1.3
           CHROME_BIN: /usr/bin/google-chrome
