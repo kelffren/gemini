@@ -209,3 +209,73 @@
     open: openBoutique
   });
 })();
+
+(function () {
+  'use strict';
+  const REGISTRY = window.KELO_TILE_REGISTRY;
+  if (!REGISTRY?.styles?.architecture || typeof window.KELO_WORLD_RENDERER?.draw !== 'function') {
+    console.error('[Kelo market pavilion] architecture layer unavailable');
+    return;
+  }
+  const ASSET = 'assets/market-pavilion-v1.png?art=220';
+  const PAVILION = Object.freeze({x:1288,y:1790,w:224,h:160,baseY:1950});
+  const COLLISION = Object.freeze({x:1300,y:1870,w:200,h:80});
+  const img = new Image();
+  let ready=false, failed=false, wrapped=false, depthWrapped=false, legacyHidden=false;
+
+  function draw(g){
+    if(!ready)return;
+    g.save();g.imageSmoothingEnabled=false;g.drawImage(img,PAVILION.x,PAVILION.y,PAVILION.w,PAVILION.h);g.restore();
+  }
+  function installLegacyVisualReplacement(){
+    if(typeof obstacles==='undefined'||!Array.isArray(obstacles))return false;
+    const target=obstacles.find(o=>o&&o.x===COLLISION.x&&o.y===COLLISION.y&&o.w===COLLISION.w&&o.h===COLLISION.h);
+    if(!target)return false;
+    target.noDraw=true;target._marketPavilionVisual=true;legacyHidden=true;return true;
+  }
+  function installWorldLayer(){
+    const base=window.KELO_WORLD_RENDERER;
+    if(!base||typeof base.draw!=='function')return false;
+    if(base.__keloMarketPavilion){wrapped=true;return true;}
+    window.KELO_WORLD_RENDERER=Object.freeze({
+      __keloMarketPavilion:true,
+      draw:function(g){const ok=base.draw(g);if(ok===true)draw(g);return ok;},
+      districts:base.districts,chunkSize:base.chunkSize,get ready(){return base.ready;}
+    });
+    wrapped=true;return true;
+  }
+  function actorBehind(actor){
+    if(!actor)return false;const r=actor.radius||20;
+    return actor.x+r>PAVILION.x+14&&actor.x-r<PAVILION.x+PAVILION.w-14&&actor.y>PAVILION.y+36&&actor.y<COLLISION.y+COLLISION.h;
+  }
+  function repaint(g,actor){
+    if(!ready||!actorBehind(actor))return false;const r=actor.radius||20;
+    g.save();g.beginPath();g.rect(actor.x-r-14,actor.y-r-52,r*2+28,r*2+70);g.clip();draw(g);g.restore();return true;
+  }
+  function installDepth(){
+    if(depthWrapped||typeof window.render!=='function')return depthWrapped;
+    const base=window.render;
+    if(base.__keloMarketDepth){depthWrapped=true;return true;}
+    const layered=function(){
+      base();
+      if(!ready||typeof ctx==='undefined'||typeof camera==='undefined'||typeof screenW==='undefined'||typeof screenH==='undefined')return;
+      const actors=[];
+      if(typeof localPlayer!=='undefined'&&localPlayer)actors.push(localPlayer);
+      if(typeof simulatedPlayers!=='undefined'&&Array.isArray(simulatedPlayers))actors.push(...simulatedPlayers);
+      const active=actors.filter(actorBehind);if(!active.length)return;
+      const z=(typeof CONFIG!=='undefined'&&CONFIG.zoom)||1;
+      ctx.save();ctx.translate(screenW/2,screenH/2);ctx.scale(z,z);ctx.translate(-camera.x,-camera.y);ctx.imageSmoothingEnabled=false;active.forEach(a=>repaint(ctx,a));ctx.restore();
+    };
+    layered.__keloMarketDepth=true;window.render=layered;depthWrapped=true;return true;
+  }
+  function install(){installLegacyVisualReplacement();installWorldLayer();installDepth();}
+  img.onload=function(){ready=true;failed=false;};
+  img.onerror=function(){failed=true;console.error('[Kelo market pavilion] authored raster failed to load:',ASSET);};
+  img.src=ASSET;
+  install();setTimeout(install,120);setTimeout(install,600);
+  window.KELO_MARKET_PAVILION=Object.freeze({
+    version:'authored-market-pavilion-v1',asset:ASSET,source:'authored-raster-architecture-family',
+    geometry:PAVILION,collision:COLLISION,depthMode:REGISTRY.styles.architecture.depthMode,
+    isOccluding:actorBehind,get ready(){return ready},get failed(){return failed},get rendererWrapped(){return wrapped},get depthWrapped(){return depthWrapped},get legacyHidden(){return legacyHidden}
+  });
+})();

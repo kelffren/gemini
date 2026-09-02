@@ -26,6 +26,8 @@ jobs:
           node --check src/environment/rural-ground.js
           node --check src/environment/rural-landmarks.js
           node --check src/environment/luxe-compose.js
+          node --check src/environment/luxe-kiosk-atlas.js
+          node --check scripts/live-pavilion-audit.mjs
           node --check src/ui/luxe-shell.js
           node --check src/ui/luxe-boutique.js
           node --check engine-a.js
@@ -37,6 +39,7 @@ jobs:
           grep -q 'src/ui/luxe-boutique.js' index.html
           grep -q "luxe-shell-v2.0" src/ui/luxe-shell.js
           grep -q "forest-ivory-gold" src/ui/luxe-shell.js
+          grep -q "authored-market-pavilion-v1" src/environment/luxe-kiosk-atlas.js
           if ! grep -q 'DISABLED_PROCEDURAL_ART' src/environment/luxe-compose.js; then
             echo 'rejected procedural plaza overlay was reactivated'
             exit 1
@@ -66,6 +69,12 @@ jobs:
           assert (width,height)==(256,128),(path,width,height)
           assert width%32==0 and height%32==0
           print('PASS rural landmarks atlas',path,width,height,'tile=32 grid=8x4')
+          path='assets/market-pavilion-v1.png'
+          header=open(path,'rb').read(24)
+          assert header[:8] == b'\x89PNG\r\n\x1a\n'
+          width,height=struct.unpack('>II',header[16:24])
+          assert (width,height)==(224,160),(path,width,height)
+          print('PASS authored market pavilion',path,width,height)
           source=open('src/environment/rural-nature-atlas.js',encoding='utf-8').read()
           match=re.search(r"data:image/png;base64,([^']+)",source)
           assert match, 'embedded rural nature PNG missing'
