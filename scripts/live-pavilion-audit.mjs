@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import { chromium } from 'playwright';
 const base=process.env.AUDIT_URL||'https://kelffren.github.io/gemini/';
+const expectedRegistry=process.env.EXPECTED_REGISTRY||'1.10.2';
 fs.mkdirSync('artifacts',{recursive:true});
 const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_BIN||'/usr/bin/google-chrome',args:['--no-sandbox','--disable-dev-shm-usage']});
 const context=await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true});
@@ -14,8 +15,8 @@ let loaded=false;
 for(let attempt=1;attempt<=24;attempt++){
   try{
     await page.goto(`${base}?pavilion-audit=${Date.now()}-${attempt}`,{waitUntil:'networkidle',timeout:45000});
-    const s=await page.evaluate(()=>({p:window.KELO_MARKET_PAVILION||null,world:window.KELO_WORLD_AUDIT||null}));
-    if(s.world?.ready&&s.p?.ready&&s.p?.rendererWrapped&&s.p?.depthWrapped&&s.p?.legacyHidden&&!s.p?.failed){loaded=true;break}
+    const s=await page.evaluate(()=>({p:window.KELO_MARKET_PAVILION||null,world:window.KELO_WORLD_AUDIT||null,registry:window.KELO_TILE_REGISTRY||null}));
+    if(s.world?.ready&&s.registry?.version===expectedRegistry&&s.registry?.styles?.architecture?.prefabContract==='registry-asset-placement-collision-v1'&&s.registry?.architectureAssets?.marketPavilion&&s.registry?.architecturePrefabs?.marketPavilion&&s.p?.ready&&s.p?.source==='tile-registry-architecture-prefab'&&s.p?.rendererWrapped&&s.p?.depthWrapped&&s.p?.legacyHidden&&!s.p?.failed){loaded=true;break}
   }catch(e){console.log(`attempt ${attempt}: ${e.message}`)}
   await page.waitForTimeout(10000);
 }
@@ -29,14 +30,17 @@ const capture=await page.evaluate(()=>{
   const px=c.getContext('2d').getImageData(0,0,c.width,c.height).data;
   let stone=0,roof=0,gold=0,glass=0;
   for(let i=0;i<px.length;i+=4){const r=px[i],g=px[i+1],b=px[i+2],a=px[i+3];if(a<200)continue;if((r===225&&g===214&&b===184)||(r===241&&g===232&&b===205))stone++;if((r===45&&g===84&&b===78)||(r===61&&g===111&&b===100))roof++;if(r===210&&g===165&&b===72)gold++;if((r===90&&g===176&&b===178)||(r===151&&g===220&&b===210))glass++;}
-  return{dataUrl:c.toDataURL('image/png'),occluding:!!window.KELO_MARKET_PAVILION?.isOccluding?.(localPlayer),state:window.KELO_MARKET_PAVILION||null,stone,roof,gold,glass};
+  return{dataUrl:c.toDataURL('image/png'),occluding:!!window.KELO_MARKET_PAVILION?.isOccluding?.(localPlayer),state:window.KELO_MARKET_PAVILION||null,registryVersion:window.KELO_TILE_REGISTRY?.version||null,prefab:window.KELO_TILE_REGISTRY?.architecturePrefabs?.marketPavilion||null,asset:window.KELO_TILE_REGISTRY?.architectureAssets?.marketPavilion||null,stone,roof,gold,glass};
 });
 if(capture?.dataUrl?.startsWith('data:image/png;base64,'))fs.writeFileSync('artifacts/live-market-pavilion.png',Buffer.from(capture.dataUrl.split(',')[1],'base64'));
-const report={loaded,capture: capture?{occluding:capture.occluding,state:capture.state,stone:capture.stone,roof:capture.roof,gold:capture.gold,glass:capture.glass}:null,consoleErrors,failedRequests,httpErrors};
+const report={loaded,expectedRegistry,capture:capture?{occluding:capture.occluding,state:capture.state,registryVersion:capture.registryVersion,prefab:capture.prefab,asset:capture.asset,stone:capture.stone,roof:capture.roof,gold:capture.gold,glass:capture.glass}:null,consoleErrors,failedRequests,httpErrors};
 fs.writeFileSync('artifacts/pavilion-report.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));
 await browser.close();
-if(!loaded)throw new Error('Market pavilion did not become ready on LIVE');
+if(!loaded)throw new Error('Market pavilion did not become ready from TileRegistry prefab on LIVE');
+if(capture?.registryVersion!==expectedRegistry)throw new Error(`Registry mismatch ${capture?.registryVersion} !== ${expectedRegistry}`);
 if(!capture?.dataUrl?.startsWith('data:image/png;base64,')||!capture.occluding)throw new Error('Pavilion depth capture failed');
+if(capture.state?.source!=='tile-registry-architecture-prefab'||capture.state?.prefabId!=='market-pavilion-south')throw new Error('Pavilion is not consuming registry prefab metadata');
+if(capture.state?.asset!==capture.asset?.src||capture.state?.geometry?.x!==capture.prefab?.x||capture.state?.geometry?.y!==capture.prefab?.y||capture.state?.collision?.x!==capture.prefab?.collision?.x||capture.state?.collision?.y!==capture.prefab?.collision?.y)throw new Error('Pavilion runtime geometry diverged from TileRegistry prefab');
 if(!capture.state?.legacyHidden||!capture.state?.rendererWrapped||!capture.state?.depthWrapped||capture.state?.failed)throw new Error('Pavilion runtime contract invalid');
 if(capture.stone<200||capture.roof<100||capture.gold<30||capture.glass<40)throw new Error(`Pavilion authored pixels missing: ${JSON.stringify({stone:capture.stone,roof:capture.roof,gold:capture.gold,glass:capture.glass})}`);
 if(consoleErrors.length)throw new Error(`Console/page errors: ${JSON.stringify(consoleErrors)}`);
