@@ -7,13 +7,13 @@
     x: 1248,
     y: 1050,
     w: 384,
-    h: 446,
+    h: 444,
     frontX: 1440,
     frontY: 1532,
     interactRadius: 220
   });
-  const COLLISION = Object.freeze({ x: 1272, y: 1362, w: 336, h: 134 });
-  const ASSET = 'assets/kelo-luxe-boutique.png?v=1';
+  const COLLISION = Object.freeze({ x: 1272, y: 1362, w: 336, h: 132 });
+  const ASSET = 'assets/kelo-luxe-boutique.svg?v=1';
 
   const img = new Image();
   let ready = false;
@@ -35,8 +35,7 @@
       wrapped = true;
       return true;
     }
-
-    const renderer = {
+    window.KELO_WORLD_RENDERER = Object.freeze({
       __keloLuxeBoutique: true,
       draw: function (g) {
         const ok = base.draw(g);
@@ -46,9 +45,7 @@
       districts: base.districts,
       chunkSize: base.chunkSize,
       get ready() { return base.ready; }
-    };
-
-    window.KELO_WORLD_RENDERER = Object.freeze(renderer);
+    });
     wrapped = true;
     return true;
   }
@@ -59,23 +56,11 @@
 
   function installCollision() {
     if (typeof obstacles === 'undefined' || !Array.isArray(obstacles)) return false;
-
-    // Remove superseded invisible plaza placeholder collisions only where the authored shop lives.
     for (let i = obstacles.length - 1; i >= 0; i--) {
       const o = obstacles[i];
-      if (o && (o._luxeBoutiqueCollision || (o.noDraw === true && overlaps(o, COLLISION)))) {
-        obstacles.splice(i, 1);
-      }
+      if (o && (o._luxeBoutiqueCollision || (o.noDraw === true && overlaps(o, COLLISION)))) obstacles.splice(i, 1);
     }
-
-    obstacles.push({
-      x: COLLISION.x,
-      y: COLLISION.y,
-      w: COLLISION.w,
-      h: COLLISION.h,
-      noDraw: true,
-      _luxeBoutiqueCollision: true
-    });
+    obstacles.push({ x: COLLISION.x, y: COLLISION.y, w: COLLISION.w, h: COLLISION.h, noDraw: true, _luxeBoutiqueCollision: true });
     return true;
   }
 
@@ -103,10 +88,8 @@
     if (!gameCanvas || typeof screenToWorld !== 'function') return null;
     const r = gameCanvas.getBoundingClientRect();
     if (!r.width || !r.height) return null;
-    const sw = gameCanvas.width || r.width;
-    const sh = gameCanvas.height || r.height;
-    const sx = (e.clientX - r.left) * (sw / r.width);
-    const sy = (e.clientY - r.top) * (sh / r.height);
+    const sx = (e.clientX - r.left) * ((gameCanvas.width || r.width) / r.width);
+    const sy = (e.clientY - r.top) * ((gameCanvas.height || r.height) / r.height);
     return screenToWorld(sx, sy);
   }
 
@@ -126,7 +109,6 @@
         openBoutique();
       }, true);
     }
-
     if (!window._keloLuxeBoutiqueKey) {
       window._keloLuxeBoutiqueKey = true;
       window.addEventListener('keydown', function (e) {
@@ -144,14 +126,8 @@
     installInteraction();
   }
 
-  img.onload = function () {
-    ready = true;
-    failed = false;
-  };
-  img.onerror = function () {
-    failed = true;
-    console.error('[Kelo Luxe] boutique raster failed to load:', ASSET);
-  };
+  img.onload = function () { ready = true; failed = false; };
+  img.onerror = function () { failed = true; console.error('[Kelo Luxe] boutique raster failed to load:', ASSET); };
   img.src = ASSET;
 
   install();
@@ -160,7 +136,7 @@
 
   window.KELO_LUXE_KIOSK = Object.freeze({
     disabled: false,
-    version: 'authored-raster-v1.1',
+    version: 'authored-raster-v1.2',
     asset: ASSET,
     source: 'user-authored-raster',
     shop: SHOP,
