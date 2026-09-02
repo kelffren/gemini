@@ -24,18 +24,53 @@
 
   const geometry=e=>({x:e.prefab.x,y:e.prefab.y,w:e.asset.worldWidth,h:e.asset.worldHeight});
   const overlaps=(a,b)=>a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;
+  const sameRect=(a,b)=>a&&b&&a.x===b.x&&a.y===b.y&&a.w===b.w&&a.h===b.h;
+
+  // These four rectangles are the original plaza placeholder buildings from engine-a.js.
+  // They were only scaffolding and must never remain visible once authored architecture loads.
+  const LEGACY_PLAZA_PLACEHOLDERS=Object.freeze([
+    Object.freeze({x:1150,y:1400,w:120,h:400}),
+    Object.freeze({x:1530,y:1400,w:120,h:400}),
+    Object.freeze({x:1300,y:1250,w:200,h:80}),
+    Object.freeze({x:1300,y:1870,w:200,h:80})
+  ]);
+
   function drawEntry(g,e){if(!e?.ready)return false;const b=geometry(e);g.save();g.imageSmoothingEnabled=false;g.drawImage(e.image,b.x,b.y,b.w,b.h);g.restore();return true;}
   function drawAll(g){entries.forEach(e=>drawEntry(g,e));}
+
   function installLegacyVisualReplacements(){
     if(typeof obstacles==='undefined'||!Array.isArray(obstacles))return false;
+
+    // Delete the old brown building placeholders completely instead of merely hiding them.
+    // This prevents any legacy renderer from painting them again behind Kelo Luxe.
+    for(let i=obstacles.length-1;i>=0;i--){
+      const o=obstacles[i];
+      if(!o)continue;
+      if(LEGACY_PLAZA_PLACEHOLDERS.some(r=>sameRect(o,r)))obstacles.splice(i,1);
+    }
+
+    // Rebuild only invisible gameplay collision from the authored prefab registry.
     for(const e of entries){
-      if(!e.prefab.legacyVisualReplacement)continue;
+      if(!e.prefab.legacyVisualReplacement||!e.prefab.collision)continue;
       const collision=e.prefab.collision;
-      for(const o of obstacles){if(!o||o._luxeBoutiqueCollision||!overlaps(o,collision))continue;o.noDraw=true;o._architectureVisualReplacement=e.prefab.id;}
-      e.legacyHidden=!obstacles.some(o=>o&&!o.noDraw&&!o._luxeBoutiqueCollision&&overlaps(o,collision));
+      for(let i=obstacles.length-1;i>=0;i--){
+        const o=obstacles[i];
+        if(!o||o._architectureCollisionFor===e.prefab.id)continue;
+        if(overlaps(o,collision)&&o._architectureVisualReplacement)obstacles.splice(i,1);
+      }
+      if(!obstacles.some(o=>o&&o._architectureCollisionFor===e.prefab.id)){
+        obstacles.push({
+          x:collision.x,y:collision.y,w:collision.w,h:collision.h,
+          noDraw:true,
+          _architectureCollisionFor:e.prefab.id,
+          _luxeBoutiqueCollision:e.key==='luxeBoutique'
+        });
+      }
+      e.legacyHidden=true;
     }
     return true;
   }
+
   function actorBehind(e,actor){
     if(!e||!actor)return false;
     const occ=e.prefab.occlusion,collision=e.prefab.collision,b=geometry(e),r=actor.radius||20;
@@ -63,9 +98,6 @@
       const active=[];for(const actor of actors)for(const e of entries)if(e.ready&&actorBehind(e,actor))active.push([e,actor]);
       const z=(typeof CONFIG!=='undefined'&&CONFIG.zoom)||1;
       ctx.save();ctx.translate(screenW/2,screenH/2);ctx.scale(z,z);ctx.translate(-camera.x,-camera.y);ctx.imageSmoothingEnabled=false;
-      // Compose registry architecture after plaza/legacy overlays so buildings inside Plaza Central
-      // cannot be painted away. Repaint actors for readability, then restore only the building
-      // pixels that must occlude actors standing physically behind a prefab.
       drawAll(ctx);
       if(typeof renderAvatar==='function')actors.forEach(actor=>renderAvatar(actor,actor===localPlayer));
       active.forEach(([e,a])=>repaint(ctx,e,a));
@@ -81,7 +113,7 @@
   function install(){installLegacyVisualReplacements();installWorldLayer();installDepthLayer();}
   install();setTimeout(install,120);setTimeout(install,600);
 
-  window.KELO_ARCHITECTURE_RENDERER=Object.freeze({version:'architecture-prefab-renderer-v1.2',mode:'generic-prefab-final-composite-v1',prefabCount:entries.length,depthMode:STYLE.depthMode,get ready(){return entries.every(e=>e.ready&&!e.failed);},get rendererWrapped(){return rendererWrapped;},get depthWrapped(){return depthWrapped;},getEntry});
+  window.KELO_ARCHITECTURE_RENDERER=Object.freeze({version:'architecture-prefab-renderer-v1.3',mode:'authored-prefab-no-legacy-buildings-v1',prefabCount:entries.length,depthMode:STYLE.depthMode,get ready(){return entries.every(e=>e.ready&&!e.failed);},get rendererWrapped(){return rendererWrapped;},get depthWrapped(){return depthWrapped;},getEntry});
 
   const luxe=getState('luxeBoutique');
   const market=getState('marketPavilion');
@@ -89,11 +121,7 @@
   const SHOP=Object.freeze({x:luxe.prefab.x,y:luxe.prefab.y,w:luxe.asset.worldWidth,h:luxe.asset.worldHeight,frontX:luxe.prefab.interaction.x,frontY:luxe.prefab.interaction.y,interactRadius:luxe.prefab.interaction.radius});
   const COLLISION=luxe.prefab.collision;
 
-  function installCollision(){
-    if(typeof obstacles==='undefined'||!Array.isArray(obstacles))return false;
-    for(let i=obstacles.length-1;i>=0;i--){const o=obstacles[i];if(o&&(o._luxeBoutiqueCollision||(o.noDraw===true&&overlaps(o,COLLISION))))obstacles.splice(i,1);}
-    obstacles.push({x:COLLISION.x,y:COLLISION.y,w:COLLISION.w,h:COLLISION.h,noDraw:true,_luxeBoutiqueCollision:true});return true;
-  }
+  function installCollision(){return installLegacyVisualReplacements();}
   function nearShop(){return typeof localPlayer!=='undefined'&&localPlayer&&Math.hypot(localPlayer.x-SHOP.frontX,localPlayer.y-SHOP.frontY)<=SHOP.interactRadius;}
   function openBoutique(){
     if(!nearShop()){if(typeof showToast==='function')showToast('Acércate a Kelo Luxe');return false;}
@@ -106,9 +134,9 @@
     const c=document.getElementById('game-canvas');if(c&&!c._keloLuxeBoutiqueTap){c._keloLuxeBoutiqueTap=true;c.addEventListener('pointerdown',e=>{const p=pointerToWorld(e);if(!insideShop(p))return;e.preventDefault();e.stopImmediatePropagation();openBoutique();},true);}
     if(!window._keloLuxeBoutiqueKey){window._keloLuxeBoutiqueKey=true;window.addEventListener('keydown',e=>{if((e.key||'').toLowerCase()!=='e')return;const a=document.activeElement;if(a&&/INPUT|TEXTAREA/.test(a.tagName||''))return;if(nearShop())openBoutique();});}
   }
-  function installBoutiqueHooks(){installCollision();installInteraction();installLegacyVisualReplacements();}
+  function installBoutiqueHooks(){installCollision();installInteraction();}
   installBoutiqueHooks();setTimeout(installBoutiqueHooks,120);setTimeout(installBoutiqueHooks,600);
 
-  window.KELO_LUXE_KIOSK=Object.freeze({disabled:false,version:'authored-raster-v1.6',asset:luxe.asset.src,source:'tile-registry-architecture-prefab',prefabId:luxe.prefab.id,shop:SHOP,collision:COLLISION,interaction:luxe.prefab.interaction,depthMode:STYLE.depthMode,depthOcclusion:true,isOccluding:actor=>actorBehind(luxe,actor),get ready(){return luxe.ready;},get failed(){return luxe.failed;},get rendererWrapped(){return rendererWrapped;},get depthWrapped(){return depthWrapped;},open:openBoutique});
-  window.KELO_MARKET_PAVILION=Object.freeze({version:'authored-market-pavilion-v1.3',asset:market.asset.src,source:'tile-registry-architecture-prefab',prefabId:market.prefab.id,geometry:Object.freeze(geometry(market)),collision:market.prefab.collision,depthMode:STYLE.depthMode,isOccluding:actor=>actorBehind(market,actor),get ready(){return market.ready;},get failed(){return market.failed;},get rendererWrapped(){return rendererWrapped;},get depthWrapped(){return depthWrapped;},get legacyHidden(){return market.legacyHidden;}});
+  window.KELO_LUXE_KIOSK=Object.freeze({disabled:false,version:'authored-raster-v1.7',asset:luxe.asset.src,source:'tile-registry-architecture-prefab',prefabId:luxe.prefab.id,shop:SHOP,collision:COLLISION,interaction:luxe.prefab.interaction,depthMode:STYLE.depthMode,depthOcclusion:true,legacyBrownPlaceholdersRemoved:true,isOccluding:actor=>actorBehind(luxe,actor),get ready(){return luxe.ready;},get failed(){return luxe.failed;},get rendererWrapped(){return rendererWrapped;},get depthWrapped(){return depthWrapped;},open:openBoutique});
+  window.KELO_MARKET_PAVILION=Object.freeze({version:'authored-market-pavilion-v1.4',asset:market.asset.src,source:'tile-registry-architecture-prefab',prefabId:market.prefab.id,geometry:Object.freeze(geometry(market)),collision:market.prefab.collision,depthMode:STYLE.depthMode,isOccluding:actor=>actorBehind(market,actor),get ready(){return market.ready;},get failed(){return market.failed;},get rendererWrapped(){return rendererWrapped;},get depthWrapped(){return depthWrapped;},get legacyHidden(){return market.legacyHidden;}});
 })();
