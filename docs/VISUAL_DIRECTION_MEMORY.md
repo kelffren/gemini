@@ -163,6 +163,15 @@ Refactor the environment renderer so it is no longer tied to a single hard-coded
 - The audit still shows four generic 404 resource errors plus the pre-existing unrelated `appendChild` page error. No new Kelo plaza/tileset/transition-atlas console error was introduced.
 - Current largest visual bottleneck is now prop and vegetation quality relative to the hero sprite: trees, lamps, columns and some plaza furniture still read flatter/simpler than the characters. The next high-impact visual pass should introduce a modular `nature_props`/`plaza_props` atlas with stronger silhouettes, richer shading, and front/back layering. If future paths become more irregular than the current plaza geometry, extend transition selection from 4-neighbour masks to diagonal-aware/8-neighbour inner-corner variants.
 
+## Validated Visual State — V5.46 / Registry 1.4.1
+- Added `src/environment/plaza-depth.js` as a dedicated front-occlusion pass instead of forcing more prop logic into `engine-l.js`.
+- Registry `1.4.1` now exposes `styles.propDepth` with `mode='y-occlusion-overlay-v1'` and identifies fountain, columns, trees and lamps as front-occluding prop families.
+- The new pass re-renders an occluding prop above the local actor only when the actor overlaps the prop footprint and is behind its base-Y. This creates the intended `props_back → actors → props_front` read for the current plaza without altering collisions, movement or gameplay systems.
+- LIVE mobile audit validated `V5.46`, `registryVersion=1.4.1`, `depthOcclusion=true`, `depthOccluderCount=11`, `assetLoaded=true`, `fallbackActive=false`, authored transitions still active, and a 390x844 CSS / 780x1688 backing canvas.
+- Manual screenshot inspection confirms the scene remains visually stable after the depth pass; the strongest remaining mismatch is still asset quality: tree/column/lamp art is materially flatter and simpler than the hero sprite, so the next high-impact pass should create a modular authored `nature_props` / `plaza_props` atlas rather than adding more procedural decoration.
+- Research validation: current Pixadom screenshots continue to use large multi-tile plants, columns, furniture and architectural props to create depth and focal hierarchy, reinforcing that prop silhouette/scale and overlap are more important now than adding more floor noise.
+- QA note: the final audit currently reports multiple generic 404 resource errors (10 in this run) plus the pre-existing `appendChild` page error. No error matched the Kelo plaza/tileset/transition/depth failure filters. A later non-art debugging pass should record failing resource URLs explicitly rather than relying on generic console text.
+
 ## Non-goals During Visual Passes
 Do not casually alter unrelated systems such as:
 - core movement feel;
