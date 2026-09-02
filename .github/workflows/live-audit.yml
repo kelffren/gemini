@@ -38,12 +38,13 @@ jobs:
         env:
           AUDIT_URL: https://kelffren.github.io/gemini/
           EXPECTED_WORLD: world-v1.2
-          EXPECTED_REGISTRY: 1.10.1
+          EXPECTED_REGISTRY: 1.10.2
           CHROME_BIN: /usr/bin/google-chrome
         run: node scripts/live-world-audit.mjs
       - name: Audit authored market pavilion
         env:
           AUDIT_URL: https://kelffren.github.io/gemini/
+          EXPECTED_REGISTRY: 1.10.2
           CHROME_BIN: /usr/bin/google-chrome
         run: node scripts/live-pavilion-audit.mjs
       - name: Upload screenshot evidence
