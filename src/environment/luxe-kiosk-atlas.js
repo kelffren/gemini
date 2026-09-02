@@ -1,290 +1,105 @@
 (function () {
   'use strict';
 
-  const REGISTRY = window.KELO_TILE_REGISTRY;
-  const ARCH = REGISTRY?.architectureAssets?.luxeBoutique;
-  const PREFAB = REGISTRY?.architecturePrefabs?.luxeBoutique;
-  if (!REGISTRY?.styles?.architecture || !ARCH || !PREFAB) {
-    console.error('[Kelo Luxe] architecture registry prefab missing');
+  const REGISTRY=window.KELO_TILE_REGISTRY;
+  const PREFABS=REGISTRY?.architecturePrefabs;
+  const ASSETS=REGISTRY?.architectureAssets;
+  const STYLE=REGISTRY?.styles?.architecture;
+  if(!PREFABS||!ASSETS||!STYLE||typeof window.KELO_WORLD_RENDERER?.draw!=='function'){
+    console.error('[Kelo architecture] registry prefabs unavailable');
     return;
   }
 
-  // Authored raster landmark. Placement, collision, interaction and depth thresholds
-  // are owned by TileRegistry so future architecture variants do not duplicate geometry.
-  const SHOP = Object.freeze({
-    x: PREFAB.x,
-    y: PREFAB.y,
-    w: ARCH.worldWidth,
-    h: ARCH.worldHeight,
-    frontX: PREFAB.interaction.x,
-    frontY: PREFAB.interaction.y,
-    interactRadius: PREFAB.interaction.radius
+  const entries=Object.entries(PREFABS).map(([key,prefab])=>{
+    const asset=ASSETS[prefab.asset];
+    if(!asset)throw new Error(`[Kelo architecture] asset missing for ${key}`);
+    const image=new Image();
+    const state={key,prefab,asset,image,ready:false,failed:false,legacyHidden:!prefab.legacyVisualReplacement};
+    image.onload=()=>{state.ready=true;state.failed=false;};
+    image.onerror=()=>{state.failed=true;console.error('[Kelo architecture] authored raster failed to load:',asset.src);};
+    image.src=asset.src;
+    return state;
   });
-  const COLLISION = PREFAB.collision;
-  const OCCLUSION = PREFAB.occlusion;
-  const ASSET = ARCH.src;
+  let rendererWrapped=false,depthWrapped=false;
 
-  const img = new Image();
-  let ready = false;
-  let failed = false;
-  let wrapped = false;
-  let depthWrapped = false;
-
-  function drawBoutique(g) {
-    if (!ready) return;
-    g.save();
-    g.imageSmoothingEnabled = false;
-    g.drawImage(img, SHOP.x, SHOP.y, SHOP.w, SHOP.h);
-    g.restore();
-  }
-
-  function installWorldLayer() {
-    const base = window.KELO_WORLD_RENDERER;
-    if (!base || typeof base.draw !== 'function') return false;
-    if (base.__keloLuxeBoutique) {
-      wrapped = true;
-      return true;
-    }
-    window.KELO_WORLD_RENDERER = Object.freeze({
-      __keloLuxeBoutique: true,
-      draw: function (g) {
-        const ok = base.draw(g);
-        if (ok === true) drawBoutique(g);
-        return ok;
-      },
-      districts: base.districts,
-      chunkSize: base.chunkSize,
-      get ready() { return base.ready; }
-    });
-    wrapped = true;
-    return true;
-  }
-
-  function actorBehindShop(actor) {
-    if (!actor) return false;
-    const r = actor.radius || 20;
-    return actor.x + r > SHOP.x + OCCLUSION.sideInset && actor.x - r < SHOP.x + SHOP.w - OCCLUSION.sideInset &&
-      actor.y > SHOP.y + OCCLUSION.topInset && actor.y < COLLISION.y + OCCLUSION.bottomPadding;
-  }
-
-  function drawActorOcclusion(g, actor) {
-    if (!ready || !actorBehindShop(actor)) return false;
-    const r = actor.radius || 20;
-    g.save();
-    g.beginPath();
-    g.rect(actor.x - r - 16, actor.y - r - 50, r * 2 + 32, r * 2 + 66);
-    g.clip();
-    drawBoutique(g);
-    g.restore();
-    return true;
-  }
-
-  function installDepthLayer() {
-    if (depthWrapped || typeof window.render !== 'function') return depthWrapped;
-    const baseRender = window.render;
-    if (baseRender.__keloLuxeDepth) { depthWrapped = true; return true; }
-    const layeredRender = function () {
-      baseRender();
-      if (!ready || typeof ctx === 'undefined' || typeof camera === 'undefined' || typeof screenW === 'undefined' || typeof screenH === 'undefined') return;
-      const actors = [];
-      if (typeof localPlayer !== 'undefined' && localPlayer) actors.push(localPlayer);
-      if (typeof simulatedPlayers !== 'undefined' && Array.isArray(simulatedPlayers)) actors.push(...simulatedPlayers);
-      const active = actors.filter(actorBehindShop);
-      if (!active.length) return;
-      const z = (typeof CONFIG !== 'undefined' && CONFIG.zoom) || 1;
-      ctx.save();
-      ctx.translate(screenW / 2, screenH / 2);
-      ctx.scale(z, z);
-      ctx.translate(-camera.x, -camera.y);
-      ctx.imageSmoothingEnabled = false;
-      active.forEach(actor => drawActorOcclusion(ctx, actor));
-      ctx.restore();
-    };
-    layeredRender.__keloLuxeDepth = true;
-    window.render = layeredRender;
-    depthWrapped = true;
-    return true;
-  }
-
-  function overlaps(a, b) {
-    return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
-  }
-
-  function installCollision() {
-    if (typeof obstacles === 'undefined' || !Array.isArray(obstacles)) return false;
-    for (let i = obstacles.length - 1; i >= 0; i--) {
-      const o = obstacles[i];
-      if (o && (o._luxeBoutiqueCollision || (o.noDraw === true && overlaps(o, COLLISION)))) obstacles.splice(i, 1);
-    }
-    obstacles.push({ x: COLLISION.x, y: COLLISION.y, w: COLLISION.w, h: COLLISION.h, noDraw: true, _luxeBoutiqueCollision: true });
-    return true;
-  }
-
-  function nearShop() {
-    if (typeof localPlayer === 'undefined' || !localPlayer) return false;
-    return Math.hypot(localPlayer.x - SHOP.frontX, localPlayer.y - SHOP.frontY) <= SHOP.interactRadius;
-  }
-
-  function openBoutique() {
-    if (!nearShop()) {
-      if (typeof showToast === 'function') showToast('Acércate a Kelo Luxe');
-      return false;
-    }
-    if (window.KELO_BOUTIQUE && typeof window.KELO_BOUTIQUE.open === 'function') {
-      window.KELO_BOUTIQUE.open();
-      if (typeof showToast === 'function') showToast('Kelo Luxe Boutique');
-      return true;
-    }
-    if (typeof showToast === 'function') showToast('Boutique cargando…');
-    return false;
-  }
-
-  function pointerToWorld(e) {
-    const gameCanvas = document.getElementById('game-canvas');
-    if (!gameCanvas || typeof screenToWorld !== 'function') return null;
-    const r = gameCanvas.getBoundingClientRect();
-    if (!r.width || !r.height) return null;
-    const sx = (e.clientX - r.left) * ((gameCanvas.width || r.width) / r.width);
-    const sy = (e.clientY - r.top) * ((gameCanvas.height || r.height) / r.height);
-    return screenToWorld(sx, sy);
-  }
-
-  function insideShop(p) {
-    return !!p && p.x >= SHOP.x && p.x <= SHOP.x + SHOP.w && p.y >= SHOP.y && p.y <= SHOP.y + SHOP.h;
-  }
-
-  function installInteraction() {
-    const gameCanvas = document.getElementById('game-canvas');
-    if (gameCanvas && !gameCanvas._keloLuxeBoutiqueTap) {
-      gameCanvas._keloLuxeBoutiqueTap = true;
-      gameCanvas.addEventListener('pointerdown', function (e) {
-        const p = pointerToWorld(e);
-        if (!insideShop(p)) return;
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        openBoutique();
-      }, true);
-    }
-    if (!window._keloLuxeBoutiqueKey) {
-      window._keloLuxeBoutiqueKey = true;
-      window.addEventListener('keydown', function (e) {
-        if ((e.key || '').toLowerCase() !== 'e') return;
-        const active = document.activeElement;
-        if (active && /INPUT|TEXTAREA/.test(active.tagName || '')) return;
-        if (nearShop()) openBoutique();
-      });
-    }
-  }
-
-  function install() {
-    installWorldLayer();
-    installCollision();
-    installInteraction();
-    installDepthLayer();
-  }
-
-  img.onload = function () { ready = true; failed = false; };
-  img.onerror = function () { failed = true; console.error('[Kelo Luxe] boutique raster failed to load:', ASSET); };
-  img.src = ASSET;
-
-  install();
-  setTimeout(install, 120);
-  setTimeout(install, 600);
-
-  window.KELO_LUXE_KIOSK = Object.freeze({
-    disabled: false,
-    version: 'authored-raster-v1.5',
-    asset: ASSET,
-    source: 'tile-registry-architecture-prefab',
-    prefabId: PREFAB.id,
-    shop: SHOP,
-    collision: COLLISION,
-    interaction: PREFAB.interaction,
-    depthMode: REGISTRY.styles.architecture.depthMode,
-    depthOcclusion: true,
-    isOccluding: actorBehindShop,
-    get ready() { return ready; },
-    get failed() { return failed; },
-    get rendererWrapped() { return wrapped; },
-    get depthWrapped() { return depthWrapped; },
-    open: openBoutique
-  });
-})();
-
-(function () {
-  'use strict';
-  const REGISTRY = window.KELO_TILE_REGISTRY;
-  const ARCH = REGISTRY?.architectureAssets?.marketPavilion;
-  const PREFAB = REGISTRY?.architecturePrefabs?.marketPavilion;
-  if (!REGISTRY?.styles?.architecture || !ARCH || !PREFAB || typeof window.KELO_WORLD_RENDERER?.draw !== 'function') {
-    console.error('[Kelo market pavilion] registry architecture prefab unavailable');
-    return;
-  }
-  const ASSET = ARCH.src;
-  const PAVILION = Object.freeze({x:PREFAB.x,y:PREFAB.y,w:ARCH.worldWidth,h:ARCH.worldHeight,baseY:PREFAB.y+PREFAB.baseYOffset});
-  const COLLISION = PREFAB.collision;
-  const img = new Image();
-  let ready=false, failed=false, wrapped=false, depthWrapped=false, legacyHidden=false;
-
-  function draw(g){
-    if(!ready)return;
-    g.save();g.imageSmoothingEnabled=false;g.drawImage(img,PAVILION.x,PAVILION.y,PAVILION.w,PAVILION.h);g.restore();
-  }
-  function overlaps(a,b){
-    return a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;
-  }
-  function installLegacyVisualReplacement(){
+  const geometry=e=>({x:e.prefab.x,y:e.prefab.y,w:e.asset.worldWidth,h:e.asset.worldHeight});
+  const overlaps=(a,b)=>a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;
+  function drawEntry(g,e){if(!e?.ready)return false;const b=geometry(e);g.save();g.imageSmoothingEnabled=false;g.drawImage(e.image,b.x,b.y,b.w,b.h);g.restore();return true;}
+  function drawAll(g){entries.forEach(e=>drawEntry(g,e));}
+  function installLegacyVisualReplacements(){
     if(typeof obstacles==='undefined'||!Array.isArray(obstacles))return false;
-    for(const o of obstacles){
-      if(!o||o._luxeBoutiqueCollision||!overlaps(o,COLLISION))continue;
-      o.noDraw=true;o._marketPavilionVisual=true;
+    for(const e of entries){
+      if(!e.prefab.legacyVisualReplacement)continue;
+      const collision=e.prefab.collision;
+      for(const o of obstacles){if(!o||o._luxeBoutiqueCollision||!overlaps(o,collision))continue;o.noDraw=true;o._architectureVisualReplacement=e.prefab.id;}
+      e.legacyHidden=!obstacles.some(o=>o&&!o.noDraw&&!o._luxeBoutiqueCollision&&overlaps(o,collision));
     }
-    legacyHidden=!obstacles.some(o=>o&&!o.noDraw&&!o._luxeBoutiqueCollision&&overlaps(o,COLLISION));
-    return legacyHidden;
+    return true;
+  }
+  function actorBehind(e,actor){
+    if(!e||!actor)return false;
+    const occ=e.prefab.occlusion,collision=e.prefab.collision,b=geometry(e),r=actor.radius||20;
+    return !!occ&&!!collision&&actor.x+r>b.x+occ.sideInset&&actor.x-r<b.x+b.w-occ.sideInset&&actor.y>b.y+occ.topInset&&actor.y<collision.y+occ.bottomPadding;
+  }
+  function repaint(g,e,actor){
+    if(!e?.ready||!actorBehind(e,actor))return false;
+    const clip=e.prefab.occlusion.clip,r=actor.radius||20;
+    g.save();g.beginPath();g.rect(actor.x-r-clip.xPadding,actor.y-r-clip.topPadding,r*2+clip.xPadding*2,r*2+clip.topPadding+clip.bottomPadding);g.clip();drawEntry(g,e);g.restore();return true;
   }
   function installWorldLayer(){
-    const base=window.KELO_WORLD_RENDERER;
-    if(!base||typeof base.draw!=='function')return false;
-    if(base.__keloMarketPavilion){wrapped=true;return true;}
-    window.KELO_WORLD_RENDERER=Object.freeze({
-      __keloMarketPavilion:true,
-      draw:function(g){const ok=base.draw(g);if(ok===true)draw(g);return ok;},
-      districts:base.districts,chunkSize:base.chunkSize,get ready(){return base.ready;}
-    });
-    wrapped=true;return true;
+    const base=window.KELO_WORLD_RENDERER;if(!base||typeof base.draw!=='function')return false;
+    if(base.__keloArchitecturePrefabs){rendererWrapped=true;return true;}
+    window.KELO_WORLD_RENDERER=Object.freeze({__keloArchitecturePrefabs:true,draw(g){const ok=base.draw(g);if(ok===true)drawAll(g);return ok;},districts:base.districts,chunkSize:base.chunkSize,get ready(){return base.ready;}});
+    rendererWrapped=true;return true;
   }
-  function actorBehind(actor){
-    if(!actor)return false;const r=actor.radius||20;
-    return actor.x+r>PAVILION.x+14&&actor.x-r<PAVILION.x+PAVILION.w-14&&actor.y>PAVILION.y+36&&actor.y<COLLISION.y+COLLISION.h;
-  }
-  function repaint(g,actor){
-    if(!ready||!actorBehind(actor))return false;const r=actor.radius||20;
-    g.save();g.beginPath();g.rect(actor.x-r-14,actor.y-r-52,r*2+28,r*2+70);g.clip();draw(g);g.restore();return true;
-  }
-  function installDepth(){
+  function installDepthLayer(){
     if(depthWrapped||typeof window.render!=='function')return depthWrapped;
-    const base=window.render;
-    if(base.__keloMarketDepth){depthWrapped=true;return true;}
+    const base=window.render;if(base.__keloArchitectureDepth){depthWrapped=true;return true;}
     const layered=function(){
       base();
-      if(!ready||typeof ctx==='undefined'||typeof camera==='undefined'||typeof screenW==='undefined'||typeof screenH==='undefined')return;
-      const actors=[];
-      if(typeof localPlayer!=='undefined'&&localPlayer)actors.push(localPlayer);
-      if(typeof simulatedPlayers!=='undefined'&&Array.isArray(simulatedPlayers))actors.push(...simulatedPlayers);
-      const active=actors.filter(actorBehind);if(!active.length)return;
-      const z=(typeof CONFIG!=='undefined'&&CONFIG.zoom)||1;
-      ctx.save();ctx.translate(screenW/2,screenH/2);ctx.scale(z,z);ctx.translate(-camera.x,-camera.y);ctx.imageSmoothingEnabled=false;active.forEach(a=>repaint(ctx,a));ctx.restore();
+      if(typeof ctx==='undefined'||typeof camera==='undefined'||typeof screenW==='undefined'||typeof screenH==='undefined')return;
+      const actors=[];if(typeof localPlayer!=='undefined'&&localPlayer)actors.push(localPlayer);if(typeof simulatedPlayers!=='undefined'&&Array.isArray(simulatedPlayers))actors.push(...simulatedPlayers);
+      const active=[];for(const actor of actors)for(const e of entries)if(e.ready&&actorBehind(e,actor))active.push([e,actor]);if(!active.length)return;
+      const z=(typeof CONFIG!=='undefined'&&CONFIG.zoom)||1;ctx.save();ctx.translate(screenW/2,screenH/2);ctx.scale(z,z);ctx.translate(-camera.x,-camera.y);ctx.imageSmoothingEnabled=false;active.forEach(([e,a])=>repaint(ctx,e,a));ctx.restore();
     };
-    layered.__keloMarketDepth=true;window.render=layered;depthWrapped=true;return true;
+    layered.__keloArchitectureDepth=true;window.render=layered;depthWrapped=true;return true;
   }
-  function install(){installLegacyVisualReplacement();installWorldLayer();installDepth();}
-  img.onload=function(){ready=true;failed=false;};
-  img.onerror=function(){failed=true;console.error('[Kelo market pavilion] authored raster failed to load:',ASSET);};
-  img.src=ASSET;
+  function getState(key){return entries.find(e=>e.key===key||e.prefab.id===key)||null;}
+  function getEntry(key){
+    const e=getState(key);if(!e)return null;
+    return Object.freeze({key:e.key,prefab:e.prefab,asset:e.asset,geometry:Object.freeze(geometry(e)),get ready(){return e.ready;},get failed(){return e.failed;},get legacyHidden(){return e.legacyHidden;},isOccluding(actor){return actorBehind(e,actor);}});
+  }
+  function install(){installLegacyVisualReplacements();installWorldLayer();installDepthLayer();}
   install();setTimeout(install,120);setTimeout(install,600);
-  window.KELO_MARKET_PAVILION=Object.freeze({
-    version:'authored-market-pavilion-v1.2',asset:ASSET,source:'tile-registry-architecture-prefab',prefabId:PREFAB.id,
-    geometry:PAVILION,collision:COLLISION,depthMode:REGISTRY.styles.architecture.depthMode,
-    isOccluding:actorBehind,get ready(){return ready},get failed(){return failed},get rendererWrapped(){return wrapped},get depthWrapped(){return depthWrapped},get legacyHidden(){return legacyHidden}
-  });
+
+  window.KELO_ARCHITECTURE_RENDERER=Object.freeze({version:'architecture-prefab-renderer-v1',mode:'generic-prefab-list-v1',prefabCount:entries.length,depthMode:STYLE.depthMode,get ready(){return entries.every(e=>e.ready&&!e.failed);},get rendererWrapped(){return rendererWrapped;},get depthWrapped(){return depthWrapped;},getEntry});
+
+  const luxe=getState('luxeBoutique');
+  const market=getState('marketPavilion');
+  if(!luxe||!market){console.error('[Kelo architecture] required live prefabs missing');return;}
+  const SHOP=Object.freeze({x:luxe.prefab.x,y:luxe.prefab.y,w:luxe.asset.worldWidth,h:luxe.asset.worldHeight,frontX:luxe.prefab.interaction.x,frontY:luxe.prefab.interaction.y,interactRadius:luxe.prefab.interaction.radius});
+  const COLLISION=luxe.prefab.collision;
+
+  function installCollision(){
+    if(typeof obstacles==='undefined'||!Array.isArray(obstacles))return false;
+    for(let i=obstacles.length-1;i>=0;i--){const o=obstacles[i];if(o&&(o._luxeBoutiqueCollision||(o.noDraw===true&&overlaps(o,COLLISION))))obstacles.splice(i,1);}
+    obstacles.push({x:COLLISION.x,y:COLLISION.y,w:COLLISION.w,h:COLLISION.h,noDraw:true,_luxeBoutiqueCollision:true});return true;
+  }
+  function nearShop(){return typeof localPlayer!=='undefined'&&localPlayer&&Math.hypot(localPlayer.x-SHOP.frontX,localPlayer.y-SHOP.frontY)<=SHOP.interactRadius;}
+  function openBoutique(){
+    if(!nearShop()){if(typeof showToast==='function')showToast('Acércate a Kelo Luxe');return false;}
+    if(window.KELO_BOUTIQUE&&typeof window.KELO_BOUTIQUE.open==='function'){window.KELO_BOUTIQUE.open();if(typeof showToast==='function')showToast('Kelo Luxe Boutique');return true;}
+    if(typeof showToast==='function')showToast('Boutique cargando…');return false;
+  }
+  function pointerToWorld(e){const c=document.getElementById('game-canvas');if(!c||typeof screenToWorld!=='function')return null;const r=c.getBoundingClientRect();if(!r.width||!r.height)return null;return screenToWorld((e.clientX-r.left)*((c.width||r.width)/r.width),(e.clientY-r.top)*((c.height||r.height)/r.height));}
+  function insideShop(p){return !!p&&p.x>=SHOP.x&&p.x<=SHOP.x+SHOP.w&&p.y>=SHOP.y&&p.y<=SHOP.y+SHOP.h;}
+  function installInteraction(){
+    const c=document.getElementById('game-canvas');if(c&&!c._keloLuxeBoutiqueTap){c._keloLuxeBoutiqueTap=true;c.addEventListener('pointerdown',e=>{const p=pointerToWorld(e);if(!insideShop(p))return;e.preventDefault();e.stopImmediatePropagation();openBoutique();},true);}
+    if(!window._keloLuxeBoutiqueKey){window._keloLuxeBoutiqueKey=true;window.addEventListener('keydown',e=>{if((e.key||'').toLowerCase()!=='e')return;const a=document.activeElement;if(a&&/INPUT|TEXTAREA/.test(a.tagName||''))return;if(nearShop())openBoutique();});}
+  }
+  function installBoutiqueHooks(){installCollision();installInteraction();installLegacyVisualReplacements();}
+  installBoutiqueHooks();setTimeout(installBoutiqueHooks,120);setTimeout(installBoutiqueHooks,600);
+
+  window.KELO_LUXE_KIOSK=Object.freeze({disabled:false,version:'authored-raster-v1.6',asset:luxe.asset.src,source:'tile-registry-architecture-prefab',prefabId:luxe.prefab.id,shop:SHOP,collision:COLLISION,interaction:luxe.prefab.interaction,depthMode:STYLE.depthMode,depthOcclusion:true,isOccluding:actor=>actorBehind(luxe,actor),get ready(){return luxe.ready;},get failed(){return luxe.failed;},get rendererWrapped(){return rendererWrapped;},get depthWrapped(){return depthWrapped;},open:openBoutique});
+  window.KELO_MARKET_PAVILION=Object.freeze({version:'authored-market-pavilion-v1.3',asset:market.asset.src,source:'tile-registry-architecture-prefab',prefabId:market.prefab.id,geometry:Object.freeze(geometry(market)),collision:market.prefab.collision,depthMode:STYLE.depthMode,isOccluding:actor=>actorBehind(market,actor),get ready(){return market.ready;},get failed(){return market.failed;},get rendererWrapped(){return rendererWrapped;},get depthWrapped(){return depthWrapped;},get legacyHidden(){return market.legacyHidden;}});
 })();

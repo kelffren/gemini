@@ -41,12 +41,13 @@
       id:'luxe-boutique-central', asset:'luxeBoutique', x:1248, y:1050, baseYOffset:444,
       collision:Object.freeze({x:1272,y:1362,w:336,h:132}),
       interaction:Object.freeze({x:1440,y:1532,radius:220}),
-      occlusion:Object.freeze({sideInset:18,topInset:76,bottomPadding:6}),
+      occlusion:Object.freeze({sideInset:18,topInset:76,bottomPadding:6,clip:Object.freeze({xPadding:16,topPadding:50,bottomPadding:16})}),
       legacyVisualReplacement:true
     }),
     marketPavilion:Object.freeze({
       id:'market-pavilion-south', asset:'marketPavilion', x:1288, y:1790, baseYOffset:160,
       collision:Object.freeze({x:1300,y:1870,w:200,h:80}),
+      occlusion:Object.freeze({sideInset:14,topInset:36,bottomPadding:80,clip:Object.freeze({xPadding:14,topPadding:52,bottomPadding:18})}),
       legacyVisualReplacement:true
     })
   });
@@ -103,7 +104,7 @@
   const styles = Object.freeze({
     plazaTransition:Object.freeze({mode:'authored-overlay-atlas',neighbourMask:'TRBL',softenStickerAccents:true}),
     propDepth:Object.freeze({mode:'y-occlusion-overlay-v1',localActorIntersection:true,frontOccluders:Object.freeze(['fountain','column','tree','lamp'])}),
-    architecture:Object.freeze({mode:'authored-layered-raster-v1',depthMode:'building-base-y-occlusion-v1',actorClip:true,prefabContract:'registry-asset-placement-collision-v1'}),
+    architecture:Object.freeze({mode:'authored-layered-raster-v1',depthMode:'building-base-y-occlusion-v1',actorClip:true,prefabContract:'registry-asset-placement-collision-v1',rendererMode:'generic-prefab-list-v1'}),
     districtGround:Object.freeze({mode:'district-profile-v1',profiles:districtGroundStyles}),
     ruralFarm:Object.freeze({
       mode:'authored-nine-slice-v1',
@@ -129,7 +130,7 @@
     })
   });
   window.KELO_TILE_REGISTRY = Object.freeze({
-    version:'1.10.3', worldTileSize:TILE,
+    version:'1.10.4', worldTileSize:TILE,
     atlases:Object.freeze({plaza:atlas,transitions:transitionAtlas,ruralSoil:ruralSoilAtlas,ruralProps:ruralPropsAtlas,ruralLandmarks:ruralLandmarksAtlas,ruralNature:ruralNatureAtlas}),
     architectureAssets,architecturePrefabs,
     tiles,ruralTiles,ruralPropTiles,ruralLandmarkTiles,ruralLandmarkSprites,ruralNatureTiles,ruralNatureSprites,families,transitionMasks,styles
