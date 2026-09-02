@@ -3,23 +3,25 @@
 
   const REGISTRY = window.KELO_TILE_REGISTRY;
   const ARCH = REGISTRY?.architectureAssets?.luxeBoutique;
-  if (!REGISTRY || !ARCH) {
-    console.error('[Kelo Luxe] architecture registry entry missing');
+  const PREFAB = REGISTRY?.architecturePrefabs?.luxeBoutique;
+  if (!REGISTRY?.styles?.architecture || !ARCH || !PREFAB) {
+    console.error('[Kelo Luxe] architecture registry prefab missing');
     return;
   }
 
-  // Authored raster landmark: user-provided Kelo Luxe Boutique artwork.
-  // Keep this file asset-driven. Do not replace it with procedural Canvas art.
+  // Authored raster landmark. Placement, collision, interaction and depth thresholds
+  // are owned by TileRegistry so future architecture variants do not duplicate geometry.
   const SHOP = Object.freeze({
-    x: 1248,
-    y: 1050,
+    x: PREFAB.x,
+    y: PREFAB.y,
     w: ARCH.worldWidth,
     h: ARCH.worldHeight,
-    frontX: 1440,
-    frontY: 1532,
-    interactRadius: 220
+    frontX: PREFAB.interaction.x,
+    frontY: PREFAB.interaction.y,
+    interactRadius: PREFAB.interaction.radius
   });
-  const COLLISION = Object.freeze({ x: 1272, y: 1362, w: 336, h: 132 });
+  const COLLISION = PREFAB.collision;
+  const OCCLUSION = PREFAB.occlusion;
   const ASSET = ARCH.src;
 
   const img = new Image();
@@ -61,8 +63,8 @@
   function actorBehindShop(actor) {
     if (!actor) return false;
     const r = actor.radius || 20;
-    return actor.x + r > SHOP.x + 18 && actor.x - r < SHOP.x + SHOP.w - 18 &&
-      actor.y > SHOP.y + 76 && actor.y < COLLISION.y + 6;
+    return actor.x + r > SHOP.x + OCCLUSION.sideInset && actor.x - r < SHOP.x + SHOP.w - OCCLUSION.sideInset &&
+      actor.y > SHOP.y + OCCLUSION.topInset && actor.y < COLLISION.y + OCCLUSION.bottomPadding;
   }
 
   function drawActorOcclusion(g, actor) {
@@ -191,12 +193,13 @@
 
   window.KELO_LUXE_KIOSK = Object.freeze({
     disabled: false,
-    version: 'authored-raster-v1.4',
+    version: 'authored-raster-v1.5',
     asset: ASSET,
-    source: 'tile-registry-architecture-asset',
+    source: 'tile-registry-architecture-prefab',
+    prefabId: PREFAB.id,
     shop: SHOP,
     collision: COLLISION,
-    interaction: 'tap-building-or-E-nearby',
+    interaction: PREFAB.interaction,
     depthMode: REGISTRY.styles.architecture.depthMode,
     depthOcclusion: true,
     isOccluding: actorBehindShop,
