@@ -24,6 +24,10 @@
     id:'plaza-training-dummy', src:'assets/training-dummy-v1.svg?art=198', width:96, height:96,
     spriteWidth:96, spriteHeight:96, columns:1, spriteCount:1, family:'training_prop'
   });
+  const plazaNpcsAtlas = Object.freeze({
+    id:'plaza-npcs', src:'assets/plaza-npcs-v1.svg?art=199', width:288, height:96,
+    spriteWidth:96, spriteHeight:96, columns:3, spriteCount:3, family:'npc_visual'
+  });
   const ruralSoilAtlas = Object.freeze({
     id:'rural-soil', src:'assets/rural-soil-v1.png?art=160', width:128, height:128,
     tileWidth:TILE, tileHeight:TILE, columns:4
@@ -66,6 +70,11 @@
   const trainingDummyProp = Object.freeze({
     id:'training-dummy-plaza',asset:'trainingDummy',x:1532,y:1608,w:96,h:96,baseY:1702,
     gameplayAnchor:Object.freeze({x:1580,y:1680,radius:22}),visualOnly:true
+  });
+  const plazaNpcVisuals = Object.freeze({
+    portero:Object.freeze({sprite:0,xOffset:-48,yOffset:-72,w:96,h:96,labelYOffset:-34}),
+    joyero:Object.freeze({sprite:1,xOffset:-48,yOffset:-72,w:96,h:96,labelYOffset:-34}),
+    maestro:Object.freeze({sprite:2,xOffset:-48,yOffset:-72,w:96,h:96,labelYOffset:-34})
   });
 
   const tiles = Object.freeze({
@@ -122,6 +131,7 @@
     plazaTransition:Object.freeze({mode:'authored-overlay-atlas',neighbourMask:'TRBL',softenStickerAccents:true}),
     plazaNature:Object.freeze({mode:'authored-transparent-prop-family-v1',depthMode:'actor-base-y-v1',visualOnly:true,collision:false}),
     trainingDummy:Object.freeze({mode:'registry-authored-training-prop-v1',asset:'trainingDummy',visualOnly:true,preserveGameplayAnchor:true,labelMode:'hp-only-v1'}),
+    plazaNpcs:Object.freeze({mode:'registry-authored-npc-visual-v1',asset:'plazaNpcs',preserveGameplayAnchors:true,labelMode:'proximity-name-v1',visualOnly:true}),
     propDepth:Object.freeze({mode:'y-occlusion-overlay-v1',localActorIntersection:true,frontOccluders:Object.freeze(['fountain','column','tree','lamp'])}),
     architecture:Object.freeze({mode:'authored-layered-raster-v1',depthMode:'building-base-y-occlusion-v1',actorClip:true,prefabContract:'registry-asset-placement-collision-v1',rendererMode:'generic-prefab-list-v1'}),
     districtGround:Object.freeze({mode:'district-profile-v1',profiles:districtGroundStyles,grassMode:'authored-eight-variant-atlas-v1'}),
@@ -149,9 +159,9 @@
     })
   });
   window.KELO_TILE_REGISTRY = Object.freeze({
-    version:'1.10.22', worldTileSize:TILE,
-    atlases:Object.freeze({plaza:atlas,plazaGround:plazaGroundAtlas,transitions:transitionAtlas,grassVariation:grassVariationAtlas,plazaNature:plazaNatureAtlas,trainingDummy:trainingDummyAtlas,ruralSoil:ruralSoilAtlas,ruralProps:ruralPropsAtlas,ruralLandmarks:ruralLandmarksAtlas,ruralNature:ruralNatureAtlas}),
-    architectureAssets,architecturePrefabs,plazaNatureProps,trainingDummyProp,
+    version:'1.10.23', worldTileSize:TILE,
+    atlases:Object.freeze({plaza:atlas,plazaGround:plazaGroundAtlas,transitions:transitionAtlas,grassVariation:grassVariationAtlas,plazaNature:plazaNatureAtlas,trainingDummy:trainingDummyAtlas,plazaNpcs:plazaNpcsAtlas,ruralSoil:ruralSoilAtlas,ruralProps:ruralPropsAtlas,ruralLandmarks:ruralLandmarksAtlas,ruralNature:ruralNatureAtlas}),
+    architectureAssets,architecturePrefabs,plazaNatureProps,trainingDummyProp,plazaNpcVisuals,
     tiles,ruralTiles,ruralPropTiles,ruralLandmarkTiles,ruralLandmarkSprites,ruralNatureTiles,ruralNatureSprites,families,transitionMasks,styles
   });
 })();
