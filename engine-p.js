@@ -5,6 +5,48 @@
   ];
   window.keloNpcs = npcs;
 
+  const registry = window.KELO_TILE_REGISTRY;
+  const npcAtlas = registry?.atlases?.plazaNpcs;
+  const npcVisuals = registry?.plazaNpcVisuals;
+  const npcStyle = registry?.styles?.plazaNpcs;
+  const npcImg = new Image();
+  npcImg.decoding = 'async';
+  let authoredReady = false;
+  let drawCount = 0;
+  window.KELO_PLAZA_NPC_AUDIT = {
+    version:'plaza-npcs-v1',
+    ready:false,
+    assetLoaded:false,
+    failed:false,
+    fallbackActive:true,
+    mode:npcStyle?.mode || null,
+    labelMode:npcStyle?.labelMode || null,
+    registryVersion:registry?.version || null,
+    drawCount:0,
+    gameplayAnchorsPreserved:true
+  };
+  if (npcAtlas && npcVisuals && npcStyle) {
+    npcImg.onload = function () {
+      if (npcImg.naturalWidth !== npcAtlas.width || npcImg.naturalHeight !== npcAtlas.height) {
+        console.error('[Kelo plaza npcs] invalid authored atlas dimensions');
+        window.KELO_PLAZA_NPC_AUDIT.failed = true;
+        return;
+      }
+      authoredReady = true;
+      window.KELO_PLAZA_NPC_AUDIT.ready = true;
+      window.KELO_PLAZA_NPC_AUDIT.assetLoaded = true;
+      window.KELO_PLAZA_NPC_AUDIT.fallbackActive = false;
+    };
+    npcImg.onerror = function () {
+      console.error('[Kelo plaza npcs] authored atlas load failed');
+      window.KELO_PLAZA_NPC_AUDIT.failed = true;
+    };
+    npcImg.src = npcAtlas.src;
+  } else {
+    console.error('[Kelo plaza npcs] registry contract missing');
+    window.KELO_PLAZA_NPC_AUDIT.failed = true;
+  }
+
   let near = null;
   let talkOpen = false;
   let game = { on: false, t: 0, hit: 0.62, hold: false };
@@ -105,6 +147,30 @@
     }
   };
 
+  function drawFallbackNpc(n) {
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.beginPath();
+    ctx.ellipse(n.x, n.y + 16, 16, 7, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = n.color;
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, 16, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+
+  function drawAuthoredNpc(n) {
+    const v = npcVisuals && npcVisuals[n.id];
+    if (!authoredReady || !v) { drawFallbackNpc(n); return; }
+    const sx = (v.sprite % npcAtlas.columns) * npcAtlas.spriteWidth;
+    const sy = Math.floor(v.sprite / npcAtlas.columns) * npcAtlas.spriteHeight;
+    ctx.drawImage(npcImg, sx, sy, npcAtlas.spriteWidth, npcAtlas.spriteHeight, n.x + v.xOffset, n.y + v.yOffset, v.w, v.h);
+    drawCount++;
+    window.KELO_PLAZA_NPC_AUDIT.drawCount = drawCount;
+  }
+
   const _r = render;
   render = function () {
     _r();
@@ -113,22 +179,16 @@
     ctx.translate(screenW / 2, screenH / 2);
     ctx.scale(z, z);
     ctx.translate(-camera.x, -camera.y);
+    ctx.imageSmoothingEnabled = false;
     npcs.forEach(function (n) {
-      ctx.fillStyle = 'rgba(0,0,0,0.35)';
-      ctx.beginPath();
-      ctx.ellipse(n.x, n.y + 16, 16, 7, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = n.color;
-      ctx.beginPath();
-      ctx.arc(n.x, n.y, 16, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = '#fff';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-      ctx.fillStyle = '#fff';
-      ctx.font = '10px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(n.name, n.x, n.y - 22);
+      drawAuthoredNpc(n);
+      if (near === n || (talkOpen && near === n)) {
+        const v = npcVisuals && npcVisuals[n.id];
+        ctx.fillStyle = '#f7f1dd';
+        ctx.font = '10px ui-monospace, monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(n.name, n.x, n.y + (v?.labelYOffset || -28));
+      }
     });
     ctx.restore();
 
