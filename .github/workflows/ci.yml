@@ -17,6 +17,7 @@ jobs:
           test -f server/package.json
           test -f assets/plaza-fountain-back-v2.svg
           test -f assets/plaza-fountain-front-v2.svg
+          test -f assets/plaza-npcs-v1.svg
           grep -q "engine-net.js" index.html
       - name: Server syntax
         run: node --check server/index.js
@@ -34,10 +35,12 @@ jobs:
           node --check scripts/live-world-audit.mjs
           node --check scripts/live-pavilion-audit.mjs
           node --check scripts/live-fountain-audit.mjs
+          node --check scripts/live-npc-audit.mjs
           node --check src/ui/luxe-shell.js
           node --check src/ui/luxe-boutique.js
           node --check engine-a.js
           node --check engine-h.js
+          node --check engine-p.js
           grep -q 'id="toast-container"' index.html
           grep -q "kelo-luxe-v3-style" src/ui/luxe-shell.js
           grep -q -- "--lx-forest:#173f36" src/ui/luxe-shell.js
@@ -45,6 +48,9 @@ jobs:
           grep -q "grassVariation:grassVariationAtlas" src/environment/tile-registry.js
           grep -q "plazaGround:plazaGroundAtlas" src/environment/tile-registry.js
           grep -q "plazaNature:plazaNatureAtlas" src/environment/tile-registry.js
+          grep -q "plazaNpcs:plazaNpcsAtlas" src/environment/tile-registry.js
+          grep -q "registry-authored-npc-visual-v1" src/environment/tile-registry.js
+          grep -q "proximity-name-v1" src/environment/tile-registry.js
           grep -q "grassMode:'authored-eight-variant-atlas-v1'" src/environment/tile-registry.js
           grep -q "grassVariationMode:'authored-eight-variant-atlas-v1'" src/environment/world-map.js
           grep -q "plaza-fountain-v1.3" src/environment/plaza-depth.js
@@ -73,11 +79,11 @@ jobs:
               size=struct.unpack('>II',header[16:24])
               assert size==expected,(path,size,expected)
               print('PASS atlas',path,*size)
-          for path in ('assets/plaza-fountain-back-v2.svg','assets/plaza-fountain-front-v2.svg'):
+          for path,w,h,vb in [('assets/plaza-fountain-back-v2.svg','200','140','0 0 200 140'),('assets/plaza-fountain-front-v2.svg','200','140','0 0 200 140'),('assets/plaza-npcs-v1.svg','288','96','0 0 288 96')]:
               root=ET.parse(path).getroot()
-              assert root.attrib.get('width')=='200' and root.attrib.get('height')=='140',(path,root.attrib)
-              assert root.attrib.get('viewBox')=='0 0 200 140',(path,root.attrib)
-              print('PASS authored fountain SVG',path,'200 140')
+              assert root.attrib.get('width')==w and root.attrib.get('height')==h,(path,root.attrib)
+              assert root.attrib.get('viewBox')==vb,(path,root.attrib)
+              print('PASS authored SVG',path,w,h)
           source=open('src/environment/rural-nature-atlas.js',encoding='utf-8').read()
           match=re.search(r"data:image/png;base64,([^']+)",source)
           assert match
