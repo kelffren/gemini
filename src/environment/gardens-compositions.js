@@ -10,7 +10,7 @@ const C=Object.freeze([
   Object.freeze({id:'west-hedge-run',cells:Object.freeze([[5,7,'HEDGE_CAP_T'],[5,8,'HEDGE_V'],[5,9,'HEDGE_CAP_B']])}),
   Object.freeze({id:'east-upper-hedge-run',cells:Object.freeze([[24,13,'HEDGE_CAP_T'],[24,14,'HEDGE_V_ALT'],[24,15,'HEDGE_CAP_B']])}),
   Object.freeze({id:'east-lower-hedge-run',cells:Object.freeze([[22,14,'HEDGE_CAP_T'],[22,15,'HEDGE_V_ALT'],[22,16,'HEDGE_CAP_B']])}),
-  Object.freeze({id:'flowerbed-nw',cells:Object.freeze([[7,6,'FLOWER_CAP_L'],[8,6,'FLOWER_CAP_R']])}),
+  Object.freeze({id:'flowerbed-nw',cells:Object.freeze([[8,8,'FLOWER_CAP_L'],[9,8,'FLOWER_CAP_R']])}),
   Object.freeze({id:'flowerbed-ne',cells:Object.freeze([[18,7,'FLOWER_CAP_L'],[19,7,'FLOWER_CAP_R']])}),
   Object.freeze({id:'flowerbed-sw',cells:Object.freeze([[9,14,'FLOWER_CAP_L'],[10,14,'FLOWER_CAP_R']])}),
   Object.freeze({id:'flowerbed-se',cells:Object.freeze([[17,14,'FLOWER_CAP_L'],[18,14,'FLOWER_MID_ALT'],[19,14,'FLOWER_CAP_R']])})
@@ -20,18 +20,20 @@ const FIXED=Object.freeze([
   Object.freeze([12,11,'WATER']),Object.freeze([17,11,'WATER']),Object.freeze([7,11,'PLINTH']),Object.freeze([21,11,'PLINTH']),
   Object.freeze([11,16,'STEPPING_STONES']),Object.freeze([16,16,'STEPPING_STONES'])
 ]);
+const declaredCellCount=C.reduce((n,comp)=>n+comp.cells.length,0)+FIXED.length;
 const styles=Object.freeze({
   ...R.styles,
   gardensCompositions:Object.freeze({
-    mode:'registry-authored-garden-compositions-v6',
+    mode:'registry-authored-garden-compositions-v7',
     sourceAtlas:G.id,
     joinAtlas:J.id,
     centerVariationMode:'authored-mid-variant-selection-v2',
     verticalVariationMode:'mirrored-authored-vertical-mid-v1',
     fixedPlacementMode:'registry-authored-fixed-accents-v1',
-    navigationSafeRelocationMode:'authored-road-clear-east-run-v1',
+    navigationSafeRelocationMode:'authored-road-clear-placements-v2',
     compositionCount:C.length,
     fixedPlacementCount:FIXED.length,
+    declaredCellCount,
     compositions:C,
     fixedPlacements:FIXED,
     preservePathClearance:true,
@@ -40,7 +42,7 @@ const styles=Object.freeze({
 });
 window.KELO_TILE_REGISTRY=Object.freeze({...R,styles});
 window.KELO_GARDENS_COMPOSITION_AUDIT=Object.freeze({
-  version:'gardens-compositions-v6',
+  version:'gardens-compositions-v7',
   ready:true,
   mode:styles.gardensCompositions.mode,
   centerVariationMode:styles.gardensCompositions.centerVariationMode,
@@ -49,11 +51,13 @@ window.KELO_GARDENS_COMPOSITION_AUDIT=Object.freeze({
   navigationSafeRelocationMode:styles.gardensCompositions.navigationSafeRelocationMode,
   compositionCount:C.length,
   fixedPlacementCount:FIXED.length,
+  declaredCellCount,
   joinAtlas:J.id,
   joinMode:J.mode,
   altCenterTileCount:4,
   verticalAltUsageCount:2,
-  navigationConflictFixCount:3,
-  relocatedEastRunAnchor:Object.freeze([24,13])
+  navigationConflictFixCount:5,
+  relocatedEastRunAnchor:Object.freeze([24,13]),
+  relocatedFlowerbedNWAnchor:Object.freeze([8,8])
 });
 })();
