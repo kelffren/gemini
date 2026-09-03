@@ -27,12 +27,14 @@ jobs:
           node --check src/environment/gardens-landmark.js
           node --check src/environment/world-map.js
           node --check scripts/live-gardens-variants-audit.mjs
-          grep -q "gardens-joins-v2" src/environment/gardens-joins.js
-          grep -q "authored-garden-endcaps-mid-variants-v2" src/environment/gardens-joins.js
+          grep -q "gardens-joins-v3" src/environment/gardens-joins.js
+          grep -q "authored-garden-endcaps-mid-variants-v3" src/environment/gardens-joins.js
           grep -q "HEDGE_MID_ALT:6" src/environment/gardens-joins.js
           grep -q "FLOWER_MID_ALT:7" src/environment/gardens-joins.js
-          grep -q "registry-authored-garden-compositions-v3" src/environment/gardens-compositions.js
-          grep -q "authored-mid-variant-selection-v1" src/environment/gardens-compositions.js
+          grep -q "HEDGE_V_ALT:8" src/environment/gardens-joins.js
+          grep -q "registry-authored-garden-compositions-v4" src/environment/gardens-compositions.js
+          grep -q "mirrored-authored-vertical-mid-v1" src/environment/gardens-compositions.js
+          grep -q "verticalAltUsageCount:2" src/environment/gardens-compositions.js
           grep -q "world-v1.14" src/environment/world-map.js
           grep -q "gardens-landmark-v1.1" src/environment/gardens-landmark.js
       - name: Install Playwright
