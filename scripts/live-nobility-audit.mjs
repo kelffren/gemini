@@ -20,11 +20,11 @@ page.on('response', r => { if (r.status() >= 400) httpErrors.push({ status: r.st
 let loaded = false;
 for (let attempt = 1; attempt <= 24; attempt++) {
   await page.goto(`${base}?nobility-audit=${Date.now()}-${attempt}`, { waitUntil: 'networkidle', timeout: 45000 });
-  loaded = await page.evaluate(() => window.KELO_NOBILITY_AUDIT?.ready === true && window.KeloNobility?.version === 'nobility-v1.1');
+  loaded = await page.evaluate(() => window.KELO_NOBILITY_AUDIT?.ready === true && ['nobility-v1.1','nobility-v1.2'].includes(window.KeloNobility?.version));
   if (loaded) break;
   await page.waitForTimeout(5000);
 }
-if (!loaded) throw new Error('LIVE never reached nobility-v1.1');
+if (!loaded) throw new Error('LIVE never reached supported nobility contract');
 
 consoleErrors.length = 0; failedRequests.length = 0; httpErrors.length = 0;
 await page.goto(`${base}?nobility-audit=final-${Date.now()}`, { waitUntil: 'networkidle', timeout: 45000 });
@@ -54,7 +54,7 @@ const result = await page.evaluate(() => {
   if (typeof saveState === 'function') saveState();
   api.open();
 
-  return { ok: true, audit, start, knightDonation, knight, baronDonation, baron, earl, duke, prince, king,
+  return { ok: true, audit, apiVersion: api.version, start, knightDonation, knight, baronDonation, baron, earl, duke, prince, king,
     panelVisible: getComputedStyle(document.getElementById('kelo-nobility')).display !== 'none',
     menuButton: !!document.getElementById('kelo-nobility-menu-btn'), title: document.title };
 });
@@ -68,6 +68,7 @@ await browser.close();
 
 if (!result.ok) throw new Error(result.reason || 'Nobility runtime missing');
 if (result.audit?.version !== 'nobility-v1.1' || !result.audit?.ready || !result.audit?.menuButton) throw new Error('Nobility audit contract invalid');
+if (!['nobility-v1.1','nobility-v1.2'].includes(result.apiVersion)) throw new Error(`Unsupported nobility wrapper ${result.apiVersion}`);
 if (result.audit?.kcToDonation !== 50000) throw new Error('KC conversion mismatch');
 if (JSON.stringify(result.audit?.fixedRanks) !== JSON.stringify([30000000,100000000,200000000])) throw new Error('Fixed rank thresholds mismatch');
 if (JSON.stringify(result.audit?.rankedTiers) !== JSON.stringify([50,15,3])) throw new Error('Ranking thresholds mismatch');
