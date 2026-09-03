@@ -9,6 +9,11 @@ fs.mkdirSync('artifacts',{recursive:true});
 const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_BIN||'/usr/bin/google-chrome',args:['--no-sandbox','--disable-dev-shm-usage']});
 const context=await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true});
 const page=await context.newPage();
+await page.route('**/src/environment/world-map.js*',route=>{
+  const u=new URL(route.request().url());
+  u.searchParams.set('live-audit-bust',`${Date.now()}-${Math.random()}`);
+  route.continue({url:u.toString()});
+});
 const consoleErrors=[],failedRequests=[],httpErrors=[];
 page.on('console',m=>{if(m.type()==='error')consoleErrors.push(m.text())});
 page.on('pageerror',e=>consoleErrors.push(`PAGEERROR: ${e.stack||e.message}`));
