@@ -93,8 +93,10 @@ jobs:
           grep -q "proximity-name-v1" src/environment/tile-registry.js
           grep -q "grassMode:'authored-eight-variant-atlas-v1'" src/environment/tile-registry.js
           grep -q "grassVariationMode:'authored-eight-variant-atlas-v1'" src/environment/world-map.js
-          grep -q "plaza-fountain-v1.5" src/environment/plaza-depth.js
+          grep -q "plaza-fountain-v1.6" src/environment/plaza-depth.js
           grep -q "authored-png-layer-pair-v1" src/environment/plaza-depth.js
+          grep -q "scaled-centered-lower-rim-v1" src/environment/plaza-depth.js
+          grep -q "frontScale:0.74" src/environment/plaza-depth.js
           grep -q "final-composite-back-actor-front-v2" src/environment/plaza-depth.js
           grep -q "plaza-fountain-back.PNG" src/environment/plaza-depth.js
           grep -q "plaza-fountain-front.PNG" src/environment/plaza-depth.js
