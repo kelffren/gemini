@@ -32,6 +32,11 @@ for(let attempt=1;attempt<=24;attempt++){
 consoleErrors.length=0;failedRequests.length=0;httpErrors.length=0;
 await page.goto(`${base}?gardens-audit=final-${Date.now()}`,{waitUntil:'networkidle',timeout:45000});
 await page.waitForTimeout(1800);
+const depthAudit=await page.evaluate(()=>{
+  if(typeof camera==='undefined'||typeof localPlayer==='undefined'||typeof render!=='function')return null;
+  localPlayer.x=1776;localPlayer.y=2492;camera.x=1776;camera.y=2500;camera.targetX=1776;camera.targetY=2500;render();
+  return window.KELO_GARDEN_LANDMARK_AUDIT||null;
+});
 const shot=await page.evaluate(()=>{
   const c=document.getElementById('game-canvas');if(!c||typeof camera==='undefined'||typeof localPlayer==='undefined'||typeof render!=='function')return null;
   localPlayer.x=1510;localPlayer.y=2356;camera.x=1510;camera.y=2356;camera.targetX=1510;camera.targetY=2356;render();
@@ -40,14 +45,14 @@ const shot=await page.evaluate(()=>{
   return{dataUrl:c.toDataURL('image/png'),audit:window.KELO_GARDEN_LANDMARK_AUDIT||null,world:window.KELO_WORLD_AUDIT||null,registry:window.KELO_TILE_REGISTRY||null,canvas:{width:c.width,height:c.height,cssWidth:c.clientWidth,cssHeight:c.clientHeight},cyan,ivory,gold,green};
 });
 if(shot?.dataUrl?.startsWith('data:image/png;base64,'))fs.writeFileSync('artifacts/live-gardens-marble.png',Buffer.from(shot.dataUrl.split(',')[1],'base64'));
-const report={loaded,title:await page.title(),expectedWorldVersion,expectedRegistryVersion,expectedGardensPathMode,expectedGardensFramingMode,expectedGardensTransitionMode,expectedGardensMarbleMode,shot:shot?{audit:shot.audit,world:shot.world,registryVersion:shot.registry?.version,canvas:shot.canvas,cyan:shot.cyan,ivory:shot.ivory,gold:shot.gold,green:shot.green}:null,consoleErrors,failedRequests,httpErrors};
+const report={loaded,title:await page.title(),expectedWorldVersion,expectedRegistryVersion,expectedGardensPathMode,expectedGardensFramingMode,expectedGardensTransitionMode,expectedGardensMarbleMode,depthAudit,shot:shot?{audit:shot.audit,world:shot.world,registryVersion:shot.registry?.version,canvas:shot.canvas,cyan:shot.cyan,ivory:shot.ivory,gold:shot.gold,green:shot.green}:null,consoleErrors,failedRequests,httpErrors};
 fs.writeFileSync('artifacts/gardens-report.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));
 await browser.close();
 if(!loaded)throw new Error(`LIVE never reached Gardens contract ${expectedWorldVersion} / ${expectedGardensMarbleMode}`);
 if(report.title!==expectedTitle)throw new Error(`Title mismatch ${report.title} !== ${expectedTitle}`);
 if(!shot?.dataUrl?.startsWith('data:image/png;base64,'))throw new Error('Gardens screenshot missing');
 if(shot.registry?.version!==expectedRegistryVersion||shot.world?.version!==expectedWorldVersion||!shot.world?.marbleVariationAssetLoaded||shot.world?.marbleVariationCount!==8||shot.world?.gardensMarbleMode!==expectedGardensMarbleMode||shot.world?.gardensPathMode!==expectedGardensPathMode||shot.world?.gardensTransitionMode!==expectedGardensTransitionMode||shot.world?.gardensFramingMode!==expectedGardensFramingMode||shot.world?.gardensLandmarkClearance!=='east-fountain-footprint-v1')throw new Error(`Stale Gardens world in final capture: ${JSON.stringify(shot.world)}`);
-if(!shot.audit?.ready||shot.audit?.failed||shot.audit?.atlasMode!=='layered-prefab-atlas-v1'||shot.audit?.renderMode!=='final-composite-back-actor-front-v1'||shot.audit?.frontOcclusionActive!==true)throw new Error(`Gardens layered landmark invalid: ${JSON.stringify(shot.audit)}`);
+if(!depthAudit?.ready||depthAudit?.failed||depthAudit?.atlasMode!=='layered-prefab-atlas-v1'||depthAudit?.renderMode!=='final-composite-back-actor-front-v1'||depthAudit?.frontOcclusionActive!==true)throw new Error(`Gardens layered landmark invalid: ${JSON.stringify(depthAudit)}`);
 if(shot.canvas?.cssWidth!==390||shot.canvas?.cssHeight!==844||shot.canvas?.width!==780||shot.canvas?.height!==1688)throw new Error(`Mobile canvas mismatch: ${JSON.stringify(shot.canvas)}`);
 if(shot.ivory<1000||shot.green<5000)throw new Error(`Garden palette evidence weak: ${JSON.stringify({ivory:shot.ivory,green:shot.green})}`);
 if(consoleErrors.length)throw new Error(`Console/page errors: ${JSON.stringify(consoleErrors)}`);
