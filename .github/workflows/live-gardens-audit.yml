@@ -35,7 +35,10 @@ jobs:
           grep -q "registry-authored-garden-compositions-v4" src/environment/gardens-compositions.js
           grep -q "mirrored-authored-vertical-mid-v1" src/environment/gardens-compositions.js
           grep -q "verticalAltUsageCount:2" src/environment/gardens-compositions.js
-          grep -q "world-v1.14" src/environment/world-map.js
+          grep -q "world-v1.15" src/environment/world-map.js
+          grep -q "oriented-authored-corner-v1" src/environment/world-map.js
+          grep -q "gardensCornerOrientationCount:4" src/environment/world-map.js
+          grep -q "drawGardenRotated" src/environment/world-map.js
           grep -q "gardens-landmark-v1.1" src/environment/gardens-landmark.js
       - name: Install Playwright
         run: npm install --no-save playwright@1.55.0
