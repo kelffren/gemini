@@ -658,6 +658,16 @@ Kelo World is no longer allowed to remain a single polished plaza floating in a 
 - Manual inspection of `live-gardens-variants.png` confirms the southwest flowerbed now renders as a complete two-cell pair on grass beside the ivory route. The relocation does not introduce seams, obstruct the route, increase visual density, or reduce hero readability.
 - Remaining declared-to-visible candidates are fixed accents: two WATER cells, the west PLINTH, one STEPPING_STONES cell conflict with road masks, and the east PLINTH is additionally suppressed by the fountain-clearance rectangle. Continue one fixed-accent cluster at a time before adding new L/T junction art.
 
+
+## Validated Gardens Water Accent Recovery — Gardens compositions v10 / 2026-09-03
+- Fresh public reference review of Pixadom plus current 32x32 top-down packs such as Wardmarch and Emberfen reinforced the same transferable rule: authored environmental density should support readable circulation, while metadata/placement validity must be verified against the final renderer rather than assumed from registry declarations. References were used only for density, legibility and consistency; no external art or layout was copied.
+- The two registry-owned Gardens `WATER` accents at local cells `[12,11]` and `[17,11]` were valid declarations but fully invisible in the composed world. `world-map.js` deliberately renders garden overlays only on non-road cells; the first water cell overlapped the central ivory corridor and the second overlapped the Gardens promenade.
+- `gardens-compositions-v10` relocates those exact two WATER cells to `[9,11]` and `[19,11]`, both grass-valid positions outside the fountain exclusion. Footprint and authored density remain two cells; no movement, collision, economy, combat, networking, chat, inventory or other gameplay semantics changed.
+- The composition contract now reports `navigationSafeRelocationMode='authored-road-clear-placements-v5'`, `navigationConflictFixCount=10`, and explicit `relocatedWaterAnchors=[[9,11],[19,11]]`. The LIVE audit frames the affected promenade area and requires cyan pixel evidence in addition to the existing grass/ivory checks.
+- Kelo CI run `33812255211` and GitHub Pages run `33812253693` passed for final QA head `04b55da482596292264a63f81cdbd9b5867cf4eb`. Gardens mobile LIVE audit `33812255145` also passed at 390x844 CSS / 780x1688 backing canvas with 2,854 qualifying cyan pixels and `consoleErrors=[]`, `failedRequests=[]`, `httpErrors=[]`.
+- Manual inspection of the LIVE screenshot confirms both small cyan water accents now appear on grass flanking readable ivory circulation, without seams, path obstruction or loss of hero legibility.
+- Next Gardens bottleneck: three older fixed accents remain candidates for declared-but-nonrenderable placement: the west plinth conflicts with road geometry, the east plinth intersects the fountain-clearance policy, and one stepping-stone placement conflicts with navigation. Continue correcting one confirmed group per pass before adding new decorative density.
+
 ## Non-goals During Visual Passes
 Do not casually alter unrelated systems such as:
 - core movement feel;
