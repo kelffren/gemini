@@ -27,8 +27,10 @@ on:
       - 'assets/rural-soil-v1.png'
       - 'assets/rural-props-v1.png'
       - 'assets/rural-landmarks-v1.png'
+      - 'assets/district-decals-v1.svg'
       - 'scripts/live-world-audit.mjs'
       - 'scripts/live-rural-audit.mjs'
+      - 'scripts/live-district-decals-audit.mjs'
       - 'scripts/live-pavilion-audit.mjs'
       - 'scripts/live-fountain-audit.mjs'
       - 'scripts/live-npc-audit.mjs'
@@ -47,7 +49,7 @@ jobs:
       - name: Resolve visual contract from source
         shell: bash
         run: |
-          REGISTRY_VERSION="$(node -e "const fs=require('fs');const s=fs.readFileSync('src/environment/tile-registry.js','utf8');const m=s.match(/version:'([^']+)'/);if(!m)process.exit(2);process.stdout.write(m[1]);")"
+          REGISTRY_VERSION="$(node -e "const fs=require('fs');const s=fs.readFileSync('src/environment/district-decals-registry.js','utf8');const m=s.match(/registryVersion:'([^']+)'/);if(!m)process.exit(2);process.stdout.write(m[1]);")"
           WORLD_VERSION="$(node -e "const fs=require('fs');const s=fs.readFileSync('src/environment/world-map.js','utf8');const m=s.match(/KELO_WORLD_AUDIT=\{version:'([^']+)'/);if(!m)process.exit(2);process.stdout.write(m[1]);")"
           PAGE_TITLE="$(node -e "const fs=require('fs');const s=fs.readFileSync('index.html','utf8');const m=s.match(/<title>([^<]+)<\\/title>/);if(!m)process.exit(2);process.stdout.write(m[1]);")"
           ARCH_VERSION="$(node -e "const fs=require('fs');const s=fs.readFileSync('src/environment/luxe-kiosk-atlas.js','utf8');const m=s.match(/KELO_ARCHITECTURE_RENDERER=Object\.freeze\(\{version:'([^']+)'/);if(!m)process.exit(2);process.stdout.write(m[1]);")"
@@ -68,6 +70,11 @@ jobs:
           AUDIT_URL: https://kelffren.github.io/gemini/
           CHROME_BIN: /usr/bin/google-chrome
         run: node scripts/live-world-audit.mjs
+      - name: Audit authored district microdecals
+        env:
+          AUDIT_URL: https://kelffren.github.io/gemini/
+          CHROME_BIN: /usr/bin/google-chrome
+        run: node scripts/live-district-decals-audit.mjs
       - name: Audit authored rural edge density
         env:
           AUDIT_URL: https://kelffren.github.io/gemini/
