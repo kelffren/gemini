@@ -8,7 +8,7 @@ const C=Object.freeze([
   Object.freeze({id:'south-west-hedge-run',cells:Object.freeze([[7,17,'HEDGE_CAP_L'],[8,17,'HEDGE_H'],[9,17,'HEDGE_CAP_R']])}),
   Object.freeze({id:'south-east-hedge-run',cells:Object.freeze([[15,17,'HEDGE_CAP_L'],[16,17,'HEDGE_H'],[17,17,'HEDGE_MID_ALT'],[18,17,'HEDGE_CAP_R']])}),
   Object.freeze({id:'west-hedge-run',cells:Object.freeze([[5,7,'HEDGE_CAP_T'],[5,8,'HEDGE_V'],[5,9,'HEDGE_CAP_B']])}),
-  Object.freeze({id:'east-upper-hedge-run',cells:Object.freeze([[22,6,'HEDGE_CAP_T'],[22,7,'HEDGE_V_ALT'],[22,8,'HEDGE_CAP_B']])}),
+  Object.freeze({id:'east-upper-hedge-run',cells:Object.freeze([[24,13,'HEDGE_CAP_T'],[24,14,'HEDGE_V_ALT'],[24,15,'HEDGE_CAP_B']])}),
   Object.freeze({id:'east-lower-hedge-run',cells:Object.freeze([[22,14,'HEDGE_CAP_T'],[22,15,'HEDGE_V_ALT'],[22,16,'HEDGE_CAP_B']])}),
   Object.freeze({id:'flowerbed-nw',cells:Object.freeze([[7,6,'FLOWER_CAP_L'],[8,6,'FLOWER_CAP_R']])}),
   Object.freeze({id:'flowerbed-ne',cells:Object.freeze([[18,7,'FLOWER_CAP_L'],[19,7,'FLOWER_CAP_R']])}),
@@ -23,12 +23,13 @@ const FIXED=Object.freeze([
 const styles=Object.freeze({
   ...R.styles,
   gardensCompositions:Object.freeze({
-    mode:'registry-authored-garden-compositions-v5',
+    mode:'registry-authored-garden-compositions-v6',
     sourceAtlas:G.id,
     joinAtlas:J.id,
     centerVariationMode:'authored-mid-variant-selection-v2',
     verticalVariationMode:'mirrored-authored-vertical-mid-v1',
     fixedPlacementMode:'registry-authored-fixed-accents-v1',
+    navigationSafeRelocationMode:'authored-road-clear-east-run-v1',
     compositionCount:C.length,
     fixedPlacementCount:FIXED.length,
     compositions:C,
@@ -39,17 +40,20 @@ const styles=Object.freeze({
 });
 window.KELO_TILE_REGISTRY=Object.freeze({...R,styles});
 window.KELO_GARDENS_COMPOSITION_AUDIT=Object.freeze({
-  version:'gardens-compositions-v5',
+  version:'gardens-compositions-v6',
   ready:true,
   mode:styles.gardensCompositions.mode,
   centerVariationMode:styles.gardensCompositions.centerVariationMode,
   verticalVariationMode:styles.gardensCompositions.verticalVariationMode,
   fixedPlacementMode:styles.gardensCompositions.fixedPlacementMode,
+  navigationSafeRelocationMode:styles.gardensCompositions.navigationSafeRelocationMode,
   compositionCount:C.length,
   fixedPlacementCount:FIXED.length,
   joinAtlas:J.id,
   joinMode:J.mode,
   altCenterTileCount:4,
-  verticalAltUsageCount:2
+  verticalAltUsageCount:2,
+  navigationConflictFixCount:3,
+  relocatedEastRunAnchor:Object.freeze([24,13])
 });
 })();
