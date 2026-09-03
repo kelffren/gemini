@@ -24,11 +24,13 @@ on:
       - 'assets/plaza-fountain-back.PNG'
       - 'assets/plaza-fountain-front.PNG'
       - 'assets/grass-variation-v1.png'
+      - 'assets/marble-variation-v1.png'
       - 'assets/rural-soil-v1.png'
       - 'assets/rural-props-v1.png'
       - 'assets/rural-landmarks-v1.png'
       - 'assets/district-decals-v1.svg'
       - 'scripts/live-world-audit.mjs'
+      - 'scripts/live-gardens-audit.mjs'
       - 'scripts/live-rural-audit.mjs'
       - 'scripts/live-district-decals-audit.mjs'
       - 'scripts/live-pavilion-audit.mjs'
@@ -70,6 +72,13 @@ jobs:
           AUDIT_URL: https://kelffren.github.io/gemini/
           CHROME_BIN: /usr/bin/google-chrome
         run: node scripts/live-world-audit.mjs
+      - name: Audit Gardens marble cadence
+        env:
+          AUDIT_URL: https://kelffren.github.io/gemini/
+          CHROME_BIN: /usr/bin/google-chrome
+          EXPECTED_TITLE: ${{ env.EXPECTED_TITLE }}
+          EXPECTED_WORLD_VERSION: ${{ env.EXPECTED_WORLD }}
+        run: node scripts/live-gardens-audit.mjs
       - name: Audit authored district microdecals
         env:
           AUDIT_URL: https://kelffren.github.io/gemini/
