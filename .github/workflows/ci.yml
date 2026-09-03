@@ -15,14 +15,30 @@ jobs:
           test -f engine-net.js
           test -f server/index.js
           test -f server/package.json
+          test -f server/nobility-store.js
+          test -f supabase/migrations/20260903_nobility.sql
+          test -f src/systems/nobility.js
+          test -f src/systems/nobility-authority.js
+          test -f src/systems/nobility-combat.js
+          test -f scripts/server-nobility-audit.js
           test -f assets/plaza-fountain-back.PNG
           test -f assets/plaza-fountain-front.PNG
           test -f assets/plaza-npcs-v1.svg
-          test -f src/systems/nobility.js
-          grep -q "engine-net.js" index.html
-          grep -q "src/systems/nobility.js?v=1" index.html
-      - name: Server syntax
-        run: node --check server/index.js
+          grep -q "engine-net.js?v=95" index.html
+          grep -q "src/systems/nobility.js?v=2" index.html
+          grep -q "src/systems/nobility-authority.js?v=1" index.html
+          grep -q "src/systems/nobility-combat.js?v=1" index.html
+      - name: Server and nobility syntax
+        run: |
+          node --check server/index.js
+          node --check server/nobility-store.js
+          node --check engine-net.js
+          node --check src/systems/nobility.js
+          node --check src/systems/nobility-authority.js
+          node --check src/systems/nobility-combat.js
+          node --check scripts/server-nobility-audit.js
+      - name: Authoritative nobility mechanics
+        run: node scripts/server-nobility-audit.js
       - name: Environment and visual contracts
         run: |
           node --check src/environment/rural-nature-atlas.js
@@ -34,7 +50,6 @@ jobs:
           node --check src/environment/plaza-depth.js
           node --check src/environment/luxe-compose.js
           node --check src/environment/luxe-kiosk-atlas.js
-          node --check src/systems/nobility.js
           node --check scripts/live-world-audit.mjs
           node --check scripts/live-pavilion-audit.mjs
           node --check scripts/live-fountain-audit.mjs
@@ -53,6 +68,13 @@ jobs:
           grep -q "top: 50" src/systems/nobility.js
           grep -q "top: 15" src/systems/nobility.js
           grep -q "top: 3" src/systems/nobility.js
+          grep -q "server-nobility-v1" server/nobility-store.js
+          grep -q "supabase-authoritative" server/nobility-store.js
+          grep -q "nobility_donate" supabase/migrations/20260903_nobility.sql
+          grep -q "combat:resolve" server/index.js
+          grep -q "nobility:donate" server/index.js
+          grep -q "nobility-authority-v1" src/systems/nobility-authority.js
+          grep -q "nobility-combat-v1" src/systems/nobility-combat.js
           grep -q "kelo-luxe-v3-style" src/ui/luxe-shell.js
           grep -q -- "--lx-forest:#173f36" src/ui/luxe-shell.js
           grep -q "mode:'luxe-only-v1'" src/environment/luxe-kiosk-atlas.js
