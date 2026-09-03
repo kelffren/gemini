@@ -17,20 +17,20 @@ const C=Object.freeze([
 ]);
 const FIXED=Object.freeze([
   Object.freeze([5,4,'HEDGE_CORNER',0]),Object.freeze([22,4,'HEDGE_CORNER',1]),Object.freeze([22,17,'HEDGE_CORNER',2]),Object.freeze([5,17,'HEDGE_CORNER',3]),
-  Object.freeze([9,11,'WATER']),Object.freeze([19,11,'WATER']),Object.freeze([7,11,'PLINTH']),Object.freeze([21,11,'PLINTH']),
+  Object.freeze([9,11,'WATER']),Object.freeze([19,11,'WATER']),Object.freeze([5,11,'PLINTH']),Object.freeze([21,11,'PLINTH']),
   Object.freeze([11,16,'STEPPING_STONES']),Object.freeze([16,16,'STEPPING_STONES'])
 ]);
 const declaredCellCount=C.reduce((n,comp)=>n+comp.cells.length,0)+FIXED.length;
 const styles=Object.freeze({
   ...R.styles,
   gardensCompositions:Object.freeze({
-    mode:'registry-authored-garden-compositions-v10',
+    mode:'registry-authored-garden-compositions-v11',
     sourceAtlas:G.id,
     joinAtlas:J.id,
     centerVariationMode:'authored-mid-variant-selection-v2',
     verticalVariationMode:'mirrored-authored-vertical-mid-v1',
     fixedPlacementMode:'registry-authored-fixed-accents-v1',
-    navigationSafeRelocationMode:'authored-road-clear-placements-v5',
+    navigationSafeRelocationMode:'authored-road-clear-placements-v6',
     compositionCount:C.length,
     fixedPlacementCount:FIXED.length,
     declaredCellCount,
@@ -42,7 +42,7 @@ const styles=Object.freeze({
 });
 window.KELO_TILE_REGISTRY=Object.freeze({...R,styles});
 window.KELO_GARDENS_COMPOSITION_AUDIT=Object.freeze({
-  version:'gardens-compositions-v10',
+  version:'gardens-compositions-v11',
   ready:true,
   mode:styles.gardensCompositions.mode,
   centerVariationMode:styles.gardensCompositions.centerVariationMode,
@@ -56,11 +56,12 @@ window.KELO_GARDENS_COMPOSITION_AUDIT=Object.freeze({
   joinMode:J.mode,
   altCenterTileCount:4,
   verticalAltUsageCount:2,
-  navigationConflictFixCount:10,
+  navigationConflictFixCount:11,
   relocatedEastRunAnchor:Object.freeze([24,13]),
   relocatedFlowerbedNWAnchor:Object.freeze([8,8]),
   relocatedFlowerbedNEAnchor:Object.freeze([19,13]),
   relocatedFlowerbedSWAnchor:Object.freeze([8,14]),
-  relocatedWaterAnchors:Object.freeze([Object.freeze([9,11]),Object.freeze([19,11])])
+  relocatedWaterAnchors:Object.freeze([Object.freeze([9,11]),Object.freeze([19,11])]),
+  relocatedWestPlinthAnchor:Object.freeze([5,11])
 });
 })();
