@@ -4,8 +4,8 @@
   const FOUNTAIN=Object.freeze({
     id:'plaza-fountain-central-v1',
     x:1340,y:1450,w:200,h:140,baseY:1555,
-    back:Object.freeze({src:'assets/plaza-fountain-back-v2.svg?art=198',width:200,height:140}),
-    front:Object.freeze({src:'assets/plaza-fountain-front-v2.svg?art=198',width:200,height:140}),
+    back:Object.freeze({src:'assets/plaza-fountain-back.PNG?art=199',sourceWidth:1499,sourceHeight:1049}),
+    front:Object.freeze({src:'assets/plaza-fountain-front.PNG?art=199',sourceWidth:1499,sourceHeight:1049}),
     collision:Object.freeze({x:1390,y:1492,w:100,h:60})
   });
 
@@ -15,10 +15,12 @@
   }
 
   const audit=window.KELO_PLAZA_FOUNTAIN_AUDIT={
-    version:'plaza-fountain-v1.3',ready:false,backLoaded:false,frontLoaded:false,failed:false,
+    version:'plaza-fountain-v1.4',ready:false,backLoaded:false,frontLoaded:false,failed:false,
     depthMode:'final-composite-back-actor-front-v2',renderWrapped:false,
-    assetMode:'authored-svg-layer-pair-v2',
+    assetMode:'authored-png-layer-pair-v1',
     x:FOUNTAIN.x,y:FOUNTAIN.y,width:FOUNTAIN.w,height:FOUNTAIN.h,baseY:FOUNTAIN.baseY,
+    sourceWidth:FOUNTAIN.back.sourceWidth,sourceHeight:FOUNTAIN.back.sourceHeight,
+    backAsset:FOUNTAIN.back.src,frontAsset:FOUNTAIN.front.src,
     collision:{...FOUNTAIN.collision},lastLocalDepth:null,lastFrontActorRedraws:0,lastActorRedraws:0,backDrawCount:0,frontDrawCount:0
   };
 
@@ -36,9 +38,9 @@
     }
   }
   function validate(img,meta,kind){
-    if(img.naturalWidth!==meta.width||img.naturalHeight!==meta.height){
+    if(img.naturalWidth!==meta.sourceWidth||img.naturalHeight!==meta.sourceHeight){
       audit.failed=true;sync();
-      console.error(`[Kelo fountain] invalid ${kind} dimensions`,img.naturalWidth,img.naturalHeight,'expected',meta.width,meta.height);
+      console.error(`[Kelo fountain] invalid ${kind} dimensions`,img.naturalWidth,img.naturalHeight,'expected',meta.sourceWidth,meta.sourceHeight);
       return false;
     }
     return true;
