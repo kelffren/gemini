@@ -639,3 +639,10 @@ A visual pass is successful only when:
 - there are no new console errors;
 - no unrelated gameplay system regresses;
 - the result remains original to Kelo World.
+## Validated Gardens Registry-Owned Fixed Accents — World v1.16 / Compositions v5 / 2026-09-03
+- Repository inspection found a remaining architecture leak in Jardines: ten authored fixed accents (four oriented hedge corners, two water cells, two plinths and two stepping-stone cells) were still owned by a renderer-local hard-coded placement object even though the surrounding hedge/flower compositions had already moved into the registry extension.
+- `gardens-compositions-v5` now owns those ten placements through `fixedPlacements` with `fixedPlacementMode=registry-authored-fixed-accents-v1`. `world-map.js` builds one garden-cell map from authored compositions plus fixed placements and advanced to `world-v1.16`; exact coordinates, four corner rotations, footprints, fountain/path clearances and density are preserved.
+- This is a visual-architecture refactor with intentionally unchanged composed appearance. No movement, collision, economy, combat, networking, chat or inventory behavior changed.
+- Kelo CI and the dedicated Gardens mobile LIVE audit passed on the implementation head. LIVE validated 390x844 CSS / 780x1688 backing canvas, eleven compositions, ten registry-owned fixed placements, the existing layered fountain and `consoleErrors=[]`, `failedRequests=[]`, `httpErrors=[]`.
+- Manual inspection of the LIVE frame confirmed no seam, placement, route-clearance or density regression. The value of this pass is that future hedge L/T junction work can now stay in the composition/registry vocabulary instead of adding another renderer-local placement table.
+- Current Gardens bottleneck: several hedge runs still read as isolated ornaments rather than connected garden boundaries. The next safe pass should add one real modular L/T junction through the existing join atlas + registry composition data, keeping current path and landmark clearances unchanged.
