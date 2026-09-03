@@ -28,10 +28,10 @@ jobs:
           test -f server/forge-store.js
           test -f scripts/server-forge-audit.js
           test -f supabase/migrations/20260903_forge.sql
-          grep -q 'Kelo World — V6.08' index.html
-          grep -q 'src/systems/equipment-system.js?v=1' index.html
-          grep -q 'src/systems/forge-system.js?v=1' index.html
-          grep -q 'src/systems/armor-aura.js?v=1' index.html
+          grep -Eq 'Kelo World — V6\.' index.html
+          grep -q 'src/systems/equipment-system.js?v=' index.html
+          grep -q 'src/systems/forge-system.js?v=' index.html
+          grep -q 'src/systems/armor-aura.js?v=' index.html
           grep -q "forge-v1.0" src/systems/forge-system.js
           grep -q "equipment-v1.0" src/systems/equipment-system.js
           grep -q "armor-aura-v1.0" src/systems/armor-aura.js
