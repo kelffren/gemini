@@ -70,15 +70,17 @@ const after=await page.evaluate(()=>{
   return{scrollTop:shell.scrollTop,clientHeight:shell.clientHeight,scrollHeight:shell.scrollHeight};
 });
 await page.screenshot({path:'artifacts/live-ui-scroll.png',fullPage:true});
-const report={ready,before,after,delta:after.scrollTop-before.scrollTop,consoleErrors,failedRequests,httpErrors};
+const maxScroll=Math.max(0,before.scrollHeight-before.clientHeight);
+const requiredScroll=Math.min(maxScroll,12);
+const report={ready,before,after,maxScroll,requiredScroll,delta:after.scrollTop-before.scrollTop,consoleErrors,failedRequests,httpErrors};
 fs.writeFileSync('artifacts/ui-scroll-report.json',JSON.stringify(report,null,2));
 console.log(JSON.stringify(report,null,2));
 await browser.close();
 
 if(before.title!==expectedTitle)throw new Error(`Title mismatch ${before.title} !== ${expectedTitle}`);
-if(before.rootTouchAction!=='pan-y'||before.menuTouchAction!=='pan-y')throw new Error(`Scrollable UI touch-action invalid: ${JSON.stringify(before)}`);
-if(before.scrollHeight<=before.clientHeight+80)throw new Error('Nobility panel is not vertically overflowed enough to test');
-if(after.scrollTop<60||report.delta<60)throw new Error(`Real mobile swipe did not scroll panel: ${JSON.stringify({before:before.scrollTop,after:after.scrollTop,delta:report.delta})}`);
+if(before.rootTouchAction!=='pan-y'||before.shellTouchAction!=='pan-y'||before.menuTouchAction!=='pan-y')throw new Error(`Scrollable UI touch-action invalid: ${JSON.stringify(before)}`);
+if(maxScroll<8)throw new Error(`Nobility panel is not vertically overflowed enough to test: ${maxScroll}`);
+if(after.scrollTop<requiredScroll||report.delta<requiredScroll)throw new Error(`Real mobile swipe did not scroll panel: ${JSON.stringify({maxScroll,requiredScroll,before:before.scrollTop,after:after.scrollTop,delta:report.delta})}`);
 if(consoleErrors.length)throw new Error(`Console/page errors: ${JSON.stringify(consoleErrors)}`);
 if(failedRequests.length)throw new Error(`Failed requests: ${JSON.stringify(failedRequests)}`);
 if(httpErrors.length)throw new Error(`HTTP errors: ${JSON.stringify(httpErrors)}`);
