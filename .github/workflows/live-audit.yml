@@ -14,6 +14,7 @@ on:
       - 'engine-aa.js'
       - 'src/environment/**'
       - 'src/ui/**'
+      - 'src/systems/**'
       - 'assets/tileset.png'
       - 'assets/tileset-vclean.png'
       - 'assets/plaza-transitions-v1.png'
@@ -30,6 +31,7 @@ on:
       - 'scripts/live-pavilion-audit.mjs'
       - 'scripts/live-fountain-audit.mjs'
       - 'scripts/live-npc-audit.mjs'
+      - 'scripts/live-nobility-audit.mjs'
       - '.github/workflows/live-audit.yml'
 
 jobs:
@@ -80,6 +82,11 @@ jobs:
           AUDIT_URL: https://kelffren.github.io/gemini/
           CHROME_BIN: /usr/bin/google-chrome
         run: node scripts/live-fountain-audit.mjs
+      - name: Audit nobility donation progression
+        env:
+          AUDIT_URL: https://kelffren.github.io/gemini/
+          CHROME_BIN: /usr/bin/google-chrome
+        run: node scripts/live-nobility-audit.mjs
       - name: Upload screenshot evidence
         if: always()
         uses: actions/upload-artifact@v4
