@@ -12,6 +12,10 @@
     id:'grass-variation', src:'assets/grass-variation-v1.png?art=191', width:128, height:64,
     tileWidth:TILE, tileHeight:TILE, columns:4, tileCount:8
   });
+  const marbleVariationAtlas = Object.freeze({
+    id:'marble-variation', src:'assets/marble-variation-v1.png?art=143', width:128, height:64,
+    tileWidth:TILE, tileHeight:TILE, columns:4, tileCount:8, overlay:true
+  });
   const plazaGroundAtlas = Object.freeze({
     id:'plaza-ground', src:'assets/plaza-ground-v1.png?art=193', width:800, height:560,
     worldWidth:800, worldHeight:560, family:'ground'
@@ -95,6 +99,7 @@
     grassDetail:Object.freeze([tiles.GRASS_FLOWERS]),
     grassAuthored:Object.freeze([0,1,2,3,4,5,6,7]),
     marble:Object.freeze([tiles.MARBLE_IVORY_A,tiles.MARBLE_IVORY_B,tiles.MARBLE_IVORY_C,tiles.MARBLE_IVORY_D,tiles.MARBLE_IVORY_A,tiles.MARBLE_IVORY_B,tiles.MARBLE_IVORY_C,tiles.MARBLE_IVORY_D]),
+    marbleVariation:Object.freeze([0,1,2,3,4,5,6,7]),
     marbleAccent:Object.freeze([tiles.MARBLE_A,tiles.MARBLE_B,tiles.MARBLE_DIAMOND]),
     marbleGold:Object.freeze([tiles.MARBLE_GOLD_A,tiles.MARBLE_GOLD_B])
   });
@@ -103,7 +108,7 @@
     rural:Object.freeze({detailEvery:31,detailCluster:true,marbleAccentEvery:0}),
     arena:Object.freeze({detailEvery:61,detailCluster:false,marbleAccentEvery:29}),
     commerce:Object.freeze({detailEvery:67,detailCluster:false,marbleAccentEvery:23}),
-    gardens:Object.freeze({detailEvery:17,detailCluster:true,marbleAccentEvery:0}),
+    gardens:Object.freeze({detailEvery:17,detailCluster:true,marbleAccentEvery:0,marbleVariation:true}),
     default:Object.freeze({detailEvery:53,detailCluster:false,marbleAccentEvery:0})
   });
   const ruralTiles = Object.freeze({
@@ -129,6 +134,7 @@
   });
   const styles = Object.freeze({
     plazaTransition:Object.freeze({mode:'authored-organic-fringe-overlay-v3',neighbourMask:'TRBL',softenStickerAccents:true}),
+    marbleVariation:Object.freeze({mode:'authored-eight-variant-overlay-v1',scope:'gardens-roads',subtle:true}),
     plazaNature:Object.freeze({mode:'authored-transparent-prop-family-v1',depthMode:'actor-base-y-v1',visualOnly:true,collision:false}),
     trainingDummy:Object.freeze({mode:'registry-authored-training-prop-v1',asset:'trainingDummy',visualOnly:true,preserveGameplayAnchor:true,labelMode:'hp-only-v1'}),
     plazaNpcs:Object.freeze({mode:'registry-authored-npc-visual-v1',asset:'plazaNpcs',preserveGameplayAnchors:true,labelMode:'proximity-name-v1',visualOnly:true}),
@@ -159,8 +165,8 @@
     })
   });
   window.KELO_TILE_REGISTRY = Object.freeze({
-    version:'1.10.25', worldTileSize:TILE,
-    atlases:Object.freeze({plaza:atlas,plazaGround:plazaGroundAtlas,transitions:transitionAtlas,grassVariation:grassVariationAtlas,plazaNature:plazaNatureAtlas,trainingDummy:trainingDummyAtlas,plazaNpcs:plazaNpcsAtlas,ruralSoil:ruralSoilAtlas,ruralProps:ruralPropsAtlas,ruralLandmarks:ruralLandmarksAtlas,ruralNature:ruralNatureAtlas}),
+    version:'1.10.26', worldTileSize:TILE,
+    atlases:Object.freeze({plaza:atlas,plazaGround:plazaGroundAtlas,transitions:transitionAtlas,grassVariation:grassVariationAtlas,marbleVariation:marbleVariationAtlas,plazaNature:plazaNatureAtlas,trainingDummy:trainingDummyAtlas,plazaNpcs:plazaNpcsAtlas,ruralSoil:ruralSoilAtlas,ruralProps:ruralPropsAtlas,ruralLandmarks:ruralLandmarksAtlas,ruralNature:ruralNatureAtlas}),
     architectureAssets,architecturePrefabs,plazaNatureProps,trainingDummyProp,plazaNpcVisuals,
     tiles,ruralTiles,ruralPropTiles,ruralLandmarkTiles,ruralLandmarkSprites,ruralNatureTiles,ruralNatureSprites,families,transitionMasks,styles
   });
