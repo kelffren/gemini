@@ -19,7 +19,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
       - name: Syntax and contract
         run: |
           node --check src/environment/gardens-atlas.js
@@ -54,7 +53,7 @@ jobs:
           grep -q "drawGardenRotated" src/environment/world-map.js
           grep -q "gardens-landmark-v1.1" src/environment/gardens-landmark.js
       - name: Install Playwright
-        run: npm ci --ignore-scripts --no-audit --no-fund
+        run: npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund playwright@1.55.0
       - name: Audit deployed Gardens on mobile
         env:
           AUDIT_URL: https://kelffren.github.io/gemini/
