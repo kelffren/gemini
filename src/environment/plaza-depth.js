@@ -3,9 +3,9 @@
 
   const FOUNTAIN=Object.freeze({
     id:'plaza-fountain-central-v1',
-    x:1340,y:1450,w:200,h:140,baseY:1555,
-    back:Object.freeze({src:'assets/plaza-fountain-back.PNG?art=199',sourceWidth:1499,sourceHeight:1049}),
-    front:Object.freeze({src:'assets/plaza-fountain-front.PNG?art=199',sourceWidth:1499,sourceHeight:1049}),
+    x:1340,y:1420,w:200,h:200,baseY:1555,
+    back:Object.freeze({src:'assets/plaza-fountain-back.PNG?art=200',sourceWidth:1254,sourceHeight:1254}),
+    front:Object.freeze({src:'assets/plaza-fountain-front.PNG?art=200',sourceWidth:1254,sourceHeight:1254}),
     collision:Object.freeze({x:1390,y:1492,w:100,h:60})
   });
 
@@ -15,7 +15,7 @@
   }
 
   const audit=window.KELO_PLAZA_FOUNTAIN_AUDIT={
-    version:'plaza-fountain-v1.4',ready:false,backLoaded:false,frontLoaded:false,failed:false,
+    version:'plaza-fountain-v1.5',ready:false,backLoaded:false,frontLoaded:false,failed:false,
     depthMode:'final-composite-back-actor-front-v2',renderWrapped:false,
     assetMode:'authored-png-layer-pair-v1',
     x:FOUNTAIN.x,y:FOUNTAIN.y,width:FOUNTAIN.w,height:FOUNTAIN.h,baseY:FOUNTAIN.baseY,
