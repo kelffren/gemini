@@ -13,6 +13,57 @@
   };
   window.trainingDummy = dummy;
 
+  const registry = window.KELO_TILE_REGISTRY;
+  const asset = registry?.atlases?.trainingDummy;
+  const prop = registry?.trainingDummyProp;
+  const style = registry?.styles?.trainingDummy;
+  const dummyImg = new Image();
+  dummyImg.decoding = 'async';
+  let authoredReady = false;
+  let drawCount = 0;
+  window.KELO_TRAINING_DUMMY_AUDIT = {
+    version:'training-dummy-v1',
+    ready:false,
+    assetLoaded:false,
+    failed:false,
+    fallbackActive:true,
+    mode:style?.mode || null,
+    registryVersion:registry?.version || null,
+    gameplayAnchorPreserved:false,
+    labelRemoved:true,
+    drawCount:0
+  };
+
+  if (asset && prop && style) {
+    const a = prop.gameplayAnchor;
+    const anchorOk = a && a.x === dummy.x && a.y === dummy.y && a.radius === dummy.radius;
+    window.KELO_TRAINING_DUMMY_AUDIT.gameplayAnchorPreserved = !!anchorOk;
+    if (!anchorOk) {
+      console.error('[Kelo training dummy] registry gameplay anchor mismatch');
+      window.KELO_TRAINING_DUMMY_AUDIT.failed = true;
+    } else {
+      dummyImg.onload = function () {
+        if (dummyImg.naturalWidth !== asset.width || dummyImg.naturalHeight !== asset.height) {
+          console.error('[Kelo training dummy] invalid authored asset dimensions');
+          window.KELO_TRAINING_DUMMY_AUDIT.failed = true;
+          return;
+        }
+        authoredReady = true;
+        window.KELO_TRAINING_DUMMY_AUDIT.ready = true;
+        window.KELO_TRAINING_DUMMY_AUDIT.assetLoaded = true;
+        window.KELO_TRAINING_DUMMY_AUDIT.fallbackActive = false;
+      };
+      dummyImg.onerror = function () {
+        console.error('[Kelo training dummy] authored asset load failed');
+        window.KELO_TRAINING_DUMMY_AUDIT.failed = true;
+      };
+      dummyImg.src = asset.src;
+    }
+  } else {
+    console.error('[Kelo training dummy] registry contract missing');
+    window.KELO_TRAINING_DUMMY_AUDIT.failed = true;
+  }
+
   function drawHp(p) {
     if (!p || p.hp == null) return;
     const ratio = Math.max(0, Math.min(1, p.hp / (p.maxHp || 100)));
@@ -59,6 +110,13 @@
     if (typeof melee === 'undefined') return;
   }, true);
 
+  function drawFallback() {
+    ctx.fillStyle = dummy.gear.bodyColor;
+    ctx.beginPath();
+    ctx.arc(dummy.x, dummy.y, dummy.radius, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
   const _nRender = render;
   render = function () {
     _nRender();
@@ -67,24 +125,17 @@
     ctx.translate(screenW / 2, screenH / 2);
     ctx.scale(z, z);
     ctx.translate(-camera.x, -camera.y);
+    ctx.imageSmoothingEnabled = false;
     if (!dummy.dead) {
-      if (typeof renderAvatar === 'function') renderAvatar(dummy, false);
-      else {
-        ctx.fillStyle = dummy.gear.bodyColor;
-        ctx.beginPath();
-        ctx.arc(dummy.x, dummy.y, dummy.radius, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      ctx.fillStyle = '#e7c56a';
-      ctx.font = '10px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('DUMMY', dummy.x, dummy.y + dummy.radius + 12);
+      if (authoredReady && prop) {
+        ctx.drawImage(dummyImg, prop.x, prop.y, prop.w, prop.h);
+        drawCount++;
+        window.KELO_TRAINING_DUMMY_AUDIT.drawCount = drawCount;
+      } else drawFallback();
     } else {
-      ctx.globalAlpha = 0.35;
-      ctx.fillStyle = '#666';
-      ctx.beginPath();
-      ctx.arc(dummy.x, dummy.y, dummy.radius, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.globalAlpha = 0.28;
+      if (authoredReady && prop) ctx.drawImage(dummyImg, prop.x, prop.y, prop.w, prop.h);
+      else drawFallback();
       ctx.globalAlpha = 1;
     }
     drawHp(localPlayer);
@@ -93,7 +144,6 @@
     ctx.restore();
   };
 
-  const prevMeleeHook = window.addEventListener;
   setInterval(function () {
     if (dummy.dead) return;
     if (Math.hypot(localPlayer.x - dummy.x, localPlayer.y - dummy.y) < 58 && localPlayer.vx + localPlayer.vy !== undefined) {
