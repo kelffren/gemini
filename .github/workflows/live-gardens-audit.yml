@@ -32,10 +32,13 @@ jobs:
           grep -q "HEDGE_MID_ALT:6" src/environment/gardens-joins.js
           grep -q "FLOWER_MID_ALT:7" src/environment/gardens-joins.js
           grep -q "HEDGE_V_ALT:8" src/environment/gardens-joins.js
-          grep -q "registry-authored-garden-compositions-v4" src/environment/gardens-compositions.js
+          grep -q "registry-authored-garden-compositions-v5" src/environment/gardens-compositions.js
+          grep -q "registry-authored-fixed-accents-v1" src/environment/gardens-compositions.js
+          grep -q "fixedPlacementCount:FIXED.length" src/environment/gardens-compositions.js
           grep -q "mirrored-authored-vertical-mid-v1" src/environment/gardens-compositions.js
           grep -q "verticalAltUsageCount:2" src/environment/gardens-compositions.js
-          grep -q "world-v1.15" src/environment/world-map.js
+          grep -q "world-v1.16" src/environment/world-map.js
+          grep -q "gardensFixedPlacementMode" src/environment/world-map.js
           grep -q "oriented-authored-corner-v1" src/environment/world-map.js
           grep -q "gardensCornerOrientationCount:4" src/environment/world-map.js
           grep -q "drawGardenRotated" src/environment/world-map.js
