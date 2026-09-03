@@ -4,6 +4,8 @@ import { chromium } from 'playwright';
 const base=process.env.AUDIT_URL||'https://kelffren.github.io/gemini/';
 const expectedJoinMode='authored-garden-endcaps-mid-variants-v3';
 const expectedCompositionMode='registry-authored-garden-compositions-v4';
+const expectedWorldVersion='world-v1.15';
+const expectedCornerMode='oriented-authored-corner-v1';
 fs.mkdirSync('artifacts',{recursive:true});
 
 const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_BIN||'/usr/bin/google-chrome',args:['--no-sandbox','--disable-dev-shm-usage']});
@@ -29,7 +31,7 @@ for(let attempt=1;attempt<=24;attempt++){
       composition:window.KELO_GARDENS_COMPOSITION_AUDIT||null,
       landmark:window.KELO_GARDEN_LANDMARK_AUDIT||null
     }));
-    if(state.joins?.mode===expectedJoinMode&&state.joins?.id==='gardens-joins-v3'&&state.joins?.width===288&&state.joins?.height===32&&state.joins?.columns===9&&state.joins?.tiles?.HEDGE_MID_ALT===6&&state.joins?.tiles?.FLOWER_MID_ALT===7&&state.joins?.tiles?.HEDGE_V_ALT===8&&state.composition?.ready&&state.composition?.mode===expectedCompositionMode&&state.composition?.centerVariationMode==='authored-mid-variant-selection-v2'&&state.composition?.verticalVariationMode==='mirrored-authored-vertical-mid-v1'&&state.composition?.altCenterTileCount===4&&state.composition?.verticalAltUsageCount===2&&state.world?.ready&&state.world?.version==='world-v1.14'&&state.world?.gardensJoinAssetLoaded&&state.landmark?.ready&&!state.landmark?.failed)break;
+    if(state.joins?.mode===expectedJoinMode&&state.joins?.id==='gardens-joins-v3'&&state.joins?.width===288&&state.joins?.height===32&&state.joins?.columns===9&&state.joins?.tiles?.HEDGE_MID_ALT===6&&state.joins?.tiles?.FLOWER_MID_ALT===7&&state.joins?.tiles?.HEDGE_V_ALT===8&&state.composition?.ready&&state.composition?.mode===expectedCompositionMode&&state.composition?.centerVariationMode==='authored-mid-variant-selection-v2'&&state.composition?.verticalVariationMode==='mirrored-authored-vertical-mid-v1'&&state.composition?.altCenterTileCount===4&&state.composition?.verticalAltUsageCount===2&&state.world?.ready&&state.world?.version===expectedWorldVersion&&state.world?.gardensCornerMode===expectedCornerMode&&state.world?.gardensCornerOrientationCount===4&&state.world?.gardensJoinAssetLoaded&&state.landmark?.ready&&!state.landmark?.failed)break;
   }catch(e){console.log(`attempt ${attempt}: ${e.message}`)}
   await page.waitForTimeout(10000);
 }
@@ -40,7 +42,7 @@ await page.waitForTimeout(1800);
 const shot=await page.evaluate(()=>{
   const c=document.getElementById('game-canvas');
   if(!c||typeof camera==='undefined'||typeof localPlayer==='undefined'||typeof render!=='function')return null;
-  localPlayer.x=1660;localPlayer.y=2356;camera.x=1660;camera.y=2356;camera.targetX=1660;camera.targetY=2356;render();
+  localPlayer.x=1240;localPlayer.y=2305;camera.x=1240;camera.y=2305;camera.targetX=1240;camera.targetY=2305;render();
   const px=c.getContext('2d').getImageData(0,0,c.width,c.height).data;let green=0,ivory=0;
   for(let i=0;i<px.length;i+=4){const r=px[i],g=px[i+1],b=px[i+2],a=px[i+3];if(a<200)continue;if(g>110&&g>r*1.35&&g>b*1.15)green++;if(r>195&&g>185&&b>145)ivory++;}
   return{
@@ -62,7 +64,7 @@ await browser.close();
 if(!shot?.dataUrl?.startsWith('data:image/png;base64,'))throw new Error('Gardens variant screenshot missing');
 if(shot.joins?.mode!==expectedJoinMode||shot.joins?.id!=='gardens-joins-v3'||shot.joins?.width!==288||shot.joins?.height!==32||shot.joins?.columns!==9||shot.joins?.tiles?.HEDGE_MID_ALT!==6||shot.joins?.tiles?.FLOWER_MID_ALT!==7||shot.joins?.tiles?.HEDGE_V_ALT!==8)throw new Error(`Join atlas contract invalid: ${JSON.stringify(shot.joins)}`);
 if(!shot.composition?.ready||shot.composition?.mode!==expectedCompositionMode||shot.composition?.centerVariationMode!=='authored-mid-variant-selection-v2'||shot.composition?.verticalVariationMode!=='mirrored-authored-vertical-mid-v1'||shot.composition?.altCenterTileCount!==4||shot.composition?.verticalAltUsageCount!==2)throw new Error(`Composition contract invalid: ${JSON.stringify(shot.composition)}`);
-if(!shot.world?.ready||shot.world?.version!=='world-v1.14'||!shot.world?.gardensJoinAssetLoaded)throw new Error(`World contract invalid: ${JSON.stringify(shot.world)}`);
+if(!shot.world?.ready||shot.world?.version!==expectedWorldVersion||shot.world?.gardensCornerMode!==expectedCornerMode||shot.world?.gardensCornerOrientationCount!==4||!shot.world?.gardensJoinAssetLoaded)throw new Error(`World contract invalid: ${JSON.stringify(shot.world)}`);
 if(!shot.landmark?.ready||shot.landmark?.failed)throw new Error(`Landmark contract invalid: ${JSON.stringify(shot.landmark)}`);
 if(shot.canvas?.cssWidth!==390||shot.canvas?.cssHeight!==844||shot.canvas?.width!==780||shot.canvas?.height!==1688)throw new Error(`Mobile canvas mismatch: ${JSON.stringify(shot.canvas)}`);
 if(shot.ivory<1000||shot.green<5000)throw new Error(`Garden palette evidence weak: ${JSON.stringify({ivory:shot.ivory,green:shot.green})}`);
