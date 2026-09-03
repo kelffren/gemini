@@ -18,7 +18,9 @@ jobs:
           test -f assets/plaza-fountain-back.PNG
           test -f assets/plaza-fountain-front.PNG
           test -f assets/plaza-npcs-v1.svg
+          test -f src/systems/nobility.js
           grep -q "engine-net.js" index.html
+          grep -q "src/systems/nobility.js?v=1" index.html
       - name: Server syntax
         run: node --check server/index.js
       - name: Environment and visual contracts
@@ -32,6 +34,7 @@ jobs:
           node --check src/environment/plaza-depth.js
           node --check src/environment/luxe-compose.js
           node --check src/environment/luxe-kiosk-atlas.js
+          node --check src/systems/nobility.js
           node --check scripts/live-world-audit.mjs
           node --check scripts/live-pavilion-audit.mjs
           node --check scripts/live-fountain-audit.mjs
@@ -42,6 +45,14 @@ jobs:
           node --check engine-h.js
           node --check engine-p.js
           grep -q 'id="toast-container"' index.html
+          grep -q "nobility-v1.1" src/systems/nobility.js
+          grep -q "KC_TO_DONATION = 50000" src/systems/nobility.js
+          grep -q "minDonation: 30000000" src/systems/nobility.js
+          grep -q "minDonation: 100000000" src/systems/nobility.js
+          grep -q "minDonation: 200000000" src/systems/nobility.js
+          grep -q "top: 50" src/systems/nobility.js
+          grep -q "top: 15" src/systems/nobility.js
+          grep -q "top: 3" src/systems/nobility.js
           grep -q "kelo-luxe-v3-style" src/ui/luxe-shell.js
           grep -q -- "--lx-forest:#173f36" src/ui/luxe-shell.js
           grep -q "mode:'luxe-only-v1'" src/environment/luxe-kiosk-atlas.js
