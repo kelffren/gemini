@@ -9,12 +9,7 @@ const browser = await chromium.launch({
   executablePath: process.env.CHROME_BIN || '/usr/bin/google-chrome',
   args: ['--no-sandbox', '--disable-dev-shm-usage']
 });
-const context = await browser.newContext({
-  viewport: { width: 390, height: 844 },
-  deviceScaleFactor: 2,
-  isMobile: true,
-  hasTouch: true
-});
+const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
 const page = await context.newPage();
 const consoleErrors = [], failedRequests = [], httpErrors = [];
 page.on('console', m => { if (m.type() === 'error') consoleErrors.push(m.text()); });
@@ -36,8 +31,7 @@ await page.goto(`${base}?nobility-audit=final-${Date.now()}`, { waitUntil: 'netw
 await page.waitForTimeout(1500);
 
 const result = await page.evaluate(() => {
-  const api = window.KeloNobility;
-  const audit = window.KELO_NOBILITY_AUDIT;
+  const api = window.KeloNobility, audit = window.KELO_NOBILITY_AUDIT;
   if (!api || !audit || typeof STATE === 'undefined') return { ok: false, reason: 'missing runtime contract' };
 
   const original = JSON.parse(JSON.stringify({ gold: STATE.gold, kc: STATE.kc, nobility: STATE.nobility || null }));
@@ -45,44 +39,24 @@ const result = await page.evaluate(() => {
   STATE.kc = 5000;
   STATE.nobility = { donation: 0, donatedToday: 0, donationDay: new Date().toISOString().slice(0, 10), history: [] };
 
-  const start = { donation: api.getDonation(), position: api.getPosition(), rank: api.getRank() };
-  const knightDonation = api.donateGold(30000000);
-  const knight = { donation: api.getDonation(), position: api.getPosition(), rank: api.getRank() };
-  const baronDonation = api.donateKC(1400);
-  const baron = { donation: api.getDonation(), position: api.getPosition(), rank: api.getRank() };
+  const snap = () => ({ donation: api.getDonation(), position: api.getPosition(), rank: api.getRank() });
+  const start = snap();
+  const knightDonation = api.donateGold(30000000); const knight = snap();
+  const baronDonation = api.donateKC(1400); const baron = snap();
+  const toEarl = api.amountToNextRank(); if (toEarl.amount > 0) api.donateGold(toEarl.amount); const earl = snap();
+  const toTop50 = api.amountToNextRank(); if (toTop50.amount > 0) api.donateGold(toTop50.amount); const duke = snap();
+  const toTop15 = api.amountToNextRank(); if (toTop15.amount > 0) api.donateGold(toTop15.amount); const prince = snap();
+  const toTop3 = api.amountToNextRank(); if (toTop3.amount > 0) api.donateGold(toTop3.amount); const king = snap();
 
-  const toTop50 = api.amountToNextRank();
-  if (toTop50.amount > 0) api.donateGold(toTop50.amount);
-  const duke = { donation: api.getDonation(), position: api.getPosition(), rank: api.getRank() };
-  const toTop15 = api.amountToNextRank();
-  if (toTop15.amount > 0) api.donateGold(toTop15.amount);
-  const prince = { donation: api.getDonation(), position: api.getPosition(), rank: api.getRank() };
-  const toTop3 = api.amountToNextRank();
-  if (toTop3.amount > 0) api.donateGold(toTop3.amount);
-  const king = { donation: api.getDonation(), position: api.getPosition(), rank: api.getRank() };
-
-  // Restore user-facing state after the mechanics test.
   STATE.gold = original.gold;
   STATE.kc = original.kc;
   STATE.nobility = original.nobility;
   if (typeof saveState === 'function') saveState();
-
   api.open();
-  return {
-    ok: true,
-    audit,
-    start,
-    knightDonation,
-    knight,
-    baronDonation,
-    baron,
-    duke,
-    prince,
-    king,
+
+  return { ok: true, audit, start, knightDonation, knight, baronDonation, baron, earl, duke, prince, king,
     panelVisible: getComputedStyle(document.getElementById('kelo-nobility')).display !== 'none',
-    menuButton: !!document.getElementById('kelo-nobility-menu-btn'),
-    title: document.title
-  };
+    menuButton: !!document.getElementById('kelo-nobility-menu-btn'), title: document.title };
 });
 
 await page.waitForTimeout(300);
@@ -100,6 +74,7 @@ if (JSON.stringify(result.audit?.rankedTiers) !== JSON.stringify([50,15,3])) thr
 if (!result.panelVisible || !result.menuButton) throw new Error('Nobility UI did not open on mobile');
 if (!result.knightDonation?.ok || result.knight.rank?.id !== 'knight' || result.knight.rank?.power !== 1) throw new Error(`Knight progression failed: ${JSON.stringify(result.knight)}`);
 if (!result.baronDonation?.ok || result.baron.rank?.id !== 'baron' || result.baron.rank?.power !== 3) throw new Error(`Baron progression failed: ${JSON.stringify(result.baron)}`);
+if (result.earl.rank?.id !== 'earl' || result.earl.rank?.power !== 5 || result.earl.donation !== 200000000) throw new Error(`Earl progression failed: ${JSON.stringify(result.earl)}`);
 if (result.duke.position > 50 || result.duke.rank?.id !== 'duke' || result.duke.rank?.power !== 7) throw new Error(`Top 50 progression failed: ${JSON.stringify(result.duke)}`);
 if (result.prince.position > 15 || result.prince.rank?.id !== 'prince' || result.prince.rank?.power !== 9) throw new Error(`Top 15 progression failed: ${JSON.stringify(result.prince)}`);
 if (result.king.position > 3 || result.king.rank?.id !== 'king' || result.king.rank?.power !== 12) throw new Error(`Top 3 progression failed: ${JSON.stringify(result.king)}`);
