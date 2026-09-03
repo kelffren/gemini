@@ -1,29 +1,43 @@
 (function () {
   const raw = new Image();
+  raw.decoding = 'async';
+  if ('fetchPriority' in raw) raw.fetchPriority = 'high';
   let sheet = null, ok = false, FW = 256, FH = 384;
   const COLS = 4;
-  raw.onload = function () {
-    const c = document.createElement('canvas');
-    c.width = raw.width;
-    c.height = raw.height;
-    const g = c.getContext('2d');
-    g.drawImage(raw, 0, 0);
-    const data = g.getImageData(0, 0, c.width, c.height);
-    const d = data.data;
-    for (let i = 0; i < d.length; i += 4) {
-      if (d[i] > 232 && d[i + 1] > 232 && d[i + 2] > 232) d[i + 3] = 0;
-    }
-    g.putImageData(data, 0, 0);
-    sheet = c;
-    FW = c.width / COLS;
-    FH = c.height / 4;
+
+  function useRawSheet() {
+    sheet = raw;
+    FW = raw.width / COLS;
+    FH = raw.height / 4;
     ok = true;
+  }
+
+  function knockWhite() {
+    try {
+      const c = document.createElement('canvas');
+      c.width = raw.width;
+      c.height = raw.height;
+      const g = c.getContext('2d', { willReadFrequently: true });
+      g.drawImage(raw, 0, 0);
+      const data = g.getImageData(0, 0, c.width, c.height);
+      const d = data.data;
+      for (let i = 0; i < d.length; i += 4) {
+        if (d[i] > 232 && d[i + 1] > 232 && d[i + 2] > 232) d[i + 3] = 0;
+      }
+      g.putImageData(data, 0, 0);
+      sheet = c;
+    } catch (e) {}
+  }
+
+  raw.onload = function () {
+    useRawSheet();
+    const later = function () { knockWhite(); };
+    if (typeof requestIdleCallback === 'function') requestIdleCallback(later, { timeout: 900 });
+    else setTimeout(later, 0);
   };
   raw.onerror = function () { console.error('[Kelo hero] production sprite load failed'); };
   raw.src = 'assets/hero.PNG';
 
-  // Legacy fallback for actors that do not yet have update-side visual state.
-  // Local player locomotion is owned by engine-ac and must not mutate here.
   function legacyMovingOf(p) {
     if (p._lx == null) { p._lx = p.x; p._ly = p.y; }
     const dx = p.x - p._lx;
