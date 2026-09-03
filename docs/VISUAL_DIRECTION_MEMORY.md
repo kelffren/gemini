@@ -441,6 +441,17 @@ Kelo World is no longer allowed to remain a single polished plaza floating in a 
 - QA finding reinforced: changing a legacy engine visual requires bumping its script query key in `index.html`; V5.98 loads `engine-o.js?v=95` and `tile-registry.js?v=231` so Pages cannot certify stale visual code.
 - Next visual bottleneck: replace or restyle the procedural circular NPC marker/label family (`Portero`, `Maestro`) without changing NPC interaction/dialogue semantics. Prefer a registry-driven authored NPC marker/body treatment and keep mobile label density restrained.
 
+## Validated Authored Plaza NPC Family — V5.99 / Registry 1.10.23 / 2026-09-03
+- Current Pixadom, Eldria and Thundoria references reinforce a transferable mobile top-down rule: dense social spaces stay readable when destinations and characters have distinct authored silhouettes and labels are restrained instead of permanently competing with scenery. These are density/readability/consistency references only; no external art or layout was copied.
+- Added original transparent `assets/plaza-npcs-v1.svg`, a 288x96 atlas with three 96x96 Plaza NPC visual identities: blue/ivory Portero, forest/gold Joyero and burgundy/ivory Maestro. TileRegistry `1.10.23` owns the atlas, sprite mapping and `styles.plazaNpcs` contract with `mode='registry-authored-npc-visual-v1'` and `labelMode='proximity-name-v1'`.
+- `engine-p.js` now consumes that registry family instead of presenting Plaza NPCs as white-stroked Canvas circles. Existing NPC coordinates, dialogue, Jeweler timing minigame, Maestro trial hookup and reward behavior remain unchanged; the previous circular renderer exists only as an asset-load fallback.
+- Persistent NPC world labels were removed. A name now appears only when the local player is close to or actively talking to that NPC, reducing mobile text competition without changing interaction semantics.
+- Page contract advanced to `Kelo World — V5.99`, with `tile-registry.js?v=232` and `engine-p.js?v=95` to prevent stale Pages certification.
+- Kelo CI and GitHub Pages passed for final validation commit `2a9cc5f33d07574e0ef58e1b0bc2a7594a1a9275`. The complete LIVE mobile workflow also passed at 390x844 CSS / 780x1688 backing canvas: world, NPC, Luxe architecture and layered-fountain audits all succeeded.
+- The first dedicated NPC audit correctly failed because one training-area frame contained Joyero/Maestro but did not actually frame Portero, despite healthy runtime state. The audit was corrected to capture a second Portero-specific frame rather than weakening its pixel gate.
+- Final visible evidence measured 1,016 exact forest NPC pixels and 2,186 burgundy pixels in `live-plaza-npcs.png`, plus 1,501 exact blue Portero pixels in `live-plaza-portero.png`; `fallbackActive=false`, three NPCs were present, and `consoleErrors=[]`, `failedRequests=[]`, `httpErrors=[]`.
+- Manual inspection confirms the three NPCs now read as authored character/role silhouettes rather than debug circles. The same training-area frame exposes the next large mismatch: the brown `Café Oro`/legacy-looking volume and remaining world/player label clutter on the east side now compete more strongly with the refined plaza. The next safe pass should identify the actual renderer/ownership of that visible brown volume or further reduce nonessential label clutter, changing only presentation and preserving gameplay semantics.
+
 ## Non-goals During Visual Passes
 Do not casually alter unrelated systems such as:
 - core movement feel;
