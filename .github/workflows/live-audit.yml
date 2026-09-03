@@ -28,6 +28,7 @@ on:
       - 'assets/rural-props-v1.png'
       - 'assets/rural-landmarks-v1.png'
       - 'scripts/live-world-audit.mjs'
+      - 'scripts/live-rural-audit.mjs'
       - 'scripts/live-pavilion-audit.mjs'
       - 'scripts/live-fountain-audit.mjs'
       - 'scripts/live-npc-audit.mjs'
@@ -67,6 +68,11 @@ jobs:
           AUDIT_URL: https://kelffren.github.io/gemini/
           CHROME_BIN: /usr/bin/google-chrome
         run: node scripts/live-world-audit.mjs
+      - name: Audit authored rural edge density
+        env:
+          AUDIT_URL: https://kelffren.github.io/gemini/
+          CHROME_BIN: /usr/bin/google-chrome
+        run: node scripts/live-rural-audit.mjs
       - name: Audit authored Plaza NPCs
         env:
           AUDIT_URL: https://kelffren.github.io/gemini/
