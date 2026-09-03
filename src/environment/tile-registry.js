@@ -20,6 +20,10 @@
     id:'plaza-nature', src:'assets/plaza-nature-v1.svg?art=192', width:192, height:96,
     spriteWidth:96, spriteHeight:96, columns:2, spriteCount:2
   });
+  const trainingDummyAtlas = Object.freeze({
+    id:'plaza-training-dummy', src:'assets/training-dummy-v1.svg?art=198', width:96, height:96,
+    spriteWidth:96, spriteHeight:96, columns:1, spriteCount:1, family:'training_prop'
+  });
   const ruralSoilAtlas = Object.freeze({
     id:'rural-soil', src:'assets/rural-soil-v1.png?art=160', width:128, height:128,
     tileWidth:TILE, tileHeight:TILE, columns:4
@@ -59,6 +63,10 @@
     Object.freeze({id:'plaza-tree-sw',sprite:1,x:1120,y:1654,w:96,h:96,baseY:1740}),
     Object.freeze({id:'plaza-tree-se',sprite:0,x:1664,y:1654,w:96,h:96,baseY:1740})
   ]);
+  const trainingDummyProp = Object.freeze({
+    id:'training-dummy-plaza',asset:'trainingDummy',x:1532,y:1608,w:96,h:96,baseY:1702,
+    gameplayAnchor:Object.freeze({x:1580,y:1680,radius:22}),visualOnly:true
+  });
 
   const tiles = Object.freeze({
     GRASS_A:0, GRASS_B:1, GRASS_C:2, GRASS_FLOWERS:3,
@@ -113,6 +121,7 @@
   const styles = Object.freeze({
     plazaTransition:Object.freeze({mode:'authored-overlay-atlas',neighbourMask:'TRBL',softenStickerAccents:true}),
     plazaNature:Object.freeze({mode:'authored-transparent-prop-family-v1',depthMode:'actor-base-y-v1',visualOnly:true,collision:false}),
+    trainingDummy:Object.freeze({mode:'registry-authored-training-prop-v1',asset:'trainingDummy',visualOnly:true,preserveGameplayAnchor:true,labelMode:'hp-only-v1'}),
     propDepth:Object.freeze({mode:'y-occlusion-overlay-v1',localActorIntersection:true,frontOccluders:Object.freeze(['fountain','column','tree','lamp'])}),
     architecture:Object.freeze({mode:'authored-layered-raster-v1',depthMode:'building-base-y-occlusion-v1',actorClip:true,prefabContract:'registry-asset-placement-collision-v1',rendererMode:'generic-prefab-list-v1'}),
     districtGround:Object.freeze({mode:'district-profile-v1',profiles:districtGroundStyles,grassMode:'authored-eight-variant-atlas-v1'}),
@@ -140,9 +149,9 @@
     })
   });
   window.KELO_TILE_REGISTRY = Object.freeze({
-    version:'1.10.21', worldTileSize:TILE,
-    atlases:Object.freeze({plaza:atlas,plazaGround:plazaGroundAtlas,transitions:transitionAtlas,grassVariation:grassVariationAtlas,plazaNature:plazaNatureAtlas,ruralSoil:ruralSoilAtlas,ruralProps:ruralPropsAtlas,ruralLandmarks:ruralLandmarksAtlas,ruralNature:ruralNatureAtlas}),
-    architectureAssets,architecturePrefabs,plazaNatureProps,
+    version:'1.10.22', worldTileSize:TILE,
+    atlases:Object.freeze({plaza:atlas,plazaGround:plazaGroundAtlas,transitions:transitionAtlas,grassVariation:grassVariationAtlas,plazaNature:plazaNatureAtlas,trainingDummy:trainingDummyAtlas,ruralSoil:ruralSoilAtlas,ruralProps:ruralPropsAtlas,ruralLandmarks:ruralLandmarksAtlas,ruralNature:ruralNatureAtlas}),
+    architectureAssets,architecturePrefabs,plazaNatureProps,trainingDummyProp,
     tiles,ruralTiles,ruralPropTiles,ruralLandmarkTiles,ruralLandmarkSprites,ruralNatureTiles,ruralNatureSprites,families,transitionMasks,styles
   });
 })();
