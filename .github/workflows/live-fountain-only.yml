@@ -1,0 +1,47 @@
+name: Focused fountain LIVE audit
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/live-fountain-only.yml'
+      - 'src/environment/plaza-depth.js'
+      - 'scripts/live-fountain-audit.mjs'
+      - 'assets/plaza-fountain-back.PNG'
+      - 'assets/plaza-fountain-front.PNG'
+      - 'index.html'
+  workflow_dispatch:
+
+jobs:
+  fountain-live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Resolve fountain contract
+        shell: bash
+        run: |
+          PAGE_TITLE="$(node -e "const fs=require('fs');const s=fs.readFileSync('index.html','utf8');const m=s.match(/<title>([^<]+)<\\/title>/);if(!m)process.exit(2);process.stdout.write(m[1]);")"
+          FOUNTAIN_VERSION="$(node -e "const fs=require('fs');const s=fs.readFileSync('src/environment/plaza-depth.js','utf8');const m=s.match(/version:'(plaza-fountain-[^']+)'/);if(!m)process.exit(2);process.stdout.write(m[1]);")"
+          echo "EXPECTED_TITLE=$PAGE_TITLE" >> "$GITHUB_ENV"
+          echo "EXPECTED_FOUNTAIN=$FOUNTAIN_VERSION" >> "$GITHUB_ENV"
+      - name: Install Playwright
+        run: npm install --no-save playwright@1.55.0
+      - name: Audit fountain on deployed mobile LIVE
+        env:
+          AUDIT_URL: https://kelffren.github.io/gemini/
+          CHROME_BIN: /usr/bin/google-chrome
+        run: node scripts/live-fountain-audit.mjs
+      - name: Upload fountain evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-fountain-audit
+          path: |
+            artifacts/fountain-report.json
+            artifacts/live-fountain-behind.png
+            artifacts/live-fountain-front.png
+          if-no-files-found: error
