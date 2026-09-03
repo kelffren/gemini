@@ -648,6 +648,16 @@ Kelo World is no longer allowed to remain a single polished plaza floating in a 
 - The same static audit leaves six additional masked authored cells as candidates (one SW flowerbed cell and five fixed accents). Continue one confirmed cluster at a time; do not move them wholesale until each candidate is inspected in LIVE context.
 - Next Gardens bottleneck: finish the declared-to-visible cleanup for the remaining confirmed mask conflicts before spending visual budget on new L/T junction art or more decorative density.
 
+
+## Validated Gardens SW Flowerbed Visibility — Compositions v9 / 2026-09-03
+- Fresh reference review kept Pixadom as a density/readability benchmark only: its browser/mobile presentation supports dense authored decoration when circulation remains obvious. Wardmarch (published 10 August 2026) and Emberfen (updated 26 August 2026) reinforce 32x32 modular families, explicit metadata and seam/placement validation rather than adding unverified decorative density. No external art or layout was copied.
+- Repository inspection continued the declared-to-visible audit and confirmed that `flowerbed-sw` was only half-renderable: local cell `[10,14]` resolves to a world cell inside the broad vertical marble road, so `world-map.js` suppresses it while `[9,14]` remains on grass.
+- `gardens-compositions-v9` relocates the two-cell SW flowerbed one cell west to local `[8,14]` + `[9,14]`, preserving the exact two-cell footprint, total authored density, navigation geometry, fountain clearance and all gameplay systems. `navigationConflictFixCount` advances to 8 and `navigationSafeRelocationMode` to `authored-road-clear-placements-v4`.
+- The dedicated Gardens audit now explicitly requires the v9 contract and `relocatedFlowerbedSWAnchor=[8,14]`, and its mobile evidence is centered on the southwest/central region so the corrected cluster is actually visible in the captured frame.
+- Validation passed: Kelo CI run `33807088183`, GitHub Pages run `33807087619`, and Gardens mobile LIVE audit run `33807088219` all completed successfully. LIVE evidence at 390x844 CSS / 780x1688 canvas reported 41 declared cells, 11 compositions, 10 fixed placements, `consoleErrors=[]`, `failedRequests=[]`, and `httpErrors=[]`.
+- Manual inspection of `live-gardens-variants.png` confirms the southwest flowerbed now renders as a complete two-cell pair on grass beside the ivory route. The relocation does not introduce seams, obstruct the route, increase visual density, or reduce hero readability.
+- Remaining declared-to-visible candidates are fixed accents: two WATER cells, the west PLINTH, one STEPPING_STONES cell conflict with road masks, and the east PLINTH is additionally suppressed by the fountain-clearance rectangle. Continue one fixed-accent cluster at a time before adding new L/T junction art.
+
 ## Non-goals During Visual Passes
 Do not casually alter unrelated systems such as:
 - core movement feel;
