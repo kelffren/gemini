@@ -569,6 +569,14 @@ Kelo World is no longer allowed to remain a single polished plaza floating in a 
 - Manual screenshot inspection confirms the grass remains highly readable against ivory marble while large green fields gain a subtle medium-scale rhythm without additional prop clutter.
 - Next bottleneck exposed by the same capture: the repeated single-tile hedge/flower props now look noticeably more blocky and low-detail than the hero and ground materials. Prefer a small authored multi-tile shrub/flowerbed family with stronger silhouettes and depth before increasing vegetation density.
 
+
+## Validated Gardens Organic Props — gardens-kit-v2 / 2026-09-03
+- `src/environment/gardens-atlas.js` keeps the existing 128x64 / eight 32x32 tile contract and the same named tile IDs, but `gardens-kit-v2` redraws hedges, flowerbeds, flower tufts and supporting garden cells with more irregular silhouettes, clustered highlights and grounded shadows. This improves the small-prop quality bar without changing world geometry or gameplay systems.
+- LIVE mobile validation at 390x844 CSS / 780x1688 backing canvas confirmed `gardensMode='authored-organic-garden-overlay-atlas-v2'`, `world-v1.12`, registry runtime `1.11.1`, all required visual assets loaded, and `consoleErrors=[]`, `failedRequests=[]`, `httpErrors=[]`.
+- QA finding: the first audit falsely passed while GitHub Pages/browser cache still served `authored-garden-overlay-atlas-v1`. `scripts/live-gardens-audit.mjs` now cache-busts `gardens-atlas.js` and asserts the exact Gardens atlas mode before accepting convergence or the final capture.
+- Manual inspection confirms better flowerbed volume/color and less rigid hedge silhouettes while preserving mobile readability and negative space around the promenade.
+- Next bottleneck: placement rhythm. Individual garden tiles are improved, but authored framing still relies heavily on isolated 1x1 stamps. The next safe pass should introduce a small modular 2x1/3x1 hedge/flowerbed composition family or registry-authored prefab groupings, keeping road clearance and overall density stable.
+
 ## Non-goals During Visual Passes
 Do not casually alter unrelated systems such as:
 - core movement feel;
