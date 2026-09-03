@@ -9,6 +9,7 @@ on:
       - 'engine-c.js'
       - 'engine-i.js'
       - 'engine-l.js'
+      - 'engine-p.js'
       - 'engine-u.js'
       - 'engine-aa.js'
       - 'src/environment/**'
@@ -18,6 +19,7 @@ on:
       - 'assets/plaza-transitions-v1.png'
       - 'assets/plaza-ground-v1.png'
       - 'assets/plaza-nature-v1.svg'
+      - 'assets/plaza-npcs-v1.svg'
       - 'assets/plaza-fountain-back-v2.svg'
       - 'assets/plaza-fountain-front-v2.svg'
       - 'assets/grass-variation-v1.png'
@@ -27,6 +29,7 @@ on:
       - 'scripts/live-world-audit.mjs'
       - 'scripts/live-pavilion-audit.mjs'
       - 'scripts/live-fountain-audit.mjs'
+      - 'scripts/live-npc-audit.mjs'
       - '.github/workflows/live-audit.yml'
 
 jobs:
@@ -62,6 +65,11 @@ jobs:
           AUDIT_URL: https://kelffren.github.io/gemini/
           CHROME_BIN: /usr/bin/google-chrome
         run: node scripts/live-world-audit.mjs
+      - name: Audit authored Plaza NPCs
+        env:
+          AUDIT_URL: https://kelffren.github.io/gemini/
+          CHROME_BIN: /usr/bin/google-chrome
+        run: node scripts/live-npc-audit.mjs
       - name: Audit authored Luxe architecture
         env:
           AUDIT_URL: https://kelffren.github.io/gemini/
