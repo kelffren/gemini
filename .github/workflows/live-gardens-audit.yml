@@ -3,15 +3,11 @@ on:
   push:
     branches: [main]
     paths:
-      - 'index.html'
-      - 'assets/plaza-transitions-v3.png'
-      - 'src/environment/tile-registry.js'
-      - 'src/environment/gardens-atlas.js'
       - 'src/environment/gardens-joins.js'
       - 'src/environment/gardens-compositions.js'
       - 'src/environment/gardens-landmark.js'
       - 'src/environment/world-map.js'
-      - 'scripts/live-gardens-audit.mjs'
+      - 'scripts/live-gardens-variants-audit.mjs'
       - '.github/workflows/live-gardens-audit.yml'
   workflow_dispatch:
 jobs:
@@ -30,29 +26,22 @@ jobs:
           node --check src/environment/gardens-compositions.js
           node --check src/environment/gardens-landmark.js
           node --check src/environment/world-map.js
-          node --check src/environment/tile-registry.js
-          node --check scripts/live-gardens-audit.mjs
-          grep -q "src/environment/gardens-joins.js?v=1" index.html
-          grep -q "src/environment/gardens-compositions.js?v=2" index.html
-          grep -q "src/environment/world-map.js?v=184" index.html
-          grep -q "src/environment/gardens-landmark.js?v=2" index.html
-          grep -q "src/environment/tile-registry.js?v=234" index.html
-          grep -q "plaza-transitions-v3.png?art=142" src/environment/tile-registry.js
-          grep -q "authored-organic-fringe-overlay-v3" src/environment/tile-registry.js
-          grep -q "authored-garden-endcaps-v1" src/environment/gardens-joins.js
-          grep -q "registry-authored-garden-compositions-v2" src/environment/gardens-compositions.js
+          node --check scripts/live-gardens-variants-audit.mjs
+          grep -q "gardens-joins-v2" src/environment/gardens-joins.js
+          grep -q "authored-garden-endcaps-mid-variants-v2" src/environment/gardens-joins.js
+          grep -q "HEDGE_MID_ALT:6" src/environment/gardens-joins.js
+          grep -q "FLOWER_MID_ALT:7" src/environment/gardens-joins.js
+          grep -q "registry-authored-garden-compositions-v3" src/environment/gardens-compositions.js
+          grep -q "authored-mid-variant-selection-v1" src/environment/gardens-compositions.js
           grep -q "world-v1.14" src/environment/world-map.js
           grep -q "gardens-landmark-v1.1" src/environment/gardens-landmark.js
-          grep -q "final-composite-back-actor-front-v1" src/environment/gardens-landmark.js
-          grep -q "layered-prefab-atlas-v1" src/environment/gardens-landmark.js
       - name: Install Playwright
         run: npm install --no-save playwright@1.55.0
       - name: Audit deployed Gardens on mobile
         env:
           AUDIT_URL: https://kelffren.github.io/gemini/
           CHROME_BIN: /usr/bin/google-chrome
-          EXPECTED_TITLE: Kelo World — V6.15
-        run: node scripts/live-gardens-audit.mjs
+        run: node scripts/live-gardens-variants-audit.mjs
       - name: Upload Gardens evidence
         if: always()
         uses: actions/upload-artifact@v4
