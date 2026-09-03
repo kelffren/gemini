@@ -34,8 +34,8 @@ jobs:
           grep -q "src/systems/nobility-authority.js?v=1" index.html
           grep -q "src/systems/nobility-combat.js?v=1" index.html
           grep -q "src/environment/rural-landmarks.js?v=209" index.html
-          grep -q "src/environment/district-decals-registry.js?v=1" index.html
-          grep -q "src/environment/district-decals.js?v=1" index.html
+          grep -q "src/environment/district-decals-registry.js?v=2" index.html
+          grep -q "src/environment/district-decals.js?v=2" index.html
       - name: Server and nobility syntax
         run: |
           node --check server/index.js
@@ -91,7 +91,8 @@ jobs:
           grep -q "authored-low-profile-edge-clusters-v1" src/environment/rural-landmarks.js
           grep -q "centerClear:true" src/environment/rural-landmarks.js
           grep -q "northRoadClear:true" src/environment/rural-landmarks.js
-          grep -q "registryVersion:'1.11.0'" src/environment/district-decals-registry.js
+          grep -q "registryVersion:'1.11.1'" src/environment/district-decals-registry.js
+          grep -q "cameraBridge:window.camera===camera" src/environment/district-decals-registry.js
           grep -q "authored-placement-layer-v1" src/environment/district-decals-registry.js
           grep -q "placementCount:placements.length" src/environment/district-decals.js
           grep -q "kelo-luxe-v3-style" src/ui/luxe-shell.js
