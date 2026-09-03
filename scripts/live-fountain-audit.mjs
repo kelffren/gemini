@@ -3,6 +3,7 @@ import { chromium } from 'playwright';
 
 const base=process.env.AUDIT_URL||'https://kelffren.github.io/gemini/';
 const expectedTitle=process.env.EXPECTED_TITLE||'';
+const expectedFountain=process.env.EXPECTED_FOUNTAIN||'plaza-fountain-v1.3';
 fs.mkdirSync('artifacts',{recursive:true});
 const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_BIN||'/usr/bin/google-chrome',args:['--no-sandbox','--disable-dev-shm-usage']});
 const context=await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true});
@@ -18,7 +19,7 @@ for(let attempt=1;attempt<=24;attempt++){
   try{
     await page.goto(`${base}?fountain-audit=${Date.now()}-${attempt}`,{waitUntil:'networkidle',timeout:45000});
     const d=await page.evaluate(()=>({title:document.title,fountain:window.KELO_PLAZA_FOUNTAIN_AUDIT||null,plaza:window.KELO_PLAZA_AUDIT||null}));
-    if((!expectedTitle||d.title===expectedTitle)&&d.fountain?.ready&&!d.fountain?.failed&&d.fountain?.version==='plaza-fountain-v1.2'&&d.fountain?.renderWrapped&&d.plaza?.fountainReady){loaded=true;break;}
+    if((!expectedTitle||d.title===expectedTitle)&&d.fountain?.ready&&!d.fountain?.failed&&d.fountain?.version===expectedFountain&&d.fountain?.assetMode==='authored-svg-layer-pair-v2'&&d.fountain?.renderWrapped&&d.plaza?.fountainReady){loaded=true;break;}
   }catch(e){console.log(`attempt ${attempt}: ${e.message}`)}
   await page.waitForTimeout(10000);
 }
@@ -57,7 +58,9 @@ await browser.close();
 
 if(!loaded)throw new Error('LIVE never reached layered fountain contract');
 if(expectedTitle&&state.title!==expectedTitle)throw new Error(`Title mismatch ${state.title} !== ${expectedTitle}`);
+if(state.fountain?.version!==expectedFountain)throw new Error(`Fountain version mismatch ${state.fountain?.version} !== ${expectedFountain}`);
 if(!state.fountain?.ready||state.fountain?.failed||!state.fountain?.backLoaded||!state.fountain?.frontLoaded||!state.fountain?.renderWrapped)throw new Error('Fountain assets/depth compositor not ready');
+if(state.fountain?.assetMode!=='authored-svg-layer-pair-v2')throw new Error(`Fountain asset mode invalid: ${state.fountain?.assetMode}`);
 if(state.fountain?.width!==200||state.fountain?.height!==140||state.fountain?.baseY!==1555||state.fountain?.depthMode!=='final-composite-back-actor-front-v2')throw new Error('Fountain geometry/depth contract invalid');
 if(behind.audit?.lastLocalDepth!=='behind-front-layer'||behind.audit?.lastActorRedraws<1)throw new Error(`Behind depth failed: ${JSON.stringify(behind.audit)}`);
 if(front.audit?.lastLocalDepth!=='in-front-of-front-layer'||front.audit?.lastFrontActorRedraws<1)throw new Error(`Front depth failed: ${JSON.stringify(front.audit)}`);
