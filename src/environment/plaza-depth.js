@@ -4,8 +4,8 @@
   const FOUNTAIN=Object.freeze({
     id:'plaza-fountain-central-v1',
     x:1340,y:1450,w:200,h:140,baseY:1555,
-    back:Object.freeze({src:'assets/fountain-back-v1.png?art=197',width:200,height:140}),
-    front:Object.freeze({src:'assets/fountain-front-v1.png?art=197',width:200,height:140}),
+    back:Object.freeze({src:'assets/plaza-fountain-back-v2.svg?art=198',width:200,height:140}),
+    front:Object.freeze({src:'assets/plaza-fountain-front-v2.svg?art=198',width:200,height:140}),
     collision:Object.freeze({x:1390,y:1492,w:100,h:60})
   });
 
@@ -15,8 +15,9 @@
   }
 
   const audit=window.KELO_PLAZA_FOUNTAIN_AUDIT={
-    version:'plaza-fountain-v1.2',ready:false,backLoaded:false,frontLoaded:false,failed:false,
+    version:'plaza-fountain-v1.3',ready:false,backLoaded:false,frontLoaded:false,failed:false,
     depthMode:'final-composite-back-actor-front-v2',renderWrapped:false,
+    assetMode:'authored-svg-layer-pair-v2',
     x:FOUNTAIN.x,y:FOUNTAIN.y,width:FOUNTAIN.w,height:FOUNTAIN.h,baseY:FOUNTAIN.baseY,
     collision:{...FOUNTAIN.collision},lastLocalDepth:null,lastFrontActorRedraws:0,lastActorRedraws:0,backDrawCount:0,frontDrawCount:0
   };
@@ -29,6 +30,7 @@
     if(window.KELO_PLAZA_AUDIT){
       window.KELO_PLAZA_AUDIT.fountainVersion=audit.version;
       window.KELO_PLAZA_AUDIT.fountainDepthMode=audit.depthMode;
+      window.KELO_PLAZA_AUDIT.fountainAssetMode=audit.assetMode;
       window.KELO_PLAZA_AUDIT.fountainReady=audit.ready;
       window.KELO_PLAZA_AUDIT.fountainLastLocalDepth=audit.lastLocalDepth;
     }
