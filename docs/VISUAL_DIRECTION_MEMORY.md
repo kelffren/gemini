@@ -668,6 +668,15 @@ Kelo World is no longer allowed to remain a single polished plaza floating in a 
 - Manual inspection of the LIVE screenshot confirms both small cyan water accents now appear on grass flanking readable ivory circulation, without seams, path obstruction or loss of hero legibility.
 - Next Gardens bottleneck: three older fixed accents remain candidates for declared-but-nonrenderable placement: the west plinth conflicts with road geometry, the east plinth intersects the fountain-clearance policy, and one stepping-stone placement conflicts with navigation. Continue correcting one confirmed group per pass before adding new decorative density.
 
+
+## Validated Gardens West Plinth Visibility — 2026-09-03 / Compositions v11
+- Runtime inspection confirmed that authored fixed accents can be valid in registry metadata yet never reach the frame: `world-map.js` draws garden overlays only on non-road cells and separately suppresses the east-fountain clearance footprint.
+- The west `PLINTH` at local garden cell `[7,11]` landed on the vertical ivory garden path, so it was fully masked in runtime. It is now relocated to grass at `[5,11]`, preserving one authored tile, the 10 fixed-placement count, the 41 declared-cell count, existing routes, fountain clearance, density and all gameplay systems.
+- `gardens-compositions-v11` uses `registry-authored-garden-compositions-v11`, `authored-road-clear-placements-v6`, `navigationConflictFixCount=11`, and exposes `relocatedWestPlinthAnchor=[5,11]` for regression auditing.
+- LIVE mobile validation passed at 390x844 CSS / 780x1688 backing canvas. The captured frame shows the pale plinth clearly on the west grass pocket beside the ivory circulation without blocking the route; `consoleErrors=[]`, `failedRequests=[]`, and `httpErrors=[]`.
+- QA lesson: the first audit retry incorrectly enabled setup-node npm caching even though this repository has no dependency lockfile; that runner failure was corrected. The Gardens audit now uses a no-lock, no-package-lock Playwright install and completed successfully.
+- Next confirmed placement bottlenecks: the east `PLINTH` remains inside the fountain-clearance suppression region and `STEPPING_STONES` at `[11,16]` remains on the main vertical road. Correct one confirmed dead placement per pass before adding new decoration.
+
 ## Non-goals During Visual Passes
 Do not casually alter unrelated systems such as:
 - core movement feel;
