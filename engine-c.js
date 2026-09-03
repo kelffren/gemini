@@ -130,7 +130,8 @@ render = function() {
   }
   ctx.strokeStyle = '#8b3a3a'; ctx.lineWidth = 4; ctx.strokeRect(0, 0, CONFIG.worldWidth, CONFIG.worldHeight);
   if (Array.isArray(obstacles)) obstacles.forEach(function(b){ if(b) b.noDraw = true; });
-  renderFarm(STATE.farm); renderPlot(STATE.plot, true); renderArena(arenaPvP);
+  if (typeof window.renderFarm === 'function') window.renderFarm(STATE.farm);
+  renderPlot(STATE.plot, true); renderArena(arenaPvP);
   for (const pt of particles) { ctx.fillStyle = pt.color; ctx.globalAlpha = pt.life / pt.maxLife; ctx.beginPath(); ctx.arc(pt.x, pt.y, pt.size * (pt.life / pt.maxLife), 0, Math.PI * 2); ctx.fill(); }
   ctx.globalAlpha = 1;
   if (isPvPActive && arenaPvP.rival) renderAvatar(arenaPvP.rival, false); else simulatedPlayers.forEach(p => renderAvatar(p, false));
