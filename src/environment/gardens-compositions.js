@@ -8,8 +8,8 @@ const C=Object.freeze([
   Object.freeze({id:'south-west-hedge-run',cells:Object.freeze([[7,17,'HEDGE_CAP_L'],[8,17,'HEDGE_H'],[9,17,'HEDGE_CAP_R']])}),
   Object.freeze({id:'south-east-hedge-run',cells:Object.freeze([[15,17,'HEDGE_CAP_L'],[16,17,'HEDGE_H'],[17,17,'HEDGE_MID_ALT'],[18,17,'HEDGE_CAP_R']])}),
   Object.freeze({id:'west-hedge-run',cells:Object.freeze([[5,7,'HEDGE_CAP_T'],[5,8,'HEDGE_V'],[5,9,'HEDGE_CAP_B']])}),
-  Object.freeze({id:'east-upper-hedge-run',cells:Object.freeze([[22,6,'HEDGE_CAP_T'],[22,7,'HEDGE_V'],[22,8,'HEDGE_CAP_B']])}),
-  Object.freeze({id:'east-lower-hedge-run',cells:Object.freeze([[22,14,'HEDGE_CAP_T'],[22,15,'HEDGE_V'],[22,16,'HEDGE_CAP_B']])}),
+  Object.freeze({id:'east-upper-hedge-run',cells:Object.freeze([[22,6,'HEDGE_CAP_T'],[22,7,'HEDGE_V_ALT'],[22,8,'HEDGE_CAP_B']])}),
+  Object.freeze({id:'east-lower-hedge-run',cells:Object.freeze([[22,14,'HEDGE_CAP_T'],[22,15,'HEDGE_V_ALT'],[22,16,'HEDGE_CAP_B']])}),
   Object.freeze({id:'flowerbed-nw',cells:Object.freeze([[7,6,'FLOWER_CAP_L'],[8,6,'FLOWER_CAP_R']])}),
   Object.freeze({id:'flowerbed-ne',cells:Object.freeze([[18,7,'FLOWER_CAP_L'],[19,7,'FLOWER_CAP_R']])}),
   Object.freeze({id:'flowerbed-sw',cells:Object.freeze([[9,14,'FLOWER_CAP_L'],[10,14,'FLOWER_CAP_R']])}),
@@ -18,10 +18,11 @@ const C=Object.freeze([
 const styles=Object.freeze({
   ...R.styles,
   gardensCompositions:Object.freeze({
-    mode:'registry-authored-garden-compositions-v3',
+    mode:'registry-authored-garden-compositions-v4',
     sourceAtlas:G.id,
     joinAtlas:J.id,
-    centerVariationMode:'authored-mid-variant-selection-v1',
+    centerVariationMode:'authored-mid-variant-selection-v2',
+    verticalVariationMode:'mirrored-authored-vertical-mid-v1',
     compositionCount:C.length,
     compositions:C,
     preservePathClearance:true,
@@ -30,13 +31,15 @@ const styles=Object.freeze({
 });
 window.KELO_TILE_REGISTRY=Object.freeze({...R,styles});
 window.KELO_GARDENS_COMPOSITION_AUDIT=Object.freeze({
-  version:'gardens-compositions-v3',
+  version:'gardens-compositions-v4',
   ready:true,
   mode:styles.gardensCompositions.mode,
   centerVariationMode:styles.gardensCompositions.centerVariationMode,
+  verticalVariationMode:styles.gardensCompositions.verticalVariationMode,
   compositionCount:C.length,
   joinAtlas:J.id,
   joinMode:J.mode,
-  altCenterTileCount:2
+  altCenterTileCount:4,
+  verticalAltUsageCount:2
 });
 })();
