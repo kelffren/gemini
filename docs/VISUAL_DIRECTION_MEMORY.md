@@ -430,6 +430,17 @@ Kelo World is no longer allowed to remain a single polished plaza floating in a 
 - QA rule validated: for focal props, readiness flags and draw counters are insufficient; the LIVE gate should verify visible authored material in the exact prop ROI and the screenshot must still be manually inspected.
 - Next visual bottleneck visible in the validated fountain capture is no longer the focal point: the procedural circular NPC markers/labels (`Portero`, `Maestro`) and the `DUMMY` training block/sign now read as the clearest prototype elements beside the authored plaza, fountain and hero sprites. Improve one of those presentation families without changing NPC/training gameplay semantics.
 
+
+## Validated Authored Plaza Training Dummy — V5.98 / Registry 1.10.22 / 2026-09-03
+- Current Pixadom roadmap continues to reinforce a useful Kelo World rule: finish authored environmental design/furnishing and improve decorative/layout variety while keeping mobile usability in scope. Applied here only as a density/readability/consistency principle; no external art or layout was copied.
+- Replaced the Plaza Central training dummy's generic circular-avatar presentation and persistent `DUMMY` ground label with original `assets/training-dummy-v1.svg`, a 96x96 crisp pixel-style wooden/straw target prop using Kelo ivory/gold/forest accents.
+- TileRegistry advanced to `1.10.22` and now owns `atlases.trainingDummy`, `trainingDummyProp`, and `styles.trainingDummy` with `mode='registry-authored-training-prop-v1'`.
+- Gameplay semantics were intentionally preserved: the training target remains exactly at anchor `(1580,1680)` with radius `22`, 80 HP, the same hit/respawn logic and the same Maestro timed-trial integration. `engine-o.js` validates this anchor against TileRegistry before enabling the authored asset and retains a primitive fallback only for load failure.
+- Final deployed commit `451373b03c1d987ee60a443d7b62084eca98df24` passed Kelo CI and GitHub Pages. The complete LIVE mobile workflow passed at 390x844 CSS / 780x1688 backing canvas with registry `1.10.22`, authored plaza/fountain/nature architecture intact and `consoleErrors=[]`, `failedRequests=[]`, `httpErrors=[]`.
+- Manual inspection of the LIVE plaza frame confirms the authored wooden target is visible at the training area and the old `DUMMY` text is gone. The nearby `Maestro` circular NPC marker remains visually dominant and now reads as the clearest remaining prototype element in that corner.
+- QA finding reinforced: changing a legacy engine visual requires bumping its script query key in `index.html`; V5.98 loads `engine-o.js?v=95` and `tile-registry.js?v=231` so Pages cannot certify stale visual code.
+- Next visual bottleneck: replace or restyle the procedural circular NPC marker/label family (`Portero`, `Maestro`) without changing NPC interaction/dialogue semantics. Prefer a registry-driven authored NPC marker/body treatment and keep mobile label density restrained.
+
 ## Non-goals During Visual Passes
 Do not casually alter unrelated systems such as:
 - core movement feel;
