@@ -71,10 +71,9 @@
   const legacyObserver = new MutationObserver(suppressLegacyUI);
   legacyObserver.observe(document.body,{childList:true,subtree:false});
 
-  if (typeof window.renderFarm === 'function' && !window.renderFarm._keloHidden) {
-    window.renderFarm = function () {};
-    window.renderFarm._keloHidden = true;
-  }
+  // The authored rural renderer is now part of the world composition. The old
+  // Luxe prototype used to blank window.renderFarm here, which also suppressed
+  // the modular soil/fence/nature atlases. Leave the active environment hook intact.
 
   function updateGold() {
     const el = document.getElementById('lx-gold');
@@ -111,11 +110,12 @@
   });
 
   window.KELO_LUXE_AUDIT = Object.freeze({
-    version:'luxe-shell-v3.1',
+    version:'luxe-shell-v3.2',
     palette:'forest-ivory-gold',
     hideKwBadge:true,
     hideLocalChip:true,
-    hideFarmOverlay:true,
+    hideFarmOverlay:false,
+    ruralRenderer:'modular-authored-v1',
     legacyHudSuppressed:true
   });
 })();
