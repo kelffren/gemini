@@ -18,8 +18,8 @@ on:
       - 'assets/plaza-transitions-v1.png'
       - 'assets/plaza-ground-v1.png'
       - 'assets/plaza-nature-v1.svg'
-      - 'assets/fountain-back-v1.png'
-      - 'assets/fountain-front-v1.png'
+      - 'assets/plaza-fountain-back-v2.svg'
+      - 'assets/plaza-fountain-front-v2.svg'
       - 'assets/grass-variation-v1.png'
       - 'assets/rural-soil-v1.png'
       - 'assets/rural-props-v1.png'
@@ -47,12 +47,14 @@ jobs:
           ARCH_VERSION="$(node -e "const fs=require('fs');const s=fs.readFileSync('src/environment/luxe-kiosk-atlas.js','utf8');const m=s.match(/KELO_ARCHITECTURE_RENDERER=Object\.freeze\(\{version:'([^']+)'/);if(!m)process.exit(2);process.stdout.write(m[1]);")"
           ARCH_MODE="$(node -e "const fs=require('fs');const s=fs.readFileSync('src/environment/luxe-kiosk-atlas.js','utf8');const m=s.match(/KELO_ARCHITECTURE_RENDERER=Object\.freeze\(\{version:'[^']+',mode:'([^']+)'/);if(!m)process.exit(2);process.stdout.write(m[1]);")"
           PLAZA_VERSION="$(node -e "const fs=require('fs');const s=fs.readFileSync('engine-l.js','utf8');const m=s.match(/version: '([^']+)'/);if(!m)process.exit(2);process.stdout.write(m[1]);")"
+          FOUNTAIN_VERSION="$(node -e "const fs=require('fs');const s=fs.readFileSync('src/environment/plaza-depth.js','utf8');const m=s.match(/version:'(plaza-fountain-[^']+)'/);if(!m)process.exit(2);process.stdout.write(m[1]);")"
           echo "EXPECTED_REGISTRY=$REGISTRY_VERSION" >> "$GITHUB_ENV"
           echo "EXPECTED_WORLD=$WORLD_VERSION" >> "$GITHUB_ENV"
           echo "EXPECTED_TITLE=$PAGE_TITLE" >> "$GITHUB_ENV"
           echo "EXPECTED_ARCHITECTURE_VERSION=$ARCH_VERSION" >> "$GITHUB_ENV"
           echo "EXPECTED_ARCHITECTURE_MODE=$ARCH_MODE" >> "$GITHUB_ENV"
           echo "EXPECTED_PLAZA=$PLAZA_VERSION" >> "$GITHUB_ENV"
+          echo "EXPECTED_FOUNTAIN=$FOUNTAIN_VERSION" >> "$GITHUB_ENV"
       - name: Install Playwright package
         run: npm install --no-save playwright@1.55.0
       - name: Audit deployed mobile world
