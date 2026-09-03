@@ -3,7 +3,7 @@ import { chromium } from 'playwright';
 
 const base=process.env.AUDIT_URL||'https://kelffren.github.io/gemini/';
 const expectedTitle=process.env.EXPECTED_TITLE||'';
-const expectedFountain=process.env.EXPECTED_FOUNTAIN||'plaza-fountain-v1.4';
+const expectedFountain=process.env.EXPECTED_FOUNTAIN||'plaza-fountain-v1.5';
 fs.mkdirSync('artifacts',{recursive:true});
 const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_BIN||'/usr/bin/google-chrome',args:['--no-sandbox','--disable-dev-shm-usage']});
 const context=await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true});
@@ -61,9 +61,9 @@ if(expectedTitle&&state.title!==expectedTitle)throw new Error(`Title mismatch ${
 if(state.fountain?.version!==expectedFountain)throw new Error(`Fountain version mismatch ${state.fountain?.version} !== ${expectedFountain}`);
 if(!state.fountain?.ready||state.fountain?.failed||!state.fountain?.backLoaded||!state.fountain?.frontLoaded||!state.fountain?.renderWrapped)throw new Error('Fountain assets/depth compositor not ready');
 if(state.fountain?.assetMode!=='authored-png-layer-pair-v1')throw new Error(`Fountain asset mode invalid: ${state.fountain?.assetMode}`);
-if(state.fountain?.sourceWidth!==1499||state.fountain?.sourceHeight!==1049)throw new Error('Fountain PNG source dimensions invalid');
+if(state.fountain?.sourceWidth!==1254||state.fountain?.sourceHeight!==1254)throw new Error('Fountain PNG source dimensions invalid');
 if(!String(state.fountain?.backAsset||'').includes('plaza-fountain-back.PNG')||!String(state.fountain?.frontAsset||'').includes('plaza-fountain-front.PNG'))throw new Error('Fountain is not using requested uppercase PNG assets');
-if(state.fountain?.width!==200||state.fountain?.height!==140||state.fountain?.baseY!==1555||state.fountain?.depthMode!=='final-composite-back-actor-front-v2')throw new Error('Fountain geometry/depth contract invalid');
+if(state.fountain?.width!==200||state.fountain?.height!==200||state.fountain?.baseY!==1555||state.fountain?.depthMode!=='final-composite-back-actor-front-v2')throw new Error('Fountain geometry/depth contract invalid');
 if(behind.audit?.lastLocalDepth!=='behind-front-layer'||behind.audit?.lastActorRedraws<1)throw new Error(`Behind depth failed: ${JSON.stringify(behind.audit)}`);
 if(front.audit?.lastLocalDepth!=='in-front-of-front-layer'||front.audit?.lastFrontActorRedraws<1)throw new Error(`Front depth failed: ${JSON.stringify(front.audit)}`);
 if(behind.audit?.backDrawCount<1||behind.audit?.frontDrawCount<1||front.audit?.backDrawCount<1||front.audit?.frontDrawCount<1)throw new Error('Fountain draw counters did not advance');
