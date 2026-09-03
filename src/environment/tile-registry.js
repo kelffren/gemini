@@ -5,7 +5,7 @@
     tileWidth:TILE, tileHeight:TILE, columns:16
   });
   const transitionAtlas = Object.freeze({
-    id:'plaza-transitions', src:'assets/plaza-transitions-v2.png?art=141', width:128, height:128,
+    id:'plaza-transitions', src:'assets/plaza-transitions-v3.png?art=142', width:128, height:128,
     tileWidth:TILE, tileHeight:TILE, columns:4
   });
   const grassVariationAtlas = Object.freeze({
@@ -128,7 +128,7 @@
     0:15,1:0,2:1,3:5,4:2,5:12,6:6,7:9,8:3,9:4,10:13,11:8,12:7,13:11,14:10,15:14
   });
   const styles = Object.freeze({
-    plazaTransition:Object.freeze({mode:'authored-organic-fringe-overlay-v2',neighbourMask:'TRBL',softenStickerAccents:true}),
+    plazaTransition:Object.freeze({mode:'authored-organic-fringe-overlay-v3',neighbourMask:'TRBL',softenStickerAccents:true}),
     plazaNature:Object.freeze({mode:'authored-transparent-prop-family-v1',depthMode:'actor-base-y-v1',visualOnly:true,collision:false}),
     trainingDummy:Object.freeze({mode:'registry-authored-training-prop-v1',asset:'trainingDummy',visualOnly:true,preserveGameplayAnchor:true,labelMode:'hp-only-v1'}),
     plazaNpcs:Object.freeze({mode:'registry-authored-npc-visual-v1',asset:'plazaNpcs',preserveGameplayAnchors:true,labelMode:'proximity-name-v1',visualOnly:true}),
@@ -159,7 +159,7 @@
     })
   });
   window.KELO_TILE_REGISTRY = Object.freeze({
-    version:'1.10.24', worldTileSize:TILE,
+    version:'1.10.25', worldTileSize:TILE,
     atlases:Object.freeze({plaza:atlas,plazaGround:plazaGroundAtlas,transitions:transitionAtlas,grassVariation:grassVariationAtlas,plazaNature:plazaNatureAtlas,trainingDummy:trainingDummyAtlas,plazaNpcs:plazaNpcsAtlas,ruralSoil:ruralSoilAtlas,ruralProps:ruralPropsAtlas,ruralLandmarks:ruralLandmarksAtlas,ruralNature:ruralNatureAtlas}),
     architectureAssets,architecturePrefabs,plazaNatureProps,trainingDummyProp,plazaNpcVisuals,
     tiles,ruralTiles,ruralPropTiles,ruralLandmarkTiles,ruralLandmarkSprites,ruralNatureTiles,ruralNatureSprites,families,transitionMasks,styles
