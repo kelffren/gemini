@@ -11,7 +11,7 @@ const C=Object.freeze([
   Object.freeze({id:'east-upper-hedge-run',cells:Object.freeze([[24,13,'HEDGE_CAP_T'],[24,14,'HEDGE_V_ALT'],[24,15,'HEDGE_CAP_B']])}),
   Object.freeze({id:'east-lower-hedge-run',cells:Object.freeze([[22,14,'HEDGE_CAP_T'],[22,15,'HEDGE_V_ALT'],[22,16,'HEDGE_CAP_B']])}),
   Object.freeze({id:'flowerbed-nw',cells:Object.freeze([[8,8,'FLOWER_CAP_L'],[9,8,'FLOWER_CAP_R']])}),
-  Object.freeze({id:'flowerbed-ne',cells:Object.freeze([[18,7,'FLOWER_CAP_L'],[19,7,'FLOWER_CAP_R']])}),
+  Object.freeze({id:'flowerbed-ne',cells:Object.freeze([[19,13,'FLOWER_CAP_L'],[20,13,'FLOWER_CAP_R']])}),
   Object.freeze({id:'flowerbed-sw',cells:Object.freeze([[9,14,'FLOWER_CAP_L'],[10,14,'FLOWER_CAP_R']])}),
   Object.freeze({id:'flowerbed-se',cells:Object.freeze([[17,14,'FLOWER_CAP_L'],[18,14,'FLOWER_MID_ALT'],[19,14,'FLOWER_CAP_R']])})
 ]);
@@ -24,13 +24,13 @@ const declaredCellCount=C.reduce((n,comp)=>n+comp.cells.length,0)+FIXED.length;
 const styles=Object.freeze({
   ...R.styles,
   gardensCompositions:Object.freeze({
-    mode:'registry-authored-garden-compositions-v7',
+    mode:'registry-authored-garden-compositions-v8',
     sourceAtlas:G.id,
     joinAtlas:J.id,
     centerVariationMode:'authored-mid-variant-selection-v2',
     verticalVariationMode:'mirrored-authored-vertical-mid-v1',
     fixedPlacementMode:'registry-authored-fixed-accents-v1',
-    navigationSafeRelocationMode:'authored-road-clear-placements-v2',
+    navigationSafeRelocationMode:'authored-road-clear-placements-v3',
     compositionCount:C.length,
     fixedPlacementCount:FIXED.length,
     declaredCellCount,
@@ -42,7 +42,7 @@ const styles=Object.freeze({
 });
 window.KELO_TILE_REGISTRY=Object.freeze({...R,styles});
 window.KELO_GARDENS_COMPOSITION_AUDIT=Object.freeze({
-  version:'gardens-compositions-v7',
+  version:'gardens-compositions-v8',
   ready:true,
   mode:styles.gardensCompositions.mode,
   centerVariationMode:styles.gardensCompositions.centerVariationMode,
@@ -56,8 +56,9 @@ window.KELO_GARDENS_COMPOSITION_AUDIT=Object.freeze({
   joinMode:J.mode,
   altCenterTileCount:4,
   verticalAltUsageCount:2,
-  navigationConflictFixCount:5,
+  navigationConflictFixCount:7,
   relocatedEastRunAnchor:Object.freeze([24,13]),
-  relocatedFlowerbedNWAnchor:Object.freeze([8,8])
+  relocatedFlowerbedNWAnchor:Object.freeze([8,8]),
+  relocatedFlowerbedNEAnchor:Object.freeze([19,13])
 });
 })();
