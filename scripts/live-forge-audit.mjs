@@ -12,7 +12,7 @@ page.on('response',r=>{if(r.status()>=400)http.push({url:r.url(),status:r.status
 let ready=false;
 for(let i=0;i<18;i++){
   await page.goto(url+'?forgeAudit='+Date.now(),{waitUntil:'networkidle',timeout:30000});
-  ready=await page.evaluate(()=>document.title.includes('V6.08')&&window.KELO_FORGE_AUDIT?.version==='forge-v1.0'&&window.KELO_EQUIPMENT_AUDIT?.version==='equipment-v1.0'&&window.KELO_ARMOR_AURA_AUDIT?.version==='armor-aura-v1.0');
+  ready=await page.evaluate(()=>/^Kelo World — V6\./.test(document.title)&&window.KELO_FORGE_AUDIT?.version==='forge-v1.0'&&window.KELO_EQUIPMENT_AUDIT?.version==='equipment-v1.0'&&window.KELO_ARMOR_AURA_AUDIT?.version==='armor-aura-v1.0');
   if(ready)break;
   await page.waitForTimeout(10000);
 }
