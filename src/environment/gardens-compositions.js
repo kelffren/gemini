@@ -15,28 +15,38 @@ const C=Object.freeze([
   Object.freeze({id:'flowerbed-sw',cells:Object.freeze([[9,14,'FLOWER_CAP_L'],[10,14,'FLOWER_CAP_R']])}),
   Object.freeze({id:'flowerbed-se',cells:Object.freeze([[17,14,'FLOWER_CAP_L'],[18,14,'FLOWER_MID_ALT'],[19,14,'FLOWER_CAP_R']])})
 ]);
+const FIXED=Object.freeze([
+  Object.freeze([5,4,'HEDGE_CORNER',0]),Object.freeze([22,4,'HEDGE_CORNER',1]),Object.freeze([22,17,'HEDGE_CORNER',2]),Object.freeze([5,17,'HEDGE_CORNER',3]),
+  Object.freeze([12,11,'WATER']),Object.freeze([17,11,'WATER']),Object.freeze([7,11,'PLINTH']),Object.freeze([21,11,'PLINTH']),
+  Object.freeze([11,16,'STEPPING_STONES']),Object.freeze([16,16,'STEPPING_STONES'])
+]);
 const styles=Object.freeze({
   ...R.styles,
   gardensCompositions:Object.freeze({
-    mode:'registry-authored-garden-compositions-v4',
+    mode:'registry-authored-garden-compositions-v5',
     sourceAtlas:G.id,
     joinAtlas:J.id,
     centerVariationMode:'authored-mid-variant-selection-v2',
     verticalVariationMode:'mirrored-authored-vertical-mid-v1',
+    fixedPlacementMode:'registry-authored-fixed-accents-v1',
     compositionCount:C.length,
+    fixedPlacementCount:FIXED.length,
     compositions:C,
+    fixedPlacements:FIXED,
     preservePathClearance:true,
     preserveLandmarkClearance:true
   })
 });
 window.KELO_TILE_REGISTRY=Object.freeze({...R,styles});
 window.KELO_GARDENS_COMPOSITION_AUDIT=Object.freeze({
-  version:'gardens-compositions-v4',
+  version:'gardens-compositions-v5',
   ready:true,
   mode:styles.gardensCompositions.mode,
   centerVariationMode:styles.gardensCompositions.centerVariationMode,
   verticalVariationMode:styles.gardensCompositions.verticalVariationMode,
+  fixedPlacementMode:styles.gardensCompositions.fixedPlacementMode,
   compositionCount:C.length,
+  fixedPlacementCount:FIXED.length,
   joinAtlas:J.id,
   joinMode:J.mode,
   altCenterTileCount:4,
