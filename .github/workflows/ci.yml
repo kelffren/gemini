@@ -15,8 +15,8 @@ jobs:
           test -f engine-net.js
           test -f server/index.js
           test -f server/package.json
-          test -f assets/fountain-back-v1.png
-          test -f assets/fountain-front-v1.png
+          test -f assets/plaza-fountain-back-v2.svg
+          test -f assets/plaza-fountain-front-v2.svg
           grep -q "engine-net.js" index.html
       - name: Server syntax
         run: node --check server/index.js
@@ -47,11 +47,12 @@ jobs:
           grep -q "plazaNature:plazaNatureAtlas" src/environment/tile-registry.js
           grep -q "grassMode:'authored-eight-variant-atlas-v1'" src/environment/tile-registry.js
           grep -q "grassVariationMode:'authored-eight-variant-atlas-v1'" src/environment/world-map.js
-          grep -q "plaza-fountain-v1.2" src/environment/plaza-depth.js
+          grep -q "plaza-fountain-v1.3" src/environment/plaza-depth.js
+          grep -q "authored-svg-layer-pair-v2" src/environment/plaza-depth.js
           grep -q "final-composite-back-actor-front-v2" src/environment/plaza-depth.js
-          grep -q "fountain-back-v1.png" src/environment/plaza-depth.js
-          grep -q "fountain-front-v1.png" src/environment/plaza-depth.js
-          grep -q "plaza-depth.js?v=211" index.html
+          grep -q "plaza-fountain-back-v2.svg" src/environment/plaza-depth.js
+          grep -q "plaza-fountain-front-v2.svg" src/environment/plaza-depth.js
+          grep -q "plaza-depth.js?v=212" index.html
           if ! grep -q 'DISABLED_PROCEDURAL_ART' src/environment/luxe-compose.js; then
             echo 'rejected procedural plaza overlay was reactivated'
             exit 1
@@ -65,15 +66,18 @@ jobs:
             exit 1
           fi
           python3 - <<'PY'
-          import base64, re, struct
-          for path,expected in [('assets/rural-soil-v1.png',(128,128)),('assets/rural-props-v1.png',(128,128)),('assets/rural-landmarks-v1.png',(256,128)),('assets/grass-variation-v1.png',(128,64)),('assets/fountain-back-v1.png',(200,140)),('assets/fountain-front-v1.png',(200,140))]:
+          import base64, re, struct, xml.etree.ElementTree as ET
+          for path,expected in [('assets/rural-soil-v1.png',(128,128)),('assets/rural-props-v1.png',(128,128)),('assets/rural-landmarks-v1.png',(256,128)),('assets/grass-variation-v1.png',(128,64))]:
               header=open(path,'rb').read(26)
               assert header[:8] == b'\x89PNG\r\n\x1a\n'
               size=struct.unpack('>II',header[16:24])
               assert size==expected,(path,size,expected)
-              if path.startswith('assets/fountain-'):
-                  assert header[25] in (4,6),(path,'fountain layer must contain alpha',header[25])
               print('PASS atlas',path,*size)
+          for path in ('assets/plaza-fountain-back-v2.svg','assets/plaza-fountain-front-v2.svg'):
+              root=ET.parse(path).getroot()
+              assert root.attrib.get('width')=='200' and root.attrib.get('height')=='140',(path,root.attrib)
+              assert root.attrib.get('viewBox')=='0 0 200 140',(path,root.attrib)
+              print('PASS authored fountain SVG',path,'200 140')
           source=open('src/environment/rural-nature-atlas.js',encoding='utf-8').read()
           match=re.search(r"data:image/png;base64,([^']+)",source)
           assert match
