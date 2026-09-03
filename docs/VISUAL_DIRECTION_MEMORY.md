@@ -587,6 +587,17 @@ Kelo World is no longer allowed to remain a single polished plaza floating in a 
 - Manual inspection of `live-gardens-marble.png` confirms the grouped hedge rows and multi-cell flowerbeds now read as intentional garden framing rather than mostly isolated 1x1 stamps. The ivory promenade remains unobstructed and the hero silhouette stays clear on mobile.
 - Next Gardens bottleneck exposed by the validated screenshot: the larger hedge/flower groupings improve rhythm, but they still have perfectly tile-aligned straight seams and identical repeated middle cells. The next safe pass should introduce one or two authored hedge/flower end-cap or join variants through the existing modular atlas/registry path, preserving the current composition footprints and density rather than adding more props.
 
+
+## Validated Gardens Mid-Run Variants — Gardens joins v2 / Compositions v3 / 2026-09-03
+- Current public Pixadom material continues to support dense but readable top-down scenes with clear circulation on browser/mobile; recent 32x32 top-down tileset references also reinforce modular variant families and metadata-driven composition rather than more one-off prop stamps. These references informed principles only; no external art or layout was copied.
+- `src/environment/gardens-joins.js` now exposes `gardens-joins-v2`, extending the authored modular join atlas from 192x32 / 6 cells to 256x32 / 8 cells while preserving end-cap IDs 0–5. New named cells `HEDGE_MID_ALT` and `FLOWER_MID_ALT` provide controlled interior variation without changing composition footprints or density.
+- `src/environment/gardens-compositions.js` now exposes `gardens-compositions-v3` / `registry-authored-garden-compositions-v3` with `centerVariationMode='authored-mid-variant-selection-v1'`. The existing 11 authored compositions keep the same coordinates, path clearance and landmark clearance; only selected center cells use the alternate authored variants.
+- The renderer required no new special-case drawing path: `world-map.js` already resolves named composition cells against the modular base/join atlases, validating the intended data-driven architecture.
+- Commit `ae30d43f3e975841f23931b5651a45d35597cec1` passed Kelo CI run `33766614168`; GitHub Pages run `33766612757` completed successfully.
+- Dedicated LIVE mobile audit run `33766614180` passed at 390x844 CSS / 780x1688 backing canvas, validating `gardens-joins-v2`, 256x32 / 8 cells, both alternate center tile IDs, `gardens-compositions-v3`, world `world-v1.14`, the layered fountain landmark and clean diagnostics: `consoleErrors=[]`, `failedRequests=[]`, `httpErrors=[]`.
+- Manual inspection of the LIVE capture confirms the long horizontal hedge and the three-cell flowerbed now have a less mechanical center cadence while their silhouettes, route clearance and overall density remain unchanged. No visible atlas seam or broken edge was introduced.
+- Next bottleneck: the remaining vertical hedge runs still reuse one center vocabulary and the authored garden framing remains strongly axis-aligned. The next safe pass should add restrained vertical/join or corner variation through the same modular registry/composition path before increasing prop density or adding another landmark.
+
 ## Non-goals During Visual Passes
 Do not casually alter unrelated systems such as:
 - core movement feel;
