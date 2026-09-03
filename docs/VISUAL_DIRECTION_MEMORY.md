@@ -637,6 +637,17 @@ Kelo World is no longer allowed to remain a single polished plaza floating in a 
 - The composition audit now exposes `declaredCellCount: 41`, `navigationConflictFixCount: 5`, and `relocatedFlowerbedNWAnchor: [8,8]`; mobile LIVE passed at 390x844 CSS / 780x1688 canvas with no console, failed-request, or HTTP errors after GitHub Pages finished deploying.
 - Continue the visibility audit one confirmed dead cluster at a time before increasing decorative density. Remaining candidates should be rechecked against the current road/landmark masks rather than assumed from registry presence alone.
 
+
+## Validated Gardens NE Flowerbed Visibility — V6.17 / Compositions v8 / 2026-09-03
+- A deterministic declared-vs-renderable audit of the 41 authored Gardens cells against the live `road()` and east-fountain clearance masks identified eight currently masked cells before this pass. The complete two-cell `flowerbed-ne` was confirmed to sit on marble navigation cells at local `[18,7]` and `[19,7]`, so it was registered but visually dead.
+- `gardens-compositions-v8` relocates only that confirmed two-cell flowerbed to the road-clear grass pocket anchored at local `[19,13]`, preserving its exact two-cell footprint, total authored density, navigation geometry, fountain clearance and all gameplay systems. `navigationConflictFixCount` advances from 5 to 7 and `navigationSafeRelocationMode` to `authored-road-clear-placements-v3`.
+- Page build advanced to `Kelo World — V6.17` and the Gardens composition script cache key advanced to `v=4`, preventing normal clients from retaining the prior placement contract.
+- Kelo CI passed on final head `c491a1142194ba202086ba29e485e7a731d3bd06`; GitHub Pages build and deploy both passed. The dedicated Gardens LIVE audit passed at 390x844 CSS / 780x1688 backing canvas with compositions v8, 41 declared cells, the relocated NE anchor `[19,13]`, and `consoleErrors=[]`, `failedRequests=[]`, `httpErrors=[]`.
+- Manual inspection of `live-gardens-variants.png`, framed around the corrected east/central Gardens area, confirms the flowerbed is now visibly composed on grass below the promenade/fountain instead of disappearing under marble. Path readability, fountain clearance and hero readability remain intact.
+- Research remains aligned with Pixadom's current browser/mobile direction and with recent 32x32 modular packs such as Wardmarch/Emberfen: authored density should be data-driven, seam/placement constraints should be explicitly validated, and detail should support rather than compete with circulation. No external art or layout was copied.
+- The same static audit leaves six additional masked authored cells as candidates (one SW flowerbed cell and five fixed accents). Continue one confirmed cluster at a time; do not move them wholesale until each candidate is inspected in LIVE context.
+- Next Gardens bottleneck: finish the declared-to-visible cleanup for the remaining confirmed mask conflicts before spending visual budget on new L/T junction art or more decorative density.
+
 ## Non-goals During Visual Passes
 Do not casually alter unrelated systems such as:
 - core movement feel;
