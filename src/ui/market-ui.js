@@ -86,6 +86,8 @@ function installBackpackDecorator(){
 }
 function open(){if(typeof closeMenu==='function')closeMenu();if(window.KeloBackpackUI)window.KeloBackpackUI.close();if(window.KeloWarehouseUI)window.KeloWarehouseUI.close();tab='mine';selectedListing=null;render();panel().style.display='block';}
 function close(){const r=document.getElementById('kelo-market-v1');if(r)r.style.display='none';selectedListing=null;}
+const previousOpenSocialTool=window.openSocialTool;
+if(typeof previousOpenSocialTool==='function')window.openSocialTool=function(tool){if(tool==='market')return open();return previousOpenSocialTool.apply(this,arguments);};
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',installBackpackDecorator);else installBackpackDecorator();
 setTimeout(decorateBackpack,300);
 window.KeloMarketUI=Object.freeze({version:VERSION,open,close,render,decorateBackpack});
