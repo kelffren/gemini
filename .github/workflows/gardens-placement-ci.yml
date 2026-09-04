@@ -4,6 +4,7 @@ on:
     branches: [main]
     paths:
       - 'assets/gardens-t-junctions-v1.svg'
+      - 'src/environment/gardens-t-junction-registry.js'
       - 'src/environment/world-map.js'
       - 'src/environment/gardens-compositions.js'
       - 'src/environment/gardens-junction-overlay.js'
@@ -12,6 +13,7 @@ on:
   pull_request:
     paths:
       - 'assets/gardens-t-junctions-v1.svg'
+      - 'src/environment/gardens-t-junction-registry.js'
       - 'src/environment/world-map.js'
       - 'src/environment/gardens-compositions.js'
       - 'src/environment/gardens-junction-overlay.js'
@@ -25,10 +27,18 @@ jobs:
       - uses: actions/checkout@v4
       - name: Syntax
         run: |
+          node --check src/environment/gardens-t-junction-registry.js
+          node --check src/environment/gardens-compositions.js
           node --check src/environment/gardens-junction-overlay.js
           node --check scripts/validate-gardens-placements.mjs
           grep -q 'width="128" height="32"' assets/gardens-t-junctions-v1.svg
-          grep -q "gardens-t-junctions-v1" src/environment/gardens-compositions.js
+          grep -q "gardens-t-junction-registry-v1" src/environment/gardens-t-junction-registry.js
+          grep -q "gardensTJunctions" src/environment/gardens-t-junction-registry.js
+          grep -q "firstClassRegistryAtlas:true" src/environment/gardens-t-junction-registry.js
+          grep -q "gardens-compositions-v20" src/environment/gardens-compositions.js
+          grep -q "tJunctionRegistryOwned:true" src/environment/gardens-compositions.js
           grep -q "tJunctionOrientationCount:4" src/environment/gardens-compositions.js
+          grep -q "gardens-junction-overlay-v3" src/environment/gardens-junction-overlay.js
+          grep -q "registryOwned:true" src/environment/gardens-junction-overlay.js
       - name: Declared to renderable Gardens placements
         run: node scripts/validate-gardens-placements.mjs
