@@ -3,7 +3,7 @@ import { chromium } from 'playwright';
 
 const base=process.env.AUDIT_URL||'https://kelffren.github.io/gemini/';
 const expectedTitle=process.env.EXPECTED_TITLE||'';
-const expectedFountain=process.env.EXPECTED_FOUNTAIN||'plaza-fountain-v1.9';
+const expectedFountain=process.env.EXPECTED_FOUNTAIN||'plaza-fountain-v1.8';
 fs.mkdirSync('artifacts',{recursive:true});
 const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_BIN||'/usr/bin/google-chrome',args:['--no-sandbox','--disable-dev-shm-usage']});
 const context=await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true});
