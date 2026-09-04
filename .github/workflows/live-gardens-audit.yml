@@ -44,8 +44,11 @@ jobs:
           grep -q "firstClassRegistryAtlas:true" src/environment/gardens-t-junction-registry.js
           grep -q "gardens-compositions-v20" src/environment/gardens-compositions.js
           grep -q "tJunctionRegistryOwned:true" src/environment/gardens-compositions.js
-          grep -q "environment-layer-stack-v1" src/environment/environment-layer-stack.js
-          grep -q "formal-environment-layer-order-v1" src/environment/environment-layer-stack.js
+          grep -q "environment-layer-stack-v2" src/environment/environment-layer-stack.js
+          grep -q "formal-pre-post-actor-layer-order-v1" src/environment/environment-layer-stack.js
+          grep -q "phase-priority-id-v1" src/environment/environment-layer-stack.js
+          grep -q "priorityTieCount" src/environment/environment-layer-stack.js
+          grep -q "orderIndex" src/environment/environment-layer-stack.js
           grep -q "'props_back'" src/environment/environment-layer-stack.js
           grep -q "gardens-junction-layer-v4" src/environment/gardens-junction-overlay.js
           grep -q "formal-props-back-t-junction-layer-v1" src/environment/gardens-junction-overlay.js
