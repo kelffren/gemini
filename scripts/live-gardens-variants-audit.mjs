@@ -2,13 +2,13 @@ import fs from 'node:fs';
 import { chromium } from 'playwright';
 
 const base=process.env.AUDIT_URL||'https://kelffren.github.io/gemini/';
-const expectedJoinMode='authored-garden-endcaps-mid-variants-v3';
-const expectedCompositionMode='registry-authored-garden-compositions-v15';
-const expectedWorldVersion='world-v1.16';
+const expectedJoinMode='authored-garden-endcaps-mid-variants-v4';
+const expectedCompositionMode='registry-authored-garden-compositions-v16';
+const expectedWorldVersion='world-v1.17';
 const expectedCornerMode='oriented-authored-corner-v1';
-const expectedFixedPlacementMode='registry-authored-fixed-accents-v1';
-const expectedRelocationMode='authored-road-clear-placements-v8';
-const expectedJunctionMode='connected-south-boundaries-v2';
+const expectedFixedPlacementMode='registry-authored-fixed-accents-v2';
+const expectedRelocationMode='authored-road-clear-placements-v9';
+const expectedJunctionMode='connected-south-boundaries-with-t-v3';
 fs.mkdirSync('artifacts',{recursive:true});
 
 const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_BIN||'/usr/bin/google-chrome',args:['--no-sandbox','--disable-dev-shm-usage']});
@@ -25,11 +25,11 @@ page.on('requestfailed',r=>failedRequests.push({url:r.url(),error:r.failure()?.e
 page.on('response',r=>{if(r.status()>=400)httpErrors.push({status:r.status(),url:r.url()})});
 
 function valid(state){
-  const water=state.composition?.relocatedWaterAnchors,westPlinth=state.composition?.relocatedWestPlinthAnchor,eastPlinth=state.composition?.relocatedEastPlinthAnchor,step=state.composition?.relocatedSteppingStoneAnchor,seCorner=state.composition?.southeastJunctionCorner,seRun=state.composition?.southeastHorizontalRunAnchor,swCorner=state.composition?.southwestJunctionCorner,swRun=state.composition?.southwestHorizontalRunAnchor,swVertical=state.composition?.southwestVerticalRunAnchor;
-  return state.joins?.mode===expectedJoinMode&&state.joins?.id==='gardens-joins-v3'&&state.joins?.width===288&&state.joins?.height===32&&state.joins?.columns===9&&state.joins?.tiles?.HEDGE_MID_ALT===6&&state.joins?.tiles?.FLOWER_MID_ALT===7&&state.joins?.tiles?.HEDGE_V_ALT===8&&
-    state.composition?.ready&&state.composition?.mode===expectedCompositionMode&&state.composition?.centerVariationMode==='authored-mid-variant-selection-v2'&&state.composition?.verticalVariationMode==='mirrored-authored-vertical-mid-v1'&&state.composition?.junctionMode===expectedJunctionMode&&state.composition?.connectedJunctionCount===2&&seCorner?.[0]===22&&seCorner?.[1]===17&&seRun?.[0]===18&&seRun?.[1]===17&&swCorner?.[0]===5&&swCorner?.[1]===17&&swRun?.[0]===6&&swRun?.[1]===17&&swVertical?.[0]===5&&swVertical?.[1]===14&&state.composition?.fixedPlacementMode===expectedFixedPlacementMode&&state.composition?.navigationSafeRelocationMode===expectedRelocationMode&&state.composition?.navigationConflictFixCount===13&&
+  const water=state.composition?.relocatedWaterAnchors,westPlinth=state.composition?.relocatedWestPlinthAnchor,eastPlinth=state.composition?.relocatedEastPlinthAnchor,step=state.composition?.relocatedSteppingStoneAnchor,t=state.composition?.southeastTJunctionAnchor,tEnd=state.composition?.southeastTBranchEnd,swCorner=state.composition?.southwestJunctionCorner,swRun=state.composition?.southwestHorizontalRunAnchor,swVertical=state.composition?.southwestVerticalRunAnchor;
+  return state.joins?.mode===expectedJoinMode&&state.joins?.id==='gardens-joins-v4'&&state.joins?.width===288&&state.joins?.height===32&&state.joins?.columns===9&&state.joins?.tiles?.HEDGE_MID_ALT===6&&state.joins?.tiles?.FLOWER_MID_ALT===7&&state.joins?.tiles?.HEDGE_V_ALT===8&&state.joins?.tiles?.HEDGE_T_NWS===-1&&state.joins?.virtualTiles?.HEDGE_T_NWS?.mode==='composite-base-hedge-nws-v1'&&
+    state.composition?.ready&&state.composition?.mode===expectedCompositionMode&&state.composition?.auditRevision==='southeast-t-v1'&&state.composition?.centerVariationMode==='authored-mid-variant-selection-v2'&&state.composition?.verticalVariationMode==='mirrored-authored-vertical-mid-v1'&&state.composition?.junctionMode===expectedJunctionMode&&state.composition?.connectedJunctionCount===3&&state.composition?.tJunctionCount===1&&t?.[0]===22&&t?.[1]===17&&tEnd?.[0]===22&&tEnd?.[1]===18&&swCorner?.[0]===5&&swCorner?.[1]===17&&swRun?.[0]===6&&swRun?.[1]===17&&swVertical?.[0]===5&&swVertical?.[1]===14&&state.composition?.fixedPlacementMode===expectedFixedPlacementMode&&state.composition?.navigationSafeRelocationMode===expectedRelocationMode&&state.composition?.navigationConflictFixCount===14&&
     state.composition?.relocatedEastRunAnchor?.[0]===24&&state.composition?.relocatedEastRunAnchor?.[1]===13&&state.composition?.relocatedFlowerbedNWAnchor?.[0]===8&&state.composition?.relocatedFlowerbedNWAnchor?.[1]===8&&state.composition?.relocatedFlowerbedNEAnchor?.[0]===19&&state.composition?.relocatedFlowerbedNEAnchor?.[1]===13&&state.composition?.relocatedFlowerbedSWAnchor?.[0]===8&&state.composition?.relocatedFlowerbedSWAnchor?.[1]===14&&water?.[0]?.[0]===9&&water?.[0]?.[1]===11&&water?.[1]?.[0]===19&&water?.[1]?.[1]===11&&westPlinth?.[0]===5&&westPlinth?.[1]===11&&eastPlinth?.[0]===25&&eastPlinth?.[1]===11&&step?.[0]===9&&step?.[1]===16&&
-    state.composition?.declaredCellCount===41&&state.composition?.fixedPlacementCount===10&&state.composition?.altCenterTileCount===4&&state.composition?.verticalAltUsageCount===2&&state.world?.ready&&state.world?.version===expectedWorldVersion&&state.world?.gardensCornerMode===expectedCornerMode&&state.world?.gardensCornerOrientationCount===4&&state.world?.gardensFixedPlacementMode===expectedFixedPlacementMode&&state.world?.gardensFixedPlacementCount===10&&state.world?.gardensJoinAssetLoaded&&state.landmark?.ready&&!state.landmark?.failed;
+    state.composition?.declaredCellCount===41&&state.composition?.fixedPlacementCount===9&&state.composition?.altCenterTileCount===4&&state.composition?.verticalAltUsageCount===2&&state.world?.ready&&state.world?.version===expectedWorldVersion&&state.world?.gardensCornerMode===expectedCornerMode&&state.world?.gardensCornerOrientationCount===4&&state.world?.gardensFixedPlacementMode===expectedFixedPlacementMode&&state.world?.gardensFixedPlacementCount===9&&state.world?.gardensJoinAssetLoaded&&state.landmark?.ready&&!state.landmark?.failed;
 }
 
 let state=null,loaded=false;
@@ -44,7 +44,7 @@ for(let attempt=1;attempt<=24;attempt++){
 if(!loaded){
   fs.writeFileSync('artifacts/gardens-variants-report.json',JSON.stringify({loaded,state,consoleErrors,failedRequests,httpErrors},null,2));
   await browser.close();
-  throw new Error(`LIVE never reached Gardens v15 contract: ${JSON.stringify(state)}`);
+  throw new Error(`LIVE never reached Gardens v16 contract: ${JSON.stringify(state)}`);
 }
 
 consoleErrors.length=0;failedRequests.length=0;httpErrors.length=0;
@@ -60,13 +60,13 @@ const shot=await page.evaluate(()=>{
 });
 if(shot?.dataUrl?.startsWith('data:image/png;base64,'))fs.writeFileSync('artifacts/live-gardens-variants.png',Buffer.from(shot.dataUrl.split(',')[1],'base64'));
 const finalState={world:shot?.world,joins:shot?.joins,composition:shot?.composition,landmark:shot?.landmark};
-const report={shot:shot?{world:shot.world,joins:{id:shot.joins?.id,mode:shot.joins?.mode,width:shot.joins?.width,height:shot.joins?.height,columns:shot.joins?.columns,tiles:shot.joins?.tiles},composition:shot.composition,landmark:shot.landmark,canvas:shot.canvas,green:shot.green,ivory:shot.ivory,cyan:shot.cyan}:null,consoleErrors,failedRequests,httpErrors};
+const report={shot:shot?{world:shot.world,joins:{id:shot.joins?.id,mode:shot.joins?.mode,width:shot.joins?.width,height:shot.joins?.height,columns:shot.joins?.columns,tiles:shot.joins?.tiles,virtualTiles:shot.joins?.virtualTiles},composition:shot.composition,landmark:shot.landmark,canvas:shot.canvas,green:shot.green,ivory:shot.ivory,cyan:shot.cyan}:null,consoleErrors,failedRequests,httpErrors};
 fs.writeFileSync('artifacts/gardens-variants-report.json',JSON.stringify(report,null,2));
 console.log(JSON.stringify(report,null,2));
 await browser.close();
 
 if(!shot?.dataUrl?.startsWith('data:image/png;base64,'))throw new Error('Gardens variant screenshot missing');
-if(!valid(finalState))throw new Error(`Final Gardens v15 contract invalid: ${JSON.stringify(finalState)}`);
+if(!valid(finalState))throw new Error(`Final Gardens v16 contract invalid: ${JSON.stringify(finalState)}`);
 if(shot.canvas?.cssWidth!==390||shot.canvas?.cssHeight!==844||shot.canvas?.width!==780||shot.canvas?.height!==1688)throw new Error(`Mobile canvas mismatch: ${JSON.stringify(shot.canvas)}`);
 if(shot.ivory<1000||shot.green<5000||shot.cyan<100)throw new Error(`Garden palette evidence weak: ${JSON.stringify({ivory:shot.ivory,green:shot.green,cyan:shot.cyan})}`);
 if(consoleErrors.length)throw new Error(`Console/page errors: ${JSON.stringify(consoleErrors)}`);
