@@ -5,9 +5,9 @@ if(!R||!G?.tiles||!J?.tiles){console.error('[Kelo gardens compositions] registry
 const C=Object.freeze([
   Object.freeze({id:'north-west-hedge-run',cells:Object.freeze([[6,4,'HEDGE_CAP_L'],[7,4,'HEDGE_H'],[8,4,'HEDGE_CAP_R']])}),
   Object.freeze({id:'north-east-hedge-run',cells:Object.freeze([[16,4,'HEDGE_CAP_L'],[17,4,'HEDGE_MID_ALT'],[18,4,'HEDGE_CAP_R']])}),
-  Object.freeze({id:'south-west-hedge-run',cells:Object.freeze([[7,17,'HEDGE_CAP_L'],[8,17,'HEDGE_H'],[9,17,'HEDGE_CAP_R']])}),
+  Object.freeze({id:'south-west-hedge-run',cells:Object.freeze([[6,17,'HEDGE_CAP_L'],[7,17,'HEDGE_H'],[8,17,'HEDGE_CAP_R']])}),
   Object.freeze({id:'south-east-hedge-run',cells:Object.freeze([[18,17,'HEDGE_CAP_L'],[19,17,'HEDGE_H'],[20,17,'HEDGE_MID_ALT'],[21,17,'HEDGE_CAP_R']])}),
-  Object.freeze({id:'west-hedge-run',cells:Object.freeze([[5,7,'HEDGE_CAP_T'],[5,8,'HEDGE_V'],[5,9,'HEDGE_CAP_B']])}),
+  Object.freeze({id:'west-hedge-run',cells:Object.freeze([[5,14,'HEDGE_CAP_T'],[5,15,'HEDGE_V'],[5,16,'HEDGE_CAP_B']])}),
   Object.freeze({id:'east-upper-hedge-run',cells:Object.freeze([[24,13,'HEDGE_CAP_T'],[24,14,'HEDGE_V_ALT'],[24,15,'HEDGE_CAP_B']])}),
   Object.freeze({id:'east-lower-hedge-run',cells:Object.freeze([[22,14,'HEDGE_CAP_T'],[22,15,'HEDGE_V_ALT'],[22,16,'HEDGE_CAP_B']])}),
   Object.freeze({id:'flowerbed-nw',cells:Object.freeze([[8,8,'FLOWER_CAP_L'],[9,8,'FLOWER_CAP_R']])}),
@@ -24,12 +24,12 @@ const declaredCellCount=C.reduce((n,comp)=>n+comp.cells.length,0)+FIXED.length;
 const styles=Object.freeze({
   ...R.styles,
   gardensCompositions:Object.freeze({
-    mode:'registry-authored-garden-compositions-v14',
+    mode:'registry-authored-garden-compositions-v15',
     sourceAtlas:G.id,
     joinAtlas:J.id,
     centerVariationMode:'authored-mid-variant-selection-v2',
     verticalVariationMode:'mirrored-authored-vertical-mid-v1',
-    junctionMode:'connected-southeast-l-boundary-v1',
+    junctionMode:'connected-south-boundaries-v2',
     fixedPlacementMode:'registry-authored-fixed-accents-v1',
     navigationSafeRelocationMode:'authored-road-clear-placements-v8',
     compositionCount:C.length,
@@ -43,7 +43,7 @@ const styles=Object.freeze({
 });
 window.KELO_TILE_REGISTRY=Object.freeze({...R,styles});
 window.KELO_GARDENS_COMPOSITION_AUDIT=Object.freeze({
-  version:'gardens-compositions-v14',
+  version:'gardens-compositions-v15',
   ready:true,
   mode:styles.gardensCompositions.mode,
   centerVariationMode:styles.gardensCompositions.centerVariationMode,
@@ -59,9 +59,12 @@ window.KELO_GARDENS_COMPOSITION_AUDIT=Object.freeze({
   altCenterTileCount:4,
   verticalAltUsageCount:2,
   navigationConflictFixCount:13,
-  connectedJunctionCount:1,
+  connectedJunctionCount:2,
   southeastJunctionCorner:Object.freeze([22,17]),
   southeastHorizontalRunAnchor:Object.freeze([18,17]),
+  southwestJunctionCorner:Object.freeze([5,17]),
+  southwestHorizontalRunAnchor:Object.freeze([6,17]),
+  southwestVerticalRunAnchor:Object.freeze([5,14]),
   relocatedEastRunAnchor:Object.freeze([24,13]),
   relocatedFlowerbedNWAnchor:Object.freeze([8,8]),
   relocatedFlowerbedNEAnchor:Object.freeze([19,13]),
