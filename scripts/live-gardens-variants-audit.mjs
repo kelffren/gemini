@@ -53,7 +53,7 @@ await page.waitForTimeout(1800);
 const shot=await page.evaluate(()=>{
   const c=document.getElementById('game-canvas');
   if(!c||typeof camera==='undefined'||typeof localPlayer==='undefined'||typeof render!=='function')return null;
-  localPlayer.x=1280;localPlayer.y=2680;camera.x=1280;camera.y=2680;camera.targetX=1280;camera.targetY=2680;render();
+  localPlayer.x=1740;localPlayer.y=2680;camera.x=1740;camera.y=2680;camera.targetX=1740;camera.targetY=2680;render();
   const px=c.getContext('2d').getImageData(0,0,c.width,c.height).data;let green=0,ivory=0,cyan=0;
   for(let i=0;i<px.length;i+=4){const r=px[i],g=px[i+1],b=px[i+2],a=px[i+3];if(a<200)continue;if(g>110&&g>r*1.35&&g>b*1.15)green++;if(r>195&&g>185&&b>145)ivory++;if(b>120&&g>95&&b>r*1.25)cyan++;}
   return{dataUrl:c.toDataURL('image/png'),world:window.KELO_WORLD_AUDIT||null,joins:window.KELO_GARDENS_JOINS||null,composition:window.KELO_GARDENS_COMPOSITION_AUDIT||null,landmark:window.KELO_GARDEN_LANDMARK_AUDIT||null,canvas:{width:c.width,height:c.height,cssWidth:c.clientWidth,cssHeight:c.clientHeight},green,ivory,cyan};
