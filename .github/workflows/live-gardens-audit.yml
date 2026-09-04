@@ -32,16 +32,17 @@ jobs:
           grep -q "HEDGE_MID_ALT:6" src/environment/gardens-joins.js
           grep -q "FLOWER_MID_ALT:7" src/environment/gardens-joins.js
           grep -q "HEDGE_V_ALT:8" src/environment/gardens-joins.js
-          grep -q "registry-authored-garden-compositions-v11" src/environment/gardens-compositions.js
+          grep -q "registry-authored-garden-compositions-v12" src/environment/gardens-compositions.js
           grep -q "registry-authored-fixed-accents-v1" src/environment/gardens-compositions.js
-          grep -q "authored-road-clear-placements-v6" src/environment/gardens-compositions.js
-          grep -q "navigationConflictFixCount:11" src/environment/gardens-compositions.js
+          grep -q "authored-road-clear-placements-v7" src/environment/gardens-compositions.js
+          grep -q "navigationConflictFixCount:12" src/environment/gardens-compositions.js
           grep -q "relocatedEastRunAnchor:Object.freeze(\[24,13\])" src/environment/gardens-compositions.js
           grep -q "relocatedFlowerbedNWAnchor:Object.freeze(\[8,8\])" src/environment/gardens-compositions.js
           grep -q "relocatedFlowerbedNEAnchor:Object.freeze(\[19,13\])" src/environment/gardens-compositions.js
           grep -q "relocatedFlowerbedSWAnchor:Object.freeze(\[8,14\])" src/environment/gardens-compositions.js
           grep -q "relocatedWaterAnchors:Object.freeze(\[Object.freeze(\[9,11\]),Object.freeze(\[19,11\])\])" src/environment/gardens-compositions.js
           grep -q "relocatedWestPlinthAnchor:Object.freeze(\[5,11\])" src/environment/gardens-compositions.js
+          grep -q "relocatedEastPlinthAnchor:Object.freeze(\[25,11\])" src/environment/gardens-compositions.js
           grep -q "declaredCellCount" src/environment/gardens-compositions.js
           grep -q "fixedPlacementCount:FIXED.length" src/environment/gardens-compositions.js
           grep -q "mirrored-authored-vertical-mid-v1" src/environment/gardens-compositions.js
