@@ -27,6 +27,7 @@
   const geometry=e=>({x:e.prefab.x,y:e.prefab.y,w:e.asset.worldWidth,h:e.asset.worldHeight});
   const overlaps=(a,b)=>a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;
   const sameRect=(a,b)=>a&&b&&a.x===b.x&&a.y===b.y&&a.w===b.w&&a.h===b.h;
+  const spatialBounds=()=>entries.map(e=>({id:e.prefab.id,...geometry(e)}));
 
   const LEGACY_PLAZA_PLACEHOLDERS=Object.freeze([
     Object.freeze({x:1150,y:1400,w:120,h:400}),
@@ -90,11 +91,11 @@
   function installEnvironmentLayers(){
     if(!backLayerRegistered){
       if(hasLayer('luxe-architecture-back'))backLayerRegistered=true;
-      else{LAYERS.register({id:'luxe-architecture-back',phase:'props_back',priority:20,required:true,ready:()=>entries.every(e=>e.ready&&!e.failed),draw:drawAll});backLayerRegistered=true;}
+      else{LAYERS.register({id:'luxe-architecture-back',phase:'props_back',priority:20,required:true,ready:()=>entries.every(e=>e.ready&&!e.failed),draw:drawAll,ownership:'architecture-prefabs-v1',bounds:spatialBounds});backLayerRegistered=true;}
     }
     if(!frontLayerRegistered){
       if(hasLayer('luxe-architecture-front'))frontLayerRegistered=true;
-      else{LAYERS.register({id:'luxe-architecture-front',phase:'props_front',priority:20,required:true,ready:()=>entries.every(e=>e.ready&&!e.failed),draw:drawFrontOcclusion});frontLayerRegistered=true;}
+      else{LAYERS.register({id:'luxe-architecture-front',phase:'props_front',priority:20,required:true,ready:()=>entries.every(e=>e.ready&&!e.failed),draw:drawFrontOcclusion,ownership:'architecture-prefabs-v1',bounds:spatialBounds});frontLayerRegistered=true;}
     }
     return backLayerRegistered&&frontLayerRegistered;
   }
@@ -106,7 +107,7 @@
   function install(){installLegacyVisualReplacements();installEnvironmentLayers();}
   install();setTimeout(install,120);setTimeout(install,600);
 
-  window.KELO_ARCHITECTURE_RENDERER=Object.freeze({version:'architecture-prefab-renderer-v1.6',mode:'luxe-only-v1',prefabCount:entries.length,depthMode:STYLE.depthMode,renderMode:'formal-back-front-layer-stack-v1',get ready(){return entries.every(e=>e.ready&&!e.failed);},get rendererWrapped(){return false;},get depthWrapped(){return false;},get environmentLayerStack(){return backLayerRegistered&&frontLayerRegistered;},get backLayerRegistered(){return backLayerRegistered;},get frontLayerRegistered(){return frontLayerRegistered;},get postActorContractPreserved(){return typeof window.KELO_WORLD_RENDERER?.drawPostActors==='function';},getEntry});
+  window.KELO_ARCHITECTURE_RENDERER=Object.freeze({version:'architecture-prefab-renderer-v1.6',mode:'luxe-only-v1',prefabCount:entries.length,depthMode:STYLE.depthMode,renderMode:'formal-back-front-layer-stack-v1',spatialOwnership:'architecture-prefabs-v1',get ready(){return entries.every(e=>e.ready&&!e.failed);},get rendererWrapped(){return false;},get depthWrapped(){return false;},get environmentLayerStack(){return backLayerRegistered&&frontLayerRegistered;},get backLayerRegistered(){return backLayerRegistered;},get frontLayerRegistered(){return frontLayerRegistered;},get postActorContractPreserved(){return typeof window.KELO_WORLD_RENDERER?.drawPostActors==='function';},getEntry});
 
   const luxe=getState('luxeBoutique');
   if(!luxe){console.error('[Kelo architecture] luxe prefab missing');return;}
