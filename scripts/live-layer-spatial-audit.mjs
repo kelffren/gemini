@@ -1,0 +1,67 @@
+import fs from 'node:fs';
+import { chromium } from 'playwright';
+
+const base=process.env.AUDIT_URL||'https://kelffren.github.io/gemini/';
+fs.mkdirSync('artifacts',{recursive:true});
+const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_BIN||'/usr/bin/google-chrome',args:['--no-sandbox','--disable-dev-shm-usage']});
+const context=await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true});
+const page=await context.newPage();
+await page.route(/\/src\/environment\/(environment-layer-stack|plaza-nature|luxe-kiosk-atlas)\.js/,route=>{const u=new URL(route.request().url());u.searchParams.set('spatial-audit-bust',`${Date.now()}-${Math.random()}`);route.continue({url:u.toString()});});
+const consoleErrors=[],failedRequests=[],httpErrors=[];
+page.on('console',m=>{if(m.type()==='error')consoleErrors.push(m.text())});
+page.on('pageerror',e=>consoleErrors.push(`PAGEERROR: ${e.stack||e.message}`));
+page.on('requestfailed',r=>failedRequests.push({url:r.url(),error:r.failure()?.errorText||'failed'}));
+page.on('response',r=>{if(r.status()>=400)httpErrors.push({status:r.status(),url:r.url()})});
+
+function valid(audit){
+  if(!audit||audit.version!=='environment-layer-stack-v2.1'||audit.orderingPolicy!=='phase-priority-id-v1'||audit.spatialPolicy!=='same-phase-priority-aabb-v1')return false;
+  if(audit.priorityTieCount<2||audit.spatialTieCount!==2)return false;
+  const expected=new Set(['props_back:20','props_front:20']);
+  for(const tie of audit.spatialTies||[]){
+    if(!expected.has(tie.key)||tie.overlapCount!==1)return false;
+    const ids=new Set([tie.a,tie.b]);
+    if(!ids.has('luxe-architecture-'+(tie.key.startsWith('props_back')?'back':'front'))||!ids.has('plaza-nature-'+(tie.key.startsWith('props_back')?'back':'front')))return false;
+    if(!tie.overlaps?.some(o=>o.a==='luxe-boutique-central'&&o.b==='plaza-tree-nw'||o.a==='plaza-tree-nw'&&o.b==='luxe-boutique-central'))return false;
+  }
+  const layers=audit.layers||[];
+  const nature=layers.filter(l=>l.id.startsWith('plaza-nature-'));
+  const luxe=layers.filter(l=>l.id.startsWith('luxe-architecture-'));
+  return nature.length===2&&luxe.length===2&&nature.every(l=>l.ownership==='plaza-nature-props-v1'&&l.boundsCount===4)&&luxe.every(l=>l.ownership==='architecture-prefabs-v1'&&l.boundsCount===1);
+}
+
+let audit=null;
+for(let attempt=1;attempt<=24;attempt++){
+  await page.goto(`${base}?layer-spatial-audit=${Date.now()}-${attempt}`,{waitUntil:'networkidle',timeout:45000});
+  await page.waitForTimeout(1000);
+  audit=await page.evaluate(()=>window.KELO_ENVIRONMENT_LAYER_AUDIT||null);
+  if(valid(audit))break;
+  await page.waitForTimeout(10000);
+}
+if(!valid(audit)){
+  fs.writeFileSync('artifacts/layer-spatial-report.json',JSON.stringify({audit,consoleErrors,failedRequests,httpErrors},null,2));
+  await browser.close();
+  throw new Error(`LIVE spatial layer contract not reached: ${JSON.stringify(audit)}`);
+}
+
+consoleErrors.length=0;failedRequests.length=0;httpErrors.length=0;
+await page.goto(`${base}?layer-spatial-audit=final-${Date.now()}`,{waitUntil:'networkidle',timeout:45000});
+await page.waitForTimeout(1400);
+const shot=await page.evaluate(()=>{
+  const c=document.getElementById('game-canvas');
+  if(!c||typeof camera==='undefined'||typeof localPlayer==='undefined'||typeof render!=='function')return null;
+  localPlayer.x=1208;localPlayer.y=1452;camera.x=1208;camera.y=1428;camera.targetX=1208;camera.targetY=1428;render();
+  return {dataUrl:c.toDataURL('image/png'),canvas:{width:c.width,height:c.height,cssWidth:c.clientWidth,cssHeight:c.clientHeight},audit:window.KELO_ENVIRONMENT_LAYER_AUDIT||null,nature:window.KELO_PLAZA_NATURE_AUDIT||null,architecture:window.KELO_ARCHITECTURE_RENDERER||null};
+});
+if(shot?.dataUrl?.startsWith('data:image/png;base64,'))fs.writeFileSync('artifacts/live-layer-spatial-overlap.png',Buffer.from(shot.dataUrl.split(',')[1],'base64'));
+const report={canvas:shot?.canvas,audit:shot?.audit,nature:shot?.nature,architecture:shot?.architecture,consoleErrors,failedRequests,httpErrors};
+fs.writeFileSync('artifacts/layer-spatial-report.json',JSON.stringify(report,null,2));
+console.log(JSON.stringify(report,null,2));
+await browser.close();
+if(!shot?.dataUrl?.startsWith('data:image/png;base64,'))throw new Error('Spatial overlap screenshot missing');
+if(!valid(shot.audit))throw new Error(`Final spatial contract invalid: ${JSON.stringify(shot.audit)}`);
+if(shot.canvas?.cssWidth!==390||shot.canvas?.cssHeight!==844||shot.canvas?.width!==780||shot.canvas?.height!==1688)throw new Error(`Mobile canvas mismatch: ${JSON.stringify(shot.canvas)}`);
+if(!shot.nature?.ready||shot.nature?.failed||shot.nature?.spatialOwnership!=='plaza-nature-props-v1')throw new Error(`Nature spatial ownership invalid: ${JSON.stringify(shot.nature)}`);
+if(!shot.architecture?.ready||shot.architecture?.spatialOwnership!=='architecture-prefabs-v1')throw new Error(`Architecture spatial ownership invalid: ${JSON.stringify(shot.architecture)}`);
+if(consoleErrors.length)throw new Error(`Console/page errors: ${JSON.stringify(consoleErrors)}`);
+if(failedRequests.length)throw new Error(`Failed requests: ${JSON.stringify(failedRequests)}`);
+if(httpErrors.length)throw new Error(`HTTP errors: ${JSON.stringify(httpErrors)}`);
