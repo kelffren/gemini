@@ -25,8 +25,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Syntax
+      - name: Syntax and ownership contracts
         run: |
+          node --check src/environment/world-map.js
           node --check src/environment/gardens-t-junction-registry.js
           node --check src/environment/gardens-compositions.js
           node --check src/environment/gardens-junction-overlay.js
@@ -40,5 +41,11 @@ jobs:
           grep -q "tJunctionOrientationCount:4" src/environment/gardens-compositions.js
           grep -q "gardens-junction-overlay-v3" src/environment/gardens-junction-overlay.js
           grep -q "registryOwned:true" src/environment/gardens-junction-overlay.js
+          grep -q "world-v1.18" src/environment/world-map.js
+          grep -q "legacyTJunctionSpecialCase:false" src/environment/world-map.js
+          if grep -q "HEDGE_T_NWS" src/environment/world-map.js; then
+            echo "Legacy Gardens T-junction special-case returned to world-map.js" >&2
+            exit 1
+          fi
       - name: Declared to renderable Gardens placements
         run: node scripts/validate-gardens-placements.mjs
