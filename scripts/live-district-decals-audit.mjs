@@ -15,8 +15,9 @@ let loaded=false;
 for(let attempt=1;attempt<=24;attempt++){
   try{
     await page.goto(`${base}?district-decals-audit=${Date.now()}-${attempt}`,{waitUntil:'networkidle',timeout:45000});
-    const state=await page.evaluate(()=>({title:document.title,registry:window.KELO_TILE_REGISTRY?.version||null,registryAudit:window.KELO_DISTRICT_DECAL_REGISTRY_AUDIT||null,decals:window.KELO_DISTRICT_DECAL_AUDIT||null,world:window.KELO_WORLD_AUDIT||null}));
-    if((!expectedTitle||state.title===expectedTitle)&&state.registry==='1.11.1'&&state.registryAudit?.cameraBridge===true&&state.decals?.ready&&state.decals?.assetLoaded&&!state.decals?.failed&&state.decals?.placementCount===13&&state.world?.ready){loaded=true;break;}
+    const state=await page.evaluate(()=>({title:document.title,registry:window.KELO_TILE_REGISTRY?.version||null,registryAudit:window.KELO_DISTRICT_DECAL_REGISTRY_AUDIT||null,decals:window.KELO_DISTRICT_DECAL_AUDIT||null,layers:window.KELO_ENVIRONMENT_LAYER_AUDIT||null,world:window.KELO_WORLD_AUDIT||null}));
+    const decalLayer=state.layers?.layers?.find?.(l=>l.id==='district-decals');
+    if((!expectedTitle||state.title===expectedTitle)&&state.registry==='1.11.1'&&state.registryAudit?.cameraBridge===true&&state.decals?.version==='district-decals-v2'&&state.decals?.ready&&state.decals?.assetLoaded&&!state.decals?.failed&&state.decals?.placementCount===13&&state.decals?.rendererWrapper===false&&state.decals?.environmentLayerStack===true&&decalLayer?.phase==='decals_details'&&decalLayer?.ready===true&&state.world?.ready){loaded=true;break;}
   }catch(e){console.log(`attempt ${attempt}: ${e.message}`)}
   await page.waitForTimeout(10000);
 }
@@ -37,16 +38,18 @@ const capture=await page.evaluate(()=>{
     if(r>150&&r<225&&g>115&&g<190&&b<125)brass++;
     if(r<15&&g<15&&b<20)black++;
   }
-  return{dataUrl:c.toDataURL('image/png'),petalPink,petalBlue,leafGreen,brass,black,decals:window.KELO_DISTRICT_DECAL_AUDIT||null,registryAudit:window.KELO_DISTRICT_DECAL_REGISTRY_AUDIT||null,registry:window.KELO_TILE_REGISTRY?.version||null,activeDistrict:window.KELO_WORLD_AUDIT?.activeDistrictLabel||null};
+  const layers=window.KELO_ENVIRONMENT_LAYER_AUDIT||null;
+  return{dataUrl:c.toDataURL('image/png'),petalPink,petalBlue,leafGreen,brass,black,decals:window.KELO_DISTRICT_DECAL_AUDIT||null,registryAudit:window.KELO_DISTRICT_DECAL_REGISTRY_AUDIT||null,layers,decalLayer:layers?.layers?.find?.(l=>l.id==='district-decals')||null,registry:window.KELO_TILE_REGISTRY?.version||null,activeDistrict:window.KELO_WORLD_AUDIT?.activeDistrictLabel||null};
 });
 if(capture?.dataUrl?.startsWith('data:image/png;base64,'))fs.writeFileSync('artifacts/live-district-decals.png',Buffer.from(capture.dataUrl.split(',')[1],'base64'));
-const report={loaded,capture:capture?{petalPink:capture.petalPink,petalBlue:capture.petalBlue,leafGreen:capture.leafGreen,brass:capture.brass,black:capture.black,decals:capture.decals,registryAudit:capture.registryAudit,registry:capture.registry,activeDistrict:capture.activeDistrict}:null,consoleErrors,failedRequests,httpErrors};
+const report={loaded,capture:capture?{petalPink:capture.petalPink,petalBlue:capture.petalBlue,leafGreen:capture.leafGreen,brass:capture.brass,black:capture.black,decals:capture.decals,registryAudit:capture.registryAudit,layers:capture.layers,decalLayer:capture.decalLayer,registry:capture.registry,activeDistrict:capture.activeDistrict}:null,consoleErrors,failedRequests,httpErrors};
 fs.writeFileSync('artifacts/district-decals-report.json',JSON.stringify(report,null,2));
 console.log(JSON.stringify(report,null,2));
 await browser.close();
-if(!loaded)throw new Error('LIVE never reached district decal + camera bridge contract');
+if(!loaded)throw new Error('LIVE never reached district decal layer-stack contract');
 if(!capture?.dataUrl?.startsWith('data:image/png;base64,'))throw new Error('District decal screenshot missing');
-if(capture.registry!=='1.11.1'||capture.registryAudit?.cameraBridge!==true||!capture.decals?.ready||!capture.decals?.assetLoaded||capture.decals?.failed||capture.decals?.mode!=='authored-placement-layer-v1'||capture.decals?.placementCount!==13)throw new Error(`District decal contract invalid: ${JSON.stringify(capture?.decals)}`);
+if(capture.registry!=='1.11.1'||capture.registryAudit?.cameraBridge!==true||capture.decals?.version!=='district-decals-v2'||!capture.decals?.ready||!capture.decals?.assetLoaded||capture.decals?.failed||capture.decals?.mode!=='formal-layer-stack-v1'||capture.decals?.placementCount!==13||capture.decals?.rendererWrapper!==false||capture.decals?.environmentLayerStack!==true)throw new Error(`District decal contract invalid: ${JSON.stringify(capture?.decals)}`);
+if(capture.decalLayer?.phase!=='decals_details'||capture.decalLayer?.ready!==true)throw new Error(`District decal formal layer invalid: ${JSON.stringify(capture?.decalLayer)}`);
 if(capture.activeDistrict!=='gardens')throw new Error(`Camera did not drive world district culling: ${capture.activeDistrict}`);
 if(capture.decals.visiblePlacementCount<1)throw new Error('No authored district decals were visible in Gardens capture');
 if((capture.petalPink+capture.petalBlue)<3)throw new Error(`Garden petal pixels not visible enough: ${JSON.stringify(capture)}`);
