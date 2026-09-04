@@ -8,11 +8,14 @@ on:
       - 'src/systems/container-system.js'
       - 'src/systems/market-escrow-system.js'
       - 'src/ui/backpack-ui.js'
+      - 'src/ui/backpack-fantasy-v1.css'
+      - 'src/ui/modal-input-lock.js'
       - 'src/ui/warehouse-ui.js'
       - 'src/ui/market-ui.js'
       - 'scripts/backpack-system-audit.js'
       - 'scripts/container-system-audit.js'
       - 'scripts/market-escrow-audit.js'
+      - 'scripts/inventory-ui-v2-audit.js'
       - '.github/workflows/backpack-ci.yml'
       - 'index.html'
   pull_request:
@@ -22,11 +25,14 @@ on:
       - 'src/systems/container-system.js'
       - 'src/systems/market-escrow-system.js'
       - 'src/ui/backpack-ui.js'
+      - 'src/ui/backpack-fantasy-v1.css'
+      - 'src/ui/modal-input-lock.js'
       - 'src/ui/warehouse-ui.js'
       - 'src/ui/market-ui.js'
       - 'scripts/backpack-system-audit.js'
       - 'scripts/container-system-audit.js'
       - 'scripts/market-escrow-audit.js'
+      - 'scripts/inventory-ui-v2-audit.js'
       - '.github/workflows/backpack-ci.yml'
       - 'index.html'
   workflow_dispatch:
@@ -44,18 +50,22 @@ jobs:
           node --check src/systems/backpack-system.js
           node --check src/systems/container-system.js
           node --check src/systems/market-escrow-system.js
+          node --check src/ui/modal-input-lock.js
           node --check src/ui/backpack-ui.js
           node --check src/ui/warehouse-ui.js
           node --check src/ui/market-ui.js
           node --check scripts/backpack-system-audit.js
           node --check scripts/container-system-audit.js
           node --check scripts/market-escrow-audit.js
+          node --check scripts/inventory-ui-v2-audit.js
       - name: Backpack mechanics
         run: node scripts/backpack-system-audit.js
       - name: Container mechanics
         run: node scripts/container-system-audit.js
       - name: Market Escrow mechanics
         run: node scripts/market-escrow-audit.js
+      - name: Inventory UI V2 contract
+        run: node scripts/inventory-ui-v2-audit.js
       - name: Integration contract
         run: |
           grep -q "equipment-v1.1.2" src/systems/equipment-system.js
@@ -71,6 +81,8 @@ jobs:
           grep -q "market-escrow-v1.0.0" src/systems/market-escrow-system.js
           grep -q "listingContract:'validate-transfer-create-persist-rollback-v1'" src/systems/market-escrow-system.js
           grep -q "cancelContract:'validate-transfer-close-persist-rollback-v1'" src/systems/market-escrow-system.js
+          grep -q "backpack-ui-v2.0.0" src/ui/backpack-ui.js
+          grep -q "modal-input-lock-v1.0.0" src/ui/modal-input-lock.js
           grep -q "warehouse-ui-v1.0.1" src/ui/warehouse-ui.js
           grep -q "market-ui-v1.0.0" src/ui/market-ui.js
           grep -q "backpackPublishAction:true" src/ui/market-ui.js
