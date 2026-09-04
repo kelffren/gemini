@@ -16,7 +16,7 @@ for(let i=0;i<36;i++){
     const forge=window.KELO_FORGE_AUDIT?.version||'';
     const equipment=window.KELO_EQUIPMENT_AUDIT?.version||'';
     const aura=window.KELO_ARMOR_AURA_AUDIT?.version||'';
-    return /^Kelo World — V6\./.test(document.title)&&forge.startsWith('forge-v1.0')&&equipment.startsWith('equipment-v1.0')&&aura.startsWith('armor-aura-v1.0');
+    return /^Kelo World — V6\./.test(document.title)&&forge.startsWith('forge-v1.0')&&equipment==='equipment-v1.1.2'&&aura.startsWith('armor-aura-v1.0');
   });
   if(ready)break;
   await page.waitForTimeout(10000);
