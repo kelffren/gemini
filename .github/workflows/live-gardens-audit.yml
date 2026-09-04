@@ -5,10 +5,12 @@ on:
     paths:
       - 'assets/gardens-t-junctions-v1.svg'
       - 'src/environment/gardens-joins.js'
+      - 'src/environment/gardens-t-junction-registry.js'
       - 'src/environment/gardens-compositions.js'
       - 'src/environment/gardens-junction-overlay.js'
       - 'src/environment/gardens-landmark.js'
       - 'src/environment/world-map.js'
+      - 'index.html'
       - 'scripts/validate-gardens-placements.mjs'
       - 'scripts/live-gardens-variants-audit.mjs'
       - '.github/workflows/live-gardens-audit.yml'
@@ -26,6 +28,7 @@ jobs:
         run: |
           node --check src/environment/gardens-atlas.js
           node --check src/environment/gardens-joins.js
+          node --check src/environment/gardens-t-junction-registry.js
           node --check src/environment/gardens-compositions.js
           node --check src/environment/gardens-junction-overlay.js
           node --check src/environment/gardens-landmark.js
@@ -34,16 +37,17 @@ jobs:
           node --check scripts/live-gardens-variants-audit.mjs
           grep -q 'width="128" height="32"' assets/gardens-t-junctions-v1.svg
           grep -q "gardens-joins-v5" src/environment/gardens-joins.js
-          grep -q "authored-garden-endcaps-mid-variants-v5" src/environment/gardens-joins.js
           grep -q "virtualTiles:Object.freeze({})" src/environment/gardens-joins.js
-          grep -q "gardens-junction-overlay-only-v1" src/environment/gardens-joins.js
-          grep -q "registry-authored-garden-compositions-v19" src/environment/gardens-compositions.js
-          grep -q "registry-overlay-exclusive-v1" src/environment/gardens-compositions.js
-          grep -q "legacyVirtualTJunctions:false" src/environment/gardens-compositions.js
-          grep -q "declaredCellCount" src/environment/gardens-compositions.js
-          grep -q "gardens-junction-overlay-v2" src/environment/gardens-junction-overlay.js
-          grep -q "legacyVirtualOwnership:false" src/environment/gardens-junction-overlay.js
-          grep -q "ownership:'registry-overlay-exclusive-v1'" src/environment/gardens-junction-overlay.js
+          grep -q "gardens-t-junction-registry-v1" src/environment/gardens-t-junction-registry.js
+          grep -q "firstClassRegistryAtlas:true" src/environment/gardens-t-junction-registry.js
+          grep -q "gardens-compositions-v20" src/environment/gardens-compositions.js
+          grep -q "registry-authored-garden-compositions-v20" src/environment/gardens-compositions.js
+          grep -q "tile-registry-overlay-exclusive-v2" src/environment/gardens-compositions.js
+          grep -q "tJunctionRegistryOwned:true" src/environment/gardens-compositions.js
+          grep -q "gardens-junction-overlay-v3" src/environment/gardens-junction-overlay.js
+          grep -q "registryOwned:true" src/environment/gardens-junction-overlay.js
+          grep -q "ownership:'tile-registry-overlay-exclusive-v2'" src/environment/gardens-junction-overlay.js
+          grep -q "gardens-t-junction-registry.js?v=1" index.html
       - name: Validate declared Gardens placement visibility
         run: node scripts/validate-gardens-placements.mjs
       - name: Install Playwright
