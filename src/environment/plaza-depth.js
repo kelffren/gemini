@@ -22,11 +22,14 @@
     return;
   }
 
+  const backBounds=()=>[{id:FOUNTAIN.id,x:FOUNTAIN.x,y:FOUNTAIN.y,w:FOUNTAIN.w,h:FOUNTAIN.h}];
+  const frontBounds=()=>[{id:FOUNTAIN.id,x:FOUNTAIN.frontX,y:FOUNTAIN.frontY,w:FOUNTAIN.frontW,h:FOUNTAIN.frontH}];
   const audit=window.KELO_PLAZA_FOUNTAIN_AUDIT={
     version:'plaza-fountain-v1.8',ready:false,backLoaded:false,frontLoaded:false,failed:false,
     depthMode:'formal-back-front-layer-stack-v1',renderWrapped:false,environmentLayerStack:true,
     postActorBridgeRestored:false,postActorBridgeAvailable:true,bridgePolicy:'upstream-contract-required-v1',
     backLayer:'props_back',frontLayer:'props_front',backLayerId:'plaza-fountain-back',frontLayerId:'plaza-fountain-front',
+    spatialOwnership:'plaza-fountain-v1',backBoundsCount:1,frontBoundsCount:1,
     assetMode:'authored-png-layer-pair-v1',alignmentMode:'scaled-centered-lower-rim-v1',
     x:FOUNTAIN.x,y:FOUNTAIN.y,width:FOUNTAIN.w,height:FOUNTAIN.h,baseY:FOUNTAIN.baseY,
     frontX:FOUNTAIN.frontX,frontY:FOUNTAIN.frontY,frontWidth:FOUNTAIN.frontW,frontHeight:FOUNTAIN.frontH,frontScale:FOUNTAIN.frontScale,visualHeight:FOUNTAIN.visualHeight,
@@ -100,8 +103,8 @@
   }
 
   try{
-    L.register({id:'plaza-fountain-back',phase:'props_back',priority:10,required:true,ready:()=>audit.backLoaded&&!audit.failed,draw:drawBack});
-    L.register({id:'plaza-fountain-front',phase:'props_front',priority:10,required:true,ready:()=>audit.frontLoaded&&!audit.failed,draw:drawFront});
+    L.register({id:'plaza-fountain-back',phase:'props_back',priority:10,required:true,ready:()=>audit.backLoaded&&!audit.failed,draw:drawBack,ownership:'plaza-fountain-v1',bounds:backBounds});
+    L.register({id:'plaza-fountain-front',phase:'props_front',priority:10,required:true,ready:()=>audit.frontLoaded&&!audit.failed,draw:drawFront,ownership:'plaza-fountain-v1',bounds:frontBounds});
   }catch(err){audit.failed=true;sync();console.error('[Kelo fountain] layer registration failed',err);return;}
 
   sync();
