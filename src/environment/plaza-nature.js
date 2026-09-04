@@ -4,7 +4,7 @@
   const A=R?.atlases?.plazaNature;
   const P=R?.plazaNatureProps;
   const L=window.KELO_ENVIRONMENT_LAYERS;
-  if(!A||!Array.isArray(P)||!R?.styles?.plazaNature||!L||typeof L.register!=='function'){
+  if(!A||!Array.isArray(P)||!R?.styles?.plazaNature||!L||typeof L.register!=='function'||typeof L.drawPostActors!=='function'){
     console.error('[Kelo plaza nature] registry/layer contract missing');
     return;
   }
@@ -12,10 +12,10 @@
   img.decoding='async';
   let ready=false;
   const audit=window.KELO_PLAZA_NATURE_AUDIT={
-    version:'plaza-nature-v2',ready:false,assetLoaded:false,failed:false,propCount:P.length,
-    depthMode:'layer-stack-back-clipped-front-v1',visualOnly:R.styles.plazaNature.visualOnly,
-    registryVersion:R.version,environmentLayerStack:true,backLayer:'props_back',frontClipOcclusion:true,
-    fullActorRedraw:false,layerId:'plaza-nature-back'
+    version:'plaza-nature-v3',ready:false,assetLoaded:false,failed:false,propCount:P.length,
+    depthMode:'formal-back-front-layer-stack-v1',visualOnly:R.styles.plazaNature.visualOnly,
+    registryVersion:R.version,environmentLayerStack:true,backLayer:'props_back',frontLayer:'props_front',frontClipOcclusion:true,
+    fullActorRedraw:false,rendererWrapper:false,backLayerId:'plaza-nature-back',frontLayerId:'plaza-nature-front'
   };
 
   function spriteOrigin(index){return{x:(index%A.columns)*A.spriteWidth,y:Math.floor(index/A.columns)*A.spriteHeight};}
@@ -38,22 +38,21 @@
     if(!ready)return;
     g.save();g.imageSmoothingEnabled=false;P.forEach(prop=>drawProp(g,prop));g.restore();
   }
-  function drawFrontOcclusion(){
+  function drawFrontOcclusion(g){
     if(!ready)return;
     const behind=actors().flatMap(actor=>P.filter(prop=>overlapActor(actor,prop)&&actor.y<prop.baseY).map(prop=>({actor,prop})));
     if(!behind.length)return;
-    const z=window.CONFIG?.zoom||1;
-    ctx.save();
-    ctx.translate(screenW/2,screenH/2);ctx.scale(z,z);ctx.translate(-camera.x,-camera.y);ctx.imageSmoothingEnabled=false;
+    g.save();g.imageSmoothingEnabled=false;
     for(const {actor,prop} of behind){
       const r=Math.max(22,(actor.radius||20)+8);
-      ctx.save();ctx.beginPath();ctx.rect(actor.x-r,actor.y-r*1.8,r*2,r*2.5);ctx.clip();drawProp(ctx,prop);ctx.restore();
+      g.save();g.beginPath();g.rect(actor.x-r,actor.y-r*1.8,r*2,r*2.5);g.clip();drawProp(g,prop);g.restore();
     }
-    ctx.restore();
+    g.restore();
   }
 
   try{
     L.register({id:'plaza-nature-back',phase:'props_back',priority:20,required:true,ready:()=>ready,draw:drawBack});
+    L.register({id:'plaza-nature-front',phase:'props_front',priority:20,required:true,ready:()=>ready,draw:drawFrontOcclusion});
   }catch(err){console.error('[Kelo plaza nature] layer registration failed',err);audit.failed=true;return;}
 
   img.onload=()=>{
@@ -64,8 +63,5 @@
     ready=true;audit.ready=true;audit.assetLoaded=true;
   };
   img.onerror=()=>{console.error('[Kelo plaza nature] asset load failed');audit.failed=true;};
-  img.src=A.src+'&v=2';
-
-  const _render=render;
-  render=function(){_render();drawFrontOcclusion();};
+  img.src=A.src+'&v=3';
 })();
