@@ -15,7 +15,8 @@
     version:'plaza-nature-v3',ready:false,assetLoaded:false,failed:false,propCount:P.length,
     depthMode:'formal-back-front-layer-stack-v1',visualOnly:R.styles.plazaNature.visualOnly,
     registryVersion:R.version,environmentLayerStack:true,backLayer:'props_back',frontLayer:'props_front',frontClipOcclusion:true,
-    fullActorRedraw:false,rendererWrapper:false,backLayerId:'plaza-nature-back',frontLayerId:'plaza-nature-front'
+    fullActorRedraw:false,rendererWrapper:false,backLayerId:'plaza-nature-back',frontLayerId:'plaza-nature-front',
+    spatialOwnership:'plaza-nature-props-v1',boundsCount:P.length
   };
 
   function spriteOrigin(index){return{x:(index%A.columns)*A.spriteWidth,y:Math.floor(index/A.columns)*A.spriteHeight};}
@@ -49,10 +50,11 @@
     }
     g.restore();
   }
+  const spatialBounds=()=>P.map(prop=>({id:prop.id,x:prop.x,y:prop.y,w:prop.w,h:prop.h}));
 
   try{
-    L.register({id:'plaza-nature-back',phase:'props_back',priority:20,required:true,ready:()=>ready,draw:drawBack});
-    L.register({id:'plaza-nature-front',phase:'props_front',priority:20,required:true,ready:()=>ready,draw:drawFrontOcclusion});
+    L.register({id:'plaza-nature-back',phase:'props_back',priority:20,required:true,ready:()=>ready,draw:drawBack,ownership:'plaza-nature-props-v1',bounds:spatialBounds});
+    L.register({id:'plaza-nature-front',phase:'props_front',priority:20,required:true,ready:()=>ready,draw:drawFrontOcclusion,ownership:'plaza-nature-props-v1',bounds:spatialBounds});
   }catch(err){console.error('[Kelo plaza nature] layer registration failed',err);audit.failed=true;return;}
 
   img.onload=()=>{
