@@ -880,6 +880,16 @@ Kelo World is no longer allowed to remain a single polished plaza floating in a 
 - Manual inspection of the LIVE overlap frame confirmed no new seam, clipping or ordering regression; Kelo Luxe, Plaza Nature, marble paths, hero and nearby environment remain readable on mobile.
 - Durable next step: `district-decals` is now the clearest formal environment layer still reporting `ownership='unspecified'` and `boundsCount=0`. Before increasing decorative density, give its 13 registry-authored placements spatial ownership/bounds so the same overlap gate can reason about decals versus future detail/prop families.
 
+
+## Validated 2026-09-04 — District decal spatial ownership
+
+- `district-decals` remains a registry-owned authored microdecal family with the same 13 placements, 32×32 tile size, PNG atlas, render phase `decals_details`, coordinates, visual density and gameplay behavior.
+- The family now declares `ownership: registry-authored-district-decals-v1`; its formal environment layer exposes one conservative 32×32 AABB for each authored placement (`boundsCount: 13`). This makes the decals visible to the same spatial observability used by Plaza Nature, Luxe, the fountain and Gardens T-junctions without changing art or placement.
+- LIVE certification requires the registry audit, district-decal audit and formal layer audit to agree on that ownership and on all 13 bounds. A LIVE run that still serves stale modules with `ownership: unspecified` / `boundsCount: 0` is not considered valid even if the visual screenshot otherwise renders.
+- The initial LIVE run exposed exactly that cache false-green. The district decal module cache keys were advanced and the dedicated LIVE gate was tightened before accepting the result. CI also contained stale literal cache-key assertions and was updated to the validated keys plus static checks for the new spatial contract.
+- Certified mobile evidence at 390×844 CSS / 780×1688 physical pixels showed `visiblePlacementCount: 2` in the Gardens capture, `spatialTieCount: 0`, no new spatial overlaps caused by the decals, and `consoleErrors=[]`, `failedRequests=[]`, `httpErrors=[]`. Visual inspection confirmed the microdecals remain subtle, pixel-crisp and subordinate to the hero/path hierarchy.
+- Architecture consequence: every layer currently registered in `environment-layer-stack-v2.2` now exposes explicit ownership and at least one bound. The next structural gap is lower terrain ownership: the formal stack defines `ground`, `ground_variation`, `transitions` and `paths_floors`, but the LIVE layer list currently begins at `decals_details`; terrain/grass/path passes are therefore the next candidates for incremental formalization rather than adding more decorative density.
+
 ## Non-goals During Visual Passes
 Do not casually alter unrelated systems such as:
 - core movement feel;
