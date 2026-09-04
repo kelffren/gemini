@@ -5,7 +5,7 @@ if(!base||typeof base.draw!=='function'){console.error('[Kelo environment layers
 const PHASES=Object.freeze(['ground','ground_variation','transitions','paths_floors','decals_details','props_back','props_front','vfx_weather_lighting']);
 const POST_ACTOR_PHASES=new Set(['props_front','vfx_weather_lighting']);
 const ORDERING_POLICY='phase-priority-id-v1';
-const SPATIAL_POLICY='same-phase-priority-aabb-v1';
+const SPATIAL_POLICY='same-phase-aabb-priority-resolution-v1';
 const phaseRank=new Map(PHASES.map((name,i)=>[name,i]));
 const layers=[];
 function sortLayers(){layers.sort((a,b)=>(phaseRank.get(a.phase)??999)-(phaseRank.get(b.phase)??999)||(a.priority||0)-(b.priority||0)||a.id.localeCompare(b.id));}
@@ -26,28 +26,33 @@ function priorityTies(){
   for(const layer of layers){const key=`${layer.phase}:${layer.priority}`;const list=groups.get(key)||[];list.push(layer.id);groups.set(key,list);}
   return Array.from(groups.entries()).filter(([,ids])=>ids.length>1).map(([key,ids])=>Object.freeze({key,ids:Object.freeze(ids.slice().sort())}));
 }
-function spatialTies(){
+function spatialOverlaps(){
   const out=[];
   for(let i=0;i<layers.length;i++)for(let j=i+1;j<layers.length;j++){
     const a=layers[i],b=layers[j];
-    if(a.phase!==b.phase||a.priority!==b.priority)continue;
+    if(a.phase!==b.phase)continue;
     const ab=normalizeBounds(a.bounds),bb=normalizeBounds(b.bounds);
     const hits=[];
     for(const x of ab)for(const y of bb)if(overlaps(x,y))hits.push(Object.freeze({a:x.id,b:y.id,x:Math.max(x.x,y.x),y:Math.max(x.y,y.y),w:Math.min(x.x+x.w,y.x+y.w)-Math.max(x.x,y.x),h:Math.min(x.y+x.h,y.y+y.h)-Math.max(x.y,y.y)}));
-    if(hits.length)out.push(Object.freeze({key:`${a.phase}:${a.priority}`,a:a.id,b:b.id,aOwnership:a.ownership,bOwnership:b.ownership,overlapCount:hits.length,overlaps:Object.freeze(hits)}));
+    if(hits.length){
+      const ambiguous=a.priority===b.priority;
+      out.push(Object.freeze({phase:a.phase,a:a.id,b:b.id,aPriority:a.priority,bPriority:b.priority,aOwnership:a.ownership,bOwnership:b.ownership,ambiguous,resolvedBy:ambiguous?'id-tiebreak':'priority',overlapCount:hits.length,overlaps:Object.freeze(hits)}));
+    }
   }
   return out;
 }
 function syncAudit(){
   if(!window.KELO_ENVIRONMENT_LAYER_AUDIT)return;
-  const ties=priorityTies(),spatial=spatialTies();
+  const ties=priorityTies(),spatial=spatialOverlaps(),ambiguous=spatial.filter(x=>x.ambiguous);
   window.KELO_ENVIRONMENT_LAYER_AUDIT.layerCount=layers.length;
   window.KELO_ENVIRONMENT_LAYER_AUDIT.preActorLayerCount=layers.filter(l=>!POST_ACTOR_PHASES.has(l.phase)).length;
   window.KELO_ENVIRONMENT_LAYER_AUDIT.postActorLayerCount=layers.filter(l=>POST_ACTOR_PHASES.has(l.phase)).length;
   window.KELO_ENVIRONMENT_LAYER_AUDIT.priorityTieCount=ties.length;
   window.KELO_ENVIRONMENT_LAYER_AUDIT.priorityTies=ties;
-  window.KELO_ENVIRONMENT_LAYER_AUDIT.spatialTieCount=spatial.length;
-  window.KELO_ENVIRONMENT_LAYER_AUDIT.spatialTies=spatial;
+  window.KELO_ENVIRONMENT_LAYER_AUDIT.spatialOverlapCount=spatial.length;
+  window.KELO_ENVIRONMENT_LAYER_AUDIT.spatialOverlaps=spatial;
+  window.KELO_ENVIRONMENT_LAYER_AUDIT.spatialTieCount=ambiguous.length;
+  window.KELO_ENVIRONMENT_LAYER_AUDIT.spatialTies=ambiguous;
   window.KELO_ENVIRONMENT_LAYER_AUDIT.layers=layers.map((l,index)=>Object.freeze({id:l.id,phase:l.phase,priority:l.priority,required:l.required,ready:!!l.ready(),timing:POST_ACTOR_PHASES.has(l.phase)?'post_actor':'pre_actor',ownership:l.ownership,boundsCount:normalizeBounds(l.bounds).length,orderIndex:index,orderKey:`${String(phaseRank.get(l.phase)).padStart(2,'0')}:${String(l.priority).padStart(4,'0')}:${l.id}`}));
 }
 function drawPhaseSet(g,postActor){
@@ -60,8 +65,8 @@ function draw(g){
   syncAudit();return true;
 }
 function drawPostActors(g){drawPhaseSet(g,true);syncAudit();return true;}
-window.KELO_ENVIRONMENT_LAYER_AUDIT={version:'environment-layer-stack-v2.1',ready:true,mode:'formal-pre-post-actor-layer-order-v1',orderingPolicy:ORDERING_POLICY,spatialPolicy:SPATIAL_POLICY,phases:PHASES,postActorPhases:Array.from(POST_ACTOR_PHASES),layerCount:0,preActorLayerCount:0,postActorLayerCount:0,priorityTieCount:0,priorityTies:[],spatialTieCount:0,spatialTies:[],layers:[]};
-window.KELO_ENVIRONMENT_LAYERS=Object.freeze({version:'environment-layer-stack-v2.1',orderingPolicy:ORDERING_POLICY,spatialPolicy:SPATIAL_POLICY,phases:PHASES,postActorPhases:Object.freeze(Array.from(POST_ACTOR_PHASES)),register:registerLayer,drawPostActors,get layers(){return layers.slice();}});
+window.KELO_ENVIRONMENT_LAYER_AUDIT={version:'environment-layer-stack-v2.2',ready:true,mode:'formal-pre-post-actor-layer-order-v1',orderingPolicy:ORDERING_POLICY,spatialPolicy:SPATIAL_POLICY,phases:PHASES,postActorPhases:Array.from(POST_ACTOR_PHASES),layerCount:0,preActorLayerCount:0,postActorLayerCount:0,priorityTieCount:0,priorityTies:[],spatialOverlapCount:0,spatialOverlaps:[],spatialTieCount:0,spatialTies:[],layers:[]};
+window.KELO_ENVIRONMENT_LAYERS=Object.freeze({version:'environment-layer-stack-v2.2',orderingPolicy:ORDERING_POLICY,spatialPolicy:SPATIAL_POLICY,phases:PHASES,postActorPhases:Object.freeze(Array.from(POST_ACTOR_PHASES)),register:registerLayer,drawPostActors,get layers(){return layers.slice();}});
 window.KELO_WORLD_RENDERER=Object.freeze({draw,drawPostActors,districts:base.districts,chunkSize:base.chunkSize,get ready(){return base.ready&&layers.every(l=>!l.required||l.ready());},environmentLayerStack:true,postActorLayerStack:true});
 syncAudit();
 })();
