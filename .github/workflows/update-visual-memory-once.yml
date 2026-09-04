@@ -1,4 +1,5 @@
 name: Update visual memory once
+# one-shot validated memory append
 on:
   push:
     branches: [main]
