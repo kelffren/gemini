@@ -10,12 +10,18 @@
     }
   }
 
+  function hideLegacyClose(sheet) {
+    const legacy = sheet.querySelector('#inspect-body [onclick="closeInspect()"]');
+    if (legacy) legacy.style.display = 'none';
+  }
+
   function ensureCloseButton() {
     const sheet = document.getElementById('inspect-sheet');
     if (!sheet) return null;
 
     sheet.setAttribute('role', 'dialog');
     sheet.setAttribute('aria-modal', 'true');
+    hideLegacyClose(sheet);
 
     let button = document.getElementById(CLOSE_ID);
     if (!button) {
@@ -77,9 +83,10 @@
   else boot();
 
   window.KELO_PROFILE_CLOSE_AUDIT = Object.freeze({
-    version: 'profile-close-v1.0.0',
+    version: 'profile-close-v1.0.1',
     closeButtonId: CLOSE_ID,
     minTouchTargetPx: 44,
-    tapClose: true
+    tapClose: true,
+    legacyCloseHidden: true
   });
 })();
