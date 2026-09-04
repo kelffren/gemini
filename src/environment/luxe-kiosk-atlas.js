@@ -117,7 +117,7 @@
   function install(){installLegacyVisualReplacements();installWorldLayer();installDepthLayer();}
   install();setTimeout(install,120);setTimeout(install,600);
 
-  window.KELO_ARCHITECTURE_RENDERER=Object.freeze({version:'architecture-prefab-renderer-v1.4',mode:'luxe-only-v1',prefabCount:entries.length,depthMode:STYLE.depthMode,get ready(){return entries.every(e=>e.ready&&!e.failed);},get rendererWrapped(){return rendererWrapped;},get depthWrapped(){return depthWrapped;},get postActorContractPreserved(){return typeof window.KELO_WORLD_RENDERER?.drawPostActors==='function';},getEntry});
+  window.KELO_ARCHITECTURE_RENDERER=Object.freeze({version:'architecture-prefab-renderer-v1.5',mode:'luxe-only-v1',prefabCount:entries.length,depthMode:STYLE.depthMode,get ready(){return entries.every(e=>e.ready&&!e.failed);},get rendererWrapped(){return rendererWrapped;},get depthWrapped(){return depthWrapped;},get postActorContractPreserved(){return typeof window.KELO_WORLD_RENDERER?.drawPostActors==='function';},getEntry});
 
   const luxe=getState('luxeBoutique');
   if(!luxe){console.error('[Kelo architecture] luxe prefab missing');return;}
