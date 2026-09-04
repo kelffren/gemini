@@ -44,6 +44,7 @@ const styles=Object.freeze({
 window.KELO_TILE_REGISTRY=Object.freeze({...R,styles});
 window.KELO_GARDENS_COMPOSITION_AUDIT=Object.freeze({
   version:'gardens-compositions-v15',
+  auditRevision:'southwest-l-v1',
   ready:true,
   mode:styles.gardensCompositions.mode,
   centerVariationMode:styles.gardensCompositions.centerVariationMode,
