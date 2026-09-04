@@ -54,6 +54,7 @@ jobs:
           REGISTRY_VERSION="$(node -e "const fs=require('fs');const s=fs.readFileSync('src/environment/district-decals-registry.js','utf8');const m=s.match(/registryVersion:'([^']+)'/);if(!m)process.exit(2);process.stdout.write(m[1]);")"
           WORLD_VERSION="$(node -e "const fs=require('fs');const s=fs.readFileSync('src/environment/world-map.js','utf8');const m=s.match(/KELO_WORLD_AUDIT=\{version:'([^']+)'/);if(!m)process.exit(2);process.stdout.write(m[1]);")"
           GARDENS_COMPOSITION_MODE="$(node -e "const fs=require('fs');const s=fs.readFileSync('src/environment/gardens-compositions.js','utf8');const m=s.match(/mode:'(registry-authored-garden-compositions-v[^']+)'/);if(!m)process.exit(2);process.stdout.write(m[1]);")"
+          GARDENS_JOIN_MODE="$(node -e "const fs=require('fs');const s=fs.readFileSync('src/environment/gardens-joins.js','utf8');const m=s.match(/mode:'([^']+)'/);if(!m)process.exit(2);process.stdout.write(m[1]);")"
           PAGE_TITLE="$(node -e "const fs=require('fs');const s=fs.readFileSync('index.html','utf8');const m=s.match(/<title>([^<]+)<\\/title>/);if(!m)process.exit(2);process.stdout.write(m[1]);")"
           ARCH_VERSION="$(node -e "const fs=require('fs');const s=fs.readFileSync('src/environment/luxe-kiosk-atlas.js','utf8');const m=s.match(/KELO_ARCHITECTURE_RENDERER=Object\.freeze\(\{version:'([^']+)'/);if(!m)process.exit(2);process.stdout.write(m[1]);")"
           ARCH_MODE="$(node -e "const fs=require('fs');const s=fs.readFileSync('src/environment/luxe-kiosk-atlas.js','utf8');const m=s.match(/KELO_ARCHITECTURE_RENDERER=Object\.freeze\(\{version:'[^']+',mode:'([^']+)'/);if(!m)process.exit(2);process.stdout.write(m[1]);")"
@@ -62,6 +63,7 @@ jobs:
           echo "EXPECTED_REGISTRY=$REGISTRY_VERSION" >> "$GITHUB_ENV"
           echo "EXPECTED_WORLD=$WORLD_VERSION" >> "$GITHUB_ENV"
           echo "EXPECTED_GARDENS_COMPOSITION_MODE=$GARDENS_COMPOSITION_MODE" >> "$GITHUB_ENV"
+          echo "EXPECTED_GARDENS_JOIN_MODE=$GARDENS_JOIN_MODE" >> "$GITHUB_ENV"
           echo "EXPECTED_TITLE=$PAGE_TITLE" >> "$GITHUB_ENV"
           echo "EXPECTED_ARCHITECTURE_VERSION=$ARCH_VERSION" >> "$GITHUB_ENV"
           echo "EXPECTED_ARCHITECTURE_MODE=$ARCH_MODE" >> "$GITHUB_ENV"
@@ -81,6 +83,7 @@ jobs:
           EXPECTED_TITLE: ${{ env.EXPECTED_TITLE }}
           EXPECTED_WORLD_VERSION: ${{ env.EXPECTED_WORLD }}
           EXPECTED_GARDENS_COMPOSITION_MODE: ${{ env.EXPECTED_GARDENS_COMPOSITION_MODE }}
+          EXPECTED_GARDENS_JOIN_MODE: ${{ env.EXPECTED_GARDENS_JOIN_MODE }}
         run: node scripts/live-gardens-audit.mjs
       - name: Audit authored district microdecals
         env:
