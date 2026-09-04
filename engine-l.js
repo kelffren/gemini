@@ -28,6 +28,7 @@
     groundWidth: GROUND_ATLAS.width,
     groundHeight: GROUND_ATLAS.height,
     worldLayerWrapped: false,
+    postActorContractPreserved: false,
     transitionAtlas: TRANSITION_ATLAS.src,
     atlasWidth: ATLAS.width,
     atlasHeight: ATLAS.height,
@@ -183,8 +184,8 @@
     if(worldLayerWrapped)return true;
     const base=window.KELO_WORLD_RENDERER;
     if(!base||typeof base.draw!=='function') return false;
-    if(base.__keloPlazaGround){worldLayerWrapped=true;window.KELO_PLAZA_AUDIT.worldLayerWrapped=true;return true;}
-    window.KELO_WORLD_RENDERER=Object.freeze({
+    if(base.__keloPlazaGround){worldLayerWrapped=true;window.KELO_PLAZA_AUDIT.worldLayerWrapped=true;window.KELO_PLAZA_AUDIT.postActorContractPreserved=typeof base.drawPostActors==='function';return true;}
+    const wrapped={
       __keloPlazaGround:true,
       draw(g){
         const ok=base.draw(g);
@@ -198,8 +199,13 @@
       districts:base.districts,
       chunkSize:base.chunkSize,
       get ready(){return base.ready;}
-    });
+    };
+    if(typeof base.drawPostActors==='function') wrapped.drawPostActors=g=>base.drawPostActors(g);
+    if(base.environmentLayerStack===true) wrapped.environmentLayerStack=true;
+    if(base.postActorLayerStack===true) wrapped.postActorLayerStack=true;
+    window.KELO_WORLD_RENDERER=Object.freeze(wrapped);
     worldLayerWrapped=true;window.KELO_PLAZA_AUDIT.worldLayerWrapped=true;
+    window.KELO_PLAZA_AUDIT.postActorContractPreserved=typeof window.KELO_WORLD_RENDERER.drawPostActors==='function';
     return true;
   }
   installWorldGroundLayer();setTimeout(installWorldGroundLayer,120);setTimeout(installWorldGroundLayer,600);
