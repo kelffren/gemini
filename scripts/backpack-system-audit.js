@@ -11,7 +11,7 @@ vm.runInContext(fs.readFileSync('src/systems/equipment-system.js','utf8'),contex
 vm.runInContext(fs.readFileSync('src/systems/backpack-system.js','utf8'),context,{filename:'backpack-system.js'});
 const E=context.KeloEquipment,B=context.KeloBackpack;
 assert(E&&B,'systems must boot');
-assert.equal(E.version,'equipment-v1.1.1');
+assert.equal(E.version,'equipment-v1.1.2');
 assert.equal(B.version,'backpack-v1.1.0');
 assert.equal(B.getStats().capacity,20);
 assert.equal(E.getEquipped().length,9,'starter equipment begins equipped');
