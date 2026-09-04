@@ -7,6 +7,7 @@ on:
       - 'src/environment/gardens-joins.js'
       - 'src/environment/gardens-t-junction-registry.js'
       - 'src/environment/gardens-compositions.js'
+      - 'src/environment/environment-layer-stack.js'
       - 'src/environment/gardens-junction-overlay.js'
       - 'src/environment/gardens-landmark.js'
       - 'src/environment/world-map.js'
@@ -30,6 +31,7 @@ jobs:
           node --check src/environment/gardens-joins.js
           node --check src/environment/gardens-t-junction-registry.js
           node --check src/environment/gardens-compositions.js
+          node --check src/environment/environment-layer-stack.js
           node --check src/environment/gardens-junction-overlay.js
           node --check src/environment/gardens-landmark.js
           node --check src/environment/world-map.js
@@ -41,13 +43,16 @@ jobs:
           grep -q "gardens-t-junction-registry-v1" src/environment/gardens-t-junction-registry.js
           grep -q "firstClassRegistryAtlas:true" src/environment/gardens-t-junction-registry.js
           grep -q "gardens-compositions-v20" src/environment/gardens-compositions.js
-          grep -q "registry-authored-garden-compositions-v20" src/environment/gardens-compositions.js
-          grep -q "tile-registry-overlay-exclusive-v2" src/environment/gardens-compositions.js
           grep -q "tJunctionRegistryOwned:true" src/environment/gardens-compositions.js
-          grep -q "gardens-junction-overlay-v3" src/environment/gardens-junction-overlay.js
-          grep -q "registryOwned:true" src/environment/gardens-junction-overlay.js
-          grep -q "ownership:'tile-registry-overlay-exclusive-v2'" src/environment/gardens-junction-overlay.js
-          grep -q "gardens-t-junction-registry.js?v=1" index.html
+          grep -q "environment-layer-stack-v1" src/environment/environment-layer-stack.js
+          grep -q "formal-environment-layer-order-v1" src/environment/environment-layer-stack.js
+          grep -q "'props_back'" src/environment/environment-layer-stack.js
+          grep -q "gardens-junction-layer-v4" src/environment/gardens-junction-overlay.js
+          grep -q "formal-props-back-t-junction-layer-v1" src/environment/gardens-junction-overlay.js
+          grep -q "ownership:'tile-registry-formal-layer-v1'" src/environment/gardens-junction-overlay.js
+          grep -q "phase:'props_back'" src/environment/gardens-junction-overlay.js
+          grep -q "environment-layer-stack.js?v=1" index.html
+          grep -q "gardens-junction-overlay.js?v=4" index.html
       - name: Validate declared Gardens placement visibility
         run: node scripts/validate-gardens-placements.mjs
       - name: Install Playwright
