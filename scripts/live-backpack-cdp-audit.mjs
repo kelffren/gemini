@@ -6,6 +6,7 @@ import { spawn } from 'node:child_process';
 const base=process.env.AUDIT_URL||'https://kelffren.github.io/gemini/';
 const expectedTitle=process.env.EXPECTED_TITLE||'Kelo World — V6.19';
 const expectedBridge='stone-backpack-bridge-v1.0.0';
+const expectedUi='backpack-ui-v1.0.1';
 const chromeBin=process.env.CHROME_BIN||'/usr/bin/google-chrome';
 const artifacts=path.resolve('artifacts');
 fs.mkdirSync(artifacts,{recursive:true});
@@ -74,7 +75,7 @@ on('Runtime.exceptionThrown',p=>consoleErrors.push(`EXCEPTION: ${p.exceptionDeta
 on('Network.loadingFailed',p=>{if(!p.canceled)failedRequests.push({requestId:p.requestId,error:p.errorText||'failed'});});
 on('Network.responseReceived',p=>{const s=Number(p.response?.status)||0;if(s>=400)httpErrors.push({status:s,url:p.response?.url||''});});
 
-const readyExpr=`document.title===${JSON.stringify(expectedTitle)}&&window.KELO_STONE_BACKPACK_BRIDGE_AUDIT?.version===${JSON.stringify(expectedBridge)}&&window.KELO_BACKPACK_AUDIT?.version==='backpack-v1.0.0'&&window.KELO_BACKPACK_UI_AUDIT?.version==='backpack-ui-v1.0.0'&&!!window.KeloBackpack&&!!window.KeloEquipment&&!!document.getElementById('lx-side-menu')`;
+const readyExpr=`document.title===${JSON.stringify(expectedTitle)}&&window.KELO_STONE_BACKPACK_BRIDGE_AUDIT?.version===${JSON.stringify(expectedBridge)}&&window.KELO_BACKPACK_AUDIT?.version==='backpack-v1.0.0'&&window.KELO_BACKPACK_UI_AUDIT?.version===${JSON.stringify(expectedUi)}&&window.KELO_BACKPACK_UI_AUDIT?.equipmentAction===false&&!!window.KeloBackpack&&!!window.KeloEquipment&&!!document.getElementById('lx-side-menu')`;
 let liveReady=false;
 for(let attempt=1;attempt<=30;attempt++){
   await navigate(`${base}?backpack-cdp=${Date.now()}-${attempt}`,sid);
@@ -82,7 +83,7 @@ for(let attempt=1;attempt<=30;attempt++){
   if(liveReady)break;
   await sleep(6000);
 }
-if(!liveReady)throw new Error(`LIVE never reached exact backpack runtime + ${expectedBridge}`);
+if(!liveReady)throw new Error(`LIVE never reached exact backpack runtime + ${expectedBridge} + ${expectedUi}`);
 
 await evalJs(`localStorage.removeItem('kelo_world_state_v2_1'); true`,sid);
 consoleErrors.length=0;failedRequests.length=0;httpErrors.length=0;
@@ -107,19 +108,14 @@ const persisted=await evalJs(`(()=>({persistedKey:KeloBackpack.getSlots()[${init
 await evalJs(`KeloSocialUI.openBag(); true`,sid);await sleep(100);
 const equipmentIndex=await evalJs(`KeloBackpack.getSlots().find(s=>s.item?.kind==='equipment')?.index??null`,sid);
 if(equipmentIndex==null)throw new Error(`No equipment after reload: ${JSON.stringify(persisted)}`);
-await evalJs(`document.querySelector('.kb-slot[data-slot="${equipmentIndex}"]')?.click(); true`,sid);
-const before=await evalJs(`([...document.querySelectorAll('.kb-actions .kb-action')].map(x=>x.textContent).find(x=>x==='Equipar'||x==='Desequipar'))||null`,sid);
-if(!before)throw new Error('Equipment action missing');
-await evalJs(`([...document.querySelectorAll('.kb-actions .kb-action')].find(x=>x.textContent===${JSON.stringify(before)}))?.click(); true`,sid);await sleep(120);
-const after=await evalJs(`([...document.querySelectorAll('.kb-actions .kb-action')].map(x=>x.textContent).find(x=>x==='Equipar'||x==='Desequipar'))||null`,sid);
-if(!after||after===before)throw new Error(`Equipment did not toggle: ${before} -> ${after}`);
-await evalJs(`([...document.querySelectorAll('.kb-actions .kb-action')].find(x=>x.textContent===${JSON.stringify(after)}))?.click(); true`,sid);await sleep(120);
-const restored=await evalJs(`([...document.querySelectorAll('.kb-actions .kb-action')].map(x=>x.textContent).find(x=>x==='Equipar'||x==='Desequipar'))||null`,sid);
+await evalJs(`document.querySelector('.kb-slot[data-slot="${equipmentIndex}"]')?.click(); true`,sid);await sleep(80);
+const equipmentDetail=await evalJs(`(()=>({detail:(document.querySelector('.kb-detail')?.textContent||'').trim(),hasEquipAction:[...document.querySelectorAll('.kb-actions .kb-action')].some(x=>x.textContent==='Equipar'||x.textContent==='Desequipar')}))()`,sid);
+if(equipmentDetail.hasEquipAction)throw new Error('Unvalidated equipment action leaked into Backpack v1');
 
 const final=await evalJs(`(()=>{const root=document.getElementById('kelo-bag');return {visible:!!root&&getComputedStyle(root).display!=='none',detailText:(root?.querySelector('.kb-detail')?.textContent||'').trim(),stats:KeloBackpack.getStats(),slotCount:KeloBackpack.getSlots().length,legacyInventoryLength:STATE.inventory.length,equipmentCount:KeloEquipment.getEquipment().length};})()`,sid);
 const shot=await send('Page.captureScreenshot',{format:'png',fromSurface:true,captureBeyondViewport:false},sid);
 fs.writeFileSync(path.join(artifacts,'live-backpack-mobile.png'),Buffer.from(shot.data,'base64'));
-const report={liveReady,initial,moved,persisted,equipmentToggle:{before,after,restored},final,consoleErrors,failedRequests,httpErrors};
+const report={liveReady,initial,moved,persisted,equipmentDetail,final,consoleErrors,failedRequests,httpErrors};
 fs.writeFileSync(path.join(artifacts,'backpack-report.json'),JSON.stringify(report,null,2));
 console.log(JSON.stringify(report,null,2));
 
@@ -130,9 +126,9 @@ if(initial.viewport.w!==390||initial.viewport.h!==844)throw new Error(`Viewport 
 if(initial.stats.capacity<20||initial.slotCount!==initial.stats.capacity)throw new Error('Capacity contract failed');
 if(initial.firstSlotTarget?.w<48||initial.firstSlotTarget?.h<48)throw new Error(`Touch target too small ${JSON.stringify(initial.firstSlotTarget)}`);
 if(initial.modelAudit?.mutatesLegacyInventoryOrder!==false)throw new Error('Legacy inventory ownership regression');
+if(initial.uiAudit?.equipmentAction!==false)throw new Error('Backpack v1 falsely advertises equipment mutation');
 if(!moved.sourceEmpty||moved.destinationKey!==initial.occupiedKey||!sameOrder)throw new Error(`Move contract failed ${JSON.stringify(moved)}`);
 if(persisted.persistedKey!==initial.occupiedKey||persisted.equipmentCount<1)throw new Error(`Persistence failed ${JSON.stringify(persisted)}`);
-if(restored!==before)throw new Error(`Equipment restore failed ${before}/${after}/${restored}`);
 if(consoleErrors.length||failedRequests.length||httpErrors.length)throw new Error(`LIVE errors ${JSON.stringify({consoleErrors,failedRequests,httpErrors})}`);
 
 try{await send('Browser.close');}catch{}finally{setTimeout(()=>chrome.kill('SIGKILL'),1000).unref();}
