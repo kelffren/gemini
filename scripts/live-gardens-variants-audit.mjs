@@ -3,18 +3,22 @@ import { chromium } from 'playwright';
 
 const base=process.env.AUDIT_URL||'https://kelffren.github.io/gemini/';
 const expectedJoinMode='authored-garden-endcaps-mid-variants-v4';
-const expectedCompositionMode='registry-authored-garden-compositions-v16';
+const expectedCompositionMode='registry-authored-garden-compositions-v17';
 const expectedWorldVersion='world-v1.17';
 const expectedCornerMode='oriented-authored-corner-v1';
 const expectedFixedPlacementMode='registry-authored-fixed-accents-v2';
 const expectedRelocationMode='authored-road-clear-placements-v9';
-const expectedJunctionMode='connected-south-boundaries-with-t-v3';
+const expectedJunctionMode='authored-four-orientation-t-family-v4';
+const expectedJunctionOverlayMode='registry-authored-four-orientation-t-overlay-v1';
 fs.mkdirSync('artifacts',{recursive:true});
 
 const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_BIN||'/usr/bin/google-chrome',args:['--no-sandbox','--disable-dev-shm-usage']});
 const context=await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true});
 const page=await context.newPage();
-await page.route(/\/src\/environment\/(world-map|tile-registry|gardens-atlas|gardens-joins|gardens-compositions|gardens-landmark)\.js/,route=>{
+await page.route(/\/src\/environment\/(world-map|tile-registry|gardens-atlas|gardens-joins|gardens-compositions|gardens-junction-overlay|gardens-landmark)\.js/,route=>{
+  const u=new URL(route.request().url());u.searchParams.set('live-audit-bust',`${Date.now()}-${Math.random()}`);route.continue({url:u.toString()});
+});
+await page.route(/\/assets\/gardens-t-junctions-v1\.svg/,route=>{
   const u=new URL(route.request().url());u.searchParams.set('live-audit-bust',`${Date.now()}-${Math.random()}`);route.continue({url:u.toString()});
 });
 
@@ -27,16 +31,18 @@ page.on('response',r=>{if(r.status()>=400)httpErrors.push({status:r.status(),url
 function valid(state){
   const water=state.composition?.relocatedWaterAnchors,westPlinth=state.composition?.relocatedWestPlinthAnchor,eastPlinth=state.composition?.relocatedEastPlinthAnchor,step=state.composition?.relocatedSteppingStoneAnchor,t=state.composition?.southeastTJunctionAnchor,tEnd=state.composition?.southeastTBranchEnd,swCorner=state.composition?.southwestJunctionCorner,swRun=state.composition?.southwestHorizontalRunAnchor,swVertical=state.composition?.southwestVerticalRunAnchor;
   return state.joins?.mode===expectedJoinMode&&state.joins?.id==='gardens-joins-v4'&&state.joins?.width===288&&state.joins?.height===32&&state.joins?.columns===9&&state.joins?.tiles?.HEDGE_MID_ALT===6&&state.joins?.tiles?.FLOWER_MID_ALT===7&&state.joins?.tiles?.HEDGE_V_ALT===8&&state.joins?.tiles?.HEDGE_T_NWS===-1&&state.joins?.virtualTiles?.HEDGE_T_NWS?.mode==='composite-base-hedge-nws-v1'&&
-    state.composition?.ready&&state.composition?.mode===expectedCompositionMode&&state.composition?.auditRevision==='southeast-t-v1'&&state.composition?.centerVariationMode==='authored-mid-variant-selection-v2'&&state.composition?.verticalVariationMode==='mirrored-authored-vertical-mid-v1'&&state.composition?.junctionMode===expectedJunctionMode&&state.composition?.connectedJunctionCount===3&&state.composition?.tJunctionCount===1&&t?.[0]===22&&t?.[1]===17&&tEnd?.[0]===22&&tEnd?.[1]===18&&swCorner?.[0]===5&&swCorner?.[1]===17&&swRun?.[0]===6&&swRun?.[1]===17&&swVertical?.[0]===5&&swVertical?.[1]===14&&state.composition?.fixedPlacementMode===expectedFixedPlacementMode&&state.composition?.navigationSafeRelocationMode===expectedRelocationMode&&state.composition?.navigationConflictFixCount===14&&
+    state.composition?.ready&&state.composition?.mode===expectedCompositionMode&&state.composition?.auditRevision==='authored-t-family-v1'&&state.composition?.centerVariationMode==='authored-mid-variant-selection-v2'&&state.composition?.verticalVariationMode==='mirrored-authored-vertical-mid-v1'&&state.composition?.junctionMode===expectedJunctionMode&&state.composition?.tJunctionAtlas==='gardens-t-junctions-v1'&&state.composition?.tJunctionOrientationCount===4&&state.composition?.connectedJunctionCount===3&&state.composition?.tJunctionCount===1&&t?.[0]===22&&t?.[1]===17&&tEnd?.[0]===22&&tEnd?.[1]===18&&swCorner?.[0]===5&&swCorner?.[1]===17&&swRun?.[0]===6&&swRun?.[1]===17&&swVertical?.[0]===5&&swVertical?.[1]===14&&state.composition?.fixedPlacementMode===expectedFixedPlacementMode&&state.composition?.navigationSafeRelocationMode===expectedRelocationMode&&state.composition?.navigationConflictFixCount===14&&
     state.composition?.relocatedEastRunAnchor?.[0]===24&&state.composition?.relocatedEastRunAnchor?.[1]===13&&state.composition?.relocatedFlowerbedNWAnchor?.[0]===8&&state.composition?.relocatedFlowerbedNWAnchor?.[1]===8&&state.composition?.relocatedFlowerbedNEAnchor?.[0]===19&&state.composition?.relocatedFlowerbedNEAnchor?.[1]===13&&state.composition?.relocatedFlowerbedSWAnchor?.[0]===8&&state.composition?.relocatedFlowerbedSWAnchor?.[1]===14&&water?.[0]?.[0]===9&&water?.[0]?.[1]===11&&water?.[1]?.[0]===19&&water?.[1]?.[1]===11&&westPlinth?.[0]===5&&westPlinth?.[1]===11&&eastPlinth?.[0]===25&&eastPlinth?.[1]===11&&step?.[0]===9&&step?.[1]===16&&
-    state.composition?.declaredCellCount===41&&state.composition?.fixedPlacementCount===9&&state.composition?.altCenterTileCount===4&&state.composition?.verticalAltUsageCount===2&&state.world?.ready&&state.world?.version===expectedWorldVersion&&state.world?.gardensCornerMode===expectedCornerMode&&state.world?.gardensCornerOrientationCount===4&&state.world?.gardensFixedPlacementMode===expectedFixedPlacementMode&&state.world?.gardensFixedPlacementCount===9&&state.world?.gardensJoinAssetLoaded&&state.landmark?.ready&&!state.landmark?.failed;
+    state.composition?.declaredCellCount===41&&state.composition?.fixedPlacementCount===9&&state.composition?.altCenterTileCount===4&&state.composition?.verticalAltUsageCount===2&&
+    state.junction?.ready&&state.junction?.assetLoaded&&state.junction?.version==='gardens-junction-overlay-v1'&&state.junction?.mode===expectedJunctionOverlayMode&&state.junction?.atlasId==='gardens-t-junctions-v1'&&state.junction?.atlasWidth===128&&state.junction?.atlasHeight===32&&state.junction?.orientationCount===4&&state.junction?.placementCount===1&&state.junction?.replacedVirtualCount===1&&
+    state.world?.ready&&state.world?.version===expectedWorldVersion&&state.world?.gardensCornerMode===expectedCornerMode&&state.world?.gardensCornerOrientationCount===4&&state.world?.gardensFixedPlacementMode===expectedFixedPlacementMode&&state.world?.gardensFixedPlacementCount===9&&state.world?.gardensJoinAssetLoaded&&state.landmark?.ready&&!state.landmark?.failed;
 }
 
 let state=null,loaded=false;
 for(let attempt=1;attempt<=24;attempt++){
   try{
     await page.goto(`${base}?gardens-variant-audit=${Date.now()}-${attempt}`,{waitUntil:'networkidle',timeout:45000});
-    state=await page.evaluate(()=>({world:window.KELO_WORLD_AUDIT||null,joins:window.KELO_GARDENS_JOINS||null,composition:window.KELO_GARDENS_COMPOSITION_AUDIT||null,landmark:window.KELO_GARDEN_LANDMARK_AUDIT||null}));
+    state=await page.evaluate(()=>({world:window.KELO_WORLD_AUDIT||null,joins:window.KELO_GARDENS_JOINS||null,composition:window.KELO_GARDENS_COMPOSITION_AUDIT||null,junction:window.KELO_GARDENS_JUNCTION_AUDIT||null,landmark:window.KELO_GARDEN_LANDMARK_AUDIT||null}));
     if(valid(state)){loaded=true;break;}
   }catch(e){console.log(`attempt ${attempt}: ${e.message}`)}
   await page.waitForTimeout(10000);
@@ -44,7 +50,7 @@ for(let attempt=1;attempt<=24;attempt++){
 if(!loaded){
   fs.writeFileSync('artifacts/gardens-variants-report.json',JSON.stringify({loaded,state,consoleErrors,failedRequests,httpErrors},null,2));
   await browser.close();
-  throw new Error(`LIVE never reached Gardens v16 contract: ${JSON.stringify(state)}`);
+  throw new Error(`LIVE never reached Gardens v17 authored T-family contract: ${JSON.stringify(state)}`);
 }
 
 consoleErrors.length=0;failedRequests.length=0;httpErrors.length=0;
@@ -54,21 +60,22 @@ const shot=await page.evaluate(()=>{
   const c=document.getElementById('game-canvas');
   if(!c||typeof camera==='undefined'||typeof localPlayer==='undefined'||typeof render!=='function')return null;
   localPlayer.x=1740;localPlayer.y=2680;camera.x=1740;camera.y=2680;camera.targetX=1740;camera.targetY=2680;render();
-  const px=c.getContext('2d').getImageData(0,0,c.width,c.height).data;let green=0,ivory=0,cyan=0;
-  for(let i=0;i<px.length;i+=4){const r=px[i],g=px[i+1],b=px[i+2],a=px[i+3];if(a<200)continue;if(g>110&&g>r*1.35&&g>b*1.15)green++;if(r>195&&g>185&&b>145)ivory++;if(b>120&&g>95&&b>r*1.25)cyan++;}
-  return{dataUrl:c.toDataURL('image/png'),world:window.KELO_WORLD_AUDIT||null,joins:window.KELO_GARDENS_JOINS||null,composition:window.KELO_GARDENS_COMPOSITION_AUDIT||null,landmark:window.KELO_GARDEN_LANDMARK_AUDIT||null,canvas:{width:c.width,height:c.height,cssWidth:c.clientWidth,cssHeight:c.clientHeight},green,ivory,cyan};
+  const px=c.getContext('2d').getImageData(0,0,c.width,c.height).data;let green=0,ivory=0,cyan=0,junctionGreen=0,junctionGold=0;
+  for(let i=0;i<px.length;i+=4){const r=px[i],g=px[i+1],b=px[i+2],a=px[i+3];if(a<200)continue;if(g>110&&g>r*1.35&&g>b*1.15)green++;if(r>195&&g>185&&b>145)ivory++;if(b>120&&g>95&&b>r*1.25)cyan++;if(r>=42&&r<=55&&g>=100&&g<=118&&b>=58&&b<=76)junctionGreen++;if(r>=220&&r<=238&&g>=205&&g<=225&&b>=130&&b<=155)junctionGold++;}
+  return{dataUrl:c.toDataURL('image/png'),world:window.KELO_WORLD_AUDIT||null,joins:window.KELO_GARDENS_JOINS||null,composition:window.KELO_GARDENS_COMPOSITION_AUDIT||null,junction:window.KELO_GARDENS_JUNCTION_AUDIT||null,landmark:window.KELO_GARDEN_LANDMARK_AUDIT||null,canvas:{width:c.width,height:c.height,cssWidth:c.clientWidth,cssHeight:c.clientHeight},green,ivory,cyan,junctionGreen,junctionGold};
 });
 if(shot?.dataUrl?.startsWith('data:image/png;base64,'))fs.writeFileSync('artifacts/live-gardens-variants.png',Buffer.from(shot.dataUrl.split(',')[1],'base64'));
-const finalState={world:shot?.world,joins:shot?.joins,composition:shot?.composition,landmark:shot?.landmark};
-const report={shot:shot?{world:shot.world,joins:{id:shot.joins?.id,mode:shot.joins?.mode,width:shot.joins?.width,height:shot.joins?.height,columns:shot.joins?.columns,tiles:shot.joins?.tiles,virtualTiles:shot.joins?.virtualTiles},composition:shot.composition,landmark:shot.landmark,canvas:shot.canvas,green:shot.green,ivory:shot.ivory,cyan:shot.cyan}:null,consoleErrors,failedRequests,httpErrors};
+const finalState={world:shot?.world,joins:shot?.joins,composition:shot?.composition,junction:shot?.junction,landmark:shot?.landmark};
+const report={shot:shot?{world:shot.world,joins:{id:shot.joins?.id,mode:shot.joins?.mode,width:shot.joins?.width,height:shot.joins?.height,columns:shot.joins?.columns,tiles:shot.joins?.tiles,virtualTiles:shot.joins?.virtualTiles},composition:shot.composition,junction:shot.junction,landmark:shot.landmark,canvas:shot.canvas,green:shot.green,ivory:shot.ivory,cyan:shot.cyan,junctionGreen:shot.junctionGreen,junctionGold:shot.junctionGold}:null,consoleErrors,failedRequests,httpErrors};
 fs.writeFileSync('artifacts/gardens-variants-report.json',JSON.stringify(report,null,2));
 console.log(JSON.stringify(report,null,2));
 await browser.close();
 
 if(!shot?.dataUrl?.startsWith('data:image/png;base64,'))throw new Error('Gardens variant screenshot missing');
-if(!valid(finalState))throw new Error(`Final Gardens v16 contract invalid: ${JSON.stringify(finalState)}`);
+if(!valid(finalState))throw new Error(`Final Gardens v17 authored T-family contract invalid: ${JSON.stringify(finalState)}`);
 if(shot.canvas?.cssWidth!==390||shot.canvas?.cssHeight!==844||shot.canvas?.width!==780||shot.canvas?.height!==1688)throw new Error(`Mobile canvas mismatch: ${JSON.stringify(shot.canvas)}`);
 if(shot.ivory<1000||shot.green<5000||shot.cyan<100)throw new Error(`Garden palette evidence weak: ${JSON.stringify({ivory:shot.ivory,green:shot.green,cyan:shot.cyan})}`);
+if(shot.junctionGreen<40||shot.junctionGold<2)throw new Error(`Authored T-junction visual evidence weak: ${JSON.stringify({junctionGreen:shot.junctionGreen,junctionGold:shot.junctionGold})}`);
 if(consoleErrors.length)throw new Error(`Console/page errors: ${JSON.stringify(consoleErrors)}`);
 if(failedRequests.length)throw new Error(`Failed requests: ${JSON.stringify(failedRequests)}`);
 if(httpErrors.length)throw new Error(`HTTP errors: ${JSON.stringify(httpErrors)}`);
