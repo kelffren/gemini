@@ -2,8 +2,8 @@
 'use strict';
 const R=window.KELO_TILE_REGISTRY;
 const GC=R?.styles?.gardensCompositions;
-const A=GC?.tJunctionAtlas;
-if(!GC||!A){console.error('[Kelo gardens junctions] registry junction contract missing');return;}
+const A=R?.atlases?.gardensTJunctions;
+if(!GC||!A||GC.tJunctionAtlas?.id!==A.id){console.error('[Kelo gardens junctions] registry junction contract missing');return;}
 const TILE=R.worldTileSize||32;
 const ORIGIN_X=33,ORIGIN_Y=67;
 const placements=[];
@@ -17,9 +17,9 @@ for(const comp of GC.compositions||[]){
 const img=new Image();
 let assetReady=false,installed=false;
 window.KELO_GARDENS_JUNCTION_AUDIT={
-  version:'gardens-junction-overlay-v2',ready:false,assetLoaded:false,mode:'registry-authored-four-orientation-t-overlay-v2',
-  atlasId:A.id,atlasWidth:A.width,atlasHeight:A.height,orientationCount:4,placementCount:placements.length,
-  authoredPlacementCount:placements.length,legacyVirtualOwnership:false,ownership:'registry-overlay-exclusive-v1',localOrigin:Object.freeze([ORIGIN_X,ORIGIN_Y])
+  version:'gardens-junction-overlay-v3',ready:false,assetLoaded:false,mode:'tile-registry-four-orientation-t-overlay-v3',
+  atlasId:A.id,registryKey:'gardensTJunctions',registryOwned:true,atlasWidth:A.width,atlasHeight:A.height,orientationCount:Object.keys(A.orientations||{}).length,placementCount:placements.length,
+  authoredPlacementCount:placements.length,legacyVirtualOwnership:false,ownership:'tile-registry-overlay-exclusive-v2',localOrigin:Object.freeze([ORIGIN_X,ORIGIN_Y])
 };
 function install(){
   if(installed)return;
