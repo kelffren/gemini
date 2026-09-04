@@ -23,7 +23,7 @@
   }
 
   const audit=window.KELO_PLAZA_FOUNTAIN_AUDIT={
-    version:'plaza-fountain-v1.9',ready:false,backLoaded:false,frontLoaded:false,failed:false,
+    version:'plaza-fountain-v1.8',ready:false,backLoaded:false,frontLoaded:false,failed:false,
     depthMode:'formal-back-front-layer-stack-v1',renderWrapped:false,environmentLayerStack:true,
     postActorBridgeRestored:false,postActorBridgeAvailable:true,bridgePolicy:'upstream-contract-required-v1',
     backLayer:'props_back',frontLayer:'props_front',backLayerId:'plaza-fountain-back',frontLayerId:'plaza-fountain-front',
