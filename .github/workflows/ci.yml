@@ -106,11 +106,14 @@ jobs:
           grep -q "proximity-name-v1" src/environment/tile-registry.js
           grep -q "grassMode:'authored-eight-variant-atlas-v1'" src/environment/tile-registry.js
           grep -q "grassVariationMode:'authored-eight-variant-atlas-v1'" src/environment/world-map.js
-          grep -q "plaza-fountain-v1.6" src/environment/plaza-depth.js
+          grep -q "plaza-fountain-v1.7" src/environment/plaza-depth.js
           grep -q "authored-png-layer-pair-v1" src/environment/plaza-depth.js
           grep -q "scaled-centered-lower-rim-v1" src/environment/plaza-depth.js
           grep -q "frontScale:0.74" src/environment/plaza-depth.js
-          grep -q "final-composite-back-actor-front-v2" src/environment/plaza-depth.js
+          grep -q "formal-back-front-layer-stack-v1" src/environment/plaza-depth.js
+          grep -q "backLayer:'props_back'" src/environment/plaza-depth.js
+          grep -q "frontLayer:'props_front'" src/environment/plaza-depth.js
+          grep -q "renderWrapped:false" src/environment/plaza-depth.js
           grep -q "plaza-fountain-back.PNG" src/environment/plaza-depth.js
           grep -q "plaza-fountain-front.PNG" src/environment/plaza-depth.js
           if ! grep -q 'DISABLED_PROCEDURAL_ART' src/environment/luxe-compose.js; then
