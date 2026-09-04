@@ -107,3 +107,60 @@ Certified runtime head: `13f37687511a9da2801c9e1fd2a1f1cba8d0a720`.
 - A future listing should move an item physically from Backpack to `market_escrow`; the same identity must not remain simultaneously portable and listed.
 - Market work should also be the point where transfer/listing operations begin crossing an explicit server-authoritative transaction boundary instead of extending client-only ownership logic.
 - Trade and House Storage should remain deferred until Market Escrow proves the generalized container contract under a third container type.
+
+## Validated Market Escrow V1 — 2026-09-04
+
+- `container-v1.1.0` extends the validated shared container contract with a third physical container: `market_escrow`.
+- `STATE.marketEscrow` owns its own `items` and `slots`; an instance listed for sale is removed from Backpack and exists physically in Escrow instead.
+- Escrow uses `permissions.merge=false`: separate listings never merge identical stacks. This preserves a strict 1:1 relationship between an active listing and its escrow item identity.
+- Escrow capacity is elastic as an internal technical mechanism only; no expansion price, premium rule, listing limit, subscription, or other economy meaning is attached to it.
+- `transferItem()` now supports deferred persistence and explicit merge policy so higher-level atomic operations can compose a container transfer without committing an intermediate state.
+- `market-escrow-v1.0.0` owns real local listing/cancel transactions. The ownership invariant remains **one item → one identity → one container**.
+- `createMarketListing(itemInstanceId, quantity, listingData)` follows VALIDATE → SNAPSHOT → Backpack→Escrow transfer with `persist:false` and `allowMerge:false` → listing creation → invariant audit → PERSIST. Any execution/invariant failure restores the snapshot.
+- A full listing preserves the original item identity. A partial-stack listing keeps the original identity on the Backpack remainder and creates a new identity for the Escrow split.
+- Active listing schema includes `listingId`, `owner`, `seller`, `escrowItemInstanceId`, `escrowItemKey`, `templateId`, `quantity`, `createdAt`, `status`, optional legacy-compatible `price`, and minimal `metadata`.
+- `cancelMarketListing(listingId)` validates the active listing and Escrow item, snapshots state, transfers Escrow→Backpack, marks the listing cancelled, audits invariants, and persists. A failure restores/retains the listing and Escrow state.
+- If Backpack cannot accept a cancelled item, cancellation returns `DESTINATION_FULL`; the item stays in Escrow and the active listing remains consistent.
+- `auditInvariants()` checks identity uniqueness across Backpack/Warehouse/Escrow, active-listing→Escrow referential integrity, Escrow→active-listing ownership, no active listing pointing to Backpack, quantity agreement, and `maxStack` validity.
+- `equipment-v1.1.2` is both Warehouse- and Market-Escrow-aware when resolving starter identities. `Equipment.ensure()` will not recreate a starter item that is stored or listed outside Backpack.
+- `market-ui-v1.0.0` is mobile-first/tap-first. Backpack item details expose `Publicar`; stacks expose a quantity stepper. Successful publication removes the item from Backpack and opens Market. `MIS PUBLICACIONES` shows only real Escrow listings and allows cancellation.
+- `EXPLORAR` remains read-only for the legacy market during this phase. Real purchase, buyer/seller settlement, taxes, fees, auctions, offers, history, Trade and House Storage are intentionally not implemented.
+- The new Escrow listing route does not charge the legacy 15-Oro fee. A `price=150` field is retained only as compatibility metadata for the existing presentation; no new pricing economy was designed in this pass.
+- Market remains client-authoritative/localStorage in V1. This is functional ownership plumbing, not anti-cheat or multiplayer economic authority.
+
+## Validation — Market Escrow V1 — 2026-09-04
+
+Certified runtime loading commit: `df7c2d7313ccc467e2fd7ad2741f7f545ee9f73e`.
+LIVE audit workflow head: `ad4d892930afcfacd37841367575c333eaf90ad4`.
+
+- Market Escrow deterministic CI run `33838582243`: SUCCESS.
+- Kelo CI on the runtime integration run `33838582385`: SUCCESS.
+- GitHub Pages deployment run `33838581455`: SUCCESS for the runtime integration.
+- Market Escrow LIVE mobile audit run `33839012299`: SUCCESS.
+- Kelo CI on the hardened LIVE audit head run `33839012330`: SUCCESS.
+- Backpack CI regression run `33839074827`: SUCCESS after aligning inherited exact-version gates to `equipment-v1.1.2` / `container-v1.1.0` and including Market Escrow mechanics.
+- Warehouse LIVE regression run `33839137874`: SUCCESS after aligning exact-version expectations; Warehouse behavior was not reimplemented.
+- Kelo CI paired with that regression run `33839137873`: SUCCESS.
+- LIVE viewport: 390×844 CSS px at DPR 2.
+- Full-listing LIVE validation: `mkt_audit_full` left Backpack (`inBag=false`), entered Escrow (`inEscrow=true`) with the same identity, kept `bound=true`, `rarity='Epic'`, and `metadata.seal='keep'`; total quantity stayed 13.
+- Reload validation: one active listing and its Escrow item survived reload; the item remained absent from Backpack and all invariants stayed green.
+- Cancel validation: active listings returned to 0, the same item returned to Backpack, Escrow no longer contained it, and invariants stayed green.
+- Partial-stack validation: source x5 listed x3 became Backpack x2 + Escrow x3 with a new Escrow identity and `splitFrom='mkt_audit_stack'`; total quantity remained 18 before and after.
+- Backpack-full cancellation returned `DESTINATION_FULL`, state comparison remained unchanged, active listing remained 1, and Escrow retained the item.
+- Final LIVE invariant report remained `ok=true` throughout each accepted state transition.
+- Final LIVE report: `consoleErrors=[]`, `failedRequests=[]`, `httpErrors=[]`.
+- LIVE screenshot was manually inspected: Market fits the 390×844 viewport; `EXPLORAR` / `MIS PUBLICACIONES (1)` are legible, the listing card clearly shows `EN ESCROW`, price presentation is readable, and the panel has no clipping.
+- QA findings corrected during certification: a post-reload synthetic non-Stone Backpack fixture was removed by the legacy Stones migration, so the audit now creates that fixture after reload; the MutationObserver-injected `Publicar` control also required human-like inter-tap timing in the audit. These were audit-harness issues, not ownership/transfer failures.
+- Inherited Backpack/Container/Forge/Warehouse exact-version gates were aligned to the validated Escrow-aware runtime instead of weakening functional checks.
+
+## Server-authority boundary — Market audited 2026-09-04
+
+- Market Escrow V1 is still client-authoritative and persisted through the current browser state/localStorage path. It must not be treated as secure multiplayer market infrastructure.
+- Before enabling real player-to-player purchases, the server must become authoritative for: listing creation, listing cancellation, Escrow ownership, item quantities, accepted listing price, buyer/seller ownership, currencies, purchase execution, and settlement.
+- The server transaction must eventually guarantee that item transfer and currency settlement succeed or fail together; client UI should only request operations and render the authoritative result.
+
+## Next bottleneck — after Market Escrow V1
+
+- The next inventory/economy bottleneck is **Market Authority V1**: move create/cancel/Escrow ownership across an explicit server-authoritative transaction boundary before implementing real purchases.
+- Only after that boundary is proven should the next pass add buyer purchase + atomic currency/item settlement.
+- Trade and House Storage remain deferred; they should reuse the same generalized container/ownership contracts rather than create parallel item-storage logic.
