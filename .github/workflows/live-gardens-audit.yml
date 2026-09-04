@@ -7,6 +7,7 @@ on:
       - 'src/environment/gardens-compositions.js'
       - 'src/environment/gardens-landmark.js'
       - 'src/environment/world-map.js'
+      - 'scripts/validate-gardens-placements.mjs'
       - 'scripts/live-gardens-variants-audit.mjs'
       - '.github/workflows/live-gardens-audit.yml'
   workflow_dispatch:
@@ -26,16 +27,17 @@ jobs:
           node --check src/environment/gardens-compositions.js
           node --check src/environment/gardens-landmark.js
           node --check src/environment/world-map.js
+          node --check scripts/validate-gardens-placements.mjs
           node --check scripts/live-gardens-variants-audit.mjs
           grep -q "gardens-joins-v3" src/environment/gardens-joins.js
           grep -q "authored-garden-endcaps-mid-variants-v3" src/environment/gardens-joins.js
           grep -q "HEDGE_MID_ALT:6" src/environment/gardens-joins.js
           grep -q "FLOWER_MID_ALT:7" src/environment/gardens-joins.js
           grep -q "HEDGE_V_ALT:8" src/environment/gardens-joins.js
-          grep -q "registry-authored-garden-compositions-v12" src/environment/gardens-compositions.js
+          grep -q "registry-authored-garden-compositions-v13" src/environment/gardens-compositions.js
           grep -q "registry-authored-fixed-accents-v1" src/environment/gardens-compositions.js
-          grep -q "authored-road-clear-placements-v7" src/environment/gardens-compositions.js
-          grep -q "navigationConflictFixCount:12" src/environment/gardens-compositions.js
+          grep -q "authored-road-clear-placements-v8" src/environment/gardens-compositions.js
+          grep -q "navigationConflictFixCount:13" src/environment/gardens-compositions.js
           grep -q "relocatedEastRunAnchor:Object.freeze(\[24,13\])" src/environment/gardens-compositions.js
           grep -q "relocatedFlowerbedNWAnchor:Object.freeze(\[8,8\])" src/environment/gardens-compositions.js
           grep -q "relocatedFlowerbedNEAnchor:Object.freeze(\[19,13\])" src/environment/gardens-compositions.js
@@ -43,6 +45,7 @@ jobs:
           grep -q "relocatedWaterAnchors:Object.freeze(\[Object.freeze(\[9,11\]),Object.freeze(\[19,11\])\])" src/environment/gardens-compositions.js
           grep -q "relocatedWestPlinthAnchor:Object.freeze(\[5,11\])" src/environment/gardens-compositions.js
           grep -q "relocatedEastPlinthAnchor:Object.freeze(\[25,11\])" src/environment/gardens-compositions.js
+          grep -q "relocatedSteppingStoneAnchor:Object.freeze(\[9,16\])" src/environment/gardens-compositions.js
           grep -q "declaredCellCount" src/environment/gardens-compositions.js
           grep -q "fixedPlacementCount:FIXED.length" src/environment/gardens-compositions.js
           grep -q "mirrored-authored-vertical-mid-v1" src/environment/gardens-compositions.js
@@ -53,6 +56,8 @@ jobs:
           grep -q "gardensCornerOrientationCount:4" src/environment/world-map.js
           grep -q "drawGardenRotated" src/environment/world-map.js
           grep -q "gardens-landmark-v1.1" src/environment/gardens-landmark.js
+      - name: Validate declared Gardens placement visibility
+        run: node scripts/validate-gardens-placements.mjs
       - name: Install Playwright
         run: npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund playwright@1.55.0
       - name: Audit deployed Gardens on mobile
