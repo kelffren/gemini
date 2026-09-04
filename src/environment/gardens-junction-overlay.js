@@ -3,7 +3,8 @@
 const R=window.KELO_TILE_REGISTRY;
 const GC=R?.styles?.gardensCompositions;
 const A=R?.atlases?.gardensTJunctions;
-if(!GC||!A||GC.tJunctionAtlas?.id!==A.id){console.error('[Kelo gardens junctions] registry junction contract missing');return;}
+const L=window.KELO_ENVIRONMENT_LAYERS;
+if(!GC||!A||GC.tJunctionAtlas?.id!==A.id||!L||typeof L.register!=='function'){console.error('[Kelo gardens junctions] registry or environment layer contract missing');return;}
 const TILE=R.worldTileSize||32;
 const ORIGIN_X=33,ORIGIN_Y=67;
 const placements=[];
@@ -15,36 +16,26 @@ for(const comp of GC.compositions||[]){
   }
 }
 const img=new Image();
-let assetReady=false,installed=false;
+let assetReady=false;
 window.KELO_GARDENS_JUNCTION_AUDIT={
-  version:'gardens-junction-overlay-v3',ready:false,assetLoaded:false,mode:'tile-registry-four-orientation-t-overlay-v3',
+  version:'gardens-junction-layer-v4',ready:false,assetLoaded:false,mode:'formal-props-back-t-junction-layer-v1',
   atlasId:A.id,registryKey:'gardensTJunctions',registryOwned:true,atlasWidth:A.width,atlasHeight:A.height,orientationCount:Object.keys(A.orientations||{}).length,placementCount:placements.length,
-  authoredPlacementCount:placements.length,legacyVirtualOwnership:false,ownership:'tile-registry-overlay-exclusive-v2',localOrigin:Object.freeze([ORIGIN_X,ORIGIN_Y])
+  authoredPlacementCount:placements.length,legacyVirtualOwnership:false,ownership:'tile-registry-formal-layer-v1',layerStackVersion:L.version,layerId:'gardens-t-junctions',layerPhase:'props_back',localOrigin:Object.freeze([ORIGIN_X,ORIGIN_Y])
 };
-function install(){
-  if(installed)return;
-  const base=window.KELO_WORLD_RENDERER;
-  if(!base||typeof base.draw!=='function'){setTimeout(install,16);return;}
-  installed=true;
-  function draw(g){
-    const drew=base.draw(g);
-    if(drew&&assetReady&&placements.length){
-      const prev=g.imageSmoothingEnabled;g.imageSmoothingEnabled=false;
-      for(const p of placements){
-        const sx=p.orientation*TILE,wx=(ORIGIN_X+p.lx)*TILE,wy=(ORIGIN_Y+p.ly)*TILE;
-        g.drawImage(img,sx,0,TILE,TILE,wx,wy,TILE,TILE);
-      }
-      g.imageSmoothingEnabled=prev;
-    }
-    return drew;
+function drawLayer(g){
+  if(!assetReady||!placements.length)return;
+  const prev=g.imageSmoothingEnabled;g.imageSmoothingEnabled=false;
+  for(const p of placements){
+    const sx=p.orientation*TILE,wx=(ORIGIN_X+p.lx)*TILE,wy=(ORIGIN_Y+p.ly)*TILE;
+    g.drawImage(img,sx,0,TILE,TILE,wx,wy,TILE,TILE);
   }
-  window.KELO_WORLD_RENDERER=Object.freeze({draw,districts:base.districts,chunkSize:base.chunkSize,get ready(){return base.ready&&assetReady;},junctionOverlay:true});
+  g.imageSmoothingEnabled=prev;
 }
+L.register({id:'gardens-t-junctions',phase:'props_back',priority:20,required:true,ready:()=>assetReady,draw:drawLayer});
 img.onload=function(){
   if(img.naturalWidth!==A.width||img.naturalHeight!==A.height){console.error('[Kelo gardens junctions] invalid atlas dimensions',img.naturalWidth,img.naturalHeight);return;}
   assetReady=true;Object.assign(window.KELO_GARDENS_JUNCTION_AUDIT,{ready:true,assetLoaded:true});
 };
 img.onerror=function(){console.error('[Kelo gardens junctions] atlas load failed');};
 img.src=A.src;
-install();
 })();
