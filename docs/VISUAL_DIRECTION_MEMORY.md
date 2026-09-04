@@ -765,6 +765,15 @@ Kelo World is no longer allowed to remain a single polished plaza floating in a 
 - A cleanup regression in the first edit (`bounds().maxY` accidentally using `camera.x`) was caught and corrected before certification. Two intermediate LIVE framings were also rejected because they either hid the T-junction or exposed insufficient visual evidence.
 - Next bottleneck: the authored T family is registry-owned, but it still renders through a late dedicated overlay wrapper. The next safe architectural improvement is to promote these authored junctions into the normal environment layer ordering so props/joins share one explicit render-layer contract rather than adding more density.
 
+
+## Validated 2026-09-04 — Formal environment layer stack for Gardens T-junctions
+
+- Runtime validated on GitHub Pages at commit `a77303f0e8296c791cd5f57d3a5e4b47d194e583` with Kelo CI, Pages deployment, and Gardens mobile LIVE audit all green.
+- Introduced `src/environment/environment-layer-stack.js` as `environment-layer-stack-v1`, defining formal environment phases: `ground`, `ground_variation`, `transitions`, `paths_floors`, `decals_details`, `props_back`, `props_front`, and `vfx_weather_lighting`.
+- Gardens authored T-junctions are no longer drawn by a bespoke late renderer wrapper. `gardens-junction-layer-v4` registers `gardens-t-junctions` into the formal `props_back` phase while preserving TileRegistry as atlas authority.
+- Mobile LIVE validation at 390×844 CSS / 780×1688 physical pixels showed the T-junctions, hero and marble paths clearly with `consoleErrors=[]`, `failedRequests=[]`, and `httpErrors=[]`.
+- Keep future environment overlays moving toward this shared layer contract instead of adding new independent renderer wrappers. The next safe candidate is the district decal/details pass.
+
 ## Non-goals During Visual Passes
 Do not casually alter unrelated systems such as:
 - core movement feel;
