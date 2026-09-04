@@ -3,8 +3,10 @@ on:
   push:
     branches: [main]
     paths:
+      - 'assets/gardens-t-junctions-v1.svg'
       - 'src/environment/gardens-joins.js'
       - 'src/environment/gardens-compositions.js'
+      - 'src/environment/gardens-junction-overlay.js'
       - 'src/environment/gardens-landmark.js'
       - 'src/environment/world-map.js'
       - 'scripts/validate-gardens-placements.mjs'
@@ -25,37 +27,31 @@ jobs:
           node --check src/environment/gardens-atlas.js
           node --check src/environment/gardens-joins.js
           node --check src/environment/gardens-compositions.js
+          node --check src/environment/gardens-junction-overlay.js
           node --check src/environment/gardens-landmark.js
           node --check src/environment/world-map.js
           node --check scripts/validate-gardens-placements.mjs
           node --check scripts/live-gardens-variants-audit.mjs
+          grep -q 'width="128" height="32"' assets/gardens-t-junctions-v1.svg
           grep -q "gardens-joins-v4" src/environment/gardens-joins.js
           grep -q "authored-garden-endcaps-mid-variants-v4" src/environment/gardens-joins.js
           grep -q "HEDGE_T_NWS:-1" src/environment/gardens-joins.js
-          grep -q "composite-base-hedge-nws-v1" src/environment/gardens-joins.js
-          grep -q "registry-authored-garden-compositions-v16" src/environment/gardens-compositions.js
-          grep -q "connected-south-boundaries-with-t-v3" src/environment/gardens-compositions.js
+          grep -q "registry-authored-garden-compositions-v17" src/environment/gardens-compositions.js
+          grep -q "authored-four-orientation-t-family-v4" src/environment/gardens-compositions.js
+          grep -q "gardens-t-junctions-v1" src/environment/gardens-compositions.js
+          grep -q "tJunctionOrientationCount:4" src/environment/gardens-compositions.js
           grep -q "connectedJunctionCount:3" src/environment/gardens-compositions.js
           grep -q "tJunctionCount:1" src/environment/gardens-compositions.js
           grep -q "southeastTJunctionAnchor:Object.freeze(\[22,17\])" src/environment/gardens-compositions.js
-          grep -q "southeastTBranchEnd:Object.freeze(\[22,18\])" src/environment/gardens-compositions.js
-          grep -q "southwestJunctionCorner:Object.freeze(\[5,17\])" src/environment/gardens-compositions.js
-          grep -q "southwestHorizontalRunAnchor:Object.freeze(\[6,17\])" src/environment/gardens-compositions.js
-          grep -q "southwestVerticalRunAnchor:Object.freeze(\[5,14\])" src/environment/gardens-compositions.js
-          grep -q "auditRevision:'southeast-t-v1'" src/environment/gardens-compositions.js
+          grep -q "auditRevision:'authored-t-family-v1'" src/environment/gardens-compositions.js
           grep -q "registry-authored-fixed-accents-v2" src/environment/gardens-compositions.js
           grep -q "authored-road-clear-placements-v9" src/environment/gardens-compositions.js
           grep -q "navigationConflictFixCount:14" src/environment/gardens-compositions.js
           grep -q "declaredCellCount" src/environment/gardens-compositions.js
-          grep -q "fixedPlacementCount:FIXED.length" src/environment/gardens-compositions.js
-          grep -q "mirrored-authored-vertical-mid-v1" src/environment/gardens-compositions.js
-          grep -q "verticalAltUsageCount:2" src/environment/gardens-compositions.js
           grep -q "world-v1.17" src/environment/world-map.js
-          grep -q "drawGardenJoin" src/environment/world-map.js
-          grep -q "HEDGE_T_NWS" src/environment/world-map.js
-          grep -q "gardensFixedPlacementMode" src/environment/world-map.js
-          grep -q "oriented-authored-corner-v1" src/environment/world-map.js
-          grep -q "gardensCornerOrientationCount:4" src/environment/world-map.js
+          grep -q "gardens-junction-overlay-v1" src/environment/gardens-junction-overlay.js
+          grep -q "registry-authored-four-orientation-t-overlay-v1" src/environment/gardens-junction-overlay.js
+          grep -q "orientationCount:4" src/environment/gardens-junction-overlay.js
           grep -q "gardens-landmark-v1.1" src/environment/gardens-landmark.js
       - name: Validate declared Gardens placement visibility
         run: node scripts/validate-gardens-placements.mjs
