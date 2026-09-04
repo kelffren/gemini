@@ -37,6 +37,7 @@ on:
       - 'scripts/live-fountain-audit.mjs'
       - 'scripts/live-npc-audit.mjs'
       - 'scripts/live-nobility-audit.mjs'
+      - 'scripts/live-layer-spatial-audit.mjs'
       - '.github/workflows/live-audit.yml'
 
 jobs:
@@ -76,6 +77,11 @@ jobs:
           AUDIT_URL: https://kelffren.github.io/gemini/
           CHROME_BIN: /usr/bin/google-chrome
         run: node scripts/live-world-audit.mjs
+      - name: Audit environment layer spatial conflicts
+        env:
+          AUDIT_URL: https://kelffren.github.io/gemini/
+          CHROME_BIN: /usr/bin/google-chrome
+        run: node scripts/live-layer-spatial-audit.mjs
       - name: Audit Gardens marble cadence
         env:
           AUDIT_URL: https://kelffren.github.io/gemini/
