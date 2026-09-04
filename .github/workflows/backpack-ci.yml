@@ -5,16 +5,22 @@ on:
     paths:
       - 'src/systems/backpack-system.js'
       - 'src/systems/equipment-system.js'
+      - 'src/systems/container-system.js'
       - 'src/ui/backpack-ui.js'
+      - 'src/ui/warehouse-ui.js'
       - 'scripts/backpack-system-audit.js'
+      - 'scripts/container-system-audit.js'
       - '.github/workflows/backpack-ci.yml'
       - 'index.html'
   pull_request:
     paths:
       - 'src/systems/backpack-system.js'
       - 'src/systems/equipment-system.js'
+      - 'src/systems/container-system.js'
       - 'src/ui/backpack-ui.js'
+      - 'src/ui/warehouse-ui.js'
       - 'scripts/backpack-system-audit.js'
+      - 'scripts/container-system-audit.js'
       - '.github/workflows/backpack-ci.yml'
       - 'index.html'
   workflow_dispatch:
@@ -30,15 +36,25 @@ jobs:
         run: |
           node --check src/systems/equipment-system.js
           node --check src/systems/backpack-system.js
+          node --check src/systems/container-system.js
           node --check src/ui/backpack-ui.js
+          node --check src/ui/warehouse-ui.js
           node --check scripts/backpack-system-audit.js
+          node --check scripts/container-system-audit.js
       - name: Backpack mechanics
         run: node scripts/backpack-system-audit.js
+      - name: Container mechanics
+        run: node scripts/container-system-audit.js
       - name: Integration contract
         run: |
-          grep -q "equipment-v1.1.0" src/systems/equipment-system.js
-          grep -q "explicitEmptySlots:true" src/systems/equipment-system.js
+          grep -q "equipment-v1.1.1" src/systems/equipment-system.js
+          grep -q "warehouseAwareStarterIdentity:true" src/systems/equipment-system.js
           grep -q "backpack-v1.1.0" src/systems/backpack-system.js
           grep -q "stacksImplemented:true" src/systems/backpack-system.js
           grep -q "splitImplemented:true" src/systems/backpack-system.js
+          grep -q "container-v1.0.0" src/systems/container-system.js
+          grep -q "strictDestinationCapacity:true" src/systems/container-system.js
+          grep -q "warehouseImplemented:true" src/systems/container-system.js
+          grep -q "warehouse-ui-v1.0.0" src/ui/warehouse-ui.js
+          grep -q "twoContainerTabs:true" src/ui/warehouse-ui.js
           grep -q "equipmentAction:true" src/ui/backpack-ui.js
