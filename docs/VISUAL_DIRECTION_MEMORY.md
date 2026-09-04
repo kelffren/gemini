@@ -700,6 +700,17 @@ Kelo World is no longer allowed to remain a single polished plaza floating in a 
 - Visual inspection of `live-gardens-marble.png` confirmed the recovered pale stepping-stone accent is readable on grass beside the ivory circulation without creating a seam, obstruction or competing focal point.
 - Next visual bottleneck: the authored-placement visibility audit should be generalized into a registry-level `declared -> renderable` validator for all Gardens placements, rather than discovering road/landmark conflicts one placement at a time.
 
+
+## Validated Gardens Dual South L Boundaries — Compositions v15 / 2026-09-04
+- Fresh reference review kept Pixadom as a density/readability/consistency benchmark only. Its current 2026 roadmap continues to emphasize environmental design/furnishing, decorative layout variety and mobile usability. Wardmarch (published 10 August 2026) and Emberfen (updated 26 August 2026) reinforce complete modular 32x32 families plus explicit seam/placement validation. No external art or layout was copied.
+- `gardens-compositions-v15` preserves exactly 41 declared Gardens cells, 11 compositions and 10 fixed placements, but reconnects the southwest hedge vocabulary into a second real L boundary: vertical run local `[5,14..16]` -> oriented corner `[5,17]` -> horizontal run `[6..8,17]`. The already validated southeast L remains intact. No prop density, road geometry, collision, movement, economy, combat, networking, chat or inventory behavior changed.
+- Runtime contract is `registry-authored-garden-compositions-v15`, `junctionMode='connected-south-boundaries-v2'`, `connectedJunctionCount=2`, with explicit southwest anchors for regression auditing. The composition script cache key was advanced in `index.html`.
+- Deterministic Gardens placement validation passed with all 41 declarations renderable and no road/landmark-clearance conflict or duplicate. Kelo CI run `33836645407` passed. GitHub Pages run `33836644542` passed on final gate head `df68ec168d5697ed576fb04fe85585b3a5188c69`.
+- Dedicated Gardens mobile LIVE audit run `33836645414` passed at 390x844 CSS / 780x1688 backing canvas. Runtime reported `gardens-compositions-v15`, `auditRevision='southwest-l-v1'`, two connected junctions and clean diagnostics: `consoleErrors=[]`, `failedRequests=[]`, `httpErrors=[]`.
+- Manual inspection of `live-gardens-variants.png` confirms the southwest vertical and horizontal hedge runs now read as one continuous L-shaped garden boundary beside the hero, while the ivory circulation remains clear and the scene remains crisp at mobile scale.
+- QA defect corrected: the first dedicated Gardens LIVE workflow still hard-coded v14 / one connected L and failed in its source `grep` stage before Playwright. The workflow was aligned to v15/two Ls and rerun without weakening any visual or diagnostic gate.
+- Next Gardens bottleneck: L-boundary vocabulary is now proven on both south corners, but there is still no true authored T-junction tile/module. The next safe art pass should add one registry-addressable T-junction variant to the modular join atlas and use it in a road-clear composition, keeping the 41-cell density budget or explicitly swapping existing cells rather than simply adding clutter.
+
 ## Non-goals During Visual Passes
 Do not casually alter unrelated systems such as:
 - core movement feel;
