@@ -4,7 +4,7 @@ import path from 'node:path';
 import {spawn} from 'node:child_process';
 
 const base=process.env.AUDIT_URL||'https://kelffren.github.io/gemini/';
-const expectedTitle=process.env.EXPECTED_TITLE||'Kelo World — V6.19';
+const expectedTitle=process.env.EXPECTED_TITLE||'Kelo World — V6.20';
 const chromeBin=process.env.CHROME_BIN||'/usr/bin/google-chrome';
 const artifacts=path.resolve('artifacts');
 fs.mkdirSync(artifacts,{recursive:true});
@@ -29,7 +29,7 @@ on('Runtime.exceptionThrown',p=>consoleErrors.push(`EXCEPTION: ${p.exceptionDeta
 on('Network.loadingFailed',p=>{if(!p.canceled)failedRequests.push({requestId:p.requestId,error:p.errorText||'failed'});});
 on('Network.responseReceived',p=>{const s=Number(p.response?.status)||0;if(s>=400)httpErrors.push({status:s,url:p.response?.url||''});});
 
-const ready=`document.title===${JSON.stringify(expectedTitle)}&&window.KELO_STONE_BACKPACK_BRIDGE_AUDIT?.version==='stone-backpack-bridge-v1.0.0'&&window.KELO_EQUIPMENT_AUDIT?.version==='equipment-v1.1.0'&&window.KELO_EQUIPMENT_AUDIT?.explicitEmptySlots===true&&window.KELO_BACKPACK_AUDIT?.version==='backpack-v1.1.0'&&window.KELO_BACKPACK_AUDIT?.stacksImplemented===true&&window.KELO_BACKPACK_AUDIT?.splitImplemented===true&&window.KELO_BACKPACK_AUDIT?.sortImplemented===true&&window.KELO_BACKPACK_AUDIT?.discardImplemented===true&&window.KELO_BACKPACK_UI_AUDIT?.version==='backpack-ui-v1.2.0'&&window.KELO_BACKPACK_UI_AUDIT?.equipmentAction===true&&window.KELO_BACKPACK_UI_AUDIT?.splitStepper===true&&!!window.KeloBackpack&&!!window.KeloEquipment&&!!document.getElementById('lx-side-menu')`;
+const ready=`document.title===${JSON.stringify(expectedTitle)}&&window.KELO_STONE_BACKPACK_BRIDGE_AUDIT?.version==='stone-backpack-bridge-v1.0.0'&&window.KELO_EQUIPMENT_AUDIT?.version==='equipment-v1.1.1'&&window.KELO_EQUIPMENT_AUDIT?.explicitEmptySlots===true&&window.KELO_BACKPACK_AUDIT?.version==='backpack-v1.1.0'&&window.KELO_BACKPACK_AUDIT?.stacksImplemented===true&&window.KELO_BACKPACK_AUDIT?.splitImplemented===true&&window.KELO_BACKPACK_AUDIT?.sortImplemented===true&&window.KELO_BACKPACK_AUDIT?.discardImplemented===true&&window.KELO_BACKPACK_UI_AUDIT?.version==='backpack-ui-v1.2.0'&&window.KELO_BACKPACK_UI_AUDIT?.equipmentAction===true&&window.KELO_BACKPACK_UI_AUDIT?.splitStepper===true&&!!window.KeloBackpack&&!!window.KeloEquipment&&!!document.getElementById('lx-side-menu')`;
 let liveReady=false;
 for(let attempt=1;attempt<=30;attempt++){await navigate(`${base}?backpack-cert=${Date.now()}-${attempt}`,sid);try{liveReady=!!(await evalJs(ready,sid));}catch{}if(liveReady)break;await sleep(5000);}
 if(!liveReady)throw new Error('LIVE never reached exact Backpack/Equipment revisions');
