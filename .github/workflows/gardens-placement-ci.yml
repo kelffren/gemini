@@ -3,14 +3,18 @@ on:
   push:
     branches: [main]
     paths:
+      - 'assets/gardens-t-junctions-v1.svg'
       - 'src/environment/world-map.js'
       - 'src/environment/gardens-compositions.js'
+      - 'src/environment/gardens-junction-overlay.js'
       - 'scripts/validate-gardens-placements.mjs'
       - '.github/workflows/gardens-placement-ci.yml'
   pull_request:
     paths:
+      - 'assets/gardens-t-junctions-v1.svg'
       - 'src/environment/world-map.js'
       - 'src/environment/gardens-compositions.js'
+      - 'src/environment/gardens-junction-overlay.js'
       - 'scripts/validate-gardens-placements.mjs'
       - '.github/workflows/gardens-placement-ci.yml'
   workflow_dispatch:
@@ -20,6 +24,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Syntax
-        run: node --check scripts/validate-gardens-placements.mjs
+        run: |
+          node --check src/environment/gardens-junction-overlay.js
+          node --check scripts/validate-gardens-placements.mjs
+          grep -q 'width="128" height="32"' assets/gardens-t-junctions-v1.svg
+          grep -q "gardens-t-junctions-v1" src/environment/gardens-compositions.js
+          grep -q "tJunctionOrientationCount:4" src/environment/gardens-compositions.js
       - name: Declared to renderable Gardens placements
         run: node scripts/validate-gardens-placements.mjs
