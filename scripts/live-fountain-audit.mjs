@@ -3,7 +3,7 @@ import { chromium } from 'playwright';
 
 const base=process.env.AUDIT_URL||'https://kelffren.github.io/gemini/';
 const expectedTitle=process.env.EXPECTED_TITLE||'';
-const expectedFountain=process.env.EXPECTED_FOUNTAIN||'plaza-fountain-v1.6';
+const expectedFountain=process.env.EXPECTED_FOUNTAIN||'plaza-fountain-v1.7';
 fs.mkdirSync('artifacts',{recursive:true});
 const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_BIN||'/usr/bin/google-chrome',args:['--no-sandbox','--disable-dev-shm-usage']});
 const context=await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true});
@@ -14,12 +14,23 @@ page.on('pageerror',e=>consoleErrors.push(`PAGEERROR: ${e.stack||e.message}`));
 page.on('requestfailed',r=>failedRequests.push({url:r.url(),error:r.failure()?.errorText||'failed'}));
 page.on('response',r=>{if(r.status()>=400)httpErrors.push({status:r.status(),url:r.url()})});
 
+function contractOk(d){
+  const f=d.fountain,l=d.layers;
+  const back=l?.layers?.find(x=>x.id==='plaza-fountain-back');
+  const front=l?.layers?.find(x=>x.id==='plaza-fountain-front');
+  return (!expectedTitle||d.title===expectedTitle)&&f?.ready&&!f?.failed&&f?.version===expectedFountain&&
+    f?.assetMode==='authored-png-layer-pair-v1'&&f?.alignmentMode==='scaled-centered-lower-rim-v1'&&
+    f?.environmentLayerStack===true&&f?.renderWrapped===false&&f?.depthMode==='formal-back-front-layer-stack-v1'&&
+    back?.phase==='props_back'&&back?.timing==='pre_actor'&&front?.phase==='props_front'&&front?.timing==='post_actor'&&
+    d.plaza?.fountainReady;
+}
+
 let loaded=false;
 for(let attempt=1;attempt<=24;attempt++){
   try{
     await page.goto(`${base}?fountain-audit=${Date.now()}-${attempt}`,{waitUntil:'networkidle',timeout:45000});
-    const d=await page.evaluate(()=>({title:document.title,fountain:window.KELO_PLAZA_FOUNTAIN_AUDIT||null,plaza:window.KELO_PLAZA_AUDIT||null}));
-    if((!expectedTitle||d.title===expectedTitle)&&d.fountain?.ready&&!d.fountain?.failed&&d.fountain?.version===expectedFountain&&d.fountain?.assetMode==='authored-png-layer-pair-v1'&&d.fountain?.alignmentMode==='scaled-centered-lower-rim-v1'&&d.fountain?.renderWrapped&&d.plaza?.fountainReady){loaded=true;break;}
+    const d=await page.evaluate(()=>({title:document.title,fountain:window.KELO_PLAZA_FOUNTAIN_AUDIT||null,plaza:window.KELO_PLAZA_AUDIT||null,layers:window.KELO_ENVIRONMENT_LAYER_AUDIT||null}));
+    if(contractOk(d)){loaded=true;break;}
   }catch(e){console.log(`attempt ${attempt}: ${e.message}`)}
   await page.waitForTimeout(10000);
 }
@@ -50,22 +61,17 @@ async function capture(name,y){
 
 const behind=await capture('live-fountain-behind',1540);
 const front=await capture('live-fountain-front',1620);
-const state=await page.evaluate(()=>({title:document.title,fountain:{...window.KELO_PLAZA_FOUNTAIN_AUDIT},plaza:window.KELO_PLAZA_AUDIT||null,canvas:(()=>{const c=document.getElementById('game-canvas');return{width:c.width,height:c.height,cssWidth:c.clientWidth,cssHeight:c.clientHeight}})()}));
+const state=await page.evaluate(()=>({title:document.title,fountain:{...window.KELO_PLAZA_FOUNTAIN_AUDIT},plaza:window.KELO_PLAZA_AUDIT||null,layers:window.KELO_ENVIRONMENT_LAYER_AUDIT||null,canvas:(()=>{const c=document.getElementById('game-canvas');return{width:c.width,height:c.height,cssWidth:c.clientWidth,cssHeight:c.clientHeight}})()}));
 const report={loaded,state,behind,front,consoleErrors,failedRequests,httpErrors};
 fs.writeFileSync('artifacts/fountain-report.json',JSON.stringify(report,null,2));
 console.log(JSON.stringify(report,null,2));
 await browser.close();
 
-if(!loaded)throw new Error('LIVE never reached corrected layered PNG fountain contract');
-if(expectedTitle&&state.title!==expectedTitle)throw new Error(`Title mismatch ${state.title} !== ${expectedTitle}`);
-if(state.fountain?.version!==expectedFountain)throw new Error(`Fountain version mismatch ${state.fountain?.version} !== ${expectedFountain}`);
-if(!state.fountain?.ready||state.fountain?.failed||!state.fountain?.backLoaded||!state.fountain?.frontLoaded||!state.fountain?.renderWrapped)throw new Error('Fountain assets/depth compositor not ready');
-if(state.fountain?.assetMode!=='authored-png-layer-pair-v1')throw new Error(`Fountain asset mode invalid: ${state.fountain?.assetMode}`);
-if(state.fountain?.alignmentMode!=='scaled-centered-lower-rim-v1')throw new Error(`Fountain alignment mode invalid: ${state.fountain?.alignmentMode}`);
+if(!loaded)throw new Error('LIVE never reached formal fountain layer contract');
+if(!contractOk(state))throw new Error(`Final fountain layer contract invalid: ${JSON.stringify(state)}`);
 if(state.fountain?.sourceWidth!==1254||state.fountain?.sourceHeight!==1254)throw new Error('Fountain PNG source dimensions invalid');
-if(!String(state.fountain?.backAsset||'').includes('plaza-fountain-back.PNG')||!String(state.fountain?.frontAsset||'').includes('plaza-fountain-front.PNG'))throw new Error('Fountain is not using requested uppercase PNG assets');
-if(state.fountain?.width!==200||state.fountain?.height!==200||state.fountain?.frontWidth!==148||state.fountain?.frontHeight!==148||state.fountain?.frontX!==1366||state.fountain?.frontY!==1508||state.fountain?.frontScale!==0.74||state.fountain?.visualHeight!==236||state.fountain?.baseY!==1592||state.fountain?.depthMode!=='final-composite-back-actor-front-v2')throw new Error(`Fountain geometry/alignment contract invalid: ${JSON.stringify(state.fountain)}`);
-if(behind.audit?.lastLocalDepth!=='behind-front-layer'||behind.audit?.lastActorRedraws<1)throw new Error(`Behind depth failed: ${JSON.stringify(behind.audit)}`);
+if(state.fountain?.width!==200||state.fountain?.height!==200||state.fountain?.frontWidth!==148||state.fountain?.frontHeight!==148||state.fountain?.frontX!==1366||state.fountain?.frontY!==1508||state.fountain?.frontScale!==0.74||state.fountain?.visualHeight!==236||state.fountain?.baseY!==1592)throw new Error(`Fountain geometry/alignment contract invalid: ${JSON.stringify(state.fountain)}`);
+if(behind.audit?.lastLocalDepth!=='behind-front-layer'||behind.audit?.lastDepthCandidates<1)throw new Error(`Behind depth failed: ${JSON.stringify(behind.audit)}`);
 if(front.audit?.lastLocalDepth!=='in-front-of-front-layer'||front.audit?.lastFrontActorRedraws<1)throw new Error(`Front depth failed: ${JSON.stringify(front.audit)}`);
 if(behind.audit?.backDrawCount<1||behind.audit?.frontDrawCount<1||front.audit?.backDrawCount<1||front.audit?.frontDrawCount<1)throw new Error('Fountain draw counters did not advance');
 if(behind.water<900||front.water<900||behind.gold<500||front.gold<500)throw new Error(`Fountain pixels not visible in fountain ROI: ${JSON.stringify({behind,front})}`);
