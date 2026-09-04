@@ -4,8 +4,8 @@
   if(!R){console.error('[Kelo district decals] tile registry missing');return;}
   if(typeof camera!=='undefined'&&!window.camera)window.camera=camera;
   const atlas=Object.freeze({
-    id:'district-decals',src:'assets/district-decals-v1.svg?art=240',width:256,height:32,
-    tileWidth:32,tileHeight:32,columns:8,tileCount:8,family:'decals'
+    id:'district-decals',src:'assets/district-decals-v1.png?art=241',width:256,height:32,
+    tileWidth:32,tileHeight:32,columns:8,tileCount:8,family:'decals',runtimeFormat:'png'
   });
   const tiles=Object.freeze({
     RURAL_DIRT_A:0,RURAL_DIRT_B:1,
@@ -40,5 +40,5 @@
     districtDecalTiles:tiles,
     styles:Object.freeze({...R.styles,districtDecals})
   });
-  window.KELO_DISTRICT_DECAL_REGISTRY_AUDIT=Object.freeze({version:'district-decals-registry-v1.1',ready:true,registryVersion:'1.11.1',placementCount:placements.length,atlas:atlas.id,cameraBridge:window.camera===camera});
+  window.KELO_DISTRICT_DECAL_REGISTRY_AUDIT=Object.freeze({version:'district-decals-registry-v1.2',ready:true,registryVersion:'1.11.1',placementCount:placements.length,atlas:atlas.id,runtimeFormat:atlas.runtimeFormat,cameraBridge:window.camera===camera});
 })();
