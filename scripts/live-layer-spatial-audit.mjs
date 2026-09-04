@@ -14,19 +14,24 @@ page.on('requestfailed',r=>failedRequests.push({url:r.url(),error:r.failure()?.e
 page.on('response',r=>{if(r.status()>=400)httpErrors.push({status:r.status(),url:r.url()})});
 
 function valid(audit){
-  if(!audit||audit.version!=='environment-layer-stack-v2.1'||audit.orderingPolicy!=='phase-priority-id-v1'||audit.spatialPolicy!=='same-phase-priority-aabb-v1')return false;
-  if(audit.priorityTieCount<2||audit.spatialTieCount!==2)return false;
-  const expected=new Set(['props_back:20','props_front:20']);
-  for(const tie of audit.spatialTies||[]){
-    if(!expected.has(tie.key)||tie.overlapCount!==1)return false;
-    const ids=new Set([tie.a,tie.b]);
-    if(!ids.has('luxe-architecture-'+(tie.key.startsWith('props_back')?'back':'front'))||!ids.has('plaza-nature-'+(tie.key.startsWith('props_back')?'back':'front')))return false;
-    if(!tie.overlaps?.some(o=>o.a==='luxe-boutique-central'&&o.b==='plaza-tree-nw'||o.a==='plaza-tree-nw'&&o.b==='luxe-boutique-central'))return false;
+  if(!audit||audit.version!=='environment-layer-stack-v2.2'||audit.orderingPolicy!=='phase-priority-id-v1'||audit.spatialPolicy!=='same-phase-aabb-priority-resolution-v1')return false;
+  if(audit.spatialOverlapCount!==2||audit.spatialTieCount!==0)return false;
+  const expected=new Set(['props_back','props_front']);
+  for(const overlap of audit.spatialOverlaps||[]){
+    if(!expected.has(overlap.phase)||overlap.overlapCount!==1||overlap.ambiguous!==false||overlap.resolvedBy!=='priority')return false;
+    const ids=new Set([overlap.a,overlap.b]);
+    const suffix=overlap.phase==='props_back'?'back':'front';
+    if(!ids.has(`luxe-architecture-${suffix}`)||!ids.has(`plaza-nature-${suffix}`))return false;
+    const natureFirst=overlap.a.startsWith('plaza-nature-');
+    const naturePriority=natureFirst?overlap.aPriority:overlap.bPriority;
+    const luxePriority=natureFirst?overlap.bPriority:overlap.aPriority;
+    if(naturePriority!==10||luxePriority!==20)return false;
+    if(!overlap.overlaps?.some(o=>(o.a==='luxe-boutique-central'&&o.b==='plaza-tree-nw')||(o.a==='plaza-tree-nw'&&o.b==='luxe-boutique-central')))return false;
   }
   const layers=audit.layers||[];
   const nature=layers.filter(l=>l.id.startsWith('plaza-nature-'));
   const luxe=layers.filter(l=>l.id.startsWith('luxe-architecture-'));
-  return nature.length===2&&luxe.length===2&&nature.every(l=>l.ownership==='plaza-nature-props-v1'&&l.boundsCount===4)&&luxe.every(l=>l.ownership==='architecture-prefabs-v1'&&l.boundsCount===1);
+  return nature.length===2&&luxe.length===2&&nature.every(l=>l.ownership==='plaza-nature-props-v1'&&l.boundsCount===4&&l.priority===10)&&luxe.every(l=>l.ownership==='architecture-prefabs-v1'&&l.boundsCount===1&&l.priority===20);
 }
 
 let audit=null;
@@ -60,7 +65,7 @@ await browser.close();
 if(!shot?.dataUrl?.startsWith('data:image/png;base64,'))throw new Error('Spatial overlap screenshot missing');
 if(!valid(shot.audit))throw new Error(`Final spatial contract invalid: ${JSON.stringify(shot.audit)}`);
 if(shot.canvas?.cssWidth!==390||shot.canvas?.cssHeight!==844||shot.canvas?.width!==780||shot.canvas?.height!==1688)throw new Error(`Mobile canvas mismatch: ${JSON.stringify(shot.canvas)}`);
-if(!shot.nature?.ready||shot.nature?.failed||shot.nature?.spatialOwnership!=='plaza-nature-props-v1')throw new Error(`Nature spatial ownership invalid: ${JSON.stringify(shot.nature)}`);
+if(!shot.nature?.ready||shot.nature?.failed||shot.nature?.spatialOwnership!=='plaza-nature-props-v1'||shot.nature?.layerPriority!==10||shot.nature?.precedencePolicy!=='nature-before-architecture-on-overlap-v1')throw new Error(`Nature spatial ownership invalid: ${JSON.stringify(shot.nature)}`);
 if(!shot.architecture?.ready||shot.architecture?.spatialOwnership!=='architecture-prefabs-v1')throw new Error(`Architecture spatial ownership invalid: ${JSON.stringify(shot.architecture)}`);
 if(consoleErrors.length)throw new Error(`Console/page errors: ${JSON.stringify(consoleErrors)}`);
 if(failedRequests.length)throw new Error(`Failed requests: ${JSON.stringify(failedRequests)}`);
