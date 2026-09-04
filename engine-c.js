@@ -136,6 +136,7 @@ render = function() {
   ctx.globalAlpha = 1;
   if (isPvPActive && arenaPvP.rival) renderAvatar(arenaPvP.rival, false); else simulatedPlayers.forEach(p => renderAvatar(p, false));
   renderAvatar(localPlayer, true);
+  if (window.KELO_WORLD_RENDERER && typeof window.KELO_WORLD_RENDERER.drawPostActors === 'function') window.KELO_WORLD_RENDERER.drawPostActors(ctx);
   ctx.restore();
   if (input.touchActive && !isBuildMode) {
     ctx.save(); ctx.strokeStyle = 'rgba(231,197,106,0.35)'; ctx.lineWidth = 2; ctx.fillStyle = 'rgba(231,197,106,0.06)';
