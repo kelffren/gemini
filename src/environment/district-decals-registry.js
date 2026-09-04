@@ -29,7 +29,7 @@
     Object.freeze({district:'gardens',tile:'GARDENS_PETALS_B',x:1216,y:2696})
   ]);
   const districtDecals=Object.freeze({
-    mode:'authored-placement-layer-v1',layer:'decals/details',atlas:'districtDecals',
+    mode:'authored-placement-layer-v1',layer:'decals/details',atlas:'districtDecals',ownership:'registry-authored-district-decals-v1',
     placementCount:placements.length,placements,
     composition:Object.freeze({central:'quiet',rural:'earth-and-weeds',arena:'worn-stone',commerce:'restrained-brass',gardens:'petals-and-leaves'})
   });
@@ -40,5 +40,5 @@
     districtDecalTiles:tiles,
     styles:Object.freeze({...R.styles,districtDecals})
   });
-  window.KELO_DISTRICT_DECAL_REGISTRY_AUDIT=Object.freeze({version:'district-decals-registry-v1.2',ready:true,registryVersion:'1.11.1',placementCount:placements.length,atlas:atlas.id,runtimeFormat:atlas.runtimeFormat,cameraBridge:window.camera===camera});
+  window.KELO_DISTRICT_DECAL_REGISTRY_AUDIT=Object.freeze({version:'district-decals-registry-v1.2',ready:true,registryVersion:'1.11.1',placementCount:placements.length,atlas:atlas.id,runtimeFormat:atlas.runtimeFormat,ownership:districtDecals.ownership,cameraBridge:window.camera===camera});
 })();
