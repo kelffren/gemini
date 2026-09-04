@@ -5,8 +5,9 @@
   const PREFABS=REGISTRY?.architecturePrefabs;
   const ASSETS=REGISTRY?.architectureAssets;
   const STYLE=REGISTRY?.styles?.architecture;
-  if(!PREFABS||!ASSETS||!STYLE||typeof window.KELO_WORLD_RENDERER?.draw!=='function'){
-    console.error('[Kelo architecture] registry prefabs unavailable');
+  const LAYERS=window.KELO_ENVIRONMENT_LAYERS;
+  if(!PREFABS||!ASSETS||!STYLE||!LAYERS||typeof LAYERS.register!=='function'){
+    console.error('[Kelo architecture] registry or environment layers unavailable');
     return;
   }
 
@@ -21,7 +22,7 @@
     image.src=asset.src;
     return state;
   });
-  let rendererWrapped=false,depthWrapped=false;
+  let backLayerRegistered=false,frontLayerRegistered=false;
 
   const geometry=e=>({x:e.prefab.x,y:e.prefab.y,w:e.asset.worldWidth,h:e.asset.worldHeight});
   const overlaps=(a,b)=>a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;
@@ -76,48 +77,36 @@
     const clip=e.prefab.occlusion.clip,r=actor.radius||20;
     g.save();g.beginPath();g.rect(actor.x-r-clip.xPadding,actor.y-r-clip.topPadding,r*2+clip.xPadding*2,r*2+clip.topPadding+clip.bottomPadding);g.clip();drawEntry(g,e);g.restore();return true;
   }
-  function installWorldLayer(){
-    const base=window.KELO_WORLD_RENDERER;if(!base||typeof base.draw!=='function')return false;
-    if(base.__keloArchitecturePrefabs){rendererWrapped=true;return true;}
-    const wrapped={
-      __keloArchitecturePrefabs:true,
-      draw(g){const ok=base.draw(g);if(ok===true)drawAll(g);return ok;},
-      districts:base.districts,
-      chunkSize:base.chunkSize,
-      get ready(){return base.ready;}
-    };
-    if(typeof base.drawPostActors==='function')wrapped.drawPostActors=g=>base.drawPostActors(g);
-    if(base.environmentLayerStack===true)wrapped.environmentLayerStack=true;
-    if(base.postActorLayerStack===true)wrapped.postActorLayerStack=true;
-    window.KELO_WORLD_RENDERER=Object.freeze(wrapped);
-    rendererWrapped=true;return true;
+  function actorList(){
+    const actors=[];
+    if(typeof localPlayer!=='undefined'&&localPlayer)actors.push(localPlayer);
+    if(typeof simulatedPlayers!=='undefined'&&Array.isArray(simulatedPlayers))actors.push(...simulatedPlayers);
+    return actors;
   }
-  function installDepthLayer(){
-    if(depthWrapped||typeof window.render!=='function')return depthWrapped;
-    const base=window.render;if(base.__keloArchitectureDepth){depthWrapped=true;return true;}
-    const layered=function(){
-      base();
-      if(typeof ctx==='undefined'||typeof camera==='undefined'||typeof screenW==='undefined'||typeof screenH==='undefined')return;
-      const actors=[];if(typeof localPlayer!=='undefined'&&localPlayer)actors.push(localPlayer);if(typeof simulatedPlayers!=='undefined'&&Array.isArray(simulatedPlayers))actors.push(...simulatedPlayers);
-      const active=[];for(const actor of actors)for(const e of entries)if(e.ready&&actorBehind(e,actor))active.push([e,actor]);
-      const z=(typeof CONFIG!=='undefined'&&CONFIG.zoom)||1;
-      ctx.save();ctx.translate(screenW/2,screenH/2);ctx.scale(z,z);ctx.translate(-camera.x,-camera.y);ctx.imageSmoothingEnabled=false;
-      drawAll(ctx);
-      if(typeof renderAvatar==='function')actors.forEach(actor=>renderAvatar(actor,actor===localPlayer));
-      active.forEach(([e,a])=>repaint(ctx,e,a));
-      ctx.restore();
-    };
-    layered.__keloArchitectureDepth=true;window.render=layered;depthWrapped=true;return true;
+  function drawFrontOcclusion(g){
+    for(const actor of actorList())for(const e of entries)repaint(g,e,actor);
+  }
+  function hasLayer(id){return Array.isArray(LAYERS.layers)&&LAYERS.layers.some(l=>l.id===id);}
+  function installEnvironmentLayers(){
+    if(!backLayerRegistered){
+      if(hasLayer('luxe-architecture-back'))backLayerRegistered=true;
+      else{LAYERS.register({id:'luxe-architecture-back',phase:'props_back',priority:20,required:true,ready:()=>entries.every(e=>e.ready&&!e.failed),draw:drawAll});backLayerRegistered=true;}
+    }
+    if(!frontLayerRegistered){
+      if(hasLayer('luxe-architecture-front'))frontLayerRegistered=true;
+      else{LAYERS.register({id:'luxe-architecture-front',phase:'props_front',priority:20,required:true,ready:()=>entries.every(e=>e.ready&&!e.failed),draw:drawFrontOcclusion});frontLayerRegistered=true;}
+    }
+    return backLayerRegistered&&frontLayerRegistered;
   }
   function getState(key){return entries.find(e=>e.key===key||e.prefab.id===key)||null;}
   function getEntry(key){
     const e=getState(key);if(!e)return null;
     return Object.freeze({key:e.key,prefab:e.prefab,asset:e.asset,geometry:Object.freeze(geometry(e)),get ready(){return e.ready;},get failed(){return e.failed;},get legacyHidden(){return e.legacyHidden;},isOccluding(actor){return actorBehind(e,actor);}});
   }
-  function install(){installLegacyVisualReplacements();installWorldLayer();installDepthLayer();}
+  function install(){installLegacyVisualReplacements();installEnvironmentLayers();}
   install();setTimeout(install,120);setTimeout(install,600);
 
-  window.KELO_ARCHITECTURE_RENDERER=Object.freeze({version:'architecture-prefab-renderer-v1.5',mode:'luxe-only-v1',prefabCount:entries.length,depthMode:STYLE.depthMode,get ready(){return entries.every(e=>e.ready&&!e.failed);},get rendererWrapped(){return rendererWrapped;},get depthWrapped(){return depthWrapped;},get postActorContractPreserved(){return typeof window.KELO_WORLD_RENDERER?.drawPostActors==='function';},getEntry});
+  window.KELO_ARCHITECTURE_RENDERER=Object.freeze({version:'architecture-prefab-renderer-v1.6',mode:'luxe-only-v1',prefabCount:entries.length,depthMode:STYLE.depthMode,renderMode:'formal-back-front-layer-stack-v1',get ready(){return entries.every(e=>e.ready&&!e.failed);},get rendererWrapped(){return false;},get depthWrapped(){return false;},get environmentLayerStack(){return backLayerRegistered&&frontLayerRegistered;},get backLayerRegistered(){return backLayerRegistered;},get frontLayerRegistered(){return frontLayerRegistered;},get postActorContractPreserved(){return typeof window.KELO_WORLD_RENDERER?.drawPostActors==='function';},getEntry});
 
   const luxe=getState('luxeBoutique');
   if(!luxe){console.error('[Kelo architecture] luxe prefab missing');return;}
@@ -140,6 +129,6 @@
   function installBoutiqueHooks(){installCollision();installInteraction();}
   installBoutiqueHooks();setTimeout(installBoutiqueHooks,120);setTimeout(installBoutiqueHooks,600);
 
-  window.KELO_LUXE_KIOSK=Object.freeze({disabled:false,version:'authored-raster-v1.8',asset:luxe.asset.src,source:'tile-registry-architecture-prefab',prefabId:luxe.prefab.id,shop:SHOP,collision:COLLISION,interaction:luxe.prefab.interaction,depthMode:STYLE.depthMode,depthOcclusion:true,legacyBrownPlaceholdersRemoved:true,isOccluding:actor=>actorBehind(luxe,actor),get ready(){return luxe.ready;},get failed(){return luxe.failed;},get rendererWrapped(){return rendererWrapped;},get depthWrapped(){return depthWrapped;},open:openBoutique});
+  window.KELO_LUXE_KIOSK=Object.freeze({disabled:false,version:'authored-raster-v1.9',asset:luxe.asset.src,source:'tile-registry-architecture-prefab',prefabId:luxe.prefab.id,shop:SHOP,collision:COLLISION,interaction:luxe.prefab.interaction,depthMode:STYLE.depthMode,depthOcclusion:true,renderMode:'formal-back-front-layer-stack-v1',backLayer:'props_back',frontLayer:'props_front',legacyBrownPlaceholdersRemoved:true,isOccluding:actor=>actorBehind(luxe,actor),get ready(){return luxe.ready;},get failed(){return luxe.failed;},get rendererWrapped(){return false;},get depthWrapped(){return false;},get environmentLayerStack(){return backLayerRegistered&&frontLayerRegistered;},open:openBoutique});
   window.KELO_MARKET_PAVILION=Object.freeze({disabled:true,reason:'removed-by-player'});
 })();
