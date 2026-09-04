@@ -3,6 +3,7 @@ const fs=require('fs');
 const vm=require('vm');
 const assert=require('assert');
 
+let saveCalls=0;
 const context={
   console,
   Date,
@@ -19,8 +20,7 @@ const context={
   clearTimeout,
   STATE:{inventory:[],equipmentSlots:{}},
   localPlayer:{},
-  saveCalls:0,
-  saveState(){this.saveCalls++;},
+  saveState(){saveCalls++;},
   window:{}
 };
 context.window=context;
@@ -69,8 +69,7 @@ assert.notEqual(result.newItem.id,potionA.id,'split stack must get unique identi
 
 result=B.sortSlots();
 assert(result.ok);
-const inventoryOrder=context.STATE.inventory.map(x=>x.id);
-const beforeMove=inventoryOrder.slice();
+const beforeMove=context.STATE.inventory.map(x=>x.id);
 slots=B.getSlots();
 a=slots.find(s=>s.item===potionB).index;
 const emptyAfterSort=slots.find(s=>!s.item).index;
@@ -86,13 +85,12 @@ const equipmentIndex=slots.find(s=>s.item&&s.item.kind==='equipment').index;
 result=B.discardSlot(equipmentIndex);
 assert.equal(result.error,'EQUIPMENT_PROTECTED');
 
-slots=B.getSlots();
-const splitItem=slots.find(s=>s.item===result.newItem);
-// result variable now points to protected discard, so resolve the split clone directly.
 const clone=context.STATE.inventory.find(x=>x&&x.splitFrom==='pot_a');
-const cloneIndex=B.getSlots().find(s=>s.item===clone).index;
+assert(clone,'split clone must exist');
+let cloneIndex=B.getSlots().find(s=>s.item===clone).index;
 result=B.discardSlot(cloneIndex,1);
 assert(result.ok&&result.remaining===1,'partial discard should decrement quantity');
+cloneIndex=B.getSlots().find(s=>s.item===clone).index;
 result=B.discardSlot(cloneIndex,1);
 assert(result.ok&&result.remaining===0,'final discard should remove stack instance');
 assert(!context.STATE.inventory.includes(clone));
@@ -100,6 +98,7 @@ assert(!context.STATE.inventory.includes(clone));
 const expanded=B.expandCapacity(5);
 assert(expanded.ok&&expanded.capacity===25,'capacity primitive should expand by one row');
 assert.equal(B.getStats().capacity,25);
+assert(saveCalls>0,'mutating operations should persist state');
 
 console.log('PASS backpack-system-audit',JSON.stringify({
   equipmentVersion:E.version,
@@ -110,5 +109,6 @@ console.log('PASS backpack-system-audit',JSON.stringify({
   stackMerge:true,
   stackSplit:true,
   sort:true,
-  discardProtection:true
+  discardProtection:true,
+  saveCalls
 }));
