@@ -33,7 +33,7 @@ jobs:
       - name: Audit real mobile backpack
         env:
           AUDIT_URL: https://kelffren.github.io/gemini/
-          EXPECTED_TITLE: Kelo World — V6.19
+          EXPECTED_TITLE: Kelo World — V6.20
           CHROME_BIN: /usr/bin/google-chrome
         run: |
           set -o pipefail
