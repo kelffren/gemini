@@ -11,14 +11,31 @@
     collision:Object.freeze({x:1390,y:1492,w:100,h:60})
   });
 
-  if(!L||typeof L.register!=='function'||typeof renderAvatar!=='function'){
+  if(!L||typeof L.register!=='function'||typeof L.drawPostActors!=='function'||typeof renderAvatar!=='function'){
     console.error('[Kelo fountain] environment layer/render hooks unavailable');
     return;
   }
 
+  let postActorBridgeRestored=false;
+  const currentWorld=window.KELO_WORLD_RENDERER;
+  if(currentWorld&&typeof currentWorld.draw==='function'&&typeof currentWorld.drawPostActors!=='function'){
+    window.KELO_WORLD_RENDERER=Object.freeze({
+      __keloPlazaGround:currentWorld.__keloPlazaGround===true,
+      draw:g=>currentWorld.draw(g),
+      drawPostActors:g=>L.drawPostActors(g),
+      districts:currentWorld.districts,
+      chunkSize:currentWorld.chunkSize,
+      get ready(){return currentWorld.ready;},
+      environmentLayerStack:true,
+      postActorLayerStack:true
+    });
+    postActorBridgeRestored=true;
+  }
+
   const audit=window.KELO_PLAZA_FOUNTAIN_AUDIT={
-    version:'plaza-fountain-v1.7',ready:false,backLoaded:false,frontLoaded:false,failed:false,
+    version:'plaza-fountain-v1.8',ready:false,backLoaded:false,frontLoaded:false,failed:false,
     depthMode:'formal-back-front-layer-stack-v1',renderWrapped:false,environmentLayerStack:true,
+    postActorBridgeRestored,postActorBridgeAvailable:typeof window.KELO_WORLD_RENDERER?.drawPostActors==='function',
     backLayer:'props_back',frontLayer:'props_front',backLayerId:'plaza-fountain-back',frontLayerId:'plaza-fountain-front',
     assetMode:'authored-png-layer-pair-v1',alignmentMode:'scaled-centered-lower-rim-v1',
     x:FOUNTAIN.x,y:FOUNTAIN.y,width:FOUNTAIN.w,height:FOUNTAIN.h,baseY:FOUNTAIN.baseY,
@@ -32,7 +49,8 @@
   backImage.decoding='async';frontImage.decoding='async';
 
   function sync(){
-    audit.ready=audit.backLoaded&&audit.frontLoaded&&!audit.failed;
+    audit.postActorBridgeAvailable=typeof window.KELO_WORLD_RENDERER?.drawPostActors==='function';
+    audit.ready=audit.backLoaded&&audit.frontLoaded&&!audit.failed&&audit.postActorBridgeAvailable;
     if(window.KELO_PLAZA_AUDIT){
       window.KELO_PLAZA_AUDIT.fountainVersion=audit.version;
       window.KELO_PLAZA_AUDIT.fountainDepthMode=audit.depthMode;
