@@ -13,6 +13,7 @@
   const img=new Image(); img.decoding='async';
   let ready=false,failed=false;
   const placements=Array.isArray(style.placements)?style.placements:[];
+  const bounds=Object.freeze(placements.map((p,i)=>Object.freeze({id:`${p.district}-${i}`,x:p.x,y:p.y,w:TILE,h:TILE})));
   function origin(id){return{x:(id%A.columns)*TILE,y:Math.floor(id/A.columns)*TILE};}
   function drawOverlay(g){
     if(!ready)return false;
@@ -34,10 +35,11 @@
     window.KELO_DISTRICT_DECAL_AUDIT.visiblePlacementCount=visible;
     return true;
   }
-  layers.register({id:'district-decals',phase:'decals_details',priority:20,required:true,draw:drawOverlay,ready:()=>ready&&!failed});
+  layers.register({id:'district-decals',phase:'decals_details',priority:20,required:true,ownership:style.ownership||'registry-authored-district-decals-v1',bounds,draw:drawOverlay,ready:()=>ready&&!failed});
   window.KELO_DISTRICT_DECAL_AUDIT={
     version:'district-decals-v2',ready:false,assetLoaded:false,failed:false,
     mode:'formal-layer-stack-v1',layer:'decals_details',placementCount:placements.length,visiblePlacementCount:0,
+    boundsCount:bounds.length,ownership:style.ownership||'registry-authored-district-decals-v1',
     atlas:A.id,registryVersion:R.version,rendererWrapper:false,environmentLayerStack:true
   };
   img.onload=function(){
