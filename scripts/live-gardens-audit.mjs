@@ -5,7 +5,7 @@ const base=process.env.AUDIT_URL||'https://kelffren.github.io/gemini/';
 const expectedTitle='Kelo World — V6.22';
 const expectedWorldVersion='world-v1.17';
 const expectedRegistryVersion='1.11.1';
-const expectedCompositionMode='registry-authored-garden-compositions-v17';
+const expectedCompositionMode='registry-authored-garden-compositions-v18';
 const expectedJoinMode='authored-garden-endcaps-mid-variants-v4';
 const expectedGardensMode='authored-organic-garden-overlay-atlas-v2';
 const expectedJunctionMode='registry-authored-four-orientation-t-overlay-v1';
@@ -26,9 +26,9 @@ function valid(s){
   const joins=s.joins,comp=s.composition,world=s.world,junction=s.junction;
   const atlasShape=joins&&joins.width===joins.columns*joins.tileWidth&&joins.height===joins.tileHeight&&joins.columns===9;
   return s.title===expectedTitle&&s.registry?.version===expectedRegistryVersion&&atlasShape&&joins.mode===expectedJoinMode&&
-    comp?.ready&&comp.mode===expectedCompositionMode&&comp.joinMode===expectedJoinMode&&comp.auditRevision==='authored-t-family-v1'&&comp.tJunctionAtlas==='gardens-t-junctions-v1'&&comp.tJunctionOrientationCount===4&&comp.compositionCount===11&&comp.fixedPlacementCount===9&&comp.declaredCellCount===41&&comp.navigationConflictFixCount===14&&comp.tJunctionCount===1&&comp.southeastTJunctionAnchor?.[0]===22&&comp.southeastTJunctionAnchor?.[1]===17&&
-    junction?.ready&&junction.assetLoaded&&junction.version==='gardens-junction-overlay-v1'&&junction.mode===expectedJunctionMode&&junction.atlasId==='gardens-t-junctions-v1'&&junction.orientationCount===4&&junction.placementCount===1&&junction.replacedVirtualCount===1&&
-    world?.ready&&world.version===expectedWorldVersion&&world.gardensMode===expectedGardensMode&&world.gardensJoinMode===expectedJoinMode&&world.gardensCompositionMode===expectedCompositionMode&&world.gardensCompositionCount===11&&world.gardensFixedPlacementCount===9&&world.gardensLandmarkClearance==='east-fountain-footprint-v1';
+    comp?.ready&&comp.mode===expectedCompositionMode&&comp.joinMode===expectedJoinMode&&comp.auditRevision==='authored-t-family-v2'&&comp.tJunctionAtlas==='gardens-t-junctions-v1'&&comp.tJunctionOrientationCount===4&&comp.compositionCount===11&&comp.fixedPlacementCount===7&&comp.declaredCellCount===41&&comp.navigationConflictFixCount===16&&comp.tJunctionCount===2&&comp.southeastTJunctionAnchor?.[0]===22&&comp.southeastTJunctionAnchor?.[1]===17&&comp.southwestTJunctionAnchor?.[0]===5&&comp.southwestTJunctionAnchor?.[1]===17&&
+    junction?.ready&&junction.assetLoaded&&junction.version==='gardens-junction-overlay-v1'&&junction.mode===expectedJunctionMode&&junction.atlasId==='gardens-t-junctions-v1'&&junction.orientationCount===4&&junction.placementCount===2&&junction.replacedVirtualCount===2&&
+    world?.ready&&world.version===expectedWorldVersion&&world.gardensMode===expectedGardensMode&&world.gardensJoinMode===expectedJoinMode&&world.gardensCompositionMode===expectedCompositionMode&&world.gardensCompositionCount===11&&world.gardensFixedPlacementCount===7&&world.gardensLandmarkClearance==='east-fountain-footprint-v1';
 }
 
 let loaded=false,lastState=null;
@@ -40,7 +40,7 @@ for(let attempt=1;attempt<=24;attempt++){
   }catch(e){console.log(`attempt ${attempt}: ${e.message}`)}
   await page.waitForTimeout(10000);
 }
-if(!loaded){fs.writeFileSync('artifacts/gardens-report.json',JSON.stringify({loaded,lastState,consoleErrors,failedRequests,httpErrors},null,2));await browser.close();throw new Error(`LIVE never reached current Gardens v17 contract: ${JSON.stringify(lastState)}`);}
+if(!loaded){fs.writeFileSync('artifacts/gardens-report.json',JSON.stringify({loaded,lastState,consoleErrors,failedRequests,httpErrors},null,2));await browser.close();throw new Error(`LIVE never reached current Gardens v18 contract: ${JSON.stringify(lastState)}`);}
 
 consoleErrors.length=0;failedRequests.length=0;httpErrors.length=0;
 await page.goto(`${base}?gardens-audit=final-${Date.now()}`,{waitUntil:'networkidle',timeout:45000});
@@ -48,7 +48,7 @@ await page.waitForTimeout(1600);
 const shot=await page.evaluate(()=>{
   const c=document.getElementById('game-canvas');
   if(!c||typeof camera==='undefined'||typeof localPlayer==='undefined'||typeof render!=='function')return null;
-  localPlayer.x=1740;localPlayer.y=2680;camera.x=1740;camera.y=2680;camera.targetX=1740;camera.targetY=2680;render();
+  localPlayer.x=1260;localPlayer.y=2680;camera.x=1260;camera.y=2680;camera.targetX=1260;camera.targetY=2680;render();
   return{dataUrl:c.toDataURL('image/png'),canvas:{width:c.width,height:c.height,cssWidth:c.clientWidth,cssHeight:c.clientHeight},registry:window.KELO_TILE_REGISTRY||null,joins:window.KELO_GARDENS_JOINS||null,composition:window.KELO_GARDENS_COMPOSITION_AUDIT||null,junction:window.KELO_GARDENS_JUNCTION_AUDIT||null,world:window.KELO_WORLD_AUDIT||null,landmark:window.KELO_GARDEN_LANDMARK_AUDIT||null};
 });
 if(shot?.dataUrl?.startsWith('data:image/png;base64,'))fs.writeFileSync('artifacts/live-gardens-marble.png',Buffer.from(shot.dataUrl.split(',')[1],'base64'));
@@ -58,7 +58,7 @@ fs.writeFileSync('artifacts/gardens-report.json',JSON.stringify(report,null,2));
 console.log(JSON.stringify(report,null,2));
 await browser.close();
 if(!shot?.dataUrl?.startsWith('data:image/png;base64,'))throw new Error('Gardens screenshot missing');
-if(!valid(finalState))throw new Error(`Final Gardens v17 contract invalid: ${JSON.stringify(finalState)}`);
+if(!valid(finalState))throw new Error(`Final Gardens v18 contract invalid: ${JSON.stringify(finalState)}`);
 if(shot.canvas?.cssWidth!==390||shot.canvas?.cssHeight!==844||shot.canvas?.width!==780||shot.canvas?.height!==1688)throw new Error(`Mobile canvas mismatch: ${JSON.stringify(shot.canvas)}`);
 if(!shot.landmark?.ready||shot.landmark?.failed)throw new Error(`Gardens landmark invalid: ${JSON.stringify(shot.landmark)}`);
 if(consoleErrors.length)throw new Error(`Console/page errors: ${JSON.stringify(consoleErrors)}`);
