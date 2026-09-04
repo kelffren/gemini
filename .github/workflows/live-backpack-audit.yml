@@ -12,6 +12,7 @@ on:
       - 'src/systems/backpack-system.js'
       - 'src/ui/backpack-ui.js'
       - 'scripts/live-backpack-audit.mjs'
+      - 'scripts/live-backpack-cdp-audit.mjs'
       - '.github/workflows/live-backpack-audit.yml'
 
 jobs:
@@ -28,9 +29,7 @@ jobs:
           node --check src/abilities/stone-backpack-bridge.js
           node --check src/systems/backpack-system.js
           node --check src/ui/backpack-ui.js
-          node --check scripts/live-backpack-audit.mjs
-      - name: Install Playwright
-        run: npm install --no-save playwright@1.55.0
+          node --check scripts/live-backpack-cdp-audit.mjs
       - name: Audit real mobile backpack
         env:
           AUDIT_URL: https://kelffren.github.io/gemini/
@@ -39,7 +38,7 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p artifacts
-          node scripts/live-backpack-audit.mjs 2>&1 | tee artifacts/backpack-audit.log
+          node scripts/live-backpack-cdp-audit.mjs 2>&1 | tee artifacts/backpack-audit.log
       - name: Upload evidence
         if: always()
         uses: actions/upload-artifact@v4
