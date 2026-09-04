@@ -15,7 +15,7 @@ function valid(s){
  return j?.id==='gardens-joins-v5'&&j?.tiles?.HEDGE_T_NWS===undefined&&Object.keys(j?.virtualTiles||{}).length===0&&
  tr?.ready&&tr?.version==='gardens-t-junction-registry-v1'&&tr?.registryVersion==='1.10.27'&&tr?.atlasId==='gardens-t-junctions-v1'&&tr?.registryKey==='gardensTJunctions'&&tr?.orientationCount===4&&tr?.firstClassRegistryAtlas===true&&
  c?.ready&&c?.version==='gardens-compositions-v20'&&c?.mode==='registry-authored-garden-compositions-v20'&&c?.tJunctionRegistryOwned===true&&c?.declaredCellCount===41&&c?.tJunctionCount===2&&
- l?.ready&&l?.version==='environment-layer-stack-v1'&&l?.mode==='formal-environment-layer-order-v1'&&Array.isArray(l?.phases)&&l.phases.includes('props_back')&&tLayer?.phase==='props_back'&&tLayer?.required===true&&tLayer?.ready===true&&
+ l?.ready&&l?.version==='environment-layer-stack-v2'&&l?.mode==='formal-pre-post-actor-layer-order-v1'&&l?.orderingPolicy==='phase-priority-id-v1'&&Number.isInteger(l?.priorityTieCount)&&Array.isArray(l?.priorityTies)&&Array.isArray(l?.phases)&&l.phases.includes('props_back')&&tLayer?.phase==='props_back'&&tLayer?.required===true&&tLayer?.ready===true&&Number.isInteger(tLayer?.orderIndex)&&typeof tLayer?.orderKey==='string'&&
  o?.ready&&o?.assetLoaded&&o?.version==='gardens-junction-layer-v4'&&o?.mode==='formal-props-back-t-junction-layer-v1'&&o?.registryKey==='gardensTJunctions'&&o?.registryOwned===true&&o?.placementCount===2&&o?.authoredPlacementCount===2&&o?.ownership==='tile-registry-formal-layer-v1'&&o?.layerId==='gardens-t-junctions'&&o?.layerPhase==='props_back'&&
  w?.ready&&w?.gardensJoinAssetLoaded&&w?.version==='world-v1.18'&&w?.legacyTJunctionSpecialCase===false&&s.landmark?.ready&&!s.landmark?.failed;
 }
