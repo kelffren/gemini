@@ -34,11 +34,15 @@ jobs:
           grep -q "HEDGE_MID_ALT:6" src/environment/gardens-joins.js
           grep -q "FLOWER_MID_ALT:7" src/environment/gardens-joins.js
           grep -q "HEDGE_V_ALT:8" src/environment/gardens-joins.js
-          grep -q "registry-authored-garden-compositions-v14" src/environment/gardens-compositions.js
-          grep -q "connected-southeast-l-boundary-v1" src/environment/gardens-compositions.js
-          grep -q "connectedJunctionCount:1" src/environment/gardens-compositions.js
+          grep -q "registry-authored-garden-compositions-v15" src/environment/gardens-compositions.js
+          grep -q "connected-south-boundaries-v2" src/environment/gardens-compositions.js
+          grep -q "connectedJunctionCount:2" src/environment/gardens-compositions.js
           grep -q "southeastJunctionCorner:Object.freeze(\[22,17\])" src/environment/gardens-compositions.js
           grep -q "southeastHorizontalRunAnchor:Object.freeze(\[18,17\])" src/environment/gardens-compositions.js
+          grep -q "southwestJunctionCorner:Object.freeze(\[5,17\])" src/environment/gardens-compositions.js
+          grep -q "southwestHorizontalRunAnchor:Object.freeze(\[6,17\])" src/environment/gardens-compositions.js
+          grep -q "southwestVerticalRunAnchor:Object.freeze(\[5,14\])" src/environment/gardens-compositions.js
+          grep -q "auditRevision:'southwest-l-v1'" src/environment/gardens-compositions.js
           grep -q "registry-authored-fixed-accents-v1" src/environment/gardens-compositions.js
           grep -q "authored-road-clear-placements-v8" src/environment/gardens-compositions.js
           grep -q "navigationConflictFixCount:13" src/environment/gardens-compositions.js
