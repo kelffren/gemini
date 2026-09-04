@@ -3,7 +3,7 @@ const fs=require('fs'),vm=require('vm'),assert=require('assert');
 let saveCalls=0;
 const context={console,Date,Math,Map,Set,Object,Array,Number,String,JSON,Promise,setTimeout,clearTimeout,STATE:{inventory:[],equipmentSlots:{}},localPlayer:{},saveState(){saveCalls++;},window:{}};context.window=context;vm.createContext(context);
 for(const file of ['src/systems/equipment-system.js','src/systems/backpack-system.js','src/systems/container-system.js'])vm.runInContext(fs.readFileSync(file,'utf8'),context,{filename:file});
-const E=context.KeloEquipment,B=context.KeloBackpack,C=context.KeloContainers;assert(E&&B&&C);assert.equal(E.version,'equipment-v1.1.1');assert.equal(B.version,'backpack-v1.1.0');assert.equal(C.version,'container-v1.0.0');
+const E=context.KeloEquipment,B=context.KeloBackpack,C=context.KeloContainers;assert(E&&B&&C);assert.equal(E.version,'equipment-v1.1.2');assert.equal(B.version,'backpack-v1.1.0');assert.equal(C.version,'container-v1.1.0');
 const totalQty=()=>context.STATE.inventory.concat(context.STATE.warehouse.items).reduce((n,x)=>n+Math.max(1,Number(x.quantity)||1),0);
 const keys=()=>context.STATE.inventory.concat(context.STATE.warehouse.items).map((x,i)=>C.keyForItem(x,i));
 const assertUnique=()=>assert.equal(new Set(keys()).size,keys().length,'identity must be unique across containers');
