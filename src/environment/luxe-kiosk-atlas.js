@@ -79,7 +79,17 @@
   function installWorldLayer(){
     const base=window.KELO_WORLD_RENDERER;if(!base||typeof base.draw!=='function')return false;
     if(base.__keloArchitecturePrefabs){rendererWrapped=true;return true;}
-    window.KELO_WORLD_RENDERER=Object.freeze({__keloArchitecturePrefabs:true,draw(g){const ok=base.draw(g);if(ok===true)drawAll(g);return ok;},districts:base.districts,chunkSize:base.chunkSize,get ready(){return base.ready;}});
+    const wrapped={
+      __keloArchitecturePrefabs:true,
+      draw(g){const ok=base.draw(g);if(ok===true)drawAll(g);return ok;},
+      districts:base.districts,
+      chunkSize:base.chunkSize,
+      get ready(){return base.ready;}
+    };
+    if(typeof base.drawPostActors==='function')wrapped.drawPostActors=g=>base.drawPostActors(g);
+    if(base.environmentLayerStack===true)wrapped.environmentLayerStack=true;
+    if(base.postActorLayerStack===true)wrapped.postActorLayerStack=true;
+    window.KELO_WORLD_RENDERER=Object.freeze(wrapped);
     rendererWrapped=true;return true;
   }
   function installDepthLayer(){
@@ -107,7 +117,7 @@
   function install(){installLegacyVisualReplacements();installWorldLayer();installDepthLayer();}
   install();setTimeout(install,120);setTimeout(install,600);
 
-  window.KELO_ARCHITECTURE_RENDERER=Object.freeze({version:'architecture-prefab-renderer-v1.4',mode:'luxe-only-v1',prefabCount:entries.length,depthMode:STYLE.depthMode,get ready(){return entries.every(e=>e.ready&&!e.failed);},get rendererWrapped(){return rendererWrapped;},get depthWrapped(){return depthWrapped;},getEntry});
+  window.KELO_ARCHITECTURE_RENDERER=Object.freeze({version:'architecture-prefab-renderer-v1.4',mode:'luxe-only-v1',prefabCount:entries.length,depthMode:STYLE.depthMode,get ready(){return entries.every(e=>e.ready&&!e.failed);},get rendererWrapped(){return rendererWrapped;},get depthWrapped(){return depthWrapped;},get postActorContractPreserved(){return typeof window.KELO_WORLD_RENDERER?.drawPostActors==='function';},getEntry});
 
   const luxe=getState('luxeBoutique');
   if(!luxe){console.error('[Kelo architecture] luxe prefab missing');return;}
