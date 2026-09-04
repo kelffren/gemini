@@ -16,26 +16,16 @@
     return;
   }
 
-  let postActorBridgeRestored=false;
   const currentWorld=window.KELO_WORLD_RENDERER;
-  if(currentWorld&&typeof currentWorld.draw==='function'&&typeof currentWorld.drawPostActors!=='function'){
-    window.KELO_WORLD_RENDERER=Object.freeze({
-      __keloPlazaGround:currentWorld.__keloPlazaGround===true,
-      draw:g=>currentWorld.draw(g),
-      drawPostActors:g=>L.drawPostActors(g),
-      districts:currentWorld.districts,
-      chunkSize:currentWorld.chunkSize,
-      get ready(){return currentWorld.ready;},
-      environmentLayerStack:true,
-      postActorLayerStack:true
-    });
-    postActorBridgeRestored=true;
+  if(!currentWorld||typeof currentWorld.draw!=='function'||typeof currentWorld.drawPostActors!=='function'){
+    console.error('[Kelo fountain] post-actor bridge unavailable; refusing local renderer repair');
+    return;
   }
 
   const audit=window.KELO_PLAZA_FOUNTAIN_AUDIT={
-    version:'plaza-fountain-v1.8',ready:false,backLoaded:false,frontLoaded:false,failed:false,
+    version:'plaza-fountain-v1.9',ready:false,backLoaded:false,frontLoaded:false,failed:false,
     depthMode:'formal-back-front-layer-stack-v1',renderWrapped:false,environmentLayerStack:true,
-    postActorBridgeRestored,postActorBridgeAvailable:typeof window.KELO_WORLD_RENDERER?.drawPostActors==='function',
+    postActorBridgeRestored:false,postActorBridgeAvailable:true,bridgePolicy:'upstream-contract-required-v1',
     backLayer:'props_back',frontLayer:'props_front',backLayerId:'plaza-fountain-back',frontLayerId:'plaza-fountain-front',
     assetMode:'authored-png-layer-pair-v1',alignmentMode:'scaled-centered-lower-rim-v1',
     x:FOUNTAIN.x,y:FOUNTAIN.y,width:FOUNTAIN.w,height:FOUNTAIN.h,baseY:FOUNTAIN.baseY,
