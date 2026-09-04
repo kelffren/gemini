@@ -11,6 +11,7 @@ on:
       - 'src/environment/world-map.js'
       - 'scripts/validate-gardens-placements.mjs'
       - 'scripts/live-gardens-variants-audit.mjs'
+      - 'scripts/live-gardens-audit.mjs'
       - '.github/workflows/live-gardens-audit.yml'
   workflow_dispatch:
 jobs:
@@ -32,21 +33,23 @@ jobs:
           node --check src/environment/world-map.js
           node --check scripts/validate-gardens-placements.mjs
           node --check scripts/live-gardens-variants-audit.mjs
+          node --check scripts/live-gardens-audit.mjs
           grep -q 'width="128" height="32"' assets/gardens-t-junctions-v1.svg
           grep -q "gardens-joins-v4" src/environment/gardens-joins.js
           grep -q "authored-garden-endcaps-mid-variants-v4" src/environment/gardens-joins.js
           grep -q "HEDGE_T_NWS:-1" src/environment/gardens-joins.js
-          grep -q "registry-authored-garden-compositions-v17" src/environment/gardens-compositions.js
-          grep -q "authored-four-orientation-t-family-v4" src/environment/gardens-compositions.js
+          grep -q "registry-authored-garden-compositions-v18" src/environment/gardens-compositions.js
+          grep -q "authored-four-orientation-t-family-v5" src/environment/gardens-compositions.js
           grep -q "gardens-t-junctions-v1" src/environment/gardens-compositions.js
           grep -q "tJunctionOrientationCount:4" src/environment/gardens-compositions.js
-          grep -q "connectedJunctionCount:3" src/environment/gardens-compositions.js
-          grep -q "tJunctionCount:1" src/environment/gardens-compositions.js
+          grep -q "connectedJunctionCount:4" src/environment/gardens-compositions.js
+          grep -q "tJunctionCount:2" src/environment/gardens-compositions.js
           grep -q "southeastTJunctionAnchor:Object.freeze(\[22,17\])" src/environment/gardens-compositions.js
-          grep -q "auditRevision:'authored-t-family-v1'" src/environment/gardens-compositions.js
-          grep -q "registry-authored-fixed-accents-v2" src/environment/gardens-compositions.js
-          grep -q "authored-road-clear-placements-v9" src/environment/gardens-compositions.js
-          grep -q "navigationConflictFixCount:14" src/environment/gardens-compositions.js
+          grep -q "southwestTJunctionAnchor:Object.freeze(\[5,17\])" src/environment/gardens-compositions.js
+          grep -q "auditRevision:'authored-t-family-v2'" src/environment/gardens-compositions.js
+          grep -q "registry-authored-fixed-accents-v3" src/environment/gardens-compositions.js
+          grep -q "authored-road-clear-placements-v10" src/environment/gardens-compositions.js
+          grep -q "navigationConflictFixCount:16" src/environment/gardens-compositions.js
           grep -q "declaredCellCount" src/environment/gardens-compositions.js
           grep -q "world-v1.17" src/environment/world-map.js
           grep -q "gardens-junction-overlay-v1" src/environment/gardens-junction-overlay.js
