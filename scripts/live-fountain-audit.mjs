@@ -3,7 +3,7 @@ import { chromium } from 'playwright';
 
 const base=process.env.AUDIT_URL||'https://kelffren.github.io/gemini/';
 const expectedTitle=process.env.EXPECTED_TITLE||'';
-const expectedFountain=process.env.EXPECTED_FOUNTAIN||'plaza-fountain-v1.8';
+const expectedFountain=process.env.EXPECTED_FOUNTAIN||'plaza-fountain-v1.9';
 fs.mkdirSync('artifacts',{recursive:true});
 const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_BIN||'/usr/bin/google-chrome',args:['--no-sandbox','--disable-dev-shm-usage']});
 const context=await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true});
@@ -20,7 +20,8 @@ function contractOk(d){
   const front=l?.layers?.find(x=>x.id==='plaza-fountain-front');
   return (!expectedTitle||d.title===expectedTitle)&&f?.ready&&!f?.failed&&f?.version===expectedFountain&&
     f?.assetMode==='authored-png-layer-pair-v1'&&f?.alignmentMode==='scaled-centered-lower-rim-v1'&&
-    f?.environmentLayerStack===true&&f?.renderWrapped===false&&f?.postActorBridgeAvailable===true&&f?.depthMode==='formal-back-front-layer-stack-v1'&&
+    f?.environmentLayerStack===true&&f?.renderWrapped===false&&f?.postActorBridgeAvailable===true&&f?.postActorBridgeRestored===false&&
+    f?.bridgePolicy==='upstream-contract-required-v1'&&f?.depthMode==='formal-back-front-layer-stack-v1'&&
     back?.phase==='props_back'&&back?.timing==='pre_actor'&&front?.phase==='props_front'&&front?.timing==='post_actor'&&
     d.plaza?.fountainReady;
 }
@@ -59,8 +60,6 @@ async function capture(name,y){
   delete result.dataUrl;return result;
 }
 
-// Capture two real full renders on opposite sides of the formal baseY contract.
-// Do not gate on the mutable lastLocalDepth telemetry because the active animation loop may overwrite it between frames.
 const behind=await capture('live-fountain-behind',1570);
 const front=await capture('live-fountain-front',1620);
 const state=await page.evaluate(()=>({title:document.title,fountain:{...window.KELO_PLAZA_FOUNTAIN_AUDIT},plaza:window.KELO_PLAZA_AUDIT||null,layers:window.KELO_ENVIRONMENT_LAYER_AUDIT||null,canvas:(()=>{const c=document.getElementById('game-canvas');return{width:c.width,height:c.height,cssWidth:c.clientWidth,cssHeight:c.clientHeight}})()}));
