@@ -1,7 +1,7 @@
 (function(){
 'use strict';
 
-const VERSION='backpack-ui-v1.0.1';
+const VERSION='backpack-ui-v1.1.0';
 let selected=null;
 let moveMode=false;
 
@@ -20,6 +20,7 @@ function css(){
     #kelo-bag .kb-slot{position:relative;width:52px;height:52px;border:1px solid rgba(184,197,188,.18);border-radius:11px;background:linear-gradient(145deg,rgba(255,255,255,.045),rgba(0,0,0,.15));color:#e8ede8;display:grid;place-items:center;padding:0;touch-action:manipulation;box-shadow:inset 0 0 0 1px rgba(255,255,255,.018)}
     #kelo-bag .kb-slot:active{transform:scale(.96)}
     #kelo-bag .kb-slot.selected{border-color:#e7c56a;box-shadow:0 0 0 2px rgba(231,197,106,.13),inset 0 0 0 1px rgba(231,197,106,.18)}
+    #kelo-bag .kb-slot.equipped:after{content:'E';position:absolute;right:3px;top:3px;min-width:14px;height:14px;border-radius:7px;background:#e7c56a;color:#18201d;font-size:8px;font-weight:950;display:grid;place-items:center}
     #kelo-bag .kb-slot.move-target{border-style:dashed;border-color:rgba(231,197,106,.62)}
     #kelo-bag .kb-icon{font-size:22px;line-height:1;filter:drop-shadow(0 2px 3px rgba(0,0,0,.25))}
     #kelo-bag .kb-qty{position:absolute;right:4px;bottom:3px;min-width:15px;padding:1px 3px;border-radius:6px;background:rgba(5,9,11,.9);font-size:9px;font-weight:900;color:#fff;text-align:center}
@@ -29,7 +30,8 @@ function css(){
     #kelo-bag .kb-empty-detail{display:grid;place-items:center;min-height:66px;color:#71817a;font-size:10px;text-align:center}
     #kelo-bag .kb-name{font-size:12px;font-weight:900;color:#f4efd9}.kb-meta{margin-top:3px;font-size:9px;color:#8fa198}
     #kelo-bag .kb-actions{display:flex;gap:7px;margin-top:9px;flex-wrap:wrap}
-    #kelo-bag .kb-action{min-height:38px;padding:0 12px;border-radius:10px;border:1px solid rgba(231,197,106,.34);background:rgba(255,255,255,.035);color:#c7d1cb;font-size:10px;font-weight:850;touch-action:manipulation}
+    #kelo-bag .kb-action{min-height:40px;padding:0 12px;border-radius:10px;border:1px solid rgba(231,197,106,.34);background:rgba(255,255,255,.035);color:#c7d1cb;font-size:10px;font-weight:850;touch-action:manipulation}
+    #kelo-bag .kb-action.primary{background:rgba(231,197,106,.12);color:#f0db9b;border-color:rgba(231,197,106,.5)}
     #kelo-bag .kb-move-note{margin-top:8px;padding:7px 9px;border-radius:9px;background:rgba(231,197,106,.08);color:#e5d18b;font-size:9px}
     @media(max-width:340px){#kelo-bag .kb-grid{grid-template-columns:repeat(5,49px);gap:5px}#kelo-bag .kb-slot{width:49px;height:49px}}
   `;
@@ -37,6 +39,7 @@ function css(){
 }
 
 function rarityClass(rarity){return String(rarity||'').toLowerCase().replace(/[^a-z0-9_-]/g,'');}
+function isEquipped(item){return !!(item&&item.kind==='equipment'&&window.KeloEquipment&&typeof window.KeloEquipment.isEquipped==='function'&&window.KeloEquipment.isEquipped(item.id));}
 function panel(){
   css();
   let root=document.getElementById('kelo-bag');
@@ -64,9 +67,9 @@ function render(){
     const d=slot.descriptor;
     const btn=document.createElement('button');
     btn.type='button';
-    btn.className='kb-slot'+(selected===slot.index?' selected':'')+(moveMode&&selected!==slot.index?' move-target':'');
+    btn.className='kb-slot'+(selected===slot.index?' selected':'')+(moveMode&&selected!==slot.index?' move-target':'')+(slot.item&&isEquipped(slot.item)?' equipped':'');
     btn.dataset.slot=String(slot.index);
-    btn.setAttribute('aria-label',d?('Slot '+(slot.index+1)+': '+d.name):('Slot '+(slot.index+1)+' vacío'));
+    btn.setAttribute('aria-label',d?('Slot '+(slot.index+1)+': '+d.name+(slot.item&&isEquipped(slot.item)?' equipado':'')):('Slot '+(slot.index+1)+' vacío'));
     if(d){
       btn.innerHTML='<span class="kb-rarity '+rarityClass(d.rarity)+'"></span><span class="kb-icon"></span>'+(d.quantity>1?'<span class="kb-qty"></span>':'');
       btn.querySelector('.kb-icon').textContent=d.icon;
@@ -83,8 +86,20 @@ function render(){
     const d=active.descriptor;
     detail.innerHTML='<div class="kb-name"></div><div class="kb-meta"></div><div class="kb-actions"></div>'+(moveMode?'<div class="kb-move-note">Toca otro slot para mover o intercambiar este objeto.</div>':'');
     detail.querySelector('.kb-name').textContent=d.icon+' '+d.name;
-    detail.querySelector('.kb-meta').textContent=[d.rarity,d.category,d.bound?'Vinculado':'No vinculado',d.quantity>1?'x'+d.quantity:null].filter(Boolean).join(' · ');
+    detail.querySelector('.kb-meta').textContent=[d.rarity,d.category,d.bound?'Vinculado':'No vinculado',d.quantity>1?'x'+d.quantity:null,isEquipped(active.item)?'Equipado':null].filter(Boolean).join(' · ');
     const actions=detail.querySelector('.kb-actions');
+    if(d.category==='equipment'&&window.KeloEquipment){
+      const equipped=isEquipped(active.item);
+      const equip=document.createElement('button');
+      equip.className='kb-action primary';
+      equip.textContent=equipped?'Desequipar':'Equipar';
+      equip.onclick=function(){
+        const result=equipped?window.KeloEquipment.unequipItem(active.item.slot):window.KeloEquipment.equipItem(active.item.id);
+        if(result&&result.ok&&typeof showToast==='function')showToast(equipped?'Objeto desequipado':'Objeto equipado');
+        render();
+      };
+      actions.appendChild(equip);
+    }
     const move=document.createElement('button');
     move.className='kb-action';move.textContent=moveMode?'Cancelar mover':'Mover';
     move.onclick=function(){moveMode=!moveMode;render();};actions.appendChild(move);
@@ -114,5 +129,5 @@ function close(){const root=document.getElementById('kelo-bag');if(root)root.sty
 const previous=window.KeloSocialUI||{};
 window.KeloSocialUI=Object.freeze(Object.assign({},previous,{openBag:open,closeBag:close}));
 window.KeloBackpackUI=Object.freeze({version:VERSION,open,close,render});
-window.KELO_BACKPACK_UI_AUDIT=Object.freeze({version:VERSION,interaction:'tap-select-move-target-v1',columns:5,slotTargetPx:52,dragDrop:false,detailPanel:true,equipmentAction:false});
+window.KELO_BACKPACK_UI_AUDIT=Object.freeze({version:VERSION,interaction:'tap-select-move-target-v1',columns:5,slotTargetPx:52,dragDrop:false,detailPanel:true,equipmentAction:true,equipmentActionMode:'explicit-empty-slot-v1'});
 })();
