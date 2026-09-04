@@ -27,7 +27,7 @@ jobs:
       - name: Audit real mobile panel scrolling
         env:
           AUDIT_URL: https://kelffren.github.io/gemini/
-          EXPECTED_TITLE: Kelo World — V6.14
+          EXPECTED_TITLE: Kelo World — V6.20
           CHROME_BIN: /usr/bin/google-chrome
         run: node scripts/live-ui-scroll-audit.mjs
       - name: Upload evidence
