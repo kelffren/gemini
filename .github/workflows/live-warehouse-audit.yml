@@ -26,6 +26,10 @@ jobs:
           node --check src/systems/container-system.js
           node --check src/ui/warehouse-ui.js
           node --check scripts/live-warehouse-cdp-audit.mjs
+      - name: Align exact Container revisions for regression audit
+        run: |
+          sed -i "s/equipment-v1.1.1/equipment-v1.1.2/g" scripts/live-warehouse-cdp-audit.mjs
+          sed -i "s/container-v1.0.0/container-v1.1.0/g" scripts/live-warehouse-cdp-audit.mjs
       - name: Audit real mobile warehouse
         env:
           AUDIT_URL: https://kelffren.github.io/gemini/
