@@ -869,6 +869,17 @@ Kelo World is no longer allowed to remain a single polished plaza floating in a 
 - Visual inspection of the final overlap frame confirmed the NW tree is behind Kelo Luxe rather than painted over its roof, while the tree remains visible beside/behind the building and the plaza remains readable.
 - Durable rule: do not renumber equal layer priorities just because they tie. First declare bounds/ownership, prove a real spatial overlap, then add the smallest semantic priority rule needed to resolve that overlap. Extend spatial bounds to remaining prop layers before adding more dense scenery.
 
+
+## Validated Spatial Ownership Coverage — Fountain + Gardens T-junctions / 2026-09-04
+- Extended the existing `environment-layer-stack-v2.2` spatial contract to two previously unowned formal prop families without changing their visuals, placement or gameplay semantics.
+- Plaza fountain formal layers now declare `ownership='plaza-fountain-v1'` with one exact AABB for `plaza-fountain-back` and one exact AABB for `plaza-fountain-front`; the existing authored PNG pair, placement, base-Y and collider are unchanged.
+- Gardens authored T-junctions now declare `ownership='gardens-t-junctions-v1'` and one 32x32 AABB per registry/composition placement. The validated LIVE state contains two T placements and therefore two spatial bounds; atlas, orientations, positions, density and navigation are unchanged.
+- `scripts/live-layer-spatial-audit.mjs` now cache-busts and explicitly gates these ownership/bounds contracts so a future same-phase overlap involving fountain or Gardens junctions becomes observable instead of remaining `ownership='unspecified'` / `boundsCount=0`.
+- Certified runtime head `11f32af9a05fd64dbaab3b11818b272f8b0ed834` passed Kelo CI, GitHub Pages and the complete mobile LIVE audit at 390x844 CSS / 780x1688 physical pixels.
+- LIVE spatial diagnostics remained stable: `spatialOverlapCount=2`, `spatialTieCount=0`; the only physical overlaps are the already-known Plaza Nature ↔ Kelo Luxe pair, both resolved by priority. Fountain and Gardens T-junction bounds introduced no new spatial conflict. Final report had `consoleErrors=[]`, `failedRequests=[]`, `httpErrors=[]`.
+- Manual inspection of the LIVE overlap frame confirmed no new seam, clipping or ordering regression; Kelo Luxe, Plaza Nature, marble paths, hero and nearby environment remain readable on mobile.
+- Durable next step: `district-decals` is now the clearest formal environment layer still reporting `ownership='unspecified'` and `boundsCount=0`. Before increasing decorative density, give its 13 registry-authored placements spatial ownership/bounds so the same overlap gate can reason about decals versus future detail/prop families.
+
 ## Non-goals During Visual Passes
 Do not casually alter unrelated systems such as:
 - core movement feel;
