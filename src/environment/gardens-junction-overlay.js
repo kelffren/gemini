@@ -15,12 +15,13 @@ for(const comp of GC.compositions||[]){
     }
   }
 }
+const spatialBounds=()=>placements.map((p,i)=>({id:`gardens-t-${i}-${p.id}`,x:(ORIGIN_X+p.lx)*TILE,y:(ORIGIN_Y+p.ly)*TILE,w:TILE,h:TILE}));
 const img=new Image();
 let assetReady=false;
 window.KELO_GARDENS_JUNCTION_AUDIT={
   version:'gardens-junction-layer-v4',ready:false,assetLoaded:false,mode:'formal-props-back-t-junction-layer-v1',
   atlasId:A.id,registryKey:'gardensTJunctions',registryOwned:true,atlasWidth:A.width,atlasHeight:A.height,orientationCount:Object.keys(A.orientations||{}).length,placementCount:placements.length,
-  authoredPlacementCount:placements.length,legacyVirtualOwnership:false,ownership:'tile-registry-formal-layer-v1',layerStackVersion:L.version,layerId:'gardens-t-junctions',layerPhase:'props_back',localOrigin:Object.freeze([ORIGIN_X,ORIGIN_Y])
+  authoredPlacementCount:placements.length,legacyVirtualOwnership:false,ownership:'tile-registry-formal-layer-v1',spatialOwnership:'gardens-t-junctions-v1',spatialBoundsCount:placements.length,layerStackVersion:L.version,layerId:'gardens-t-junctions',layerPhase:'props_back',localOrigin:Object.freeze([ORIGIN_X,ORIGIN_Y])
 };
 function drawLayer(g){
   if(!assetReady||!placements.length)return;
@@ -31,7 +32,7 @@ function drawLayer(g){
   }
   g.imageSmoothingEnabled=prev;
 }
-L.register({id:'gardens-t-junctions',phase:'props_back',priority:20,required:true,ready:()=>assetReady,draw:drawLayer});
+L.register({id:'gardens-t-junctions',phase:'props_back',priority:20,required:true,ready:()=>assetReady,draw:drawLayer,ownership:'gardens-t-junctions-v1',bounds:spatialBounds});
 img.onload=function(){
   if(img.naturalWidth!==A.width||img.naturalHeight!==A.height){console.error('[Kelo gardens junctions] invalid atlas dimensions',img.naturalWidth,img.naturalHeight);return;}
   assetReady=true;Object.assign(window.KELO_GARDENS_JUNCTION_AUDIT,{ready:true,assetLoaded:true});
