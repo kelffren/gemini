@@ -4,9 +4,9 @@
   const A=R?.atlases?.districtDecals;
   const T=R?.districtDecalTiles;
   const style=R?.styles?.districtDecals;
-  const base=window.KELO_WORLD_RENDERER;
-  if(!A||!T||!style||!base||typeof base.draw!=='function'){
-    console.error('[Kelo district decals] registry or world renderer missing');
+  const layers=window.KELO_ENVIRONMENT_LAYERS;
+  if(!A||!T||!style||!layers||typeof layers.register!=='function'){
+    console.error('[Kelo district decals] registry or environment layer stack missing');
     return;
   }
   const TILE=R.worldTileSize||32;
@@ -34,16 +34,11 @@
     window.KELO_DISTRICT_DECAL_AUDIT.visiblePlacementCount=visible;
     return true;
   }
-  window.KELO_WORLD_RENDERER=Object.freeze({
-    ...base,
-    draw(g){const ok=base.draw(g)===true;if(ok)drawOverlay(g);return ok;},
-    districtDecalMode:style.mode,
-    districtDecalCount:placements.length
-  });
+  layers.register({id:'district-decals',phase:'decals_details',priority:20,required:true,draw:drawOverlay,ready:()=>ready&&!failed});
   window.KELO_DISTRICT_DECAL_AUDIT={
-    version:'district-decals-v1',ready:false,assetLoaded:false,failed:false,
-    mode:style.mode,layer:style.layer,placementCount:placements.length,visiblePlacementCount:0,
-    atlas:A.id,registryVersion:R.version
+    version:'district-decals-v2',ready:false,assetLoaded:false,failed:false,
+    mode:'formal-layer-stack-v1',layer:'decals_details',placementCount:placements.length,visiblePlacementCount:0,
+    atlas:A.id,registryVersion:R.version,rendererWrapper:false,environmentLayerStack:true
   };
   img.onload=function(){
     if(img.naturalWidth!==A.width||img.naturalHeight!==A.height){
