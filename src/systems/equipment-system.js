@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-const VERSION='equipment-v1.1.0';
+const VERSION='equipment-v1.1.1';
 const SLOTS=['weapon','helmet','chest','gloves','boots','accessory','necklace','ring','belt'];
 const CORE_SLOTS=['weapon','helmet','chest','gloves','boots','accessory'];
 const QUALITY_NAMES={1:'Normal',2:'Common',3:'Enhanced',4:'Delicate',5:'Good',6:'Superior',7:'Classic',8:'Eternal',9:'Epic'};
@@ -17,6 +17,7 @@ function template(slot){
  const specials={attackPct:slot==='weapon'||slot==='ring'?2:0,defensePct:['helmet','chest','boots','belt'].includes(slot)?2:0,hpPct:['chest','accessory','necklace'].includes(slot)?2:0};
  return {id:uid(slot),templateId:'starter_'+slot,name:'Equipo '+SLOT_LABELS[slot],slot,itemLevel:1,quality:1,grade:1,baseStats:bases[slot],specialStats:specials,bound:false,createdAt:Date.now(),kind:'equipment'};
 }
+function warehouseItems(){return STATE.warehouse&&Array.isArray(STATE.warehouse.items)?STATE.warehouse.items:[];}
 function hasSlotState(slot){return Object.prototype.hasOwnProperty.call(STATE.equipmentSlots,slot);}
 function ensure(){
  if(typeof STATE==='undefined')return null;
@@ -26,10 +27,13 @@ function ensure(){
   if(!Array.isArray(STATE.inventory))STATE.inventory=[];
   if(!STATE.equipmentSlots||typeof STATE.equipmentSlots!=='object')STATE.equipmentSlots={};
   SLOTS.forEach(function(slot){
-   let item=STATE.inventory.find(function(x){return x&&x.kind==='equipment'&&x.id===uid(slot)});
-   if(!item){item=template(slot);STATE.inventory.push(item);}
+   let portable=STATE.inventory.find(function(x){return x&&x.kind==='equipment'&&x.id===uid(slot)});
+   let stored=!portable?warehouseItems().find(function(x){return x&&x.kind==='equipment'&&x.id===uid(slot)}):null;
+   let item=portable||stored;
+   if(!item){item=template(slot);STATE.inventory.push(item);portable=item;}
    item.slot=slot;item.quality=clampTier(item.quality);item.grade=clampTier(item.grade);item.itemLevel=Math.max(1,Math.floor(Number(item.itemLevel)||1));
-   if(!hasSlotState(slot))STATE.equipmentSlots[slot]=item.id;
+   if(!hasSlotState(slot))STATE.equipmentSlots[slot]=portable?item.id:null;
+   if(stored&&STATE.equipmentSlots[slot]===item.id)STATE.equipmentSlots[slot]=null;
   });
  }finally{ensuring=false;}
  if(typeof localPlayer!=='undefined')recalculate(localPlayer,true);
@@ -54,5 +58,5 @@ function applyServerItem(serverItem){ensure();if(!serverItem||!serverItem.id)ret
 ensure();
 window.KeloEquipment=Object.freeze({version:VERSION,SLOTS:SLotsSafe(),CORE_SLOTS:CORE_SLOTS.slice(),QUALITY_NAMES:{...QUALITY_NAMES},QUALITY_MULTIPLIER:{...QUALITY_MULTIPLIER},GRADE_ARMOR_POINTS:{...GRADE_ARMOR_POINTS},GRADE_SPECIAL_MULTIPLIER:{...GRADE_SPECIAL_MULTIPLIER},AURA_THRESHOLDS:AURA_THRESHOLDS.slice(),getEquipment:allEquipment,getEquipped:equippedItems,isEquipped,equipItem,unequipItem,getArmorScore,getAverageQuality,getAverageGrade,getAuraRank,qualityName,finalStats,recalculate,nextAura,applyServerItem,getItem:find});
 function SLotsSafe(){return SLOTS.slice();}
-window.KELO_EQUIPMENT_AUDIT={version:VERSION,ready:true,explicitEmptySlots:true,emptySlotEncoding:'null',minSlots:6,slotCount:SLOTS.length,maxQuality:9,maxGrade:9,maxAura:9,maxReachableArmorScore:SLOTS.length*GRADE_ARMOR_POINTS[9]};
+window.KELO_EQUIPMENT_AUDIT={version:VERSION,ready:true,explicitEmptySlots:true,emptySlotEncoding:'null',warehouseAwareStarterIdentity:true,minSlots:6,slotCount:SLOTS.length,maxQuality:9,maxGrade:9,maxAura:9,maxReachableArmorScore:SLOTS.length*GRADE_ARMOR_POINTS[9]};
 })();
