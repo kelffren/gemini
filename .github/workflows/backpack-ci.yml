@@ -55,6 +55,7 @@ jobs:
           grep -q "container-v1.0.0" src/systems/container-system.js
           grep -q "strictDestinationCapacity:true" src/systems/container-system.js
           grep -q "warehouseImplemented:true" src/systems/container-system.js
-          grep -q "warehouse-ui-v1.0.0" src/ui/warehouse-ui.js
+          grep -q "warehouse-ui-v1.0.1" src/ui/warehouse-ui.js
+          grep -q "defaultTransfer:'full-stack'" src/ui/warehouse-ui.js
           grep -q "twoContainerTabs:true" src/ui/warehouse-ui.js
           grep -q "equipmentAction:true" src/ui/backpack-ui.js
