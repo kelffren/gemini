@@ -1,7 +1,7 @@
 (function(){
 'use strict';
 
-const VERSION='backpack-ui-v1.0.0';
+const VERSION='backpack-ui-v1.0.1';
 let selected=null;
 let moveMode=false;
 
@@ -29,8 +29,7 @@ function css(){
     #kelo-bag .kb-empty-detail{display:grid;place-items:center;min-height:66px;color:#71817a;font-size:10px;text-align:center}
     #kelo-bag .kb-name{font-size:12px;font-weight:900;color:#f4efd9}.kb-meta{margin-top:3px;font-size:9px;color:#8fa198}
     #kelo-bag .kb-actions{display:flex;gap:7px;margin-top:9px;flex-wrap:wrap}
-    #kelo-bag .kb-action{min-height:38px;padding:0 12px;border-radius:10px;border:1px solid rgba(231,197,106,.34);background:#173f36;color:#ead58e;font-size:10px;font-weight:850;touch-action:manipulation}
-    #kelo-bag .kb-action.secondary{background:rgba(255,255,255,.035);color:#c7d1cb;border-color:rgba(255,255,255,.1)}
+    #kelo-bag .kb-action{min-height:38px;padding:0 12px;border-radius:10px;border:1px solid rgba(231,197,106,.34);background:rgba(255,255,255,.035);color:#c7d1cb;font-size:10px;font-weight:850;touch-action:manipulation}
     #kelo-bag .kb-move-note{margin-top:8px;padding:7px 9px;border-radius:9px;background:rgba(231,197,106,.08);color:#e5d18b;font-size:9px}
     @media(max-width:340px){#kelo-bag .kb-grid{grid-template-columns:repeat(5,49px);gap:5px}#kelo-bag .kb-slot{width:49px;height:49px}}
   `;
@@ -46,11 +45,6 @@ function panel(){
   root.setAttribute('role','dialog');
   root.setAttribute('aria-label','Mochila');
   return root;
-}
-
-function equipped(item){
-  if(!item||item.kind!=='equipment'||!window.KeloEquipment)return false;
-  return window.KeloEquipment.getEquipped().some(function(x){return x&&x.id===item.id;});
 }
 
 function render(){
@@ -87,26 +81,13 @@ function render(){
     detail.innerHTML='<div class="kb-empty-detail">Selecciona un objeto para ver sus datos.</div>';
   }else{
     const d=active.descriptor;
-    const isEq=d.category==='equipment';
-    const isEquipped=isEq&&equipped(active.item);
     detail.innerHTML='<div class="kb-name"></div><div class="kb-meta"></div><div class="kb-actions"></div>'+(moveMode?'<div class="kb-move-note">Toca otro slot para mover o intercambiar este objeto.</div>':'');
     detail.querySelector('.kb-name').textContent=d.icon+' '+d.name;
     detail.querySelector('.kb-meta').textContent=[d.rarity,d.category,d.bound?'Vinculado':'No vinculado',d.quantity>1?'x'+d.quantity:null].filter(Boolean).join(' · ');
     const actions=detail.querySelector('.kb-actions');
     const move=document.createElement('button');
-    move.className='kb-action secondary';move.textContent=moveMode?'Cancelar mover':'Mover';
+    move.className='kb-action';move.textContent=moveMode?'Cancelar mover':'Mover';
     move.onclick=function(){moveMode=!moveMode;render();};actions.appendChild(move);
-    if(isEq&&window.KeloEquipment){
-      const equip=document.createElement('button');
-      equip.className='kb-action';equip.textContent=isEquipped?'Desequipar':'Equipar';
-      equip.onclick=function(){
-        const result=isEquipped?window.KeloEquipment.unequipItem(active.item.slot):window.KeloEquipment.equipItem(active.item.id);
-        if(!result||result.ok!==true){if(typeof showToast==='function')showToast('No se pudo cambiar el equipo');return;}
-        if(typeof showToast==='function')showToast(isEquipped?'Equipo guardado en mochila':'Equipo equipado');
-        render();
-      };
-      actions.appendChild(equip);
-    }
   }
 }
 
@@ -133,5 +114,5 @@ function close(){const root=document.getElementById('kelo-bag');if(root)root.sty
 const previous=window.KeloSocialUI||{};
 window.KeloSocialUI=Object.freeze(Object.assign({},previous,{openBag:open,closeBag:close}));
 window.KeloBackpackUI=Object.freeze({version:VERSION,open,close,render});
-window.KELO_BACKPACK_UI_AUDIT=Object.freeze({version:VERSION,interaction:'tap-select-move-target-v1',columns:5,slotTargetPx:52,dragDrop:false,detailPanel:true,equipmentAction:true});
+window.KELO_BACKPACK_UI_AUDIT=Object.freeze({version:VERSION,interaction:'tap-select-move-target-v1',columns:5,slotTargetPx:52,dragDrop:false,detailPanel:true,equipmentAction:false});
 })();
