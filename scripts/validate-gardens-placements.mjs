@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 
+// CI/LIVE guard: authored Gardens metadata must survive the renderer's real navigation and landmark masks.
 const worldSource=fs.readFileSync('src/environment/world-map.js','utf8');
 const compositionSource=fs.readFileSync('src/environment/gardens-compositions.js','utf8');
 const TILE=32;
