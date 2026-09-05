@@ -1,0 +1,64 @@
+name: Integrate crimson bot temp
+
+on:
+  push:
+    branches:
+      - chatgpt/bot-crimson-live-v3
+    paths:
+      - .github/workflows/integrate-crimson-bot-temp.yml
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate appearance module and exact asset
+        run: |
+          node --check src/characters/character-appearance.js
+          test "$(stat -c%s assets/bot-crimson-v1.png)" = "2030009"
+          test "$(sha256sum assets/bot-crimson-v1.png | cut -d' ' -f1)" = "579ad3028b510c60532cb72471ebec9e27e8ed185488b9cb864daf294047aa30"
+          python - <<'PY'
+          import struct
+          p='assets/bot-crimson-v1.png'
+          with open(p,'rb') as f:
+              sig=f.read(8)
+              assert sig == b'\x89PNG\r\n\x1a\n'
+              length=struct.unpack('>I',f.read(4))[0]
+              assert f.read(4) == b'IHDR'
+              data=f.read(length)
+              w,h=struct.unpack('>II',data[:8])
+              print('PNG_DIMENSIONS',w,h)
+              assert (w,h)==(1024,1536)
+          PY
+      - name: Patch index load order
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('index.html')
+          s=p.read_text()
+          preload='<link rel="preload" as="image" href="assets/bot-crimson-v1.png?v=1">'
+          if preload not in s:
+              needle='<link rel="preload" as="image" href="assets/hero.PNG" fetchpriority="high">'
+              assert needle in s
+              s=s.replace(needle, needle+'\n  '+preload, 1)
+          script='<script src="src/characters/character-appearance.js?v=2"></script>'
+          if script not in s:
+              needle='<script src="engine-ab.js?v=240"></script><script src="engine-ac.js?v=222"></script>'
+              assert needle in s
+              s=s.replace(needle, '<script src="engine-ab.js?v=240"></script>'+script+'<script src="engine-ac.js?v=222"></script>', 1)
+          assert s.count(preload)==1
+          assert s.count(script)==1
+          assert s.index('engine-ab.js?v=240') < s.index('character-appearance.js?v=2') < s.index('engine-ac.js?v=222')
+          p.write_text(s)
+          PY
+          git diff --check
+      - name: Commit integration
+        run: |
+          git config user.name 'kelo-asset-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add index.html
+          git commit -m 'feat(avatar): load crimson bot appearance on game boot'
+          git push origin HEAD:chatgpt/bot-crimson-live-v3
