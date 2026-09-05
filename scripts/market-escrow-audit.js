@@ -8,9 +8,9 @@ const E=context.KeloEquipment,B=context.KeloBackpack,C=context.KeloContainers,M=
 assert(E&&B&&C&&M);
 assert.equal(E.version,'equipment-v1.1.2');
 assert.equal(B.version,'backpack-v1.1.0');
-assert.equal(C.version,'container-v1.1.0');
+assert.equal(C.version,'container-v1.2.0');
 assert.equal(M.version,'market-escrow-v1.0.0');
-const allItems=()=>context.STATE.inventory.concat(context.STATE.warehouse.items,context.STATE.marketEscrow.items);
+const allItems=()=>context.STATE.inventory.concat(context.STATE.warehouse.items,context.STATE.marketEscrow.items,context.STATE.emoteLoadout.items);
 const totalQty=()=>allItems().reduce((n,x)=>n+Math.max(1,Number(x.quantity)||1),0);
 const ids=()=>allItems().map(x=>M.itemIdentity(x));
 const assertUnique=()=>assert.equal(new Set(ids()).size,ids().length,'one identity must exist in only one container');
@@ -18,6 +18,7 @@ const findBag=id=>C.getSlots('backpack').find(s=>s.item&&M.itemIdentity(s.item)=
 const findEsc=id=>C.getSlots('market_escrow').find(s=>s.item&&M.itemIdentity(s.item)===id);
 assert.equal(C.getStats('market_escrow').used,0);
 assert.equal(C.getStats('market_escrow').capacity>=20,true);
+assert.equal(C.getStats('emote_loadout').capacity,4);
 const relic={id:'market_relic',templateId:'relic',name:'Reliquia Market',icon:'◆',kind:'material',quantity:1,maxStack:1,bound:true,rarity:'Epic',metadata:{seal:'keep'}};
 context.STATE.inventory.push(relic);B.ensure();
 let before=totalQty(),out=M.createMarketListing('market_relic',1,{price:150});
