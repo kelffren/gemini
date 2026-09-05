@@ -29,7 +29,7 @@ try{
   const layout=await page.locator('#kelo-property-editor').boundingBox();
   if(!layout||layout.x<0||layout.y<0||layout.x+layout.width>390.5||layout.y+layout.height>844.5)throw new Error(`Mobile editor overflows viewport: ${JSON.stringify(layout)}`);
   const audit=await page.evaluate(()=>({editor:window.KELO_PROPERTY_EDITOR_AUDIT,extras:window.KELO_PROPERTY_EDITOR_EXTRAS,system:window.KELO_PROPERTY_AUDIT,catalog:window.KELO_PROPERTY_CATALOG.list().length}));
-  if(!audit.editor?.mobile||!audit.editor?.worldEditor||!audit.editor?.unitAware)throw new Error('Editor audit flags missing');
+  if(!audit.editor?.mobile||!audit.editor?.worldEditor||!audit.editor?.unitAware||!audit.editor?.nativeMove)throw new Error('Editor audit flags missing');
   if(!audit.extras?.thumbnails||!audit.extras?.moveWithoutConsumingUnits)throw new Error('Editor extras missing');
   if(audit.catalog<1)throw new Error('Property catalog empty');
   await page.waitForFunction(()=>document.querySelectorAll('.pe-thumb').length>0,{timeout:10000});
@@ -62,11 +62,14 @@ try{
   await page.waitForFunction(({pid,n})=>window.KELO_PROPERTY_SYSTEM.getPlacements(pid).length>n,{pid:parcelId,n:beforeParcel},{timeout:5000});
   const placement=await page.evaluate(pid=>window.KELO_PROPERTY_SYSTEM.getPlacements(pid).at(-1),parcelId);
   const unitsBeforeMove=await page.evaluate(aid=>({owned:window.KELO_PROPERTY_SYSTEM.getOwnedUnits(aid),available:window.KELO_PROPERTY_SYSTEM.getAvailableUnits(aid),deployed:window.KELO_PROPERTY_SYSTEM.getDeployedUnits(aid)}),parcelChoice.assetId);
-  await page.evaluate(({pid,id})=>{const r=window.KELO_PROPERTY_SYSTEM.getPlacements(pid).find(x=>x.placementId===id);const b=window.KELO_PROPERTY_SYSTEM.placementBounds(r);const z=CONFIG.zoom||1;const sx=screenW/2+(b.x+b.w/2-camera.x)*z;const sy=screenH/2+(b.y+b.h/2-camera.y)*z;window.dispatchEvent(new PointerEvent('pointerdown',{clientX:sx,clientY:sy,bubbles:true,pointerId:77}));},{pid:parcelId,id:placement.placementId});
-  await page.waitForTimeout(150);
+  const selectPoint=await page.evaluate(({pid,id})=>{const r=window.KELO_PROPERTY_SYSTEM.getPlacements(pid).find(x=>x.placementId===id);const b=window.KELO_PROPERTY_SYSTEM.placementBounds(r);const z=CONFIG.zoom||1;return{x:screenW/2+(b.x+b.w/2-camera.x)*z,y:screenH/2+(b.y+b.h/2-camera.y)*z};},{pid:parcelId,id:placement.placementId});
+  if(selectPoint.y>=350||selectPoint.y<0)throw new Error(`Placement selection point covered by editor: ${JSON.stringify(selectPoint)}`);
+  await page.mouse.click(selectPoint.x,selectPoint.y);
+  await page.waitForFunction(id=>window.KELO_PROPERTY_EDITOR.selectedPlacementId===id,placement.placementId,{timeout:5000});
   if(await page.locator('#pe-move').isDisabled())throw new Error('Move button did not bind selected placement');
   await page.locator('#pe-move').click();
-  const moveTarget=await page.evaluate(({pid,id})=>{const r=window.KELO_PROPERTY_SYSTEM.getPlacements(pid).find(x=>x.placementId===id);const t=window.KELO_PROPERTY_CATALOG.get(r.assetId),p=window.KELO_PROPERTY_SYSTEM.parcel(pid),z=CONFIG.zoom||1;let wx=Math.min(p.bounds.x+p.bounds.w-t.width-16,r.x+32),wy=r.y; if(wx===r.x)wx=Math.max(p.bounds.x+16,r.x-32);return{x:screenW/2+(wx-camera.x)*z,y:screenH/2+(wy-camera.y)*z,wx,wy};},{pid:parcelId,id:placement.placementId});
+  if(await page.evaluate(()=>window.KELO_PROPERTY_EDITOR.movingPlacementId)!==placement.placementId)throw new Error('Move mode did not arm selected placement');
+  const moveTarget=await page.evaluate(({pid,id})=>{const r=window.KELO_PROPERTY_SYSTEM.getPlacements(pid).find(x=>x.placementId===id);const t=window.KELO_PROPERTY_CATALOG.get(r.assetId),p=window.KELO_PROPERTY_SYSTEM.parcel(pid),z=CONFIG.zoom||1;let wx=Math.min(p.bounds.x+p.bounds.w-t.width-16,r.x+32),wy=r.y;if(wx===r.x)wx=Math.max(p.bounds.x+16,r.x-32);return{x:screenW/2+(wx-camera.x)*z,y:screenH/2+(wy-camera.y)*z,wx,wy};},{pid:parcelId,id:placement.placementId});
   const posBefore=await page.evaluate(({pid,id})=>{const r=window.KELO_PROPERTY_SYSTEM.getPlacements(pid).find(x=>x.placementId===id);return{x:r.x,y:r.y};},{pid:parcelId,id:placement.placementId});
   if(moveTarget.y>=350||moveTarget.y<0)throw new Error(`Move target covered by editor: ${JSON.stringify(moveTarget)}`);
   await page.mouse.click(moveTarget.x,moveTarget.y);
