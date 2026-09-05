@@ -57,6 +57,9 @@ jobs:
           node --check src/environment/rural-ground.js
           node --check src/environment/rural-landmarks.js
           node --check src/environment/plaza-nature.js
+          node --check src/environment/environment-layer-stack.js
+          node --check src/environment/prop-contract.js
+          node --check src/environment/generic-props.js
           node --check src/environment/plaza-depth.js
           node --check src/environment/luxe-compose.js
           node --check src/environment/luxe-kiosk-atlas.js
@@ -109,17 +112,25 @@ jobs:
           grep -q "proximity-name-v1" src/environment/tile-registry.js
           grep -q "grassMode:'authored-eight-variant-atlas-v1'" src/environment/tile-registry.js
           grep -q "grassVariationMode:'authored-eight-variant-atlas-v1'" src/environment/world-map.js
-          grep -q "plaza-fountain-v1.8" src/environment/plaza-depth.js
-          grep -q "authored-png-layer-pair-v1" src/environment/plaza-depth.js
-          grep -q "scaled-centered-lower-rim-v1" src/environment/plaza-depth.js
-          grep -q "frontScale:0.74" src/environment/plaza-depth.js
+          grep -q "version:'1.4.0'" src/environment/prop-contract.js
+          grep -q "plazaFountain:Object.freeze" src/environment/prop-contract.js
+          grep -q "plazaFountainBack" src/environment/prop-contract.js
+          grep -q "plazaFountainFront" src/environment/prop-contract.js
+          grep -q "actor-base-y-redraw-v1" src/environment/prop-contract.js
+          grep -q "generic-props-v1.4" src/environment/generic-props.js
+          grep -q "data-driven-props-v4" src/environment/generic-props.js
+          grep -q "plaza-fountain-v2.0" src/environment/plaza-depth.js
+          grep -q "generic-prop-contract-v1" src/environment/plaza-depth.js
           grep -q "formal-back-front-layer-stack-v1" src/environment/plaza-depth.js
           grep -q "backLayer:'props_back'" src/environment/plaza-depth.js
           grep -q "frontLayer:'props_front'" src/environment/plaza-depth.js
           grep -q "renderWrapped:false" src/environment/plaza-depth.js
-          grep -q "postActorBridgeRestored" src/environment/plaza-depth.js
-          grep -q "plaza-fountain-back.PNG" src/environment/plaza-depth.js
-          grep -q "plaza-fountain-front.PNG" src/environment/plaza-depth.js
+          grep -q "postActorBridgeRestored:false" src/environment/plaza-depth.js
+          if grep -Eq "new Image\(|drawImage|renderAvatar\(|L\.register\(" src/environment/plaza-depth.js; then
+            echo 'special-case fountain renderer reintroduced in plaza-depth.js'
+            exit 1
+          fi
+          python3 scripts/validate_depth_pipeline.py
           if ! grep -q 'DISABLED_PROCEDURAL_ART' src/environment/luxe-compose.js; then
             echo 'rejected procedural plaza overlay was reactivated'
             exit 1
