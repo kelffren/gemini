@@ -16,103 +16,116 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Resolve Firestorage share and verify exact PNG
+      - name: Install headless browser
+        run: |
+          npm install --no-save playwright
+          npx playwright install chromium
+
+      - name: Download exact PNG through Firestorage share page
         env:
           SHARE_URL: https://firestorage.ai/ja/f/1P1I0_CrIwP8
           EXPECTED_SHA256: 579ad3028b510c60532cb72471ebec9e27e8ed185488b9cb864daf294047aa30
           EXPECTED_SIZE: '2030009'
         run: |
-          python - <<'PY'
-          import hashlib
-          import html
-          import os
-          import re
-          import sys
-          from urllib.parse import urljoin
-          import requests
+          node <<'NODE'
+          const fs = require('fs');
+          const crypto = require('crypto');
+          const { chromium } = require('playwright');
 
-          share = os.environ['SHARE_URL']
-          expected_sha = os.environ['EXPECTED_SHA256']
-          expected_size = int(os.environ['EXPECTED_SIZE'])
-          out = 'assets/bot-crimson-v1.png'
-          session = requests.Session()
-          session.headers.update({'User-Agent':'Mozilla/5.0 Chrome/128 Safari/537.36'})
+          const share = process.env.SHARE_URL;
+          const expectedSha = process.env.EXPECTED_SHA256;
+          const expectedSize = Number(process.env.EXPECTED_SIZE);
+          const out = 'assets/bot-crimson-v1.png';
+          let found = false;
 
-          def exact_png(data):
-              return len(data)==expected_size and data.startswith(b'\x89PNG\r\n\x1a\n') and hashlib.sha256(data).hexdigest()==expected_sha
+          function verifyAndSave(buf, source) {
+            const sha = crypto.createHash('sha256').update(buf).digest('hex');
+            console.log(`VERIFY source=${source} bytes=${buf.length} sha256=${sha}`);
+            if (buf.length === expectedSize && sha === expectedSha && buf.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10]))) {
+              fs.mkdirSync('assets', { recursive: true });
+              fs.writeFileSync(out, buf);
+              found = true;
+              console.log('EXACT_PNG_FOUND');
+              return true;
+            }
+            return false;
+          }
 
-          def save_if_exact(data, source):
-              sha=hashlib.sha256(data).hexdigest()
-              if len(data)>100000 or data.startswith(b'\x89PNG'):
-                  print(f'CANDIDATE bytes={len(data)} sha256={sha} source={source[:260]}')
-              if exact_png(data):
-                  os.makedirs(os.path.dirname(out),exist_ok=True)
-                  open(out,'wb').write(data)
-                  print('EXACT_PNG_FOUND',source)
-                  return True
-              return False
+          (async () => {
+            const browser = await chromium.launch({ headless: true });
+            const context = await browser.newContext({ acceptDownloads: true });
+            const page = await context.newPage();
 
-          page=session.get(share,timeout=30,allow_redirects=True)
-          page.raise_for_status()
-          print('SHARE_PAGE',page.status_code,page.url,page.headers.get('content-type'),len(page.content))
-          if save_if_exact(page.content,page.url): sys.exit(0)
-          normalized=html.unescape(page.text).replace('\\/','/')
-          candidates=[]
-          for pattern in [r'(?:href|src|action|data-[\w-]*url)=[\"\']([^\"\']+)[\"\']',r'[\"\'](https?://[^\"\'<>\\s]+)[\"\']']:
-              for raw in re.findall(pattern,normalized,flags=re.I):
-                  raw=raw.strip()
-                  if not raw or raw.startswith(('javascript:','data:','#')): continue
-                  u=urljoin(page.url,raw)
-                  if u not in candidates: candidates.append(u)
-          print('URLS_BEGIN')
-          for u in candidates: print(u)
-          print('URLS_END')
+            page.on('response', async (response) => {
+              if (found) return;
+              try {
+                const headers = response.headers();
+                const type = (headers['content-type'] || '').toLowerCase();
+                const len = Number(headers['content-length'] || 0);
+                if (type.includes('image/png') && (len > 500000 || !len)) {
+                  const body = await response.body();
+                  verifyAndSave(body, response.url());
+                }
+              } catch (_) {}
+            });
 
-          fetched={}
-          priority=sorted(candidates,key=lambda u:(0 if any(k in u.lower() for k in ('download','file','asset','media','api','storage')) else 1,len(u)))
-          for u in priority[:180]:
-              try:
-                  r=session.get(u,timeout=30,allow_redirects=True)
-                  fetched[u]=r
-              except Exception as exc:
-                  print('REQUEST_ERROR',u[:180],repr(exc)); continue
-              if save_if_exact(r.content,r.url): sys.exit(0)
+            await page.goto(share, { waitUntil: 'domcontentloaded', timeout: 60000 });
+            await page.waitForTimeout(12000);
+            console.log('PAGE_URL', page.url());
+            console.log('PAGE_TITLE', await page.title());
+            console.log('PAGE_TEXT', (await page.locator('body').innerText()).slice(0,5000));
 
-          print('STATIC_LINKS_DID_NOT_RETURN_EXACT_PNG')
-          probes=('download','file_id','fileid','public_id','publicid','presigned','signed_url','signedurl','share_url','shareurl','/api/','api/','sAXq3Ns1F9CD32FT','1P1I0_CrIwP8')
-          print('HTML_TAIL_BEGIN')
-          print(normalized[-6500:].replace('\n',' ')[:6500])
-          print('HTML_TAIL_END')
-          for u,r in fetched.items():
-              ctype=(r.headers.get('content-type') or '').lower()
-              if 'javascript' not in ctype and not u.endswith('.js'): continue
-              js=r.text.replace('\\/','/')
-              low=js.lower()
-              hits=[]
-              for token in probes:
-                  start=0
-                  while True:
-                      idx=low.find(token.lower(),start)
-                      if idx<0: break
-                      hits.append((idx,token)); start=idx+len(token)
-                      if len(hits)>=20: break
-                  if len(hits)>=20: break
-              if hits:
-                  print('JS_FILE',u,'bytes',len(r.content),'hits',len(hits))
-                  for idx,token in hits[:20]:
-                      snippet=js[max(0,idx-350):idx+850].replace('\n',' ')
-                      print('JS_HINT',token,snippet[:1200])
-          raise SystemExit(17)
-          PY
+            const clickable = page.locator('a,button');
+            const count = await clickable.count();
+            console.log('CLICKABLE_COUNT', count);
+            for (let i=0; i<count; i++) {
+              const el = clickable.nth(i);
+              const text = ((await el.innerText().catch(()=>'')) || '').trim();
+              const href = await el.getAttribute('href').catch(()=>null);
+              const disabled = await el.isDisabled().catch(()=>false);
+              console.log('CLICKABLE', i, JSON.stringify(text.slice(0,180)), href || '', 'disabled='+disabled);
+            }
 
-      - name: Confirm dimensions
+            const selectors = [
+              'a[download]',
+              'button:has-text("ダウンロード")',
+              'a:has-text("ダウンロード")',
+              'button:has-text("Download")',
+              'a:has-text("Download")',
+              'button:has-text("download")',
+              'a:has-text("download")'
+            ];
+
+            for (const selector of selectors) {
+              if (found) break;
+              const loc = page.locator(selector).first();
+              if (!(await loc.count())) continue;
+              console.log('TRY_SELECTOR', selector);
+              await loc.waitFor({ state: 'visible', timeout: 15000 }).catch(()=>{});
+              const downloadPromise = page.waitForEvent('download', { timeout: 20000 }).catch(()=>null);
+              await loc.click({ timeout: 15000 }).catch(e => console.log('CLICK_ERROR', selector, e.message));
+              const download = await downloadPromise;
+              if (download) {
+                const path = await download.path();
+                if (path) verifyAndSave(fs.readFileSync(path), 'browser-download:'+download.suggestedFilename());
+              }
+              await page.waitForTimeout(3000);
+            }
+
+            await browser.close();
+            if (!found) process.exit(17);
+          })().catch(err => { console.error(err); process.exit(18); });
+          NODE
+
+      - name: Confirm exact binary and dimensions
         run: |
+          sha256sum assets/bot-crimson-v1.png
+          test "$(stat -c%s assets/bot-crimson-v1.png)" = "2030009"
           python - <<'PY'
           from PIL import Image
-          p='assets/bot-crimson-v1.png'
-          with Image.open(p) as im:
-              print('PNG_DIMENSIONS',im.size,im.mode)
-              assert im.size==(1024,1536)
+          with Image.open('assets/bot-crimson-v1.png') as im:
+              print('PNG_DIMENSIONS', im.size, im.mode)
+              assert im.size == (1024, 1536)
           PY
 
       - name: Commit proof asset to test branch
