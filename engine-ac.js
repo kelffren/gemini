@@ -3,6 +3,7 @@
   // MOV-004: visual stride advances from actual world distance, never render count.
   // MOV-CADENCE-V2: remove the 50->90px stride-length jump at WALK->RUN.
   // MOV-STOP-V2: release never freezes an arbitrary stride pose; physics remains unchanged.
+  // MOV-REVERSAL-AUDIT-V1: measure real lateral reversal continuity instead of publishing inert counters.
   const WALK_MAX = 0.74;
   const WALK_SPEED = 110;
   const RUN_SPEED = 178;
@@ -59,7 +60,7 @@
 
   function publishAudit(mag, gait, speedCap, visual) {
     window.KELO_MOVEMENT_AUDIT = {
-      version: 'MOV-stop-v2',
+      version: 'MOV-reversal-audit-v1',
       rawTouchMag: rawTouchMag(),
       processedMag: mag,
       gait,
@@ -80,7 +81,11 @@
       lastReleaseFromPhase: visual ? visual.lastReleaseFromPhase : 0,
       unsupportedPoseFreezeMs: visual ? visual.unsupportedPoseFreezeMs : 0,
       releaseToStablePlantMs: visual ? visual.releaseToStablePlantMs : 0,
-      reversalAccidentalIdleCount: visual ? visual.reversalAccidentalIdleCount : 0
+      reversalCount: visual ? visual.reversalCount : 0,
+      reversalAccidentalIdleCount: visual ? visual.reversalAccidentalIdleCount : 0,
+      reversalFrameJumpCount: visual ? visual.reversalFrameJumpCount : 0,
+      lastReversalFromFrame: visual ? visual.lastReversalFromFrame : 0,
+      lastReversalToFrame: visual ? visual.lastReversalToFrame : 0
     };
   }
 
@@ -105,7 +110,12 @@
         lastReleaseFromPhase: 0,
         unsupportedPoseFreezeMs: 0,
         releaseToStablePlantMs: 0,
-        reversalAccidentalIdleCount: 0
+        reversalCount: 0,
+        reversalAccidentalIdleCount: 0,
+        reversalFrameJumpCount: 0,
+        lastReversalFromFrame: 0,
+        lastReversalToFrame: 0,
+        lastIntentHorizontalSign: 0
       };
     }
     return p._visualMotion;
@@ -120,6 +130,14 @@
     const hasIntent = gait !== 'idle';
     const physicallyMoving = dist > MIN_VISUAL_MOVE_PX || spd > 16;
     const wasOn = v.on;
+    const intentX = input.normX || 0;
+    const intentY = input.normY || 0;
+    const horizontalIntentSign = hasIntent && Math.abs(intentX) >= Math.abs(intentY) && Math.abs(intentX) > 0.0001
+      ? Math.sign(intentX)
+      : 0;
+    const reversalFromFrame = v.frame;
+    const lateralReversal = horizontalIntentSign !== 0 && v.lastIntentHorizontalSign !== 0 && horizontalIntentSign !== v.lastIntentHorizontalSign;
+    if (horizontalIntentSign !== 0) v.lastIntentHorizontalSign = horizontalIntentSign;
 
     if (hasIntent || physicallyMoving) {
       v.stopElapsed = 0;
@@ -168,6 +186,16 @@
       v.stridePhase = 0;
       v.strideDistancePx = 0;
       v.frame = 0;
+    }
+
+    if (lateralReversal) {
+      v.reversalCount += 1;
+      v.lastReversalFromFrame = reversalFromFrame;
+      v.lastReversalToFrame = v.frame;
+      if (!v.on) v.reversalAccidentalIdleCount += 1;
+      const forward = (v.frame - reversalFromFrame + 4) % 4;
+      const backward = (reversalFromFrame - v.frame + 4) % 4;
+      if (Math.min(forward, backward) > 1) v.reversalFrameJumpCount += 1;
     }
 
     v.gait = gait;
