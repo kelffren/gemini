@@ -13,7 +13,7 @@ page.on('requestfailed',r=>failedRequests.push({url:r.url(),error:r.failure()?.e
 page.on('response',r=>{if(r.status()>=400)httpErrors.push({status:r.status(),url:r.url()})});
 
 await page.goto(`${base}?rural-edge-audit=${Date.now()}`,{waitUntil:'networkidle',timeout:45000});
-await page.waitForFunction(()=>window.KELO_RURAL_LANDMARK_AUDIT?.ready===true&&window.KELO_RURAL_GROUND_AUDIT?.ready===true&&window.KELO_WORLD_AUDIT?.ready===true,null,{timeout:45000});
+await page.waitForFunction(()=>window.KELO_RURAL_LANDMARK_AUDIT?.ready===true&&window.KELO_RURAL_GROUND_AUDIT?.ready===true&&window.KELO_WORLD_AUDIT?.ready===true&&window.KELO_GENERIC_PROP_AUDIT?.ready===true,null,{timeout:45000});
 await page.waitForTimeout(800);
 const rural=await page.evaluate(()=>{
   const c=document.getElementById('game-canvas');
@@ -34,7 +34,6 @@ const rural=await page.evaluate(()=>{
   }
   const ruralMaterialPixels=countMaterial();
   const dataUrl=c.toDataURL('image/png');
-  // Diagnostic only: call the active farm renderer directly under the exact world transform.
   g.save();
   const z=CONFIG.zoom||1;
   g.translate(screenW/2,screenH/2);g.scale(z,z);g.translate(-camera.x,-camera.y);
@@ -45,17 +44,18 @@ const rural=await page.evaluate(()=>{
     dataUrl,
     landmark:window.KELO_RURAL_LANDMARK_AUDIT||null,
     ground:window.KELO_RURAL_GROUND_AUDIT||null,
+    genericProps:window.KELO_GENERIC_PROP_AUDIT||null,
+    propContract:window.KELO_PROP_CONTRACT?{version:window.KELO_PROP_CONTRACT.version,mode:window.KELO_PROP_CONTRACT.mode,assetCount:Object.keys(window.KELO_PROP_CONTRACT.assets||{}).length,layerGroupCount:Object.keys(window.KELO_PROP_CONTRACT.layerGroups||{}).length,sourceCount:Object.keys(window.KELO_PROP_CONTRACT.sources||{}).length}:null,
     world:window.KELO_WORLD_AUDIT||null,
     farm:{x:farm.x,y:farm.y,w:farm.w,h:farm.h,cropCount:Array.isArray(farm.crops)?farm.crops.length:0,focusX,focusY},
     ruralMaterialPixels,directMaterialPixels,hookCalls,
     finalRenderUsesWindowFarm:String(render).includes('window.renderFarm'),
-    activeFarmRendererLooksLayered:String(activeFarmRenderer).includes('baseRenderFarm'),
-    activeFarmRendererPreview:String(activeFarmRenderer).slice(0,220),
+    activeFarmRendererPreview:String(activeFarmRenderer).slice(0,260),
     canvas:{width:c.width,height:c.height,cssWidth:c.clientWidth,cssHeight:c.clientHeight}
   };
 });
 if(rural?.dataUrl?.startsWith('data:image/png;base64,'))fs.writeFileSync('artifacts/live-rural-edge.png',Buffer.from(rural.dataUrl.split(',')[1],'base64'));
-const report={rural:rural?{landmark:rural.landmark,ground:rural.ground,world:rural.world,farm:rural.farm,ruralMaterialPixels:rural.ruralMaterialPixels,directMaterialPixels:rural.directMaterialPixels,hookCalls:rural.hookCalls,finalRenderUsesWindowFarm:rural.finalRenderUsesWindowFarm,activeFarmRendererLooksLayered:rural.activeFarmRendererLooksLayered,activeFarmRendererPreview:rural.activeFarmRendererPreview,canvas:rural.canvas}:null,consoleErrors,failedRequests,httpErrors};
+const report={rural:rural?{landmark:rural.landmark,ground:rural.ground,genericProps:rural.genericProps,propContract:rural.propContract,world:rural.world,farm:rural.farm,ruralMaterialPixels:rural.ruralMaterialPixels,directMaterialPixels:rural.directMaterialPixels,hookCalls:rural.hookCalls,finalRenderUsesWindowFarm:rural.finalRenderUsesWindowFarm,activeFarmRendererPreview:rural.activeFarmRendererPreview,canvas:rural.canvas}:null,consoleErrors,failedRequests,httpErrors};
 fs.writeFileSync('artifacts/rural-edge-report.json',JSON.stringify(report,null,2));
 console.log(JSON.stringify(report,null,2));
 await browser.close();
@@ -63,8 +63,11 @@ if(!rural?.dataUrl?.startsWith('data:image/png;base64,'))throw new Error('Rural 
 if(!rural.landmark?.ready||!rural.landmark?.assetLoaded||rural.landmark?.failed)throw new Error(`Rural edge layer failed: ${JSON.stringify(rural.landmark)}`);
 if(rural.landmark?.mode!=='authored-low-profile-edge-clusters-v1'||rural.landmark?.clusterTileCount!==17||rural.landmark?.centerClear!==true||rural.landmark?.northRoadClear!==true)throw new Error(`Rural edge contract invalid: ${JSON.stringify(rural.landmark)}`);
 if(!rural.ground?.ready||rural.ground?.fallbackActive)throw new Error('Rural ground fallback active');
+if(rural.ground?.boundaryMode!=='generic-prop-contract-v1'||rural.ground?.genericPropContract!==true||rural.ground?.propContractVersion!=='1.2.0'||rural.ground?.boundarySource!=='ruralFarmBoundary')throw new Error(`Rural boundary is not contract-driven: ${JSON.stringify(rural.ground)}`);
+if(!rural.genericProps?.ready||rural.genericProps?.failed||rural.genericProps?.rendererMode!=='data-driven-props-v2'||rural.genericProps?.assetCount<2||rural.genericProps?.layerGroupCount<2||rural.genericProps?.immediateDrawCalls<1||rural.genericProps?.immediatePropCount<8)throw new Error(`Generic prop renderer did not own rural props: ${JSON.stringify(rural.genericProps)}`);
+if(rural.propContract?.version!=='1.2.0'||rural.propContract?.mode!=='generic-prop-contract-v2'||rural.propContract?.assetCount<2||rural.propContract?.layerGroupCount<2||rural.propContract?.sourceCount<1)throw new Error(`Prop contract runtime state invalid: ${JSON.stringify(rural.propContract)}`);
 if(!rural.farm||rural.farm.cropCount<4)throw new Error(`Farm state missing from visual evidence: ${JSON.stringify(rural.farm)}`);
-if(rural.ruralMaterialPixels<15000)throw new Error(`Farm/edge not visible: normal=${rural.ruralMaterialPixels}, direct=${rural.directMaterialPixels}, hookCalls=${rural.hookCalls}, finalUsesWindow=${rural.finalRenderUsesWindowFarm}, layered=${rural.activeFarmRendererLooksLayered}`);
+if(rural.ruralMaterialPixels<15000)throw new Error(`Farm/edge not visible: normal=${rural.ruralMaterialPixels}, direct=${rural.directMaterialPixels}, hookCalls=${rural.hookCalls}, finalUsesWindow=${rural.finalRenderUsesWindowFarm}`);
 if(consoleErrors.length)throw new Error(`Console/page errors: ${JSON.stringify(consoleErrors)}`);
 if(failedRequests.length)throw new Error(`Failed requests: ${JSON.stringify(failedRequests)}`);
 if(httpErrors.length)throw new Error(`HTTP errors: ${JSON.stringify(httpErrors)}`);
