@@ -31,7 +31,7 @@ async function runViewport(name, contextOptions) {
     timeout: 45000
   });
 
-  await page.waitForFunction(() => window.KELO_MOVEMENT_AUDIT?.version === 'MOV-reversal-audit-v1', null, { timeout: 10000 });
+  await page.waitForFunction(() => window.KELO_MOVEMENT_AUDIT?.version === 'MOV-plant-audit-v1', null, { timeout: 10000 });
 
   async function snap(label) {
     return page.evaluate(sampleLabel => {
@@ -67,7 +67,9 @@ async function runViewport(name, contextOptions) {
     reversalAccidentalIdleDelta: (release.movement.reversalAccidentalIdleCount || 0) - (baseline.movement.reversalAccidentalIdleCount || 0),
     reversalFrameJumpDelta: (release.movement.reversalFrameJumpCount || 0) - (baseline.movement.reversalFrameJumpCount || 0),
     releaseCountDelta: (release.movement.releaseCount || 0) - (baseline.movement.releaseCount || 0),
+    plantFrame: release.movement.plantFrame,
     releaseVisualFrame: release.movement.visualFrame,
+    releaseStridePhase: release.movement.stridePhase,
     releaseVisualOn: release.movement.visualOn
   };
 
@@ -77,7 +79,9 @@ async function runViewport(name, contextOptions) {
   if (metrics.reversalAccidentalIdleDelta !== 0) throw new Error(`${name}: reversal introduced accidental idle ${JSON.stringify(metrics)}`);
   if (metrics.reversalFrameJumpDelta !== 0) throw new Error(`${name}: reversal skipped animation frames ${JSON.stringify(metrics)}`);
   if (!(metrics.releaseCountDelta >= 1)) throw new Error(`${name}: release was not observed ${JSON.stringify(metrics)}`);
-  if (metrics.releaseVisualOn || metrics.releaseVisualFrame !== 0) throw new Error(`${name}: release did not settle ${JSON.stringify(metrics)}`);
+  if (metrics.plantFrame !== 2 || metrics.releaseVisualOn || metrics.releaseVisualFrame !== 2 || Math.abs(metrics.releaseStridePhase - 0.5) > 0.0001) {
+    throw new Error(`${name}: release did not settle on authored contact candidate ${JSON.stringify(metrics)}`);
+  }
   if (errors.length) throw new Error(`${name}: browser errors ${JSON.stringify(errors)}`);
 
   await page.screenshot({ path: `artifacts/movement-${name}.png`, scale: 'device' });
@@ -98,7 +102,7 @@ const desktop = await runViewport('desktop', {
   hasTouch: false
 });
 
-const report = { version: 'lateral-reversal-live-v1', mobile, desktop };
+const report = { version: 'lateral-plant-live-v1', mobile, desktop };
 fs.writeFileSync('artifacts/movement-live-audit.json', JSON.stringify(report, null, 2));
 console.log(JSON.stringify(report, null, 2));
 await browser.close();
