@@ -1,0 +1,95 @@
+{
+  "contractVersion": "kelo-art-asset-contract-v1",
+  "worldTileSize": 32,
+  "sampling": "nearest",
+  "assets": [
+    {
+      "id": "grass-variation-v1",
+      "path": "assets/grass-variation-v1.png",
+      "kind": "ground-variation-atlas",
+      "width": 128,
+      "height": 64,
+      "cellWidth": 32,
+      "cellHeight": 32,
+      "columns": 4,
+      "rows": 2,
+      "requireAlpha": false
+    },
+    {
+      "id": "marble-variation-v1",
+      "path": "assets/marble-variation-v1.png",
+      "kind": "ground-variation-atlas",
+      "width": 128,
+      "height": 64,
+      "cellWidth": 32,
+      "cellHeight": 32,
+      "columns": 4,
+      "rows": 2,
+      "requireAlpha": true
+    },
+    {
+      "id": "plaza-transitions-v3",
+      "path": "assets/plaza-transitions-v3.png",
+      "kind": "terrain-transition-atlas",
+      "width": 128,
+      "height": 128,
+      "cellWidth": 32,
+      "cellHeight": 32,
+      "columns": 4,
+      "rows": 4,
+      "requireAlpha": true
+    },
+    {
+      "id": "rural-soil-v1",
+      "path": "assets/rural-soil-v1.png",
+      "kind": "ground-atlas",
+      "width": 128,
+      "height": 128,
+      "cellWidth": 32,
+      "cellHeight": 32,
+      "columns": 4,
+      "rows": 4,
+      "requireAlpha": false
+    },
+    {
+      "id": "rural-props-v1",
+      "path": "assets/rural-props-v1.png",
+      "kind": "prop-atlas",
+      "width": 128,
+      "height": 128,
+      "cellWidth": 32,
+      "cellHeight": 32,
+      "columns": 4,
+      "rows": 4,
+      "requireAlpha": true
+    },
+    {
+      "id": "rural-landmarks-v1",
+      "path": "assets/rural-landmarks-v1.png",
+      "kind": "prefab-atlas",
+      "width": 256,
+      "height": 128,
+      "cellWidth": 32,
+      "cellHeight": 32,
+      "columns": 8,
+      "rows": 4,
+      "requireAlpha": true
+    },
+    {
+      "id": "plaza-fountain-back",
+      "path": "assets/plaza-fountain-back.PNG",
+      "kind": "layered-prop-back",
+      "width": 1254,
+      "height": 1254,
+      "requireAlpha": true
+    },
+    {
+      "id": "plaza-fountain-front",
+      "path": "assets/plaza-fountain-front.PNG",
+      "kind": "layered-prop-front",
+      "width": 1254,
+      "height": 1254,
+      "requireAlpha": true
+    }
+  ]
+}
