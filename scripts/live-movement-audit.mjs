@@ -5,6 +5,26 @@ const base = process.env.AUDIT_URL || 'https://kelffren.github.io/gemini/';
 const chrome = process.env.CHROME_BIN || '/usr/bin/google-chrome';
 fs.mkdirSync('artifacts', { recursive: true });
 
+async function waitForDeployedMovementSource() {
+  const deadline = Date.now() + 120000;
+  let last = '';
+  while (Date.now() < deadline) {
+    try {
+      const url = new URL('engine-ac.js', base);
+      url.searchParams.set('movement-source-check', String(Date.now()));
+      const response = await fetch(url, { cache: 'no-store' });
+      last = await response.text();
+      if (response.ok && last.includes("version: 'MOV-plant-audit-v1'") && last.includes('DEFAULT_PLANT_FRAME = 2')) return;
+    } catch (error) {
+      last = String(error && error.message ? error.message : error);
+    }
+    await new Promise(resolve => setTimeout(resolve, 3000));
+  }
+  throw new Error(`Pages did not expose MOV-plant-audit-v1 before timeout; last=${last.slice(0, 240)}`);
+}
+
+await waitForDeployedMovementSource();
+
 const browser = await chromium.launch({
   headless: true,
   executablePath: chrome,
@@ -18,8 +38,6 @@ async function runViewport(name, contextOptions) {
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
   page.on('pageerror', e => errors.push(`PAGEERROR: ${e.stack || e.message}`));
 
-  // Movement owners are cache-busted so this run verifies the current main implementation,
-  // not an older Pages resource cached under index.html's long-lived query versions.
   await page.route(/\/(engine-ac\.js|engine-ah\.js)(\?|$)/, route => {
     const u = new URL(route.request().url());
     u.searchParams.set('movement-audit-bust', `${Date.now()}-${Math.random()}`);
