@@ -10,7 +10,7 @@ function pos() {
 }
 
 test.describe('Kelo World live Pages harness', () => {
-  test('boot, version, stick/keys movement, cafe button', async ({ page }) => {
+  test('boot, version, hero audit, stick/keys movement, cafe button', async ({ page }) => {
     const consoleErrors = [];
     const pageErrors = [];
     const failed = [];
@@ -41,16 +41,37 @@ test.describe('Kelo World live Pages harness', () => {
       cafeBtnText: (document.getElementById('kelo-cafe-btn') || {}).textContent || null,
       ruralAudit: window.KELO_RURAL_GROUND_AUDIT || null,
     }));
+
+    await page.waitForFunction(() => {
+      const audit = window.KELO_HERO_SPRITE_AUDIT;
+      return !!(audit && audit.loaded && (audit.processed || audit.error));
+    }, null, { timeout: 5000 });
+
+    const heroAudit = await page.evaluate(() => {
+      const a = window.KELO_HERO_SPRITE_AUDIT || null;
+      return a ? JSON.parse(JSON.stringify(a)) : null;
+    });
+
     fs.writeFileSync('test-results/boot-report.json', JSON.stringify({
       url: page.url(), httpStatus: res.status(), title,
       titleMatch: title.includes(EXPECT_TITLE),
       cacheHint: probe.scripts.some((s) => s.includes(EXPECT_CACHE)),
-      probe, consoleErrors, pageErrors, failedRequests: failed, status400,
+      probe, heroAudit, consoleErrors, pageErrors, failedRequests: failed, status400,
     }, null, 2));
+    fs.writeFileSync('test-results/hero-audit.json', JSON.stringify(heroAudit, null, 2));
+
     expect(probe.canvasW).toBeGreaterThan(0);
     expect(probe.ruralAudit && probe.ruralAudit.ready).toBe(true);
     expect(probe.ruralAudit.renderingMode).toBe('authored-nine-slice-v1');
     expect(probe.ruralAudit.plotSize).toBe(96);
+    expect(heroAudit).not.toBeNull();
+    expect(heroAudit.loaded).toBe(true);
+    expect(heroAudit.processed).toBe(true);
+    expect(heroAudit.error).toBeNull();
+    expect(heroAudit.version).toBe('hero-preprocess-audit-v2');
+    expect(heroAudit.croppedOpaquePixelCountByFrame).toHaveLength(16);
+    expect(heroAudit.sheetMutationAfterIdle).toBe(heroAudit.whiteKnockoutOpaquePixelCount > 0);
+    expect(heroAudit.visibleAlphaMutationAfterIdle).toBe(heroAudit.whiteKnockoutOpaquePixelCount > 0);
 
     const beforeKeys = await page.evaluate(pos);
     await page.keyboard.down('d');
