@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 
 ROOT = Path('.')
+# One-shot idempotent migration used by CI to wire generated irregular atlas metadata
+# into the existing generic renderer without asset-specific draw branches.
 
 
 def replace_once(text: str, old: str, new: str, label: str) -> str:
@@ -90,7 +92,6 @@ asset = {
     'ownership':'tile-registry','layers':['props_back','props_front'],'priority':10,'occlusion':{'mode':'registry-instance'},'districtCompatibility':['central'],
     'cache':{'strategy':'query','key':'art','value':'305'},'fallback':{'mode':'none'}
 }
-# Keep nature asset in the same logical slot after plaza ground.
 insert_at = next((i+1 for i,a in enumerate(manifest['assets']) if a.get('id')=='plaza-ground-v1'), len(manifest['assets']))
 manifest['assets'].insert(insert_at, asset)
 manifest_path.write_text(json.dumps(manifest,separators=(',',':'))+'\n',encoding='utf-8')
