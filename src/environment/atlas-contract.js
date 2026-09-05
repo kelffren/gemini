@@ -3,7 +3,7 @@
   if(!R?.atlases){console.error('[Kelo atlas] TileRegistry missing');return;}
 
   const POLICY=Object.freeze({
-    id:'kelo-atlas-contract-v1',version:'1.3.0',sampling:'nearest',maxDimension:2048,
+    id:'kelo-atlas-contract-v1',version:'1.2.0',sampling:'nearest',maxDimension:2048,
     preferredDimensions:Object.freeze([128,256,512,1024]),
     tiers:Object.freeze({
       small:Object.freeze({maxDimension:256,use:'small tile/prop families'}),
