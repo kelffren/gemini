@@ -6,7 +6,7 @@ const world=fs.readFileSync('src/environment/world-map.js','utf8');
 const manifest=JSON.parse(fs.readFileSync('src/environment/art-asset-manifest.json','utf8'));
 const errors=[];
 
-for(const token of ["kelo-atlas-contract-v1","version:'1.3.0'","maxDimension:2048","small:Object.freeze({maxDimension:256","medium:Object.freeze({maxDimension:1024","packedSprites:Object.freeze({paddingMin:1,spacingMin:1","lazy-when-district-needed","imageCreation:'atlas-contract-only'","consumerRule:'acquire-by-key-never-rewrite-src'","allowSilentMissing:false","decodedTextureMB","residentDistrictAtlasCount","kelo:atlas-audit"]){
+for(const token of ["kelo-atlas-contract-v1","version:'1.2.0'","maxDimension:2048","small:Object.freeze({maxDimension:256","medium:Object.freeze({maxDimension:1024","packedSprites:Object.freeze({paddingMin:1,spacingMin:1","lazy-when-district-needed","imageCreation:'atlas-contract-only'","consumerRule:'acquire-by-key-never-rewrite-src'","allowSilentMissing:false","decodedTextureMB","residentDistrictAtlasCount","kelo:atlas-audit"]){
   if(!contract.includes(token))errors.push(`atlas contract missing policy token: ${token}`);
 }
 
@@ -44,4 +44,4 @@ const families=new Set(productionPngs.map(a=>a.family));
 if(families.size<5)errors.push(`asset families unexpectedly collapsed: ${families.size}`);
 
 if(errors.length){console.error(errors.join('\n'));process.exit(1)}
-console.log(JSON.stringify({policy:'kelo-atlas-contract-v1',contractVersion:'1.3.0',worldAtlasConsumer:'managed',productionPngs:productionPngs.length,registryVersionedSources:srcMatches.length,families:families.size,largeAssets:giantAtlas.map(a=>a.id)},null,2));
+console.log(JSON.stringify({policy:'kelo-atlas-contract-v1',contractVersion:'1.2.0',worldAtlasConsumer:'managed',productionPngs:productionPngs.length,registryVersionedSources:srcMatches.length,families:families.size,largeAssets:giantAtlas.map(a=>a.id)},null,2));
