@@ -20,6 +20,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: Upload source pack for visual audit
+        uses: actions/upload-artifact@v4
+        with:
+          name: arboleskelo1-source
+          path: assets/Arboleskelo1.PNG
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -27,6 +32,13 @@ jobs:
         run: pip install pillow numpy opencv-python-headless
       - name: Extract exact tree asset
         run: python3 scripts/extract_plaza_tree.py
+      - name: Upload extracted preview
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: plaza-tree-extraction-preview
+          path: assets/plaza-tree-large-v1.png
+          if-no-files-found: ignore
       - name: Commit extracted PNG
         run: |
           git config user.name 'kelo-art-bot'
