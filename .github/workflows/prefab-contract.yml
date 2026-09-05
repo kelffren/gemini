@@ -32,7 +32,10 @@ jobs:
             exit 1
           fi
           grep -q "mode:'generic-prefab-contract-v1'" src/environment/luxe-kiosk-atlas.js
-          grep -q "rendererMode:'data-driven-prefabs-v1'" src/environment/generic-prefabs.js
-          grep -q "version:'1.0.0'" src/environment/prefab-contract.js
+          grep -q "rendererMode:'data-driven-prefabs-v2'" src/environment/generic-prefabs.js
+          grep -q "version:'1.1.0'" src/environment/prefab-contract.js
+          grep -q "renderParts:true" src/environment/prefab-contract.js
+          grep -q "splitAssets:true" src/environment/prefab-contract.js
+          grep -q "frameSelection:true" src/environment/prefab-contract.js
           grep -Eq 'src/environment/prefab-contract.js\?v=[0-9]+' index.html
           grep -Eq 'src/environment/generic-prefabs.js\?v=[0-9]+' index.html
