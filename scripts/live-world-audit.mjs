@@ -7,6 +7,15 @@ const expectedTitle=process.env.EXPECTED_TITLE||'';
 const expectedPlaza=process.env.EXPECTED_PLAZA||'';
 const expectedArchitectureVersion=process.env.EXPECTED_ARCHITECTURE_VERSION||'';
 const expectedArchitectureMode=process.env.EXPECTED_ARCHITECTURE_MODE||'';
+const expectedGeneric=(()=>{
+  const propSource=fs.readFileSync(new URL('../src/environment/prop-contract.js',import.meta.url),'utf8');
+  const genericSource=fs.readFileSync(new URL('../src/environment/generic-props.js',import.meta.url),'utf8');
+  const contractVersion=propSource.match(/KELO_PROP_CONTRACT=Object\.freeze\(\{version:'([^']+)'/)?.[1];
+  const rendererVersion=genericSource.match(/KELO_GENERIC_PROP_AUDIT=\{version:'([^']+)'/)?.[1];
+  const rendererMode=genericSource.match(/rendererMode:'([^']+)'/)?.[1];
+  if(!contractVersion||!rendererVersion||!rendererMode)throw new Error('Could not resolve generic prop LIVE contract from source');
+  return{contractVersion,rendererVersion,rendererMode};
+})();
 const expectedMarbleScope=process.env.EXPECTED_MARBLE_SCOPE||(()=>{
   const source=fs.readFileSync(new URL('../src/environment/tile-registry.js',import.meta.url),'utf8');
   const match=source.match(/marbleVariation:Object\.freeze\(\{[^}]*scope:'([^']+)'/);
@@ -37,7 +46,7 @@ for(let attempt=1;attempt<=24;attempt++){
     const okPlaza=(!expectedPlaza||d.plaza?.version===expectedPlaza)&&d.plaza?.ready&&d.plaza?.groundAssetLoaded&&d.plaza?.fallbackActive===false&&d.plaza?.worldLayerWrapped===true&&d.plaza?.renderingMode==='authored-plaza-ground-v1'&&d.tileset?.sourceMode==='authored-raster-ground-v1'&&d.tileset?.authoredGround===true;
     const okArch=(!expectedArchitectureVersion||d.architecture?.version===expectedArchitectureVersion)&&(!expectedArchitectureMode||d.architecture?.mode===expectedArchitectureMode);
     const okNature=d.nature?.ready&&d.nature?.assetLoaded&&!d.nature?.failed&&d.nature?.version==='plaza-nature-v3.1'&&d.nature?.propCount===4&&d.nature?.depthMode==='formal-back-front-layer-stack-v1'&&d.nature?.rendererWrapper===false&&d.nature?.layerPriority===10&&d.nature?.precedencePolicy==='nature-before-architecture-on-overlap-v1'&&validDepth(d);
-    const okRural=d.generic?.ready&&!d.generic?.failed&&d.generic?.contractVersion==='1.3.0'&&d.generic?.rendererMode==='data-driven-props-v3'&&d.generic?.immediateLayerGroupCount===0&&d.generic?.dynamicSourceCount>=1&&d.rural?.ready&&d.rural?.boundaryMode==='environment-layer-stack-props-back-v1'&&d.rural?.immediateBoundaryDraw===false;
+    const okRural=d.generic?.ready&&!d.generic?.failed&&d.generic?.contractVersion===expectedGeneric.contractVersion&&d.generic?.rendererMode===expectedGeneric.rendererMode&&d.generic?.immediateLayerGroupCount===0&&d.generic?.dynamicSourceCount>=1&&d.rural?.ready&&d.rural?.boundaryMode==='environment-layer-stack-props-back-v1'&&d.rural?.immediateBoundaryDraw===false;
     const okCommerce=d.world?.commerceMarbleVariation===true&&d.world?.marbleVariationScope===expectedMarbleScope&&d.registry?.styles?.districtGround?.profiles?.commerce?.marbleVariation===true&&d.registry?.styles?.marbleVariation?.scope===expectedMarbleScope;
     if(okTitle&&okPlaza&&okArch&&okNature&&okRural&&okCommerce&&d.world?.ready&&d.world?.version===expectedWorld&&d.world?.grassVariationAssetLoaded&&d.world?.grassVariationMode==='authored-eight-variant-atlas-v1'&&d.world?.grassVariationCount===8&&d.registry?.version===expectedRegistry&&d.registry?.atlases?.grassVariation?.src?.includes('grass-variation-v1.png')&&d.registry?.atlases?.plazaGround?.src?.includes('plaza-ground-v1.png')&&d.registry?.atlases?.plazaNature?.src?.includes('plaza-nature-v1.svg')&&d.architecture?.prefabCount===1&&d.kiosk?.ready&&d.market?.disabled===true){loaded=true;break;}
   }catch(e){console.log(`attempt ${attempt}: ${e.message}`)}
@@ -99,7 +108,7 @@ if(state.architectureRenderer?.prefabCount!==1||state.architectureRenderer?.mode
 if(!state.kiosk?.ready||state.kiosk?.failed||state.market?.disabled!==true)throw new Error('Luxe architecture state invalid');
 if(!state.nature?.ready||!state.nature?.assetLoaded||state.nature?.failed||state.nature?.propCount!==4||state.nature?.version!=='plaza-nature-v3.1'||state.nature?.depthMode!=='formal-back-front-layer-stack-v1'||state.nature?.rendererWrapper!==false||state.nature?.layerPriority!==10||state.nature?.precedencePolicy!=='nature-before-architecture-on-overlap-v1')throw new Error(`Plaza nature contract invalid: ${JSON.stringify(state.nature)}`);
 if(!validDepth(state))throw new Error(`Formal base/back/actor/front layer contract invalid: ${JSON.stringify(state.layers)}`);
-if(!state.generic?.ready||state.generic?.failed||state.generic?.contractVersion!=='1.3.0'||state.generic?.rendererMode!=='data-driven-props-v3'||state.generic?.immediateLayerGroupCount!==0||state.generic?.dynamicSourceCount<1)throw new Error(`Generic dynamic prop contract invalid: ${JSON.stringify(state.generic)}`);
+if(!state.generic?.ready||state.generic?.failed||state.generic?.contractVersion!==expectedGeneric.contractVersion||state.generic?.rendererMode!==expectedGeneric.rendererMode||state.generic?.immediateLayerGroupCount!==0||state.generic?.dynamicSourceCount<1)throw new Error(`Generic dynamic prop contract invalid: ${JSON.stringify(state.generic)}`);
 if(!state.rural?.ready||state.rural?.boundaryMode!=='environment-layer-stack-props-back-v1'||state.rural?.immediateBoundaryDraw!==false)throw new Error(`Rural formal props_back contract invalid: ${JSON.stringify(state.rural)}`);
 if(!plazaTree?.dataUrl?.startsWith('data:image/png;base64,')||plazaTree.registryNature?.length!==4)throw new Error('Plaza nature screenshot evidence missing');
 if(!rural?.dataUrl?.startsWith('data:image/png;base64,')||rural.canvas?.cssWidth!==390||rural.canvas?.cssHeight!==844||rural.canvas?.width!==780||rural.canvas?.height!==1688)throw new Error(`Rural depth screenshot evidence missing: ${JSON.stringify(rural?.canvas)}`);
