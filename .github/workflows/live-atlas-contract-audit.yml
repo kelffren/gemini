@@ -7,6 +7,8 @@ on:
       - 'index.html'
       - 'src/environment/atlas-contract.js'
       - 'src/environment/tile-registry.js'
+      - 'src/environment/generic-props.js'
+      - 'src/environment/generic-prefabs.js'
       - 'scripts/live-atlas-contract-audit.mjs'
       - '.github/workflows/live-atlas-contract-audit.yml'
   workflow_dispatch:
