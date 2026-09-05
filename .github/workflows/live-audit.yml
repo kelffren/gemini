@@ -3,49 +3,19 @@ name: Live mobile screenshot audit
 on:
   workflow_dispatch:
   push:
-    branches: [ main ]
+    branches: [main]
     paths:
       - 'index.html'
-      - 'engine-c.js'
-      - 'engine-i.js'
-      - 'engine-l.js'
-      - 'engine-p.js'
-      - 'engine-u.js'
-      - 'engine-aa.js'
-      - 'engine-ab.js'
+      - 'engine-*.js'
       - 'src/environment/**'
       - 'src/ui/**'
       - 'src/systems/**'
       - 'assets/**/*.png'
       - 'assets/**/*.PNG'
-      - 'assets/hero.PNG'
-      - 'assets/tileset.png'
-      - 'assets/tileset-vclean.png'
-      - 'assets/plaza-transitions-v1.png'
-      - 'assets/plaza-ground-v1.png'
-      - 'assets/plaza-nature-v1.svg'
-      - 'assets/plaza-npcs-v1.svg'
-      - 'assets/plaza-fountain-back.PNG'
-      - 'assets/plaza-fountain-front.PNG'
-      - 'assets/grass-variation-v1.png'
-      - 'assets/marble-variation-v1.png'
-      - 'assets/rural-soil-v1.png'
-      - 'assets/rural-props-v1.png'
-      - 'assets/rural-landmarks-v1.png'
-      - 'assets/district-decals-v1.svg'
+      - 'scripts/live-*.mjs'
       - 'scripts/png-validation-core.mjs'
       - 'scripts/validate-png-pipeline.mjs'
       - 'scripts/test-png-validation.mjs'
-      - 'scripts/live-world-audit.mjs'
-      - 'scripts/live-hero-audit.mjs'
-      - 'scripts/live-gardens-audit.mjs'
-      - 'scripts/live-rural-audit.mjs'
-      - 'scripts/live-district-decals-audit.mjs'
-      - 'scripts/live-pavilion-audit.mjs'
-      - 'scripts/live-fountain-audit.mjs'
-      - 'scripts/live-npc-audit.mjs'
-      - 'scripts/live-nobility-audit.mjs'
-      - 'scripts/live-layer-spatial-audit.mjs'
       - '.github/workflows/live-audit.yml'
 
 concurrency:
@@ -61,82 +31,39 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - name: Resolve visual contract from source
-        shell: bash
-        run: |
-          REGISTRY_VERSION="$(node -e "const fs=require('fs');const s=fs.readFileSync('src/environment/district-decals-registry.js','utf8');const m=s.match(/registryVersion:'([^']+)'/);if(!m)process.exit(2);process.stdout.write(m[1]);")"
-          WORLD_VERSION="$(node -e "const fs=require('fs');const s=fs.readFileSync('src/environment/world-map.js','utf8');const m=s.match(/KELO_WORLD_AUDIT=\{version:'([^']+)'/);if(!m)process.exit(2);process.stdout.write(m[1]);")"
-          GARDENS_COMPOSITION_MODE="$(node -e "const fs=require('fs');const s=fs.readFileSync('src/environment/gardens-compositions.js','utf8');const m=s.match(/mode:'(registry-authored-garden-compositions-v[^']+)'/);if(!m)process.exit(2);process.stdout.write(m[1]);")"
-          GARDENS_JOIN_MODE="$(node -e "const fs=require('fs');const s=fs.readFileSync('src/environment/gardens-joins.js','utf8');const m=s.match(/mode:'([^']+)'/);if(!m)process.exit(2);process.stdout.write(m[1]);")"
-          PAGE_TITLE="$(node -e "const fs=require('fs');const s=fs.readFileSync('index.html','utf8');const m=s.match(/<title>([^<]+)<\\/title>/);if(!m)process.exit(2);process.stdout.write(m[1]);")"
-          ARCH_VERSION="$(node -e "const fs=require('fs');const s=fs.readFileSync('src/environment/luxe-kiosk-atlas.js','utf8');const m=s.match(/KELO_ARCHITECTURE_RENDERER=Object\.freeze\(\{version:'([^']+)'/);if(!m)process.exit(2);process.stdout.write(m[1]);")"
-          ARCH_MODE="$(node -e "const fs=require('fs');const s=fs.readFileSync('src/environment/luxe-kiosk-atlas.js','utf8');const m=s.match(/KELO_ARCHITECTURE_RENDERER=Object\.freeze\(\{version:'[^']+',mode:'([^']+)'/);if(!m)process.exit(2);process.stdout.write(m[1]);")"
-          PLAZA_VERSION="$(node -e "const fs=require('fs');const s=fs.readFileSync('engine-l.js','utf8');const m=s.match(/version: '([^']+)'/);if(!m)process.exit(2);process.stdout.write(m[1]);")"
-          FOUNTAIN_VERSION="$(node -e "const fs=require('fs');const s=fs.readFileSync('src/environment/plaza-depth.js','utf8');const m=s.match(/version:'(plaza-fountain-[^']+)'/);if(!m)process.exit(2);process.stdout.write(m[1]);")"
-          echo "EXPECTED_REGISTRY=$REGISTRY_VERSION" >> "$GITHUB_ENV"
-          echo "EXPECTED_WORLD=$WORLD_VERSION" >> "$GITHUB_ENV"
-          echo "EXPECTED_GARDENS_COMPOSITION_MODE=$GARDENS_COMPOSITION_MODE" >> "$GITHUB_ENV"
-          echo "EXPECTED_GARDENS_JOIN_MODE=$GARDENS_JOIN_MODE" >> "$GITHUB_ENV"
-          echo "EXPECTED_TITLE=$PAGE_TITLE" >> "$GITHUB_ENV"
-          echo "EXPECTED_ARCHITECTURE_VERSION=$ARCH_VERSION" >> "$GITHUB_ENV"
-          echo "EXPECTED_ARCHITECTURE_MODE=$ARCH_MODE" >> "$GITHUB_ENV"
-          echo "EXPECTED_PLAZA=$PLAZA_VERSION" >> "$GITHUB_ENV"
-          echo "EXPECTED_FOUNTAIN=$FOUNTAIN_VERSION" >> "$GITHUB_ENV"
       - name: Install Playwright package
         run: npm install --no-save playwright@1.55.0
       - name: Audit live hero sprite on mobile and desktop
-        env:
+        env: &liveenv
           AUDIT_URL: https://kelffren.github.io/gemini/
           CHROME_BIN: /usr/bin/google-chrome
         run: node scripts/live-hero-audit.mjs
-      - name: Audit deployed mobile world
-        env:
-          AUDIT_URL: https://kelffren.github.io/gemini/
-          CHROME_BIN: /usr/bin/google-chrome
-        run: node scripts/live-world-audit.mjs
+      - name: Audit current authored mobile world
+        env: *liveenv
+        run: node scripts/live-world-audit-v2.mjs
       - name: Audit environment layer spatial conflicts
-        env:
-          AUDIT_URL: https://kelffren.github.io/gemini/
-          CHROME_BIN: /usr/bin/google-chrome
+        env: *liveenv
         run: node scripts/live-layer-spatial-audit.mjs
       - name: Audit Gardens marble cadence
-        env:
-          AUDIT_URL: https://kelffren.github.io/gemini/
-          CHROME_BIN: /usr/bin/google-chrome
-          EXPECTED_TITLE: ${{ env.EXPECTED_TITLE }}
-          EXPECTED_WORLD_VERSION: ${{ env.EXPECTED_WORLD }}
-          EXPECTED_GARDENS_COMPOSITION_MODE: ${{ env.EXPECTED_GARDENS_COMPOSITION_MODE }}
-          EXPECTED_GARDENS_JOIN_MODE: ${{ env.EXPECTED_GARDENS_JOIN_MODE }}
+        env: *liveenv
         run: node scripts/live-gardens-audit.mjs
       - name: Audit authored district microdecals
-        env:
-          AUDIT_URL: https://kelffren.github.io/gemini/
-          CHROME_BIN: /usr/bin/google-chrome
+        env: *liveenv
         run: node scripts/live-district-decals-audit.mjs
       - name: Audit authored rural edge density
-        env:
-          AUDIT_URL: https://kelffren.github.io/gemini/
-          CHROME_BIN: /usr/bin/google-chrome
+        env: *liveenv
         run: node scripts/live-rural-audit.mjs
       - name: Audit authored Plaza NPCs
-        env:
-          AUDIT_URL: https://kelffren.github.io/gemini/
-          CHROME_BIN: /usr/bin/google-chrome
+        env: *liveenv
         run: node scripts/live-npc-audit.mjs
       - name: Audit authored Luxe architecture
-        env:
-          AUDIT_URL: https://kelffren.github.io/gemini/
-          CHROME_BIN: /usr/bin/google-chrome
+        env: *liveenv
         run: node scripts/live-pavilion-audit.mjs
       - name: Audit layered plaza fountain
-        env:
-          AUDIT_URL: https://kelffren.github.io/gemini/
-          CHROME_BIN: /usr/bin/google-chrome
+        env: *liveenv
         run: node scripts/live-fountain-audit.mjs
       - name: Audit nobility donation progression
-        env:
-          AUDIT_URL: https://kelffren.github.io/gemini/
-          CHROME_BIN: /usr/bin/google-chrome
+        env: *liveenv
         run: node scripts/live-nobility-audit.mjs
       - name: Upload screenshot evidence
         if: always()
