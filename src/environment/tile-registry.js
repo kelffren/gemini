@@ -85,7 +85,15 @@
     Object.freeze({id:'plaza-tree-nw',sprite:0,x:1096,y:1196,w:144,h:192,baseY:1388}),
     Object.freeze({id:'plaza-tree-ne',sprite:0,x:1640,y:1196,w:144,h:192,baseY:1388}),
     Object.freeze({id:'plaza-tree-sw',sprite:0,x:1096,y:1548,w:144,h:192,baseY:1740}),
-    Object.freeze({id:'plaza-tree-se',sprite:0,x:1640,y:1548,w:144,h:192,baseY:1740})
+    Object.freeze({id:'plaza-tree-se',sprite:0,x:1640,y:1548,w:144,h:192,baseY:1740}),
+    Object.freeze({id:'plaza-tree-west-1',sprite:0,x:1008,y:1336,w:132,h:176,baseY:1512}),
+    Object.freeze({id:'plaza-tree-west-2',sprite:0,x:1008,y:1504,w:132,h:176,baseY:1680}),
+    Object.freeze({id:'plaza-tree-east-1',sprite:0,x:1740,y:1336,w:132,h:176,baseY:1512}),
+    Object.freeze({id:'plaza-tree-east-2',sprite:0,x:1740,y:1504,w:132,h:176,baseY:1680}),
+    Object.freeze({id:'plaza-tree-north-west',sprite:0,x:1232,y:1112,w:128,h:170,baseY:1282}),
+    Object.freeze({id:'plaza-tree-north-east',sprite:0,x:1520,y:1112,w:128,h:170,baseY:1282}),
+    Object.freeze({id:'plaza-tree-south-west',sprite:0,x:1232,y:1736,w:128,h:170,baseY:1906}),
+    Object.freeze({id:'plaza-tree-south-east',sprite:0,x:1520,y:1736,w:128,h:170,baseY:1906})
   ]);
   const trainingDummyProp = Object.freeze({
     id:'training-dummy-plaza',asset:'trainingDummy',x:1532,y:1608,w:96,h:96,baseY:1702,
@@ -181,7 +189,7 @@
     })
   });
   window.KELO_TILE_REGISTRY = Object.freeze({
-    version:'1.10.30', worldTileSize:TILE,
+    version:'1.10.31', worldTileSize:TILE,
     atlases:Object.freeze({plaza:atlas,plazaGround:plazaGroundAtlas,transitions:transitionAtlas,grassVariation:grassVariationAtlas,marbleVariation:marbleVariationAtlas,plazaNature:plazaNatureAtlas,trainingDummy:trainingDummyAtlas,plazaNpcs:plazaNpcsAtlas,ruralSoil:ruralSoilAtlas,ruralProps:ruralPropsAtlas,ruralLandmarks:ruralLandmarksAtlas,ruralNature:ruralNatureAtlas}),
     architectureAssets,architecturePrefabs,plazaNatureProps,trainingDummyProp,plazaNpcVisuals,
     tiles,ruralTiles,ruralPropTiles,ruralLandmarkTiles,ruralLandmarkSprites,ruralNatureTiles,ruralNatureSprites,families,transitionMasks,styles
