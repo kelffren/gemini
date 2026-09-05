@@ -46,7 +46,7 @@ jobs:
           require 'tJunctionOrientationCount:4' src/environment/gardens-compositions.js
           require 'gardens-junction-layer-v4' src/environment/gardens-junction-overlay.js
           require 'registryOwned:true' src/environment/gardens-junction-overlay.js
-          require 'world-v1.23' src/environment/world-map.js
+          require 'world-v1.25' src/environment/world-map.js
           require "districtSourceMode:'terrain-contract-district-profiles-v2'" src/environment/world-map.js
           require "districtOverlayMode:'profile-selected-provider-v1'" src/environment/world-map.js
           require 'legacyTJunctionSpecialCase:false' src/environment/world-map.js
