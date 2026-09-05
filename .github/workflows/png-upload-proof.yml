@@ -29,85 +29,79 @@ jobs:
           import re
           import sys
           from urllib.parse import urljoin
-
           import requests
 
           share = os.environ['SHARE_URL']
           expected_sha = os.environ['EXPECTED_SHA256']
           expected_size = int(os.environ['EXPECTED_SIZE'])
           out = 'assets/bot-crimson-v1.png'
-
           session = requests.Session()
-          session.headers.update({
-              'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/128 Safari/537.36',
-              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-          })
+          session.headers.update({'User-Agent':'Mozilla/5.0 Chrome/128 Safari/537.36'})
 
           def exact_png(data):
-              return (
-                  len(data) == expected_size
-                  and data.startswith(b'\x89PNG\r\n\x1a\n')
-                  and hashlib.sha256(data).hexdigest() == expected_sha
-              )
+              return len(data)==expected_size and data.startswith(b'\x89PNG\r\n\x1a\n') and hashlib.sha256(data).hexdigest()==expected_sha
 
           def save_if_exact(data, source):
-              sha = hashlib.sha256(data).hexdigest()
-              print(f'candidate bytes={len(data)} sha256={sha} source={source[:240]}')
+              sha=hashlib.sha256(data).hexdigest()
+              if len(data)>100000 or data.startswith(b'\x89PNG'):
+                  print(f'CANDIDATE bytes={len(data)} sha256={sha} source={source[:260]}')
               if exact_png(data):
-                  os.makedirs(os.path.dirname(out), exist_ok=True)
-                  with open(out, 'wb') as f:
-                      f.write(data)
-                  print('EXACT_PNG_FOUND', source)
+                  os.makedirs(os.path.dirname(out),exist_ok=True)
+                  open(out,'wb').write(data)
+                  print('EXACT_PNG_FOUND',source)
                   return True
               return False
 
-          page = session.get(share, timeout=30, allow_redirects=True)
+          page=session.get(share,timeout=30,allow_redirects=True)
           page.raise_for_status()
-          print('share_page', page.status_code, page.url, page.headers.get('content-type'), len(page.content))
-          if save_if_exact(page.content, page.url):
-              sys.exit(0)
+          print('SHARE_PAGE',page.status_code,page.url,page.headers.get('content-type'),len(page.content))
+          if save_if_exact(page.content,page.url): sys.exit(0)
+          normalized=html.unescape(page.text).replace('\\/','/')
+          candidates=[]
+          for pattern in [r'(?:href|src|action|data-[\w-]*url)=[\"\']([^\"\']+)[\"\']',r'[\"\'](https?://[^\"\'<>\\s]+)[\"\']']:
+              for raw in re.findall(pattern,normalized,flags=re.I):
+                  raw=raw.strip()
+                  if not raw or raw.startswith(('javascript:','data:','#')): continue
+                  u=urljoin(page.url,raw)
+                  if u not in candidates: candidates.append(u)
+          print('URLS_BEGIN')
+          for u in candidates: print(u)
+          print('URLS_END')
 
-          text = page.text
-          normalized = html.unescape(text).replace('\\/', '/')
-          candidates = []
-
-          attr_patterns = [
-              r'(?:href|src|action|data-[\w-]*url)=[\"\']([^\"\']+)[\"\']',
-              r'[\"\'](https?://[^\"\'<>\\s]+)[\"\']',
-          ]
-          for pattern in attr_patterns:
-              for raw in re.findall(pattern, normalized, flags=re.I):
-                  raw = raw.strip()
-                  if not raw or raw.startswith(('javascript:', 'data:', '#')):
-                      continue
-                  url = urljoin(page.url, raw)
-                  if url not in candidates:
-                      candidates.append(url)
-
-          print('candidate_url_count', len(candidates))
-          priority = sorted(
-              candidates,
-              key=lambda u: (0 if any(k in u.lower() for k in ('download','file','asset','media','api','storage')) else 1, len(u))
-          )
-
-          for url in priority[:160]:
+          fetched={}
+          priority=sorted(candidates,key=lambda u:(0 if any(k in u.lower() for k in ('download','file','asset','media','api','storage')) else 1,len(u)))
+          for u in priority[:180]:
               try:
-                  response = session.get(url, timeout=30, allow_redirects=True)
+                  r=session.get(u,timeout=30,allow_redirects=True)
+                  fetched[u]=r
               except Exception as exc:
-                  print('request_error', url[:180], repr(exc))
-                  continue
-              ctype = (response.headers.get('content-type') or '').lower()
-              data = response.content
-              if 'image/png' in ctype or data.startswith(b'\x89PNG') or len(data) > 200000:
-                  if save_if_exact(data, response.url):
-                      sys.exit(0)
+                  print('REQUEST_ERROR',u[:180],repr(exc)); continue
+              if save_if_exact(r.content,r.url): sys.exit(0)
 
-          print('No exact PNG found from static share-page links.')
-          low = normalized.lower()
-          for token in ('download', 'ダウンロード', 'file_id', 'public_id', 'presigned', 'signed_url', 'signedurl'):
-              idx = low.find(token.lower())
-              if idx >= 0:
-                  print('HTML_HINT', token, normalized[max(0, idx-300):idx+700].replace('\n',' ')[:1000])
+          print('STATIC_LINKS_DID_NOT_RETURN_EXACT_PNG')
+          probes=('download','file_id','fileid','public_id','publicid','presigned','signed_url','signedurl','share_url','shareurl','/api/','api/','sAXq3Ns1F9CD32FT','1P1I0_CrIwP8')
+          print('HTML_TAIL_BEGIN')
+          print(normalized[-6500:].replace('\n',' ')[:6500])
+          print('HTML_TAIL_END')
+          for u,r in fetched.items():
+              ctype=(r.headers.get('content-type') or '').lower()
+              if 'javascript' not in ctype and not u.endswith('.js'): continue
+              js=r.text.replace('\\/','/')
+              low=js.lower()
+              hits=[]
+              for token in probes:
+                  start=0
+                  while True:
+                      idx=low.find(token.lower(),start)
+                      if idx<0: break
+                      hits.append((idx,token)); start=idx+len(token)
+                      if len(hits)>=20: break
+                  if len(hits)>=20: break
+              if hits:
+                  print('JS_FILE',u,'bytes',len(r.content),'hits',len(hits))
+                  for idx,token in hits[:20]:
+                      snippet=js[max(0,idx-350):idx+850].replace('\n',' ')
+                      print('JS_HINT',token,snippet[:1200])
           raise SystemExit(17)
           PY
 
@@ -117,8 +111,8 @@ jobs:
           from PIL import Image
           p='assets/bot-crimson-v1.png'
           with Image.open(p) as im:
-              print('PNG_DIMENSIONS', im.size, im.mode)
-              assert im.size == (1024, 1536)
+              print('PNG_DIMENSIONS',im.size,im.mode)
+              assert im.size==(1024,1536)
           PY
 
       - name: Commit proof asset to test branch
