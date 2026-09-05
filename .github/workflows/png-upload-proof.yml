@@ -1,0 +1,130 @@
+name: PNG upload proof
+
+on:
+  push:
+    branches:
+      - chatgpt/png-upload-proof
+    paths:
+      - .github/workflows/png-upload-proof.yml
+
+permissions:
+  contents: write
+
+jobs:
+  import-png:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve Firestorage share and verify exact PNG
+        env:
+          SHARE_URL: https://firestorage.ai/ja/f/1P1I0_CrIwP8
+          EXPECTED_SHA256: 579ad3028b510c60532cb72471ebec9e27e8ed185488b9cb864daf294047aa30
+          EXPECTED_SIZE: '2030009'
+        run: |
+          python - <<'PY'
+          import hashlib
+          import html
+          import os
+          import re
+          import sys
+          from urllib.parse import urljoin
+
+          import requests
+
+          share = os.environ['SHARE_URL']
+          expected_sha = os.environ['EXPECTED_SHA256']
+          expected_size = int(os.environ['EXPECTED_SIZE'])
+          out = 'assets/bot-crimson-v1.png'
+
+          session = requests.Session()
+          session.headers.update({
+              'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/128 Safari/537.36',
+              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+          })
+
+          def exact_png(data):
+              return (
+                  len(data) == expected_size
+                  and data.startswith(b'\x89PNG\r\n\x1a\n')
+                  and hashlib.sha256(data).hexdigest() == expected_sha
+              )
+
+          def save_if_exact(data, source):
+              sha = hashlib.sha256(data).hexdigest()
+              print(f'candidate bytes={len(data)} sha256={sha} source={source[:240]}')
+              if exact_png(data):
+                  os.makedirs(os.path.dirname(out), exist_ok=True)
+                  with open(out, 'wb') as f:
+                      f.write(data)
+                  print('EXACT_PNG_FOUND', source)
+                  return True
+              return False
+
+          page = session.get(share, timeout=30, allow_redirects=True)
+          page.raise_for_status()
+          print('share_page', page.status_code, page.url, page.headers.get('content-type'), len(page.content))
+          if save_if_exact(page.content, page.url):
+              sys.exit(0)
+
+          text = page.text
+          normalized = html.unescape(text).replace('\\/', '/')
+          candidates = []
+
+          attr_patterns = [
+              r'(?:href|src|action|data-[\w-]*url)=[\"\']([^\"\']+)[\"\']',
+              r'[\"\'](https?://[^\"\'<>\\s]+)[\"\']',
+          ]
+          for pattern in attr_patterns:
+              for raw in re.findall(pattern, normalized, flags=re.I):
+                  raw = raw.strip()
+                  if not raw or raw.startswith(('javascript:', 'data:', '#')):
+                      continue
+                  url = urljoin(page.url, raw)
+                  if url not in candidates:
+                      candidates.append(url)
+
+          print('candidate_url_count', len(candidates))
+          priority = sorted(
+              candidates,
+              key=lambda u: (0 if any(k in u.lower() for k in ('download','file','asset','media','api','storage')) else 1, len(u))
+          )
+
+          for url in priority[:160]:
+              try:
+                  response = session.get(url, timeout=30, allow_redirects=True)
+              except Exception as exc:
+                  print('request_error', url[:180], repr(exc))
+                  continue
+              ctype = (response.headers.get('content-type') or '').lower()
+              data = response.content
+              if 'image/png' in ctype or data.startswith(b'\x89PNG') or len(data) > 200000:
+                  if save_if_exact(data, response.url):
+                      sys.exit(0)
+
+          print('No exact PNG found from static share-page links.')
+          low = normalized.lower()
+          for token in ('download', 'ダウンロード', 'file_id', 'public_id', 'presigned', 'signed_url', 'signedurl'):
+              idx = low.find(token.lower())
+              if idx >= 0:
+                  print('HTML_HINT', token, normalized[max(0, idx-300):idx+700].replace('\n',' ')[:1000])
+          raise SystemExit(17)
+          PY
+
+      - name: Confirm dimensions
+        run: |
+          python - <<'PY'
+          from PIL import Image
+          p='assets/bot-crimson-v1.png'
+          with Image.open(p) as im:
+              print('PNG_DIMENSIONS', im.size, im.mode)
+              assert im.size == (1024, 1536)
+          PY
+
+      - name: Commit proof asset to test branch
+        run: |
+          git config user.name 'kelo-asset-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add assets/bot-crimson-v1.png
+          git commit -m 'test: import exact crimson bot PNG via bridge'
+          git push origin HEAD:chatgpt/png-upload-proof
