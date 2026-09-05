@@ -6,7 +6,7 @@
   const GENERIC_PROPS=window.KELO_GENERIC_PROPS;
   const boundarySource=PROP_CONTRACT?.sources?.ruralFarmBoundary;
   const originalRenderFarm=window.renderFarm;
-  if(!ATLAS||!R||!boundarySource||!GENERIC_PROPS||typeof GENERIC_PROPS.drawInstances!=='function'||typeof originalRenderFarm!=='function'){
+  if(!ATLAS||!R||!boundarySource||!GENERIC_PROPS||typeof originalRenderFarm!=='function'){
     console.error('[Kelo rural] soil atlas, generic prop contract, or farm renderer missing'); return;
   }
   const TILE=REGISTRY.worldTileSize||32;
@@ -42,7 +42,6 @@
     if(!soilReady){ originalRenderFarm(farm); return; }
     const now=Date.now();
     ctx.save(); ctx.imageSmoothingEnabled=false;
-    if(genericBoundaryReady())GENERIC_PROPS.drawInstances(ctx,boundarySource.build(farm),true);
     ctx.fillStyle='rgba(22,80,49,.13)'; ctx.fillRect(farm.x-8,farm.y-8,farm.w+16,farm.h+16);
     farm.crops.forEach((c,index)=>{
       const x=farm.x+20+(index%2)*110, y=farm.y+30+Math.floor(index/2)*110;
@@ -53,12 +52,12 @@
   };
 
   window.KELO_RURAL_GROUND_AUDIT={
-    version:'rural-v2.2',ready:false,assetLoaded:false,propsLoaded:false,fallbackActive:true,
+    version:'rural-v2.3',ready:false,assetLoaded:false,propsLoaded:false,fallbackActive:true,
     atlas:ATLAS.src,propAtlas:PROP_CONTRACT.assets?.ruralProps?.src||null,atlasWidth:ATLAS.width,atlasHeight:ATLAS.height,
     propAtlasWidth:PROP_CONTRACT.assets?.ruralProps?.width||0,propAtlasHeight:PROP_CONTRACT.assets?.ruralProps?.height||0,tileSize:TILE,modularTiles:true,
-    renderingMode:'authored-nine-slice-v1',plotSize:PLOT,boundaryMode:'generic-prop-contract-v1',
+    renderingMode:'authored-nine-slice-v1',plotSize:PLOT,boundaryMode:'environment-layer-stack-props-back-v1',
     gateSide:'north',dirtApproachTiles:1,genericPropContract:true,propContractVersion:PROP_CONTRACT.version,
-    propRendererVersion:GENERIC_PROPS.version,boundarySource:boundarySource.id
+    propRendererVersion:GENERIC_PROPS.version,boundarySource:boundarySource.id,immediateBoundaryDraw:false
   };
   function syncReady(){
     const a=window.KELO_RURAL_GROUND_AUDIT,propsReady=genericBoundaryReady();
@@ -69,7 +68,7 @@
     soilReady=true;syncReady();
   };
   sheet.onerror=function(){console.error('[Kelo rural] soil atlas load failed');};
-  sheet.src=ATLAS.src+'&rural=172';
+  sheet.src=ATLAS.src+'&rural=173';
   function waitForGeneric(){syncReady();if(!window.KELO_RURAL_GROUND_AUDIT.ready&&!window.KELO_GENERIC_PROP_AUDIT?.failed)requestAnimationFrame(waitForGeneric);}
   waitForGeneric();
 })();
