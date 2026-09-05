@@ -1,0 +1,60 @@
+name: Patch LIVE world contract expectations
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/patch-live-world-contract.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Make generic prop LIVE expectations source-driven
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('scripts/live-world-audit.mjs')
+          s=p.read_text()
+          anchor="const expectedMarbleScope=process.env.EXPECTED_MARBLE_SCOPE||(()=>{"
+          insert="""const expectedGeneric=(()=>{\n  const propSource=fs.readFileSync(new URL('../src/environment/prop-contract.js',import.meta.url),'utf8');\n  const genericSource=fs.readFileSync(new URL('../src/environment/generic-props.js',import.meta.url),'utf8');\n  const contractVersion=propSource.match(/KELO_PROP_CONTRACT=Object\\.freeze\\(\\{version:'([^']+)'/)?.[1];\n  const rendererVersion=genericSource.match(/KELO_GENERIC_PROP_AUDIT=\\{version:'([^']+)'/)?.[1];\n  const rendererMode=genericSource.match(/rendererMode:'([^']+)'/)?.[1];\n  if(!contractVersion||!rendererVersion||!rendererMode)throw new Error('Could not resolve generic prop LIVE contract from source');\n  return{contractVersion,rendererVersion,rendererMode};\n})();\n"""
+          assert anchor in s
+          if 'const expectedGeneric=(()=>{' not in s:
+              s=s.replace(anchor,insert+anchor,1)
+          replacements={
+            "d.generic?.contractVersion==='1.3.0'":"d.generic?.contractVersion===expectedGeneric.contractVersion",
+            "d.generic?.rendererMode==='data-driven-props-v3'":"d.generic?.rendererMode===expectedGeneric.rendererMode",
+            "state.generic?.contractVersion!=='1.3.0'":"state.generic?.contractVersion!==expectedGeneric.contractVersion",
+            "state.generic?.rendererMode!=='data-driven-props-v3'":"state.generic?.rendererMode!==expectedGeneric.rendererMode",
+            "state.generic?.version!=='generic-props-v1.4'":"state.generic?.version!==expectedGeneric.rendererVersion",
+            "state.generic?.version!=='generic-props-v1.5'":"state.generic?.version!==expectedGeneric.rendererVersion",
+          }
+          for old,new in replacements.items(): s=s.replace(old,new)
+          assert "contractVersion==='1.3.0'" not in s
+          assert "rendererMode==='data-driven-props-v3'" not in s
+          assert "contractVersion!=='1.3.0'" not in s
+          assert "rendererMode!=='data-driven-props-v3'" not in s
+          p.write_text(s)
+          PY
+      - name: Verify audit still has strict generic prop gates
+        run: |
+          node --check scripts/live-world-audit.mjs
+          grep -Fq 'expectedGeneric.contractVersion' scripts/live-world-audit.mjs
+          grep -Fq 'expectedGeneric.rendererMode' scripts/live-world-audit.mjs
+          grep -Fq "Could not resolve generic prop LIVE contract from source" scripts/live-world-audit.mjs
+          git diff --check
+      - name: Commit patch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add scripts/live-world-audit.mjs
+          git commit -m 'test: derive LIVE prop contract from source'
+          for i in 1 2 3; do
+            git pull --rebase origin main && git push origin HEAD:main && exit 0
+            sleep 2
+          done
+          exit 1
