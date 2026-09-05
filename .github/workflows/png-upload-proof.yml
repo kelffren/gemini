@@ -21,7 +21,7 @@ jobs:
           npm install --no-save playwright
           npx playwright install chromium
 
-      - name: Download exact PNG through Firestorage share page
+      - name: Download exact PNG through Firestorage
         env:
           SHARE_URL: https://firestorage.ai/ja/f/1P1I0_CrIwP8
           EXPECTED_SHA256: 579ad3028b510c60532cb72471ebec9e27e8ed185488b9cb864daf294047aa30
@@ -31,101 +31,56 @@ jobs:
           const fs = require('fs');
           const crypto = require('crypto');
           const { chromium } = require('playwright');
-
           const share = process.env.SHARE_URL;
           const expectedSha = process.env.EXPECTED_SHA256;
           const expectedSize = Number(process.env.EXPECTED_SIZE);
           const out = 'assets/bot-crimson-v1.png';
-          let found = false;
-
-          function verifyAndSave(buf, source) {
-            const sha = crypto.createHash('sha256').update(buf).digest('hex');
-            console.log(`VERIFY source=${source} bytes=${buf.length} sha256=${sha}`);
-            if (buf.length === expectedSize && sha === expectedSha && buf.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10]))) {
-              fs.mkdirSync('assets', { recursive: true });
-              fs.writeFileSync(out, buf);
-              found = true;
-              console.log('EXACT_PNG_FOUND');
-              return true;
-            }
-            return false;
+          function exact(buf) {
+            return buf.length === expectedSize &&
+              crypto.createHash('sha256').update(buf).digest('hex') === expectedSha &&
+              buf.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10]));
           }
-
           (async () => {
             const browser = await chromium.launch({ headless: true });
             const context = await browser.newContext({ acceptDownloads: true });
             const page = await context.newPage();
-
-            page.on('response', async (response) => {
-              if (found) return;
-              try {
-                const headers = response.headers();
-                const type = (headers['content-type'] || '').toLowerCase();
-                const len = Number(headers['content-length'] || 0);
-                if (type.includes('image/png') && (len > 500000 || !len)) {
-                  const body = await response.body();
-                  verifyAndSave(body, response.url());
-                }
-              } catch (_) {}
-            });
-
             await page.goto(share, { waitUntil: 'domcontentloaded', timeout: 60000 });
-            await page.waitForTimeout(12000);
-            console.log('PAGE_URL', page.url());
-            console.log('PAGE_TITLE', await page.title());
-            console.log('PAGE_TEXT', (await page.locator('body').innerText()).slice(0,5000));
-
-            const clickable = page.locator('a,button');
-            const count = await clickable.count();
-            console.log('CLICKABLE_COUNT', count);
-            for (let i=0; i<count; i++) {
-              const el = clickable.nth(i);
-              const text = ((await el.innerText().catch(()=>'')) || '').trim();
-              const href = await el.getAttribute('href').catch(()=>null);
-              const disabled = await el.isDisabled().catch(()=>false);
-              console.log('CLICKABLE', i, JSON.stringify(text.slice(0,180)), href || '', 'disabled='+disabled);
-            }
-
-            const selectors = [
-              'a[download]',
-              'button:has-text("ダウンロード")',
-              'a:has-text("ダウンロード")',
-              'button:has-text("Download")',
-              'a:has-text("Download")',
-              'button:has-text("download")',
-              'a:has-text("download")'
-            ];
-
-            for (const selector of selectors) {
-              if (found) break;
-              const loc = page.locator(selector).first();
-              if (!(await loc.count())) continue;
-              console.log('TRY_SELECTOR', selector);
-              await loc.waitFor({ state: 'visible', timeout: 15000 }).catch(()=>{});
-              const downloadPromise = page.waitForEvent('download', { timeout: 20000 }).catch(()=>null);
-              await loc.click({ timeout: 15000 }).catch(e => console.log('CLICK_ERROR', selector, e.message));
-              const download = await downloadPromise;
-              if (download) {
-                const path = await download.path();
-                if (path) verifyAndSave(fs.readFileSync(path), 'browser-download:'+download.suggestedFilename());
-              }
-              await page.waitForTimeout(3000);
-            }
-
+            await page.waitForTimeout(10000);
+            const button = page.locator('button:has-text("ダウンロード")').first();
+            await button.waitFor({ state: 'visible', timeout: 20000 });
+            const downloadPromise = page.waitForEvent('download', { timeout: 30000 });
+            await button.click();
+            const download = await downloadPromise;
+            const tempPath = await download.path();
+            if (!tempPath) throw new Error('browser did not expose downloaded file');
+            const buf = fs.readFileSync(tempPath);
+            const sha = crypto.createHash('sha256').update(buf).digest('hex');
+            console.log('DOWNLOADED_BYTES', buf.length);
+            console.log('DOWNLOADED_SHA256', sha);
+            if (!exact(buf)) throw new Error('downloaded binary does not match source PNG');
+            fs.mkdirSync('assets', { recursive: true });
+            fs.writeFileSync(out, buf);
+            console.log('EXACT_PNG_FOUND');
             await browser.close();
-            if (!found) process.exit(17);
-          })().catch(err => { console.error(err); process.exit(18); });
+          })().catch(err => { console.error(err); process.exit(1); });
           NODE
 
-      - name: Confirm exact binary and dimensions
+      - name: Confirm exact binary and PNG dimensions
         run: |
-          sha256sum assets/bot-crimson-v1.png
+          test "$(sha256sum assets/bot-crimson-v1.png | awk '{print $1}')" = "579ad3028b510c60532cb72471ebec9e27e8ed185488b9cb864daf294047aa30"
           test "$(stat -c%s assets/bot-crimson-v1.png)" = "2030009"
           python - <<'PY'
-          from PIL import Image
-          with Image.open('assets/bot-crimson-v1.png') as im:
-              print('PNG_DIMENSIONS', im.size, im.mode)
-              assert im.size == (1024, 1536)
+          import struct
+          p='assets/bot-crimson-v1.png'
+          with open(p,'rb') as f:
+              sig=f.read(8)
+              assert sig == b'\x89PNG\r\n\x1a\n'
+              length=struct.unpack('>I',f.read(4))[0]
+              kind=f.read(4)
+              assert kind == b'IHDR' and length >= 8
+              width,height=struct.unpack('>II',f.read(8))
+          print('PNG_DIMENSIONS',width,height)
+          assert (width,height)==(1024,1536)
           PY
 
       - name: Commit proof asset to test branch
