@@ -1,0 +1,40 @@
+{
+  "version": "kelo-png-validation-policy-v1",
+  "excludedFromWorldContract": [
+    {
+      "path": "assets/hero.PNG",
+      "scope": "non-world-ui",
+      "reason": "UI/landing artwork is outside the Kelo World environment asset contract."
+    },
+    {
+      "path": "assets/fountain-front-v1.png",
+      "scope": "superseded-archive",
+      "reason": "Superseded fountain export retained for history; LIVE uses plaza-fountain-front.PNG."
+    },
+    {
+      "path": "assets/market-pavilion-v1.png",
+      "scope": "unadopted-archive",
+      "reason": "Unadopted authored candidate retained in assets but not part of the LIVE world contract."
+    },
+    {
+      "path": "assets/plaza-transitions-v1.png",
+      "scope": "superseded-archive",
+      "reason": "Superseded transition atlas retained for history; LIVE terrain contract uses v3."
+    },
+    {
+      "path": "assets/plaza-transitions-v2.png",
+      "scope": "superseded-archive",
+      "reason": "Superseded transition atlas retained for history; LIVE terrain contract uses v3."
+    },
+    {
+      "path": "assets/plaza.PNG",
+      "scope": "superseded-archive",
+      "reason": "Legacy Plaza raster retained for history and not part of the LIVE generic world pipeline."
+    },
+    {
+      "path": "assets/tileset.png",
+      "scope": "superseded-archive",
+      "reason": "Legacy tileset retained for history; LIVE TileRegistry uses tileset-vclean.png."
+    }
+  ]
+}
