@@ -34,10 +34,14 @@ function valid(s){
 }
 
 async function state(){return page.evaluate(()=>({title:document.title,registry:window.KELO_TILE_REGISTRY||null,joins:window.KELO_GARDENS_JOINS||null,composition:window.KELO_GARDENS_COMPOSITION_AUDIT||null,junction:window.KELO_GARDENS_JUNCTION_AUDIT||null,world:window.KELO_WORLD_AUDIT||null,district:window.KELO_DISTRICT_VISUAL_PROFILES||null}));}
+async function loadCurrent(url){
+  await page.goto(url,{waitUntil:'domcontentloaded',timeout:30000});
+  await page.waitForFunction(()=>window.KELO_WORLD_AUDIT?.ready&&window.KELO_GARDENS_COMPOSITION_AUDIT?.ready&&window.KELO_GARDENS_JUNCTION_AUDIT?.ready&&window.KELO_DISTRICT_VISUAL_PROFILES?.version,{timeout:20000});
+}
 let loaded=false,lastState=null;
 for(let attempt=1;attempt<=6;attempt++){
   try{
-    await page.goto(`${base}?gardens-audit=${Date.now()}-${attempt}`,{waitUntil:'networkidle',timeout:45000});
+    await loadCurrent(`${base}?gardens-audit=${Date.now()}-${attempt}`);
     lastState=await state();
     if(valid(lastState)){loaded=true;break;}
     console.log(`contract mismatch attempt ${attempt}: ${JSON.stringify(lastState)}`);
@@ -47,7 +51,7 @@ for(let attempt=1;attempt<=6;attempt++){
 if(!loaded){fs.writeFileSync('artifacts/gardens-report.json',JSON.stringify({loaded,lastState,consoleErrors,failedRequests,httpErrors,expected:{expectedTitle,expectedWorldVersion,expectedDistrictProfileVersion,expectedCompositionMode,expectedJoinMode}},null,2));await browser.close();throw new Error(`LIVE never reached current Gardens contract: ${JSON.stringify(lastState)}`);}
 
 consoleErrors.length=0;failedRequests.length=0;httpErrors.length=0;
-await page.goto(`${base}?gardens-audit=final-${Date.now()}`,{waitUntil:'networkidle',timeout:45000});
+await loadCurrent(`${base}?gardens-audit=final-${Date.now()}`);
 await page.waitForTimeout(1600);
 const shot=await page.evaluate(()=>{
   const c=document.getElementById('game-canvas');
