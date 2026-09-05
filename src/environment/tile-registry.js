@@ -54,6 +54,14 @@
     luxeBoutique:Object.freeze({
       id:'luxe-boutique', src:'assets/kelo-luxe-boutique.png?v=6', width:192, height:222,
       worldWidth:192, worldHeight:222, family:'architecture'
+    }),
+    arenaWarWall:Object.freeze({
+      id:'arena-war-wall', src:'assets/arena-war-wall-v1.png?art=301', width:640, height:192,
+      worldWidth:640, worldHeight:192, family:'arena-architecture'
+    }),
+    arenaWarEdgeDecor:Object.freeze({
+      id:'arena-war-edge-decor', src:'assets/arena-war-edge-decor-v1.png?art=301', width:640, height:96,
+      worldWidth:640, worldHeight:96, family:'arena-landmark'
     })
   });
   const architecturePrefabs = Object.freeze({
@@ -63,6 +71,14 @@
       interaction:Object.freeze({x:1208,y:1552,radius:90}),
       occlusion:Object.freeze({sideInset:9,topInset:40,bottomPadding:4,clip:Object.freeze({xPadding:7,topPadding:24,bottomPadding:7})}),
       legacyVisualReplacement:true
+    }),
+    arenaWarWall:Object.freeze({
+      id:'arena-war-wall-north', asset:'arenaWarWall', x:1840, y:480, baseYOffset:192,
+      districts:Object.freeze(['arena']), priority:24, ownership:'arena-authored-war-v1'
+    }),
+    arenaWarEdgeDecor:Object.freeze({
+      id:'arena-war-edge-decor-south', asset:'arenaWarEdgeDecor', x:1840, y:912, baseYOffset:96,
+      districts:Object.freeze(['arena']), priority:18, ownership:'arena-authored-war-v1'
     })
   });
   const plazaNatureProps = Object.freeze([
@@ -165,7 +181,7 @@
     })
   });
   window.KELO_TILE_REGISTRY = Object.freeze({
-    version:'1.10.28', worldTileSize:TILE,
+    version:'1.10.29', worldTileSize:TILE,
     atlases:Object.freeze({plaza:atlas,plazaGround:plazaGroundAtlas,transitions:transitionAtlas,grassVariation:grassVariationAtlas,marbleVariation:marbleVariationAtlas,plazaNature:plazaNatureAtlas,trainingDummy:trainingDummyAtlas,plazaNpcs:plazaNpcsAtlas,ruralSoil:ruralSoilAtlas,ruralProps:ruralPropsAtlas,ruralLandmarks:ruralLandmarksAtlas,ruralNature:ruralNatureAtlas}),
     architectureAssets,architecturePrefabs,plazaNatureProps,trainingDummyProp,plazaNpcVisuals,
     tiles,ruralTiles,ruralPropTiles,ruralLandmarkTiles,ruralLandmarkSprites,ruralNatureTiles,ruralNatureSprites,families,transitionMasks,styles
