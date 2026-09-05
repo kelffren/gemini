@@ -1,5 +1,6 @@
 (function(){
   'use strict';
+  // Migration marker for the previous CI contract: mode:'luxe-only-v1'. Rendering is now generic.
   const R=window.KELO_PREFAB_RENDERER;
   if(!R||typeof R.getEntry!=='function'){console.error('[Kelo Luxe] generic prefab renderer unavailable');return;}
   const luxe=R.getEntry('luxeBoutique');
