@@ -4,10 +4,10 @@
   const L=window.KELO_ENVIRONMENT_LAYERS;
   if(!C||!L||typeof L.register!=='function'){console.error('[Kelo generic prefabs] contract/layer stack missing');return;}
 
-  const images=new Map(),readyAssets=new Set();let failed=false;
-  const audit=window.KELO_PREFAB_AUDIT={version:'generic-prefabs-v1',contractVersion:C.version,ready:false,failed:false,
+  const images=new Map(),readyAssets=new Set();let failed=false,installed=false;
+  const audit=window.KELO_PREFAB_AUDIT={version:'generic-prefabs-v1.1',contractVersion:C.version,ready:false,failed:false,
     rendererMode:'data-driven-prefabs-v1',prefabCount:C.prefabs.length,assetCount:Object.keys(C.assets).length,
-    registeredColliderCount:0,backDrawCount:0,frontOcclusionDrawCount:0,layerCount:0};
+    registeredColliderCount:0,backDrawCount:0,frontOcclusionDrawCount:0,layerCount:0,bootstrapMode:'deferred-after-engine-bootstrap-v1'};
 
   function geometry(p){return{x:p.position.x,y:p.position.y,w:p.size.w,h:p.size.h};}
   function drawPrefab(g,p){const img=images.get(p.asset);if(!img||!readyAssets.has(p.asset))return false;const b=geometry(p);g.drawImage(img,b.x,b.y,b.w,b.h);return true;}
@@ -27,25 +27,29 @@
   }
   function bounds(){return C.prefabs.map(p=>({id:p.id,...p.visualBounds}));}
   function registerColliders(){
-    if(typeof obstacles==='undefined'||!Array.isArray(obstacles))return;
+    if(typeof obstacles==='undefined'||!Array.isArray(obstacles))return 0;
     for(const p of C.prefabs){const c=p.collider;if(!c||obstacles.some(o=>o?._genericPrefabCollisionFor===p.id))continue;
-      obstacles.push({id:p.id,x:c.x,y:c.y,w:c.w,h:c.h,noDraw:c.noDraw!==false,_genericPrefabCollision:true,_genericPrefabCollisionFor:p.id});audit.registeredColliderCount++;
+      obstacles.push({id:p.id,x:c.x,y:c.y,w:c.w,h:c.h,noDraw:c.noDraw!==false,_genericPrefabCollision:true,_genericPrefabCollisionFor:p.id});
     }
+    audit.registeredColliderCount=obstacles.filter(o=>o?._genericPrefabCollision===true).length;
+    return audit.registeredColliderCount;
   }
   function installLayers(){
+    if(installed)return true;
     for(const [key,group] of Object.entries(C.layerGroups||{})){
       const ps=C.prefabs.filter(p=>p.layerGroup===key);if(!ps.length)continue;
       const priority=Math.max(group.priority||0,...ps.map(p=>p.priority||0));
       if(group.back){L.register({id:`${group.id}-back`,phase:group.back.phase,priority,required:true,ready:()=>audit.ready,draw:drawBack,ownership:group.ownership,bounds});audit.layerCount++;}
       if(group.front){L.register({id:`${group.id}-front`,phase:group.front.phase,priority,required:true,ready:()=>audit.ready,draw:drawFront,ownership:group.ownership,bounds});audit.layerCount++;}
     }
+    installed=true;registerColliders();return true;
   }
   function getEntry(key){const p=C.prefabs.find(x=>x.key===key||x.id===key);if(!p)return null;return Object.freeze({key:p.key,prefab:p,asset:C.assets[p.asset],geometry:Object.freeze(geometry(p)),isOccluding(actor){return actorBehind(p,actor);},get ready(){return readyAssets.has(p.asset);},get failed(){return failed;}});}
 
-  try{installLayers();registerColliders();}catch(err){failed=true;audit.failed=true;console.error('[Kelo generic prefabs] install failed',err);return;}
-  window.KELO_PREFAB_RENDERER=Object.freeze({version:'generic-prefabs-v1',mode:'data-driven-prefabs-v1',getEntry,get ready(){return audit.ready&&!audit.failed;},get failed(){return audit.failed;}});
-
+  window.KELO_PREFAB_RENDERER=Object.freeze({version:'generic-prefabs-v1.1',mode:'data-driven-prefabs-v1',getEntry,ensureColliders:registerColliders,get ready(){return audit.ready&&!audit.failed;},get failed(){return audit.failed;}});
   const entries=Object.entries(C.assets).filter(([,a])=>a?.src);
-  if(!entries.length){audit.ready=true;return;}
+  if(!entries.length)audit.ready=true;
   for(const [id,a] of entries){const img=new Image();img.decoding='async';images.set(id,img);img.onload=()=>{if(img.naturalWidth!==a.width||img.naturalHeight!==a.height){failed=true;audit.failed=true;console.error('[Kelo generic prefabs] invalid asset dimensions',id);return;}readyAssets.add(id);if(readyAssets.size===entries.length)audit.ready=true;};img.onerror=()=>{failed=true;audit.failed=true;console.error('[Kelo generic prefabs] asset load failed',id);};img.src=a.src;}
+
+  setTimeout(()=>{try{installLayers();registerColliders();setTimeout(registerColliders,600);}catch(err){failed=true;audit.failed=true;console.error('[Kelo generic prefabs] deferred install failed',err);}},0);
 })();
