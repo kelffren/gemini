@@ -2,10 +2,10 @@ import fs from 'node:fs';
 import { chromium } from 'playwright';
 
 const base=process.env.AUDIT_URL||'https://kelffren.github.io/gemini/';
-const expectedTitle=process.env.EXPECTED_TITLE||'Kelo World — V6.23';
+const expectedTitle=process.env.EXPECTED_TITLE||'Kelo World — V6.24';
 const expectedWorldVersion=process.env.EXPECTED_WORLD_VERSION||'world-v1.23';
 const expectedDistrictProfileVersion=process.env.EXPECTED_DISTRICT_PROFILE_VERSION||'1.2.0';
-const expectedRegistryVersion='1.11.1';
+const expectedRegistryVersion='1.10.28';
 const expectedCompositionMode=process.env.EXPECTED_GARDENS_COMPOSITION_MODE||'registry-authored-garden-compositions-v20';
 const expectedJoinMode=process.env.EXPECTED_GARDENS_JOIN_MODE||'authored-garden-endcaps-mid-variants-v4';
 const expectedGardensMode='authored-organic-garden-overlay-atlas-v2';
