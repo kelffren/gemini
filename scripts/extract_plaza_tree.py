@@ -22,18 +22,25 @@ rect = (8, 4, bgr.shape[1] - 16, bgr.shape[0] - 8)
 cv2.grabCut(bgr, mask, rect, bgd, fgd, 8, cv2.GC_INIT_WITH_RECT)
 fg = np.where((mask == cv2.GC_FGD) | (mask == cv2.GC_PR_FGD), 255, 0).astype(np.uint8)
 
-# Keep the main connected component only, removing background remnants.
+# Preserve the tree as several connected foreground islands (canopy, trunk, roots/flowers)
+# while discarding tiny background remnants.
 num, labels, stats, _ = cv2.connectedComponentsWithStats((fg > 0).astype(np.uint8), 8)
 assert num > 1, 'tree segmentation failed'
-largest = 1 + np.argmax(stats[1:, cv2.CC_STAT_AREA])
-fg = np.where(labels == largest, 255, 0).astype(np.uint8)
+order = sorted(range(1, num), key=lambda i: int(stats[i, cv2.CC_STAT_AREA]), reverse=True)
+keep = np.zeros(fg.shape, dtype=bool)
+for i in order[:10]:
+    if int(stats[i, cv2.CC_STAT_AREA]) < 40:
+        continue
+    keep |= labels == i
+fg = np.where(keep, 255, 0).astype(np.uint8)
 
 rgba = np.dstack([crop, fg])
 out = Image.fromarray(rgba, 'RGBA')
 bbox = out.getchannel('A').getbbox()
 assert bbox, 'empty alpha mask'
 out = out.crop(bbox)
-out.save(OUT, 'PNG', optimize=True)
 
+# Guard against accidentally extracting only the canopy or only the trunk.
+assert out.width >= 180 and out.height >= 200, out.size
+out.save(OUT, 'PNG', optimize=True)
 print('PASS extracted', OUT, out.size)
-assert out.size == (191, 229), out.size
