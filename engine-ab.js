@@ -8,7 +8,7 @@
   const FOOT_ROOT_OFFSET_Y = 10;
   const AVATAR_VISUAL_SCALE = 1.15;
   const HERO_AUDIT = window.KELO_HERO_SPRITE_AUDIT = {
-    version: 'hero-preprocess-audit-v4',
+    version: 'hero-preprocess-audit-v5',
     source: 'assets/hero.PNG',
     loaded: false,
     processed: false,
@@ -26,6 +26,9 @@
     row1VsRow2RgbaSimilarityPct: 0,
     row1VsMirroredRow2RgbaSimilarityPct: 0,
     lateralSimilarityDeltaPct: 0,
+    lateralRenderedRow: 2,
+    lateralContactEvidenceMode: 'visible-silhouette-bottom-band-v1',
+    lateralContactFrames: [],
     avatarVisualScale: AVATAR_VISUAL_SCALE,
     sheetMutationAfterIdle: false,
     visibleAlphaMutationAfterIdle: false,
@@ -89,6 +92,58 @@
     HERO_AUDIT.lateralSimilarityDeltaPct = mirrorPct - directPct;
   }
 
+  function measureLateralContactFrames(d, width, padX, padY) {
+    const fw = Math.floor(FW);
+    const fh = Math.floor(FH);
+    const minX = Math.ceil(padX);
+    const maxX = Math.max(minX, Math.floor(FW - padX - 1));
+    const minY = Math.ceil(padY);
+    const maxY = Math.max(minY, Math.floor(FH - padY - 1));
+    const rowY = fh * 2;
+    const frames = [];
+
+    for (let col = 0; col < COLS; col++) {
+      const frameX = col * fw;
+      let lowestOpaqueY = -1;
+      for (let y = minY; y <= maxY; y++) {
+        for (let x = minX; x <= maxX; x++) {
+          const i = ((rowY + y) * width + frameX + x) * 4;
+          if (d[i + 3] > 0 && y > lowestOpaqueY) lowestOpaqueY = y;
+        }
+      }
+
+      let bottomBandOpaquePixelCount = 0;
+      let supportMinX = null;
+      let supportMaxX = null;
+      let supportXSum = 0;
+      if (lowestOpaqueY >= 0) {
+        const bandMinY = Math.max(minY, lowestOpaqueY - 2);
+        for (let y = bandMinY; y <= lowestOpaqueY; y++) {
+          for (let x = minX; x <= maxX; x++) {
+            const i = ((rowY + y) * width + frameX + x) * 4;
+            if (d[i + 3] <= 0) continue;
+            bottomBandOpaquePixelCount += 1;
+            supportXSum += x;
+            supportMinX = supportMinX == null ? x : Math.min(supportMinX, x);
+            supportMaxX = supportMaxX == null ? x : Math.max(supportMaxX, x);
+          }
+        }
+      }
+
+      frames.push({
+        frame: col,
+        lowestOpaqueY,
+        bottomBandHeightPx: lowestOpaqueY >= 0 ? 3 : 0,
+        bottomBandOpaquePixelCount,
+        supportMinX,
+        supportMaxX,
+        supportWidthPx: supportMinX == null ? 0 : supportMaxX - supportMinX + 1,
+        supportCentroidX: bottomBandOpaquePixelCount ? supportXSum / bottomBandOpaquePixelCount : null
+      });
+    }
+    HERO_AUDIT.lateralContactFrames = frames;
+  }
+
   function knockWhite() {
     const t0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
     try {
@@ -132,6 +187,7 @@
           }
         }
       }
+      measureLateralContactFrames(d, c.width, padX, padY);
       g.putImageData(data, 0, 0);
       sheet = c;
       HERO_AUDIT.processed = true;
