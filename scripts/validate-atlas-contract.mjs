@@ -2,11 +2,19 @@ import fs from 'node:fs';
 
 const registry=fs.readFileSync('src/environment/tile-registry.js','utf8');
 const contract=fs.readFileSync('src/environment/atlas-contract.js','utf8');
+const world=fs.readFileSync('src/environment/world-map.js','utf8');
 const manifest=JSON.parse(fs.readFileSync('src/environment/art-asset-manifest.json','utf8'));
 const errors=[];
 
-for(const token of ["kelo-atlas-contract-v1","maxDimension:2048","small:Object.freeze({maxDimension:256","medium:Object.freeze({maxDimension:1024","packedSprites:Object.freeze({paddingMin:1,spacingMin:1","lazy-when-district-needed","allowSilentMissing:false"]){
+for(const token of ["kelo-atlas-contract-v1","version:'1.2.0'","maxDimension:2048","small:Object.freeze({maxDimension:256","medium:Object.freeze({maxDimension:1024","packedSprites:Object.freeze({paddingMin:1,spacingMin:1","lazy-when-district-needed","imageCreation:'atlas-contract-only'","consumerRule:'acquire-by-key-never-rewrite-src'","allowSilentMissing:false"]){
   if(!contract.includes(token))errors.push(`atlas contract missing policy token: ${token}`);
+}
+
+for(const token of ["A=window.KELO_ATLAS_CONTRACT","A.acquire(key)","A.acquire('gardensBase')","A.acquire('gardensJoins')","atlasConsumerMode:'atlas-contract-managed-v1'","worldOwnsImageLoader:false"]){
+  if(!world.includes(token))errors.push(`world renderer missing managed-atlas token: ${token}`);
+}
+for(const forbidden of ['new Image()','function versionedSrc','world=191']){
+  if(world.includes(forbidden))errors.push(`world renderer must not own atlas loading/cache rewrite: ${forbidden}`);
 }
 
 const productionPngs=manifest.assets.filter(a=>String(a.path||'').toLowerCase().endsWith('.png'));
@@ -36,4 +44,4 @@ const families=new Set(productionPngs.map(a=>a.family));
 if(families.size<5)errors.push(`asset families unexpectedly collapsed: ${families.size}`);
 
 if(errors.length){console.error(errors.join('\n'));process.exit(1)}
-console.log(JSON.stringify({policy:'kelo-atlas-contract-v1',productionPngs:productionPngs.length,registryVersionedSources:srcMatches.length,families:families.size,largeAssets:giantAtlas.map(a=>a.id)},null,2));
+console.log(JSON.stringify({policy:'kelo-atlas-contract-v1',contractVersion:'1.2.0',worldAtlasConsumer:'managed',productionPngs:productionPngs.length,registryVersionedSources:srcMatches.length,families:families.size,largeAssets:giantAtlas.map(a=>a.id)},null,2));
