@@ -59,8 +59,9 @@ async function runViewport(name, contextOptions) {
   await page.screenshot({ path: `artifacts/hero-${name}.png`, fullPage: false, scale: 'device' });
 
   if (!result.audit) throw new Error(`${name}: hero audit missing`);
-  if (result.audit.version !== 'hero-preprocess-audit-v3') throw new Error(`${name}: unexpected hero audit ${result.audit.version}`);
+  if (result.audit.version !== 'hero-preprocess-audit-v4') throw new Error(`${name}: unexpected hero audit ${result.audit.version}`);
   if (!result.audit.loaded || !result.audit.processed || result.audit.error) throw new Error(`${name}: hero preprocessing failed ${JSON.stringify(result.audit)}`);
+  if (result.audit.avatarVisualScale !== 1.15) throw new Error(`${name}: hero audit visual scale mismatch ${result.audit.avatarVisualScale}`);
   if (!Array.isArray(result.audit.croppedOpaquePixelCountByFrame) || result.audit.croppedOpaquePixelCountByFrame.length !== 16) throw new Error(`${name}: crop buckets invalid`);
   if (!(result.audit.lateralComparedPixelCount > 0)) throw new Error(`${name}: lateral row comparison missing`);
   for (const k of ['row1VsRow2RgbaSimilarityPct', 'row1VsMirroredRow2RgbaSimilarityPct']) {
@@ -69,6 +70,9 @@ async function runViewport(name, contextOptions) {
   }
   if (result.audit.visibleAlphaMutationAfterIdle !== (result.audit.whiteKnockoutOpaquePixelCount > 0)) throw new Error(`${name}: alpha mutation semantics inconsistent`);
   if (!result.presentation || result.presentation.colliderRadius !== result.player?.radius) throw new Error(`${name}: presentation/collider contract unavailable`);
+  if (result.presentation.visualScale !== 1.15) throw new Error(`${name}: presentation scale mismatch ${result.presentation.visualScale}`);
+  if (result.presentation.footRootX !== result.presentation.physicsRootX || result.presentation.footRootY - result.presentation.physicsRootY !== 10) throw new Error(`${name}: foot root drift under visual scale`);
+  if (!(result.presentation.visualWidth > result.presentation.baseVisualWidth && result.presentation.visualHeight > result.presentation.baseVisualHeight)) throw new Error(`${name}: 1.15x visual scale did not enlarge avatar`);
   if (consoleErrors.length || failedRequests.length || httpErrors.length) {
     throw new Error(`${name}: browser errors ${JSON.stringify({ consoleErrors, failedRequests, httpErrors })}`);
   }
