@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import zlib from 'node:zlib';
 
 export const PNG_SIGNATURE = Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a]);
 
@@ -25,6 +26,24 @@ function validBitDepth(colorType, bitDepth) {
   return allowed.get(colorType)?.includes(bitDepth) === true;
 }
 
+function validateInflatedImageData(ihdr, idatParts, label) {
+  assert(ihdr.interlace === 0, `${label}: interlaced PNGs are not permitted in the runtime art pipeline`);
+  let raw;
+  try {
+    raw = zlib.inflateSync(Buffer.concat(idatParts));
+  } catch (error) {
+    throw new Error(`${label}: IDAT zlib stream cannot be decoded (${error.message})`);
+  }
+  const channels = new Map([[0,1],[2,3],[3,1],[4,2],[6,4]]).get(ihdr.colorType);
+  const rowBytes = Math.ceil((ihdr.width * channels * ihdr.bitDepth) / 8);
+  const expected = ihdr.height * (rowBytes + 1);
+  assert(raw.length === expected, `${label}: decoded scanline bytes=${raw.length} expected=${expected}`);
+  for (let row = 0, offset = 0; row < ihdr.height; row += 1, offset += rowBytes + 1) {
+    assert(raw[offset] <= 4, `${label}: invalid PNG filter=${raw[offset]} at row=${row}`);
+  }
+  return {decodedBytes: raw.length, rowBytes};
+}
+
 export function inspectPng(buffer, label = 'PNG') {
   assert(Buffer.isBuffer(buffer), `${label}: expected Buffer`);
   assert(buffer.length >= 33, `${label}: truncated before IHDR`);
@@ -39,6 +58,7 @@ export function inspectPng(buffer, label = 'PNG') {
   let sawIEND = false;
   let hasTRNS = false;
   const chunks = [];
+  const idatParts = [];
 
   while (offset < buffer.length) {
     assert(offset + 12 <= buffer.length, `${label}: truncated chunk header at byte ${offset}`);
@@ -86,6 +106,7 @@ export function inspectPng(buffer, label = 'PNG') {
     } else if (type === 'IDAT') {
       assert(!idatClosed, `${label}: IDAT chunks must be consecutive`);
       sawIDAT = true;
+      idatParts.push(buffer.subarray(dataStart, crcOffset));
     } else if (sawIDAT && type !== 'IEND') {
       idatClosed = true;
     }
@@ -111,9 +132,11 @@ export function inspectPng(buffer, label = 'PNG') {
   assert(offset === buffer.length, `${label}: trailing bytes after IEND`);
   if (ihdr.colorType === 3) assert(sawPLTE, `${label}: indexed-color PNG requires PLTE`);
   if (ihdr.colorType === 0 || ihdr.colorType === 4) assert(!sawPLTE, `${label}: PLTE forbidden for grayscale PNG`);
+  const decoded = validateInflatedImageData(ihdr, idatParts, label);
 
   return {
     ...ihdr,
+    ...decoded,
     hasTransparency: ihdr.colorType === 4 || ihdr.colorType === 6 || hasTRNS,
     chunks
   };
