@@ -7,7 +7,7 @@
   const ROWS = 4;
   const FOOT_ROOT_OFFSET_Y = 10;
   const HERO_AUDIT = window.KELO_HERO_SPRITE_AUDIT = {
-    version: 'hero-preprocess-audit-v1',
+    version: 'hero-preprocess-audit-v2',
     source: 'assets/hero.PNG',
     loaded: false,
     processed: false,
@@ -22,6 +22,7 @@
     croppedOpaquePixelCount: 0,
     croppedOpaquePixelCountByFrame: [],
     sheetMutationAfterIdle: false,
+    visibleAlphaMutationAfterIdle: false,
     preprocessMs: 0,
     error: null
   };
@@ -89,7 +90,8 @@
       HERO_AUDIT.whiteKnockoutOpaqueLossPct = opaqueTotal ? affectedOpaque / opaqueTotal * 100 : 0;
       HERO_AUDIT.croppedOpaquePixelCount = croppedOpaque;
       HERO_AUDIT.croppedOpaquePixelCountByFrame = cropByFrame;
-      HERO_AUDIT.sheetMutationAfterIdle = affected > 0;
+      HERO_AUDIT.visibleAlphaMutationAfterIdle = affectedOpaque > 0;
+      HERO_AUDIT.sheetMutationAfterIdle = HERO_AUDIT.visibleAlphaMutationAfterIdle;
     } catch (e) {
       HERO_AUDIT.error = String(e && e.message ? e.message : e);
     }
@@ -195,7 +197,6 @@
     const m = motionOf(p);
     const face = faceOf(p, m);
     const col = stepCol(p, m);
-    const side = face === 'left' || face === 'right';
     const row = face === 'up' ? 3 : (face === 'down' ? 0 : 2);
     const padX = Math.max(2, FW * 0.05);
     const padY = Math.max(2, FH * 0.04);
