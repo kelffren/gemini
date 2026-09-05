@@ -17,31 +17,36 @@ fs.mkdirSync('artifacts',{recursive:true});
 const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_BIN||'/usr/bin/google-chrome',args:['--no-sandbox','--disable-dev-shm-usage']});
 const context=await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true});
 const page=await context.newPage();
-await page.route(/\/src\/environment\/(tile-registry|world-map)\.js/,route=>{const u=new URL(route.request().url());u.searchParams.set('audit-bust',`${Date.now()}-${Math.random()}`);route.continue({url:u.toString()});});
+await page.route(/\/src\/environment\/(tile-registry|world-map|environment-layer-stack|prop-contract|generic-props|rural-ground)\.js/,route=>{const u=new URL(route.request().url());u.searchParams.set('audit-bust',`${Date.now()}-${Math.random()}`);route.continue({url:u.toString()});});
 const consoleErrors=[],failedRequests=[],httpErrors=[];
 page.on('console',m=>{if(m.type()==='error')consoleErrors.push(m.text())});
 page.on('pageerror',e=>consoleErrors.push(`PAGEERROR: ${e.stack||e.message}`));
 page.on('requestfailed',r=>failedRequests.push({url:r.url(),error:r.failure()?.errorText||'failed'}));
 page.on('response',r=>{if(r.status()>=400)httpErrors.push({status:r.status(),url:r.url()})});
+function validDepth(d){
+  const frontLayer=d.layers?.layers?.find?.(l=>l.id==='plaza-nature-front');
+  const ruralBack=d.layers?.layers?.find?.(l=>l.id==='rural-boundary-back');
+  return d.layers?.version==='environment-layer-stack-v2.3'&&d.layers?.mode==='formal-base-back-actor-front-order-v1'&&d.layers?.spatialPolicy==='same-phase-aabb-priority-resolution-v1'&&d.layers?.spatialTieCount===0&&d.layers?.preActorLayerCount>=1&&d.layers?.postActorLayerCount>=1&&frontLayer?.phase==='props_front'&&frontLayer?.timing==='post_actor'&&frontLayer?.priority===10&&ruralBack?.phase==='props_back'&&ruralBack?.timing==='pre_actor'&&ruralBack?.priority===8;
+}
 let loaded=false;
 for(let attempt=1;attempt<=24;attempt++){
   try{
     await page.goto(`${base}?world-audit=${Date.now()}-${attempt}`,{waitUntil:'networkidle',timeout:45000});
-    const d=await page.evaluate(()=>({title:document.title,world:window.KELO_WORLD_AUDIT||null,plaza:window.KELO_PLAZA_AUDIT||null,tileset:window.KELO_PLAZA_TILESET||null,registry:window.KELO_TILE_REGISTRY||null,architecture:window.KELO_ARCHITECTURE_RENDERER||null,kiosk:window.KELO_LUXE_KIOSK||null,market:window.KELO_MARKET_PAVILION||null,nature:window.KELO_PLAZA_NATURE_AUDIT||null,layers:window.KELO_ENVIRONMENT_LAYER_AUDIT||null}));
+    const d=await page.evaluate(()=>({title:document.title,world:window.KELO_WORLD_AUDIT||null,plaza:window.KELO_PLAZA_AUDIT||null,tileset:window.KELO_PLAZA_TILESET||null,registry:window.KELO_TILE_REGISTRY||null,architecture:window.KELO_ARCHITECTURE_RENDERER||null,kiosk:window.KELO_LUXE_KIOSK||null,market:window.KELO_MARKET_PAVILION||null,nature:window.KELO_PLAZA_NATURE_AUDIT||null,layers:window.KELO_ENVIRONMENT_LAYER_AUDIT||null,generic:window.KELO_GENERIC_PROP_AUDIT||null,rural:window.KELO_RURAL_GROUND_AUDIT||null}));
     const okTitle=!expectedTitle||d.title===expectedTitle;
     const okPlaza=(!expectedPlaza||d.plaza?.version===expectedPlaza)&&d.plaza?.ready&&d.plaza?.groundAssetLoaded&&d.plaza?.fallbackActive===false&&d.plaza?.worldLayerWrapped===true&&d.plaza?.renderingMode==='authored-plaza-ground-v1'&&d.tileset?.sourceMode==='authored-raster-ground-v1'&&d.tileset?.authoredGround===true;
     const okArch=(!expectedArchitectureVersion||d.architecture?.version===expectedArchitectureVersion)&&(!expectedArchitectureMode||d.architecture?.mode===expectedArchitectureMode);
-    const frontLayer=d.layers?.layers?.find?.(l=>l.id==='plaza-nature-front');
-    const okNature=d.nature?.ready&&d.nature?.assetLoaded&&!d.nature?.failed&&d.nature?.version==='plaza-nature-v3.1'&&d.nature?.propCount===4&&d.nature?.depthMode==='formal-back-front-layer-stack-v1'&&d.nature?.rendererWrapper===false&&d.nature?.layerPriority===10&&d.nature?.precedencePolicy==='nature-before-architecture-on-overlap-v1'&&d.layers?.version==='environment-layer-stack-v2.2'&&d.layers?.spatialPolicy==='same-phase-aabb-priority-resolution-v1'&&d.layers?.spatialTieCount===0&&d.layers?.postActorLayerCount>=1&&frontLayer?.phase==='props_front'&&frontLayer?.timing==='post_actor'&&frontLayer?.priority===10;
+    const okNature=d.nature?.ready&&d.nature?.assetLoaded&&!d.nature?.failed&&d.nature?.version==='plaza-nature-v3.1'&&d.nature?.propCount===4&&d.nature?.depthMode==='formal-back-front-layer-stack-v1'&&d.nature?.rendererWrapper===false&&d.nature?.layerPriority===10&&d.nature?.precedencePolicy==='nature-before-architecture-on-overlap-v1'&&validDepth(d);
+    const okRural=d.generic?.ready&&!d.generic?.failed&&d.generic?.contractVersion==='1.3.0'&&d.generic?.rendererMode==='data-driven-props-v3'&&d.generic?.immediateLayerGroupCount===0&&d.generic?.dynamicSourceCount>=1&&d.rural?.ready&&d.rural?.boundaryMode==='environment-layer-stack-props-back-v1'&&d.rural?.immediateBoundaryDraw===false;
     const okCommerce=d.world?.commerceMarbleVariation===true&&d.world?.marbleVariationScope===expectedMarbleScope&&d.registry?.styles?.districtGround?.profiles?.commerce?.marbleVariation===true&&d.registry?.styles?.marbleVariation?.scope===expectedMarbleScope;
-    if(okTitle&&okPlaza&&okArch&&okNature&&okCommerce&&d.world?.ready&&d.world?.version===expectedWorld&&d.world?.grassVariationAssetLoaded&&d.world?.grassVariationMode==='authored-eight-variant-atlas-v1'&&d.world?.grassVariationCount===8&&d.registry?.version===expectedRegistry&&d.registry?.atlases?.grassVariation?.src?.includes('grass-variation-v1.png')&&d.registry?.atlases?.plazaGround?.src?.includes('plaza-ground-v1.png')&&d.registry?.atlases?.plazaNature?.src?.includes('plaza-nature-v1.svg')&&d.architecture?.prefabCount===1&&d.kiosk?.ready&&d.market?.disabled===true){loaded=true;break;}
+    if(okTitle&&okPlaza&&okArch&&okNature&&okRural&&okCommerce&&d.world?.ready&&d.world?.version===expectedWorld&&d.world?.grassVariationAssetLoaded&&d.world?.grassVariationMode==='authored-eight-variant-atlas-v1'&&d.world?.grassVariationCount===8&&d.registry?.version===expectedRegistry&&d.registry?.atlases?.grassVariation?.src?.includes('grass-variation-v1.png')&&d.registry?.atlases?.plazaGround?.src?.includes('plaza-ground-v1.png')&&d.registry?.atlases?.plazaNature?.src?.includes('plaza-nature-v1.svg')&&d.architecture?.prefabCount===1&&d.kiosk?.ready&&d.market?.disabled===true){loaded=true;break;}
   }catch(e){console.log(`attempt ${attempt}: ${e.message}`)}
   await page.waitForTimeout(10000);
 }
 consoleErrors.length=0;failedRequests.length=0;httpErrors.length=0;
 await page.goto(`${base}?world-audit=final-${Date.now()}`,{waitUntil:'networkidle',timeout:45000});
 await page.waitForTimeout(2500);
-const state=await page.evaluate(()=>({title:document.title,world:window.KELO_WORLD_AUDIT||null,plaza:window.KELO_PLAZA_AUDIT||null,tileset:window.KELO_PLAZA_TILESET||null,registryVersion:window.KELO_TILE_REGISTRY?.version||null,architectureRenderer:window.KELO_ARCHITECTURE_RENDERER||null,kiosk:window.KELO_LUXE_KIOSK||null,market:window.KELO_MARKET_PAVILION||null,nature:window.KELO_PLAZA_NATURE_AUDIT||null,layers:window.KELO_ENVIRONMENT_LAYER_AUDIT||null,canvas:(()=>{const c=document.getElementById('game-canvas');return c?{width:c.width,height:c.height,cssWidth:c.clientWidth,cssHeight:c.clientHeight}:null})()}));
+const state=await page.evaluate(()=>({title:document.title,world:window.KELO_WORLD_AUDIT||null,plaza:window.KELO_PLAZA_AUDIT||null,tileset:window.KELO_PLAZA_TILESET||null,registryVersion:window.KELO_TILE_REGISTRY?.version||null,architectureRenderer:window.KELO_ARCHITECTURE_RENDERER||null,kiosk:window.KELO_LUXE_KIOSK||null,market:window.KELO_MARKET_PAVILION||null,nature:window.KELO_PLAZA_NATURE_AUDIT||null,layers:window.KELO_ENVIRONMENT_LAYER_AUDIT||null,generic:window.KELO_GENERIC_PROP_AUDIT||null,rural:window.KELO_RURAL_GROUND_AUDIT||null,canvas:(()=>{const c=document.getElementById('game-canvas');return c?{width:c.width,height:c.height,cssWidth:c.clientWidth,cssHeight:c.clientHeight}:null})()}));
 await page.screenshot({path:'artifacts/live-mobile.png',fullPage:false});
 const plaza=await page.evaluate(()=>{
   const c=document.getElementById('game-canvas');if(!c||typeof camera==='undefined'||typeof localPlayer==='undefined'||typeof render!=='function')return null;
@@ -71,7 +76,14 @@ const plazaTree=await page.evaluate(()=>{
   return{dataUrl:c.toDataURL('image/png'),nature:window.KELO_PLAZA_NATURE_AUDIT||null,layers:window.KELO_ENVIRONMENT_LAYER_AUDIT||null,registryNature:window.KELO_TILE_REGISTRY?.plazaNatureProps||null};
 });
 if(plazaTree?.dataUrl?.startsWith('data:image/png;base64,'))fs.writeFileSync('artifacts/live-plaza-tree.png',Buffer.from(plazaTree.dataUrl.split(',')[1],'base64'));
-const report={loaded,expectedMarbleScope,state,plaza:plaza?{ivory:plaza.ivory,gold:plaza.gold,teal:plaza.teal}:null,grass:grass?{base:grass.base,light:grass.light,dark:grass.dark,pink:grass.pink,blue:grass.blue}:null,commerce:commerce?{world:commerce.world,profile:commerce.profile,scope:commerce.scope,canvas:commerce.canvas}:null,plazaTree:plazaTree?{nature:plazaTree.nature,layers:plazaTree.layers,propCount:plazaTree.registryNature?.length||0}:null,consoleErrors,failedRequests,httpErrors};
+const rural=await page.evaluate(()=>{
+  const c=document.getElementById('game-canvas');if(!c||typeof camera==='undefined'||typeof localPlayer==='undefined'||typeof render!=='function')return null;
+  const f=typeof STATE!=='undefined'?STATE.farm:null;if(!f)return null;
+  localPlayer.x=f.x+f.w/2;localPlayer.y=f.y-20;camera.x=f.x+f.w/2;camera.y=f.y+f.h/2;camera.targetX=camera.x;camera.targetY=camera.y;render();
+  return{dataUrl:c.toDataURL('image/png'),rural:window.KELO_RURAL_GROUND_AUDIT||null,generic:window.KELO_GENERIC_PROP_AUDIT||null,layers:window.KELO_ENVIRONMENT_LAYER_AUDIT||null,canvas:{width:c.width,height:c.height,cssWidth:c.clientWidth,cssHeight:c.clientHeight}};
+});
+if(rural?.dataUrl?.startsWith('data:image/png;base64,'))fs.writeFileSync('artifacts/live-rural-depth.png',Buffer.from(rural.dataUrl.split(',')[1],'base64'));
+const report={loaded,expectedMarbleScope,state,plaza:plaza?{ivory:plaza.ivory,gold:plaza.gold,teal:plaza.teal}:null,grass:grass?{base:grass.base,light:grass.light,dark:grass.dark,pink:grass.pink,blue:grass.blue}:null,commerce:commerce?{world:commerce.world,profile:commerce.profile,scope:commerce.scope,canvas:commerce.canvas}:null,plazaTree:plazaTree?{nature:plazaTree.nature,layers:plazaTree.layers,propCount:plazaTree.registryNature?.length||0}:null,rural:rural?{rural:rural.rural,generic:rural.generic,layers:rural.layers,canvas:rural.canvas}:null,consoleErrors,failedRequests,httpErrors};
 fs.writeFileSync('artifacts/report.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));
 await browser.close();
 if(!loaded)throw new Error(`LIVE never reached current visual contract (marbleScope=${expectedMarbleScope})`);
@@ -85,10 +97,12 @@ if(state.world?.commerceMarbleVariation!==true||state.world?.marbleVariationScop
 if(state.registryVersion!==expectedRegistry)throw new Error(`Registry mismatch ${state.registryVersion} !== ${expectedRegistry}`);
 if(state.architectureRenderer?.prefabCount!==1||state.architectureRenderer?.mode!=='luxe-only-v1')throw new Error('Luxe-only architecture contract invalid');
 if(!state.kiosk?.ready||state.kiosk?.failed||state.market?.disabled!==true)throw new Error('Luxe architecture state invalid');
-const frontLayer=state.layers?.layers?.find?.(l=>l.id==='plaza-nature-front');
 if(!state.nature?.ready||!state.nature?.assetLoaded||state.nature?.failed||state.nature?.propCount!==4||state.nature?.version!=='plaza-nature-v3.1'||state.nature?.depthMode!=='formal-back-front-layer-stack-v1'||state.nature?.rendererWrapper!==false||state.nature?.layerPriority!==10||state.nature?.precedencePolicy!=='nature-before-architecture-on-overlap-v1')throw new Error(`Plaza nature contract invalid: ${JSON.stringify(state.nature)}`);
-if(state.layers?.version!=='environment-layer-stack-v2.2'||state.layers?.spatialPolicy!=='same-phase-aabb-priority-resolution-v1'||state.layers?.spatialTieCount!==0||state.layers?.postActorLayerCount<1||frontLayer?.phase!=='props_front'||frontLayer?.timing!=='post_actor'||frontLayer?.priority!==10)throw new Error(`Resolved post-actor layer contract invalid: ${JSON.stringify(state.layers)}`);
+if(!validDepth(state))throw new Error(`Formal base/back/actor/front layer contract invalid: ${JSON.stringify(state.layers)}`);
+if(!state.generic?.ready||state.generic?.failed||state.generic?.contractVersion!=='1.3.0'||state.generic?.rendererMode!=='data-driven-props-v3'||state.generic?.immediateLayerGroupCount!==0||state.generic?.dynamicSourceCount<1)throw new Error(`Generic dynamic prop contract invalid: ${JSON.stringify(state.generic)}`);
+if(!state.rural?.ready||state.rural?.boundaryMode!=='environment-layer-stack-props-back-v1'||state.rural?.immediateBoundaryDraw!==false)throw new Error(`Rural formal props_back contract invalid: ${JSON.stringify(state.rural)}`);
 if(!plazaTree?.dataUrl?.startsWith('data:image/png;base64,')||plazaTree.registryNature?.length!==4)throw new Error('Plaza nature screenshot evidence missing');
+if(!rural?.dataUrl?.startsWith('data:image/png;base64,')||rural.canvas?.cssWidth!==390||rural.canvas?.cssHeight!==844||rural.canvas?.width!==780||rural.canvas?.height!==1688)throw new Error(`Rural depth screenshot evidence missing: ${JSON.stringify(rural?.canvas)}`);
 if(!grass?.dataUrl?.startsWith('data:image/png;base64,')||grass.base<1000||grass.light<20||grass.dark<20||(grass.pink+grass.blue)<2)throw new Error(`Authored grass pixels missing: ${JSON.stringify(grass)}`);
 if(!commerce?.dataUrl?.startsWith('data:image/png;base64,')||commerce.world?.activeDistrictLabel!=='commerce'||commerce.profile?.marbleVariation!==true||commerce.scope!==expectedMarbleScope)throw new Error(`Commerce marble screenshot/contract evidence missing: ${JSON.stringify(commerce)}`);
 if(consoleErrors.length)throw new Error(`Console/page errors: ${JSON.stringify(consoleErrors)}`);
