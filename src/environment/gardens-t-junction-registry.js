@@ -8,9 +8,9 @@ const atlas=Object.freeze({
   orientationMode:'clockwise-missing-branch-v1',orientations:Object.freeze({NWS:0,WNE:1,NES:2,ESW:3})
 });
 const atlases=Object.freeze({...R.atlases,gardensTJunctions:atlas});
-window.KELO_TILE_REGISTRY=Object.freeze({...R,version:'1.10.27',atlases});
+window.KELO_TILE_REGISTRY=Object.freeze({...R,version:R.version,atlases});
 window.KELO_GARDENS_T_REGISTRY_AUDIT=Object.freeze({
-  version:'gardens-t-junction-registry-v1',ready:true,registryVersion:'1.10.27',atlasId:atlas.id,
+  version:'gardens-t-junction-registry-v1.1',ready:true,registryVersion:R.version,atlasId:atlas.id,
   registryKey:'gardensTJunctions',orientationCount:Object.keys(atlas.orientations).length,firstClassRegistryAtlas:true
 });
 })();
