@@ -1,85 +1,167 @@
-# Kelo World Asset Contract v1
+# Kelo World Asset Contract v2
 
-Purpose: make authored art replaceable without renderer-specific code. A final PNG should be describable by data, validated before deploy, registered, then rendered by the existing environment architecture.
+Purpose: make final authored PNGs replaceable through data instead of renderer-specific code.
 
-## Global rules
+The production path is:
 
-- Logical world tile: 32x32 px.
-- Pixel-art sampling: nearest-neighbour; Canvas 2D smoothing must remain disabled when scaling pixel art.
-- Tile atlases must declare exact pixel dimensions and exact grid dimensions.
-- Every asset has a stable id, path and kind in `src/environment/art-asset-manifest.json`.
-- Runtime placement metadata belongs in TileRegistry / family registries, not inside renderer conditionals.
-- Visual bounds, gameplay footprint/collider and interaction bounds are separate concepts.
-- Assets that can occlude actors use the formal `props_back -> actors -> props_front` path instead of wrapping the renderer.
-- Replacing an image file must not require district-specific renderer logic.
+`PNG → validate → manifest → TileRegistry / profile metadata → generic render layers → LIVE`
 
-## Ground / ground variation atlas
+## Global invariants
 
-Required metadata:
+- Logical world tile: `32x32`.
+- Pixel sampling: `nearest`.
+- Every production PNG has a stable `id`, `family`, semantic `version`, file `path`, `kind`, dimensions and alpha policy.
+- Every asset explicitly declares padding/spacing and frame mode, even when both are zero or the PNG is a single frame.
+- Asset semantics and instance placement are separate. The manifest declares what an asset can do; TileRegistry/profile/prefab data owns concrete world coordinates and per-instance values.
+- Visual bounds, gameplay footprint, collider and interaction are independent concepts.
+- Runtime layer names are contract data and must exactly match the formal environment layer stack.
+- District compatibility is declared as data. `*` means reusable in every district.
+- Cache metadata is executable: for TileRegistry-owned PNGs, CI verifies the manifest cache key/value against the query string used by TileRegistry.
+- Fallback behavior is explicit. Silent renderer-specific fallbacks are not part of the production contract.
+
+## Required per-asset metadata
+
+Every entry in `src/environment/art-asset-manifest.json` must declare:
 
 - `id`
+- `family`
+- `version`
 - `path`
 - `kind`
 - `width`, `height`
-- `cellWidth=32`, `cellHeight=32`
-- `columns`, `rows`
-- sampling inherited from the manifest (`nearest`)
+- `requireAlpha`
+- `sampling`
+- `padding`, `spacing`
+- `frames`
+- `anchor`
+- `visualBounds`
+- `footprint`
+- `collider`
+- `ownership`
+- `layers`
+- `priority`
+- `occlusion`
+- `districtCompatibility`
+- `cache`
+- `fallback`
 
-The grid must cover the image exactly. Variant selection should remain deterministic and data-driven.
+Grid atlases additionally declare `cellWidth`, `cellHeight`, `columns` and `rows`.
 
-## Terrain transition atlas
+## Placement modes
 
-Transition art is a separate family from base ground. Kelo currently uses a 4-neighbour topology contract for authored grass/marble transitions. A future final transition family must be representable as data for edge/corner/multi-edge connectivity; adding a new terrain pair must not require a new renderer branch.
+The contract deliberately does not duplicate world coordinates into the asset manifest.
 
-Tiled's terrain/Wang model is the reference model for future generalization: terrain connectivity is metadata attached to tiles, supporting corner, edge or mixed terrain sets. Kelo does not need to adopt Tiled files directly, but the Asset Contract should remain compatible with that data model.
+`anchor`, `visualBounds`, `footprint`, `collider` and `occlusion` declare whether their values come from:
 
-## Props and prefabs
+- the tile/cell itself;
+- the whole asset;
+- a registry frame;
+- a registry instance;
+- or `none`.
 
-A registry-owned prop/prefab should eventually declare:
+This keeps one asset reusable across many placements while making ownership explicit and machine-checkable.
 
-- asset / atlas frame
-- anchor or base-Y
-- visual bounds
-- footprint
-- collider (optional and independent)
-- layer (`props_back` or `props_front` when applicable)
-- district/profile eligibility
-- priority
-- occlusion metadata
+## Formal layers
 
-Large authored props can be single PNGs and are not required to use the 32x32 grid.
+`layerPhases` in the manifest is checked against `src/environment/environment-layer-stack.js`.
 
-## Layered back/front art
+Current phases:
 
-If an actor can pass visually behind and in front of one object, represent that object through formal back/front layers. Back/front PNGs may be independent raster files. Gameplay collision remains separate from visual clipping.
+1. `ground`
+2. `ground_variation`
+3. `transitions`
+4. `paths_floors`
+5. `decals_details`
+6. `props_back`
+7. `props_front`
+8. `vfx_weather_lighting`
 
-## Atlas padding
+Actors remain between the pre-actor and post-actor passes; they are not an environment asset phase.
 
-Kelo's current renderer is Canvas 2D with nearest-neighbour sampling and exact source rectangles, so existing grid atlases can remain unpadded. The contract intentionally does not hard-code zero padding as a universal future rule. If a WebGL/mipmap pipeline is introduced, atlas metadata must add padding/extrusion requirements to prevent neighbouring-frame bleeding.
+## Frames, padding and spacing
+
+Grid coverage is validated with:
+
+`2*padding + columns*cellWidth + (columns-1)*spacing = PNG width`
+
+and the equivalent height formula.
+
+This preserves the current zero-padding Canvas 2D atlases while allowing future atlases to add spacing/extrusion without changing validator ownership.
+
+`frames.count` must equal the grid cell count for grid atlases. Single-image prefabs must declare exactly one frame.
+
+## Cache contract
+
+TileRegistry PNGs use:
+
+```json
+"cache": {
+  "strategy": "query",
+  "key": "art",
+  "value": "191"
+}
+```
+
+CI reads TileRegistry and verifies that the runtime source contains the same query key/value. A PNG replacement therefore cannot accidentally ship with stale registry cache metadata.
+
+Assets loaded by another formal owner may use `runtime-owner` with an explicit version until that owner is migrated to a shared asset loader.
+
+## Fallback contract
+
+Fallback is always explicit:
+
+```json
+{"mode":"none"}
+```
+
+or:
+
+```json
+{"mode":"asset","assetId":"tileset-vclean"}
+```
+
+The referenced fallback asset must exist in the manifest.
 
 ## Validation gate
 
-`scripts/validate-art-assets.mjs` validates the manifest before deploy. v1 checks:
+`scripts/validate-art-assets.mjs` now validates:
 
-- manifest version and 32px logical tile contract
-- PNG file existence and PNG signature
-- declared dimensions vs actual dimensions
-- exact grid coverage for tiled atlases
-- alpha channel where explicitly required
-- duplicate asset ids
+- contract version;
+- world tile and sampling invariants;
+- formal layer-stack parity;
+- known district compatibility;
+- required production metadata;
+- duplicate ids and paths;
+- PNG signature;
+- actual vs declared dimensions;
+- alpha / `tRNS` support;
+- frame count;
+- padding / spacing / grid coverage;
+- placement mode validity;
+- ownership, layers and priority;
+- cache metadata;
+- fallback references;
+- TileRegistry PNG parity;
+- TileRegistry ↔ manifest cache-key parity.
 
-Later contract versions can add frame-level anchors, bounds, padding, seam checks and transition completeness without changing renderer ownership.
+This is a CI gate, not documentation-only guidance.
 
-## Integration target
+## Integration rule
 
-For a future `grass-final-v1.png`, the intended path is:
+A future final asset such as `oak-tree-v1.png` should require:
 
-1. add PNG;
-2. declare it in the asset manifest;
-3. pass asset validation;
-4. register its family/frames in TileRegistry;
-5. assign it through a district visual profile;
-6. render through existing ground/layer contracts;
+1. add the PNG;
+2. add one manifest entry;
+3. pass the validator;
+4. register frame/instance metadata;
+5. assign it to a district/profile or prefab definition;
+6. render through the existing generic layer path;
 7. certify LIVE mobile.
 
-If integrating that PNG requires a new `if (district === ...)` or asset-name branch in the renderer, the contract is not yet complete enough.
+If a new authored PNG requires an asset-name or district-specific branch in the renderer, the pipeline is still incomplete and the next contract layer must be generalized instead of adding that branch.
+
+## Phase status
+
+Asset Contract v2 closes the asset-level metadata and validation portion of Phase 1.
+
+It does **not** claim the entire art factory is finished. Terrain topology, generic props, prefabs, district profiles and the final A→B substitution test remain later phases and must build on this contract rather than bypass it.
