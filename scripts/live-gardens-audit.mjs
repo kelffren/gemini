@@ -7,7 +7,7 @@ const expectedWorldVersion=process.env.EXPECTED_WORLD_VERSION||'world-v1.23';
 const expectedDistrictProfileVersion=process.env.EXPECTED_DISTRICT_PROFILE_VERSION||'1.2.0';
 const expectedRegistryVersion='1.10.28';
 const expectedCompositionMode=process.env.EXPECTED_GARDENS_COMPOSITION_MODE||'registry-authored-garden-compositions-v20';
-const expectedJoinMode=process.env.EXPECTED_GARDENS_JOIN_MODE||'authored-garden-endcaps-mid-variants-v4';
+const expectedJoinMode=process.env.EXPECTED_GARDENS_JOIN_MODE||'authored-garden-endcaps-mid-variants-v5';
 const expectedGardensMode='authored-organic-garden-overlay-atlas-v2';
 const expectedJunctionMode='formal-props-back-t-junction-layer-v1';
 fs.mkdirSync('artifacts',{recursive:true});
