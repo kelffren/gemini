@@ -2,6 +2,7 @@
   // MOV-001: one processed intent magnitude drives gait + speed.
   // MOV-004: visual stride advances from actual world distance, never render count.
   // MOV-CADENCE-V2: remove the 50->90px stride-length jump at WALK->RUN.
+  // MOV-STOP-V2: release never freezes an arbitrary stride pose; physics remains unchanged.
   const WALK_MAX = 0.74;
   const WALK_SPEED = 110;
   const RUN_SPEED = 178;
@@ -14,6 +15,7 @@
   const RUN_CYCLE_WORLD_PX = 90;
   const MIN_VISUAL_MOVE_PX = 0.12;
   const MOV_CADENCE_V2 = new URLSearchParams(window.location.search).get('movCadenceV2') !== '0';
+  const MOV_STOP_V2 = new URLSearchParams(window.location.search).get('movStopV2') !== '0';
   CONFIG.speed = WALK_SPEED;
   CONFIG.joystickDeadzone = 0.045;
   CONFIG.joystickCurve = 'LINEAR';
@@ -57,7 +59,7 @@
 
   function publishAudit(mag, gait, speedCap, visual) {
     window.KELO_MOVEMENT_AUDIT = {
-      version: 'MOV-cadence-v2',
+      version: 'MOV-stop-v2',
       rawTouchMag: rawTouchMag(),
       processedMag: mag,
       gait,
@@ -66,12 +68,19 @@
       actualSpeed: Math.hypot(localPlayer.vx || 0, localPlayer.vy || 0),
       colliderRadius: localPlayer.radius,
       cadenceV2: MOV_CADENCE_V2,
+      stopV2: MOV_STOP_V2,
       cycleWorldPx: visual ? visual.cycleWorldPx : cycleWorldPxFor(mag, gait),
       visualOn: !!(visual && visual.on),
       visualFrame: visual ? visual.frame : 0,
       stridePhase: visual ? visual.stridePhase : 0,
       strideDistancePx: visual ? visual.strideDistancePx : 0,
-      lastStepDistancePx: visual ? visual.lastStepDistancePx : 0
+      lastStepDistancePx: visual ? visual.lastStepDistancePx : 0,
+      releaseCount: visual ? visual.releaseCount : 0,
+      lastReleaseFromFrame: visual ? visual.lastReleaseFromFrame : 0,
+      lastReleaseFromPhase: visual ? visual.lastReleaseFromPhase : 0,
+      unsupportedPoseFreezeMs: visual ? visual.unsupportedPoseFreezeMs : 0,
+      releaseToStablePlantMs: visual ? visual.releaseToStablePlantMs : 0,
+      reversalAccidentalIdleCount: visual ? visual.reversalAccidentalIdleCount : 0
     };
   }
 
@@ -90,7 +99,13 @@
         stridePhase: 0,
         strideDistancePx: 0,
         lastStepDistancePx: 0,
-        cycleWorldPx: WALK_CYCLE_WORLD_PX
+        cycleWorldPx: WALK_CYCLE_WORLD_PX,
+        releaseCount: 0,
+        lastReleaseFromFrame: 0,
+        lastReleaseFromPhase: 0,
+        unsupportedPoseFreezeMs: 0,
+        releaseToStablePlantMs: 0,
+        reversalAccidentalIdleCount: 0
       };
     }
     return p._visualMotion;
@@ -104,13 +119,26 @@
     const spd = Math.hypot(p.vx || 0, p.vy || 0);
     const hasIntent = gait !== 'idle';
     const physicallyMoving = dist > MIN_VISUAL_MOVE_PX || spd > 16;
+    const wasOn = v.on;
 
     if (hasIntent || physicallyMoving) {
       v.stopElapsed = 0;
       v.on = true;
+    } else if (MOV_STOP_V2) {
+      if (wasOn) {
+        v.releaseCount += 1;
+        v.lastReleaseFromFrame = v.frame;
+        v.lastReleaseFromPhase = v.stridePhase;
+      }
+      v.stopElapsed = VISUAL_STOP_HOLD_SEC;
+      v.on = false;
+      v.unsupportedPoseFreezeMs = 0;
+      v.releaseToStablePlantMs = 0;
     } else {
       v.stopElapsed += Math.max(0, dt || 0);
       v.on = v.stopElapsed < VISUAL_STOP_HOLD_SEC;
+      v.unsupportedPoseFreezeMs = v.on ? v.stopElapsed * 1000 : 0;
+      v.releaseToStablePlantMs = v.on ? v.stopElapsed * 1000 : VISUAL_STOP_HOLD_SEC * 1000;
     }
 
     if (dist > MIN_VISUAL_MOVE_PX) {
