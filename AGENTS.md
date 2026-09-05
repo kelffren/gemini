@@ -1,3 +1,17 @@
+# ⚠️ LEY DEL REPO — LÉE ESTO PRIMERO
+
+**Todo lo que se cree o se cambie debe nacer listo para enchufarse al online.**
+No rediseñar después. Misma API hoy (local-fallback) y mañana (server).
+
+Documento corto: [`docs/ONLINE_FIRST.md`](docs/ONLINE_FIRST.md)
+
+Antes de marcar algo como listo:
+> ¿Puedo conectarlo al online cambiando solo la capa de autoridad, sin rehacer lógica, IDs, dueños ni el flujo del jugador?
+
+Si es NO, no está listo.
+
+---
+
 # Kelo World — Mandatory Development Rules
 
 This file is mandatory reading before any implementation, refactor, integration, or new gameplay/system pass in Kelo World.
@@ -51,6 +65,7 @@ This rule applies to all gameplay and economy systems, including but not limited
 - progression
 - cooldowns
 - PvP and combat state
+- abilities / stones / hotbar casts visible to other players
 
 ### Server-authoritative target
 
@@ -78,10 +93,11 @@ System-specific memory documents record validated implementation details. They d
 
 For Inventory/Containers/Market, read `docs/BACKPACK_SYSTEM_MEMORY.md` before changes.
 For visual/world work, read `docs/VISUAL_DIRECTION_MEMORY.md` before changes.
+For online-first law, read `docs/ONLINE_FIRST.md` before changes.
 
 ## Required startup protocol for every development pass
 
-1. Read this `AGENTS.md` completely.
+1. Read `ONLINE_FIRST.md` and this `AGENTS.md` completely.
 2. Read the memory document(s) for the subsystem being changed.
 3. Inspect the current code and deployed state before modifying it.
 4. Preserve validated invariants.
