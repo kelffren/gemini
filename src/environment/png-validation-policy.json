@@ -12,6 +12,21 @@
       "reason": "Actor sprites are owned by the character appearance pipeline, outside the environment asset contract."
     },
     {
+      "path": "assets/Arboleskelo1.PNG",
+      "scope": "source-sheet",
+      "reason": "Original authored asset sheet is retained at full resolution as importer source-of-truth; LIVE renders the generated irregular atlas instead."
+    },
+    {
+      "path": "assets/plaza-nature-v2.png",
+      "scope": "superseded-archive",
+      "reason": "Rejected simplified Plaza vegetation export retained only for history; LIVE uses Arboleskelo1.atlas.png."
+    },
+    {
+      "path": "assets/plaza-tree-large-v1.png",
+      "scope": "superseded-archive",
+      "reason": "Previous one-off tree extraction is superseded by the named tree_large frame in Arboleskelo1.atlas.png."
+    },
+    {
       "path": "assets/fountain-front-v1.png",
       "scope": "superseded-archive",
       "reason": "Superseded fountain export retained for history; LIVE uses plaza-fountain-front.PNG."
