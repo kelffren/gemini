@@ -37,11 +37,14 @@ for(const src of srcMatches){
   if(!/[?&](art|v)=/.test(src))errors.push(`TileRegistry asset lacks cache-busting token: ${src}`);
 }
 
-const giantAtlas=productionPngs.filter(a=>Math.max(a.width,a.height)>1024);
-if(giantAtlas.length>2)errors.push(`too many >1024px production assets (${giantAtlas.length}); split by family before growth`);
+const giantAtlases=productionPngs.filter(a=>Math.max(a.width,a.height)>1024);
+const giantRegularAtlases=giantAtlases.filter(a=>a.frames?.mode!=='irregular');
+const giantIrregularAtlases=giantAtlases.filter(a=>a.frames?.mode==='irregular');
+if(giantRegularAtlases.length>2)errors.push(`too many >1024px regular production assets (${giantRegularAtlases.length}); split by family before growth`);
+if(giantIrregularAtlases.length>1)errors.push(`too many >1024px irregular source atlases (${giantIrregularAtlases.length}); keep only one original-resolution sheet resident per visual family`);
 
 const families=new Set(productionPngs.map(a=>a.family));
 if(families.size<5)errors.push(`asset families unexpectedly collapsed: ${families.size}`);
 
 if(errors.length){console.error(errors.join('\n'));process.exit(1)}
-console.log(JSON.stringify({policy:'kelo-atlas-contract-v1',contractVersion:'1.2.0',worldAtlasConsumer:'managed',productionPngs:productionPngs.length,registryVersionedSources:srcMatches.length,families:families.size,largeAssets:giantAtlas.map(a=>a.id)},null,2));
+console.log(JSON.stringify({policy:'kelo-atlas-contract-v1',contractVersion:'1.2.0',worldAtlasConsumer:'managed',productionPngs:productionPngs.length,registryVersionedSources:srcMatches.length,families:families.size,largeRegularAssets:giantRegularAtlases.map(a=>a.id),largeIrregularAssets:giantIrregularAtlases.map(a=>a.id)},null,2));
