@@ -44,7 +44,7 @@ jobs:
           require 'gardens-compositions-v20' src/environment/gardens-compositions.js
           require 'tJunctionRegistryOwned:true' src/environment/gardens-compositions.js
           require 'tJunctionOrientationCount:4' src/environment/gardens-compositions.js
-          require 'gardens-junction-overlay-v3' src/environment/gardens-junction-overlay.js
+          require 'gardens-junction-layer-v4' src/environment/gardens-junction-overlay.js
           require 'registryOwned:true' src/environment/gardens-junction-overlay.js
           require 'world-v1.22' src/environment/world-map.js
           require "districtSourceMode:'terrain-contract-district-profiles-v1'" src/environment/world-map.js
