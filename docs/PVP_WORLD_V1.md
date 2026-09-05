@@ -10,6 +10,48 @@ Status: vertical slice / local authority
 - PvP world mode, combat permission, target selection, basic-attack command/result boundary and PvP presentation are owned by `src/systems/pvp-world.js`.
 - Multiplayer transport remains owned by `engine-net.js` and `server/index.js`.
 
+## PERMANENT RULE — EVERY NEW ABILITY MUST BE ONLINE-READY
+
+This is a mandatory architecture rule for all future Kelo World abilities/stones, even while the game is running with local authority.
+
+**Every new ability MUST be designed so multiplayer integration replaces/connects the authority layer instead of requiring the ability to be rewritten.**
+
+Required pipeline:
+
+`Input -> Ability/Combat Command -> Authority -> Simulation/Validation -> Result -> Presentation`
+
+Minimum command/contract fields when applicable:
+- `abilityId`
+- `casterId`
+- `targetId` or explicit target position/direction
+- cast/request id
+- world/room/zone context
+- authoritative state needed to validate range, cooldown and resource cost
+
+Rules:
+1. Input/UI/render/VFX MUST NOT directly mutate authoritative HP, positions, cooldowns or persistent combat state.
+2. Local/offline execution must live behind an authority boundary that can later become server authority.
+3. Damage, healing, teleport/swap, crowd control, projectile impacts, persistent entities, resource spending, death and cooldown start must have explicit command/result semantics.
+4. Persistent ability objects (projectiles, traps, planted swords, walls, summons, zones, etc.) need stable IDs and serializable state suitable for network replication.
+5. Target/range/collision checks must use world/simulation coordinates, never visual sprite size as authority.
+6. Presentation may predict/animate locally for responsiveness, but the authoritative result must be reconcilable with a future server result.
+7. Cooldown must have one logical source of truth. Online, the server/authority decides when it starts and the client HUD presents that result.
+8. Abilities involving another player or position changes must be designed against player/entity IDs, not direct references to local JavaScript objects.
+9. A new ability is architecturally incomplete if moving it online would require rewriting its gameplay rules rather than connecting `LocalAuthority -> ServerAuthority`.
+10. Before accepting a new ability implementation, ask: **If multiplayer authority were enabled tomorrow, what code survives unchanged and what authority adapter changes?**
+
+Canonical migration target:
+
+`Local Ability Authority -> Server Ability Authority`
+
+while keeping definitions, commands, results, targeting semantics, HUD and VFX/presentation reusable.
+
+Example — Swap Sword:
+- client input requests sword throw / target selection;
+- authority owns sword entity id/state, validates target/range and resolves the swap;
+- authority emits the resulting positions and cooldown start;
+- presentation owns sword flight, planted effect, swap VFX and sword return animation.
+
 ## World boundary
 
 Social mode:
