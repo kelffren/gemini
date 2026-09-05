@@ -67,7 +67,7 @@ async function runViewport(name, contextOptions) {
   await page.screenshot({ path: `artifacts/hero-${name}.png`, fullPage: false, scale: 'device' });
 
   if (!result.audit) throw new Error(`${name}: hero audit missing`);
-  if (result.audit.version !== 'hero-preprocess-audit-v4') throw new Error(`${name}: unexpected hero audit ${result.audit.version}`);
+  if (result.audit.version !== 'hero-preprocess-audit-v5') throw new Error(`${name}: unexpected hero audit ${result.audit.version}`);
   if (!result.audit.loaded || !result.audit.processed || result.audit.error) throw new Error(`${name}: hero preprocessing failed ${JSON.stringify(result.audit)}`);
   if (result.audit.avatarVisualScale !== 1.15) throw new Error(`${name}: hero audit visual scale mismatch ${result.audit.avatarVisualScale}`);
   if (!Array.isArray(result.audit.croppedOpaquePixelCountByFrame) || result.audit.croppedOpaquePixelCountByFrame.length !== 16) throw new Error(`${name}: crop buckets invalid`);
@@ -75,6 +75,18 @@ async function runViewport(name, contextOptions) {
   for (const k of ['row1VsRow2RgbaSimilarityPct', 'row1VsMirroredRow2RgbaSimilarityPct']) {
     const v = result.audit[k];
     if (!(v >= 0 && v <= 100)) throw new Error(`${name}: ${k} out of range: ${v}`);
+  }
+  if (result.audit.lateralRenderedRow !== 2 || result.audit.lateralContactEvidenceMode !== 'visible-silhouette-bottom-band-v1') {
+    throw new Error(`${name}: lateral contact evidence contract missing`);
+  }
+  if (!Array.isArray(result.audit.lateralContactFrames) || result.audit.lateralContactFrames.length !== 4) {
+    throw new Error(`${name}: lateral contact frame evidence missing`);
+  }
+  for (const frame of result.audit.lateralContactFrames) {
+    if (!Number.isInteger(frame.frame) || frame.frame < 0 || frame.frame > 3) throw new Error(`${name}: invalid contact frame index ${JSON.stringify(frame)}`);
+    if (!(frame.lowestOpaqueY >= 0 && frame.lowestOpaqueY < result.audit.frameHeight)) throw new Error(`${name}: invalid lowest opaque y ${JSON.stringify(frame)}`);
+    if (!(frame.bottomBandOpaquePixelCount > 0 && frame.supportWidthPx > 0)) throw new Error(`${name}: empty bottom support evidence ${JSON.stringify(frame)}`);
+    if (!(frame.supportCentroidX >= 0 && frame.supportCentroidX < result.audit.frameWidth)) throw new Error(`${name}: invalid support centroid ${JSON.stringify(frame)}`);
   }
   if (result.audit.visibleAlphaMutationAfterIdle !== (result.audit.whiteKnockoutOpaquePixelCount > 0)) throw new Error(`${name}: alpha mutation semantics inconsistent`);
   if (!result.presentation || result.presentation.colliderRadius !== result.player?.radius) throw new Error(`${name}: presentation/collider contract unavailable`);
