@@ -6,41 +6,60 @@ import cv2
 SRC = Path('assets/Arboleskelo1.PNG')
 OUT = Path('assets/plaza-tree-large-v1.png')
 
-# Exact source region of tree_large_v1 in the uploaded Kelo asset sheet.
-LEFT, TOP, RIGHT, BOTTOM = 965, 20, 1195, 260
+# Exact source region of the large green tree in the user-uploaded Arboleskelo1 pack.
+LEFT, TOP, RIGHT, BOTTOM = 10, 20, 440, 550
 
 im = Image.open(SRC).convert('RGB')
 assert im.size == (1536, 1024), im.size
 crop = np.array(im.crop((LEFT, TOP, RIGHT, BOTTOM)))
-
-# Remove only the baked background. RGB pixels of the asset are never redrawn.
+h, w, _ = crop.shape
 bgr = cv2.cvtColor(crop, cv2.COLOR_RGB2BGR)
-mask = np.zeros(bgr.shape[:2], np.uint8)
-bgd = np.zeros((1, 65), np.float64)
-fgd = np.zeros((1, 65), np.float64)
-rect = (8, 4, bgr.shape[1] - 16, bgr.shape[0] - 8)
-cv2.grabCut(bgr, mask, rect, bgd, fgd, 8, cv2.GC_INIT_WITH_RECT)
-fg = np.where((mask == cv2.GC_FGD) | (mask == cv2.GC_PR_FGD), 255, 0).astype(np.uint8)
 
-# Preserve the tree as several connected foreground islands (canopy, trunk, roots/flowers)
-# while discarding tiny background remnants.
-num, labels, stats, _ = cv2.connectedComponentsWithStats((fg > 0).astype(np.uint8), 8)
+# Start from probable background, then seed only obvious tree regions.
+# This removes the baked presentation background without redrawing the asset RGB.
+mask = np.full((h, w), cv2.GC_PR_BGD, np.uint8)
+mask[:20, :] = cv2.GC_BGD
+mask[-20:, :] = cv2.GC_BGD
+mask[:, :20] = cv2.GC_BGD
+mask[:, -20:] = cv2.GC_BGD
+
+# Probable foreground: full tree silhouette area.
+cv2.ellipse(mask, (215, 170), (190, 150), 0, 0, 360, cv2.GC_PR_FGD, -1)
+trunk_poly = np.array([[120,240],[300,240],[310,445],[280,505],[140,505],[100,445]], np.int32)
+cv2.fillPoly(mask, [trunk_poly], cv2.GC_PR_FGD)
+
+# Definite foreground seeds on unmistakable canopy/trunk/base pixels.
+for cx,cy,rx,ry in [
+    (210,120,80,60),
+    (120,180,45,45),
+    (305,190,45,45),
+    (220,280,30,45),
+    (205,365,35,70),
+    (190,455,70,30),
+]:
+    cv2.ellipse(mask, (cx,cy), (rx,ry), 0, 0, 360, cv2.GC_FGD, -1)
+
+bgd = np.zeros((1,65), np.float64)
+fgd = np.zeros((1,65), np.float64)
+cv2.grabCut(bgr, mask, None, bgd, fgd, 10, cv2.GC_INIT_WITH_MASK)
+alpha = np.where((mask == cv2.GC_FGD) | (mask == cv2.GC_PR_FGD), 255, 0).astype(np.uint8)
+
+# Keep meaningful tree components only; tiny presentation-background fragments are discarded.
+num, labels, stats, _ = cv2.connectedComponentsWithStats((alpha > 0).astype(np.uint8), 8)
 assert num > 1, 'tree segmentation failed'
 order = sorted(range(1, num), key=lambda i: int(stats[i, cv2.CC_STAT_AREA]), reverse=True)
-keep = np.zeros(fg.shape, dtype=bool)
-for i in order[:10]:
-    if int(stats[i, cv2.CC_STAT_AREA]) < 40:
-        continue
-    keep |= labels == i
-fg = np.where(keep, 255, 0).astype(np.uint8)
+keep = np.zeros((h, w), dtype=bool)
+for i in order[:12]:
+    if int(stats[i, cv2.CC_STAT_AREA]) >= 50:
+        keep |= labels == i
+alpha = np.where(keep, 255, 0).astype(np.uint8)
 
-rgba = np.dstack([crop, fg])
-out = Image.fromarray(rgba, 'RGBA')
+out = Image.fromarray(np.dstack([crop, alpha]), 'RGBA')
 bbox = out.getchannel('A').getbbox()
 assert bbox, 'empty alpha mask'
 out = out.crop(bbox)
 
-# Guard against accidentally extracting only the canopy or only the trunk.
-assert out.width >= 180 and out.height >= 200, out.size
+# Guard against a partial extraction.
+assert out.width >= 340 and out.height >= 450, out.size
 out.save(OUT, 'PNG', optimize=True)
 print('PASS extracted', OUT, out.size)
