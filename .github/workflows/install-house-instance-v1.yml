@@ -17,7 +17,16 @@ jobs:
         with:
           node-version: '20'
       - name: Expand implementation bundle
-        run: tar -xzf scripts/house-instance-v1.tgz
+        run: |
+          set -euo pipefail
+          if tar -xzf scripts/house-instance-v1.tgz 2>/tmp/house-tar.err; then
+            echo 'bundle-format=raw-gzip'
+          else
+            cat /tmp/house-tar.err || true
+            base64 -d scripts/house-instance-v1.tgz > /tmp/house-instance-v1.tgz
+            tar -xzf /tmp/house-instance-v1.tgz
+            echo 'bundle-format=base64-text'
+          fi
       - name: Integrate with current Property branch
         run: python3 scripts/integrate-house-instance-v1.py
       - name: Deterministic validation
