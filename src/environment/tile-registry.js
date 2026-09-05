@@ -9,7 +9,7 @@
     tileWidth:TILE, tileHeight:TILE, columns:4
   });
   const grassVariationAtlas = Object.freeze({
-    id:'grass-variation', src:'assets/grass-variation-v1.png?art=191', width:128, height:64,
+    id:'grass-variation', src:'assets/grass-variation-v1.png?art=191&swap=phase10-b', width:128, height:64,
     tileWidth:TILE, tileHeight:TILE, columns:4, tileCount:8
   });
   const marbleVariationAtlas = Object.freeze({
