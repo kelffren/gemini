@@ -78,7 +78,7 @@ const requiredAssetFields = [
 const anchorModes = new Set(['tile-origin','world-top-left','registry-frame','registry-instance']);
 const visualBoundsModes = new Set(['cell','asset','registry-frame','registry-instance']);
 const placementModes = new Set(['none','registry-frame','registry-instance']);
-const frameModes = new Set(['grid','single']);
+const frameModes = new Set(['grid','single','irregular']);
 const cacheStrategies = new Set(['query','runtime-owner']);
 const fallbackModes = new Set(['none','asset']);
 
@@ -114,7 +114,7 @@ for (const asset of manifest.assets || []) {
 
   if (!asset.frames || typeof asset.frames !== 'object' || !frameModes.has(asset.frames.mode) ||
       !Number.isInteger(asset.frames.count) || asset.frames.count <= 0) {
-    fail(`${asset.id} frames must declare mode=grid|single and positive integer count`);
+    fail(`${asset.id} frames must declare mode=grid|single|irregular and positive integer count`);
   }
   requireMode(asset, 'anchor', anchorModes);
   requireMode(asset, 'visualBounds', visualBoundsModes);
@@ -188,6 +188,26 @@ for (const asset of manifest.assets || []) {
   const hasGrid = gridFields.some(field => asset[field] !== undefined);
   if (asset.frames?.mode === 'grid' && !hasGrid) fail(`${asset.id} frames.mode=grid requires grid metadata`);
   if (asset.frames?.mode === 'single' && hasGrid) fail(`${asset.id} frames.mode=single must not declare grid metadata`);
+  if (asset.frames?.mode === 'irregular') {
+    if (hasGrid) fail(`${asset.id} frames.mode=irregular must not declare grid metadata`);
+    if (!isNonEmptyString(asset.frames.metadata)) {
+      fail(`${asset.id} irregular frames require frames.metadata`);
+    } else {
+      const metadataPath = path.join(root, asset.frames.metadata);
+      if (!fs.existsSync(metadataPath)) fail(`${asset.id} missing irregular metadata ${asset.frames.metadata}`);
+      else {
+        try {
+          const atlasMeta = JSON.parse(fs.readFileSync(metadataPath, 'utf8'));
+          const entries = Object.entries(atlasMeta.frames || {});
+          if (atlasMeta.width !== width || atlasMeta.height !== height) fail(`${asset.id} irregular metadata dimensions do not match PNG`);
+          if (entries.length !== asset.frames.count) fail(`${asset.id} irregular frame count ${entries.length} != declared ${asset.frames.count}`);
+          for (const [frameId, r] of entries) {
+            if (![r.x,r.y,r.w,r.h].every(Number.isInteger) || r.w <= 0 || r.h <= 0 || r.x < 0 || r.y < 0 || r.x+r.w > width || r.y+r.h > height) fail(`${asset.id} invalid irregular frame ${frameId}`);
+          }
+        } catch (err) { fail(`${asset.id} invalid irregular metadata: ${err.message}`); }
+      }
+    }
+  }
 
   if (hasGrid) {
     const { cellWidth, cellHeight, columns, rows, padding, spacing } = asset;
