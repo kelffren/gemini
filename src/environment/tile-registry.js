@@ -21,8 +21,8 @@
     worldWidth:800, worldHeight:560, family:'ground'
   });
   const plazaNatureAtlas = Object.freeze({
-    id:'plaza-nature', src:'assets/plaza-tree-large-v1.png?art=303', width:367, height:489,
-    spriteWidth:367, spriteHeight:489, columns:1, spriteCount:1
+    id:'plaza-nature', src:'assets/plaza-tree-large-v1.png?art=304', width:430, height:530,
+    spriteWidth:430, spriteHeight:530, columns:1, spriteCount:1
   });
   const trainingDummyAtlas = Object.freeze({
     id:'plaza-training-dummy', src:'assets/training-dummy-v1.svg?art=198', width:96, height:96,
@@ -189,7 +189,7 @@
     })
   });
   window.KELO_TILE_REGISTRY = Object.freeze({
-    version:'1.10.31', worldTileSize:TILE,
+    version:'1.10.32', worldTileSize:TILE,
     atlases:Object.freeze({plaza:atlas,plazaGround:plazaGroundAtlas,transitions:transitionAtlas,grassVariation:grassVariationAtlas,marbleVariation:marbleVariationAtlas,plazaNature:plazaNatureAtlas,trainingDummy:trainingDummyAtlas,plazaNpcs:plazaNpcsAtlas,ruralSoil:ruralSoilAtlas,ruralProps:ruralPropsAtlas,ruralLandmarks:ruralLandmarksAtlas,ruralNature:ruralNatureAtlas}),
     architectureAssets,architecturePrefabs,plazaNatureProps,trainingDummyProp,plazaNpcVisuals,
     tiles,ruralTiles,ruralPropTiles,ruralLandmarkTiles,ruralLandmarkSprites,ruralNatureTiles,ruralNatureSprites,families,transitionMasks,styles
