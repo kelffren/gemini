@@ -4,6 +4,7 @@
   if ('fetchPriority' in raw) raw.fetchPriority = 'high';
   let sheet = null, ok = false, FW = 256, FH = 384;
   const COLS = 4;
+  const FOOT_ROOT_OFFSET_Y = 10;
 
   function useRawSheet() {
     sheet = raw;
@@ -88,6 +89,36 @@
     return Math.floor(Date.now() / 130) % COLS;
   }
 
+  function presentationOf(p, face) {
+    const side = face === 'left' || face === 'right';
+    const visualWidth = side ? 48 : 54;
+    const visualHeight = Math.round(54 * (FH / FW));
+    const physicsRootX = p.x;
+    const physicsRootY = p.y;
+    const footRootX = p.x;
+    const footRootY = p.y + FOOT_ROOT_OFFSET_Y;
+    return {
+      physicsRootX, physicsRootY,
+      colliderRadius: p.radius,
+      footRootX, footRootY,
+      depthRootX: footRootX, depthRootY: footRootY,
+      shadowAnchorX: footRootX, shadowAnchorY: footRootY,
+      visualWidth, visualHeight,
+      visualLeft: footRootX - visualWidth / 2,
+      visualTop: footRootY - visualHeight,
+      visualRight: footRootX + visualWidth / 2,
+      visualBottom: footRootY,
+      nameplateAnchorX: footRootX,
+      nameplateAnchorY: footRootY - visualHeight - 6
+    };
+  }
+
+  window.KELO_AVATAR_PRESENTATION = Object.freeze({
+    version: 'foot-root-v1',
+    footRootOffsetY: FOOT_ROOT_OFFSET_Y,
+    get: function (p, face) { return presentationOf(p, face || (p && p._face) || 'down'); }
+  });
+
   const _av = renderAvatar;
   renderAvatar = function (p, isSelf) {
     if (!ok || !p || !sheet) return _av(p, isSelf);
@@ -98,9 +129,10 @@
     const row = face === 'up' ? 3 : (face === 'down' ? 0 : 2);
     const padX = Math.max(2, FW * 0.05);
     const padY = Math.max(2, FH * 0.04);
-    const dw = side ? 48 : 54;
-    const dh = Math.round(54 * (FH / FW));
-    const footY = p.y + 10;
+    const layout = presentationOf(p, face);
+    const dw = layout.visualWidth;
+    const dh = layout.visualHeight;
+    const footY = layout.footRootY;
     ctx.save();
     const prevSmooth = ctx.imageSmoothingEnabled;
     ctx.imageSmoothingEnabled = false;
@@ -121,7 +153,7 @@
     ctx.fillStyle = isSelf ? '#e7c56a' : '#f3eee4';
     ctx.font = 'bold 11px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(p.name || 'Kelo', Math.round(p.x), Math.round(footY - dh - 6));
+    ctx.fillText(p.name || 'Kelo', Math.round(layout.nameplateAnchorX), Math.round(layout.nameplateAnchorY));
     ctx.restore();
   };
 })();
