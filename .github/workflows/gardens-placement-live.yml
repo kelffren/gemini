@@ -3,7 +3,10 @@ on:
   push:
     branches: [main]
     paths:
+      - 'src/environment/terrain-contract.js'
+      - 'src/environment/world-map.js'
       - 'scripts/validate-gardens-placements.mjs'
+      - 'scripts/live-gardens-audit.mjs'
       - '.github/workflows/gardens-placement-ci.yml'
       - '.github/workflows/gardens-placement-live.yml'
   workflow_dispatch:
@@ -19,7 +22,10 @@ jobs:
       - name: Validate authored Gardens placements
         run: node scripts/validate-gardens-placements.mjs
       - name: Syntax
-        run: node --check scripts/live-gardens-audit.mjs
+        run: |
+          node --check src/environment/terrain-contract.js
+          node --check src/environment/world-map.js
+          node --check scripts/live-gardens-audit.mjs
       - name: Install Playwright
         run: npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund playwright@1.55.0
       - name: Audit deployed Gardens on mobile
