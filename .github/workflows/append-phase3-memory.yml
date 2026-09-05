@@ -1,0 +1,33 @@
+name: Append Phase 3 visual memory
+on:
+  push:
+    paths:
+      - '.github/workflows/append-phase3-memory.yml'
+permissions:
+  contents: write
+jobs:
+  append-memory:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Append validated Phase 3 decision and self-remove
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('docs/VISUAL_DIRECTION_MEMORY.md')
+          text=p.read_text()
+          marker='## Phase 3 — Generic Prop System closed (2026-09-05)'
+          block='''\n\n## Phase 3 — Generic Prop System closed (2026-09-05)\n- Validated `KELO_PROP_CONTRACT` v1.2.0 / `generic-props-v1.2` with two materially different real families: Plaza nature (96x96 authored sprites using layer-stack back/front actor clipping) and Rural farm boundary (32x32 modular fence/gate/sign/weed/stone frames built dynamically from contract metadata).\n- `rural-ground.js` no longer loads or frame-renders `rural-props-v1.png` itself; the generic renderer owns asset loading and frame drawing. No family- or asset-specific branch was added to the generic renderer.\n- The contract currently supports `renderMode: layer-stack | immediate`. `immediate` is a compatibility timing adapter because the existing `renderFarm()` hook runs after `props_back`; normalizing that timing belongs to Phase 4 rather than reintroducing a rural renderer.\n- LIVE validation at 390x844 CSS / 780x1688 backing confirmed contract v1.2.0, generic renderer v1.2, Rural boundary source `ruralFarmBoundary`, no fallback, and no console/request/HTTP errors.\n- Next bottleneck: Phase 4 must normalize dynamic visual instances into the formal `props_back -> actors -> props_front` ordering and retire the immediate timing adapter where safe, without touching farm gameplay.\n'''
+          if marker not in text:
+              p.write_text(text.rstrip()+block+'\n')
+          PY
+          git rm .github/workflows/append-phase3-memory.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add docs/VISUAL_DIRECTION_MEMORY.md
+          git diff --cached --quiet && exit 0
+          git commit -m 'docs: close generic prop system phase'
+          git push origin main
