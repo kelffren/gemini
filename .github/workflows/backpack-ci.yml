@@ -7,14 +7,17 @@ on:
       - 'src/systems/equipment-system.js'
       - 'src/systems/container-system.js'
       - 'src/systems/market-escrow-system.js'
+      - 'src/systems/emote-system.js'
       - 'src/ui/backpack-ui.js'
       - 'src/ui/backpack-fantasy-v1.css'
       - 'src/ui/modal-input-lock.js'
       - 'src/ui/warehouse-ui.js'
       - 'src/ui/market-ui.js'
+      - 'src/ui/self-interaction-ui.js'
       - 'scripts/backpack-system-audit.js'
       - 'scripts/container-system-audit.js'
       - 'scripts/market-escrow-audit.js'
+      - 'scripts/emote-system-audit.js'
       - 'scripts/inventory-ui-v2-audit.js'
       - '.github/workflows/backpack-ci.yml'
       - 'index.html'
@@ -24,14 +27,17 @@ on:
       - 'src/systems/equipment-system.js'
       - 'src/systems/container-system.js'
       - 'src/systems/market-escrow-system.js'
+      - 'src/systems/emote-system.js'
       - 'src/ui/backpack-ui.js'
       - 'src/ui/backpack-fantasy-v1.css'
       - 'src/ui/modal-input-lock.js'
       - 'src/ui/warehouse-ui.js'
       - 'src/ui/market-ui.js'
+      - 'src/ui/self-interaction-ui.js'
       - 'scripts/backpack-system-audit.js'
       - 'scripts/container-system-audit.js'
       - 'scripts/market-escrow-audit.js'
+      - 'scripts/emote-system-audit.js'
       - 'scripts/inventory-ui-v2-audit.js'
       - '.github/workflows/backpack-ci.yml'
       - 'index.html'
@@ -50,13 +56,16 @@ jobs:
           node --check src/systems/backpack-system.js
           node --check src/systems/container-system.js
           node --check src/systems/market-escrow-system.js
+          node --check src/systems/emote-system.js
           node --check src/ui/modal-input-lock.js
           node --check src/ui/backpack-ui.js
           node --check src/ui/warehouse-ui.js
           node --check src/ui/market-ui.js
+          node --check src/ui/self-interaction-ui.js
           node --check scripts/backpack-system-audit.js
           node --check scripts/container-system-audit.js
           node --check scripts/market-escrow-audit.js
+          node --check scripts/emote-system-audit.js
           node --check scripts/inventory-ui-v2-audit.js
       - name: Backpack mechanics
         run: node scripts/backpack-system-audit.js
@@ -64,6 +73,8 @@ jobs:
         run: node scripts/container-system-audit.js
       - name: Market Escrow mechanics
         run: node scripts/market-escrow-audit.js
+      - name: Emote loadout mechanics
+        run: node scripts/emote-system-audit.js
       - name: Inventory UI V2 contract
         run: node scripts/inventory-ui-v2-audit.js
       - name: Integration contract
@@ -73,11 +84,14 @@ jobs:
           grep -q "backpack-v1.1.0" src/systems/backpack-system.js
           grep -q "stacksImplemented:true" src/systems/backpack-system.js
           grep -q "splitImplemented:true" src/systems/backpack-system.js
-          grep -q "container-v1.1.0" src/systems/container-system.js
+          grep -q "container-v1.2.0" src/systems/container-system.js
           grep -q "strictDestinationCapacity:true" src/systems/container-system.js
           grep -q "warehouseImplemented:true" src/systems/container-system.js
           grep -q "marketEscrowImplemented:true" src/systems/container-system.js
           grep -q "marketEscrowMerge:false" src/systems/container-system.js
+          grep -q "emoteLoadoutImplemented:true" src/systems/container-system.js
+          grep -q "emote-loadout-v1.0.0" src/systems/emote-system.js
+          grep -q "noDuplicateInBackpackWhileEquipped:true" src/systems/emote-system.js
           grep -q "market-escrow-v1.0.0" src/systems/market-escrow-system.js
           grep -q "listingContract:'validate-transfer-create-persist-rollback-v1'" src/systems/market-escrow-system.js
           grep -q "cancelContract:'validate-transfer-close-persist-rollback-v1'" src/systems/market-escrow-system.js
@@ -86,3 +100,5 @@ jobs:
           grep -q "warehouse-ui-v1.0.1" src/ui/warehouse-ui.js
           grep -q "market-ui-v1.0.0" src/ui/market-ui.js
           grep -q "backpackPublishAction:true" src/ui/market-ui.js
+          grep -q "self-interaction-ui-v1.0.0" src/ui/self-interaction-ui.js
+          grep -q "profileUsesBackpackUI:true" src/ui/self-interaction-ui.js
