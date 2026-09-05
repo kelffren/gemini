@@ -18,6 +18,7 @@ if (manifest.sampling !== 'nearest') fail(`sampling must be nearest, got ${manif
 if (!Array.isArray(manifest.assets) || manifest.assets.length === 0) fail('assets must be a non-empty array');
 
 const seen = new Set();
+const manifestPaths = new Set();
 for (const asset of manifest.assets || []) {
   if (!asset.id || !asset.path || !asset.kind) {
     fail(`asset missing id/path/kind: ${JSON.stringify(asset)}`);
@@ -25,6 +26,8 @@ for (const asset of manifest.assets || []) {
   }
   if (seen.has(asset.id)) fail(`duplicate id=${asset.id}`);
   seen.add(asset.id);
+  if (manifestPaths.has(asset.path)) fail(`duplicate path=${asset.path}`);
+  manifestPaths.add(asset.path);
 
   if (!/\.png$/i.test(asset.path)) {
     fail(`${asset.id} must point to a PNG: ${asset.path}`);
@@ -72,6 +75,20 @@ for (const asset of manifest.assets || []) {
   console.log(`ASSET_CONTRACT_PASS ${asset.id} ${width}x${height} ${asset.kind}`);
 }
 
+const tileRegistryPath = path.join(root, 'src/environment/tile-registry.js');
+const tileRegistrySource = fs.readFileSync(tileRegistryPath, 'utf8');
+const registryPngPaths = new Set();
+for (const match of tileRegistrySource.matchAll(/src:'(assets\/[^']+?\.png)(?:\?[^']*)?'/gi)) {
+  registryPngPaths.add(match[1]);
+}
+for (const registryPath of [...registryPngPaths].sort()) {
+  if (!manifestPaths.has(registryPath)) {
+    fail(`TileRegistry PNG missing from asset manifest: ${registryPath}`);
+  } else {
+    console.log(`ASSET_CONTRACT_REGISTRY_PASS ${registryPath}`);
+  }
+}
+
 if (!process.exitCode) {
-  console.log(`ASSET_CONTRACT_OK version=${manifest.contractVersion} assets=${manifest.assets.length}`);
+  console.log(`ASSET_CONTRACT_OK version=${manifest.contractVersion} assets=${manifest.assets.length} registryPngs=${registryPngPaths.size}`);
 }
