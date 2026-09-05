@@ -12,9 +12,11 @@ on:
       - 'engine-p.js'
       - 'engine-u.js'
       - 'engine-aa.js'
+      - 'engine-ab.js'
       - 'src/environment/**'
       - 'src/ui/**'
       - 'src/systems/**'
+      - 'assets/hero.PNG'
       - 'assets/tileset.png'
       - 'assets/tileset-vclean.png'
       - 'assets/plaza-transitions-v1.png'
@@ -30,6 +32,7 @@ on:
       - 'assets/rural-landmarks-v1.png'
       - 'assets/district-decals-v1.svg'
       - 'scripts/live-world-audit.mjs'
+      - 'scripts/live-hero-audit.mjs'
       - 'scripts/live-gardens-audit.mjs'
       - 'scripts/live-rural-audit.mjs'
       - 'scripts/live-district-decals-audit.mjs'
@@ -72,6 +75,11 @@ jobs:
           echo "EXPECTED_FOUNTAIN=$FOUNTAIN_VERSION" >> "$GITHUB_ENV"
       - name: Install Playwright package
         run: npm install --no-save playwright@1.55.0
+      - name: Audit live hero sprite on mobile and desktop
+        env:
+          AUDIT_URL: https://kelffren.github.io/gemini/
+          CHROME_BIN: /usr/bin/google-chrome
+        run: node scripts/live-hero-audit.mjs
       - name: Audit deployed mobile world
         env:
           AUDIT_URL: https://kelffren.github.io/gemini/
