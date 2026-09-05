@@ -992,3 +992,11 @@ A visual pass is successful only when:
 - GitHub Pages deployed that exact commit successfully. LIVE mobile audit then passed at 390x844 CSS / 780x1688 backing canvas with `genericPropContract=true`, prop contract `1.1.0`, `rendererMode='data-driven-props-v1'`, four Plaza nature props, stable back/front layer IDs and `consoleErrors=[]`, `failedRequests=[]`, `httpErrors=[]`.
 - A deployment-race false positive was detected during the first audit attempt because the artifact still showed the pre-migration nature renderer. It was not accepted; validation was repeated after Pages deployment. This reinforces the rule that artifact state, not workflow green alone, must prove the new contract is LIVE.
 - Phase 3 is NOT globally closed yet: only Plaza nature is migrated. Next priority is to migrate at least one materially different prop family through the same contract and prove that no new renderer branch is required before declaring Generic Prop System complete.
+
+## Phase 3 — Generic Prop System closed (2026-09-05)
+- Validated `KELO_PROP_CONTRACT` v1.2.0 / `generic-props-v1.2` with two materially different real families: Plaza nature (96x96 authored sprites using layer-stack back/front actor clipping) and Rural farm boundary (32x32 modular fence/gate/sign/weed/stone frames built dynamically from contract metadata).
+- `rural-ground.js` no longer loads or frame-renders `rural-props-v1.png` itself; the generic renderer owns asset loading and frame drawing. No family- or asset-specific branch was added to the generic renderer.
+- The contract currently supports `renderMode: layer-stack | immediate`. `immediate` is a compatibility timing adapter because the existing `renderFarm()` hook runs after `props_back`; normalizing that timing belongs to Phase 4 rather than reintroducing a rural renderer.
+- LIVE validation at 390x844 CSS / 780x1688 backing confirmed contract v1.2.0, generic renderer v1.2, Rural boundary source `ruralFarmBoundary`, no fallback, and no console/request/HTTP errors.
+- Next bottleneck: Phase 4 must normalize dynamic visual instances into the formal `props_back -> actors -> props_front` ordering and retire the immediate timing adapter where safe, without touching farm gameplay.
+
