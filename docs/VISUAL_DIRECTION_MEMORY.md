@@ -911,6 +911,16 @@ Kelo World is no longer allowed to remain a single polished plaza floating in a 
 - Validation: Kelo CI run `33941490874` passed; Asset Contract CI `33941490900` passed; Pages deployment `33941490231` passed; LIVE mobile audit `33941490791` passed after Pages. NPC LIVE state reported `ready=true`, `assetLoaded=true`, `failed=false`, `fallbackActive=false`, `gameplayAnchorsPreserved=true`, `npcCount=3`, canvas 390x844 CSS / 780x1688 physical, with `consoleErrors=[]`, `failedRequests=[]`, `httpErrors=[]`.
 - Manual inspection of `live-plaza-npcs.png` and `live-plaza-portero.png` confirms the new role silhouettes are visible in production and improve immediate NPC differentiation. It also shows the next bottleneck clearly: the Plaza service-NPC atlas still uses a coarse geometric body language compared with the hero sprite family. The next safe pass should improve character anatomy/proportions and pixel-cluster shaping (or migrate this family to a richer raster authored atlas) while preserving the same registry cells and gameplay anchors.
 
+
+## Validated Plaza NPC Anatomy Refinement — 2026-09-05
+
+- Public reference pass reconfirmed the direction without copying assets or layouts: Pixadom remains a useful browser/mobile benchmark for dense but readable environments and coherent NPC presence; current top-down asset work also emphasizes consistent palettes, modular atlases and crisp nearest-neighbour presentation.
+- The remaining Plaza NPC mismatch was not role identity but body construction: Portero, Joyero and Maestro still read as wide stacked rectangles beside the substantially richer hero art.
+- `assets/plaza-npcs-v1.svg` was refined in place while preserving the existing 288x96 atlas, three 96x96 cells, TileRegistry mapping and gameplay anchors. The new construction narrows heads and torsos, uses stepped shoulder/arm/leg silhouettes and keeps each role accessory outside the body mass for faster mobile recognition.
+- Implementation commit `fa2ab25bc6886d480d60cb4a976ea708e48a9564` (`art: refine Plaza NPC anatomy`) passed Kelo CI, Asset Contract CI, GitHub Pages and the complete mobile LIVE audit.
+- LIVE audit run `33944107182` passed at 390x844 CSS / 780x1688 backing canvas. `npc-report.json` confirmed `ready=true`, `assetLoaded=true`, `fallbackActive=false`, `npcCount=3`, `gameplayAnchorsPreserved=true`, with `consoleErrors=[]`, `failedRequests=[]` and `httpErrors=[]`.
+- Manual inspection of `live-plaza-npcs.png` and `live-plaza-portero.png` confirms the silhouettes are less block-like and remain readable against the authored plaza. The service NPCs are still intentionally much simpler than the hero, so the next safe bottleneck is moving this family from geometric SVG construction toward a genuinely authored pixel-character raster atlas or equivalent higher-fidelity character pipeline, without changing the 96x96 cells or gameplay anchors.
+
 ## Non-goals During Visual Passes
 Do not casually alter unrelated systems such as:
 - core movement feel;
