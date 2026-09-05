@@ -29,7 +29,7 @@ for (const item of policy.excludedFromWorldContract || []) {
   }
   if (exclusions.has(item.path)) fail(`duplicate exclusion path=${item.path}`);
   if (manifestByPath.has(item.path)) fail(`path cannot be both registered and excluded: ${item.path}`);
-  if (!['non-world-ui','superseded-archive','unadopted-archive'].includes(item.scope)) fail(`invalid exclusion scope=${item.scope} path=${item.path}`);
+  if (!['non-world-ui','superseded-archive','unadopted-archive','source-sheet'].includes(item.scope)) fail(`invalid exclusion scope=${item.scope} path=${item.path}`);
   if (typeof item.reason !== 'string' || item.reason.trim().length < 12) fail(`exclusion requires concrete reason: ${item.path}`);
   exclusions.set(item.path, item);
 }
@@ -65,20 +65,14 @@ for (const [file, asset] of manifestByPath) {
   }
 }
 
-const runtimeRoots = [
-  'index.html',
-  'src'
-].map(item => path.join(root, item)).filter(fs.existsSync);
+const runtimeRoots = ['index.html','src'].map(item => path.join(root, item)).filter(fs.existsSync);
 const textFiles = [];
 for (const item of runtimeRoots) {
   const stat = fs.statSync(item);
   if (stat.isFile()) textFiles.push(item);
   else textFiles.push(...walkFiles(item, file => /\.(?:js|mjs|html|css|json)$/i.test(file)));
 }
-const excludedScanFiles = new Set([
-  'src/environment/art-asset-manifest.json',
-  'src/environment/png-validation-policy.json'
-]);
+const excludedScanFiles = new Set(['src/environment/art-asset-manifest.json','src/environment/png-validation-policy.json']);
 const runtimeRefs = new Map();
 const refPattern = /assets\/[A-Za-z0-9_./-]+\.png/gi;
 for (const file of textFiles) {
@@ -106,17 +100,21 @@ for (const [ref, owners] of [...runtimeRefs.entries()].sort()) {
   const exclusion = exclusions.get(exactDiskPath);
   if (!exclusion) {
     fail(`runtime PNG reference is outside manifest/policy: ${exactDiskPath} owners=${[...owners].join(',')}`);
-  } else if (exclusion.scope !== 'non-world-ui') {
-    fail(`archived PNG is still runtime-referenced: ${exactDiskPath} scope=${exclusion.scope} owners=${[...owners].join(',')}`);
-  } else {
+  } else if (exclusion.scope === 'non-world-ui') {
     pass(`non-world runtime-ref ${exactDiskPath} owners=${[...owners].join(',')}`);
+  } else if (exclusion.scope === 'source-sheet') {
+    const ownerList=[...owners];
+    const metadataOnly=ownerList.every(owner=>/^src\/environment\/generated\/.+atlas\.js$/i.test(owner));
+    if (!metadataOnly) fail(`source-sheet PNG may only be referenced by generated atlas metadata: ${exactDiskPath} owners=${ownerList.join(',')}`);
+    else pass(`source-sheet metadata-ref ${exactDiskPath} owners=${ownerList.join(',')}`);
+  } else {
+    fail(`archived PNG is still runtime-referenced: ${exactDiskPath} scope=${exclusion.scope} owners=${[...owners].join(',')}`);
   }
 }
 
 for (const [file, exclusion] of exclusions) {
-  if (!runtimeRefs.has(file) && exclusion.scope === 'non-world-ui') {
-    pass(`explicit non-world PNG ${file} is retained but currently unreferenced`);
-  }
+  if (!runtimeRefs.has(file) && exclusion.scope === 'non-world-ui') pass(`explicit non-world PNG ${file} is retained but currently unreferenced`);
+  if (!runtimeRefs.has(file) && exclusion.scope === 'source-sheet') pass(`source sheet ${file} retained as importer input and not fetched by runtime`);
 }
 
 if (failures.length) {
