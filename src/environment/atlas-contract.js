@@ -3,7 +3,7 @@
   if(!R?.atlases){console.error('[Kelo atlas] TileRegistry missing');return;}
 
   const POLICY=Object.freeze({
-    id:'kelo-atlas-contract-v1',version:'1.1.0',sampling:'nearest',maxDimension:2048,
+    id:'kelo-atlas-contract-v1',version:'1.1.1',sampling:'nearest',maxDimension:2048,
     preferredDimensions:Object.freeze([128,256,512,1024]),
     tiers:Object.freeze({
       small:Object.freeze({maxDimension:256,use:'small tile/prop families'}),
@@ -14,7 +14,7 @@
       grid:Object.freeze({paddingMin:0,spacingMin:0,requiresExactCellGrid:true}),
       packedSprites:Object.freeze({paddingMin:1,spacingMin:1,extrudeRecommended:true})
     }),
-    cache:Object.freeze({strategy:'versioned-url',required:true,acceptedQueryKeys:Object.freeze(['art','v'])}),
+    cache:Object.freeze({strategy:'versioned-url-or-embedded',required:true,acceptedQueryKeys:Object.freeze(['art','v'])}),
     loading:Object.freeze({core:'eager',district:'lazy-when-district-needed',optional:'lazy-on-first-use'}),
     unloading:Object.freeze({core:'retain',district:'eligible-after-district-eviction',optional:'eligible-when-refcount-zero'}),
     missingAsset:Object.freeze({mode:'fail-visible-and-report',allowSilentMissing:false})
@@ -30,7 +30,7 @@
   const runtime=new Map();
 
   function tierForAtlas(atlas){const d=Math.max(Number(atlas?.width)||0,Number(atlas?.height)||0);if(d<=256)return 'small';if(d<=1024)return 'medium';return 'large'}
-  function cacheToken(src){try{const u=new URL(src,location.href);return [...u.searchParams.entries()].find(([k])=>POLICY.cache.acceptedQueryKeys.includes(k))||null}catch{return null}}
+  function cacheToken(src){if(typeof src==='string'&&src.startsWith('data:'))return ['embedded','content-addressed'];try{const u=new URL(src,location.href);return [...u.searchParams.entries()].find(([k])=>POLICY.cache.acceptedQueryKeys.includes(k))||null}catch{return null}}
   function normalize(key,atlas,role){return Object.freeze({key,id:atlas?.id||key,src:atlas?.src,width:Number(atlas?.width)||0,height:Number(atlas?.height)||0,role:role||ROLE_BY_KEY[key]||'optional',tier:tierForAtlas(atlas),cacheToken:cacheToken(atlas?.src),grid:Boolean(atlas?.tileWidth&&atlas?.tileHeight&&atlas?.columns),sampling:POLICY.sampling})}
   function register(key,atlas,opts={}){if(!key||!atlas)return null;const entry=normalize(key,atlas,opts.role);records.set(key,entry);refreshAudit();return entry}
   function validate(entry){const v=[];if(!entry.src)v.push(`${entry.key}: missing src`);if(!(entry.width>0&&entry.height>0))v.push(`${entry.key}: invalid dimensions`);if(Math.max(entry.width,entry.height)>POLICY.maxDimension)v.push(`${entry.key}: exceeds ${POLICY.maxDimension}px`);if(POLICY.cache.required&&!entry.cacheToken)v.push(`${entry.key}: missing versioned URL cache token`);return v}
