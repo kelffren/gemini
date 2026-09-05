@@ -1,0 +1,128 @@
+name: Crimson bot LIVE proof
+
+on:
+  push:
+    branches:
+      - chatgpt/bot-crimson-live-audit
+    paths:
+      - .github/workflows/bot-crimson-live-proof.yml
+
+jobs:
+  mobile-live-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install Playwright
+        run: npm install --no-save playwright@1.55.0
+      - name: Prove distinct player and crimson bot LIVE
+        env:
+          AUDIT_URL: https://kelffren.github.io/gemini/
+          CHROME_BIN: /usr/bin/google-chrome
+        run: |
+          mkdir -p artifacts
+          node <<'NODE'
+          const fs = require('fs');
+          const { chromium } = require('playwright');
+          const assert = (cond, msg) => { if (!cond) throw new Error(msg); };
+          (async () => {
+            const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROME_BIN });
+            const context = await browser.newContext({
+              viewport: { width: 390, height: 844 },
+              deviceScaleFactor: 3,
+              isMobile: true,
+              hasTouch: true,
+              userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 Version/18.6 Mobile/15E148 Safari/604.1'
+            });
+            const page = await context.newPage();
+            const pageErrors = [];
+            const consoleErrors = [];
+            page.on('pageerror', e => pageErrors.push(String(e && e.message || e)));
+            page.on('console', m => { if (m.type() === 'error') consoleErrors.push(m.text()); });
+
+            const url = process.env.AUDIT_URL + '?botLiveAudit=' + Date.now();
+            await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+            await page.waitForFunction(() => window.KeloCharacterAppearance && window.KELO_CHARACTER_APPEARANCE_AUDIT, null, { timeout: 45000 });
+            await page.waitForFunction(() => window.KELO_CHARACTER_APPEARANCE_AUDIT.loaded.bot_crimson_v1 === true, null, { timeout: 45000 });
+
+            const boot = await page.evaluate(() => ({
+              version: window.KeloCharacterAppearance && window.KeloCharacterAppearance.version,
+              auditVersion: window.KELO_CHARACTER_APPEARANCE_AUDIT && window.KELO_CHARACTER_APPEARANCE_AUDIT.version,
+              player: typeof localPlayer !== 'undefined' && localPlayer ? { id: localPlayer.id, appearanceId: localPlayer.appearanceId } : null,
+              bots: typeof simulatedPlayers !== 'undefined' && Array.isArray(simulatedPlayers) ? simulatedPlayers.map(p => ({ id:p.id, name:p.name, appearanceId:p.appearanceId })) : [],
+              dimensions: window.KELO_CHARACTER_APPEARANCE_AUDIT.dimensions.bot_crimson_v1,
+              loaded: window.KELO_CHARACTER_APPEARANCE_AUDIT.loaded.bot_crimson_v1,
+              assignedPlayers: window.KELO_CHARACTER_APPEARANCE_AUDIT.assignedPlayers,
+              assignedBots: window.KELO_CHARACTER_APPEARANCE_AUDIT.assignedBots
+            }));
+            console.log('BOOT_AUDIT', JSON.stringify(boot));
+            assert(boot.version === 'character-appearance-v2.0.0', 'wrong appearance runtime version');
+            assert(boot.loaded === true, 'crimson PNG not loaded LIVE');
+            assert(boot.dimensions && boot.dimensions.width === 1024 && boot.dimensions.height === 1536, 'wrong LIVE sprite dimensions');
+            assert(boot.player && boot.player.appearanceId === 'player_hero_v1', 'player did not keep hero appearance');
+            assert(boot.bots.length >= 1, 'no simulated bot available');
+            assert(boot.bots.every(b => b.appearanceId === 'bot_crimson_v1'), 'simulated actors do not use crimson appearance');
+
+            const pvpButton = page.locator('button').filter({ hasText: /PVP/i }).first();
+            await pvpButton.waitFor({ state: 'visible', timeout: 30000 });
+            await pvpButton.click({ timeout: 15000 });
+            await page.waitForFunction(() => window.KELO_COMBAT_ENABLED === true, null, { timeout: 10000 });
+            await page.waitForFunction(() => (window.KELO_CHARACTER_APPEARANCE_AUDIT.drawCountByAppearance.bot_crimson_v1 || 0) > 0, null, { timeout: 10000 });
+            await page.waitForTimeout(800);
+
+            const expectedRows = { down:0, left:384, right:768, up:1152 };
+            const faceProofs = [];
+            for (const face of ['down','left','right','up']) {
+              await page.evaluate(face => {
+                const d = (typeof simulatedPlayers !== 'undefined' && simulatedPlayers && simulatedPlayers[0]) || null;
+                if (!d) throw new Error('dummy unavailable');
+                d._visualMotion = { on:false, dx:0, dy:0, face, frame:0 };
+              }, face);
+              await page.waitForFunction(face => {
+                const d = (typeof simulatedPlayers !== 'undefined' && simulatedPlayers && simulatedPlayers[0]) || null;
+                const x = window.KELO_CHARACTER_APPEARANCE_AUDIT.lastDraw;
+                return !!(d && x && x.actorId === d.id && x.appearanceId === 'bot_crimson_v1' && x.face === face);
+              }, face, { timeout: 5000 });
+              const proof = await page.evaluate(() => ({ ...window.KELO_CHARACTER_APPEARANCE_AUDIT.lastDraw }));
+              console.log('FACE_PROOF', face, JSON.stringify(proof));
+              assert(proof.sourceRect[1] === expectedRows[face], 'wrong row for ' + face);
+              assert(proof.footRoot && proof.sourceFootAnchor, 'missing foot anchor for ' + face);
+              faceProofs.push({ face, sourceRect: proof.sourceRect, sourceFootAnchor: proof.sourceFootAnchor, footRoot: proof.footRoot, destinationRect: proof.destinationRect });
+            }
+
+            await page.screenshot({ path:'artifacts/bot-crimson-mobile-live.png', fullPage:false });
+            const finalAudit = await page.evaluate(() => ({
+              player: typeof localPlayer !== 'undefined' && localPlayer ? localPlayer.appearanceId : null,
+              dummy: typeof simulatedPlayers !== 'undefined' && simulatedPlayers[0] ? simulatedPlayers[0].appearanceId : null,
+              drawCount: window.KELO_CHARACTER_APPEARANCE_AUDIT.drawCountByAppearance.bot_crimson_v1 || 0,
+              fallbackDraws: window.KELO_CHARACTER_APPEARANCE_AUDIT.fallbackDraws,
+              cleanupPixels: window.KELO_CHARACTER_APPEARANCE_AUDIT.cleanupPixels.bot_crimson_v1 || 0,
+              lastDraw: window.KELO_CHARACTER_APPEARANCE_AUDIT.lastDraw,
+              combat: window.KELO_COMBAT_ENABLED
+            }));
+            console.log('FINAL_AUDIT', JSON.stringify(finalAudit));
+            console.log('FACE_PROOFS', JSON.stringify(faceProofs));
+            console.log('PAGE_ERRORS', JSON.stringify(pageErrors));
+            console.log('CONSOLE_ERRORS', JSON.stringify(consoleErrors));
+            assert(finalAudit.player === 'player_hero_v1', 'player appearance changed in PvP');
+            assert(finalAudit.dummy === 'bot_crimson_v1', 'dummy appearance wrong in PvP');
+            assert(finalAudit.drawCount > 0, 'crimson bot never rendered');
+            assert(finalAudit.combat === true, 'PvP did not remain active');
+            assert(pageErrors.length === 0, 'page errors: ' + pageErrors.join(' | '));
+            const relevantConsoleErrors = consoleErrors.filter(e => /character|appearance|bot-crimson|sprite/i.test(e));
+            assert(relevantConsoleErrors.length === 0, 'appearance console errors: ' + relevantConsoleErrors.join(' | '));
+            fs.writeFileSync('artifacts/bot-crimson-live-audit.json', JSON.stringify({boot,finalAudit,faceProofs,pageErrors,consoleErrors},null,2));
+            await browser.close();
+            console.log('CRIMSON_BOT_LIVE_PROOF_OK');
+          })().catch(err => { console.error(err); process.exit(1); });
+          NODE
+      - name: Upload proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: crimson-bot-live-proof
+          path: artifacts/
+          if-no-files-found: error
