@@ -7,7 +7,7 @@
   const ROWS = 4;
   const FOOT_ROOT_OFFSET_Y = 10;
   const HERO_AUDIT = window.KELO_HERO_SPRITE_AUDIT = {
-    version: 'hero-preprocess-audit-v2',
+    version: 'hero-preprocess-audit-v3',
     source: 'assets/hero.PNG',
     loaded: false,
     processed: false,
@@ -21,6 +21,10 @@
     whiteKnockoutOpaqueLossPct: 0,
     croppedOpaquePixelCount: 0,
     croppedOpaquePixelCountByFrame: [],
+    lateralComparedPixelCount: 0,
+    row1VsRow2RgbaSimilarityPct: 0,
+    row1VsMirroredRow2RgbaSimilarityPct: 0,
+    lateralSimilarityDeltaPct: 0,
     sheetMutationAfterIdle: false,
     visibleAlphaMutationAfterIdle: false,
     preprocessMs: 0,
@@ -39,6 +43,50 @@
     HERO_AUDIT.frameHeight = FH;
   }
 
+  function rgbaEqual(d, a, b) {
+    return d[a] === d[b] && d[a + 1] === d[b + 1] && d[a + 2] === d[b + 2] && d[a + 3] === d[b + 3];
+  }
+
+  function compareLateralRows(d, width) {
+    const fw = Math.floor(FW);
+    const fh = Math.floor(FH);
+    if (!(fw > 0 && fh > 0)) return;
+    const row1Y = fh;
+    const row2Y = fh * 2;
+    let comparedDirect = 0;
+    let equalDirect = 0;
+    let comparedMirror = 0;
+    let equalMirror = 0;
+
+    for (let col = 0; col < COLS; col++) {
+      const frameX = col * fw;
+      for (let y = 0; y < fh; y++) {
+        for (let x = 0; x < fw; x++) {
+          const xMirror = fw - 1 - x;
+          const i1 = ((row1Y + y) * width + frameX + x) * 4;
+          const i2 = ((row2Y + y) * width + frameX + x) * 4;
+          const i2m = ((row2Y + y) * width + frameX + xMirror) * 4;
+
+          if (d[i1 + 3] > 0 || d[i2 + 3] > 0) {
+            comparedDirect += 1;
+            if (rgbaEqual(d, i1, i2)) equalDirect += 1;
+          }
+          if (d[i1 + 3] > 0 || d[i2m + 3] > 0) {
+            comparedMirror += 1;
+            if (rgbaEqual(d, i1, i2m)) equalMirror += 1;
+          }
+        }
+      }
+    }
+
+    const directPct = comparedDirect ? equalDirect / comparedDirect * 100 : 0;
+    const mirrorPct = comparedMirror ? equalMirror / comparedMirror * 100 : 0;
+    HERO_AUDIT.lateralComparedPixelCount = Math.max(comparedDirect, comparedMirror);
+    HERO_AUDIT.row1VsRow2RgbaSimilarityPct = directPct;
+    HERO_AUDIT.row1VsMirroredRow2RgbaSimilarityPct = mirrorPct;
+    HERO_AUDIT.lateralSimilarityDeltaPct = mirrorPct - directPct;
+  }
+
   function knockWhite() {
     const t0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
     try {
@@ -49,6 +97,7 @@
       g.drawImage(raw, 0, 0);
       const data = g.getImageData(0, 0, c.width, c.height);
       const d = data.data;
+      compareLateralRows(d, c.width);
       const padX = Math.max(2, FW * 0.05);
       const padY = Math.max(2, FH * 0.04);
       const cropByFrame = new Array(COLS * ROWS).fill(0);
