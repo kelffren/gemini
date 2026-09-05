@@ -208,6 +208,26 @@ for (const asset of manifest.assets || []) {
       }
     }
   }
+  if (asset.frames?.mode === 'irregular') {
+    if (hasGrid) fail(`${asset.id} frames.mode=irregular must not declare grid metadata`);
+    if (!isNonEmptyString(asset.frames.metadata)) {
+      fail(`${asset.id} irregular frames require frames.metadata`);
+    } else {
+      const metadataPath = path.join(root, asset.frames.metadata);
+      if (!fs.existsSync(metadataPath)) fail(`${asset.id} missing irregular metadata ${asset.frames.metadata}`);
+      else {
+        try {
+          const atlasMeta = JSON.parse(fs.readFileSync(metadataPath, 'utf8'));
+          const entries = Object.entries(atlasMeta.frames || {});
+          if (atlasMeta.width !== width || atlasMeta.height !== height) fail(`${asset.id} irregular metadata dimensions do not match PNG`);
+          if (entries.length !== asset.frames.count) fail(`${asset.id} irregular frame count ${entries.length} != declared ${asset.frames.count}`);
+          for (const [frameId, r] of entries) {
+            if (![r.x,r.y,r.w,r.h].every(Number.isInteger) || r.w <= 0 || r.h <= 0 || r.x < 0 || r.y < 0 || r.x+r.w > width || r.y+r.h > height) fail(`${asset.id} invalid irregular frame ${frameId}`);
+          }
+        } catch (err) { fail(`${asset.id} invalid irregular metadata: ${err.message}`); }
+      }
+    }
+  }
 
   if (hasGrid) {
     const { cellWidth, cellHeight, columns, rows, padding, spacing } = asset;
