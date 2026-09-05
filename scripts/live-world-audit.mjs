@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { createHash } from 'node:crypto';
 import { chromium } from 'playwright';
 const base=process.env.AUDIT_URL||'https://kelffren.github.io/gemini/';
 const expectedWorld=process.env.EXPECTED_WORLD||'world-v1.4';
@@ -22,6 +23,7 @@ const expectedMarbleScope=process.env.EXPECTED_MARBLE_SCOPE||(()=>{
   if(!match)throw new Error('Could not resolve marble variation scope from TileRegistry');
   return match[1];
 })();
+const expectedGrassHash=createHash('sha256').update(fs.readFileSync(new URL('../assets/grass-variation-v1.png',import.meta.url))).digest('hex');
 fs.mkdirSync('artifacts',{recursive:true});
 const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_BIN||'/usr/bin/google-chrome',args:['--no-sandbox','--disable-dev-shm-usage']});
 const context=await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true});
@@ -65,12 +67,21 @@ const plaza=await page.evaluate(()=>{
   return{dataUrl:c.toDataURL('image/png'),ivory,gold,teal};
 });
 if(plaza?.dataUrl?.startsWith('data:image/png;base64,'))fs.writeFileSync('artifacts/live-plaza.png',Buffer.from(plaza.dataUrl.split(',')[1],'base64'));
-const grass=await page.evaluate(()=>{
+const grass=await page.evaluate(async()=>{
   const c=document.getElementById('game-canvas');if(!c||typeof camera==='undefined'||typeof localPlayer==='undefined'||typeof render!=='function')return null;
   localPlayer.x=760;localPlayer.y=760;camera.x=760;camera.y=760;camera.targetX=760;camera.targetY=760;render();
-  const px=c.getContext('2d').getImageData(0,0,c.width,c.height).data;let base=0,light=0,dark=0,pink=0,blue=0;
-  for(let i=0;i<px.length;i+=4){const r=px[i],g=px[i+1],b=px[i+2],a=px[i+3];if(a<200)continue;if(r===72&&g===198&&b===55)base++;if(r===91&&g===218&&b===68)light++;if(r===50&&g===157&&b===44)dark++;if(r===242&&g===130&&b===178)pink++;if(r===104&&g===159&&b===229)blue++;}
-  return{dataUrl:c.toDataURL('image/png'),base,light,dark,pink,blue};
+  const src=window.KELO_TILE_REGISTRY?.atlases?.grassVariation?.src||null;
+  let assetHash=null,assetByteLength=0;
+  if(src){
+    const response=await fetch(src,{cache:'no-store'});
+    const bytes=await response.arrayBuffer();assetByteLength=bytes.byteLength;
+    const digest=await crypto.subtle.digest('SHA-256',bytes);
+    assetHash=[...new Uint8Array(digest)].map(v=>v.toString(16).padStart(2,'0')).join('');
+  }
+  const px=c.getContext('2d').getImageData(0,0,c.width,c.height).data;
+  let opaquePixels=0;const colors=new Set();
+  for(let i=0;i<px.length;i+=4){const a=px[i+3];if(a<200)continue;opaquePixels++;if(colors.size<4096)colors.add(`${px[i]},${px[i+1]},${px[i+2]}`);}
+  return{dataUrl:c.toDataURL('image/png'),atlasSrc:src,assetHash,assetByteLength,opaquePixels,uniqueOpaqueColors:colors.size};
 });
 if(grass?.dataUrl?.startsWith('data:image/png;base64,'))fs.writeFileSync('artifacts/live-grass.png',Buffer.from(grass.dataUrl.split(',')[1],'base64'));
 const commerce=await page.evaluate(()=>{
@@ -92,7 +103,7 @@ const rural=await page.evaluate(()=>{
   return{dataUrl:c.toDataURL('image/png'),rural:window.KELO_RURAL_GROUND_AUDIT||null,generic:window.KELO_GENERIC_PROP_AUDIT||null,layers:window.KELO_ENVIRONMENT_LAYER_AUDIT||null,canvas:{width:c.width,height:c.height,cssWidth:c.clientWidth,cssHeight:c.clientHeight}};
 });
 if(rural?.dataUrl?.startsWith('data:image/png;base64,'))fs.writeFileSync('artifacts/live-rural-depth.png',Buffer.from(rural.dataUrl.split(',')[1],'base64'));
-const report={loaded,expectedMarbleScope,state,plaza:plaza?{ivory:plaza.ivory,gold:plaza.gold,teal:plaza.teal}:null,grass:grass?{base:grass.base,light:grass.light,dark:grass.dark,pink:grass.pink,blue:grass.blue}:null,commerce:commerce?{world:commerce.world,profile:commerce.profile,scope:commerce.scope,canvas:commerce.canvas}:null,plazaTree:plazaTree?{nature:plazaTree.nature,layers:plazaTree.layers,propCount:plazaTree.registryNature?.length||0}:null,rural:rural?{rural:rural.rural,generic:rural.generic,layers:rural.layers,canvas:rural.canvas}:null,consoleErrors,failedRequests,httpErrors};
+const report={loaded,expectedMarbleScope,expectedGrassHash,state,plaza:plaza?{ivory:plaza.ivory,gold:plaza.gold,teal:plaza.teal}:null,grass:grass?{atlasSrc:grass.atlasSrc,assetHash:grass.assetHash,assetByteLength:grass.assetByteLength,opaquePixels:grass.opaquePixels,uniqueOpaqueColors:grass.uniqueOpaqueColors}:null,commerce:commerce?{world:commerce.world,profile:commerce.profile,scope:commerce.scope,canvas:commerce.canvas}:null,plazaTree:plazaTree?{nature:plazaTree.nature,layers:plazaTree.layers,propCount:plazaTree.registryNature?.length||0}:null,rural:rural?{rural:rural.rural,generic:rural.generic,layers:rural.layers,canvas:rural.canvas}:null,consoleErrors,failedRequests,httpErrors};
 fs.writeFileSync('artifacts/report.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));
 await browser.close();
 if(!loaded)throw new Error(`LIVE never reached current visual contract (marbleScope=${expectedMarbleScope})`);
@@ -112,7 +123,7 @@ if(!state.generic?.ready||state.generic?.failed||state.generic?.contractVersion!
 if(!state.rural?.ready||state.rural?.boundaryMode!=='environment-layer-stack-props-back-v1'||state.rural?.immediateBoundaryDraw!==false)throw new Error(`Rural formal props_back contract invalid: ${JSON.stringify(state.rural)}`);
 if(!plazaTree?.dataUrl?.startsWith('data:image/png;base64,')||plazaTree.registryNature?.length!==4)throw new Error('Plaza nature screenshot evidence missing');
 if(!rural?.dataUrl?.startsWith('data:image/png;base64,')||rural.canvas?.cssWidth!==390||rural.canvas?.cssHeight!==844||rural.canvas?.width!==780||rural.canvas?.height!==1688)throw new Error(`Rural depth screenshot evidence missing: ${JSON.stringify(rural?.canvas)}`);
-if(!grass?.dataUrl?.startsWith('data:image/png;base64,')||grass.base<1000||grass.light<20||grass.dark<20||(grass.pink+grass.blue)<2)throw new Error(`Authored grass pixels missing: ${JSON.stringify(grass)}`);
+if(!grass?.dataUrl?.startsWith('data:image/png;base64,')||grass.assetHash!==expectedGrassHash||grass.assetByteLength<100||grass.opaquePixels<100000||grass.uniqueOpaqueColors<4)throw new Error(`Authored grass substitution contract invalid: ${JSON.stringify({expectedGrassHash,grass})}`);
 if(!commerce?.dataUrl?.startsWith('data:image/png;base64,')||commerce.world?.activeDistrictLabel!=='commerce'||commerce.profile?.marbleVariation!==true||commerce.scope!==expectedMarbleScope)throw new Error(`Commerce marble screenshot/contract evidence missing: ${JSON.stringify(commerce)}`);
 if(consoleErrors.length)throw new Error(`Console/page errors: ${JSON.stringify(consoleErrors)}`);
 if(failedRequests.length)throw new Error(`Failed requests: ${JSON.stringify(failedRequests)}`);
