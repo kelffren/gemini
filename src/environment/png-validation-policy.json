@@ -7,6 +7,11 @@
       "reason": "UI/landing artwork is outside the Kelo World environment asset contract."
     },
     {
+      "path": "assets/bot-crimson-v1.png",
+      "scope": "non-world-ui",
+      "reason": "Actor sprites are owned by the character appearance pipeline, outside the environment asset contract."
+    },
+    {
       "path": "assets/fountain-front-v1.png",
       "scope": "superseded-archive",
       "reason": "Superseded fountain export retained for history; LIVE uses plaza-fountain-front.PNG."
