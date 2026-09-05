@@ -1,7 +1,8 @@
 (function(){
 'use strict';
 
-const VERSION='master-bot-pipelines-v1.0.0';
+const VERSION='master-bot-pipelines-v1.0.1';
+const BOT_APPEARANCE='bot_crimson_v1';
 const SOCIAL_PIPELINE=Object.freeze({
   id:'social_master_v1',
   role:'social_master',
@@ -18,7 +19,7 @@ const PVP_PIPELINE=Object.freeze({
 });
 
 const socialMasters=Object.freeze([
-  Object.freeze({id:'social_master_guide_01',name:'Maestro Social',title:'Guía de Kelo World',pipelineId:SOCIAL_PIPELINE.id,zone:'social',behavior:'future-ai'})
+  Object.freeze({id:'social_master_guide_01',name:'Maestro Social',title:'Guía de Kelo World',pipelineId:SOCIAL_PIPELINE.id,zone:'social',behavior:'future-ai',appearanceId:BOT_APPEARANCE})
 ]);
 
 const pvpMasters=Object.freeze([
@@ -29,6 +30,7 @@ const pvpMasters=Object.freeze([
     pipelineId:PVP_PIPELINE.id,
     zone:'pvp_training',
     behavior:'stationary-training',
+    appearanceId:BOT_APPEARANCE,
     hp:1000,
     maxHp:1000,
     radius:20,
@@ -51,6 +53,7 @@ window.KELO_MASTER_BOT_PIPELINE_AUDIT=Object.freeze({
   version:VERSION,
   separateSocialAndPvPRoles:true,
   serverAuthorityReady:true,
+  appearanceId:BOT_APPEARANCE,
   socialPipeline:SOCIAL_PIPELINE.id,
   pvpPipeline:PVP_PIPELINE.id
 });
