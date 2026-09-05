@@ -1,6 +1,7 @@
 (function () {
   // MOV-001: one processed intent magnitude drives gait + speed.
   // MOV-004: visual stride advances from actual world distance, never render count.
+  // MOV-CADENCE-V2: remove the 50->90px stride-length jump at WALK->RUN.
   const WALK_MAX = 0.74;
   const WALK_SPEED = 110;
   const RUN_SPEED = 178;
@@ -12,6 +13,7 @@
   const WALK_CYCLE_WORLD_PX = 50;
   const RUN_CYCLE_WORLD_PX = 90;
   const MIN_VISUAL_MOVE_PX = 0.12;
+  const MOV_CADENCE_V2 = new URLSearchParams(window.location.search).get('movCadenceV2') !== '0';
   CONFIG.speed = WALK_SPEED;
   CONFIG.joystickDeadzone = 0.045;
   CONFIG.joystickCurve = 'LINEAR';
@@ -41,6 +43,13 @@
     return 'run';
   }
 
+  function cycleWorldPxFor(mag, gait) {
+    if (!MOV_CADENCE_V2) return gait === 'run' ? RUN_CYCLE_WORLD_PX : WALK_CYCLE_WORLD_PX;
+    if (gait !== 'run') return WALK_CYCLE_WORLD_PX;
+    const t = Math.max(0, Math.min(1, (mag - GAIT_RUN_START) / (1 - GAIT_RUN_START)));
+    return WALK_CYCLE_WORLD_PX + (RUN_CYCLE_WORLD_PX - WALK_CYCLE_WORLD_PX) * t;
+  }
+
   function rawTouchMag() {
     if (!input.touchActive) return null;
     return Math.min(1, Math.hypot(input.currentX - input.originX, input.currentY - input.originY) / CONFIG.joystickRadius);
@@ -48,7 +57,7 @@
 
   function publishAudit(mag, gait, speedCap, visual) {
     window.KELO_MOVEMENT_AUDIT = {
-      version: 'MOV-smooth-stick-v1',
+      version: 'MOV-cadence-v2',
       rawTouchMag: rawTouchMag(),
       processedMag: mag,
       gait,
@@ -56,6 +65,8 @@
       targetSpeed: mag * speedCap,
       actualSpeed: Math.hypot(localPlayer.vx || 0, localPlayer.vy || 0),
       colliderRadius: localPlayer.radius,
+      cadenceV2: MOV_CADENCE_V2,
+      cycleWorldPx: visual ? visual.cycleWorldPx : cycleWorldPxFor(mag, gait),
       visualOn: !!(visual && visual.on),
       visualFrame: visual ? visual.frame : 0,
       stridePhase: visual ? visual.stridePhase : 0,
@@ -78,13 +89,14 @@
         stopElapsed: VISUAL_STOP_HOLD_SEC,
         stridePhase: 0,
         strideDistancePx: 0,
-        lastStepDistancePx: 0
+        lastStepDistancePx: 0,
+        cycleWorldPx: WALK_CYCLE_WORLD_PX
       };
     }
     return p._visualMotion;
   }
 
-  function updateVisualMotion(p, dt, gait) {
+  function updateVisualMotion(p, dt, gait, mag) {
     const v = visualStateOf(p);
     const dx = p.x - v.lastX;
     const dy = p.y - v.lastY;
@@ -119,10 +131,10 @@
     }
 
     v.lastStepDistancePx = dist > MIN_VISUAL_MOVE_PX ? dist : 0;
+    v.cycleWorldPx = cycleWorldPxFor(mag, gait);
     if (v.on && v.lastStepDistancePx > 0) {
-      const cyclePx = gait === 'run' ? RUN_CYCLE_WORLD_PX : WALK_CYCLE_WORLD_PX;
       v.strideDistancePx += v.lastStepDistancePx;
-      v.stridePhase = (v.stridePhase + v.lastStepDistancePx / cyclePx) % 1;
+      v.stridePhase = (v.stridePhase + v.lastStepDistancePx / v.cycleWorldPx) % 1;
       v.frame = Math.floor(v.stridePhase * 4) % 4;
     } else if (!v.on) {
       v.stridePhase = 0;
@@ -145,7 +157,7 @@
     localPlayer._gait = gait;
     CONFIG.speed = speedCap;
     _move(dt);
-    const visual = updateVisualMotion(localPlayer, dt, gait);
+    const visual = updateVisualMotion(localPlayer, dt, gait, mag);
     publishAudit(mag, gait, speedCap, visual);
   };
 })();
