@@ -6,7 +6,7 @@ fs.mkdirSync('artifacts',{recursive:true});
 const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_BIN||'/usr/bin/google-chrome',args:['--no-sandbox','--disable-dev-shm-usage']});
 const context=await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true});
 const page=await context.newPage();
-await page.route(/\/src\/environment\/(environment-layer-stack|plaza-nature|luxe-kiosk-atlas|plaza-depth|gardens-junction-overlay)\.js/,route=>{const u=new URL(route.request().url());u.searchParams.set('spatial-audit-bust',`${Date.now()}-${Math.random()}`);route.continue({url:u.toString()});});
+await page.route(/\/src\/environment\/(environment-layer-stack|plaza-nature|luxe-kiosk-atlas|plaza-depth|gardens-junction-overlay|prop-contract|generic-props)\.js/,route=>{const u=new URL(route.request().url());u.searchParams.set('spatial-audit-bust',`${Date.now()}-${Math.random()}`);route.continue({url:u.toString()});});
 const consoleErrors=[],failedRequests=[],httpErrors=[];
 page.on('console',m=>{if(m.type()==='error')consoleErrors.push(m.text())});
 page.on('pageerror',e=>consoleErrors.push(`PAGEERROR: ${e.stack||e.message}`));
@@ -14,8 +14,8 @@ page.on('requestfailed',r=>failedRequests.push({url:r.url(),error:r.failure()?.e
 page.on('response',r=>{if(r.status()>=400)httpErrors.push({status:r.status(),url:r.url()})});
 
 function valid(audit){
-  if(!audit||audit.version!=='environment-layer-stack-v2.2'||audit.orderingPolicy!=='phase-priority-id-v1'||audit.spatialPolicy!=='same-phase-aabb-priority-resolution-v1')return false;
-  if(audit.spatialOverlapCount!==2||audit.spatialTieCount!==0)return false;
+  if(!audit||audit.version!=='environment-layer-stack-v2.3'||audit.mode!=='formal-base-back-actor-front-order-v1'||audit.orderingPolicy!=='phase-priority-id-v1'||audit.spatialPolicy!=='same-phase-aabb-priority-resolution-v1')return false;
+  if(audit.preActorLayerCount<1||audit.postActorLayerCount<1||audit.spatialOverlapCount!==2||audit.spatialTieCount!==0)return false;
   const expected=new Set(['props_back','props_front']);
   for(const overlap of audit.spatialOverlaps||[]){
     if(!expected.has(overlap.phase)||overlap.overlapCount!==1||overlap.ambiguous!==false||overlap.resolvedBy!=='priority')return false;
@@ -31,10 +31,11 @@ function valid(audit){
   const layers=audit.layers||[];
   const nature=layers.filter(l=>l.id.startsWith('plaza-nature-'));
   const luxe=layers.filter(l=>l.id.startsWith('luxe-architecture-'));
+  const ruralBack=layers.find(l=>l.id==='rural-boundary-back');
   const fountainBack=layers.find(l=>l.id==='plaza-fountain-back');
   const fountainFront=layers.find(l=>l.id==='plaza-fountain-front');
   const gardensJunctions=layers.find(l=>l.id==='gardens-t-junctions');
-  return nature.length===2&&luxe.length===2&&nature.every(l=>l.ownership==='plaza-nature-props-v1'&&l.boundsCount===4&&l.priority===10)&&luxe.every(l=>l.ownership==='architecture-prefabs-v1'&&l.boundsCount===1&&l.priority===20)&&fountainBack?.ownership==='plaza-fountain-v1'&&fountainBack.boundsCount===1&&fountainFront?.ownership==='plaza-fountain-v1'&&fountainFront.boundsCount===1&&gardensJunctions?.ownership==='gardens-t-junctions-v1'&&gardensJunctions.boundsCount>0;
+  return nature.length===2&&luxe.length===2&&nature.every(l=>l.ownership==='plaza-nature-props-v1'&&l.boundsCount===4&&l.priority===10)&&luxe.every(l=>l.ownership==='architecture-prefabs-v1'&&l.boundsCount===1&&l.priority===20)&&ruralBack?.ownership==='rural-farm-boundary-props-v1'&&ruralBack.phase==='props_back'&&ruralBack.timing==='pre_actor'&&ruralBack.priority===8&&ruralBack.boundsCount>0&&fountainBack?.ownership==='plaza-fountain-v1'&&fountainBack.boundsCount===1&&fountainFront?.ownership==='plaza-fountain-v1'&&fountainFront.boundsCount===1&&gardensJunctions?.ownership==='gardens-t-junctions-v1'&&gardensJunctions.boundsCount>0;
 }
 
 let audit=null;
