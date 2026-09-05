@@ -1,44 +1,73 @@
 (function(){
+  const freezeList=(items)=>Object.freeze(items);
+  const freezeRules=(rules)=>Object.freeze(rules);
+  function defineDistrict(def){
+    return Object.freeze({
+      ...def,
+      bounds:Object.freeze(def.bounds),
+      groundFamilies:freezeList(def.groundFamilies||[]),
+      transitionFamilies:freezeList(def.transitionFamilies||[]),
+      pathFamilies:freezeList(def.pathFamilies||[]),
+      vegetationFamilies:freezeList(def.vegetationFamilies||[]),
+      propFamilies:freezeList(def.propFamilies||[]),
+      architectureFamilies:freezeList(def.architectureFamilies||[]),
+      landmarkFamilies:freezeList(def.landmarkFamilies||[]),
+      decorationRules:freezeRules(def.decorationRules||{}),
+      placementRules:freezeRules(def.placementRules||{})
+    });
+  }
+
   const profiles=Object.freeze({
-    central:Object.freeze({
-      id:'central', name:'Plaza Central', kind:'plaza', bounds:Object.freeze({x:1040,y:1240,w:800,h:560}),
-      terrainProfile:'central', groundFamilies:Object.freeze(['grass','marble']), transitionFamilies:Object.freeze(['marble_to_grass']),
-      pathFamilies:Object.freeze(['marble']), vegetationFamilies:Object.freeze(['plazaNature']), propFamilies:Object.freeze(['plazaNature','plazaFountain']),
-      architectureFamilies:Object.freeze(['architecture']), landmarkFamilies:Object.freeze(['plazaFountain','luxeBoutique']),
-      palette:'bright-roman-garden', density:'medium', variation:'controlled', decorationRules:Object.freeze({negativeSpace:'medium',focalPoints:true})
+    central:defineDistrict({
+      id:'central', name:'Plaza Central', kind:'plaza', bounds:{x:1040,y:1240,w:800,h:560},
+      terrainProfile:'central', groundFamilies:['grass','marble'], transitionFamilies:['marble_to_grass'],
+      pathFamilies:['marble'], vegetationFamilies:['plazaNature'], propFamilies:['plazaNature','plazaFountain'],
+      architectureFamilies:['architecture'], landmarkFamilies:['plazaFountain','luxeBoutique'],
+      palette:'bright-roman-garden', density:'medium', variation:'controlled',
+      decorationRules:{negativeSpace:'medium',focalPoints:true}, placementRules:{keepPrimaryPathsClear:true,landmarkPriority:'high'}
     }),
-    rural:Object.freeze({
-      id:'rural', name:'Distrito Rural', kind:'farm', bounds:Object.freeze({x:448,y:1320,w:720,h:640}),
-      terrainProfile:'rural', groundFamilies:Object.freeze(['grass','ruralSoil']), transitionFamilies:Object.freeze(['marble_to_grass']),
-      pathFamilies:Object.freeze(['marble','dirt']), vegetationFamilies:Object.freeze(['ruralNature']), propFamilies:Object.freeze(['ruralProps','ruralNature']),
-      architectureFamilies:Object.freeze(['ruralLandmarks']), landmarkFamilies:Object.freeze(['ruralLandmarks']),
-      palette:'warm-rural', density:'low-medium', variation:'clustered', decorationRules:Object.freeze({centerClear:true,northRoadClear:true})
+    rural:defineDistrict({
+      id:'rural', name:'Distrito Rural', kind:'farm', bounds:{x:448,y:1320,w:720,h:640},
+      terrainProfile:'rural', groundFamilies:['grass','ruralSoil'], transitionFamilies:['marble_to_grass'],
+      pathFamilies:['marble','dirt'], vegetationFamilies:['ruralNature'], propFamilies:['ruralProps','ruralNature'],
+      architectureFamilies:['ruralLandmarks'], landmarkFamilies:['ruralLandmarks'],
+      palette:'warm-rural', density:'low-medium', variation:'clustered',
+      decorationRules:{centerClear:true,northRoadClear:true}, placementRules:{farmPerimeterAware:true,approachPathClear:true}
     }),
-    arena:Object.freeze({
-      id:'arena', name:'Distrito Arena', kind:'arena', bounds:Object.freeze({x:1728,y:448,w:864,h:640}),
-      terrainProfile:'arena', groundFamilies:Object.freeze(['grass','marble']), transitionFamilies:Object.freeze(['marble_to_grass']),
-      pathFamilies:Object.freeze(['marble']), vegetationFamilies:Object.freeze([]), propFamilies:Object.freeze(['arenaProps']),
-      architectureFamilies:Object.freeze(['arenaArchitecture']), landmarkFamilies:Object.freeze(['arenaLandmarks']),
-      palette:'stone-sport', density:'low', variation:'restrained', decorationRules:Object.freeze({combatReadability:true})
+    arena:defineDistrict({
+      id:'arena', name:'Distrito Arena', kind:'arena', bounds:{x:1728,y:448,w:864,h:640},
+      terrainProfile:'arena', groundFamilies:['grass','marble'], transitionFamilies:['marble_to_grass'],
+      pathFamilies:['marble'], vegetationFamilies:[], propFamilies:['arenaProps'],
+      architectureFamilies:['arenaArchitecture'], landmarkFamilies:['arenaLandmarks'],
+      palette:'stone-sport', density:'low', variation:'restrained',
+      decorationRules:{combatReadability:true}, placementRules:{combatCoreClear:true,edgeWeightedProps:true}
     }),
-    commerce:Object.freeze({
-      id:'commerce', name:'Distrito Comercio', kind:'commerce', bounds:Object.freeze({x:1888,y:1264,w:896,h:704}),
-      terrainProfile:'commerce', groundFamilies:Object.freeze(['grass','marble']), transitionFamilies:Object.freeze(['marble_to_grass']),
-      pathFamilies:Object.freeze(['marble']), vegetationFamilies:Object.freeze([]), propFamilies:Object.freeze(['commerceProps']),
-      architectureFamilies:Object.freeze(['commerceArchitecture']), landmarkFamilies:Object.freeze(['commerceLandmarks']),
-      palette:'premium-market', density:'medium-high', variation:'structured', decorationRules:Object.freeze({storefrontReadability:true})
+    commerce:defineDistrict({
+      id:'commerce', name:'Distrito Comercio', kind:'commerce', bounds:{x:1888,y:1264,w:896,h:704},
+      terrainProfile:'commerce', groundFamilies:['grass','marble'], transitionFamilies:['marble_to_grass'],
+      pathFamilies:['marble'], vegetationFamilies:[], propFamilies:['commerceProps'],
+      architectureFamilies:['commerceArchitecture'], landmarkFamilies:['commerceLandmarks'],
+      palette:'premium-market', density:'medium-high', variation:'structured',
+      decorationRules:{storefrontReadability:true}, placementRules:{storefrontFrontageClear:true,pedestrianLaneClear:true}
     }),
-    gardens:Object.freeze({
-      id:'gardens', name:'Jardines del Sur', kind:'garden', bounds:Object.freeze({x:1056,y:2144,w:896,h:704}),
-      terrainProfile:'gardens', groundFamilies:Object.freeze(['grass','marble']), transitionFamilies:Object.freeze(['marble_to_grass']),
-      pathFamilies:Object.freeze(['marble']), vegetationFamilies:Object.freeze(['gardens']), propFamilies:Object.freeze(['gardens']),
-      architectureFamilies:Object.freeze([]), landmarkFamilies:Object.freeze(['gardensFountain']),
-      palette:'lush-cyan-garden', density:'high', variation:'clustered', decorationRules:Object.freeze({landmarkClearance:true,negativeSpace:'controlled'})
+    gardens:defineDistrict({
+      id:'gardens', name:'Jardines del Sur', kind:'garden', bounds:{x:1056,y:2144,w:896,h:704},
+      terrainProfile:'gardens', groundFamilies:['grass','marble'], transitionFamilies:['marble_to_grass'],
+      pathFamilies:['marble'], vegetationFamilies:['gardens'], propFamilies:['gardens'],
+      architectureFamilies:[], landmarkFamilies:['gardensFountain'],
+      palette:'lush-cyan-garden', density:'high', variation:'clustered',
+      decorationRules:{landmarkClearance:true,negativeSpace:'controlled'}, placementRules:{promenadeClear:true,fountainFootprintClear:true}
     })
   });
+
   const order=Object.freeze(['central','rural','arena','commerce','gardens']);
   const districts=Object.freeze(order.map(id=>{const p=profiles[id],b=p.bounds;return Object.freeze({id:p.id,name:p.name,kind:p.kind,x:b.x,y:b.y,w:b.w,h:b.h});}));
   function get(id){return profiles[id]||null;}
   function terrainProfileFor(id){return get(id)?.terrainProfile||id||'default';}
-  window.KELO_DISTRICT_VISUAL_PROFILES=Object.freeze({version:'1.0.0',mode:'data-driven-district-visual-profiles-v1',profiles,order,districts,get,terrainProfileFor});
+  function districtForPoint(x,y){return districts.find(d=>x>=d.x&&y>=d.y&&x<d.x+d.w&&y<d.y+d.h)||null;}
+
+  window.KELO_DISTRICT_VISUAL_PROFILES=Object.freeze({
+    version:'1.1.0', mode:'data-driven-district-visual-profiles-v2', profiles, order, districts,
+    get, terrainProfileFor, districtForPoint
+  });
 })();
