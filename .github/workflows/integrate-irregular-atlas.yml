@@ -1,0 +1,57 @@
+name: Integrate Arboleskelo1 irregular atlas
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'scripts/integrate_irregular_atlas.py'
+      - 'assets/Arboleskelo1.atlas.json'
+      - 'src/environment/generated/arboleskelo1-atlas.js'
+      - '.github/workflows/integrate-irregular-atlas.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply generic irregular-atlas migration
+        run: python3 scripts/integrate_irregular_atlas.py
+      - name: Validate asset contract
+        run: node scripts/validate-art-assets.mjs
+      - name: Structural regression checks
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          reg=Path('src/environment/tile-registry.js').read_text()
+          prop=Path('src/environment/prop-contract.js').read_text()
+          renderer=Path('src/environment/generic-props.js').read_text()
+          index=Path('index.html').read_text()
+          assert "frame:'tree_large'" in reg
+          assert 'assets/Arboleskelo1.atlas.png?art=305' in reg
+          assert "frameMode:'irregular'" in reg
+          assert "typeof f==='string'&&a.frames[f]" in renderer
+          assert "p.frame??0" in renderer
+          assert 'if(asset' not in renderer.replace('if(!a||!img','')
+          assert 'generated/arboleskelo1-atlas.js' in index
+          assert 'plaza-tree-large-v1.png' not in reg
+          assert 'frame:(p.frame??p.sprite??0)' in prop
+          print('IRREGULAR_ATLAS_STRUCTURAL_OK')
+          PY
+      - name: Commit integration
+        run: |
+          git config user.name 'kelo-art-bot'
+          git config user.email '68343904+kelffren@users.noreply.github.com'
+          git add index.html src/environment/tile-registry.js src/environment/prop-contract.js src/environment/generic-props.js src/environment/art-asset-manifest.json scripts/validate-art-assets.mjs
+          if git diff --cached --quiet; then
+            echo 'integration already current'
+            exit 0
+          fi
+          git commit -m 'Use Arboleskelo1 irregular atlas in Plaza'
+          git push origin HEAD:main
