@@ -134,6 +134,7 @@ render = function() {
   renderPlot(STATE.plot, true); renderArena(arenaPvP);
   for (const pt of particles) { ctx.fillStyle = pt.color; ctx.globalAlpha = pt.life / pt.maxLife; ctx.beginPath(); ctx.arc(pt.x, pt.y, pt.size * (pt.life / pt.maxLife), 0, Math.PI * 2); ctx.fill(); }
   ctx.globalAlpha = 1;
+  if (window.KELO_WORLD_RENDERER && typeof window.KELO_WORLD_RENDERER.drawPreActors === 'function') window.KELO_WORLD_RENDERER.drawPreActors(ctx);
   if (isPvPActive && arenaPvP.rival) renderAvatar(arenaPvP.rival, false); else simulatedPlayers.forEach(p => renderAvatar(p, false));
   renderAvatar(localPlayer, true);
   if (window.KELO_WORLD_RENDERER && typeof window.KELO_WORLD_RENDERER.drawPostActors === 'function') window.KELO_WORLD_RENDERER.drawPostActors(ctx);
