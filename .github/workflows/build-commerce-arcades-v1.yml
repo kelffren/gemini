@@ -18,8 +18,8 @@ jobs:
       - name: Install raster tools
         run: pip install --disable-pip-version-check cairosvg pillow
       - name: Build and integrate arcade family
-        shell: python
         run: |
+          python3 - <<'PY'
           import json, pathlib, re
           import cairosvg
           from PIL import Image
@@ -87,14 +87,10 @@ jobs:
               if aid not in known:
                   manifest['assets'].append({'id':aid,'path':path,**base})
           manifest_path.write_text(json.dumps(manifest,separators=(',',':'))+'\n')
-
-          terrain_path=root/'src/environment/terrain-contract.js'
-          terrain=terrain_path.read_text()
-          # Commerce profile already declares commerceArchitecture; assert rather than add new infrastructure.
+          terrain=(root/'src/environment/terrain-contract.js').read_text()
           assert "architectureFamilies:['commerceArchitecture']" in terrain
-
-          print('BUILT',west,east)
-          print('REGISTRY', '1.12.0', 'commerce arcade family integrated')
+          print('BUILT Commerce arcades + registry + manifest')
+          PY
       - name: Validate authored art contracts
         run: |
           node --check src/environment/tile-registry.js
