@@ -16,7 +16,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
 
-  const VERSION = 2;
+  const VERSION = 3;
 
   const STONE_TYPES = Object.freeze({
     ELEMENT: 'element',
@@ -51,6 +51,7 @@
     wall: Object.freeze({ id: 'wall', type: STONE_TYPES.FORM, name: 'Muro', icon: '🧱' }),
     trap: Object.freeze({ id: 'trap', type: STONE_TYPES.FORM, name: 'Trampa', icon: '🪤' }),
     aura: Object.freeze({ id: 'aura', type: STONE_TYPES.FORM, name: 'Aura', icon: '⭕' }),
+    swap: Object.freeze({ id: 'swap', type: STONE_TYPES.FORM, name: 'Intercambio', icon: '🗡️' }),
   });
 
   const ABILITIES = Object.freeze([
@@ -212,6 +213,21 @@
       delivery: Object.freeze({ type: 'aura', radius: 100, duration: 4, tickInterval: 1 }),
       effects: Object.freeze([Object.freeze({ type: 'heal', amount: 12, perTick: true })]),
       visuals: Object.freeze({ color: '#fff3b0', fx: 'light_aura' }),
+    }),
+    Object.freeze({
+      id: 11,
+      key: 'swap_sword',
+      name: 'Espada de Intercambio',
+      icon: '🗡️',
+      slotType: 'normal',
+      role: 'mobility',
+      recipe: Object.freeze(['shadow', 'swap']),
+      targeting: Object.freeze({ type: 'position', range: 420 }),
+      resource: Object.freeze({ type: 'mana', cost: 30 }),
+      cooldown: 12,
+      delivery: Object.freeze({ type: 'swap_sword', speed: 720, selectRadius: 42, returnDuration: 0.28 }),
+      effects: Object.freeze([]),
+      visuals: Object.freeze({ color: '#64d7ff', accent: '#e7c56a', fx: 'swap_sword' }),
     }),
   ]);
 
