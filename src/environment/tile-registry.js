@@ -106,7 +106,7 @@
   const districtGroundStyles = Object.freeze({
     central:Object.freeze({detailEvery:43,detailCluster:false,marbleAccentEvery:0}),
     rural:Object.freeze({detailEvery:31,detailCluster:true,marbleAccentEvery:0}),
-    arena:Object.freeze({detailEvery:61,detailCluster:false,marbleAccentEvery:29}),
+    arena:Object.freeze({detailEvery:61,detailCluster:false,marbleAccentEvery:29,marbleVariation:true}),
     commerce:Object.freeze({detailEvery:67,detailCluster:false,marbleAccentEvery:23,marbleVariation:true}),
     gardens:Object.freeze({detailEvery:17,detailCluster:true,marbleAccentEvery:0,marbleVariation:true}),
     default:Object.freeze({detailEvery:53,detailCluster:false,marbleAccentEvery:0})
@@ -134,7 +134,7 @@
   });
   const styles = Object.freeze({
     plazaTransition:Object.freeze({mode:'authored-organic-fringe-overlay-v3',neighbourMask:'TRBL',softenStickerAccents:true}),
-    marbleVariation:Object.freeze({mode:'authored-eight-variant-overlay-v1',scope:'gardens-commerce-roads',subtle:true}),
+    marbleVariation:Object.freeze({mode:'authored-eight-variant-overlay-v1',scope:'gardens-commerce-arena-roads',subtle:true}),
     plazaNature:Object.freeze({mode:'authored-transparent-prop-family-v1',depthMode:'actor-base-y-v1',visualOnly:true,collision:false}),
     trainingDummy:Object.freeze({mode:'registry-authored-training-prop-v1',asset:'trainingDummy',visualOnly:true,preserveGameplayAnchor:true,labelMode:'hp-only-v1'}),
     plazaNpcs:Object.freeze({mode:'registry-authored-npc-visual-v1',asset:'plazaNpcs',preserveGameplayAnchors:true,labelMode:'proximity-name-v1',visualOnly:true}),
@@ -165,7 +165,7 @@
     })
   });
   window.KELO_TILE_REGISTRY = Object.freeze({
-    version:'1.10.27', worldTileSize:TILE,
+    version:'1.10.28', worldTileSize:TILE,
     atlases:Object.freeze({plaza:atlas,plazaGround:plazaGroundAtlas,transitions:transitionAtlas,grassVariation:grassVariationAtlas,marbleVariation:marbleVariationAtlas,plazaNature:plazaNatureAtlas,trainingDummy:trainingDummyAtlas,plazaNpcs:plazaNpcsAtlas,ruralSoil:ruralSoilAtlas,ruralProps:ruralPropsAtlas,ruralLandmarks:ruralLandmarksAtlas,ruralNature:ruralNatureAtlas}),
     architectureAssets,architecturePrefabs,plazaNatureProps,trainingDummyProp,plazaNpcVisuals,
     tiles,ruralTiles,ruralPropTiles,ruralLandmarkTiles,ruralLandmarkSprites,ruralNatureTiles,ruralNatureSprites,families,transitionMasks,styles
