@@ -10,6 +10,27 @@ function fail(message) {
   process.exitCode = 1;
 }
 
+function pngHasTransparency(buffer, colorType) {
+  // PNG color types 4 and 6 carry alpha per pixel. Indexed (3), grayscale (0),
+  // and truecolor (2) may instead declare transparency through a tRNS chunk.
+  if (colorType === 4 || colorType === 6) return true;
+
+  let offset = 8;
+  while (offset + 12 <= buffer.length) {
+    const length = buffer.readUInt32BE(offset);
+    const typeStart = offset + 4;
+    const dataStart = offset + 8;
+    const nextChunk = dataStart + length + 4;
+    if (nextChunk > buffer.length) return false;
+
+    const type = buffer.toString('ascii', typeStart, typeStart + 4);
+    if (type === 'tRNS') return true;
+    if (type === 'IDAT' || type === 'IEND') return false;
+    offset = nextChunk;
+  }
+  return false;
+}
+
 if (manifest.contractVersion !== 'kelo-art-asset-contract-v1') {
   fail(`unexpected contractVersion=${manifest.contractVersion}`);
 }
@@ -39,7 +60,8 @@ for (const asset of manifest.assets || []) {
     continue;
   }
 
-  const header = fs.readFileSync(fullPath).subarray(0, 26);
+  const png = fs.readFileSync(fullPath);
+  const header = png.subarray(0, 26);
   const signature = Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a]);
   if (header.length < 26 || !header.subarray(0, 8).equals(signature)) {
     fail(`${asset.id} is not a valid PNG header`);
@@ -52,8 +74,8 @@ for (const asset of manifest.assets || []) {
   if (width !== asset.width || height !== asset.height) {
     fail(`${asset.id} dimensions ${width}x${height} != declared ${asset.width}x${asset.height}`);
   }
-  if (asset.requireAlpha === true && colorType !== 4 && colorType !== 6) {
-    fail(`${asset.id} requires alpha but PNG colorType=${colorType}`);
+  if (asset.requireAlpha === true && !pngHasTransparency(png, colorType)) {
+    fail(`${asset.id} requires transparency but PNG colorType=${colorType} has no alpha/tRNS`);
   }
 
   const hasGrid = asset.cellWidth !== undefined || asset.cellHeight !== undefined || asset.columns !== undefined || asset.rows !== undefined;
