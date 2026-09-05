@@ -1,0 +1,62 @@
+# ÍNDICE DE CÓDIGO — palabras clave
+
+Busca en el repo: `KELO-INDEX` o la clave (`NET`, `CAST`, `POSE`, …).
+
+Formato obligatorio en JS (el motor **no lo ejecuta**):
+
+```js
+/* KELO-INDEX
+ * area: NET
+ * keys: POSE CAST AUTHORITY PLAYERKEY WS
+ * hace: puente WebSocket; el cliente pide, el server decide si hay ws
+ * online: request() misma boca local/server
+ */
+```
+
+Encima de una función:
+
+```js
+// KELO-INDEX NET/POSE envia x y face gait zone al room
+function sendPose() { ... }
+```
+
+No uses `/*` para apagar código. Los comentarios solo documentan.
+
+---
+
+## Claves → archivo dueño LIVE
+
+| Clave | Qué es | Dónde
+|---|---|---|
+| CORE | estado, input, física, loop | `engine-a.js` |
+| LOOP | requestAnimationFrame | `engine-b.js` |
+| MOVE JOY GAIT | joystick, walk/run | `engine-ac.js` |
+| HERO SPRITE | hoja del personaje | `engine-ab.js` |
+| MELEE TAP | ataque por toque (APAGADO) | `engine-n.js` |
+| PLAZA GROUND | suelo authored | `engine-l.js` |
+| HOUSES | casas legacy | `engine-y.js` |
+| TILES REGISTRY | atlas + prefabs | `src/environment/tile-registry.js` |
+| WORLD CHUNKS | renderer 512 | `src/environment/world-map.js` |
+| LUXE BOUTIQUE | tienda | `src/environment/luxe-kiosk-atlas.js` `src/ui/luxe-boutique.js` |
+| HUD LUXE | shell menú | `src/ui/luxe-shell.js` |
+| STONES RECIPE | piedras data-driven | `src/abilities/stone-system.js` `abilityData.js` |
+| CAST ABILITY | delivery VFX/daño cliente | `src/abilities/kelo-ability-boot.js` |
+| NET WS POSE | online room | `engine-net.js` |
+| AUTHORITY | boca única client→server | `engine-net.js` `KeloNetAuthority` |
+| NOBLEZA | rangos donación | `src/systems/nobility.js` `nobility-authority.js` |
+| FORGE EQUIP | forja / gear | `src/systems/forge-system.js` `equipment-system.js` |
+| SERVER ROOM | autoridad Node | `server/index.js` |
+
+---
+
+## Áreas (primera palabra después de KELO-INDEX)
+
+`CORE` `NET` `AUTH` `CAST` `STONES` `MOVE` `HERO` `PLAZA` `LUXE` `HUD` `ECON` `COMBAT` `SERVER` `UI`
+
+Grep rápido:
+
+```
+KELO-INDEX NET
+KELO-INDEX CAST
+KELO-INDEX MOVE
+```
