@@ -20,24 +20,24 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git pull --rebase origin main
-          marker='## Validated PNG Asset Contract v1 — 2026-09-04'
+          marker='## Validated PNG Asset Contract Coverage — 2026-09-05'
           if grep -Fq "$marker" docs/VISUAL_DIRECTION_MEMORY.md; then
             echo 'Memory entry already present.'
             exit 0
           fi
           cat >> docs/VISUAL_DIRECTION_MEMORY.md <<'EOF'
 
-## Validated PNG Asset Contract v1 — 2026-09-04
-- Added `src/environment/art-asset-manifest.json` as the structural ingress contract for authored final PNGs. The contract fixes the current logical world tile at 32x32, nearest-neighbour sampling, stable asset ids/kinds, exact declared dimensions and optional exact atlas grids without adding renderer-specific asset branches.
-- Added `scripts/validate-art-assets.mjs` plus dedicated Asset Contract CI. The v1 gate validates PNG signature/existence, actual dimensions, exact 32x32 grid coverage for tiled atlases, required alpha and duplicate ids before authored assets are accepted.
-- `docs/ASSET_CONTRACT.md` records the durable integration target: final art should flow through manifest -> validation -> TileRegistry/family metadata -> district profile -> existing render layers -> LIVE mobile, and a new asset should not require `if (district === ...)` or asset-name logic in the renderer.
-- Focused LIVE Asset Contract audit validated the published manifest `kelo-art-asset-contract-v1` with 8 existing authored assets, `worldTileSize=32`, `sampling=nearest`, mobile 390x844 CSS / 780x1688 backing canvas, and `consoleErrors=[]`, `failedRequests=[]`, `httpErrors=[]`. Manual screenshot inspection found no visual regression; this pass intentionally changed no art.
-- Research decision: keep transition connectivity metadata compatible in spirit with Tiled terrain/Wang edge/corner topology; do not commit to WebGL-style atlas extrusion while the current Canvas 2D renderer uses nearest-neighbour exact source rectangles. Padding/extrusion becomes mandatory contract metadata if a mipmapped/WebGL renderer is introduced later.
-- QA finding: the legacy broad LIVE audit currently contains an obsolete `gardens-commerce-roads` expectation while LIVE/TileRegistry already expose `gardens-commerce-arena-roads`; that inherited gate failure is not evidence against Asset Contract v1 and must be repaired separately without reverting Arena.
-- Next Asset Contract gap: formalize semantic terrain-transition topology/completeness so a future grass/marble/dirt transition PNG family can be swapped through metadata rather than renderer branches.
+## Validated PNG Asset Contract Coverage — 2026-09-05
+- The existing `kelo-art-asset-contract-v1` manifest now covers all production PNG paths currently referenced directly by `TileRegistry`, including `assets/tileset-vclean.png`, `assets/plaza-ground-v1.png` and `assets/kelo-luxe-boutique.png`; the manifest currently validates 11 authored PNG assets.
+- `scripts/validate-art-assets.mjs` now enforces TileRegistry PNG -> manifest parity, so a production registry PNG cannot silently bypass the central dimensions/grid/transparency gate. SVG families remain outside this PNG-specific parity rule until their final raster replacements arrive.
+- PNG transparency validation now accepts both direct alpha color types and valid indexed/truecolor transparency declared through a PNG `tRNS` chunk. This was required by the existing indexed `kelo-luxe-boutique.png`; the contract was corrected rather than weakened.
+- The first Asset Contract CI run correctly exposed that indexed-transparency assumption. After the validator fix, Asset Contract CI and Kelo CI passed, and GitHub Pages deployed successfully.
+- The first full LIVE mobile audit exposed a separate stale QA assertion: the auditor still hard-coded `gardens-commerce-roads` while the source TileRegistry and LIVE renderer use `gardens-commerce-arena-roads`. `scripts/live-world-audit.mjs` now derives the expected marble scope from TileRegistry source, preventing that contract string from drifting independently again.
+- Final complete mobile LIVE audit run `33939094752` passed all world, layer-spatial, Gardens, district-decals, rural, Plaza NPC, Luxe, fountain and nobility gates. The final 390x844 CSS / 780x1688 backing-canvas report recorded `consoleErrors=[]`, `failedRequests=[]`, `httpErrors=[]`; manual inspection found no visual regression to plaza/path/grass readability from this pipeline-only change.
+- Manual LIVE inspection also exposed the next larger visual bottleneck: several Plaza NPC/service figures still read as square procedural placeholders beside the high-detail hero and authored plaza. Do not spend the next round polishing grass/marble noise first; replace or route those placeholder figures through the existing registry-driven authored NPC visual family while preserving their gameplay anchors and mobile legibility.
 EOF
           git add docs/VISUAL_DIRECTION_MEMORY.md
-          git commit -m "Append validated PNG Asset Contract memory"
+          git commit -m "Append validated PNG Asset Contract coverage memory"
           for attempt in 1 2 3 4 5; do
             if git pull --rebase origin main && git push origin HEAD:main; then
               exit 0
