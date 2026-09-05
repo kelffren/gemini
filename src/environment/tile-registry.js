@@ -21,8 +21,8 @@
     worldWidth:800, worldHeight:560, family:'ground'
   });
   const plazaNatureAtlas = Object.freeze({
-    id:'plaza-nature', src:'assets/plaza-nature-v2.png?art=302', width:192, height:96,
-    spriteWidth:96, spriteHeight:96, columns:2, spriteCount:2
+    id:'plaza-nature', src:'assets/plaza-tree-large-v1.png?art=303', width:367, height:489,
+    spriteWidth:367, spriteHeight:489, columns:1, spriteCount:1
   });
   const trainingDummyAtlas = Object.freeze({
     id:'plaza-training-dummy', src:'assets/training-dummy-v1.svg?art=198', width:96, height:96,
@@ -82,10 +82,10 @@
     })
   });
   const plazaNatureProps = Object.freeze([
-    Object.freeze({id:'plaza-tree-nw',sprite:0,x:1120,y:1302,w:96,h:96,baseY:1388}),
-    Object.freeze({id:'plaza-tree-ne',sprite:1,x:1664,y:1302,w:96,h:96,baseY:1388}),
-    Object.freeze({id:'plaza-tree-sw',sprite:1,x:1120,y:1654,w:96,h:96,baseY:1740}),
-    Object.freeze({id:'plaza-tree-se',sprite:0,x:1664,y:1654,w:96,h:96,baseY:1740})
+    Object.freeze({id:'plaza-tree-nw',sprite:0,x:1096,y:1196,w:144,h:192,baseY:1388}),
+    Object.freeze({id:'plaza-tree-ne',sprite:0,x:1640,y:1196,w:144,h:192,baseY:1388}),
+    Object.freeze({id:'plaza-tree-sw',sprite:0,x:1096,y:1548,w:144,h:192,baseY:1740}),
+    Object.freeze({id:'plaza-tree-se',sprite:0,x:1640,y:1548,w:144,h:192,baseY:1740})
   ]);
   const trainingDummyProp = Object.freeze({
     id:'training-dummy-plaza',asset:'trainingDummy',x:1532,y:1608,w:96,h:96,baseY:1702,
@@ -181,7 +181,7 @@
     })
   });
   window.KELO_TILE_REGISTRY = Object.freeze({
-    version:'1.10.29', worldTileSize:TILE,
+    version:'1.10.30', worldTileSize:TILE,
     atlases:Object.freeze({plaza:atlas,plazaGround:plazaGroundAtlas,transitions:transitionAtlas,grassVariation:grassVariationAtlas,marbleVariation:marbleVariationAtlas,plazaNature:plazaNatureAtlas,trainingDummy:trainingDummyAtlas,plazaNpcs:plazaNpcsAtlas,ruralSoil:ruralSoilAtlas,ruralProps:ruralPropsAtlas,ruralLandmarks:ruralLandmarksAtlas,ruralNature:ruralNatureAtlas}),
     architectureAssets,architecturePrefabs,plazaNatureProps,trainingDummyProp,plazaNpcVisuals,
     tiles,ruralTiles,ruralPropTiles,ruralLandmarkTiles,ruralLandmarkSprites,ruralNatureTiles,ruralNatureSprites,families,transitionMasks,styles
