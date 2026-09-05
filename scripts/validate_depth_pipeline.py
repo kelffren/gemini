@@ -10,6 +10,7 @@ engine = text('engine-c.js')
 contract = text('src/environment/prop-contract.js')
 generic = text('src/environment/generic-props.js')
 rural = text('src/environment/rural-ground.js')
+fountain = text('src/environment/plaza-depth.js')
 
 checks = {
     'environment stack exposes props_back pre-actor phase': "PRE_ACTOR_PHASES=new Set(['props_back'])" in env,
@@ -24,6 +25,12 @@ checks = {
     'rural renderer no longer draws generic props immediately': 'GENERIC_PROPS.drawInstances' not in rural,
     'rural audit declares formal props_back mode': "boundaryMode:'environment-layer-stack-props-back-v1'" in rural,
     'rural audit declares no immediate boundary draw': 'immediateBoundaryDraw:false' in rural,
+    'fountain uses generic prop layer group': "plazaFountain:Object.freeze({id:'plaza-fountain'" in contract and "layerRole:'front'" in contract,
+    'generic renderer supports split front role': "p.layerRole==='front'" in generic and "p.layerRole!=='front'" in generic,
+    'generic renderer supports actor base-y redraw': "actor-base-y-redraw-v1" in contract and "p.occlusion?.mode==='actor-base-y-redraw-v1'" in generic,
+    'generic renderer owns static prop colliders': 'registerStaticColliders()' in generic and '_genericPropCollision:true' in generic,
+    'plaza fountain legacy file is telemetry only': 'new Image()' not in fountain and 'g.drawImage' not in fountain and 'renderAvatar(' not in fountain and 'L.register(' not in fountain,
+    'fountain bridge declares generic contract ownership': "bridgePolicy:'generic-prop-contract-v1'" in fountain,
 }
 
 failed = [name for name, ok in checks.items() if not ok]
