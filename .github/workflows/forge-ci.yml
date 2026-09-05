@@ -34,7 +34,7 @@ jobs:
           grep -q 'src/systems/armor-aura.js?v=' index.html
           grep -q "forge-v1.0" src/systems/forge-system.js
           grep -q "equipment-v1.1.2" src/systems/equipment-system.js
-          grep -q "armor-aura-v1.0" src/systems/armor-aura.js
+          grep -q "armor-aura-v1.1" src/systems/armor-aura.js
           grep -q "crypto.randomInt" server/forge-store.js
           grep -q "forge:attempt" server/index.js
           grep -q "crystalLimit:25" src/systems/forge-system.js
