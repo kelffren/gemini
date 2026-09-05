@@ -38,7 +38,7 @@ jobs:
           grep -q "src/environment/rural-landmarks.js?v=209" index.html
           grep -q "src/environment/district-decals-registry.js?v=3" index.html
           grep -q "src/environment/district-decals.js?v=3" index.html
-          grep -q "src/environment/atlas-contract.js?v=2" index.html
+          grep -q "src/environment/atlas-contract.js?v=3" index.html
       - name: Server and nobility syntax
         run: |
           node --check server/index.js
@@ -139,6 +139,8 @@ jobs:
             exit 1
           fi
           node scripts/validate-atlas-contract.mjs
+          node scripts/validate-png-pipeline.mjs
+          node scripts/test-png-validation.mjs
           grep -q "plaza-fountain-v2.0" src/environment/plaza-depth.js
           grep -q "generic-prop-contract-v1" src/environment/plaza-depth.js
           grep -q "formal-back-front-layer-stack-v1" src/environment/plaza-depth.js
