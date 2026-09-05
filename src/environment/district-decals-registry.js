@@ -35,10 +35,10 @@
   });
   window.KELO_TILE_REGISTRY=Object.freeze({
     ...R,
-    version:'1.11.1',
+    version:R.version,
     atlases:Object.freeze({...R.atlases,districtDecals:atlas}),
     districtDecalTiles:tiles,
     styles:Object.freeze({...R.styles,districtDecals})
   });
-  window.KELO_DISTRICT_DECAL_REGISTRY_AUDIT=Object.freeze({version:'district-decals-registry-v1.2',ready:true,registryVersion:'1.11.1',placementCount:placements.length,atlas:atlas.id,runtimeFormat:atlas.runtimeFormat,ownership:districtDecals.ownership,cameraBridge:window.camera===camera});
+  window.KELO_DISTRICT_DECAL_REGISTRY_AUDIT=Object.freeze({version:'district-decals-registry-v1.3',ready:true,registryVersion:R.version,placementCount:placements.length,atlas:atlas.id,runtimeFormat:atlas.runtimeFormat,ownership:districtDecals.ownership,cameraBridge:window.camera===camera});
 })();
