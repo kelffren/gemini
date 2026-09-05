@@ -4,16 +4,42 @@
   if ('fetchPriority' in raw) raw.fetchPriority = 'high';
   let sheet = null, ok = false, FW = 256, FH = 384;
   const COLS = 4;
+  const ROWS = 4;
   const FOOT_ROOT_OFFSET_Y = 10;
+  const HERO_AUDIT = window.KELO_HERO_SPRITE_AUDIT = {
+    version: 'hero-preprocess-audit-v1',
+    source: 'assets/hero.PNG',
+    loaded: false,
+    processed: false,
+    sheetWidth: 0,
+    sheetHeight: 0,
+    frameWidth: 0,
+    frameHeight: 0,
+    nearWhitePixelCount: 0,
+    whiteKnockoutAffectedPixelCount: 0,
+    whiteKnockoutOpaquePixelCount: 0,
+    whiteKnockoutOpaqueLossPct: 0,
+    croppedOpaquePixelCount: 0,
+    croppedOpaquePixelCountByFrame: [],
+    sheetMutationAfterIdle: false,
+    preprocessMs: 0,
+    error: null
+  };
 
   function useRawSheet() {
     sheet = raw;
     FW = raw.width / COLS;
-    FH = raw.height / 4;
+    FH = raw.height / ROWS;
     ok = true;
+    HERO_AUDIT.loaded = true;
+    HERO_AUDIT.sheetWidth = raw.width;
+    HERO_AUDIT.sheetHeight = raw.height;
+    HERO_AUDIT.frameWidth = FW;
+    HERO_AUDIT.frameHeight = FH;
   }
 
   function knockWhite() {
+    const t0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
     try {
       const c = document.createElement('canvas');
       c.width = raw.width;
@@ -22,12 +48,53 @@
       g.drawImage(raw, 0, 0);
       const data = g.getImageData(0, 0, c.width, c.height);
       const d = data.data;
-      for (let i = 0; i < d.length; i += 4) {
-        if (d[i] > 232 && d[i + 1] > 232 && d[i + 2] > 232) d[i + 3] = 0;
+      const padX = Math.max(2, FW * 0.05);
+      const padY = Math.max(2, FH * 0.04);
+      const cropByFrame = new Array(COLS * ROWS).fill(0);
+      let nearWhite = 0;
+      let affected = 0;
+      let affectedOpaque = 0;
+      let opaqueTotal = 0;
+      let croppedOpaque = 0;
+
+      for (let y = 0; y < c.height; y++) {
+        const row = Math.min(ROWS - 1, Math.floor(y / FH));
+        const localY = y - row * FH;
+        for (let x = 0; x < c.width; x++) {
+          const col = Math.min(COLS - 1, Math.floor(x / FW));
+          const localX = x - col * FW;
+          const i = (y * c.width + x) * 4;
+          const alpha = d[i + 3];
+          const isNearWhite = d[i] > 232 && d[i + 1] > 232 && d[i + 2] > 232;
+          if (alpha > 0) opaqueTotal += 1;
+          if (isNearWhite) nearWhite += 1;
+          if (alpha > 0 && (localX < padX || localX >= FW - padX || localY < padY || localY >= FH - padY)) {
+            const frameIndex = row * COLS + col;
+            cropByFrame[frameIndex] += 1;
+            croppedOpaque += 1;
+          }
+          if (isNearWhite) {
+            affected += 1;
+            if (alpha > 0) affectedOpaque += 1;
+            d[i + 3] = 0;
+          }
+        }
       }
       g.putImageData(data, 0, 0);
       sheet = c;
-    } catch (e) {}
+      HERO_AUDIT.processed = true;
+      HERO_AUDIT.nearWhitePixelCount = nearWhite;
+      HERO_AUDIT.whiteKnockoutAffectedPixelCount = affected;
+      HERO_AUDIT.whiteKnockoutOpaquePixelCount = affectedOpaque;
+      HERO_AUDIT.whiteKnockoutOpaqueLossPct = opaqueTotal ? affectedOpaque / opaqueTotal * 100 : 0;
+      HERO_AUDIT.croppedOpaquePixelCount = croppedOpaque;
+      HERO_AUDIT.croppedOpaquePixelCountByFrame = cropByFrame;
+      HERO_AUDIT.sheetMutationAfterIdle = affected > 0;
+    } catch (e) {
+      HERO_AUDIT.error = String(e && e.message ? e.message : e);
+    }
+    const t1 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+    HERO_AUDIT.preprocessMs = Math.max(0, t1 - t0);
   }
 
   raw.onload = function () {
@@ -36,7 +103,10 @@
     if (typeof requestIdleCallback === 'function') requestIdleCallback(later, { timeout: 900 });
     else setTimeout(later, 0);
   };
-  raw.onerror = function () { console.error('[Kelo hero] production sprite load failed'); };
+  raw.onerror = function () {
+    HERO_AUDIT.error = 'production sprite load failed';
+    console.error('[Kelo hero] production sprite load failed');
+  };
   raw.src = 'assets/hero.PNG';
 
   function legacyMovingOf(p) {
