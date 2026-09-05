@@ -1,264 +1,53 @@
 (function () {
   'use strict';
 
-  const VERSION = 'pvp-world-v1.0';
+  const VERSION = 'pvp-world-v1.1';
+  const TRANSITION_MS = 1050;
   const WORLD = Object.freeze({ x: 2660, y: 360, w: 720, h: 720, spawnX: 2790, spawnY: 720, dummyX: 3190, dummyY: 720 });
   const state = {
-    mode: 'social',
-    combatEnabled: false,
-    selected: null,
-    armedSlot: -1,
-    basicCooldown: 0,
-    saved: null,
-    floats: [],
-    commandSeq: 1,
-    resultSeq: 1,
-    dummy: null,
+    mode: 'social', combatEnabled: false, transitioning: false, selected: null, armedSlot: -1,
+    basicCooldown: 0, saved: null, floats: [], commandSeq: 1, resultSeq: 1, dummy: null, transitionTimer: null,
   };
 
   window.KELO_COMBAT_ENABLED = false;
+  function toast(msg){ if(typeof showToast==='function') showToast(msg); }
+  function clamp(n,a,b){ return Math.max(a,Math.min(b,n)); }
+  function dist(a,b){ return Math.hypot((a.x||0)-(b.x||0),(a.y||0)-(b.y||0)); }
+  function screenWorld(sx,sy){ if(typeof screenToWorld==='function') return screenToWorld(sx,sy); const z=(typeof CONFIG!=='undefined'&&CONFIG.zoom)||1; return{x:camera.x+(sx-screenW/2)/z,y:camera.y+(sy-screenH/2)/z}; }
+  function dummyEntity(){ if(state.dummy) return state.dummy; if(typeof simulatedPlayers==='undefined'||!simulatedPlayers.length) return null; state.dummy=simulatedPlayers[0]; return state.dummy; }
+  function command(type,payload){ return Object.freeze({id:state.commandSeq++,type,payload:payload||{},issuedAt:performance.now()}); }
 
-  function toast(msg) { if (typeof showToast === 'function') showToast(msg); }
-  function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
-  function dist(a, b) { return Math.hypot((a.x || 0) - (b.x || 0), (a.y || 0) - (b.y || 0)); }
-  function screenWorld(sx, sy) {
-    if (typeof screenToWorld === 'function') return screenToWorld(sx, sy);
-    const z = (typeof CONFIG !== 'undefined' && CONFIG.zoom) || 1;
-    return { x: camera.x + (sx - screenW / 2) / z, y: camera.y + (sy - screenH / 2) / z };
-  }
+  const localAuthority=Object.freeze({execute(cmd){
+    if(!state.combatEnabled||state.transitioning) return Object.freeze({id:state.resultSeq++,commandId:cmd.id,ok:false,reason:'COMBAT_DISABLED'});
+    if(cmd.type==='SELECT_TARGET'){ const target=cmd.payload.target; state.selected=target&&target.hp>0?target:null; return Object.freeze({id:state.resultSeq++,commandId:cmd.id,ok:!!state.selected,type:'TARGET_SELECTED',targetId:state.selected&&state.selected.id}); }
+    if(cmd.type==='BASIC_ATTACK'){ const target=cmd.payload.target; if(!target||target.hp<=0)return Object.freeze({id:state.resultSeq++,commandId:cmd.id,ok:false,reason:'INVALID_TARGET'}); if(state.basicCooldown>0)return Object.freeze({id:state.resultSeq++,commandId:cmd.id,ok:false,reason:'COOLDOWN'}); if(dist(localPlayer,target)>150)return Object.freeze({id:state.resultSeq++,commandId:cmd.id,ok:false,reason:'OUT_OF_RANGE'}); const amount=18; target.hp=Math.max(0,(target.hp==null?100:target.hp)-amount); state.basicCooldown=.7; return Object.freeze({id:state.resultSeq++,commandId:cmd.id,ok:true,type:'DAMAGE',targetId:target.id,amount,hp:target.hp}); }
+    if(cmd.type==='CAST_ABILITY'){ if(!window.KeloAbilities||!window.KeloAbilities.engine)return Object.freeze({id:state.resultSeq++,commandId:cmd.id,ok:false,reason:'ABILITY_ENGINE_UNAVAILABLE'}); const result=window.KeloAbilities.engine.cast(cmd.payload.request); return Object.freeze({id:state.resultSeq++,commandId:cmd.id,ok:!!result.valid,type:'ABILITY_RESULT',result}); }
+    return Object.freeze({id:state.resultSeq++,commandId:cmd.id,ok:false,reason:'UNKNOWN_COMMAND'});
+  }});
 
-  function dummyEntity() {
-    if (state.dummy) return state.dummy;
-    if (typeof simulatedPlayers === 'undefined' || !simulatedPlayers.length) return null;
-    state.dummy = simulatedPlayers[0];
-    return state.dummy;
-  }
+  function present(result,target){ if(!result)return; if(result.ok&&result.type==='DAMAGE'&&target){ state.floats.push({x:target.x,y:target.y-42,text:'-'+result.amount,life:.8}); if(target.hp<=0)toast('Dummy derrotado'); return; } if(!result.ok&&result.reason==='OUT_OF_RANGE')toast('Fuera de alcance'); else if(!result.ok&&result.reason==='COOLDOWN')toast('Ataque recargando'); }
+  function armAbility(slot){ if(!state.combatEnabled||state.transitioning||!window.KeloAbilities)return; const instance=window.KeloAbilities.hotbar&&window.KeloAbilities.hotbar.slots[slot]; if(!instance)return toast('Slot vacío'); const targeting=instance.definition&&instance.definition.targeting; if(targeting&&targeting.type==='self'){ const result=localAuthority.execute(command('CAST_ABILITY',{request:{slotIndex:slot}})); if(!result.ok)toast('No se pudo usar la habilidad'); state.armedSlot=-1; return; } state.armedSlot=slot; toast('Habilidad lista · toca objetivo o suelo'); }
+  function castArmedAt(w,target){ const slot=state.armedSlot; if(slot<0||!window.KeloAbilities)return false; const instance=window.KeloAbilities.hotbar&&window.KeloAbilities.hotbar.slots[slot]; if(!instance||!instance.definition){state.armedSlot=-1;return false;} const def=instance.definition,d={x:w.x-localPlayer.x,y:w.y-localPlayer.y},len=Math.hypot(d.x,d.y)||1,dir={x:d.x/len,y:d.y/len},req={slotIndex:slot}; if(def.targeting.type==='position')req.position=w; else if(def.targeting.type==='target'){if(!target){toast('Toca un enemigo');return true;}req.targetId=target.id;} else if(def.targeting.type==='direction')req.direction=dir; const result=localAuthority.execute(command('CAST_ABILITY',{request:req})); state.armedSlot=-1; if(!result.ok)toast('No se pudo usar la habilidad'); return true; }
+  function targetAt(w){ const d=dummyEntity(); return d&&d.hp>0&&dist(w,d)<=(d.radius||20)*2.1?d:null; }
+  function handleCombatTap(clientX,clientY){ if(!state.combatEnabled||state.transitioning)return false; const w=screenWorld(clientX,clientY),target=targetAt(w); if(state.armedSlot>=0)return castArmedAt(w,target); if(!target){state.selected=null;return false;} localAuthority.execute(command('SELECT_TARGET',{target})); const result=localAuthority.execute(command('BASIC_ATTACK',{target})); present(result,target); return true; }
 
-  function command(type, payload) {
-    return Object.freeze({ id: state.commandSeq++, type, payload: payload || {}, issuedAt: performance.now() });
-  }
+  function ensureTransitionUi(){ let overlay=document.getElementById('kelo-pvp-transition'); if(overlay)return overlay; const style=document.createElement('style'); style.id='kelo-pvp-transition-style'; style.textContent=`#kelo-pvp-transition{display:none;position:fixed;inset:0;z-index:1000;background:radial-gradient(circle at 50% 47%,rgba(37,52,72,.96),rgba(4,7,11,.995) 60%);align-items:center;justify-content:center;flex-direction:column;color:#fff4d6;pointer-events:auto}#kelo-pvp-transition.active{display:flex}#kelo-pvp-transition .pvp-portal{width:92px;height:92px;border-radius:50%;border:4px solid rgba(231,197,106,.3);border-top-color:#e7c56a;border-bottom-color:#7ec8ff;box-shadow:0 0 34px rgba(126,200,255,.24),inset 0 0 26px rgba(231,197,106,.12);animation:keloPortalSpin .8s linear infinite;position:relative}#kelo-pvp-transition .pvp-portal:after{content:'✦';position:absolute;inset:0;display:grid;place-items:center;font-size:34px;color:#e7c56a;animation:keloPortalPulse .55s ease-in-out infinite alternate}#kelo-pvp-transition .pvp-title{margin-top:20px;font-size:15px;font-weight:900;letter-spacing:.16em;color:#e7c56a;text-align:center}#kelo-pvp-transition .pvp-sub{margin-top:7px;font-size:10px;color:#aab7c7;letter-spacing:.08em}#kelo-pvp-transition .pvp-track{width:min(220px,62vw);height:5px;margin-top:18px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden}#kelo-pvp-transition .pvp-fill{height:100%;width:0;background:linear-gradient(90deg,#7ec8ff,#e7c56a);animation:keloPortalLoad 1s ease-out forwards}@keyframes keloPortalSpin{to{transform:rotate(360deg)}}@keyframes keloPortalPulse{from{transform:scale(.78);opacity:.55}to{transform:scale(1.12);opacity:1}}@keyframes keloPortalLoad{from{width:0}to{width:100%}}`; document.head.appendChild(style); overlay=document.createElement('div'); overlay.id='kelo-pvp-transition'; overlay.innerHTML='<div class="pvp-portal"></div><div class="pvp-title" id="kelo-pvp-transition-title">TELETRANSPORTANDO</div><div class="pvp-sub" id="kelo-pvp-transition-sub">Preparando arena de combate…</div><div class="pvp-track"><div class="pvp-fill"></div></div>'; document.body.appendChild(overlay); return overlay; }
+  function showTransition(kind){ const overlay=ensureTransitionUi(),title=overlay.querySelector('#kelo-pvp-transition-title'),sub=overlay.querySelector('#kelo-pvp-transition-sub'),fill=overlay.querySelector('.pvp-fill'); if(title)title.textContent=kind==='leave'?'SALIENDO DEL PVP':'TELETRANSPORTANDO'; if(sub)sub.textContent=kind==='leave'?'Volviendo al mundo social…':'Preparando arena de combate…'; if(fill){fill.style.animation='none';void fill.offsetWidth;fill.style.animation='';} overlay.classList.add('active'); }
+  function hideTransition(){ const overlay=document.getElementById('kelo-pvp-transition'); if(overlay)overlay.classList.remove('active'); }
+  function setExitVisible(visible){ const luxeExit=document.getElementById('lx-side-pvp-exit'); if(luxeExit)luxeExit.style.display=visible?'flex':'none'; const legacyExit=document.getElementById('kelo-pvp-exit'); if(legacyExit)legacyExit.style.display=visible&&!luxeExit?'block':'none'; }
+  function ensureFallbackExit(){ if(document.getElementById('lx-side-pvp-exit'))return null; let exit=document.getElementById('kelo-pvp-exit'); if(!exit){exit=document.createElement('button');exit.id='kelo-pvp-exit';exit.type='button';exit.textContent='Salir PvP';exit.style.cssText='display:none;position:absolute;top:max(198px,calc(env(safe-area-inset-top) + 190px));right:max(12px,env(safe-area-inset-right));z-index:140;pointer-events:auto;background:rgba(18,20,27,.95);color:#ffd6d6;border:1px solid rgba(255,90,90,.7);border-radius:12px;padding:9px 12px;font-size:11px;font-weight:850';exit.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();leave();});document.body.appendChild(exit);} return exit; }
+  function freezeMovement(){ if(typeof localPlayer!=='undefined'){localPlayer.vx=0;localPlayer.vy=0;} if(typeof input!=='undefined'&&input){input.normX=0;input.normY=0;input.touchActive=false;input.touchId=null;if(input.keys)Object.keys(input.keys).forEach(k=>input.keys[k]=false);} }
 
-  const localAuthority = Object.freeze({
-    execute(cmd) {
-      if (!state.combatEnabled) return Object.freeze({ id: state.resultSeq++, commandId: cmd.id, ok: false, reason: 'COMBAT_DISABLED' });
-      if (cmd.type === 'SELECT_TARGET') {
-        const target = cmd.payload.target;
-        state.selected = target && target.hp > 0 ? target : null;
-        return Object.freeze({ id: state.resultSeq++, commandId: cmd.id, ok: !!state.selected, type: 'TARGET_SELECTED', targetId: state.selected && state.selected.id });
-      }
-      if (cmd.type === 'BASIC_ATTACK') {
-        const target = cmd.payload.target;
-        if (!target || target.hp <= 0) return Object.freeze({ id: state.resultSeq++, commandId: cmd.id, ok: false, reason: 'INVALID_TARGET' });
-        if (state.basicCooldown > 0) return Object.freeze({ id: state.resultSeq++, commandId: cmd.id, ok: false, reason: 'COOLDOWN' });
-        if (dist(localPlayer, target) > 150) return Object.freeze({ id: state.resultSeq++, commandId: cmd.id, ok: false, reason: 'OUT_OF_RANGE' });
-        const amount = 18;
-        target.hp = Math.max(0, (target.hp == null ? 100 : target.hp) - amount);
-        state.basicCooldown = 0.7;
-        return Object.freeze({ id: state.resultSeq++, commandId: cmd.id, ok: true, type: 'DAMAGE', targetId: target.id, amount, hp: target.hp });
-      }
-      if (cmd.type === 'CAST_ABILITY') {
-        if (!window.KeloAbilities || !window.KeloAbilities.engine) return Object.freeze({ id: state.resultSeq++, commandId: cmd.id, ok: false, reason: 'ABILITY_ENGINE_UNAVAILABLE' });
-        const result = window.KeloAbilities.engine.cast(cmd.payload.request);
-        return Object.freeze({ id: state.resultSeq++, commandId: cmd.id, ok: !!result.valid, type: 'ABILITY_RESULT', result });
-      }
-      return Object.freeze({ id: state.resultSeq++, commandId: cmd.id, ok: false, reason: 'UNKNOWN_COMMAND' });
-    }
-  });
+  function enter(){ if(state.mode!=='social'||state.transitioning)return; const d=dummyEntity(); if(!d)return toast('PvP todavía cargando'); state.saved={x:localPlayer.x,y:localPlayer.y,cameraX:camera.x,cameraY:camera.y,dummyX:d.x,dummyY:d.y,dummyHp:d.hp,dummyMaxHp:d.maxHp}; state.mode='entering';state.transitioning=true;state.combatEnabled=false;state.selected=null;state.armedSlot=-1;window.KELO_COMBAT_ENABLED=false;freezeMovement();if(typeof closeMenu==='function')closeMenu();showTransition('enter');audit('enter-loading');clearTimeout(state.transitionTimer);state.transitionTimer=setTimeout(()=>{d.x=WORLD.dummyX;d.y=WORLD.dummyY;d.hp=d.maxHp=100;if(typeof arenaPvP!=='undefined')arenaPvP.rival=d;localPlayer.x=WORLD.spawnX;localPlayer.y=WORLD.spawnY;localPlayer.vx=0;localPlayer.vy=0;camera.x=camera.targetX=localPlayer.x;camera.y=camera.targetY=localPlayer.y;if(typeof isPvPActive!=='undefined')isPvPActive=true;document.body.classList.remove('social-mode');state.mode='pvp';state.combatEnabled=true;state.transitioning=false;window.KELO_COMBAT_ENABLED=true;setExitVisible(true);hideTransition();toast('Mundo PvP · toca al dummy para atacar');audit('entered');},TRANSITION_MS); }
+  function leave(){ if(state.mode!=='pvp'||state.transitioning)return; const d=dummyEntity();state.mode='leaving';state.transitioning=true;state.selected=null;state.armedSlot=-1;freezeMovement();showTransition('leave');audit('leave-loading');clearTimeout(state.transitionTimer);state.transitionTimer=setTimeout(()=>{state.combatEnabled=false;window.KELO_COMBAT_ENABLED=false;if(typeof isPvPActive!=='undefined')isPvPActive=false;if(typeof arenaPvP!=='undefined')arenaPvP.rival=null;if(state.saved){localPlayer.x=state.saved.x;localPlayer.y=state.saved.y;localPlayer.vx=0;localPlayer.vy=0;camera.x=camera.targetX=state.saved.cameraX;camera.y=camera.targetY=state.saved.cameraY;if(d){d.x=state.saved.dummyX;d.y=state.saved.dummyY;d.hp=state.saved.dummyHp;d.maxHp=state.saved.dummyMaxHp;}}document.body.classList.add('social-mode');state.mode='social';state.transitioning=false;setExitVisible(false);hideTransition();toast('Volviste al mundo social');audit('left');},TRANSITION_MS); }
 
-  function present(result, target) {
-    if (!result) return;
-    if (result.ok && result.type === 'DAMAGE' && target) {
-      state.floats.push({ x: target.x, y: target.y - 42, text: '-' + result.amount, life: 0.8 });
-      if (target.hp <= 0) toast('Dummy derrotado');
-      return;
-    }
-    if (!result.ok && result.reason === 'OUT_OF_RANGE') toast('Fuera de alcance');
-    else if (!result.ok && result.reason === 'COOLDOWN') toast('Ataque recargando');
-  }
+  function drawArenaScene(){ if(typeof ctx==='undefined')return; ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle='#070b12';ctx.fillRect(0,0,canvas.width||screenW,canvas.height||screenH);ctx.restore();const z=(typeof CONFIG!=='undefined'&&CONFIG.zoom)||1;ctx.save();ctx.translate(screenW/2,screenH/2);ctx.scale(z,z);ctx.translate(-camera.x,-camera.y);ctx.fillStyle='#101722';ctx.fillRect(WORLD.x,WORLD.y,WORLD.w,WORLD.h);ctx.fillStyle='#162231';ctx.fillRect(WORLD.x+24,WORLD.y+24,WORLD.w-48,WORLD.h-48);ctx.strokeStyle='rgba(231,197,106,.72)';ctx.lineWidth=5;ctx.strokeRect(WORLD.x+18,WORLD.y+18,WORLD.w-36,WORLD.h-36);ctx.strokeStyle='rgba(231,197,106,.18)';ctx.lineWidth=2;for(let x=WORLD.x+80;x<WORLD.x+WORLD.w;x+=80){ctx.beginPath();ctx.moveTo(x,WORLD.y+24);ctx.lineTo(x,WORLD.y+WORLD.h-24);ctx.stroke();}for(let y=WORLD.y+80;y<WORLD.y+WORLD.h;y+=80){ctx.beginPath();ctx.moveTo(WORLD.x+24,y);ctx.lineTo(WORLD.x+WORLD.w-24,y);ctx.stroke();}const d=dummyEntity();if(d){if(state.selected===d&&d.hp>0){ctx.strokeStyle='#ff5d5d';ctx.lineWidth=3;ctx.beginPath();ctx.ellipse(d.x,d.y+12,30,13,0,0,Math.PI*2);ctx.stroke();}if(typeof renderAvatar==='function'&&d.hp>0)renderAvatar(d,false);if(d.hp>0){ctx.fillStyle='rgba(0,0,0,.72)';ctx.fillRect(d.x-34,d.y-58,68,7);ctx.fillStyle='#ef476f';ctx.fillRect(d.x-34,d.y-58,68*clamp(d.hp/d.maxHp,0,1),7);}}if(typeof renderAvatar==='function')renderAvatar(localPlayer,true);state.floats.forEach(f=>{ctx.globalAlpha=clamp(f.life/.8,0,1);ctx.fillStyle='#fff';ctx.font='bold 16px sans-serif';ctx.textAlign='center';ctx.fillText(f.text,f.x,f.y);});ctx.globalAlpha=1;ctx.restore(); }
+  function audit(event){const d=dummyEntity();window.KELO_PVP_AUDIT={version:VERSION,event:event||null,mode:state.mode,combatEnabled:state.combatEnabled,transitioning:state.transitioning,transitionMs:TRANSITION_MS,abilityBarVisible:document.body.classList.contains('social-mode')===false,dummyAlive:!!(d&&d.hp>0),dummyHp:d?d.hp:null,armedSlot:state.armedSlot,authority:'local-command-simulation-v1',commandResultBoundary:true,socialAbilityPermission:state.mode==='social'?false:null,isolatedArenaRender:true};}
 
-  function armAbility(slot) {
-    if (!state.combatEnabled || !window.KeloAbilities) return;
-    const instance = window.KeloAbilities.hotbar && window.KeloAbilities.hotbar.slots[slot];
-    if (!instance) return toast('Slot vacío');
-    const targeting = instance.definition && instance.definition.targeting;
-    if (targeting && targeting.type === 'self') {
-      const result = localAuthority.execute(command('CAST_ABILITY', { request: { slotIndex: slot } }));
-      if (!result.ok) toast('No se pudo usar la habilidad');
-      state.armedSlot = -1;
-      return;
-    }
-    state.armedSlot = slot;
-    toast('Habilidad lista · toca objetivo o suelo');
-  }
+  const previousUpdate=typeof updateSimulation==='function'?updateSimulation:null; if(previousUpdate)updateSimulation=function(dt){previousUpdate(dt);state.basicCooldown=Math.max(0,state.basicCooldown-dt);for(let i=state.floats.length-1;i>=0;i--){state.floats[i].life-=dt;state.floats[i].y-=20*dt;if(state.floats[i].life<=0)state.floats.splice(i,1);}if(state.transitioning)freezeMovement();if(state.combatEnabled){localPlayer.x=clamp(localPlayer.x,WORLD.x+localPlayer.radius,WORLD.x+WORLD.w-localPlayer.radius);localPlayer.y=clamp(localPlayer.y,WORLD.y+localPlayer.radius,WORLD.y+WORLD.h-localPlayer.radius);}audit('tick');};
+  const previousRender=typeof render==='function'?render:null; if(previousRender)render=function(){if(state.combatEnabled||state.mode==='leaving')drawArenaScene();else previousRender();};
+  window.addEventListener('pointerdown',function(event){if(!state.combatEnabled||state.transitioning)return;const slotButton=event.target&&event.target.closest&&event.target.closest('.stone-slot');if(slotButton){event.preventDefault();event.stopImmediatePropagation();armAbility(Number(slotButton.dataset.slot));return;}if(event.target!==canvas)return;if(handleCombatTap(event.clientX,event.clientY)){event.preventDefault();event.stopImmediatePropagation();}},true);
 
-  function castArmedAt(w, target) {
-    const slot = state.armedSlot;
-    if (slot < 0 || !window.KeloAbilities) return false;
-    const instance = window.KeloAbilities.hotbar && window.KeloAbilities.hotbar.slots[slot];
-    if (!instance || !instance.definition) { state.armedSlot = -1; return false; }
-    const def = instance.definition;
-    const d = { x: w.x - localPlayer.x, y: w.y - localPlayer.y };
-    const len = Math.hypot(d.x, d.y) || 1;
-    const dir = { x: d.x / len, y: d.y / len };
-    const req = { slotIndex: slot };
-    if (def.targeting.type === 'position') req.position = w;
-    else if (def.targeting.type === 'target') {
-      if (!target) { toast('Toca un enemigo'); return true; }
-      req.targetId = target.id;
-    } else if (def.targeting.type === 'direction') req.direction = dir;
-    const result = localAuthority.execute(command('CAST_ABILITY', { request: req }));
-    state.armedSlot = -1;
-    if (!result.ok) toast('No se pudo usar la habilidad');
-    return true;
-  }
-
-  function targetAt(w) {
-    const d = dummyEntity();
-    return d && d.hp > 0 && dist(w, d) <= (d.radius || 20) * 2.1 ? d : null;
-  }
-
-  function handleCombatTap(clientX, clientY) {
-    if (!state.combatEnabled) return false;
-    const w = screenWorld(clientX, clientY);
-    const target = targetAt(w);
-    if (state.armedSlot >= 0) return castArmedAt(w, target);
-    if (!target) { state.selected = null; return false; }
-    localAuthority.execute(command('SELECT_TARGET', { target }));
-    const result = localAuthority.execute(command('BASIC_ATTACK', { target }));
-    present(result, target);
-    return true;
-  }
-
-  function ensureUi() {
-    let exit = document.getElementById('kelo-pvp-exit');
-    if (!exit) {
-      exit = document.createElement('button');
-      exit.id = 'kelo-pvp-exit'; exit.type = 'button'; exit.textContent = 'Salir PvP';
-      exit.style.cssText = 'display:none;position:absolute;top:max(62px,calc(env(safe-area-inset-top) + 54px));right:max(12px,env(safe-area-inset-right));z-index:140;pointer-events:auto;background:rgba(18,20,27,.95);color:#ffd6d6;border:1px solid rgba(255,90,90,.7);border-radius:12px;padding:9px 12px;font-size:11px;font-weight:850';
-      exit.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); leave(); });
-      document.body.appendChild(exit);
-    }
-    return exit;
-  }
-
-  function enter() {
-    if (state.mode === 'pvp') return;
-    const d = dummyEntity();
-    if (!d) return toast('PvP todavía cargando');
-    state.saved = {
-      x: localPlayer.x, y: localPlayer.y,
-      cameraX: camera.x, cameraY: camera.y,
-      dummyX: d.x, dummyY: d.y, dummyHp: d.hp, dummyMaxHp: d.maxHp,
-    };
-    state.mode = 'pvp'; state.combatEnabled = true; state.selected = null; state.armedSlot = -1;
-    window.KELO_COMBAT_ENABLED = true;
-    if (typeof isPvPActive !== 'undefined') isPvPActive = true;
-    d.x = WORLD.dummyX; d.y = WORLD.dummyY; d.hp = d.maxHp = 100;
-    if (typeof arenaPvP !== 'undefined') arenaPvP.rival = d;
-    localPlayer.x = WORLD.spawnX; localPlayer.y = WORLD.spawnY; localPlayer.vx = 0; localPlayer.vy = 0;
-    camera.x = camera.targetX = localPlayer.x; camera.y = camera.targetY = localPlayer.y;
-    document.body.classList.remove('social-mode');
-    const exit = ensureUi(); exit.style.display = 'block';
-    if (typeof closeMenu === 'function') closeMenu();
-    toast('Mundo PvP · toca al dummy para atacar');
-    audit('entered');
-  }
-
-  function leave() {
-    if (state.mode !== 'pvp') return;
-    const d = dummyEntity();
-    state.mode = 'social'; state.combatEnabled = false; state.selected = null; state.armedSlot = -1;
-    window.KELO_COMBAT_ENABLED = false;
-    if (typeof isPvPActive !== 'undefined') isPvPActive = false;
-    if (typeof arenaPvP !== 'undefined') arenaPvP.rival = null;
-    if (state.saved) {
-      localPlayer.x = state.saved.x; localPlayer.y = state.saved.y; localPlayer.vx = 0; localPlayer.vy = 0;
-      camera.x = camera.targetX = state.saved.cameraX; camera.y = camera.targetY = state.saved.cameraY;
-      if (d) { d.x = state.saved.dummyX; d.y = state.saved.dummyY; d.hp = state.saved.dummyHp; d.maxHp = state.saved.dummyMaxHp; }
-    }
-    document.body.classList.add('social-mode');
-    const exit = ensureUi(); exit.style.display = 'none';
-    toast('Volviste al mundo social');
-    audit('left');
-  }
-
-  function drawArenaOverlay() {
-    if (!state.combatEnabled || typeof ctx === 'undefined') return;
-    ctx.save();
-    const z = (typeof CONFIG !== 'undefined' && CONFIG.zoom) || 1;
-    ctx.translate(screenW / 2, screenH / 2); ctx.scale(z, z); ctx.translate(-camera.x, -camera.y);
-    ctx.fillStyle = '#101722'; ctx.fillRect(WORLD.x, WORLD.y, WORLD.w, WORLD.h);
-    ctx.fillStyle = '#162231'; ctx.fillRect(WORLD.x + 24, WORLD.y + 24, WORLD.w - 48, WORLD.h - 48);
-    ctx.strokeStyle = 'rgba(231,197,106,.72)'; ctx.lineWidth = 5; ctx.strokeRect(WORLD.x + 18, WORLD.y + 18, WORLD.w - 36, WORLD.h - 36);
-    ctx.strokeStyle = 'rgba(231,197,106,.18)'; ctx.lineWidth = 2;
-    for (let x = WORLD.x + 80; x < WORLD.x + WORLD.w; x += 80) { ctx.beginPath(); ctx.moveTo(x, WORLD.y + 24); ctx.lineTo(x, WORLD.y + WORLD.h - 24); ctx.stroke(); }
-    for (let y = WORLD.y + 80; y < WORLD.y + WORLD.h; y += 80) { ctx.beginPath(); ctx.moveTo(WORLD.x + 24, y); ctx.lineTo(WORLD.x + WORLD.w - 24, y); ctx.stroke(); }
-    const d = dummyEntity();
-    if (d) {
-      if (state.selected === d && d.hp > 0) { ctx.strokeStyle = '#ff5d5d'; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(d.x, d.y + 12, 30, 13, 0, 0, Math.PI * 2); ctx.stroke(); }
-      if (typeof renderAvatar === 'function' && d.hp > 0) renderAvatar(d, false);
-      if (d.hp > 0) {
-        ctx.fillStyle = 'rgba(0,0,0,.72)'; ctx.fillRect(d.x - 34, d.y - 58, 68, 7);
-        ctx.fillStyle = '#ef476f'; ctx.fillRect(d.x - 34, d.y - 58, 68 * clamp(d.hp / d.maxHp, 0, 1), 7);
-      }
-    }
-    if (typeof renderAvatar === 'function') renderAvatar(localPlayer, true);
-    state.floats.forEach((f) => { ctx.globalAlpha = clamp(f.life / 0.8, 0, 1); ctx.fillStyle = '#fff'; ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(f.text, f.x, f.y); });
-    ctx.globalAlpha = 1;
-    ctx.restore();
-  }
-
-  function audit(event) {
-    const d = dummyEntity();
-    window.KELO_PVP_AUDIT = {
-      version: VERSION, event: event || null,
-      mode: state.mode, combatEnabled: state.combatEnabled,
-      abilityBarVisible: document.body.classList.contains('social-mode') === false,
-      dummyAlive: !!(d && d.hp > 0), dummyHp: d ? d.hp : null,
-      armedSlot: state.armedSlot,
-      authority: 'local-command-simulation-v1',
-      commandResultBoundary: true,
-      socialAbilityPermission: state.mode === 'social' ? false : null,
-    };
-  }
-
-  const previousUpdate = typeof updateSimulation === 'function' ? updateSimulation : null;
-  if (previousUpdate) updateSimulation = function (dt) {
-    previousUpdate(dt);
-    state.basicCooldown = Math.max(0, state.basicCooldown - dt);
-    for (let i = state.floats.length - 1; i >= 0; i--) { state.floats[i].life -= dt; state.floats[i].y -= 20 * dt; if (state.floats[i].life <= 0) state.floats.splice(i, 1); }
-    if (state.combatEnabled) {
-      localPlayer.x = clamp(localPlayer.x, WORLD.x + localPlayer.radius, WORLD.x + WORLD.w - localPlayer.radius);
-      localPlayer.y = clamp(localPlayer.y, WORLD.y + localPlayer.radius, WORLD.y + WORLD.h - localPlayer.radius);
-    }
-    audit('tick');
-  };
-
-  const previousRender = typeof render === 'function' ? render : null;
-  if (previousRender) render = function () { previousRender(); drawArenaOverlay(); };
-
-  window.addEventListener('pointerdown', function (event) {
-    if (!state.combatEnabled) return;
-    const slotButton = event.target && event.target.closest && event.target.closest('.stone-slot');
-    if (slotButton) {
-      event.preventDefault(); event.stopImmediatePropagation();
-      armAbility(Number(slotButton.dataset.slot));
-      return;
-    }
-    if (event.target !== canvas) return;
-    if (handleCombatTap(event.clientX, event.clientY)) { event.preventDefault(); event.stopImmediatePropagation(); }
-  }, true);
-
-  window.enterPvPWorld = enter;
-  window.leavePvPWorld = leave;
-  window.KeloPvPWorld = Object.freeze({
-    version: VERSION,
-    enter, leave,
-    get state() { return Object.freeze({ mode: state.mode, combatEnabled: state.combatEnabled, selectedId: state.selected && state.selected.id, armedSlot: state.armedSlot }); },
-    command,
-    authority: localAuthority,
-  });
-
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => { ensureUi(); audit('boot'); }, { once: true });
-  else { ensureUi(); audit('boot'); }
+  window.enterPvPWorld=enter;window.leavePvPWorld=leave;window.KeloPvPWorld=Object.freeze({version:VERSION,enter,leave,get state(){return Object.freeze({mode:state.mode,combatEnabled:state.combatEnabled,transitioning:state.transitioning,selectedId:state.selected&&state.selected.id,armedSlot:state.armedSlot});},command,authority:localAuthority});
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{ensureTransitionUi();ensureFallbackExit();setExitVisible(false);audit('boot');},{once:true});else{ensureTransitionUi();ensureFallbackExit();setExitVisible(false);audit('boot');}
 })();
