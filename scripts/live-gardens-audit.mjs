@@ -16,7 +16,7 @@ const browser=await chromium.launch({headless:true,executablePath:process.env.CH
 const context=await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true});
 const page=await context.newPage();
 await page.route(/\/src\/environment\/(terrain-contract|world-map|gardens-compositions|gardens-junction-overlay)\.js/,route=>{const u=new URL(route.request().url());u.searchParams.set('audit-bust',`${Date.now()}-${Math.random()}`);route.continue({url:u.toString()});});
-await page.route(/\/assets\/gardens-t-junctions-v1\.svg/,route=>{const u=new URL(route.request().url());u.searchParams.set('audit-bust',`${Date.now()}-${Math.random()}`);route.continue({url:u.toString()});});
+await page.route(/\/assets\/gardens-t-junctions-v1\.svg/,route=>{const u=new URL(route.request().url());u.searchParams.set('audit-bust',`${Date.now()}-${Math.random()}`);route.continue({url:u.toString()()});});
 const consoleErrors=[],failedRequests=[],httpErrors=[];
 page.on('console',m=>{if(m.type()==='error')consoleErrors.push(m.text())});
 page.on('pageerror',e=>consoleErrors.push(`PAGEERROR: ${e.stack||e.message}`));
@@ -35,13 +35,14 @@ function valid(s){
 
 async function state(){return page.evaluate(()=>({title:document.title,registry:window.KELO_TILE_REGISTRY||null,joins:window.KELO_GARDENS_JOINS||null,composition:window.KELO_GARDENS_COMPOSITION_AUDIT||null,junction:window.KELO_GARDENS_JUNCTION_AUDIT||null,world:window.KELO_WORLD_AUDIT||null,district:window.KELO_DISTRICT_VISUAL_PROFILES||null}));}
 let loaded=false,lastState=null;
-for(let attempt=1;attempt<=24;attempt++){
+for(let attempt=1;attempt<=6;attempt++){
   try{
     await page.goto(`${base}?gardens-audit=${Date.now()}-${attempt}`,{waitUntil:'networkidle',timeout:45000});
     lastState=await state();
     if(valid(lastState)){loaded=true;break;}
+    console.log(`contract mismatch attempt ${attempt}: ${JSON.stringify(lastState)}`);
   }catch(e){console.log(`attempt ${attempt}: ${e.message}`)}
-  await page.waitForTimeout(10000);
+  await page.waitForTimeout(5000);
 }
 if(!loaded){fs.writeFileSync('artifacts/gardens-report.json',JSON.stringify({loaded,lastState,consoleErrors,failedRequests,httpErrors,expected:{expectedTitle,expectedWorldVersion,expectedDistrictProfileVersion,expectedCompositionMode,expectedJoinMode}},null,2));await browser.close();throw new Error(`LIVE never reached current Gardens contract: ${JSON.stringify(lastState)}`);}
 
