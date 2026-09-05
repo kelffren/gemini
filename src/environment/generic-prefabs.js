@@ -5,25 +5,41 @@
   if(!C||!L||typeof L.register!=='function'){console.error('[Kelo generic prefabs] contract/layer stack missing');return;}
 
   const images=new Map(),readyAssets=new Set();let failed=false,installed=false;
-  const audit=window.KELO_PREFAB_AUDIT={version:'generic-prefabs-v1.1',contractVersion:C.version,ready:false,failed:false,
-    rendererMode:'data-driven-prefabs-v1',prefabCount:C.prefabs.length,assetCount:Object.keys(C.assets).length,
-    registeredColliderCount:0,backDrawCount:0,frontOcclusionDrawCount:0,layerCount:0,bootstrapMode:'deferred-after-engine-bootstrap-v1'};
+  const audit=window.KELO_PREFAB_AUDIT={version:'generic-prefabs-v1.2',contractVersion:C.version,ready:false,failed:false,
+    rendererMode:'data-driven-prefabs-v2',prefabCount:C.prefabs.length,assetCount:Object.keys(C.assets).length,
+    registeredColliderCount:0,backDrawCount:0,frontDrawCount:0,frontOcclusionDrawCount:0,layerCount:0,
+    renderPartCount:C.prefabs.reduce((n,p)=>n+(p.renderPlan?.parts?.length||0),0),bootstrapMode:'deferred-after-engine-bootstrap-v1'};
 
   function geometry(p){return{x:p.position.x,y:p.position.y,w:p.size.w,h:p.size.h};}
-  function drawPrefab(g,p){const img=images.get(p.asset);if(!img||!readyAssets.has(p.asset))return false;const b=geometry(p);g.drawImage(img,b.x,b.y,b.w,b.h);return true;}
+  function partGeometry(p,part){return{x:p.position.x+part.offset.x,y:p.position.y+part.offset.y,w:part.size.w,h:part.size.h};}
+  function drawPart(g,p,part){
+    const img=images.get(part.asset);if(!img||!readyAssets.has(part.asset))return false;
+    const d=partGeometry(p,part),s=part.source;
+    const prev=g.globalAlpha;g.globalAlpha=prev*part.opacity;
+    g.drawImage(img,s.x,s.y,s.w,s.h,d.x,d.y,d.w,d.h);
+    g.globalAlpha=prev;return true;
+  }
   function actorList(){const out=[];if(typeof localPlayer!=='undefined'&&localPlayer)out.push(localPlayer);if(typeof simulatedPlayers!=='undefined'&&Array.isArray(simulatedPlayers))out.push(...simulatedPlayers);if(typeof isPvPActive!=='undefined'&&isPvPActive&&typeof arenaPvP!=='undefined'&&arenaPvP?.rival)out.push(arenaPvP.rival);return out;}
   function actorBehind(p,actor){
     const o=p.occlusion,c=p.collider,b=p.visualBounds,r=actor?.radius||20;if(!o||!actor)return false;
     const bottom=c?c.y+c.h:b.y+b.h;
     return actor.x+r>b.x+(o.sideInset||0)&&actor.x-r<b.x+b.w-(o.sideInset||0)&&actor.y>b.y+(o.topInset||0)&&actor.y<bottom+(o.bottomPadding||0);
   }
-  function drawBack(g){if(failed)return;let count=0;g.save();g.imageSmoothingEnabled=false;for(const p of C.prefabs)if(drawPrefab(g,p))count++;g.restore();audit.backDrawCount=count;}
+  function drawPhaseParts(g,p,phase){let count=0;for(const part of p.renderPlan?.parts||[])if(part.phase===phase&&drawPart(g,p,part))count++;return count;}
+  function drawBack(g){if(failed)return;let count=0;g.save();g.imageSmoothingEnabled=false;for(const p of C.prefabs)count+=drawPhaseParts(g,p,'props_back');g.restore();audit.backDrawCount=count;}
   function drawFront(g){
-    if(failed)return;let count=0;g.save();g.imageSmoothingEnabled=false;
-    for(const p of C.prefabs){const clip=p.occlusion?.clip;if(!clip)continue;for(const actor of actorList()){
-      if(!actorBehind(p,actor))continue;const r=actor.radius||20;g.save();g.beginPath();g.rect(actor.x-r-(clip.xPadding||0),actor.y-r-(clip.topPadding||0),r*2+(clip.xPadding||0)*2,r*2+(clip.topPadding||0)+(clip.bottomPadding||0));g.clip();if(drawPrefab(g,p))count++;g.restore();
-    }}
-    g.restore();audit.frontOcclusionDrawCount=count;
+    if(failed)return;let front=0,clips=0;g.save();g.imageSmoothingEnabled=false;
+    for(const p of C.prefabs){
+      front+=drawPhaseParts(g,p,'props_front');
+      if(p.renderPlan?.occlusionFallback!=='clip-redraw-back-v1')continue;
+      const clip=p.occlusion?.clip;if(!clip)continue;
+      for(const actor of actorList()){
+        if(!actorBehind(p,actor))continue;const r=actor.radius||20;g.save();g.beginPath();g.rect(actor.x-r-(clip.xPadding||0),actor.y-r-(clip.topPadding||0),r*2+(clip.xPadding||0)*2,r*2+(clip.topPadding||0)+(clip.bottomPadding||0));g.clip();
+        for(const part of p.renderPlan?.back||[])if(drawPart(g,p,part))clips++;
+        g.restore();
+      }
+    }
+    g.restore();audit.frontDrawCount=front;audit.frontOcclusionDrawCount=clips;
   }
   function bounds(){return C.prefabs.map(p=>({id:p.id,...p.visualBounds}));}
   function registerColliders(){
@@ -44,9 +60,9 @@
     }
     installed=true;registerColliders();return true;
   }
-  function getEntry(key){const p=C.prefabs.find(x=>x.key===key||x.id===key);if(!p)return null;return Object.freeze({key:p.key,prefab:p,asset:C.assets[p.asset],geometry:Object.freeze(geometry(p)),isOccluding(actor){return actorBehind(p,actor);},get ready(){return readyAssets.has(p.asset);},get failed(){return failed;}});}
+  function getEntry(key){const p=C.prefabs.find(x=>x.key===key||x.id===key);if(!p)return null;return Object.freeze({key:p.key,prefab:p,asset:C.assets[p.asset],geometry:Object.freeze(geometry(p)),renderPlan:p.renderPlan,isOccluding(actor){return actorBehind(p,actor);},get ready(){return readyAssets.has(p.asset);},get failed(){return failed;}});}
 
-  window.KELO_PREFAB_RENDERER=Object.freeze({version:'generic-prefabs-v1.1',mode:'data-driven-prefabs-v1',getEntry,ensureColliders:registerColliders,get ready(){return audit.ready&&!audit.failed;},get failed(){return audit.failed;}});
+  window.KELO_PREFAB_RENDERER=Object.freeze({version:'generic-prefabs-v1.2',mode:'data-driven-prefabs-v2',getEntry,ensureColliders:registerColliders,get ready(){return audit.ready&&!audit.failed;},get failed(){return audit.failed;}});
   const entries=Object.entries(C.assets).filter(([,a])=>a?.src);
   if(!entries.length)audit.ready=true;
   for(const [id,a] of entries){const img=new Image();img.decoding='async';images.set(id,img);img.onload=()=>{if(img.naturalWidth!==a.width||img.naturalHeight!==a.height){failed=true;audit.failed=true;console.error('[Kelo generic prefabs] invalid asset dimensions',id);return;}readyAssets.add(id);if(readyAssets.size===entries.length)audit.ready=true;};img.onerror=()=>{failed=true;audit.failed=true;console.error('[Kelo generic prefabs] asset load failed',id);};img.src=a.src;}
