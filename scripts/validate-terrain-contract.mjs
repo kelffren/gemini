@@ -12,8 +12,8 @@ const R=context.window.KELO_TILE_REGISTRY;
 assert(C&&R,'terrain contract and TileRegistry must load');
 assert.equal(C.tileSize,R.worldTileSize,'terrain tile size must match TileRegistry');
 assert.equal(C.topology,'edge-bitmask-4-v1');
-assert.deepEqual(Object.keys(C.sideBits),['top','right','bottom','left']);
-assert.deepEqual(Object.values(C.sideBits),[1,2,4,8]);
+assert.equal(Object.keys(C.sideBits).join(','),'top,right,bottom,left');
+assert.equal(Object.values(C.sideBits).join(','),'1,2,4,8');
 
 for(const [id,m] of Object.entries(C.materials)){
   assert.equal(m.id,id,`material ${id} id mismatch`);
@@ -46,13 +46,27 @@ for(const [id,p] of Object.entries(C.profiles)){
   assert(C.materials[p.pathTerrain],`profile ${id} pathTerrain missing`);
 }
 
+const declaredKeys=C.collectAtlasKeys();
+assert.equal(declaredKeys.sort().join(','),Array.from(C.requiredAtlasKeys).sort().join(','),'required atlas keys must derive from material/transition metadata');
+const syntheticMaterials={...C.materials,stone:{id:'stone',atlas:'stoneAtlas',family:'stoneTiles'}};
+const syntheticTransitions={...C.transitions,stone_to_grass:{id:'stone_to_grass',owner:'stone',neighbour:'grass',atlas:'stoneEdges'}};
+const syntheticKeys=C.collectAtlasKeys(syntheticMaterials,syntheticTransitions);
+assert(syntheticKeys.includes('stoneAtlas'),'new terrain atlas must be discovered from metadata');
+assert(syntheticKeys.includes('stoneEdges'),'new transition atlas must be discovered from metadata');
+
 const world=fs.readFileSync('src/environment/world-map.js','utf8');
-assert(world.includes("terrainRendererMode:'contract-driven-materials-v1'"),'world renderer must advertise terrain contract mode');
+assert(world.includes("terrainRendererMode:'contract-driven-materials-v2'"),'world renderer must advertise dynamic terrain contract mode');
 assert(world.includes('TERRAIN.materials[key]'),'world renderer must resolve materials from contract data');
 assert(world.includes('Object.values(TERRAIN.transitions)'),'world renderer must enumerate transition sets generically');
+assert(world.includes('function terrainAtlasKeys()'),'world renderer must discover atlas dependencies from contract data');
+assert(world.includes('for(const key of TERRAIN_ATLAS_KEYS)'),'world renderer must load discovered terrain atlases generically');
+assert(!world.includes('R.atlases.plaza'),'world renderer must not bind the plaza atlas directly');
+assert(!world.includes('R.atlases.transitions'),'world renderer must not bind the transition atlas directly');
+assert(!world.includes('R.atlases.grassVariation'),'world renderer must not bind the grass atlas directly');
+assert(!world.includes('R.atlases.marbleVariation'),'world renderer must not bind the marble detail atlas directly');
 assert(!world.includes('TM=R.transitionMasks'),'legacy TileRegistry transition mask binding must not return');
 assert(!world.includes('function roadMask('),'legacy marble-specific roadMask must not return');
 
 const index=fs.readFileSync('index.html','utf8');
 assert(index.indexOf('terrain-contract.js')<index.indexOf('world-map.js'),'terrain contract must load before world renderer');
-console.log('PASS terrain contract',C.version,Object.keys(C.materials).length,'materials',Object.keys(C.transitions).length,'transition sets',Object.keys(C.profiles).length,'profiles');
+console.log('PASS terrain contract',C.version,Object.keys(C.materials).length,'materials',Object.keys(C.transitions).length,'transition sets',Object.keys(C.profiles).length,'profiles','synthetic extension OK');
