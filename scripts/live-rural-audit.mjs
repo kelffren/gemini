@@ -2,6 +2,15 @@ import fs from 'node:fs';
 import { chromium } from 'playwright';
 
 const base=process.env.AUDIT_URL||'https://kelffren.github.io/gemini/';
+const expectedGeneric=(()=>{
+  const propSource=fs.readFileSync(new URL('../src/environment/prop-contract.js',import.meta.url),'utf8');
+  const genericSource=fs.readFileSync(new URL('../src/environment/generic-props.js',import.meta.url),'utf8');
+  const contractVersion=propSource.match(/KELO_PROP_CONTRACT=Object\.freeze\(\{version:'([^']+)'/)?.[1];
+  const contractMode=propSource.match(/KELO_PROP_CONTRACT=Object\.freeze\(\{version:'[^']+',mode:'([^']+)'/)?.[1];
+  const rendererMode=genericSource.match(/rendererMode:'([^']+)'/)?.[1];
+  if(!contractVersion||!contractMode||!rendererMode)throw new Error('Could not resolve rural generic prop expectations from source');
+  return{contractVersion,contractMode,rendererMode};
+})();
 fs.mkdirSync('artifacts',{recursive:true});
 const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_BIN||'/usr/bin/google-chrome',args:['--no-sandbox','--disable-dev-shm-usage']});
 const context=await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true});
@@ -53,7 +62,7 @@ const rural=await page.evaluate(()=>{
   };
 });
 if(rural?.dataUrl?.startsWith('data:image/png;base64,'))fs.writeFileSync('artifacts/live-rural-edge.png',Buffer.from(rural.dataUrl.split(',')[1],'base64'));
-const report={rural:rural?{landmark:rural.landmark,ground:rural.ground,genericProps:rural.genericProps,propContract:rural.propContract,layers:rural.layers,ruralBack:rural.ruralBack,world:rural.world,farm:rural.farm,ruralMaterialPixels:rural.ruralMaterialPixels,hookCalls:rural.hookCalls,finalRenderUsesWindowFarm:rural.finalRenderUsesWindowFarm,activeFarmRendererPreview:rural.activeFarmRendererPreview,canvas:rural.canvas}:null,consoleErrors,failedRequests,httpErrors};
+const report={expectedGeneric,rural:rural?{landmark:rural.landmark,ground:rural.ground,genericProps:rural.genericProps,propContract:rural.propContract,layers:rural.layers,ruralBack:rural.ruralBack,world:rural.world,farm:rural.farm,ruralMaterialPixels:rural.ruralMaterialPixels,hookCalls:rural.hookCalls,finalRenderUsesWindowFarm:rural.finalRenderUsesWindowFarm,activeFarmRendererPreview:rural.activeFarmRendererPreview,canvas:rural.canvas}:null,consoleErrors,failedRequests,httpErrors};
 fs.writeFileSync('artifacts/rural-edge-report.json',JSON.stringify(report,null,2));
 console.log(JSON.stringify(report,null,2));
 await browser.close();
@@ -61,9 +70,9 @@ if(!rural?.dataUrl?.startsWith('data:image/png;base64,'))throw new Error('Rural 
 if(!rural.landmark?.ready||!rural.landmark?.assetLoaded||rural.landmark?.failed)throw new Error(`Rural edge layer failed: ${JSON.stringify(rural.landmark)}`);
 if(rural.landmark?.mode!=='authored-low-profile-edge-clusters-v1'||rural.landmark?.clusterTileCount!==17||rural.landmark?.centerClear!==true||rural.landmark?.northRoadClear!==true)throw new Error(`Rural edge contract invalid: ${JSON.stringify(rural.landmark)}`);
 if(!rural.ground?.ready||rural.ground?.fallbackActive)throw new Error('Rural ground fallback active');
-if(rural.ground?.boundaryMode!=='environment-layer-stack-props-back-v1'||rural.ground?.genericPropContract!==true||rural.ground?.propContractVersion!=='1.3.0'||rural.ground?.boundarySource!=='ruralFarmBoundary'||rural.ground?.immediateBoundaryDraw!==false)throw new Error(`Rural boundary is not formal-stack driven: ${JSON.stringify(rural.ground)}`);
-if(!rural.genericProps?.ready||rural.genericProps?.failed||rural.genericProps?.rendererMode!=='data-driven-props-v3'||rural.genericProps?.assetCount<2||rural.genericProps?.layerGroupCount<2||rural.genericProps?.immediateLayerGroupCount!==0||rural.genericProps?.immediateDrawCalls!==0||rural.genericProps?.dynamicSourceCount<1||rural.genericProps?.dynamicPropCount<8)throw new Error(`Generic prop renderer did not resolve rural props through data: ${JSON.stringify(rural.genericProps)}`);
-if(rural.propContract?.version!=='1.3.0'||rural.propContract?.mode!=='generic-prop-contract-v3'||rural.propContract?.assetCount<2||rural.propContract?.layerGroupCount<2||rural.propContract?.sourceCount<1)throw new Error(`Prop contract runtime state invalid: ${JSON.stringify(rural.propContract)}`);
+if(rural.ground?.boundaryMode!=='environment-layer-stack-props-back-v1'||rural.ground?.genericPropContract!==true||rural.ground?.propContractVersion!==expectedGeneric.contractVersion||rural.ground?.boundarySource!=='ruralFarmBoundary'||rural.ground?.immediateBoundaryDraw!==false)throw new Error(`Rural boundary is not formal-stack driven: ${JSON.stringify(rural.ground)}`);
+if(!rural.genericProps?.ready||rural.genericProps?.failed||rural.genericProps?.rendererMode!==expectedGeneric.rendererMode||rural.genericProps?.assetCount<2||rural.genericProps?.layerGroupCount<2||rural.genericProps?.immediateLayerGroupCount!==0||rural.genericProps?.immediateDrawCalls!==0||rural.genericProps?.dynamicSourceCount<1||rural.genericProps?.dynamicPropCount<8)throw new Error(`Generic prop renderer did not resolve rural props through data: ${JSON.stringify(rural.genericProps)}`);
+if(rural.propContract?.version!==expectedGeneric.contractVersion||rural.propContract?.mode!==expectedGeneric.contractMode||rural.propContract?.assetCount<2||rural.propContract?.layerGroupCount<2||rural.propContract?.sourceCount<1)throw new Error(`Prop contract runtime state invalid: ${JSON.stringify(rural.propContract)}`);
 if(rural.layers?.version!=='environment-layer-stack-v2.3'||rural.layers?.mode!=='formal-base-back-actor-front-order-v1'||rural.layers?.preActorLayerCount<1)throw new Error(`Formal depth stack missing: ${JSON.stringify(rural.layers)}`);
 if(rural.ruralBack?.phase!=='props_back'||rural.ruralBack?.timing!=='pre_actor'||rural.ruralBack?.priority!==8||rural.ruralBack?.ownership!=='rural-farm-boundary-props-v1'||rural.ruralBack?.boundsCount<8)throw new Error(`Rural props_back layer invalid: ${JSON.stringify(rural.ruralBack)}`);
 if(!rural.farm||rural.farm.cropCount<4)throw new Error(`Farm state missing from visual evidence: ${JSON.stringify(rural.farm)}`);
