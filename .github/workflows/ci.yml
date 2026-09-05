@@ -21,6 +21,7 @@ jobs:
           test -f src/systems/nobility-authority.js
           test -f src/systems/nobility-combat.js
           test -f scripts/server-nobility-audit.js
+          test -f scripts/live-world-audit-v2.mjs
           test -f scripts/live-rural-audit.mjs
           test -f scripts/live-district-decals-audit.mjs
           test -f src/environment/district-decals-registry.js
@@ -69,6 +70,7 @@ jobs:
           node --check src/environment/luxe-compose.js
           node --check src/environment/luxe-kiosk-atlas.js
           node --check scripts/live-world-audit.mjs
+          node --check scripts/live-world-audit-v2.mjs
           node --check scripts/live-rural-audit.mjs
           node --check scripts/live-district-decals-audit.mjs
           node --check scripts/live-pavilion-audit.mjs
@@ -99,7 +101,8 @@ jobs:
           grep -q "authored-low-profile-edge-clusters-v1" src/environment/rural-landmarks.js
           grep -q "centerClear:true" src/environment/rural-landmarks.js
           grep -q "northRoadClear:true" src/environment/rural-landmarks.js
-          grep -q "registryVersion:'1.11.1'" src/environment/district-decals-registry.js
+          grep -q "version:R.version" src/environment/district-decals-registry.js
+          grep -q "registryVersion:R.version" src/environment/district-decals-registry.js
           grep -q "cameraBridge:window.camera===camera" src/environment/district-decals-registry.js
           grep -q "authored-placement-layer-v1" src/environment/district-decals-registry.js
           grep -q "registry-authored-district-decals-v1" src/environment/district-decals-registry.js
