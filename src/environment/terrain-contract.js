@@ -37,10 +37,18 @@
   function getTransition(owner,neighbour){return transitions[transitionKey(owner,neighbour)]||null;}
   function frameFor(owner,neighbour,mask){const set=getTransition(owner,neighbour);return set?.frameByMask?.[mask]??null;}
   function profileFor(id){return profiles[id]||profiles.default;}
+  function collectAtlasKeys(materialSet=materials,transitionSet=transitions){
+    const keys=new Set();
+    for(const def of Object.values(materialSet||{})){if(def?.atlas)keys.add(def.atlas);if(def?.detailAtlas)keys.add(def.detailAtlas)}
+    for(const set of Object.values(transitionSet||{}))if(set?.atlas)keys.add(set.atlas);
+    return [...keys];
+  }
+  const requiredAtlasKeys=Object.freeze(collectAtlasKeys());
 
   window.KELO_TERRAIN_CONTRACT=Object.freeze({
-    version:'1.1.0', tileSize:32, topology:'edge-bitmask-4-v1',
+    version:'1.2.0', tileSize:32, topology:'edge-bitmask-4-v1',
     defaults:Object.freeze({baseTerrain:'grass',pathTerrain:'marble'}),
-    sideBits:SIDES, materials, transitions, profiles, getTransition, frameFor, profileFor
+    sideBits:SIDES, materials, transitions, profiles, requiredAtlasKeys,
+    getTransition, frameFor, profileFor, collectAtlasKeys
   });
 })();
