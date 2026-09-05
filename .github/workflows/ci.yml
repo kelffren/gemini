@@ -38,7 +38,7 @@ jobs:
           grep -q "src/environment/rural-landmarks.js?v=209" index.html
           grep -q "src/environment/district-decals-registry.js?v=3" index.html
           grep -q "src/environment/district-decals.js?v=3" index.html
-          grep -q "src/environment/atlas-contract.js?v=1" index.html
+          grep -q "src/environment/atlas-contract.js?v=2" index.html
       - name: Server and nobility syntax
         run: |
           node --check server/index.js
@@ -128,11 +128,14 @@ jobs:
           grep -q "generic-prefabs-v1.3" src/environment/generic-prefabs.js
           grep -q "resourceMode:'atlas-contract-managed-v1'" src/environment/generic-prefabs.js
           grep -q "kelo-atlas-contract-v1" src/environment/atlas-contract.js
-          grep -q "version:'1.1.1'" src/environment/atlas-contract.js
+          grep -q "version:'1.2.0'" src/environment/atlas-contract.js
           grep -q "maxDimension:2048" src/environment/atlas-contract.js
+          grep -q "imageCreation:'atlas-contract-only'" src/environment/atlas-contract.js
           grep -q "allowSilentMissing:false" src/environment/atlas-contract.js
-          if grep -Eq "new Image\(" src/environment/generic-props.js src/environment/generic-prefabs.js; then
-            echo 'generic prop/prefab renderer bypasses atlas contract with direct Image loading'
+          grep -q "atlasConsumerMode:'atlas-contract-managed-v1'" src/environment/world-map.js
+          grep -q "worldOwnsImageLoader:false" src/environment/world-map.js
+          if grep -Eq "new Image\(" src/environment/generic-props.js src/environment/generic-prefabs.js src/environment/world-map.js; then
+            echo 'environment renderer bypasses atlas contract with direct Image loading'
             exit 1
           fi
           node scripts/validate-atlas-contract.mjs
