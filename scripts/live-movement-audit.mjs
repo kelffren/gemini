@@ -14,13 +14,16 @@ async function waitForDeployedMovementSource() {
       url.searchParams.set('movement-source-check', String(Date.now()));
       const response = await fetch(url, { cache: 'no-store' });
       last = await response.text();
-      if (response.ok && last.includes("version: 'MOV-plant-audit-v1'") && last.includes('DEFAULT_PLANT_FRAME = 2')) return;
+      const exactPlantSelector = last.includes('const rawPlantFrame = params.get(\'plantFrame\');') &&
+        last.includes('rawPlantFrame == null ? NaN : Number(rawPlantFrame)') &&
+        last.includes('const DEFAULT_PLANT_FRAME = 2;');
+      if (response.ok && last.includes("version: 'MOV-plant-audit-v1'") && exactPlantSelector) return;
     } catch (error) {
       last = String(error && error.message ? error.message : error);
     }
     await new Promise(resolve => setTimeout(resolve, 3000));
   }
-  throw new Error(`Pages did not expose MOV-plant-audit-v1 before timeout; last=${last.slice(0, 240)}`);
+  throw new Error(`Pages did not expose the exact frame2 plant selector before timeout; last=${last.slice(0, 240)}`);
 }
 
 await waitForDeployedMovementSource();
@@ -120,7 +123,7 @@ const desktop = await runViewport('desktop', {
   hasTouch: false
 });
 
-const report = { version: 'lateral-plant-live-v1', mobile, desktop };
+const report = { version: 'lateral-plant-live-v2', sourceContract: 'frame2-null-safe-selector-v1', mobile, desktop };
 fs.writeFileSync('artifacts/movement-live-audit.json', JSON.stringify(report, null, 2));
 console.log(JSON.stringify(report, null, 2));
 await browser.close();
