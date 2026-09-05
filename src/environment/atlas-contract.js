@@ -3,10 +3,7 @@
   if(!R?.atlases){console.error('[Kelo atlas] TileRegistry missing');return;}
 
   const POLICY=Object.freeze({
-    id:'kelo-atlas-contract-v1',
-    version:'1.0.0',
-    sampling:'nearest',
-    maxDimension:2048,
+    id:'kelo-atlas-contract-v1',version:'1.1.0',sampling:'nearest',maxDimension:2048,
     preferredDimensions:Object.freeze([128,256,512,1024]),
     tiers:Object.freeze({
       small:Object.freeze({maxDimension:256,use:'small tile/prop families'}),
@@ -18,51 +15,36 @@
       packedSprites:Object.freeze({paddingMin:1,spacingMin:1,extrudeRecommended:true})
     }),
     cache:Object.freeze({strategy:'versioned-url',required:true,acceptedQueryKeys:Object.freeze(['art','v'])}),
-    loading:Object.freeze({
-      core:'eager',
-      district:'lazy-when-district-needed',
-      optional:'lazy-on-first-use',
-      unload:'retain-core; district/optional may unload after district eviction when no live owners remain'
-    }),
+    loading:Object.freeze({core:'eager',district:'lazy-when-district-needed',optional:'lazy-on-first-use'}),
+    unloading:Object.freeze({core:'retain',district:'eligible-after-district-eviction',optional:'eligible-when-refcount-zero'}),
     missingAsset:Object.freeze({mode:'fail-visible-and-report',allowSilentMissing:false})
   });
 
   const ROLE_BY_KEY=Object.freeze({
-    plaza:'core',plazaGround:'core',transitions:'core',grassVariation:'core',marbleVariation:'core',
-    plazaNature:'core',trainingDummy:'optional',plazaNpcs:'optional',
-    ruralSoil:'district',ruralProps:'district',ruralLandmarks:'district',ruralNature:'district'
+    plaza:'core',plazaGround:'core',transitions:'core',grassVariation:'core',marbleVariation:'core',plazaNature:'core',
+    trainingDummy:'optional',plazaNpcs:'optional',
+    ruralSoil:'district',ruralProps:'district',ruralLandmarks:'district',ruralNature:'district',
+    gardensBase:'district',gardensJoins:'district',luxeBoutique:'optional'
   });
+  const records=new Map();
+  const runtime=new Map();
 
-  function tierFor(atlas){
-    const d=Math.max(Number(atlas?.width)||0,Number(atlas?.height)||0);
-    if(d<=POLICY.tiers.small.maxDimension)return 'small';
-    if(d<=POLICY.tiers.medium.maxDimension)return 'medium';
-    return 'large';
-  }
-  function cacheToken(src){
-    try{
-      const u=new URL(src,location.href),pairs=[...u.searchParams.entries()];
-      return pairs.find(([k])=>POLICY.cache.acceptedQueryKeys.includes(k))||null;
-    }catch{return null;}
-  }
-  function describe(key,atlas){
-    return Object.freeze({
-      key,id:atlas.id||key,src:atlas.src,width:atlas.width,height:atlas.height,
-      role:ROLE_BY_KEY[key]||'optional',tier:tierFor(atlas),cacheToken:cacheToken(atlas.src),
-      grid:Boolean(atlas.tileWidth&&atlas.tileHeight&&atlas.columns),
-      sampling:POLICY.sampling
-    });
-  }
-  const catalog=Object.freeze(Object.fromEntries(Object.entries(R.atlases).map(([key,a])=>[key,describe(key,a)])));
-  const violations=[];
-  for(const entry of Object.values(catalog)){
-    if(!entry.src)violations.push(`${entry.key}: missing src`);
-    if(!(entry.width>0&&entry.height>0))violations.push(`${entry.key}: invalid dimensions`);
-    if(Math.max(entry.width,entry.height)>POLICY.maxDimension)violations.push(`${entry.key}: exceeds ${POLICY.maxDimension}px`);
-    if(POLICY.cache.required&&!entry.cacheToken)violations.push(`${entry.key}: missing versioned URL cache token`);
-  }
-  const audit=Object.freeze({version:POLICY.version,policyId:POLICY.id,atlasCount:Object.keys(catalog).length,violations:Object.freeze(violations.slice()),roles:Object.freeze(Object.fromEntries(Object.entries(catalog).map(([k,v])=>[k,v.role])))});
-  if(violations.length)console.error('[Kelo atlas] contract violations',violations);
-  window.KELO_ATLAS_CONTRACT=Object.freeze({policy:POLICY,catalog,roleFor:key=>catalog[key]?.role||null,tierFor:key=>catalog[key]?.tier||null,describe:key=>catalog[key]||null});
-  window.KELO_ATLAS_AUDIT=audit;
+  function tierForAtlas(atlas){const d=Math.max(Number(atlas?.width)||0,Number(atlas?.height)||0);if(d<=256)return 'small';if(d<=1024)return 'medium';return 'large'}
+  function cacheToken(src){try{const u=new URL(src,location.href);return [...u.searchParams.entries()].find(([k])=>POLICY.cache.acceptedQueryKeys.includes(k))||null}catch{return null}}
+  function normalize(key,atlas,role){return Object.freeze({key,id:atlas?.id||key,src:atlas?.src,width:Number(atlas?.width)||0,height:Number(atlas?.height)||0,role:role||ROLE_BY_KEY[key]||'optional',tier:tierForAtlas(atlas),cacheToken:cacheToken(atlas?.src),grid:Boolean(atlas?.tileWidth&&atlas?.tileHeight&&atlas?.columns),sampling:POLICY.sampling})}
+  function register(key,atlas,opts={}){if(!key||!atlas)return null;const entry=normalize(key,atlas,opts.role);records.set(key,entry);refreshAudit();return entry}
+  function validate(entry){const v=[];if(!entry.src)v.push(`${entry.key}: missing src`);if(!(entry.width>0&&entry.height>0))v.push(`${entry.key}: invalid dimensions`);if(Math.max(entry.width,entry.height)>POLICY.maxDimension)v.push(`${entry.key}: exceeds ${POLICY.maxDimension}px`);if(POLICY.cache.required&&!entry.cacheToken)v.push(`${entry.key}: missing versioned URL cache token`);return v}
+  function refreshAudit(){const violations=[...records.values()].flatMap(validate);window.KELO_ATLAS_AUDIT=Object.freeze({version:POLICY.version,policyId:POLICY.id,atlasCount:records.size,violations:Object.freeze(violations),roles:Object.freeze(Object.fromEntries([...records].map(([k,v])=>[k,v.role]))),loaded:Object.freeze([...runtime].filter(([,v])=>v.image?.complete&&v.image?.naturalWidth>0).map(([k])=>k))});if(violations.length)console.error('[Kelo atlas] contract violations',violations)}
+  function acquire(key){const entry=records.get(key);if(!entry)return Promise.reject(new Error(`[Kelo atlas] unknown asset ${key}`));let state=runtime.get(key);if(state){state.refs++;return state.promise}const image=new Image(),promise=new Promise((resolve,reject)=>{image.onload=()=>{if(image.naturalWidth!==entry.width||image.naturalHeight!==entry.height){reject(new Error(`[Kelo atlas] ${key} dimension mismatch ${image.naturalWidth}x${image.naturalHeight}`));return}refreshAudit();resolve(image)};image.onerror=()=>reject(new Error(`[Kelo atlas] failed to load ${key}`));image.src=entry.src});state={image,promise,refs:1,role:entry.role};runtime.set(key,state);return promise}
+  function release(key){const state=runtime.get(key);if(!state)return false;state.refs=Math.max(0,state.refs-1);if(state.refs===0&&state.role!=='core'){state.image.src='';runtime.delete(key);refreshAudit();return true}return false}
+  function describe(key){return records.get(key)||null}
+  function catalog(){return Object.freeze(Object.fromEntries(records))}
+
+  for(const [key,atlas] of Object.entries(R.atlases))register(key,atlas);
+  if(window.KELO_GARDENS_ATLAS)register('gardensBase',window.KELO_GARDENS_ATLAS,{role:'district'});
+  if(window.KELO_GARDENS_JOINS)register('gardensJoins',window.KELO_GARDENS_JOINS,{role:'district'});
+  for(const [key,asset] of Object.entries(R.architectureAssets||{}))register(key,asset,{role:'optional'});
+  refreshAudit();
+
+  window.KELO_ATLAS_CONTRACT=Object.freeze({policy:POLICY,register,acquire,release,describe,get catalog(){return catalog()},roleFor:key=>records.get(key)?.role||null,tierFor:key=>records.get(key)?.tier||null});
 })();
