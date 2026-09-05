@@ -7,6 +7,12 @@ const expectedTitle=process.env.EXPECTED_TITLE||'';
 const expectedPlaza=process.env.EXPECTED_PLAZA||'';
 const expectedArchitectureVersion=process.env.EXPECTED_ARCHITECTURE_VERSION||'';
 const expectedArchitectureMode=process.env.EXPECTED_ARCHITECTURE_MODE||'';
+const expectedMarbleScope=process.env.EXPECTED_MARBLE_SCOPE||(()=>{
+  const source=fs.readFileSync(new URL('../src/environment/tile-registry.js',import.meta.url),'utf8');
+  const match=source.match(/marbleVariation:Object\.freeze\(\{[^}]*scope:'([^']+)'/);
+  if(!match)throw new Error('Could not resolve marble variation scope from TileRegistry');
+  return match[1];
+})();
 fs.mkdirSync('artifacts',{recursive:true});
 const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_BIN||'/usr/bin/google-chrome',args:['--no-sandbox','--disable-dev-shm-usage']});
 const context=await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true});
@@ -27,7 +33,7 @@ for(let attempt=1;attempt<=24;attempt++){
     const okArch=(!expectedArchitectureVersion||d.architecture?.version===expectedArchitectureVersion)&&(!expectedArchitectureMode||d.architecture?.mode===expectedArchitectureMode);
     const frontLayer=d.layers?.layers?.find?.(l=>l.id==='plaza-nature-front');
     const okNature=d.nature?.ready&&d.nature?.assetLoaded&&!d.nature?.failed&&d.nature?.version==='plaza-nature-v3.1'&&d.nature?.propCount===4&&d.nature?.depthMode==='formal-back-front-layer-stack-v1'&&d.nature?.rendererWrapper===false&&d.nature?.layerPriority===10&&d.nature?.precedencePolicy==='nature-before-architecture-on-overlap-v1'&&d.layers?.version==='environment-layer-stack-v2.2'&&d.layers?.spatialPolicy==='same-phase-aabb-priority-resolution-v1'&&d.layers?.spatialTieCount===0&&d.layers?.postActorLayerCount>=1&&frontLayer?.phase==='props_front'&&frontLayer?.timing==='post_actor'&&frontLayer?.priority===10;
-    const okCommerce=d.world?.commerceMarbleVariation===true&&d.world?.marbleVariationScope==='gardens-commerce-roads'&&d.registry?.styles?.districtGround?.profiles?.commerce?.marbleVariation===true;
+    const okCommerce=d.world?.commerceMarbleVariation===true&&d.world?.marbleVariationScope===expectedMarbleScope&&d.registry?.styles?.districtGround?.profiles?.commerce?.marbleVariation===true&&d.registry?.styles?.marbleVariation?.scope===expectedMarbleScope;
     if(okTitle&&okPlaza&&okArch&&okNature&&okCommerce&&d.world?.ready&&d.world?.version===expectedWorld&&d.world?.grassVariationAssetLoaded&&d.world?.grassVariationMode==='authored-eight-variant-atlas-v1'&&d.world?.grassVariationCount===8&&d.registry?.version===expectedRegistry&&d.registry?.atlases?.grassVariation?.src?.includes('grass-variation-v1.png')&&d.registry?.atlases?.plazaGround?.src?.includes('plaza-ground-v1.png')&&d.registry?.atlases?.plazaNature?.src?.includes('plaza-nature-v1.svg')&&d.architecture?.prefabCount===1&&d.kiosk?.ready&&d.market?.disabled===true){loaded=true;break;}
   }catch(e){console.log(`attempt ${attempt}: ${e.message}`)}
   await page.waitForTimeout(10000);
@@ -65,17 +71,17 @@ const plazaTree=await page.evaluate(()=>{
   return{dataUrl:c.toDataURL('image/png'),nature:window.KELO_PLAZA_NATURE_AUDIT||null,layers:window.KELO_ENVIRONMENT_LAYER_AUDIT||null,registryNature:window.KELO_TILE_REGISTRY?.plazaNatureProps||null};
 });
 if(plazaTree?.dataUrl?.startsWith('data:image/png;base64,'))fs.writeFileSync('artifacts/live-plaza-tree.png',Buffer.from(plazaTree.dataUrl.split(',')[1],'base64'));
-const report={loaded,state,plaza:plaza?{ivory:plaza.ivory,gold:plaza.gold,teal:plaza.teal}:null,grass:grass?{base:grass.base,light:grass.light,dark:grass.dark,pink:grass.pink,blue:grass.blue}:null,commerce:commerce?{world:commerce.world,profile:commerce.profile,scope:commerce.scope,canvas:commerce.canvas}:null,plazaTree:plazaTree?{nature:plazaTree.nature,layers:plazaTree.layers,propCount:plazaTree.registryNature?.length||0}:null,consoleErrors,failedRequests,httpErrors};
+const report={loaded,expectedMarbleScope,state,plaza:plaza?{ivory:plaza.ivory,gold:plaza.gold,teal:plaza.teal}:null,grass:grass?{base:grass.base,light:grass.light,dark:grass.dark,pink:grass.pink,blue:grass.blue}:null,commerce:commerce?{world:commerce.world,profile:commerce.profile,scope:commerce.scope,canvas:commerce.canvas}:null,plazaTree:plazaTree?{nature:plazaTree.nature,layers:plazaTree.layers,propCount:plazaTree.registryNature?.length||0}:null,consoleErrors,failedRequests,httpErrors};
 fs.writeFileSync('artifacts/report.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));
 await browser.close();
-if(!loaded)throw new Error('LIVE never reached current Luxe-only grass + Commerce marble + resolved plaza-nature layer contract');
+if(!loaded)throw new Error(`LIVE never reached current visual contract (marbleScope=${expectedMarbleScope})`);
 if(expectedTitle&&state.title!==expectedTitle)throw new Error(`Title mismatch ${state.title} !== ${expectedTitle}`);
 if(expectedPlaza&&state.plaza?.version!==expectedPlaza)throw new Error(`Plaza mismatch ${state.plaza?.version} !== ${expectedPlaza}`);
 if(!state.plaza?.ready||!state.plaza?.assetLoaded||!state.plaza?.groundAssetLoaded||state.plaza?.fallbackActive||!state.plaza?.worldLayerWrapped||state.plaza?.renderingMode!=='authored-plaza-ground-v1')throw new Error('Authored plaza ground did not become the active world layer');
 if(state.plaza?.groundWidth!==800||state.plaza?.groundHeight!==560||state.tileset?.sourceMode!=='authored-raster-ground-v1'||state.tileset?.authoredGround!==true||!state.tileset?.assetPath?.includes('plaza-ground-v1.png'))throw new Error('Authored plaza ground contract invalid');
 if(!plaza?.dataUrl?.startsWith('data:image/png;base64,')||plaza.ivory<10000||plaza.gold<100||plaza.teal<10)throw new Error(`Authored plaza materials not visible: ${JSON.stringify(plaza)}`);
 if(state.world?.version!==expectedWorld||state.world?.plazaRoadAlignment!=='authored-plaza-ground-v1'||!state.world?.grassVariationAssetLoaded||state.world?.grassVariationCount!==8)throw new Error('World/plaza road alignment contract invalid');
-if(state.world?.commerceMarbleVariation!==true||state.world?.marbleVariationScope!=='gardens-commerce-roads')throw new Error(`Commerce marble contract invalid: ${JSON.stringify(state.world)}`);
+if(state.world?.commerceMarbleVariation!==true||state.world?.marbleVariationScope!==expectedMarbleScope)throw new Error(`Commerce marble contract invalid: ${JSON.stringify(state.world)}`);
 if(state.registryVersion!==expectedRegistry)throw new Error(`Registry mismatch ${state.registryVersion} !== ${expectedRegistry}`);
 if(state.architectureRenderer?.prefabCount!==1||state.architectureRenderer?.mode!=='luxe-only-v1')throw new Error('Luxe-only architecture contract invalid');
 if(!state.kiosk?.ready||state.kiosk?.failed||state.market?.disabled!==true)throw new Error('Luxe architecture state invalid');
@@ -84,7 +90,7 @@ if(!state.nature?.ready||!state.nature?.assetLoaded||state.nature?.failed||state
 if(state.layers?.version!=='environment-layer-stack-v2.2'||state.layers?.spatialPolicy!=='same-phase-aabb-priority-resolution-v1'||state.layers?.spatialTieCount!==0||state.layers?.postActorLayerCount<1||frontLayer?.phase!=='props_front'||frontLayer?.timing!=='post_actor'||frontLayer?.priority!==10)throw new Error(`Resolved post-actor layer contract invalid: ${JSON.stringify(state.layers)}`);
 if(!plazaTree?.dataUrl?.startsWith('data:image/png;base64,')||plazaTree.registryNature?.length!==4)throw new Error('Plaza nature screenshot evidence missing');
 if(!grass?.dataUrl?.startsWith('data:image/png;base64,')||grass.base<1000||grass.light<20||grass.dark<20||(grass.pink+grass.blue)<2)throw new Error(`Authored grass pixels missing: ${JSON.stringify(grass)}`);
-if(!commerce?.dataUrl?.startsWith('data:image/png;base64,')||commerce.world?.activeDistrictLabel!=='commerce'||commerce.profile?.marbleVariation!==true||commerce.scope!=='gardens-commerce-roads')throw new Error(`Commerce marble screenshot/contract evidence missing: ${JSON.stringify(commerce)}`);
+if(!commerce?.dataUrl?.startsWith('data:image/png;base64,')||commerce.world?.activeDistrictLabel!=='commerce'||commerce.profile?.marbleVariation!==true||commerce.scope!==expectedMarbleScope)throw new Error(`Commerce marble screenshot/contract evidence missing: ${JSON.stringify(commerce)}`);
 if(consoleErrors.length)throw new Error(`Console/page errors: ${JSON.stringify(consoleErrors)}`);
 if(failedRequests.length)throw new Error(`Failed requests: ${JSON.stringify(failedRequests)}`);
 if(httpErrors.length)throw new Error(`HTTP errors: ${JSON.stringify(httpErrors)}`);
