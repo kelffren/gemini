@@ -1,19 +1,19 @@
 (function () {
   const REGISTRY=window.KELO_TILE_REGISTRY;
   const ATLAS=REGISTRY?.atlases?.ruralSoil;
-  const PROP_ATLAS=REGISTRY?.atlases?.ruralProps;
   const R=REGISTRY?.ruralTiles;
-  const P=REGISTRY?.ruralPropTiles;
+  const PROP_CONTRACT=window.KELO_PROP_CONTRACT;
+  const GENERIC_PROPS=window.KELO_GENERIC_PROPS;
+  const boundarySource=PROP_CONTRACT?.sources?.ruralFarmBoundary;
   const originalRenderFarm=window.renderFarm;
-  if(!ATLAS||!PROP_ATLAS||!R||!P||typeof originalRenderFarm!=='function'){
-    console.error('[Kelo rural] registry atlases or farm renderer missing'); return;
+  if(!ATLAS||!R||!boundarySource||!GENERIC_PROPS||typeof GENERIC_PROPS.drawInstances!=='function'||typeof originalRenderFarm!=='function'){
+    console.error('[Kelo rural] soil atlas, generic prop contract, or farm renderer missing'); return;
   }
   const TILE=REGISTRY.worldTileSize||32;
   const PLOT=96;
   const GRID=Object.freeze([R.TOP_LEFT,R.TOP,R.TOP_RIGHT,R.LEFT,R.CENTER,R.RIGHT,R.BOTTOM_LEFT,R.BOTTOM,R.BOTTOM_RIGHT]);
   const sheet=new Image(); sheet.decoding='async';
-  const props=new Image(); props.decoding='async';
-  let soilReady=false, propsReady=false;
+  let soilReady=false;
 
   function origin(id,atlas){ return {x:(id%atlas.columns)*TILE,y:Math.floor(id/atlas.columns)*TILE}; }
   function tile(g,img,atlas,id,x,y){ const p=origin(id,atlas); g.drawImage(img,p.x,p.y,TILE,TILE,x,y,TILE,TILE); }
@@ -36,61 +36,40 @@
       if(progress>.55){ g.fillStyle=c.type==='carrot'?'#f18b35':'#f2cf62'; g.fillRect(px-3,py-3,7,4); }
     });
   }
-  function propTile(g,id,x,y){ tile(g,props,PROP_ATLAS,id,x,y); }
-  function drawBoundary(g,farm){
-    const left=farm.x-16, right=farm.x+farm.w+16, top=farm.y-16, bottom=farm.y+farm.h+16;
-    const gateX=Math.round((farm.x+farm.w/2)/TILE)*TILE-TILE/2;
-    // Short north-facing dirt threshold connects directly to the rerouted ivory road.
-    propTile(g,P.DIRT_VERTICAL,gateX,top-TILE);
-    for(let x=left+TILE;x<=right-TILE;x+=TILE){
-      if(Math.abs(x-gateX)>TILE/2) propTile(g,P.FENCE_H,x,top);
-      propTile(g,P.FENCE_H,x,bottom);
-    }
-    for(let y=top+TILE;y<=bottom-TILE;y+=TILE){
-      propTile(g,P.FENCE_V,left,y); propTile(g,P.FENCE_V,right,y);
-    }
-    propTile(g,P.CORNER_LEFT,left,top); propTile(g,P.CORNER_RIGHT,right-TILE,top);
-    propTile(g,P.CORNER_LEFT,left,bottom); propTile(g,P.CORNER_RIGHT,right-TILE,bottom);
-    propTile(g,P.GATE_OPEN,gateX,top);
-    propTile(g,P.FIELD_SIGN,left+TILE,top+TILE);
-    propTile(g,P.WEED_A,left-TILE,top+2*TILE);
-    propTile(g,P.STONE_A,right+6,top+5*TILE);
-    propTile(g,P.WEED_B,right+4,bottom-2*TILE);
-  }
+  function genericBoundaryReady(){return GENERIC_PROPS.ready&&GENERIC_PROPS.isAssetReady('ruralProps');}
 
   window.renderFarm=function(farm){
     if(!soilReady){ originalRenderFarm(farm); return; }
     const now=Date.now();
     ctx.save(); ctx.imageSmoothingEnabled=false;
-    if(propsReady) drawBoundary(ctx,farm);
+    if(genericBoundaryReady())GENERIC_PROPS.drawInstances(ctx,boundarySource.build(farm),true);
     ctx.fillStyle='rgba(22,80,49,.13)'; ctx.fillRect(farm.x-8,farm.y-8,farm.w+16,farm.h+16);
     farm.crops.forEach((c,index)=>{
       const x=farm.x+20+(index%2)*110, y=farm.y+30+Math.floor(index/2)*110;
       plot(ctx,x,y,index); crop(ctx,c,x,y,now,index);
     });
     ctx.restore();
+    syncReady();
   };
 
   window.KELO_RURAL_GROUND_AUDIT={
-    version:'rural-v2.1',ready:false,assetLoaded:false,propsLoaded:false,fallbackActive:true,
-    atlas:ATLAS.src,propAtlas:PROP_ATLAS.src,atlasWidth:ATLAS.width,atlasHeight:ATLAS.height,
-    propAtlasWidth:PROP_ATLAS.width,propAtlasHeight:PROP_ATLAS.height,tileSize:TILE,modularTiles:true,
-    renderingMode:'authored-nine-slice-v1',plotSize:PLOT,boundaryMode:'modular-fence-gate-v1',
-    gateSide:'north',dirtApproachTiles:1
+    version:'rural-v2.2',ready:false,assetLoaded:false,propsLoaded:false,fallbackActive:true,
+    atlas:ATLAS.src,propAtlas:PROP_CONTRACT.assets?.ruralProps?.src||null,atlasWidth:ATLAS.width,atlasHeight:ATLAS.height,
+    propAtlasWidth:PROP_CONTRACT.assets?.ruralProps?.width||0,propAtlasHeight:PROP_CONTRACT.assets?.ruralProps?.height||0,tileSize:TILE,modularTiles:true,
+    renderingMode:'authored-nine-slice-v1',plotSize:PLOT,boundaryMode:'generic-prop-contract-v1',
+    gateSide:'north',dirtApproachTiles:1,genericPropContract:true,propContractVersion:PROP_CONTRACT.version,
+    propRendererVersion:GENERIC_PROPS.version,boundarySource:boundarySource.id
   };
   function syncReady(){
-    const a=window.KELO_RURAL_GROUND_AUDIT;
-    a.assetLoaded=soilReady&&propsReady; a.propsLoaded=propsReady; a.ready=soilReady&&propsReady; a.fallbackActive=!soilReady;
+    const a=window.KELO_RURAL_GROUND_AUDIT,propsReady=genericBoundaryReady();
+    a.assetLoaded=soilReady&&propsReady;a.propsLoaded=propsReady;a.ready=soilReady&&propsReady;a.fallbackActive=!soilReady;
   }
   sheet.onload=function(){
     if(sheet.naturalWidth!==ATLAS.width||sheet.naturalHeight!==ATLAS.height){console.error('[Kelo rural] invalid soil atlas dimensions',sheet.naturalWidth,sheet.naturalHeight);return;}
-    soilReady=true; syncReady();
+    soilReady=true;syncReady();
   };
   sheet.onerror=function(){console.error('[Kelo rural] soil atlas load failed');};
-  props.onload=function(){
-    if(props.naturalWidth!==PROP_ATLAS.width||props.naturalHeight!==PROP_ATLAS.height){console.error('[Kelo rural] invalid props atlas dimensions',props.naturalWidth,props.naturalHeight);return;}
-    propsReady=true; syncReady();
-  };
-  props.onerror=function(){console.error('[Kelo rural] props atlas load failed');};
-  sheet.src=ATLAS.src+'&rural=171'; props.src=PROP_ATLAS.src+'&rural=171';
+  sheet.src=ATLAS.src+'&rural=172';
+  function waitForGeneric(){syncReady();if(!window.KELO_RURAL_GROUND_AUDIT.ready&&!window.KELO_GENERIC_PROP_AUDIT?.failed)requestAnimationFrame(waitForGeneric);}
+  waitForGeneric();
 })();
