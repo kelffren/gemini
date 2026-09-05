@@ -17,10 +17,13 @@
     .lx-spacer{flex:1}
     .lx-top-btn{height:38px;padding:0 11px;border-radius:12px;border:1px solid rgba(231,197,106,.38);background:rgba(14,28,29,.93);color:var(--lx-gold);font-size:11px;font-weight:800;letter-spacing:.2px;box-shadow:0 6px 18px rgba(0,0,0,.18)}
     .lx-top-btn:active{transform:translateY(1px)}
-    .lx-rail{position:absolute;top:max(62px,calc(env(safe-area-inset-top) + 54px));right:max(8px,env(safe-area-inset-right));pointer-events:auto}
-    .lx-side-menu{width:64px;height:64px;padding:5px;border-radius:18px;border:1px solid rgba(231,197,106,.58);background:linear-gradient(145deg,rgba(28,31,25,.98),rgba(10,17,18,.98));color:var(--lx-ivory);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;box-shadow:0 10px 26px rgba(0,0,0,.34),inset 0 0 0 1px rgba(255,255,255,.035);font-size:8px;font-weight:900;letter-spacing:.13em}
+    .lx-rail{position:absolute;top:max(62px,calc(env(safe-area-inset-top) + 54px));right:max(8px,env(safe-area-inset-right));pointer-events:auto;display:flex;flex-direction:column;align-items:center;gap:8px}
+    .lx-side-menu,.lx-side-pvp{width:64px;height:64px;padding:5px;border-radius:18px;border:1px solid rgba(231,197,106,.58);background:linear-gradient(145deg,rgba(28,31,25,.98),rgba(10,17,18,.98));color:var(--lx-ivory);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;box-shadow:0 10px 26px rgba(0,0,0,.34),inset 0 0 0 1px rgba(255,255,255,.035);font-size:8px;font-weight:900;letter-spacing:.13em}
     .lx-side-menu b{display:block;color:var(--lx-gold);font-size:23px;line-height:20px;font-family:Georgia,serif;text-shadow:0 0 13px rgba(231,197,106,.24)}
-    .lx-side-menu:active{transform:scale(.96);border-color:rgba(231,197,106,.9)}
+    .lx-side-pvp{height:58px;border-color:rgba(231,197,106,.48)}
+    .lx-side-pvp b{display:block;color:var(--lx-ivory);font-size:24px;line-height:21px;text-shadow:0 0 12px rgba(231,197,106,.18)}
+    .lx-side-pvp span{color:var(--lx-gold);font-size:9px;letter-spacing:.14em}
+    .lx-side-menu:active,.lx-side-pvp:active{transform:scale(.96);border-color:rgba(231,197,106,.9)}
     .lx-chat-drawer{display:none;position:absolute;left:max(8px,env(safe-area-inset-left));right:max(8px,env(safe-area-inset-right));bottom:max(70px,calc(env(safe-area-inset-bottom) + 62px));z-index:88;padding:9px;border-radius:14px;background:rgba(9,18,21,.96);border:1px solid rgba(231,197,106,.34);box-shadow:0 14px 34px rgba(0,0,0,.35);pointer-events:auto}
     .lx-chat-drawer.open{display:block}
     .lx-log{height:62px;overflow:auto;padding:2px 3px 7px;color:#e8ede8;font-size:11px;line-height:1.4}
@@ -34,7 +37,7 @@
     .action-bar .stone-slot.ultimate{border-color:rgba(231,197,106,.88)!important;background:linear-gradient(145deg,rgba(25,55,45,.96),rgba(11,22,24,.96))!important}
     .action-bar .stone-slot span[style*="opacity"]{font-size:13px!important;color:#69837b!important;opacity:.52!important}
     #kelo-bag,#kelo-builder,#menu-sheet{border-color:rgba(231,197,106,.45)!important;background:rgba(9,18,21,.97)!important;box-shadow:0 16px 36px rgba(0,0,0,.34)!important;color:#e8ede8!important}
-    @media(max-width:360px){.lx-presence{display:none}.lx-top-btn{padding:0 8px}.lx-side-menu{width:58px;height:58px}.action-bar{grid-template-columns:repeat(5,41px)!important;gap:5px!important}.action-bar .stone-slot,.action-bar .stone-slot.ultimate{width:41px!important;height:41px!important}}
+    @media(max-width:360px){.lx-presence{display:none}.lx-top-btn{padding:0 8px}.lx-side-menu,.lx-side-pvp{width:58px}.lx-side-menu{height:58px}.lx-side-pvp{height:54px}.action-bar{grid-template-columns:repeat(5,41px)!important;gap:5px!important}.action-bar .stone-slot,.action-bar .stone-slot.ultimate{width:41px!important;height:41px!important}}
   `;
   document.head.appendChild(css);
 
@@ -49,6 +52,7 @@
     </div>
     <div class="lx-rail">
       <button class="lx-side-menu" id="lx-side-menu" aria-label="Abrir menú"><b>◆</b><span>MENÚ</span></button>
+      <button class="lx-side-pvp" id="lx-side-pvp" aria-label="Entrar al mundo PvP"><b>⚔</b><span>PVP</span></button>
     </div>
     <div class="lx-chat-drawer" id="lx-chat-drawer">
       <div class="lx-log" id="lx-log"></div>
@@ -88,6 +92,14 @@
     if (typeof toggleMenu === 'function') toggleMenu();
   };
 
+  document.getElementById('lx-side-pvp').onclick = function () {
+    const drawer = document.getElementById('lx-chat-drawer');
+    if (drawer) drawer.classList.remove('open');
+    if (typeof closeMenu === 'function') closeMenu();
+    if (typeof window.enterPvPWorld === 'function') window.enterPvPWorld();
+    else if (typeof showToast === 'function') showToast('PvP todavía cargando');
+  };
+
   function appendChat(who,text){
     const log=document.getElementById('lx-log'); if(!log)return;
     const row=document.createElement('div');
@@ -110,12 +122,13 @@
   });
 
   window.KELO_LUXE_AUDIT = Object.freeze({
-    version:'luxe-shell-v3.2',
+    version:'luxe-shell-v3.3',
     palette:'forest-ivory-gold',
     hideKwBadge:true,
     hideLocalChip:true,
     hideFarmOverlay:false,
     ruralRenderer:'modular-authored-v1',
-    legacyHudSuppressed:true
+    legacyHudSuppressed:true,
+    pvpRailButton:true
   });
 })();
