@@ -1,0 +1,61 @@
+name: Install House Instance V1
+on:
+  push:
+    branches: [ feature/map-editor-parcels-v1 ]
+    paths:
+      - 'scripts/house-instance-v1.tgz'
+      - '.github/workflows/install-house-instance-v1.yml'
+permissions:
+  contents: write
+jobs:
+  install-and-certify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Expand implementation bundle
+        run: tar -xzf scripts/house-instance-v1.tgz
+      - name: Integrate with current Property branch
+        run: python3 scripts/integrate-house-instance-v1.py
+      - name: Deterministic validation
+        run: |
+          node --check src/instances/instance-system.js
+          node --check src/instances/property-house-bridge.js
+          node --check src/instances/house-instance.js
+          node --check src/instances/instance-runtime-bridge.js
+          node --check src/ui/house-instance-ui.js
+          node --check scripts/instance-system-audit.js
+          node --check scripts/house-instance-browser-audit.mjs
+          node scripts/instance-system-audit.js
+          node scripts/property-editor-audit.js
+      - name: Install browser audit dependency
+        run: npm install --no-save playwright@1.55.0
+      - name: Serve candidate locally
+        run: |
+          python3 -m http.server 8000 --bind 127.0.0.1 > /tmp/house-v1-http.log 2>&1 &
+          for i in {1..20}; do curl -fsS http://127.0.0.1:8000/index.html >/dev/null && exit 0; sleep 1; done
+          cat /tmp/house-v1-http.log
+          exit 1
+      - name: Certify mobile and desktop flow
+        env:
+          AUDIT_URL: http://127.0.0.1:8000/
+          CHROME_BIN: /usr/bin/google-chrome
+        run: node scripts/house-instance-browser-audit.mjs
+      - name: Remove one-time installer and commit certified implementation
+        run: |
+          rm -f scripts/house-instance-v1.tgz .github/workflows/install-house-instance-v1.yml
+          git config user.name kelo-instance-bot
+          git config user.email 68343904+kelffren@users.noreply.github.com
+          git add -A -- src/instances src/ui/house-instance-ui.js scripts/instance-system-audit.js scripts/house-instance-browser-audit.mjs scripts/integrate-house-instance-v1.py docs/INSTANCE_SYSTEM_MEMORY.md docs/CODE_INDEX.md ENGINE_MAP.md index.html package.json .github/workflows
+          git commit -m 'House Instance V1 offline-first online-ready'
+          git push
+      - name: Upload certification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: house-instance-v1-install-audit
+          path: artifacts/house-instance-*
+          if-no-files-found: warn
