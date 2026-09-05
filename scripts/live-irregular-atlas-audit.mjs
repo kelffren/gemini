@@ -25,15 +25,18 @@ const state=await page.evaluate(()=>({
 const atlasResponse=await page.request.get(`${base}assets/Arboleskelo1.atlas.png?audit=${Date.now()}`);
 const metaResponse=await page.request.get(`${base}assets/Arboleskelo1.atlas.json?audit=${Date.now()}`);
 await page.screenshot({path:'artifacts/irregular-atlas-live-390x844.png',fullPage:false});
-const report={state,atlasStatus:atlasResponse.status(),metaStatus:metaResponse.status(),consoleErrors,failedRequests,httpErrors};
+const frameCounts=Object.fromEntries((state.props||[]).reduce((m,p)=>m.set(p.frame,(m.get(p.frame)||0)+1),new Map()));
+const report={state,frameCounts,atlasStatus:atlasResponse.status(),metaStatus:metaResponse.status(),consoleErrors,failedRequests,httpErrors};
 fs.writeFileSync('artifacts/irregular-atlas-live-report.json',JSON.stringify(report,null,2));
 console.log(JSON.stringify(report,null,2));
 if(state.canvas?.cssWidth!==390||state.canvas?.cssHeight!==844) throw new Error(`bad mobile viewport ${JSON.stringify(state.canvas)}`);
 if(state.atlas?.frameMode!=='irregular') throw new Error(`LIVE atlas is not irregular: ${JSON.stringify(state.atlas)}`);
-if(!state.atlas?.frames?.tree_large) throw new Error('LIVE tree_large frame missing');
+const expected=['tree_large','tree_pink','tree_medium','tree_cypress','tree_small'];
+for(const id of expected){if(!state.atlas?.frames?.[id]) throw new Error(`LIVE frame missing ${id}`);}
 const f=state.atlas.frames.tree_large;
 if(f.x!==7||f.y!==25||f.w!==438||f.h!==527) throw new Error(`unexpected tree_large ${JSON.stringify(f)}`);
-if(!Array.isArray(state.props)||state.props.length<12||state.props.some(p=>p.frame!=='tree_large')) throw new Error('Plaza props not using tree_large named frame');
+if(!Array.isArray(state.props)||state.props.length<20) throw new Error(`expected at least 20 Plaza vegetation props, got ${state.props?.length}`);
+for(const id of expected){if(!state.props.some(p=>p.frame===id)) throw new Error(`Plaza does not use ${id}`);}
 if(atlasResponse.status()!==200||metaResponse.status()!==200) throw new Error('atlas resources unavailable');
 if(consoleErrors.length||failedRequests.length||httpErrors.length) throw new Error(`LIVE runtime/network errors ${JSON.stringify({consoleErrors,failedRequests,httpErrors})}`);
 await browser.close();
