@@ -1,0 +1,34 @@
+name: Repair PNG integrity
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/repair-png-integrity.yml'
+      - 'scripts/repair-png-crcs.mjs'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Repair boutique checksums without changing DEFLATE payload
+        run: node scripts/repair-png-crcs.mjs assets/kelo-luxe-boutique.png
+      - name: Validate complete PNG pipeline
+        run: node scripts/validate-png-pipeline.mjs
+      - name: Prove corruption fails closed
+        run: node scripts/test-png-validation.mjs
+      - name: Commit repaired PNG if changed
+        run: |
+          if git diff --quiet -- assets/kelo-luxe-boutique.png; then
+            echo 'No checksum changes required.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add assets/kelo-luxe-boutique.png
+          git commit -m 'art: repair boutique PNG zlib checksum losslessly'
+          git push origin HEAD:main
