@@ -1,0 +1,25 @@
+name: Asset Contract CI
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'assets/**'
+      - 'src/environment/art-asset-manifest.json'
+      - 'scripts/validate-art-assets.mjs'
+      - 'docs/ASSET_CONTRACT.md'
+      - '.github/workflows/asset-contract-ci.yml'
+  pull_request:
+    paths:
+      - 'assets/**'
+      - 'src/environment/art-asset-manifest.json'
+      - 'scripts/validate-art-assets.mjs'
+      - 'docs/ASSET_CONTRACT.md'
+      - '.github/workflows/asset-contract-ci.yml'
+  workflow_dispatch:
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate authored PNG contract
+        run: node scripts/validate-art-assets.mjs
