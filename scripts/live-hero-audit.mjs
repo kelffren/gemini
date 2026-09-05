@@ -41,6 +41,8 @@ async function runViewport(name, contextOptions) {
     return !!(a && a.loaded && (a.processed || a.error));
   }, null, { timeout: 10000 });
 
+  await page.waitForFunction(() => !!window.KELO_MOVEMENT_AUDIT, null, { timeout: 5000 });
+
   const result = await page.evaluate(() => {
     const a = window.KELO_HERO_SPRITE_AUDIT ? JSON.parse(JSON.stringify(window.KELO_HERO_SPRITE_AUDIT)) : null;
     const p = window.localPlayer || (typeof localPlayer !== 'undefined' ? localPlayer : null);
@@ -84,12 +86,82 @@ async function runViewport(name, contextOptions) {
   if (result.auraMetrics.physicsRadius !== result.player?.radius) throw new Error(`${name}: aura changed physics radius`);
   if (result.auraMetrics.visualScale !== result.presentation.visualScale) throw new Error(`${name}: aura visual scale drift ${result.auraMetrics.visualScale}`);
   if (!(result.auraMetrics.effectRadius > result.auraMetrics.physicsRadius)) throw new Error(`${name}: aura did not follow enlarged avatar`);
+
+  async function movementSnapshot(label) {
+    return page.evaluate((sampleLabel) => {
+      const p = window.localPlayer || (typeof localPlayer !== 'undefined' ? localPlayer : null);
+      const movement = window.KELO_MOVEMENT_AUDIT ? JSON.parse(JSON.stringify(window.KELO_MOVEMENT_AUDIT)) : null;
+      const presentation = p && window.KELO_AVATAR_PRESENTATION ? window.KELO_AVATAR_PRESENTATION.get(p, p._face || 'down') : null;
+      return {
+        label: sampleLabel,
+        player: p ? { x: p.x, y: p.y, vx: p.vx || 0, vy: p.vy || 0, radius: p.radius, face: p._face || null } : null,
+        movement,
+        presentation
+      };
+    }, label);
+  }
+
+  function assertPresentationInvariant(sample) {
+    if (!sample.player || !sample.movement || !sample.presentation) throw new Error(`${name}: incomplete dynamic sample ${sample.label}`);
+    if (sample.presentation.visualScale !== 1.15) throw new Error(`${name}: visual scale drift during ${sample.label}`);
+    if (sample.presentation.colliderRadius !== sample.player.radius) throw new Error(`${name}: collider drift during ${sample.label}`);
+    if (sample.presentation.footRootX !== sample.presentation.physicsRootX || sample.presentation.footRootY - sample.presentation.physicsRootY !== 10) {
+      throw new Error(`${name}: foot root drift during ${sample.label}`);
+    }
+  }
+
+  // Controlled short trace: cardinal RIGHT, immediate reversal LEFT, release, then diagonal.
+  // Short holds keep the run close to spawn so environment collision differences do not dominate the hero contract.
+  const dynamic = { samples: [] };
+  dynamic.samples.push(await movementSnapshot('baseline'));
+
+  await page.keyboard.down('d');
+  await page.waitForTimeout(220);
+  dynamic.samples.push(await movementSnapshot('right'));
+  await page.keyboard.up('d');
+  await page.keyboard.down('a');
+  await page.waitForTimeout(220);
+  dynamic.samples.push(await movementSnapshot('left-reversal'));
+  await page.keyboard.up('a');
+  await page.waitForTimeout(140);
+  dynamic.samples.push(await movementSnapshot('release'));
+
+  await page.keyboard.down('d');
+  await page.keyboard.down('s');
+  await page.waitForTimeout(220);
+  dynamic.samples.push(await movementSnapshot('diagonal-down-right'));
+  await page.keyboard.up('d');
+  await page.keyboard.up('s');
+  await page.waitForTimeout(140);
+  dynamic.samples.push(await movementSnapshot('final-release'));
+
+  for (const sample of dynamic.samples) assertPresentationInvariant(sample);
+
+  const [baseline, right, left, release, diagonal, finalRelease] = dynamic.samples;
+  dynamic.rightDistancePx = Math.hypot(right.player.x - baseline.player.x, right.player.y - baseline.player.y);
+  dynamic.reversalDistancePx = Math.hypot(left.player.x - right.player.x, left.player.y - right.player.y);
+  dynamic.diagonalDxPx = diagonal.player.x - release.player.x;
+  dynamic.diagonalDyPx = diagonal.player.y - release.player.y;
+  dynamic.finalOffsetPx = Math.hypot(finalRelease.player.x - baseline.player.x, finalRelease.player.y - baseline.player.y);
+  dynamic.releaseCountDelta = (finalRelease.movement.releaseCount || 0) - (baseline.movement.releaseCount || 0);
+  dynamic.reversalAccidentalIdleDelta = (finalRelease.movement.reversalAccidentalIdleCount || 0) - (baseline.movement.reversalAccidentalIdleCount || 0);
+
+  if (!(dynamic.rightDistancePx > 8 && right.player.x > baseline.player.x)) throw new Error(`${name}: RIGHT trace did not move right ${JSON.stringify(dynamic)}`);
+  if (!(dynamic.reversalDistancePx > 8 && left.player.x < right.player.x)) throw new Error(`${name}: LEFT reversal did not move left ${JSON.stringify(dynamic)}`);
+  if (!(Math.abs(dynamic.diagonalDxPx) > 4 && Math.abs(dynamic.diagonalDyPx) > 4)) throw new Error(`${name}: diagonal trace missing one axis ${JSON.stringify(dynamic)}`);
+  if (dynamic.reversalAccidentalIdleDelta !== 0) throw new Error(`${name}: reversal introduced accidental idle ${JSON.stringify(dynamic)}`);
+  if (!(dynamic.releaseCountDelta >= 2)) throw new Error(`${name}: release transitions were not observed ${JSON.stringify(dynamic)}`);
+  if (release.movement.visualOn || release.movement.visualFrame !== 0) throw new Error(`${name}: release did not settle to planted frame ${JSON.stringify(release)}`);
+  if (finalRelease.movement.visualOn || finalRelease.movement.visualFrame !== 0) throw new Error(`${name}: final release did not settle to planted frame ${JSON.stringify(finalRelease)}`);
+
+  await page.screenshot({ path: `artifacts/hero-${name}-after-dynamic-trace.png`, fullPage: false, scale: 'device' });
+
   if (consoleErrors.length || failedRequests.length || httpErrors.length) {
     throw new Error(`${name}: browser errors ${JSON.stringify({ consoleErrors, failedRequests, httpErrors })}`);
   }
 
   await context.close();
-  return { name, ...result, consoleErrors, failedRequests, httpErrors };
+  return { name, ...result, dynamic, consoleErrors, failedRequests, httpErrors };
 }
 
 const mobile = await runViewport('mobile', {
