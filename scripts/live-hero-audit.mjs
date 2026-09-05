@@ -23,9 +23,9 @@ async function runViewport(name, contextOptions) {
   page.on('requestfailed', r => failedRequests.push({ url: r.url(), error: r.failure()?.errorText || 'failed' }));
   page.on('response', r => { if (r.status() >= 400) httpErrors.push({ status: r.status(), url: r.url() }); });
 
-  // Hero presentation and its dependent aura are under active locomotion/scale research.
-  // Bust only these resources so the audit cannot validate stale visual code.
-  await page.route(/\/(engine-ab\.js|assets\/hero\.PNG|src\/systems\/armor-aura\.js)(\?|$)/, route => {
+  // Hero presentation, lateral gait and dependent aura are under active locomotion/scale research.
+  // Bust only these resources so the audit cannot validate stale visual or gait code.
+  await page.route(/\/(engine-ab\.js|engine-ac\.js|engine-ah\.js|assets\/hero\.PNG|src\/systems\/armor-aura\.js)(\?|$)/, route => {
     const u = new URL(route.request().url());
     u.searchParams.set('hero-audit-bust', `${Date.now()}-${Math.random()}`);
     route.continue({ url: u.toString() });
@@ -41,7 +41,10 @@ async function runViewport(name, contextOptions) {
     return !!(a && a.loaded && (a.processed || a.error));
   }, null, { timeout: 10000 });
 
-  await page.waitForFunction(() => !!window.KELO_MOVEMENT_AUDIT, null, { timeout: 5000 });
+  await page.waitForFunction(() => {
+    const m = window.KELO_MOVEMENT_AUDIT;
+    return !!(m && m.version === 'MOV-plant-audit-v1');
+  }, null, { timeout: 5000 });
 
   const result = await page.evaluate(() => {
     const a = window.KELO_HERO_SPRITE_AUDIT ? JSON.parse(JSON.stringify(window.KELO_HERO_SPRITE_AUDIT)) : null;
@@ -115,11 +118,20 @@ async function runViewport(name, contextOptions) {
 
   function assertPresentationInvariant(sample) {
     if (!sample.player || !sample.movement || !sample.presentation) throw new Error(`${name}: incomplete dynamic sample ${sample.label}`);
+    if (sample.movement.version !== 'MOV-plant-audit-v1') throw new Error(`${name}: stale movement contract during ${sample.label}`);
     if (sample.presentation.visualScale !== 1.15) throw new Error(`${name}: visual scale drift during ${sample.label}`);
     if (sample.presentation.colliderRadius !== sample.player.radius) throw new Error(`${name}: collider drift during ${sample.label}`);
     if (sample.presentation.footRootX !== sample.presentation.physicsRootX || sample.presentation.footRootY - sample.presentation.physicsRootY !== 10) {
       throw new Error(`${name}: foot root drift during ${sample.label}`);
     }
+  }
+
+  function assertPlantedRelease(sample) {
+    const m = sample.movement;
+    if (m.visualOn) throw new Error(`${name}: ${sample.label} still visually moving ${JSON.stringify(sample)}`);
+    if (m.visualFrame !== m.plantFrame) throw new Error(`${name}: ${sample.label} frame ${m.visualFrame} != plant ${m.plantFrame}`);
+    if (Math.abs((m.stridePhase || 0) - (m.plantPhase || 0)) > 0.001) throw new Error(`${name}: ${sample.label} phase ${m.stridePhase} != plant ${m.plantPhase}`);
+    if (Math.abs(m.strideDistancePx || 0) > 0.001) throw new Error(`${name}: ${sample.label} retained stride distance ${m.strideDistancePx}`);
   }
 
   // Controlled short trace: cardinal RIGHT, immediate reversal LEFT, release, then diagonal.
@@ -156,15 +168,21 @@ async function runViewport(name, contextOptions) {
   dynamic.diagonalDyPx = diagonal.player.y - release.player.y;
   dynamic.finalOffsetPx = Math.hypot(finalRelease.player.x - baseline.player.x, finalRelease.player.y - baseline.player.y);
   dynamic.releaseCountDelta = (finalRelease.movement.releaseCount || 0) - (baseline.movement.releaseCount || 0);
+  dynamic.reversalCountDelta = (finalRelease.movement.reversalCount || 0) - (baseline.movement.reversalCount || 0);
   dynamic.reversalAccidentalIdleDelta = (finalRelease.movement.reversalAccidentalIdleCount || 0) - (baseline.movement.reversalAccidentalIdleCount || 0);
+  dynamic.reversalFrameJumpDelta = (finalRelease.movement.reversalFrameJumpCount || 0) - (baseline.movement.reversalFrameJumpCount || 0);
+  dynamic.plantFrame = finalRelease.movement.plantFrame;
+  dynamic.plantPhase = finalRelease.movement.plantPhase;
 
   if (!(dynamic.rightDistancePx > 8 && right.player.x > baseline.player.x)) throw new Error(`${name}: RIGHT trace did not move right ${JSON.stringify(dynamic)}`);
   if (!(dynamic.reversalDistancePx > 8 && left.player.x < right.player.x)) throw new Error(`${name}: LEFT reversal did not move left ${JSON.stringify(dynamic)}`);
   if (!(Math.abs(dynamic.diagonalDxPx) > 4 && Math.abs(dynamic.diagonalDyPx) > 4)) throw new Error(`${name}: diagonal trace missing one axis ${JSON.stringify(dynamic)}`);
+  if (!(dynamic.reversalCountDelta >= 1)) throw new Error(`${name}: LEFT/RIGHT reversal was not observed ${JSON.stringify(dynamic)}`);
   if (dynamic.reversalAccidentalIdleDelta !== 0) throw new Error(`${name}: reversal introduced accidental idle ${JSON.stringify(dynamic)}`);
+  if (dynamic.reversalFrameJumpDelta !== 0) throw new Error(`${name}: reversal introduced a frame jump ${JSON.stringify(dynamic)}`);
   if (!(dynamic.releaseCountDelta >= 2)) throw new Error(`${name}: release transitions were not observed ${JSON.stringify(dynamic)}`);
-  if (release.movement.visualOn || release.movement.visualFrame !== 0) throw new Error(`${name}: release did not settle to planted frame ${JSON.stringify(release)}`);
-  if (finalRelease.movement.visualOn || finalRelease.movement.visualFrame !== 0) throw new Error(`${name}: final release did not settle to planted frame ${JSON.stringify(finalRelease)}`);
+  assertPlantedRelease(release);
+  assertPlantedRelease(finalRelease);
 
   await page.screenshot({ path: `artifacts/hero-${name}-after-dynamic-trace.png`, fullPage: false, scale: 'device' });
 
