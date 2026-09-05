@@ -68,10 +68,15 @@ test.describe('Kelo World live Pages harness', () => {
     expect(heroAudit.loaded).toBe(true);
     expect(heroAudit.processed).toBe(true);
     expect(heroAudit.error).toBeNull();
-    expect(heroAudit.version).toBe('hero-preprocess-audit-v2');
+    expect(heroAudit.version).toBe('hero-preprocess-audit-v3');
     expect(heroAudit.croppedOpaquePixelCountByFrame).toHaveLength(16);
     expect(heroAudit.sheetMutationAfterIdle).toBe(heroAudit.whiteKnockoutOpaquePixelCount > 0);
     expect(heroAudit.visibleAlphaMutationAfterIdle).toBe(heroAudit.whiteKnockoutOpaquePixelCount > 0);
+    expect(heroAudit.lateralComparedPixelCount).toBeGreaterThan(0);
+    expect(heroAudit.row1VsRow2RgbaSimilarityPct).toBeGreaterThanOrEqual(0);
+    expect(heroAudit.row1VsRow2RgbaSimilarityPct).toBeLessThanOrEqual(100);
+    expect(heroAudit.row1VsMirroredRow2RgbaSimilarityPct).toBeGreaterThanOrEqual(0);
+    expect(heroAudit.row1VsMirroredRow2RgbaSimilarityPct).toBeLessThanOrEqual(100);
 
     const beforeKeys = await page.evaluate(pos);
     await page.keyboard.down('d');
