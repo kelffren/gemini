@@ -1,6 +1,7 @@
 (function () {
-  const dprCap = 3;
-  // Pixel-art HD mode: use the device backing store, but never blur authored pixels.
+  const mobilePerf = window.KELO_MOBILE_PERFORMANCE_CONTRACT;
+  const dprCap = Number(mobilePerf?.dprCap) || 3;
+  // Pixel-art HD mode: use the contract-governed device backing store, never blur authored pixels.
   function activeDpr(){ return Math.min(window.devicePixelRatio || 1, dprCap); }
   function pixelPerfectZoom(target){
     const dpr = activeDpr();
@@ -38,6 +39,7 @@
     canvas.style.imageRendering = 'pixelated';
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.imageSmoothingEnabled = false;
+    try { window.dispatchEvent(new CustomEvent('kelo:world-audit')); } catch (e) {}
   };
   resize();
   const PLAZA = { x: 1040, y: 1240, w: 800, h: 560 };
@@ -87,6 +89,6 @@
     ctx.fillRect = origFillRect;
     ctx.imageSmoothingEnabled = false;
   };
-  window.KELO_HD_RENDER = Object.freeze({mode:'hidpi-pixel-perfect-v1',dprCap,defaultZoom:CONFIG.zoom,smoothing:false});
+  window.KELO_HD_RENDER = Object.freeze({mode:'hidpi-pixel-perfect-v2',dprCap,defaultZoom:CONFIG.zoom,smoothing:false,mobilePerformanceContractVersion:mobilePerf?.version||null});
   window.KELO_LEGACY_PLAZA_IMAGE_DISABLED = true;
 })();
