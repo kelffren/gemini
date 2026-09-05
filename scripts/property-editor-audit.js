@@ -24,11 +24,12 @@ run('src/property/property-asset-catalog.js');run('src/property/property-system.
   const a=await S.request('place',{ownerId:'audit-player',parcelId:p.parcelId,assetId:asset.id,x:2048,y:1536});
   const b=await S.request('place',{ownerId:'audit-player',parcelId:p.parcelId,assetId:asset.id,x:2112,y:1536});
   assert(a.placementId!==b.placementId,'placement ids must be unique');assert.equal(S.getAvailableUnits(asset.id,'audit-player'),0);
+  await S.request('move',{ownerId:'audit-player',placementId:b.placementId,x:2144,y:1568});assert.equal(S.getAvailableUnits(asset.id,'audit-player'),0,'moving must not consume or release a unit');
   await assert.rejects(()=>S.request('place',{ownerId:'audit-player',parcelId:p.parcelId,assetId:asset.id,x:2176,y:1536}),/NO_OWNED_UNITS/);
   await S.request('remove',{ownerId:'audit-player',placementId:a.placementId});assert.equal(S.getAvailableUnits(asset.id,'audit-player'),1,'removing must release one deployable unit');
   await assert.rejects(()=>S.request('place',{ownerId:'audit-player',parcelId:p.parcelId,assetId:asset.id,x:1984,y:1472}),/OUTSIDE_PARCEL/);
   const wp=await S.request('ensureWorldEditorParcel',{ownerId:'developer'});await S.request('place',{ownerId:'developer',parcelId:wp.parcelId,assetId:asset.id,x:64,y:64});
   assert.equal(layers.filter(x=>x.id.indexOf('property-placements-')===0).length,2,'back/front property layers required');
   const exp=S.exportLayout(wp.parcelId);assert.equal(exp.contract,'kelo-property-layout-v1');assert(exp.placements.length>=1);
-  console.log(JSON.stringify({ok:true,catalog:C.list().length,playerPlacements:S.getPlacements(p.parcelId).length,worldPlacements:S.getPlacements(wp.parcelId).length,layers:layers.length}));
+  console.log(JSON.stringify({ok:true,catalog:C.list().length,playerPlacements:S.getPlacements(p.parcelId).length,worldPlacements:S.getPlacements(wp.parcelId).length,layers:layers.length,movePreservesUnits:true}));
 })().catch(err=>{console.error(err);process.exitCode=1;});
