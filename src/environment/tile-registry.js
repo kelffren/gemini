@@ -62,6 +62,14 @@
       id:'luxe-boutique', src:'assets/kelo-luxe-boutique.png?v=6', width:192, height:222,
       worldWidth:192, worldHeight:222, family:'architecture'
     }),
+    commerceArcadeWest:Object.freeze({
+      id:'commerce-arcade-west', src:'assets/commerce-arcade-west-v1.png?art=306', width:160, height:432,
+      worldWidth:144, worldHeight:384, family:'commerce-architecture'
+    }),
+    commerceArcadeEast:Object.freeze({
+      id:'commerce-arcade-east', src:'assets/commerce-arcade-east-v1.png?art=306', width:160, height:432,
+      worldWidth:144, worldHeight:384, family:'commerce-architecture'
+    }),
     arenaWarWall:Object.freeze({
       id:'arena-war-wall', src:'assets/arena-war-wall-v1.png?art=301', width:640, height:192,
       worldWidth:640, worldHeight:192, family:'arena-architecture'
@@ -78,6 +86,18 @@
       interaction:Object.freeze({x:1208,y:1552,radius:90}),
       occlusion:Object.freeze({sideInset:9,topInset:40,bottomPadding:4,clip:Object.freeze({xPadding:7,topPadding:24,bottomPadding:7})}),
       legacyVisualReplacement:true
+    }),
+    commerceArcadeWest:Object.freeze({
+      id:'commerce-arcade-west-south', asset:'commerceArcadeWest', x:1920, y:1584, worldWidth:144, worldHeight:384, baseYOffset:384,
+      collision:Object.freeze({x:1932,y:1934,w:120,h:28}),
+      occlusion:Object.freeze({sideInset:8,topInset:36,bottomPadding:4,clip:Object.freeze({xPadding:6,topPadding:18,bottomPadding:6})}),
+      districts:Object.freeze(['commerce']), priority:24, ownership:'commerce-authored-arcade-v1', legacyVisualReplacement:true
+    }),
+    commerceArcadeEast:Object.freeze({
+      id:'commerce-arcade-east-south', asset:'commerceArcadeEast', x:2624, y:1584, worldWidth:144, worldHeight:384, baseYOffset:384,
+      collision:Object.freeze({x:2636,y:1934,w:120,h:28}),
+      occlusion:Object.freeze({sideInset:8,topInset:36,bottomPadding:4,clip:Object.freeze({xPadding:6,topPadding:18,bottomPadding:6})}),
+      districts:Object.freeze(['commerce']), priority:24, ownership:'commerce-authored-arcade-v1', legacyVisualReplacement:true
     }),
     arenaWarWall:Object.freeze({
       id:'arena-war-wall-north', asset:'arenaWarWall', x:1840, y:480, baseYOffset:192,
@@ -204,7 +224,7 @@
     })
   });
   window.KELO_TILE_REGISTRY = Object.freeze({
-    version:'1.11.1', worldTileSize:TILE,
+    version:'1.12.0', worldTileSize:TILE,
     atlases:Object.freeze({plaza:atlas,plazaGround:plazaGroundAtlas,transitions:transitionAtlas,grassVariation:grassVariationAtlas,marbleVariation:marbleVariationAtlas,plazaNature:plazaNatureAtlas,trainingDummy:trainingDummyAtlas,plazaNpcs:plazaNpcsAtlas,ruralSoil:ruralSoilAtlas,ruralProps:ruralPropsAtlas,ruralLandmarks:ruralLandmarksAtlas,ruralNature:ruralNatureAtlas}),
     architectureAssets,architecturePrefabs,plazaNatureProps,trainingDummyProp,plazaNpcVisuals,
     tiles,ruralTiles,ruralPropTiles,ruralLandmarkTiles,ruralLandmarkSprites,ruralNatureTiles,ruralNatureSprites,families,transitionMasks,styles
