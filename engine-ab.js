@@ -6,8 +6,9 @@
   const COLS = 4;
   const ROWS = 4;
   const FOOT_ROOT_OFFSET_Y = 10;
+  const AVATAR_VISUAL_SCALE = 1.15;
   const HERO_AUDIT = window.KELO_HERO_SPRITE_AUDIT = {
-    version: 'hero-preprocess-audit-v3',
+    version: 'hero-preprocess-audit-v4',
     source: 'assets/hero.PNG',
     loaded: false,
     processed: false,
@@ -25,6 +26,7 @@
     row1VsRow2RgbaSimilarityPct: 0,
     row1VsMirroredRow2RgbaSimilarityPct: 0,
     lateralSimilarityDeltaPct: 0,
+    avatarVisualScale: AVATAR_VISUAL_SCALE,
     sheetMutationAfterIdle: false,
     visibleAlphaMutationAfterIdle: false,
     preprocessMs: 0,
@@ -212,8 +214,10 @@
 
   function presentationOf(p, face) {
     const side = face === 'left' || face === 'right';
-    const visualWidth = side ? 48 : 54;
-    const visualHeight = Math.round(54 * (FH / FW));
+    const baseVisualWidth = side ? 48 : 54;
+    const baseVisualHeight = Math.round(54 * (FH / FW));
+    const visualWidth = Math.round(baseVisualWidth * AVATAR_VISUAL_SCALE);
+    const visualHeight = Math.round(baseVisualHeight * AVATAR_VISUAL_SCALE);
     const physicsRootX = p.x;
     const physicsRootY = p.y;
     const footRootX = p.x;
@@ -224,6 +228,8 @@
       footRootX, footRootY,
       depthRootX: footRootX, depthRootY: footRootY,
       shadowAnchorX: footRootX, shadowAnchorY: footRootY,
+      visualScale: AVATAR_VISUAL_SCALE,
+      baseVisualWidth, baseVisualHeight,
       visualWidth, visualHeight,
       visualLeft: footRootX - visualWidth / 2,
       visualTop: footRootY - visualHeight,
@@ -235,8 +241,9 @@
   }
 
   window.KELO_AVATAR_PRESENTATION = Object.freeze({
-    version: 'foot-root-v1',
+    version: 'foot-root-scale-v2',
     footRootOffsetY: FOOT_ROOT_OFFSET_Y,
+    visualScale: AVATAR_VISUAL_SCALE,
     get: function (p, face) { return presentationOf(p, face || (p && p._face) || 'down'); }
   });
 
