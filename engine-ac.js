@@ -4,6 +4,7 @@
   // MOV-CADENCE-V2: remove the 50->90px stride-length jump at WALK->RUN.
   // MOV-STOP-V2: release never freezes an arbitrary stride pose; physics remains unchanged.
   // MOV-REVERSAL-AUDIT-V1: measure real lateral reversal continuity instead of publishing inert counters.
+  // MOV-PLANT-V1: settle on authored lateral frame 2 after release; frame 0 remains available via ?plantFrame=0 baseline.
   const WALK_MAX = 0.74;
   const WALK_SPEED = 110;
   const RUN_SPEED = 178;
@@ -15,8 +16,15 @@
   const WALK_CYCLE_WORLD_PX = 50;
   const RUN_CYCLE_WORLD_PX = 90;
   const MIN_VISUAL_MOVE_PX = 0.12;
-  const MOV_CADENCE_V2 = new URLSearchParams(window.location.search).get('movCadenceV2') !== '0';
-  const MOV_STOP_V2 = new URLSearchParams(window.location.search).get('movStopV2') !== '0';
+  const DEFAULT_PLANT_FRAME = 2;
+  const params = new URLSearchParams(window.location.search);
+  const MOV_CADENCE_V2 = params.get('movCadenceV2') !== '0';
+  const MOV_STOP_V2 = params.get('movStopV2') !== '0';
+  const requestedPlantFrame = Number(params.get('plantFrame'));
+  const PLANT_FRAME = Number.isInteger(requestedPlantFrame) && requestedPlantFrame >= 0 && requestedPlantFrame < 4
+    ? requestedPlantFrame
+    : DEFAULT_PLANT_FRAME;
+  const PLANT_PHASE = PLANT_FRAME / 4;
   CONFIG.speed = WALK_SPEED;
   CONFIG.joystickDeadzone = 0.045;
   CONFIG.joystickCurve = 'LINEAR';
@@ -60,7 +68,7 @@
 
   function publishAudit(mag, gait, speedCap, visual) {
     window.KELO_MOVEMENT_AUDIT = {
-      version: 'MOV-reversal-audit-v1',
+      version: 'MOV-plant-audit-v1',
       rawTouchMag: rawTouchMag(),
       processedMag: mag,
       gait,
@@ -70,22 +78,24 @@
       colliderRadius: localPlayer.radius,
       cadenceV2: MOV_CADENCE_V2,
       stopV2: MOV_STOP_V2,
+      plantFrame: PLANT_FRAME,
+      plantPhase: PLANT_PHASE,
       cycleWorldPx: visual ? visual.cycleWorldPx : cycleWorldPxFor(mag, gait),
       visualOn: !!(visual && visual.on),
-      visualFrame: visual ? visual.frame : 0,
-      stridePhase: visual ? visual.stridePhase : 0,
+      visualFrame: visual ? visual.frame : PLANT_FRAME,
+      stridePhase: visual ? visual.stridePhase : PLANT_PHASE,
       strideDistancePx: visual ? visual.strideDistancePx : 0,
       lastStepDistancePx: visual ? visual.lastStepDistancePx : 0,
       releaseCount: visual ? visual.releaseCount : 0,
-      lastReleaseFromFrame: visual ? visual.lastReleaseFromFrame : 0,
-      lastReleaseFromPhase: visual ? visual.lastReleaseFromPhase : 0,
+      lastReleaseFromFrame: visual ? visual.lastReleaseFromFrame : PLANT_FRAME,
+      lastReleaseFromPhase: visual ? visual.lastReleaseFromPhase : PLANT_PHASE,
       unsupportedPoseFreezeMs: visual ? visual.unsupportedPoseFreezeMs : 0,
       releaseToStablePlantMs: visual ? visual.releaseToStablePlantMs : 0,
       reversalCount: visual ? visual.reversalCount : 0,
       reversalAccidentalIdleCount: visual ? visual.reversalAccidentalIdleCount : 0,
       reversalFrameJumpCount: visual ? visual.reversalFrameJumpCount : 0,
-      lastReversalFromFrame: visual ? visual.lastReversalFromFrame : 0,
-      lastReversalToFrame: visual ? visual.lastReversalToFrame : 0
+      lastReversalFromFrame: visual ? visual.lastReversalFromFrame : PLANT_FRAME,
+      lastReversalToFrame: visual ? visual.lastReversalToFrame : PLANT_FRAME
     };
   }
 
@@ -99,22 +109,22 @@
         on: false,
         face: p._face || 'down',
         gait: 'idle',
-        frame: 0,
+        frame: PLANT_FRAME,
         stopElapsed: VISUAL_STOP_HOLD_SEC,
-        stridePhase: 0,
+        stridePhase: PLANT_PHASE,
         strideDistancePx: 0,
         lastStepDistancePx: 0,
         cycleWorldPx: WALK_CYCLE_WORLD_PX,
         releaseCount: 0,
-        lastReleaseFromFrame: 0,
-        lastReleaseFromPhase: 0,
+        lastReleaseFromFrame: PLANT_FRAME,
+        lastReleaseFromPhase: PLANT_PHASE,
         unsupportedPoseFreezeMs: 0,
         releaseToStablePlantMs: 0,
         reversalCount: 0,
         reversalAccidentalIdleCount: 0,
         reversalFrameJumpCount: 0,
-        lastReversalFromFrame: 0,
-        lastReversalToFrame: 0,
+        lastReversalFromFrame: PLANT_FRAME,
+        lastReversalToFrame: PLANT_FRAME,
         lastIntentHorizontalSign: 0
       };
     }
@@ -183,9 +193,9 @@
       v.stridePhase = (v.stridePhase + v.lastStepDistancePx / v.cycleWorldPx) % 1;
       v.frame = Math.floor(v.stridePhase * 4) % 4;
     } else if (!v.on) {
-      v.stridePhase = 0;
+      v.stridePhase = PLANT_PHASE;
       v.strideDistancePx = 0;
-      v.frame = 0;
+      v.frame = PLANT_FRAME;
     }
 
     if (lateralReversal) {
