@@ -5,6 +5,8 @@ on:
     branches: [ main ]
     paths:
       - '.github/workflows/audit-plaza-tree-live.yml'
+      - 'src/environment/tile-registry.js'
+      - 'assets/plaza-tree-large-v1.png'
   workflow_dispatch:
 
 permissions:
@@ -25,17 +27,18 @@ jobs:
         env:
           AUDIT_URL: https://kelffren.github.io/gemini/
         run: node scripts/live-asset-contract-audit.mjs
-      - name: Verify authored tree is what LIVE references
+      - name: Verify authored tree population is LIVE
         run: |
           python3 - <<'PY'
           import urllib.request
-          registry=urllib.request.urlopen('https://kelffren.github.io/gemini/src/environment/tile-registry.js?tree-audit=1', timeout=30).read().decode()
+          registry=urllib.request.urlopen('https://kelffren.github.io/gemini/src/environment/tile-registry.js?tree-audit=2', timeout=30).read().decode()
           assert 'assets/plaza-tree-large-v1.png?art=303' in registry
           assert 'spriteWidth:367, spriteHeight:489, columns:1, spriteCount:1' in registry
-          assert "w:144,h:192" in registry
-          png=urllib.request.urlopen('https://kelffren.github.io/gemini/assets/plaza-tree-large-v1.png?tree-audit=1', timeout=30).read()
+          assert "version:'1.10.31'" in registry
+          assert registry.count("Object.freeze({id:'plaza-tree-") >= 12
+          png=urllib.request.urlopen('https://kelffren.github.io/gemini/assets/plaza-tree-large-v1.png?tree-audit=2', timeout=30).read()
           assert png[:8] == b'\x89PNG\r\n\x1a\n'
-          print('PASS LIVE authored Plaza tree bytes=',len(png))
+          print('PASS LIVE authored Plaza tree population')
           PY
       - name: Upload mobile screenshot and report
         if: always()
