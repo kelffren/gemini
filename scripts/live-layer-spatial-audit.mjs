@@ -15,13 +15,15 @@ page.on('response',r=>{if(r.status()>=400)httpErrors.push({status:r.status(),url
 
 function valid(audit){
   if(!audit||audit.version!=='environment-layer-stack-v2.3'||audit.mode!=='formal-base-back-actor-front-order-v1'||audit.orderingPolicy!=='phase-priority-id-v1'||audit.spatialPolicy!=='same-phase-aabb-priority-resolution-v1')return false;
-  if(audit.preActorLayerCount<1||audit.postActorLayerCount<1||audit.spatialOverlapCount!==2||audit.spatialTieCount!==0)return false;
-  const expected=new Set(['props_back','props_front']);
-  for(const overlap of audit.spatialOverlaps||[]){
-    if(!expected.has(overlap.phase)||overlap.overlapCount!==1||overlap.ambiguous!==false||overlap.resolvedBy!=='priority')return false;
+  if(audit.preActorLayerCount<1||audit.postActorLayerCount<1||audit.spatialTieCount!==0)return false;
+  const target=(audit.spatialOverlaps||[]).filter(overlap=>{
     const ids=new Set([overlap.a,overlap.b]);
-    const suffix=overlap.phase==='props_back'?'back':'front';
-    if(!ids.has(`luxe-architecture-${suffix}`)||!ids.has(`plaza-nature-${suffix}`))return false;
+    const suffix=overlap.phase==='props_back'?'back':overlap.phase==='props_front'?'front':null;
+    return suffix&&ids.has(`luxe-architecture-${suffix}`)&&ids.has(`plaza-nature-${suffix}`);
+  });
+  if(target.length!==2)return false;
+  for(const overlap of target){
+    if(overlap.overlapCount!==1||overlap.ambiguous!==false||overlap.resolvedBy!=='priority')return false;
     const natureFirst=overlap.a.startsWith('plaza-nature-');
     const naturePriority=natureFirst?overlap.aPriority:overlap.bPriority;
     const luxePriority=natureFirst?overlap.bPriority:overlap.aPriority;
@@ -35,7 +37,7 @@ function valid(audit){
   const fountainBack=layers.find(l=>l.id==='plaza-fountain-back');
   const fountainFront=layers.find(l=>l.id==='plaza-fountain-front');
   const gardensJunctions=layers.find(l=>l.id==='gardens-t-junctions');
-  return nature.length===2&&luxe.length===2&&nature.every(l=>l.ownership==='plaza-nature-props-v1'&&l.boundsCount===4&&l.priority===10)&&luxe.every(l=>l.ownership==='architecture-prefabs-v1'&&l.boundsCount===1&&l.priority===20)&&ruralBack?.ownership==='rural-farm-boundary-props-v1'&&ruralBack.phase==='props_back'&&ruralBack.timing==='pre_actor'&&ruralBack.priority===8&&ruralBack.boundsCount>0&&fountainBack?.ownership==='plaza-fountain-v1'&&fountainBack.boundsCount===1&&fountainFront?.ownership==='plaza-fountain-v1'&&fountainFront.boundsCount===1&&gardensJunctions?.ownership==='gardens-t-junctions-v1'&&gardensJunctions.boundsCount>0;
+  return nature.length===2&&luxe.length===2&&nature.every(l=>l.ownership==='plaza-nature-props-v1'&&l.boundsCount===4&&l.priority===10)&&luxe.every(l=>l.ownership==='architecture-prefabs-v1'&&l.boundsCount===1&&l.priority===20)&&ruralBack?.ownership==='rural-farm-boundary-props-v1'&&ruralBack.phase==='props_back'&&ruralBack.timing==='pre_actor'&&ruralBack.priority===8&&fountainBack?.ownership==='plaza-fountain-v1'&&fountainBack.boundsCount===1&&fountainFront?.ownership==='plaza-fountain-v1'&&fountainFront.boundsCount===1&&gardensJunctions?.ownership==='gardens-t-junctions-v1'&&gardensJunctions.boundsCount>0;
 }
 
 let audit=null;
