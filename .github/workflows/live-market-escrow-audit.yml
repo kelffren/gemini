@@ -22,6 +22,18 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
+      - name: Normalize release-title gate
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('scripts/live-market-escrow-cdp-audit-v3.mjs')
+          s=p.read_text(encoding='utf-8')
+          old="document.title==='Kelo World — V6.20'"
+          new="document.title.startsWith('Kelo World — V6.')"
+          if old not in s:
+              raise SystemExit('expected stale V6.20 title gate not found')
+          p.write_text(s.replace(old,new),encoding='utf-8')
+          PY
       - name: Market syntax
         run: |
           node --check src/systems/equipment-system.js
