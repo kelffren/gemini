@@ -21,7 +21,7 @@
     worldWidth:800, worldHeight:560, family:'ground'
   });
   const plazaNatureAtlas = Object.freeze({
-    id:'plaza-nature', src:'assets/plaza-nature-v1.svg?art=192', width:192, height:96,
+    id:'plaza-nature', src:'assets/plaza-nature-v2.png?art=302', width:192, height:96,
     spriteWidth:96, spriteHeight:96, columns:2, spriteCount:2
   });
   const trainingDummyAtlas = Object.freeze({
