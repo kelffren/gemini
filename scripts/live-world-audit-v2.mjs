@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import {createHash} from 'node:crypto';
 import {chromium} from 'playwright';
 
+const AUDIT_REVISION='current-world-contract-v2-commerce';
 const base=process.env.AUDIT_URL||'https://kelffren.github.io/gemini/';
 const tileSource=fs.readFileSync(new URL('../src/environment/tile-registry.js',import.meta.url),'utf8');
 const worldSource=fs.readFileSync(new URL('../src/environment/world-map.js',import.meta.url),'utf8');
@@ -80,7 +81,7 @@ await capture('live-commerce-center',2352,1664);
 await page.screenshot({path:'artifacts/live-mobile-current.png',fullPage:false});
 
 const report={
-  expectedRegistry,expectedWorld,state:{
+  auditRevision:AUDIT_REVISION,expectedRegistry,expectedWorld,state:{
     registryVersion:state.registry?.version,worldVersion:state.world?.version,worldReady:state.world?.ready,
     architectureVersion:state.architecture?.version,architectureReady:state.architecture?.ready,prefabCount:state.architecture?.prefabCount,
     contractPrefabCount:prefabs.length,natureFrameMode:nature?.frameMode,naturePropCount:natureProps.length,
