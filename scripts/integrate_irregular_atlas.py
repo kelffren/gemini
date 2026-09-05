@@ -16,7 +16,6 @@ def replace_once(text: str, old: str, new: str, label: str) -> str:
     return text.replace(old, new, 1)
 
 
-# 1) Load generated metadata before TileRegistry.
 index_path = ROOT / 'index.html'
 index = index_path.read_text(encoding='utf-8')
 old = '<script src="src/environment/terrain-contract.js?v=1"></script><script src="src/environment/tile-registry.js?v=235"></script>'
@@ -24,7 +23,6 @@ new = '<script src="src/environment/terrain-contract.js?v=1"></script><script sr
 index = replace_once(index, old, new, 'generated atlas metadata script ordering')
 index_path.write_text(index, encoding='utf-8')
 
-# 2) TileRegistry consumes atlas metadata and placements reference a named frame.
 reg_path = ROOT / 'src/environment/tile-registry.js'
 reg = reg_path.read_text(encoding='utf-8')
 old = """  const plazaNatureAtlas = Object.freeze({
@@ -50,7 +48,6 @@ reg = reg[:start] + block + reg[end:]
 reg = reg.replace("version:'1.10.32'", "version:'1.11.0'", 1)
 reg_path.write_text(reg, encoding='utf-8')
 
-# 3) Prop Contract carries named frame metadata generically.
 prop_path = ROOT / 'src/environment/prop-contract.js'
 prop = prop_path.read_text(encoding='utf-8')
 prop = replace_once(prop, "frame:p.sprite||0", "frame:(p.frame??p.sprite??0)", 'prop frame selection')
@@ -60,7 +57,6 @@ prop = replace_once(prop, old, new, 'prop irregular frame metadata')
 prop = prop.replace("version:'1.4.0'", "version:'1.5.0'", 1).replace("mode:'generic-prop-contract-v4'", "mode:'generic-prop-contract-v5'", 1)
 prop_path.write_text(prop, encoding='utf-8')
 
-# 4) Generic Props supports irregular source rectangles for every future atlas.
 gp_path = ROOT / 'src/environment/generic-props.js'
 gp = gp_path.read_text(encoding='utf-8')
 old = "function frameOrigin(a,f){const cols=a.columns||1;return{x:(f%cols)*a.frameWidth,y:Math.floor(f/cols)*a.frameHeight};}\n  function drawProp(g,p){const a=C.assets[p.asset],img=images.get(p.asset);if(!a||!img||!readyAssets.has(p.asset))return false;const s=frameOrigin(a,p.frame||0);g.drawImage(img,s.x,s.y,a.frameWidth,a.frameHeight,p.position.x,p.position.y,p.size.w,p.size.h);return true;}"
@@ -69,7 +65,6 @@ gp = replace_once(gp, old, new, 'generic irregular frame renderer')
 gp = gp.replace("version:'generic-props-v1.5'", "version:'generic-props-v1.6'", 2).replace("rendererMode:'data-driven-props-v4'", "rendererMode:'data-driven-props-v5-irregular-frames'", 1)
 gp_path.write_text(gp, encoding='utf-8')
 
-# 5) Asset Contract learns an irregular frame mode and validates its generated JSON.
 validator_path = ROOT / 'scripts/validate-art-assets.mjs'
 validator = validator_path.read_text(encoding='utf-8')
 validator = replace_once(validator, "const frameModes = new Set(['grid','single']);", "const frameModes = new Set(['grid','single','irregular']);", 'irregular frame mode allowance')
@@ -79,10 +74,10 @@ insert = "  if (asset.frames?.mode === 'grid' && !hasGrid) fail(`${asset.id} fra
 validator = replace_once(validator, needle, insert, 'irregular metadata validation')
 validator_path.write_text(validator, encoding='utf-8')
 
-# 6) Production manifest points to the reusable atlas, not the one-off cut tree.
 manifest_path = ROOT / 'src/environment/art-asset-manifest.json'
 manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
-manifest['assets'] = [a for a in manifest['assets'] if a.get('id') != 'plaza-tree-large-v1']
+# Idempotency: remove both the legacy one-off tree and any prior generated-atlas entry.
+manifest['assets'] = [a for a in manifest['assets'] if a.get('id') not in {'plaza-tree-large-v1','arboleskelo1-atlas-v1'} and a.get('path') != 'assets/Arboleskelo1.atlas.png']
 meta = json.loads((ROOT / 'assets/Arboleskelo1.atlas.json').read_text(encoding='utf-8'))
 asset = {
     'id':'arboleskelo1-atlas-v1','family':'plaza-nature','version':'1.0.0','path':'assets/Arboleskelo1.atlas.png','kind':'prop-atlas-irregular',
