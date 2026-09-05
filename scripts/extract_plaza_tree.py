@@ -6,60 +6,87 @@ import cv2
 SRC = Path('assets/Arboleskelo1.PNG')
 OUT = Path('assets/plaza-tree-large-v1.png')
 
-# Exact source region of the large green tree in the user-uploaded Arboleskelo1 pack.
+# Source cell containing the large green tree in Arboleskelo1. The crop is kept at
+# its full authored cell size so rocks, flowers, roots and shadows cannot be lost
+# merely because they are disconnected from the main trunk/canopy silhouette.
 LEFT, TOP, RIGHT, BOTTOM = 10, 20, 440, 550
+FRAME_W, FRAME_H = RIGHT - LEFT, BOTTOM - TOP
 
 im = Image.open(SRC).convert('RGB')
 assert im.size == (1536, 1024), im.size
-crop = np.array(im.crop((LEFT, TOP, RIGHT, BOTTOM)))
-h, w, _ = crop.shape
-bgr = cv2.cvtColor(crop, cv2.COLOR_RGB2BGR)
+rgb = np.array(im.crop((LEFT, TOP, RIGHT, BOTTOM)))
+h, w, _ = rgb.shape
+assert (w, h) == (FRAME_W, FRAME_H)
 
-# Start from probable background, then seed only obvious tree regions.
-# This removes the baked presentation background without redrawing the asset RGB.
-mask = np.full((h, w), cv2.GC_PR_BGD, np.uint8)
-mask[:20, :] = cv2.GC_BGD
-mask[-20:, :] = cv2.GC_BGD
-mask[:, :20] = cv2.GC_BGD
-mask[:, -20:] = cv2.GC_BGD
+# Estimate the presentation background from the outer frame. This is deliberately
+# data-driven instead of hand-drawing a tree-shaped mask.
+border = np.concatenate([
+    rgb[:12, :, :].reshape(-1, 3),
+    rgb[-12:, :, :].reshape(-1, 3),
+    rgb[:, :12, :].reshape(-1, 3),
+    rgb[:, -12:, :].reshape(-1, 3),
+], axis=0).astype(np.float32)
+bg = np.median(border, axis=0)
+dist = np.linalg.norm(rgb.astype(np.float32) - bg[None, None, :], axis=2)
 
-# Probable foreground: full tree silhouette area.
-cv2.ellipse(mask, (215, 170), (190, 150), 0, 0, 360, cv2.GC_PR_FGD, -1)
-trunk_poly = np.array([[120,240],[300,240],[310,445],[280,505],[140,505],[100,445]], np.int32)
-cv2.fillPoly(mask, [trunk_poly], cv2.GC_PR_FGD)
+# Two-level threshold keeps antialiased/pale edge pixels while still rejecting the
+# near-uniform sheet background. Morphology then reconnects tiny authored gaps.
+core = (dist >= 30).astype(np.uint8)
+soft = (dist >= 12).astype(np.uint8)
+core = cv2.morphologyEx(core, cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8), iterations=2)
 
-# Definite foreground seeds on unmistakable canopy/trunk/base pixels.
-for cx,cy,rx,ry in [
-    (210,120,80,60),
-    (120,180,45,45),
-    (305,190,45,45),
-    (220,280,30,45),
-    (205,365,35,70),
-    (190,455,70,30),
-]:
-    cv2.ellipse(mask, (cx,cy), (rx,ry), 0, 0, 360, cv2.GC_FGD, -1)
+num, labels, stats, centroids = cv2.connectedComponentsWithStats(core, 8)
+assert num > 1, 'foreground segmentation failed'
 
-bgd = np.zeros((1,65), np.float64)
-fgd = np.zeros((1,65), np.float64)
-cv2.grabCut(bgr, mask, None, bgd, fgd, 10, cv2.GC_INIT_WITH_MASK)
-alpha = np.where((mask == cv2.GC_FGD) | (mask == cv2.GC_PR_FGD), 255, 0).astype(np.uint8)
+# The large tree is the dominant component in this source cell. Instead of keeping
+# only that component, expand around it and absorb nearby authored components so
+# decorative stones, flowers, roots and ground shadow remain part of the sprite.
+main = 1 + int(np.argmax(stats[1:, cv2.CC_STAT_AREA]))
+mx, my, mw, mh, ma = stats[main]
+assert ma > 15000, ('unexpected main component', int(ma))
 
-# Keep meaningful tree components only; tiny presentation-background fragments are discarded.
-num, labels, stats, _ = cv2.connectedComponentsWithStats((alpha > 0).astype(np.uint8), 8)
-assert num > 1, 'tree segmentation failed'
-order = sorted(range(1, num), key=lambda i: int(stats[i, cv2.CC_STAT_AREA]), reverse=True)
-keep = np.zeros((h, w), dtype=bool)
-for i in order[:12]:
-    if int(stats[i, cv2.CC_STAT_AREA]) >= 50:
-        keep |= labels == i
+main_mask = (labels == main).astype(np.uint8)
+proximity = cv2.dilate(main_mask, np.ones((39, 39), np.uint8), iterations=1)
+keep = main_mask.astype(bool)
+
+for i in range(1, num):
+    if i == main:
+        continue
+    x, y, cw, ch, area = stats[i]
+    if area < 18:
+        continue
+    component = labels == i
+    # Keep pieces touching the expanded silhouette OR living directly beneath the
+    # trunk/base within the authored base band. This is the important protection
+    # against the previously clipped rocks and flowers.
+    near_main = bool(np.any(proximity[component]))
+    cx, cy = centroids[i]
+    in_base_band = (mx - 45 <= cx <= mx + mw + 45 and my + int(mh * 0.66) <= cy <= h - 8)
+    if near_main or in_base_band:
+        keep |= component
+
+# Grow selected components into the soft antialias mask; this preserves edge pixels
+# without pulling distant neighbouring assets into the frame.
+expanded = cv2.dilate(keep.astype(np.uint8), np.ones((7, 7), np.uint8), iterations=1).astype(bool)
+keep |= expanded & (soft > 0)
 alpha = np.where(keep, 255, 0).astype(np.uint8)
 
-out = Image.fromarray(np.dstack([crop, alpha]), 'RGBA')
-bbox = out.getchannel('A').getbbox()
-assert bbox, 'empty alpha mask'
-out = out.crop(bbox)
+# Clear only the absolute outer edge. The image remains the full authored source
+# cell (430x530), with transparent padding rather than a destructive tight crop.
+alpha[:2, :] = 0
+alpha[-2:, :] = 0
+alpha[:, :2] = 0
+alpha[:, -2:] = 0
 
-# Guard against a partial extraction.
-assert out.width >= 340 and out.height >= 450, out.size
+# Regression guards: require foreground low in the base region and meaningful
+# content in both lower corners of the tree footprint. A future extraction that
+# loses the decorative base must fail CI instead of silently shipping.
+ys, xs = np.where(alpha > 0)
+assert len(xs) > 20000, len(xs)
+assert ys.max() >= h - 55, ('base clipped', int(ys.max()), h)
+base_pixels = int(np.count_nonzero(alpha[int(h * 0.72):, :]))
+assert base_pixels >= 2200, ('insufficient base detail', base_pixels)
+
+out = Image.fromarray(np.dstack([rgb, alpha]), 'RGBA')
 out.save(OUT, 'PNG', optimize=True)
-print('PASS extracted', OUT, out.size)
+print('PASS complete authored tree frame', OUT, out.size, 'bg=', tuple(int(v) for v in bg), 'base_pixels=', base_pixels)
