@@ -117,13 +117,16 @@ jobs:
           grep -q "proximity-name-v1" src/environment/tile-registry.js
           grep -q "grassMode:'authored-eight-variant-atlas-v1'" src/environment/tile-registry.js
           grep -q "grassVariationMode:'authored-eight-variant-atlas-v1'" src/environment/world-map.js
-          grep -q "version:'1.4.0'" src/environment/prop-contract.js
+          grep -q "version:'1.5.0'" src/environment/prop-contract.js
+          grep -q "generic-prop-contract-v5" src/environment/prop-contract.js
+          grep -q "frame:(p.frame??p.sprite??0)" src/environment/prop-contract.js
           grep -q "plazaFountain:Object.freeze" src/environment/prop-contract.js
           grep -q "plazaFountainBack" src/environment/prop-contract.js
           grep -q "plazaFountainFront" src/environment/prop-contract.js
           grep -q "actor-base-y-redraw-v1" src/environment/prop-contract.js
-          grep -q "generic-props-v1.5" src/environment/generic-props.js
-          grep -q "data-driven-props-v4" src/environment/generic-props.js
+          grep -q "generic-props-v1.6" src/environment/generic-props.js
+          grep -q "data-driven-props-v5-irregular-frames" src/environment/generic-props.js
+          grep -q "function frameRect" src/environment/generic-props.js
           grep -q "resourceMode:'atlas-contract-managed-v1'" src/environment/generic-props.js
           grep -q "generic-prefabs-v1.3" src/environment/generic-prefabs.js
           grep -q "resourceMode:'atlas-contract-managed-v1'" src/environment/generic-prefabs.js
