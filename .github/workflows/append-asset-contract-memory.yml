@@ -20,24 +20,23 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git pull --rebase origin main
-          marker='## Validated PNG Asset Contract Coverage — 2026-09-05'
+          marker='## Validated Asset Contract v2 — 2026-09-05'
           if grep -Fq "$marker" docs/VISUAL_DIRECTION_MEMORY.md; then
             echo 'Memory entry already present.'
             exit 0
           fi
           cat >> docs/VISUAL_DIRECTION_MEMORY.md <<'EOF'
           
-          ## Validated PNG Asset Contract Coverage — 2026-09-05
-          - The existing `kelo-art-asset-contract-v1` manifest now covers all production PNG paths currently referenced directly by `TileRegistry`, including `assets/tileset-vclean.png`, `assets/plaza-ground-v1.png` and `assets/kelo-luxe-boutique.png`; the manifest currently validates 11 authored PNG assets.
-          - `scripts/validate-art-assets.mjs` now enforces TileRegistry PNG -> manifest parity, so a production registry PNG cannot silently bypass the central dimensions/grid/transparency gate. SVG families remain outside this PNG-specific parity rule until their final raster replacements arrive.
-          - PNG transparency validation now accepts both direct alpha color types and valid indexed/truecolor transparency declared through a PNG `tRNS` chunk. This was required by the existing indexed `kelo-luxe-boutique.png`; the contract was corrected rather than weakened.
-          - The first Asset Contract CI run correctly exposed that indexed-transparency assumption. After the validator fix, Asset Contract CI and Kelo CI passed, and GitHub Pages deployed successfully.
-          - The first full LIVE mobile audit exposed a separate stale QA assertion: the auditor still hard-coded `gardens-commerce-roads` while the source TileRegistry and LIVE renderer use `gardens-commerce-arena-roads`. `scripts/live-world-audit.mjs` now derives the expected marble scope from TileRegistry source, preventing that contract string from drifting independently again.
-          - Final complete mobile LIVE audit run `33939094752` passed all world, layer-spatial, Gardens, district-decals, rural, Plaza NPC, Luxe, fountain and nobility gates. The final 390x844 CSS / 780x1688 backing-canvas report recorded `consoleErrors=[]`, `failedRequests=[]`, `httpErrors=[]`; manual inspection found no visual regression to plaza/path/grass readability from this pipeline-only change.
-          - Manual LIVE inspection also exposed the next larger visual bottleneck: several Plaza NPC/service figures still read as square procedural placeholders beside the high-detail hero and authored plaza. Do not spend the next round polishing grass/marble noise first; replace or route those placeholder figures through the existing registry-driven authored NPC visual family while preserving their gameplay anchors and mobile legibility.
+          ## Validated Asset Contract v2 — 2026-09-05
+          - Phase 1 asset-level contract is now closed as `kelo-art-asset-contract-v2`. All 11 production PNG entries declare machine-readable family, semantic version, dimensions/alpha/sampling, padding/spacing, frames, anchor, visual bounds, footprint, collider, ownership, formal render layers, priority, occlusion, district compatibility, cache policy and fallback policy. Concrete world coordinates remain owned by TileRegistry/profile/prefab data rather than duplicated into the manifest.
+          - `scripts/validate-art-assets.mjs` now validates the production metadata above, exact frame/grid coverage including padding/spacing, fallback references, formal `environment-layer-stack.js` phase parity, district compatibility and TileRegistry PNG parity. For the 9 PNGs loaded directly by TileRegistry it additionally verifies the manifest cache key/value against the actual runtime query string, preventing stale-art cache metadata from drifting silently.
+          - `scripts/live-asset-contract-audit.mjs` now requires the complete v2 manifest from published GitHub Pages and verifies LIVE environment-layer phase parity before accepting the mobile audit.
+          - Validation for implementation commit `4ac80378165c06f1b13c0b2fa12c791f1fbcdebf`: Asset Contract CI run `33947288794` PASS; Kelo CI run `33947288806` PASS; GitHub Pages run `33947288353` PASS; Live Asset Contract Audit run `33947288953` PASS; general Live mobile screenshot audit run `33947288813` PASS.
+          - LIVE Asset Contract report exposed `kelo-art-asset-contract-v2`, 11/11 assets with complete production metadata, 9 query-cache assets, 2 runtime-owner assets, TileRegistry `1.11.1`, world `world-v1.19`, layer stack `environment-layer-stack-v2.2`, 390x844 CSS / 780x1688 backing canvas, `consoleErrors=[]`, `failedRequests=[]`, `httpErrors=[]`. Manual screenshot inspection found no visual regression from this metadata/validation-only migration.
+          - Do not spend the next pipeline round on provisional art. The next structural bottleneck is Phase 2 Terrain Contract: the current authored transition system still exposes a fixed 4-neighbour `transitionMasks` table and Plaza-specific topology ownership. Generalize terrain connectivity into data so a new terrain pair can be registered without a district/terrain branch in the renderer; compare bitmask/Wang/hybrid topology only as needed to make that concrete decision.
           EOF
           git add docs/VISUAL_DIRECTION_MEMORY.md
-          git commit -m "Append validated PNG Asset Contract coverage memory"
+          git commit -m "Append validated Asset Contract v2 memory"
           for attempt in 1 2 3 4 5; do
             if git pull --rebase origin main && git push origin HEAD:main; then
               exit 0
