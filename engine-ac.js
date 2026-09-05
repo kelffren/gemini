@@ -20,7 +20,8 @@
   const params = new URLSearchParams(window.location.search);
   const MOV_CADENCE_V2 = params.get('movCadenceV2') !== '0';
   const MOV_STOP_V2 = params.get('movStopV2') !== '0';
-  const requestedPlantFrame = Number(params.get('plantFrame'));
+  const rawPlantFrame = params.get('plantFrame');
+  const requestedPlantFrame = rawPlantFrame == null ? NaN : Number(rawPlantFrame);
   const PLANT_FRAME = Number.isInteger(requestedPlantFrame) && requestedPlantFrame >= 0 && requestedPlantFrame < 4
     ? requestedPlantFrame
     : DEFAULT_PLANT_FRAME;
