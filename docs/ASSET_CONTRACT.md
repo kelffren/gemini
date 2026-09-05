@@ -124,7 +124,7 @@ The referenced fallback asset must exist in the manifest.
 
 ## Validation gate
 
-`scripts/validate-art-assets.mjs` now validates:
+`scripts/validate-art-assets.mjs` validates:
 
 - contract version;
 - world tile and sampling invariants;
@@ -144,7 +144,9 @@ The referenced fallback asset must exist in the manifest.
 - TileRegistry PNG parity;
 - TileRegistry ↔ manifest cache-key parity.
 
-This is a CI gate, not documentation-only guidance.
+Phase 9 adds `scripts/validate-png-pipeline.mjs` and `scripts/png-validation-core.mjs` as the binary/inventory gate. For every registered production PNG, CI now validates the full chunk stream rather than only IHDR: chunk bounds/order, CRCs, IHDR/PLTE/IDAT/IEND rules, non-interlaced runtime policy, zlib decode, decoded scanline length and filter bytes. It also inventories every PNG under `assets/`, rejects unregistered world PNGs, requires explicit policy entries for retained non-world/archive PNGs, detects path case collisions and verifies runtime PNG references resolve to a registered production asset or an explicitly allowed non-world UI asset.
+
+`scripts/test-png-validation.mjs` mutates a known-good PNG and proves the validator fails closed for bad signatures, truncation, CRC corruption, invalid IHDR interlace metadata and trailing bytes. These are CI gates, not documentation-only guidance.
 
 ## Integration rule
 
@@ -162,6 +164,6 @@ If a new authored PNG requires an asset-name or district-specific branch in the 
 
 ## Phase status
 
-Asset Contract v2 closes the asset-level metadata and validation portion of Phase 1.
+Asset Contract v2 closes the asset-level metadata portion of Phase 1. The complete PNG integrity/inventory gate is owned by Phase 9 and builds on this same manifest instead of creating a second source of truth.
 
-It does **not** claim the entire art factory is finished. Terrain topology, generic props, prefabs, district profiles and the final A→B substitution test remain later phases and must build on this contract rather than bypass it.
+It does **not** claim the entire art factory is finished. The final A→B substitution test must still prove that authored art can be replaced through PNG + metadata without renderer/gameplay edits.
