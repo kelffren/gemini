@@ -23,9 +23,9 @@ async function runViewport(name, contextOptions) {
   page.on('requestfailed', r => failedRequests.push({ url: r.url(), error: r.failure()?.errorText || 'failed' }));
   page.on('response', r => { if (r.status() >= 400) httpErrors.push({ status: r.status(), url: r.url() }); });
 
-  // The hero renderer and PNG are under active locomotion research. Bust only these resources
-  // so the audit never evaluates a stale sprite/renderer while leaving the rest of Pages intact.
-  await page.route(/\/(engine-ab\.js|assets\/hero\.PNG)(\?|$)/, route => {
+  // Hero presentation and its dependent aura are under active locomotion/scale research.
+  // Bust only these resources so the audit cannot validate stale visual code.
+  await page.route(/\/(engine-ab\.js|assets\/hero\.PNG|src\/systems\/armor-aura\.js)(\?|$)/, route => {
     const u = new URL(route.request().url());
     u.searchParams.set('hero-audit-bust', `${Date.now()}-${Math.random()}`);
     route.continue({ url: u.toString() });
@@ -45,11 +45,17 @@ async function runViewport(name, contextOptions) {
     const a = window.KELO_HERO_SPRITE_AUDIT ? JSON.parse(JSON.stringify(window.KELO_HERO_SPRITE_AUDIT)) : null;
     const p = window.localPlayer || (typeof localPlayer !== 'undefined' ? localPlayer : null);
     const presentation = p && window.KELO_AVATAR_PRESENTATION ? window.KELO_AVATAR_PRESENTATION.get(p, p._face || 'down') : null;
+    const auraAudit = window.KELO_ARMOR_AURA_AUDIT ? JSON.parse(JSON.stringify(window.KELO_ARMOR_AURA_AUDIT)) : null;
+    const auraMetrics = p && window.KeloArmorAura && typeof window.KeloArmorAura.visualMetrics === 'function'
+      ? window.KeloArmorAura.visualMetrics(p)
+      : null;
     const c = document.getElementById('game-canvas');
     return {
       title: document.title,
       audit: a,
       presentation,
+      auraAudit,
+      auraMetrics,
       player: p ? { x: p.x, y: p.y, radius: p.radius, face: p._face || null } : null,
       canvas: c ? { width: c.width, height: c.height, cssWidth: c.clientWidth, cssHeight: c.clientHeight } : null,
       dpr: window.devicePixelRatio || 1
@@ -73,6 +79,11 @@ async function runViewport(name, contextOptions) {
   if (result.presentation.visualScale !== 1.15) throw new Error(`${name}: presentation scale mismatch ${result.presentation.visualScale}`);
   if (result.presentation.footRootX !== result.presentation.physicsRootX || result.presentation.footRootY - result.presentation.physicsRootY !== 10) throw new Error(`${name}: foot root drift under visual scale`);
   if (!(result.presentation.visualWidth > result.presentation.baseVisualWidth && result.presentation.visualHeight > result.presentation.baseVisualHeight)) throw new Error(`${name}: 1.15x visual scale did not enlarge avatar`);
+  if (!result.auraAudit || result.auraAudit.version !== 'armor-aura-v1.1' || result.auraAudit.usesAvatarPresentation !== true) throw new Error(`${name}: aura audit contract missing`);
+  if (!result.auraMetrics) throw new Error(`${name}: aura visual metrics missing`);
+  if (result.auraMetrics.physicsRadius !== result.player?.radius) throw new Error(`${name}: aura changed physics radius`);
+  if (result.auraMetrics.visualScale !== result.presentation.visualScale) throw new Error(`${name}: aura visual scale drift ${result.auraMetrics.visualScale}`);
+  if (!(result.auraMetrics.effectRadius > result.auraMetrics.physicsRadius)) throw new Error(`${name}: aura did not follow enlarged avatar`);
   if (consoleErrors.length || failedRequests.length || httpErrors.length) {
     throw new Error(`${name}: browser errors ${JSON.stringify({ consoleErrors, failedRequests, httpErrors })}`);
   }
