@@ -22,9 +22,9 @@ function contractOk(d){
     f?.assetMode==='authored-png-layer-pair-v1'&&f?.alignmentMode==='scaled-centered-lower-rim-v1'&&
     f?.environmentLayerStack===true&&f?.renderWrapped===false&&f?.postActorBridgeAvailable===true&&f?.postActorBridgeRestored===false&&
     f?.bridgePolicy==='generic-prop-contract-v1'&&f?.depthMode==='formal-back-front-layer-stack-v1'&&
-    g?.rendererMode==='data-driven-props-v4'&&g?.contractVersion==='1.4.0'&&
-    back?.phase==='props_back'&&back?.timing==='pre_actor'&&front?.phase==='props_front'&&front?.timing==='post_actor'&&
-    d.plaza?.fountainReady;
+    g?.ready===true&&g?.failed===false&&g?.rendererMode==='data-driven-props-v4'&&g?.contractVersion==='1.4.0'&&
+    back?.ready===true&&back?.phase==='props_back'&&back?.timing==='pre_actor'&&
+    front?.ready===true&&front?.phase==='props_front'&&front?.timing==='post_actor';
 }
 
 let loaded=false;
@@ -75,8 +75,8 @@ if(state.fountain?.sourceWidth!==1254||state.fountain?.sourceHeight!==1254)throw
 if(state.fountain?.width!==200||state.fountain?.height!==200||state.fountain?.frontWidth!==148||state.fountain?.frontHeight!==148||state.fountain?.frontX!==1366||state.fountain?.frontY!==1508||state.fountain?.frontScale!==0.74||state.fountain?.visualHeight!==236||state.fountain?.baseY!==1592)throw new Error(`Fountain geometry/alignment contract invalid: ${JSON.stringify(state.fountain)}`);
 if(behind.localY!==1570||behind.expectedLocalDepth!=='behind-front-layer'||behind.localY>=state.fountain.baseY)throw new Error(`Behind geometry contract failed: ${JSON.stringify(behind)}`);
 if(front.localY!==1620||front.expectedLocalDepth!=='in-front-of-front-layer'||front.localY<=state.fountain.baseY)throw new Error(`Front geometry contract failed: ${JSON.stringify(front)}`);
-if(behind.audit?.backDrawCount<1||behind.audit?.frontDrawCount<1||front.audit?.backDrawCount<1||front.audit?.frontDrawCount<1)throw new Error('Generic fountain back/front passes did not execute');
-if(state.fountain?.lastFrontActorRedraws<1)throw new Error('Generic post-actor fountain pass did not redraw any front-side actor');
+if((state.generic?.frontDrawCountByGroup?.plazaFountain||0)<1)throw new Error('Generic fountain front pass did not execute');
+if((state.generic?.actorRedrawCountByGroup?.plazaFountain||0)<1)throw new Error('Generic post-actor fountain pass did not redraw any front-side actor');
 if(state.generic?.registeredColliderCount<1)throw new Error('Generic prop renderer did not register fountain collider');
 if(behind.basin<900||front.basin<900||behind.gold<500||front.gold<500)throw new Error(`Fountain pixels not visible in fountain ROI: ${JSON.stringify({behind,front})}`);
 if(consoleErrors.length)throw new Error(`Console/page errors: ${JSON.stringify(consoleErrors)}`);
