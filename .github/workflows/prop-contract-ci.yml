@@ -1,0 +1,25 @@
+name: Generic Prop Contract CI
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/environment/prop-contract.js'
+      - 'src/environment/generic-props.js'
+      - 'src/environment/plaza-nature.js'
+      - 'scripts/validate-prop-contract.mjs'
+      - '.github/workflows/prop-contract-ci.yml'
+  pull_request:
+    paths:
+      - 'src/environment/prop-contract.js'
+      - 'src/environment/generic-props.js'
+      - 'src/environment/plaza-nature.js'
+      - 'scripts/validate-prop-contract.mjs'
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: node scripts/validate-prop-contract.mjs
