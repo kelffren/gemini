@@ -890,6 +890,17 @@ Kelo World is no longer allowed to remain a single polished plaza floating in a 
 - Certified mobile evidence at 390×844 CSS / 780×1688 physical pixels showed `visiblePlacementCount: 2` in the Gardens capture, `spatialTieCount: 0`, no new spatial overlaps caused by the decals, and `consoleErrors=[]`, `failedRequests=[]`, `httpErrors=[]`. Visual inspection confirmed the microdecals remain subtle, pixel-crisp and subordinate to the hero/path hierarchy.
 - Architecture consequence: every layer currently registered in `environment-layer-stack-v2.2` now exposes explicit ownership and at least one bound. The next structural gap is lower terrain ownership: the formal stack defines `ground`, `ground_variation`, `transitions` and `paths_floors`, but the LIVE layer list currently begins at `decals_details`; terrain/grass/path passes are therefore the next candidates for incremental formalization rather than adding more decorative density.
 
+
+## Validated Commerce Marble Variation — World v1.19 / 2026-09-05
+- Distrito Comercio now opts into the existing authored eight-variant marble overlay through `TileRegistry` district profile metadata (`marbleVariation:true`) and the marble variation scope is explicitly `gardens-commerce-roads`.
+- `world-map.js` no longer hard-codes authored marble variation to Gardens; it follows each district profile's `marbleVariation` flag. This makes future district opt-ins data-driven without another renderer-specific condition.
+- No gameplay coordinates, collision, movement, economy, combat, networking, chat or inventory behavior changed. The pass only changes visual ground rendering policy and cache keys.
+- Validation caught a false implementation before certification: adding the Commerce flag to TileRegistry alone did not alter LIVE rendering because the renderer still required `d.id==='gardens'`. The hard-coded district check was removed before acceptance.
+- Validation also caught stale Gardens workflow assertions for old environment layer/junction cache keys; those QA checks were aligned to the already-live v2/v5 contracts rather than changing runtime behavior to satisfy stale tests.
+- GitHub Pages, Kelo CI and the complete mobile LIVE audit all passed on head `eb4489574c8f774d59a82428efdb57f9f778afe2`. The dedicated Commerce evidence rendered at 390x844 CSS / 780x1688 backing canvas with `activeDistrictLabel='commerce'`, `commerceMarbleVariation=true`, eight marble variants loaded, and no console, failed-request or HTTP errors.
+- Manual inspection of `live-commerce-marble.png` confirms the ivory Commerce approach now has restrained authored cracks/speckle variation instead of reading as a completely uniform white carpet; the effect remains subtle enough that the player and parcel/architecture footprint remain dominant on mobile.
+- Next bottleneck: Arena still has broad uniform ivory navigation/pad surfaces, but it should not automatically inherit Commerce's treatment. The next pass should evaluate a district-specific Arena floor rhythm (wear/cracks or a restrained stone family) while preserving material identity and mobile readability.
+
 ## Non-goals During Visual Passes
 Do not casually alter unrelated systems such as:
 - core movement feel;
