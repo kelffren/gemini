@@ -4,6 +4,18 @@
   "sampling": "nearest",
   "assets": [
     {
+      "id": "tileset-vclean",
+      "path": "assets/tileset-vclean.png",
+      "kind": "core-tile-atlas",
+      "width": 512,
+      "height": 512,
+      "cellWidth": 32,
+      "cellHeight": 32,
+      "columns": 16,
+      "rows": 16,
+      "requireAlpha": false
+    },
+    {
       "id": "grass-variation-v1",
       "path": "assets/grass-variation-v1.png",
       "kind": "ground-variation-atlas",
@@ -40,6 +52,14 @@
       "requireAlpha": true
     },
     {
+      "id": "plaza-ground-v1",
+      "path": "assets/plaza-ground-v1.png",
+      "kind": "ground-prefab",
+      "width": 800,
+      "height": 560,
+      "requireAlpha": true
+    },
+    {
       "id": "rural-soil-v1",
       "path": "assets/rural-soil-v1.png",
       "kind": "ground-atlas",
@@ -73,6 +93,14 @@
       "cellHeight": 32,
       "columns": 8,
       "rows": 4,
+      "requireAlpha": true
+    },
+    {
+      "id": "kelo-luxe-boutique",
+      "path": "assets/kelo-luxe-boutique.png",
+      "kind": "architecture-prefab",
+      "width": 192,
+      "height": 222,
       "requireAlpha": true
     },
     {
