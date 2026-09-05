@@ -921,6 +921,19 @@ Kelo World is no longer allowed to remain a single polished plaza floating in a 
 - LIVE audit run `33944107182` passed at 390x844 CSS / 780x1688 backing canvas. `npc-report.json` confirmed `ready=true`, `assetLoaded=true`, `fallbackActive=false`, `npcCount=3`, `gameplayAnchorsPreserved=true`, with `consoleErrors=[]`, `failedRequests=[]` and `httpErrors=[]`.
 - Manual inspection of `live-plaza-npcs.png` and `live-plaza-portero.png` confirms the silhouettes are less block-like and remain readable against the authored plaza. The service NPCs are still intentionally much simpler than the hero, so the next safe bottleneck is moving this family from geometric SVG construction toward a genuinely authored pixel-character raster atlas or equivalent higher-fidelity character pipeline, without changing the 96x96 cells or gameplay anchors.
 
+
+## Validated Phase 5 — Building / Prefab Contract v2 (2026-09-05)
+
+- **Status:** CLOSED for the current authored architecture path after exact LIVE validation.
+- **Contract:** `src/environment/prefab-contract.js` v1.1.0 (`data-driven-building-prefabs-v2`). Prefabs can declare render parts by asset/frame, `props_back` / `props_front`, offsets, world size, opacity, collider, footprint, interaction/entrance, doors, shadows, overlays, animation metadata, occlusion, district compatibility and ownership without teaching the generic renderer a building type.
+- **Renderer:** `src/environment/generic-prefabs.js` v1.2 consumes the normalized render plan; the renderer does not branch on boutique/castle/building identity. A synthetic split-prefab test proved base/front parts can use separate assets/frames without renderer changes.
+- **Depth defect discovered and fixed:** `engine-l.js` wrapped `KELO_WORLD_RENDERER` while preserving `drawPostActors` but silently dropped `drawPreActors`, so a valid prefab back part never reached `props_back`. The wrapper now preserves both pre-actor and post-actor contracts and their capability flags.
+- **QA hardening:** `scripts/live-prefab-audit.mjs` now waits for `KELO_PLAZA_AUDIT.preActorContractPreserved === true` and verifies a real back draw plus front occlusion. `.github/workflows/live-prefab.yml` now triggers when `engine-l.js` or the formal environment layer stack changes, preventing this regression from escaping again.
+- **Validated LIVE evidence:** Generic Prefab LIVE audit run `33963503184` passed on commit `1e5fd7a35f8f39ccb20a178e74400d6610d976be`; mobile canvas was 390x844 CSS / 780x1688 backing, `backDrawCount=1`, `frontOcclusionDrawCount=1`, one live collider, pre/post actor contracts preserved, and console/page/request/HTTP error lists empty. The screenshot was manually inspected and the boutique, player occlusion, plaza/fountain edge and surrounding props remained visually coherent.
+- **CI / deployment:** Kelo CI run `33963503192` passed and Pages run `33963502209` deployed the exact same commit successfully.
+- **Future rule:** Any wrapper around `KELO_WORLD_RENDERER` must preserve the complete base/pre-actor/post-actor contract, not only `draw()` or `drawPostActors()`.
+- **Next structural bottleneck:** Phase 6 — District Visual Profiles. Move district identity, bounds, terrain/profile mapping, visual families, density/variation and landmark/architecture declarations out of renderer-specific constants, then prove two materially different districts consume the same data-driven contract.
+
 ## Non-goals During Visual Passes
 Do not casually alter unrelated systems such as:
 - core movement feel;
