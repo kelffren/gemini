@@ -43,6 +43,10 @@ on:
       - 'scripts/live-layer-spatial-audit.mjs'
       - '.github/workflows/live-audit.yml'
 
+concurrency:
+  group: live-mobile-audit-main
+  cancel-in-progress: true
+
 jobs:
   audit-live:
     runs-on: ubuntu-latest
