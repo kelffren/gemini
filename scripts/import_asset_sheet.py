@@ -8,6 +8,8 @@ import cv2
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
+# Reusable importer: sheet pixels are the source of truth; no sprite is redrawn.
+
 
 def estimate_background(rgb: np.ndarray, border: int = 12) -> np.ndarray:
     strips = np.concatenate([
@@ -66,7 +68,6 @@ def expand_box(box, margin, width, height):
 
 
 def row_sort(boxes):
-    # Geometry-only ordering. Tall top-row trees are naturally grouped before lower props.
     return sorted(boxes, key=lambda b: (round(b[1] / 90), b[0], b[1]))
 
 
@@ -118,7 +119,6 @@ def main():
     bg = estimate_background(rgb)
     alpha, dist = alpha_from_background(rgb, bg, args.soft_threshold, args.core_threshold)
 
-    # Detection uses solid foreground, but output alpha keeps antialiased edge pixels.
     core = (dist >= args.core_threshold).astype(np.uint8)
     core = cv2.morphologyEx(core, cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8), iterations=1)
     count, labels, stats, _ = cv2.connectedComponentsWithStats(core, 8)
@@ -130,8 +130,6 @@ def main():
             continue
         raw_boxes.append((x, y, x + cw, y + ch))
 
-    # Proximity grouping is the core rule: decorative stones/flowers/roots remain with
-    # their parent object instead of being dropped because they are disconnected pixels.
     merged = merge_boxes(raw_boxes, args.merge_gap)
     merged = [expand_box(b, args.margin, w, h) for b in merged]
     merged = [b for b in merged if (b[2] - b[0]) >= 16 and (b[3] - b[1]) >= 16]
