@@ -3,7 +3,7 @@
   if(!R?.atlases){console.error('[Kelo atlas] TileRegistry missing');return;}
 
   const POLICY=Object.freeze({
-    id:'kelo-atlas-contract-v1',version:'1.2.0',sampling:'nearest',maxDimension:2048,
+    id:'kelo-atlas-contract-v1',version:'1.3.0',sampling:'nearest',maxDimension:2048,
     preferredDimensions:Object.freeze([128,256,512,1024]),
     tiers:Object.freeze({
       small:Object.freeze({maxDimension:256,use:'small tile/prop families'}),
@@ -35,7 +35,15 @@
   function normalize(key,atlas,role){return Object.freeze({key,id:atlas?.id||key,src:atlas?.src,width:Number(atlas?.width)||0,height:Number(atlas?.height)||0,role:role||ROLE_BY_KEY[key]||'optional',tier:tierForAtlas(atlas),cacheToken:cacheToken(atlas?.src),grid:Boolean(atlas?.tileWidth&&atlas?.tileHeight&&atlas?.columns),sampling:POLICY.sampling})}
   function register(key,atlas,opts={}){if(!key||!atlas)return null;const entry=normalize(key,atlas,opts.role);records.set(key,entry);refreshAudit();return entry}
   function validate(entry){const v=[];if(!entry.src)v.push(`${entry.key}: missing src`);if(!(entry.width>0&&entry.height>0))v.push(`${entry.key}: invalid dimensions`);if(Math.max(entry.width,entry.height)>POLICY.maxDimension)v.push(`${entry.key}: exceeds ${POLICY.maxDimension}px`);if(POLICY.cache.required&&!entry.cacheToken)v.push(`${entry.key}: missing versioned URL cache token`);return v}
-  function refreshAudit(){const violations=[...records.values()].flatMap(validate);window.KELO_ATLAS_AUDIT=Object.freeze({version:POLICY.version,policyId:POLICY.id,atlasCount:records.size,violations:Object.freeze(violations),roles:Object.freeze(Object.fromEntries([...records].map(([k,v])=>[k,v.role]))),loaded:Object.freeze([...runtime].filter(([,v])=>v.image?.complete&&v.image?.naturalWidth>0).map(([k])=>k)),refCounts:Object.freeze(Object.fromEntries([...runtime].map(([k,v])=>[k,v.refs]))) });if(violations.length)console.error('[Kelo atlas] contract violations',violations)}
+  function refreshAudit(){
+    const violations=[...records.values()].flatMap(validate);
+    const loadedEntries=[...runtime].filter(([,v])=>v.image?.complete&&v.image?.naturalWidth>0);
+    const decodedBytes=loadedEntries.reduce((sum,[,v])=>sum+(v.image.naturalWidth*v.image.naturalHeight*4),0);
+    const residentDistrictAtlasCount=loadedEntries.filter(([k])=>records.get(k)?.role==='district').length;
+    window.KELO_ATLAS_AUDIT=Object.freeze({version:POLICY.version,policyId:POLICY.id,atlasCount:records.size,violations:Object.freeze(violations),roles:Object.freeze(Object.fromEntries([...records].map(([k,v])=>[k,v.role]))),loaded:Object.freeze(loadedEntries.map(([k])=>k)),refCounts:Object.freeze(Object.fromEntries([...runtime].map(([k,v])=>[k,v.refs]))),decodedTextureMB:decodedBytes/(1024*1024),residentDistrictAtlasCount});
+    try{window.dispatchEvent(new CustomEvent('kelo:atlas-audit'))}catch{}
+    if(violations.length)console.error('[Kelo atlas] contract violations',violations)
+  }
   function acquire(key){const entry=records.get(key);if(!entry)return Promise.reject(new Error(`[Kelo atlas] unknown asset ${key}`));let state=runtime.get(key);if(state){state.refs++;refreshAudit();return state.promise}const image=new Image(),promise=new Promise((resolve,reject)=>{image.onload=()=>{if(image.naturalWidth!==entry.width||image.naturalHeight!==entry.height){reject(new Error(`[Kelo atlas] ${key} dimension mismatch ${image.naturalWidth}x${image.naturalHeight}`));return}refreshAudit();resolve(image)};image.onerror=()=>reject(new Error(`[Kelo atlas] failed to load ${key}`));image.src=entry.src});state={image,promise,refs:1,role:entry.role};runtime.set(key,state);refreshAudit();return promise}
   function release(key){const state=runtime.get(key);if(!state)return false;state.refs=Math.max(0,state.refs-1);if(state.refs===0&&state.role!=='core'){state.image.src='';runtime.delete(key);refreshAudit();return true}refreshAudit();return false}
   function describe(key){return records.get(key)||null}
