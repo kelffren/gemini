@@ -6,6 +6,9 @@ on:
     paths:
       - 'index.html'
       - 'src/environment/atlas-contract.js'
+      - 'src/environment/world-map.js'
+      - 'src/environment/gardens-atlas.js'
+      - 'src/environment/gardens-joins.js'
       - 'src/environment/tile-registry.js'
       - 'src/environment/prop-contract.js'
       - 'src/environment/prefab-contract.js'
