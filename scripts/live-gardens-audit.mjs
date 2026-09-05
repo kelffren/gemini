@@ -16,7 +16,7 @@ const browser=await chromium.launch({headless:true,executablePath:process.env.CH
 const context=await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true});
 const page=await context.newPage();
 await page.route(/\/src\/environment\/(terrain-contract|world-map|gardens-compositions|gardens-junction-overlay)\.js/,route=>{const u=new URL(route.request().url());u.searchParams.set('audit-bust',`${Date.now()}-${Math.random()}`);route.continue({url:u.toString()});});
-await page.route(/\/assets\/gardens-t-junctions-v1\.svg/,route=>{const u=new URL(route.request().url());u.searchParams.set('audit-bust',`${Date.now()}-${Math.random()}`);route.continue({url:u.toString()()});});
+await page.route(/\/assets\/gardens-t-junctions-v1\.svg/,route=>{const u=new URL(route.request().url());u.searchParams.set('audit-bust',`${Date.now()}-${Math.random()}`);route.continue({url:u.toString()});});
 const consoleErrors=[],failedRequests=[],httpErrors=[];
 page.on('console',m=>{if(m.type()==='error')consoleErrors.push(m.text())});
 page.on('pageerror',e=>consoleErrors.push(`PAGEERROR: ${e.stack||e.message}`));
