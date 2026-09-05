@@ -4,6 +4,7 @@
 No rediseñar después. Misma API hoy (local-fallback) y mañana (server).
 
 Documento corto: [`docs/ONLINE_FIRST.md`](docs/ONLINE_FIRST.md)
+Índice de código: [`docs/CODE_INDEX.md`](docs/CODE_INDEX.md)
 
 Antes de marcar algo como listo:
 > ¿Puedo conectarlo al online cambiando solo la capa de autoridad, sin rehacer lógica, IDs, dueños ni el flujo del jugador?
@@ -43,41 +44,33 @@ Before declaring any feature complete, answer:
 
 If the answer is NO, the architecture is not complete.
 
-### Systems covered
+## RULE 5 — COMENTARIOS ÍNDICE (OBLIGATORIO)
 
-This rule applies to all gameplay and economy systems, including but not limited to:
+Todo archivo JS/HTML nuevo o tocado debe llevar comentarios que **el runtime no ejecuta** (`//` o `/* */`) y una cabecera `KELO-INDEX` con palabras clave para saltar con grep.
 
-- Inventory / Backpack
-- Containers / Warehouse
-- Equipment
-- Market / Escrow
-- Trade
-- currencies and economy
-- crafting
-- resources and gathering
-- drops and loot
-- NPC interactions
-- quests
-- professions
-- properties / housing
-- mounts
-- guilds
-- progression
-- cooldowns
-- PvP and combat state
-- abilities / stones / hotbar casts visible to other players
+Plantilla:
 
-### Server-authoritative target
+```js
+/* KELO-INDEX
+ * area: NET
+ * keys: POSE CAST AUTHORITY PLAYERKEY
+ * hace: una línea en español de qué hace este archivo
+ * online: cómo se enchufa al server (o N/A si es solo arte)
+ */
+```
 
-Before production multiplayer, the server must be authoritative for any operation capable of creating, destroying, transferring, spending, earning, owning, selling, buying, equipping, or otherwise changing valuable/shared game state.
+Encima de funciones que mutan estado o que el otro jugador debe ver:
 
-The client may predict or display state for responsiveness, but it must not be the trusted source of truth for multiplayer-critical state.
+```js
+// KELO-INDEX NET/POSE envia x y face gait zone
+```
 
-### Architecture principle
-
-Build locally playable now; make authority replaceable later.
-
-Do not create throwaway offline architecture that must be rewritten to become online.
+Reglas:
+- El comentario describe la función, no narra la historia del commit.
+- Claves en MAYÚSCULAS, estables: ver `docs/CODE_INDEX.md`.
+- No comentar cada línea. Comentar bloques y dueños.
+- No usar comentarios para desactivar sistemas vivos; para eso hay flags `disabled`.
+- Un cambio sin `KELO-INDEX` en archivo nuevo no está terminado.
 
 ## RULE 2 — PRESERVE VALIDATED SYSTEMS
 
@@ -94,6 +87,7 @@ System-specific memory documents record validated implementation details. They d
 For Inventory/Containers/Market, read `docs/BACKPACK_SYSTEM_MEMORY.md` before changes.
 For visual/world work, read `docs/VISUAL_DIRECTION_MEMORY.md` before changes.
 For online-first law, read `docs/ONLINE_FIRST.md` before changes.
+For comment keywords, read `docs/CODE_INDEX.md` before changes.
 
 ## Required startup protocol for every development pass
 
@@ -105,3 +99,4 @@ For online-first law, read `docs/ONLINE_FIRST.md` before changes.
 6. Test deterministically.
 7. Validate LIVE when the changed feature is user-facing/deployed.
 8. Update subsystem memory only with behavior actually validated.
+9. Stamp or refresh `KELO-INDEX` on files you touch.
