@@ -54,8 +54,8 @@ jobs:
           grep -q "formal-props-back-t-junction-layer-v1" src/environment/gardens-junction-overlay.js
           grep -q "ownership:'tile-registry-formal-layer-v1'" src/environment/gardens-junction-overlay.js
           grep -q "phase:'props_back'" src/environment/gardens-junction-overlay.js
-          grep -q "environment-layer-stack.js?v=1" index.html
-          grep -q "gardens-junction-overlay.js?v=4" index.html
+          grep -q "environment-layer-stack.js?v=2" index.html
+          grep -q "gardens-junction-overlay.js?v=5" index.html
       - name: Validate declared Gardens placement visibility
         run: node scripts/validate-gardens-placements.mjs
       - name: Install Playwright
