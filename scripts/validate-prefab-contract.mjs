@@ -24,6 +24,6 @@ if(castle.entrance?.x!==860||castle.doors.length!==1||castle.shadows.length!==1|
 for(const key of ['splitLayers','colliders','interactionMetadata','entrances','doors','shadows','overlays','animationFrames','occlusion','districtCompatibility'])if(C.capabilities[key]!==true)throw new Error(`Missing capability ${key}`);
 if(/luxeBoutique|kelo-luxe|SHOP|Boutique/.test(rendererSource))throw new Error('Generic prefab renderer contains building-specific knowledge');
 if(/new Image\(|drawImage|\.register\(\{id:[`'"]?luxe/.test(adapterSource))throw new Error('Luxe adapter still owns rendering');
-if(!indexSource.includes('src/environment/prefab-contract.js?v=1')||!indexSource.includes('src/environment/generic-prefabs.js?v=1'))throw new Error('Generic prefab pipeline is not booted');
-if(indexSource.indexOf('prefab-contract.js?v=1')>indexSource.indexOf('luxe-kiosk-atlas.js'))throw new Error('Prefab contract loads after compatibility adapter');
+if(!/src\/environment\/prefab-contract\.js\?v=\d+/.test(indexSource)||!/src\/environment\/generic-prefabs\.js\?v=\d+/.test(indexSource))throw new Error('Generic prefab pipeline is not booted');
+if(indexSource.indexOf('prefab-contract.js?')>indexSource.indexOf('luxe-kiosk-atlas.js'))throw new Error('Prefab contract loads after compatibility adapter');
 console.log('PASS prefab contract: synthetic castle integrated through metadata without renderer changes');
