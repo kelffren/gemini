@@ -322,6 +322,35 @@
       "districtCompatibility": ["central"],
       "cache": {"strategy": "runtime-owner", "version": "1"},
       "fallback": {"mode": "none"}
+    },
+    {
+      "id": "district-decals-v1",
+      "family": "district-decals",
+      "version": "1.0.0",
+      "path": "assets/district-decals-v1.png",
+      "kind": "decal-atlas",
+      "width": 256,
+      "height": 32,
+      "requireAlpha": true,
+      "sampling": "nearest",
+      "padding": 0,
+      "spacing": 0,
+      "frames": {"mode": "grid", "count": 8},
+      "anchor": {"mode": "registry-instance"},
+      "visualBounds": {"mode": "registry-frame"},
+      "footprint": {"mode": "none"},
+      "collider": {"mode": "none"},
+      "ownership": "tile-registry",
+      "layers": ["decals_details"],
+      "priority": 0,
+      "occlusion": {"mode": "none"},
+      "districtCompatibility": ["rural", "arena", "commerce", "gardens"],
+      "cache": {"strategy": "query", "key": "art", "value": "241"},
+      "fallback": {"mode": "none"},
+      "cellWidth": 32,
+      "cellHeight": 32,
+      "columns": 8,
+      "rows": 1
     }
   ]
 }
