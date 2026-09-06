@@ -3,7 +3,7 @@
 
   const VERSION = 'character-appearance-v2.0.0';
   const DEFAULT_PLAYER = 'player_hero_v1';
-  const DEFAULT_BOT = 'bot_crimson_v1';
+  const DEFAULT_BOT = window.KELO_WORLD_DECORATION_RESET === true ? DEFAULT_PLAYER : 'bot_crimson_v1';
   const ALPHA_CLEANUP_THRESHOLD = 8;
 
   const definitions = Object.freeze({
@@ -85,7 +85,7 @@
     return runtime;
   }
 
-  Object.keys(definitions).forEach(function (id) { const def = definitions[id]; if (!def.delegateToLegacyHero) ensureRuntime(def); });
+  Object.keys(definitions).forEach(function (id) { const def = definitions[id]; if (!def.delegateToLegacyHero && !(window.KELO_WORLD_DECORATION_RESET === true && def.role === 'bot')) ensureRuntime(def); });
 
   function assignDefaults() {
     if (typeof localPlayer !== 'undefined' && localPlayer) {

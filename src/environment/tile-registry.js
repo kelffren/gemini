@@ -1,23 +1,29 @@
 (function () {
   const TILE = 32;
+  const RESET = window.KELO_WORLD_DECORATION_RESET === true;
+  function resetBlank(width,height){
+    const w=Math.max(1,Number(width)||1),h=Math.max(1,Number(height)||1);
+    return `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='${w}' height='${h}' viewBox='0 0 ${w} ${h}'%3E%3C/svg%3E#kelo-reset`;
+  }
+  function assetSrc(src,width,height){ return RESET ? resetBlank(width,height) : src; }
   const atlas = Object.freeze({
-    id:'plaza-core', src:'assets/tileset-vclean.png?art=131', width:512, height:512,
+    id:'plaza-core', src:assetSrc('assets/tileset-vclean.png?art=131',512,512), width:512, height:512,
     tileWidth:TILE, tileHeight:TILE, columns:16
   });
   const transitionAtlas = Object.freeze({
-    id:'plaza-transitions', src:'assets/plaza-transitions-v3.png?art=142', width:128, height:128,
+    id:'plaza-transitions', src:assetSrc('assets/plaza-transitions-v3.png?art=142',128,128), width:128, height:128,
     tileWidth:TILE, tileHeight:TILE, columns:4
   });
   const grassVariationAtlas = Object.freeze({
-    id:'grass-variation', src:'assets/grass-variation-v1.png?art=191', width:128, height:64,
+    id:'grass-variation', src:assetSrc('assets/grass-variation-v1.png?art=191',128,64), width:128, height:64,
     tileWidth:TILE, tileHeight:TILE, columns:4, tileCount:8
   });
   const marbleVariationAtlas = Object.freeze({
-    id:'marble-variation', src:'assets/marble-variation-v1.png?art=143', width:128, height:64,
+    id:'marble-variation', src:assetSrc('assets/marble-variation-v1.png?art=143',128,64), width:128, height:64,
     tileWidth:TILE, tileHeight:TILE, columns:4, tileCount:8, overlay:true
   });
   const plazaGroundAtlas = Object.freeze({
-    id:'plaza-ground', src:'assets/plaza-ground-v1.png?art=193', width:800, height:560,
+    id:'plaza-ground', src:assetSrc('assets/plaza-ground-v1.png?art=193',800,560), width:800, height:560,
     worldWidth:800, worldHeight:560, family:'ground'
   });
   const plazaNatureMeta = window.KELO_ARBOL_1_ATLAS_META;
@@ -32,23 +38,23 @@
     spriteCount:Object.keys(plazaNatureMeta.frames).length
   });
   const trainingDummyAtlas = Object.freeze({
-    id:'plaza-training-dummy', src:'assets/training-dummy-v1.svg?art=198', width:96, height:96,
+    id:'plaza-training-dummy', src:assetSrc('assets/training-dummy-v1.svg?art=198',96,96), width:96, height:96,
     spriteWidth:96, spriteHeight:96, columns:1, spriteCount:1, family:'training_prop'
   });
   const plazaNpcsAtlas = Object.freeze({
-    id:'plaza-npcs', src:'assets/plaza-npcs-v1.svg?art=199', width:288, height:96,
+    id:'plaza-npcs', src:assetSrc('assets/plaza-npcs-v1.svg?art=199',288,96), width:288, height:96,
     spriteWidth:96, spriteHeight:96, columns:3, spriteCount:3, family:'npc_visual'
   });
   const ruralSoilAtlas = Object.freeze({
-    id:'rural-soil', src:'assets/rural-soil-v1.png?art=160', width:128, height:128,
+    id:'rural-soil', src:assetSrc('assets/rural-soil-v1.png?art=160',128,128), width:128, height:128,
     tileWidth:TILE, tileHeight:TILE, columns:4
   });
   const ruralPropsAtlas = Object.freeze({
-    id:'rural-props', src:'assets/rural-props-v1.png?art=170', width:128, height:128,
+    id:'rural-props', src:assetSrc('assets/rural-props-v1.png?art=170',128,128), width:128, height:128,
     tileWidth:TILE, tileHeight:TILE, columns:4
   });
   const ruralLandmarksAtlas = Object.freeze({
-    id:'rural-landmarks', src:'assets/rural-landmarks-v1.png?art=180', width:256, height:128,
+    id:'rural-landmarks', src:assetSrc('assets/rural-landmarks-v1.png?art=180',256,128), width:256, height:128,
     tileWidth:TILE, tileHeight:TILE, columns:8
   });
   const ruralNatureAtlas = window.KELO_RURAL_NATURE_ATLAS;
@@ -59,23 +65,23 @@
 
   const architectureAssets = Object.freeze({
     luxeBoutique:Object.freeze({
-      id:'luxe-boutique', src:'assets/kelo-luxe-boutique.png?v=6', width:192, height:222,
+      id:'luxe-boutique', src:assetSrc('assets/kelo-luxe-boutique.png?v=6',192,222), width:192, height:222,
       worldWidth:192, worldHeight:222, family:'architecture'
     }),
     commerceArcadeWest:Object.freeze({
-      id:'commerce-arcade-west', src:'assets/commerce-arcade-west-v1.png?art=306', width:160, height:432,
+      id:'commerce-arcade-west', src:assetSrc('assets/commerce-arcade-west-v1.png?art=306',160,432), width:160, height:432,
       worldWidth:80, worldHeight:216, family:'commerce-architecture'
     }),
     commerceArcadeEast:Object.freeze({
-      id:'commerce-arcade-east', src:'assets/commerce-arcade-east-v1.png?art=306', width:160, height:432,
+      id:'commerce-arcade-east', src:assetSrc('assets/commerce-arcade-east-v1.png?art=306',160,432), width:160, height:432,
       worldWidth:80, worldHeight:216, family:'commerce-architecture'
     }),
     arenaWarWall:Object.freeze({
-      id:'arena-war-wall', src:'assets/arena-war-wall-v1.png?art=301', width:640, height:192,
+      id:'arena-war-wall', src:assetSrc('assets/arena-war-wall-v1.png?art=301',640,192), width:640, height:192,
       worldWidth:640, worldHeight:192, family:'arena-architecture'
     }),
     arenaWarEdgeDecor:Object.freeze({
-      id:'arena-war-edge-decor', src:'assets/arena-war-edge-decor-v1.png?art=301', width:640, height:96,
+      id:'arena-war-edge-decor', src:assetSrc('assets/arena-war-edge-decor-v1.png?art=301',640,96), width:640, height:96,
       worldWidth:640, worldHeight:96, family:'arena-landmark'
     })
   });

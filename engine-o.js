@@ -37,7 +37,11 @@
     decorationResetSuppressed:true
   };
 
-  if (asset && prop && style) {
+  if (resetActive()) {
+    window.KELO_TRAINING_DUMMY_AUDIT.ready = true;
+    window.KELO_TRAINING_DUMMY_AUDIT.assetLoaded = false;
+    window.KELO_TRAINING_DUMMY_AUDIT.fallbackActive = false;
+  } else if (asset && prop && style) {
     const a = prop.gameplayAnchor;
     const anchorOk = a && a.x === dummy.x && a.y === dummy.y && a.radius === dummy.radius;
     window.KELO_TRAINING_DUMMY_AUDIT.gameplayAnchorPreserved = !!anchorOk;

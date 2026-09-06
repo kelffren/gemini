@@ -28,7 +28,11 @@
     decorationReset:true,
     decorationResetSuppressed:true
   };
-  if (npcAtlas && npcVisuals && npcStyle) {
+  if (resetActive()) {
+    window.KELO_PLAZA_NPC_AUDIT.ready = true;
+    window.KELO_PLAZA_NPC_AUDIT.assetLoaded = false;
+    window.KELO_PLAZA_NPC_AUDIT.fallbackActive = false;
+  } else if (npcAtlas && npcVisuals && npcStyle) {
     npcImg.onload = function () {
       if (npcImg.naturalWidth !== npcAtlas.width || npcImg.naturalHeight !== npcAtlas.height) {
         console.error('[Kelo plaza npcs] invalid authored atlas dimensions');

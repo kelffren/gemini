@@ -178,9 +178,18 @@
   sheet.onerror=function(){ console.error('[Kelo plaza] tileset load failed'); };
   transitionSheet.onerror=function(){ console.error('[Kelo plaza] transition atlas load failed'); };
   groundSheet.onerror=function(){ console.error('[Kelo plaza] authored ground load failed'); };
-  sheet.src=ATLAS.src+'&v=100';
-  transitionSheet.src=TRANSITION_ATLAS.src+'&v=100';
-  groundSheet.src=GROUND_ATLAS.src+'&v=100';
+  if(window.KELO_WORLD_DECORATION_RESET!==true){
+    sheet.src=ATLAS.src+'&v=100';
+    transitionSheet.src=TRANSITION_ATLAS.src+'&v=100';
+    groundSheet.src=GROUND_ATLAS.src+'&v=100';
+  }else{
+    window.KELO_PLAZA_AUDIT.ready=true;
+    window.KELO_PLAZA_AUDIT.assetLoaded=false;
+    window.KELO_PLAZA_AUDIT.groundAssetLoaded=false;
+    window.KELO_PLAZA_AUDIT.fallbackActive=false;
+    window.KELO_PLAZA_AUDIT.decorationReset=true;
+    window.KELO_PLAZA_AUDIT.decorationResetSuppressed=true;
+  }
 
   let worldLayerWrapped=false;
   function installWorldGroundLayer(){
