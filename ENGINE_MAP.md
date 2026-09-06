@@ -633,3 +633,7 @@ Reglas:
 
 ## House Instance V1 (offline-first)
 `KELO_INSTANCES` separa conceptualmente world e instancias. House usa autoridad/persistencia reemplazables y reutiliza Property placements. En online, World y House workers podrán separarse sin cambiar UI/contratos.
+
+
+## Admin Key / World Creator V1
+`KELO_ADMIN_KEYS` decide quién puede abrir el modo de autor del mundo. Scopes iniciales: `world.edit`, `world.export`, `world.import`, `world.publish`, `admin.issue`, `admin.revoke`. El backend futuro sustituye la autoridad local sin cambiar el editor.
