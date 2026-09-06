@@ -50,9 +50,13 @@ if(!Object.values(afterPaint.cells).some(x=>x.role==='path'))throw new Error('pa
 
 await page.locator('[data-wb-layer="objects"]').click();
 await page.waitForFunction(()=>document.querySelectorAll('#wb-list .wb-card').length>0);
+const selectedTemplate=await page.evaluate(()=>{const t=window.KELO_PROPERTY_CATALOG.list()[0];return{id:t.id,label:t.label,assetKeys:[...new Set((t.parts||[]).map(p=>p.assetKey))]};});
+await page.waitForFunction(keys=>keys.every(k=>window.KELO_WORLD_BUILDER_PROPERTY_RENDERER?.readyKeys?.includes(k)||window.KELO_WORLD_BUILDER_PROPERTY_RENDERER?.errors?.[k]),selectedTemplate.assetKeys,{timeout:6000});
+const selectedAtlas=await page.evaluate(keys=>({ready:window.KELO_WORLD_BUILDER_PROPERTY_RENDERER.readyKeys,errors:window.KELO_WORLD_BUILDER_PROPERTY_RENDERER.errors,required:keys}),selectedTemplate.assetKeys);
+const failedSelected=selectedTemplate.assetKeys.filter(k=>!selectedAtlas.ready.includes(k));
+if(failedSelected.length)throw new Error('selected Property atlas failed '+JSON.stringify({selectedTemplate,selectedAtlas}));
 await page.locator('#wb-list .wb-card').first().click();
 await page.mouse.click(270,250);
-await page.waitForFunction(()=>window.KELO_WORLD_BUILDER_PROPERTY_RENDERER?.imageCount>0,null,{timeout:6000});
 await page.waitForTimeout(400);
 const objects=await page.evaluate(async()=>{const p=await window.KELO_PROPERTY_SYSTEM.request('ensureWorldEditorParcel',{ownerId:'developer'});return{parcel:p,rows:window.KELO_PROPERTY_SYSTEM.getPlacements(p.parcelId),catalog:window.KELO_PROPERTY_CATALOG.list().length,renderer:window.KELO_WORLD_RENDERER?.worldBuilderPropertyRenderer===true,imageCount:window.KELO_WORLD_BUILDER_PROPERTY_RENDERER?.imageCount||0};});
 if(objects.catalog<1)throw new Error('property catalog empty');
