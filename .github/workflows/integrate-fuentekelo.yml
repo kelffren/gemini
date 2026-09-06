@@ -1,0 +1,59 @@
+name: Integrate Kelo Fountain
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'assets/fuentekelo.PNG'
+      - 'scripts/integrate_fuentekelo.py'
+      - '.github/workflows/integrate-fuentekelo.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install image tooling
+        run: python -m pip install --disable-pip-version-check pillow numpy
+      - name: Integrate fuentekelo
+        run: python scripts/integrate_fuentekelo.py
+      - name: Syntax and contract checks
+        run: |
+          node --check src/environment/environment-layer-stack.js
+          node --check src/environment/prop-contract.js
+          node --check src/environment/generic-props.js
+          node --check src/environment/plaza-depth.js
+          node --check scripts/live-fountain-audit.mjs
+          node scripts/validate-art-assets.mjs
+          node scripts/validate-atlas-contract.mjs
+          node scripts/validate-png-pipeline.mjs
+          python scripts/validate_depth_pipeline.py
+          git diff --check
+      - name: Verify runtime PNG alpha
+        run: |
+          python - <<'PY'
+          from PIL import Image
+          p='assets/fuentekelo-runtime.png'
+          im=Image.open(p)
+          assert im.size==(1312,1199), im.size
+          assert im.mode=='RGBA', im.mode
+          assert im.getchannel('A').getextrema()==(0,255), im.getchannel('A').getextrema()
+          print('PASS',p,im.size,im.mode,im.getchannel('A').getextrema())
+          PY
+      - name: Commit integration
+        run: |
+          if git diff --quiet && git diff --cached --quiet; then
+            echo 'No changes to commit'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add assets/fuentekelo-runtime.png assets/plaza-fountain-back.PNG assets/plaza-fountain-front.PNG src/environment/prop-contract.js src/environment/environment-layer-stack.js src/environment/generic-props.js src/environment/plaza-depth.js src/environment/art-asset-manifest.json src/environment/png-validation-policy.json scripts/live-fountain-audit.mjs .github/workflows/ci.yml index.html
+          git commit -m 'Integrate fuentekelo at Plaza center'
+          git push origin HEAD:main
