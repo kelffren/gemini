@@ -4,6 +4,7 @@ on:
     branches: [ feature/world-builder-admin-v1 ]
     paths:
       - 'src/environment/world-builder-system.js'
+      - 'src/environment/world-builder-property-renderer.js'
       - 'src/ui/world-builder-ui.js'
       - 'src/systems/admin-key-system.js'
       - 'scripts/world-builder-browser-audit.mjs'
@@ -22,6 +23,7 @@ jobs:
       - name: Syntax checks
         run: |
           node --check src/environment/world-builder-system.js
+          node --check src/environment/world-builder-property-renderer.js
           node --check src/ui/world-builder-ui.js
           node --check src/systems/admin-key-system.js
           node --check scripts/world-builder-browser-audit.mjs
