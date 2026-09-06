@@ -1,0 +1,32 @@
+name: World Builder Atlas Audit Patch Once
+on:
+  push:
+    branches: [ feature/world-builder-admin-v1 ]
+    paths: [ '.github/workflows/world-builder-atlas-audit-patch-once.yml' ]
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require selected asset atlas
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('scripts/world-builder-browser-audit.mjs')
+          s=p.read_text()
+          old='''await page.locator('[data-wb-layer="objects"]').click();\nawait page.waitForFunction(()=>document.querySelectorAll('#wb-list .wb-card').length>0);\nawait page.locator('#wb-list .wb-card').first().click();\nawait page.mouse.click(270,250);\nawait page.waitForFunction(()=>window.KELO_WORLD_BUILDER_PROPERTY_RENDERER?.imageCount>0,null,{timeout:6000});\nawait page.waitForTimeout(400);'''
+          new='''await page.locator('[data-wb-layer="objects"]').click();\nawait page.waitForFunction(()=>document.querySelectorAll('#wb-list .wb-card').length>0);\nconst selectedTemplate=await page.evaluate(()=>{const t=window.KELO_PROPERTY_CATALOG.list()[0];return{id:t.id,label:t.label,assetKeys:[...new Set((t.parts||[]).map(p=>p.assetKey))]};});\nawait page.waitForFunction(keys=>keys.every(k=>window.KELO_WORLD_BUILDER_PROPERTY_RENDERER?.readyKeys?.includes(k)||window.KELO_WORLD_BUILDER_PROPERTY_RENDERER?.errors?.[k]),selectedTemplate.assetKeys,{timeout:6000});\nconst selectedAtlas=await page.evaluate(keys=>({ready:window.KELO_WORLD_BUILDER_PROPERTY_RENDERER.readyKeys,errors:window.KELO_WORLD_BUILDER_PROPERTY_RENDERER.errors,required:keys}),selectedTemplate.assetKeys);\nconst failedSelected=selectedTemplate.assetKeys.filter(k=>!selectedAtlas.ready.includes(k));\nif(failedSelected.length)throw new Error('selected Property atlas failed '+JSON.stringify({selectedTemplate,selectedAtlas}));\nawait page.locator('#wb-list .wb-card').first().click();\nawait page.mouse.click(270,250);\nawait page.waitForTimeout(400);'''
+          if old not in s:
+              raise SystemExit('target block not found')
+          p.write_text(s.replace(old,new))
+          PY
+      - name: Commit and remove one-time patcher
+        run: |
+          git config user.name kelo-world-builder-bot
+          git config user.email 68343904+kelffren@users.noreply.github.com
+          git rm .github/workflows/world-builder-atlas-audit-patch-once.yml
+          git add scripts/world-builder-browser-audit.mjs
+          git commit -m 'Certify selected World Builder asset atlas'
+          git push
