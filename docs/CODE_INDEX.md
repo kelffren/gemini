@@ -43,6 +43,15 @@ No uses `/*` para apagar código. Los comentarios solo documentan.
 | STONES RECIPE | piedras data-driven | `src/abilities/stone-system.js` `abilityData.js` |
 | CAST ABILITY | delivery VFX/daño cliente | `src/abilities/kelo-ability-boot.js` |
 | NET WS POSE | online room | `engine-net.js` |
+| VISUAL ASSET REGISTRY | IDs / preload / lazy visual | `src/visuals/asset-registry.js` |
+| ANIMATION CLIP ANCHOR | clips, channels, foot-root sockets | `src/visuals/animation-system.js` |
+| VFX PROJECTILE SFX SCREEN | FX reutilizable / projectile visual / sonido | `src/visuals/fx-system.js` |
+| VISUAL SEQUENCE | timelines/composición opcional | `src/visuals/sequence-system.js` |
+| ABILITY VISUAL PROFILE | Ability event → presentation | `src/visuals/ability-visuals.js` |
+| VISUAL EVENT AUDIT | bus/context/layers/audit | `src/visuals/visual-system.js` |
+| VISUAL LAB | galería dev `?visualLab=1` | `src/visuals/visual-lab.js` |
+| VISUAL ACTOR BRIDGE | actorBackFX/actorFrontFX final | `src/visuals/visual-integration.js` |
+| NET VISUAL EVENT | relay semántico presentation-only | `engine-net.js` + `server/index.js` |
 | AUTHORITY | boca única client→server | `engine-net.js` `KeloNetAuthority` |
 | PROPERTY CATALOG | templates placeables desde props/prefabs | `src/property/property-asset-catalog.js` |
 | PROPERTY PARCEL UNITS | balances, placements, autoridad reemplazable | `src/property/property-system.js` |
@@ -85,3 +94,20 @@ KELO-INDEX UI
 - Botón `↻ GIRAR` vive en el rail móvil de Luxe; intenta `ScreenOrientation.lock()` cuando el navegador lo permite.
 - iOS/WebKit u otros navegadores sin lock conservan fallback seguro: giro físico + reajuste automático.
 - `scripts/mobile-orientation-audit.mjs`: certifica 390×844 y 844×390, cambio dinámico y ausencia de errores.
+
+<!-- CODE-INDEX-VISUAL-V1:START -->
+## VISUAL SYSTEM V1
+
+Regla: visuales son piezas reutilizables; StoneSystem no conoce Animation/VFX/Sequence. El gameplay emite eventos y la presentación los consume.
+
+Orden de carga relevante:
+`visual core/manifests/registries → abilityData → stone-system → ability boot → ability-visuals → engine-net → sistemas tardíos → visual-lab → visual-integration final`.
+
+Render: `groundFX → belowActor → actorBackFX → actor → actorFrontFX → worldFX → foregroundFX → screenFX → UI`.
+
+APIs clave: `KeloAnimation.play`, `KeloAnchors.get`, `KeloFX.spawn`, `KeloProjectileVisuals.preview/attach`, `KeloSFX.play`, `KeloSequence.play`, `KeloAbilityVisuals.playCue`, `KeloVisualEventBus.emit`.
+
+QA: `scripts/visual-system-contract-audit.js` + `scripts/live-visual-system-audit.mjs`; workflows `visual-system-ci.yml` y `visual-system-live.yml`.
+
+Detalle: `docs/VISUAL_SYSTEM.md`.
+<!-- CODE-INDEX-VISUAL-V1:END -->

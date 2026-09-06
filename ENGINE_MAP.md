@@ -314,6 +314,35 @@ Por eso, al auditar runtime, la versión relevante es `1.11.1`, no `1.10.26` ais
 
 ---
 
+<!-- VISUAL-SYSTEM-V1:START -->
+# ANIMACIÓN / VFX MODULAR — VISUAL SYSTEM V1
+
+**Estado:** OWNER LIVE CLIENT · LIVE móvil validado en Kelo World V6.26.
+
+Regla de ownership: `Asset → Component independiente → Sequence opcional → VisualProfile opcional → Ability event opcional`. StoneSystem no reproduce animaciones y una pieza visual debe poder ejecutarse sin Ability.
+
+| Responsabilidad | Estado | OWNER LIVE | Notas |
+|---|---|---|---|
+| Visual manifests | OWNER LIVE | `src/visuals/visual-manifests.js` | definiciones data-driven; Fireball solo es piloto |
+| Asset registry / preload | OWNER LIVE CLIENT | `src/visuals/asset-registry.js` | IDs estables, lazy/preload, sin Image por cast |
+| Actor animation / channels / anchors | OWNER LIVE CLIENT | `src/visuals/animation-system.js` | `locomotion/action/reaction/overlay`; sockets desde `KELO_AVATAR_PRESENTATION` |
+| VFX / projectile visuals / SFX / screen FX | OWNER LIVE CLIENT | `src/visuals/fx-system.js` | pooling, culling, KELO_PERF; no decide gameplay |
+| Sequences | OWNER LIVE CLIENT | `src/visuals/sequence-system.js` | timeline que referencia piezas, no las posee |
+| Ability visual profiles | OWNER LIVE CLIENT | `src/visuals/ability-visuals.js` | adapter semántico + fallback legacy; no toca StoneSystem |
+| Visual event/context/audit | OWNER LIVE CLIENT | `src/visuals/visual-system.js` | `KeloVisualEventBus`, `KeloVisualContext`, `KELO_VISUAL_AUDIT` |
+| World visual layers | OWNER LIVE | `engine-c.js` | `groundFX → belowActor → worldFX → foregroundFX → screenFX` |
+| Actor visual bridge | OWNER LIVE CLIENT | `src/visuals/visual-integration.js` | final idempotent bridge: `actorBackFX → actor → actorFrontFX` |
+| Visual Lab | DEV ONLY | `src/visuals/visual-lab.js` | solo `?visualLab=1`; previews sin combate |
+| Semantic visual network relay | PRESENTATION-ONLY | `engine-net.js` + `server/index.js` | servidor sanea/retransmite eventos; NO es autoridad Ability gameplay |
+| Ability gameplay actual | CLIENT/FALLBACK | `src/abilities/kelo-ability-boot.js` | mantiene gameplay + primitives legacy mientras se migra habilidad por habilidad |
+
+Fireball usa `visualProfileId: ability_visual_fireball_01`; si el resolver visual se desactiva, el cast sigue funcionando y vuelve el primitive legacy. LIVE validó mana `100→80`, cooldown `4`, foot-root `+10 px`, movimiento `MOV-plant-audit-v1`, remote replay por el mismo bus y cero errores HTTP/consola.
+
+Documento operativo: `docs/VISUAL_SYSTEM.md`.
+<!-- VISUAL-SYSTEM-V1:END -->
+
+---
+
 # ABILITIES Y PIEDRAS
 
 ## Nuevo sistema — usar para trabajo nuevo
