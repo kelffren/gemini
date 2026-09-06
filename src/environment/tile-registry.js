@@ -42,7 +42,7 @@
     return;
   }
   const plazaNatureAtlas = Object.freeze({
-    id:'plaza-nature', src:resetBlank(plazaNatureMeta.width,plazaNatureMeta.height), retiredVisual:true,
+    id:'plaza-nature', src:'assets/Arboleskelo1.PNG?art=306', retiredVisual:true,
     width:plazaNatureMeta.width, height:plazaNatureMeta.height,
     frameMode:'irregular', frames:plazaNatureMeta.frames,
     spriteCount:Object.keys(plazaNatureMeta.frames).length
