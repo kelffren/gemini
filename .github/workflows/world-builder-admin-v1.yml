@@ -1,0 +1,49 @@
+name: World Builder Admin V1
+on:
+  push:
+    branches: [ feature/world-builder-admin-v1 ]
+    paths:
+      - 'src/environment/world-builder-system.js'
+      - 'src/ui/world-builder-ui.js'
+      - 'src/systems/admin-key-system.js'
+      - 'scripts/world-builder-browser-audit.mjs'
+      - '.github/workflows/world-builder-admin-v1.yml'
+permissions:
+  contents: read
+jobs:
+  certify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Syntax checks
+        run: |
+          node --check src/environment/world-builder-system.js
+          node --check src/ui/world-builder-ui.js
+          node --check src/systems/admin-key-system.js
+          node --check scripts/world-builder-browser-audit.mjs
+      - name: Property regression
+        run: node scripts/property-editor-audit.js
+      - name: Install browser audit dependency
+        run: npm install --no-save playwright@1.55.0
+      - name: Serve candidate
+        run: |
+          python3 -m http.server 8000 --bind 127.0.0.1 > /tmp/world-builder-http.log 2>&1 &
+          for i in {1..20}; do curl -fsS http://127.0.0.1:8000/index.html >/dev/null && exit 0; sleep 1; done
+          cat /tmp/world-builder-http.log
+          exit 1
+      - name: Certify mobile and desktop World Builder
+        env:
+          AUDIT_URL: http://127.0.0.1:8000/
+          CHROME_BIN: /usr/bin/google-chrome
+        run: node scripts/world-builder-browser-audit.mjs
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: world-builder-admin-v1-audit
+          path: artifacts/world-builder-*
+          if-no-files-found: warn
