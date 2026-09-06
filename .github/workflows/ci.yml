@@ -32,7 +32,7 @@ jobs:
           test -f assets/plaza-fountain-back.PNG
           test -f assets/plaza-fountain-front.PNG
           test -f assets/plaza-npcs-v1.svg
-          grep -q "engine-net.js?v=95" index.html
+          grep -q "engine-net.js?v=96" index.html
           grep -q "src/systems/nobility.js?v=2" index.html
           grep -q "src/systems/nobility-authority.js?v=1" index.html
           grep -q "src/systems/nobility-combat.js?v=1" index.html
