@@ -1,15 +1,16 @@
 /* KELO-INDEX
  * area: UI
- * keys: MOBILE ORIENTATION ROTATE BUTTON PORTRAIT LANDSCAPE FULLSCREEN VIEWPORT CAMERA ZOOM FOV
- * hace: detecta la orientación, sincroniza viewport y conserva en horizontal el mismo campo de visión vertical que en vertical
+ * keys: MOBILE ORIENTATION ROTATE BUTTON PORTRAIT LANDSCAPE FULLSCREEN VIEWPORT CAMERA ZOOM BALANCED FOV
+ * hace: detecta la orientación, sincroniza viewport y usa un zoom horizontal equilibrado para conservar escala visual sin desperdiciar el ancho
  * online: UI/cámara local; no contiene estado valioso ni autoridad compartida
  */
 (function(){
 'use strict';
 if(window.KELO_ORIENTATION)return;
 
-const VERSION='mobile-orientation-v1.2.0';
+const VERSION='mobile-orientation-v1.3.0';
 const ZOOM_PRESETS=Object.freeze([0.7,0.82,1]);
+const LANDSCAPE_MIN_SCALE=0.72;
 let lastOrientation=null;
 let preferredOrientation=null;
 let syncing=false;
@@ -64,7 +65,11 @@ function ensurePortraitBaseZoom(){
 function landscapeZoomFactor(){
   const w=Math.max(1,window.innerWidth),h=Math.max(1,window.innerHeight);
   if(w<=h)return 1;
-  return h/w;
+  const aspectRatio=h/w;
+  // Compensación perceptual: mitad de camino en escala logarítmica entre
+  // mantener el zoom idéntico y conservar exactamente el FOV vertical.
+  // El piso evita que teléfonos muy anchos alejen demasiado al personaje.
+  return Math.max(LANDSCAPE_MIN_SCALE,Math.sqrt(aspectRatio));
 }
 function effectiveZoomFor(base,orientation){
   return orientation==='landscape'?base*landscapeZoomFactor():base;
@@ -77,10 +82,11 @@ function applyCameraZoom(source){
   const changed=!Number.isFinite(lastEffectiveZoom)||Math.abs(lastEffectiveZoom-effective)>0.0001;
   lastEffectiveZoom=effective;
   document.documentElement.style.setProperty('--kelo-camera-zoom',String(effective));
+  document.documentElement.style.setProperty('--kelo-landscape-zoom-scale',String(landscapeZoomFactor()));
   if(changed){
     window.dispatchEvent(new CustomEvent('kelo:camerazoomchange',{detail:{
       source:source||'orientation',orientation,baseZoom:base,effectiveZoom:effective,
-      verticalWorldSpan:window.innerHeight/effective,
+      landscapeScale:landscapeZoomFactor(),verticalWorldSpan:window.innerHeight/effective,
       portraitReferenceWorldSpan:Math.max(window.innerWidth,window.innerHeight)/base
     }}));
   }
@@ -123,7 +129,7 @@ function applyOrientation(source){
   if(current!==lastOrientation){
     const previous=lastOrientation;
     lastOrientation=current;
-    window.dispatchEvent(new CustomEvent('kelo:orientationchange',{detail:{orientation:current,previous,source:source||'sync',width:window.innerWidth,height:window.innerHeight,baseZoom:ensurePortraitBaseZoom(),effectiveZoom:readRuntimeZoom()}}));
+    window.dispatchEvent(new CustomEvent('kelo:orientationchange',{detail:{orientation:current,previous,source:source||'sync',width:window.innerWidth,height:window.innerHeight,baseZoom:ensurePortraitBaseZoom(),effectiveZoom:readRuntimeZoom(),landscapeScale:landscapeZoomFactor()}}));
   }
   return current;
 }
@@ -220,12 +226,13 @@ window.KELO_ORIENTATION=Object.freeze({
   sync:()=>applyOrientation('api'),
   baseZoom:()=>ensurePortraitBaseZoom(),
   effectiveZoom:()=>readRuntimeZoom(),
+  landscapeScale:()=>landscapeZoomFactor(),
   setBaseZoom:(value)=>setBaseZoom(value,'api'),
   verticalWorldSpan:()=>{const z=readRuntimeZoom()||1;return window.innerHeight/z;},
   portraitReferenceWorldSpan:()=>Math.max(window.innerWidth,window.innerHeight)/ensurePortraitBaseZoom(),
   supported:()=>({touch:isTouchDevice(),orientationLock:!!(screen.orientation&&typeof screen.orientation.lock==='function'),fullscreen:!!document.fullscreenEnabled})
 });
-window.KELO_ORIENTATION_AUDIT=Object.freeze({version:VERSION,autoDetect:true,viewportSync:true,rotateButton:true,portrait:true,landscape:true,equivalentPortraitZoom:true,verticalFovLock:true,orientationLockProgressive:true,iosSafeFallback:true});
+window.KELO_ORIENTATION_AUDIT=Object.freeze({version:VERSION,autoDetect:true,viewportSync:true,rotateButton:true,portrait:true,landscape:true,balancedLandscapeZoom:true,minimumLandscapeScale:LANDSCAPE_MIN_SCALE,verticalFovLock:false,orientationLockProgressive:true,iosSafeFallback:true});
 
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 })();
