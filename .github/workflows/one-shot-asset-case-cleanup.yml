@@ -28,32 +28,22 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           import json
-
           root=Path('.')
-          replacements={
-            'assets/fuentekelo-runtime.png':'assets/fuentekelo-runtime.PNG',
-            'assets/cesped-runtime.png':'assets/cesped-runtime.PNG',
-          }
+          replacements={'assets/fuentekelo-runtime.png':'assets/fuentekelo-runtime.PNG','assets/cesped-runtime.png':'assets/cesped-runtime.PNG'}
           text_ext={'.js','.mjs','.cjs','.json','.html','.css','.md','.yml','.yaml','.py','.sh'}
           for p in root.rglob('*'):
-            if not p.is_file() or '.git' in p.parts or p.suffix.lower() not in text_ext:
-              continue
+            if not p.is_file() or '.git' in p.parts or p.suffix.lower() not in text_ext: continue
             try: s=p.read_text(encoding='utf-8')
             except UnicodeDecodeError: continue
             n=s
             for old,new in replacements.items(): n=n.replace(old,new)
             if n!=s: p.write_text(n,encoding='utf-8')
-
           policy_path=root/'src/environment/png-validation-policy.json'
           policy=json.loads(policy_path.read_text())
-          kept=[]
-          for item in policy.get('excludedFromWorldContract',[]):
-            if (root/item['path']).exists():
-              item['reason']=item['reason'].replace('fuentekelo-runtime.png','fuentekelo-runtime.PNG').replace('cesped-runtime.png','cesped-runtime.PNG')
-              kept.append(item)
-          policy['excludedFromWorldContract']=kept
+          policy['excludedFromWorldContract']=[item for item in policy.get('excludedFromWorldContract',[]) if (root/item['path']).exists()]
+          for item in policy['excludedFromWorldContract']:
+            item['reason']=item['reason'].replace('fuentekelo-runtime.png','fuentekelo-runtime.PNG').replace('cesped-runtime.png','cesped-runtime.PNG')
           policy_path.write_text(json.dumps(policy,indent=2,ensure_ascii=False)+'\n')
-
           headers={
             root/'src/environment/tile-registry.js':"/* KELO-INDEX\n * area: PLAZA\n * keys: TILES REGISTRY ASSET PNG TERRAIN\n * hace: registra atlas, familias, estilos y prefabs visuales del mundo\n * online: N/A; metadata visual cliente\n */\n",
             root/'src/environment/prop-contract.js':"/* KELO-INDEX\n * area: PLAZA\n * keys: PROP ASSET PNG FOUNTAIN COLLIDER DEPTH\n * hace: contrato data-driven de props y su metadata visual/espacial\n * online: N/A; props visuales, gameplay permanece fuera del renderer\n */\n",
@@ -89,8 +79,9 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -A
           git reset .github/workflows/one-shot-asset-case-cleanup.yml
+          git checkout -- .github/workflows/one-shot-asset-case-cleanup.yml
           if git diff --cached --quiet; then echo 'No cleanup changes'; exit 0; fi
           git commit -m 'chore: normalize active assets to .PNG'
           git pull --rebase origin main
           git push origin HEAD:main
-# trigger: 2026-09-06T00:17-04:00
+# trigger: 2026-09-06T00:19-04:00
