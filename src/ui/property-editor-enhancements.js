@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: UI
- * keys: MAP EDITOR PREVIEW THUMBNAIL PARCEL
- * hace: añade miniaturas reales del catálogo al editor; mover vive en el editor principal
+ * keys: MAP EDITOR PREVIEW THUMBNAIL TILESET PARCEL
+ * hace: miniaturas del catálogo; refresca cuando llegan tilesets tarde de assets/
  * online: solo lectura de catálogo/atlas; no muta balances ni placements
  */
 (function(){
@@ -12,7 +12,10 @@
   function acquire(key){
     if(images.has(key))return Promise.resolve(images.get(key));
     if(pending.has(key))return pending.get(key);
-    const p=A.acquire(key).then(img=>{images.set(key,img);pending.delete(key);queuePaint();return img;}).catch(()=>{pending.delete(key);return null;});pending.set(key,p);return p;
+    const finish=img=>{if(img)images.set(key,img);pending.delete(key);queuePaint();return img;};
+    const fromSrc=src=>new Promise(resolve=>{if(!src){resolve(null);return;}const img=new Image();img.onload=()=>resolve(finish(img));img.onerror=()=>resolve(finish(null));img.src=src;});
+    const p=Promise.resolve(A.acquire(key)).then(img=>finish(img)).catch(()=>fromSrc(A.describe?.(key)?.src));
+    pending.set(key,p);return p;
   }
   function drawPreview(canvas,t){
     if(!canvas||!t)return;const g=canvas.getContext('2d');if(!g)return;const W=canvas.width,H=canvas.height;g.clearRect(0,0,W,H);g.imageSmoothingEnabled=false;
@@ -28,11 +31,17 @@
   }
   function queuePaint(){if(paintQueued)return;paintQueued=true;requestAnimationFrame(paintCards);}
   function installUi(){
-    const root=document.getElementById('kelo-property-editor'),list=document.getElementById('pe-list');if(!root||!list)return false;
+    const root=document.getElementById('kelo-property-editor'),list=document.getElementById('pe-list'),cat=document.getElementById('pe-cat');
+    if(!root||!list)return false;
     if(!document.getElementById('kelo-property-editor-extras-style')){const st=document.createElement('style');st.id='kelo-property-editor-extras-style';st.textContent='.pe-card{min-height:112px!important}.pe-thumb{display:block;width:100%;height:54px;margin:0 0 5px;border-radius:8px;background:rgba(255,255,255,.025);image-rendering:pixelated}@media(max-width:600px){.pe-card{min-height:105px!important}}';document.head.appendChild(st);}
+    if(cat&&!cat._keloTilesetDefault){const has=[].some.call(cat.options,o=>o.value==='tileset');if(has){cat.value='tileset';cat._keloTilesetDefault=true;cat.dispatchEvent(new Event('change'));}}
     if(!list._keloPreviewObserver){const o=new MutationObserver(queuePaint);o.observe(list,{childList:true,subtree:true});list._keloPreviewObserver=o;}
-    ['pe-q','pe-cat'].forEach(id=>document.getElementById(id)?.addEventListener('input',queuePaint));queuePaint();return true;
+    ['pe-q','pe-cat'].forEach(id=>document.getElementById(id)?.addEventListener('input',queuePaint));
+    ['pe-q','pe-cat'].forEach(id=>document.getElementById(id)?.addEventListener('change',queuePaint));
+    queuePaint();return true;
   }
-  const timer=setInterval(()=>{if(installUi())clearInterval(timer);},80);setTimeout(()=>clearInterval(timer),5000);
-  window.KELO_PROPERTY_EDITOR_EXTRAS=Object.freeze({version:'property-editor-extras-v1.1.0',thumbnails:true,moveWithoutConsumingUnits:true,moveOwner:'property-editor-core'});
+  C.onRegister(()=>queuePaint());
+  const timer=setInterval(()=>{if(installUi()){/* keep refreshing thumbs as sheets load */}},80);
+  setTimeout(()=>clearInterval(timer),15000);
+  window.KELO_PROPERTY_EDITOR_EXTRAS=Object.freeze({version:'property-editor-extras-v1.2.0',thumbnails:true,lateTilesetRefresh:true,defaultTilesetFilter:true,moveWithoutConsumingUnits:true,moveOwner:'property-editor-core'});
 })();
