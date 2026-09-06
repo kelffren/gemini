@@ -666,3 +666,21 @@ Reglas:
 
 ## Admin Key / World Creator V1
 `KELO_ADMIN_KEYS` decide quién puede abrir el modo de autor del mundo. Scopes iniciales: `world.edit`, `world.export`, `world.import`, `world.publish`, `admin.issue`, `admin.revoke`. El backend futuro sustituye la autoridad local sin cambiar el editor.
+
+
+<!-- WORLD-BUILDER-V1:START -->
+## WORLD BUILDER / ADMIN AUTHORING V1
+
+| Sistema | Estado | OWNER LIVE / FEATURE | SUPPORT / notas |
+|---|---|---|---|
+| Permisos de creador | CLIENT/FALLBACK, server-ready | `src/systems/admin-key-system.js` | scopes `world.edit/export/import/publish`, `admin.issue/revoke`; online deberá validar servidor |
+| World terrain/path draft | CLIENT/FALLBACK, authority-replaceable | `src/environment/world-builder-system.js` | overrides versionados; no sustituye el mapa base destructivamente |
+| World collisions draft | CLIENT/FALLBACK, authority-replaceable | `src/environment/world-builder-system.js` | IDs estables; se reflejan en `obstacles` |
+| World object placements | OWNER = PROPERTY | `src/property/property-system.js` | World Builder reutiliza `parcel:world:editor`; no existe un segundo modelo de objetos |
+| World object presentation bajo Decoration Reset | SUPPORT presentation-only | `src/environment/world-builder-property-renderer.js` | lee Property; nunca posee placements ni economía |
+| World Builder UI | CLIENT UI | `src/ui/world-builder-ui.js` | móvil/desktop; toda mutación pasa por `request()` |
+
+**Invariante:** parcela del jugador continúa limitada por unidades. La Llave Admin solo habilita autoría del mundo principal.
+
+**Persistencia actual:** `kelo_world_builder_state_v1` detrás de LocalWorldBuilderAuthority; objetos siguen en Property.
+<!-- WORLD-BUILDER-V1:END -->
