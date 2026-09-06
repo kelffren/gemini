@@ -32,6 +32,7 @@ jobs:
           test -f src/systems/nobility.js
           test -f src/systems/nobility-authority.js
           test -f src/systems/nobility-combat.js
+          test -f src/systems/performance-governor.js
           test -f src/environment/tile-registry.js
           test -f src/environment/atlas-contract.js
           test -f src/environment/world-map.js
@@ -42,6 +43,7 @@ jobs:
           test -f src/characters/character-appearance.js
           test -f scripts/live-fountain-audit.mjs
           test -f scripts/validate-asset-integrity.mjs
+          test -f scripts/validate-performance-telemetry.mjs
           test -f assets/hero.PNG
           test -f assets/fuentekelo.PNG
           test -f assets/fuentekelo-runtime.PNG
@@ -61,6 +63,7 @@ jobs:
           node --check src/systems/nobility.js
           node --check src/systems/nobility-authority.js
           node --check src/systems/nobility-combat.js
+          node --check src/systems/performance-governor.js
           node --check src/environment/tile-registry.js
           node --check src/environment/atlas-contract.js
           node --check src/environment/world-map.js
@@ -72,6 +75,7 @@ jobs:
           node --check scripts/live-fountain-audit.mjs
           node --check scripts/server-nobility-audit.js
           node --check scripts/validate-asset-integrity.mjs
+          node --check scripts/validate-performance-telemetry.mjs
 
       - name: Strict asset integrity
         run: |
@@ -83,6 +87,9 @@ jobs:
             echo "$bad"
             exit 1
           fi
+
+      - name: Frame telemetry contract
+        run: node scripts/validate-performance-telemetry.mjs
 
       - name: Authoritative nobility mechanics
         run: node scripts/server-nobility-audit.js
