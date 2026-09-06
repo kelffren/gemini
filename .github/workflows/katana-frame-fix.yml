@@ -18,18 +18,12 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          import re
 
           p=Path('src/visuals/visual-manifests.js')
           s=p.read_text()
-          old="""    sword_swap_katana_throw_visual: Object.freeze({
-              id: 'sword_swap_katana_throw_visual', type: 'sprite_animation',
-              assetId: 'sword_swap_katana_throw_asset', layer: 'worldFX',
-              frameWidth: 362, frameHeight: 724, columns: 6, rows: 1, frames: 6, fps: 12, loop: true,
-              width: 126, height: 252, alpha: 1, alignToVelocity: true, rotationOffset: 0,
-              defaultSpeed: 720, defaultMaxDistance: 420
-            })
-          """
-          new="""    sword_swap_katana_throw_visual: Object.freeze({
+          pattern=r"    sword_swap_katana_throw_visual: Object\.freeze\(\{\n.*?      defaultSpeed: 720, defaultMaxDistance: 420\n    \}\)"
+          replacement="""    sword_swap_katana_throw_visual: Object.freeze({
               id: 'sword_swap_katana_throw_visual', type: 'sprite_animation',
               assetId: 'sword_swap_katana_throw_asset', layer: 'worldFX',
               frames: 6, fps: 12, loop: true,
@@ -44,34 +38,16 @@ jobs:
               sourcePixelScale: 0.348, width: 140, height: 94,
               alpha: 1, alignToVelocity: true, rotationOffset: 0,
               defaultSpeed: 720, defaultMaxDistance: 420
-            })
-          """
-          assert old in s, 'katana visual manifest anchor missing'
-          s=s.replace(old,new).replace("version: 'visual-manifests-v1.3.0'", "version: 'visual-manifests-v1.3.1'")
-          p.write_text(s)
+            })"""
+          s2,n=re.subn(pattern,replacement,s,count=1,flags=re.S)
+          assert n==1, f'katana visual block matches={n}'
+          s2=s2.replace("version: 'visual-manifests-v1.3.0'", "version: 'visual-manifests-v1.3.1'")
+          p.write_text(s2)
 
           p=Path('src/visuals/fx-system.js')
           s=p.read_text()
-          old="""    if (def.type === 'sprite_animation') {
-                const frameWidth = Math.max(1, Number(def.frameWidth) || sw);
-                const frameHeight = Math.max(1, Number(def.frameHeight) || sh);
-                const columns = Math.max(1, Number(def.columns) || Math.floor(sw / frameWidth) || 1);
-                const rows = Math.max(1, Number(def.rows) || Math.floor(sh / frameHeight) || 1);
-                const available = Math.max(1, columns * rows);
-                const frameCount = Math.max(1, Math.min(Number(def.frames) || available, available));
-                const fps = Math.max(0.001, Number(def.fps) || 12);
-                const rawFrame = Math.floor(item.elapsed * fps);
-                const frame = item.loop ? rawFrame % frameCount : Math.min(frameCount - 1, rawFrame);
-                sx = (frame % columns) * frameWidth;
-                sy = Math.floor(frame / columns) * frameHeight;
-                sw = frameWidth;
-                sh = frameHeight;
-              }
-
-              const width = (Number(def.width) || sw || 32) * item.scale;
-              const height = (Number(def.height) || sh || 32) * item.scale;
-          """
-          new="""    if (def.type === 'sprite_animation') {
+          pattern=r"    if \(def\.type === 'sprite_animation'\) \{\n.*?    const height = \(Number\(def\.height\) \|\| sh \|\| 32\) \* item\.scale;"
+          replacement="""    if (def.type === 'sprite_animation') {
                 const rects = Array.isArray(def.frameRects) ? def.frameRects : null;
                 const fps = Math.max(0.001, Number(def.fps) || 12);
                 if (rects && rects.length) {
@@ -101,12 +77,11 @@ jobs:
 
               const sourcePixelScale = Math.max(0, Number(def.sourcePixelScale) || 0);
               const width = (sourcePixelScale ? sw * sourcePixelScale : (Number(def.width) || sw || 32)) * item.scale;
-              const height = (sourcePixelScale ? sh * sourcePixelScale : (Number(def.height) || sh || 32)) * item.scale;
-          """
-          assert old in s, 'asset projectile crop anchor missing'
-          s=s.replace(old,new)
-          s=s.replace('projectile-visual-registry-v1.1.0','projectile-visual-registry-v1.1.1').replace('projectile-visual-runtime-v1.1.0','projectile-visual-runtime-v1.1.1')
-          p.write_text(s)
+              const height = (sourcePixelScale ? sh * sourcePixelScale : (Number(def.height) || sh || 32)) * item.scale;"""
+          s2,n=re.subn(pattern,replacement,s,count=1,flags=re.S)
+          assert n==1, f'projectile crop block matches={n}'
+          s2=s2.replace('projectile-visual-registry-v1.1.0','projectile-visual-registry-v1.1.1').replace('projectile-visual-runtime-v1.1.0','projectile-visual-runtime-v1.1.1')
+          p.write_text(s2)
           PY
       - name: Validate
         run: |
