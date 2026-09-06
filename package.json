@@ -4,7 +4,8 @@
   "scripts": {
     "test": "playwright test",
     "test:live": "playwright test",
-    "audit:stones": "node scripts/audit-stones.js"
+    "audit:stones": "node scripts/audit-stones.js",
+    "audit:property": "node scripts/property-editor-audit.js"
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0"

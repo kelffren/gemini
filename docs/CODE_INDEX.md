@@ -43,6 +43,9 @@ No uses `/*` para apagar código. Los comentarios solo documentan.
 | CAST ABILITY | delivery VFX/daño cliente | `src/abilities/kelo-ability-boot.js` |
 | NET WS POSE | online room | `engine-net.js` |
 | AUTHORITY | boca única client→server | `engine-net.js` `KeloNetAuthority` |
+| PROPERTY CATALOG | templates placeables desde props/prefabs | `src/property/property-asset-catalog.js` |
+| PROPERTY PARCEL UNITS | balances, placements, autoridad reemplazable | `src/property/property-system.js` |
+| MAP EDITOR | editor mundo/parcela, export/import | `src/ui/property-editor.js` |
 | NOBLEZA | rangos donación | `src/systems/nobility.js` `nobility-authority.js` |
 | FORGE EQUIP | forja / gear | `src/systems/forge-system.js` `equipment-system.js` |
 | SERVER ROOM | autoridad Node | `server/index.js` |
@@ -51,7 +54,7 @@ No uses `/*` para apagar código. Los comentarios solo documentan.
 
 ## Áreas (primera palabra después de KELO-INDEX)
 
-`CORE` `NET` `AUTH` `CAST` `STONES` `MOVE` `HERO` `PLAZA` `LUXE` `HUD` `ECON` `COMBAT` `SERVER` `UI`
+`CORE` `NET` `AUTH` `CAST` `STONES` `MOVE` `HERO` `PLAZA` `LUXE` `HUD` `ECON` `COMBAT` `SERVER` `UI` `PROPERTY`
 
 Grep rápido:
 
@@ -59,4 +62,12 @@ Grep rápido:
 KELO-INDEX NET
 KELO-INDEX CAST
 KELO-INDEX MOVE
+KELO-INDEX PROPERTY
 ```
+
+## INSTANCE SYSTEM V1
+- `src/instances/instance-system.js`: manager/lifecycle/contexto genérico.
+- `src/instances/instance-runtime-bridge.js`: transición world/house y bounds visuales.
+- `src/instances/house-instance.js`: autoridad, persistencia, snapshot y permisos House.
+- `src/instances/property-house-bridge.js`: contrato Property ↔ House.
+- `src/ui/house-instance-ui.js`: entrada/salida y acceso al mismo Property Editor.
