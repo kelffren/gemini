@@ -25,8 +25,11 @@ const adminUrl=base+'?mapEditor=1&audit=world-builder-admin';
 const {context,page}=await makePage({width:390,height:844},adminUrl);
 await page.evaluate(()=>{localStorage.removeItem('kelo_admin_keys_v1');localStorage.removeItem('kelo_world_builder_state_v1');localStorage.removeItem('kelo_property_state_v1');});
 await page.reload({waitUntil:'domcontentloaded'});
-await page.waitForFunction(()=>window.KELO_ADMIN_KEYS?.can?.('world.edit',window.KELO_ADMIN_KEYS.playerId())&&window.KELO_WORLD_BUILDER&&window.KELO_WORLD_BUILDER_UI&&document.getElementById('kelo-world-builder-fab'));
+await page.waitForFunction(()=>window.KELO_ADMIN_KEYS?.can?.('world.edit',window.KELO_ADMIN_KEYS.playerId())&&window.KELO_WORLD_BUILDER&&window.KELO_WORLD_BUILDER_UI&&window.KELO_WORLD_BUILDER_PROPERTY_RENDERER_AUDIT&&document.getElementById('kelo-world-builder-fab'));
 await page.waitForTimeout(700);
+const rendererState=await page.evaluate(()=>({installed:window.KELO_WORLD_RENDERER?.worldBuilderPropertyRenderer===true,audit:window.KELO_WORLD_BUILDER_PROPERTY_RENDERER_AUDIT}));
+if(!rendererState.installed)throw new Error('World Builder Property renderer not installed');
+if(!rendererState.audit?.propertySourceOfTruth||!rendererState.audit?.directFallback)throw new Error('Property renderer audit contract missing');
 await page.locator('#kelo-world-builder-fab').click();
 await page.waitForFunction(()=>document.getElementById('kelo-world-builder')?.style.display==='flex');
 const initial=await page.evaluate(()=>({badge:document.querySelector('#kelo-world-builder .wb-badge')?.textContent,layer:window.KELO_WORLD_BUILDER_UI.layer,materials:window.KELO_WORLD_BUILDER.materials,authority:window.KELO_WORLD_BUILDER.authoritySource()}));
@@ -54,11 +57,13 @@ await page.locator('[data-wb-layer="objects"]').click();
 await page.waitForFunction(()=>document.querySelectorAll('#wb-list .wb-card').length>0);
 await page.locator('#wb-list .wb-card').first().click();
 await page.mouse.click(270,250);
-await page.waitForTimeout(200);
-const objects=await page.evaluate(async()=>{const p=await window.KELO_PROPERTY_SYSTEM.request('ensureWorldEditorParcel',{ownerId:'developer'});return{parcel:p,rows:window.KELO_PROPERTY_SYSTEM.getPlacements(p.parcelId),catalog:window.KELO_PROPERTY_CATALOG.list().length};});
+await page.waitForTimeout(450);
+const objects=await page.evaluate(async()=>{const p=await window.KELO_PROPERTY_SYSTEM.request('ensureWorldEditorParcel',{ownerId:'developer'});return{parcel:p,rows:window.KELO_PROPERTY_SYSTEM.getPlacements(p.parcelId),catalog:window.KELO_PROPERTY_CATALOG.list().length,renderer:window.KELO_WORLD_RENDERER?.worldBuilderPropertyRenderer===true};});
 if(objects.catalog<1)throw new Error('property catalog empty');
 if(objects.rows.length<1)throw new Error('world object placement missing');
 if(objects.parcel.kind!=='world_editor')throw new Error('objects are not using world_editor parcel');
+if(!objects.renderer)throw new Error('Property direct renderer detached after placement');
+await page.screenshot({path:'artifacts/world-builder-mobile-object.png',fullPage:true});
 
 // Collision layer: create one invisible world blocker.
 await page.locator('[data-wb-layer="collision"]').click();
@@ -71,13 +76,14 @@ await page.screenshot({path:'artifacts/world-builder-mobile.png',fullPage:true})
 // Persistence: destroy runtime through reload and reconstruct from adapters/local storage.
 const beforeReload=await page.evaluate(async()=>{const p=await window.KELO_PROPERTY_SYSTEM.request('ensureWorldEditorParcel',{ownerId:'developer'});return{world:window.KELO_WORLD_BUILDER.snapshot(),objects:window.KELO_PROPERTY_SYSTEM.getPlacements(p.parcelId)};});
 await page.reload({waitUntil:'domcontentloaded'});
-await page.waitForFunction(()=>window.KELO_WORLD_BUILDER&&window.KELO_PROPERTY_SYSTEM&&window.KELO_ADMIN_KEYS?.can?.('world.edit',window.KELO_ADMIN_KEYS.playerId()));
+await page.waitForFunction(()=>window.KELO_WORLD_BUILDER&&window.KELO_PROPERTY_SYSTEM&&window.KELO_WORLD_BUILDER_PROPERTY_RENDERER_AUDIT&&window.KELO_ADMIN_KEYS?.can?.('world.edit',window.KELO_ADMIN_KEYS.playerId()));
 await page.waitForTimeout(500);
-const afterReload=await page.evaluate(async()=>{const p=await window.KELO_PROPERTY_SYSTEM.request('ensureWorldEditorParcel',{ownerId:'developer'});return{world:window.KELO_WORLD_BUILDER.snapshot(),objects:window.KELO_PROPERTY_SYSTEM.getPlacements(p.parcelId),fab:getComputedStyle(document.getElementById('kelo-world-builder-fab')).display};});
+const afterReload=await page.evaluate(async()=>{const p=await window.KELO_PROPERTY_SYSTEM.request('ensureWorldEditorParcel',{ownerId:'developer'});return{world:window.KELO_WORLD_BUILDER.snapshot(),objects:window.KELO_PROPERTY_SYSTEM.getPlacements(p.parcelId),fab:getComputedStyle(document.getElementById('kelo-world-builder-fab')).display,renderer:window.KELO_WORLD_RENDERER?.worldBuilderPropertyRenderer===true};});
 if(Object.keys(afterReload.world.cells).length!==Object.keys(beforeReload.world.cells).length)throw new Error('terrain recovery mismatch');
 if(Object.keys(afterReload.world.collisions).length!==Object.keys(beforeReload.world.collisions).length)throw new Error('collision recovery mismatch');
 if(afterReload.objects.length!==beforeReload.objects.length)throw new Error('property object recovery mismatch');
 if(afterReload.fab==='none')throw new Error('admin builder unavailable after reload');
+if(!afterReload.renderer)throw new Error('Property renderer missing after reload');
 
 // Old MUNDO tab must route to the new builder when the Admin Key exists.
 await page.evaluate(()=>window.KELO_PROPERTY_EDITOR?.open?.('parcel'));
@@ -94,7 +100,7 @@ await context.close();
 // Desktop smoke + visual evidence.
 {
   const {context:desktopContext,page:desktop}=await makePage({width:1440,height:900},adminUrl);
-  await desktop.waitForFunction(()=>window.KELO_ADMIN_KEYS?.can?.('world.edit',window.KELO_ADMIN_KEYS.playerId())&&window.KELO_WORLD_BUILDER_UI);
+  await desktop.waitForFunction(()=>window.KELO_ADMIN_KEYS?.can?.('world.edit',window.KELO_ADMIN_KEYS.playerId())&&window.KELO_WORLD_BUILDER_UI&&window.KELO_WORLD_BUILDER_PROPERTY_RENDERER_AUDIT);
   await desktop.locator('#kelo-world-builder-fab').click();
   await desktop.waitForTimeout(250);
   const box=await desktop.locator('#kelo-world-builder').boundingBox();
@@ -104,6 +110,6 @@ await context.close();
 }
 
 if(errors.length)throw new Error('page errors: '+errors.join(' | '));
-fs.writeFileSync('artifacts/world-builder-audit.json',JSON.stringify({ok:true,cells:Object.keys(beforeReload.world.cells).length,objects:beforeReload.objects.length,collisions:Object.keys(beforeReload.world.collisions).length,errors},null,2));
-console.log(JSON.stringify({ok:true,cells:Object.keys(beforeReload.world.cells).length,objects:beforeReload.objects.length,collisions:Object.keys(beforeReload.world.collisions).length},null,2));
+fs.writeFileSync('artifacts/world-builder-audit.json',JSON.stringify({ok:true,cells:Object.keys(beforeReload.world.cells).length,objects:beforeReload.objects.length,collisions:Object.keys(beforeReload.world.collisions).length,propertyRenderer:true,errors},null,2));
+console.log(JSON.stringify({ok:true,cells:Object.keys(beforeReload.world.cells).length,objects:beforeReload.objects.length,collisions:Object.keys(beforeReload.world.collisions).length,propertyRenderer:true},null,2));
 await browser.close();
