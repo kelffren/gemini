@@ -1,3 +1,9 @@
+/* KELO-INDEX
+ * area: CORE
+ * keys: RENDER LAYERS VISUAL VFX SCREEN UPDATE SOCIAL
+ * hace: orquesta render del mundo/actores/UI y ofrece puntos explícitos para el sistema visual modular
+ * online: visuales consumen eventos; este archivo no decide autoridad compartida
+ */
 CONFIG.zoom = 0.82;
 const ZOOM_STEPS = [0.7, 0.82, 1];
 function screenToWorld(sx, sy) {
@@ -121,6 +127,7 @@ render = function() {
   ctx.fillStyle = '#07090d'; ctx.fillRect(0, 0, screenW, screenH);
   const z = CONFIG.zoom || 1;
   ctx.save(); ctx.translate(screenW / 2, screenH / 2); ctx.scale(z, z); ctx.translate(-camera.x, -camera.y);
+  if (window.KeloScreenFX && typeof window.KeloScreenFX.applyWorldTransform === 'function') window.KeloScreenFX.applyWorldTransform(ctx);
   let worldDrawn = false;
   if (window.KELO_WORLD_RENDERER && typeof window.KELO_WORLD_RENDERER.draw === 'function') {
     worldDrawn = window.KELO_WORLD_RENDERER.draw(ctx) === true;
@@ -128,17 +135,22 @@ render = function() {
   if (!worldDrawn) {
     ctx.fillStyle = '#49c934'; ctx.fillRect(0, 0, CONFIG.worldWidth, CONFIG.worldHeight);
   }
+  if (window.KeloVisualSystem) window.KeloVisualSystem.renderWorldLayer('groundFX', ctx);
   ctx.strokeStyle = '#8b3a3a'; ctx.lineWidth = 4; ctx.strokeRect(0, 0, CONFIG.worldWidth, CONFIG.worldHeight);
   if (Array.isArray(obstacles)) obstacles.forEach(function(b){ if(b) b.noDraw = true; });
   if (typeof window.renderFarm === 'function') window.renderFarm(STATE.farm);
   renderPlot(STATE.plot, true); renderArena(arenaPvP);
   for (const pt of particles) { ctx.fillStyle = pt.color; ctx.globalAlpha = pt.life / pt.maxLife; ctx.beginPath(); ctx.arc(pt.x, pt.y, pt.size * (pt.life / pt.maxLife), 0, Math.PI * 2); ctx.fill(); }
   ctx.globalAlpha = 1;
+  if (window.KeloVisualSystem) window.KeloVisualSystem.renderWorldLayer('belowActor', ctx);
   if (window.KELO_WORLD_RENDERER && typeof window.KELO_WORLD_RENDERER.drawPreActors === 'function') window.KELO_WORLD_RENDERER.drawPreActors(ctx);
   if (isPvPActive && arenaPvP.rival) renderAvatar(arenaPvP.rival, false); else simulatedPlayers.forEach(p => renderAvatar(p, false));
   renderAvatar(localPlayer, true);
+  if (window.KeloVisualSystem) window.KeloVisualSystem.renderWorldLayer('worldFX', ctx);
   if (window.KELO_WORLD_RENDERER && typeof window.KELO_WORLD_RENDERER.drawPostActors === 'function') window.KELO_WORLD_RENDERER.drawPostActors(ctx);
+  if (window.KeloVisualSystem) window.KeloVisualSystem.renderWorldLayer('foregroundFX', ctx);
   ctx.restore();
+  if (window.KeloVisualSystem) window.KeloVisualSystem.renderScreenLayer('screenFX', ctx);
   if (input.touchActive && !isBuildMode) {
     ctx.save(); ctx.strokeStyle = 'rgba(231,197,106,0.35)'; ctx.lineWidth = 2; ctx.fillStyle = 'rgba(231,197,106,0.06)';
     ctx.beginPath(); ctx.arc(input.originX, input.originY, CONFIG.joystickRadius, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
@@ -158,6 +170,7 @@ updateSimulation = function(dt) {
   if (STATE.farm.pen && STATE.farm.pen.fedAt && STATE.farm.pen.fedAt > 0 && (now - STATE.farm.pen.fedAt) / 1000 >= STATE.farm.pen.duration) {
     if (!STATE.farm.pen.ready) { STATE.farm.pen.ready = true; STATE.silo.pork = (STATE.silo.pork || 0) + 1; STATE.farm.pen.fedAt = 0; saveState(); showToast('+1 cerdo'); }
   }
+  if (window.KeloVisualSystem && typeof window.KeloVisualSystem.update === 'function') window.KeloVisualSystem.update(dt);
 };
 localPlayer.title = 'Caballero';
 const _renderAvatar = renderAvatar;
