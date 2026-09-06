@@ -1,39 +1,114 @@
-name: One-shot asset integrity baseline
+name: One-shot dead asset reference cleanup
 on:
   push:
     branches: [main]
     paths:
       - '.github/workflows/one-shot-asset-case-cleanup.yml'
 permissions:
-  contents: read
+  contents: write
 jobs:
-  audit:
+  cleanup:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - name: Current PNG pipeline result
-        continue-on-error: true
-        run: node scripts/validate-png-pipeline.mjs
-      - name: Enumerate missing runtime asset references
+        with:
+          fetch-depth: 0
+      - name: Remove stale runtime asset references without changing gameplay contracts
         run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace(path, old, new):
+              p=Path(path); text=p.read_text(encoding='utf-8')
+              if old not in text:
+                  raise SystemExit(f'expected pattern missing in {path}: {old[:90]}')
+              p.write_text(text.replace(old,new),encoding='utf-8')
+
+          registry='src/environment/tile-registry.js'
+          swaps={
+            "src:assetSrc('assets/tileset-vclean.png?art=131',512,512)":"src:resetBlank(512,512), retiredVisual:true",
+            "src:assetSrc('assets/plaza-transitions-v3.png?art=142',128,128)":"src:resetBlank(128,128), retiredVisual:true",
+            "src:assetSrc('assets/grass-variation-v1.png?art=191',128,64)":"src:resetBlank(128,64), retiredVisual:true",
+            "src:assetSrc('assets/marble-variation-v1.png?art=143',128,64)":"src:resetBlank(128,64), retiredVisual:true",
+            "src:assetSrc('assets/plaza-ground-v1.png?art=193',800,560)":"src:resetBlank(800,560), retiredVisual:true",
+            "id:'plaza-nature', src:'assets/Arboleskelo1.atlas.png?art=305',":"id:'plaza-nature', src:resetBlank(plazaNatureMeta.width,plazaNatureMeta.height), retiredVisual:true,",
+            "src:assetSrc('assets/training-dummy-v1.svg?art=198',96,96)":"src:resetBlank(96,96), retiredVisual:true",
+            "src:assetSrc('assets/plaza-npcs-v1.svg?art=199',288,96)":"src:resetBlank(288,96), retiredVisual:true",
+            "src:assetSrc('assets/rural-soil-v1.png?art=160',128,128)":"src:resetBlank(128,128), retiredVisual:true",
+            "src:assetSrc('assets/rural-props-v1.png?art=170',128,128)":"src:resetBlank(128,128), retiredVisual:true",
+            "src:assetSrc('assets/rural-landmarks-v1.png?art=180',256,128)":"src:resetBlank(256,128), retiredVisual:true",
+            "src:assetSrc('assets/kelo-luxe-boutique.png?v=6',192,222)":"src:resetBlank(192,222), retiredVisual:true",
+            "src:assetSrc('assets/commerce-arcade-west-v1.png?art=306',160,432)":"src:resetBlank(160,432), retiredVisual:true",
+            "src:assetSrc('assets/commerce-arcade-east-v1.png?art=306',160,432)":"src:resetBlank(160,432), retiredVisual:true",
+            "src:assetSrc('assets/arena-war-wall-v1.png?art=301',640,192)":"src:resetBlank(640,192), retiredVisual:true",
+            "src:assetSrc('assets/arena-war-edge-decor-v1.png?art=301',640,96)":"src:resetBlank(640,96), retiredVisual:true",
+          }
+          for old,new in swaps.items(): replace(registry,old,new)
+
+          generated='src/environment/generated/arboleskelo1-atlas.js'
+          replace(generated,'"atlas":"assets/Arboleskelo1.atlas.png"','"atlas":null')
+          p=Path(generated); t=p.read_text();
+          if 'KELO-INDEX' not in t[:500]:
+              p.write_text("/* KELO-INDEX\n * area: PLAZA\n * keys: ARBOLES ATLAS FRAMES METADATA SOURCE\n * hace: conserva metadata irregular del sheet Arboleskelo1; atlas derivado retirado del runtime\n * online: N/A; metadata visual cliente\n */\n"+t)
+
+          p=Path('src/environment/district-decals-registry.js'); t=p.read_text()
+          t=t.replace("src:'assets/district-decals-v1.png?art=241'","src:\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='256' height='32'/%3E\",retiredVisual:true")
+          if 'assets/district-decals-v1.png' in t: raise SystemExit('district decal stale ref survived')
+          if 'KELO-INDEX' not in t[:500]:
+              t="/* KELO-INDEX\n * area: WORLD\n * keys: DISTRICT DECALS RESET RETIRED ATLAS\n * hace: conserva contrato de decals sin cargar el sheet eliminado durante el reset visual\n * online: N/A; metadata visual cliente\n */\n"+t
+          p.write_text(t)
+
+          p=Path('src/environment/gardens-t-junction-registry.js'); t=p.read_text()
+          t=t.replace("src:'assets/gardens-t-junctions-v1.svg?v=1'","src:\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='128' height='32'/%3E\",retiredVisual:true")
+          if 'assets/gardens-t-junctions-v1.svg' in t: raise SystemExit('gardens T stale ref survived')
+          if 'KELO-INDEX' not in t[:500]:
+              t="/* KELO-INDEX\n * area: GARDENS\n * keys: T JUNCTION RESET RETIRED ATLAS\n * hace: conserva contrato de cruces de jardin sin cargar el SVG eliminado\n * online: N/A; metadata visual cliente\n */\n"+t
+          p.write_text(t)
+
+          p=Path('src/characters/character-appearance.js'); t=p.read_text()
+          t=t.replace("const DEFAULT_BOT = window.KELO_WORLD_DECORATION_RESET === true ? DEFAULT_PLAYER : 'bot_crimson_v1';","const DEFAULT_BOT = DEFAULT_PLAYER;")
+          t=t.replace("id: 'bot_crimson_v1', role: 'bot', source: 'assets/bot-crimson-v1.png?v=1', delegateToLegacyHero: false,","id: 'bot_crimson_v1', role: 'bot', source: 'assets/hero.PNG', delegateToLegacyHero: true, retiredVisual: true,")
+          if 'assets/bot-crimson-v1.png' in t: raise SystemExit('bot crimson stale ref survived')
+          if 'KELO-INDEX' not in t[:500]:
+              t="/* KELO-INDEX\n * area: CHARACTERS\n * keys: APPEARANCE PLAYER BOT HERO SPRITE FALLBACK\n * hace: asigna sprites de apariencia; visual de bot retirado cae al hero existente\n * online: visual cliente; autoridad de actor fuera de este modulo\n */\n"+t
+          p.write_text(t)
+          PY
+      - name: Prove zero missing runtime asset references
+        run: |
+          set -euo pipefail
           python - <<'PY'
           from pathlib import Path
           import re
           root=Path('.')
           disk={p.as_posix() for p in (root/'assets').rglob('*') if p.is_file()}
-          refs={}
+          bad_files=[p for p in disk if not p.endswith('.PNG')]
+          if bad_files: raise SystemExit('non-.PNG assets: '+', '.join(sorted(bad_files)))
           files=[root/'index.html']+[p for p in (root/'src').rglob('*') if p.is_file() and p.suffix.lower() in {'.js','.mjs','.html','.css','.json'}]
           pat=re.compile(r'assets/[A-Za-z0-9_./-]+\.(?:PNG|png|svg)')
+          missing=[]; lower=[]
           for p in files:
-            text=p.read_text(encoding='utf-8',errors='ignore')
-            for ref in pat.findall(text): refs.setdefault(ref,set()).add(p.as_posix())
-          print('ASSET_FILES',len(disk))
-          for p in sorted(disk): print('DISK',p)
-          missing=[]
-          for ref,owners in sorted(refs.items()):
-            state='OK' if ref in disk else 'MISSING'
-            print(state,ref,'owners='+','.join(sorted(owners)))
-            if state=='MISSING': missing.append(ref)
-          print('MISSING_COUNT',len(missing))
+              text=p.read_text(encoding='utf-8',errors='ignore')
+              for ref in pat.findall(text):
+                  if ref.lower().endswith('.png') and not ref.endswith('.PNG'): lower.append((p.as_posix(),ref))
+                  if ref not in disk: missing.append((p.as_posix(),ref))
+          if lower: raise SystemExit('lowercase PNG refs: '+repr(lower))
+          if missing: raise SystemExit('missing runtime refs: '+repr(missing))
+          print('PASS zero missing runtime asset references; assets=',len(disk))
           PY
+          node --check src/environment/tile-registry.js
+          node --check src/environment/generated/arboleskelo1-atlas.js
+          node --check src/environment/district-decals-registry.js
+          node --check src/environment/gardens-t-junction-registry.js
+          node --check src/characters/character-appearance.js
+          git diff --check
+      - name: Commit dead reference cleanup
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/environment/tile-registry.js src/environment/generated/arboleskelo1-atlas.js src/environment/district-decals-registry.js src/environment/gardens-t-junction-registry.js src/characters/character-appearance.js
+          git commit -m 'chore: remove stale runtime asset references'
+          git pull --rebase origin main
+          git push origin HEAD:main
