@@ -1,11 +1,17 @@
+/* KELO-INDEX
+ * area: BUILD
+ * keys: PNG VALIDATION CORRUPTION CRC FIXTURE CI
+ * hace: prueba que el validador PNG rechaza binarios corruptos usando un asset runtime vigente
+ * online: N/A; test estatico de CI
+ */
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import {crc32, inspectPng} from './png-validation-core.mjs';
 
-const source = fs.readFileSync('assets/grass-variation-v1.png');
+const source = fs.readFileSync('assets/cesped-runtime.PNG');
 const baseline = inspectPng(source, 'baseline');
-assert.equal(baseline.width, 128);
-assert.equal(baseline.height, 64);
+assert.equal(baseline.width, 160);
+assert.equal(baseline.height, 160);
 
 function mustReject(name, mutate, pattern) {
   const copy = Buffer.from(source);
