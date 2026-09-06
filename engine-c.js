@@ -6,6 +6,9 @@
  */
 CONFIG.zoom = 0.82;
 const ZOOM_STEPS = [0.7, 0.82, 1];
+function decorationResetActive() {
+  return window.KELO_WORLD_DECORATION_RESET === true || window.KELO_WORLD_RENDERER?.decorationReset === true;
+}
 function screenToWorld(sx, sy) {
   const z = CONFIG.zoom || 1;
   return { x: camera.x + (sx - screenW / 2) / z, y: camera.y + (sy - screenH / 2) / z };
@@ -85,6 +88,7 @@ function quickTravel(dest) {
   else if (dest === 'arena') { localPlayer.x = arenaPvP.x + 80; localPlayer.y = arenaPvP.y + arenaPvP.h / 2; camera.targetX = arenaPvP.x + arenaPvP.w / 2; camera.targetY = arenaPvP.y + arenaPvP.h / 2; showToast('Arena 1v1'); }
 }
 checkFarmTouch = function(sx, sy) {
+  if (decorationResetActive()) return false;
   const w = screenToWorld(sx, sy);
   const farm = STATE.farm, now = Date.now();
   for (let i = 0; i < farm.crops.length; i++) {
@@ -106,6 +110,7 @@ checkFarmTouch = function(sx, sy) {
   return false;
 };
 checkSocialTouch = function(sx, sy) {
+  if (decorationResetActive()) { closeSocialModal(); return; }
   const w = screenToWorld(sx, sy);
   for (const p of simulatedPlayers) {
     if (Math.hypot(w.x - p.x, w.y - p.y) < p.radius * 1.8) { openSocialModal(p, sx, sy); return; }
@@ -113,6 +118,7 @@ checkSocialTouch = function(sx, sy) {
   closeSocialModal();
 };
 handleBuildGridTap = function(sx, sy) {
+  if (decorationResetActive()) return;
   const w = screenToWorld(sx, sy);
   const plot = STATE.plot;
   if (w.x < plot.x || w.x > plot.x + plot.w || w.y < plot.y || w.y > plot.y + plot.h) return;
@@ -124,7 +130,8 @@ handleBuildGridTap = function(sx, sy) {
 };
 const _render = render;
 render = function() {
-  ctx.fillStyle = '#07090d'; ctx.fillRect(0, 0, screenW, screenH);
+  const reset = decorationResetActive();
+  ctx.fillStyle = reset ? '#ffffff' : '#07090d'; ctx.fillRect(0, 0, screenW, screenH);
   const z = CONFIG.zoom || 1;
   ctx.save(); ctx.translate(screenW / 2, screenH / 2); ctx.scale(z, z); ctx.translate(-camera.x, -camera.y);
   if (window.KeloScreenFX && typeof window.KeloScreenFX.applyWorldTransform === 'function') window.KeloScreenFX.applyWorldTransform(ctx);
@@ -133,18 +140,24 @@ render = function() {
     worldDrawn = window.KELO_WORLD_RENDERER.draw(ctx) === true;
   }
   if (!worldDrawn) {
-    ctx.fillStyle = '#49c934'; ctx.fillRect(0, 0, CONFIG.worldWidth, CONFIG.worldHeight);
+    ctx.fillStyle = reset ? '#ffffff' : '#49c934'; ctx.fillRect(0, 0, CONFIG.worldWidth, CONFIG.worldHeight);
   }
   if (window.KeloVisualSystem) window.KeloVisualSystem.renderWorldLayer('groundFX', ctx);
-  ctx.strokeStyle = '#8b3a3a'; ctx.lineWidth = 4; ctx.strokeRect(0, 0, CONFIG.worldWidth, CONFIG.worldHeight);
-  if (Array.isArray(obstacles)) obstacles.forEach(function(b){ if(b) b.noDraw = true; });
-  if (typeof window.renderFarm === 'function') window.renderFarm(STATE.farm);
-  renderPlot(STATE.plot, true); renderArena(arenaPvP);
+  if (!reset) {
+    ctx.strokeStyle = '#8b3a3a'; ctx.lineWidth = 4; ctx.strokeRect(0, 0, CONFIG.worldWidth, CONFIG.worldHeight);
+    if (Array.isArray(obstacles)) obstacles.forEach(function(b){ if(b) b.noDraw = true; });
+    if (typeof window.renderFarm === 'function') window.renderFarm(STATE.farm);
+    renderPlot(STATE.plot, true);
+    renderArena(arenaPvP);
+  } else if (Array.isArray(obstacles) && obstacles.length) {
+    obstacles.length = 0;
+  }
   for (const pt of particles) { ctx.fillStyle = pt.color; ctx.globalAlpha = pt.life / pt.maxLife; ctx.beginPath(); ctx.arc(pt.x, pt.y, pt.size * (pt.life / pt.maxLife), 0, Math.PI * 2); ctx.fill(); }
   ctx.globalAlpha = 1;
   if (window.KeloVisualSystem) window.KeloVisualSystem.renderWorldLayer('belowActor', ctx);
   if (window.KELO_WORLD_RENDERER && typeof window.KELO_WORLD_RENDERER.drawPreActors === 'function') window.KELO_WORLD_RENDERER.drawPreActors(ctx);
-  if (isPvPActive && arenaPvP.rival) renderAvatar(arenaPvP.rival, false); else simulatedPlayers.forEach(p => renderAvatar(p, false));
+  if (isPvPActive && arenaPvP.rival) renderAvatar(arenaPvP.rival, false);
+  else if (!reset) simulatedPlayers.forEach(p => renderAvatar(p, false));
   renderAvatar(localPlayer, true);
   if (window.KeloVisualSystem) window.KeloVisualSystem.renderWorldLayer('worldFX', ctx);
   if (window.KELO_WORLD_RENDERER && typeof window.KELO_WORLD_RENDERER.drawPostActors === 'function') window.KELO_WORLD_RENDERER.drawPostActors(ctx);
@@ -183,3 +196,12 @@ window.addEventListener('keydown', function(e) {
 });
 const _feedAnimals = feedAnimals;
 feedAnimals = function(type) { _feedAnimals(type); if (type === 'chickens' && STATE.farm.coop) STATE.farm.coop.ready = false; if (type === 'pigs' && STATE.farm.pen) STATE.farm.pen.ready = false; };
+window.KELO_LEGACY_WORLD_DRAW_AUDIT = Object.freeze({
+  version:'legacy-world-reset-guard-v1',
+  get decorationReset(){ return decorationResetActive(); },
+  farmSuppressed:true,
+  plotSuppressed:true,
+  arenaFrameSuppressed:true,
+  simulatedPlayersSuppressed:true,
+  baseObstaclesSuppressed:true
+});
