@@ -1,3 +1,9 @@
+/* KELO-INDEX
+ * area: SERVER
+ * keys: WEBSOCKET AUTHORITY VISUAL EVENT RELAY CAST PROJECTILE STATUS VALIDATION
+ * hace: autoridad de sistemas compartidos existentes y relay validado de eventos puramente visuales
+ * online: visual:event no resuelve gameplay; solo retransmite presentación semántica saneada
+ */
 /**
  * Kelo plaza room — WebSocket authority for movement, Nobleza, PvP damage and forging.
  * Supabase persistence hooks activate when SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY exist.
@@ -10,6 +16,10 @@ const { createForgeService } = require('./forge-store');
 const PORT = Number(process.env.PORT || 2567);
 const MAX = 32;
 const WORLD = { w: 3600, h: 3200 };
+const VISUAL_EVENT_ALLOWLIST = new Set([
+  'CAST_CONFIRMED','PROJECTILE_SPAWNED','PROJECTILE_HIT','PROJECTILE_EXPIRED','ABILITY_IMPACT',
+  'STATUS_APPLIED','STATUS_REMOVED','SHIELD_APPLIED','SHIELD_BROKEN','DASH_STARTED','DASH_ENDED','DEATH'
+]);
 const players = new Map();
 let seq = 1;
 
@@ -52,6 +62,54 @@ function broadcast(obj, except) {
   players.forEach((p) => { if (p !== except && p.ws && p.ws.readyState === 1) p.ws.send(raw); });
 }
 function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
+function shortId(value, max) { return value == null ? null : String(value).replace(/[^a-zA-Z0-9_:\-.]/g, '').slice(0, max || 96); }
+function safeVec(value) {
+  if (!value || !Number.isFinite(Number(value.x)) || !Number.isFinite(Number(value.y))) return null;
+  return { x: clamp(Number(value.x), -256, WORLD.w + 256), y: clamp(Number(value.y), -256, WORLD.h + 256) };
+}
+function safeDirection(value) {
+  if (!value || !Number.isFinite(Number(value.x)) || !Number.isFinite(Number(value.y))) return null;
+  const x = Number(value.x), y = Number(value.y), len = Math.hypot(x, y);
+  if (!len || len > 1000) return null;
+  return { x: Number((x / len).toFixed(5)), y: Number((y / len).toFixed(5)) };
+}
+function sanitizeVisualContext(raw) {
+  const c = raw && typeof raw === 'object' ? raw : {};
+  const gp = c.gameplay && typeof c.gameplay === 'object' ? c.gameplay : {};
+  const visual = c.visual && typeof c.visual === 'object' ? c.visual : {};
+  return {
+    castId: shortId(c.castId, 96),
+    abilityId: Number.isSafeInteger(Number(c.abilityId)) ? clamp(Number(c.abilityId), 0, 100000) : null,
+    abilityKey: shortId(c.abilityKey, 64),
+    origin: safeVec(c.origin),
+    target: safeVec(c.target),
+    direction: safeDirection(c.direction),
+    gameplay: {
+      speed: Number.isFinite(Number(gp.speed)) ? clamp(Number(gp.speed), 0, 5000) : 0,
+      range: Number.isFinite(Number(gp.range)) ? clamp(Number(gp.range), 0, 5000) : 0,
+      radius: Number.isFinite(Number(gp.radius)) ? clamp(Number(gp.radius), 0, 1000) : 0,
+    },
+    visual: {
+      scale: Number.isFinite(Number(visual.scale)) ? clamp(Number(visual.scale), 0.05, 8) : 1,
+      seed: Number.isFinite(Number(visual.seed)) ? (Number(visual.seed) >>> 0) : 0,
+      variant: shortId(visual.variant, 64),
+    },
+    projectileId: shortId(c.projectileId, 96),
+    statusId: shortId(c.statusId, 96),
+    confirmed: true,
+  };
+}
+function sanitizeVisualMeta(raw) {
+  const m = raw && typeof raw === 'object' ? raw : {};
+  const targetActorId = shortId(m.targetActorId, 80);
+  return {
+    status: shortId(m.status, 40),
+    duration: Number.isFinite(Number(m.duration)) ? clamp(Number(m.duration), 0, 120) : null,
+    targetActorId: targetActorId && players.has(targetActorId) ? targetActorId : null,
+    amount: Number.isFinite(Number(m.amount)) ? clamp(Number(m.amount), -1000000, 1000000) : null,
+    reason: shortId(m.reason, 80),
+  };
+}
 
 async function refreshNobility(me, requestId) {
   const snapshot = await nobility.snapshot(me.playerKey, me.name);
@@ -107,6 +165,13 @@ wss.on('connection', (ws) => {
         return;
       }
       if (!me.playerKey) { protocolError(ws, msg.requestId, 'IDENTITY_REQUIRED', 'Envía hello antes de usar sistemas autoritativos.'); return; }
+      if (msg.t === 'visual:event') {
+        if (!VISUAL_EVENT_ALLOWLIST.has(msg.name)) { protocolError(ws, msg.requestId, 'INVALID_VISUAL_EVENT', 'Evento visual no permitido.'); return; }
+        const context = sanitizeVisualContext(msg.context);
+        const meta = sanitizeVisualMeta(msg.meta);
+        broadcast({ t: 'visual:event', name: msg.name, actorId: me.id, context, meta, serverTime: Date.now(), source: 'server-visual-relay-v1' }, me);
+        return;
+      }
       if (msg.t === 'nobility:get') { await refreshNobility(me, msg.requestId); return; }
       if (msg.t === 'nobility:donate') {
         const currency = msg.currency === 'kc' ? 'kc' : (msg.currency === 'gold' ? 'gold' : null);
@@ -132,7 +197,7 @@ wss.on('connection', (ws) => {
       }
     } catch (err) {
       const raw = String(err && err.message || err);
-      const known=['INSUFFICIENT_GOLD','INSUFFICIENT_KC','INVALID_AMOUNT','INVALID_CURRENCY','ITEM_NOT_OWNED','INVALID_FORGE_TYPE','INVALID_TIER','MAX_TIER','INVALID_MATERIAL_LEVEL','TOO_MANY_CRYSTALS','INVALID_CRYSTAL','MATERIAL_REQUIRED','CRYSTAL_REQUIRED','INVALID_MATERIAL','MAX_MATERIAL_LEVEL','NEED_SIX'];
+      const known=['INSUFFICIENT_GOLD','INSUFFICIENT_KC','INVALID_AMOUNT','INVALID_CURRENCY','ITEM_NOT_OWNED','INVALID_FORGE_TYPE','INVALID_TIER','MAX_TIER','INVALID_MATERIAL_LEVEL','TOO_MANY_CRYSTALS','INVALID_CRYSTAL','MATERIAL_REQUIRED','CRYSTAL_REQUIRED','INVALID_MATERIAL','MAX_MATERIAL_LEVEL','NEED_SIX','INVALID_VISUAL_EVENT'];
       const code = known.find(k=>raw.includes(k)) || 'SERVER_ERROR';
       console.error('protocol error', msg && msg.t, raw);
       protocolError(ws, msg && msg.requestId, code, code);
