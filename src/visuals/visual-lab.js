@@ -64,20 +64,20 @@
     const p = actor();
     if (!p || !root.KeloFX) return;
     const spawn = function () {
-      root.KeloFX.spawn('sword_swap_activation_eye', {
+      root.KeloFX.spawn('sword_swap_activation_eye_anim', {
         actor: p,
         actorId: p.id,
-        visual: { scale: 1.45, seed: Date.now() & 65535 }
+        visual: { scale: 1.35, seed: Date.now() & 65535 }
       }, {
         socket: 'head',
-        scale: 1.45,
+        scale: 1.35,
         loop: false,
-        duration: 1.35
+        duration: 1.0
       });
       collapseAfterPreview();
     };
-    if (root.KeloAssetRegistry && !root.KeloAssetRegistry.isReady('sword_swap_activation_eye_asset')) {
-      root.KeloAssetRegistry.load('sword_swap_activation_eye_asset').then(spawn);
+    if (root.KeloAssetRegistry && !root.KeloAssetRegistry.isReady('sword_swap_activation_eye_anim_asset')) {
+      root.KeloAssetRegistry.load('sword_swap_activation_eye_anim_asset').then(spawn);
     } else spawn();
   }
 
@@ -95,7 +95,7 @@
     body = document.createElement('div'); body.dataset.visualLabBody = '1'; panel.appendChild(body);
     const hint = document.createElement('div'); hint.textContent = 'Piezas independientes · toca PROBAR y la ventana se minimiza sola para que veas el efecto'; hint.style.cssText = 'color:#78808b;margin:4px 0 9px'; body.appendChild(hint);
 
-    const eyeQuick = button('👁 PROBAR ACTIVATION EYE', playActivationEyePreview);
+    const eyeQuick = button('👁 PROBAR ACTIVATION EYE ANIMADO', playActivationEyePreview);
     eyeQuick.style.cssText += ';display:block;width:100%;margin:0 0 10px;background:#2b1740;border-color:#8b5cf6;color:#f0ddff;font-size:11px';
     body.appendChild(eyeQuick);
 
@@ -113,7 +113,7 @@
     }));
 
     const fx = document.createElement('select'); options(fx, root.KeloFXRegistry ? root.KeloFXRegistry.list() : []); body.appendChild(row('VFX', fx));
-    const eyeIndex = Array.from(fx.options).findIndex(function (option) { return option.value === 'sword_swap_activation_eye'; });
+    const eyeIndex = Array.from(fx.options).findIndex(function (option) { return option.value === 'sword_swap_activation_eye_anim'; });
     if (eyeIndex >= 0) fx.selectedIndex = eyeIndex;
     body.appendChild(button('✦ SPAWN VFX', function () {
       const p = actor(), dir = directionOf(direction.value), pos = originFor(dir, 70);
@@ -130,7 +130,7 @@
     }));
 
     const sequence = document.createElement('select'); options(sequence, root.KeloSequenceRegistry ? root.KeloSequenceRegistry.list() : []); body.appendChild(row('Sequence', sequence));
-    const seqIndex = Array.from(sequence.options).findIndex(function (option) { return option.value === 'sequence_sword_swap_activation_eye'; });
+    const seqIndex = Array.from(sequence.options).findIndex(function (option) { return option.value === 'sequence_sword_swap_activation_eye_anim'; });
     if (seqIndex >= 0) sequence.selectedIndex = seqIndex;
     body.appendChild(button('▶ PLAY SEQUENCE', function () {
       const p = actor(), dir = directionOf(direction.value); if (p) p._face = direction.value;
@@ -157,7 +157,7 @@
   }
 
   root.KeloVisualLab = Object.freeze({
-    version: 'visual-lab-v1.1.0',
+    version: 'visual-lab-v1.2.0',
     open: build,
     minimize: function () { setCollapsed(true); },
     expand: function () { setCollapsed(false); },
