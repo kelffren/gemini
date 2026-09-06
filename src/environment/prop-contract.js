@@ -1,6 +1,7 @@
 (function(){
   'use strict';
   const R=window.KELO_TILE_REGISTRY;
+  const RESET=window.KELO_WORLD_DECORATION_RESET===true;
   if(!R){console.error('[Kelo prop contract] TileRegistry missing');return;}
   const defs=[];
   const plazaNatureAtlas=R.atlases?.plazaNature;
@@ -12,12 +13,13 @@
     plazaFountain:Object.freeze({id:'plaza-fountain',ownership:'plaza-fountain-kelo-v1',priority:20,renderMode:'layer-stack',visibleDuringReset:true,front:Object.freeze({phase:'props_front'})}),
     ruralBoundary:Object.freeze({id:'rural-boundary',ownership:'rural-farm-boundary-props-v1',priority:8,renderMode:'layer-stack',back:Object.freeze({phase:'props_back'})})
   });
-  if(plazaNatureAtlas&&Array.isArray(R.plazaNatureProps)){
+  if(!RESET&&plazaNatureAtlas&&Array.isArray(R.plazaNatureProps)){
     for(const p of R.plazaNatureProps){defs.push(Object.freeze({id:p.id,family:'nature_prop',asset:'plazaNature',frame:(p.frame??p.sprite??0),layerGroup:'plazaNature',layerRole:'back',position:Object.freeze({x:p.x,y:p.y}),size:Object.freeze({w:p.w,h:p.h}),anchor:Object.freeze({x:0.5,y:1}),visualBounds:Object.freeze({x:p.x,y:p.y,w:p.w,h:p.h}),footprint:Object.freeze({x:p.x+Math.round(p.w*0.28),y:p.baseY-18,w:Math.round(p.w*0.44),h:18}),collider:Object.freeze({mode:'none'}),layers:Object.freeze({back:'props_back',front:'props_front'}),priority:10,district:'central',occlusion:Object.freeze({mode:'actor-base-y-clip-v1',baseY:p.baseY,clipPadding:8}),visualOnly:true}));}
   }
   const assets=Object.freeze({
-    plazaNature:Object.freeze({id:'plazaNature',src:plazaNatureAtlas?.src,width:plazaNatureAtlas?.width,height:plazaNatureAtlas?.height,frameMode:plazaNatureAtlas?.frameMode,frames:plazaNatureAtlas?.frames,frameWidth:plazaNatureAtlas?.spriteWidth,frameHeight:plazaNatureAtlas?.spriteHeight,columns:plazaNatureAtlas?.columns}),
-    ruralProps:Object.freeze({id:'ruralProps',src:ruralPropsAtlas?.src,width:ruralPropsAtlas?.width,height:ruralPropsAtlas?.height,frameWidth:ruralPropsAtlas?.tileWidth||TILE,frameHeight:ruralPropsAtlas?.tileHeight||TILE,columns:ruralPropsAtlas?.columns}),
+    plazaNature:Object.freeze({id:'plazaNature',src:RESET?null:plazaNatureAtlas?.src,width:plazaNatureAtlas?.width,height:plazaNatureAtlas?.height,frameMode:plazaNatureAtlas?.frameMode,frames:plazaNatureAtlas?.frames,frameWidth:plazaNatureAtlas?.spriteWidth,frameHeight:plazaNatureAtlas?.spriteHeight,columns:plazaNatureAtlas?.columns}),
+    ruralProps:Object.freeze({id:'ruralProps',src:RESET?null:ruralPropsAtlas?.src,width:ruralPropsAtlas?.width,height:ruralPropsAtlas?.height,frameWidth:ruralPropsAtlas?.tileWidth||TILE,frameHeight:ruralPropsAtlas?.tileHeight||TILE,columns:ruralPropsAtlas?.columns}),
+    plazaFountainKelo:Object.freeze({id:'plazaFountainKelo',src:'assets/fuentekelo-runtime.png?art=401',width:1312,height:1199,frameWidth:1312,frameHeight:1199,columns:1}),
     plazaFountainKelo:Object.freeze({id:'plazaFountainKelo',src:'assets/fuentekelo-runtime.png?art=401',width:1312,height:1199,frameWidth:1312,frameHeight:1199,columns:1}),
   });
   defs.push(Object.freeze({id:'plaza-fountain-kelo',family:'landmark_prop',asset:'plazaFountainKelo',frame:0,layerGroup:'plazaFountain',layerRole:'front',position:Object.freeze({x:1080,y:862}),size:Object.freeze({w:720,h:658}),anchor:Object.freeze({x:0.5,y:1}),visualBounds:Object.freeze({x:1080,y:862,w:720,h:658}),footprint:Object.freeze({x:1190,y:1430,w:500,h:90}),collider:Object.freeze({mode:'none'}),layers:Object.freeze({back:null,front:'props_front'}),priority:20,district:'central',occlusion:Object.freeze({mode:'actor-base-y-redraw-v1',baseY:1505,bounds:Object.freeze({x:1080,y:862,w:720,h:658})}),visualOnly:false}));
