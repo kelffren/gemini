@@ -5,6 +5,11 @@ on:
     branches: [ main ]
     paths:
       - '.github/workflows/live-fountain-only.yml'
+      - 'engine-l.js'
+      - 'engine-o.js'
+      - 'engine-p.js'
+      - 'src/characters/character-appearance.js'
+      - 'src/environment/tile-registry.js'
       - 'src/environment/world-map.js'
       - 'src/environment/prop-contract.js'
       - 'src/environment/generic-props.js'
