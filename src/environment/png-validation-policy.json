@@ -7,6 +7,11 @@
       "reason": "Player/UI sprite is outside the Kelo World environment asset contract."
     },
     {
+      "path": "assets/fx/sword-swap/activation-eye.PNG",
+      "scope": "non-world-ui",
+      "reason": "Sword Swap activation eye is an actor presentation VFX asset owned by the modular Visual System, not the environment art contract."
+    },
+    {
       "path": "assets/fuentekelo.PNG",
       "scope": "source-sheet",
       "reason": "Original Kelo-uploaded fountain source retained untouched; LIVE uses the deterministic alpha-clean derivative assets/fuentekelo-runtime.PNG."
