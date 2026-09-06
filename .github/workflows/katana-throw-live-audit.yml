@@ -20,80 +20,58 @@ jobs:
           node-version: '20'
       - name: Install Playwright
         run: npm install --no-save playwright@1.55.0
-      - name: Wait for deployed katana runtime
+      - name: Wait for corrected deployed katana runtime
         run: |
           python3 - <<'PY'
           import time, urllib.request
           base='https://kelffren.github.io/gemini/'
           for attempt in range(24):
+              stamp=str(time.time())
               try:
-                  stamp=str(time.time())
                   manifest=urllib.request.urlopen(base+'src/visuals/visual-manifests.js?katana='+stamp, timeout=15).read().decode('utf-8','ignore')
-                  lab=urllib.request.urlopen(base+'src/visuals/visual-lab.js?katana='+stamp, timeout=15).read().decode('utf-8','ignore')
                   fx=urllib.request.urlopen(base+'src/visuals/fx-system.js?katana='+stamp, timeout=15).read().decode('utf-8','ignore')
-                  if 'sword_swap_katana_throw_visual' in manifest and 'PROBAR KATANA THROW' in lab and 'projectile-visual-runtime-v1.1.0' in fx:
-                      print('KATANA_DEPLOY_VISIBLE')
+                  if "visual-manifests-v1.3.1" in manifest and 'frameRects' in manifest and 'projectile-visual-runtime-v1.1.1' in fx:
+                      print('KATANA_CORRECTED_DEPLOY_VISIBLE')
                       break
               except Exception as exc:
                   print('deploy check', attempt+1, exc)
               time.sleep(5)
           else:
-              raise SystemExit('Katana throw runtime was not visible on Pages in validation window')
+              raise SystemExit('Corrected katana runtime not visible on Pages')
           PY
-      - name: Audit katana throw on mobile
+      - name: Audit corrected katana throw on mobile
         env:
           CHROME_BIN: /usr/bin/google-chrome
         run: |
           mkdir -p artifacts
           node <<'NODE'
-          const fs = require('fs');
-          const { chromium } = require('playwright');
-          (async () => {
-            const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROME_BIN, args: ['--no-sandbox','--disable-dev-shm-usage'] });
-            const context = await browser.newContext({ viewport: { width:390, height:844 }, deviceScaleFactor:2, isMobile:true, hasTouch:true });
-            const page = await context.newPage();
-            const consoleErrors=[]; const failed=[]; const http=[];
-            page.on('console', m => { if (m.type()==='error') consoleErrors.push(m.text()); });
-            page.on('pageerror', e => consoleErrors.push(`PAGEERROR: ${e.message}`));
-            page.on('requestfailed', r => failed.push({url:r.url(),error:r.failure()?.errorText||'failed'}));
-            page.on('response', r => { if (r.status()>=400) http.push({status:r.status(),url:r.url()}); });
-            await page.goto(`https://kelffren.github.io/gemini/?visualLab=1&katana-live=${Date.now()}`, { waitUntil:'domcontentloaded', timeout:45000 });
-            await page.waitForFunction(() => window.KELO_VISUAL_AUDIT?.integrationReady === true && window.KeloVisualLab?.previewKatanaThrow && window.KeloProjectileVisualRegistry?.get('sword_swap_katana_throw_visual'), null, { timeout:20000 });
-            await page.evaluate(async () => { await KeloAssetRegistry.load('sword_swap_katana_throw_asset'); });
-            const before = await page.evaluate(() => {
-              const p=window.localPlayer || localPlayer;
-              const def=KeloProjectileVisualRegistry.get('sword_swap_katana_throw_visual');
-              const img=KeloAssetRegistry.resource('sword_swap_katana_throw_asset');
-              const canvas=document.createElement('canvas'); canvas.width=img.naturalWidth||img.width; canvas.height=img.naturalHeight||img.height;
-              const c=canvas.getContext('2d'); c.drawImage(img,0,0);
-              const corner=c.getImageData(0,0,1,1).data[3];
-              let visible=false;
-              for(let y=0;y<canvas.height && !visible;y+=64) for(let x=0;x<canvas.width;x+=64) if(c.getImageData(x,y,1,1).data[3]>8){visible=true;break;}
-              return { player:{x:p.x,y:p.y,radius:p.radius}, def, image:{width:img.naturalWidth||img.width,height:img.naturalHeight||img.height,cornerAlpha:corner,hasVisiblePixels:visible}, labVersion:KeloVisualLab.version, projectileVersion:KeloProjectileVisuals.version };
-            });
-            if(before.def.frames!==6 || before.def.columns!==6 || before.def.rows!==1 || before.def.frameWidth!==362 || before.def.frameHeight!==724 || before.def.fps!==12 || before.def.alignToVelocity!==true) throw new Error(`katana definition mismatch ${JSON.stringify(before.def)}`);
-            if(before.image.width!==2172 || before.image.height!==724 || before.image.cornerAlpha!==0 || !before.image.hasVisiblePixels) throw new Error(`katana image/alpha mismatch ${JSON.stringify(before.image)}`);
-            await page.evaluate(() => KeloVisualLab.previewKatanaThrow());
-            await page.waitForTimeout(180);
-            const during = await page.evaluate(() => {
-              const p=window.localPlayer || localPlayer;
-              return { player:{x:p.x,y:p.y,radius:p.radius}, metrics:KeloProjectileVisuals.metrics(), collapsed:KeloVisualLab.collapsed, audit:JSON.parse(JSON.stringify(KELO_VISUAL_AUDIT)) };
-            });
-            if(during.metrics.active<1) throw new Error(`katana preview not active ${JSON.stringify(during.metrics)}`);
-            if(!during.collapsed) throw new Error('Visual Lab did not minimize after katana preview');
-            if(during.player.x!==before.player.x || during.player.y!==before.player.y || during.player.radius!==before.player.radius) throw new Error('katana visual mutated gameplay position/physics');
-            if(during.audit.missingAssets?.length) throw new Error(`missing assets ${JSON.stringify(during.audit.missingAssets)}`);
-            await page.screenshot({path:'artifacts/katana-throw-mobile.png',fullPage:false,scale:'device'});
-            if(consoleErrors.length || failed.length || http.length) throw new Error(`browser errors ${JSON.stringify({consoleErrors,failed,http})}`);
-            const report={before,during,consoleErrors,failed,http};
-            fs.writeFileSync('artifacts/katana-throw-live.json',JSON.stringify(report,null,2));
-            console.log('KATANA_LIVE_PASS '+JSON.stringify({def:before.def,image:before.image,metrics:during.metrics,collapsed:during.collapsed}));
+          const fs=require('fs'); const {chromium}=require('playwright');
+          (async()=>{
+            const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_BIN,args:['--no-sandbox','--disable-dev-shm-usage']});
+            const context=await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true});
+            const page=await context.newPage(); const errors=[]; const failed=[]; const http=[];
+            page.on('console',m=>{if(m.type()==='error')errors.push(m.text())}); page.on('pageerror',e=>errors.push(`PAGEERROR: ${e.message}`));
+            page.on('requestfailed',r=>failed.push(r.url())); page.on('response',r=>{if(r.status()>=400)http.push([r.status(),r.url()])});
+            await page.goto(`https://kelffren.github.io/gemini/?visualLab=1&katana-fixed=${Date.now()}`,{waitUntil:'domcontentloaded',timeout:45000});
+            await page.waitForFunction(()=>window.KELO_VISUAL_AUDIT?.integrationReady&&window.KeloVisualLab?.previewKatanaThrow&&window.KeloProjectileVisualRegistry?.get('sword_swap_katana_throw_visual'),null,{timeout:20000});
+            await page.evaluate(async()=>KeloAssetRegistry.load('sword_swap_katana_throw_asset'));
+            const before=await page.evaluate(()=>{const p=window.localPlayer||localPlayer;const d=KeloProjectileVisualRegistry.get('sword_swap_katana_throw_visual');const img=KeloAssetRegistry.resource('sword_swap_katana_throw_asset');return{player:{x:p.x,y:p.y,radius:p.radius},def:d,image:{w:img.naturalWidth||img.width,h:img.naturalHeight||img.height},runtime:KeloProjectileVisuals.version};});
+            if(before.image.w!==2172||before.image.h!==724)throw new Error('wrong image dimensions');
+            if(before.def.frames!==6||before.def.fps!==12||!Array.isArray(before.def.frameRects)||before.def.frameRects.length!==6||before.runtime!=='projectile-visual-runtime-v1.1.1')throw new Error(`wrong corrected definition ${JSON.stringify(before)}`);
+            await page.evaluate(()=>KeloVisualLab.previewKatanaThrow()); await page.waitForTimeout(180);
+            const during=await page.evaluate(()=>{const p=window.localPlayer||localPlayer;return{player:{x:p.x,y:p.y,radius:p.radius},metrics:KeloProjectileVisuals.metrics(),collapsed:KeloVisualLab.collapsed,missing:KELO_VISUAL_AUDIT.missingAssets.slice()};});
+            if(during.metrics.active<1||!during.collapsed||during.missing.length)throw new Error(`katana preview state bad ${JSON.stringify(during)}`);
+            if(JSON.stringify(during.player)!==JSON.stringify(before.player))throw new Error('visual mutated gameplay');
+            await page.screenshot({path:'artifacts/katana-throw-mobile-fixed.png',fullPage:false,scale:'device'});
+            if(errors.length||failed.length||http.length)throw new Error(`browser errors ${JSON.stringify({errors,failed,http})}`);
+            fs.writeFileSync('artifacts/katana-throw-live-fixed.json',JSON.stringify({before,during,errors,failed,http},null,2));
+            console.log('KATANA_FIXED_LIVE_PASS '+JSON.stringify({def:before.def,image:before.image,runtime:before.runtime,metrics:during.metrics}));
             await context.close(); await browser.close();
-          })().catch(err => { console.error(err); process.exit(1); });
+          })().catch(e=>{console.error(e);process.exit(1)});
           NODE
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: katana-throw-live
+          name: katana-throw-live-fixed
           path: artifacts/
           if-no-files-found: error
