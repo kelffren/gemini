@@ -1,5 +1,6 @@
 name: Sword Swap Asset Inspect
 
+# One-shot diagnostic for the Sword Swap katana throw spritesheet.
 on:
   push:
     branches: [main]
@@ -37,14 +38,14 @@ jobs:
               vals=[]
               for k in range(1, cols):
                   x=round(w*k/cols)
-                  xs=range(max(0,x-2), min(w,x+3))
+                  xs=list(range(max(0,x-2), min(w,x+3)))
                   count=sum(1 for xx in xs for y in range(h) if pix[xx,y] > 8)
-                  vals.append(count/(len(list(xs))*h))
+                  vals.append(count/(len(xs)*h))
               for k in range(1, rows):
                   y=round(h*k/rows)
-                  ys=range(max(0,y-2), min(h,y+3))
+                  ys=list(range(max(0,y-2), min(h,y+3)))
                   count=sum(1 for yy in ys for x in range(w) if pix[x,yy] > 8)
-                  vals.append(count/(len(list(ys))*w))
+                  vals.append(count/(len(ys)*w))
               return sum(vals)/len(vals) if vals else 1.0
 
           candidates=[]
@@ -85,7 +86,7 @@ jobs:
               'alphaMin':amin,'alphaMax':amax,'nonTransparentRatio':round(nonzero/total,6),
               'topCandidates':candidates[:12]
           }
-          print('KATANA_THROW_ANALYSIS '+json.dumps(report, separators=(',',':')))
+          print('KATANA_THROW_ANALYSIS '+json.dumps(report,separators=(',',':')))
           with open('artifacts/katana-throw-analysis.json','w') as f: json.dump(report,f,indent=2)
           shutil.copy2(path,'artifacts/katana-throw.PNG')
           PY
