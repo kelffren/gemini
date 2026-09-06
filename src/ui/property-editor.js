@@ -8,7 +8,9 @@
   'use strict';
   const S=window.KELO_PROPERTY_SYSTEM,C=window.KELO_PROPERTY_CATALOG,L=window.KELO_ENVIRONMENT_LAYERS;
   if(!S||!C||!L){console.error('[Kelo property editor] system/catalog/layers missing');return;}
-  const params=new URLSearchParams(location.search),developer=params.get('mapEditor')==='1'||params.get('editor')==='1';
+  const params=new URLSearchParams(location.search);
+  const developer=!!window.KELO_ADMIN_KEYS?.can?.('world.edit',S.playerId());
+  const localPrototype=params.get('mapEditor')==='1'&&window.KELO_ADMIN_KEYS?.authoritySource?.()==='local-prototype';
   let open=false,mode=developer?'world':'parcel',parcelId=null,selectedAsset=null,selectedPlacement=null,movePlacementId=null,ghost=null;
 
   const css=document.createElement('style');css.id='kelo-property-editor-style';css.textContent=`
@@ -34,13 +36,14 @@
   const el=id=>document.getElementById(id);const toast=msg=>{if(typeof showToast==='function')showToast(msg);else console.log(msg);};
   function currentParcel(){return S.parcel(parcelId);}
   function isWorld(){return currentParcel()?.kind==='world_editor';}
+  function worldScope(scope){if(!isWorld())return true;try{window.KELO_ADMIN_KEYS?.assert?.(scope,S.playerId());return true;}catch(e){toast('Tu Llave Admin no tiene permiso para esta acción');return false;}}
   function toWorld(sx,sy){if(typeof screenToWorld==='function')return screenToWorld(sx,sy);const z=(typeof CONFIG!=='undefined'&&CONFIG.zoom)||1;return{x:camera.x+(sx-screenW/2)/z,y:camera.y+(sy-screenH/2)/z};}
   function snapPoint(w,t){const s=t?.snap||C.tileSize;return{x:Math.round(w.x/s)*s,y:Math.round(w.y/s)*s};}
   async function ensureParcel(){const p=mode==='world'?await S.request('ensureWorldEditorParcel',{ownerId:'developer'}):await S.request('ensureLegacyParcel',{ownerId:S.playerId()});parcelId=p.parcelId;return p;}
-  function refreshInfo(){const p=currentParcel();if(!p)return;const n=S.getPlacements(parcelId).length;el('pe-mode').textContent=mode==='world'?'AUTOR · ILIMITADO':'PARCELA · UNIDADES';el('pe-info').textContent=`${p.parcelId} · ${Math.round(p.bounds.w/C.tileSize)}×${Math.round(p.bounds.h/C.tileSize)} tiles · ${n} colocados`;el('pe-tabs').querySelectorAll('.pe-tab').forEach(b=>b.classList.toggle('on',b.dataset.mode===mode));}
+  function refreshInfo(){const p=currentParcel();if(!p)return;const n=S.getPlacements(parcelId).length;el('pe-mode').textContent=mode==='world'?'LLAVE ADMIN · MUNDO':'PARCELA · UNIDADES';el('pe-info').textContent=`${p.parcelId} · ${Math.round(p.bounds.w/C.tileSize)}×${Math.round(p.bounds.h/C.tileSize)} tiles · ${n} colocados`;el('pe-tabs').querySelectorAll('.pe-tab').forEach(b=>b.classList.toggle('on',b.dataset.mode===mode));}
   function cards(){
     const q=el('pe-q').value.trim().toLowerCase(),cat=el('pe-cat').value;let list=C.list({category:cat||undefined});if(q)list=list.filter(t=>`${t.label} ${t.id} ${t.family}`.toLowerCase().includes(q));
-    el('pe-list').innerHTML='';for(const t of list){const b=document.createElement('button');b.className='pe-card'+(selectedAsset===t.id?' on':'');const owned=isWorld()?Infinity:S.getOwnedUnits(t.id),avail=isWorld()?Infinity:S.getAvailableUnits(t.id);b.innerHTML=`<strong>${t.label}</strong><small>${t.category} · ${Math.round(t.width)}×${Math.round(t.height)}</small><span class="pe-count">${isWorld()?'∞':`${avail}/${owned}`}</span>${developer&&!isWorld()?'<span class="pe-test">TEST +1</span>':''}`;
+    el('pe-list').innerHTML='';for(const t of list){const b=document.createElement('button');b.className='pe-card'+(selectedAsset===t.id?' on':'');const owned=isWorld()?Infinity:S.getOwnedUnits(t.id),avail=isWorld()?Infinity:S.getAvailableUnits(t.id);b.innerHTML=`<strong>${t.label}</strong><small>${t.category} · ${Math.round(t.width)}×${Math.round(t.height)}</small><span class="pe-count">${isWorld()?'∞':`${avail}/${owned}`}</span>${localPrototype&&!isWorld()?'<span class="pe-test">TEST +1</span>':''}`;
       b.onclick=async ev=>{if(ev.target.classList.contains('pe-test')){ev.stopPropagation();await S.request('grantUnits',{ownerId:S.playerId(),assetId:t.id,quantity:1,developer:true});cards();return;}selectedAsset=t.id;selectedPlacement=null;movePlacementId=null;ghost=null;cards();refreshSelected();};el('pe-list').appendChild(b);}
   }
   function refreshSelected(){const t=C.get(selectedAsset);const p=selectedPlacement&&S.getPlacements(parcelId).find(x=>x.placementId===selectedPlacement);el('pe-selected').textContent=movePlacementId?'Toca el nuevo lugar del objeto':(p?`Seleccionado: ${C.get(p.assetId)?.label||p.assetId}`:(t?`Para colocar: ${t.label}`:''));el('pe-move').disabled=!p;el('pe-move').classList.toggle('on',!!movePlacementId);el('pe-move').textContent=movePlacementId?'TOCA DESTINO':'MOVER';el('pe-rotate').disabled=!p;el('pe-delete').disabled=!p;}
@@ -68,12 +71,12 @@
   el('pe-move').onclick=()=>{if(!selectedPlacement)return;movePlacementId=movePlacementId?null:selectedPlacement;selectedAsset=null;ghost=null;cards();refreshSelected();if(movePlacementId)toast('Toca el nuevo lugar del objeto');};
   el('pe-rotate').onclick=async()=>{if(!selectedPlacement)return;movePlacementId=null;try{await S.request('rotate',{ownerId:isWorld()?'developer':S.playerId(),placementId:selectedPlacement,delta:1});refreshSelected();}catch(err){toast(err.message==='OUTSIDE_PARCEL'?'No cabe al rotarlo':err.message);}};
   el('pe-delete').onclick=async()=>{if(!selectedPlacement)return;movePlacementId=null;await S.request('remove',{ownerId:isWorld()?'developer':S.playerId(),placementId:selectedPlacement});selectedPlacement=null;refreshInfo();cards();refreshSelected();};
-  el('pe-export').onclick=()=>{const data=S.exportLayout(parcelId),blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`kelo-${parcelId.replace(/[^a-z0-9]+/gi,'-')}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);};
-  el('pe-import').onclick=()=>{if(!isWorld()){toast('Importar layouts completos solo está disponible en modo autor');return;}el('pe-file').click();};
+  el('pe-export').onclick=()=>{if(!worldScope('world.export'))return;const data=S.exportLayout(parcelId),blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`kelo-${parcelId.replace(/[^a-z0-9]+/gi,'-')}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);};
+  el('pe-import').onclick=()=>{if(!isWorld()){toast('Importar layouts completos solo está disponible en modo autor');return;}if(!worldScope('world.import'))return;el('pe-file').click();};
   el('pe-file').onchange=async e=>{const f=e.target.files?.[0];if(!f)return;try{const data=JSON.parse(await f.text());await S.request('replaceLayout',{parcelId,placements:data.placements||[],developer:true});refreshInfo();cards();toast('Layout importado');}catch(err){toast('JSON de layout no válido');}e.target.value='';};
 
   const oldOpen=window.openSocialTool;if(typeof oldOpen==='function'){window.openSocialTool=function(tool){if(tool==='properties'){openEditor('parcel');return;}return oldOpen.apply(this,arguments);};}
   populateCategories();S.onChange(()=>{if(open){refreshInfo();cards();refreshSelected();}});
-  window.KELO_PROPERTY_EDITOR=Object.freeze({version:'property-editor-v1.1.0',developer,open:(m)=>openEditor(m||'parcel'),close:closeEditor,toggle:()=>toggle(mode),get mode(){return mode;},get parcelId(){return parcelId;},get selectedPlacementId(){return selectedPlacement;},get movingPlacementId(){return movePlacementId;}});
-  window.KELO_PROPERTY_EDITOR_AUDIT=Object.freeze({version:'property-editor-v1.1.0',developerGate:'query-mapEditor-1',mobile:true,exportImport:true,unitAware:true,worldEditor:true,nativeMove:true,selectExistingBeforePlace:true});
+  window.KELO_PROPERTY_EDITOR=Object.freeze({version:'property-editor-v1.2.0',developer,open:(m)=>openEditor(m||'parcel'),close:closeEditor,toggle:()=>toggle(mode),get mode(){return mode;},get parcelId(){return parcelId;},get selectedPlacementId(){return selectedPlacement;},get movingPlacementId(){return movePlacementId;}});
+  window.KELO_PROPERTY_EDITOR_AUDIT=Object.freeze({version:'property-editor-v1.2.0',developerGate:'admin-key-world.edit',mobile:true,exportImport:true,unitAware:true,worldEditor:true,nativeMove:true,selectExistingBeforePlace:true});
 })();

@@ -71,3 +71,9 @@ KELO-INDEX PROPERTY
 - `src/instances/house-instance.js`: autoridad, persistencia, snapshot y permisos House.
 - `src/instances/property-house-bridge.js`: contrato Property ↔ House.
 - `src/ui/house-instance-ui.js`: entrada/salida y acceso al mismo Property Editor.
+
+
+## ADMIN KEY / WORLD CREATOR V1
+- `src/systems/admin-key-system.js`: objeto/entitlement Llave Admin, scopes y autoridad reemplazable.
+- `src/ui/property-editor.js`: modo MUNDO visible únicamente con `world.edit`.
+- Parcela de jugador conserva unidades/ownership; Llave Admin no altera esa economía.
