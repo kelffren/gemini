@@ -50,6 +50,7 @@ jobs:
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -A assets/fuentekelo-runtime.png src/environment/prop-contract.js src/environment/environment-layer-stack.js src/environment/generic-props.js src/environment/plaza-depth.js src/environment/art-asset-manifest.json src/environment/png-validation-policy.json scripts/live-fountain-audit.mjs .github/workflows/ci.yml index.html
+          git checkout -- .github/workflows/ci.yml
+          git add -A assets/fuentekelo-runtime.png src/environment/prop-contract.js src/environment/environment-layer-stack.js src/environment/generic-props.js src/environment/plaza-depth.js src/environment/art-asset-manifest.json src/environment/png-validation-policy.json scripts/live-fountain-audit.mjs index.html
           git commit -m 'Integrate fuentekelo at Plaza center'
           git push origin HEAD:main
