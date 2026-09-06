@@ -52,7 +52,6 @@ jobs:
           policy['excludedFromWorldContract']=kept
           policy_path.write_text(json.dumps(policy,indent=2,ensure_ascii=False)+'\n')
 
-          # Repository rule: any JS/HTML touched by this case migration keeps/gets a KELO-INDEX header.
           headers={
             root/'src/environment/tile-registry.js':"/* KELO-INDEX\n * area: PLAZA\n * keys: TILES REGISTRY ASSET PNG TERRAIN\n * hace: registra atlas, familias, estilos y prefabs visuales del mundo\n * online: N/A; metadata visual cliente\n */\n",
             root/'src/environment/prop-contract.js':"/* KELO-INDEX\n * area: PLAZA\n * keys: PROP ASSET PNG FOUNTAIN COLLIDER DEPTH\n * hace: contrato data-driven de props y su metadata visual/espacial\n * online: N/A; props visuales, gameplay permanece fuera del renderer\n */\n",
@@ -92,3 +91,4 @@ jobs:
           git commit -m 'chore: normalize active assets to .PNG'
           git pull --rebase origin main
           git push origin HEAD:main
+# trigger: 2026-09-06T00:15-04:00
