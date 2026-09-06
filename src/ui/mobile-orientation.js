@@ -1,14 +1,14 @@
 /* KELO-INDEX
  * area: UI
- * keys: MOBILE ORIENTATION ROTATE BUTTON PORTRAIT LANDSCAPE FULLSCREEN
- * hace: detecta la orientación real del teléfono, marca el layout y ofrece un botón para solicitar la orientación contraria
+ * keys: MOBILE ORIENTATION ROTATE BUTTON PORTRAIT LANDSCAPE FULLSCREEN VIEWPORT
+ * hace: detecta la orientación real del teléfono, sincroniza el viewport completo y ofrece un botón para solicitar la orientación contraria
  * online: UI local; no contiene estado valioso ni autoridad compartida
  */
 (function(){
 'use strict';
 if(window.KELO_ORIENTATION)return;
 
-const VERSION='mobile-orientation-v1.0.0';
+const VERSION='mobile-orientation-v1.1.0';
 let lastOrientation=null;
 let preferredOrientation=null;
 let syncing=false;
@@ -41,13 +41,17 @@ function updateButton(current){
   const value=el.querySelector('[data-orientation-label]');
   if(value)value.textContent=current==='portrait'?'VERTICAL':'HORIZONTAL';
 }
+function syncViewportCss(){
+  const root=document.documentElement;
+  root.style.setProperty('--kelo-vw',`${window.innerWidth}px`);
+  root.style.setProperty('--kelo-vh',`${window.innerHeight}px`);
+}
 function applyOrientation(source){
+  syncViewportCss();
   const current=physicalOrientation();
   document.documentElement.dataset.keloOrientation=current;
   document.body?.classList.toggle('kelo-orientation-portrait',current==='portrait');
   document.body?.classList.toggle('kelo-orientation-landscape',current==='landscape');
-  document.documentElement.style.setProperty('--kelo-vw',`${window.innerWidth}px`);
-  document.documentElement.style.setProperty('--kelo-vh',`${window.innerHeight}px`);
   updateButton(current);
   if(current!==lastOrientation){
     const previous=lastOrientation;
@@ -78,7 +82,7 @@ async function requestOrientation(target){
     try{
       await requestFullscreenIfUseful();
       await screen.orientation.lock(target);
-      setTimeout(()=>{window.dispatchEvent(new Event('resize'));applyOrientation('lock');},120);
+      setTimeout(()=>{syncViewportCss();window.dispatchEvent(new Event('resize'));applyOrientation('lock');},120);
       toast(`Orientación ${labelFor(target)} activada`);
       return{ok:true,mode:'screen-orientation-lock',target};
     }catch(e){
@@ -102,6 +106,8 @@ function ensureButton(){
   const style=document.createElement('style');
   style.id='kelo-orientation-style';
   style.textContent=`
+    html,body{width:var(--kelo-vw,100vw)!important;height:var(--kelo-vh,100vh)!important;max-width:var(--kelo-vw,100vw)!important;max-height:var(--kelo-vh,100vh)!important;overflow:hidden!important}
+    #game-canvas,#ui-layer,#kelo-luxe{width:var(--kelo-vw,100vw)!important;height:var(--kelo-vh,100vh)!important;max-width:var(--kelo-vw,100vw)!important;max-height:var(--kelo-vh,100vh)!important}
     #kelo-orientation-btn{width:54px;min-height:50px;padding:5px 4px;border-radius:16px;border:1px solid rgba(231,197,106,.48);background:linear-gradient(145deg,rgba(22,37,35,.97),rgba(9,17,18,.97));color:#fff4d6;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;box-shadow:0 9px 24px rgba(0,0,0,.3);font:800 7px/1.05 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;letter-spacing:.08em;pointer-events:auto;touch-action:manipulation}
     #kelo-orientation-btn .kelo-rotate-icon{font-size:22px;line-height:22px;color:#e7c56a;transition:transform .18s ease}
     #kelo-orientation-btn:active{transform:scale(.96);border-color:rgba(231,197,106,.92)}
@@ -126,10 +132,11 @@ function ensureButton(){
 }
 
 function boot(){
+  syncViewportCss();
   ensureButton();
   applyOrientation('boot');
   window.addEventListener('resize',()=>scheduleSync('resize'),{passive:true});
-  window.addEventListener('orientationchange',()=>{setTimeout(()=>{window.dispatchEvent(new Event('resize'));applyOrientation('orientationchange');},120);},{passive:true});
+  window.addEventListener('orientationchange',()=>{setTimeout(()=>{syncViewportCss();window.dispatchEvent(new Event('resize'));applyOrientation('orientationchange');},120);},{passive:true});
   window.visualViewport?.addEventListener('resize',()=>scheduleSync('visualViewport'),{passive:true});
   try{screen.orientation?.addEventListener?.('change',()=>scheduleSync('screen.orientation'));}catch(e){}
 }
@@ -144,7 +151,7 @@ window.KELO_ORIENTATION=Object.freeze({
   sync:()=>applyOrientation('api'),
   supported:()=>({touch:isTouchDevice(),orientationLock:!!(screen.orientation&&typeof screen.orientation.lock==='function'),fullscreen:!!document.fullscreenEnabled})
 });
-window.KELO_ORIENTATION_AUDIT=Object.freeze({version:VERSION,autoDetect:true,rotateButton:true,portrait:true,landscape:true,orientationLockProgressive:true,iosSafeFallback:true});
+window.KELO_ORIENTATION_AUDIT=Object.freeze({version:VERSION,autoDetect:true,viewportSync:true,rotateButton:true,portrait:true,landscape:true,orientationLockProgressive:true,iosSafeFallback:true});
 
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 })();
