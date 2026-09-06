@@ -5,13 +5,14 @@ on:
     branches: [ main ]
     paths:
       - '.github/workflows/live-fountain-only.yml'
+      - 'src/environment/world-map.js'
       - 'src/environment/prop-contract.js'
       - 'src/environment/generic-props.js'
       - 'src/environment/environment-layer-stack.js'
       - 'src/environment/plaza-depth.js'
       - 'scripts/live-fountain-audit.mjs'
-      - 'assets/plaza-fountain-back.PNG'
-      - 'assets/plaza-fountain-front.PNG'
+      - 'assets/fuentekelo.PNG'
+      - 'assets/fuentekelo-runtime.png'
       - 'index.html'
   workflow_dispatch:
 
@@ -27,9 +28,7 @@ jobs:
       - name: Resolve fountain contract
         shell: bash
         run: |
-          PAGE_TITLE="$(node -e "const fs=require('fs');const s=fs.readFileSync('index.html','utf8');const m=s.match(/<title>([^<]+)<\\/title>/);if(!m)process.exit(2);process.stdout.write(m[1]);")"
           FOUNTAIN_VERSION="$(node -e "const fs=require('fs');const s=fs.readFileSync('src/environment/plaza-depth.js','utf8');const m=s.match(/version:'(plaza-fountain-[^']+)'/);if(!m)process.exit(2);process.stdout.write(m[1]);")"
-          echo "EXPECTED_TITLE=$PAGE_TITLE" >> "$GITHUB_ENV"
           echo "EXPECTED_FOUNTAIN=$FOUNTAIN_VERSION" >> "$GITHUB_ENV"
       - name: Install Playwright
         run: npm install --no-save playwright@1.55.0
@@ -42,9 +41,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: live-fountain-audit
+          name: live-fuentekelo-audit
           path: |
-            artifacts/fountain-report.json
-            artifacts/live-fountain-behind.png
-            artifacts/live-fountain-front.png
+            artifacts/fuentekelo-report.json
+            artifacts/live-fuentekelo-390x844.png
           if-no-files-found: error
