@@ -31,12 +31,21 @@
   function snap(v,s){return Math.round((Number(v)||0)/s)*s;}
   function within(b,x,y,w,h){return x>=b.x&&y>=b.y&&x+w<=b.x+b.w&&y+h<=b.y+b.h;}
   function canEdit(p,owner){return !!p&&(p.kind==='world_editor'||p.ownerId===owner);}
+  function currentHouseInstance(){const i=window.KELO_INSTANCES?.current?.();return i&&i.type==='house'?i:null;}
+  function placementVisible(rec){const p=parcel(rec.parcelId),i=currentHouseInstance();return i?(p?.kind==='house'&&p.houseId===i.resourceId):(p?.kind!=='house');}
+  function isHouseMutation(op,data){if(!['place','move','rotate','remove'].includes(op))return false;let p=null;if(op==='place')p=parcel(data?.parcelId);else{const rec=state.placements.find(x=>x.placementId===data?.placementId);p=rec&&parcel(rec.parcelId);}return p?.kind==='house';}
 
   // KELO-INDEX PROPERTY/AUTHORITY operación única de mutación: mañana el servidor implementa la misma boca.
   async function localRequest(op,payload){
     const data=payload||{},owner=String(data.ownerId||playerId());
     if(op==='snapshot')return snapshot();
     if(op==='ensureLegacyParcel'){
+      const hi=currentHouseInstance();
+      if(hi){
+        const pid=String(hi.parcelId||`parcel:house:${hi.resourceId}`),b=hi.config?.bounds||{x:0,y:0,w:768,h:544};
+        if(!state.parcels[pid]){state.parcels[pid]={parcelId:pid,ownerId:String(hi.ownerId||owner),kind:'house',houseId:String(hi.resourceId),bounds:{x:Number(b.x)||0,y:Number(b.y)||0,w:Number(b.w)||768,h:Number(b.h)||544},district:'instance',status:'active'};bump();}
+        return clone(state.parcels[pid]);
+      }
       const legacy=(typeof STATE!=='undefined'&&STATE?.plot)?STATE.plot:{x:2000,y:1500,w:400,h:300};
       const pid='parcel:legacy:104';
       if(!state.parcels[pid]){state.parcels[pid]={parcelId:pid,ownerId:owner,kind:'player',bounds:{x:legacy.x,y:legacy.y,w:legacy.w,h:legacy.h},district:'central',status:'owned'};bump();}
@@ -46,6 +55,12 @@
     if(op==='ensureWorldEditorParcel'){
       const pid='parcel:world:editor';
       if(!state.parcels[pid]){state.parcels[pid]={parcelId:pid,ownerId:'developer',kind:'world_editor',bounds:{x:0,y:0,w:Number(CONFIG?.worldWidth)||3600,h:Number(CONFIG?.worldHeight)||3200},district:'*',status:'developer'};bump();}
+      return clone(state.parcels[pid]);
+    }
+    if(op==='ensureHouseParcel'){
+      const houseId=String(data.houseId||''),b=data.bounds||{x:0,y:0,w:768,h:544};if(!houseId)throw new Error('HOUSE_ID_REQUIRED');const pid=`parcel:house:${houseId}`;
+      if(!state.parcels[pid]){state.parcels[pid]={parcelId:pid,ownerId:owner,kind:'house',houseId,bounds:{x:Number(b.x)||0,y:Number(b.y)||0,w:Number(b.w)||768,h:Number(b.h)||544},district:'instance',status:'active'};bump();}
+      else{const row=state.parcels[pid];row.ownerId=owner;row.houseId=houseId;row.bounds={x:Number(b.x)||0,y:Number(b.y)||0,w:Number(b.w)||768,h:Number(b.h)||544};row.status='active';bump();}
       return clone(state.parcels[pid]);
     }
     if(op==='grantUnits'){
@@ -69,6 +84,11 @@
     if(op==='remove'){
       const i=state.placements.findIndex(x=>x.placementId===data.placementId);if(i<0)throw new Error('PLACEMENT_NOT_FOUND');const rec=state.placements[i],p=parcel(rec.parcelId);if(!canEdit(p,owner)&&rec.ownerId!==owner)throw new Error('NOT_PLACEMENT_OWNER');state.placements.splice(i,1);bump();return clone(rec);
     }
+    if(op==='replaceHouseLayout'){
+      const p=parcel(data.parcelId);if(!p||p.kind!=='house')throw new Error('HOUSE_PARCEL_ONLY');if(!data.authorityRestore&&p.ownerId!==owner)throw new Error('NOT_PARCEL_OWNER');const rows=Array.isArray(data.placements)?data.placements:[];
+      const safe=[];for(const raw of rows){const t=C.get(raw.assetId);if(!t)continue;const q=((Math.floor(Number(raw.rotation)||0)%4)+4)%4,d=rotatedSize(t,q),x=snap(raw.x,t.snap||C.tileSize),y=snap(raw.y,t.snap||C.tileSize);if(!within(p.bounds,x,y,d.w,d.h))continue;safe.push({placementId:String(raw.placementId||id('placement')),parcelId:p.parcelId,ownerId:String(raw.ownerId||p.ownerId),assetId:t.id,x,y,rotation:q,layer:'property',createdAt:Number(raw.createdAt)||Date.now(),updatedAt:Number(raw.updatedAt)||Date.now()});}
+      state.placements=state.placements.filter(x=>x.parcelId!==p.parcelId).concat(safe);bump();return{count:safe.length};
+    }
     if(op==='replaceLayout'){
       if(!data.developer)throw new Error('DEVELOPER_ONLY');const p=parcel(data.parcelId);if(!p||p.kind!=='world_editor')throw new Error('WORLD_EDITOR_ONLY');const rows=Array.isArray(data.placements)?data.placements:[];
       const safe=[];for(const raw of rows){const t=C.get(raw.assetId);if(!t)continue;const q=((Math.floor(Number(raw.rotation)||0)%4)+4)%4,d=rotatedSize(t,q),x=snap(raw.x,t.snap),y=snap(raw.y,t.snap);if(!within(p.bounds,x,y,d.w,d.h))continue;safe.push({placementId:String(raw.placementId||id('placement')),parcelId:p.parcelId,ownerId:'developer',assetId:t.id,x,y,rotation:q,layer:'property',createdAt:Number(raw.createdAt)||Date.now(),updatedAt:Date.now()});}
@@ -76,7 +96,7 @@
     }
     throw new Error('UNKNOWN_PROPERTY_OPERATION');
   }
-  async function request(op,payload){if(remoteAdapter&&typeof remoteAdapter.request==='function')return remoteAdapter.request(op,payload||{});return localRequest(op,payload||{});}
+  async function request(op,payload){const data=payload||{};if(isHouseMutation(op,data)&&window.KELO_HOUSE_AUTHORITY?.request)return window.KELO_HOUSE_AUTHORITY.request(op,data);if(remoteAdapter&&typeof remoteAdapter.request==='function')return remoteAdapter.request(op,data);return localRequest(op,data);}
   function installRemoteAdapter(adapter){if(adapter&&typeof adapter.request!=='function')throw new Error('INVALID_PROPERTY_ADAPTER');remoteAdapter=adapter||null;window.KELO_PROPERTY_AUDIT.authority=remoteAdapter?'remote-adapter':'local-fallback';}
   function ingestAuthoritySnapshot(next){if(!next||next.schema!==SCHEMA||!next.parcels||!next.balances||!Array.isArray(next.placements))throw new Error('INVALID_PROPERTY_SNAPSHOT');state=clone(next);persist();return snapshot();}
 
@@ -87,7 +107,7 @@
   }
   function syncColliders(){
     if(typeof obstacles==='undefined'||!Array.isArray(obstacles))return;for(let i=obstacles.length-1;i>=0;i--)if(obstacles[i]?._propertyPlacementId)obstacles.splice(i,1);
-    for(const rec of state.placements){const t=C.get(rec.assetId);if(!t?.collision)continue;const b=transformedRect(rec,t,t.collision);if(b.w>0&&b.h>0)obstacles.push({id:`property:${rec.placementId}`,x:b.x,y:b.y,w:b.w,h:b.h,noDraw:true,_propertyPlacementId:rec.placementId});}
+    for(const rec of state.placements){if(!placementVisible(rec))continue;const t=C.get(rec.assetId);if(!t?.collision)continue;const b=transformedRect(rec,t,t.collision);if(b.w>0&&b.h>0)obstacles.push({id:`property:${rec.placementId}`,x:b.x,y:b.y,w:b.w,h:b.h,noDraw:true,_propertyPlacementId:rec.placementId});}
   }
 
   function drawTemplate(g,t,rec,phase){
@@ -95,8 +115,8 @@
     for(const part of t.parts){if(part.phase!==phase)continue;const img=images.get(part.assetKey);if(!img||!readyAssets.has(part.assetKey))continue;const a=g.globalAlpha;g.globalAlpha=a*part.opacity;g.drawImage(img,part.source.x,part.source.y,part.source.w,part.source.h,part.offset.x,part.offset.y,part.size.w,part.size.h);g.globalAlpha=a;}
     g.restore();
   }
-  function drawPhase(g,phase){g.save();g.imageSmoothingEnabled=false;for(const rec of state.placements){const t=C.get(rec.assetId);if(t)drawTemplate(g,t,rec,phase);}g.restore();}
-  function bounds(){return state.placements.map(p=>({id:p.placementId,...placementBounds(p)})).filter(x=>x.w>0&&x.h>0);}
+  function drawPhase(g,phase){g.save();g.imageSmoothingEnabled=false;for(const rec of state.placements){if(!placementVisible(rec))continue;const t=C.get(rec.assetId);if(t)drawTemplate(g,t,rec,phase);}g.restore();}
+  function bounds(){return state.placements.filter(placementVisible).map(p=>({id:p.placementId,...placementBounds(p)})).filter(x=>x.w>0&&x.h>0);}
   L.register({id:'property-placements-back',phase:'props_back',priority:35,required:false,ready:()=>true,draw:g=>drawPhase(g,'props_back'),ownership:'property-placement-system-v1',bounds});
   L.register({id:'property-placements-front',phase:'props_front',priority:35,required:false,ready:()=>true,draw:g=>drawPhase(g,'props_front'),ownership:'property-placement-system-v1',bounds});
 
@@ -109,7 +129,7 @@
   function suppressLegacyFurniture(plot){const p=state.parcels['parcel:legacy:104'];return !!p&&p.bounds.x===plot?.x&&p.bounds.y===plot?.y&&state.placements.some(x=>x.parcelId===p.parcelId);}
   if(typeof renderPlot==='function'){const legacyRenderPlot=renderPlot;renderPlot=function(plot,isOwn){if(suppressLegacyFurniture(plot))return legacyRenderPlot(Object.assign({},plot,{furniture:[]}),isOwn);return legacyRenderPlot(plot,isOwn);};}
   window.KELO_PROPERTY_SYSTEM=Object.freeze({
-    version:'property-system-v1.0.0',storageMode:'local-fallback-replaceable',request,installRemoteAdapter,ingestAuthoritySnapshot,snapshot,playerId,parcel,getOwnedUnits:(assetId,owner)=>owned(String(owner||playerId()),assetId),getDeployedUnits:(assetId,owner)=>deployed(String(owner||playerId()),assetId),getAvailableUnits:(assetId,owner)=>available(String(owner||playerId()),assetId),getPlacements:(pid)=>state.placements.filter(p=>!pid||p.parcelId===pid).map(clone),placementBounds,placementForPoint,exportLayout,suppressLegacyFurniture,onChange(fn){if(typeof fn!=='function')return()=>{};listeners.add(fn);return()=>listeners.delete(fn);},get ready(){return true;}
+    version:'property-system-v1.1.0',storageMode:'local-fallback-replaceable',request,authorityLocalRequest:localRequest,installRemoteAdapter,ingestAuthoritySnapshot,snapshot,playerId,parcel,getOwnedUnits:(assetId,owner)=>owned(String(owner||playerId()),assetId),getDeployedUnits:(assetId,owner)=>deployed(String(owner||playerId()),assetId),getAvailableUnits:(assetId,owner)=>available(String(owner||playerId()),assetId),getPlacements:(pid)=>state.placements.filter(p=>!pid||p.parcelId===pid).map(clone),placementBounds,placementForPoint,exportLayout,suppressLegacyFurniture,refreshSceneColliders:syncColliders,onChange(fn){if(typeof fn!=='function')return()=>{};listeners.add(fn);return()=>listeners.delete(fn);},get ready(){return true;}
   });
-  window.KELO_PROPERTY_AUDIT={version:'property-system-v1.0.0',schema:SCHEMA,authority:'local-fallback',serverReplaceable:true,parcelCount:Object.keys(state.parcels).length,placementCount:state.placements.length,assetCount:C.list().length};
+  window.KELO_PROPERTY_AUDIT={version:'property-system-v1.1.0',schema:SCHEMA,authority:'local-fallback',serverReplaceable:true,parcelCount:Object.keys(state.parcels).length,placementCount:state.placements.length,assetCount:C.list().length};
 })();

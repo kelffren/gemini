@@ -630,3 +630,6 @@ Reglas:
 - Visual memory: `docs/VISUAL_DIRECTION_MEMORY.md`
 - ChatGPT → Grok: `docs/ai-bridge/CHATGPT_TO_GROK.md`
 - Grok → ChatGPT: `docs/ai-bridge/GROK_TO_CHATGPT.md`
+
+## House Instance V1 (offline-first)
+`KELO_INSTANCES` separa conceptualmente world e instancias. House usa autoridad/persistencia reemplazables y reutiliza Property placements. En online, World y House workers podrán separarse sin cambiar UI/contratos.

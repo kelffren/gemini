@@ -64,3 +64,10 @@ KELO-INDEX CAST
 KELO-INDEX MOVE
 KELO-INDEX PROPERTY
 ```
+
+## INSTANCE SYSTEM V1
+- `src/instances/instance-system.js`: manager/lifecycle/contexto genérico.
+- `src/instances/instance-runtime-bridge.js`: transición world/house y bounds visuales.
+- `src/instances/house-instance.js`: autoridad, persistencia, snapshot y permisos House.
+- `src/instances/property-house-bridge.js`: contrato Property ↔ House.
+- `src/ui/house-instance-ui.js`: entrada/salida y acceso al mismo Property Editor.
