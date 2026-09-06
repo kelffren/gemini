@@ -1,14 +1,14 @@
 /* KELO-INDEX
  * area: WORLD BUILDER
- * keys: ADMIN KEY WORLD EDIT TERRAIN PATH COLLISION DRAFT AUTHORITY OFFLINE ONLINE READY
- * hace: guarda overrides editables del mundo principal, los renderiza sobre el mapa base y mantiene colisiones de autor
+ * keys: ADMIN KEY WORLD EDIT TERRAIN PATH COLLISION PROPERTY DRAFT AUTHORITY OFFLINE ONLINE READY
+ * hace: guarda overrides editables del mundo principal, los renderiza sobre el mapa base y mantiene colisiones/objetos de autor visibles
  * online: request() e installRemoteAdapter() permiten sustituir LocalWorldBuilderAuthority por servidor sin cambiar editor/render
  */
 (function(){
 'use strict';
 if(window.KELO_WORLD_BUILDER)return;
 
-const VERSION='world-builder-v1.0.0';
+const VERSION='world-builder-v1.1.0';
 const SCHEMA=1;
 const STORAGE='kelo_world_builder_state_v1';
 const TILE=Number(window.KELO_TILE_REGISTRY?.worldTileSize)||32;
@@ -45,10 +45,10 @@ async function localRequest(op,payload){
   const data=payload||{},actor=requireScope(op==='world-builder:export'?'world.export':op==='world-builder:import'?'world.import':'world.edit',data.actorId);
   if(op==='world-builder:snapshot'||op==='world-builder:export')return snapshot();
   if(op==='world-builder:paint'){
-    const cells=brushCells(data.x,data.y,data.brushSize);for(const [x,y] of cells){const rec=normalizedCell(x,y,data.material,data.role,actor);state.cells[cellKey(x,y)]=rec;}bump('paint',{material:data.material,role:data.role||'terrain',brushSize:Number(data.brushSize)||1,count:cells.length,x:snap(data.x),y:snap(data.y)},actor);return{count:cells.length,revision:state.revision};
+    const brush=brushCells(data.x,data.y,data.brushSize);for(const [x,y] of brush){const rec=normalizedCell(x,y,data.material,data.role,actor);state.cells[cellKey(x,y)]=rec;}bump('paint',{material:data.material,role:data.role||'terrain',brushSize:Number(data.brushSize)||1,count:brush.length,x:snap(data.x),y:snap(data.y)},actor);return{count:brush.length,revision:state.revision};
   }
   if(op==='world-builder:erase-terrain'){
-    const cells=brushCells(data.x,data.y,data.brushSize),removed=[];for(const [x,y] of cells){const k=cellKey(x,y);if(state.cells[k]){removed.push(k);delete state.cells[k];}}if(removed.length)bump('erase-terrain',{cells:removed},actor);return{count:removed.length,revision:state.revision};
+    const brush=brushCells(data.x,data.y,data.brushSize),removed=[];for(const [x,y] of brush){const k=cellKey(x,y);if(state.cells[k]){removed.push(k);delete state.cells[k];}}if(removed.length)bump('erase-terrain',{cells:removed},actor);return{count:removed.length,revision:state.revision};
   }
   if(op==='world-builder:collision-create'){
     const rec=normalizeCollision(data,actor);state.collisions[rec.collisionId]=rec;bump('collision-create',rec,actor);return clone(rec);
@@ -80,20 +80,22 @@ function atlasOrigin(meta,id){const tw=Number(meta?.tileWidth)||TILE,th=Number(m
 function acquireAtlas(key){if(!key||atlasImages.has(key)||atlasPromises.has(key)||!A?.acquire)return;const p=Promise.resolve(A.acquire(key)).then(img=>{if(img)atlasImages.set(key,img);atlasPromises.delete(key);}).catch(()=>atlasPromises.delete(key));atlasPromises.set(key,p);}
 function drawCell(g,rec){const def=TERRAIN?.materials?.[rec.material],meta=atlasMeta(def?.atlas),img=atlasImages.get(def?.atlas),pool=R?.families?.[def?.family]||[];if(def?.atlas&&!img)acquireAtlas(def.atlas);if(img&&meta&&pool.length){const id=pool[hash(rec.x,rec.y)%pool.length],s=atlasOrigin(meta,id);g.drawImage(img,s.x,s.y,s.w,s.h,rec.x,rec.y,TILE,TILE);}else{g.fillStyle=materialColor(rec.material);g.fillRect(rec.x,rec.y,TILE,TILE);}}
 function drawTerrain(g){if(!isMainWorld())return;const list=cells();if(!list.length)return;g.save();g.imageSmoothingEnabled=false;for(const rec of list)drawCell(g,rec);g.restore();}
-function syncColliders(){if(!isMainWorld()||typeof obstacles==='undefined'||!Array.isArray(obstacles))return;for(let i=obstacles.length-1;i>=0;i--)if(obstacles[i]?._worldBuilderCollisionId)obstacles.splice(i,1);for(const c of collisions())obstacles.push({id:`world-builder:${c.collisionId}`,x:c.x,y:c.y,w:c.w,h:c.h,noDraw:true,_worldBuilderCollisionId:c.collisionId});}
+function syncColliders(){if(!isMainWorld()||typeof obstacles==='undefined'||!Array.isArray(obstacles))return;for(let i=obstacles.length-1;i>=0;i--)if(obstacles[i]?._worldBuilderCollisionId)obstacles.splice(i,1);for(const c of collisions())obstacles.push({id:`world-builder:${c.collisionId}`,x:c.x,y:c.y,w:c.w,h:c.h,noDraw:true,_worldBuilderCollisionId:c.collisionId});try{window.KELO_PROPERTY_SYSTEM?.refreshSceneColliders?.();}catch(e){}}
+function drawRegisteredLayer(id,g){const layer=window.KELO_ENVIRONMENT_LAYERS?.layers?.find?.(x=>x.id===id);if(!layer||typeof layer.draw!=='function')return false;try{if(layer.ready&&!layer.ready())return false;layer.draw(g);return true;}catch(e){return false;}}
+function drawPropertyFallback(g,phase,base){if(!isMainWorld()||base?.decorationReset!==true)return;drawRegisteredLayer(phase==='back'?'property-placements-back':'property-placements-front',g);}
 function drawGuides(g){const ui=window.KELO_WORLD_BUILDER_UI,guide=ui?.guideState?.();if(!guide?.open||!isMainWorld())return;g.save();g.lineWidth=2;if(guide.layer==='collision'){g.fillStyle='rgba(255,90,90,.16)';g.strokeStyle='rgba(255,120,120,.95)';for(const c of collisions()){g.fillRect(c.x,c.y,c.w,c.h);g.strokeRect(c.x,c.y,c.w,c.h);}}if(guide.cursor){g.strokeStyle='#fff0b0';g.setLineDash([6,4]);g.strokeRect(guide.cursor.x,guide.cursor.y,guide.cursor.w||TILE,guide.cursor.h||TILE);g.setLineDash([]);}g.restore();}
 function installRenderer(){
   if(rendererInstalled)return;const base=window.KELO_WORLD_RENDERER;if(!base||typeof base.draw!=='function'){setTimeout(installRenderer,120);return;}
   rendererInstalled=true;
   window.KELO_WORLD_RENDERER=Object.freeze({
     draw(g){const ok=base.draw(g);drawTerrain(g);return ok!==false;},
-    drawPreActors(g){const r=typeof base.drawPreActors==='function'?base.drawPreActors(g):true;syncColliders();drawGuides(g);return r;},
-    drawPostActors(g){return typeof base.drawPostActors==='function'?base.drawPostActors(g):true;},
+    drawPreActors(g){const r=typeof base.drawPreActors==='function'?base.drawPreActors(g):true;drawPropertyFallback(g,'back',base);syncColliders();drawGuides(g);return r;},
+    drawPostActors(g){const r=typeof base.drawPostActors==='function'?base.drawPostActors(g):true;drawPropertyFallback(g,'front',base);return r;},
     districts:base.districts,chunkSize:base.chunkSize,get ready(){return base.ready!==false;},environmentLayerStack:base.environmentLayerStack,preActorLayerStack:true,postActorLayerStack:true,decorationReset:base.decorationReset,worldBuilderOverlay:true
   });
 }
 function boot(){for(const id of MATERIALS){const key=TERRAIN?.materials?.[id]?.atlas;if(key)acquireAtlas(key);}installRenderer();syncColliders();}
 window.KELO_WORLD_BUILDER=Object.freeze({version:VERSION,schema:SCHEMA,tileSize:TILE,materials:Object.freeze(MATERIALS.slice()),request,installRemoteAdapter,snapshot,cells:()=>clone(cells()),collisions:()=>clone(collisions()),collisionAt:(x,y)=>clone(collisionAt(x,y)),onChange(fn){if(typeof fn!=='function')return()=>{};listeners.add(fn);return()=>listeners.delete(fn);},authoritySource:()=>remoteAdapter?'remote-adapter':'local-draft',isMainWorld});
-window.KELO_WORLD_BUILDER_AUDIT={version:VERSION,authorityReplaceable:true,versionedDraft:true,terrainOverrides:true,pathOverrides:true,collisionLayer:true,propertyReuse:true,rendererOverlay:true,localOnly:true};
+window.KELO_WORLD_BUILDER_AUDIT={version:VERSION,authorityReplaceable:true,versionedDraft:true,terrainOverrides:true,pathOverrides:true,collisionLayer:true,propertyReuse:true,propertyResetFallback:true,rendererOverlay:true,localOnly:true};
 if(document.readyState==='complete')setTimeout(boot,0);else window.addEventListener('load',boot,{once:true});
 })();
