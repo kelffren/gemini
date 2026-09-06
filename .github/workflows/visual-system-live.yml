@@ -35,17 +35,17 @@ jobs:
           python3 - <<'PY'
           import time, urllib.request
           url='https://kelffren.github.io/gemini/'
-          for attempt in range(12):
+          for attempt in range(18):
               try:
                   body=urllib.request.urlopen(url+'?visual-version-check='+str(time.time()), timeout=15).read().decode('utf-8','ignore')
-                  if 'Kelo World — V6.26' in body and 'src/visuals/visual-integration.js?v=1' in body:
-                      print('Pages V6.26 visual runtime visible')
+                  if 'Kelo World — V' in body and 'src/visuals/visual-integration.js?v=1' in body and 'src/visuals/visual-lab.js' in body:
+                      print('Current Kelo visual runtime visible on Pages')
                       break
               except Exception as exc:
                   print('Pages check', attempt+1, exc)
               time.sleep(5)
           else:
-              raise SystemExit('Pages did not expose V6.26 visual runtime in validation window')
+              raise SystemExit('Pages did not expose the current modular visual runtime in validation window')
           PY
       - name: Audit modular visual runtime on mobile
         env:
