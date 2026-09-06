@@ -1,20 +1,20 @@
 {
-  "version": "kelo-png-validation-policy-v1",
+  "version": "kelo-png-validation-policy-v2",
   "excludedFromWorldContract": [
     {
       "path": "assets/hero.PNG",
       "scope": "non-world-ui",
-      "reason": "UI/landing artwork is outside the Kelo World environment asset contract."
+      "reason": "Player/UI sprite is outside the Kelo World environment asset contract."
     },
     {
       "path": "assets/Arboleskelo1.PNG",
       "scope": "source-sheet",
-      "reason": "Original authored asset sheet is retained at full resolution as importer source-of-truth; LIVE renders the generated irregular atlas instead."
+      "reason": "Original authored vegetation sheet retained at full resolution as importer source-of-truth; its deleted derived atlas is no longer a runtime reference."
     },
     {
       "path": "assets/fuentekelo.PNG",
-      "scope": "unadopted-archive",
-      "reason": "Original Kelo-uploaded fountain source retained untouched; LIVE uses the deterministic alpha-clean derivative fuentekelo-runtime.PNG."
+      "scope": "source-sheet",
+      "reason": "Original Kelo-uploaded fountain source retained untouched; LIVE uses the deterministic alpha-clean derivative assets/fuentekelo-runtime.PNG."
     },
     {
       "path": "assets/plaza.PNG",
@@ -24,7 +24,12 @@
     {
       "path": "assets/cesped.PNG",
       "scope": "source-sheet",
-      "reason": "Original Kelo-uploaded HD grass sheet retained as visual source-of-truth; LIVE renders the deterministic mobile runtime atlas cesped-runtime.png."
+      "reason": "Original Kelo-uploaded HD grass sheet retained as visual source-of-truth; LIVE uses assets/cesped-runtime.PNG."
+    },
+    {
+      "path": "assets/cespedsindivisiones.PNG",
+      "scope": "source-sheet-pending",
+      "reason": "Kelo-uploaded PNG retained without runtime adoption until it is explicitly processed and integrated through the art pipeline."
     }
   ]
 }
