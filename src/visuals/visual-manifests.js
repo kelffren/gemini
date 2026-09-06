@@ -15,6 +15,11 @@
     sword_swap_activation_eye_asset: Object.freeze({
       id: 'sword_swap_activation_eye_asset', type: 'image',
       src: 'assets/fx/sword-swap/activation-eye.PNG', preload: true
+    }),
+    sword_swap_activation_eye_anim_asset: Object.freeze({
+      id: 'sword_swap_activation_eye_anim_asset', type: 'image',
+      src: 'assets/fx/sword-swap/activation-eye-anim.PNG', preload: true,
+      frameWidth: 512, frameHeight: 512, columns: 3, rows: 2, frames: 6
     })
   });
 
@@ -77,6 +82,12 @@
       id: 'sword_swap_activation_eye', type: 'static_sprite', assetId: 'sword_swap_activation_eye_asset',
       space: 'ACTOR', layer: 'actorFrontFX', socket: 'head', duration: 0.35, loop: false,
       width: 72, height: 72, alpha: 1
+    }),
+    sword_swap_activation_eye_anim: Object.freeze({
+      id: 'sword_swap_activation_eye_anim', type: 'sprite_animation', assetId: 'sword_swap_activation_eye_anim_asset',
+      frameWidth: 512, frameHeight: 512, columns: 3, rows: 2, frames: 6, fps: 12,
+      space: 'ACTOR', layer: 'actorFrontFX', socket: 'head', duration: 0.5, loop: false,
+      width: 92, height: 92, offset: Object.freeze({ x: 0, y: -10 }), alpha: 1, fadeOut: false
     })
   });
 
@@ -134,6 +145,12 @@
       cues: Object.freeze([
         Object.freeze({ at: 0, type: 'fx', ref: 'sword_swap_activation_eye', socket: 'head' })
       ])
+    }),
+    sequence_sword_swap_activation_eye_anim: Object.freeze({
+      id: 'sequence_sword_swap_activation_eye_anim', duration: 500,
+      cues: Object.freeze([
+        Object.freeze({ at: 0, type: 'fx', ref: 'sword_swap_activation_eye_anim', socket: 'head' })
+      ])
     })
   });
 
@@ -147,7 +164,7 @@
     }),
     ability_visual_sword_swap_01: Object.freeze({
       id: 'ability_visual_sword_swap_01', abilityKey: 'swap_sword',
-      castSequence: 'sequence_sword_swap_activation_eye'
+      castSequence: 'sequence_sword_swap_activation_eye_anim'
     })
   });
 
@@ -157,7 +174,7 @@
   });
 
   root.KELO_VISUAL_MANIFESTS = Object.freeze({
-    version: 'visual-manifests-v1.1.0',
+    version: 'visual-manifests-v1.2.0',
     assets: ASSETS,
     animationClips: ANIMATION_CLIPS,
     fx: FX,
