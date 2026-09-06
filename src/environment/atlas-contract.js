@@ -22,7 +22,7 @@
   });
 
   const ROLE_BY_KEY=Object.freeze({
-    plaza:'core',plazaGround:'core',transitions:'core',grassVariation:'core',marbleVariation:'core',plazaNature:'core',
+    cesped:'core',plaza:'core',plazaGround:'core',transitions:'core',grassVariation:'core',marbleVariation:'core',plazaNature:'core',
     trainingDummy:'optional',plazaNpcs:'optional',
     ruralSoil:'district',ruralProps:'district',ruralLandmarks:'district',ruralNature:'district',
     gardensBase:'district',gardensJoins:'district',luxeBoutique:'optional'

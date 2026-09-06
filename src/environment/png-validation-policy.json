@@ -60,6 +60,11 @@
       "path": "assets/tileset.png",
       "scope": "superseded-archive",
       "reason": "Legacy tileset retained for history; LIVE TileRegistry uses tileset-vclean.png."
+    },
+    {
+      "path": "assets/cesped.PNG",
+      "scope": "source-sheet",
+      "reason": "Original Kelo-uploaded HD grass sheet retained as visual source-of-truth; LIVE renders the deterministic mobile runtime atlas cesped-runtime.png."
     }
   ]
 }

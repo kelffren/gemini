@@ -10,6 +10,10 @@
     id:'plaza-core', src:assetSrc('assets/tileset-vclean.png?art=131',512,512), width:512, height:512,
     tileWidth:TILE, tileHeight:TILE, columns:16
   });
+  const cespedAtlas = Object.freeze({
+    id:'cesped-hd', src:'assets/cesped-runtime.png?art=501', width:160, height:160,
+    tileWidth:TILE, tileHeight:TILE, columns:5, tileCount:25, family:'ground_grass'
+  });
   const transitionAtlas = Object.freeze({
     id:'plaza-transitions', src:assetSrc('assets/plaza-transitions-v3.png?art=142',128,128), width:128, height:128,
     tileWidth:TILE, tileHeight:TILE, columns:4
@@ -205,6 +209,7 @@
     plazaNpcs:Object.freeze({mode:'registry-authored-npc-visual-v1',asset:'plazaNpcs',preserveGameplayAnchors:true,labelMode:'proximity-name-v1',visualOnly:true}),
     propDepth:Object.freeze({mode:'y-occlusion-overlay-v1',localActorIntersection:true,frontOccluders:Object.freeze(['fountain','column','tree','lamp'])}),
     architecture:Object.freeze({mode:'authored-layered-raster-v1',depthMode:'building-base-y-occlusion-v1',actorClip:true,prefabContract:'registry-asset-placement-collision-v1',rendererMode:'generic-prefab-list-v1'}),
+    surfaceGround:Object.freeze({mode:'rebuild-hd-grass-v1',asset:'cesped',baseFrames:Object.freeze([1,7,12,21]),detailFrames:Object.freeze([0,2,6,10,16,19,24]),detailModulo:11}),
     districtGround:Object.freeze({mode:'district-profile-v1',profiles:districtGroundStyles,grassMode:'authored-eight-variant-atlas-v1'}),
     ruralFarm:Object.freeze({
       mode:'authored-nine-slice-v1',
@@ -230,8 +235,8 @@
     })
   });
   window.KELO_TILE_REGISTRY = Object.freeze({
-    version:'1.12.1', worldTileSize:TILE,
-    atlases:Object.freeze({plaza:atlas,plazaGround:plazaGroundAtlas,transitions:transitionAtlas,grassVariation:grassVariationAtlas,marbleVariation:marbleVariationAtlas,plazaNature:plazaNatureAtlas,trainingDummy:trainingDummyAtlas,plazaNpcs:plazaNpcsAtlas,ruralSoil:ruralSoilAtlas,ruralProps:ruralPropsAtlas,ruralLandmarks:ruralLandmarksAtlas,ruralNature:ruralNatureAtlas}),
+    version:'1.13.0', worldTileSize:TILE,
+    atlases:Object.freeze({cesped:cespedAtlas,plaza:atlas,plazaGround:plazaGroundAtlas,transitions:transitionAtlas,grassVariation:grassVariationAtlas,marbleVariation:marbleVariationAtlas,plazaNature:plazaNatureAtlas,trainingDummy:trainingDummyAtlas,plazaNpcs:plazaNpcsAtlas,ruralSoil:ruralSoilAtlas,ruralProps:ruralPropsAtlas,ruralLandmarks:ruralLandmarksAtlas,ruralNature:ruralNatureAtlas}),
     architectureAssets,architecturePrefabs,plazaNatureProps,trainingDummyProp,plazaNpcVisuals,
     tiles,ruralTiles,ruralPropTiles,ruralLandmarkTiles,ruralLandmarkSprites,ruralNatureTiles,ruralNatureSprites,families,transitionMasks,styles
   });
