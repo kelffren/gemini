@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 
 const context={window:{KELO_RURAL_NATURE_ATLAS:{width:256,height:128,tiles:{},treeFamilies:{}}},console};
 vm.createContext(context);
-for(const file of ['src/environment/terrain-contract.js','src/environment/tile-registry.js']){
+for(const file of ['src/environment/terrain-contract.js','src/environment/generated/arboleskelo1-atlas.js','src/environment/tile-registry.js']){
   vm.runInContext(fs.readFileSync(file,'utf8'),context,{filename:file});
 }
 const C=context.window.KELO_TERRAIN_CONTRACT;
@@ -69,4 +69,5 @@ assert(!world.includes('function roadMask('),'legacy marble-specific roadMask mu
 
 const index=fs.readFileSync('index.html','utf8');
 assert(index.indexOf('terrain-contract.js')<index.indexOf('world-map.js'),'terrain contract must load before world renderer');
+assert(index.indexOf('generated/arboleskelo1-atlas.js')<index.indexOf('tile-registry.js'),'tree atlas metadata must load before TileRegistry');
 console.log('PASS terrain contract',C.version,Object.keys(C.materials).length,'materials',Object.keys(C.transitions).length,'transition sets',Object.keys(C.profiles).length,'profiles','synthetic extension OK');
