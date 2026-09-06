@@ -127,7 +127,7 @@ def patch_prop_contract() -> None:
             continue
         filtered.append(line)
         if "ruralProps:Object.freeze" in line and not inserted_asset:
-            filtered.append("    plazaFountainKelo:Object.freeze({id:'plazaFountainKelo',src:'assets/fuentekelo-runtime.png?art=401',width:1312,height:1199,frameWidth:1312,frameHeight:1199,columns:1}),")
+            filtered.append("    plazaFountainKelo:Object.freeze({id:'plazaFountainKelo',src:'assets/fuentekelo-runtime.PNG?art=401',width:1312,height:1199,frameWidth:1312,frameHeight:1199,columns:1}),")
             inserted_asset = True
         if line.strip() == '});' and 'const assets=Object.freeze({' in '\n'.join(filtered[-8:]) and not inserted_prop:
             pass
@@ -266,7 +266,7 @@ def patch_manifest_and_policy() -> None:
         'id': 'fuentekelo-v1',
         'family': 'plaza-fountain',
         'version': '1.0.0',
-        'path': 'assets/fuentekelo-runtime.png',
+        'path': 'assets/fuentekelo-runtime.PNG',
         'kind': 'landmark-prop',
         'width': 1312,
         'height': 1199,
@@ -305,20 +305,20 @@ def patch_index_and_ci() -> None:
     text = text.replace('src/environment/prop-contract.js?v=5', 'src/environment/prop-contract.js?v=6')
     text = text.replace('src/environment/generic-props.js?v=5', 'src/environment/generic-props.js?v=6')
     text = text.replace('src/environment/plaza-depth.js?v=218', 'src/environment/plaza-depth.js?v=219')
-    if 'assets/fuentekelo-runtime.png?art=401' not in text:
-        text = text.replace('<link rel="preload" as="image" href="assets/plaza-ground-v1.png?art=193" fetchpriority="high">', '<link rel="preload" as="image" href="assets/plaza-ground-v1.png?art=193" fetchpriority="high">\n  <link rel="preload" as="image" href="assets/fuentekelo-runtime.png?art=401" fetchpriority="high">')
+    if 'assets/fuentekelo-runtime.PNG?art=401' not in text:
+        text = text.replace('<link rel="preload" as="image" href="assets/plaza-ground-v1.png?art=193" fetchpriority="high">', '<link rel="preload" as="image" href="assets/plaza-ground-v1.png?art=193" fetchpriority="high">\n  <link rel="preload" as="image" href="assets/fuentekelo-runtime.PNG?art=401" fetchpriority="high">')
     write_text(index_path, text)
 
     ci_path = ROOT / '.github/workflows/ci.yml'
     ci = ci_path.read_text(encoding='utf-8')
-    ci = ci.replace('          test -f assets/plaza-fountain-back.PNG\n          test -f assets/plaza-fountain-front.PNG', '          test -f assets/fuentekelo-runtime.png')
+    ci = ci.replace('          test -f assets/plaza-fountain-back.PNG\n          test -f assets/plaza-fountain-front.PNG', '          test -f assets/fuentekelo-runtime.PNG')
     ci = ci.replace("grep -q \"version:'1.5.0'\" src/environment/prop-contract.js", "grep -q \"version:'1.6.0'\" src/environment/prop-contract.js")
     ci = ci.replace('grep -q "generic-prop-contract-v5" src/environment/prop-contract.js', 'grep -q "generic-prop-contract-v6-reset-centerpiece" src/environment/prop-contract.js')
     ci = ci.replace('          grep -q "plazaFountainBack" src/environment/prop-contract.js\n          grep -q "plazaFountainFront" src/environment/prop-contract.js', '          grep -q "plazaFountainKelo" src/environment/prop-contract.js\n          grep -q "visibleDuringReset:true" src/environment/prop-contract.js')
     ci = ci.replace('grep -q "generic-props-v1.6" src/environment/generic-props.js', 'grep -q "generic-props-v1.7" src/environment/generic-props.js')
     ci = ci.replace('grep -q "data-driven-props-v5-irregular-frames" src/environment/generic-props.js', 'grep -q "data-driven-props-v6-reset-visible" src/environment/generic-props.js')
     ci = ci.replace('          grep -q "plaza-fountain-v2.0" src/environment/plaza-depth.js\n          grep -q "generic-prop-contract-v1" src/environment/plaza-depth.js\n          grep -q "formal-back-front-layer-stack-v1" src/environment/plaza-depth.js\n          grep -q "backLayer:\'props_back\'" src/environment/plaza-depth.js\n          grep -q "frontLayer:\'props_front\'" src/environment/plaza-depth.js\n          grep -q "renderWrapped:false" src/environment/plaza-depth.js\n          grep -q "postActorBridgeRestored:false" src/environment/plaza-depth.js', '          grep -q "plaza-fountain-v3.0" src/environment/plaza-depth.js\n          grep -q "generic-prop-contract-v1" src/environment/plaza-depth.js\n          grep -q "single-front-layer-with-actor-redraw-v1" src/environment/plaza-depth.js\n          grep -q "frontLayer:\'props_front\'" src/environment/plaza-depth.js\n          grep -q "renderWrapped:false" src/environment/plaza-depth.js\n          grep -q "decorationResetVisible:true" src/environment/plaza-depth.js')
-    ci = ci.replace("('assets/plaza-fountain-back.PNG',(1254,1254)),('assets/plaza-fountain-front.PNG',(1254,1254))", "('assets/fuentekelo-runtime.png',(1312,1199))")
+    ci = ci.replace("('assets/plaza-fountain-back.PNG',(1254,1254)),('assets/plaza-fountain-front.PNG',(1254,1254))", "('assets/fuentekelo-runtime.PNG',(1312,1199))")
     ci = ci.replace("if 'plaza-fountain-' in path:", "if 'fuentekelo-runtime' in path:")
     write_text(ci_path, ci)
 

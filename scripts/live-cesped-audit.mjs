@@ -20,7 +20,7 @@ const state=await page.evaluate(async()=>{
   const env=window.KELO_ENVIRONMENT_LAYER_AUDIT||null;
   const props=window.KELO_GENERIC_PROP_AUDIT||null;
   const canvas=document.querySelector('#game-canvas');
-  const status=await fetch('assets/cesped-runtime.png?art=501',{cache:'no-store'}).then(r=>r.status).catch(()=>0);
+  const status=await fetch('assets/cesped-runtime.PNG?art=501',{cache:'no-store'}).then(r=>r.status).catch(()=>0);
   let samples=[];
   try{
     const g=canvas.getContext('2d'),w=canvas.width,h=canvas.height;

@@ -5,7 +5,7 @@ from PIL import Image, ImageFilter
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / 'assets/cesped.PNG'
-RUNTIME = ROOT / 'assets/cesped-runtime.png'
+RUNTIME = ROOT / 'assets/cesped-runtime.PNG'
 COLS = ROWS = 5
 CELL = 32
 ART = '501'
@@ -89,7 +89,7 @@ def patch_registry():
     marker = "  const transitionAtlas = Object.freeze({"
     block = (
         "  const cespedAtlas = Object.freeze({\n"
-        "    id:'cesped-hd', src:'assets/cesped-runtime.png?art=501', width:160, height:160,\n"
+        "    id:'cesped-hd', src:'assets/cesped-runtime.PNG?art=501', width:160, height:160,\n"
         "    tileWidth:TILE, tileHeight:TILE, columns:5, tileCount:25, family:'ground_grass'\n"
         "  });\n"
     )
@@ -154,9 +154,9 @@ def patch_surface_ground():
 def patch_manifest():
     path = ROOT / 'src/environment/art-asset-manifest.json'
     data = json.loads(path.read_text(encoding='utf-8'))
-    assets = [a for a in data.get('assets', []) if a.get('id') != 'cesped-ground-v1' and a.get('path') != 'assets/cesped-runtime.png']
+    assets = [a for a in data.get('assets', []) if a.get('id') != 'cesped-ground-v1' and a.get('path') != 'assets/cesped-runtime.PNG']
     assets.append({
-        'id':'cesped-ground-v1','family':'ground_grass','version':'1.0.0','path':'assets/cesped-runtime.png','kind':'ground-atlas',
+        'id':'cesped-ground-v1','family':'ground_grass','version':'1.0.0','path':'assets/cesped-runtime.PNG','kind':'ground-atlas',
         'width':160,'height':160,'requireAlpha':False,'sampling':'nearest','padding':0,'spacing':0,
         'frames':{'mode':'grid','count':25},'cellWidth':32,'cellHeight':32,'columns':5,'rows':5,
         'anchor':{'mode':'tile-origin'},'visualBounds':{'mode':'cell'},'footprint':{'mode':'none'},'collider':{'mode':'none'},
@@ -179,11 +179,11 @@ def patch_png_policy():
 def patch_index():
     path = ROOT / 'index.html'
     text = path.read_text(encoding='utf-8')
-    if 'assets/cesped-runtime.png?art=501' not in text:
-        marker = '<link rel="preload" as="image" href="assets/fuentekelo-runtime.png?art=401" fetchpriority="high">'
+    if 'assets/cesped-runtime.PNG?art=501' not in text:
+        marker = '<link rel="preload" as="image" href="assets/fuentekelo-runtime.PNG?art=401" fetchpriority="high">'
         if marker not in text:
             raise RuntimeError('fountain preload marker missing')
-        text = text.replace(marker, marker + '\n  <link rel="preload" as="image" href="assets/cesped-runtime.png?art=501" fetchpriority="high">', 1)
+        text = text.replace(marker, marker + '\n  <link rel="preload" as="image" href="assets/cesped-runtime.PNG?art=501" fetchpriority="high">', 1)
     if 'src/environment/surface-ground.js' not in text:
         marker = '<script src="src/environment/environment-layer-stack.js?v=4"></script>'
         if marker not in text:

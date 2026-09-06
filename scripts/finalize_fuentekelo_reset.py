@@ -72,7 +72,7 @@ def prune_manifest(text):
     kept = []
     for asset in data.get('assets', []):
         path = asset.get('path')
-        if path == 'assets/fuentekelo-runtime.png':
+        if path == 'assets/fuentekelo-runtime.PNG':
             kept.append(asset)
             continue
         if path and (ROOT / path).exists():

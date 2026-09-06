@@ -1,3 +1,9 @@
+/* KELO-INDEX
+ * area: PLAZA
+ * keys: TILES REGISTRY ASSET PNG TERRAIN
+ * hace: registra atlas, familias, estilos y prefabs visuales del mundo
+ * online: N/A; metadata visual cliente
+ */
 (function () {
   const TILE = 32;
   const RESET = window.KELO_WORLD_DECORATION_RESET === true;
@@ -11,7 +17,7 @@
     tileWidth:TILE, tileHeight:TILE, columns:16
   });
   const cespedAtlas = Object.freeze({
-    id:'cesped-hd', src:'assets/cesped-runtime.png?art=501', width:160, height:160,
+    id:'cesped-hd', src:'assets/cesped-runtime.PNG?art=501', width:160, height:160,
     tileWidth:TILE, tileHeight:TILE, columns:5, tileCount:25, family:'ground_grass'
   });
   const transitionAtlas = Object.freeze({

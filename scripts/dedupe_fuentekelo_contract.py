@@ -2,7 +2,7 @@ from pathlib import Path
 
 p = Path(__file__).resolve().parents[1] / 'src/environment/prop-contract.js'
 text = p.read_text(encoding='utf-8')
-needle = "    plazaFountainKelo:Object.freeze({id:'plazaFountainKelo',src:'assets/fuentekelo-runtime.png?art=401',width:1312,height:1199,frameWidth:1312,frameHeight:1199,columns:1}),"
+needle = "    plazaFountainKelo:Object.freeze({id:'plazaFountainKelo',src:'assets/fuentekelo-runtime.PNG?art=401',width:1312,height:1199,frameWidth:1312,frameHeight:1199,columns:1}),"
 lines = text.splitlines()
 out = []
 seen = False
