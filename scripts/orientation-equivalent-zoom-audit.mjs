@@ -3,7 +3,7 @@ import fs from 'node:fs';
 
 const url=process.env.AUDIT_URL||'http://127.0.0.1:8000/';
 fs.mkdirSync('artifacts',{recursive:true});
-const browser=await chromium.launch({headless:true});
+const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_BIN||'/usr/bin/google-chrome'});
 const context=await browser.newContext({viewport:{width:390,height:844},hasTouch:true,isMobile:true});
 const page=await context.newPage();
 const errors=[];
