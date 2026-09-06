@@ -39,6 +39,7 @@ No uses `/*` para apagar código. Los comentarios solo documentan.
 | WORLD CHUNKS | renderer 512 | `src/environment/world-map.js` |
 | LUXE BOUTIQUE | tienda | `src/environment/luxe-kiosk-atlas.js` `src/ui/luxe-boutique.js` |
 | HUD LUXE | shell menú | `src/ui/luxe-shell.js` |
+| MOBILE ORIENTATION | vertical/horizontal, viewport y botón GIRAR | `src/ui/mobile-orientation.js` |
 | STONES RECIPE | piedras data-driven | `src/abilities/stone-system.js` `abilityData.js` |
 | CAST ABILITY | delivery VFX/daño cliente | `src/abilities/kelo-ability-boot.js` |
 | NET WS POSE | online room | `engine-net.js` |
@@ -63,6 +64,7 @@ KELO-INDEX NET
 KELO-INDEX CAST
 KELO-INDEX MOVE
 KELO-INDEX PROPERTY
+KELO-INDEX UI
 ```
 
 ## INSTANCE SYSTEM V1
@@ -77,3 +79,9 @@ KELO-INDEX PROPERTY
 - `src/systems/admin-key-system.js`: objeto/entitlement Llave Admin, scopes y autoridad reemplazable.
 - `src/ui/property-editor.js`: modo MUNDO visible únicamente con `world.edit`.
 - Parcela de jugador conserva unidades/ownership; Llave Admin no altera esa economía.
+
+## MOBILE ORIENTATION V1
+- `src/ui/mobile-orientation.js`: detecta portrait/landscape, sincroniza `innerWidth/innerHeight` con canvas/UI y expone `KELO_ORIENTATION`.
+- Botón `↻ GIRAR` vive en el rail móvil de Luxe; intenta `ScreenOrientation.lock()` cuando el navegador lo permite.
+- iOS/WebKit u otros navegadores sin lock conservan fallback seguro: giro físico + reajuste automático.
+- `scripts/mobile-orientation-audit.mjs`: certifica 390×844 y 844×390, cambio dinámico y ausencia de errores.
