@@ -1,9 +1,15 @@
+/* KELO-INDEX
+ * area: CHARACTERS
+ * keys: APPEARANCE PLAYER BOT HERO SPRITE FALLBACK
+ * hace: asigna sprites de apariencia; visual de bot retirado cae al hero existente
+ * online: visual cliente; autoridad de actor fuera de este modulo
+ */
 (function () {
   'use strict';
 
   const VERSION = 'character-appearance-v2.0.0';
   const DEFAULT_PLAYER = 'player_hero_v1';
-  const DEFAULT_BOT = window.KELO_WORLD_DECORATION_RESET === true ? DEFAULT_PLAYER : 'bot_crimson_v1';
+  const DEFAULT_BOT = DEFAULT_PLAYER;
   const ALPHA_CLEANUP_THRESHOLD = 8;
 
   const definitions = Object.freeze({
@@ -12,7 +18,7 @@
       columns: 4, rows: 4, frameWidth: 256, frameHeight: 384
     }),
     bot_crimson_v1: Object.freeze({
-      id: 'bot_crimson_v1', role: 'bot', source: 'assets/bot-crimson-v1.png?v=1', delegateToLegacyHero: false,
+      id: 'bot_crimson_v1', role: 'bot', source: 'assets/hero.PNG', delegateToLegacyHero: true, retiredVisual: true,
       columns: 4, rows: 4, frameWidth: 256, frameHeight: 384,
       faceRows: Object.freeze({ down: 0, left: 1, right: 2, up: 3 }),
       mirrorFaces: Object.freeze({ down: false, left: false, right: false, up: false }),

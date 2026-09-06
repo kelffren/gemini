@@ -1,10 +1,16 @@
+/* KELO-INDEX
+ * area: WORLD
+ * keys: DISTRICT DECALS RESET RETIRED ATLAS
+ * hace: conserva contrato de decals sin cargar el sheet eliminado durante el reset visual
+ * online: N/A; metadata visual cliente
+ */
 (function(){
   'use strict';
   const R=window.KELO_TILE_REGISTRY;
   if(!R){console.error('[Kelo district decals] tile registry missing');return;}
   if(typeof camera!=='undefined'&&!window.camera)window.camera=camera;
   const atlas=Object.freeze({
-    id:'district-decals',src:'assets/district-decals-v1.png?art=241',width:256,height:32,
+    id:'district-decals',src:"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='256' height='32'/%3E",retiredVisual:true,width:256,height:32,
     tileWidth:32,tileHeight:32,columns:8,tileCount:8,family:'decals',runtimeFormat:'png'
   });
   const tiles=Object.freeze({
