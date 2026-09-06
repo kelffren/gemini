@@ -387,23 +387,36 @@
     let sx = 0, sy = 0;
     let sw = image.width || 32, sh = image.height || 32;
     if (def.type === 'sprite_animation') {
-      const frameWidth = Math.max(1, Number(def.frameWidth) || sw);
-      const frameHeight = Math.max(1, Number(def.frameHeight) || sh);
-      const columns = Math.max(1, Number(def.columns) || Math.floor(sw / frameWidth) || 1);
-      const rows = Math.max(1, Number(def.rows) || Math.floor(sh / frameHeight) || 1);
-      const available = Math.max(1, columns * rows);
-      const frameCount = Math.max(1, Math.min(Number(def.frames) || available, available));
+      const rects = Array.isArray(def.frameRects) ? def.frameRects : null;
       const fps = Math.max(0.001, Number(def.fps) || 12);
-      const rawFrame = Math.floor(item.elapsed * fps);
-      const frame = item.loop ? rawFrame % frameCount : Math.min(frameCount - 1, rawFrame);
-      sx = (frame % columns) * frameWidth;
-      sy = Math.floor(frame / columns) * frameHeight;
-      sw = frameWidth;
-      sh = frameHeight;
+      if (rects && rects.length) {
+        const frameCount = Math.max(1, Math.min(Number(def.frames) || rects.length, rects.length));
+        const rawFrame = Math.floor(item.elapsed * fps);
+        const frame = item.loop ? rawFrame % frameCount : Math.min(frameCount - 1, rawFrame);
+        const rect = rects[frame] || rects[0];
+        sx = Math.max(0, Number(rect.x) || 0);
+        sy = Math.max(0, Number(rect.y) || 0);
+        sw = Math.max(1, Number(rect.width) || sw);
+        sh = Math.max(1, Number(rect.height) || sh);
+      } else {
+        const frameWidth = Math.max(1, Number(def.frameWidth) || sw);
+        const frameHeight = Math.max(1, Number(def.frameHeight) || sh);
+        const columns = Math.max(1, Number(def.columns) || Math.floor(sw / frameWidth) || 1);
+        const rows = Math.max(1, Number(def.rows) || Math.floor(sh / frameHeight) || 1);
+        const available = Math.max(1, columns * rows);
+        const frameCount = Math.max(1, Math.min(Number(def.frames) || available, available));
+        const rawFrame = Math.floor(item.elapsed * fps);
+        const frame = item.loop ? rawFrame % frameCount : Math.min(frameCount - 1, rawFrame);
+        sx = (frame % columns) * frameWidth;
+        sy = Math.floor(frame / columns) * frameHeight;
+        sw = frameWidth;
+        sh = frameHeight;
+      }
     }
 
-    const width = (Number(def.width) || sw || 32) * item.scale;
-    const height = (Number(def.height) || sh || 32) * item.scale;
+    const sourcePixelScale = Math.max(0, Number(def.sourcePixelScale) || 0);
+    const width = (sourcePixelScale ? sw * sourcePixelScale : (Number(def.width) || sw || 32)) * item.scale;
+    const height = (sourcePixelScale ? sh * sourcePixelScale : (Number(def.height) || sh || 32)) * item.scale;
     const alpha = Math.max(0, Number(def.alpha == null ? 1 : def.alpha));
     g.globalAlpha = alpha;
     g.imageSmoothingEnabled = false;
@@ -521,8 +534,8 @@
 
   root.KeloFXRegistry = Object.freeze({ version: 'fx-registry-v1.1.0', get: function (id) { return fxDefs.get(String(id || '')) || null; }, list: function () { return Array.from(fxDefs.values()); }, register: function (def) { return registerInto(fxDefs, def, 'FX'); } });
   root.KeloFX = Object.freeze({ version: 'fx-runtime-v1.1.0', spawn: spawnFx, stop: stopFx, update: updateFx, drawLayer: drawLayer, drawActorLayer: drawActorLayer, metrics: fxMetrics });
-  root.KeloProjectileVisualRegistry = Object.freeze({ version: 'projectile-visual-registry-v1.1.0', get: function (id) { return projectileDefs.get(String(id || '')) || null; }, list: function () { return Array.from(projectileDefs.values()); }, register: function (def) { return registerInto(projectileDefs, def, 'PROJECTILE_VISUAL'); } });
-  root.KeloProjectileVisuals = Object.freeze({ version: 'projectile-visual-runtime-v1.1.0', attach: attachProjectile, preview: previewProjectile, stop: stopProjectile, update: updateProjectiles, drawLayer: drawProjectileLayer, metrics: projectileMetrics });
+  root.KeloProjectileVisualRegistry = Object.freeze({ version: 'projectile-visual-registry-v1.1.1', get: function (id) { return projectileDefs.get(String(id || '')) || null; }, list: function () { return Array.from(projectileDefs.values()); }, register: function (def) { return registerInto(projectileDefs, def, 'PROJECTILE_VISUAL'); } });
+  root.KeloProjectileVisuals = Object.freeze({ version: 'projectile-visual-runtime-v1.1.1', attach: attachProjectile, preview: previewProjectile, stop: stopProjectile, update: updateProjectiles, drawLayer: drawProjectileLayer, metrics: projectileMetrics });
   root.KeloSFXRegistry = Object.freeze({ version: 'sfx-registry-v1.0.0', get: function (id) { return sfxDefs.get(String(id || '')) || null; }, list: function () { return Array.from(sfxDefs.values()); }, register: function (def) { return registerInto(sfxDefs, def, 'SFX'); } });
   root.KeloSFX = Object.freeze({ version: 'sfx-runtime-v1.0.0', play: playSfx });
   root.KeloScreenFX = Object.freeze({ version: 'screen-fx-v1.0.0', get: function (id) { return screenDefs.get(String(id || '')) || null; }, shake: shake, flash: flash, play: spawnScreen, update: updateScreen, draw: drawScreen, worldOffset: worldOffset, applyWorldTransform: applyWorldTransform });

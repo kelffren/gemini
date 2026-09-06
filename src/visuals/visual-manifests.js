@@ -103,12 +103,21 @@
       defaultSpeed: 420, defaultMaxDistance: 500
     }),
     sword_swap_katana_throw_visual: Object.freeze({
-      id: 'sword_swap_katana_throw_visual', type: 'sprite_animation',
-      assetId: 'sword_swap_katana_throw_asset', layer: 'worldFX',
-      frameWidth: 362, frameHeight: 724, columns: 6, rows: 1, frames: 6, fps: 12, loop: true,
-      width: 126, height: 252, alpha: 1, alignToVelocity: true, rotationOffset: 0,
-      defaultSpeed: 720, defaultMaxDistance: 420
-    })
+    id: 'sword_swap_katana_throw_visual', type: 'sprite_animation',
+    assetId: 'sword_swap_katana_throw_asset', layer: 'worldFX',
+    frames: 6, fps: 12, loop: true,
+    frameRects: Object.freeze([
+      Object.freeze({ x: 16, y: 299, width: 290, height: 119 }),
+      Object.freeze({ x: 333, y: 299, width: 302, height: 123 }),
+      Object.freeze({ x: 661, y: 277, width: 321, height: 159 }),
+      Object.freeze({ x: 997, y: 273, width: 365, height: 190 }),
+      Object.freeze({ x: 1373, y: 271, width: 385, height: 188 }),
+      Object.freeze({ x: 1768, y: 248, width: 394, height: 260 })
+    ]),
+    sourcePixelScale: 0.348, width: 140, height: 94,
+    alpha: 1, alignToVelocity: true, rotationOffset: 0,
+    defaultSpeed: 720, defaultMaxDistance: 420
+  })
   });
 
   const SFX = Object.freeze({
@@ -187,7 +196,7 @@
   });
 
   root.KELO_VISUAL_MANIFESTS = Object.freeze({
-    version: 'visual-manifests-v1.3.0',
+    version: 'visual-manifests-v1.3.1',
     assets: ASSETS,
     animationClips: ANIMATION_CLIPS,
     fx: FX,
