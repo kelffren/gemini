@@ -1,13 +1,13 @@
 /* KELO-INDEX
  * area: AUTH
- * keys: ADMIN KEY WORLD EDIT CREATOR PERMISSION BACKPACK OFFLINE ONLINE READY
- * hace: modela Llave Admin como entitlement/objeto bound y decide capacidades de edición del mundo
+ * keys: ADMIN KEY WORLD EDIT CREATOR PERMISSION BACKPACK WORLD BUILDER OFFLINE ONLINE READY
+ * hace: modela Llave Admin como entitlement/objeto bound, decide capacidades y arranca las herramientas de autor del mundo
  * online: request() e installRemoteAdapter() permiten sustituir la autoridad local por servidor sin cambiar UI
  */
 (function(){
 'use strict';
 
-const VERSION='admin-key-v1.0.0';
+const VERSION='admin-key-v1.1.0';
 const SCHEMA=1;
 const STORAGE='kelo_admin_keys_v1';
 const TEMPLATE_ID='admin-key';
@@ -84,6 +84,10 @@ async function localRequest(op,payload){
 async function request(op,payload){if(remoteAdapter&&typeof remoteAdapter.request==='function')return remoteAdapter.request(op,payload||{});return localRequest(op,payload||{});}
 function installRemoteAdapter(adapter){if(adapter&&typeof adapter.request!=='function')throw new Error('INVALID_ADMIN_KEY_ADAPTER');remoteAdapter=adapter||null;}
 function assert(scope,ownerId){requireScope(scope,String(ownerId||playerId()));return true;}
+function loadAuthorTools(){
+  if(document.getElementById('kelo-world-builder-system-loader'))return;
+  const system=document.createElement('script');system.id='kelo-world-builder-system-loader';system.src='src/environment/world-builder-system.js?v=1';system.onload=()=>{if(document.getElementById('kelo-world-builder-ui-loader'))return;const ui=document.createElement('script');ui.id='kelo-world-builder-ui-loader';ui.src='src/ui/world-builder-ui.js?v=1';document.head.appendChild(ui);};document.head.appendChild(system);
+}
 
 window.KELO_ADMIN_KEYS=Object.freeze({
   version:VERSION,
@@ -100,9 +104,10 @@ window.KELO_ADMIN_KEYS=Object.freeze({
   onChange(fn){if(typeof fn!=='function')return()=>{};listeners.add(fn);return()=>listeners.delete(fn);},
   authoritySource:()=>remoteAdapter?'remote-adapter':'local-prototype'
 });
-window.KELO_ADMIN_KEY_AUDIT=Object.freeze({version:VERSION,itemIdentity:true,bound:true,scopedPermissions:true,serverReplaceable:true,uiTrustOnlyOffline:true});
+window.KELO_ADMIN_KEY_AUDIT=Object.freeze({version:VERSION,itemIdentity:true,bound:true,scopedPermissions:true,serverReplaceable:true,uiTrustOnlyOffline:true,worldBuilderBoot:true});
 
 const params=new URLSearchParams(location.search);
 if(params.get('mapEditor')==='1')request('admin-key:bootstrap-local-root',{actorId:playerId(),ownerId:playerId(),developer:true}).then(syncWhenReady).catch(console.error);else syncWhenReady();
 window.addEventListener('load',syncWhenReady,{once:true});
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',loadAuthorTools,{once:true});else loadAuthorTools();
 })();
