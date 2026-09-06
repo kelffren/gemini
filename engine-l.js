@@ -36,7 +36,9 @@
     tileSize: TILE,
     layeredTransitions: true,
     authoredTransitions: true,
-    propsDisabled: true
+    propsDisabled: true,
+    decorationReset: window.KELO_WORLD_DECORATION_RESET === true,
+    decorationResetSuppressed: window.KELO_WORLD_DECORATION_RESET === true
   };
 
   function inPlaza(o) {
@@ -190,13 +192,19 @@
       window.KELO_PLAZA_AUDIT.worldLayerWrapped=true;
       window.KELO_PLAZA_AUDIT.preActorContractPreserved=typeof base.drawPreActors==='function';
       window.KELO_PLAZA_AUDIT.postActorContractPreserved=typeof base.drawPostActors==='function';
+      window.KELO_PLAZA_AUDIT.decorationReset=base.decorationReset===true||window.KELO_WORLD_DECORATION_RESET===true;
+      window.KELO_PLAZA_AUDIT.decorationResetSuppressed=window.KELO_PLAZA_AUDIT.decorationReset;
       return true;
     }
     const wrapped={
       __keloPlazaGround:true,
+      decorationReset:base.decorationReset===true||window.KELO_WORLD_DECORATION_RESET===true,
       draw(g){
         const ok=base.draw(g);
-        if(ok===true&&floorLayer){
+        const reset=base.decorationReset===true||window.KELO_WORLD_DECORATION_RESET===true;
+        window.KELO_PLAZA_AUDIT.decorationReset=reset;
+        window.KELO_PLAZA_AUDIT.decorationResetSuppressed=reset;
+        if(ok===true&&floorLayer&&!reset){
           g.save();g.imageSmoothingEnabled=false;g.drawImage(floorLayer,PLAZA.x,PLAZA.y);
           if(transitionLayer)g.drawImage(transitionLayer,PLAZA.x,PLAZA.y);
           g.restore();
