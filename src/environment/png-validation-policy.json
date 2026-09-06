@@ -1,5 +1,5 @@
 {
-  "version": "kelo-png-validation-policy-v2",
+  "version": "kelo-png-validation-policy-v1",
   "excludedFromWorldContract": [
     {
       "path": "assets/hero.PNG",
@@ -28,8 +28,8 @@
     },
     {
       "path": "assets/cespedsindivisiones.PNG",
-      "scope": "source-sheet-pending",
-      "reason": "Kelo-uploaded PNG retained without runtime adoption until it is explicitly processed and integrated through the art pipeline."
+      "scope": "source-sheet",
+      "reason": "Kelo-uploaded PNG retained as importer input only; it is not a runtime asset until explicitly processed and integrated."
     }
   ]
 }
