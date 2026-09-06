@@ -1,88 +1,39 @@
-name: One-shot strict PNG case cleanup
+name: One-shot asset integrity baseline
 on:
   push:
     branches: [main]
     paths:
       - '.github/workflows/one-shot-asset-case-cleanup.yml'
 permissions:
-  contents: write
+  contents: read
 jobs:
-  cleanup:
+  audit:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - name: Install image tooling
-        run: python -m pip install --disable-pip-version-check pillow
-      - name: Normalize runtime PNG names and references
+      - name: Current PNG pipeline result
+        continue-on-error: true
+        run: node scripts/validate-png-pipeline.mjs
+      - name: Enumerate missing runtime asset references
         run: |
-          set -euo pipefail
-          git mv assets/fuentekelo-runtime.png assets/fuentekelo-runtime.PNG
-          git mv assets/cesped-runtime.png assets/cesped-runtime.PNG
-          if [ -f assets/fx/sword-swap/README.md ]; then git rm assets/fx/sword-swap/README.md; fi
           python - <<'PY'
           from pathlib import Path
-          import json
+          import re
           root=Path('.')
-          replacements={'assets/fuentekelo-runtime.png':'assets/fuentekelo-runtime.PNG','assets/cesped-runtime.png':'assets/cesped-runtime.PNG'}
-          text_ext={'.js','.mjs','.cjs','.json','.html','.css','.md','.yml','.yaml','.py','.sh'}
-          for p in root.rglob('*'):
-            if not p.is_file() or '.git' in p.parts or p.suffix.lower() not in text_ext: continue
-            if len(p.parts)>=2 and p.parts[0]=='.github' and p.parts[1]=='workflows': continue
-            try: s=p.read_text(encoding='utf-8')
-            except UnicodeDecodeError: continue
-            n=s
-            for old,new in replacements.items(): n=n.replace(old,new)
-            if n!=s: p.write_text(n,encoding='utf-8')
-          policy_path=root/'src/environment/png-validation-policy.json'
-          policy=json.loads(policy_path.read_text())
-          policy['excludedFromWorldContract']=[item for item in policy.get('excludedFromWorldContract',[]) if (root/item['path']).exists()]
-          for item in policy['excludedFromWorldContract']:
-            item['reason']=item['reason'].replace('fuentekelo-runtime.png','fuentekelo-runtime.PNG').replace('cesped-runtime.png','cesped-runtime.PNG')
-          policy_path.write_text(json.dumps(policy,indent=2,ensure_ascii=False)+'\n')
-          headers={
-            root/'src/environment/tile-registry.js':"/* KELO-INDEX\n * area: PLAZA\n * keys: TILES REGISTRY ASSET PNG TERRAIN\n * hace: registra atlas, familias, estilos y prefabs visuales del mundo\n * online: N/A; metadata visual cliente\n */\n",
-            root/'src/environment/prop-contract.js':"/* KELO-INDEX\n * area: PLAZA\n * keys: PROP ASSET PNG FOUNTAIN COLLIDER DEPTH\n * hace: contrato data-driven de props y su metadata visual/espacial\n * online: N/A; props visuales, gameplay permanece fuera del renderer\n */\n",
-          }
-          for p,h in headers.items():
-            s=p.read_text(encoding='utf-8')
-            if 'KELO-INDEX' not in s[:500]: p.write_text(h+s,encoding='utf-8')
+          disk={p.as_posix() for p in (root/'assets').rglob('*') if p.is_file()}
+          refs={}
+          files=[root/'index.html']+[p for p in (root/'src').rglob('*') if p.is_file() and p.suffix.lower() in {'.js','.mjs','.html','.css','.json'}]
+          pat=re.compile(r'assets/[A-Za-z0-9_./-]+\.(?:PNG|png|svg)')
+          for p in files:
+            text=p.read_text(encoding='utf-8',errors='ignore')
+            for ref in pat.findall(text): refs.setdefault(ref,set()).add(p.as_posix())
+          print('ASSET_FILES',len(disk))
+          for p in sorted(disk): print('DISK',p)
+          missing=[]
+          for ref,owners in sorted(refs.items()):
+            state='OK' if ref in disk else 'MISSING'
+            print(state,ref,'owners='+','.join(sorted(owners)))
+            if state=='MISSING': missing.append(ref)
+          print('MISSING_COUNT',len(missing))
           PY
-      - name: Prove strict assets directory
-        run: |
-          set -euo pipefail
-          bad="$(find assets -type f ! -name '*.PNG' -print)"
-          if [ -n "$bad" ]; then echo "Non-.PNG files remain under assets:"; echo "$bad"; exit 1; fi
-          test -f assets/fuentekelo-runtime.PNG
-          test -f assets/cesped-runtime.PNG
-          ! grep -R -n -E 'assets/(fuentekelo-runtime|cesped-runtime)\.png' --exclude-dir=.git --exclude-dir=.github .
-          git diff --check
-      - name: Focused syntax and binary checks
-        run: |
-          node --check src/environment/tile-registry.js
-          node --check src/environment/prop-contract.js
-          python - <<'PY'
-          from PIL import Image
-          for p,size in [('assets/fuentekelo-runtime.PNG',(1312,1199)),('assets/cesped-runtime.PNG',(160,160))]:
-            im=Image.open(p)
-            assert im.size==size,(p,im.size)
-            print('PASS',p,im.size,im.mode)
-          PY
-      - name: Commit normalized asset case
-        run: |
-          set -euo pipefail
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -A
-          git reset .github/workflows/one-shot-asset-case-cleanup.yml
-          git checkout -- .github/workflows/one-shot-asset-case-cleanup.yml
-          if git diff --cached --quiet; then echo 'No cleanup changes'; exit 0; fi
-          git commit -m 'chore: normalize active assets to .PNG'
-          git pull --rebase origin main
-          git push origin HEAD:main
-# trigger: 2026-09-06T00:22-04:00
