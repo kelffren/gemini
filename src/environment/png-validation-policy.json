@@ -7,11 +7,6 @@
       "reason": "Player/UI sprite is outside the Kelo World environment asset contract."
     },
     {
-      "path": "assets/Arboleskelo1.PNG",
-      "scope": "source-sheet",
-      "reason": "Original authored vegetation sheet retained at full resolution as importer source-of-truth; its deleted derived atlas is no longer a runtime reference."
-    },
-    {
       "path": "assets/fuentekelo.PNG",
       "scope": "source-sheet",
       "reason": "Original Kelo-uploaded fountain source retained untouched; LIVE uses the deterministic alpha-clean derivative assets/fuentekelo-runtime.PNG."
