@@ -111,15 +111,3 @@ QA: `scripts/visual-system-contract-audit.js` + `scripts/live-visual-system-audi
 
 Detalle: `docs/VISUAL_SYSTEM.md`.
 <!-- CODE-INDEX-VISUAL-V1:END -->
-
-
-<!-- WORLD-BUILDER-V1:START -->
-## WORLD BUILDER / ADMIN AUTHORING V1
-- `src/environment/world-builder-system.js`: autoridad local reemplazable para overrides de SUELO/CAMINOS y colisiones del mundo principal.
-- `src/environment/world-builder-property-renderer.js`: fallback visual de placements Property cuando Decoration Reset suprime las capas normales; no posee estado.
-- `src/ui/world-builder-ui.js`: UI táctil/desktop `🗝 WORLD BUILDER`; capas SUELO, CAMINOS, OBJETOS y COLISIÓN.
-- `src/property/property-system.js`: continúa siendo la única fuente de verdad para OBJETOS/placements del mundo y parcelas.
-- `src/systems/admin-key-system.js`: única puerta de permisos/scopes de autor.
-- `docs/WORLD_BUILDER_MEMORY.md`: contrato completo, snapshot y migración online.
-- Hoy = `BORRADOR LOCAL`; futuro = `ServerWorldBuilderAuthority → Draft → Review → Publish`.
-<!-- WORLD-BUILDER-V1:END -->

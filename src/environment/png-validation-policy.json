@@ -19,7 +19,7 @@
     {
       "path": "assets/fuentekelo.PNG",
       "scope": "unadopted-archive",
-      "reason": "Manually uploaded fountain candidate is intentionally not adopted by the runtime while the world decoration is reset to a blank canvas."
+      "reason": "Original Kelo-uploaded fountain source retained untouched; LIVE uses the deterministic alpha-clean derivative fuentekelo-runtime.png."
     },
     {
       "path": "assets/plaza-nature-v2.png",
