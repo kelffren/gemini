@@ -17,6 +17,11 @@
       "reason": "Original authored asset sheet is retained at full resolution as importer source-of-truth; LIVE renders the generated irregular atlas instead."
     },
     {
+      "path": "assets/fuentekelo.PNG",
+      "scope": "unadopted-archive",
+      "reason": "Manually uploaded fountain candidate is intentionally not adopted by the runtime while the world decoration is reset to a blank canvas."
+    },
+    {
       "path": "assets/plaza-nature-v2.png",
       "scope": "superseded-archive",
       "reason": "Rejected simplified Plaza vegetation export retained only for history; LIVE uses Arboleskelo1.atlas.png."
