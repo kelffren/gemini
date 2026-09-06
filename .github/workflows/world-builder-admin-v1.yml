@@ -1,4 +1,5 @@
 name: World Builder Admin V1
+# Final certification trigger after synchronizing the current main tree.
 on:
   workflow_dispatch:
   push:
