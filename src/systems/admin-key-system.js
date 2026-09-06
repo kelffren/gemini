@@ -46,13 +46,19 @@ function keyInventoryRow(k){return{
   description:'Permiso especial para construir en el mundo principal de Kelo World.'
 };}
 function syncInventory(){
-  if(typeof STATE==='undefined'||!Array.isArray(STATE.inventory))return;
+  if(typeof STATE==='undefined'||!Array.isArray(STATE.inventory))return false;
   const me=playerId();
   const valid=new Map(activeKeys(me).map(k=>[k.keyId,k]));
   let changed=false;
   for(let i=STATE.inventory.length-1;i>=0;i--){const item=STATE.inventory[i];if(item?.kind==='admin_key'&&item?.templateId===TEMPLATE_ID&&!valid.has(String(item.adminKeyId||item.id||''))){STATE.inventory.splice(i,1);changed=true;}}
   for(const [keyId,k] of valid){const existing=STATE.inventory.find(x=>x?.kind==='admin_key'&&String(x.adminKeyId||x.id||'')===keyId);if(existing){existing.scopes=clone(k.scopes||[]);existing.bound=true;existing.name=k.label||'Llave Admin';}else{STATE.inventory.push(keyInventoryRow(k));changed=true;}}
   if(changed){try{window.KeloBackpack?.ensure?.();}catch(e){};try{if(typeof saveState==='function')saveState();}catch(e){}}
+  return true;
+}
+function syncWhenReady(){
+  if(syncInventory())return;
+  let tries=0;
+  const timer=setInterval(()=>{tries++;if(syncInventory()||tries>=20)clearInterval(timer);},50);
 }
 function requireScope(scope,actorId){if(!can(scope,actorId))throw new Error('ADMIN_KEY_PERMISSION_DENIED');}
 async function localRequest(op,payload){
@@ -97,5 +103,6 @@ window.KELO_ADMIN_KEYS=Object.freeze({
 window.KELO_ADMIN_KEY_AUDIT=Object.freeze({version:VERSION,itemIdentity:true,bound:true,scopedPermissions:true,serverReplaceable:true,uiTrustOnlyOffline:true});
 
 const params=new URLSearchParams(location.search);
-if(params.get('mapEditor')==='1')request('admin-key:bootstrap-local-root',{actorId:playerId(),ownerId:playerId(),developer:true}).catch(console.error);else setTimeout(syncInventory,0);
+if(params.get('mapEditor')==='1')request('admin-key:bootstrap-local-root',{actorId:playerId(),ownerId:playerId(),developer:true}).then(syncWhenReady).catch(console.error);else syncWhenReady();
+window.addEventListener('load',syncWhenReady,{once:true});
 })();
