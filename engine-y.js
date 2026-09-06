@@ -4,10 +4,11 @@
     { x: OX + 4 * T, y: OY + 2 * T, w: 5 * T, h: 3 * T, title: 'Mercado', wall: '#4a281c', roof: '#6a3020' },
     { x: OX + 20 * T, y: OY + 5 * T, w: 4 * T, h: 3 * T, title: 'Banco', wall: '#2a3038', roof: '#3a4048' },
     { x: OX + 2 * T, y: OY + 8 * T, w: 4 * T, h: 3 * T, title: 'Atelier', wall: '#402028', roof: '#5a2830' },
-    { x: OX + 18 * T, y: OY + 14 * T, w: 5 * T, h: 3 * T, title: 'Caf\u00e9 Oro', wall: '#3a2814', roof: '#5a3a18' }
+    { x: OX + 18 * T, y: OY + 14 * T, w: 5 * T, h: 3 * T, title: 'Café Oro', wall: '#3a2814', roof: '#5a3a18' }
   ];
   window.keloHouses = HOUSES;
 
+  function resetActive(){return window.KELO_WORLD_DECORATION_RESET===true||window.KELO_WORLD_RENDERER?.decorationReset===true;}
   function overlapArea(a,b) {
     const w=Math.max(0,Math.min(a.x+a.w,b.x+b.w)-Math.max(a.x,b.x));
     const h=Math.max(0,Math.min(a.y+a.h,b.y+b.h)-Math.max(a.y,b.y));
@@ -24,8 +25,8 @@
   function substantiallyCoveredByAuthored(b) {
     return authoredReplacementBounds().some(a=>overlapArea(b,a)/(b.w*b.h)>=0.35);
   }
-  function visibleHouses(){return HOUSES.filter(b=>!substantiallyCoveredByAuthored(b));}
-  function suppressedHouses(){return HOUSES.filter(substantiallyCoveredByAuthored).map(b=>b.title);}
+  function visibleHouses(){return resetActive()?[]:HOUSES.filter(b=>!substantiallyCoveredByAuthored(b));}
+  function suppressedHouses(){return resetActive()?HOUSES.map(b=>b.title):HOUSES.filter(substantiallyCoveredByAuthored).map(b=>b.title);}
 
   function facade(ctx, b) {
     const x = b.x, y = b.y, w = b.w, h = b.h;
@@ -55,6 +56,7 @@
   const _r = render;
   render = function () {
     _r();
+    if (resetActive()) return;
     if (window._keloHouseFrame === window._keloFrame) return;
     window._keloHouseFrame = window._keloFrame || 0;
     const z = CONFIG.zoom || 1;
@@ -65,5 +67,5 @@
     visibleHouses().forEach(function (b) { facade(ctx, b); });
     ctx.restore();
   };
-  window.KELO_LEGACY_HOUSE_RENDERER=Object.freeze({version:'legacy-house-authored-overlap-v1',suppressionMode:'luxe-prefab-overlap-ratio-v1',coverageSource:'registry-prefabs-v1',threshold:0.35,get visibleTitles(){return visibleHouses().map(b=>b.title);},get suppressedTitles(){return suppressedHouses();}});
+  window.KELO_LEGACY_HOUSE_RENDERER=Object.freeze({version:'legacy-house-authored-overlap-v2',suppressionMode:'decoration-reset-or-luxe-overlap-v1',coverageSource:'registry-prefabs-v1',threshold:0.35,get decorationReset(){return resetActive();},get visibleTitles(){return visibleHouses().map(b=>b.title);},get suppressedTitles(){return suppressedHouses();}});
 })();
