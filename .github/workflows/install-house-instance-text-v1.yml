@@ -18,6 +18,7 @@ jobs:
       - name: Materialize House integration
         run: |
           python3 scripts/install-house-instance-text-v1.py
+          python3 scripts/fix-property-control-v1.py
           python3 scripts/fix-house-runtime-callback-v1.py
       - name: Syntax and deterministic audits
         run: |
@@ -49,10 +50,10 @@ jobs:
           rm -f scripts/house-instance-v1.tgz
           rm -f .github/workflows/install-house-instance-v1.yml
           rm -f .github/workflows/install-house-instance-text-v1.yml
-          rm -f scripts/install-house-instance-text-v1.py scripts/fix-house-runtime-callback-v1.py
+          rm -f scripts/install-house-instance-text-v1.py scripts/fix-house-runtime-callback-v1.py scripts/fix-property-control-v1.py
           git config user.name kelo-instance-bot
           git config user.email 68343904+kelffren@users.noreply.github.com
-          git add -A -- src/instances src/property/property-system.js src/ui/house-instance-ui.js scripts/instance-system-audit.js scripts/house-instance-browser-audit.mjs docs/INSTANCE_SYSTEM_MEMORY.md docs/CODE_INDEX.md ENGINE_MAP.md index.html .github/workflows scripts/house-instance-v1.tgz scripts/install-house-instance-text-v1.py scripts/fix-house-runtime-callback-v1.py
+          git add -A -- src/instances src/property/property-system.js src/ui/house-instance-ui.js scripts/instance-system-audit.js scripts/house-instance-browser-audit.mjs docs/INSTANCE_SYSTEM_MEMORY.md docs/CODE_INDEX.md ENGINE_MAP.md index.html .github/workflows scripts/house-instance-v1.tgz scripts/install-house-instance-text-v1.py scripts/fix-house-runtime-callback-v1.py scripts/fix-property-control-v1.py
           git commit -m 'House Instance V1 offline-first online-ready'
           git push
       - name: Upload certification evidence
