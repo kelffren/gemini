@@ -6,7 +6,7 @@
   if(!C||!L||typeof L.register!=='function'||!A||typeof A.acquire!=='function'){console.error('[Kelo generic prefabs] contract/layer stack/atlas contract missing');return;}
 
   const images=new Map(),readyAssets=new Set();let failed=false,installed=false;
-  const audit=window.KELO_PREFAB_AUDIT={version:'generic-prefabs-v1.4',contractVersion:C.version,ready:false,failed:false,
+  const audit=window.KELO_PREFAB_AUDIT={version:'generic-prefabs-v1.3',contractVersion:C.version,ready:false,failed:false,
     rendererMode:'data-driven-prefabs-v2',resourceMode:'atlas-contract-managed-v1',prefabCount:C.prefabs.length,assetCount:Object.keys(C.assets).length,
     decorationReset:window.KELO_WORLD_DECORATION_RESET===true,registeredColliderCount:0,backDrawCount:0,frontDrawCount:0,frontOcclusionDrawCount:0,layerCount:0,
     renderPartCount:C.prefabs.reduce((n,p)=>n+(p.renderPlan?.parts?.length||0),0),bootstrapMode:'deferred-after-engine-bootstrap-v1'};
@@ -68,7 +68,7 @@
   }
   function getEntry(key){const p=C.prefabs.find(x=>x.key===key||x.id===key);if(!p)return null;return Object.freeze({key:p.key,prefab:p,asset:C.assets[p.asset],geometry:Object.freeze(geometry(p)),renderPlan:p.renderPlan,isOccluding(actor){return actorBehind(p,actor);},get ready(){return readyAssets.has(p.asset);},get failed(){return failed;}});}
 
-  window.KELO_PREFAB_RENDERER=Object.freeze({version:'generic-prefabs-v1.4',mode:'data-driven-prefabs-v2',resourceMode:'atlas-contract-managed-v1',getEntry,ensureColliders:registerColliders,get ready(){return audit.ready&&!audit.failed;},get failed(){return audit.failed;}});
+  window.KELO_PREFAB_RENDERER=Object.freeze({version:'generic-prefabs-v1.3',mode:'data-driven-prefabs-v2',resourceMode:'atlas-contract-managed-v1',getEntry,ensureColliders:registerColliders,get ready(){return audit.ready&&!audit.failed;},get failed(){return audit.failed;}});
   const entries=Object.entries(C.assets).filter(([,a])=>a?.src);
   if(!entries.length)audit.ready=true;
   for(const [id] of entries){
