@@ -29,6 +29,7 @@ jobs:
           node --check src/environment/tile-registry.js
           node --check src/environment/atlas-contract.js
           node --check src/environment/surface-ground.js
+          node scripts/validate-asset-integrity.mjs
           node - <<'NODE'
           const fs=require('fs');
           const registry=fs.readFileSync('src/environment/tile-registry.js','utf8');
@@ -39,12 +40,12 @@ jobs:
           const policy=JSON.parse(fs.readFileSync('src/environment/png-validation-policy.json','utf8'));
           const asset=manifest.assets.find(a=>a.id==='cesped-ground-v1');
           if(!asset) throw new Error('cesped-ground-v1 missing from Asset Contract');
-          if(asset.path!=='assets/cesped-runtime.png'||asset.width!==160||asset.height!==160) throw new Error('bad cesped Asset Contract dimensions/path');
+          if(asset.path!=='assets/cesped-runtime.PNG'||asset.width!==160||asset.height!==160) throw new Error('bad cesped Asset Contract dimensions/path');
           if(asset.cache?.value!=='501') throw new Error('bad cesped cache version');
-          if(!registry.includes("src:'assets/cesped-runtime.png?art=501'")||!registry.includes('cesped:cespedAtlas')||!registry.includes('surfaceGround:Object.freeze')) throw new Error('TileRegistry cesped registration missing');
+          if(!registry.includes("src:'assets/cesped-runtime.PNG?art=501'")||!registry.includes('cesped:cespedAtlas')||!registry.includes('surfaceGround:Object.freeze')) throw new Error('TileRegistry cesped registration missing');
           if(!atlas.includes("cesped:'core'")) throw new Error('Atlas Contract cesped role missing');
           if(!surface.includes("id:'kelo-surface-ground'")||!surface.includes("visibleDuringReset:true")||!surface.includes("ownership:'surface-ground-v1'")) throw new Error('generic reset-visible surface layer missing');
-          if(!index.includes('src/environment/surface-ground.js?v=1')||!index.includes('assets/cesped-runtime.png?art=501')) throw new Error('cesped runtime not loaded/preloaded');
+          if(!index.includes('src/environment/surface-ground.js?v=1')||!index.includes('assets/cesped-runtime.PNG?art=501')) throw new Error('cesped runtime not loaded/preloaded');
           const source=policy.excludedFromWorldContract.find(x=>x.path==='assets/cesped.PNG');
           if(source?.scope!=='source-sheet') throw new Error('cesped source-sheet policy missing');
           console.log('CESPED_FOCUSED_CONTRACT_PASS');
@@ -54,7 +55,7 @@ jobs:
         run: |
           python - <<'PY'
           from PIL import Image
-          p='assets/cesped-runtime.png'
+          p='assets/cesped-runtime.PNG'
           im=Image.open(p)
           assert im.size==(160,160), im.size
           assert im.mode in ('RGB','RGBA'), im.mode
@@ -68,7 +69,7 @@ jobs:
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add assets/cesped-runtime.png src/environment/tile-registry.js src/environment/atlas-contract.js src/environment/surface-ground.js src/environment/art-asset-manifest.json src/environment/png-validation-policy.json index.html
+          git add assets/cesped-runtime.PNG src/environment/tile-registry.js src/environment/atlas-contract.js src/environment/surface-ground.js src/environment/art-asset-manifest.json src/environment/png-validation-policy.json index.html
           git commit -m 'Cover rebuild world with Kelo cesped'
           git push origin HEAD:main
 # focused: reset-era validators currently include superseded TileRegistry registrations; this job validates the new rebuild surface itself.
