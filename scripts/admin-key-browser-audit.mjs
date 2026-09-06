@@ -29,7 +29,7 @@ const normalState=await normal.page.evaluate(()=>({
   canEdit:window.KELO_ADMIN_KEYS.can('world.edit'),
   developer:window.KELO_PROPERTY_EDITOR.developer,
   tabsHidden:document.getElementById('pe-tabs').classList.contains('pe-hidden'),
-  adminItems:(window.STATE?.inventory||[]).filter(x=>x?.kind==='admin_key').length
+  adminItems:window.KeloBackpack.getSlots().filter(s=>s?.item?.kind==='admin_key').length
 }));
 assert.equal(normalState.hasKey,false);
 assert.equal(normalState.canEdit,false);
@@ -42,11 +42,13 @@ await normal.context.close();
 // Offline owner bootstrap: mapEditor creates a bound root Admin Key; editor reads the key, not URL directly.
 const root=await openPage('?mapEditor=1&adminAudit=root');
 await root.page.waitForFunction(()=>window.KELO_ADMIN_KEYS.hasKey()&&window.KELO_ADMIN_KEYS.can('world.edit'));
+await root.page.waitForFunction(()=>window.KeloBackpack.getSlots().some(s=>s?.item?.kind==='admin_key'&&s?.item?.templateId==='admin-key'));
 const rootState=await root.page.evaluate(async()=>{
   const A=window.KELO_ADMIN_KEYS,S=window.KELO_PROPERTY_SYSTEM;
   const me=S.playerId();
   const status=await A.request('admin-key:status',{actorId:me});
-  const item=(window.STATE?.inventory||[]).find(x=>x?.kind==='admin_key'&&x?.templateId==='admin-key');
+  const slot=window.KeloBackpack.getSlots().find(s=>s?.item?.kind==='admin_key'&&s?.item?.templateId==='admin-key');
+  const item=slot?.item||null;
   const creator=await A.request('admin-key:issue',{actorId:me,ownerId:'creator-a',label:'Llave Admin · Builder'});
   const creatorCanEdit=A.can('world.edit','creator-a');
   const creatorCanPublish=A.can('world.publish','creator-a');
