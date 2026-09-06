@@ -43,13 +43,14 @@ jobs:
           node --check src/environment/generic-props.js
           node --check src/environment/plaza-depth.js
           node --check scripts/live-fountain-audit.mjs
+          node scripts/validate-asset-integrity.mjs
           test "$(grep -c "plazaFountainKelo:Object.freeze" src/environment/prop-contract.js)" -eq 1
           git diff --check
       - name: Verify runtime PNG alpha
         run: |
           python - <<'PY'
           from PIL import Image
-          p='assets/fuentekelo-runtime.png'
+          p='assets/fuentekelo-runtime.PNG'
           im=Image.open(p)
           assert im.size==(1312,1199), im.size
           assert im.mode=='RGBA', im.mode
@@ -65,6 +66,6 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git checkout -- .github/workflows/ci.yml
-          git add -A assets/fuentekelo-runtime.png engine-l.js engine-o.js engine-p.js src/characters/character-appearance.js src/environment/tile-registry.js src/environment/world-map.js src/environment/prop-contract.js src/environment/environment-layer-stack.js src/environment/generic-props.js src/environment/plaza-depth.js src/environment/art-asset-manifest.json src/environment/png-validation-policy.json scripts/live-fountain-audit.mjs index.html
+          git add -A assets/fuentekelo-runtime.PNG engine-l.js engine-o.js engine-p.js src/characters/character-appearance.js src/environment/tile-registry.js src/environment/world-map.js src/environment/prop-contract.js src/environment/environment-layer-stack.js src/environment/generic-props.js src/environment/plaza-depth.js src/environment/art-asset-manifest.json src/environment/png-validation-policy.json scripts/live-fountain-audit.mjs index.html
           git commit -m 'Finalize fuentekelo on blank Plaza'
           git push origin HEAD:main
