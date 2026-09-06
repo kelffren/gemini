@@ -11,6 +11,10 @@
     hero_default_sheet: Object.freeze({
       id: 'hero_default_sheet', type: 'spritesheet', src: 'assets/hero.PNG', preload: false,
       frameWidth: 256, frameHeight: 384, columns: 4, rows: 4
+    }),
+    sword_swap_activation_eye_asset: Object.freeze({
+      id: 'sword_swap_activation_eye_asset', type: 'image',
+      src: 'assets/fx/sword-swap/activation-eye.PNG', preload: true
     })
   });
 
@@ -68,6 +72,11 @@
     shield_ring_01: Object.freeze({
       id: 'shield_ring_01', type: 'ring', space: 'ACTOR', layer: 'actorFrontFX',
       socket: 'center', duration: 0.65, loop: false, radius: 34, color: '#ffd166', alpha: 0.58
+    }),
+    sword_swap_activation_eye: Object.freeze({
+      id: 'sword_swap_activation_eye', type: 'static_sprite', assetId: 'sword_swap_activation_eye_asset',
+      space: 'ACTOR', layer: 'actorFrontFX', socket: 'head', duration: 0.35, loop: false,
+      width: 72, height: 72, alpha: 1
     })
   });
 
@@ -119,6 +128,12 @@
         Object.freeze({ at: 0, type: 'fx', ref: 'magic_ground_ring_01' }),
         Object.freeze({ at: 180, type: 'fx', ref: 'fire_explosion_medium' })
       ])
+    }),
+    sequence_sword_swap_activation_eye: Object.freeze({
+      id: 'sequence_sword_swap_activation_eye', duration: 350,
+      cues: Object.freeze([
+        Object.freeze({ at: 0, type: 'fx', ref: 'sword_swap_activation_eye', socket: 'head' })
+      ])
     })
   });
 
@@ -129,6 +144,10 @@
       projectileVisual: 'projectile_fire_orb_01',
       impactSequence: 'sequence_fire_impact_01',
       statusVisuals: Object.freeze({ burn: 'burn_body_small' })
+    }),
+    ability_visual_sword_swap_01: Object.freeze({
+      id: 'ability_visual_sword_swap_01', abilityKey: 'swap_sword',
+      castSequence: 'sequence_sword_swap_activation_eye'
     })
   });
 
@@ -138,7 +157,7 @@
   });
 
   root.KELO_VISUAL_MANIFESTS = Object.freeze({
-    version: 'visual-manifests-v1.0.0',
+    version: 'visual-manifests-v1.1.0',
     assets: ASSETS,
     animationClips: ANIMATION_CLIPS,
     fx: FX,
