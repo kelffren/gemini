@@ -1,0 +1,171 @@
+name: Fix Sword Swap Real Throw
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/fix-sword-swap-real-throw.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Wire authored katana throw into real PvP Sword Swap
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          # --- ability-visuals: semantic Sword Swap throw resolver ---
+          p=Path('src/visuals/ability-visuals.js')
+          s=p.read_text()
+          old="  const activeProjectileVisuals = new Map();\n"
+          new="  const activeProjectileVisuals = new Map();\n  const activeSwordThrowVisuals = new Map();\n"
+          assert old in s, 'active projectile map anchor missing'
+          s=s.replace(old,new,1)
+
+          old="  function onProjectileExpired(payload) { stopProjectileFor(normalizedEvent(payload)); }\n\n"
+          new="""  function onProjectileExpired(payload) { stopProjectileFor(normalizedEvent(payload)); }
+
+  function swordThrowKey(payload, c) {
+    return String(payload && payload.swordEntityId || c && (c.projectileId || c.castId) || '');
+  }
+
+  // Sword Swap has its own gameplay object/state machine. The visual follows that object without owning movement or collision.
+  function onSwordThrown(payload) {
+    if (!enabled || !root.KeloProjectileVisuals) return;
+    const c = normalizedEvent(payload);
+    const profile = resolveProfile(c.abilityId, c.abilityKey);
+    const ref = profile && profile.throwVisual;
+    if (!ref) return;
+    const gameplayObject = payload && payload.gameplayObject || null;
+    const options = { speed: c.gameplay.speed, maxDistance: c.gameplay.range, loop: true };
+    const visualId = gameplayObject
+      ? root.KeloProjectileVisuals.attach(gameplayObject, ref, c, options)
+      : root.KeloProjectileVisuals.preview(ref, c, options);
+    const key = swordThrowKey(payload, c);
+    if (key && visualId) activeSwordThrowVisuals.set(key, visualId);
+  }
+
+  function stopSwordThrow(payload) {
+    if (!root.KeloProjectileVisuals) return;
+    const c = normalizedEvent(payload);
+    const key = swordThrowKey(payload, c);
+    const visualId = key && activeSwordThrowVisuals.get(key);
+    if (visualId) root.KeloProjectileVisuals.stop(visualId);
+    if (key) activeSwordThrowVisuals.delete(key);
+  }
+
+"""
+          assert old in s, 'projectile expired anchor missing'
+          s=s.replace(old,new,1)
+
+          old="  bus.on('PROJECTILE_EXPIRED', onProjectileExpired);\n"
+          new="  bus.on('PROJECTILE_EXPIRED', onProjectileExpired);\n  bus.on('SWORD_THROWN', onSwordThrown);\n  bus.on('SWORD_LANDED', stopSwordThrow);\n  bus.on('SWORD_THROW_CANCELLED', stopSwordThrow);\n"
+          assert old in s, 'visual bus projectile anchor missing'
+          s=s.replace(old,new,1)
+
+          old="""      pendingBySlot.delete(slot);
+    });
+
+    abilityBus.on('ABILITY_FAILED', function (payload) {
+"""
+          new="""      pendingBySlot.delete(slot);
+    });
+
+    // PvP Sword Swap emits domain events with the live sword gameplay object. Translate them to visual semantics here.
+    abilityBus.on('SWAP_SWORD_THROWN', function (payload) {
+      bus.emit('SWORD_THROWN', Object.assign({}, payload || {}));
+    });
+    abilityBus.on('SWAP_SWORD_LANDED', function (payload) {
+      bus.emit('SWORD_LANDED', Object.assign({}, payload || {}));
+    });
+    abilityBus.on('SWAP_SWORD_THROW_CANCELLED', function (payload) {
+      bus.emit('SWORD_THROW_CANCELLED', Object.assign({}, payload || {}));
+    });
+
+    abilityBus.on('ABILITY_FAILED', function (payload) {
+"""
+          assert old in s, 'ability bus adapter anchor missing'
+          s=s.replace(old,new,1)
+
+          old="    if (profile) { addSequence(profile.castSequence); addSequence(profile.impactSequence); addFromProjectile(profile.projectileVisual); }\n"
+          new="    if (profile) { addSequence(profile.castSequence); addSequence(profile.impactSequence); addFromProjectile(profile.projectileVisual); addFromProjectile(profile.throwVisual); }\n"
+          assert old in s, 'profile preload anchor missing'
+          s=s.replace(old,new,1)
+
+          old="    if (cue === 'projectile' && profile.projectileVisual && root.KeloProjectileVisuals) return root.KeloProjectileVisuals.preview(profile.projectileVisual, c, { speed: c.gameplay.speed, maxDistance: c.gameplay.range });\n"
+          new="    if (cue === 'projectile' && profile.projectileVisual && root.KeloProjectileVisuals) return root.KeloProjectileVisuals.preview(profile.projectileVisual, c, { speed: c.gameplay.speed, maxDistance: c.gameplay.range });\n    if (cue === 'throw' && profile.throwVisual && root.KeloProjectileVisuals) return root.KeloProjectileVisuals.preview(profile.throwVisual, c, { speed: c.gameplay.speed, maxDistance: c.gameplay.range, loop: true });\n"
+          assert old in s, 'playCue projectile anchor missing'
+          s=s.replace(old,new,1)
+
+          s=s.replace("version: 'ability-visual-resolver-v1.1.0'", "version: 'ability-visual-resolver-v1.2.0'", 1)
+          s=s.replace("root.KELO_VISUAL_AUDIT.legacyAbilityAdapter = 'semantic-event-bridge-v1'", "root.KELO_VISUAL_AUDIT.legacyAbilityAdapter = 'semantic-event-bridge-v1.1'", 1)
+          p.write_text(s)
+
+          # --- pvp-world: emit gameplay lifecycle events and draw world projectile visuals in isolated arena ---
+          p=Path('src/systems/pvp-world.js')
+          s=p.read_text()
+          s=s.replace("const VERSION='pvp-world-v1.4'", "const VERSION='pvp-world-v1.5'", 1)
+
+          old="function startSwapSwordCooldown(i,d){if(i)i.cooldown=(d&&d.cooldown)||12}\n"
+          new="""function startSwapSwordCooldown(i,d){if(i)i.cooldown=(d&&d.cooldown)||12}
+function swapSwordVisualPayload(d,s){const dx=s.tx-s.sx,dy=s.ty-s.sy,l=Math.hypot(dx,dy)||1;return{playerId:localPlayer.id||'local',actor:localPlayer,actorId:String(localPlayer.id||'local'),abilityId:d.id,abilityKey:d.key,swordEntityId:s.id,gameplayObject:s,origin:{x:s.sx,y:s.sy},target:{x:s.tx,y:s.ty},direction:{x:dx/l,y:dy/l},gameplay:{speed:(d.delivery&&d.delivery.speed)||720,range:Math.hypot(dx,dy)},visual:{scale:1,seed:Date.now()&65535}}}
+"""
+          assert old in s, 'pvp cooldown anchor missing'
+          s=s.replace(old,new,1)
+
+          old="""  emitAbility('ABILITY_CAST',{playerId:localPlayer.id||'local',abilityId:d.id,abilityKey:d.key,slotIndex:slot,specialPhase:'throw',swordEntityId:state.swapSword.id});
+  toast('Espada lanzada · vuelve a tocar la habilidad para ir a ella');audit('swap-sword-thrown');return{valid:true,type:'SWAP_SWORD_THROW',swordEntityId:state.swapSword.id};
+"""
+          new="""  emitAbility('ABILITY_CAST',{playerId:localPlayer.id||'local',abilityId:d.id,abilityKey:d.key,slotIndex:slot,specialPhase:'throw',swordEntityId:state.swapSword.id});
+  emitAbility('SWAP_SWORD_THROWN',swapSwordVisualPayload(d,state.swapSword));
+  toast('Espada lanzada · vuelve a tocar la habilidad para ir a ella');audit('swap-sword-thrown');return{valid:true,type:'SWAP_SWORD_THROW',swordEntityId:state.swapSword.id};
+"""
+          assert old in s, 'real throw event anchor missing'
+          s=s.replace(old,new,1)
+
+          old="function cancelSwapSword(){state.swapSword=null}\n"
+          new="function cancelSwapSword(){const s=state.swapSword;if(s&&s.phase==='flying'){const i=hotbarInstance(s.slot),d=i&&i.definition;emitAbility('SWAP_SWORD_THROW_CANCELLED',{playerId:localPlayer&&localPlayer.id||'local',abilityId:d&&d.id,abilityKey:d&&d.key||'swap_sword',swordEntityId:s.id})}state.swapSword=null}\n"
+          assert old in s, 'cancel swap sword anchor missing'
+          s=s.replace(old,new,1)
+
+          old="""  if(s.phase==='flying'){s.time+=dt;const k=clamp(s.time/s.max,0,1),ease=1-Math.pow(1-k,3);s.x=s.sx+(s.tx-s.sx)*ease;s.y=s.sy+(s.ty-s.sy)*ease;if(k>=1){s.x=s.tx;s.y=s.ty;s.phase='planted';s.time=0;toast('Espada clavada · toca la habilidad otra vez o elige un personaje');audit('swap-sword-planted')}}
+"""
+          new="""  if(s.phase==='flying'){s.time+=dt;const k=clamp(s.time/s.max,0,1),ease=1-Math.pow(1-k,3);s.x=s.sx+(s.tx-s.sx)*ease;s.y=s.sy+(s.ty-s.sy)*ease;if(k>=1){s.x=s.tx;s.y=s.ty;s.phase='planted';s.time=0;const i=hotbarInstance(s.slot),d=i&&i.definition;emitAbility('SWAP_SWORD_LANDED',{playerId:localPlayer.id||'local',actor:localPlayer,actorId:String(localPlayer.id||'local'),abilityId:d&&d.id,abilityKey:d&&d.key||'swap_sword',swordEntityId:s.id,position:{x:s.x,y:s.y},target:{x:s.x,y:s.y}});toast('Espada clavada · toca la habilidad otra vez o elige un personaje');audit('swap-sword-planted')}}
+"""
+          assert old in s, 'flying landing anchor missing'
+          s=s.replace(old,new,1)
+
+          old="function drawSwordWorld(){const s=state.swapSword;if(!s||typeof ctx==='undefined')return;const planted="
+          new="function drawSwordWorld(){const s=state.swapSword;if(!s||typeof ctx==='undefined')return;if(s.phase==='flying'&&window.KeloProjectileVisualRegistry&&window.KeloProjectileVisualRegistry.get('sword_swap_katana_throw_visual'))return;const planted="
+          assert old in s, 'legacy sword draw anchor missing'
+          s=s.replace(old,new,1)
+
+          old="""ctx.strokeStyle='rgba(231,197,106,.72)';ctx.lineWidth=5;ctx.strokeRect(WORLD.x+18,WORLD.y+18,WORLD.w-36,WORLD.h-36);drawSwordWorld();const d=dummyEntity();
+"""
+          new="""ctx.strokeStyle='rgba(231,197,106,.72)';ctx.lineWidth=5;ctx.strokeRect(WORLD.x+18,WORLD.y+18,WORLD.w-36,WORLD.h-36);drawSwordWorld();if(window.KeloProjectileVisuals)window.KeloProjectileVisuals.drawLayer('worldFX',ctx);const d=dummyEntity();
+"""
+          assert old in s, 'PvP world render anchor missing'
+          s=s.replace(old,new,1)
+
+          p.write_text(s)
+          PY
+      - name: Static contract validation
+        run: |
+          node --check src/visuals/ability-visuals.js
+          node --check src/systems/pvp-world.js
+          grep -q "ability-visual-resolver-v1.2.0" src/visuals/ability-visuals.js
+          grep -q "SWAP_SWORD_THROWN" src/visuals/ability-visuals.js
+          grep -q "SWAP_SWORD_THROWN" src/systems/pvp-world.js
+          grep -q "KeloProjectileVisuals.drawLayer('worldFX',ctx)" src/systems/pvp-world.js
+      - name: Commit real throw integration
+        run: |
+          git config user.name 'kelo-visual-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add src/visuals/ability-visuals.js src/systems/pvp-world.js
+          git commit -m 'visual: connect katana throw to real Sword Swap'
+          git push
