@@ -33,33 +33,53 @@ jobs:
           node-version: '20'
       - name: Install Playwright package
         run: npm install --no-save playwright@1.55.0
+      - name: Detect world decoration mode
+        id: mode
+        run: |
+          if grep -q 'const DECORATION_RESET=true;' src/environment/environment-layer-stack.js; then
+            echo 'blank=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'blank=false' >> "$GITHUB_OUTPUT"
+          fi
       - name: Audit live hero sprite on mobile and desktop
         env: &liveenv
           AUDIT_URL: https://kelffren.github.io/gemini/
           CHROME_BIN: /usr/bin/google-chrome
         run: node scripts/live-hero-audit.mjs
+      - name: Audit blank world reset
+        if: steps.mode.outputs.blank == 'true'
+        env: *liveenv
+        run: node scripts/live-blank-world-audit.mjs
       - name: Audit current authored mobile world
+        if: steps.mode.outputs.blank != 'true'
         env: *liveenv
         run: node scripts/live-world-audit-v2.mjs
       - name: Audit environment layer spatial conflicts
+        if: steps.mode.outputs.blank != 'true'
         env: *liveenv
         run: node scripts/live-layer-spatial-audit.mjs
       - name: Audit Gardens marble cadence
+        if: steps.mode.outputs.blank != 'true'
         env: *liveenv
         run: node scripts/live-gardens-audit.mjs
       - name: Audit authored district microdecals
+        if: steps.mode.outputs.blank != 'true'
         env: *liveenv
         run: node scripts/live-district-decals-audit.mjs
       - name: Audit authored rural edge density
+        if: steps.mode.outputs.blank != 'true'
         env: *liveenv
         run: node scripts/live-rural-audit.mjs
       - name: Audit authored Plaza NPCs
+        if: steps.mode.outputs.blank != 'true'
         env: *liveenv
         run: node scripts/live-npc-audit.mjs
       - name: Audit authored Luxe architecture
+        if: steps.mode.outputs.blank != 'true'
         env: *liveenv
         run: node scripts/live-pavilion-audit.mjs
       - name: Audit layered plaza fountain
+        if: steps.mode.outputs.blank != 'true'
         env: *liveenv
         run: node scripts/live-fountain-audit.mjs
       - name: Audit nobility donation progression
