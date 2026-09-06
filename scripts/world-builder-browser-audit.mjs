@@ -50,10 +50,10 @@ if(!Object.values(afterPaint.cells).some(x=>x.role==='path'))throw new Error('pa
 
 await page.locator('[data-wb-layer="objects"]').click();
 await page.waitForFunction(()=>document.querySelectorAll('#wb-list .wb-card').length>0);
-await page.waitForFunction(()=>document.querySelector('#wb-list .wb-card[data-asset-id]'),null,{timeout:6000});
-const selectedTemplate=await page.evaluate(()=>{const id=document.querySelector('#wb-list .wb-card[data-asset-id]')?.dataset.assetId,t=window.KELO_PROPERTY_CATALOG.get(id);return{id:t.id,label:t.label,assetKeys:[...new Set((t.parts||[]).map(p=>p.assetKey))],ready:window.KELO_WORLD_BUILDER_PROPERTY_RENDERER.readyKeys,errors:window.KELO_WORLD_BUILDER_PROPERTY_RENDERER.errors};});
+await page.waitForFunction(()=>document.querySelector('#wb-list .wb-card[data-asset-id][data-ready="1"]'),null,{timeout:6000});
+const selectedTemplate=await page.evaluate(()=>{const id=document.querySelector('#wb-list .wb-card[data-asset-id][data-ready="1"]')?.dataset.assetId,t=window.KELO_PROPERTY_CATALOG.get(id);return{id:t.id,label:t.label,assetKeys:[...new Set((t.parts||[]).map(p=>p.assetKey))],ready:window.KELO_WORLD_BUILDER_PROPERTY_RENDERER.readyKeys,errors:window.KELO_WORLD_BUILDER_PROPERTY_RENDERER.errors};});
 if(selectedTemplate.assetKeys.some(k=>!selectedTemplate.ready.includes(k)||selectedTemplate.errors[k]))throw new Error('World Builder exposed a broken asset '+JSON.stringify(selectedTemplate));
-await page.locator('#wb-list .wb-card[data-asset-id]').first().click();
+await page.locator('#wb-list .wb-card[data-asset-id][data-ready="1"]').first().click();
 await page.mouse.click(270,250);
 await page.waitForTimeout(400);
 const objects=await page.evaluate(async()=>{const p=await window.KELO_PROPERTY_SYSTEM.request('ensureWorldEditorParcel',{ownerId:'developer'});return{parcel:p,rows:window.KELO_PROPERTY_SYSTEM.getPlacements(p.parcelId),catalog:window.KELO_PROPERTY_CATALOG.list().length,renderer:window.KELO_WORLD_RENDERER?.worldBuilderPropertyRenderer===true,imageCount:window.KELO_WORLD_BUILDER_PROPERTY_RENDERER?.imageCount||0};});
