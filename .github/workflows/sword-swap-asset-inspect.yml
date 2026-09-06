@@ -90,6 +90,10 @@ jobs:
           with open('artifacts/katana-throw-analysis.json','w') as f: json.dump(report,f,indent=2)
           shutil.copy2(path,'artifacts/katana-throw.PNG')
           PY
+          cp src/visuals/fx-system.js artifacts/fx-system.js
+          cp src/visuals/visual-manifests.js artifacts/visual-manifests.js
+          cp src/visuals/visual-lab.js artifacts/visual-lab.js
+          cp src/environment/png-validation-policy.json artifacts/png-validation-policy.json
       - uses: actions/upload-artifact@v4
         with:
           name: katana-throw-inspection
