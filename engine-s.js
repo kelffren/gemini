@@ -12,6 +12,8 @@
   const BOT_LINES = ['esa vitrina', 'voy al cafe', 'quien es el Rey'];
   let walkT = 0;
   window.keloBubbles = bubbles;
+  function resetActive(){return window.KELO_WORLD_DECORATION_RESET===true||window.KELO_WORLD_RENDERER?.decorationReset===true;}
+  window.KELO_SOCIAL_WORLD_AUDIT={version:'social-world-reset-guard-v1',decorationReset:true,legacyFountainDrawCount:0,botWorldBubblesSuppressed:true};
 
   function worldFromEvent(e) {
     const z = CONFIG.zoom || 1;
@@ -19,6 +21,7 @@
   }
 
   window.addEventListener('pointerup', function (e) {
+    if (resetActive()) return;
     if (e.target && e.target.closest && (e.target.closest('#ui-layer') || e.target.closest('.stone-slot') || e.target.closest('#kelo-chat'))) return;
     const w = worldFromEvent(e);
     if (typeof simulatedPlayers !== 'undefined') {
@@ -103,7 +106,7 @@
       bubbles[i].t -= dt;
       if (bubbles[i].t <= 0) bubbles.splice(i, 1);
     }
-    if (Math.random() < 0.0012 && simulatedPlayers.length) {
+    if (!resetActive() && Math.random() < 0.0012 && simulatedPlayers.length) {
       const b = simulatedPlayers[Math.floor(Math.random() * simulatedPlayers.length)];
       say(b.name, BOT_LINES[Math.floor(Math.random() * BOT_LINES.length)]);
     }
@@ -112,6 +115,10 @@
   const _r = render;
   render = function () {
     _r();
+    if (resetActive()) {
+      window.KELO_SOCIAL_WORLD_AUDIT.decorationReset=true;
+      return;
+    }
     const z = CONFIG.zoom || 1;
     ctx.save();
     ctx.translate(screenW / 2, screenH / 2);
@@ -126,6 +133,7 @@
     ctx.beginPath();
     ctx.arc(fountainX, fountainY, 16 + Math.sin(walkT * 4) * 2, 0, Math.PI * 2);
     ctx.fill();
+    window.KELO_SOCIAL_WORLD_AUDIT.legacyFountainDrawCount++;
     bubbles.forEach(function (bu) {
       let x = localPlayer.x, y = localPlayer.y - 38;
       const who = simulatedPlayers.find(function (p) { return p.name === bu.name; });
