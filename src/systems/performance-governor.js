@@ -1,11 +1,19 @@
+/* KELO-INDEX
+ * area: PERFORMANCE
+ * keys: FPS FRAME P50 P95 P99 STALL LOAF VISIBILITY QUALITY GOVERNOR
+ * hace: mide carga visible y frame-time real sin ocultar stalls; mantiene el auto-tuning existente separado de la telemetria
+ * online: N/A; diagnostico y calidad local del cliente
+ */
 (function (root) {
   'use strict';
 
-  const VERSION = '1.0.0';
+  const VERSION = '1.1.0';
   const TARGET_FPS = 60;
   const TARGET_FRAME_MS = 1000 / TARGET_FPS;
   const SAMPLE_ALPHA = 0.08;
   const REPORT_TTL_MS = 750;
+  const FRAME_WINDOW = 600;
+  const TELEMETRY_REFRESH_MS = 500;
 
   const WEIGHTS = Object.freeze({
     chunk: 2,
@@ -31,6 +39,15 @@
   const reported = new Map();
   const textureMemory = new Map();
   const updateClock = new Map();
+  const frameTimes = new Float64Array(FRAME_WINDOW);
+  let frameWriteIndex = 0;
+  let frameSampleCount = 0;
+  let lastTelemetryRefreshAt = -Infinity;
+  let frameStats = Object.freeze({ sampleCount: 0, averageMs: TARGET_FRAME_MS, p50Ms: TARGET_FRAME_MS, p95Ms: TARGET_FRAME_MS, p99Ms: TARGET_FRAME_MS, worstMs: TARGET_FRAME_MS, over16: 0, over33: 0, over50: 0, over100: 0, over120: 0 });
+  let visibilityResets = 0;
+  let loafCount = 0;
+  let worstLoafMs = 0;
+  let recentLoafs = Object.freeze([]);
   let profileIndex = 1;
   let manualProfile = null;
   let lastFrameAt = performance.now();
@@ -41,6 +58,12 @@
   let hud = null;
   let hudEnabled = false;
   let lastSnapshot = null;
+
+  const loafSupported = !!(
+    root.PerformanceObserver &&
+    Array.isArray(root.PerformanceObserver.supportedEntryTypes) &&
+    root.PerformanceObserver.supportedEntryTypes.includes('long-animation-frame')
+  );
 
   function safeGlobal(name) {
     try {
@@ -59,6 +82,93 @@
   function profile() {
     if (manualProfile) return PROFILES.find(p => p.id === manualProfile) || PROFILES[profileIndex];
     return PROFILES[profileIndex];
+  }
+
+  function recordFrame(frameMs) {
+    if (!(frameMs > 0) || !Number.isFinite(frameMs)) return;
+    frameTimes[frameWriteIndex] = frameMs;
+    frameWriteIndex = (frameWriteIndex + 1) % FRAME_WINDOW;
+    if (frameSampleCount < FRAME_WINDOW) frameSampleCount += 1;
+  }
+
+  function percentile(sorted, ratio) {
+    if (!sorted.length) return TARGET_FRAME_MS;
+    const index = Math.min(sorted.length - 1, Math.max(0, Math.ceil(sorted.length * ratio) - 1));
+    return sorted[index];
+  }
+
+  function refreshFrameStats(now, force) {
+    if (!force && frameSampleCount > 0 && now - lastTelemetryRefreshAt < TELEMETRY_REFRESH_MS) return frameStats;
+    lastTelemetryRefreshAt = now;
+    if (!frameSampleCount) return frameStats;
+    const values = new Array(frameSampleCount);
+    let sum = 0;
+    let worst = 0;
+    let over16 = 0;
+    let over33 = 0;
+    let over50 = 0;
+    let over100 = 0;
+    let over120 = 0;
+    const start = (frameWriteIndex - frameSampleCount + FRAME_WINDOW) % FRAME_WINDOW;
+    for (let i = 0; i < frameSampleCount; i += 1) {
+      const value = frameTimes[(start + i) % FRAME_WINDOW];
+      values[i] = value;
+      sum += value;
+      if (value > worst) worst = value;
+      if (value > TARGET_FRAME_MS) over16 += 1;
+      if (value > 33) over33 += 1;
+      if (value > 50) over50 += 1;
+      if (value > 100) over100 += 1;
+      if (value >= 120) over120 += 1;
+    }
+    values.sort((a, b) => a - b);
+    frameStats = Object.freeze({
+      sampleCount: frameSampleCount,
+      averageMs: sum / frameSampleCount,
+      p50Ms: percentile(values, 0.50),
+      p95Ms: percentile(values, 0.95),
+      p99Ms: percentile(values, 0.99),
+      worstMs: worst,
+      over16,
+      over33,
+      over50,
+      over100,
+      over120
+    });
+    return frameStats;
+  }
+
+  function compactLoaf(entry) {
+    const scripts = Array.isArray(entry && entry.scripts) ? entry.scripts.slice(0, 5).map(script => Object.freeze({
+      sourceURL: String(script.sourceURL || ''),
+      invoker: String(script.invoker || script.invokerType || ''),
+      duration: Number(script.duration) || 0
+    })) : [];
+    return Object.freeze({
+      startTime: Number(entry && entry.startTime) || 0,
+      duration: Number(entry && entry.duration) || 0,
+      blockingDuration: Number(entry && entry.blockingDuration) || 0,
+      scripts: Object.freeze(scripts)
+    });
+  }
+
+  function setupLoafObserver() {
+    if (!loafSupported) return;
+    try {
+      const observer = new root.PerformanceObserver(list => {
+        const next = recentLoafs.slice();
+        for (const entry of list.getEntries()) {
+          loafCount += 1;
+          worstLoafMs = Math.max(worstLoafMs, Number(entry.duration) || 0);
+          next.push(compactLoaf(entry));
+          while (next.length > 10) next.shift();
+        }
+        recentLoafs = Object.freeze(next);
+      });
+      observer.observe({ type: 'long-animation-frame', buffered: true });
+    } catch (e) {
+      console.warn('[Kelo perf] Long Animation Frame observer unavailable', e);
+    }
   }
 
   function estimateActiveChunks() {
@@ -121,12 +231,29 @@
     for (const [kind, count] of Object.entries(external)) counts[kind] = Math.max(counts[kind] || 0, count);
     const p = profile();
     const cost = weightedCost(counts);
+    const telemetry = refreshFrameStats(now, false);
     return Object.freeze({
       version: VERSION,
       targetFps: TARGET_FPS,
       targetFrameMs: TARGET_FRAME_MS,
       fps: 1000 / Math.max(1, emaFrameMs),
       frameMs: emaFrameMs,
+      frameSampleCount: telemetry.sampleCount,
+      frameAverageMs: telemetry.averageMs,
+      frameP50Ms: telemetry.p50Ms,
+      frameP95Ms: telemetry.p95Ms,
+      frameP99Ms: telemetry.p99Ms,
+      worstFrameMs: telemetry.worstMs,
+      framesOver16: telemetry.over16,
+      framesOver33: telemetry.over33,
+      framesOver50: telemetry.over50,
+      framesOver100: telemetry.over100,
+      framesOver120: telemetry.over120,
+      visibilityResets,
+      loafSupported,
+      loafCount,
+      worstLoafMs,
+      recentLoafs,
       quality: p.id,
       manualQuality: manualProfile,
       weightedCost: cost,
@@ -188,17 +315,18 @@
     ensureHud();
     if (!hud) return;
     hud.style.display = 'block';
-    hud.textContent = 'KELO PERF ' + VERSION + '\n' + snapshot.quality.toUpperCase() + '  ' + snapshot.fps.toFixed(1) + ' FPS  ' + snapshot.frameMs.toFixed(2) + 'ms\n' + 'budget ' + snapshot.weightedCost.toFixed(1) + '/' + snapshot.weightedBudget + '  ' + Math.round(snapshot.pressure * 100) + '%\n' + 'chunks ' + (snapshot.counts.chunk || 0) + '  actors ' + (snapshot.counts.player || 0) + '  particles ' + (snapshot.counts.particle || 0) + '/' + snapshot.particleCap + '\n' + 'textures ' + snapshot.textureMB.toFixed(1) + ' MB';
+    hud.textContent = 'KELO PERF ' + VERSION + '\n' + snapshot.quality.toUpperCase() + '  ' + snapshot.fps.toFixed(1) + ' FPS  EMA ' + snapshot.frameMs.toFixed(2) + 'ms\n' + 'p50 ' + snapshot.frameP50Ms.toFixed(1) + '  p95 ' + snapshot.frameP95Ms.toFixed(1) + '  p99 ' + snapshot.frameP99Ms.toFixed(1) + '  worst ' + snapshot.worstFrameMs.toFixed(1) + '\n' + '>33 ' + snapshot.framesOver33 + '  >50 ' + snapshot.framesOver50 + '  >100 ' + snapshot.framesOver100 + '  >=120 ' + snapshot.framesOver120 + '  LoAF ' + snapshot.loafCount + '\n' + 'budget ' + snapshot.weightedCost.toFixed(1) + '/' + snapshot.weightedBudget + '  ' + Math.round(snapshot.pressure * 100) + '%\n' + 'chunks ' + (snapshot.counts.chunk || 0) + '  actors ' + (snapshot.counts.player || 0) + '  particles ' + (snapshot.counts.particle || 0) + '/' + snapshot.particleCap + '\n' + 'textures ' + snapshot.textureMB.toFixed(1) + ' MB';
   }
 
   function frame(now) {
     const rawDt = now - lastFrameAt;
     lastFrameAt = now;
-    if (!document.hidden && rawDt > 0 && rawDt < 120) {
-      emaFrameMs += (rawDt - emaFrameMs) * SAMPLE_ALPHA;
+    if (!document.hidden && rawDt > 0) {
+      recordFrame(rawDt);
+      if (rawDt < 120) emaFrameMs += (rawDt - emaFrameMs) * SAMPLE_ALPHA;
       const snapshot = buildSnapshot(now);
       lastSnapshot = snapshot;
-      autoTune(rawDt, snapshot);
+      if (rawDt < 120) autoTune(rawDt, snapshot);
       updateHud(now, snapshot);
     }
     root.requestAnimationFrame(frame);
@@ -270,11 +398,23 @@
   }
 
   function getSnapshot() { return lastSnapshot || buildSnapshot(performance.now()); }
+  function getFrameTelemetry() {
+    const stats = refreshFrameStats(performance.now(), true);
+    return Object.freeze({
+      ...stats,
+      visibilityResets,
+      loafSupported,
+      loafCount,
+      worstLoafMs,
+      recentLoafs
+    });
+  }
 
   const api = Object.freeze({
     version: VERSION,
     targetFps: TARGET_FPS,
     targetFrameMs: TARGET_FRAME_MS,
+    frameWindow: FRAME_WINDOW,
     weights: WEIGHTS,
     profiles: PROFILES,
     reportVisible,
@@ -287,6 +427,7 @@
     setManualQuality,
     toggleHUD,
     getSnapshot,
+    getFrameTelemetry,
     get profile() { return profile(); }
   });
 
@@ -310,5 +451,11 @@
     root.spawnParticle = wrapped;
   }
 
+  document.addEventListener('visibilitychange', () => {
+    lastFrameAt = performance.now();
+    if (!document.hidden) visibilityResets += 1;
+  }, { passive: true });
+
+  setupLoafObserver();
   root.requestAnimationFrame(frame);
 })(typeof globalThis !== 'undefined' ? globalThis : window);
