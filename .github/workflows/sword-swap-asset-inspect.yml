@@ -1,0 +1,96 @@
+name: Sword Swap Asset Inspect
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'assets/fx/sword-swap/katana-throw.PNG'
+      - '.github/workflows/sword-swap-asset-inspect.yml'
+  workflow_dispatch:
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Pillow
+        run: python -m pip install --disable-pip-version-check pillow
+      - name: Inspect katana throw PNG
+        run: |
+          mkdir -p artifacts
+          python - <<'PY'
+          from PIL import Image
+          import json, math, shutil
+          path='assets/fx/sword-swap/katana-throw.PNG'
+          img=Image.open(path).convert('RGBA')
+          w,h=img.size
+          alpha=img.getchannel('A')
+          amin,amax=alpha.getextrema()
+          pix=alpha.load()
+          total=w*h
+          nonzero=sum(1 for y in range(h) for x in range(w) if pix[x,y] > 8)
+
+          def boundary_density(cols, rows):
+              vals=[]
+              for k in range(1, cols):
+                  x=round(w*k/cols)
+                  xs=range(max(0,x-2), min(w,x+3))
+                  count=sum(1 for xx in xs for y in range(h) if pix[xx,y] > 8)
+                  vals.append(count/(len(list(xs))*h))
+              for k in range(1, rows):
+                  y=round(h*k/rows)
+                  ys=range(max(0,y-2), min(h,y+3))
+                  count=sum(1 for yy in ys for x in range(w) if pix[x,yy] > 8)
+                  vals.append(count/(len(list(ys))*w))
+              return sum(vals)/len(vals) if vals else 1.0
+
+          candidates=[]
+          for cols in range(1,9):
+              if w % cols: continue
+              for rows in range(1,7):
+                  if h % rows: continue
+                  frames=cols*rows
+                  if frames < 2 or frames > 16: continue
+                  fw,fh=w//cols,h//rows
+                  if fw < 96 or fh < 96: continue
+                  occ=[]
+                  bboxes=[]
+                  for r in range(rows):
+                      for c in range(cols):
+                          crop=alpha.crop((c*fw,r*fh,(c+1)*fw,(r+1)*fh))
+                          bbox=crop.point(lambda a: 255 if a>8 else 0).getbbox()
+                          nz=sum(1 for a in crop.getdata() if a>8)
+                          occ.append(nz/(fw*fh))
+                          bboxes.append(bbox)
+                  mean=sum(occ)/len(occ)
+                  variance=sum((v-mean)**2 for v in occ)/len(occ)
+                  bd=boundary_density(cols,rows)
+                  aspect=fw/fh
+                  square_pen=abs(math.log(aspect))
+                  empty=sum(1 for v in occ if v < 0.005)
+                  score=bd*5 + math.sqrt(variance)*2 + square_pen*0.25 + empty*2
+                  candidates.append({
+                      'cols':cols,'rows':rows,'frames':frames,'frameWidth':fw,'frameHeight':fh,
+                      'boundaryDensity':round(bd,6),'meanOccupancy':round(mean,6),
+                      'occupancyStd':round(math.sqrt(variance),6),'emptyCells':empty,
+                      'score':round(score,6),'cellOccupancy':[round(v,5) for v in occ],
+                      'cellBBoxes':bboxes
+                  })
+          candidates.sort(key=lambda c:c['score'])
+          report={
+              'path':path,'mode':'RGBA','width':w,'height':h,
+              'alphaMin':amin,'alphaMax':amax,'nonTransparentRatio':round(nonzero/total,6),
+              'topCandidates':candidates[:12]
+          }
+          print('KATANA_THROW_ANALYSIS '+json.dumps(report, separators=(',',':')))
+          with open('artifacts/katana-throw-analysis.json','w') as f: json.dump(report,f,indent=2)
+          shutil.copy2(path,'artifacts/katana-throw.PNG')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: katana-throw-inspection
+          path: artifacts/
+          if-no-files-found: error
