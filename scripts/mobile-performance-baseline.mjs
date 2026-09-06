@@ -1,6 +1,6 @@
 /* KELO-INDEX
  * area: BUILD
- * keys: MOBILE PERFORMANCE BASELINE PLAYWRIGHT LIVE P95 P99 HTTP CONSOLE
+ * keys: MOBILE PERFORMANCE BASELINE PLAYWRIGHT LIVE P95 P99 HTTP CONSOLE ROUTE
  * hace: recorre Plaza-Commerce-Jardines en LIVE 390x844 y guarda telemetria reproducible sin imponer aun thresholds de FPS
  * online: auditoria LIVE de GitHub Pages
  */
@@ -56,9 +56,14 @@ await page.waitForTimeout(5000);
 const initial = await page.evaluate(() => ({
   perf: window.KELO_PERF?.getSnapshot?.() || null,
   canvas: (() => { const c = document.getElementById('game-canvas'); return c ? { width: c.width, height: c.height, cssWidth: c.clientWidth, cssHeight: c.clientHeight } : null; })(),
-  heap: performance.memory ? { usedJSHeapSize: performance.memory.usedJSHeapSize, totalJSHeapSize: performance.memory.totalJSHeapSize, jsHeapSizeLimit: performance.memory.jsHeapSizeLimit } : null
+  heap: performance.memory ? { usedJSHeapSize: performance.memory.usedJSHeapSize, totalJSHeapSize: performance.memory.totalJSHeapSize, jsHeapSizeLimit: performance.memory.jsHeapSizeLimit } : null,
+  gameGlobals: {
+    player: typeof localPlayer !== 'undefined' && !!localPlayer,
+    camera: typeof camera !== 'undefined' && !!camera
+  }
 }));
 if (initial.perf?.version !== expectedVersion) throw new Error(`Unexpected performance governor version ${initial.perf?.version}`);
+if (!initial.gameGlobals.player || !initial.gameGlobals.camera) throw new Error(`Game globals unavailable to baseline driver: ${JSON.stringify(initial.gameGlobals)}`);
 
 const route = [
   { id: 'plaza', x: 1440, y: 1520 },
@@ -81,10 +86,15 @@ await page.evaluate(({ route, durationMs }) => {
     const b = route[index + 1];
     const x = a.x + (b.x - a.x) * local;
     const y = a.y + (b.y - a.y) * local;
-    if (window.localPlayer) { window.localPlayer.x = x; window.localPlayer.y = y; }
-    if (window.camera) {
-      window.camera.x = x; window.camera.y = y;
-      window.camera.targetX = x; window.camera.targetY = y;
+    if (typeof localPlayer !== 'undefined' && localPlayer) {
+      localPlayer.x = x;
+      localPlayer.y = y;
+    }
+    if (typeof camera !== 'undefined' && camera) {
+      camera.x = x;
+      camera.y = y;
+      camera.targetX = x;
+      camera.targetY = y;
     }
     if (progress < 1) requestAnimationFrame(drive);
     else driver.active = false;
@@ -100,13 +110,17 @@ while (Date.now() - startedAt < durationMs) {
   const sample = await page.evaluate(() => {
     const snap = window.KELO_PERF?.getSnapshot?.() || null;
     const telemetry = window.KELO_PERF?.getFrameTelemetry?.() || null;
+    const actor = typeof localPlayer !== 'undefined' ? localPlayer : null;
+    const districtId = actor && window.KELO_TERRAIN_CONTRACT?.districtForPoint
+      ? window.KELO_TERRAIN_CONTRACT.districtForPoint(actor.x, actor.y)?.id || null
+      : window.KELO_WORLD_AUDIT?.activeDistrictLabel || null;
     return {
       at: performance.now(),
       snap,
       telemetry,
       heap: performance.memory ? { usedJSHeapSize: performance.memory.usedJSHeapSize, totalJSHeapSize: performance.memory.totalJSHeapSize } : null,
-      district: window.KELO_WORLD_AUDIT?.activeDistrictLabel || null,
-      player: window.localPlayer ? { x: Math.round(window.localPlayer.x), y: Math.round(window.localPlayer.y) } : null
+      district: districtId,
+      player: actor ? { x: Math.round(actor.x), y: Math.round(actor.y) } : null
     };
   });
   samples.push(sample);
@@ -117,10 +131,12 @@ await page.waitForTimeout(1000);
 
 const final = await page.evaluate(() => {
   const resources = performance.getEntriesByType('resource');
+  const actor = typeof localPlayer !== 'undefined' ? localPlayer : null;
   return {
     perf: window.KELO_PERF?.getSnapshot?.() || null,
     telemetry: window.KELO_PERF?.getFrameTelemetry?.() || null,
     world: window.KELO_WORLD_AUDIT || null,
+    player: actor ? { x: Math.round(actor.x), y: Math.round(actor.y) } : null,
     canvas: (() => { const c = document.getElementById('game-canvas'); return c ? { width: c.width, height: c.height, cssWidth: c.clientWidth, cssHeight: c.clientHeight } : null; })(),
     heap: performance.memory ? { usedJSHeapSize: performance.memory.usedJSHeapSize, totalJSHeapSize: performance.memory.totalJSHeapSize, jsHeapSizeLimit: performance.memory.jsHeapSizeLimit } : null,
     resources: {
@@ -134,11 +150,18 @@ const final = await page.evaluate(() => {
 const p95Values = samples.map(s => Number(s.telemetry?.p95Ms)).filter(Number.isFinite);
 const p99Values = samples.map(s => Number(s.telemetry?.p99Ms)).filter(Number.isFinite);
 const worstValues = samples.map(s => Number(s.telemetry?.worstMs)).filter(Number.isFinite);
+const routeCoverage = {
+  observedPlayer: samples.every(sample => !!sample.player),
+  reachedCommerceX: samples.some(sample => (sample.player?.x || 0) > 1800),
+  reachedGardensY: samples.some(sample => (sample.player?.y || 0) > 2200),
+  districtsSeen: [...new Set(samples.map(sample => sample.district).filter(Boolean))]
+};
 const summary = {
   governorVersion: final.perf?.version || null,
   durationMs,
   viewport: '390x844@2x',
   sampleCount: samples.length,
+  routeCoverage,
   maxWindowP95Ms: p95Values.length ? Math.max(...p95Values) : null,
   maxWindowP99Ms: p99Values.length ? Math.max(...p99Values) : null,
   worstObservedFrameMs: worstValues.length ? Math.max(...worstValues) : null,
@@ -164,6 +187,9 @@ await browser.close();
 
 if (summary.governorVersion !== expectedVersion) throw new Error('Performance governor version mismatch');
 if (!samples.length || summary.maxWindowP95Ms == null || summary.maxWindowP99Ms == null) throw new Error('Performance telemetry did not produce percentile samples');
+if (!routeCoverage.observedPlayer || !routeCoverage.reachedCommerceX || !routeCoverage.reachedGardensY) {
+  throw new Error(`Baseline route did not traverse the real game world: ${JSON.stringify(routeCoverage)}`);
+}
 if (consoleErrors.length || pageErrors.length || failedRequests.length || httpErrors.length) {
   throw new Error(`LIVE runtime errors detected: ${JSON.stringify({ consoleErrors, pageErrors, failedRequests, httpErrors })}`);
 }
