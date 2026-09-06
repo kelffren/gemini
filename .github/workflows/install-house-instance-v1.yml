@@ -1,5 +1,6 @@
 name: Install House Instance V1
 on:
+  workflow_dispatch:
   push:
     branches: [ feature/map-editor-parcels-v1 ]
     paths:
