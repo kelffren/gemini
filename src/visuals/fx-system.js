@@ -1,6 +1,6 @@
 /* KELO-INDEX
  * area: VISUAL
- * keys: VFX FX PROJECTILE TRAIL PARTICLE SFX AUDIO SCREEN SHAKE FLASH POOL CULL QUALITY
+ * keys: VFX FX PROJECTILE TRAIL PARTICLE SFX AUDIO SCREEN SHAKE FLASH POOL CULL QUALITY SPRITESHEET
  * hace: runtimes independientes para VFX, proyectiles visuales, sonido y efectos de pantalla
  * online: solo representa eventos/contexto; jamás calcula hit, daño, estado real ni trayectoria autoritativa
  */
@@ -202,16 +202,46 @@
     g.beginPath(); g.arc(p.x, p.y, r, 0, Math.PI * 2); g.fill();
   }
 
+  // KELO-INDEX VISUAL/SPRITESHEET recorta frames de una hoja sin mover gameplay ni mezclar ownership.
   function drawAssetFx(g, item, p) {
     const assetId = item.def.assetId;
     if (!assetId || !root.KeloAssetRegistry) return false;
     const image = root.KeloAssetRegistry.resource(assetId);
     if (!image) { root.KeloAssetRegistry.load(assetId); return false; }
-    const width = (Number(item.def.width) || image.width || 32) * item.scale;
-    const height = (Number(item.def.height) || image.height || 32) * item.scale;
-    g.globalAlpha = alphaOf(item);
+
+    let sx = 0, sy = 0;
+    let sw = image.width || 32, sh = image.height || 32;
+    if (item.def.type === 'sprite_animation') {
+      const frameWidth = Math.max(1, Number(item.def.frameWidth) || sw);
+      const frameHeight = Math.max(1, Number(item.def.frameHeight) || sh);
+      const columns = Math.max(1, Number(item.def.columns) || Math.floor(sw / frameWidth) || 1);
+      const rows = Math.max(1, Number(item.def.rows) || Math.floor(sh / frameHeight) || 1);
+      const available = Math.max(1, columns * rows);
+      const frameCount = Math.max(1, Math.min(Number(item.def.frames) || available, available));
+      const fps = Math.max(0.001, Number(item.def.fps) || 12);
+      const rawFrame = Math.floor(item.elapsed * fps);
+      const frame = item.loop ? rawFrame % frameCount : Math.min(frameCount - 1, rawFrame);
+      sx = (frame % columns) * frameWidth;
+      sy = Math.floor(frame / columns) * frameHeight;
+      sw = frameWidth;
+      sh = frameHeight;
+    }
+
+    const width = (Number(item.def.width) || sw || 32) * item.scale;
+    const height = (Number(item.def.height) || sh || 32) * item.scale;
+    const offset = item.def.offset || {};
+    const ox = (Number(item.def.offsetX) || Number(offset.x) || 0) * item.scale;
+    const oy = (Number(item.def.offsetY) || Number(offset.y) || 0) * item.scale;
+    const alpha = Math.max(0, Number(item.def.alpha == null ? 1 : item.def.alpha));
+    g.globalAlpha = item.def.fadeOut === false ? alpha : alphaOf(item);
     g.imageSmoothingEnabled = false;
-    g.drawImage(image, Math.round(p.x - width * 0.5), Math.round(p.y - height * 0.5), width, height);
+    g.drawImage(
+      image,
+      sx, sy, sw, sh,
+      Math.round(p.x + ox - width * 0.5),
+      Math.round(p.y + oy - height * 0.5),
+      width, height
+    );
     return true;
   }
 
@@ -428,8 +458,8 @@
     });
   }
 
-  root.KeloFXRegistry = Object.freeze({ version: 'fx-registry-v1.0.0', get: function (id) { return fxDefs.get(String(id || '')) || null; }, list: function () { return Array.from(fxDefs.values()); }, register: function (def) { return registerInto(fxDefs, def, 'FX'); } });
-  root.KeloFX = Object.freeze({ version: 'fx-runtime-v1.0.0', spawn: spawnFx, stop: stopFx, update: updateFx, drawLayer: drawLayer, drawActorLayer: drawActorLayer, metrics: fxMetrics });
+  root.KeloFXRegistry = Object.freeze({ version: 'fx-registry-v1.1.0', get: function (id) { return fxDefs.get(String(id || '')) || null; }, list: function () { return Array.from(fxDefs.values()); }, register: function (def) { return registerInto(fxDefs, def, 'FX'); } });
+  root.KeloFX = Object.freeze({ version: 'fx-runtime-v1.1.0', spawn: spawnFx, stop: stopFx, update: updateFx, drawLayer: drawLayer, drawActorLayer: drawActorLayer, metrics: fxMetrics });
   root.KeloProjectileVisualRegistry = Object.freeze({ version: 'projectile-visual-registry-v1.0.0', get: function (id) { return projectileDefs.get(String(id || '')) || null; }, list: function () { return Array.from(projectileDefs.values()); }, register: function (def) { return registerInto(projectileDefs, def, 'PROJECTILE_VISUAL'); } });
   root.KeloProjectileVisuals = Object.freeze({ version: 'projectile-visual-runtime-v1.0.0', attach: attachProjectile, preview: previewProjectile, stop: stopProjectile, update: updateProjectiles, drawLayer: drawProjectileLayer, metrics: projectileMetrics });
   root.KeloSFXRegistry = Object.freeze({ version: 'sfx-registry-v1.0.0', get: function (id) { return sfxDefs.get(String(id || '')) || null; }, list: function () { return Array.from(sfxDefs.values()); }, register: function (def) { return registerInto(sfxDefs, def, 'SFX'); } });
