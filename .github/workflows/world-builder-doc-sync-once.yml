@@ -1,0 +1,40 @@
+name: World Builder Docs Sync Once
+on:
+  push:
+    branches: [ feature/world-builder-admin-v1 ]
+    paths:
+      - '.github/workflows/world-builder-doc-sync-once.yml'
+permissions:
+  contents: write
+jobs:
+  sync-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Append ownership docs without overwriting latest main
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          engine=Path('ENGINE_MAP.md')
+          text=engine.read_text()
+          marker='<!-- WORLD-BUILDER-V1:START -->'
+          if marker not in text:
+              text += '''\n\n<!-- WORLD-BUILDER-V1:START -->\n## WORLD BUILDER / ADMIN AUTHORING V1\n\n| Sistema | Estado | OWNER LIVE / FEATURE | SUPPORT / notas |\n|---|---|---|---|\n| Permisos de creador | CLIENT/FALLBACK, server-ready | `src/systems/admin-key-system.js` | scopes `world.edit/export/import/publish`, `admin.issue/revoke`; online deberá validar servidor |\n| World terrain/path draft | CLIENT/FALLBACK, authority-replaceable | `src/environment/world-builder-system.js` | overrides versionados; no sustituye el mapa base destructivamente |\n| World collisions draft | CLIENT/FALLBACK, authority-replaceable | `src/environment/world-builder-system.js` | IDs estables; se reflejan en `obstacles` |\n| World object placements | OWNER = PROPERTY | `src/property/property-system.js` | World Builder reutiliza `parcel:world:editor`; no existe un segundo modelo de objetos |\n| World object presentation bajo Decoration Reset | SUPPORT presentation-only | `src/environment/world-builder-property-renderer.js` | lee Property; nunca posee placements ni economía |\n| World Builder UI | CLIENT UI | `src/ui/world-builder-ui.js` | móvil/desktop; toda mutación pasa por `request()` |\n\n**Invariante:** parcela del jugador continúa limitada por unidades. La Llave Admin solo habilita autoría del mundo principal.\n\n**Persistencia actual:** `kelo_world_builder_state_v1` detrás de LocalWorldBuilderAuthority; objetos siguen en Property.\n<!-- WORLD-BUILDER-V1:END -->\n'''
+              engine.write_text(text)
+
+          idx=Path('docs/CODE_INDEX.md')
+          text=idx.read_text()
+          marker='<!-- WORLD-BUILDER-V1:START -->'
+          if marker not in text:
+              text += '''\n\n<!-- WORLD-BUILDER-V1:START -->\n## WORLD BUILDER / ADMIN AUTHORING V1\n- `src/environment/world-builder-system.js`: autoridad local reemplazable para overrides de SUELO/CAMINOS y colisiones del mundo principal.\n- `src/environment/world-builder-property-renderer.js`: fallback visual de placements Property cuando Decoration Reset suprime las capas normales; no posee estado.\n- `src/ui/world-builder-ui.js`: UI táctil/desktop `🗝 WORLD BUILDER`; capas SUELO, CAMINOS, OBJETOS y COLISIÓN.\n- `src/property/property-system.js`: continúa siendo la única fuente de verdad para OBJETOS/placements del mundo y parcelas.\n- `src/systems/admin-key-system.js`: única puerta de permisos/scopes de autor.\n- `docs/WORLD_BUILDER_MEMORY.md`: contrato completo, snapshot y migración online.\n- Hoy = `BORRADOR LOCAL`; futuro = `ServerWorldBuilderAuthority → Draft → Review → Publish`.\n<!-- WORLD-BUILDER-V1:END -->\n'''
+              idx.write_text(text)
+          PY
+      - name: Commit docs and remove one-time workflow
+        run: |
+          rm -f .github/workflows/world-builder-doc-sync-once.yml
+          git config user.name kelo-world-builder-bot
+          git config user.email 68343904+kelffren@users.noreply.github.com
+          git add ENGINE_MAP.md docs/CODE_INDEX.md .github/workflows/world-builder-doc-sync-once.yml
+          git commit -m 'Document World Builder on latest engine map'
+          git push
