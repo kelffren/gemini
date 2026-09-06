@@ -1,0 +1,57 @@
+name: Integrate Kelo Cesped Ground
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'assets/cesped.PNG'
+      - 'scripts/integrate_cesped_ground.py'
+      - '.github/workflows/integrate-cesped-ground.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install image tooling
+        run: python -m pip install --disable-pip-version-check pillow numpy
+      - name: Build and integrate cesped runtime atlas
+        run: python scripts/integrate_cesped_ground.py
+      - name: Syntax and contract checks
+        run: |
+          node --check src/environment/tile-registry.js
+          node --check src/environment/atlas-contract.js
+          node --check src/environment/surface-ground.js
+          node scripts/validate-art-assets.mjs
+          node scripts/validate-atlas-contract.mjs
+          node scripts/validate-png-pipeline.mjs
+          node scripts/test-png-validation.mjs
+          git diff --check
+      - name: Verify cesped runtime binary
+        run: |
+          python - <<'PY'
+          from PIL import Image
+          p='assets/cesped-runtime.png'
+          im=Image.open(p)
+          assert im.size==(160,160), im.size
+          assert im.mode in ('RGB','RGBA'), im.mode
+          print('PASS',p,im.size,im.mode)
+          PY
+      - name: Commit cesped integration
+        run: |
+          if git diff --quiet && git diff --cached --quiet; then
+            echo 'No changes to commit'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add assets/cesped-runtime.png src/environment/tile-registry.js src/environment/atlas-contract.js src/environment/surface-ground.js src/environment/art-asset-manifest.json src/environment/png-validation-policy.json index.html
+          git commit -m 'Cover rebuild world with Kelo cesped'
+          git push origin HEAD:main
