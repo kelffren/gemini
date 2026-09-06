@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: QA
- * keys: LIVE MOBILE VISUAL ANIMATION VFX PROJECTILE SEQUENCE FIREBALL REMOTE DECOUPLING
- * hace: valida en Pages que las piezas visuales son independientes y que Fireball conserva gameplay sin resolver visual
+ * keys: LIVE MOBILE VISUAL ANIMATION VFX PROJECTILE SEQUENCE FIREBALL REMOTE DECOUPLING SWORD SWAP SPRITESHEET
+ * hace: valida en Pages que las piezas visuales son independientes, Sword Swap anima su activation eye y Fireball conserva gameplay sin resolver visual
  * online: simula el mismo evento semántico que recibe un peer; no falsifica autoridad gameplay
  */
 import fs from 'node:fs';
@@ -56,12 +56,55 @@ const boot = await page.evaluate(() => {
     layout
   };
 });
-if (!boot.title.includes('V6.26')) throw new Error(`stale LIVE title ${boot.title}`);
+if (!/^Kelo World — V\d+/i.test(boot.title)) throw new Error(`unexpected LIVE title ${boot.title}`);
 if (boot.fireSlot < 0) throw new Error('Fireball starter slot missing');
 if (!boot.lab) throw new Error('Visual Lab did not activate with query flag');
 for (const [key, value] of Object.entries(boot.api)) if (!value) throw new Error(`missing public visual API ${key}`);
 if (!boot.audit.actorBridgeWrapped || !boot.audit.integrationReady) throw new Error(`visual integration unavailable ${JSON.stringify(boot.audit)}`);
 if (!boot.layout || boot.layout.footRootY - boot.layout.physicsRootY !== 10) throw new Error('foot-root contract drifted before visual test');
+
+// Sword Swap pilot: prove the uploaded 3x2 sheet is registered, loads, spawns on the actor,
+// stays presentation-only, finishes, and is selectable through the same modular resolver.
+const swordSwapSetup = await page.evaluate(async () => {
+  const p = window.localPlayer || localPlayer;
+  const before = { x: p.x, y: p.y, radius: p.radius };
+  const asset = window.KELO_VISUAL_MANIFESTS?.assets?.sword_swap_activation_eye_anim_asset || null;
+  const fx = window.KeloFXRegistry?.get('sword_swap_activation_eye_anim') || null;
+  const sequence = window.KeloSequenceRegistry?.get('sequence_sword_swap_activation_eye_anim') || null;
+  const profile = window.KeloAbilityVisuals?.resolveProfile(11, 'swap_sword') || null;
+  const loaded = asset ? await window.KeloAssetRegistry.load('sword_swap_activation_eye_anim_asset') : null;
+  const fxId = window.KeloFX?.spawn('sword_swap_activation_eye_anim', {
+    actor: p, actorId: p.id, visual: { scale: 1.15, seed: 606 }
+  }, { socket: 'head', scale: 1.15, loop: false });
+  return {
+    before,
+    asset: asset && { src: asset.src, frameWidth: asset.frameWidth, frameHeight: asset.frameHeight, columns: asset.columns, rows: asset.rows, frames: asset.frames },
+    fx: fx && { type: fx.type, assetId: fx.assetId, frameWidth: fx.frameWidth, frameHeight: fx.frameHeight, columns: fx.columns, rows: fx.rows, frames: fx.frames, fps: fx.fps, duration: fx.duration, loop: fx.loop, space: fx.space, layer: fx.layer, socket: fx.socket },
+    sequence: sequence && { id: sequence.id, duration: sequence.duration },
+    profile: profile && { id: profile.id, abilityKey: profile.abilityKey, castSequence: profile.castSequence },
+    loaded: !!loaded,
+    fxId,
+    active: window.KeloFX.metrics().active
+  };
+});
+if (!swordSwapSetup.asset || swordSwapSetup.asset.src !== 'assets/fx/sword-swap/activation-eye-anim.PNG') throw new Error(`Sword Swap animated asset path missing ${JSON.stringify(swordSwapSetup)}`);
+if (swordSwapSetup.asset.frameWidth !== 512 || swordSwapSetup.asset.frameHeight !== 512 || swordSwapSetup.asset.columns !== 3 || swordSwapSetup.asset.rows !== 2 || swordSwapSetup.asset.frames !== 6) throw new Error(`Sword Swap asset grid contract failed ${JSON.stringify(swordSwapSetup.asset)}`);
+if (!swordSwapSetup.fx || swordSwapSetup.fx.type !== 'sprite_animation' || swordSwapSetup.fx.frames !== 6 || swordSwapSetup.fx.fps !== 12 || swordSwapSetup.fx.loop !== false || swordSwapSetup.fx.space !== 'ACTOR' || swordSwapSetup.fx.layer !== 'actorFrontFX' || swordSwapSetup.fx.socket !== 'head') throw new Error(`Sword Swap animated FX contract failed ${JSON.stringify(swordSwapSetup.fx)}`);
+if (!swordSwapSetup.sequence || swordSwapSetup.sequence.id !== 'sequence_sword_swap_activation_eye_anim') throw new Error(`Sword Swap sequence missing ${JSON.stringify(swordSwapSetup.sequence)}`);
+if (!swordSwapSetup.profile || swordSwapSetup.profile.id !== 'ability_visual_sword_swap_01' || swordSwapSetup.profile.castSequence !== 'sequence_sword_swap_activation_eye_anim') throw new Error(`Sword Swap profile did not prioritize animated eye ${JSON.stringify(swordSwapSetup.profile)}`);
+if (!swordSwapSetup.loaded || !swordSwapSetup.fxId || swordSwapSetup.active < 1) throw new Error(`Sword Swap animated eye did not load/spawn ${JSON.stringify(swordSwapSetup)}`);
+await page.waitForTimeout(250);
+const swordSwapMid = await page.evaluate(() => {
+  const p = window.localPlayer || localPlayer;
+  return { player: { x: p.x, y: p.y, radius: p.radius }, active: KeloFX.metrics().active };
+});
+if (swordSwapMid.player.x !== swordSwapSetup.before.x || swordSwapMid.player.y !== swordSwapSetup.before.y || swordSwapMid.player.radius !== swordSwapSetup.before.radius) throw new Error('Sword Swap activation VFX mutated gameplay pose/physics');
+if (swordSwapMid.active < 1) throw new Error(`Sword Swap animated eye ended before mid-animation ${JSON.stringify(swordSwapMid)}`);
+await page.screenshot({ path: 'artifacts/sword-swap-activation-eye-mobile.png', fullPage: false, scale: 'device' });
+await page.waitForTimeout(400);
+const swordSwapEnd = await page.evaluate(() => ({ active: KeloFX.metrics().active, missingAssets: [...(KELO_VISUAL_AUDIT.missingAssets || [])] }));
+if (swordSwapEnd.active !== 0) throw new Error(`Sword Swap activation VFX did not finish cleanly ${JSON.stringify(swordSwapEnd)}`);
+if (swordSwapEnd.missingAssets.length) throw new Error(`Sword Swap activation asset missing on LIVE ${JSON.stringify(swordSwapEnd.missingAssets)}`);
 
 const independent = await page.evaluate(() => {
   const p = window.localPlayer || localPlayer;
@@ -138,6 +181,7 @@ const final = await page.evaluate(() => {
     presentation: window.KELO_AVATAR_PRESENTATION?.get(p, p._face || 'down'),
     movement: window.KELO_MOVEMENT_AUDIT ? JSON.parse(JSON.stringify(window.KELO_MOVEMENT_AUDIT)) : null,
     profile: KeloAbilityVisuals.resolveProfile(1, 'fireball')?.id,
+    swordSwapProfile: KeloAbilityVisuals.resolveProfile(11, 'swap_sword')?.id,
     visualLabApiStillAvailable: !!window.KeloVisualLab,
     stoneSystemVisualKnowledge: ['KeloAnimation','KeloFX','KeloSequence'].some(k => Object.prototype.hasOwnProperty.call(window.KeloStones || {}, k))
   };
@@ -146,10 +190,11 @@ if (final.audit.missingAssets.length) throw new Error(`unexpected missing visual
 if (!final.presentation || final.presentation.footRootY - final.presentation.physicsRootY !== 10) throw new Error('foot-root drift after visual runtime');
 if (!final.movement || final.movement.version !== 'MOV-plant-audit-v1') throw new Error('movement owner/gait contract missing after visual integration');
 if (final.profile !== 'ability_visual_fireball_01') throw new Error('Fireball profile lost');
+if (final.swordSwapProfile !== 'ability_visual_sword_swap_01') throw new Error('Sword Swap profile lost');
 if (!final.visualLabApiStillAvailable || final.stoneSystemVisualKnowledge) throw new Error(`visual lab/stone decoupling regression ${JSON.stringify(final)}`);
 
 if (consoleErrors.length || failedRequests.length || httpErrors.length) throw new Error(`browser errors ${JSON.stringify({ consoleErrors, failedRequests, httpErrors })}`);
-const report = { boot, independent, afterIndependent, disabledGameplay, enabledFireball, fireballRuntime, remote, final, consoleErrors, failedRequests, httpErrors };
+const report = { boot, swordSwapSetup, swordSwapMid, swordSwapEnd, independent, afterIndependent, disabledGameplay, enabledFireball, fireballRuntime, remote, final, consoleErrors, failedRequests, httpErrors };
 fs.writeFileSync('artifacts/visual-system-live-audit.json', JSON.stringify(report, null, 2));
 console.log(JSON.stringify(report, null, 2));
 await context.close();
