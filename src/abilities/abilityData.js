@@ -1,3 +1,9 @@
+/* KELO-INDEX
+ * area: ABILITY
+ * keys: DATA GAMEPLAY STONE RECIPE DELIVERY EFFECT VISUAL PROFILE
+ * hace: fuente data-driven de gameplay; visualProfileId es una referencia opcional y no contiene implementación visual
+ * online: servidor futuro puede validar estos IDs/reglas; presentation permanece cliente
+ */
 (function (root, factory) {
   const data = factory();
 
@@ -71,6 +77,7 @@
         Object.freeze({ type: 'damage', damageType: 'fire', amount: 35 }),
         Object.freeze({ type: 'status', status: 'burn', duration: 3, magnitude: 6, tickInterval: 1 }),
       ]),
+      visualProfileId: 'ability_visual_fireball_01',
       visuals: Object.freeze({ color: '#ff6b35', fx: 'fireball' }),
     }),
     Object.freeze({
