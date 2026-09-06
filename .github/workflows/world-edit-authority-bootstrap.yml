@@ -1,0 +1,46 @@
+name: Bootstrap World Edit Authority V1
+
+on:
+  push:
+    branches: [feature/world-edit-authority-v1]
+    paths:
+      - '.bootstrap/world-edit-authority/**'
+      - '.github/workflows/world-edit-authority-bootstrap.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Rebuild source bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .bootstrap/world-edit-authority/part00 \
+              .bootstrap/world-edit-authority/part01 \
+              .bootstrap/world-edit-authority/part02 \
+              .bootstrap/world-edit-authority/part03 \
+              .bootstrap/world-edit-authority/part04 \
+              .bootstrap/world-edit-authority/part05 > /tmp/world-edit-authority.tgz
+          tar -xzf /tmp/world-edit-authority.tgz -C .
+          rm -rf .bootstrap/world-edit-authority
+          rm -f .github/workflows/world-edit-authority-bootstrap.yml
+      - name: Commit generated implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No generated changes"
+            exit 0
+          fi
+          git commit -m "Install World Edit Authority V1"
+          git push origin HEAD:feature/world-edit-authority-v1
