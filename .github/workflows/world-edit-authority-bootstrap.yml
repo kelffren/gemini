@@ -29,18 +29,20 @@ jobs:
               .bootstrap/world-edit-authority/part04 \
               .bootstrap/world-edit-authority/part05 > /tmp/world-edit-authority.tgz
           tar -xzf /tmp/world-edit-authority.tgz -C .
-          rm -rf .bootstrap/world-edit-authority
-          rm -f .github/workflows/world-edit-authority-bootstrap.yml
-      - name: Commit generated implementation
+      - name: Commit source implementation only
         shell: bash
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
+          git add src/world \
+                  src/environment/world-builder-system.js \
+                  src/ui/world-builder-ui.js \
+                  scripts/world-edit-authority-audit.mjs \
+                  docs/WORLD_EDIT_AUTHORITY_MEMORY.md
           if git diff --cached --quiet; then
-            echo "No generated changes"
+            echo "No source changes"
             exit 0
           fi
-          git commit -m "Install World Edit Authority V1"
+          git commit -m "Install World Edit Authority V1 source"
           git push origin HEAD:feature/world-edit-authority-v1
