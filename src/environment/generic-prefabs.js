@@ -6,14 +6,15 @@
   if(!C||!L||typeof L.register!=='function'||!A||typeof A.acquire!=='function'){console.error('[Kelo generic prefabs] contract/layer stack/atlas contract missing');return;}
 
   const images=new Map(),readyAssets=new Set();let failed=false,installed=false;
-  const audit=window.KELO_PREFAB_AUDIT={version:'generic-prefabs-v1.3',contractVersion:C.version,ready:false,failed:false,
+  const audit=window.KELO_PREFAB_AUDIT={version:'generic-prefabs-v1.4',contractVersion:C.version,ready:false,failed:false,
     rendererMode:'data-driven-prefabs-v2',resourceMode:'atlas-contract-managed-v1',prefabCount:C.prefabs.length,assetCount:Object.keys(C.assets).length,
-    registeredColliderCount:0,backDrawCount:0,frontDrawCount:0,frontOcclusionDrawCount:0,layerCount:0,
+    decorationReset:window.KELO_WORLD_DECORATION_RESET===true,registeredColliderCount:0,backDrawCount:0,frontDrawCount:0,frontOcclusionDrawCount:0,layerCount:0,
     renderPartCount:C.prefabs.reduce((n,p)=>n+(p.renderPlan?.parts?.length||0),0),bootstrapMode:'deferred-after-engine-bootstrap-v1'};
 
   function geometry(p){return{x:p.position.x,y:p.position.y,w:p.size.w,h:p.size.h};}
   function partGeometry(p,part){return{x:p.position.x+part.offset.x,y:p.position.y+part.offset.y,w:part.size.w,h:part.size.h};}
   function drawPart(g,p,part){
+    if(window.KELO_WORLD_DECORATION_RESET===true)return false;
     const img=images.get(part.asset);if(!img||!readyAssets.has(part.asset))return false;
     const d=partGeometry(p,part),s=part.source;
     const prev=g.globalAlpha;g.globalAlpha=prev*part.opacity;
@@ -26,10 +27,10 @@
     const bottom=c?c.y+c.h:b.y+b.h;
     return actor.x+r>b.x+(o.sideInset||0)&&actor.x-r<b.x+b.w-(o.sideInset||0)&&actor.y>b.y+(o.topInset||0)&&actor.y<bottom+(o.bottomPadding||0);
   }
-  function drawPhaseParts(g,p,phase){let count=0;for(const part of p.renderPlan?.parts||[])if(part.phase===phase&&drawPart(g,p,part))count++;return count;}
-  function drawBack(g){if(failed)return;let count=0;g.save();g.imageSmoothingEnabled=false;for(const p of C.prefabs)count+=drawPhaseParts(g,p,'props_back');g.restore();audit.backDrawCount=count;}
+  function drawPhaseParts(g,p,phase){if(window.KELO_WORLD_DECORATION_RESET===true)return 0;let count=0;for(const part of p.renderPlan?.parts||[])if(part.phase===phase&&drawPart(g,p,part))count++;return count;}
+  function drawBack(g){if(failed||window.KELO_WORLD_DECORATION_RESET===true)return;let count=0;g.save();g.imageSmoothingEnabled=false;for(const p of C.prefabs)count+=drawPhaseParts(g,p,'props_back');g.restore();audit.backDrawCount=count;}
   function drawFront(g){
-    if(failed)return;let front=0,clips=0;g.save();g.imageSmoothingEnabled=false;
+    if(failed||window.KELO_WORLD_DECORATION_RESET===true)return;let front=0,clips=0;g.save();g.imageSmoothingEnabled=false;
     for(const p of C.prefabs){
       front+=drawPhaseParts(g,p,'props_front');
       if(p.renderPlan?.occlusionFallback!=='clip-redraw-back-v1')continue;
@@ -42,9 +43,13 @@
     }
     g.restore();audit.frontDrawCount=front;audit.frontOcclusionDrawCount=clips;
   }
-  function bounds(){return C.prefabs.map(p=>({id:p.id,...p.visualBounds}));}
+  function bounds(){return window.KELO_WORLD_DECORATION_RESET===true?[]:C.prefabs.map(p=>({id:p.id,...p.visualBounds}));}
   function registerColliders(){
     if(typeof obstacles==='undefined'||!Array.isArray(obstacles))return 0;
+    if(window.KELO_WORLD_DECORATION_RESET===true){
+      for(let i=obstacles.length-1;i>=0;i--)if(obstacles[i]?._genericPrefabCollision===true)obstacles.splice(i,1);
+      audit.registeredColliderCount=0;return 0;
+    }
     for(const p of C.prefabs){const c=p.collider;if(!c||obstacles.some(o=>o?._genericPrefabCollisionFor===p.id))continue;
       obstacles.push({id:p.id,x:c.x,y:c.y,w:c.w,h:c.h,noDraw:c.noDraw!==false,_genericPrefabCollision:true,_genericPrefabCollisionFor:p.id});
     }
@@ -63,7 +68,7 @@
   }
   function getEntry(key){const p=C.prefabs.find(x=>x.key===key||x.id===key);if(!p)return null;return Object.freeze({key:p.key,prefab:p,asset:C.assets[p.asset],geometry:Object.freeze(geometry(p)),renderPlan:p.renderPlan,isOccluding(actor){return actorBehind(p,actor);},get ready(){return readyAssets.has(p.asset);},get failed(){return failed;}});}
 
-  window.KELO_PREFAB_RENDERER=Object.freeze({version:'generic-prefabs-v1.3',mode:'data-driven-prefabs-v2',resourceMode:'atlas-contract-managed-v1',getEntry,ensureColliders:registerColliders,get ready(){return audit.ready&&!audit.failed;},get failed(){return audit.failed;}});
+  window.KELO_PREFAB_RENDERER=Object.freeze({version:'generic-prefabs-v1.4',mode:'data-driven-prefabs-v2',resourceMode:'atlas-contract-managed-v1',getEntry,ensureColliders:registerColliders,get ready(){return audit.ready&&!audit.failed;},get failed(){return audit.failed;}});
   const entries=Object.entries(C.assets).filter(([,a])=>a?.src);
   if(!entries.length)audit.ready=true;
   for(const [id] of entries){
