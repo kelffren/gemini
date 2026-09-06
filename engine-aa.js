@@ -7,14 +7,17 @@
     { x: OX + 8 * T, y: OY + 16 * T },
     { x: OX + 19 * T, y: OY + 16 * T }
   ];
+  function resetActive(){return window.KELO_WORLD_DECORATION_RESET===true||window.KELO_WORLD_RENDERER?.decorationReset===true;}
 
-  window.KELO_LEGACY_PLAZA_AUDIT = Object.freeze({
-    version: 'legacy-plaza-v1.1',
+  window.KELO_LEGACY_PLAZA_AUDIT = {
+    version: 'legacy-plaza-v1.2',
     proceduralTreeMode: 'disabled-authored-nature-owned-v1',
     proceduralTreeCount: 0,
-    lampsPreserved: true,
-    fountainGlowPreserved: true
-  });
+    lampsPreserved: false,
+    fountainGlowPreserved: false,
+    decorationReset: true,
+    drawCount: 0
+  };
 
   function lamp(ctx, x, y, t) {
     ctx.fillStyle = '#2a2428';
@@ -31,6 +34,10 @@
   const _r = render;
   render = function () {
     _r();
+    if (resetActive()) {
+      window.KELO_LEGACY_PLAZA_AUDIT.decorationReset = true;
+      return;
+    }
     const z = CONFIG.zoom || 1;
     const t = Date.now() / 1000;
     ctx.save();
@@ -46,5 +53,6 @@
     if (typeof simulatedPlayers !== 'undefined') simulatedPlayers.forEach(function (p) { renderAvatar(p, false); });
     renderAvatar(localPlayer, true);
     ctx.restore();
+    window.KELO_LEGACY_PLAZA_AUDIT.drawCount++;
   };
 })();
