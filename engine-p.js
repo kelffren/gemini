@@ -4,6 +4,7 @@
     { id: 'joyero', name: 'Joyero', x: 1520, y: 1520, color: '#e7c56a', line: 'Corta en el brillo. Si aciertas, hay KC.' }
   ];
   window.keloNpcs = npcs;
+  function resetActive(){return window.KELO_WORLD_DECORATION_RESET===true||window.KELO_WORLD_RENDERER?.decorationReset===true;}
 
   const registry = window.KELO_TILE_REGISTRY;
   const npcAtlas = registry?.atlases?.plazaNpcs;
@@ -14,7 +15,7 @@
   let authoredReady = false;
   let drawCount = 0;
   window.KELO_PLAZA_NPC_AUDIT = {
-    version:'plaza-npcs-v1',
+    version:'plaza-npcs-v1.1',
     ready:false,
     assetLoaded:false,
     failed:false,
@@ -23,7 +24,9 @@
     labelMode:npcStyle?.labelMode || null,
     registryVersion:registry?.version || null,
     drawCount:0,
-    gameplayAnchorsPreserved:true
+    gameplayAnchorsPreserved:true,
+    decorationReset:true,
+    decorationResetSuppressed:true
   };
   if (npcAtlas && npcVisuals && npcStyle) {
     npcImg.onload = function () {
@@ -56,6 +59,7 @@
   }
 
   function closest() {
+    if (resetActive()) return null;
     let best = null, bestD = 64;
     npcs.forEach(function (n) {
       const d = dist(localPlayer, n);
@@ -76,6 +80,7 @@
   }
 
   function startCut() {
+    if (resetActive()) return;
     game.on = true;
     game.t = 0;
     talkOpen = false;
@@ -90,6 +95,7 @@
   }
 
   window.addEventListener('keydown', function (e) {
+    if (resetActive()) return;
     if (e.key === 'e' || e.key === 'E') {
       if (game.on) { tryCut(); return; }
       near = closest();
@@ -99,6 +105,7 @@
   });
 
   window.addEventListener('pointerdown', function (e) {
+    if (resetActive()) return;
     if (game.on) {
       e.preventDefault();
       tryCut();
@@ -132,6 +139,14 @@
   const _upd = updateSimulation;
   updateSimulation = function (dt) {
     _upd(dt);
+    if (resetActive()) {
+      near=null;talkOpen=false;game.on=false;
+      const hint=document.getElementById('npc-hint');
+      const box=document.getElementById('npc-talk');
+      if(hint)hint.style.display='none';
+      if(box)box.style.display='none';
+      return;
+    }
     near = closest();
     if (game.on) game.t += dt;
     const hint = document.getElementById('npc-hint');
@@ -174,6 +189,11 @@
   const _r = render;
   render = function () {
     _r();
+    if (resetActive()) {
+      window.KELO_PLAZA_NPC_AUDIT.decorationReset=true;
+      window.KELO_PLAZA_NPC_AUDIT.decorationResetSuppressed=true;
+      return;
+    }
     const z = CONFIG.zoom || 1;
     ctx.save();
     ctx.translate(screenW / 2, screenH / 2);
