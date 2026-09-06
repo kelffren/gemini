@@ -70,4 +70,8 @@ jobs:
           git config user.email '68343904+kelffren@users.noreply.github.com'
           git add docs/ai-bridge/CHATGPT_TO_GROK.md
           git commit -m 'Append pending ChatGPT bridge research'
+          # main receives frequent concurrent commits from other Kelo workflows/agents.
+          # Rebase this append-only commit onto the latest remote head before pushing
+          # so a harmless race does not lose the research handoff.
+          git pull --rebase origin main
           git push origin HEAD:main
