@@ -307,6 +307,9 @@
     item.vy = dir.y / len * (Number(opts.speed) || Number(c.gameplay.speed) || Number(def.defaultSpeed) || 0);
     item.maxDistance = Number(opts.maxDistance) || Number(c.gameplay.range) || Number(def.defaultMaxDistance) || 500;
     item.traveled = 0;
+    item.elapsed = 0;
+    item.scale = Math.max(0.05, Number(opts.scale != null ? opts.scale : c.visual.scale) || 1);
+    item.loop = opts.loop != null ? opts.loop === true : def.loop === true;
     item.preview = !gameplayObject;
     item.dead = false;
     item.trail = [];
@@ -335,6 +338,7 @@
   function updateProjectiles(dt) {
     for (let i = activeProjectiles.length - 1; i >= 0; i--) {
       const item = activeProjectiles[i];
+      item.elapsed += dt;
       const beforeX = item.x, beforeY = item.y;
       if (item.gameplayObject) {
         if (item.gameplayObject._keloVisualDead === true) {
@@ -349,27 +353,84 @@
           activeProjectiles.splice(i, 1); projectilePool.push(item); continue;
         }
       }
-      item.trailClock += dt;
-      if (item.trailClock >= 0.045) {
-        item.trailClock = 0;
-        item.trail.push({ x: item.x, y: item.y, life: 0.24 });
-        if (item.trail.length > 10) item.trail.shift();
+      if (item.def.trailRef) {
+        item.trailClock += dt;
+        if (item.trailClock >= 0.045) {
+          item.trailClock = 0;
+          item.trail.push({ x: item.x, y: item.y, life: 0.24 });
+          if (item.trail.length > 10) item.trail.shift();
+        }
+        item.trail.forEach(function (pt) { pt.life -= dt; });
+        item.trail = item.trail.filter(function (pt) { return pt.life > 0; });
       }
-      item.trail.forEach(function (pt) { pt.life -= dt; });
-      item.trail = item.trail.filter(function (pt) { return pt.life > 0; });
     }
   }
 
-  function drawProjectile(item, g) {
-    if (!worldVisible(item.x, item.y, Number(item.def.glowRadius) || 24)) { culled += 1; return; }
+  function drawProjectileTrail(item, g) {
+    if (!item.def.trailRef) return;
     const trailDef = fxDefs.get(item.def.trailRef);
-    g.save();
     item.trail.forEach(function (pt) {
       const a = Math.max(0, pt.life / 0.24) * Number(trailDef && trailDef.alpha || 0.4);
       g.globalAlpha = a;
       g.fillStyle = trailDef && trailDef.color || item.def.color || '#fff';
       g.beginPath(); g.arc(pt.x, pt.y, Math.max(2, (Number(trailDef && trailDef.radius) || 7) * a), 0, Math.PI * 2); g.fill();
     });
+  }
+
+  // KELO-INDEX VISUAL/PROJECTILE_SPRITE recorta spritesheets de proyectiles visuales sin tocar su gameplay.
+  function drawAssetProjectile(item, g) {
+    const def = item.def;
+    if (!def.assetId || !root.KeloAssetRegistry) return false;
+    const image = root.KeloAssetRegistry.resource(def.assetId);
+    if (!image) { root.KeloAssetRegistry.load(def.assetId); return false; }
+
+    let sx = 0, sy = 0;
+    let sw = image.width || 32, sh = image.height || 32;
+    if (def.type === 'sprite_animation') {
+      const frameWidth = Math.max(1, Number(def.frameWidth) || sw);
+      const frameHeight = Math.max(1, Number(def.frameHeight) || sh);
+      const columns = Math.max(1, Number(def.columns) || Math.floor(sw / frameWidth) || 1);
+      const rows = Math.max(1, Number(def.rows) || Math.floor(sh / frameHeight) || 1);
+      const available = Math.max(1, columns * rows);
+      const frameCount = Math.max(1, Math.min(Number(def.frames) || available, available));
+      const fps = Math.max(0.001, Number(def.fps) || 12);
+      const rawFrame = Math.floor(item.elapsed * fps);
+      const frame = item.loop ? rawFrame % frameCount : Math.min(frameCount - 1, rawFrame);
+      sx = (frame % columns) * frameWidth;
+      sy = Math.floor(frame / columns) * frameHeight;
+      sw = frameWidth;
+      sh = frameHeight;
+    }
+
+    const width = (Number(def.width) || sw || 32) * item.scale;
+    const height = (Number(def.height) || sh || 32) * item.scale;
+    const alpha = Math.max(0, Number(def.alpha == null ? 1 : def.alpha));
+    g.globalAlpha = alpha;
+    g.imageSmoothingEnabled = false;
+    if (def.alignToVelocity === true && (item.vx || item.vy)) {
+      g.translate(item.x, item.y);
+      g.rotate(Math.atan2(item.vy, item.vx) + (Number(def.rotationOffset) || 0));
+      g.drawImage(image, sx, sy, sw, sh, Math.round(-width * 0.5), Math.round(-height * 0.5), width, height);
+    } else {
+      g.drawImage(image, sx, sy, sw, sh, Math.round(item.x - width * 0.5), Math.round(item.y - height * 0.5), width, height);
+    }
+    return true;
+  }
+
+  function drawProjectile(item, g) {
+    const spriteRadius = Math.max(Number(item.def.width) || 0, Number(item.def.height) || 0) * item.scale * 0.5;
+    const cullRadius = Math.max(Number(item.def.glowRadius) || 24, spriteRadius || 0);
+    if (!worldVisible(item.x, item.y, cullRadius)) { culled += 1; return; }
+    g.save();
+    drawProjectileTrail(item, g);
+
+    if (item.def.type === 'static_sprite' || item.def.type === 'sprite_animation') {
+      drawAssetProjectile(item, g);
+      g.restore();
+      drawn += 1;
+      return;
+    }
+
     g.globalAlpha = 0.18;
     g.fillStyle = item.def.color || '#fff';
     g.beginPath(); g.arc(item.x, item.y, Number(item.def.glowRadius) || 20, 0, Math.PI * 2); g.fill();
@@ -460,8 +521,8 @@
 
   root.KeloFXRegistry = Object.freeze({ version: 'fx-registry-v1.1.0', get: function (id) { return fxDefs.get(String(id || '')) || null; }, list: function () { return Array.from(fxDefs.values()); }, register: function (def) { return registerInto(fxDefs, def, 'FX'); } });
   root.KeloFX = Object.freeze({ version: 'fx-runtime-v1.1.0', spawn: spawnFx, stop: stopFx, update: updateFx, drawLayer: drawLayer, drawActorLayer: drawActorLayer, metrics: fxMetrics });
-  root.KeloProjectileVisualRegistry = Object.freeze({ version: 'projectile-visual-registry-v1.0.0', get: function (id) { return projectileDefs.get(String(id || '')) || null; }, list: function () { return Array.from(projectileDefs.values()); }, register: function (def) { return registerInto(projectileDefs, def, 'PROJECTILE_VISUAL'); } });
-  root.KeloProjectileVisuals = Object.freeze({ version: 'projectile-visual-runtime-v1.0.0', attach: attachProjectile, preview: previewProjectile, stop: stopProjectile, update: updateProjectiles, drawLayer: drawProjectileLayer, metrics: projectileMetrics });
+  root.KeloProjectileVisualRegistry = Object.freeze({ version: 'projectile-visual-registry-v1.1.0', get: function (id) { return projectileDefs.get(String(id || '')) || null; }, list: function () { return Array.from(projectileDefs.values()); }, register: function (def) { return registerInto(projectileDefs, def, 'PROJECTILE_VISUAL'); } });
+  root.KeloProjectileVisuals = Object.freeze({ version: 'projectile-visual-runtime-v1.1.0', attach: attachProjectile, preview: previewProjectile, stop: stopProjectile, update: updateProjectiles, drawLayer: drawProjectileLayer, metrics: projectileMetrics });
   root.KeloSFXRegistry = Object.freeze({ version: 'sfx-registry-v1.0.0', get: function (id) { return sfxDefs.get(String(id || '')) || null; }, list: function () { return Array.from(sfxDefs.values()); }, register: function (def) { return registerInto(sfxDefs, def, 'SFX'); } });
   root.KeloSFX = Object.freeze({ version: 'sfx-runtime-v1.0.0', play: playSfx });
   root.KeloScreenFX = Object.freeze({ version: 'screen-fx-v1.0.0', get: function (id) { return screenDefs.get(String(id || '')) || null; }, shake: shake, flash: flash, play: spawnScreen, update: updateScreen, draw: drawScreen, worldOffset: worldOffset, applyWorldTransform: applyWorldTransform });

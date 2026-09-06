@@ -20,6 +20,11 @@
       id: 'sword_swap_activation_eye_anim_asset', type: 'image',
       src: 'assets/fx/sword-swap/activation-eye-anim.PNG', preload: true,
       frameWidth: 512, frameHeight: 512, columns: 3, rows: 2, frames: 6
+    }),
+    sword_swap_katana_throw_asset: Object.freeze({
+      id: 'sword_swap_katana_throw_asset', type: 'image',
+      src: 'assets/fx/sword-swap/katana-throw.PNG', preload: true,
+      frameWidth: 362, frameHeight: 724, columns: 6, rows: 1, frames: 6
     })
   });
 
@@ -96,6 +101,13 @@
       id: 'projectile_fire_orb_01', type: 'orb', layer: 'worldFX', radius: 11,
       color: '#ff6b35', coreColor: '#ffe0a3', glowRadius: 22, trailRef: 'fire_trail_01',
       defaultSpeed: 420, defaultMaxDistance: 500
+    }),
+    sword_swap_katana_throw_visual: Object.freeze({
+      id: 'sword_swap_katana_throw_visual', type: 'sprite_animation',
+      assetId: 'sword_swap_katana_throw_asset', layer: 'worldFX',
+      frameWidth: 362, frameHeight: 724, columns: 6, rows: 1, frames: 6, fps: 12, loop: true,
+      width: 126, height: 252, alpha: 1, alignToVelocity: true, rotationOffset: 0,
+      defaultSpeed: 720, defaultMaxDistance: 420
     })
   });
 
@@ -164,7 +176,8 @@
     }),
     ability_visual_sword_swap_01: Object.freeze({
       id: 'ability_visual_sword_swap_01', abilityKey: 'swap_sword',
-      castSequence: 'sequence_sword_swap_activation_eye_anim'
+      castSequence: 'sequence_sword_swap_activation_eye_anim',
+      throwVisual: 'sword_swap_katana_throw_visual'
     })
   });
 
@@ -174,7 +187,7 @@
   });
 
   root.KELO_VISUAL_MANIFESTS = Object.freeze({
-    version: 'visual-manifests-v1.2.0',
+    version: 'visual-manifests-v1.3.0',
     assets: ASSETS,
     animationClips: ANIMATION_CLIPS,
     fx: FX,

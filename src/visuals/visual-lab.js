@@ -81,6 +81,25 @@
     } else spawn();
   }
 
+  function playKatanaThrowPreview() {
+    const p = actor();
+    if (!p || !root.KeloProjectileVisuals) return;
+    const face = p._face || 'right';
+    const dir = directionOf(face);
+    const spawn = function () {
+      const origin = root.KeloAnchors ? root.KeloAnchors.get(p, 'weapon') : { x: p.x, y: p.y };
+      root.KeloProjectileVisuals.preview('sword_swap_katana_throw_visual', {
+        actor: p, actorId: p.id, origin: origin, direction: dir,
+        gameplay: { speed: 360, range: 290 },
+        visual: { scale: 1, seed: Date.now() & 65535 }
+      }, { scale: 1, loop: true });
+      collapseAfterPreview();
+    };
+    if (root.KeloAssetRegistry && !root.KeloAssetRegistry.isReady('sword_swap_katana_throw_asset')) {
+      root.KeloAssetRegistry.load('sword_swap_katana_throw_asset').then(spawn);
+    } else spawn();
+  }
+
   function build() {
     if (panel || !document.body) return;
     panel = document.createElement('div'); panel.id = 'kelo-visual-lab';
@@ -96,8 +115,11 @@
     const hint = document.createElement('div'); hint.textContent = 'Piezas independientes · toca PROBAR y la ventana se minimiza sola para que veas el efecto'; hint.style.cssText = 'color:#78808b;margin:4px 0 9px'; body.appendChild(hint);
 
     const eyeQuick = button('👁 PROBAR ACTIVATION EYE ANIMADO', playActivationEyePreview);
-    eyeQuick.style.cssText += ';display:block;width:100%;margin:0 0 10px;background:#2b1740;border-color:#8b5cf6;color:#f0ddff;font-size:11px';
+    eyeQuick.style.cssText += ';display:block;width:100%;margin:0 0 7px;background:#2b1740;border-color:#8b5cf6;color:#f0ddff;font-size:11px';
     body.appendChild(eyeQuick);
+    const katanaQuick = button('🗡 PROBAR KATANA THROW', playKatanaThrowPreview);
+    katanaQuick.style.cssText += ';display:block;width:100%;margin:0 0 10px;background:#21152f;border-color:#a774ff;color:#f0ddff;font-size:11px';
+    body.appendChild(katanaQuick);
 
     const direction = document.createElement('select'); options(direction, ['right','down','left','up']);
     const scale = document.createElement('input'); scale.type = 'range'; scale.min = '0.5'; scale.max = '2'; scale.step = '0.1'; scale.value = '1';
@@ -124,6 +146,8 @@
     }));
 
     const projectile = document.createElement('select'); options(projectile, root.KeloProjectileVisualRegistry ? root.KeloProjectileVisualRegistry.list() : []); body.appendChild(row('Projectile', projectile));
+    const katanaIndex = Array.from(projectile.options).findIndex(function (option) { return option.value === 'sword_swap_katana_throw_visual'; });
+    if (katanaIndex >= 0) projectile.selectedIndex = katanaIndex;
     body.appendChild(button('➜ PREVIEW PROJECTILE', function () {
       const p = actor(), dir = directionOf(direction.value); if (p) p._face = direction.value;
       root.KeloProjectileVisuals && root.KeloProjectileVisuals.preview(projectile.value, { actor: p, actorId: p && p.id, origin: p && root.KeloAnchors ? root.KeloAnchors.get(p, anchor.value) : originFor(dir, 0), direction: dir, gameplay: { speed: 420 * Number(speed.value), range: 320 }, visual: { scale: Number(scale.value), seed: Date.now() & 65535 } }); collapseAfterPreview();
@@ -157,11 +181,12 @@
   }
 
   root.KeloVisualLab = Object.freeze({
-    version: 'visual-lab-v1.2.0',
+    version: 'visual-lab-v1.3.0',
     open: build,
     minimize: function () { setCollapsed(true); },
     expand: function () { setCollapsed(false); },
     previewActivationEye: playActivationEyePreview,
+    previewKatanaThrow: playKatanaThrowPreview,
     get enabled() { return enabled(); },
     get collapsed() { return collapsed; }
   });
