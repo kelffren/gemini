@@ -33,6 +33,7 @@ jobs:
           text_ext={'.js','.mjs','.cjs','.json','.html','.css','.md','.yml','.yaml','.py','.sh'}
           for p in root.rglob('*'):
             if not p.is_file() or '.git' in p.parts or p.suffix.lower() not in text_ext: continue
+            if len(p.parts)>=2 and p.parts[0]=='.github' and p.parts[1]=='workflows': continue
             try: s=p.read_text(encoding='utf-8')
             except UnicodeDecodeError: continue
             n=s
@@ -59,7 +60,7 @@ jobs:
           if [ -n "$bad" ]; then echo "Non-.PNG files remain under assets:"; echo "$bad"; exit 1; fi
           test -f assets/fuentekelo-runtime.PNG
           test -f assets/cesped-runtime.PNG
-          ! grep -R -n -E 'assets/(fuentekelo-runtime|cesped-runtime)\.png' --exclude-dir=.git .
+          ! grep -R -n -E 'assets/(fuentekelo-runtime|cesped-runtime)\.png' --exclude-dir=.git --exclude-dir=.github .
           git diff --check
       - name: Focused syntax and binary checks
         run: |
@@ -84,4 +85,4 @@ jobs:
           git commit -m 'chore: normalize active assets to .PNG'
           git pull --rebase origin main
           git push origin HEAD:main
-# trigger: 2026-09-06T00:19-04:00
+# trigger: 2026-09-06T00:22-04:00
