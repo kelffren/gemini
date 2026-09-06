@@ -1,5 +1,6 @@
 name: World Builder Admin V1
 on:
+  workflow_dispatch:
   push:
     branches: [ feature/world-builder-admin-v1 ]
     paths:
