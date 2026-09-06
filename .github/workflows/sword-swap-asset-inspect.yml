@@ -1,101 +1,299 @@
-name: Sword Swap Asset Inspect
+name: Sword Swap Katana Integrate
 
-# One-shot diagnostic for the Sword Swap katana throw spritesheet.
 on:
   push:
     branches: [main]
     paths:
-      - 'assets/fx/sword-swap/katana-throw.PNG'
       - '.github/workflows/sword-swap-asset-inspect.yml'
-  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
-  inspect:
+  integrate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Install Pillow
-        run: python -m pip install --disable-pip-version-check pillow
-      - name: Inspect katana throw PNG
+      - name: Verify source PNG
         run: |
-          mkdir -p artifacts
+          python -m pip install --disable-pip-version-check pillow
           python - <<'PY'
           from PIL import Image
-          import json, math, shutil
-          path='assets/fx/sword-swap/katana-throw.PNG'
-          img=Image.open(path).convert('RGBA')
-          w,h=img.size
-          alpha=img.getchannel('A')
-          amin,amax=alpha.getextrema()
-          pix=alpha.load()
-          total=w*h
-          nonzero=sum(1 for y in range(h) for x in range(w) if pix[x,y] > 8)
-
-          def boundary_density(cols, rows):
-              vals=[]
-              for k in range(1, cols):
-                  x=round(w*k/cols)
-                  xs=list(range(max(0,x-2), min(w,x+3)))
-                  count=sum(1 for xx in xs for y in range(h) if pix[xx,y] > 8)
-                  vals.append(count/(len(xs)*h))
-              for k in range(1, rows):
-                  y=round(h*k/rows)
-                  ys=list(range(max(0,y-2), min(h,y+3)))
-                  count=sum(1 for yy in ys for x in range(w) if pix[x,yy] > 8)
-                  vals.append(count/(len(ys)*w))
-              return sum(vals)/len(vals) if vals else 1.0
-
-          candidates=[]
-          for cols in range(1,9):
-              if w % cols: continue
-              for rows in range(1,7):
-                  if h % rows: continue
-                  frames=cols*rows
-                  if frames < 2 or frames > 16: continue
-                  fw,fh=w//cols,h//rows
-                  if fw < 96 or fh < 96: continue
-                  occ=[]
-                  bboxes=[]
-                  for r in range(rows):
-                      for c in range(cols):
-                          crop=alpha.crop((c*fw,r*fh,(c+1)*fw,(r+1)*fh))
-                          bbox=crop.point(lambda a: 255 if a>8 else 0).getbbox()
-                          nz=sum(1 for a in crop.getdata() if a>8)
-                          occ.append(nz/(fw*fh))
-                          bboxes.append(bbox)
-                  mean=sum(occ)/len(occ)
-                  variance=sum((v-mean)**2 for v in occ)/len(occ)
-                  bd=boundary_density(cols,rows)
-                  aspect=fw/fh
-                  square_pen=abs(math.log(aspect))
-                  empty=sum(1 for v in occ if v < 0.005)
-                  score=bd*5 + math.sqrt(variance)*2 + square_pen*0.25 + empty*2
-                  candidates.append({
-                      'cols':cols,'rows':rows,'frames':frames,'frameWidth':fw,'frameHeight':fh,
-                      'boundaryDensity':round(bd,6),'meanOccupancy':round(mean,6),
-                      'occupancyStd':round(math.sqrt(variance),6),'emptyCells':empty,
-                      'score':round(score,6),'cellOccupancy':[round(v,5) for v in occ],
-                      'cellBBoxes':bboxes
-                  })
-          candidates.sort(key=lambda c:c['score'])
-          report={
-              'path':path,'mode':'RGBA','width':w,'height':h,
-              'alphaMin':amin,'alphaMax':amax,'nonTransparentRatio':round(nonzero/total,6),
-              'topCandidates':candidates[:12]
-          }
-          print('KATANA_THROW_ANALYSIS '+json.dumps(report,separators=(',',':')))
-          with open('artifacts/katana-throw-analysis.json','w') as f: json.dump(report,f,indent=2)
-          shutil.copy2(path,'artifacts/katana-throw.PNG')
+          p='assets/fx/sword-swap/katana-throw.PNG'
+          im=Image.open(p)
+          assert im.size == (2172,724), im.size
+          assert im.mode == 'RGBA', im.mode
+          assert im.getchannel('A').getextrema() == (0,255)
+          print('KATANA_SOURCE_PASS size=2172x724 layout=6x1 frame=362x724 RGBA')
           PY
-          cp src/visuals/fx-system.js artifacts/fx-system.js
-          cp src/visuals/visual-manifests.js artifacts/visual-manifests.js
-          cp src/visuals/visual-lab.js artifacts/visual-lab.js
-          cp src/environment/png-validation-policy.json artifacts/png-validation-policy.json
-      - uses: actions/upload-artifact@v4
-        with:
-          name: katana-throw-inspection
-          path: artifacts/
-          if-no-files-found: error
+      - name: Integrate reusable katana projectile visual
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import json
+
+          # Manifest: asset + projectile visual + Sword Swap visual hook.
+          p=Path('src/visuals/visual-manifests.js')
+          s=p.read_text()
+          old="""    sword_swap_activation_eye_anim_asset: Object.freeze({
+              id: 'sword_swap_activation_eye_anim_asset', type: 'image',
+              src: 'assets/fx/sword-swap/activation-eye-anim.PNG', preload: true,
+              frameWidth: 512, frameHeight: 512, columns: 3, rows: 2, frames: 6
+            })
+          """
+          new="""    sword_swap_activation_eye_anim_asset: Object.freeze({
+              id: 'sword_swap_activation_eye_anim_asset', type: 'image',
+              src: 'assets/fx/sword-swap/activation-eye-anim.PNG', preload: true,
+              frameWidth: 512, frameHeight: 512, columns: 3, rows: 2, frames: 6
+            }),
+            sword_swap_katana_throw_asset: Object.freeze({
+              id: 'sword_swap_katana_throw_asset', type: 'image',
+              src: 'assets/fx/sword-swap/katana-throw.PNG', preload: true,
+              frameWidth: 362, frameHeight: 724, columns: 6, rows: 1, frames: 6
+            })
+          """
+          assert old in s, 'manifest asset anchor missing'
+          s=s.replace(old,new)
+          old="""    projectile_fire_orb_01: Object.freeze({
+              id: 'projectile_fire_orb_01', type: 'orb', layer: 'worldFX', radius: 11,
+              color: '#ff6b35', coreColor: '#ffe0a3', glowRadius: 22, trailRef: 'fire_trail_01',
+              defaultSpeed: 420, defaultMaxDistance: 500
+            })
+          """
+          new="""    projectile_fire_orb_01: Object.freeze({
+              id: 'projectile_fire_orb_01', type: 'orb', layer: 'worldFX', radius: 11,
+              color: '#ff6b35', coreColor: '#ffe0a3', glowRadius: 22, trailRef: 'fire_trail_01',
+              defaultSpeed: 420, defaultMaxDistance: 500
+            }),
+            sword_swap_katana_throw_visual: Object.freeze({
+              id: 'sword_swap_katana_throw_visual', type: 'sprite_animation',
+              assetId: 'sword_swap_katana_throw_asset', layer: 'worldFX',
+              frameWidth: 362, frameHeight: 724, columns: 6, rows: 1, frames: 6, fps: 12, loop: true,
+              width: 126, height: 252, alpha: 1, alignToVelocity: true, rotationOffset: 0,
+              defaultSpeed: 720, defaultMaxDistance: 420
+            })
+          """
+          assert old in s, 'manifest projectile anchor missing'
+          s=s.replace(old,new)
+          old="""    ability_visual_sword_swap_01: Object.freeze({
+              id: 'ability_visual_sword_swap_01', abilityKey: 'swap_sword',
+              castSequence: 'sequence_sword_swap_activation_eye_anim'
+            })
+          """
+          new="""    ability_visual_sword_swap_01: Object.freeze({
+              id: 'ability_visual_sword_swap_01', abilityKey: 'swap_sword',
+              castSequence: 'sequence_sword_swap_activation_eye_anim',
+              throwVisual: 'sword_swap_katana_throw_visual'
+            })
+          """
+          assert old in s, 'Sword Swap profile anchor missing'
+          s=s.replace(old,new).replace("version: 'visual-manifests-v1.2.0'", "version: 'visual-manifests-v1.3.0'")
+          p.write_text(s)
+
+          # Projectile runtime: add elapsed/scale and generic asset-backed sprite rendering.
+          p=Path('src/visuals/fx-system.js')
+          s=p.read_text()
+          old="""    item.maxDistance = Number(opts.maxDistance) || Number(c.gameplay.range) || Number(def.defaultMaxDistance) || 500;
+              item.traveled = 0;
+              item.preview = !gameplayObject;
+          """
+          new="""    item.maxDistance = Number(opts.maxDistance) || Number(c.gameplay.range) || Number(def.defaultMaxDistance) || 500;
+              item.traveled = 0;
+              item.elapsed = 0;
+              item.scale = Math.max(0.05, Number(opts.scale != null ? opts.scale : c.visual.scale) || 1);
+              item.loop = opts.loop != null ? opts.loop === true : def.loop === true;
+              item.preview = !gameplayObject;
+          """
+          assert old in s, 'projectile reset anchor missing'
+          s=s.replace(old,new)
+          old="""      const item = activeProjectiles[i];
+              const beforeX = item.x, beforeY = item.y;
+          """
+          new="""      const item = activeProjectiles[i];
+              item.elapsed += dt;
+              const beforeX = item.x, beforeY = item.y;
+          """
+          assert old in s, 'projectile update anchor missing'
+          s=s.replace(old,new)
+          old="""      item.trailClock += dt;
+              if (item.trailClock >= 0.045) {
+                item.trailClock = 0;
+                item.trail.push({ x: item.x, y: item.y, life: 0.24 });
+                if (item.trail.length > 10) item.trail.shift();
+              }
+              item.trail.forEach(function (pt) { pt.life -= dt; });
+              item.trail = item.trail.filter(function (pt) { return pt.life > 0; });
+          """
+          new="""      if (item.def.trailRef) {
+                item.trailClock += dt;
+                if (item.trailClock >= 0.045) {
+                  item.trailClock = 0;
+                  item.trail.push({ x: item.x, y: item.y, life: 0.24 });
+                  if (item.trail.length > 10) item.trail.shift();
+                }
+                item.trail.forEach(function (pt) { pt.life -= dt; });
+                item.trail = item.trail.filter(function (pt) { return pt.life > 0; });
+              }
+          """
+          assert old in s, 'projectile trail anchor missing'
+          s=s.replace(old,new)
+          start=s.index('  function drawProjectile(item, g) {')
+          end=s.index('\n  function drawProjectileLayer(layer, g) {', start)
+          replacement="""  function drawProjectileTrail(item, g) {
+              if (!item.def.trailRef) return;
+              const trailDef = fxDefs.get(item.def.trailRef);
+              item.trail.forEach(function (pt) {
+                const a = Math.max(0, pt.life / 0.24) * Number(trailDef && trailDef.alpha || 0.4);
+                g.globalAlpha = a;
+                g.fillStyle = trailDef && trailDef.color || item.def.color || '#fff';
+                g.beginPath(); g.arc(pt.x, pt.y, Math.max(2, (Number(trailDef && trailDef.radius) || 7) * a), 0, Math.PI * 2); g.fill();
+              });
+            }
+
+            // KELO-INDEX VISUAL/PROJECTILE_SPRITE recorta spritesheets de proyectiles visuales sin tocar su gameplay.
+            function drawAssetProjectile(item, g) {
+              const def = item.def;
+              if (!def.assetId || !root.KeloAssetRegistry) return false;
+              const image = root.KeloAssetRegistry.resource(def.assetId);
+              if (!image) { root.KeloAssetRegistry.load(def.assetId); return false; }
+              let sx = 0, sy = 0;
+              let sw = image.width || 32, sh = image.height || 32;
+              if (def.type === 'sprite_animation') {
+                const frameWidth = Math.max(1, Number(def.frameWidth) || sw);
+                const frameHeight = Math.max(1, Number(def.frameHeight) || sh);
+                const columns = Math.max(1, Number(def.columns) || Math.floor(sw / frameWidth) || 1);
+                const rows = Math.max(1, Number(def.rows) || Math.floor(sh / frameHeight) || 1);
+                const available = Math.max(1, columns * rows);
+                const frameCount = Math.max(1, Math.min(Number(def.frames) || available, available));
+                const fps = Math.max(0.001, Number(def.fps) || 12);
+                const rawFrame = Math.floor(item.elapsed * fps);
+                const frame = item.loop ? rawFrame % frameCount : Math.min(frameCount - 1, rawFrame);
+                sx = (frame % columns) * frameWidth;
+                sy = Math.floor(frame / columns) * frameHeight;
+                sw = frameWidth;
+                sh = frameHeight;
+              }
+              const width = (Number(def.width) || sw || 32) * item.scale;
+              const height = (Number(def.height) || sh || 32) * item.scale;
+              g.globalAlpha = Math.max(0, Number(def.alpha == null ? 1 : def.alpha));
+              g.imageSmoothingEnabled = false;
+              if (def.alignToVelocity === true && (item.vx || item.vy)) {
+                g.translate(item.x, item.y);
+                g.rotate(Math.atan2(item.vy, item.vx) + (Number(def.rotationOffset) || 0));
+                g.drawImage(image, sx, sy, sw, sh, Math.round(-width * 0.5), Math.round(-height * 0.5), width, height);
+              } else {
+                g.drawImage(image, sx, sy, sw, sh, Math.round(item.x - width * 0.5), Math.round(item.y - height * 0.5), width, height);
+              }
+              return true;
+            }
+
+            function drawProjectile(item, g) {
+              const spriteRadius = Math.max(Number(item.def.width) || 0, Number(item.def.height) || 0) * item.scale * 0.5;
+              const cullRadius = Math.max(Number(item.def.glowRadius) || 24, spriteRadius || 0);
+              if (!worldVisible(item.x, item.y, cullRadius)) { culled += 1; return; }
+              g.save();
+              drawProjectileTrail(item, g);
+              if (item.def.type === 'static_sprite' || item.def.type === 'sprite_animation') {
+                drawAssetProjectile(item, g);
+                g.restore();
+                drawn += 1;
+                return;
+              }
+              g.globalAlpha = 0.18;
+              g.fillStyle = item.def.color || '#fff';
+              g.beginPath(); g.arc(item.x, item.y, Number(item.def.glowRadius) || 20, 0, Math.PI * 2); g.fill();
+              g.globalAlpha = 1;
+              g.fillStyle = item.def.color || '#fff';
+              g.beginPath(); g.arc(item.x, item.y, Number(item.def.radius) || 10, 0, Math.PI * 2); g.fill();
+              g.fillStyle = item.def.coreColor || '#fff';
+              g.beginPath(); g.arc(item.x, item.y, Math.max(2, (Number(item.def.radius) || 10) * 0.42), 0, Math.PI * 2); g.fill();
+              g.restore();
+              drawn += 1;
+            }
+          """
+          s=s[:start]+replacement+s[end:]
+          s=s.replace('projectile-visual-registry-v1.0.0','projectile-visual-registry-v1.1.0').replace('projectile-visual-runtime-v1.0.0','projectile-visual-runtime-v1.1.0')
+          p.write_text(s)
+
+          # Visual Lab: quick mobile test and generic selector defaults to katana.
+          p=Path('src/visuals/visual-lab.js')
+          s=p.read_text()
+          anchor='''  function build() {\n'''
+          fn="""  function playKatanaThrowPreview() {
+              const p = actor();
+              if (!p || !root.KeloProjectileVisuals) return;
+              const dir = directionOf(p._face || 'right');
+              const spawn = function () {
+                const origin = root.KeloAnchors ? root.KeloAnchors.get(p, 'weapon') : { x: p.x, y: p.y };
+                root.KeloProjectileVisuals.preview('sword_swap_katana_throw_visual', {
+                  actor: p, actorId: p.id, origin: origin, direction: dir,
+                  gameplay: { speed: 360, range: 290 }, visual: { scale: 1, seed: Date.now() & 65535 }
+                }, { scale: 1, loop: true });
+                collapseAfterPreview();
+              };
+              if (root.KeloAssetRegistry && !root.KeloAssetRegistry.isReady('sword_swap_katana_throw_asset')) root.KeloAssetRegistry.load('sword_swap_katana_throw_asset').then(spawn);
+              else spawn();
+            }
+
+          """
+          assert anchor in s and 'playKatanaThrowPreview' not in s
+          s=s.replace(anchor,fn+anchor,1)
+          old="""    const eyeQuick = button('👁 PROBAR ACTIVATION EYE ANIMADO', playActivationEyePreview);
+              eyeQuick.style.cssText += ';display:block;width:100%;margin:0 0 10px;background:#2b1740;border-color:#8b5cf6;color:#f0ddff;font-size:11px';
+              body.appendChild(eyeQuick);
+          """
+          new="""    const eyeQuick = button('👁 PROBAR ACTIVATION EYE ANIMADO', playActivationEyePreview);
+              eyeQuick.style.cssText += ';display:block;width:100%;margin:0 0 7px;background:#2b1740;border-color:#8b5cf6;color:#f0ddff;font-size:11px';
+              body.appendChild(eyeQuick);
+              const katanaQuick = button('🗡 PROBAR KATANA THROW', playKatanaThrowPreview);
+              katanaQuick.style.cssText += ';display:block;width:100%;margin:0 0 10px;background:#21152f;border-color:#a774ff;color:#f0ddff;font-size:11px';
+              body.appendChild(katanaQuick);
+          """
+          assert old in s
+          s=s.replace(old,new)
+          old="""    const projectile = document.createElement('select'); options(projectile, root.KeloProjectileVisualRegistry ? root.KeloProjectileVisualRegistry.list() : []); body.appendChild(row('Projectile', projectile));
+              body.appendChild(button('➜ PREVIEW PROJECTILE', function () {
+          """
+          new="""    const projectile = document.createElement('select'); options(projectile, root.KeloProjectileVisualRegistry ? root.KeloProjectileVisualRegistry.list() : []); body.appendChild(row('Projectile', projectile));
+              const katanaIndex = Array.from(projectile.options).findIndex(function (option) { return option.value === 'sword_swap_katana_throw_visual'; });
+              if (katanaIndex >= 0) projectile.selectedIndex = katanaIndex;
+              body.appendChild(button('➜ PREVIEW PROJECTILE', function () {
+          """
+          assert old in s
+          s=s.replace(old,new)
+          s=s.replace("version: 'visual-lab-v1.2.0'", "version: 'visual-lab-v1.3.0'")
+          s=s.replace('    previewActivationEye: playActivationEyePreview,\n', '    previewActivationEye: playActivationEyePreview,\n    previewKatanaThrow: playKatanaThrowPreview,\n')
+          p.write_text(s)
+
+          # Classify as Visual System asset, not world/environment art.
+          p=Path('src/environment/png-validation-policy.json')
+          j=json.loads(p.read_text())
+          entries=j['excludedFromWorldContract']
+          if not any(e['path']=='assets/fx/sword-swap/katana-throw.PNG' for e in entries):
+              idx=next(i for i,e in enumerate(entries) if e['path']=='assets/fuentekelo.PNG')
+              entries.insert(idx, {'path':'assets/fx/sword-swap/katana-throw.PNG','scope':'non-world-ui','reason':'Sword Swap katana throw is a reusable projectile presentation spritesheet owned by the modular Visual System, not the environment art contract.'})
+          p.write_text(json.dumps(j,indent=2,ensure_ascii=False)+'\n')
+          PY
+      - name: Validate integration
+        run: |
+          node --check src/visuals/visual-manifests.js
+          node --check src/visuals/fx-system.js
+          node --check src/visuals/visual-lab.js
+          python -m json.tool src/environment/png-validation-policy.json >/dev/null
+          grep -q "sword_swap_katana_throw_asset" src/visuals/visual-manifests.js
+          grep -q "sword_swap_katana_throw_visual" src/visuals/visual-manifests.js
+          grep -q "PROBAR KATANA THROW" src/visuals/visual-lab.js
+          git diff --check
+      - name: Commit integration
+        run: |
+          git config user.name 'kelo-visual-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add src/visuals/visual-manifests.js src/visuals/fx-system.js src/visuals/visual-lab.js src/environment/png-validation-policy.json
+          git rm .github/workflows/sword-swap-asset-inspect.yml
+          git commit -m 'visual: integrate Sword Swap katana throw animation'
+          git push origin HEAD:main
