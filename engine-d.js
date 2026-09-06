@@ -110,6 +110,7 @@ renderAvatar = function(p, isSelf) {
   ctx.font = '10px sans-serif'; ctx.fillStyle = isSelf ? '#e7c56a' : '#ffffff'; ctx.fillText(p.name, p.x, p.y - p.radius - 7);
 };
 function drawMinimap() {
+  if (window.KELO_WORLD_DECORATION_RESET === true || window.KELO_WORLD_RENDERER?.decorationReset === true) return;
   var w = 92, h = 78, pad = 10, x = pad, y = screenH - h - pad - 8;
   ctx.save(); ctx.globalAlpha = 0.88; ctx.fillStyle = 'rgba(10,13,18,0.85)'; ctx.strokeStyle = 'rgba(231,197,106,0.35)'; ctx.lineWidth = 1;
   ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(x, y, w, h, 8); else ctx.rect(x, y, w, h); ctx.fill(); ctx.stroke();
@@ -124,6 +125,7 @@ function drawMinimap() {
 var _render3 = render;
 render = function() { _render3(); drawMinimap(); };
 checkSocialTouch = function(sx, sy) {
+  if (window.KELO_WORLD_DECORATION_RESET === true || window.KELO_WORLD_RENDERER?.decorationReset === true) { closeSocialModal(); return; }
   var w = screenToWorld(sx, sy);
   if (Math.hypot(w.x - localPlayer.x, w.y - localPlayer.y) < localPlayer.radius * 1.6) { inspectPlayer(localPlayer, true); return; }
   for (var i = 0; i < simulatedPlayers.length; i++) {
@@ -141,3 +143,4 @@ updateHud = function() {
 ensureInspectUI();
 localPlayer.title = currentRank().name;
 updateHud();
+window.KELO_MINIMAP_AUDIT=Object.freeze({version:'legacy-minimap-reset-guard-v1',get decorationReset(){return window.KELO_WORLD_DECORATION_RESET===true||window.KELO_WORLD_RENDERER?.decorationReset===true;},suppressedDuringReset:true});
