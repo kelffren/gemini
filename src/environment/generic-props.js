@@ -12,38 +12,8 @@
   const backDrawCountByGroup={};
   const frontDrawCountByGroup={};
   const actorRedrawCountByGroup={};
-  const audit=window.KELO_GENERIC_PROP_AUDIT={version:'generic-props-v1.8',contractVersion:C.version,ready:false,failed:false,propCount:C.props.length,assetCount:Object.keys(C.assets).length,layerGroupCount:groups.length,stackedLayerGroupCount:stackedGroups.length,immediateLayerGroupCount:groups.length-stackedGroups.length,sourceCount:sources.length,dynamicSourceCount:sources.filter(s=>typeof s.instances==='function').length,rendererMode:'data-driven-props-v6-reset-visible',resourceMode:'atlas-contract-managed-v1',spatialBoundsMode:'layer-owned-visible-bounds-v1',decorationReset:window.KELO_WORLD_DECORATION_RESET===true,immediateDrawCalls:0,immediatePropCount:0,dynamicPropCount:0,registeredColliderCount:0,dynamicSourcePropCounts,backDrawCountByGroup,frontDrawCountByGroup,actorRedrawCountByGroup,fountainChroma:true};
+  const audit=window.KELO_GENERIC_PROP_AUDIT={version:'generic-props-v1.9',contractVersion:C.version,ready:false,failed:false,propCount:C.props.length,assetCount:Object.keys(C.assets).length,layerGroupCount:groups.length,stackedLayerGroupCount:stackedGroups.length,immediateLayerGroupCount:groups.length-stackedGroups.length,sourceCount:sources.length,dynamicSourceCount:sources.filter(s=>typeof s.instances==='function').length,rendererMode:'data-driven-props-v6-reset-visible',resourceMode:'atlas-contract-managed-v1',spatialBoundsMode:'layer-owned-visible-bounds-v1',decorationReset:window.KELO_WORLD_DECORATION_RESET===true,immediateDrawCalls:0,immediatePropCount:0,dynamicPropCount:0,registeredColliderCount:0,dynamicSourcePropCounts,backDrawCountByGroup,frontDrawCountByGroup,actorRedrawCountByGroup,fountainChroma:false};
   function frameRect(a,f){if(a?.frames&&typeof f==='string'&&a.frames[f]){const r=a.frames[f];return{x:Number(r.x)||0,y:Number(r.y)||0,w:Number(r.w)||0,h:Number(r.h)||0};}const i=Number(f)||0,cols=a.columns||1;return{x:(i%cols)*a.frameWidth,y:Math.floor(i/cols)*a.frameHeight,w:a.frameWidth,h:a.frameHeight};}
-  function punchChecker(img){
-    try{
-      const c=document.createElement('canvas');
-      c.width=img.naturalWidth||img.width;c.height=img.naturalHeight||img.height;
-      const g=c.getContext('2d',{willReadFrequently:true});
-      g.drawImage(img,0,0);
-      const d=g.getImageData(0,0,c.width,c.height),p=d.data,w=c.width,h=c.height;
-      const sat=(i)=>{const r=p[i],gg=p[i+1],b=p[i+2];return Math.max(r,gg,b)-Math.min(r,gg,b);};
-      const luma=(i)=>0.299*p[i]+0.587*p[i+1]+0.114*p[i+2];
-      for(let i=0;i<p.length;i+=4){
-        if(p[i+3]<20){p[i+3]=0;continue;}
-        const s=sat(i),l=luma(i);
-        if(s<20&&l>165)p[i+3]=0;
-      }
-      const a0=new Uint8ClampedArray(w*h);
-      for(let i=0,j=0;i<p.length;i+=4,j++)a0[j]=p[i+3];
-      for(let y=1;y<h-1;y++){
-        for(let x=1;x<w-1;x++){
-          const j=y*w+x,i=j*4;
-          if(a0[j]<16)continue;
-          if(sat(i)>24)continue;
-          let t=0;
-          if(a0[j-1]<16)t++;if(a0[j+1]<16)t++;if(a0[j-w]<16)t++;if(a0[j+w]<16)t++;
-          if(t>=1&&luma(i)>85)p[i+3]=0;
-        }
-      }
-      g.putImageData(d,0,0);
-      return c;
-    }catch(err){console.warn('[Kelo fountain] chroma punch failed',err);return img;}
-  }
   function drawProp(g,p){const a=C.assets[p.asset],img=images.get(p.asset);if(!a||!img||!readyAssets.has(p.asset))return false;const s=frameRect(a,p.frame??0);if(!(s.w>0&&s.h>0))return false;g.drawImage(img,s.x,s.y,s.w,s.h,p.position.x,p.position.y,p.size.w,p.size.h);return true;}
   function drawInstances(g,props,track,allowDuringReset=false){if(failed||!g||!Array.isArray(props)||(window.KELO_WORLD_DECORATION_RESET===true&&!allowDuringReset))return 0;let count=0;g.save();g.imageSmoothingEnabled=false;for(const p of props)if(p&&drawProp(g,p))count++;g.restore();if(track){audit.immediateDrawCalls++;audit.immediatePropCount=count;}return count;}
   function actors(){const out=[];const reset=window.KELO_WORLD_DECORATION_RESET===true;const pvp=typeof isPvPActive!=='undefined'&&isPvPActive&&typeof arenaPvP!=='undefined'&&arenaPvP?.rival;if(pvp)out.push(arenaPvP.rival);else if(!reset&&typeof simulatedPlayers!=='undefined'&&Array.isArray(simulatedPlayers))out.push(...simulatedPlayers);if(typeof localPlayer!=='undefined'&&localPlayer)out.push(localPlayer);return out;}
@@ -96,14 +66,11 @@
   }
   try{for(const [key,group] of stackedGroups){if(group.back)L.register({id:`${group.id}-back`,phase:group.back.phase,priority:group.priority,required:true,ready:()=>audit.ready,draw:g=>drawBack(key,g),ownership:group.ownership,visibleDuringReset:group.visibleDuringReset===true,bounds:boundsFor(key,'back')});if(group.front)L.register({id:`${group.id}-front`,phase:group.front.phase,priority:group.priority,required:true,ready:()=>audit.ready,draw:g=>drawFront(key,g),ownership:group.ownership,visibleDuringReset:group.visibleDuringReset===true,bounds:boundsFor(key,'front')});}}catch(err){failed=true;audit.failed=true;console.error('[Kelo generic props] layer registration failed',err);return;}
   registerStaticColliders();
-  window.KELO_GENERIC_PROPS=Object.freeze({version:'generic-props-v1.8',resourceMode:'atlas-contract-managed-v1',drawInstances,isAssetReady(id){return readyAssets.has(id);},get ready(){return audit.ready&&!audit.failed;}});
+  window.KELO_GENERIC_PROPS=Object.freeze({version:'generic-props-v1.9',resourceMode:'atlas-contract-managed-v1',drawInstances,isAssetReady(id){return readyAssets.has(id);},get ready(){return audit.ready&&!audit.failed;}});
   const entries=Object.entries(C.assets).filter(([,a])=>a?.src);
   if(!entries.length){audit.ready=true;return;}
   for(const [id,a] of entries){
     if(!A.describe(id))A.register(id,a,{role:'optional'});
-    A.acquire(id).then(img=>{
-      const ready=id==='plazaFountainKelo'?punchChecker(img):img;
-      images.set(id,ready);readyAssets.add(id);if(readyAssets.size===entries.length)audit.ready=true;
-    }).catch(err=>{failed=true;audit.failed=true;console.error('[Kelo generic props] managed asset load failed',id,err);});
+    A.acquire(id).then(img=>{images.set(id,img);readyAssets.add(id);if(readyAssets.size===entries.length)audit.ready=true;}).catch(err=>{failed=true;audit.failed=true;console.error('[Kelo generic props] managed asset load failed',id,err);});
   }
 })();
