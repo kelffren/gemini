@@ -12,6 +12,7 @@
     gear: { bodyColor: '#6b5b4a', armorColor: '#c9a24a', weaponColor: '#888' }
   };
   window.trainingDummy = dummy;
+  function resetActive(){return window.KELO_WORLD_DECORATION_RESET===true||window.KELO_WORLD_RENDERER?.decorationReset===true;}
 
   const registry = window.KELO_TILE_REGISTRY;
   const asset = registry?.atlases?.trainingDummy;
@@ -22,7 +23,7 @@
   let authoredReady = false;
   let drawCount = 0;
   window.KELO_TRAINING_DUMMY_AUDIT = {
-    version:'training-dummy-v1',
+    version:'training-dummy-v1.1',
     ready:false,
     assetLoaded:false,
     failed:false,
@@ -31,7 +32,9 @@
     registryVersion:registry?.version || null,
     gameplayAnchorPreserved:false,
     labelRemoved:true,
-    drawCount:0
+    drawCount:0,
+    decorationReset:true,
+    decorationResetSuppressed:true
   };
 
   if (asset && prop && style) {
@@ -120,6 +123,11 @@
   const _nRender = render;
   render = function () {
     _nRender();
+    if (resetActive()) {
+      window.KELO_TRAINING_DUMMY_AUDIT.decorationReset=true;
+      window.KELO_TRAINING_DUMMY_AUDIT.decorationResetSuppressed=true;
+      return;
+    }
     const z = CONFIG.zoom || 1;
     ctx.save();
     ctx.translate(screenW / 2, screenH / 2);
