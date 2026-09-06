@@ -18,6 +18,7 @@
   const profiles = new Map();
   const profileByAbilityKey = new Map();
   const activeProjectileVisuals = new Map();
+  const activeSwordThrowVisuals = new Map();
   const activeStatusVisuals = new Map();
   const activeCastSequences = new Map();
   const activeCastByAbility = new Map();
@@ -85,6 +86,7 @@
     if (cue === 'cast' && profile.castSequence && root.KeloSequence) return root.KeloSequence.play(profile.castSequence, c);
     if (cue === 'impact' && profile.impactSequence && root.KeloSequence) return root.KeloSequence.play(profile.impactSequence, c);
     if (cue === 'projectile' && profile.projectileVisual && root.KeloProjectileVisuals) return root.KeloProjectileVisuals.preview(profile.projectileVisual, c, { speed: c.gameplay.speed, maxDistance: c.gameplay.range });
+    if (cue === 'throw' && profile.throwVisual && root.KeloProjectileVisuals) return root.KeloProjectileVisuals.preview(profile.throwVisual, c, { speed: c.gameplay.speed, maxDistance: c.gameplay.range, loop: true });
     const ref = profile[cue];
     if (ref && root.KeloFX) return root.KeloFX.spawn(ref, c);
     return null;
@@ -152,6 +154,34 @@
 
   function onProjectileExpired(payload) { stopProjectileFor(normalizedEvent(payload)); }
 
+  function swordThrowKey(payload, c) {
+    return String(payload && payload.swordEntityId || c && (c.projectileId || c.castId) || '');
+  }
+
+  function onSwordThrown(payload) {
+    if (!enabled || !root.KeloProjectileVisuals) return;
+    const c = normalizedEvent(payload);
+    const profile = resolveProfile(c.abilityId, c.abilityKey);
+    const ref = profile && profile.throwVisual;
+    if (!ref) return;
+    const gameplayObject = payload && payload.gameplayObject || null;
+    const options = { speed: c.gameplay.speed, maxDistance: c.gameplay.range, loop: true };
+    const visualId = gameplayObject
+      ? root.KeloProjectileVisuals.attach(gameplayObject, ref, c, options)
+      : root.KeloProjectileVisuals.preview(ref, c, options);
+    const key = swordThrowKey(payload, c);
+    if (key && visualId) activeSwordThrowVisuals.set(key, visualId);
+  }
+
+  function stopSwordThrow(payload) {
+    if (!root.KeloProjectileVisuals) return;
+    const c = normalizedEvent(payload);
+    const key = swordThrowKey(payload, c);
+    const visualId = key && activeSwordThrowVisuals.get(key);
+    if (visualId) root.KeloProjectileVisuals.stop(visualId);
+    if (key) activeSwordThrowVisuals.delete(key);
+  }
+
   function statusKey(c, status) { return String(c.actorId || 'actor') + ':' + String(status || c.statusId || 'status'); }
   function onStatusApplied(payload) {
     if (!enabled || !root.KeloFX) return;
@@ -188,6 +218,9 @@
   bus.on('PROJECTILE_SPAWNED', onProjectileSpawn);
   bus.on('PROJECTILE_HIT', onProjectileHit);
   bus.on('PROJECTILE_EXPIRED', onProjectileExpired);
+  bus.on('SWORD_THROWN', onSwordThrown);
+  bus.on('SWORD_LANDED', stopSwordThrow);
+  bus.on('SWORD_THROW_CANCELLED', stopSwordThrow);
   bus.on('STATUS_APPLIED', onStatusApplied);
   bus.on('STATUS_REMOVED', onStatusRemoved);
   bus.on('SHIELD_APPLIED', onShield);
@@ -334,6 +367,16 @@
       pendingBySlot.delete(slot);
     });
 
+    abilityBus.on('SWAP_SWORD_THROWN', function (payload) {
+      bus.emit('SWORD_THROWN', Object.assign({}, payload || {}));
+    });
+    abilityBus.on('SWAP_SWORD_LANDED', function (payload) {
+      bus.emit('SWORD_LANDED', Object.assign({}, payload || {}));
+    });
+    abilityBus.on('SWAP_SWORD_THROW_CANCELLED', function (payload) {
+      bus.emit('SWORD_THROW_CANCELLED', Object.assign({}, payload || {}));
+    });
+
     abilityBus.on('ABILITY_FAILED', function (payload) {
       const slot = Number(payload && payload.request && payload.request.slotIndex);
       const pending = pendingBySlot.get(slot);
@@ -379,7 +422,7 @@
     });
 
     root.KELO_ABILITY_SEMANTIC_EVENTS = true;
-    if (root.KELO_VISUAL_AUDIT) root.KELO_VISUAL_AUDIT.legacyAbilityAdapter = 'semantic-event-bridge-v1';
+    if (root.KELO_VISUAL_AUDIT) root.KELO_VISUAL_AUDIT.legacyAbilityAdapter = 'semantic-event-bridge-v1.1';
   }
 
   function collectProfileAssets(profile) {
@@ -395,7 +438,7 @@
         if (cue.type === 'sfx') { const sfx = root.KeloSFXRegistry && root.KeloSFXRegistry.get(cue.ref); if (sfx && sfx.assetId) ids.add(sfx.assetId); }
       });
     }
-    if (profile) { addSequence(profile.castSequence); addSequence(profile.impactSequence); addFromProjectile(profile.projectileVisual); }
+    if (profile) { addSequence(profile.castSequence); addSequence(profile.impactSequence); addFromProjectile(profile.projectileVisual); addFromProjectile(profile.throwVisual); }
     return Array.from(ids);
   }
 
@@ -413,7 +456,7 @@
 
   root.KeloVisualProfileRegistry = Object.freeze({ version: 'visual-profile-registry-v1.0.0', register: register, get: get, list: list, resolve: resolveProfile });
   root.KeloAbilityVisuals = Object.freeze({
-    version: 'ability-visual-resolver-v1.1.0',
+    version: 'ability-visual-resolver-v1.2.0',
     setEnabled: setEnabled,
     get enabled() { return enabled; },
     hasProfile: hasProfile,
