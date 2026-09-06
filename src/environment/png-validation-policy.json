@@ -24,7 +24,7 @@
     {
       "path": "assets/cesped.PNG",
       "scope": "source-sheet",
-      "reason": "Original Kelo-uploaded HD grass sheet retained as visual source-of-truth; LIVE renders the deterministic mobile runtime atlas cesped-runtime.PNG."
+      "reason": "Original Kelo-uploaded HD grass sheet retained as visual source-of-truth; LIVE renders the deterministic mobile runtime atlas cesped-runtime.png."
     }
   ]
 }
