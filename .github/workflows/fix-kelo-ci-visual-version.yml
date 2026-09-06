@@ -1,0 +1,40 @@
+name: Repair stale visual cache contract
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/fix-kelo-ci-visual-version.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Align network cache contract
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('.github/workflows/ci.yml')
+          text = path.read_text()
+          old = 'engine-net.js?v=95'
+          new = 'engine-net.js?v=96'
+          if old not in text:
+              if new in text:
+                  print('Already aligned')
+                  raise SystemExit(0)
+              raise SystemExit('Expected Kelo CI network cache token not found')
+          path.write_text(text.replace(old, new, 1))
+          PY
+      - name: Commit repair
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name 'kelo-ci-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add .github/workflows/ci.yml
+          git commit -m 'Align Kelo CI with engine-net v96'
+          git push origin HEAD:main
