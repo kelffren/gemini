@@ -5,7 +5,7 @@ import {spawn} from 'node:child_process';
 
 const base=process.env.AUDIT_URL||'https://kelffren.github.io/gemini/';
 const chromeBin=process.env.CHROME_BIN||'/usr/bin/google-chrome';
-const expectedBridge='sword-swap-pvp-visuals-v1.2.0';
+const expectedBridge='sword-swap-pvp-visuals-v1.4.0';
 const expectedTitle='Kelo World — V6.37';
 const artifacts=path.resolve('artifacts');
 fs.mkdirSync(artifacts,{recursive:true});
@@ -53,9 +53,9 @@ const setup=await evalJs(`(()=>{
   KeloAbilities.syncFromWorldState(true);
   localPlayer.mana=100;
   const slot=KeloAbilities.hotbar.slots.findIndex(s=>s?.definition?.key==='swap_sword');
-  return {slot,title:document.title,bridge:KELO_SWORD_SWAP_PVP_VISUAL_AUDIT.version,assetsReady:KELO_SWORD_SWAP_PVP_VISUAL_AUDIT.assetsReady};
+  return {slot,title:document.title,bridge:KELO_SWORD_SWAP_PVP_VISUAL_AUDIT.version,assetsReady:KELO_SWORD_SWAP_PVP_VISUAL_AUDIT.assetsReady,blockerInstalled:KELO_SWORD_SWAP_PVP_VISUAL_AUDIT.blockerInstalled};
 })()`,sid);
-if(setup.slot<0||setup.title!==expectedTitle||setup.bridge!==expectedBridge||!setup.assetsReady)throw new Error(`Swap Sword setup failed ${JSON.stringify(setup)}`);
+if(setup.slot<0||setup.title!==expectedTitle||setup.bridge!==expectedBridge||!setup.assetsReady||!setup.blockerInstalled)throw new Error(`Swap Sword setup failed ${JSON.stringify(setup)}`);
 
 await evalJs(`KeloPvPWorld.enter();true`,sid);
 await waitFor(`KeloPvPWorld.state.mode==='pvp'&&KeloPvPWorld.state.combatEnabled===true`,sid,'PvP entered',10000);
@@ -69,6 +69,20 @@ const thrown=await evalJs(`(()=>{
 if(!thrown.ok)throw new Error(`Sword throw failed ${JSON.stringify(thrown)}`);
 await waitFor(`KeloPvPWorld.state.swapSword?.phase==='planted'`,sid,'Sword planted',5000);
 await waitFor(`KELO_SWORD_SWAP_PVP_VISUAL_AUDIT.impactPlayed>=1&&KELO_SWORD_SWAP_PVP_VISUAL_AUDIT.loopPlayed>=1`,sid,'impact and planted loop visible',5000);
+
+const blockerCheck=await evalJs(`(()=>{
+  const sword=KeloPvPWorld.state.swapSword;
+  const beforeHits=KELO_SWORD_SWAP_PVP_VISUAL_AUDIT.blockerHits;
+  const restore={x:localPlayer.x,y:localPlayer.y};
+  localPlayer.x=sword.x;localPlayer.y=sword.y;
+  if(typeof updateSimulation==='function')updateSimulation(1/60);
+  const after={x:localPlayer.x,y:localPlayer.y};
+  const moved=Math.hypot(after.x-sword.x,after.y-sword.y);
+  const out={active:KELO_SWORD_SWAP_PVP_VISUAL_AUDIT.blockerActive,hits:KELO_SWORD_SWAP_PVP_VISUAL_AUDIT.blockerHits-beforeHits,moved,box:KELO_SWORD_SWAP_PVP_VISUAL_AUDIT.blockerBox};
+  localPlayer.x=restore.x;localPlayer.y=restore.y;localPlayer.vx=0;localPlayer.vy=0;
+  return out;
+})()`,sid);
+if(!blockerCheck.active||blockerCheck.hits<1||blockerCheck.moved<1)throw new Error(`Planted sword blocker failed ${JSON.stringify(blockerCheck)}`);
 await screenshot('01-sword-planted.png',sid);
 
 const beforeSwap=await evalJs(`(()=>{const d=simulatedPlayers[0];return {player:{x:localPlayer.x,y:localPlayer.y},dummy:d?{x:d.x,y:d.y,id:d.id||null}:null,audit:{...KELO_SWORD_SWAP_PVP_VISUAL_AUDIT},projectiles:KeloProjectileVisuals.metrics()};})()`,sid);
@@ -78,10 +92,10 @@ const swapped=await evalJs(`(()=>{
   return {ok:r.ok,result:r.result||null,player:{x:localPlayer.x,y:localPlayer.y},dummy:{x:d.x,y:d.y,id:d.id||null}};
 })()`,sid);
 if(!swapped.ok)throw new Error(`Character swap failed ${JSON.stringify(swapped)}`);
-await waitFor(`KELO_SWORD_SWAP_PVP_VISUAL_AUDIT.teleportPlayed>=1&&KELO_SWORD_SWAP_PVP_VISUAL_AUDIT.returnPlayed>=1`,sid,'teleport and sword return VFX spawned',3000);
+await waitFor(`KELO_SWORD_SWAP_PVP_VISUAL_AUDIT.teleportPlayed>=1&&KELO_SWORD_SWAP_PVP_VISUAL_AUDIT.returnPlayed>=1&&KELO_SWORD_SWAP_PVP_VISUAL_AUDIT.returnLaunchPlayed>=1`,sid,'teleport and sword return VFX spawned',3000);
 await sleep(120);
-const teleportMoment=await evalJs(`(()=>({audit:{...KELO_SWORD_SWAP_PVP_VISUAL_AUDIT},projectiles:KeloProjectileVisuals.metrics(),assets:{teleport:KeloAssetRegistry.isReady('sword_swap_pvp_teleport_asset_v2'),return:KeloAssetRegistry.isReady('sword_swap_pvp_return_asset_v2')}}))()`,sid);
-if(!teleportMoment.assets.teleport||!teleportMoment.assets.return||teleportMoment.projectiles.active<3)throw new Error(`Teleport visual not actually active ${JSON.stringify(teleportMoment)}`);
+const teleportMoment=await evalJs(`(()=>({audit:{...KELO_SWORD_SWAP_PVP_VISUAL_AUDIT},projectiles:KeloProjectileVisuals.metrics(),assets:{teleport:KeloAssetRegistry.isReady('sword_swap_pvp_teleport_asset_v4'),return:KeloAssetRegistry.isReady('sword_swap_pvp_return_asset_v4')}}))()`,sid);
+if(!teleportMoment.assets.teleport||!teleportMoment.assets.return||teleportMoment.projectiles.active<3)throw new Error(`Teleport/return launch visual not actually active ${JSON.stringify(teleportMoment)}`);
 await screenshot('02-character-swap-teleport.png',sid);
 
 await sleep(650);
@@ -102,10 +116,10 @@ if(recallMoment.projectiles.active<2)throw new Error(`Recall teleport not visibl
 await screenshot('04-recall-to-sword-teleport.png',sid);
 
 const finalState=await evalJs(`(()=>({title:document.title,bridge:{...KELO_SWORD_SWAP_PVP_VISUAL_AUDIT},assetMetrics:KeloAssetRegistry.metrics(),projectileMetrics:KeloProjectileVisuals.metrics(),pvp:KeloPvPWorld.state}))()`,sid);
-const report={liveReady,setup,thrown,beforeSwap,swapped,teleportMoment,returnMoment,recalled,recallMoment,finalState,assetHttpErrors,assetLoadFailures,consoleErrors};
+const report={liveReady,setup,thrown,blockerCheck,beforeSwap,swapped,teleportMoment,returnMoment,recalled,recallMoment,finalState,assetHttpErrors,assetLoadFailures,consoleErrors};
 fs.writeFileSync(path.join(artifacts,'sword-swap-vfx-report.json'),JSON.stringify(report,null,2));
 console.log(JSON.stringify(report,null,2));
 if(assetHttpErrors.length||assetLoadFailures.length||consoleErrors.length)throw new Error(`Sword Swap LIVE errors ${JSON.stringify({assetHttpErrors,assetLoadFailures,consoleErrors})}`);
-if(finalState.title!==expectedTitle||finalState.bridge.teleportPlayed<2||finalState.bridge.returnPlayed<1||finalState.bridge.impactPlayed<2||finalState.bridge.loopPlayed<1)throw new Error(`Incomplete VFX coverage ${JSON.stringify(finalState)}`);
+if(finalState.title!==expectedTitle||finalState.bridge.teleportPlayed<2||finalState.bridge.returnPlayed<1||finalState.bridge.returnLaunchPlayed<1||finalState.bridge.impactPlayed<2||finalState.bridge.loopPlayed<1||finalState.bridge.blockerHits<1)throw new Error(`Incomplete VFX/blocker coverage ${JSON.stringify(finalState)}`);
 
 try{await send('Browser.close');}catch{}finally{setTimeout(()=>chrome.kill('SIGKILL'),1000).unref();}
