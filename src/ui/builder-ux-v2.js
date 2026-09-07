@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: UI
  * keys: BUILDER UX SCOPE PICKUP ROTATE DOCK BRUSH UNDO ONLINE
- * hace: Plaza|Parcela + recoger/rotar + barra abajo + pincel arrastre
+ * hace: Plaza|Parcela + recoger/rotar + barra abajo; el pointer lo posee builder-input
  * online: envuelve request()
  */
 (function(){
@@ -9,7 +9,7 @@
   if(window.KELO_BUILDER_UX)return;
   const TILE=32;
   const undo=[];
-  let ghost=null,scope='world',parcel=null,editWrapped=false,held=null,selectedId=null,handsReady=false;
+  let ghost=null,scope='world',parcel=null,editWrapped=false,held=null,selectedId=null;
   const toast=m=>{if(typeof showToast==='function')showToast(m);};
   const actor=()=>String(window.keloNet?.playerKey||window.KELO_ADMIN_KEYS?.playerId?.()||window.localPlayer?.id||'local_pioneer');
   function toWorld(e){if(typeof screenToWorld==='function')return screenToWorld(e.clientX,e.clientY);const z=(typeof CONFIG!=='undefined'&&CONFIG.zoom)||1;return{x:camera.x+(e.clientX-screenW/2)/z,y:camera.y+(e.clientY-screenH/2)/z};}
@@ -23,20 +23,15 @@
     const S=window.KELO_PROPERTY_SYSTEM;if(!S?.placementForPoint)return null;
     return S.placementForPoint(x,y,parcelIdNow())||S.placementForPoint(x,y)||null;
   }
-
   async function ensureParcel(){
     const S=window.KELO_PROPERTY_SYSTEM;if(!S?.request)return null;
-    parcel=scope==='world'
-      ?await S.request('ensureWorldEditorParcel',{ownerId:'developer'})
-      :await S.request('ensureLegacyParcel',{ownerId:actor()});
+    parcel=scope==='world'?await S.request('ensureWorldEditorParcel',{ownerId:'developer'}):await S.request('ensureLegacyParcel',{ownerId:actor()});
     return parcel;
   }
-
   async function editReq(op,payload){
     const E=window.KELO_WORLD_EDIT;if(!E?.request)throw new Error('WORLD_EDIT_NOT_READY');
     return E.request(op,payload);
   }
-
   async function pickUp(rec){
     if(!rec){toast('Toca un objeto primero');return;}
     const C=window.KELO_PROPERTY_CATALOG,t=C?.get?.(rec.assetId);
@@ -50,10 +45,7 @@
     if(!held)return;
     const x=snap(w.x),y=snap(w.y);
     if(scope==='parcel'&&!insideParcel(x,y)){toast('FUERA_DE_LA_PARCELA');return;}
-    try{
-      await editReq('world:placement:create',{actorId:actor(),assetId:held.assetId,x,y,rotation:held.rotation||0});
-      held=null;toast('Colocado');
-    }catch(e){toast(e.message);}
+    try{await editReq('world:placement:create',{actorId:actor(),assetId:held.assetId,x,y,rotation:held.rotation||0});held=null;toast('Colocado');}catch(e){toast(e.message);}
   }
   async function rotateHeldOrSelected(){
     if(held){held.rotation=((held.rotation||0)+1)%4;toast('Rotado '+held.rotation);return;}
@@ -65,7 +57,6 @@
     const hit=hitAt(ghost.x+8,ghost.y+8);if(!hit){toast('No hay objeto bajo el recuadro');return;}
     await pickUp(hit);
   }
-
   async function undoLast(){
     const e=undo.pop();if(!e){toast('Nada que deshacer');return;}
     try{
@@ -79,7 +70,6 @@
       toast('Deshecho');
     }catch(err){toast(err.message||'No se pudo deshacer');}
   }
-
   function wrapWorld(){
     const WB=window.KELO_WORLD_BUILDER;if(!WB||WB.__uxWrapped)return;
     const raw=WB.request.bind(WB);
@@ -136,7 +126,6 @@
     window.KELO_WORLD_EDIT=Object.assign({},E,{request});
     editWrapped=true;
   }
-
   function setScope(next){
     scope=next==='parcel'?'parcel':'world';
     ensureParcel().then(p=>{
@@ -149,7 +138,6 @@
       document.getElementById('kelo-scope-parcel')?.classList.toggle('on',scope==='parcel');
     }).catch(err=>toast(err.message));
   }
-
   function dock(on){
     const host=document.getElementById('kelo-world-builder');if(!host)return;
     host.classList.toggle('wb-dock',!!on);
@@ -194,20 +182,7 @@
     if(pe&&host.style.display!=='none'&&pe.style.display==='flex')pe.style.display='none';
     const lyr=layerNow();
     if(builderOpen()&&(lyr==='terrain'||lyr==='path'||lyr==='objects'))dock(true);
-    handsReady=true;
   }
-
-  function onPointerDown(e){
-    if(!builderOpen()||layerNow()!=='objects')return;
-    const host=document.getElementById('kelo-world-builder');
-    if(host&&host.contains(e.target))return;
-    const w=toWorld(e);
-    if(held){e.preventDefault();e.stopImmediatePropagation();dropHeld(w);return;}
-    const hit=hitAt(w.x,w.y);
-    if(hit&&selectedId===hit.placementId){e.preventDefault();e.stopImmediatePropagation();pickUp(hit);return;}
-    if(hit)selectedId=hit.placementId;
-  }
-
   function drawGhost(g){
     if(parcel?.bounds&&scope==='parcel'){
       const b=parcel.bounds;g.save();g.strokeStyle='rgba(231,197,106,.9)';g.setLineDash([8,6]);g.strokeRect(b.x,b.y,b.w,b.h);g.setLineDash([]);g.restore();
@@ -219,19 +194,17 @@
     g.restore();
   }
   const L=window.KELO_ENVIRONMENT_LAYERS;
-  if(L?.register)L.register({id:'builder-ux-ghost',phase:'vfx_weather_lighting',priority:998,required:false,ready:()=>true,draw:drawGhost,ownership:'builder-ux-v3',bounds:()=>[]});
-
-  window.addEventListener('pointerdown',onPointerDown,true);
+  if(L?.register)L.register({id:'builder-ux-ghost',phase:'vfx_weather_lighting',priority:998,required:false,ready:()=>true,draw:drawGhost,ownership:'builder-ux-v4',bounds:()=>[]});
   window.addEventListener('pointermove',e=>{const w=toWorld(e);ghost={x:snap(w.x),y:snap(w.y),w:held?.w||TILE,h:held?.h||TILE};},{passive:true});
   window.addEventListener('keydown',e=>{
     if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='z'){e.preventDefault();undoLast();}
     if(e.key.toLowerCase()==='r')rotateHeldOrSelected();
   });
-
   const t=setInterval(()=>{wrapWorld();wrapProperty();wrapEdit();injectChrome();},200);
   setTimeout(()=>clearInterval(t),25000);
   window.KELO_BUILDER_UX=Object.freeze({
-    version:'builder-ux-v1.2.0',undoLast,setScope,pickUnderGhost,rotateHeldOrSelected,dock,
+    version:'builder-ux-v1.3.0',undoLast,setScope,pickUnderGhost,rotateHeldOrSelected,dock,
+    drop:dropHeld,pickUp,
     get scope(){return scope;},get parcelId(){return parcel?.parcelId||null;},get holding(){return !!held;},get undoCount(){return undo.length;}
   });
 })();
