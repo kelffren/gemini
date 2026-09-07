@@ -4,6 +4,13 @@ import path from 'node:path';
 
 const url = process.env.AUDIT_URL || 'https://kelffren.github.io/gemini/';
 const outDir = path.resolve('artifacts/character-customization-live');
+const EXPECTED = Object.freeze({
+  schema:'character-slot-schema-v1.0.0',
+  core:'character-customization-v1.0.4',
+  stack:'character-visual-stack-v1.0.1',
+  kit:'character-demo-kit-v1.1.0',
+  preview:'character-customizer-preview-v1.1.0'
+});
 await fs.mkdir(outDir, { recursive: true });
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
@@ -16,15 +23,30 @@ async function waitPreviewItem(id) {
 
 try {
   await page.goto(url + '?character-customizer-audit=' + Date.now(), { waitUntil: 'domcontentloaded', timeout: 60000 });
-  await page.waitForFunction(() => !!window.KeloCharacterCustomization && !!window.KeloCharacterCustomizer &&
+  await page.waitForFunction(() => !!window.KeloCharacterSlotSchema && !!window.KeloCharacterCustomization && !!window.KeloCharacterVisualStack && !!window.KeloCharacterCustomizer &&
+    window.KELO_CHARACTER_SLOT_SCHEMA_AUDIT?.ready === true &&
+    window.KELO_CHARACTER_CUSTOMIZATION_AUDIT?.ready === true &&
+    window.KELO_CHARACTER_VISUAL_STACK_AUDIT?.ready === true &&
     window.KELO_CHARACTER_CUSTOMIZER_UI_AUDIT?.ready === true &&
     window.KELO_CHARACTER_DEMO_KIT_AUDIT?.ready === true &&
     window.KELO_CHARACTER_CUSTOMIZER_PREVIEW_AUDIT?.ready === true,
   null, { timeout: 30000 });
 
-  const baseline = await page.evaluate(async () => {
+  const baseline = await page.evaluate(async expected => {
+    const Schema = window.KeloCharacterSlotSchema;
     const A = window.KeloCharacterCustomization;
+    const Stack = window.KeloCharacterVisualStack;
     const kit = window.KELO_CHARACTER_DEMO_KIT_AUDIT;
+    const previewAudit = window.KELO_CHARACTER_CUSTOMIZER_PREVIEW_AUDIT;
+    if (Schema.version !== expected.schema) throw new Error('STALE_SLOT_SCHEMA_' + Schema.version);
+    if (A.version !== expected.core) throw new Error('STALE_CHARACTER_CORE_' + A.version);
+    if (Stack.version !== expected.stack) throw new Error('STALE_VISUAL_STACK_' + Stack.version);
+    if (kit?.version !== expected.kit) throw new Error('STALE_DEMO_KIT_' + kit?.version);
+    if (previewAudit?.version !== expected.preview) throw new Error('STALE_PREVIEW_' + previewAudit?.version);
+    if (window.KELO_CHARACTER_CUSTOMIZATION_AUDIT?.sharedSlotSchema !== true) throw new Error('CORE_NOT_USING_SHARED_SLOT_SCHEMA');
+    if (window.KELO_CHARACTER_VISUAL_STACK_AUDIT?.sharedSlotSchema !== true) throw new Error('STACK_NOT_USING_SHARED_SLOT_SCHEMA');
+    if (Schema.slots.length !== 21 || window.KELO_CHARACTER_SLOT_SCHEMA_AUDIT?.slotCount !== 21) throw new Error('EXPECTED_21_SCHEMA_SLOTS');
+    if (Schema.visualSlotForGameplay('weapon') !== 'weaponMain' || Schema.visualSlotForGameplay('helmet') !== 'head') throw new Error('GAMEPLAY_VISUAL_MAPPING_WRONG');
     const before = A.getState();
     if (A.slots.length !== 21) throw new Error('EXPECTED_21_SLOTS_' + A.slots.length);
     if (before.mode !== 'modular') throw new Error('MODULAR_NOT_DEFAULT');
@@ -53,10 +75,7 @@ try {
     if (net.outfitId !== 'outfit_kelo_vanguard') throw new Error('NETWORK_OUTFIT_ID_MISSING');
     if (net.slots.head !== 'head_vanguard_crown' || net.slots.weaponMain !== 'weapon_solar_saber') throw new Error('NETWORK_VISUAL_IDS_MISSING');
 
-    const actor = {
-      id:'__character_kit_melee_audit', x:-1000, y:-1000, radius:20, _face:'down',
-      _visualMotion:{ on:true, frame:2, face:'down' }
-    };
+    const actor = { id:'__character_kit_melee_audit', x:-1000, y:-1000, radius:20, _face:'down', _visualMotion:{ on:true, frame:2, face:'down' } };
     A.applyRemote(actor, net);
     if (typeof window.renderAvatar !== 'function' || !window.renderAvatar.__keloModularCustomization) throw new Error('MODULAR_RENDERER_NOT_INSTALLED');
     const drawsBefore = window.KELO_CHARACTER_CUSTOMIZATION_AUDIT.draws;
@@ -78,17 +97,17 @@ try {
     if (attackDraws < 5) throw new Error('MODULAR_ATTACK_RENDER_DID_NOT_DRAW_SELECTED_LAYERS_' + attackDraws);
 
     return {
-      slots:A.slots.slice(),
-      bodyBefore,
-      networkSchema:net.schema,
-      assetResults,
+      versions:{ schema:Schema.version, core:A.version, stack:Stack.version, kit:kit.version, preview:previewAudit.version },
+      slots:A.slots.slice(), bodyBefore, networkSchema:net.schema, assetResults,
       firstLoadout:{ outfit:equipped.outfitId, head:equipped.slots.head, weaponMain:equipped.slots.weaponMain },
       gameplayRender:{ walkDraws, attackDraws, movingFrame:actor._visualMotion.frame },
       meleeTransform:{ clipId:transform.clipId, rotation:transform.rotation, offsetX:transform.offsetX, offsetY:transform.offsetY },
+      schemaAudit:window.KELO_CHARACTER_SLOT_SCHEMA_AUDIT,
+      stackAudit:window.KELO_CHARACTER_VISUAL_STACK_AUDIT,
       audit:window.KELO_CHARACTER_CUSTOMIZATION_AUDIT,
       kitAudit:kit
     };
-  });
+  }, EXPECTED);
 
   await page.evaluate(() => window.KeloCharacterCustomizer.open());
   const modal = page.locator('#kelo-character-customizer');
@@ -146,23 +165,12 @@ try {
   if (!labels.some(x => x.includes('Arma principal'))) throw new Error('WEAPON_SLOT_NOT_VISIBLE');
   if (pageErrors.length) throw new Error('PAGE_ERRORS_' + pageErrors.join(' | '));
 
-  const report = {
-    ok:true,
-    url,
-    viewport:{ width:390, height:844 },
-    baseline,
-    swap,
-    removal,
-    previewLayers:{ first:firstLayerCount, second:secondLayerCount },
-    tabs:['appearance','outfits','equipment','cosmetics'],
-    equipmentLabels:labels,
-    pageErrors
-  };
+  const report = { ok:true, url, expected:EXPECTED, viewport:{ width:390, height:844 }, baseline, swap, removal, previewLayers:{ first:firstLayerCount, second:secondLayerCount }, tabs:['appearance','outfits','equipment','cosmetics'], equipmentLabels:labels, pageErrors };
   await fs.writeFile(path.join(outDir, 'report.json'), JSON.stringify(report, null, 2));
-  console.log('CHARACTER_CUSTOMIZATION_LIVE_OK', JSON.stringify({ pieces:7, previewLayers:secondLayerCount, walkDraws:baseline.gameplayRender.walkDraws, attackDraws:baseline.gameplayRender.attackDraws, assets:baseline.assetResults.length, errors:pageErrors.length }));
+  console.log('CHARACTER_CUSTOMIZATION_LIVE_OK', JSON.stringify({ versions:baseline.versions, pieces:7, previewLayers:secondLayerCount, walkDraws:baseline.gameplayRender.walkDraws, attackDraws:baseline.gameplayRender.attackDraws, assets:baseline.assetResults.length, errors:pageErrors.length }));
 } catch (error) {
   await page.screenshot({ path:path.join(outDir, 'character-customizer-failure.png'), fullPage:true }).catch(() => {});
-  await fs.writeFile(path.join(outDir, 'report.json'), JSON.stringify({ ok:false, url, error:String(error?.stack || error), pageErrors }, null, 2));
+  await fs.writeFile(path.join(outDir, 'report.json'), JSON.stringify({ ok:false, url, expected:EXPECTED, error:String(error?.stack || error), pageErrors }, null, 2));
   throw error;
 } finally {
   await browser.close();
