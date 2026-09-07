@@ -6,6 +6,7 @@ import {spawn} from 'node:child_process';
 const base=process.env.AUDIT_URL||'https://kelffren.github.io/gemini/';
 const chromeBin=process.env.CHROME_BIN||'/usr/bin/google-chrome';
 const expectedBridge='sword-swap-pvp-visuals-v1.2.0';
+const expectedTitle='Kelo World — V6.37';
 const artifacts=path.resolve('artifacts');
 fs.mkdirSync(artifacts,{recursive:true});
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
@@ -33,7 +34,7 @@ on('Network.loadingFailed',p=>{const url=requests.get(p.requestId)||'';if(url.in
 on('Runtime.consoleAPICalled',p=>{if(p.type!=='error')return;const text=(p.args||[]).map(a=>a.value??a.description??'').join(' ');if(/SwordSwap|sword[_ -]?swap/i.test(text))consoleErrors.push(text);});
 on('Runtime.exceptionThrown',p=>{const text=`EXCEPTION: ${p.exceptionDetails?.text||'unknown'}`;consoleErrors.push(text);});
 
-const ready=`window.KELO_SWORD_SWAP_PVP_VISUAL_AUDIT?.version===${JSON.stringify(expectedBridge)}&&window.KeloPvPWorld&&window.KeloAbilities&&window.KeloAssetRegistry&&window.KeloProjectileVisuals`;
+const ready=`document.title===${JSON.stringify(expectedTitle)}&&window.KELO_SWORD_SWAP_PVP_VISUAL_AUDIT?.version===${JSON.stringify(expectedBridge)}&&window.KeloPvPWorld&&window.KeloAbilities&&window.KeloAssetRegistry&&window.KeloProjectileVisuals`;
 let liveReady=false;
 for(let attempt=1;attempt<=45;attempt++){
   await navigate(`${base}?sword-swap-vfx-cert=${Date.now()}-${attempt}`,sid);
@@ -41,7 +42,7 @@ for(let attempt=1;attempt<=45;attempt++){
   if(liveReady)break;
   await sleep(5000);
 }
-if(!liveReady)throw new Error('LIVE never reached exact Sword Swap PvP visual bridge');
+if(!liveReady)throw new Error('LIVE never reached exact Sword Swap PvP visual bridge and cache-busted game version');
 
 await waitFor(`window.KELO_SWORD_SWAP_PVP_VISUAL_AUDIT?.assetsReady===true`,sid,'Sword Swap PNG assets ready',30000);
 
@@ -52,9 +53,9 @@ const setup=await evalJs(`(()=>{
   KeloAbilities.syncFromWorldState(true);
   localPlayer.mana=100;
   const slot=KeloAbilities.hotbar.slots.findIndex(s=>s?.definition?.key==='swap_sword');
-  return {slot,bridge:KELO_SWORD_SWAP_PVP_VISUAL_AUDIT.version,assetsReady:KELO_SWORD_SWAP_PVP_VISUAL_AUDIT.assetsReady};
+  return {slot,title:document.title,bridge:KELO_SWORD_SWAP_PVP_VISUAL_AUDIT.version,assetsReady:KELO_SWORD_SWAP_PVP_VISUAL_AUDIT.assetsReady};
 })()`,sid);
-if(setup.slot<0||setup.bridge!==expectedBridge||!setup.assetsReady)throw new Error(`Swap Sword setup failed ${JSON.stringify(setup)}`);
+if(setup.slot<0||setup.title!==expectedTitle||setup.bridge!==expectedBridge||!setup.assetsReady)throw new Error(`Swap Sword setup failed ${JSON.stringify(setup)}`);
 
 await evalJs(`KeloPvPWorld.enter();true`,sid);
 await waitFor(`KeloPvPWorld.state.mode==='pvp'&&KeloPvPWorld.state.combatEnabled===true`,sid,'PvP entered',10000);
@@ -105,6 +106,6 @@ const report={liveReady,setup,thrown,beforeSwap,swapped,teleportMoment,returnMom
 fs.writeFileSync(path.join(artifacts,'sword-swap-vfx-report.json'),JSON.stringify(report,null,2));
 console.log(JSON.stringify(report,null,2));
 if(assetHttpErrors.length||assetLoadFailures.length||consoleErrors.length)throw new Error(`Sword Swap LIVE errors ${JSON.stringify({assetHttpErrors,assetLoadFailures,consoleErrors})}`);
-if(finalState.bridge.teleportPlayed<2||finalState.bridge.returnPlayed<1||finalState.bridge.impactPlayed<2||finalState.bridge.loopPlayed<1)throw new Error(`Incomplete VFX coverage ${JSON.stringify(finalState.bridge)}`);
+if(finalState.title!==expectedTitle||finalState.bridge.teleportPlayed<2||finalState.bridge.returnPlayed<1||finalState.bridge.impactPlayed<2||finalState.bridge.loopPlayed<1)throw new Error(`Incomplete VFX coverage ${JSON.stringify(finalState)}`);
 
 try{await send('Browser.close');}catch{}finally{setTimeout(()=>chrome.kill('SIGKILL'),1000).unref();}
