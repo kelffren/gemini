@@ -7,7 +7,7 @@
 (function (root) {
   'use strict';
 
-  const VERSION = 'character-customization-v1.0.1';
+  const VERSION = 'character-customization-v1.0.2';
   const STORAGE_KEY = 'kelo_character_customization_v1';
   const FACE_ORDER = Object.freeze({
     down: Object.freeze(['back','body','skinTone','legs','feet','torso','gloves','armor','face','eyes','facialHair','hair','head','faceAccessory','accessory1','accessory2','weaponSecondary','weaponMain','weaponSkin','aura','characterFX']),
@@ -23,7 +23,7 @@
   });
   const ALL_SLOTS = Object.freeze(Array.from(new Set(Object.keys(SLOT_GROUPS).reduce(function (all, key) { return all.concat(SLOT_GROUPS[key]); }, []))));
   const GAMEPLAY_TO_VISUAL = Object.freeze({ weapon:'weaponMain', helmet:'head', chest:'armor', gloves:'gloves', boots:'feet', accessory:'accessory1' });
-  const BACK_SLOTS = new Set(['back','weaponSecondary']);
+  const UP_BACK_SLOTS = new Set(['back','weaponSecondary','weaponMain','weaponSkin']);
   const imageCache = new Map();
   const catalog = new Map();
   const outfits = new Map();
@@ -52,6 +52,8 @@
     sharedAnimationState: true,
     actionTransformShared: true,
     independentEquipmentLayers: true,
+    outfitEquipmentIndependence: true,
+    upFacingWeaponOcclusion: true,
     gameplayStatsOwnedElsewhere: true,
     onlineUsesIdsOnly: true,
     slotCount: ALL_SLOTS.length,
@@ -175,7 +177,11 @@
       if (item.locked && !(options && options.force)) return { ok:false, error:'ITEM_LOCKED' };
       state.slots[slot] = item.id;
     } else state.slots[slot] = null;
-    if (!(options && options.keepOutfit)) state.outfitId = null;
+    if (!(options && options.keepOutfit) && state.outfitId) {
+      const activeOutfit = outfits.get(state.outfitId);
+      const outfitOwnsSlot = !!(activeOutfit && Object.prototype.hasOwnProperty.call(activeOutfit.slots, slot));
+      if (!activeOutfit || (outfitOwnsSlot && activeOutfit.slots[slot] !== state.slots[slot])) state.outfitId = null;
+    }
     emitChange('slot', { slot:slot, itemId:state.slots[slot] });
     return { ok:true, slot:slot, itemId:state.slots[slot], state:snapshot() };
   }
@@ -274,7 +280,7 @@
     order.forEach(function (slot,index) {
       const item=getItem(s.slots[slot]);
       if (!item || !item.visual) return;
-      const behind = item.visual.layer === 'back' || BACK_SLOTS.has(slot) && face === 'up';
+      const behind = item.visual.layer === 'back' || (face === 'up' && UP_BACK_SLOTS.has(slot));
       if ((section==='back') === behind) selected.push({ item:item,index:index });
     });
     selected.sort(function(a,b){return a.index-b.index;}); return selected.map(function(x){return x.item;});
