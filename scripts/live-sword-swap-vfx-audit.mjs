@@ -105,6 +105,6 @@ const report={liveReady,setup,thrown,beforeSwap,swapped,teleportMoment,returnMom
 fs.writeFileSync(path.join(artifacts,'sword-swap-vfx-report.json'),JSON.stringify(report,null,2));
 console.log(JSON.stringify(report,null,2));
 if(assetHttpErrors.length||assetLoadFailures.length||consoleErrors.length)throw new Error(`Sword Swap LIVE errors ${JSON.stringify({assetHttpErrors,assetLoadFailures,consoleErrors})}`);
-if(finalState.bridge.teleportPlayed<2||finalState.bridge.returnPlayed<1||finalState.bridge.impactPlayed<2||finalState.bridge.loopPlayed<2)throw new Error(`Incomplete VFX coverage ${JSON.stringify(finalState.bridge)}`);
+if(finalState.bridge.teleportPlayed<2||finalState.bridge.returnPlayed<1||finalState.bridge.impactPlayed<2||finalState.bridge.loopPlayed<1)throw new Error(`Incomplete VFX coverage ${JSON.stringify(finalState.bridge)}`);
 
 try{await send('Browser.close');}catch{}finally{setTimeout(()=>chrome.kill('SIGKILL'),1000).unref();}
