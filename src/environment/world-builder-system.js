@@ -1,6 +1,6 @@
 /* KELO-INDEX
  * area: WORLD BUILDER
- * keys: ADMIN KEY WORLD EDIT TERRAIN PATH COLLISION PROPERTY RUNTIME VIEW AUTHORITY OFFLINE ONLINE READY
+ * keys: ADMIN KEY WORLD EDIT TERRAIN PATH COLLISION PROPERTY RUNTIME VIEW AUTHORITY OFFLINE ONLINE READY AUTOTILE
  * hace: renderer/runtime efímero de overrides del mundo; NO persiste ni decide Draft/Publish
  * online: toda mutación se delega a KELO_WORLD_EDIT.request(); el runtime solo ingiere la vista autorizada
  */
@@ -8,7 +8,7 @@
 'use strict';
 if(window.KELO_WORLD_BUILDER)return;
 
-const VERSION='world-builder-v2.0.0';
+const VERSION='world-builder-v2.1.0';
 const SCHEMA=2;
 const TILE=Number(window.KELO_TILE_REGISTRY?.worldTileSize)||32;
 const R=window.KELO_TILE_REGISTRY;
@@ -79,7 +79,6 @@ async function request(op,payload={}){
   throw new Error('UNKNOWN_WORLD_BUILDER_OPERATION');
 }
 
-
 function loadScriptOnce(id,src){
   if(document.getElementById(id))return Promise.resolve();
   return new Promise((resolve,reject)=>{
@@ -108,12 +107,18 @@ function acquireAtlas(key){
   const p=Promise.resolve(A.acquire(key)).then(img=>{if(img)atlasImages.set(key,img);atlasPromises.delete(key);}).catch(()=>atlasPromises.delete(key));
   atlasPromises.set(key,p);
 }
+function neighborMask(rec){
+  const m=rec.material,has=(dx,dy)=>{const n=state.cells[cellKey(rec.x+dx*TILE,rec.y+dy*TILE)];return n&&n.material===m;};
+  return (has(0,-1)?1:0)|(has(1,0)?2:0)|(has(0,1)?4:0)|(has(-1,0)?8:0);
+}
 function drawCell(g,rec){
   if(!validMaterial(rec.material))return;
   const def=TERRAIN?.materials?.[rec.material],meta=atlasMeta(def?.atlas),img=atlasImages.get(def?.atlas),pool=R?.families?.[def?.family]||[];
   if(def?.atlas&&!img)acquireAtlas(def.atlas);
   if(img&&meta&&pool.length){
-    const id=pool[hash(rec.x,rec.y)%pool.length],s=atlasOrigin(meta,id);
+    const mask=neighborMask(rec);
+    const id=pool.length>=16?pool[mask%pool.length]:pool[(hash(rec.x,rec.y)+mask)%pool.length];
+    const s=atlasOrigin(meta,id);
     g.drawImage(img,s.x,s.y,s.w,s.h,rec.x,rec.y,TILE,TILE);
   }else{
     g.fillStyle=materialColor(rec.material);g.fillRect(rec.x,rec.y,TILE,TILE);
@@ -200,6 +205,7 @@ window.KELO_WORLD_BUILDER_AUDIT=Object.freeze({
   authorityReplaceable:true,
   versionedDraft:true,
   terrainOverrides:true,
+  autotile4bit:true,
   pathOverrides:true,
   collisionLayer:true,
   propertyReuse:true,
