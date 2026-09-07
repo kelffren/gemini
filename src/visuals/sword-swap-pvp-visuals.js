@@ -7,7 +7,7 @@
 (function (root) {
   'use strict';
 
-  const VERSION = 'sword-swap-pvp-visuals-v1.3.0';
+  const VERSION = 'sword-swap-pvp-visuals-v1.3.1';
   const FRAME_W = 362;
   const FRAME_H = 724;
   const IMPACT_MS = 500;
@@ -122,14 +122,14 @@
       id: IDS.impactVisual,
       type: 'sprite_animation', assetId: IDS.impactAsset, layer: 'worldFX',
       frameWidth: FRAME_W, frameHeight: FRAME_H, columns: 6, rows: 1, frames: 6, fps: 12, loop: false,
-      sourcePixelScale: 0.40, alpha: 1, alignToVelocity: false, defaultSpeed: 0, defaultMaxDistance: 1,
+      sourcePixelScale: 0.22, alpha: 1, alignToVelocity: false, defaultSpeed: 0, defaultMaxDistance: 1,
     });
 
     registerVisual({
       id: IDS.loopVisual,
       type: 'sprite_animation', assetId: IDS.loopAsset, layer: 'worldFX',
       frameWidth: FRAME_W, frameHeight: FRAME_H, columns: 6, rows: 1, frames: 6, fps: 10, loop: true,
-      sourcePixelScale: 0.40, alpha: 1, alignToVelocity: false, defaultSpeed: 0, defaultMaxDistance: 1,
+      sourcePixelScale: 0.22, alpha: 1, alignToVelocity: false, defaultSpeed: 0, defaultMaxDistance: 1,
     });
 
     registerVisual({
