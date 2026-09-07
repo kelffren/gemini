@@ -1,0 +1,55 @@
+name: Live Melee Visual Audit
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'index.html'
+      - 'src/systems/pvp-world.js'
+      - 'src/visuals/visual-manifests.js'
+      - 'src/visuals/melee-visual-manifest.js'
+      - 'src/visuals/melee-combat-visuals.js'
+      - 'assets/fx/melee/**'
+      - 'scripts/live-melee-visual-audit.mjs'
+      - '.github/workflows/live-melee-visual-audit.yml'
+  workflow_dispatch:
+
+jobs:
+  live-mobile-melee:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Wait for current Pages build
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 36); do
+            body="$(curl -fsSL --retry 2 --retry-delay 1 "https://kelffren.github.io/gemini/?melee-deploy-check=${GITHUB_SHA}-${i}" || true)"
+            if printf '%s' "$body" | grep -q 'Kelo World — V6.39' && printf '%s' "$body" | grep -q 'melee-combat-visuals.js?v=1'; then
+              echo "Current melee build is live"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "Current melee build did not appear on Pages"
+          exit 1
+      - name: Live mobile melee audit
+        env:
+          AUDIT_URL: https://kelffren.github.io/gemini/
+        run: node scripts/live-melee-visual-audit.mjs
+      - name: Upload melee audit evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-melee-visual-audit
+          path: artifacts/melee-live/
+          if-no-files-found: warn
+          retention-days: 14
