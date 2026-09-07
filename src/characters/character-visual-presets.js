@@ -7,7 +7,7 @@
 (function (root) {
   'use strict';
 
-  const VERSION = 'character-visual-presets-v1.0.0';
+  const VERSION = 'character-visual-presets-v1.0.1';
   const DEFAULT_FACE_ROWS = Object.freeze({ down:0, left:1, right:2, up:3 });
 
   function clone(value) {
@@ -54,7 +54,7 @@
       anchor:Object.assign({ x:0.5, y:1 }, o.anchor || {}),
       rotation:Number(o.rotation) || 0,
       offsets:clone(o.offsets || {}),
-      preview:Object.assign({ kind:'socket' }, clone(o.preview || {}))
+      preview:Object.assign({ kind:'socket', leftPercent:50, bottomPercent:20, widthPercent:24 }, clone(o.preview || {}))
     };
   }
 
@@ -72,7 +72,7 @@
         left:{ x:-7, y:0, rotation:-90 },
         right:{ x:7, y:0, rotation:90 }
       }, clone(o.offsets || {})),
-      preview:Object.assign({ kind:'socket', leftPercent:66, bottomPx:72, widthPx:62, heightPx:62, rotationDeg:180, anchorX:0.5, anchorY:0.88 }, clone(o.preview || {}))
+      preview:Object.assign({ kind:'socket', leftPercent:66, bottomPercent:22, widthPercent:27, rotationDeg:180, anchorX:0.5, anchorY:0.88 }, clone(o.preview || {}))
     });
   }
 
@@ -89,6 +89,7 @@
     version:VERSION,
     ready:true,
     pureData:true,
+    responsivePreviewMetadata:true,
     factories:Object.freeze(['source','sheet','socket','weapon'])
   });
 })(typeof globalThis !== 'undefined' ? globalThis : window);
