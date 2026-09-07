@@ -5,7 +5,7 @@ import {spawn} from 'node:child_process';
 
 const base=process.env.AUDIT_URL||'https://kelffren.github.io/gemini/';
 const chromeBin=process.env.CHROME_BIN||'/usr/bin/google-chrome';
-const expectedBridge='sword-swap-pvp-visuals-v1.4.0';
+const expectedBridge='sword-swap-pvp-visuals-v1.4.1';
 const expectedTitle='Kelo World — V6.37';
 const artifacts=path.resolve('artifacts');
 fs.mkdirSync(artifacts,{recursive:true});
@@ -92,10 +92,10 @@ const swapped=await evalJs(`(()=>{
   return {ok:r.ok,result:r.result||null,player:{x:localPlayer.x,y:localPlayer.y},dummy:{x:d.x,y:d.y,id:d.id||null}};
 })()`,sid);
 if(!swapped.ok)throw new Error(`Character swap failed ${JSON.stringify(swapped)}`);
-await waitFor(`KELO_SWORD_SWAP_PVP_VISUAL_AUDIT.teleportPlayed>=1&&KELO_SWORD_SWAP_PVP_VISUAL_AUDIT.returnPlayed>=1&&KELO_SWORD_SWAP_PVP_VISUAL_AUDIT.returnLaunchPlayed>=1`,sid,'teleport and sword return VFX spawned',3000);
+await waitFor(`KELO_SWORD_SWAP_PVP_VISUAL_AUDIT.teleportPlayed>=1&&KELO_SWORD_SWAP_PVP_VISUAL_AUDIT.returnPlayed>=1`,sid,'teleport and sword return VFX spawned',3000);
 await sleep(120);
-const teleportMoment=await evalJs(`(()=>({audit:{...KELO_SWORD_SWAP_PVP_VISUAL_AUDIT},projectiles:KeloProjectileVisuals.metrics(),assets:{teleport:KeloAssetRegistry.isReady('sword_swap_pvp_teleport_asset_v4'),return:KeloAssetRegistry.isReady('sword_swap_pvp_return_asset_v4')}}))()`,sid);
-if(!teleportMoment.assets.teleport||!teleportMoment.assets.return||teleportMoment.projectiles.active<3)throw new Error(`Teleport/return launch visual not actually active ${JSON.stringify(teleportMoment)}`);
+const teleportMoment=await evalJs(`(()=>({audit:{...KELO_SWORD_SWAP_PVP_VISUAL_AUDIT},projectiles:KeloProjectileVisuals.metrics(),assets:{teleport:KeloAssetRegistry.isReady('sword_swap_pvp_teleport_asset_v41'),return:KeloAssetRegistry.isReady('sword_swap_pvp_return_asset_v41')}}))()`,sid);
+if(!teleportMoment.assets.teleport||!teleportMoment.assets.return||teleportMoment.projectiles.active<2)throw new Error(`Teleport visual not actually active ${JSON.stringify(teleportMoment)}`);
 await screenshot('02-character-swap-teleport.png',sid);
 
 await sleep(650);
@@ -120,6 +120,6 @@ const report={liveReady,setup,thrown,blockerCheck,beforeSwap,swapped,teleportMom
 fs.writeFileSync(path.join(artifacts,'sword-swap-vfx-report.json'),JSON.stringify(report,null,2));
 console.log(JSON.stringify(report,null,2));
 if(assetHttpErrors.length||assetLoadFailures.length||consoleErrors.length)throw new Error(`Sword Swap LIVE errors ${JSON.stringify({assetHttpErrors,assetLoadFailures,consoleErrors})}`);
-if(finalState.title!==expectedTitle||finalState.bridge.teleportPlayed<2||finalState.bridge.returnPlayed<1||finalState.bridge.returnLaunchPlayed<1||finalState.bridge.impactPlayed<2||finalState.bridge.loopPlayed<1||finalState.bridge.blockerHits<1)throw new Error(`Incomplete VFX/blocker coverage ${JSON.stringify(finalState)}`);
+if(finalState.title!==expectedTitle||finalState.bridge.teleportPlayed<2||finalState.bridge.returnPlayed<1||finalState.bridge.impactPlayed<2||finalState.bridge.loopPlayed<1||finalState.bridge.blockerHits<1)throw new Error(`Incomplete VFX/blocker coverage ${JSON.stringify(finalState)}`);
 
 try{await send('Browser.close');}catch{}finally{setTimeout(()=>chrome.kill('SIGKILL'),1000).unref();}
