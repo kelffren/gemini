@@ -6,7 +6,7 @@ import {spawn} from 'node:child_process';
 const base=process.env.AUDIT_URL||'https://kelffren.github.io/gemini/';
 const chromeBin=process.env.CHROME_BIN||'/usr/bin/google-chrome';
 const expectedBridge='sword-swap-pvp-visuals-v1.4.1';
-const expectedTitle='Kelo World — V6.37';
+const expectedTitle='Kelo World — V6.38';
 const artifacts=path.resolve('artifacts');
 fs.mkdirSync(artifacts,{recursive:true});
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
