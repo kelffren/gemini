@@ -7,29 +7,28 @@
 (function (root) {
   'use strict';
 
-  const VERSION = 'sword-swap-pvp-visuals-v1.4.1';
+  const VERSION = 'sword-swap-pvp-visuals-v1.4.2';
   const FRAME_W = 362;
   const FRAME_H = 724;
   const IMPACT_MS = 500;
   const TELEPORT_MS = 500;
   const EYE_MS = 520;
-  const RETURN_PULL_MS = 140;
   const RETURN_END_HOLD_MS = 90;
   const BLOCK_W = 28;
   const BLOCK_H = 26;
   const BLOCK_Y_OFFSET = -18;
 
   const IDS = Object.freeze({
-    eyeAsset: 'sword_swap_pvp_eye_asset_v41',
-    impactAsset: 'sword_swap_pvp_impact_asset_v41',
-    loopAsset: 'sword_swap_pvp_loop_asset_v41',
-    teleportAsset: 'sword_swap_pvp_teleport_asset_v41',
-    returnAsset: 'sword_swap_pvp_return_asset_v41',
-    eyeVisual: 'sword_swap_pvp_eye_visual_v41',
-    impactVisual: 'sword_swap_pvp_impact_visual_v41',
-    loopVisual: 'sword_swap_pvp_loop_visual_v41',
-    teleportVisual: 'sword_swap_pvp_teleport_visual_v41',
-    returnFlightVisual: 'sword_swap_pvp_return_flight_visual_v41',
+    eyeAsset: 'sword_swap_pvp_eye_asset_v42',
+    impactAsset: 'sword_swap_pvp_impact_asset_v42',
+    loopAsset: 'sword_swap_pvp_loop_asset_v42',
+    teleportAsset: 'sword_swap_pvp_teleport_asset_v42',
+    returnAsset: 'sword_swap_pvp_return_asset_v42',
+    eyeVisual: 'sword_swap_pvp_eye_visual_v42',
+    impactVisual: 'sword_swap_pvp_impact_visual_v42',
+    loopVisual: 'sword_swap_pvp_loop_visual_v42',
+    teleportVisual: 'sword_swap_pvp_teleport_visual_v42',
+    returnFlightVisual: 'sword_swap_pvp_return_flight_visual_v42',
   });
 
   const swordObjects = new Map();
@@ -60,6 +59,8 @@
     lastTeleportPoints: null,
     lastReturnDirection: null,
     lastReturnDurationMs: null,
+    returnSyncedToGameplayObject: false,
+    lastReturnSyncError: null,
     reason: 'PvP arena has an isolated renderer; Sword Swap uses projectile worldFX plus a planted-sword local blocker',
   };
 
@@ -163,8 +164,7 @@
       sourcePixelScale: 0.34, alpha: 1, alignToVelocity: false, defaultSpeed: 0, defaultMaxDistance: 1,
     });
 
-    // Regreso: usar únicamente los dos frames de vuelo limpios del PNG.
-    // El sprite base tiene el MANGO a la izquierda; rotationOffset PI hace que el mango apunte siempre hacia el jugador.
+    // Frames 5-6 de regreso2 son el vuelo limpio. El mango queda al frente con PI.
     registerVisual({
       id: IDS.returnFlightVisual,
       type: 'sprite_animation', assetId: IDS.returnAsset, layer: 'worldFX',
@@ -235,10 +235,6 @@
     audit.lastTeleportPoints = { from: a, to: b };
   }
 
-  function easeInOutCubic(t) {
-    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-  }
-
   function beginReturnVisual(key, payload) {
     const object = key && swordObjects.get(key);
     const actor = player();
@@ -251,7 +247,6 @@
     const len = Math.hypot(dx, dy) || 1;
     const dir = { x: dx / len, y: dy / len };
     const totalMs = Math.max(700, Number(payload && payload.returnDurationSec || 3) * 1000);
-    const flightMs = Math.max(320, totalMs - RETURN_PULL_MS);
 
     const record = active.get(key) || {
       impactId: null, loopId: null, returnId: null,
@@ -260,58 +255,43 @@
     if (record.timer) { clearTimeout(record.timer); record.timer = null; }
     clearReturnAnimation(record);
     stopVisual(record.impactId); record.impactId = null;
+    stopVisual(record.loopId); record.loopId = null;
 
-    // Mantener el loop clavado unos milisegundos funciona como "tirón" visual y evita el salto/corte.
-    record.returnFlightTimer = setTimeout(function () {
-      const current = active.get(key);
-      const targetActor = player();
-      if (!current || current !== record || !targetActor || !root.KeloProjectileVisuals) return;
-      stopVisual(current.loopId);
-      current.loopId = null;
+    // La VFX sigue la MISMA entidad que mueve el gameplay. Así no se separa, no salta y no se corta.
+    const anchor = { x: Number(object.x), y: Number(object.y), _keloVisualDead: false };
+    record.returnAnchor = anchor;
+    const context = contextFor(payload, anchor, dir);
+    context.target = { x: Number(actor.x), y: Number(actor.y) };
+    context.gameplay = { speed: 1, range: 1 };
+    record.returnId = root.KeloProjectileVisuals.attach(anchor, IDS.returnFlightVisual, context, {
+      speed: 1,
+      maxDistance: 1,
+      loop: true,
+    });
 
-      const anchor = { x: origin.x, y: origin.y, _keloVisualDead: false };
-      current.returnAnchor = anchor;
-      const startDirX = Number(targetActor.x) - origin.x;
-      const startDirY = Number(targetActor.y) - origin.y;
-      const startLen = Math.hypot(startDirX, startDirY) || 1;
-      const flightDir = { x: startDirX / startLen, y: startDirY / startLen };
-      const context = contextFor(payload, anchor, flightDir);
-      context.target = { x: Number(targetActor.x), y: Number(targetActor.y) };
-      context.gameplay = { speed: 1, range: 1 };
-
-      current.returnId = root.KeloProjectileVisuals.attach(anchor, IDS.returnFlightVisual, context, {
-        speed: 1,
-        maxDistance: 1,
-        loop: true,
-      });
-
-      const startedAt = root.performance && typeof root.performance.now === 'function' ? root.performance.now() : Date.now();
-      function step(now) {
-        const live = active.get(key);
-        const target = player();
-        if (!live || live !== current || !target || !current.returnAnchor) return;
-        const elapsed = Math.max(0, Number(now) - startedAt);
-        const k = Math.max(0, Math.min(1, elapsed / flightMs));
-        const ease = easeInOutCubic(k);
-        current.returnAnchor.x = origin.x + (Number(target.x) - origin.x) * ease;
-        current.returnAnchor.y = origin.y + (Number(target.y) - origin.y) * ease;
-        if (k < 1) {
-          current.returnFrame = root.requestAnimationFrame(step);
-          return;
-        }
-        current.returnAnchor.x = Number(target.x);
-        current.returnAnchor.y = Number(target.y);
-        current.returnFrame = null;
-        current.returnTimer = setTimeout(function () {
-          const latest = active.get(key);
-          if (!latest || latest !== current) return;
-          clearReturnAnimation(current);
-          active.delete(key);
-          swordObjects.delete(key);
-        }, RETURN_END_HOLD_MS);
+    const startedAt = root.performance && typeof root.performance.now === 'function' ? root.performance.now() : Date.now();
+    function step(now) {
+      const live = active.get(key);
+      if (!live || live !== record || !record.returnAnchor) return;
+      record.returnAnchor.x = Number(object.x);
+      record.returnAnchor.y = Number(object.y);
+      audit.returnSyncedToGameplayObject = true;
+      audit.lastReturnSyncError = Math.hypot(record.returnAnchor.x - Number(object.x), record.returnAnchor.y - Number(object.y));
+      const elapsed = Math.max(0, Number(now) - startedAt);
+      if (elapsed < totalMs) {
+        record.returnFrame = root.requestAnimationFrame(step);
+        return;
       }
-      current.returnFrame = root.requestAnimationFrame(step);
-    }, RETURN_PULL_MS);
+      record.returnFrame = null;
+      record.returnTimer = setTimeout(function () {
+        const latest = active.get(key);
+        if (!latest || latest !== record) return;
+        clearReturnAnimation(record);
+        active.delete(key);
+        swordObjects.delete(key);
+      }, RETURN_END_HOLD_MS);
+    }
+    record.returnFrame = root.requestAnimationFrame(step);
 
     active.set(key, record);
     audit.returnPlayed += 1;
