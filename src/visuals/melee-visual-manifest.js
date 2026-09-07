@@ -7,7 +7,7 @@
 (function (root) {
   'use strict';
 
-  const VERSION = 'melee-visual-manifest-v1.1.1';
+  const VERSION = 'melee-visual-manifest-v1.1.2';
   const IMPACT_AT_MS = 150;
   const ATTACK_DURATION = 0.33;
   const REACTION_DURATION = 0.11;
@@ -193,8 +193,8 @@
       Object.freeze({ at: 0, type: 'fx', ref: 'melee_hit_glow_light_01' }),
       Object.freeze({ at: 0, type: 'fx', ref: 'melee_hit_sparks_light_01' }),
       Object.freeze({ at: 0, type: 'sfx', ref: 'melee_hit_light_01' }),
-      Object.freeze({ at: 8, type: 'screenFx', ref: 'impact_medium' }),
-      Object.freeze({ at: 8, type: 'screenFx', ref: 'flash_warm_small' })
+      Object.freeze({ at: 8, type: 'screenFx', ref: 'impact_melee_light' }),
+      Object.freeze({ at: 8, type: 'screenFx', ref: 'flash_melee_light' })
     ])
   });
 
