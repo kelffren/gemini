@@ -1,5 +1,9 @@
 (function () {
   const CLOSE_ID = 'kelo-profile-close';
+  const CUSTOMIZATION_SCRIPTS = [
+    'src/characters/character-customization.js?v=1',
+    'src/ui/character-customizer-ui.js?v=1'
+  ];
 
   function closeProfilePanel() {
     const sheet = document.getElementById('inspect-sheet');
@@ -74,19 +78,43 @@
     window.inspectPlayer = wrappedInspectPlayer;
   }
 
+  function loadScriptSequentially(index) {
+    if (index >= CUSTOMIZATION_SCRIPTS.length) return;
+    const src = CUSTOMIZATION_SCRIPTS[index];
+    const base = src.split('?')[0];
+    if (Array.from(document.scripts).some(function (s) { return (s.getAttribute('src') || '').split('?')[0] === base; })) {
+      loadScriptSequentially(index + 1);
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = src;
+    script.async = false;
+    script.dataset.keloCharacterCustomization = '1';
+    script.onload = function () { loadScriptSequentially(index + 1); };
+    script.onerror = function () { console.error('[Kelo profile] customization module failed', base); };
+    document.body.appendChild(script);
+  }
+
+  function ensureCustomizationModules() {
+    loadScriptSequentially(0);
+  }
+
   function boot() {
     ensureCloseButton();
     wrapInspectPlayer();
+    ensureCustomizationModules();
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true });
   else boot();
 
   window.KELO_PROFILE_CLOSE_AUDIT = Object.freeze({
-    version: 'profile-close-v1.0.1',
+    version: 'profile-close-v1.1.0',
     closeButtonId: CLOSE_ID,
     minTouchTargetPx: 44,
     tapClose: true,
-    legacyCloseHidden: true
+    legacyCloseHidden: true,
+    characterCustomizationBootstrap: true,
+    customizationScripts: CUSTOMIZATION_SCRIPTS.slice()
   });
 })();
