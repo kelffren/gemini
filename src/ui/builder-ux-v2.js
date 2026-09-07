@@ -1,33 +1,69 @@
 /* KELO-INDEX
  * area: UI
- * keys: BUILDER UX SCOPE PLAZA PARCEL UNDO COLLISION GHOST ONLINE
- * hace: un panel Plaza|Parcela; props de parcela van a property-system.request
- * online: no persiste; envuelve request()
+ * keys: BUILDER UX SCOPE PICKUP ROTATE DOCK BRUSH UNDO ONLINE
+ * hace: Plaza|Parcela + recoger/rotar + barra abajo + pincel arrastre
+ * online: envuelve request()
  */
 (function(){
   'use strict';
   if(window.KELO_BUILDER_UX)return;
   const TILE=32;
   const undo=[];
-  let ghost=null,scope='world',parcel=null,editWrapped=false;
+  let ghost=null,scope='world',parcel=null,editWrapped=false,held=null,selectedId=null,handsReady=false;
   const toast=m=>{if(typeof showToast==='function')showToast(m);};
   const actor=()=>String(window.keloNet?.playerKey||window.KELO_ADMIN_KEYS?.playerId?.()||window.localPlayer?.id||'local_pioneer');
   function toWorld(e){if(typeof screenToWorld==='function')return screenToWorld(e.clientX,e.clientY);const z=(typeof CONFIG!=='undefined'&&CONFIG.zoom)||1;return{x:camera.x+(e.clientX-screenW/2)/z,y:camera.y+(e.clientY-screenH/2)/z};}
   function snap(v){return Math.floor(Number(v)/TILE)*TILE;}
-  function insideParcel(x,y){
-    const b=parcel?.bounds;if(!b)return true;
-    return x>=b.x&&y>=b.y&&x<=b.x+b.w&&y<=b.y+b.h;
-  }
+  function insideParcel(x,y){const b=parcel?.bounds;if(!b)return true;return x>=b.x&&y>=b.y&&x<=b.x+b.w&&y<=b.y+b.h;}
   function pushUndo(entry){undo.push(entry);if(undo.length>20)undo.shift();}
+  function layerNow(){return window.KELO_WORLD_BUILDER_UI?.guideState?.()?.layer||'terrain';}
+  function builderOpen(){return !!window.KELO_WORLD_BUILDER_UI?.guideState?.()?.open;}
+  function parcelIdNow(){return scope==='parcel'?(parcel?.parcelId||null):'parcel:world:editor';}
+  function hitAt(x,y){
+    const S=window.KELO_PROPERTY_SYSTEM;if(!S?.placementForPoint)return null;
+    return S.placementForPoint(x,y,parcelIdNow())||S.placementForPoint(x,y)||null;
+  }
 
   async function ensureParcel(){
     const S=window.KELO_PROPERTY_SYSTEM;if(!S?.request)return null;
-    if(scope==='world'){
-      parcel=await S.request('ensureWorldEditorParcel',{ownerId:'developer'});
-    }else{
-      parcel=await S.request('ensureLegacyParcel',{ownerId:actor()});
-    }
+    parcel=scope==='world'
+      ?await S.request('ensureWorldEditorParcel',{ownerId:'developer'})
+      :await S.request('ensureLegacyParcel',{ownerId:actor()});
     return parcel;
+  }
+
+  async function editReq(op,payload){
+    const E=window.KELO_WORLD_EDIT;if(!E?.request)throw new Error('WORLD_EDIT_NOT_READY');
+    return E.request(op,payload);
+  }
+
+  async function pickUp(rec){
+    if(!rec){toast('Toca un objeto primero');return;}
+    const C=window.KELO_PROPERTY_CATALOG,t=C?.get?.(rec.assetId);
+    held={assetId:rec.assetId,rotation:rec.rotation||0,w:t?.width||TILE,h:t?.height||TILE,fromId:rec.placementId};
+    try{await editReq('world:placement:remove',{actorId:actor(),placementId:rec.placementId});}catch(e){
+      try{await window.KELO_PROPERTY_SYSTEM.request('remove',{ownerId:actor(),placementId:rec.placementId});}catch(err){toast(err.message);held=null;return;}
+    }
+    selectedId=null;toast('En la mano — toca el suelo');
+  }
+  async function dropHeld(w){
+    if(!held)return;
+    const x=snap(w.x),y=snap(w.y);
+    if(scope==='parcel'&&!insideParcel(x,y)){toast('FUERA_DE_LA_PARCELA');return;}
+    try{
+      await editReq('world:placement:create',{actorId:actor(),assetId:held.assetId,x,y,rotation:held.rotation||0});
+      held=null;toast('Colocado');
+    }catch(e){toast(e.message);}
+  }
+  async function rotateHeldOrSelected(){
+    if(held){held.rotation=((held.rotation||0)+1)%4;toast('Rotado '+held.rotation);return;}
+    if(!selectedId){toast('Selecciona o recoge un objeto');return;}
+    try{await editReq('world:placement:rotate',{actorId:actor(),placementId:selectedId,delta:1});toast('Rotado');}catch(e){toast(e.message);}
+  }
+  async function pickUnderGhost(){
+    if(!ghost){toast('Pon el recuadro sobre el objeto');return;}
+    const hit=hitAt(ghost.x+8,ghost.y+8);if(!hit){toast('No hay objeto bajo el recuadro');return;}
+    await pickUp(hit);
   }
 
   async function undoLast(){
@@ -48,9 +84,7 @@
     const WB=window.KELO_WORLD_BUILDER;if(!WB||WB.__uxWrapped)return;
     const raw=WB.request.bind(WB);
     async function request(op,payload){
-      if(scope==='parcel'&&(op==='world-builder:paint'||op==='world-builder:erase-terrain')){
-        if(!insideParcel(payload.x,payload.y))throw new Error('FUERA_DE_LA_PARCELA');
-      }
+      if(scope==='parcel'&&(op==='world-builder:paint'||op==='world-builder:erase-terrain')&&!insideParcel(payload.x,payload.y))throw new Error('FUERA_DE_LA_PARCELA');
       const out=await raw(op,payload||{});
       if(op==='world-builder:paint')pushUndo({kind:'paint',x:payload.x,y:payload.y,brush:payload.brushSize||1});
       if(op==='world-builder:erase-terrain')pushUndo({kind:'erase',x:payload.x,y:payload.y,material:'grass'});
@@ -59,7 +93,6 @@
     }
     window.KELO_WORLD_BUILDER=Object.assign({},WB,{request,__uxWrapped:true});
   }
-
   function wrapProperty(){
     const S=window.KELO_PROPERTY_SYSTEM;if(!S||S.__uxWrapped)return;
     const raw=S.request.bind(S);
@@ -84,7 +117,6 @@
     }
     window.KELO_PROPERTY_SYSTEM=Object.assign({},S,{request,__uxWrapped:true});
   }
-
   function wrapEdit(){
     const E=window.KELO_WORLD_EDIT;if(!E?.request||editWrapped)return;
     const raw=E.request.bind(E);
@@ -92,25 +124,12 @@
       if(scope==='parcel'){
         await ensureParcel();
         const S=window.KELO_PROPERTY_SYSTEM;
-        if(op==='world:placement:create'){
-          return S.request('place',{ownerId:actor(),parcelId:parcel.parcelId,assetId:payload.assetId,x:payload.x,y:payload.y,rotation:payload.rotation||0});
-        }
-        if(op==='world:placement:move'){
-          return S.request('move',{ownerId:actor(),placementId:payload.placementId,x:payload.x,y:payload.y});
-        }
-        if(op==='world:placement:rotate'){
-          return S.request('rotate',{ownerId:actor(),placementId:payload.placementId,delta:payload.delta||1});
-        }
-        if(op==='world:placement:remove'){
-          return S.request('remove',{ownerId:actor(),placementId:payload.placementId});
-        }
-        if(op==='world:tile:paint'||op==='world:tile:clear'){
-          if(!insideParcel(payload.x,payload.y))throw new Error('FUERA_DE_LA_PARCELA');
-        }
-        if(op==='world:publish'||op==='world:draft:submit'||op==='world:draft:approve'){
-          toast('En parcela no se publica el mundo');
-          return {ok:false,reason:'PARCEL_SCOPE'};
-        }
+        if(op==='world:placement:create')return S.request('place',{ownerId:actor(),parcelId:parcel.parcelId,assetId:payload.assetId,x:payload.x,y:payload.y,rotation:payload.rotation||0});
+        if(op==='world:placement:move')return S.request('move',{ownerId:actor(),placementId:payload.placementId,x:payload.x,y:payload.y});
+        if(op==='world:placement:rotate')return S.request('rotate',{ownerId:actor(),placementId:payload.placementId,delta:payload.delta||1});
+        if(op==='world:placement:remove')return S.request('remove',{ownerId:actor(),placementId:payload.placementId});
+        if((op==='world:tile:paint'||op==='world:tile:clear')&&!insideParcel(payload.x,payload.y))throw new Error('FUERA_DE_LA_PARCELA');
+        if(op==='world:publish'||op==='world:draft:submit'||op==='world:draft:approve'){toast('En parcela no se publica el mundo');return{ok:false,reason:'PARCEL_SCOPE'};}
       }
       return raw(op,payload||{});
     }
@@ -123,45 +142,70 @@
     ensureParcel().then(p=>{
       toast(scope==='world'?'Editando PLAZA':'Editando MI PARCELA');
       if(scope==='parcel'&&p?.bounds&&typeof localPlayer!=='undefined'){
-        localPlayer.x=p.bounds.x+p.bounds.w/2;
-        localPlayer.y=p.bounds.y+p.bounds.h+40;
+        localPlayer.x=p.bounds.x+p.bounds.w/2;localPlayer.y=p.bounds.y+p.bounds.h+40;
         if(typeof camera!=='undefined'){camera.x=localPlayer.x;camera.y=localPlayer.y;camera.targetX=localPlayer.x;camera.targetY=localPlayer.y;}
       }
-      const a=document.getElementById('kelo-scope-world');
-      const b=document.getElementById('kelo-scope-parcel');
-      if(a)a.classList.toggle('on',scope==='world');
-      if(b)b.classList.toggle('on',scope==='parcel');
+      document.getElementById('kelo-scope-world')?.classList.toggle('on',scope==='world');
+      document.getElementById('kelo-scope-parcel')?.classList.toggle('on',scope==='parcel');
     }).catch(err=>toast(err.message));
   }
 
-  function injectScope(){
-    const host=document.getElementById('kelo-world-builder');
-    if(!host||document.getElementById('kelo-builder-scope'))return;
-    const bar=document.createElement('div');
-    bar.id='kelo-builder-scope';
-    bar.innerHTML='<style>#kelo-builder-scope{display:flex;gap:6px;padding:8px 10px 0}#kelo-builder-scope button{flex:1;border:1px solid rgba(231,197,106,.28);background:#111e20;color:#9db0a9;border-radius:9px;padding:8px;font-size:9px;font-weight:900}#kelo-builder-scope button.on{border-color:#e7c56a;color:#fff4d6;background:#1a2c26}</style><button id="kelo-scope-world" class="on">PLAZA</button><button id="kelo-scope-parcel">MI PARCELA</button>';
-    const head=host.querySelector('.wb-head')||host.firstElementChild;
-    if(head&&head.nextSibling)host.insertBefore(bar,head.nextSibling);else host.insertBefore(bar,host.firstChild);
-    document.getElementById('kelo-scope-world').onclick=()=>setScope('world');
-    document.getElementById('kelo-scope-parcel').onclick=()=>setScope('parcel');
+  function dock(on){
+    const host=document.getElementById('kelo-world-builder');if(!host)return;
+    host.classList.toggle('wb-dock',!!on);
+    const btn=document.getElementById('kelo-builder-dock');
+    if(btn)btn.textContent=on?'PANEL':'BARRA';
   }
-
-  function unifyUi(){
-    const peFab=document.getElementById('pe-fab');
-    if(peFab)peFab.style.display='none';
-    const tools=document.getElementById('pe-world-tools');
-    if(tools)tools.remove();
-    injectScope();
+  function injectChrome(){
+    const host=document.getElementById('kelo-world-builder');
+    if(!host)return;
+    if(!document.getElementById('kelo-builder-scope')){
+      const bar=document.createElement('div');
+      bar.id='kelo-builder-scope';
+      bar.innerHTML='<button id="kelo-scope-world" class="on">PLAZA</button><button id="kelo-scope-parcel">MI PARCELA</button>';
+      const head=host.querySelector('.wb-head')||host.firstElementChild;
+      if(head&&head.nextSibling)host.insertBefore(bar,head.nextSibling);else host.prepend(bar);
+      document.getElementById('kelo-scope-world').onclick=()=>setScope('world');
+      document.getElementById('kelo-scope-parcel').onclick=()=>setScope('parcel');
+    }
+    if(!document.getElementById('kelo-builder-hands')){
+      const hands=document.createElement('div');
+      hands.id='kelo-builder-hands';
+      hands.innerHTML='<button id="kelo-builder-pick">RECOGER</button><button id="kelo-builder-rot">ROTAR</button><button id="kelo-builder-dock">BARRA</button>';
+      host.appendChild(hands);
+      document.getElementById('kelo-builder-pick').onclick=()=>pickUnderGhost();
+      document.getElementById('kelo-builder-rot').onclick=()=>rotateHeldOrSelected();
+      document.getElementById('kelo-builder-dock').onclick=()=>dock(!host.classList.contains('wb-dock'));
+    }
+    if(!document.getElementById('kelo-builder-ux-css')){
+      const s=document.createElement('style');s.id='kelo-builder-ux-css';
+      s.textContent='#kelo-builder-scope,#kelo-builder-hands{display:flex;gap:6px;padding:8px 10px}#kelo-builder-scope button,#kelo-builder-hands button{flex:1;border:1px solid rgba(231,197,106,.28);background:#111e20;color:#9db0a9;border-radius:9px;padding:8px;font-size:9px;font-weight:900}#kelo-builder-scope button.on,#kelo-builder-hands button.on{border-color:#e7c56a;color:#fff4d6;background:#1a2c26}#kelo-world-builder.wb-dock{top:auto!important;left:0!important;right:0!important;bottom:0!important;width:100%!important;height:auto!important;max-height:42vh;border-radius:18px 18px 0 0}#kelo-world-builder.wb-dock .wb-workflow,#kelo-world-builder.wb-dock .wb-history,#kelo-world-builder.wb-dock .wb-status{display:none}#kelo-world-builder.wb-dock .wb-list{max-height:22vh}';
+      document.head.appendChild(s);
+    }
     if(!document.getElementById('kelo-builder-undo')){
       const b=document.createElement('button');
       b.id='kelo-builder-undo';b.textContent='DESHACER';
       b.style.cssText='position:absolute;z-index:250;left:max(10px,env(safe-area-inset-left));bottom:max(58px,calc(env(safe-area-inset-bottom) + 46px));pointer-events:auto;border:1px solid rgba(231,197,106,.5);background:rgba(10,20,21,.94);color:#e7c56a;border-radius:12px;padding:8px 10px;font:800 10px/1 sans-serif';
-      b.onclick=()=>undoLast();
-      document.body.appendChild(b);
+      b.onclick=()=>undoLast();document.body.appendChild(b);
     }
+    const peFab=document.getElementById('pe-fab');if(peFab)peFab.style.display='none';
+    document.getElementById('pe-world-tools')?.remove();
     const pe=document.getElementById('kelo-property-editor');
-    const wb=document.getElementById('kelo-world-builder');
-    if(pe&&wb&&pe.style.display==='flex'&&wb.style.display!=='none')pe.style.display='none';
+    if(pe&&host.style.display!=='none'&&pe.style.display==='flex')pe.style.display='none';
+    const lyr=layerNow();
+    if(builderOpen()&&(lyr==='terrain'||lyr==='path'||lyr==='objects'))dock(true);
+    handsReady=true;
+  }
+
+  function onPointerDown(e){
+    if(!builderOpen()||layerNow()!=='objects')return;
+    const host=document.getElementById('kelo-world-builder');
+    if(host&&host.contains(e.target))return;
+    const w=toWorld(e);
+    if(held){e.preventDefault();e.stopImmediatePropagation();dropHeld(w);return;}
+    const hit=hitAt(w.x,w.y);
+    if(hit&&selectedId===hit.placementId){e.preventDefault();e.stopImmediatePropagation();pickUp(hit);return;}
+    if(hit)selectedId=hit.placementId;
   }
 
   function drawGhost(g){
@@ -169,27 +213,25 @@
       const b=parcel.bounds;g.save();g.strokeStyle='rgba(231,197,106,.9)';g.setLineDash([8,6]);g.strokeRect(b.x,b.y,b.w,b.h);g.setLineDash([]);g.restore();
     }
     if(!ghost)return;
-    g.save();g.globalAlpha=.38;g.fillStyle='#e7c56a';g.fillRect(ghost.x,ghost.y,ghost.w,ghost.h);g.globalAlpha=1;g.strokeStyle='#fff4d6';g.strokeRect(ghost.x,ghost.y,ghost.w,ghost.h);g.restore();
+    const w=held?.w||TILE,h=held?.h||TILE;
+    g.save();g.globalAlpha=.4;g.fillStyle=held?'#7ad0ff':'#e7c56a';g.fillRect(ghost.x,ghost.y,w,h);g.globalAlpha=1;g.strokeStyle='#fff4d6';g.strokeRect(ghost.x,ghost.y,w,h);
+    if(held){g.fillStyle='#fff4d6';g.font='12px sans-serif';g.fillText('↻ '+((held.rotation||0)*90)+'°',ghost.x+4,ghost.y+14);}
+    g.restore();
   }
   const L=window.KELO_ENVIRONMENT_LAYERS;
-  if(L?.register){
-    L.register({id:'builder-ux-ghost',phase:'vfx_weather_lighting',priority:998,required:false,ready:()=>true,draw:drawGhost,ownership:'builder-ux-v2',bounds:()=>[]});
-  }
+  if(L?.register)L.register({id:'builder-ux-ghost',phase:'vfx_weather_lighting',priority:998,required:false,ready:()=>true,draw:drawGhost,ownership:'builder-ux-v3',bounds:()=>[]});
 
-  window.addEventListener('pointermove',e=>{
-    const w=toWorld(e);
-    ghost={x:snap(w.x),y:snap(w.y),w:TILE,h:TILE};
-  },{passive:true});
-  window.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='z'){e.preventDefault();undoLast();}});
+  window.addEventListener('pointerdown',onPointerDown,true);
+  window.addEventListener('pointermove',e=>{const w=toWorld(e);ghost={x:snap(w.x),y:snap(w.y),w:held?.w||TILE,h:held?.h||TILE};},{passive:true});
+  window.addEventListener('keydown',e=>{
+    if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='z'){e.preventDefault();undoLast();}
+    if(e.key.toLowerCase()==='r')rotateHeldOrSelected();
+  });
 
-  const t=setInterval(()=>{wrapWorld();wrapProperty();wrapEdit();unifyUi();},200);
+  const t=setInterval(()=>{wrapWorld();wrapProperty();wrapEdit();injectChrome();},200);
   setTimeout(()=>clearInterval(t),25000);
   window.KELO_BUILDER_UX=Object.freeze({
-    version:'builder-ux-v1.1.0',
-    undoLast,
-    setScope,
-    get scope(){return scope;},
-    get parcelId(){return parcel?.parcelId||null;},
-    get undoCount(){return undo.length;}
+    version:'builder-ux-v1.2.0',undoLast,setScope,pickUnderGhost,rotateHeldOrSelected,dock,
+    get scope(){return scope;},get parcelId(){return parcel?.parcelId||null;},get holding(){return !!held;},get undoCount(){return undo.length;}
   });
 })();
