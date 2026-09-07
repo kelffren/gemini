@@ -24,7 +24,9 @@ assert(core.includes('KeloAnimation.sampleTransform'),'equipment shares melee/ac
 assert(core.includes('KeloAnchors.get'),'equipment can attach to semantic sockets');
 assert(core.includes('KeloAnchors.presentation'),'layers use shared avatar presentation');
 assert(core.includes('outfitOwnsSlot')&&core.includes('activeOutfit.slots[slot] !== state.slots[slot]'),'equipment outside an outfit does not erase the active outfit');
-assert(core.includes("const UP_BACK_SLOTS = new Set(['back','weaponSecondary','weaponMain','weaponSkin'])")&&core.includes("face === 'up' && UP_BACK_SLOTS.has(slot)"),'main weapon and weapon skin render behind the actor when facing up');
+assert(core.includes('KeloCharacterVisualStack')&&core.includes('Stack.resolve({ actor:actor, face:faceOf(actor), section:section })'),'game renderer consumes shared visual stack');
+assert(!core.includes('UP_BACK_SLOTS'),'game renderer no longer duplicates directional depth policy');
+assert(stack.includes("const UP_BACK_SLOTS = new Set(['back','weaponSecondary','weaponMain','weaponSkin'])")&&stack.includes("face === 'up' && UP_BACK_SLOTS.has(slot)"),'visual stack owns up-facing weapon depth policy');
 assert(presets.includes('KeloCharacterVisualPresets')&&presets.includes('function sheet(')&&presets.includes('function socket(')&&presets.includes('function weapon('),'visual descriptor factories are reusable and centralized');
 assert(!/\.hp\s*=|\.damage\s*=|cooldown\s*=|attackPower\s*=/.test(presets),'visual presets stay gameplay-stat free');
 assert(packs.includes('KeloCharacterContentPacks')&&packs.includes('function define(')&&packs.includes('registerPack'),'content packs have a reusable idempotent registry');
