@@ -1,0 +1,52 @@
+name: Live Character Customization Audit
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/characters/character-customization.js'
+      - 'src/ui/character-customizer-ui.js'
+      - 'src/ui/profile-panel-close.js'
+      - 'scripts/live-character-customization-audit.mjs'
+      - '.github/workflows/live-character-customization-audit.yml'
+  workflow_dispatch:
+
+jobs:
+  live-mobile-character-customizer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Wait for current Pages build
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 36); do
+            body="$(curl -fsSL --retry 2 --retry-delay 1 "https://kelffren.github.io/gemini/src/ui/profile-panel-close.js?character-customizer-deploy=${GITHUB_SHA}-${i}" || true)"
+            if printf '%s' "$body" | grep -q 'characterCustomizationBootstrap' && printf '%s' "$body" | grep -q 'character-customization.js?v=1'; then
+              echo "Current character customizer build is live"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "Current character customizer build did not appear on Pages"
+          exit 1
+      - name: Live mobile character customization audit
+        env:
+          AUDIT_URL: https://kelffren.github.io/gemini/
+        run: node scripts/live-character-customization-audit.mjs
+      - name: Upload character customization evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-character-customization-audit
+          path: artifacts/character-customization-live/
+          if-no-files-found: warn
+          retention-days: 14
