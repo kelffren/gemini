@@ -19,6 +19,8 @@ assert(core.includes("drawSectionWithActorTransform(ctx, actor, 'back')")&&core.
 assert(core.includes('KeloAnimation.sampleTransform'),'equipment shares melee/action transform with the body');
 assert(core.includes('KeloAnchors.get'),'equipment can attach to semantic sockets');
 assert(core.includes('KeloAnchors.presentation'),'layers use shared avatar presentation');
+assert(core.includes('outfitOwnsSlot')&&core.includes('activeOutfit.slots[slot] !== state.slots[slot]'),'equipment outside an outfit does not erase the active outfit');
+assert(core.includes("const UP_BACK_SLOTS = new Set(['back','weaponSecondary','weaponMain','weaponSkin'])")&&core.includes("face === 'up' && UP_BACK_SLOTS.has(slot)"),'main weapon and weapon skin render behind the actor when facing up');
 assert(ui.includes("['appearance','outfits','equipment','cosmetics']")||ui.includes("['appearance','APARIENCIA']"),'UI exposes appearance, outfits, equipment and cosmetics');
 assert(ui.includes("String(tool)==='profile'"),'Personaje menu route opens customizer');
 assert(ui.includes('.ksi-profile'),'self profile button is bridged to customizer');
