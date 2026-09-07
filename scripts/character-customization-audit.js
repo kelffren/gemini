@@ -3,6 +3,10 @@ const fs=require('fs');
 function read(p){return fs.readFileSync(p,'utf8');}
 function assert(ok,msg){if(!ok){console.error('FAIL:',msg);process.exitCode=1;}else console.log('PASS:',msg);}
 const core=read('src/characters/character-customization.js');
+const presets=read('src/characters/character-visual-presets.js');
+const packs=read('src/characters/character-content-packs.js');
+const stack=read('src/characters/character-visual-stack.js');
+const preview=read('src/ui/character-customizer-preview.js');
 const ui=read('src/ui/character-customizer-ui.js');
 const profile=read('src/ui/profile-panel-close.js');
 const expected=['body','skinTone','face','eyes','hair','facialHair','torso','legs','feet','gloves','head','faceAccessory','armor','back','weaponMain','weaponSecondary','accessory1','accessory2','aura','weaponSkin','characterFX'];
@@ -21,13 +25,17 @@ assert(core.includes('KeloAnchors.get'),'equipment can attach to semantic socket
 assert(core.includes('KeloAnchors.presentation'),'layers use shared avatar presentation');
 assert(core.includes('outfitOwnsSlot')&&core.includes('activeOutfit.slots[slot] !== state.slots[slot]'),'equipment outside an outfit does not erase the active outfit');
 assert(core.includes("const UP_BACK_SLOTS = new Set(['back','weaponSecondary','weaponMain','weaponSkin'])")&&core.includes("face === 'up' && UP_BACK_SLOTS.has(slot)"),'main weapon and weapon skin render behind the actor when facing up');
+assert(presets.includes('KeloCharacterVisualPresets')&&presets.includes('function sheet(')&&presets.includes('function socket(')&&presets.includes('function weapon('),'visual descriptor factories are reusable and centralized');
+assert(!/\.hp\s*=|\.damage\s*=|cooldown\s*=|attackPower\s*=/.test(presets),'visual presets stay gameplay-stat free');
+assert(packs.includes('KeloCharacterContentPacks')&&packs.includes('function define(')&&packs.includes('registerPack'),'content packs have a reusable idempotent registry');
+assert(!/\.hp\s*=|\.damage\s*=|cooldown\s*=|attackPower\s*=/.test(packs),'content pack registry stays gameplay-stat free');
+assert(stack.includes('KeloCharacterVisualStack')&&stack.includes('function resolve(')&&stack.includes('sectionFilter'),'visual stack resolves reusable ordered front/back entries');
+assert(!stack.includes('drawImage('),'visual stack resolves data without rendering');
+assert(preview.includes('KeloCharacterVisualStack')&&!preview.includes('SHEET_SLOTS')&&!preview.includes('state.slots.weaponMain'),'preview consumes generic stack without slot-specific rules');
 assert(ui.includes("['appearance','outfits','equipment','cosmetics']")||ui.includes("['appearance','APARIENCIA']"),'UI exposes appearance, outfits, equipment and cosmetics');
 assert(ui.includes("String(tool)==='profile'"),'Personaje menu route opens customizer');
 assert(ui.includes('.ksi-profile'),'self profile button is bridged to customizer');
-const coreAt=profile.indexOf('character-customization.js');
-const kitAt=profile.indexOf('character-demo-kit.js');
-const uiAt=profile.indexOf('character-customizer-ui.js');
-const previewAt=profile.indexOf('character-customizer-preview.js');
-assert(coreAt>=0&&coreAt<kitAt&&kitAt<uiAt&&uiAt<previewAt,'profile bootstrap loads core -> modular content -> UI -> preview');
+const order=['character-customization.js','character-visual-presets.js','character-content-packs.js','character-visual-stack.js','character-demo-kit.js','character-customizer-ui.js','character-customizer-preview.js'].map(x=>profile.indexOf(x));
+assert(order.every(x=>x>=0)&&order.every((x,i)=>i===0||x>order[i-1]),'profile bootstrap loads core -> foundations -> content -> UI -> preview');
 assert(core.includes('localStorage')&&core.includes('characterCustomization'),'state persists with STATE plus local fallback');
 if(process.exitCode){console.error('\nCharacter customization audit FAILED');process.exit(process.exitCode);}else console.log('\nCharacter customization audit OK');
