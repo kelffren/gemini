@@ -1,21 +1,35 @@
 /* KELO-INDEX
  * area: UI
- * keys: BUILDER UX UNDO AUTOTILE COLLISION GHOST PICKUP DOCK ONLINE
- * hace: unifica constructores, undo 20, colisión al colocar, ghost y recoger; no guarda mundo
- * online: solo envuelve request() existente
+ * keys: BUILDER UX SCOPE PLAZA PARCEL UNDO COLLISION GHOST ONLINE
+ * hace: un panel Plaza|Parcela; props de parcela van a property-system.request
+ * online: no persiste; envuelve request()
  */
 (function(){
   'use strict';
   if(window.KELO_BUILDER_UX)return;
   const TILE=32;
   const undo=[];
-  let ghost=null,held=null,busy=false;
+  let ghost=null,scope='world',parcel=null,editWrapped=false;
   const toast=m=>{if(typeof showToast==='function')showToast(m);};
   const actor=()=>String(window.keloNet?.playerKey||window.KELO_ADMIN_KEYS?.playerId?.()||window.localPlayer?.id||'local_pioneer');
   function toWorld(e){if(typeof screenToWorld==='function')return screenToWorld(e.clientX,e.clientY);const z=(typeof CONFIG!=='undefined'&&CONFIG.zoom)||1;return{x:camera.x+(e.clientX-screenW/2)/z,y:camera.y+(e.clientY-screenH/2)/z};}
   function snap(v){return Math.floor(Number(v)/TILE)*TILE;}
-
+  function insideParcel(x,y){
+    const b=parcel?.bounds;if(!b)return true;
+    return x>=b.x&&y>=b.y&&x<=b.x+b.w&&y<=b.y+b.h;
+  }
   function pushUndo(entry){undo.push(entry);if(undo.length>20)undo.shift();}
+
+  async function ensureParcel(){
+    const S=window.KELO_PROPERTY_SYSTEM;if(!S?.request)return null;
+    if(scope==='world'){
+      parcel=await S.request('ensureWorldEditorParcel',{ownerId:'developer'});
+    }else{
+      parcel=await S.request('ensureLegacyParcel',{ownerId:actor()});
+    }
+    return parcel;
+  }
+
   async function undoLast(){
     const e=undo.pop();if(!e){toast('Nada que deshacer');return;}
     try{
@@ -23,8 +37,7 @@
       else if(e.kind==='erase')await window.KELO_WORLD_BUILDER.request('world-builder:paint',{actorId:actor(),x:e.x,y:e.y,brushSize:1,material:e.material||'grass',role:e.role||'terrain'});
       else if(e.kind==='collision'&&e.collisionId)await window.KELO_WORLD_BUILDER.request('world-builder:collision-remove',{actorId:actor(),collisionId:e.collisionId});
       else if(e.kind==='place'&&e.placementId){
-        const S=window.KELO_PROPERTY_SYSTEM;
-        await S.request('remove',{ownerId:e.ownerId,placementId:e.placementId});
+        await window.KELO_PROPERTY_SYSTEM.request('remove',{ownerId:e.ownerId||actor(),placementId:e.placementId});
         if(e.collisionId)await window.KELO_WORLD_BUILDER.request('world-builder:collision-remove',{actorId:actor(),collisionId:e.collisionId});
       }
       toast('Deshecho');
@@ -35,35 +48,102 @@
     const WB=window.KELO_WORLD_BUILDER;if(!WB||WB.__uxWrapped)return;
     const raw=WB.request.bind(WB);
     async function request(op,payload){
+      if(scope==='parcel'&&(op==='world-builder:paint'||op==='world-builder:erase-terrain')){
+        if(!insideParcel(payload.x,payload.y))throw new Error('FUERA_DE_LA_PARCELA');
+      }
       const out=await raw(op,payload||{});
       if(op==='world-builder:paint')pushUndo({kind:'paint',x:payload.x,y:payload.y,brush:payload.brushSize||1});
       if(op==='world-builder:erase-terrain')pushUndo({kind:'erase',x:payload.x,y:payload.y,material:'grass'});
-      if(op==='world-builder:collision-create')pushUndo({kind:'collision',collisionId:out?.collisionId||out?.id});
+      if(op==='world-builder:collision-create')pushUndo({kind:'collision',collisionId:out?.collisionId||out?.id||out?.collision?.collisionId});
       return out;
     }
     window.KELO_WORLD_BUILDER=Object.assign({},WB,{request,__uxWrapped:true});
   }
+
   function wrapProperty(){
     const S=window.KELO_PROPERTY_SYSTEM;if(!S||S.__uxWrapped)return;
     const raw=S.request.bind(S);
     async function request(op,payload){
-      const out=await raw(op,payload||{});
+      const data=Object.assign({},payload||{});
+      if(op==='place'&&scope==='parcel'&&parcel?.parcelId)data.parcelId=parcel.parcelId;
+      if(op==='place'&&scope==='world')data.parcelId=data.parcelId||'parcel:world:editor';
+      const out=await raw(op,data);
       if(op==='place'&&out?.placementId){
-        const C=window.KELO_PROPERTY_CATALOG,t=C?.get?.(payload.assetId);
+        const C=window.KELO_PROPERTY_CATALOG,t=C?.get?.(data.assetId);
         const fp=t?.footprint||{x:0,y:0,w:t?.width||TILE,h:Math.max(16,(t?.height||TILE)*0.28)};
         let collisionId=null;
         try{
           const col=await window.KELO_WORLD_BUILDER?.request?.('world-builder:collision-create',{
-            actorId:actor(),x:payload.x+(fp.x||0),y:payload.y+(t?t.height-fp.h:0),w:fp.w||TILE,h:fp.h||TILE
+            actorId:actor(),x:data.x+(fp.x||0),y:data.y+(t?Math.max(0,t.height-(fp.h||16)):0),w:fp.w||TILE,h:fp.h||TILE
           });
-          collisionId=col?.collisionId||col?.id||null;
+          collisionId=col?.collisionId||col?.id||col?.collision?.collisionId||null;
         }catch(e){}
-        pushUndo({kind:'place',placementId:out.placementId,ownerId:payload.ownerId,collisionId});
+        pushUndo({kind:'place',placementId:out.placementId,ownerId:data.ownerId||actor(),collisionId});
       }
       return out;
     }
-    const next=Object.assign({},S,{request,__uxWrapped:true});
-    window.KELO_PROPERTY_SYSTEM=next;
+    window.KELO_PROPERTY_SYSTEM=Object.assign({},S,{request,__uxWrapped:true});
+  }
+
+  function wrapEdit(){
+    const E=window.KELO_WORLD_EDIT;if(!E?.request||editWrapped)return;
+    const raw=E.request.bind(E);
+    async function request(op,payload){
+      if(scope==='parcel'){
+        await ensureParcel();
+        const S=window.KELO_PROPERTY_SYSTEM;
+        if(op==='world:placement:create'){
+          return S.request('place',{ownerId:actor(),parcelId:parcel.parcelId,assetId:payload.assetId,x:payload.x,y:payload.y,rotation:payload.rotation||0});
+        }
+        if(op==='world:placement:move'){
+          return S.request('move',{ownerId:actor(),placementId:payload.placementId,x:payload.x,y:payload.y});
+        }
+        if(op==='world:placement:rotate'){
+          return S.request('rotate',{ownerId:actor(),placementId:payload.placementId,delta:payload.delta||1});
+        }
+        if(op==='world:placement:remove'){
+          return S.request('remove',{ownerId:actor(),placementId:payload.placementId});
+        }
+        if(op==='world:tile:paint'||op==='world:tile:clear'){
+          if(!insideParcel(payload.x,payload.y))throw new Error('FUERA_DE_LA_PARCELA');
+        }
+        if(op==='world:publish'||op==='world:draft:submit'||op==='world:draft:approve'){
+          toast('En parcela no se publica el mundo');
+          return {ok:false,reason:'PARCEL_SCOPE'};
+        }
+      }
+      return raw(op,payload||{});
+    }
+    window.KELO_WORLD_EDIT=Object.assign({},E,{request});
+    editWrapped=true;
+  }
+
+  function setScope(next){
+    scope=next==='parcel'?'parcel':'world';
+    ensureParcel().then(p=>{
+      toast(scope==='world'?'Editando PLAZA':'Editando MI PARCELA');
+      if(scope==='parcel'&&p?.bounds&&typeof localPlayer!=='undefined'){
+        localPlayer.x=p.bounds.x+p.bounds.w/2;
+        localPlayer.y=p.bounds.y+p.bounds.h+40;
+        if(typeof camera!=='undefined'){camera.x=localPlayer.x;camera.y=localPlayer.y;camera.targetX=localPlayer.x;camera.targetY=localPlayer.y;}
+      }
+      const a=document.getElementById('kelo-scope-world');
+      const b=document.getElementById('kelo-scope-parcel');
+      if(a)a.classList.toggle('on',scope==='world');
+      if(b)b.classList.toggle('on',scope==='parcel');
+    }).catch(err=>toast(err.message));
+  }
+
+  function injectScope(){
+    const host=document.getElementById('kelo-world-builder');
+    if(!host||document.getElementById('kelo-builder-scope'))return;
+    const bar=document.createElement('div');
+    bar.id='kelo-builder-scope';
+    bar.innerHTML='<style>#kelo-builder-scope{display:flex;gap:6px;padding:8px 10px 0}#kelo-builder-scope button{flex:1;border:1px solid rgba(231,197,106,.28);background:#111e20;color:#9db0a9;border-radius:9px;padding:8px;font-size:9px;font-weight:900}#kelo-builder-scope button.on{border-color:#e7c56a;color:#fff4d6;background:#1a2c26}</style><button id="kelo-scope-world" class="on">PLAZA</button><button id="kelo-scope-parcel">MI PARCELA</button>';
+    const head=host.querySelector('.wb-head')||host.firstElementChild;
+    if(head&&head.nextSibling)host.insertBefore(bar,head.nextSibling);else host.insertBefore(bar,host.firstChild);
+    document.getElementById('kelo-scope-world').onclick=()=>setScope('world');
+    document.getElementById('kelo-scope-parcel').onclick=()=>setScope('parcel');
   }
 
   function unifyUi(){
@@ -71,6 +151,7 @@
     if(peFab)peFab.style.display='none';
     const tools=document.getElementById('pe-world-tools');
     if(tools)tools.remove();
+    injectScope();
     if(!document.getElementById('kelo-builder-undo')){
       const b=document.createElement('button');
       b.id='kelo-builder-undo';b.textContent='DESHACER';
@@ -80,31 +161,35 @@
     }
     const pe=document.getElementById('kelo-property-editor');
     const wb=document.getElementById('kelo-world-builder');
-    if(pe&&wb&&pe.style.display==='flex'&&wb.style.display!=='none'){
-      pe.style.display='none';
-    }
+    if(pe&&wb&&pe.style.display==='flex'&&wb.style.display!=='none')pe.style.display='none';
   }
 
   function drawGhost(g){
+    if(parcel?.bounds&&scope==='parcel'){
+      const b=parcel.bounds;g.save();g.strokeStyle='rgba(231,197,106,.9)';g.setLineDash([8,6]);g.strokeRect(b.x,b.y,b.w,b.h);g.setLineDash([]);g.restore();
+    }
     if(!ghost)return;
     g.save();g.globalAlpha=.38;g.fillStyle='#e7c56a';g.fillRect(ghost.x,ghost.y,ghost.w,ghost.h);g.globalAlpha=1;g.strokeStyle='#fff4d6';g.strokeRect(ghost.x,ghost.y,ghost.w,ghost.h);g.restore();
   }
   const L=window.KELO_ENVIRONMENT_LAYERS;
   if(L?.register){
-    L.register({id:'builder-ux-ghost',phase:'vfx_weather_lighting',priority:998,required:false,ready:()=>true,draw:drawGhost,ownership:'builder-ux-v1',bounds:()=>[]});
+    L.register({id:'builder-ux-ghost',phase:'vfx_weather_lighting',priority:998,required:false,ready:()=>true,draw:drawGhost,ownership:'builder-ux-v2',bounds:()=>[]});
   }
 
   window.addEventListener('pointermove',e=>{
-    const ui=window.KELO_WORLD_BUILDER_UI;
-    const tool=ui?.tool||'place';
     const w=toWorld(e);
-    if(held){ghost={x:snap(w.x),y:snap(w.y),w:held.w||TILE,h:held.h||TILE};return;}
-    if(tool&&tool!=='place')ghost={x:snap(w.x),y:snap(w.y),w:TILE,h:TILE};
+    ghost={x:snap(w.x),y:snap(w.y),w:TILE,h:TILE};
   },{passive:true});
-
   window.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='z'){e.preventDefault();undoLast();}});
 
-  const t=setInterval(()=>{wrapWorld();wrapProperty();unifyUi();},200);
+  const t=setInterval(()=>{wrapWorld();wrapProperty();wrapEdit();unifyUi();},200);
   setTimeout(()=>clearInterval(t),25000);
-  window.KELO_BUILDER_UX=Object.freeze({version:'builder-ux-v1.0.0',undoLast,get undoCount(){return undo.length;}});
+  window.KELO_BUILDER_UX=Object.freeze({
+    version:'builder-ux-v1.1.0',
+    undoLast,
+    setScope,
+    get scope(){return scope;},
+    get parcelId(){return parcel?.parcelId||null;},
+    get undoCount(){return undo.length;}
+  });
 })();
