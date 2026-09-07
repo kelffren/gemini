@@ -22,6 +22,26 @@
       "reason": "Sword Swap katana throw is a reusable projectile presentation spritesheet owned by the modular Visual System, not the environment art contract."
     },
     {
+      "path": "assets/fx/sword-swap/a.PNG",
+      "scope": "non-world-ui",
+      "reason": "Sword Swap landing and planted-sword impact spritesheet is gameplay presentation VFX, not an environment world-art asset."
+    },
+    {
+      "path": "assets/fx/sword-swap/loop.PNG",
+      "scope": "non-world-ui",
+      "reason": "Sword Swap planted-sword idle loop is reusable ability presentation VFX, outside the environment world-art contract."
+    },
+    {
+      "path": "assets/fx/sword-swap/regreso2.PNG",
+      "scope": "non-world-ui",
+      "reason": "Sword Swap recall and handle-first return spritesheet is reusable ability presentation VFX, outside the environment world-art contract."
+    },
+    {
+      "path": "assets/fx/sword-swap/teleport .PNG",
+      "scope": "non-world-ui",
+      "reason": "Sword Swap instant exchange and teleport spritesheet is reusable character ability VFX, outside the environment world-art contract."
+    },
+    {
       "path": "assets/fuentekelo.PNG",
       "scope": "source-sheet",
       "reason": "Original Kelo-uploaded fountain source retained untouched; LIVE uses the deterministic alpha-clean derivative assets/fuentekelo-runtime.PNG."
