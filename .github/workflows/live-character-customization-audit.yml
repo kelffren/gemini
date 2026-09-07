@@ -5,7 +5,10 @@ on:
     branches: [main]
     paths:
       - 'src/characters/character-customization.js'
+      - 'src/characters/character-demo-kit.js'
+      - 'src/characters/customization-assets/**'
       - 'src/ui/character-customizer-ui.js'
+      - 'src/ui/character-customizer-preview.js'
       - 'src/ui/profile-panel-close.js'
       - 'scripts/live-character-customization-audit.mjs'
       - '.github/workflows/live-character-customization-audit.yml'
@@ -30,13 +33,13 @@ jobs:
           set -euo pipefail
           for i in $(seq 1 36); do
             body="$(curl -fsSL --retry 2 --retry-delay 1 "https://kelffren.github.io/gemini/src/ui/profile-panel-close.js?character-customizer-deploy=${GITHUB_SHA}-${i}" || true)"
-            if printf '%s' "$body" | grep -q 'characterCustomizationBootstrap' && printf '%s' "$body" | grep -q 'character-customization.js?v=1'; then
-              echo "Current character customizer build is live"
+            if printf '%s' "$body" | grep -q 'character-demo-kit.js?v=1' && printf '%s' "$body" | grep -q 'character-customizer-preview.js?v=1'; then
+              echo "Current modular character kit is live"
               exit 0
             fi
             sleep 10
           done
-          echo "Current character customizer build did not appear on Pages"
+          echo "Current modular character kit did not appear on Pages"
           exit 1
       - name: Live mobile character customization audit
         env:
