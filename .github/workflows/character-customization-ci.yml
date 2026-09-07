@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
     paths:
+      - 'src/characters/character-slot-schema.js'
       - 'src/characters/character-customization.js'
       - 'src/characters/character-visual-presets.js'
       - 'src/characters/character-content-packs.js'
@@ -19,6 +20,7 @@ on:
       - '.github/workflows/character-customization-ci.yml'
   pull_request:
     paths:
+      - 'src/characters/character-slot-schema.js'
       - 'src/characters/character-customization.js'
       - 'src/characters/character-visual-presets.js'
       - 'src/characters/character-content-packs.js'
