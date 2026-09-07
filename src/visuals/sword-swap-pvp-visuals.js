@@ -1,36 +1,43 @@
 /* KELO-INDEX
  * area: VISUAL
- * keys: SWORD SWAP PVP ACTIVATION EYE IMPACT PLANTED LOOP TELEPORT RETURN SPRITESHEET
- * hace: puente visual del PvP aislado para activación, impacto, espada clavada, teleport y llamada/retorno usando los PNG reales en la capa projectile worldFX que sí renderiza la arena
- * online: solo consume eventos semánticos; no cambia posiciones, cooldown, daño ni autoridad
+ * keys: SWORD SWAP PVP ACTIVATION EYE IMPACT PLANTED LOOP TELEPORT RETURN SPRITESHEET BLOCKER
+ * hace: puente visual del PvP aislado para activación, impacto, espada clavada, bloqueo físico, teleport y llamada/retorno usando los PNG reales en la capa projectile worldFX que sí renderiza la arena
+ * online: consume eventos semánticos y añade únicamente presentación + colisión local de prototipo; no decide daño, cooldown ni autoridad remota
  */
 (function (root) {
   'use strict';
 
-  const VERSION = 'sword-swap-pvp-visuals-v1.3.1';
+  const VERSION = 'sword-swap-pvp-visuals-v1.4.0';
   const FRAME_W = 362;
   const FRAME_H = 724;
   const IMPACT_MS = 500;
   const TELEPORT_MS = 500;
   const EYE_MS = 520;
+  const RETURN_LAUNCH_MS = 360;
+  const RETURN_END_HOLD_MS = 90;
+  const BLOCK_W = 28;
+  const BLOCK_H = 26;
+  const BLOCK_Y_OFFSET = -18;
 
   const IDS = Object.freeze({
-    eyeAsset: 'sword_swap_pvp_eye_asset_v3',
-    impactAsset: 'sword_swap_pvp_impact_asset_v3',
-    loopAsset: 'sword_swap_pvp_loop_asset_v3',
-    teleportAsset: 'sword_swap_pvp_teleport_asset_v3',
-    returnAsset: 'sword_swap_pvp_return_asset_v3',
-    eyeVisual: 'sword_swap_pvp_eye_visual_v3',
-    impactVisual: 'sword_swap_pvp_impact_visual_v3',
-    loopVisual: 'sword_swap_pvp_loop_visual_v3',
-    teleportVisual: 'sword_swap_pvp_teleport_visual_v3',
-    returnVisual: 'sword_swap_pvp_return_visual_v3',
+    eyeAsset: 'sword_swap_pvp_eye_asset_v4',
+    impactAsset: 'sword_swap_pvp_impact_asset_v4',
+    loopAsset: 'sword_swap_pvp_loop_asset_v4',
+    teleportAsset: 'sword_swap_pvp_teleport_asset_v4',
+    returnAsset: 'sword_swap_pvp_return_asset_v4',
+    eyeVisual: 'sword_swap_pvp_eye_visual_v4',
+    impactVisual: 'sword_swap_pvp_impact_visual_v4',
+    loopVisual: 'sword_swap_pvp_loop_visual_v4',
+    teleportVisual: 'sword_swap_pvp_teleport_visual_v4',
+    returnLaunchVisual: 'sword_swap_pvp_return_launch_visual_v4',
+    returnFlightVisual: 'sword_swap_pvp_return_flight_visual_v4',
   });
 
   const swordObjects = new Map();
   const active = new Map();
   const transient = new Set();
   let installed = false;
+  let blockerInstalled = false;
   let lastPlayerPos = null;
   let trackingStarted = false;
 
@@ -44,12 +51,18 @@
     impactPlayed: 0,
     loopPlayed: 0,
     teleportPlayed: 0,
+    returnLaunchPlayed: 0,
     returnPlayed: 0,
+    blockerInstalled: false,
+    blockerActive: false,
+    blockerHits: 0,
+    blockerBox: null,
     lastPhase: null,
     lastSwordEntityId: null,
     lastTeleportPoints: null,
     lastReturnDirection: null,
-    reason: 'PvP arena has an isolated renderer and only draws projectile worldFX directly',
+    lastReturnDurationMs: null,
+    reason: 'PvP arena has an isolated renderer; Sword Swap uses projectile worldFX plus a planted-sword local blocker',
   };
 
   function player() {
@@ -79,14 +92,29 @@
     transient.delete(id);
   }
 
+  function clearReturnAnimation(item) {
+    if (!item) return;
+    if (item.returnFlightTimer) clearTimeout(item.returnFlightTimer);
+    if (item.returnTimer) clearTimeout(item.returnTimer);
+    if (item.returnFrame && typeof root.cancelAnimationFrame === 'function') root.cancelAnimationFrame(item.returnFrame);
+    if (item.returnAnchor) item.returnAnchor._keloVisualDead = true;
+    stopVisual(item.returnLaunchId);
+    stopVisual(item.returnId);
+    item.returnFlightTimer = null;
+    item.returnTimer = null;
+    item.returnFrame = null;
+    item.returnAnchor = null;
+    item.returnLaunchId = null;
+    item.returnId = null;
+  }
+
   function clearActive(key, forgetObject) {
     const item = active.get(key);
     if (item) {
       if (item.timer) clearTimeout(item.timer);
-      if (item.returnTimer) clearTimeout(item.returnTimer);
+      clearReturnAnimation(item);
       stopVisual(item.impactId);
       stopVisual(item.loopId);
-      stopVisual(item.returnId);
       active.delete(key);
     }
     if (forgetObject) swordObjects.delete(key);
@@ -139,16 +167,26 @@
       sourcePixelScale: 0.34, alpha: 1, alignToVelocity: false, defaultSpeed: 0, defaultMaxDistance: 1,
     });
 
+    // Frames 1-4: clavada -> contracción -> extracción -> giro.
     registerVisual({
-      id: IDS.returnVisual,
+      id: IDS.returnLaunchVisual,
       type: 'sprite_animation', assetId: IDS.returnAsset, layer: 'worldFX',
-      frames: 2, fps: 14, loop: true,
+      frameWidth: FRAME_W, frameHeight: FRAME_H, columns: 6, rows: 1, frames: 4, fps: 11, loop: false,
+      sourcePixelScale: 0.22, alpha: 1, alignToVelocity: false, defaultSpeed: 0, defaultMaxDistance: 1,
+    });
+
+    // Frames 5-6: vuelo de regreso con el MANGO al frente. El PNG base ya apunta el mango a la derecha,
+    // por eso rotationOffset debe ser 0; el antiguo PI lo volteaba y hacía el regreso antinatural.
+    registerVisual({
+      id: IDS.returnFlightVisual,
+      type: 'sprite_animation', assetId: IDS.returnAsset, layer: 'worldFX',
+      frames: 2, fps: 12, loop: true,
       frameRects: [
         { x: FRAME_W * 4, y: 0, width: FRAME_W, height: FRAME_H },
         { x: FRAME_W * 5, y: 0, width: FRAME_W, height: FRAME_H },
       ],
-      sourcePixelScale: 0.36, alpha: 1, alignToVelocity: true,
-      rotationOffset: Math.PI, defaultSpeed: 980, defaultMaxDistance: 1200,
+      sourcePixelScale: 0.22, alpha: 1, alignToVelocity: true,
+      rotationOffset: 0, defaultSpeed: 1, defaultMaxDistance: 1,
     });
 
     root.KeloAssetRegistry.preload(assets.map(function (a) { return a.id; })).then(function () {
@@ -209,46 +247,159 @@
     audit.lastTeleportPoints = { from: a, to: b };
   }
 
+  function easeInOutCubic(t) {
+    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  }
+
   function beginReturnVisual(key, payload) {
     const object = key && swordObjects.get(key);
     const actor = player();
     if (!key || !object || !actor || !root.KeloProjectileVisuals) return;
 
-    const dx = Number(actor.x) - Number(object.x);
-    const dy = Number(actor.y) - Number(object.y);
+    const origin = pointOf(object);
+    if (!origin) return;
+    const dx = Number(actor.x) - origin.x;
+    const dy = Number(actor.y) - origin.y;
     const len = Math.hypot(dx, dy) || 1;
     const dir = { x: dx / len, y: dy / len };
-    const context = contextFor(payload, object, dir);
-    context.target = { x: Number(actor.x), y: Number(actor.y) };
-    context.gameplay = { speed: 980, range: Math.max(120, len + 120) };
+    const totalMs = Math.max(700, Number(payload && payload.returnDurationSec || 3) * 1000);
+    const flightMs = Math.max(320, totalMs - RETURN_LAUNCH_MS);
 
-    const record = active.get(key) || { impactId: null, loopId: null, returnId: null, timer: null, returnTimer: null };
+    const record = active.get(key) || {
+      impactId: null, loopId: null, returnLaunchId: null, returnId: null,
+      timer: null, returnFlightTimer: null, returnTimer: null, returnFrame: null, returnAnchor: null,
+    };
     if (record.timer) { clearTimeout(record.timer); record.timer = null; }
+    clearReturnAnimation(record);
     stopVisual(record.impactId); record.impactId = null;
     stopVisual(record.loopId); record.loopId = null;
-    stopVisual(record.returnId);
 
-    record.returnId = root.KeloProjectileVisuals.attach(object, IDS.returnVisual, context, {
-      speed: 980,
-      maxDistance: Math.max(120, len + 120),
-      loop: true,
-    });
-    const returnMs = Math.max(450, Number(payload && payload.returnDurationSec || 3) * 1000 + 180);
-    record.returnTimer = setTimeout(function () {
+    record.returnLaunchId = attachStaticVisual(origin, IDS.returnLaunchVisual, RETURN_LAUNCH_MS + 30);
+    audit.returnLaunchPlayed += 1;
+
+    record.returnFlightTimer = setTimeout(function () {
       const current = active.get(key);
-      if (!current || current !== record) return;
-      stopVisual(current.returnId);
-      current.returnId = null;
-      current.returnTimer = null;
-      active.delete(key);
-      swordObjects.delete(key);
-    }, returnMs);
-    active.set(key, record);
+      const targetActor = player();
+      if (!current || current !== record || !targetActor || !root.KeloProjectileVisuals) return;
 
+      const anchor = { x: origin.x, y: origin.y, _keloVisualDead: false };
+      current.returnAnchor = anchor;
+      const startDirX = Number(targetActor.x) - origin.x;
+      const startDirY = Number(targetActor.y) - origin.y;
+      const startLen = Math.hypot(startDirX, startDirY) || 1;
+      const flightDir = { x: startDirX / startLen, y: startDirY / startLen };
+      const context = contextFor(payload, anchor, flightDir);
+      context.target = { x: Number(targetActor.x), y: Number(targetActor.y) };
+      context.gameplay = { speed: 1, range: 1 };
+
+      current.returnId = root.KeloProjectileVisuals.attach(anchor, IDS.returnFlightVisual, context, {
+        speed: 1,
+        maxDistance: 1,
+        loop: true,
+      });
+
+      const startedAt = root.performance && typeof root.performance.now === 'function' ? root.performance.now() : Date.now();
+      function step(now) {
+        const live = active.get(key);
+        const target = player();
+        if (!live || live !== current || !target || !current.returnAnchor) return;
+        const elapsed = Math.max(0, Number(now) - startedAt);
+        const k = Math.max(0, Math.min(1, elapsed / flightMs));
+        const ease = easeInOutCubic(k);
+        current.returnAnchor.x = origin.x + (Number(target.x) - origin.x) * ease;
+        current.returnAnchor.y = origin.y + (Number(target.y) - origin.y) * ease;
+        if (k < 1) {
+          current.returnFrame = root.requestAnimationFrame(step);
+          return;
+        }
+        current.returnAnchor.x = Number(target.x);
+        current.returnAnchor.y = Number(target.y);
+        current.returnFrame = null;
+        current.returnTimer = setTimeout(function () {
+          const latest = active.get(key);
+          if (!latest || latest !== current) return;
+          clearReturnAnimation(current);
+          active.delete(key);
+          swordObjects.delete(key);
+        }, RETURN_END_HOLD_MS);
+      }
+      current.returnFrame = root.requestAnimationFrame(step);
+    }, RETURN_LAUNCH_MS);
+
+    active.set(key, record);
     audit.returnPlayed += 1;
     audit.lastPhase = 'RETURN';
     audit.lastSwordEntityId = key;
     audit.lastReturnDirection = dir;
+    audit.lastReturnDurationMs = totalMs;
+  }
+
+  function currentSwordBlock() {
+    const pvp = root.KeloPvPWorld;
+    const snapshot = pvp && pvp.state;
+    const sword = snapshot && snapshot.swapSword;
+    if (!sword || sword.phase !== 'planted') return null;
+    return {
+      x: Number(sword.x) - BLOCK_W * 0.5,
+      y: Number(sword.y) + BLOCK_Y_OFFSET,
+      w: BLOCK_W,
+      h: BLOCK_H,
+    };
+  }
+
+  function resolveEntityAgainstSword(entity, box) {
+    if (!entity || !box || !root.KELO_COLLISION || typeof root.KELO_COLLISION.resolveCircleAABB !== 'function') return false;
+    const radius = Math.max(10, Number(entity.radius) || 18);
+    const hit = root.KELO_COLLISION.resolveCircleAABB(Number(entity.x), Number(entity.y), radius, box);
+    if (!hit || !hit.collided) return false;
+    entity.x = Number(entity.x) + Number(hit.pushX || 0);
+    entity.y = Number(entity.y) + Number(hit.pushY || 0);
+    if (Math.abs(Number(hit.pushX || 0)) >= Math.abs(Number(hit.pushY || 0))) {
+      if ('vx' in entity) entity.vx = 0;
+    } else if ('vy' in entity) entity.vy = 0;
+    audit.blockerHits += 1;
+    return true;
+  }
+
+  function applySwordBlocker() {
+    if (root.KELO_COMBAT_ENABLED !== true) {
+      audit.blockerActive = false;
+      audit.blockerBox = null;
+      return;
+    }
+    const box = currentSwordBlock();
+    if (!box) {
+      audit.blockerActive = false;
+      audit.blockerBox = null;
+      return;
+    }
+    audit.blockerActive = true;
+    audit.blockerBox = { x: box.x, y: box.y, w: box.w, h: box.h };
+    const local = player();
+    if (local) resolveEntityAgainstSword(local, box);
+    try {
+      if (typeof simulatedPlayers !== 'undefined' && simulatedPlayers) {
+        if (typeof simulatedPlayers.forEach === 'function') {
+          simulatedPlayers.forEach(function (entity) { if (entity && entity !== local) resolveEntityAgainstSword(entity, box); });
+        } else if (Array.isArray(simulatedPlayers)) {
+          simulatedPlayers.forEach(function (entity) { if (entity && entity !== local) resolveEntityAgainstSword(entity, box); });
+        }
+      }
+    } catch (e) {}
+  }
+
+  function installSwordBlocker() {
+    if (blockerInstalled) return true;
+    let previous = null;
+    try { previous = typeof updateSimulation === 'function' ? updateSimulation : null; } catch (e) { previous = null; }
+    if (!previous) return false;
+    updateSimulation = function (dt) {
+      previous(dt);
+      applySwordBlocker();
+    };
+    blockerInstalled = true;
+    audit.blockerInstalled = true;
+    return true;
   }
 
   function onThrown(payload) {
@@ -271,7 +422,10 @@
     clearActive(key, false);
     const context = contextFor(payload, object);
     const impactId = root.KeloProjectileVisuals.attach(object, IDS.impactVisual, context, { speed: 0, maxDistance: 1, loop: false });
-    const record = { impactId: impactId, loopId: null, returnId: null, timer: null, returnTimer: null };
+    const record = {
+      impactId: impactId, loopId: null, returnLaunchId: null, returnId: null,
+      timer: null, returnFlightTimer: null, returnTimer: null, returnFrame: null, returnAnchor: null,
+    };
     active.set(key, record);
     audit.impactPlayed += 1;
     audit.lastPhase = 'IMPACT';
@@ -337,6 +491,7 @@
     bus.on('SWAP_SWORD_RESOLVED', onCancelled);
     bus.on('ABILITY_CAST', onAbilityCast);
 
+    if (!installSwordBlocker()) return false;
     if (!trackingStarted && typeof root.requestAnimationFrame === 'function') root.requestAnimationFrame(trackPlayer);
     installed = true;
     audit.ready = true;
