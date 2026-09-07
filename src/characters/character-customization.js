@@ -7,13 +7,13 @@
 (function (root) {
   'use strict';
 
-  const VERSION = 'character-customization-v1.0.0';
+  const VERSION = 'character-customization-v1.0.1';
   const STORAGE_KEY = 'kelo_character_customization_v1';
   const FACE_ORDER = Object.freeze({
-    down: Object.freeze(['back','body','legs','feet','torso','armor','face','hair','head','faceAccessory','accessory1','accessory2','weaponSecondary','weaponMain','aura','characterFX']),
-    left: Object.freeze(['back','weaponSecondary','body','legs','feet','torso','armor','face','hair','head','faceAccessory','accessory1','accessory2','weaponMain','aura','characterFX']),
-    right: Object.freeze(['back','weaponSecondary','body','legs','feet','torso','armor','face','hair','head','faceAccessory','accessory1','accessory2','weaponMain','aura','characterFX']),
-    up: Object.freeze(['weaponMain','weaponSecondary','back','body','legs','feet','torso','armor','face','hair','head','faceAccessory','accessory1','accessory2','aura','characterFX'])
+    down: Object.freeze(['back','body','skinTone','legs','feet','torso','gloves','armor','face','eyes','facialHair','hair','head','faceAccessory','accessory1','accessory2','weaponSecondary','weaponMain','weaponSkin','aura','characterFX']),
+    left: Object.freeze(['back','weaponSecondary','body','skinTone','legs','feet','torso','gloves','armor','face','eyes','facialHair','hair','head','faceAccessory','accessory1','accessory2','weaponMain','weaponSkin','aura','characterFX']),
+    right: Object.freeze(['back','weaponSecondary','body','skinTone','legs','feet','torso','gloves','armor','face','eyes','facialHair','hair','head','faceAccessory','accessory1','accessory2','weaponMain','weaponSkin','aura','characterFX']),
+    up: Object.freeze(['weaponMain','weaponSkin','weaponSecondary','back','body','skinTone','legs','feet','torso','gloves','armor','face','eyes','facialHair','hair','head','faceAccessory','accessory1','accessory2','aura','characterFX'])
   });
   const SLOT_GROUPS = Object.freeze({
     appearance: Object.freeze(['body','skinTone','face','eyes','hair','facialHair']),
@@ -50,6 +50,7 @@
     modular: true,
     legacyBaseFallback: true,
     sharedAnimationState: true,
+    actionTransformShared: true,
     independentEquipmentLayers: true,
     gameplayStatsOwnedElsewhere: true,
     onlineUsesIdsOnly: true,
@@ -281,14 +282,29 @@
   function drawSection(g, actor, section) {
     const face=faceOf(actor); orderedItems(actor,section).forEach(function(item){drawVisualItem(g,actor,item,face);});
   }
+  function drawSectionWithActorTransform(g, actor, section) {
+    if (!g || !actor) return;
+    const transform = root.KeloAnimation && typeof root.KeloAnimation.sampleTransform === 'function' ? root.KeloAnimation.sampleTransform(actor) : null;
+    const pivot = root.KeloAnchors && typeof root.KeloAnchors.get === 'function' ? root.KeloAnchors.get(actor,'foot') : { x:Number(actor.x)||0, y:Number(actor.y)||0 };
+    g.save();
+    if (transform && pivot) {
+      g.translate(Number(transform.offsetX)||0,Number(transform.offsetY)||0);
+      g.translate(Number(pivot.x)||0,Number(pivot.y)||0);
+      if (Number(transform.rotation)) g.rotate(Number(transform.rotation));
+      g.scale(Number(transform.scaleX)||1,Number(transform.scaleY)||1);
+      g.translate(-(Number(pivot.x)||0),-(Number(pivot.y)||0));
+    }
+    drawSection(g,actor,section);
+    g.restore();
+  }
 
   function installRenderer() {
     if (typeof renderAvatar !== 'function' || renderAvatar.__keloModularCustomization) return false;
     const previous = renderAvatar;
     function modularRender(actor, isSelf) {
-      if (typeof ctx !== 'undefined' && ctx) drawSection(ctx, actor, 'back');
+      if (typeof ctx !== 'undefined' && ctx) drawSectionWithActorTransform(ctx, actor, 'back');
       const out = previous.apply(this, arguments);
-      if (typeof ctx !== 'undefined' && ctx) drawSection(ctx, actor, 'front');
+      if (typeof ctx !== 'undefined' && ctx) drawSectionWithActorTransform(ctx, actor, 'front');
       return out;
     }
     modularRender.__keloModularCustomization = true;
