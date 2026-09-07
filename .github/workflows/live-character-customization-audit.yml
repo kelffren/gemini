@@ -36,18 +36,18 @@ jobs:
           set -euo pipefail
           for i in $(seq 1 36); do
             body="$(curl -fsSL --retry 2 --retry-delay 1 "https://kelffren.github.io/gemini/src/ui/profile-panel-close.js?character-customizer-deploy=${GITHUB_SHA}-${i}" || true)"
-            if printf '%s' "$body" | grep -q 'character-customization.js?v=3' \
+            if printf '%s' "$body" | grep -q 'character-customization.js?v=4' \
               && printf '%s' "$body" | grep -q 'character-visual-presets.js?v=2' \
               && printf '%s' "$body" | grep -q 'character-content-packs.js?v=1' \
               && printf '%s' "$body" | grep -q 'character-visual-stack.js?v=1' \
               && printf '%s' "$body" | grep -q 'character-demo-kit.js?v=2' \
               && printf '%s' "$body" | grep -q 'character-customizer-preview.js?v=2'; then
-              echo "Current reusable character foundation is live"
+              echo "Current shared-stack character renderer is live"
               exit 0
             fi
             sleep 10
           done
-          echo "Current reusable character foundation did not appear on Pages"
+          echo "Current shared-stack character renderer did not appear on Pages"
           exit 1
       - name: Live mobile character customization audit
         env:
