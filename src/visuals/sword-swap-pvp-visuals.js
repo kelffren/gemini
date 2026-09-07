@@ -7,30 +7,29 @@
 (function (root) {
   'use strict';
 
-  const VERSION = 'sword-swap-pvp-visuals-v1.4.0';
+  const VERSION = 'sword-swap-pvp-visuals-v1.4.1';
   const FRAME_W = 362;
   const FRAME_H = 724;
   const IMPACT_MS = 500;
   const TELEPORT_MS = 500;
   const EYE_MS = 520;
-  const RETURN_LAUNCH_MS = 360;
+  const RETURN_PULL_MS = 140;
   const RETURN_END_HOLD_MS = 90;
   const BLOCK_W = 28;
   const BLOCK_H = 26;
   const BLOCK_Y_OFFSET = -18;
 
   const IDS = Object.freeze({
-    eyeAsset: 'sword_swap_pvp_eye_asset_v4',
-    impactAsset: 'sword_swap_pvp_impact_asset_v4',
-    loopAsset: 'sword_swap_pvp_loop_asset_v4',
-    teleportAsset: 'sword_swap_pvp_teleport_asset_v4',
-    returnAsset: 'sword_swap_pvp_return_asset_v4',
-    eyeVisual: 'sword_swap_pvp_eye_visual_v4',
-    impactVisual: 'sword_swap_pvp_impact_visual_v4',
-    loopVisual: 'sword_swap_pvp_loop_visual_v4',
-    teleportVisual: 'sword_swap_pvp_teleport_visual_v4',
-    returnLaunchVisual: 'sword_swap_pvp_return_launch_visual_v4',
-    returnFlightVisual: 'sword_swap_pvp_return_flight_visual_v4',
+    eyeAsset: 'sword_swap_pvp_eye_asset_v41',
+    impactAsset: 'sword_swap_pvp_impact_asset_v41',
+    loopAsset: 'sword_swap_pvp_loop_asset_v41',
+    teleportAsset: 'sword_swap_pvp_teleport_asset_v41',
+    returnAsset: 'sword_swap_pvp_return_asset_v41',
+    eyeVisual: 'sword_swap_pvp_eye_visual_v41',
+    impactVisual: 'sword_swap_pvp_impact_visual_v41',
+    loopVisual: 'sword_swap_pvp_loop_visual_v41',
+    teleportVisual: 'sword_swap_pvp_teleport_visual_v41',
+    returnFlightVisual: 'sword_swap_pvp_return_flight_visual_v41',
   });
 
   const swordObjects = new Map();
@@ -51,7 +50,6 @@
     impactPlayed: 0,
     loopPlayed: 0,
     teleportPlayed: 0,
-    returnLaunchPlayed: 0,
     returnPlayed: 0,
     blockerInstalled: false,
     blockerActive: false,
@@ -98,13 +96,11 @@
     if (item.returnTimer) clearTimeout(item.returnTimer);
     if (item.returnFrame && typeof root.cancelAnimationFrame === 'function') root.cancelAnimationFrame(item.returnFrame);
     if (item.returnAnchor) item.returnAnchor._keloVisualDead = true;
-    stopVisual(item.returnLaunchId);
     stopVisual(item.returnId);
     item.returnFlightTimer = null;
     item.returnTimer = null;
     item.returnFrame = null;
     item.returnAnchor = null;
-    item.returnLaunchId = null;
     item.returnId = null;
   }
 
@@ -167,16 +163,8 @@
       sourcePixelScale: 0.34, alpha: 1, alignToVelocity: false, defaultSpeed: 0, defaultMaxDistance: 1,
     });
 
-    // Frames 1-4: clavada -> contracción -> extracción -> giro.
-    registerVisual({
-      id: IDS.returnLaunchVisual,
-      type: 'sprite_animation', assetId: IDS.returnAsset, layer: 'worldFX',
-      frameWidth: FRAME_W, frameHeight: FRAME_H, columns: 6, rows: 1, frames: 4, fps: 11, loop: false,
-      sourcePixelScale: 0.22, alpha: 1, alignToVelocity: false, defaultSpeed: 0, defaultMaxDistance: 1,
-    });
-
-    // Frames 5-6: vuelo de regreso con el MANGO al frente. El PNG base ya apunta el mango a la derecha,
-    // por eso rotationOffset debe ser 0; el antiguo PI lo volteaba y hacía el regreso antinatural.
+    // Regreso: usar únicamente los dos frames de vuelo limpios del PNG.
+    // El sprite base tiene el MANGO a la izquierda; rotationOffset PI hace que el mango apunte siempre hacia el jugador.
     registerVisual({
       id: IDS.returnFlightVisual,
       type: 'sprite_animation', assetId: IDS.returnAsset, layer: 'worldFX',
@@ -186,7 +174,7 @@
         { x: FRAME_W * 5, y: 0, width: FRAME_W, height: FRAME_H },
       ],
       sourcePixelScale: 0.22, alpha: 1, alignToVelocity: true,
-      rotationOffset: 0, defaultSpeed: 1, defaultMaxDistance: 1,
+      rotationOffset: Math.PI, defaultSpeed: 1, defaultMaxDistance: 1,
     });
 
     root.KeloAssetRegistry.preload(assets.map(function (a) { return a.id; })).then(function () {
@@ -263,24 +251,23 @@
     const len = Math.hypot(dx, dy) || 1;
     const dir = { x: dx / len, y: dy / len };
     const totalMs = Math.max(700, Number(payload && payload.returnDurationSec || 3) * 1000);
-    const flightMs = Math.max(320, totalMs - RETURN_LAUNCH_MS);
+    const flightMs = Math.max(320, totalMs - RETURN_PULL_MS);
 
     const record = active.get(key) || {
-      impactId: null, loopId: null, returnLaunchId: null, returnId: null,
+      impactId: null, loopId: null, returnId: null,
       timer: null, returnFlightTimer: null, returnTimer: null, returnFrame: null, returnAnchor: null,
     };
     if (record.timer) { clearTimeout(record.timer); record.timer = null; }
     clearReturnAnimation(record);
     stopVisual(record.impactId); record.impactId = null;
-    stopVisual(record.loopId); record.loopId = null;
 
-    record.returnLaunchId = attachStaticVisual(origin, IDS.returnLaunchVisual, RETURN_LAUNCH_MS + 30);
-    audit.returnLaunchPlayed += 1;
-
+    // Mantener el loop clavado unos milisegundos funciona como "tirón" visual y evita el salto/corte.
     record.returnFlightTimer = setTimeout(function () {
       const current = active.get(key);
       const targetActor = player();
       if (!current || current !== record || !targetActor || !root.KeloProjectileVisuals) return;
+      stopVisual(current.loopId);
+      current.loopId = null;
 
       const anchor = { x: origin.x, y: origin.y, _keloVisualDead: false };
       current.returnAnchor = anchor;
@@ -324,7 +311,7 @@
         }, RETURN_END_HOLD_MS);
       }
       current.returnFrame = root.requestAnimationFrame(step);
-    }, RETURN_LAUNCH_MS);
+    }, RETURN_PULL_MS);
 
     active.set(key, record);
     audit.returnPlayed += 1;
@@ -423,7 +410,7 @@
     const context = contextFor(payload, object);
     const impactId = root.KeloProjectileVisuals.attach(object, IDS.impactVisual, context, { speed: 0, maxDistance: 1, loop: false });
     const record = {
-      impactId: impactId, loopId: null, returnLaunchId: null, returnId: null,
+      impactId: impactId, loopId: null, returnId: null,
       timer: null, returnFlightTimer: null, returnTimer: null, returnFrame: null, returnAnchor: null,
     };
     active.set(key, record);
