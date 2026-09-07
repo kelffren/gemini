@@ -7,7 +7,7 @@
 (function (root) {
   'use strict';
 
-  const VERSION = 'melee-visual-manifest-v1.1.0';
+  const VERSION = 'melee-visual-manifest-v1.1.1';
   const IMPACT_AT_MS = 150;
   const ATTACK_DURATION = 0.33;
   const REACTION_DURATION = 0.11;
@@ -129,9 +129,8 @@
   registerSafe(fxRegistry, {
     id: 'melee_hit_sparks_light_01',
     type: 'burst',
-    space: 'ACTOR',
-    layer: 'actorFrontFX',
-    socket: 'center',
+    space: 'WORLD',
+    layer: 'foregroundFX',
     duration: 0.13,
     loop: false,
     radius: 19,
@@ -144,9 +143,8 @@
   registerSafe(fxRegistry, {
     id: 'melee_hit_glow_light_01',
     type: 'glow',
-    space: 'ACTOR',
-    layer: 'actorFrontFX',
-    socket: 'center',
+    space: 'WORLD',
+    layer: 'foregroundFX',
     duration: 0.075,
     loop: false,
     radius: 12,
@@ -192,8 +190,8 @@
     id: 'sequence_melee_hit_light_01',
     duration: 170,
     cues: Object.freeze([
-      Object.freeze({ at: 0, type: 'fx', ref: 'melee_hit_glow_light_01', socket: 'center' }),
-      Object.freeze({ at: 0, type: 'fx', ref: 'melee_hit_sparks_light_01', socket: 'center' }),
+      Object.freeze({ at: 0, type: 'fx', ref: 'melee_hit_glow_light_01' }),
+      Object.freeze({ at: 0, type: 'fx', ref: 'melee_hit_sparks_light_01' }),
       Object.freeze({ at: 0, type: 'sfx', ref: 'melee_hit_light_01' }),
       Object.freeze({ at: 8, type: 'screenFx', ref: 'impact_medium' }),
       Object.freeze({ at: 8, type: 'screenFx', ref: 'flash_warm_small' })
