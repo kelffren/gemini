@@ -1,27 +1,30 @@
 /* KELO-INDEX
  * area: VISUAL
- * keys: SWORD SWAP PVP IMPACT PLANTED LOOP TELEPORT RETURN SPRITESHEET
- * hace: puente visual del PvP aislado para impacto, espada clavada, teleport y llamada/retorno usando los PNG reales en la capa projectile worldFX que sí renderiza la arena
+ * keys: SWORD SWAP PVP ACTIVATION EYE IMPACT PLANTED LOOP TELEPORT RETURN SPRITESHEET
+ * hace: puente visual del PvP aislado para activación, impacto, espada clavada, teleport y llamada/retorno usando los PNG reales en la capa projectile worldFX que sí renderiza la arena
  * online: solo consume eventos semánticos; no cambia posiciones, cooldown, daño ni autoridad
  */
 (function (root) {
   'use strict';
 
-  const VERSION = 'sword-swap-pvp-visuals-v1.2.0';
+  const VERSION = 'sword-swap-pvp-visuals-v1.3.0';
   const FRAME_W = 362;
   const FRAME_H = 724;
   const IMPACT_MS = 500;
   const TELEPORT_MS = 500;
+  const EYE_MS = 520;
 
   const IDS = Object.freeze({
-    impactAsset: 'sword_swap_pvp_impact_asset_v2',
-    loopAsset: 'sword_swap_pvp_loop_asset_v2',
-    teleportAsset: 'sword_swap_pvp_teleport_asset_v2',
-    returnAsset: 'sword_swap_pvp_return_asset_v2',
-    impactVisual: 'sword_swap_pvp_impact_visual_v2',
-    loopVisual: 'sword_swap_pvp_loop_visual_v2',
-    teleportVisual: 'sword_swap_pvp_teleport_visual_v2',
-    returnVisual: 'sword_swap_pvp_return_visual_v2',
+    eyeAsset: 'sword_swap_pvp_eye_asset_v3',
+    impactAsset: 'sword_swap_pvp_impact_asset_v3',
+    loopAsset: 'sword_swap_pvp_loop_asset_v3',
+    teleportAsset: 'sword_swap_pvp_teleport_asset_v3',
+    returnAsset: 'sword_swap_pvp_return_asset_v3',
+    eyeVisual: 'sword_swap_pvp_eye_visual_v3',
+    impactVisual: 'sword_swap_pvp_impact_visual_v3',
+    loopVisual: 'sword_swap_pvp_loop_visual_v3',
+    teleportVisual: 'sword_swap_pvp_teleport_visual_v3',
+    returnVisual: 'sword_swap_pvp_return_visual_v3',
   });
 
   const swordObjects = new Map();
@@ -34,9 +37,10 @@
   const audit = root.KELO_SWORD_SWAP_PVP_VISUAL_AUDIT = {
     ready: false,
     version: VERSION,
-    sourceAssets: ['a.PNG', 'loop.PNG', 'teleport .PNG', 'regreso2.PNG'],
+    sourceAssets: ['activation-eye-anim.PNG', 'clavandose .PNG', 'loop2.PNG', 'teleport .PNG', 'regreso2.PNG'],
     renderPath: 'KeloProjectileVisuals/worldFX',
     assetsReady: false,
+    eyePlayed: 0,
     impactPlayed: 0,
     loopPlayed: 0,
     teleportPlayed: 0,
@@ -96,14 +100,22 @@
     if (!root.KeloAssetRegistry || !root.KeloProjectileVisualRegistry) return false;
 
     const assets = [
-      { id: IDS.impactAsset, type: 'image', src: 'assets/fx/sword-swap/a.PNG', preload: true },
-      { id: IDS.loopAsset, type: 'image', src: 'assets/fx/sword-swap/loop.PNG', preload: true },
+      { id: IDS.eyeAsset, type: 'image', src: 'assets/fx/sword-swap/activation-eye-anim.PNG', preload: true },
+      { id: IDS.impactAsset, type: 'image', src: 'assets/fx/sword-swap/clavandose%20.PNG', preload: true },
+      { id: IDS.loopAsset, type: 'image', src: 'assets/fx/sword-swap/loop2.PNG', preload: true },
       { id: IDS.teleportAsset, type: 'image', src: 'assets/fx/sword-swap/teleport%20.PNG', preload: true },
       { id: IDS.returnAsset, type: 'image', src: 'assets/fx/sword-swap/regreso2.PNG', preload: true },
     ];
 
     assets.forEach(function (def) {
       if (!root.KeloAssetRegistry.get(def.id)) root.KeloAssetRegistry.register(def);
+    });
+
+    registerVisual({
+      id: IDS.eyeVisual,
+      type: 'sprite_animation', assetId: IDS.eyeAsset, layer: 'worldFX',
+      frameWidth: FRAME_W, frameHeight: FRAME_H, columns: 6, rows: 1, frames: 6, fps: 14, loop: false,
+      sourcePixelScale: 0.18, alpha: 1, alignToVelocity: false, defaultSpeed: 0, defaultMaxDistance: 1,
     });
 
     registerVisual({
@@ -116,7 +128,7 @@
     registerVisual({
       id: IDS.loopVisual,
       type: 'sprite_animation', assetId: IDS.loopAsset, layer: 'worldFX',
-      frameWidth: FRAME_W, frameHeight: FRAME_H, columns: 6, rows: 1, frames: 6, fps: 9, loop: true,
+      frameWidth: FRAME_W, frameHeight: FRAME_H, columns: 6, rows: 1, frames: 6, fps: 10, loop: true,
       sourcePixelScale: 0.40, alpha: 1, alignToVelocity: false, defaultSpeed: 0, defaultMaxDistance: 1,
     });
 
@@ -174,6 +186,17 @@
     transient.add(id);
     setTimeout(function () { anchor._keloVisualDead = true; clearTransient(id); }, Math.max(100, durationMs || TELEPORT_MS));
     return id;
+  }
+
+  function playActivationEye() {
+    const p = player();
+    const at = pointOf(p);
+    if (!at) return;
+    const eyePoint = { x: at.x, y: at.y - 42 };
+    const id = attachStaticVisual(eyePoint, IDS.eyeVisual, EYE_MS);
+    if (!id) return;
+    audit.eyePlayed += 1;
+    audit.lastPhase = 'ACTIVATION_EYE';
   }
 
   function playTeleportPair(from, to) {
@@ -234,6 +257,7 @@
     if (!key || !payload || !payload.gameplayObject) return;
     clearActive(key, false);
     swordObjects.set(key, payload.gameplayObject);
+    playActivationEye();
     audit.lastPhase = 'THROW';
     audit.lastSwordEntityId = key;
   }
