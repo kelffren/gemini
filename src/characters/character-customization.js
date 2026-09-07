@@ -7,22 +7,11 @@
 (function (root) {
   'use strict';
 
-  const VERSION = 'character-customization-v1.0.3';
+  const VERSION = 'character-customization-v1.0.4';
   const STORAGE_KEY = 'kelo_character_customization_v1';
-  const FACE_ORDER = Object.freeze({
-    down: Object.freeze(['back','body','skinTone','legs','feet','torso','gloves','armor','face','eyes','facialHair','hair','head','faceAccessory','accessory1','accessory2','weaponSecondary','weaponMain','weaponSkin','aura','characterFX']),
-    left: Object.freeze(['back','weaponSecondary','body','skinTone','legs','feet','torso','gloves','armor','face','eyes','facialHair','hair','head','faceAccessory','accessory1','accessory2','weaponMain','weaponSkin','aura','characterFX']),
-    right: Object.freeze(['back','weaponSecondary','body','skinTone','legs','feet','torso','gloves','armor','face','eyes','facialHair','hair','head','faceAccessory','accessory1','accessory2','weaponMain','weaponSkin','aura','characterFX']),
-    up: Object.freeze(['weaponMain','weaponSkin','weaponSecondary','back','body','skinTone','legs','feet','torso','gloves','armor','face','eyes','facialHair','hair','head','faceAccessory','accessory1','accessory2','aura','characterFX'])
-  });
-  const SLOT_GROUPS = Object.freeze({
-    appearance: Object.freeze(['body','skinTone','face','eyes','hair','facialHair']),
-    clothing: Object.freeze(['torso','legs','feet','gloves']),
-    equipment: Object.freeze(['head','faceAccessory','armor','back','weaponMain','weaponSecondary','accessory1','accessory2']),
-    cosmetics: Object.freeze(['aura','weaponSkin','characterFX'])
-  });
-  const ALL_SLOTS = Object.freeze(Array.from(new Set(Object.keys(SLOT_GROUPS).reduce(function (all, key) { return all.concat(SLOT_GROUPS[key]); }, []))));
-  const GAMEPLAY_TO_VISUAL = Object.freeze({ weapon:'weaponMain', helmet:'head', chest:'armor', gloves:'gloves', boots:'feet', accessory:'accessory1' });
+  const Schema = root.KeloCharacterSlotSchema;
+  if (!Schema) throw new Error('CHARACTER_SLOT_SCHEMA_NOT_LOADED');
+  const ALL_SLOTS = Schema.slots;
   const imageCache = new Map();
   const catalog = new Map();
   const outfits = new Map();
@@ -51,6 +40,7 @@
     sharedAnimationState: true,
     actionTransformShared: true,
     independentEquipmentLayers: true,
+    sharedSlotSchema: true,
     sharedVisualStack: true,
     outfitEquipmentIndependence: true,
     upFacingWeaponOcclusion: true,
@@ -144,7 +134,7 @@
     return Object.freeze(out);
   }
   function registerItem(def) {
-    if (!def || !def.id || !def.slot || ALL_SLOTS.indexOf(String(def.slot)) < 0) throw new Error('INVALID_CHARACTER_ITEM');
+    if (!def || !def.id || !def.slot || !Schema.isSlot(def.slot)) throw new Error('INVALID_CHARACTER_ITEM');
     const id = String(def.id), slot = String(def.slot);
     const item = Object.freeze({
       id:id, slot:slot, name:String(def.name || id), group:String(def.group || groupOf(slot)), rarity:String(def.rarity || 'Normal'),
@@ -155,21 +145,18 @@
   }
   function registerOutfit(def) {
     if (!def || !def.id) throw new Error('INVALID_OUTFIT');
-    const sparse = {}; Object.keys(def.slots || {}).forEach(function (slot) { if (ALL_SLOTS.indexOf(slot) >= 0) sparse[slot] = def.slots[slot]; });
+    const sparse = {}; Object.keys(def.slots || {}).forEach(function (slot) { if (Schema.isSlot(slot)) sparse[slot] = def.slots[slot]; });
     const item = Object.freeze({ id:String(def.id), name:String(def.name || def.id), slots:Object.freeze(sparse), preview:def.preview || null, locked:def.locked === true });
     outfits.set(item.id, item); audit.registeredOutfits = outfits.size; return item;
   }
-  function groupOf(slot) {
-    const s = String(slot || '');
-    return Object.keys(SLOT_GROUPS).find(function (g) { return SLOT_GROUPS[g].indexOf(s) >= 0; }) || 'equipment';
-  }
+  function groupOf(slot) { return Schema.groupOf(slot) || 'equipment'; }
   function getItem(id) { return id == null ? null : catalog.get(String(id)) || null; }
   function listItems(slot) { return Array.from(catalog.values()).filter(function (item) { return !item.hidden && (!slot || item.slot === slot); }); }
   function listOutfits() { return Array.from(outfits.values()); }
 
   function select(slot, itemId, options) {
     slot = String(slot || '');
-    if (ALL_SLOTS.indexOf(slot) < 0) return { ok:false, error:'INVALID_SLOT' };
+    if (!Schema.isSlot(slot)) return { ok:false, error:'INVALID_SLOT' };
     if (itemId != null) {
       const item = getItem(itemId);
       if (!item) return { ok:false, error:'ITEM_NOT_REGISTERED' };
@@ -189,7 +176,7 @@
     const outfit = outfits.get(String(id || ''));
     if (!outfit) return { ok:false, error:'OUTFIT_NOT_FOUND' };
     if (outfit.locked) return { ok:false, error:'OUTFIT_LOCKED' };
-    Object.keys(outfit.slots).forEach(function (slot) { if (ALL_SLOTS.indexOf(slot) >= 0) state.slots[slot] = outfit.slots[slot]; });
+    Object.keys(outfit.slots).forEach(function (slot) { if (Schema.isSlot(slot)) state.slots[slot] = outfit.slots[slot]; });
     state.outfitId = outfit.id;
     emitChange('outfit', { outfitId:outfit.id });
     return { ok:true, outfitId:outfit.id, state:snapshot() };
@@ -211,7 +198,7 @@
     try { items = root.KeloEquipment.getEquipped() || []; } catch (e) { return 0; }
     items.forEach(function (eq) {
       if (!eq || !eq.slot) return;
-      const visualSlot = GAMEPLAY_TO_VISUAL[eq.slot];
+      const visualSlot = Schema.visualSlotForGameplay(eq.slot);
       if (!visualSlot) return;
       const registered = Array.from(catalog.values()).find(function (item) { return item.gameplayItemId === String(eq.id || eq.templateId || ''); });
       if (registered && state.slots[visualSlot] !== registered.id) { state.slots[visualSlot] = registered.id; changed += 1; }
@@ -237,7 +224,7 @@
     imageCache.set(source, rt);
     return rt;
   }
-  function faceOf(actor) { return actor && actor._face || actor && actor._visualMotion && actor._visualMotion.face || 'down'; }
+  function faceOf(actor) { return Schema.normalizeFace(actor && actor._face || actor && actor._visualMotion && actor._visualMotion.face || 'down'); }
   function frameOf(actor, columns) {
     const visual = actor && actor._visualMotion;
     if (visual && Number.isFinite(Number(visual.frame))) return Math.abs(Math.floor(Number(visual.frame))) % columns;
@@ -320,7 +307,7 @@
   }
 
   root.KeloCharacterCustomization = Object.freeze({
-    version:VERSION, slots:ALL_SLOTS.slice(), slotGroups:SLOT_GROUPS, gameplaySlotMap:GAMEPLAY_TO_VISUAL, faceOrder:FACE_ORDER,
+    version:VERSION, slots:ALL_SLOTS.slice(), slotGroups:Schema.slotGroups, gameplaySlotMap:Schema.gameplayToVisual, faceOrder:Schema.faceOrder,
     getState:function(){return snapshot();}, refreshFromState:refreshFromState, getItem:getItem, listItems:listItems, registerItem:registerItem,
     listOutfits:listOutfits, registerOutfit:registerOutfit, select:select, clear:function(slot){return select(slot,null);}, applyOutfit:applyOutfit,
     reset:reset, setMode:setMode, stateForActor:function(actor){return snapshot(stateForActor(actor));}, networkSnapshot:networkSnapshot,
