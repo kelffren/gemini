@@ -1,8 +1,10 @@
 (function () {
   const CLOSE_ID = 'kelo-profile-close';
   const CUSTOMIZATION_SCRIPTS = [
-    'src/characters/character-customization.js?v=1',
-    'src/ui/character-customizer-ui.js?v=1'
+    'src/characters/character-customization.js?v=2',
+    'src/characters/character-demo-kit.js?v=1',
+    'src/ui/character-customizer-ui.js?v=2',
+    'src/ui/character-customizer-preview.js?v=1'
   ];
 
   function closeProfilePanel() {
@@ -109,7 +111,7 @@
   else boot();
 
   window.KELO_PROFILE_CLOSE_AUDIT = Object.freeze({
-    version: 'profile-close-v1.1.0',
+    version: 'profile-close-v1.2.0',
     closeButtonId: CLOSE_ID,
     minTouchTargetPx: 44,
     tapClose: true,
