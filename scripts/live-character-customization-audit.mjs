@@ -45,19 +45,37 @@ try {
     const equipped = A.getState();
     if (!outfit.ok || !helmet.ok || !sword.ok) throw new Error('DEMO_EQUIP_FAILED');
     if (equipped.slots.body !== bodyBefore) throw new Error('BODY_CHANGED_WHEN_EQUIPPING_DEMO_KIT');
+    if (equipped.outfitId !== 'outfit_kelo_vanguard') throw new Error('OUTFIT_ID_LOST_WHEN_EQUIPPING_INDEPENDENT_GEAR');
     if (equipped.slots.torso !== 'torso_kelo_vanguard' || equipped.slots.legs !== 'legs_kelo_vanguard' || equipped.slots.feet !== 'feet_kelo_vanguard') throw new Error('OUTFIT_NOT_MODULAR');
     if (equipped.slots.head !== 'head_vanguard_crown' || equipped.slots.weaponMain !== 'weapon_solar_saber') throw new Error('FIRST_LOADOUT_FAILED');
     const net = A.networkSnapshot();
     if (net.schema !== 'kelo-character-visual-v1') throw new Error('NETWORK_SCHEMA_MISSING');
+    if (net.outfitId !== 'outfit_kelo_vanguard') throw new Error('NETWORK_OUTFIT_ID_MISSING');
     if (net.slots.head !== 'head_vanguard_crown' || net.slots.weaponMain !== 'weapon_solar_saber') throw new Error('NETWORK_VISUAL_IDS_MISSING');
 
-    const actor = { id:'__character_kit_melee_audit', x:120, y:120, radius:20, _face:'down' };
+    const actor = {
+      id:'__character_kit_melee_audit', x:-1000, y:-1000, radius:20, _face:'down',
+      _visualMotion:{ on:true, frame:2, face:'down' }
+    };
+    A.applyRemote(actor, net);
+    if (typeof window.renderAvatar !== 'function' || !window.renderAvatar.__keloModularCustomization) throw new Error('MODULAR_RENDERER_NOT_INSTALLED');
+    const drawsBefore = window.KELO_CHARACTER_CUSTOMIZATION_AUDIT.draws;
+    window.renderAvatar(actor, false);
+    await new Promise(resolve => setTimeout(resolve, 350));
+    window.renderAvatar(actor, false);
+    const walkDraws = window.KELO_CHARACTER_CUSTOMIZATION_AUDIT.draws - drawsBefore;
+    if (walkDraws < 5) throw new Error('MODULAR_WALK_RENDER_DID_NOT_DRAW_ALL_SELECTED_LAYERS_' + walkDraws);
+
     const clipId = window.KELO_MELEE_VISUAL_MANIFEST?.attackClips?.down;
     if (!clipId || !window.KeloAnimation) throw new Error('MELEE_ANIMATION_UNAVAILABLE');
     const animationId = window.KeloAnimation.play(actor, clipId, { force:true });
     window.KeloAnimation.update(0.15);
     const transform = window.KeloAnimation.sampleTransform(actor);
     if (!animationId || !transform || transform.clipId !== clipId) throw new Error('MELEE_SHARED_TRANSFORM_FAILED');
+    const attackDrawsBefore = window.KELO_CHARACTER_CUSTOMIZATION_AUDIT.draws;
+    window.renderAvatar(actor, false);
+    const attackDraws = window.KELO_CHARACTER_CUSTOMIZATION_AUDIT.draws - attackDrawsBefore;
+    if (attackDraws < 5) throw new Error('MODULAR_ATTACK_RENDER_DID_NOT_DRAW_SELECTED_LAYERS_' + attackDraws);
 
     return {
       slots:A.slots.slice(),
@@ -65,6 +83,7 @@ try {
       networkSchema:net.schema,
       assetResults,
       firstLoadout:{ outfit:equipped.outfitId, head:equipped.slots.head, weaponMain:equipped.slots.weaponMain },
+      gameplayRender:{ walkDraws, attackDraws, movingFrame:actor._visualMotion.frame },
       meleeTransform:{ clipId:transform.clipId, rotation:transform.rotation, offsetX:transform.offsetX, offsetY:transform.offsetY },
       audit:window.KELO_CHARACTER_CUSTOMIZATION_AUDIT,
       kitAudit:kit
@@ -98,13 +117,27 @@ try {
     const after = A.getState();
     if (!h.ok || !w.ok) throw new Error('SECOND_LOADOUT_FAILED');
     if (after.slots.body !== bodyBefore) throw new Error('BODY_CHANGED_ON_SWAP');
-    return { bodyBefore, bodyAfter:after.slots.body, head:after.slots.head, weaponMain:after.slots.weaponMain, revision:after.revision };
+    if (after.outfitId !== 'outfit_kelo_vanguard') throw new Error('OUTFIT_ID_LOST_ON_EQUIPMENT_SWAP');
+    return { bodyBefore, bodyAfter:after.slots.body, outfitId:after.outfitId, head:after.slots.head, weaponMain:after.slots.weaponMain, revision:after.revision };
   });
   await waitPreviewItem('head_night_visor');
   await waitPreviewItem('weapon_onyx_katana');
   const secondLayerCount = await modal.locator('.kc-kit-layer').count();
   if (secondLayerCount !== 5) throw new Error('EXPECTED_5_PREVIEW_LAYERS_SECOND_' + secondLayerCount);
   await page.screenshot({ path:path.join(outDir, 'character-customizer-vanguard-night-onyx.png'), fullPage:true });
+
+  const removal = await page.evaluate(() => {
+    const A = window.KeloCharacterCustomization;
+    const bodyBefore = A.getState().slots.body;
+    const clearHead = A.clear('head');
+    const clearWeapon = A.clear('weaponMain');
+    const after = A.getState();
+    if (!clearHead.ok || !clearWeapon.ok) throw new Error('CLEAR_GEAR_FAILED');
+    if (after.slots.head !== null || after.slots.weaponMain !== null) throw new Error('GEAR_NOT_REMOVED');
+    if (after.slots.body !== bodyBefore) throw new Error('BODY_CHANGED_ON_REMOVE');
+    if (after.outfitId !== 'outfit_kelo_vanguard') throw new Error('OUTFIT_ID_LOST_ON_REMOVE');
+    return { bodyBefore, bodyAfter:after.slots.body, outfitId:after.outfitId, head:after.slots.head, weaponMain:after.slots.weaponMain, revision:after.revision };
+  });
 
   await modal.locator('[data-kc-tab="equipment"]').click();
   await page.waitForTimeout(100);
@@ -119,13 +152,14 @@ try {
     viewport:{ width:390, height:844 },
     baseline,
     swap,
+    removal,
     previewLayers:{ first:firstLayerCount, second:secondLayerCount },
     tabs:['appearance','outfits','equipment','cosmetics'],
     equipmentLabels:labels,
     pageErrors
   };
   await fs.writeFile(path.join(outDir, 'report.json'), JSON.stringify(report, null, 2));
-  console.log('CHARACTER_CUSTOMIZATION_LIVE_OK', JSON.stringify({ pieces:7, previewLayers:secondLayerCount, assets:baseline.assetResults.length, errors:pageErrors.length }));
+  console.log('CHARACTER_CUSTOMIZATION_LIVE_OK', JSON.stringify({ pieces:7, previewLayers:secondLayerCount, walkDraws:baseline.gameplayRender.walkDraws, attackDraws:baseline.gameplayRender.attackDraws, assets:baseline.assetResults.length, errors:pageErrors.length }));
 } catch (error) {
   await page.screenshot({ path:path.join(outDir, 'character-customizer-failure.png'), fullPage:true }).catch(() => {});
   await fs.writeFile(path.join(outDir, 'report.json'), JSON.stringify({ ok:false, url, error:String(error?.stack || error), pageErrors }, null, 2));
