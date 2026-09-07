@@ -194,7 +194,12 @@
   function castWall(request, owner, def) {
     const p = request.position || owner;
     const width = def.delivery.width || 150;
-    const wall = { x: p.x - width / 2, y: p.y - 12, w: width, h: 24, hp: def.delivery.hp || 250, time: def.delivery.duration || 4 };
+    const wall = {
+      x: p.x - width / 2, y: p.y - 12, w: width, h: 24,
+      hp: def.delivery.hp || 250, time: def.delivery.duration || 4,
+      blocksMovement: def.delivery.blocksMovement !== false,
+      blocksProjectiles: def.delivery.blocksProjectiles !== false,
+    };
     fx.walls.push(wall);
     if (typeof obstacles !== 'undefined') obstacles.push(wall);
   }
@@ -216,6 +221,20 @@
     });
   }
 
+  const deliveryHandlers = Object.freeze({
+    projectile: (request, owner, def) => castProjectile(request, owner, def),
+    self_aoe: (request, owner, def) => castSelfAoe(owner, def),
+    chain: (request, owner, def) => castChain(owner, def),
+    dash: (request, owner, def) => castDash(request, owner, def),
+    blink: (request, owner, def) => castBlink(request, owner, def),
+    instant: (request, owner, def) => applyEffects(def, owner, owner, false),
+    persistent_area: (request, owner, def) => castArea(request, owner, def),
+    wall: (request, owner, def) => castWall(request, owner, def),
+    trap: (request, owner, def) => castTrap(request, owner, def),
+    aura: (request, owner, def) => castAura(owner, def),
+  });
+  const pendingDeliveryTypes = Object.freeze(['swap_sword']);
+
   function cast(request) {
     const slot = Number(request && request.slotIndex);
     if (!Number.isInteger(slot) || slot < 0 || slot >= hotbar.slots.length) return { valid: false, reason: 'INVALID_SLOT' };
@@ -227,6 +246,14 @@
       return validation;
     }
 
+    const type = def.delivery.type;
+    const handler = deliveryHandlers[type];
+    if (!handler) {
+      const failed = { valid: false, reason: 'UNSUPPORTED_DELIVERY', deliveryType: type };
+      emit('ABILITY_FAILED', { request, reason: failed.reason, deliveryType: type });
+      return failed;
+    }
+
     localPlayer.mana -= def.resource.cost || 0;
     instance.cooldown = def.cooldown;
     emit('ABILITY_CAST', {
@@ -235,22 +262,15 @@
       clientSequence: sequence++, loadoutFingerprint: fingerprint,
     });
 
-    const type = def.delivery.type;
-    if (type === 'projectile') castProjectile(request, localPlayer, def);
-    else if (type === 'self_aoe') castSelfAoe(localPlayer, def);
-    else if (type === 'chain') castChain(localPlayer, def);
-    else if (type === 'dash') castDash(request, localPlayer, def);
-    else if (type === 'blink') castBlink(request, localPlayer, def);
-    else if (type === 'instant') applyEffects(def, localPlayer, localPlayer, false);
-    else if (type === 'persistent_area') castArea(request, localPlayer, def);
-    else if (type === 'wall') castWall(request, localPlayer, def);
-    else if (type === 'trap') castTrap(request, localPlayer, def);
-    else if (type === 'aura') castAura(localPlayer, def);
-    else return { valid: false, reason: 'UNSUPPORTED_DELIVERY' };
+    handler(request || {}, localPlayer, def);
     return { valid: true, abilityId: def.id, stoneUid: instance.stoneUid };
   }
 
-  const engine = Object.freeze({ cast });
+  const engine = Object.freeze({
+    cast,
+    getSupportedDeliveryTypes: () => Object.keys(deliveryHandlers),
+    getPendingDeliveryTypes: () => pendingDeliveryTypes.slice(),
+  });
 
   function syncFromState(force) {
     if (typeof STATE === 'undefined') return;
@@ -298,8 +318,24 @@
         const dash = localPlayer._dash;
         dash.time -= dt;
         const k = 1 - Math.max(0, dash.time) / dash.max;
-        localPlayer.x = dash.sx + (dash.tx - dash.sx) * Math.min(1, k);
-        localPlayer.y = dash.sy + (dash.ty - dash.sy) * Math.min(1, k);
+        let nextX = dash.sx + (dash.tx - dash.sx) * Math.min(1, k);
+        let nextY = dash.sy + (dash.ty - dash.sy) * Math.min(1, k);
+        if (window.KELO_COLLISION && typeof obstacles !== 'undefined') {
+          let hitT = null;
+          for (const box of obstacles) {
+            if (!box || box.blocksMovement === false) continue;
+            const t = window.KELO_COLLISION.segmentAabbHitT(dash.sx, dash.sy, nextX, nextY, box, localPlayer.radius || 20);
+            if (t != null && (hitT == null || t < hitT)) hitT = t;
+          }
+          if (hitT != null) {
+            const safeT = Math.max(0, hitT - 1e-4);
+            nextX = dash.sx + (nextX - dash.sx) * safeT;
+            nextY = dash.sy + (nextY - dash.sy) * safeT;
+            dash.time = 0;
+          }
+        }
+        localPlayer.x = nextX;
+        localPlayer.y = nextY;
         if (dash.time <= 0) localPlayer._dash = null;
       }
     }
@@ -307,11 +343,16 @@
     for (let i = fx.projectiles.length - 1; i >= 0; i--) {
       const p = fx.projectiles[i];
       const step = Math.hypot(p.vx, p.vy) * dt;
+      const oldX = p.x, oldY = p.y;
       p.x += p.vx * dt; p.y += p.vy * dt; p.traveled += step;
       let hit = enemies(p.owner).find((enemy) => distance(p, enemy) < p.radius + (enemy.radius || 16));
-      if (typeof obstacles !== 'undefined' && obstacles.some((wall) => p.x > wall.x && p.x < wall.x + wall.w && p.y > wall.y && p.y < wall.y + wall.h)) hit = hit || false;
+      let blocked = false;
+      if (window.KELO_COLLISION && typeof obstacles !== 'undefined') {
+        blocked = obstacles.some((wall) => wall && wall.blocksProjectiles !== false &&
+          window.KELO_COLLISION.segmentAabbHitT(oldX, oldY, p.x, p.y, wall, p.radius || 0) != null);
+      }
       if (hit) applyEffects(p.def, p.owner, hit, false);
-      if (hit !== undefined || p.traveled >= p.maxDistance) fx.projectiles.splice(i, 1);
+      if (blocked || hit !== undefined || p.traveled >= p.maxDistance) fx.projectiles.splice(i, 1);
     }
 
     for (let i = fx.areas.length - 1; i >= 0; i--) {

@@ -136,12 +136,8 @@ function processInput(){
   } else { input.normX=0; input.normY=0; }
 }
 function resolveCircleAABB(cx,cy,r,box){
-  const closestX=Math.max(box.x, Math.min(cx, box.x+box.w));
-  const closestY=Math.max(box.y, Math.min(cy, box.y+box.h));
-  const distX=cx-closestX, distY=cy-closestY, distSq=distX*distX+distY*distY;
-  if (distSq < r*r && distSq>0) { const dist=Math.sqrt(distSq), overlap=r-dist; return {collided:true, pushX:(distX/dist)*overlap, pushY:(distY/dist)*overlap}; }
-  if (distSq===0) return {collided:true, pushX:0, pushY:-r};
-  return {collided:false, pushX:0, pushY:0};
+  if (!window.KELO_COLLISION) throw new Error('KELO_COLLISION unavailable');
+  return window.KELO_COLLISION.resolveCircleAABB(cx,cy,r,box);
 }
 function updateMovement(dt){
   const targetVx=input.normX*CONFIG.speed, targetVy=input.normY*CONFIG.speed;
@@ -155,9 +151,9 @@ function updateMovement(dt){
   localPlayer.squashX+=(1+(currentSpeed/CONFIG.speed)*0.08-localPlayer.squashX)*(1-Math.exp(-15*dt));
   localPlayer.squashY+=(1-(currentSpeed/CONFIG.speed)*0.06-localPlayer.squashY)*(1-Math.exp(-15*dt));
   localPlayer.x+=localPlayer.vx*dt;
-  for (const b of obstacles) { const res=resolveCircleAABB(localPlayer.x,localPlayer.y,localPlayer.radius,b); if(res.collided) localPlayer.x+=res.pushX; }
+  for (const b of obstacles) { if (!b || b.blocksMovement === false) continue; const res=resolveCircleAABB(localPlayer.x,localPlayer.y,localPlayer.radius,b); if(res.collided) localPlayer.x+=res.pushX; }
   localPlayer.y+=localPlayer.vy*dt;
-  for (const b of obstacles) { const res=resolveCircleAABB(localPlayer.x,localPlayer.y,localPlayer.radius,b); if(res.collided) localPlayer.y+=res.pushY; }
+  for (const b of obstacles) { if (!b || b.blocksMovement === false) continue; const res=resolveCircleAABB(localPlayer.x,localPlayer.y,localPlayer.radius,b); if(res.collided) localPlayer.y+=res.pushY; }
   localPlayer.x=Math.max(localPlayer.radius, Math.min(CONFIG.worldWidth-localPlayer.radius, localPlayer.x));
   localPlayer.y=Math.max(localPlayer.radius, Math.min(CONFIG.worldHeight-localPlayer.radius, localPlayer.y));
 }
