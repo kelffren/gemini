@@ -22,6 +22,10 @@ assert(core.includes('KeloAnchors.presentation'),'layers use shared avatar prese
 assert(ui.includes("['appearance','outfits','equipment','cosmetics']")||ui.includes("['appearance','APARIENCIA']"),'UI exposes appearance, outfits, equipment and cosmetics');
 assert(ui.includes("String(tool)==='profile'"),'Personaje menu route opens customizer');
 assert(ui.includes('.ksi-profile'),'self profile button is bridged to customizer');
-assert(profile.includes('character-customization.js?v=1')&&profile.includes('character-customizer-ui.js?v=1'),'profile bootstrap loads customization modules');
+const coreAt=profile.indexOf('character-customization.js');
+const kitAt=profile.indexOf('character-demo-kit.js');
+const uiAt=profile.indexOf('character-customizer-ui.js');
+const previewAt=profile.indexOf('character-customizer-preview.js');
+assert(coreAt>=0&&coreAt<kitAt&&kitAt<uiAt&&uiAt<previewAt,'profile bootstrap loads core -> modular content -> UI -> preview');
 assert(core.includes('localStorage')&&core.includes('characterCustomization'),'state persists with STATE plus local fallback');
 if(process.exitCode){console.error('\nCharacter customization audit FAILED');process.exit(process.exitCode);}else console.log('\nCharacter customization audit OK');
