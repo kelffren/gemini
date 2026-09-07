@@ -33,10 +33,11 @@ jobs:
         run: |
           npm install --no-audit --no-fund
           npx playwright test tests/stone-system.spec.js
-      - name: Commit verified patch to feature branch
+      - name: Commit verified runtime patch to feature branch
         run: |
           git config user.name "Kelo Backlog Bot"
           git config user.email "actions@users.noreply.github.com"
-          git add index.html engine-a.js engine-c.js src/physics/collision-utils.js src/abilities/kelo-ability-boot.js tests/stone-system.spec.js scripts/validate-ability-runtime-contract.mjs scripts/validate-collision-contract.mjs .github/workflows/ci.yml
+          git checkout -- .github/workflows/ci.yml
+          git add index.html engine-a.js engine-c.js src/physics/collision-utils.js src/abilities/kelo-ability-boot.js tests/stone-system.spec.js scripts/validate-ability-runtime-contract.mjs scripts/validate-collision-contract.mjs
           git commit -m "Harden ability and collision contracts [backlog-applied]"
           git push origin HEAD:kelo/backlog-hardening-20260907
