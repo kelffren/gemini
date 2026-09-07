@@ -5,17 +5,25 @@ on:
     branches: [main]
     paths:
       - 'src/characters/character-customization.js'
+      - 'src/characters/character-demo-kit.js'
+      - 'src/characters/customization-assets/**'
       - 'src/ui/character-customizer-ui.js'
+      - 'src/ui/character-customizer-preview.js'
       - 'src/ui/profile-panel-close.js'
       - 'scripts/character-customization-audit.js'
+      - 'scripts/character-customization-kit-audit.js'
       - 'package.json'
       - '.github/workflows/character-customization-ci.yml'
   pull_request:
     paths:
       - 'src/characters/character-customization.js'
+      - 'src/characters/character-demo-kit.js'
+      - 'src/characters/customization-assets/**'
       - 'src/ui/character-customizer-ui.js'
+      - 'src/ui/character-customizer-preview.js'
       - 'src/ui/profile-panel-close.js'
       - 'scripts/character-customization-audit.js'
+      - 'scripts/character-customization-kit-audit.js'
       - 'package.json'
 
 jobs:
@@ -28,3 +36,5 @@ jobs:
           node-version: '20'
       - name: Audit modular character contract
         run: npm run audit:character
+      - name: Audit first modular content kit
+        run: node scripts/character-customization-kit-audit.js
