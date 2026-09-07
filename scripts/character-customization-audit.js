@@ -1,0 +1,24 @@
+'use strict';
+const fs=require('fs');
+function read(p){return fs.readFileSync(p,'utf8');}
+function assert(ok,msg){if(!ok){console.error('FAIL:',msg);process.exitCode=1;}else console.log('PASS:',msg);}
+const core=read('src/characters/character-customization.js');
+const ui=read('src/ui/character-customizer-ui.js');
+const profile=read('src/ui/profile-panel-close.js');
+const expected=['body','skinTone','face','eyes','hair','facialHair','torso','legs','feet','gloves','head','faceAccessory','armor','back','weaponMain','weaponSecondary','accessory1','accessory2','aura','weaponSkin','characterFX'];
+expected.forEach(s=>assert(core.includes("'"+s+"'")||core.includes(s+":"),'slot '+s+' declared'));
+assert(core.includes("mode: 'modular'")||core.includes("mode:'modular'"),'modular mode is default');
+assert(core.includes('fullBodyOverride'),'full body override remains an explicit exception');
+assert(core.includes('GAMEPLAY_TO_VISUAL'),'gameplay equipment maps to visual slots without replacing gameplay system');
+assert(core.includes('networkSnapshot'),'network snapshot API exists');
+assert(core.includes("schema:'kelo-character-visual-v1'"),'network payload has visual-only schema');
+assert(!/\.hp\s*=|\.damage\s*=|basicCooldown\s*=/.test(core),'customization does not mutate hp, damage or combat cooldown');
+assert(core.includes("drawSection(ctx, actor, 'back')")&&core.includes("drawSection(ctx, actor, 'front')"),'renderer composes back and front layers around base avatar');
+assert(core.includes('KeloAnchors.get'),'equipment can attach to semantic sockets');
+assert(core.includes('KeloAnchors.presentation'),'layers use shared avatar presentation');
+assert(ui.includes("['appearance','outfits','equipment','cosmetics']")||ui.includes("['appearance','APARIENCIA']"),'UI exposes appearance, outfits, equipment and cosmetics');
+assert(ui.includes("String(tool)==='profile'"),'Personaje menu route opens customizer');
+assert(ui.includes('.ksi-profile'),'self profile button is bridged to customizer');
+assert(profile.includes('character-customization.js?v=1')&&profile.includes('character-customizer-ui.js?v=1'),'profile bootstrap loads customization modules');
+assert(core.includes('localStorage')&&core.includes('characterCustomization'),'state persists with STATE plus local fallback');
+if(process.exitCode){console.error('\nCharacter customization audit FAILED');process.exit(process.exitCode);}else console.log('\nCharacter customization audit OK');
