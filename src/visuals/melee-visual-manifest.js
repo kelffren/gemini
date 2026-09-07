@@ -7,7 +7,7 @@
 (function (root) {
   'use strict';
 
-  const VERSION = 'melee-visual-manifest-v1.1.2';
+  const VERSION = 'melee-visual-manifest-v1.1.3';
   const IMPACT_AT_MS = 150;
   const ATTACK_DURATION = 0.33;
   const REACTION_DURATION = 0.11;
@@ -54,7 +54,7 @@
     registerSafe(assetRegistry, {
       id: assetId,
       type: 'image',
-      src: 'assets/fx/melee/sword-light-slash-' + face + '.svg',
+      src: 'src/visuals/melee-assets/sword-light-slash-' + face + '.svg',
       preload: true
     });
     registerSafe(fxRegistry, {
