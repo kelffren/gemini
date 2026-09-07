@@ -103,21 +103,21 @@
       defaultSpeed: 420, defaultMaxDistance: 500
     }),
     sword_swap_katana_throw_visual: Object.freeze({
-    id: 'sword_swap_katana_throw_visual', type: 'sprite_animation',
-    assetId: 'sword_swap_katana_throw_asset', layer: 'worldFX',
-    frames: 6, fps: 12, loop: true,
-    frameRects: Object.freeze([
-      Object.freeze({ x: 16, y: 299, width: 290, height: 119 }),
-      Object.freeze({ x: 333, y: 299, width: 302, height: 123 }),
-      Object.freeze({ x: 661, y: 277, width: 321, height: 159 }),
-      Object.freeze({ x: 997, y: 273, width: 365, height: 190 }),
-      Object.freeze({ x: 1373, y: 271, width: 385, height: 188 }),
-      Object.freeze({ x: 1768, y: 248, width: 394, height: 260 })
-    ]),
-    sourcePixelScale: 0.348, width: 140, height: 94,
-    alpha: 1, alignToVelocity: true, rotationOffset: 0,
-    defaultSpeed: 720, defaultMaxDistance: 420
-  })
+      id: 'sword_swap_katana_throw_visual', type: 'sprite_animation',
+      assetId: 'sword_swap_katana_throw_asset', layer: 'worldFX',
+      frames: 6, fps: 12, loop: true,
+      frameRects: Object.freeze([
+        Object.freeze({ x: 16, y: 299, width: 290, height: 119 }),
+        Object.freeze({ x: 333, y: 299, width: 302, height: 123 }),
+        Object.freeze({ x: 661, y: 277, width: 321, height: 159 }),
+        Object.freeze({ x: 997, y: 273, width: 365, height: 190 }),
+        Object.freeze({ x: 1373, y: 271, width: 385, height: 188 }),
+        Object.freeze({ x: 1768, y: 248, width: 394, height: 260 })
+      ]),
+      sourcePixelScale: 0.348, width: 140, height: 94,
+      alpha: 1, alignToVelocity: true, rotationOffset: 0,
+      defaultSpeed: 720, defaultMaxDistance: 420
+    })
   });
 
   const SFX = Object.freeze({
@@ -133,7 +133,9 @@
 
   const SCREEN_FX = Object.freeze({
     impact_medium: Object.freeze({ id: 'impact_medium', type: 'shake', duration: 0.16, amplitude: 3.5 }),
-    flash_warm_small: Object.freeze({ id: 'flash_warm_small', type: 'flash', duration: 0.10, alpha: 0.08, color: '#ffd7a1' })
+    flash_warm_small: Object.freeze({ id: 'flash_warm_small', type: 'flash', duration: 0.10, alpha: 0.08, color: '#ffd7a1' }),
+    impact_melee_light: Object.freeze({ id: 'impact_melee_light', type: 'shake', duration: 0.075, amplitude: 1.65 }),
+    flash_melee_light: Object.freeze({ id: 'flash_melee_light', type: 'flash', duration: 0.055, alpha: 0.025, color: '#fff1c4' })
   });
 
   const SEQUENCES = Object.freeze({
@@ -196,7 +198,7 @@
   });
 
   root.KELO_VISUAL_MANIFESTS = Object.freeze({
-    version: 'visual-manifests-v1.3.1',
+    version: 'visual-manifests-v1.3.2',
     assets: ASSETS,
     animationClips: ANIMATION_CLIPS,
     fx: FX,
