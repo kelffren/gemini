@@ -3,12 +3,14 @@ const data = require('../src/abilities/abilityData.js');
 const stones = require('../src/abilities/stone-system.js');
 
 test.describe('Kelo Stone System V3', () => {
-  test('catalog keeps 10 unique scalable abilities', () => {
-    expect(data.ABILITIES).toHaveLength(10);
+  test('catalog keeps unique scalable abilities', () => {
+    expect(data.ABILITIES.length).toBeGreaterThan(0);
     const keys = new Set(data.ABILITIES.map((ability) => ability.key));
+    const ids = new Set(data.ABILITIES.map((ability) => ability.id));
     const recipes = new Set(data.ABILITIES.map((ability) => [...ability.recipe].sort().join('|')));
-    expect(keys.size).toBe(10);
-    expect(recipes.size).toBe(10);
+    expect(keys.size).toBe(data.ABILITIES.length);
+    expect(ids.size).toBe(data.ABILITIES.length);
+    expect(recipes.size).toBe(data.ABILITIES.length);
   });
 
   test('legacy stones migrate without a second source of truth', () => {

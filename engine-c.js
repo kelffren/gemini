@@ -149,8 +149,6 @@ render = function() {
     if (typeof window.renderFarm === 'function') window.renderFarm(STATE.farm);
     renderPlot(STATE.plot, true);
     renderArena(arenaPvP);
-  } else if (Array.isArray(obstacles) && obstacles.length) {
-    obstacles.length = 0;
   }
   for (const pt of particles) { ctx.fillStyle = pt.color; ctx.globalAlpha = pt.life / pt.maxLife; ctx.beginPath(); ctx.arc(pt.x, pt.y, pt.size * (pt.life / pt.maxLife), 0, Math.PI * 2); ctx.fill(); }
   ctx.globalAlpha = 1;
