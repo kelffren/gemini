@@ -8,6 +8,7 @@ on:
       - 'src/visuals/visual-manifests.js'
       - 'src/visuals/melee-visual-manifest.js'
       - 'src/visuals/melee-combat-visuals.js'
+      - 'src/visuals/melee-assets/**'
       - 'assets/fx/melee/**'
       - 'scripts/live-melee-visual-audit.mjs'
       - '.github/workflows/live-melee-visual-audit.yml'
