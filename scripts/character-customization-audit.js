@@ -2,6 +2,7 @@
 const fs=require('fs');
 function read(p){return fs.readFileSync(p,'utf8');}
 function assert(ok,msg){if(!ok){console.error('FAIL:',msg);process.exitCode=1;}else console.log('PASS:',msg);}
+const schema=read('src/characters/character-slot-schema.js');
 const core=read('src/characters/character-customization.js');
 const presets=read('src/characters/character-visual-presets.js');
 const packs=read('src/characters/character-content-packs.js');
@@ -10,12 +11,17 @@ const preview=read('src/ui/character-customizer-preview.js');
 const ui=read('src/ui/character-customizer-ui.js');
 const profile=read('src/ui/profile-panel-close.js');
 const expected=['body','skinTone','face','eyes','hair','facialHair','torso','legs','feet','gloves','head','faceAccessory','armor','back','weaponMain','weaponSecondary','accessory1','accessory2','aura','weaponSkin','characterFX'];
-expected.forEach(s=>assert(core.includes("'"+s+"'")||core.includes(s+":"),'slot '+s+' declared'));
-const faceOrderBlock=(core.match(/const FACE_ORDER[\s\S]*?const SLOT_GROUPS/)||[''])[0];
-expected.forEach(s=>assert(faceOrderBlock.includes("'"+s+"'"),'slot '+s+' participates in directional layer order'));
+expected.forEach(s=>assert(schema.includes("'"+s+"'"),'schema declares slot '+s));
+const schemaFaceOrder=(schema.match(/const FACE_ORDER[\s\S]*?const SLOT_GROUPS/)||[''])[0];
+expected.forEach(s=>assert(schemaFaceOrder.includes("'"+s+"'"),'schema directional order includes '+s));
+assert(schema.includes('KeloCharacterSlotSchema')&&schema.includes('function isSlot(')&&schema.includes('function groupOf(')&&schema.includes('function orderFor(')&&schema.includes('function visualSlotForGameplay('),'slot schema exposes reusable helpers');
+assert(schema.includes("weapon:'weaponMain'")&&schema.includes("helmet:'head'")&&schema.includes("boots:'feet'"),'slot schema owns gameplay-to-visual mapping');
+assert(!/\.hp\s*=|\.damage\s*=|basicCooldown\s*=|attackPower\s*=/.test(schema),'slot schema stays pure and gameplay-stat free');
+assert(core.includes('const Schema = root.KeloCharacterSlotSchema'),'customization core consumes shared slot schema');
+assert(!core.includes('const FACE_ORDER =')&&!core.includes('const SLOT_GROUPS =')&&!core.includes('const GAMEPLAY_TO_VISUAL ='),'core no longer duplicates slot/order/mapping policy');
+assert(core.includes('Schema.isSlot')&&core.includes('Schema.groupOf')&&core.includes('Schema.visualSlotForGameplay'),'core delegates slot validation/group/mapping to schema');
 assert(core.includes("mode: 'modular'")||core.includes("mode:'modular'"),'modular mode is default');
 assert(core.includes('fullBodyOverride'),'full body override remains an explicit exception');
-assert(core.includes('GAMEPLAY_TO_VISUAL'),'gameplay equipment maps to visual slots without replacing gameplay system');
 assert(core.includes('networkSnapshot'),'network snapshot API exists');
 assert(core.includes("schema:'kelo-character-visual-v1'"),'network payload has visual-only schema');
 assert(!/\.hp\s*=|\.damage\s*=|basicCooldown\s*=/.test(core),'customization does not mutate hp, damage or combat cooldown');
@@ -25,7 +31,8 @@ assert(core.includes('KeloAnchors.get'),'equipment can attach to semantic socket
 assert(core.includes('KeloAnchors.presentation'),'layers use shared avatar presentation');
 assert(core.includes('outfitOwnsSlot')&&core.includes('activeOutfit.slots[slot] !== state.slots[slot]'),'equipment outside an outfit does not erase the active outfit');
 assert(core.includes('KeloCharacterVisualStack')&&core.includes('Stack.resolve({ actor:actor, face:faceOf(actor), section:section })'),'game renderer consumes shared visual stack');
-assert(!core.includes('UP_BACK_SLOTS'),'game renderer no longer duplicates directional depth policy');
+assert(!core.includes('UP_BACK_SLOTS'),'game renderer does not duplicate directional depth policy');
+assert(stack.includes('KeloCharacterSlotSchema')&&stack.includes('Schema.normalizeFace')&&stack.includes('Schema.orderFor(face)'),'visual stack consumes shared slot schema');
 assert(stack.includes("const UP_BACK_SLOTS = new Set(['back','weaponSecondary','weaponMain','weaponSkin'])")&&stack.includes("face === 'up' && UP_BACK_SLOTS.has(slot)"),'visual stack owns up-facing weapon depth policy');
 assert(presets.includes('KeloCharacterVisualPresets')&&presets.includes('function sheet(')&&presets.includes('function socket(')&&presets.includes('function weapon('),'visual descriptor factories are reusable and centralized');
 assert(!/\.hp\s*=|\.damage\s*=|cooldown\s*=|attackPower\s*=/.test(presets),'visual presets stay gameplay-stat free');
@@ -37,7 +44,7 @@ assert(preview.includes('KeloCharacterVisualStack')&&!preview.includes('SHEET_SL
 assert(ui.includes("['appearance','outfits','equipment','cosmetics']")||ui.includes("['appearance','APARIENCIA']"),'UI exposes appearance, outfits, equipment and cosmetics');
 assert(ui.includes("String(tool)==='profile'"),'Personaje menu route opens customizer');
 assert(ui.includes('.ksi-profile'),'self profile button is bridged to customizer');
-const order=['character-customization.js','character-visual-presets.js','character-content-packs.js','character-visual-stack.js','character-demo-kit.js','character-customizer-ui.js','character-customizer-preview.js'].map(x=>profile.indexOf(x));
-assert(order.every(x=>x>=0)&&order.every((x,i)=>i===0||x>order[i-1]),'profile bootstrap loads core -> foundations -> content -> UI -> preview');
+const order=['character-slot-schema.js','character-customization.js','character-visual-presets.js','character-content-packs.js','character-visual-stack.js','character-demo-kit.js','character-customizer-ui.js','character-customizer-preview.js'].map(x=>profile.indexOf(x));
+assert(order.every(x=>x>=0)&&order.every((x,i)=>i===0||x>order[i-1]),'profile bootstrap loads schema -> core -> foundations -> content -> UI -> preview');
 assert(core.includes('localStorage')&&core.includes('characterCustomization'),'state persists with STATE plus local fallback');
 if(process.exitCode){console.error('\nCharacter customization audit FAILED');process.exit(process.exitCode);}else console.log('\nCharacter customization audit OK');
