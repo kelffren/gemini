@@ -7,7 +7,7 @@
 (function (root) {
   'use strict';
 
-  const VERSION = 'melee-combat-visuals-v1.0.0';
+  const VERSION = 'melee-combat-visuals-v1.0.1';
   const manifest = root.KELO_MELEE_VISUAL_MANIFEST;
   const bus = root.KeloVisualEventBus;
   const contextApi = root.KeloVisualContext;
@@ -123,8 +123,9 @@
     actor._face = face;
     const context = baseContext(Object.assign({}, payload, { attackId: id }), actor, direction);
     const clipId = manifest.attackClips[face] || manifest.attackClips.down;
+    const sequenceRef = manifest.swingSequences[face] || manifest.swingSequences.down;
     const animationId = root.KeloAnimation.play(actor, clipId, { channel: 'action', context: context });
-    const sequenceId = root.KeloSequence.play(manifest.swingSequence, context);
+    const sequenceId = root.KeloSequence.play(sequenceRef, context);
 
     audit.attacksStarted += 1;
     audit.lastAttackId = id;
