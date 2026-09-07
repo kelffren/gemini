@@ -7,18 +7,18 @@
 (function (root) {
   'use strict';
 
-  const VERSION = 'melee-visual-manifest-v1.0.0';
+  const VERSION = 'melee-visual-manifest-v1.1.0';
   const IMPACT_AT_MS = 150;
   const ATTACK_DURATION = 0.33;
   const REACTION_DURATION = 0.11;
 
+  const assetRegistry = root.KeloAssetRegistry;
   const animationRegistry = root.KeloAnimationRegistry;
   const fxRegistry = root.KeloFXRegistry;
   const sfxRegistry = root.KeloSFXRegistry;
-  const screenRegistry = root.KeloScreenFXRegistry;
   const sequenceRegistry = root.KeloSequenceRegistry;
 
-  if (!animationRegistry || !fxRegistry || !sfxRegistry || !screenRegistry || !sequenceRegistry) {
+  if (!assetRegistry || !animationRegistry || !fxRegistry || !sfxRegistry || !sequenceRegistry) {
     console.error('[Kelo melee manifest] visual registries unavailable');
     return;
   }
@@ -44,6 +44,36 @@
     up: Object.freeze({ x: 0, y: -4, rotation: -0.035 }),
     right: Object.freeze({ x: 4, y: 0, rotation: 0.035 }),
     left: Object.freeze({ x: -4, y: 0, rotation: -0.035 })
+  });
+
+  const slashAssets = {};
+  const slashFx = {};
+  ['up', 'down', 'left', 'right'].forEach(function (face) {
+    const assetId = 'melee_slash_sword_light_01_' + face + '_asset';
+    const fxId = 'melee_slash_sword_light_01_' + face;
+    registerSafe(assetRegistry, {
+      id: assetId,
+      type: 'image',
+      src: 'assets/fx/melee/sword-light-slash-' + face + '.svg',
+      preload: true
+    });
+    registerSafe(fxRegistry, {
+      id: fxId,
+      type: 'static_sprite',
+      assetId: assetId,
+      space: 'ACTOR',
+      layer: 'actorFrontFX',
+      socket: 'weapon',
+      duration: 0.11,
+      loop: false,
+      width: 94,
+      height: 94,
+      alpha: 0.96,
+      fadeOut: true
+    });
+    slashAssets[face] = assetId;
+    slashFx[face] = fxId;
+    assetRegistry.load(assetId);
   });
 
   const attackClips = {};
@@ -97,24 +127,6 @@
   });
 
   registerSafe(fxRegistry, {
-    id: 'melee_slash_sword_light_01',
-    type: 'slash_arc',
-    space: 'ACTOR',
-    layer: 'actorFrontFX',
-    socket: 'weapon',
-    duration: 0.11,
-    loop: false,
-    radius: 36,
-    arc: 2.25,
-    width: 7.5,
-    squash: 0.62,
-    color: '#f0c85a',
-    accent: '#fff6ce',
-    coreColor: '#ffffff',
-    alpha: 0.94
-  });
-
-  registerSafe(fxRegistry, {
     id: 'melee_hit_sparks_light_01',
     type: 'burst',
     space: 'ACTOR',
@@ -162,39 +174,29 @@
     gain: 0.034
   });
 
-  registerSafe(screenRegistry, {
-    id: 'melee_impact_light',
-    type: 'shake',
-    duration: 0.075,
-    amplitude: 1.65
-  });
-
-  registerSafe(screenRegistry, {
-    id: 'melee_flash_light',
-    type: 'flash',
-    duration: 0.055,
-    alpha: 0.025,
-    color: '#fff1c4'
-  });
-
-  registerSafe(sequenceRegistry, {
-    id: 'sequence_melee_sword_light_01',
-    duration: 180,
-    cues: Object.freeze([
-      Object.freeze({ at: 62, type: 'sfx', ref: 'melee_swing_light_01' }),
-      Object.freeze({ at: 68, type: 'fx', ref: 'melee_slash_sword_light_01', socket: 'weapon' })
-    ])
+  const swingSequences = {};
+  ['up', 'down', 'left', 'right'].forEach(function (face) {
+    const id = 'sequence_melee_sword_light_01_' + face;
+    registerSafe(sequenceRegistry, {
+      id: id,
+      duration: 180,
+      cues: Object.freeze([
+        Object.freeze({ at: 62, type: 'sfx', ref: 'melee_swing_light_01' }),
+        Object.freeze({ at: 68, type: 'fx', ref: slashFx[face], socket: 'weapon' })
+      ])
+    });
+    swingSequences[face] = id;
   });
 
   registerSafe(sequenceRegistry, {
     id: 'sequence_melee_hit_light_01',
-    duration: 150,
+    duration: 170,
     cues: Object.freeze([
       Object.freeze({ at: 0, type: 'fx', ref: 'melee_hit_glow_light_01', socket: 'center' }),
       Object.freeze({ at: 0, type: 'fx', ref: 'melee_hit_sparks_light_01', socket: 'center' }),
       Object.freeze({ at: 0, type: 'sfx', ref: 'melee_hit_light_01' }),
-      Object.freeze({ at: 0, type: 'screenFx', ref: 'melee_impact_light' }),
-      Object.freeze({ at: 0, type: 'screenFx', ref: 'melee_flash_light' })
+      Object.freeze({ at: 8, type: 'screenFx', ref: 'impact_medium' }),
+      Object.freeze({ at: 8, type: 'screenFx', ref: 'flash_warm_small' })
     ])
   });
 
@@ -210,7 +212,9 @@
     visualThrottleMs: 180,
     attackClips: Object.freeze(attackClips),
     reactionClips: Object.freeze(reactionClips),
-    swingSequence: 'sequence_melee_sword_light_01',
+    slashAssets: Object.freeze(slashAssets),
+    slashFx: Object.freeze(slashFx),
+    swingSequences: Object.freeze(swingSequences),
     hitSequence: 'sequence_melee_hit_light_01'
   });
 
@@ -219,6 +223,7 @@
     version: VERSION,
     attackClips: Object.keys(attackClips).length,
     reactionClips: Object.keys(reactionClips).length,
+    slashAssets: Object.keys(slashAssets).length,
     impactAtMs: IMPACT_AT_MS
   });
 })(typeof globalThis !== 'undefined' ? globalThis : window);
