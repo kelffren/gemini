@@ -2,6 +2,7 @@
 const fs = require('fs');
 function read(path) { return fs.readFileSync(path, 'utf8'); }
 function assert(ok, message) { if (!ok) { console.error('FAIL:', message); process.exitCode = 1; } else console.log('PASS:', message); }
+const schema = read('src/characters/character-slot-schema.js');
 const kit = read('src/characters/character-demo-kit.js');
 const presets = read('src/characters/character-visual-presets.js');
 const packs = read('src/characters/character-content-packs.js');
@@ -11,6 +12,7 @@ const sheetAssets = ['vanguard-torso.svg','vanguard-legs.svg','vanguard-feet.svg
 const weaponAssets = ['solar-saber.svg','onyx-katana.svg'];
 const ids = ['torso_kelo_vanguard','legs_kelo_vanguard','feet_kelo_vanguard','head_vanguard_crown','head_night_visor','weapon_solar_saber','weapon_onyx_katana','outfit_kelo_vanguard'];
 ids.forEach(id => assert(kit.includes(id), 'demo kit declares ' + id));
+assert(schema.includes('KeloCharacterSlotSchema')&&schema.includes('slotCount:SLOTS.length'),'shared slot schema is available to every content pack');
 assert(kit.includes("id:'kelo-vanguard-v1'")&&kit.includes('Packs.define({'),'Vanguard content is a declarative named pack');
 assert(kit.includes('V.sheet(')&&kit.includes('V.weapon('),'Vanguard uses shared visual factories');
 assert(!kit.includes('setInterval(')&&!kit.includes('registerItemSafe')&&!kit.includes('registerOutfitSafe'),'Vanguard contains no custom loader/registration loop');
@@ -21,8 +23,8 @@ assert(presets.includes("socket(src, 'weapon'"),'shared weapon preset uses seman
 assert(packs.includes('registered.has(pack.id)')&&packs.includes('if (!A.getItem(def.id)) A.registerItem(def)'),'pack registry is idempotent');
 sheetAssets.forEach(name => { const path='src/characters/customization-assets/'+name; assert(fs.existsSync(path), name+' exists'); if(!fs.existsSync(path))return; const svg=read(path); assert(/<svg[^>]+width="512"[^>]+height="768"/.test(svg), name+' is 512x768 / 4x4 actor-sheet sized'); assert((svg.match(/<use\b/g)||[]).length===16, name+' explicitly covers all 16 directional frames'); assert(svg.includes('shape-rendering="crispEdges"'), name+' keeps crisp pixel sampling'); });
 weaponAssets.forEach(name => { const path='src/characters/customization-assets/'+name; assert(fs.existsSync(path), name+' exists'); if(!fs.existsSync(path))return; const svg=read(path); assert(/<svg[^>]+width="64"[^>]+height="64"/.test(svg), name+' uses a compact 64x64 weapon canvas'); assert(svg.includes('shape-rendering="crispEdges"'), name+' keeps crisp pixel sampling'); });
-const order=['character-customization.js','character-visual-presets.js','character-content-packs.js','character-visual-stack.js','character-demo-kit.js','character-customizer-ui.js','character-customizer-preview.js'].map(x=>bootstrap.indexOf(x));
-assert(order.every(x=>x>=0)&&order.every((x,i)=>i===0||x>order[i-1]),'bootstrap loads reusable foundations before Vanguard content');
+const order=['character-slot-schema.js','character-customization.js','character-visual-presets.js','character-content-packs.js','character-visual-stack.js','character-demo-kit.js','character-customizer-ui.js','character-customizer-preview.js'].map(x=>bootstrap.indexOf(x));
+assert(order.every(x=>x>=0)&&order.every((x,i)=>i===0||x>order[i-1]),'bootstrap loads slot schema and reusable foundations before Vanguard content');
 assert(preview.includes('KeloCharacterVisualStack')&&!preview.includes('SHEET_SLOTS')&&!preview.includes('state.slots.weaponMain'),'preview is generic and not coupled to Vanguard slots');
 assert(preview.includes('image-rendering:pixelated'),'preview preserves pixel-art sampling');
 if(process.exitCode){console.error('\nCharacter customization demo kit audit FAILED');process.exit(process.exitCode);}else console.log('\nCharacter customization demo kit audit OK');
