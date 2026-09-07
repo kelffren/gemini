@@ -39,6 +39,15 @@
     return true;
   }
 
+  function loadAbilityIntegrations() {
+    if (document.querySelector('script[data-kelo-sword-swap-runtime]')) return;
+    const script = document.createElement('script');
+    script.src = 'src/abilities/sword-swap-runtime.js?v=2';
+    script.dataset.keloSwordSwapRuntime = '1';
+    script.async = false;
+    document.body.appendChild(script);
+  }
+
   function boot() {
     const ok = installActorBridge();
     if (root.KeloVisualSystem && typeof root.KeloVisualSystem.syncAudit === 'function') root.KeloVisualSystem.syncAudit();
@@ -47,9 +56,10 @@
       root.KELO_VISUAL_AUDIT.updateBridgeWrapped = false;
       root.KELO_VISUAL_AUDIT.renderBridgePolicy = 'engine-c-explicit-layers-plus-final-actor-bridge-v1';
     }
+    loadAbilityIntegrations();
   }
 
-  root.KeloVisualIntegration = Object.freeze({ version: 'visual-integration-v1.0.0', installActorBridge: installActorBridge });
+  root.KeloVisualIntegration = Object.freeze({ version: 'visual-integration-v1.1.0', installActorBridge: installActorBridge, loadAbilityIntegrations: loadAbilityIntegrations });
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true });
   else boot();
 })(typeof globalThis !== 'undefined' ? globalThis : window);
