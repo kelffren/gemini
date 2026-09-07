@@ -1,14 +1,14 @@
 /* KELO-INDEX
  * area: UI
- * keys: BUILDER INPUT SINGLE OWNER POINTER PAINT PLACE PICKUP
- * hace: un solo pointerdown/move/up para el constructor
- * online: llama a World Builder / request(); no persiste
+ * keys: BUILDER INPUT SINGLE OWNER POINTER
+ * hace: registra el pointer DESPUÉS del World Builder para ganar capture
+ * online: llama paintAt/objectAt; no persiste
  */
 (function(){
   'use strict';
   if(window.KELO_BUILDER_INPUT)return;
   window.KELO_BUILDER_OWN_INPUT=true;
-  let painting=false;
+  let painting=false,bound=false;
   function ui(){return window.KELO_WORLD_BUILDER_UI;}
   function host(){return document.getElementById('kelo-world-builder');}
   function fab(){return document.getElementById('kelo-world-builder-fab');}
@@ -24,13 +24,12 @@
     const UX=window.KELO_BUILDER_UX;
     if(!open()||ui()?.previewing)return;
     if(host()?.contains(e.target)||fab()?.contains(e.target))return;
-    const w=world(e);
-    const lyr=layer();
+    const w=world(e),lyr=layer();
     e.preventDefault();e.stopImmediatePropagation();
     if(typeof window.input!=='undefined')window.input.touchActive=false;
     if(lyr==='objects'){
-      if(UX?.holding){UX.drop?.(w);return;}
       painting=false;
+      if(UX?.holding){UX.drop?.(w);return;}
       ui().objectAt?.(w);
       return;
     }
@@ -42,12 +41,21 @@
     if(!open()||!painting)return;
     if(host()?.contains(e.target))return;
     const lyr=layer();
-    if(lyr==='terrain'||lyr==='path')ui().paintAt?.(world(e));
+    if(lyr==='terrain'||lyr==='path'){
+      e.stopImmediatePropagation();
+      ui().paintAt?.(world(e));
+    }
   }
   function onUp(){painting=false;ui()?.pointerUp?.();}
-  document.addEventListener('pointerdown',onDown,true);
-  document.addEventListener('pointermove',onMove,true);
-  document.addEventListener('pointerup',onUp,true);
-  document.addEventListener('pointercancel',onUp,true);
-  window.KELO_BUILDER_INPUT=Object.freeze({version:'builder-input-v1.0.0',owned:true});
+  function bind(){
+    if(bound||!ui())return;
+    document.addEventListener('pointerdown',onDown,true);
+    document.addEventListener('pointermove',onMove,true);
+    document.addEventListener('pointerup',onUp,true);
+    document.addEventListener('pointercancel',onUp,true);
+    bound=true;
+  }
+  const t=setInterval(bind,120);
+  setTimeout(()=>clearInterval(t),8000);
+  window.KELO_BUILDER_INPUT=Object.freeze({version:'builder-input-v1.1.0',owned:true});
 })();
