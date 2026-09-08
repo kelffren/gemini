@@ -77,7 +77,7 @@ socialAction = function(action) {
   if (action === 'Ver Perfil' && activeSocialTarget) { inspectPlayer(activeSocialTarget, false); closeSocialModal(); return; }
   _socialAction(action);
 };
-renderAvatar = function(p, isSelf) {
+function renderRankedAvatar(p, isSelf) {
   var jewels = isSelf ? STATE.jewels : (p.jewels || {});
   ctx.save();
   ctx.fillStyle = 'rgba(0,0,0,0.4)';
@@ -108,7 +108,9 @@ renderAvatar = function(p, isSelf) {
   var rankColor = isSelf ? currentRank().color : ((found && found.color) || '#fff');
   ctx.textAlign = 'center'; ctx.font = '9px sans-serif'; ctx.fillStyle = rankColor; ctx.fillText(rankName, p.x, p.y - p.radius - 18);
   ctx.font = '10px sans-serif'; ctx.fillStyle = isSelf ? '#e7c56a' : '#ffffff'; ctx.fillText(p.name, p.x, p.y - p.radius - 7);
-};
+}
+if(!window.KeloAvatar) throw new Error('KeloAvatar unavailable before engine-d');
+window.KeloAvatar.setBase('engine-d:rank-jewels', renderRankedAvatar);
 function drawMinimap() {
   if (window.KELO_WORLD_DECORATION_RESET === true || window.KELO_WORLD_RENDERER?.decorationReset === true) return;
   var w = 92, h = 78, pad = 10, x = pad, y = screenH - h - pad - 8;
