@@ -12,6 +12,9 @@ on:
       - 'scripts/luxe-menu-audit.mjs'
       - 'scripts/live-luxe-menu-audit.mjs'
       - '.github/workflows/premium-main-menu-ci.yml'
+      - 'docs/systems/MAIN_MENU_SYSTEM.md'
+      - 'docs/system-catalog.json'
+      - 'ENGINE_MAP.md'
       - 'guide.html'
   push:
     branches: [main]
@@ -26,6 +29,9 @@ on:
       - 'scripts/luxe-menu-audit.mjs'
       - 'scripts/live-luxe-menu-audit.mjs'
       - '.github/workflows/premium-main-menu-ci.yml'
+      - 'docs/systems/MAIN_MENU_SYSTEM.md'
+      - 'docs/system-catalog.json'
+      - 'ENGINE_MAP.md'
       - 'guide.html'
   workflow_dispatch:
 
