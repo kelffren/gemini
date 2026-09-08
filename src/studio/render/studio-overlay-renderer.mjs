@@ -1,6 +1,6 @@
 /* KELO-INDEX
  * area: STUDIO / OVERLAY RENDERER
- * owns: transient editor-only selection/ghost/gizmo/surface/collision primitives
+ * owns: transient editor-only selection/ghost/gizmo/surface/collision/prefab primitives
  * does-not-own: world rendering, terrain textures, gameplay sprites or physics
  * public-api: createStudioOverlayRenderer()
  * online: local-only
@@ -14,6 +14,7 @@ export function createStudioOverlayRenderer({ kernel, tools } = {}) {
     if (!ctx) return;ctx.save();ctx.lineWidth = 2;
     for (const id of kernel.selection.get()) { const row = kernel.spatial.get(id); if (row?.rect) drawRect(ctx, row.rect); }
     const placement = tools?.placement?.getPreview?.();if (placement) { ctx.save();ctx.globalAlpha=.35;ctx.fillRect(placement.transform.x,placement.transform.y,placement.bounds.w,placement.bounds.h);ctx.restore();drawRect(ctx,{x:placement.transform.x,y:placement.transform.y,w:placement.bounds.w,h:placement.bounds.h},{dashed:true}); }
+    const prefab = tools?.prefabStamp?.getPreview?.();if(prefab){ctx.save();ctx.globalAlpha=.16;ctx.fillStyle='#e7c56a';ctx.fillRect(prefab.x,prefab.y,prefab.w,prefab.h);ctx.restore();drawRect(ctx,prefab,{dashed:true,alpha:.9});}
     const transform = tools?.transform?.getPreview?.();if (transform) { const row=kernel.spatial.get(transform.entityId);if(row?.rect)drawRect(ctx,{...row.rect,x:transform.x??row.rect.x,y:transform.y??row.rect.y},{dashed:true,alpha:.7}); }
     const stroke=tools?.terrain?.getStrokePreview?.();if(stroke?.cells?.length){for(const cell of stroke.cells)drawSurfaceCell(ctx,cell,{alpha:.20});}
     const terrain=tools?.terrain?.getPreview?.();if(terrain){const cells=terrain.cells?.length?terrain.cells:[terrain];for(const cell of cells)drawSurfaceCell(ctx,cell,{alpha:.28,dashed:true});}
