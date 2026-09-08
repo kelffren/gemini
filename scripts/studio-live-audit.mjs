@@ -47,7 +47,7 @@ await page.evaluate(()=>window.KELO_STUDIO_LAUNCHER.open());
 await page.waitForFunction(()=>document.body.classList.contains('kelo-studio-active')&&!!document.getElementById('kelo-studio-live'),null,{timeout:15000});
 const opened=await page.evaluate(()=>({
   shell:!!document.getElementById('kelo-studio-live'),
-  lockOwners:(window.KeloInputLocks?.snapshot?.().locks||[]).map(x=>x.owner),
+  lockOwners:window.KeloInputLocks?.snapshot?.().owners||[],
   studioResources:performance.getEntriesByType('resource').map(x=>x.name).filter(x=>/\/src\/studio\//.test(x)),
   status:document.querySelector('#kelo-studio-live .ks-status')?.textContent||''
 }));
@@ -82,7 +82,7 @@ await page.screenshot({path:'artifacts/studio-live-open.png',fullPage:true});
 await page.locator('#kelo-studio-live [data-act="close"]').click();
 await page.waitForFunction(()=>!document.body.classList.contains('kelo-studio-active')&&!document.getElementById('kelo-studio-live'),null,{timeout:10000});
 const closed=await page.evaluate(()=>({
-  lockOwners:(window.KeloInputLocks?.snapshot?.().locks||[]).map(x=>x.owner),
+  lockOwners:window.KeloInputLocks?.snapshot?.().owners||[],
   view:window.KELO_WORLD_EDIT?.getViewState?.()||null
 }));
 if(closed.lockOwners.includes('kelo-studio'))throw new Error('STUDIO_FOUNDATION_LOCK_LEAK');
