@@ -1,19 +1,21 @@
 /* KELO-INDEX
  * area: UI / BOOT
  * owner: profile/runtime bootstrap bridge
- * keys: PROFILE CLOSE CHARACTER CUSTOMIZER BOOT FOUNDATION
- * purpose: conserva el cierre del perfil legacy y carga en orden las foundations dinámicas del Character Creator
+ * keys: PROFILE CLOSE CHARACTER CUSTOMIZER BOOT FOUNDATION RESPONSIVE
+ * purpose: conserva el cierre del perfil legacy y carga en orden las foundations dinámicas + estilos del Character Creator
  * public-api: KELO_PROFILE_CLOSE_AUDIT
- * consumes: kelo-runtime-bootstrap + módulos de CharacterCustomization
+ * consumes: kelo-runtime-bootstrap + módulos/estilos de CharacterCustomization
  * state-owned: ninguno salvo DOM del botón close legacy
  * extension-points: cambiar versiones/orden solo cuando el contrato real lo requiera
- * reuse: late boot del creador sin duplicar scripts ya cargados
+ * reuse: late boot del creador sin duplicar scripts/estilos ya cargados
  * legacy: wrapInspectPlayer sigue siendo adapter temporal del sheet histórico
  * do-not: NO poseer estado del personaje ni input
  */
 (function () {
   'use strict';
   const CLOSE_ID = 'kelo-profile-close';
+  const CUSTOMIZER_STYLE_ID = 'kelo-character-customizer-responsive-link';
+  const CUSTOMIZER_STYLE = 'src/ui/character-customizer-responsive.css?v=1';
   const FOUNDATION_SCRIPTS = [
     'src/core/kelo-runtime-bootstrap.js?v=1'
   ];
@@ -65,6 +67,18 @@
     return button;
   }
 
+  function ensureCustomizerStyle() {
+    const existing = document.getElementById(CUSTOMIZER_STYLE_ID);
+    if (existing) return existing;
+    const link = document.createElement('link');
+    link.id = CUSTOMIZER_STYLE_ID;
+    link.rel = 'stylesheet';
+    link.href = CUSTOMIZER_STYLE;
+    link.dataset.keloCharacterCustomizer = 'responsive';
+    document.head.appendChild(link);
+    return link;
+  }
+
   function wrapInspectPlayer() {
     const original = window.inspectPlayer;
     if (typeof original !== 'function' || original.__keloProfileCloseWrapped) return;
@@ -86,15 +100,16 @@
     script.onerror = function () { console.error('[Kelo boot] module failed', base); };
     document.body.appendChild(script);
   }
-  function ensureRuntimeModules() { loadScriptSequentially(0); }
+  function ensureRuntimeModules() { ensureCustomizerStyle();loadScriptSequentially(0); }
   function boot() { ensureCloseButton();wrapInspectPlayer();ensureRuntimeModules(); }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true });
   else boot();
 
   window.KELO_PROFILE_CLOSE_AUDIT = Object.freeze({
-    version:'profile-close-v1.6.0',closeButtonId:CLOSE_ID,minTouchTargetPx:44,tapClose:true,legacyCloseHidden:true,
-    runtimeFoundationBootstrap:true,characterCustomizationBootstrap:true,foundationScripts:FOUNDATION_SCRIPTS.slice(),
+    version:'profile-close-v1.7.0',closeButtonId:CLOSE_ID,minTouchTargetPx:44,tapClose:true,legacyCloseHidden:true,
+    runtimeFoundationBootstrap:true,characterCustomizationBootstrap:true,characterCustomizerResponsiveStyle:true,
+    customizationStyle:CUSTOMIZER_STYLE,foundationScripts:FOUNDATION_SCRIPTS.slice(),
     customizationScripts:CUSTOMIZATION_SCRIPTS.slice(),bootScripts:BOOT_SCRIPTS.slice()
   });
 })();
