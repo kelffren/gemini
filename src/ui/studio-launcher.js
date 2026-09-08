@@ -8,7 +8,7 @@
  * state-owned: solo estado efímero de carga
  * extension-points: Creator Hub / WorkspaceRegistry; no domain logic here
  * reuse: entrada única a herramientas creator
- * do-not: NO mutar mundo, NO duplicar menú, NO cargar src/studio ni src/creators durante boot normal
+ * do-not: NO mutar mundo, NO duplicar menú, NO cargar src/studio ni src/creators durante boot normal, NO polling
  */
 (function(){
   'use strict';
@@ -47,9 +47,9 @@
     if(!btn){btn=document.createElement('button');btn.id='lx-create-studio';btn.type='button';btn.className='lx-menu-item';btn.onclick=e=>{e.preventDefault();e.stopPropagation();void open();};grid.appendChild(btn);}
     btn.setAttribute('aria-label','Abrir Kelo Creators');paint(btn,loading);return true;
   }
-  function boot(){if(!sync())setTimeout(boot,120);}
+  function boot(){sync();}
   window.KELO_ADMIN_KEYS?.onChange?.(sync);
-  const api=Object.freeze({version:'studio-launcher-v1.5.0-premium-menu',open,sync,get allowed(){return allowed();}});
+  const api=Object.freeze({version:'studio-launcher-v1.5.1-premium-menu',open,sync,get allowed(){return allowed();}});
   window.KELO_STUDIO_LAUNCHER=api;
   window.KELO_CREATORS_LAUNCHER=api;
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
