@@ -42,7 +42,9 @@ migrated.forEach(file=>{const text=fs.readFileSync(file,'utf8');ok(!directRender
 ok(fs.readFileSync('engine-d.js','utf8').includes("KeloRender.afterFrame('engine-d:minimap'"),'MINIMAP_HOOK');
 ok(fs.readFileSync('engine-g.js','utf8').includes("KeloRender.afterFrame('engine-g:skill-indicator'"),'SKILL_HOOK');
 ok(fs.readFileSync('engine-h.js','utf8').includes("KeloRender.beforeFrame('engine-h:legacy-plaza-fillrect'")&&fs.readFileSync('engine-h.js','utf8').includes("KeloRender.afterFrame('engine-h:legacy-plaza-fillrect'"),'HD_HOOKS');
-ok(fs.readFileSync('engine-l.js','utf8').includes("KeloRender.beforeFrame('engine-l:hidpi'")&&fs.readFileSync('engine-l.js','utf8').includes("KeloRender.afterFrame('engine-l:landing-marker'"),'PLAZA_HOOKS');
+const plaza=fs.readFileSync('engine-l.js','utf8');
+ok(!plaza.includes("KeloRender.beforeFrame('engine-l:hidpi'")&&plaza.includes("KeloRender.afterFrame('engine-l:landing-marker'"),'PLAZA_HOOKS');
+ok(!/\bcanvas\.(?:width|height)\s*=/.test(plaza),'PLAZA_VIEWPORT_MUST_BE_CAMERA_OWNED');
 ok(fs.readFileSync('engine-ae.js','utf8').includes("KeloRender.beforeFrame('engine-ae:frame-counter'"),'FRAME_COUNTER_HOOK');
 ok(fs.readFileSync('engine-ai.js','utf8').includes("KeloRender.afterFrame('engine-ai:cafe-overlay'"),'CAFE_HOOK');
 ok(fs.readFileSync('engine-net.js','utf8').includes("KeloRender.afterFrame('engine-net:peers'"),'NETWORK_PEER_HOOK');

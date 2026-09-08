@@ -1,8 +1,11 @@
 /* KELO-INDEX
  * area: CORE
- * keys: RENDER LAYERS VISUAL VFX SCREEN UPDATE SOCIAL
- * hace: orquesta render del mundo/actores/UI y ofrece puntos explícitos para el sistema visual modular
+ * owner: legacy render/social core; camera commands after boot owned by KeloCamera
+ * keys: RENDER LAYERS VISUAL VFX SCREEN UPDATE SOCIAL CAMERA FOUNDATION
+ * hace: orquesta render del mundo/actores/UI y ofrece puntos explícitos para sistemas Foundation
  * online: visuales consumen eventos; este archivo no decide autoridad compartida
+ * legacy: CONFIG.zoom/cycleZoom/screenToWorld son bootstrap pre-KeloCamera y quedan reemplazados por el owner tras carga
+ * do-not: no añadir nuevos writers camera.*; usar KeloCamera
  */
 CONFIG.zoom = 0.82;
 const ZOOM_STEPS = [0.7, 0.82, 1];
@@ -82,10 +85,11 @@ function openSocialTool(tool) {
 }
 function quickTravel(dest) {
   closeMenu();
-  if (dest === 'plaza') { localPlayer.x = 1400; localPlayer.y = 1600; camera.targetX = 1400; camera.targetY = 1600; showToast('Plaza Central'); }
+  if (!window.KeloCamera) throw new Error('KeloCamera unavailable during quickTravel');
+  if (dest === 'plaza') { localPlayer.x = 1400; localPlayer.y = 1600; window.KeloCamera.setTarget(1400, 1600, { source:'engine-c:quick-travel-plaza' }); showToast('Plaza Central'); }
   else if (dest === 'farm') { teleportToFarm(); showToast('Distrito Rural'); }
   else if (dest === 'house') { teleportToPlot(); showToast('Tu parcela'); }
-  else if (dest === 'arena') { localPlayer.x = arenaPvP.x + 80; localPlayer.y = arenaPvP.y + arenaPvP.h / 2; camera.targetX = arenaPvP.x + arenaPvP.w / 2; camera.targetY = arenaPvP.y + arenaPvP.h / 2; showToast('Arena 1v1'); }
+  else if (dest === 'arena') { localPlayer.x = arenaPvP.x + 80; localPlayer.y = arenaPvP.y + arenaPvP.h / 2; window.KeloCamera.setTarget(arenaPvP.x + arenaPvP.w / 2, arenaPvP.y + arenaPvP.h / 2, { source:'engine-c:quick-travel-arena' }); showToast('Arena 1v1'); }
 }
 checkFarmTouch = function(sx, sy) {
   if (decorationResetActive()) return false;

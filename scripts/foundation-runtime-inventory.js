@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: QA / FOUNDATION
  * owner: FOUNDATION CI
- * keys: INVENTORY OWNERSHIP WRAPPERS GLOBALS TIMERS LOCKS STORAGE LIVE RUNTIME
+ * keys: INVENTORY OWNERSHIP WRAPPERS GLOBALS TIMERS LOCKS STORAGE CAMERA VIEWPORT LIVE RUNTIME
  * purpose: inventaría patrones sensibles en repo completo y separa los archivos cargados directamente por index.html
  * public-api: CLI `node scripts/foundation-runtime-inventory.js`
  * consumes: archivos JS/HTML del repo + script src de index.html
@@ -9,7 +9,7 @@
  * extension-points: añadir patrones observables, no inferencias subjetivas
  * reuse: auditoría Foundation y revisión de PR
  * legacy: carga dinámica no declarada en index se reporta en repoTotal hasta que tenga manifest explícito
- * do-not: no falla CI por deuda histórica; el guard de regresión vive en foundation-architecture-audit.js
+ * do-not: no falla CI por deuda histórica; los guards de regresión viven en audits contractuales
  */
 'use strict';
 const fs=require('fs');
@@ -77,6 +77,12 @@ const rules=[
   ['avatarWrapper',globalAssignment('renderAvatar')],
   ['simulationWrapper',globalAssignment('updateSimulation')],
   ['socialToolWrite',globalAssignment('openSocialTool')],
+  ['cameraTargetWrite',/\bcamera\.(?:targetX|targetY)\s*=/g],
+  ['cameraPositionWrite',/\bcamera\.(?:x|y)\s*=/g],
+  ['cameraZoomWrite',/\bCONFIG\.zoom\s*=/g],
+  ['canvasSizeWrite',/\bcanvas\.(?:width|height)\s*=/g],
+  ['resizeOverride',globalAssignment('resize')],
+  ['cycleZoomOverride',globalAssignment('cycleZoom')],
   ['obstaclesPush',/\bobstacles\.push\s*\(/g],
   ['setInterval',/\bsetInterval\s*\(/g],
   ['mutationObserver',/\bnew\s+MutationObserver\b/g],

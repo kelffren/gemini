@@ -23,6 +23,8 @@ jobs:
         run: node scripts/input-system-contract-audit.js
       - name: Audit movement owner contract
         run: node scripts/movement-system-contract-audit.js
+      - name: Audit camera/viewport owner contract
+        run: node scripts/camera-system-contract-audit.js
       - name: Audit render extension owner contract
         run: node scripts/render-extension-contract-audit.js
       - name: Audit simulation extension owner contract
@@ -39,6 +41,7 @@ jobs:
           node --check src/core/input-system.js
           node --check src/core/input-gate.js
           node --check src/core/movement-system.js
+          node --check src/core/camera-system.js
           node --check src/core/render-extension-system.js
           node --check src/core/simulation-extension-system.js
           node --check src/core/avatar-render-system.js
@@ -64,6 +67,7 @@ jobs:
           node --check engine-net.js
           node --check src/characters/character-appearance.js
           node --check src/systems/pvp-world.js
+          node --check src/ui/mobile-orientation.js
           node --check src/ui/pvp-social-touch-guard.js
           node --check src/ui/backpack-ui.js
           node --check src/abilities/kelo-ability-boot.js
@@ -75,6 +79,7 @@ jobs:
           node --check scripts/input-lock-contract-audit.js
           node --check scripts/input-system-contract-audit.js
           node --check scripts/movement-system-contract-audit.js
+          node --check scripts/camera-system-contract-audit.js
           node --check scripts/render-extension-contract-audit.js
           node --check scripts/simulation-extension-contract-audit.js
           node --check scripts/avatar-render-contract-audit.js

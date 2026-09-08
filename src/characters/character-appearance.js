@@ -47,14 +47,14 @@
 
   function makeCleanSource(image, def) {
     try {
-      const canvas = document.createElement('canvas');
-      canvas.width = image.naturalWidth || image.width;
-      canvas.height = image.naturalHeight || image.height;
-      const c = canvas.getContext('2d', { willReadFrequently: true });
+      const cleanupCanvas = document.createElement('canvas');
+      cleanupCanvas.width = image.naturalWidth || image.width;
+      cleanupCanvas.height = image.naturalHeight || image.height;
+      const c = cleanupCanvas.getContext('2d', { willReadFrequently: true });
       if (!c) return image;
       c.imageSmoothingEnabled = false;
       c.drawImage(image, 0, 0);
-      const data = c.getImageData(0, 0, canvas.width, canvas.height);
+      const data = c.getImageData(0, 0, cleanupCanvas.width, cleanupCanvas.height);
       let cleaned = 0;
       for (let i = 3; i < data.data.length; i += 4) {
         if (data.data[i] <= ALPHA_CLEANUP_THRESHOLD) {
@@ -64,7 +64,7 @@
       }
       c.putImageData(data, 0, 0);
       audit.cleanupPixels[def.id] = cleaned;
-      return canvas;
+      return cleanupCanvas;
     } catch (error) {
       audit.loadErrors[def.id + ':cleanup'] = String(error && error.message || error);
       return image;
