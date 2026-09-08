@@ -1,9 +1,9 @@
 /* KELO-INDEX
  * area: STUDIO / KERNEL
- * owns: composition of document, commands, history, selection, registries, spatial index, dirty chunks and tools
+ * owns: document, commands, history, selection, registries, spatial index, dirty chunks and tools
  * does-not-own: UI, gameplay implementation, network transport
  * public-api: createStudioKernel()
- * online: adapter can mirror serialized commands after local validation
+ * online: adapter mirror is transactional; failed authority writes roll local state back
  */
 
 import { createHistoryManager } from './history-manager.mjs';
@@ -26,12 +26,12 @@ export function createStudioKernel({ document, adapter = null, historyBudgetByte
   function rebuildSpatial() { spatial.clear(); for (const e of current.entities) if (e?.id) spatial.upsert({ id: e.id, category: 'entity', rect: entityRect(e), data: e }); }
   function syncEntity(id) { if (!id) return; const e = current.entities.find(row => row.id === id); if (e) spatial.upsert({ id: e.id, category: 'entity', rect: entityRect(e), data: e }); else spatial.remove(id); }
   function markRects(rects, reason) { for (const rect of rects || []) if (rect) dirty.markRect(rect, reason || 'edit'); }
-  const commandBus = createCommandBus({ history, onAfterExecute: async event => { const s = event.command || {}; syncEntity(s.id || s.entity?.id); markRects(event.affectedRects, s.type || 'edit'); } });
+  async function mirror(event) { if (typeof adapter?.mirrorStudioEvent === 'function') await adapter.mirrorStudioEvent(event, { document: current, kernel }); }
+  const commandBus = createCommandBus({ history, onAfterExecute: async event => { await mirror(event); const s = event.command || {}; syncEntity(s.id || s.entity?.id); markRects(event.affectedRects, s.type || 'edit'); }, onRollback: async event => { rebuildSpatial(); markRects(event.affectedRects, 'rollback'); } });
   const execute = command => commandBus.execute(command, { document: current, kernel, adapter });
-  async function undo() { const entry = await history.undo(); if (!entry) return null; rebuildSpatial(); markRects(entry.affectedRects, `undo:${entry.type || 'command'}`); return entry; }
-  async function redo() { const entry = await history.redo(); if (!entry) return null; rebuildSpatial(); markRects(entry.affectedRects, `redo:${entry.type || 'command'}`); return entry; }
+  async function undo() { const entry = await history.undo(); if (!entry) return null; const event = { type: 'undo', command: entry.serialized, affectedRects: entry.affectedRects || [] }; try { await mirror(event); } catch (error) { await history.redo(); rebuildSpatial(); throw error; } rebuildSpatial(); markRects(event.affectedRects, `undo:${entry.type || 'command'}`); commandBus.emit(event); return entry; }
+  async function redo() { const entry = await history.redo(); if (!entry) return null; const event = { type: 'redo', command: entry.serialized, affectedRects: entry.affectedRects || [] }; try { await mirror(event); } catch (error) { await history.undo(); rebuildSpatial(); throw error; } rebuildSpatial(); markRects(event.affectedRects, `redo:${entry.type || 'command'}`); commandBus.emit(event); return entry; }
   function setDocument(next) { current = normalizeWorldDocument(next); spatial = createSpatialChunkIndex({ chunkSize: current.settings.chunkSize }); dirty = createDirtyChunkManager({ chunkSize: current.settings.chunkSize }); history.clear(); selection.clear(); rebuildSpatial(); return current; }
-  kernel = { version: 'studio-kernel-v1.2.0', execute, undo, redo, setDocument,
-    get document() { return current; }, get adapter() { return adapter; }, get history() { return history; }, get commands() { return commandBus; }, get input() { return input; }, get selection() { return selection; }, get components() { return components; }, get prefabs() { return prefabs; }, get spatial() { return spatial; }, get dirty() { return dirty; } };
+  kernel = { version: 'studio-kernel-v1.4.0', execute, undo, redo, setDocument, get document() { return current; }, get adapter() { return adapter; }, get history() { return history; }, get commands() { return commandBus; }, get input() { return input; }, get selection() { return selection; }, get components() { return components; }, get prefabs() { return prefabs; }, get spatial() { return spatial; }, get dirty() { return dirty; } };
   kernel.tools = createToolRegistry({ kernel }); rebuildSpatial(); return Object.freeze(kernel);
 }
