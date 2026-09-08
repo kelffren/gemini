@@ -1,8 +1,22 @@
+/* KELO-INDEX
+ * area: VISUAL / AVATAR SUPPORT
+ * owner: KeloArmorAura; avatar composition owned by KeloAvatar
+ * keys: ARMOR AURA AVATAR BACK FRONT MIDDLEWARE FOUNDATION
+ * purpose: dibuja aura de armadura alrededor del avatar sin envolver renderAvatar
+ * public-api: KeloArmorAura
+ * consumes: KeloAvatar, KeloEquipment, KELO_AVATAR_PRESENTATION, ctx
+ * state-owned: ninguno; presentación derivada del armor score/rank del actor
+ * extension-points: KeloAvatar.use middleware exterior a appearance/base
+ * reuse: efectos persistentes ligados al actor que deban respetar composición Avatar
+ * legacy: conserva renderBack/renderFront públicos para consumidores existentes
+ * do-not: NO envolver renderAvatar ni decidir gameplay
+ */
 (function(){
 'use strict';
-const VERSION='armor-aura-v1.1';
+const VERSION='armor-aura-v1.2-foundation';
 const THRESHOLDS=[0,330,475,750,950,1350,1720,2225,3860,5250];
 const PARTICLES=[0,0,2,4,5,6,8,10,12,16];
+let avatarHookId=null;
 function rankFromScore(score){score=Math.max(0,Math.floor(Number(score)||0));let r=0;for(let i=1;i<THRESHOLDS.length;i++)if(score>=THRESHOLDS[i])r=i;return r;}
 function rankOf(player){if(!player)return 0;if(Number.isFinite(player.auraRank))return Math.max(0,Math.min(9,Math.floor(player.auraRank)));if(window.KeloEquipment){const score=player===localPlayer?window.KeloEquipment.getArmorScore():Number(player.armorScore)||0;return window.KeloEquipment.getAuraRank(score);}return rankFromScore(player.armorScore||0);}
 function phase(player,salt){const id=String(player&&player.id||'p');let h=0;for(let i=0;i<id.length;i++)h=(h*31+id.charCodeAt(i))>>>0;return (performance.now()*0.001+(h%97)*0.07+(salt||0));}
@@ -14,8 +28,9 @@ function drawParticles(ctx,p,rank,front){if(rank<5)return;const m=visualMetrics(
 function drawSpark(ctx,p,rank){if(rank<9)return;const m=visualMetrics(p),t=phase(p,9);ctx.save();ctx.strokeStyle='#fff2ba';ctx.globalAlpha=.45+.22*Math.sin(t*3);ctx.lineWidth=1;for(let i=0;i<3;i++){const a=t*.55+i*Math.PI*2/3,r=m.effectRadius*1.45,x=p.x+Math.cos(a)*r,y=p.y-m.physicsRadius*.25+Math.sin(a)*r*.55;ctx.beginPath();ctx.moveTo(x-3,y);ctx.lineTo(x+3,y);ctx.moveTo(x,y-3);ctx.lineTo(x,y+3);ctx.stroke();}ctx.restore();}
 function renderBack(ctx,p){const rank=rankOf(p);if(!rank)return;drawRing(ctx,p,rank,false);drawBodyGlow(ctx,p,rank);drawParticles(ctx,p,rank,false);}
 function renderFront(ctx,p){const rank=rankOf(p);if(!rank)return;drawRing(ctx,p,rank,true);drawParticles(ctx,p,rank,true);drawSpark(ctx,p,rank);}
-function install(){if(typeof renderAvatar!=='function'||renderAvatar.__keloArmorAura)return false;const base=renderAvatar;const wrapped=function(p,isSelf){renderBack(ctx,p);base(p,isSelf);renderFront(ctx,p);};wrapped.__keloArmorAura=true;renderAvatar=wrapped;return true;}
+function middleware(p,isSelf,next){if(!p||typeof ctx==='undefined')return next();renderBack(ctx,p);const out=next();renderFront(ctx,p);return out;}
+function install(){if(avatarHookId)return true;if(!window.KeloAvatar||typeof window.KeloAvatar.use!=='function')return false;avatarHookId=window.KeloAvatar.use('armor-aura:actor-shell',middleware,300);return true;}
 install();
 window.KeloArmorAura=Object.freeze({version:VERSION,thresholds:THRESHOLDS.slice(),particleBudget:PARTICLES.slice(),getAuraRank:rankFromScore,rankOf,visualMetrics,renderBack,renderFront,install});
-window.KELO_ARMOR_AURA_AUDIT={version:VERSION,ready:true,maxRank:9,maxParticles:16,canvasOnly:true,usesAvatarPresentation:true,visualScaleFallback:1,thresholds:THRESHOLDS.slice()};
+window.KELO_ARMOR_AURA_AUDIT={version:VERSION,ready:true,maxRank:9,maxParticles:16,canvasOnly:true,usesAvatarPresentation:true,visualScaleFallback:1,thresholds:THRESHOLDS.slice(),avatarOwner:'KeloAvatar',avatarHook:'armor-aura:actor-shell',avatarPriority:300,directRenderAvatarWrapper:false};
 })();
