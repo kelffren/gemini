@@ -2,13 +2,13 @@
  * area: QA / INPUT
  * owner: FOUNDATION CI
  * keys: INPUT LOCK OWNER TOKEN LEGACY CONTRACT
- * purpose: valida que KeloInputLocks preserve claims independientes y compatibilidad legacy sin clobber
+ * purpose: valida que KeloInputLocks preserve claims independientes y que consumidores migrados no vuelvan al global legacy
  * public-api: CLI
- * consumes: src/core/input-lock-system.js
+ * consumes: src/core/input-lock-system.js + consumidores Foundation migrados
  * state-owned: ninguno
  * extension-points: añadir invariantes del contrato, no comportamiento UI
  * reuse: Foundation CI
- * legacy: verifica adapter KELO_MODAL_INPUT_LOCK
+ * legacy: verifica adapter KELO_MODAL_INPUT_LOCK solo dentro del owner core
  * do-not: no simular gameplay aquí
  */
 'use strict';
@@ -37,4 +37,13 @@ assert(!L.has('legacy-panel')&&L.has('emotes'),'legacy null must release only le
 L.release(emotes);
 assert(!L.isLocked()&&L.snapshot().count===0,'all explicit claims must release cleanly');
 assert(events.some(e=>e.name==='input-locks:changed'),'changes should publish through existing KeloEvents when available');
-if(!process.exitCode)console.log('INPUT_LOCK_OK: owner/token/legacy contract passed');
+
+const backpack=fs.readFileSync(path.resolve(__dirname,'../src/ui/backpack-ui.js'),'utf8');
+const pvpGuard=fs.readFileSync(path.resolve(__dirname,'../src/ui/pvp-social-touch-guard.js'),'utf8');
+assert(!/\bKELO_MODAL_INPUT_LOCK\s*=/.test(backpack),'backpack must not write legacy modal lock');
+assert(backpack.includes("locks.acquire('backpack-ui'"),'backpack must acquire a token from KeloInputLocks');
+assert(backpack.includes('locks.release(inputLockToken)'),'backpack must release its own token');
+assert(!/\bKELO_MODAL_INPUT_LOCK\s*=/.test(pvpGuard),'PvP social guard must not write legacy modal lock');
+assert(pvpGuard.includes("locks.releaseOwner(owner)"),'PvP social guard must release known social lock owners via KeloInputLocks');
+
+if(!process.exitCode)console.log('INPUT_LOCK_OK: owner/token/legacy adapter + migrated UI consumer contract passed');
