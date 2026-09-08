@@ -43,7 +43,7 @@ assert(luxe.includes("KeloBackpackUI?.open"),'Backpack must route to KeloBackpac
 assert(luxe.includes("KeloMarketUI?.open"),'Market must route to KeloMarketUI');
 assert(luxe.includes("KELO_HOUSE_UI?.show"),'Properties must route to house/property UI owner');
 assert(luxe.includes("KeloAbilities?.openStonePanel"),'Abilities must route to KeloAbilities');
-assert(ability.includes("const equip=row.querySelector('[data-equip]');if(equip)"),'Abilities inventory must safely ignore non-stone inventory entries');
+assert(ability.includes("let visibleStoneCount = 0")&&ability.includes("if (!html) return;")&&ability.includes("if (!equip) return;"),'Abilities inventory must safely ignore non-stone inventory entries');
 
 assert(luxe.includes("KeloMissionsUI")&&luxe.includes("optional:true"),'Missions must be owner-gated, not a fake button');
 assert(luxe.includes("KeloSettingsUI")&&luxe.includes("optional:true"),'Settings must be owner-gated, not a fake button');
