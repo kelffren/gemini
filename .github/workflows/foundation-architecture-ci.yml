@@ -27,6 +27,8 @@ jobs:
         run: node scripts/render-extension-contract-audit.js
       - name: Audit simulation extension owner contract
         run: node scripts/simulation-extension-contract-audit.js
+      - name: Audit avatar render owner contract
+        run: node scripts/avatar-render-contract-audit.js
       - name: Audit system documentation contract
         run: node scripts/system-documentation-audit.js
       - name: Report current architecture debt inventory
@@ -39,7 +41,9 @@ jobs:
           node --check src/core/movement-system.js
           node --check src/core/render-extension-system.js
           node --check src/core/simulation-extension-system.js
+          node --check src/core/avatar-render-system.js
           node --check engine-d.js
+          node --check engine-e.js
           node --check engine-f.js
           node --check engine-g.js
           node --check engine-h.js
@@ -49,13 +53,16 @@ jobs:
           node --check engine-p.js
           node --check engine-q.js
           node --check engine-s.js
+          node --check engine-w.js
           node --check engine-y.js
           node --check engine-aa.js
+          node --check engine-ab.js
           node --check engine-ac.js
           node --check engine-ae.js
           node --check engine-ah.js
           node --check engine-ai.js
           node --check engine-net.js
+          node --check src/characters/character-appearance.js
           node --check src/systems/pvp-world.js
           node --check src/abilities/sword-swap-runtime.js
           node --check src/visuals/sword-swap-pvp-visuals.js
@@ -65,5 +72,6 @@ jobs:
           node --check scripts/movement-system-contract-audit.js
           node --check scripts/render-extension-contract-audit.js
           node --check scripts/simulation-extension-contract-audit.js
+          node --check scripts/avatar-render-contract-audit.js
           node --check scripts/system-documentation-audit.js
           node --check scripts/foundation-runtime-inventory.js
