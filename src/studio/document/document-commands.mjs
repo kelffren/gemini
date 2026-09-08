@@ -9,6 +9,11 @@
 const copy = value => value == null ? value : (typeof structuredClone === 'function' ? structuredClone(value) : JSON.parse(JSON.stringify(value)));
 const rectFor = entity => ({ x: Number(entity?.transform?.x) || 0, y: Number(entity?.transform?.y) || 0, w: Math.max(1, Number(entity?.bounds?.w) || 1), h: Math.max(1, Number(entity?.bounds?.h) || 1) });
 const findIndex = (document, id) => document.entities.findIndex(e => e.id === id);
+const normalizePatch = patch => {
+  const next = copy(patch || {});
+  if (next?.transform && next.transform.rotation != null) next.transform.rotation = Math.round((Number(next.transform.rotation) || 0) / 90) * 90;
+  return next;
+};
 
 export function createPlaceEntityCommand(entity) {
   const row = copy(entity);
@@ -36,7 +41,7 @@ export function createRemoveEntityCommand(id) {
 }
 
 export function createPatchEntityCommand(id, patch) {
-  id = String(id); const next = copy(patch || {}); let previous = null;
+  id = String(id); const next = normalizePatch(patch); let previous = null;
   return { type: 'entity.patch', label: `Edit ${id}`,
     execute({ document }) { const i = findIndex(document, id); if (i < 0) throw new Error('STUDIO_ENTITY_NOT_FOUND'); if (!previous) previous = copy(document.entities[i]); document.entities[i] = { ...document.entities[i], ...copy(next) }; },
     undo({ document }) { const i = findIndex(document, id); if (i >= 0 && previous) document.entities[i] = copy(previous); },
