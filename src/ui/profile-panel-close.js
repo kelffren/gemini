@@ -1,5 +1,8 @@
 (function () {
   const CLOSE_ID = 'kelo-profile-close';
+  const FOUNDATION_SCRIPTS = [
+    'src/core/kelo-runtime-bootstrap.js?v=1'
+  ];
   const CUSTOMIZATION_SCRIPTS = [
     'src/characters/character-slot-schema.js?v=1',
     'src/characters/character-customization.js?v=5',
@@ -10,6 +13,7 @@
     'src/ui/character-customizer-ui.js?v=2',
     'src/ui/character-customizer-preview.js?v=2'
   ];
+  const BOOT_SCRIPTS = FOUNDATION_SCRIPTS.concat(CUSTOMIZATION_SCRIPTS);
 
   function closeProfilePanel() {
     const sheet = document.getElementById('inspect-sheet');
@@ -85,8 +89,8 @@
   }
 
   function loadScriptSequentially(index) {
-    if (index >= CUSTOMIZATION_SCRIPTS.length) return;
-    const src = CUSTOMIZATION_SCRIPTS[index];
+    if (index >= BOOT_SCRIPTS.length) return;
+    const src = BOOT_SCRIPTS[index];
     const base = src.split('?')[0];
     if (Array.from(document.scripts).some(function (s) { return (s.getAttribute('src') || '').split('?')[0] === base; })) {
       loadScriptSequentially(index + 1);
@@ -95,32 +99,35 @@
     const script = document.createElement('script');
     script.src = src;
     script.async = false;
-    script.dataset.keloCharacterCustomization = '1';
+    script.dataset.keloRuntimeBootstrap = FOUNDATION_SCRIPTS.indexOf(src) >= 0 ? 'foundation' : 'character';
     script.onload = function () { loadScriptSequentially(index + 1); };
-    script.onerror = function () { console.error('[Kelo profile] customization module failed', base); };
+    script.onerror = function () { console.error('[Kelo boot] module failed', base); };
     document.body.appendChild(script);
   }
 
-  function ensureCustomizationModules() {
+  function ensureRuntimeModules() {
     loadScriptSequentially(0);
   }
 
   function boot() {
     ensureCloseButton();
     wrapInspectPlayer();
-    ensureCustomizationModules();
+    ensureRuntimeModules();
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true });
   else boot();
 
   window.KELO_PROFILE_CLOSE_AUDIT = Object.freeze({
-    version: 'profile-close-v1.4.0',
+    version: 'profile-close-v1.5.0',
     closeButtonId: CLOSE_ID,
     minTouchTargetPx: 44,
     tapClose: true,
     legacyCloseHidden: true,
+    runtimeFoundationBootstrap: true,
     characterCustomizationBootstrap: true,
-    customizationScripts: CUSTOMIZATION_SCRIPTS.slice()
+    foundationScripts: FOUNDATION_SCRIPTS.slice(),
+    customizationScripts: CUSTOMIZATION_SCRIPTS.slice(),
+    bootScripts: BOOT_SCRIPTS.slice()
   });
 })();
