@@ -211,7 +211,7 @@ Melee → profile → KeloMeleeEngine → KeloCombatEngine → events → presen
 Effect → definition/type → KeloEffectEngine
 Prop → contract/catalog → Property/World → KELO_COLLISION owner → renderer
 VFX → manifest/primitive → KeloVisualSystem
-Avatar → KeloAvatar middleware 400 visual → 300 aura 300 → appearance 200 → hero 100 → base
+Avatar → KeloAvatar middleware visual 400 → aura 300 → appearance 200 → hero 100 → base
 Item → definition → backpack/equipment/container APIs
 UI → system public API → render result
 ```
@@ -274,11 +274,11 @@ Regla: UI/cliente solicita operaciones; autoridad crítica puede migrar al serve
 | Backpack direct legacy lock writes | ✅ 0; token `KeloInputLocks` |
 | Hotfix watchdog `force-unlock` activo | ✅ retirado y fuera del runtime |
 | Prefab contract | ✅ LIVE; renderer genérico dormant probado como unidad |
-| Generic Prop contract | ✅ contrato estructural LIVE + collision ownership; CI #25 verde |
-| Property Editor | ✅ correctamente clasificado DORMANT; browser audit #194 verde |
-| House lifecycle/recovery | ✅ browser audit móvil/desktop #157 verde |
-| CI arquitectónico/documental | ✅ Foundation #158 verde en el paquete conductual V2 |
-| CI funcional relacionado | ✅ Ability Collision #187, Generic Prop #25, Property #194, House #157, Studio #23, Backpack #308, Prefab #311, Terrain #293 y Mobile Performance #249 verdes |
+| Generic Prop contract | ✅ contrato estructural LIVE + collision ownership; CI #26 verde |
+| Property Editor | ✅ correctamente clasificado DORMANT; browser audit #195 verde |
+| House lifecycle/recovery | ✅ browser audit móvil/desktop #158 verde |
+| CI arquitectónico/documental | ✅ Foundation #160 verde en el HEAD documental V2 |
+| CI funcional relacionado | ✅ Ability Collision #188, Generic Prop #26, Property #195, House #158, Studio #24, Backpack #309, Prefab #312, Terrain #294 y Mobile Performance #250 verdes |
 | CI de assets global | ⚠️ Kelo CI / Visual System CI mantienen deuda de assets/manifest independiente |
 | `main` protegido | ❌ no está protegido en la última lectura disponible |
 | Legacy totalmente clasificado/migrado | ⚠️ en progreso; siguiente deuda prioritaria: camera/zoom, inventory state, World Edit/storage y assets |
