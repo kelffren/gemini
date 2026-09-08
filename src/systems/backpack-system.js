@@ -1,37 +1,35 @@
+/* KELO-INDEX
+ * area: SYSTEMS / BACKPACK
+ * owner: KeloBackpack
+ * purpose: layout, slots, sorting y acciones UX del backpack sobre items propiedad de KeloInventory
+ * public-api: KeloBackpack
+ * consumes: KeloInventory, KeloEquipment
+ * state-owned: STATE.backpack slot metadata/capacity
+ * extension-points: moveSlot/mergeStacks/splitStack/sortSlots/discardSlot/expandCapacity
+ * reuse: UI y features usan esta API para orden del backpack; almacenamiento/identidad usa KeloInventory
+ * legacy: STATE.backpack persiste dentro del STATE monolítico
+ * do-not: NO escribir STATE.inventory ni duplicar identidad/stack helpers
+ */
 (function(){
 'use strict';
 
-const VERSION='backpack-v1.1.0';
+const VERSION='backpack-v1.2.0';
 const SCHEMA_VERSION=2;
 const BASE_CAPACITY=20;
 const COLUMNS=5;
+const inventoryOwner=window.KeloInventory;
+if(!inventoryOwner)throw new Error('KeloInventory unavailable before backpack-system');
 let ensuring=false;
 
 function nextCapacity(count){
   const needed=Math.max(BASE_CAPACITY,Math.max(0,Math.floor(Number(count)||0)));
   return Math.ceil(needed/COLUMNS)*COLUMNS;
 }
-
-function stableKey(item,index){
-  if(!item||typeof item!=='object')return null;
-  if(item.id)return 'id:'+String(item.id);
-  if(item.uid)return 'uid:'+String(item.uid);
-  if(!item._backpackId){
-    item._backpackId='bp_'+Date.now().toString(36)+'_'+index.toString(36)+'_'+Math.random().toString(36).slice(2,8);
-  }
-  return 'bp:'+item._backpackId;
-}
-
-function stackLimit(item){return Math.max(1,Math.floor(Number(item&&item.maxStack)||1));}
-function quantity(item){return Math.max(1,Math.floor(Number(item&&item.quantity)||1));}
-function stackSignature(item){
-  if(!item||item.kind==='equipment'||stackLimit(item)<=1)return null;
-  if(item.stackKey)return 'stack:'+String(item.stackKey);
-  if(item.templateId)return 'template:'+String(item.templateId);
-  if(item.typeId)return 'type:'+String(item.typeId)+':tier:'+String(item.tier||'')+':quality:'+String(item.quality||'');
-  return null;
-}
-function canStack(a,b){const sa=stackSignature(a),sb=stackSignature(b);return !!(sa&&sb&&sa===sb);}
+function stableKey(item,index){return inventoryOwner.keyForItem(item,index);}
+function stackLimit(item){return inventoryOwner.stackLimit(item);}
+function quantity(item){return inventoryOwner.quantity(item);}
+function stackSignature(item){return inventoryOwner.stackSignature(item);}
+function canStack(a,b){return inventoryOwner.canStack(a,b);}
 
 function ensure(){
   if(typeof STATE==='undefined')return null;
@@ -39,8 +37,8 @@ function ensure(){
   ensuring=true;
   let changed=false;
   try{
-    if(!Array.isArray(STATE.inventory)){STATE.inventory=[];changed=true;}
-    const inventory=STATE.inventory;
+    inventoryOwner.ensure();
+    const inventory=inventoryOwner.getItems('backpack');
     const capacity=nextCapacity(inventory.length);
     if(!STATE.backpack||typeof STATE.backpack!=='object'){
       STATE.backpack={schemaVersion:SCHEMA_VERSION,capacity,slots:[]};
@@ -55,8 +53,8 @@ function ensure(){
     const keys=[];
     const valid=new Set();
     inventory.forEach(function(item,index){
-      item.quantity=quantity(item);
-      if(stackLimit(item)>1)item.maxStack=stackLimit(item);
+      const q=quantity(item);if(Number(item.quantity)!==q){inventoryOwner.setQuantity(item,q,{persist:false});changed=true;}
+      if(stackLimit(item)>1&&Number(item.maxStack)!==stackLimit(item)){item.maxStack=stackLimit(item);changed=true;}
       const key=stableKey(item,index);
       if(key&&!valid.has(key)){keys.push(key);valid.add(key);}
     });
@@ -84,19 +82,11 @@ function ensure(){
     if(JSON.stringify(bag.slots)!==JSON.stringify(rebuilt)){bag.slots=rebuilt;changed=true;}
     if(bag.capacity!==rebuilt.length){bag.capacity=rebuilt.length;changed=true;}
   }finally{ensuring=false;}
-  if(changed&&typeof saveState==='function')saveState();
+  if(changed)inventoryOwner.persist();
   return STATE.backpack;
 }
 
-function itemMap(){
-  ensure();
-  const map=new Map();
-  STATE.inventory.forEach(function(item,index){
-    const key=stableKey(item,index);
-    if(key&&!map.has(key))map.set(key,item);
-  });
-  return map;
-}
+function itemMap(){ensure();return inventoryOwner.itemMap('backpack');}
 
 function descriptor(item,index){
   if(!item)return null;
@@ -137,9 +127,7 @@ function slotAt(index){
   const slots=getSlots();
   return Number.isInteger(index)&&index>=0&&index<slots.length?slots[index]:null;
 }
-function save(){if(typeof saveState==='function')saveState();}
-function removeInventoryItem(item){const i=STATE.inventory.indexOf(item);if(i>=0)STATE.inventory.splice(i,1);}
-function newStackId(){return 'stack_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,9);}
+function save(){inventoryOwner.persist();}
 
 function mergeStacks(from,to){
   const bag=ensure();
@@ -149,10 +137,10 @@ function mergeStacks(from,to){
   const room=stackLimit(target.item)-quantity(target.item);
   if(room<=0)return {ok:false,error:'TARGET_STACK_FULL'};
   const moved=Math.min(room,quantity(source.item));
-  target.item.quantity=quantity(target.item)+moved;
-  source.item.quantity=quantity(source.item)-moved;
-  if(source.item.quantity<=0){
-    removeInventoryItem(source.item);
+  inventoryOwner.setQuantity(target.item,quantity(target.item)+moved,{persist:false});
+  inventoryOwner.setQuantity(source.item,quantity(source.item)-moved,{persist:false});
+  if(Number(source.item.quantity)<=0){
+    inventoryOwner.removeItem('backpack',source.item,{persist:false});
     bag.slots[from]=null;
   }
   save();
@@ -186,13 +174,11 @@ function splitStack(from,to,amount){
   if(!stackSignature(source.item))return {ok:false,error:'NOT_STACKABLE'};
   const current=quantity(source.item);
   if(!Number.isInteger(amount)||amount<1||amount>=current)return {ok:false,error:'INVALID_AMOUNT'};
-  const clone=Object.assign({},source.item,{quantity:amount,createdAt:Date.now(),splitFrom:source.item.id||source.item.uid||source.item._backpackId||null});
-  if(Object.prototype.hasOwnProperty.call(clone,'id'))clone.id=newStackId();
-  else if(Object.prototype.hasOwnProperty.call(clone,'uid'))clone.uid=newStackId();
-  else clone._backpackId=newStackId();
-  source.item.quantity=current-amount;
-  STATE.inventory.push(clone);
-  bag.slots[to]=stableKey(clone,STATE.inventory.length-1);
+  const clone=inventoryOwner.cloneWithNewIdentity(source.item,{quantity:amount,createdAt:Date.now(),splitFrom:source.item.id||source.item.uid||source.item._backpackId||null});
+  inventoryOwner.setQuantity(source.item,current-amount,{persist:false});
+  const added=inventoryOwner.addItem('backpack',clone,{persist:false});
+  if(!added.ok)return added;
+  bag.slots[to]=added.key;
   save();
   return {ok:true,from,to,amount,sourceQuantity:source.item.quantity,newItem:clone};
 }
@@ -225,8 +211,8 @@ function discardSlot(index,amount){
   const current=quantity(slot.item);
   const drop=amount==null?current:amount;
   if(!Number.isInteger(drop)||drop<1||drop>current)return {ok:false,error:'INVALID_AMOUNT'};
-  if(drop===current){removeInventoryItem(slot.item);bag.slots[index]=null;}
-  else slot.item.quantity=current-drop;
+  if(drop===current){inventoryOwner.removeItem('backpack',slot.item,{persist:false});bag.slots[index]=null;}
+  else inventoryOwner.setQuantity(slot.item,current-drop,{persist:false});
   save();
   return {ok:true,discarded:drop,remaining:drop===current?0:slot.item.quantity};
 }
@@ -271,11 +257,13 @@ window.KELO_BACKPACK_AUDIT=Object.freeze({
   schemaVersion:SCHEMA_VERSION,
   baseCapacity:BASE_CAPACITY,
   columns:COLUMNS,
-  source:'STATE.inventory-adapter-v2',
+  source:'KeloInventory-backpack-view-v3',
+  inventoryOwner:'KeloInventory',
+  directInventoryWrites:false,
   ordering:'stable-slot-metadata-v2',
   mutatesLegacyInventoryOrderOnMove:false,
   stacksImplemented:true,
-  stackMode:'explicit-signature-transactional-v1',
+  stackMode:'KeloInventory-shared-signature-v2',
   splitImplemented:true,
   sortImplemented:true,
   discardImplemented:true,

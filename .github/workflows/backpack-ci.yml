@@ -3,6 +3,7 @@ on:
   push:
     branches: [main]
     paths:
+      - 'src/core/inventory-state-system.js'
       - 'src/core/input-lock-system.js'
       - 'src/core/input-gate.js'
       - 'src/systems/backpack-system.js'
@@ -10,12 +11,16 @@ on:
       - 'src/systems/container-system.js'
       - 'src/systems/market-escrow-system.js'
       - 'src/systems/emote-system.js'
+      - 'src/systems/forge-system.js'
+      - 'src/ui/luxe-boutique.js'
       - 'src/ui/backpack-ui.js'
       - 'src/ui/backpack-fantasy-v1.css'
       - 'src/ui/modal-input-lock.js'
       - 'src/ui/warehouse-ui.js'
       - 'src/ui/market-ui.js'
       - 'src/ui/self-interaction-ui.js'
+      - 'src/abilities/stone-backpack-bridge.js'
+      - 'scripts/inventory-state-contract-audit.js'
       - 'scripts/backpack-system-audit.js'
       - 'scripts/container-system-audit.js'
       - 'scripts/market-escrow-audit.js'
@@ -25,6 +30,7 @@ on:
       - 'index.html'
   pull_request:
     paths:
+      - 'src/core/inventory-state-system.js'
       - 'src/core/input-lock-system.js'
       - 'src/core/input-gate.js'
       - 'src/systems/backpack-system.js'
@@ -32,12 +38,16 @@ on:
       - 'src/systems/container-system.js'
       - 'src/systems/market-escrow-system.js'
       - 'src/systems/emote-system.js'
+      - 'src/systems/forge-system.js'
+      - 'src/ui/luxe-boutique.js'
       - 'src/ui/backpack-ui.js'
       - 'src/ui/backpack-fantasy-v1.css'
       - 'src/ui/modal-input-lock.js'
       - 'src/ui/warehouse-ui.js'
       - 'src/ui/market-ui.js'
       - 'src/ui/self-interaction-ui.js'
+      - 'src/abilities/stone-backpack-bridge.js'
+      - 'scripts/inventory-state-contract-audit.js'
       - 'scripts/backpack-system-audit.js'
       - 'scripts/container-system-audit.js'
       - 'scripts/market-escrow-audit.js'
@@ -56,6 +66,7 @@ jobs:
           node-version: 24
       - name: Syntax
         run: |
+          node --check src/core/inventory-state-system.js
           node --check src/core/input-lock-system.js
           node --check src/core/input-gate.js
           node --check src/systems/equipment-system.js
@@ -63,16 +74,22 @@ jobs:
           node --check src/systems/container-system.js
           node --check src/systems/market-escrow-system.js
           node --check src/systems/emote-system.js
+          node --check src/systems/forge-system.js
+          node --check src/ui/luxe-boutique.js
+          node --check src/abilities/stone-backpack-bridge.js
           node --check src/ui/modal-input-lock.js
           node --check src/ui/backpack-ui.js
           node --check src/ui/warehouse-ui.js
           node --check src/ui/market-ui.js
           node --check src/ui/self-interaction-ui.js
+          node --check scripts/inventory-state-contract-audit.js
           node --check scripts/backpack-system-audit.js
           node --check scripts/container-system-audit.js
           node --check scripts/market-escrow-audit.js
           node --check scripts/emote-system-audit.js
           node --check scripts/inventory-ui-v2-audit.js
+      - name: Inventory ownership contract
+        run: node scripts/inventory-state-contract-audit.js
       - name: Backpack mechanics
         run: node scripts/backpack-system-audit.js
       - name: Container mechanics
@@ -85,22 +102,27 @@ jobs:
         run: node scripts/inventory-ui-v2-audit.js
       - name: Integration contract
         run: |
-          grep -q "equipment-v1.1.2" src/systems/equipment-system.js
-          grep -q "marketEscrowAwareStarterIdentity:true" src/systems/equipment-system.js
-          grep -q "backpack-v1.1.0" src/systems/backpack-system.js
+          grep -q "inventory-state-v1.0.0" src/core/inventory-state-system.js
+          grep -q "oneIdentityAcrossContainers:true" src/core/inventory-state-system.js
+          grep -q "equipment-v1.2.0" src/systems/equipment-system.js
+          grep -q "inventoryOwner:'KeloInventory'" src/systems/equipment-system.js
+          grep -q "backpack-v1.2.0" src/systems/backpack-system.js
           grep -q "stacksImplemented:true" src/systems/backpack-system.js
           grep -q "splitImplemented:true" src/systems/backpack-system.js
-          grep -q "container-v1.2.0" src/systems/container-system.js
+          grep -q "container-v1.3.0" src/systems/container-system.js
           grep -q "strictDestinationCapacity:true" src/systems/container-system.js
           grep -q "warehouseImplemented:true" src/systems/container-system.js
           grep -q "marketEscrowImplemented:true" src/systems/container-system.js
           grep -q "marketEscrowMerge:false" src/systems/container-system.js
           grep -q "emoteLoadoutImplemented:true" src/systems/container-system.js
-          grep -q "emote-loadout-v1.0.0" src/systems/emote-system.js
+          grep -q "emote-loadout-v1.1.0" src/systems/emote-system.js
           grep -q "noDuplicateInBackpackWhileEquipped:true" src/systems/emote-system.js
-          grep -q "market-escrow-v1.0.0" src/systems/market-escrow-system.js
+          grep -q "market-escrow-v1.1.0" src/systems/market-escrow-system.js
           grep -q "listingContract:'validate-transfer-create-persist-rollback-v1'" src/systems/market-escrow-system.js
           grep -q "cancelContract:'validate-transfer-close-persist-rollback-v1'" src/systems/market-escrow-system.js
+          grep -q "forge-v1.1.0" src/systems/forge-system.js
+          grep -q "directInventoryWrites:false" src/systems/forge-system.js
+          grep -q "shadow-stone-migration-preserve-all-portable-v2" src/abilities/stone-backpack-bridge.js
           grep -Eq "backpack-ui-v2\.[0-9]+\.[0-9]+" src/ui/backpack-ui.js
           grep -q "locks.acquire('backpack-ui'" src/ui/backpack-ui.js
           grep -q "inputLockTokenized:true" src/ui/backpack-ui.js

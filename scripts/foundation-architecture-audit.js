@@ -114,6 +114,10 @@ function hasGlobalAssignment(line,name){
 function hasCoreGlobalAssignment(line){
   return ['render','renderAvatar','updateSimulation','processInput','updateMovement'].some((name)=>hasGlobalAssignment(line,name));
 }
+function hasDirectInventoryWrite(line){
+  const code=codeOnlyLine(line);
+  return /\bSTATE\.inventory\s*=/.test(code)||/\bSTATE\.inventory\s*\.(?:push|splice|pop|shift|unshift|sort|reverse)\s*\(/.test(code);
+}
 
 const base = resolveBase();
 if (!base) {
@@ -135,7 +139,8 @@ if (!base) {
     { name: 'UI directly mutates player position/HP', test: (x) => /^src\/ui\//.test(x.file) && /\blocalPlayer\.(x|y|hp|maxHp)\s*=/.test(codeOnlyLine(x.line)) },
     { name: 'UI directly pushes physical obstacle', test: (x) => /^src\/ui\//.test(x.file) && /\bobstacles\.push\s*\(/.test(codeOnlyLine(x.line)) },
     { name: 'new engine-v2 style parallel core file', test: (x) => /(^|\/)engine[-_]?v?2/i.test(x.file) },
-    { name: 'new direct legacy modal-lock write', test: (x) => !isContractFixture(x.file) && x.file !== 'src/core/input-lock-system.js' && hasGlobalAssignment(x.line,'KELO_MODAL_INPUT_LOCK') }
+    { name: 'new direct legacy modal-lock write', test: (x) => !isContractFixture(x.file) && x.file !== 'src/core/input-lock-system.js' && hasGlobalAssignment(x.line,'KELO_MODAL_INPUT_LOCK') },
+    { name: 'new direct legacy inventory write', test: (x) => !isContractFixture(x.file) && x.file !== 'src/core/inventory-state-system.js' && hasDirectInventoryWrite(x.line) }
   ];
 
   added.forEach((entry) => {

@@ -25,6 +25,8 @@ jobs:
         run: node scripts/movement-system-contract-audit.js
       - name: Audit camera/viewport owner contract
         run: node scripts/camera-system-contract-audit.js
+      - name: Audit inventory state owner contract
+        run: node scripts/inventory-state-contract-audit.js
       - name: Audit render extension owner contract
         run: node scripts/render-extension-contract-audit.js
       - name: Audit simulation extension owner contract
@@ -42,6 +44,7 @@ jobs:
           node --check src/core/input-gate.js
           node --check src/core/movement-system.js
           node --check src/core/camera-system.js
+          node --check src/core/inventory-state-system.js
           node --check src/core/render-extension-system.js
           node --check src/core/simulation-extension-system.js
           node --check src/core/avatar-render-system.js
@@ -67,9 +70,17 @@ jobs:
           node --check engine-net.js
           node --check src/characters/character-appearance.js
           node --check src/systems/pvp-world.js
+          node --check src/systems/equipment-system.js
+          node --check src/systems/backpack-system.js
+          node --check src/systems/container-system.js
+          node --check src/systems/emote-system.js
+          node --check src/systems/market-escrow-system.js
+          node --check src/systems/forge-system.js
+          node --check src/ui/luxe-boutique.js
           node --check src/ui/mobile-orientation.js
           node --check src/ui/pvp-social-touch-guard.js
           node --check src/ui/backpack-ui.js
+          node --check src/abilities/stone-backpack-bridge.js
           node --check src/abilities/kelo-ability-boot.js
           node --check src/abilities/sword-swap-runtime.js
           node --check src/systems/armor-aura.js
@@ -80,6 +91,7 @@ jobs:
           node --check scripts/input-system-contract-audit.js
           node --check scripts/movement-system-contract-audit.js
           node --check scripts/camera-system-contract-audit.js
+          node --check scripts/inventory-state-contract-audit.js
           node --check scripts/render-extension-contract-audit.js
           node --check scripts/simulation-extension-contract-audit.js
           node --check scripts/avatar-render-contract-audit.js

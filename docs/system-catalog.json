@@ -46,6 +46,14 @@
       "status": "foundation-transitional"
     },
     {
+      "id": "inventory-state",
+      "owner": "KeloInventory",
+      "source": "src/core/inventory-state-system.js",
+      "technicalDoc": "docs/systems/INVENTORY_STATE_SYSTEM.md",
+      "playerVisible": false,
+      "status": "foundation-transitional"
+    },
+    {
       "id": "render-extensions",
       "owner": "KeloRender",
       "source": "src/core/render-extension-system.js",
