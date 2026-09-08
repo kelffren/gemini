@@ -1,12 +1,20 @@
 /* KELO-INDEX
- * area: UI
- * keys: CHARACTER CUSTOMIZER PREVIEW VISUAL STACK GENERIC LAYERS
- * hace: renderiza cualquier pieza modular seleccionada usando el visual stack compartido
+ * area: UI / CHARACTER PREVIEW
+ * owner: KeloCharacterCustomizerPreview
+ * keys: CHARACTER CUSTOMIZER PREVIEW VISUAL STACK GENERIC LAYERS SLEEP WAKE PERFORMANCE
+ * purpose: renderiza piezas modulares solo cuando el Character Customizer está abierto, sin observar todo document.body
+ * public-api: KeloCharacterCustomizerPreview.render/entries/wake/sleep/isAwake
+ * consumes: KeloCharacterCustomization, KeloCharacterVisualStack, KeloCharacterCustomizer
+ * state-owned: scheduling efímero de un único RAF de preview
+ * extension-points: eventos semánticos de customization/content packs
+ * reuse: preview modular de cualquier slot registrado
+ * legacy: ninguno
+ * do-not: NO MutationObserver global permanente, NO loop RAF continuo
  */
 (function (root) {
   'use strict';
 
-  const VERSION = 'character-customizer-preview-v1.1.0';
+  const VERSION = 'character-customizer-preview-v1.2.0';
   const audit = root.KELO_CHARACTER_CUSTOMIZER_PREVIEW_AUDIT = {
     version:VERSION,
     ready:false,
@@ -14,11 +22,16 @@
     layers:0,
     lastKey:null,
     genericVisualStack:true,
-    hardcodedSlots:false
+    hardcodedSlots:false,
+    globalMutationObserver:false,
+    continuousRaf:false,
+    awake:false
   };
+  let frameId = 0;
 
   function api() { return root.KeloCharacterCustomization || null; }
   function stackApi() { return root.KeloCharacterVisualStack || null; }
+  function isOpen() { return !!(root.KeloCharacterCustomizer && typeof root.KeloCharacterCustomizer.isOpen === 'function' && root.KeloCharacterCustomizer.isOpen()); }
   function ensureStyle() {
     if (document.getElementById('kelo-character-customizer-preview-style')) return;
     const s = document.createElement('style');
@@ -37,9 +50,7 @@
     if (!A || !Stack) return [];
     return Stack.resolve({ state:A.getState(), face:'down' });
   }
-  function layerZ(entry) {
-    return entry.section === 'back' ? 1 : 4 + Math.min(20, Number(entry.index) || 0);
-  }
+  function layerZ(entry) { return entry.section === 'back' ? 1 : 4 + Math.min(20, Number(entry.index) || 0); }
   function renderSheet(stage, entry) {
     const visual = entry.visual;
     const layer = document.createElement('div');
@@ -77,6 +88,7 @@
   }
 
   function renderPreview() {
+    if (!isOpen()) return false;
     const stage = document.querySelector('#kelo-character-customizer .kc-stage');
     const A = api(), Stack = stackApi();
     if (!A || !Stack || !stage) return false;
@@ -84,7 +96,6 @@
     const entries = previewEntries();
     const key = entries.map(function (entry) { return entry.slot + ':' + entry.item.id + ':' + entry.section; }).join('|');
     if (stage.dataset.keloKitPreviewKey === key && stage.querySelectorAll('.kc-kit-layer').length === entries.length) return true;
-
     stage.querySelectorAll('.kc-kit-layer').forEach(function (node) { node.remove(); });
     entries.forEach(function (entry) {
       if (entry.visual.mode === 'sheet') renderSheet(stage, entry);
@@ -97,16 +108,26 @@
     return true;
   }
 
-  let scheduled = false;
-  function schedule() {
-    if (scheduled) return;
-    scheduled = true;
-    requestAnimationFrame(function () { scheduled = false; renderPreview(); });
+  function sleep() {
+    if (frameId) cancelAnimationFrame(frameId);
+    frameId = 0;
+    audit.awake = false;
+    return true;
   }
+  function schedule() {
+    if (!isOpen()) { sleep(); return false; }
+    audit.awake = true;
+    if (frameId) return true;
+    frameId = requestAnimationFrame(function () {
+      frameId = 0;
+      if (!isOpen()) { audit.awake = false; return; }
+      renderPreview();
+    });
+    return true;
+  }
+  function wake() { return schedule(); }
   function boot() {
     ensureStyle();
-    const observer = new MutationObserver(schedule);
-    observer.observe(document.body, { childList:true, subtree:true });
     root.addEventListener('kelo:character-customization-changed', schedule);
     root.addEventListener('kelo:character-content-pack-ready', schedule);
     root.addEventListener('kelo:character-demo-kit-ready', schedule);
@@ -117,5 +138,5 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once:true });
   else boot();
 
-  root.KeloCharacterCustomizerPreview = Object.freeze({ version:VERSION, render:renderPreview, entries:previewEntries });
+  root.KeloCharacterCustomizerPreview = Object.freeze({ version:VERSION, render:renderPreview, entries:previewEntries, wake:wake, sleep:sleep, isAwake:function(){return audit.awake;} });
 })(typeof globalThis !== 'undefined' ? globalThis : window);
