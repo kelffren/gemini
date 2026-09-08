@@ -6,51 +6,40 @@
  * online: serialize() output is transport-friendly
  */
 
-const copy = value => value == null ? value : structuredClone(value);
+const copy = value => value == null ? value : (typeof structuredClone === 'function' ? structuredClone(value) : JSON.parse(JSON.stringify(value)));
 const rectFor = entity => ({ x: Number(entity?.transform?.x) || 0, y: Number(entity?.transform?.y) || 0, w: Math.max(1, Number(entity?.bounds?.w) || 1), h: Math.max(1, Number(entity?.bounds?.h) || 1) });
-
-function findIndex(document, id) { return document.entities.findIndex(e => e.id === id); }
+const findIndex = (document, id) => document.entities.findIndex(e => e.id === id);
 
 export function createPlaceEntityCommand(entity) {
   const row = copy(entity);
-  return {
-    type: 'entity.place', label: `Place ${row.prefabId || row.id}`,
+  return { type: 'entity.place', label: `Place ${row.prefabId || row.id}`,
     execute({ document }) { if (findIndex(document, row.id) >= 0) throw new Error('STUDIO_ENTITY_ALREADY_EXISTS'); document.entities.push(copy(row)); },
     undo({ document }) { const i = findIndex(document, row.id); if (i >= 0) document.entities.splice(i, 1); },
-    serialize: () => ({ type: 'entity.place', entity: copy(row) }),
-    affectedRects: () => [rectFor(row)]
-  };
+    serialize: () => ({ type: 'entity.place', entity: copy(row) }), affectedRects: () => [rectFor(row)] };
 }
 
 export function createMoveEntityCommand(id, to) {
   id = String(id); const target = { x: Number(to?.x) || 0, y: Number(to?.y) || 0 }; let from = null;
-  return {
-    type: 'entity.move', label: `Move ${id}`,
+  return { type: 'entity.move', label: `Move ${id}`,
     execute({ document }) { const e = document.entities[findIndex(document, id)]; if (!e) throw new Error('STUDIO_ENTITY_NOT_FOUND'); if (!from) from = { x: Number(e.transform?.x) || 0, y: Number(e.transform?.y) || 0 }; e.transform = { ...(e.transform || {}), ...target }; },
     undo({ document }) { const e = document.entities[findIndex(document, id)]; if (e && from) e.transform = { ...(e.transform || {}), ...from }; },
     serialize: () => ({ type: 'entity.move', id, from: copy(from), to: copy(target) }),
-    affectedRects({ document }) { const e = document.entities[findIndex(document, id)]; const now = e ? rectFor(e) : { x: target.x, y: target.y, w: 1, h: 1 }; return [now, { ...now, x: from?.x ?? now.x, y: from?.y ?? now.y }]; }
-  };
+    affectedRects({ document }) { const e = document.entities[findIndex(document, id)]; const now = e ? rectFor(e) : { x: target.x, y: target.y, w: 1, h: 1 }; return [now, { ...now, x: from?.x ?? now.x, y: from?.y ?? now.y }]; } };
 }
 
 export function createRemoveEntityCommand(id) {
   id = String(id); let removed = null; let index = -1;
-  return {
-    type: 'entity.remove', label: `Remove ${id}`,
+  return { type: 'entity.remove', label: `Remove ${id}`,
     execute({ document }) { index = findIndex(document, id); if (index < 0) throw new Error('STUDIO_ENTITY_NOT_FOUND'); removed = copy(document.entities[index]); document.entities.splice(index, 1); },
-    undo({ document }) { if (!removed) return; document.entities.splice(Math.max(0, index), 0, copy(removed)); },
-    serialize: () => ({ type: 'entity.remove', id, entity: copy(removed) }),
-    affectedRects: () => removed ? [rectFor(removed)] : []
-  };
+    undo({ document }) { if (removed) document.entities.splice(Math.max(0, index), 0, copy(removed)); },
+    serialize: () => ({ type: 'entity.remove', id, entity: copy(removed) }), affectedRects: () => removed ? [rectFor(removed)] : [] };
 }
 
 export function createPatchEntityCommand(id, patch) {
   id = String(id); const next = copy(patch || {}); let previous = null;
-  return {
-    type: 'entity.patch', label: `Edit ${id}`,
+  return { type: 'entity.patch', label: `Edit ${id}`,
     execute({ document }) { const i = findIndex(document, id); if (i < 0) throw new Error('STUDIO_ENTITY_NOT_FOUND'); previous = copy(document.entities[i]); document.entities[i] = { ...document.entities[i], ...copy(next) }; },
     undo({ document }) { const i = findIndex(document, id); if (i >= 0 && previous) document.entities[i] = copy(previous); },
     serialize: () => ({ type: 'entity.patch', id, patch: copy(next) }),
-    affectedRects({ document }) { const i = findIndex(document, id); return [previous && rectFor(previous), i >= 0 && rectFor(document.entities[i])].filter(Boolean); }
-  };
+    affectedRects({ document }) { const i = findIndex(document, id); return [previous && rectFor(previous), i >= 0 && rectFor(document.entities[i])].filter(Boolean); } };
 }

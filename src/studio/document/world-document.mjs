@@ -8,7 +8,7 @@
 
 export const WORLD_DOCUMENT_SCHEMA = 1;
 
-const clone = value => value == null ? value : structuredClone(value);
+const clone = value => value == null ? value : (typeof structuredClone === 'function' ? structuredClone(value) : JSON.parse(JSON.stringify(value)));
 
 function stableId(prefix = 'world') {
   const uuid = globalThis.crypto?.randomUUID?.();
@@ -21,20 +21,7 @@ export function createWorldDocument(overrides = {}) {
     worldId: stableId('world'),
     metadata: { name: 'Untitled', description: '', tags: [] },
     settings: { tileSize: 32, chunkSize: 512 },
-    layers: [],
-    terrain: {},
-    entities: [],
-    zones: [],
-    logicGraphs: [],
-    variables: [],
-    gameRules: {},
-    navigation: {},
-    spawnPoints: [],
-    objectives: [],
-    dependencies: [],
-    performanceBudget: {},
-    permissions: {},
-    revision: { number: 0, id: null },
+    layers: [], terrain: {}, entities: [], zones: [], logicGraphs: [], variables: [], gameRules: {}, navigation: {}, spawnPoints: [], objectives: [], dependencies: [], performanceBudget: {}, permissions: {}, revision: { number: 0, id: null },
     ...overrides
   });
 }
@@ -49,15 +36,10 @@ export function normalizeWorldDocument(input = {}) {
     settings: { tileSize: Math.max(1, Number(settings.tileSize) || 32), chunkSize: Math.max(64, Number(settings.chunkSize) || 512), ...clone(settings) },
     layers: array(input.layers),
     terrain: clone(input.terrain && typeof input.terrain === 'object' ? input.terrain : {}),
-    entities: array(input.entities),
-    zones: array(input.zones),
-    logicGraphs: array(input.logicGraphs),
-    variables: array(input.variables),
+    entities: array(input.entities), zones: array(input.zones), logicGraphs: array(input.logicGraphs), variables: array(input.variables),
     gameRules: clone(input.gameRules && typeof input.gameRules === 'object' ? input.gameRules : {}),
     navigation: clone(input.navigation && typeof input.navigation === 'object' ? input.navigation : {}),
-    spawnPoints: array(input.spawnPoints),
-    objectives: array(input.objectives),
-    dependencies: array(input.dependencies),
+    spawnPoints: array(input.spawnPoints), objectives: array(input.objectives), dependencies: array(input.dependencies),
     performanceBudget: clone(input.performanceBudget && typeof input.performanceBudget === 'object' ? input.performanceBudget : {}),
     permissions: clone(input.permissions && typeof input.permissions === 'object' ? input.permissions : {}),
     revision: clone(input.revision && typeof input.revision === 'object' ? input.revision : { number: 0, id: null })

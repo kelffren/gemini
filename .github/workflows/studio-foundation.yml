@@ -1,0 +1,28 @@
+name: Kelo Studio Foundation
+on:
+  pull_request:
+    paths:
+      - 'src/studio/**'
+      - 'scripts/studio-foundation-audit.mjs'
+      - 'package.json'
+      - '.github/workflows/studio-foundation.yml'
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax check Studio modules
+        run: find src/studio -type f -name '*.mjs' -print0 | xargs -0 -n1 node --check
+      - name: Studio foundation functional audit
+        run: node scripts/studio-foundation-audit.mjs
+      - name: Verify lazy boot contract
+        run: |
+          if grep -Eq 'src/studio/|studio-entry\.mjs' index.html; then
+            echo 'Studio must not be eagerly loaded by index.html'
+            exit 1
+          fi
