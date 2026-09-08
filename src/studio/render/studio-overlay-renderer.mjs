@@ -13,6 +13,7 @@ export function createStudioOverlayRenderer({ kernel, tools } = {}) {
   function draw(ctx) {
     if (!ctx) return;ctx.save();ctx.lineWidth = 2;
     for (const id of kernel.selection.get()) { const row = kernel.spatial.get(id); if (row?.rect) drawRect(ctx, row.rect); }
+    const marquee=tools?.marquee?.getPreview?.();if(marquee){ctx.save();ctx.fillStyle='rgba(231,197,106,.10)';ctx.fillRect(marquee.x,marquee.y,marquee.w,marquee.h);ctx.strokeStyle='rgba(231,197,106,.85)';drawRect(ctx,marquee,{dashed:true});ctx.restore();}
     const placement = tools?.placement?.getPreview?.();if (placement) { ctx.save();ctx.globalAlpha=.35;ctx.fillRect(placement.transform.x,placement.transform.y,placement.bounds.w,placement.bounds.h);ctx.restore();drawRect(ctx,{x:placement.transform.x,y:placement.transform.y,w:placement.bounds.w,h:placement.bounds.h},{dashed:true}); }
     const prefab = tools?.prefabStamp?.getPreview?.();if(prefab){ctx.save();ctx.globalAlpha=.16;ctx.fillStyle='#e7c56a';ctx.fillRect(prefab.x,prefab.y,prefab.w,prefab.h);ctx.restore();drawRect(ctx,prefab,{dashed:true,alpha:.9});}
     const transforms=tools?.transform?.getPreviews?.()||[];if(transforms.length){for(const transform of transforms){const row=kernel.spatial.get(transform.entityId);if(row?.rect)drawRect(ctx,{...row.rect,x:transform.x??row.rect.x,y:transform.y??row.rect.y},{dashed:true,alpha:.7});}}
