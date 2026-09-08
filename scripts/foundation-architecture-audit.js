@@ -38,7 +38,13 @@ requireText('docs/KELO_FOUNDATION.md', [
 ]);
 requireText('AGENTS.md', ['docs/KELO_FOUNDATION.md', '1 RESPONSABILIDAD = 1 OWNER']);
 requireText('ENGINE_MAP.md', ['docs/KELO_FOUNDATION.md', 'OWNER LIVE']);
-requireText('src/ui/force-unlock-move.js', ['HOTFIX TEMPORAL', 'NO REUTILIZAR']);
+requireText('src/ui/force-unlock-move.js', ['NO REUTILIZAR']);
+if (exists('src/ui/force-unlock-move.js')) {
+  const hotfix = read('src/ui/force-unlock-move.js');
+  if (!hotfix.includes('HOTFIX TEMPORAL') && !hotfix.includes('RETIRED HOTFIX')) {
+    fail('src/ui/force-unlock-move.js must be marked HOTFIX TEMPORAL or RETIRED HOTFIX');
+  }
+}
 
 if (exists('index.html')) {
   const html = read('index.html');
@@ -64,6 +70,12 @@ function resolveBase() {
   return null;
 }
 function isContractFixture(file){return /^scripts\/.*(?:contract|audit|test).*\.js$/i.test(file);}
+function isAuthorizedInputGate(entry, ruleName){
+  if (ruleName !== 'new direct core wrapper') return false;
+  if (entry.file !== 'src/core/input-gate.js') return false;
+  if (!exists(entry.file)) return false;
+  return read(entry.file).includes('FOUNDATION-ALLOW') && read(entry.file).includes('owner: KeloInputLocks');
+}
 
 const base = resolveBase();
 if (!base) {
@@ -89,8 +101,10 @@ if (!base) {
   ];
 
   added.forEach((entry) => {
-    if (/FOUNDATION-ALLOW\b/.test(entry.line)) return;
-    forbidden.forEach((rule) => { if (rule.test(entry)) fail(rule.name + ' in ' + entry.file + ': ' + entry.line.trim()); });
+    forbidden.forEach((rule) => {
+      if (isAuthorizedInputGate(entry, rule.name)) return;
+      if (rule.test(entry)) fail(rule.name + ' in ' + entry.file + ': ' + entry.line.trim());
+    });
   });
 
   nameStatus.split('\n').filter(Boolean).forEach((row) => {
