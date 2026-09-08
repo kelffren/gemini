@@ -1,10 +1,10 @@
 /* KELO-INDEX
  * area: UI / SOCIAL
  * owner: KeloSelfInteractionUI (presentation only)
- * keys: SELF PROFILE EMOTES INPUT LOCK FOUNDATION
- * purpose: presenta acciones sobre el propio jugador y panel de burlas
+ * keys: SELF PROFILE CHARACTER CUSTOMIZER LAZY EMOTES INPUT LOCK FOUNDATION PERFORMANCE
+ * purpose: presenta acciones sobre el propio jugador y panel de burlas sin cargar Profile/Character Creator hasta su uso
  * public-api: KeloSelfInteractionUI
- * consumes: KeloEmotes, KeloBackpackUI, KeloInputLocks
+ * consumes: KELO_PROFILE_LAUNCHER, KeloCharacterCustomizer, KeloEmotes, KeloBackpackUI, KeloInputLocks
  * state-owned: estado visual de sus paneles + tokens de input propios
  * extension-points: nuevas acciones UI consumen APIs de sus owners
  * reuse: menú contextual del propio jugador
@@ -14,7 +14,7 @@
 (function(){
 'use strict';
 
-const VERSION='self-interaction-ui-v1.2.0';
+const VERSION='self-interaction-ui-v1.3.0';
 const ACTION_ID='kelo-self-actions';
 const EMOTE_PANEL_ID='kelo-emotes-panel';
 let actionOpen=false,emoteOpen=false;
@@ -69,7 +69,18 @@ function releaseLock(owner){
 }
 function closeActionMenu(){const el=document.getElementById(ACTION_ID);if(el)el.style.display='none';actionOpen=false;releaseLock('self-actions');}
 function closeEmotes(){const el=document.getElementById(EMOTE_PANEL_ID);if(el)el.style.display='none';emoteOpen=false;releaseLock('emotes');}
-function openProfile(){closeActionMenu();closeEmotes();if(window.KeloBackpackUI&&typeof window.KeloBackpackUI.open==='function'){window.KeloBackpackUI.open();return;}if(typeof inspectPlayer==='function')inspectPlayer(localPlayer,true);}
+function openProfile(){
+  closeActionMenu();closeEmotes();
+  if(window.KeloCharacterCustomizer&&typeof window.KeloCharacterCustomizer.open==='function'){
+    if(window.KeloCharacterCustomizer.open())return;
+  }
+  if(window.KELO_PROFILE_LAUNCHER&&typeof window.KELO_PROFILE_LAUNCHER.openCustomizer==='function'){
+    void window.KELO_PROFILE_LAUNCHER.openCustomizer();
+    return;
+  }
+  if(window.KeloBackpackUI&&typeof window.KeloBackpackUI.open==='function'){window.KeloBackpackUI.open();return;}
+  if(typeof inspectPlayer==='function')inspectPlayer(localPlayer,true);
+}
 function renderEmotes(){
   ensureStyles();
   let root=document.getElementById(EMOTE_PANEL_ID);
@@ -134,8 +145,11 @@ function decorateBackpack(){
   actions.insertBefore(button,actions.firstChild);
 }
 function observeBackpack(){
-  const observer=new MutationObserver(function(){queueMicrotask(decorateBackpack);});
-  observer.observe(document.documentElement,{childList:true,subtree:true});
+  const root=document.getElementById('kelo-bag');
+  if(root){
+    const observer=new MutationObserver(function(){queueMicrotask(decorateBackpack);});
+    observer.observe(root,{childList:true,subtree:true});
+  }
   window.addEventListener('kelo:emotes-changed',function(){if(window.KeloBackpackUI&&window.KeloBackpackUI.isOpen())window.KeloBackpackUI.render();});
 }
 function installSelfTap(){
@@ -158,9 +172,9 @@ function wrapMenu(){
   function wrapped(){closeActionMenu();closeEmotes();return original.apply(this,arguments);}
   wrapped.__keloSelfWrapped=true;window.toggleMenu=wrapped;
 }
-function boot(){ensureStyles();ensureActionMenu();renderEmotes();observeBackpack();installSelfTap();wrapMenu();}
+function boot(){observeBackpack();installSelfTap();wrapMenu();}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 
 window.KeloSelfInteractionUI=Object.freeze({version:VERSION,open:openActionMenu,close:closeActionMenu,openProfile,openEmotes,closeEmotes,decorateBackpack});
-window.KELO_SELF_INTERACTION_AUDIT=Object.freeze({version:VERSION,selfTapMenu:true,actions:['my_profile','emotes'],closeButtonMinPx:48,profileUsesBackpackUI:true,emotePanel:true,backpackEquipBridge:true,tapFirst:true,dragDrop:false,inputLockOwner:'KeloInputLocks',tokenLocks:true,legacyModalWrites:false});
+window.KELO_SELF_INTERACTION_AUDIT=Object.freeze({version:VERSION,selfTapMenu:true,actions:['my_profile','emotes'],closeButtonMinPx:48,profileUsesCharacterCustomizer:true,profileLazyLauncher:true,profileFallbackUsesBackpackUI:true,emotePanel:true,emoteDomLazy:true,actionMenuDomLazy:true,backpackEquipBridge:true,backpackObserverScope:'kelo-bag',tapFirst:true,dragDrop:false,inputLockOwner:'KeloInputLocks',tokenLocks:true,legacyModalWrites:false});
 })();
