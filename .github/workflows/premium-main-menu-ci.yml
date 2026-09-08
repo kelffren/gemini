@@ -8,6 +8,7 @@ on:
       - 'src/systems/nobility.js'
       - 'src/ui/self-interaction-ui.js'
       - 'src/ui/character-customizer-ui.js'
+      - 'src/abilities/kelo-ability-boot.js'
       - 'scripts/luxe-menu-audit.mjs'
       - 'scripts/live-luxe-menu-audit.mjs'
       - '.github/workflows/premium-main-menu-ci.yml'
@@ -21,6 +22,7 @@ on:
       - 'src/systems/nobility.js'
       - 'src/ui/self-interaction-ui.js'
       - 'src/ui/character-customizer-ui.js'
+      - 'src/abilities/kelo-ability-boot.js'
       - 'scripts/luxe-menu-audit.mjs'
       - 'scripts/live-luxe-menu-audit.mjs'
       - '.github/workflows/premium-main-menu-ci.yml'
@@ -39,6 +41,7 @@ jobs:
         run: |
           node --check src/ui/luxe-shell.js
           node --check src/ui/studio-launcher.js
+          node --check src/abilities/kelo-ability-boot.js
           node --check scripts/luxe-menu-audit.mjs
           node --check scripts/live-luxe-menu-audit.mjs
       - name: Premium menu owner contract
@@ -91,7 +94,7 @@ jobs:
         run: npm install --no-save playwright@1.55.0
       - name: Wait for GitHub Pages revision
         run: |
-          expected='src/ui/luxe-shell.js?v=228'
+          expected='src/ui/luxe-shell.js?v=229'
           ready=0
           for i in {1..48}; do
             if curl -fsSL --max-time 12 "https://kelffren.github.io/gemini/?menuAudit=${GITHUB_SHA}" | grep -Fq "$expected"; then
