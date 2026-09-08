@@ -4,48 +4,32 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230a0d12'/%3E%3Cpath fill='%23e7c56a' d='M7 5h5v9l8-9h6L16 16l11 11h-6l-9-9v9H7z'/%3E%3C/svg%3E">
   <link rel="preload" as="image" href="assets/hero.PNG" fetchpriority="high">
-  <link rel="preload" as="image" href="assets/fuentekelo-runtime.PNG?art=401" fetchpriority="high">
-  <link rel="preload" as="image" href="assets/cesped-runtime.PNG?art=501" fetchpriority="high">
   <link rel="stylesheet" href="src/ui/backpack-fantasy-v1.css?v=1">
-  <title>Kelo World — V6.46</title>
+  <title>Kelo World — V6.47</title>
   <style>
     *{box-sizing:border-box;margin:0;padding:0;user-select:none;-webkit-user-select:none}
-    html,body{width:100%;height:100%;overflow:hidden;background:#05070a;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
-    #game-canvas{width:100%;height:100%;display:block;image-rendering:pixelated;image-rendering:crisp-edges;touch-action:none}
+    html,body{width:100%;height:100%;overflow:hidden;background:#05070a;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    #game-canvas{width:100%;height:100%;display:block;touch-action:none}
     #ui-layer{position:absolute;inset:0;pointer-events:none;z-index:10}
-    .top-bar{position:absolute;top:max(8px,env(safe-area-inset-top));left:max(8px,env(safe-area-inset-left));right:max(8px,env(safe-area-inset-right));display:flex;justify-content:flex-start;gap:8px;pointer-events:none}
-    .hud-badge{font-family:ui-monospace,monospace;font-size:11px;color:#e7c56a;background:rgba(10,13,18,.88);padding:7px 12px;border-radius:999px;border:1px solid rgba(231,197,106,.26);white-space:nowrap;backdrop-filter:blur(8px)}
-    .action-bar{position:absolute;bottom:max(16px,env(safe-area-inset-bottom));right:max(12px,env(safe-area-inset-right));display:grid;grid-template-columns:repeat(2,52px) 62px;grid-template-rows:repeat(2,52px);gap:8px;pointer-events:auto}
+    .hud-badge{position:absolute;top:max(8px,env(safe-area-inset-top));left:max(8px,env(safe-area-inset-left));font:11px ui-monospace,monospace;color:#e7c56a;background:rgba(10,13,18,.88);padding:7px 12px;border-radius:999px;border:1px solid rgba(231,197,106,.26)}
     body.social-mode #action-bar-container{display:none!important}
-    #menu-sheet{position:absolute;top:max(132px,calc(env(safe-area-inset-top) + 120px));right:max(12px,env(safe-area-inset-right));width:min(356px,calc(100vw - 24px));max-height:min(68vh,560px);background:linear-gradient(180deg,rgba(18,21,27,.985),rgba(9,12,17,.985));border:1px solid rgba(231,197,106,.42);border-radius:20px;padding:14px;color:#c9d1d9;font-size:11px;z-index:110;overflow-y:auto;pointer-events:auto;display:none}
-    #toast-container{position:absolute;top:max(66px,calc(env(safe-area-inset-top) + 58px));left:50%;transform:translateX(-50%);width:min(320px,calc(100vw - 32px));z-index:200;pointer-events:none}
-    .toast{padding:8px 12px;border-radius:10px;border:1px solid rgba(231,197,106,.45);background:rgba(10,13,18,.94);color:#f3d48b;font-size:12px;font-weight:700}
+    #menu-sheet{position:absolute;top:max(132px,calc(env(safe-area-inset-top)+120px));right:max(12px,env(safe-area-inset-right));width:min(356px,calc(100vw - 24px));display:none;z-index:110;pointer-events:auto;background:#111;color:#ddd;padding:14px;border-radius:16px;border:1px solid rgba(231,197,106,.4)}
+    #toast-container{position:absolute;top:70px;left:50%;transform:translateX(-50%);z-index:200;pointer-events:none}
+    .toast{padding:8px 12px;border-radius:10px;border:1px solid rgba(231,197,106,.45);background:#0a0d12;color:#f3d48b;font-size:12px;font-weight:700}
     #kelo-online,.lx-mark,#kelo-minimap,#minimap{display:none!important}
   </style>
 </head>
 <body class="social-mode">
 <canvas id="game-canvas"></canvas>
-<div id="ui-layer"><div class="top-bar"><div class="hud-badge" id="telemetry-bar">Oro: 1500 | KC: 200</div></div><div class="action-bar" id="action-bar-container"></div></div>
-<div id="toast-container" aria-live="polite"></div>
-<div id="menu-sheet">
-  <div class="panel-header" style="display:flex;justify-content:space-between;color:#e7c56a;font-weight:800"><span>KELO WORLD</span><button onclick="toggleMenu()" style="border:0;background:transparent;color:#8b949e;font-size:22px">×</button></div>
-  <div class="menu-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
-    <button onclick="openSocialTool('profile')">Personaje</button>
-    <button onclick="openSocialTool('bag')">Mochila</button>
-    <button onclick="openSocialTool('stones')">Habilidades</button>
-    <button onclick="openSocialTool('market')">Mercado</button>
-    <button onclick="openSocialTool('chat')">Chat</button>
-    <button onclick="openSocialTool('properties')">Propiedades</button>
-    <button onclick="openSocialTool('settings')">Ajustes</button>
-  </div>
-</div>
+<div id="ui-layer"><div class="hud-badge" id="telemetry-bar">Oro: 1500 | KC: 200</div><div id="action-bar-container"></div></div>
+<div id="toast-container"></div>
+<div id="menu-sheet"><button onclick="toggleMenu()">Cerrar</button></div>
 <script src="src/physics/collision-utils.js?v=1"></script><script src="engine-a.js?v=150"></script><script src="engine-b.js?v=94"></script><script src="engine-c.js?v=228"></script><script src="engine-d.js?v=95"></script><script src="engine-e.js?v=94"></script><script src="engine-f.js?v=94"></script><script src="engine-g.js?v=94"></script><script src="src/environment/mobile-performance-contract.js?v=1"></script><script src="engine-h.js?v=151"></script><script src="engine-i.js?v=94"></script><script src="engine-j.js?v=94"></script><script src="engine-k.js?v=94"></script>
 <script>window.KELO_WORLD_DECORATION_RESET=true;</script><script src="src/environment/rural-nature-atlas.js?v=200"></script><script src="src/environment/gardens-atlas.js?v=2"></script><script src="src/environment/gardens-joins.js?v=3"></script><script src="src/environment/terrain-contract.js?v=1"></script><script src="src/environment/generated/arboleskelo1-atlas.js?v=1"></script><script src="src/environment/tile-registry.js?v=237"></script><script src="src/environment/atlas-contract.js?v=3"></script><script src="src/environment/gardens-t-junction-registry.js?v=1"></script><script src="src/environment/district-decals-registry.js?v=3"></script><script src="src/environment/gardens-compositions.js?v=10"></script><script src="src/environment/world-map.js?v=terrain-190"></script><script src="src/environment/environment-layer-stack.js?v=4"></script><script src="src/environment/surface-ground.js?v=1"></script><script src="src/environment/prop-contract.js?v=6"></script><script src="src/environment/generic-props.js?v=8"></script><script src="src/environment/prefab-contract.js?v=1"></script><script src="engine-l.js?v=223"></script>
 <script src="engine-m.js?v=94"></script><script src="engine-n.js?v=230"></script><script src="engine-o.js?v=96"></script><script src="engine-p.js?v=96"></script><script src="engine-q.js?v=94"></script><script src="engine-r.js?v=94"></script><script src="engine-s.js?v=96"></script><script src="engine-t.js?v=94"></script><script src="engine-u.js?v=94"></script><script src="engine-v.js?v=94"></script><script src="engine-w.js?v=94"></script><script src="engine-x.js?v=94"></script><script src="engine-y.js?v=98"></script><script src="engine-z.js?v=94"></script><script src="engine-aa.js?v=96"></script><script src="engine-ab.js?v=240"></script><script src="src/characters/character-appearance.js?v=2"></script><script src="engine-ac.js?v=222"></script><script src="engine-ae.js?v=94"></script><script src="engine-af.js?v=94"></script><script src="engine-ag.js?v=94"></script><script src="engine-ah.js?v=94"></script><script src="engine-ai.js?v=94"></script><script src="engine-aj.js?v=94"></script><script src="src/systems/master-bot-pipelines.js?v=1"></script><script src="src/systems/pvp-world.js?v=5"></script>
 <script src="src/visuals/visual-system.js?v=1"></script><script src="src/visuals/visual-manifests.js?v=1"></script><script src="src/visuals/asset-registry.js?v=1"></script><script src="src/visuals/animation-system.js?v=1"></script><script src="src/visuals/fx-system.js?v=1"></script><script src="src/visuals/sequence-system.js?v=1"></script><script src="src/visuals/melee-visual-manifest.js?v=1"></script><script src="src/visuals/melee-combat-visuals.js?v=1"></script>
-<script src="src/abilities/abilityData.js?v=154"></script><script src="src/abilities/stone-system.js?v=154"></script><script src="src/abilities/stone-backpack-bridge.js?v=2"></script><script src="src/abilities/kelo-ability-boot.js?v=154"></script><script src="src/visuals/ability-visuals.js?v=2"></script><script data-kelo-sword-swap-runtime="1" src="src/abilities/sword-swap-runtime.js?v=2"></script><script src="src/visuals/sword-swap-pvp-visuals.js?v=4"></script><script src="engine-net.js?v=96"></script>
+<script src="src/abilities/abilityData.js?v=154"></script><script src="src/abilities/stone-system.js?v=154"></script><script src="src/abilities/stone-backpack-bridge.js?v=2"></script><script src="src/abilities/kelo-ability-boot.js?v=154"></script><script src="src/visuals/ability-visuals.js?v=2"></script><script src="src/abilities/sword-swap-runtime.js?v=2"></script><script src="src/visuals/sword-swap-pvp-visuals.js?v=4"></script><script src="engine-net.js?v=96"></script>
 <script src="src/ui/luxe-shell.js?v=225"></script>
 <script src="src/ui/mobile-orientation.js?v=1"></script>
 <script src="src/ui/luxe-boutique.js?v=206"></script>
@@ -77,6 +61,7 @@
 <script src="src/ui/builder-collision-bind.js?v=1"></script>
 <script src="src/ui/builder-rules.js?v=1"></script>
 <script src="src/ui/builder-parcel-meta.js?v=1"></script>
+<script src="src/ui/builder-parcel-acl.js?v=1"></script>
 <script src="src/ui/house-instance-ui.js?v=1"></script>
 <script src="src/ui/modal-input-lock.js?v=2"></script>
 <script src="src/ui/backpack-ui.js?v=4"></script>
