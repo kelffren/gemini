@@ -15,15 +15,15 @@ fs.mkdirSync(OUT,{recursive:true});
 const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_BIN||undefined,args:['--no-sandbox']});
 const context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:1});
 const page=await context.newPage();
-const pageErrors=[],consoleErrors=[];
-page.on('pageerror',e=>pageErrors.push(String(e)));
+const pageErrors=[],consoleErrors=[],httpErrors=[];
+page.on('pageerror',e=>pageErrors.push(String(e?.stack||e)));
 page.on('console',m=>{if(m.type()==='error')consoleErrors.push(m.text());});
-const report={ok:false,url:URL,portrait:null,landscape:null,routes:{},movement:null,pvp:null,pageErrors,consoleErrors};
+page.on('response',r=>{if(r.status()>=400)httpErrors.push({status:r.status(),url:r.url()});});
+const report={ok:false,url:URL,portrait:null,landscape:null,routes:{},movement:null,pvp:null,pageErrors,consoleErrors,httpErrors};
 const assert=(condition,message)=>{if(!condition)throw new Error(message);};
-const visible=async selector=>page.locator(selector).evaluate(el=>{const s=getComputedStyle(el),r=el.getBoundingClientRect();return s.display!=='none'&&s.visibility!=='hidden'&&Number(s.opacity)!==0&&r.width>0&&r.height>0;});
 
 async function waitRuntime(){
-  await page.waitForFunction(()=>window.KELO_LUXE&&window.KeloInputLocks&&window.KeloBackpackUI&&window.KeloAbilities&&window.KeloMarketUI&&window.KELO_HOUSE_UI&&window.KeloNobility&&window.KeloSelfInteractionUI&&window.KeloCharacterCustomizer,{timeout:20000});
+  await page.waitForFunction(()=>window.KELO_LUXE&&window.KeloInputLocks&&window.KeloBackpackUI&&window.KeloAbilities&&window.KeloMarketUI&&window.KELO_HOUSE_UI&&window.KeloNobility&&window.KeloSelfInteractionUI&&window.KeloCharacterCustomizer,null,{timeout:20000});
 }
 async function openMenu(){
   await page.locator('#lx-side-menu').click();
@@ -121,11 +121,11 @@ try{
   report.movement=movement;
 
   await page.locator('#lx-side-pvp').click();
-  await page.waitForFunction(()=>!document.body.classList.contains('social-mode')&&window.KELO_COMBAT_ENABLED===true,{timeout:5000});
+  await page.waitForFunction(()=>!document.body.classList.contains('social-mode')&&window.KELO_COMBAT_ENABLED===true,null,{timeout:5000});
   const pvpEntered=await page.evaluate(()=>({social:document.body.classList.contains('social-mode'),combat:window.KELO_COMBAT_ENABLED}));
   assert(pvpEntered.combat===true&&!pvpEntered.social,'PvP did not enter');
   await page.evaluate(()=>{if(typeof leavePvPWorld==='function')leavePvPWorld();});
-  await page.waitForFunction(()=>document.body.classList.contains('social-mode')&&window.KELO_COMBAT_ENABLED===false,{timeout:5000});
+  await page.waitForFunction(()=>document.body.classList.contains('social-mode')&&window.KELO_COMBAT_ENABLED===false,null,{timeout:5000});
   report.pvp={entered:true,left:true};
 
   await page.waitForTimeout(200);
