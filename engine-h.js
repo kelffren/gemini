@@ -60,12 +60,23 @@
   }
 
   let restoreFillRect = null;
+  let legacyPlazaPatchedFrames = 0;
+  let legacyPlazaInterceptHits = 0;
+  let legacyPlazaInterceptFrames = 0;
+  let legacyPlazaHitThisFrame = false;
   function prepareLegacyFillRect() {
     ctx.imageSmoothingEnabled = false;
+    legacyPlazaPatchedFrames++;
+    legacyPlazaHitThisFrame = false;
     const origFillRect = ctx.fillRect.bind(ctx);
     restoreFillRect = origFillRect;
     ctx.fillRect = function (x, y, w, h) {
-      if (w === 520 && h === 520) { drawMarblePlaza(); return; }
+      if (w === 520 && h === 520) {
+        legacyPlazaInterceptHits++;
+        if (!legacyPlazaHitThisFrame) { legacyPlazaHitThisFrame = true; legacyPlazaInterceptFrames++; }
+        drawMarblePlaza();
+        return;
+      }
       origFillRect(x, y, w, h);
     };
   }
@@ -77,6 +88,21 @@
   window.KeloRender.beforeFrame('engine-h:legacy-plaza-fillrect', prepareLegacyFillRect, 30);
   window.KeloRender.afterFrame('engine-h:legacy-plaza-fillrect', restoreLegacyFillRect, 30);
 
-  window.KELO_HD_RENDER = Object.freeze({mode:'hidpi-pixel-perfect-v3-camera-owner',dprCap,defaultZoom:cameraOwner.getEffectiveZoom(),defaultBaseZoom:cameraOwner.getBaseZoom(),smoothing:false,mobilePerformanceContractVersion:mobilePerf?.version||null,cameraOwner:'KeloCamera',renderOwner:'KeloRender',directViewportWrites:false,directZoomWrites:false});
+  window.KELO_HD_RENDER = Object.freeze({
+    mode:'hidpi-pixel-perfect-v3-camera-owner',
+    dprCap,
+    defaultZoom:cameraOwner.getEffectiveZoom(),
+    defaultBaseZoom:cameraOwner.getBaseZoom(),
+    smoothing:false,
+    mobilePerformanceContractVersion:mobilePerf?.version||null,
+    cameraOwner:'KeloCamera',
+    renderOwner:'KeloRender',
+    directViewportWrites:false,
+    directZoomWrites:false,
+    hotPathAuditVersion:'legacy-plaza-intercept-v1',
+    get legacyPlazaPatchedFrames(){return legacyPlazaPatchedFrames;},
+    get legacyPlazaInterceptHits(){return legacyPlazaInterceptHits;},
+    get legacyPlazaInterceptFrames(){return legacyPlazaInterceptFrames;}
+  });
   window.KELO_LEGACY_PLAZA_IMAGE_DISABLED = true;
 })();
