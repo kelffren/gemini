@@ -17,6 +17,7 @@ on:
       - 'src/ui/self-interaction-ui.js'
       - 'scripts/character-customization-audit.js'
       - 'scripts/character-customization-kit-audit.js'
+      - 'scripts/live-character-customization-audit.mjs'
       - 'docs/systems/CHARACTER_CUSTOMIZATION_SYSTEM.md'
       - 'docs/system-catalog.json'
       - 'guide.html'
@@ -38,6 +39,7 @@ on:
       - 'src/ui/self-interaction-ui.js'
       - 'scripts/character-customization-audit.js'
       - 'scripts/character-customization-kit-audit.js'
+      - 'scripts/live-character-customization-audit.mjs'
       - 'docs/systems/CHARACTER_CUSTOMIZATION_SYSTEM.md'
       - 'docs/system-catalog.json'
       - 'guide.html'
@@ -74,3 +76,38 @@ jobs:
           node --check src/ui/character-customizer-preview.js
           node --check src/ui/profile-panel-close.js
           node --check src/ui/self-interaction-ui.js
+          node --check scripts/live-character-customization-audit.mjs
+
+  browser:
+    needs: contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install browser audit dependencies
+        run: npm install --no-audit --no-fund
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run Character Creator V2 on the PR checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m http.server 4173 --bind 127.0.0.1 >/tmp/kelo-character-http.log 2>&1 &
+          server_pid=$!
+          trap 'kill ${server_pid} >/dev/null 2>&1 || true' EXIT
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then break; fi
+            sleep 1
+          done
+          AUDIT_URL=http://127.0.0.1:4173/ node scripts/live-character-customization-audit.mjs
+      - name: Upload Character Creator V2 browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: character-creator-v2-pr-browser
+          path: artifacts/character-customization-live/
+          if-no-files-found: warn
+          retention-days: 14
