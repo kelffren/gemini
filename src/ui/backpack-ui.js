@@ -31,7 +31,7 @@ const FILTERS=[['all','TODO'],['consumables','CONSUMIBLES'],['materials','MATERI
 let topTab='equipment',filter='all',selectedBag=null,selectedEquip=null,moveMode=false,splitMode=false,splitAmount=1,discardConfirm=false,isOpen=false,inputLockToken=null;
 
 function toast(t){if(typeof showToast==='function')showToast(t);}
-function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c];});}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function rarityClass(v){return String(v||'common').toLowerCase().replace(/[^a-z0-9_-]/g,'');}
 function normalizeCategory(d){const v=String((d&&d.category)||'').toLowerCase();if(/consum|potion|food/.test(v))return'consumables';if(/material|resource|craft/.test(v))return'materials';if(/mission|quest/.test(v))return'missions';return'others';}
 function isEquipped(item){return !!(item&&window.KeloEquipment&&typeof window.KeloEquipment.isEquipped==='function'&&window.KeloEquipment.isEquipped(item.id));}
