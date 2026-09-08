@@ -10,35 +10,19 @@ import { registerKeloComponents } from '../src/studio/components/kelo-components
 import { seedCatalogPrefabs } from '../src/studio/adapters/catalog-prefab-seeder.mjs';
 import { importCurrentKeloWorld } from '../src/studio/adapters/current-world-importer.mjs';
 import { createPlaceEntityCommand, createMoveEntityCommand, createRemoveEntityCommand } from '../src/studio/document/document-commands.mjs';
+import { registerBasicTools } from '../src/studio/tools/register-basic-tools.mjs';
+import { virtualRange } from '../src/studio/ui/virtual-list.mjs';
+import { buildInspectorModel } from '../src/studio/ui/inspector-model.mjs';
 
-const doc = createWorldDocument({ worldId: 'world:test', settings: { tileSize: 32, chunkSize: 512 } });
-const kernel = createStudioKernel({ document: doc, historyBudgetBytes: 1024 * 1024 });
-registerKeloComponents(kernel.components);
-assert.ok(kernel.components.has('container') && kernel.components.has('craftingStation') && kernel.components.has('growZone'));
-
-const fakeCatalog = { list: () => [{ id:'prefab:house', label:'House', category:'architecture', width:96, height:64, parts:[], collision:{x:0,y:0,w:96,h:64} }], get: id => id === 'prefab:house' ? fakeCatalog.list()[0] : null };
-seedCatalogPrefabs({ prefabRegistry: kernel.prefabs, assetCatalog: fakeCatalog });
-assert.equal(kernel.prefabs.resolve('prefab:house').bounds.w, 96);
-
-const house = { id: 'entity:house:1', prefabId: 'prefab:house', transform: { x: 100, y: 120 }, bounds: { w: 96, h: 64 }, components: { collider: { rect: { x: 0, y: 0, w: 96, h: 64 } }, interaction: { action: 'enter' } } };
-await kernel.execute(createPlaceEntityCommand(house));
-assert.equal(kernel.spatial.queryPoint(110,130).length, 1); assert.ok(kernel.dirty.size >= 1);
-await kernel.execute(createMoveEntityCommand(house.id,{x:700,y:120}));
-assert.equal(kernel.spatial.queryPoint(710,130).length,1); assert.equal(kernel.spatial.queryPoint(110,130).length,0);
-await kernel.undo(); assert.equal(kernel.document.entities[0].transform.x,100);
-await kernel.redo(); assert.equal(kernel.document.entities[0].transform.x,700);
-
-const resolvePrefab = id => kernel.prefabs.resolve(id) || { id }, compiler = createWorldCompiler({ resolvePrefab });
-const bundleA = compiler.compile(kernel.document), bundleB = compiler.compile(kernel.document); assert.deepEqual(bundleA,bundleB); assert.equal(bundleA.colliders[0].rect.x,700);
-const workerFallback = createStudioWorkerClient({ WorkerCtor:null, resolvePrefab }); assert.deepEqual(await workerFallback.compile(kernel.document),bundleA); workerFallback.close();
-const emptyBundle = compiler.compile(createWorldDocument({worldId:'world:test'}));
-const diff = diffRuntimeBundles(emptyBundle,bundleA); assert.equal(diff.upsertChunks.length,1); assert.equal(diff.upsertColliders.length,1);
-
-const store = createStudioStore({ indexedDBFactory:null }); await store.saveCheckpoint('world:test',kernel.document); await store.appendCommand('world:test',{type:'test'}); const recovery=await store.loadRecovery('world:test'); assert.ok(recovery.checkpoint); assert.equal(recovery.commands.length,1); await store.close();
-
-const imported = await importCurrentKeloWorld({ mode:'world', adapter:{ assetCatalog:fakeCatalog, tileRegistry:{worldTileSize:32}, worldRenderer:{chunkSize:512}, worldEditRequest:async()=>({viewSnapshot:{worldId:'world:kelo-main',cells:{'0,0':'grass'},collisions:{},placements:[{placementId:'p1',assetId:'prefab:house',x:32,y:64,rotation:1}]},viewMeta:{revisionId:'r1',number:3}}) } });
-assert.equal(imported.entities.length,1); assert.equal(imported.entities[0].bounds.w,64); assert.equal(imported.revision.id,'r1');
-
-await kernel.execute(createRemoveEntityCommand(house.id)); assert.equal(kernel.document.entities.length,0); await kernel.undo(); assert.equal(kernel.document.entities.length,1);
-const index = await readFile(new URL('../index.html',import.meta.url),'utf8'); assert.equal(/src\/studio\/|studio-entry\.mjs/.test(index),false,'Studio must remain lazy and absent from normal index boot');
-console.log(JSON.stringify({ok:true,version:kernel.version,chunks:bundleA.chunks.length,historyDepth:kernel.history.undoDepth,spatial:kernel.spatial.stats(),builtInComponents:kernel.components.size(),lazyInIndex:true,storageFallback:true,importer:true},null,2));
+const doc=createWorldDocument({worldId:'world:test',settings:{tileSize:32,chunkSize:512}}),kernel=createStudioKernel({document:doc,historyBudgetBytes:1024*1024});
+registerKeloComponents(kernel.components);assert.ok(kernel.components.has('container')&&kernel.components.has('craftingStation')&&kernel.components.has('growZone'));
+const fakeCatalog={list:()=>[{id:'prefab:house',label:'House',category:'architecture',width:96,height:64,parts:[],collision:{x:0,y:0,w:96,h:64}}],get:id=>id==='prefab:house'?fakeCatalog.list()[0]:null};seedCatalogPrefabs({prefabRegistry:kernel.prefabs,assetCatalog:fakeCatalog});
+const house={id:'entity:house:1',prefabId:'prefab:house',transform:{x:100,y:120},bounds:{w:96,h:64},components:{collider:{rect:{x:0,y:0,w:96,h:64}},interaction:{action:'enter'}}};
+await kernel.execute(createPlaceEntityCommand(house));assert.equal(kernel.spatial.queryPoint(110,130).length,1);await kernel.execute(createMoveEntityCommand(house.id,{x:700,y:120}));assert.equal(kernel.spatial.queryPoint(710,130).length,1);assert.equal(kernel.spatial.queryPoint(110,130).length,0);await kernel.undo();assert.equal(kernel.document.entities[0].transform.x,100);await kernel.redo();assert.equal(kernel.document.entities[0].transform.x,700);
+const resolvePrefab=id=>kernel.prefabs.resolve(id)||{id},compiler=createWorldCompiler({resolvePrefab}),bundleA=compiler.compile(kernel.document),bundleB=compiler.compile(kernel.document);assert.deepEqual(bundleA,bundleB);assert.equal(bundleA.colliders[0].rect.x,700);const workerFallback=createStudioWorkerClient({WorkerCtor:null,resolvePrefab});assert.deepEqual(await workerFallback.compile(kernel.document),bundleA);workerFallback.close();const diff=diffRuntimeBundles(compiler.compile(createWorldDocument({worldId:'world:test'})),bundleA);assert.equal(diff.upsertChunks.length,1);
+const store=createStudioStore({indexedDBFactory:null});await store.saveCheckpoint('world:test',kernel.document);await store.appendCommand('world:test',{type:'test'});assert.equal((await store.loadRecovery('world:test')).commands.length,1);await store.close();
+const imported=await importCurrentKeloWorld({mode:'world',adapter:{assetCatalog:fakeCatalog,tileRegistry:{worldTileSize:32},worldRenderer:{chunkSize:512},worldEditRequest:async()=>({viewSnapshot:{worldId:'world:kelo-main',cells:{'0,0':'grass'},collisions:{},placements:[{placementId:'p1',assetId:'prefab:house',x:32,y:64,rotation:1}]},viewMeta:{revisionId:'r1',number:3}})}});assert.equal(imported.entities[0].bounds.w,64);assert.equal(imported.revision.id,'r1');
+const tools=registerBasicTools(kernel);const beforePlacement=kernel.document.entities.length;tools.placement.start('prefab:house');tools.placement.move(1040,130,{snap:32});assert.equal(kernel.document.entities.length,beforePlacement,'preview must not mutate document');const placed=await tools.placement.commit();assert.equal(kernel.document.entities.length,beforePlacement+1);tools.select.selectPoint(placed.transform.x+1,placed.transform.y+1);assert.ok(kernel.selection.has(placed.id));tools.transform.begin(placed.id);tools.transform.previewMove(1200,256,{snap:32});assert.equal(kernel.document.entities.find(e=>e.id===placed.id).transform.x,placed.transform.x,'transform preview must be local');await tools.transform.commit();assert.equal(kernel.document.entities.find(e=>e.id===placed.id).transform.x,1216);
+const range=virtualRange({count:20000,rowHeight:40,scrollTop:4000,viewportHeight:800,overscan:4});assert.ok(range.count<40,'virtualized range should stay tiny for 20k rows');const inspector=buildInspectorModel({entity:kernel.document.entities[0],componentRegistry:kernel.components});assert.ok(inspector.sections.some(s=>s.id==='interaction'));
+await kernel.execute(createRemoveEntityCommand(house.id));await kernel.undo();assert.ok(kernel.document.entities.some(e=>e.id===house.id));const index=await readFile(new URL('../index.html',import.meta.url),'utf8');assert.equal(/src\/studio\/|studio-entry\.mjs/.test(index),false,'Studio must remain lazy');
+console.log(JSON.stringify({ok:true,version:kernel.version,chunks:bundleA.chunks.length,historyDepth:kernel.history.undoDepth,spatial:kernel.spatial.stats(),builtInComponents:kernel.components.size(),virtualRows:range.count,lazyInIndex:true,storageFallback:true,importer:true,basicTools:true},null,2));

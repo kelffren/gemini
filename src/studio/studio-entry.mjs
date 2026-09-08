@@ -16,6 +16,8 @@ import { seedCatalogPrefabs } from './adapters/catalog-prefab-seeder.mjs';
 import { registerKeloComponents } from './components/kelo-components.mjs';
 import { createStudioStore } from './storage/indexeddb-studio-store.mjs';
 import { createStudioProfiler } from './performance/studio-profiler.mjs';
+import { registerBasicTools } from './tools/register-basic-tools.mjs';
+import { createStudioOverlayRenderer } from './render/studio-overlay-renderer.mjs';
 
 let session = null;
 
@@ -24,25 +26,22 @@ export async function bootKeloStudio({ mode = 'world', actorId = null, document 
   const adapter = createKeloRuntimeAdapter(root);
   const initial = document || createWorldDocument({ worldId: mode === 'parcel' ? `parcel:${actorId || 'local'}` : 'world:kelo-main', metadata: { name: mode === 'parcel' ? 'My Parcel' : 'Kelo World', description: '', tags: [mode] }, settings: { tileSize: root.KELO_TILE_REGISTRY?.worldTileSize || 32, chunkSize: root.KELO_WORLD_RENDERER?.chunkSize || 512 } });
   const kernel = createStudioKernel({ document: initial, adapter });
-  registerKeloComponents(kernel.components);
-  seedCatalogPrefabs({ prefabRegistry: kernel.prefabs, assetCatalog: adapter.assetCatalog });
+  registerKeloComponents(kernel.components); seedCatalogPrefabs({ prefabRegistry: kernel.prefabs, assetCatalog: adapter.assetCatalog });
+  const tools = registerBasicTools(kernel), overlayRenderer = createStudioOverlayRenderer({ kernel, tools });
   const resolvePrefab = id => kernel.prefabs.resolve(id) || adapter.assetCatalog.get(id) || { id };
   const compiler = createWorldCompiler({ resolvePrefab });
   const worker = createStudioWorkerClient({ resolvePrefab, prefabSnapshot: () => Object.fromEntries(kernel.prefabs.list().map(p => [p.id, kernel.prefabs.resolve(p.id)])) });
   const store = createStudioStore(), profiler = createStudioProfiler();
   const unsubscribeJournal = kernel.commands.on(event => { store.appendCommand(kernel.document.worldId, event.command).catch(() => {}); });
-
-  session = Object.freeze({
-    version: 'kelo-studio-foundation-v1.2.0', mode, actorId, kernel, compiler, worker, store, profiler, adapter,
+  session = Object.freeze({ version: 'kelo-studio-foundation-v1.3.0', mode, actorId, kernel, tools, overlayRenderer, compiler, worker, store, profiler, adapter,
     compile: options => profiler.measure('compile.sync', () => compiler.compile(kernel.document, options)),
     compileAsync: options => profiler.measure('compile.worker', () => worker.compile(kernel.document, options)),
-    async importCurrent(options = {}) { const next = await profiler.measure('import.current', () => importCurrentKeloWorld({ adapter, mode, actorId, ...options })); kernel.setDocument(next); seedCatalogPrefabs({ prefabRegistry: kernel.prefabs, assetCatalog: adapter.assetCatalog }); return next; },
-    checkpoint: () => store.saveCheckpoint(kernel.document.worldId, kernel.document),
-    recover: () => store.loadRecovery(kernel.document.worldId),
-    close() { unsubscribeJournal(); worker.close(); profiler.close(); store.close().catch(() => {}); session = null; }
+    async importCurrent(options={}) { const next=await profiler.measure('import.current',()=>importCurrentKeloWorld({adapter,mode,actorId,...options})); kernel.setDocument(next); seedCatalogPrefabs({prefabRegistry:kernel.prefabs,assetCatalog:adapter.assetCatalog}); return next; },
+    checkpoint: () => store.saveCheckpoint(kernel.document.worldId,kernel.document), recover: () => store.loadRecovery(kernel.document.worldId),
+    close(){unsubscribeJournal();worker.close();profiler.close();store.close().catch(()=>{});session=null;}
   });
   return session;
 }
 
-export function getKeloStudioSession() { return session; }
-if (typeof window !== 'undefined') window.KELO_STUDIO_LAZY_BOOT = bootKeloStudio;
+export function getKeloStudioSession(){return session;}
+if(typeof window!=='undefined')window.KELO_STUDIO_LAZY_BOOT=bootKeloStudio;
