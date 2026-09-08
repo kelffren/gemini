@@ -2,7 +2,7 @@
 
 > **START HERE.** Antes de modificar Kelo World, lee este archivo y después `ENGINE_MAP.md`.
 >
-> Baseline de esta Foundation: `main` en `ef6bdd087b851d36768e7f3a31ca767974d3d21e` (Kelo World V6.53). Si `main` avanzó, vuelve a auditar antes de cambiar comportamiento.
+> Baseline de este pass Performance Foundation: `main` en `910debe302e22b8abbf114d02f51332f8b28b8f3` (Kelo World V6.53). Si `main` avanzó, vuelve a auditar antes de cambiar comportamiento.
 
 ## 1. Regla principal
 
@@ -69,19 +69,24 @@ Antes de añadirla:
 | Movement base | `engine-a.js` + soporte legacy tardío | NEEDS_AUDIT | Un único owner final |
 | Collision primitives | `src/physics/collision-utils.js` / `KELO_COLLISION` | OWNER | Reutilizar; no duplicar geometría |
 | Camera | core + ajustes tardíos | NEEDS_AUDIT | Un único owner de zoom/backing rules |
-| Render orchestration | `engine-c.js` | OWNER actual | Sistemas se conectan por hooks, no wrappers nuevos |
+| Render orchestration | `engine-c.js` + `KeloRender` extension owner | OWNER actual | Sistemas se conectan por hooks; hooks inactivos pueden dormir |
+| Simulation extensions | `KeloSimulation` | OWNER Foundation | Sistemas registran una vez y pueden `setEnabled` sin otro loop |
+| Performance policy/telemetry | `src/systems/performance-governor.js` / `KELO_PERF` | OWNER Foundation | Una política de distancia/calidad/visibility; no otro governor |
+| Mobile budgets | `KELO_MOBILE_PERFORMANCE_CONTRACT` | OWNER Foundation | DPR/memoria/chunks/Canvas se consultan, no se duplican |
+| Asset atlas lifecycle | `KELO_ATLAS_CONTRACT` | OWNER | `acquire/release`; core retain, non-core warm/evict |
 | World renderer | `src/environment/world-map.js` / `KELO_WORLD_RENDERER` | OWNER | Contenido de mundo no dibuja por fuera sin contrato |
-| Visual/VFX | `src/visuals/*` / `KeloVisualSystem` | OWNER | Visuales no aplican gameplay |
+| Visual/VFX | `src/visuals/*` / `KeloVisualSystem` | OWNER | Visuales no aplican gameplay; presentación idle/hidden puede dormir |
 | Ability runtime | `src/abilities/kelo-ability-boot.js` / `KeloAbilities` | OWNER para abilities modernas | Ability nueva = data + primitives existentes |
 | Stone/loadout | `src/abilities/stone-system.js` / `KeloStones` | OWNER | No usar schema legacy para features nuevas |
 | Equipment | `src/systems/equipment-system.js` | OWNER client | Consumidores no escriben internals directamente |
 | Backpack/inventory moderno | `src/systems/backpack-system.js` | OWNER candidato | Consolidar legacy antes de retirar |
 | Property | `src/property/property-system.js` | OWNER | Una placement = un owner físico |
 | Instances | `src/instances/*` | OWNER | Reutilizar runtime/bridges existentes |
-| Networking client | `engine-net.js` | OWNER transporte client | No confundir transporte con autoridad |
-| Server authority | `server/*` | OWNER online donde aplique | Cliente no se declara autoridad online |
+| Networking client | `engine-net.js` / `KeloNetAuthority` | OWNER transporte client | Culling/LOD no equivale a autoridad |
+| Server authority/AOI | `server/*` room owner | OWNER online donde aplique | AOI filtra transporte; no elimina state autoritativo |
 | UI | `src/ui/*` | CONSUMER | UI llama APIs; no gobierna state ajeno |
-| Combat/effects/melee foundation nueva | `src/core/kelo-runtime-bootstrap.js` + `src/systems/{combat,effects,melee}` | PREPARED / NO asumir LIVE | Solo es LIVE si `index.html`/runtime lo carga y tests lo prueban |
+| Character Customizer entry | `KELO_PROFILE_LAUNCHER` + owners Character existentes | SUPPORT UI | Feature pesada lazy al primer uso; no bootstrap global |
+| Combat/effects/melee foundation nueva | `src/core/kelo-runtime-bootstrap.js` + `src/systems/{combat,effects,melee}` | PREPARED / DORMANT salvo loader explícito | No cargar por existir; solo si una feature real lo requiere |
 
 **Importante:** existir en el repositorio no equivale a estar LIVE. `index.html` y el runtime real mandan.
 
@@ -107,6 +112,7 @@ CAMERA ← SIMULATION → ABILITIES / SYSTEMS
 UI → PUBLIC APIs
 NETWORK → authority bridge / transport
 SERVER → authoritative decisions online
+PERFORMANCE → policy/telemetry consumida por owners, nunca gameplay authority
 ```
 
 Dependencias peligrosas:
@@ -118,6 +124,8 @@ feature → obstacles.push directamente
 feature → render = wrapper
 feature → processInput = wrapper
 feature → setInterval para reparar ownership
+feature → segundo RAF/game loop
+feature → AssetManager2 / PerformanceEngine
 legacy → nuevas features
 ```
 
@@ -139,6 +147,9 @@ Salvo excepción auditada y documentada:
 - No wrappers nuevos directos de `render`, `renderAvatar`, `updateSimulation`, `processInput` cuando exista hook oficial.
 - No manager nuevo solo para “organizar”.
 - No migración tecnológica masiva sin baseline y rollback.
+- No cargar una feature pesada en boot solo porque existe.
+- No mantener un RAF/timer/MutationObserver global de una feature cerrada si puede ser event-driven/lazy.
+- No crear un segundo asset loader para saltarse `KELO_ATLAS_CONTRACT`.
 
 ---
 
@@ -152,13 +163,17 @@ Proceso:
 
 A partir de Foundation, un wrapper nuevo de core requiere una justificación explícita en el PR.
 
-Hooks existentes que deben preferirse donde apliquen:
+Hooks/owners existentes que deben preferirse donde apliquen:
 
+- `KeloSimulation.before/after/setEnabled`
+- `KeloRender.intercept/beforeFrame/afterFrame/setEnabled`
 - `KELO_WORLD_RENDERER.draw(...)`
 - `drawPreActors(...)`
 - `drawPostActors(...)`
-- `KeloVisualSystem` layers/update
-- buses/eventos de sistemas propietarios
+- `KeloVisualSystem` layers/update/lifecycle
+- `KELO_PERF` distance/quality policy
+- `KELO_ATLAS_CONTRACT.acquire/release`
+- buses/eventos de sistemas propietarios, empezando por `KeloEvents` cuando el evento es genérico
 
 ---
 
@@ -176,6 +191,7 @@ Estados válidos:
 - `CLIENT/FALLBACK`
 - `NEEDS_AUDIT`
 - `PREPARED` (existe, pero no está demostrado LIVE)
+- `DORMANT` (preparado pero no cargado/activo en flujo normal)
 
 Regla de retirada:
 
@@ -187,15 +203,13 @@ Nunca `BORRAR → arreglar lo que rompa`.
 
 ## 8. Hotfix de movimiento
 
-`src/ui/force-unlock-move.js` se clasifica como **HOTFIX TEMPORAL**.
-
-No copiar su patrón. Su existencia indica ownership incompleto alrededor de `KELO_MODAL_INPUT_LOCK`, `isBuildMode` y `processInput`.
+`src/ui/force-unlock-move.js` se conserva como referencia histórica de un patrón que no debe copiarse; el runtime Foundation actual debe demostrar por tests si ya está RETIRED.
 
 Objetivo Foundation:
 
 `force-unlock watchdog requerido = 0`
 
-No se retira hasta demostrar que todos los locks tienen owner, acquire/release equilibrados y smoke tests de menú/PvP/touch/movement pasan.
+Locks nuevos pertenecen a `KeloInputLocks`; no introducir escrituras directas nuevas de compatibilidad.
 
 ---
 
@@ -252,24 +266,29 @@ No documentar cada línea. Documentar fronteras, ownership y puntos de reutiliza
 2. Reutilizar `deliveryHandlers`/effects soportados.
 3. Reutilizar Visual System/manifests.
 4. No tocar core salvo capacidad genuinamente nueva.
+5. Si la capacidad no tiene trabajo continuo, no asumir que merece un tick permanente.
 
 ### Quiero añadir un VFX
 
 1. Revisar Visual System/manifests/FX primitives.
 2. Añadir definición/presentación.
 3. Gameplay emite evento; VFX lo representa.
+4. Al terminar el último visual, el owner debe poder volver a estado idle sin loop nuevo.
 
 ### Quiero añadir un prop
 
 1. Usar contratos/registry/property/world existentes.
 2. Definir collision policy explícita.
 3. No hacer `obstacles.push` desde la feature.
+4. Assets no-core se adquieren/liberan mediante su owner.
 
 ### Quiero añadir UI
 
 1. Consumir API pública del sistema owner.
 2. UI no modifica state gameplay directamente.
-3. Input lock debe pertenecer al contrato de input/movement, no al panel individual.
+3. Input lock debe pertenecer a `KeloInputLocks`, no a watchdogs.
+4. UI pesada debe ser lazy si no es necesaria para PLAYER PLAYABLE.
+5. Cerrada no debe conservar trabajo global innecesario.
 
 ### Quiero añadir un comportamiento nuevo
 
@@ -292,16 +311,52 @@ Todo cambio Foundation debe poder responder:
 7. ¿Métrica/criterio de éxito?
 8. ¿Qué legacy/deuda queda?
 9. ¿Documentación actualizada?
+10. ¿Añade coste permanente a boot/frame/memoria/red aunque la feature no se use?
 
 ---
 
-## 13. Performance
+## 13. Performance — contrato permanente
 
 Optimización siempre:
 
 `BASELINE → CAMBIO → TEST → MÉTRICA → KEEP/REVERT`
 
-Prioridades acumuladas ya investigadas incluyen collider sync, viewport culling, visual hot paths, DPR móvil, memory accounting, lazy loading, World Edit boot/clones/storage y networking snapshots.
+Principio de escalabilidad:
+
+> **MÁS CONTENIDO DISPONIBLE NO DEBE SIGNIFICAR MÁS CONTENIDO EJECUTÁNDOSE.**
+
+Objetivo cliente:
+
+```text
+CURRENT PLAYER
++ CURRENT VIEW
++ CURRENT WORLD AREA
++ CURRENT ACTION
++ RELEVANT ONLINE PLAYERS
+```
+
+El resto debe ser, según el dominio:
+
+- `LAZY`: código/feature no entra hasta primer uso;
+- `SLEEPING`: registrado pero fuera del hot path;
+- `CULLED`: existe pero no se actualiza/renderiza por irrelevancia visual;
+- `WARM`: conserva recurso temporalmente sin trabajo continuo;
+- `UNLOADED/EVICTED`: recurso pesado liberado cuando es seguro.
+
+### Reglas de implementación
+
+1. **Scheduling:** `KeloSimulation` y `KeloRender` poseen sleep/wake de hooks. No crear otro scheduler.
+2. **Distancia:** `KELO_PERF.getAnimationHz/shouldUpdate/shouldRenderActor` es la política única de LOD cliente.
+3. **Visibility:** `KELO_PERF` publica `CLIENT_HIDDEN/CLIENT_VISIBLE` mediante `KeloEvents`; no crear `PageLifecycleManager`.
+4. **Assets:** `KELO_ATLAS_CONTRACT` posee `acquire/release`; core se retiene, non-core puede quedar WARM y expulsarse al llegar a refs=0.
+5. **UI pesada:** launcher mínimo + carga bajo acción real. Studio es patrón de referencia.
+6. **Network:** culling de presentación no cambia authority. AOI server filtra transporte, no state.
+7. **Pose:** preferir change-driven + heartbeat a mensajes idénticos permanentes cuando preserve recovery.
+8. **Hot paths:** no optimizar microdetalles sin profiler; evitar allocation/DOM/recorridos completos demostrados en loops calientes.
+9. **Build tool:** code splitting/Vite se evalúa como compilador de producción después de lifecycle/baseline, no como sustituto de Foundation.
+10. **CI:** contratos estructurales de rendimiento viven en `npm run audit:performance` y no dependen de benchmarks ruidosos.
+
+Documento técnico: `docs/systems/PERFORMANCE_FOUNDATION.md`.
 
 No conservar optimización solo porque “parece moderna”.
 
@@ -321,7 +376,7 @@ Foundation no se declara terminada hasta:
 - [ ] Contenido estándar añadible sin modificar core.
 - [ ] APIs públicas documentadas.
 - [ ] Legacy clasificado y sin features nuevas.
-- [ ] CI arquitectónico activo.
+- [x] CI arquitectónico activo para Performance Foundation.
 - [ ] Flujo normal de `main`: branch → PR → checks → merge.
 - [ ] Input/movement sin locks huérfanos.
 - [ ] Smoke tests core verdes en móvil y desktop.
@@ -337,7 +392,8 @@ Un desarrollador nuevo, leyendo solo `AGENTS.md`, este documento y `ENGINE_MAP.m
 4. añadir un VFX;
 5. conectar UI;
 6. no crear sistema paralelo;
-7. no tocar core para contenido ordinario.
+7. no tocar core para contenido ordinario;
+8. añadir contenido sin añadir automáticamente otro tick/request/atlas residente permanente.
 
 Si pregunta “¿en qué engine meto esto?”, la Foundation todavía no está suficientemente clara.
 
@@ -356,3 +412,9 @@ Y antes de cada feature:
 > CAPACIDAD → EXTIENDE EL OWNER.
 >
 > NUNCA → DUPLICA.
+
+Y antes de añadir coste continuo:
+
+> **¿ESTO TIENE TRABAJO AHORA MISMO?**
+>
+> SI NO → LAZY / SLEEP / CULL / WARM / UNLOAD según el owner.
