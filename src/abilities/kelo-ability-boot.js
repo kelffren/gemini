@@ -1,20 +1,23 @@
 /* KELO-INDEX
  * area: ABILITIES / RUNTIME
  * owner: KeloAbilities; frame/simulation extension owners KeloRender + KeloSimulation
- * keys: ABILITY STONE DELIVERY FX HOTBAR RENDER SIMULATION FOUNDATION
+ * keys: ABILITY STONE DELIVERY FX HOTBAR RENDER SIMULATION FOUNDATION COLLISION
  * purpose: runtime data-driven de habilidades y piedras sin envolver render/updateSimulation
  * public-api: KeloAbilities + adapters legacy de stones
- * consumes: KeloStones, KeloSimulation, KeloRender, collision/world/player state
+ * consumes: KeloStones, KeloSimulation, KeloRender, KELO_COLLISION, world/player state
  * state-owned: hotbar runtime + FX legacy de ability delivery
+ * collision-owned: abilities:walls publicado mediante KELO_COLLISION; obstacles es solo lectura legacy
  * extension-points: KeloSimulation.after + KeloRender.afterFrame
  * reuse: nuevas deliveries entran por deliveryHandlers; no crear loops/wrappers paralelos
  * legacy: conserva adapters públicos de stones/fusion mientras migran consumidores
- * do-not: NO envolver render/updateSimulation ni crear otro game loop
+ * do-not: NO envolver render/updateSimulation ni crear otro game loop ni mutar obstacles
  */
 (function () {
   'use strict';
 
   const stones = window.KeloStones;
+  const collision = window.KELO_COLLISION;
+  const WALL_COLLISION_OWNER = 'abilities:walls';
   if (!stones) {
     console.error('KeloAbilities: KeloStones not loaded');
     return;
@@ -208,13 +211,14 @@
     const p = request.position || owner;
     const width = def.delivery.width || 150;
     const wall = {
+      id: uid('wall'),
       x: p.x - width / 2, y: p.y - 12, w: width, h: 24,
       hp: def.delivery.hp || 250, time: def.delivery.duration || 4,
       blocksMovement: def.delivery.blocksMovement !== false,
       blocksProjectiles: def.delivery.blocksProjectiles !== false,
     };
     fx.walls.push(wall);
-    if (typeof obstacles !== 'undefined') obstacles.push(wall);
+    collision.upsert(WALL_COLLISION_OWNER, wall);
   }
 
   function castTrap(request, owner, def) {
@@ -281,6 +285,7 @@
 
   const engine = Object.freeze({
     cast,
+    collisionOwner: WALL_COLLISION_OWNER,
     getSupportedDeliveryTypes: () => Object.keys(deliveryHandlers),
     getPendingDeliveryTypes: () => pendingDeliveryTypes.slice(),
   });
@@ -387,10 +392,7 @@
       const wall = fx.walls[i];
       wall.time -= dt;
       if (wall.time <= 0 || wall.hp <= 0) {
-        if (typeof obstacles !== 'undefined') {
-          const index = obstacles.indexOf(wall);
-          if (index >= 0) obstacles.splice(index, 1);
-        }
+        collision.remove(WALL_COLLISION_OWNER, wall.id);
         fx.walls.splice(i, 1);
       }
     }
@@ -659,6 +661,8 @@
 
   function boot() {
     if (typeof STATE === 'undefined') return console.error('KeloAbilities: STATE unavailable');
+    if (!collision || typeof collision.upsert !== 'function' || typeof collision.remove !== 'function') throw new Error('KeloAbilities: KELO_COLLISION owner unavailable');
+    collision.clearOwner(WALL_COLLISION_OWNER);
     const migration = stones.migrateState(STATE);
     if (!STATE.equipped.length && !STATE.inventory.length) STATE.equipped = stones.createStarterSet();
     if (typeof localPlayer !== 'undefined') { localPlayer.mana = 100; localPlayer.maxMana = 100; }
@@ -679,7 +683,7 @@
       validateLoadoutSnapshot: (snapshot) => stones.validateLoadoutSnapshot(snapshot, STATE),
       openStonePanel: openPanel,
     });
-    window.KELO_STONE_AUDIT = { ready: true, schemaVersion: stones.SCHEMA_VERSION, abilityCount: defs.length, equippedCount: STATE.equipped.length, inventoryCount: STATE.inventory.length, loadoutFingerprint: fingerprint, migration, simulationOwner:'KeloSimulation', simulationHook:'kelo-ability-boot:runtime', renderOwner:'KeloRender', renderHook:'kelo-ability-boot:legacy-fx', directCoreWrappers:false };
+    window.KELO_STONE_AUDIT = { ready: true, schemaVersion: stones.SCHEMA_VERSION, abilityCount: defs.length, equippedCount: STATE.equipped.length, inventoryCount: STATE.inventory.length, loadoutFingerprint: fingerprint, migration, simulationOwner:'KeloSimulation', simulationHook:'kelo-ability-boot:runtime', renderOwner:'KeloRender', renderHook:'kelo-ability-boot:legacy-fx', collisionOwner:WALL_COLLISION_OWNER, directObstacleWrites:false, directCoreWrappers:false };
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true });
