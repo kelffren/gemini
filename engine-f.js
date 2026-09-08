@@ -1,13 +1,26 @@
+/* KELO-INDEX
+ * area: LEGACY ABILITY / INPUT
+ * owner: legacy skill aim; input extension owned by KeloInput
+ * keys: AIM DASH INPUT AFTER TRIGGERSTONE LEGACY
+ * purpose: conserva dirección de aim y habilidades legacy sin envolver processInput
+ * public-api: dashDirection/spawnDashTrail legacy
+ * consumes: KeloInput, input, localPlayer, STATE, triggerStone
+ * state-owned: aim legacy
+ * extension-points: KeloInput.after para derivar aim de intención procesada
+ * reuse: NO añadir abilities nuevas aquí; usar sistema moderno de abilities
+ * legacy: triggerStone wrapper permanece pendiente de migración
+ * do-not: NO volver a envolver processInput
+ */
 const aim = { x: 1, y: 0 };
-const _processInput = processInput;
-processInput = function() {
-  _processInput();
-  if (Math.hypot(input.normX, input.normY) > 0.15) {
-    const len = Math.hypot(input.normX, input.normY);
-    aim.x = input.normX / len;
-    aim.y = input.normY / len;
+if(!window.KeloInput) throw new Error('KeloInput unavailable before engine-f');
+window.KeloInput.after('engine-f:legacy-aim', function(ctx) {
+  const source=ctx&&ctx.input?ctx.input:input;
+  if (Math.hypot(source.normX, source.normY) > 0.15) {
+    const len = Math.hypot(source.normX, source.normY);
+    aim.x = source.normX / len;
+    aim.y = source.normY / len;
   }
-};
+}, 10);
 function dashDirection() {
   const moveLen = Math.hypot(localPlayer.vx, localPlayer.vy);
   if (Math.hypot(input.normX, input.normY) > 0.12) {

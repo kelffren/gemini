@@ -1,0 +1,118 @@
+<!-- KELO-INDEX
+  area: PLAYER DOCS
+  owner: Documentation / Foundation
+  keys: GUIDE MECHANICS PLAYER DOCS PUBLIC
+  purpose: guía pública de mecánicas de Kelo World para jugadores
+  public-api: página estática guide.html
+  consumes: comportamiento LIVE validado y docs/system-catalog.json
+  state-owned: ninguno
+  extension-points: añadir secciones player-visible por sistema
+  reuse: documentación pública de mecánicas
+  legacy: N/A
+  do-not: no publicar secretos, claves ni internals explotables
+-->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Kelo World — Guía de Mecánicas</title>
+  <meta name="description" content="Guía oficial de mecánicas, controles y sistemas de Kelo World.">
+  <style>
+    :root{--bg:#071014;--panel:#0d191d;--panel2:#122328;--gold:#e7c56a;--text:#eef3ef;--muted:#8da19b;--line:rgba(231,197,106,.22)}
+    *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:radial-gradient(circle at 50% 0,#17352f 0,#071014 42%);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;line-height:1.55}
+    a{color:var(--gold)}.wrap{width:min(920px,calc(100% - 28px));margin:auto;padding:24px 0 70px}.top{display:flex;align-items:center;gap:12px;margin-bottom:28px}.back{display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:0 14px;border:1px solid var(--line);border-radius:12px;background:rgba(9,19,22,.9);text-decoration:none;font-weight:800}.brand{margin-left:auto;color:var(--gold);font:800 13px Georgia,serif;letter-spacing:.12em}
+    .hero{padding:26px;border:1px solid var(--line);border-radius:24px;background:linear-gradient(145deg,rgba(23,63,54,.82),rgba(8,17,21,.96));box-shadow:0 20px 60px rgba(0,0,0,.24)}h1{margin:0;color:#f5dda0;font:800 clamp(30px,7vw,52px) Georgia,serif}.lead{max-width:700px;color:#c8d5cf;margin:10px 0 0}.notice{margin-top:16px;padding:12px 14px;border-left:3px solid var(--gold);background:rgba(231,197,106,.07);color:#cfdbd5;font-size:13px}
+    .toc{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:9px;margin:18px 0 30px}.toc a{padding:13px 14px;border:1px solid rgba(255,255,255,.08);border-radius:13px;background:rgba(255,255,255,.035);text-decoration:none;color:#e9eee9;font-size:13px;font-weight:750}.toc small{display:block;color:var(--muted);font-weight:500;margin-top:3px}
+    section{margin:18px 0;padding:21px;border:1px solid rgba(255,255,255,.08);border-radius:18px;background:linear-gradient(180deg,rgba(13,25,29,.96),rgba(8,17,21,.96))}h2{margin:0 0 8px;color:var(--gold);font-size:21px}h3{margin:18px 0 6px;font-size:15px;color:#f0e4ba}p{margin:7px 0;color:#cbd6d1}ul{padding-left:20px;color:#cbd6d1}.tag{display:inline-block;margin-bottom:10px;padding:4px 8px;border:1px solid var(--line);border-radius:999px;color:var(--gold);font-size:10px;font-weight:900;letter-spacing:.08em}.example{padding:12px;border-radius:12px;background:#091216;color:#abbdb5;font-size:13px}.footer{margin-top:30px;color:#758a82;font-size:12px;text-align:center}
+  </style>
+</head>
+<body>
+<main class="wrap">
+  <div class="top"><a class="back" href="./">← Volver al juego</a><div class="brand">KELO WORLD</div></div>
+  <header class="hero">
+    <span class="tag">GUÍA OFICIAL</span>
+    <h1>Mecánicas de Kelo World</h1>
+    <p class="lead">Aquí se explica cómo funciona el juego desde el punto de vista del jugador. Esta guía crecerá junto al juego: cada sistema visible nuevo debe publicar aquí sus reglas, controles, límites y ejemplos.</p>
+    <div class="notice">La guía describe comportamiento validado. Mecánicas en pruebas pueden cambiar antes de considerarse definitivas.</div>
+  </header>
+
+  <nav class="toc" aria-label="Índice de mecánicas">
+    <a href="#movimiento">Movimiento<small>Caminar, correr y soltar</small></a>
+    <a href="#controles-y-bloqueos-de-interfaz">Controles e interfaces<small>Paneles y control</small></a>
+    <a href="#habilidades">Habilidades<small>Piedras y slots</small></a>
+    <a href="#mochila">Mochila<small>Objetos y equipo</small></a>
+    <a href="#pvp">PvP<small>Combate y arena</small></a>
+  </nav>
+
+  <section id="movimiento">
+    <span class="tag">MOVIMIENTO</span>
+    <h2>Caminar y correr</h2>
+    <p>La velocidad del personaje responde a la intensidad de la dirección que estás marcando. En móvil, desplazar poco el joystick produce un movimiento más suave; al llevarlo más lejos, el personaje pasa de caminar a correr.</p>
+    <ul>
+      <li>Sin intención de movimiento, el personaje debe detenerse.</li>
+      <li>Con una dirección suave, el personaje camina.</li>
+      <li>Con una dirección fuerte, entra progresivamente en carrera.</li>
+      <li>Las paredes y objetos sólidos limitan el desplazamiento físico; no deberías atravesarlos por mantener el joystick pulsado.</li>
+      <li>La animación de pasos avanza usando la distancia realmente recorrida, para que los pies no sigan caminando cuando un obstáculo impide avanzar.</li>
+    </ul>
+    <div class="example"><strong>Ejemplo:</strong> empujas el joystick ligeramente → caminas; lo llevas más lejos → aceleras hacia carrera; lo sueltas → el personaje se planta y se detiene.</div>
+  </section>
+
+  <section id="controles-y-bloqueos-de-interfaz">
+    <span class="tag">CONTROLES</span>
+    <h2>Movimiento e interfaces</h2>
+    <p>El mundo se controla directamente desde el joystick táctil o los controles disponibles en tu dispositivo. Algunos paneles necesitan tu atención exclusiva para que un toque destinado a la interfaz no se convierta también en movimiento o una acción dentro del mundo.</p>
+    <h3>¿Qué ocurre cuando abres un panel?</h3>
+    <ul>
+      <li>Paneles modales como inventario, personalización u otras interfaces pueden reclamar temporalmente el control.</li>
+      <li>Mientras ese panel tenga el control, las acciones del mundo que podrían activarse accidentalmente deben quedar bloqueadas.</li>
+      <li>Al cerrar el panel, el control normal debe regresar automáticamente.</li>
+      <li>Un panel no debe cancelar silenciosamente el control reclamado por otro panel todavía abierto.</li>
+    </ul>
+    <div class="example"><strong>Ejemplo:</strong> abres la Mochila → interactúas con objetos sin mover al personaje → cierras la Mochila → vuelves a caminar normalmente.</div>
+    <h3>Si no puedes moverte</h3>
+    <p>Cierra cualquier panel abierto primero. Si la pantalla ya está libre y el personaje continúa sin responder, eso se considera un problema del juego y no una mecánica intencional.</p>
+  </section>
+
+  <section id="habilidades">
+    <span class="tag">COMBATE</span>
+    <h2>Habilidades y piedras</h2>
+    <p>Las habilidades modernas de Kelo World se equipan mediante piedras y aparecen en los slots disponibles. Cada habilidad define su objetivo, coste, cooldown, efecto y forma de ejecución.</p>
+    <ul>
+      <li>Un slot vacío no puede lanzar una habilidad.</li>
+      <li>Una habilidad en cooldown debe esperar antes de reutilizarse.</li>
+      <li>Algunas habilidades apuntan una dirección, una posición, un objetivo o al propio jugador.</li>
+      <li>El coste de recursos y las reglas de alcance se validan antes de ejecutar el efecto.</li>
+    </ul>
+    <p>Las páginas específicas de cada habilidad se irán añadiendo cuando esa habilidad se considere validada para jugadores.</p>
+  </section>
+
+  <section id="mochila">
+    <span class="tag">INVENTARIO</span>
+    <h2>Mochila y equipo</h2>
+    <p>La Mochila contiene los objetos portátiles del jugador. Desde ella puedes inspeccionar objetos y, según el tipo, moverlos, dividir stacks, descartarlos o equiparlos.</p>
+    <ul>
+      <li>Los objetos equipados usan el sistema de Equipo.</li>
+      <li>Los stacks pueden dividirse solo cuando hay espacio libre.</li>
+      <li>Los objetos vinculados pueden tener restricciones adicionales.</li>
+      <li>Acciones como Mercado o Almacén usan sus propios contratos para mover objetos de forma segura.</li>
+    </ul>
+  </section>
+
+  <section id="pvp">
+    <span class="tag">PVP</span>
+    <h2>Mundo PvP</h2>
+    <p>El modo PvP cambia el contexto del jugador desde social a combate. El sistema valida el estado del combate antes de aceptar ataques y habilidades.</p>
+    <ul>
+      <li>Los ataques tienen alcance y cooldown.</li>
+      <li>Las habilidades conservan sus propias reglas de targeting y recursos.</li>
+      <li>Salir del PvP devuelve al jugador al contexto social correspondiente.</li>
+    </ul>
+    <p>Las reglas competitivas definitivas y la autoridad online se documentarán aquí cuando el modo multijugador de producción quede cerrado.</p>
+  </section>
+
+  <div class="footer">Kelo World · Guía de mecánicas viva · actualizada junto al runtime validado.</div>
+</main>
+</body>
+</html>

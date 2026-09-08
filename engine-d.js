@@ -77,7 +77,7 @@ socialAction = function(action) {
   if (action === 'Ver Perfil' && activeSocialTarget) { inspectPlayer(activeSocialTarget, false); closeSocialModal(); return; }
   _socialAction(action);
 };
-renderAvatar = function(p, isSelf) {
+function renderRankedAvatar(p, isSelf) {
   var jewels = isSelf ? STATE.jewels : (p.jewels || {});
   ctx.save();
   ctx.fillStyle = 'rgba(0,0,0,0.4)';
@@ -108,7 +108,9 @@ renderAvatar = function(p, isSelf) {
   var rankColor = isSelf ? currentRank().color : ((found && found.color) || '#fff');
   ctx.textAlign = 'center'; ctx.font = '9px sans-serif'; ctx.fillStyle = rankColor; ctx.fillText(rankName, p.x, p.y - p.radius - 18);
   ctx.font = '10px sans-serif'; ctx.fillStyle = isSelf ? '#e7c56a' : '#ffffff'; ctx.fillText(p.name, p.x, p.y - p.radius - 7);
-};
+}
+if(!window.KeloAvatar) throw new Error('KeloAvatar unavailable before engine-d');
+window.KeloAvatar.setBase('engine-d:rank-jewels', renderRankedAvatar);
 function drawMinimap() {
   if (window.KELO_WORLD_DECORATION_RESET === true || window.KELO_WORLD_RENDERER?.decorationReset === true) return;
   var w = 92, h = 78, pad = 10, x = pad, y = screenH - h - pad - 8;
@@ -122,8 +124,8 @@ function drawMinimap() {
   simulatedPlayers.forEach(function(p){ ctx.fillStyle = '#fff'; ctx.fillRect(sx(p.x) - 1, sy(p.y) - 1, 2, 2); });
   ctx.fillStyle = '#e7c56a'; ctx.beginPath(); ctx.arc(sx(localPlayer.x), sy(localPlayer.y), 2.4, 0, Math.PI * 2); ctx.fill(); ctx.restore();
 }
-var _render3 = render;
-render = function() { _render3(); drawMinimap(); };
+if(!window.KeloRender) throw new Error('KeloRender unavailable before engine-d');
+window.KeloRender.afterFrame('engine-d:minimap', drawMinimap, 10);
 checkSocialTouch = function(sx, sy) {
   if (window.KELO_WORLD_DECORATION_RESET === true || window.KELO_WORLD_RENDERER?.decorationReset === true) { closeSocialModal(); return; }
   var w = screenToWorld(sx, sy);

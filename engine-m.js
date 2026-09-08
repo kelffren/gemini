@@ -1,3 +1,16 @@
+/* KELO-INDEX
+ * area: LEGACY ABILITY PRESENTATION
+ * owner: legacy skill shots; extension owners KeloSimulation + KeloRender
+ * keys: SKILL SHOTS SIMULATION RENDER FOUNDATION
+ * purpose: conserva proyectiles visuales legacy sin envolver core
+ * public-api: window.skillShots + castAimedSkill compatibility
+ * consumes: KeloSimulation, KeloRender, STATE, localPlayer, simulatedPlayers
+ * state-owned: skillShots legacy
+ * extension-points: KeloSimulation.after + KeloRender.afterFrame
+ * reuse: no añadir abilities nuevas aquí
+ * legacy: skill shot stack pendiente de retirada
+ * do-not: NO envolver updateSimulation ni render
+ */
 (function () {
   window.skillShots = window.skillShots || [];
 
@@ -60,9 +73,8 @@
     _castAll(index, typeId, dirX, dirY);
   };
 
-  const _upd = updateSimulation;
-  updateSimulation = function(dt) {
-    _upd(dt);
+  function updateSkillShots(context) {
+    const dt=context.dt;
     for (let i = skillShots.length - 1; i >= 0; i--) {
       const s = skillShots[i];
       s.x += s.vx * dt;
@@ -81,7 +93,7 @@
         skillShots.splice(i, 1);
       }
     }
-  };
+  }
 
   function drawShots() {
     if (!skillShots.length) return;
@@ -116,9 +128,8 @@
     ctx.restore();
   }
 
-  const _render = render;
-  render = function () {
-    _render();
-    drawShots();
-  };
+  if(!window.KeloSimulation) throw new Error('KeloSimulation unavailable before engine-m');
+  if(!window.KeloRender) throw new Error('KeloRender unavailable before engine-m');
+  window.KeloSimulation.after('engine-m:skill-shots', updateSkillShots, 10);
+  window.KeloRender.afterFrame('engine-m:skill-shots', drawShots, 50);
 })();

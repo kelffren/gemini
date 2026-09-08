@@ -1,3 +1,16 @@
+/* KELO-INDEX
+ * area: LEGACY ABILITY / MOVEMENT
+ * owner: legacy skill aiming; movement extension owned by KeloMovement; render extension owned by KeloRender
+ * keys: DASH AIM MOVEMENT INTERCEPT SKILL INDICATOR RENDER HOOK
+ * purpose: conserva aiming/dash legacy y registra extensiones mediante owners Foundation
+ * public-api: funciones legacy skill aim/renderActionBar
+ * consumes: KeloMovement, KeloRender, STATE, localPlayer, obstacles
+ * state-owned: skillAim + dashTween legacy
+ * extension-points: KeloMovement.intercept + KeloRender.afterFrame
+ * reuse: NO añadir habilidades nuevas aquí; usar sistema moderno de abilities
+ * legacy: skill stack aún pendiente de migración
+ * do-not: NO volver a envolver updateMovement ni render
+ */
 const skillAim = { active: false, index: -1, typeId: '', pointerId: null, originX: 0, originY: 0, currentX: 0, currentY: 0, dirX: 1, dirY: 0 };
 const dashTween = { active: false, t: 0, dur: 0.16, fromX: 0, fromY: 0, toX: 0, toY: 0 };
 function skillRange(typeId) {
@@ -75,27 +88,25 @@ window.addEventListener('pointermove', (e) => {
 }, { passive: true });
 window.addEventListener('pointerup', endSkillAim);
 window.addEventListener('pointercancel', endSkillAim);
-const _updateMovement = updateMovement;
-updateMovement = function(dt) {
-  if (dashTween.active) {
-    dashTween.t += dt;
-    const u = Math.min(1, dashTween.t / dashTween.dur);
-    const ease = 1 - Math.pow(1 - u, 2);
-    localPlayer.x = dashTween.fromX + (dashTween.toX - dashTween.fromX) * ease;
-    localPlayer.y = dashTween.fromY + (dashTween.toY - dashTween.fromY) * ease;
-    for (const b of obstacles) {
-      const res = resolveCircleAABB(localPlayer.x, localPlayer.y, localPlayer.radius, b);
-      if (res.collided) { localPlayer.x += res.pushX; localPlayer.y += res.pushY; }
-    }
-    if (isPvPActive && arenaPvP.rival && Math.hypot(localPlayer.x - arenaPvP.rival.x, localPlayer.y - arenaPvP.rival.y) < 52) {
-      const stone = STATE.equipped.find(s => s.typeId === 'dash');
-      applyPvPDamage(arenaPvP.rival, stone ? stone.dmg : 15);
-    }
-    if (u >= 1) dashTween.active = false;
-    return;
+if(!window.KeloMovement) throw new Error('KeloMovement unavailable before engine-g');
+window.KeloMovement.intercept('engine-g:legacy-dash', function(ctx) {
+  if (!dashTween.active) return false;
+  dashTween.t += ctx.dt;
+  const u = Math.min(1, dashTween.t / dashTween.dur);
+  const ease = 1 - Math.pow(1 - u, 2);
+  localPlayer.x = dashTween.fromX + (dashTween.toX - dashTween.fromX) * ease;
+  localPlayer.y = dashTween.fromY + (dashTween.toY - dashTween.fromY) * ease;
+  for (const b of obstacles) {
+    const res = resolveCircleAABB(localPlayer.x, localPlayer.y, localPlayer.radius, b);
+    if (res.collided) { localPlayer.x += res.pushX; localPlayer.y += res.pushY; }
   }
-  _updateMovement(dt);
-};
+  if (isPvPActive && arenaPvP.rival && Math.hypot(localPlayer.x - arenaPvP.rival.x, localPlayer.y - arenaPvP.rival.y) < 52) {
+    const stone = STATE.equipped.find(s => s.typeId === 'dash');
+    applyPvPDamage(arenaPvP.rival, stone ? stone.dmg : 15);
+  }
+  if (u >= 1) dashTween.active = false;
+  return true;
+}, 10);
 function drawSkillIndicator() {
   if (!skillAim.active) return;
   const z = CONFIG.zoom || 1, range = skillRange(skillAim.typeId);
@@ -119,6 +130,6 @@ function drawSkillIndicator() {
   ctx.beginPath(); ctx.arc(skillAim.originX, skillAim.originY, 46, 0, Math.PI * 2); ctx.stroke();
   ctx.fillStyle = '#ffd166'; ctx.beginPath(); ctx.arc(skillAim.currentX, skillAim.currentY, 14, 0, Math.PI * 2); ctx.fill(); ctx.restore();
 }
-const _renderSkills = render;
-render = function() { _renderSkills(); drawSkillIndicator(); };
+if(!window.KeloRender) throw new Error('KeloRender unavailable before engine-g');
+window.KeloRender.afterFrame('engine-g:skill-indicator', drawSkillIndicator, 20);
 renderActionBar();

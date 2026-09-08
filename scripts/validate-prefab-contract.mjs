@@ -31,6 +31,10 @@ for(const key of ['renderParts','splitLayers','splitAssets','frameSelection','co
 if(/luxeBoutique|kelo-luxe|SHOP|Boutique/.test(rendererSource))throw new Error('Generic prefab renderer contains building-specific knowledge');
 for(const token of ['part.source','part.offset','part.size','part.phase','renderPlan?.parts','clip-redraw-back-v1'])if(!rendererSource.includes(token))throw new Error(`Renderer does not consume normalized render metadata: ${token}`);
 if(/new Image\(|drawImage|\.register\(\{id:[`'\"]?luxe/.test(adapterSource))throw new Error('Luxe adapter still owns rendering');
-if(!/src\/environment\/prefab-contract\.js\?v=\d+/.test(indexSource)||!/src\/environment\/generic-prefabs\.js\?v=\d+/.test(indexSource))throw new Error('Generic prefab pipeline is not booted');
-if(indexSource.indexOf('prefab-contract.js?')>indexSource.indexOf('luxe-kiosk-atlas.js'))throw new Error('Prefab contract loads after compatibility adapter');
-console.log('PASS prefab contract: legacy shop + synthetic split castle normalize through metadata without renderer changes');
+
+const contractLive=/src\/environment\/prefab-contract\.js\?v=[^\"']+/.test(indexSource);
+const genericRendererLive=/src\/environment\/generic-prefabs\.js\?v=[^\"']+/.test(indexSource);
+if(!contractLive)throw new Error('Prefab data contract is not booted in the live runtime');
+if(genericRendererLive)throw new Error('generic-prefabs.js is currently classified DORMANT; update ENGINE_MAP/contracts before activating it');
+
+console.log(JSON.stringify({ok:true,contractLive,genericRendererLive,rendererContractTested:true,mode:'live-contract+dormant-renderer'},null,2));

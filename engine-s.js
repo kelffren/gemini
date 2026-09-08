@@ -1,3 +1,16 @@
+/* KELO-INDEX
+ * area: LEGACY SOCIAL WORLD
+ * owner: social-world legacy; extension owners KeloSimulation + KeloRender
+ * keys: SOCIAL BOTS CHAT BUBBLES SIMULATION RENDER FOUNDATION
+ * purpose: conserva bots/chat/burbujas legacy sin wrappers core
+ * public-api: KeloSocialUI, keloSay, keloBubbles
+ * consumes: KeloSimulation, KeloRender, simulatedPlayers, localPlayer
+ * state-owned: bubbles + walkT + legacy social UI
+ * extension-points: KeloSimulation.before/after + KeloRender.afterFrame
+ * reuse: no añadir sistemas sociales nuevos aquí
+ * legacy: social prototype
+ * do-not: NO envolver updateSimulation ni render
+ */
 (function () {
   const EXTRA = [
     { id: 'b3', name: 'Andrea', x: 1460, y: 1500, targetX: 1460, targetY: 1500, hp: 100, maxHp: 100, radius: 16, gear: { bodyColor: '#d4a5c9', armorColor: '#fff', weaponColor: '#e7c56a' } }
@@ -13,7 +26,7 @@
   let walkT = 0;
   window.keloBubbles = bubbles;
   function resetActive(){return window.KELO_WORLD_DECORATION_RESET===true||window.KELO_WORLD_RENDERER?.decorationReset===true;}
-  window.KELO_SOCIAL_WORLD_AUDIT={version:'social-world-reset-guard-v1',decorationReset:true,legacyFountainDrawCount:0,botWorldBubblesSuppressed:true};
+  window.KELO_SOCIAL_WORLD_AUDIT={version:'social-world-foundation-v2',decorationReset:true,legacyFountainDrawCount:0,botWorldBubblesSuppressed:true,renderOwner:'KeloRender',simulationOwner:'KeloSimulation'};
 
   function worldFromEvent(e) {
     const z = CONFIG.zoom || 1;
@@ -87,12 +100,12 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ensureChat);
   else ensureChat();
 
-  const _upd = updateSimulation;
-  updateSimulation = function (dt) {
-    if (simulatedPlayers) {
-      simulatedPlayers.forEach(function (b) { b._px = b.x; b._py = b.y; });
-    }
-    _upd(dt);
+  function beforeSocialSimulation() {
+    if (simulatedPlayers) simulatedPlayers.forEach(function (b) { b._px = b.x; b._py = b.y; });
+  }
+
+  function afterSocialSimulation(context) {
+    const dt=context.dt;
     if (simulatedPlayers) {
       simulatedPlayers.forEach(function (b) {
         const dx = b.x - (b._px || b.x);
@@ -110,11 +123,9 @@
       const b = simulatedPlayers[Math.floor(Math.random() * simulatedPlayers.length)];
       say(b.name, BOT_LINES[Math.floor(Math.random() * BOT_LINES.length)]);
     }
-  };
+  }
 
-  const _r = render;
-  render = function () {
-    _r();
+  function drawSocialWorld() {
     if (resetActive()) {
       window.KELO_SOCIAL_WORLD_AUDIT.decorationReset=true;
       return;
@@ -149,5 +160,11 @@
       ctx.fillText(bu.text.slice(0, 18), x, y - 4);
     });
     ctx.restore();
-  };
+  }
+
+  if(!window.KeloSimulation) throw new Error('KeloSimulation unavailable before engine-s');
+  if(!window.KeloRender) throw new Error('KeloRender unavailable before engine-s');
+  window.KeloSimulation.before('engine-s:social-bot-snapshot', beforeSocialSimulation, 50);
+  window.KeloSimulation.after('engine-s:social-world', afterSocialSimulation, 50);
+  window.KeloRender.afterFrame('engine-s:social-world', drawSocialWorld, 80);
 })();

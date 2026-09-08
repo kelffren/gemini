@@ -1,7 +1,19 @@
+/* KELO-INDEX
+ * area: LEGACY HD RENDER SUPPORT
+ * owner: HD/pixel-perfect compatibility; frame extension owned by KeloRender
+ * keys: HIDPI PIXEL PERFECT PLAZA FALLBACK RENDER FOUNDATION
+ * purpose: conserva DPR/zoom/fallback procedural sin envolver render
+ * public-api: KELO_HD_RENDER, resize compatibility
+ * consumes: KeloRender, mobile performance contract, canvas/ctx
+ * state-owned: plazaReady legacy
+ * extension-points: KeloRender.beforeFrame/afterFrame
+ * reuse: no añadir renderers nuevos aquí
+ * legacy: resize/zoom ownership aún pendiente de consolidación
+ * do-not: NO envolver render
+ */
 (function () {
   const mobilePerf = window.KELO_MOBILE_PERFORMANCE_CONTRACT;
   const dprCap = Number(mobilePerf?.dprCap) || 3;
-  // Pixel-art HD mode: use the contract-governed device backing store, never blur authored pixels.
   function activeDpr(){ return Math.min(window.devicePixelRatio || 1, dprCap); }
   function pixelPerfectZoom(target){
     const dpr = activeDpr();
@@ -25,8 +37,6 @@
     };
   }
 
-  // The live plaza is atlas-owned by engine-l.js. Keep the procedural fallback here,
-  // but never probe legacy JPG paths that are no longer part of the production build.
   let plazaReady = false;
   resize = function () {
     screenW = window.innerWidth;
@@ -77,18 +87,28 @@
     ctx.fillRect(p.x, p.y, p.w, p.h);
     ctx.restore();
   }
-  const _renderC = render;
-  render = function () {
+
+  let restoreFillRect = null;
+  function prepareLegacyFillRect() {
     ctx.imageSmoothingEnabled = false;
     const origFillRect = ctx.fillRect.bind(ctx);
+    restoreFillRect = origFillRect;
     ctx.fillRect = function (x, y, w, h) {
       if (w === 520 && h === 520) { drawMarblePlaza(); return; }
       origFillRect(x, y, w, h);
     };
-    _renderC();
-    ctx.fillRect = origFillRect;
+  }
+  function restoreLegacyFillRect() {
+    if (restoreFillRect) {
+      ctx.fillRect = restoreFillRect;
+      restoreFillRect = null;
+    }
     ctx.imageSmoothingEnabled = false;
-  };
-  window.KELO_HD_RENDER = Object.freeze({mode:'hidpi-pixel-perfect-v2',dprCap,defaultZoom:CONFIG.zoom,smoothing:false,mobilePerformanceContractVersion:mobilePerf?.version||null});
+  }
+  if(!window.KeloRender) throw new Error('KeloRender unavailable before engine-h');
+  window.KeloRender.beforeFrame('engine-h:legacy-plaza-fillrect', prepareLegacyFillRect, 30);
+  window.KeloRender.afterFrame('engine-h:legacy-plaza-fillrect', restoreLegacyFillRect, 30);
+
+  window.KELO_HD_RENDER = Object.freeze({mode:'hidpi-pixel-perfect-v2',dprCap,defaultZoom:CONFIG.zoom,smoothing:false,mobilePerformanceContractVersion:mobilePerf?.version||null,renderOwner:'KeloRender'});
   window.KELO_LEGACY_PLAZA_IMAGE_DISABLED = true;
 })();

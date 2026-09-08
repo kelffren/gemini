@@ -1,13 +1,16 @@
 /* KELO-INDEX
  * area: VISUAL
- * keys: SWORD SWAP PVP ACTIVATION EYE IMPACT PLANTED LOOP TELEPORT RETURN SPRITESHEET BLOCKER
+ * owner: Sword Swap PvP presentation; simulation extension owned by KeloSimulation
+ * keys: SWORD SWAP PVP ACTIVATION EYE IMPACT PLANTED LOOP TELEPORT RETURN SPRITESHEET BLOCKER FOUNDATION
  * hace: puente visual del PvP aislado para activación, impacto, espada clavada, bloqueo físico, teleport y llamada/retorno usando los PNG reales en la capa projectile worldFX que sí renderiza la arena
  * online: consume eventos semánticos y añade únicamente presentación + colisión local de prototipo; no decide daño, cooldown ni autoridad remota
+ * extension-points: KeloSimulation.after para resolver el blocker de espada plantada tras la simulación
+ * do-not: NO envolver updateSimulation
  */
 (function (root) {
   'use strict';
 
-  const VERSION = 'sword-swap-pvp-visuals-v1.4.2';
+  const VERSION = 'sword-swap-pvp-visuals-v1.5.0-foundation';
   const FRAME_W = 362;
   const FRAME_H = 724;
   const IMPACT_MS = 500;
@@ -54,6 +57,8 @@
     blockerActive: false,
     blockerHits: 0,
     blockerBox: null,
+    simulationOwner: 'KeloSimulation',
+    blockerHook: 'sword-swap-pvp-visuals:blocker',
     lastPhase: null,
     lastSwordEntityId: null,
     lastTeleportPoints: null,
@@ -357,13 +362,10 @@
 
   function installSwordBlocker() {
     if (blockerInstalled) return true;
-    let previous = null;
-    try { previous = typeof updateSimulation === 'function' ? updateSimulation : null; } catch (e) { previous = null; }
-    if (!previous) return false;
-    updateSimulation = function (dt) {
-      previous(dt);
+    if (!root.KeloSimulation || typeof root.KeloSimulation.after !== 'function') return false;
+    root.KeloSimulation.after('sword-swap-pvp-visuals:blocker', function () {
       applySwordBlocker();
-    };
+    }, 220);
     blockerInstalled = true;
     audit.blockerInstalled = true;
     return true;

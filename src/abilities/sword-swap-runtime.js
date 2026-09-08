@@ -1,8 +1,11 @@
 /* KELO-INDEX
  * area: ABILITY
- * keys: SWORD SWAP THROW ANCHOR TELEPORT RETURN VFX AMENOTEJIKARA
+ * owner: KeloSwordSwapRuntime; simulation extension owned by KeloSimulation
+ * keys: SWORD SWAP THROW ANCHOR TELEPORT RETURN VFX AMENOTEJIKARA FOUNDATION
  * hace: runtime mínimo de Espada de Intercambio; usa los PNG dedicados y conserva gameplay separado de presentación
  * online: emite eventos semánticos en KeloAbilities.bus; la autoridad puede reemplazar estas mutaciones locales más adelante
+ * extension-points: KeloSimulation.after para el tick de la state machine
+ * do-not: NO envolver updateSimulation
  */
 (function (root) {
   'use strict';
@@ -20,7 +23,7 @@
     anchorRemaining: 0, phaseRemaining: 0,
     loopFxId: null, directThrowVisualId: null, returnVisualId: null,
     input: null, sequence: 1,
-    updateWrapped: false, inputInstalled: false, visualsRegistered: false,
+    simulationHookInstalled: false, inputInstalled: false, visualsRegistered: false,
   };
 
   function nowId(prefix) {
@@ -562,27 +565,24 @@
     }, true);
   }
 
-  function wrapUpdate() {
-    if (state.updateWrapped || typeof updateSimulation !== 'function') return false;
-    const base = updateSimulation;
-    updateSimulation = function (dt) {
-      base(dt);
-      update(dt);
-    };
-    updateSimulation.__keloSwordSwapRuntime = true;
-    state.updateWrapped = true;
+  function installSimulationHook() {
+    if (state.simulationHookInstalled) return true;
+    if (!root.KeloSimulation || typeof root.KeloSimulation.after !== 'function') return false;
+    root.KeloSimulation.after('sword-swap-runtime:tick', function (context) {
+      update(context.dt);
+    }, 200);
+    state.simulationHookInstalled = true;
     return true;
   }
 
   function boot() {
-    if (!root.KeloAbilities || !registerVisuals() || typeof updateSimulation !== 'function') {
+    if (!root.KeloAbilities || !registerVisuals() || !installSimulationHook()) {
       setTimeout(boot, 80);
       return;
     }
     installInput();
-    wrapUpdate();
     root.KeloSwordSwapRuntime = Object.freeze({
-      version: 'sword-swap-runtime-v2.0.0',
+      version: 'sword-swap-runtime-v2.1.0-foundation',
       getState: function () {
         return {
           phase: state.phase, slot: state.slot, anchorRemaining: state.anchorRemaining,
@@ -593,7 +593,8 @@
       reset: function () { finishResolution('debug-reset'); },
     });
     root.KELO_SWORD_SWAP_AUDIT = {
-      ready: true, version: '2.0.0',
+      ready: true, version: '2.1.0-foundation',
+      simulationOwner: 'KeloSimulation', simulationHook: 'sword-swap-runtime:tick',
       assets: ['a.PNG', 'loop.PNG', 'teleport .PNG', 'regreso2.PNG', 'katana-throw.PNG'],
       behavior: 'throw->impact->loop->[swap sword | swap character->return | timeout->return]'
     };
