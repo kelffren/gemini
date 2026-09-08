@@ -1,15 +1,15 @@
 /* KELO-INDEX
  * area: LEGACY ZONE / CAFE
- * owner: cafe feature; movement extension owned by KeloMovement; render extension owned by KeloRender
- * keys: CAFE ZONE MOVEMENT CLAMP RENDER LEGACY
+ * owner: cafe feature; movement extension owned by KeloMovement; camera commands owned by KeloCamera; render extension owned by KeloRender
+ * keys: CAFE ZONE MOVEMENT CLAMP CAMERA RENDER LEGACY
  * purpose: conserva entrada/salida del café y limita movimiento/render mediante owners Foundation
  * public-api: enterCafe/exitCafe + keloCafe/keloZone legacy
- * consumes: KeloMovement, KeloRender, localPlayer, camera, obstacles
+ * consumes: KeloMovement, KeloCamera, KeloRender, localPlayer, obstacles
  * state-owned: estado legacy de zona café
- * extension-points: KeloMovement.after + KeloRender.afterFrame
+ * extension-points: KeloMovement.after + KeloCamera.setTarget + KeloRender.afterFrame
  * reuse: NO usar como patrón de nuevas instancias; usar InstanceSystem
- * legacy: teleport directo pendiente de migración
- * do-not: NO volver a envolver updateMovement ni render
+ * legacy: teleport del jugador sigue siendo feature legacy; cámara ya migrada al owner
+ * do-not: NO volver a envolver updateMovement/render ni escribir camera.* directamente
  */
 (function () {
   const T = window.KELO_TILE || 32;
@@ -35,8 +35,8 @@
     localPlayer.vx = 0;
     localPlayer.vy = 0;
     if (input) { input.normX = 0; input.normY = 0; }
-    camera.x = camera.targetX = localPlayer.x;
-    camera.y = camera.targetY = localPlayer.y;
+    if (!window.KeloCamera) throw new Error('KeloCamera unavailable before cafe snap');
+    window.KeloCamera.setTarget(localPlayer.x, localPlayer.y, { snap: true, source: 'engine-ai:cafe-snap' });
   }
 
   function enterCafe() {
