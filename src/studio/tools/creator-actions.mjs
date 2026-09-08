@@ -1,6 +1,6 @@
 /* KELO-INDEX
  * area: STUDIO / CREATOR ACTIONS
- * owns: reusable multi-selection productivity actions
+ * owns: reusable multi-selection productivity and clipboard actions
  * does-not-own: UI, authority transport, rendering
  * public-api: createCreatorActions()
  * online: all persistent changes flow through CommandBus as one reversible batch
@@ -14,7 +14,9 @@ function newId() { const uuid = globalThis.crypto?.randomUUID?.(); return `entit
 
 export function createCreatorActions(kernel) {
   if (!kernel) throw new Error('STUDIO_CREATOR_ACTIONS_KERNEL_REQUIRED');
+  let clipboard = [], pasteCount = 0;
   const selectedEntities = () => kernel.selection.get().map(id => kernel.document.entities.find(e => e.id === id)).filter(Boolean);
+  const sanitizeClone = row => { const clone=copy(row); clone.id=newId(); if(clone.source)clone.source={...clone.source,authorityPlacementId:undefined}; return clone; };
 
   async function removeSelection() {
     const rows = selectedEntities(); if (!rows.length) return [];
@@ -25,13 +27,22 @@ export function createCreatorActions(kernel) {
   async function duplicateSelection({ offsetX, offsetY } = {}) {
     const rows = selectedEntities(); if (!rows.length) return [];
     const tile = Math.max(1, Number(kernel.document.settings?.tileSize) || 32), dx = Number.isFinite(Number(offsetX)) ? Number(offsetX) : tile, dy = Number.isFinite(Number(offsetY)) ? Number(offsetY) : tile;
-    const clones = rows.map(row => {
-      const clone = copy(row); clone.id = newId(); clone.transform = { ...(clone.transform || {}), x: (Number(clone.transform?.x) || 0) + dx, y: (Number(clone.transform?.y) || 0) + dy };
-      if (clone.source) clone.source = { ...clone.source, authorityPlacementId: undefined };
-      return clone;
-    });
+    const clones = rows.map(row => { const clone=sanitizeClone(row); clone.transform={...(clone.transform||{}),x:(Number(clone.transform?.x)||0)+dx,y:(Number(clone.transform?.y)||0)+dy}; return clone; });
     await kernel.execute(createCompositeCommand(clones.map(row => createPlaceEntityCommand(row)), { type: 'entity.batch.duplicate', label: `Duplicate ${clones.length} object${clones.length === 1 ? '' : 's'}` }));
     kernel.selection.set(clones.map(row => row.id)); return clones;
+  }
+
+  function copySelection() {
+    const rows=selectedEntities(); clipboard=rows.map(copy); pasteCount=0; return clipboard.length;
+  }
+
+  async function pasteClipboard({ offsetX, offsetY } = {}) {
+    if(!clipboard.length)return [];
+    const tile=Math.max(1,Number(kernel.document.settings?.tileSize)||32);pasteCount++;
+    const dx=Number.isFinite(Number(offsetX))?Number(offsetX):tile*pasteCount,dy=Number.isFinite(Number(offsetY))?Number(offsetY):tile*pasteCount;
+    const clones=clipboard.map(row=>{const clone=sanitizeClone(row);clone.transform={...(clone.transform||{}),x:(Number(clone.transform?.x)||0)+dx,y:(Number(clone.transform?.y)||0)+dy};return clone;});
+    await kernel.execute(createCompositeCommand(clones.map(row=>createPlaceEntityCommand(row)),{type:'entity.batch.paste',label:`Paste ${clones.length} object${clones.length===1?'':'s'}`}));
+    kernel.selection.set(clones.map(row=>row.id));return clones;
   }
 
   async function rotateSelection(delta = 90) {
@@ -50,5 +61,5 @@ export function createCreatorActions(kernel) {
     return kernel.document.entities.find(e => e.id === id) || null;
   }
 
-  return Object.freeze({ selectedEntities, removeSelection, duplicateSelection, rotateSelection, patchPrimary });
+  return Object.freeze({ selectedEntities, removeSelection, duplicateSelection, copySelection, pasteClipboard, rotateSelection, patchPrimary, get clipboardSize(){return clipboard.length;} });
 }
