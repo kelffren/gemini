@@ -1,6 +1,6 @@
 # Kelo Creators — Reuse Map
 
-PR A begins by preserving current owners. “New” means a missing cross-workspace contract/envelope, not a replacement runtime.
+PR A begins by preserving current owners. “New” means a missing cross-workspace contract/envelope, not a replacement runtime. This map was revalidated after Foundation V3 and Kelo Studio Creator V1 landed on `main`.
 
 | Responsibility | Current owner | Reuse method | New owner? |
 |---|---|---|---|
@@ -11,24 +11,26 @@ PR A begins by preserving current owners. “New” means a missing cross-worksp
 | Selection | Studio `SelectionManager` | shared | No |
 | Tools | Studio `ToolRegistry` | register domain tools later | No |
 | Components | Studio `ComponentRegistry` | schema extensions | No |
-| Prefabs | Studio `PrefabRegistry` + Property catalog seeder | registry/adapter | No |
-| Preview rendering | Studio overlay renderer/canvas | compose | No |
+| Prefabs | Studio `PrefabRegistry` + Property catalog seeder + Creator V1 prefab library | registry/adapter | No |
+| Preview rendering | Studio overlay renderer/canvas + Creator V1 asset preview service | compose | No |
+| Camera / viewport / screen↔world | Foundation `KeloCamera` + Studio camera controller | adapter/controller reuse; never create another global camera owner | No |
 | Compiler | Studio compiler + worker client | reuse per supported document | No |
 | Spatial/dirty chunks | `SpatialChunkIndex` / `DirtyChunkManager` | direct | No |
 | Crash recovery | `indexeddb-studio-store.mjs` | checkpoint/journal only | No |
 | Permissions | `KELO_ADMIN_KEYS` | `CreatorPermissionAdapter` | Adapter only |
 | World authority | `KELO_WORLD_EDIT` | World compatibility adapter | No |
+| World authority readiness | `KELO_WORLD_EDIT.whenReady()` | World adapter/workspace waits for existing owner | No |
 | World draft persistence | `KELO_WORLD_DRAFT_STORE` behind World authority | delegate; never reuse as generic DB | No |
 | Collisions | existing collision/runtime + World authority ops | commands/adapters | No |
 | Terrain | existing World Builder/World authority terrain ops | commands/adapters | No |
-| Placements/Property | `KELO_PROPERTY_SYSTEM` | existing runtime adapter | No |
+| Placements/Property | `KELO_PROPERTY_SYSTEM` / PropertySystem | existing runtime adapter | No |
 | Global navigation | Luxe menu | evolve tiny Studio launcher to CREATORS | No |
 | World Draft lifecycle | `KELO_WORLD_EDIT` | status mapping only | No |
 | World revisions/review/publish/audit | existing World authority/revision system | future generic adapters delegate | No |
 | Asset catalog | Property/Studio asset adapter | filter/context later | No |
-| Validation | existing Studio/Foundation gates; domain validators later | compose, do not centralize prematurely | No new engine |
+| Validation | Studio Foundation + Creator V1 gates; domain validators later | compose, do not centralize prematurely | No new engine |
 | Performance | Studio profiler, workers, chunks, virtual list | reuse | No |
-| Mobile input | pointer adapter + `KeloInputLocks` | reuse | No |
+| Mobile input | pointer adapter + `KeloInputLocks` + `KeloCamera` | reuse | No |
 | Project envelope/lifecycle | Missing cross-workspace concept | pure model | **Yes** |
 | Revision envelope | Missing cross-workspace metadata | adapter-friendly immutable model | **Yes** |
 | Asset metadata | Missing cross-workspace envelope | metadata only | **Yes** |
@@ -41,4 +43,4 @@ PR A begins by preserving current owners. “New” means a missing cross-worksp
 
 ## Non-goals for PR A
 
-No Animation, VFX, Ability, Timeline, Graph, TestLab, WebRTC, WebSocket, remote backend, InviteService, ProjectLockService, second World editor, second collision system, second PropertySystem, or legacy Builder deletion.
+No Animation, VFX, Ability, Timeline, Graph, TestLab, WebRTC, WebSocket, remote backend, InviteService, ProjectLockService, second World editor, second collision system, second PropertySystem, second camera owner, or legacy Builder deletion.

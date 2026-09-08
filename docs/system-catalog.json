@@ -68,6 +68,15 @@
       "technicalDoc": "docs/systems/AVATAR_RENDER_SYSTEM.md",
       "playerVisible": false,
       "status": "foundation-transitional"
+    },
+    {
+      "id": "character-customization",
+      "owner": "KeloCharacterCustomization",
+      "source": "src/characters/character-customization.js",
+      "technicalDoc": "docs/systems/CHARACTER_CUSTOMIZATION_SYSTEM.md",
+      "playerVisible": true,
+      "playerGuideAnchor": "personalizacion-de-personaje",
+      "status": "foundation-candidate"
     }
   ]
 }

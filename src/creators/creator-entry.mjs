@@ -15,7 +15,12 @@ export async function bootKeloCreators({root=globalThis,stateAdapter=null}={}){
   if(platform)return platform;
   const permission=createCreatorPermissionAdapter(root),world=createWorldCreatorAdapter({root,permission}),projects=createLocalCreatorProjectRepository({domainAdapters:[world],stateAdapter}),workspaces=createCreatorWorkspaceRegistry(),dependencies=createCreatorDependencyGraph();
   registerWorldWorkspace(workspaces);
-  platform=Object.freeze({version:'kelo-creators-core-v1.0.0',permission,projects,workspaces,dependencies,openWorkspace:(id,context={})=>workspaces.open(id,{root,...context}),close(){platform=null;}});
+  async function openWorkspace(id,context={}){
+    const manifest=workspaces.resolve(id);if(!manifest)throw new Error(`CREATOR_WORKSPACE_NOT_FOUND:${id}`);
+    if(manifest.capability)permission.require(manifest.capability,permission.actorId(),context.projectId||null);
+    return workspaces.open(id,{root,...context});
+  }
+  platform=Object.freeze({version:'kelo-creators-core-v1.0.1',permission,projects,workspaces,dependencies,openWorkspace,close(){platform=null;}});
   return platform;
 }
 export function getKeloCreatorsPlatform(){return platform;}

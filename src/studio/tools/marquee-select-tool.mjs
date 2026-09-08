@@ -1,0 +1,17 @@
+/* KELO-INDEX
+ * area: STUDIO / MARQUEE SELECT
+ * owns: local rectangular multi-selection preview and commit
+ * does-not-own: pointer transport, camera gestures or drawing
+ * public-api: createMarqueeSelectTool()
+ * online: local-only
+ */
+
+export function createMarqueeSelectTool(kernel){
+  if(!kernel)throw new Error('STUDIO_MARQUEE_KERNEL_REQUIRED');let state=null;
+  const rect=()=>{if(!state)return null;const x=Math.min(state.x0,state.x1),y=Math.min(state.y0,state.y1);return{x,y,w:Math.max(1,Math.abs(state.x1-state.x0)),h:Math.max(1,Math.abs(state.y1-state.y0))};};
+  function begin(x,y,{append=false}={}){state={x0:Number(x)||0,y0:Number(y)||0,x1:Number(x)||0,y1:Number(y)||0,append:!!append};return rect();}
+  function move(x,y){if(!state)return null;state.x1=Number(x)||0;state.y1=Number(y)||0;return rect();}
+  function commit(){if(!state)return[];const box=rect(),append=state.append;state=null;const ids=kernel.spatial.queryRect(box,{category:'entity'}).map(row=>row.id);if(append){for(const id of ids)kernel.selection.add(id);}else kernel.selection.set(ids);return ids;}
+  function cancel(){state=null;}
+  return Object.freeze({id:'marquee',begin,move,commit,cancel,getPreview:rect,get active(){return!!state;}});
+}

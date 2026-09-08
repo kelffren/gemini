@@ -1,7 +1,7 @@
 <!-- KELO-INDEX
   area: PLAYER DOCS
   owner: Documentation / Foundation
-  keys: GUIDE MECHANICS PLAYER DOCS PUBLIC
+  keys: GUIDE MECHANICS PLAYER DOCS PUBLIC CHARACTER CUSTOMIZATION
   purpose: guía pública de mecánicas de Kelo World para jugadores
   public-api: página estática guide.html
   consumes: comportamiento LIVE validado y docs/system-catalog.json
@@ -40,6 +40,7 @@
   <nav class="toc" aria-label="Índice de mecánicas">
     <a href="#movimiento">Movimiento<small>Caminar, correr y soltar</small></a>
     <a href="#controles-y-bloqueos-de-interfaz">Controles e interfaces<small>Paneles y control</small></a>
+    <a href="#personalizacion-de-personaje">Personaje<small>Apariencia, ropa y guardados</small></a>
     <a href="#camara-y-pantalla">Cámara y pantalla<small>Zoom, giro y fullscreen</small></a>
     <a href="#habilidades">Habilidades<small>Piedras y slots</small></a>
     <a href="#mochila">Mochila<small>Objetos y equipo</small></a>
@@ -74,6 +75,26 @@
     <div class="example"><strong>Ejemplo:</strong> abres la Mochila → interactúas con objetos sin mover al personaje → cierras la Mochila → vuelves a caminar normalmente.</div>
     <h3>Si no puedes moverte</h3>
     <p>Cierra cualquier panel abierto primero. Si la pantalla ya está libre y el personaje continúa sin responder, eso se considera un problema del juego y no una mecánica intencional.</p>
+  </section>
+
+  <section id="personalizacion-de-personaje">
+    <span class="tag">PERSONAJE</span>
+    <h2>Crea y cambia tu apariencia</h2>
+    <p>El editor de personaje separa la apariencia en piezas. Puedes cambiar piel, rostro, ojos, cejas, nariz, boca, pelo y barba; además existen secciones independientes para ropa, equipo y cosméticos.</p>
+    <ul>
+      <li>Los <strong>presets</strong> son puntos de partida: después puedes cambiar cualquier pieza individualmente.</li>
+      <li>Los colores disponibles para piel, pelo u ojos cambian la paleta de esa pieza sin obligarte a elegir un sprite duplicado.</li>
+      <li>El preview puede mirar abajo, izquierda, derecha o arriba y alternar entre quieto y caminar para comprobar cómo encajan las capas.</li>
+      <li><strong>Aleatorio</strong> puede cambiar una categoría o todo el personaje. Usa el candado de una pieza para conservarla mientras aleatorizas lo demás.</li>
+      <li>Deshacer y rehacer te permiten experimentar sin perder inmediatamente la apariencia anterior.</li>
+    </ul>
+    <h3>Ropa, equipo y cosméticos</h3>
+    <p>La ropa se combina por partes; un traje es un conjunto modular y no convierte al personaje en una única imagen. Casco, armas, accesorios, auras y otros elementos pueden seguir viviendo en sus propias capas.</p>
+    <h3>Guardar personajes</h3>
+    <p>Puedes conservar hasta cinco configuraciones visuales en los slots del editor y recuperarlas más tarde. Los guardados del creador contienen apariencia visual: no reemplazan tu inventario, HP, estadísticas ni progreso de combate.</p>
+    <h3>Compartir un personaje</h3>
+    <p>El editor puede exportar un código de personaje e importar uno compatible. Si el código está dañado o hace referencia a contenido que tu versión del juego no reconoce, el editor lo rechaza o conserva un fallback seguro en vez de ejecutar datos desconocidos.</p>
+    <div class="example"><strong>Flujo rápido:</strong> abre Personaje → elige un preset → bloquea el pelo que te gusta → pulsa Aleatorio en Apariencia → prueba la vista ↑ y Caminar → guarda la configuración → pulsa Listo para volver al mundo.</div>
   </section>
 
   <section id="camara-y-pantalla">

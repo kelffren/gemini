@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: CREATORS / WORLD COMPATIBILITY ADAPTER
  * owner: mapping existing World Draft/Revision semantics into CreatorProject boundary
- * owns: mapping only
+ * owns: mapping + readiness bridge to existing KELO_WORLD_EDIT authority
  * does-not-own: World drafts, revisions, placements, terrain, collisions or publishing
  * consumes: KELO_WORLD_EDIT; no second World authority
  */
@@ -9,6 +9,27 @@ import { normalizeCreatorProject } from '../core/creator-project.mjs';
 const WORLD_PROJECT_ID='world:kelo-main';
 const mapStatus=status=>({DRAFT:'TEAM_DRAFT',SUBMITTED:'IN_REVIEW',APPROVED:'APPROVED',REJECTED:'CHANGES_REQUESTED',PUBLISHED:'PUBLISHED',DISCARDED:'ARCHIVED'}[String(status||'').toUpperCase()]||'TEAM_DRAFT');
 const revisionIdOf=d=>d?.publishedRevisionId||d?.revisionId||d?.baseRevisionId||null;
+
+export async function waitForWorldEditAuthority(root=globalThis,{timeoutMs=10000}={}){
+  const now=()=>root.performance?.now?.()??Date.now(),started=now();
+  let E=root.KELO_WORLD_EDIT;
+  if(!E){
+    E=await new Promise((resolve,reject)=>{
+      const check=()=>{
+        if(root.KELO_WORLD_EDIT)return resolve(root.KELO_WORLD_EDIT);
+        if(now()-started>=timeoutMs)return reject(new Error('WORLD_EDIT_OWNER_TIMEOUT'));
+        root.setTimeout?.(check,40)??setTimeout(check,40);
+      };
+      check();
+    });
+  }
+  if(E.ready)return E;
+  if(typeof E.whenReady!=='function')throw new Error('WORLD_EDIT_READY_CONTRACT_MISSING');
+  await E.whenReady({timeoutMs});
+  if(!E.ready)throw new Error('WORLD_EDIT_NOT_READY');
+  return E;
+}
+
 export function createWorldCreatorAdapter({root=globalThis,permission=null}={}){
   const actor=()=>String(permission?.actorId?.()||root.KELO_ADMIN_KEYS?.playerId?.()||root.keloNet?.playerKey||root.localPlayer?.id||'local_pioneer');
   const allowed=()=>permission?.can?permission.can('world.edit',actor(),WORLD_PROJECT_ID):!!root.KELO_ADMIN_KEYS?.can?.('world.edit',actor());
@@ -19,8 +40,8 @@ export function createWorldCreatorAdapter({root=globalThis,permission=null}={}){
     async list(){return allowed()?[await project()]:[];},
     async get(projectId){return allowed()&&String(projectId)===WORLD_PROJECT_ID?project():null;},
     async create(){if(!allowed())throw new Error('CREATOR_PERMISSION_DENIED:world.edit');return project();},
-    async saveDraft(projectId,_document,{draftId=null}={}){if(String(projectId)!==WORLD_PROJECT_ID)throw new Error('CREATOR_WORLD_PROJECT_INVALID');permission?.require?.('world.edit',actor(),WORLD_PROJECT_ID);return root.KELO_WORLD_EDIT.request('world:draft:save',{actorId:actor(),draftId:draftId||undefined});},
-    async loadDraft(projectId){if(String(projectId)!==WORLD_PROJECT_ID)throw new Error('CREATOR_WORLD_PROJECT_INVALID');const d=await current();if(!d)return null;return root.KELO_WORLD_EDIT.request('world:draft:get',{actorId:actor(),draftId:d.draftId});},
+    async saveDraft(projectId,_document,{draftId=null}={}){if(String(projectId)!==WORLD_PROJECT_ID)throw new Error('CREATOR_WORLD_PROJECT_INVALID');permission?.require?.('world.edit',actor(),WORLD_PROJECT_ID);const E=await waitForWorldEditAuthority(root);return E.request('world:draft:save',{actorId:actor(),draftId:draftId||undefined});},
+    async loadDraft(projectId){if(String(projectId)!==WORLD_PROJECT_ID)throw new Error('CREATOR_WORLD_PROJECT_INVALID');const E=await waitForWorldEditAuthority(root),d=await current();if(!d)return null;return E.request('world:draft:get',{actorId:actor(),draftId:d.draftId});},
     async archive(){throw new Error('CREATOR_WORLD_ARCHIVE_UNSUPPORTED');}
   });
 }

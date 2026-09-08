@@ -1,18 +1,20 @@
 /* KELO-INDEX
  * area: WORLD EDIT
- * keys: AUTHORITY FACADE REQUEST LOCAL REMOTE VIEW PROJECTION PROPERTY RUNTIME
- * hace: única boca pública KELO_WORLD_EDIT; aplica snapshots a renderer/Property y permite cambiar autoridad sin tocar UI
+ * keys: AUTHORITY FACADE REQUEST LOCAL REMOTE VIEW PROJECTION PROPERTY RUNTIME READY
+ * hace: única boca pública KELO_WORLD_EDIT; aplica snapshots a renderer/Property, permite cambiar autoridad y expone whenReady() sin sleeps mágicos
  * online: installAuthority(new RemoteWorldEditAuthority(transport)) cambia backend manteniendo el mismo contrato
  */
 (function(){
 'use strict';
 if(window.KELO_WORLD_EDIT)return;
 
-const VERSION='world-edit-authority-v1.0.0';
+const VERSION='world-edit-authority-v1.1.0';
 const WORLD_PARCEL_ID='parcel:world:editor';
 const listeners=new Set();
+const readyWaiters=new Set();
 const clone=v=>v==null?v:JSON.parse(JSON.stringify(v));
 let authority=null;
+let readyState=false;
 let currentView={kind:'boot',id:null,worldId:'world:kelo-main',revisionVersion:0,publishedRevisionId:null};
 let lastError=null;
 
@@ -52,6 +54,22 @@ function normalizeAuthority(adapter){
   if(!adapter||typeof adapter.request!=='function')throw new Error('INVALID_WORLD_EDIT_AUTHORITY');
   return adapter;
 }
+function markNotReady(){readyState=false;}
+function markReady(){
+  readyState=true;
+  for(const waiter of readyWaiters){clearTimeout(waiter.timer);try{waiter.resolve(window.KELO_WORLD_EDIT);}catch(e){}}
+  readyWaiters.clear();
+  emit({type:'ready',source:authoritySource(),view:clone(currentView)});
+}
+function whenReady({timeoutMs=10000}={}){
+  if(readyState&&authority)return Promise.resolve(window.KELO_WORLD_EDIT);
+  const ms=Math.max(250,Number(timeoutMs)||10000);
+  return new Promise((resolve,reject)=>{
+    const waiter={resolve,reject,timer:null};
+    waiter.timer=setTimeout(()=>{readyWaiters.delete(waiter);reject(new Error('WORLD_EDIT_READY_TIMEOUT'));},ms);
+    readyWaiters.add(waiter);
+  });
+}
 async function request(op,payload={}){
   if(!authority)throw new Error('WORLD_EDIT_AUTHORITY_NOT_READY');
   try{
@@ -66,18 +84,28 @@ async function request(op,payload={}){
   }
 }
 async function installAuthority(adapter){
+  markNotReady();
   authority=normalizeAuthority(adapter);
-  const result=await request('world:published:get',{});
-  emit({type:'authority',source:authoritySource(),view:clone(currentView)});
-  return result;
+  try{
+    const result=await request('world:published:get',{});
+    markReady();
+    emit({type:'authority',source:authoritySource(),view:clone(currentView)});
+    return result;
+  }catch(err){
+    markNotReady();
+    throw err;
+  }
 }
 function authoritySource(){return String(authority?.source||'custom');}
 async function boot(){
   if(!window.LocalWorldEditAuthority){setTimeout(boot,40);return;}
   try{
+    markNotReady();
     authority=new window.LocalWorldEditAuthority();
     await request('world:published:get',{});
+    markReady();
   }catch(err){
+    markNotReady();
     lastError=String(err?.message||err);
     console.error('[Kelo world edit] boot failed',err);
   }
@@ -88,6 +116,7 @@ window.KELO_WORLD_EDIT=Object.freeze({
   request,
   installAuthority,
   authoritySource,
+  whenReady,
   getCurrentDraft:async()=>request('world:draft:current',{}),
   getPublishedRevision:async()=>request('world:published:meta',{}),
   listRevisions:async()=>request('world:revision:list',{}),
@@ -95,7 +124,7 @@ window.KELO_WORLD_EDIT=Object.freeze({
   getViewState:()=>clone(currentView),
   get lastError(){return lastError;},
   onChange(fn){if(typeof fn!=='function')return()=>{};listeners.add(fn);return()=>listeners.delete(fn);},
-  get ready(){return !!authority;}
+  get ready(){return readyState&&!!authority;}
 });
 window.KELO_WORLD_EDIT_AUDIT=Object.freeze({
   version:VERSION,
@@ -104,7 +133,8 @@ window.KELO_WORLD_EDIT_AUDIT=Object.freeze({
   uiStorageFree:true,
   uiTransportFree:true,
   publishedProjectionOnBoot:true,
-  propertySourceOfTruth:true
+  propertySourceOfTruth:true,
+  readinessContract:true
 });
 
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(boot,0),{once:true});else setTimeout(boot,0);
