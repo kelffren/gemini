@@ -4,6 +4,7 @@
  * does-not-own: gameplay camera follow, player movement or world rendering
  * public-api: createStudioCameraController()
  * online: local-only; restores runtime camera settings on suspend/destroy
+ * note: zoom is intentionally 1x-2x because legacy runtime renders a fixed viewport; zoom-out would expose non-rendered margins
  */
 
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
