@@ -1,13 +1,27 @@
+/* KELO-INDEX
+ * area: UI / SOCIAL
+ * owner: KeloSelfInteractionUI (presentation only)
+ * keys: SELF PROFILE EMOTES INPUT LOCK FOUNDATION
+ * purpose: presenta acciones sobre el propio jugador y panel de burlas
+ * public-api: KeloSelfInteractionUI
+ * consumes: KeloEmotes, KeloBackpackUI, KeloInputLocks
+ * state-owned: estado visual de sus paneles + tokens de input propios
+ * extension-points: nuevas acciones UI consumen APIs de sus owners
+ * reuse: menú contextual del propio jugador
+ * legacy: todavía envuelve checkSocialTouch/toggleMenu; no añadir wrappers nuevos
+ * do-not: no modificar movimiento ni gameplay directamente
+ */
 (function(){
 'use strict';
 
-const VERSION='self-interaction-ui-v1.0.0';
+const VERSION='self-interaction-ui-v1.1.0';
 const ACTION_ID='kelo-self-actions';
 const EMOTE_PANEL_ID='kelo-emotes-panel';
 let actionOpen=false,emoteOpen=false;
+const inputLockTokens=Object.create(null);
 
 function toast(text){if(typeof showToast==='function')showToast(text);}
-function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c];});}
 function ensureStyles(){
   if(document.getElementById('kelo-self-interaction-styles'))return;
   const style=document.createElement('style');
@@ -37,8 +51,20 @@ function ensureStyles(){
 `;
   document.head.appendChild(style);
 }
-function claimLock(owner){window.KELO_MODAL_INPUT_LOCK=owner;}
-function releaseLock(owner){if(window.KELO_MODAL_INPUT_LOCK===owner)window.KELO_MODAL_INPUT_LOCK=null;}
+function claimLock(owner){
+  if(window.KeloInputLocks&&typeof window.KeloInputLocks.acquire==='function'){
+    if(!inputLockTokens[owner])inputLockTokens[owner]=window.KeloInputLocks.acquire(owner,{source:'self-interaction-ui'});
+    return;
+  }
+  window.KELO_MODAL_INPUT_LOCK=owner;
+}
+function releaseLock(owner){
+  const token=inputLockTokens[owner];
+  if(token&&window.KeloInputLocks&&typeof window.KeloInputLocks.release==='function'){
+    window.KeloInputLocks.release(token);delete inputLockTokens[owner];return;
+  }
+  if(window.KELO_MODAL_INPUT_LOCK===owner)window.KELO_MODAL_INPUT_LOCK=null;
+}
 function closeActionMenu(){const el=document.getElementById(ACTION_ID);if(el)el.style.display='none';actionOpen=false;releaseLock('self-actions');}
 function closeEmotes(){const el=document.getElementById(EMOTE_PANEL_ID);if(el)el.style.display='none';emoteOpen=false;releaseLock('emotes');}
 function openProfile(){closeActionMenu();closeEmotes();if(window.KeloBackpackUI&&typeof window.KeloBackpackUI.open==='function'){window.KeloBackpackUI.open();return;}if(typeof inspectPlayer==='function')inspectPlayer(localPlayer,true);}
@@ -134,5 +160,5 @@ function boot(){ensureStyles();ensureActionMenu();renderEmotes();observeBackpack
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 
 window.KeloSelfInteractionUI=Object.freeze({version:VERSION,open:openActionMenu,close:closeActionMenu,openProfile,openEmotes,closeEmotes,decorateBackpack});
-window.KELO_SELF_INTERACTION_AUDIT=Object.freeze({version:VERSION,selfTapMenu:true,actions:['my_profile','emotes'],closeButtonMinPx:48,profileUsesBackpackUI:true,emotePanel:true,backpackEquipBridge:true,tapFirst:true,dragDrop:false});
+window.KELO_SELF_INTERACTION_AUDIT=Object.freeze({version:VERSION,selfTapMenu:true,actions:['my_profile','emotes'],closeButtonMinPx:48,profileUsesBackpackUI:true,emotePanel:true,backpackEquipBridge:true,tapFirst:true,dragDrop:false,inputLockOwner:'KeloInputLocks',tokenLocks:true});
 })();
