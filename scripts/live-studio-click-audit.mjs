@@ -88,7 +88,7 @@ try{
 
   const before=await objectCount(page);
   await firstAsset.click();
-  await page.waitForFunction(()=>{const r=document.querySelector('#kelo-studio-live');return r?.dataset.compact==='asset'&&!!r.dataset.activeAsset&&!!r.querySelector('.ks-bottom.ks-compact [data-act="edit-assets"]');},null,{timeout:8000});
+  await page.waitForFunction(()=>{const r=document.querySelector('#kelo-studio-live');return r?.dataset.compact==='asset'&&!!r.dataset.activeAsset&&!!r.querySelector('.ks-compact-bar [data-act="edit-assets"]');},null,{timeout:8000});
   report.assetCompact=true;
   report.activeAsset=await page.locator('#kelo-studio-live').getAttribute('data-active-asset');
   report.modeAfterAsset=await page.locator('#kelo-studio-live .ks-status').textContent();
@@ -105,7 +105,7 @@ try{
   report.placedCount=(await objectCount(page))-before;
   if(!report.persistentPaint||report.placedCount<2)throw new Error(`STUDIO_PERSISTENT_PAINT_FAILED:${JSON.stringify({activeAfterTwo,modeAfterTwo,placedCount:report.placedCount})}`);
 
-  await page.click('#kelo-studio-live .ks-bottom.ks-compact [data-act="edit-assets"]');
+  await page.click('#kelo-studio-live .ks-compact-bar [data-act="edit-assets"]');
   await page.waitForFunction(active=>{const r=document.querySelector('#kelo-studio-live');return r?.dataset.compact==='full'&&r.dataset.activeAsset===active&&r.dataset.sheetOpen==='1'&&r.querySelector('.ks-mobile-pane[data-pane="assets"]')?.classList.contains('on');},report.activeAsset,{timeout:5000});
   report.editReopens=true;
   const visibleAssetCount=await page.locator('#kelo-studio-live .ks-mobile-pane[data-pane="assets"] [data-asset]').count();
