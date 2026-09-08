@@ -3,19 +3,23 @@
  * keys: ADMIN KEY WORLD EDIT TERRAIN PATH COLLISION PROPERTY RUNTIME VIEW AUTHORITY OFFLINE ONLINE READY AUTOTILE
  * hace: renderer/runtime efímero de overrides del mundo; NO persiste ni decide Draft/Publish
  * online: toda mutación se delega a KELO_WORLD_EDIT.request(); el runtime solo ingiere la vista autorizada
+ * collision: publica world-builder:collisions en KELO_COLLISION; sync por revisión/escena, no por frame
  */
 (function(){
 'use strict';
 if(window.KELO_WORLD_BUILDER)return;
 
-const VERSION='world-builder-v2.1.0';
+const VERSION='world-builder-v2.2.0';
 const SCHEMA=2;
 const TILE=Number(window.KELO_TILE_REGISTRY?.worldTileSize)||32;
 const R=window.KELO_TILE_REGISTRY;
 const TERRAIN=window.KELO_TERRAIN_CONTRACT;
 const A=window.KELO_ATLAS_CONTRACT;
+const K=window.KELO_COLLISION;
+const COLLISION_OWNER='world-builder:collisions';
 const MATERIALS=Object.freeze(Object.keys(TERRAIN?.materials||{}));
 let rendererInstalled=false;
+let colliderSyncKey='';
 const listeners=new Set();
 const atlasImages=new Map();
 const atlasPromises=new Map();
@@ -45,7 +49,7 @@ function ingestViewSnapshot(next,meta={}){
     updatedAt:Date.now(),
     view:Object.assign({kind:'published',id:null,worldId:'world:kelo-main',publishedRevisionId:null},clone(meta||{}))
   };
-  syncColliders();notify();return snapshot();
+  syncColliders(true);notify();return snapshot();
 }
 function collisionAt(x,y){return collisions().slice().reverse().find(c=>x>=c.x&&x<=c.x+c.w&&y>=c.y&&y<=c.y+c.h)||null;}
 function validMaterial(id){return MATERIALS.includes(String(id||''));}
@@ -129,11 +133,17 @@ function drawTerrain(g){
   const list=cells();if(!list.length)return;
   g.save();g.imageSmoothingEnabled=false;for(const rec of list)drawCell(g,rec);g.restore();
 }
-function syncColliders(){
-  if(!isMainWorld()||typeof obstacles==='undefined'||!Array.isArray(obstacles))return;
-  for(let i=obstacles.length-1;i>=0;i--)if(obstacles[i]?._worldBuilderCollisionId)obstacles.splice(i,1);
-  for(const c of collisions())obstacles.push({id:`world-builder:${c.collisionId}`,x:c.x,y:c.y,w:c.w,h:c.h,noDraw:true,_worldBuilderCollisionId:c.collisionId});
+function syncColliders(force){
+  if(!K||typeof K.replaceOwner!=='function')return 0;
+  const main=isMainWorld();
+  const scene=main?'world':String(window.KELO_INSTANCES?.current?.()?.instanceId||'instance');
+  const key=`${scene}:${state.revision}:${state.updatedAt}:${Object.keys(state.collisions||{}).length}`;
+  if(!force&&key===colliderSyncKey)return K.ownerSnapshot(COLLISION_OWNER).count;
+  const rows=main?collisions().map(c=>({id:`world-builder:${c.collisionId}`,x:c.x,y:c.y,w:c.w,h:c.h,noDraw:true,_worldBuilderCollisionId:c.collisionId})):[];
+  const count=K.replaceOwner(COLLISION_OWNER,rows);
+  colliderSyncKey=key;
   try{window.KELO_PROPERTY_SYSTEM?.refreshSceneColliders?.();}catch(e){}
+  return count;
 }
 function drawRegisteredLayer(id,g){
   const layer=window.KELO_ENVIRONMENT_LAYERS?.layers?.find?.(x=>x.id===id);
@@ -164,7 +174,7 @@ function installRenderer(){
   rendererInstalled=true;
   window.KELO_WORLD_RENDERER=Object.freeze({
     draw(g){const ok=base.draw(g);drawTerrain(g);return ok!==false;},
-    drawPreActors(g){const r=typeof base.drawPreActors==='function'?base.drawPreActors(g):true;drawPropertyFallback(g,'back',base);syncColliders();drawGuides(g);return r;},
+    drawPreActors(g){const r=typeof base.drawPreActors==='function'?base.drawPreActors(g):true;drawPropertyFallback(g,'back',base);syncColliders(false);drawGuides(g);return r;},
     drawPostActors(g){const r=typeof base.drawPostActors==='function'?base.drawPostActors(g):true;drawPropertyFallback(g,'front',base);return r;},
     districts:base.districts,
     chunkSize:base.chunkSize,
@@ -179,7 +189,7 @@ function installRenderer(){
 function boot(){
   loadAuthorityStack().catch(err=>console.error('[Kelo world edit] authority stack failed',err));
   for(const id of MATERIALS){const key=TERRAIN?.materials?.[id]?.atlas;if(key)acquireAtlas(key);}
-  installRenderer();syncColliders();
+  installRenderer();syncColliders(true);
 }
 
 window.KELO_WORLD_BUILDER=Object.freeze({
@@ -187,6 +197,7 @@ window.KELO_WORLD_BUILDER=Object.freeze({
   schema:SCHEMA,
   tileSize:TILE,
   materials:Object.freeze(MATERIALS.slice()),
+  collisionOwner:COLLISION_OWNER,
   request,
   ingestViewSnapshot,
   snapshot,
@@ -208,6 +219,9 @@ window.KELO_WORLD_BUILDER_AUDIT=Object.freeze({
   autotile4bit:true,
   pathOverrides:true,
   collisionLayer:true,
+  collisionMode:'kelo-collision-owner-v2',
+  collisionOwner:COLLISION_OWNER,
+  colliderDirtySync:true,
   propertyReuse:true,
   propertyResetFallback:true,
   rendererOverlay:true,
