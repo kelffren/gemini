@@ -5,6 +5,7 @@
 **Estado:** índice maestro operativo del runtime Foundation actual.  
 **Runtime declarado en `index.html`:** Kelo World V6.53.  
 **Character Creator V2:** 2026-09-08 · `KeloCharacterCustomization` + `KeloCharacterSlotSchema` + `KeloCharacterVisualStack` activos y validados en Pages sobre `035af63e3a5f7b72283659cf02454bb048ade350`.  
+**Main Menu V4:** 2026-09-08 · `src/ui/luxe-shell.js` / `KELO_LUXE` conserva ownership único de la navegación principal; Apariencia, Nobleza y Burlas vuelven a ser descubribles mediante sus owners reales; Misiones/Ajustes permanecen ocultos mientras no exista owner UI válido.  
 **Foundation V3 — Camera / Viewport Ownership:** 2026-09-08 · rama `foundation/kelo-foundation-v3-camera-final` · `KeloCamera` consolidado y verificado por Camera Foundation CI + Foundation Architecture CI sobre el candidato V3.  
 **Foundation V2 — Collision Ownership:** 2026-09-08 · lifecycle de colliders consolidado en `KELO_COLLISION`; histórico de ese pass preservado en Git.  
 **Regla de autoridad documental:** si este mapa contradice `index.html`, los contratos Foundation o comportamiento LIVE verificado, gana el runtime y este archivo debe corregirse en el mismo pass.  
@@ -56,6 +57,8 @@ Foundation V3 instala `KeloCamera` inmediatamente después de `engine-c` y conce
 
 Character Creator V2 mantiene una única identidad visual modular: `KeloCharacterSlotSchema` define 24 slots y orden direccional; `KeloCharacterCustomization` posee estado/operaciones visuales; `KeloCharacterVisualPresets` y `KeloCharacterContentPacks` describen contenido; `KeloCharacterVisualStack` resuelve orden/front-back; y `KeloAvatar` compone las capas mediante middleware priority 250. El editor y el preview son consumidores; no poseen gameplay ni crean otro renderer. El snapshot online envía únicamente IDs, paletas y revision bajo `kelo-character-visual-v2`.
 
+Main Menu V4 no introduce un segundo sistema de navegación. `src/ui/luxe-shell.js` sigue siendo la única superficie principal y `KELO_LUXE` posee apertura/cierre/render del menú; cada tarjeta delega al API público del owner real (`KeloBackpackUI`, `KeloAbilities`, `KeloCharacterCustomizer`, `KeloMarketUI`, `KELO_HOUSE_UI`, `KeloNobility`, `KeloSelfInteractionUI`) o a adapters LIVE todavía válidos para Perfil/Chat. Apariencia, Nobleza y Burlas recuperan acceso directo. Misiones y Ajustes quedan owner-gated y no se renderizan mientras solo existan placeholders legacy. Creators se injerta en el mismo grid únicamente cuando su launcher autorizado está disponible. Menú y Chat reclaman input mediante tokens propios de `KeloInputLocks`.
+
 El adapter `KELO_MODAL_INPUT_LOCK` sigue existiendo dentro de `KeloInputLocks` para compatibilidad, pero el inventario actual no encuentra ningún writer directo LIVE. Los 5 writes restantes están únicamente en archivos de repo no cargados directamente por el runtime (`self-profile-touch-hotfix` y `builder-restore-move`). El Character Creator reclama input exclusivamente mediante token de `KeloInputLocks` y su audit LIVE demostró release limpio al cerrar.
 
 La existencia de un archivo en `src/` NO demuestra por sí sola que esté LIVE. La carga real puede ser directa desde `index.html` o dinámica desde un bootstrap LIVE. En particular, `src/environment/generic-prefabs.js` y `src/ui/property-editor.js` están **DORMANT** en V6.53: se pueden probar como unidades, pero no deben tratarse como dependencias LIVE ni reactivarse para satisfacer un test viejo. `profile-panel-close.js` sigue siendo un bootstrap tardío para combat/effects/melee y Character Customization V2; esa frontera de boot todavía debe limpiarse sin crear un segundo boot system.
@@ -77,7 +80,7 @@ La existencia de un archivo en `src/` NO demuestra por sí sola que esté LIVE. 
 7.  Visual System / manifests / asset registry / animation / FX / sequence
 8.  modern abilities + stones + Sword Swap runtime/visuals
 9.  engine-net
-10. Luxe/UI + mobile orientation + plaza depth
+10. Luxe premium main menu/HUD + mobile orientation + plaza depth
 11. gameplay systems (nobility/equipment/backpack/container/emote/market)
 12. property + instances + world builder + house UI
 13. forge/aura/illumination/performance
@@ -141,7 +144,7 @@ El orden importa: `KeloCamera`, `KeloAvatar`, `KeloRender` y `KeloSimulation` se
 | Combat foundation | `KeloCombatEngine` + Hit/Damage resolvers | DYNAMIC LIVE | Gameplay/presentation separados; server adapter puede reemplazar authority |
 | Effects foundation | `KeloEffectEngine` | DYNAMIC LIVE | Registry data-driven de efectos |
 | Melee foundation | `KeloMeleeEngine` | DYNAMIC LIVE | Perfil → CombatEngine; no HP/render directo |
-| Ability runtime moderno | `src/abilities/kelo-ability-boot.js` / `KeloAbilities` | OWNER LIVE | Tick vía `KeloSimulation`, FX vía `KeloRender`, walls vía `KELO_COLLISION`; 0 wrappers core y 0 writes directos de collider |
+| Ability runtime moderno | `src/abilities/kelo-ability-boot.js` / `KeloAbilities` | OWNER LIVE | Tick vía `KeloSimulation`, FX vía `KeloRender`, walls vía `KELO_COLLISION`; Stone Panel filtra inventario no-piedra sin asumir que todo item tiene controles de habilidad |
 | Stone/loadout moderno | `src/abilities/stone-system.js` / `KeloStones` | OWNER LIVE | Legacy stones no recibe features |
 | Sword Swap runtime | ability/runtime + PvP visuals | OWNER LIVE feature / SUPPORT Foundation | Tick usa `KeloSimulation`; ya no envuelve simulation |
 | PvP world | `src/systems/pvp-world.js` | OWNER LIVE feature / NEEDS_AUDIT authority | Render exclusivo usa `KeloRender`; tick usa `KeloSimulation`; cámara usa `KeloCamera`; autoridad local sigue siendo prototipo |
@@ -155,6 +158,7 @@ El orden importa: `KeloCamera`, `KeloAvatar`, `KeloRender` y `KeloSimulation` se
 | Property Editor | `src/ui/property-editor.js` | PREPARED / DORMANT | Unit contract puede ejecutarse; browser smoke solo aplica si `index.html` lo activa |
 | Instances / House lifecycle | `src/instances/*` + `src/ui/house-instance-ui.js` | OWNER LIVE | House authority, persistence, crash recovery, cámara restaurada vía `KeloCamera` y panel móvil/desktop probados sin depender del editor dormant |
 | World Builder runtime | `src/environment/world-builder-system.js` | OWNER/SUPPORT LIVE / NEEDS_AUDIT authoring | Collision lifecycle resuelto; persisten límites authoring/runtime, persistencia y snapshots |
+| Main menu / Luxe HUD | `src/ui/luxe-shell.js` / `KELO_LUXE` | OWNER LIVE UI | Única navegación principal; grid premium mobile-first, rutas owner-backed, `KeloInputLocks` tokenizado, placeholders sin owner ocultos; no posee gameplay state |
 | UI | `src/ui/*` | CONSUMER | UI consume APIs; no gobierna gameplay state ajeno |
 | Legacy modal lock writes LIVE | ninguno | RESUELTO EN RUNTIME | `modalLockWrite liveDirect=0`; adapter permanece por compatibilidad |
 | Legacy modal lock writes REPO | `self-profile-touch-hotfix.js`, `builder-restore-move.js` | LEGACY / NOT DIRECT LIVE | 5 writes totales; retirar/migrar solo al decidir su destino |
@@ -189,13 +193,14 @@ KeloVisualSystem layers/update
 KeloCombatEngine / KeloEffectEngine / KeloMeleeEngine
 KeloAbilities
 KeloStones
+KELO_LUXE.toggleMenu / closeMenu / renderMenu
 Property/Instance APIs
 system-owned event buses
 ```
 
-Prohibición Foundation: no introducir wrappers nuevos directos de `render`, `renderAvatar`, `updateSimulation`, `processInput` o `updateMovement` cuando exista un owner/punto de extensión apropiado. Camera/viewport/zoom nuevo debe pasar por `KeloCamera`; ningún consumidor nuevo escribe `camera.targetX/Y`, `CONFIG.zoom`, `canvas.width/height`, `resize`, `cycleZoom` o `updateCamera` directamente. Para colisiones, ningún productor nuevo debe mutar `obstacles`; debe publicar su collider/set mediante `KELO_COLLISION`. Para personaje, contenido nuevo entra por ContentPacks/VisualPresets y mutaciones visuales pasan por `KeloCharacterCustomization`; no se crean schemas, stacks o renderers paralelos.
+Prohibición Foundation: no introducir wrappers nuevos directos de `render`, `renderAvatar`, `updateSimulation`, `processInput` o `updateMovement` cuando exista un owner/punto de extensión apropiado. Camera/viewport/zoom nuevo debe pasar por `KeloCamera`; ningún consumidor nuevo escribe `camera.targetX/Y`, `CONFIG.zoom`, `canvas.width/height`, `resize`, `cycleZoom` o `updateCamera` directamente. Para colisiones, ningún productor nuevo debe mutar `obstacles`; debe publicar su collider/set mediante `KELO_COLLISION`. Para personaje, contenido nuevo entra por ContentPacks/VisualPresets y mutaciones visuales pasan por `KeloCharacterCustomization`; no se crean schemas, stacks o renderers paralelos. Para navegación principal, extender `KELO_LUXE` y conectar owners reales; no crear otro menú ni botones fake para features sin owner.
 
-El CI Foundation contiene contratos específicos para Input Locks, Input, Movement, Camera, Render, Simulation y Avatar, documentación obligatoria, inventario de deuda LIVE y syntax-check explícito de consumidores migrados. Ability Collision CI valida también aislamiento entre owners, no duplicación, vista legacy y ausencia de writes directos en Generic Props, Property, World Builder y Ability Walls. Camera Foundation CI añade contrato determinista y browser audit portrait 390×844 → landscape 844×390 → desktop 1440×900, DPR, Canvas, base/effective zoom y screen↔world. Character Customization CI valida 24 slots, compat V1, palettes/cache, presets, randomizer locks, undo/redo, saves, share/import, snapshot V2, middleware `KeloAvatar`, token input locks y browser audit portrait/landscape.
+El CI Foundation contiene contratos específicos para Input Locks, Input, Movement, Camera, Render, Simulation y Avatar, documentación obligatoria, inventario de deuda LIVE y syntax-check explícito de consumidores migrados. Ability Collision CI valida también aislamiento entre owners, no duplicación, vista legacy y ausencia de writes directos en Generic Props, Property, World Builder y Ability Walls. Camera Foundation CI añade contrato determinista y browser audit portrait 390×844 → landscape 844×390 → desktop 1440×900, DPR, Canvas, base/effective zoom y screen↔world. Character Customization CI valida 24 slots, compat V1, palettes/cache, presets, randomizer locks, undo/redo, saves, share/import, snapshot V2, middleware `KeloAvatar`, token input locks y browser audit portrait/landscape. Premium Main Menu CI valida ownership de rutas, locks tokenizados, ausencia de placeholders visibles, texto sin clipping, portrait/landscape, apertura real de cada owner, movimiento y PvP después de cerrar UI.
 
 ---
 
@@ -217,7 +222,8 @@ Deuda prioritaria, sin borrar a ciegas:
 **Resuelto en Foundation V1:** cadenas feature-level de wrappers de Render, Simulation y Avatar; writers directos LIVE de `KELO_MODAL_INPUT_LOCK`; Backpack lock tokenizado; CI Prefab/House/Property alineado con activación runtime real.  
 **Resuelto en Foundation V2 Collision:** lifecycle owner por bucket; `core-static` adoptado; Generic Props/Property/World Builder/Ability Walls migrados; World Builder deja de reconstruir colliders sin cambios cada frame; Generic Prop CI actualizado a contrato estructural del runtime actual. No reintroducir writes directos a `obstacles`.  
 **Resuelto en Foundation V3 Camera:** `KeloCamera` es owner único de comandos de cámara, base/effective zoom, viewport/Canvas DPR, follow tuning, `updateCamera` y screen↔world; consumidores modernos migrados; `engine-l` dejó HiDPI; responsive zoom ya no cambia el base al rotar; static writer guard + browser audit verdes.  
-**Resuelto en Character Creator V2:** schema compartido de 24 slots, palette swapping/cache, presets data-driven, smart randomizer, undo/redo, 5 saves, share/import KW2, snapshot online IDs-only V2, capas por middleware `KeloAvatar` priority 250, preview por VisualStack compartido y lock tokenizado. Pages LIVE verde en portrait 390×844 y landscape 844×390.
+**Resuelto en Character Creator V2:** schema compartido de 24 slots, palette swapping/cache, presets data-driven, smart randomizer, undo/redo, 5 saves, share/import KW2, snapshot online IDs-only V2, capas por middleware `KeloAvatar` priority 250, preview por VisualStack compartido y lock tokenizado. Pages LIVE verde en portrait 390×844 y landscape 844×390.  
+**Resuelto en Main Menu V4:** Luxe Shell permanece como owner único; Apariencia/Nobleza/Burlas recuperan acceso mediante sus owners reales; Misiones/Ajustes no se muestran sin owner; Creators reutiliza el grid autorizado; menú/chat usan tokens `KeloInputLocks`; Stone Panel tolera inventario mixto.
 
 Toda retirada:
 
@@ -236,7 +242,7 @@ VFX → manifest/primitive → KeloVisualSystem
 Character → ContentPack/VisualPresets → KeloCharacterCustomization → KeloCharacterVisualStack → KeloAvatar
 Avatar → KeloAvatar middleware visual 400 → aura 300 → character customization 250 → appearance 200 → hero 100 → base
 Item → definition → backpack/equipment/container APIs
-UI → system public API → render result
+UI navigation → KELO_LUXE → system public API → render result
 ```
 
 Contenido nuevo no debe crear una arquitectura paralela.
@@ -259,7 +265,7 @@ guide.html (si playerVisible)  ← jugadores
 system-documentation-audit.js  ← CI
 ```
 
-El catálogo Foundation contiene actualmente **9 sistemas registrados**, incluyendo `KeloCamera`, `KeloAvatar` y `KeloCharacterCustomization`.
+El catálogo Foundation contiene actualmente **10 sistemas registrados**, incluyendo `KeloCamera`, `KeloAvatar`, `KeloCharacterCustomization` y `KELO_LUXE`.
 
 Un cambio de contrato no se considera completo si la documentación técnica o la mecánica pública queda desactualizada.
 
@@ -269,7 +275,7 @@ Un cambio de contrato no se considera completo si la documentación técnica o l
 
 Leer `docs/ONLINE_FIRST.md`.
 
-Regla: UI/cliente solicita operaciones; autoridad crítica puede migrar al server sin rediseñar IDs, ownership, contratos o flujo de jugador. Character Customization ya expone `networkSnapshot()` IDs-only; antes de producción, el server debe validar ownership/unlocks de cosméticos sin cambiar el renderer ni el flujo del editor.
+Regla: UI/cliente solicita operaciones; autoridad crítica puede migrar al server sin rediseñar IDs, ownership, contratos o flujo de jugador. Character Customization ya expone `networkSnapshot()` IDs-only; antes de producción, el server debe validar ownership/unlocks de cosméticos sin cambiar el renderer ni el flujo del editor. El menú principal solo enruta solicitudes hacia owners; no adquiere autoridad de inventario, combate, mercado, propiedad, nobleza ni cosméticos.
 
 ---
 
@@ -281,7 +287,7 @@ Regla: UI/cliente solicita operaciones; autoridad crítica puede migrar al serve
 | Entrada obligatoria para agentes/humanos | ✅ `AGENTS.md` |
 | ENGINE_MAP sincronizado a V6.53 Foundation | ✅ este documento |
 | Estándar de documentación | ✅ `docs/SYSTEM_DOCUMENTATION_STANDARD.md` |
-| Catálogo documental | ✅ 9 sistemas en `docs/system-catalog.json` |
+| Catálogo documental | ✅ 10 sistemas en `docs/system-catalog.json` |
 | Input lock owner único | ✅ `KeloInputLocks` |
 | Writers directos `KELO_MODAL_INPUT_LOCK` LIVE | ✅ 0 |
 | Input pipeline owner único | ✅ `KeloInput` |
@@ -295,6 +301,8 @@ Regla: UI/cliente solicita operaciones; autoridad crítica puede migrar al serve
 | Character customization owner | ✅ `KeloCharacterCustomization` + shared SlotSchema/VisualStack; Character Creator V2 LIVE verde |
 | Character modal/input safety | ✅ token `KeloInputLocks`; close audit deja 0 claims del customizer |
 | Character online visual contract | ✅ `kelo-character-visual-v2`; IDs + palettes + revision, sin gameplay state |
+| Main menu navigation owner | ✅ `KELO_LUXE`; una sola superficie, rutas owner-backed y placeholders sin owner ocultos |
+| Main menu modal/input safety | ✅ tokens `luxe-main-menu` / `luxe-chat` sobre `KeloInputLocks` |
 | Collision lifecycle owner único | ✅ `KELO_COLLISION`; buckets por owner + vista legacy `obstacles` |
 | Direct collider writes migrados | ✅ 0 en Generic Props, Property, World Builder y Ability Walls |
 | World Builder collider rebuild por frame | ✅ eliminado para estado sin cambios mediante dirty/revision sync |
@@ -309,6 +317,7 @@ Regla: UI/cliente solicita operaciones; autoridad crítica puede migrar al serve
 | CI Camera Foundation V3 | ✅ verde en candidato V3 |
 | CI Foundation Architecture | ✅ verde en Character Creator V2 PR |
 | CI Character Customization V2 | ✅ contract + browser PR verdes; Pages LIVE audit verde post-merge |
+| CI Premium Main Menu V4 | ✅ contract + browser PR verdes; Pages LIVE audit obligatorio post-merge |
 | CI funcional relacionado | ✅ Character Customization, Camera, Foundation, Combat, Backpack y Prefab verdes en el pass V2; Terrain/Generic Prop/Mobile Performance/Studio/Ability Collision/House/Property conservan sus gates existentes |
 | CI de assets global | ⚠️ Kelo CI / Visual System CI mantienen deuda de assets/manifest independiente y preexistente; no atribuida al Character Creator V2 |
 | `main` protegido | ❌ no está protegido en la última lectura disponible |
