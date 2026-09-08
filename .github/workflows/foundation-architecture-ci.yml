@@ -23,6 +23,10 @@ jobs:
         run: node scripts/input-system-contract-audit.js
       - name: Audit movement owner contract
         run: node scripts/movement-system-contract-audit.js
+      - name: Audit render extension owner contract
+        run: node scripts/render-extension-contract-audit.js
+      - name: Audit simulation extension owner contract
+        run: node scripts/simulation-extension-contract-audit.js
       - name: Audit system documentation contract
         run: node scripts/system-documentation-audit.js
       - name: Report current architecture debt inventory
@@ -33,14 +37,20 @@ jobs:
           node --check src/core/input-system.js
           node --check src/core/input-gate.js
           node --check src/core/movement-system.js
+          node --check src/core/render-extension-system.js
+          node --check src/core/simulation-extension-system.js
+          node --check engine-d.js
           node --check engine-f.js
           node --check engine-g.js
           node --check engine-ac.js
+          node --check engine-ae.js
           node --check engine-ah.js
           node --check engine-ai.js
           node --check scripts/foundation-architecture-audit.js
           node --check scripts/input-lock-contract-audit.js
           node --check scripts/input-system-contract-audit.js
           node --check scripts/movement-system-contract-audit.js
+          node --check scripts/render-extension-contract-audit.js
+          node --check scripts/simulation-extension-contract-audit.js
           node --check scripts/system-documentation-audit.js
           node --check scripts/foundation-runtime-inventory.js
