@@ -1,4 +1,18 @@
+/* KELO-INDEX
+ * area: UI / BOUTIQUE
+ * owner: KELO_BOUTIQUE for presentation; portable item storage owned by KeloInventory
+ * purpose: boutique de joyería y compra local legacy
+ * public-api: KELO_BOUTIQUE
+ * consumes: KeloInventory + legacy STATE.gold
+ * state-owned: panel/UI; no posee inventory
+ * extension-points: open/buy catalog
+ * reuse: compras de items portátiles publican por KeloInventory
+ * legacy: descuento de STATE.gold sigue directo hasta Foundation Economy
+ * do-not: NO escribir STATE.inventory directamente
+ */
 (function () {
+  var inventoryOwner=window.KeloInventory;
+  if(!inventoryOwner)throw new Error('KeloInventory unavailable before luxe-boutique');
   function ensureStyle(){
     if(document.getElementById('kelo-boutique-style'))return;
     var s=document.createElement('style');
@@ -12,15 +26,16 @@
       if (typeof showToast === 'function') showToast('Oro insuficiente');
       return;
     }
+    var item={templateId:'jewel_'+it.k,name:it.n,kind:'jewelry',price:it.c,quantity:1,maxStack:1,source:'luxe-boutique'};
+    var added=inventoryOwner.addItem('backpack',item,{persist:false});
+    if(!added.ok){if(typeof showToast==='function')showToast('No se pudo guardar la compra');return;}
     STATE.gold -= it.c;
-    if (!Array.isArray(STATE.inventory)) STATE.inventory = [];
-    STATE.inventory.push({ id: 'jewel_' + it.k, name: it.n, kind: 'jewelry', price: it.c });
-    if (typeof saveState === 'function') saveState();
+    inventoryOwner.persist();
     if (typeof showToast === 'function') showToast(it.n + ' · -' + it.c + ' oro');
     var g = document.getElementById('lx-gold');
     if (g) g.textContent = 'Oro ' + STATE.gold;
     var note = document.getElementById('lx-b-note');
-    if (note) note.textContent = 'Oro: ' + STATE.gold + ' · piezas: ' + STATE.inventory.filter(function (x) { return x.kind === 'jewelry'; }).length;
+    if (note) note.textContent = 'Oro: ' + STATE.gold + ' · piezas: ' + inventoryOwner.getItems('backpack').filter(function (x) { return x.kind === 'jewelry'; }).length;
   }
   function panel() {
     var p = document.getElementById('kelo-boutique');
@@ -61,5 +76,5 @@
   }
   hook();
   setTimeout(hook, 200);
-  window.KELO_BOUTIQUE = { open: open, version: 'buy-v1' };
+  window.KELO_BOUTIQUE = { open: open, version: 'buy-v1.1-inventory-owner', inventoryOwner:'KeloInventory', directInventoryWrites:false };
 })();
