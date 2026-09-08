@@ -14,6 +14,7 @@ on:
       - 'src/ui/character-customizer-ui.js'
       - 'src/ui/character-customizer-preview.js'
       - 'src/ui/profile-panel-close.js'
+      - 'src/ui/self-interaction-ui.js'
       - 'scripts/live-character-customization-audit.mjs'
       - '.github/workflows/live-character-customization-audit.yml'
   workflow_dispatch:
@@ -21,7 +22,7 @@ on:
 jobs:
   live-mobile-character-customizer:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 14
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -31,35 +32,36 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
-      - name: Wait for current Pages build
+      - name: Wait for Character Creator V2 on Pages
         shell: bash
         run: |
           set -euo pipefail
-          for i in $(seq 1 36); do
-            body="$(curl -fsSL --retry 2 --retry-delay 1 "https://kelffren.github.io/gemini/src/ui/profile-panel-close.js?character-customizer-deploy=${GITHUB_SHA}-${i}" || true)"
-            if printf '%s' "$body" | grep -q 'character-slot-schema.js?v=1' \
-              && printf '%s' "$body" | grep -q 'character-customization.js?v=5' \
-              && printf '%s' "$body" | grep -q 'character-visual-presets.js?v=2' \
-              && printf '%s' "$body" | grep -q 'character-content-packs.js?v=1' \
-              && printf '%s' "$body" | grep -q 'character-visual-stack.js?v=2' \
-              && printf '%s' "$body" | grep -q 'character-demo-kit.js?v=2' \
-              && printf '%s' "$body" | grep -q 'character-customizer-preview.js?v=2'; then
-              echo "Current slot-schema character foundation is live"
+          for i in $(seq 1 42); do
+            body="$(curl -fsSL --retry 2 --retry-delay 1 "https://kelffren.github.io/gemini/src/ui/profile-panel-close.js?character-creator-v2=${GITHUB_SHA}-${i}" || true)"
+            if printf '%s' "$body" | grep -q 'character-slot-schema.js?v=2' \
+              && printf '%s' "$body" | grep -q 'character-customization.js?v=6' \
+              && printf '%s' "$body" | grep -q 'character-visual-presets.js?v=3' \
+              && printf '%s' "$body" | grep -q 'character-content-packs.js?v=2' \
+              && printf '%s' "$body" | grep -q 'character-visual-stack.js?v=3' \
+              && printf '%s' "$body" | grep -q 'character-demo-kit.js?v=3' \
+              && printf '%s' "$body" | grep -q 'character-customizer-ui.js?v=3' \
+              && printf '%s' "$body" | grep -q 'character-customizer-preview.js?v=3'; then
+              echo "Character Creator V2 bootstrap is live"
               exit 0
             fi
             sleep 10
           done
-          echo "Current slot-schema character foundation did not appear on Pages"
+          echo "Character Creator V2 did not appear on Pages in time"
           exit 1
-      - name: Live mobile character customization audit
+      - name: Live portrait + landscape Character Creator V2 audit
         env:
           AUDIT_URL: https://kelffren.github.io/gemini/
         run: node scripts/live-character-customization-audit.mjs
-      - name: Upload character customization evidence
+      - name: Upload Character Creator V2 live evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: live-character-customization-audit
+          name: live-character-creator-v2
           path: artifacts/character-customization-live/
           if-no-files-found: warn
           retention-days: 14
