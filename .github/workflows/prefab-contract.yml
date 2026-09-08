@@ -25,7 +25,7 @@ jobs:
           node --check scripts/validate-prefab-contract.mjs
       - name: Contract extension proof
         run: node scripts/validate-prefab-contract.mjs
-      - name: No building-specific rendering in compatibility adapter
+      - name: Live contract and dormant compatibility proof
         run: |
           if grep -Eq 'new Image\(|drawImage|LAYERS?\.register\(' src/environment/luxe-kiosk-atlas.js; then
             echo 'Luxe compatibility adapter owns rendering/layer registration'
@@ -37,5 +37,8 @@ jobs:
           grep -q "renderParts:true" src/environment/prefab-contract.js
           grep -q "splitAssets:true" src/environment/prefab-contract.js
           grep -q "frameSelection:true" src/environment/prefab-contract.js
-          grep -Eq 'src/environment/prefab-contract.js\?v=[0-9]+' index.html
-          grep -Eq 'src/environment/generic-prefabs.js\?v=[0-9]+' index.html
+          grep -Eq 'src/environment/prefab-contract.js\?v=[^"'"']+' index.html
+          if grep -Eq 'src/environment/generic-prefabs.js\?v=[^"'"']+' index.html; then
+            echo 'generic-prefabs.js is classified dormant in Foundation; update architecture contract before booting it'
+            exit 1
+          fi
