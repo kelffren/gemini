@@ -177,7 +177,6 @@
         .sort((a, b) => distance(origin, a) - distance(origin, b))[0];
     }
   }
-
   function castDash(request, owner, def) {
     const d = direction(request.direction.x, request.direction.y);
     const duration = def.delivery.duration || 0.18;
@@ -357,7 +356,6 @@
         if (dash.time <= 0) localPlayer._dash = null;
       }
     }
-
     for (let i = fx.projectiles.length - 1; i >= 0; i--) {
       const p = fx.projectiles[i];
       const step = Math.hypot(p.vx, p.vy) * dt;
@@ -583,11 +581,19 @@
       loadout.appendChild(row);
     }
     const inventory = panel.querySelector('#kelo-inventory');
-    if (!STATE.inventory.length) inventory.innerHTML = '<div style="padding:10px;color:#8b949e;border:1px dashed #30363d;border-radius:10px">No tienes piedras guardadas.</div>';
+    let visibleStoneCount = 0;
     STATE.inventory.forEach((stone, index) => {
-      const row = document.createElement('div'); row.innerHTML = card(stone, '<button data-equip style="width:100%;margin-top:7px;padding:7px">Equipar</button>');
-      row.querySelector('[data-equip]').onclick = () => equipInventory(index); inventory.appendChild(row);
+      const html = card(stone, '<button data-equip style="width:100%;margin-top:7px;padding:7px">Equipar</button>');
+      if (!html) return;
+      const row = document.createElement('div');
+      row.innerHTML = html;
+      const equip = row.querySelector('[data-equip]');
+      if (!equip) return;
+      equip.onclick = () => equipInventory(index);
+      inventory.appendChild(row);
+      visibleStoneCount++;
     });
+    if (!visibleStoneCount) inventory.innerHTML = '<div style="padding:10px;color:#8b949e;border:1px dashed #30363d;border-radius:10px">No tienes piedras guardadas.</div>';
   }
 
   function openPanel() {

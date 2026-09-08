@@ -77,6 +77,15 @@
       "playerVisible": true,
       "playerGuideAnchor": "personalizacion-de-personaje",
       "status": "foundation-active"
+    },
+    {
+      "id": "main-menu",
+      "owner": "KELO_LUXE",
+      "source": "src/ui/luxe-shell.js",
+      "technicalDoc": "docs/systems/MAIN_MENU_SYSTEM.md",
+      "playerVisible": true,
+      "playerGuideAnchor": "menu-principal",
+      "status": "foundation-active"
     }
   ]
 }
