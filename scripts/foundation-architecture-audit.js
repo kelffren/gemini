@@ -84,6 +84,36 @@ function isAuthorizedCoreWrapper(entry, ruleName){
   const source=read(entry.file);
   return source.includes('FOUNDATION-ALLOW')&&source.includes(ownerMarker);
 }
+function codeOnlyLine(line){
+  const trimmed=line.trim();
+  if(trimmed.startsWith('//')||trimmed.startsWith('/*')||trimmed.startsWith('*'))return '';
+  let out='',quote='',escaped=false;
+  for(let i=0;i<line.length;i++){
+    const c=line[i],n=line[i+1];
+    if(quote){
+      if(escaped){escaped=false;out+=' ';continue;}
+      if(c==='\\'){escaped=true;out+=' ';continue;}
+      if(c===quote){quote='';out+=' ';continue;}
+      out+=' ';continue;
+    }
+    if(c==='/'&&n==='/')break;
+    if(c==='/'&&n==='*')break;
+    if(c==='"'||c==="'"||c==='`'){quote=c;out+=' ';continue;}
+    out+=c;
+  }
+  return out;
+}
+function hasGlobalAssignment(line,name){
+  const code=codeOnlyLine(line);
+  if(!code)return false;
+  const escaped=name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  const explicit=new RegExp('\\b(?:window|globalThis|root)\\.'+escaped+'\\s*=');
+  const bare=new RegExp('(?:^|[;{}]|\\))\\s*'+escaped+'\\s*=');
+  return explicit.test(code)||bare.test(code);
+}
+function hasCoreGlobalAssignment(line){
+  return ['render','renderAvatar','updateSimulation','processInput','updateMovement'].some((name)=>hasGlobalAssignment(line,name));
+}
 
 const base = resolveBase();
 if (!base) {
@@ -99,14 +129,13 @@ if (!base) {
     added.push({ file: currentFile, line: line.slice(1) });
   });
 
-  const coreGlobalAssignment = /\b(?:window\.|globalThis\.|root\.)?(render|renderAvatar|updateSimulation|processInput|updateMovement)\s*=/;
   const forbidden = [
-    { name: 'new direct core wrapper', test: (x) => coreGlobalAssignment.test(x.line) },
-    { name: 'new watchdog/timer used as state repair', test: (x) => /setInterval\s*\(/.test(x.line) && /unlock|lock|restore|repair|force|fix/i.test(x.line) },
-    { name: 'UI directly mutates player position/HP', test: (x) => /^src\/ui\//.test(x.file) && /\blocalPlayer\.(x|y|hp|maxHp)\s*=/.test(x.line) },
-    { name: 'UI directly pushes physical obstacle', test: (x) => /^src\/ui\//.test(x.file) && /\bobstacles\.push\s*\(/.test(x.line) },
+    { name: 'new direct core wrapper', test: (x) => hasCoreGlobalAssignment(x.line) },
+    { name: 'new watchdog/timer used as state repair', test: (x) => /setInterval\s*\(/.test(codeOnlyLine(x.line)) && /unlock|lock|restore|repair|force|fix/i.test(codeOnlyLine(x.line)) },
+    { name: 'UI directly mutates player position/HP', test: (x) => /^src\/ui\//.test(x.file) && /\blocalPlayer\.(x|y|hp|maxHp)\s*=/.test(codeOnlyLine(x.line)) },
+    { name: 'UI directly pushes physical obstacle', test: (x) => /^src\/ui\//.test(x.file) && /\bobstacles\.push\s*\(/.test(codeOnlyLine(x.line)) },
     { name: 'new engine-v2 style parallel core file', test: (x) => /(^|\/)engine[-_]?v?2/i.test(x.file) },
-    { name: 'new direct legacy modal-lock write', test: (x) => !isContractFixture(x.file) && x.file !== 'src/core/input-lock-system.js' && /\bKELO_MODAL_INPUT_LOCK\s*=/.test(x.line) }
+    { name: 'new direct legacy modal-lock write', test: (x) => !isContractFixture(x.file) && x.file !== 'src/core/input-lock-system.js' && hasGlobalAssignment(x.line,'KELO_MODAL_INPUT_LOCK') }
   ];
 
   added.forEach((entry) => {
