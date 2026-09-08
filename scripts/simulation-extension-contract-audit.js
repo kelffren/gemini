@@ -16,7 +16,7 @@ const fs=require('fs');
 const vm=require('vm');
 const source=fs.readFileSync('src/core/simulation-extension-system.js','utf8');
 const html=fs.readFileSync('index.html','utf8');
-const migrated=['engine-m.js','engine-o.js','engine-p.js','engine-q.js','engine-s.js'];
+const migrated=['engine-m.js','engine-o.js','engine-p.js','engine-q.js','engine-s.js','engine-net.js','src/systems/pvp-world.js'];
 const trace=[];
 const context={console,localPlayer:{x:0,y:0},STATE:{},updateSimulation:function(dt){trace.push('base:'+dt);return 9;}};
 context.window=context;context.globalThis=context;
@@ -39,6 +39,8 @@ ok(fs.readFileSync('engine-o.js','utf8').includes("KeloSimulation.after('engine-
 ok(fs.readFileSync('engine-p.js','utf8').includes("KeloSimulation.after('engine-p:plaza-npcs'"),'ENGINE_P_HOOK');
 ok(fs.readFileSync('engine-q.js','utf8').includes("KeloSimulation.after('engine-q:maestro-trial'"),'ENGINE_Q_HOOK');
 ok(fs.readFileSync('engine-s.js','utf8').includes("KeloSimulation.before('engine-s:social-bot-snapshot'")&&fs.readFileSync('engine-s.js','utf8').includes("KeloSimulation.after('engine-s:social-world'"),'ENGINE_S_HOOKS');
+ok(fs.readFileSync('engine-net.js','utf8').includes("KeloSimulation.after('engine-net:network'"),'NETWORK_SIM_HOOK');
+ok(fs.readFileSync('src/systems/pvp-world.js','utf8').includes("KeloSimulation.after('pvp-world:tick'"),'PVP_SIM_HOOK');
 const iC=html.indexOf('engine-c.js');const iS=html.indexOf('src/core/simulation-extension-system.js');const iD=html.indexOf('engine-d.js');
 ok(iC>=0&&iS>iC&&iD>iS,'LOAD_ORDER');
 console.log('SIMULATION_EXTENSION_OK: single bridge + deterministic hooks + migrated simulation chain passed');
