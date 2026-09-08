@@ -16,7 +16,7 @@ const fs=require('fs');
 const vm=require('vm');
 const source=fs.readFileSync('src/core/render-extension-system.js','utf8');
 const html=fs.readFileSync('index.html','utf8');
-const migrated=['engine-d.js','engine-g.js','engine-h.js','engine-l.js','engine-m.js','engine-o.js','engine-p.js','engine-s.js','engine-y.js','engine-aa.js','engine-ae.js','engine-ai.js'];
+const migrated=['engine-d.js','engine-g.js','engine-h.js','engine-l.js','engine-m.js','engine-o.js','engine-p.js','engine-s.js','engine-y.js','engine-aa.js','engine-ae.js','engine-ai.js','engine-net.js','src/systems/pvp-world.js'];
 const trace=[];
 const context={console,ctx:{},screenW:390,screenH:844,camera:{x:1,y:2},CONFIG:{zoom:1},render:function(){trace.push('base');return 7;}};
 context.window=context;context.globalThis=context;
@@ -44,6 +44,9 @@ ok(fs.readFileSync('engine-h.js','utf8').includes("KeloRender.beforeFrame('engin
 ok(fs.readFileSync('engine-l.js','utf8').includes("KeloRender.beforeFrame('engine-l:hidpi'")&&fs.readFileSync('engine-l.js','utf8').includes("KeloRender.afterFrame('engine-l:landing-marker'"),'PLAZA_HOOKS');
 ok(fs.readFileSync('engine-ae.js','utf8').includes("KeloRender.beforeFrame('engine-ae:frame-counter'"),'FRAME_COUNTER_HOOK');
 ok(fs.readFileSync('engine-ai.js','utf8').includes("KeloRender.afterFrame('engine-ai:cafe-overlay'"),'CAFE_HOOK');
+ok(fs.readFileSync('engine-net.js','utf8').includes("KeloRender.afterFrame('engine-net:peers'"),'NETWORK_PEER_HOOK');
+const pvp=fs.readFileSync('src/systems/pvp-world.js','utf8');
+ok(pvp.includes("KeloRender.intercept('pvp-world:arena-exclusive'")&&pvp.includes("KeloRender.afterFrame('pvp-world:transition-fx'"),'PVP_RENDER_OWNER_HOOKS');
 const iC=html.indexOf('engine-c.js');const iR=html.indexOf('src/core/render-extension-system.js');const iD=html.indexOf('engine-d.js');
 ok(iC>=0&&iR>iC&&iD>iR,'LOAD_ORDER');
 console.log('RENDER_EXTENSION_OK: single bridge + exclusive intercept + deterministic hooks + migrated render chain passed');
