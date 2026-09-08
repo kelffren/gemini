@@ -4,8 +4,8 @@
  * keys: RENDER LAYERS VISUAL VFX SCREEN UPDATE SOCIAL CAMERA FOUNDATION
  * hace: orquesta render del mundo/actores/UI y ofrece puntos explícitos para sistemas Foundation
  * online: visuales consumen eventos; este archivo no decide autoridad compartida
- * legacy: CONFIG.zoom/cycleZoom/screenToWorld son bootstrap pre-KeloCamera y quedan reemplazados por el owner tras carga
- * do-not: no añadir nuevos writers camera.*; usar KeloCamera
+ * legacy: CONFIG.zoom/cycleZoom/screenToWorld son bootstrap pre-KeloCamera y quedan reemplazados por el owner tras carga; title Caballero wrapper RETIRED
+ * do-not: no añadir nuevos writers camera.* ni wrappers renderAvatar; usar KeloCamera/KeloAvatar
  */
 CONFIG.zoom = 0.82;
 const ZOOM_STEPS = [0.7, 0.82, 1];
@@ -186,12 +186,6 @@ updateSimulation = function(dt) {
     if (!STATE.farm.pen.ready) { STATE.farm.pen.ready = true; STATE.silo.pork = (STATE.silo.pork || 0) + 1; STATE.farm.pen.fedAt = 0; saveState(); showToast('+1 cerdo'); }
   }
   if (window.KeloVisualSystem && typeof window.KeloVisualSystem.update === 'function') window.KeloVisualSystem.update(dt);
-};
-localPlayer.title = 'Caballero';
-const _renderAvatar = renderAvatar;
-renderAvatar = function(p, isSelf) {
-  _renderAvatar(p, isSelf);
-  if (isSelf) { ctx.fillStyle = '#e7c56a'; ctx.font = '9px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(p.title || 'Caballero', p.x, p.y - p.radius - 18); }
 };
 window.addEventListener('keydown', function(e) {
   if (e.key === 'Escape') { closeMenu(); closeSocialOverlays(); document.querySelectorAll('.app-panel').forEach(function(p){ p.style.display = 'none'; }); }
