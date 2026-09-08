@@ -3,7 +3,9 @@ on:
   pull_request:
     paths:
       - 'src/studio/**'
+      - 'src/ui/studio-launcher.js'
       - 'scripts/studio-foundation-audit.mjs'
+      - 'index.html'
       - 'package.json'
       - '.github/workflows/studio-foundation.yml'
   workflow_dispatch:
@@ -17,12 +19,16 @@ jobs:
         with:
           node-version: '22'
       - name: Syntax check Studio modules
-        run: find src/studio -type f -name '*.mjs' -print0 | xargs -0 -n1 node --check
+        run: |
+          find src/studio -type f -name '*.mjs' -print0 | xargs -0 -n1 node --check
+          node --check src/ui/studio-launcher.js
       - name: Studio foundation functional audit
         run: node scripts/studio-foundation-audit.mjs
       - name: Verify lazy boot contract
         run: |
           if grep -Eq 'src/studio/|studio-entry\.mjs' index.html; then
-            echo 'Studio must not be eagerly loaded by index.html'
+            echo 'Studio modules must not be eagerly loaded by index.html'
             exit 1
           fi
+          grep -q 'src/ui/studio-launcher.js?v=1' index.html
+          grep -q "import('./../studio/integration/live-studio-controller.mjs')" src/ui/studio-launcher.js
