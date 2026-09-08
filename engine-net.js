@@ -1,13 +1,22 @@
 /* KELO-INDEX
  * area: NETWORK
- * keys: WEBSOCKET AUTHORITY POSE VISUAL EVENT CAST PROJECTILE STATUS ONLINE
- * hace: transporte cliente para pose/sistemas autoritativos y relay semántico de presentación visual
- * online: visual:event jamás decide gameplay; servidor sigue siendo la frontera para estado valioso/compartido
+ * owner: KeloNetAuthority transport client
+ * keys: WEBSOCKET AUTHORITY POSE AOI CULL LOD VISUAL EVENT CAST PROJECTILE STATUS ONLINE PERFORMANCE
+ * hace: transporte cliente; pose change-driven + heartbeat y presentación de peers gobernada por KELO_PERF
+ * online: server sigue siendo frontera de autoridad; LOD cliente solo reduce presentación/interpolación
+ * public-api: KeloNetAuthority + performanceSnapshot
+ * consumes: KeloSimulation, KeloRender, KELO_PERF, KeloVisualEventBus
+ * state-owned: socket, peers recibidos, pending requests y telemetría de transporte cliente
+ * do-not: NO convertir culling visual en autoridad gameplay, NO crear otro loop de red
  */
 (function () {
+  'use strict';
   const params = new URLSearchParams(location.search);
   const NET = params.get('net');
   const PLAYER_KEY_STORAGE = 'kelo_player_key_v1';
+  const POSE_MIN_INTERVAL = 0.1;
+  const POSE_HEARTBEAT_INTERVAL = 1.0;
+  const POSE_POSITION_EPSILON = 0.75;
   const pending = new Map();
   const VISUAL_EVENT_ALLOWLIST = new Set([
     'CAST_CONFIRMED','PROJECTILE_SPAWNED','PROJECTILE_HIT','PROJECTILE_EXPIRED','ABILITY_IMPACT',
@@ -26,10 +35,23 @@
   function savePlayerKey(key) { if (!key) return; try { localStorage.setItem(PLAYER_KEY_STORAGE, key); } catch (e) {} }
   window.keloNet = { on: false, id: null, peers: {}, url: NET, playerKey: readPlayerKey(), nobilitySource: 'local-fallback', forgeSource: 'local-fallback', visualEventSource: 'local-fallback' };
 
+  const perfAudit = window.KELO_NETWORK_PERF_AUDIT = {
+    version:'network-perf-v1.0.0',
+    stateSnapshotsReceived:0,
+    poseSent:0,
+    poseSkippedUnchanged:0,
+    peerUpdates:0,
+    peerUpdatesCulled:0,
+    peersRendered:0,
+    peersRenderCulled:0,
+    lastPoseReason:null
+  };
+
   function ensureChip() { let chip = document.getElementById('kelo-online'); if (chip) return chip; chip = document.createElement('div'); chip.id = 'kelo-online'; chip.style.cssText = ['position:absolute','top:max(44px, calc(env(safe-area-inset-top) + 36px))','left:max(8px, env(safe-area-inset-left))','z-index:80','pointer-events:none','display:flex','align-items:center','gap:6px','padding:5px 10px','border-radius:999px','background:rgba(10,13,18,.92)','border:1px solid rgba(231,197,106,.35)','color:#e7c56a','font:700 10px/1.2 -apple-system,sans-serif','white-space:nowrap'].join(';'); document.body.appendChild(chip); return chip; }
   function paintChip(state, n) { const chip = ensureChip(); const dot = state === 'on' ? '#3ddc84' : (state === 'wait' ? '#e7c56a' : '#8a9099'); const label = state === 'on' ? ('Online ' + n) : state === 'wait' ? 'Conectando' : state === 'err' ? 'Sin señal' : 'Local'; chip.innerHTML = '<span style="width:7px;height:7px;border-radius:50%;background:' + dot + '"></span><span>' + label + '</span>'; }
-  function countOnline() { const others = Object.keys(window.keloNet.peers || {}).length; return window.keloNet.on ? (1 + others) : 0; }
-  let ws = null, myId = null, sendAcc = 0;
+  function countOnline() { let others=0; for(const id in window.keloNet.peers) if(Object.prototype.hasOwnProperty.call(window.keloNet.peers,id)) others+=1; return window.keloNet.on ? (1 + others) : 0; }
+  let ws = null, myId = null, sendAcc = 0, heartbeatAcc = 0;
+  let lastPose = null;
   const peers = window.keloNet.peers;
   function nextRequestId(prefix) { return prefix + '_' + Date.now().toString(36) + '_' + (requestSeq++).toString(36); }
   function request(type, payload, timeoutMs) { if (!ws || ws.readyState !== 1) return Promise.reject(new Error('NETWORK_OFFLINE')); const requestId = nextRequestId(type.replace(/[^a-z]/gi, '')); return new Promise(function(resolve, reject) { const timer = setTimeout(function() { pending.delete(requestId); reject(new Error('NETWORK_TIMEOUT')); }, timeoutMs || 8000); pending.set(requestId, { resolve, reject, timer }); ws.send(JSON.stringify(Object.assign({ t: type, requestId }, payload || {}))); }); }
@@ -71,9 +93,7 @@
     if (msg.name === 'CAST_CONFIRMED' || msg.name === 'PROJECTILE_SPAWNED' || msg.name === 'PROJECTILE_HIT' || msg.name === 'PROJECTILE_EXPIRED' || msg.name === 'ABILITY_IMPACT' || msg.name === 'DASH_STARTED' || msg.name === 'DASH_ENDED') {
       c.actorId = msg.actorId || c.actorId;
       c.actor = peers[c.actorId] || null;
-    } else if (c.actorId) {
-      c.actor = peers[c.actorId] || null;
-    }
+    } else if (c.actorId) c.actor = peers[c.actorId] || null;
     window.keloNet.visualEventSource = 'server-relay';
     window.KeloVisualEventBus.emit(msg.name, c);
   }
@@ -82,14 +102,14 @@
     if (!NET) { paintChip('off', 0); return; }
     try { ws = new WebSocket(NET); } catch (e) { paintChip('err', 0); return; }
     paintChip('wait', 0);
-    ws.onopen = function () { window.keloNet.on = true; ws.send(JSON.stringify({ t: 'hello', name: (localPlayer && localPlayer.name) || 'Kelo', playerKey: window.keloNet.playerKey })); paintChip('on', countOnline()); };
+    ws.onopen = function () { window.keloNet.on = true; lastPose=null; sendAcc=POSE_MIN_INTERVAL; heartbeatAcc=POSE_HEARTBEAT_INTERVAL; ws.send(JSON.stringify({ t: 'hello', name: (localPlayer && localPlayer.name) || 'Kelo', playerKey: window.keloNet.playerKey })); paintChip('on', countOnline()); };
     ws.onclose = function () { window.keloNet.on = false; pending.forEach(function(item) { clearTimeout(item.timer); item.reject(new Error('NETWORK_CLOSED')); }); pending.clear(); paintChip('err', 0); setTimeout(connect, 1500); };
     ws.onerror = function () { paintChip('err', 0); };
     ws.onmessage = function (ev) {
       let msg; try { msg = JSON.parse(ev.data); } catch (e) { return; }
       if (msg.t === 'welcome') { myId = msg.id; window.keloNet.id = myId; window.keloNet.nobilitySource = msg.nobilitySource || window.keloNet.nobilitySource; window.keloNet.forgeSource = msg.forgeSource || window.keloNet.forgeSource; ingest(msg.players); }
       if (msg.t === 'identity' && msg.playerKey) { window.keloNet.playerKey = msg.playerKey; savePlayerKey(msg.playerKey); }
-      if (msg.t === 'state') ingest(msg.players);
+      if (msg.t === 'state') { perfAudit.stateSnapshotsReceived += 1; ingest(msg.players); }
       if (msg.t === 'join' && msg.player) upsert(msg.player);
       if (msg.t === 'leave' && msg.id) { delete peers[msg.id]; paintChip(window.keloNet.on ? 'on' : 'err', countOnline()); }
       if (msg.t === 'visual:event') ingestVisualEvent(msg);
@@ -105,14 +125,20 @@
   function upsert(p) {
     if (!p || !p.id || p.id === myId) return;
     const prev = peers[p.id] || { id: p.id, name: p.name || 'Kelo', x: p.x, y: p.y, vx: 0, vy: 0, radius: 20, hp: 100, maxHp: 100, gear: { bodyColor: '#7b6cff', armorColor: '#e7c56a', weaponColor: '#fff' }, _face: p.face || 'down', _gait: p.gait || 'idle', targetX: p.x, targetY: p.y };
-    prev.name = p.name || prev.name; prev.targetX = p.x; prev.targetY = p.y; prev._face = p.face || prev._face; prev._gait = p.gait || 'walk';
+    prev.name = p.name || prev.name; prev.targetX = p.x; prev.targetY = p.y; prev._face = p.face || prev._face; prev._gait = p.gait || 'walk'; prev.zone=p.zone||prev.zone||'plaza';
     prev.nobilityRank = p.nobilityRank || prev.nobilityRank || 'none'; prev.nobilityPower = Number(p.nobilityPower) || 0;
     prev.armorScore = Math.max(0, Math.floor(Number(p.armorScore)||0)); prev.auraRank = Math.max(0, Math.min(9, Math.floor(Number(p.auraRank)||0))); prev.averageQuality = Number(p.averageQuality)||0; prev.averageGrade = Number(p.averageGrade)||0; prev.equipmentSummary = Array.isArray(p.equipmentSummary)?p.equipmentSummary:[];
     peers[p.id] = prev; paintChip('on', countOnline());
   }
-  function ingest(map) { if (!map) return; const live = {}; Object.keys(map).forEach(function (id) { live[id] = true; upsert(map[id]); }); Object.keys(peers).forEach(function (id) { if (!live[id]) delete peers[id]; }); paintChip(window.keloNet.on ? 'on' : 'wait', countOnline()); }
+  function ingest(map) { if (!map) return; const live = Object.create(null); for(const id in map){ if(!Object.prototype.hasOwnProperty.call(map,id))continue; live[id]=true; upsert(map[id]); } for(const id in peers){ if(Object.prototype.hasOwnProperty.call(peers,id)&&!live[id]) delete peers[id]; } paintChip(window.keloNet.on ? 'on' : 'wait', countOnline()); }
+
+  function performanceSnapshot(){
+    let peerCount=0; for(const id in peers) if(Object.prototype.hasOwnProperty.call(peers,id)) peerCount+=1;
+    return Object.freeze({version:perfAudit.version,online:!!window.keloNet.on,peerCount:peerCount,stateSnapshotsReceived:perfAudit.stateSnapshotsReceived,poseSent:perfAudit.poseSent,poseSkippedUnchanged:perfAudit.poseSkippedUnchanged,peerUpdates:perfAudit.peerUpdates,peerUpdatesCulled:perfAudit.peerUpdatesCulled,peersRendered:perfAudit.peersRendered,peersRenderCulled:perfAudit.peersRenderCulled,lastPoseReason:perfAudit.lastPoseReason});
+  }
+
   window.KeloNetAuthority = Object.freeze({
-    version: 'net-authority-v3',
+    version: 'net-authority-v3.1-performance',
     isOnline: function() { return !!(ws && ws.readyState === 1 && window.keloNet.on); },
     getNobility: function() { return request('nobility:get'); },
     donateNobility: function(currency, amount) { return request('nobility:donate', { currency, amount: Math.floor(Number(amount)) }); },
@@ -121,41 +147,68 @@
     attemptForge: function(itemId, forgeType, materialLevel, crystals) { return request('forge:attempt', { itemId, forgeType, materialLevel: Math.floor(Number(materialLevel)), crystals: Array.isArray(crystals)?crystals:[] }); },
     combineForgeMaterials: function(materialId) { return request('forge:combine', { materialId }); },
     syncEquipment: function() { return Promise.resolve({ok:true,mode:'server-derived'}); },
-    replicateVisualEvent: replicateVisualEvent
+    replicateVisualEvent: replicateVisualEvent,
+    performanceSnapshot:performanceSnapshot
   });
 
   if (window.KeloVisualEventBus && typeof window.KeloVisualEventBus.on === 'function') {
-    VISUAL_EVENT_ALLOWLIST.forEach(function (name) {
-      window.KeloVisualEventBus.on(name, function (payload) { replicateVisualEvent(name, payload); });
-    });
+    VISUAL_EVENT_ALLOWLIST.forEach(function (name) { window.KeloVisualEventBus.on(name, function (payload) { replicateVisualEvent(name, payload); }); });
   }
 
   connect();
 
+  function currentPose(){
+    return {x:Number(localPlayer.x)||0,y:Number(localPlayer.y)||0,face:localPlayer._face||'down',gait:localPlayer._gait||'idle',zone:window.keloZone||'plaza'};
+  }
+  function poseChanged(next){
+    if(!lastPose)return true;
+    if(next.face!==lastPose.face||next.gait!==lastPose.gait||next.zone!==lastPose.zone)return true;
+    return Math.abs(next.x-lastPose.x)>POSE_POSITION_EPSILON||Math.abs(next.y-lastPose.y)>POSE_POSITION_EPSILON;
+  }
+  // KELO-INDEX NET/POSE envía cambios a máximo 10 Hz y heartbeat para idle; evita paquetes idénticos permanentes.
+  function maybeSendPose(){
+    if(!ws||ws.readyState!==1||!localPlayer)return false;
+    const pose=currentPose(),changed=poseChanged(pose),heartbeat=heartbeatAcc>=POSE_HEARTBEAT_INTERVAL;
+    if(sendAcc<POSE_MIN_INTERVAL&&!heartbeat)return false;
+    if(!changed&&!heartbeat){perfAudit.poseSkippedUnchanged+=1;return false;}
+    ws.send(JSON.stringify(Object.assign({t:'pose'},pose)));
+    lastPose=pose; sendAcc=0; heartbeatAcc=0; perfAudit.poseSent+=1; perfAudit.lastPoseReason=changed?'changed':'heartbeat';
+    return true;
+  }
+
   function tickNetwork(context) {
-    const dt = context.dt;
-    sendAcc += dt;
-    if (ws && ws.readyState === 1 && localPlayer && sendAcc > 0.1) {
-      sendAcc = 0;
-      ws.send(JSON.stringify({ t: 'pose', x: localPlayer.x, y: localPlayer.y, face: localPlayer._face || 'down', gait: localPlayer._gait || 'idle', zone: window.keloZone || 'plaza' }));
+    const dt = Math.max(0,Math.min(0.25,Number(context.dt)||0));
+    sendAcc += dt; heartbeatAcc += dt;
+    maybeSendPose();
+    const now=performance.now(),perf=window.KELO_PERF;
+    for(const id in peers){
+      if(!Object.prototype.hasOwnProperty.call(peers,id))continue;
+      const p=peers[id],distance=localPlayer?Math.hypot((p.x||0)-localPlayer.x,(p.y||0)-localPlayer.y):0;
+      if(perf&&typeof perf.shouldUpdate==='function'&&!perf.shouldUpdate('net-peer:'+id,distance,now)){perfAudit.peerUpdatesCulled+=1;continue;}
+      const tx=p.targetX!=null?p.targetX:p.x,ty=p.targetY!=null?p.targetY:p.y;
+      p.x+=(tx-p.x)*Math.min(1,12*dt); p.y+=(ty-p.y)*Math.min(1,12*dt); perfAudit.peerUpdates+=1;
     }
-    Object.keys(peers).forEach(function (id) {
-      const p = peers[id], tx = p.targetX != null ? p.targetX : p.x, ty = p.targetY != null ? p.targetY : p.y;
-      p.x += (tx - p.x) * Math.min(1, 12 * dt);
-      p.y += (ty - p.y) * Math.min(1, 12 * dt);
-    });
   }
 
   function drawPeers() {
     if (typeof renderAvatar !== 'function') return;
-    const ids = Object.keys(peers);
-    if (!ids.length) return;
+    const perf=window.KELO_PERF;
+    let hasVisible=false;
+    for(const id in peers){
+      if(!Object.prototype.hasOwnProperty.call(peers,id))continue;
+      const p=peers[id],distance=localPlayer?Math.hypot((p.x||0)-localPlayer.x,(p.y||0)-localPlayer.y):0;
+      if(perf&&typeof perf.shouldRenderActor==='function'&&!perf.shouldRenderActor(distance)){perfAudit.peersRenderCulled+=1;continue;}
+      hasVisible=true; break;
+    }
+    if(!hasVisible)return;
     const z = CONFIG.zoom || 1;
-    ctx.save();
-    ctx.translate(screenW / 2, screenH / 2);
-    ctx.scale(z, z);
-    ctx.translate(-camera.x, -camera.y);
-    ids.forEach(function (id) { renderAvatar(peers[id], false); });
+    ctx.save(); ctx.translate(screenW / 2, screenH / 2); ctx.scale(z, z); ctx.translate(-camera.x, -camera.y);
+    for(const id in peers){
+      if(!Object.prototype.hasOwnProperty.call(peers,id))continue;
+      const p=peers[id],distance=localPlayer?Math.hypot((p.x||0)-localPlayer.x,(p.y||0)-localPlayer.y):0;
+      if(perf&&typeof perf.shouldRenderActor==='function'&&!perf.shouldRenderActor(distance)){continue;}
+      renderAvatar(p,false); perfAudit.peersRendered+=1;
+    }
     ctx.restore();
   }
 
