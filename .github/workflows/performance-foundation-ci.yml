@@ -1,0 +1,61 @@
+name: Performance Foundation CI
+on:
+  pull_request:
+    paths:
+      - 'index.html'
+      - 'engine-net.js'
+      - 'server/**'
+      - 'src/core/**'
+      - 'src/environment/**'
+      - 'src/systems/performance-governor.js'
+      - 'src/visuals/**'
+      - 'src/ui/profile-panel-close.js'
+      - 'src/ui/self-interaction-ui.js'
+      - 'src/ui/character-customizer-*.js'
+      - 'scripts/performance-foundation-audit.js'
+      - 'package.json'
+      - '.github/workflows/performance-foundation-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'index.html'
+      - 'engine-net.js'
+      - 'server/**'
+      - 'src/core/**'
+      - 'src/environment/**'
+      - 'src/systems/performance-governor.js'
+      - 'src/visuals/**'
+      - 'src/ui/profile-panel-close.js'
+      - 'src/ui/self-interaction-ui.js'
+      - 'src/ui/character-customizer-*.js'
+      - 'scripts/performance-foundation-audit.js'
+      - 'package.json'
+  workflow_dispatch:
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax — touched performance owners
+        run: |
+          node --check src/core/simulation-extension-system.js
+          node --check src/core/render-extension-system.js
+          node --check src/systems/performance-governor.js
+          node --check src/visuals/visual-system.js
+          node --check src/environment/atlas-contract.js
+          node --check src/ui/profile-panel-close.js
+          node --check src/ui/self-interaction-ui.js
+          node --check src/ui/character-customizer-preview.js
+          node --check engine-net.js
+          node --check server/index.js
+          node --check scripts/performance-foundation-audit.js
+      - name: Performance architecture contracts
+        run: npm run audit:performance
+      - name: Foundation architecture contracts
+        run: npm run audit:foundation
+      - name: Documentation contracts
+        run: npm run audit:docs
