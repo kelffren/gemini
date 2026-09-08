@@ -51,12 +51,12 @@
   }
   function get(stat) {
     const key = String(stat || '');
-    if (online() && serverProgress) return Math.max(0, Math.floor(Number(serverProgress[key]) || 0));
+    if (online()) return serverProgress ? Math.max(0, Math.floor(Number(serverProgress[key]) || 0)) : 0;
     const local = ensureLocal();
     return local ? Math.max(0, Math.floor(Number(local[key]) || 0)) : 0;
   }
   function snapshot() {
-    const source = online() && serverProgress ? serverProgress : (ensureLocal() || {});
+    const source = online() ? (serverProgress || {}) : (ensureLocal() || {});
     const out = {};
     Object.keys(source).forEach(function (key) { out[key] = Math.max(0, Math.floor(Number(source[key]) || 0)); });
     return Object.freeze(out);
@@ -160,5 +160,5 @@
   };
   if (devEnabled()) api.dev = Object.freeze({ set: devSet, simulateOpenWorldKill: devSimulateOpenWorldKill });
   root.KeloPlayerStats = Object.freeze(api);
-  root.KELO_PLAYER_STATS_AUDIT = Object.freeze({ version: VERSION, ready: true, combatEvent: 'combat:entity_killed', onlineWritesBlocked: true, rewardFree: true, devEnabled: devEnabled() });
+  root.KELO_PLAYER_STATS_AUDIT = Object.freeze({ version: VERSION, ready: true, combatEvent: 'combat:entity_killed', onlineWritesBlocked: true, onlinePreSnapshotFailClosed: true, rewardFree: true, devEnabled: devEnabled() });
 })(typeof globalThis !== 'undefined' ? globalThis : window);
