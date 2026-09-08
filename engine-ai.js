@@ -1,15 +1,15 @@
 /* KELO-INDEX
  * area: LEGACY ZONE / CAFE
- * owner: cafe feature; movement extension owned by KeloMovement
+ * owner: cafe feature; movement extension owned by KeloMovement; render extension owned by KeloRender
  * keys: CAFE ZONE MOVEMENT CLAMP RENDER LEGACY
- * purpose: conserva entrada/salida del café y limita movimiento interior mediante KeloMovement
+ * purpose: conserva entrada/salida del café y limita movimiento/render mediante owners Foundation
  * public-api: enterCafe/exitCafe + keloCafe/keloZone legacy
- * consumes: KeloMovement, localPlayer, camera, obstacles, render
+ * consumes: KeloMovement, KeloRender, localPlayer, camera, obstacles
  * state-owned: estado legacy de zona café
- * extension-points: KeloMovement.after para límites post-física
+ * extension-points: KeloMovement.after + KeloRender.afterFrame
  * reuse: NO usar como patrón de nuevas instancias; usar InstanceSystem
- * legacy: render wrapper y teleport directo pendientes de migración
- * do-not: NO volver a envolver updateMovement
+ * legacy: teleport directo pendiente de migración
+ * do-not: NO volver a envolver updateMovement ni render
  */
 (function () {
   const T = window.KELO_TILE || 32;
@@ -92,9 +92,7 @@
     localPlayer.y = Math.max(room.y + 12, Math.min(room.y + room.h - 8, localPlayer.y));
   }, 40);
 
-  var _r = render;
-  render = function () {
-    _r();
+  function drawCafeOverlay() {
     var z = CONFIG.zoom || 1;
     ctx.save();
     ctx.translate(screenW / 2, screenH / 2);
@@ -115,5 +113,7 @@
       ctx.fillText('boton Salir', box.x + box.w / 2, door.y + 16);
     }
     ctx.restore();
-  };
+  }
+  if(!window.KeloRender) throw new Error('KeloRender unavailable before engine-ai');
+  window.KeloRender.afterFrame('engine-ai:cafe-overlay', drawCafeOverlay, 140);
 })();
