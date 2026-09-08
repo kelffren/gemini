@@ -39,7 +39,7 @@
     .lx-chat-form input{min-width:0;flex:1;height:36px;border-radius:10px;border:1px solid rgba(255,255,255,.1);background:#111d21;color:#f6f2df;padding:0 10px;outline:none}
     .lx-chat-form input:focus{border-color:rgba(231,197,106,.58)}
     .lx-chat-form button{height:36px;min-width:48px;border-radius:10px;border:1px solid rgba(231,197,106,.52);background:var(--lx-forest);color:var(--lx-gold);font-weight:900}
-    .action-bar{left:auto!important;right:max(10px,env(safe-area-inset-right))!important;bottom:max(10px,env(safe-area-inset-bottom))!important;transform:none!important;display:grid!important;grid-template-columns:repeat(5,44px)!important;grid-template-rows:44px!important;gap:6px!important;width:auto!important;height:44px!important;z-index:84!important;pointer-events:auto!important}
+    .action-bar{position:absolute!important;left:auto!important;right:max(10px,env(safe-area-inset-right))!important;bottom:max(10px,env(safe-area-inset-bottom))!important;transform:none!important;display:grid!important;grid-template-columns:repeat(5,44px)!important;grid-template-rows:44px!important;gap:6px!important;width:auto!important;height:44px!important;z-index:84!important;pointer-events:auto!important}
     .action-bar .stone-slot,.action-bar .stone-slot.ultimate{grid-column:auto!important;grid-row:auto!important;width:44px!important;height:44px!important;border-radius:13px!important;border:1px solid rgba(231,197,106,.56)!important;background:rgba(11,22,24,.92)!important;color:var(--lx-gold)!important;box-shadow:0 7px 18px rgba(0,0,0,.22),inset 0 0 0 1px rgba(255,255,255,.035)!important;font-size:7px!important}
     .action-bar .stone-slot.ultimate{border-color:rgba(231,197,106,.88)!important;background:linear-gradient(145deg,rgba(25,55,45,.96),rgba(11,22,24,.96))!important}
     .action-bar .stone-slot span[style*="opacity"]{font-size:13px!important;color:#69837b!important;opacity:.52!important}
@@ -163,7 +163,7 @@
   });
 
   window.KELO_LUXE_AUDIT = Object.freeze({
-    version:'luxe-shell-v3.4',
+    version:'luxe-shell-v3.5',
     palette:'forest-ivory-gold',
     hideKwBadge:true,
     hideLocalChip:true,
