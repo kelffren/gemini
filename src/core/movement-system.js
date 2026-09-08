@@ -1,26 +1,26 @@
 /* KELO-INDEX
  * area: CORE / MOVEMENT
  * owner: KeloMovement
- * keys: MOVEMENT HOOK BEFORE AFTER UPDATE EXTENSION FOUNDATION
+ * keys: MOVEMENT HOOK BEFORE INTERCEPT AFTER UPDATE EXTENSION FOUNDATION
  * purpose: único punto de extensión alrededor del updateMovement legacy mientras la física base siga en engine-a
- * public-api: KeloMovement.before/after/unregister/snapshot
+ * public-api: KeloMovement.before/intercept/after/unregister/snapshot
  * consumes: updateMovement legacy
- * state-owned: registro ordenado de hooks de movimiento
- * extension-points: before/after con prioridad explícita
- * reuse: gait, telemetría y compatibilidad que necesiten observar/ajustar movimiento sin volver a envolver updateMovement
+ * state-owned: registro ordenado de hooks e interceptores de movimiento
+ * extension-points: before/intercept/after con prioridad explícita
+ * reuse: gait, telemetría, dash/knockback/cutscene y compatibilidad sin volver a envolver updateMovement
  * legacy: bridge temporal; la física base aún vive en engine-a.js
  * do-not: NO meter UI, input locks, reglas de habilidad ni render aquí
  */
 (function(root){
   'use strict';
   if(root.KeloMovement)return;
-  const VERSION='kelo-movement-v1.0.0';
+  const VERSION='kelo-movement-v1.1.0';
   if(typeof updateMovement!=='function'){
     root.KELO_MOVEMENT_SYSTEM_AUDIT=Object.freeze({version:VERSION,installed:false,reason:'updateMovement-missing'});
     return;
   }
   const originalUpdateMovement=updateMovement;
-  const hooks={before:[],after:[]};
+  const hooks={before:[],intercept:[],after:[]};
   let sequence=1;
 
   function add(phase,owner,fn,priority){
@@ -32,7 +32,7 @@
   }
   function unregister(id){
     let removed=false;
-    ['before','after'].forEach(function(phase){
+    ['before','intercept','after'].forEach(function(phase){
       const i=hooks[phase].findIndex(function(h){return h.id===id;});
       if(i>=0){hooks[phase].splice(i,1);removed=true;}
     });
@@ -42,28 +42,35 @@
     const list=hooks[phase].slice();
     for(let i=0;i<list.length;i++)list[i].fn(ctx);
   }
+  function runInterceptor(ctx){
+    const list=hooks.intercept.slice();
+    for(let i=0;i<list.length;i++){
+      if(list[i].fn(ctx)===true){ctx.handledBy=list[i].owner;return true;}
+    }
+    return false;
+  }
+  function publicList(phase){
+    return Object.freeze(hooks[phase].map(function(h){return Object.freeze({id:h.id,owner:h.owner,priority:h.priority});}));
+  }
   function snapshot(){
-    return Object.freeze({
-      version:VERSION,
-      before:Object.freeze(hooks.before.map(function(h){return Object.freeze({id:h.id,owner:h.owner,priority:h.priority});})),
-      after:Object.freeze(hooks.after.map(function(h){return Object.freeze({id:h.id,owner:h.owner,priority:h.priority});}))
-    });
+    return Object.freeze({version:VERSION,before:publicList('before'),intercept:publicList('intercept'),after:publicList('after')});
   }
 
   // FOUNDATION-ALLOW: único bridge autorizado alrededor del updateMovement legacy.
   updateMovement=function(dt){
-    const ctx={dt:Number(dt)||0,player:typeof localPlayer!=='undefined'?localPlayer:null,input:typeof input!=='undefined'?input:null,config:typeof CONFIG!=='undefined'?CONFIG:null};
+    const ctx={dt:Number(dt)||0,player:typeof localPlayer!=='undefined'?localPlayer:null,input:typeof input!=='undefined'?input:null,config:typeof CONFIG!=='undefined'?CONFIG:null,handledBy:null};
     run('before',ctx);
-    originalUpdateMovement(dt);
+    if(!runInterceptor(ctx))originalUpdateMovement(dt);
     run('after',ctx);
   };
 
   root.KeloMovement=Object.freeze({
     version:VERSION,
     before:function(owner,fn,priority){return add('before',owner,fn,priority);},
+    intercept:function(owner,fn,priority){return add('intercept',owner,fn,priority);},
     after:function(owner,fn,priority){return add('after',owner,fn,priority);},
     unregister:unregister,
     snapshot:snapshot
   });
-  root.KELO_MOVEMENT_SYSTEM_AUDIT=Object.freeze({version:VERSION,installed:true,singleLegacyWrapper:true,beforeAfterHooks:true,timers:0,uiRules:false});
+  root.KELO_MOVEMENT_SYSTEM_AUDIT=Object.freeze({version:VERSION,installed:true,singleLegacyWrapper:true,beforeAfterHooks:true,exclusiveInterceptors:true,timers:0,uiRules:false});
 })(typeof globalThis!=='undefined'?globalThis:window);
