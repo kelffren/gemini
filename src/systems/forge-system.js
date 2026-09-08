@@ -1,6 +1,18 @@
+/* KELO-INDEX
+ * area: SYSTEMS / FORGE
+ * owner: KeloForge
+ * purpose: reglas de forja, materiales y UI de forja; almacenamiento portable vive en KeloInventory
+ * public-api: KeloForge
+ * consumes: KeloInventory, KeloEquipment, KeloNetAuthority
+ * state-owned: selección/UI local de forja + reglas de chance/coste; oro sigue legacy economy state
+ * extension-points: calculateChance/attemptForge/combineMaterials
+ * reuse: materiales nuevos entran como items por KeloInventory; no crear otra colección
+ * legacy: STATE.gold y persistencia global siguen en engine-a hasta Foundation de economy/state
+ * do-not: NO leer/escribir STATE.inventory directamente
+ */
 (function(){
 'use strict';
-const VERSION='forge-v1.0';
+const VERSION='forge-v1.1.0';
 const BASE_CHANCE={2:100,3:90,4:80,5:68,6:55,7:42,8:28,9:15};
 const MATERIAL_BONUS={1:0,2:8,3:16,4:24};
 const CRYSTAL_BONUS={1:2,2:4,3:8,4:12};
@@ -8,13 +20,15 @@ const GOLD_COST={2:500,3:1000,4:2500,5:5000,6:10000,7:25000,8:60000,9:150000};
 const MATERIAL_BY_TYPE={level:'ruby',quality:'sapphire',grade:'emerald'};
 const TYPE_LABEL={level:'Nivel',quality:'Quality',grade:'Grade'};
 const MAX_CRYSTALS=25;
+const inventoryOwner=window.KeloInventory;
+if(!inventoryOwner)throw new Error('KeloInventory unavailable before forge-system');
 let selectedItemId=null,forgeType='quality',materialLevel=1,crystalLevel=1,crystalCount=0;
 function ensureInventory(){
- if(typeof STATE==='undefined')return;
- if(!Array.isArray(STATE.inventory))STATE.inventory=[];
- ['ruby','sapphire','emerald','forge_crystal'].forEach(function(family){for(let lvl=1;lvl<=4;lvl++){const id=family+'_'+lvl;let x=STATE.inventory.find(function(i){return i&&i.kind==='forgeMaterial'&&i.id===id;});if(!x){x={id,name:family.replace('_',' ')+' '+lvl,kind:'forgeMaterial',family,level:lvl,qty:lvl===1?18:0};STATE.inventory.push(x);}}});
+ inventoryOwner.ensure();
+ const items=inventoryOwner.getItems('backpack');
+ ['ruby','sapphire','emerald','forge_crystal'].forEach(function(family){for(let lvl=1;lvl<=4;lvl++){const id=family+'_'+lvl;let x=items.find(function(i){return i&&i.kind==='forgeMaterial'&&i.id===id;});if(!x){x={id,name:family.replace('_',' ')+' '+lvl,kind:'forgeMaterial',family,level:lvl,qty:lvl===1?18:0};inventoryOwner.addItem('backpack',x,{persist:false});}}});
 }
-function material(id){ensureInventory();return STATE.inventory.find(function(x){return x&&x.kind==='forgeMaterial'&&x.id===id;})||null;}
+function material(id){ensureInventory();return inventoryOwner.getItems('backpack').find(function(x){return x&&x.kind==='forgeMaterial'&&x.id===id;})||null;}
 function qty(id){const x=material(id);return x?Math.max(0,Math.floor(Number(x.qty)||0)):0;}
 function tierOf(item,type){if(type==='level')return Math.max(1,Math.floor(Number(item.itemLevel)||1));if(type==='quality')return Math.max(1,Math.floor(Number(item.quality)||1));return Math.max(1,Math.floor(Number(item.grade)||1));}
 function calculateChance(opts){opts=opts||{};const current=Math.max(1,Math.floor(Number(opts.currentTier)||1)),next=current+1;if(next>9)return 0;const ml=Math.max(1,Math.min(4,Math.floor(Number(opts.materialLevel)||1)));const crystals=Array.isArray(opts.crystals)?opts.crystals:[];if(crystals.length>MAX_CRYSTALS)throw new Error('TOO_MANY_CRYSTALS');let c=(BASE_CHANCE[next]||0)+(MATERIAL_BONUS[ml]||0);crystals.forEach(function(v){const l=Math.max(1,Math.min(4,Math.floor(Number(v)||1)));c+=CRYSTAL_BONUS[l]||0;});return Math.max(0,Math.min(100,c));}
@@ -22,17 +36,17 @@ function costFor(item,type){const next=tierOf(item,type)+1;return GOLD_COST[next
 function localAttempt(item,type,ml,crystals){
  const tier=tierOf(item,type),next=tier+1;if(next>9)return Promise.resolve({ok:false,error:'MAX_TIER'});if(crystals.length>MAX_CRYSTALS)return Promise.resolve({ok:false,error:'TOO_MANY_CRYSTALS'});
  const family=MATERIAL_BY_TYPE[type],matId=family+'_'+ml,mat=material(matId),cost=GOLD_COST[next]||0;if(!mat||qty(matId)<1)return Promise.resolve({ok:false,error:'MATERIAL_REQUIRED'});const crystalNeed={};crystals.forEach(function(l){const id='forge_crystal_'+l;crystalNeed[id]=(crystalNeed[id]||0)+1;});for(const id in crystalNeed)if(qty(id)<crystalNeed[id])return Promise.resolve({ok:false,error:'CRYSTAL_REQUIRED'});if((Number(STATE.gold)||0)<cost)return Promise.resolve({ok:false,error:'INSUFFICIENT_GOLD'});
- const chance=calculateChance({forgeType:type,currentTier:tier,materialLevel:ml,crystals});mat.qty-=1;Object.keys(crystalNeed).forEach(function(id){material(id).qty-=crystalNeed[id];});STATE.gold-=cost;const roll=Math.random()*100,success=roll<chance;if(success){if(type==='level')item.itemLevel=next;else item[type]=next;}window.KeloEquipment.recalculate(localPlayer);if(typeof saveState==='function')saveState();return Promise.resolve({ok:true,success,chance,roll:+roll.toFixed(2),item,armorScore:localPlayer.armorScore,auraRank:localPlayer.auraRank,source:'local-fallback'});
+ const chance=calculateChance({forgeType:type,currentTier:tier,materialLevel:ml,crystals});mat.qty-=1;Object.keys(crystalNeed).forEach(function(id){material(id).qty-=crystalNeed[id];});STATE.gold-=cost;const roll=Math.random()*100,success=roll<chance;if(success){if(type==='level')item.itemLevel=next;else item[type]=next;}window.KeloEquipment.recalculate(localPlayer);inventoryOwner.persist();return Promise.resolve({ok:true,success,chance,roll:+roll.toFixed(2),item,armorScore:localPlayer.armorScore,auraRank:localPlayer.auraRank,source:'local-fallback'});
 }
 async function attemptForge(opts){
  ensureInventory();opts=opts||{};const item=window.KeloEquipment&&window.KeloEquipment.getItem(opts.itemId);const type=['level','quality','grade'].includes(opts.forgeType)?opts.forgeType:null;const ml=Math.max(1,Math.min(4,Math.floor(Number(opts.materialLevel)||1)));const crystals=Array.isArray(opts.crystals)?opts.crystals.map(function(x){return Math.max(1,Math.min(4,Math.floor(Number(x)||1)));}):[];
  if(!item)return {ok:false,error:'ITEM_NOT_FOUND'};if(!type)return {ok:false,error:'INVALID_FORGE_TYPE'};if(crystals.length>MAX_CRYSTALS)return {ok:false,error:'TOO_MANY_CRYSTALS'};
  if(window.KeloNetAuthority&&window.KeloNetAuthority.isOnline&&window.KeloNetAuthority.isOnline()&&typeof window.KeloNetAuthority.attemptForge==='function'){
-  try{const r=await window.KeloNetAuthority.attemptForge(item.id,type,ml,crystals);if(r&&r.item)window.KeloEquipment.applyServerItem(r.item);if(r&&Number.isFinite(r.gold))STATE.gold=r.gold;if(r&&r.inventory){Object.keys(r.inventory).forEach(function(id){const m=material(id);if(m)m.qty=r.inventory[id];});}if(typeof saveState==='function')saveState();return Object.assign({ok:true,source:'server-authoritative'},r);}catch(e){return {ok:false,error:e.message||'SERVER_ERROR'};}
+  try{const r=await window.KeloNetAuthority.attemptForge(item.id,type,ml,crystals);if(r&&r.item)window.KeloEquipment.applyServerItem(r.item);if(r&&Number.isFinite(r.gold))STATE.gold=r.gold;if(r&&r.inventory){Object.keys(r.inventory).forEach(function(id){const m=material(id);if(m)m.qty=r.inventory[id];});}inventoryOwner.persist();return Object.assign({ok:true,source:'server-authoritative'},r);}catch(e){return {ok:false,error:e.message||'SERVER_ERROR'};}
  }
  return localAttempt(item,type,ml,crystals);
 }
-function combineMaterials(id){ensureInventory();const src=material(id);if(!src||src.level>=4)return {ok:false,error:'MAX_MATERIAL_LEVEL'};if(qty(id)<6)return {ok:false,error:'NEED_SIX'};const dst=material(src.family+'_'+(src.level+1));src.qty-=6;dst.qty+=1;if(typeof saveState==='function')saveState();renderPanel();return {ok:true,from:id,to:dst.id};}
+function combineMaterials(id){ensureInventory();const src=material(id);if(!src||src.level>=4)return {ok:false,error:'MAX_MATERIAL_LEVEL'};if(qty(id)<6)return {ok:false,error:'NEED_SIX'};const dst=material(src.family+'_'+(src.level+1));src.qty-=6;dst.qty+=1;inventoryOwner.persist();renderPanel();return {ok:true,from:id,to:dst.id};}
 function installStyle(){if(document.getElementById('kelo-forge-style'))return;const s=document.createElement('style');s.id='kelo-forge-style';s.textContent=`#kelo-forge-panel{top:max(74px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);width:min(370px,calc(100vw - 20px));max-height:82vh;background:linear-gradient(180deg,rgba(20,25,33,.99),rgba(8,11,16,.99));border:1px solid rgba(231,197,106,.45);border-radius:18px;padding:14px;box-shadow:0 22px 70px rgba(0,0,0,.58)}.kf-head{display:flex;justify-content:space-between;align-items:center;color:#e7c56a;font-weight:900;font-size:15px}.kf-close{border:0;background:none;color:#e7c56a;font-size:24px}.kf-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.kf-card,.kf-box{border:1px solid #313b49;background:rgba(255,255,255,.035);border-radius:12px;padding:10px;color:#e6edf3}.kf-card button,.kf-type button,.kf-controls button,.kf-forge{touch-action:manipulation}.kf-card button{width:100%;margin-top:6px;border:1px solid rgba(231,197,106,.25);background:#171d26;color:#d9c47f;border-radius:8px;padding:7px}.kf-type{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:10px 0}.kf-type button{padding:8px;border-radius:9px;border:1px solid #35404e;background:#121820;color:#aab5c0;font-weight:800}.kf-type button.active{border-color:#d5ad52;color:#f0cf79}.kf-row{display:flex;justify-content:space-between;gap:8px;font-size:11px;margin:7px 0}.kf-chance{text-align:center;margin:12px 0;padding:12px;border-radius:13px;border:1px solid rgba(231,197,106,.34);background:rgba(231,197,106,.07)}.kf-chance strong{display:block;color:#ffe28b;font-size:28px}.kf-controls{display:grid;grid-template-columns:1fr 1fr;gap:8px}.kf-controls button{padding:9px;border-radius:9px;border:1px solid #394555;background:#151c25;color:#d6dee7}.kf-forge{width:100%;min-height:50px;margin-top:10px;border-radius:11px;border:1px solid #c89c43;background:linear-gradient(#6d5426,#35250f);color:#ffe18e;font-weight:900;font-size:15px}.kf-note{font-size:9px;color:#8e9aa7;margin-top:8px;line-height:1.4}`;document.head.appendChild(s);}
 function panel(){let p=document.getElementById('kelo-forge-panel');if(!p){p=document.createElement('div');p.id='kelo-forge-panel';p.className='app-panel';document.body.appendChild(p);}return p;}
 function selected(){const all=window.KeloEquipment?window.KeloEquipment.getEquipment():[];if(!selectedItemId&&all[0])selectedItemId=all[0].id;return all.find(function(x){return x.id===selectedItemId;})||all[0]||null;}
@@ -45,5 +59,5 @@ function renderPanel(){installStyle();const p=panel(),item=selected();if(!item){
 function injectMenu(){const grid=document.querySelector('#menu-sheet .menu-grid');if(!grid||document.getElementById('kelo-forge-menu-btn'))return;const b=document.createElement('button');b.id='kelo-forge-menu-btn';b.className='menu-btn';b.innerHTML='<span class="menu-icon">⚒</span><span>Forja</span>';b.onclick=openPanel;grid.appendChild(b);}
 ensureInventory();injectMenu();
 window.KeloForge=Object.freeze({version:VERSION,calculateChance,attemptForge,combineMaterials,getConfig:function(){return {BASE_CHANCE:{...BASE_CHANCE},MATERIAL_BONUS:{...MATERIAL_BONUS},CRYSTAL_BONUS:{...CRYSTAL_BONUS},GOLD_COST:{...GOLD_COST},maxCrystals:MAX_CRYSTALS};},open:openPanel,close:closePanel,getMaterialQty:qty});
-window.KELO_FORGE_AUDIT={version:VERSION,ready:true,maxQuality:9,maxGrade:9,maxAura:9,crystalLimit:25,serverAuthoritative:true,inventoryIntegrated:true};
+window.KELO_FORGE_AUDIT={version:VERSION,ready:true,maxQuality:9,maxGrade:9,maxAura:9,crystalLimit:25,serverAuthoritative:true,inventoryIntegrated:true,inventoryOwner:'KeloInventory',directInventoryWrites:false};
 })();
