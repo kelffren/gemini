@@ -303,9 +303,8 @@
     get: function (p, face) { return presentationOf(p, face || (p && p._face) || 'down'); }
   });
 
-  const _av = renderAvatar;
-  renderAvatar = function (p, isSelf) {
-    if (!ok || !p || !sheet) return _av(p, isSelf);
+  function renderProductionHero(p, isSelf, next) {
+    if (!ok || !p || !sheet) return next();
     const m = motionOf(p);
     const face = faceOf(p, m);
     const col = stepCol(p, m);
@@ -338,5 +337,8 @@
     ctx.textAlign = 'center';
     ctx.fillText(p.name || 'Kelo', Math.round(layout.nameplateAnchorX), Math.round(layout.nameplateAnchorY));
     ctx.restore();
-  };
+  }
+
+  if(!window.KeloAvatar) throw new Error('KeloAvatar unavailable before engine-ab');
+  window.KeloAvatar.use('engine-ab:production-hero', renderProductionHero, 100);
 })();

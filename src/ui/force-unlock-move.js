@@ -1,21 +1,27 @@
 /* KELO-INDEX
- * area: UI
- * keys: INPUT UNLOCK JOYSTICK MODAL BUILDMODE
- * hace: fuerza el joy encendido y apaga locks que dejan al personaje quieto
+ * area: UI / INPUT COMPAT
+ * owner: NONE — RETIRED HOTFIX, conservado temporalmente para auditoría/cache compatibility
+ * keys: INPUT UNLOCK JOYSTICK MODAL BUILDMODE HOTFIX RETIRED FOUNDATION
+ * purpose: documenta el antiguo watchdog que borraba locks; ya NO muta input, build mode ni processInput
+ * public-api: KELO_FORCE_UNLOCK_AUDIT
+ * consumes: ninguno
+ * state-owned: ninguno
+ * extension-points: ninguno
+ * reuse: NO REUTILIZAR este patrón
+ * legacy: eliminar cuando no queden referencias/cache contracts al nombre del archivo
+ * do-not: NO añadir timers, flags, wrappers ni comportamiento gameplay aquí
  */
-(function(){
+(function(root){
   'use strict';
-  function unlock(){
-    window.KELO_MODAL_INPUT_LOCK=null;
-    try{if(typeof isBuildMode!=='undefined')isBuildMode=false;}catch(e){}
-  }
-  unlock();
-  setInterval(unlock,200);
-  if(typeof processInput==='function'){
-    const prev=processInput;
-    processInput=function(){
-      unlock();
-      return prev.apply(this,arguments);
-    };
-  }
-})();
+  root.KELO_FORCE_UNLOCK_AUDIT=Object.freeze({
+    version:'force-unlock-retired-v2.0.0',
+    active:false,
+    retired:true,
+    timers:0,
+    processInputWrapper:false,
+    clearsModalLocks:false,
+    clearsBuildMode:false,
+    replacementOwner:'KeloInputLocks',
+    replacementGate:'KELO_INPUT_GATE_AUDIT'
+  });
+})(typeof globalThis!=='undefined'?globalThis:window);

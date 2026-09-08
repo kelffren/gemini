@@ -1,8 +1,23 @@
+/* KELO-INDEX
+ * area: UI / PVP SUPPORT
+ * owner: KeloPvPSocialTouchGuard; core extension owners KeloInputLocks + KeloSimulation
+ * keys: PVP SOCIAL TOUCH TRAINING DUMMY INPUT LOCK SIMULATION FOUNDATION
+ * purpose: bloquea UI social durante PvP y estabiliza el dummy maestro sin envolver globals core
+ * public-api: KeloPvPSocialTouchGuard, KeloPvPTrainingDummyGuard
+ * consumes: KeloInputLocks, KeloSimulation, KeloPvPWorld, KeloMasterBots
+ * state-owned: snapshot/anchor local del dummy de entrenamiento y registro del hook tardío
+ * extension-points: KeloSimulation.after; KeloInputLocks.releaseOwner
+ * reuse: soporte transitorio del mundo PvP mientras el training target siga siendo actor legacy
+ * legacy: checkSocialTouch sigue envuelto localmente; NO envolver updateSimulation ni escribir KELO_MODAL_INPUT_LOCK
+ * do-not: no decidir daño, autoridad online ni física general
+ */
 (function(){
 'use strict';
-const VERSION='pvp-social-touch-guard-v1.2.0';
+const VERSION='pvp-social-touch-guard-v1.3.0';
 const TRAINING_ARENA=Object.freeze({x:2660,y:360,w:720,h:720,padding:56,spawnX:3190,spawnY:720});
+const SOCIAL_LOCK_OWNERS=Object.freeze(['self-actions','emotes','profile-transition']);
 const training={anchorX:TRAINING_ARENA.spawnX,anchorY:TRAINING_ARENA.spawnY,lastCombat:false,lastCorrection:0,adoptedCombatMoves:0,snapshot:null,masterApplied:false};
+let trainingSimulationHookId=null;
 
 function combatActive(){
   if(window.KELO_COMBAT_ENABLED===true)return true;
@@ -12,6 +27,11 @@ function combatSimulationActive(){return window.KELO_COMBAT_ENABLED===true;}
 function trainingDummy(){return (typeof simulatedPlayers!=='undefined'&&simulatedPlayers&&simulatedPlayers[0])?simulatedPlayers[0]:null;}
 function pvpMaster(){return window.KeloMasterBots&&window.KeloMasterBots.getPvPMaster?window.KeloMasterBots.getPvPMaster('pvp_master_hook_01'):null;}
 function cloneOwn(o){const out={};if(!o)return out;Object.keys(o).forEach(function(k){const v=o[k];if(typeof v!=='function')out[k]=v;});return out;}
+function releaseSocialInputLocks(){
+  const locks=window.KeloInputLocks;
+  if(!locks||typeof locks.releaseOwner!=='function')return;
+  SOCIAL_LOCK_OWNERS.forEach(function(owner){locks.releaseOwner(owner);});
+}
 
 function closeSocialUi(){
   try{if(typeof window.closeSocialModal==='function')window.closeSocialModal();}catch(e){}
@@ -19,7 +39,7 @@ function closeSocialUi(){
   const selectors=['#social-modal','#inspect-sheet','#kelo-self-actions','#kelo-emotes-panel','.social-modal','.player-inspect','[data-player-inspect]'];
   selectors.forEach(function(sel){document.querySelectorAll(sel).forEach(function(el){el.style.display='none';el.classList.remove('open');});});
   if(combatActive())document.querySelectorAll('.app-panel').forEach(function(el){el.style.display='none';el.classList.remove('open');});
-  if(window.KELO_MODAL_INPUT_LOCK==='self-actions'||window.KELO_MODAL_INPUT_LOCK==='emotes'||window.KELO_MODAL_INPUT_LOCK==='profile-transition')window.KELO_MODAL_INPUT_LOCK=null;
+  releaseSocialInputLocks();
 }
 function install(){
   const original=window.checkSocialTouch;
@@ -62,10 +82,17 @@ function constrainTrainingDummy(){
   d.x=training.anchorX;d.y=training.anchorY;d.targetX=training.anchorX;d.targetY=training.anchorY;d.vx=0;d.vy=0;if('_dash' in d)d._dash=null;
   publishTraining(drift>.01?'legacy-wander-blocked':'stable');
 }
+function trainingSimulationTick(){
+  syncMasterRole();
+  if(combatActive())closeSocialUi();
+  constrainTrainingDummy();
+}
 function installTrainingGuard(){
-  const original=window.updateSimulation;if(typeof original!=='function'||original.__keloTrainingDummyGuard)return false;
-  function guardedUpdate(dt){original(dt);syncMasterRole();if(combatActive())closeSocialUi();constrainTrainingDummy();}
-  guardedUpdate.__keloTrainingDummyGuard=true;guardedUpdate.__keloOriginal=original;window.updateSimulation=guardedUpdate;return true;
+  if(trainingSimulationHookId)return true;
+  const sim=window.KeloSimulation;
+  if(!sim||typeof sim.after!=='function')return false;
+  trainingSimulationHookId=sim.after('pvp-social-touch-guard:training-dummy',trainingSimulationTick,1000);
+  return !!trainingSimulationHookId;
 }
 function boot(){
   install();installTrainingGuard();setTimeout(install,0);setTimeout(install,250);setTimeout(installTrainingGuard,0);setTimeout(installTrainingGuard,250);syncMasterRole();publishTraining('boot');
@@ -74,6 +101,6 @@ window.addEventListener('kelo:pvp-enter',function(){closeSocialUi();setTimeout(f
 window.addEventListener('kelo:pvp-leave',function(){setTimeout(function(){syncMasterRole();},0);});
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 window.KeloPvPSocialTouchGuard=Object.freeze({version:VERSION,install,closeSocialUi,combatActive});
-window.KeloPvPTrainingDummyGuard=Object.freeze({version:VERSION,install:installTrainingGuard,getState:function(){return Object.freeze({anchorX:training.anchorX,anchorY:training.anchorY,combatEnabled:combatSimulationActive(),adoptedCombatMoves:training.adoptedCombatMoves,masterApplied:training.masterApplied});}});
-window.KELO_PVP_SOCIAL_TOUCH_AUDIT=Object.freeze({version:VERSION,blocksSocialProfilesInCombat:true,closesLegacyInspect:true,closesAllAppPanelsInCombat:true,trainingDummyGuard:true,dedicatedPvPMaster:true,separateMasterPipelines:true});
+window.KeloPvPTrainingDummyGuard=Object.freeze({version:VERSION,install:installTrainingGuard,getState:function(){return Object.freeze({anchorX:training.anchorX,anchorY:training.anchorY,combatEnabled:combatSimulationActive(),adoptedCombatMoves:training.adoptedCombatMoves,masterApplied:training.masterApplied,simulationHookId:trainingSimulationHookId});}});
+window.KELO_PVP_SOCIAL_TOUCH_AUDIT=Object.freeze({version:VERSION,blocksSocialProfilesInCombat:true,closesLegacyInspect:true,closesAllAppPanelsInCombat:true,trainingDummyGuard:true,dedicatedPvPMaster:true,separateMasterPipelines:true,simulationOwner:'KeloSimulation',directSimulationWrapper:false,inputLockOwner:'KeloInputLocks',directLegacyModalWrite:false});
 })();

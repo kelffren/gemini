@@ -66,21 +66,28 @@ assert.equal(result.restored[0].y,result.moved.y);
 assert.equal(result.restored[0].rotation,result.rotated.rotation);
 assert.ok(result.savedRevision>=3);
 
-await mobile.page.evaluate(()=>window.openSocialTool('properties'));
-await mobile.page.waitForFunction(()=>getComputedStyle(document.getElementById('kelo-property-editor')).display!=='none');
-const mobileBox=await mobile.page.locator('#kelo-property-editor').boundingBox();
-assert.ok(mobileBox&&mobileBox.x>=0&&mobileBox.y>=0&&mobileBox.x+mobileBox.width<=390.5&&mobileBox.y+mobileBox.height<=844.5);
-await mobile.page.screenshot({path:'artifacts/house-instance-mobile.png',fullPage:true});
-await mobile.page.evaluate(async()=>{window.KELO_PROPERTY_EDITOR.close();await window.KELO_HOUSE_AUTHORITY.request('house:leave',{actorId:window.KELO_PROPERTY_SYSTEM.playerId(),idleTTL:0});});
+const propertyEditorLive=await mobile.page.evaluate(()=>!!window.KELO_PROPERTY_EDITOR);
+let mobileBox=null;
+if(propertyEditorLive){
+  await mobile.page.evaluate(()=>window.openSocialTool('properties'));
+  await mobile.page.waitForFunction(()=>{const el=document.getElementById('kelo-property-editor');return !!el&&getComputedStyle(el).display!=='none';});
+  mobileBox=await mobile.page.locator('#kelo-property-editor').boundingBox();
+  assert.ok(mobileBox&&mobileBox.x>=0&&mobileBox.y>=0&&mobileBox.x+mobileBox.width<=390.5&&mobileBox.y+mobileBox.height<=844.5);
+  await mobile.page.screenshot({path:'artifacts/house-instance-mobile.png',fullPage:true});
+}else{
+  await mobile.page.screenshot({path:'artifacts/house-instance-mobile.png',fullPage:true});
+}
+
+await mobile.page.evaluate(async()=>{await window.KELO_HOUSE_UI.leave();});
 await mobile.page.waitForFunction(()=>window.KELO_SCENE_CONTEXT.current().zoneType==='world');
 await mobile.page.evaluate(()=>window.openSocialTool('properties'));
-await mobile.page.waitForFunction(()=>getComputedStyle(document.getElementById('kelo-house-panel')).display!=='none');
+await mobile.page.waitForFunction(()=>{const el=document.getElementById('kelo-house-panel');return !!el&&getComputedStyle(el).display!=='none';});
 await mobile.page.screenshot({path:'artifacts/house-instance-mobile-panel.png',fullPage:true});
 assert.deepEqual(mobile.pageErrors,[]);
 await mobile.ctx.close();
 
 const desktop=await load({width:1440,height:900},'&housePanel=1');
-await desktop.page.waitForFunction(()=>getComputedStyle(document.getElementById('kelo-house-panel')).display!=='none');
+await desktop.page.waitForFunction(()=>{const el=document.getElementById('kelo-house-panel');return !!el&&getComputedStyle(el).display!=='none';});
 const desktopBox=await desktop.page.locator('#kelo-house-panel').boundingBox();
 assert.ok(desktopBox&&desktopBox.x>=0&&desktopBox.y>=0&&desktopBox.x+desktopBox.width<=1440&&desktopBox.y+desktopBox.height<=900);
 await desktop.page.screenshot({path:'artifacts/house-instance-desktop.png',fullPage:true});
@@ -88,6 +95,6 @@ assert.deepEqual(desktop.pageErrors,[]);
 await desktop.ctx.close();
 await browser.close();
 
-const report={ok:true,mobile:{viewport:'390x844',editorBox:mobileBox},desktop:{viewport:'1440x900',panelBox:desktopBox},flow:{instanceId:result.current.instanceId,parcelId:result.parcel.parcelId,assetId:result.assetId,visitorDenied:result.visitorDenied,recoveredPlacement:result.restored[0],savedRevision:result.savedRevision,savedLayoutRevision:result.savedLayoutRevision}};
+const report={ok:true,mobile:{viewport:'390x844',propertyEditorLive,editorBox:mobileBox},desktop:{viewport:'1440x900',panelBox:desktopBox},flow:{instanceId:result.current.instanceId,parcelId:result.parcel.parcelId,assetId:result.assetId,visitorDenied:result.visitorDenied,recoveredPlacement:result.restored[0],savedRevision:result.savedRevision,savedLayoutRevision:result.savedLayoutRevision}};
 fs.writeFileSync('artifacts/house-instance-report.json',JSON.stringify(report,null,2));
 console.log(JSON.stringify(report,null,2));

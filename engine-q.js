@@ -1,3 +1,16 @@
+/* KELO-INDEX
+ * area: LEGACY NPC TRIAL
+ * owner: maestro trial legacy; simulation extension owned by KeloSimulation
+ * keys: NPC TRIAL SIMULATION TIMER FOUNDATION
+ * purpose: conserva prueba del Maestro sin envolver updateSimulation
+ * public-api: none
+ * consumes: KeloSimulation, trainingDummy, STATE
+ * state-owned: trial legacy
+ * extension-points: KeloSimulation.after
+ * reuse: no usar como patrón de misiones nuevas
+ * legacy: mission prototype
+ * do-not: NO envolver updateSimulation
+ */
 (function () {
   if (window.keloNpcs) {
     window.keloNpcs.push({
@@ -40,9 +53,8 @@
   }
   setTimeout(hookUi, 80);
 
-  const _upd = updateSimulation;
-  updateSimulation = function (dt) {
-    _upd(dt);
+  function updateTrial(context) {
+    const dt=context.dt;
     if (!trial.on) return;
     trial.t -= dt;
     if (window.trainingDummy && trainingDummy.dead) {
@@ -55,5 +67,7 @@
       trial.on = false;
       if (typeof showToast === 'function') showToast('Se acabó el tiempo');
     }
-  };
+  }
+  if(!window.KeloSimulation) throw new Error('KeloSimulation unavailable before engine-q');
+  window.KeloSimulation.after('engine-q:maestro-trial', updateTrial, 40);
 })();

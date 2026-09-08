@@ -1,0 +1,64 @@
+{
+  "schema": 1,
+  "systems": [
+    {
+      "id": "input-locks",
+      "owner": "KeloInputLocks",
+      "source": "src/core/input-lock-system.js",
+      "technicalDoc": "docs/systems/INPUT_LOCK_SYSTEM.md",
+      "playerVisible": true,
+      "playerGuideAnchor": "controles-y-bloqueos-de-interfaz",
+      "status": "foundation-active"
+    },
+    {
+      "id": "input",
+      "owner": "KeloInput",
+      "source": "src/core/input-system.js",
+      "technicalDoc": "docs/systems/INPUT_SYSTEM.md",
+      "playerVisible": true,
+      "playerGuideAnchor": "controles-y-bloqueos-de-interfaz",
+      "status": "foundation-transitional"
+    },
+    {
+      "id": "input-gate-retired",
+      "owner": "none",
+      "source": "src/core/input-gate.js",
+      "technicalDoc": "docs/systems/INPUT_GATE.md",
+      "playerVisible": false,
+      "status": "retired-compat"
+    },
+    {
+      "id": "movement",
+      "owner": "KeloMovement",
+      "source": "src/core/movement-system.js",
+      "technicalDoc": "docs/systems/MOVEMENT_SYSTEM.md",
+      "playerVisible": true,
+      "playerGuideAnchor": "movimiento",
+      "status": "foundation-transitional"
+    },
+    {
+      "id": "render-extensions",
+      "owner": "KeloRender",
+      "source": "src/core/render-extension-system.js",
+      "technicalDoc": "docs/systems/RENDER_EXTENSION_SYSTEM.md",
+      "playerVisible": false,
+      "status": "foundation-transitional"
+    },
+    {
+      "id": "simulation-extensions",
+      "owner": "KeloSimulation",
+      "source": "src/core/simulation-extension-system.js",
+      "technicalDoc": "docs/systems/SIMULATION_EXTENSION_SYSTEM.md",
+      "playerVisible": false,
+      "status": "foundation-transitional"
+    },
+    {
+      "id": "avatar-render",
+      "owner": "KeloAvatar",
+      "source": "src/core/avatar-render-system.js",
+      "technicalDoc": "docs/systems/AVATAR_RENDER_SYSTEM.md",
+      "playerVisible": false,
+      "status": "foundation-transitional"
+    }
+  ]
+}

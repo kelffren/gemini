@@ -1,3 +1,16 @@
+/* KELO-INDEX
+ * area: LEGACY PLAZA HOUSES
+ * owner: legacy house presentation; render extension owned by KeloRender
+ * keys: HOUSES FACADE RENDER FOUNDATION
+ * purpose: conserva fachadas legacy no sustituidas por assets authored sin envolver render
+ * public-api: keloHouses, KELO_LEGACY_HOUSE_RENDERER
+ * consumes: KeloRender, tile registry, camera
+ * state-owned: HOUSES legacy
+ * extension-points: KeloRender.afterFrame
+ * reuse: no añadir arquitectura nueva aquí
+ * legacy: visual fallback
+ * do-not: NO envolver render
+ */
 (function () {
   const T = 32, OX = 1024, OY = 1216;
   const HOUSES = [
@@ -53,9 +66,7 @@
     ctx.fillText(b.title, x + w / 2, y - 26);
   }
 
-  const _r = render;
-  render = function () {
-    _r();
+  function drawLegacyHouses() {
     if (resetActive()) return;
     if (window._keloHouseFrame === window._keloFrame) return;
     window._keloHouseFrame = window._keloFrame || 0;
@@ -66,6 +77,8 @@
     ctx.translate(-camera.x, -camera.y);
     visibleHouses().forEach(function (b) { facade(ctx, b); });
     ctx.restore();
-  };
-  window.KELO_LEGACY_HOUSE_RENDERER=Object.freeze({version:'legacy-house-authored-overlap-v2',suppressionMode:'decoration-reset-or-luxe-overlap-v1',coverageSource:'registry-prefabs-v1',threshold:0.35,get decorationReset(){return resetActive();},get visibleTitles(){return visibleHouses().map(b=>b.title);},get suppressedTitles(){return suppressedHouses();}});
+  }
+  if(!window.KeloRender) throw new Error('KeloRender unavailable before engine-y');
+  window.KeloRender.afterFrame('engine-y:legacy-houses', drawLegacyHouses, 90);
+  window.KELO_LEGACY_HOUSE_RENDERER=Object.freeze({version:'legacy-house-authored-overlap-v3-foundation',suppressionMode:'decoration-reset-or-luxe-overlap-v1',coverageSource:'registry-prefabs-v1',threshold:0.35,renderOwner:'KeloRender',get decorationReset(){return resetActive();},get visibleTitles(){return visibleHouses().map(b=>b.title);},get suppressedTitles(){return suppressedHouses();}});
 })();

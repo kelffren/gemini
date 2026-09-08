@@ -1,3 +1,16 @@
+/* KELO-INDEX
+ * area: LEGACY PLAZA NPCS
+ * owner: plaza NPC/minigame legacy; extension owners KeloSimulation + KeloRender
+ * keys: NPC JOYERO MINIGAME SIMULATION RENDER FOUNDATION
+ * purpose: conserva NPCs y minijuego sin wrappers core
+ * public-api: window.keloNpcs
+ * consumes: KeloSimulation, KeloRender, tile registry, localPlayer, STATE
+ * state-owned: near/talkOpen/game + authored NPC runtime
+ * extension-points: KeloSimulation.after + KeloRender.afterFrame
+ * reuse: no añadir NPC systems nuevos aquí
+ * legacy: plaza NPC prototype
+ * do-not: NO envolver updateSimulation ni render
+ */
 (function () {
   const npcs = [
     { id: 'portero', name: 'Portero', x: 1320, y: 1580, color: '#8ab4ff', line: 'Bienvenido a la Plaza Kelo. El Joyero espera a tu derecha.' },
@@ -15,7 +28,7 @@
   let authoredReady = false;
   let drawCount = 0;
   window.KELO_PLAZA_NPC_AUDIT = {
-    version:'plaza-npcs-v1.1',
+    version:'plaza-npcs-v1.2-foundation',
     ready:false,
     assetLoaded:false,
     failed:false,
@@ -26,7 +39,9 @@
     drawCount:0,
     gameplayAnchorsPreserved:true,
     decorationReset:true,
-    decorationResetSuppressed:true
+    decorationResetSuppressed:true,
+    renderOwner:'KeloRender',
+    simulationOwner:'KeloSimulation'
   };
   if (resetActive()) {
     window.KELO_PLAZA_NPC_AUDIT.ready = true;
@@ -58,10 +73,7 @@
   let talkOpen = false;
   let game = { on: false, t: 0, hit: 0.62, hold: false };
 
-  function dist(a, b) {
-    return Math.hypot(a.x - b.x, a.y - b.y);
-  }
-
+  function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
   function closest() {
     if (resetActive()) return null;
     let best = null, bestD = 64;
@@ -140,9 +152,8 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ensureUi);
   else ensureUi();
 
-  const _upd = updateSimulation;
-  updateSimulation = function (dt) {
-    _upd(dt);
+  function updateNpcState(context) {
+    const dt=context.dt;
     if (resetActive()) {
       near=null;talkOpen=false;game.on=false;
       const hint=document.getElementById('npc-hint');
@@ -164,7 +175,7 @@
         document.getElementById('npc-talk-go').textContent = near.id === 'joyero' ? 'Cortar' : 'Cerrar';
       }
     }
-  };
+  }
 
   function drawFallbackNpc(n) {
     ctx.fillStyle = 'rgba(0,0,0,0.35)';
@@ -190,9 +201,7 @@
     window.KELO_PLAZA_NPC_AUDIT.drawCount = drawCount;
   }
 
-  const _r = render;
-  render = function () {
-    _r();
+  function drawNpcLayer() {
     if (resetActive()) {
       window.KELO_PLAZA_NPC_AUDIT.decorationReset=true;
       window.KELO_PLAZA_NPC_AUDIT.decorationResetSuppressed=true;
@@ -233,5 +242,10 @@
       ctx.fillStyle = '#fff';
       ctx.fillRect(x + w * pos - 3, y - 4, 6, h + 8);
     }
-  };
+  }
+
+  if(!window.KeloSimulation) throw new Error('KeloSimulation unavailable before engine-p');
+  if(!window.KeloRender) throw new Error('KeloRender unavailable before engine-p');
+  window.KeloSimulation.after('engine-p:plaza-npcs', updateNpcState, 30);
+  window.KeloRender.afterFrame('engine-p:plaza-npcs', drawNpcLayer, 70);
 })();

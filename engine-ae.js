@@ -29,9 +29,8 @@
   }
   buildings.forEach(function (b) { obstacles.push(b); });
 
-  const _r = render;
-  render = function () {
+  if(!window.KeloRender) throw new Error('KeloRender unavailable before engine-ae');
+  window.KeloRender.beforeFrame('engine-ae:frame-counter', function () {
     window._keloFrame = (window._keloFrame || 0) + 1;
-    _r();
-  };
+  }, 5);
 })();

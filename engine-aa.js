@@ -1,3 +1,16 @@
+/* KELO-INDEX
+ * area: LEGACY PLAZA OVERLAY
+ * owner: legacy plaza presentation; render extension owned by KeloRender
+ * keys: PLAZA LAMPS FOUNTAIN ACTOR REDRAW RENDER FOUNDATION
+ * purpose: conserva overlay legacy de plaza sin envolver render
+ * public-api: KELO_LEGACY_PLAZA_AUDIT
+ * consumes: KeloRender, renderAvatar, simulatedPlayers, localPlayer
+ * state-owned: lamps legacy + draw audit
+ * extension-points: KeloRender.afterFrame
+ * reuse: no añadir visuales nuevos aquí
+ * legacy: actor redraw/fountain fallback pendiente de retirada
+ * do-not: NO envolver render
+ */
 (function () {
   const T = window.KELO_TILE || 32;
   const OX = 1024, OY = 1216;
@@ -10,13 +23,14 @@
   function resetActive(){return window.KELO_WORLD_DECORATION_RESET===true||window.KELO_WORLD_RENDERER?.decorationReset===true;}
 
   window.KELO_LEGACY_PLAZA_AUDIT = {
-    version: 'legacy-plaza-v1.2',
+    version: 'legacy-plaza-v1.3-foundation',
     proceduralTreeMode: 'disabled-authored-nature-owned-v1',
     proceduralTreeCount: 0,
     lampsPreserved: false,
     fountainGlowPreserved: false,
     decorationReset: true,
-    drawCount: 0
+    drawCount: 0,
+    renderOwner:'KeloRender'
   };
 
   function lamp(ctx, x, y, t) {
@@ -31,9 +45,7 @@
     ctx.fill();
   }
 
-  const _r = render;
-  render = function () {
-    _r();
+  function drawLegacyPlazaOverlay() {
     if (resetActive()) {
       window.KELO_LEGACY_PLAZA_AUDIT.decorationReset = true;
       return;
@@ -54,5 +66,7 @@
     renderAvatar(localPlayer, true);
     ctx.restore();
     window.KELO_LEGACY_PLAZA_AUDIT.drawCount++;
-  };
+  }
+  if(!window.KeloRender) throw new Error('KeloRender unavailable before engine-aa');
+  window.KeloRender.afterFrame('engine-aa:legacy-plaza-overlay', drawLegacyPlazaOverlay, 100);
 })();
