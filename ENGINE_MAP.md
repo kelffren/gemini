@@ -4,7 +4,7 @@
 
 **Estado:** índice maestro operativo del runtime Foundation actual.  
 **Runtime declarado en `index.html`:** Kelo World V6.53.  
-**Última verificación pre-merge:** 2026-09-08 · rama `foundation/kelo-foundation-v1-2` · Foundation CI #137 verde sobre `8019a299ef0ed995641fa29979efb628ac60ac38`.  
+**Candidato Foundation V1:** 2026-09-08 · rama `foundation/kelo-foundation-v1-2` · último paquete conductual verificado en `8019a299ef0ed995641fa29979efb628ac60ac38`; los commits posteriores a ese SHA son documentación/estado de merge.  
 **Regla de autoridad documental:** si este mapa contradice `index.html`, los contratos Foundation o comportamiento LIVE verificado, gana el runtime y este archivo debe corregirse en el mismo pass.  
 **Mapa histórico V6.16 preservado:** `docs/archive/ENGINE_MAP_V6.16.md`.
 
@@ -262,7 +262,7 @@ Regla: UI/cliente solicita operaciones; autoridad crítica puede migrar al serve
 | Prefab contract | ✅ LIVE; renderer genérico dormant probado como unidad |
 | Property Editor | ✅ correctamente clasificado DORMANT; unit audit verde |
 | House lifecycle/recovery | ✅ browser audit móvil/desktop verde sin dependencia falsa del editor dormant |
-| CI arquitectónico/documental | ✅ Foundation #137 verde pre-merge |
+| CI arquitectónico/documental | ✅ Foundation verde en el último paquete conductual pre-merge |
 | CI funcional relacionado | ✅ Backpack, Prefab, Property Editor, House, Ability Collision, Combat, Character, Terrain y Mobile Performance verdes pre-merge |
 | CI de assets global | ⚠️ Kelo CI / Visual System CI mantienen deuda de assets/manifest independiente |
 | `main` protegido | ❌ no está protegido en la última lectura disponible |
