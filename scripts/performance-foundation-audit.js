@@ -2,7 +2,7 @@
 /* KELO-INDEX
  * area: PERFORMANCE / CI
  * owner: Performance Foundation audit
- * keys: PERFORMANCE LIFECYCLE SLEEP WAKE LAZY AOI CULL ATLAS VISIBILITY CI
+ * keys: PERFORMANCE LIFECYCLE SLEEP WAKE LAZY AOI CULL ATLAS WORLD LRU VISIBILITY CI
  * purpose: protege contratos estructurales de rendimiento sin depender de timings inestables
  * online: valida fronteras de transporte/AOI; no sustituye tests de autoridad server
  */
@@ -14,16 +14,9 @@ const vm = require('vm');
 const assert = require('assert');
 const ROOT = path.resolve(__dirname, '..');
 
-function read(file) {
-  return fs.readFileSync(path.join(ROOT, file), 'utf8');
-}
-function ok(condition, message) {
-  assert.ok(condition, message);
-  console.log('PASS', message);
-}
-function count(text, pattern) {
-  return (text.match(pattern) || []).length;
-}
+function read(file) { return fs.readFileSync(path.join(ROOT, file), 'utf8'); }
+function ok(condition, message) { assert.ok(condition, message); console.log('PASS', message); }
+function count(text, pattern) { return (text.match(pattern) || []).length; }
 
 function auditSimulationLifecycle() {
   const source = read('src/core/simulation-extension-system.js');
@@ -92,6 +85,7 @@ function auditStaticContracts() {
   const server = read('server/index.js');
   const perf = read('src/systems/performance-governor.js');
   const atlas = read('src/environment/atlas-contract.js');
+  const world = read('src/environment/world-map.js');
   const index = read('index.html');
 
   ok(count(sim, /updateSimulation\s*=\s*function/g) === 1, 'KeloSimulation keeps one authorized legacy bridge');
@@ -124,6 +118,12 @@ function auditStaticContracts() {
   ok(atlas.includes("district:'warm-then-evict'"), 'District atlases use warm-then-evict policy');
   ok(atlas.includes("entry?.role==='core'"), 'Core atlases are protected from eviction');
   ok(atlas.includes('runtimeSnapshot'), 'Atlas owner exposes resident/refcount lifecycle telemetry');
+
+  ok(world.includes("A.acquire('gardensBase')") && world.includes('function requestGardens()'), 'Gardens atlases have an explicit lazy acquisition path');
+  ok(!world.includes("gardenImg=await A.acquire('gardensBase')"), 'World boot no longer eagerly acquires Gardens atlas');
+  ok(world.includes('chunkCacheMode:\'lru-v1\''), 'World chunk cache is LRU bounded by mobile contract');
+  ok(world.includes("A.release('gardensBase')") && world.includes('releaseGardens'), 'World releases district atlas references after leaving relevance');
+  ok(world.includes('syncDistrictAssets(b)'), 'District residency is driven by current view bounds');
 }
 
 function reportBootGraph() {
@@ -132,7 +132,7 @@ function reportBootGraph() {
   const customizer = directScripts.filter(src => /character-customizer|character-customization|character-content-packs|character-slot-schema/.test(src));
   console.log('INFO direct-script-count', directScripts.length);
   console.log('INFO direct-character-customizer-count', customizer.length);
-  console.log('INFO performance-foundation-audit', 'v1.0.0');
+  console.log('INFO performance-foundation-audit', 'v1.1.0');
 }
 
 try {
