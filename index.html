@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <link rel="preload" as="image" href="assets/hero.PNG" fetchpriority="high">
   <link rel="stylesheet" href="src/ui/backpack-fantasy-v1.css?v=1">
-  <title>Kelo World — V6.48</title>
+  <title>Kelo World — V6.49</title>
   <style>
     *{box-sizing:border-box;margin:0;padding:0;user-select:none;-webkit-user-select:none}
     html,body{width:100%;height:100%;overflow:hidden;background:#05070a;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
@@ -14,7 +14,7 @@
     #ui-layer{position:absolute;inset:0;pointer-events:none;z-index:10}
     .hud-badge{position:absolute;top:max(8px,env(safe-area-inset-top));left:max(8px,env(safe-area-inset-left));font:11px ui-monospace,monospace;color:#e7c56a;background:rgba(10,13,18,.88);padding:7px 12px;border-radius:999px;border:1px solid rgba(231,197,106,.26)}
     body.social-mode #action-bar-container{display:none!important}
-    #menu-sheet{position:absolute;top:max(132px,calc(env(safe-area-inset-top)+120px));right:max(12px,env(safe-area-inset-right));width:min(356px,calc(100vw - 24px));display:none;z-index:110;pointer-events:auto;background:#111;color:#ddd;padding:14px;border-radius:16px;border:1px solid rgba(231,197,106,.4)}
+    #menu-sheet{position:absolute;display:none}
     #toast-container{position:absolute;top:70px;left:50%;transform:translateX(-50%);z-index:200;pointer-events:none}
     .toast{padding:8px 12px;border-radius:10px;border:1px solid rgba(231,197,106,.45);background:#0a0d12;color:#f3d48b;font-size:12px;font-weight:700}
     #kelo-online,.lx-mark,#kelo-minimap,#minimap{display:none!important}
@@ -59,6 +59,7 @@
 <script src="src/ui/builder-ux-v2.js?v=4"></script>
 <script src="src/ui/builder-input.js?v=3"></script>
 <script src="src/ui/builder-move-hotfix.js?v=1"></script>
+<script src="src/ui/builder-closed-default.js?v=1"></script>
 <script src="src/ui/builder-collision-bind.js?v=1"></script>
 <script src="src/ui/builder-rules.js?v=1"></script>
 <script src="src/ui/builder-parcel-meta.js?v=1"></script>
