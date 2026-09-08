@@ -122,8 +122,8 @@ function drawMinimap() {
   simulatedPlayers.forEach(function(p){ ctx.fillStyle = '#fff'; ctx.fillRect(sx(p.x) - 1, sy(p.y) - 1, 2, 2); });
   ctx.fillStyle = '#e7c56a'; ctx.beginPath(); ctx.arc(sx(localPlayer.x), sy(localPlayer.y), 2.4, 0, Math.PI * 2); ctx.fill(); ctx.restore();
 }
-var _render3 = render;
-render = function() { _render3(); drawMinimap(); };
+if(!window.KeloRender) throw new Error('KeloRender unavailable before engine-d');
+window.KeloRender.afterFrame('engine-d:minimap', drawMinimap, 10);
 checkSocialTouch = function(sx, sy) {
   if (window.KELO_WORLD_DECORATION_RESET === true || window.KELO_WORLD_RENDERER?.decorationReset === true) { closeSocialModal(); return; }
   var w = screenToWorld(sx, sy);
