@@ -36,14 +36,17 @@ function directRuntimeFiles(){
   }
   return set;
 }
+// Wrapper rules intentionally count both bare globals and explicit window/globalThis/root assignments.
+// This prevents `window.updateSimulation = namedFn` from hiding behind a narrower `= function` regex.
+const coreAssignment=function(name){return new RegExp('(?:\\b(?:window|globalThis|root)\\.)?\\b'+name+'\\s*=','g');};
 const rules=[
   ['modalLock',/KELO_MODAL_INPUT_LOCK/g],
   ['buildMode',/\bisBuildMode\b/g],
-  ['processInputWrapper',/\bprocessInput\s*=\s*function\b/g],
-  ['movementWrapper',/\bupdateMovement\s*=\s*function\b/g],
-  ['renderWrapper',/\brender\s*=\s*function\b/g],
-  ['avatarWrapper',/\brenderAvatar\s*=\s*function\b/g],
-  ['simulationWrapper',/\bupdateSimulation\s*=\s*function\b/g],
+  ['processInputWrapper',coreAssignment('processInput')],
+  ['movementWrapper',coreAssignment('updateMovement')],
+  ['renderWrapper',coreAssignment('render')],
+  ['avatarWrapper',coreAssignment('renderAvatar')],
+  ['simulationWrapper',coreAssignment('updateSimulation')],
   ['socialToolWrite',/\bopenSocialTool\s*=\s*function\b/g],
   ['obstaclesPush',/\bobstacles\.push\s*\(/g],
   ['setInterval',/\bsetInterval\s*\(/g],
