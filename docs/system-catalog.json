@@ -11,12 +11,21 @@
       "status": "foundation-active"
     },
     {
-      "id": "input-gate",
-      "owner": "KeloInputLocks (support bridge)",
+      "id": "input",
+      "owner": "KeloInput",
+      "source": "src/core/input-system.js",
+      "technicalDoc": "docs/systems/INPUT_SYSTEM.md",
+      "playerVisible": true,
+      "playerGuideAnchor": "controles-y-bloqueos-de-interfaz",
+      "status": "foundation-transitional"
+    },
+    {
+      "id": "input-gate-retired",
+      "owner": "none",
       "source": "src/core/input-gate.js",
       "technicalDoc": "docs/systems/INPUT_GATE.md",
       "playerVisible": false,
-      "status": "foundation-transitional"
+      "status": "retired-compat"
     },
     {
       "id": "movement",
