@@ -1,10 +1,10 @@
 /* KELO-INDEX
  * area: QA / INVENTORY UI
  * owner: Backpack CI
- * keys: BACKPACK INVENTORY INPUT LOCK GATE FOUNDATION
- * purpose: valida el contrato visual de mochila y su integración con el owner central de input
+ * keys: BACKPACK INVENTORY INPUT LOCK OWNER FOUNDATION
+ * purpose: valida el contrato visual de mochila y su integración con los owners centrales de input
  * public-api: CLI
- * consumes: backpack UI/CSS, KeloInputLocks, input-gate, index.html
+ * consumes: backpack UI/CSS, KeloInputLocks, KeloInput, index.html
  * state-owned: ninguno
  * extension-points: invariantes de UI/ownership, no implementación gameplay
  * reuse: Backpack CI
@@ -16,7 +16,8 @@ const fs=require('fs');
 const js=fs.readFileSync('src/ui/backpack-ui.js','utf8');
 const css=fs.readFileSync('src/ui/backpack-fantasy-v1.css','utf8');
 const locks=fs.readFileSync('src/core/input-lock-system.js','utf8');
-const gate=fs.readFileSync('src/core/input-gate.js','utf8');
+const inputSystem=fs.readFileSync('src/core/input-system.js','utf8');
+const retiredGate=fs.readFileSync('src/core/input-gate.js','utf8');
 const compat=fs.readFileSync('src/ui/modal-input-lock.js','utf8');
 const html=fs.readFileSync('index.html','utf8');
 function ok(cond,msg){if(!cond)throw new Error(msg);}
@@ -40,12 +41,14 @@ ok(css.includes('@media(max-width:760px)')&&css.includes('@media(max-width:379px
 ok(css.includes('grid-template-columns:repeat(5,minmax(48px,1fr))'),'MOBILE_5_COLUMNS');
 ok(css.includes('grid-template-columns:repeat(4,minmax(50px,1fr))'),'NARROW_4_COLUMNS');
 ok(css.includes('min-height:48px'),'TOUCH_TARGET');
-ok(locks.includes('root.KeloInputLocks=Object.freeze')&&locks.includes("Object.defineProperty(root,'KELO_MODAL_INPUT_LOCK'"),'INPUT_OWNER');
-ok(gate.includes("owner:'KeloInputLocks'")&&gate.includes('previousProcessInput.apply'),'MOVEMENT_GATE');
-ok(compat.includes('processInputWrapper:false')&&compat.includes("replacementOwner:'KeloInputLocks'"),'LEGACY_GATE_RETIRED');
+ok(locks.includes('root.KeloInputLocks=Object.freeze')&&locks.includes("Object.defineProperty(root,'KELO_MODAL_INPUT_LOCK'"),'INPUT_LOCK_OWNER');
+ok(inputSystem.includes('root.KeloInput=Object.freeze')&&inputSystem.includes("owner: KeloInput"),'INPUT_PIPELINE_OWNER');
+ok(retiredGate.includes('RETIRED into KeloInput')&&!/\bprocessInput\s*=\s*function\b/.test(retiredGate),'OLD_GATE_RETIRED');
+ok(compat.includes('processInputWrapper:false')&&compat.includes("replacementOwner:'KeloInputLocks'"),'LEGACY_MODAL_GATE_RETIRED');
 ok(html.includes('src/ui/backpack-fantasy-v1.css?v=1'),'CSS_LOADED');
-ok(html.includes('src/core/input-lock-system.js?v=1'),'INPUT_OWNER_LOADED');
-ok(html.includes('src/core/input-gate.js?v=1'),'INPUT_GATE_LOADED');
+ok(html.includes('src/core/input-lock-system.js?v=1'),'INPUT_LOCK_OWNER_LOADED');
+ok(html.includes('src/core/input-system.js?v=1'),'INPUT_PIPELINE_LOADED');
+ok(!html.includes('src/core/input-gate.js'),'OLD_GATE_NOT_LOADED');
 ok(html.includes('src/ui/backpack-ui.js?v=4'),'UI_CACHE_BUST');
 ok(!js.includes('action-bar-container')&&!css.includes('action-bar-container'),'NO_SKILL_BAR_UI');
-console.log(JSON.stringify({ok:true,version:'backpack-ui-v2.0.0',equipmentSlots:8,filters:5,mobileColumns:[4,5],movementLockOwner:'KeloInputLocks',movementGate:'input-gate',marketCompatible:true,noSkillBar:true}));
+console.log(JSON.stringify({ok:true,version:'backpack-ui-v2.0.0',equipmentSlots:8,filters:5,mobileColumns:[4,5],movementLockOwner:'KeloInputLocks',inputOwner:'KeloInput',marketCompatible:true,noSkillBar:true}));
