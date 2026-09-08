@@ -1,7 +1,7 @@
-name: Orientation Equivalent Zoom V1
+name: Orientation Balanced Zoom V2
 on:
   push:
-    branches: [ feature/orientation-equivalent-zoom-v1 ]
+    branches: [ feature/orientation-balanced-zoom-v2 ]
     paths:
       - 'src/ui/mobile-orientation.js'
       - 'scripts/orientation-equivalent-zoom-audit.mjs'
@@ -29,14 +29,15 @@ jobs:
           for i in {1..20}; do curl -fsS http://127.0.0.1:8000/index.html >/dev/null && exit 0; sleep 1; done
           cat /tmp/orientation-zoom-http.log
           exit 1
-      - name: Certify equivalent portrait framing
+      - name: Certify balanced mobile framing
         env:
           AUDIT_URL: http://127.0.0.1:8000/
+          CHROME_BIN: /usr/bin/google-chrome
         run: node scripts/orientation-equivalent-zoom-audit.mjs
       - name: Upload evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: orientation-equivalent-zoom-v1-audit
-          path: artifacts/orientation-equivalent-zoom-*
+          name: orientation-balanced-zoom-v2-audit
+          path: artifacts/orientation-balanced-zoom-*
           if-no-files-found: warn
