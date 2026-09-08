@@ -16,6 +16,7 @@ Estados válidos:
 - **SUPPORT**: participa, no posee la decisión final.
 - **LEGACY**: compatibilidad; no recibe features nuevas.
 - **HOTFIX**: parche temporal; no copiar como patrón.
+- **DYNAMIC LIVE**: forma parte del runtime, pero entra mediante bootstrap dinámico.
 - **PREPARED**: existe en repo pero no está demostrado LIVE.
 - **DEAD**: no forma parte del runtime.
 - **EXPERIMENTAL**: prototipo no consolidado.
@@ -31,7 +32,7 @@ Kelo World es un juego web 2D top-down móvil-first sobre Canvas. El runtime tod
 
 La Foundation NO crea un segundo engine. El objetivo es reducir progresivamente los engines históricos hasta que el contenido nuevo entre por owners y contratos estables.
 
-La existencia de un archivo en `src/` NO significa que esté LIVE. `index.html` manda sobre la carga cliente. Por ejemplo, `src/core/kelo-runtime-bootstrap.js` y los foundations de combat/effects/melee existen actualmente, pero en este baseline no están cargados directamente por `index.html`; por tanto se clasifican **PREPARED** hasta demostrar activación runtime.
+La existencia de un archivo en `src/` NO demuestra por sí sola que esté LIVE. La carga real puede ser directa desde `index.html` o dinámica desde un bootstrap LIVE. En V6.53, `profile-panel-close.js` carga `src/core/kelo-runtime-bootstrap.js`, y éste instala Event Bus + combat/effects/melee; por tanto ese foundation es **DYNAMIC LIVE**, aunque no aparezca como `<script>` directo en `index.html`.
 
 ---
 
@@ -51,8 +52,9 @@ La existencia de un archivo en `src/` NO significa que esté LIVE. `index.html` 
 9. property + instances + world builder
 10. UI panels
 11. forge/aura/illumination/performance
-12. profile/self interaction/PvP guards/visual integration
-13. force-unlock-move HOTFIX
+12. profile-panel-close → dynamic runtime bootstrap → Event Bus + combat/effects/melee
+13. self interaction/PvP guards/visual integration
+14. force-unlock-move HOTFIX
 ```
 
 El script cargado más tarde puede envolver o modificar globals anteriores. Por eso Foundation prohíbe nuevos wrappers core cuando exista hook/API.
@@ -65,17 +67,21 @@ El script cargado más tarde puede envolver o modificar globals anteriores. Por 
 |---|---|---|---|
 | Core state / game loop base | `engine-a.js` | OWNER LIVE / NEEDS_AUDIT | Demasiadas responsabilidades; extracción incremental, no rewrite |
 | Input base | `engine-a.js` | NEEDS_AUDIT | Debe terminar produciendo intención únicamente |
-| Movement | `engine-a.js` + soporte tardío | NEEDS_AUDIT | Conflicto de locks aún evidenciado por HOTFIX |
+| Movement | `engine-a.js` + `engine-ac.js` + `engine-ah.js` | NEEDS_AUDIT | Hay wrapper chain y locks compartidos; consolidar sin cambiar feel |
 | Collision primitives | `src/physics/collision-utils.js` / `KELO_COLLISION` | OWNER LIVE | No duplicar geometría |
 | Camera/zoom | core + engines tardíos + mobile orientation | NEEDS_AUDIT | Consolidar ownership con tests móviles |
 | Render orchestration | `engine-c.js` | OWNER LIVE | Preferir hooks oficiales a wrappers |
 | World renderer | `src/environment/world-map.js` / `KELO_WORLD_RENDERER` | OWNER LIVE | World content entra por contracts/renderer |
 | Environment assets/contracts | `src/environment/*` | OWNER/SUPPORT | Registry/contracts antes de hardcode |
 | Visual/VFX | `src/visuals/*` / `KeloVisualSystem` | OWNER LIVE | Presentación no decide gameplay |
+| Event bus | `src/core/events/event-bus.js` / `KeloEvents` | DYNAMIC LIVE | Primitive genérico; reutilizar, no crear otro bus global |
+| Combat foundation | `KeloCombatEngine` + Hit/Damage resolvers | DYNAMIC LIVE | Gameplay/presentation separados; server adapter puede reemplazar authority |
+| Effects foundation | `KeloEffectEngine` | DYNAMIC LIVE | Registry data-driven de efectos |
+| Melee foundation | `KeloMeleeEngine` | DYNAMIC LIVE | Perfil → CombatEngine; no HP/render directo |
 | Ability runtime moderno | `src/abilities/kelo-ability-boot.js` / `KeloAbilities` | OWNER LIVE | Nueva ability = data + primitives |
 | Stone/loadout moderno | `src/abilities/stone-system.js` / `KeloStones` | OWNER LIVE | Legacy stones no recibe features |
-| Sword Swap | ability/runtime + visuals dedicados | OWNER LIVE feature | Debe consumir owners de ability/visual/collision |
-| PvP world | `src/systems/pvp-world.js` + networking/authority según modo | NEEDS_AUDIT | Separar reglas, transporte y presentación |
+| Sword Swap | ability/runtime + PvP integration + visuals | OWNER LIVE feature / NEEDS_AUDIT | Debe converger hacia owners genéricos sin alterar gameplay |
+| PvP world | `src/systems/pvp-world.js` + networking/authority según modo | NEEDS_AUDIT | Ya usa Combat/Melee; aún mezcla transiciones y casos especiales |
 | Networking client | `engine-net.js` | OWNER LIVE transporte | Transporte no equivale a autoridad |
 | Server authority | `server/*` | SERVER-AUTHORITATIVE donde aplique | Economía/combate online no confían en cliente final |
 | Equipment | `src/systems/equipment-system.js` | OWNER LIVE client | Reutilizar API; no escribir internals |
@@ -84,10 +90,11 @@ El script cargado más tarde puede envolver o modificar globals anteriores. Por 
 | Market escrow | `src/systems/market-escrow-system.js` | OWNER client/fallback | Online debe pasar por authority |
 | Property | `src/property/property-system.js` | OWNER LIVE | Una placement debe tener un owner físico |
 | Instances | `src/instances/*` | OWNER LIVE | Reutilizar runtime/bridges existentes |
-| World Builder runtime | `src/environment/world-builder-system.js` | OWNER/SUPPORT | No debe duplicar collider ownership de Property |
+| World Builder runtime | `src/environment/world-builder-system.js` | OWNER/SUPPORT / NEEDS_AUDIT | Runtime bien separado de authority; collider/render sync aún tiene deuda |
 | UI | `src/ui/*` | CONSUMER | UI consume APIs; no gobierna gameplay state ajeno |
+| Modal input lock | global `KELO_MODAL_INPUT_LOCK` escrito por varias UIs | NEEDS_AUDIT | Foundation debe introducir owner único y migrar writers |
 | `force-unlock-move.js` | ninguno: parche | HOTFIX | Retirar solo al arreglar lock ownership |
-| Combat/effects/melee foundation (`src/core/kelo-runtime-bootstrap.js`) | candidate APIs | PREPARED | No declarar LIVE hasta carga/runtime/test |
+| Runtime bootstrap | `src/core/kelo-runtime-bootstrap.js` | DYNAMIC LIVE | Actualmente lanzado desde `profile-panel-close.js`; boot ownership debe limpiarse después |
 
 ---
 
@@ -96,11 +103,13 @@ El script cargado más tarde puede envolver o modificar globals anteriores. Por 
 Antes de envolver core, buscar y reutilizar:
 
 ```text
+KeloEvents
 KELO_COLLISION
 KELO_WORLD_RENDERER.draw
 drawPreActors
 drawPostActors
 KeloVisualSystem layers/update
+KeloCombatEngine / KeloEffectEngine / KeloMeleeEngine
 KeloAbilities
 KeloStones
 Property/Instance APIs
@@ -116,12 +125,14 @@ Prohibición Foundation: no introducir wrappers nuevos directos de `render`, `re
 Deuda prioritaria, sin borrar a ciegas:
 
 1. Input/movement locks y `force-unlock-move`.
-2. Abilities/stones legacy en engines vs `src/abilities/*`.
-3. Inventory/equipment legacy state vs sistemas modernos.
-4. Render/avatar wrapper chain.
-5. Camera/zoom ownership compartido.
-6. Collision ownership Property/World Builder.
-7. World Edit authoring/runtime boundaries.
+2. Movement wrapper chain `engine-a → engine-ac → engine-ah`.
+3. Abilities/stones legacy en engines vs `src/abilities/*`.
+4. Inventory/equipment legacy state vs sistemas modernos.
+5. Render/avatar wrapper chain.
+6. Camera/zoom ownership compartido.
+7. Collision ownership Property/World Builder.
+8. World Edit authoring/runtime boundaries.
+9. Core bootstrap disparado desde un archivo de UI.
 
 Toda retirada:
 
@@ -133,6 +144,8 @@ Toda retirada:
 
 ```text
 Ability → abilityData → delivery/effects → KeloAbilities → VisualSystem
+Melee → profile → KeloMeleeEngine → KeloCombatEngine → events → presentation
+Effect → definition/type → KeloEffectEngine
 Prop → contract/catalog → Property/World → renderer/collision owner
 VFX → manifest/primitive → KeloVisualSystem
 Item → definition → backpack/equipment/container APIs
@@ -160,10 +173,10 @@ Regla: UI/cliente solicita operaciones; autoridad crítica puede migrar al serve
 | ENGINE_MAP sincronizado a V6.53 baseline | ✅ este documento |
 | Owner único para todos los dominios críticos | ⚠️ en progreso |
 | Cero hotfix watchdogs | ❌ `force-unlock-move.js` todavía requerido |
-| Cero nuevos wrappers core | política Foundation activa; CI por añadir/validar |
+| Cero nuevos wrappers core | ✅ política + Foundation audit para deuda nueva |
 | Legacy totalmente clasificado/migrado | ⚠️ en progreso |
 | APIs públicas completas documentadas | ⚠️ en progreso |
-| CI arquitectónico | ⚠️ Foundation pass |
+| CI arquitectónico | ✅ workflow Foundation añadido; falta validación del run |
 | `main` protegido | ❌ baseline GitHub indica branch sin protección |
 | Móvil/desktop/LIVE post-migración | pendiente por cada cambio conductual |
 
