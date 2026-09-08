@@ -5,20 +5,21 @@
  * purpose: único owner de locks semánticos que bloquean interacción/movimiento mientras una UI o transición está activa
  * public-api: KeloInputLocks.acquire/release/releaseOwner/isLocked/has/snapshot
  * consumes: KeloEvents opcional
- * state-owned: active input lock claims + legacy compatibility claim
+ * state-owned: active input lock claims + legacy compatibility claims
  * extension-points: nuevos consumidores usan acquire/release; no escriben globals directamente
  * reuse: cualquier modal/transición que necesite reclamar input temporalmente
- * legacy: mantiene KELO_MODAL_INPUT_LOCK como adapter transitorio
+ * legacy: mantiene KELO_MODAL_INPUT_LOCK como adapter transitorio apilable por owner
  * do-not: NO meter reglas de UI, PvP, build mode ni movimiento físico aquí
  */
 (function(root){
   'use strict';
   if(root.KeloInputLocks)return;
 
-  const VERSION='kelo-input-locks-v1.0.0';
+  const VERSION='kelo-input-locks-v1.1.0';
   const claims=new Map();
+  const legacyByOwner=new Map();
+  const legacyOrder=[];
   let sequence=1;
-  let legacyToken=null;
   let changes=0;
 
   function normalizeOwner(owner){
@@ -33,14 +34,23 @@
   }
   function acquire(owner,meta){
     const token='input-lock-'+(sequence++).toString(36);
-    claims.set(token,Object.freeze({token:token,owner:normalizeOwner(owner),meta:meta&&typeof meta==='object'?Object.freeze(Object.assign({},meta)):null,createdAt:Date.now()}));
+    claims.set(token,Object.freeze({token:token,owner:normalizeOwner(owner),meta:meta&&typeof meta==='object'?Object.freeze(Object.assign({},meta)):null,createdAt:Date.now(),legacy:false}));
     emit('acquire');
     return token;
+  }
+  function forgetLegacyToken(token){
+    for(const entry of legacyByOwner.entries()){
+      if(entry[1]!==token)continue;
+      legacyByOwner.delete(entry[0]);
+      const i=legacyOrder.lastIndexOf(entry[0]);
+      if(i>=0)legacyOrder.splice(i,1);
+      break;
+    }
   }
   function release(token){
     const key=String(token||'');
     if(!key||!claims.has(key))return false;
-    if(key===legacyToken)legacyToken=null;
+    forgetLegacyToken(key);
     const removed=claims.delete(key);
     if(removed)emit('release');
     return removed;
@@ -51,8 +61,10 @@
     Array.from(claims.entries()).forEach(function(entry){
       const token=entry[0],claim=entry[1];
       if(claim.owner!==target)return;
-      claims.delete(token);if(token===legacyToken)legacyToken=null;removed+=1;
+      claims.delete(token);forgetLegacyToken(token);removed+=1;
     });
+    legacyByOwner.delete(target);
+    for(let i=legacyOrder.length-1;i>=0;i--)if(legacyOrder[i]===target)legacyOrder.splice(i,1);
     if(removed)emit('release-owner');
     return removed;
   }
@@ -64,18 +76,42 @@
   function owners(){return Array.from(new Set(Array.from(claims.values()).map(function(c){return c.owner;})));}
   function isLocked(){return claims.size>0;}
   function snapshot(reason){
-    return Object.freeze({version:VERSION,locked:isLocked(),count:claims.size,owners:Object.freeze(owners()),reason:reason||null,changes:changes});
+    return Object.freeze({version:VERSION,locked:isLocked(),count:claims.size,owners:Object.freeze(owners()),legacyOwners:Object.freeze(legacyOrder.slice()),reason:reason||null,changes:changes});
+  }
+  function claimLegacy(owner){
+    const target=normalizeOwner(owner);
+    if(legacyByOwner.has(target)){
+      const oldIndex=legacyOrder.lastIndexOf(target);
+      if(oldIndex>=0)legacyOrder.splice(oldIndex,1);
+      legacyOrder.push(target);
+      emit('legacy-focus');
+      return legacyByOwner.get(target);
+    }
+    const token='input-lock-legacy-'+(sequence++).toString(36);
+    claims.set(token,Object.freeze({token:token,owner:target,meta:Object.freeze({source:'KELO_MODAL_INPUT_LOCK'}),createdAt:Date.now(),legacy:true}));
+    legacyByOwner.set(target,token);
+    legacyOrder.push(target);
+    emit('legacy-acquire');
+    return token;
+  }
+  function releaseCurrentLegacy(){
+    while(legacyOrder.length){
+      const owner=legacyOrder.pop();
+      const token=legacyByOwner.get(owner);
+      legacyByOwner.delete(owner);
+      if(token&&claims.delete(token)){emit('legacy-release');return true;}
+    }
+    return false;
   }
   function setLegacy(value){
-    if(legacyToken){claims.delete(legacyToken);legacyToken=null;}
-    if(value!=null&&value!==false&&String(value).trim()){
-      legacyToken='input-lock-legacy';
-      claims.set(legacyToken,Object.freeze({token:legacyToken,owner:normalizeOwner(value),meta:Object.freeze({source:'KELO_MODAL_INPUT_LOCK'}),createdAt:Date.now()}));
-    }
-    emit('legacy-set');
+    if(value==null||value===false||!String(value).trim()){releaseCurrentLegacy();return;}
+    claimLegacy(value);
   }
   function legacyValue(){
-    if(legacyToken&&claims.has(legacyToken))return claims.get(legacyToken).owner;
+    for(let i=legacyOrder.length-1;i>=0;i--){
+      const owner=legacyOrder[i],token=legacyByOwner.get(owner);
+      if(token&&claims.has(token))return owner;
+    }
     const first=claims.values().next();
     return first.done?null:first.value.owner;
   }
@@ -89,7 +125,7 @@
       set:setLegacy
     });
   }catch(_){ }
-  if(previous!=null&&previous!==false&&String(previous).trim())setLegacy(previous);
+  if(previous!=null&&previous!==false&&String(previous).trim())claimLegacy(previous);
 
   root.KeloInputLocks=Object.freeze({
     version:VERSION,
@@ -101,5 +137,5 @@
     owners:function(){return Object.freeze(owners());},
     snapshot:snapshot
   });
-  root.KELO_INPUT_LOCK_AUDIT=Object.freeze({version:VERSION,ready:true,singleOwner:true,legacyAdapter:true,tokenClaims:true,domainRules:false});
+  root.KELO_INPUT_LOCK_AUDIT=Object.freeze({version:VERSION,ready:true,singleOwner:true,legacyAdapter:true,legacyStack:true,tokenClaims:true,domainRules:false});
 })(typeof globalThis!=='undefined'?globalThis:window);
