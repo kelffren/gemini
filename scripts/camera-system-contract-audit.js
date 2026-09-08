@@ -1,14 +1,14 @@
 /* KELO-INDEX
  * area: QA / CAMERA
  * owner: FOUNDATION CI
- * keys: CAMERA VIEWPORT ZOOM DPR TARGET SCREEN WORLD ORIENTATION CONTRACT
- * purpose: valida owner único KeloCamera y compatibilidad determinista sin arrancar el juego completo
+ * keys: CAMERA VIEWPORT ZOOM DPR TARGET SCREEN WORLD ORIENTATION LIVE WRITERS CONTRACT
+ * purpose: valida owner único KeloCamera, compatibilidad determinista y ausencia de nuevos owners paralelos en scripts LIVE
  * public-api: CLI
- * consumes: camera-system, engine-h, mobile-orientation, index.html
+ * consumes: camera-system, engine-h, mobile-orientation, index.html y scripts runtime directos
  * state-owned: ninguno
- * extension-points: invariantes KeloCamera
+ * extension-points: invariantes KeloCamera + allowlist legacy explícita y temporal
  * reuse: Foundation CI
- * legacy: simula camera/CONFIG/updateCamera de engine-a
+ * legacy: engine-a conserva follow/Canvas bootstrap; engine-b/c conservan writers de target capturados por adapters hasta migración posterior
  * do-not: no sustituir browser smoke de rotación/viewport
  */
 'use strict';
@@ -78,4 +78,51 @@ ok(!/\bwindow\.cycleZoom\s*=/.test(orientation),'ORIENTATION_CYCLE_OVERRIDE');
 ok(!/\bwindow\.resize\s*=/.test(orientation),'ORIENTATION_RESIZE_OVERRIDE');
 const iA=html.indexOf('engine-a.js'),iC=html.indexOf('engine-c.js'),iCamera=html.indexOf('src/core/camera-system.js'),iAvatar=html.indexOf('src/core/avatar-render-system.js'),iH=html.indexOf('engine-h.js'),iOrientation=html.indexOf('src/ui/mobile-orientation.js');
 ok(iA>=0&&iC>iA&&iCamera>iC&&iAvatar>iCamera&&iH>iCamera&&iOrientation>iCamera,'LOAD_ORDER');
-console.log('CAMERA_SYSTEM_OK: owner + target + tuning + viewport + DPR + equivalent orientation zoom + screen/world contract passed');
+
+function stripNonCode(text){
+  let out='',state='code',quote='',escaped=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i],n=text[i+1];
+    if(state==='line'){if(c==='\n'){state='code';out+='\n';}else out+=' ';continue;}
+    if(state==='block'){if(c==='*'&&n==='/'){out+='  ';i++;state='code';}else out+=c==='\n'?'\n':' ';continue;}
+    if(state==='string'){
+      if(escaped){escaped=false;out+=c==='\n'?'\n':' ';continue;}
+      if(c==='\\'){escaped=true;out+=' ';continue;}
+      if(c===quote){state='code';quote='';out+=' ';continue;}
+      out+=c==='\n'?'\n':' ';continue;
+    }
+    if(c==='/'&&n==='/'){out+='  ';i++;state='line';continue;}
+    if(c==='/'&&n==='*'){out+='  ';i++;state='block';continue;}
+    if(c==='"'||c==="'"||c==='`'){state='string';quote=c;out+=' ';continue;}
+    out+=c;
+  }
+  return out;
+}
+function globalAssignment(name){
+  const escaped=name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  return new RegExp('(?:\\b(?:window|globalThis|root)\\.'+escaped+'\\s*=)|(?:^|[;{}]|\\))\\s*'+escaped+'\\s*=','gm');
+}
+function directRuntimeFiles(){
+  const out=[];const re=/<script\b[^>]*\bsrc=["']([^"']+)["'][^>]*>/gi;let m;
+  while((m=re.exec(html))){const file=m[1].split('?')[0].replace(/^\.\//,'');if(!/^(https?:)?\/\//.test(file))out.push(file);}
+  return [...new Set(out)];
+}
+function writers(pattern){
+  const found=[];
+  for(const file of directRuntimeFiles()){
+    if(!fs.existsSync(file))continue;
+    const text=stripNonCode(fs.readFileSync(file,'utf8'));pattern.lastIndex=0;
+    if(pattern.test(text))found.push(file);
+  }
+  return found.sort();
+}
+function exactWriters(pattern,allowed,label){
+  const actual=writers(pattern);const expected=[...allowed].sort();
+  ok(JSON.stringify(actual)===JSON.stringify(expected),label+': actual='+actual.join(',')+' expected='+expected.join(','));
+}
+exactWriters(/\bcamera\.(?:targetX|targetY)\s*=/g,['engine-b.js','engine-c.js'],'LIVE_CAMERA_TARGET_WRITERS');
+exactWriters(/\bCONFIG\.zoom\s*=/g,['engine-c.js'],'LIVE_CAMERA_ZOOM_WRITERS');
+exactWriters(/\bcanvas\.(?:width|height)\s*=/g,['engine-a.js','src/core/camera-system.js'],'LIVE_CANVAS_SIZE_WRITERS');
+exactWriters(globalAssignment('resize'),['src/core/camera-system.js'],'LIVE_RESIZE_OWNERS');
+exactWriters(globalAssignment('cycleZoom'),['src/core/camera-system.js'],'LIVE_CYCLE_ZOOM_OWNERS');
+console.log('CAMERA_SYSTEM_OK: owner + target + tuning + viewport + DPR + orientation + screen/world + LIVE writer guard passed');
