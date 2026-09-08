@@ -33,8 +33,13 @@ export async function openCreatorHub({root=globalThis}={}){
   const mark=make('div',{class:'kc-mark'},make('span',{text:'KC'})),title=make('div',{class:'kc-title'},[make('strong',{text:'KELO CREATORS'}),make('small',{text:'One studio. Many workspaces.'})]),close=make('button',{class:'kc-close',text:'CLOSE','aria-label':'Cerrar Kelo Creators'}),head=make('header',{class:'kc-head'},[mark,title,close]);
   const nav=make('nav',{class:'kc-nav','aria-label':'Creator sections'}),main=make('main',{class:'kc-main'}),layout=make('div',{class:'kc-layout'},[nav,main]);hub.append(head,layout);doc.body.append(hub);
   const sections=[['create','CREATE'],['projects','MY PROJECTS'],['assets','MY ASSETS'],['shared','SHARED WITH ME'],['invites','TEST INVITES'],['reviews','REVIEWS'],['published','PUBLISHED']];
-  const buttons=new Map();let current='create';
-  async function openWorld(){destroy();await platform.openWorkspace('world');}
+  const buttons=new Map();let current='create',openingWorld=false;
+  async function openWorld(){
+    if(openingWorld)return;openingWorld=true;
+    try{await platform.openWorkspace('world');destroy();}
+    catch(error){console.error('[Kelo Creators → World]',error);if(typeof root.showToast==='function')root.showToast(error?.message||'No se pudo abrir World Creator');}
+    finally{openingWorld=false;}
+  }
   async function renderCreate(){main.replaceChildren(make('h1',{text:'Create'}),make('p',{class:'kc-lead',text:'Choose a workspace. Only production-ready creators can be opened.'}));for(const group of CATALOG){const sec=make('section',{class:'kc-section'},[make('h2',{text:group.category})]),grid=make('div',{class:'kc-grid'});for(const [wid,label,state] of group.items){const card=make('button',{class:`kc-card ${state==='active'?'active':''}`,disabled:state!=='active','aria-label':state==='active'?`Abrir ${label}`:`${label} coming soon`},[make('span',{class:'kc-pill',text:state==='active'?'ACTIVE':'COMING SOON'}),make('strong',{text:label}),make('small',{text:state==='active'?'Uses existing Kelo Studio':'Workspace not implemented yet'})]);if(wid==='world'&&state==='active')card.onclick=()=>void openWorld();grid.append(card);}sec.append(grid);main.append(sec);}}
   async function renderProjects(){main.replaceChildren(make('h1',{text:'My Projects'}),make('p',{class:'kc-lead',text:'Projects available through the repository boundary.'}));const rows=await platform.projects.list({ownerId:platform.permission.actorId()});if(!rows.length)return main.append(make('div',{class:'kc-empty',text:'No projects yet.'}));for(const p of rows){const row=make('div',{class:'kc-project'},[make('div',{},[make('strong',{text:p.name}),make('div',{class:'kc-lead',text:`${p.type} · ${p.status}`})])]);if(p.type==='WORLD'){const b=make('button',{text:'OPEN'});b.onclick=()=>void openWorld();row.append(b);}main.append(row);}}
   function renderEmpty(label,detail){main.replaceChildren(make('h1',{text:label}),make('p',{class:'kc-lead',text:detail}),make('div',{class:'kc-empty',text:'Nothing here yet. This surface is ready for its future repository/service adapter.'}));}
@@ -42,7 +47,7 @@ export async function openCreatorHub({root=globalThis}={}){
   for(const [id,label] of sections){const b=make('button',{text:label,'aria-selected':'false'});if(id==='reviews'&&!platform.permission.can('review.approve'))b.hidden=true;b.onclick=()=>void render(id);buttons.set(id,b);nav.append(b);}
   function destroy(){if(active?.hub!==hub)return;active=null;hub.remove();style.remove();doc.removeEventListener('keydown',onKey,true);}
   const onKey=e=>{if(e.key==='Escape'){e.preventDefault();destroy();}};close.onclick=destroy;doc.addEventListener('keydown',onKey,true);
-  active=Object.freeze({version:'kelo-creator-hub-v1.0.0',hub,platform,get section(){return current;},show:render,close:destroy});await render('create');return active;
+  active=Object.freeze({version:'kelo-creator-hub-v1.0.1',hub,platform,get section(){return current;},show:render,close:destroy});await render('create');return active;
 }
 export function closeCreatorHub(){active?.close?.();}
 export function getCreatorHub(){return active;}
