@@ -6,6 +6,7 @@ Antes de modificar Kelo World, son obligatorios estos documentos:
 2. [`ENGINE_MAP.md`](ENGINE_MAP.md) — **qué existe y quién manda en el runtime actual**.
 3. [`docs/ONLINE_FIRST.md`](docs/ONLINE_FIRST.md) — **cómo preservar el camino a autoridad online/server**.
 4. [`docs/CODE_INDEX.md`](docs/CODE_INDEX.md) — **convención de navegación y KELO-INDEX**.
+5. [`docs/SYSTEM_DOCUMENTATION_STANDARD.md`](docs/SYSTEM_DOCUMENTATION_STANDARD.md) — **cómo documentar cada sistema para humanos/IA y jugadores**.
 
 Si estos documentos contradicen el código LIVE cargado por `index.html`, gana el runtime y la documentación debe corregirse en el mismo pass.
 
@@ -148,11 +149,27 @@ Reglas:
 - No usar comentarios para desactivar sistemas vivos; para eso hay flags `disabled`.
 - Un cambio sin `KELO-INDEX` en archivo nuevo no está terminado.
 
+## RULE 6 — DOCUMENTACIÓN DOBLE DE SISTEMAS (OBLIGATORIO)
+
+Todo sistema/capacidad nueva y todo cambio material de contrato debe mantener documentación sincronizada según `docs/SYSTEM_DOCUMENTATION_STANDARD.md`.
+
+Obligatorio:
+
+1. Documento técnico en `docs/systems/` con ownership, API, estado, flujo, invariantes, extensión, online-first, tests, deuda y ejemplos de reutilización.
+2. Registro en `docs/system-catalog.json`.
+3. Si el jugador puede percibir o usar el sistema, una sección pública en `guide.html` que explique la mecánica sin revelar internals sensibles.
+4. Si cambia la regla visible, actualizar guía pública en el mismo PR.
+5. Ejecutar `npm run audit:docs`.
+
+Un sistema nuevo sin documento técnico y registro de documentación **NO está terminado**.
+
+La documentación pública no expone secretos, claves, rutas admin ni detalles explotables de autoridad. Explica qué hace el juego, cómo usarlo, límites y estados normales.
+
 ## Required startup protocol for every development pass
 
-1. Read `docs/KELO_FOUNDATION.md`, `ENGINE_MAP.md`, `docs/ONLINE_FIRST.md` and this `AGENTS.md` completely.
+1. Read `docs/KELO_FOUNDATION.md`, `ENGINE_MAP.md`, `docs/ONLINE_FIRST.md`, `docs/SYSTEM_DOCUMENTATION_STANDARD.md` and this `AGENTS.md` completely.
 2. Re-scan current `main` and record HEAD before assuming ownership or LIVE status.
-3. Read the memory document(s) for the subsystem being changed.
+3. Read the memory document(s) and `docs/systems/*` document for the subsystem being changed.
 4. Inspect `index.html` and current code/deployed state before modifying it.
 5. Identify the OWNER and classify the change as CONTENT or CAPABILITY.
 6. Preserve validated invariants and apply online-first rules.
@@ -162,3 +179,4 @@ Reglas:
 10. Update subsystem memory only with behavior actually validated.
 11. Stamp or refresh `KELO-INDEX` on files you touch.
 12. Update `ENGINE_MAP.md`/`docs/KELO_FOUNDATION.md` when ownership, API or architecture changes.
+13. Update technical docs, system catalog and `guide.html` when the system contract or player-visible behavior changes.
