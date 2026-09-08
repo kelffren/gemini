@@ -1,13 +1,13 @@
 /* KELO-INDEX
  * area: QA / STUDIO LIVE
  * owner: Studio LIVE CI
- * purpose: valida en GitHub Pages CREATORS -> World -> Studio -> objects/surface/collision -> authority/history/save -> close
+ * purpose: valida CREATORS -> World -> Studio -> objects/surface/collision -> authority/history/save -> close
  * public-api: CLI `node scripts/studio-live-audit.mjs`
  * consumes: deployed Kelo World, KELO_ADMIN_KEYS, KELO_STUDIO_LAUNCHER, Creator Hub, KeloInputLocks, KELO_WORLD_BUILDER
- * state-owned: ninguno; usa un browser context efímero con localStorage aislado
+ * state-owned: ninguno; usa un browser context efímero con storage aislado
  * extension-points: ampliar solo con comportamientos creator estables
  * reuse: workflow studio-live-audit.yml
- * do-not: no publicar Drafts ni depender de estado persistente del usuario
+ * do-not: no publicar Drafts, no depender de estado persistente del usuario, no fijar números de versión para readiness
  */
 import fs from 'node:fs';
 import { chromium } from 'playwright';
@@ -31,15 +31,15 @@ async function deployed(path,markers){
   }catch{return false;}
 }
 
-// GitHub Pages can briefly expose a mixed old/new tree after a push. Require the
-// complete Creator route and current Studio shell before opening the product page.
+// Pages can briefly expose a mixed old/new tree after a push. Readiness is based
+// on stable capabilities/contracts, never frozen implementation version numbers.
 let deployReady=false;
 for(let attempt=0;attempt<60;attempt++){
   const checks=await Promise.all([
-    deployed('src/ui/studio-launcher.js',['studio-launcher-v1.4.0',"creators/ui/creator-hub.mjs"]),
-    deployed('src/creators/ui/creator-hub.mjs',['kelo-creator-hub-v1.0.1','Abrir ${label}']),
+    deployed('src/ui/studio-launcher.js',["creators/ui/creator-hub.mjs",'KELO_CREATORS_LAUNCHER','NO polling']),
+    deployed('src/creators/ui/creator-hub.mjs',['openCreatorHub','Abrir ${label}',"['animation','Animation','active']"]),
     deployed('src/creators/workspaces/world-workspace.mjs',['CREATOR_WORLD_STUDIO_ENTRY_MISSING','live-studio-controller.mjs']),
-    deployed('src/studio/ui/studio-live-shell.mjs',['studio-live-shell-v1.4.0','data-pane="assets"','data-mode="terrain"','data-mode="path"','data-mode="collision"','data-act="edit-assets"'])
+    deployed('src/studio/ui/studio-live-shell.mjs',['createStudioLiveShell','data-pane="assets"','data-mode="terrain"','data-mode="path"','data-mode="collision"','data-act="edit-assets"'])
   ]);
   if(checks.every(Boolean)){deployReady=true;break;}
   await sleep(2000);
@@ -54,9 +54,10 @@ for(let attempt=0;attempt<20;attempt++){
     ready=await page.evaluate(()=>{
       const src=[...document.scripts].map(s=>s.getAttribute('src')||'');
       const actor=window.KELO_ADMIN_KEYS?.playerId?.();
-      return src.some(x=>x.includes('src/ui/studio-launcher.js?v=2'))&&
-        window.KELO_STUDIO_LAUNCHER?.version==='studio-launcher-v1.4.0'&&
-        window.KELO_CREATORS_LAUNCHER===window.KELO_STUDIO_LAUNCHER&&
+      const launcher=window.KELO_STUDIO_LAUNCHER;
+      return src.some(x=>x.includes('src/ui/studio-launcher.js'))&&
+        typeof launcher?.open==='function'&&typeof launcher?.sync==='function'&&
+        window.KELO_CREATORS_LAUNCHER===launcher&&launcher.allowed===true&&
         !!actor&&window.KELO_ADMIN_KEYS?.can?.('world.edit',actor)===true&&
         !!window.KeloInputLocks&&!!window.KeloCamera&&!!window.KELO_WORLD_EDIT?.ready&&!!window.KELO_WORLD_BUILDER;
     });
