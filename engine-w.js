@@ -72,8 +72,11 @@
     ctx.restore();
   }
 
-  renderAvatar = function (p, isSelf) {
+  function renderLegacyPixelHero(p, isSelf) {
     if (!p) return;
     drawHero(ctx, p, !!isSelf);
-  };
+  }
+
+  if(!window.KeloAvatar) throw new Error('KeloAvatar unavailable before engine-w');
+  window.KeloAvatar.setBase('engine-w:legacy-pixel-hero', renderLegacyPixelHero);
 })();
