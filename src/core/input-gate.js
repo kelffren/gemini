@@ -1,60 +1,26 @@
 /* KELO-INDEX
- * area: CORE / INPUT
- * owner: KeloInputLocks (SUPPORT bridge)
- * keys: INPUT GATE MOVEMENT LOCK PROCESSINPUT FOUNDATION COMPAT
- * purpose: conecta el owner KeloInputLocks con el processInput legacy sin meter reglas de UI dentro del core
- * public-api: KELO_INPUT_GATE_AUDIT (observabilidad); no API gameplay
- * consumes: KeloInputLocks, processInput, input, localPlayer
+ * area: CORE / INPUT COMPAT
+ * owner: NONE — RETIRED into KeloInput
+ * keys: INPUT GATE RETIRED COMPAT FOUNDATION
+ * purpose: conserva el nombre histórico del antiguo gate para auditoría; el runtime usa src/core/input-system.js
+ * public-api: ninguna
+ * consumes: KeloInput opcional
  * state-owned: ninguno
- * extension-points: ninguno; consumidores reclaman input mediante KeloInputLocks
- * reuse: bridge temporal único mientras processInput siga viviendo en engine-a.js
- * legacy: retirar cuando Input sea extraído y consulte KeloInputLocks directamente
- * do-not: NO añadir owners, reglas de panel, PvP, build mode ni timers aquí
+ * extension-points: ninguno
+ * reuse: NO cargar ni extender; usar KeloInput
+ * legacy: compatibilidad documental únicamente
+ * do-not: NO envolver processInput, NO crear timers ni reglas de input aquí
  */
 (function(root){
   'use strict';
-  const VERSION='kelo-input-gate-v1.0.0';
-  if(root.KELO_INPUT_GATE_AUDIT&&root.KELO_INPUT_GATE_AUDIT.installed)return;
-  if(typeof processInput!=='function'){
-    root.KELO_INPUT_GATE_AUDIT=Object.freeze({version:VERSION,installed:false,reason:'processInput-missing'});
-    return;
-  }
-
-  const previousProcessInput=processInput;
-
-  function clearIntent(){
-    if(typeof input!=='undefined'&&input){
-      input.normX=0;
-      input.normY=0;
-      input.touchActive=false;
-      input.touchId=null;
-      const keys=input.keys||{};
-      Object.keys(keys).forEach(function(key){keys[key]=false;});
-    }
-    if(typeof localPlayer!=='undefined'&&localPlayer){
-      localPlayer.vx=0;
-      localPlayer.vy=0;
-    }
-  }
-
-  // FOUNDATION-ALLOW: único bridge temporal autorizado para processInput legacy.
-  processInput=function(){
-    const locks=root.KeloInputLocks;
-    if(locks&&typeof locks.isLocked==='function'&&locks.isLocked()){
-      clearIntent();
-      return;
-    }
-    return previousProcessInput.apply(this,arguments);
-  };
-
+  if(root.KELO_INPUT_GATE_AUDIT)return;
   root.KELO_INPUT_GATE_AUDIT=Object.freeze({
-    version:VERSION,
-    installed:true,
-    owner:'KeloInputLocks',
-    bridge:true,
-    timers:0,
-    uiRules:false,
-    gameplayRules:false,
-    legacyTarget:'processInput'
+    version:'kelo-input-gate-retired-v2.0.0',
+    installed:false,
+    retired:true,
+    replacementOwner:'KeloInput',
+    lockOwner:'KeloInputLocks',
+    processInputWrapper:false,
+    timers:0
   });
 })(typeof globalThis!=='undefined'?globalThis:window);
