@@ -16,6 +16,7 @@ on:
       - 'src/ui/warehouse-ui.js'
       - 'src/ui/market-ui.js'
       - 'src/ui/self-interaction-ui.js'
+      - 'src/ui/character-customizer-ui.js'
       - 'scripts/backpack-system-audit.js'
       - 'scripts/container-system-audit.js'
       - 'scripts/market-escrow-audit.js'
@@ -38,6 +39,7 @@ on:
       - 'src/ui/warehouse-ui.js'
       - 'src/ui/market-ui.js'
       - 'src/ui/self-interaction-ui.js'
+      - 'src/ui/character-customizer-ui.js'
       - 'scripts/backpack-system-audit.js'
       - 'scripts/container-system-audit.js'
       - 'scripts/market-escrow-audit.js'
@@ -68,6 +70,7 @@ jobs:
           node --check src/ui/warehouse-ui.js
           node --check src/ui/market-ui.js
           node --check src/ui/self-interaction-ui.js
+          node --check src/ui/character-customizer-ui.js
           node --check scripts/backpack-system-audit.js
           node --check scripts/container-system-audit.js
           node --check scripts/market-escrow-audit.js
@@ -115,4 +118,6 @@ jobs:
           grep -q "inputLockOwner:'KeloInputLocks'" src/ui/self-interaction-ui.js
           grep -q "tokenLocks:true" src/ui/self-interaction-ui.js
           grep -q "legacyModalWrites:false" src/ui/self-interaction-ui.js
-          grep -q "profileUsesBackpackUI:true" src/ui/self-interaction-ui.js
+          grep -q "profileUsesCharacterCustomizer:true" src/ui/self-interaction-ui.js
+          grep -q "profileFallbackUsesBackpackUI:true" src/ui/self-interaction-ui.js
+          grep -q "KeloCharacterCustomizer" src/ui/self-interaction-ui.js
