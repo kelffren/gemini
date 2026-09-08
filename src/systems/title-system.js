@@ -16,7 +16,7 @@
   if (root.KeloTitles) return;
   if (!root.KeloTitleCatalog || !root.KeloPlayerStats) return;
 
-  const VERSION = 'kelo-titles-v1';
+  const VERSION = 'kelo-titles-v1.1';
   const catalog = root.KeloTitleCatalog;
   const stats = root.KeloPlayerStats;
   let serverSnapshot = null;
@@ -42,7 +42,7 @@
   function persist() { try { if (typeof saveState === 'function') saveState(); } catch (e) {} }
   function emit(name, payload) { if (root.KeloEvents && root.KeloEvents.emit) root.KeloEvents.emit(name, payload); }
   function currentState() {
-    if (online() && serverSnapshot) return serverSnapshot;
+    if (online()) return serverSnapshot || { unlocked: [], equippedTitleId: null, progress: {} };
     return ensureLocal() || { unlocked: [], equippedTitleId: null, progress: stats.snapshot() };
   }
   function getUnlocked() { return Object.freeze((currentState().unlocked || []).slice()); }
@@ -132,6 +132,7 @@
       unlocked: Array.from(new Set((Array.isArray(snapshot.unlocked) ? snapshot.unlocked : []).filter(function (id) { return !!catalog.get(id); }))),
       progress: snapshot.progress && typeof snapshot.progress === 'object' ? snapshot.progress : {}
     };
+    if (normalized.equippedTitleId && normalized.unlocked.indexOf(normalized.equippedTitleId) < 0) normalized.equippedTitleId = null;
     serverSnapshot = normalized;
     stats.ingestServerSnapshot(normalized.progress);
     syncActor();
@@ -221,5 +222,5 @@
     bindNobilityPane: bindNobilityPane,
     isAuthoritative: function () { return !!(online() && serverSnapshot); }
   });
-  root.KELO_TITLES_AUDIT = Object.freeze({ version: VERSION, ready: true, catalogSize: catalog.list().length, indexedByStat: true, frameEvaluation: false, onlineClientUnlock: false });
+  root.KELO_TITLES_AUDIT = Object.freeze({ version: VERSION, ready: true, catalogSize: catalog.list().length, indexedByStat: true, frameEvaluation: false, onlineClientUnlock: false, onlinePreSnapshotFailClosed: true });
 })(typeof globalThis !== 'undefined' ? globalThis : window);
