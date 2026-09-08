@@ -12,7 +12,7 @@ function prefabId(){const u=globalThis.crypto?.randomUUID?.();return `creator-pr
 export function createCreatorPrefabLibrary({kernel,store,tool,ownerId='local'}={}){
   if(!kernel||!store||!tool)throw new Error('STUDIO_CREATOR_PREFAB_LIBRARY_DEPS_REQUIRED');
   const rows=new Map();
-  const assetRow=def=>({id:def.id,label:def.label,category:'My Prefabs',width:def.bounds.w,height:def.bounds.h,creatorPrefab:true});
+  const assetRow=def=>({id:def.id,label:def.label,category:'My Prefabs',width:def.bounds.w,height:def.bounds.h,creatorPrefab:true,previewChildren:copy(def.children)});
   async function load(){for(const def of await store.listCreatorPrefabs(ownerId)){rows.set(def.id,copy(def));tool.register(def);}return list();}
   function list(){return [...rows.values()].sort((a,b)=>String(a.label).localeCompare(String(b.label))).map(copy);}
   function assets(){return list().map(assetRow);}
