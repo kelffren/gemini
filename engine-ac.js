@@ -1,3 +1,16 @@
+/* KELO-INDEX
+ * area: MOVEMENT / PRESENTATION
+ * owner: KeloMovement consumer
+ * keys: MOVEMENT GAIT SPEED STRIDE PLANT AUDIT
+ * purpose: calcula gait/velocidad objetivo y estado visual de zancada usando hooks del owner KeloMovement
+ * public-api: KELO_MOVEMENT_AUDIT
+ * consumes: KeloMovement, input, CONFIG, localPlayer
+ * state-owned: _visualMotion del actor local + telemetría de gait
+ * extension-points: hooks before/after de KeloMovement
+ * reuse: perfil de marcha/carrera del jugador actual
+ * legacy: mantiene constantes y telemetría históricas; ya no envuelve updateMovement directamente
+ * do-not: NO resolver colisiones, NO crear otro wrapper de updateMovement
+ */
 (function () {
   // MOV-001: one processed intent magnitude drives gait + speed.
   // MOV-004: visual stride advances from actual world distance, never render count.
@@ -33,6 +46,7 @@
   CONFIG.movementType = 'DIRECT';
   CONFIG.accelDecay = 32;
   CONFIG.decelDecay = 18;
+  let frameState={mag:0,gait:'idle',speedCap:WALK_SPEED};
 
   function processedMag() {
     return Math.min(1, Math.hypot(input.normX || 0, input.normY || 0));
@@ -215,16 +229,18 @@
     return v;
   }
 
-  const _move = updateMovement;
-  updateMovement = function (dt) {
-    const mag = processedMag();
-    const gait = gaitFrom(mag);
-    const speedCap = speedFor(mag);
-    localPlayer.gait = gait;
-    localPlayer._gait = gait;
-    CONFIG.speed = speedCap;
-    _move(dt);
-    const visual = updateVisualMotion(localPlayer, dt, gait, mag);
-    publishAudit(mag, gait, speedCap, visual);
-  };
+  if(!window.KeloMovement)throw new Error('KeloMovement unavailable before engine-ac');
+  window.KeloMovement.before('engine-ac:gait-speed',function(){
+    const mag=processedMag();
+    const gait=gaitFrom(mag);
+    const speedCap=speedFor(mag);
+    frameState={mag:mag,gait:gait,speedCap:speedCap};
+    localPlayer.gait=gait;
+    localPlayer._gait=gait;
+    CONFIG.speed=speedCap;
+  },10);
+  window.KeloMovement.after('engine-ac:visual-motion',function(ctx){
+    const visual=updateVisualMotion(localPlayer,ctx.dt,frameState.gait,frameState.mag);
+    publishAudit(frameState.mag,frameState.gait,frameState.speedCap,visual);
+  },20);
 })();
