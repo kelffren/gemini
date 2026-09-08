@@ -24,6 +24,13 @@
     .lx-side-pvp b{display:block;color:var(--lx-ivory);font-size:24px;line-height:21px;text-shadow:0 0 12px rgba(231,197,106,.18)}
     .lx-side-pvp span{color:var(--lx-gold);font-size:9px;letter-spacing:.14em}
     .lx-side-menu:active,.lx-side-pvp:active{transform:scale(.96);border-color:rgba(231,197,106,.9)}
+    .lx-menu-panel{display:none;position:absolute;top:max(62px,calc(env(safe-area-inset-top) + 54px));right:max(80px,calc(env(safe-area-inset-right) + 72px));z-index:87;width:min(286px,calc(100vw - 96px));padding:12px;border-radius:18px;background:rgba(9,18,21,.97);border:1px solid rgba(231,197,106,.45);box-shadow:0 16px 36px rgba(0,0,0,.34);pointer-events:auto}
+    .lx-menu-panel.open{display:block}
+    .lx-menu-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;color:var(--lx-gold);font-size:12px;font-weight:900;letter-spacing:.13em}
+    .lx-menu-close{width:32px;height:32px;border-radius:10px;border:1px solid rgba(231,197,106,.28);background:#111d21;color:var(--lx-ivory);font-size:18px;font-weight:800}
+    .lx-menu-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+    .lx-menu-item{min-height:45px;padding:7px 8px;border-radius:12px;border:1px solid rgba(255,255,255,.09);background:linear-gradient(145deg,rgba(23,63,54,.75),rgba(13,29,30,.96));color:var(--lx-ivory);font-size:10px;font-weight:800;text-align:left}
+    .lx-menu-item:active{transform:scale(.98);border-color:rgba(231,197,106,.58)}
     .lx-chat-drawer{display:none;position:absolute;left:max(8px,env(safe-area-inset-left));right:max(8px,env(safe-area-inset-right));bottom:max(70px,calc(env(safe-area-inset-bottom) + 62px));z-index:88;padding:9px;border-radius:14px;background:rgba(9,18,21,.96);border:1px solid rgba(231,197,106,.34);box-shadow:0 14px 34px rgba(0,0,0,.35);pointer-events:auto}
     .lx-chat-drawer.open{display:block}
     .lx-log{height:62px;overflow:auto;padding:2px 3px 7px;color:#e8ede8;font-size:11px;line-height:1.4}
@@ -36,8 +43,8 @@
     .action-bar .stone-slot,.action-bar .stone-slot.ultimate{grid-column:auto!important;grid-row:auto!important;width:44px!important;height:44px!important;border-radius:13px!important;border:1px solid rgba(231,197,106,.56)!important;background:rgba(11,22,24,.92)!important;color:var(--lx-gold)!important;box-shadow:0 7px 18px rgba(0,0,0,.22),inset 0 0 0 1px rgba(255,255,255,.035)!important;font-size:7px!important}
     .action-bar .stone-slot.ultimate{border-color:rgba(231,197,106,.88)!important;background:linear-gradient(145deg,rgba(25,55,45,.96),rgba(11,22,24,.96))!important}
     .action-bar .stone-slot span[style*="opacity"]{font-size:13px!important;color:#69837b!important;opacity:.52!important}
-    #kelo-bag,#kelo-builder,#menu-sheet{border-color:rgba(231,197,106,.45)!important;background:rgba(9,18,21,.97)!important;box-shadow:0 16px 36px rgba(0,0,0,.34)!important;color:#e8ede8!important}
-    @media(max-width:360px){.lx-presence{display:none}.lx-top-btn{padding:0 8px}.lx-side-menu,.lx-side-pvp{width:58px}.lx-side-menu{height:58px}.lx-side-pvp{height:54px}.action-bar{grid-template-columns:repeat(5,41px)!important;gap:5px!important}.action-bar .stone-slot,.action-bar .stone-slot.ultimate{width:41px!important;height:41px!important}}
+    #kelo-bag,#kelo-builder{border-color:rgba(231,197,106,.45)!important;background:rgba(9,18,21,.97)!important;box-shadow:0 16px 36px rgba(0,0,0,.34)!important;color:#e8ede8!important}
+    @media(max-width:360px){.lx-presence{display:none}.lx-top-btn{padding:0 8px}.lx-side-menu,.lx-side-pvp{width:58px}.lx-side-menu{height:58px}.lx-side-pvp{height:54px}.lx-menu-panel{right:72px;width:calc(100vw - 84px)}.action-bar{grid-template-columns:repeat(5,41px)!important;gap:5px!important}.action-bar .stone-slot,.action-bar .stone-slot.ultimate{width:41px!important;height:41px!important}}
   `;
   document.head.appendChild(css);
 
@@ -51,14 +58,47 @@
       <button class="lx-top-btn" id="lx-shop">Boutique</button>
     </div>
     <div class="lx-rail">
-      <button class="lx-side-menu" id="lx-side-menu" aria-label="Abrir menú"><b>◆</b><span>MENÚ</span></button>
+      <button class="lx-side-menu" id="lx-side-menu" aria-label="Abrir menú" aria-expanded="false"><b>◆</b><span>MENÚ</span></button>
       <button class="lx-side-pvp" id="lx-side-pvp" aria-label="Entrar al mundo PvP"><b>⚔</b><span>PVP</span></button>
+    </div>
+    <div class="lx-menu-panel" id="lx-menu-panel" aria-hidden="true">
+      <div class="lx-menu-head"><span>MENÚ</span><button class="lx-menu-close" id="lx-menu-close" aria-label="Cerrar menú">×</button></div>
+      <div class="lx-menu-grid">
+        <button class="lx-menu-item" data-tool="bag">Mochila</button>
+        <button class="lx-menu-item" data-tool="abilities">Habilidades</button>
+        <button class="lx-menu-item" data-tool="profile">Perfil</button>
+        <button class="lx-menu-item" data-tool="chat">Chat</button>
+        <button class="lx-menu-item" data-tool="market">Mercado</button>
+        <button class="lx-menu-item" data-tool="missions">Misiones</button>
+        <button class="lx-menu-item" data-tool="properties">Propiedades</button>
+        <button class="lx-menu-item" data-tool="settings">Ajustes</button>
+      </div>
     </div>
     <div class="lx-chat-drawer" id="lx-chat-drawer">
       <div class="lx-log" id="lx-log"></div>
       <form class="lx-chat-form" id="lx-form"><input id="lx-in" maxlength="80" placeholder="Escribe un mensaje…" autocomplete="off"><button>OK</button></form>
     </div>`;
   document.body.appendChild(root);
+
+  const menuPanel = document.getElementById('lx-menu-panel');
+  const menuButton = document.getElementById('lx-side-menu');
+  function setMenuOpen(force) {
+    const open = typeof force === 'boolean' ? force : !menuPanel.classList.contains('open');
+    menuPanel.classList.toggle('open', open);
+    menuPanel.setAttribute('aria-hidden', String(!open));
+    menuButton.setAttribute('aria-expanded', String(open));
+    if (open) {
+      const drawer = document.getElementById('lx-chat-drawer');
+      if (drawer) drawer.classList.remove('open');
+    }
+    return open;
+  }
+  function closeLuxeMenu() { return setMenuOpen(false); }
+  window.KELO_LUXE = Object.freeze({
+    toggleMenu: setMenuOpen,
+    closeMenu: closeLuxeMenu,
+    isMenuOpen: function(){ return menuPanel.classList.contains('open'); }
+  });
 
   function suppressLegacyUI() {
     const ids = ['kelo-chat','kelo-stones-btn','social-menu-toggle','kelo-online','kelo-minimap','minimap'];
@@ -75,10 +115,6 @@
   const legacyObserver = new MutationObserver(suppressLegacyUI);
   legacyObserver.observe(document.body,{childList:true,subtree:false});
 
-  // The authored rural renderer is now part of the world composition. The old
-  // Luxe prototype used to blank window.renderFarm here, which also suppressed
-  // the modular soil/fence/nature atlases. Leave the active environment hook intact.
-
   function updateGold() {
     const el = document.getElementById('lx-gold');
     if (el && typeof STATE !== 'undefined') el.textContent = 'Oro ' + (STATE.gold || 0);
@@ -86,16 +122,21 @@
   updateGold();
   setInterval(updateGold, 1200);
 
-  document.getElementById('lx-side-menu').onclick = function () {
-    const drawer = document.getElementById('lx-chat-drawer');
-    if (drawer) drawer.classList.remove('open');
-    if (typeof toggleMenu === 'function') toggleMenu();
-  };
+  menuButton.onclick = function () { setMenuOpen(); };
+  document.getElementById('lx-menu-close').onclick = closeLuxeMenu;
+  menuPanel.addEventListener('click', function (e) {
+    const btn = e.target.closest('[data-tool]');
+    if (!btn) return;
+    closeLuxeMenu();
+    const tool = btn.getAttribute('data-tool');
+    if (typeof openSocialTool === 'function') openSocialTool(tool);
+    else if (typeof showToast === 'function') showToast('Menú todavía cargando');
+  });
 
   document.getElementById('lx-side-pvp').onclick = function () {
     const drawer = document.getElementById('lx-chat-drawer');
     if (drawer) drawer.classList.remove('open');
-    if (typeof closeMenu === 'function') closeMenu();
+    closeLuxeMenu();
     if (typeof window.enterPvPWorld === 'function') window.enterPvPWorld();
     else if (typeof showToast === 'function') showToast('PvP todavía cargando');
   };
@@ -122,13 +163,14 @@
   });
 
   window.KELO_LUXE_AUDIT = Object.freeze({
-    version:'luxe-shell-v3.3',
+    version:'luxe-shell-v3.4',
     palette:'forest-ivory-gold',
     hideKwBadge:true,
     hideLocalChip:true,
     hideFarmOverlay:false,
     ruralRenderer:'modular-authored-v1',
     legacyHudSuppressed:true,
+    luxeMenuPanel:true,
     pvpRailButton:true
   });
 })();
