@@ -115,7 +115,7 @@ const afterPlace=await page.evaluate(()=>({
 if(afterPlace.placements<=beforePlacements)throw new Error(`STUDIO_PLACE_DID_NOT_COMMIT:${beforePlacements}->${afterPlace.placements}`);
 
 // Reopen the full mobile workspace without clearing the active asset, then enter Move.
-await page.locator('#kelo-studio-live .ks-bottom.ks-compact [data-act="edit-assets"]').click();
+await page.locator('#kelo-studio-live .ks-bottom.ks-compact .ks-compact-bar [data-act="edit-assets"]').click();
 await page.waitForFunction(()=>{
   const root=document.querySelector('#kelo-studio-live');
   return root?.dataset.compact==='full'&&root.dataset.sheetOpen==='1';
