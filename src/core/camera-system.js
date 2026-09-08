@@ -5,11 +5,11 @@
  * purpose: owner único para comandos de cámara, zoom, viewport/Canvas y conversiones screen↔world sin reescribir el follow legacy
  * public-api: KeloCamera
  * consumes: camera, CONFIG, canvas, ctx, screenW/screenH y updateCamera legacy de engine-a
- * state-owned: base zoom, viewport policy, DPR policy y comandos externos de target/focus
+ * state-owned: targetX/Y, zoom efectivo/base, viewport policy, DPR policy y comandos externos de foco
  * extension-points: setTarget/focus/setBaseZoom/configureViewport/syncViewport/setFollowTuning
  * reuse: gameplay pide foco/zoom al owner; UI/orientación delegan viewport y framing aquí
- * legacy: engine-a conserva temporalmente la matemática interna de follow/dead-zone; KeloCamera posee su entrypoint
- * do-not: NO escribir camera.targetX/Y, CONFIG.zoom, canvas.width/height o reemplazar resize desde features
+ * legacy: engine-a conserva temporalmente la matemática interna de follow/dead-zone; writers legacy de target/zoom quedan capturados por adapters de propiedad
+ * do-not: NO escribir camera.targetX/Y, CONFIG.zoom, canvas.width/height o reemplazar resize desde features nuevas
  */
 (function(root){
   'use strict';
@@ -18,10 +18,13 @@
     throw new Error('KeloCamera: legacy camera/canvas core unavailable');
   }
 
-  const VERSION='kelo-camera-v1.0.0';
+  const VERSION='kelo-camera-v1.1.0';
   const ZOOM_PRESETS=Object.freeze([0.7,0.82,1]);
   const legacyUpdateCamera=typeof updateCamera==='function'?updateCamera:null;
   let baseZoom=Number.isFinite(Number(CONFIG.zoom))&&Number(CONFIG.zoom)>0?Number(CONFIG.zoom):0.82;
+  let effectiveZoom=baseZoom;
+  let managedTargetX=Number(camera.targetX)||0;
+  let managedTargetY=Number(camera.targetY)||0;
   let dprCap=3;
   let pixelPerfect=false;
   let roundPixels=!!CONFIG.roundPixels;
@@ -30,6 +33,13 @@
   let viewportScheduled=false;
   let lastEffectiveZoom=null;
   let lastViewportKey='';
+
+  Object.defineProperty(camera,'targetX',{configurable:true,enumerable:true,get:()=>managedTargetX,set:value=>{const n=Number(value);if(Number.isFinite(n))managedTargetX=n;}});
+  Object.defineProperty(camera,'targetY',{configurable:true,enumerable:true,get:()=>managedTargetY,set:value=>{const n=Number(value);if(Number.isFinite(n))managedTargetY=n;}});
+  Object.defineProperty(CONFIG,'zoom',{configurable:true,enumerable:true,get:()=>effectiveZoom,set:value=>{
+    const n=Number(value);
+    if(Number.isFinite(n)&&n>0){baseZoom=n;effectiveZoom=n;}
+  }});
 
   function orientation(){return root.innerWidth>=root.innerHeight?'landscape':'portrait';}
   function activeDpr(){return Math.max(1,Math.min(Number(root.devicePixelRatio)||1,Math.max(1,Number(dprCap)||1)));}
@@ -52,19 +62,18 @@
   }
   function applyZoom(source){
     const mode=orientation();
-    const effective=effectiveZoomFor(baseZoom,mode);
-    CONFIG.zoom=effective;
-    document.documentElement.style.setProperty('--kelo-camera-zoom',String(effective));
-    const changed=!Number.isFinite(lastEffectiveZoom)||Math.abs(lastEffectiveZoom-effective)>0.0001;
-    lastEffectiveZoom=effective;
+    effectiveZoom=effectiveZoomFor(baseZoom,mode);
+    document.documentElement.style.setProperty('--kelo-camera-zoom',String(effectiveZoom));
+    const changed=!Number.isFinite(lastEffectiveZoom)||Math.abs(lastEffectiveZoom-effectiveZoom)>0.0001;
+    lastEffectiveZoom=effectiveZoom;
     if(changed){
       emit('kelo:camerazoomchange',{
-        source:source||'camera',orientation:mode,baseZoom,effectiveZoom:effective,
-        verticalWorldSpan:root.innerHeight/effective,
+        source:source||'camera',orientation:mode,baseZoom,effectiveZoom,
+        verticalWorldSpan:root.innerHeight/effectiveZoom,
         portraitReferenceWorldSpan:Math.max(root.innerWidth,root.innerHeight)/baseZoom
       });
     }
-    return effective;
+    return effectiveZoom;
   }
   function configureViewport(options){
     const opts=options||{};
@@ -91,11 +100,11 @@
     ctx.imageSmoothingEnabled=smoothing;
     CONFIG.roundPixels=roundPixels;
     syncViewportCss();
-    const effective=applyZoom(source||'viewport');
-    const key=[screenW,screenH,dpr,effective].join(':');
+    const zoom=applyZoom(source||'viewport');
+    const key=[screenW,screenH,dpr,zoom].join(':');
     if(key!==lastViewportKey){
       lastViewportKey=key;
-      emit('kelo:viewportchange',{source:source||'viewport',width:screenW,height:screenH,dpr,orientation:orientation(),baseZoom,effectiveZoom:effective});
+      emit('kelo:viewportchange',{source:source||'viewport',width:screenW,height:screenH,dpr,orientation:orientation(),baseZoom,effectiveZoom:zoom});
       try{root.dispatchEvent(new CustomEvent('kelo:world-audit'));}catch(e){}
     }
     return snapshot();
@@ -127,15 +136,12 @@
   function setTarget(x,y,options){
     const nx=Number(x),ny=Number(y),opts=options||{};
     if(!Number.isFinite(nx)||!Number.isFinite(ny))return false;
-    camera.targetX=nx;camera.targetY=ny;
+    managedTargetX=nx;managedTargetY=ny;
     if(opts.snap===true){camera.x=nx;camera.y=ny;camera.lookOffsetX=0;camera.lookOffsetY=0;}
     emit('kelo:cameratargetchange',{source:opts.source||'api',x:nx,y:ny,snap:opts.snap===true});
     return true;
   }
-  function focus(value,options){
-    if(!value)return false;
-    return setTarget(value.x,value.y,options);
-  }
+  function focus(value,options){if(!value)return false;return setTarget(value.x,value.y,options);}
   function setFollowTuning(next){
     const values=next||{};
     for(const key of ['dampX','dampY','deadXRatio','deadYRatio','lookAheadDist','lookAheadDecay']){
@@ -144,16 +150,16 @@
     return Object.freeze({dampX:CONFIG.dampX,dampY:CONFIG.dampY,deadXRatio:CONFIG.deadXRatio,deadYRatio:CONFIG.deadYRatio,lookAheadDist:CONFIG.lookAheadDist,lookAheadDecay:CONFIG.lookAheadDecay});
   }
   function screenToWorldPoint(sx,sy){
-    const z=Number(CONFIG.zoom)||1;
+    const z=effectiveZoom||1;
     return{x:camera.x+(Number(sx)-screenW/2)/z,y:camera.y+(Number(sy)-screenH/2)/z};
   }
   function worldToScreenPoint(wx,wy){
-    const z=Number(CONFIG.zoom)||1;
+    const z=effectiveZoom||1;
     return{x:(Number(wx)-camera.x)*z+screenW/2,y:(Number(wy)-camera.y)*z+screenH/2};
   }
   function update(dt){if(legacyUpdateCamera)legacyUpdateCamera(dt);}
   function refreshZoom(source){return applyZoom(source||'refresh');}
-  function snapshot(){return Object.freeze({version:VERSION,x:camera.x,y:camera.y,targetX:camera.targetX,targetY:camera.targetY,baseZoom,effectiveZoom:Number(CONFIG.zoom)||1,orientation:orientation(),screenW,screenH,dpr:activeDpr(),dprCap,pixelPerfect,roundPixels,smoothing});}
+  function snapshot(){return Object.freeze({version:VERSION,x:camera.x,y:camera.y,targetX:managedTargetX,targetY:managedTargetY,baseZoom,effectiveZoom,orientation:orientation(),screenW,screenH,dpr:activeDpr(),dprCap,pixelPerfect,roundPixels,smoothing});}
 
   root.updateCamera=update;
   root.resize=()=>syncViewport('legacy-resize-call');
@@ -164,12 +170,12 @@
   root.KeloCamera=Object.freeze({
     version:VERSION,
     setTarget,focus,setFollowTuning,
-    setBaseZoom,getBaseZoom:()=>baseZoom,getEffectiveZoom:()=>Number(CONFIG.zoom)||1,
+    setBaseZoom,getBaseZoom:()=>baseZoom,getEffectiveZoom:()=>effectiveZoom,
     cycleZoom,refreshZoom,getOrientation:orientation,
     configureViewport,syncViewport,scheduleViewportSync,syncViewportCss,
     activeDpr,pixelPerfectZoom,
     screenToWorld:screenToWorldPoint,worldToScreen:worldToScreenPoint,
     snapshot
   });
-  root.KELO_CAMERA_AUDIT=Object.freeze({version:VERSION,owner:'KeloCamera',legacyFollowMath:true,updateCameraOwner:true,viewportOwner:true,zoomOwner:true,targetOwner:true,screenWorldOwner:true});
+  root.KELO_CAMERA_AUDIT=Object.freeze({version:VERSION,owner:'KeloCamera',legacyFollowMath:true,legacyTargetAdapter:true,legacyZoomAdapter:true,updateCameraOwner:true,viewportOwner:true,zoomOwner:true,targetOwner:true,screenWorldOwner:true});
 })(typeof globalThis!=='undefined'?globalThis:window);
