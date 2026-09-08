@@ -8,16 +8,24 @@
 'use strict';
 if(window.KELO_ORIENTATION)return;
 
-const VERSION='mobile-orientation-v1.3.0';
+const VERSION='mobile-orientation-v1.3.1';
 const ZOOM_PRESETS=Object.freeze([0.7,0.82,1]);
 let lastOrientation=null;
 let preferredOrientation=null;
 let syncing=false;
 let portraitBaseZoom=null;
 let lastEffectiveZoom=null;
+let immersiveFallback=false;
 
 function isTouchDevice(){
   return (navigator.maxTouchPoints||0)>0 || !!window.matchMedia?.('(pointer: coarse)').matches;
+}
+function isIOSFamily(){
+  const ua=navigator.userAgent||'';
+  return /iPhone|iPad|iPod/i.test(ua) || (navigator.platform==='MacIntel' && (navigator.maxTouchPoints||0)>1);
+}
+function standaloneActive(){
+  return navigator.standalone===true || !!window.matchMedia?.('(display-mode: standalone)').matches || !!window.matchMedia?.('(display-mode: fullscreen)').matches;
 }
 function orientationFromViewport(){
   return window.innerWidth>=window.innerHeight?'landscape':'portrait';
@@ -35,16 +43,24 @@ function toast(msg){
 }
 function haptic(){try{navigator.vibrate?.(12);}catch(e){}}
 function button(){return document.getElementById('kelo-orientation-btn');}
-function fullscreenSupported(){
+function nativeFullscreenSupported(){
   return typeof document.documentElement?.requestFullscreen==='function';
 }
-function fullscreenActive(){return !!document.fullscreenElement;}
+function nativeFullscreenActive(){return !!document.fullscreenElement;}
+function fullscreenActive(){return nativeFullscreenActive()||immersiveFallback||standaloneActive();}
+function fullscreenMode(){
+  if(nativeFullscreenActive())return'native';
+  if(standaloneActive())return'standalone';
+  if(immersiveFallback)return'immersive';
+  return'windowed';
+}
 function updateButton(current){
   const el=button(); if(!el)return;
   const active=fullscreenActive();
   const orientation=current||physicalOrientation();
   el.dataset.orientation=orientation;
   el.dataset.fullscreen=active?'active':'windowed';
+  el.dataset.fullscreenMode=fullscreenMode();
   el.setAttribute('aria-pressed',String(active));
   el.setAttribute('aria-label',active?'Salir de pantalla completa':'Entrar en pantalla completa');
   el.setAttribute('title',active?'Salir de pantalla completa':'Pantalla completa');
@@ -146,14 +162,19 @@ function scheduleSync(source){
 }
 function emitFullscreenChange(source){
   const active=fullscreenActive();
-  document.documentElement.dataset.keloFullscreen=active?'active':'windowed';
+  const mode=fullscreenMode();
+  document.documentElement.dataset.keloFullscreen=mode;
   document.body?.classList.toggle('kelo-fullscreen-active',active);
+  document.body?.classList.toggle('kelo-immersive-fallback',immersiveFallback);
   updateButton();
   syncViewportCss();
   scheduleSync(source||'fullscreen');
   window.dispatchEvent(new CustomEvent('kelo:fullscreenchange',{detail:{
     active,
-    supported:fullscreenSupported(),
+    nativeActive:nativeFullscreenActive(),
+    supported:nativeFullscreenSupported(),
+    mode,
+    standalone:standaloneActive(),
     source:source||'fullscreen',
     width:window.innerWidth,
     height:window.innerHeight,
@@ -161,29 +182,58 @@ function emitFullscreenChange(source){
   }}));
   return active;
 }
+function closeFullscreenHelp(){
+  document.getElementById('kelo-fullscreen-help')?.remove();
+}
+function showFullscreenHelp(){
+  if(document.getElementById('kelo-fullscreen-help'))return;
+  const overlay=document.createElement('div');
+  overlay.id='kelo-fullscreen-help';
+  overlay.innerHTML=`<div class="kelo-fullscreen-help-card" role="dialog" aria-modal="true" aria-labelledby="kelo-fullscreen-help-title">
+    <div class="kelo-fullscreen-help-mark">⛶</div>
+    <div id="kelo-fullscreen-help-title" class="kelo-fullscreen-help-title">PANTALLA COMPLETA EN iPHONE</div>
+    <div class="kelo-fullscreen-help-copy">Safari no permite poner un juego HTML completo en fullscreen como hace con un vídeo. Kelo World activó el máximo espacio disponible.</div>
+    <div class="kelo-fullscreen-help-steps"><b>Para jugar sin la barra del navegador:</b><span>1. Toca Compartir.</span><span>2. Elige “Añadir a pantalla de inicio”.</span><span>3. Abre Kelo World desde su icono.</span></div>
+    <button type="button" data-kelo-fullscreen-help-close>ENTENDIDO</button>
+  </div>`;
+  overlay.addEventListener('click',(e)=>{if(e.target===overlay||e.target.closest('[data-kelo-fullscreen-help-close]'))closeFullscreenHelp();});
+  document.body.appendChild(overlay);
+}
+function enterImmersiveFallback(source){
+  immersiveFallback=true;
+  emitFullscreenChange(source||'immersive-fallback');
+  if(isIOSFamily()&&!standaloneActive())showFullscreenHelp();
+  else toast('Modo inmersivo activado');
+  return true;
+}
+function exitImmersiveFallback(source){
+  immersiveFallback=false;
+  closeFullscreenHelp();
+  emitFullscreenChange(source||'immersive-exit');
+  return true;
+}
 async function requestFullscreenIfUseful(){
   if(fullscreenActive())return true;
   const root=document.documentElement;
-  if(!fullscreenSupported()){
-    syncViewportCss();
-    scheduleSync('fullscreen-fallback');
-    toast('Kelo World ya está usando el máximo espacio disponible en este navegador.');
-    return false;
-  }
+  if(!nativeFullscreenSupported())return enterImmersiveFallback('fullscreen-unsupported');
   try{
     await root.requestFullscreen({navigationUI:'hide'});
     return true;
   }catch(e){
-    syncViewportCss();
-    scheduleSync('fullscreen-denied');
-    toast('Pantalla completa no está disponible en este navegador.');
-    return false;
+    return enterImmersiveFallback('fullscreen-denied');
   }
 }
 async function exitFullscreen(){
-  if(!fullscreenActive())return true;
-  if(typeof document.exitFullscreen!=='function')return false;
-  try{await document.exitFullscreen();return true;}catch(e){return false;}
+  if(nativeFullscreenActive()){
+    if(typeof document.exitFullscreen!=='function')return false;
+    try{await document.exitFullscreen();return true;}catch(e){return false;}
+  }
+  if(immersiveFallback)return exitImmersiveFallback('immersive-button-exit');
+  if(standaloneActive()){
+    toast('Kelo World está abierto como app. Sal con el gesto del sistema.');
+    return false;
+  }
+  return true;
 }
 async function toggleFullscreen(){
   const el=button();
@@ -244,10 +294,19 @@ function ensureButton(){
     #kelo-orientation-btn[data-fullscreen="active"]::before{opacity:1;transform:scale(1)}
     #kelo-orientation-btn[data-fullscreen="active"] .kelo-fullscreen-icon{transform:scale(.92);filter:drop-shadow(0 0 11px color-mix(in srgb,var(--lx-gold,#e7c56a) 34%,transparent))}
     .kelo-orientation-fallback{position:fixed;z-index:79;right:max(8px,env(safe-area-inset-right));top:max(190px,calc(env(safe-area-inset-top) + 182px));pointer-events:auto}
+    body.kelo-immersive-fallback{position:fixed!important;inset:0!important;width:var(--kelo-vw,100vw)!important;height:var(--kelo-vh,100dvh)!important;overscroll-behavior:none!important;background:#05070a}
     :fullscreen{background:#05070a}
     :fullscreen #game-canvas,:fullscreen #ui-layer,:fullscreen #kelo-luxe{width:100vw!important;height:100vh!important;max-width:100vw!important;max-height:100vh!important}
+    #kelo-fullscreen-help{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;padding:max(18px,env(safe-area-inset-top)) max(18px,env(safe-area-inset-right)) max(18px,env(safe-area-inset-bottom)) max(18px,env(safe-area-inset-left));background:rgba(3,8,10,.68);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);pointer-events:auto}
+    .kelo-fullscreen-help-card{width:min(340px,92vw);padding:22px 18px 18px;border-radius:24px;border:1px solid color-mix(in srgb,var(--lx-gold,#e7c56a) 48%,transparent);background:linear-gradient(155deg,rgba(21,48,43,.98),rgba(8,16,19,.99));box-shadow:0 24px 70px rgba(0,0,0,.48),inset 0 0 0 1px rgba(255,255,255,.035);color:var(--lx-ivory,#fff4d6);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;text-align:center}
+    .kelo-fullscreen-help-mark{font-size:34px;line-height:1;color:var(--lx-gold,#e7c56a);text-shadow:0 0 18px color-mix(in srgb,var(--lx-gold,#e7c56a) 30%,transparent)}
+    .kelo-fullscreen-help-title{margin-top:10px;font-size:12px;font-weight:900;letter-spacing:.12em;color:var(--lx-gold,#e7c56a)}
+    .kelo-fullscreen-help-copy{margin-top:10px;font-size:12px;line-height:1.45;color:#e9efe9}
+    .kelo-fullscreen-help-steps{margin-top:14px;padding:12px;border-radius:14px;background:rgba(0,0,0,.18);display:flex;flex-direction:column;gap:6px;text-align:left;font-size:11px;line-height:1.35;color:var(--lx-muted,#aab7ae)}
+    .kelo-fullscreen-help-steps b{color:var(--lx-ivory,#fff4d6)}
+    .kelo-fullscreen-help-card button{margin-top:15px;width:100%;height:42px;border-radius:13px;border:1px solid color-mix(in srgb,var(--lx-gold,#e7c56a) 58%,transparent);background:var(--lx-forest,#173f36);color:var(--lx-gold,#e7c56a);font:900 11px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;letter-spacing:.12em}
     @media (orientation:landscape){.kelo-orientation-fallback{top:max(154px,calc(env(safe-area-inset-top) + 146px))}}
-    @media (max-height:430px) and (orientation:landscape){#kelo-orientation-btn{width:48px;min-height:48px;border-radius:14px}.kelo-orientation-fallback{top:max(128px,calc(env(safe-area-inset-top) + 120px))}}
+    @media (max-height:430px) and (orientation:landscape){#kelo-orientation-btn{width:48px;min-height:48px;border-radius:14px}.kelo-orientation-fallback{top:max(128px,calc(env(safe-area-inset-top) + 120px))}.kelo-fullscreen-help-card{width:min(520px,82vw);padding:14px 16px}.kelo-fullscreen-help-copy{margin-top:7px}.kelo-fullscreen-help-steps{margin-top:8px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px}.kelo-fullscreen-help-card button{margin-top:10px}}
     @media (prefers-reduced-motion:reduce){#kelo-orientation-btn,#kelo-orientation-btn::before,#kelo-orientation-btn .kelo-fullscreen-icon{transition:none!important}}
   `;
   document.head.appendChild(style);
@@ -276,13 +335,16 @@ function boot(){
   window.addEventListener('orientationchange',()=>{setTimeout(()=>{syncViewportCss();window.dispatchEvent(new Event('resize'));applyOrientation('orientationchange');},120);},{passive:true});
   window.visualViewport?.addEventListener('resize',()=>scheduleSync('visualViewport'),{passive:true});
   document.addEventListener('fullscreenchange',()=>emitFullscreenChange('native-fullscreen'));
-  document.addEventListener('fullscreenerror',()=>{updateButton();toast('No se pudo activar pantalla completa.');});
+  document.addEventListener('fullscreenerror',()=>{if(!nativeFullscreenActive())enterImmersiveFallback('fullscreenerror');});
   try{screen.orientation?.addEventListener?.('change',()=>scheduleSync('screen.orientation'));}catch(e){}
 }
 
 const fullscreenApi=Object.freeze({
   active:fullscreenActive,
-  supported:fullscreenSupported,
+  nativeActive:nativeFullscreenActive,
+  mode:fullscreenMode,
+  supported:nativeFullscreenSupported,
+  standalone:standaloneActive,
   enter:requestFullscreenIfUseful,
   exit:exitFullscreen,
   toggle:toggleFullscreen
@@ -302,9 +364,9 @@ window.KELO_ORIENTATION=Object.freeze({
   setBaseZoom:(value)=>setBaseZoom(value,'api'),
   verticalWorldSpan:()=>{const z=readRuntimeZoom()||1;return window.innerHeight/z;},
   portraitReferenceWorldSpan:()=>Math.max(window.innerWidth,window.innerHeight)/ensurePortraitBaseZoom(),
-  supported:()=>({touch:isTouchDevice(),orientationLock:!!(screen.orientation&&typeof screen.orientation.lock==='function'),fullscreen:fullscreenSupported()})
+  supported:()=>({touch:isTouchDevice(),orientationLock:!!(screen.orientation&&typeof screen.orientation.lock==='function'),fullscreen:nativeFullscreenSupported(),standalone:standaloneActive(),ios:isIOSFamily()})
 });
-window.KELO_ORIENTATION_AUDIT=Object.freeze({version:VERSION,autoDetect:true,viewportSync:true,fullscreenButton:true,fullscreenToggle:true,fullscreenEvent:true,portrait:true,landscape:true,equivalentPortraitZoom:true,verticalFovLock:true,orientationLockProgressive:true,iosSafeFallback:true,reusesLuxeRail:true,reusesLuxeTokens:true});
+window.KELO_ORIENTATION_AUDIT=Object.freeze({version:VERSION,autoDetect:true,viewportSync:true,fullscreenButton:true,fullscreenToggle:true,fullscreenEvent:true,fullscreenImmersiveFallback:true,iosFullscreenGuidance:true,portrait:true,landscape:true,equivalentPortraitZoom:true,verticalFovLock:true,orientationLockProgressive:true,iosSafeFallback:true,reusesLuxeRail:true,reusesLuxeTokens:true});
 
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 })();
