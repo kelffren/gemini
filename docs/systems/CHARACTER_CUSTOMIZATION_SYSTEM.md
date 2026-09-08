@@ -2,7 +2,7 @@
 
 ## Status
 
-**Foundation candidate — Character Creator V2.** This document describes the contract implemented on the feature branch. It becomes `foundation-active` only after deterministic CI and the Pages mobile LIVE audit pass on the merged revision.
+**Foundation active — Character Creator V2.** Validated on merged `main` revision `035af63e3a5f7b72283659cf02454bb048ade350`: deterministic Character Customization CI passed, GitHub Pages deployed successfully, and the post-deploy mobile LIVE audit passed in portrait 390×844 and landscape 844×390 with no character missing-assets, page errors, console errors, viewport overflow or leaked `character-customizer` input lock.
 
 ## Owner and responsibility
 
@@ -309,7 +309,7 @@ If a new feature needs a capability the owner lacks, extend the smallest existin
 
 ## Deterministic validation
 
-Static/CI validation must cover at minimum:
+Static/CI validation covers:
 
 - 24 shared slots and all directional orders
 - V1 state compatibility
@@ -327,4 +327,4 @@ Static/CI validation must cover at minimum:
 - no gameplay-stat mutation
 - no duplicate polling/loaders
 
-The LIVE audit additionally validates the mobile UI, portrait/landscape preview, real asset HTTP loading, palette rendering, close/reopen behavior and release of input control.
+The LIVE audit validates the mobile UI, portrait/landscape preview, real asset HTTP loading, palette rendering, close behavior and release of input control. The activation run verified 20/20 starter assets with HTTP 200, 19 palettes, 4 presets, 12 palette builds, no missing character assets, and a clean input-lock snapshot after closing the editor.

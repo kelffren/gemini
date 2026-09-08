@@ -54,10 +54,13 @@ jobs:
           else
             echo 'blank=false' >> "$GITHUB_OUTPUT"
           fi
-      - name: Audit live hero sprite on mobile and desktop
+      - name: Audit legacy render hot path on LIVE
         env: &liveenv
           AUDIT_URL: https://kelffren.github.io/gemini/
           CHROME_BIN: /usr/bin/google-chrome
+        run: node scripts/live-render-hotpath-audit.mjs
+      - name: Audit live hero sprite on mobile and desktop
+        env: *liveenv
         run: node scripts/live-hero-audit.mjs
       - name: Audit blank world reset
         if: steps.mode.outputs.blank == 'true'
