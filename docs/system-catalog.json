@@ -17,6 +17,15 @@
       "technicalDoc": "docs/systems/INPUT_GATE.md",
       "playerVisible": false,
       "status": "foundation-transitional"
+    },
+    {
+      "id": "movement",
+      "owner": "KeloMovement",
+      "source": "src/core/movement-system.js",
+      "technicalDoc": "docs/systems/MOVEMENT_SYSTEM.md",
+      "playerVisible": true,
+      "playerGuideAnchor": "movimiento",
+      "status": "foundation-transitional"
     }
   ]
 }
