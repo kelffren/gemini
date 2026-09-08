@@ -38,9 +38,23 @@ jobs:
           node --check scripts/property-editor-audit.js
           node --check scripts/property-editor-browser-audit.mjs
           node scripts/property-editor-audit.js
+      - name: Runtime activation contract
+        id: runtime
+        run: |
+          mkdir -p artifacts
+          if grep -q 'src/ui/property-editor.js?v=' index.html; then
+            echo 'active=true' >> "$GITHUB_OUTPUT"
+            printf '{"status":"live","browserAuditRequired":true}\n' > artifacts/property-editor-runtime-status.json
+          else
+            echo 'active=false' >> "$GITHUB_OUTPUT"
+            printf '{"status":"dormant","browserAuditRequired":false,"reason":"property-editor.js is not booted by index.html"}\n' > artifacts/property-editor-runtime-status.json
+            echo 'Property editor is DORMANT in the current Foundation runtime; unit contract passed and browser smoke is not applicable.'
+          fi
       - name: Install Playwright browser package
+        if: steps.runtime.outputs.active == 'true'
         run: npm install --no-save playwright@1.55.0
       - name: Serve branch locally
+        if: steps.runtime.outputs.active == 'true'
         run: |
           python3 -m http.server 8000 --bind 127.0.0.1 > /tmp/kelo-property-http.log 2>&1 &
           echo $! > /tmp/kelo-property-http.pid
@@ -48,6 +62,7 @@ jobs:
           cat /tmp/kelo-property-http.log
           exit 1
       - name: Mobile and desktop browser audit
+        if: steps.runtime.outputs.active == 'true'
         env:
           AUDIT_URL: http://127.0.0.1:8000/
           CHROME_BIN: /usr/bin/google-chrome
@@ -58,4 +73,4 @@ jobs:
         with:
           name: property-editor-browser-audit
           path: artifacts/property-editor-*
-          if-no-files-found: warn
+          if-no-files-found: error
