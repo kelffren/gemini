@@ -58,6 +58,7 @@ function castAimedSkill(index, typeId, dirX, dirY) {
 }
 renderActionBar = function() {
   const container = document.getElementById('action-bar-container');
+  if (!container) return;
   container.innerHTML = '';
   STATE.equipped.forEach((stone, idx) => {
     const slot = document.createElement('div');
