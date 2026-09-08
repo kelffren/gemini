@@ -36,18 +36,47 @@ function directRuntimeFiles(){
   }
   return set;
 }
-// Wrapper rules intentionally count bare globals plus explicit window/globalThis/root assignments.
-// This prevents named-function core reassignments from hiding behind a narrower function-literal regex.
-const coreAssignment=function(name){return new RegExp('(?:\\b(?:window|globalThis|root)\\.)?\\b'+name+'\\s*=','g');};
+function stripNonCode(text){
+  let out='',state='code',quote='',escaped=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i],n=text[i+1];
+    if(state==='line'){
+      if(c==='\n'){state='code';out+='\n';}else out+=' ';
+      continue;
+    }
+    if(state==='block'){
+      if(c==='*'&&n==='/'){out+='  ';i++;state='code';}
+      else out+=c==='\n'?'\n':' ';
+      continue;
+    }
+    if(state==='string'){
+      if(escaped){escaped=false;out+=c==='\n'?'\n':' ';continue;}
+      if(c==='\\'){escaped=true;out+=' ';continue;}
+      if(c===quote){state='code';quote='';out+=' ';continue;}
+      out+=c==='\n'?'\n':' ';
+      continue;
+    }
+    if(c==='/'&&n==='/'){out+='  ';i++;state='line';continue;}
+    if(c==='/'&&n==='*'){out+='  ';i++;state='block';continue;}
+    if(c==='"'||c==="'"||c==='`'){state='string';quote=c;out+=' ';continue;}
+    out+=c;
+  }
+  return out;
+}
+function globalAssignment(name){
+  const escaped=name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  return new RegExp('(?:\\b(?:window|globalThis|root)\\.'+escaped+'\\s*=)|(?:^|[;{}]|\\))\\s*'+escaped+'\\s*=','gm');
+}
 const rules=[
-  ['modalLock',/KELO_MODAL_INPUT_LOCK/g],
+  ['modalLockMention',/\bKELO_MODAL_INPUT_LOCK\b/g],
+  ['modalLockWrite',globalAssignment('KELO_MODAL_INPUT_LOCK')],
   ['buildMode',/\bisBuildMode\b/g],
-  ['processInputWrapper',coreAssignment('processInput')],
-  ['movementWrapper',coreAssignment('updateMovement')],
-  ['renderWrapper',coreAssignment('render')],
-  ['avatarWrapper',coreAssignment('renderAvatar')],
-  ['simulationWrapper',coreAssignment('updateSimulation')],
-  ['socialToolWrite',/\bopenSocialTool\s*=\s*function\b/g],
+  ['processInputWrapper',globalAssignment('processInput')],
+  ['movementWrapper',globalAssignment('updateMovement')],
+  ['renderWrapper',globalAssignment('render')],
+  ['avatarWrapper',globalAssignment('renderAvatar')],
+  ['simulationWrapper',globalAssignment('updateSimulation')],
+  ['socialToolWrite',globalAssignment('openSocialTool')],
   ['obstaclesPush',/\bobstacles\.push\s*\(/g],
   ['setInterval',/\bsetInterval\s*\(/g],
   ['mutationObserver',/\bnew\s+MutationObserver\b/g],
@@ -59,7 +88,8 @@ const runtimeTotals=Object.fromEntries(rules.map(r=>[r[0],0]));
 const byRule=Object.fromEntries(rules.map(r=>[r[0],[]]));
 const runtimeByRule=Object.fromEntries(rules.map(r=>[r[0],[]]));
 for(const file of files){
-  const text=fs.readFileSync(file.abs,'utf8');
+  const raw=fs.readFileSync(file.abs,'utf8');
+  const text=stripNonCode(raw);
   const isRuntime=runtimeFiles.has(file.rel);
   for(const [name,re] of rules){
     re.lastIndex=0;let count=0;while(re.exec(text))count+=1;
