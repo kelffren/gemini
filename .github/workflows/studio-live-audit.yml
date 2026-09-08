@@ -1,0 +1,39 @@
+name: Kelo Studio LIVE audit
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/studio/**'
+      - 'src/ui/studio-launcher.js'
+      - 'src/core/input-lock-system.js'
+      - 'src/core/input-system.js'
+      - 'index.html'
+      - 'scripts/studio-live-audit.mjs'
+      - '.github/workflows/studio-live-audit.yml'
+  workflow_dispatch:
+
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Syntax
+        run: node --check scripts/studio-live-audit.mjs
+      - name: Install Playwright
+        run: npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund playwright@1.55.0
+      - name: Audit deployed Kelo Studio vertical slice
+        env:
+          AUDIT_URL: https://kelffren.github.io/gemini/
+          CHROME_BIN: /usr/bin/google-chrome
+        run: node scripts/studio-live-audit.mjs
+      - name: Upload Studio LIVE evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: studio-live-audit
+          path: artifacts/
+          if-no-files-found: warn
