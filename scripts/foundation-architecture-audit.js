@@ -76,7 +76,8 @@ function isAuthorizedCoreWrapper(entry, ruleName){
     'src/core/input-system.js':'owner: KeloInput',
     'src/core/movement-system.js':'owner: KeloMovement',
     'src/core/render-extension-system.js':'owner: KeloRender',
-    'src/core/simulation-extension-system.js':'owner: KeloSimulation'
+    'src/core/simulation-extension-system.js':'owner: KeloSimulation',
+    'src/core/avatar-render-system.js':'owner: KeloAvatar'
   };
   const ownerMarker=authorized[entry.file];
   if(!ownerMarker||!exists(entry.file))return false;
