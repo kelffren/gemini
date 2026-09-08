@@ -1,6 +1,6 @@
 # ENGINE_MAP — Kelo World
 
-> **ANTES DE CREAR O MODIFICAR UN SISTEMA:** lee `docs/KELO_FOUNDATION.md` y `AGENTS.md`. Toda feature nueva debe reutilizar un OWNER existente o justificar una CAPACIDAD nueva.
+> **ANTES DE CREAR O MODIFICAR UN SISTEMA:** lee `docs/KELO_FOUNDATION.md`, `docs/SYSTEM_DOCUMENTATION_STANDARD.md` y `AGENTS.md`. Toda feature nueva debe reutilizar un OWNER existente o justificar una CAPACIDAD nueva.
 
 **Estado:** índice maestro operativo del runtime actual.  
 **Foundation baseline:** 2026-09-08 · `main` `ef6bdd087b851d36768e7f3a31ca767974d3d21e`.  
@@ -28,7 +28,7 @@ Estados válidos:
 
 # ESTADO DEL PROYECTO EN 60 SEGUNDOS
 
-Kelo World es un juego web 2D top-down móvil-first sobre Canvas. El runtime todavía carga una cadena extensa de `engine-*.js`, pero los dominios modernos ya se están moviendo a `src/` con contratos explícitos: physics, environment, abilities, visuals, property, instances, systems y UI.
+Kelo World es un juego web 2D top-down móvil-first sobre Canvas. El runtime todavía carga una cadena extensa de `engine-*.js`, pero los dominios modernos ya se están moviendo a `src/` con contratos explícitos: core/events, input locks, physics, environment, abilities, visuals, combat/effects/melee, property, instances, systems y UI.
 
 La Foundation NO crea un segundo engine. El objetivo es reducir progresivamente los engines históricos hasta que el contenido nuevo entre por owners y contratos estables.
 
@@ -36,11 +36,12 @@ La existencia de un archivo en `src/` NO demuestra por sí sola que esté LIVE. 
 
 ---
 
-# ORDEN DE CARGA — BLOQUES REALES DE V6.53
+# ORDEN DE CARGA — BLOQUES REALES DE V6.53 FOUNDATION
 
 `index.html` carga conceptualmente en este orden:
 
 ```text
+0. Foundation primitives: KeloEvents + KeloInputLocks
 1. collision-utils + engine-a..k
 2. environment contracts / atlases / world-map + engine-l
 3. engine-m..aj + character appearance + pvp-world
@@ -66,6 +67,7 @@ El script cargado más tarde puede envolver o modificar globals anteriores. Por 
 | Responsabilidad | Owner / API | Estado | Nota Foundation |
 |---|---|---|---|
 | Core state / game loop base | `engine-a.js` | OWNER LIVE / NEEDS_AUDIT | Demasiadas responsabilidades; extracción incremental, no rewrite |
+| Input lock claims | `src/core/input-lock-system.js` / `KeloInputLocks` | OWNER LIVE FOUNDATION | Token claims; `KELO_MODAL_INPUT_LOCK` queda como adapter legacy temporal |
 | Input base | `engine-a.js` | NEEDS_AUDIT | Debe terminar produciendo intención únicamente |
 | Movement | `engine-a.js` + `engine-ac.js` + `engine-ah.js` | NEEDS_AUDIT | Hay wrapper chain y locks compartidos; consolidar sin cambiar feel |
 | Collision primitives | `src/physics/collision-utils.js` / `KELO_COLLISION` | OWNER LIVE | No duplicar geometría |
@@ -74,7 +76,7 @@ El script cargado más tarde puede envolver o modificar globals anteriores. Por 
 | World renderer | `src/environment/world-map.js` / `KELO_WORLD_RENDERER` | OWNER LIVE | World content entra por contracts/renderer |
 | Environment assets/contracts | `src/environment/*` | OWNER/SUPPORT | Registry/contracts antes de hardcode |
 | Visual/VFX | `src/visuals/*` / `KeloVisualSystem` | OWNER LIVE | Presentación no decide gameplay |
-| Event bus | `src/core/events/event-bus.js` / `KeloEvents` | DYNAMIC LIVE | Primitive genérico; reutilizar, no crear otro bus global |
+| Event bus | `src/core/events/event-bus.js` / `KeloEvents` | DYNAMIC LIVE + early Foundation load | Primitive genérico; reutilizar, no crear otro bus global |
 | Combat foundation | `KeloCombatEngine` + Hit/Damage resolvers | DYNAMIC LIVE | Gameplay/presentation separados; server adapter puede reemplazar authority |
 | Effects foundation | `KeloEffectEngine` | DYNAMIC LIVE | Registry data-driven de efectos |
 | Melee foundation | `KeloMeleeEngine` | DYNAMIC LIVE | Perfil → CombatEngine; no HP/render directo |
@@ -92,7 +94,7 @@ El script cargado más tarde puede envolver o modificar globals anteriores. Por 
 | Instances | `src/instances/*` | OWNER LIVE | Reutilizar runtime/bridges existentes |
 | World Builder runtime | `src/environment/world-builder-system.js` | OWNER/SUPPORT / NEEDS_AUDIT | Runtime bien separado de authority; collider/render sync aún tiene deuda |
 | UI | `src/ui/*` | CONSUMER | UI consume APIs; no gobierna gameplay state ajeno |
-| Modal input lock | global `KELO_MODAL_INPUT_LOCK` escrito por varias UIs | NEEDS_AUDIT | Foundation debe introducir owner único y migrar writers |
+| Legacy modal lock writers | varias UIs escribiendo `KELO_MODAL_INPUT_LOCK` | LEGACY / MIGRATION | Migrar a `KeloInputLocks.acquire/release(token)` uno por uno |
 | `force-unlock-move.js` | ninguno: parche | HOTFIX | Retirar solo al arreglar lock ownership |
 | Runtime bootstrap | `src/core/kelo-runtime-bootstrap.js` | DYNAMIC LIVE | Actualmente lanzado desde `profile-panel-close.js`; boot ownership debe limpiarse después |
 
@@ -104,6 +106,7 @@ Antes de envolver core, buscar y reutilizar:
 
 ```text
 KeloEvents
+KeloInputLocks
 KELO_COLLISION
 KELO_WORLD_RENDERER.draw
 drawPreActors
@@ -124,7 +127,7 @@ Prohibición Foundation: no introducir wrappers nuevos directos de `render`, `re
 
 Deuda prioritaria, sin borrar a ciegas:
 
-1. Input/movement locks y `force-unlock-move`.
+1. Migrar writers legacy de modal input a `KeloInputLocks` y retirar `force-unlock-move` cuando los smoke tests lo permitan.
 2. Movement wrapper chain `engine-a → engine-ac → engine-ah`.
 3. Abilities/stones legacy en engines vs `src/abilities/*`.
 4. Inventory/equipment legacy state vs sistemas modernos.
@@ -156,6 +159,26 @@ Contenido nuevo no debe crear una arquitectura paralela.
 
 ---
 
+# DOCUMENTACIÓN OBLIGATORIA
+
+Cada sistema/capacidad nueva debe cumplir `docs/SYSTEM_DOCUMENTATION_STANDARD.md`:
+
+```text
+CODE
+  ↓
+docs/systems/<SYSTEM>.md        ← humanos / IA
+  ↓
+docs/system-catalog.json       ← fuente de verdad documental
+  ↓
+guide.html (si playerVisible)  ← jugadores
+  ↓
+system-documentation-audit.js  ← CI
+```
+
+Un cambio de contrato no se considera completo si la documentación técnica o la mecánica pública queda desactualizada.
+
+---
+
 # ONLINE-FIRST
 
 Leer `docs/ONLINE_FIRST.md`.
@@ -166,17 +189,19 @@ Regla: UI/cliente solicita operaciones; autoridad crítica puede migrar al serve
 
 # FOUNDATION STATUS
 
-| Criterio | Estado baseline |
+| Criterio | Estado Foundation |
 |---|---|
 | Constitución técnica | ✅ `docs/KELO_FOUNDATION.md` |
 | Entrada obligatoria para agentes/humanos | ✅ `AGENTS.md` |
-| ENGINE_MAP sincronizado a V6.53 baseline | ✅ este documento |
+| ENGINE_MAP sincronizado a V6.53 Foundation | ✅ este documento |
+| Estándar de documentación | ✅ `docs/SYSTEM_DOCUMENTATION_STANDARD.md` |
+| Catálogo documental + guía pública | ✅ `docs/system-catalog.json` + `guide.html` |
 | Owner único para todos los dominios críticos | ⚠️ en progreso |
 | Cero hotfix watchdogs | ❌ `force-unlock-move.js` todavía requerido |
 | Cero nuevos wrappers core | ✅ política + Foundation audit para deuda nueva |
 | Legacy totalmente clasificado/migrado | ⚠️ en progreso |
 | APIs públicas completas documentadas | ⚠️ en progreso |
-| CI arquitectónico | ✅ workflow Foundation añadido; falta validación del run |
+| CI arquitectónico/documental | ✅ workflow Foundation en rama; falta validar run de PR |
 | `main` protegido | ❌ baseline GitHub indica branch sin protección |
 | Móvil/desktop/LIVE post-migración | pendiente por cada cambio conductual |
 
@@ -191,5 +216,9 @@ Antes de escribir código:
 - CONTENIDO → REUTILIZA.
 - CAPACIDAD → EXTIENDE EL OWNER.
 - NUNCA → DUPLICA.
+
+Después de cambiar un sistema:
+
+> **¿SU DOCUMENTO TÉCNICO Y SU GUÍA DE JUGADOR SIGUEN DICIENDO LA VERDAD?**
 
 Para las reglas completas, ver `docs/KELO_FOUNDATION.md`.
