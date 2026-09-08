@@ -1,3 +1,16 @@
+/* KELO-INDEX
+ * area: LEGACY TRAINING DUMMY
+ * owner: training dummy legacy; extension owners KeloSimulation + KeloRender
+ * keys: DUMMY HP RESPAWN SIMULATION RENDER FOUNDATION
+ * purpose: conserva dummy de entrenamiento sin wrappers core ni timer no-op
+ * public-api: window.trainingDummy
+ * consumes: KeloSimulation, KeloRender, skillShots, tile registry
+ * state-owned: dummy legacy + authored visual readiness
+ * extension-points: KeloSimulation.after + KeloRender.afterFrame
+ * reuse: no añadir enemigos nuevos aquí
+ * legacy: training prototype
+ * do-not: NO envolver updateSimulation/render ni crear polling sin efecto
+ */
 (function () {
   const dummy = {
     id: 'dummy_plaza',
@@ -23,7 +36,7 @@
   let authoredReady = false;
   let drawCount = 0;
   window.KELO_TRAINING_DUMMY_AUDIT = {
-    version:'training-dummy-v1.1',
+    version:'training-dummy-v1.2-foundation',
     ready:false,
     assetLoaded:false,
     failed:false,
@@ -34,7 +47,10 @@
     labelRemoved:true,
     drawCount:0,
     decorationReset:true,
-    decorationResetSuppressed:true
+    decorationResetSuppressed:true,
+    renderOwner:'KeloRender',
+    simulationOwner:'KeloSimulation',
+    pollingTimers:0
   };
 
   if (resetActive()) {
@@ -96,9 +112,8 @@
     return !dummy.dead && Math.hypot(x - dummy.x, y - dummy.y) < (r || 40);
   }
 
-  const _upd = updateSimulation;
-  updateSimulation = function (dt) {
-    _upd(dt);
+  function updateDummy(context) {
+    const dt=context.dt;
     if (dummy.dead) {
       dummy.respawnIn -= dt;
       if (dummy.respawnIn <= 0) {
@@ -111,7 +126,7 @@
         if (nearDummy(s.x, s.y, 28) || nearDummy(s.tx, s.ty, 36)) hitDummy(18);
       });
     }
-  };
+  }
 
   window.addEventListener('pointerdown', function () {
     if (typeof melee === 'undefined') return;
@@ -124,9 +139,7 @@
     ctx.fill();
   }
 
-  const _nRender = render;
-  render = function () {
-    _nRender();
+  function drawDummy() {
     if (resetActive()) {
       window.KELO_TRAINING_DUMMY_AUDIT.decorationReset=true;
       window.KELO_TRAINING_DUMMY_AUDIT.decorationResetSuppressed=true;
@@ -154,12 +167,10 @@
     drawHp(dummy);
     if (typeof simulatedPlayers !== 'undefined') simulatedPlayers.forEach(drawHp);
     ctx.restore();
-  };
+  }
 
-  setInterval(function () {
-    if (dummy.dead) return;
-    if (Math.hypot(localPlayer.x - dummy.x, localPlayer.y - dummy.y) < 58 && localPlayer.vx + localPlayer.vy !== undefined) {
-      /* proximity tag only */
-    }
-  }, 400);
+  if(!window.KeloSimulation) throw new Error('KeloSimulation unavailable before engine-o');
+  if(!window.KeloRender) throw new Error('KeloRender unavailable before engine-o');
+  window.KeloSimulation.after('engine-o:training-dummy', updateDummy, 20);
+  window.KeloRender.afterFrame('engine-o:training-dummy', drawDummy, 60);
 })();
