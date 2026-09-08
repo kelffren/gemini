@@ -34,38 +34,76 @@ export async function openKeloStudioLive({ root = globalThis } = {}) {
   let draftId=draft.draftId;
   const mirror=installStudioAuthorityMirror({adapter:studio.adapter,actorId,getDraftId:()=>draftId});
   for(const e of studio.kernel.document.entities)mirror.seed(e.id,e.source?.authorityPlacementId||e.id);
+  for(const c of Object.values(studio.kernel.document.navigation?.collisions||{}))mirror.seedCollision(c.collisionId,c.collisionId);
 
   let inputLockToken=null,overlay=null,shell=null,unregisterInput=null,detachPointer=null,frame=0,running=true,mode='select',dragEntity=null,onKey=null;
   try {
     inputLockToken=root.KeloInputLocks.acquire('kelo-studio',{kind:'creator-session',draftId});
     overlay=createStudioOverlayCanvas({host:root.document.body});
     const assets=studio.adapter.assetCatalog.list()||[];
-    const updateShell=()=>{shell?.setHistory({canUndo:studio.kernel.history.canUndo,canRedo:studio.kernel.history.canRedo});shell?.setStatus(`${mode.toUpperCase()} · ${studio.kernel.document.entities.length} entities · ${studio.kernel.history.undoDepth} undo`);};
+    const materials=Array.from(new Set([...(root.KELO_WORLD_BUILDER?.materials||[]),...Object.keys(root.KELO_TERRAIN_CONTRACT?.materials||{})]));
+    const groundMaterial=materials.includes('grass')?'grass':materials[0]||'grass';
+    const pathMaterial=materials.includes('marble')?'marble':materials[1]||materials[0]||'grass';
+    const surfaceCount=()=>Object.keys(studio.kernel.document.terrain||{}).length;
+    const collisionCount=()=>Object.keys(studio.kernel.document.navigation?.collisions||{}).length;
+    const updateShell=()=>{shell?.setHistory({canUndo:studio.kernel.history.canUndo,canRedo:studio.kernel.history.canRedo});shell?.setStatus(`${mode.toUpperCase()} · ${studio.kernel.document.entities.length} objects · ${surfaceCount()} surface · ${collisionCount()} collision · ${studio.kernel.history.undoDepth} undo`);};
     async function guarded(fn){try{await fn();updateShell();}catch(e){toast(root,e.message||String(e));}}
-    function setMode(next){mode=['select','move','placement'].includes(next)?next:'select';dragEntity=null;if(mode!=='placement')studio.tools.placement.cancel();updateShell();}
-    function beginPlacement(assetId){try{studio.tools.placement.start(assetId);mode='placement';updateShell();}catch(e){toast(root,e.message);}}
+    function setMode(next){
+      mode=['select','move','placement','terrain','path','collision'].includes(next)?next:'select';dragEntity=null;
+      if(mode!=='placement')studio.tools.placement.cancel();
+      if(mode!=='terrain'&&mode!=='path')studio.tools.terrain.cancel();
+      studio.tools.collision.setVisible(mode==='collision');
+      if(mode==='terrain')studio.tools.terrain.configure({role:'terrain',material:groundMaterial,erase:false});
+      if(mode==='path')studio.tools.terrain.configure({role:'path',material:pathMaterial,erase:false});
+      updateShell();
+    }
+    function beginPlacement(assetId){try{studio.tools.terrain.cancel();studio.tools.collision.setVisible(false);studio.tools.placement.start(assetId);mode='placement';updateShell();}catch(e){toast(root,e.message);}}
 
     const handlers={
-      pointerdown:e=>{if(mode==='placement'){studio.tools.placement.move(e.worldX,e.worldY,{snap:studio.kernel.document.settings.tileSize});return true;}const hit=studio.tools.select.selectPoint(e.worldX,e.worldY);if(mode==='move'&&hit){dragEntity=hit.id;studio.tools.transform.begin(hit.id);}updateShell();return true;},
-      pointermove:e=>{if(mode==='placement')studio.tools.placement.move(e.worldX,e.worldY,{snap:studio.kernel.document.settings.tileSize});else if(mode==='move'&&dragEntity)studio.tools.transform.previewMove(e.worldX,e.worldY,{snap:studio.kernel.document.settings.tileSize});return true;},
-      pointerup:e=>{if(mode==='placement'&&studio.tools.placement.getPreview()){const prefab=studio.tools.placement.getPreview().prefabId;void guarded(async()=>{await studio.tools.placement.commit();studio.tools.placement.start(prefab);studio.tools.placement.move(e.worldX,e.worldY,{snap:studio.kernel.document.settings.tileSize});});}else if(mode==='move'&&dragEntity){dragEntity=null;void guarded(()=>studio.tools.transform.commit());}return true;},
-      pointercancel:()=>{if(mode==='move'){dragEntity=null;studio.tools.transform.cancel();}return true;}
+      pointerdown:e=>{
+        if(mode==='placement'){studio.tools.placement.move(e.worldX,e.worldY,{snap:studio.kernel.document.settings.tileSize});return true;}
+        if(mode==='terrain'||mode==='path'){studio.tools.terrain.move(e.worldX,e.worldY);return true;}
+        if(mode==='collision'){studio.tools.collision.beginAt(e.worldX,e.worldY);return true;}
+        const hit=studio.tools.select.selectPoint(e.worldX,e.worldY);if(mode==='move'&&hit){dragEntity=hit.id;studio.tools.transform.begin(hit.id);}updateShell();return true;
+      },
+      pointermove:e=>{
+        if(mode==='placement')studio.tools.placement.move(e.worldX,e.worldY,{snap:studio.kernel.document.settings.tileSize});
+        else if(mode==='terrain'||mode==='path')studio.tools.terrain.move(e.worldX,e.worldY);
+        else if(mode==='collision'&&studio.tools.collision.getPreview())studio.tools.collision.move(e.worldX,e.worldY);
+        else if(mode==='move'&&dragEntity)studio.tools.transform.previewMove(e.worldX,e.worldY,{snap:studio.kernel.document.settings.tileSize});
+        return true;
+      },
+      pointerup:e=>{
+        if(mode==='placement'&&studio.tools.placement.getPreview()){const prefab=studio.tools.placement.getPreview().prefabId;void guarded(async()=>{await studio.tools.placement.commit();studio.tools.placement.start(prefab);studio.tools.placement.move(e.worldX,e.worldY,{snap:studio.kernel.document.settings.tileSize});});}
+        else if((mode==='terrain'||mode==='path')&&studio.tools.terrain.getPreview()){void guarded(async()=>{await studio.tools.terrain.commit();studio.tools.terrain.move(e.worldX,e.worldY);});}
+        else if(mode==='collision'&&studio.tools.collision.getPreview())void guarded(()=>studio.tools.collision.commit());
+        else if(mode==='move'&&dragEntity){dragEntity=null;void guarded(()=>studio.tools.transform.commit());}
+        return true;
+      },
+      pointercancel:()=>{if(mode==='move'){dragEntity=null;studio.tools.transform.cancel();}if(mode==='terrain'||mode==='path')studio.tools.terrain.cancel();if(mode==='collision')studio.tools.collision.cancel();return true;}
     };
     unregisterInput=studio.kernel.input.register('studio-live',handlers,1000);studio.kernel.input.push('studio-live');
     const isStudioUi=e=>!!e.target?.closest?.('[data-kelo-studio-ui]');
     detachPointer=attachStudioPointerInput({element:root.document,router:studio.kernel.input,toWorld:(x,y)=>studio.adapter.screenToWorld(x,y),capture:true,stopPropagation:true,shouldHandle:e=>running&&!isStudioUi(e)});
-    shell=createStudioLiveShell({host:root.document.body,assets,onMode:setMode,onAsset:beginPlacement,onUndo:()=>guarded(()=>studio.kernel.undo()),onRedo:()=>guarded(()=>studio.kernel.redo()),onRotate:()=>{if(mode==='placement')studio.tools.placement.rotate(90);},onSave:()=>guarded(async()=>{await studio.adapter.worldEditRequest('world:draft:save',{actorId,draftId});await studio.checkpoint();toast(root,'Studio guardado');}),onClose:()=>{void closeKeloStudioLive({root});}});updateShell();
+    shell=createStudioLiveShell({
+      host:root.document.body,assets,onMode:setMode,onAsset:beginPlacement,
+      onUndo:()=>guarded(()=>studio.kernel.undo()),onRedo:()=>guarded(()=>studio.kernel.redo()),
+      onRotate:()=>{if(mode==='placement')studio.tools.placement.rotate(90);},
+      onErase:erase=>{if(mode==='terrain'||mode==='path'){studio.tools.terrain.configure({erase});updateShell();}},
+      onSave:()=>guarded(async()=>{await studio.adapter.worldEditRequest('world:draft:save',{actorId,draftId});await studio.checkpoint();toast(root,'Studio guardado');}),
+      onClose:()=>{void closeKeloStudioLive({root});}
+    });updateShell();
 
     function draw(){if(!running)return;overlay.resize();overlay.clear();const ctx=overlay.ctx,w=overlay.canvas.clientWidth||root.innerWidth||1,h=overlay.canvas.clientHeight||root.innerHeight||1,z=Number(root.CONFIG?.zoom)||1,c=root.camera||{x:0,y:0};ctx.save();ctx.translate(w/2,h/2);ctx.scale(z,z);ctx.translate(-c.x,-c.y);studio.overlayRenderer.draw(ctx);ctx.restore();frame=root.requestAnimationFrame?.(draw)||setTimeout(draw,16);}draw();
-    onKey=e=>{if(isStudioUi(e))return;const key=e.key.toLowerCase();if((e.metaKey||e.ctrlKey)&&key==='z'){e.preventDefault();void guarded(()=>e.shiftKey?studio.kernel.redo():studio.kernel.undo());}else if(key==='escape'){e.preventDefault();if(mode==='placement'){studio.tools.placement.cancel();setMode('select');}else void closeKeloStudioLive({root});}else if(key==='r'&&mode==='placement'){e.preventDefault();studio.tools.placement.rotate(90);}};
+    onKey=e=>{if(isStudioUi(e))return;const key=e.key.toLowerCase();if((e.metaKey||e.ctrlKey)&&key==='z'){e.preventDefault();void guarded(()=>e.shiftKey?studio.kernel.redo():studio.kernel.undo());}else if(key==='escape'){e.preventDefault();if(mode==='placement'){studio.tools.placement.cancel();setMode('select');}else if(mode==='terrain'||mode==='path'){studio.tools.terrain.cancel();setMode('select');}else if(mode==='collision'){studio.tools.collision.cancel();setMode('select');}else void closeKeloStudioLive({root});}else if(key==='r'&&mode==='placement'){e.preventDefault();studio.tools.placement.rotate(90);}else if(key==='e'&&(mode==='terrain'||mode==='path')){e.preventDefault();const next=!studio.tools.terrain.state().erase;studio.tools.terrain.configure({erase:next});shell?.setErase(next);updateShell();}else if((key==='delete'||key==='backspace')&&mode==='collision'&&studio.tools.collision.selectedId){e.preventDefault();void guarded(()=>studio.tools.collision.removeSelected());}};
     root.document.addEventListener('keydown',onKey,true);
 
-    const liveSession={version:'kelo-studio-live-v1.1.0',studio,get draftId(){return draftId;},get mode(){return mode;},setMode,beginPlacement,close:()=>closeKeloStudioLive({root})};
+    const liveSession={version:'kelo-studio-live-v1.2.0',studio,get draftId(){return draftId;},get mode(){return mode;},setMode,beginPlacement,close:()=>closeKeloStudioLive({root})};
     Object.defineProperty(liveSession,'__cleanup',{value:async()=>{
       running=false;
       if(typeof root.cancelAnimationFrame==='function')root.cancelAnimationFrame(frame);else clearTimeout(frame);
       if(onKey)root.document.removeEventListener('keydown',onKey,true);
-      detachPointer?.();studio.kernel.input.pop('studio-live');unregisterInput?.();mirror.uninstall();shell?.destroy();overlay?.destroy();
+      detachPointer?.();studio.kernel.input.pop('studio-live');unregisterInput?.();mirror.uninstall();shell?.destroy();overlay?.destroy();studio.tools.collision.setVisible(false);
       if(inputLockToken){root.KeloInputLocks.release(inputLockToken);inputLockToken=null;}
       try{await studio.checkpoint();}catch{}
       try{studio.close();}catch{}
@@ -78,7 +116,7 @@ export async function openKeloStudioLive({ root = globalThis } = {}) {
     try{detachPointer?.();}catch{}
     try{studio.kernel.input.pop('studio-live');unregisterInput?.();}catch{}
     try{mirror.uninstall();}catch{}
-    try{shell?.destroy();overlay?.destroy();}catch{}
+    try{shell?.destroy();overlay?.destroy();studio.tools.collision.setVisible(false);}catch{}
     if(inputLockToken){try{root.KeloInputLocks.release(inputLockToken);}catch{}inputLockToken=null;}
     try{studio.close();}catch{}
     throw error;
