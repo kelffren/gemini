@@ -4,16 +4,7 @@
 
 `KeloMovement` es el OWNER de los puntos de extensión del movimiento del jugador mientras la física base siga viviendo en `engine-a.js`.
 
-Su objetivo no es reemplazar la física existente, sino impedir que cada feature vuelva a hacer esto:
-
-```js
-const old = updateMovement;
-updateMovement = function(dt){ ... old(dt); ... };
-```
-
-Ese patrón crea una cadena de wrappers cuyo orden termina siendo parte accidental del gameplay.
-
-Con Foundation, el patrón oficial es:
+Su objetivo no es reemplazar la física existente, sino impedir que cada feature vuelva a envolver `updateMovement` por su cuenta.
 
 ```text
 updateMovement legacy
@@ -21,7 +12,8 @@ updateMovement legacy
        ▼
    KeloMovement
    ├─ before hooks
-   ├─ física legacy exacta
+   ├─ interceptors exclusivos
+   ├─ física legacy exacta si nadie interceptó
    └─ after hooks
 ```
 
@@ -30,163 +22,135 @@ updateMovement legacy
 **Owner:** `window.KeloMovement`  
 **Fuente:** `src/core/movement-system.js`
 
-KeloMovement posee únicamente:
+KeloMovement posee:
 
-- registro de hooks `before`;
-- registro de hooks `after`;
+- hooks `before`;
+- interceptores exclusivos ordenados;
+- hooks `after`;
 - orden determinista por prioridad;
 - el único bridge permitido alrededor de `updateMovement` legacy.
 
-No posee:
+No posee UI, input modal, colisiones, abilities, VFX, cámara, PvP ni render.
 
-- input modal;
-- joystick UI;
-- colisiones;
-- abilities;
-- VFX;
-- cámara;
-- PvP;
-- render.
-
-La colisión y desplazamiento físico siguen ejecutándose exactamente en el `updateMovement` original de `engine-a.js` durante esta fase transitoria.
+La colisión y desplazamiento físico normales siguen ejecutándose en el `updateMovement` original de `engine-a.js` durante esta fase transitoria.
 
 ## API pública
 
 ### `KeloMovement.before(owner, fn, priority)`
 
-Registra una función antes de la física base.
+Se ejecuta antes de decidir cómo se moverá el actor. Sirve para gait, speed cap, preparación de telemetría u otras transformaciones reutilizables de intención.
 
-Uso adecuado:
+### `KeloMovement.intercept(owner, fn, priority)`
 
-- calcular gait;
-- ajustar el speed cap actual;
-- transformar intención ya procesada;
-- preparar telemetría del frame.
+Permite que una capacidad de movimiento dirigido gestione completamente ese frame. El interceptor devuelve `true` cuando ya resolvió el movimiento y la física normal no debe ejecutarse ese frame.
 
-Devuelve un ID de hook.
+Usos válidos:
+
+- dash interpolado;
+- knockback dirigido;
+- cutscene/scripted motion;
+- transporte temporal que deba sustituir movimiento normal.
+
+No debe usarse para UI ni para saltarse colisiones arbitrariamente. La primitive que lo usa sigue siendo responsable de respetar su contrato físico.
+
+Si varios interceptores están registrados, el primero por prioridad que devuelve `true` gana ese frame. Los `after` hooks siguen ejecutándose, de modo que presentación y telemetría pueden observar la distancia realmente recorrida.
 
 ### `KeloMovement.after(owner, fn, priority)`
 
-Registra una función después de la física base.
-
-Uso adecuado:
-
-- calcular distancia realmente recorrida;
-- actualizar estado visual dependiente del desplazamiento;
-- aplicar reglas de compatibilidad post-movimiento ya existentes;
-- emitir telemetría.
+Se ejecuta después del movimiento normal o del interceptor ganador. Sirve para stride, límites post-física, telemetría y compatibilidad que necesita observar la posición resultante.
 
 ### `KeloMovement.unregister(id)`
 
-Elimina un hook previamente registrado.
+Retira cualquier hook/interceptor registrado.
 
 ### `KeloMovement.snapshot()`
 
-Devuelve la lista de hooks registrados, owner y prioridad. Es observabilidad/debug, no gameplay.
+Expone owners y prioridades de `before`, `intercept` y `after` para depuración/arquitectura.
 
-## Orden
-
-Menor prioridad se ejecuta primero.
-
-Estado Foundation inicial:
+## Orden Foundation actual
 
 ```text
 before
   10 engine-ac:gait-speed
 
-física engine-a
+intercept
+  10 engine-g:legacy-dash   ← solo gana mientras dashTween está activo
+
+física engine-a             ← se ejecuta si ningún interceptor manejó el frame
 
 after
   20 engine-ac:visual-motion
   30 engine-ah:release-brake
+  40 engine-ai:cafe-room-clamp
 ```
 
-Ese orden preserva la intención histórica:
+Esto preserva el comportamiento anterior sin wrappers encadenados:
 
-1. `engine-ac` decide gait/speed antes del movimiento;
-2. `engine-a` mueve y colisiona;
-3. `engine-ac` calcula stride usando distancia real;
-4. `engine-ah` conserva el stop inmediato al soltar.
-
-## Por qué es mejor que wrappers encadenados
-
-Antes, cada archivo capturaba la versión de `updateMovement` existente en el momento de carga. Para entender el resultado final había que reconstruir el orden de `<script>` y cada wrapper.
-
-Ahora un humano o IA puede consultar:
-
-```js
-KeloMovement.snapshot()
-```
-
-y ver quién participa y en qué orden.
-
-## Regla para nuevas features
-
-Antes de tocar movimiento, pregunta:
-
-1. ¿La feature solo necesita observar o ajustar el ciclo actual? → usa un hook existente.
-2. ¿La feature es una regla de input? → pertenece a Input, no a Movement.
-3. ¿La feature cambia colisiones? → pertenece a Collision.
-4. ¿La feature es un dash/blink/ability? → debe pasar por el owner de abilities y su primitive, no meter reglas especiales aquí.
-5. ¿Se necesita una nueva capacidad de movimiento reutilizable? → ampliar el contrato de `KeloMovement`, no crear otro wrapper.
+1. `engine-ac` decide gait/speed.
+2. Si hay dash legacy activo, `engine-g` interpola y devuelve `true`; si no, corre la física de `engine-a`.
+3. `engine-ac` mide el desplazamiento real para stride.
+4. `engine-ah` conserva el freno al soltar.
+5. `engine-ai` limita al jugador al interior del café cuando aplica.
 
 ## Invariantes
 
-- Solo existe un wrapper Foundation directo alrededor de `updateMovement` legacy.
-- `engine-ac.js` no asigna `updateMovement`.
-- `engine-ah.js` no asigna `updateMovement`.
+- Solo `src/core/movement-system.js` asigna `updateMovement` fuera de la definición original de `engine-a.js` en Foundation.
+- `engine-g`, `engine-ac`, `engine-ah` y `engine-ai` no vuelven a envolver `updateMovement`.
+- La física original se ejecuta exactamente una vez cuando ningún interceptor maneja el frame.
+- Si un interceptor devuelve `true`, la física normal no se ejecuta ese frame.
+- Los `after` hooks se ejecutan en ambos casos.
+- El orden es determinista.
 - Los hooks no dependen de DOM/UI.
-- La física original de `engine-a.js` se ejecuta exactamente una vez por llamada.
-- El orden de hooks es determinista.
 
-## Qué se preservó de engine-ac
+## Reutilización
 
-- WALK speed y curva actual;
-- RUN transition;
-- gait idle/walk/run;
-- stride por distancia real;
-- cadence V2;
-- stop V2;
-- plant frame;
-- reversal audit;
-- `KELO_MOVEMENT_AUDIT`.
+Antes de tocar movimiento:
 
-## Qué se preservó de engine-ah
+1. Solo necesitas preparar el frame → `before`.
+2. Necesitas sustituir temporalmente el movimiento normal → `intercept`.
+3. Necesitas observar/ajustar el resultado → `after`.
+4. Es input → pertenece al owner de Input.
+5. Es colisión → pertenece a Collision.
+6. Es una nueva ability → la ability debe usar una primitive genérica que se conecte a KeloMovement; no añadir lógica de la habilidad directamente al owner.
 
-- detección de ausencia de input;
-- `vx/vy = 0` al soltar;
-- limpieza de `normX/normY` al soltar.
+## Migración legacy realizada
+
+- `engine-g`: dash tween → `intercept`.
+- `engine-ac`: gait/speed → `before`; stride/audit → `after`.
+- `engine-ah`: release brake → `after`.
+- `engine-ai`: café room clamp → `after`.
+
+Los otros comportamientos legacy de esos archivos siguen clasificados aparte; esta migración solo consolidó ownership de movimiento.
 
 ## Online-first
 
-El movimiento local actual sigue siendo client-side. `KeloMovement` no debe convertirse en autoridad de posición online.
-
-En multiplayer autoritativo:
+KeloMovement es un owner de ciclo/extension points del cliente, no autoridad final online de posición. En multiplayer autoritativo:
 
 ```text
-Input intent
-  → client prediction/movement request
-  → server authority
-  → authoritative position
-  → reconciliation
+input intent
+→ prediction/request
+→ server authority
+→ authoritative position
+→ reconciliation
 ```
 
-Los hooks de presentación/telemetría pueden permanecer en cliente, mientras la autoridad final de posición se sustituye sin cambiar el contrato de contenido.
+Los hooks de presentación pueden permanecer clientes; las primitives de movimiento competitivo deberán poder delegar la decisión final al servidor.
 
-## Tests requeridos
+## Tests
 
-El contrato debe comprobar:
+`scripts/movement-system-contract-audit.js` verifica:
 
-- física base llamada exactamente una vez;
-- before se ejecuta antes;
-- after se ejecuta después;
-- prioridades deterministas;
-- unregister funciona;
-- engine-ac/engine-ah no vuelven a envolver `updateMovement`;
-- `index.html` carga KeloMovement después de `engine-a` y antes de `engine-ac`.
+- before/after y prioridades;
+- base exactamente una vez;
+- interceptor salta base;
+- after sigue corriendo tras intercept;
+- unregister;
+- ausencia de wrappers en g/ac/ah/ai;
+- registro correcto de cada consumidor;
+- orden de carga en `index.html`.
 
 ## Estado
 
 **FOUNDATION ACTIVE / TRANSITIONAL CORE BRIDGE**
 
-La arquitectura final podrá mover la física base fuera de `engine-a.js`. Cuando eso ocurra, la API `KeloMovement` debe mantenerse o migrarse de manera compatible, y el wrapper temporal podrá desaparecer.
+Cuando la física salga de `engine-a.js`, se conservará la API pública o se migrará mediante adapter antes de retirar este bridge.
