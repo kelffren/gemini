@@ -1,7 +1,15 @@
 /* KELO-INDEX
- * area: UI
- * keys: INPUT UNLOCK JOYSTICK MODAL BUILDMODE
- * hace: fuerza el joy encendido y apaga locks que dejan al personaje quieto
+ * area: UI / INPUT COMPAT
+ * owner: NONE — HOTFIX TEMPORAL, no es autoridad de movimiento
+ * keys: INPUT UNLOCK JOYSTICK MODAL BUILDMODE HOTFIX FOUNDATION
+ * purpose: evita que locks huérfanos de UI/build dejen al personaje inmóvil mientras se repara ownership
+ * public-api: ninguna
+ * consumes: KELO_MODAL_INPUT_LOCK, isBuildMode, processInput
+ * state-owned: ninguno
+ * extension-points: ninguno
+ * reuse: NO REUTILIZAR este patrón
+ * legacy: retirar solo tras validar ownership acquire/release de todos los locks
+ * do-not: NO añadir más flags, timers ni comportamiento gameplay aquí
  */
 (function(){
   'use strict';
