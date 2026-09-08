@@ -2,9 +2,9 @@
  * area: QA / SIMULATION
  * owner: FOUNDATION CI
  * keys: SIMULATION HOOK BEFORE AFTER WRAPPER CONTRACT
- * purpose: valida KeloSimulation como bridge único antes de migrar wrappers legacy
+ * purpose: valida KeloSimulation como bridge único y módulos legacy ya migrados
  * public-api: CLI
- * consumes: simulation extension owner, index.html
+ * consumes: simulation extension owner, engines migrados, index.html
  * state-owned: ninguno
  * extension-points: invariantes del contrato de simulación
  * reuse: Foundation CI
@@ -16,6 +16,7 @@ const fs=require('fs');
 const vm=require('vm');
 const source=fs.readFileSync('src/core/simulation-extension-system.js','utf8');
 const html=fs.readFileSync('index.html','utf8');
+const migrated=['engine-m.js','engine-o.js','engine-p.js','engine-q.js','engine-s.js'];
 const trace=[];
 const context={console,localPlayer:{x:0,y:0},STATE:{},updateSimulation:function(dt){trace.push('base:'+dt);return 9;}};
 context.window=context;context.globalThis=context;
@@ -32,6 +33,12 @@ ok(trace.join('|')==='before-early|before-late|base:0.25|after-1|after-2','HOOK_
 ok(context.KeloSimulation.unregister(early),'UNREGISTER');
 trace.length=0;context.updateSimulation(.5);
 ok(trace.join('|')==='before-late|base:0.5|after-1|after-2','UNREGISTER_EFFECT');
+migrated.forEach(file=>{const text=fs.readFileSync(file,'utf8');ok(!/\bupdateSimulation\s*=\s*function\b/.test(text),file+'_MUST_NOT_WRAP_SIMULATION');});
+ok(fs.readFileSync('engine-m.js','utf8').includes("KeloSimulation.after('engine-m:skill-shots'"),'ENGINE_M_HOOK');
+ok(fs.readFileSync('engine-o.js','utf8').includes("KeloSimulation.after('engine-o:training-dummy'"),'ENGINE_O_HOOK');
+ok(fs.readFileSync('engine-p.js','utf8').includes("KeloSimulation.after('engine-p:plaza-npcs'"),'ENGINE_P_HOOK');
+ok(fs.readFileSync('engine-q.js','utf8').includes("KeloSimulation.after('engine-q:maestro-trial'"),'ENGINE_Q_HOOK');
+ok(fs.readFileSync('engine-s.js','utf8').includes("KeloSimulation.before('engine-s:social-bot-snapshot'")&&fs.readFileSync('engine-s.js','utf8').includes("KeloSimulation.after('engine-s:social-world'"),'ENGINE_S_HOOKS');
 const iC=html.indexOf('engine-c.js');const iS=html.indexOf('src/core/simulation-extension-system.js');const iD=html.indexOf('engine-d.js');
 ok(iC>=0&&iS>iC&&iD>iS,'LOAD_ORDER');
-console.log('SIMULATION_EXTENSION_OK: single bridge + deterministic hooks passed');
+console.log('SIMULATION_EXTENSION_OK: single bridge + deterministic hooks + migrated simulation chain passed');
