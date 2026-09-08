@@ -4,7 +4,7 @@ const base = process.env.AUDIT_URL || 'https://kelffren.github.io/gemini/';
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 async function waitForDeploy(){
   const targets=[
-    ['src/ui/studio-launcher.js','studio-launcher-v1.2.0'],
+    ['src/ui/studio-launcher.js','studio-launcher-v1.3.0'],
     ['src/world/world-edit-authority.js','world-edit-authority-v1.1.0'],
     ['src/studio/input/studio-camera-controller.mjs','STUDIO_CAMERA_OWNER_REQUIRED']
   ];
