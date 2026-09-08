@@ -2,7 +2,7 @@
  * area: CHARACTERS
  * owner: KeloCharacterAppearance; avatar composition owned by KeloAvatar
  * keys: APPEARANCE PLAYER BOT HERO SPRITE FALLBACK FOUNDATION
- * hace: asigna sprites de apariencia; visual de bot retirado cae al hero existente
+ * hace: asigna y renderiza sprites de apariencia; el hero.PNG subido usa el owner modular con 4 direcciones
  * online: visual cliente; autoridad de actor fuera de este modulo
  * extension-points: KeloAvatar.use como middleware condicional de apariencia
  * do-not: NO envolver renderAvatar
@@ -10,27 +10,34 @@
 (function () {
   'use strict';
 
-  const VERSION = 'character-appearance-v2.1.0-foundation';
+  const VERSION = 'character-appearance-v2.2.0-hero-live';
   const DEFAULT_PLAYER = 'player_hero_v1';
   const DEFAULT_BOT = DEFAULT_PLAYER;
   const ALPHA_CLEANUP_THRESHOLD = 8;
+  const HERO_SOURCE = 'assets/hero.PNG?hero=deeab966';
+  const HERO_FACE_ROWS = Object.freeze({ down: 0, left: 1, right: 2, up: 3 });
+  const HERO_MIRROR_FACES = Object.freeze({ down: false, left: false, right: false, up: false });
+  const HERO_FRAME_METRICS = Object.freeze({
+    down: Object.freeze({ bodyHeight: 303, footX: Object.freeze([160,142,107,94]), footY: Object.freeze([364,369,368,368]) }),
+    left: Object.freeze({ bodyHeight: 302, footX: Object.freeze([132,108,91,77]), footY: Object.freeze([344,346,347,348]) }),
+    right: Object.freeze({ bodyHeight: 369, footX: Object.freeze([145,135,121,113]), footY: Object.freeze([384,384,384,384]) }),
+    up: Object.freeze({ bodyHeight: 307, footX: Object.freeze([134,118,107,121]), footY: Object.freeze([300,308,308,312]) })
+  });
 
   const definitions = Object.freeze({
     player_hero_v1: Object.freeze({
-      id: 'player_hero_v1', role: 'player', source: 'assets/hero.PNG', delegateToLegacyHero: true,
-      columns: 4, rows: 4, frameWidth: 256, frameHeight: 384
+      id: 'player_hero_v1', role: 'player', source: HERO_SOURCE, delegateToLegacyHero: false,
+      columns: 4, rows: 4, frameWidth: 256, frameHeight: 384,
+      faceRows: HERO_FACE_ROWS,
+      mirrorFaces: HERO_MIRROR_FACES,
+      frameMetrics: HERO_FRAME_METRICS
     }),
     bot_crimson_v1: Object.freeze({
-      id: 'bot_crimson_v1', role: 'bot', source: 'assets/hero.PNG', delegateToLegacyHero: true, retiredVisual: true,
+      id: 'bot_crimson_v1', role: 'bot', source: HERO_SOURCE, delegateToLegacyHero: true, retiredVisual: true,
       columns: 4, rows: 4, frameWidth: 256, frameHeight: 384,
-      faceRows: Object.freeze({ down: 0, left: 1, right: 2, up: 3 }),
-      mirrorFaces: Object.freeze({ down: false, left: false, right: false, up: false }),
-      frameMetrics: Object.freeze({
-        down: Object.freeze({ bodyHeight: 303, footX: Object.freeze([160,142,107,94]), footY: Object.freeze([364,369,368,368]) }),
-        left: Object.freeze({ bodyHeight: 302, footX: Object.freeze([132,108,91,77]), footY: Object.freeze([344,346,347,348]) }),
-        right: Object.freeze({ bodyHeight: 369, footX: Object.freeze([145,135,121,113]), footY: Object.freeze([384,384,384,384]) }),
-        up: Object.freeze({ bodyHeight: 307, footX: Object.freeze([134,118,107,121]), footY: Object.freeze([300,308,308,312]) })
-      })
+      faceRows: HERO_FACE_ROWS,
+      mirrorFaces: HERO_MIRROR_FACES,
+      frameMetrics: HERO_FRAME_METRICS
     })
   });
 
