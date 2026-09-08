@@ -19,8 +19,8 @@ jobs:
         run: node scripts/foundation-architecture-audit.js
       - name: Audit input-lock ownership contract
         run: node scripts/input-lock-contract-audit.js
-      - name: Audit input gate contract
-        run: node scripts/input-gate-contract-audit.js
+      - name: Audit input owner contract
+        run: node scripts/input-system-contract-audit.js
       - name: Audit movement owner contract
         run: node scripts/movement-system-contract-audit.js
       - name: Audit system documentation contract
@@ -30,13 +30,17 @@ jobs:
       - name: Syntax-check Foundation primitives
         run: |
           node --check src/core/input-lock-system.js
+          node --check src/core/input-system.js
           node --check src/core/input-gate.js
           node --check src/core/movement-system.js
+          node --check engine-f.js
+          node --check engine-g.js
           node --check engine-ac.js
           node --check engine-ah.js
+          node --check engine-ai.js
           node --check scripts/foundation-architecture-audit.js
           node --check scripts/input-lock-contract-audit.js
-          node --check scripts/input-gate-contract-audit.js
+          node --check scripts/input-system-contract-audit.js
           node --check scripts/movement-system-contract-audit.js
           node --check scripts/system-documentation-audit.js
           node --check scripts/foundation-runtime-inventory.js
