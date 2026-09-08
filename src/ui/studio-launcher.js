@@ -1,13 +1,13 @@
 /* KELO-INDEX
- * area: UI / STUDIO LAUNCHER
- * owner: Kelo Studio Launcher
- * purpose: añade CREATE al menú Luxe existente y abre Kelo Studio solo cuando el owner World Edit existe y está listo
- * public-api: KELO_STUDIO_LAUNCHER.open/sync/allowed
- * consumes: KELO_ADMIN_KEYS, KELO_LUXE, KELO_WORLD_EDIT.whenReady, menú Luxe existente
+ * area: UI / CREATORS LAUNCHER
+ * owner: Kelo Studio Launcher (compat name retained)
+ * purpose: añade CREATORS al menú Luxe existente y carga solo Creator Hub tras acción explícita
+ * public-api: KELO_STUDIO_LAUNCHER + KELO_CREATORS_LAUNCHER alias
+ * consumes: KELO_ADMIN_KEYS, KELO_LUXE, menú Luxe existente
  * state-owned: solo estado efímero de carga
- * extension-points: ninguna; capacidades nuevas pertenecen a src/studio
+ * extension-points: Creator Hub / WorkspaceRegistry; no domain logic here
  * reuse: entrada única a herramientas creator
- * do-not: NO mutar mundo, NO duplicar menú, NO cargar src/studio durante boot normal
+ * do-not: NO mutar mundo, NO duplicar menú, NO cargar src/studio ni src/creators durante boot normal
  */
 (function(){
   'use strict';
@@ -15,45 +15,20 @@
   let loading=false;
   const actor=()=>String(window.KELO_ADMIN_KEYS?.playerId?.()||window.keloNet?.playerKey||window.localPlayer?.id||'local_pioneer');
   const allowed=()=>!!window.KELO_ADMIN_KEYS?.can?.('world.edit',actor());
-  const toast=m=>{if(typeof window.showToast==='function')window.showToast(m);else console.info('[Kelo Studio]',m);};
-  function waitForOwner({timeoutMs=10000}={}){
-    if(window.KELO_WORLD_EDIT)return Promise.resolve(window.KELO_WORLD_EDIT);
-    const started=performance.now();
-    return new Promise((resolve,reject)=>{
-      const check=()=>{
-        if(window.KELO_WORLD_EDIT)return resolve(window.KELO_WORLD_EDIT);
-        if(performance.now()-started>=timeoutMs)return reject(new Error('WORLD_EDIT_OWNER_TIMEOUT'));
-        setTimeout(check,40);
-      };
-      check();
-    });
-  }
-  async function waitForWorldEdit(){
-    const E=await waitForOwner({timeoutMs:10000});
-    if(E.ready)return E;
-    if(typeof E.whenReady!=='function')throw new Error('WORLD_EDIT_READY_CONTRACT_MISSING');
-    await E.whenReady({timeoutMs:10000});
-    return E;
-  }
-  function friendlyError(error){
-    const code=String(error?.message||error||'');
-    if(code.includes('WORLD_EDIT_OWNER_TIMEOUT')||code.includes('WORLD_EDIT_READY_TIMEOUT')||code.includes('WORLD_EDIT_NOT_READY')||code.includes('WORLD_EDIT_AUTHORITY_NOT_READY'))return 'El editor del mundo todavía está iniciando. Intenta nuevamente.';
-    if(code.includes('WORLD_EDIT_READY_CONTRACT_MISSING'))return 'El sistema de creación todavía no está listo. Recarga la página.';
-    return code||'No se pudo abrir Kelo Studio';
-  }
+  const toast=m=>{if(typeof window.showToast==='function')window.showToast(m);else console.info('[Kelo Creators]',m);};
+  function friendlyError(error){const code=String(error?.message||error||'');return code||'No se pudo abrir Kelo Creators';}
   async function open(){
     if(loading)return;
-    if(!allowed())return toast('Necesitas permiso world.edit');
+    if(!allowed())return toast('Necesitas acceso a Kelo Creators');
     loading=true;
-    const btn=document.getElementById('lx-create-studio'),oldText=btn?.textContent||'CREATE';
+    const btn=document.getElementById('lx-create-studio'),oldText=btn?.textContent||'CREATORS';
     if(btn){btn.disabled=true;btn.textContent='ABRIENDO…';btn.setAttribute('aria-busy','true');}
     try{
-      await waitForWorldEdit();
       window.KELO_LUXE?.closeMenu?.();
-      const mod=await import('./../studio/integration/live-studio-controller.mjs');
-      await mod.openKeloStudioLive({root:window});
+      const mod=await import('./../creators/ui/creator-hub.mjs');
+      await mod.openCreatorHub({root:window});
     }catch(e){
-      console.error('[Kelo Studio launcher]',e);toast(friendlyError(e));
+      console.error('[Kelo Creators launcher]',e);toast(friendlyError(e));
     }finally{
       loading=false;
       if(btn?.isConnected){btn.disabled=false;btn.textContent=oldText;btn.removeAttribute('aria-busy');}
@@ -64,14 +39,14 @@
     if(!grid)return false;
     let btn=document.getElementById('lx-create-studio');
     if(!allowed()){btn?.remove();return true;}
-    if(!btn){
-      btn=document.createElement('button');btn.id='lx-create-studio';btn.className='lx-menu-item';btn.textContent='CREATE';btn.setAttribute('aria-label','Abrir Kelo Studio');
-      btn.onclick=e=>{e.preventDefault();e.stopPropagation();void open();};grid.appendChild(btn);
-    }
+    if(!btn){btn=document.createElement('button');btn.id='lx-create-studio';btn.className='lx-menu-item';btn.onclick=e=>{e.preventDefault();e.stopPropagation();void open();};grid.appendChild(btn);}
+    btn.textContent='CREATORS';btn.setAttribute('aria-label','Abrir Kelo Creators');
     return true;
   }
   function boot(){if(!sync())setTimeout(boot,120);}
   window.KELO_ADMIN_KEYS?.onChange?.(sync);
-  window.KELO_STUDIO_LAUNCHER=Object.freeze({version:'studio-launcher-v1.3.0',open,sync,get allowed(){return allowed();}});
+  const api=Object.freeze({version:'studio-launcher-v1.4.0',open,sync,get allowed(){return allowed();}});
+  window.KELO_STUDIO_LAUNCHER=api;
+  window.KELO_CREATORS_LAUNCHER=api;
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 })();

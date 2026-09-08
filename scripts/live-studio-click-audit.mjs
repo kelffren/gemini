@@ -4,7 +4,9 @@ const base = process.env.AUDIT_URL || 'https://kelffren.github.io/gemini/';
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 async function waitForDeploy(){
   const targets=[
-    ['src/ui/studio-launcher.js','studio-launcher-v1.3.0'],
+    ['src/ui/studio-launcher.js','studio-launcher-v1.4.0'],
+    ['src/creators/ui/creator-hub.mjs','kelo-creator-hub-v1.0.1'],
+    ['src/creators/workspaces/world-workspace.mjs','CREATOR_WORLD_STUDIO_ENTRY_MISSING'],
     ['src/world/world-edit-authority.js','world-edit-authority-v1.1.0'],
     ['src/studio/ui/studio-live-shell.mjs','studio-live-shell-v1.4.0'],
     ['src/studio/input/studio-camera-controller.mjs','STUDIO_CAMERA_OWNER_REQUIRED']
@@ -35,21 +37,38 @@ url.searchParams.set('studioClickAudit',String(Date.now()));
 const browser = await chromium.launch({headless:true,executablePath:process.env.CHROME_BIN||'/usr/bin/google-chrome',args:['--no-sandbox','--disable-dev-shm-usage']});
 const context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,serviceWorkers:'block'});
 const page=await context.newPage();
-const pageErrors=[];const consoleErrors=[];
+const pageErrors=[];const consoleErrors=[];const requested=[];
 page.on('pageerror',e=>pageErrors.push(String(e?.stack||e)));
 page.on('console',m=>{if(m.type()==='error')consoleErrors.push(m.text());});
-let report={ok:false,url:String(url),deployAttempt,createVisible:false,studioVisible:false,permission:false,lockAcquired:false,visualAssets:false,assetCompact:false,editReopens:false,persistentPaint:false,pageErrors,consoleErrors,toasts:[]};
+page.on('request',r=>requested.push(r.url()));
+let report={ok:false,url:String(url),deployAttempt,creatorsButtonVisible:false,creatorHubVisible:false,lazyStudioBeforeWorld:false,studioVisible:false,permission:false,lockAcquired:false,visualAssets:false,assetCompact:false,editReopens:false,persistentPaint:false,pageErrors,consoleErrors,toasts:[]};
 try{
   await page.goto(String(url),{waitUntil:'domcontentloaded',timeout:30000});
   await page.waitForFunction(()=>window.KELO_ADMIN_KEYS?.can?.('world.edit',window.KELO_ADMIN_KEYS?.playerId?.()),null,{timeout:12000});
   report.permission=true;
   await page.waitForSelector('#lx-side-menu',{state:'visible',timeout:8000});
+  const studioAtBoot=requested.filter(u=>/\/src\/studio\//.test(u));
+  if(studioAtBoot.length)throw new Error(`STUDIO_EAGER_BOOT:${JSON.stringify(studioAtBoot)}`);
   await page.click('#lx-side-menu');
   await page.waitForSelector('#lx-create-studio',{state:'visible',timeout:8000});
-  report.createVisible=true;
+  report.creatorsButtonVisible=true;
+  report.creatorsButtonText=await page.locator('#lx-create-studio').textContent();
+  if(String(report.creatorsButtonText||'').trim()!=='CREATORS')throw new Error(`CREATORS_BUTTON_LABEL_INVALID:${report.creatorsButtonText}`);
   await page.click('#lx-create-studio');
+  await page.waitForSelector('#kelo-creators-hub',{state:'visible',timeout:10000});
+  report.creatorHubVisible=true;
+  report.creatorRequests=requested.filter(u=>/\/src\/creators\//.test(u)).length;
+  const studioBeforeWorld=requested.filter(u=>/\/src\/studio\//.test(u));
+  report.lazyStudioBeforeWorld=studioBeforeWorld.length===0;
+  if(!report.lazyStudioBeforeWorld)throw new Error(`STUDIO_LOADED_BEFORE_WORLD:${JSON.stringify(studioBeforeWorld)}`);
+  const navLabels=await page.locator('#kelo-creators-hub .kc-nav button').allTextContents();
+  for(const label of ['CREATE','MY PROJECTS','MY ASSETS','SHARED WITH ME','TEST INVITES','PUBLISHED'])if(!navLabels.includes(label))throw new Error(`CREATOR_HUB_NAV_MISSING:${label}`);
+  const worldButton=page.getByRole('button',{name:'Abrir World'});
+  await worldButton.click();
   await page.waitForSelector('#kelo-studio-live',{state:'visible',timeout:15000});
   report.studioVisible=true;
+  report.studioRequestsAfterWorld=requested.filter(u=>/\/src\/studio\//.test(u)).length;
+  if(report.studioRequestsAfterWorld<1)throw new Error('STUDIO_NOT_LAZY_LOADED_AFTER_WORLD');
   report.lockAcquired=await page.waitForFunction(()=>window.KeloInputLocks?.snapshot?.().owners?.some?.(o=>o.owner==='kelo-studio'||o.id==='kelo-studio'||String(o).includes('kelo-studio')),null,{timeout:5000}).then(()=>true).catch(()=>false);
   report.visualAssets=await page.waitForFunction(()=>!!document.querySelector('#kelo-studio-live [data-asset] canvas'),null,{timeout:8000}).then(()=>true).catch(()=>false);
   if(!report.lockAcquired)throw new Error(`STUDIO_LOCK_NOT_ACQUIRED: ${JSON.stringify(report)}`);
@@ -88,6 +107,7 @@ try{
   report.toasts=await page.locator('#toast-container > *').allTextContents().catch(()=>[]);
   report.session=await page.evaluate(()=>({
     launcher:window.KELO_STUDIO_LAUNCHER?.version||null,
+    creatorsAlias:window.KELO_CREATORS_LAUNCHER?.version||null,
     worldEdit:window.KELO_WORLD_EDIT?.version||null,
     worldEditReady:window.KELO_WORLD_EDIT?.ready??null,
     allowed:window.KELO_STUDIO_LAUNCHER?.allowed??null,
@@ -96,7 +116,8 @@ try{
     shellVersion:document.querySelector('#kelo-studio-live')?.dataset.shellVersion||null,
     compact:document.querySelector('#kelo-studio-live')?.dataset.compact||null,
     activeAsset:document.querySelector('#kelo-studio-live')?.dataset.activeAsset||null,
-    studioNode:!!document.querySelector('#kelo-studio-live')
+    studioNode:!!document.querySelector('#kelo-studio-live'),
+    creatorHubNode:!!document.querySelector('#kelo-creators-hub')
   }));
   await page.click('#kelo-studio-live [data-act="close"]');
   await page.waitForFunction(()=>!document.querySelector('#kelo-studio-live'),null,{timeout:8000});
@@ -107,7 +128,7 @@ try{
   console.log(JSON.stringify(report,null,2));
 } catch(error){
   report.toasts=await page.locator('#toast-container > *').allTextContents().catch(()=>report.toasts||[]);
-  report.session=await page.evaluate(()=>({launcher:window.KELO_STUDIO_LAUNCHER?.version||null,worldEdit:window.KELO_WORLD_EDIT?.version||null,worldEditReady:window.KELO_WORLD_EDIT?.ready??null,allowed:window.KELO_STUDIO_LAUNCHER?.allowed??null,cameraOwner:window.KeloCamera?.version||null,shellVersion:document.querySelector('#kelo-studio-live')?.dataset.shellVersion||null,compact:document.querySelector('#kelo-studio-live')?.dataset.compact||null,activeAsset:document.querySelector('#kelo-studio-live')?.dataset.activeAsset||null,studioNode:!!document.querySelector('#kelo-studio-live')})).catch(()=>null);
+  report.session=await page.evaluate(()=>({launcher:window.KELO_STUDIO_LAUNCHER?.version||null,creatorsAlias:window.KELO_CREATORS_LAUNCHER?.version||null,worldEdit:window.KELO_WORLD_EDIT?.version||null,worldEditReady:window.KELO_WORLD_EDIT?.ready??null,allowed:window.KELO_STUDIO_LAUNCHER?.allowed??null,cameraOwner:window.KeloCamera?.version||null,shellVersion:document.querySelector('#kelo-studio-live')?.dataset.shellVersion||null,compact:document.querySelector('#kelo-studio-live')?.dataset.compact||null,activeAsset:document.querySelector('#kelo-studio-live')?.dataset.activeAsset||null,studioNode:!!document.querySelector('#kelo-studio-live'),creatorHubNode:!!document.querySelector('#kelo-creators-hub')})).catch(()=>null);
   console.error(JSON.stringify(report,null,2));
   throw error;
 } finally {await browser.close();}

@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - 'src/studio/**'
+      - 'src/creators/workspaces/world-workspace.mjs'
       - 'src/ui/studio-launcher.js'
       - 'scripts/studio-foundation-audit.mjs'
       - 'scripts/studio-creator-v1-audit.mjs'
@@ -22,6 +23,7 @@ jobs:
       - name: Syntax check Studio modules
         run: |
           find src/studio -type f -name '*.mjs' -print0 | xargs -0 -n1 node --check
+          node --check src/creators/workspaces/world-workspace.mjs
           node --check src/ui/studio-launcher.js
           node --check scripts/studio-foundation-audit.mjs
           node --check scripts/studio-creator-v1-audit.mjs
@@ -29,11 +31,13 @@ jobs:
         run: node scripts/studio-foundation-audit.mjs
       - name: Studio Creator V1 functional audit
         run: node scripts/studio-creator-v1-audit.mjs
-      - name: Verify lazy boot contract
+      - name: Verify two-stage lazy boot contract
         run: |
-          if grep -Eq 'src/studio/|studio-entry\.mjs' index.html; then
-            echo 'Studio modules must not be eagerly loaded by index.html'
+          if grep -Eq 'src/studio/|studio-entry\.mjs|src/creators/' index.html; then
+            echo 'Studio and Creator modules must not be eagerly loaded by index.html'
             exit 1
           fi
           grep -q 'src/ui/studio-launcher.js?v=2' index.html
-          grep -q "import('./../studio/integration/live-studio-controller.mjs')" src/ui/studio-launcher.js
+          grep -Fq "import('./../creators/ui/creator-hub.mjs')" src/ui/studio-launcher.js
+          ! grep -Fq "import('./../studio/" src/ui/studio-launcher.js
+          grep -Fq "import('../../studio/integration/live-studio-controller.mjs')" src/creators/workspaces/world-workspace.mjs
