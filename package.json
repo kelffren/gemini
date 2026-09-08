@@ -7,6 +7,8 @@
     "audit:stones": "node scripts/audit-stones.js",
     "audit:property": "node scripts/property-editor-audit.js",
     "audit:character": "node scripts/character-customization-audit.js",
+    "audit:foundation": "node scripts/foundation-architecture-audit.js",
+    "audit:docs": "node scripts/system-documentation-audit.js",
     "audit:studio": "node scripts/studio-foundation-audit.mjs"
   },
   "devDependencies": {
