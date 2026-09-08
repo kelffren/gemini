@@ -8,8 +8,8 @@
  * state-owned: ninguno
  * extension-points: invariantes de UI/ownership, no implementación gameplay
  * reuse: Backpack CI
- * legacy: permite que backpack-ui use temporalmente KELO_MODAL_INPUT_LOCK porque el adapter pertenece a KeloInputLocks
- * do-not: no exigir wrappers antiguos de processInput
+ * legacy: aliases públicos de inventory pueden permanecer, pero la UI no escribe el modal-lock global
+ * do-not: no exigir wrappers antiguos de processInput ni congelar patch versions anteriores
  */
 'use strict';
 const fs=require('fs');
@@ -21,7 +21,8 @@ const retiredGate=fs.readFileSync('src/core/input-gate.js','utf8');
 const compat=fs.readFileSync('src/ui/modal-input-lock.js','utf8');
 const html=fs.readFileSync('index.html','utf8');
 function ok(cond,msg){if(!cond)throw new Error(msg);}
-ok(js.includes("backpack-ui-v2.0.0"),'VERSION');
+const versionMatch=js.match(/const VERSION='(backpack-ui-v2\.\d+\.\d+)'/);
+ok(!!versionMatch,'VERSION');
 ok(js.includes("mainTabs:['equipment','appearance']"),'MAIN_TABS');
 ok(js.includes('visibleEquipmentSlots:8'),'EQUIPMENT_SLOT_COUNT');
 ok(js.includes('inventoryFilters:5'),'FILTER_COUNT');
@@ -31,7 +32,9 @@ ok(js.includes("amulet:{actual:'necklace'"),'AMULET_NECKLACE_MAPPING');
 ok(js.includes('window.KeloBackpack.getSlots()'),'REAL_BACKPACK_SOURCE');
 ok(js.includes('window.KeloEquipment.equipItem'),'REAL_EQUIP_ACTION');
 ok(js.includes('window.KeloEquipment.unequipItem'),'REAL_UNEQUIP_ACTION');
-ok(js.includes("window.KELO_MODAL_INPUT_LOCK='inventory'")||js.includes("KeloInputLocks.acquire('inventory'"),'INPUT_LOCK_ACQUIRE');
+ok(js.includes("locks.acquire('backpack-ui'")&&js.includes('locks.release(inputLockToken)'),'INPUT_LOCK_TOKEN_LIFECYCLE');
+ok(!/\bKELO_MODAL_INPUT_LOCK\s*=/.test(js),'NO_DIRECT_LEGACY_MODAL_WRITE');
+ok(js.includes("inputLockOwner:'KeloInputLocks'")&&js.includes('inputLockTokenized:true'),'INPUT_LOCK_AUDIT');
 ok(js.includes("window.openInventory=open")&&js.includes('window.closeInventory=close')&&js.includes('window.toggleInventory=toggle'),'PUBLIC_OPEN_CLOSE');
 ok(js.includes("appearanceCosmeticOnly:true"),'COSMETIC_BOUNDARY');
 ok(js.includes("marketDecoratorCompatible:true"),'MARKET_COMPAT');
@@ -51,4 +54,4 @@ ok(html.includes('src/core/input-system.js?v=1'),'INPUT_PIPELINE_LOADED');
 ok(!html.includes('src/core/input-gate.js'),'OLD_GATE_NOT_LOADED');
 ok(html.includes('src/ui/backpack-ui.js?v=4'),'UI_CACHE_BUST');
 ok(!js.includes('action-bar-container')&&!css.includes('action-bar-container'),'NO_SKILL_BAR_UI');
-console.log(JSON.stringify({ok:true,version:'backpack-ui-v2.0.0',equipmentSlots:8,filters:5,mobileColumns:[4,5],movementLockOwner:'KeloInputLocks',inputOwner:'KeloInput',marketCompatible:true,noSkillBar:true}));
+console.log(JSON.stringify({ok:true,version:versionMatch[1],equipmentSlots:8,filters:5,mobileColumns:[4,5],movementLockOwner:'KeloInputLocks',inputOwner:'KeloInput',tokenizedInputLock:true,marketCompatible:true,noSkillBar:true}));
