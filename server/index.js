@@ -1,8 +1,11 @@
 /* KELO-INDEX
- * area: SERVER
- * keys: WEBSOCKET AUTHORITY VISUAL EVENT RELAY CAST PROJECTILE STATUS VALIDATION
- * hace: autoridad de sistemas compartidos existentes y relay validado de eventos puramente visuales
- * online: visual:event no resuelve gameplay; solo retransmite presentación semántica saneada
+ * area: SERVER / NETWORK
+ * owner: Kelo plaza room authority
+ * keys: WEBSOCKET AUTHORITY AOI SPATIAL GRID ZONE HYSTERESIS VISUAL EVENT RELAY CAST PROJECTILE STATUS VALIDATION PERFORMANCE
+ * hace: autoridad compartida y snapshots por área de interés; evita enviar actores irrelevantes a cada cliente
+ * online: servidor decide relevancia de transporte sin mover autoridad gameplay al cliente
+ * state-owned: sockets, players, AOI interest sets y servicios autoritativos
+ * do-not: NO usar AOI para borrar estado autoritativo; solo filtra qué representación recibe cada cliente
  */
 /**
  * Kelo plaza room — WebSocket authority for movement, Nobleza, PvP damage and forging.
@@ -16,6 +19,9 @@ const { createForgeService } = require('./forge-store');
 const PORT = Number(process.env.PORT || 2567);
 const MAX = 32;
 const WORLD = { w: 3600, h: 3200 };
+const AOI_CELL = 512;
+const AOI_RADIUS = 1800;
+const AOI_HYSTERESIS = 256;
 const VISUAL_EVENT_ALLOWLIST = new Set([
   'CAST_CONFIRMED','PROJECTILE_SPAWNED','PROJECTILE_HIT','PROJECTILE_EXPIRED','ABILITY_IMPACT',
   'STATUS_APPLIED','STATUS_REMOVED','SHIELD_APPLIED','SHIELD_BROKEN','DASH_STARTED','DASH_ENDED','DEATH'
@@ -32,35 +38,84 @@ const forge = createForgeService({
   supabaseServiceKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
 });
 
-function publicState() {
-  const out = {};
-  players.forEach((p, id) => {
-    out[id] = {
-      id: p.id,
-      playerKey: p.playerKey,
-      name: p.name,
-      x: p.x,
-      y: p.y,
-      face: p.face,
-      gait: p.gait,
-      zone: p.zone,
-      nobilityRank: p.nobilityRank || 'none',
-      nobilityPower: p.nobilityPower || 0,
-      armorScore: p.armorScore || 0,
-      auraRank: p.auraRank || 0,
-      averageQuality: p.averageQuality || 0,
-      averageGrade: p.averageGrade || 0,
-      equipmentSummary: Array.isArray(p.equipmentSummary) ? p.equipmentSummary : [],
-    };
+function publicPlayer(p) {
+  return {
+    id: p.id,
+    playerKey: p.playerKey,
+    name: p.name,
+    x: p.x,
+    y: p.y,
+    face: p.face,
+    gait: p.gait,
+    zone: p.zone,
+    nobilityRank: p.nobilityRank || 'none',
+    nobilityPower: p.nobilityPower || 0,
+    armorScore: p.armorScore || 0,
+    auraRank: p.auraRank || 0,
+    averageQuality: p.averageQuality || 0,
+    averageGrade: p.averageGrade || 0,
+    equipmentSummary: Array.isArray(p.equipmentSummary) ? p.equipmentSummary : [],
+  };
+}
+
+function spatialKey(zone, cx, cy) { return String(zone || 'plaza') + ':' + cx + ':' + cy; }
+function buildSpatialIndex() {
+  const index = new Map();
+  players.forEach((p) => {
+    const cx = Math.floor(p.x / AOI_CELL), cy = Math.floor(p.y / AOI_CELL);
+    const key = spatialKey(p.zone, cx, cy);
+    if (!index.has(key)) index.set(key, []);
+    index.get(key).push(p);
   });
+  return index;
+}
+function candidatePlayers(viewer, index) {
+  const out = [];
+  const span = Math.ceil((AOI_RADIUS + AOI_HYSTERESIS) / AOI_CELL);
+  const cx = Math.floor(viewer.x / AOI_CELL), cy = Math.floor(viewer.y / AOI_CELL);
+  for (let y = cy - span; y <= cy + span; y++) {
+    for (let x = cx - span; x <= cx + span; x++) {
+      const bucket = index.get(spatialKey(viewer.zone, x, y));
+      if (bucket) for (const p of bucket) out.push(p);
+    }
+  }
   return out;
+}
+function relevant(viewer, target) {
+  if (!viewer || !target) return false;
+  if (viewer.id === target.id) return true;
+  if (viewer.zone !== target.zone) return false;
+  const wasRelevant = viewer.interest && viewer.interest.has(target.id);
+  const radius = AOI_RADIUS + (wasRelevant ? AOI_HYSTERESIS : 0);
+  const dx = target.x - viewer.x, dy = target.y - viewer.y;
+  return dx * dx + dy * dy <= radius * radius;
+}
+// KELO-INDEX SERVER/AOI snapshot individual por zone+grid+radio; el player sigue existiendo aunque no viaje a ese cliente.
+function publicStateFor(viewer, index) {
+  const out = {};
+  const nextInterest = new Set();
+  for (const p of candidatePlayers(viewer, index)) {
+    if (!relevant(viewer, p)) continue;
+    out[p.id] = publicPlayer(p);
+    if (p.id !== viewer.id) nextInterest.add(p.id);
+  }
+  viewer.interest = nextInterest;
+  return out;
+}
+function sendRelevantStates() {
+  if (!players.size) return;
+  const index = buildSpatialIndex();
+  players.forEach((viewer) => send(viewer.ws, { t:'state', players:publicStateFor(viewer, index), aoi:{mode:'zone-grid-radius-v1', radius:AOI_RADIUS, cell:AOI_CELL} }));
+}
+function sendRelevantEvent(source, obj, except) {
+  const index = buildSpatialIndex();
+  players.forEach((viewer) => {
+    if (viewer === except || !viewer.ws || viewer.ws.readyState !== 1) return;
+    if (relevant(viewer, source)) send(viewer.ws, obj);
+  });
 }
 
 function send(ws, obj) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj)); }
-function broadcast(obj, except) {
-  const raw = JSON.stringify(obj);
-  players.forEach((p) => { if (p !== except && p.ws && p.ws.readyState === 1) p.ws.send(raw); });
-}
 function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
 function shortId(value, max) { return value == null ? null : String(value).replace(/[^a-zA-Z0-9_:\-.]/g, '').slice(0, max || 96); }
 function safeVec(value) {
@@ -131,15 +186,15 @@ async function refreshForge(me, requestId) {
 function protocolError(ws, requestId, code, message) { send(ws, { t: 'error', requestId: requestId || null, code, message: message || code }); }
 
 const wss = new WebSocketServer({ port: PORT });
-console.log(`Kelo plaza room on ws://0.0.0.0:${PORT} · Nobleza ${nobility.source} · Forge ${forge.source}`);
+console.log(`Kelo plaza room on ws://0.0.0.0:${PORT} · Nobleza ${nobility.source} · Forge ${forge.source} · AOI ${AOI_RADIUS}px/${AOI_CELL}px`);
 
 wss.on('connection', (ws) => {
   if (players.size >= MAX) { ws.close(1013, 'room full'); return; }
   const id = 'p' + (seq++);
-  const me = { id, ws, playerKey: null, name: 'Kelo', x: 1400, y: 1600, face: 'down', gait: 'idle', zone: 'plaza', nobilityRank: 'none', nobilityPower: 0, armorScore: 0, auraRank: 0, averageQuality: 0, averageGrade: 0, equipmentSummary: [] };
+  const me = { id, ws, playerKey: null, name: 'Kelo', x: 1400, y: 1600, face: 'down', gait: 'idle', zone: 'plaza', interest:new Set(), nobilityRank: 'none', nobilityPower: 0, armorScore: 0, auraRank: 0, averageQuality: 0, averageGrade: 0, equipmentSummary: [] };
   players.set(id, me);
-  send(ws, { t: 'welcome', id, players: publicState(), nobilitySource: nobility.source, forgeSource: forge.source });
-  broadcast({ t: 'join', player: publicState()[id] }, me);
+  send(ws, { t: 'welcome', id, players: publicStateFor(me, buildSpatialIndex()), nobilitySource: nobility.source, forgeSource: forge.source, aoi:{mode:'zone-grid-radius-v1',radius:AOI_RADIUS,cell:AOI_CELL,hysteresis:AOI_HYSTERESIS} });
+  sendRelevantEvent(me, { t:'join', player:publicPlayer(me) }, me);
 
   ws.on('message', async (buf) => {
     let msg;
@@ -153,7 +208,7 @@ wss.on('connection', (ws) => {
         send(ws, { t: 'identity', playerKey: me.playerKey });
         await refreshNobility(me, msg.requestId);
         await refreshForge(me, msg.requestId);
-        broadcast({ t: 'state', players: publicState() }, me);
+        sendRelevantStates();
         return;
       }
       if (msg.t === 'pose') {
@@ -169,7 +224,7 @@ wss.on('connection', (ws) => {
         if (!VISUAL_EVENT_ALLOWLIST.has(msg.name)) { protocolError(ws, msg.requestId, 'INVALID_VISUAL_EVENT', 'Evento visual no permitido.'); return; }
         const context = sanitizeVisualContext(msg.context);
         const meta = sanitizeVisualMeta(msg.meta);
-        broadcast({ t: 'visual:event', name: msg.name, actorId: me.id, context, meta, serverTime: Date.now(), source: 'server-visual-relay-v1' }, me);
+        sendRelevantEvent(me, { t: 'visual:event', name: msg.name, actorId: me.id, context, meta, serverTime: Date.now(), source: 'server-visual-relay-v2-aoi' }, me);
         return;
       }
       if (msg.t === 'nobility:get') { await refreshNobility(me, msg.requestId); return; }
@@ -180,7 +235,7 @@ wss.on('connection', (ws) => {
         const result = await nobility.donate(me.playerKey, me.name, currency, amount);
         me.nobilityRank = result.snapshot.rank.id; me.nobilityPower = result.snapshot.rank.power;
         send(ws, { t: 'nobility:donated', requestId: msg.requestId || null, donationAdded: result.donationAdded, snapshot: result.snapshot });
-        broadcast({ t: 'state', players: publicState() }, me); return;
+        sendRelevantStates(); return;
       }
       if (msg.t === 'combat:resolve') { const result = await nobility.resolveDamage(me.playerKey, me.name, msg.baseDamage); send(ws, { t: 'combat:resolved', requestId: msg.requestId || null, ...result }); return; }
       if (msg.t === 'forge:get') { await refreshForge(me, msg.requestId); return; }
@@ -188,7 +243,7 @@ wss.on('connection', (ws) => {
         const result = await forge.attempt(me.playerKey, { itemId: msg.itemId, forgeType: msg.forgeType, materialLevel: msg.materialLevel, crystals: msg.crystals });
         me.armorScore = result.armorScore; me.auraRank = result.auraRank; me.averageQuality = result.averageQuality; me.averageGrade = result.averageGrade; me.equipmentSummary = result.equipmentSummary;
         send(ws, { t: 'forge:result', requestId: msg.requestId || null, ...result, source: 'server-authoritative' });
-        broadcast({ t: 'state', players: publicState() }, me); return;
+        sendRelevantStates(); return;
       }
       if (msg.t === 'forge:combine') {
         const snapshot = await forge.combine(me.playerKey, msg.materialId);
@@ -203,11 +258,11 @@ wss.on('connection', (ws) => {
       protocolError(ws, msg && msg.requestId, code, code);
     }
   });
-  ws.on('close', () => { players.delete(id); broadcast({ t: 'leave', id }); });
+  ws.on('close', () => {
+    players.forEach((viewer) => { if (viewer !== me && viewer.interest && viewer.interest.has(id)) send(viewer.ws, { t:'leave', id }); });
+    players.delete(id);
+  });
 });
 
-setInterval(() => {
-  if (!players.size) return;
-  const raw = JSON.stringify({ t: 'state', players: publicState() });
-  players.forEach((p) => { if (p.ws && p.ws.readyState === 1) p.ws.send(raw); });
-}, 100);
+// 10 Hz de snapshot sigue siendo el contrato actual; el payload ahora es por AOI y no por room completa.
+setInterval(sendRelevantStates, 100);
