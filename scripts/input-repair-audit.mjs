@@ -16,7 +16,7 @@ const context = await browser.newContext({
 });
 const page = await context.newPage();
 const pageErrors = [];
-page.on('pageerror', (error) => pageErrors.push(String(error?.message || error)));
+page.on('pageerror', (error) => pageErrors.push(String(error?.stack || error?.message || error)));
 
 try {
   await page.goto(url, { waitUntil: 'networkidle', timeout: 60_000 });
@@ -73,6 +73,15 @@ try {
   const stopped = await snapshot();
 
   const moved = Math.hypot(moving.x - before.x, moving.y - before.y);
+  const measurement = {
+    legacyContract,
+    before,
+    moving,
+    stopped,
+    moved: Number(moved.toFixed(2))
+  };
+  console.log('MOVEMENT_MEASUREMENT ' + JSON.stringify(measurement));
+
   if (moved < 8) {
     throw new Error(`Pointer input did not move player enough: ${moved.toFixed(2)}px`);
   }
@@ -88,14 +97,7 @@ try {
     throw new Error(`Page errors during movement audit:\n${pageErrors.join('\n')}`);
   }
 
-  console.log(JSON.stringify({
-    status: 'PASS',
-    legacyContract,
-    before,
-    moving,
-    stopped,
-    moved: Number(moved.toFixed(2))
-  }, null, 2));
+  console.log(JSON.stringify({ status: 'PASS', ...measurement }, null, 2));
 } finally {
   await browser.close();
 }
