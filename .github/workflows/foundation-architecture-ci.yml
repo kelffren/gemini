@@ -17,3 +17,10 @@ jobs:
           node-version: '20'
       - name: Audit Foundation architecture
         run: node scripts/foundation-architecture-audit.js
+      - name: Audit input-lock ownership contract
+        run: node scripts/input-lock-contract-audit.js
+      - name: Syntax-check Foundation primitives
+        run: |
+          node --check src/core/input-lock-system.js
+          node --check scripts/foundation-architecture-audit.js
+          node --check scripts/input-lock-contract-audit.js
