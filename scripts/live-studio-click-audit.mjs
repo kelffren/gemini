@@ -66,8 +66,7 @@ try{
   if(!report.lazyStudioBeforeWorld)throw new Error(`STUDIO_LOADED_BEFORE_WORLD:${JSON.stringify(studioBeforeWorld)}`);
   const navLabels=await page.locator('#kelo-creators-hub .kc-nav button').allTextContents();
   for(const label of ['CREATE','MY PROJECTS','MY ASSETS','SHARED WITH ME','TEST INVITES','PUBLISHED'])if(!navLabels.includes(label))throw new Error(`CREATOR_HUB_NAV_MISSING:${label}`);
-  const worldButton=page.getByRole('button',{name:'Abrir World'});
-  await worldButton.click();
+  await page.getByRole('button',{name:'Abrir World'}).click();
   await page.waitForSelector('#kelo-studio-live',{state:'visible',timeout:15000});
   report.studioVisible=true;
   report.studioRequestsAfterWorld=requested.filter(u=>/\/src\/studio\//.test(u)).length;
@@ -77,8 +76,17 @@ try{
   if(!report.lockAcquired)throw new Error(`STUDIO_LOCK_NOT_ACQUIRED: ${JSON.stringify(report)}`);
   if(!report.visualAssets)throw new Error(`STUDIO_VISUAL_ASSETS_MISSING: ${JSON.stringify(report)}`);
 
+  // Mobile premium flow: the Assets sheet starts closed. EDIT is the official
+  // affordance that opens it; do not click the hidden desktop asset panel.
+  await page.locator('#kelo-studio-live .ks-deck [data-act="edit-assets"]').click();
+  await page.waitForFunction(()=>{
+    const root=document.querySelector('#kelo-studio-live');
+    return root?.dataset.sheetOpen==='1'&&root.querySelector('.ks-mobile-pane[data-pane="assets"]')?.classList.contains('on');
+  },null,{timeout:5000});
+  const firstAsset=page.locator('#kelo-studio-live .ks-mobile-pane[data-pane="assets"] [data-asset]').first();
+  await firstAsset.waitFor({state:'visible',timeout:5000});
+
   const before=await objectCount(page);
-  const firstAsset=page.locator('#kelo-studio-live [data-pane="assets"] [data-asset]').first();
   await firstAsset.click();
   await page.waitForFunction(()=>{const r=document.querySelector('#kelo-studio-live');return r?.dataset.compact==='asset'&&!!r.dataset.activeAsset&&!!r.querySelector('.ks-bottom.ks-compact [data-act="edit-assets"]');},null,{timeout:8000});
   report.assetCompact=true;
@@ -98,11 +106,11 @@ try{
   if(!report.persistentPaint||report.placedCount<2)throw new Error(`STUDIO_PERSISTENT_PAINT_FAILED:${JSON.stringify({activeAfterTwo,modeAfterTwo,placedCount:report.placedCount})}`);
 
   await page.click('#kelo-studio-live .ks-bottom.ks-compact [data-act="edit-assets"]');
-  await page.waitForFunction(active=>{const r=document.querySelector('#kelo-studio-live');return r?.dataset.compact==='full'&&r.dataset.activeAsset===active&&r.querySelector('[data-pane="assets"]')?.classList.contains('on');},report.activeAsset,{timeout:5000});
+  await page.waitForFunction(active=>{const r=document.querySelector('#kelo-studio-live');return r?.dataset.compact==='full'&&r.dataset.activeAsset===active&&r.dataset.sheetOpen==='1'&&r.querySelector('.ks-mobile-pane[data-pane="assets"]')?.classList.contains('on');},report.activeAsset,{timeout:5000});
   report.editReopens=true;
-  const visibleAssetCount=await page.locator('#kelo-studio-live [data-pane="assets"] [data-asset]').count();
+  const visibleAssetCount=await page.locator('#kelo-studio-live .ks-mobile-pane[data-pane="assets"] [data-asset]').count();
   if(visibleAssetCount>1){
-    await page.locator('#kelo-studio-live [data-pane="assets"] [data-asset]').nth(1).click();
+    await page.locator('#kelo-studio-live .ks-mobile-pane[data-pane="assets"] [data-asset]').nth(1).click();
     await page.waitForFunction(old=>{const r=document.querySelector('#kelo-studio-live');return r?.dataset.compact==='asset'&&!!r.dataset.activeAsset&&r.dataset.activeAsset!==old;},report.activeAsset,{timeout:5000});
     report.changedAsset=true;
   }
