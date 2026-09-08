@@ -68,6 +68,14 @@
       "technicalDoc": "docs/systems/AVATAR_RENDER_SYSTEM.md",
       "playerVisible": false,
       "status": "foundation-transitional"
+    },
+    {
+      "id": "performance-foundation",
+      "owner": "KELO_PERF + existing Foundation owners",
+      "source": "src/systems/performance-governor.js",
+      "technicalDoc": "docs/systems/PERFORMANCE_FOUNDATION.md",
+      "playerVisible": false,
+      "status": "foundation-active"
     }
   ]
 }
