@@ -1,117 +1,89 @@
-# KELO STUDIO — Foundation Architecture v1.1
+# KELO STUDIO — Foundation Architecture v1.2
 
 **Status:** integration-ready foundation; intentionally not wired into LIVE automatically.
 
 ## Purpose
 Kelo Studio is the authoring layer for parcels, world maps, dungeons and future game modes. It reuses Kelo World runtime contracts instead of creating a second game engine.
 
-## Architectural laws
-1. Studio describes gameplay; it does not reimplement gameplay.
-2. Every persistent authoring mutation goes through a Command.
-3. The readable source of truth is `WorldDocument`; runtime may consume compiled projections.
-4. World content is spatially indexed by the same 512px chunk concept already used by the world renderer.
-5. A local edit invalidates only affected chunks.
-6. Gameplay systems are reached through adapters (`KELO_WORLD_EDIT`, Property, Forge, Inventory, TileRegistry, Environment Layers).
-7. Studio code is lazy. Normal gameplay must not require Studio modules.
-8. No player-authored arbitrary JavaScript. Creator power comes from approved Components/Devices/Actions.
-9. No new `*-hotfix.js` architecture. Fix ownership at the responsible module.
-10. Public APIs stay small and files declare what they own and do not own.
+## Laws
+1. Studio describes gameplay; it never reimplements gameplay systems.
+2. Persistent authoring mutations go through Commands.
+3. `WorldDocument` is readable source-of-truth; runtime receives compiled projections.
+4. Spatial work uses the existing 512px chunk concept and dirty-chunk invalidation.
+5. Existing world/property/forge/inventory/tile/atlas/layer contracts are reached through adapters.
+6. Studio stays absent from normal `index.html`; creator tooling is lazy-loaded.
+7. Players never supply arbitrary JS; creator power is registered Components/Prefabs/Devices/Actions.
+8. New capabilities go through registries, not building-specific `if/else` or hotfix files.
 
-## Foundation
+## Modules
 ```text
 src/studio/
   studio-entry.mjs
-  core/
-    studio-kernel.mjs
-    command-bus.mjs
-    history-manager.mjs
-    input-router.mjs
-    selection-manager.mjs
-    tool-registry.mjs
-  document/
-    world-document.mjs
-    document-commands.mjs
-  entities/
-    component-registry.mjs
-    prefab-registry.mjs
-  spatial/
-    spatial-chunk-index.mjs
-    dirty-chunk-manager.mjs
-  compiler/
-    world-compiler.mjs
-    worker-client.mjs
-    studio-worker.mjs
-  adapters/
-    kelo-runtime-adapter.mjs
+  core/        kernel, commands, history, input, selection, tools
+  document/    WorldDocument + reusable entity commands
+  entities/    ComponentRegistry + PrefabRegistry
+  components/  Kelo creator-facing component definitions
+  spatial/     512px SpatialChunkIndex + DirtyChunkManager
+  compiler/    deterministic compiler + worker + runtime diff
+  adapters/    current Kelo contracts, catalog seeding, current-world import
+  storage/     IndexedDB checkpoints + command journal
+  performance/ lightweight timing + long-task observer
 ```
 
-## Existing contracts deliberately reused
-- `KELO_PROPERTY_CATALOG`: existing assets/prefabs/tiles.
-- `KELO_PROPERTY_SYSTEM`: existing parcel placement/local-remote authority.
-- `KELO_WORLD_EDIT`: single public world editing authority facade.
-- `KELO_WORLD_REVISIONS`: stable IDs and immutable published revisions.
-- `KELO_WORLD_RENDERER`: existing 512px chunk renderer.
-- `KELO_ENVIRONMENT_LAYERS`: current render phase ownership.
-- `KELO_TILE_REGISTRY` / Atlas Contract: existing asset ownership.
-- Forge/Inventory/Farming runtime systems: remain gameplay authorities; Studio Components reference them through adapters.
+## Reuse of current code
+`KELO_PROPERTY_CATALOG`, `KELO_PROPERTY_SYSTEM`, `KELO_WORLD_EDIT`, `KELO_WORLD_REVISIONS`, `KELO_WORLD_RENDERER`, `KELO_ENVIRONMENT_LAYERS`, `KELO_TILE_REGISTRY`, Atlas Contract and gameplay systems remain authorities. Studio's `KeloRuntimeAdapter` is the only compatibility boundary.
+
+Existing PropertyCatalog assets are seeded into `PrefabRegistry`; the Studio does not create duplicate images or duplicate asset definitions. The current published world/property snapshot can be imported into `WorldDocument` without mutating LIVE.
 
 ## Lazy integration
-Do **not** add Studio script tags to `index.html`.
+Do not add Studio scripts to `index.html`.
 ```js
 const { bootKeloStudio } = await import('./src/studio/studio-entry.mjs');
 const studio = await bootKeloStudio({ mode: 'world' });
+await studio.importCurrent();
 ```
-Parcel Builder uses the same entry with `mode: 'parcel'` and a simpler UX shell.
+Parcel Builder uses `mode:'parcel'` with the same Kernel and a simpler UX shell.
 
-## Authoring flow
+## Edit flow
 ```text
-UI -> Tool -> CommandBus -> WorldDocument
-                     |-> History
-                     |-> SpatialChunkIndex
-                     |-> DirtyChunkManager
-                     `-> Compiler / Worker -> Runtime patch
+pointermove -> local overlay preview only
+pointerup   -> Tool -> CommandBus -> WorldDocument
+                                 |-> History journal
+                                 |-> SpatialChunkIndex
+                                 |-> DirtyChunkManager
+                                 `-> Compiler Worker -> RuntimeDiff -> adapters
 ```
-Dragging is preview-only. A mutation commits on pointer-up. Online authority is called at the persistence/command adapter boundary, not on every pointermove.
+No full snapshot or network write is required during dragging.
 
-## Component / Prefab rule
-A Chest, Forge, Garden or Dungeon Spawner is not a special Studio engine. It is a prefab composed from registered components. Prefab instances store only IDs + transform + meaningful overrides. New creator behavior is added by registering reusable capabilities, never by adding `if (asset === ...)` logic to the editor.
+## Persistence
+IndexedDB is local crash-recovery only: checkpoints + serialized command journal. Online/server state remains canonical. The store has an in-memory fallback for tests/unsupported environments. Checkpoints use structured clone rather than large localStorage JSON blobs.
 
-## Migration from current Builder
-The current Builder remains LIVE during migration:
-1. selection/drag preview -> `InputRouter` + Tool;
-2. create/move/rotate/remove -> document Commands;
-3. old 20-item undo -> `HistoryManager`;
-4. full placement scans -> `SpatialChunkIndex`;
-5. full collider rebuild -> incremental runtime adapter;
-6. terrain painting -> Commands + DirtyChunkManager;
-7. only after parity tests, remove wrapper/hotfix files.
+## Components
+Built-in creator metadata now includes Visual, Collider, Interaction, Container, CraftingStation, GrowZone, Door, Lockable, Spawner, Permission, Persistent, AnalyticsMarker and AudioEmitter. These define editor properties only; runtime behavior remains owned by existing/future gameplay systems.
 
 ## Performance contract
-- Studio JS is absent from normal `index.html` boot.
-- No whole-world scan during an animation frame.
-- No full snapshot or server writes during drag.
-- Only dirty chunks are recompiled/re-rendered.
-- Compiler has a Worker client with deterministic synchronous fallback.
-- Large Asset Browser/Outliner collections must be virtualized.
-- Large drafts/checkpoints belong in IndexedDB; server remains canonical online.
-- Runtime representation may be compact while `WorldDocument` remains readable.
+- 0 Studio JS in normal `index.html` boot.
+- no whole-world scan in animation-frame paths;
+- 512px chunk spatial lookup;
+- incremental dirty chunks and runtime bundle diffs;
+- compiler Worker with deterministic synchronous fallback;
+- large Asset Browser/Outliner must be virtualized when UI lands;
+- static chunk caching/ImageBitmap only after measured integration tests;
+- profiler exposes Studio timing and Long Task telemetry.
 
-## Next integration slices
-1. Studio Overlay Canvas + Select/Transform/Placement tools.
-2. Import existing published Property placements into `WorldDocument`.
-3. Incremental collider adapter replacing Property `syncColliders()` rebuild.
-4. IndexedDB command journal/checkpoints and recovery.
-5. Dirty-chunk renderer bridge / ImageBitmap cache where measurement justifies it.
-6. Inspector generated from `ComponentRegistry` schemas.
-7. Prefab overrides/variants + asset browser virtualization.
-8. Smart terrain/autotile/path tools in Worker.
-9. Visual Devices/Logic Graph + debugger.
-10. Dungeon/Game Mode creator UX and publish validation.
+## Safe migration from current Builder
+1. Overlay Canvas + Select/Transform/Placement tools.
+2. Import current published snapshot to WorldDocument.
+3. Commit placement commands back through existing authority.
+4. Replace full collider rebuild with incremental runtime-diff adapter.
+5. Move terrain brush/autotile to commands + worker.
+6. Build generated Inspector on ComponentRegistry and virtualized Asset Browser/Outliner.
+7. Only after Playwright/mobile parity, retire old builder wrappers/hotfixes.
 
-## Definition of done per slice
+## Definition of done for each integration slice
 - no new runtime dependency;
-- no duplicated gameplay system;
-- functional audit;
-- Playwright LIVE regression for visual/input changes;
+- no duplicated gameplay owner;
+- functional audit + syntax checks;
+- Playwright regression for any LIVE visual/input change;
 - mobile validation before legacy removal;
-- `ENGINE_MAP` ownership changes only once the new path is actually OWNER LIVE.
+- `ENGINE_MAP` ownership changes only when a new path becomes OWNER LIVE.
