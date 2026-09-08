@@ -1,3 +1,16 @@
+/* KELO-INDEX
+ * area: LEGACY PLAZA GROUND / AIM PRESENTATION
+ * owner: plaza ground legacy; frame extension owned by KeloRender
+ * keys: PLAZA ATLAS HIDPI LANDING RENDER FOUNDATION
+ * purpose: conserva ground authored y landing marker sin envolver render
+ * public-api: KELO_PLAZA_TILESET, KELO_PLAZA_AUDIT
+ * consumes: KeloRender, tile registry, world renderer, skillAim
+ * state-owned: atlas images + baked layers
+ * extension-points: KeloRender.beforeFrame/afterFrame
+ * reuse: contenido de plaza debe ir al registry/world renderer, no crear wrappers
+ * legacy: castAimedSkill y world-renderer decorator pendientes de consolidación
+ * do-not: NO envolver render
+ */
 (function () {
   // LIVE owner: plaza tiles + HiDPI + aimed-skill landing marker.
   const PLAZA = { x: 1040, y: 1240, w: 800, h: 560 };
@@ -16,7 +29,7 @@
   const TRANSITION_MASKS = REGISTRY.transitionMasks;
 
   window.KELO_PLAZA_AUDIT = {
-    version: 'V5.93-authored-ground',
+    version: 'V5.93-authored-ground-foundation',
     ready: false,
     assetLoaded: false,
     groundAssetLoaded: false,
@@ -38,7 +51,8 @@
     authoredTransitions: true,
     propsDisabled: true,
     decorationReset: window.KELO_WORLD_DECORATION_RESET === true,
-    decorationResetSuppressed: window.KELO_WORLD_DECORATION_RESET === true
+    decorationResetSuppressed: window.KELO_WORLD_DECORATION_RESET === true,
+    renderOwner:'KeloRender'
   };
 
   function inPlaza(o) {
@@ -273,11 +287,9 @@
     ctx.restore();
   }
 
-  const _r=render;
-  render=function(){
-    applyHiDPI(); _r();
-    drawLanding();
-  };
+  if(!window.KeloRender) throw new Error('KeloRender unavailable before engine-l');
+  window.KeloRender.beforeFrame('engine-l:hidpi', applyHiDPI, 20);
+  window.KeloRender.afterFrame('engine-l:landing-marker', drawLanding, 40);
 
-  window.KELO_PLAZA_TILESET=Object.freeze({sourceMode:'authored-raster-ground-v1',registryVersion:REGISTRY.version,assetPath:GROUND_ATLAS.src,fallbackAssetPath:ATLAS.src,transitionAssetPath:TRANSITION_ATLAS.src,atlasWidth:GROUND_ATLAS.width,atlasHeight:GROUND_ATLAS.height,atlasTileSize:TILE,worldTileSize:TILE,columns:COLS,layeredTransitions:true,authoredTransitions:true,authoredGround:true,plaza:Object.freeze({...PLAZA})});
+  window.KELO_PLAZA_TILESET=Object.freeze({sourceMode:'authored-raster-ground-v1',registryVersion:REGISTRY.version,assetPath:GROUND_ATLAS.src,fallbackAssetPath:ATLAS.src,transitionAssetPath:TRANSITION_ATLAS.src,atlasWidth:GROUND_ATLAS.width,atlasHeight:GROUND_ATLAS.height,atlasTileSize:TILE,worldTileSize:TILE,columns:COLS,layeredTransitions:true,authoredTransitions:true,authoredGround:true,plaza:Object.freeze({...PLAZA}),renderOwner:'KeloRender'});
 })();
