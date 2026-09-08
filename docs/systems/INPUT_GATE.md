@@ -1,118 +1,55 @@
-# INPUT GATE — KeloInputLocks → processInput
+# INPUT GATE — retirado dentro de KeloInput
 
-**Estado:** Foundation V1 · bridge temporal de compatibilidad.  
-**Código:** `src/core/input-gate.js`  
-**Owner:** `KeloInputLocks` es el owner de locks; Input Gate es SUPPORT.  
-**API pública gameplay:** ninguna.  
-**Auditoría:** `window.KELO_INPUT_GATE_AUDIT`.
+**Estado:** RETIRED COMPAT.  
+**Código histórico:** `src/core/input-gate.js`  
+**Reemplazo:** `src/core/input-system.js` / `window.KeloInput`.  
+**Owner de locks:** `KeloInputLocks`.
 
-## Propósito
+## Qué cambió
 
-Mientras `processInput()` siga viviendo dentro del core legacy, necesitamos un único punto donde el runtime respete `KeloInputLocks` sin pedir a cada panel que manipule movimiento directamente.
+El primer tramo de Foundation introdujo un bridge separado llamado Input Gate para impedir que los paneles siguieran peleándose por `processInput`.
 
-Input Gate hace exactamente eso:
-
-```text
-processInput solicitado
-        ↓
-KeloInputLocks.isLocked() ?
-   ├─ sí → limpia intención temporal y NO delega al processInput legacy
-   └─ no → ejecuta el processInput anterior sin modificarlo
-```
-
-No es un segundo sistema de input. Es un bridge temporal hacia el owner nuevo.
-
-## Por qué existe
-
-Antes de Foundation, paneles y hotfixes podían bloquear/desbloquear movimiento escribiendo globals o envolviendo `processInput`. Eso hacía imposible razonar sobre quién mandaba.
-
-El objetivo de transición es:
+Después se consolidó Input por completo en un owner explícito:
 
 ```text
-UI → KeloInputLocks.acquire/release
-              ↓
-         Input Gate
-              ↓
-      processInput legacy
+KeloInputLocks  → claims de bloqueo
+       ↓
+KeloInput       → pipeline único de processInput
+       ↓
+KeloMovement / otros consumidores
 ```
 
-Cuando Input sea extraído de `engine-a.js`, el nuevo owner podrá consultar `KeloInputLocks` directamente y este bridge deberá retirarse.
+Por tanto el archivo `src/core/input-gate.js` ya no está cargado por `index.html`, no envuelve `processInput` y no debe recibir funcionalidad nueva.
 
-## Estado que posee
+## Por qué no se borró todavía
 
-Ninguno.
+Se conserva temporalmente porque tests, diagnósticos o caches históricos pueden conocer el nombre del archivo y `KELO_INPUT_GATE_AUDIT`.
 
-Input Gate no guarda claims, no guarda owner de paneles y no decide cuánto dura un lock.
+`KeloInput` publica un audit compatible mientras dura la transición.
 
-## Estado que puede poner a cero mientras hay lock
+## Regla de reutilización
 
-Para evitar que una intención previa siga desplazando al jugador, el bridge limpia temporalmente:
+NO importar/cargar `input-gate.js`.
 
-- `input.normX`
-- `input.normY`
-- `input.touchActive`
-- `input.touchId`
-- teclas activas de `input.keys`
-- `localPlayer.vx`
-- `localPlayer.vy`
-
-No cambia posición, HP, cooldown, economía ni reglas PvP.
-
-## Dependencias
-
-- `KeloInputLocks`
-- `processInput` legacy
-- `input`
-- `localPlayer`
-
-No depende de DOM ni conoce nombres de paneles.
-
-## Invariante principal
-
-Si `KeloInputLocks.isLocked()` devuelve `true`, `processInput` legacy NO debe ejecutarse.
-
-Si devuelve `false`, el bridge debe delegar exactamente al `processInput` anterior.
-
-## Extension points
-
-Ninguno.
-
-No añadir aquí excepciones tipo:
+Para bloquear input:
 
 ```text
-si inventory...
-si PvP...
-si emotes...
+KeloInputLocks.acquire/release
 ```
 
-Los consumidores reclaman/rechazan locks mediante `KeloInputLocks`; el gate solo consulta estado agregado.
+Para observar o extender el pipeline:
 
-## Anti-patrones
+```text
+KeloInput.before/after
+```
 
-No añadir timers.
+## Condición para borrar el archivo
 
-No añadir reglas UI.
+Puede eliminarse cuando:
 
-No usarlo para stun, root, knockback o slow: esos son estados gameplay.
+- ninguna referencia runtime lo cargue;
+- ningún CI o diagnóstico necesite leerlo;
+- no haya clientes/cache relevantes esperando el nombre;
+- `KeloInput` esté validado en browser/móvil.
 
-No crear otro wrapper de `processInput` para una feature nueva.
-
-## Tests
-
-`scripts/input-gate-contract-audit.js` valida:
-
-1. sin lock, delega al `processInput` anterior;
-2. con lock, no delega;
-3. con lock, limpia intención/velocidad residual;
-4. al liberar token, vuelve a delegar.
-
-## Retirada futura
-
-Eliminar únicamente cuando:
-
-1. exista un owner explícito de Input fuera de `engine-a.js`;
-2. ese owner consulte `KeloInputLocks` directamente;
-3. ningún consumidor dependa del bridge;
-4. los smoke tests de movement/menu/PvP/touch pasen sin él.
-
-Hasta entonces debe existir un solo Input Gate, no varios.
+La documentación viva del sistema activo está en `docs/systems/INPUT_SYSTEM.md`.
