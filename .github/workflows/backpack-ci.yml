@@ -3,6 +3,8 @@ on:
   push:
     branches: [main]
     paths:
+      - 'src/core/input-lock-system.js'
+      - 'src/core/input-gate.js'
       - 'src/systems/backpack-system.js'
       - 'src/systems/equipment-system.js'
       - 'src/systems/container-system.js'
@@ -23,6 +25,8 @@ on:
       - 'index.html'
   pull_request:
     paths:
+      - 'src/core/input-lock-system.js'
+      - 'src/core/input-gate.js'
       - 'src/systems/backpack-system.js'
       - 'src/systems/equipment-system.js'
       - 'src/systems/container-system.js'
@@ -49,9 +53,11 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
       - name: Syntax
         run: |
+          node --check src/core/input-lock-system.js
+          node --check src/core/input-gate.js
           node --check src/systems/equipment-system.js
           node --check src/systems/backpack-system.js
           node --check src/systems/container-system.js
@@ -96,9 +102,11 @@ jobs:
           grep -q "listingContract:'validate-transfer-create-persist-rollback-v1'" src/systems/market-escrow-system.js
           grep -q "cancelContract:'validate-transfer-close-persist-rollback-v1'" src/systems/market-escrow-system.js
           grep -q "backpack-ui-v2.0.0" src/ui/backpack-ui.js
-          grep -q "modal-input-lock-v1.0.0" src/ui/modal-input-lock.js
+          grep -q "modal-input-lock-v2.0.0-retired" src/ui/modal-input-lock.js
+          grep -q "replacementOwner:'KeloInputLocks'" src/ui/modal-input-lock.js
           grep -q "warehouse-ui-v1.0.1" src/ui/warehouse-ui.js
           grep -q "market-ui-v1.0.0" src/ui/market-ui.js
           grep -q "backpackPublishAction:true" src/ui/market-ui.js
-          grep -q "self-interaction-ui-v1.0.0" src/ui/self-interaction-ui.js
+          grep -q "self-interaction-ui-v1.1.0" src/ui/self-interaction-ui.js
+          grep -q "KeloInputLocks.acquire" src/ui/self-interaction-ui.js
           grep -q "profileUsesBackpackUI:true" src/ui/self-interaction-ui.js
