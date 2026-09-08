@@ -46,7 +46,7 @@ jobs:
           test -f scripts/validate-performance-telemetry.mjs
           test -f assets/hero.PNG
           test -f assets/fuentekelo.PNG
-          test -f assets/fuentekelo-runtime.PNG
+          test -f assets/justicia_fountain_v2.PNG
           test -f assets/cesped.PNG
           test -f assets/cesped-runtime.PNG
 
@@ -97,17 +97,21 @@ jobs:
       - name: Intentional visual reset contract
         run: |
           grep -q "window.KELO_WORLD_DECORATION_RESET=true" index.html
-          grep -q "assets/fuentekelo-runtime.PNG?art=401" index.html
-          grep -q "version:'1.6.0'" src/environment/prop-contract.js
-          grep -q "generic-prop-contract-v6-reset-centerpiece" src/environment/prop-contract.js
+          if grep -q "assets/fuentekelo-runtime.PNG" index.html; then
+            echo 'superseded fountain runtime is still bootstrapped by index.html'
+            exit 1
+          fi
+          grep -q "version:'1.7.0'" src/environment/prop-contract.js
+          grep -q "generic-prop-contract-v7-justice-fountain-v2" src/environment/prop-contract.js
           test "$(grep -c "plazaFountainKelo:Object.freeze" src/environment/prop-contract.js)" -eq 1
+          grep -q "src:'assets/justicia_fountain_v2.PNG?art=502'" src/environment/prop-contract.js
           grep -q "id:'plaza-fountain-kelo'" src/environment/prop-contract.js
-          grep -q "position:Object.freeze({x:1080,y:862})" src/environment/prop-contract.js
-          grep -q "size:Object.freeze({w:720,h:658})" src/environment/prop-contract.js
+          grep -q "position:Object.freeze({x:1080,y:800})" src/environment/prop-contract.js
+          grep -q "size:Object.freeze({w:720,h:720})" src/environment/prop-contract.js
           grep -q "baseY:1505" src/environment/prop-contract.js
           grep -q "visibleDuringReset:true" src/environment/prop-contract.js
           grep -q "actor-base-y-redraw-v1" src/environment/prop-contract.js
-          grep -q "generic-props-v1.7" src/environment/generic-props.js
+          grep -q "generic-props-v2.0" src/environment/generic-props.js
           grep -q "data-driven-props-v6-reset-visible" src/environment/generic-props.js
           grep -q "environment-layer-stack-v2.5" src/environment/environment-layer-stack.js
           grep -q "blank-world-reset-visible-landmarks-v2" src/environment/environment-layer-stack.js
@@ -132,40 +136,31 @@ jobs:
             exit 1
           fi
 
-      - name: Exact Kelo fountain source and alpha runtime
+      - name: Current Justicia fountain and historical source contract
         run: |
           test "$(git hash-object assets/fuentekelo.PNG)" = "2ae3403e28cb3dca39cab310084292d397c79c6e"
           python - <<'PY'
-          from PIL import Image
           import json
           from pathlib import Path
 
-          src=Image.open('assets/fuentekelo.PNG')
-          assert src.size==(1312,1199), src.size
-          assert src.mode=='RGB', src.mode
-
-          runtime=Image.open('assets/fuentekelo-runtime.PNG')
-          assert runtime.size==(1312,1199), runtime.size
-          assert runtime.mode=='RGBA', runtime.mode
-          alpha=runtime.getchannel('A')
-          assert alpha.getextrema()==(0,255), alpha.getextrema()
-          hist=alpha.histogram()
-          total=sum(hist)
-          transparent=sum(hist[:8])
-          visible=sum(hist[248:])
-          assert transparent/total>0.10, transparent/total
-          assert visible/total>0.20, visible/total
-
           manifest=json.loads(Path('src/environment/art-asset-manifest.json').read_text())
-          fountain=[a for a in manifest['assets'] if a.get('id')=='fuentekelo-v1']
+          fountain=[a for a in manifest['assets'] if a.get('id')=='justicia-fountain-v2']
           assert len(fountain)==1, fountain
           a=fountain[0]
-          assert a['path']=='assets/fuentekelo-runtime.PNG'
-          assert (a['width'],a['height'])==(1312,1199)
+          assert a['path']=='assets/justicia_fountain_v2.PNG'
+          assert (a['width'],a['height'])==(1254,1254)
           assert a['requireAlpha'] is True
-          missing=[a['path'] for a in manifest['assets'] if not Path(a['path']).exists()]
+          assert a['cache']=={'strategy':'query','key':'art','value':'502'}
+          assert Path(a['path']).exists(), a['path']
+
+          policy=json.loads(Path('src/environment/png-validation-policy.json').read_text())
+          archived=[x for x in policy['excludedFromWorldContract'] if x.get('path')=='assets/fuentekelo-runtime.PNG']
+          assert len(archived)==1, archived
+          assert archived[0]['scope']=='superseded-archive', archived[0]
+
+          missing=[asset['path'] for asset in manifest['assets'] if not Path(asset['path']).exists()]
           assert not missing, missing
-          print('PASS exact fuentekelo source + transparent runtime + manifest')
+          print('PASS current Justicia fountain + historical fountain source/archive contract')
           PY
 
       - name: Reset CI scope guard
