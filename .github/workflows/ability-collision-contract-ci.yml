@@ -8,6 +8,9 @@ on:
       - 'index.html'
       - 'src/physics/**'
       - 'src/abilities/**'
+      - 'src/environment/generic-props.js'
+      - 'src/environment/world-builder-system.js'
+      - 'src/property/property-system.js'
       - 'src/visuals/ability-visuals.js'
       - 'scripts/validate-ability-runtime-contract.mjs'
       - 'scripts/validate-collision-contract.mjs'
@@ -20,6 +23,9 @@ on:
       - 'index.html'
       - 'src/physics/**'
       - 'src/abilities/**'
+      - 'src/environment/generic-props.js'
+      - 'src/environment/world-builder-system.js'
+      - 'src/property/property-system.js'
       - 'src/visuals/ability-visuals.js'
       - 'scripts/validate-ability-runtime-contract.mjs'
       - 'scripts/validate-collision-contract.mjs'
@@ -43,6 +49,9 @@ jobs:
           node --check src/abilities/abilityData.js
           node --check src/abilities/stone-system.js
           node --check src/abilities/kelo-ability-boot.js
+          node --check src/environment/generic-props.js
+          node --check src/environment/world-builder-system.js
+          node --check src/property/property-system.js
           node --check src/visuals/ability-visuals.js
           node --check scripts/validate-ability-runtime-contract.mjs
           node --check scripts/validate-collision-contract.mjs
