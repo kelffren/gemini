@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: STUDIO / OVERLAY RENDERER
- * owns: transient editor-only selection/ghost/gizmo primitives
- * does-not-own: world rendering or gameplay sprites
+ * owns: transient editor-only selection/ghost/gizmo/surface/collision primitives
+ * does-not-own: world rendering, terrain textures, gameplay sprites or physics
  * public-api: createStudioOverlayRenderer()
  * online: local-only
  */
@@ -22,6 +22,20 @@ export function createStudioOverlayRenderer({ kernel, tools } = {}) {
     if (placement) { ctx.save(); ctx.globalAlpha = 0.35; ctx.fillRect(placement.transform.x, placement.transform.y, placement.bounds.w, placement.bounds.h); ctx.restore(); drawRect(ctx, { x: placement.transform.x, y: placement.transform.y, w: placement.bounds.w, h: placement.bounds.h }, { dashed: true }); }
     const transform = tools?.transform?.getPreview?.();
     if (transform) { const row = kernel.spatial.get(transform.entityId); if (row?.rect) drawRect(ctx, { ...row.rect, x: transform.x ?? row.rect.x, y: transform.y ?? row.rect.y }, { dashed: true, alpha: 0.7 }); }
+
+    const terrain = tools?.terrain?.getPreview?.();
+    if (terrain) {
+      ctx.save(); ctx.globalAlpha = 0.28; ctx.fillStyle = terrain.erase ? '#ff7777' : terrain.role === 'path' ? '#e7c56a' : '#70c46a'; ctx.fillRect(terrain.x, terrain.y, terrain.w, terrain.h); ctx.restore();
+      drawRect(ctx, terrain, { dashed: true, alpha: 0.9 });
+    }
+
+    if (tools?.collision?.visible) {
+      ctx.save(); ctx.strokeStyle = 'rgba(255,105,105,.72)'; ctx.fillStyle = 'rgba(255,80,80,.10)';
+      for (const row of tools.collision.list?.() || []) { ctx.fillRect(row.x,row.y,row.w,row.h); drawRect(ctx,row,{alpha:.75}); }
+      const collision = tools.collision.getPreview?.();
+      if (collision) { ctx.globalAlpha = 0.28; ctx.fillRect(collision.x,collision.y,collision.w,collision.h); drawRect(ctx,collision,{dashed:true,alpha:1}); }
+      ctx.restore();
+    }
     ctx.restore();
   }
 
