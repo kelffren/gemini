@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-const VERSION='market-ui-v1.0.0';
+const VERSION='market-ui-v1.1.0-commerce-compat';
 let tab='browse',selectedListing=null;
 function toast(t){if(typeof showToast==='function')showToast(t);}
 function css(){
@@ -21,13 +21,13 @@ function render(){
   if(!window.KeloMarketEscrow||!window.KeloContainers){r.innerHTML='<div class="km-empty">Mercado cargando…</div>';return;}
   const mine=window.KeloMarketEscrow.getActiveListings();
   if(selectedListing&&!mine.some(function(x){return x.listingId===selectedListing;}))selectedListing=null;
-  r.innerHTML=`<div class="km-head"><div class="km-title">MERCADO</div><button class="km-close" aria-label="Cerrar">×</button></div><div class="km-tabs"><button class="km-tab ${tab==='browse'?'active':''}" data-tab="browse">EXPLORAR</button><button class="km-tab ${tab==='mine'?'active':''}" data-tab="mine">MIS PUBLICACIONES (${mine.length})</button></div><div class="km-note">${tab==='browse'?'Publicaciones existentes · compra todavía no forma parte de Market Escrow V1':'Tus objetos publicados viven físicamente en Escrow hasta cancelar'}</div><div class="km-list"></div><div class="km-detail"></div>`;
+  r.innerHTML=`<div class="km-head"><div class="km-title">MERCADO</div><button class="km-close" aria-label="Cerrar">×</button></div><div class="km-tabs"><button class="km-tab ${tab==='browse'?'active':''}" data-tab="browse">EXPLORAR</button><button class="km-tab ${tab==='mine'?'active':''}" data-tab="mine">MIS PUBLICACIONES (${mine.length})</button></div><div class="km-note">${tab==='browse'?'Vista legacy de compatibilidad · el Mercado Central nuevo ejecuta compras':'Tus objetos publicados viven físicamente en Escrow hasta cancelar'}</div><div class="km-list"></div><div class="km-detail"></div>`;
   r.querySelector('.km-close').onclick=close;
   r.querySelectorAll('.km-tab').forEach(function(b){b.onclick=function(){tab=b.dataset.tab;selectedListing=null;render();};});
   const list=r.querySelector('.km-list'),detail=r.querySelector('.km-detail');
   if(tab==='browse'){
     const rows=legacyRows();
-    if(!rows.length){list.innerHTML='<div class="km-empty">No hay publicaciones externas.</div>';detail.style.display='none';return;}
+    if(!rows.length){list.innerHTML='<div class="km-empty">No hay publicaciones legacy.</div>';detail.style.display='none';return;}
     rows.forEach(function(lst){
       const item=lst.item||{name:lst.name,icon:lst.icon,rarity:lst.tier,quantity:1,kind:lst.type};
       const d=describe(item,0),card=document.createElement('div');card.className='km-card';
@@ -35,7 +35,7 @@ function render(){
       card.querySelector('.km-icon').textContent=d.icon;card.querySelector('.km-name').textContent=d.name;card.querySelector('.km-sub').textContent=(lst.seller||'Mercado')+' · '+d.rarity;card.querySelector('.km-price').textContent=Number.isFinite(Number(lst.price))?String(lst.price)+' Oro':'—';
       list.appendChild(card);
     });
-    detail.innerHTML='<div class="km-sub">Market Escrow V1 no ejecuta compras ni mueve monedas todavía.</div>';return;
+    detail.innerHTML='<div class="km-sub">Usa el acceso Mercado del menú para entrar a la zona comercial completa.</div>';return;
   }
   if(!mine.length){list.innerHTML='<div class="km-empty">Aún no tienes objetos en Escrow.<br>Publícalos desde Mochila.</div>';detail.style.display='none';return;}
   mine.forEach(function(lst){
@@ -49,7 +49,7 @@ function render(){
   const item=escrowItem(selected.escrowItemInstanceId),d=describe(item,0);
   detail.innerHTML='<div class="km-name"></div><div class="km-sub"></div><div style="margin-top:9px"><button class="km-cancel">CANCELAR PUBLICACIÓN</button></div>';
   detail.querySelector('.km-name').textContent=d.icon+' '+d.name;detail.querySelector('.km-sub').textContent='x'+selected.quantity+' · identidad '+selected.escrowItemInstanceId;
-  detail.querySelector('.km-cancel').onclick=function(){const out=window.KeloMarketEscrow.cancelMarketListing(selected.listingId);if(out.ok){toast('Publicación cancelada · objeto devuelto a Mochila');selectedListing=null;}else if(out.error==='DESTINATION_FULL')toast('Mochila llena · el objeto sigue seguro en Escrow');else toast('Cancelación rechazada');render();if(window.KeloBackpackUI)window.KeloBackpackUI.render();};
+  detail.querySelector('.km-cancel').onclick=async function(){const out=window.KeloCommerceAuthority?await window.KeloCommerceAuthority.cancelMarketListing(selected.listingId):{ok:false,error:'COMMERCE_AUTHORITY_UNAVAILABLE'};if(out.ok){toast('Publicación cancelada · objeto devuelto a Mochila');selectedListing=null;}else if(out.error==='DESTINATION_FULL')toast('Mochila llena · el objeto sigue seguro en Escrow');else toast('Cancelación rechazada');render();if(window.KeloBackpackUI)window.KeloBackpackUI.render();};
 }
 function decorateBackpack(){
   if(!window.KeloBackpack||!window.KeloMarketEscrow)return;
@@ -63,14 +63,14 @@ function decorateBackpack(){
     const d=slot.descriptor||window.KeloBackpack.describeItem(slot.item,index),max=Math.max(1,Number(d?.quantity)||1);
     let value=max;
     const box=document.createElement('div');box.className='kb-market-box';
-    box.innerHTML='<div>Publicar en Market Escrow · el objeto saldrá de Mochila.</div><div class="kb-market-step"><button type="button" class="kb-market-minus">−</button><span class="kb-market-value"></span><button type="button" class="kb-market-plus">+</button><button type="button" class="kb-market-go">CONFIRMAR</button></div>';
+    box.innerHTML='<div>Publicar vía Commerce Authority · el objeto saldrá de Mochila.</div><div class="kb-market-step"><button type="button" class="kb-market-minus">−</button><span class="kb-market-value"></span><button type="button" class="kb-market-plus">+</button><button type="button" class="kb-market-go">CONFIRMAR · 150 ORO</button></div>';
     const valueEl=box.querySelector('.kb-market-value'),sync=function(){valueEl.textContent=String(value);};sync();
     box.querySelector('.kb-market-minus').onclick=function(){value=Math.max(1,value-1);sync();};
     box.querySelector('.kb-market-plus').onclick=function(){value=Math.min(max,value+1);sync();};
-    box.querySelector('.kb-market-go').onclick=function(){
+    box.querySelector('.kb-market-go').onclick=async function(){
       const instanceId=window.KeloMarketEscrow.itemIdentity(slot.item);
-      const out=window.KeloMarketEscrow.createMarketListing(instanceId,value,{price:150,metadata:{priceSource:'legacy-market-compat'}});
-      if(out.ok){toast('Publicado · objeto movido a Escrow');window.KeloBackpackUI?.render();open();}
+      const out=window.KeloCommerceAuthority?await window.KeloCommerceAuthority.createMarketListing(instanceId,value,150,{priceSource:'legacy-market-compat'}):{ok:false,error:'COMMERCE_AUTHORITY_UNAVAILABLE'};
+      if(out.ok){toast('Publicado · objeto movido a Escrow');window.KeloBackpackUI?.render();if(window.KeloCommerceUI?.enterMarket)window.KeloCommerceUI.enterMarket();else open();}
       else if(out.error==='EQUIPPED_ITEM_PROTECTED')toast('Desequipa el objeto antes de publicarlo');
       else if(out.error==='INVALID_AMOUNT')toast('Cantidad inválida');
       else toast('Publicación rechazada');
@@ -84,12 +84,12 @@ function installBackpackDecorator(){
   const obs=new MutationObserver(function(){queueMicrotask(decorateBackpack);});
   obs.observe(root,{childList:true,subtree:true,attributes:true,attributeFilter:['style','class']});
 }
-function open(){if(typeof closeMenu==='function')closeMenu();if(window.KeloBackpackUI)window.KeloBackpackUI.close();if(window.KeloWarehouseUI)window.KeloWarehouseUI.close();tab='mine';selectedListing=null;render();panel().style.display='block';}
+function open(){if(window.KeloCommerceUI?.enterMarket)return window.KeloCommerceUI.enterMarket();if(typeof closeMenu==='function')closeMenu();if(window.KeloBackpackUI)window.KeloBackpackUI.close();if(window.KeloWarehouseUI)window.KeloWarehouseUI.close();tab='mine';selectedListing=null;render();panel().style.display='block';}
 function close(){const r=document.getElementById('kelo-market-v1');if(r)r.style.display='none';selectedListing=null;}
 const previousOpenSocialTool=window.openSocialTool;
 if(typeof previousOpenSocialTool==='function')window.openSocialTool=function(tool){if(tool==='market')return open();return previousOpenSocialTool.apply(this,arguments);};
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',installBackpackDecorator);else installBackpackDecorator();
 setTimeout(decorateBackpack,300);
 window.KeloMarketUI=Object.freeze({version:VERSION,open,close,render,decorateBackpack});
-window.KELO_MARKET_UI_AUDIT=Object.freeze({version:VERSION,interaction:'tap-first-list-cancel-v1',mobile:true,browseReadOnly:true,ownListings:true,cancelAction:true,backpackPublishAction:true,publishQuantityStepper:true,dragDrop:false});
+window.KELO_MARKET_UI_AUDIT=Object.freeze({version:VERSION,interaction:'legacy-compat-to-commerce-v1',mobile:true,authorityBoundary:'KeloCommerceAuthority',directEscrowWrites:false,ownListings:true,cancelAction:true,backpackPublishAction:true,publishQuantityStepper:true,newMarketRoute:'KeloCommerceUI/KeloMarketWorld',dragDrop:false});
 })();
