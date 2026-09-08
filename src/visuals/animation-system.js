@@ -3,7 +3,7 @@
  * keys: ANIMATION CLIP CHANNEL LOCOMOTION ACTION REACTION OVERLAY ANCHOR SOCKET MARKER INTERRUPT PREVIEW
  * hace: controlador de animaciones corporales reutilizables y anchors semánticos sin modificar física
  * online: reproduce clips locales desde eventos; nunca decide movimiento, hit, cooldown ni validez del cast
- * creator: preview() reproduce una definición transitoria sin registrarla ni convertirla en contenido LIVE
+ * creator: preview/previewLocal reproducen definiciones transitorias sin registrarlas ni convertirlas en contenido LIVE
  */
 (function (root) {
   'use strict';
@@ -31,6 +31,7 @@
   Object.keys(manifests.animationClips || {}).forEach(function (id) { register(manifests.animationClips[id]); });
   function get(id) { return clips.get(String(id || '')) || null; }
   function list() { return Array.from(clips.values()); }
+  function localActor() { try { return typeof localPlayer !== 'undefined' ? localPlayer : (root.localPlayer || null); } catch (e) { return root.localPlayer || null; } }
 
   function actorKey(actor) {
     return root.KeloVisualContext && root.KeloVisualContext.actorIdOf(actor) || (actor && actor.id) || null;
@@ -137,6 +138,11 @@
     if (!definition || !definition.id) throw new Error('INVALID_ANIMATION_PREVIEW_CLIP');
     return start(actor, cloneDef(definition), Object.assign({}, options || {}, { force: true }));
   }
+  function previewLocal(definition, options) {
+    const actor = localActor();
+    if (!actor) throw new Error('ANIMATION_PREVIEW_ACTOR_UNAVAILABLE');
+    return preview(actor, definition, options);
+  }
 
   function stop(actor, channel, reason) {
     const map = channelMap(actor, false);
@@ -149,6 +155,7 @@
     if (!map.size) active.delete(current.actorId);
     return true;
   }
+  function stopLocal(channel, reason) { const actor = localActor(); return actor ? stop(actor, channel, reason) : false; }
 
   function markerTime(def, value, duration) {
     const n = Number(value);
@@ -243,6 +250,6 @@
   root.KeloAnchors = Object.freeze({ version: 'anchors-v1.0.0', get: anchor, presentation: presentation });
   root.KeloAnimation = Object.freeze({
     version: 'animation-controller-v1.1.0', channels: Object.freeze(Object.keys(CHANNEL_PRIORITY)), priorities: CHANNEL_PRIORITY,
-    play: play, preview: preview, stop: stop, update: update, sampleTransform: sampleTransform, frameOverride: frameOverride, metrics: metrics
+    play: play, preview: preview, previewLocal: previewLocal, stop: stop, stopLocal: stopLocal, update: update, sampleTransform: sampleTransform, frameOverride: frameOverride, metrics: metrics
   });
 })(typeof globalThis !== 'undefined' ? globalThis : window);
