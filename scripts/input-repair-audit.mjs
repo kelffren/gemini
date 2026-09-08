@@ -27,18 +27,40 @@ try {
     typeof renderActionBar === 'function'
   ), null, { timeout: 30_000 });
 
-  const legacyContract = await page.evaluate(() => ({
-    actionBarPresent: !!document.getElementById('action-bar-container'),
-    menuSheetPresent: !!document.getElementById('menu-sheet'),
-    renderActionBarSafe: (() => {
+  const abilityBarContract = await page.evaluate(() => {
+    const bar = document.getElementById('action-bar-container');
+    const renderActionBarSafe = (() => {
       try { renderActionBar(); return true; } catch (error) { return String(error?.message || error); }
-    })()
-  }));
-  if (legacyContract.actionBarPresent) throw new Error('Unexpected legacy #action-bar-container is present');
-  if (legacyContract.menuSheetPresent) throw new Error('Unexpected legacy #menu-sheet is present');
-  if (legacyContract.renderActionBarSafe !== true) {
-    throw new Error(`renderActionBar is not optional-safe: ${legacyContract.renderActionBarSafe}`);
+    })();
+    const slots = bar ? Array.from(bar.querySelectorAll('.stone-slot')) : [];
+    const visibleSlots = slots.filter((slot) => {
+      const style = getComputedStyle(slot);
+      const rect = slot.getBoundingClientRect();
+      return style.display !== 'none' && style.visibility !== 'hidden' && Number(style.opacity || 1) > 0 && rect.width > 0 && rect.height > 0;
+    });
+    const rect = bar ? bar.getBoundingClientRect() : null;
+    return {
+      actionBarPresent: !!bar,
+      actionBarClass: !!bar && bar.classList.contains('action-bar'),
+      slotCount: slots.length,
+      visibleSlotCount: visibleSlots.length,
+      barDisplay: bar ? getComputedStyle(bar).display : null,
+      barPointerEvents: bar ? getComputedStyle(bar).pointerEvents : null,
+      barRect: rect ? { x: rect.x, y: rect.y, width: rect.width, height: rect.height } : null,
+      menuSheetPresent: !!document.getElementById('menu-sheet'),
+      renderActionBarSafe
+    };
+  });
+  if (!abilityBarContract.actionBarPresent) throw new Error('Missing active #action-bar-container');
+  if (!abilityBarContract.actionBarClass) throw new Error('Ability bar is missing active .action-bar Luxe contract');
+  if (abilityBarContract.menuSheetPresent) throw new Error('Unexpected legacy #menu-sheet is present');
+  if (abilityBarContract.renderActionBarSafe !== true) {
+    throw new Error(`renderActionBar failed: ${abilityBarContract.renderActionBarSafe}`);
   }
+  if (abilityBarContract.slotCount !== 5 || abilityBarContract.visibleSlotCount !== 5) {
+    throw new Error(`Expected 5 visible ability slots: ${JSON.stringify(abilityBarContract)}`);
+  }
+  console.log('ABILITY_BAR_MEASUREMENT ' + JSON.stringify(abilityBarContract));
 
   const snapshot = () => page.evaluate(() => ({
     x: localPlayer.x,
@@ -116,7 +138,7 @@ try {
 
   const moved = Math.hypot(moving.x - before.x, moving.y - before.y);
   const measurement = {
-    legacyContract,
+    abilityBarContract,
     start,
     end,
     hitStack,
@@ -160,7 +182,7 @@ try {
   console.log('MENU_MEASUREMENT ' + JSON.stringify({ menuOpen, menuClosed }));
 
   if (pageErrors.length) {
-    throw new Error(`Page errors during input/menu audit:\n${pageErrors.join('\n')}`);
+    throw new Error(`Page errors during input/menu/ability audit:\n${pageErrors.join('\n')}`);
   }
 
   console.log(JSON.stringify({ status: 'PASS', ...measurement, menuOpen, menuClosed }, null, 2));
