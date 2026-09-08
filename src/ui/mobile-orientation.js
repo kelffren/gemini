@@ -1,14 +1,14 @@
 /* KELO-INDEX
  * area: UI
- * keys: MOBILE ORIENTATION ROTATE BUTTON PORTRAIT LANDSCAPE FULLSCREEN VIEWPORT CAMERA ZOOM FOV
- * hace: detecta la orientación, sincroniza viewport y conserva en horizontal el mismo campo de visión vertical que en vertical
+ * keys: MOBILE ORIENTATION FULLSCREEN IMMERSIVE BUTTON PORTRAIT LANDSCAPE VIEWPORT CAMERA ZOOM FOV
+ * hace: detecta orientación, sincroniza viewport/cámara y reutiliza el control lateral móvil como pantalla completa inmersiva
  * online: UI/cámara local; no contiene estado valioso ni autoridad compartida
  */
 (function(){
 'use strict';
 if(window.KELO_ORIENTATION)return;
 
-const VERSION='mobile-orientation-v1.2.0';
+const VERSION='mobile-orientation-v1.3.0';
 const ZOOM_PRESETS=Object.freeze([0.7,0.82,1]);
 let lastOrientation=null;
 let preferredOrientation=null;
@@ -33,16 +33,25 @@ function toast(msg){
   if(typeof window.showToast==='function')window.showToast(msg);
   else console.info('[KeloOrientation]',msg);
 }
+function haptic(){try{navigator.vibrate?.(12);}catch(e){}}
 function button(){return document.getElementById('kelo-orientation-btn');}
+function fullscreenSupported(){
+  return typeof document.documentElement?.requestFullscreen==='function';
+}
+function fullscreenActive(){return !!document.fullscreenElement;}
 function updateButton(current){
   const el=button(); if(!el)return;
-  const target=current==='portrait'?'landscape':'portrait';
-  el.dataset.orientation=current;
-  el.dataset.target=target;
-  el.setAttribute('aria-label',`Cambiar a ${labelFor(target)}`);
-  el.setAttribute('title',`Cambiar a ${labelFor(target)}`);
-  const value=el.querySelector('[data-orientation-label]');
-  if(value)value.textContent=current==='portrait'?'VERTICAL':'HORIZONTAL';
+  const active=fullscreenActive();
+  const orientation=current||physicalOrientation();
+  el.dataset.orientation=orientation;
+  el.dataset.fullscreen=active?'active':'windowed';
+  el.setAttribute('aria-pressed',String(active));
+  el.setAttribute('aria-label',active?'Salir de pantalla completa':'Entrar en pantalla completa');
+  el.setAttribute('title',active?'Salir de pantalla completa':'Pantalla completa');
+  const primary=el.querySelector('[data-fullscreen-primary]');
+  const secondary=el.querySelector('[data-fullscreen-secondary]');
+  if(primary)primary.textContent=active?'SALIR':'PANTALLA';
+  if(secondary)secondary.textContent=active?'PANTALLA':'COMPLETA';
 }
 function syncViewportCss(){
   const root=document.documentElement;
@@ -135,11 +144,58 @@ function scheduleSync(source){
     applyOrientation(source);
   });
 }
+function emitFullscreenChange(source){
+  const active=fullscreenActive();
+  document.documentElement.dataset.keloFullscreen=active?'active':'windowed';
+  document.body?.classList.toggle('kelo-fullscreen-active',active);
+  updateButton();
+  syncViewportCss();
+  scheduleSync(source||'fullscreen');
+  window.dispatchEvent(new CustomEvent('kelo:fullscreenchange',{detail:{
+    active,
+    supported:fullscreenSupported(),
+    source:source||'fullscreen',
+    width:window.innerWidth,
+    height:window.innerHeight,
+    orientation:physicalOrientation()
+  }}));
+  return active;
+}
 async function requestFullscreenIfUseful(){
-  if(document.fullscreenElement||!document.fullscreenEnabled)return false;
+  if(fullscreenActive())return true;
   const root=document.documentElement;
-  if(typeof root.requestFullscreen!=='function')return false;
-  try{await root.requestFullscreen({navigationUI:'hide'});return true;}catch(e){return false;}
+  if(!fullscreenSupported()){
+    syncViewportCss();
+    scheduleSync('fullscreen-fallback');
+    toast('Kelo World ya está usando el máximo espacio disponible en este navegador.');
+    return false;
+  }
+  try{
+    await root.requestFullscreen({navigationUI:'hide'});
+    return true;
+  }catch(e){
+    syncViewportCss();
+    scheduleSync('fullscreen-denied');
+    toast('Pantalla completa no está disponible en este navegador.');
+    return false;
+  }
+}
+async function exitFullscreen(){
+  if(!fullscreenActive())return true;
+  if(typeof document.exitFullscreen!=='function')return false;
+  try{await document.exitFullscreen();return true;}catch(e){return false;}
+}
+async function toggleFullscreen(){
+  const el=button();
+  if(el?.dataset.busy==='true')return false;
+  if(el)el.dataset.busy='true';
+  try{
+    haptic();
+    return fullscreenActive()?await exitFullscreen():await requestFullscreenIfUseful();
+  }finally{
+    if(el)el.dataset.busy='false';
+    updateButton();
+  }
 }
 async function requestOrientation(target){
   target=target==='landscape'?'landscape':'portrait';
@@ -175,22 +231,33 @@ function ensureButton(){
   style.textContent=`
     html,body{width:var(--kelo-vw,100vw)!important;height:var(--kelo-vh,100vh)!important;max-width:var(--kelo-vw,100vw)!important;max-height:var(--kelo-vh,100vh)!important;overflow:hidden!important}
     #game-canvas,#ui-layer,#kelo-luxe{width:var(--kelo-vw,100vw)!important;height:var(--kelo-vh,100vh)!important;max-width:var(--kelo-vw,100vw)!important;max-height:var(--kelo-vh,100vh)!important}
-    #kelo-orientation-btn{width:54px;min-height:50px;padding:5px 4px;border-radius:16px;border:1px solid rgba(231,197,106,.48);background:linear-gradient(145deg,rgba(22,37,35,.97),rgba(9,17,18,.97));color:#fff4d6;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;box-shadow:0 9px 24px rgba(0,0,0,.3);font:800 7px/1.05 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;letter-spacing:.08em;pointer-events:auto;touch-action:manipulation}
-    #kelo-orientation-btn .kelo-rotate-icon{font-size:22px;line-height:22px;color:#e7c56a;transition:transform .18s ease}
-    #kelo-orientation-btn:active{transform:scale(.96);border-color:rgba(231,197,106,.92)}
-    #kelo-orientation-btn:active .kelo-rotate-icon{transform:rotate(35deg)}
-    #kelo-orientation-btn [data-orientation-label]{font-size:6px;color:#aab7ae;letter-spacing:.05em;max-width:46px;overflow:hidden;text-overflow:ellipsis}
+    #kelo-orientation-btn{position:relative;isolation:isolate;width:54px;min-height:54px;padding:5px 4px;border-radius:16px;border:1px solid color-mix(in srgb,var(--lx-gold,#e7c56a) 48%,transparent);background:linear-gradient(145deg,color-mix(in srgb,var(--lx-forest,#173f36) 48%,#0e1819),#091112);color:var(--lx-ivory,#fff4d6);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;box-shadow:0 9px 24px rgba(0,0,0,.30),inset 0 0 0 1px rgba(255,255,255,.035);font:800 7px/1.05 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;letter-spacing:.08em;pointer-events:auto;touch-action:manipulation;overflow:hidden;transition:transform .18s ease,border-color .22s ease,box-shadow .22s ease,background .22s ease}
+    #kelo-orientation-btn::before{content:"";position:absolute;inset:-28%;z-index:-1;background:radial-gradient(circle,color-mix(in srgb,var(--lx-gold,#e7c56a) 20%,transparent),transparent 62%);opacity:0;transform:scale(.72);transition:opacity .24s ease,transform .24s ease}
+    #kelo-orientation-btn .kelo-fullscreen-icon{width:24px;height:24px;color:var(--lx-gold,#e7c56a);filter:drop-shadow(0 0 8px color-mix(in srgb,var(--lx-gold,#e7c56a) 22%,transparent));transition:transform .22s ease,filter .22s ease}
+    #kelo-orientation-btn .kelo-fullscreen-icon path{fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+    #kelo-orientation-btn [data-fullscreen-primary]{font-size:6.4px;color:var(--lx-ivory,#fff4d6);letter-spacing:.07em}
+    #kelo-orientation-btn [data-fullscreen-secondary]{font-size:5.7px;color:var(--lx-muted,#aab7ae);letter-spacing:.055em}
+    #kelo-orientation-btn:active{transform:scale(.94);border-color:color-mix(in srgb,var(--lx-gold,#e7c56a) 92%,transparent)}
+    #kelo-orientation-btn:active .kelo-fullscreen-icon{transform:scale(1.08)}
+    #kelo-orientation-btn[data-busy="true"]{pointer-events:none;opacity:.82}
+    #kelo-orientation-btn[data-fullscreen="active"]{border-color:color-mix(in srgb,var(--lx-gold,#e7c56a) 80%,transparent);box-shadow:0 10px 28px rgba(0,0,0,.34),0 0 18px color-mix(in srgb,var(--lx-gold,#e7c56a) 10%,transparent),inset 0 0 0 1px rgba(255,255,255,.05)}
+    #kelo-orientation-btn[data-fullscreen="active"]::before{opacity:1;transform:scale(1)}
+    #kelo-orientation-btn[data-fullscreen="active"] .kelo-fullscreen-icon{transform:scale(.92);filter:drop-shadow(0 0 11px color-mix(in srgb,var(--lx-gold,#e7c56a) 34%,transparent))}
     .kelo-orientation-fallback{position:fixed;z-index:79;right:max(8px,env(safe-area-inset-right));top:max(190px,calc(env(safe-area-inset-top) + 182px));pointer-events:auto}
+    :fullscreen{background:#05070a}
+    :fullscreen #game-canvas,:fullscreen #ui-layer,:fullscreen #kelo-luxe{width:100vw!important;height:100vh!important;max-width:100vw!important;max-height:100vh!important}
     @media (orientation:landscape){.kelo-orientation-fallback{top:max(154px,calc(env(safe-area-inset-top) + 146px))}}
-    @media (max-height:430px) and (orientation:landscape){#kelo-orientation-btn{width:48px;min-height:44px;border-radius:14px}.kelo-orientation-fallback{top:max(128px,calc(env(safe-area-inset-top) + 120px))}}
+    @media (max-height:430px) and (orientation:landscape){#kelo-orientation-btn{width:48px;min-height:48px;border-radius:14px}.kelo-orientation-fallback{top:max(128px,calc(env(safe-area-inset-top) + 120px))}}
+    @media (prefers-reduced-motion:reduce){#kelo-orientation-btn,#kelo-orientation-btn::before,#kelo-orientation-btn .kelo-fullscreen-icon{transition:none!important}}
   `;
   document.head.appendChild(style);
 
   const el=document.createElement('button');
   el.id='kelo-orientation-btn';
   el.type='button';
-  el.innerHTML='<span class="kelo-rotate-icon">↻</span><span>GIRAR</span><span data-orientation-label></span>';
-  el.addEventListener('click',toggle);
+  el.dataset.busy='false';
+  el.innerHTML='<svg class="kelo-fullscreen-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4H5a1 1 0 0 0-1 1v3M16 4h3a1 1 0 0 1 1 1v3M8 20H5a1 1 0 0 1-1-1v-3M16 20h3a1 1 0 0 0 1-1v-3"/></svg><span data-fullscreen-primary>PANTALLA</span><span data-fullscreen-secondary>COMPLETA</span>';
+  el.addEventListener('click',toggleFullscreen);
   const rail=document.querySelector('.lx-rail');
   if(rail)rail.appendChild(el);
   else{const wrap=document.createElement('div');wrap.className='kelo-orientation-fallback';wrap.appendChild(el);document.body.appendChild(wrap);}
@@ -204,11 +271,22 @@ function boot(){
   syncViewportCss();
   ensureButton();
   applyOrientation('boot');
+  emitFullscreenChange('boot');
   window.addEventListener('resize',()=>scheduleSync('resize'),{passive:true});
   window.addEventListener('orientationchange',()=>{setTimeout(()=>{syncViewportCss();window.dispatchEvent(new Event('resize'));applyOrientation('orientationchange');},120);},{passive:true});
   window.visualViewport?.addEventListener('resize',()=>scheduleSync('visualViewport'),{passive:true});
+  document.addEventListener('fullscreenchange',()=>emitFullscreenChange('native-fullscreen'));
+  document.addEventListener('fullscreenerror',()=>{updateButton();toast('No se pudo activar pantalla completa.');});
   try{screen.orientation?.addEventListener?.('change',()=>scheduleSync('screen.orientation'));}catch(e){}
 }
+
+const fullscreenApi=Object.freeze({
+  active:fullscreenActive,
+  supported:fullscreenSupported,
+  enter:requestFullscreenIfUseful,
+  exit:exitFullscreen,
+  toggle:toggleFullscreen
+});
 
 window.KELO_ORIENTATION=Object.freeze({
   version:VERSION,
@@ -218,14 +296,15 @@ window.KELO_ORIENTATION=Object.freeze({
   toggle,
   unlock,
   sync:()=>applyOrientation('api'),
+  fullscreen:fullscreenApi,
   baseZoom:()=>ensurePortraitBaseZoom(),
   effectiveZoom:()=>readRuntimeZoom(),
   setBaseZoom:(value)=>setBaseZoom(value,'api'),
   verticalWorldSpan:()=>{const z=readRuntimeZoom()||1;return window.innerHeight/z;},
   portraitReferenceWorldSpan:()=>Math.max(window.innerWidth,window.innerHeight)/ensurePortraitBaseZoom(),
-  supported:()=>({touch:isTouchDevice(),orientationLock:!!(screen.orientation&&typeof screen.orientation.lock==='function'),fullscreen:!!document.fullscreenEnabled})
+  supported:()=>({touch:isTouchDevice(),orientationLock:!!(screen.orientation&&typeof screen.orientation.lock==='function'),fullscreen:fullscreenSupported()})
 });
-window.KELO_ORIENTATION_AUDIT=Object.freeze({version:VERSION,autoDetect:true,viewportSync:true,rotateButton:true,portrait:true,landscape:true,equivalentPortraitZoom:true,verticalFovLock:true,orientationLockProgressive:true,iosSafeFallback:true});
+window.KELO_ORIENTATION_AUDIT=Object.freeze({version:VERSION,autoDetect:true,viewportSync:true,fullscreenButton:true,fullscreenToggle:true,fullscreenEvent:true,portrait:true,landscape:true,equivalentPortraitZoom:true,verticalFovLock:true,orientationLockProgressive:true,iosSafeFallback:true,reusesLuxeRail:true,reusesLuxeTokens:true});
 
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 })();
