@@ -4,11 +4,11 @@ const base = process.env.AUDIT_URL || 'https://kelffren.github.io/gemini/';
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 async function waitForDeploy(){
   const targets=[
-    ['src/ui/studio-launcher.js','studio-launcher-v1.4.0'],
-    ['src/creators/ui/creator-hub.mjs','kelo-creator-hub-v1.0.1'],
+    ['src/ui/studio-launcher.js',"creators/ui/creator-hub.mjs"],
+    ['src/creators/ui/creator-hub.mjs','Abrir ${label}'],
     ['src/creators/workspaces/world-workspace.mjs','CREATOR_WORLD_STUDIO_ENTRY_MISSING'],
     ['src/world/world-edit-authority.js','world-edit-authority-v1.1.0'],
-    ['src/studio/ui/studio-live-shell.mjs','studio-live-shell-v1.4.0'],
+    ['src/studio/ui/studio-live-shell.mjs','createStudioLiveShell'],
     ['src/studio/input/studio-camera-controller.mjs','STUDIO_CAMERA_OWNER_REQUIRED']
   ];
   for(let attempt=1;attempt<=90;attempt++){
