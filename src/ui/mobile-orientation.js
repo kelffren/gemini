@@ -1,27 +1,29 @@
 /* KELO-INDEX
- * area: UI
- * keys: MOBILE ORIENTATION FULLSCREEN IMMERSIVE BUTTON PORTRAIT LANDSCAPE VIEWPORT CAMERA ZOOM FOV
- * hace: detecta orientación, sincroniza viewport/cámara y reutiliza el control lateral móvil como pantalla completa inmersiva
- * online: UI/cámara local; no contiene estado valioso ni autoridad compartida
+ * area: UI / ORIENTATION
+ * owner: KELO_ORIENTATION for orientation/fullscreen UI; camera/viewport/zoom owned by KeloCamera
+ * keys: MOBILE ORIENTATION FULLSCREEN IMMERSIVE BUTTON PORTRAIT LANDSCAPE CAMERA FOUNDATION
+ * purpose: detecta orientación y controla fullscreen sin escribir zoom, Canvas o viewport directamente
+ * public-api: KELO_ORIENTATION
+ * consumes: KeloCamera + Screen Orientation/Fullscreen browser APIs
+ * state-owned: preferredOrientation + fullscreen/orientation UI state
+ * extension-points: KeloCamera.syncViewport/refreshZoom/setBaseZoom
+ * reuse: UI de orientación; cualquier feature visual pide framing a KeloCamera
+ * legacy: API baseZoom/effectiveZoom se conserva como adapter de lectura hacia KeloCamera
+ * do-not: NO escribir CONFIG.zoom/canvas size, NO reemplazar cycleZoom/resize
  */
 (function(){
 'use strict';
 if(window.KELO_ORIENTATION)return;
+const cameraOwner=window.KeloCamera;
+if(!cameraOwner)throw new Error('KELO_ORIENTATION: KeloCamera unavailable');
 
-const VERSION='mobile-orientation-v1.3.0';
-const ZOOM_PRESETS=Object.freeze([0.7,0.82,1]);
+const VERSION='mobile-orientation-v1.4.0-camera-owner';
 let lastOrientation=null;
 let preferredOrientation=null;
 let syncing=false;
-let portraitBaseZoom=null;
-let lastEffectiveZoom=null;
 
-function isTouchDevice(){
-  return (navigator.maxTouchPoints||0)>0 || !!window.matchMedia?.('(pointer: coarse)').matches;
-}
-function orientationFromViewport(){
-  return window.innerWidth>=window.innerHeight?'landscape':'portrait';
-}
+function isTouchDevice(){return (navigator.maxTouchPoints||0)>0 || !!window.matchMedia?.('(pointer: coarse)').matches;}
+function orientationFromViewport(){return window.innerWidth>=window.innerHeight?'landscape':'portrait';}
 function physicalOrientation(){
   const type=screen.orientation?.type||'';
   if(type.startsWith('landscape'))return'landscape';
@@ -29,21 +31,16 @@ function physicalOrientation(){
   return orientationFromViewport();
 }
 function labelFor(value){return value==='landscape'?'horizontal':'vertical';}
-function toast(msg){
-  if(typeof window.showToast==='function')window.showToast(msg);
-  else console.info('[KeloOrientation]',msg);
-}
+function toast(msg){if(typeof window.showToast==='function')window.showToast(msg);else console.info('[KeloOrientation]',msg);}
 function haptic(){try{navigator.vibrate?.(12);}catch(e){}}
 function button(){return document.getElementById('kelo-orientation-btn');}
-function fullscreenSupported(){
-  return typeof document.documentElement?.requestFullscreen==='function';
-}
+function fullscreenSupported(){return typeof document.documentElement?.requestFullscreen==='function';}
 function fullscreenActive(){return !!document.fullscreenElement;}
 function updateButton(current){
-  const el=button(); if(!el)return;
+  const el=button();if(!el)return;
   const active=fullscreenActive();
-  const orientation=current||physicalOrientation();
-  el.dataset.orientation=orientation;
+  const mode=current||physicalOrientation();
+  el.dataset.orientation=mode;
   el.dataset.fullscreen=active?'active':'windowed';
   el.setAttribute('aria-pressed',String(active));
   el.setAttribute('aria-label',active?'Salir de pantalla completa':'Entrar en pantalla completa');
@@ -53,132 +50,43 @@ function updateButton(current){
   if(primary)primary.textContent=active?'SALIR':'PANTALLA';
   if(secondary)secondary.textContent=active?'PANTALLA':'COMPLETA';
 }
-function syncViewportCss(){
-  const root=document.documentElement;
-  root.style.setProperty('--kelo-vw',`${window.innerWidth}px`);
-  root.style.setProperty('--kelo-vh',`${window.innerHeight}px`);
-}
-function readRuntimeZoom(){
-  try{return typeof CONFIG!=='undefined'&&Number.isFinite(Number(CONFIG.zoom))?Number(CONFIG.zoom):null;}catch(e){return null;}
-}
-function writeRuntimeZoom(value){
-  try{if(typeof CONFIG!=='undefined')CONFIG.zoom=value;}catch(e){}
-}
-function ensurePortraitBaseZoom(){
-  if(Number.isFinite(portraitBaseZoom)&&portraitBaseZoom>0)return portraitBaseZoom;
-  const runtime=readRuntimeZoom();
-  portraitBaseZoom=Number.isFinite(runtime)&&runtime>0?runtime:0.82;
-  return portraitBaseZoom;
-}
-function landscapeZoomFactor(){
-  const w=Math.max(1,window.innerWidth),h=Math.max(1,window.innerHeight);
-  if(w<=h)return 1;
-  return h/w;
-}
-function effectiveZoomFor(base,orientation){
-  return orientation==='landscape'?base*landscapeZoomFactor():base;
-}
-function applyCameraZoom(source){
-  const base=ensurePortraitBaseZoom();
-  const orientation=physicalOrientation();
-  const effective=effectiveZoomFor(base,orientation);
-  writeRuntimeZoom(effective);
-  const changed=!Number.isFinite(lastEffectiveZoom)||Math.abs(lastEffectiveZoom-effective)>0.0001;
-  lastEffectiveZoom=effective;
-  document.documentElement.style.setProperty('--kelo-camera-zoom',String(effective));
-  if(changed){
-    window.dispatchEvent(new CustomEvent('kelo:camerazoomchange',{detail:{
-      source:source||'orientation',orientation,baseZoom:base,effectiveZoom:effective,
-      verticalWorldSpan:window.innerHeight/effective,
-      portraitReferenceWorldSpan:Math.max(window.innerWidth,window.innerHeight)/base
-    }}));
-  }
-  return effective;
-}
-function setBaseZoom(value,source){
-  const next=Number(value);
-  if(!Number.isFinite(next)||next<=0)return applyCameraZoom(source||'invalid-base');
-  portraitBaseZoom=next;
-  return applyCameraZoom(source||'set-base');
-}
-function nearestPresetIndex(value){
-  let best=0,dist=Infinity;
-  ZOOM_PRESETS.forEach((z,i)=>{const d=Math.abs(z-value);if(d<dist){dist=d;best=i;}});
-  return best;
-}
-function installZoomBridge(){
-  const previous=window.cycleZoom;
-  if(typeof previous!=='function'||previous._keloEquivalentZoomBridge)return;
-  const bridged=function(){
-    const base=ensurePortraitBaseZoom();
-    const i=nearestPresetIndex(base);
-    const next=ZOOM_PRESETS[(i+1)%ZOOM_PRESETS.length];
-    setBaseZoom(next,'cycle');
-    toast('Zoom '+next+(physicalOrientation()==='landscape'?' · cámara adaptada':''));
-    if(typeof window.closeMenu==='function')window.closeMenu();
-  };
-  bridged._keloEquivalentZoomBridge=true;
-  bridged._previous=previous;
-  window.cycleZoom=bridged;
-}
 function applyOrientation(source){
-  syncViewportCss();
   const current=physicalOrientation();
   document.documentElement.dataset.keloOrientation=current;
   document.body?.classList.toggle('kelo-orientation-portrait',current==='portrait');
   document.body?.classList.toggle('kelo-orientation-landscape',current==='landscape');
   updateButton(current);
-  applyCameraZoom(source||'orientation');
+  cameraOwner.syncViewport(source||'orientation');
   if(current!==lastOrientation){
-    const previous=lastOrientation;
-    lastOrientation=current;
-    window.dispatchEvent(new CustomEvent('kelo:orientationchange',{detail:{orientation:current,previous,source:source||'sync',width:window.innerWidth,height:window.innerHeight,baseZoom:ensurePortraitBaseZoom(),effectiveZoom:readRuntimeZoom()}}));
+    const previous=lastOrientation;lastOrientation=current;
+    window.dispatchEvent(new CustomEvent('kelo:orientationchange',{detail:{orientation:current,previous,source:source||'sync',width:window.innerWidth,height:window.innerHeight,baseZoom:cameraOwner.getBaseZoom(),effectiveZoom:cameraOwner.getEffectiveZoom()}}));
   }
   return current;
 }
 function scheduleSync(source){
   if(syncing)return;
   syncing=true;
-  requestAnimationFrame(()=>{
-    syncing=false;
-    applyOrientation(source);
-  });
+  requestAnimationFrame(()=>{syncing=false;applyOrientation(source);});
 }
 function emitFullscreenChange(source){
   const active=fullscreenActive();
   document.documentElement.dataset.keloFullscreen=active?'active':'windowed';
   document.body?.classList.toggle('kelo-fullscreen-active',active);
   updateButton();
-  syncViewportCss();
   scheduleSync(source||'fullscreen');
-  window.dispatchEvent(new CustomEvent('kelo:fullscreenchange',{detail:{
-    active,
-    supported:fullscreenSupported(),
-    source:source||'fullscreen',
-    width:window.innerWidth,
-    height:window.innerHeight,
-    orientation:physicalOrientation()
-  }}));
+  window.dispatchEvent(new CustomEvent('kelo:fullscreenchange',{detail:{active,supported:fullscreenSupported(),source:source||'fullscreen',width:window.innerWidth,height:window.innerHeight,orientation:physicalOrientation()}}));
   return active;
 }
 async function requestFullscreenIfUseful(){
   if(fullscreenActive())return true;
   const root=document.documentElement;
   if(!fullscreenSupported()){
-    syncViewportCss();
     scheduleSync('fullscreen-fallback');
     toast('Kelo World ya está usando el máximo espacio disponible en este navegador.');
     return false;
   }
-  try{
-    await root.requestFullscreen({navigationUI:'hide'});
-    return true;
-  }catch(e){
-    syncViewportCss();
-    scheduleSync('fullscreen-denied');
-    toast('Pantalla completa no está disponible en este navegador.');
-    return false;
-  }
+  try{await root.requestFullscreen({navigationUI:'hide'});return true;}
+  catch(e){scheduleSync('fullscreen-denied');toast('Pantalla completa no está disponible en este navegador.');return false;}
 }
 async function exitFullscreen(){
   if(!fullscreenActive())return true;
@@ -189,13 +97,8 @@ async function toggleFullscreen(){
   const el=button();
   if(el?.dataset.busy==='true')return false;
   if(el)el.dataset.busy='true';
-  try{
-    haptic();
-    return fullscreenActive()?await exitFullscreen():await requestFullscreenIfUseful();
-  }finally{
-    if(el)el.dataset.busy='false';
-    updateButton();
-  }
+  try{haptic();return fullscreenActive()?await exitFullscreen():await requestFullscreenIfUseful();}
+  finally{if(el)el.dataset.busy='false';updateButton();}
 }
 async function requestOrientation(target){
   target=target==='landscape'?'landscape':'portrait';
@@ -205,25 +108,17 @@ async function requestOrientation(target){
     try{
       await requestFullscreenIfUseful();
       await screen.orientation.lock(target);
-      setTimeout(()=>{syncViewportCss();window.dispatchEvent(new Event('resize'));applyOrientation('lock');},120);
+      setTimeout(()=>applyOrientation('lock'),120);
       toast(`Orientación ${labelFor(target)} activada`);
       return{ok:true,mode:'screen-orientation-lock',target};
-    }catch(e){
-      // iOS/WebKit y algunos navegadores no permiten forzar la orientación desde web.
-    }
+    }catch(e){}
   }
   toast(`Gira el teléfono a ${labelFor(target)}. Kelo World se ajustará automáticamente.`);
   return{ok:false,mode:'physical-rotation-required',target};
 }
-async function toggle(){
-  const current=physicalOrientation();
-  return requestOrientation(current==='portrait'?'landscape':'portrait');
-}
-function unlock(){
-  preferredOrientation=null;
-  try{screen.orientation?.unlock?.();}catch(e){}
-  applyOrientation('unlock');
-}
+async function toggle(){const current=physicalOrientation();return requestOrientation(current==='portrait'?'landscape':'portrait');}
+function unlock(){preferredOrientation=null;try{screen.orientation?.unlock?.();}catch(e){}applyOrientation('unlock');}
+
 function ensureButton(){
   if(button()||!isTouchDevice())return button();
   const style=document.createElement('style');
@@ -251,43 +146,27 @@ function ensureButton(){
     @media (prefers-reduced-motion:reduce){#kelo-orientation-btn,#kelo-orientation-btn::before,#kelo-orientation-btn .kelo-fullscreen-icon{transition:none!important}}
   `;
   document.head.appendChild(style);
-
   const el=document.createElement('button');
-  el.id='kelo-orientation-btn';
-  el.type='button';
-  el.dataset.busy='false';
+  el.id='kelo-orientation-btn';el.type='button';el.dataset.busy='false';
   el.innerHTML='<svg class="kelo-fullscreen-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4H5a1 1 0 0 0-1 1v3M16 4h3a1 1 0 0 1 1 1v3M8 20H5a1 1 0 0 1-1-1v-3M16 20h3a1 1 0 0 0 1-1v-3"/></svg><span data-fullscreen-primary>PANTALLA</span><span data-fullscreen-secondary>COMPLETA</span>';
   el.addEventListener('click',toggleFullscreen);
   const rail=document.querySelector('.lx-rail');
-  if(rail)rail.appendChild(el);
-  else{const wrap=document.createElement('div');wrap.className='kelo-orientation-fallback';wrap.appendChild(el);document.body.appendChild(wrap);}
-  updateButton(physicalOrientation());
-  return el;
+  if(rail)rail.appendChild(el);else{const wrap=document.createElement('div');wrap.className='kelo-orientation-fallback';wrap.appendChild(el);document.body.appendChild(wrap);}
+  updateButton(physicalOrientation());return el;
 }
 
 function boot(){
-  ensurePortraitBaseZoom();
-  installZoomBridge();
-  syncViewportCss();
   ensureButton();
   applyOrientation('boot');
   emitFullscreenChange('boot');
-  window.addEventListener('resize',()=>scheduleSync('resize'),{passive:true});
-  window.addEventListener('orientationchange',()=>{setTimeout(()=>{syncViewportCss();window.dispatchEvent(new Event('resize'));applyOrientation('orientationchange');},120);},{passive:true});
-  window.visualViewport?.addEventListener('resize',()=>scheduleSync('visualViewport'),{passive:true});
+  window.addEventListener('resize',()=>scheduleSync('orientation-ui-resize'),{passive:true});
+  window.addEventListener('orientationchange',()=>setTimeout(()=>applyOrientation('orientationchange'),120),{passive:true});
   document.addEventListener('fullscreenchange',()=>emitFullscreenChange('native-fullscreen'));
   document.addEventListener('fullscreenerror',()=>{updateButton();toast('No se pudo activar pantalla completa.');});
   try{screen.orientation?.addEventListener?.('change',()=>scheduleSync('screen.orientation'));}catch(e){}
 }
 
-const fullscreenApi=Object.freeze({
-  active:fullscreenActive,
-  supported:fullscreenSupported,
-  enter:requestFullscreenIfUseful,
-  exit:exitFullscreen,
-  toggle:toggleFullscreen
-});
-
+const fullscreenApi=Object.freeze({active:fullscreenActive,supported:fullscreenSupported,enter:requestFullscreenIfUseful,exit:exitFullscreen,toggle:toggleFullscreen});
 window.KELO_ORIENTATION=Object.freeze({
   version:VERSION,
   current:physicalOrientation,
@@ -297,14 +176,14 @@ window.KELO_ORIENTATION=Object.freeze({
   unlock,
   sync:()=>applyOrientation('api'),
   fullscreen:fullscreenApi,
-  baseZoom:()=>ensurePortraitBaseZoom(),
-  effectiveZoom:()=>readRuntimeZoom(),
-  setBaseZoom:(value)=>setBaseZoom(value,'api'),
-  verticalWorldSpan:()=>{const z=readRuntimeZoom()||1;return window.innerHeight/z;},
-  portraitReferenceWorldSpan:()=>Math.max(window.innerWidth,window.innerHeight)/ensurePortraitBaseZoom(),
+  baseZoom:()=>cameraOwner.getBaseZoom(),
+  effectiveZoom:()=>cameraOwner.getEffectiveZoom(),
+  setBaseZoom:(value)=>cameraOwner.setBaseZoom(value,'orientation-api'),
+  verticalWorldSpan:()=>window.innerHeight/(cameraOwner.getEffectiveZoom()||1),
+  portraitReferenceWorldSpan:()=>Math.max(window.innerWidth,window.innerHeight)/cameraOwner.getBaseZoom(),
   supported:()=>({touch:isTouchDevice(),orientationLock:!!(screen.orientation&&typeof screen.orientation.lock==='function'),fullscreen:fullscreenSupported()})
 });
-window.KELO_ORIENTATION_AUDIT=Object.freeze({version:VERSION,autoDetect:true,viewportSync:true,fullscreenButton:true,fullscreenToggle:true,fullscreenEvent:true,portrait:true,landscape:true,equivalentPortraitZoom:true,verticalFovLock:true,orientationLockProgressive:true,iosSafeFallback:true,reusesLuxeRail:true,reusesLuxeTokens:true});
+window.KELO_ORIENTATION_AUDIT=Object.freeze({version:VERSION,autoDetect:true,viewportOwner:'KeloCamera',zoomOwner:'KeloCamera',directZoomWrites:false,directCanvasWrites:false,fullscreenButton:true,fullscreenToggle:true,fullscreenEvent:true,portrait:true,landscape:true,equivalentPortraitZoom:true,verticalFovLock:true,orientationLockProgressive:true,iosSafeFallback:true,reusesLuxeRail:true,reusesLuxeTokens:true});
 
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 })();
