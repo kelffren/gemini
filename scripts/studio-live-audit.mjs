@@ -21,6 +21,23 @@ const page=await context.newPage();
 const pageErrors=[];
 page.on('pageerror',e=>pageErrors.push(String(e?.stack||e?.message||e)));
 
+// Pages may briefly serve the previous commit after main moves. Probe with the
+// Playwright request context (not the page) so this convergence check does not
+// violate or contaminate the product's lazy-load contract.
+let surfaceDeployReady=false,surfaceProbeError=null;
+const shellUrl=new URL('src/studio/ui/studio-live-shell.mjs',BASE).href;
+for(let attempt=0;attempt<30;attempt++){
+  try{
+    const response=await context.request.get(`${shellUrl}?studio-surface-probe=${Date.now()}`,{headers:{'cache-control':'no-cache'}});
+    const text=response.ok()?await response.text():'';
+    surfaceDeployReady=text.includes('data-mode="terrain"')&&text.includes('data-mode="path"')&&text.includes('data-mode="collision"');
+    if(surfaceDeployReady)break;
+    surfaceProbeError=`HTTP ${response.status()} / Surface controls absent`;
+  }catch(e){surfaceProbeError=String(e?.message||e);}
+  await new Promise(resolve=>setTimeout(resolve,3000));
+}
+if(!surfaceDeployReady){await browser.close();throw new Error(`STUDIO_SURFACE_DEPLOY_NOT_READY:${surfaceProbeError||'unknown'}`);}
+
 let ready=false,lastError=null;
 for(let attempt=0;attempt<20;attempt++){
   try{
@@ -47,11 +64,13 @@ await page.evaluate(()=>window.KELO_STUDIO_LAUNCHER.open());
 await page.waitForFunction(()=>document.body.classList.contains('kelo-studio-active')&&!!document.getElementById('kelo-studio-live'),null,{timeout:15000});
 const opened=await page.evaluate(()=>({
   shell:!!document.getElementById('kelo-studio-live'),
+  surfaceModes:['terrain','path','collision'].every(mode=>!!document.querySelector(`#kelo-studio-live [data-mode="${mode}"]`)),
   lockOwners:window.KeloInputLocks?.snapshot?.().owners||[],
   studioResources:performance.getEntriesByType('resource').map(x=>x.name).filter(x=>/\/src\/studio\//.test(x)),
   status:document.querySelector('#kelo-studio-live .ks-status')?.textContent||''
 }));
 if(!opened.shell)throw new Error('STUDIO_SHELL_NOT_OPEN');
+if(!opened.surfaceModes)throw new Error('STUDIO_SURFACE_CONTROLS_MISSING');
 if(!opened.lockOwners.includes('kelo-studio'))throw new Error('STUDIO_FOUNDATION_LOCK_NOT_ACQUIRED');
 if(!opened.studioResources.length)throw new Error('STUDIO_DYNAMIC_IMPORT_NOT_OBSERVED');
 
@@ -129,7 +148,7 @@ const closed=await page.evaluate(()=>({
 if(closed.lockOwners.includes('kelo-studio'))throw new Error('STUDIO_FOUNDATION_LOCK_LEAK');
 if(pageErrors.length)throw new Error(`STUDIO_PAGE_ERRORS:${pageErrors.join(' | ')}`);
 
-const report={ok:true,url:BASE,viewport:{width:390,height:844,dpr:2},lazyBeforeOpen:true,opened,placementDelta:afterPlace.placements-beforePlacements,afterPlace,ground:{world:groundWorld,afterGround,afterErase},road:{world:roadWorld,afterRoad},collision:{world:collisionWorld,before:beforeCollisions,afterCollision,afterCollisionUndo},closed,pageErrors};
+const report={ok:true,url:BASE,viewport:{width:390,height:844,dpr:2},surfaceDeployReady,lazyBeforeOpen:true,opened,placementDelta:afterPlace.placements-beforePlacements,afterPlace,ground:{world:groundWorld,afterGround,afterErase},road:{world:roadWorld,afterRoad},collision:{world:collisionWorld,before:beforeCollisions,afterCollision,afterCollisionUndo},closed,pageErrors};
 fs.writeFileSync('artifacts/studio-live.json',JSON.stringify(report,null,2));
 console.log(JSON.stringify(report,null,2));
 await browser.close();
