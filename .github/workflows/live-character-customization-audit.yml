@@ -13,6 +13,7 @@ on:
       - 'src/characters/customization-assets/**'
       - 'src/ui/character-customizer-ui.js'
       - 'src/ui/character-customizer-preview.js'
+      - 'src/ui/character-customizer-responsive.css'
       - 'src/ui/profile-panel-close.js'
       - 'src/ui/self-interaction-ui.js'
       - 'scripts/live-character-customization-audit.mjs'
@@ -45,7 +46,8 @@ jobs:
               && printf '%s' "$body" | grep -q 'character-visual-stack.js?v=3' \
               && printf '%s' "$body" | grep -q 'character-demo-kit.js?v=3' \
               && printf '%s' "$body" | grep -q 'character-customizer-ui.js?v=3' \
-              && printf '%s' "$body" | grep -q 'character-customizer-preview.js?v=3'; then
+              && printf '%s' "$body" | grep -q 'character-customizer-preview.js?v=3' \
+              && printf '%s' "$body" | grep -q 'character-customizer-responsive.css?v=1'; then
               echo "Character Creator V2 bootstrap is live"
               exit 0
             fi
