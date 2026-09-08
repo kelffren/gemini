@@ -111,5 +111,8 @@ jobs:
           grep -q "market-ui-v1.0.0" src/ui/market-ui.js
           grep -q "backpackPublishAction:true" src/ui/market-ui.js
           grep -Eq "self-interaction-ui-v1\.[0-9]+\.[0-9]+" src/ui/self-interaction-ui.js
-          grep -q "KeloInputLocks.acquire" src/ui/self-interaction-ui.js
+          grep -q "locks.acquire(owner" src/ui/self-interaction-ui.js
+          grep -q "inputLockOwner:'KeloInputLocks'" src/ui/self-interaction-ui.js
+          grep -q "tokenLocks:true" src/ui/self-interaction-ui.js
+          grep -q "legacyModalWrites:false" src/ui/self-interaction-ui.js
           grep -q "profileUsesBackpackUI:true" src/ui/self-interaction-ui.js
