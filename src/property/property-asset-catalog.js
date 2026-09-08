@@ -88,10 +88,9 @@
     for(const [key,atlas] of Object.entries(atlases))sliceAtlas(key,atlas,'tileset',36);
   }
 
+  // Only expose runtime-approved sheets here. Source sheets and superseded
+  // archive rasters stay available for authoring/history but are not fetched by LIVE.
   const EXTRA_SHEETS=Object.freeze([
-    {key:'plazaPng',src:'assets/plaza.PNG?art=editor1',tile:32},
-    {key:'cespedPng',src:'assets/cesped.PNG?art=editor1',tile:32},
-    {key:'cespedFullPng',src:'assets/cespedsindivisiones.PNG?art=editor1',tile:32},
     {key:'cespedRuntimePng',src:'assets/cesped-runtime.PNG?art=501',tile:32},
     {key:'arbolesKelo1',src:'assets/Arboleskelo1.PNG?art=306',tile:32}
   ]);
