@@ -48,13 +48,17 @@ try{
   const hit=await page.evaluate(()=>{
     const P=window.KeloPvPWorld,A=window.KeloCombatSchema.events,events=[];
     const stops=[A.ATTACK_STARTED,A.HIT_CONFIRMED,A.DAMAGE_APPLIED,A.ENTITY_KILLED,A.ATTACK_RESOLVED].map(name=>window.KeloEvents.on(name,p=>events.push({name,attackId:p.attackId,confirmedHit:p.confirmedHit,amount:p.amount??null})));
-    const dummy=window.simulatedPlayers&&window.simulatedPlayers[0];
-    if(!dummy)throw new Error('LIVE_DUMMY_MISSING');
-    dummy.hp=100;dummy.maxHp=100;dummy.keloShield=0;dummy.x=window.localPlayer.x+100;dummy.y=window.localPlayer.y;
-    const cmd=P.command('BASIC_ATTACK',{target:dummy});
+    const target=window.__KELO_COMBAT_ARCH_AUDIT_TARGET={
+      id:'__combat_arch_audit_target',
+      playerKey:'__combat_arch_audit_target',
+      x:window.localPlayer.x+100,
+      y:window.localPlayer.y,
+      vx:0,vy:0,radius:20,hp:100,maxHp:100,keloShield:0,_face:'left'
+    };
+    const cmd=P.command('BASIC_ATTACK',{target});
     const result=P.authority.execute(cmd);
     stops.forEach(stop=>stop());
-    return{result,hp:dummy.hp,events};
+    return{result,hp:target.hp,events};
   });
   if(!hit.result.ok||hit.result.amount!==18||hit.hp!==82)throw new Error('LIVE_HIT_NOT_18_'+JSON.stringify(hit));
   const hitNames=hit.events.map(e=>e.name);
@@ -62,9 +66,9 @@ try{
   if(hitNames.join('|')!==[ce.ATTACK_STARTED,ce.HIT_CONFIRMED,ce.DAMAGE_APPLIED,ce.ATTACK_RESOLVED].join('|'))throw new Error('LIVE_HIT_EVENT_ORDER_'+hitNames.join('|'));
 
   const cooldown=await page.evaluate(()=>{
-    const P=window.KeloPvPWorld,dummy=window.simulatedPlayers[0],before=dummy.hp;
-    const result=P.authority.execute(P.command('BASIC_ATTACK',{target:dummy}));
-    return{result,before,after:dummy.hp};
+    const P=window.KeloPvPWorld,target=window.__KELO_COMBAT_ARCH_AUDIT_TARGET,before=target.hp;
+    const result=P.authority.execute(P.command('BASIC_ATTACK',{target}));
+    return{result,before,after:target.hp};
   });
   if(cooldown.result.ok||cooldown.result.reason!=='COOLDOWN'||cooldown.before!==cooldown.after)throw new Error('LIVE_COOLDOWN_FAILED_'+JSON.stringify(cooldown));
 
@@ -72,10 +76,11 @@ try{
   const miss=await page.evaluate(()=>{
     const P=window.KeloPvPWorld,A=window.KeloCombatSchema.events,events=[];
     const stops=[A.ATTACK_STARTED,A.HIT_CONFIRMED,A.DAMAGE_APPLIED,A.ATTACK_RESOLVED].map(name=>window.KeloEvents.on(name,p=>events.push({name,confirmedHit:p.confirmedHit})));
-    const dummy=window.simulatedPlayers[0];const before=dummy.hp;dummy.x=window.localPlayer.x+200;dummy.y=window.localPlayer.y;
-    const result=P.authority.execute(P.command('BASIC_ATTACK',{target:dummy}));
+    const target=window.__KELO_COMBAT_ARCH_AUDIT_TARGET;
+    const before=target.hp;target.x=window.localPlayer.x+200;target.y=window.localPlayer.y;
+    const result=P.authority.execute(P.command('BASIC_ATTACK',{target}));
     stops.forEach(stop=>stop());
-    return{result,before,after:dummy.hp,events};
+    return{result,before,after:target.hp,events};
   });
   if(miss.result.ok||miss.result.reason!=='OUT_OF_RANGE'||miss.before!==miss.after)throw new Error('LIVE_MISS_MUTATED_HP_'+JSON.stringify(miss));
   if(miss.events.map(e=>e.name).join('|')!==[ce.ATTACK_STARTED,ce.ATTACK_RESOLVED].join('|'))throw new Error('LIVE_MISS_EVENT_ORDER');
@@ -96,7 +101,7 @@ try{
   if(afterVisual.pvpAudit?.combatEngineDelegated!==true||afterVisual.pvpAudit?.directBasicDamage!==false)throw new Error('LIVE_PVP_DELEGATION_AUDIT_FAILED');
 
   await page.screenshot({path:path.join(outDir,'combat-architecture-mobile.png'),fullPage:true});
-  await page.evaluate(()=>window.leavePvPWorld());
+  await page.evaluate(()=>{delete window.__KELO_COMBAT_ARCH_AUDIT_TARGET;window.leavePvPWorld();});
   if(pageErrors.length)throw new Error('PAGE_ERRORS_'+pageErrors.join(' | '));
 
   const report={ok:true,url,viewport:{width:390,height:844},foundation,hit,cooldown,miss,beforeVisual,afterVisual,pageErrors};
