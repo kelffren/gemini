@@ -36,8 +36,8 @@ function directRuntimeFiles(){
   }
   return set;
 }
-// Wrapper rules intentionally count both bare globals and explicit window/globalThis/root assignments.
-// This prevents `window.updateSimulation = namedFn` from hiding behind a narrower `= function` regex.
+// Wrapper rules intentionally count bare globals plus explicit window/globalThis/root assignments.
+// This prevents named-function core reassignments from hiding behind a narrower function-literal regex.
 const coreAssignment=function(name){return new RegExp('(?:\\b(?:window|globalThis|root)\\.)?\\b'+name+'\\s*=','g');};
 const rules=[
   ['modalLock',/KELO_MODAL_INPUT_LOCK/g],
