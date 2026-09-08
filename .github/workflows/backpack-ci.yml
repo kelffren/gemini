@@ -101,7 +101,10 @@ jobs:
           grep -q "market-escrow-v1.0.0" src/systems/market-escrow-system.js
           grep -q "listingContract:'validate-transfer-create-persist-rollback-v1'" src/systems/market-escrow-system.js
           grep -q "cancelContract:'validate-transfer-close-persist-rollback-v1'" src/systems/market-escrow-system.js
-          grep -q "backpack-ui-v2.0.0" src/ui/backpack-ui.js
+          grep -Eq "backpack-ui-v2\.[0-9]+\.[0-9]+" src/ui/backpack-ui.js
+          grep -q "KeloInputLocks.acquire('backpack-ui'" src/ui/backpack-ui.js
+          grep -q "inputLockTokenized:true" src/ui/backpack-ui.js
+          ! grep -Eq "KELO_MODAL_INPUT_LOCK[[:space:]]*=" src/ui/backpack-ui.js
           grep -q "modal-input-lock-v2.0.0-retired" src/ui/modal-input-lock.js
           grep -q "replacementOwner:'KeloInputLocks'" src/ui/modal-input-lock.js
           grep -q "warehouse-ui-v1.0.1" src/ui/warehouse-ui.js
