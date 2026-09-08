@@ -48,12 +48,18 @@ assert(engineAt>=0&&attachAt>engineAt&&inputAt>attachAt,'legacy obstacle view is
 for(const file of [
   'src/environment/generic-props.js',
   'src/property/property-system.js',
-  'src/environment/world-builder-system.js'
+  'src/environment/world-builder-system.js',
+  'src/abilities/kelo-ability-boot.js'
 ]){
   const src=fs.readFileSync(file,'utf8');
   assert(!/\bobstacles\s*\.\s*(?:push|splice|pop|shift|unshift)\s*\(/.test(src),`${file} still mutates obstacles directly`);
-  assert(/KELO_COLLISION|\bK=window\.KELO_COLLISION\b/.test(src),`${file} does not consume KELO_COLLISION owner`);
+  assert(/KELO_COLLISION|\bK=window\.KELO_COLLISION\b|\bcollision\s*=\s*window\.KELO_COLLISION\b/.test(src),`${file} does not consume KELO_COLLISION owner`);
 }
+
+const ability=fs.readFileSync('src/abilities/kelo-ability-boot.js','utf8');
+assert(ability.includes("WALL_COLLISION_OWNER = 'abilities:walls'"),'ability wall collision owner missing');
+assert(ability.includes('collision.upsert(WALL_COLLISION_OWNER, wall)'),'ability wall does not register through collision owner');
+assert(ability.includes('collision.remove(WALL_COLLISION_OWNER, wall.id)'),'ability wall does not unregister through collision owner');
 
 console.log(JSON.stringify({
   ok:true,
@@ -62,5 +68,5 @@ console.log(JSON.stringify({
   ownership:true,
   foreignOwnerIsolation:true,
   legacyView:true,
-  migratedProducers:['generic-props','property','world-builder']
+  migratedProducers:['generic-props','property','world-builder','ability-walls']
 },null,2));
