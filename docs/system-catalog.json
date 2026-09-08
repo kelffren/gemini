@@ -103,6 +103,15 @@
       "playerVisible": true,
       "playerGuideAnchor": "nobleza-y-titulos",
       "status": "foundation-active"
+    },
+    {
+      "id": "commerce",
+      "owner": "KeloCommerceAuthority",
+      "source": "src/systems/commerce-authority.js",
+      "technicalDoc": "docs/systems/COMMERCE_SYSTEM.md",
+      "playerVisible": true,
+      "playerGuideAnchor": "mercado-comercio-y-trade",
+      "status": "offline-active-online-ready"
     }
   ]
 }
