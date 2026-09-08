@@ -40,6 +40,7 @@
   <nav class="toc" aria-label="Índice de mecánicas">
     <a href="#movimiento">Movimiento<small>Caminar, correr y soltar</small></a>
     <a href="#controles-y-bloqueos-de-interfaz">Controles e interfaces<small>Paneles y control</small></a>
+    <a href="#camara-y-pantalla">Cámara y pantalla<small>Zoom, giro y fullscreen</small></a>
     <a href="#habilidades">Habilidades<small>Piedras y slots</small></a>
     <a href="#mochila">Mochila<small>Objetos y equipo</small></a>
     <a href="#pvp">PvP<small>Combate y arena</small></a>
@@ -73,6 +74,31 @@
     <div class="example"><strong>Ejemplo:</strong> abres la Mochila → interactúas con objetos sin mover al personaje → cierras la Mochila → vuelves a caminar normalmente.</div>
     <h3>Si no puedes moverte</h3>
     <p>Cierra cualquier panel abierto primero. Si la pantalla ya está libre y el personaje continúa sin responder, eso se considera un problema del juego y no una mecánica intencional.</p>
+  </section>
+
+  <section id="camara-y-pantalla">
+    <span class="tag">CÁMARA</span>
+    <h2>Cámara, zoom y pantalla</h2>
+    <p>La cámara sigue al personaje de forma suave y adapta lo que ves al tamaño y orientación de tu pantalla. El movimiento del personaje y el movimiento visual de la cámara son cosas distintas: la cámara puede tardar una fracción de segundo en acompañarte sin cambiar tu posición real.</p>
+    <ul>
+      <li>El seguimiento usa suavizado y una zona muerta para evitar que la imagen tiemble con cada pequeño movimiento.</li>
+      <li>El zoom tiene varios niveles y mantiene una referencia coherente al girar entre vertical y horizontal.</li>
+      <li>En horizontal se ajusta el zoom efectivo para conservar aproximadamente el mismo campo de visión vertical que en vertical.</li>
+      <li>La resolución interna del juego se adapta a la densidad de píxeles del dispositivo dentro de límites de rendimiento.</li>
+      <li>En móvil, el botón <strong>PANTALLA COMPLETA</strong> intenta usar el máximo espacio disponible del navegador. Algunos navegadores, especialmente en iPhone/iPad, pueden limitar fullscreen u orientation lock.</li>
+    </ul>
+    <h3>Girar el teléfono</h3>
+    <p>Kelo World detecta vertical y horizontal y vuelve a calcular el viewport. Girar el teléfono no debería teletransportar al personaje ni cambiar tu zoom base elegido; únicamente cambia cómo se encuadra el mundo en la nueva pantalla.</p>
+    <h3>Zoom</h3>
+    <p>Los niveles actuales de referencia son 0.70, 0.82 y 1.00. En horizontal el valor efectivo puede verse distinto internamente porque el juego compensa la proporción de la pantalla.</p>
+    <div class="example"><strong>Ejemplo:</strong> eliges un zoom en vertical → giras a horizontal → ves una cantidad vertical de mundo equivalente → vuelves a vertical → recuperas el mismo zoom base.</div>
+    <h3>Comportamientos normales</h3>
+    <ul>
+      <li>La cámara puede continuar suavemente hacia su objetivo después de que el personaje se detenga.</li>
+      <li>Entrar en una zona, viajar o iniciar PvP puede cambiar el objetivo de cámara.</li>
+      <li>Si el navegador no permite bloquear orientación, el juego te pedirá girar físicamente el dispositivo.</li>
+      <li>Si fullscreen no está permitido, el juego sigue funcionando usando el máximo viewport disponible.</li>
+    </ul>
   </section>
 
   <section id="habilidades">
