@@ -90,10 +90,16 @@ if(!opened.surfaceModes)throw new Error('STUDIO_SURFACE_CONTROLS_MISSING');
 if(!opened.lockOwners.includes('kelo-studio'))throw new Error('STUDIO_FOUNDATION_LOCK_NOT_ACQUIRED');
 if(!opened.studioResources.length)throw new Error('STUDIO_DYNAMIC_IMPORT_NOT_OBSERVED');
 
-// On 390×844 the desktop Assets panel intentionally exists but is hidden. Use
-// the active mobile Assets pane so the regression test follows the real UX.
-const rows=page.locator('#kelo-studio-live [data-pane="assets"] [data-asset]');
+// Mobile premium flow: Assets starts collapsed. Open it through the same EDIT
+// affordance a player/creator uses, then interact only with the visible mobile pane.
+await page.locator('#kelo-studio-live .ks-deck [data-act="edit-assets"]').click();
+await page.waitForFunction(()=>{
+  const root=document.querySelector('#kelo-studio-live');
+  return root?.dataset.sheetOpen==='1'&&root.querySelector('.ks-mobile-pane[data-pane="assets"]')?.classList.contains('on');
+},null,{timeout:5000});
+const rows=page.locator('#kelo-studio-live .ks-mobile-pane[data-pane="assets"] [data-asset]');
 if(await rows.count()<1)throw new Error('STUDIO_ASSET_BROWSER_EMPTY');
+await rows.first().waitFor({state:'visible',timeout:5000});
 const beforePlacements=await page.evaluate(()=>window.KELO_PROPERTY_SYSTEM?.getPlacements?.('parcel:world:editor')?.length||0);
 await rows.first().click();
 await page.waitForFunction(()=>document.querySelector('#kelo-studio-live')?.dataset.compact==='asset',null,{timeout:5000});
@@ -108,15 +114,18 @@ const afterPlace=await page.evaluate(()=>({
 }));
 if(afterPlace.placements<=beforePlacements)throw new Error(`STUDIO_PLACE_DID_NOT_COMMIT:${beforePlacements}->${afterPlace.placements}`);
 
-// Reopen the full mobile sheet without clearing the active asset, then enter Move.
+// Reopen the full mobile workspace without clearing the active asset, then enter Move.
 await page.locator('#kelo-studio-live .ks-bottom.ks-compact [data-act="edit-assets"]').click();
-await page.waitForFunction(()=>document.querySelector('#kelo-studio-live')?.dataset.compact==='full',null,{timeout:5000});
-await page.locator('#kelo-studio-live .ks-tools [data-mode="move"]').click();
+await page.waitForFunction(()=>{
+  const root=document.querySelector('#kelo-studio-live');
+  return root?.dataset.compact==='full'&&root.dataset.sheetOpen==='1';
+},null,{timeout:5000});
+await page.locator('#kelo-studio-live .ks-deck [data-mode="move"]').click();
 await page.mouse.move(x,y);await page.mouse.down();await page.mouse.move(x+64,y+64,{steps:4});await page.mouse.up();
 await page.waitForFunction(()=>/·\s*2\s+undo/.test(document.querySelector('#kelo-studio-live .ks-status')?.textContent||''),null,{timeout:10000});
-await page.locator('#kelo-studio-live .ks-actions [data-act="undo"]').click();
+await page.locator('#kelo-studio-live .ks-deck [data-act="undo"]').click();
 await page.waitForFunction(()=>/·\s*1\s+undo/.test(document.querySelector('#kelo-studio-live .ks-status')?.textContent||''),null,{timeout:10000});
-await page.locator('#kelo-studio-live .ks-actions [data-act="redo"]').click();
+await page.locator('#kelo-studio-live .ks-deck [data-act="redo"]').click();
 await page.waitForFunction(()=>/·\s*2\s+undo/.test(document.querySelector('#kelo-studio-live .ks-status')?.textContent||''),null,{timeout:10000});
 
 const surfacePoint=async(clientX,clientY)=>page.evaluate(({clientX,clientY})=>{
@@ -129,32 +138,32 @@ const roadScreen={x:Math.round(box.x+box.width*.82),y:groundScreen.y};
 const collisionScreen={x:groundScreen.x,y:Math.round(box.y+Math.min(box.height*.29,230))};
 const groundWorld=await surfacePoint(groundScreen.x,groundScreen.y),roadWorld=await surfacePoint(roadScreen.x,roadScreen.y),collisionWorld=await surfacePoint(collisionScreen.x,collisionScreen.y);
 
-await page.locator('#kelo-studio-live .ks-tools [data-mode="terrain"]').click();
+await page.locator('#kelo-studio-live .ks-deck [data-mode="terrain"]').click();
 await page.mouse.click(groundScreen.x,groundScreen.y);
 await page.waitForFunction(({x,y})=>window.KELO_WORLD_BUILDER?.cells?.().some(c=>c.x===x&&c.y===y&&c.role!=='path'),{x:groundWorld.x,y:groundWorld.y},{timeout:10000});
 const afterGround=await page.evaluate(({x,y})=>({cell:window.KELO_WORLD_BUILDER.cells().find(c=>c.x===x&&c.y===y)||null,status:document.querySelector('#kelo-studio-live .ks-status')?.textContent||''}),{x:groundWorld.x,y:groundWorld.y});
 if(!afterGround.cell)throw new Error('STUDIO_GROUND_DID_NOT_COMMIT');
 
-await page.locator('#kelo-studio-live .ks-tools [data-mode="path"]').click();
+await page.locator('#kelo-studio-live .ks-deck [data-mode="path"]').click();
 await page.mouse.click(roadScreen.x,roadScreen.y);
 await page.waitForFunction(({x,y})=>window.KELO_WORLD_BUILDER?.cells?.().some(c=>c.x===x&&c.y===y&&c.role==='path'),{x:roadWorld.x,y:roadWorld.y},{timeout:10000});
 const afterRoad=await page.evaluate(({x,y})=>({cell:window.KELO_WORLD_BUILDER.cells().find(c=>c.x===x&&c.y===y)||null,status:document.querySelector('#kelo-studio-live .ks-status')?.textContent||''}),{x:roadWorld.x,y:roadWorld.y});
 if(afterRoad.cell?.role!=='path')throw new Error('STUDIO_ROAD_DID_NOT_COMMIT');
 
 const beforeCollisions=await page.evaluate(()=>window.KELO_WORLD_BUILDER?.collisions?.().length||0);
-await page.locator('#kelo-studio-live .ks-tools [data-mode="collision"]').click();
+await page.locator('#kelo-studio-live .ks-deck [data-mode="collision"]').click();
 await page.mouse.click(collisionScreen.x,collisionScreen.y);
 await page.waitForFunction(({x,y,before})=>{const list=window.KELO_WORLD_BUILDER?.collisions?.()||[];return list.length>before&&list.some(c=>c.x===x&&c.y===y);},{x:collisionWorld.x,y:collisionWorld.y,before:beforeCollisions},{timeout:10000});
 const afterCollision=await page.evaluate(({x,y})=>({collisions:window.KELO_WORLD_BUILDER.collisions().length,collision:window.KELO_WORLD_BUILDER.collisions().find(c=>c.x===x&&c.y===y)||null,status:document.querySelector('#kelo-studio-live .ks-status')?.textContent||''}),{x:collisionWorld.x,y:collisionWorld.y});
 if(!afterCollision.collision)throw new Error('STUDIO_COLLISION_DID_NOT_COMMIT');
 
-await page.locator('#kelo-studio-live .ks-actions [data-act="undo"]').click();
+await page.locator('#kelo-studio-live .ks-deck [data-act="undo"]').click();
 await page.waitForFunction(before=>window.KELO_WORLD_BUILDER?.collisions?.().length===before,beforeCollisions,{timeout:10000});
 const afterCollisionUndo=await page.evaluate(()=>({collisions:window.KELO_WORLD_BUILDER?.collisions?.().length||0,status:document.querySelector('#kelo-studio-live .ks-status')?.textContent||''}));
 if(afterCollisionUndo.collisions!==beforeCollisions)throw new Error('STUDIO_COLLISION_UNDO_DID_NOT_RESTORE');
 
-await page.locator('#kelo-studio-live .ks-tools [data-mode="terrain"]').click();
-await page.locator('#kelo-studio-live .ks-actions [data-act="erase"]').click();
+await page.locator('#kelo-studio-live .ks-deck [data-mode="terrain"]').click();
+await page.locator('#kelo-studio-live .ks-deck [data-act="erase"]').click();
 await page.mouse.click(groundScreen.x,groundScreen.y);
 await page.waitForFunction(({x,y})=>!window.KELO_WORLD_BUILDER?.cells?.().some(c=>c.x===x&&c.y===y),{x:groundWorld.x,y:groundWorld.y},{timeout:10000});
 const afterErase=await page.evaluate(({x,y})=>({exists:window.KELO_WORLD_BUILDER.cells().some(c=>c.x===x&&c.y===y),status:document.querySelector('#kelo-studio-live .ks-status')?.textContent||''}),{x:groundWorld.x,y:groundWorld.y});
