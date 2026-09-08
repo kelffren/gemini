@@ -40,6 +40,7 @@ export function createPlacementTool(kernel) {
     if (!preview) throw new Error('STUDIO_PLACEMENT_NOT_ACTIVE');
     const row = { ...preview, transform: { ...preview.transform }, bounds: { ...preview.bounds }, components: { ...preview.components } };
     await kernel.execute(createPlaceEntityCommand(row));
+    kernel.selection.set(row.id);
     preview = null; emit(); return row;
   }
 
