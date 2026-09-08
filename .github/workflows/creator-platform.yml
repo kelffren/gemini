@@ -1,0 +1,42 @@
+name: Creator Platform
+on:
+  push:
+    paths:
+      - 'src/creators/**'
+      - 'src/ui/studio-launcher.js'
+      - 'scripts/creator-platform-audit.mjs'
+      - 'docs/KELO_CREATORS_*.md'
+      - 'index.html'
+      - '.github/workflows/creator-platform.yml'
+  pull_request:
+    paths:
+      - 'src/creators/**'
+      - 'src/ui/studio-launcher.js'
+      - 'scripts/creator-platform-audit.mjs'
+      - 'docs/KELO_CREATORS_*.md'
+      - 'index.html'
+      - '.github/workflows/creator-platform.yml'
+jobs:
+  creator-platform:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Syntax — Creator modules
+        run: find src/creators -type f -name '*.mjs' -print0 | xargs -0 -n1 node --check
+      - name: Syntax — tiny launcher
+        run: node --check src/ui/studio-launcher.js
+      - name: Creator Platform audit
+        run: node scripts/creator-platform-audit.mjs
+      - name: Lazy boot contract
+        shell: bash
+        run: |
+          ! grep -Eq 'src/studio/|src/creators/' index.html
+          grep -q 'src/ui/studio-launcher.js' index.html
+          grep -Fq "import('./../creators/ui/creator-hub.mjs')" src/ui/studio-launcher.js
+          ! grep -Fq "import('./../studio/" src/ui/studio-launcher.js
+      - name: Reuse contract
+        run: |
+          ! grep -REn --include='*.mjs' '\blocalStorage\b|\bindexedDB\b|new[[:space:]]+WebSocket|new[[:space:]]+RTCPeerConnection|\beval[[:space:]]*\(|new[[:space:]]+Function[[:space:]]*\(' src/creators/workspaces src/creators/ui
