@@ -12,6 +12,7 @@
     #game-canvas{width:100%;height:100%;display:block;touch-action:none}
     #ui-layer{position:absolute;inset:0;pointer-events:none;z-index:10}
     .hud-badge{position:absolute;top:max(8px,env(safe-area-inset-top));left:max(8px,env(safe-area-inset-left));font:11px ui-monospace,monospace;color:#e7c56a;background:rgba(10,13,18,.88);padding:7px 12px;border-radius:999px;border:1px solid rgba(231,197,106,.26)}
+    #kelo-guide-link{position:absolute;top:max(43px,calc(env(safe-area-inset-top) + 35px));left:max(8px,env(safe-area-inset-left));pointer-events:auto;padding:5px 9px;border-radius:999px;border:1px solid rgba(231,197,106,.28);background:rgba(10,13,18,.84);color:#e7c56a;text-decoration:none;font:800 9px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;letter-spacing:.04em}
     body.social-mode #action-bar-container{display:none!important}
     #action-bar-container .stone-slot{position:relative!important}
     #action-bar-container .stone-slot>span[style*="position:absolute"]{pointer-events:none}
@@ -20,7 +21,7 @@
 </head>
 <body class="social-mode">
 <canvas id="game-canvas"></canvas>
-<div id="ui-layer"><div class="hud-badge" id="telemetry-bar">Oro: 1500 | KC: 200</div><div class="action-bar" id="action-bar-container" aria-label="Barra de habilidades"></div></div>
+<div id="ui-layer"><div class="hud-badge" id="telemetry-bar">Oro: 1500 | KC: 200</div><a id="kelo-guide-link" href="guide.html" aria-label="Abrir guía de mecánicas">GUÍA</a><div class="action-bar" id="action-bar-container" aria-label="Barra de habilidades"></div></div>
 
 <!-- KELO-INDEX CORE: primitives compartidos antes del runtime legacy. Leer docs/KELO_FOUNDATION.md antes de añadir globals/wrappers. -->
 <script src="src/core/events/event-bus.js?v=1"></script>
