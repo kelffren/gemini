@@ -4,7 +4,7 @@
 
 **Estado:** índice maestro operativo del runtime Foundation actual.  
 **Runtime declarado en `index.html`:** Kelo World V6.53.  
-**Candidato Foundation V1:** 2026-09-08 · rama `foundation/kelo-foundation-v1-2` · último paquete conductual verificado en `8019a299ef0ed995641fa29979efb628ac60ac38`; los commits posteriores a ese SHA son documentación/estado de merge.  
+**Candidato Foundation V2 — Collision Ownership:** 2026-09-08 · rama `foundation/kelo-foundation-v2-collision` · paquete conductual verificado sobre `6d1bd6b59e18c31304be6203d319b9bb7b8ff580`; cambios posteriores de este pass son documentación/estado de merge.  
 **Regla de autoridad documental:** si este mapa contradice `index.html`, los contratos Foundation o comportamiento LIVE verificado, gana el runtime y este archivo debe corregirse en el mismo pass.  
 **Mapa histórico V6.16 preservado:** `docs/archive/ENGINE_MAP_V6.16.md`.
 
@@ -45,6 +45,8 @@ KELO_MODAL_INPUT_LOCK writes = 0 LIVE
 
 Para Render, Simulation y Avatar, `engine-c` define/orquesta el entrypoint legacy y un único owner Foundation lo envuelve. No quedan wrappers feature-level LIVE de esos tres globals. `kelo-ability-boot`, `armor-aura` y `visual-integration` consumen los owners Foundation mediante hooks/middleware.
 
+Foundation V2 extiende el owner existente `KELO_COLLISION`: ahora posee no solo las primitivas geométricas sino también el lifecycle de colliders por bucket nombrado. `obstacles` sigue existiendo como **vista legacy de lectura** para movimiento/proyectiles; `core-static` se adopta una vez tras `engine-a`, mientras Generic Props, Property, World Builder y Ability Walls publican/retiran únicamente su propio bucket. Ninguno de esos productores LIVE hace ya `obstacles.push/splice` directamente.
+
 El adapter `KELO_MODAL_INPUT_LOCK` sigue existiendo dentro de `KeloInputLocks` para compatibilidad, pero el inventario actual no encuentra ningún writer directo LIVE. Los 5 writes restantes están únicamente en archivos de repo no cargados directamente por el runtime (`self-profile-touch-hotfix` y `builder-restore-move`).
 
 La existencia de un archivo en `src/` NO demuestra por sí sola que esté LIVE. La carga real puede ser directa desde `index.html` o dinámica desde un bootstrap LIVE. En particular, `src/environment/generic-prefabs.js` y `src/ui/property-editor.js` están **DORMANT** en V6.53: se pueden probar como unidades, pero no deben tratarse como dependencias LIVE ni reactivarse para satisfacer un test viejo. `profile-panel-close.js` sigue siendo un bootstrap tardío para foundations adicionales de combat/effects/melee; esa frontera todavía debe limpiarse sin crear un segundo boot system.
@@ -57,7 +59,7 @@ La existencia de un archivo en `src/` NO demuestra por sí sola que esté LIVE. 
 
 ```text
 0.  KeloEvents + KeloInputLocks
-1.  collision-utils + engine-a
+1.  collision-utils + engine-a → KELO_COLLISION adopta obstacles como core-static
 2.  KeloInput + KeloMovement + engine-b + engine-c
 3.  KeloAvatar + KeloRender + KeloSimulation
 4.  engine-d..k
@@ -72,6 +74,7 @@ La existencia de un archivo en `src/` NO demuestra por sí sola que esté LIVE. 
 13. forge/aura/illumination/performance
 14. profile-panel-close → dynamic runtime bootstrap de foundations adicionales
 15. self interaction / PvP touch guard / visual lab / visual integration
+16. Studio launcher mínimo; módulos Studio se cargan bajo acción explícita
 ```
 
 No forman parte del boot actual:
@@ -83,7 +86,7 @@ src/ui/property-editor.js          → DORMANT editor; PropertySystem sí está 
 
 `force-unlock-move.js` está **RETIRED** y ya no se carga en runtime Foundation.
 
-El orden importa: `KeloAvatar` se instala inmediatamente después de `engine-c`, de modo que los renderers históricos posteriores registran base/middleware en el owner en vez de sustituir el global por su cuenta. `KeloRender` y `KeloSimulation` hacen lo mismo para frame/tick.
+El orden importa: `KeloAvatar` se instala inmediatamente después de `engine-c`, de modo que los renderers históricos posteriores registran base/middleware en el owner en vez de sustituir el global por su cuenta. `KeloRender` y `KeloSimulation` hacen lo mismo para frame/tick. `KELO_COLLISION.attachLegacyObstacleArray(...)` corre justo después de `engine-a`, antes de los productores modernos de colliders.
 
 ---
 
@@ -98,7 +101,12 @@ El orden importa: `KeloAvatar` se instala inmediatamente después de `engine-c`,
 | Movement physics | `engine-a.js` | OWNER LIVE LEGACY CORE | Desplazamiento + colisión actual; extraer más adelante sin cambiar feel |
 | Gait/speed/stride | `engine-ac.js` vía `KeloMovement` | SUPPORT LIVE | Ya no envuelve `updateMovement` |
 | Release brake | `engine-ah.js` vía `KeloMovement` | SUPPORT LIVE | Ya no envuelve `updateMovement` |
-| Collision primitives | `src/physics/collision-utils.js` / `KELO_COLLISION` | OWNER LIVE | No duplicar geometría |
+| Collision geometry + lifecycle | `src/physics/collision-utils.js` / `KELO_COLLISION` | OWNER LIVE FOUNDATION V2 | `replaceOwner/upsert/remove/clearOwner`; `obstacles` es vista legacy, no API de escritura |
+| Core static colliders | `engine-a.js` → owner `core-static` | LEGACY DATA / OWNED VIEW | Se adoptan una vez por `KELO_COLLISION` sin reescribir `engine-a` |
+| Generic Prop colliders | `src/environment/generic-props.js` → `environment:generic-props` | SUPPORT LIVE / OWNED | Publica set completo mediante `replaceOwner`; cero writes directos a `obstacles` |
+| Property colliders | `src/property/property-system.js` → `property:placements` | SUPPORT LIVE / OWNED | Rotación/visibilidad se proyectan a un único bucket físico |
+| World Builder colliders | `src/environment/world-builder-system.js` → `world-builder:collisions` | SUPPORT LIVE / OWNED | Dirty/revision sync; ya no reconstruye el bucket sin cambios en cada frame |
+| Ability wall colliders | `src/abilities/kelo-ability-boot.js` → `abilities:walls` | SUPPORT LIVE / OWNED | `upsert` al crear, `remove` al expirar/destruir; no depende de identidad dentro de `obstacles` |
 | Camera/zoom | core + engines tardíos + mobile orientation | NEEDS_AUDIT | Ownership todavía compartido; consolidar con tests móviles |
 | Render base/orchestration | `engine-c.js` | OWNER LIVE LEGACY CORE | Orquesta frame/mundo/actores/UI Canvas |
 | Render extensions | `src/core/render-extension-system.js` / `KeloRender` | OWNER LIVE FOUNDATION / TRANSITIONAL | Único wrapper Foundation de `render`; inventario LIVE = `engine-c` + owner |
@@ -118,7 +126,7 @@ El orden importa: `KeloAvatar` se instala inmediatamente después de `engine-c`,
 | Combat foundation | `KeloCombatEngine` + Hit/Damage resolvers | DYNAMIC LIVE | Gameplay/presentation separados; server adapter puede reemplazar authority |
 | Effects foundation | `KeloEffectEngine` | DYNAMIC LIVE | Registry data-driven de efectos |
 | Melee foundation | `KeloMeleeEngine` | DYNAMIC LIVE | Perfil → CombatEngine; no HP/render directo |
-| Ability runtime moderno | `src/abilities/kelo-ability-boot.js` / `KeloAbilities` | OWNER LIVE | Tick vía `KeloSimulation` y FX vía `KeloRender`; 0 wrappers core directos |
+| Ability runtime moderno | `src/abilities/kelo-ability-boot.js` / `KeloAbilities` | OWNER LIVE | Tick vía `KeloSimulation`, FX vía `KeloRender`, walls vía `KELO_COLLISION`; 0 wrappers core y 0 writes directos de collider |
 | Stone/loadout moderno | `src/abilities/stone-system.js` / `KeloStones` | OWNER LIVE | Legacy stones no recibe features |
 | Sword Swap runtime | ability/runtime + PvP visuals | OWNER LIVE feature / SUPPORT Foundation | Tick usa `KeloSimulation`; ya no envuelve simulation |
 | PvP world | `src/systems/pvp-world.js` | OWNER LIVE feature / NEEDS_AUDIT authority | Render exclusivo usa `KeloRender`; tick usa `KeloSimulation`; autoridad local sigue siendo prototipo |
@@ -128,10 +136,10 @@ El orden importa: `KeloAvatar` se instala inmediatamente después de `engine-c`,
 | Backpack/inventory | `src/systems/backpack-system.js` + `KeloBackpackUI` | OWNER LIVE moderno / migración | UI usa token propio `KeloInputLocks`; estado legacy aún debe consolidarse antes de retirar |
 | Containers | `src/systems/container-system.js` | OWNER LIVE | Inventory ownership debe permanecer explícito |
 | Market escrow | `src/systems/market-escrow-system.js` | OWNER client/fallback | Online debe pasar por authority |
-| Property | `src/property/property-system.js` | OWNER LIVE | Una placement debe tener un owner físico |
+| Property | `src/property/property-system.js` | OWNER LIVE | Una placement tiene un owner lógico y su collider se proyecta al bucket `property:placements` |
 | Property Editor | `src/ui/property-editor.js` | PREPARED / DORMANT | Unit contract puede ejecutarse; browser smoke solo aplica si `index.html` lo activa |
 | Instances / House lifecycle | `src/instances/*` + `src/ui/house-instance-ui.js` | OWNER LIVE | House authority, persistence, crash recovery y panel móvil/desktop probados sin depender del editor dormant |
-| World Builder runtime | `src/environment/world-builder-system.js` | OWNER/SUPPORT / NEEDS_AUDIT | Collider/render sync y authoring boundaries mantienen deuda |
+| World Builder runtime | `src/environment/world-builder-system.js` | OWNER/SUPPORT LIVE / NEEDS_AUDIT authoring | Collision lifecycle resuelto; persisten límites authoring/runtime, persistencia y snapshots |
 | UI | `src/ui/*` | CONSUMER | UI consume APIs; no gobierna gameplay state ajeno |
 | Legacy modal lock writes LIVE | ninguno | RESUELTO EN RUNTIME | `modalLockWrite liveDirect=0`; adapter permanece por compatibilidad |
 | Legacy modal lock writes REPO | `self-profile-touch-hotfix.js`, `builder-restore-move.js` | LEGACY / NOT DIRECT LIVE | 5 writes totales; retirar/migrar solo al decidir su destino |
@@ -154,7 +162,8 @@ KeloMovement.before / after
 KeloRender.intercept / beforeFrame / afterFrame
 KeloSimulation.before / after
 KeloAvatar.setBase / use
-KELO_COLLISION
+KELO_COLLISION.replaceOwner / upsert / remove / clearOwner
+KELO_COLLISION.resolveCircleAABB / segmentAabbHitT
 KELO_WORLD_RENDERER.draw / drawPreActors / drawPostActors
 KeloVisualSystem layers/update
 KeloCombatEngine / KeloEffectEngine / KeloMeleeEngine
@@ -164,9 +173,9 @@ Property/Instance APIs
 system-owned event buses
 ```
 
-Prohibición Foundation: no introducir wrappers nuevos directos de `render`, `renderAvatar`, `updateSimulation`, `processInput` o `updateMovement` cuando exista un owner/punto de extensión apropiado.
+Prohibición Foundation: no introducir wrappers nuevos directos de `render`, `renderAvatar`, `updateSimulation`, `processInput` o `updateMovement` cuando exista un owner/punto de extensión apropiado. Para colisiones, ningún productor nuevo debe mutar `obstacles`; debe publicar su collider/set mediante `KELO_COLLISION`.
 
-El CI Foundation contiene contratos específicos para Input Locks, Input, Movement, Render, Simulation y Avatar, documentación obligatoria, inventario de deuda LIVE y syntax-check explícito de consumidores migrados.
+El CI Foundation contiene contratos específicos para Input Locks, Input, Movement, Render, Simulation y Avatar, documentación obligatoria, inventario de deuda LIVE y syntax-check explícito de consumidores migrados. Ability Collision CI ahora valida también aislamiento entre owners, no duplicación, vista legacy y ausencia de writes directos en Generic Props, Property, World Builder y Ability Walls.
 
 ---
 
@@ -179,13 +188,14 @@ Deuda prioritaria, sin borrar a ciegas:
 3. Consolidar camera/zoom ownership, especialmente orientación/DPR móvil.
 4. Abilities/stones legacy en engines vs `src/abilities/*`.
 5. Inventory/equipment legacy state vs sistemas modernos.
-6. **Collision ownership Property/World Builder y lifecycle de colliders.**
+6. Retirar gradualmente la **lectura legacy de `obstacles`** cuando movimiento/proyectiles puedan consultar el owner sin duplicar lógica; no crear otro collider store mientras tanto.
 7. World Edit authoring/runtime boundaries, persistencia y snapshots.
 8. Core bootstrap disparado desde un archivo de UI.
 9. Timers/MutationObservers/global writers restantes según inventario Foundation, priorizados por impacto medido.
 10. Deuda de assets/CI PNG se mantiene separada: no atribuir fallos de manifest/dimensiones a Foundation ownership.
 
-**Resuelto en Foundation V1:** cadenas feature-level de wrappers de Render, Simulation y Avatar; writers directos LIVE de `KELO_MODAL_INPUT_LOCK`; Backpack lock tokenizado; CI Prefab/House/Property alineado con activación runtime real. No reintroducirlos.
+**Resuelto en Foundation V1:** cadenas feature-level de wrappers de Render, Simulation y Avatar; writers directos LIVE de `KELO_MODAL_INPUT_LOCK`; Backpack lock tokenizado; CI Prefab/House/Property alineado con activación runtime real.  
+**Resuelto en Foundation V2 Collision:** lifecycle owner por bucket; `core-static` adoptado; Generic Props/Property/World Builder/Ability Walls migrados; World Builder deja de reconstruir colliders sin cambios cada frame; Generic Prop CI actualizado a contrato estructural del runtime actual. No reintroducir writes directos a `obstacles`.
 
 Toda retirada:
 
@@ -199,9 +209,9 @@ Toda retirada:
 Ability → abilityData → delivery/effects → KeloAbilities → KeloSimulation/KeloRender → VisualSystem
 Melee → profile → KeloMeleeEngine → KeloCombatEngine → events → presentation
 Effect → definition/type → KeloEffectEngine
-Prop → contract/catalog → Property/World → renderer/collision owner
+Prop → contract/catalog → Property/World → KELO_COLLISION owner → renderer
 VFX → manifest/primitive → KeloVisualSystem
-Avatar → KeloAvatar middleware 400 visual → 300 aura → 200 appearance → 100 hero → base
+Avatar → KeloAvatar middleware 400 visual → 300 aura 300 → appearance 200 → hero 100 → base
 Item → definition → backpack/equipment/container APIs
 UI → system public API → render result
 ```
@@ -256,17 +266,22 @@ Regla: UI/cliente solicita operaciones; autoridad crítica puede migrar al serve
 | Render extension owner único | ✅ `KeloRender`; LIVE = `engine-c` + owner |
 | Simulation extension owner único | ✅ `KeloSimulation`; LIVE = `engine-c` + owner |
 | Avatar render owner único | ✅ `KeloAvatar`; LIVE = `engine-c` + owner |
+| Collision lifecycle owner único | ✅ `KELO_COLLISION`; buckets por owner + vista legacy `obstacles` |
+| Direct collider writes migrados | ✅ 0 en Generic Props, Property, World Builder y Ability Walls |
+| World Builder collider rebuild por frame | ✅ eliminado para estado sin cambios mediante dirty/revision sync |
 | Ability runtime core wrappers | ✅ 0; usa `KeloSimulation` + `KeloRender` |
+| Ability wall collider lifecycle | ✅ `abilities:walls` vía `KELO_COLLISION` |
 | Backpack direct legacy lock writes | ✅ 0; token `KeloInputLocks` |
 | Hotfix watchdog `force-unlock` activo | ✅ retirado y fuera del runtime |
 | Prefab contract | ✅ LIVE; renderer genérico dormant probado como unidad |
-| Property Editor | ✅ correctamente clasificado DORMANT; unit audit verde |
-| House lifecycle/recovery | ✅ browser audit móvil/desktop verde sin dependencia falsa del editor dormant |
-| CI arquitectónico/documental | ✅ Foundation verde en el último paquete conductual pre-merge |
-| CI funcional relacionado | ✅ Backpack, Prefab, Property Editor, House, Ability Collision, Combat, Character, Terrain y Mobile Performance verdes pre-merge |
+| Generic Prop contract | ✅ contrato estructural LIVE + collision ownership; CI #25 verde |
+| Property Editor | ✅ correctamente clasificado DORMANT; browser audit #194 verde |
+| House lifecycle/recovery | ✅ browser audit móvil/desktop #157 verde |
+| CI arquitectónico/documental | ✅ Foundation #158 verde en el paquete conductual V2 |
+| CI funcional relacionado | ✅ Ability Collision #187, Generic Prop #25, Property #194, House #157, Studio #23, Backpack #308, Prefab #311, Terrain #293 y Mobile Performance #249 verdes |
 | CI de assets global | ⚠️ Kelo CI / Visual System CI mantienen deuda de assets/manifest independiente |
 | `main` protegido | ❌ no está protegido en la última lectura disponible |
-| Legacy totalmente clasificado/migrado | ⚠️ en progreso; Foundation V2 continúa por colisiones/camera/storage/assets |
+| Legacy totalmente clasificado/migrado | ⚠️ en progreso; siguiente deuda prioritaria: camera/zoom, inventory state, World Edit/storage y assets |
 
 ---
 
