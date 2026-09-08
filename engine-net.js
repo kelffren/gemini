@@ -131,8 +131,35 @@
   }
 
   connect();
-  const _sim = updateSimulation;
-  updateSimulation = function (dt) { _sim(dt); sendAcc += dt; if (ws && ws.readyState === 1 && localPlayer && sendAcc > 0.1) { sendAcc = 0; ws.send(JSON.stringify({ t: 'pose', x: localPlayer.x, y: localPlayer.y, face: localPlayer._face || 'down', gait: localPlayer._gait || 'idle', zone: window.keloZone || 'plaza' })); } Object.keys(peers).forEach(function (id) { const p = peers[id], tx = p.targetX != null ? p.targetX : p.x, ty = p.targetY != null ? p.targetY : p.y; p.x += (tx - p.x) * Math.min(1, 12 * dt); p.y += (ty - p.y) * Math.min(1, 12 * dt); }); };
-  const _render = render;
-  render = function () { _render(); if (typeof renderAvatar !== 'function') return; const ids = Object.keys(peers); if (!ids.length) return; const z = CONFIG.zoom || 1; ctx.save(); ctx.translate(screenW / 2, screenH / 2); ctx.scale(z, z); ctx.translate(-camera.x, -camera.y); ids.forEach(function (id) { renderAvatar(peers[id], false); }); ctx.restore(); };
+
+  function tickNetwork(context) {
+    const dt = context.dt;
+    sendAcc += dt;
+    if (ws && ws.readyState === 1 && localPlayer && sendAcc > 0.1) {
+      sendAcc = 0;
+      ws.send(JSON.stringify({ t: 'pose', x: localPlayer.x, y: localPlayer.y, face: localPlayer._face || 'down', gait: localPlayer._gait || 'idle', zone: window.keloZone || 'plaza' }));
+    }
+    Object.keys(peers).forEach(function (id) {
+      const p = peers[id], tx = p.targetX != null ? p.targetX : p.x, ty = p.targetY != null ? p.targetY : p.y;
+      p.x += (tx - p.x) * Math.min(1, 12 * dt);
+      p.y += (ty - p.y) * Math.min(1, 12 * dt);
+    });
+  }
+
+  function drawPeers() {
+    if (typeof renderAvatar !== 'function') return;
+    const ids = Object.keys(peers);
+    if (!ids.length) return;
+    const z = CONFIG.zoom || 1;
+    ctx.save();
+    ctx.translate(screenW / 2, screenH / 2);
+    ctx.scale(z, z);
+    ctx.translate(-camera.x, -camera.y);
+    ids.forEach(function (id) { renderAvatar(peers[id], false); });
+    ctx.restore();
+  }
+
+  if (!window.KeloSimulation || !window.KeloRender) throw new Error('Foundation render/simulation owners unavailable before engine-net');
+  window.KeloSimulation.after('engine-net:network', tickNetwork, 300);
+  window.KeloRender.afterFrame('engine-net:peers', drawPeers, 300);
 })();
