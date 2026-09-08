@@ -6,13 +6,13 @@
   "districtIds": ["central", "rural", "arena", "commerce", "gardens"],
   "assets": [
     {
-      "id": "fuentekelo-v1",
+      "id": "justicia-fountain-v2",
       "family": "plaza-fountain",
-      "version": "1.0.0",
-      "path": "assets/fuentekelo-runtime.PNG",
+      "version": "2.0.0",
+      "path": "assets/justicia_fountain_v2.PNG",
       "kind": "landmark-prop",
-      "width": 1312,
-      "height": 1199,
+      "width": 1254,
+      "height": 1254,
       "requireAlpha": true,
       "sampling": "nearest",
       "padding": 0,
@@ -27,7 +27,7 @@
       "priority": 20,
       "occlusion": {"mode": "registry-instance"},
       "districtCompatibility": ["central"],
-      "cache": {"strategy": "query", "key": "art", "value": "401"},
+      "cache": {"strategy": "query", "key": "art", "value": "502"},
       "fallback": {"mode": "none"}
     },
     {
