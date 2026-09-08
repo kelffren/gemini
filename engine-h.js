@@ -1,57 +1,28 @@
 /* KELO-INDEX
  * area: LEGACY HD RENDER SUPPORT
- * owner: HD/pixel-perfect compatibility; frame extension owned by KeloRender
- * keys: HIDPI PIXEL PERFECT PLAZA FALLBACK RENDER FOUNDATION
- * purpose: conserva DPR/zoom/fallback procedural sin envolver render
- * public-api: KELO_HD_RENDER, resize compatibility
- * consumes: KeloRender, mobile performance contract, canvas/ctx
+ * owner: HD/pixel-perfect compatibility; camera/viewport owned by KeloCamera; frame extension owned by KeloRender
+ * keys: HIDPI PIXEL PERFECT PLAZA FALLBACK RENDER CAMERA FOUNDATION
+ * purpose: conserva DPR/pixel-perfect/fallback procedural sin poseer resize, zoom ni render
+ * public-api: KELO_HD_RENDER
+ * consumes: KeloCamera, KeloRender, mobile performance contract, canvas/ctx
  * state-owned: plazaReady legacy
- * extension-points: KeloRender.beforeFrame/afterFrame
- * reuse: no añadir renderers nuevos aquí
- * legacy: resize/zoom ownership aún pendiente de consolidación
- * do-not: NO envolver render
+ * extension-points: KeloCamera.configureViewport + KeloRender.beforeFrame/afterFrame
+ * reuse: políticas de viewport se configuran en KeloCamera; no reemplazar resize/cycleZoom aquí
+ * legacy: fallback procedural de plaza permanece; cámara ya migrada
+ * do-not: NO envolver render, NO reemplazar resize/cycleZoom, NO escribir CONFIG.zoom/canvas size
  */
 (function () {
   const mobilePerf = window.KELO_MOBILE_PERFORMANCE_CONTRACT;
+  const cameraOwner = window.KeloCamera;
   const dprCap = Number(mobilePerf?.dprCap) || 3;
-  function activeDpr(){ return Math.min(window.devicePixelRatio || 1, dprCap); }
-  function pixelPerfectZoom(target){
-    const dpr = activeDpr();
-    const physicalScale = Math.max(1, Math.round((target || 1) * dpr));
-    return physicalScale / dpr;
-  }
-  if (typeof CONFIG !== 'undefined') {
-    CONFIG.zoom = pixelPerfectZoom(1);
-    CONFIG.roundPixels = true;
-  }
-  if (typeof cycleZoom === 'function') {
-    const zoomTargets = [0.55, 1, 1.45];
-    cycleZoom = function () {
-      const dpr = activeDpr();
-      const steps = [...new Set(zoomTargets.map(pixelPerfectZoom))];
-      let i = steps.findIndex(v => Math.abs(v - (CONFIG.zoom || 1)) < 0.001);
-      if (i < 0) i = 0;
-      CONFIG.zoom = steps[(i + 1) % steps.length];
-      if (typeof showToast === 'function') showToast('Zoom HD ' + CONFIG.zoom.toFixed(2));
-      if (typeof closeMenu === 'function') closeMenu();
-    };
-  }
+  if(!cameraOwner) throw new Error('KeloCamera unavailable before engine-h');
+
+  cameraOwner.configureViewport({dprCap,pixelPerfect:true,roundPixels:true,smoothing:false,imageRendering:'pixelated'});
+  const defaultBaseZoom=cameraOwner.pixelPerfectZoom(1);
+  cameraOwner.setBaseZoom(defaultBaseZoom,'engine-h-default');
+  cameraOwner.syncViewport('engine-h-boot');
 
   let plazaReady = false;
-  resize = function () {
-    screenW = window.innerWidth;
-    screenH = window.innerHeight;
-    const dpr = activeDpr();
-    canvas.width = Math.floor(screenW * dpr);
-    canvas.height = Math.floor(screenH * dpr);
-    canvas.style.width = screenW + 'px';
-    canvas.style.height = screenH + 'px';
-    canvas.style.imageRendering = 'pixelated';
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.imageSmoothingEnabled = false;
-    try { window.dispatchEvent(new CustomEvent('kelo:world-audit')); } catch (e) {}
-  };
-  resize();
   const PLAZA = { x: 1040, y: 1240, w: 800, h: 560 };
   function drawMarblePlaza() {
     const p = PLAZA;
@@ -99,16 +70,13 @@
     };
   }
   function restoreLegacyFillRect() {
-    if (restoreFillRect) {
-      ctx.fillRect = restoreFillRect;
-      restoreFillRect = null;
-    }
+    if (restoreFillRect) { ctx.fillRect = restoreFillRect; restoreFillRect = null; }
     ctx.imageSmoothingEnabled = false;
   }
   if(!window.KeloRender) throw new Error('KeloRender unavailable before engine-h');
   window.KeloRender.beforeFrame('engine-h:legacy-plaza-fillrect', prepareLegacyFillRect, 30);
   window.KeloRender.afterFrame('engine-h:legacy-plaza-fillrect', restoreLegacyFillRect, 30);
 
-  window.KELO_HD_RENDER = Object.freeze({mode:'hidpi-pixel-perfect-v2',dprCap,defaultZoom:CONFIG.zoom,smoothing:false,mobilePerformanceContractVersion:mobilePerf?.version||null,renderOwner:'KeloRender'});
+  window.KELO_HD_RENDER = Object.freeze({mode:'hidpi-pixel-perfect-v3-camera-owner',dprCap,defaultZoom:cameraOwner.getEffectiveZoom(),defaultBaseZoom:cameraOwner.getBaseZoom(),smoothing:false,mobilePerformanceContractVersion:mobilePerf?.version||null,cameraOwner:'KeloCamera',renderOwner:'KeloRender',directViewportWrites:false,directZoomWrites:false});
   window.KELO_LEGACY_PLAZA_IMAGE_DISABLED = true;
 })();
