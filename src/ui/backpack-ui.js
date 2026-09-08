@@ -1,6 +1,19 @@
+/* KELO-INDEX
+ * area: UI / INVENTORY
+ * owner: KeloBackpackUI; input lock owner KeloInputLocks
+ * keys: BACKPACK EQUIPMENT INVENTORY INPUT LOCK FOUNDATION
+ * purpose: presenta equipo/mochila y reclama input mediante token del owner Foundation
+ * public-api: KeloBackpackUI, KeloInventoryViewModel, KeloSocialUI.openBag/closeBag
+ * consumes: KeloBackpack, KeloEquipment, KeloInputLocks, KeloMarketUI, KeloWarehouseUI
+ * state-owned: estado efímero de selección/filtros UI + token de lock de esta superficie
+ * extension-points: APIs de Backpack/Equipment; KeloInputLocks acquire/release
+ * reuse: abrir/cerrar inventario desde shell social sin tocar el lock global legacy
+ * legacy: globals openInventory/closeInventory/toggleInventory se conservan como aliases de compatibilidad
+ * do-not: NO escribir KELO_MODAL_INPUT_LOCK, gameplay state o internals de inventory directamente
+ */
 (function(){
 'use strict';
-const VERSION='backpack-ui-v2.0.0';
+const VERSION='backpack-ui-v2.1.0';
 const BASE_PLAYER_STATS=Object.freeze({hp:1250,mana:420,attack:150,defense:120,speed:110,crit:12,resistance:8,equipmentLevel:1,weaponLevel:1});
 const DEFAULT_CURRENCIES=Object.freeze({silver:9223,gold:0,eGold:0});
 const EQUIP_LAYOUT={
@@ -15,10 +28,10 @@ const EQUIP_LAYOUT={
 };
 const LEFT=['helmet','chest','gloves','boots'],RIGHT=['weapon','cape','ring','amulet'];
 const FILTERS=[['all','TODO'],['consumables','CONSUMIBLES'],['materials','MATERIALES'],['missions','MISIONES'],['others','OTROS']];
-let topTab='equipment',filter='all',selectedBag=null,selectedEquip=null,moveMode=false,splitMode=false,splitAmount=1,discardConfirm=false,isOpen=false;
+let topTab='equipment',filter='all',selectedBag=null,selectedEquip=null,moveMode=false,splitMode=false,splitAmount=1,discardConfirm=false,isOpen=false,inputLockToken=null;
 
 function toast(t){if(typeof showToast==='function')showToast(t);}
-function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c];});}
 function rarityClass(v){return String(v||'common').toLowerCase().replace(/[^a-z0-9_-]/g,'');}
 function normalizeCategory(d){const v=String((d&&d.category)||'').toLowerCase();if(/consum|potion|food/.test(v))return'consumables';if(/material|resource|craft/.test(v))return'materials';if(/mission|quest/.test(v))return'missions';return'others';}
 function isEquipped(item){return !!(item&&window.KeloEquipment&&typeof window.KeloEquipment.isEquipped==='function'&&window.KeloEquipment.isEquipped(item.id));}
@@ -50,8 +63,8 @@ function render(){const root=ensurePanel();if(!window.KeloBackpack){root.innerHT
  root.querySelectorAll('.kb-equip-slot').forEach(function(b){b.onclick=function(){selectedEquip=b.dataset.equipKey;selectedBag=null;resetModes();render();};});
  const grid=root.querySelector('.kb-grid');slots.forEach(function(slot){const d=slot.descriptor,cat=d?normalizeCategory(d):null,visible=filter==='all'||cat===filter,btn=document.createElement('button');btn.type='button';btn.dataset.slot=String(slot.index);btn.className='kb-slot'+(selectedBag===slot.index?' selected':'')+(moveMode&&selectedBag!==slot.index?' move-target':'')+(slot.item&&isEquipped(slot.item)?' equipped':'')+(!visible?' filtered-empty':'');btn.setAttribute('aria-label',d&&visible?'Slot '+(slot.index+1)+': '+d.name:'Slot '+(slot.index+1)+' vacío');if(d&&visible){btn.innerHTML='<span class="kb-rarity '+rarityClass(d.rarity)+'"></span><span class="kb-icon">'+esc(d.icon)+'</span>'+(d.quantity>1?'<span class="kb-qty">'+esc(d.quantity)+'</span>':'');}btn.onclick=function(){onSlot(slot.index,visible);};grid.appendChild(btn);});renderDetail(root);if(window.KeloMarketUI&&typeof window.KeloMarketUI.decorateBackpack==='function')queueMicrotask(window.KeloMarketUI.decorateBackpack);}
 function onSlot(index,visible){if(!visible&&filter!=='all')return;if(moveMode&&selectedBag!=null&&index!==selectedBag){const out=window.KeloBackpack.moveSlot(selectedBag,index);if(out.ok){selectedBag=out.merged?(out.sourceRemaining>0?selectedBag:index):index;moveMode=false;toast(out.merged?'Stacks combinados':'Objeto movido');render();}return;}if(moveMode&&index===selectedBag){moveMode=false;render();return;}const slot=getSlots()[index];selectedBag=slot&&slot.item?index:null;selectedEquip=null;resetModes();render();}
-function acquireInputLock(){window.KELO_MODAL_INPUT_LOCK='inventory';document.body.classList.add('kelo-inventory-open');}
-function releaseInputLock(){if(window.KELO_MODAL_INPUT_LOCK==='inventory')window.KELO_MODAL_INPUT_LOCK=null;document.body.classList.remove('kelo-inventory-open');}
+function acquireInputLock(){const locks=window.KeloInputLocks;if(!inputLockToken&&locks&&typeof locks.acquire==='function')inputLockToken=locks.acquire('backpack-ui',{surface:'inventory'});document.body.classList.add('kelo-inventory-open');return !!inputLockToken;}
+function releaseInputLock(){const locks=window.KeloInputLocks;if(inputLockToken&&locks&&typeof locks.release==='function')locks.release(inputLockToken);inputLockToken=null;document.body.classList.remove('kelo-inventory-open');}
 function open(){if(typeof closeMenu==='function')closeMenu();if(window.KeloWarehouseUI)window.KeloWarehouseUI.close();if(window.KeloMarketUI)window.KeloMarketUI.close();selectedBag=null;selectedEquip=null;resetModes();topTab='equipment';render();ensurePanel().style.display='block';isOpen=true;acquireInputLock();}
 function close(){const root=document.getElementById('kelo-bag');if(root)root.style.display='none';selectedBag=null;selectedEquip=null;resetModes();isOpen=false;releaseInputLock();}
 function toggle(){isOpen?close():open();}
@@ -60,5 +73,5 @@ if(!window.__KELO_INVENTORY_ESC_BOUND){window.addEventListener('keydown',onKey);
 const previous=window.KeloSocialUI||{};window.KeloSocialUI=Object.freeze(Object.assign({},previous,{openBag:open,closeBag:close}));window.openInventory=open;window.closeInventory=close;window.toggleInventory=toggle;
 window.KeloInventoryViewModel=Object.freeze({basePlayerStats:BASE_PLAYER_STATS,defaultCurrencies:DEFAULT_CURRENCIES,getPlayerStats:getStats,getCurrencies:getCurrencies,equipmentLayout:Object.freeze(Object.assign({},EQUIP_LAYOUT))});
 window.KeloBackpackUI=Object.freeze({version:VERSION,open,close,toggle,render,isOpen:function(){return isOpen;}});
-window.KELO_BACKPACK_UI_AUDIT=Object.freeze({version:VERSION,layout:'fantasy-equipment-inventory-v1',mobileFirst:true,mainTabs:['equipment','appearance'],visibleEquipmentSlots:8,inventoryFilters:5,slotTargetMinPx:48,tapFirst:true,dragDrop:false,inputLock:true,noSkillBar:true,realBackpackState:true,realEquipmentActions:true,appearanceCosmeticOnly:true,marketDecoratorCompatible:true,authorityBoundary:'ui-requests-existing-domain-operations'});
+window.KELO_BACKPACK_UI_AUDIT=Object.freeze({version:VERSION,layout:'fantasy-equipment-inventory-v1',mobileFirst:true,mainTabs:['equipment','appearance'],visibleEquipmentSlots:8,inventoryFilters:5,slotTargetMinPx:48,tapFirst:true,dragDrop:false,inputLock:true,inputLockOwner:'KeloInputLocks',inputLockTokenized:true,directLegacyModalWrite:false,noSkillBar:true,realBackpackState:true,realEquipmentActions:true,appearanceCosmeticOnly:true,marketDecoratorCompatible:true,authorityBoundary:'ui-requests-existing-domain-operations'});
 })();
