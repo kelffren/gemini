@@ -64,6 +64,8 @@ jobs:
           node --check engine-net.js
           node --check src/characters/character-appearance.js
           node --check src/systems/pvp-world.js
+          node --check src/ui/pvp-social-touch-guard.js
+          node --check src/ui/backpack-ui.js
           node --check src/abilities/sword-swap-runtime.js
           node --check src/visuals/sword-swap-pvp-visuals.js
           node --check scripts/foundation-architecture-audit.js
