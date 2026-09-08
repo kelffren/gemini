@@ -1,3 +1,15 @@
+/* KELO-INDEX
+ * area: LEGACY GAMEPLAY / PANELS
+ * owner: legacy feature collection; portable inventory owned by KeloInventory
+ * purpose: conserva UI/gameplay legacy mientras delega mutaciones de items portátiles al owner Foundation
+ * public-api: legacy globals used by inline UI
+ * consumes: KeloInventory, STATE, camera/movement legacy APIs
+ * state-owned: legacy panels, fusion selection, farm/market/economy state; NO portable inventory
+ * extension-points: migrar feature por feature a owners modernos
+ * reuse: no añadir features nuevas aquí; usar owners Foundation
+ * legacy: archivo multi-responsabilidad pendiente de retirada incremental
+ * do-not: NO escribir STATE.inventory directamente
+ */
 function renderFarm(farm) {
   ctx.fillStyle = 'rgba(46, 117, 89, 0.15)';
   ctx.fillRect(farm.x, farm.y, farm.w, farm.h);
@@ -162,6 +174,11 @@ function renderFarmPanel() {
     '<div>Huevos: <strong>' + (STATE.silo.eggs || 0) + '</strong></div>' +
     '<div>Cerdos: <strong>' + (STATE.silo.pork || 0) + '</strong></div>';
 }
+function portableInventory() {
+  if (!window.KeloInventory) throw new Error('KeloInventory unavailable in engine-b');
+  return window.KeloInventory.getItems('backpack');
+}
+function legacyStone(item) { return !!(item && item.uid && item.typeId && item.tier); }
 function renderBuildPanel() {
   const eqList = document.getElementById('equipped-list');
   const invList = document.getElementById('inventory-list');
@@ -171,7 +188,8 @@ function renderBuildPanel() {
     card.innerHTML = '<div><strong>' + stone.icon + ' [' + stone.tier + '] ' + stone.name + '</strong></div><button class="btn-sm" onclick="unequipStone(' + idx + ')">Desequipar</button>';
     eqList.appendChild(card);
   });
-  STATE.inventory.forEach((stone, idx) => {
+  portableInventory().forEach((stone, idx) => {
+    if (!legacyStone(stone)) return;
     const card = document.createElement('div'); card.className = 'item-card tier-' + stone.tier;
     card.innerHTML = '<div><strong>' + stone.icon + ' [' + stone.tier + '] ' + stone.name + '</strong></div><button class="btn-sm" onclick="equipStone(' + idx + ')">Equipar</button>';
     invList.appendChild(card);
@@ -179,14 +197,21 @@ function renderBuildPanel() {
 }
 function equipStone(invIdx) {
   if (STATE.equipped.length >= 5) { showToast('Ranuras llenas'); return; }
-  STATE.equipped.push(STATE.inventory.splice(invIdx, 1)[0]); saveState(); renderBuildPanel(); renderActionBar();
+  const stone = portableInventory()[invIdx];
+  if (!legacyStone(stone)) return;
+  const removed = window.KeloInventory.removeItem('backpack', stone, { persist:false });
+  if (!removed.ok) return;
+  STATE.equipped.push(stone); window.KeloInventory.persist(); renderBuildPanel(); renderActionBar();
 }
 function unequipStone(eqIdx) {
-  STATE.inventory.push(STATE.equipped.splice(eqIdx, 1)[0]); saveState(); renderBuildPanel(); renderActionBar();
+  const stone = STATE.equipped[eqIdx]; if (!stone) return;
+  const added = window.KeloInventory.addItem('backpack', stone, { persist:false });
+  if (!added.ok) return;
+  STATE.equipped.splice(eqIdx, 1); window.KeloInventory.persist(); renderBuildPanel(); renderActionBar();
 }
 function addTestStones() {
-  STATE.inventory.push(createStoneInstance('dash', 'Common'), createStoneInstance('shield', 'Common'), createStoneInstance('fireball', 'Common'));
-  saveState(); renderBuildPanel();
+  [createStoneInstance('dash', 'Common'), createStoneInstance('shield', 'Common'), createStoneInstance('fireball', 'Common')].forEach(stone => window.KeloInventory.addItem('backpack', stone, { persist:false }));
+  window.KeloInventory.persist(); renderBuildPanel();
 }
 let fusionSelection = [];
 function renderFusionPanel() {
@@ -212,33 +237,36 @@ function renderFusionPanel() {
   let selectList = document.getElementById('fusion-inv-list');
   if (!selectList) { selectList = document.createElement('div'); selectList.id = 'fusion-inv-list'; document.getElementById('panel-fusion').appendChild(selectList); }
   selectList.innerHTML = '<strong>Inventario:</strong>';
-  STATE.inventory.forEach((stone, idx) => {
-    if (fusionSelection.some(sel => sel.uid === stone.uid)) return;
+  portableInventory().forEach((stone, idx) => {
+    if (!legacyStone(stone) || fusionSelection.some(sel => sel.uid === stone.uid)) return;
     const card = document.createElement('div'); card.className = 'item-card tier-' + stone.tier;
     card.innerHTML = '<div>' + stone.icon + ' [' + stone.tier + '] ' + stone.name + '</div><button class="btn-sm" onclick="selectForFusion(' + idx + ')">Anadir</button>';
     selectList.appendChild(card);
   });
 }
-function selectForFusion(invIdx) { if (fusionSelection.length >= 3) return; fusionSelection.push(STATE.inventory[invIdx]); renderFusionPanel(); }
+function selectForFusion(invIdx) { if (fusionSelection.length >= 3) return; const stone=portableInventory()[invIdx]; if(legacyStone(stone))fusionSelection.push(stone); renderFusionPanel(); }
 function removeFusionSelection(idx) { fusionSelection.splice(idx, 1); renderFusionPanel(); }
 function executeFusion() {
   if (fusionSelection.length !== 3 || STATE.gold < 100) { if (STATE.gold < 100) showToast('Oro insuficiente'); return; }
+  const snapshot = window.KeloInventory.snapshot(['inventory']);
   STATE.gold -= 100;
   const tier = fusionSelection[0].tier; const nextTier = TIERS[TIERS.indexOf(tier) + 1];
-  const uids = fusionSelection.map(s => s.uid);
-  STATE.inventory = STATE.inventory.filter(s => uids.indexOf(s.uid) === -1);
+  for (const stone of fusionSelection) {
+    const removed=window.KeloInventory.removeItem('backpack', stone, { persist:false });
+    if(!removed.ok){window.KeloInventory.restore(snapshot,{persist:false});STATE.gold+=100;return;}
+  }
   const roll = Math.random() * 100;
   const successOdds = Math.max(20, 75 - (TIERS.indexOf(tier) + 1) * 12 + STATE.fusionMastery * 2);
   const breakOdds = Math.min(40, (TIERS.indexOf(tier) + 1) * 8);
   const logEl = document.getElementById('fusion-log');
   if (roll < successOdds) {
     const newStone = createStoneInstance(fusionSelection[0].typeId, nextTier);
-    STATE.inventory.push(newStone); STATE.fusionXp += 25;
+    window.KeloInventory.addItem('backpack', newStone, { persist:false }); STATE.fusionXp += 25;
     if (STATE.fusionXp >= 100) { STATE.fusionMastery++; STATE.fusionXp = 0; }
     logEl.style.color = '#39d353'; logEl.textContent = 'EXITO: [' + nextTier + '] ' + newStone.name;
   } else if (roll < successOdds + breakOdds) { logEl.style.color = '#ff7b72'; logEl.textContent = 'FALLO CRITICO'; }
-  else { STATE.inventory.push(fusionSelection[0]); logEl.style.color = '#ffd166'; logEl.textContent = 'Fallo regular: 1 piedra recuperada'; }
-  fusionSelection = []; saveState(); renderFusionPanel();
+  else { window.KeloInventory.addItem('backpack', fusionSelection[0], { persist:false }); logEl.style.color = '#ffd166'; logEl.textContent = 'Fallo regular: 1 piedra recuperada'; }
+  fusionSelection = []; window.KeloInventory.persist(); renderFusionPanel();
 }
 function resetDecayTimer() {
   if (STATE.gold < 50) { showToast('Oro insuficiente'); return; }
@@ -270,7 +298,8 @@ function renderMarketContent() {
       cont.appendChild(card);
     });
   } else if (activeMarketTab === 'sell') {
-    STATE.inventory.forEach((st, idx) => {
+    portableInventory().forEach((st, idx) => {
+      if(!legacyStone(st))return;
       const card = document.createElement('div'); card.className = 'item-card tier-' + st.tier;
       card.innerHTML = '<div>' + st.icon + ' [' + st.tier + '] ' + st.name + '</div><button class="btn-sm" onclick="listStoneForSale(' + idx + ')">Publicar</button>';
       cont.appendChild(card);
@@ -286,16 +315,20 @@ function renderMarketContent() {
 function buyMarketItem(idx) {
   const lst = STATE.marketListings[idx];
   if (STATE.gold < lst.price) { showToast('Oro insuficiente'); return; }
+  if (lst.type === 'stone') {
+    const added=window.KeloInventory.addItem('backpack', lst.item, { persist:false });
+    if(!added.ok){showToast('No se pudo guardar la piedra');return;}
+  } else STATE.silo.wheat = (STATE.silo.wheat || 0) + 20;
   STATE.gold -= lst.price;
-  if (lst.type === 'stone') STATE.inventory.push(lst.item); else STATE.silo.wheat = (STATE.silo.wheat || 0) + 20;
-  STATE.marketListings.splice(idx, 1); saveState(); renderMarketContent(); showToast('Comprado');
+  STATE.marketListings.splice(idx, 1); window.KeloInventory.persist(); renderMarketContent(); showToast('Comprado');
 }
 function listStoneForSale(invIdx) {
   if (STATE.gold < 15) { showToast('Tasa 15 Oro'); return; }
+  const stone = portableInventory()[invIdx]; if(!legacyStone(stone))return;
+  const removed=window.KeloInventory.removeItem('backpack', stone, { persist:false }); if(!removed.ok)return;
   STATE.gold -= 15;
-  const stone = STATE.inventory.splice(invIdx, 1)[0];
   STATE.marketListings.push({ id: 'lst_' + Math.random().toString(36).substr(2,6), seller: 'KeloPioneer (Tu)', type: 'stone', item: stone, price: 150 });
-  saveState(); renderMarketContent(); showToast('Listado');
+  window.KeloInventory.persist(); renderMarketContent(); showToast('Listado');
 }
 function bidAuction(aucIdx) {
   const auc = STATE.auctions[aucIdx]; const newBid = auc.currentBid + 100;
