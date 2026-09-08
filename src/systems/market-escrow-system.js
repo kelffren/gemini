@@ -1,9 +1,23 @@
+/* KELO-INDEX
+ * area: SYSTEMS / MARKET ESCROW
+ * owner: KeloMarketEscrow
+ * purpose: listing lifecycle y escrow invariants; portable items/identidad pertenecen a KeloInventory
+ * public-api: KeloMarketEscrow
+ * consumes: KeloInventory, KeloContainers
+ * state-owned: STATE.marketEscrowListings
+ * extension-points: createMarketListing/cancelMarketListing/auditInvariants
+ * reuse: listings nuevas mueven items mediante KeloContainers y validan identidad KeloInventory
+ * legacy: listings persisten dentro de STATE; server authority pendiente
+ * do-not: NO leer/escribir STATE.inventory ni duplicar snapshot/identity helpers
+ */
 (function(){
 'use strict';
-const VERSION='market-escrow-v1.0.0';
+const VERSION='market-escrow-v1.1.0';
 const SCHEMA_VERSION=1;
 const OWNER='local_pioneer';
-function save(){if(typeof saveState==='function')saveState();}
+const inventoryOwner=window.KeloInventory;
+if(!inventoryOwner)throw new Error('KeloInventory unavailable before market-escrow-system');
+function save(){inventoryOwner.persist();}
 function ensure(){
   if(typeof STATE==='undefined')return null;
   if(!window.KeloContainers)return null;
@@ -12,16 +26,10 @@ function ensure(){
   STATE.marketEscrowListings.forEach(function(x){if(x&&x.schemaVersion==null)x.schemaVersion=SCHEMA_VERSION;});
   return STATE.marketEscrow;
 }
-function itemIdentity(item){
-  if(!item)return null;
-  if(item.id!=null)return String(item.id);
-  if(item.uid!=null)return String(item.uid);
-  if(item._backpackId!=null)return String(item._backpackId);
-  return null;
-}
-function itemKey(item,index){return window.KeloContainers.keyForItem(item,index||0);}
-function quantity(item){return Math.max(1,Math.floor(Number(item&&item.quantity)||1));}
-function stackLimit(item){return Math.max(1,Math.floor(Number(item&&item.maxStack)||1));}
+function itemIdentity(item){return inventoryOwner.itemIdentity(item);}
+function itemKey(item,index){return inventoryOwner.keyForItem(item,index||0);}
+function quantity(item){return inventoryOwner.quantity(item);}
+function stackLimit(item){return inventoryOwner.stackLimit(item);}
 function activeListings(){ensure();return STATE.marketEscrowListings.filter(function(x){return x&&x.status==='active';});}
 function allListings(){ensure();return STATE.marketEscrowListings.slice();}
 function findBackpackSlot(instanceId){
@@ -33,15 +41,15 @@ function findEscrowSlot(instanceId){
   return window.KeloContainers.getSlots('market_escrow').find(function(s){return s.item&&itemIdentity(s.item)===instanceId;})||null;
 }
 function listingId(){return 'mkt_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,8);}
-function snapshot(){return JSON.parse(JSON.stringify({inventory:STATE.inventory,backpack:STATE.backpack,warehouse:STATE.warehouse,marketEscrow:STATE.marketEscrow,marketEscrowListings:STATE.marketEscrowListings}));}
-function restore(s){STATE.inventory=s.inventory;STATE.backpack=s.backpack;STATE.warehouse=s.warehouse;STATE.marketEscrow=s.marketEscrow;STATE.marketEscrowListings=s.marketEscrowListings;}
+function snapshot(){return inventoryOwner.snapshot(['inventory','backpack','warehouse','marketEscrow','marketEscrowListings']);}
+function restore(s){inventoryOwner.restore(s,{persist:false});}
 function auditInvariants(){
   ensure();
   const errors=[];
   const containers=[
-    {name:'backpack',items:STATE.inventory||[]},
-    {name:'warehouse',items:(STATE.warehouse&&STATE.warehouse.items)||[]},
-    {name:'market_escrow',items:(STATE.marketEscrow&&STATE.marketEscrow.items)||[]}
+    {name:'backpack',items:inventoryOwner.getItems('backpack')},
+    {name:'warehouse',items:inventoryOwner.getItems('warehouse')},
+    {name:'market_escrow',items:inventoryOwner.getItems('market_escrow')}
   ];
   const seen=new Map();
   containers.forEach(function(c){
@@ -55,7 +63,7 @@ function auditInvariants(){
     });
   });
   const escrowById=new Map();
-  ((STATE.marketEscrow&&STATE.marketEscrow.items)||[]).forEach(function(item,index){
+  inventoryOwner.getItems('market_escrow').forEach(function(item,index){
     const id=itemIdentity(item);if(id)escrowById.set(id,{item,key:itemKey(item,index)});
   });
   const active=activeListings();
@@ -73,9 +81,7 @@ function auditInvariants(){
     if(listingByEscrow.has(eid))errors.push({code:'MULTIPLE_LISTINGS_ONE_ESCROW_ITEM',escrowItemInstanceId:eid});
     else listingByEscrow.set(eid,lst.listingId);
   });
-  escrowById.forEach(function(rec,id){
-    if(!listingByEscrow.has(id))errors.push({code:'ORPHAN_ESCROW_ITEM',escrowItemInstanceId:id});
-  });
+  escrowById.forEach(function(rec,id){if(!listingByEscrow.has(id))errors.push({code:'ORPHAN_ESCROW_ITEM',escrowItemInstanceId:id});});
   return {ok:errors.length===0,errors,activeListings:active.length,escrowItems:escrowById.size,uniqueIdentities:seen.size};
 }
 function createMarketListing(itemInstanceId,amount,listingData){
@@ -92,20 +98,7 @@ function createMarketListing(itemInstanceId,amount,listingData){
     const escrowSlot=window.KeloContainers.getSlots('market_escrow').find(function(s){return s.key===movedKey;});
     if(!escrowSlot||!escrowSlot.item)throw new Error('ESCROW_ITEM_NOT_FOUND_AFTER_TRANSFER');
     const escrowItem=escrowSlot.item,escrowId=itemIdentity(escrowItem);
-    const listing={
-      schemaVersion:SCHEMA_VERSION,
-      listingId:listingId(),
-      owner:OWNER,
-      seller:'KeloPioneer (Tu)',
-      escrowItemInstanceId:escrowId,
-      escrowItemKey:escrowSlot.key,
-      templateId:escrowItem.templateId||escrowItem.typeId||null,
-      quantity:quantity(escrowItem),
-      createdAt:Date.now(),
-      status:'active',
-      price:Number.isFinite(Number(listingData.price))?Number(listingData.price):null,
-      metadata:listingData.metadata&&typeof listingData.metadata==='object'?Object.assign({},listingData.metadata):{}
-    };
+    const listing={schemaVersion:SCHEMA_VERSION,listingId:listingId(),owner:OWNER,seller:'KeloPioneer (Tu)',escrowItemInstanceId:escrowId,escrowItemKey:escrowSlot.key,templateId:escrowItem.templateId||escrowItem.typeId||null,quantity:quantity(escrowItem),createdAt:Date.now(),status:'active',price:Number.isFinite(Number(listingData.price))?Number(listingData.price):null,metadata:listingData.metadata&&typeof listingData.metadata==='object'?Object.assign({},listingData.metadata):{}};
     STATE.marketEscrowListings.push(listing);
     const audit=auditInvariants();if(!audit.ok)throw new Error('INVARIANT:'+JSON.stringify(audit.errors));
     save();
@@ -129,5 +122,5 @@ function cancelMarketListing(id){
 }
 ensure();
 window.KeloMarketEscrow=Object.freeze({version:VERSION,schemaVersion:SCHEMA_VERSION,owner:OWNER,ensure,itemIdentity,getListings:allListings,getActiveListings:activeListings,createMarketListing,cancelMarketListing,auditInvariants});
-window.KELO_MARKET_ESCROW_AUDIT=Object.freeze({version:VERSION,schemaVersion:SCHEMA_VERSION,containerType:'market_escrow',identityRule:'listed-item-in-escrow-not-backpack',listingContract:'validate-transfer-create-persist-rollback-v1',cancelContract:'validate-transfer-close-persist-rollback-v1',escrowMerge:false,fullTransferPreservesIdentity:true,partialTransferCreatesIdentity:true,cancelPreservesIdentity:true,serverAuthoritative:false});
+window.KELO_MARKET_ESCROW_AUDIT=Object.freeze({version:VERSION,schemaVersion:SCHEMA_VERSION,inventoryOwner:'KeloInventory',directInventoryWrites:false,containerType:'market_escrow',identityRule:'listed-item-in-escrow-not-backpack',listingContract:'validate-transfer-create-persist-rollback-v1',cancelContract:'validate-transfer-close-persist-rollback-v1',escrowMerge:false,fullTransferPreservesIdentity:true,partialTransferCreatesIdentity:true,cancelPreservesIdentity:true,serverAuthoritative:false});
 })();
