@@ -3,13 +3,15 @@
  * keys: PARCEL PLACEMENT OWNERSHIP UNITS AUTHORITY RENDER COLLISION
  * hace: autoridad local reemplazable, balances por unidad, colocaciones y render dinámico de parcelas
  * online: UI solo llama request(); installRemoteAdapter permite sustituir localStorage por servidor sin cambiar UI
+ * collision: publica el set property:placements mediante KELO_COLLISION; no muta obstacles
  */
 (function(){
   'use strict';
-  const C=window.KELO_PROPERTY_CATALOG,L=window.KELO_ENVIRONMENT_LAYERS,A=window.KELO_ATLAS_CONTRACT;
+  const C=window.KELO_PROPERTY_CATALOG,L=window.KELO_ENVIRONMENT_LAYERS,A=window.KELO_ATLAS_CONTRACT,K=window.KELO_COLLISION;
   if(!C||!L||typeof L.register!=='function'||!A||typeof A.acquire!=='function'){console.error('[Kelo property] catalog/layers/atlas missing');return;}
   const STORAGE='kelo_property_state_v1';
   const SCHEMA=1;
+  const COLLISION_OWNER='property:placements';
   const images=new Map();
   const readyAssets=new Set();
   const listeners=new Set();
@@ -106,8 +108,10 @@
     const q=((rec.rotation%4)+4)%4,W=t.width,H=t.height;const pts=[[r.x,r.y],[r.x+r.w,r.y],[r.x,r.y+r.h],[r.x+r.w,r.y+r.h]].map(([px,py])=>{let x=px,y=py;if(q===1){return[H-y,x];}if(q===2){return[W-x,H-y];}if(q===3){return[y,W-x];}return[x,y];});const xs=pts.map(p=>p[0]),ys=pts.map(p=>p[1]);return{x:rec.x+Math.min(...xs),y:rec.y+Math.min(...ys),w:Math.max(...xs)-Math.min(...xs),h:Math.max(...ys)-Math.min(...ys)};
   }
   function syncColliders(){
-    if(typeof obstacles==='undefined'||!Array.isArray(obstacles))return;for(let i=obstacles.length-1;i>=0;i--)if(obstacles[i]?._propertyPlacementId)obstacles.splice(i,1);
-    for(const rec of state.placements){if(!placementVisible(rec))continue;const t=C.get(rec.assetId);if(!t?.collision)continue;const b=transformedRect(rec,t,t.collision);if(b.w>0&&b.h>0)obstacles.push({id:`property:${rec.placementId}`,x:b.x,y:b.y,w:b.w,h:b.h,noDraw:true,_propertyPlacementId:rec.placementId});}
+    if(!K||typeof K.replaceOwner!=='function')return 0;
+    const rows=[];
+    for(const rec of state.placements){if(!placementVisible(rec))continue;const t=C.get(rec.assetId);if(!t?.collision)continue;const b=transformedRect(rec,t,t.collision);if(b.w>0&&b.h>0)rows.push({id:`property:${rec.placementId}`,x:b.x,y:b.y,w:b.w,h:b.h,noDraw:true,_propertyPlacementId:rec.placementId});}
+    return K.replaceOwner(COLLISION_OWNER,rows);
   }
 
   function drawTemplate(g,t,rec,phase){
@@ -129,7 +133,7 @@
   function suppressLegacyFurniture(plot){const p=state.parcels['parcel:legacy:104'];return !!p&&p.bounds.x===plot?.x&&p.bounds.y===plot?.y&&state.placements.some(x=>x.parcelId===p.parcelId);}
   if(typeof renderPlot==='function'){const legacyRenderPlot=renderPlot;renderPlot=function(plot,isOwn){if(suppressLegacyFurniture(plot))return legacyRenderPlot(Object.assign({},plot,{furniture:[]}),isOwn);return legacyRenderPlot(plot,isOwn);};}
   window.KELO_PROPERTY_SYSTEM=Object.freeze({
-    version:'property-system-v1.1.0',storageMode:'local-fallback-replaceable',request,authorityLocalRequest:localRequest,installRemoteAdapter,ingestAuthoritySnapshot,snapshot,playerId,parcel,getOwnedUnits:(assetId,owner)=>owned(String(owner||playerId()),assetId),getDeployedUnits:(assetId,owner)=>deployed(String(owner||playerId()),assetId),getAvailableUnits:(assetId,owner)=>available(String(owner||playerId()),assetId),getPlacements:(pid)=>state.placements.filter(p=>!pid||p.parcelId===pid).map(clone),placementBounds,placementForPoint,exportLayout,suppressLegacyFurniture,refreshSceneColliders:syncColliders,onChange(fn){if(typeof fn!=='function')return()=>{};listeners.add(fn);return()=>listeners.delete(fn);},get ready(){return true;}
+    version:'property-system-v1.2.0',storageMode:'local-fallback-replaceable',collisionOwner:COLLISION_OWNER,request,authorityLocalRequest:localRequest,installRemoteAdapter,ingestAuthoritySnapshot,snapshot,playerId,parcel,getOwnedUnits:(assetId,owner)=>owned(String(owner||playerId()),assetId),getDeployedUnits:(assetId,owner)=>deployed(String(owner||playerId()),assetId),getAvailableUnits:(assetId,owner)=>available(String(owner||playerId()),assetId),getPlacements:(pid)=>state.placements.filter(p=>!pid||p.parcelId===pid).map(clone),placementBounds,placementForPoint,exportLayout,suppressLegacyFurniture,refreshSceneColliders:syncColliders,onChange(fn){if(typeof fn!=='function')return()=>{};listeners.add(fn);return()=>listeners.delete(fn);},get ready(){return true;}
   });
-  window.KELO_PROPERTY_AUDIT={version:'property-system-v1.1.0',schema:SCHEMA,authority:'local-fallback',serverReplaceable:true,parcelCount:Object.keys(state.parcels).length,placementCount:state.placements.length,assetCount:C.list().length};
+  window.KELO_PROPERTY_AUDIT={version:'property-system-v1.2.0',schema:SCHEMA,authority:'local-fallback',serverReplaceable:true,collisionMode:'kelo-collision-owner-v2',collisionOwner:COLLISION_OWNER,parcelCount:Object.keys(state.parcels).length,placementCount:state.placements.length,assetCount:C.list().length};
 })();
