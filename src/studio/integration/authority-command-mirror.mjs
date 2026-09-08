@@ -3,7 +3,7 @@
  * owns: translation of confirmed Studio Commands into KELO_WORLD_EDIT operations
  * does-not-own: drag previews, gameplay, draft lifecycle, Property internals or collision resolution
  * public-api: installStudioAuthorityMirror()
- * online: one authority request per confirmed command/history action
+ * online: one authority operation per persistent child command; batches remain one local History action
  */
 
 const quarter = degrees => ((Math.round((Number(degrees) || 0) / 90) % 4) + 4) % 4;
@@ -62,8 +62,12 @@ export function installStudioAuthorityMirror({ adapter, actorId, getDraftId } = 
     const id = collisionAuthorityId(command.id); if (!id) throw new Error('STUDIO_AUTHORITY_COLLISION_ID_MISSING');
     return adapter.worldEditRequest('world:collision:update', base({ collisionId: id, x: Number(target?.x) || 0, y: Number(target?.y) || 0, w: Number(target?.w) || 32, h: Number(target?.h) || 32 }));
   }
-  async function mirror(event) {
-    const command = event?.command || {}, action = event?.type || 'execute';
+  async function mirrorCommand(command, action) {
+    if (Array.isArray(command?.commands)) {
+      const children = action === 'undo' ? command.commands.slice().reverse() : command.commands;
+      for (const child of children) await mirrorCommand(child, action);
+      return true;
+    }
     if (command.type === 'surface.cell') return applySurface(command, action === 'undo' ? command.before : command.after);
     if (command.type === 'collision.create') return action === 'undo' ? removeCollision(command.collision) : createCollision(command.collision);
     if (command.type === 'collision.remove') return action === 'undo' ? createCollision(command.collision) : removeCollision(command.collision || { collisionId: command.id });
@@ -78,6 +82,7 @@ export function installStudioAuthorityMirror({ adapter, actorId, getDraftId } = 
     }
     return null;
   }
+  async function mirror(event) { return mirrorCommand(event?.command || {}, event?.type || 'execute'); }
   const uninstall = adapter.installCommandMirror(mirror);
   return Object.freeze({
     uninstall,
