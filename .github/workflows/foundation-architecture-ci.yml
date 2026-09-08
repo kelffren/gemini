@@ -19,6 +19,8 @@ jobs:
         run: node scripts/foundation-architecture-audit.js
       - name: Audit input-lock ownership contract
         run: node scripts/input-lock-contract-audit.js
+      - name: Audit system documentation contract
+        run: node scripts/system-documentation-audit.js
       - name: Report current architecture debt inventory
         run: node scripts/foundation-runtime-inventory.js
       - name: Syntax-check Foundation primitives
@@ -26,4 +28,5 @@ jobs:
           node --check src/core/input-lock-system.js
           node --check scripts/foundation-architecture-audit.js
           node --check scripts/input-lock-contract-audit.js
+          node --check scripts/system-documentation-audit.js
           node --check scripts/foundation-runtime-inventory.js
