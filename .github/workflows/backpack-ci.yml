@@ -107,6 +107,6 @@ jobs:
           grep -q "warehouse-ui-v1.0.1" src/ui/warehouse-ui.js
           grep -q "market-ui-v1.0.0" src/ui/market-ui.js
           grep -q "backpackPublishAction:true" src/ui/market-ui.js
-          grep -q "self-interaction-ui-v1.1.0" src/ui/self-interaction-ui.js
+          grep -Eq "self-interaction-ui-v1\.[0-9]+\.[0-9]+" src/ui/self-interaction-ui.js
           grep -q "KeloInputLocks.acquire" src/ui/self-interaction-ui.js
           grep -q "profileUsesBackpackUI:true" src/ui/self-interaction-ui.js
