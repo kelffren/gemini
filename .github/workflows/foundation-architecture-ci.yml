@@ -21,6 +21,8 @@ jobs:
         run: node scripts/input-lock-contract-audit.js
       - name: Audit input gate contract
         run: node scripts/input-gate-contract-audit.js
+      - name: Audit movement owner contract
+        run: node scripts/movement-system-contract-audit.js
       - name: Audit system documentation contract
         run: node scripts/system-documentation-audit.js
       - name: Report current architecture debt inventory
@@ -29,8 +31,12 @@ jobs:
         run: |
           node --check src/core/input-lock-system.js
           node --check src/core/input-gate.js
+          node --check src/core/movement-system.js
+          node --check engine-ac.js
+          node --check engine-ah.js
           node --check scripts/foundation-architecture-audit.js
           node --check scripts/input-lock-contract-audit.js
           node --check scripts/input-gate-contract-audit.js
+          node --check scripts/movement-system-contract-audit.js
           node --check scripts/system-documentation-audit.js
           node --check scripts/foundation-runtime-inventory.js
