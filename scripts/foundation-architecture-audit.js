@@ -99,8 +99,9 @@ if (!base) {
     added.push({ file: currentFile, line: line.slice(1) });
   });
 
+  const coreGlobalAssignment = /\b(?:window\.|globalThis\.|root\.)?(render|renderAvatar|updateSimulation|processInput|updateMovement)\s*=/;
   const forbidden = [
-    { name: 'new direct core wrapper', test: (x) => /\b(render|renderAvatar|updateSimulation|processInput|updateMovement)\s*=\s*function\b/.test(x.line) },
+    { name: 'new direct core wrapper', test: (x) => coreGlobalAssignment.test(x.line) },
     { name: 'new watchdog/timer used as state repair', test: (x) => /setInterval\s*\(/.test(x.line) && /unlock|lock|restore|repair|force|fix/i.test(x.line) },
     { name: 'UI directly mutates player position/HP', test: (x) => /^src\/ui\//.test(x.file) && /\blocalPlayer\.(x|y|hp|maxHp)\s*=/.test(x.line) },
     { name: 'UI directly pushes physical obstacle', test: (x) => /^src\/ui\//.test(x.file) && /\bobstacles\.push\s*\(/.test(x.line) },
