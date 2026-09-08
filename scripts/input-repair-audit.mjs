@@ -42,6 +42,7 @@ try {
     return {
       actionBarPresent: !!bar,
       actionBarClass: !!bar && bar.classList.contains('action-bar'),
+      bodySocialMode: document.body.classList.contains('social-mode'),
       slotCount: slots.length,
       visibleSlotCount: visibleSlots.length,
       barDisplay: bar ? getComputedStyle(bar).display : null,
@@ -57,10 +58,47 @@ try {
   if (abilityBarContract.renderActionBarSafe !== true) {
     throw new Error(`renderActionBar failed: ${abilityBarContract.renderActionBarSafe}`);
   }
-  if (abilityBarContract.slotCount !== 5 || abilityBarContract.visibleSlotCount !== 5) {
-    throw new Error(`Expected 5 visible ability slots: ${JSON.stringify(abilityBarContract)}`);
+  if (!abilityBarContract.bodySocialMode) {
+    throw new Error(`Expected initial social-mode body: ${JSON.stringify(abilityBarContract)}`);
   }
-  console.log('ABILITY_BAR_MEASUREMENT ' + JSON.stringify(abilityBarContract));
+  if (abilityBarContract.slotCount !== 5 || abilityBarContract.visibleSlotCount !== 0) {
+    throw new Error(`Expected 5 mounted but hidden social ability slots: ${JSON.stringify(abilityBarContract)}`);
+  }
+  console.log('ABILITY_BAR_SOCIAL_MEASUREMENT ' + JSON.stringify(abilityBarContract));
+
+  const combatBarContract = await page.evaluate(() => {
+    const bar = document.getElementById('action-bar-container');
+    document.body.classList.remove('social-mode');
+    const slots = bar ? Array.from(bar.querySelectorAll('.stone-slot')) : [];
+    const visibleSlots = slots.filter((slot) => {
+      const style = getComputedStyle(slot);
+      const rect = slot.getBoundingClientRect();
+      return style.display !== 'none' && style.visibility !== 'hidden' && Number(style.opacity || 1) > 0 && rect.width > 0 && rect.height > 0;
+    });
+    const rect = bar ? bar.getBoundingClientRect() : null;
+    const result = {
+      slotCount: slots.length,
+      visibleSlotCount: visibleSlots.length,
+      barDisplay: bar ? getComputedStyle(bar).display : null,
+      barPointerEvents: bar ? getComputedStyle(bar).pointerEvents : null,
+      barRect: rect ? { x: rect.x, y: rect.y, width: rect.width, height: rect.height } : null,
+      viewportHeight: window.innerHeight,
+      bottomGap: rect ? window.innerHeight - rect.bottom : null
+    };
+    document.body.classList.add('social-mode');
+    result.restoredSocialHidden = bar ? getComputedStyle(bar).display === 'none' : false;
+    return result;
+  });
+  if (combatBarContract.slotCount !== 5 || combatBarContract.visibleSlotCount !== 5) {
+    throw new Error(`Expected 5 visible combat ability slots: ${JSON.stringify(combatBarContract)}`);
+  }
+  if (combatBarContract.bottomGap == null || combatBarContract.bottomGap < 0 || combatBarContract.bottomGap > 30) {
+    throw new Error(`Ability bar is not anchored to the bottom safe area: ${JSON.stringify(combatBarContract)}`);
+  }
+  if (!combatBarContract.restoredSocialHidden) {
+    throw new Error(`Ability bar did not hide again after restoring social-mode: ${JSON.stringify(combatBarContract)}`);
+  }
+  console.log('ABILITY_BAR_COMBAT_LAYOUT ' + JSON.stringify(combatBarContract));
 
   const snapshot = () => page.evaluate(() => ({
     x: localPlayer.x,
@@ -139,6 +177,7 @@ try {
   const moved = Math.hypot(moving.x - before.x, moving.y - before.y);
   const measurement = {
     abilityBarContract,
+    combatBarContract,
     start,
     end,
     hitStack,
