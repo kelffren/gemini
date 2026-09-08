@@ -3,7 +3,7 @@
  * owns: generic entity authoring mutations with reversible deltas
  * does-not-own: gameplay-specific object behavior
  * public-api: createPlaceEntityCommand(), createMoveEntityCommand(), createRemoveEntityCommand(), createPatchEntityCommand()
- * online: serialize() output is transport-friendly
+ * online: serialize() includes enough before/after state for authority undo/redo
  */
 
 const copy = value => value == null ? value : (typeof structuredClone === 'function' ? structuredClone(value) : JSON.parse(JSON.stringify(value)));
@@ -38,8 +38,8 @@ export function createRemoveEntityCommand(id) {
 export function createPatchEntityCommand(id, patch) {
   id = String(id); const next = copy(patch || {}); let previous = null;
   return { type: 'entity.patch', label: `Edit ${id}`,
-    execute({ document }) { const i = findIndex(document, id); if (i < 0) throw new Error('STUDIO_ENTITY_NOT_FOUND'); previous = copy(document.entities[i]); document.entities[i] = { ...document.entities[i], ...copy(next) }; },
+    execute({ document }) { const i = findIndex(document, id); if (i < 0) throw new Error('STUDIO_ENTITY_NOT_FOUND'); if (!previous) previous = copy(document.entities[i]); document.entities[i] = { ...document.entities[i], ...copy(next) }; },
     undo({ document }) { const i = findIndex(document, id); if (i >= 0 && previous) document.entities[i] = copy(previous); },
-    serialize: () => ({ type: 'entity.patch', id, patch: copy(next) }),
+    serialize: () => ({ type: 'entity.patch', id, previous: copy(previous), patch: copy(next) }),
     affectedRects({ document }) { const i = findIndex(document, id); return [previous && rectFor(previous), i >= 0 && rectFor(document.entities[i])].filter(Boolean); } };
 }
