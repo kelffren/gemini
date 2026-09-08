@@ -1,9 +1,9 @@
 /* KELO-INDEX
  * area: QA / STUDIO LIVE
  * owner: Studio LIVE CI
- * purpose: valida en GitHub Pages el vertical slice CREATE -> Studio -> authority/history -> close
+ * purpose: valida en GitHub Pages CREATE -> Studio -> objects/surface/collision -> authority/history -> close
  * public-api: CLI `node scripts/studio-live-audit.mjs`
- * consumes: deployed Kelo World, KELO_ADMIN_KEYS, KELO_STUDIO_LAUNCHER, KeloInputLocks
+ * consumes: deployed Kelo World, KELO_ADMIN_KEYS, KELO_STUDIO_LAUNCHER, KeloInputLocks, KELO_WORLD_BUILDER
  * state-owned: ninguno; usa un browser context efímero con localStorage aislado
  * extension-points: ampliar solo con comportamientos creator estables
  * reuse: workflow studio-live-audit.yml
@@ -32,13 +32,13 @@ for(let attempt=0;attempt<20;attempt++){
       return src.some(x=>x.includes('src/ui/studio-launcher.js?v=2')) &&
         !!window.KELO_STUDIO_LAUNCHER &&
         !!actor && window.KELO_ADMIN_KEYS?.can?.('world.edit',actor)===true &&
-        !!window.KeloInputLocks && !!window.KELO_WORLD_EDIT?.ready;
+        !!window.KeloInputLocks && !!window.KELO_WORLD_EDIT?.ready && !!window.KELO_WORLD_BUILDER;
     });
     if(ready)break;
   }catch(e){lastError=e;}
   await page.waitForTimeout(3500);
 }
-if(!ready){await browser.close();throw new Error(`STUDIO_LIVE_DEPLOY_NOT_READY:${String(lastError||'launcher/admin/authority not ready')}`);}
+if(!ready){await browser.close();throw new Error(`STUDIO_LIVE_DEPLOY_NOT_READY:${String(lastError||'launcher/admin/authority/world-builder not ready')}`);}
 
 const resourcesBefore=await page.evaluate(()=>performance.getEntriesByType('resource').map(x=>x.name));
 if(resourcesBefore.some(x=>/\/src\/studio\//.test(x))) { await browser.close(); throw new Error('STUDIO_LAZY_BOOT_VIOLATION'); }
@@ -78,6 +78,47 @@ await page.waitForFunction(()=>/·\s*1\s+undo/.test(document.querySelector('#kel
 await page.locator('#kelo-studio-live [data-act="redo"]').click();
 await page.waitForFunction(()=>/·\s*2\s+undo/.test(document.querySelector('#kelo-studio-live .ks-status')?.textContent||''),null,{timeout:10000});
 
+const surfacePoint=async(clientX,clientY)=>page.evaluate(({clientX,clientY})=>{
+  const p=typeof window.screenToWorld==='function'?window.screenToWorld(clientX,clientY):{x:clientX,y:clientY};
+  const t=Math.max(1,Number(window.KELO_WORLD_BUILDER?.tileSize)||32);
+  return{x:Math.floor(Math.max(0,p.x)/t)*t,y:Math.floor(Math.max(0,p.y)/t)*t,t};
+},{clientX,clientY});
+const groundScreen={x:Math.round(box.x+box.width*.72),y:Math.round(box.y+Math.min(box.height*.16,130))};
+const roadScreen={x:Math.round(box.x+box.width*.82),y:groundScreen.y};
+const collisionScreen={x:groundScreen.x,y:Math.round(box.y+Math.min(box.height*.29,230))};
+const groundWorld=await surfacePoint(groundScreen.x,groundScreen.y),roadWorld=await surfacePoint(roadScreen.x,roadScreen.y),collisionWorld=await surfacePoint(collisionScreen.x,collisionScreen.y);
+
+await page.locator('#kelo-studio-live [data-mode="terrain"]').click();
+await page.mouse.click(groundScreen.x,groundScreen.y);
+await page.waitForFunction(({x,y})=>window.KELO_WORLD_BUILDER?.cells?.().some(c=>c.x===x&&c.y===y&&c.role!=='path'),{x:groundWorld.x,y:groundWorld.y},{timeout:10000});
+const afterGround=await page.evaluate(({x,y})=>({cell:window.KELO_WORLD_BUILDER.cells().find(c=>c.x===x&&c.y===y)||null,status:document.querySelector('#kelo-studio-live .ks-status')?.textContent||''}),{x:groundWorld.x,y:groundWorld.y});
+if(!afterGround.cell)throw new Error('STUDIO_GROUND_DID_NOT_COMMIT');
+
+await page.locator('#kelo-studio-live [data-mode="path"]').click();
+await page.mouse.click(roadScreen.x,roadScreen.y);
+await page.waitForFunction(({x,y})=>window.KELO_WORLD_BUILDER?.cells?.().some(c=>c.x===x&&c.y===y&&c.role==='path'),{x:roadWorld.x,y:roadWorld.y},{timeout:10000});
+const afterRoad=await page.evaluate(({x,y})=>({cell:window.KELO_WORLD_BUILDER.cells().find(c=>c.x===x&&c.y===y)||null,status:document.querySelector('#kelo-studio-live .ks-status')?.textContent||''}),{x:roadWorld.x,y:roadWorld.y});
+if(afterRoad.cell?.role!=='path')throw new Error('STUDIO_ROAD_DID_NOT_COMMIT');
+
+const beforeCollisions=await page.evaluate(()=>window.KELO_WORLD_BUILDER?.collisions?.().length||0);
+await page.locator('#kelo-studio-live [data-mode="collision"]').click();
+await page.mouse.click(collisionScreen.x,collisionScreen.y);
+await page.waitForFunction(({x,y,before})=>{const rows=window.KELO_WORLD_BUILDER?.collisions?.()||[];return rows.length>before&&rows.some(c=>c.x===x&&c.y===y);},{x:collisionWorld.x,y:collisionWorld.y,before:beforeCollisions},{timeout:10000});
+const afterCollision=await page.evaluate(({x,y})=>({collisions:window.KELO_WORLD_BUILDER.collisions().length,collision:window.KELO_WORLD_BUILDER.collisions().find(c=>c.x===x&&c.y===y)||null,status:document.querySelector('#kelo-studio-live .ks-status')?.textContent||''}),{x:collisionWorld.x,y:collisionWorld.y});
+if(!afterCollision.collision)throw new Error('STUDIO_COLLISION_DID_NOT_COMMIT');
+
+await page.locator('#kelo-studio-live [data-act="undo"]').click();
+await page.waitForFunction(before=>window.KELO_WORLD_BUILDER?.collisions?.().length===before,beforeCollisions,{timeout:10000});
+const afterCollisionUndo=await page.evaluate(()=>({collisions:window.KELO_WORLD_BUILDER?.collisions?.().length||0,status:document.querySelector('#kelo-studio-live .ks-status')?.textContent||''}));
+if(afterCollisionUndo.collisions!==beforeCollisions)throw new Error('STUDIO_COLLISION_UNDO_DID_NOT_RESTORE');
+
+await page.locator('#kelo-studio-live [data-mode="terrain"]').click();
+await page.locator('#kelo-studio-live [data-act="erase"]').click();
+await page.mouse.click(groundScreen.x,groundScreen.y);
+await page.waitForFunction(({x,y})=>!window.KELO_WORLD_BUILDER?.cells?.().some(c=>c.x===x&&c.y===y),{x:groundWorld.x,y:groundWorld.y},{timeout:10000});
+const afterErase=await page.evaluate(({x,y})=>({exists:window.KELO_WORLD_BUILDER.cells().some(c=>c.x===x&&c.y===y),status:document.querySelector('#kelo-studio-live .ks-status')?.textContent||''}),{x:groundWorld.x,y:groundWorld.y});
+if(afterErase.exists)throw new Error('STUDIO_GROUND_ERASE_DID_NOT_COMMIT');
+
 await page.screenshot({path:'artifacts/studio-live-open.png',fullPage:true});
 await page.locator('#kelo-studio-live [data-act="close"]').click();
 await page.waitForFunction(()=>!document.body.classList.contains('kelo-studio-active')&&!document.getElementById('kelo-studio-live'),null,{timeout:10000});
@@ -88,7 +129,7 @@ const closed=await page.evaluate(()=>({
 if(closed.lockOwners.includes('kelo-studio'))throw new Error('STUDIO_FOUNDATION_LOCK_LEAK');
 if(pageErrors.length)throw new Error(`STUDIO_PAGE_ERRORS:${pageErrors.join(' | ')}`);
 
-const report={ok:true,url:BASE,viewport:{width:390,height:844,dpr:2},lazyBeforeOpen:true,opened,placementDelta:afterPlace.placements-beforePlacements,afterPlace,closed,pageErrors};
+const report={ok:true,url:BASE,viewport:{width:390,height:844,dpr:2},lazyBeforeOpen:true,opened,placementDelta:afterPlace.placements-beforePlacements,afterPlace,ground:{world:groundWorld,afterGround,afterErase},road:{world:roadWorld,afterRoad},collision:{world:collisionWorld,before:beforeCollisions,afterCollision,afterCollisionUndo},closed,pageErrors};
 fs.writeFileSync('artifacts/studio-live.json',JSON.stringify(report,null,2));
 console.log(JSON.stringify(report,null,2));
 await browser.close();
