@@ -1,15 +1,15 @@
 /* KELO-INDEX
  * area: LEGACY ABILITY / MOVEMENT
- * owner: legacy skill aiming; movement extension owned by KeloMovement
- * keys: DASH AIM MOVEMENT INTERCEPT SKILL INDICATOR
- * purpose: conserva aiming/dash legacy y registra el dash dirigido como interceptor reutilizable de KeloMovement
+ * owner: legacy skill aiming; movement extension owned by KeloMovement; render extension owned by KeloRender
+ * keys: DASH AIM MOVEMENT INTERCEPT SKILL INDICATOR RENDER HOOK
+ * purpose: conserva aiming/dash legacy y registra extensiones mediante owners Foundation
  * public-api: funciones legacy skill aim/renderActionBar
- * consumes: KeloMovement, STATE, localPlayer, obstacles, render
+ * consumes: KeloMovement, KeloRender, STATE, localPlayer, obstacles
  * state-owned: skillAim + dashTween legacy
- * extension-points: KeloMovement.intercept para desplazamiento exclusivo
+ * extension-points: KeloMovement.intercept + KeloRender.afterFrame
  * reuse: NO añadir habilidades nuevas aquí; usar sistema moderno de abilities
- * legacy: render wrapper y skill stack aún pendientes de migración
- * do-not: NO volver a envolver updateMovement
+ * legacy: skill stack aún pendiente de migración
+ * do-not: NO volver a envolver updateMovement ni render
  */
 const skillAim = { active: false, index: -1, typeId: '', pointerId: null, originX: 0, originY: 0, currentX: 0, currentY: 0, dirX: 1, dirY: 0 };
 const dashTween = { active: false, t: 0, dur: 0.16, fromX: 0, fromY: 0, toX: 0, toY: 0 };
@@ -130,6 +130,6 @@ function drawSkillIndicator() {
   ctx.beginPath(); ctx.arc(skillAim.originX, skillAim.originY, 46, 0, Math.PI * 2); ctx.stroke();
   ctx.fillStyle = '#ffd166'; ctx.beginPath(); ctx.arc(skillAim.currentX, skillAim.currentY, 14, 0, Math.PI * 2); ctx.fill(); ctx.restore();
 }
-const _renderSkills = render;
-render = function() { _renderSkills(); drawSkillIndicator(); };
+if(!window.KeloRender) throw new Error('KeloRender unavailable before engine-g');
+window.KeloRender.afterFrame('engine-g:skill-indicator', drawSkillIndicator, 20);
 renderActionBar();
