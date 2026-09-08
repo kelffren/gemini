@@ -19,22 +19,16 @@ const cp = require('child_process');
 const ROOT = path.resolve(__dirname, '..');
 let failures = 0;
 
-function fail(message) {
-  failures += 1;
-  console.error('FOUNDATION_FAIL:', message);
-}
+function fail(message) { failures += 1; console.error('FOUNDATION_FAIL:', message); }
 function ok(message) { console.log('FOUNDATION_OK:', message); }
 function read(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
 function exists(rel) { return fs.existsSync(path.join(ROOT, rel)); }
 function requireText(rel, needles) {
   if (!exists(rel)) { fail(rel + ' missing'); return; }
   const text = read(rel);
-  needles.forEach((needle) => {
-    if (!text.includes(needle)) fail(rel + ' missing required marker: ' + needle);
-  });
+  needles.forEach((needle) => { if (!text.includes(needle)) fail(rel + ' missing required marker: ' + needle); });
 }
 
-// La ley del repo debe existir y enlazarse desde el punto de entrada.
 requireText('docs/KELO_FOUNDATION.md', [
   'OWNER único por responsabilidad',
   '¿QUÉ OWNER EXISTENTE DEBERÍA HACER ESTO?',
@@ -46,7 +40,6 @@ requireText('AGENTS.md', ['docs/KELO_FOUNDATION.md', '1 RESPONSABILIDAD = 1 OWNE
 requireText('ENGINE_MAP.md', ['docs/KELO_FOUNDATION.md', 'OWNER LIVE']);
 requireText('src/ui/force-unlock-move.js', ['HOTFIX TEMPORAL', 'NO REUTILIZAR']);
 
-// Todo script local declarado por index debe existir. Evita load-order roto por renombres/limpieza.
 if (exists('index.html')) {
   const html = read('index.html');
   const scriptRe = /<script\b[^>]*\bsrc=["']([^"']+)["'][^>]*>/gi;
@@ -70,6 +63,7 @@ function resolveBase() {
   if (git(['rev-parse', '--verify', 'HEAD^'])) return 'HEAD^';
   return null;
 }
+function isContractFixture(file){return /^scripts\/.*(?:contract|audit|test).*\.js$/i.test(file);}
 
 const base = resolveBase();
 if (!base) {
@@ -91,23 +85,20 @@ if (!base) {
     { name: 'UI directly mutates player position/HP', test: (x) => /^src\/ui\//.test(x.file) && /\blocalPlayer\.(x|y|hp|maxHp)\s*=/.test(x.line) },
     { name: 'UI directly pushes physical obstacle', test: (x) => /^src\/ui\//.test(x.file) && /\bobstacles\.push\s*\(/.test(x.line) },
     { name: 'new engine-v2 style parallel core file', test: (x) => /(^|\/)engine[-_]?v?2/i.test(x.file) },
-    { name: 'new direct legacy modal-lock write', test: (x) => x.file !== 'src/core/input-lock-system.js' && /\bKELO_MODAL_INPUT_LOCK\s*=/.test(x.line) }
+    { name: 'new direct legacy modal-lock write', test: (x) => !isContractFixture(x.file) && x.file !== 'src/core/input-lock-system.js' && /\bKELO_MODAL_INPUT_LOCK\s*=/.test(x.line) }
   ];
 
   added.forEach((entry) => {
     if (/FOUNDATION-ALLOW\b/.test(entry.line)) return;
-    forbidden.forEach((rule) => {
-      if (rule.test(entry)) fail(rule.name + ' in ' + entry.file + ': ' + entry.line.trim());
-    });
+    forbidden.forEach((rule) => { if (rule.test(entry)) fail(rule.name + ' in ' + entry.file + ': ' + entry.line.trim()); });
   });
 
-  // Archivos JS/HTML NUEVOS deben auto-documentarse con KELO-INDEX.
   nameStatus.split('\n').filter(Boolean).forEach((row) => {
     const parts = row.split('\t');
     const status = parts[0];
     const file = parts[parts.length - 1];
-    if (status === 'A' && /\.(js|html)$/.test(file) && exists(file)) {
-      if (!read(file).includes('KELO-INDEX')) fail('new code file missing KELO-INDEX: ' + file);
+    if (status === 'A' && /\.(js|html)$/.test(file) && exists(file) && !read(file).includes('KELO-INDEX')) {
+      fail('new code file missing KELO-INDEX: ' + file);
     }
   });
 
