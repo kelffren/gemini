@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "systems": [
+    {
+      "id": "input-locks",
+      "owner": "KeloInputLocks",
+      "source": "src/core/input-lock-system.js",
+      "technicalDoc": "docs/systems/INPUT_LOCK_SYSTEM.md",
+      "playerVisible": true,
+      "playerGuideAnchor": "controles-y-bloqueos-de-interfaz",
+      "status": "foundation-active"
+    }
+  ]
+}
