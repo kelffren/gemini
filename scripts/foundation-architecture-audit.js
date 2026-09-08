@@ -70,11 +70,16 @@ function resolveBase() {
   return null;
 }
 function isContractFixture(file){return /^scripts\/.*(?:contract|audit|test).*\.js$/i.test(file);}
-function isAuthorizedInputGate(entry, ruleName){
+function isAuthorizedCoreWrapper(entry, ruleName){
   if (ruleName !== 'new direct core wrapper') return false;
-  if (entry.file !== 'src/core/input-gate.js') return false;
-  if (!exists(entry.file)) return false;
-  return read(entry.file).includes('FOUNDATION-ALLOW') && read(entry.file).includes('owner: KeloInputLocks');
+  const authorized={
+    'src/core/input-gate.js':'owner: KeloInputLocks',
+    'src/core/movement-system.js':'owner: KeloMovement'
+  };
+  const ownerMarker=authorized[entry.file];
+  if(!ownerMarker||!exists(entry.file))return false;
+  const source=read(entry.file);
+  return source.includes('FOUNDATION-ALLOW')&&source.includes(ownerMarker);
 }
 
 const base = resolveBase();
@@ -92,7 +97,7 @@ if (!base) {
   });
 
   const forbidden = [
-    { name: 'new direct core wrapper', test: (x) => /\b(render|renderAvatar|updateSimulation|processInput)\s*=\s*function\b/.test(x.line) },
+    { name: 'new direct core wrapper', test: (x) => /\b(render|renderAvatar|updateSimulation|processInput|updateMovement)\s*=\s*function\b/.test(x.line) },
     { name: 'new watchdog/timer used as state repair', test: (x) => /setInterval\s*\(/.test(x.line) && /unlock|lock|restore|repair|force|fix/i.test(x.line) },
     { name: 'UI directly mutates player position/HP', test: (x) => /^src\/ui\//.test(x.file) && /\blocalPlayer\.(x|y|hp|maxHp)\s*=/.test(x.line) },
     { name: 'UI directly pushes physical obstacle', test: (x) => /^src\/ui\//.test(x.file) && /\bobstacles\.push\s*\(/.test(x.line) },
@@ -102,7 +107,7 @@ if (!base) {
 
   added.forEach((entry) => {
     forbidden.forEach((rule) => {
-      if (isAuthorizedInputGate(entry, rule.name)) return;
+      if (isAuthorizedCoreWrapper(entry, rule.name)) return;
       if (rule.test(entry)) fail(rule.name + ' in ' + entry.file + ': ' + entry.line.trim());
     });
   });
