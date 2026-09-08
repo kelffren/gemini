@@ -1,3 +1,16 @@
+/* KELO-INDEX
+ * area: ABILITIES / RUNTIME
+ * owner: KeloAbilities; frame/simulation extension owners KeloRender + KeloSimulation
+ * keys: ABILITY STONE DELIVERY FX HOTBAR RENDER SIMULATION FOUNDATION
+ * purpose: runtime data-driven de habilidades y piedras sin envolver render/updateSimulation
+ * public-api: KeloAbilities + adapters legacy de stones
+ * consumes: KeloStones, KeloSimulation, KeloRender, collision/world/player state
+ * state-owned: hotbar runtime + FX legacy de ability delivery
+ * extension-points: KeloSimulation.after + KeloRender.afterFrame
+ * reuse: nuevas deliveries entran por deliveryHandlers; no crear loops/wrappers paralelos
+ * legacy: conserva adapters públicos de stones/fusion mientras migran consumidores
+ * do-not: NO envolver render/updateSimulation ni crear otro game loop
+ */
 (function () {
   'use strict';
 
@@ -652,10 +665,11 @@
     installLegacyAdapters(); installUi(); syncFromState(true); paintHotbar();
     if (migration.migrated || migration.quarantined || migration.rekeyed || migration.overflow) { console.info('KeloStones migration', migration); if (typeof saveState === 'function') saveState(); }
 
-    const previousUpdate = updateSimulation;
-    updateSimulation = (dt) => { previousUpdate(dt); update(dt); };
-    const previousRender = render;
-    render = () => { previousRender(); draw(); };
+    if (!window.KeloSimulation || typeof window.KeloSimulation.after !== 'function' || !window.KeloRender || typeof window.KeloRender.afterFrame !== 'function') {
+      throw new Error('KeloAbilities: Foundation render/simulation owners unavailable');
+    }
+    window.KeloSimulation.after('kelo-ability-boot:runtime', (context) => { update(context.dt); }, 1000);
+    window.KeloRender.afterFrame('kelo-ability-boot:legacy-fx', () => { draw(); }, 1000);
 
     window.KeloAbilities = Object.freeze({
       registry: Object.freeze({ getById: (id) => byId.get(id) || null, getByKey: (key) => byKey.get(key) || null, getAll: () => defs.slice() }),
@@ -665,7 +679,7 @@
       validateLoadoutSnapshot: (snapshot) => stones.validateLoadoutSnapshot(snapshot, STATE),
       openStonePanel: openPanel,
     });
-    window.KELO_STONE_AUDIT = { ready: true, schemaVersion: stones.SCHEMA_VERSION, abilityCount: defs.length, equippedCount: STATE.equipped.length, inventoryCount: STATE.inventory.length, loadoutFingerprint: fingerprint, migration };
+    window.KELO_STONE_AUDIT = { ready: true, schemaVersion: stones.SCHEMA_VERSION, abilityCount: defs.length, equippedCount: STATE.equipped.length, inventoryCount: STATE.inventory.length, loadoutFingerprint: fingerprint, migration, simulationOwner:'KeloSimulation', simulationHook:'kelo-ability-boot:runtime', renderOwner:'KeloRender', renderHook:'kelo-ability-boot:legacy-fx', directCoreWrappers:false };
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true });
