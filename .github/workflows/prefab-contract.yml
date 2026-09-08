@@ -37,8 +37,8 @@ jobs:
           grep -q "renderParts:true" src/environment/prefab-contract.js
           grep -q "splitAssets:true" src/environment/prefab-contract.js
           grep -q "frameSelection:true" src/environment/prefab-contract.js
-          grep -Eq 'src/environment/prefab-contract.js\?v=[^"'"']+' index.html
-          if grep -Eq 'src/environment/generic-prefabs.js\?v=[^"'"']+' index.html; then
+          grep -q 'src/environment/prefab-contract.js?v=' index.html
+          if grep -q 'src/environment/generic-prefabs.js?v=' index.html; then
             echo 'generic-prefabs.js is classified dormant in Foundation; update architecture contract before booting it'
             exit 1
           fi
