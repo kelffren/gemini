@@ -55,6 +55,10 @@ jobs:
           node --check engine-ae.js
           node --check engine-ah.js
           node --check engine-ai.js
+          node --check engine-net.js
+          node --check src/systems/pvp-world.js
+          node --check src/abilities/sword-swap-runtime.js
+          node --check src/visuals/sword-swap-pvp-visuals.js
           node --check scripts/foundation-architecture-audit.js
           node --check scripts/input-lock-contract-audit.js
           node --check scripts/input-system-contract-audit.js
