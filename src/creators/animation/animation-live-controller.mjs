@@ -9,23 +9,31 @@ import { createStudioKernel } from '../../studio/core/studio-kernel.mjs';
 import { createStudioWorkspaceShell } from '../../studio/ui/studio-workspace-shell.mjs';
 import { createStudioTimeline } from '../../studio/ui/studio-timeline.mjs';
 import { animationDocumentModel,normalizeAnimationDocument,validateAnimationDocument,ANIMATION_TRACK_TYPES } from './animation-document.mjs';
-import { createPatchAnimationClipCommand,createUpsertAnimationMarkerCommand,createRemoveAnimationMarkerCommand,createUpsertAnimationKeyframeCommand,createRemoveAnimationKeyframeCommand,createUpsertAnimationTrackEventCommand,createRemoveAnimationTrackEventCommand } from './animation-commands.mjs';
+import { createPatchAnimationClipCommand,createUpsertAnimationMarkerCommand,createRemoveAnimationMarkerCommand,createUpsertAnimationKeyframeCommand,createUpsertAnimationTrackEventCommand,createRemoveAnimationTrackEventCommand } from './animation-commands.mjs';
 import { createAnimationPreviewAdapter } from './animation-preview-adapter.mjs';
 let active=null;
 const actorId=root=>String(root.KELO_ADMIN_KEYS?.playerId?.()||root.keloNet?.playerKey||root.localPlayer?.id||'local_pioneer');
 const toast=(root,msg)=>typeof root.showToast==='function'?root.showToast(msg):console.info('[Animation Creator]',msg);
 const field=(doc,label,node)=>{const wrap=doc.createElement('div');wrap.className='ksw-field';const l=doc.createElement('label');l.textContent=label;wrap.append(l,node);return wrap;};
 const button=(doc,text,fn)=>{const b=doc.createElement('button');b.type='button';b.textContent=text;b.onclick=fn;return b;};
-const input=(doc,type,value)=>{const el=doc.createElement('input');el.type=type; if(type==='checkbox')el.checked=value===true;else el.value=String(value??'');return el;};
+const input=(doc,type,value)=>{const el=doc.createElement('input');el.type=type;if(type==='checkbox')el.checked=value===true;else el.value=String(value??'');return el;};
 const select=(doc,values,value)=>{const el=doc.createElement('select');for(const row of values){const item=typeof row==='string'?{value:row,label:row}:row,o=doc.createElement('option');o.value=item.value;o.textContent=item.label||item.value;el.append(o);}el.value=String(value??'');return el;};
 function clipIdFromName(name){return String(name||'animation_clip').toLowerCase().replace(/[^a-z0-9_]+/g,'_').replace(/^_+|_+$/g,'')||'animation_clip';}
 function timelineTracks(document){const clip=document.clip,duration=clip.duration,tracks=[];if(clip.type==='transform')tracks.push({id:'keyframes',label:'KEYFRAMES',items:(clip.keyframes||[]).map(row=>({id:row.id,label:row.id,at:(Number(row.t)||0)*duration}))});tracks.push({id:'markers',label:'MARKERS',items:Object.entries(clip.markers||{}).map(([name,at])=>({id:name,label:name,at}))});for(const name of ANIMATION_TRACK_TYPES)tracks.push({id:name,label:name.toUpperCase(),items:(document.tracks?.[name]||[]).map(row=>({id:row.id,label:row.label,start:row.start,end:row.end}))});return tracks;}
 export async function openAnimationCreator({root=globalThis,projectId=null,projects}={}){
-  if(active)return active;if(!root.document)throw new Error('ANIMATION_CREATOR_DOM_REQUIRED');if(!projects?.get||!projects?.saveDraft)throw new Error('ANIMATION_CREATOR_PROJECT_REPOSITORY_REQUIRED');if(!root.KeloInputLocks?.acquire||!root.KeloInputLocks?.release)throw new Error('ANIMATION_CREATOR_INPUT_LOCKS_NOT_READY');
-  const owner=actorId(root);let project=projectId?await projects.get(projectId):null;if(!project)project=await projects.create({type:'ANIMATION',name:'New Animation',ownerId:owner});if(project.type!=='ANIMATION')throw new Error('ANIMATION_CREATOR_PROJECT_TYPE_MISMATCH');let draft=await projects.loadDraft(project.projectId);if(!draft)draft=normalizeAnimationDocument({clip:{id:clipIdFromName(project.name)}});
-  const kernel=createStudioKernel({document:draft,documentModel:animationDocumentModel}),preview=createAnimationPreviewAdapter(root),doc=root.document;let lockToken=null,shell=null,timeline=null,direction='down',speed=1,markerName='release',trackType='hitbox',trackLabel='hit',trackWindow=.1,onKey=null;
+  if(active)return active;
+  if(!root.document)throw new Error('ANIMATION_CREATOR_DOM_REQUIRED');
+  if(!projects?.get||!projects?.saveDraft)throw new Error('ANIMATION_CREATOR_PROJECT_REPOSITORY_REQUIRED');
+  if(!root.KeloInputLocks?.acquire||!root.KeloInputLocks?.release)throw new Error('ANIMATION_CREATOR_INPUT_LOCKS_NOT_READY');
+  const owner=actorId(root);let project=projectId?await projects.get(projectId):null;
+  if(!project)project=await projects.create({type:'ANIMATION',name:'New Animation',ownerId:owner});
+  if(project.type!=='ANIMATION')throw new Error('ANIMATION_CREATOR_PROJECT_TYPE_MISMATCH');
+  let draft=await projects.loadDraft(project.projectId);if(!draft)draft=normalizeAnimationDocument({clip:{id:clipIdFromName(project.name)}});
+  const kernel=createStudioKernel({document:draft,documentModel:animationDocumentModel}),preview=createAnimationPreviewAdapter(root),doc=root.document;
+  let lockToken=null,shell=null,timeline=null,direction='down',speed=1,markerName='release',trackType='hitbox',trackLabel='hit',trackWindow=.1,onKey=null;
   try{
     lockToken=root.KeloInputLocks.acquire('kelo-animation-creator',{kind:'creator-workspace',projectId:project.projectId});
+    doc.body.classList.add('kelo-animation-creator-active');
     shell=createStudioWorkspaceShell({host:doc.body,title:`ANIMATION · ${project.name}`,badge:'CREATOR V1',leftTitle:'CLIP',rightTitle:'MARKERS / GAMEPLAY TRACKS',viewportHint:'Live preview uses KeloAnimation + your current avatar',onUndo:()=>guarded(()=>kernel.undo()),onRedo:()=>guarded(()=>kernel.redo()),onSave:()=>guarded(save),onClose:()=>void closeAnimationCreator({root})});
     timeline=createStudioTimeline({host:shell.timelineHost,duration:kernel.document.clip.duration,tracks:timelineTracks(kernel.document),onScrub:at=>{timeline?.setPlayhead(at);syncStatus();},onSelect:({at})=>{timeline?.setPlayhead(at);syncStatus();}});
     async function guarded(fn){try{const value=await fn();render();return value;}catch(error){toast(root,error?.message||String(error));return null;}}
@@ -44,21 +52,39 @@ export async function openAnimationCreator({root=globalThis,projectId=null,proje
       const interruptible=input(doc,'checkbox',c.interruptible);interruptible.onchange=()=>void guarded(()=>execute(createPatchAnimationClipCommand({interruptible:interruptible.checked})));host.append(field(doc,'Interruptible',interruptible));
       if(c.type==='spritesheet'){
         const assets=(root.KeloAssetRegistry?.list?.()||[]).filter(row=>['image','sprite','spritesheet','atlas'].includes(row.type)).map(row=>({value:row.id,label:row.id})),asset=select(doc,assets,c.assetId);asset.onchange=()=>void guarded(()=>execute(createPatchAnimationClipCommand({assetId:asset.value})));host.append(field(doc,'Asset',asset));
-        for(const [label,key,step] of [['Frames','frames','1'],['FPS','fps','1'],['Frame W','frameWidth','1'],['Frame H','frameHeight','1']]){const el=input(doc,'number',c[key]);el.min='1';el.step=step;el.onchange=()=>void guarded(()=>execute(createPatchAnimationClipCommand({[key]:Number(el.value)})));host.append(field(doc,label,el));}
+        for(const [label,key] of [['Frames','frames'],['FPS','fps'],['Frame W','frameWidth'],['Frame H','frameHeight']]){const el=input(doc,'number',c[key]);el.min='1';el.step='1';el.onchange=()=>void guarded(()=>execute(createPatchAnimationClipCommand({[key]:Number(el.value)})));host.append(field(doc,label,el));}
       }
-      const dir=select(doc,['down','right','up','left'],direction);dir.onchange=()=>{direction=dir.value;};host.append(field(doc,'Direction',dir));const speedInput=input(doc,'number',speed);speedInput.min='.1';speedInput.max='4';speedInput.step='.1';speedInput.onchange=()=>{speed=Math.max(.1,Number(speedInput.value)||1);};host.append(field(doc,'Preview x',speedInput));
+      const dir=select(doc,['down','right','up','left'],direction);dir.onchange=()=>{direction=dir.value;};host.append(field(doc,'Direction',dir));
+      const speedInput=input(doc,'number',speed);speedInput.min='.1';speedInput.max='4';speedInput.step='.1';speedInput.onchange=()=>{speed=Math.max(.1,Number(speedInput.value)||1);};host.append(field(doc,'Preview x',speedInput));
       const actions=doc.createElement('div');actions.className='ksw-actions';actions.append(button(doc,'▶ PLAY',()=>void guarded(()=>preview.play(kernel.document,{direction,speed}))),button(doc,'■ STOP',()=>preview.stop(kernel.document)));if(c.type==='transform')actions.append(button(doc,'+ KEYFRAME @ PLAYHEAD',addKeyframe));host.append(actions);
-      const note=doc.createElement('p');note.className='ksw-note';note.textContent='Preview reuses KeloAnimation. Saving stores the Creator draft; it does not publish or change LIVE gameplay.';host.append(note);
+      const note=doc.createElement('p');note.className='ksw-note';note.textContent='Preview reuses KeloAnimation. Saving stores the private Creator draft; it does not register or publish the clip to LIVE.';host.append(note);
     }
-    function renderRight(){const host=shell.right;host.replaceChildren();const marker=input(doc,'text',markerName);marker.oninput=()=>{markerName=marker.value;};host.append(field(doc,'Marker',marker));const markerActions=doc.createElement('div');markerActions.className='ksw-actions';markerActions.append(button(doc,'+ MARKER @ PLAYHEAD',addMarker));host.append(markerActions);const markerList=doc.createElement('div');markerList.className='ksw-list';for(const [name,at] of Object.entries(kernel.document.clip.markers||{})){const b=button(doc,`${name} · ${Number(at).toFixed(3)}s`,()=>{timeline.setPlayhead(Number(at)||0);});b.ondblclick=()=>void guarded(()=>execute(createRemoveAnimationMarkerCommand(name)));markerList.append(b);}host.append(markerList);
-      const divider=doc.createElement('p');divider.className='ksw-note';divider.textContent='Gameplay tracks are authoring metadata until their runtime owner consumes them. Double-tap/list delete is intentionally not implicit.';host.append(divider);
-      const type=select(doc,ANIMATION_TRACK_TYPES,trackType);type.onchange=()=>{trackType=type.value;renderRight();};host.append(field(doc,'Track',type));const label=input(doc,'text',trackLabel);label.oninput=()=>{trackLabel=label.value;};host.append(field(doc,'Label / Ref',label));const windowInput=input(doc,'number',trackWindow);windowInput.min='0';windowInput.step='.01';windowInput.onchange=()=>{trackWindow=Math.max(0,Number(windowInput.value)||0);};host.append(field(doc,'Window s',windowInput));const add=doc.createElement('div');add.className='ksw-actions';add.append(button(doc,'+ EVENT @ PLAYHEAD',addTrack));host.append(add);const rows=doc.createElement('div');rows.className='ksw-list';for(const row of kernel.document.tracks?.[trackType]||[]){const b=button(doc,`${row.label} · ${row.start.toFixed(3)}-${row.end.toFixed(3)}s`,()=>timeline.setPlayhead(row.start));const del=button(doc,'DELETE',()=>void guarded(()=>execute(createRemoveAnimationTrackEventCommand(trackType,row.id))));const wrap=doc.createElement('div');wrap.style.display='grid';wrap.style.gridTemplateColumns='1fr auto';wrap.style.gap='4px';wrap.append(b,del);rows.append(wrap);}host.append(rows);
+    function renderRight(){const host=shell.right;host.replaceChildren();
+      const marker=input(doc,'text',markerName);marker.oninput=()=>{markerName=marker.value;};host.append(field(doc,'Marker',marker));
+      const markerActions=doc.createElement('div');markerActions.className='ksw-actions';markerActions.append(button(doc,'+ MARKER @ PLAYHEAD',addMarker));host.append(markerActions);
+      const markerList=doc.createElement('div');markerList.className='ksw-list';for(const [name,at] of Object.entries(kernel.document.clip.markers||{})){const open=button(doc,`${name} · ${Number(at).toFixed(3)}s`,()=>timeline.setPlayhead(Number(at)||0)),del=button(doc,'DELETE',()=>void guarded(()=>execute(createRemoveAnimationMarkerCommand(name)))),wrap=doc.createElement('div');wrap.style.display='grid';wrap.style.gridTemplateColumns='1fr auto';wrap.style.gap='4px';wrap.append(open,del);markerList.append(wrap);}host.append(markerList);
+      const divider=doc.createElement('p');divider.className='ksw-note';divider.textContent='Gameplay tracks are authoring metadata only until their gameplay owner consumes them. Animation Creator never applies damage or hit validation.';host.append(divider);
+      const type=select(doc,ANIMATION_TRACK_TYPES,trackType);type.onchange=()=>{trackType=type.value;renderRight();};host.append(field(doc,'Track',type));
+      const label=input(doc,'text',trackLabel);label.oninput=()=>{trackLabel=label.value;};host.append(field(doc,'Label / Ref',label));
+      const windowInput=input(doc,'number',trackWindow);windowInput.min='0';windowInput.step='.01';windowInput.onchange=()=>{trackWindow=Math.max(0,Number(windowInput.value)||0);};host.append(field(doc,'Window s',windowInput));
+      const add=doc.createElement('div');add.className='ksw-actions';add.append(button(doc,'+ EVENT @ PLAYHEAD',addTrack));host.append(add);
+      const rows=doc.createElement('div');rows.className='ksw-list';for(const row of kernel.document.tracks?.[trackType]||[]){const open=button(doc,`${row.label} · ${row.start.toFixed(3)}-${row.end.toFixed(3)}s`,()=>timeline.setPlayhead(row.start)),del=button(doc,'DELETE',()=>void guarded(()=>execute(createRemoveAnimationTrackEventCommand(trackType,row.id)))),wrap=doc.createElement('div');wrap.style.display='grid';wrap.style.gridTemplateColumns='1fr auto';wrap.style.gap='4px';wrap.append(open,del);rows.append(wrap);}host.append(rows);
     }
     function syncStatus(){const validation=validateAnimationDocument(kernel.document,{assetRegistry:root.KeloAssetRegistry}),c=kernel.document.clip;shell.setHistory({canUndo:kernel.history.canUndo,canRedo:kernel.history.canRedo});shell.setStatus(`${c.type.toUpperCase()} · ${c.duration.toFixed(2)}s · ${Object.keys(c.markers).length} markers · ${kernel.history.undoDepth} undo · ${validation.ok?'VALID':validation.errors[0]}`);}
     function render(){timeline.set({duration:kernel.document.clip.duration,tracks:timelineTracks(kernel.document),playhead:Math.min(timeline.playhead,kernel.document.clip.duration)});renderLeft();renderRight();syncStatus();}
-    onKey=event=>{if(event.key==='Escape'){event.preventDefault();void closeAnimationCreator({root});return;}if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='z'){event.preventDefault();void guarded(()=>event.shiftKey?kernel.redo():kernel.undo());}else if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='y'){event.preventDefault();void guarded(()=>kernel.redo());}};doc.addEventListener('keydown',onKey,true);render();
-    active=Object.freeze({version:'animation-creator-v1.0.0',projectId:project.projectId,project,kernel,shell,timeline,preview,save,close:()=>closeAnimationCreator({root})});return active;
-  }catch(error){if(lockToken)root.KeloInputLocks.release(lockToken);timeline?.destroy?.();shell?.destroy?.();throw error;}
+    onKey=event=>{if(event.key==='Escape'){event.preventDefault();void closeAnimationCreator({root});return;}if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='z'){event.preventDefault();void guarded(()=>event.shiftKey?kernel.redo():kernel.undo());}else if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='y'){event.preventDefault();void guarded(()=>kernel.redo());}};
+    doc.addEventListener('keydown',onKey,true);render();
+    active=Object.freeze({version:'animation-creator-v1.0.1',projectId:project.projectId,project,kernel,shell,timeline,preview,lockToken,onKey,save,close:()=>closeAnimationCreator({root})});return active;
+  }catch(error){doc.body.classList.remove('kelo-animation-creator-active');if(lockToken)try{root.KeloInputLocks.release(lockToken);}catch{}timeline?.destroy?.();shell?.destroy?.();if(onKey)doc.removeEventListener('keydown',onKey,true);throw error;}
 }
-export async function closeAnimationCreator({root=globalThis}={}){if(!active)return false;const session=active;active=null;try{session.preview.stop(session.kernel.document);}catch{}try{session.timeline.destroy();}catch{}try{session.shell.destroy();}catch{}try{root.document?.removeEventListener?.('keydown',session.onKey,true);}catch{}try{for(const owner of root.KeloInputLocks?.snapshot?.().owners||[])if(owner==='kelo-animation-creator')root.KeloInputLocks.release(owner);}catch{}return true;}
+export async function closeAnimationCreator({root=globalThis}={}){
+  if(!active)return false;const session=active;active=null;
+  try{session.preview.stop(session.kernel.document);}catch{}
+  try{root.document?.removeEventListener?.('keydown',session.onKey,true);}catch{}
+  try{session.timeline.destroy();}catch{}
+  try{session.shell.destroy();}catch{}
+  try{if(session.lockToken)root.KeloInputLocks?.release?.(session.lockToken);}catch{}
+  try{root.document?.body?.classList?.remove?.('kelo-animation-creator-active');}catch{}
+  return true;
+}
 export function getAnimationCreator(){return active;}
