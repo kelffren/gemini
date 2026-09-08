@@ -38,11 +38,26 @@
   </header>
 
   <nav class="toc" aria-label="Índice de mecánicas">
-    <a href="#controles-y-bloqueos-de-interfaz">Controles e interfaces<small>Movimiento y paneles</small></a>
+    <a href="#movimiento">Movimiento<small>Caminar, correr y soltar</small></a>
+    <a href="#controles-y-bloqueos-de-interfaz">Controles e interfaces<small>Paneles y control</small></a>
     <a href="#habilidades">Habilidades<small>Piedras y slots</small></a>
     <a href="#mochila">Mochila<small>Objetos y equipo</small></a>
     <a href="#pvp">PvP<small>Combate y arena</small></a>
   </nav>
+
+  <section id="movimiento">
+    <span class="tag">MOVIMIENTO</span>
+    <h2>Caminar y correr</h2>
+    <p>La velocidad del personaje responde a la intensidad de la dirección que estás marcando. En móvil, desplazar poco el joystick produce un movimiento más suave; al llevarlo más lejos, el personaje pasa de caminar a correr.</p>
+    <ul>
+      <li>Sin intención de movimiento, el personaje debe detenerse.</li>
+      <li>Con una dirección suave, el personaje camina.</li>
+      <li>Con una dirección fuerte, entra progresivamente en carrera.</li>
+      <li>Las paredes y objetos sólidos limitan el desplazamiento físico; no deberías atravesarlos por mantener el joystick pulsado.</li>
+      <li>La animación de pasos avanza usando la distancia realmente recorrida, para que los pies no sigan caminando cuando un obstáculo impide avanzar.</li>
+    </ul>
+    <div class="example"><strong>Ejemplo:</strong> empujas el joystick ligeramente → caminas; lo llevas más lejos → aceleras hacia carrera; lo sueltas → el personaje se planta y se detiene.</div>
+  </section>
 
   <section id="controles-y-bloqueos-de-interfaz">
     <span class="tag">CONTROLES</span>
