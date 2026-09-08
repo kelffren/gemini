@@ -106,7 +106,7 @@ inspectPlayer = function(p, isSelf) {
   body.innerHTML = '<div style="display:flex;justify-content:space-between"><strong style="color:' + rank.color + '">' + p.name + '</strong><span style="cursor:pointer" onclick="closeInspect()">X</span></div><div style="color:' + rank.color + ';font-weight:700;margin:6px 0">' + p.title + ' · Poder ' + p.power + '</div><div style="font-size:10px;color:#8b949e;margin-bottom:8px">Contrato player unico</div>' + jewelRows + rankBtns;
   document.getElementById('inspect-sheet').style.display = 'block';
 };
-renderAvatar = function(p, isSelf) {
+function renderIdentityAvatar(p, isSelf) {
   applyState(p, {});
   const jewels = p.jewels || {};
   const torso = jewels.torso;
@@ -128,7 +128,9 @@ renderAvatar = function(p, isSelf) {
   const rank = RANKS.find(r => r.id === p.rankId) || RANKS[0];
   ctx.textAlign = 'center'; ctx.font = '9px sans-serif'; ctx.fillStyle = rank.color; ctx.fillText(p.title, p.x, p.y - p.radius - 18);
   ctx.font = '10px sans-serif'; ctx.fillStyle = isSelf ? '#e7c56a' : '#ffffff'; ctx.fillText(p.name, p.x, p.y - p.radius - 7);
-};
+}
+if(!window.KeloAvatar) throw new Error('KeloAvatar unavailable before engine-e');
+window.KeloAvatar.setBase('engine-e:identity-jewels', renderIdentityAvatar);
 updateHud = function() {
   applyState(localPlayer, {});
   const el = document.getElementById('telemetry-bar');
