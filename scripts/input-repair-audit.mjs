@@ -50,45 +50,90 @@ try {
     touchActive: input.touchActive
   }));
 
-  const dispatchTouchPointer = (type, x, y) => page.evaluate(({ type, x, y }) => {
-    const target = document.getElementById('game-canvas');
-    if (!target) throw new Error('#game-canvas missing');
-    target.dispatchEvent(new PointerEvent(type, {
-      bubbles: true,
-      cancelable: true,
-      pointerId: 77,
-      pointerType: 'touch',
-      isPrimary: true,
-      clientX: x,
-      clientY: y,
-      buttons: type === 'pointerup' ? 0 : 1
-    }));
-  }, { type, x, y });
+  const inspectPoint = (x, y) => page.evaluate(({ x, y }) => {
+    return document.elementsFromPoint(x, y).slice(0, 12).map((el) => {
+      const style = getComputedStyle(el);
+      const rect = el.getBoundingClientRect();
+      return {
+        tag: el.tagName,
+        id: el.id || null,
+        className: typeof el.className === 'string' ? el.className : null,
+        display: style.display,
+        visibility: style.visibility,
+        opacity: style.opacity,
+        pointerEvents: style.pointerEvents,
+        position: style.position,
+        zIndex: style.zIndex,
+        rect: {
+          x: Number(rect.x.toFixed(1)),
+          y: Number(rect.y.toFixed(1)),
+          width: Number(rect.width.toFixed(1)),
+          height: Number(rect.height.toFixed(1))
+        }
+      };
+    });
+  }, { x, y });
 
+  await page.evaluate(() => {
+    window.__KELO_REAL_TOUCH_AUDIT = [];
+    const capture = (e) => {
+      window.__KELO_REAL_TOUCH_AUDIT.push({
+        type: e.type,
+        target: {
+          tag: e.target?.tagName || null,
+          id: e.target?.id || null,
+          className: typeof e.target?.className === 'string' ? e.target.className : null
+        },
+        x: e.clientX,
+        y: e.clientY,
+        pointerType: e.pointerType || null,
+        defaultPrevented: e.defaultPrevented
+      });
+    };
+    window.addEventListener('pointerdown', capture, { capture: true, once: true });
+  });
+
+  const start = { x: 70, y: 650 };
+  const end = { x: 130, y: 650 };
+  const hitStack = await inspectPoint(start.x, start.y);
   const before = await snapshot();
-  await dispatchTouchPointer('pointerdown', 70, 650);
-  await dispatchTouchPointer('pointermove', 130, 650);
+
+  const cdp = await context.newCDPSession(page);
+  await cdp.send('Input.dispatchTouchEvent', {
+    type: 'touchStart',
+    touchPoints: [{ x: start.x, y: start.y, radiusX: 2, radiusY: 2, force: 1, id: 77 }]
+  });
+  await cdp.send('Input.dispatchTouchEvent', {
+    type: 'touchMove',
+    touchPoints: [{ x: end.x, y: end.y, radiusX: 2, radiusY: 2, force: 1, id: 77 }]
+  });
   await page.waitForTimeout(450);
   const moving = await snapshot();
-  await dispatchTouchPointer('pointerup', 130, 650);
+  const realTouchEvents = await page.evaluate(() => window.__KELO_REAL_TOUCH_AUDIT || []);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   await page.waitForTimeout(350);
   const stopped = await snapshot();
 
   const moved = Math.hypot(moving.x - before.x, moving.y - before.y);
   const measurement = {
     legacyContract,
+    start,
+    end,
+    hitStack,
+    realTouchEvents,
     before,
     moving,
     stopped,
     moved: Number(moved.toFixed(2))
   };
+  console.log('REAL_TOUCH_HIT_TEST ' + JSON.stringify({ hitStack, realTouchEvents }));
   console.log('MOVEMENT_MEASUREMENT ' + JSON.stringify(measurement));
 
-  if (moved < 8) throw new Error(`Pointer input did not move player enough: ${moved.toFixed(2)}px`);
-  if (!(moving.normX > 0.2)) throw new Error(`processInput did not receive pointer direction: normX=${moving.normX}`);
-  if (stopped.touchActive) throw new Error('pointerup did not release touch state');
+  if (moved < 8) throw new Error(`Real hit-tested touch did not move player enough: ${moved.toFixed(2)}px; target=${JSON.stringify(realTouchEvents[0]?.target || null)}; stack=${JSON.stringify(hitStack)}`);
+  if (!(moving.normX > 0.2)) throw new Error(`processInput did not receive real touch direction: normX=${moving.normX}`);
+  if (stopped.touchActive) throw new Error('touchEnd did not release touch state');
   if (Math.hypot(stopped.vx, stopped.vy) > 5) {
-    throw new Error(`Player did not stop after pointerup: speed=${Math.hypot(stopped.vx, stopped.vy).toFixed(2)}`);
+    throw new Error(`Player did not stop after touchEnd: speed=${Math.hypot(stopped.vx, stopped.vy).toFixed(2)}`);
   }
 
   await page.locator('#lx-side-menu').click();
