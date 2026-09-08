@@ -1,3 +1,16 @@
+/* KELO-INDEX
+ * area: LEGACY ZONE / CAFE
+ * owner: cafe feature; movement extension owned by KeloMovement
+ * keys: CAFE ZONE MOVEMENT CLAMP RENDER LEGACY
+ * purpose: conserva entrada/salida del café y limita movimiento interior mediante KeloMovement
+ * public-api: enterCafe/exitCafe + keloCafe/keloZone legacy
+ * consumes: KeloMovement, localPlayer, camera, obstacles, render
+ * state-owned: estado legacy de zona café
+ * extension-points: KeloMovement.after para límites post-física
+ * reuse: NO usar como patrón de nuevas instancias; usar InstanceSystem
+ * legacy: render wrapper y teleport directo pendientes de migración
+ * do-not: NO volver a envolver updateMovement
+ */
 (function () {
   const T = window.KELO_TILE || 32;
   const OX = 1024, OY = 1216;
@@ -72,13 +85,12 @@
   ensureBtn();
   setTimeout(ensureBtn, 300);
 
-  var _move = updateMovement;
-  updateMovement = function (dt) {
-    _move(dt);
+  if(!window.KeloMovement) throw new Error('KeloMovement unavailable before engine-ai');
+  window.KeloMovement.after('engine-ai:cafe-room-clamp', function () {
     if (window.keloZone !== 'cafe') return;
     localPlayer.x = Math.max(room.x + 12, Math.min(room.x + room.w - 12, localPlayer.x));
     localPlayer.y = Math.max(room.y + 12, Math.min(room.y + room.h - 8, localPlayer.y));
-  };
+  }, 40);
 
   var _r = render;
   render = function () {
