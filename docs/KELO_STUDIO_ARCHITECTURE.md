@@ -1,14 +1,15 @@
-# KELO STUDIO — Foundation Architecture v1.3
+# KELO STUDIO — Foundation Architecture v1.4
 
-**Status:** integration-ready foundation; intentionally not wired into LIVE automatically.
+**Status:** LIVE vertical slice ready for integration on Kelo Foundation V1. Studio remains lazy-loaded: normal gameplay boots only the tiny `src/ui/studio-launcher.js`; `src/studio/**` loads after an authorized `CREATE` action.
 
 ## Core laws
 - Studio describes gameplay; runtime systems own gameplay.
+- Persistent world edits continue through `KELO_WORLD_EDIT`; Studio never becomes a second authority.
 - Mutations are Commands; pointer dragging is preview-only until release.
 - `WorldDocument` is readable authoring state; runtime uses deterministic compiled bundles/diffs.
 - Space is indexed by the same 512px chunk concept as the current world renderer.
 - Only dirty chunks are invalidated.
-- Studio stays out of normal `index.html` and has no runtime dependency.
+- Gameplay input locking is owned by Foundation `KeloInputLocks`; Studio only acquires/releases a named token.
 - Existing Property/WorldEdit/Tile/Atlas/Layer/Forge/Inventory contracts are reused through adapters.
 - New creator behavior is Components/Prefabs/Devices, never asset-specific editor branches or hotfix files.
 
@@ -26,44 +27,55 @@ src/studio/
   storage/     IndexedDB checkpoints + command journal
   performance/ profiler + Long Task telemetry
   tools/       Select + Placement + Transform (preview then one commit)
-  input/       optional PointerEvent adapter with pointer capture + rAF move coalescing
+  input/       PointerEvent adapter with pointer capture + rAF move coalescing
   render/      independent Studio overlay renderer/canvas
-  ui/          virtual-list math + schema-driven Inspector model
+  integration/ transactional authority mirror + LIVE controller
+  ui/          virtualized creator shell + schema-driven Inspector model
 ```
 
 ## Reuse
-Existing PropertyCatalog assets seed directly into Studio PrefabRegistry. Existing published Property/WorldEdit data can be imported read-only to `WorldDocument`. A Forge/Chest/Garden in Studio is metadata that points to runtime capabilities; Studio never embeds a second forge, inventory or farming engine.
+Existing `KELO_PROPERTY_CATALOG` assets seed directly into Studio `PrefabRegistry`. Existing mutable Draft data is imported into `WorldDocument`. A Forge/Chest/Garden in Studio is metadata that points to runtime capabilities; Studio never embeds a second forge, inventory or farming engine.
 
-## Lazy boot
-```js
-const { bootKeloStudio } = await import('./src/studio/studio-entry.mjs');
-const studio = await bootKeloStudio({mode:'world'});
-await studio.importCurrent();
+## LIVE lazy boot
+Normal `index.html` loads only:
+```html
+<script src="src/ui/studio-launcher.js?v=2"></script>
 ```
-Nothing under `src/studio/` is referenced by normal `index.html` yet.
+The launcher adds `CREATE` to the existing Luxe menu only when `world.edit` is allowed. On click it dynamically imports:
+```js
+import('./../studio/integration/live-studio-controller.mjs')
+```
+No module under `src/studio/` is eagerly referenced by `index.html`.
 
-## Interaction contract
+## Input ownership
+Opening Studio acquires one semantic Foundation lock:
+```text
+KeloInputLocks.acquire('kelo-studio', ...)
+```
+Foundation `KeloInput` then suppresses normal movement/input intent while Studio routes creator pointer events through its internal `InputRouter`. Closing or failed startup releases the same token. Studio does not wrap `processInput`, mutate the legacy modal-lock global, or install repair/watchdog timers.
+
+## Interaction and authority contract
 ```text
 pointermove -> rAF-coalesced local preview -> overlay only
-pointerup   -> exactly one Command -> document/history/spatial/dirty
-                                  -> compiler worker
-                                  -> RuntimeDiff
-                                  -> authority/runtime adapters (integration slice)
+pointerup   -> exactly one Command
+            -> local document/spatial/dirty state
+            -> transactional authority mirror
+            -> KELO_WORLD_EDIT request on the current Draft
 ```
-This avoids 60 server writes/saves/collider rebuilds during a drag.
+History is committed only after authority success. If authority rejects an execute/undo/redo operation, the local document is reverted so editor state and authoritative Draft cannot silently diverge.
+
+## Stable identity
+Studio entity IDs remain stable authoring IDs. The integration mirror separately tracks the current authority `placementId`, so remove/move/undo/redo remain valid even when an authority recreates a placement with a different runtime ID.
 
 ## Persistence/performance
-IndexedDB stores local checkpoints + serialized command journal; server remains canonical online. Asset Browser/Outliner UI must use virtualization (the foundation includes range math). Studio profiler can track timing and Long Tasks. Static cached chunks/ImageBitmap remain an integration optimization to apply only after measuring the live renderer.
+IndexedDB stores local checkpoints + serialized command journal for crash recovery; the authority remains canonical online. Asset Browser/Outliner range math is virtualized for large catalogs. Studio compilation can run in a Worker and spatial work is chunk-indexed.
 
-## Current LIVE migration order
-1. attach separate Studio Overlay Canvas without changing the world renderer;
-2. route Studio pointer input through InputRouter/Pointer adapter while gameplay is disabled by context;
-3. import current snapshot and test Select/Placement/Transform parity;
-4. translate committed Commands to existing `KELO_WORLD_EDIT` authority;
-5. apply RuntimeDiff incrementally to render/collision instead of Property `syncColliders()` full rebuild;
-6. move terrain brush/autotile to command + worker pipeline;
-7. build actual visual Asset Browser/Outliner/Inspector shell using virtualization/schema model;
-8. after Playwright + mobile parity, retire legacy builder wrappers/hotfixes.
+## Migration order after this slice
+1. validate CREATE/open/select/place/move/undo/redo/close on LIVE desktop + mobile;
+2. apply `RuntimeDiff` incrementally to render/collision paths where measurements show value;
+3. move terrain brush/autotile to command + worker pipeline;
+4. expand schema-driven Inspector and creator devices;
+5. only after behavioral parity, mark legacy builder wrappers DEAD and retire them individually.
 
 ## Definition of done per slice
-No duplicated gameplay owner, no new runtime dependency, functional audit, Playwright regression for LIVE changes, mobile validation before legacy removal, and `ENGINE_MAP` ownership only changes when the new path truly becomes OWNER LIVE.
+No duplicated gameplay owner, no new core wrapper, authority remains replaceable, Foundation input ownership is reused, functional audit passes, mobile/runtime regression is checked before legacy removal, and `ENGINE_MAP` ownership changes only when a new path truly becomes OWNER LIVE.
