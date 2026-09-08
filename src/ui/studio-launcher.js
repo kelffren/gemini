@@ -14,7 +14,10 @@
   if(window.KELO_STUDIO_LAUNCHER)return;
   let loading=false;
   const actor=()=>String(window.KELO_ADMIN_KEYS?.playerId?.()||window.keloNet?.playerKey||window.localPlayer?.id||'local_pioneer');
-  const allowed=()=>!!window.KELO_ADMIN_KEYS?.can?.('world.edit',actor());
+  const allowed=()=>{
+    const keys=window.KELO_ADMIN_KEYS,who=actor();
+    return !!(keys?.can?.('creators.access',who)||keys?.can?.('world.edit',who)||keys?.can?.('animation.edit',who));
+  };
   const toast=m=>{if(typeof window.showToast==='function')window.showToast(m);else console.info('[Kelo Creators]',m);};
   function friendlyError(error){const code=String(error?.message||error||'');return code||'No se pudo abrir Kelo Creators';}
   async function open(){
