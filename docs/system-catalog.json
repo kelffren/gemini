@@ -35,6 +35,22 @@
       "playerVisible": true,
       "playerGuideAnchor": "movimiento",
       "status": "foundation-transitional"
+    },
+    {
+      "id": "render-extensions",
+      "owner": "KeloRender",
+      "source": "src/core/render-extension-system.js",
+      "technicalDoc": "docs/systems/RENDER_EXTENSION_SYSTEM.md",
+      "playerVisible": false,
+      "status": "foundation-transitional"
+    },
+    {
+      "id": "simulation-extensions",
+      "owner": "KeloSimulation",
+      "source": "src/core/simulation-extension-system.js",
+      "technicalDoc": "docs/systems/SIMULATION_EXTENSION_SYSTEM.md",
+      "playerVisible": false,
+      "status": "foundation-transitional"
     }
   ]
 }
