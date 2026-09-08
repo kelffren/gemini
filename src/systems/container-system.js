@@ -1,22 +1,30 @@
+/* KELO-INDEX
+ * area: SYSTEMS / CONTAINERS
+ * owner: KeloContainers
+ * purpose: reglas y slots de warehouse/escrow/emote loadout; item storage e identidad pertenecen a KeloInventory
+ * public-api: KeloContainers
+ * consumes: KeloInventory, KeloBackpack, KeloEquipment
+ * state-owned: container capacity/slots/permissions
+ * extension-points: getSlots/getStats/transferItem
+ * reuse: toda transferencia portable usa este contrato y KeloInventory para mutar colecciones
+ * legacy: container records persisten dentro de STATE
+ * do-not: NO escribir STATE.inventory ni duplicar helpers de identidad/stack/snapshot
+ */
 (function(){
 'use strict';
-const VERSION='container-v1.2.0';
+const VERSION='container-v1.3.0';
 const SCHEMA_VERSION=1;
 const WAREHOUSE_CAPACITY=30;
 const ESCROW_BASE_CAPACITY=20;
 const EMOTE_LOADOUT_CAPACITY=4;
 const OWNER='local_pioneer';
+const inventoryOwner=window.KeloInventory;
+if(!inventoryOwner)throw new Error('KeloInventory unavailable before container-system');
 let ensuring=false;
-function save(){if(typeof saveState==='function')saveState();}
-function keyForItem(item,index){
-  if(!item||typeof item!=='object')return null;
-  if(item.id)return 'id:'+String(item.id);
-  if(item.uid)return 'uid:'+String(item.uid);
-  if(!item._backpackId)item._backpackId='bp_'+Date.now().toString(36)+'_'+String(index||0)+'_'+Math.random().toString(36).slice(2,8);
-  return 'bp:'+item._backpackId;
-}
+function save(){inventoryOwner.persist();}
+function keyForItem(item,index){return inventoryOwner.keyForItem(item,index);}
 function normalizeSlots(slots,n){const out=Array.isArray(slots)?slots.slice(0,n):[];while(out.length<n)out.push(null);return out;}
-function itemMap(items){const m=new Map();items.forEach((item,i)=>{const k=keyForItem(item,i);if(k&&!m.has(k))m.set(k,item);});return m;}
+function itemMap(items){return inventoryOwner.itemMap(items);}
 function rebuildSlots(slots,items,capacity){
   const valid=itemMap(items),rebuilt=new Array(capacity).fill(null),placed=new Set();
   normalizeSlots(slots,capacity).forEach((k,i)=>{if(k&&valid.has(k)&&!placed.has(k)){rebuilt[i]=k;placed.add(k);}});
@@ -39,7 +47,7 @@ function ensure(){
   if(ensuring)return STATE.warehouse||null;
   ensuring=true;let changed=false;
   try{
-    if(!Array.isArray(STATE.inventory)){STATE.inventory=[];changed=true;}
+    inventoryOwner.ensure();
     if(window.KeloBackpack&&typeof window.KeloBackpack.ensure==='function')window.KeloBackpack.ensure();
     const wh=ensureContainerState(STATE.warehouse,{schemaVersion:SCHEMA_VERSION,id:'warehouse_main',type:'warehouse',owner:OWNER,capacity:WAREHOUSE_CAPACITY,permissions:{deposit:true,withdraw:true,merge:true}},WAREHOUSE_CAPACITY);
     STATE.warehouse=wh.container;changed=changed||wh.changed;
@@ -54,22 +62,21 @@ function source(type){
   ensure();
   if(type==='backpack'){
     if(window.KeloBackpack&&typeof window.KeloBackpack.ensure==='function')window.KeloBackpack.ensure();
-    return {type:'backpack',id:'backpack',owner:OWNER,items:STATE.inventory,slots:STATE.backpack.slots,capacity:STATE.backpack.capacity,permissions:{deposit:true,withdraw:true,merge:true}};
+    return {type:'backpack',id:'backpack',owner:OWNER,items:inventoryOwner.getItems('backpack'),slots:STATE.backpack.slots,capacity:STATE.backpack.capacity,permissions:{deposit:true,withdraw:true,merge:true}};
   }
-  if(type==='warehouse')return {type:'warehouse',id:STATE.warehouse.id,owner:STATE.warehouse.owner,items:STATE.warehouse.items,slots:STATE.warehouse.slots,capacity:STATE.warehouse.capacity,permissions:STATE.warehouse.permissions};
-  if(type==='market_escrow')return {type:'market_escrow',id:STATE.marketEscrow.id,owner:STATE.marketEscrow.owner,items:STATE.marketEscrow.items,slots:STATE.marketEscrow.slots,capacity:STATE.marketEscrow.capacity,permissions:STATE.marketEscrow.permissions};
-  if(type==='emote_loadout')return {type:'emote_loadout',id:STATE.emoteLoadout.id,owner:STATE.emoteLoadout.owner,items:STATE.emoteLoadout.items,slots:STATE.emoteLoadout.slots,capacity:STATE.emoteLoadout.capacity,permissions:STATE.emoteLoadout.permissions};
+  if(type==='warehouse')return {type:'warehouse',id:STATE.warehouse.id,owner:STATE.warehouse.owner,items:inventoryOwner.getItems('warehouse'),slots:STATE.warehouse.slots,capacity:STATE.warehouse.capacity,permissions:STATE.warehouse.permissions};
+  if(type==='market_escrow')return {type:'market_escrow',id:STATE.marketEscrow.id,owner:STATE.marketEscrow.owner,items:inventoryOwner.getItems('market_escrow'),slots:STATE.marketEscrow.slots,capacity:STATE.marketEscrow.capacity,permissions:STATE.marketEscrow.permissions};
+  if(type==='emote_loadout')return {type:'emote_loadout',id:STATE.emoteLoadout.id,owner:STATE.emoteLoadout.owner,items:inventoryOwner.getItems('emote_loadout'),slots:STATE.emoteLoadout.slots,capacity:STATE.emoteLoadout.capacity,permissions:STATE.emoteLoadout.permissions};
   return null;
 }
-function quantity(item){return Math.max(1,Math.floor(Number(item&&item.quantity)||1));}
-function stackLimit(item){return Math.max(1,Math.floor(Number(item&&item.maxStack)||1));}
-function stackSignature(item){if(!item||item.kind==='equipment'||item.kind==='emote'||stackLimit(item)<=1)return null;if(item.stackKey)return 'stack:'+String(item.stackKey);if(item.templateId)return 'template:'+String(item.templateId);if(item.typeId)return 'type:'+String(item.typeId)+':tier:'+String(item.tier||'')+':quality:'+String(item.quality||'');return null;}
-function canStack(a,b){const x=stackSignature(a),y=stackSignature(b);return !!(x&&y&&x===y);}
+function quantity(item){return inventoryOwner.quantity(item);}
+function stackLimit(item){return inventoryOwner.stackLimit(item);}
+function stackSignature(item){return inventoryOwner.stackSignature(item);}
+function canStack(a,b){return inventoryOwner.canStack(a,b);}
 function getSlots(type){const c=source(type);if(!c)return[];const map=itemMap(c.items);return c.slots.map((key,index)=>({index,key:key||null,item:key?map.get(key)||null:null}));}
 function getStats(type){const c=source(type);if(!c)return{capacity:0,used:0,free:0};const used=c.slots.filter(Boolean).length;return{id:c.id,type:c.type,owner:c.owner,capacity:c.capacity,used,free:c.capacity-used};}
-function newIdentity(clone){const id='stack_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,9);if(Object.prototype.hasOwnProperty.call(clone,'id'))clone.id=id;else if(Object.prototype.hasOwnProperty.call(clone,'uid'))clone.uid=id;else clone._backpackId=id;return clone;}
-function cloneState(){return {inventory:JSON.parse(JSON.stringify(STATE.inventory)),backpack:JSON.parse(JSON.stringify(STATE.backpack)),warehouse:JSON.parse(JSON.stringify(STATE.warehouse)),marketEscrow:JSON.parse(JSON.stringify(STATE.marketEscrow)),emoteLoadout:JSON.parse(JSON.stringify(STATE.emoteLoadout))};}
-function restore(s){STATE.inventory=s.inventory;STATE.backpack=s.backpack;STATE.warehouse=s.warehouse;STATE.marketEscrow=s.marketEscrow;STATE.emoteLoadout=s.emoteLoadout;}
+function cloneState(){return inventoryOwner.snapshot(['inventory','backpack','warehouse','marketEscrow','emoteLoadout']);}
+function restore(s){inventoryOwner.restore(s,{persist:false});}
 function ensureElasticRoom(dst,item,amount){
   if(!dst||!dst.permissions||dst.permissions.elastic!==true)return;
   const perSlot=stackLimit(item),neededSlots=Math.max(1,Math.ceil(amount/perSlot)),free=dst.slots.filter(k=>!k).length;
@@ -94,14 +101,28 @@ function transferItem(sourceType,destType,itemKey,amount,options){
   if(available<amount)return{ok:false,error:'DESTINATION_FULL',requested:amount,available};
   const snap=cloneState();let remaining=amount,merged=0,createdKeys=[],preservedIdentity=false,movedItemKey=null;
   try{
-    for(const target of compatible){if(!remaining)break;const n=Math.min(target.room,remaining);target.item.quantity=quantity(target.item)+n;remaining-=n;merged+=n;}
+    for(const target of compatible){if(!remaining)break;const n=Math.min(target.room,remaining);inventoryOwner.setQuantity(target.item,quantity(target.item)+n,{persist:false});remaining-=n;merged+=n;}
     if(amount===current){
-      item.quantity=current-merged;
-      if(remaining>0){const free=dst.slots.indexOf(null);if(free<0)throw new Error('DESTINATION_FULL');src.slots[sourceIndex]=null;const pos=src.items.indexOf(item);if(pos>=0)src.items.splice(pos,1);dst.items.push(item);dst.slots[free]=itemKey;preservedIdentity=true;movedItemKey=itemKey;remaining=0;}
-      else{src.slots[sourceIndex]=null;const pos=src.items.indexOf(item);if(pos>=0)src.items.splice(pos,1);}
+      inventoryOwner.setQuantity(item,current-merged,{persist:false});
+      if(remaining>0){
+        const free=dst.slots.indexOf(null);if(free<0)throw new Error('DESTINATION_FULL');
+        src.slots[sourceIndex]=null;
+        const removed=inventoryOwner.removeItem(sourceType,item,{persist:false});if(!removed.ok)throw new Error(removed.error);
+        const added=inventoryOwner.addItem(destType,item,{persist:false});if(!added.ok)throw new Error(added.error);
+        dst.slots[free]=itemKey;preservedIdentity=true;movedItemKey=itemKey;remaining=0;
+      }else{
+        src.slots[sourceIndex]=null;
+        const removed=inventoryOwner.removeItem(sourceType,item,{persist:false});if(!removed.ok)throw new Error(removed.error);
+      }
     }else{
-      item.quantity=current-amount;
-      while(remaining>0){const free=dst.slots.indexOf(null);if(free<0)throw new Error('DESTINATION_FULL');const n=Math.min(stackLimit(item),remaining);const clone=newIdentity(Object.assign({},item,{quantity:n,createdAt:Date.now(),splitFrom:item.id||item.uid||item._backpackId||null}));dst.items.push(clone);const key=keyForItem(clone,dst.items.length-1);dst.slots[free]=key;createdKeys.push(key);if(!movedItemKey)movedItemKey=key;remaining-=n;}
+      inventoryOwner.setQuantity(item,current-amount,{persist:false});
+      while(remaining>0){
+        const free=dst.slots.indexOf(null);if(free<0)throw new Error('DESTINATION_FULL');
+        const n=Math.min(stackLimit(item),remaining);
+        const clone=inventoryOwner.cloneWithNewIdentity(item,{quantity:n,createdAt:Date.now(),splitFrom:item.id||item.uid||item._backpackId||null});
+        const added=inventoryOwner.addItem(destType,clone,{persist:false});if(!added.ok)throw new Error(added.error);
+        dst.slots[free]=added.key;createdKeys.push(added.key);if(!movedItemKey)movedItemKey=added.key;remaining-=n;
+      }
     }
     if(options.persist!==false)save();
     return{ok:true,source:sourceType,destination:destType,itemKey,requested:amount,moved:amount,merged,createdKeys,preservedIdentity,movedItemKey,sourceRemaining:amount===current?0:quantity(item)};
@@ -109,5 +130,5 @@ function transferItem(sourceType,destType,itemKey,amount,options){
 }
 ensure();
 window.KeloContainers=Object.freeze({version:VERSION,schemaVersion:SCHEMA_VERSION,warehouseCapacity:WAREHOUSE_CAPACITY,marketEscrowBaseCapacity:ESCROW_BASE_CAPACITY,emoteLoadoutCapacity:EMOTE_LOADOUT_CAPACITY,ensure,keyForItem,getSlots,getStats,transferItem,canStack,stackSignature});
-window.KELO_CONTAINER_AUDIT=Object.freeze({version:VERSION,schemaVersion:SCHEMA_VERSION,identityRule:'one-item-one-container',containerModel:'separate-item-arrays-shared-contract-v3',transferMode:'validate-prepare-execute-persist-rollback-v2',strictDestinationCapacity:true,warehouseImplemented:true,marketEscrowImplemented:true,marketEscrowMerge:false,marketEscrowElastic:true,emoteLoadoutImplemented:true,emoteLoadoutCapacity:EMOTE_LOADOUT_CAPACITY,emoteOnlyContainer:true,deferredPersistSupported:true,serverAuthoritative:false});
+window.KELO_CONTAINER_AUDIT=Object.freeze({version:VERSION,schemaVersion:SCHEMA_VERSION,inventoryOwner:'KeloInventory',directInventoryWrites:false,identityRule:'one-item-one-container',containerModel:'KeloInventory-backed-separate-containers-v4',transferMode:'validate-prepare-owner-mutate-persist-rollback-v3',strictDestinationCapacity:true,warehouseImplemented:true,marketEscrowImplemented:true,marketEscrowMerge:false,marketEscrowElastic:true,emoteLoadoutImplemented:true,emoteLoadoutCapacity:EMOTE_LOADOUT_CAPACITY,emoteOnlyContainer:true,deferredPersistSupported:true,serverAuthoritative:false});
 })();
