@@ -27,9 +27,19 @@
       "reason": "Sword Swap landing and planted-sword impact spritesheet is gameplay presentation VFX, not an environment world-art asset."
     },
     {
+      "path": "assets/fx/sword-swap/clavandose .PNG",
+      "scope": "non-world-ui",
+      "reason": "Sword Swap planted-sword impact animation is active ability presentation VFX and is not owned by the environment world-art contract."
+    },
+    {
       "path": "assets/fx/sword-swap/loop.PNG",
       "scope": "non-world-ui",
       "reason": "Sword Swap planted-sword idle loop is reusable ability presentation VFX, outside the environment world-art contract."
+    },
+    {
+      "path": "assets/fx/sword-swap/loop2.PNG",
+      "scope": "non-world-ui",
+      "reason": "Sword Swap PvP planted-sword loop is active ability presentation VFX and is not owned by the environment world-art contract."
     },
     {
       "path": "assets/fx/sword-swap/regreso2.PNG",
@@ -44,7 +54,12 @@
     {
       "path": "assets/fuentekelo.PNG",
       "scope": "source-sheet",
-      "reason": "Original Kelo-uploaded fountain source retained untouched; LIVE uses the deterministic alpha-clean derivative assets/fuentekelo-runtime.PNG."
+      "reason": "Original Kelo-uploaded fountain source is retained untouched for authoring history; LIVE now uses assets/justicia_fountain_v2.PNG."
+    },
+    {
+      "path": "assets/fuentekelo-runtime.PNG",
+      "scope": "superseded-archive",
+      "reason": "Previous alpha-clean fountain runtime derivative is retained for history but has been superseded by assets/justicia_fountain_v2.PNG."
     },
     {
       "path": "assets/plaza.PNG",
