@@ -51,8 +51,8 @@ try{
     const target=window.__KELO_COMBAT_ARCH_AUDIT_TARGET={
       id:'__combat_arch_audit_target',
       playerKey:'__combat_arch_audit_target',
-      x:window.localPlayer.x+100,
-      y:window.localPlayer.y,
+      x:localPlayer.x+100,
+      y:localPlayer.y,
       vx:0,vy:0,radius:20,hp:100,maxHp:100,keloShield:0,_face:'left'
     };
     const cmd=P.command('BASIC_ATTACK',{target});
@@ -77,7 +77,7 @@ try{
     const P=window.KeloPvPWorld,A=window.KeloCombatSchema.events,events=[];
     const stops=[A.ATTACK_STARTED,A.HIT_CONFIRMED,A.DAMAGE_APPLIED,A.ATTACK_RESOLVED].map(name=>window.KeloEvents.on(name,p=>events.push({name,confirmedHit:p.confirmedHit})));
     const target=window.__KELO_COMBAT_ARCH_AUDIT_TARGET;
-    const before=target.hp;target.x=window.localPlayer.x+200;target.y=window.localPlayer.y;
+    const before=target.hp;target.x=localPlayer.x+200;target.y=localPlayer.y;
     const result=P.authority.execute(P.command('BASIC_ATTACK',{target}));
     stops.forEach(stop=>stop());
     return{result,before,after:target.hp,events};
