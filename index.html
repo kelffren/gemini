@@ -13,6 +13,8 @@
     #ui-layer{position:absolute;inset:0;pointer-events:none;z-index:10}
     .hud-badge{position:absolute;top:max(8px,env(safe-area-inset-top));left:max(8px,env(safe-area-inset-left));font:11px ui-monospace,monospace;color:#e7c56a;background:rgba(10,13,18,.88);padding:7px 12px;border-radius:999px;border:1px solid rgba(231,197,106,.26)}
     body.social-mode #action-bar-container{display:none!important}
+    #action-bar-container .stone-slot{position:relative!important}
+    #action-bar-container .stone-slot>span[style*="position:absolute"]{pointer-events:none}
     #kelo-online,.lx-mark,#kelo-minimap,#minimap{display:none!important}
   </style>
 </head>
