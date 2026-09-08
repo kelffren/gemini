@@ -37,6 +37,15 @@
       "status": "foundation-transitional"
     },
     {
+      "id": "camera",
+      "owner": "KeloCamera",
+      "source": "src/core/camera-system.js",
+      "technicalDoc": "docs/systems/CAMERA_SYSTEM.md",
+      "playerVisible": true,
+      "playerGuideAnchor": "camara-y-pantalla",
+      "status": "foundation-transitional"
+    },
+    {
       "id": "render-extensions",
       "owner": "KeloRender",
       "source": "src/core/render-extension-system.js",
