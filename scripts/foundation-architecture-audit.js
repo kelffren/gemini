@@ -34,9 +34,9 @@ function requireText(rel, needles) {
   });
 }
 
-// 1) La ley del repo debe existir y enlazarse desde el punto de entrada.
+// La ley del repo debe existir y enlazarse desde el punto de entrada.
 requireText('docs/KELO_FOUNDATION.md', [
-  '1 RESPONSABILIDAD = 1 OWNER',
+  'OWNER único por responsabilidad',
   '¿QUÉ OWNER EXISTENTE DEBERÍA HACER ESTO?',
   'CONTENIDO',
   'CAPACIDAD',
@@ -46,7 +46,7 @@ requireText('AGENTS.md', ['docs/KELO_FOUNDATION.md', '1 RESPONSABILIDAD = 1 OWNE
 requireText('ENGINE_MAP.md', ['docs/KELO_FOUNDATION.md', 'OWNER LIVE']);
 requireText('src/ui/force-unlock-move.js', ['HOTFIX TEMPORAL', 'NO REUTILIZAR']);
 
-// 2) Todo script local declarado por index debe existir. Evita load-order roto por renombres/limpieza.
+// Todo script local declarado por index debe existir. Evita load-order roto por renombres/limpieza.
 if (exists('index.html')) {
   const html = read('index.html');
   const scriptRe = /<script\b[^>]*\bsrc=["']([^"']+)["'][^>]*>/gi;
@@ -62,7 +62,6 @@ function git(args) {
   try { return cp.execFileSync('git', args, { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim(); }
   catch (_) { return ''; }
 }
-
 function resolveBase() {
   const envBase = process.env.KELO_FOUNDATION_BASE;
   if (envBase && git(['rev-parse', '--verify', envBase])) return envBase;
@@ -78,8 +77,6 @@ if (!base) {
 } else {
   const diff = git(['diff', '--unified=0', base + '...HEAD', '--', '*.js', '*.html']);
   const nameStatus = git(['diff', '--name-status', base + '...HEAD']);
-
-  // Parse only ADDED lines. Existing debt is migrated separately; this prevents new debt now.
   let currentFile = '';
   const added = [];
   diff.split('\n').forEach((line) => {
@@ -89,26 +86,12 @@ if (!base) {
   });
 
   const forbidden = [
-    {
-      name: 'new direct core wrapper',
-      test: (x) => /\b(render|renderAvatar|updateSimulation|processInput)\s*=\s*function\b/.test(x.line)
-    },
-    {
-      name: 'new watchdog/timer used as state repair',
-      test: (x) => /setInterval\s*\(/.test(x.line) && /unlock|lock|restore|repair|force|fix/i.test(x.line)
-    },
-    {
-      name: 'UI directly mutates player position/HP',
-      test: (x) => /^src\/ui\//.test(x.file) && /\blocalPlayer\.(x|y|hp|maxHp)\s*=/.test(x.line)
-    },
-    {
-      name: 'UI directly pushes physical obstacle',
-      test: (x) => /^src\/ui\//.test(x.file) && /\bobstacles\.push\s*\(/.test(x.line)
-    },
-    {
-      name: 'new engine-v2 style parallel core file',
-      test: (x) => /(^|\/)engine[-_]?v?2/i.test(x.file)
-    }
+    { name: 'new direct core wrapper', test: (x) => /\b(render|renderAvatar|updateSimulation|processInput)\s*=\s*function\b/.test(x.line) },
+    { name: 'new watchdog/timer used as state repair', test: (x) => /setInterval\s*\(/.test(x.line) && /unlock|lock|restore|repair|force|fix/i.test(x.line) },
+    { name: 'UI directly mutates player position/HP', test: (x) => /^src\/ui\//.test(x.file) && /\blocalPlayer\.(x|y|hp|maxHp)\s*=/.test(x.line) },
+    { name: 'UI directly pushes physical obstacle', test: (x) => /^src\/ui\//.test(x.file) && /\bobstacles\.push\s*\(/.test(x.line) },
+    { name: 'new engine-v2 style parallel core file', test: (x) => /(^|\/)engine[-_]?v?2/i.test(x.file) },
+    { name: 'new direct legacy modal-lock write', test: (x) => x.file !== 'src/core/input-lock-system.js' && /\bKELO_MODAL_INPUT_LOCK\s*=/.test(x.line) }
   ];
 
   added.forEach((entry) => {
