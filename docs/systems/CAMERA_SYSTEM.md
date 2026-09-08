@@ -35,6 +35,7 @@ KeloCamera posee:
 - viewport CSS;
 - conversión `screen → world`;
 - conversión `world → screen`;
+- AABB read-only del viewport visible en coordenadas world mediante `worldView()`;
 - parámetros de seguimiento de cámara;
 - entrypoint público de `updateCamera`;
 - lifecycle de resize/visualViewport;
@@ -190,6 +191,34 @@ Convierte un punto de pantalla a coordenadas de mundo usando:
 
 Operación inversa.
 
+## `KeloCamera.worldView()`
+
+Devuelve un snapshot **read-only** del rectángulo world-space visible por la cámara actual.
+
+Campos:
+
+- `x`, `y`, `w`, `h`;
+- `left`, `top`, `right`, `bottom`;
+- `centerX`, `centerY`;
+- `zoom`;
+- `screenW`, `screenH`.
+
+La geometría usa exactamente el mismo `effectiveZoom`, centro y viewport que `screenToWorld()` / `worldToScreen()`.
+
+Ejemplo para culling simple:
+
+```js
+const view = KeloCamera.worldView();
+const visible = object.x < view.right &&
+  object.x + object.w > view.left &&
+  object.y < view.bottom &&
+  object.y + object.h > view.top;
+```
+
+Los consumidores pueden añadir su propio margen de seguridad, pero **no deben volver a calcular** `screenW / zoom`, `screenH / zoom` o el centro de cámara.
+
+`world-map.js` es el primer consumidor migrado: conserva su margen histórico de chunks y solo sustituye la matemática duplicada del viewport por esta primitive.
+
 ## `KeloCamera.setFollowTuning(values)`
 
 Parámetros soportados:
@@ -333,6 +362,10 @@ player.y = destination.y;
 KeloCamera.setTarget(destination.x, destination.y, { source: 'teleport' });
 ```
 
+## Culling / render de mundo
+
+Consumir `KeloCamera.worldView()` y aplicar AABB/margen propio del sistema. No crear `ViewportManager`, `CullingManager` ni volver a derivar el viewport desde globals.
+
 ## Zoom temporal
 
 No crear un sistema paralelo.
@@ -367,11 +400,22 @@ window.resize = myResize;
 window.cycleZoom = myZoom;
 ```
 
+Para geometría visible tampoco debe hacer:
+
+```js
+const visibleWorldWidth = screenW / CONFIG.zoom;
+const visibleWorldHeight = screenH / CONFIG.zoom;
+```
+
+Usa `KeloCamera.worldView()`.
+
 Tampoco debe crear:
 
 - `BossCameraManager`;
 - `PvPCameraManager`;
 - `VehicleCameraManager`;
+- `ViewportManager`;
+- `CullingManager`;
 - otro resize owner;
 - otro zoom bridge.
 
@@ -410,6 +454,9 @@ El zoom elegido tampoco se migra todavía a un preference owner. Si se decide pe
 Disponibles:
 
 - `KeloCamera.snapshot()`;
+- `KeloCamera.worldView()`;
+- `KELO_CAMERA_AUDIT.worldViewOwner`;
+- `KELO_WORLD_AUDIT.viewportOwner/viewportMode` para el renderer de chunks;
 - `KELO_CAMERA_AUDIT`;
 - eventos `kelo:camera*` / `kelo:viewportchange`;
 - `KELO_HD_RENDER` documenta que su camera owner es `KeloCamera`;
@@ -425,8 +472,9 @@ Disponibles:
 4. El renderer consume zoom/camera; no decide su ownership.
 5. Rotar preserva el base zoom.
 6. Portrait y landscape mantienen el contrato de span vertical equivalente.
-7. Conversiones screen/world usan el mismo zoom que el renderer.
-8. El follow legacy conserva su comportamiento durante la migración.
+7. Conversiones screen/world y `worldView()` usan el mismo zoom que el renderer.
+8. Consumidores de culling no duplican matemática de viewport; consultan `worldView()`.
+9. El follow legacy conserva su comportamiento durante la migración.
 
 ---
 
@@ -438,6 +486,8 @@ Debe verificar como mínimo:
 
 - carga de KeloCamera después de `engine-c`;
 - APIs públicas;
+- `worldView()` read-only y geométricamente equivalente en portrait/landscape;
+- `world-map.js` consumiendo `worldView()` sin duplicar `screenW/zoom`;
 - `engine-h` sin reemplazos directos de resize/zoom;
 - `mobile-orientation` sin escrituras directas de zoom/Canvas;
 - screen↔world reversible;
@@ -453,6 +503,7 @@ Debe verificar como mínimo:
 - `engine-a` todavía contiene la implementación matemática de follow y el listener resize inicial.
 - varios callers legacy todavía escriben propiedades capturadas por adapters; deben migrarse cuando sus archivos se limpien por dominio.
 - camera bounds legacy todavía usan la matemática histórica; Foundation V3 no cambia edge behavior para evitar alterar gameplay.
+- consumidores de viewport distintos de `world-map.js` deben migrarse gradualmente cuando sean tocados; no hacer una reescritura masiva.
 - camera shake/tween/cinematic claims aún no existen.
 
 Esta deuda es explícita. No justifica crear otro camera system.
@@ -465,7 +516,7 @@ Antes de implementar:
 
 - [ ] ¿KeloCamera ya puede expresarlo?
 - [ ] ¿Es contenido/configuración o una capacidad realmente nueva?
-- [ ] ¿Se puede construir sobre `setTarget`, zoom o viewport actual?
+- [ ] ¿Se puede construir sobre `setTarget`, zoom, `worldView()` o viewport actual?
 - [ ] ¿Mantiene un solo owner?
 - [ ] ¿Evita escribir globals directamente?
 - [ ] ¿Necesita evento/telemetría?

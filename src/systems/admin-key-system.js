@@ -1,13 +1,13 @@
 /* KELO-INDEX
  * area: AUTH
- * keys: ADMIN KEY WORLD EDIT CREATOR PERMISSION BACKPACK WORLD BUILDER OFFLINE ONLINE READY PREVIEW
- * hace: modela Llave Admin como entitlement/objeto bound, decide capacidades y arranca las herramientas de autor del mundo
- * online: request() e installRemoteAdapter() permiten sustituir la autoridad local por servidor sin cambiar UI
+ * keys: ADMIN KEY WORLD EDIT CREATOR PERMISSION BACKPACK OFFLINE ONLINE READY
+ * hace: modela Llave Admin como entitlement/objeto bound y decide capacidades; Creator/Studio posee la UI de autoría
+ * online: request() e installRemoteAdapter() permiten sustituir la autoridad local por servidor sin cambiar consumidores
  */
 (function(){
 'use strict';
 
-const VERSION='admin-key-v1.2.1';
+const VERSION='admin-key-v1.3.0';
 const SCHEMA=1;
 const STORAGE='kelo_admin_keys_v1';
 const TEMPLATE_ID='admin-key';
@@ -72,7 +72,7 @@ async function localRequest(op,payload){
     const keyId=newId();state.keys[keyId]={schema:1,keyId,templateId:TEMPLATE_ID,ownerId,label:String(data.label||'Llave Admin · Creador'),scopes,active:true,issuedBy:actorId,createdAt:now(),revokedAt:null};bump();return publicKey(state.keys[keyId]);
   }
   if(op==='admin-key:revoke'){
-    requireScope('admin.revoke',actorId);const keyId=String(data.keyId||'');const k=state.keys[keyId];if(!k)throw new Error('ADMIN_KEY_NOT_FOUND');k.active=false;k.revokedAt=now();k.revokedBy=actorId;bump();return publicKey(k);
+    requireScope('admin.revoke',actorId);const keyId=String(data.keyId||'');const k=state.keys[keyId];if(!k)throw new Error('ADMIN_KEY_NOT_FOUND');k.active=false;k.revokedAt=now();k.revokedBy=actorId;bump();return publicKey(state.keys[keyId]);
   }
   if(op==='admin-key:bootstrap-local-root'){
     if(!data.developer||!new URLSearchParams(location.search).has('mapEditor'))throw new Error('LOCAL_BOOTSTRAP_DISABLED');
@@ -84,23 +84,6 @@ async function localRequest(op,payload){
 async function request(op,payload){if(remoteAdapter&&typeof remoteAdapter.request==='function')return remoteAdapter.request(op,payload||{});return localRequest(op,payload||{});}
 function installRemoteAdapter(adapter){if(adapter&&typeof adapter.request!=='function')throw new Error('INVALID_ADMIN_KEY_ADAPTER');remoteAdapter=adapter||null;}
 function assert(scope,ownerId){requireScope(scope,String(ownerId||playerId()));return true;}
-function loadPreviewFix(){
-  if(document.getElementById('kelo-world-builder-preview-hotfix-loader'))return;
-  const preview=document.createElement('script');preview.id='kelo-world-builder-preview-hotfix-loader';preview.src='src/ui/world-builder-preview-hotfix.js?v=1';document.head.appendChild(preview);
-}
-function loadAuthorTools(){
-  if(document.getElementById('kelo-world-builder-system-loader'))return;
-  const system=document.createElement('script');system.id='kelo-world-builder-system-loader';system.src='src/environment/world-builder-system.js?v=2';
-  system.onload=()=>{
-    const renderer=document.createElement('script');renderer.id='kelo-world-builder-property-renderer-loader';renderer.src='src/environment/world-builder-property-renderer.js?v=1';
-    renderer.onload=()=>{
-      if(document.getElementById('kelo-world-builder-ui-loader')){loadPreviewFix();return;}
-      const ui=document.createElement('script');ui.id='kelo-world-builder-ui-loader';ui.src='src/ui/world-builder-ui.js?v=1';ui.onload=loadPreviewFix;document.head.appendChild(ui);
-    };
-    document.head.appendChild(renderer);
-  };
-  document.head.appendChild(system);
-}
 
 window.KELO_ADMIN_KEYS=Object.freeze({
   version:VERSION,
@@ -117,10 +100,9 @@ window.KELO_ADMIN_KEYS=Object.freeze({
   onChange(fn){if(typeof fn!=='function')return()=>{};listeners.add(fn);return()=>listeners.delete(fn);},
   authoritySource:()=>remoteAdapter?'remote-adapter':'local-prototype'
 });
-window.KELO_ADMIN_KEY_AUDIT=Object.freeze({version:VERSION,itemIdentity:true,bound:true,scopedPermissions:true,serverReplaceable:true,uiTrustOnlyOffline:true,worldBuilderBoot:true,worldBuilderPropertyRenderer:true,worldBuilderPreviewFix:true});
+window.KELO_ADMIN_KEY_AUDIT=Object.freeze({version:VERSION,itemIdentity:true,bound:true,scopedPermissions:true,serverReplaceable:true,uiTrustOnlyOffline:true,creatorUiOwner:'Kelo Creators',legacyWorldBuilderUiBoot:false,legacyPreviewHotfixBoot:false});
 
 const params=new URLSearchParams(location.search);
 if(params.get('mapEditor')==='1')request('admin-key:bootstrap-local-root',{actorId:playerId(),ownerId:playerId(),developer:true}).then(syncWhenReady).catch(console.error);else syncWhenReady();
 window.addEventListener('load',syncWhenReady,{once:true});
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',loadAuthorTools,{once:true});else loadAuthorTools();
 })();
