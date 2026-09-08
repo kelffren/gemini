@@ -28,7 +28,7 @@ Estados válidos:
 
 # ESTADO DEL PROYECTO EN 60 SEGUNDOS
 
-Kelo World es un juego web 2D top-down móvil-first sobre Canvas. El runtime todavía carga una cadena extensa de `engine-*.js`, pero los dominios modernos ya se están moviendo a `src/` con contratos explícitos: core/events, input locks, physics, environment, abilities, visuals, combat/effects/melee, property, instances, systems y UI.
+Kelo World es un juego web 2D top-down móvil-first sobre Canvas. El runtime todavía carga una cadena extensa de `engine-*.js`, pero los dominios modernos ya se están moviendo a `src/` con contratos explícitos: core/events, input locks, movement extensions, physics, environment, abilities, visuals, combat/effects/melee, property, instances, systems y UI.
 
 La Foundation NO crea un segundo engine. El objetivo es reducir progresivamente los engines históricos hasta que el contenido nuevo entre por owners y contratos estables.
 
@@ -42,21 +42,23 @@ La existencia de un archivo en `src/` NO demuestra por sí sola que esté LIVE. 
 
 ```text
 0. Foundation primitives: KeloEvents + KeloInputLocks
-1. collision-utils + engine-a..k
+1. collision-utils + engine-a + KeloMovement + engine-b..k
 2. environment contracts / atlases / world-map + engine-l
 3. engine-m..aj + character appearance + pvp-world
-4. Visual System / manifests / asset registry / animation / FX / sequence
-5. modern abilities + stone bridge + sword swap visuals/runtime
-6. engine-net
-7. Luxe/UI + mobile orientation + plaza depth
-8. gameplay systems (nobility/equipment/backpack/container/emote/market)
-9. property + instances + world builder
-10. UI panels
-11. forge/aura/illumination/performance
-12. profile-panel-close → dynamic runtime bootstrap → Event Bus + combat/effects/melee
-13. self interaction/PvP guards/visual integration
-14. force-unlock-move HOTFIX
+4. KeloInput gate sobre processInput legacy final
+5. Visual System / manifests / asset registry / animation / FX / sequence
+6. modern abilities + stone bridge + sword swap visuals/runtime
+7. engine-net
+8. Luxe/UI + mobile orientation + plaza depth
+9. gameplay systems (nobility/equipment/backpack/container/emote/market)
+10. property + instances + world builder
+11. UI panels
+12. forge/aura/illumination/performance
+13. profile-panel-close → dynamic runtime bootstrap → Event Bus + combat/effects/melee
+14. self interaction/PvP guards/visual integration
 ```
+
+`force-unlock-move.js` está **RETIRED** y ya no se carga en runtime Foundation.
 
 El script cargado más tarde puede envolver o modificar globals anteriores. Por eso Foundation prohíbe nuevos wrappers core cuando exista hook/API.
 
@@ -68,8 +70,11 @@ El script cargado más tarde puede envolver o modificar globals anteriores. Por 
 |---|---|---|---|
 | Core state / game loop base | `engine-a.js` | OWNER LIVE / NEEDS_AUDIT | Demasiadas responsabilidades; extracción incremental, no rewrite |
 | Input lock claims | `src/core/input-lock-system.js` / `KeloInputLocks` | OWNER LIVE FOUNDATION | Token claims; `KELO_MODAL_INPUT_LOCK` queda como adapter legacy temporal |
-| Input base | `engine-a.js` | NEEDS_AUDIT | Debe terminar produciendo intención únicamente |
-| Movement | `engine-a.js` + `engine-ac.js` + `engine-ah.js` | NEEDS_AUDIT | Hay wrapper chain y locks compartidos; consolidar sin cambiar feel |
+| Input base | `engine-a.js` + `src/core/input-gate.js` bridge | NEEDS_AUDIT / FOUNDATION BRIDGE | Input gate consulta `KeloInputLocks`; física/input base aún legacy |
+| Movement extension ownership | `src/core/movement-system.js` / `KeloMovement` | OWNER LIVE FOUNDATION / TRANSITIONAL | Único wrapper autorizado de `updateMovement`; hooks before/after deterministas |
+| Movement physics | `engine-a.js` | OWNER LIVE LEGACY CORE | Desplazamiento + colisión actual; extraer más adelante sin cambiar feel |
+| Gait/speed/stride | `engine-ac.js` vía `KeloMovement` | SUPPORT LIVE | Ya no envuelve `updateMovement` |
+| Release brake | `engine-ah.js` vía `KeloMovement` | SUPPORT LIVE | Ya no envuelve `updateMovement` |
 | Collision primitives | `src/physics/collision-utils.js` / `KELO_COLLISION` | OWNER LIVE | No duplicar geometría |
 | Camera/zoom | core + engines tardíos + mobile orientation | NEEDS_AUDIT | Consolidar ownership con tests móviles |
 | Render orchestration | `engine-c.js` | OWNER LIVE | Preferir hooks oficiales a wrappers |
@@ -94,8 +99,9 @@ El script cargado más tarde puede envolver o modificar globals anteriores. Por 
 | Instances | `src/instances/*` | OWNER LIVE | Reutilizar runtime/bridges existentes |
 | World Builder runtime | `src/environment/world-builder-system.js` | OWNER/SUPPORT / NEEDS_AUDIT | Runtime bien separado de authority; collider/render sync aún tiene deuda |
 | UI | `src/ui/*` | CONSUMER | UI consume APIs; no gobierna gameplay state ajeno |
-| Legacy modal lock writers | varias UIs escribiendo `KELO_MODAL_INPUT_LOCK` | LEGACY / MIGRATION | Migrar a `KeloInputLocks.acquire/release(token)` uno por uno |
-| `force-unlock-move.js` | ninguno: parche | HOTFIX | Retirar solo al arreglar lock ownership |
+| Legacy modal lock writers | varias UIs escribiendo `KELO_MODAL_INPUT_LOCK` | LEGACY / MIGRATION | El adapter ya evita clobber; código nuevo debe usar tokens y writers viejos se migran progresivamente |
+| `src/ui/modal-input-lock.js` | compatibilidad antigua | RETIRED COMPAT | Ya no envuelve `processInput`; conserva loader histórico si algún consumidor lo solicita |
+| `force-unlock-move.js` | ninguno | RETIRED HOTFIX / NOT LOADED | 0 timers, 0 wrappers, 0 clear de locks/build mode |
 | Runtime bootstrap | `src/core/kelo-runtime-bootstrap.js` | DYNAMIC LIVE | Actualmente lanzado desde `profile-panel-close.js`; boot ownership debe limpiarse después |
 
 ---
@@ -107,6 +113,7 @@ Antes de envolver core, buscar y reutilizar:
 ```text
 KeloEvents
 KeloInputLocks
+KeloMovement.before / after
 KELO_COLLISION
 KELO_WORLD_RENDERER.draw
 drawPreActors
@@ -119,7 +126,7 @@ Property/Instance APIs
 system-owned event buses
 ```
 
-Prohibición Foundation: no introducir wrappers nuevos directos de `render`, `renderAvatar`, `updateSimulation` o `processInput` cuando exista un punto de extensión apropiado.
+Prohibición Foundation: no introducir wrappers nuevos directos de `render`, `renderAvatar`, `updateSimulation`, `processInput` o `updateMovement` cuando exista un punto de extensión apropiado.
 
 ---
 
@@ -127,8 +134,8 @@ Prohibición Foundation: no introducir wrappers nuevos directos de `render`, `re
 
 Deuda prioritaria, sin borrar a ciegas:
 
-1. Migrar writers legacy de modal input a `KeloInputLocks` y retirar `force-unlock-move` cuando los smoke tests lo permitan.
-2. Movement wrapper chain `engine-a → engine-ac → engine-ah`.
+1. Migrar writers legacy de modal input a `KeloInputLocks`; `force-unlock-move` ya está retirado y fuera del runtime.
+2. Extraer en el futuro la física base de `engine-a` detrás de `KeloMovement`; wrapper chain `engine-ac/engine-ah` ya eliminado.
 3. Abilities/stones legacy en engines vs `src/abilities/*`.
 4. Inventory/equipment legacy state vs sistemas modernos.
 5. Render/avatar wrapper chain.
@@ -196,14 +203,17 @@ Regla: UI/cliente solicita operaciones; autoridad crítica puede migrar al serve
 | ENGINE_MAP sincronizado a V6.53 Foundation | ✅ este documento |
 | Estándar de documentación | ✅ `docs/SYSTEM_DOCUMENTATION_STANDARD.md` |
 | Catálogo documental + guía pública | ✅ `docs/system-catalog.json` + `guide.html` |
-| Owner único para todos los dominios críticos | ⚠️ en progreso |
-| Cero hotfix watchdogs | ❌ `force-unlock-move.js` todavía requerido |
+| Input lock owner único | ✅ `KeloInputLocks` |
+| Movement extension owner único | ✅ `KeloMovement` |
+| `engine-ac`/`engine-ah` wrappers de movement | ✅ eliminados; ahora hooks |
+| Hotfix watchdog `force-unlock` activo | ✅ retirado y fuera del runtime |
+| Owner único para todos los demás dominios críticos | ⚠️ en progreso |
 | Cero nuevos wrappers core | ✅ política + Foundation audit para deuda nueva |
 | Legacy totalmente clasificado/migrado | ⚠️ en progreso |
 | APIs públicas completas documentadas | ⚠️ en progreso |
-| CI arquitectónico/documental | ✅ workflow Foundation en rama; falta validar run de PR |
+| CI arquitectónico/documental | ✅ workflow Foundation; validar cada HEAD de PR |
 | `main` protegido | ❌ baseline GitHub indica branch sin protección |
-| Móvil/desktop/LIVE post-migración | pendiente por cada cambio conductual |
+| Móvil/desktop/LIVE post-migración | pendiente por cada cambio conductual antes de merge |
 
 ---
 
