@@ -1,16 +1,24 @@
 /* KELO-INDEX
  * area: CHARACTERS
- * keys: CONTENT PACK REGISTRY MODULAR ITEMS OUTFITS REUSABLE
- * hace: registra paquetes declarativos de piezas/outfits de forma idempotente sobre CharacterCustomization
- * online: registra IDs y metadatos visuales; no toca stats, inventario ni autoridad
+ * owner: KeloCharacterContentPacks
+ * keys: CONTENT PACK REGISTRY MODULAR ITEMS OUTFITS PRESETS PALETTES REUSABLE
+ * purpose: registra paquetes declarativos de piezas, outfits, presets y paletas sobre CharacterCustomization
+ * public-api: KeloCharacterContentPacks.define/flush/has/isRegistered/list
+ * consumes: KeloCharacterCustomization
+ * state-owned: definiciones de packs + IDs ya registrados
+ * extension-points: cualquier pack futuro declara data; no crea loaders propios
+ * reuse: apariencia, ropa, equipo, cosméticos y contenido premium
+ * legacy: packs v1 sin palettes/presets siguen registrando normalmente
+ * do-not: NO tocar stats, inventario ni autoridad; NO usar polling/watchdogs
+ * online: registra IDs/metadatos visuales; ownership final puede validarlo servidor
  */
 (function (root) {
   'use strict';
 
-  const VERSION = 'character-content-packs-v1.0.0';
+  const VERSION = 'character-content-packs-v2.0.0';
   const packs = new Map();
   const registered = new Set();
-  let timer = null;
+  let readyListenerInstalled = false;
 
   const audit = root.KELO_CHARACTER_CONTENT_PACKS_AUDIT = {
     version:VERSION,
@@ -19,6 +27,9 @@
     registered:0,
     itemCount:0,
     outfitCount:0,
+    presetCount:0,
+    paletteCount:0,
+    polling:false,
     lastPack:null,
     errors:[]
   };
@@ -31,6 +42,8 @@
       version:String(input.version || '1'),
       items:Object.freeze((input.items || []).slice()),
       outfits:Object.freeze((input.outfits || []).slice()),
+      presets:Object.freeze((input.presets || []).slice()),
+      palettes:Object.freeze((input.palettes || []).slice()),
       tags:Object.freeze((input.tags || []).map(String))
     });
   }
@@ -39,6 +52,10 @@
     const A = api();
     if (!A || !pack || registered.has(pack.id)) return false;
     try {
+      pack.palettes.forEach(function (def) {
+        if (!def || !def.id) throw new Error('INVALID_CHARACTER_PACK_PALETTE_' + pack.id);
+        if (!A.getPalette(def.id)) A.registerPalette(def);
+      });
       pack.items.forEach(function (def) {
         if (!def || !def.id) throw new Error('INVALID_CHARACTER_PACK_ITEM_' + pack.id);
         if (!A.getItem(def.id)) A.registerItem(def);
@@ -48,10 +65,16 @@
         const exists = A.listOutfits().some(function (item) { return item.id === String(def.id); });
         if (!exists) A.registerOutfit(def);
       });
+      pack.presets.forEach(function (def) {
+        if (!def || !def.id) throw new Error('INVALID_CHARACTER_PACK_PRESET_' + pack.id);
+        if (!A.getPreset(def.id)) A.registerPreset(def);
+      });
       registered.add(pack.id);
       audit.registered = registered.size;
       audit.itemCount += pack.items.length;
       audit.outfitCount += pack.outfits.length;
+      audit.presetCount += pack.presets.length;
+      audit.paletteCount += pack.palettes.length;
       audit.lastPack = pack.id;
       try { root.dispatchEvent(new CustomEvent('kelo:character-content-pack-ready', { detail:{ id:pack.id, version:pack.version } })); } catch (e) {}
       return true;
@@ -69,19 +92,10 @@
     return changed;
   }
 
-  function ensureRetry() {
-    if (api()) { flush(); return; }
-    if (timer) return;
-    let attempts = 0;
-    timer = setInterval(function () {
-      attempts += 1;
-      if (api()) {
-        clearInterval(timer); timer = null; flush();
-      } else if (attempts >= 100) {
-        clearInterval(timer); timer = null;
-        if (audit.errors.indexOf('CHARACTER_CUSTOMIZATION_API_TIMEOUT') < 0) audit.errors.push('CHARACTER_CUSTOMIZATION_API_TIMEOUT');
-      }
-    }, 50);
+  function ensureReadyListener() {
+    if (readyListenerInstalled) return;
+    readyListenerInstalled = true;
+    root.addEventListener('kelo:character-customization-ready', flush, { once:true });
   }
 
   function define(input) {
@@ -90,10 +104,11 @@
     if (existing) return existing;
     packs.set(pack.id, pack);
     audit.defined = packs.size;
-    if (!registerPack(pack)) ensureRetry();
+    if (!registerPack(pack)) ensureReadyListener();
     return pack;
   }
 
+  ensureReadyListener();
   root.KeloCharacterContentPacks = Object.freeze({
     version:VERSION,
     define:define,
