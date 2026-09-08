@@ -47,18 +47,19 @@ try{
     settingsOwner:!!(window.KeloSettingsUI&&typeof window.KeloSettingsUI.open==='function'),
     creatorsAllowed:!!window.KELO_CREATORS_LAUNCHER?.allowed
   }));
-  assert(baseline.luxe?.version==='luxe-shell-v4.0.1-premium-menu','Premium Luxe runtime version missing');
+  assert(baseline.luxe?.version==='luxe-shell-v4.0.2-premium-menu','Premium Luxe runtime version missing');
   assert(baseline.luxe?.tokenLocks===true,'Premium menu token-lock audit missing');
 
   await openMenu();
   const portrait=await page.evaluate(()=>{
     const panel=document.getElementById('lx-menu-panel'),grid=document.getElementById('lx-menu-grid');
-    const pr=panel.getBoundingClientRect(),gr=getComputedStyle(grid);
+    const pr=panel.getBoundingClientRect(),gr=getComputedStyle(grid),titles=Array.from(grid.querySelectorAll('.lx-menu-copy b'));
     return {
       width:innerWidth,height:innerHeight,
       panel:{left:pr.left,top:pr.top,right:pr.right,bottom:pr.bottom,width:pr.width,height:pr.height},
       columns:gr.gridTemplateColumns.split(' ').filter(Boolean).length,
-      labels:Array.from(grid.querySelectorAll('.lx-menu-copy b')).map(x=>x.textContent.trim()),
+      labels:titles.map(x=>x.textContent.trim()),
+      clippedTitles:titles.filter(x=>x.scrollWidth>x.clientWidth+1).map(x=>x.textContent.trim()),
       tools:Array.from(grid.querySelectorAll('[data-tool]')).map(x=>x.dataset.tool),
       mainLock:window.KeloInputLocks.has('luxe-main-menu'),
       overflowX:document.documentElement.scrollWidth>innerWidth+1,
@@ -67,6 +68,7 @@ try{
   });
   for(const label of ['Mochila','Habilidades','Apariencia','Perfil','Mercado','Chat','Propiedades','Nobleza','Burlas'])assert(portrait.labels.includes(label),'Missing visible menu entry: '+label);
   assert(portrait.columns===2,'Portrait menu is not two columns');
+  assert(portrait.clippedTitles.length===0,'Portrait menu clips title text: '+portrait.clippedTitles.join(', '));
   assert(portrait.mainLock===true,'Main menu did not acquire KeloInputLocks token');
   assert(portrait.panel.left>=0&&portrait.panel.right<=portrait.width+1&&portrait.panel.top>=0&&portrait.panel.bottom<=portrait.height+1,'Portrait menu escapes viewport');
   assert(!portrait.overflowX,'Portrait document has horizontal overflow');
@@ -97,10 +99,11 @@ try{
   await page.waitForTimeout(250);
   await openMenu();
   const landscape=await page.evaluate(()=>{
-    const panel=document.getElementById('lx-menu-panel'),grid=document.getElementById('lx-menu-grid'),r=panel.getBoundingClientRect();
-    return {width:innerWidth,height:innerHeight,panel:{left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height},columns:getComputedStyle(grid).gridTemplateColumns.split(' ').filter(Boolean).length,scrollHeight:panel.querySelector('.lx-menu-scroll').scrollHeight,clientHeight:panel.querySelector('.lx-menu-scroll').clientHeight,overflowX:document.documentElement.scrollWidth>innerWidth+1};
+    const panel=document.getElementById('lx-menu-panel'),grid=document.getElementById('lx-menu-grid'),r=panel.getBoundingClientRect(),titles=Array.from(grid.querySelectorAll('.lx-menu-copy b'));
+    return {width:innerWidth,height:innerHeight,panel:{left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height},columns:getComputedStyle(grid).gridTemplateColumns.split(' ').filter(Boolean).length,clippedTitles:titles.filter(x=>x.scrollWidth>x.clientWidth+1).map(x=>x.textContent.trim()),scrollHeight:panel.querySelector('.lx-menu-scroll').scrollHeight,clientHeight:panel.querySelector('.lx-menu-scroll').clientHeight,overflowX:document.documentElement.scrollWidth>innerWidth+1};
   });
   assert(landscape.columns===2,'Landscape menu is not two columns');
+  assert(landscape.clippedTitles.length===0,'Landscape menu clips title text: '+landscape.clippedTitles.join(', '));
   assert(landscape.panel.left>=0&&landscape.panel.right<=landscape.width+1&&landscape.panel.top>=0&&landscape.panel.bottom<=landscape.height+1,'Landscape menu escapes viewport');
   assert(!landscape.overflowX,'Landscape has horizontal overflow');
   report.landscape=landscape;
