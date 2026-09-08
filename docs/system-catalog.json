@@ -9,6 +9,14 @@
       "playerVisible": true,
       "playerGuideAnchor": "controles-y-bloqueos-de-interfaz",
       "status": "foundation-active"
+    },
+    {
+      "id": "input-gate",
+      "owner": "KeloInputLocks (support bridge)",
+      "source": "src/core/input-gate.js",
+      "technicalDoc": "docs/systems/INPUT_GATE.md",
+      "playerVisible": false,
+      "status": "foundation-transitional"
     }
   ]
 }
