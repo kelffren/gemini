@@ -51,6 +51,14 @@
       "technicalDoc": "docs/systems/SIMULATION_EXTENSION_SYSTEM.md",
       "playerVisible": false,
       "status": "foundation-transitional"
+    },
+    {
+      "id": "avatar-render",
+      "owner": "KeloAvatar",
+      "source": "src/core/avatar-render-system.js",
+      "technicalDoc": "docs/systems/AVATAR_RENDER_SYSTEM.md",
+      "playerVisible": false,
+      "status": "foundation-transitional"
     }
   ]
 }
