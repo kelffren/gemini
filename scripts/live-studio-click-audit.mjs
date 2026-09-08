@@ -54,8 +54,9 @@ try{
   report.creatorsButtonVisible=true;
   const creatorsButton=page.locator('#lx-create-studio');
   report.creatorsButtonText=await creatorsButton.textContent();
+  report.creatorsButtonTitle=String(await creatorsButton.locator('.lx-menu-copy b').textContent().catch(()=>'' )||'').trim();
   report.creatorsButtonLabel=await creatorsButton.getAttribute('aria-label');
-  if(report.creatorsButtonLabel!=='Abrir Kelo Creators'||!/\bCreators\b/i.test(String(report.creatorsButtonText||'')))throw new Error(`CREATORS_BUTTON_IDENTITY_INVALID:${JSON.stringify({label:report.creatorsButtonLabel,text:report.creatorsButtonText})}`);
+  if(report.creatorsButtonLabel!=='Abrir Kelo Creators'||report.creatorsButtonTitle!=='Creators')throw new Error(`CREATORS_BUTTON_IDENTITY_INVALID:${JSON.stringify({label:report.creatorsButtonLabel,title:report.creatorsButtonTitle,text:report.creatorsButtonText})}`);
   await creatorsButton.click();
   await page.waitForSelector('#kelo-creators-hub',{state:'visible',timeout:10000});
   report.creatorHubVisible=true;
