@@ -1,14 +1,14 @@
 /* KELO-INDEX
  * area: QA / CAMERA
  * owner: FOUNDATION CI
- * keys: CAMERA VIEWPORT ZOOM DPR TARGET SCREEN WORLD ORIENTATION LIVE WRITERS CONTRACT
+ * keys: CAMERA VIEWPORT ZOOM DPR TARGET RESTORE SCREEN WORLD ORIENTATION LIVE WRITERS CONTRACT
  * purpose: valida owner único KeloCamera, compatibilidad determinista y ausencia de nuevos owners paralelos en scripts LIVE
  * public-api: CLI
  * consumes: camera-system, engine-h, mobile-orientation, index.html y scripts runtime directos
  * state-owned: ninguno
  * extension-points: invariantes KeloCamera + allowlist legacy explícita y temporal
  * reuse: Foundation CI
- * legacy: engine-a conserva follow/Canvas bootstrap; engine-b/c conservan writers de target capturados por adapters hasta migración posterior
+ * legacy: engine-a conserva follow/Canvas bootstrap; engine-b es el único writer legacy directo de target tolerado temporalmente
  * do-not: no sustituir browser smoke de rotación/viewport
  */
 'use strict';
@@ -40,11 +40,13 @@ vm.createContext(context);
 vm.runInContext(source,context,{filename:'camera-system.js'});
 ok(context.KeloCamera&&context.KELO_CAMERA_AUDIT?.owner==='KeloCamera','OWNER_NOT_INSTALLED');
 ok(context.KeloCamera.version.startsWith('kelo-camera-v1.'),'VERSION');
-ok(typeof context.KeloCamera.setTarget==='function'&&typeof context.KeloCamera.screenToWorld==='function'&&typeof context.KeloCamera.worldToScreen==='function','PUBLIC_API');
+ok(typeof context.KeloCamera.setTarget==='function'&&typeof context.KeloCamera.restoreState==='function'&&typeof context.KeloCamera.screenToWorld==='function'&&typeof context.KeloCamera.worldToScreen==='function','PUBLIC_API');
 context.KeloCamera.setTarget(500,600,{source:'test'});
 ok(context.camera.targetX===500&&context.camera.targetY===600,'TARGET_API');
 context.camera.targetX=700;context.camera.targetY=800;
 ok(context.KeloCamera.snapshot().targetX===700&&context.KeloCamera.snapshot().targetY===800,'LEGACY_TARGET_ADAPTER');
+context.KeloCamera.restoreState({x:111,y:222,targetX:333,targetY:444,lookOffsetX:5,lookOffsetY:-4},{source:'test-restore'});
+ok(context.camera.x===111&&context.camera.y===222&&context.camera.targetX===333&&context.camera.targetY===444&&context.camera.lookOffsetX===5&&context.camera.lookOffsetY===-4,'RESTORE_STATE_API');
 context.KeloCamera.setFollowTuning({dampX:12,lookAheadDist:60});
 ok(context.CONFIG.dampX===12&&context.CONFIG.lookAheadDist===60,'FOLLOW_TUNING_API');
 context.CONFIG.dampY=9;
@@ -65,7 +67,7 @@ ok(context.canvas.width===1688&&context.canvas.height===780,'LANDSCAPE_DPR_VIEWP
 const before=context.KeloCamera.getBaseZoom();context.cycleZoom();
 ok(Math.abs(context.KeloCamera.getBaseZoom()-before)>1e-6,'GLOBAL_CYCLE_OWNED');
 ok(styleValues['--kelo-vw']==='844px'&&styleValues['--kelo-vh']==='390px','VIEWPORT_CSS_OWNER');
-ok(events.some(e=>e.type==='kelo:viewportchange')&&events.some(e=>e.type==='kelo:camerazoomchange'),'OBSERVABILITY_EVENTS');
+ok(events.some(e=>e.type==='kelo:viewportchange')&&events.some(e=>e.type==='kelo:camerazoomchange')&&events.some(e=>e.type==='kelo:camerarestore'),'OBSERVABILITY_EVENTS');
 ok(hd.includes("cameraOwner = window.KeloCamera")&&hd.includes('cameraOwner.configureViewport')&&hd.includes('cameraOwner.syncViewport'),'ENGINE_H_CONSUMES_OWNER');
 ok(!/\bCONFIG\.zoom\s*=/.test(hd),'ENGINE_H_DIRECT_ZOOM_WRITE');
 ok(!/\b(?:window\.)?resize\s*=/.test(hd),'ENGINE_H_RESIZE_OVERRIDE');
@@ -120,9 +122,9 @@ function exactWriters(pattern,allowed,label){
   const actual=writers(pattern);const expected=[...allowed].sort();
   ok(JSON.stringify(actual)===JSON.stringify(expected),label+': actual='+actual.join(',')+' expected='+expected.join(','));
 }
-exactWriters(/\bcamera\.(?:targetX|targetY)\s*=/g,['engine-b.js','engine-c.js'],'LIVE_CAMERA_TARGET_WRITERS');
+exactWriters(/\bcamera\.(?:targetX|targetY)\s*=/g,['engine-b.js'],'LIVE_CAMERA_TARGET_WRITERS');
 exactWriters(/\bCONFIG\.zoom\s*=/g,['engine-c.js'],'LIVE_CAMERA_ZOOM_WRITERS');
 exactWriters(/\bcanvas\.(?:width|height)\s*=/g,['engine-a.js','src/core/camera-system.js'],'LIVE_CANVAS_SIZE_WRITERS');
 exactWriters(globalAssignment('resize'),['src/core/camera-system.js'],'LIVE_RESIZE_OWNERS');
 exactWriters(globalAssignment('cycleZoom'),['src/core/camera-system.js'],'LIVE_CYCLE_ZOOM_OWNERS');
-console.log('CAMERA_SYSTEM_OK: owner + target + tuning + viewport + DPR + orientation + screen/world + LIVE writer guard passed');
+console.log('CAMERA_SYSTEM_OK: owner + target + restore + tuning + viewport + DPR + orientation + screen/world + LIVE writer guard passed');
