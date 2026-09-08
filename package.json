@@ -6,7 +6,8 @@
     "test:live": "playwright test",
     "audit:stones": "node scripts/audit-stones.js",
     "audit:property": "node scripts/property-editor-audit.js",
-    "audit:character": "node scripts/character-customization-audit.js"
+    "audit:character": "node scripts/character-customization-audit.js",
+    "audit:foundation": "node scripts/foundation-architecture-audit.js"
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0"
