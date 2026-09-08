@@ -198,7 +198,9 @@ function updateSimulation(dt){
   for (let i=particles.length-1;i>=0;i--){ particles[i].life-=dt; if(particles[i].life<=0) particles.splice(i,1); }
 }
 function renderActionBar(){
-  const container=document.getElementById('action-bar-container'); container.innerHTML='';
+  const container=document.getElementById('action-bar-container');
+  if (!container) return;
+  container.innerHTML='';
   STATE.equipped.forEach((stone,idx)=>{
     const slot=document.createElement('div'); slot.className='stone-slot'+(stone.isUlt?' ultimate':'');
     slot.onclick=()=>triggerStone(idx);
@@ -249,7 +251,7 @@ function render(){
     ctx.beginPath(); ctx.arc(input.originX,input.originY,CONFIG.joystickRadius,0,Math.PI*2); ctx.fill(); ctx.stroke();
     ctx.strokeStyle='rgba(255,50,50,0.4)'; ctx.beginPath(); ctx.arc(input.originX,input.originY,CONFIG.joystickRadius*CONFIG.joystickDeadzone,0,Math.PI*2); ctx.stroke();
     const dx=input.currentX-input.originX, dy=input.currentY-input.originY, dist=Math.hypot(dx,dy), clamped=Math.min(dist,CONFIG.joystickRadius), angle=Math.atan2(dy,dx);
-    ctx.fillStyle='#00d2ff'; ctx.beginPath(); ctx.arc(input.originX+Math.cos(angle)*clamped, input.originY+Math.sin(angle)*clamped, 20, 0, Math.PI*2); ctx.fill(); ctx.restore();
+    ctx.fillStyle='#00d2ff'; ctx.beginPath(); ctx.arc(input.originX+Math.cos(angle)*clamped, input.originY+Math.sin(angle)*clamped, 20, 0,Math.PI*2); ctx.fill(); ctx.restore();
   }
 }
 function renderAvatar(p,isSelf){
