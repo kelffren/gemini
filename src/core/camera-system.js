@@ -6,8 +6,8 @@
  * public-api: KeloCamera
  * consumes: camera, CONFIG, canvas, ctx, screenW/screenH y updateCamera legacy de engine-a
  * state-owned: targetX/Y, posición comandada, follow tuning, zoom efectivo/base, viewport policy, DPR policy y foco
- * extension-points: setTarget/focus/restoreState/setBaseZoom/configureViewport/syncViewport/setFollowTuning
- * reuse: gameplay pide foco/restore/zoom al owner; UI/orientación delegan viewport y framing aquí
+ * extension-points: setTarget/focus/restoreState/setBaseZoom/configureViewport/syncViewport/setFollowTuning/worldView
+ * reuse: gameplay pide foco/restore/zoom al owner; render/culling consulta worldView(); UI/orientación delegan viewport y framing aquí
  * legacy: engine-a conserva temporalmente la matemática interna de follow/dead-zone; writers legacy de target/zoom/tuning quedan capturados por adapters
  * do-not: NO escribir camera.targetX/Y, camera.x/y por comandos externos, CONFIG.zoom/camera tuning, canvas.width/height o reemplazar resize desde features nuevas
  */
@@ -16,7 +16,7 @@
   if(root.KeloCamera)return;
   if(typeof camera==='undefined'||typeof CONFIG==='undefined'||typeof canvas==='undefined'||typeof ctx==='undefined')throw new Error('KeloCamera: legacy camera/canvas core unavailable');
 
-  const VERSION='kelo-camera-v1.3.0';
+  const VERSION='kelo-camera-v1.4.0';
   const ZOOM_PRESETS=Object.freeze([0.7,0.82,1]);
   const TUNING_KEYS=Object.freeze(['dampX','dampY','deadXRatio','deadYRatio','lookAheadDist','lookAheadDecay']);
   const legacyUpdateCamera=typeof updateCamera==='function'?updateCamera:null;
@@ -51,6 +51,7 @@
   function getFollowTuning(){return Object.freeze(Object.fromEntries(TUNING_KEYS.map(key=>[key,managedTuning[key]])));}
   function screenToWorldPoint(sx,sy){const z=effectiveZoom||1;return{x:camera.x+(Number(sx)-screenW/2)/z,y:camera.y+(Number(sy)-screenH/2)/z};}
   function worldToScreenPoint(wx,wy){const z=effectiveZoom||1;return{x:(Number(wx)-camera.x)*z+screenW/2,y:(Number(wy)-camera.y)*z+screenH/2};}
+  function worldView(){const z=effectiveZoom||1,w=screenW/z,h=screenH/z,cx=Number(camera.x)||0,cy=Number(camera.y)||0,left=cx-w/2,top=cy-h/2;return Object.freeze({x:left,y:top,w,h,left,top,right:left+w,bottom:top+h,centerX:cx,centerY:cy,zoom:z,screenW,screenH});}
   function update(dt){if(legacyUpdateCamera)legacyUpdateCamera(dt);}
   function refreshZoom(source){return applyZoom(source||'refresh');}
   function snapshot(){return Object.freeze({version:VERSION,x:camera.x,y:camera.y,targetX:managedTargetX,targetY:managedTargetY,lookOffsetX:Number(camera.lookOffsetX)||0,lookOffsetY:Number(camera.lookOffsetY)||0,baseZoom,effectiveZoom,orientation:orientation(),screenW,screenH,dpr:activeDpr(),dprCap,pixelPerfect,roundPixels,smoothing,follow:getFollowTuning()});}
@@ -63,6 +64,6 @@
   root.addEventListener('resize',()=>scheduleViewportSync('resize'),{passive:true});
   root.visualViewport?.addEventListener('resize',()=>scheduleViewportSync('visualViewport'),{passive:true});
 
-  root.KeloCamera=Object.freeze({version:VERSION,setTarget,focus,restoreState,setFollowTuning,getFollowTuning,setBaseZoom,getBaseZoom:()=>baseZoom,getEffectiveZoom:()=>effectiveZoom,cycleZoom,refreshZoom,getOrientation:orientation,configureViewport,syncViewport,scheduleViewportSync,syncViewportCss,activeDpr,pixelPerfectZoom,screenToWorld:screenToWorldPoint,worldToScreen:worldToScreenPoint,snapshot});
-  root.KELO_CAMERA_AUDIT=Object.freeze({version:VERSION,owner:'KeloCamera',legacyFollowMath:true,legacyTargetAdapter:true,legacyZoomAdapter:true,legacyTuningAdapter:true,updateCameraOwner:true,viewportOwner:true,zoomOwner:true,targetOwner:true,restoreOwner:true,screenWorldOwner:true});
+  root.KeloCamera=Object.freeze({version:VERSION,setTarget,focus,restoreState,setFollowTuning,getFollowTuning,setBaseZoom,getBaseZoom:()=>baseZoom,getEffectiveZoom:()=>effectiveZoom,cycleZoom,refreshZoom,getOrientation:orientation,configureViewport,syncViewport,scheduleViewportSync,syncViewportCss,activeDpr,pixelPerfectZoom,screenToWorld:screenToWorldPoint,worldToScreen:worldToScreenPoint,worldView,snapshot});
+  root.KELO_CAMERA_AUDIT=Object.freeze({version:VERSION,owner:'KeloCamera',legacyFollowMath:true,legacyTargetAdapter:true,legacyZoomAdapter:true,legacyTuningAdapter:true,updateCameraOwner:true,viewportOwner:true,zoomOwner:true,targetOwner:true,restoreOwner:true,screenWorldOwner:true,worldViewOwner:true});
 })(typeof globalThis!=='undefined'?globalThis:window);
