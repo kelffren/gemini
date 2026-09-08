@@ -73,7 +73,7 @@ function isContractFixture(file){return /^scripts\/.*(?:contract|audit|test).*\.
 function isAuthorizedCoreWrapper(entry, ruleName){
   if (ruleName !== 'new direct core wrapper') return false;
   const authorized={
-    'src/core/input-gate.js':'owner: KeloInputLocks',
+    'src/core/input-system.js':'owner: KeloInput',
     'src/core/movement-system.js':'owner: KeloMovement'
   };
   const ownerMarker=authorized[entry.file];
