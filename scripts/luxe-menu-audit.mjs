@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: TEST / UI
  * owner: Premium main menu + player HUD contract audit
- * keys: MENU LUXE HUD PLAYER NOBILITY TITLES CLAN HP MANA GOLD GUIDE INPUT LOCK FOUNDATION COMMERCE MOUNTS
+ * keys: MENU LUXE HUD PLAYER NOBILITY TITLES CLAN HP MANA GOLD GUIDE INPUT LOCK FOUNDATION COMMERCE MOUNTS WORLD FIRST
  * purpose: prueba estáticamente que Luxe reutiliza owners reales, monta un HUD único y no reintroduce legacy/polling
  * online: N/A; valida fronteras UI/owner, no autoridad gameplay
  */
@@ -79,15 +79,18 @@ assert(playerHud.includes("p?.mana??state?.playerProfile?.mana")&&playerHud.incl
 assert(playerHud.includes("return 'Sin clan'")&&playerHud.includes("p?.clan?.name"),'Clan must use adapter/fallback without creating a parallel clan system');
 assert(playerHud.includes('env(safe-area-inset-top)')&&playerHud.includes('env(safe-area-inset-left)'),'Player HUD must respect iOS safe areas');
 assert(playerHud.includes('min-height:44px')&&playerHud.includes('@media(max-width:360px)'),'Player HUD must keep touch target and narrow-mobile layout');
-assert(playerHud.includes('width:clamp(184px,55vw,218px)'),'Player HUD ultra-compact width contract missing');
+assert(playerHud.includes('width:clamp(150px,43vw,176px)'),'Player HUD world-first width contract missing');
 assert(playerHud.includes('.kw-hud-resource-main{display:block')&&playerHud.includes('.kw-hud-bar{display:block;width:100%'),'HP/Mana bars must remain real visible blocks');
-assert(playerHud.includes('.kw-hud-copy{position:absolute'),'Copy affordance must stay out of compact HUD layout flow');
+assert(playerHud.includes('.kw-hud-copy{margin-left:auto;width:22px;height:22px'),'Copy affordance must remain compact and touchable');
+assert(playerHud.includes('.kw-hud-details{display:grid')&&playerHud.includes('.kw-player-hud.expanded .kw-hud-details'),'Clan/Nobleza/Título must use progressive disclosure while exploring');
+assert(playerHud.includes('grid-template-columns:repeat(2,44px)')&&playerHud.includes('#kelo-luxe .lx-top{display:none!important}'),'Permanent mobile chrome must use the compact 2x2 world-first rail');
+assert(playerHud.includes("rail.appendChild(shop)")&&playerHud.includes("aria-label','Abrir Boutique"),'Boutique must reuse the compact Luxe rail instead of a permanent top banner');
 assert(!playerHud.includes('setInterval('),'Player HUD must not poll with setInterval');
 assert((playerHud.match(/requestAnimationFrame\(/g)||[]).length===1,'Player HUD may use one initial RAF, not a continuous frame loop');
 assert(!/STATE\s*\.\s*gold\s*[+\-*/]?=/.test(playerHud),'Player HUD must not mutate gold');
 assert(!/\.hp\s*[+\-*/]?=/.test(playerHud),'Player HUD must not mutate HP');
 
-assert(index.includes('src/ui/luxe-player-hud.js?v=1'),'Player HUD bootstrap missing');
+assert(index.includes('src/ui/luxe-player-hud.js?v=2'),'Player HUD bootstrap/cache-bust missing');
 assert(!index.includes('id="telemetry-bar"'),'Legacy telemetry gold badge must be removed from runtime DOM');
 assert(!index.includes('id="kelo-guide-link"'),'Legacy standalone guide link must be removed from runtime DOM');
 assert(!index.includes('.hud-badge{'),'Legacy telemetry HUD CSS must be retired, not hidden');
@@ -97,4 +100,4 @@ assert(index.includes('src/ui/luxe-shell.js?v=230'),'Luxe cache-bust not updated
 assert(index.includes('src/abilities/kelo-ability-boot.js?v=157'),'Abilities cache-bust not updated');
 assert(index.includes('src/ui/studio-launcher.js?v=3'),'Creators cache-bust not updated');
 
-console.log(JSON.stringify({status:'PASS',owner:'Kelo Luxe Shell presentation',playerHud:'src/ui/luxe-player-hud.js',legacyTelemetryRemoved:true,guideIntegrated:true,titleBook:true,mountRoute:true,commerceRoute:'KeloMarketUI -> KeloCommerceUI/KeloMarketWorld',dataSources:['localPlayer','STATE','KeloNobility','KeloTitles'],clanFallback:true,manaHonestUnavailableFallback:true,recovered:['Apariencia','Monturas','Nobleza','Libro de títulos','Burlas'],existingReal:['Mochila','Habilidades','Perfil','Mercado','Chat','Propiedades'],conditional:['Misiones','Ajustes'],creators:'authorization-gated launcher',noParallelMenu:true,noPolling:true,tokenInputLocks:true,ultraCompactHud:true,narrowScreenTitles:'no-ellipsis'},null,2));
+console.log(JSON.stringify({status:'PASS',owner:'Kelo Luxe Shell presentation',playerHud:'src/ui/luxe-player-hud.js',legacyTelemetryRemoved:true,guideIntegrated:true,titleBook:true,mountRoute:true,commerceRoute:'KeloMarketUI -> KeloCommerceUI/KeloMarketWorld',dataSources:['localPlayer','STATE','KeloNobility','KeloTitles'],clanFallback:true,manaHonestUnavailableFallback:true,recovered:['Apariencia','Monturas','Nobleza','Libro de títulos','Burlas'],existingReal:['Mochila','Habilidades','Perfil','Mercado','Chat','Propiedades'],conditional:['Misiones','Ajustes'],creators:'authorization-gated launcher',noParallelMenu:true,noPolling:true,tokenInputLocks:true,ultraCompactHud:true,worldFirstHud:true,secondaryMetadata:'progressive-disclosure',narrowScreenTitles:'no-ellipsis'},null,2));
