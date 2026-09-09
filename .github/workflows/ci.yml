@@ -81,9 +81,9 @@ jobs:
         run: |
           node scripts/validate-asset-integrity.mjs
           node scripts/validate-png-pipeline.mjs
-          bad="$(find assets -type f ! -name '*.PNG' -print)"
+          bad="$(find assets -type f ! -iname '*.png' -print)"
           if [ -n "$bad" ]; then
-            echo 'assets/ contains non-.PNG files:'
+            echo 'assets/ contains non-PNG files:'
             echo "$bad"
             exit 1
           fi
