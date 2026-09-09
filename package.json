@@ -16,6 +16,7 @@
     "audit:studio": "node scripts/studio-foundation-audit.mjs",
     "audit:studio:creator": "node scripts/studio-creator-v1-audit.mjs",
     "audit:mounts": "node scripts/mount-foundation-audit.mjs",
+    "audit:equipment-abilities": "node scripts/equipment-ability-audit.mjs",
     "audit:stats": "node scripts/stat-modifier-audit.mjs",
     "audit:appearance": "node scripts/appearance-foundation-audit.mjs",
     "audit:mount-creator": "node scripts/mount-creator-audit.mjs"

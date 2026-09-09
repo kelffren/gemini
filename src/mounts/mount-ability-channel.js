@@ -1,29 +1,27 @@
 /* KELO-INDEX
  * area: MOUNTS / ABILITY CHANNEL
  * owner: KeloMountAbilityChannel adapter; KeloAbilities remains delivery/effect runtime owner
- * purpose: 3 slots exclusivos de montura reutilizando KeloAbilities.engine.cast sin tocar STATE.equipped
+ * purpose: 3 slots exclusivos de montura reutilizando KeloAbilitySourceCast → KeloAbilities sin tocar STATE.equipped
  * public-api: sync/getSlots/cast/getSnapshot/on
- * consumes: KeloMounts, KeloAbilities, KELO_MOUNT_ABILITY_DATA
+ * consumes: KeloMounts, KeloAbilitySourceCast, KeloAbilities indirecto, KELO_MOUNT_ABILITY_DATA
  * state-owned: cooldown readyAt + 3 runtime slot descriptors; NO stones
  * extension-points: sourceType/sourceId semantic event payload
  * online: emite sourceType=mount/sourceId/mountSlot; authority futura valida por mountId+abilityId
- * legacy: bridge temporal mientras cast interno de KeloAbilities sigue indexado por stone hotbar
+ * legacy: source adapter transicional mientras KeloAbilities sigue indexado por Stone hotbar
  * do-not: no crear delivery/effect handlers; no escribir STATE.equipped; no segundo simulation loop
  */
 (function(root){'use strict';if(root.KeloMountAbilityChannel)return;
-const VERSION='mount-ability-channel-v1.0.0',COUNT=3,listeners=new Map(),slots=Array(COUNT).fill(null);let fingerprint='none';
+const VERSION='mount-ability-channel-v1.1.0',COUNT=3,listeners=new Map(),slots=Array(COUNT).fill(null);let fingerprint='none';
 const defs=new Map((root.KELO_MOUNT_ABILITY_DATA?.abilities||[]).map(d=>[String(d.key),d]));
 function emit(name,payload){const set=listeners.get(name);if(set)for(const fn of [...set])try{fn(payload);}catch(e){console.error(e);}try{root.KeloEvents?.emit?.(name,payload);}catch(_e){}}
 function on(name,fn){if(!listeners.has(name))listeners.set(name,new Set());listeners.get(name).add(fn);return()=>listeners.get(name)?.delete(fn);}
 function sync(force){const snap=root.KeloMounts?.getAbilityLoadout?.()||{mounted:false,slots:[null,null,null],fingerprint:'none'};if(!force&&snap.fingerprint===fingerprint)return snapshot();const old=new Map(slots.filter(Boolean).map(s=>[s.sourceId+':'+s.slotIndex+':'+s.abilityKey,s]));for(let i=0;i<COUNT;i++){const entry=snap.slots?.[i];if(!entry){slots[i]=null;continue;}const def=defs.get(String(entry.abilityKey));if(!def){slots[i]=null;continue;}const key=entry.sourceId+':'+i+':'+entry.abilityKey,prev=old.get(key);slots[i]={sourceType:'mount',sourceId:String(entry.sourceId),slotIndex:i,abilityId:def.id,abilityKey:def.key,definition:def,readyAt:prev?.readyAt||0};}fingerprint=snap.fingerprint||'none';emit('MOUNT_ABILITY_LOADOUT_CHANGED',snapshot());return snapshot();}
 function remaining(instance){return instance?Math.max(0,(Number(instance.readyAt)||0)-Date.now())/1000:0;}
 function snapshot(){return{version:VERSION,fingerprint,mounted:root.KeloMounts?.isMounted?.()===true,mountId:root.KeloMounts?.getEquippedMountId?.()||null,slots:slots.map(s=>s?{sourceType:'mount',sourceId:s.sourceId,slotIndex:s.slotIndex,abilityId:s.abilityId,abilityKey:s.abilityKey,cooldown:remaining(s)}:null)};}
-function cast(request){sync(false);const slotIndex=Number(request?.slotIndex);if(!Number.isInteger(slotIndex)||slotIndex<0||slotIndex>=COUNT)return{valid:false,reason:'INVALID_MOUNT_SLOT'};if(root.KeloMounts?.isMounted?.()!==true)return{valid:false,reason:'NOT_MOUNTED'};const instance=slots[slotIndex];if(!instance)return{valid:false,reason:'EMPTY_SLOT'};const left=remaining(instance);if(left>0)return{valid:false,reason:'COOLDOWN',cooldown:left};const abilities=root.KeloAbilities;if(!abilities?.engine?.cast||!abilities?.hotbar?.slots)return{valid:false,reason:'ABILITY_RUNTIME_UNAVAILABLE'};
- // Adapter transicional: inyecta una instancia NO-stone solo durante el cast síncrono; state/loadout Stone nunca cambia.
- const bridgeIndex=0,previous=abilities.hotbar.slots[bridgeIndex];const bridge={sourceType:'mount',sourceId:instance.sourceId,mountSlot:slotIndex,stoneUid:null,abilityId:instance.abilityId,abilityKey:instance.abilityKey,tier:null,definition:instance.definition,cooldown:0};abilities.hotbar.slots[bridgeIndex]=bridge;
- let result;try{result=abilities.engine.cast({...request,slotIndex:bridgeIndex});}finally{abilities.hotbar.slots[bridgeIndex]=previous;}
- if(result?.valid){instance.readyAt=Date.now()+Number(instance.definition.cooldown||0)*1000;const semantic={valid:true,sourceType:'mount',sourceId:instance.sourceId,mountSlot:slotIndex,abilityId:instance.abilityId,abilityKey:instance.abilityKey,cooldown:Number(instance.definition.cooldown)||0};emit('MOUNT_ABILITY_CAST',semantic);return semantic;}return result||{valid:false,reason:'CAST_FAILED'};
+function cast(request){sync(false);const slotIndex=Number(request?.slotIndex);if(!Number.isInteger(slotIndex)||slotIndex<0||slotIndex>=COUNT)return{valid:false,reason:'INVALID_MOUNT_SLOT'};if(root.KeloMounts?.isMounted?.()!==true)return{valid:false,reason:'NOT_MOUNTED'};const instance=slots[slotIndex];if(!instance)return{valid:false,reason:'EMPTY_SLOT'};const left=remaining(instance);if(left>0)return{valid:false,reason:'COOLDOWN',cooldown:left};const sourceCast=root.KeloAbilitySourceCast;if(!sourceCast?.cast)return{valid:false,reason:'ABILITY_SOURCE_CAST_UNAVAILABLE'};
+ const result=sourceCast.cast({sourceType:'mount',sourceId:instance.sourceId,sourceSlot:'M'+(slotIndex+1),sourceFingerprint:fingerprint,definition:instance.definition,request});
+ if(result?.valid){instance.readyAt=Date.now()+Number(instance.definition.cooldown||0)*1000;const semantic=Object.assign({},result,{valid:true,sourceType:'mount',sourceId:instance.sourceId,mountSlot:slotIndex,abilityId:instance.abilityId,abilityKey:instance.abilityKey,cooldown:Number(instance.definition.cooldown)||0});emit('MOUNT_ABILITY_CAST',semantic);return semantic;}return result||{valid:false,reason:'CAST_FAILED'};
 }
 root.KeloMountAbilityChannel=Object.freeze({version:VERSION,slotCount:COUNT,sync,getSlots:()=>slots.slice(),getSnapshot:snapshot,cast,on,getRemainingCooldown:slot=>remaining(slots[Number(slot)])});
-root.KELO_MOUNT_ABILITY_AUDIT=Object.freeze({version:VERSION,slotCount:COUNT,stoneStateWrites:0,reusesKeloAbilitiesEngine:true,duplicateDeliveryHandlers:0,simulationHooks:0,legacyBridge:true});
+root.KELO_MOUNT_ABILITY_AUDIT=Object.freeze({version:VERSION,slotCount:COUNT,stoneStateWrites:0,reusesKeloAbilitiesEngine:true,reusesGenericSourceCast:true,duplicateDeliveryHandlers:0,simulationHooks:0,legacyBridge:true});
 })(typeof globalThis!=='undefined'?globalThis:window);
