@@ -2,89 +2,68 @@
 
 ## Propósito
 
-`KeloArenaProgression` posee la progresión competitiva persistente que existe **fuera** de una partida concreta: Mastery, objetivos de habilidad y rivalidades/series BO3. Consume resultados confirmados por `KeloArena`; nunca decide quién ganó, cuánto MMR cambia, cuánto daño se aplica ni qué actor es válido.
+`KeloArenaProgression` posee la progresión competitiva persistente que existe fuera de una partida concreta: Mastery, objetivos de habilidad y rivalidades/series BO3. Consume resultados confirmados por `KeloArena`, telemetría observada por `KeloArenaTelemetry` y momentos semánticos de `KeloArenaHighlights`; nunca decide ganador, MMR, daño ni validez de actores.
 
 ## OWNER
 
 - Runtime owner: `src/systems/arena-progression.js` → `window.KeloArenaProgression`.
 - Match owner consumido: `window.KeloArena`.
+- Telemetría consumida: `window.KeloArenaTelemetry`.
+- Highlights consumidos: `window.KeloArenaHighlights`.
 - UI consumer: `src/ui/arena-ui.js`.
-- Persistencia local actual: `localStorage` como fallback de prototipo.
+- Persistencia local: `localStorage` como fallback de prototipo.
 - Autoridad online final: servidor pendiente.
 
 ## Mastery
 
-Mastery es independiente del Rank/MMR y no da estadísticas. Solo expresa experiencia/ejecución competitiva.
+Mastery es independiente del Rank/MMR y no da estadísticas. Tiers: Iniciado → Combatiente → Duelista → Táctico → Maestro → Campeón → Leyenda de Arena.
 
-Tiers V1:
-
-Iniciado → Combatiente → Duelista → Táctico → Maestro → Campeón → Leyenda de Arena.
-
-La ganancia usa resultado + calidad de partida. Partidas dominadas por bots siguen dando algo de progreso de práctica, pero ponderado por Match Quality para evitar farming equivalente a una partida humana competitiva.
+La ganancia usa resultado, calidad de partida y pequeñas señales de ejecución verificadas. Todo se pondera por Match Quality para reducir farming contra bots.
 
 ## Objetivos de habilidad
 
-V1 publica objetivos verificables desde datos ya disponibles:
+Además de victorias, streaks y milestones, Mastery puede desbloquear objetivos basados en evidencia real:
 
-- Primera Victoria;
-- Controlador — ganar 3v3 Control;
-- Duelista MOBA — ganar 1v1 MOBA;
-- Sangre Fría — ganar en OVERTIME;
-- Nunca Rendirse — ganar una REMONTADA;
-- Rompenúcleos — ganar MOBA destruyendo el núcleo;
-- En Racha — 3 victorias consecutivas;
-- Veterano I — 10 partidas;
-- Veterano II — 25 partidas.
+- Mano Firme — 10+ ataques y al menos 60% de precisión;
+- Ancla del Objetivo — 30 s dentro de Control;
+- Presión de Asedio — 150+ de daño a estructuras;
+- Duelo Limpio — ganar MOBA sin overextension;
+- Paso Fantasma — dodge efectivo confirmado;
+- Interruptor — interrupt confirmado;
+- Primer Golpe — FIRST BLOOD local;
+- Cazarrecompensas — SHUTDOWN local;
+- Rompetorres — caída confirmada de la torre rival;
+- Ladrón del Sigilo — WAR SIGIL STEAL local;
+- Último Suspiro — ESCAPE CRÍTICO local.
 
-No se inventan métricas que todavía no estén instrumentadas de forma fiable.
+Estos objetivos no alteran stats, matchmaking ni MMR.
 
 ## Rivalidades y BO3
 
-Después de una partida se identifica el rival del equipo contrario a partir del roster de `KeloArena`.
-
-Se persiste por `mode + opponentId`:
-
-- partidas;
-- victorias;
-- derrotas;
-- última fecha de enfrentamiento.
-
-La serie activa es Best of 3: primero en llegar a 2 victorias. Si el rival es un bot, la UI la etiqueta como **Serie de práctica**; no se presenta como rivalidad humana.
-
-`rematchSeries()` reutiliza `KeloArena.rematch()` y solo puede ejecutarse cuando Arena volvió a `idle`. No existe una segunda cola de revancha.
+Se persiste historial por `mode + opponentId`. La serie activa es Best of 3: primero en llegar a 2. Si el rival es bot, la UI lo etiqueta como Serie de práctica. `rematchSeries()` reutiliza `KeloArena.rematch()`; no existe una segunda cola.
 
 ## API pública
 
-- `snapshot()` — Mastery, objetivos, rivalidades, serie y última ganancia.
-- `getMastery(xp?)` — tier/progreso visible.
-- `getRivalry(id, mode)` — historial contra un rival.
-- `rematchSeries()` — solicita siguiente partida de la misma serie reutilizando Arena.
-- `resetSeries()` — limpia la serie activa local.
+- `snapshot()`
+- `getMastery(xp?)`
+- `getRivalry(id, mode)`
+- `rematchSeries()`
+- `resetSeries()`
 
 ## Invariantes
 
 1. No modifica HP, stats, abilities ni resources.
 2. No modifica MMR/RP ni matchmaking.
-3. No decide ganador/score/objetivos de partida.
-4. No crea loop ni timer propios.
-5. Bots se identifican como bots también en series.
+3. No decide ganador/score.
+4. No crea loop propio.
+5. Bots permanecen identificados como bots.
 6. Mastery no concede ventajas de combate.
-7. Progreso local es fallback; producción online debe fallar cerrado hacia autoridad server.
+7. Telemetry/highlights cliente son progreso local de prototipo; producción online debe validar server-side.
 
 ## Flujo
 
-`KeloArena termina match → kelo:arena-match-finished → KeloArenaProgression procesa resultado → Mastery/objetivos/rivalidad → Arena UI presenta → revancha opcional → KeloArena.rematch()`.
-
-## Anti-patrones
-
-- usar Mastery como daño/HP adicional;
-- convertir objetivos en loot aleatorio;
-- fingir un bot como rival humano;
-- duplicar MMR dentro de Progression;
-- crear `RivalryMatchmaker` o una cola BO3 separada;
-- autoencadenar partidas sin decisión del jugador;
-- usar localStorage como autoridad competitiva final online.
+`KeloArena termina → Telemetry cierra resumen + Highlights cierra momentos → KeloArenaProgression procesa → Mastery/objetivos/rivalidad → Arena UI presenta → revancha opcional`.
 
 ## Tests / CI
 
-`npm run audit:arena` valida sintaxis, tiers, objetivos, BO3, ponderación por Match Quality, ausencia de buffs/MMR authority y orden LIVE Arena → Lane Pressure → Progression → UI.
+`npm run audit:arena` protege tiers, objetivos de telemetría/highlights, BO3, Match Quality, ausencia de buffs/MMR authority y orden LIVE Arena → Lane → Telemetry → Highlights → Progression → UI.
