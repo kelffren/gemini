@@ -14,7 +14,7 @@ const context={
 context.window=context;vm.createContext(context);
 for(const file of ['src/systems/backpack-system.js','src/systems/container-system.js','src/systems/market-escrow-system.js','src/systems/equipment-item-catalog.js','src/systems/commerce-authority.js'])vm.runInContext(fs.readFileSync(file,'utf8'),context,{filename:file});
 const B=context.KeloBackpack,K=context.KeloContainers,M=context.KeloMarketEscrow,C=context.KeloCommerceAuthority,W=context.KELO_EQUIPMENT_ITEM_CATALOG;
-assert(B&&K&&M&&C&&W,'commerce dependencies and weapon catalog must load');assert.equal(K.version,'container-v1.3.0');assert.equal(C.version,'commerce-authority-v1.1.0');assert.equal(W.version,1);assert.equal(C.getMode(),'local-offline');assert.equal(K.getStats('trade_escrow').capacity,12);
+assert(B&&K&&M&&C&&W,'commerce dependencies and weapon catalog must load');assert.equal(K.version,'container-v1.4.0');assert.equal(C.version,'commerce-authority-v1.1.0');assert.equal(W.version,1);assert.equal(C.getMode(),'local-offline');assert.equal(K.getStats('trade_escrow').capacity,12);
 function add(item){context.STATE.inventory.push(item);B.ensure();return item;}
 function bag(id){return K.getSlots('backpack').find(s=>s.item&&(s.item.id===id||s.item.uid===id));}
 function trade(id){return K.getSlots('trade_escrow').find(s=>s.item&&(s.item.id===id||s.item.uid===id));}

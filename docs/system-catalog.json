@@ -189,6 +189,38 @@
       "technicalDoc": "docs/systems/APPEARANCE_CREATOR.md",
       "playerVisible": false,
       "status": "creator-candidate"
+    },
+    {
+      "id": "regional-economy",
+      "owner": "KeloRegionalEconomy",
+      "source": "src/systems/regional-economy-system.js",
+      "technicalDoc": "docs/systems/REGIONAL_ECONOMY_LOGISTICS_SYSTEM.md",
+      "playerVisible": false,
+      "status": "foundation-api-live-offline-online-ready"
+    },
+    {
+      "id": "caravans",
+      "owner": "KeloCaravans",
+      "source": "src/systems/caravan-system.js",
+      "technicalDoc": "docs/systems/REGIONAL_ECONOMY_LOGISTICS_SYSTEM.md",
+      "playerVisible": false,
+      "status": "foundation-api-live-offline-online-ready"
+    },
+    {
+      "id": "factions-clans",
+      "owner": "KeloFactions",
+      "source": "src/systems/faction-clan-system.js",
+      "technicalDoc": "docs/systems/REGIONAL_ECONOMY_LOGISTICS_SYSTEM.md",
+      "playerVisible": false,
+      "status": "foundation-api-live-offline-online-ready"
+    },
+    {
+      "id": "logistics-devtools",
+      "owner": "KeloLogisticsDevtools",
+      "source": "src/systems/logistics-devtools.js",
+      "technicalDoc": "docs/systems/REGIONAL_ECONOMY_LOGISTICS_SYSTEM.md",
+      "playerVisible": false,
+      "status": "development-observability"
     }
   ]
 }
