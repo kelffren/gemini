@@ -48,7 +48,10 @@ function createCommerceService(opts={}){
   function splitToEscrow(p,sourceId,qty,container,purpose,sessionId){
     const src=findItem(p,sourceId,'backpack');if(!src)throw new Error('ITEM_NOT_FOUND');if(src.bound)throw new Error('BOUND_ITEM_NOT_TRADABLE');ensureFree(src,purpose,sessionId);
     qty=qty==null?amount(src.quantity):Math.floor(Number(qty));if(!Number.isInteger(qty)||qty<1||qty>amount(src.quantity))throw new Error('INVALID_AMOUNT');
-    let moved;if(qty===amount(src.quantity)){moved=src;moved.container=container;}else{src.quantity=amount(src.quantity)-qty;moved={...clone(src),id:uid('item'),quantity:qty,container,splitFrom:itemId(src)};p.items.push(moved);}moved.ownerId=p.id;reserve(p,moved,purpose,sessionId);return moved;
+    let moved;
+    if(qty===amount(src.quantity)){moved=src;moved.container=container;}
+    else{src.quantity=amount(src.quantity)-qty;moved={...clone(src),id:uid('item'),quantity:qty,container,splitFrom:itemId(src)};p.items.push(moved);}
+    moved.ownerId=p.id;reserve(p,moved,purpose,sessionId);return moved;
   }
   function moveEscrowToBackpack(p,id){const item=findItem(p,id);if(!item)throw new Error('ITEM_NOT_FOUND');unreserve(p,id);item.container='backpack';return item;}
   function ownStall(ownerId){return [...stalls.values()].find(x=>x.ownerId===String(ownerId))||null;}
@@ -93,7 +96,6 @@ function createCommerceService(opts={}){
     id=String(id);expirePendingTrades();if(activeTradeByPlayer.has(id))throw new Error('TRADE_ALREADY_ACTIVE');const peerId=String(data.peerId||'');if(!peerId||peerId===id)throw new Error('INVALID_TRADE_PEER');if(opts.isPlayerOnline&&!opts.isPlayerOnline(peerId))throw new Error('PLAYER_NOT_ONLINE');if(activeTradeByPlayer.has(peerId))throw new Error('PEER_TRADE_BUSY');requireTradeRange(id,peerId);player(peerId);
     const tradeId=uid('trade'),requested=status==='REQUESTED';const t={tradeId,status,requestedBy:requested?id:null,expiresAt:requested?now()+TRADE_REQUEST_TTL_MS:null,participants:{a:{id,name:playerName(id)},b:{id:peerId,name:playerName(peerId,data.peerName)}},offers:{a:{items:[],gold:0,ready:false,finalAccepted:false},b:{items:[],gold:0,ready:false,finalAccepted:false}},revision:1,createdAt:now(),updatedAt:now()};trades.set(tradeId,t);activeTradeByPlayer.set(id,tradeId);activeTradeByPlayer.set(peerId,tradeId);return t;
   }
-  function createTrade(id,data){const t=makeTrade(id,data,'OPEN');return{ok:true,trade:publicTradeFor(t,id),notifyPlayerIds:[t.participants.b.id]};}
   function requestTrade(id,data){const t=makeTrade(id,data,'REQUESTED');return{ok:true,status:'REQUESTED',trade:publicTradeFor(t,id),notifyPlayerIds:[t.participants.b.id]};}
   function acceptTrade(id){const t=tradeForPlayer(id);if(!t)throw new Error('TRADE_NOT_FOUND');if(t.status!=='REQUESTED')throw new Error('TRADE_REQUEST_NOT_PENDING');if(String(id)===String(t.requestedBy))throw new Error('TRADE_REQUEST_TARGET_REQUIRED');requireTradeRange(t.participants.a.id,t.participants.b.id);t.status='OPEN';t.expiresAt=null;t.updatedAt=now();return{ok:true,status:'OPEN',trade:publicTradeFor(t,id),notifyPlayerIds:[t.requestedBy]};}
   function rejectTrade(id){const t=tradeForPlayer(id);if(!t)throw new Error('TRADE_NOT_FOUND');if(t.status!=='REQUESTED')throw new Error('TRADE_REQUEST_NOT_PENDING');if(String(id)===String(t.requestedBy))throw new Error('TRADE_REQUEST_TARGET_REQUIRED');const initiator=t.requestedBy,tradeId=t.tradeId;clearTrade(t,'REJECTED','target-rejected');return{ok:true,status:'REJECTED',tradeId,notifyPlayerIds:[initiator]};}
@@ -111,7 +113,24 @@ function createCommerceService(opts={}){
   async function handle(id,op,payload={},requestId){
     id=String(id);expirePendingTrades();const hit=cached(id,requestId);if(hit)return hit;player(id);let result;
     try{
-      if(op==='snapshot')result={ok:true};else if(op==='inventory:migrate')result=await migrateLegacyItems(id,payload);else if(op==='stall:claim')result=claimStall(id,payload);else if(op==='stall:release')result=releaseStall(id,payload);else if(op==='stall:message')result=setStallMessage(id,payload);else if(op==='market:create')result=await createListing(id,payload);else if(op==='market:cancel')result=await cancelListing(id,payload);else if(op==='market:buy')result=await buyListing(id,payload);else if(op==='trade:create')result=createTrade(id,payload);else if(op==='trade:request')result=requestTrade(id,payload);else if(op==='trade:accept')result=acceptTrade(id);else if(op==='trade:reject')result=rejectTrade(id);else if(op==='trade:addItem')result=addTradeItem(id,payload);else if(op==='trade:removeItem')result=removeTradeItem(id,payload);else if(op==='trade:setGold')result=setTradeGold(id,payload);else if(op==='trade:ready')result=setTradeReady(id,payload);else if(op==='trade:finalAccept')result=await finalAccept(id,payload);else if(op==='trade:cancel')result=cancelTrade(id,'player-cancelled');else throw new Error('UNKNOWN_COMMERCE_OPERATION');
+      if(op==='snapshot')result={ok:true};
+      else if(op==='inventory:migrate')result=await migrateLegacyItems(id,payload);
+      else if(op==='stall:claim')result=claimStall(id,payload);
+      else if(op==='stall:release')result=releaseStall(id,payload);
+      else if(op==='stall:message')result=setStallMessage(id,payload);
+      else if(op==='market:create')result=await createListing(id,payload);
+      else if(op==='market:cancel')result=await cancelListing(id,payload);
+      else if(op==='market:buy')result=await buyListing(id,payload);
+      else if(op==='trade:create'||op==='trade:request')result=requestTrade(id,payload);
+      else if(op==='trade:accept')result=acceptTrade(id);
+      else if(op==='trade:reject')result=rejectTrade(id);
+      else if(op==='trade:addItem')result=addTradeItem(id,payload);
+      else if(op==='trade:removeItem')result=removeTradeItem(id,payload);
+      else if(op==='trade:setGold')result=setTradeGold(id,payload);
+      else if(op==='trade:ready')result=setTradeReady(id,payload);
+      else if(op==='trade:finalAccept')result=await finalAccept(id,payload);
+      else if(op==='trade:cancel')result=cancelTrade(id,'player-cancelled');
+      else throw new Error('UNKNOWN_COMMERCE_OPERATION');
       const notify=result.notifyPlayerIds||[];delete result.notifyPlayerIds;result=notifyResult(id,result,notify);remember(id,requestId,result);return result;
     }catch(err){result=notifyResult(id,{ok:false,error:String(err&&err.message||err)},[]);remember(id,requestId,result);return result;}
   }
