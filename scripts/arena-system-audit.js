@@ -3,8 +3,8 @@ const fs=require('fs'),path=require('path');
 const root=path.resolve(__dirname,'..');
 function read(p){return fs.readFileSync(path.join(root,p),'utf8');}
 function must(cond,msg){if(!cond)throw new Error('ARENA AUDIT: '+msg);}
-const system=read('src/systems/arena-system.js'),lane=read('src/systems/arena-lane-pressure.js'),telemetry=read('src/systems/arena-telemetry.js'),progression=read('src/systems/arena-progression.js'),ui=read('src/ui/arena-ui.js'),pvp=read('src/systems/pvp-world.js'),index=read('index.html'),catalog=read('docs/system-catalog.json'),guide=read('guide.html');
-new Function(system);new Function(lane);new Function(telemetry);new Function(progression);new Function(ui);new Function(pvp);
+const system=read('src/systems/arena-system.js'),lane=read('src/systems/arena-lane-pressure.js'),telemetry=read('src/systems/arena-telemetry.js'),highlights=read('src/systems/arena-highlights.js'),progression=read('src/systems/arena-progression.js'),highlightUi=read('src/ui/arena-highlights-ui.js'),ui=read('src/ui/arena-ui.js'),pvp=read('src/systems/pvp-world.js'),index=read('index.html'),catalog=read('docs/system-catalog.json'),guide=read('guide.html');
+new Function(system);new Function(lane);new Function(telemetry);new Function(highlights);new Function(progression);new Function(highlightUi);new Function(ui);new Function(pvp);
 must(system.includes('owner: KeloArena'),'KeloArena owner header missing');
 must(system.includes("teamSize:3")&&system.includes("mode:'control'"),'3v3 Control rules missing');
 must(system.includes("teamSize:1")&&system.includes("mode:'moba'"),'1v1 MOBA rules missing');
@@ -14,7 +14,7 @@ must(system.includes('overtimeGrace')&&system.includes("emit('overtime'"),'Contr
 must(system.includes('REMONTADA')&&system.includes('NÚCLEO AL LÍMITE'),'clutch accolades missing');
 must(system.includes('transparentBots:true')&&system.includes('botsUseCombatEngine:true'),'bot invariants missing');
 must(system.includes('minimumRankedQuality')&&system.includes('normalizedHp'),'competitive fairness missing');
-must(!system.includes('setInterval(')&&!lane.includes('setInterval(')&&!telemetry.includes('setInterval(')&&!progression.includes('setInterval('),'Arena support must not create a second timer loop');
+must(!system.includes('setInterval(')&&!lane.includes('setInterval(')&&!telemetry.includes('setInterval(')&&!highlights.includes('setInterval(')&&!progression.includes('setInterval('),'Arena support must not create a second timer loop');
 must(lane.includes('owner: KeloArenaLanePressure'),'lane pressure owner header missing');
 must(lane.includes('minionsPerWave:3')&&lane.includes('waveEvery:20'),'lightweight MOBA waves missing');
 must(lane.includes("source:'arena-minion'")&&lane.includes('KeloCombatEngine.attackSweep'),'minions must reuse CombatEngine');
@@ -24,6 +24,13 @@ must(telemetry.includes('ATTACK_RESOLVED')&&telemetry.includes('DAMAGE_APPLIED')
 must(telemetry.includes('objectiveSeconds')&&telemetry.includes('damageStructures')&&telemetry.includes('overextensions'),'behavior metrics missing');
 must(telemetry.includes('lazySchemaBinding:true'),'late CombatSchema binding protection missing');
 must(telemetry.includes('combatWrapper:false')&&telemetry.includes('ratingAuthority:false')&&telemetry.includes('masteryAuthority:false'),'telemetry crossed authority boundary');
+must(highlights.includes('owner: KeloArenaHighlights'),'highlight owner header missing');
+must(highlights.includes('first_blood')&&highlights.includes('double_kill')&&highlights.includes('shutdown'),'combat highlights missing');
+must(highlights.includes('tower_break')&&highlights.includes('core_exposed'),'MOBA structure highlights missing');
+must(highlights.includes('war_sigil_steal')&&highlights.includes('comeback')&&highlights.includes('critical_escape'),'objective/clutch highlights missing');
+must(highlights.includes('combatWrapper:false')&&highlights.includes('gameplayAuthority:false'),'highlights crossed authority boundary');
+must(highlightUi.includes('owner: KeloArenaHighlightsUI')&&highlightUi.includes('MOMENTOS DE LA PARTIDA'),'highlight UI/post-match surface missing');
+must(highlightUi.includes('gameplayAuthority:false')&&highlightUi.includes('secondMenu:false'),'highlight UI crossed authority boundary');
 must(progression.includes('owner: KeloArenaProgression'),'Arena progression owner header missing');
 must(progression.includes('MASTERY_TIERS')&&progression.includes("label:'Leyenda de Arena'"),'Mastery tiers missing');
 must(progression.includes('accurate_fighter')&&progression.includes('objective_anchor')&&progression.includes('siege_pressure')&&progression.includes('effective_dodge'),'telemetry skill objectives missing');
@@ -35,8 +42,8 @@ must(ui.includes('COACH CARD')&&ui.includes('SIGUIENTE FOCO'),'post-match coachi
 must(ui.includes('PRECISIÓN')&&ui.includes('DMG ESTRUCT.')&&ui.includes('OVEREXT.'),'telemetry post-match surface missing');
 must(ui.includes('OVERTIME')&&ui.includes('War Sigil')&&ui.includes('Mastery')&&ui.includes('RIVALIDAD BO3'),'Arena engagement UI missing');
 must(pvp.includes('KeloArena')&&pvp.includes('getHostileActors')&&pvp.includes('drawWorld(ctx)'),'PvP integration missing');
-const arenaPos=index.indexOf('src/systems/arena-system.js'),lanePos=index.indexOf('src/systems/arena-lane-pressure.js'),telemetryPos=index.indexOf('src/systems/arena-telemetry.js'),progressionPos=index.indexOf('src/systems/arena-progression.js'),uiPos=index.indexOf('src/ui/arena-ui.js');
-must(arenaPos>=0&&lanePos>arenaPos&&telemetryPos>lanePos&&progressionPos>telemetryPos&&uiPos>progressionPos,'Arena LIVE load order must be Arena -> Lane -> Telemetry -> Progression -> UI');
-must(catalog.includes('"id": "arena-ranked"')&&catalog.includes('"id": "arena-telemetry"'),'system catalog missing Arena/telemetry');
+const arenaPos=index.indexOf('src/systems/arena-system.js'),lanePos=index.indexOf('src/systems/arena-lane-pressure.js'),telemetryPos=index.indexOf('src/systems/arena-telemetry.js'),highlightsPos=index.indexOf('src/systems/arena-highlights.js'),progressionPos=index.indexOf('src/systems/arena-progression.js'),uiPos=index.indexOf('src/ui/arena-ui.js'),highlightUiPos=index.indexOf('src/ui/arena-highlights-ui.js');
+must(arenaPos>=0&&lanePos>arenaPos&&telemetryPos>lanePos&&highlightsPos>telemetryPos&&progressionPos>highlightsPos&&uiPos>progressionPos&&highlightUiPos>uiPos,'Arena LIVE load order must be Arena -> Lane -> Telemetry -> Highlights -> Progression -> UI -> HighlightsUI');
+must(catalog.includes('"id": "arena-ranked"')&&catalog.includes('"id": "arena-telemetry"')&&catalog.includes('"id": "arena-highlights"'),'system catalog missing Arena support systems');
 must(guide.includes('id="arena-ranked"'),'player guide missing Arena section');
-console.log('Arena System Audit OK: Control+MOBA, waves, War Sigil, overtime, telemetry, coaching, Mastery, objectives, BO3 and PvP integration.');
+console.log('Arena System Audit OK: Control+MOBA, waves, War Sigil, overtime, telemetry, semantic highlights, coaching, Mastery, objectives, BO3 and PvP integration.');
