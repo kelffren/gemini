@@ -1,7 +1,7 @@
 <!-- KELO-INDEX
   area: PLAYER DOCS
   owner: Documentation / Foundation
-  keys: GUIDE MECHANICS PLAYER DOCS PUBLIC CHARACTER CUSTOMIZATION MENU NOBILITY TITLES
+  keys: GUIDE MECHANICS PLAYER DOCS PUBLIC CHARACTER CUSTOMIZATION MENU NOBILITY TITLES COMMERCE MARKET TRADE
   purpose: guía pública de mecánicas de Kelo World para jugadores
   public-api: página estática guide.html
   consumes: comportamiento LIVE validado y docs/system-catalog.json
@@ -45,6 +45,7 @@
     <a href="#camara-y-pantalla">Cámara y pantalla<small>Zoom, giro y fullscreen</small></a>
     <a href="#habilidades">Habilidades<small>Piedras y slots</small></a>
     <a href="#mochila">Mochila<small>Objetos y equipo</small></a>
+    <a href="#mercado-comercio-y-trade">Mercado y trade<small>Puestos, alfombras y doble confirmación</small></a>
     <a href="#nobleza-y-titulos">Nobleza y títulos<small>Rango automático y prestigio equipado</small></a>
     <a href="#pvp">PvP<small>Combate y arena</small></a>
   </nav>
@@ -88,7 +89,7 @@
       <li><strong>Habilidades</strong> abre el panel de piedras y habilidades.</li>
       <li><strong>Apariencia</strong> abre directamente el editor de personaje.</li>
       <li><strong>Perfil</strong> muestra la información del personaje.</li>
-      <li><strong>Mercado</strong> abre el flujo de compra, venta y publicaciones disponible.</li>
+      <li><strong>Mercado</strong> te transporta al Mercado Central, donde están los puestos, alfombras de venta y comercio entre jugadores.</li>
       <li><strong>Chat</strong> abre la conversación rápida del HUD.</li>
       <li><strong>Propiedades</strong> abre tu flujo de casa/parcela.</li>
       <li><strong>Nobleza</strong> abre donaciones, rango de Nobleza y la colección de títulos personales desbloqueables.</li>
@@ -98,7 +99,7 @@
     <p>Las herramientas <strong>Creators</strong> solo aparecen cuando tu cuenta tiene permiso para usarlas. No todos los jugadores ven ese acceso.</p>
     <h3>Opciones todavía no publicadas como pantalla</h3>
     <p>Una opción no aparece en el menú solo por existir como idea o prototipo. Por ejemplo, Misiones o Ajustes se mostrarán como acceso propio cuando tengan una pantalla funcional del juego; esto evita botones que parezcan activos pero solo enseñen un mensaje temporal.</p>
-    <div class="example"><strong>Flujo rápido:</strong> MENÚ → Apariencia para editar tu personaje; MENÚ → Nobleza para donar, revisar tu rango o equipar un título; MENÚ → Burlas para gestionar emotes.</div>
+    <div class="example"><strong>Flujo rápido:</strong> MENÚ → Apariencia para editar tu personaje; MENÚ → Mercado para viajar a la zona comercial; MENÚ → Nobleza para revisar tu rango o equipar un título.</div>
   </section>
 
   <section id="personalizacion-de-personaje">
@@ -169,6 +170,34 @@
       <li>Los objetos vinculados pueden tener restricciones adicionales.</li>
       <li>Acciones como Mercado o Almacén usan sus propios contratos para mover objetos de forma segura.</li>
     </ul>
+  </section>
+
+  <section id="mercado-comercio-y-trade">
+    <span class="tag">COMERCIO</span>
+    <h2>Mercado Central, puestos y trade</h2>
+    <p>El Mercado Central es una zona separada dedicada a comprar, vender y negociar. Desde <strong>MENÚ → Mercado</strong> entras al área comercial y puedes caminar entre los puestos.</p>
+    <h3>Puestos y alfombras</h3>
+    <ul>
+      <li>Toca la alfombra de un puesto para ver lo que vende.</li>
+      <li>Si una alfombra está libre, puedes reclamar ese puesto para ti.</li>
+      <li>En tu puesto puedes escribir un mensaje corto y publicar objetos de tu Mochila indicando su precio en Oro.</li>
+      <li>Al activar <strong>Ponerme a vender</strong>, tu personaje se coloca detrás del puesto y queda quieto hasta que dejas de vender.</li>
+      <li>Puedes cancelar una publicación y el objeto vuelve a tu Mochila si hay espacio disponible.</li>
+    </ul>
+    <h3>Comprar</h3>
+    <p>Al comprar, el Oro y el objeto se transfieren como una sola operación. Si la compra no puede completarse correctamente, no debería quedarse a medias.</p>
+    <h3>Trade directo</h3>
+    <p>El trade permite que dos jugadores preparen un intercambio de objetos y Oro antes de ejecutarlo.</p>
+    <ul>
+      <li>Cada jugador añade lo que quiere entregar.</li>
+      <li>Modificar un objeto o la cantidad de Oro reinicia las confirmaciones de ambos jugadores.</li>
+      <li>Primero ambos deben marcarse como <strong>Listo</strong>.</li>
+      <li>Después aparece una revisión final: los dos deben aceptar una segunda vez.</li>
+      <li>El intercambio solo se completa cuando existen las dos confirmaciones finales.</li>
+      <li>Si cancelas antes de completar, tus objetos ofrecidos regresan a tu Mochila.</li>
+    </ul>
+    <div class="example"><strong>Prueba offline:</strong> entra al Mercado → toca una alfombra libre y reclámala → publica un objeto → abre Trade Demo → añade un objeto y Oro → marca Listo en ambos lados → confirma las dos aceptaciones finales.</div>
+    <p>En la prueba offline aparecen mercaderes y un rival de trade de demostración para poder recorrer todo el flujo sin otros jugadores conectados. Cuando el modo online use la autoridad del servidor, la misma interfaz se utilizará con jugadores y publicaciones reales.</p>
   </section>
 
   <section id="nobleza-y-titulos">
