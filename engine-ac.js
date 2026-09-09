@@ -1,14 +1,14 @@
 /* KELO-INDEX
  * area: MOVEMENT / PRESENTATION
  * owner: KeloMovement consumer
- * keys: MOVEMENT GAIT SPEED STRIDE PLANT AUDIT AIM FACING PVP
+ * keys: MOVEMENT GAIT SPEED STRIDE PLANT AUDIT AIM FACING PVP PARITY
  * purpose: calcula gait/velocidad objetivo y estado visual de zancada usando hooks del owner KeloMovement
  * public-api: KELO_MOVEMENT_AUDIT
- * consumes: KeloMovement, input, CONFIG, localPlayer, KELO_COMBAT_ENABLED
+ * consumes: KeloMovementProfile, KeloMovement, input, CONFIG, localPlayer, KELO_COMBAT_ENABLED
  * state-owned: _visualMotion del actor local + telemetría de gait
  * extension-points: hooks before/after de KeloMovement
- * reuse: perfil de marcha/carrera del jugador actual
- * legacy: mantiene constantes y telemetría históricas; ya no envuelve updateMovement directamente
+ * reuse: perfil compartido de marcha/carrera consumido también por autoridad PvP server
+ * legacy: mantiene telemetría/stride históricas; ya no posee la curva de velocidad canónica
  * do-not: NO resolver colisiones, NO crear otro wrapper de updateMovement, NO pisar aim-facing durante PvP
  */
 (function () {
@@ -19,13 +19,12 @@
   // MOV-REVERSAL-AUDIT-V1: measure real lateral reversal continuity instead of publishing inert counters.
   // MOV-PLANT-V1: settle on authored lateral frame 2 after release; frame 0 remains available via ?plantFrame=0 baseline.
   // MOV-COMBAT-FACING-V1: movement presentation never overwrites PvP aim-facing; combat geometry remains authority-owned elsewhere.
-  const WALK_MAX = 0.74;
-  const WALK_SPEED = 110;
-  const RUN_SPEED = 178;
-  const MAX_SPEED = RUN_SPEED + (1 - WALK_MAX) * 28;
-  const SPEED_BLEND_START = 0.48;
-  const GAIT_IDLE_MAX = 0.03;
-  const GAIT_RUN_START = 0.70;
+  // MOV-PARITY-V1: speed/gait semantics come from KeloMovementProfile, shared with server authority.
+  const movementProfile = window.KeloMovementProfile;
+  if (!movementProfile) throw new Error('KeloMovementProfile unavailable before engine-ac');
+  const PROFILE = movementProfile.profile;
+  const WALK_SPEED = PROFILE.walkSpeed;
+  const GAIT_RUN_START = PROFILE.gaitRunStart;
   const VISUAL_STOP_HOLD_SEC = 0.075;
   const WALK_CYCLE_WORLD_PX = 50;
   const RUN_CYCLE_WORLD_PX = 90;
@@ -53,21 +52,12 @@
     return Math.min(1, Math.hypot(input.normX || 0, input.normY || 0));
   }
 
-  function smoothstep01(t) {
-    t = Math.max(0, Math.min(1, t));
-    return t * t * (3 - 2 * t);
-  }
-
   function speedFor(mag) {
-    if (mag <= SPEED_BLEND_START) return WALK_SPEED;
-    const t = (mag - SPEED_BLEND_START) / (1 - SPEED_BLEND_START);
-    return WALK_SPEED + (MAX_SPEED - WALK_SPEED) * smoothstep01(t);
+    return movementProfile.speedCapForMagnitude(mag);
   }
 
   function gaitFrom(mag) {
-    if (mag < GAIT_IDLE_MAX) return 'idle';
-    if (mag < GAIT_RUN_START) return 'walk';
-    return 'run';
+    return movementProfile.gaitForMagnitude(mag);
   }
 
   function cycleWorldPxFor(mag, gait) {
@@ -92,7 +82,8 @@
 
   function publishAudit(mag, gait, speedCap, visual) {
     window.KELO_MOVEMENT_AUDIT = {
-      version: 'MOV-combat-facing-v1',
+      version: 'MOV-shared-profile-v1',
+      movementProfileVersion: movementProfile.version,
       rawTouchMag: rawTouchMag(),
       processedMag: mag,
       gait,
