@@ -50,6 +50,7 @@ jobs:
           node-version: 22
       - name: Syntax — touched runtime
         run: |
+          node --check src/core/kelo-runtime-bootstrap.js
           node --check src/core/simulation-extension-system.js
           node --check src/core/render-extension-system.js
           node --check src/abilities/kelo-ability-boot.js
