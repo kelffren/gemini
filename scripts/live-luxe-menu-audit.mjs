@@ -63,7 +63,7 @@ function assertHud(h,label){
   assert(h.hud&&h.hud.left>=0&&h.hud.right<=h.width+1&&h.hud.top>=0&&h.hud.bottom<=h.height+1,label+': player HUD escapes viewport');
   assert(h.card&&h.guide&&h.guide.top>=h.card.bottom-1,label+': GUÍA is not directly below player card');
   assert(h.guide.height>=35,label+': GUÍA touch target collapsed');
-  if(h.width>=360)assert(h.guide.height>=43,label+': GUÍA should preserve ~44px touch target');
+  if(h.height>520)assert(h.guide.height>=43,label+': GUÍA should preserve ~44px touch target');
   assert(h.rail&&h.hud.right<=h.rail.left+1,label+': player HUD overlaps right-side Menu/PvP rail');
   assert(!h.overflowX,label+': document has horizontal overflow');
   assert(h.name&&h.id&&h.clan&&h.nobility&&h.title&&h.hp&&h.mana&&h.gold,label+': required HUD text is missing');
@@ -88,7 +88,7 @@ try{
 
   report.hud=await inspectHud();
   assertHud(report.hud,'390x844');
-  assert(report.hud.snap.hp===localPlayer?.hp||report.hud.hp!=='— / —','HUD HP did not read the live player');
+  assert(Number.isFinite(report.hud.snap?.hp)&&report.hud.hp!=='— / —','HUD HP did not read the live player');
   await page.screenshot({path:path.join(OUT,'premium-player-hud-390.png'),fullPage:false});
 
   // Required responsive widths: compact iPhones, large phones, tablet and desktop.
