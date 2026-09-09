@@ -6,7 +6,7 @@ context.window=context;vm.createContext(context);
 for(const file of ['src/systems/equipment-system.js','src/systems/backpack-system.js','src/systems/container-system.js','src/systems/market-escrow-system.js'])vm.runInContext(fs.readFileSync(file,'utf8'),context,{filename:file});
 const E=context.KeloEquipment,B=context.KeloBackpack,C=context.KeloContainers,M=context.KeloMarketEscrow;
 assert(E&&B&&C&&M);
-assert.equal(E.version,'equipment-v1.1.2');
+assert.equal(E.version,'equipment-v1.2.1');
 assert.equal(B.version,'backpack-v1.1.0');
 assert.equal(C.version,'container-v1.3.0');
 assert.equal(M.version,'market-escrow-v1.0.0');
