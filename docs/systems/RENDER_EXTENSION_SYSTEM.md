@@ -11,9 +11,9 @@ render legacy de engine-c
         │
         ▼
     KeloRender
-    ├─ beforeFrame hooks
+    ├─ beforeFrame hooks activos
     ├─ render base exacto
-    └─ afterFrame hooks
+    └─ afterFrame hooks activos
 ```
 
 ## Owner
@@ -31,13 +31,19 @@ Registra preparación previa al frame. Ejemplos válidos: configurar contexto, a
 
 Registra overlays o presentación posterior al frame: minimapa, indicadores, UI Canvas, actores remotos legacy durante la migración, etc.
 
+### `KeloRender.setEnabled(id, enabled)`
+
+Activa o duerme un hook ya registrado. `false` lo saca del hot path sin perder su identidad, prioridad ni función; `true` lo devuelve al orden determinista original. Es la API oficial para features que necesitan sleep/wake de presentación.
+
+No se debe reemplazar por un RAF propio, un wrapper adicional ni unregister/register continuo.
+
 ### `KeloRender.unregister(id)`
 
-Retira un hook registrado.
+Retira definitivamente un hook registrado.
 
 ### `KeloRender.snapshot()`
 
-Expone owners y prioridades para auditoría/debug.
+Expone owners, prioridades, estado `enabled` y conteos activos/dormidos para auditoría/debug.
 
 ## Invariantes
 
@@ -46,6 +52,8 @@ Expone owners y prioridades para auditoría/debug.
 - Features nuevas no deben hacer `const old=render; render=function(){...}`.
 - Orden por prioridad es determinista; menor prioridad se ejecuta primero dentro de cada fase.
 - El `render` capturado se ejecuta exactamente una vez por llamada.
+- Un hook dormido no se ejecuta y no debe obligar al sistema a crear otro scheduler.
+- Cambiar `enabled` reconstruye la lista activa solo cuando cambia lifecycle; no se filtra la lista completa cada frame.
 
 ## Migración legacy
 
@@ -59,6 +67,10 @@ No se reescribe el renderer completo.
 
 Render es presentación cliente. Eventos o snapshots autoritativos pueden alimentar contenido visual, pero `KeloRender` jamás convierte el cliente en autoridad de estado compartido.
 
+## Performance Foundation
+
+Para el contrato conjunto de startup, CPU, memoria, mundo y red, ver `docs/systems/PERFORMANCE_FOUNDATION.md`.
+
 ## Estado
 
-**FOUNDATION ACTIVE / TRANSITIONAL CORE BRIDGE**
+**FOUNDATION ACTIVE / TRANSITIONAL CORE BRIDGE — SLEEP/WAKE ENABLED**
