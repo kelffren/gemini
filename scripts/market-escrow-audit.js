@@ -8,16 +8,17 @@ const E=context.KeloEquipment,B=context.KeloBackpack,C=context.KeloContainers,M=
 assert(E&&B&&C&&M);
 assert.equal(E.version,'equipment-v1.1.2');
 assert.equal(B.version,'backpack-v1.1.0');
-assert.equal(C.version,'container-v1.2.0');
+assert.equal(C.version,'container-v1.3.0');
 assert.equal(M.version,'market-escrow-v1.0.0');
-const allItems=()=>context.STATE.inventory.concat(context.STATE.warehouse.items,context.STATE.marketEscrow.items,context.STATE.emoteLoadout.items);
+const allItems=()=>context.STATE.inventory.concat(context.STATE.warehouse.items,context.STATE.marketEscrow.items,context.STATE.tradeEscrow.items,context.STATE.emoteLoadout.items);
 const totalQty=()=>allItems().reduce((n,x)=>n+Math.max(1,Number(x.quantity)||1),0);
 const ids=()=>allItems().map(x=>M.itemIdentity(x));
-const assertUnique=()=>assert.equal(new Set(ids()).size,ids().length,'one identity must exist in only one container');
+const assertUnique=()=>{assert.equal(new Set(ids()).size,ids().length,'one identity must exist in only one container');assert(C.auditIdentities().ok,'container owner must agree on identity invariant');};
 const findBag=id=>C.getSlots('backpack').find(s=>s.item&&M.itemIdentity(s.item)===id);
 const findEsc=id=>C.getSlots('market_escrow').find(s=>s.item&&M.itemIdentity(s.item)===id);
 assert.equal(C.getStats('market_escrow').used,0);
 assert.equal(C.getStats('market_escrow').capacity>=20,true);
+assert.equal(C.getStats('trade_escrow').capacity,12);
 assert.equal(C.getStats('emote_loadout').capacity,4);
 const relic={id:'market_relic',templateId:'relic',name:'Reliquia Market',icon:'◆',kind:'material',quantity:1,maxStack:1,bound:true,rarity:'Epic',metadata:{seal:'keep'}};
 context.STATE.inventory.push(relic);B.ensure();
@@ -46,12 +47,12 @@ while(C.getStats('backpack').free>0){
   context.STATE.inventory.push(filler);B.ensure();
 }
 assert.equal(C.getStats('backpack').free,0);
-const fullSnap=JSON.stringify({inventory:context.STATE.inventory,backpack:context.STATE.backpack,marketEscrow:context.STATE.marketEscrow,marketEscrowListings:context.STATE.marketEscrowListings});
+const fullSnap=JSON.stringify({inventory:context.STATE.inventory,backpack:context.STATE.backpack,marketEscrow:context.STATE.marketEscrow,tradeEscrow:context.STATE.tradeEscrow,marketEscrowListings:context.STATE.marketEscrowListings});
 out=M.cancelMarketListing(fullListing.listingId);assert.equal(out.error,'DESTINATION_FULL');
-assert.equal(JSON.stringify({inventory:context.STATE.inventory,backpack:context.STATE.backpack,marketEscrow:context.STATE.marketEscrow,marketEscrowListings:context.STATE.marketEscrowListings}),fullSnap,'full Backpack cancellation must have zero mutation');
+assert.equal(JSON.stringify({inventory:context.STATE.inventory,backpack:context.STATE.backpack,marketEscrow:context.STATE.marketEscrow,tradeEscrow:context.STATE.tradeEscrow,marketEscrowListings:context.STATE.marketEscrowListings}),fullSnap,'full Backpack cancellation must have zero mutation');
 assert(findEsc('cancel_full_target'));assert(context.STATE.marketEscrowListings.find(x=>x.listingId===fullListing.listingId).status==='active');
 const reload=JSON.stringify(context.STATE);context.STATE=JSON.parse(reload);C.ensure();M.ensure();assert(M.auditInvariants().ok,'reload must preserve listing + escrow');assertUnique();
 const activeBefore=M.getActiveListings().length;context.STATE.marketEscrowListings.push({schemaVersion:1,listingId:'orphan_test',owner:'local_pioneer',escrowItemInstanceId:'does_not_exist',quantity:1,status:'active',createdAt:Date.now()});
 const broken=M.auditInvariants();assert(!broken.ok&&broken.errors.some(x=>x.code==='ORPHAN_LISTING'));context.STATE.marketEscrowListings=context.STATE.marketEscrowListings.filter(x=>x.listingId!=='orphan_test');assert.equal(M.getActiveListings().length,activeBefore);assert(M.auditInvariants().ok);
 assert(saveCalls>0);
-console.log('PASS market-escrow-audit',JSON.stringify({marketVersion:M.version,containerVersion:C.version,activeListings:M.getActiveListings().length,escrowItems:context.STATE.marketEscrow.items.length,identityUnique:true,totalQuantity:totalQty(),saves:saveCalls}));
+console.log('PASS market-escrow-audit',JSON.stringify({marketVersion:M.version,containerVersion:C.version,activeListings:M.getActiveListings().length,escrowItems:context.STATE.marketEscrow.items.length,tradeEscrowItems:context.STATE.tradeEscrow.items.length,identityUnique:true,totalQuantity:totalQty(),saves:saveCalls}));

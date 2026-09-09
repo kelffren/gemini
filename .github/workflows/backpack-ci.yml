@@ -9,17 +9,20 @@ on:
       - 'src/systems/equipment-system.js'
       - 'src/systems/container-system.js'
       - 'src/systems/market-escrow-system.js'
+      - 'src/systems/commerce-authority.js'
       - 'src/systems/emote-system.js'
       - 'src/ui/backpack-ui.js'
       - 'src/ui/backpack-fantasy-v1.css'
       - 'src/ui/modal-input-lock.js'
       - 'src/ui/warehouse-ui.js'
       - 'src/ui/market-ui.js'
+      - 'src/ui/commerce-ui.js'
       - 'src/ui/self-interaction-ui.js'
       - 'src/ui/character-customizer-ui.js'
       - 'scripts/backpack-system-audit.js'
       - 'scripts/container-system-audit.js'
       - 'scripts/market-escrow-audit.js'
+      - 'scripts/commerce-system-audit.js'
       - 'scripts/emote-system-audit.js'
       - 'scripts/inventory-ui-v2-audit.js'
       - '.github/workflows/backpack-ci.yml'
@@ -32,17 +35,20 @@ on:
       - 'src/systems/equipment-system.js'
       - 'src/systems/container-system.js'
       - 'src/systems/market-escrow-system.js'
+      - 'src/systems/commerce-authority.js'
       - 'src/systems/emote-system.js'
       - 'src/ui/backpack-ui.js'
       - 'src/ui/backpack-fantasy-v1.css'
       - 'src/ui/modal-input-lock.js'
       - 'src/ui/warehouse-ui.js'
       - 'src/ui/market-ui.js'
+      - 'src/ui/commerce-ui.js'
       - 'src/ui/self-interaction-ui.js'
       - 'src/ui/character-customizer-ui.js'
       - 'scripts/backpack-system-audit.js'
       - 'scripts/container-system-audit.js'
       - 'scripts/market-escrow-audit.js'
+      - 'scripts/commerce-system-audit.js'
       - 'scripts/emote-system-audit.js'
       - 'scripts/inventory-ui-v2-audit.js'
       - '.github/workflows/backpack-ci.yml'
@@ -64,16 +70,19 @@ jobs:
           node --check src/systems/backpack-system.js
           node --check src/systems/container-system.js
           node --check src/systems/market-escrow-system.js
+          node --check src/systems/commerce-authority.js
           node --check src/systems/emote-system.js
           node --check src/ui/modal-input-lock.js
           node --check src/ui/backpack-ui.js
           node --check src/ui/warehouse-ui.js
           node --check src/ui/market-ui.js
+          node --check src/ui/commerce-ui.js
           node --check src/ui/self-interaction-ui.js
           node --check src/ui/character-customizer-ui.js
           node --check scripts/backpack-system-audit.js
           node --check scripts/container-system-audit.js
           node --check scripts/market-escrow-audit.js
+          node --check scripts/commerce-system-audit.js
           node --check scripts/emote-system-audit.js
           node --check scripts/inventory-ui-v2-audit.js
       - name: Backpack mechanics
@@ -82,6 +91,8 @@ jobs:
         run: node scripts/container-system-audit.js
       - name: Market Escrow mechanics
         run: node scripts/market-escrow-audit.js
+      - name: Commerce mechanics
+        run: node scripts/commerce-system-audit.js
       - name: Emote loadout mechanics
         run: node scripts/emote-system-audit.js
       - name: Inventory UI V2 contract
@@ -93,17 +104,21 @@ jobs:
           grep -q "backpack-v1.1.0" src/systems/backpack-system.js
           grep -q "stacksImplemented:true" src/systems/backpack-system.js
           grep -q "splitImplemented:true" src/systems/backpack-system.js
-          grep -q "container-v1.2.0" src/systems/container-system.js
+          grep -q "container-v1.3.0" src/systems/container-system.js
           grep -q "strictDestinationCapacity:true" src/systems/container-system.js
           grep -q "warehouseImplemented:true" src/systems/container-system.js
           grep -q "marketEscrowImplemented:true" src/systems/container-system.js
           grep -q "marketEscrowMerge:false" src/systems/container-system.js
+          grep -q "tradeEscrowImplemented:true" src/systems/container-system.js
+          grep -q "checkpointTransactions:true" src/systems/container-system.js
           grep -q "emoteLoadoutImplemented:true" src/systems/container-system.js
           grep -q "emote-loadout-v1.0.0" src/systems/emote-system.js
           grep -q "noDuplicateInBackpackWhileEquipped:true" src/systems/emote-system.js
           grep -q "market-escrow-v1.0.0" src/systems/market-escrow-system.js
           grep -q "listingContract:'validate-transfer-create-persist-rollback-v1'" src/systems/market-escrow-system.js
           grep -q "cancelContract:'validate-transfer-close-persist-rollback-v1'" src/systems/market-escrow-system.js
+          grep -q "commerce-authority-v1.0.0" src/systems/commerce-authority.js
+          grep -q "tradeDoubleConfirmation:true" src/systems/commerce-authority.js
           grep -Eq "backpack-ui-v2\.[0-9]+\.[0-9]+" src/ui/backpack-ui.js
           grep -q "locks.acquire('backpack-ui'" src/ui/backpack-ui.js
           grep -q "inputLockTokenized:true" src/ui/backpack-ui.js
@@ -111,8 +126,9 @@ jobs:
           grep -q "modal-input-lock-v2.0.0-retired" src/ui/modal-input-lock.js
           grep -q "replacementOwner:'KeloInputLocks'" src/ui/modal-input-lock.js
           grep -q "warehouse-ui-v1.0.1" src/ui/warehouse-ui.js
-          grep -q "market-ui-v1.0.0" src/ui/market-ui.js
+          grep -q "market-ui-v1.1.0-commerce-compat" src/ui/market-ui.js
           grep -q "backpackPublishAction:true" src/ui/market-ui.js
+          grep -q "authorityBoundary:'KeloCommerceAuthority'" src/ui/market-ui.js
           grep -Eq "self-interaction-ui-v1\.[0-9]+\.[0-9]+" src/ui/self-interaction-ui.js
           grep -q "locks.acquire(owner" src/ui/self-interaction-ui.js
           grep -q "inputLockOwner:'KeloInputLocks'" src/ui/self-interaction-ui.js
