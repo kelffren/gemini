@@ -97,7 +97,7 @@ jobs:
         run: node scripts/server-commerce-audit.js
       - name: Documentation contract
         run: node scripts/system-documentation-audit.js
-      - name: Architecture contract
+      - name: Authority architecture contract
         run: |
           grep -q "tradeEscrowImplemented:true" src/systems/container-system.js
           grep -q "checkpointTransactions:true" src/systems/container-system.js
@@ -106,12 +106,18 @@ jobs:
           grep -q "recoverableFixtureMerge:true" src/systems/commerce-authority.js
           grep -q "noOnlineLocalFallback:true" src/systems/commerce-authority.js
           grep -q "tradeDoubleConfirmation:true" src/systems/commerce-authority.js
+      - name: Market UI architecture contract
+        run: |
           grep -q "market-instance-v1.0.1" src/instances/market-instance.js
           grep -q "economyOwner:'KeloCommerceAuthority'" src/instances/market-instance.js
           grep -q "commerce-ui-v1.0.0" src/ui/commerce-ui.js
           grep -q "authorityOnly:true" src/ui/commerce-ui.js
           grep -q "doubleConfirmation:true" src/ui/commerce-ui.js
           ! grep -q "slots.slice(0,12)" src/ui/commerce-ui.js
+          ! grep -Eq "STATE\.(gold|inventory)[[:space:]]*=" src/ui/commerce-ui.js
+          ! grep -Eq "marketEscrow\.(items|slots)[[:space:]]*=" src/ui/commerce-ui.js
+      - name: Server commerce architecture contract
+        run: |
           grep -q "requestCommerce" engine-net.js
           grep -q "commerce:request" engine-net.js
           grep -q "createPlayerEconomyStore" server/forge-store.js
@@ -122,11 +128,11 @@ jobs:
           grep -q "commerce:event" server/index.js
           grep -q "player-economy-store-v1.0.0" server/player-economy-store.js
           grep -q "commerce-server-v1.1.0" server/commerce-store.js
+      - name: Boot and docs commerce contract
+        run: |
           grep -q "src/systems/equipment-item-catalog.js" index.html
           grep -q "src/systems/commerce-authority.js" index.html
           grep -q "src/instances/market-instance.js" index.html
           grep -q "src/ui/commerce-ui.js" index.html
           grep -q '"id": "commerce"' docs/system-catalog.json
           grep -q 'id="mercado-comercio-y-trade"' guide.html
-          ! grep -Eq "STATE\.(gold|inventory)[[:space:]]*=" src/ui/commerce-ui.js
-          ! grep -Eq "marketEscrow\.(items|slots)[[:space:]]*=" src/ui/commerce-ui.js
