@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: BUILD
- * keys: PNG VALIDATION ASSETS PATH CASE CI
- * hace: valida inventario, referencias runtime e integridad binaria de los PNG del proyecto
+ * keys: PNG VALIDATION ASSETS PATH CASE CI STAGING UUID
+ * hace: valida inventario, referencias runtime e integridad binaria de los PNG; UUID nuevos pueden quedar en staging si runtime no los referencia
  * online: N/A; gate estatico de assets/CI
  */
 import fs from 'node:fs';
@@ -19,6 +19,7 @@ const fail = message => failures.push(message);
 const rel = full => path.relative(root, full).split(path.sep).join('/');
 const normalizePngExtensionCase = value => value.replace(/\.png$/i, '.png');
 const samePngPathAllowingExtensionCase = (left, right) => normalizePngExtensionCase(left) === normalizePngExtensionCase(right);
+const STAGED_UUID_PNG = /^assets\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.png$/i;
 
 if (policy.version !== 'kelo-png-validation-policy-v1') fail(`unexpected policy version=${policy.version}`);
 if (!Array.isArray(policy.excludedFromWorldContract)) fail('excludedFromWorldContract must be an array');
@@ -51,10 +52,21 @@ for (const file of pngFiles) {
   diskCaseMap.set(key, file);
 }
 
+const stagedFiles = new Set();
 for (const file of pngFiles) {
   const registered = manifestByPath.has(file);
   const excluded = exclusions.has(file);
-  if (registered === excluded) fail(`${file} must be exactly one of registered or explicitly excluded`);
+  if (registered && excluded) {
+    fail(`${file} cannot be both registered and explicitly excluded`);
+    continue;
+  }
+  if (registered || excluded) continue;
+  if (STAGED_UUID_PNG.test(file)) {
+    stagedFiles.add(file);
+    pass(`staged UUID asset awaiting catalog inspection ${file}`);
+    continue;
+  }
+  fail(`${file} must be registered, explicitly excluded, or a staged UUID asset`);
 }
 for (const file of manifestByPath.keys()) if (!diskSet.has(file)) fail(`manifest PNG missing from disk: ${file}`);
 for (const file of exclusions.keys()) if (!diskSet.has(file)) fail(`excluded PNG missing from disk: ${file}`);
@@ -63,14 +75,10 @@ for (const [file, asset] of manifestByPath) {
   if (!diskSet.has(file)) continue;
   try {
     const info = inspectPng(fs.readFileSync(path.join(root, file)), file);
-    if (info.width !== asset.width || info.height !== asset.height) {
-      fail(`${file} binary dimensions ${info.width}x${info.height} != manifest ${asset.width}x${asset.height}`);
-    }
+    if (info.width !== asset.width || info.height !== asset.height) fail(`${file} binary dimensions ${info.width}x${info.height} != manifest ${asset.width}x${asset.height}`);
     if (asset.requireAlpha === true && !info.hasTransparency) fail(`${file} requires alpha/tRNS but binary has none`);
     pass(`${file} binary=${info.width}x${info.height} bitDepth=${info.bitDepth} colorType=${info.colorType} chunks=${info.chunks.length}`);
-  } catch (error) {
-    fail(error.message);
-  }
+  } catch (error) { fail(error.message); }
 }
 
 const runtimeRoots = ['index.html','src'].map(item => path.join(root, item)).filter(fs.existsSync);
@@ -100,11 +108,13 @@ for (const [ref, owners] of [...runtimeRefs.entries()].sort()) {
     fail(`runtime PNG reference missing from disk: ${ref} owners=${[...owners].join(',')}`);
     continue;
   }
-  if (!samePngPathAllowingExtensionCase(exactDiskPath, ref)) {
-    fail(`runtime PNG path case mismatch outside extension: ref=${ref} disk=${exactDiskPath}`);
-  }
+  if (!samePngPathAllowingExtensionCase(exactDiskPath, ref)) fail(`runtime PNG path case mismatch outside extension: ref=${ref} disk=${exactDiskPath}`);
   if (manifestByPath.has(exactDiskPath)) {
     pass(`runtime-ref ${exactDiskPath} owners=${[...owners].join(',')}`);
+    continue;
+  }
+  if (stagedFiles.has(exactDiskPath)) {
+    fail(`staged UUID asset cannot be runtime-referenced before catalog adoption: ${exactDiskPath} owners=${[...owners].join(',')}`);
     continue;
   }
   const exclusion = exclusions.get(exactDiskPath);
@@ -129,7 +139,7 @@ for (const [file, exclusion] of exclusions) {
 
 if (failures.length) {
   for (const message of failures) console.error(`PNG_PIPELINE_FAIL ${message}`);
-  console.error(`PNG_PIPELINE_NOT_OK failures=${failures.length} disk=${pngFiles.length} registered=${manifestByPath.size} excluded=${exclusions.size} runtimeRefs=${runtimeRefs.size}`);
+  console.error(`PNG_PIPELINE_NOT_OK failures=${failures.length} disk=${pngFiles.length} registered=${manifestByPath.size} excluded=${exclusions.size} staged=${stagedFiles.size} runtimeRefs=${runtimeRefs.size}`);
   process.exit(1);
 }
-console.log(`PNG_PIPELINE_OK policy=${policy.version} disk=${pngFiles.length} registered=${manifestByPath.size} excluded=${exclusions.size} runtimeRefs=${runtimeRefs.size}`);
+console.log(`PNG_PIPELINE_OK policy=${policy.version} disk=${pngFiles.length} registered=${manifestByPath.size} excluded=${exclusions.size} staged=${stagedFiles.size} runtimeRefs=${runtimeRefs.size}`);
