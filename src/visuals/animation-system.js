@@ -234,10 +234,13 @@
     const instance = winningInstance(actor);
     if (!instance || instance.def.type !== 'spritesheet') return null;
     const def = instance.def;
-    const frames = Math.max(1, Number(def.frames) || 1);
+    const configured = Array.isArray(def.frameSequence) ? def.frameSequence.map(function (frame) { return Math.max(0, Math.round(Number(frame) || 0)); }) : null;
+    const sequence = configured && configured.length ? configured : null;
+    const frames = sequence ? sequence.length : Math.max(1, Number(def.frames) || 1);
     const fps = Math.max(1, Number(def.fps) || 12);
-    const frame = Math.min(frames - 1, Math.floor(instance.elapsed * fps) % frames);
-    return { assetId: def.assetId, frame: frame, frameWidth: def.frameWidth, frameHeight: def.frameHeight, anchor: def.anchor || { x: 0.5, y: 1 }, direction: faceOf(actor), mirrorLeftFromRight: def.mirrorLeftFromRight === true };
+    const slot = Math.min(frames - 1, Math.floor(instance.elapsed * fps) % frames);
+    const frame = sequence ? sequence[slot] : slot;
+    return { assetId: def.assetId, frame: frame, frameSlot: slot, frameSequenceLength: frames, frameWidth: def.frameWidth, frameHeight: def.frameHeight, anchor: def.anchor || { x: 0.5, y: 1 }, direction: faceOf(actor), mirrorLeftFromRight: def.mirrorLeftFromRight === true };
   }
 
   function metrics() {
@@ -249,7 +252,7 @@
   root.KeloAnimationRegistry = Object.freeze({ version: 'animation-registry-v1.0.0', register: register, get: get, list: list });
   root.KeloAnchors = Object.freeze({ version: 'anchors-v1.0.0', get: anchor, presentation: presentation });
   root.KeloAnimation = Object.freeze({
-    version: 'animation-controller-v1.1.0', channels: Object.freeze(Object.keys(CHANNEL_PRIORITY)), priorities: CHANNEL_PRIORITY,
+    version: 'animation-controller-v1.2.0', channels: Object.freeze(Object.keys(CHANNEL_PRIORITY)), priorities: CHANNEL_PRIORITY,
     play: play, preview: preview, previewLocal: previewLocal, stop: stop, stopLocal: stopLocal, update: update, sampleTransform: sampleTransform, frameOverride: frameOverride, metrics: metrics
   });
 })(typeof globalThis !== 'undefined' ? globalThis : window);
