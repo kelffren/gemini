@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: CHARACTERS
  * owner: KeloCharacterAppearance; avatar composition owned by KeloAvatar
- * keys: APPEARANCE PLAYER BOT HERO SPRITE FALLBACK FOUNDATION PVP AIM FACING STRAFE LOCOMOTION
+ * keys: APPEARANCE PLAYER BOT HERO SPRITE FALLBACK FOUNDATION PVP AIM FACING STRAFE LOCOMOTION PLANT
  * hace: asigna y renderiza sprites de apariencia; el hero.PNG subido usa el owner modular con 4 direcciones
  * online: visual cliente; autoridad de actor fuera de este modulo; en PvP conserva aim de gameplay y usa fila de aim solo durante compromiso de ataque/aim explícito
  * extension-points: KeloAvatar.use como middleware condicional de apariencia
@@ -10,7 +10,7 @@
 (function () {
   'use strict';
 
-  const VERSION = 'character-appearance-v2.4.0-pvp-locomotion-row';
+  const VERSION = 'character-appearance-v2.4.1-idle-plant-frame';
   const DEFAULT_PLAYER = 'player_hero_v1';
   const DEFAULT_BOT = DEFAULT_PLAYER;
   const ALPHA_CLEANUP_THRESHOLD = 8;
@@ -47,6 +47,7 @@
     assignedPlayers: 0, assignedBots: 0, loaded: {}, dimensions: {}, loadErrors: {}, cleanupPixels: {},
     drawCountByAppearance: {}, fallbackDraws: 0, imageSmoothingDisabled: true,
     usesSingleImagePerAppearance: true, usesActorAppearanceId: true, usesPerFrameFootAnchor: true,
+    usesExplicitIdleFrame: true,
     usesCombatAimFacing: true, combatAimFacingPolicy: 'idle-or-attack-commitment',
     avatarOwner: 'KeloAvatar', avatarMiddleware: 'character-appearance:custom-sprite', lastDraw: null
   };
@@ -179,8 +180,9 @@
   }
 
   function frameColumn(actor, motion, def) {
-    if (!motion.moving) return 0;
+    // MOV-PLANT-V2: KeloMovement owns stride/plant semantics. Appearance must honor an explicit frame even when idle.
     if (motion.frame != null) return Math.abs(Math.floor(motion.frame)) % def.columns;
+    if (!motion.moving) return 0;
     const phase = actor && actor.id ? Array.from(String(actor.id)).reduce(function(sum,ch){ return sum+ch.charCodeAt(0); },0) : 0;
     return Math.floor((performance.now()+phase*23)/130) % def.columns;
   }
