@@ -30,7 +30,7 @@
     if(op==='house:leave'){const i=runtimeForPayload(data);if(i)await persistRuntime(i,false,false);return I.leaveCurrent(actorId,{idleTTL:data.idleTTL});}
     if(op==='house:save'){const i=runtimeForPayload(data);return persistRuntime(i,false,false);}
     if(op==='permission:update'){const i=runtimeForPayload(data);requireCap(i,actorId,'canInvite');const target=String(data.targetId||'');const role=String(data.role||'visitor');if(!target||!roleCaps[role])throw new Error('INVALID_HOUSE_PERMISSION');i.permissions[target]=role;return persistRuntime(i,true,false);}
-    if(['place','move','rotate','remove'].includes(op)){
+    if(['place','move','rotate','scale','remove'].includes(op)){
       const i=runtimeForPayload(data);if(!i)throw new Error('HOUSE_INSTANCE_NOT_FOUND');const cap=op==='place'?'canBuild':op==='remove'?'canRemoveAssets':'canMoveAssets';requireCap(i,actorId,cap);const localPayload=Object.assign({},data,{ownerId:String(i.ownerId)});delete localPayload.actorId;const result=await S.authorityLocalRequest(op,localPayload);await persistRuntime(i,true,true);return result;
     }
     throw new Error('UNKNOWN_HOUSE_OPERATION');

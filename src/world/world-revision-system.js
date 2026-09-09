@@ -11,6 +11,7 @@ if(window.KELO_WORLD_REVISIONS)return;
 const VERSION='world-revision-system-v1.0.0';
 let seq=1;
 const clone=v=>v==null?v:JSON.parse(JSON.stringify(v));
+const normalizeScale=v=>{const n=Number(v);return Math.max(.1,Math.min(8,Number.isFinite(n)?Math.round(n*100)/100:1));};
 function stableId(prefix){
   const uuid=globalThis.crypto?.randomUUID?.();
   return `${prefix}:${uuid||`${Date.now().toString(36)}:${(seq++).toString(36)}`}`;
@@ -25,6 +26,7 @@ function normalizePlacement(raw){
     x:Number(raw.x)||0,
     y:Number(raw.y)||0,
     rotation:((Math.floor(Number(raw.rotation)||0)%4)+4)%4,
+    scale:normalizeScale(raw.scale),
     layer:String(raw.layer||'property'),
     createdAt:Number(raw.createdAt)||Date.now(),
     updatedAt:Number(raw.updatedAt)||Date.now()

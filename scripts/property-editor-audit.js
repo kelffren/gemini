@@ -29,8 +29,8 @@ run('src/property/property-asset-catalog.js');run('src/property/property-system.
   await assert.rejects(()=>S.request('place',{ownerId:'audit-player',parcelId:p.parcelId,assetId:asset.id,x:2176,y:1536}),/NO_OWNED_UNITS/);
   await S.request('remove',{ownerId:'audit-player',placementId:a.placementId});assert.equal(S.getAvailableUnits(asset.id,'audit-player'),1,'removing must release one deployable unit');
   await assert.rejects(()=>S.request('place',{ownerId:'audit-player',parcelId:p.parcelId,assetId:asset.id,x:1984,y:1472}),/OUTSIDE_PARCEL/);
-  const wp=await S.request('ensureWorldEditorParcel',{ownerId:'developer'});await S.request('place',{ownerId:'developer',parcelId:wp.parcelId,assetId:asset.id,x:64,y:64});
+  const wp=await S.request('ensureWorldEditorParcel',{ownerId:'developer'});const worldPlacement=await S.request('place',{ownerId:'developer',parcelId:wp.parcelId,assetId:asset.id,x:64,y:64});const beforeScale=S.placementBounds(worldPlacement);const scaled=await S.request('scale',{ownerId:'developer',placementId:worldPlacement.placementId,scale:1.5});const afterScale=S.placementBounds(scaled);assert.equal(scaled.scale,1.5);assert.equal(afterScale.w,beforeScale.w*1.5);assert.equal(afterScale.h,beforeScale.h*1.5);
   assert.equal(layers.filter(x=>x.id.indexOf('property-placements-')===0).length,2,'back/front property layers required');
   const exp=S.exportLayout(wp.parcelId);assert.equal(exp.contract,'kelo-property-layout-v1');assert(exp.placements.length>=1);
-  console.log(JSON.stringify({ok:true,catalog:C.list().length,playerPlacements:S.getPlacements(p.parcelId).length,worldPlacements:S.getPlacements(wp.parcelId).length,layers:layers.length,movePreservesUnits:true,imageStub:'node-audit-only'}));
+  console.log(JSON.stringify({ok:true,catalog:C.list().length,playerPlacements:S.getPlacements(p.parcelId).length,worldPlacements:S.getPlacements(wp.parcelId).length,layers:layers.length,movePreservesUnits:true,scale:true,imageStub:'node-audit-only'}));
 })().catch(err=>{console.error(err);process.exitCode=1;});

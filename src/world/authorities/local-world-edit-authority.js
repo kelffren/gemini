@@ -456,18 +456,19 @@ class LocalWorldEditAuthority{
     }
 
     // Property remains the active placement engine; drafts/revisions only snapshot its layout.
-    if(['world:placement:create','world:placement:move','world:placement:rotate','world:placement:remove'].includes(op)){
+    if(['world:placement:create','world:placement:move','world:placement:rotate','world:placement:scale','world:placement:remove'].includes(op)){
       const key=this._require('world.edit',actorId),d=this._requireMutableDraft(payload,actorId),S=this._property();
       await this._ensureWorldParcel();
       let result=null,before=null,objectId=null;
       if(op==='world:placement:create'){
-        result=await S.request('place',{ownerId:'developer',parcelId:WORLD_PARCEL_ID,assetId:payload.assetId,x:payload.x,y:payload.y,rotation:payload.rotation||0});
+        result=await S.request('place',{ownerId:'developer',parcelId:WORLD_PARCEL_ID,assetId:payload.assetId,x:payload.x,y:payload.y,rotation:payload.rotation||0,scale:payload.scale});
         objectId=result.placementId;
       }else{
         objectId=String(payload.placementId||'');
         before=S.getPlacements(WORLD_PARCEL_ID).find(x=>x.placementId===objectId)||null;
         if(op==='world:placement:move')result=await S.request('move',{ownerId:'developer',placementId:objectId,x:payload.x,y:payload.y});
         if(op==='world:placement:rotate')result=await S.request('rotate',{ownerId:'developer',placementId:objectId,delta:payload.delta||1});
+        if(op==='world:placement:scale')result=await S.request('scale',{ownerId:'developer',placementId:objectId,scale:payload.scale});
         if(op==='world:placement:remove')result=await S.request('remove',{ownerId:'developer',placementId:objectId});
       }
       d.snapshot.placements=this.rev.normalizeSnapshot({placements:this._capturePlacements()}).placements;
