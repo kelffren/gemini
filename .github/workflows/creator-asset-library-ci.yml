@@ -1,0 +1,60 @@
+# KELO-INDEX
+# area: QA / CREATORS / ASSET LIBRARY
+# owner: Creator Asset Library CI
+name: Creator Asset Library CI
+on:
+  pull_request:
+    paths:
+      - 'src/creators/assets/**'
+      - 'src/creators/ui/asset-library-workspace.mjs'
+      - 'src/creators/ui/creator-hub.mjs'
+      - 'src/creators/workspaces/asset-library-workspace.mjs'
+      - 'src/creators/workspaces/map-forge-workspace.mjs'
+      - 'src/creators/creator-entry.mjs'
+      - 'src/world/map-forge/map-forge-asset-binding.mjs'
+      - 'src/world/map-forge/map-forge-worker-client.mjs'
+      - 'scripts/creator-asset-library-audit.mjs'
+      - 'docs/systems/CREATOR_ASSET_LIBRARY.md'
+      - 'docs/systems/MAP_FORGE_SYSTEM.md'
+      - 'docs/system-catalog.json'
+      - '.github/workflows/creator-asset-library-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'src/creators/assets/**'
+      - 'src/creators/ui/asset-library-workspace.mjs'
+      - 'src/creators/ui/creator-hub.mjs'
+      - 'src/creators/workspaces/asset-library-workspace.mjs'
+      - 'src/creators/workspaces/map-forge-workspace.mjs'
+      - 'src/creators/creator-entry.mjs'
+      - 'src/world/map-forge/map-forge-asset-binding.mjs'
+      - 'src/world/map-forge/map-forge-worker-client.mjs'
+      - 'scripts/creator-asset-library-audit.mjs'
+      - 'docs/systems/CREATOR_ASSET_LIBRARY.md'
+      - 'docs/systems/MAP_FORGE_SYSTEM.md'
+      - 'docs/system-catalog.json'
+      - '.github/workflows/creator-asset-library-ci.yml'
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Syntax
+        run: |
+          node --check src/creators/assets/indexeddb-creator-asset-repository.mjs
+          node --check src/creators/assets/creator-asset-library.mjs
+          node --check src/creators/workspaces/asset-library-workspace.mjs
+          node --check src/creators/ui/asset-library-workspace.mjs
+          node --check src/creators/ui/creator-hub.mjs
+          node --check src/creators/creator-entry.mjs
+          node --check src/world/map-forge/map-forge-asset-binding.mjs
+          node --check src/world/map-forge/map-forge-worker-client.mjs
+          node --check scripts/creator-asset-library-audit.mjs
+      - name: Asset library contract
+        run: npm run audit:creator-assets
+      - name: Documentation contract
+        run: npm run audit:docs
