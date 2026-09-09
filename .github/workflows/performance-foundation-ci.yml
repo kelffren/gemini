@@ -8,6 +8,7 @@ on:
       - 'server/**'
       - 'src/core/**'
       - 'src/environment/**'
+      - 'src/abilities/kelo-ability-boot.js'
       - 'src/systems/performance-governor.js'
       - 'src/visuals/**'
       - 'src/ui/profile-panel-close.js'
@@ -24,6 +25,7 @@ on:
       - 'server/**'
       - 'src/core/**'
       - 'src/environment/**'
+      - 'src/abilities/kelo-ability-boot.js'
       - 'src/systems/performance-governor.js'
       - 'src/visuals/**'
       - 'src/ui/profile-panel-close.js'
@@ -48,6 +50,7 @@ jobs:
         run: |
           node --check src/core/simulation-extension-system.js
           node --check src/core/render-extension-system.js
+          node --check src/abilities/kelo-ability-boot.js
           node --check src/systems/performance-governor.js
           node --check src/visuals/visual-system.js
           node --check src/environment/atlas-contract.js
