@@ -1,10 +1,22 @@
 /* KELO-INDEX
  * area: RENDER
- * keys: AVATAR CAMERA PIXEL PHASE DPR ZOOM JITTER BENCHMARK
- * hace: compara redondeo world-space actual contra snap físico adaptativo sin tocar gameplay
+ * keys: AVATAR CAMERA PIXEL PHASE DPR ZOOM JITTER BENCHMARK CONTRACT
+ * hace: compara redondeo world-space actual contra snap físico adaptativo y verifica el contrato LIVE
  * online: N/A; audit determinista de presentación cliente
  */
 'use strict';
+const fs=require('fs');
+
+const appearance=fs.readFileSync('src/characters/character-appearance.js','utf8');
+const requiredSource=[
+  "adaptivePhysicalPixelSnap: true",
+  "const rawDx=layout.footRootX-anchorX*scale",
+  "if (z*dpr>=1)",
+  "cameraApi.worldToScreen(rawDx,rawDy)",
+  "pixelSnapMode='physical'",
+  "worldPixelFallbackCount"
+];
+for(const token of requiredSource){if(!appearance.includes(token)) throw new Error('production pixel-phase contract missing: '+token);}
 
 const viewports = [
   {name:'portrait-phone', w:390, h:844, dprs:[2,3]},
@@ -33,7 +45,7 @@ function samplePolicy(rawWorld,cameraWorld,screenSpan,z,dpr,policy){
   if(policy==='A') return current;
   if(policy==='B') return rawWorld;
   const physicalScale=z*dpr;
-  if(physicalScale < 1) return current; // adaptive safety: never coarser than 1 world-px quantization
+  if(physicalScale < 1) return current;
   const css=(rawWorld-cameraWorld)*z+screenSpan/2;
   const snappedCss=Math.round(css*dpr)/dpr;
   return cameraWorld+(snappedCss-screenSpan/2)/z;
@@ -52,7 +64,6 @@ for(const vp of viewports){
           let camX=1400.11,camY=1600.19;
           for(let i=0;i<Math.round(hz*1.5);i++){
             x+=dir.x*speed*dt; y+=dir.y*speed*dt;
-            // same deterministic camera trace for all policies; deliberately subpixel.
             camX+=(x-camX)*0.08; camY+=(y-camY)*0.08;
             for(const policy of ['A','B','C']){
               const dx=samplePolicy(x-18.37,camX,vp.w,z,dpr,policy);
@@ -85,9 +96,12 @@ const highDprA=metrics.A.filter(r=>r.physicalScale>=1);
 const highDprC=metrics.C.filter(r=>r.physicalScale>=1);
 out.highDprCurrent=summarize(highDprA);
 out.highDprAdaptive=summarize(highDprC);
-out.lowScaleAdaptiveFallsBack=metrics.C.filter(r=>r.physicalScale<1).every((r,i)=>true);
+out.lowScaleFallbackSamples=metrics.C.filter(r=>r.physicalScale<1).length;
+out.productionContractVerified=true;
 console.log(JSON.stringify(out,null,2));
 
+if(!(out.C_ADAPTIVE_PHYSICAL.phaseP95 < out.A_CURRENT.phaseP95)) throw new Error('adaptive snap did not improve global physical pixel phase P95');
 if(!(out.highDprAdaptive.phaseP95 < out.highDprCurrent.phaseP95)) throw new Error('adaptive snap did not reduce physical pixel phase error where physicalScale>=1');
 if(out.C_ADAPTIVE_PHYSICAL.positionErrorMaxCss > out.A_CURRENT.positionErrorMaxCss + 0.001) throw new Error('adaptive snap worsened max CSS position error');
+if(out.lowScaleFallbackSamples<1) throw new Error('audit did not exercise low-scale world-rounding fallback');
 console.log('PIXEL_PHASE_AUDIT_OK');
