@@ -28,7 +28,7 @@
 <script src="src/core/input-lock-system.js?v=1"></script>
 
 <!-- KELO-INDEX CORE/LEGACY: engine-a define parsers/física base; KELO_COLLISION adopta obstacles; KeloInput/KeloMovement/KeloCamera/KeloAvatar y bridges Render/Simulation son los puntos de extensión core. -->
-<script src="src/physics/collision-utils.js?v=2"></script><script src="engine-a.js?v=151"></script><script>window.KELO_COLLISION.attachLegacyObstacleArray(obstacles,{adoptExistingOwner:'core-static'});</script><script src="src/core/input-system.js?v=1"></script><script src="src/core/movement-system.js?v=2"></script><script src="engine-b.js?v=94"></script><script src="engine-c.js?v=228"></script><script src="src/core/camera-system.js?v=1"></script><script src="src/core/avatar-render-system.js?v=1"></script><script src="src/core/render-extension-system.js?v=2"></script><script src="src/core/simulation-extension-system.js?v=2"></script><script src="engine-d.js?v=95"></script><script src="engine-e.js?v=94"></script><script src="engine-f.js?v=95"></script><script src="engine-g.js?v=96"></script><script src="src/environment/mobile-performance-contract.js?v=1"></script><script src="engine-h.js?v=151"></script><script src="engine-i.js?v=94"></script><script src="engine-j.js?v=94"></script><script src="engine-k.js?v=94"></script>
+<script src="src/physics/collision-utils.js?v=2"></script><script src="engine-a.js?v=151"></script><script>window.KELO_COLLISION.attachLegacyObstacleArray(obstacles,{adoptExistingOwner:'core-static'});</script><script src="src/core/input-system.js?v=1"></script><script src="src/core/movement-system.js?v=2"></script><script src="engine-b.js?v=94"></script><script src="engine-c.js?v=229"></script><script src="src/core/camera-system.js?v=1"></script><script src="src/core/avatar-render-system.js?v=1"></script><script src="src/core/render-extension-system.js?v=2"></script><script src="src/core/simulation-extension-system.js?v=2"></script><script src="engine-d.js?v=95"></script><script src="engine-e.js?v=94"></script><script src="engine-f.js?v=95"></script><script src="engine-g.js?v=96"></script><script src="src/environment/mobile-performance-contract.js?v=1"></script><script src="engine-h.js?v=151"></script><script src="engine-i.js?v=94"></script><script src="engine-j.js?v=94"></script><script src="engine-k.js?v=94"></script>
 
 <!-- KELO-INDEX WORLD: contracts, atlases y renderer del mundo. -->
 <script>window.KELO_WORLD_DECORATION_RESET=true;</script><script src="src/environment/rural-nature-atlas.js?v=200"></script><script src="src/environment/gardens-atlas.js?v=2"></script><script src="src/environment/gardens-joins.js?v=3"></script><script src="src/environment/terrain-contract.js?v=1"></script><script src="src/environment/generated/arboleskelo1-atlas.js?v=1"></script><script src="src/environment/tile-registry.js?v=237"></script><script src="src/environment/atlas-contract.js?v=3"></script><script src="src/environment/gardens-t-junction-registry.js?v=1"></script><script src="src/environment/district-decals-registry.js?v=3"></script><script src="src/environment/gardens-compositions.js?v=10"></script><script src="src/environment/world-map.js?v=terrain-190"></script><script src="src/environment/environment-layer-stack.js?v=4"></script><script src="src/environment/surface-ground.js?v=1"></script><script src="src/environment/prop-contract.js?v=6"></script><script src="src/environment/generic-props.js?v=9"></script><script src="src/environment/prefab-contract.js?v=1"></script><script src="engine-l.js?v=223"></script>
@@ -39,22 +39,30 @@
 <!-- KELO-INDEX VISUALS: presentación modular; no autoridad gameplay. -->
 <script src="src/visuals/visual-system.js?v=1"></script><script src="src/visuals/visual-manifests.js?v=1"></script><script src="src/visuals/asset-registry.js?v=1"></script><script src="src/visuals/animation-system.js?v=1"></script><script src="src/visuals/fx-system.js?v=1"></script><script src="src/visuals/sequence-system.js?v=1"></script><script src="src/visuals/melee-visual-manifest.js?v=1"></script><script src="src/visuals/melee-combat-visuals.js?v=1"></script>
 
-<!-- KELO-INDEX ABILITIES/NET: data-driven abilities, stones y transporte cliente. -->
-<script src="src/abilities/abilityData.js?v=154"></script><script src="src/abilities/stone-system.js?v=154"></script><script src="src/abilities/stone-backpack-bridge.js?v=2"></script><script src="src/abilities/kelo-ability-boot.js?v=157"></script><script src="src/visuals/ability-visuals.js?v=2"></script><script src="src/abilities/sword-swap-runtime.js?v=2"></script><script src="src/visuals/sword-swap-pvp-visuals.js?v=4"></script><script src="engine-net.js?v=96"></script>
+<!-- KELO-INDEX ABILITIES/PROGRESSION/NET: data-driven abilities, player stats/titles y transporte cliente. -->
+<script src="src/abilities/abilityData.js?v=154"></script><script src="src/abilities/stone-system.js?v=154"></script><script src="src/abilities/stone-backpack-bridge.js?v=2"></script><script src="src/abilities/kelo-ability-boot.js?v=157"></script><script src="src/visuals/ability-visuals.js?v=2"></script><script src="src/abilities/sword-swap-runtime.js?v=2"></script><script src="src/visuals/sword-swap-pvp-visuals.js?v=4"></script><script src="src/systems/title-catalog.js?v=1"></script><script src="src/systems/player-stats.js?v=1"></script><script src="src/systems/title-system.js?v=1"></script><script src="engine-net.js?v=98"></script>
 
 <!-- KELO-INDEX UI/SYSTEMS: UI consume APIs; sistemas poseen sus dominios. -->
 <script src="src/ui/luxe-shell.js?v=229"></script>
 <script src="src/ui/mobile-orientation.js?v=6"></script>
 <script src="src/ui/luxe-boutique.js?v=206"></script>
 <script src="src/environment/plaza-depth.js?v=219"></script>
-<script src="src/systems/nobility.js?v=3"></script>
-<script src="src/systems/nobility-authority.js?v=1"></script>
+<script src="src/systems/nobility.js?v=4"></script>
+<script src="src/systems/nobility-authority.js?v=2"></script>
+<script src="src/ui/player-nameplate.js?v=1"></script>
 <script src="src/systems/nobility-combat.js?v=1"></script>
 <script src="src/systems/equipment-system.js?v=5"></script>
 <script src="src/systems/backpack-system.js?v=2"></script>
-<script src="src/systems/container-system.js?v=3"></script>
+<script src="src/systems/container-system.js?v=5"></script>
+<!-- KELO-INDEX ECON/LOGISTICS: single owners para reservas regionales, riesgo, carts, factions y clans. -->
+<script src="src/systems/regional-economy-math.js?v=1"></script>
+<script src="src/systems/regional-economy-system.js?v=1"></script>
+<script src="src/systems/faction-clan-system.js?v=1"></script>
+<script src="src/systems/caravan-system.js?v=1"></script>
+<script src="src/systems/logistics-devtools.js?v=1"></script>
 <script src="src/systems/emote-system.js?v=1"></script>
 <script src="src/systems/market-escrow-system.js?v=1"></script>
+<script src="src/systems/commerce-authority.js?v=1"></script>
 <script src="src/property/property-asset-catalog.js?v=2"></script>
 <script src="src/property/property-system.js?v=3"></script>
 <script src="src/systems/admin-key-system.js?v=2-preview"></script>
@@ -62,11 +70,13 @@
 <script src="src/instances/instance-runtime-bridge.js?v=1"></script>
 <script src="src/instances/house-instance.js?v=1"></script>
 <script src="src/instances/property-house-bridge.js?v=1"></script>
+<script src="src/instances/market-instance.js?v=1"></script>
 <script src="src/environment/world-builder-system.js?v=3"></script>
 <script src="src/ui/house-instance-ui.js?v=1"></script>
 <script src="src/ui/backpack-ui.js?v=4"></script>
 <script src="src/ui/warehouse-ui.js?v=3"></script>
-<script src="src/ui/market-ui.js?v=1"></script>
+<script src="src/ui/market-ui.js?v=2"></script>
+<script src="src/ui/commerce-ui.js?v=1"></script>
 <script src="src/systems/forge-system.js?v=1"></script>
 <script src="src/systems/armor-aura.js?v=1"></script>
 <script src="src/systems/illumination.js?v=2"></script>
