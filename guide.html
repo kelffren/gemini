@@ -1,7 +1,7 @@
 <!-- KELO-INDEX
   area: PLAYER DOCS
   owner: Documentation / Foundation
-  keys: GUIDE MECHANICS PLAYER DOCS PUBLIC CHARACTER CUSTOMIZATION MENU HUD NOBILITY TITLES COMMERCE MARKET TRADE
+  keys: GUIDE MECHANICS PLAYER DOCS PUBLIC CHARACTER CUSTOMIZATION MENU HUD NOBILITY TITLES COMMERCE MARKET TRADE MOUNTS APPEARANCE
   purpose: guía pública de mecánicas de Kelo World para jugadores
   public-api: página estática guide.html
   consumes: comportamiento LIVE validado y docs/system-catalog.json
@@ -34,7 +34,7 @@
     <span class="tag">GUÍA OFICIAL</span>
     <h1>Mecánicas de Kelo World</h1>
     <p class="lead">Aquí se explica cómo funciona el juego desde el punto de vista del jugador. Esta guía crecerá junto al juego: cada sistema visible nuevo debe publicar aquí sus reglas, controles, límites y ejemplos.</p>
-    <div class="notice">La guía describe comportamiento validado. Mecánicas en pruebas pueden cambiar antes de considerarse definitivas.</div>
+    <div class="notice">La guía describe comportamiento validado o, cuando se indica, foundations todavía en prueba. Mecánicas en pruebas pueden cambiar antes de considerarse definitivas.</div>
   </header>
 
   <nav class="toc" aria-label="Índice de mecánicas">
@@ -42,8 +42,10 @@
     <a href="#controles-y-bloqueos-de-interfaz">Controles e interfaces<small>Paneles y control</small></a>
     <a href="#menu-principal">HUD y menú<small>Perfil rápido, GUÍA y accesos</small></a>
     <a href="#personalizacion-de-personaje">Personaje<small>Apariencia, ropa y guardados</small></a>
+    <a href="#atuendos-y-apariencia">Atuendos<small>Cosméticos separados de stats</small></a>
     <a href="#camara-y-pantalla">Cámara y pantalla<small>Zoom, giro y fullscreen</small></a>
     <a href="#habilidades">Habilidades<small>Piedras y slots</small></a>
+    <a href="#monturas">Monturas<small>Equipo, movimiento y M1–M3</small></a>
     <a href="#mochila">Mochila<small>Objetos y equipo</small></a>
     <a href="#mercado-comercio-y-trade">Mercado y trade<small>Puestos, alfombras y doble confirmación</small></a>
     <a href="#nobleza-y-titulos">Nobleza y títulos<small>Rango automático y prestigio equipado</small></a>
@@ -136,6 +138,19 @@
     <div class="example"><strong>Flujo rápido:</strong> abre Personaje → elige un preset → bloquea el pelo que te gusta → pulsa Aleatorio en Apariencia → prueba la vista ↑ y Caminar → guarda la configuración → pulsa Listo para volver al mundo.</div>
   </section>
 
+  <section id="atuendos-y-apariencia">
+    <span class="tag">APARIENCIA · FOUNDATION EN PRUEBAS</span>
+    <h2>Atuendos y cosméticos</h2>
+    <p>Kelo World separa la apariencia visual del equipo que modifica estadísticas. Un atuendo puede cambiar cómo se ve un personaje o una montura sin cambiar automáticamente su ataque, defensa, HP o velocidad.</p>
+    <ul>
+      <li>Los atuendos se organizan por slots y perfiles compatibles.</li>
+      <li>Personajes y monturas comparten la misma base de apariencia, aunque cada tipo puede tener slots y posiciones diferentes.</li>
+      <li>Una corona de caballo, por ejemplo, solo se puede aplicar a perfiles donde ese slot sea compatible.</li>
+      <li>El equipo de gameplay puede tener una apariencia asociada, pero sus stats siguen perteneciendo al equipo, no al cosmético.</li>
+    </ul>
+    <div class="example"><strong>Ejemplo:</strong> cambias la corona o el aura de una montura → cambia su apariencia; las estadísticas permanecen iguales salvo que equipes también una pieza de equipo con bonus propios.</div>
+  </section>
+
   <section id="camara-y-pantalla">
     <span class="tag">CÁMARA</span>
     <h2>Cámara, zoom y pantalla</h2>
@@ -172,6 +187,27 @@
       <li>El coste de recursos y las reglas de alcance se validan antes de ejecutar el efecto.</li>
     </ul>
     <p>Las páginas específicas de cada habilidad se irán añadiendo cuando esa habilidad se considere validada para jugadores.</p>
+  </section>
+
+  <section id="monturas">
+    <span class="tag">MONTURAS · FOUNDATION EN PRUEBAS</span>
+    <h2>Monturas, equipo y habilidades exclusivas</h2>
+    <p>Una montura puede estar <strong>equipada</strong> sin que estés montado sobre ella. Al pulsar montar, cambia tu perfil de desplazamiento y se habilita una barra exclusiva con tres habilidades de esa montura.</p>
+    <ul>
+      <li>Tus cinco slots normales de piedras permanecen separados e intactos.</li>
+      <li>Al montar aparecen tres slots adicionales: <strong>M1, M2 y M3</strong>.</li>
+      <li>M1–M3 pertenecen a la montura; cambiar de montura cambia ese kit.</li>
+      <li>Al desmontar, M1–M3 dejan de estar activos.</li>
+      <li>Cada especie puede tener un perfil de movimiento diferente definido por datos.</li>
+      <li>La montura puede llevar equipo propio, como silla, armadura, herraduras, bolsas u otros slots compatibles.</li>
+      <li>Algunas piezas pueden dar bonus a la propia montura y también al personaje mientras está montado.</li>
+    </ul>
+    <h3>Equipo y atuendo no son lo mismo</h3>
+    <p>El equipo puede modificar estadísticas. El atuendo es visual. Por eso puedes cambiar una apariencia sin perder o duplicar los bonus de tu equipo real.</p>
+    <h3>En móvil</h3>
+    <p>La barra M1–M3 aparece separada de las cinco piedras. El panel Montura permite equipar, montar/desmontar y gestionar slots compatibles.</p>
+    <div class="example"><strong>Ejemplo:</strong> equipas una montura → le colocas equipo → montas → aparecen M1/M2/M3 y se activan los bonus condicionados a estar montado → desmontas → los cinco slots de piedras siguen igual.</div>
+    <p><strong>Nota de prueba:</strong> la Foundation de datos, equipo y habilidades puede probarse antes de que los sprites finales de monturas estén disponibles. La apariencia visual final no se considera aprobada hasta validar los assets reales.</p>
   </section>
 
   <section id="mochila">

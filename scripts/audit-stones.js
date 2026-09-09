@@ -8,16 +8,19 @@ const supportedDelivery = new Set([
   'projectile', 'self_aoe', 'chain', 'dash', 'blink',
   'instant', 'persistent_area', 'wall', 'trap', 'aura',
 ]);
+const specializedDelivery = new Map([['swap_sword', 'swap_sword']]);
 
 function recipeKey(recipe) {
   return [...recipe].sort().join('|');
 }
 
 function auditCatalog() {
-  assert.equal(data.ABILITIES.length, 10, 'V1 must expose exactly 10 abilities');
+  assert.equal(data.ABILITIES.length, 11, 'catalog must expose the 11 current abilities');
   const ids = new Set();
   const keys = new Set();
   const recipes = new Set();
+  let generic = 0;
+  let specialized = 0;
 
   for (const ability of data.ABILITIES) {
     assert(!ids.has(ability.id), 'duplicate ability id ' + ability.id);
@@ -33,11 +36,18 @@ function auditCatalog() {
     assert(parts.every(Boolean), ability.key + ' references unknown recipe component');
     assert(parts.some((p) => p.type === data.STONE_TYPES.ELEMENT), ability.key + ' missing element');
     assert(parts.some((p) => p.type === data.STONE_TYPES.FORM), ability.key + ' missing form');
-    assert(supportedDelivery.has(ability.delivery.type), ability.key + ' uses unsupported delivery ' + ability.delivery.type);
+    if (supportedDelivery.has(ability.delivery.type)) generic++;
+    else {
+      assert.equal(specializedDelivery.get(ability.key), ability.delivery.type, ability.key + ' uses unregistered specialized delivery ' + ability.delivery.type);
+      specialized++;
+    }
     assert(['normal', 'ultimate'].includes(ability.slotType), ability.key + ' missing slotType');
   }
 
-  return { abilities: ids.size, recipes: recipes.size };
+  assert.equal(generic, 10, 'ten abilities should use generic delivery handlers');
+  assert.equal(specialized, 1, 'only swap_sword should use a specialized delivery');
+  assert.equal(data.ABILITIES.find((a) => a.key === 'swap_sword').delivery.type, 'swap_sword');
+  return { abilities: ids.size, recipes: recipes.size, generic, specialized };
 }
 
 function auditMigration() {
@@ -62,13 +72,14 @@ function auditMigration() {
 
 function auditLoadout() {
   const starter = stones.createStarterSet();
-  assert.equal(starter.length, 5, 'starter loadout must contain five stones');
+  assert.equal(starter.length, 5, 'starter loadout must contain exactly five stones');
   assert.equal(starter[4].abilityKey, 'fire_tornado', 'fifth starter stone must be the ultimate');
   assert.equal(stones.abilityByKey(starter[4].abilityKey).slotType, 'ultimate');
 
   const state = { inventory: [], equipped: starter, marketListings: [] };
   stones.migrateState(state);
   const snapshot = stones.exportLoadout(state);
+  assert.equal(snapshot.slots.length, 5, 'exported Stone loadout contract must remain exactly five slots');
   assert.equal(snapshot.slots.filter(Boolean).length, 5);
   assert.equal(snapshot.slots[4].abilityKey, 'fire_tornado', 'ultimate must project into slot 5');
   assert(snapshot.slots.slice(0, 4).every((slot) => slot && stones.abilityByKey(slot.abilityKey).slotType === 'normal'), 'slots 1-4 must be normal');

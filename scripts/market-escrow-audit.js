@@ -6,7 +6,7 @@ context.window=context;vm.createContext(context);
 for(const file of ['src/systems/equipment-system.js','src/systems/backpack-system.js','src/systems/container-system.js','src/systems/market-escrow-system.js'])vm.runInContext(fs.readFileSync(file,'utf8'),context,{filename:file});
 const E=context.KeloEquipment,B=context.KeloBackpack,C=context.KeloContainers,M=context.KeloMarketEscrow;
 assert(E&&B&&C&&M);
-assert.equal(E.version,'equipment-v1.1.2');
+assert.equal(E.version,'equipment-v1.2.0');
 assert.equal(B.version,'backpack-v1.1.0');
 assert.equal(C.version,'container-v1.3.0');
 assert.equal(M.version,'market-escrow-v1.0.0');
@@ -55,4 +55,4 @@ const reload=JSON.stringify(context.STATE);context.STATE=JSON.parse(reload);C.en
 const activeBefore=M.getActiveListings().length;context.STATE.marketEscrowListings.push({schemaVersion:1,listingId:'orphan_test',owner:'local_pioneer',escrowItemInstanceId:'does_not_exist',quantity:1,status:'active',createdAt:Date.now()});
 const broken=M.auditInvariants();assert(!broken.ok&&broken.errors.some(x=>x.code==='ORPHAN_LISTING'));context.STATE.marketEscrowListings=context.STATE.marketEscrowListings.filter(x=>x.listingId!=='orphan_test');assert.equal(M.getActiveListings().length,activeBefore);assert(M.auditInvariants().ok);
 assert(saveCalls>0);
-console.log('PASS market-escrow-audit',JSON.stringify({marketVersion:M.version,containerVersion:C.version,activeListings:M.getActiveListings().length,escrowItems:context.STATE.marketEscrow.items.length,tradeEscrowItems:context.STATE.tradeEscrow.items.length,identityUnique:true,totalQuantity:totalQty(),saves:saveCalls}));
+console.log('PASS market-escrow-audit',JSON.stringify({equipmentVersion:E.version,marketVersion:M.version,containerVersion:C.version,activeListings:M.getActiveListings().length,escrowItems:context.STATE.marketEscrow.items.length,tradeEscrowItems:context.STATE.tradeEscrow.items.length,identityUnique:true,totalQuantity:totalQty(),saves:saveCalls}));
