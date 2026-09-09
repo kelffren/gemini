@@ -2,30 +2,95 @@
 
 ## Propósito
 
-Añade identidad de combate basada en el arma equipada sin crear clases fijas ni un segundo motor de habilidades. Los cinco slots Stone siguen siendo el loadout principal. Cuando el jugador está a pie, el arma equipada proyecta exactamente tres técnicas `Q/W/E`. Cuando monta, esa fila se sustituye por `M1/M2/M3` de la montura; nunca se apilan dos filas adicionales.
+Kelo World da identidad de combate al arma equipada sin clases fijas y sin crear un segundo motor de habilidades. Los cinco slots Stone siguen siendo el loadout principal. A pie, el arma proyecta exactamente tres técnicas `Q/W/E`; montado, esa misma fila contextual se sustituye por `M1/M2/M3`. El máximo visible sigue siendo ocho habilidades y nunca se apilan arma + montura.
 
-La fase 2 añade dos capacidades sin cambiar ownership: familias de arma escalables y selección permitida por slot dentro de una misma familia. Esto permite que miles de items compartan runtime y profile, mientras variantes concretas pueden elegir una Q/W/E distinta entre opciones autorizadas por datos.
+La capacidad source-native actual elimina la deuda del bridge antiguo: armas y monturas ya no sustituyen temporalmente ningún slot Stone. `KeloAbilities` acepta directamente definitions externas mediante `engine.castSource()` y `engine.predictSource()`, reutilizando el mismo pipeline de validación, recursos, delivery, effects y eventos.
 
 ## Ownership y archivos
 
-- `KeloEquipment` (`src/systems/equipment-system.js`) sigue siendo el único owner del arma y del equipo del jugador.
-- `KeloAbilities` (`src/abilities/kelo-ability-boot.js`) sigue siendo el único owner de targeting, delivery, effects y ejecución de habilidades.
-- `KeloStones` sigue siendo el único owner de los cinco Stone slots.
-- `KeloMounts` + `KeloMountAbilityChannel` siguen poseyendo el estado/canal exclusivo de monturas.
-- `src/abilities/equipment-ability-data.js` es contenido puro: AbilityDefinitions, WeaponProfiles, bindings de templates y opciones permitidas por slot.
-- `src/abilities/equipment-ability-channel.js` es una proyección SUPPORT del arma equipada a tres slots runtime.
-- `src/abilities/ability-source-cast.js` es un adapter SUPPORT reutilizable para que fuentes no-Stone usen `KeloAbilities` sin tocar `STATE.equipped`.
-- `src/ui/equipment-action-bar.js` es UI consumidora únicamente.
+- `KeloAbilities` (`src/abilities/kelo-ability-boot.js`) es el único owner de ejecución: targeting, validación de recursos, delivery, effects, collision y eventos de cast.
+- `KeloStones` es el único owner de los **5 Stone slots** y de sus cooldowns runtime.
+- `KeloEquipment` (`src/systems/equipment-system.js`) es el único owner del arma equipada y de la selección Q/W/E persistida en el item.
+- `KeloEquipmentAbilityChannel` (`src/abilities/equipment-ability-channel.js`) proyecta el arma equipada a Q/W/E y posee únicamente sus cooldowns efímeros `readyAt`.
+- `KeloMounts` + `KeloMountAbilityChannel` poseen el estado/canal M1/M2/M3 de montura y sus cooldowns efímeros.
+- `src/abilities/equipment-ability-data.js` es contenido puro: AbilityDefinitions, WeaponProfiles, bindings y `slotChoices`.
+- `src/abilities/ability-source-cast.js` queda como **shim de compatibilidad**. Delega a `KeloAbilities.engine.castSource()` y no toca hotbar ni gameplay state.
+- `src/ui/equipment-action-bar.js` y Backpack son consumidores UI; nunca escriben gameplay state directamente.
 
-No se crea `WeaponAbilityEngine`, `EquipmentAbilityEngine` ni otro runtime de delivery/effects.
+No existe `WeaponAbilityEngine`, `EquipmentAbilityEngine` ni `MountAbilityEngine`.
 
-## Estado que posee
+## Estado que posee cada parte
 
-`KeloEquipmentAbilityChannel` posee únicamente tres descriptors runtime `Q/W/E`, sus `readyAt` de cooldown local y el fingerprint de la proyección actual del arma. No posee inventario, `STATE.equipmentSlots`, Stone loadout, HP, maná, stats, posición ni autoridad de daño.
+### `KeloAbilities`
 
-`KeloAbilitySourceCast` no persiste estado. Sustituye temporalmente un slot runtime de `KeloAbilities.hotbar` durante un cast síncrono y lo restaura en `finally`.
+Posee:
+- hotbar Stone de cinco slots;
+- deliveries runtime efímeros (`projectiles`, `areas`, `walls`, `traps`);
+- ejecución común de casts.
 
-## APIs públicas
+No posee:
+- inventario/equipment del jugador;
+- selección Q/W/E del arma;
+- cooldown `readyAt` de arma/montura;
+- estado de montura;
+- autoridad competitiva final online.
+
+### `KeloEquipmentAbilityChannel`
+
+Posee solo:
+- tres descriptors runtime Q/W/E;
+- `readyAt` por técnica;
+- fingerprint de la proyección actual.
+
+### `KeloMountAbilityChannel`
+
+Posee solo:
+- tres descriptors runtime M1/M2/M3;
+- `readyAt` por técnica;
+- fingerprint de la montura/loadout actual.
+
+### `KeloAbilitySourceCast`
+
+No posee estado. Es compatibilidad pura y solo delega al API source-native del owner.
+
+## API pública source-native
+
+### `KeloAbilities.engine.castSource(options)`
+
+```js
+KeloAbilities.engine.castSource({
+  sourceType: 'equipment',
+  sourceId: 'weapon_2042',
+  sourceSlot: 'Q',
+  sourceFingerprint: 'weapon_2042|weapon.longbow|...',
+  definition,
+  request: {
+    slotIndex: 0,
+    direction: { x: 1, y: 0 }
+  }
+});
+```
+
+Campos:
+- `sourceType`: fuente semántica no-Stone, por ejemplo `equipment` o `mount`.
+- `sourceId`: identidad estable de la fuente real.
+- `sourceSlot`: slot semántico (`Q/W/E`, `M1/M2/M3`).
+- `sourceFingerprint`: identidad del loadout/equipo que produjo ese cast.
+- `definition`: AbilityDefinition validada por el caller owner de contenido/loadout.
+- `request`: target/direction/position del cast.
+
+`sourceType: 'stone'` se rechaza en este API. Stone mantiene su camino normal `engine.cast({slotIndex})`, preservando ownership.
+
+### `KeloAbilities.engine.predictSource(options)`
+
+Usa exactamente la misma definición, targeting y delivery en modo visual/predicción, pero no consume recursos ni aplica resultados gameplay autoritativos.
+
+### APIs Stone existentes
+
+- `KeloAbilities.engine.cast(request)`
+- `KeloAbilities.engine.predict(request)`
+
+Siguen resolviendo la habilidad desde `hotbar.slots[slotIndex]` y conservan cooldown Stone dentro del runtime Stone.
 
 ### `KELO_EQUIPMENT_ABILITY_DATA`
 
@@ -40,9 +105,7 @@ No se crea `WeaponAbilityEngine`, `EquipmentAbilityEngine` ni otro runtime de de
 - `validateProfile(profile)`
 - `validateLoadout(profile, abilityKeys)`
 
-Cada `WeaponProfile` declara exactamente tres `abilityKeys` por defecto, correspondientes a Q, W y E. Opcionalmente declara `slotChoices`, también con exactamente tres entradas. Cada entrada es la lista de Ability keys que están autorizadas en ese slot.
-
-Un item puede declarar `combatAbilityKeys` o `weaponAbilityKeys` como array `[Q,W,E]` o como objeto `{Q,W,E}`. El resolver solo acepta una selección si cada habilidad existe y está autorizada para ese slot del profile. Una selección inválida nunca se ejecuta: se usa el kit por defecto y `selectionStatus` pasa a `invalid_fallback`.
+Cada `WeaponProfile` declara exactamente tres `abilityKeys` por defecto y tres listas `slotChoices` cuando existe personalización por slot.
 
 ### `KeloEquipmentAbilityChannel`
 
@@ -52,76 +115,53 @@ Un item puede declarar `combatAbilityKeys` o `weaponAbilityKeys` como array `[Q,
 - `cast(request)`
 - `on(event, fn)`
 - `getRemainingCooldown(slot)`
-- `labels` = `['Q','W','E']`
+- `labels = ['Q','W','E']`
 
-El snapshot expone además `profileName`, `abilityKeys`, `selectionStatus` y `customized` para UI, edición y futura autoridad online.
+### `KeloAbilitySourceCast` — compatibilidad
 
-### `KeloAbilitySourceCast`
-
-- `cast({ sourceType, sourceId, sourceSlot, sourceFingerprint, definition, request })`
+- `cast(options)` → delega a `KeloAbilities.engine.castSource(options)`
 - `isAvailable()`
 
-### `KELO_EQUIPMENT_ACTION_BAR`
+Código nuevo no necesita usar este shim.
 
-- `refresh()`
-- `destroy()`
+## Flujo actual
 
-## Flujo
+### Stone
 
-1. `KeloEquipment` equipa o desequipa un arma mediante su API actual.
-2. `KeloEquipmentAbilityChannel.sync()` lee el equipo mediante `KeloEquipment.getEquipped()`; nunca lee/escribe `STATE.equipmentSlots` directamente.
-3. `KELO_EQUIPMENT_ABILITY_DATA.resolveProfileForItem()` resuelve el `WeaponProfile` por `weaponProfileId`/`combatProfileId` o por binding del `templateId`.
-4. `resolveLoadoutForItem()` toma las Q/W/E por defecto o una selección permitida del item.
-5. Si la selección no es válida, el resolver vuelve al kit por defecto del profile.
-6. La UI convierte el gesto táctil en dirección/posición y llama `KeloEquipmentAbilityChannel.cast()`.
-7. El channel valida slot, montura y cooldown local y delega a `KeloAbilitySourceCast`.
-8. El adapter proyecta la AbilityDefinition durante el cast síncrono dentro del hotbar runtime de `KeloAbilities`.
-9. `KeloAbilities` ejecuta su validación, targeting, resource cost, delivery, collision, effects y eventos existentes.
-10. El adapter restaura el mismo objeto Stone que existía antes del cast.
-11. El channel inicia su `readyAt` solo si el cast fue válido.
-12. Al montar, Q/W/E queda deshabilitado y la misma posición visual se entrega a M1/M2/M3.
+`Stone slot → KeloAbilities.engine.cast → dispatchResolved → validateCast → resource/cooldown Stone → delivery → effects → events`
+
+### Arma
+
+`KeloEquipment → WeaponProfile/loadout → KeloEquipmentAbilityChannel → KeloAbilities.engine.castSource → dispatchResolved → validateCast → resource → delivery → effects → events`
+
+El channel inicia su `readyAt` solamente si KeloAbilities devuelve un cast válido.
+
+### Montura
+
+`KeloMounts → KeloMountAbilityChannel → KeloAbilities.engine.castSource → dispatchResolved → validateCast → resource → delivery → effects → events`
+
+El channel de montura mantiene su cooldown. No se crea una entrada Stone falsa.
+
+## Garantía: el hotbar Stone no se presta
+
+Un cast source-native crea únicamente un descriptor local efímero dentro de la llamada. Ese objeto **nunca** se asigna a `KeloAbilities.hotbar.slots`.
+
+Esto elimina el antiguo patrón:
+
+`guardar Stone 0 → sustituir Stone 0 → cast → restaurar Stone 0`
+
+El patrón anterior queda prohibido por audits. Las cinco referencias Stone deben ser idénticas antes y después de cualquier cast o predicción de arma/montura.
 
 ## Familias disponibles
 
-### Hoja de Vanguardia — `weapon.vanguard_blade`
+- `weapon.vanguard_blade` — espada: Corte de Vanguardia / Rompeguardia, Paso del Duelista, Ruptura Real.
+- `weapon.arcane_staff` — bastón: Proyectil Arcano, Salto Arcano, Tempestad Arcana.
+- `weapon.longbow` — arco: Disparo Rápido / Flecha Perforante, Paso Evasivo, Lluvia de Flechas.
+- `weapon.shadow_daggers` — dagas: Ráfaga de Hojas, Paso Sombrío, Círculo de Ejecución.
+- `weapon.war_hammer` — martillo: Golpe de Tierra, Carga del Toro, Terremoto.
+- `weapon.frost_staff` — glacial: Esquirla de Hielo, Paso Glacial, Campo Glacial.
 
-- Q — **Corte de Vanguardia**.
-- Q alternativa autorizada — **Rompeguardia**.
-- W — **Paso del Duelista**.
-- E — **Ruptura Real**.
-
-### Bastón Arcano — `weapon.arcane_staff`
-
-- Q — **Proyectil Arcano**.
-- W — **Salto Arcano**.
-- E — **Tempestad Arcana**.
-
-### Arco Largo — `weapon.longbow`
-
-- Q — **Disparo Rápido**.
-- Q alternativa autorizada — **Flecha Perforante**.
-- W — **Paso Evasivo**.
-- E — **Lluvia de Flechas**.
-
-### Dagas de Sombra — `weapon.shadow_daggers`
-
-- Q — **Ráfaga de Hojas**.
-- W — **Paso Sombrío**.
-- E — **Círculo de Ejecución**.
-
-### Martillo de Guerra — `weapon.war_hammer`
-
-- Q — **Golpe de Tierra**.
-- W — **Carga del Toro**.
-- E — **Terremoto**.
-
-### Bastón Glacial — `weapon.frost_staff`
-
-- Q — **Esquirla de Hielo**.
-- W — **Paso Glacial**.
-- E — **Campo Glacial**.
-
-Todas estas técnicas reutilizan únicamente deliveries existentes de `KeloAbilities`: `projectile`, `self_aoe`, `dash`, `blink` y `persistent_area`.
+Todas reutilizan deliveries del mismo `KeloAbilities`: `projectile`, `self_aoe`, `dash`, `blink` y `persistent_area`.
 
 ## Bindings iniciales
 
@@ -134,109 +174,123 @@ Todas estas técnicas reutilizan únicamente deliveries existentes de `KeloAbili
 
 ## Invariantes
 
-1. `KeloStones.LOADOUT_SIZE` permanece exactamente en 5.
-2. El Equipment Ability System nunca inserta una habilidad en `STATE.equipped`.
-3. A pie puede haber 5 Stone + 3 weapon = 8 habilidades activas visibles como máximo.
-4. Montado puede haber 5 Stone + 3 mount = 8 habilidades activas visibles como máximo.
-5. Q/W/E y M1/M2/M3 son mutuamente excluyentes.
-6. Toda habilidad de arma reutiliza deliveries/effects existentes de `KeloAbilities`.
-7. Casco, pecho, botas y otras piezas continúan aportando stats/pasivas mediante `KeloEquipment → KeloStats`; esta capacidad no duplica ese cálculo.
-8. UI no modifica estado gameplay.
-9. Cambiar de familia de arma cambia el kit por datos; no se añaden ramas por weapon ID al runtime.
-10. Una selección personalizada solo puede usar habilidades autorizadas por `slotChoices` para ese profile y slot.
-11. Una selección inválida hace fallback al kit por defecto; nunca se castea una habilidad ajena a la familia.
+1. `KeloStones.LOADOUT_SIZE === 5`.
+2. Ningún cast source-native escribe `STATE.equipped`.
+3. Ningún cast source-native sustituye, añade o elimina entradas de `KeloAbilities.hotbar.slots`.
+4. A pie: máximo `5 Stone + 3 weapon = 8` activas visibles.
+5. Montado: máximo `5 Stone + 3 mount = 8` activas visibles.
+6. Q/W/E y M1/M2/M3 son mutuamente excluyentes.
+7. Weapon y mount reutilizan exactamente los mismos `deliveryHandlers` y Effect Engine.
+8. Cooldowns Q/W/E y M1/M2/M3 permanecen en sus respectivos channels; Stone cooldown permanece en Stone runtime.
+9. Coste de recurso, targeting y delivery de todas las fuentes pasan por `KeloAbilities`.
+10. Una selección Q/W/E solo puede usar habilidades autorizadas por `slotChoices`.
+11. Selección inválida hace fallback al kit por defecto y nunca ejecuta una habilidad de otra familia.
+12. UI no muta estado gameplay.
 
 ## Eventos y observabilidad
 
+`ABILITY_CAST` es el evento común del runtime y ahora incluye identidad de fuente:
+
+- `sourceType`
+- `sourceId`
+- `sourceSlot`
+- `sourceFingerprint`
+- `abilityId`
+- `abilityKey`
+- `castId`
+- `predicted`
+
+Stone conserva `stoneUid` y `slotIndex`.
+
+Para casts no-Stone, `KeloAbilities` publica además `KELO_ABILITY_SOURCE_CAST` con la misma identidad semántica. Los channels continúan emitiendo sus eventos de dominio:
+
 - `EQUIPMENT_ABILITY_LOADOUT_CHANGED`
 - `EQUIPMENT_ABILITY_CAST`
-- `KELO_ABILITY_SOURCE_CAST`
-- eventos existentes de `KeloAbilities`, incluido `ABILITY_CAST`
-
-`KELO_ABILITY_SOURCE_CAST` contiene `sourceType`, `sourceId`, `sourceSlot`, `sourceFingerprint`, `abilityId` y `abilityKey` para depuración y futura validación autoritativa.
+- `MOUNT_ABILITY_LOADOUT_CHANGED`
+- `MOUNT_ABILITY_CAST`
 
 ## Online-first / autoridad
 
-El prototipo actual mantiene predicción/ejecución cliente igual que el runtime de habilidades existente. Antes de PvP competitivo de producción, el servidor debe validar como mínimo que `sourceId` pertenece al jugador, que esa arma está realmente equipada, que el WeaponProfile corresponde al item, que la Q/W/E elegida está autorizada en `slotChoices`, resource cost y cooldown autoritativos, target/range y el resultado de daño.
+La API source-native prepara una frontera explícita para servidor. Antes de PvP competitivo de producción, el servidor debe validar:
 
-El fingerprint incluye el loadout Q/W/E resuelto, de modo que cambiar una técnica modifica la identidad semántica del arma sin requerir otro engine.
+- que `sourceId` pertenece al jugador;
+- que arma/montura está realmente equipada/activa;
+- que `sourceFingerprint` corresponde al loadout aprobado;
+- que la AbilityDefinition/slot está permitido por su profile;
+- cooldown autoritativo;
+- resource cost;
+- target/range;
+- resultado de daño/status.
 
-Los IDs estables y `sourceFingerprint` permiten mover esa decisión al servidor sin cambiar el flujo visible ni los contratos de contenido. El adapter temporal existe porque `KeloAbilities.engine.cast()` todavía recibe un índice del hotbar Stone. La deuda correcta es evolucionar `KeloAbilities` hacia un cast source-native y retirar el bridge; no crear un segundo engine.
+El cliente puede mantener predicción para sensación inmediata, pero el resultado competitivo final pertenece al servidor. La migración online no requiere reconstruir channels, IDs, perfiles ni flujo visible: cambia la capa de autoridad del cast.
 
 ## Persistencia
 
-No se introduce un store paralelo. El arma se persiste por `KeloEquipment`. Si un item necesita una variante puede persistir `combatAbilityKeys` dentro de su propio registro de item; el Equipment Ability System solo lo lee y valida. Los cooldowns Q/W/E son runtime efímero. Online competitivo requerirá cooldown autoritativo del servidor.
+No hay store paralelo.
 
-## Extensión / reutilización
+- `KeloEquipment` persiste el arma y `combatAbilityKeys` cuando existe personalización.
+- `KeloMounts` persiste su estado propio.
+- cooldowns Q/W/E/M1–M3 son efímeros en el prototipo.
+- Stone conserva su contrato de persistencia/loadout actual.
 
-Para añadir otra familia de arma:
+## Extensión
 
-1. definir las AbilityDefinitions usando deliveries/effects ya soportados;
-2. crear un `WeaponProfile` con exactamente tres `abilityKeys` por defecto;
-3. si existe elección por slot, añadir `slotChoices` sin cambiar el channel;
-4. enlazar el template del arma al profile o publicar `weaponProfileId` en el item;
-5. ejecutar audits;
-6. solo extender `KeloAbilities` si falta una primitive genérica real.
+Para añadir una familia de arma:
 
-Miles de armas pueden reutilizar el mismo profile. Diferencias de calidad, tier, skin o stats no requieren profiles nuevos. Una variante que solo cambia una Q/W/E puede usar `combatAbilityKeys`; un kit realmente distinto puede usar otro profile.
+1. crear AbilityDefinitions usando primitives existentes;
+2. crear `WeaponProfile` con exactamente Q/W/E por defecto;
+3. definir `slotChoices` si hay selección;
+4. enlazar template/profile;
+5. pasar audits;
+6. si falta una capacidad de gameplay genérica, extender `KeloAbilities` una sola vez.
 
-## Uso correcto
+Para una futura fuente de habilidades no-Stone:
 
-```js
-const weapon = {
-  id: 'weapon_2042',
-  templateId: 'starter_bow',
-  slot: 'weapon',
-  combatAbilityKeys: {
-    Q: 'weapon_bow_piercing_arrow',
-    W: 'weapon_bow_evasive_step',
-    E: 'weapon_bow_arrow_rain'
-  }
-};
-// KeloEquipment posee el item/equip.
-// El data resolver valida cada elección contra weapon.longbow.slotChoices.
-```
+1. su owner resuelve qué AbilityDefinition puede usar;
+2. su channel/owner conserva el cooldown que le corresponde;
+3. llama `KeloAbilities.engine.castSource()` con identidad estable;
+4. nunca toca Stone hotbar ni duplica delivery/effects.
 
 ## Anti-patrones
 
 - No añadir Q/W/E a `STATE.equipped`.
 - No cambiar Stone de 5 a 8 slots.
+- No “pedir prestado” `hotbar.slots[0]` ni ningún otro Stone slot.
 - No duplicar `deliveryHandlers`.
-- No escribir cooldowns desde el DOM.
-- No hardcodear familias dentro de `KeloEquipment`.
-- No crear un profile nuevo solo porque cambió quality/tier/skin.
-- No aceptar una ability key que no esté autorizada por el slot del profile.
+- No crear un engine por arma, montura o futura fuente.
+- No escribir cooldowns desde DOM.
+- No hardcodear familias en `KeloEquipment`.
 - No permitir Q/W/E y M1/M2/M3 simultáneamente.
 - No usar VFX para decidir daño.
-- No declarar el cliente autoridad competitiva final.
+- No considerar cliente autoridad PvP final.
 
 ## Tests / CI
 
+- `npm run audit:ability-source-native`
 - `npm run audit:equipment-abilities`
+- `node scripts/equipment-weapon-loadout-audit.js`
 - `npm run audit:mounts`
 - `npm run audit:stones`
 - `npm run audit:foundation`
 - `npm run audit:docs`
 
-El audit específico verifica que existen seis familias, veinte AbilityDefinitions, que los profiles/slotChoices son válidos, que una Q personalizada permitida funciona, que una selección cruzada inválida hace fallback, que el bridge restaura la referencia original del Stone, que siguen existiendo exactamente cinco Stone slots, que Q/W/E son tres, que M1–M3 son tres y que montura/arma son mutuamente excluyentes.
+`ability-source-native-cast-audit.mjs` arranca el owner real, ejecuta `castSource()` y `predictSource()`, valida consumo/no consumo de maná, identidad semántica y comprueba por referencia estricta que los cinco Stone slots quedan intactos.
+
+Los audits de Equipment y Mount rechazan dependencias activas sobre `KeloAbilitySourceCast` y cualquier acceso al hotbar Stone desde los channels.
 
 ## Deuda conocida
 
-- `KeloAbilitySourceCast` usa de forma transicional el slot runtime 0 durante un cast estrictamente síncrono; siempre lo restaura con `finally`.
-- `ABILITY_CAST` del runtime antiguo todavía nace desde la semántica del hotbar Stone. Para autoridad online de fuentes no-Stone debe preferirse el payload semántico `KELO_ABILITY_SOURCE_CAST` hasta que `KeloAbilities` exponga cast source-native.
-- Las técnicas reutilizan presentación/fallback existente; arte/VFX exclusivo puede añadirse por el Visual System sin cambiar gameplay.
-- La fase actual valida `combatAbilityKeys` en cliente. El servidor deberá volver a resolver y validar el mismo profile/slotChoice en PvP competitivo.
+- `KeloAbilitySourceCast` sigue existiendo solo como shim público de compatibilidad para consumidores externos/antiguos. No participa en el camino normal Q/W/E ni M1/M2/M3.
+- La autoridad competitiva del cooldown/recursos/resultado todavía debe moverse al servidor antes de PvP online de producción.
+- Las técnicas reutilizan presentación existente; VFX exclusivos pueden añadirse mediante Visual System sin cambiar gameplay.
 
-## Checklist para ampliar sin duplicar owner
+## Checklist
 
-- [ ] ¿Es contenido expresable con AbilityDefinition existente?
-- [ ] ¿El arma resuelve un profile por datos?
-- [ ] ¿El profile contiene exactamente Q/W/E por defecto?
-- [ ] ¿Cada `slotChoices` contiene solo abilities permitidas de esa familia?
-- [ ] ¿Una selección inválida hace fallback en lugar de ejecutarse?
-- [ ] ¿Los cinco Stone siguen intactos?
-- [ ] ¿Montado sustituye Q/W/E por M1/M2/M3?
-- [ ] ¿KeloAbilities sigue siendo el único runtime de delivery/effects?
-- [ ] ¿KeloEquipment sigue siendo el único owner del arma equipada?
-- [ ] ¿La operación conserva IDs/fingerprint aptos para autoridad server?
-- [ ] ¿Pasaron los audits de equipment abilities, mounts, stones, foundation y docs?
+- [ ] ¿La fuente reutiliza `KeloAbilities.engine.castSource()`?
+- [ ] ¿Los cinco Stone mantienen exactamente su owner y referencias?
+- [ ] ¿No existe otro delivery/effect engine?
+- [ ] ¿Cooldown de la fuente vive en su owner/channel?
+- [ ] ¿KeloAbilities conserva validación de recurso/target/delivery/effects?
+- [ ] ¿IDs y fingerprint son estables para server authority?
+- [ ] ¿Q/W/E y M1/M2/M3 siguen mutuamente excluyentes?
+- [ ] ¿Pasaron source-native, equipment, mount, Stone, foundation y docs audits?

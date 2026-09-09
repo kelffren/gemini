@@ -1,3 +1,9 @@
+/* KELO-INDEX
+ * area: AUDIT / MOUNT FOUNDATION
+ * keys: AUDIT MOUNT CATALOG ABILITY SOURCE CAST STONE HOTBAR RENDER
+ * purpose: protege catálogo 20k, 3 M-slots, owner de render y cast nativo de montura sin tocar Stones
+ * online: valida identidad estable de mount/source para futura autoridad server
+ */
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
@@ -23,14 +29,16 @@ assert(actionBarSource.includes('KeloRender?.afterFrame'),'mount HUD must consum
 assert(actionBarSource.includes('KeloRender?.unregister'),'mount HUD must unregister its render hook');
 
 const mountChannelSource=fs.readFileSync(new URL('../src/mounts/mount-ability-channel.js',import.meta.url),'utf8');
-assert(mountChannelSource.includes('KeloAbilitySourceCast'),'mount channel must reuse generic ability source bridge');
-assert(!mountChannelSource.includes('abilities.hotbar.slots[bridgeIndex]'),'mount channel must not implement a second temporary hotbar bridge');
+assert(mountChannelSource.includes('KeloAbilities?.engine'),'mount channel must consume KeloAbilities owner');
+assert(mountChannelSource.includes('castSource'),'mount channel must use source-native KeloAbilities cast');
+assert(!mountChannelSource.includes('root.KeloAbilitySourceCast'),'mount channel must not execute through the legacy compatibility shim');
+assert(!mountChannelSource.includes('hotbar.slots'),'mount channel must never borrow a Stone hotbar slot');
 
-// Three-slot adapter reuses KeloAbilities synchronously through the generic source bridge and restores Stone hotbar.
-const stone0={stoneUid:'stone-real',abilityKey:'fireball',cooldown:0};const stoneSlots=[stone0,{stoneUid:'stone-2'},null,null,null];let casts=0;
+// Three-slot adapter sends semantic source metadata directly to KeloAbilities and never mutates Stone hotbar.
+const stone0={stoneUid:'stone-real',abilityKey:'fireball',cooldown:0};const stoneSlots=[stone0,{stoneUid:'stone-2'},null,null,null];const before=stoneSlots.slice();let casts=0,lastSource=null;
 globalThis.KeloMounts={isMounted:()=>true,getEquippedMountId:()=> 'mount.training_horse',getAbilityLoadout:()=>({mounted:true,mountId:'mount.training_horse',fingerprint:'mount.training_horse|1',slots:base.abilityIds.map((abilityKey,slotIndex)=>({sourceType:'mount',sourceId:'mount.training_horse',slotIndex,abilityKey}))})};
-globalThis.KeloAbilities={hotbar:{slots:stoneSlots},engine:{cast(req){casts++;assert.equal(req.slotIndex,0);assert.equal(globalThis.KeloAbilities.hotbar.slots[0].sourceType,'mount');assert.equal(globalThis.KeloAbilities.hotbar.slots[0].stoneUid,null);return{valid:true,abilityId:globalThis.KeloAbilities.hotbar.slots[0].abilityId};}}};
-globalThis.KeloEvents={emit(){}};globalThis.KeloAbilitySourceCast=undefined;globalThis.KeloMountAbilityChannel=undefined;
-require('../src/abilities/ability-source-cast.js');require('../src/mounts/mount-ability-channel.js');
-const Channel=globalThis.KeloMountAbilityChannel;assert.equal(Channel.slotCount,3);Channel.sync(true);assert.equal(Channel.getSnapshot().slots.length,3);const result=Channel.cast({slotIndex:0,direction:{x:1,y:0}});assert.equal(result.valid,true);assert.equal(result.sourceType,'mount');assert.equal(casts,1);assert.equal(globalThis.KeloAbilities.hotbar.slots[0],stone0,'generic bridge must restore original Stone slot object');assert.equal(stoneSlots.length,5,'Stone hotbar remains exactly five slots');assert.equal(globalThis.KELO_MOUNT_ABILITY_AUDIT.reusesGenericSourceCast,true);
-console.log(JSON.stringify({ok:true,catalogVersion:Catalog.version,mountCount:Catalog.count,twentyK:true,exactMountAbilitySlots:3,stoneSlotsUntouched:stoneSlots.length,reusesAbilityEngine:true,reusesGenericSourceCast:true,starterIdsInCore:false,secondLoop:false,usesKeloRender:true},null,2));
+globalThis.KeloAbilities={hotbar:{slots:stoneSlots},engine:{castSource(opts){casts++;lastSource=opts;assert.equal(opts.sourceType,'mount');assert.equal(opts.sourceId,'mount.training_horse');assert.equal(opts.sourceSlot,'M1');for(let i=0;i<5;i++)assert.strictEqual(stoneSlots[i],before[i]);return{valid:true,abilityId:opts.definition.id,abilityKey:opts.definition.key,stoneUid:null,sourceType:opts.sourceType,sourceId:opts.sourceId,sourceSlot:opts.sourceSlot,sourceFingerprint:opts.sourceFingerprint};}}};
+globalThis.KeloEvents={emit(){}};globalThis.KeloMountAbilityChannel=undefined;
+require('../src/mounts/mount-ability-channel.js');
+const Channel=globalThis.KeloMountAbilityChannel;assert.equal(Channel.slotCount,3);Channel.sync(true);assert.equal(Channel.getSnapshot().slots.length,3);const result=Channel.cast({slotIndex:0,direction:{x:1,y:0}});assert.equal(result.valid,true);assert.equal(result.sourceType,'mount');assert.equal(result.sourceSlot,'M1');assert.equal(casts,1);assert.equal(lastSource.definition.key,'mount_horse_gallop');for(let i=0;i<5;i++)assert.strictEqual(globalThis.KeloAbilities.hotbar.slots[i],before[i],'native source cast must preserve original Stone slot object');assert.equal(stoneSlots.length,5,'Stone hotbar remains exactly five slots');assert.equal(globalThis.KELO_MOUNT_ABILITY_AUDIT.nativeSourceCast,true);assert.equal(globalThis.KELO_MOUNT_ABILITY_AUDIT.legacyBridge,false);
+console.log(JSON.stringify({ok:true,catalogVersion:Catalog.version,mountCount:Catalog.count,twentyK:true,exactMountAbilitySlots:3,stoneSlotsUntouched:stoneSlots.length,reusesAbilityEngine:true,nativeSourceCast:true,legacyBridge:false,starterIdsInCore:false,secondLoop:false,usesKeloRender:true},null,2));

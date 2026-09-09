@@ -4,6 +4,7 @@
 
 **Estado:** índice maestro operativo del runtime Foundation actual.  
 **Runtime declarado en `index.html`:** Kelo World V6.53.  
+**Ability Source-Native:** `KeloAbilities.engine.castSource/predictSource` ejecuta weapon/mount/futuras fuentes no-Stone por el mismo targeting/delivery/effects sin sustituir ningún slot del hotbar Stone; `KeloAbilitySourceCast` queda como shim de compatibilidad.  
 **Identity / Prestige Foundation:** 2026-09-08 · `KeloPlayerStats` + `KeloTitles` + catálogo data-driven + `KeloActorNameplate` activos; Nobleza permanece separada en `KeloNobility`; `localPlayer.title = 'Caballero'` y su wrapper avatar legacy fueron retirados.  
 **Character Creator V2:** 2026-09-08 · `KeloCharacterCustomization` + `KeloCharacterSlotSchema` + `KeloCharacterVisualStack` activos y validados en Pages sobre `035af63e3a5f7b72283659cf02454bb048ade350`.  
 **Main Menu V4:** 2026-09-08 · `src/ui/luxe-shell.js` / `KELO_LUXE` conserva ownership único de la navegación principal; Apariencia, Nobleza y Burlas vuelven a ser descubribles mediante sus owners reales; Misiones/Ajustes permanecen ocultos mientras no exista owner UI válido.  

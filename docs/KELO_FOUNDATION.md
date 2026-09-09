@@ -80,11 +80,11 @@ Antes de añadirla:
 | Avatar composition | `KeloAvatar` | OWNER / TRANSITIONAL | Middleware; no renderer paralelo |
 | World renderer | `KELO_WORLD_RENDERER` | OWNER | Mundo entra por contracts/renderer |
 | Visual/VFX | `KeloVisualSystem` + visual primitives | OWNER | Presentación no decide gameplay |
-| Ability runtime | `KeloAbilities` | OWNER | Delivery/effects/cooldown/collision; mount reutiliza este owner |
+| Ability runtime | `KeloAbilities` | OWNER | Delivery/effects/cooldown/collision; `castSource/predictSource` permite fuentes no-Stone sin tocar hotbar; mount/weapon reutilizan este owner |
 | Stone/loadout | `KeloStones` | OWNER | **Exactamente 5 slots Stone**; mount no entra en `STATE.equipped` |
 | Mount definitions/profiles | `KeloMountCatalog` | FOUNDATION CANDIDATE | Nueva montura = data; no class/switch por mount ID |
 | Mount runtime/state | `KeloMounts` | FOUNDATION CANDIDATE / CLIENT FALLBACK | Único owner de `STATE.mounts`; equip/mount/dismount/equipment/outfit |
-| Mount exclusive ability channel | `KeloMountAbilityChannel` → `KeloAbilities` | SUPPORT CANDIDATE | Exact 3 M1/M2/M3 mounted-only; no MountAbilityEngine |
+| Mount exclusive ability channel | `KeloMountAbilityChannel` → `KeloAbilities.engine.castSource` | SUPPORT CANDIDATE | Exact 3 M1/M2/M3 mounted-only; no MountAbilityEngine ni préstamo de slots Stone |
 | Shared stat resolution | `KeloStats` | FOUNDATION CANDIDATE | Modifiers declarativos; sources poseen su propio state |
 | Player equipment | `KeloEquipment` | OWNER client + stats adapter | API legacy preservada; mount equipment no vive aquí |
 | Shared appearance definitions | `KeloAppearance` | FOUNDATION CANDIDATE | Cosmetic profiles/items/anchors; no stats ni gameplay state |
