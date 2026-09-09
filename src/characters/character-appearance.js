@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: CHARACTERS
  * owner: KeloCharacterAppearance; avatar composition owned by KeloAvatar
- * keys: APPEARANCE PLAYER BOT HERO SPRITE FALLBACK FOUNDATION PVP AIM FACING STRAFE LOCOMOTION PLANT
+ * keys: APPEARANCE PLAYER BOT HERO SPRITE FALLBACK FOUNDATION PVP AIM FACING STRAFE LOCOMOTION PLANT PIXEL PHASE DPR CAMERA
  * hace: asigna y renderiza sprites de apariencia; el hero.PNG subido usa el owner modular con 4 direcciones
  * online: visual cliente; autoridad de actor fuera de este modulo; en PvP conserva aim de gameplay y usa fila de aim solo durante compromiso de ataque/aim explícito
  * extension-points: KeloAvatar.use como middleware condicional de apariencia
@@ -10,7 +10,7 @@
 (function () {
   'use strict';
 
-  const VERSION = 'character-appearance-v2.4.1-idle-plant-frame';
+  const VERSION = 'character-appearance-v2.5.0-physical-pixel-phase';
   const DEFAULT_PLAYER = 'player_hero_v1';
   const DEFAULT_BOT = DEFAULT_PLAYER;
   const ALPHA_CLEANUP_THRESHOLD = 8;
@@ -49,6 +49,7 @@
     usesSingleImagePerAppearance: true, usesActorAppearanceId: true, usesPerFrameFootAnchor: true,
     usesExplicitIdleFrame: true,
     usesCombatAimFacing: true, combatAimFacingPolicy: 'idle-or-attack-commitment',
+    adaptivePhysicalPixelSnap: true, physicalPixelSnapCount: 0, worldPixelFallbackCount: 0,
     avatarOwner: 'KeloAvatar', avatarMiddleware: 'character-appearance:custom-sprite', lastDraw: null
   };
 
@@ -208,14 +209,31 @@
     const targetBodyHeight=Math.max(1,Number(layout.visualHeight)||93), scale=targetBodyHeight/metrics.bodyHeight;
     const sx=col*def.frameWidth, sy=row*def.frameHeight, sw=def.frameWidth, sh=def.frameHeight;
     const anchorX=metrics.footX[col]==null?metrics.footX[0]:metrics.footX[col], anchorY=metrics.footY[col]==null?metrics.footY[0]:metrics.footY[col];
-    const dx=Math.round(layout.footRootX-anchorX*scale), dy=Math.round(layout.footRootY-anchorY*scale), dw=Math.round(sw*scale), dh=Math.round(sh*scale);
+    const rawDx=layout.footRootX-anchorX*scale, rawDy=layout.footRootY-anchorY*scale;
+    let dx=Math.round(rawDx), dy=Math.round(rawDy), pixelSnapMode='world';
+    const cameraApi=window.KeloCamera;
+    if (cameraApi && typeof cameraApi.worldToScreen==='function' && typeof cameraApi.getEffectiveZoom==='function' && typeof cameraApi.activeDpr==='function') {
+      const z=Math.max(0.0001,Number(cameraApi.getEffectiveZoom())||1), dpr=Math.max(1,Number(cameraApi.activeDpr())||1);
+      // RENDER/PIXEL-PHASE: physical snapping is only finer than legacy 1-world-px rounding when zoom×DPR >= 1.
+      if (z*dpr>=1) {
+        const screen=cameraApi.worldToScreen(rawDx,rawDy);
+        const snappedScreenX=Math.round(screen.x*dpr)/dpr, snappedScreenY=Math.round(screen.y*dpr)/dpr;
+        dx=rawDx+(snappedScreenX-screen.x)/z;
+        dy=rawDy+(snappedScreenY-screen.y)/z;
+        pixelSnapMode='physical';
+        audit.physicalPixelSnapCount += 1;
+      } else {
+        audit.worldPixelFallbackCount += 1;
+      }
+    }
+    const dw=Math.round(sw*scale), dh=Math.round(sh*scale);
     ctx.save(); const previousSmoothing=ctx.imageSmoothingEnabled; ctx.imageSmoothingEnabled=false;
     if (def.mirrorFaces && def.mirrorFaces[face]) { ctx.translate(Math.round(layout.footRootX),0); ctx.scale(-1,1); ctx.translate(-Math.round(layout.footRootX),0); }
     ctx.drawImage(runtime.source,sx,sy,sw,sh,dx,dy,dw,dh); ctx.imageSmoothingEnabled=previousSmoothing; ctx.restore();
     ctx.save(); ctx.fillStyle=isSelf?'#e7c56a':'#f3eee4'; ctx.font='bold 11px sans-serif'; ctx.textAlign='center';
     ctx.fillText(actor.name||'Kelo',Math.round(layout.nameplateAnchorX),Math.round(layout.nameplateAnchorY)); ctx.restore();
     audit.drawCountByAppearance[def.id]=(audit.drawCountByAppearance[def.id]||0)+1;
-    audit.lastDraw={ actorId:actor.id||null, appearanceId:def.id, face:face, faceSource:motion.faceSource||'movement', frame:col, sourceRect:[sx,sy,sw,sh], destinationRect:[dx,dy,dw,dh], scale:scale, sourceFootAnchor:[anchorX,anchorY], footRoot:[layout.footRootX,layout.footRootY] };
+    audit.lastDraw={ actorId:actor.id||null, appearanceId:def.id, face:face, faceSource:motion.faceSource||'movement', frame:col, sourceRect:[sx,sy,sw,sh], destinationRect:[dx,dy,dw,dh], rawDestination:[rawDx,rawDy], pixelSnapMode:pixelSnapMode, scale:scale, sourceFootAnchor:[anchorX,anchorY], footRoot:[layout.footRootX,layout.footRootY] };
   }
 
   window.KeloAvatar.use('character-appearance:custom-sprite', renderAppearance, 200);
