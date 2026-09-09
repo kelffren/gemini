@@ -1,8 +1,8 @@
 /* KELO-INDEX
  * area: TEST / UI / LIVE
  * owner: Premium menu + player HUD browser audit
- * keys: MENU HUD PLAYER MOBILE PORTRAIT LANDSCAPE RESPONSIVE ROUTES INPUT PVP FULLSCREEN CONSOLE SCREENSHOT
- * purpose: valida Luxe real, HUD único, owners consumidos, responsive, locks y smoke de movimiento/PvP/fullscreen
+ * keys: MENU HUD PLAYER MOBILE PORTRAIT LANDSCAPE RESPONSIVE ROUTES INPUT PVP FULLSCREEN COMMERCE TITLES CONSOLE SCREENSHOT
+ * purpose: valida Luxe real, HUD único, owners consumidos, responsive, locks, Mercado autoritativo y smoke de movimiento/PvP/fullscreen
  * online: prueba presentación/rutas; no altera reglas autoritativas
  */
 import { chromium } from 'playwright';
@@ -35,6 +35,24 @@ async function route(name,tool,selector,closeExpression){
   await clickRoute(tool);await page.waitForFunction(sel=>{const el=document.querySelector(sel);if(!el)return false;const s=getComputedStyle(el),r=el.getBoundingClientRect();return s.display!=='none'&&s.visibility!=='hidden'&&r.width>0&&r.height>0;},selector,{timeout:6000});
   report.routes[name]=true;
   if(closeExpression)await page.evaluate(closeExpression);
+}
+async function routeMarket(){
+  await clickRoute('market');
+  await page.waitForFunction(()=>window.KeloMarketWorld?.isActive?.()===true&&document.getElementById('kelo-commerce-dock')?.classList.contains('show'),null,{timeout:8000});
+  const entered=await page.evaluate(()=>({
+    active:window.KeloMarketWorld?.isActive?.()===true,
+    dockVisible:document.getElementById('kelo-commerce-dock')?.classList.contains('show')===true,
+    menuOpen:window.KELO_LUXE?.isMenuOpen?.()===true,
+    menuLocked:window.KeloInputLocks.has('luxe-main-menu'),
+    commerceAudit:window.KELO_COMMERCE_UI_AUDIT||null
+  }));
+  assert(entered.active&&entered.dockVisible,'Mercado route did not enter authoritative market instance');
+  assert(!entered.menuOpen&&!entered.menuLocked,'Main menu stayed open/locked after market travel');
+  assert(entered.commerceAudit?.authorityOnly===true&&entered.commerceAudit?.marketInstanceEntry===true,'Commerce authority boundary audit missing');
+  report.routes.market=true;
+  await page.evaluate(async()=>{window.KeloCommerceUI?.close?.();await window.KeloCommerceUI?.leaveMarket?.();});
+  await page.waitForFunction(()=>window.KeloMarketWorld?.isActive?.()===false&&!document.getElementById('kelo-commerce-dock')?.classList.contains('show'),null,{timeout:8000});
+  assert(await page.evaluate(()=>!window.KeloInputLocks.has('commerce-ui')&&!window.KeloInputLocks.has('luxe-main-menu')),'Market route leaked an input lock');
 }
 async function inspectHud(){
   return page.evaluate(()=>{
@@ -82,7 +100,7 @@ try{
     creatorsAllowed:!!window.KELO_CREATORS_LAUNCHER?.allowed,
     fullscreenButton:!!document.getElementById('kelo-orientation-btn')
   }));
-  assert(baseline.luxe?.version==='luxe-shell-v4.0.2-premium-menu','Premium Luxe runtime version missing');
+  assert(baseline.luxe?.version==='luxe-shell-v4.0.3-title-book','Premium Luxe runtime version missing');
   assert(baseline.luxe?.tokenLocks===true,'Premium menu token-lock audit missing');
   assert(baseline.playerHud?.version==='luxe-player-hud-v1.0.0','Premium player HUD runtime version missing');
   assert(baseline.playerHud?.polling===false,'Player HUD must advertise polling=false');
@@ -120,7 +138,7 @@ try{
       overflowY:document.documentElement.scrollHeight>innerHeight+1
     };
   });
-  for(const label of ['Mochila','Habilidades','Apariencia','Perfil','Mercado','Chat','Propiedades','Nobleza','Burlas'])assert(portrait.labels.includes(label),'Missing visible menu entry: '+label);
+  for(const label of ['Mochila','Habilidades','Apariencia','Perfil','Mercado','Chat','Propiedades','Nobleza','Libro de títulos','Burlas'])assert(portrait.labels.includes(label),'Missing visible menu entry: '+label);
   assert(portrait.columns===2,'Portrait menu is not two columns');
   assert(portrait.clippedTitles.length===0,'Portrait menu clips title text: '+portrait.clippedTitles.join(', '));
   assert(portrait.mainLock===true,'Main menu did not acquire KeloInputLocks token');
@@ -135,16 +153,11 @@ try{
 
   await route('appearance','appearance','#kelo-character-customizer',()=>window.KeloCharacterCustomizer.close());
   await route('nobility','nobility','#kelo-nobility',()=>window.KeloNobility.close());
+  await route('titles','titles','#kelo-title-book',()=>window.KeloTitles.closeBook());
+  assert(await page.evaluate(()=>!window.KeloInputLocks.has('titles-book')),'Title Book input lock leaked');
   await route('emotes','emotes','#kelo-emotes-panel',()=>window.KeloSelfInteractionUI.closeEmotes());
   await route('backpack','bag','#kelo-bag',()=>window.KeloBackpackUI.close());
-
-  // El owner actual de Mercado entra a la instancia caminable; ya no abre siempre el panel legacy #kelo-market-v1.
-  await clickRoute('market');
-  await page.waitForFunction(()=>window.KeloMarketWorld?.isActive?.()===true,null,{timeout:6000});
-  report.routes.market=true;
-  await page.evaluate(async()=>{window.KeloCommerceUI?.close?.();await window.KeloMarketWorld?.leave?.();});
-  await page.waitForFunction(()=>window.KeloMarketWorld?.isActive?.()===false,null,{timeout:6000});
-
+  await routeMarket();
   await route('properties','properties','#kelo-house-panel',()=>window.KELO_HOUSE_UI.hide());
   await route('profile','profile','#inspect-sheet',()=>{if(typeof closeInspect==='function')closeInspect();});
   await route('abilities','abilities','#kelo-builder',()=>{const p=document.getElementById('kelo-builder');if(p)p.style.display='none';});
