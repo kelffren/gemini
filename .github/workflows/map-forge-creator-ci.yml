@@ -1,0 +1,75 @@
+# KELO-INDEX
+# area: QA / MAP FORGE / CREATORS
+# owner: Map Forge Creator CI
+# purpose: validate Creator registration, browser Worker parity, mobile UI and lock cleanup
+name: Map Forge Creator CI
+
+on:
+  pull_request:
+    paths:
+      - 'src/world/map-forge/**'
+      - 'src/creators/**'
+      - 'scripts/map-forge-creator-browser-audit.mjs'
+      - '.github/workflows/map-forge-creator-ci.yml'
+      - 'docs/systems/MAP_FORGE_SYSTEM.md'
+  push:
+    branches: [main]
+    paths:
+      - 'src/world/map-forge/**'
+      - 'src/creators/**'
+      - 'scripts/map-forge-creator-browser-audit.mjs'
+      - '.github/workflows/map-forge-creator-ci.yml'
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Syntax
+        run: |
+          node --check src/world/map-forge/map-forge-worker.mjs
+          node --check src/world/map-forge/map-forge-worker-client.mjs
+          node --check src/creators/workspaces/map-forge-workspace.mjs
+          node --check src/creators/ui/map-forge-workspace.mjs
+          node --check src/creators/creator-entry.mjs
+          node --check src/creators/ui/creator-hub.mjs
+          node --check scripts/map-forge-creator-browser-audit.mjs
+      - name: Workspace contract
+        run: |
+          grep -q "registerMapForgeWorkspace" src/creators/creator-entry.mjs
+          grep -q "\['map-forge','Map Forge','active'" src/creators/ui/creator-hub.mjs
+          grep -q "capability: 'world.edit'" src/creators/workspaces/map-forge-workspace.mjs
+          grep -q "createMapForgeWorkerClient" src/creators/ui/map-forge-workspace.mjs
+          grep -q "GENERAR CIUDAD" src/creators/ui/map-forge-workspace.mjs
+          grep -q "EXPORTAR JSON" src/creators/ui/map-forge-workspace.mjs
+
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install browser audit dependencies
+        run: npm install --no-save playwright
+      - name: Install Chromium
+        run: npx playwright install chromium
+      - name: Serve PR checkout
+        run: |
+          python3 -m http.server 4173 --bind 127.0.0.1 > /tmp/map-forge-http.log 2>&1 &
+          echo $! > /tmp/map-forge-http.pid
+      - name: Run Map Forge Creator browser audit
+        env:
+          AUDIT_URL: http://127.0.0.1:4173/
+        run: node scripts/map-forge-creator-browser-audit.mjs
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: map-forge-creator-evidence
+          path: artifacts/
