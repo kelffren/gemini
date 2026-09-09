@@ -8,13 +8,20 @@ const supportedDelivery = new Set([
   'projectile', 'self_aoe', 'chain', 'dash', 'blink',
   'instant', 'persistent_area', 'wall', 'trap', 'aura',
 ]);
+const explicitlyPendingDelivery = new Set(['swap_sword']);
+const V1_BASELINE_KEYS = Object.freeze([
+  'fireball','ice_nova','chain_lightning','wind_dash','stone_shield',
+  'fire_tornado','ice_wall','shadow_step','poison_trap','light_aura',
+]);
 
 function recipeKey(recipe) {
   return [...recipe].sort().join('|');
 }
 
 function auditCatalog() {
-  assert.equal(data.ABILITIES.length, 10, 'V1 must expose exactly 10 abilities');
+  assert(data.ABILITIES.length >= V1_BASELINE_KEYS.length, 'ability catalog must preserve the V1 baseline');
+  const currentKeys = new Set(data.ABILITIES.map((ability) => ability.key));
+  for (const key of V1_BASELINE_KEYS) assert(currentKeys.has(key), 'V1 baseline ability missing: ' + key);
   const ids = new Set();
   const keys = new Set();
   const recipes = new Set();
@@ -33,11 +40,20 @@ function auditCatalog() {
     assert(parts.every(Boolean), ability.key + ' references unknown recipe component');
     assert(parts.some((p) => p.type === data.STONE_TYPES.ELEMENT), ability.key + ' missing element');
     assert(parts.some((p) => p.type === data.STONE_TYPES.FORM), ability.key + ' missing form');
-    assert(supportedDelivery.has(ability.delivery.type), ability.key + ' uses unsupported delivery ' + ability.delivery.type);
+    assert(
+      supportedDelivery.has(ability.delivery.type) || explicitlyPendingDelivery.has(ability.delivery.type),
+      ability.key + ' uses unclassified delivery ' + ability.delivery.type,
+    );
     assert(['normal', 'ultimate'].includes(ability.slotType), ability.key + ' missing slotType');
   }
 
-  return { abilities: ids.size, recipes: recipes.size };
+  return {
+    abilities: ids.size,
+    recipes: recipes.size,
+    v1Baseline: V1_BASELINE_KEYS.length,
+    extensions: Math.max(0, ids.size - V1_BASELINE_KEYS.length),
+    pendingDeliveryTypes: [...explicitlyPendingDelivery],
+  };
 }
 
 function auditMigration() {
@@ -70,6 +86,7 @@ function auditLoadout() {
   stones.migrateState(state);
   const snapshot = stones.exportLoadout(state);
   assert.equal(snapshot.slots.filter(Boolean).length, 5);
+  assert.equal(snapshot.slots.length, 5, 'Stone hotbar contract remains exactly five slots');
   assert.equal(snapshot.slots[4].abilityKey, 'fire_tornado', 'ultimate must project into slot 5');
   assert(snapshot.slots.slice(0, 4).every((slot) => slot && stones.abilityByKey(slot.abilityKey).slotType === 'normal'), 'slots 1-4 must be normal');
   assert(stones.validateLoadoutSnapshot(snapshot, state).valid, 'authoritative snapshot should validate');

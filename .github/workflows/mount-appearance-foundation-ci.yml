@@ -1,0 +1,146 @@
+name: Mount Appearance Foundation CI
+on:
+  pull_request:
+    paths:
+      - 'index.html'
+      - 'package.json'
+      - 'src/mounts/**'
+      - 'src/stats/**'
+      - 'src/appearance/**'
+      - 'src/abilities/**'
+      - 'src/creators/**'
+      - 'src/systems/equipment-system.js'
+      - 'src/ui/mount-*.js'
+      - 'scripts/mount-foundation-audit.mjs'
+      - 'scripts/stat-modifier-audit.mjs'
+      - 'scripts/appearance-foundation-audit.mjs'
+      - 'scripts/mount-creator-audit.mjs'
+      - 'scripts/audit-stones.js'
+      - 'scripts/validate-ability-runtime-contract.mjs'
+      - 'docs/KELO_FOUNDATION.md'
+      - 'docs/CODE_INDEX.md'
+      - 'docs/systems/MOUNT_*.md'
+      - 'docs/systems/APPEARANCE_*.md'
+      - 'docs/systems/STAT_MODIFIER_SYSTEM.md'
+      - 'docs/system-catalog.json'
+      - 'ENGINE_MAP.md'
+      - 'guide.html'
+      - '.github/workflows/mount-appearance-foundation-ci.yml'
+  workflow_dispatch:
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Syntax
+        run: |
+          node --check src/mounts/mount-catalog.js
+          node --check src/mounts/mount-asset-adapter.js
+          node --check src/mounts/mount-system.js
+          node --check src/mounts/mount-ability-channel.js
+          node --check src/stats/stat-modifier-system.js
+          node --check src/appearance/appearance-system.js
+          node --check src/systems/equipment-system.js
+          node --check src/ui/mount-action-bar.js
+          node --check src/ui/mount-panel.js
+          node --check scripts/mount-foundation-audit.mjs
+          node --check scripts/stat-modifier-audit.mjs
+          node --check scripts/appearance-foundation-audit.mjs
+          node --check scripts/mount-creator-audit.mjs
+          node --check scripts/audit-stones.js
+          node --check scripts/validate-ability-runtime-contract.mjs
+      - name: Mount foundation and 20k scale
+        run: npm run audit:mounts
+      - name: Shared attribute modifiers
+        run: npm run audit:stats
+      - name: Shared appearance
+        run: npm run audit:appearance
+      - name: Creator foundation
+        run: npm run audit:mount-creator
+      - name: Ability delivery classification
+        run: node scripts/validate-ability-runtime-contract.mjs
+      - name: Five Stone slot regression
+        run: npm run audit:stones
+      - name: Character regression
+        run: npm run audit:character
+      - name: Foundation architecture regression
+        run: npm run audit:foundation
+      - name: Documentation contract
+        run: npm run audit:docs
+      - name: Studio foundation regression
+        run: npm run audit:studio
+      - name: Studio creator regression
+        run: npm run audit:studio:creator
+
+  browser-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install browser driver
+        run: npm install --no-save playwright@1.55.0
+      - name: Serve candidate and verify boot
+        env:
+          CHROME_BIN: /usr/bin/google-chrome
+        run: |
+          python3 -m http.server 4173 >/tmp/kelo-mount-server.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+          for i in {1..24}; do
+            curl -fsS http://127.0.0.1:4173/ >/dev/null && break
+            sleep 0.25
+          done
+          node - <<'NODE'
+          const { chromium } = require('playwright');
+          (async()=>{
+            const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_BIN});
+            const page=await browser.newPage({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
+            const runtimeErrors=[];
+            const criticalResources=[];
+            page.on('pageerror',e=>runtimeErrors.push('pageerror '+String(e)));
+            page.on('console',m=>{
+              if(m.type()!=='error')return;
+              const text=m.text();
+              if(text.includes('Failed to load resource'))return;
+              runtimeErrors.push('console '+text);
+            });
+            page.on('response',res=>{
+              if(res.status()<400)return;
+              const type=res.request().resourceType();
+              if(['document','script','stylesheet'].includes(type))criticalResources.push(`${res.status()} ${type} ${res.url()}`);
+            });
+            page.on('requestfailed',req=>{
+              const type=req.resourceType();
+              if(['document','script','stylesheet'].includes(type))criticalResources.push(`FAILED ${type} ${req.url()} ${req.failure()?.errorText||''}`);
+            });
+            await page.goto('http://127.0.0.1:4173/',{waitUntil:'domcontentloaded'});
+            await page.waitForFunction(()=>window.KeloMounts&&window.KeloStatModifiers&&window.KeloAppearance&&window.KeloMountAssets&&window.KeloMountAbilityChannel,{timeout:7000});
+            const result=await page.evaluate(()=>({
+              mounts:!!window.KeloMounts,
+              statModifiers:!!window.KeloStatModifiers,
+              playerStats:!!window.KeloPlayerStats,
+              statOwnersSeparated:window.KeloStatModifiers!==window.KeloPlayerStats,
+              appearance:!!window.KeloAppearance,
+              mountAssets:!!window.KeloMountAssets,
+              mountChannel:!!window.KeloMountAbilityChannel,
+              stoneSlots:Array.isArray(window.KeloAbilities?.hotbar?.slots)?window.KeloAbilities.hotbar.slots.length:null,
+              mountSlots:window.KeloMountAbilityChannel?.slotCount||null,
+              secondLoader:window.KELO_MOUNT_ASSET_AUDIT?.secondLoader,
+              rehydrates:window.KELO_MOUNT_AUDIT?.rehydratesPersistedStats
+            }));
+            if(!result.mounts||!result.statModifiers||!result.playerStats||!result.statOwnersSeparated||!result.appearance||!result.mountAssets||!result.mountChannel)throw new Error('Mount/Stats/Appearance boot incomplete '+JSON.stringify(result));
+            if(result.stoneSlots!==5)throw new Error('Stone slots regression '+JSON.stringify(result));
+            if(result.mountSlots!==3)throw new Error('Mount slot count regression '+JSON.stringify(result));
+            if(result.secondLoader!==false||result.rehydrates!==true)throw new Error('Foundation audit flags invalid '+JSON.stringify(result));
+            if(criticalResources.length)throw new Error('Critical resource failures: '+criticalResources.join(' | '));
+            if(runtimeErrors.length)throw new Error('Browser runtime errors: '+runtimeErrors.join(' | '));
+            console.log(JSON.stringify({ok:true,...result,criticalResources:0,runtimeErrors:0},null,2));
+            await browser.close();
+          })().catch(e=>{console.error(e);process.exit(1);});
+          NODE

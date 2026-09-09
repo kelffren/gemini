@@ -26,7 +26,7 @@ No uses `/*` para apagar código. Los comentarios solo documentan.
 
 ## Claves → archivo dueño LIVE
 
-| Clave | Qué es | Dónde
+| Clave | Qué es | Dónde |
 |---|---|---|
 | CORE | estado, input, física, loop | `engine-a.js` |
 | LOOP | requestAnimationFrame | `engine-b.js` |
@@ -40,8 +40,18 @@ No uses `/*` para apagar código. Los comentarios solo documentan.
 | LUXE BOUTIQUE | tienda | `src/environment/luxe-kiosk-atlas.js` `src/ui/luxe-boutique.js` |
 | HUD LUXE | shell menú | `src/ui/luxe-shell.js` |
 | MOBILE ORIENTATION | vertical/horizontal, viewport y botón GIRAR | `src/ui/mobile-orientation.js` |
-| STONES RECIPE | piedras data-driven | `src/abilities/stone-system.js` `abilityData.js` |
-| CAST ABILITY | delivery VFX/daño cliente | `src/abilities/kelo-ability-boot.js` |
+| STONES RECIPE | piedras data-driven; 5 slots | `src/abilities/stone-system.js` `abilityData.js` |
+| CAST ABILITY | delivery VFX/daño compartido | `src/abilities/kelo-ability-boot.js` |
+| MOUNT CATALOG PROFILE | MountDefinition + MovementProfile + EquipmentSlotProfile | `src/mounts/mount-catalog.js` |
+| MOUNT RUNTIME EQUIP | equipar/montar/equipo/outfit + authority boundary | `src/mounts/mount-system.js` |
+| MOUNT ABILITY M1 M2 M3 | canal exclusivo de 3 slots reutilizando KeloAbilities | `src/mounts/mount-ability-channel.js` `mount-ability-data.js` |
+| MOUNT UI | panel + barra M1–M3 | `src/ui/mount-panel.js` `src/ui/mount-action-bar.js` |
+| STATS MODIFIER AGGREGATOR | math compartida player/mount y scopes | `src/stats/stat-modifier-system.js` |
+| APPEARANCE OUTFIT PROFILE | profiles/slots/anchors/outfits Character+Mount | `src/appearance/appearance-system.js` |
+| CHARACTER APPEARANCE ADAPTER | KeloCharacterSlotSchema → shared Appearance profile | `src/appearance/character-appearance-adapter.js` |
+| MOUNT CREATOR | definitions/import/virtual list/undo | `src/creators/workspaces/mount-workspace.mjs` `src/creators/ui/mount-creator.mjs` |
+| APPEARANCE CREATOR | Character+Mount outfit authoring/drag anchors | `src/creators/workspaces/appearance-workspace.mjs` `src/creators/ui/appearance-creator.mjs` |
+| CREATOR TABULAR IMPORT | CSV + XLSX lazy authoring | `src/creators/importers/tabular-definition-importer.mjs` |
 | NET WS POSE | online room | `engine-net.js` |
 | VISUAL ASSET REGISTRY | IDs / preload / lazy visual | `src/visuals/asset-registry.js` |
 | ANIMATION CLIP ANCHOR | clips, channels, foot-root sockets | `src/visuals/animation-system.js` |
@@ -64,17 +74,34 @@ No uses `/*` para apagar código. Los comentarios solo documentan.
 
 ## Áreas (primera palabra después de KELO-INDEX)
 
-`CORE` `NET` `AUTH` `CAST` `STONES` `MOVE` `HERO` `PLAZA` `LUXE` `HUD` `ECON` `COMBAT` `SERVER` `UI` `PROPERTY`
+`CORE` `NET` `AUTH` `CAST` `STONES` `MOUNTS` `STATS` `APPEARANCE` `CREATORS` `MOVE` `HERO` `PLAZA` `LUXE` `HUD` `ECON` `COMBAT` `SERVER` `UI` `PROPERTY`
 
 Grep rápido:
 
-```
+```text
 KELO-INDEX NET
 KELO-INDEX CAST
+KELO-INDEX MOUNTS
+KELO-INDEX STATS
+KELO-INDEX APPEARANCE
+KELO-INDEX CREATORS
 KELO-INDEX MOVE
 KELO-INDEX PROPERTY
 KELO-INDEX UI
 ```
+
+## MOUNT / STATS / APPEARANCE FOUNDATION V1
+- `src/mounts/mount-catalog.js`: definiciones ligeras; una montura nueva es data, no clase.
+- `src/mounts/mount-system.js`: único owner de `STATE.mounts`; equip/mount/dismount, equipo y outfit.
+- `src/mounts/mount-ability-channel.js`: tres slots adicionales; no modifica los 5 Stone slots ni crea delivery handlers paralelos.
+- `src/stats/stat-modifier-system.js`: resolver determinista común; `KeloEquipment` publica su equipo legacy como source adapter.
+- `src/appearance/appearance-system.js`: contrato visual compartido Character/Mount, completamente separado de stats.
+- `src/appearance/character-appearance-adapter.js`: deriva slots/orden del owner `KeloCharacterSlotSchema`; Character Creator sigue siendo su owner actual.
+- `src/creators/workspaces/mount-workspace.mjs` + `appearance-workspace.mjs`: workspaces lazy registrados en Kelo Creators.
+- `src/creators/core/definition-workspace-session.mjs`: reutiliza History + Studio Store para authoring de definitions.
+- `src/creators/importers/tabular-definition-importer.mjs`: CSV local y SheetJS XLSX cargado solo al importar.
+- Audits: `audit:mounts`, `audit:stats`, `audit:appearance`, `audit:mount-creator`.
+- Arte real de monturas todavía pendiente: no confundir Foundation/data/editor con aprobación visual pixel-perfect.
 
 ## INSTANCE SYSTEM V1
 - `src/instances/instance-system.js`: manager/lifecycle/contexto genérico.
@@ -82,7 +109,6 @@ KELO-INDEX UI
 - `src/instances/house-instance.js`: autoridad, persistencia, snapshot y permisos House.
 - `src/instances/property-house-bridge.js`: contrato Property ↔ House.
 - `src/ui/house-instance-ui.js`: entrada/salida y acceso al mismo Property Editor.
-
 
 ## ADMIN KEY / WORLD CREATOR V1
 - `src/systems/admin-key-system.js`: objeto/entitlement Llave Admin, scopes y autoridad reemplazable.
@@ -101,7 +127,7 @@ KELO-INDEX UI
 Regla: visuales son piezas reutilizables; StoneSystem no conoce Animation/VFX/Sequence. El gameplay emite eventos y la presentación los consume.
 
 Orden de carga relevante:
-`visual core/manifests/registries → abilityData → stone-system → ability boot → ability-visuals → engine-net → sistemas tardíos → visual-lab → visual-integration final`.
+`visual core/manifests/registries → abilityData → stone-system → mount ability data → ability boot → ability-visuals → engine-net → sistemas tardíos → visual-lab → visual-integration final`.
 
 Render: `groundFX → belowActor → actorBackFX → actor → actorFrontFX → worldFX → foregroundFX → screenFX → UI`.
 
@@ -111,7 +137,6 @@ QA: `scripts/visual-system-contract-audit.js` + `scripts/live-visual-system-audi
 
 Detalle: `docs/VISUAL_SYSTEM.md`.
 <!-- CODE-INDEX-VISUAL-V1:END -->
-
 
 <!-- WORLD-BUILDER-V1:START -->
 ## WORLD BUILDER / ADMIN AUTHORING V1
