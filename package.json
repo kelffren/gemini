@@ -13,6 +13,7 @@
     "audit:containers": "node scripts/container-system-audit.js",
     "audit:commerce": "node scripts/commerce-system-audit.js",
     "audit:arena": "node scripts/arena-system-audit.js",
+    "audit:pvp-facing": "node scripts/pvp-aim-facing-audit.js",
     "audit:studio": "node scripts/studio-foundation-audit.mjs",
     "audit:studio:creator": "node scripts/studio-creator-v1-audit.mjs",
     "audit:mounts": "node scripts/mount-foundation-audit.mjs",
