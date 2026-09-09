@@ -67,15 +67,19 @@ assert(afterBuy.fire,'bought item must enter backpack');
 assert(afterBuy.gold<boot.gold,'market purchase must debit gold');
 assert.equal(afterBuy.tx?.status,'committed');
 
-// Claim a free stall and verify selling uses semantic input lock.
+// Claiming "RECLAMAR Y VENDER" intentionally enters vendor mode immediately.
 await page.evaluate(()=>window.KeloCommerceUI.openStall('stall_01'));
 await page.getByRole('button',{name:'RECLAMAR Y VENDER'}).click();
 await page.waitForFunction(()=>window.KeloCommerceAuthority.snapshot().stalls.some(x=>x.stallId==='stall_01'&&!x.demo));
-await page.getByRole('button',{name:'PONERME A VENDER'}).click();
 await page.waitForFunction(()=>window.KeloMarketWorld.getSellingStall()==='stall_01'&&window.KeloInputLocks.has('commerce-stall'));
 const selling=await page.evaluate(()=>({stall:window.KeloMarketWorld.getSellingStall(),locks:window.KeloInputLocks.snapshot(),player:{x:localPlayer.x,y:localPlayer.y}}));
 assert.equal(selling.stall,'stall_01');
 assert(selling.locks.owners.includes('commerce-stall'));
+await page.getByRole('button',{name:'DEJAR DE VENDER'}).click();
+await page.waitForFunction(()=>!window.KeloInputLocks.has('commerce-stall'));
+// Re-enter once to prove the explicit toggle also works after claiming.
+await page.getByRole('button',{name:'PONERME A VENDER'}).click();
+await page.waitForFunction(()=>window.KeloMarketWorld.getSellingStall()==='stall_01'&&window.KeloInputLocks.has('commerce-stall'));
 await page.getByRole('button',{name:'DEJAR DE VENDER'}).click();
 await page.waitForFunction(()=>!window.KeloInputLocks.has('commerce-stall'));
 
