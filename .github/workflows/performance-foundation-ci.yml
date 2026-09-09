@@ -10,6 +10,7 @@ on:
       - 'src/environment/**'
       - 'src/abilities/kelo-ability-boot.js'
       - 'src/systems/performance-governor.js'
+      - 'src/systems/pvp-combat-runtime-loader.js'
       - 'src/visuals/**'
       - 'src/ui/profile-panel-close.js'
       - 'scripts/performance-foundation-audit.js'
@@ -27,6 +28,7 @@ on:
       - 'src/environment/**'
       - 'src/abilities/kelo-ability-boot.js'
       - 'src/systems/performance-governor.js'
+      - 'src/systems/pvp-combat-runtime-loader.js'
       - 'src/visuals/**'
       - 'src/ui/profile-panel-close.js'
       - 'scripts/performance-foundation-audit.js'
@@ -52,6 +54,7 @@ jobs:
           node --check src/core/render-extension-system.js
           node --check src/abilities/kelo-ability-boot.js
           node --check src/systems/performance-governor.js
+          node --check src/systems/pvp-combat-runtime-loader.js
           node --check src/visuals/visual-system.js
           node --check src/environment/atlas-contract.js
           node --check src/environment/world-map.js
