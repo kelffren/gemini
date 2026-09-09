@@ -52,6 +52,9 @@ No uses `/*` para apagar código. Los comentarios solo documentan.
 | MOUNT CREATOR | definitions/import/virtual list/undo | `src/creators/workspaces/mount-workspace.mjs` `src/creators/ui/mount-creator.mjs` |
 | APPEARANCE CREATOR | Character+Mount outfit authoring/drag anchors | `src/creators/workspaces/appearance-workspace.mjs` `src/creators/ui/appearance-creator.mjs` |
 | CREATOR TABULAR IMPORT | CSV + XLSX lazy authoring | `src/creators/importers/tabular-definition-importer.mjs` |
+| CREATOR ASSET LIBRARY | import manual, revisiones, private/review/global; reutiliza catálogo runtime | `src/creators/assets/creator-asset-library.mjs` `src/creators/ui/asset-library-workspace.mjs` |
+| CREATOR ASSET REPOSITORY | persistencia reemplazable de metadata + Blob | `src/creators/assets/indexeddb-creator-asset-repository.mjs` |
+| MAP FORGE ASSET BINDING | familia semántica → assetId real determinista | `src/world/map-forge/map-forge-asset-binding.mjs` `src/world/map-forge/map-forge-worker-client.mjs` |
 | NET WS POSE | online room | `engine-net.js` |
 | VISUAL ASSET REGISTRY | IDs / preload / lazy visual | `src/visuals/asset-registry.js` |
 | ANIMATION CLIP ANCHOR | clips, channels, foot-root sockets | `src/visuals/animation-system.js` |
@@ -63,7 +66,7 @@ No uses `/*` para apagar código. Los comentarios solo documentan.
 | VISUAL ACTOR BRIDGE | actorBackFX/actorFrontFX final | `src/visuals/visual-integration.js` |
 | NET VISUAL EVENT | relay semántico presentation-only | `engine-net.js` + `server/index.js` |
 | AUTHORITY | boca única client→server | `engine-net.js` `KeloNetAuthority` |
-| PROPERTY CATALOG | templates placeables desde props/prefabs | `src/property/property-asset-catalog.js` |
+| PROPERTY CATALOG | templates placeables desde props/prefabs/Creator Library | `src/property/property-asset-catalog.js` |
 | PROPERTY PARCEL UNITS | balances, placements, autoridad reemplazable | `src/property/property-system.js` |
 | MAP EDITOR | editor mundo/parcela, export/import | `src/ui/property-editor.js` |
 | NOBLEZA | rangos donación | `src/systems/nobility.js` `nobility-authority.js` |
@@ -74,7 +77,7 @@ No uses `/*` para apagar código. Los comentarios solo documentan.
 
 ## Áreas (primera palabra después de KELO-INDEX)
 
-`CORE` `NET` `AUTH` `CAST` `STONES` `MOUNTS` `STATS` `APPEARANCE` `CREATORS` `MOVE` `HERO` `PLAZA` `LUXE` `HUD` `ECON` `COMBAT` `SERVER` `UI` `PROPERTY`
+`CORE` `NET` `AUTH` `CAST` `STONES` `MOUNTS` `STATS` `APPEARANCE` `CREATORS` `WORLD` `MOVE` `HERO` `PLAZA` `LUXE` `HUD` `ECON` `COMBAT` `SERVER` `UI` `PROPERTY`
 
 Grep rápido:
 
@@ -85,6 +88,7 @@ KELO-INDEX MOUNTS
 KELO-INDEX STATS
 KELO-INDEX APPEARANCE
 KELO-INDEX CREATORS
+KELO-INDEX WORLD
 KELO-INDEX MOVE
 KELO-INDEX PROPERTY
 KELO-INDEX UI
@@ -102,6 +106,17 @@ KELO-INDEX UI
 - `src/creators/importers/tabular-definition-importer.mjs`: CSV local y SheetJS XLSX cargado solo al importar.
 - Audits: `audit:mounts`, `audit:stats`, `audit:appearance`, `audit:mount-creator`.
 - Arte real de monturas todavía pendiente: no confundir Foundation/data/editor con aprobación visual pixel-perfect.
+
+## CREATOR ASSET LIBRARY V1
+- `src/creators/assets/creator-asset-library.mjs`: owner de metadata/revisiones de assets manuales; NO crea un catálogo runtime paralelo.
+- `src/creators/assets/indexeddb-creator-asset-repository.mjs`: persistencia local reemplazable por repository remoto.
+- `src/creators/ui/asset-library-workspace.mjs`: upload manual + metadata + vistas My/Global/Review/Official, paginadas.
+- `src/property/property-asset-catalog.js`: continúa siendo el owner de templates colocables usados por World Editor/runtime.
+- `src/environment/atlas-contract.js`: continúa siendo el owner de carga/registro de imágenes.
+- `src/world/map-forge/map-forge-asset-binding.mjs`: solo resuelve familias semánticas a IDs del catálogo; no renderiza ni posee assets.
+- Flujo actual: `private → review → global`; `world.publish` aprueba en el fallback local.
+- `global` real cross-account requiere repository/authority remotos; IDs/workspaces/Map Forge quedan igual.
+- Audit: `npm run audit:creator-assets`.
 
 ## INSTANCE SYSTEM V1
 - `src/instances/instance-system.js`: manager/lifecycle/contexto genérico.
