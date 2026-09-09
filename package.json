@@ -20,6 +20,7 @@
     "audit:stats": "node scripts/stat-modifier-audit.mjs",
     "audit:appearance": "node scripts/appearance-foundation-audit.mjs",
     "audit:mount-creator": "node scripts/mount-creator-audit.mjs",
+    "audit:creator-assets": "node scripts/creator-asset-library-audit.mjs",
     "audit:logistics": "node scripts/regional-logistics-audit.js",
     "audit:logistics-ui": "node scripts/logistics-admin-ui-audit.js"
   },
