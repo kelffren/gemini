@@ -13,7 +13,7 @@
     #ui-layer{position:absolute;inset:0;pointer-events:none;z-index:10}
     .hud-badge{position:absolute;top:max(8px,env(safe-area-inset-top));left:max(8px,env(safe-area-inset-left));font:11px ui-monospace,monospace;color:#e7c56a;background:rgba(10,13,18,.88);padding:7px 12px;border-radius:999px;border:1px solid rgba(231,197,106,.26)}
     #kelo-guide-link{position:absolute;top:max(43px,calc(env(safe-area-inset-top) + 35px));left:max(8px,env(safe-area-inset-left));pointer-events:auto;padding:5px 9px;border-radius:999px;border:1px solid rgba(231,197,106,.28);background:rgba(10,13,18,.84);color:#e7c56a;text-decoration:none;font:800 9px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;letter-spacing:.04em}
-    body.social-mode #action-bar-container{display:none!important}
+    body.social-mode #action-bar-container,body.social-mode #mount-action-bar-container{display:none!important}
     #action-bar-container .stone-slot{position:relative!important}
     #action-bar-container .stone-slot>span[style*="position:absolute"]{pointer-events:none}
     #kelo-online,.lx-mark,#kelo-minimap,#minimap{display:none!important}
@@ -39,10 +39,10 @@
 <!-- KELO-INDEX VISUALS: presentación modular; no autoridad gameplay. -->
 <script src="src/visuals/visual-system.js?v=1"></script><script src="src/visuals/visual-manifests.js?v=1"></script><script src="src/visuals/asset-registry.js?v=1"></script><script src="src/visuals/animation-system.js?v=1"></script><script src="src/visuals/fx-system.js?v=1"></script><script src="src/visuals/sequence-system.js?v=1"></script><script src="src/visuals/melee-visual-manifest.js?v=1"></script><script src="src/visuals/melee-combat-visuals.js?v=1"></script>
 
-<!-- KELO-INDEX ABILITIES/PROGRESSION/NET: data-driven abilities, player stats/titles y transporte cliente. -->
-<script src="src/abilities/abilityData.js?v=154"></script><script src="src/abilities/stone-system.js?v=154"></script><script src="src/abilities/stone-backpack-bridge.js?v=2"></script><script src="src/abilities/kelo-ability-boot.js?v=157"></script><script src="src/visuals/ability-visuals.js?v=2"></script><script src="src/abilities/sword-swap-runtime.js?v=2"></script><script src="src/visuals/sword-swap-pvp-visuals.js?v=4"></script><script src="src/systems/title-catalog.js?v=1"></script><script src="src/systems/player-stats.js?v=1"></script><script src="src/systems/title-system.js?v=1"></script><script src="engine-net.js?v=98"></script>
+<!-- KELO-INDEX ABILITIES/PROGRESSION/NET: Stones conserva 5 slots; Mount abilities viven en data separada; PlayerStats/Titles y transporte conservan sus owners. -->
+<script src="src/abilities/abilityData.js?v=154"></script><script src="src/abilities/stone-system.js?v=154"></script><script src="src/mounts/mount-ability-data.js?v=1"></script><script src="src/abilities/stone-backpack-bridge.js?v=2"></script><script src="src/abilities/kelo-ability-boot.js?v=157"></script><script src="src/visuals/ability-visuals.js?v=2"></script><script src="src/abilities/sword-swap-runtime.js?v=2"></script><script src="src/visuals/sword-swap-pvp-visuals.js?v=4"></script><script src="src/systems/title-catalog.js?v=1"></script><script src="src/systems/player-stats.js?v=1"></script><script src="src/systems/title-system.js?v=1"></script><script src="engine-net.js?v=98"></script>
 
-<!-- KELO-INDEX UI/SYSTEMS: UI consume APIs; sistemas poseen sus dominios. -->
+<!-- KELO-INDEX UI/SYSTEMS: KeloPlayerStats=counters de progreso; KeloStatModifiers=atributos derivados. UI consume APIs; sistemas poseen sus dominios. -->
 <script src="src/ui/luxe-shell.js?v=229"></script>
 <script src="src/ui/mobile-orientation.js?v=6"></script>
 <script src="src/ui/luxe-boutique.js?v=206"></script>
@@ -51,7 +51,17 @@
 <script src="src/systems/nobility-authority.js?v=2"></script>
 <script src="src/ui/player-nameplate.js?v=1"></script>
 <script src="src/systems/nobility-combat.js?v=1"></script>
-<script src="src/systems/equipment-system.js?v=5"></script>
+<script src="src/stats/stat-modifier-system.js?v=2"></script>
+<script src="src/appearance/appearance-system.js?v=1"></script>
+<script src="src/mounts/mount-appearance-content.js?v=1"></script>
+<script src="src/mounts/mount-catalog.js?v=2"></script>
+<script src="src/mounts/mount-asset-adapter.js?v=1"></script>
+<script src="src/mounts/mount-equipment-catalog.js?v=1"></script>
+<script src="src/systems/equipment-system.js?v=6"></script>
+<script src="src/mounts/mount-system.js?v=3"></script>
+<script src="src/mounts/mount-ability-channel.js?v=1"></script>
+<script src="src/ui/mount-action-bar.js?v=1"></script>
+<script src="src/ui/mount-panel.js?v=1"></script>
 <script src="src/systems/backpack-system.js?v=2"></script>
 <script src="src/systems/container-system.js?v=4"></script>
 <script src="src/systems/emote-system.js?v=1"></script>
@@ -76,12 +86,13 @@
 <script src="src/systems/illumination.js?v=2"></script>
 <script src="src/systems/performance-governor.js?v=2"></script>
 
-<!-- KELO-INDEX LATE BOOT: profile bootstrap instala foundations combat/effects/melee. Hotfix force-unlock está RETIRED y ya no se carga. -->
+<!-- KELO-INDEX LATE BOOT: presentation adapters tardíos; Character Appearance reutiliza el shared Appearance owner. -->
 <script src="src/ui/profile-panel-close.js?v=1"></script>
+<script src="src/appearance/character-appearance-adapter.js?v=1"></script>
 <script src="src/ui/self-interaction-ui.js?v=1"></script>
 <script src="src/ui/pvp-social-touch-guard.js?v=3"></script>
 <script src="src/visuals/visual-lab.js?v=1"></script>
 <script src="src/visuals/visual-integration.js?v=2"></script>
-<!-- KELO-INDEX STUDIO: launcher mínimo; módulos Studio se importan solo tras acción CREATE. -->
+<!-- KELO-INDEX STUDIO: launcher mínimo; Mount/Appearance/World creators se importan solo tras acción CREATE. -->
 <script src="src/ui/studio-launcher.js?v=3"></script>
 </body></html>

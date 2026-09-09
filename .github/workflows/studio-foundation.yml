@@ -37,7 +37,7 @@ jobs:
             echo 'Studio and Creator modules must not be eagerly loaded by index.html'
             exit 1
           fi
-          grep -q 'src/ui/studio-launcher.js?v=2' index.html
+          grep -Eq 'src/ui/studio-launcher\.js\?v=[0-9]+' index.html
           grep -Fq "import('./../creators/ui/creator-hub.mjs')" src/ui/studio-launcher.js
           ! grep -Fq "import('./../studio/" src/ui/studio-launcher.js
           grep -Fq "import('../../studio/integration/live-studio-controller.mjs')" src/creators/workspaces/world-workspace.mjs

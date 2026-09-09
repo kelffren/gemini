@@ -99,7 +99,7 @@ jobs:
         run: node scripts/inventory-ui-v2-audit.js
       - name: Integration contract
         run: |
-          grep -q "equipment-v1.1.2" src/systems/equipment-system.js
+          grep -q "equipment-v1.2.1" src/systems/equipment-system.js
           grep -q "marketEscrowAwareStarterIdentity:true" src/systems/equipment-system.js
           grep -q "backpack-v1.1.0" src/systems/backpack-system.js
           grep -q "stacksImplemented:true" src/systems/backpack-system.js
