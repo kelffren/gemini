@@ -10,7 +10,7 @@ on:
       - 'src/abilities/**'
       - 'src/visuals/**'
       - 'src/systems/pvp-world.js'
-      - 'assets/fx/melee/**'
+      - 'src/visuals/melee-assets/**'
       - 'scripts/visual-system-contract-audit.js'
       - 'scripts/melee-visuals-audit.js'
       - '.github/workflows/visual-system-ci.yml'
@@ -23,7 +23,7 @@ on:
       - 'src/abilities/**'
       - 'src/visuals/**'
       - 'src/systems/pvp-world.js'
-      - 'assets/fx/melee/**'
+      - 'src/visuals/melee-assets/**'
       - 'scripts/visual-system-contract-audit.js'
       - 'scripts/melee-visuals-audit.js'
       - '.github/workflows/visual-system-ci.yml'
@@ -48,10 +48,10 @@ jobs:
           test -f src/visuals/visual-lab.js
           test -f src/visuals/visual-integration.js
           test -f scripts/melee-visuals-audit.js
-          test -f assets/fx/melee/sword-light-slash-up.svg
-          test -f assets/fx/melee/sword-light-slash-down.svg
-          test -f assets/fx/melee/sword-light-slash-left.svg
-          test -f assets/fx/melee/sword-light-slash-right.svg
+          test -f src/visuals/melee-assets/sword-light-slash-up.svg
+          test -f src/visuals/melee-assets/sword-light-slash-down.svg
+          test -f src/visuals/melee-assets/sword-light-slash-left.svg
+          test -f src/visuals/melee-assets/sword-light-slash-right.svg
       - name: Syntax
         run: |
           node --check src/visuals/visual-system.js

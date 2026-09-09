@@ -57,9 +57,9 @@ for(const file of [
 }
 
 const ability=fs.readFileSync('src/abilities/kelo-ability-boot.js','utf8');
-assert(ability.includes("WALL_COLLISION_OWNER = 'abilities:walls'"),'ability wall collision owner missing');
-assert(ability.includes('collision.upsert(WALL_COLLISION_OWNER, wall)'),'ability wall does not register through collision owner');
-assert(ability.includes('collision.remove(WALL_COLLISION_OWNER, wall.id)'),'ability wall does not unregister through collision owner');
+assert(/\bWALL_COLLISION_OWNER\s*=\s*['"]abilities:walls['"]/.test(ability),'ability wall collision owner missing');
+assert(/collision\.upsert\(\s*WALL_COLLISION_OWNER\s*,\s*wall\s*\)/.test(ability),'ability wall does not register through collision owner');
+assert(/collision\.remove\(\s*WALL_COLLISION_OWNER\s*,\s*wall\.id\s*\)/.test(ability),'ability wall does not unregister through collision owner');
 
 console.log(JSON.stringify({
   ok:true,
