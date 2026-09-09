@@ -89,18 +89,18 @@
   }
 
   const IMPERIAL_PLAZA_ASSETS=Object.freeze([
-    {key:'imperialFountainJustice',id:'imperial:fuente-justicia',label:'Fuente de la Justicia',src:'assets/world/imperial-plaza/fuente-de-la-justicia.png',imageW:911,imageH:903,width:128,height:128,category:'architecture',collision:{x:0,y:64,w:128,h:64}},
-    {key:'imperialCompassRose',id:'imperial:rosa-vientos',label:'Rosa de los Vientos',src:'assets/world/imperial-plaza/rosa-de-los-vientos.png',imageW:1527,imageH:1244,width:160,height:128,category:'decor',collision:{x:0,y:64,w:160,h:64}},
-    {key:'imperialCeremonialPlatform',id:'imperial:plataforma-ceremonial',label:'Plataforma Ceremonial',src:'assets/world/imperial-plaza/plataforma-ceremonial.png',imageW:1254,imageH:1259,width:160,height:160,category:'architecture',collision:{x:0,y:64,w:160,h:96}},
-    {key:'imperialCurvedPlanter',id:'imperial:jardinera-curva',label:'Jardinera Imperial Curva',src:'assets/world/imperial-plaza/jardinera-imperial-curva.png',imageW:1254,imageH:1259,width:160,height:160,category:'decor',collision:{x:0,y:96,w:160,h:64}},
-    {key:'imperialBanner',id:'imperial:estandarte',label:'Estandarte Imperial',src:'assets/world/imperial-plaza/estandarte-imperial.png',imageW:1057,imageH:1064,width:64,height:96,category:'decor',collision:{x:16,y:64,w:32,h:32}},
-    {key:'imperialLionFountain',id:'imperial:fuente-leones',label:'Fuente de los Leones',src:'assets/world/imperial-plaza/fuente-de-los-leones.png',imageW:758,imageH:744,width:128,height:128,category:'architecture',collision:{x:0,y:64,w:128,h:64}},
-    {key:'imperialPodium',id:'imperial:podio',label:'Podio Imperial',src:'assets/world/imperial-plaza/podio-imperial.png',imageW:760,imageH:678,width:96,height:96,category:'architecture',collision:{x:0,y:48,w:96,h:48}},
-    {key:'imperialKiosk',id:'imperial:kiosco',label:'Kiosco Imperial',src:'assets/world/imperial-plaza/kiosco-imperial.png',imageW:1254,imageH:1259,width:160,height:160,category:'architecture',collision:{x:0,y:64,w:160,h:96}},
-    {key:'imperialObelisk',id:'imperial:obelisco',label:'Obelisco Imperial',src:'assets/world/imperial-plaza/obelisco-imperial.png',imageW:755,imageH:748,width:96,height:128,category:'architecture',collision:{x:0,y:80,w:96,h:48}},
-    {key:'imperialStaircase',id:'imperial:escalinata',label:'Escalinata Imperial',src:'assets/world/imperial-plaza/escalinata-imperial.png',imageW:723,imageH:703,width:128,height:96,category:'architecture',collision:{x:0,y:48,w:128,h:48}},
-    {key:'imperialLamp',id:'imperial:farola',label:'Farola Imperial',src:'assets/world/imperial-plaza/farola-imperial.png',imageW:469,imageH:687,width:64,height:96,category:'decor',collision:{x:16,y:64,w:32,h:32}},
-    {key:'imperialTopiary',id:'imperial:topiario',label:'Topiario Imperial',src:'assets/world/imperial-plaza/topiario-imperial.png',imageW:759,imageH:757,width:96,height:96,category:'decor',collision:{x:16,y:64,w:64,h:32}}
+    {key:'imperialFountainJustice',id:'imperial:fuente-justicia',label:'Fuente de la Justicia',src:'assets/world/imperial-plaza/fuente-de-la-justicia.png?art=601',imageW:911,imageH:903,width:128,height:128,category:'architecture',collision:{x:0,y:64,w:128,h:64}},
+    {key:'imperialCompassRose',id:'imperial:rosa-vientos',label:'Rosa de los Vientos',src:'assets/world/imperial-plaza/rosa-de-los-vientos.png?art=602',imageW:1527,imageH:1244,width:160,height:128,category:'decor',collision:null},
+    {key:'imperialCeremonialPlatform',id:'imperial:plataforma-ceremonial',label:'Plataforma Ceremonial',src:'assets/world/imperial-plaza/plataforma-ceremonial.png?art=603',imageW:1254,imageH:1259,width:160,height:160,category:'architecture',collision:null},
+    {key:'imperialCurvedPlanter',id:'imperial:jardinera-curva',label:'Jardinera Imperial Curva',src:'assets/world/imperial-plaza/jardinera-imperial-curva.png?art=604',imageW:1254,imageH:1259,width:160,height:160,category:'decor',collision:{x:0,y:96,w:160,h:64}},
+    {key:'imperialBanner',id:'imperial:estandarte',label:'Estandarte Imperial',src:'assets/world/imperial-plaza/estandarte-imperial.png?art=605',imageW:1057,imageH:1064,width:64,height:96,category:'decor',collision:{x:16,y:64,w:32,h:32}},
+    {key:'imperialLionFountain',id:'imperial:fuente-leones',label:'Fuente de los Leones',src:'assets/world/imperial-plaza/fuente-de-los-leones.png?art=606',imageW:758,imageH:744,width:128,height:128,category:'architecture',collision:{x:0,y:64,w:128,h:64}},
+    {key:'imperialPodium',id:'imperial:podio',label:'Podio Imperial',src:'assets/world/imperial-plaza/podio-imperial.png?art=607',imageW:760,imageH:678,width:96,height:96,category:'architecture',collision:{x:0,y:48,w:96,h:48}},
+    {key:'imperialKiosk',id:'imperial:kiosco',label:'Kiosco Imperial',src:'assets/world/imperial-plaza/kiosco-imperial.png?art=608',imageW:1254,imageH:1259,width:160,height:160,category:'architecture',collision:{x:0,y:64,w:160,h:96}},
+    {key:'imperialObelisk',id:'imperial:obelisco',label:'Obelisco Imperial',src:'assets/world/imperial-plaza/obelisco-imperial.png?art=609',imageW:755,imageH:748,width:96,height:128,category:'architecture',collision:{x:0,y:80,w:96,h:48}},
+    {key:'imperialStaircase',id:'imperial:escalinata',label:'Escalinata Imperial',src:'assets/world/imperial-plaza/escalinata-imperial.png?art=610',imageW:723,imageH:703,width:128,height:96,category:'architecture',collision:null},
+    {key:'imperialLamp',id:'imperial:farola',label:'Farola Imperial',src:'assets/world/imperial-plaza/farola-imperial.png?art=611',imageW:469,imageH:687,width:64,height:96,category:'decor',collision:{x:16,y:64,w:32,h:32}},
+    {key:'imperialTopiary',id:'imperial:topiario',label:'Topiario Imperial',src:'assets/world/imperial-plaza/topiario-imperial.png?art=612',imageW:759,imageH:757,width:96,height:96,category:'decor',collision:{x:16,y:64,w:64,h:32}}
   ]);
 
   function registerImperialPlazaAssets(){
@@ -146,7 +146,7 @@
 
   registerPropTemplates(); registerPrefabTemplates(); registerRegistryTilesets(); registerImperialPlazaAssets(); registerExtraSheets();
   window.KELO_PROPERTY_CATALOG=Object.freeze({
-    version:'property-asset-catalog-v1.2.0',tileSize:TILE,registerTemplate:register,get(id){return templates.get(String(id))||null;},list(filter){let out=Array.from(templates.values()).filter(x=>x.placeable);if(filter?.category)out=out.filter(x=>x.category===filter.category);if(filter?.district)out=out.filter(x=>x.districts.includes('*')||x.districts.includes(filter.district));return out;},categories(){return Array.from(new Set(Array.from(templates.values()).map(x=>x.category))).sort();},onRegister(fn){if(typeof fn!=='function')return()=>{};listeners.add(fn);return()=>listeners.delete(fn);}
+    version:'property-asset-catalog-v1.2.1',tileSize:TILE,registerTemplate:register,get(id){return templates.get(String(id))||null;},list(filter){let out=Array.from(templates.values()).filter(x=>x.placeable);if(filter?.category)out=out.filter(x=>x.category===filter.category);if(filter?.district)out=out.filter(x=>x.districts.includes('*')||x.districts.includes(filter.district));return out;},categories(){return Array.from(new Set(Array.from(templates.values()).map(x=>x.category))).sort();},onRegister(fn){if(typeof fn!=='function')return()=>{};listeners.add(fn);return()=>listeners.delete(fn);}
   });
-  window.KELO_PROPERTY_CATALOG_AUDIT=Object.freeze({version:'property-asset-catalog-v1.2.0',templateCount:templates.size,propSource:!!P,prefabSource:!!F,tileSize:TILE,imperialPlazaAssets:IMPERIAL_PLAZA_ASSETS.map(s=>s.key),extraSheets:EXTRA_SHEETS.map(s=>s.key)});
+  window.KELO_PROPERTY_CATALOG_AUDIT=Object.freeze({version:'property-asset-catalog-v1.2.1',templateCount:templates.size,propSource:!!P,prefabSource:!!F,tileSize:TILE,imperialPlazaAssets:IMPERIAL_PLAZA_ASSETS.map(s=>s.key),extraSheets:EXTRA_SHEETS.map(s=>s.key)});
 })();
