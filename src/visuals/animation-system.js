@@ -1,8 +1,9 @@
 /* KELO-INDEX
  * area: VISUAL
- * keys: ANIMATION CLIP CHANNEL LOCOMOTION ACTION REACTION OVERLAY ANCHOR SOCKET MARKER INTERRUPT
+ * keys: ANIMATION CLIP CHANNEL LOCOMOTION ACTION REACTION OVERLAY ANCHOR SOCKET MARKER INTERRUPT PREVIEW
  * hace: controlador de animaciones corporales reutilizables y anchors semánticos sin modificar física
  * online: reproduce clips locales desde eventos; nunca decide movimiento, hit, cooldown ni validez del cast
+ * creator: preview/previewLocal reproducen definiciones transitorias sin registrarlas ni convertirlas en contenido LIVE
  */
 (function (root) {
   'use strict';
@@ -30,6 +31,7 @@
   Object.keys(manifests.animationClips || {}).forEach(function (id) { register(manifests.animationClips[id]); });
   function get(id) { return clips.get(String(id || '')) || null; }
   function list() { return Array.from(clips.values()); }
+  function localActor() { try { return typeof localPlayer !== 'undefined' ? localPlayer : (root.localPlayer || null); } catch (e) { return root.localPlayer || null; } }
 
   function actorKey(actor) {
     return root.KeloVisualContext && root.KeloVisualContext.actorIdOf(actor) || (actor && actor.id) || null;
@@ -65,7 +67,6 @@
     return { x: 0, y: 1 };
   }
 
-  // KELO-INDEX VISUAL/ANCHOR deriva sockets desde foot-root/presentación; no usa offsets dispersos en abilities.
   function anchor(actor, name) {
     if (!actor) return null;
     const face = faceOf(actor);
@@ -105,20 +106,12 @@
     return current.interruptible !== false && options && options.force === true;
   }
 
-  // KELO-INDEX VISUAL/ANIMATION inicia clip por actor/canal; el clip no bloquea movimiento ni valida gameplay.
-  function play(actor, clipId, options) {
-    const def = get(clipId);
-    if (!actor || !def) {
-      if (!def && root.KELO_VISUAL_AUDIT && root.KELO_VISUAL_AUDIT.missingAssets.indexOf(String(clipId)) < 0) root.KELO_VISUAL_AUDIT.missingAssets.push(String(clipId));
-      return null;
-    }
-    const opts = options || {};
-    const channel = String(opts.channel || def.channel || 'action');
-    const map = channelMap(actor, true);
-    const current = map.get(channel);
+  function start(actor, definition, options) {
+    if (!actor || !definition || !definition.id) return null;
+    const def = definition, opts = options || {}, channel = String(opts.channel || def.channel || 'action'), map = channelMap(actor, true), current = map.get(channel);
     if (!canReplace(current, def, opts)) return null;
     const instance = {
-      id: 'anim_' + (nextId++).toString(36), actor: actor, actorId: actorKey(actor), clipId: def.id, def: def,
+      id: 'anim_' + (nextId++).toString(36), actor: actor, actorId: actorKey(actor), clipId: String(def.id), def: def,
       channel: channel, elapsed: 0, duration: Math.max(0.001, Number(def.duration) || 0.001),
       speed: Math.max(0.05, Number(opts.speed) || 1), loop: opts.loop != null ? opts.loop === true : def.loop === true,
       priority: Number(opts.priority != null ? opts.priority : def.priority != null ? def.priority : CHANNEL_PRIORITY[channel] || 0),
@@ -127,8 +120,28 @@
     };
     if (current) bus.emit('ANIMATION_CANCELLED', { actorId: current.actorId, clipId: current.clipId, animationId: current.id, reason: 'REPLACED' });
     map.set(channel, instance);
-    bus.emit('ANIMATION_STARTED', { actorId: instance.actorId, clipId: def.id, animationId: instance.id, channel: channel, context: instance.context });
+    bus.emit('ANIMATION_STARTED', { actorId: instance.actorId, clipId: instance.clipId, animationId: instance.id, channel: channel, context: instance.context });
     return instance.id;
+  }
+
+  function play(actor, clipId, options) {
+    const def = get(clipId);
+    if (!def) {
+      if (root.KELO_VISUAL_AUDIT && root.KELO_VISUAL_AUDIT.missingAssets.indexOf(String(clipId)) < 0) root.KELO_VISUAL_AUDIT.missingAssets.push(String(clipId));
+      return null;
+    }
+    return start(actor, def, options);
+  }
+
+  // Creator/debug only: transient definitions are never inserted into KeloAnimationRegistry.
+  function preview(actor, definition, options) {
+    if (!definition || !definition.id) throw new Error('INVALID_ANIMATION_PREVIEW_CLIP');
+    return start(actor, cloneDef(definition), Object.assign({}, options || {}, { force: true }));
+  }
+  function previewLocal(definition, options) {
+    const actor = localActor();
+    if (!actor) throw new Error('ANIMATION_PREVIEW_ACTOR_UNAVAILABLE');
+    return preview(actor, definition, options);
   }
 
   function stop(actor, channel, reason) {
@@ -142,10 +155,13 @@
     if (!map.size) active.delete(current.actorId);
     return true;
   }
+  function stopLocal(channel, reason) { const actor = localActor(); return actor ? stop(actor, channel, reason) : false; }
 
   function markerTime(def, value, duration) {
     const n = Number(value);
     if (!Number.isFinite(n)) return null;
+    if (def && def.markerMode === 'seconds') return n;
+    if (def && def.markerMode === 'normalized') return n * duration;
     return n <= 1 && duration > 1 ? n * duration : n;
   }
 
@@ -233,7 +249,7 @@
   root.KeloAnimationRegistry = Object.freeze({ version: 'animation-registry-v1.0.0', register: register, get: get, list: list });
   root.KeloAnchors = Object.freeze({ version: 'anchors-v1.0.0', get: anchor, presentation: presentation });
   root.KeloAnimation = Object.freeze({
-    version: 'animation-controller-v1.0.0', channels: Object.freeze(Object.keys(CHANNEL_PRIORITY)), priorities: CHANNEL_PRIORITY,
-    play: play, stop: stop, update: update, sampleTransform: sampleTransform, frameOverride: frameOverride, metrics: metrics
+    version: 'animation-controller-v1.1.0', channels: Object.freeze(Object.keys(CHANNEL_PRIORITY)), priorities: CHANNEL_PRIORITY,
+    play: play, preview: preview, previewLocal: previewLocal, stop: stop, stopLocal: stopLocal, update: update, sampleTransform: sampleTransform, frameOverride: frameOverride, metrics: metrics
   });
 })(typeof globalThis !== 'undefined' ? globalThis : window);
