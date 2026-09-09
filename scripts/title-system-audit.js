@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: QA / PROGRESSION / TITLES
- * keys: TITLES STATS SERVER AUTHORITY TEST AUDIT
- * hace: valida catálogo, reglas de kill, unlock/equip server y guardas Foundation estáticas
+ * keys: TITLES STATS SERVER AUTHORITY TEST AUDIT TITLE BOOK PLACEHOLDERS
+ * hace: valida catálogo, placeholders, Libro de títulos, reglas de kill, unlock/equip server y guardas Foundation estáticas
  * online: comprueba que no exista protocolo cliente titles:unlock ni progreso por visual DEATH
  */
 'use strict';
@@ -20,10 +20,15 @@ const validContext = (overrides = {}) => ({
 });
 
 (async function run() {
-  assert.strictEqual(catalog.version, 'title-catalog-v1');
+  assert.strictEqual(catalog.version, 'title-catalog-v1.1');
   assert.strictEqual(catalog.get('pvp_assassin').name, 'Asesino');
   assert.strictEqual(catalog.get('missing'), null);
   assert.deepStrictEqual(catalog.byStat('openWorldPlayerKills').map((x) => x.requirement.value), [10, 50, 200, 500, 1000]);
+  assert.ok(catalog.list().length >= 10, 'el Libro debe tener varios títulos');
+  assert.strictEqual(catalog.get('placeholder_gatherer_01').placeholder, true, 'recolección queda como placeholder DATA');
+  assert.strictEqual(catalog.get('placeholder_gatherer_01').requirement.stat, 'resourcesGathered');
+  assert.strictEqual(catalog.get('placeholder_forgemaster_01').requirement.stat, 'itemsForged');
+  assert.ok(catalog.get('placeholder_forgemaster_01').description.includes('forjas'), 'placeholder explica cómo conseguirse');
 
   const adapter = createMemoryAdapter();
   const titles = createTitleService({ adapter });
@@ -72,6 +77,8 @@ const validContext = (overrides = {}) => ({
   const engineC = read('engine-c.js');
   const avatarOwner = read('src/core/avatar-render-system.js');
   const nameplate = read('src/ui/player-nameplate.js');
+  const titleSystem = read('src/systems/title-system.js');
+  const luxe = read('src/ui/luxe-shell.js');
   const net = read('engine-net.js');
   const server = read('server/index.js');
   const index = read('index.html');
@@ -79,6 +86,11 @@ const validContext = (overrides = {}) => ({
   assert.strictEqual(/renderAvatar\s*=\s*function/.test(nameplate), false, 'nameplate no envuelve renderAvatar');
   assert.strictEqual(nameplate.includes("KeloAvatar.use('actor-nameplate'"), true, 'nameplate usa KeloAvatar');
   assert.strictEqual(avatarOwner.includes('FOUNDATION-ALLOW'), true, 'owner Avatar conserva wrapper autorizado');
+  assert.strictEqual(titleSystem.includes('openBook: openBook'), true, 'KeloTitles expone Libro de títulos');
+  assert.strictEqual(titleSystem.includes('CÓMO CONSEGUIRLO'), true, 'Libro muestra requisito del título seleccionado');
+  assert.strictEqual(titleSystem.includes("KeloInputLocks.acquire('titles-book'"), true, 'Libro usa KeloInputLocks');
+  assert.strictEqual(luxe.includes("id:'titles',label:'Libro de títulos'"), true, 'menú contiene Libro de títulos');
+  assert.strictEqual(luxe.includes("window.KeloTitles?.openBook"), true, 'launcher reutiliza KeloTitles');
   assert.strictEqual(net.includes('equippedTitleId'), true, 'peer snapshot replica equippedTitleId');
   assert.strictEqual(net.includes("request('titles:equip'"), true, 'cliente solo solicita equip');
   assert.strictEqual(server.includes("msg.t === 'titles:unlock'"), false, 'server no expone titles:unlock');
@@ -88,5 +100,5 @@ const validContext = (overrides = {}) => ({
   assert.ok(index.indexOf('src/systems/title-system.js') < index.indexOf('src/systems/nobility.js'), 'Titles carga antes de panel Nobleza');
   assert.ok(index.indexOf('src/ui/player-nameplate.js') > index.indexOf('src/systems/nobility-authority.js'), 'nameplate resuelve catálogo/rangos tras owners');
 
-  console.log('✅ Kelo Titles audit: catalog/data, 199→200 unlock, invalid kills, equip/unequip, persistence, net + Foundation guards OK');
+  console.log('✅ Kelo Titles audit: catalog/data/placeholders, Title Book, 199→200 unlock, invalid kills, equip/unequip, persistence, net + Foundation guards OK');
 })().catch((err) => { console.error('❌ Kelo Titles audit failed:', err); process.exitCode = 1; });
