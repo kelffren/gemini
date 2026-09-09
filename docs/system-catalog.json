@@ -140,6 +140,15 @@
       "status": "foundation-candidate"
     },
     {
+      "id": "equipment-abilities",
+      "owner": "KeloAbilities (cast) + KeloEquipment (weapon state)",
+      "source": "src/abilities/equipment-ability-channel.js",
+      "technicalDoc": "docs/systems/EQUIPMENT_ABILITY_SYSTEM.md",
+      "playerVisible": true,
+      "playerGuideAnchor": "habilidades",
+      "status": "foundation-support-active"
+    },
+    {
       "id": "stat-modifiers",
       "owner": "KeloStats",
       "source": "src/stats/stat-modifier-system.js",
