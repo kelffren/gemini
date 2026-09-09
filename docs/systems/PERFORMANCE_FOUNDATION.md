@@ -16,6 +16,8 @@ Este documento no crea un nuevo engine. Define cómo los OWNERS existentes coope
 
 - `KeloSimulation`: scheduler oficial de extensiones de simulación. Sus hooks pueden quedar `enabled=false` sin desregistrarse.
 - `KeloRender`: scheduler oficial de extensiones de frame. Sus hooks pueden quedar `enabled=false` sin crear otro loop.
+- `KeloAbilities`: mantiene ownership de cooldowns, recursos y FX legacy; duerme sus propios hooks cuando no queda trabajo real y los despierta bajo cast/cambio de loadout.
+- `KeloVisualSystem`: presentación modular; su fast-path evita updates costosos cuando no hay animaciones/FX/secuencias activas.
 - `KELO_PERF` / `KELO_PERFORMANCE_GOVERNOR`: calidad, telemetría, LOD espacial y lifecycle de visibilidad.
 - `KELO_ATLAS_CONTRACT`: adquisición, refcount, warm residency y eviction de imágenes/atlases.
 - `KELO_WORLD_RENDERER`: chunks visibles, cache LRU y assets de distrito.
@@ -46,6 +48,10 @@ Features opcionales no pertenecen al critical path. Character Customizer y Studi
 
 Un feature sin trabajo no debe ejecutar lógica significativa cada frame. `KeloSimulation.setEnabled()` y `KeloRender.setEnabled()` son los puntos oficiales para sleep/wake de hooks registrados. No se crean `requestAnimationFrame`, `setInterval` o wrappers paralelos para solucionar scheduling.
 
+`KeloAbilities` registra una vez sus hooks oficiales y decide internamente si tiene trabajo de simulación/presentación. Se mantiene despierto mientras exista al menos uno de estos motivos: cooldown activo, regeneración de mana pendiente, dash, shield timer, projectile, area, wall, trap o status. Al quedar vacío/full-idle, deshabilita el hook correspondiente mediante Foundation. Un cast o cambio real de loadout lo despierta. Esto conserva las semánticas actuales de cooldown/mana sin introducir un segundo reloj ni cambiar autoridad.
+
+La barra de habilidades tampoco reescribe DOM cada frame: una fingerprint visual por slot evita repaints cuando la décima de cooldown visible y el contenido no han cambiado. El panel de Piedras sigue filtrando entradas no-stone de un inventario mixto.
+
 ### GPU y memoria
 
 `KELO_ATLAS_CONTRACT` es la única frontera para lifecycle de atlases gestionados. `core` permanece retenido; `district` y `optional` pueden quedar warm un intervalo corto y luego evictarse si su refcount sigue en cero.
@@ -73,6 +79,7 @@ El audit de Performance Foundation debe fallar si reaparece cualquiera de estas 
 - Character Customizer vuelve a cargarse eager desde Profile.
 - Profile vuelve a arrancar `kelo-runtime-bootstrap.js`.
 - KeloSimulation/KeloRender pierden `setEnabled`.
+- `KeloAbilities` vuelve a ejecutar sus hooks completos permanentemente estando idle o pierde el filtro de inventario mixto.
 - Visual System pierde su fast-path/sleep de trabajo vacío.
 - Gardens vuelve a adquirirse incondicionalmente al boot del WorldRenderer.
 - La cache de chunks deja de ser LRU limitada.
@@ -87,6 +94,7 @@ Antes y después de cambios grandes se registran, cuando el entorno lo permita:
 - tiempo hasta PLAYER READY;
 - frame p50/p95/p99 y long frames;
 - hooks activos/dormidos de KeloSimulation/KeloRender;
+- estado awake/sleep y work counters de `KeloAbilities`;
 - decoded/resident texture budget;
 - cache de chunks, hits y evictions;
 - peers actualizados/dibujados vs culled;
