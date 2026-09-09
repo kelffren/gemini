@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: QA / TITLES
- * keys: PLAYWRIGHT TITLES NOBILITY NAMEPLATE MOBILE DEV
- * hace: prueba 199→200, equip/unequip, panel integrado, nameplate y gate DEV en viewport móvil
+ * keys: PLAYWRIGHT TITLES NOBILITY NAMEPLATE MOBILE DEV TITLE BOOK
+ * hace: prueba 199→200, equip/unequip, Libro de títulos, panel integrado, nameplate y gate DEV en viewport móvil
  * online: usa fallback local únicamente; autoridad server se cubre en scripts/title-system-audit.js
  */
 const { test, expect } = require('@playwright/test');
@@ -10,10 +10,53 @@ const BASE = process.env.KELO_TITLE_PAGE || 'http://127.0.0.1:4173/';
 function url(dev) { return BASE + (BASE.includes('?') ? '&' : '?') + (dev ? 'titleDev=1' : 'titleDev=0'); }
 
 async function waitFoundation(page) {
-  await page.waitForFunction(() => !!(window.KeloTitles && window.KeloPlayerStats && window.KeloNobility && window.KeloActorNameplate), null, { timeout: 10000 });
+  await page.waitForFunction(() => !!(window.KeloTitles && window.KeloPlayerStats && window.KeloNobility && window.KeloActorNameplate && window.KELO_LUXE), null, { timeout: 10000 });
 }
 
 test.describe('Kelo Titles foundation', () => {
+  test('Libro de títulos abre desde el menú y explica cómo conseguir cada título', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    const pageErrors = [];
+    page.on('pageerror', (err) => pageErrors.push(String(err)));
+    const response = await page.goto(url(true), { waitUntil: 'domcontentloaded' });
+    expect(response.status()).toBeLessThan(400);
+    await waitFoundation(page);
+
+    await page.evaluate(() => KELO_LUXE.toggleMenu(true));
+    const menuEntry = page.locator('[data-tool="titles"]');
+    await expect(menuEntry).toBeVisible();
+    await expect(menuEntry).toContainText('Libro de títulos');
+    await menuEntry.click();
+
+    const book = page.locator('#kelo-title-book');
+    await expect(book).toBeVisible();
+    await expect(book).toContainText('LIBRO DE TÍTULOS');
+    await expect(book).toContainText('Asesino');
+    await expect(book).toContainText('Recolector I');
+    await expect(book).toContainText('Forjador I');
+
+    await page.locator('[data-title-book-select="placeholder_gatherer_01"]').click();
+    const detail = page.locator('[data-title-book-detail]');
+    await expect(detail).toContainText('CÓMO CONSEGUIRLO');
+    await expect(detail).toContainText('recolecta 250 recursos');
+    await expect(detail).toContainText('PROVISIONAL');
+    await expect(detail).toContainText('/ 250');
+
+    await page.locator('[data-title-book-select="placeholder_forgemaster_01"]').click();
+    await expect(detail).toContainText('completa 25 forjas válidas');
+    await expect(detail).toContainText('/ 25');
+
+    const bounds = await page.locator('.title-book-shell').boundingBox();
+    expect(bounds.x).toBeGreaterThanOrEqual(0);
+    expect(bounds.y).toBeGreaterThanOrEqual(0);
+    expect(bounds.x + bounds.width).toBeLessThanOrEqual(391);
+    expect(bounds.y + bounds.height).toBeLessThanOrEqual(845);
+
+    await page.locator('#kelo-title-book [data-title-book-close]').last().click();
+    await expect(book).toBeHidden();
+    expect(pageErrors).toEqual([]);
+  });
+
   test('199→200 desbloquea Asesino una vez, equipa y se refleja en Nobleza/nameplate', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     const pageErrors = [];
