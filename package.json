@@ -11,7 +11,8 @@
     "audit:docs": "node scripts/system-documentation-audit.js",
     "audit:titles": "node scripts/title-system-audit.js",
     "audit:studio": "node scripts/studio-foundation-audit.mjs",
-    "audit:studio:creator": "node scripts/studio-creator-v1-audit.mjs"
+    "audit:studio:creator": "node scripts/studio-creator-v1-audit.mjs",
+    "audit:logistics": "node scripts/regional-logistics-audit.js"
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0"
