@@ -1,9 +1,9 @@
 /* KELO-INDEX
  * area: EFFECTS
  * owner: KeloEffectEngine
- * keys: ENGINE REGISTRY DAMAGE HEAL SHIELD STATUS CC REUSABLE EVENTS
+ * keys: ENGINE REGISTRY DAMAGE HEAL SHIELD STATUS CC REUSABLE EVENTS SANDBOX TEST LAB
  * purpose: despacha efectos por tipo mediante handlers registrables; unifica abilities/melee con DamageResolver y StatusEffects
- * public-api: register/apply/applyAll/has/metrics
+ * public-api: register/apply/applySandbox/applyAll/has/metrics
  * online: mismo contrato puede ejecutarse detrás de server authority; presentation consume eventos semánticos
  * do-not: NO hit geometry, NO target selection, NO VFX, NO ability IDs hardcodeados
  */
@@ -11,9 +11,10 @@
   'use strict';
   const VERSION='effect-engine-v2.0.0-pvp-bible';
   const handlers=new Map();let applied=0;
-  function emit(name,payload){try{if(root.KeloEvents&&typeof root.KeloEvents.emit==='function')root.KeloEvents.emit(name,payload);}catch(_){} }
+  function emit(name,payload){if(payload&&payload.sandbox===true)return;try{if(root.KeloEvents&&typeof root.KeloEvents.emit==='function')root.KeloEvents.emit(name,payload);}catch(_){} }
   function register(type,handler){const key=String(type||'');if(!key||typeof handler!=='function')throw new Error('INVALID_EFFECT_HANDLER');handlers.set(key,handler);return key;}
   function apply(effect,context){const e=effect&&typeof effect==='object'?effect:{},type=String(e.type||'');if(!root.KeloEffectSchema||!root.KeloEffectSchema.supports(type))return Object.freeze({ok:false,reason:'UNKNOWN_EFFECT_TYPE',type});const handler=handlers.get(type);if(!handler)return Object.freeze({ok:false,reason:'EFFECT_RUNTIME_NOT_REGISTERED',type});const result=handler(e,context||{})||{};applied+=1;return Object.freeze(Object.assign({ok:result.ok!==false,type},result));}
+  function applySandbox(effect,context){return apply(effect,Object.assign({},context||{},{sandbox:true}));}
   function applyAll(effects,context){return(Array.isArray(effects)?effects:[]).map(effect=>apply(effect,context));}
   function damageHandler(effect,ctx){
     if(!root.KeloDamageResolver)return{ok:false,reason:'DAMAGE_RESOLVER_UNAVAILABLE'};const target=ctx.target;if(!target)return{ok:false,reason:'INVALID_TARGET'};
@@ -32,6 +33,6 @@
   register('damage',damageHandler);register('heal',healHandler);register('shield',shieldHandler);register('status',statusHandler);
   ['burn','slow','poison','bleed','stun','knockback','stagger','root','silence','invulnerable','movement_buff','damage_buff','damage_debuff','buff','debuff'].forEach(type=>register(type,statusHandler));
   register('lifesteal',function(effect,ctx){const dealt=damageHandler(Object.assign({},effect,{type:'damage'}),ctx);if(dealt.ok&&dealt.amount>0&&ctx.source)healHandler({amount:dealt.amount*Math.max(0,Number(effect.ratio)||1)},Object.assign({},ctx,{target:ctx.source}));return dealt;});
-  root.KELO_EFFECT_ENGINE_AUDIT={version:VERSION,ready:true,registeredHandlers:()=>handlers.size,abilitySpecificLogic:false,presentationFree:true,damageOwner:'KeloDamageResolver',statusOwner:'KeloStatusEffects'};
-  root.KeloEffectEngine=Object.freeze({version:VERSION,register,apply,applyAll,has:type=>handlers.has(String(type||'')),metrics:()=>Object.freeze({handlers:handlers.size,applied})});
+  root.KELO_EFFECT_ENGINE_AUDIT={version:VERSION,ready:true,registeredHandlers:()=>handlers.size,abilitySpecificLogic:false,presentationFree:true,damageOwner:'KeloDamageResolver',statusOwner:'KeloStatusEffects',sandboxApply:true,sandboxEventsSuppressed:true};
+  root.KeloEffectEngine=Object.freeze({version:VERSION,register,apply,applySandbox,applyAll,has:type=>handlers.has(String(type||'')),metrics:()=>Object.freeze({handlers:handlers.size,applied})});
 })(typeof globalThis!=='undefined'?globalThis:window);

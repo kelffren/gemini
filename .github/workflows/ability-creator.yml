@@ -4,10 +4,12 @@ on:
     paths:
       - 'src/creators/**'
       - 'src/studio/core/**'
+      - 'src/studio/testlab/**'
       - 'src/studio/ui/studio-timeline.mjs'
       - 'src/studio/ui/studio-workspace-shell.mjs'
       - 'src/abilities/**'
       - 'src/visuals/fx-system.js'
+      - 'src/systems/effects/**'
       - 'src/systems/admin-key-system.js'
       - 'scripts/ability-creator-audit.mjs'
       - 'scripts/ability-creator-live-audit.mjs'
@@ -21,10 +23,12 @@ on:
       - 'src/creators/creator-entry.mjs'
       - 'src/creators/ui/creator-hub.mjs'
       - 'src/studio/core/studio-kernel.mjs'
+      - 'src/studio/testlab/**'
       - 'src/studio/ui/studio-timeline.mjs'
       - 'src/studio/ui/studio-workspace-shell.mjs'
       - 'src/abilities/**'
       - 'src/visuals/fx-system.js'
+      - 'src/systems/effects/**'
       - 'src/systems/admin-key-system.js'
       - 'scripts/ability-creator-*.mjs'
       - '.github/workflows/ability-creator.yml'
@@ -44,10 +48,15 @@ jobs:
           node --check src/creators/ability/ability-document.mjs
           node --check src/creators/ability/ability-commands.mjs
           node --check src/creators/ability/ability-preview-adapter.mjs
+          node --check src/creators/ability/ability-test-adapter.mjs
+          node --check src/creators/ability/ability-test-lab-ui.mjs
           node --check src/creators/ability/ability-live-controller.mjs
+          node --check src/studio/testlab/studio-test-lab.mjs
           node --check src/creators/workspaces/ability-workspace.mjs
           node --check src/creators/creator-entry.mjs
           node --check src/creators/ui/creator-hub.mjs
+          node --check src/systems/effects/effect-engine.js
+          node --check src/systems/effects/status-engine.js
           node --check src/systems/admin-key-system.js
           node --check scripts/ability-creator-audit.mjs
           node --check scripts/ability-creator-live-audit.mjs
@@ -70,7 +79,7 @@ jobs:
           for i in {1..20}; do curl -fsS http://127.0.0.1:8000/index.html >/dev/null && exit 0; sleep 1; done
           cat /tmp/ability-creator-http.log
           exit 1
-      - name: Audit Ability Creator at 390x844
+      - name: Audit Ability Creator + TestLab at 390x844
         env:
           AUDIT_URL: http://127.0.0.1:8000/
           CHROME_BIN: /usr/bin/google-chrome
@@ -79,6 +88,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ability-creator-audit
+          name: ability-creator-testlab-audit
           path: artifacts/
           if-no-files-found: warn
