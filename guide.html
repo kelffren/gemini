@@ -1,7 +1,7 @@
 <!-- KELO-INDEX
   area: PLAYER DOCS
   owner: Documentation / Foundation
-  keys: GUIDE MECHANICS PLAYER DOCS PUBLIC CHARACTER CUSTOMIZATION MENU NOBILITY TITLES COMMERCE MARKET TRADE
+  keys: GUIDE MECHANICS PLAYER DOCS PUBLIC CHARACTER CUSTOMIZATION MENU HUD NOBILITY TITLES COMMERCE MARKET TRADE
   purpose: guía pública de mecánicas de Kelo World para jugadores
   public-api: página estática guide.html
   consumes: comportamiento LIVE validado y docs/system-catalog.json
@@ -40,7 +40,7 @@
   <nav class="toc" aria-label="Índice de mecánicas">
     <a href="#movimiento">Movimiento<small>Caminar, correr y soltar</small></a>
     <a href="#controles-y-bloqueos-de-interfaz">Controles e interfaces<small>Paneles y control</small></a>
-    <a href="#menu-principal">Menú principal<small>Accesos, Apariencia y Nobleza</small></a>
+    <a href="#menu-principal">HUD y menú<small>Perfil rápido, GUÍA y accesos</small></a>
     <a href="#personalizacion-de-personaje">Personaje<small>Apariencia, ropa y guardados</small></a>
     <a href="#camara-y-pantalla">Cámara y pantalla<small>Zoom, giro y fullscreen</small></a>
     <a href="#habilidades">Habilidades<small>Piedras y slots</small></a>
@@ -81,8 +81,22 @@
   </section>
 
   <section id="menu-principal">
-    <span class="tag">MENÚ</span>
-    <h2>Menú principal</h2>
+    <span class="tag">HUD + MENÚ</span>
+    <h2>Perfil rápido y menú principal</h2>
+    <p>La esquina superior izquierda reúne la información principal de tu héroe en un solo panel. El objetivo es que puedas reconocer tu identidad, prestigio y recursos sin tener varios contadores superpuestos.</p>
+    <h3>Panel del héroe</h3>
+    <ul>
+      <li><strong>Nombre e ID:</strong> muestran tu identidad actual; el ID puede copiarse desde el propio panel.</li>
+      <li><strong>Clan:</strong> aparece debajo de la foto. Si tu personaje todavía no pertenece a un clan, verás <em>Sin clan</em>.</li>
+      <li><strong>Nobleza:</strong> es el dato de prestigio que más destaca visualmente y muestra el rango calculado por el sistema de Nobleza.</li>
+      <li><strong>Título:</strong> muestra únicamente el título personal que tengas equipado; no es lo mismo que la Nobleza.</li>
+      <li><strong>Vida:</strong> muestra tus HP actuales y máximos con una barra roja.</li>
+      <li><strong>Maná:</strong> solo muestra números y barra cuando el personaje dispone de una fuente real de maná. Mientras el prototipo no exponga ese recurso, verás <strong>— / —</strong> en vez de una cifra inventada.</li>
+      <li><strong>Oro:</strong> aparece integrado dentro del mismo panel y representa el mismo saldo usado por el resto del juego.</li>
+    </ul>
+    <p>Justo debajo está el botón <strong>GUÍA</strong>, que abre esta página. La foto del personaje puede reutilizar el acceso al perfil cuando ese panel está disponible.</p>
+    <div class="example"><strong>Ejemplo:</strong> tu Nobleza puede ser Duque y, al mismo tiempo, tu título equipado puede ser 《Asesino》. Los dos aparecen separados porque representan progresos diferentes.</div>
+    <h3>Menú principal</h3>
     <p>El botón <strong>MENÚ</strong> abre el panel principal del juego. En móvil se presenta como una cuadrícula de accesos grandes para que puedas entrar a cada sistema sin buscar opciones escondidas.</p>
     <ul>
       <li><strong>Mochila</strong> abre tu inventario y equipo.</li>
@@ -203,7 +217,7 @@
   <section id="nobleza-y-titulos">
     <span class="tag">PRESTIGIO</span>
     <h2>Nobleza y títulos personales</h2>
-    <p>Tu <strong>rango de Nobleza</strong> y tu <strong>título personal</strong> son dos cosas distintas y pueden mostrarse al mismo tiempo sobre el personaje.</p>
+    <p>Tu <strong>rango de Nobleza</strong> y tu <strong>título personal</strong> son dos cosas distintas y pueden mostrarse al mismo tiempo sobre el personaje y en el panel del héroe.</p>
     <ul>
       <li>La Nobleza se calcula automáticamente con las reglas de donación y ranking. No eliges manualmente ser Caballero, Barón, Conde, Duque, Príncipe o Rey.</li>
       <li>Los títulos personales se desbloquean al cumplir logros y puedes elegir cuál de los desbloqueados mostrar.</li>
@@ -215,7 +229,7 @@
     <p>NPCs, dummies, entrenamiento, arena, self-kills y muertes no confirmadas no avanzan el contador de Mundo Abierto.</p>
     <h3>Equipar un título</h3>
     <p>Abre <strong>MENÚ → Nobleza → Títulos</strong>. Ahí verás el título equipado, los ya desbloqueados y el progreso de los que faltan. Pulsa <strong>Equipar</strong> sobre uno desbloqueado o <strong>Desequipar</strong> para no mostrar ninguno.</p>
-    <div class="example"><strong>Ejemplo:</strong> alcanzas 200 bajas válidas de Mundo Abierto → desbloqueas 《Asesino》 → lo equipas en Nobleza → otros jugadores pueden verlo bajo tu nombre.</div>
+    <div class="example"><strong>Ejemplo:</strong> alcanzas 200 bajas válidas de Mundo Abierto → desbloqueas 《Asesino》 → lo equipas en Nobleza → otros jugadores pueden verlo bajo tu nombre y tu propio HUD lo muestra como título activo.</div>
   </section>
 
   <section id="pvp">

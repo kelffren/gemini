@@ -15,9 +15,15 @@ on:
       - 'src/ui/market-ui.js'
       - 'src/ui/commerce-ui.js'
       - 'engine-net.js'
+      - 'server/index.js'
+      - 'server/player-economy-store.js'
+      - 'server/forge-store.js'
+      - 'server/commerce-store.js'
       - 'scripts/container-system-audit.js'
       - 'scripts/market-escrow-audit.js'
       - 'scripts/commerce-system-audit.js'
+      - 'scripts/server-forge-audit.js'
+      - 'scripts/server-commerce-audit.js'
       - 'docs/systems/COMMERCE_SYSTEM.md'
       - 'docs/system-catalog.json'
       - 'guide.html'
@@ -32,9 +38,15 @@ on:
       - 'src/ui/market-ui.js'
       - 'src/ui/commerce-ui.js'
       - 'engine-net.js'
+      - 'server/index.js'
+      - 'server/player-economy-store.js'
+      - 'server/forge-store.js'
+      - 'server/commerce-store.js'
       - 'scripts/container-system-audit.js'
       - 'scripts/market-escrow-audit.js'
       - 'scripts/commerce-system-audit.js'
+      - 'scripts/server-forge-audit.js'
+      - 'scripts/server-commerce-audit.js'
       - 'docs/systems/COMMERCE_SYSTEM.md'
       - 'docs/system-catalog.json'
       - 'guide.html'
@@ -59,15 +71,25 @@ jobs:
           node --check src/ui/market-ui.js
           node --check src/ui/commerce-ui.js
           node --check engine-net.js
+          node --check server/index.js
+          node --check server/player-economy-store.js
+          node --check server/forge-store.js
+          node --check server/commerce-store.js
           node --check scripts/container-system-audit.js
           node --check scripts/market-escrow-audit.js
           node --check scripts/commerce-system-audit.js
+          node --check scripts/server-forge-audit.js
+          node --check scripts/server-commerce-audit.js
       - name: Container mechanics
         run: node scripts/container-system-audit.js
       - name: Market escrow mechanics
         run: node scripts/market-escrow-audit.js
-      - name: Commerce transactions
+      - name: Offline Commerce transactions
         run: node scripts/commerce-system-audit.js
+      - name: Shared Forge economy regression
+        run: node scripts/server-forge-audit.js
+      - name: Server Commerce transactions
+        run: node scripts/server-commerce-audit.js
       - name: Documentation contract
         run: node scripts/system-documentation-audit.js
       - name: Architecture contract
@@ -82,8 +104,17 @@ jobs:
           grep -q "commerce-ui-v1.0.0" src/ui/commerce-ui.js
           grep -q "authorityOnly:true" src/ui/commerce-ui.js
           grep -q "doubleConfirmation:true" src/ui/commerce-ui.js
+          ! grep -q "slots.slice(0,12)" src/ui/commerce-ui.js
           grep -q "requestCommerce" engine-net.js
           grep -q "commerce:request" engine-net.js
+          grep -q "createPlayerEconomyStore" server/forge-store.js
+          grep -q "economyStore: economy" server/index.js
+          grep -q "createCommerceService" server/index.js
+          grep -q "commerce:request" server/index.js
+          grep -q "commerce:result" server/index.js
+          grep -q "commerce:event" server/index.js
+          grep -q "player-economy-store-v1.0.0" server/player-economy-store.js
+          grep -q "commerce-server-v1.0.0" server/commerce-store.js
           grep -q "src/systems/commerce-authority.js" index.html
           grep -q "src/instances/market-instance.js" index.html
           grep -q "src/ui/commerce-ui.js" index.html
