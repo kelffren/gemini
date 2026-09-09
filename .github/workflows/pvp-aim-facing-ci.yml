@@ -1,0 +1,36 @@
+name: PvP Aim Facing CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'engine-ac.js'
+      - 'src/characters/character-appearance.js'
+      - 'src/systems/pvp-world.js'
+      - 'scripts/pvp-aim-facing-audit.js'
+      - 'package.json'
+      - '.github/workflows/pvp-aim-facing-ci.yml'
+  pull_request:
+    paths:
+      - 'engine-ac.js'
+      - 'src/characters/character-appearance.js'
+      - 'src/systems/pvp-world.js'
+      - 'scripts/pvp-aim-facing-audit.js'
+      - 'package.json'
+      - '.github/workflows/pvp-aim-facing-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Verify independent movement and PvP aim-facing
+        run: npm run audit:pvp-facing
+      - name: Verify Foundation architecture
+        run: npm run audit:foundation
