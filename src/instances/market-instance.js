@@ -11,7 +11,7 @@
  */
 (function(root){
 'use strict';
-const VERSION='market-instance-v1.0.0';
+const VERSION='market-instance-v1.0.1';
 const I=root.KELO_INSTANCES;
 const cameraOwner=root.KeloCamera;
 const renderOwner=root.KeloRender;
@@ -55,13 +55,13 @@ function startSelling(stallId){
 function stopSelling(){if(sellingLockToken&&root.KeloInputLocks?.release)root.KeloInputLocks.release(sellingLockToken);else root.KeloInputLocks?.releaseOwner?.('commerce-stall');sellingLockToken=null;sellingStallId=null;document.body.classList.remove('kelo-stall-selling');return true;}
 function drawStoneFloor(g){
   g.fillStyle='#071012';g.fillRect(BOUNDS.x,BOUNDS.y,BOUNDS.w,BOUNDS.h);
-  const tile=64;for(let y=BOUNDS.y;y<BOUNDS.h;y+=tile){for(let x=BOUNDS.x;x<BOUNDS.w;x+=tile){const alt=((x/tile+y/tile)&1)===0;g.fillStyle=alt?'#12201f':'#0f1b1b';g.fillRect(x,y,tile,tile);g.strokeStyle='rgba(231,197,106,.035)';g.lineWidth=1;g.strokeRect(x+.5,y+.5,tile-1,tile-1);}}
+  const tile=64;for(let y=BOUNDS.y;y<BOUNDS.y+BOUNDS.h;y+=tile){for(let x=BOUNDS.x;x<BOUNDS.x+BOUNDS.w;x+=tile){const alt=((x/tile+y/tile)&1)===0;g.fillStyle=alt?'#12201f':'#0f1b1b';g.fillRect(x,y,tile,tile);g.strokeStyle='rgba(231,197,106,.035)';g.lineWidth=1;g.strokeRect(x+.5,y+.5,tile-1,tile-1);}}
   g.strokeStyle='rgba(231,197,106,.48)';g.lineWidth=8;g.strokeRect(BOUNDS.x+8,BOUNDS.y+8,BOUNDS.w-16,BOUNDS.h-16);
   g.strokeStyle='rgba(255,244,214,.08)';g.lineWidth=1;g.strokeRect(BOUNDS.x+22,BOUNDS.y+22,BOUNDS.w-44,BOUNDS.h-44);
   g.fillStyle='rgba(231,197,106,.06)';g.fillRect(555,330,170,150);g.strokeStyle='rgba(231,197,106,.22)';g.lineWidth=3;g.strokeRect(555,330,170,150);
   g.fillStyle='#e7c56a';g.font='900 16px Georgia,serif';g.textAlign='center';g.fillText('MERCADO CENTRAL',640,392);g.fillStyle='rgba(238,243,239,.58)';g.font='700 9px -apple-system,sans-serif';g.fillText('COMERCIO · TRUEQUE · PUESTOS',640,412);
 }
-function drawVendorFigure(g,stall,claim){if(!claim)return;const p=sellerPosition(stall);g.save();g.fillStyle=claim.demo?'#6eb9a1':'#d5b85d';g.beginPath();g.arc(p.x,p.y-12,12,0,Math.PI*2);g.fill();g.fillStyle=claim.demo?'#24483f':'#55461e';g.fillRect(p.x-13,p.y,p.x?26:26,25);g.restore();}
+function drawVendorFigure(g,stall,claim){if(!claim)return;const p=sellerPosition(stall);g.save();g.fillStyle=claim.demo?'#6eb9a1':'#d5b85d';g.beginPath();g.arc(p.x,p.y-12,12,0,Math.PI*2);g.fill();g.fillStyle=claim.demo?'#24483f':'#55461e';g.fillRect(p.x-13,p.y,26,25);g.restore();}
 function drawStall(g,stall){
   const claim=claimFor(stall.stallId),own=!!(claim&&!claim.demo&&(String(claim.ownerId)==='local_pioneer'||String(claim.ownerId)===String(root.KeloCommerceAuthority?.playerId?.()))),carpet=stallCarpetRect(stall);
   g.save();
@@ -75,7 +75,7 @@ function drawStall(g,stall){
 }
 function drawJoystick(g){if(typeof input==='undefined'||!input.touchActive||typeof CONFIG==='undefined')return;g.save();g.strokeStyle='rgba(231,197,106,.35)';g.lineWidth=2;g.fillStyle='rgba(231,197,106,.06)';g.beginPath();g.arc(input.originX,input.originY,CONFIG.joystickRadius,0,Math.PI*2);g.fill();g.stroke();const dx=input.currentX-input.originX,dy=input.currentY-input.originY,dist=Math.hypot(dx,dy),clamped=Math.min(dist,CONFIG.joystickRadius),angle=Math.atan2(dy,dx);g.fillStyle='#e7c56a';g.beginPath();g.arc(input.originX+Math.cos(angle)*clamped,input.originY+Math.sin(angle)*clamped,18,0,Math.PI*2);g.fill();g.restore();}
 function drawMarket(context){
-  if(!active())return false;const g=context.ctx;if(!g)return true;g.save();g.setTransform(1,0,0,1,0,0);g.fillStyle='#05090b';g.fillRect(0,0,context.screenW,context.screenH);g.restore();
+  if(!active())return false;const g=context.ctx;if(!g)return true;g.save();g.fillStyle='#05090b';g.fillRect(0,0,context.screenW,context.screenH);g.restore();
   const z=context.config?.zoom||1,c=context.camera;g.save();g.translate(context.screenW/2,context.screenH/2);g.scale(z,z);g.translate(-c.x,-c.y);drawStoneFloor(g);STALLS.forEach(s=>drawStall(g,s));if(typeof renderAvatar==='function'&&typeof localPlayer!=='undefined'&&localPlayer)renderAvatar(localPlayer,true);g.restore();drawJoystick(g);return true;
 }
 function clampPlayer(){if(!active()||typeof localPlayer==='undefined'||!localPlayer)return;if(sellingStallId){const stall=stallById(sellingStallId);if(stall){const p=sellerPosition(stall);localPlayer.x=p.x;localPlayer.y=p.y;localPlayer.vx=0;localPlayer.vy=0;}return;}const pad=Math.max(24,Number(localPlayer.radius)||20);localPlayer.x=Math.max(BOUNDS.x+pad,Math.min(BOUNDS.x+BOUNDS.w-pad,Number(localPlayer.x)||SPAWN.x));localPlayer.y=Math.max(BOUNDS.y+pad,Math.min(BOUNDS.y+BOUNDS.h-pad,Number(localPlayer.y)||SPAWN.y));}
@@ -88,5 +88,5 @@ renderOwner.intercept('market-instance:exclusive-render',drawMarket,260);
 simulationOwner.after('market-instance:bounds',clampPlayer,860);
 installPointer();
 root.KeloMarketWorld=Object.freeze({version:VERSION,resourceId:RESOURCE_ID,bounds:clone(BOUNDS),spawn:clone(SPAWN),enter,leave,isActive:active,getStalls:()=>STALLS.map(clone),getStall:stallId=>clone(stallById(stallId)),getClaim:stallId=>clone(claimFor(stallId)),startSelling,stopSelling,getSellingStall:()=>sellingStallId,hitTest:(x,y)=>clone(hitStall(x,y))});
-root.KELO_MARKET_WORLD_AUDIT=Object.freeze({version:VERSION,instanceType:'market',offline:true,serverReplaceable:true,exclusiveRenderOwner:'KeloRender',simulationOwner:'KeloSimulation',cameraOwner:'KeloCamera',economyOwner:'KeloCommerceAuthority',stallCarpets:true,freeStallClaimInteraction:true,sellingMovementLock:true,directInventoryMutation:false,directGoldMutation:false});
+root.KELO_MARKET_WORLD_AUDIT=Object.freeze({version:VERSION,instanceType:'market',offline:true,serverReplaceable:true,exclusiveRenderOwner:'KeloRender',simulationOwner:'KeloSimulation',cameraOwner:'KeloCamera',economyOwner:'KeloCommerceAuthority',stallCarpets:true,freeStallClaimInteraction:true,sellingMovementLock:true,dprSafeCanvasTransform:true,directInventoryMutation:false,directGoldMutation:false});
 })(typeof globalThis!=='undefined'?globalThis:window);
