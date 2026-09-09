@@ -1,12 +1,12 @@
 /* KELO-INDEX
  * area: QA / PVP / MOVEMENT / APPEARANCE
  * owner: FOUNDATION CI
- * keys: PVP AIM FACING MOVEMENT APPEARANCE CONTRACT ONLINE STRAFE COMMITMENT
- * purpose: valida que locomoción no pise aim-facing de gameplay y que el renderer use fila de locomoción al moverse salvo compromiso real de combate
+ * keys: PVP AIM FACING MOVEMENT APPEARANCE CONTRACT ONLINE STRAFE COMMITMENT PLANT REVERSAL 60HZ 90HZ 120HZ
+ * purpose: valida aim/locomoción independientes, continuidad de reversal y que Appearance respete el plant frame publicado por Movement al quedar idle
  * public-api: CLI `node scripts/pvp-aim-facing-audit.js`
  * consumes: engine-ac.js, src/characters/character-appearance.js
  * state-owned: ninguno
- * extension-points: contrato presentación move+aim independiente
+ * extension-points: contrato presentación move+aim independiente + stride/plant publicado por KeloMovement
  * reuse: regresión PvP desktop/touch/controller; no decide gameplay
  * legacy: N/A
  * do-not: no sustituir smoke browser ni autoridad server
@@ -23,7 +23,7 @@ function ok(condition, message) {
   if (!condition) throw new Error('PVP_AIM_FACING_FAIL:' + message);
 }
 
-function movementContext(combatEnabled) {
+function createMovementHarness(combatEnabled) {
   const hooks = {};
   const context = {
     console,
@@ -56,10 +56,37 @@ function movementContext(combatEnabled) {
   context.globalThis = context;
   vm.createContext(context);
   vm.runInContext(acSource, context, { filename: 'engine-ac.js' });
+  return { context, hooks };
+}
+
+function movementContext(combatEnabled) {
+  const harness = createMovementHarness(combatEnabled);
+  harness.hooks.before();
+  harness.context.localPlayer.x = 10;
+  harness.hooks.after({ dt: 1 / 60 });
+  return harness.context;
+}
+
+function reversalContext(hz) {
+  const harness = createMovementHarness(false);
+  const context = harness.context;
+  const hooks = harness.hooks;
+  const dt = 1 / hz;
+
   hooks.before();
-  context.localPlayer.x = 10;
-  hooks.after({ dt: 1 / 60 });
-  return context;
+  context.localPlayer.vx = 185.28;
+  context.localPlayer.x += 185.28 * dt;
+  hooks.after({ dt });
+  const before = Object.assign({}, context.KELO_MOVEMENT_AUDIT);
+
+  context.input.normX = -1;
+  hooks.before();
+  context.localPlayer.vx = -185.28;
+  context.localPlayer.x -= 185.28 * dt;
+  hooks.after({ dt });
+  const after = Object.assign({}, context.KELO_MOVEMENT_AUDIT);
+
+  return { hz, before, after };
 }
 
 function appearanceContext(combatEnabled, options) {
@@ -102,6 +129,7 @@ function appearanceContext(combatEnabled, options) {
     drawImage() { drawCalls.push(Array.from(arguments)); }
   };
   const moving = options.moving !== false;
+  const visualFrame = Number.isFinite(options.visualFrame) ? options.visualFrame : 1;
   const actor = {
     id: 'local',
     name: 'Kelo',
@@ -112,7 +140,7 @@ function appearanceContext(combatEnabled, options) {
     appearanceId: 'player_hero_v1',
     actorKind: 'player',
     _face: 'up',
-    _visualMotion: { dx: moving ? 10 : 0, dy: 0, on: moving, face: 'right', frame: 1 }
+    _visualMotion: { dx: moving ? 10 : 0, dy: 0, on: moving, face: 'right', frame: visualFrame }
   };
   const pvpState = Object.freeze({
     basicAttack: options.basicAttack ? Object.freeze({ id: 'audit-basic', phase: 'windup' }) : null,
@@ -165,6 +193,14 @@ ok(combatMovement.KELO_MOVEMENT_AUDIT.combatAimFacingActive === true, 'COMBAT_AI
 const socialMovement = movementContext(false);
 ok(socialMovement.localPlayer._face === 'right', 'SOCIAL_MOVEMENT_NO_LONGER_OWNS_FACING');
 
+const reversalRates = [60, 90, 120].map(reversalContext);
+for (const result of reversalRates) {
+  ok(result.after.reversalCount === 1, 'REVERSAL_NOT_COUNTED_' + result.hz + 'HZ');
+  ok(result.after.reversalAccidentalIdleCount === 0, 'REVERSAL_INSERTED_IDLE_' + result.hz + 'HZ');
+  ok(result.after.reversalFrameJumpCount === 0, 'REVERSAL_FRAME_JUMP_' + result.hz + 'HZ');
+  ok(result.after.movementFace === 'left', 'REVERSAL_FACE_NOT_IMMEDIATE_' + result.hz + 'HZ');
+}
+
 // BEFORE v2.4: move RIGHT + aim UP rendered UP for the entire PvP mode.
 // AFTER v2.4: ordinary locomotion renders RIGHT, while gameplay _face remains UP.
 const movingCombatAppearance = appearanceContext(true, { moving: true });
@@ -179,8 +215,11 @@ ok(attackingCombatAppearance.context.KELO_CHARACTER_APPEARANCE_AUDIT.lastDraw.fa
 const armedCombatAppearance = appearanceContext(true, { moving: true, armedSlot: 2 });
 ok(armedCombatAppearance.context.KELO_CHARACTER_APPEARANCE_AUDIT.lastDraw.face === 'up', 'ARMED_CAST_DID_NOT_USE_AIM_FACE');
 
-const idleCombatAppearance = appearanceContext(true, { moving: false });
+// engine-ac publishes plant frame 2 when visual motion stops. Appearance must not replace it with column 0 merely because moving=false.
+const idleCombatAppearance = appearanceContext(true, { moving: false, visualFrame: 2 });
 ok(idleCombatAppearance.context.KELO_CHARACTER_APPEARANCE_AUDIT.lastDraw.face === 'up', 'IDLE_PVP_DID_NOT_PRESERVE_AIM_FACE');
+ok(idleCombatAppearance.context.KELO_CHARACTER_APPEARANCE_AUDIT.lastDraw.frame === 2, 'IDLE_PLANT_FRAME_NOT_HONORED');
+ok(idleCombatAppearance.context.KELO_CHARACTER_APPEARANCE_AUDIT.usesExplicitIdleFrame === true, 'IDLE_PLANT_POLICY_NOT_AUDITABLE');
 
 const socialAppearance = appearanceContext(false, { moving: true });
 ok(socialAppearance.context.KELO_CHARACTER_APPEARANCE_AUDIT.lastDraw.face === 'right', 'SOCIAL_RENDER_DID_NOT_USE_MOVEMENT_FACE');
@@ -194,5 +233,14 @@ console.log(JSON.stringify({
   afterOrthogonalLocomotionRowMismatchPct: 0,
   gameplayAimPreserved: movingCombatAppearance.actor._face === 'up',
   attackAimPresentationPreserved: attackingCombatAppearance.context.KELO_CHARACTER_APPEARANCE_AUDIT.lastDraw.face === 'up',
+  reversal: reversalRates.map(result => ({
+    hz: result.hz,
+    accidentalIdleCount: result.after.reversalAccidentalIdleCount,
+    frameJumpCount: result.after.reversalFrameJumpCount,
+    resultingFace: result.after.movementFace
+  })),
+  beforeIdlePlantRenderedFrame: 0,
+  afterIdlePlantRenderedFrame: idleCombatAppearance.context.KELO_CHARACTER_APPEARANCE_AUDIT.lastDraw.frame,
+  explicitIdlePlantFrameHonored: idleCombatAppearance.context.KELO_CHARACTER_APPEARANCE_AUDIT.lastDraw.frame === 2,
   policy: movingCombatAppearance.context.KELO_CHARACTER_APPEARANCE_AUDIT.combatAimFacingPolicy
 }, null, 2));
