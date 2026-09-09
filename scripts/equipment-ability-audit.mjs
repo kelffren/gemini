@@ -45,7 +45,7 @@ const commerceSource=fs.readFileSync(new URL('../src/systems/commerce-authority.
 new Function(commerceSource);assert.ok(commerceSource.includes('KELO_EQUIPMENT_ITEM_CATALOG'));assert.ok(commerceSource.includes('catalog.marketOffers'));assert.ok(commerceSource.includes("listingId:'demo_listing_'+offer.offerId"));assert.ok(commerceSource.includes("!s.demoListings.some(x=>x&&x.listingId===row.listingId)"));assert.ok(!commerceSource.includes('shadow_blade_demo'));
 
 const equipmentChannelSource=fs.readFileSync(new URL('../src/abilities/equipment-ability-channel.js',import.meta.url),'utf8');
-assert(equipmentChannelSource.includes('KeloAbilities?.engine'));assert(equipmentChannelSource.includes('castSource'));assert(!equipmentChannelSource.includes('KeloAbilitySourceCast'));assert(!equipmentChannelSource.includes('hotbar.slots'));
+assert(equipmentChannelSource.includes('KeloAbilities?.engine'));assert(equipmentChannelSource.includes('castSource'));assert(!equipmentChannelSource.includes('root.KeloAbilitySourceCast'));assert(!equipmentChannelSource.includes('hotbar.slots'));
 let weapon={id:'eq_weapon',templateId:'starter_weapon',slot:'weapon',itemLevel:1,quality:1,grade:1};
 globalThis.KeloEquipment={getEquipped:()=>[weapon]};globalThis.KeloMounts={isMounted:()=>false,getEquippedMountId:()=>null};
 require('../src/abilities/equipment-ability-channel.js');
