@@ -16,17 +16,18 @@ import { registerMapForgeWorkspace } from './workspaces/map-forge-workspace.mjs'
 import { registerMountWorkspace } from './workspaces/mount-workspace.mjs';
 import { registerAppearanceWorkspace } from './workspaces/appearance-workspace.mjs';
 import { registerAnimationWorkspace } from './workspaces/animation-workspace.mjs';
+import { registerVfxWorkspace } from './workspaces/vfx-workspace.mjs';
 let platform=null;
 export async function bootKeloCreators({root=globalThis,stateAdapter=null}={}){
   if(platform)return platform;
   const permission=createCreatorPermissionAdapter(root),world=createWorldCreatorAdapter({root,permission}),localState=stateAdapter||createIndexedDbCreatorStateAdapter({indexedDBFactory:root.indexedDB}),projects=createLocalCreatorProjectRepository({domainAdapters:[world],stateAdapter:localState}),workspaces=createCreatorWorkspaceRegistry(),dependencies=createCreatorDependencyGraph();
-  registerWorldWorkspace(workspaces);registerMapForgeWorkspace(workspaces);registerMountWorkspace(workspaces);registerAppearanceWorkspace(workspaces);registerAnimationWorkspace(workspaces);
+  registerWorldWorkspace(workspaces);registerMapForgeWorkspace(workspaces);registerMountWorkspace(workspaces);registerAppearanceWorkspace(workspaces);registerAnimationWorkspace(workspaces);registerVfxWorkspace(workspaces);
   async function openWorkspace(id,context={}){
     const manifest=workspaces.resolve(id);if(!manifest)throw new Error(`CREATOR_WORKSPACE_NOT_FOUND:${id}`);
     if(manifest.capability)permission.require(manifest.capability,permission.actorId(),context.projectId||null);
     return workspaces.open(id,{root,projects,permission,dependencies,openWorkspace,...context});
   }
-  platform=Object.freeze({version:'kelo-creators-core-v1.2.0',permission,projects,workspaces,dependencies,openWorkspace,close(){try{localState.close?.();}catch{}platform=null;}});
+  platform=Object.freeze({version:'kelo-creators-core-v1.3.0',permission,projects,workspaces,dependencies,openWorkspace,close(){try{localState.close?.();}catch{}platform=null;}});
   return platform;
 }
 export function getKeloCreatorsPlatform(){return platform;}

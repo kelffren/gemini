@@ -1,18 +1,18 @@
 /* KELO-INDEX
  * area: AUTH
- * keys: ADMIN KEY CREATORS WORLD EDIT ANIMATION EDIT PERMISSION BACKPACK OFFLINE ONLINE READY
+ * keys: ADMIN KEY CREATORS WORLD EDIT ANIMATION EDIT VFX EDIT PERMISSION BACKPACK OFFLINE ONLINE READY
  * hace: modela Llave Admin como entitlement/objeto bound y decide capacidades; Creator/Studio posee la UI de autoría
  * online: request() e installRemoteAdapter() permiten sustituir la autoridad local por servidor sin cambiar consumidores
  */
 (function(){
 'use strict';
 
-const VERSION='admin-key-v1.3.0';
+const VERSION='admin-key-v1.4.0';
 const SCHEMA=1;
 const STORAGE='kelo_admin_keys_v1';
 const TEMPLATE_ID='admin-key';
 const DEFAULT_CREATOR_SCOPES=Object.freeze(['creators.access','world.edit','world.export','world.import']);
-const ROOT_SCOPES=Object.freeze(['creators.access','world.edit','world.export','world.import','world.publish','animation.edit','admin.issue','admin.revoke']);
+const ROOT_SCOPES=Object.freeze(['creators.access','world.edit','world.export','world.import','world.publish','animation.edit','vfx.edit','admin.issue','admin.revoke']);
 let remoteAdapter=null;
 let seq=1;
 const listeners=new Set();
@@ -68,7 +68,7 @@ function assert(scope,ownerId){requireScope(scope,String(ownerId||playerId()));r
 
 migrateLocalRootScopes();
 window.KELO_ADMIN_KEYS=Object.freeze({version:VERSION,templateId:TEMPLATE_ID,scopes:Object.freeze({creator:DEFAULT_CREATOR_SCOPES,root:ROOT_SCOPES}),request,installRemoteAdapter,can,assert,hasKey:(ownerId)=>activeKeys(ownerId).length>0,getActiveKeys:(ownerId)=>activeKeys(ownerId).map(publicKey),syncInventory,playerId,onChange(fn){if(typeof fn!=='function')return()=>{};listeners.add(fn);return()=>listeners.delete(fn);},authoritySource:()=>remoteAdapter?'remote-adapter':'local-prototype'});
-window.KELO_ADMIN_KEY_AUDIT=Object.freeze({version:VERSION,itemIdentity:true,bound:true,scopedPermissions:true,serverReplaceable:true,uiTrustOnlyOffline:true,creatorUiOwner:'Kelo Creators',creatorAccessScope:true,animationEditScope:true,legacyWorldBuilderUiBoot:false,legacyPreviewHotfixBoot:false});
+window.KELO_ADMIN_KEY_AUDIT=Object.freeze({version:VERSION,itemIdentity:true,bound:true,scopedPermissions:true,serverReplaceable:true,uiTrustOnlyOffline:true,creatorUiOwner:'Kelo Creators',creatorAccessScope:true,animationEditScope:true,vfxEditScope:true,legacyWorldBuilderUiBoot:false,legacyPreviewHotfixBoot:false});
 
 const params=new URLSearchParams(location.search);
 if(params.get('mapEditor')==='1')request('admin-key:bootstrap-local-root',{actorId:playerId(),ownerId:playerId(),developer:true}).then(syncWhenReady).catch(console.error);else syncWhenReady();

@@ -1,8 +1,9 @@
 /* KELO-INDEX
  * area: VISUAL
- * keys: VFX FX PROJECTILE TRAIL PARTICLE SFX AUDIO SCREEN SHAKE FLASH POOL CULL QUALITY SPRITESHEET
+ * keys: VFX FX PROJECTILE TRAIL PARTICLE SFX AUDIO SCREEN SHAKE FLASH POOL CULL QUALITY SPRITESHEET PREVIEW
  * hace: runtimes independientes para VFX, proyectiles visuales, sonido y efectos de pantalla
  * online: solo representa eventos/contexto; jamás calcula hit, daño, estado real ni trayectoria autoritativa
+ * creator: preview() reproduce definiciones transitorias sin registrarlas ni convertirlas en contenido LIVE
  */
 (function (root) {
   'use strict';
@@ -103,14 +104,24 @@
     return item;
   }
 
-  // KELO-INDEX VISUAL/VFX instancia una definición sin requerir ability, stone ni combate.
-  function spawnFx(id, context, options) {
-    const def = fxDefs.get(String(id || ''));
-    if (!def) return null;
+  function spawnDefinition(def, context, options) {
+    if (!def || !def.id || !def.type) throw new Error('INVALID_FX_DEFINITION');
     if (!canSpawn(def.type === 'particle_emitter' ? 'complexFx' : 'simpleFx', 1)) return null;
-    const item = resetFxObject(fxPool.pop() || {}, def, context, options);
+    const transient = Object.freeze(Object.assign({}, def, { id: String(def.id) }));
+    const item = resetFxObject(fxPool.pop() || {}, transient, context, options);
     activeFx.push(item);
     return item.id;
+  }
+
+  // KELO-INDEX VISUAL/VFX instancia una definición registrada sin requerir ability, stone ni combate.
+  function spawnFx(id, context, options) {
+    const def = fxDefs.get(String(id || ''));
+    return def ? spawnDefinition(def, context, options) : null;
+  }
+
+  // Creator/debug only: transient definitions never enter KeloFXRegistry or manifests.
+  function previewFx(definition, context, options) {
+    return spawnDefinition(definition, context, options);
   }
 
   function stopFx(id) {
@@ -533,7 +544,7 @@
   }
 
   root.KeloFXRegistry = Object.freeze({ version: 'fx-registry-v1.1.0', get: function (id) { return fxDefs.get(String(id || '')) || null; }, list: function () { return Array.from(fxDefs.values()); }, register: function (def) { return registerInto(fxDefs, def, 'FX'); } });
-  root.KeloFX = Object.freeze({ version: 'fx-runtime-v1.1.0', spawn: spawnFx, stop: stopFx, update: updateFx, drawLayer: drawLayer, drawActorLayer: drawActorLayer, metrics: fxMetrics });
+  root.KeloFX = Object.freeze({ version: 'fx-runtime-v1.2.0', spawn: spawnFx, preview: previewFx, stop: stopFx, update: updateFx, drawLayer: drawLayer, drawActorLayer: drawActorLayer, metrics: fxMetrics });
   root.KeloProjectileVisualRegistry = Object.freeze({ version: 'projectile-visual-registry-v1.1.1', get: function (id) { return projectileDefs.get(String(id || '')) || null; }, list: function () { return Array.from(projectileDefs.values()); }, register: function (def) { return registerInto(projectileDefs, def, 'PROJECTILE_VISUAL'); } });
   root.KeloProjectileVisuals = Object.freeze({ version: 'projectile-visual-runtime-v1.1.1', attach: attachProjectile, preview: previewProjectile, stop: stopProjectile, update: updateProjectiles, drawLayer: drawProjectileLayer, metrics: projectileMetrics });
   root.KeloSFXRegistry = Object.freeze({ version: 'sfx-registry-v1.0.0', get: function (id) { return sfxDefs.get(String(id || '')) || null; }, list: function () { return Array.from(sfxDefs.values()); }, register: function (def) { return registerInto(sfxDefs, def, 'SFX'); } });

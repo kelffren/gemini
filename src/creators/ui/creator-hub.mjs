@@ -10,9 +10,10 @@ let active=null;
 const CATALOG=Object.freeze([
   {category:'BUILD',items:[['world','World','active'],['map-forge','Map Forge','active'],['parcel','Parcel','soon'],['dungeon','Dungeon','soon'],['game-mode','Game Mode','soon']]},
   {category:'GAMEPLAY',items:[['mount','Mount','active'],['ability','Ability','soon'],['npc','NPC','soon'],['quest','Quest / Dialogue','soon'],['item','Item','soon'],['crafting','Crafting','soon']]},
-  {category:'VISUAL',items:[['appearance','Appearance','active'],['animation','Animation','active'],['vfx','VFX','soon'],['cinematic','Cinematic','soon']]},
+  {category:'VISUAL',items:[['appearance','Appearance','active'],['animation','Animation','active'],['vfx','VFX','active'],['cinematic','Cinematic','soon']]},
   {category:'CONTENT',items:[['prefab','Prefab','soon'],['environment','Environment','soon'],['audio','Audio','soon']]}
 ]);
+const REPOSITORY_PROJECT_TYPES=Object.freeze({animation:'ANIMATION',vfx:'VFX'});
 function css(){return `
 [data-kelo-creators-ui]{box-sizing:border-box;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#f5f3ea}
 #kelo-creators-hub{position:fixed;inset:0;z-index:2147482100;background:radial-gradient(circle at 50% -10%,rgba(198,164,92,.16),transparent 34%),rgba(7,8,10,.96);backdrop-filter:blur(16px);display:grid;grid-template-rows:auto 1fr;overflow:hidden}
@@ -38,8 +39,9 @@ export async function openCreatorHub({root=globalThis}={}){
     if(opening.has(id))return;opening.add(id);
     try{
       let resolvedProjectId=projectId;
-      if(id==='animation'&&!resolvedProjectId){
-        const ownerId=platform.permission.actorId(),existing=await platform.projects.list({ownerId,type:'ANIMATION'}),project=await platform.projects.create({type:'ANIMATION',name:`Animation ${existing.length+1}`,ownerId});
+      const projectType=REPOSITORY_PROJECT_TYPES[id]||null;
+      if(projectType&&!resolvedProjectId){
+        const ownerId=platform.permission.actorId(),existing=await platform.projects.list({ownerId,type:projectType}),label=projectType==='VFX'?'VFX':'Animation',project=await platform.projects.create({type:projectType,name:`${label} ${existing.length+1}`,ownerId});
         resolvedProjectId=project.projectId;
       }
       await platform.openWorkspace(id,resolvedProjectId?{projectId:resolvedProjectId}:{});destroy();
@@ -52,7 +54,7 @@ export async function openCreatorHub({root=globalThis}={}){
   for(const [id,label] of sections){const b=make('button',{text:label,'aria-selected':'false'});if(id==='reviews'&&!platform.permission.can('review.approve'))b.hidden=true;b.onclick=()=>void render(id);buttons.set(id,b);nav.append(b);}
   function destroy(){if(active?.hub!==hub)return;active=null;hub.remove();style.remove();doc.removeEventListener('keydown',onKey,true);}
   const onKey=e=>{if(e.key==='Escape'){e.preventDefault();destroy();}};close.onclick=destroy;doc.addEventListener('keydown',onKey,true);
-  active=Object.freeze({version:'kelo-creator-hub-v1.2.0',hub,platform,get section(){return current;},show:render,close:destroy});await render('create');return active;
+  active=Object.freeze({version:'kelo-creator-hub-v1.3.0',hub,platform,get section(){return current;},show:render,close:destroy});await render('create');return active;
 }
 export function closeCreatorHub(){active?.close?.();}
 export function getCreatorHub(){return active;}
