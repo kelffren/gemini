@@ -1,8 +1,8 @@
 /* KELO-INDEX
  * area: TEST / UI / LIVE
  * owner: Premium menu browser audit
- * keys: MENU MOBILE PORTRAIT LANDSCAPE ROUTES INPUT PVP CONSOLE SCREENSHOT
- * purpose: valida el menú Luxe real, owners recuperados, locks, responsive y smoke de movimiento/PvP
+ * keys: MENU MOBILE PORTRAIT LANDSCAPE ROUTES INPUT PVP COMMERCE CONSOLE SCREENSHOT
+ * purpose: valida el menú Luxe real, owners recuperados, locks, responsive, Mercado autoritativo y smoke de movimiento/PvP
  * online: prueba presentación/rutas; no altera reglas autoritativas
  */
 import { chromium } from 'playwright';
@@ -23,7 +23,7 @@ const report={ok:false,url:URL,portrait:null,landscape:null,routes:{},movement:n
 const assert=(condition,message)=>{if(!condition)throw new Error(message);};
 
 async function waitRuntime(){
-  await page.waitForFunction(()=>window.KELO_LUXE&&window.KeloInputLocks&&window.KeloBackpackUI&&window.KeloAbilities&&window.KeloMarketUI&&window.KELO_HOUSE_UI&&window.KeloNobility&&window.KeloSelfInteractionUI&&window.KeloCharacterCustomizer,null,{timeout:20000});
+  await page.waitForFunction(()=>window.KELO_LUXE&&window.KeloInputLocks&&window.KeloBackpackUI&&window.KeloAbilities&&window.KeloMarketUI&&window.KeloCommerceUI&&window.KeloMarketWorld&&window.KELO_HOUSE_UI&&window.KeloNobility&&window.KeloSelfInteractionUI&&window.KeloCharacterCustomizer,null,{timeout:20000});
 }
 async function openMenu(){
   await page.locator('#lx-side-menu').click();
@@ -32,9 +32,28 @@ async function openMenu(){
 async function closeMenu(){if(await page.evaluate(()=>window.KELO_LUXE?.isMenuOpen?.()))await page.locator('#lx-menu-close').click();}
 async function clickRoute(tool){await openMenu();const button=page.locator(`#lx-menu-panel [data-tool="${tool}"]`);await button.waitFor({state:'visible'});await button.click();}
 async function route(name,tool,selector,closeExpression){
-  await clickRoute(tool);await page.waitForFunction(sel=>{const el=document.querySelector(sel);if(!el)return false;const s=getComputedStyle(el),r=el.getBoundingClientRect();return s.display!=='none'&&s.visibility!=='hidden'&&r.width>0&&r.height>0;},selector,{timeout:6000});
+  await clickRoute(tool);
+  await page.waitForFunction(sel=>{const el=document.querySelector(sel);if(!el)return false;const s=getComputedStyle(el),r=el.getBoundingClientRect();return s.display!=='none'&&s.visibility!=='hidden'&&r.width>0&&r.height>0;},selector,{timeout:6000});
   report.routes[name]=true;
   if(closeExpression)await page.evaluate(closeExpression);
+}
+async function routeMarket(){
+  await clickRoute('market');
+  await page.waitForFunction(()=>window.KeloMarketWorld?.isActive?.()===true&&document.getElementById('kelo-commerce-dock')?.classList.contains('show'),null,{timeout:8000});
+  const entered=await page.evaluate(()=>({
+    active:window.KeloMarketWorld?.isActive?.()===true,
+    dockVisible:document.getElementById('kelo-commerce-dock')?.classList.contains('show')===true,
+    menuOpen:window.KELO_LUXE?.isMenuOpen?.()===true,
+    menuLocked:window.KeloInputLocks.has('luxe-main-menu'),
+    commerceAudit:window.KELO_COMMERCE_UI_AUDIT||null
+  }));
+  assert(entered.active&&entered.dockVisible,'Mercado route did not enter authoritative market instance');
+  assert(!entered.menuOpen&&!entered.menuLocked,'Main menu stayed open/locked after market travel');
+  assert(entered.commerceAudit?.authorityOnly===true&&entered.commerceAudit?.marketInstanceEntry===true,'Commerce authority boundary audit missing');
+  report.routes.market=true;
+  await page.evaluate(async()=>{await window.KeloCommerceUI.leaveMarket();});
+  await page.waitForFunction(()=>window.KeloMarketWorld?.isActive?.()===false&&!document.getElementById('kelo-commerce-dock')?.classList.contains('show'),null,{timeout:8000});
+  assert(await page.evaluate(()=>!window.KeloInputLocks.has('commerce-ui')&&!window.KeloInputLocks.has('luxe-main-menu')),'Market route leaked an input lock');
 }
 
 try{
@@ -83,7 +102,7 @@ try{
   await route('nobility','nobility','#kelo-nobility',()=>window.KeloNobility.close());
   await route('emotes','emotes','#kelo-emotes-panel',()=>window.KeloSelfInteractionUI.closeEmotes());
   await route('backpack','bag','#kelo-bag',()=>window.KeloBackpackUI.close());
-  await route('market','market','#kelo-market-v1',()=>window.KeloMarketUI.close());
+  await routeMarket();
   await route('properties','properties','#kelo-house-panel',()=>window.KELO_HOUSE_UI.hide());
   await route('profile','profile','#inspect-sheet',()=>{if(typeof closeInspect==='function')closeInspect();});
   await route('abilities','abilities','#kelo-builder',()=>{const p=document.getElementById('kelo-builder');if(p)p.style.display='none';});
