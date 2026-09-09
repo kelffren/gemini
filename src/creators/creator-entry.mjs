@@ -24,7 +24,7 @@ export async function bootKeloCreators({root=globalThis,stateAdapter=null}={}){
     if(manifest.capability)permission.require(manifest.capability,permission.actorId(),context.projectId||null);
     return workspaces.open(id,{root,...context});
   }
-  platform=Object.freeze({version:'kelo-creators-core-v1.2.0-map-forge',permission,projects,workspaces,dependencies,openWorkspace,close(){platform=null;}});
+  platform=Object.freeze({version:'kelo-creators-core-v1.1.0',permission,projects,workspaces,dependencies,openWorkspace,close(){platform=null;}});
   return platform;
 }
 export function getKeloCreatorsPlatform(){return platform;}
