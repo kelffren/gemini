@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: TEST / UI
  * owner: Premium main menu + player HUD contract audit
- * keys: MENU LUXE HUD PLAYER NOBILITY TITLES CLAN HP MANA GOLD GUIDE INPUT LOCK FOUNDATION COMMERCE
+ * keys: MENU LUXE HUD PLAYER NOBILITY TITLES CLAN HP MANA GOLD GUIDE INPUT LOCK FOUNDATION COMMERCE MOUNTS
  * purpose: prueba estáticamente que Luxe reutiliza owners reales, monta un HUD único y no reintroduce legacy/polling
  * online: N/A; valida fronteras UI/owner, no autoridad gameplay
  */
@@ -26,7 +26,7 @@ const engineC=read('engine-c.js');
 const engineQ=read('engine-q.js');
 
 assert(luxe.includes('KELO-INDEX'),'Luxe shell must carry KELO-INDEX');
-assert(luxe.includes("luxe-shell-v4.0.3-title-book"),'Premium Luxe version missing');
+assert(luxe.includes("luxe-shell-v4.0.4-mount-menu"),'Premium Luxe version missing');
 assert(luxe.includes("grid-template-columns:repeat(2,minmax(0,1fr))"),'Premium menu must use a two-column grid');
 assert(luxe.includes("env(safe-area-inset-top)")&&luxe.includes("env(safe-area-inset-bottom)"),'Safe-area support missing');
 assert(luxe.includes("min-height:78px")&&luxe.includes("width:44px;height:44px"),'Touch-target contract missing');
@@ -36,10 +36,11 @@ assert(!luxe.includes('KELO_MODAL_INPUT_LOCK='),'Luxe shell must not write legac
 assert(!luxe.includes('setInterval('),'Luxe shell must not poll with setInterval');
 assert(!studio.includes('setInterval(')&&!studio.includes('setTimeout(boot'),'Creators launcher must not poll/retry for the Luxe menu');
 
-for(const id of ['bag','abilities','appearance','profile','market','chat','properties','nobility','titles','emotes']){
+for(const id of ['bag','abilities','appearance','mounts','profile','market','chat','properties','nobility','titles','emotes']){
   assert(luxe.includes("id:'"+id+"'"),'Missing real menu route: '+id);
 }
 assert(luxe.includes("KeloCharacterCustomizer?.open"),'Appearance must route to Character Creator owner');
+assert(luxe.includes("KeloMountPanel?.open"),'Mounts must route to KeloMountPanel owner');
 assert(luxe.includes("KeloNobility?.open"),'Nobility must route to KeloNobility owner');
 assert(luxe.includes("KeloTitles?.openBook"),'Titles must route to KeloTitles owner');
 assert(luxe.includes("KeloSelfInteractionUI?.openEmotes"),'Emotes must route to self interaction owner');
@@ -78,6 +79,9 @@ assert(playerHud.includes("p?.mana??state?.playerProfile?.mana")&&playerHud.incl
 assert(playerHud.includes("return 'Sin clan'")&&playerHud.includes("p?.clan?.name"),'Clan must use adapter/fallback without creating a parallel clan system');
 assert(playerHud.includes('env(safe-area-inset-top)')&&playerHud.includes('env(safe-area-inset-left)'),'Player HUD must respect iOS safe areas');
 assert(playerHud.includes('min-height:44px')&&playerHud.includes('@media(max-width:360px)'),'Player HUD must keep touch target and narrow-mobile layout');
+assert(playerHud.includes('width:clamp(184px,55vw,218px)'),'Player HUD ultra-compact width contract missing');
+assert(playerHud.includes('.kw-hud-resource-main{display:block')&&playerHud.includes('.kw-hud-bar{display:block;width:100%'),'HP/Mana bars must remain real visible blocks');
+assert(playerHud.includes('.kw-hud-copy{position:absolute'),'Copy affordance must stay out of compact HUD layout flow');
 assert(!playerHud.includes('setInterval('),'Player HUD must not poll with setInterval');
 assert((playerHud.match(/requestAnimationFrame\(/g)||[]).length===1,'Player HUD may use one initial RAF, not a continuous frame loop');
 assert(!/STATE\s*\.\s*gold\s*[+\-*/]?=/.test(playerHud),'Player HUD must not mutate gold');
@@ -89,8 +93,8 @@ assert(!index.includes('id="kelo-guide-link"'),'Legacy standalone guide link mus
 assert(!index.includes('.hud-badge{'),'Legacy telemetry HUD CSS must be retired, not hidden');
 assert(!index.includes('#kelo-guide-link{'),'Legacy guide CSS must be retired, not hidden');
 assert(index.includes('<div id="ui-layer"><div class="action-bar"'),'UI layer should retain only its owned action bar surface');
-assert(index.includes('src/ui/luxe-shell.js?v=229'),'Luxe cache-bust not updated');
+assert(index.includes('src/ui/luxe-shell.js?v=230'),'Luxe cache-bust not updated');
 assert(index.includes('src/abilities/kelo-ability-boot.js?v=157'),'Abilities cache-bust not updated');
 assert(index.includes('src/ui/studio-launcher.js?v=3'),'Creators cache-bust not updated');
 
-console.log(JSON.stringify({status:'PASS',owner:'Kelo Luxe Shell presentation',playerHud:'src/ui/luxe-player-hud.js',legacyTelemetryRemoved:true,guideIntegrated:true,titleBook:true,commerceRoute:'KeloMarketUI -> KeloCommerceUI/KeloMarketWorld',dataSources:['localPlayer','STATE','KeloNobility','KeloTitles'],clanFallback:true,manaHonestUnavailableFallback:true,recovered:['Apariencia','Nobleza','Libro de títulos','Burlas'],existingReal:['Mochila','Habilidades','Perfil','Mercado','Chat','Propiedades'],conditional:['Misiones','Ajustes'],creators:'authorization-gated launcher',noParallelMenu:true,noPolling:true,tokenInputLocks:true,narrowScreenTitles:'no-ellipsis'},null,2));
+console.log(JSON.stringify({status:'PASS',owner:'Kelo Luxe Shell presentation',playerHud:'src/ui/luxe-player-hud.js',legacyTelemetryRemoved:true,guideIntegrated:true,titleBook:true,mountRoute:true,commerceRoute:'KeloMarketUI -> KeloCommerceUI/KeloMarketWorld',dataSources:['localPlayer','STATE','KeloNobility','KeloTitles'],clanFallback:true,manaHonestUnavailableFallback:true,recovered:['Apariencia','Monturas','Nobleza','Libro de títulos','Burlas'],existingReal:['Mochila','Habilidades','Perfil','Mercado','Chat','Propiedades'],conditional:['Misiones','Ajustes'],creators:'authorization-gated launcher',noParallelMenu:true,noPolling:true,tokenInputLocks:true,ultraCompactHud:true,narrowScreenTitles:'no-ellipsis'},null,2));
