@@ -40,9 +40,13 @@ try{
   if(report.ui.canvas.width<250||report.ui.canvas.height<300||report.ui.pixels[0]<250||report.ui.pixels[1]<300)throw new Error('Map Forge preview canvas collapsed');
   if(report.ui.overflowX)throw new Error('Map Forge introduced horizontal overflow');
 
-  await page.selectOption('.kmf-select','KELO_VILLAGE_V1');
+  await page.locator('.kmf-select').first().selectOption('KELO_VILLAGE_V1');
   await page.waitForFunction(()=>document.querySelector('.kmf-chip.gold')?.textContent==='KELO_VILLAGE_V1',null,{timeout:20000});
-  await page.selectOption('select.kmf-select:nth-of-type(1)',{label:'Best of 4'}).catch(()=>{});
+  await page.locator('.kmf-select').nth(1).selectOption('4');
+  await page.getByRole('button',{name:'GENERAR',exact:true}).click();
+  await page.waitForFunction(()=>document.querySelectorAll('.kmf-candidate').length===4,null,{timeout:20000});
+  const village=await page.evaluate(()=>({cards:document.querySelectorAll('.kmf-candidate').length,recipe:document.querySelector('.kmf-chip.gold')?.textContent,valid:[...document.querySelectorAll('.kmf-chip')].some(x=>x.textContent.includes('VÁLIDO'))}));
+  if(village.cards!==4||village.recipe!=='KELO_VILLAGE_V1'||!village.valid)throw new Error('Map Forge recipe/count controls failed');
   await page.screenshot({path:`${OUT}/map-forge-mobile.png`,fullPage:false});
   await page.evaluate(async()=>{const mod=await import('/src/creators/ui/map-forge-workspace.mjs');mod.closeMapForgeWorkspace();});
   await page.waitForFunction(()=>!document.getElementById('kelo-map-forge'));
