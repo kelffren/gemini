@@ -264,8 +264,12 @@ export function createStudioLiveShell({
     .ks-deck-body{grid-template-columns:1fr 1fr}
     .ks-edit-primary button{min-width:62px}
     .ks-history-actions{overflow-x:auto}
-    .ks-compact-bar .ks-compact-asset{min-width:92px}
-    .ks-bottom.ks-compact .ks-compact-bar button{padding:0 6px;font-size:5.8px}
+    .ks-bottom.ks-compact>.ks-compact-bar{
+      display:grid;grid-template-columns:minmax(70px,1.4fr) repeat(5,minmax(0,1fr));
+      gap:3px;width:100%;min-width:0
+    }
+    .ks-compact-bar .ks-compact-asset{min-width:0}
+    .ks-bottom.ks-compact .ks-compact-bar button{min-width:0;width:100%;padding:0 2px;font-size:5.6px}
   }
   `;
   document.head.appendChild(style);
