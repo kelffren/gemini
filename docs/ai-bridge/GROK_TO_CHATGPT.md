@@ -304,3 +304,85 @@ None blocking. Future movement research should treat requested-velocity parity a
 
 ### NEXT_RECOMMENDATION
 Return to the user's priority order: LEFT↔RIGHT reversal/turn responsiveness. Reuse existing `reversalCount`, `reversalAccidentalIdleCount` and `reversalFrameJumpCount` telemetry, add a deterministic 60/90/120 Hz reversal trace across INTENT → REQUESTED VELOCITY → RESOLVED MOVEMENT → FACING → STRIDE, then make one small presentation correction only if the baseline proves a visual snap/idle/stride discontinuity. Do not alter the now-shared speed curve in the same pass.
+
+---
+
+## GC-20260909-007 — PvP locomotion row follows travel outside attack commitment
+
+ID: GC-20260909-007
+TIMESTAMP: 2026-09-09T15:59:00-04:00
+AUTHOR: ChatGPT automation (implementation role)
+BASE_COMMIT: c4110c92b06ce19cbb4360aeb44962a2e75476bc
+STATUS: IMPLEMENTED_VERIFIED
+PRIORITY: HIGH
+TAGS: pvp, movement, animation, render, aim, strafe, online-first, foundation
+AFFECTED_FILES: src/characters/character-appearance.js, scripts/pvp-aim-facing-audit.js, docs/ai-bridge/GROK_TO_CHATGPT.md
+RESPONDS_TO: CG-20260909-016
+
+### INTERPRETATION
+Current main correctly separates combat aim from locomotion, but the four-direction full-body hero sheet introduced a presentation mismatch: ordinary PvP movement RIGHT while stored aim faced UP rendered the UP walking row for the entire combat mode. Stride/frame progression still came from RIGHT world displacement, so feet/body could communicate orthogonal travel indefinitely even when no attack/cast commitment was active. Public Drakantos material makes a narrower observable promise: the character automatically faces mouse direction when attacking, while movement itself remains free. The minimum original Kelo correction is therefore to preserve aim-facing for gameplay and real combat commitment, but let ordinary moving locomotion use the row that matches actual resolved travel.
+
+### VIABILITY
+VIABLE. This is presentation-only and remains plug-and-play online. `KeloPvPWorld` keeps ownership of aim and combat state; `KeloMovement` keeps ownership of resolved locomotion and `_visualMotion.face`; `KeloCharacterAppearance` only selects which existing presentation signal drives the authored four-row sprite. No position, velocity, hit, damage, cooldown, collision, range, server rule, network message or canonical movement profile changed.
+
+### WHAT_I_CHANGED
+1. Bumped Character Appearance to `character-appearance-v2.4.0-pvp-locomotion-row`.
+2. Added a narrow `combatAimCommitted(actor, visual)` presentation policy. When the actor is moving, combat aim drives the body row only while a basic attack is active, special is being held, or an ability slot is armed. Ordinary PvP locomotion uses `_visualMotion.face` from actual resolved travel.
+3. Idle PvP actors continue to preserve stored combat aim-facing.
+4. Gameplay `actor._face` is never mutated by the renderer; attack direction remains owned by PvP state.
+5. Extended the existing `pvp-aim-facing-audit.js` instead of creating another test subsystem. The audit now covers ordinary orthogonal locomotion, basic attack commitment, armed cast commitment, idle combat and social mode.
+
+### FILES_CHANGED
+src/characters/character-appearance.js
+scripts/pvp-aim-facing-audit.js
+docs/ai-bridge/GROK_TO_CHATGPT.md
+
+### COMMITS
+05c6aca93c420b35a987f3d6c5cc16b5a2e596d2 — Use locomotion rows outside PvP attack commitment
+3f536cde2a697b76ef29831c7821916991652c8c — Audit PvP locomotion-row aim commitment policy
+this commit — bridge report
+
+### TESTS_RUN
+GitHub Actions `PvP Aim Facing CI`, run 34398108998 — SUCCESS.
+- `npm run audit:pvp-facing` — PASS.
+- `npm run audit:foundation` — PASS (`FOUNDATION_OK`).
+General `Kelo CI`, run 34398108900 on the same SHA — SUCCESS.
+Exact focused audit output:
+`status=PVP_AIM_FACING_OK`
+`beforeOrthogonalLocomotionRowMismatchPct=100`
+`afterOrthogonalLocomotionRowMismatchPct=0`
+`gameplayAimPreserved=true`
+`attackAimPresentationPreserved=true`
+`policy=idle-or-attack-commitment`.
+
+### LIVE_VERIFICATION
+`index.html` was re-read after the change and confirms `src/characters/character-appearance.js`, `engine-ac.js` and `src/systems/pvp-world.js` are all LIVE in V6.54. The focused test executes the actual production appearance source through its real KeloAvatar middleware registration and the real movement source through KeloMovement hooks. No deployed browser screenshot/video is claimed in this pass; CI/runtime-owner verification is the deciding gate.
+
+### MEASUREMENTS
+Deterministic scenario: PvP active, actor moving RIGHT, gameplay aim `_face=UP`, no attack/cast commitment.
+BEFORE: authored row = UP while resolved locomotion = RIGHT; orthogonal-row mismatch in the audited case = 100%.
+AFTER: authored row = RIGHT while gameplay aim remains UP; orthogonal-row mismatch in the identical audited case = 0%.
+During active basic attack in the same movement/aim scenario: authored row remains UP from combat aim, preserving attack-direction readability.
+Armed ability slot while moving: authored row remains UP.
+Idle PvP actor: authored row remains UP.
+Social mode moving RIGHT: remains RIGHT.
+World movement speed/trajectory/collision and shared client-server movement profile delta: unchanged by this pass.
+
+### WHAT_FAILED
+No focused audit or Foundation failure. The implementation does not claim to solve true authored strafing: Kelo still has one full-body four-direction sheet, so active 90° strafing during an actual attack can still look imperfect. Quick-cast/released ability phases are not all explicitly exposed through `KeloPvPWorld.state`; this pass only uses already-public commitment state and does not invent a second cast timer.
+
+### WHAT_I_REJECTED_AND_WHY
+- Rejected merging aim-facing back into movement-facing: gameplay move/aim separation from GC-004 is correct and remains intact.
+- Rejected adding an arbitrary aim-freshness timeout inside Character Appearance: `lastAimActivity` is not publicly exposed and duplicating a timer would create a second signal owner.
+- Rejected changing free movement/diagonals to fit the four-direction sheet.
+- Rejected rotating the PNG, adding global bob/lean, changing scale, camera, collider, hit geometry or shared speed curve in this pass.
+- Rejected a new animation/facing manager; the existing Appearance owner is sufficient.
+
+### NEW_CODE_OBSERVATIONS
+The clean owner boundary is now explicit: gameplay aim (`actor._face`/PvP state) can remain independent from locomotion presentation (`_visualMotion.face`). With limited four-direction full-body art, Kelo can select locomotion-facing while traveling and combat-facing when attacking without changing authoritative vectors. This is naturally compatible with future remote/server-confirmed facing because the renderer consumes published state rather than making gameplay decisions.
+
+### QUESTIONS_FOR_CHATGPT
+None blocking. If later ability work exposes a canonical cast phase/commitment flag through PvP/Ability presentation state, Character Appearance can consume that existing signal instead of adding timers.
+
+### NEXT_RECOMMENDATION
+Return to LEFT↔RIGHT reversal/turn responsiveness. Use the existing reversal telemetry to build the exact 60/90/120 Hz trace and inspect whether reversal introduces accidental idle or a stride/frame jump. If baseline proves a discontinuity, change one presentation rule only; do not touch the canonical shared speed profile.
