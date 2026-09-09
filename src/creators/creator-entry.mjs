@@ -10,17 +10,19 @@ import { createCreatorPermissionAdapter } from './adapters/creator-permission-ad
 import { createWorldCreatorAdapter } from './adapters/world-creator-adapter.mjs';
 import { createLocalCreatorProjectRepository } from './repository/local-creator-project-repository.mjs';
 import { registerWorldWorkspace } from './workspaces/world-workspace.mjs';
+import { registerMapForgeWorkspace } from './workspaces/map-forge-workspace.mjs';
 let platform=null;
 export async function bootKeloCreators({root=globalThis,stateAdapter=null}={}){
   if(platform)return platform;
   const permission=createCreatorPermissionAdapter(root),world=createWorldCreatorAdapter({root,permission}),projects=createLocalCreatorProjectRepository({domainAdapters:[world],stateAdapter}),workspaces=createCreatorWorkspaceRegistry(),dependencies=createCreatorDependencyGraph();
   registerWorldWorkspace(workspaces);
+  registerMapForgeWorkspace(workspaces);
   async function openWorkspace(id,context={}){
     const manifest=workspaces.resolve(id);if(!manifest)throw new Error(`CREATOR_WORKSPACE_NOT_FOUND:${id}`);
     if(manifest.capability)permission.require(manifest.capability,permission.actorId(),context.projectId||null);
     return workspaces.open(id,{root,...context});
   }
-  platform=Object.freeze({version:'kelo-creators-core-v1.0.1',permission,projects,workspaces,dependencies,openWorkspace,close(){platform=null;}});
+  platform=Object.freeze({version:'kelo-creators-core-v1.1.0-map-forge',permission,projects,workspaces,dependencies,openWorkspace,close(){platform=null;}});
   return platform;
 }
 export function getKeloCreatorsPlatform(){return platform;}
