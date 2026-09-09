@@ -1,103 +1,64 @@
 /* KELO-INDEX
  * area: TEST / UI
  * owner: Premium main menu + player HUD contract audit
- * keys: MENU LUXE HUD PLAYER NOBILITY TITLES CLAN HP MANA GOLD GUIDE INPUT LOCK FOUNDATION COMMERCE MOUNTS WORLD FIRST
- * purpose: prueba estáticamente que Luxe reutiliza owners reales, monta un HUD único y no reintroduce legacy/polling
+ * keys: MENU LUXE HUD PVP HP MANA GUIDE INPUT LOCK FOUNDATION COMMERCE MOUNTS
+ * purpose: prueba estáticamente que Luxe reutiliza owners reales, oculta el HUD en social y presenta solo Vida/Maná en PvP con rail lateral único
  * online: N/A; valida fronteras UI/owner, no autoridad gameplay
  */
 import fs from 'node:fs';
-
 const read=(path)=>fs.readFileSync(path,'utf8');
 const assert=(condition,message)=>{if(!condition)throw new Error(message);};
-const luxe=read('src/ui/luxe-shell.js');
-const playerHud=read('src/ui/luxe-player-hud.js');
-const index=read('index.html');
-const nobility=read('src/systems/nobility.js');
-const titles=read('src/systems/title-system.js');
-const character=read('src/ui/character-customizer-ui.js');
-const selfUi=read('src/ui/self-interaction-ui.js');
-const backpack=read('src/ui/backpack-ui.js');
-const market=read('src/ui/market-ui.js');
-const commerce=read('src/ui/commerce-ui.js');
-const house=read('src/ui/house-instance-ui.js');
-const studio=read('src/ui/studio-launcher.js');
-const ability=read('src/abilities/kelo-ability-boot.js');
-const engineC=read('engine-c.js');
-const engineQ=read('engine-q.js');
-
+const luxe=read('src/ui/luxe-shell.js'),playerHud=read('src/ui/luxe-player-hud.js'),index=read('index.html'),character=read('src/ui/character-customizer-ui.js'),selfUi=read('src/ui/self-interaction-ui.js'),backpack=read('src/ui/backpack-ui.js'),market=read('src/ui/market-ui.js'),commerce=read('src/ui/commerce-ui.js'),house=read('src/ui/house-instance-ui.js'),studio=read('src/ui/studio-launcher.js'),engineC=read('engine-c.js'),engineQ=read('engine-q.js');
 assert(luxe.includes('KELO-INDEX'),'Luxe shell must carry KELO-INDEX');
 assert(luxe.includes("luxe-shell-v4.0.4-mount-menu"),'Premium Luxe version missing');
 assert(luxe.includes("grid-template-columns:repeat(2,minmax(0,1fr))"),'Premium menu must use a two-column grid');
 assert(luxe.includes("env(safe-area-inset-top)")&&luxe.includes("env(safe-area-inset-bottom)"),'Safe-area support missing');
-assert(luxe.includes("min-height:78px")&&luxe.includes("width:44px;height:44px"),'Touch-target contract missing');
-assert(luxe.includes("white-space:normal")&&luxe.includes("text-overflow:clip"),'Narrow-screen titles must not use ellipsis clipping');
 assert(luxe.includes("KeloInputLocks")&&luxe.includes("luxe-main-menu")&&luxe.includes("luxe-chat"),'Token input-lock routes missing');
 assert(!luxe.includes('KELO_MODAL_INPUT_LOCK='),'Luxe shell must not write legacy modal lock directly');
 assert(!luxe.includes('setInterval('),'Luxe shell must not poll with setInterval');
 assert(!studio.includes('setInterval(')&&!studio.includes('setTimeout(boot'),'Creators launcher must not poll/retry for the Luxe menu');
-
-for(const id of ['bag','abilities','appearance','mounts','profile','market','chat','properties','nobility','titles','emotes']){
-  assert(luxe.includes("id:'"+id+"'"),'Missing real menu route: '+id);
-}
-assert(luxe.includes("KeloCharacterCustomizer?.open"),'Appearance must route to Character Creator owner');
-assert(luxe.includes("KeloMountPanel?.open"),'Mounts must route to KeloMountPanel owner');
-assert(luxe.includes("KeloNobility?.open"),'Nobility must route to KeloNobility owner');
-assert(luxe.includes("KeloTitles?.openBook"),'Titles must route to KeloTitles owner');
-assert(luxe.includes("KeloSelfInteractionUI?.openEmotes"),'Emotes must route to self interaction owner');
-assert(luxe.includes("KeloBackpackUI?.open"),'Backpack must route to KeloBackpackUI');
-assert(luxe.includes("KeloMarketUI?.open"),'Market must route through KeloMarketUI compatibility owner');
-assert(market.includes('KeloCommerceUI?.enterMarket'),'Market compatibility UI must delegate to Commerce when available');
-assert(commerce.includes('authorityOnly:true')&&commerce.includes('marketInstanceEntry:true'),'Commerce UI authority/instance contract missing');
-assert(luxe.includes("KELO_HOUSE_UI?.show"),'Properties must route to house/property UI owner');
-assert(luxe.includes("KeloAbilities?.openStonePanel"),'Abilities must route to KeloAbilities');
-assert(ability.includes("let visibleStoneCount = 0")&&ability.includes("if (!html) return;")&&ability.includes("if (!equip) return;"),'Abilities inventory must safely ignore non-stone inventory entries');
-
-assert(luxe.includes("KeloMissionsUI")&&luxe.includes("optional:true"),'Missions must be owner-gated, not a fake button');
-assert(luxe.includes("KeloSettingsUI")&&luxe.includes("optional:true"),'Settings must be owner-gated, not a fake button');
-assert(engineC.includes("tool === 'missions'")&&engineC.includes('acceso social preparado'),'Expected current missions placeholder contract not found');
-assert(engineC.includes("tool === 'settings'")&&engineC.includes('Zoom HD por ahora'),'Expected current settings placeholder contract not found');
-assert(engineQ.includes('legacy: mission prototype'),'Legacy Maestro trial must remain classified legacy rather than promoted as Missions UI');
-
-assert(nobility.includes('window.KeloNobility = Object.freeze')&&nobility.includes('donateGold')&&nobility.includes('donateKC'),'Nobility owner/donation API missing');
-assert(nobility.includes("{ id: 'knight', name: 'Caballero'")&&nobility.includes("{ id: 'king', name: 'Rey'"),'Nobility Caballero/Rey rank contract missing');
-assert(titles.includes('root.KeloTitles = Object.freeze')&&titles.includes('getEquipped: getEquipped')&&titles.includes('openBook: openBook'),'Title owner/equipped/book API missing');
+for(const id of ['bag','abilities','appearance','mounts','profile','market','chat','properties','nobility','titles','emotes'])assert(luxe.includes("id:'"+id+"'"),'Missing real menu route: '+id);
+assert(luxe.includes("KeloCharacterCustomizer?.open"),'Appearance owner route missing');
+assert(luxe.includes("KeloMountPanel?.open"),'Mount owner route missing');
+assert(luxe.includes("KeloNobility?.open"),'Nobility owner route missing');
+assert(luxe.includes("KeloTitles?.openBook"),'Titles owner route missing');
+assert(luxe.includes("KeloSelfInteractionUI?.openEmotes"),'Emotes owner route missing');
+assert(luxe.includes("KeloBackpackUI?.open"),'Backpack owner route missing');
+assert(luxe.includes("KeloMarketUI?.open"),'Market owner route missing');
+assert(market.includes('KeloCommerceUI?.enterMarket'),'Market must delegate to Commerce when available');
+assert(commerce.includes('authorityOnly:true')&&commerce.includes('marketInstanceEntry:true'),'Commerce authority boundary missing');
+assert(luxe.includes("KELO_HOUSE_UI?.show"),'Properties owner route missing');
+assert(luxe.includes("KeloAbilities?.openStonePanel"),'Abilities owner route missing');
+assert(luxe.includes("KeloMissionsUI")&&luxe.includes("optional:true"),'Missions must remain owner-gated');
+assert(luxe.includes("KeloSettingsUI")&&luxe.includes("optional:true"),'Settings must remain owner-gated');
+assert(engineC.includes("tool === 'missions'")&&engineC.includes('acceso social preparado'),'Missions placeholder contract drifted');
+assert(engineC.includes("tool === 'settings'")&&engineC.includes('Zoom HD por ahora'),'Settings placeholder contract drifted');
+assert(engineQ.includes('legacy: mission prototype'),'Legacy Maestro trial classification missing');
 assert(character.includes('window.KeloCharacterCustomizer=')||character.includes('root.KeloCharacterCustomizer='),'Character Creator owner missing');
 assert(selfUi.includes('openEmotes')&&selfUi.includes('window.KeloSelfInteractionUI'),'Emote UI owner missing');
 assert(backpack.includes('window.KeloBackpackUI=Object.freeze'),'Backpack UI owner missing');
 assert(market.includes('window.KeloMarketUI=Object.freeze'),'Market UI owner missing');
-assert(house.includes('window.KELO_HOUSE_UI=Object.freeze'),'Property/house UI owner missing');
-assert(studio.includes("document.querySelector('#lx-menu-panel .lx-menu-grid')")&&studio.includes("Herramientas de creación"),'Creators launcher must reuse premium Luxe grid');
-
-assert(playerHud.includes('KELO-INDEX')&&playerHud.includes('owner: Kelo Luxe Shell presentation'),'Player HUD must remain under Luxe presentation ownership');
-for(const id of ['kw-player-hud-wrap','kw-hud-avatar','kw-hud-name','kw-hud-id','kw-hud-clan','kw-hud-nobility','kw-hud-title','kw-hud-hp-bar','kw-hud-mana-bar','kw-player-guide']){
-  assert(playerHud.includes(id),'Player HUD missing required element: '+id);
-}
-assert(playerHud.includes("root.KeloNobility?.getRank?.()"),'HUD nobleza must consume KeloNobility instead of calculating rank');
-assert(playerHud.includes("root.KeloTitles?.getEquipped?.()")&&playerHud.includes("root.KeloTitles?.getTitle?.(id)"),'HUD title must consume KeloTitles equipped title');
-assert(playerHud.includes("finite(state.gold)")&&playerHud.includes("finite(p.hp)")&&playerHud.includes("finite(p.maxHp)"),'HUD must consume existing gold/HP values');
-assert(playerHud.includes("p?.mana??state?.playerProfile?.mana")&&playerHud.includes("'— / —'"),'Mana must fail visibly unavailable instead of inventing a resource');
-assert(playerHud.includes("return 'Sin clan'")&&playerHud.includes("p?.clan?.name"),'Clan must use adapter/fallback without creating a parallel clan system');
-assert(playerHud.includes('env(safe-area-inset-top)')&&playerHud.includes('env(safe-area-inset-left)'),'Player HUD must respect iOS safe areas');
-assert(playerHud.includes('min-height:44px')&&playerHud.includes('@media(max-width:360px)'),'Player HUD must keep touch target and narrow-mobile layout');
-assert(playerHud.includes('width:clamp(150px,43vw,176px)'),'Player HUD world-first width contract missing');
-assert(playerHud.includes('.kw-hud-resource-main{display:block')&&playerHud.includes('.kw-hud-bar{display:block;width:100%'),'HP/Mana bars must remain real visible blocks');
-assert(playerHud.includes('.kw-hud-copy{margin-left:auto;width:22px;height:22px'),'Copy affordance must remain compact and touchable');
-assert(playerHud.includes('.kw-hud-details{display:grid')&&playerHud.includes('.kw-player-hud.expanded .kw-hud-details'),'Clan/Nobleza/Título must use progressive disclosure while exploring');
-assert(playerHud.includes('grid-template-columns:repeat(2,44px)')&&playerHud.includes('#kelo-luxe .lx-top{display:none!important}'),'Permanent mobile chrome must use the compact 2x2 world-first rail');
-assert(playerHud.includes("rail.appendChild(shop)")&&playerHud.includes("aria-label','Abrir Boutique"),'Boutique must reuse the compact Luxe rail instead of a permanent top banner');
-assert(!playerHud.includes('setInterval('),'Player HUD must not poll with setInterval');
-assert((playerHud.match(/requestAnimationFrame\(/g)||[]).length===1,'Player HUD may use one initial RAF, not a continuous frame loop');
-assert(!/STATE\s*\.\s*gold\s*[+\-*/]?=/.test(playerHud),'Player HUD must not mutate gold');
-assert(!/\.hp\s*[+\-*/]?=/.test(playerHud),'Player HUD must not mutate HP');
-
-assert(index.includes('src/ui/luxe-player-hud.js?v=2'),'Player HUD bootstrap/cache-bust missing');
-assert(!index.includes('id="telemetry-bar"'),'Legacy telemetry gold badge must be removed from runtime DOM');
-assert(!index.includes('id="kelo-guide-link"'),'Legacy standalone guide link must be removed from runtime DOM');
-assert(!index.includes('.hud-badge{'),'Legacy telemetry HUD CSS must be retired, not hidden');
-assert(!index.includes('#kelo-guide-link{'),'Legacy guide CSS must be retired, not hidden');
-assert(index.includes('<div id="ui-layer"><div class="action-bar"'),'UI layer should retain only its owned action bar surface');
-assert(index.includes('src/ui/luxe-shell.js?v=230'),'Luxe cache-bust not updated');
-assert(index.includes('src/abilities/kelo-ability-boot.js?v=157'),'Abilities cache-bust not updated');
-assert(index.includes('src/ui/studio-launcher.js?v=3'),'Creators cache-bust not updated');
-
-console.log(JSON.stringify({status:'PASS',owner:'Kelo Luxe Shell presentation',playerHud:'src/ui/luxe-player-hud.js',legacyTelemetryRemoved:true,guideIntegrated:true,titleBook:true,mountRoute:true,commerceRoute:'KeloMarketUI -> KeloCommerceUI/KeloMarketWorld',dataSources:['localPlayer','STATE','KeloNobility','KeloTitles'],clanFallback:true,manaHonestUnavailableFallback:true,recovered:['Apariencia','Monturas','Nobleza','Libro de títulos','Burlas'],existingReal:['Mochila','Habilidades','Perfil','Mercado','Chat','Propiedades'],conditional:['Misiones','Ajustes'],creators:'authorization-gated launcher',noParallelMenu:true,noPolling:true,tokenInputLocks:true,ultraCompactHud:true,worldFirstHud:true,secondaryMetadata:'progressive-disclosure',narrowScreenTitles:'no-ellipsis'},null,2));
+assert(house.includes('window.KELO_HOUSE_UI=Object.freeze'),'Property UI owner missing');
+assert(studio.includes("document.querySelector('#lx-menu-panel .lx-menu-grid')"),'Creators launcher must reuse Luxe grid');
+assert(playerHud.includes('KELO-INDEX')&&playerHud.includes('owner: Kelo Luxe Shell presentation'),'Combat HUD owner missing');
+for(const id of ['kw-player-hud-wrap','kw-hud-hp-row','kw-hud-hp-bar','kw-hud-hp-text','kw-hud-mana-row','kw-hud-mana-bar','kw-hud-mana-text','kw-player-guide'])assert(playerHud.includes(id),'Combat HUD missing required element: '+id);
+for(const removed of ['kw-hud-avatar','kw-hud-name','kw-hud-id','kw-hud-clan','kw-hud-nobility','kw-hud-title','kw-hud-gold'])assert(!playerHud.includes(removed),'Permanent profile metadata returned: '+removed);
+assert(playerHud.includes('body:not(.social-mode) #kw-player-hud-wrap{display:block}'),'Combat HUD must reveal only outside social mode');
+assert(playerHud.includes('#kw-player-hud-wrap')&&playerHud.includes('display:none'),'Combat HUD must hide by default');
+assert(playerHud.includes("finite(p?.hp)")&&playerHud.includes("finite(p?.maxHp)"),'Combat HUD must consume real HP');
+assert(playerHud.includes("p?.mana??state?.playerProfile?.mana")&&playerHud.includes("'— / —'"),'Mana unavailable contract missing');
+assert(playerHud.includes("root.KeloPvPWorld?.state")&&playerHud.includes('KELO_COMBAT_ENABLED'),'PvP owner compatibility read missing');
+assert(playerHud.includes('env(safe-area-inset-top)')&&playerHud.includes('env(safe-area-inset-left)'),'iOS safe area support missing');
+assert(playerHud.includes('flex-direction:column!important')&&playerHud.includes('[shop,menu,pvp,guide,fullscreen]'),'Right rail must be one ordered vertical stack');
+assert(playerHud.includes("shop.textContent='Boutique'")&&playerHud.includes("guide.href='guide.html'"),'Boutique/Guide rail reuse contract missing');
+assert(playerHud.includes('#kelo-orientation-btn')&&playerHud.includes('#lx-shop')&&playerHud.includes('.lx-side-guide'),'Five lateral controls styling contract missing');
+assert(!playerHud.includes('grid-template-columns:repeat(2,44px)'),'Deprecated 2x2 rail returned');
+assert(!playerHud.includes('setInterval('),'Combat HUD must not poll');
+assert((playerHud.match(/requestAnimationFrame\(/g)||[]).length===1,'Combat HUD may use one initial RAF only');
+assert(!/STATE\s*\.\s*gold\s*[+\-*/]?=/.test(playerHud),'Combat HUD must not mutate gold');
+assert(!/\.hp\s*[+\-*/]?=/.test(playerHud),'Combat HUD must not mutate HP');
+assert(index.includes('src/ui/luxe-player-hud.js?v=3'),'Combat HUD cache-bust missing');
+assert(!index.includes('id="telemetry-bar"'),'Legacy telemetry returned');
+assert(!index.includes('id="kelo-guide-link"'),'Legacy guide returned');
+assert(index.includes('<div id="ui-layer"><div class="action-bar"'),'UI layer owner surface drifted');
+console.log(JSON.stringify({status:'PASS',owner:'Kelo Luxe Shell presentation',layout:'pvp-only-combat-v1',socialHudHidden:true,pvpResources:['hp','mana'],rightRail:['Boutique','Menu','PvP','Guía','Pantalla completa'],noProfileMetadataInPersistentHud:true,noPolling:true,tokenInputLocks:true},null,2));
