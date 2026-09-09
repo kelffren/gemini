@@ -1,10 +1,11 @@
 /* KELO-INDEX
  * area: AUDIT / EQUIPMENT ABILITIES
- * keys: AUDIT EQUIPMENT WEAPON Q W E MOUNT STONES SOURCE CAST SLOT CHOICES
- * purpose: protege 5 Stone intactos, Q/W/E data-driven, selección por slot, sustitución por M1-M3 y reutilización de KeloAbilities
- * online: valida identidad semántica sourceType/sourceId/sourceFingerprint; no prueba servidor real
+ * keys: AUDIT EQUIPMENT WEAPON Q W E MOUNT STONES SOURCE CAST SLOT CHOICES CATALOG MARKET
+ * purpose: protege 5 Stone intactos, Q/W/E data-driven, catálogo de armas, adquisición Commerce y reutilización de KeloAbilities
+ * online: valida IDs/profile/fingerprint/content; la autoridad final del mercado/PvP sigue siendo server-ready
  */
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import { createRequire } from 'node:module';
 const require=createRequire(import.meta.url);
 globalThis.window=globalThis;
@@ -28,6 +29,29 @@ let resolved=data.resolveLoadoutForItem(customSword);assert.equal(resolved.custo
 const invalidSword={slot:'weapon',templateId:'starter_weapon',combatAbilityKeys:['weapon_bow_quickshot','weapon_duelist_step','weapon_royal_break']};
 resolved=data.resolveLoadoutForItem(invalidSword);assert.equal(resolved.customized,false);assert.equal(resolved.selectionStatus,'invalid_fallback');assert.equal(resolved.abilityKeys[0],'weapon_vanguard_cut');
 
+// Real item catalog: each family becomes an equipment item resolvable by the same ability data.
+const itemCatalog=require('../src/systems/equipment-item-catalog.js');globalThis.KELO_EQUIPMENT_ITEM_CATALOG=itemCatalog;
+assert.equal(itemCatalog.version,1);assert.equal(itemCatalog.templates.length,6);assert.equal(itemCatalog.marketOffers.length,6);
+assert.equal(new Set(itemCatalog.templates.map(x=>x.templateId)).size,6);assert.equal(new Set(itemCatalog.templates.map(x=>x.weaponProfileId)).size,6);assert.equal(new Set(itemCatalog.marketOffers.map(x=>x.offerId)).size,6);
+for(const template of itemCatalog.templates){
+ assert.equal(itemCatalog.validateTemplate(template,data).ok,true);assert.equal(template.kind,'equipment');assert.equal(template.slot,'weapon');assert.ok(template.marketPrice>0);
+ const item=itemCatalog.createItem(template.templateId,{id:'audit_'+template.templateId,createdAt:1});assert.equal(item.kind,'equipment');assert.equal(item.slot,'weapon');assert.equal(item.templateId,template.templateId);assert.equal(item.weaponProfileId,template.weaponProfileId);
+ const loadout=data.resolveLoadoutForItem(item);assert.ok(loadout);assert.equal(loadout.profile.id,template.weaponProfileId);assert.equal(loadout.profile.family,template.family);assert.equal(loadout.abilityKeys.length,3);
+}
+const expectedFamilies=['sword','staff','bow','dagger','hammer','frost_staff'];assert.deepEqual(itemCatalog.templates.map(x=>x.family),expectedFamilies);
+
+// LIVE load order + commerce owner contract: catalog must exist before Equipment and Commerce consume it.
+const indexSource=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8');
+const catalogPos=indexSource.indexOf('src/systems/equipment-item-catalog.js'),equipmentPos=indexSource.indexOf('src/systems/equipment-system.js'),commercePos=indexSource.indexOf('src/systems/commerce-authority.js');
+assert.ok(catalogPos>=0&&equipmentPos>catalogPos&&commercePos>catalogPos);
+const commerceSource=fs.readFileSync(new URL('../src/systems/commerce-authority.js',import.meta.url),'utf8');
+new Function(commerceSource);
+assert.ok(commerceSource.includes('KELO_EQUIPMENT_ITEM_CATALOG'));
+assert.ok(commerceSource.includes('catalog.marketOffers'));
+assert.ok(commerceSource.includes("listingId:'demo_listing_'+offer.offerId"));
+assert.ok(commerceSource.includes("!s.demoListings.some(x=>x&&x.listingId===row.listingId)"));
+assert.ok(!commerceSource.includes('shadow_blade_demo'));
+
 let weapon={id:'eq_weapon',templateId:'starter_weapon',slot:'weapon',itemLevel:1,quality:1,grade:1};
 globalThis.KeloEquipment={getEquipped:()=>[weapon]};
 globalThis.KeloMounts={isMounted:()=>false,getEquippedMountId:()=>null};
@@ -39,8 +63,8 @@ assert.ok(EquipmentChannel.getRemainingCooldown(0)>0);assert.equal(stone0.cooldo
 // Same weapon family can select a permitted Q without creating another runtime/profile owner.
 weapon={...weapon,combatAbilityKeys:['weapon_guard_breaker','weapon_duelist_step','weapon_royal_break']};snap=EquipmentChannel.sync(true);assert.equal(snap.customized,true);assert.equal(snap.selectionStatus,'custom');assert.equal(snap.abilityKeys[0],'weapon_guard_breaker');assert.equal(snap.slots[0].abilityKey,'weapon_guard_breaker');result=EquipmentChannel.cast({slotIndex:0,direction:{x:1,y:0}});assert.equal(result.valid,true);assert.equal(lastBridge.abilityKey,'weapon_guard_breaker');assert.equal(stoneSlots[0],stone0);assert.equal(stoneSlots.length,5);
 
-// Switching to another template changes the whole kit by data, not by runtime branches.
-weapon={id:'eq_bow',templateId:'starter_bow',slot:'weapon',itemLevel:1,quality:1,grade:1};snap=EquipmentChannel.sync(true);assert.equal(snap.profileId,'weapon.longbow');assert.equal(snap.weaponFamily,'bow');assert.deepEqual(snap.abilityKeys,['weapon_bow_quickshot','weapon_bow_evasive_step','weapon_bow_arrow_rain']);
+// Switching to a catalog item changes the whole kit by data, not by runtime branches.
+weapon=itemCatalog.createItem('starter_bow',{id:'eq_bow',createdAt:1});snap=EquipmentChannel.sync(true);assert.equal(snap.profileId,'weapon.longbow');assert.equal(snap.weaponFamily,'bow');assert.deepEqual(snap.abilityKeys,['weapon_bow_quickshot','weapon_bow_evasive_step','weapon_bow_arrow_rain']);
 
 // Mount mode replaces weapon Q/W/E rather than stacking a second three-slot bar.
 globalThis.KeloMounts={isMounted:()=>true,getEquippedMountId:()=> 'mount.training_horse',getAbilityLoadout:()=>({mounted:true,mountId:'mount.training_horse',fingerprint:'mount.training_horse|1',slots:['mount_horse_gallop','mount_horse_guard','mount_horse_trample'].map((abilityKey,slotIndex)=>({sourceType:'mount',sourceId:'mount.training_horse',slotIndex,abilityKey}))})};
@@ -52,4 +76,4 @@ assert.equal(casts,3);
 assert.ok(globalThis.KeloEvents.events.some(e=>e.name==='KELO_ABILITY_SOURCE_CAST'&&e.payload.sourceType==='equipment'));
 assert.ok(globalThis.KeloEvents.events.some(e=>e.name==='KELO_ABILITY_SOURCE_CAST'&&e.payload.sourceType==='mount'));
 console.log('KELO_EQUIPMENT_ABILITY_AUDIT=PASS');
-console.log(JSON.stringify({ok:true,weaponProfiles:data.profiles.length,equipmentAbilities:data.abilities.length,weaponSlots:3,mountSlots:3,stoneSlotsUntouched:stoneSlots.length,reusesAbilityEngine:true,genericSourceBridge:true,mountMutualExclusion:true,sourceEvents:true,perItemSlotChoices:true,families:data.profiles.map(p=>p.family)},null,2));
+console.log(JSON.stringify({ok:true,weaponProfiles:data.profiles.length,equipmentAbilities:data.abilities.length,weaponCatalogItems:itemCatalog.templates.length,marketWeaponOffers:itemCatalog.marketOffers.length,weaponSlots:3,mountSlots:3,stoneSlotsUntouched:stoneSlots.length,reusesAbilityEngine:true,genericSourceBridge:true,mountMutualExclusion:true,sourceEvents:true,perItemSlotChoices:true,catalogCommerceBridge:true,families:data.profiles.map(p=>p.family)},null,2));
