@@ -86,6 +86,64 @@
       "playerVisible": true,
       "playerGuideAnchor": "menu-principal",
       "status": "foundation-active"
+    },
+    {
+      "id": "player-stats",
+      "owner": "KeloPlayerStats",
+      "source": "src/systems/player-stats.js",
+      "technicalDoc": "docs/systems/PLAYER_STATS_SYSTEM.md",
+      "playerVisible": false,
+      "status": "foundation-active"
+    },
+    {
+      "id": "titles",
+      "owner": "KeloTitles",
+      "source": "src/systems/title-system.js",
+      "technicalDoc": "docs/systems/TITLE_SYSTEM.md",
+      "playerVisible": true,
+      "playerGuideAnchor": "nobleza-y-titulos",
+      "status": "foundation-active"
+    },
+    {
+      "id": "commerce",
+      "owner": "KeloCommerceAuthority",
+      "source": "src/systems/commerce-authority.js",
+      "technicalDoc": "docs/systems/COMMERCE_SYSTEM.md",
+      "playerVisible": true,
+      "playerGuideAnchor": "mercado-comercio-y-trade",
+      "status": "offline-active-online-ready"
+    },
+    {
+      "id": "regional-economy",
+      "owner": "KeloRegionalEconomy",
+      "source": "src/systems/regional-economy-system.js",
+      "technicalDoc": "docs/systems/REGIONAL_ECONOMY_LOGISTICS_SYSTEM.md",
+      "playerVisible": false,
+      "status": "foundation-api-live-offline-online-ready"
+    },
+    {
+      "id": "caravans",
+      "owner": "KeloCaravans",
+      "source": "src/systems/caravan-system.js",
+      "technicalDoc": "docs/systems/REGIONAL_ECONOMY_LOGISTICS_SYSTEM.md",
+      "playerVisible": false,
+      "status": "foundation-api-live-offline-online-ready"
+    },
+    {
+      "id": "factions-clans",
+      "owner": "KeloFactions",
+      "source": "src/systems/faction-clan-system.js",
+      "technicalDoc": "docs/systems/REGIONAL_ECONOMY_LOGISTICS_SYSTEM.md",
+      "playerVisible": false,
+      "status": "foundation-api-live-offline-online-ready"
+    },
+    {
+      "id": "logistics-devtools",
+      "owner": "KeloLogisticsDevtools",
+      "source": "src/systems/logistics-devtools.js",
+      "technicalDoc": "docs/systems/REGIONAL_ECONOMY_LOGISTICS_SYSTEM.md",
+      "playerVisible": false,
+      "status": "development-observability"
     }
   ]
 }
