@@ -2,7 +2,7 @@
 /* KELO-INDEX
  * area: TOOLING / PERFORMANCE
  * owner: Performance Foundation CI contract
- * keys: AUDIT PERFORMANCE LAZY SLEEP WAKE LRU AOI NETWORK VISIBILITY ABILITIES
+ * keys: AUDIT PERFORMANCE LAZY SLEEP WAKE LRU AOI NETWORK VISIBILITY ABILITIES PVP
  * purpose: detectar regresiones estructurales que vuelven eager/per-frame/global trabajo que debe ser lazy/dormible/espacial
  * public-api: CLI `node scripts/performance-foundation-audit.js`
  * consumes: source text only; no browser/network required
@@ -34,6 +34,7 @@ function ok(condition, message) {
 function has(text, token) { return text.includes(token); }
 
 const profile = read('src/ui/profile-panel-close.js');
+const pvpLoader = read('src/systems/pvp-combat-runtime-loader.js');
 const simulation = read('src/core/simulation-extension-system.js');
 const render = read('src/core/render-extension-system.js');
 const visual = read('src/visuals/visual-system.js');
@@ -49,6 +50,12 @@ const catalog = JSON.parse(read('docs/system-catalog.json'));
 ok(!has(profile, "loadScript('src/core/kelo-runtime-bootstrap.js") && !has(profile, 'RUNTIME_SCRIPTS'), 'Profile no arranca combat/effects/melee como side effect');
 ok(has(profile, 'CUSTOMIZATION_SCRIPTS') && has(profile, 'ensureCustomizer') && has(profile, 'characterCustomizationLazy:true'), 'Character Customizer tiene launcher lazy de primera acción');
 ok(!/character-customizer-(?:ui|preview)\.js[^\n<]*<script/i.test(index), 'Character Customizer pesado no está en el critical path de index.html');
+
+ok(has(pvpLoader, "BOOTSTRAP_SRC='src/core/kelo-runtime-bootstrap.js") && has(pvpLoader, 'ensureCombatReady') && has(pvpLoader, 'combatReady()'), 'PvP carga Combat/Effects/Melee por first-use usando el bootstrap existente');
+ok(has(pvpLoader, 'enterPromise') && has(pvpLoader, 'if(enterPromise)return enterPromise'), 'PvP deduplica entradas mientras Combat está cargando');
+ok(has(pvpLoader, 'Object.getOwnPropertyDescriptors(original)') && has(pvpLoader, 'descriptors.enter=') && has(pvpLoader, 'descriptors.ensureCombatReady='), 'PvP conserva la API/getters del owner al instalar la fachada lazy');
+ok(has(index, 'src/systems/pvp-combat-runtime-loader.js?v=1'), 'Runtime monta el bridge lazy inmediatamente después de KeloPvPWorld');
+ok(!/<script[^>]+src=["']src\/core\/kelo-runtime-bootstrap\.js/i.test(index), 'Combat bootstrap pesado no vuelve al critical path de index.html');
 
 ok(has(simulation, 'setEnabled') && has(simulation, 'enabled') && has(simulation, 'activeBefore'), 'KeloSimulation soporta sleep/wake sin unregister/register por frame');
 ok(has(render, 'setEnabled') && has(render, 'enabled') && has(render, 'activeAfter'), 'KeloRender soporta sleep/wake sin wrapper paralelo');
@@ -83,6 +90,7 @@ const forbidden = [
   ['src/core/render-extension-system.js', /setInterval\s*\(/],
   ['src/ui/profile-panel-close.js', /setInterval\s*\(/],
   ['src/abilities/kelo-ability-boot.js', /setInterval\s*\(/],
+  ['src/systems/pvp-combat-runtime-loader.js', /setInterval\s*\(/],
 ];
 for (const [rel, re] of forbidden) ok(!re.test(read(rel)), rel + ' no introduce watchdog setInterval');
 
