@@ -93,6 +93,7 @@ export function installStudioAuthorityMirror({ adapter, actorId, getDraftId } = 
   const uninstall = adapter.installCommandMirror(mirror);
   return Object.freeze({
     uninstall,
+    previewScale: (entityId,value) => scalePlacement({id:String(entityId)},value),
     authorityIdFor: id => authorityIds.get(String(id)) || null,
     collisionAuthorityIdFor: id => collisionAuthorityIds.get(String(id)) || null,
     seed(entityId, placementId) { if (entityId && placementId) authorityIds.set(String(entityId), String(placementId)); },

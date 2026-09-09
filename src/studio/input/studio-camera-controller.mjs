@@ -11,7 +11,7 @@ const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const MIN_ZOOM=.35;
 const MAX_ZOOM=3;
 
-export function createStudioCameraController({root=globalThis,onNavigateStart=()=>{},isUi=()=>false}={}){
+export function createStudioCameraController({root=globalThis,onNavigateStart=()=>{},isUi=()=>false,onPinchStart=()=>false,onPinchMove=()=>{},onPinchEnd=()=>{}}={}){
   const document=root.document,owner=root.KeloCamera;
   if(!document||!owner?.snapshot||!owner?.setTarget||!owner?.setBaseZoom||!owner?.screenToWorld||!owner?.setFollowTuning)throw new Error('STUDIO_CAMERA_OWNER_REQUIRED');
 
@@ -54,7 +54,7 @@ export function createStudioCameraController({root=globalThis,onNavigateStart=()
     if(e.pointerType==='touch'){
       pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
       if(pointers.size===1&&panMode){onNavigateStart();touchPan={id:e.pointerId,x:e.clientX,y:e.clientY};navTouchIds.add(e.pointerId);consume(e);return;}
-      if(pointers.size===2){onNavigateStart();touchPan=null;for(const id of pointers.keys())navTouchIds.add(id);const [a,b]=[...pointers.values()],cx=(a.x+b.x)/2,cy=(a.y+b.y)/2;pinch={cx,cy,d:Math.max(1,Math.hypot(a.x-b.x,a.y-b.y)),zoom};consume(e);}return;
+      if(pointers.size===2){touchPan=null;for(const id of pointers.keys())navTouchIds.add(id);const [a,b]=[...pointers.values()],cx=(a.x+b.x)/2,cy=(a.y+b.y)/2,d=Math.max(1,Math.hypot(a.x-b.x,a.y-b.y)),world=toWorld(cx,cy),delegated=!!onPinchStart({clientX:cx,clientY:cy,worldX:world.x,worldY:world.y,distance:d});if(delegated){pinch={mode:'delegate',cx,cy,d,zoom};consume(e);return;}onNavigateStart();pinch={mode:'camera',cx,cy,d,zoom};consume(e);}return;
     }
     if(e.button===1||(e.button===0&&(space||panMode))){onNavigateStart();mousePan={id:e.pointerId,x:e.clientX,y:e.clientY};consume(e);}
   }
@@ -62,14 +62,14 @@ export function createStudioCameraController({root=globalThis,onNavigateStart=()
     if(!enabled)return;
     if(e.pointerType==='touch'&&pointers.has(e.pointerId)){
       pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
-      if(pointers.size>=2&&pinch){for(const id of pointers.keys())navTouchIds.add(id);const [a,b]=[...pointers.values()].slice(0,2),cx=(a.x+b.x)/2,cy=(a.y+b.y)/2,d=Math.max(1,Math.hypot(a.x-b.x,a.y-b.y));panScreen(cx-pinch.cx,cy-pinch.cy);setZoom(pinch.zoom*(d/pinch.d),{anchorX:cx,anchorY:cy});pinch={...pinch,cx,cy};consume(e);}
+      if(pointers.size>=2&&pinch){for(const id of pointers.keys())navTouchIds.add(id);const [a,b]=[...pointers.values()].slice(0,2),cx=(a.x+b.x)/2,cy=(a.y+b.y)/2,d=Math.max(1,Math.hypot(a.x-b.x,a.y-b.y));if(pinch.mode==='delegate'){const world=toWorld(cx,cy);onPinchMove({clientX:cx,clientY:cy,worldX:world.x,worldY:world.y,distance:d,ratio:d/pinch.d});consume(e);}else{panScreen(cx-pinch.cx,cy-pinch.cy);setZoom(pinch.zoom*(d/pinch.d),{anchorX:cx,anchorY:cy});pinch={...pinch,cx,cy};consume(e);}}
       else if(touchPan&&e.pointerId===touchPan.id&&panMode){const dx=e.clientX-touchPan.x,dy=e.clientY-touchPan.y;touchPan.x=e.clientX;touchPan.y=e.clientY;panScreen(dx,dy);consume(e);}
       else if(navTouchIds.has(e.pointerId))consume(e);return;
     }
     if(mousePan&&e.pointerId===mousePan.id){const dx=e.clientX-mousePan.x,dy=e.clientY-mousePan.y;mousePan.x=e.clientX;mousePan.y=e.clientY;panScreen(dx,dy);consume(e);}
   }
   function pointerup(e){
-    if(e.pointerType==='touch'){const wasNav=navTouchIds.has(e.pointerId);pointers.delete(e.pointerId);if(touchPan&&touchPan.id===e.pointerId)touchPan=null;if(pointers.size<2)pinch=null;if(wasNav){navTouchIds.delete(e.pointerId);consume(e);}if(!pointers.size)navTouchIds.clear();return;}
+    if(e.pointerType==='touch'){const wasNav=navTouchIds.has(e.pointerId),endingPinch=pinch;pointers.delete(e.pointerId);if(touchPan&&touchPan.id===e.pointerId)touchPan=null;if(pointers.size<2){if(endingPinch?.mode==='delegate')onPinchEnd({cancelled:e.type==='pointercancel'});pinch=null;}if(wasNav){navTouchIds.delete(e.pointerId);consume(e);}if(!pointers.size)navTouchIds.clear();return;}
     if(mousePan&&e.pointerId===mousePan.id){mousePan=null;consume(e);}
   }
   function resume(){

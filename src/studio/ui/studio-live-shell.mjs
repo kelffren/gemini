@@ -11,7 +11,7 @@
 
 import { virtualRange } from './virtual-list.mjs';
 
-const SHELL_VERSION='studio-live-shell-v1.6.0';
+const SHELL_VERSION='studio-live-shell-v1.7.0';
 
 const TOOL_LABELS=Object.freeze({
   select:'Selección',
@@ -202,6 +202,11 @@ export function createStudioLiveShell({
   .ks-compact-copy{min-width:0}
   .ks-compact-copy small{display:block;color:#789085;font-size:6px;font-weight:900;letter-spacing:.08em}
   .ks-compact-copy strong{display:block;color:#fff1b8;font-size:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+  .ks-scale-hud{position:absolute;left:50%;bottom:max(76px,calc(env(safe-area-inset-bottom) + 70px));transform:translateX(-50%);display:none;align-items:center;gap:5px;padding:5px 6px;border:1px solid rgba(231,197,106,.58);border-radius:14px;background:rgba(5,14,16,.97);box-shadow:0 12px 34px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.05);pointer-events:auto;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);z-index:3}
+  .ks-scale-hud.on{display:flex}.ks-scale-hud.gesture{border-color:#f4dd8d;box-shadow:0 0 0 2px rgba(231,197,106,.12),0 12px 34px rgba(0,0,0,.55)}
+  .ks-scale-hud small{font-size:5.5px;line-height:1.15;font-weight:950;letter-spacing:.1em;color:#8fa89f;text-align:center}.ks-scale-hud small span{color:#e7c56a}
+  .ks-scale-hud button{width:42px;height:40px;padding:0;border:1px solid rgba(231,197,106,.3);border-radius:11px;background:#102022;color:#fff0b2;font-size:21px;font-weight:850;line-height:1}
+  .ks-scale-hud .ks-scale-reset{font-size:15px}.ks-scale-value{min-width:58px;text-align:center;color:#fff2bc;font-size:13px;font-weight:950;font-variant-numeric:tabular-nums}
 
   @media(max-width:760px){
     .ks-top{left:8px;right:8px;min-height:52px;padding:7px 8px;border-radius:16px}
@@ -314,6 +319,14 @@ export function createStudioLiveShell({
         </section>
       </div>
     </aside>
+
+    <div class="ks-scale-hud" aria-label="Escala del objeto seleccionado">
+      <small>ESCALA<br><span>2 DEDOS</span></small>
+      <button data-act="scale-down" aria-label="Reducir objeto">−</button>
+      <strong class="ks-scale-value">100%</strong>
+      <button data-act="scale-up" aria-label="Agrandar objeto">＋</button>
+      <button class="ks-scale-reset" data-act="scale-reset" aria-label="Restablecer escala a 100%">↺</button>
+    </div>
 
     <div class="ks-bottom">
       <div class="ks-compact-bar">
@@ -434,6 +447,8 @@ export function createStudioLiveShell({
   const compactLabel=root.querySelector('.ks-active-asset-label');
   const activeToolValue=root.querySelector('.ks-active-tool-value');
   const selectionBadge=root.querySelector('.ks-selection-badge');
+  const scaleHud=root.querySelector('.ks-scale-hud');
+  const scaleValue=root.querySelector('.ks-scale-value');
   const searches=[root.querySelector('.ks-asset-search'),root.querySelector('.ks-asset-search-mobile')].filter(Boolean);
 
   let rows=assets.slice(),selectedAsset=null,mode='select',erase=false,entities=[],selection=[],brushSize=1;
@@ -558,6 +573,8 @@ export function createStudioLiveShell({
     syncContextActions();
   }
 
+  function syncScaleHud({forcedScale=null,active=false}={}){const entity=selection.length===1?entities.find(e=>String(e.id)===String(selection[0])):null,scale=forcedScale==null?Math.max(.1,Math.min(8,Number(entity?.transform?.scale)||1)):Math.max(.1,Math.min(8,Number(forcedScale)||1)),show=!!entity&&isMobile()&&root.dataset.sheetOpen!=='1';if(scaleValue)scaleValue.textContent=`${Math.round(scale*100)}%`;scaleHud?.classList.toggle('on',show);scaleHud?.classList.toggle('gesture',show&&!!active);}
+
   function syncContextActions(){
     const hasSelection=selection.length>0;
     root.dataset.selectionCount=String(selection.length);
@@ -571,6 +588,7 @@ export function createStudioLiveShell({
     });
     root.querySelectorAll('[data-act="rotate"]').forEach(button=>{button.disabled=!hasSelection&&!selectedAsset;});
     root.querySelectorAll('[data-act="scale-down"],[data-act="scale-reset"],[data-act="scale-up"]').forEach(button=>{button.disabled=!hasSelection;});
+    syncScaleHud();
   }
 
   function setCompact(next){
@@ -578,12 +596,14 @@ export function createStudioLiveShell({
     bottom?.classList.toggle('ks-compact',compact);
     root.dataset.compact=compact?'asset':'full';
     if(compact){root.dataset.sheetOpen='0';document.activeElement?.blur?.();}
+    syncScaleHud();
     return compact;
   }
 
   function openAssets(){
     setCompact(false);
     root.dataset.sheetOpen='1';
+    syncScaleHud();
     const tab=root.querySelector('[data-tab="assets"]');
     root.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('on',b===tab));
     root.querySelectorAll('[data-pane]').forEach(p=>p.classList.toggle('on',p.dataset.pane==='assets'));
@@ -667,6 +687,7 @@ export function createStudioLiveShell({
     const tab=e.target.closest('[data-tab]');
     if(tab){
       root.dataset.sheetOpen='1';
+      syncScaleHud();
       root.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('on',b===tab));
       root.querySelectorAll('[data-pane]').forEach(p=>p.classList.toggle('on',p.dataset.pane===tab.dataset.tab));
       return;
@@ -723,6 +744,7 @@ export function createStudioLiveShell({
     setCompact,
     openAssets,
     setActiveTool:setToolLabel,
+    setScaleGesture(scale,{active=false}={}){syncScaleHud({forcedScale:scale,active});},
     setSelectedAsset(id,{compact=false}={}){
       selectedAsset=id==null?null:String(id);
       syncCompactAsset();
