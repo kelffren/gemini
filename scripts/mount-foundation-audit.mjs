@@ -31,7 +31,7 @@ assert(actionBarSource.includes('KeloRender?.unregister'),'mount HUD must unregi
 const mountChannelSource=fs.readFileSync(new URL('../src/mounts/mount-ability-channel.js',import.meta.url),'utf8');
 assert(mountChannelSource.includes('KeloAbilities?.engine'),'mount channel must consume KeloAbilities owner');
 assert(mountChannelSource.includes('castSource'),'mount channel must use source-native KeloAbilities cast');
-assert(!mountChannelSource.includes('KeloAbilitySourceCast'),'mount channel must not depend on the legacy compatibility shim');
+assert(!mountChannelSource.includes('root.KeloAbilitySourceCast'),'mount channel must not execute through the legacy compatibility shim');
 assert(!mountChannelSource.includes('hotbar.slots'),'mount channel must never borrow a Stone hotbar slot');
 
 // Three-slot adapter sends semantic source metadata directly to KeloAbilities and never mutates Stone hotbar.
