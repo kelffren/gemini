@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: MOVEMENT / PRESENTATION
  * owner: KeloMovement consumer
- * keys: MOVEMENT GAIT SPEED STRIDE PLANT AUDIT AIM FACING PVP PARITY
+ * keys: MOVEMENT GAIT SPEED STRIDE PLANT ONSET STEP-OFF AUDIT AIM FACING PVP PARITY
  * purpose: calcula gait/velocidad objetivo y estado visual de zancada usando hooks del owner KeloMovement
  * public-api: KELO_MOVEMENT_AUDIT
  * consumes: KeloMovementProfile, KeloMovement, input, CONFIG, localPlayer, KELO_COMBAT_ENABLED
@@ -18,6 +18,7 @@
   // MOV-STOP-V2: release never freezes an arbitrary stride pose; physics remains unchanged.
   // MOV-REVERSAL-AUDIT-V1: measure real lateral reversal continuity instead of publishing inert counters.
   // MOV-PLANT-V1: settle on authored lateral frame 2 after release; frame 0 remains available via ?plantFrame=0 baseline.
+  // MOV-ONSET-V1: first real resolved displacement steps off the plant pose immediately; blocked intent cannot advance stride.
   // MOV-COMBAT-FACING-V1: movement presentation never overwrites PvP aim-facing; combat geometry remains authority-owned elsewhere.
   // MOV-PARITY-V1: speed/gait semantics come from KeloMovementProfile, shared with server authority.
   const movementProfile = window.KeloMovementProfile;
@@ -82,7 +83,7 @@
 
   function publishAudit(mag, gait, speedCap, visual) {
     window.KELO_MOVEMENT_AUDIT = {
-      version: 'MOV-shared-profile-v1',
+      version: 'MOV-shared-profile-v1-onset-step-off',
       movementProfileVersion: movementProfile.version,
       rawTouchMag: rawTouchMag(),
       processedMag: mag,
@@ -104,6 +105,11 @@
       stridePhase: visual ? visual.stridePhase : PLANT_PHASE,
       strideDistancePx: visual ? visual.strideDistancePx : 0,
       lastStepDistancePx: visual ? visual.lastStepDistancePx : 0,
+      onsetCount: visual ? visual.onsetCount : 0,
+      onsetStepOffCount: visual ? visual.onsetStepOffCount : 0,
+      onsetPendingResolvedDisplacement: !!(visual && visual.pendingStepOff),
+      lastOnsetFromFrame: visual ? visual.lastOnsetFromFrame : PLANT_FRAME,
+      lastOnsetToFrame: visual ? visual.lastOnsetToFrame : PLANT_FRAME,
       releaseCount: visual ? visual.releaseCount : 0,
       lastReleaseFromFrame: visual ? visual.lastReleaseFromFrame : PLANT_FRAME,
       lastReleaseFromPhase: visual ? visual.lastReleaseFromPhase : PLANT_PHASE,
@@ -133,6 +139,11 @@
         strideDistancePx: 0,
         lastStepDistancePx: 0,
         cycleWorldPx: WALK_CYCLE_WORLD_PX,
+        pendingStepOff: false,
+        onsetCount: 0,
+        onsetStepOffCount: 0,
+        lastOnsetFromFrame: PLANT_FRAME,
+        lastOnsetToFrame: PLANT_FRAME,
         releaseCount: 0,
         lastReleaseFromFrame: PLANT_FRAME,
         lastReleaseFromPhase: PLANT_PHASE,
@@ -170,6 +181,11 @@
     if (hasIntent || physicallyMoving) {
       v.stopElapsed = 0;
       v.on = true;
+      if (!wasOn) {
+        v.pendingStepOff = true;
+        v.onsetCount += 1;
+        v.lastOnsetFromFrame = v.frame;
+      }
     } else if (MOV_STOP_V2) {
       if (wasOn) {
         v.releaseCount += 1;
@@ -178,11 +194,13 @@
       }
       v.stopElapsed = VISUAL_STOP_HOLD_SEC;
       v.on = false;
+      v.pendingStepOff = false;
       v.unsupportedPoseFreezeMs = 0;
       v.releaseToStablePlantMs = 0;
     } else {
       v.stopElapsed += Math.max(0, dt || 0);
       v.on = v.stopElapsed < VISUAL_STOP_HOLD_SEC;
+      if (!v.on) v.pendingStepOff = false;
       v.unsupportedPoseFreezeMs = v.on ? v.stopElapsed * 1000 : 0;
       v.releaseToStablePlantMs = v.on ? v.stopElapsed * 1000 : VISUAL_STOP_HOLD_SEC * 1000;
     }
@@ -209,9 +227,17 @@
     v.lastStepDistancePx = dist > MIN_VISUAL_MOVE_PX ? dist : 0;
     v.cycleWorldPx = cycleWorldPxFor(mag, gait);
     if (v.on && v.lastStepDistancePx > 0) {
+      if (v.pendingStepOff) {
+        // Step off the authored plant pose only when world displacement actually resolved.
+        // This keeps blocked intent foot-planted while making responsive movement visible on the first real step.
+        v.stridePhase = ((PLANT_FRAME + 1) % 4) / 4;
+        v.pendingStepOff = false;
+        v.onsetStepOffCount += 1;
+      }
       v.strideDistancePx += v.lastStepDistancePx;
       v.stridePhase = (v.stridePhase + v.lastStepDistancePx / v.cycleWorldPx) % 1;
       v.frame = Math.floor(v.stridePhase * 4) % 4;
+      if (v.onsetStepOffCount === v.onsetCount) v.lastOnsetToFrame = v.frame;
     } else if (!v.on) {
       v.stridePhase = PLANT_PHASE;
       v.strideDistancePx = 0;
