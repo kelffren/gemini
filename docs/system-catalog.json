@@ -62,6 +62,14 @@
       "status": "foundation-transitional"
     },
     {
+      "id": "performance-foundation",
+      "owner": "existing-owners-contract",
+      "source": "src/systems/performance-governor.js",
+      "technicalDoc": "docs/systems/PERFORMANCE_FOUNDATION.md",
+      "playerVisible": false,
+      "status": "foundation-active"
+    },
+    {
       "id": "avatar-render",
       "owner": "KeloAvatar",
       "source": "src/core/avatar-render-system.js",
