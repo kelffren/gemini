@@ -221,6 +221,14 @@
       "technicalDoc": "docs/systems/REGIONAL_ECONOMY_LOGISTICS_SYSTEM.md",
       "playerVisible": false,
       "status": "development-observability"
+    },
+    {
+      "id": "logistics-admin-ui",
+      "owner": "KeloLogisticsAdminUI",
+      "source": "src/ui/logistics-admin-ui.js",
+      "technicalDoc": "docs/systems/LOGISTICS_ADMIN_UI.md",
+      "playerVisible": false,
+      "status": "internal-admin-qa-live"
     }
   ]
 }
