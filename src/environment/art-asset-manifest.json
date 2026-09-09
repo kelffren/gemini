@@ -71,7 +71,7 @@
       "sampling": "nearest",
       "padding": 0,
       "spacing": 0,
-      "frames": {"mode": "irregular", "count": 17, "metadata": "src/environment/generated/arboleskelo1-atlas.js"},
+      "frames": {"mode": "irregular", "count": 17, "metadata": "src/environment/generated/arboleskelo1-atlas.json"},
       "anchor": {"mode": "registry-frame"},
       "visualBounds": {"mode": "registry-frame"},
       "footprint": {"mode": "registry-instance"},
