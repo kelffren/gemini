@@ -39,19 +39,20 @@ jobs:
           target_dir = root / 'assets' / 'world' / 'imperial-plaza'
           target_dir.mkdir(parents=True, exist_ok=True)
 
+          # Order matches the visual inspection contact sheet used to identify them.
           assets = [
-              ('assets/461588171420118.png', 'fuente-de-la-justicia.png', False),
-              ('assets/6c541509-a9b5-5045-ae88-65f9781ad378.png', 'rosa-de-los-vientos.png', False),
-              ('assets/0ec46354-2860-5612-b415-bbebfce85e4f.png', 'plataforma-ceremonial.png', True),
-              ('assets/2a3a286d8af2116d865d50a434b4acef.png', 'jardinera-imperial-curva.png', True),
-              ('assets/08e43293-3dbb-54cb-9d49-f3cc69270475.png', 'estandarte-imperial.png', False),
-              ('assets/0a136956-22c6-5642-8c9b-d07d80bc3aeb.png', 'fuente-de-los-leones.png', False),
-              ('assets/045f2266-27fe-5e9f-be84-b52b9351a222.png', 'podio-imperial.png', False),
-              ('assets/0545fa69-2887-5936-9cc5-c3801a9357b6.png', 'kiosco-imperial.png', True),
-              ('assets/011d93ed-f524-59db-8b77-60c7dd6e5751.png', 'obelisco-imperial.png', False),
-              ('assets/03b2d8aa-56ef-5382-b29f-f75a42bdd3d0.png', 'escalinata-imperial.png', False),
-              ('assets/02a73d1d-03c4-515b-969d-3b26b03a0894.png', 'farola-imperial.png', False),
-              ('assets/010ce07d-8d90-5874-8cd9-1734f7e10d19.png', 'topiario-imperial.png', False),
+              ('assets/0401F8B5-2FCF-4CC5-B19A-CFF0D738E77A.png', 'fuente-de-la-justicia.png', False),
+              ('assets/0FED06CB-E23B-433C-A88D-55DDC3EC7BB5.png', 'rosa-de-los-vientos.png', False),
+              ('assets/1C16A3B8-CC59-420C-9B5B-0B483375F842.png', 'plataforma-ceremonial.png', True),
+              ('assets/3F064BEE-CC8E-4431-BBF8-3722A05A97C1.png', 'jardinera-imperial-curva.png', True),
+              ('assets/4635DA44-88C7-4A27-B567-8DA0F178DAA0.png', 'estandarte-imperial.png', False),
+              ('assets/608D7806-71E8-4DEB-97E8-33EE449A7D27.png', 'fuente-de-los-leones.png', False),
+              ('assets/930630F4-557E-40C7-A928-8DFD72B843B1.png', 'podio-imperial.png', False),
+              ('assets/BA1A549D-6FF5-4170-AD93-E81432793911.png', 'kiosco-imperial.png', True),
+              ('assets/CCD7666A-7999-46F5-9884-AA5CB10C4937.png', 'obelisco-imperial.png', False),
+              ('assets/E765632E-EFE2-401E-AF87-06BA8FF7E1B0.png', 'escalinata-imperial.png', False),
+              ('assets/E9CF5E8F-5983-4C9F-BB2D-BA0D61F9389D.png', 'farola-imperial.png', False),
+              ('assets/FE7DE07B-52F2-4C1D-AF7A-486DC5556075.png', 'topiario-imperial.png', False),
           ]
 
           def remove_border_black(src: Path, dst: Path):
@@ -127,18 +128,18 @@ jobs:
         shell: bash
         run: |
           for old in \
-            assets/461588171420118.png \
-            assets/6c541509-a9b5-5045-ae88-65f9781ad378.png \
-            assets/0ec46354-2860-5612-b415-bbebfce85e4f.png \
-            assets/2a3a286d8af2116d865d50a434b4acef.png \
-            assets/08e43293-3dbb-54cb-9d49-f3cc69270475.png \
-            assets/0a136956-22c6-5642-8c9b-d07d80bc3aeb.png \
-            assets/045f2266-27fe-5e9f-be84-b52b9351a222.png \
-            assets/0545fa69-2887-5936-9cc5-c3801a9357b6.png \
-            assets/011d93ed-f524-59db-8b77-60c7dd6e5751.png \
-            assets/03b2d8aa-56ef-5382-b29f-f75a42bdd3d0.png \
-            assets/02a73d1d-03c4-515b-969d-3b26b03a0894.png \
-            assets/010ce07d-8d90-5874-8cd9-1734f7e10d19.png; do
+            assets/0401F8B5-2FCF-4CC5-B19A-CFF0D738E77A.png \
+            assets/0FED06CB-E23B-433C-A88D-55DDC3EC7BB5.png \
+            assets/1C16A3B8-CC59-420C-9B5B-0B483375F842.png \
+            assets/3F064BEE-CC8E-4431-BBF8-3722A05A97C1.png \
+            assets/4635DA44-88C7-4A27-B567-8DA0F178DAA0.png \
+            assets/608D7806-71E8-4DEB-97E8-33EE449A7D27.png \
+            assets/930630F4-557E-40C7-A928-8DFD72B843B1.png \
+            assets/BA1A549D-6FF5-4170-AD93-E81432793911.png \
+            assets/CCD7666A-7999-46F5-9884-AA5CB10C4937.png \
+            assets/E765632E-EFE2-401E-AF87-06BA8FF7E1B0.png \
+            assets/E9CF5E8F-5983-4C9F-BB2D-BA0D61F9389D.png \
+            assets/FE7DE07B-52F2-4C1D-AF7A-486DC5556075.png; do
             test ! -e "$old"
           done
           test "$(find assets/world/imperial-plaza -maxdepth 1 -type f -name '*.png' | wc -l)" -eq 12
