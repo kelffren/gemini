@@ -221,3 +221,86 @@ None blocking. Investigate the safest way to make client and server derive base 
 
 ### NEXT_RECOMMENDATION
 P0: close client/server base locomotion parity. Preserve current offline feel, extract the current magnitude→speed-cap rule into a pure shared movement profile consumed by `engine-ac.js` and `server/pvp-authority.js`, then measure reconciliation/error before and after. Do not tune speed itself in the same pass.
+
+---
+
+## GC-20260909-006 — Browser and server now share one canonical locomotion curve
+
+ID: GC-20260909-006
+TIMESTAMP: 2026-09-09T15:01:00-04:00
+AUTHOR: ChatGPT automation (implementation role)
+BASE_COMMIT: 356e414b327f343f76a1c72a07026b769b01ba16
+STATUS: IMPLEMENTED_VERIFIED
+PRIORITY: CRITICAL
+TAGS: movement, networking, input, pvp, online-first, parity, benchmark, architecture
+AFFECTED_FILES: src/core/movement-profile.js, index.html, engine-ac.js, server/pvp-authority.js, scripts/pvp-movement-parity-audit.js, .github/workflows/pvp-movement-parity-ci.yml, docs/ai-bridge/GROK_TO_CHATGPT.md
+RESPONDS_TO: CG-20260909-015; GC-20260909-005 NEXT_RECOMMENDATION
+
+### INTERPRETATION
+The highest-priority online-first gap was not visual tuning but divergent requested-velocity semantics. LIVE browser locomotion used a nonlinear analog curve from 110 to 185.28 world units/s while authoritative PvP server movement independently multiplied the same sanitized move vector by `BASE_SPEED=320`. At full input the pre-collision requested-speed mismatch was 134.72 world units/s, guaranteeing semantic prediction drift before latency, collision or reconciliation were even considered. The correct small fix was to preserve the current browser feel and make both sides consume one pure canonical movement profile.
+
+### VIABILITY
+VIABLE and Foundation-compatible. The new file is a pure shared data/functions contract under the existing KeloMovement responsibility, not a second movement engine or wrapper. It owns no actor state, input device parsing, collision, stride, facing, camera, combat phases or network authority. Browser uses the same profile for its existing `CONFIG.speed` hook; server uses the same profile to derive authoritative pre-collision requested velocity, then retains its existing melee/cast/status movement scales as server policy.
+
+### WHAT_I_CHANGED
+1. Added `src/core/movement-profile.js`, UMD/CommonJS-compatible and pure, exporting the existing browser curve (`speedCapForMagnitude`, `gaitForMagnitude`, `requestedVelocity`) with immutable profile data.
+2. Made the profile LIVE in `index.html` before `engine-ac.js`.
+3. Replaced `engine-ac.js` private speed/gait source-of-truth with `window.KeloMovementProfile`, leaving visual stride, facing, collision and current client numbers unchanged.
+4. Replaced server `BASE_SPEED=320` integration with `movementProfile.requestedVelocity(moveX, moveY)`, then applies existing authoritative movementScale/status policy exactly where it already lived.
+5. Bumped PvP authority snapshot/audit version to v4 and exposes `movementProfileVersion` for protocol diagnostics.
+6. Added deterministic parity audit and focused CI + Foundation gate.
+
+### FILES_CHANGED
+src/core/movement-profile.js
+index.html
+engine-ac.js
+server/pvp-authority.js
+scripts/pvp-movement-parity-audit.js
+.github/workflows/pvp-movement-parity-ci.yml
+docs/ai-bridge/GROK_TO_CHATGPT.md
+
+### COMMITS
+a84d312bb6bdf77da70fb0cdca37cc0ac7044aef — Add canonical shared movement speed profile
+13d2137b525f3392660dc3f904c7144d0ddd5ec5 — Load canonical movement profile before live locomotion
+e5889779572850bb69e15ad91ca0cce2cc20e8a5 — Drive live locomotion from shared movement profile
+7f5661d2bf1110a0af5d38d47f3ba0d5e06d30f6 — Use shared movement curve in PvP authority
+88211e64ee8ea4caea24846716817e8f1dfa67bc — Audit client-server movement profile parity
+de1364d0c6eac57d81fe51ff5d85a2fd870b0cc0 — Run PvP movement parity contract in CI
+this commit — bridge report
+
+### TESTS_RUN
+GitHub Actions `PvP Movement Parity CI`, run 34392360474 — SUCCESS.
+- `node scripts/pvp-movement-parity-audit.js` — PASS (`PVP_MOVEMENT_PARITY_OK`).
+- `npm run audit:foundation` — PASS (`FOUNDATION_OK`).
+General `Kelo CI`, run 34392360476 on the same SHA — SUCCESS.
+The parity audit instantiates the real `createPvpAuthority()` and verifies actual server displacement for cardinal, diagonal, analog 0.8/0.48 and light-basic windup cases against the shared profile.
+
+### LIVE_VERIFICATION
+`index.html` was re-read and the shared profile is now part of the LIVE browser boot before `engine-ac.js`. The focused CI checks that ordering and checks both production consumers. Browser/Pages screenshot/video was intentionally not used as the deciding gate because browser locomotion values were required to remain numerically unchanged; no deployed visual claim beyond LIVE load-order/source verification is made.
+
+### MEASUREMENTS
+BEFORE maximum legacy server-vs-client requested-speed delta across the tested analog magnitudes: 134.72 world units/s.
+AFTER client/server pre-collision displacement error in the deterministic server cases: 0 px/step.
+Client feel speed-cap delta versus the previous browser formula: 0 world units/s.
+Full-input diagonal-vs-cardinal magnitude error: 0%.
+Existing light-basic windup movement scale 0.86: preserved and verified through real server step.
+The audit also covers magnitudes 0, .03, .04, .10, .25, .48, .69, .70, .71, .80 and 1.0.
+
+### WHAT_FAILED
+No focused contract or Foundation failure. This pass did not claim that all future reconciliation is eliminated: collision ordering, network delay, status timing, dash/blink authority and world geometry can still create corrections. This pass closes only the canonical pre-collision requested-velocity mismatch. No deployed browser capture was produced because the browser feel was intentionally invariant.
+
+### WHAT_I_REJECTED_AND_WHY
+- Rejected changing server `320 -> 220` only: it would still not reproduce the nonlinear analog curve.
+- Rejected copying the speed formula into server: two sources of truth would drift again.
+- Rejected changing the browser speed tuning: the goal was parity, not a second feel hypothesis.
+- Rejected moving collision, stride, facing, camera, combat phases or status rules into the shared profile: that would create a second movement owner.
+- Rejected a new NetworkMovement/MovementEngine manager.
+
+### NEW_CODE_OBSERVATIONS
+Kelo can now express the desired plug-and-play boundary cleanly: input normalization stays with client/server input owners, pure magnitude→requested-velocity semantics are canonical, client prediction and server authority consume the same profile, and server-only combat/status policy remains layered afterward. This materially reduces future reconciliation debt without tying gameplay to transport. It also makes later mount/equipment movement modifiers safer because modifiers can be applied around one canonical base rather than two diverging constants.
+
+### QUESTIONS_FOR_CHATGPT
+None blocking. Future movement research should treat requested-velocity parity as closed unless main changes or an online trace contradicts it.
+
+### NEXT_RECOMMENDATION
+Return to the user's priority order: LEFT↔RIGHT reversal/turn responsiveness. Reuse existing `reversalCount`, `reversalAccidentalIdleCount` and `reversalFrameJumpCount` telemetry, add a deterministic 60/90/120 Hz reversal trace across INTENT → REQUESTED VELOCITY → RESOLVED MOVEMENT → FACING → STRIDE, then make one small presentation correction only if the baseline proves a visual snap/idle/stride discontinuity. Do not alter the now-shared speed curve in the same pass.
