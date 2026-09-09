@@ -1,7 +1,7 @@
 <!-- KELO-INDEX
   area: RUNTIME / UI BOOT
   owner: index.html load order
-  keys: HUD LUXE PLAYER GUIDE NOBILITY TITLES MOBILE MOUNTS APPEARANCE
+  keys: HUD LUXE PLAYER GUIDE NOBILITY TITLES MOBILE MOUNTS APPEARANCE REGIONAL ECONOMY LOGISTICS CARAVANS FACTIONS
   purpose: carga el runtime LIVE y monta un único HUD superior izquierdo mediante Kelo Luxe
   online: la UI solo consume estado; autoridad permanece en los owners de dominio
 -->
@@ -68,7 +68,13 @@
 <script src="src/ui/mount-action-bar.js?v=2"></script>
 <script src="src/ui/mount-panel.js?v=2"></script>
 <script src="src/systems/backpack-system.js?v=2"></script>
-<script src="src/systems/container-system.js?v=4"></script>
+<script src="src/systems/container-system.js?v=5"></script>
+<!-- KELO-INDEX REGIONAL LOGISTICS: extiende owners existentes; Container -> Economy -> Factions -> Caravans -> Devtools. -->
+<script src="src/systems/regional-economy-math.js?v=1"></script>
+<script src="src/systems/regional-economy-system.js?v=1"></script>
+<script src="src/systems/faction-clan-system.js?v=1"></script>
+<script src="src/systems/caravan-system.js?v=1"></script>
+<script src="src/systems/logistics-devtools.js?v=1"></script>
 <script src="src/systems/emote-system.js?v=1"></script>
 <script src="src/systems/market-escrow-system.js?v=1"></script>
 <script src="src/systems/commerce-authority.js?v=1"></script>
