@@ -1,21 +1,21 @@
 /* KELO-INDEX
  * area: UI / MENU HUD CHAT
  * owner: Kelo Luxe Shell presentation
- * keys: MENU PREMIUM MOBILE NAVIGATION INPUT LOCK CHARACTER NOBILITY EMOTES
+ * keys: MENU PREMIUM MOBILE NAVIGATION INPUT LOCK CHARACTER NOBILITY TITLES EMOTES
  * purpose: presenta el HUD Luxe y el menú principal premium consumiendo únicamente APIs públicas de owners existentes
  * public-api: KELO_LUXE.toggleMenu/closeMenu/isMenuOpen/closeChat/renderMenu
- * consumes: KeloInputLocks + Backpack/Abilities/Character/Market/House/Nobility/Emotes owners + legacy profile/chat adapters
+ * consumes: KeloInputLocks + Backpack/Abilities/Character/Market/House/Nobility/Titles/Emotes owners + legacy profile/chat adapters
  * state-owned: apertura del menú/chat y tokens de input de estas superficies
  * extension-points: botones owner-backed; CREATORS conserva su launcher tardío sobre .lx-menu-grid
  * reuse: shell visible único del menú móvil actual
  * legacy: openSocialTool/inspectPlayer solo como adapters de compatibilidad donde todavía son el route LIVE
  * do-not: NO gameplay state, NO rutas fake, NO polling/setInterval, NO segundo menú
- * online: navegación solamente; autoridad permanece en cada owner (market/nobility/property/etc.)
+ * online: navegación solamente; autoridad permanece en cada owner (market/nobility/titles/property/etc.)
  */
 (function(){
 'use strict';
 if(document.getElementById('kelo-luxe'))return;
-const VERSION='luxe-shell-v4.0.2-premium-menu';
+const VERSION='luxe-shell-v4.0.3-title-book';
 const locks=window.KeloInputLocks;
 let menuLockToken=null,chatLockToken=null;
 const MENU_ENTRIES=Object.freeze([
@@ -27,6 +27,7 @@ const MENU_ENTRIES=Object.freeze([
 {id:'chat',label:'Chat',sub:'Habla con la comunidad',icon:'●'},
 {id:'properties',label:'Propiedades',sub:'Tu tierra y edificios',icon:'⌂'},
 {id:'nobility',label:'Nobleza',sub:'Caballero · Rey',icon:'♛',accent:true},
+{id:'titles',label:'Libro de títulos',sub:'Logros · identidad · prestigio',icon:'▤',accent:true},
 {id:'emotes',label:'Burlas',sub:'Emotes y gestos',icon:'☻'},
 {id:'missions',label:'Misiones',sub:'Aventuras y desafíos',icon:'✧',optional:true},
 {id:'settings',label:'Ajustes',sub:'Configura tu experiencia',icon:'⚙',optional:true}
@@ -61,12 +62,12 @@ function closeChat(){chatDrawer.classList.remove('open');releaseChatLock();}
 function openChat(){closeLuxeMenu();chatDrawer.classList.add('open');claimChatLock();requestAnimationFrame(()=>document.getElementById('lx-in')?.focus({preventScroll:true}));}
 function setMenuOpen(force){const open=typeof force==='boolean'?force:!menuPanel.classList.contains('open');if(open){closeChat();renderMenu();claimMenuLock();updateGold();}else releaseMenuLock();menuPanel.classList.toggle('open',open);menuPanel.setAttribute('aria-hidden',String(!open));menuButton.setAttribute('aria-expanded',String(open));return open;}
 function closeLuxeMenu(){return setMenuOpen(false);}
-function runTool(tool){closeLuxeMenu();if(tool==='bag'){if(window.KeloBackpackUI?.open)return window.KeloBackpackUI.open();if(window.KeloSocialUI?.openBag)return window.KeloSocialUI.openBag();}if(tool==='abilities'&&window.KeloAbilities?.openStonePanel)return window.KeloAbilities.openStonePanel();if(tool==='appearance'){if(window.KeloCharacterCustomizer?.open)return window.KeloCharacterCustomizer.open();toast('Apariencia todavía cargando');return;}if(tool==='profile'){if(typeof inspectPlayer==='function'&&typeof localPlayer!=='undefined')return inspectPlayer(localPlayer,true);}if(tool==='market'&&window.KeloMarketUI?.open)return window.KeloMarketUI.open();if(tool==='chat'){openChat();return;}if(tool==='properties'){if(window.KELO_HOUSE_UI?.show)return window.KELO_HOUSE_UI.show();if(typeof openSocialTool==='function')return openSocialTool('properties');}if(tool==='nobility'&&window.KeloNobility?.open)return window.KeloNobility.open();if(tool==='emotes'&&window.KeloSelfInteractionUI?.openEmotes)return window.KeloSelfInteractionUI.openEmotes();if(tool==='missions'&&window.KeloMissionsUI?.open)return window.KeloMissionsUI.open();if(tool==='settings'&&window.KeloSettingsUI?.open)return window.KeloSettingsUI.open();toast('Esta sección todavía no tiene una pantalla LIVE válida');}
+function runTool(tool){closeLuxeMenu();if(tool==='bag'){if(window.KeloBackpackUI?.open)return window.KeloBackpackUI.open();if(window.KeloSocialUI?.openBag)return window.KeloSocialUI.openBag();}if(tool==='abilities'&&window.KeloAbilities?.openStonePanel)return window.KeloAbilities.openStonePanel();if(tool==='appearance'){if(window.KeloCharacterCustomizer?.open)return window.KeloCharacterCustomizer.open();toast('Apariencia todavía cargando');return;}if(tool==='profile'){if(typeof inspectPlayer==='function'&&typeof localPlayer!=='undefined')return inspectPlayer(localPlayer,true);}if(tool==='market'&&window.KeloMarketUI?.open)return window.KeloMarketUI.open();if(tool==='chat'){openChat();return;}if(tool==='properties'){if(window.KELO_HOUSE_UI?.show)return window.KELO_HOUSE_UI.show();if(typeof openSocialTool==='function')return openSocialTool('properties');}if(tool==='nobility'&&window.KeloNobility?.open)return window.KeloNobility.open();if(tool==='titles'&&window.KeloTitles?.openBook)return window.KeloTitles.openBook();if(tool==='emotes'&&window.KeloSelfInteractionUI?.openEmotes)return window.KeloSelfInteractionUI.openEmotes();if(tool==='missions'&&window.KeloMissionsUI?.open)return window.KeloMissionsUI.open();if(tool==='settings'&&window.KeloSettingsUI?.open)return window.KeloSettingsUI.open();toast('Esta sección todavía no tiene una pantalla LIVE válida');}
 function suppressLegacyUI(){['kelo-chat','kelo-stones-btn','social-menu-toggle','kelo-online','kelo-minimap','minimap'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.setProperty('display','none','important');});const top=document.querySelector('.top-bar');if(top)top.style.setProperty('display','none','important');Array.from(document.body.children).forEach(el=>{if(el.tagName==='BUTTON'&&(el.textContent||'').trim()==='Mochila'){if(!el.id)el.id='kelo-bag-btn';el.style.setProperty('display','none','important');}});}suppressLegacyUI();
 function updateGold(){const el=document.getElementById('lx-gold');if(el&&typeof STATE!=='undefined')el.textContent='Oro '+(Number(STATE.gold)||0);}updateGold();const telemetry=document.getElementById('telemetry-bar');if(telemetry)new MutationObserver(updateGold).observe(telemetry,{childList:true,characterData:true,subtree:true});
 menuButton.onclick=()=>setMenuOpen();document.getElementById('lx-menu-close').onclick=closeLuxeMenu;document.getElementById('lx-chat-close').onclick=closeChat;menuPanel.addEventListener('pointerdown',e=>e.stopPropagation());document.querySelector('.lx-top')?.addEventListener('pointerdown',e=>e.stopPropagation());document.querySelector('.lx-rail')?.addEventListener('pointerdown',e=>e.stopPropagation());chatDrawer.addEventListener('pointerdown',e=>e.stopPropagation());menuPanel.addEventListener('click',e=>{const b=e.target.closest('[data-tool]');if(b)runTool(b.dataset.tool);});
 document.getElementById('lx-side-pvp').onclick=()=>{closeChat();closeLuxeMenu();if(typeof window.enterPvPWorld==='function')window.enterPvPWorld();else toast('PvP todavía cargando');};
 function appendChat(who,text){const log=document.getElementById('lx-log');if(!log)return;const row=document.createElement('div');row.textContent=(who||'Tu')+': '+text;log.appendChild(row);log.scrollTop=log.scrollHeight;while(log.children.length>12)log.removeChild(log.firstChild);}const oldSay=window.keloSay;if(typeof oldSay==='function'&&!oldSay._luxeWrapped){const wrapped=function(who,text){oldSay(who,text);appendChat(who,text);};wrapped._luxeWrapped=true;window.keloSay=wrapped;}document.getElementById('lx-form').addEventListener('submit',e=>{e.preventDefault();const inp=document.getElementById('lx-in'),text=(inp.value||'').trim();if(!text)return;const who=(typeof localPlayer!=='undefined'&&localPlayer.name)||'Tu';if(typeof window.keloSay==='function')window.keloSay(who,text);else appendChat(who,text);inp.value='';});
 window.addEventListener('keydown',e=>{if(e.key!=='Escape')return;if(menuPanel.classList.contains('open')){e.preventDefault();closeLuxeMenu();}else if(chatDrawer.classList.contains('open')){e.preventDefault();closeChat();}});window.addEventListener('kelo:character-customization-ready',renderMenu);
-window.KELO_LUXE=Object.freeze({toggleMenu:setMenuOpen,closeMenu:closeLuxeMenu,isMenuOpen:()=>menuPanel.classList.contains('open'),closeChat,renderMenu});window.KELO_LUXE_AUDIT=Object.freeze({version:VERSION,palette:'premium-fantasy-forest-gold',mobileFirst:true,gridColumns:2,minTouchTargetPx:44,inputLockOwner:'KeloInputLocks',tokenLocks:true,directLegacyModalWrite:false,noPolling:true,routes:['bag','abilities','appearance','profile','market','chat','properties','nobility','emotes'],optionalRoutes:['missions','settings'],legacyHudSuppressed:true,pvpRailButton:true});
+window.KELO_LUXE=Object.freeze({toggleMenu:setMenuOpen,closeMenu:closeLuxeMenu,isMenuOpen:()=>menuPanel.classList.contains('open'),closeChat,renderMenu});window.KELO_LUXE_AUDIT=Object.freeze({version:VERSION,palette:'premium-fantasy-forest-gold',mobileFirst:true,gridColumns:2,minTouchTargetPx:44,inputLockOwner:'KeloInputLocks',tokenLocks:true,directLegacyModalWrite:false,noPolling:true,routes:['bag','abilities','appearance','profile','market','chat','properties','nobility','titles','emotes'],optionalRoutes:['missions','settings'],legacyHudSuppressed:true,pvpRailButton:true});
 })();
