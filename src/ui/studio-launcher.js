@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: UI / CREATORS LAUNCHER
  * owner: Kelo Studio Launcher (compat name retained)
- * keys: CREATORS MENU PREMIUM LAZY ADMIN
+ * keys: CREATORS MENU PREMIUM LAZY ADMIN ANIMATION CAPABILITY
  * purpose: añade CREATORS al menú Luxe existente y carga solo Creator Hub tras acción explícita
  * public-api: KELO_STUDIO_LAUNCHER + KELO_CREATORS_LAUNCHER alias
  * consumes: KELO_ADMIN_KEYS, KELO_LUXE, menú Luxe existente
@@ -15,7 +15,10 @@
   if(window.KELO_STUDIO_LAUNCHER)return;
   let loading=false;
   const actor=()=>String(window.KELO_ADMIN_KEYS?.playerId?.()||window.keloNet?.playerKey||window.localPlayer?.id||'local_pioneer');
-  const allowed=()=>!!window.KELO_ADMIN_KEYS?.can?.('world.edit',actor());
+  const allowed=()=>{
+    const keys=window.KELO_ADMIN_KEYS,who=actor();
+    return !!(keys?.can?.('creators.access',who)||keys?.can?.('world.edit',who)||keys?.can?.('animation.edit',who));
+  };
   const toast=m=>{if(typeof window.showToast==='function')window.showToast(m);else console.info('[Kelo Creators]',m);};
   function friendlyError(error){const code=String(error?.message||error||'');return code||'No se pudo abrir Kelo Creators';}
   function paint(button,busy){
@@ -49,7 +52,7 @@
   }
   function boot(){sync();}
   window.KELO_ADMIN_KEYS?.onChange?.(sync);
-  const api=Object.freeze({version:'studio-launcher-v1.5.1-premium-menu',open,sync,get allowed(){return allowed();}});
+  const api=Object.freeze({version:'studio-launcher-v1.5.2-creators-capabilities',open,sync,get allowed(){return allowed();}});
   window.KELO_STUDIO_LAUNCHER=api;
   window.KELO_CREATORS_LAUNCHER=api;
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
