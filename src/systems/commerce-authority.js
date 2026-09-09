@@ -4,7 +4,7 @@
  * keys: TRADE MARKET STALL ESCROW AUTHORITY OFFLINE ONLINE TRANSACTION
  * purpose: frontera única para comercio valioso; UI solicita intenciones y el adapter activo valida/ejecuta
  * public-api: KeloCommerceAuthority.request/snapshot/onChange + helpers de trade/market/stall
- * consumes: KeloContainers, KeloMarketEscrow, KeloNetAuthority, STATE/saveState
+ * consumes: KeloContainers, KeloMarketEscrow, KeloNetAuthority, KELO_EQUIPMENT_ITEM_CATALOG, STATE/saveState
  * state-owned: sesiones de trade offline, puestos, fixtures demo y log local de transacciones
  * extension-points: installAuthorityAdapter o KeloNetAuthority.requestCommerce para servidor autoritativo
  * reuse: trade directo, puestos, compras de mercado y futuras subastas/regalos deben entrar por este owner
@@ -13,7 +13,7 @@
  */
 (function(root){
 'use strict';
-const VERSION='commerce-authority-v1.0.0';
+const VERSION='commerce-authority-v1.1.0';
 const SCHEMA=1;
 const LOCAL_ID='local_pioneer';
 const MAX_HISTORY=60;
@@ -30,16 +30,22 @@ function playerId(){return String(root.keloNet?.playerKey||root.keloNet?.id||LOC
 function playerName(){return String((typeof localPlayer!=='undefined'&&localPlayer&&localPlayer.name)||'Kelo');}
 function itemIdentity(item){if(root.KeloMarketEscrow?.itemIdentity)return root.KeloMarketEscrow.itemIdentity(item);if(!item)return null;return String(item.id||item.uid||item._backpackId||'')||null;}
 function describe(item){if(!item)return null;let d=null;try{d=root.KeloBackpack?.describeItem?.(item,0)||null;}catch(_){ }return{name:String(d?.name||item.name||item.templateId||item.typeId||'Objeto'),icon:String(d?.icon||item.icon||'▪'),rarity:String(d?.rarity||item.rarity||item.tier||'Normal'),quantity:Math.max(1,Math.floor(Number(item.quantity)||1)),kind:String(item.kind||d?.category||'item'),instanceId:itemIdentity(item)};}
+function armoryDemoListings(){
+  const catalog=root.KELO_EQUIPMENT_ITEM_CATALOG;if(!catalog?.marketOffers||typeof catalog.createItem!=='function')return[];
+  return catalog.marketOffers.map((offer,index)=>{
+    const item=catalog.createItem(offer.templateId,{id:'demo_armory_'+offer.templateId,createdAt:1});if(!item)return null;
+    return {listingId:'demo_listing_'+offer.offerId,ownerId:'offline_vendor_ron',sellerName:'Ron',stallId:'stall_05',price:Math.max(1,Math.floor(Number(offer.price)||1)),quantity:1,status:'active',demo:true,item};
+  }).filter(Boolean);
+}
 function defaultDemoListings(){
   return [
     {listingId:'demo_listing_fire_01',ownerId:'offline_vendor_maya',sellerName:'Maya',stallId:'stall_02',price:45,quantity:1,status:'active',demo:true,item:{id:'demo_market_fire_01',templateId:'fire_shard_demo',name:'Fragmento de Fuego',icon:'🔥',kind:'material',quantity:1,maxStack:1,rarity:'Rare'}},
-    {listingId:'demo_listing_ore_01',ownerId:'offline_vendor_maya',sellerName:'Maya',stallId:'stall_02',price:25,quantity:3,status:'active',demo:true,item:{id:'demo_market_ore_01',templateId:'moon_ore_demo',name:'Mineral Lunar',icon:'◆',kind:'material',quantity:3,maxStack:20,rarity:'Uncommon'}},
-    {listingId:'demo_listing_sword_01',ownerId:'offline_vendor_ron',sellerName:'Ron',stallId:'stall_05',price:120,quantity:1,status:'active',demo:true,item:{id:'demo_market_sword_01',templateId:'shadow_blade_demo',name:'Espada de Sombra',icon:'⚔️',kind:'equipment',slot:'weapon',quantity:1,maxStack:1,rarity:'Epic',quality:3}}
-  ];
+    {listingId:'demo_listing_ore_01',ownerId:'offline_vendor_maya',sellerName:'Maya',stallId:'stall_02',price:25,quantity:3,status:'active',demo:true,item:{id:'demo_market_ore_01',templateId:'moon_ore_demo',name:'Mineral Lunar',icon:'◆',kind:'material',quantity:3,maxStack:20,rarity:'Uncommon'}}
+  ].concat(armoryDemoListings());
 }
 function defaultStalls(){return{
   stall_02:{stallId:'stall_02',ownerId:'offline_vendor_maya',sellerName:'Maya',message:'🔥 Piedras y materiales',demo:true,claimedAt:now()},
-  stall_05:{stallId:'stall_05',ownerId:'offline_vendor_ron',sellerName:'Ron',message:'⚔️ Equipo de prueba',demo:true,claimedAt:now()}
+  stall_05:{stallId:'stall_05',ownerId:'offline_vendor_ron',sellerName:'Ron',message:'⚔️ Arsenal de armas',demo:true,claimedAt:now()}
 };}
 function ensureState(){
   if(typeof STATE==='undefined')return null;
@@ -55,8 +61,8 @@ function ensureState(){
   if(!Array.isArray(s.demoListings)){s.demoListings=defaultDemoListings();changed=true;}
   if(!Number.isFinite(Number(s.transactionSeq))){s.transactionSeq=0;changed=true;}
   // Fixtures are recoverable development data, never authoritative ownership.
-  const defaults=defaultStalls();Object.keys(defaults).forEach(k=>{if(!s.stallClaims[k]){s.stallClaims[k]=defaults[k];changed=true;}});
-  if(!s.demoListings.some(x=>x&&x.demo===true)){s.demoListings=defaultDemoListings();changed=true;}
+  const defaults=defaultStalls();Object.keys(defaults).forEach(k=>{if(!s.stallClaims[k]){s.stallClaims[k]=defaults[k];changed=true;}else if(s.stallClaims[k]?.demo===true&&s.stallClaims[k].message!==defaults[k].message){s.stallClaims[k].message=defaults[k].message;changed=true;}});
+  const fixtureListings=defaultDemoListings();fixtureListings.forEach(row=>{if(!s.demoListings.some(x=>x&&x.listingId===row.listingId)){s.demoListings.push(row);changed=true;}});
   if(changed)save();
   if(!initialized&&!recovering){initialized=true;recoverInterruptedTrade();}
   return s;
@@ -204,5 +210,5 @@ root.KeloCommerceAuthority=Object.freeze({
   createTrade:(peer)=>request('trade:create',peer||{}),addTradeItem:(instanceId,quantity)=>request('trade:addItem',{instanceId,quantity}),removeTradeItem:(instanceId)=>request('trade:removeItem',{instanceId}),setTradeGold:(gold)=>request('trade:setGold',{gold}),setTradeReady:(ready)=>request('trade:ready',{ready}),finalAcceptTrade:(accept)=>request('trade:finalAccept',{accept}),cancelTrade:()=>request('trade:cancel',{}),
   demoPeerReady:(ready)=>request('trade:demoPeerReady',{ready}),demoPeerFinalAccept:(accept)=>request('trade:demoPeerFinalAccept',{accept})
 });
-root.KELO_COMMERCE_AUDIT=Object.freeze({version:VERSION,authorityBoundary:true,offlineAdapter:true,automaticServerBridge:true,noOnlineLocalFallback:true,tradeDoubleConfirmation:true,offerMutationResetsConfirmation:true,separateTradeEscrow:true,marketEscrowReused:true,atomicCommitViaContainerCheckpoint:true,transactionLog:true,marketStalls:true,offlineDemoFixtures:true,serverReplaceable:true});
+root.KELO_COMMERCE_AUDIT=Object.freeze({version:VERSION,authorityBoundary:true,offlineAdapter:true,automaticServerBridge:true,noOnlineLocalFallback:true,tradeDoubleConfirmation:true,offerMutationResetsConfirmation:true,separateTradeEscrow:true,marketEscrowReused:true,atomicCommitViaContainerCheckpoint:true,transactionLog:true,marketStalls:true,offlineDemoFixtures:true,equipmentCatalogMarketFixtures:true,recoverableFixtureMerge:true,serverReplaceable:true});
 })(typeof globalThis!=='undefined'?globalThis:window);

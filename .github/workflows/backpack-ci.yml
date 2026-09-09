@@ -6,6 +6,7 @@ on:
       - 'src/core/input-lock-system.js'
       - 'src/core/input-gate.js'
       - 'src/systems/backpack-system.js'
+      - 'src/systems/equipment-item-catalog.js'
       - 'src/systems/equipment-system.js'
       - 'src/systems/container-system.js'
       - 'src/systems/market-escrow-system.js'
@@ -32,6 +33,7 @@ on:
       - 'src/core/input-lock-system.js'
       - 'src/core/input-gate.js'
       - 'src/systems/backpack-system.js'
+      - 'src/systems/equipment-item-catalog.js'
       - 'src/systems/equipment-system.js'
       - 'src/systems/container-system.js'
       - 'src/systems/market-escrow-system.js'
@@ -66,6 +68,7 @@ jobs:
         run: |
           node --check src/core/input-lock-system.js
           node --check src/core/input-gate.js
+          node --check src/systems/equipment-item-catalog.js
           node --check src/systems/equipment-system.js
           node --check src/systems/backpack-system.js
           node --check src/systems/container-system.js
@@ -99,7 +102,7 @@ jobs:
         run: node scripts/inventory-ui-v2-audit.js
       - name: Integration contract
         run: |
-          grep -q "equipment-v1.1.2" src/systems/equipment-system.js
+          grep -q "equipment-v1.2.0" src/systems/equipment-system.js
           grep -q "marketEscrowAwareStarterIdentity:true" src/systems/equipment-system.js
           grep -q "backpack-v1.1.0" src/systems/backpack-system.js
           grep -q "stacksImplemented:true" src/systems/backpack-system.js
@@ -117,7 +120,8 @@ jobs:
           grep -q "market-escrow-v1.0.0" src/systems/market-escrow-system.js
           grep -q "listingContract:'validate-transfer-create-persist-rollback-v1'" src/systems/market-escrow-system.js
           grep -q "cancelContract:'validate-transfer-close-persist-rollback-v1'" src/systems/market-escrow-system.js
-          grep -q "commerce-authority-v1.0.0" src/systems/commerce-authority.js
+          grep -q "commerce-authority-v1.1.0" src/systems/commerce-authority.js
+          grep -q "equipmentCatalogMarketFixtures:true" src/systems/commerce-authority.js
           grep -q "tradeDoubleConfirmation:true" src/systems/commerce-authority.js
           grep -Eq "backpack-ui-v2\.[0-9]+\.[0-9]+" src/ui/backpack-ui.js
           grep -q "locks.acquire('backpack-ui'" src/ui/backpack-ui.js
