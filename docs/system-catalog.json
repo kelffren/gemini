@@ -146,7 +146,15 @@
       "source": "src/world/map-forge/map-forge-core.mjs",
       "technicalDoc": "docs/systems/MAP_FORGE_SYSTEM.md",
       "playerVisible": false,
-      "status": "prepared-headless"
+      "status": "creator-active-draft-safe"
+    },
+    {
+      "id": "creator-asset-library",
+      "owner": "Kelo Creator Asset Library",
+      "source": "src/creators/assets/creator-asset-library.mjs",
+      "technicalDoc": "docs/systems/CREATOR_ASSET_LIBRARY.md",
+      "playerVisible": false,
+      "status": "creator-local-fallback-online-ready"
     },
     {
       "id": "mounts",
