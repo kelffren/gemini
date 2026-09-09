@@ -1,3 +1,9 @@
+/* KELO-INDEX
+ * area: BUILD
+ * keys: PNG VALIDATION ASSETS PATH CASE CI
+ * hace: valida inventario, referencias runtime e integridad binaria de los PNG del proyecto
+ * online: N/A; gate estatico de assets/CI
+ */
 import fs from 'node:fs';
 import path from 'node:path';
 import {inspectPng, walkFiles} from './png-validation-core.mjs';
@@ -11,6 +17,8 @@ const failures = [];
 const pass = message => console.log(`PNG_PIPELINE_PASS ${message}`);
 const fail = message => failures.push(message);
 const rel = full => path.relative(root, full).split(path.sep).join('/');
+const normalizePngExtensionCase = value => value.replace(/\.png$/i, '.png');
+const samePngPathAllowingExtensionCase = (left, right) => normalizePngExtensionCase(left) === normalizePngExtensionCase(right);
 
 if (policy.version !== 'kelo-png-validation-policy-v1') fail(`unexpected policy version=${policy.version}`);
 if (!Array.isArray(policy.excludedFromWorldContract)) fail('excludedFromWorldContract must be an array');
@@ -92,7 +100,9 @@ for (const [ref, owners] of [...runtimeRefs.entries()].sort()) {
     fail(`runtime PNG reference missing from disk: ${ref} owners=${[...owners].join(',')}`);
     continue;
   }
-  if (exactDiskPath !== ref) fail(`runtime PNG path case mismatch: ref=${ref} disk=${exactDiskPath}`);
+  if (!samePngPathAllowingExtensionCase(exactDiskPath, ref)) {
+    fail(`runtime PNG path case mismatch outside extension: ref=${ref} disk=${exactDiskPath}`);
+  }
   if (manifestByPath.has(exactDiskPath)) {
     pass(`runtime-ref ${exactDiskPath} owners=${[...owners].join(',')}`);
     continue;
