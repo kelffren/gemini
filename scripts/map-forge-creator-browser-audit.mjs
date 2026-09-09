@@ -37,7 +37,7 @@ try{
   if(report.ui.candidates!==8||report.ui.selected!==1||!report.ui.valid)throw new Error('Map Forge initial candidate UI invalid');
   if(!report.ui.lock)throw new Error('Map Forge did not acquire input lock');
   if(report.ui.shell.left<0||report.ui.shell.top<0||report.ui.shell.right>390.5||report.ui.shell.bottom>844.5)throw new Error('Map Forge mobile shell escapes viewport');
-  if(report.ui.canvas.width<250||report.ui.canvas.height<300||report.ui.pixels[0]<250||report.ui.pixels[1]<300)throw new Error('Map Forge preview canvas collapsed');
+  if(report.ui.canvas.width<250||report.ui.canvas.height<300||report.ui.canvas.pixels[0]<250||report.ui.canvas.pixels[1]<300)throw new Error('Map Forge preview canvas collapsed');
   if(report.ui.overflowX)throw new Error('Map Forge introduced horizontal overflow');
 
   await page.locator('.kmf-select').first().selectOption('KELO_VILLAGE_V1');
