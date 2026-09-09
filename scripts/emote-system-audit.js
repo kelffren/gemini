@@ -4,7 +4,7 @@ let saveCalls=0;
 const context={console,Date,Math,Map,Set,Object,Array,Number,String,JSON,Promise,setTimeout,clearTimeout,CustomEvent:function(type,init){this.type=type;this.detail=init&&init.detail;},STATE:{inventory:[],equipmentSlots:{}},localPlayer:{},saveState(){saveCalls++;},dispatchEvent(){},window:{}};context.window=context;vm.createContext(context);
 for(const file of ['src/systems/equipment-system.js','src/systems/backpack-system.js','src/systems/container-system.js','src/systems/emote-system.js'])vm.runInContext(fs.readFileSync(file,'utf8'),context,{filename:file});
 const B=context.KeloBackpack,C=context.KeloContainers,E=context.KeloEmotes;
-assert(B&&C&&E);assert.equal(C.version,'container-v1.2.0');assert.equal(E.version,'emote-loadout-v1.0.0');assert.equal(C.getStats('emote_loadout').capacity,4);
+assert(B&&C&&E);assert.equal(C.version,'container-v1.3.0');assert.equal(E.version,'emote-loadout-v1.0.0');assert.equal(C.getStats('emote_loadout').capacity,4);
 const total=()=>context.STATE.inventory.concat(context.STATE.emoteLoadout.items).reduce((n,x)=>n+Math.max(1,Number(x.quantity)||1),0);
 const ids=()=>context.STATE.inventory.concat(context.STATE.emoteLoadout.items).map(x=>String(x.id||x.uid||x._backpackId));
 const unique=()=>assert.equal(new Set(ids()).size,ids().length,'emote identity must exist in one container only');
