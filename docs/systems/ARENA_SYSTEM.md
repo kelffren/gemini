@@ -2,7 +2,7 @@
 
 ## Propósito
 
-`KeloArena` añade una capa competitiva sobre el PvP action-combat existente sin crear un segundo combat engine. La primera regla publicada es una cola única `3v3 Control`, diseñada para funcionar desde población casi cero mediante bots transparentes y reducirlos progresivamente cuando existan suficientes humanos.
+`KeloArena` añade una capa competitiva sobre el PvP action-combat existente sin crear un segundo combat engine. Publica dos modos reutilizando el mismo owner: `3v3 Control` y `1v1 MOBA`. Ambos pueden funcionar desde población casi cero mediante bots transparentes y reducirlos progresivamente cuando existan suficientes humanos.
 
 ## OWNER
 
@@ -10,161 +10,95 @@
 - UI consumer: `src/ui/arena-ui.js` → `window.KeloArenaUI`.
 - Combat owner reutilizado: `KeloPvPWorld` + `KeloCombatEngine` + `KeloMeleeEngine` + `KeloHitResolver` + `KeloDamageResolver`.
 - Simulation: `KeloSimulation.after(...)`; Arena no crea loop propio.
-- Online final: server authority pendiente de completar para matchmaking/rating competitivo real.
+- Online final: server authority pendiente para matchmaking/rating competitivo real.
 
 ## Estado que posee
 
-`KeloArena` posee únicamente:
-
-- lifecycle de cola/match Arena;
-- ruleset Arena;
-- roster del fallback local;
-- score del objetivo Control;
-- estado de decisión de bots Arena;
-- profile/rating fallback local;
-- resultado de la partida.
-
-No posee:
-
-- daño/HP resolution;
-- hit geometry;
-- movement core;
-- ability delivery;
-- VFX;
-- input core;
-- networking transport.
+Arena posee lifecycle de cola/match, ruleset seleccionado, roster fallback, objetivos del modo, estructuras MOBA, estado de bots, profile/rating fallback y resultado. No posee hit geometry, input core, movement core, ability delivery, render base ni networking transport.
 
 ## API pública
 
-- `joinQueue()` / `openQueue()` — entra en la única cola publicada.
-- `leaveQueue()` — cancela mientras todavía no comenzó el match.
-- `finishMatch(winner, reason)` — cierra una partida activa; en online final esta operación será server-only.
+- `joinQueue(mode)` / `openQueue(mode)` — entra en Control por defecto o en el modo solicitado.
+- `joinMobaQueue()` — acceso explícito a 1v1 MOBA.
+- `leaveQueue()` — cancela antes del match.
+- `finishMatch(winner, reason)` — cierre interno/fallback; en online final será server-only.
 - `abort(reason)` — limpia un match incompleto.
-- `getHostileActors(viewer)` — proveedor de actores hostiles para que `KeloPvPWorld` siga usando su mismo CombatEngine.
-- `getActorById(id)` — resolución de actor para targeting/aim assist.
-- `drawWorld(ctx)` — presentation support invocado desde el renderer PvP ya existente.
-- `snapshot()` — snapshot read-only para UI/debug.
-- `getRank(mmr?)` — proyección del rango visible.
+- `getHostileActors(viewer)` — entrega héroes y, en MOBA, la estructura enemiga actualmente atacable.
+- `getActorById(id)` — targeting de héroes/estructuras.
+- `drawWorld(ctx)` — presentation support sobre el renderer PvP existente.
+- `snapshot()` y `getRank(mmr?)` — lectura para UI/debug.
 
-## Ruleset V1
+## Ruleset 3v3 Control
 
-- modo: `Control`;
-- equipos: 3v3;
-- una sola cola;
-- score objetivo: 100;
-- duración máxima: 180 segundos;
-- stats Arena normalizados inicialmente a 100 HP / 100 mana;
-- bots rellenan huecos del fallback local y siempre llevan `[Bot]` en el nombre;
-- el objetivo progresa únicamente cuando dentro de la zona hay presencia de un solo equipo.
+- equipos 3v3;
+- score a 100;
+- máximo 180 s;
+- zona central disputable;
+- 100 HP / 100 maná normalizados;
+- fallback inicial: 1 humano + 5 bots `[Bot]`.
+
+## Ruleset 1v1 MOBA
+
+- equipos 1v1;
+- un solo carril;
+- una torre y un núcleo por equipo;
+- la torre enemiga debe caer antes de que el núcleo aparezca como objetivo atacable;
+- victoria al destruir el núcleo rival;
+- máximo 300 s; si expira, se compara HP restante de los núcleos;
+- respawn de héroes;
+- torre defensiva con rango/cadencia propios;
+- stats de héroes normalizados igual que en Control;
+- fallback sin rival: 1 humano contra 1 bot `[Bot]`;
+- Match Quality reducido en fallback bot para evitar farmear rating completo.
+
+Las estructuras se representan como actores de objetivo compatibles con la geometría y resolución ya existentes. No existe `MobaCombatEngine` ni un resolver de daño paralelo.
 
 ## Ranking
 
-El prototipo mantiene dos conceptos separados:
-
-- MMR oculto: número de matchmaking interno;
-- rango visible + RP: proyección player-facing.
-
-Tiers V1:
-
-Bronce → Plata → Oro → Platino → Esmeralda → Diamante → Mithril → Adamantita → Etéreo.
-
-La fórmula local es una aproximación Elo para probar el flujo. No constituye la fórmula competitiva final.
-
-## Match Quality
-
-El sistema registra cuántos humanos componen el match. La variación de rating se multiplica por `quality` para que una partida completada principalmente con bots no otorgue el mismo progreso que una partida humana completa.
-
-El fallback local actual tiene un humano y cinco bots, por lo que utiliza el quality floor del ruleset. Esto es deliberado: mantiene Arena jugable sin convertir bots en una granja de rango.
+MMR oculto y rango visible/RP permanecen compartidos por Arena. Tiers actuales: Bronce → Plata → Oro → Platino → Esmeralda → Diamante → Mithril → Adamantita → Etéreo. La fórmula local es de prototipo y no es autoridad competitiva final.
 
 ## Bots
 
-Los bots son NPC competitivos transparentes. No se presentan como personas reales.
-
-Cada bot posee una personalidad ligera:
-
-- aggressor;
-- guardian;
-- tactician;
-- assassin;
-- support.
-
-La decisión usa utility heuristics sencillas alrededor de:
-
-- vida;
-- distancia al enemigo;
-- objetivo central;
-- aggression/objective/retreat weights.
-
-Cuando atacan reutilizan `KeloCombatEngine.attackSweep(...)`. No escriben HP directamente.
-
-## Flujo local actual
-
-`Arena UI → KeloArena.joinQueue → KeloPvPWorld.enter → transición PvP existente → KeloArena activa roster 3v3 → PvPWorld obtiene hostiles desde KeloArena → CombatEngine resuelve golpes → KeloArena calcula Control/respawns → resultado → restore stats/world → KeloPvPWorld.leave`.
+Los bots siempre se identifican como `[Bot]`. Sus decisiones utilizan utility heuristics y sus ataques de héroe reutilizan `KeloCombatEngine.attackSweep(...)`. En MOBA el bot puede priorizar rival, torre o núcleo según contexto y vulnerabilidad del objetivo.
 
 ## Online-first
 
-El contrato está preparado para que `joinQueue()` pueda delegar a `KeloNetAuthority.requestArena(...)` cuando exista. Mientras el server Arena no esté implementado por completo, el prototipo usa local fallback.
-
-Antes de permitir Ranked competitivo real, el servidor debe ser autoridad de:
-
-- cola/match assignment;
-- identidad human/bot;
-- teams;
-- normalized effective stats;
-- score/control ownership;
-- respawn;
-- match result;
-- MMR/RP;
-- anti-abuse;
-- disconnect/rejoin;
-- bot simulation si el servidor decide rellenar huecos.
-
-El cliente nunca debe poder enviar `winner`, `mmrDelta` o `score` como verdad final.
+`joinQueue()` y `joinMobaQueue()` están preparados para delegar a `KeloNetAuthority.requestArena(...)`. Antes de Ranked real el servidor debe poseer matchmaking, humans/bots, equipos, stats efectivos, score/estructuras, respawns, resultado, MMR/RP, reconnect y anti-abuse. El cliente nunca debe declarar `winner`, `score`, `coreHp` o `mmrDelta` como verdad final.
 
 ## Invariantes
 
-1. Arena no crea otro CombatEngine.
-2. Arena no crea otro Simulation loop.
-3. Bots nunca mutan HP directamente.
-4. UI nunca escribe MMR/score/roster.
-5. Bots visibles se identifican como `[Bot]`.
-6. Stats normalizados se restauran al salir.
-7. PvPWorld puede seguir funcionando sin Arena.
-8. Match Quality evita progreso completo contra una población mayoritariamente bot.
+1. Un solo owner `KeloArena` para modos Arena.
+2. Ningún segundo CombatEngine o Simulation loop.
+3. UI no escribe gameplay/rating.
+4. Bots no se presentan como humanos.
+5. Stats normalizados se restauran al salir.
+6. PvPWorld sigue funcionando sin Arena.
+7. Match Quality reduce progreso de fallback bot.
+8. 1v1 MOBA exige torre → núcleo; el núcleo no es target mientras vive su torre.
 
-## Extensión
+## Flujo actual
 
-### Más humanos
-
-La evolución esperada no cambia el client flow: el authority devuelve un roster con más `human` y menos `bot`. `KeloArena` consume el mismo contrato.
-
-### Nuevos modos
-
-No añadir lógica de Escort/Assault dentro del UI. Añadir rulesets/objective primitives reutilizables al owner Arena cuando exista evidencia y tests.
-
-### 1v1 / 5v5
-
-`teamSize` pertenece al ruleset. No hardcodear `3` dentro del combat engine.
+`Arena UI → elegir modo → KeloArena.joinQueue/joinMobaQueue → KeloPvPWorld.enter → Arena construye roster/objetivos → PvPWorld pide hostiles a KeloArena → CombatEngine resuelve ataques → Arena actualiza Control o MOBA → resultado → restore → PvPWorld.leave`.
 
 ## Anti-patrones
 
-- crear `ArenaCombatEngine`;
-- crear `RankedDamageResolver`;
-- bots aplicando `target.hp -= damage`;
-- esconder bots como humanos;
-- dar 100% de RP en partidas casi completamente bot;
-- meter matchmaking dentro de `arena-ui.js`;
-- `setInterval()` propio para IA/score;
-- usar localStorage como autoridad online final.
+- `ArenaCombatEngine` / `MobaCombatEngine`;
+- `RankedDamageResolver`;
+- segundo game loop;
+- matchmaking dentro de UI;
+- bots disfrazados de jugadores;
+- 100% RP contra bots;
+- localStorage como autoridad online final.
 
 ## Tests / CI
 
-- `scripts/arena-system-audit.js` verifica ownership, 3v3 Control, Match Quality, normalized stats, uso de CombatEngine, integración actor-provider, carga runtime y documentación.
+- `scripts/arena-system-audit.js` valida 3v3 Control + 1v1 MOBA, torre/núcleo, cola MOBA, bots, Match Quality, normalización, integración con PvPWorld, runtime y docs.
 - `npm run audit:arena`.
-- `npm run audit:docs` protege catálogo/guía.
+- Ranked Arena CI.
 
 ## Deuda conocida
 
-- El authority server de Arena todavía debe implementar matchmaking/rating persistente y bot simulation autoritativa para multiplayer real.
-- El fallback V1 solo representa un humano local; no pretende simular una población online ficticia.
-- El balance de bot utility, score rate, MMR K-factor y tier thresholds es tuning inicial, no balance final.
+- Falta authority server completo de Arena.
+- El fallback MOBA actual usa un rival bot, no población ficticia.
+- Torre/núcleo, daño de torre, tiempos, MMR y tiers son tuning inicial.
+- Minions, shop, XP y jungla no forman parte de este 1v1; el objetivo es un duelo MOBA compacto centrado en héroe + torre + núcleo.
