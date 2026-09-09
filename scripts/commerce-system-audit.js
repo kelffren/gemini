@@ -12,9 +12,9 @@ const context={
   window:{}
 };
 context.window=context;vm.createContext(context);
-for(const file of ['src/systems/backpack-system.js','src/systems/container-system.js','src/systems/market-escrow-system.js','src/systems/commerce-authority.js'])vm.runInContext(fs.readFileSync(file,'utf8'),context,{filename:file});
-const B=context.KeloBackpack,K=context.KeloContainers,M=context.KeloMarketEscrow,C=context.KeloCommerceAuthority;
-assert(B&&K&&M&&C,'commerce dependencies must load');assert.equal(K.version,'container-v1.3.0');assert.equal(C.version,'commerce-authority-v1.0.0');assert.equal(C.getMode(),'local-offline');assert.equal(K.getStats('trade_escrow').capacity,12);
+for(const file of ['src/systems/backpack-system.js','src/systems/container-system.js','src/systems/market-escrow-system.js','src/systems/equipment-item-catalog.js','src/systems/commerce-authority.js'])vm.runInContext(fs.readFileSync(file,'utf8'),context,{filename:file});
+const B=context.KeloBackpack,K=context.KeloContainers,M=context.KeloMarketEscrow,C=context.KeloCommerceAuthority,W=context.KELO_EQUIPMENT_ITEM_CATALOG;
+assert(B&&K&&M&&C&&W,'commerce dependencies and weapon catalog must load');assert.equal(K.version,'container-v1.3.0');assert.equal(C.version,'commerce-authority-v1.1.0');assert.equal(W.version,1);assert.equal(C.getMode(),'local-offline');assert.equal(K.getStats('trade_escrow').capacity,12);
 function add(item){context.STATE.inventory.push(item);B.ensure();return item;}
 function bag(id){return K.getSlots('backpack').find(s=>s.item&&(s.item.id===id||s.item.uid===id));}
 function trade(id){return K.getSlots('trade_escrow').find(s=>s.item&&(s.item.id===id||s.item.uid===id));}
@@ -26,6 +26,14 @@ function trade(id){return K.getSlots('trade_escrow').find(s=>s.item&&(s.item.id=
   r=await C.cancelMarketListing(r.listing.listingId);assert(r.ok&&bag('listing_local_1'),'cancelling must return physical item');
 
   const beforeBuy=context.STATE.gold;r=await C.buyListing('demo_listing_fire_01');assert(r.ok,'demo market purchase must commit');assert.equal(context.STATE.gold,beforeBuy-45);assert(context.STATE.inventory.some(x=>x.templateId==='fire_shard_demo'),'purchased item must enter backpack');assert(!C.snapshot().marketListings.some(x=>x.listingId==='demo_listing_fire_01'),'sold listing must disappear from active snapshot');
+
+  // Equipment catalog -> Commerce authority -> Containers -> Backpack, preserving combat identity.
+  const weaponListingId='demo_listing_armory_weapon_03',beforeWeapon=context.STATE.gold;
+  assert(C.snapshot().marketListings.some(x=>x.listingId===weaponListingId&&x.item?.templateId==='starter_bow'),'catalog bow must be exposed by existing market snapshot');
+  r=await C.buyListing(weaponListingId);assert(r.ok,'catalog weapon purchase must commit through Commerce');assert.equal(context.STATE.gold,beforeWeapon-120);
+  const boughtBow=context.STATE.inventory.find(x=>x.templateId==='starter_bow');assert(boughtBow,'catalog weapon must enter existing backpack');assert.equal(boughtBow.kind,'equipment');assert.equal(boughtBow.slot,'weapon');assert.equal(boughtBow.weaponProfileId,'weapon.longbow');assert.equal(boughtBow.family,'bow');
+  assert(!C.snapshot().marketListings.some(x=>x.listingId===weaponListingId),'sold catalog weapon must disappear from active snapshot');
+  const persistedRows=context.STATE.commerce.demoListings.filter(x=>x.listingId===weaponListingId);assert.equal(persistedRows.length,1,'fixture merge must not duplicate sold catalog listing');assert.equal(persistedRows[0].status,'sold','sold catalog fixture must not revive during ensure/snapshot');
 
   add({id:'trade_local_1',templateId:'audit_trade',name:'Audit Trade Item',icon:'◈',kind:'material',quantity:1,maxStack:1,rarity:'Epic'});
   r=await C.createTrade({peerId:'audit_peer',peerName:'Audit Peer',demo:true});assert(r.ok);const tradeId=r.trade.tradeId;
@@ -41,5 +49,5 @@ function trade(id){return K.getSlots('trade_escrow').find(s=>s.item&&(s.item.id=
 
   const cp=K.checkpoint();const incoming={id:'external_atomic_1',templateId:'external_atomic',name:'External Atomic',kind:'material',quantity:1,maxStack:1};r=K.receiveItem('backpack',incoming,{persist:false,allowMerge:false,preserveIdentity:true});assert(r.ok&&bag('external_atomic_1'));K.restoreCheckpoint(cp,{persist:false});assert(!bag('external_atomic_1'),'container checkpoint rollback must restore pre-transaction state');assert(K.auditIdentities().ok);
 
-  assert(saves>0);console.log('PASS commerce-system-audit',JSON.stringify({commerce:C.version,container:K.version,market:M.version,doubleConfirmation:true,mutationReset:true,atomicTrade:true,marketPurchase:true,stallClaim:true,rollback:true,saves}));
+  assert(saves>0);console.log('PASS commerce-system-audit',JSON.stringify({commerce:C.version,container:K.version,market:M.version,weaponCatalog:W.version,doubleConfirmation:true,mutationReset:true,atomicTrade:true,marketPurchase:true,catalogWeaponPurchase:true,soldFixtureDoesNotRevive:true,stallClaim:true,rollback:true,saves}));
 })().catch(err=>{console.error(err);process.exitCode=1;});
