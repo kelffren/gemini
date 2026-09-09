@@ -7,7 +7,15 @@ const {createCommerceService}=require('../server/commerce-store');
 (async()=>{
   const economy=createPlayerEconomyStore({});
   const names={alice:'Alice',bob:'Bob'};
-  const commerce=createCommerceService({economyStore:economy,resolvePlayerName:id=>names[id]||id});
+  const online=new Set(['alice','bob']);
+  let inRange=true;
+  const commerce=createCommerceService({
+    economyStore:economy,
+    resolvePlayerName:id=>names[id]||id,
+    isPlayerOnline:id=>online.has(String(id)),
+    canTradePlayers:(a,b)=>inRange&&online.has(String(a))&&online.has(String(b)),
+    listTradeCandidates:id=>inRange?[...online].filter(x=>x!==String(id)).map(x=>({id:x,name:names[x],zone:'market',distance:42})):[]
+  });
   const forge=createForgeService({economyStore:economy});
   const alice=economy.ensure('alice'),bob=economy.ensure('bob');
   alice.gold=2000;bob.gold=1500;
@@ -19,6 +27,8 @@ const {createCommerceService}=require('../server/commerce-store');
     {id:'b_gem',templateId:'gem',name:'Gema',quantity:1,maxStack:1},
     {id:'b_potion',templateId:'potion',name:'Poción',quantity:3,maxStack:20}
   ]);
+
+  assert.deepStrictEqual(commerce.snapshot('alice').tradeCandidates.map(x=>x.id),['bob'],'candidate discovery is authority-provided');
 
   // One economy truth: Forge spends the exact gold Commerce sees.
   alice.inventory.sapphire_1=5;
@@ -42,9 +52,17 @@ const {createCommerceService}=require('../server/commerce-store');
   const secondBuyerAttempt=await commerce.handle('alice','market:buy',{listingId},'buy-after-sold');
   assert.strictEqual(secondBuyerAttempt.ok,false);assert.strictEqual(secondBuyerAttempt.error,'LISTING_NOT_FOUND');
 
-  // Bilateral trade: item + gold, mutation reset, two final accepts.
-  r=await commerce.handle('alice','trade:create',{peerId:'bob',peerName:'Bob'},'trade-create');
-  assert.strictEqual(r.ok,true);const tradeId=r.trade.tradeId;
+  // Real handshake: request -> target accepts -> editable bilateral trade.
+  r=await commerce.handle('alice','trade:request',{peerId:'bob',peerName:'Bob'},'trade-request');
+  assert.strictEqual(r.ok,true);assert.strictEqual(r.status,'REQUESTED');const tradeId=r.trade.tradeId;
+  let ta=commerce.snapshot('alice').activeTrade,tb=commerce.snapshot('bob').activeTrade;
+  assert.strictEqual(ta.status,'REQUESTED');assert.strictEqual(ta.requestDirection,'outgoing');
+  assert.strictEqual(tb.status,'REQUESTED');assert.strictEqual(tb.requestDirection,'incoming');
+  r=await commerce.handle('bob','trade:addItem',{instanceId:'b_gem',quantity:1},'trade-before-accept');
+  assert.strictEqual(r.ok,false);assert.strictEqual(r.error,'TRADE_NOT_ACCEPTED','no offer mutation before target acceptance');
+  r=await commerce.handle('bob','trade:accept',{},'trade-accept');
+  assert.strictEqual(r.ok,true);assert.strictEqual(r.status,'OPEN');
+
   r=await commerce.handle('alice','trade:addItem',{instanceId:'a_ore',quantity:2},'trade-a-item');assert.strictEqual(r.ok,true);
   r=await commerce.handle('bob','trade:addItem',{instanceId:'b_gem',quantity:1},'trade-b-item');assert.strictEqual(r.ok,true);
   await commerce.handle('alice','trade:setGold',{gold:10},'trade-a-gold-10');
@@ -53,7 +71,7 @@ const {createCommerceService}=require('../server/commerce-store');
   await commerce.handle('bob','trade:ready',{ready:true},'trade-b-ready-1');
   assert.strictEqual(commerce.snapshot('alice').activeTrade.status,'FINAL_REVIEW');
   await commerce.handle('alice','trade:setGold',{gold:11},'trade-a-gold-11');
-  let ta=commerce.snapshot('alice').activeTrade;
+  ta=commerce.snapshot('alice').activeTrade;
   assert.strictEqual(ta.offers.local.ready,false);assert.strictEqual(ta.offers.peer.ready,false);assert.strictEqual(ta.offers.local.finalAccepted,false);assert.strictEqual(ta.offers.peer.finalAccepted,false);
   await commerce.handle('alice','trade:ready',{ready:true},'trade-a-ready-2');
   await commerce.handle('bob','trade:ready',{ready:true},'trade-b-ready-2');
@@ -71,13 +89,30 @@ const {createCommerceService}=require('../server/commerce-store');
   assert.strictEqual(economy.auditPlayer('alice').ok,true);assert.strictEqual(economy.auditPlayer('bob').ok,true);assert.strictEqual(commerce.audit().ok,true);
   assert(commerce.snapshot('alice').transactionHistory.some(x=>x.type==='player_trade'&&x.status==='committed'));
 
+  // Reject must free both sides immediately.
+  r=await commerce.handle('alice','trade:request',{peerId:'bob'},'reject-request');assert.strictEqual(r.ok,true);
+  r=await commerce.handle('bob','trade:reject',{},'reject-target');assert.strictEqual(r.ok,true);assert.strictEqual(r.status,'REJECTED');
+  assert.strictEqual(commerce.snapshot('alice').activeTrade,null);assert.strictEqual(commerce.snapshot('bob').activeTrade,null);
+
+  // Compatibility alias cannot bypass target consent online.
+  r=await commerce.handle('alice','trade:create',{peerId:'bob'},'legacy-create');assert.strictEqual(r.ok,true);assert.strictEqual(r.status,'REQUESTED');
+  assert.strictEqual(commerce.snapshot('bob').activeTrade.requestDirection,'incoming');
+  await commerce.handle('alice','trade:cancel',{},'legacy-cancel');
+
+  // Authority can enforce proximity without changing UI/protocol.
+  inRange=false;
+  r=await commerce.handle('alice','trade:request',{peerId:'bob'},'range-denied');assert.strictEqual(r.ok,false);assert.strictEqual(r.error,'PLAYERS_NOT_IN_TRADE_RANGE');
+  assert.strictEqual(commerce.snapshot('alice').tradeCandidates.length,0);
+  inRange=true;
+
   // Cancel/disconnect releases escrow and stall ownership.
   await commerce.handle('bob','stall:claim',{stallId:'stall_03'},'claim-b');
-  await commerce.handle('alice','trade:create',{peerId:'bob'},'trade-cancel-create');
+  await commerce.handle('alice','trade:request',{peerId:'bob'},'trade-cancel-request');
+  await commerce.handle('bob','trade:accept',{},'trade-cancel-accept');
   const swordBack=economy.ensure('bob').items.find(x=>x.id==='a_sword');
   await commerce.handle('bob','trade:addItem',{instanceId:swordBack.id,quantity:1},'trade-cancel-item');
   assert.strictEqual(swordBack.container,'trade_escrow');
   const disc=commerce.disconnect('bob');assert.strictEqual(disc.status,'CANCELLED');assert.strictEqual(swordBack.container,'backpack');assert.strictEqual(disc.releasedStall,'stall_03');
 
-  console.log('PASS server-commerce-audit',JSON.stringify({commerce:commerce.version,economy:economy.version,forgeSharedGold:true,idempotentPurchase:true,doubleConfirmation:true,tradeRollbackBoundary:true,aliceGold:economy.ensure('alice').gold,bobGold:economy.ensure('bob').gold}));
+  console.log('PASS server-commerce-audit',JSON.stringify({commerce:commerce.version,economy:economy.version,forgeSharedGold:true,idempotentPurchase:true,requestAcceptReject:true,noLegacyBypass:true,rangePolicyHook:true,doubleConfirmation:true,tradeRollbackBoundary:true,aliceGold:economy.ensure('alice').gold,bobGold:economy.ensure('bob').gold}));
 })().catch(err=>{console.error(err);process.exit(1);});
