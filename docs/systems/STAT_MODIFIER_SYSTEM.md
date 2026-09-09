@@ -2,20 +2,23 @@
 
 ## Status
 
-**Foundation candidate.** `KeloStats` provides the shared deterministic stat resolver used by player equipment and mount equipment.
+**Foundation candidate.** `KeloStatModifiers` is the shared deterministic resolver for derived gameplay attributes such as attack, defense, HP, movement-related mount stats and future equipment/buff modifiers.
 
-## Purpose
+`KeloStatModifiers` is intentionally different from `KeloPlayerStats`:
 
-Prevent every equipment/buff/mount system from inventing its own stat math. Sources publish declarative modifiers; one owner resolves them in a deterministic order and caches results until a source changes.
+- `KeloPlayerStats` owns progression counters such as kills and title/achievement progress.
+- `KeloStatModifiers` resolves temporary/derived attributes from equipment, mounts, buffs and similar sources.
+
+These owners must never be merged or treated as aliases.
 
 ## Owner and files
 
-- **Owner:** `KeloStats`
+- **Owner:** `KeloStatModifiers`
 - **Source:** `src/stats/stat-modifier-system.js`
-- **Legacy adapter:** `src/systems/equipment-system.js`
+- **Legacy equipment adapter:** `src/systems/equipment-system.js`
 - **Mount source:** `src/mounts/mount-system.js`
 
-`KeloStats` does not own inventory, equipment slots, mounts, buffs, player persistence or UI.
+`KeloStatModifiers` does not own inventory, progression counters, equipment slots, mounts, persistence or UI.
 
 ## Modifier contract
 
@@ -54,8 +57,6 @@ Supported V1 scopes:
 
 ## Resolution order
 
-For a stat:
-
 ```text
 base
 → flatAdd / flatSubtract
@@ -66,7 +67,7 @@ base
 → final
 ```
 
-Modifiers are sorted by explicit priority then stable modifier ID so result does not depend on object iteration order.
+Modifiers are sorted by explicit priority and stable modifier ID so results do not depend on object iteration order.
 
 ## Public API
 
@@ -84,79 +85,74 @@ Equipment / Mount / future Buff owner
         ↓ provider()
       modifiers
         ↓
-     KeloStats
+ KeloStatModifiers
         ↓
-  deterministic resolve
+ deterministic resolve
         ↓
-    final stats
+    final attributes
 ```
 
-`registerSource` is the extension point. A source owns its own state; it only returns modifiers to KeloStats.
+A source owns its own canonical state and only publishes modifiers. The resolver owns math and cache, not the source data.
 
 ## Caching
 
-`KeloStats` has a global revision and result cache. Register/unregister/`markDirty()` increments revision and clears cache. Gameplay owners must call `markDirty()` only when their stat-producing state changes. Do not recalculate entire inventories each render frame.
+`KeloStatModifiers` keeps a revisioned cache. Registering/unregistering a source or calling `markDirty()` invalidates cached results. Gameplay owners call `markDirty()` only when stat-producing state changes; never every render frame.
 
 ## Player equipment adapter
 
-`KeloEquipment` keeps its historical public API and `player.equipmentStats`. It additionally registers a `player-equipment` source and exposes `player.finalStats` / `getFinalStats()`. This is an adapter migration, not a destructive rewrite.
+`KeloEquipment` preserves its existing public API and legacy `player.equipmentStats` compatibility while publishing equipment through the shared modifier source. `player.finalStats` / `getFinalStats()` are derived values, not a second canonical inventory state.
 
 ## Mount equipment
 
-`KeloMounts` registers a `mount-equipment` source. A saddle can simultaneously publish a player modifier and a mount modifier. `whileMounted` controls player bonuses that disappear on dismount; `whileEquipped` can remain active on the mount definition itself.
+`KeloMounts` publishes a `mount-equipment` source. A saddle or other mount item may provide modifiers to the player, the mount, or both. `whileMounted` controls bonuses that apply only while riding; `whileEquipped` may affect the mount even when not currently ridden.
 
 ## Local vs online authority
 
-The resolver is deterministic presentation/domain math. Production authority must decide which sources/items are valid and owned. The client must not be allowed to invent trusted modifiers. Server and client can share IDs/rules or the server can return accepted state; the UI should not become authority.
+The resolver is deterministic domain math. Production authority decides which items/sources/modifiers are valid and owned. Clients may calculate previews, but they must not invent trusted gameplay modifiers.
 
 ## Persistence
 
-KeloStats itself persists nothing. Source owners persist their own IDs/state. This prevents cached derived numbers from becoming a second source of truth.
+`KeloStatModifiers` persists nothing. Source owners persist stable IDs/state. Derived final numbers remain recomputable.
 
 ## Invariants
 
-- one modifier format for every source;
+- one modifier format for all sources;
 - one deterministic resolution order;
-- source state remains outside KeloStats;
-- UI never registers arbitrary trusted modifiers;
-- removing a source/equipment item reverses its effect exactly;
-- appearance/cosmetics never enter this pipeline unless a separate gameplay equipment item explicitly provides a modifier.
+- source state stays outside the resolver;
+- UI never becomes authority;
+- removing a source reverses its contribution exactly;
+- cosmetic appearance is stat-free unless a separate gameplay equipment item explicitly contributes modifiers;
+- `KeloPlayerStats` progression counters remain a separate owner.
 
 ## Correct use
 
 ```js
-const stop = KeloStats.registerSource('example', () => [
+const stop = KeloStatModifiers.registerSource('example', () => [
   { id:'example.def', target:'player', stat:'defense', operation:'percentAdd', value:.04, scope:'whileMounted' }
 ]);
-KeloStats.markDirty();
-const result = KeloStats.resolve('player', { defense:100 }, { mounted:true });
+KeloStatModifiers.markDirty();
+const result = KeloStatModifiers.resolve('player', { defense:100 }, { mounted:true });
 ```
 
 ## Anti-patterns
 
-- calculating mount bonus directly in UI;
-- `if (itemId === ...) player.defense += ...`;
-- persisting `finalStats` as canonical inventory state;
-- running full aggregation every animation frame;
-- creating separate PlayerStatsEngine and MountStatsEngine with different math.
+- calculating mount bonuses directly in UI;
+- mutating player stats from item-ID branches;
+- persisting `finalStats` as canonical state;
+- recalculating entire inventories every frame;
+- creating separate PlayerAttributeEngine and MountAttributeEngine;
+- using `KeloPlayerStats` progression counters as the equipment attribute resolver.
 
 ## Tests / CI
 
-`npm run audit:stats` verifies scope activation, player + mount targets, deterministic repeat result and exact reversion after source removal.
-
-## Observability
-
-Public `revision` and `sourceCount` are available for audits/debug. Source provider errors are isolated and logged with source ID.
-
-## Known limitations
-
-V1 scopes are intentionally small. Future scopes must be added to this owner with tests rather than encoded as item-specific condition functions.
+`npm run audit:stats` verifies deterministic resolution, scopes, player + mount targets, exact reversion and explicit separation from `KeloPlayerStats`.
 
 ## Checklist for a new stat-producing system
 
 1. keep canonical state in its own owner;
 2. publish stable modifier IDs;
-3. use an existing operation/scope when possible;
-4. add a new generic operation/scope here only when genuinely reusable;
-5. call `markDirty()` on state changes, not every frame;
-6. add exact-before/after/reversion tests.
+3. reuse existing operation/scope when possible;
+4. add a generic operation/scope only when genuinely reusable;
+5. call `markDirty()` on meaningful state changes;
+6. test before/after and exact reversion;
+7. never use progression counters as derived combat attributes.
