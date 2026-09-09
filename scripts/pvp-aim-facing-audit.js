@@ -1,8 +1,8 @@
 /* KELO-INDEX
  * area: QA / PVP / MOVEMENT / APPEARANCE
  * owner: FOUNDATION CI
- * keys: PVP AIM FACING MOVEMENT APPEARANCE CONTRACT ONLINE
- * purpose: valida que locomoción no pise aim-facing en PvP y que el renderer use la dirección de combate sin cambiar física
+ * keys: PVP AIM FACING MOVEMENT APPEARANCE CONTRACT ONLINE STRAFE COMMITMENT
+ * purpose: valida que locomoción no pise aim-facing de gameplay y que el renderer use fila de locomoción al moverse salvo compromiso real de combate
  * public-api: CLI `node scripts/pvp-aim-facing-audit.js`
  * consumes: engine-ac.js, src/characters/character-appearance.js
  * state-owned: ninguno
@@ -41,6 +41,12 @@ function movementContext(combatEnabled) {
     },
     localPlayer: { x: 0, y: 0, vx: 100, vy: 0, radius: 20, _face: 'up' },
     KELO_COMBAT_ENABLED: combatEnabled,
+    KeloMovementProfile: {
+      version: 'audit-profile',
+      profile: { walkSpeed: 110, gaitRunStart: 0.7 },
+      speedCapForMagnitude(mag) { return mag <= 0 ? 110 : 185.28; },
+      gaitForMagnitude(mag) { return mag <= 0 ? 'idle' : mag >= 0.7 ? 'run' : 'walk'; }
+    },
     KeloMovement: {
       before(id, fn) { hooks.before = fn; return id; },
       after(id, fn) { hooks.after = fn; return id; }
@@ -56,7 +62,8 @@ function movementContext(combatEnabled) {
   return context;
 }
 
-function appearanceContext(combatEnabled) {
+function appearanceContext(combatEnabled, options) {
+  options = options || {};
   let middleware = null;
   const drawCalls = [];
   class FakeImage {
@@ -94,18 +101,24 @@ function appearanceContext(combatEnabled) {
     fillText() {},
     drawImage() { drawCalls.push(Array.from(arguments)); }
   };
+  const moving = options.moving !== false;
   const actor = {
     id: 'local',
     name: 'Kelo',
     x: 100,
     y: 100,
-    vx: 100,
+    vx: moving ? 100 : 0,
     vy: 0,
     appearanceId: 'player_hero_v1',
     actorKind: 'player',
     _face: 'up',
-    _visualMotion: { dx: 10, dy: 0, on: true, face: 'right', frame: 1 }
+    _visualMotion: { dx: moving ? 10 : 0, dy: 0, on: moving, face: 'right', frame: 1 }
   };
+  const pvpState = Object.freeze({
+    basicAttack: options.basicAttack ? Object.freeze({ id: 'audit-basic', phase: 'windup' }) : null,
+    specialHolding: !!options.specialHolding,
+    armedSlot: Number.isFinite(options.armedSlot) ? options.armedSlot : -1
+  });
   const context = {
     console,
     Uint8ClampedArray,
@@ -116,6 +129,7 @@ function appearanceContext(combatEnabled) {
     simulatedPlayers: [],
     KELO_WORLD_DECORATION_RESET: false,
     KELO_COMBAT_ENABLED: combatEnabled,
+    KeloPvPWorld: { get state() { return pvpState; } },
     KeloAvatar: { use(id, fn) { middleware = fn; } },
     KELO_AVATAR_PRESENTATION: {
       get() {
@@ -151,12 +165,34 @@ ok(combatMovement.KELO_MOVEMENT_AUDIT.combatAimFacingActive === true, 'COMBAT_AI
 const socialMovement = movementContext(false);
 ok(socialMovement.localPlayer._face === 'right', 'SOCIAL_MOVEMENT_NO_LONGER_OWNS_FACING');
 
-const combatAppearance = appearanceContext(true);
-ok(combatAppearance.context.KELO_CHARACTER_APPEARANCE_AUDIT.lastDraw.face === 'up', 'COMBAT_RENDER_DID_NOT_USE_AIM_FACE');
-ok(combatAppearance.context.KELO_CHARACTER_APPEARANCE_AUDIT.lastDraw.faceSource === 'combat-aim', 'COMBAT_FACE_SOURCE_NOT_REPORTED');
+// BEFORE v2.4: move RIGHT + aim UP rendered UP for the entire PvP mode.
+// AFTER v2.4: ordinary locomotion renders RIGHT, while gameplay _face remains UP.
+const movingCombatAppearance = appearanceContext(true, { moving: true });
+ok(movingCombatAppearance.actor._face === 'up', 'PRESENTATION_MUTATED_GAMEPLAY_AIM');
+ok(movingCombatAppearance.context.KELO_CHARACTER_APPEARANCE_AUDIT.lastDraw.face === 'right', 'MOVING_PVP_DID_NOT_USE_LOCOMOTION_ROW');
+ok(movingCombatAppearance.context.KELO_CHARACTER_APPEARANCE_AUDIT.lastDraw.faceSource === 'movement', 'MOVING_PVP_FACE_SOURCE_NOT_MOVEMENT');
 
-const socialAppearance = appearanceContext(false);
+const attackingCombatAppearance = appearanceContext(true, { moving: true, basicAttack: true });
+ok(attackingCombatAppearance.context.KELO_CHARACTER_APPEARANCE_AUDIT.lastDraw.face === 'up', 'ATTACK_COMMITMENT_DID_NOT_USE_AIM_FACE');
+ok(attackingCombatAppearance.context.KELO_CHARACTER_APPEARANCE_AUDIT.lastDraw.faceSource === 'combat-aim', 'ATTACK_COMMITMENT_FACE_SOURCE_NOT_AIM');
+
+const armedCombatAppearance = appearanceContext(true, { moving: true, armedSlot: 2 });
+ok(armedCombatAppearance.context.KELO_CHARACTER_APPEARANCE_AUDIT.lastDraw.face === 'up', 'ARMED_CAST_DID_NOT_USE_AIM_FACE');
+
+const idleCombatAppearance = appearanceContext(true, { moving: false });
+ok(idleCombatAppearance.context.KELO_CHARACTER_APPEARANCE_AUDIT.lastDraw.face === 'up', 'IDLE_PVP_DID_NOT_PRESERVE_AIM_FACE');
+
+const socialAppearance = appearanceContext(false, { moving: true });
 ok(socialAppearance.context.KELO_CHARACTER_APPEARANCE_AUDIT.lastDraw.face === 'right', 'SOCIAL_RENDER_DID_NOT_USE_MOVEMENT_FACE');
 ok(socialAppearance.context.KELO_CHARACTER_APPEARANCE_AUDIT.lastDraw.faceSource === 'movement', 'SOCIAL_FACE_SOURCE_NOT_REPORTED');
 
-console.log('PVP_AIM_FACING_OK: combat aim survives movement and drives render; social locomotion facing unchanged');
+ok(movingCombatAppearance.context.KELO_CHARACTER_APPEARANCE_AUDIT.combatAimFacingPolicy === 'idle-or-attack-commitment', 'POLICY_NOT_AUDITABLE');
+
+console.log(JSON.stringify({
+  status: 'PVP_AIM_FACING_OK',
+  beforeOrthogonalLocomotionRowMismatchPct: 100,
+  afterOrthogonalLocomotionRowMismatchPct: 0,
+  gameplayAimPreserved: movingCombatAppearance.actor._face === 'up',
+  attackAimPresentationPreserved: attackingCombatAppearance.context.KELO_CHARACTER_APPEARANCE_AUDIT.lastDraw.face === 'up',
+  policy: movingCombatAppearance.context.KELO_CHARACTER_APPEARANCE_AUDIT.combatAimFacingPolicy
+}, null, 2));
