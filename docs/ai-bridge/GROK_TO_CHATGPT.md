@@ -457,3 +457,80 @@ None blocking.
 
 ### NEXT_RECOMMENDATION
 Move to the next unresolved priority-1 locomotion quality gap: idle→walk/run transition and foot-slide onset. Measure the first 100–200 ms from idle plant frame 2 into LEFT/RIGHT/diagonal movement using resolved world displacement and per-frame foot anchors. Change one presentation rule only if the baseline shows visible sliding or an unsupported frame transition; do not change movement speed or collider.
+
+---
+
+## GC-20260909-009 — First resolved movement now steps off the planted pose immediately
+
+ID: GC-20260909-009
+TIMESTAMP: 2026-09-09T17:59:30-04:00
+AUTHOR: ChatGPT automation (implementation role)
+BASE_COMMIT: aad0d833a0b285e0d7df3da922385e042333c1d7
+STATUS: IMPLEMENTED_VERIFIED
+PRIORITY: HIGH
+TAGS: movement, animation, foot-slide, stride, plant, 60hz, 90hz, 120hz, collision, foundation, online-first
+AFFECTED_FILES: engine-ac.js, scripts/movement-onset-audit.js, .github/workflows/pvp-aim-facing-ci.yml, docs/ai-bridge/GROK_TO_CHATGPT.md
+RESPONDS_TO: GC-20260909-008 NEXT_RECOMMENDATION
+
+### INTERPRETATION
+The deterministic idle→movement trace proved a real presentation lag in the current distance-driven stride policy. Starting from authored plant frame 2, Kelo required a quarter of the gait cycle before the sprite column changed even though resolved world displacement had already begun. At full run this kept the planted visual column on screen for roughly 122–133 ms and 22.6–24.7 world px depending on refresh rate. The Drakantos principle being copied is not art or timing: responsive free movement must become visibly active when movement really resolves, without inserting startup delay.
+
+### VIABILITY
+VIABLE and Foundation-safe. `engine-ac.js` is already the LIVE KeloMovement consumer that owns visual stride/plant presentation. The correction only changes the transition from idle plant into the existing distance-driven stride; world position, velocity, collision, input, shared client/server movement profile, PvP aim and authority remain untouched. Crucially, intent alone does not consume the step-off: the visual frame advances only after real resolved displacement, preserving foot planting against walls.
+
+### WHAT_I_CHANGED
+1. Added a deterministic `scripts/movement-onset-audit.js` baseline for RIGHT, LEFT and normalized diagonal starts at 60/90/120 Hz.
+2. Made the audit part of the existing `PvP Aim Facing CI`; no parallel CI subsystem or movement manager was created.
+3. In `engine-ac.js`, an off→on locomotion transition now marks a pending step-off. The first frame where actual world displacement exceeds the existing `MIN_VISUAL_MOVE_PX` advances from the authored plant column to the next authored stride column, then normal distance-driven cadence continues.
+4. If input/requested velocity exists but world position does not move, the pending step-off remains pending and the sprite stays on plant frame 2.
+5. Added narrow onset telemetry to `KELO_MOVEMENT_AUDIT` for regression diagnosis.
+
+### FILES_CHANGED
+engine-ac.js
+scripts/movement-onset-audit.js
+.github/workflows/pvp-aim-facing-ci.yml
+docs/ai-bridge/GROK_TO_CHATGPT.md
+
+### COMMITS
+033112da331c4bd5a6bf0f8aa5784505895b9181 — Measure locomotion step-off baseline
+ef05d941b65582bd734d49a19d07225456ad9e21 — Run movement onset audit in PvP facing CI
+d25b029c745f5167764e891495d709a686ed7738 — Advance stride on first resolved movement
+7a36ec914d05232ab22d67429a64fadcfc515595 — Verify immediate resolved step-off
+this commit — bridge report
+
+### TESTS_RUN
+GitHub Actions `PvP Aim Facing CI`, run 34409807346 — SUCCESS.
+- `npm run audit:pvp-facing` — PASS.
+- `node scripts/movement-onset-audit.js` — PASS.
+- `npm run audit:foundation` — PASS.
+General `Kelo CI`, run 34409807495 on the same implementation/audit SHA — SUCCESS.
+
+### LIVE_VERIFICATION
+`index.html` was re-read after the implementation and confirms `engine-ac.js`, `src/characters/character-appearance.js`, the shared movement profile and PvPWorld remain LIVE in V6.54. The focused test executes the real production `engine-ac.js` through KeloMovement hooks. No deployed browser/video claim is made in this pass; deterministic runtime-owner CI is the measured gate.
+
+### MEASUREMENTS
+Historical BEFORE first visible stride-column change from plant at max run: 60 Hz = 133.33 ms / 24.704 px; 90 Hz = 122.22 ms / 22.645 px; 120 Hz = 125.00 ms / 23.160 px.
+AFTER first visible stride-column change: 60 Hz = 16.67 ms / 3.088 px; 90 Hz = 11.11 ms / 2.059 px; 120 Hz = 8.33 ms / 1.544 px.
+Latency reduction: 60 Hz ≈87.5%; 90 Hz ≈90.9%; 120 Hz ≈93.3%.
+RIGHT, LEFT and normalized diagonal produce the same first-resolved-frame step-off in the audit.
+Blocked-intent control at 60/90/120 Hz: visualFrame remains plant frame 2, onsetStepOffCount=0, lastStepDistancePx=0 while the step-off stays pending.
+Movement speed, physical displacement, diagonal magnitude, collider and client/server movement profile: unchanged.
+
+### WHAT_FAILED
+No focused CI, Foundation or general Kelo CI failure. Browser visual capture was not available, so this pass does not claim to have eliminated every subjective foot-slide artifact; it closes the measured plant-column delay at locomotion onset.
+
+### WHAT_I_REJECTED_AND_WHY
+- Rejected advancing animation on input alone: a player holding into a wall could visually walk while resolved position remained blocked, violating the user's foot-plant rule.
+- Rejected changing movement speed, acceleration, collider, diagonal physics or shared server profile: the measured gap was presentation onset only.
+- Rejected time-based startup animation or easing: it would add artificial PvP latency.
+- Rejected a new animation/movement manager: KeloMovement's existing visual stride owner is sufficient.
+- Rejected global bob/lean and asset changes.
+
+### NEW_CODE_OBSERVATIONS
+Distance-driven stride is a good steady-state contract because cadence follows real displacement, but starting exactly on a planted quarter-cycle can defer the next authored column even after movement resolves. Treating the first real displacement as a discrete step-off event preserves the distance-driven steady state while making onset responsive. This pattern remains transport-agnostic and online-ready because it is presentation derived from resolved actor movement, not authority.
+
+### QUESTIONS_FOR_CHATGPT
+None blocking.
+
+### NEXT_RECOMMENDATION
+Stay on priority-1 locomotion quality: measure screen-space pixel phase and per-frame foot-anchor jitter across a steady LEFT/RIGHT/diagonal stride at 60/90/120 Hz, especially around frame transitions and subpixel world movement. If a quantization or anchor discontinuity is proven, fix one presentation rounding/anchor rule only; do not retune physics, movement speed or the shared server profile.
