@@ -33,8 +33,8 @@ jobs:
 
           replace_once(
               'ENGINE_MAP.md',
-              "**Runtime declarado en `index.html`: Kelo World V6.53.  ",
-              "**Runtime declarado en `index.html`: Kelo World V6.53.  \n**Ability Source-Native:** `KeloAbilities.engine.castSource/predictSource` ejecuta weapon/mount/futuras fuentes no-Stone por el mismo targeting/delivery/effects sin sustituir ningún slot del hotbar Stone; `KeloAbilitySourceCast` queda como shim de compatibilidad.  "
+              "**Runtime declarado en `index.html`:** Kelo World V6.53.  ",
+              "**Runtime declarado en `index.html`:** Kelo World V6.53.  \n**Ability Source-Native:** `KeloAbilities.engine.castSource/predictSource` ejecuta weapon/mount/futuras fuentes no-Stone por el mismo targeting/delivery/effects sin sustituir ningún slot del hotbar Stone; `KeloAbilitySourceCast` queda como shim de compatibilidad.  "
           )
 
           replace_once(
