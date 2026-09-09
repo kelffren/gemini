@@ -1,3 +1,12 @@
+/* KELO-INDEX
+ * area: TESTS / EQUIPMENT ABILITIES
+ * owner: Equipment Ability contracts
+ * keys: WEAPON LOADOUT Q W E SLOTCHOICES BACKPACK ONLINE AUTHORITY
+ * purpose: protege selección Q/W/E, rechazo cross-family, reset, hidratación server y ownership UI
+ * consumes: KELO_EQUIPMENT_ABILITY_DATA, KeloEquipment, KeloEquipmentAbilityChannel
+ * state-owned: ninguno; harness VM efímero
+ * do-not: no implementar gameplay ni autoridad aquí
+ */
 'use strict';
 const fs=require('fs'),vm=require('vm'),assert=require('assert');
 let saves=0,syncs=0,online=false;
