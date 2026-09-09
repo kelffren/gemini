@@ -121,7 +121,7 @@ jobs:
           grep -q "requestCommerce" engine-net.js
           grep -q "commerce:request" engine-net.js
           grep -q "createPlayerEconomyStore" server/forge-store.js
-          grep -q "economyStore: economy" server/index.js
+          grep -Eq "economyStore[[:space:]]*:[[:space:]]*economy" server/index.js
           grep -q "createCommerceService" server/index.js
           grep -q "commerce:request" server/index.js
           grep -q "commerce:result" server/index.js
