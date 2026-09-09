@@ -2,6 +2,9 @@
 const fs=require('fs'),assert=require('assert');
 const path='src/ui/logistics-admin-ui.js';
 const src=fs.readFileSync(path,'utf8');
+const index=fs.readFileSync('index.html','utf8');
+const pkg=JSON.parse(fs.readFileSync('package.json','utf8'));
+const catalog=JSON.parse(fs.readFileSync('docs/system-catalog.json','utf8'));
 assert(src.includes('owner: KeloLogisticsAdminUI'),'KELO-INDEX owner missing');
 assert(src.includes("KeloLogisticsDevtools.run"),'UI must delegate mutations to logistics devtools');
 assert(src.includes("KeloInputLocks.acquire"),'UI must acquire shared input lock');
@@ -13,4 +16,9 @@ for(const tab of ['overview','economy','routes','carts','factions'])assert(src.i
 for(const action of ['emergency-apples','activate-raiders','attach-cart','detach-cart','begin-claim','complete-claim','join-faction','create-clan','join-clan'])assert(src.includes(action),'missing action '+action);
 assert(src.includes('@media(max-width:620px)'),'mobile layout contract missing');
 assert(src.includes("root.KeloLogisticsAdminUI=Object.freeze"),'public UI API missing');
-console.log('PASS logistics-admin-ui-audit',JSON.stringify({adminGated:true,inputLocks:true,noDirectState:true,noPolling:true,mobile:true,tabs:5}));
+assert(index.includes('src/ui/logistics-admin-ui.js?v=1'),'LIVE index must load logistics admin UI');
+assert(index.indexOf('src/systems/admin-key-system.js')<index.indexOf('src/ui/logistics-admin-ui.js'),'Admin Key must load before logistics admin UI');
+assert.equal(pkg.scripts['audit:logistics-ui'],'node scripts/logistics-admin-ui-audit.js');
+const row=catalog.systems.find(x=>x.id==='logistics-admin-ui');
+assert(row&&row.owner==='KeloLogisticsAdminUI'&&row.playerVisible===false,'system catalog entry missing/invalid');
+console.log('PASS logistics-admin-ui-audit',JSON.stringify({adminGated:true,inputLocks:true,noDirectState:true,noPolling:true,mobile:true,tabs:5,liveBoot:true,documented:true}));
