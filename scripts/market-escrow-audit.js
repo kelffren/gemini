@@ -8,7 +8,7 @@ const E=context.KeloEquipment,B=context.KeloBackpack,C=context.KeloContainers,M=
 assert(E&&B&&C&&M);
 assert.equal(E.version,'equipment-v1.3.0');
 assert.equal(B.version,'backpack-v1.1.0');
-assert.equal(C.version,'container-v1.3.0');
+assert.equal(C.version,'container-v1.4.0');
 assert.equal(M.version,'market-escrow-v1.0.0');
 const allItems=()=>context.STATE.inventory.concat(context.STATE.warehouse.items,context.STATE.marketEscrow.items,context.STATE.tradeEscrow.items,context.STATE.emoteLoadout.items);
 const totalQty=()=>allItems().reduce((n,x)=>n+Math.max(1,Number(x.quantity)||1),0);
