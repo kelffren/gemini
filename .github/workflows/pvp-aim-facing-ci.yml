@@ -8,6 +8,7 @@ on:
       - 'src/characters/character-appearance.js'
       - 'src/systems/pvp-world.js'
       - 'scripts/pvp-aim-facing-audit.js'
+      - 'scripts/movement-onset-audit.js'
       - 'package.json'
       - '.github/workflows/pvp-aim-facing-ci.yml'
   pull_request:
@@ -16,6 +17,7 @@ on:
       - 'src/characters/character-appearance.js'
       - 'src/systems/pvp-world.js'
       - 'scripts/pvp-aim-facing-audit.js'
+      - 'scripts/movement-onset-audit.js'
       - 'package.json'
       - '.github/workflows/pvp-aim-facing-ci.yml'
 
@@ -32,5 +34,7 @@ jobs:
           node-version: 20
       - name: Verify independent movement and PvP aim-facing
         run: npm run audit:pvp-facing
+      - name: Measure idle-to-movement step-off
+        run: node scripts/movement-onset-audit.js
       - name: Verify Foundation architecture
         run: npm run audit:foundation
