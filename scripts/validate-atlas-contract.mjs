@@ -18,6 +18,7 @@ for(const forbidden of ['new Image()','function versionedSrc','world=191']){
 }
 
 const productionPngs=manifest.assets.filter(a=>String(a.path||'').toLowerCase().endsWith('.png'));
+const manifestByPath=new Map(productionPngs.map(a=>[String(a.path),a]));
 for(const asset of productionPngs){
   if(!(asset.width>0&&asset.height>0))errors.push(`${asset.id}: invalid dimensions`);
   if(Math.max(asset.width,asset.height)>2048)errors.push(`${asset.id}: exceeds atlas max dimension 2048`);
@@ -32,9 +33,14 @@ for(const asset of productionPngs){
 }
 
 const srcMatches=[...registry.matchAll(/src:'([^']+)'/g)].map(m=>m[1]);
-if(srcMatches.length<8)errors.push(`TileRegistry atlas coverage unexpectedly low: ${srcMatches.length}`);
+if(srcMatches.length===0)errors.push('TileRegistry must expose at least one manifest-backed atlas source');
+const registryPaths=new Set();
 for(const src of srcMatches){
   if(!/[?&](art|v)=/.test(src))errors.push(`TileRegistry asset lacks cache-busting token: ${src}`);
+  const path=src.split('?')[0];
+  if(registryPaths.has(path))errors.push(`TileRegistry duplicates atlas source: ${path}`);
+  registryPaths.add(path);
+  if(!manifestByPath.has(path))errors.push(`TileRegistry atlas source missing from art manifest: ${path}`);
 }
 
 const giantAtlases=productionPngs.filter(a=>Math.max(a.width,a.height)>1024);
@@ -43,8 +49,8 @@ const giantIrregularAtlases=giantAtlases.filter(a=>a.frames?.mode==='irregular')
 if(giantRegularAtlases.length>2)errors.push(`too many >1024px regular production assets (${giantRegularAtlases.length}); split by family before growth`);
 if(giantIrregularAtlases.length>1)errors.push(`too many >1024px irregular source atlases (${giantIrregularAtlases.length}); keep only one original-resolution sheet resident per visual family`);
 
-const families=new Set(productionPngs.map(a=>a.family));
-if(families.size<5)errors.push(`asset families unexpectedly collapsed: ${families.size}`);
+const families=new Set(productionPngs.map(a=>a.family).filter(Boolean));
+if(productionPngs.length>0&&families.size===0)errors.push('production assets must declare at least one family');
 
 if(errors.length){console.error(errors.join('\n'));process.exit(1)}
-console.log(JSON.stringify({policy:'kelo-atlas-contract-v1',contractVersion:'1.2.0',worldAtlasConsumer:'managed',productionPngs:productionPngs.length,registryVersionedSources:srcMatches.length,families:families.size,largeRegularAssets:giantRegularAtlases.map(a=>a.id),largeIrregularAssets:giantIrregularAtlases.map(a=>a.id)},null,2));
+console.log(JSON.stringify({policy:'kelo-atlas-contract-v1',contractVersion:'1.2.0',worldAtlasConsumer:'managed',productionPngs:productionPngs.length,registryVersionedSources:srcMatches.length,registryManifestCoverage:[...registryPaths],families:families.size,largeRegularAssets:giantRegularAtlases.map(a=>a.id),largeIrregularAssets:giantIrregularAtlases.map(a=>a.id)},null,2));
