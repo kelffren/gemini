@@ -1,15 +1,15 @@
 /* KELO-INDEX
  * area: MOVEMENT / PRESENTATION
  * owner: KeloMovement consumer
- * keys: MOVEMENT GAIT SPEED STRIDE PLANT AUDIT
+ * keys: MOVEMENT GAIT SPEED STRIDE PLANT AUDIT AIM FACING PVP
  * purpose: calcula gait/velocidad objetivo y estado visual de zancada usando hooks del owner KeloMovement
  * public-api: KELO_MOVEMENT_AUDIT
- * consumes: KeloMovement, input, CONFIG, localPlayer
+ * consumes: KeloMovement, input, CONFIG, localPlayer, KELO_COMBAT_ENABLED
  * state-owned: _visualMotion del actor local + telemetría de gait
  * extension-points: hooks before/after de KeloMovement
  * reuse: perfil de marcha/carrera del jugador actual
  * legacy: mantiene constantes y telemetría históricas; ya no envuelve updateMovement directamente
- * do-not: NO resolver colisiones, NO crear otro wrapper de updateMovement
+ * do-not: NO resolver colisiones, NO crear otro wrapper de updateMovement, NO pisar aim-facing durante PvP
  */
 (function () {
   // MOV-001: one processed intent magnitude drives gait + speed.
@@ -18,6 +18,7 @@
   // MOV-STOP-V2: release never freezes an arbitrary stride pose; physics remains unchanged.
   // MOV-REVERSAL-AUDIT-V1: measure real lateral reversal continuity instead of publishing inert counters.
   // MOV-PLANT-V1: settle on authored lateral frame 2 after release; frame 0 remains available via ?plantFrame=0 baseline.
+  // MOV-COMBAT-FACING-V1: movement presentation never overwrites PvP aim-facing; combat geometry remains authority-owned elsewhere.
   const WALK_MAX = 0.74;
   const WALK_SPEED = 110;
   const RUN_SPEED = 178;
@@ -81,9 +82,17 @@
     return Math.min(1, Math.hypot(input.currentX - input.originX, input.currentY - input.originY) / CONFIG.joystickRadius);
   }
 
+  function isCardinalFace(face) {
+    return face === 'left' || face === 'right' || face === 'up' || face === 'down';
+  }
+
+  function combatAimFacing(p) {
+    return window.KELO_COMBAT_ENABLED === true && p && isCardinalFace(p._face) ? p._face : null;
+  }
+
   function publishAudit(mag, gait, speedCap, visual) {
     window.KELO_MOVEMENT_AUDIT = {
-      version: 'MOV-plant-audit-v1',
+      version: 'MOV-combat-facing-v1',
       rawTouchMag: rawTouchMag(),
       processedMag: mag,
       gait,
@@ -95,6 +104,9 @@
       stopV2: MOV_STOP_V2,
       plantFrame: PLANT_FRAME,
       plantPhase: PLANT_PHASE,
+      combatAimFacingActive: !!combatAimFacing(localPlayer),
+      movementFace: visual ? visual.face : localPlayer._face || 'down',
+      actorFace: localPlayer._face || 'down',
       cycleWorldPx: visual ? visual.cycleWorldPx : cycleWorldPxFor(mag, gait),
       visualOn: !!(visual && visual.on),
       visualFrame: visual ? visual.frame : PLANT_FRAME,
@@ -198,7 +210,9 @@
     if (v.on && (Math.abs(v.dx) > 0.0001 || Math.abs(v.dy) > 0.0001)) {
       const side = Math.abs(v.dx) * 1.15 >= Math.abs(v.dy);
       v.face = side ? (v.dx >= 0 ? 'right' : 'left') : (v.dy >= 0 ? 'down' : 'up');
-      p._face = v.face;
+      // En social/exploración, movement posee el facing visual normal.
+      // En PvP, `_face` ya representa la intención de aim de KeloPvPWorld y no debe ser sobrescrita por locomoción.
+      if (!combatAimFacing(p)) p._face = v.face;
     }
 
     v.lastStepDistancePx = dist > MIN_VISUAL_MOVE_PX ? dist : 0;
