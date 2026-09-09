@@ -12,6 +12,7 @@
     "audit:titles": "node scripts/title-system-audit.js",
     "audit:containers": "node scripts/container-system-audit.js",
     "audit:commerce": "node scripts/commerce-system-audit.js",
+    "audit:performance-foundation": "node scripts/performance-foundation-audit.js",
     "audit:studio": "node scripts/studio-foundation-audit.mjs",
     "audit:studio:creator": "node scripts/studio-creator-v1-audit.mjs"
   },
