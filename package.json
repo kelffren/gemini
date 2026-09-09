@@ -17,7 +17,8 @@
     "audit:mounts": "node scripts/mount-foundation-audit.mjs",
     "audit:stats": "node scripts/stat-modifier-audit.mjs",
     "audit:appearance": "node scripts/appearance-foundation-audit.mjs",
-    "audit:mount-creator": "node scripts/mount-creator-audit.mjs"
+    "audit:mount-creator": "node scripts/mount-creator-audit.mjs",
+    "audit:performance": "node scripts/performance-foundation-audit.js"
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0"

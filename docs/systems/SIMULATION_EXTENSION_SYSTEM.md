@@ -4,16 +4,16 @@
 
 `KeloSimulation` es el OWNER único de extensiones que necesitan ejecutar lógica antes o después de la simulación legacy consolidada por `engine-c.js`.
 
-No crea un segundo game loop y no reemplaza la física base. Su función es retirar la cadena histórica de wrappers de `updateSimulation` y convertirla en hooks observables y ordenados.
+No crea un segundo game loop y no reemplaza la física base. Su función es retirar la cadena histórica de wrappers de `updateSimulation` y convertirla en hooks observables, ordenados y capaces de dormir cuando su owner no tiene trabajo.
 
 ```text
 updateSimulation legacy post-engine-c
             │
             ▼
       KeloSimulation
-      ├─ before hooks
+      ├─ before hooks activos
       ├─ simulación base exacta
-      └─ after hooks
+      └─ after hooks activos
 ```
 
 ## Owner
@@ -31,13 +31,19 @@ Registra preparación previa a la simulación base.
 
 Registra updates posteriores: timers gameplay ya existentes, interpolación, actualizaciones de entidades auxiliares o compatibilidad en migración.
 
+### `KeloSimulation.setEnabled(id, enabled)`
+
+Activa o duerme un hook ya registrado. `false` lo saca del hot path sin perder identidad, prioridad ni función; `true` lo devuelve al orden determinista original. Es la API Foundation para sleep/wake de simulación auxiliar.
+
+No sustituye autoridad de gameplay ni permite congelar un sistema si sus timers/recursos siguen necesitando avanzar. El owner de la feature decide si realmente está idle.
+
 ### `KeloSimulation.unregister(id)`
 
-Retira un hook.
+Retira definitivamente un hook.
 
 ### `KeloSimulation.snapshot()`
 
-Devuelve owners/prioridades para observabilidad.
+Devuelve owners, prioridades, estado `enabled` y conteos activos/dormidos para observabilidad.
 
 ## Invariantes
 
@@ -47,6 +53,8 @@ Devuelve owners/prioridades para observabilidad.
 - Los hooks no crean otro `requestAnimationFrame` ni otro game loop.
 - Features nuevas no deben envolver `updateSimulation` directamente.
 - Menor prioridad se ejecuta primero dentro de cada fase.
+- Un hook dormido no se ejecuta.
+- Cambiar `enabled` reconstruye la lista activa solo al cambiar lifecycle; no se hace un filtro completo de hooks en cada frame.
 
 ## Migración legacy
 
@@ -56,6 +64,10 @@ Cada wrapper se migra de forma incremental y conserva su orden histórico median
 
 La simulación local puede contener predicción/presentación. Estado autoritativo online debe permanecer en los owners/server correspondientes; `KeloSimulation` es infraestructura de extensión cliente, no authority.
 
+## Performance Foundation
+
+Para el contrato conjunto de startup, CPU, memoria, mundo y red, ver `docs/systems/PERFORMANCE_FOUNDATION.md`.
+
 ## Estado
 
-**FOUNDATION ACTIVE / TRANSITIONAL CORE BRIDGE**
+**FOUNDATION ACTIVE / TRANSITIONAL CORE BRIDGE — SLEEP/WAKE ENABLED**
