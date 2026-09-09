@@ -2,219 +2,264 @@
 
 ## Propósito
 
-Commerce V1 unifica el comercio valioso de Kelo World bajo una sola frontera de autoridad. Permite probar offline el Mercado Central, puestos de jugador, publicaciones, compras y trade directo sin construir un segundo flujo que luego haya que reemplazar al conectar servidor.
+Commerce unifica todo movimiento valioso de Oro, objetos y ownership comercial bajo una sola frontera. El mismo frontend funciona en dos modos:
+
+- **offline:** adapter local para desarrollo y pruebas;
+- **online:** servidor autoritativo mediante el WebSocket existente.
+
+No existe un TradeEngine paralelo ni un segundo MarketEngine. Trade directo, puestos y compras terminan en el mismo owner de Commerce.
 
 ## OWNER y archivos principales
 
-- **OWNER gameplay/economía:** `window.KeloCommerceAuthority` — `src/systems/commerce-authority.js`.
-- **Movimiento físico de objetos:** `window.KeloContainers` — `src/systems/container-system.js`.
-- **Escrow de publicaciones:** `window.KeloMarketEscrow` — `src/systems/market-escrow-system.js`.
-- **Zona/instancia visual:** `window.KeloMarketWorld` — `src/instances/market-instance.js`.
+- **OWNER cliente / frontera de intents:** `window.KeloCommerceAuthority` — `src/systems/commerce-authority.js`.
+- **OWNER server de comercio:** `CommerceService` — `server/commerce-store.js`.
+- **Fuente económica server compartida:** `PlayerEconomyStore` — `server/player-economy-store.js`.
+- **Forge consumidor del mismo saldo:** `server/forge-store.js`.
+- **Movimiento físico offline:** `window.KeloContainers` — `src/systems/container-system.js`.
+- **Escrow de publicaciones offline:** `window.KeloMarketEscrow` — `src/systems/market-escrow-system.js`.
+- **Zona visual:** `window.KeloMarketWorld` — `src/instances/market-instance.js`.
 - **UI:** `window.KeloCommerceUI` — `src/ui/commerce-ui.js`.
-- **Compatibilidad UI anterior:** `src/ui/market-ui.js`, ahora delega escrituras a Commerce Authority.
-- **Puente online:** `window.KeloNetAuthority.requestCommerce()` — `engine-net.js`.
+- **Transporte:** `window.KeloNetAuthority.requestCommerce()` — `engine-net.js` → `server/index.js`.
+
+## Regla de autoridad
+
+La UI jamás transfiere Oro u objetos directamente.
+
+```text
+UI
+  ↓ intent
+KeloCommerceAuthority
+  ↓
+local adapter  OR  KeloNetAuthority
+                     ↓
+               commerce:request
+                     ↓
+               CommerceService
+                     ↓
+             PlayerEconomyStore
+```
+
+Online, si `KeloNetAuthority.isOnline()` es verdadero, Commerce **no puede caer al adapter local**. El servidor decide saldo, ownership, reservas, sesiones, compras y commits.
 
 ## Estado que posee
 
-`KeloCommerceAuthority` posee en modo offline:
+### Offline
 
-- una sesión de trade activa;
-- historial acotado de trades;
-- log acotado de transacciones;
+`KeloCommerceAuthority` conserva únicamente el estado necesario para la demo local: sesión de trade, claims/listings demo e historial acotado. Los objetos reservados usan contenedores explícitos.
+
+### Online
+
+`CommerceService` posee:
+
+- sesiones de trade;
+- estado `REQUESTED/OPEN/FINAL_REVIEW`;
 - claims de puestos;
-- fixtures de vendedores/listings demo usados únicamente para pruebas offline.
+- listings y reservas;
+- idempotencia de requests;
+- coordinación del commit atómico.
 
-`KeloContainers` posee `tradeEscrow`, además de los contenedores ya existentes.
+`PlayerEconomyStore` es la única verdad server-side para:
 
-`KeloMarketWorld` solo posee estado temporal de escena: snapshot de posición/cámara y modo vendedor local.
+- Oro;
+- items/owner/container;
+- reservas;
+- historial económico.
 
-## Estado que NO posee
+Forge y Commerce consumen ese mismo store. No se permite otro ledger de Oro o inventario paralelo.
 
-La UI no posee ni muta:
+## API pública cliente
 
-- `STATE.gold`;
-- `STATE.inventory`;
-- arrays de Warehouse/Market Escrow/Trade Escrow;
-- estado autoritativo de un trade;
-- ownership real de un puesto online.
+`KeloCommerceAuthority` mantiene:
 
-`KeloMarketWorld` tampoco decide compras, transfers ni balances.
+- `request(op, payload)`;
+- `snapshot()`;
+- `getMode()`;
+- `installAuthorityAdapter(adapter)`;
+- helpers existentes de market/stall/trade.
 
-## API pública
+`KeloCommerceUI` expone:
 
-### `KeloCommerceAuthority`
+- `openTrade()`;
+- `openTradeWithPlayer(peer)` — punto de integración para interacción con otro actor;
+- `openMarket()` / `openStall()` / `openOwnStall()`;
+- `enterMarket()` / `leaveMarket()`.
 
-- `request(op, payload)` — boca única de comandos.
-- `snapshot()` — vista pública del comercio.
-- `getMode()` — `local-offline`, `server-authoritative` o adapter inyectado.
-- `installAuthorityAdapter(adapter)` — extensión explícita para otro authority provider.
-- `createMarketListing(instanceId, quantity, price, metadata)`.
-- `cancelMarketListing(listingId)`.
-- `buyListing(listingId)`.
-- `claimStall(stallId, message)` / `releaseStall(stallId)` / `setStallMessage(message)`.
-- `createTrade(peer)`.
-- `addTradeItem(instanceId, quantity)` / `removeTradeItem(instanceId)`.
-- `setTradeGold(gold)`.
-- `setTradeReady(ready)`.
-- `finalAcceptTrade(accept)`.
-- `cancelTrade()`.
-- `demoPeerReady()` y `demoPeerFinalAccept()` existen solo para demostrar el protocolo offline.
+El contrato de `peer` para iniciar un trade online es estable y mínimo:
 
-### `KeloContainers` añadido para Commerce
+```js
+KeloCommerceUI.openTradeWithPlayer({
+  id: stablePlayerId,
+  name: displayName
+});
+```
 
-- `checkpoint()`.
-- `restoreCheckpoint(snapshot, options)`.
-- `receiveItem(destination, item, options)`.
-- `extractItem(source, itemKey, options)`.
-- contenedor `trade_escrow`, separado de `market_escrow`.
+La UI no necesita conocer WebSocket, base de datos ni implementación del backend.
 
-### `KeloMarketWorld`
+## Protocolo online
 
-- `enter()` / `leave()`.
-- `getStalls()` / `getStall(id)` / `getClaim(id)`.
-- `startSelling(stallId)` / `stopSelling()`.
-- `hitTest(worldX, worldY)`.
+Mensajes existentes:
 
-## Flujo — Mercado
+```text
+client → commerce:request { requestId, op, payload }
+server → commerce:result  { requestId, ...result, snapshot }
+server → commerce:event   { reason, snapshot }
+```
 
-1. El jugador abre **Mercado**.
-2. `KeloCommerceUI` pide entrar a `KeloMarketWorld`.
-3. `KELO_INSTANCES` crea/entra a la instancia lógica `market:central-market`.
-4. El renderer exclusivo de `KeloMarketWorld` dibuja suelo, puestos, alfombras y personaje usando `KeloRender` y `KeloCamera`.
-5. Tocar una alfombra abre el puesto correspondiente.
-6. Publicar envía `market:create` a Commerce Authority.
-7. Offline, Commerce reutiliza `KeloMarketEscrow`, que mueve físicamente el item desde Backpack a `market_escrow`.
-8. Comprar una fixture offline ejecuta una transacción con checkpoint de contenedores + balance de oro. Si cualquier paso falla, se restaura todo.
+`engine-net.js` traduce estos mensajes al mismo `KeloCommerceAuthority`; no hay un transporte exclusivo de Trade.
 
-## Flujo — Puesto
+## Flujo de trade jugador ↔ jugador
 
-1. Una alfombra sin claim puede reclamarse mediante `stall:claim`.
-2. El jugador puede definir un mensaje corto del puesto.
-3. `startSelling()` coloca al personaje detrás del puesto y adquiere un lock semántico `commerce-stall` mediante `KeloInputLocks`.
-4. Dejar de vender libera exclusivamente ese lock.
-5. Liberar el puesto no modifica listings por fuera de Commerce Authority.
+Online el handshake obligatorio es:
 
-## Flujo — Trade directo
+```text
+A selecciona B
+→ trade:request
+→ REQUESTED
+→ B recibe prompt
+→ B trade:accept o trade:reject
+→ OPEN
+→ cada lado añade objetos/Oro
+→ cada lado ready
+→ FINAL_REVIEW
+→ cada lado finalAccept
+→ COMMIT ATÓMICO
+```
 
-1. `trade:create` crea una sesión.
-2. Añadir un item lo mueve físicamente de Backpack a `trade_escrow`.
-3. Cambiar objetos u oro reinicia **las confirmaciones de ambos lados**.
-4. Cada lado marca `ready`.
-5. Solo cuando ambos están ready se entra a `FINAL_REVIEW`.
-6. Cada lado debe aceptar una segunda vez (`finalAccepted`).
-7. Con ambas aceptaciones finales se ejecuta `commitTrade()`.
-8. El commit usa checkpoint de contenedores, valida oro, recibe items entrantes y extrae los salientes.
-9. Si falla cualquier operación, se restauran contenedores, oro y estado Commerce.
-10. Cancelar devuelve los items de `trade_escrow` a Backpack.
+### Seguridad de la solicitud
 
-## Dependencias permitidas
+- Mientras el estado es `REQUESTED`, nadie puede editar la oferta.
+- Solo el receptor puede `trade:accept` o `trade:reject`.
+- La solicitud expira automáticamente.
+- `trade:create` en el servidor es solo alias de compatibilidad de `trade:request`; **no abre un trade directamente** y no permite saltarse el consentimiento.
+- El servidor puede inyectar `isPlayerOnline`, `listTradeCandidates` y `canTradePlayers` sin cambiar la UI ni el protocolo.
 
-Commerce puede consumir:
+### Oferta y doble confirmación
 
-- `KeloContainers`;
-- `KeloMarketEscrow`;
-- `KeloNetAuthority`;
-- `STATE/saveState` dentro del adapter local;
-- `KeloEvents` para observabilidad.
+- cada item queda reservado en `trade_escrow`;
+- cada lado puede ofrecer Oro;
+- cualquier mutación de objetos u Oro reinicia **ready y finalAccepted de ambos lados**;
+- ambos deben llegar a `FINAL_REVIEW`;
+- la primera aceptación final nunca ejecuta por sí sola;
+- el commit ocurre únicamente cuando las dos aceptaciones finales están presentes.
 
-La UI solo consume APIs públicas de Commerce/Market World/Backpack/Containers para lectura.
+## Commit atómico
 
-## Eventos y hooks
+El server usa `PlayerEconomyStore.transaction([playerA, playerB], ...)`.
 
-- `commerce:changed` en `KeloEvents` cuando está disponible.
-- DOM `kelo:commerce-changed`.
-- DOM `kelo:commerce-server-event` para ingestión de snapshots/eventos del transporte online.
-- `kelo:scenechange` para mostrar/ocultar dock del Mercado.
-- `KeloRender.intercept` para render exclusivo de la instancia market.
-- `KeloSimulation.after` para bounds y modo vendedor.
+Antes de transferir valida:
 
-## Modelo offline vs autoridad online
+- ownership real;
+- container `trade_escrow`;
+- reservation + `tradeId`;
+- saldo de ambos jugadores;
+- sesión activa y doble aceptación.
 
-### Offline actual
+Después mueve Oro y ownership en una sola transacción. Una excepción restaura el checkpoint de ambos jugadores. El cliente nunca intenta reconstruir un commit parcial.
 
-`KeloCommerceAuthority.request()` ejecuta `localRequest()`. Esto hace la demo completamente jugable sin servidor.
+## Idempotencia
 
-### Online preparado
+`requestId` se cachea por jugador. Repetir la misma compra o comando por retry/doble tap devuelve el resultado anterior y no vuelve a debitar o duplicar assets.
 
-Cuando `KeloNetAuthority.isOnline()` es verdadero:
+Esto es obligatorio para móvil y redes inestables.
 
-- Commerce **no usa fallback local** para estado valioso;
-- exige `KeloNetAuthority.requestCommerce()`;
-- el cliente envía `commerce:request` con `{ op, payload }`;
-- el contrato espera `commerce:result` para respuestas y `commerce:event` para pushes;
-- snapshots/eventos se propagan a Commerce mediante `kelo:commerce-server-event`.
+## Disconnect / cancel
 
-El servidor futuro implementa esos mensajes y se convierte en la única autoridad de oro, ownership, inventory, escrow, sessions y commit. La UI y `KeloMarketWorld` no necesitan reescritura.
+Cancelar o desconectarse antes del commit:
 
-## Persistencia
+- cancela la sesión;
+- libera reservas;
+- devuelve items de `trade_escrow` a `backpack`;
+- notifica al otro participante mediante `commerce:event`.
 
-Offline usa el `saveState()` actual. `STATE.commerce`, `STATE.tradeEscrow` y publicaciones de Market Escrow quedan dentro del save existente.
+Una vez comprometida la transacción, el snapshot server es la verdad y la UI solo refleja el resultado.
 
-En boot, si quedaron items en `trade_escrow` por un cierre inesperado, Commerce intenta recuperarlos a Backpack y limpia la sesión incompleta. Un backend final reemplazará esta recuperación con estado durable server-side.
+## Mercado y puestos
+
+El Mercado conserva el mismo modelo:
+
+1. entrar en `market:central-market`;
+2. reclamar una alfombra/puesto;
+3. activar modo vendedor si se desea;
+4. publicar items desde la mochila;
+5. comprador solicita `market:buy`;
+6. server valida listing/saldo/reserva;
+7. Oro + item se transfieren atómicamente.
+
+La UI online obtiene los items publicables desde `snapshot.player.items`, nunca desde la mochila local. Offline reutiliza los contenedores actuales.
+
+## Snapshot online
+
+El snapshot de Commerce contiene, como mínimo:
+
+```text
+player.id / player.name / player.gold / player.items
+activeTrade
+tradeCandidates
+marketListings
+stalls
+tradeHistory
+transactionHistory
+```
+
+`activeTrade` siempre está normalizado desde la perspectiva del receptor del snapshot: `offers.local`, `offers.peer`, `participants.local`, `participants.peer`.
+
+Durante una solicitud incluye además:
+
+```text
+requestDirection = incoming | outgoing
+requestedBy
+expiresAt
+```
+
+Esto permite que el mismo componente UI sirva a los dos jugadores.
+
+## Plug-and-play de producción
+
+La frontera ya está hecha. Para pasar de prototipo server a producción no se debe reescribir Trade ni Market UI.
+
+Lo sustituible detrás del contrato es:
+
+- autenticación real por cuenta/personaje;
+- persistencia durable del `PlayerEconomyStore` (DB/Supabase/etc.);
+- directorio de participantes/rango mediante `listTradeCandidates` + `canTradePlayers`;
+- sharding/instancias;
+- reconciliación/telemetría.
+
+El `playerKey` actual del prototipo WebSocket **no debe considerarse autenticación de producción**. La autenticación final cambia la resolución de identidad server-side, no el contrato de Commerce.
 
 ## Invariantes
 
-1. Una identidad de item no puede vivir en dos contenedores a la vez.
-2. `market_escrow` se usa exclusivamente para publicaciones activas.
-3. `trade_escrow` se usa exclusivamente para oferta local de una sesión de trade.
-4. La UI nunca mueve items ni oro directamente.
-5. Cambiar una oferta invalida ready/finalAccepted de ambos lados.
-6. Un trade solo puede hacer commit después de la doble confirmación de ambos lados.
-7. Commit o cancel deben ser atómicos: éxito completo o rollback.
-8. Estar online nunca habilita fallback local para una operación Commerce valiosa.
+1. Una identidad de item vive en un solo owner/container.
+2. `market_escrow` y `trade_escrow` tienen propósitos separados.
+3. La UI no muta Oro, inventario ni ownership.
+4. Online no tiene fallback local para operaciones valiosas.
+5. Una solicitud debe aceptarse antes de editar ofertas.
+6. Toda mutación reinicia las confirmaciones de ambos lados.
+7. El trade requiere dos READY + dos final accepts.
+8. Compra/trade son atómicos e idempotentes.
+9. Forge y Commerce comparten una sola verdad económica.
+10. Nuevas subastas/regalos deben reutilizar Commerce/PlayerEconomyStore, no crear otro ledger.
 
 ## Extension points
 
-- Nuevo tipo de venta: añadir un nuevo `op` a Commerce Authority, no un manager paralelo.
-- Subastas/regalos: reutilizar `request()` + primitivas transaccionales de Containers.
-- Persistencia remota: implementar server adapter; no tocar UI.
-- Nuevos mapas de mercado: reutilizar `KeloMarketWorld` o registrar otro `KELO_INSTANCES` type consumiendo el mismo Commerce owner.
-- Assets premium: reemplazar únicamente presentación de puestos/alfombras; sus IDs y hitboxes siguen data-driven.
-
-## Uso correcto
-
-```js
-await KeloCommerceAuthority.createMarketListing(itemId, 1, 250, { stallId: 'stall_01' });
-await KeloCommerceAuthority.setTradeGold(100);
-await KeloCommerceAuthority.setTradeReady(true);
-```
-
-## Anti-patrones
-
-No hacer:
-
-```js
-STATE.gold -= price;
-STATE.inventory.splice(index, 1);
-STATE.tradeEscrow.items.push(item);
-KeloMarketEscrow.createMarketListing(...); // desde UI nueva
-```
-
-La única excepción a llamar `KeloMarketEscrow` directamente es el adapter local interno de Commerce Authority.
+- `CommerceService({ isPlayerOnline, listTradeCandidates, canTradePlayers })` para presencia y política de distancia.
+- `KeloCommerceAuthority.installAuthorityAdapter()` para reemplazar transporte sin tocar UI.
+- nuevos `op` bajo Commerce para auction/gift/repair cuando realmente muevan ownership.
+- nuevos mapas de mercado pueden consumir el mismo Commerce owner.
 
 ## Tests / CI
 
-- `scripts/container-system-audit.js` protege identidad, trade escrow, checkpoint, receive/extract y rollback.
-- `scripts/commerce-system-audit.js` prueba publicación/cancelación, compra, puesto, trade, reset de confirmaciones, segunda aceptación y commit atómico.
-- `scripts/system-documentation-audit.js` protege documentación/catálogo.
+- `scripts/commerce-system-audit.js`: adapter offline, escrow, market, double confirmation y rollback.
+- `scripts/server-commerce-audit.js`: economía compartida con Forge, compra idempotente, request/accept/reject, prevención de bypass por `trade:create`, policy hook de rango, ownership y disconnect cleanup.
+- `scripts/live-commerce-audit.mjs`: recorrido móvil real en GitHub Pages del modo offline.
+- `.github/workflows/market-ci.yml`: contrato de sintaxis/arquitectura/Commerce.
 
-## Observabilidad
+## Checklist para extender
 
-`KELO_COMMERCE_AUDIT`, `KELO_CONTAINER_AUDIT`, `KELO_MARKET_WORLD_AUDIT` y `KELO_COMMERCE_UI_AUDIT` exponen contratos diagnósticos. Commerce mantiene además un `transactionHistory` local acotado para reconciliar pruebas offline.
-
-## Deuda conocida / pendiente
-
-- El servidor todavía debe implementar `commerce:request`, `commerce:result` y `commerce:event`; el cliente ya tiene el adapter final preparado.
-- Los vendedores/listings externos actuales son fixtures offline explícitas, no economía real.
-- La primera presentación de puestos usa Canvas procedural; assets premium pueden sustituirla sin cambiar el dominio.
-- La instancia online final deberá recibir capacidad/sharding/participants desde el director de servidor.
-
-## Checklist para extender sin duplicar owner
-
-1. ¿La capacidad mueve oro/items/ownership? → entra por `KeloCommerceAuthority`.
-2. ¿Necesita reservar un item? → usa un contenedor/escrow explícito de `KeloContainers`.
-3. ¿La operación puede fallar a mitad? → checkpoint + rollback.
-4. ¿Es UI? → solo intenciones y snapshots.
-5. ¿Cambia una oferta de trade? → reset de ambas confirmaciones.
-6. ¿Debe funcionar online? → mismo `op`; implementar servidor, no otro frontend.
-7. Actualizar este documento, catálogo, guía y auditorías en el mismo cambio.
+1. ¿Mueve Oro/items/ownership? → Commerce.
+2. ¿Necesita reserva? → escrow explícito.
+3. ¿Puede fallar a mitad? → transacción/checkpoint.
+4. ¿Es UI? → intent + snapshot solamente.
+5. ¿Es online? → mismo `op`, autoridad server.
+6. ¿Necesita seleccionar otro jugador? → `openTradeWithPlayer(peer)` + policy server; no otro panel.
+7. Actualizar documentación y auditoría junto al cambio.
