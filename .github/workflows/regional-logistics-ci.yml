@@ -15,7 +15,6 @@ on:
       - 'scripts/regional-logistics-audit.js'
       - 'docs/systems/REGIONAL_ECONOMY_LOGISTICS_SYSTEM.md'
       - 'docs/system-catalog.json'
-      - 'guide.html'
       - 'index.html'
       - 'package.json'
       - '.github/workflows/regional-logistics-ci.yml'
@@ -30,7 +29,6 @@ on:
       - 'scripts/regional-logistics-audit.js'
       - 'docs/systems/REGIONAL_ECONOMY_LOGISTICS_SYSTEM.md'
       - 'docs/system-catalog.json'
-      - 'guide.html'
       - 'index.html'
       - 'package.json'
       - '.github/workflows/regional-logistics-ci.yml'
@@ -47,8 +45,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
-      - run: npm ci
       - run: npm run audit:logistics
       - run: npm run audit:containers
       - run: npm run audit:commerce
