@@ -18,6 +18,7 @@ The production path is:
 - District compatibility is declared as data. `*` means reusable in every district.
 - Cache metadata is executable: for TileRegistry-owned PNGs, CI verifies the manifest cache key/value against the query string used by TileRegistry.
 - Fallback behavior is explicit. Silent renderer-specific fallbacks are not part of the production contract.
+- PNG extension casing is not semantic: `.png`, `.PNG` and mixed-case variants are valid. Runtime path matching ignores casing only for the final `.png` extension; directory and basename casing remain exact, and case-colliding files are still rejected.
 
 ## Required per-asset metadata
 
@@ -144,7 +145,7 @@ The referenced fallback asset must exist in the manifest.
 - TileRegistry PNG parity;
 - TileRegistry ↔ manifest cache-key parity.
 
-Phase 9 adds `scripts/validate-png-pipeline.mjs` and `scripts/png-validation-core.mjs` as the binary/inventory gate. For every registered production PNG, CI now validates the full chunk stream rather than only IHDR: chunk bounds/order, CRCs, IHDR/PLTE/IDAT/IEND rules, non-interlaced runtime policy, zlib decode, decoded scanline length and filter bytes. It also inventories every PNG under `assets/`, rejects unregistered world PNGs, requires explicit policy entries for retained non-world/archive PNGs, detects path case collisions and verifies runtime PNG references resolve to a registered production asset or an explicitly allowed non-world UI asset.
+Phase 9 adds `scripts/validate-png-pipeline.mjs` and `scripts/png-validation-core.mjs` as the binary/inventory gate. For every registered production PNG, CI now validates the full chunk stream rather than only IHDR: chunk bounds/order, CRCs, IHDR/PLTE/IDAT/IEND rules, non-interlaced runtime policy, zlib decode, decoded scanline length and filter bytes. It also inventories every PNG under `assets/`, rejects unregistered world PNGs, requires explicit policy entries for retained non-world/archive PNGs, detects path case collisions and verifies runtime PNG references resolve to a registered production asset or an explicitly allowed non-world UI asset. Extension casing is deliberately excluded from runtime path-case mismatch failures; only the basename/directory portion must retain exact casing.
 
 `scripts/test-png-validation.mjs` mutates a known-good PNG and proves the validator fails closed for bad signatures, truncation, CRC corruption, invalid IHDR interlace metadata and trailing bytes. These are CI gates, not documentation-only guidance.
 
