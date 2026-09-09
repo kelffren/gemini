@@ -1,8 +1,8 @@
 /* KELO-INDEX
  * area: TEST / UI / LIVE
  * owner: Premium menu + player HUD browser audit
- * keys: MENU HUD PLAYER MOBILE PORTRAIT LANDSCAPE RESPONSIVE ROUTES INPUT PVP FULLSCREEN COMMERCE TITLES CONSOLE SCREENSHOT
- * purpose: valida Luxe real, HUD único, owners consumidos, responsive, locks, Mercado autoritativo y smoke de movimiento/PvP/fullscreen
+ * keys: MENU HUD PLAYER MOBILE PORTRAIT LANDSCAPE RESPONSIVE ROUTES INPUT PVP FULLSCREEN COMMERCE TITLES MOUNTS CONSOLE SCREENSHOT
+ * purpose: valida Luxe real, HUD único/ultra-compacto, owners consumidos, responsive, locks, Mercado autoritativo y smoke de movimiento/PvP/fullscreen
  * online: prueba presentación/rutas; no altera reglas autoritativas
  */
 import { chromium } from 'playwright';
@@ -23,7 +23,7 @@ const report={ok:false,url:URL,hud:null,hudWidths:[],portrait:null,landscape:nul
 const assert=(condition,message)=>{if(!condition)throw new Error(message);};
 
 async function waitRuntime(){
-  await page.waitForFunction(()=>window.KELO_LUXE&&window.KELO_LUXE_PLAYER_HUD&&window.KeloInputLocks&&window.KeloBackpackUI&&window.KeloAbilities&&window.KeloMarketUI&&window.KeloMarketWorld&&window.KeloCommerceUI&&window.KELO_HOUSE_UI&&window.KeloNobility&&window.KeloTitles&&window.KeloSelfInteractionUI&&window.KeloCharacterCustomizer&&window.KELO_ORIENTATION,null,{timeout:20000});
+  await page.waitForFunction(()=>window.KELO_LUXE&&window.KELO_LUXE_PLAYER_HUD&&window.KeloInputLocks&&window.KeloBackpackUI&&window.KeloAbilities&&window.KeloMarketUI&&window.KeloMarketWorld&&window.KeloCommerceUI&&window.KELO_HOUSE_UI&&window.KeloNobility&&window.KeloTitles&&window.KeloMountPanel&&window.KeloSelfInteractionUI&&window.KeloCharacterCustomizer&&window.KELO_ORIENTATION,null,{timeout:20000});
 }
 async function openMenu(){
   await page.locator('#lx-side-menu').click();
@@ -57,9 +57,11 @@ async function routeMarket(){
 async function inspectHud(){
   return page.evaluate(()=>{
     const hud=document.getElementById('kw-player-hud-wrap'),card=hud?.querySelector('.kw-player-hud'),guide=document.getElementById('kw-player-guide'),rail=document.querySelector('.lx-rail');
-    const hr=hud?.getBoundingClientRect(),cr=card?.getBoundingClientRect(),gr=guide?.getBoundingClientRect(),rr=rail?.getBoundingClientRect();
+    const hpBar=document.getElementById('kw-hud-hp-bar'),manaBar=document.getElementById('kw-hud-mana-bar');
+    const hr=hud?.getBoundingClientRect(),cr=card?.getBoundingClientRect(),gr=guide?.getBoundingClientRect(),rr=rail?.getBoundingClientRect(),hpr=hpBar?.getBoundingClientRect(),mr=manaBar?.getBoundingClientRect();
     const snap=window.KELO_LUXE_PLAYER_HUD?.snapshot?.();
     const text=id=>document.getElementById(id)?.textContent?.trim()||'';
+    const clipped=id=>{const n=document.getElementById(id);return !!n&&n.scrollWidth>n.clientWidth+1;};
     return {
       width:innerWidth,height:innerHeight,count:document.querySelectorAll('#kw-player-hud-wrap').length,
       legacyTelemetry:!!document.getElementById('telemetry-bar'),legacyGuide:!!document.getElementById('kelo-guide-link'),
@@ -68,6 +70,8 @@ async function inspectHud(){
       card:cr?{left:cr.left,top:cr.top,right:cr.right,bottom:cr.bottom,width:cr.width,height:cr.height}:null,
       guide:gr?{left:gr.left,top:gr.top,right:gr.right,bottom:gr.bottom,width:gr.width,height:gr.height}:null,
       rail:rr?{left:rr.left,top:rr.top,right:rr.right,bottom:rr.bottom,width:rr.width,height:rr.height}:null,
+      hpBar:hpr?{width:hpr.width,height:hpr.height}:null,manaBar:mr?{width:mr.width,height:mr.height}:null,
+      clipped:{name:clipped('kw-hud-name'),clan:clipped('kw-hud-clan'),nobility:clipped('kw-hud-nobility'),title:clipped('kw-hud-title')},
       name:text('kw-hud-name'),id:text('kw-hud-id'),clan:text('kw-hud-clan'),nobility:text('kw-hud-nobility'),title:text('kw-hud-title'),hp:text('kw-hud-hp-text'),mana:text('kw-hud-mana-text'),gold:text('lx-gold'),
       snap,overflowX:document.documentElement.scrollWidth>innerWidth+1
     };
@@ -79,10 +83,14 @@ function assertHud(h,label){
   assert(!h.legacyGuide,label+': legacy guide link still mounted');
   assert(h.luxeGoldNodes===0&&h.luxePresenceNodes===0,label+': old standalone Luxe top-left nodes still mounted');
   assert(h.hud&&h.hud.left>=0&&h.hud.right<=h.width+1&&h.hud.top>=0&&h.hud.bottom<=h.height+1,label+': player HUD escapes viewport');
+  assert(h.card&&h.card.width<=219,label+': ultra-compact player card is wider than 218px target');
+  if(h.height>520)assert(h.card.height<=165,label+': ultra-compact player card is taller than 165px target');
   assert(h.card&&h.guide&&h.guide.top>=h.card.bottom-1,label+': GUÍA is not directly below player card');
   assert(h.guide.height>=35,label+': GUÍA touch target collapsed');
   if(h.height>520)assert(h.guide.height>=43,label+': GUÍA should preserve ~44px touch target');
   assert(h.rail&&h.hud.right<=h.rail.left+1,label+': player HUD overlaps right-side Menu/PvP rail');
+  assert(h.hpBar?.width>30&&h.hpBar?.height>=4&&h.manaBar?.width>30&&h.manaBar?.height>=4,label+': HP/Mana bars collapsed or disappeared');
+  assert(!h.clipped.name&&!h.clipped.clan&&!h.clipped.nobility&&!h.clipped.title,label+': player HUD text is clipped');
   assert(!h.overflowX,label+': document has horizontal overflow');
   assert(h.name&&h.id&&h.clan&&h.nobility&&h.title&&h.hp&&h.mana&&h.gold,label+': required HUD text is missing');
   assert(h.snap?.name&&h.snap?.id,label+': HUD snapshot lacks player identity');
@@ -100,7 +108,7 @@ try{
     creatorsAllowed:!!window.KELO_CREATORS_LAUNCHER?.allowed,
     fullscreenButton:!!document.getElementById('kelo-orientation-btn')
   }));
-  assert(baseline.luxe?.version==='luxe-shell-v4.0.3-title-book','Premium Luxe runtime version missing');
+  assert(baseline.luxe?.version==='luxe-shell-v4.0.4-mount-menu','Premium Luxe runtime version missing');
   assert(baseline.luxe?.tokenLocks===true,'Premium menu token-lock audit missing');
   assert(baseline.playerHud?.version==='luxe-player-hud-v1.0.0','Premium player HUD runtime version missing');
   assert(baseline.playerHud?.polling===false,'Player HUD must advertise polling=false');
@@ -111,14 +119,13 @@ try{
   assert(Number.isFinite(report.hud.snap?.hp)&&report.hud.hp!=='— / —','HUD HP did not read the live player');
   await page.screenshot({path:path.join(OUT,'premium-player-hud-390.png'),fullPage:false});
 
-  // Required responsive widths: compact iPhones, large phones, tablet and desktop.
   const sizes=[
     {width:320,height:568},{width:360,height:780},{width:375,height:812},{width:390,height:844},
     {width:414,height:896},{width:430,height:932},{width:768,height:1024},{width:1280,height:800}
   ];
   for(const size of sizes){
     await page.setViewportSize(size);await page.waitForTimeout(60);
-    const h=await inspectHud();assertHud(h,`${size.width}x${size.height}`);report.hudWidths.push({size,hud:h.hud,guide:h.guide,rail:h.rail});
+    const h=await inspectHud();assertHud(h,`${size.width}x${size.height}`);report.hudWidths.push({size,hud:h.hud,card:h.card,guide:h.guide,rail:h.rail,hpBar:h.hpBar,manaBar:h.manaBar,clipped:h.clipped});
   }
   await page.setViewportSize({width:390,height:844});await page.waitForTimeout(60);
 
@@ -138,7 +145,7 @@ try{
       overflowY:document.documentElement.scrollHeight>innerHeight+1
     };
   });
-  for(const label of ['Mochila','Habilidades','Apariencia','Perfil','Mercado','Chat','Propiedades','Nobleza','Libro de títulos','Burlas'])assert(portrait.labels.includes(label),'Missing visible menu entry: '+label);
+  for(const label of ['Mochila','Habilidades','Apariencia','Monturas','Perfil','Mercado','Chat','Propiedades','Nobleza','Libro de títulos','Burlas'])assert(portrait.labels.includes(label),'Missing visible menu entry: '+label);
   assert(portrait.columns===2,'Portrait menu is not two columns');
   assert(portrait.clippedTitles.length===0,'Portrait menu clips title text: '+portrait.clippedTitles.join(', '));
   assert(portrait.mainLock===true,'Main menu did not acquire KeloInputLocks token');
@@ -152,6 +159,7 @@ try{
   assert(await page.evaluate(()=>!window.KeloInputLocks.has('luxe-main-menu')),'Main menu lock leaked after close');
 
   await route('appearance','appearance','#kelo-character-customizer',()=>window.KeloCharacterCustomizer.close());
+  await route('mounts','mounts','#kelo-mount-panel',()=>window.KeloMountPanel.close());
   await route('nobility','nobility','#kelo-nobility',()=>window.KeloNobility.close());
   await route('titles','titles','#kelo-title-book',()=>window.KeloTitles.closeBook());
   assert(await page.evaluate(()=>!window.KeloInputLocks.has('titles-book')),'Title Book input lock leaked');
@@ -169,7 +177,6 @@ try{
   assert(await page.evaluate(()=>!window.KeloInputLocks.has('luxe-chat')),'Chat input lock leaked');
   report.routes.chat=true;
 
-  // Fullscreen real: el botón debe activar native fullscreen o el fallback inmersivo y después poder salir.
   const fsButton=page.locator('#kelo-orientation-btn');
   await fsButton.click();
   await page.waitForFunction(()=>window.KELO_ORIENTATION?.fullscreen?.active?.()===true,null,{timeout:5000});
