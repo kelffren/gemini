@@ -41,7 +41,7 @@ No uses `/*` para apagar código. Los comentarios solo documentan.
 | HUD LUXE | shell menú | `src/ui/luxe-shell.js` |
 | MOBILE ORIENTATION | vertical/horizontal, viewport y botón GIRAR | `src/ui/mobile-orientation.js` |
 | STONES RECIPE | piedras data-driven; 5 slots | `src/abilities/stone-system.js` `abilityData.js` |
-| CAST ABILITY | delivery VFX/daño compartido | `src/abilities/kelo-ability-boot.js` |
+| CAST ABILITY | delivery/effects compartidos + `castSource/predictSource` para weapon/mount sin tocar Stone hotbar | `src/abilities/kelo-ability-boot.js` |
 | MOUNT CATALOG PROFILE | MountDefinition + MovementProfile + EquipmentSlotProfile | `src/mounts/mount-catalog.js` |
 | MOUNT RUNTIME EQUIP | equipar/montar/equipo/outfit + authority boundary | `src/mounts/mount-system.js` |
 | MOUNT ABILITY M1 M2 M3 | canal exclusivo de 3 slots reutilizando KeloAbilities | `src/mounts/mount-ability-channel.js` `mount-ability-data.js` |
