@@ -123,6 +123,15 @@
       "status": "offline-active-online-authority-pending"
     },
     {
+      "id": "arena-telemetry",
+      "owner": "KeloArenaTelemetry",
+      "source": "src/systems/arena-telemetry.js",
+      "technicalDoc": "docs/systems/ARENA_TELEMETRY_SYSTEM.md",
+      "playerVisible": true,
+      "playerGuideAnchor": "arena-ranked",
+      "status": "offline-active-server-validation-pending"
+    },
+    {
       "id": "arena-progression",
       "owner": "KeloArenaProgression",
       "source": "src/systems/arena-progression.js",
