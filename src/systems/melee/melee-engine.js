@@ -1,23 +1,32 @@
 /* KELO-INDEX
  * area: MELEE
- * keys: ENGINE PROFILE COMBAT ADAPTER REUSABLE
- * hace: selecciona perfil melee y delega resolución a CombatEngine; no dibuja ni muta HP directamente
+ * owner: KeloMeleeEngine
+ * keys: ENGINE PROFILE COMBAT ADAPTER REUSABLE DIRECTION SWEEP
+ * purpose: selecciona perfil melee y delega resolución single/sweep al KeloCombatEngine
+ * public-api: beginAttack / attack / attackSweep / getProfile
+ * online: la misma llamada puede ejecutarse detrás de autoridad server
+ * do-not: NO dibujar ni mutar HP directamente
  */
 (function(root){
   'use strict';
-  const VERSION='melee-engine-v1.0.0';
-  function attack(options){
-    const o=options||{},profiles=root.KeloMeleeProfiles,combat=root.KeloCombatEngine;
-    if(!profiles||!combat)return Object.freeze({ok:false,reason:'MELEE_FOUNDATION_UNAVAILABLE'});
-    const profileId=String(o.profileId||'sword_light_basic'),profile=profiles.get(profileId);
-    if(!profile)return Object.freeze({ok:false,reason:'MELEE_PROFILE_NOT_FOUND',profileId:profileId});
-    return combat.attack({
-      attacker:o.attacker,target:o.target,profile:profile,profileId:profile.id,kind:'melee',
-      weaponClass:profile.weaponClass,attackProfile:profile.attackProfile,
-      cooldownRemaining:o.cooldownRemaining,attackId:o.attackId,startedAt:o.startedAt,
-      source:o.source||'melee-engine',visual:o.visual
-    });
+  const VERSION='melee-engine-v2.0.0-action-combat';
+  function profileOf(id){return root.KeloMeleeProfiles&&root.KeloMeleeProfiles.get(String(id||'sword_light_basic'));}
+  function base(o,profile){return{attacker:o.attacker,profile,profileId:profile.id,kind:'melee',weaponClass:profile.weaponClass,attackProfile:profile.attackProfile,direction:o.direction,cooldownRemaining:o.cooldownRemaining,attackId:o.attackId,startedAt:o.startedAt,source:o.source||'melee-engine',visual:o.visual,skipStart:o.skipStart};}
+  function beginAttack(options){
+    const o=options||{},combat=root.KeloCombatEngine,profile=profileOf(o.profileId);
+    if(!profile||!combat||typeof combat.beginAttack!=='function')return Object.freeze({ok:false,reason:'MELEE_FOUNDATION_UNAVAILABLE'});
+    return combat.beginAttack(base(o,profile));
   }
-  root.KELO_MELEE_ENGINE_AUDIT={version:VERSION,ready:true,usesCombatEngine:true,directHpMutation:false,presentationFree:true};
-  root.KeloMeleeEngine=Object.freeze({version:VERSION,attack:attack});
+  function attack(options){
+    const o=options||{},combat=root.KeloCombatEngine,profile=profileOf(o.profileId);
+    if(!profile||!combat)return Object.freeze({ok:false,reason:'MELEE_FOUNDATION_UNAVAILABLE'});
+    return combat.attack(Object.assign(base(o,profile),{target:o.target}));
+  }
+  function attackSweep(options){
+    const o=options||{},combat=root.KeloCombatEngine,profile=profileOf(o.profileId);
+    if(!profile||!combat||typeof combat.attackSweep!=='function')return Object.freeze({ok:false,reason:'MELEE_SWEEP_UNAVAILABLE',hits:[]});
+    return combat.attackSweep(Object.assign(base(o,profile),{targets:Array.isArray(o.targets)?o.targets:[]}));
+  }
+  root.KELO_MELEE_ENGINE_AUDIT={version:VERSION,ready:true,usesCombatEngine:true,directHpMutation:false,presentationFree:true,directional:true,sweep:true};
+  root.KeloMeleeEngine=Object.freeze({version:VERSION,beginAttack,attack,attackSweep,getProfile:profileOf});
 })(typeof globalThis!=='undefined'?globalThis:window);

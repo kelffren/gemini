@@ -1,36 +1,89 @@
 /* KELO-INDEX
  * area: PVP / WORLD
- * owner: KeloPvPWorld; camera commands owned by KeloCamera; frame/simulation extension owners KeloRender + KeloSimulation
- * keys: PVP ARENA TRANSITION SWAP SWORD CAMERA RENDER INTERCEPT SIMULATION FOUNDATION
- * purpose: conserva autoridad/comandos PvP y usa owners Foundation para cámara, arena exclusiva y tick
+ * owner: KeloPvPWorld; gameplay resolution delegates KeloMeleeEngine/KeloAbilities; movement extension delegates KeloMovement
+ * keys: PVP ACTION COMBAT AIM 360 MELEE SKILLSHOT TELEGRAPH TOUCH POINTER DODGE CAMERA RENDER SIMULATION AUTHORITY
+ * purpose: action-combat PvP sin target-lock: movimiento + aim independiente + hitboxes reales + casts direccionales
  * public-api: KeloPvPWorld, enterPvPWorld, leavePvPWorld
- * consumes: KeloCamera, KeloRender, KeloSimulation, KeloMeleeEngine, KeloCombatEngine, KeloAbilities
- * state-owned: modo PvP, transición, target, cooldown básico, floats y swap sword local prototype
- * extension-points: KeloCamera.setTarget/restoreState + KeloRender.intercept/afterFrame + KeloSimulation.after
- * reuse: nuevas reglas PvP deben entrar por KeloPvPWorld/Combat owners, no wrappers core
- * legacy: authority local es prototipo; online final debe ser server-authoritative
- * do-not: NO escribir camera.* ni envolver render/updateSimulation
+ * consumes: KeloInput, KeloMovement, KeloCamera, KeloRender, KeloSimulation, KeloMeleeEngine, KeloCombatEngine, KeloHitResolver, KeloAbilities, KeloNetAuthority
+ * state-owned: modo PvP, aim intent, fases del basic, targeting visual, floats, hit feedback y swap sword local fallback
+ * extension-points: KeloMovement.before/after + KeloCamera + KeloRender + KeloSimulation; networking por KeloNetAuthority
+ * reuse: reglas PvP entran por owners existentes; telegraphs/presentación nunca deciden daño
+ * legacy: Sword Swap conserva fallback local; online competitivo usa combat intent cuando KeloNetAuthority lo soporta
+ * do-not: NO target-lock obligatorio, NO escribir camera.*, NO envolver core, NO VFX→damage
  */
 (function(){
 'use strict';
-const VERSION='pvp-world-v1.10-camera-owner',TRANSITION_MS=1150,WORLD=Object.freeze({x:2660,y:360,w:720,h:720,spawnX:2790,spawnY:720,dummyX:3190,dummyY:720});
+const VERSION='pvp-world-v2.0.0-action-combat';
+const TRANSITION_MS=1150;
+const WORLD=Object.freeze({x:2660,y:360,w:720,h:720,spawnX:2790,spawnY:720,dummyX:3190,dummyY:720});
+const SWAP_SWORD_CHARACTER_RETURN_SEC=.7,SWAP_SWORD_RESET_CHANCE=.25;
+const MOBILE_COMBAT_SPLIT=.55;
 const cameraOwner=window.KeloCamera;
 if(!cameraOwner)throw new Error('KeloCamera unavailable before pvp-world');
-const SWAP_SWORD_CHARACTER_RETURN_SEC=.7;
-const SWAP_SWORD_RESET_CHANCE=.25;
-const state={mode:'social',combatEnabled:false,transitioning:false,selected:null,armedSlot:-1,basicCooldown:0,saved:null,floats:[],commandSeq:1,resultSeq:1,dummy:null,transitionTimer:null,transitionStartedAt:0,transitionKind:null,lastError:null,swapSword:null};
+const state={
+  mode:'social',combatEnabled:false,transitioning:false,armedSlot:-1,basicCooldown:0,basicAttack:null,
+  aim:{x:1,y:0,worldX:WORLD.spawnX+160,worldY:WORLD.spawnY,source:'default'},
+  saved:null,floats:[],impacts:[],hitStop:0,commandSeq:1,resultSeq:1,dummy:null,transitionTimer:null,transitionStartedAt:0,transitionKind:null,lastError:null,swapSword:null,
+  combatPointerId:null,abilityPointerId:null,abilityPointerSlot:-1,lastPointerType:null,lastCastAt:0
+};
 window.KELO_COMBAT_ENABLED=false;
 function toast(m){if(typeof showToast==='function')showToast(m)}
 function clamp(n,a,b){return Math.max(a,Math.min(b,n))}
-function dist(a,b){return Math.hypot((a.x||0)-(b.x||0),(a.y||0)-(b.y||0))}
+function dist(a,b){return Math.hypot((a&&a.x||0)-(b&&b.x||0),(a&&a.y||0)-(b&&b.y||0))}
+function norm(x,y){const l=Math.hypot(Number(x)||0,Number(y)||0)||1;return{x:(Number(x)||0)/l,y:(Number(y)||0)/l}}
+function now(){return performance&&performance.now?performance.now():Date.now()}
 function ready(){return typeof localPlayer!=='undefined'&&localPlayer&&cameraOwner}
-function combatReady(){return !!(window.KeloMeleeEngine&&window.KeloCombatEngine&&window.KeloCombatSchema&&window.KeloEvents)}
+function combatReady(){return !!(window.KeloMeleeEngine&&window.KeloCombatEngine&&window.KeloHitResolver&&window.KeloCombatSchema&&window.KeloEvents)}
 function dummyEntity(){if(state.dummy)return state.dummy;if(typeof simulatedPlayers==='undefined'||!simulatedPlayers||!simulatedPlayers.length)return null;return state.dummy=simulatedPlayers[0]}
 function screenWorld(x,y){return cameraOwner.screenToWorld(x,y)}
-function command(type,payload){return Object.freeze({id:state.commandSeq++,type,payload:payload||{},issuedAt:performance.now()})}
+function command(type,payload){return Object.freeze({id:state.commandSeq++,type,payload:payload||{},issuedAt:now()})}
+function faceFromDirection(d){return Math.abs(d.x)>Math.abs(d.y)?(d.x<0?'left':'right'):(d.y<0?'up':'down')}
+function updateAimWorld(w,source){if(!ready()||!w)return state.aim;const d=norm(w.x-localPlayer.x,w.y-localPlayer.y);state.aim={x:d.x,y:d.y,worldX:Number(w.x)||localPlayer.x+d.x*160,worldY:Number(w.y)||localPlayer.y+d.y*160,source:source||'world'};localPlayer._face=faceFromDirection(d);return state.aim}
+function updateAimScreen(x,y,source){return updateAimWorld(screenWorld(x,y),source||'pointer')}
+function aimDistance(){return ready()?Math.hypot(state.aim.worldX-localPlayer.x,state.aim.worldY-localPlayer.y):0}
+function aimPosition(range){const r=Math.max(0,Number(range)||0),amount=r?Math.min(r,Math.max(50,aimDistance())):Math.max(50,aimDistance());return{x:localPlayer.x+state.aim.x*amount,y:localPlayer.y+state.aim.y*amount}}
 function hotbarInstance(slot){return window.KeloAbilities&&window.KeloAbilities.hotbar&&window.KeloAbilities.hotbar.slots[slot]||null}
 function isSwapSwordInstance(i){return !!(i&&i.definition&&i.definition.key==='swap_sword')}
 function emitAbility(name,payload){try{if(window.KeloAbilities&&window.KeloAbilities.bus)window.KeloAbilities.bus.emit(name,payload)}catch(e){console.warn('[KeloPvP] ability emit failed',e)}}
+function sendIntent(action,extra){try{if(window.KeloNetAuthority&&typeof window.KeloNetAuthority.sendCombatIntent==='function')window.KeloNetAuthority.sendCombatIntent(Object.assign({action,moveX:typeof input!=='undefined'?Number(input.normX)||0:0,moveY:typeof input!=='undefined'?Number(input.normY)||0:0,aimX:state.aim.x,aimY:state.aim.y,clientTime:Date.now()},extra||{}));}catch(e){console.warn('[KeloPvP] intent send failed',e)}}
+function pvpCandidates(){
+  const out=[],d=dummyEntity();if(d&&d.hp>0)out.push(d);
+  if(window.KeloNetAuthority&&window.KeloNetAuthority.isOnline&&window.KeloNetAuthority.isOnline())return out;
+  if(window.keloNet&&window.keloNet.peers)Object.keys(window.keloNet.peers).forEach(id=>{const p=window.keloNet.peers[id];if(p&&p.zone==='pvp'&&(p.hp==null||p.hp>0))out.push(p)});
+  return out;
+}
+function findAimTarget(range,arc){const list=pvpCandidates().filter(t=>t!==dummyEntity()||t.hp>0),profile={hitShape:'sector',range:Number(range)||400,arcDegrees:Number(arc)||24,forwardOffset:0};return list.filter(t=>window.KeloHitResolver&&window.KeloHitResolver.resolveMelee(localPlayer,t,state.aim,profile).hit).sort((a,b)=>dist(localPlayer,a)-dist(localPlayer,b))[0]||null}
+
+function meleeProfile(){return window.KeloMeleeEngine&&window.KeloMeleeEngine.getProfile?window.KeloMeleeEngine.getProfile('sword_light_basic'):null}
+function startBasicAttack(source){
+  if(!state.combatEnabled||state.transitioning||state.basicAttack||state.basicCooldown>0||!combatReady())return false;
+  const profile=meleeProfile();if(!profile)return false;
+  const c=command('BASIC_ATTACK',{direction:{x:state.aim.x,y:state.aim.y}}),attackId='basic_'+c.id;
+  const begun=window.KeloMeleeEngine.beginAttack({attacker:localPlayer,direction:{x:state.aim.x,y:state.aim.y},profileId:profile.id,cooldownRemaining:0,attackId,startedAt:c.issuedAt,source:'pvp-basic-action'});
+  if(!begun.ok)return false;
+  state.basicCooldown=profile.cooldown;
+  state.basicAttack={id:attackId,phase:'windup',phaseTime:0,totalTime:0,direction:{x:state.aim.x,y:state.aim.y},profile,resolved:false,source:source||'input',startedAt:c.issuedAt};
+  localPlayer._face=faceFromDirection(state.basicAttack.direction);
+  sendIntent('basic_attack',{attackId,phase:'pressed'});audit('basic-windup');return true;
+}
+function resolveBasicActive(){
+  const a=state.basicAttack;if(!a||a.resolved||!window.KeloMeleeEngine)return;
+  a.resolved=true;
+  const r=window.KeloMeleeEngine.attackSweep({attacker:localPlayer,targets:pvpCandidates(),direction:a.direction,profileId:a.profile.id,cooldownRemaining:0,attackId:a.id,startedAt:a.startedAt,source:'pvp-basic-action',skipStart:true});
+  const hits=r&&Array.isArray(r.hits)?r.hits:[];
+  hits.forEach(h=>{const t=h.target;if(t){state.floats.push({x:t.x,y:t.y-42,text:'-'+h.amount,life:.8});state.impacts.push({x:t.x,y:t.y-16,life:.18,max:.18});if(t.hp<=0)toast('Objetivo derrotado')}});
+  if(hits.length)state.hitStop=.035;
+  sendIntent('basic_attack',{attackId:a.id,phase:'active'});audit(hits.length?'basic-hit':'basic-miss');
+}
+function updateBasicAttack(dt){
+  const a=state.basicAttack;if(!a)return;
+  if(state.hitStop>0)return;
+  a.phaseTime+=dt;a.totalTime+=dt;
+  if(a.phase==='windup'&&a.phaseTime>=a.profile.windup){a.phase='active';a.phaseTime=0;resolveBasicActive();return}
+  if(a.phase==='active'&&a.phaseTime>=a.profile.active){a.phase='recovery';a.phaseTime=0;return}
+  if(a.phase==='recovery'&&a.phaseTime>=a.profile.recovery){sendIntent('basic_attack',{attackId:a.id,phase:'released'});state.basicAttack=null;audit('basic-ready')}
+}
+
 function startSwapSwordCooldown(i,d){if(i)i.cooldown=(d&&d.cooldown)||12}
 function swapSwordVisualPayload(d,s){const dx=s.tx-s.sx,dy=s.ty-s.sy,l=Math.hypot(dx,dy)||1;return{playerId:localPlayer.id||'local',actor:localPlayer,actorId:String(localPlayer.id||'local'),abilityId:d.id,abilityKey:d.key,swordEntityId:s.id,gameplayObject:s,origin:{x:s.sx,y:s.sy},target:{x:s.tx,y:s.ty},direction:{x:dx/l,y:dy/l},gameplay:{speed:(d.delivery&&d.delivery.speed)||720,range:Math.hypot(dx,dy)},visual:{scale:1,seed:Date.now()&65535}}}
 function beginSwapSword(slot,w){
@@ -41,114 +94,85 @@ function beginSwapSword(slot,w){
   localPlayer.mana-=((d.resource&&d.resource.cost)||0);
   const sx=localPlayer.x,sy=localPlayer.y,tx=w.x,ty=w.y,travel=Math.max(.18,Math.min(.6,dist({x:sx,y:sy},{x:tx,y:ty})/((d.delivery&&d.delivery.speed)||720)));
   state.swapSword={id:'swap_sword_'+Date.now().toString(36)+'_'+state.commandSeq,slot,phase:'flying',x:sx,y:sy,sx,sy,tx,ty,time:0,max:travel,angle:Math.atan2(ty-sy,tx-sx),returnFromX:null,returnFromY:null,cooldownResetOnReturn:false};
-  emitAbility('ABILITY_CAST',{playerId:localPlayer.id||'local',abilityId:d.id,abilityKey:d.key,slotIndex:slot,specialPhase:'throw',swordEntityId:state.swapSword.id});
-  emitAbility('SWAP_SWORD_THROWN',swapSwordVisualPayload(d,state.swapSword));
-  toast('Espada lanzada · vuelve a tocar la habilidad para ir a ella');audit('swap-sword-thrown');return{valid:true,type:'SWAP_SWORD_THROW',swordEntityId:state.swapSword.id};
+  emitAbility('ABILITY_CAST',{playerId:localPlayer.id||'local',abilityId:d.id,abilityKey:d.key,slotIndex:slot,specialPhase:'throw',swordEntityId:state.swapSword.id});emitAbility('SWAP_SWORD_THROWN',swapSwordVisualPayload(d,state.swapSword));sendIntent('ability',{abilityKey:d.key,slot,phase:'cast',position:{x:tx,y:ty}});toast('Espada lanzada · vuelve a tocar la habilidad para ir a ella');audit('swap-sword-thrown');return{valid:true,type:'SWAP_SWORD_THROW',swordEntityId:state.swapSword.id};
 }
-function recallToSwapSword(){
-  const s=state.swapSword;if(!s||s.phase!=='planted')return{valid:false,reason:'SWORD_NOT_READY'};
-  const i=hotbarInstance(s.slot),d=i&&i.definition;if(!i||!d)return{valid:false,reason:'ABILITY_GONE'};
-  localPlayer.x=s.x;localPlayer.y=s.y;localPlayer.vx=localPlayer.vy=0;
-  startSwapSwordCooldown(i,d);
-  const swordEntityId=s.id;state.swapSword=null;
-  emitAbility('ABILITY_CAST',{playerId:localPlayer.id||'local',abilityId:d.id,abilityKey:d.key,slotIndex:s.slot,specialPhase:'recall_to_sword',swordEntityId});
-  toast('¡Volviste a la espada!');audit('swap-sword-instant-recall');
-  return{valid:true,type:'SWAP_SWORD_INSTANT_RECALL',swordEntityId,cooldownStarted:true};
-}
-function resolveSwapSword(w,target){
-  const s=state.swapSword;if(!s||s.phase!=='planted')return{valid:false,reason:'SWORD_NOT_READY'};
-  const i=hotbarInstance(s.slot),d=i&&i.definition;if(!i||!d)return{valid:false,reason:'ABILITY_GONE'};
-  const swordHit=dist(w,s)<=((d.delivery&&d.delivery.selectRadius)||42);if(!swordHit&&!target)return{valid:false,reason:'NO_SWAP_TARGET'};
-  if(!target)return recallToSwapSword();
-  const oldPlayer={x:localPlayer.x,y:localPlayer.y};const tx=target.x,ty=target.y;
-  target.x=oldPlayer.x;target.y=oldPlayer.y;localPlayer.x=tx;localPlayer.y=ty;localPlayer.vx=localPlayer.vy=0;target.vx=0;target.vy=0;
-  startSwapSwordCooldown(i,d);
-  s.phase='returning';s.returnFromX=s.x;s.returnFromY=s.y;s.time=0;s.max=SWAP_SWORD_CHARACTER_RETURN_SEC;s.cooldownResetOnReturn=Math.random()<SWAP_SWORD_RESET_CHANCE;
-  emitAbility('ABILITY_CAST',{playerId:localPlayer.id||'local',abilityId:d.id,abilityKey:d.key,slotIndex:s.slot,specialPhase:'swap_character',swapTargetId:target.id||null,swordEntityId:s.id,returnDurationSec:s.max,cooldownResetOnReturn:s.cooldownResetOnReturn,cooldownResetChance:SWAP_SWORD_RESET_CHANCE});
-  toast('¡Posiciones intercambiadas! La espada regresa');audit('swap-sword-character-swapped');
-  return{valid:true,type:'SWAP_SWORD_SWAP',mode:'character',targetId:target.id||null,swordEntityId:s.id,returnDurationSec:s.max,cooldownResetOnReturn:s.cooldownResetOnReturn,cooldownResetChance:SWAP_SWORD_RESET_CHANCE};
-}
+function recallToSwapSword(){const s=state.swapSword;if(!s||s.phase!=='planted')return{valid:false,reason:'SWORD_NOT_READY'};const i=hotbarInstance(s.slot),d=i&&i.definition;if(!i||!d)return{valid:false,reason:'ABILITY_GONE'};localPlayer.x=s.x;localPlayer.y=s.y;localPlayer.vx=localPlayer.vy=0;startSwapSwordCooldown(i,d);const swordEntityId=s.id;state.swapSword=null;emitAbility('ABILITY_CAST',{playerId:localPlayer.id||'local',abilityId:d.id,abilityKey:d.key,slotIndex:s.slot,specialPhase:'recall_to_sword',swordEntityId});sendIntent('ability',{abilityKey:d.key,slot:s.slot,phase:'recall',swordEntityId});toast('¡Volviste a la espada!');audit('swap-sword-instant-recall');return{valid:true,type:'SWAP_SWORD_INSTANT_RECALL',swordEntityId,cooldownStarted:true}}
+function resolveSwapSword(w,target){const s=state.swapSword;if(!s||s.phase!=='planted')return{valid:false,reason:'SWORD_NOT_READY'};const i=hotbarInstance(s.slot),d=i&&i.definition;if(!i||!d)return{valid:false,reason:'ABILITY_GONE'};const swordHit=dist(w,s)<=((d.delivery&&d.delivery.selectRadius)||42);if(!swordHit&&!target)return{valid:false,reason:'NO_SWAP_TARGET'};if(!target)return recallToSwapSword();const oldPlayer={x:localPlayer.x,y:localPlayer.y},tx=target.x,ty=target.y;target.x=oldPlayer.x;target.y=oldPlayer.y;localPlayer.x=tx;localPlayer.y=ty;localPlayer.vx=localPlayer.vy=0;target.vx=0;target.vy=0;startSwapSwordCooldown(i,d);s.phase='returning';s.returnFromX=s.x;s.returnFromY=s.y;s.time=0;s.max=SWAP_SWORD_CHARACTER_RETURN_SEC;s.cooldownResetOnReturn=Math.random()<SWAP_SWORD_RESET_CHANCE;emitAbility('ABILITY_CAST',{playerId:localPlayer.id||'local',abilityId:d.id,abilityKey:d.key,slotIndex:s.slot,specialPhase:'swap_character',swapTargetId:target.id||null,swordEntityId:s.id,returnDurationSec:s.max,cooldownResetOnReturn:s.cooldownResetOnReturn,cooldownResetChance:SWAP_SWORD_RESET_CHANCE});sendIntent('ability',{abilityKey:d.key,slot:s.slot,phase:'swap',targetId:target.id||null});toast('¡Posiciones intercambiadas! La espada regresa');audit('swap-sword-character-swapped');return{valid:true,type:'SWAP_SWORD_SWAP',mode:'character',targetId:target.id||null,swordEntityId:s.id,returnDurationSec:s.max,cooldownResetOnReturn:s.cooldownResetOnReturn,cooldownResetChance:SWAP_SWORD_RESET_CHANCE}}
 function cancelSwapSword(){const s=state.swapSword;if(s&&s.phase==='flying'){const i=hotbarInstance(s.slot),d=i&&i.definition;emitAbility('SWAP_SWORD_THROW_CANCELLED',{playerId:localPlayer&&localPlayer.id||'local',abilityId:d&&d.id,abilityKey:d&&d.key||'swap_sword',swordEntityId:s.id})}state.swapSword=null}
+
 const localAuthority=Object.freeze({execute(c){
   if(!state.combatEnabled||state.transitioning)return Object.freeze({id:state.resultSeq++,commandId:c.id,ok:false,reason:'COMBAT_DISABLED'});
-  if(c.type==='SELECT_TARGET'){const t=c.payload.target;state.selected=t&&t.hp>0?t:null;return Object.freeze({id:state.resultSeq++,commandId:c.id,ok:!!state.selected,type:'TARGET_SELECTED',targetId:state.selected&&state.selected.id})}
-  if(c.type==='BASIC_ATTACK'){
-    const t=c.payload.target;
-    if(!window.KeloMeleeEngine)return Object.freeze({id:state.resultSeq++,commandId:c.id,ok:false,reason:'COMBAT_ENGINE_UNAVAILABLE'});
-    const r=window.KeloMeleeEngine.attack({attacker:localPlayer,target:t,profileId:'sword_light_basic',cooldownRemaining:state.basicCooldown,attackId:'basic_'+c.id,startedAt:c.issuedAt,source:'pvp-basic-attack'});
-    if(r.ok)state.basicCooldown=r.cooldown;
-    return Object.freeze({id:state.resultSeq++,commandId:c.id,ok:!!r.ok,type:r.ok?'DAMAGE':'ATTACK_RESULT',reason:r.reason||null,targetId:r.targetId||(t&&t.id)||null,amount:r.amount||0,absorbed:r.absorbed||0,hp:r.hp==null?(t&&t.hp):r.hp,attackId:r.attackId||null});
-  }
   if(c.type==='CAST_ABILITY'){if(!window.KeloAbilities||!window.KeloAbilities.engine)return Object.freeze({id:state.resultSeq++,commandId:c.id,ok:false,reason:'ABILITY_ENGINE_UNAVAILABLE'});const r=window.KeloAbilities.engine.cast(c.payload.request);return Object.freeze({id:state.resultSeq++,commandId:c.id,ok:!!r.valid,type:'ABILITY_RESULT',result:r})}
   if(c.type==='THROW_SWAP_SWORD'){const r=beginSwapSword(c.payload.slot,c.payload.position);return Object.freeze({id:state.resultSeq++,commandId:c.id,ok:!!r.valid,type:'SWAP_SWORD_THROW_RESULT',result:r})}
   if(c.type==='RECALL_SWAP_SWORD'){const r=recallToSwapSword();return Object.freeze({id:state.resultSeq++,commandId:c.id,ok:!!r.valid,type:'SWAP_SWORD_RECALL_RESULT',result:r})}
   if(c.type==='RESOLVE_SWAP_SWORD'){const r=resolveSwapSword(c.payload.position,c.payload.target||null);return Object.freeze({id:state.resultSeq++,commandId:c.id,ok:!!r.valid,type:'SWAP_SWORD_SWAP_RESULT',result:r})}
   return Object.freeze({id:state.resultSeq++,commandId:c.id,ok:false,reason:'UNKNOWN_COMMAND'});
 }});
-function present(r,t){if(!r)return;if(r.ok&&r.type==='DAMAGE'&&t){state.floats.push({x:t.x,y:t.y-42,text:'-'+r.amount,life:.8});if(t.hp<=0)toast('Dummy derrotado')}else if(!r.ok&&r.reason==='OUT_OF_RANGE')toast('Fuera de alcance');else if(!r.ok&&r.reason==='COOLDOWN')toast('Ataque recargando')}
-function armAbility(s){
-  if(!state.combatEnabled||state.transitioning||!window.KeloAbilities)return;
-  const i=hotbarInstance(s);if(!i)return toast('Slot vacío');
-  if(isSwapSwordInstance(i)&&state.swapSword){
-    if(state.swapSword.phase==='flying')return toast('La espada todavía está en vuelo');
-    if(state.swapSword.phase==='planted'){const r=localAuthority.execute(command('RECALL_SWAP_SWORD',{slot:s,swordEntityId:state.swapSword.id}));if(!r.ok)toast('No se pudo volver a la espada');state.armedSlot=-1;return}
-    return toast('La espada está regresando');
-  }
-  const t=i.definition&&i.definition.targeting;if(t&&t.type==='self'){const r=localAuthority.execute(command('CAST_ABILITY',{request:{slotIndex:s}}));if(!r.ok)toast('No se pudo usar la habilidad');state.armedSlot=-1;return}
-  state.armedSlot=s;toast(isSwapSwordInstance(i)?'Toca el suelo donde quieres clavar la espada':'Habilidad lista · toca objetivo o suelo');
+
+function armAbility(slot){
+  if(!state.combatEnabled||state.transitioning||!window.KeloAbilities)return false;
+  const i=hotbarInstance(slot);if(!i){toast('Slot vacío');return false}
+  if(isSwapSwordInstance(i)&&state.swapSword){if(state.swapSword.phase==='flying'){toast('La espada todavía está en vuelo');return false}if(state.swapSword.phase==='planted'){const r=localAuthority.execute(command('RECALL_SWAP_SWORD',{slot,swordEntityId:state.swapSword.id}));state.armedSlot=-1;return !!r.ok}toast('La espada está regresando');return false}
+  const t=i.definition&&i.definition.targeting;if(t&&t.type==='self'){const r=localAuthority.execute(command('CAST_ABILITY',{request:{slotIndex:slot}}));if(r.ok)sendIntent('ability',{abilityKey:i.definition.key,slot,phase:'cast'});state.armedSlot=-1;return !!r.ok}
+  state.armedSlot=slot;audit('ability-armed');return true;
 }
-function castArmedAt(w,t){
-  const s=state.armedSlot;if(s<0||!window.KeloAbilities)return false;const i=hotbarInstance(s);if(!i||!i.definition){state.armedSlot=-1;return false}
-  if(isSwapSwordInstance(i)){const r=localAuthority.execute(command('THROW_SWAP_SWORD',{slot:s,position:w}));state.armedSlot=-1;if(!r.ok)toast(r.result&&r.result.reason==='OUT_OF_RANGE'?'Muy lejos':r.result&&r.result.reason==='NO_MANA'?'Sin maná':'No se pudo lanzar la espada');return true}
-  const d=i.definition,v={x:w.x-localPlayer.x,y:w.y-localPlayer.y},l=Math.hypot(v.x,v.y)||1,q={slotIndex:s};if(d.targeting.type==='position')q.position=w;else if(d.targeting.type==='target'){if(!t){toast('Toca un enemigo');return true}q.targetId=t.id}else if(d.targeting.type==='direction')q.direction={x:v.x/l,y:v.y/l};const r=localAuthority.execute(command('CAST_ABILITY',{request:q}));state.armedSlot=-1;if(!r.ok)toast('No se pudo usar la habilidad');return true;
+function castArmed(){
+  const slot=state.armedSlot;if(slot<0||!window.KeloAbilities)return false;const i=hotbarInstance(slot);if(!i||!i.definition){state.armedSlot=-1;return false}const d=i.definition,range=d.targeting&&d.targeting.range||d.delivery&&d.delivery.maxDistance||300,pos=aimPosition(range);
+  if(isSwapSwordInstance(i)){const r=localAuthority.execute(command('THROW_SWAP_SWORD',{slot,position:pos}));state.armedSlot=-1;return !!r.ok}
+  const q={slotIndex:slot,direction:{x:state.aim.x,y:state.aim.y}};
+  if(d.targeting.type==='position')q.position=pos;
+  else if(d.targeting.type==='target'){const t=findAimTarget(d.targeting.range||400,28);if(!t){toast('Apunta a un enemigo');return false}q.targetId=t.id;q.target=t}
+  const r=localAuthority.execute(command('CAST_ABILITY',{request:q}));state.armedSlot=-1;if(r.ok){sendIntent('ability',{abilityKey:d.key,slot,phase:'cast',direction:q.direction,position:q.position||null,targetId:q.targetId||null});state.lastCastAt=now()}else toast('No se pudo usar la habilidad');audit(r.ok?'ability-cast':'ability-failed');return !!r.ok;
 }
-function targetAt(w){const d=dummyEntity();return d&&d.hp>0&&dist(w,d)<=(d.radius||20)*2.1?d:null}
-function handleCombatTap(x,y){
-  if(!state.combatEnabled||state.transitioning)return false;const w=screenWorld(x,y),t=targetAt(w);
-  if(state.swapSword&&state.swapSword.phase==='planted'){const i=hotbarInstance(state.swapSword.slot),radius=(i&&i.definition&&i.definition.delivery&&i.definition.delivery.selectRadius)||42;if(t||dist(w,state.swapSword)<=radius){const r=localAuthority.execute(command('RESOLVE_SWAP_SWORD',{position:w,target:t}));if(!r.ok)toast('No se pudo intercambiar');return true}}
-  if(state.armedSlot>=0)return castArmedAt(w,t);if(!t){state.selected=null;return false}localAuthority.execute(command('SELECT_TARGET',{target:t}));const c=command('BASIC_ATTACK',{target:t}),r=localAuthority.execute(c);present(r,t);return true;
-}
+function quickCastSlot(slot){if(!armAbility(slot))return false;return state.armedSlot===slot?castArmed():true}
+function cancelAim(){state.armedSlot=-1;state.abilityPointerId=null;state.abilityPointerSlot=-1;audit('aim-cancelled')}
+
+function targetAt(w){const list=pvpCandidates();return list.filter(t=>dist(w,t)<=(Number(t.radius)||20)*2.1).sort((a,b)=>dist(w,a)-dist(w,b))[0]||null}
+function updateSwapSword(dt){const s=state.swapSword;if(!s)return;if(s.phase==='flying'){s.time+=dt;const k=clamp(s.time/s.max,0,1),ease=1-Math.pow(1-k,3);s.x=s.sx+(s.tx-s.sx)*ease;s.y=s.sy+(s.ty-s.sy)*ease;if(k>=1){s.x=s.tx;s.y=s.ty;s.phase='planted';s.time=0;const i=hotbarInstance(s.slot),d=i&&i.definition;emitAbility('SWAP_SWORD_LANDED',{playerId:localPlayer.id||'local',actor:localPlayer,actorId:String(localPlayer.id||'local'),abilityId:d&&d.id,abilityKey:d&&d.key||'swap_sword',swordEntityId:s.id,position:{x:s.x,y:s.y},target:{x:s.x,y:s.y}});toast('Espada clavada · habilidad otra vez para volver');audit('swap-sword-planted')}}else if(s.phase==='returning'){s.time+=dt;const k=clamp(s.time/s.max,0,1),ease=1-Math.pow(1-k,3);s.x=s.returnFromX+(localPlayer.x-s.returnFromX)*ease;s.y=s.returnFromY+(localPlayer.y-s.returnFromY)*ease;if(k>=1){const i=hotbarInstance(s.slot),reset=!!s.cooldownResetOnReturn,swordEntityId=s.id;state.swapSword=null;if(reset&&i){i.cooldown=0;emitAbility('ABILITY_COOLDOWN_RESET',{playerId:localPlayer.id||'local',abilityKey:'swap_sword',slotIndex:s.slot,swordEntityId,reason:'character_swap_return_proc',chance:SWAP_SWORD_RESET_CHANCE});toast('¡Espada recuperada! Habilidad lista')}else toast('Espada recuperada');audit(reset?'swap-sword-returned-reset':'swap-sword-returned')}}}
+
 function setExitVisible(v){const x=document.getElementById('lx-side-pvp-exit');if(x)x.style.display=v?'flex':'none';const y=document.getElementById('kelo-pvp-exit');if(y)y.style.display=v&&!x?'block':'none'}
 function ensureFallbackExit(){if(document.getElementById('lx-side-pvp-exit'))return;let e=document.getElementById('kelo-pvp-exit');if(!e){e=document.createElement('button');e.id='kelo-pvp-exit';e.type='button';e.textContent='Salir PvP';e.style.cssText='display:none;position:absolute;top:max(198px,calc(env(safe-area-inset-top) + 190px));right:max(12px,env(safe-area-inset-right));z-index:140;pointer-events:auto;background:rgba(18,20,27,.95);color:#ffd6d6;border:1px solid rgba(255,90,90,.7);border-radius:12px;padding:9px 12px;font-size:11px;font-weight:850';e.addEventListener('pointerdown',a=>{a.preventDefault();a.stopPropagation();leave()});document.body.appendChild(e)}}
 function freezeMovement(){if(typeof localPlayer!=='undefined'&&localPlayer){localPlayer.vx=0;localPlayer.vy=0}if(typeof input!=='undefined'&&input){input.normX=0;input.normY=0;input.touchActive=false;input.touchId=null;if(input.keys)Object.keys(input.keys).forEach(k=>input.keys[k]=false)}}
-function progress(){return state.transitioning&&state.transitionStartedAt?clamp((performance.now()-state.transitionStartedAt)/TRANSITION_MS,0,1):0}
-function startTransition(k){state.transitioning=true;state.transitionKind=k;state.transitionStartedAt=performance.now();freezeMovement();audit(k+'-casting')}
+function progress(){return state.transitioning&&state.transitionStartedAt?clamp((now()-state.transitionStartedAt)/TRANSITION_MS,0,1):0}
+function startTransition(k){state.transitioning=true;state.transitionKind=k;state.transitionStartedAt=now();freezeMovement();audit(k+'-casting')}
 function finishTransition(){state.transitioning=false;state.transitionKind=null;state.transitionStartedAt=0}
-function enter(){if(state.mode!=='social'||state.transitioning)return;if(!ready())return toast('PvP todavía cargando');if(!combatReady())return toast('Combate todavía cargando');const d=dummyEntity();state.saved={x:localPlayer.x,y:localPlayer.y,camera:cameraOwner.snapshot(),dummyX:d&&d.x,dummyY:d&&d.y,dummyHp:d&&d.hp,dummyMaxHp:d&&d.maxHp};state.mode='entering';state.combatEnabled=false;state.selected=null;state.armedSlot=-1;cancelSwapSword();window.KELO_COMBAT_ENABLED=false;if(typeof closeMenu==='function')closeMenu();startTransition('enter');clearTimeout(state.transitionTimer);state.transitionTimer=setTimeout(()=>{try{if(!ready())throw Error('PLAYER_OR_CAMERA_UNAVAILABLE');if(d){d.x=WORLD.dummyX;d.y=WORLD.dummyY;d.hp=d.maxHp=100}localPlayer.x=WORLD.spawnX;localPlayer.y=WORLD.spawnY;localPlayer.vx=localPlayer.vy=0;cameraOwner.setTarget(localPlayer.x,localPlayer.y,{snap:true,source:'pvp-world:enter'});document.body.classList.remove('social-mode');state.mode='pvp';state.combatEnabled=true;window.KELO_COMBAT_ENABLED=true;finishTransition();setExitVisible(true);toast('Mundo PvP');audit('entered')}catch(e){state.lastError=String(e&&e.message||e);state.mode='social';state.combatEnabled=false;window.KELO_COMBAT_ENABLED=false;finishTransition();setExitVisible(false);document.body.classList.add('social-mode');toast('No se pudo entrar al PvP');audit('enter-error');console.error('[KeloPvP] enter failed',e)}},TRANSITION_MS)}
-function leave(){if(state.mode!=='pvp'||state.transitioning)return;state.mode='leaving';state.selected=null;state.armedSlot=-1;cancelSwapSword();startTransition('leave');clearTimeout(state.transitionTimer);state.transitionTimer=setTimeout(()=>{try{state.combatEnabled=false;window.KELO_COMBAT_ENABLED=false;if(state.saved&&ready()){localPlayer.x=state.saved.x;localPlayer.y=state.saved.y;localPlayer.vx=localPlayer.vy=0;if(state.saved.camera)cameraOwner.restoreState(state.saved.camera,{source:'pvp-world:leave'});const d=dummyEntity();if(d&&state.saved.dummyX!=null){d.x=state.saved.dummyX;d.y=state.saved.dummyY;d.hp=state.saved.dummyHp;d.maxHp=state.saved.dummyMaxHp}}document.body.classList.add('social-mode');state.mode='social';finishTransition();setExitVisible(false);toast('Volviste al mundo social');audit('left')}catch(e){state.lastError=String(e&&e.message||e);state.combatEnabled=false;window.KELO_COMBAT_ENABLED=false;document.body.classList.add('social-mode');state.mode='social';finishTransition();setExitVisible(false);audit('leave-error');console.error('[KeloPvP] leave failed',e)}},TRANSITION_MS)}
-function updateSwapSword(dt){
-  const s=state.swapSword;if(!s)return;
-  if(s.phase==='flying'){s.time+=dt;const k=clamp(s.time/s.max,0,1),ease=1-Math.pow(1-k,3);s.x=s.sx+(s.tx-s.sx)*ease;s.y=s.sy+(s.ty-s.sy)*ease;if(k>=1){s.x=s.tx;s.y=s.ty;s.phase='planted';s.time=0;const i=hotbarInstance(s.slot),d=i&&i.definition;emitAbility('SWAP_SWORD_LANDED',{playerId:localPlayer.id||'local',actor:localPlayer,actorId:String(localPlayer.id||'local'),abilityId:d&&d.id,abilityKey:d&&d.key||'swap_sword',swordEntityId:s.id,position:{x:s.x,y:s.y},target:{x:s.x,y:s.y}});toast('Espada clavada · toca la habilidad otra vez o elige un personaje');audit('swap-sword-planted')}}
-  else if(s.phase==='returning'){s.time+=dt;const k=clamp(s.time/s.max,0,1),ease=1-Math.pow(1-k,3);s.x=s.returnFromX+(localPlayer.x-s.returnFromX)*ease;s.y=s.returnFromY+(localPlayer.y-s.returnFromY)*ease;if(k>=1){const i=hotbarInstance(s.slot);const reset=!!s.cooldownResetOnReturn;const swordEntityId=s.id;state.swapSword=null;if(reset&&i){i.cooldown=0;emitAbility('ABILITY_COOLDOWN_RESET',{playerId:localPlayer.id||'local',abilityKey:'swap_sword',slotIndex:s.slot,swordEntityId,reason:'character_swap_return_proc',chance:SWAP_SWORD_RESET_CHANCE});toast('¡Espada recuperada! Habilidad lista otra vez')}else toast('Espada recuperada');audit(reset?'swap-sword-returned-reset':'swap-sword-returned')}}
+function enter(){if(state.mode!=='social'||state.transitioning)return;if(!ready())return toast('PvP todavía cargando');if(!combatReady())return toast('Combate todavía cargando');const d=dummyEntity();state.saved={x:localPlayer.x,y:localPlayer.y,camera:cameraOwner.snapshot(),dummyX:d&&d.x,dummyY:d&&d.y,dummyHp:d&&d.hp,dummyMaxHp:d&&d.maxHp};state.mode='entering';state.combatEnabled=false;state.armedSlot=-1;state.basicAttack=null;state.basicCooldown=0;cancelSwapSword();window.KELO_COMBAT_ENABLED=false;if(typeof closeMenu==='function')closeMenu();startTransition('enter');clearTimeout(state.transitionTimer);state.transitionTimer=setTimeout(()=>{try{if(!ready())throw Error('PLAYER_OR_CAMERA_UNAVAILABLE');if(d){d.x=WORLD.dummyX;d.y=WORLD.dummyY;d.hp=d.maxHp=100}localPlayer.x=WORLD.spawnX;localPlayer.y=WORLD.spawnY;localPlayer.vx=localPlayer.vy=0;updateAimWorld({x:WORLD.dummyX,y:WORLD.dummyY},'enter');cameraOwner.setTarget(localPlayer.x,localPlayer.y,{snap:true,source:'pvp-world:enter'});document.body.classList.remove('social-mode');state.mode='pvp';state.combatEnabled=true;window.KELO_COMBAT_ENABLED=true;finishTransition();setExitVisible(true);sendIntent('enter_pvp');toast('Mundo PvP · combate libre');audit('entered')}catch(e){state.lastError=String(e&&e.message||e);state.mode='social';state.combatEnabled=false;window.KELO_COMBAT_ENABLED=false;finishTransition();setExitVisible(false);document.body.classList.add('social-mode');toast('No se pudo entrar al PvP');audit('enter-error');console.error('[KeloPvP] enter failed',e)}},TRANSITION_MS)}
+function leave(){if(state.mode!=='pvp'||state.transitioning)return;state.mode='leaving';state.armedSlot=-1;state.basicAttack=null;cancelSwapSword();sendIntent('leave_pvp');startTransition('leave');clearTimeout(state.transitionTimer);state.transitionTimer=setTimeout(()=>{try{state.combatEnabled=false;window.KELO_COMBAT_ENABLED=false;if(state.saved&&ready()){localPlayer.x=state.saved.x;localPlayer.y=state.saved.y;localPlayer.vx=localPlayer.vy=0;if(state.saved.camera)cameraOwner.restoreState(state.saved.camera,{source:'pvp-world:leave'});const d=dummyEntity();if(d&&state.saved.dummyX!=null){d.x=state.saved.dummyX;d.y=state.saved.dummyY;d.hp=state.saved.dummyHp;d.maxHp=state.saved.dummyMaxHp}}document.body.classList.add('social-mode');state.mode='social';finishTransition();setExitVisible(false);toast('Volviste al mundo social');audit('left')}catch(e){state.lastError=String(e&&e.message||e);state.combatEnabled=false;window.KELO_COMBAT_ENABLED=false;document.body.classList.add('social-mode');state.mode='social';finishTransition();setExitVisible(false);audit('leave-error');console.error('[KeloPvP] leave failed',e)}},TRANSITION_MS)}
+
+function drawSwordWorld(){const s=state.swapSword;if(!s||typeof ctx==='undefined')return;const customThrow=window.KeloProjectileVisualRegistry&&window.KeloProjectileVisualRegistry.get('sword_swap_katana_throw_visual'),customReturn=window.KELO_SWORD_SWAP_PVP_VISUAL_AUDIT&&window.KELO_SWORD_SWAP_PVP_VISUAL_AUDIT.ready;if((s.phase==='flying'&&customThrow)||(s.phase==='returning'&&customReturn))return;const planted=s.phase==='planted',returning=s.phase==='returning',spin=s.phase==='flying'?now()/70:s.angle-Math.PI/2;ctx.save();ctx.translate(s.x,s.y-(planted?20:10));ctx.rotate(planted?-Math.PI/2:spin);ctx.globalCompositeOperation='lighter';ctx.shadowBlur=18;ctx.shadowColor='#64d7ff';ctx.strokeStyle='#64d7ff';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(-18,0);ctx.lineTo(20,0);ctx.stroke();ctx.shadowBlur=8;ctx.strokeStyle='#e7c56a';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-16,0);ctx.lineTo(19,0);ctx.stroke();ctx.fillStyle='#e7c56a';ctx.beginPath();ctx.moveTo(22,0);ctx.lineTo(15,-5);ctx.lineTo(15,5);ctx.closePath();ctx.fill();ctx.restore();if(planted){ctx.save();ctx.globalAlpha=.75;ctx.strokeStyle='#64d7ff';ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(s.x,s.y+5,30,11,0,0,Math.PI*2);ctx.stroke();ctx.restore()}if(returning){ctx.save();ctx.globalAlpha=.45;ctx.strokeStyle='#64d7ff';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(s.x,s.y);ctx.lineTo(localPlayer.x,localPlayer.y-18);ctx.stroke();ctx.restore()}}
+function drawArc(origin,direction,range,arcDegrees,alpha,lineWidth){const a=Math.atan2(direction.y,direction.x),half=(Number(arcDegrees)||90)*Math.PI/360;ctx.save();ctx.globalAlpha=alpha;ctx.strokeStyle='#f4c86a';ctx.lineWidth=lineWidth||2;ctx.beginPath();ctx.arc(origin.x,origin.y,range,a-half,a+half);ctx.stroke();ctx.beginPath();ctx.moveTo(origin.x+Math.cos(a-half)*22,origin.y+Math.sin(a-half)*22);ctx.lineTo(origin.x+Math.cos(a-half)*range,origin.y+Math.sin(a-half)*range);ctx.moveTo(origin.x+Math.cos(a+half)*22,origin.y+Math.sin(a+half)*22);ctx.lineTo(origin.x+Math.cos(a+half)*range,origin.y+Math.sin(a+half)*range);ctx.stroke();ctx.restore()}
+function drawTelegraph(){
+  if(!state.combatEnabled||!ready())return;
+  const a=state.basicAttack;if(a){const phaseAlpha=a.phase==='windup'?.34:a.phase==='active'?.9:.18;drawArc(localPlayer,a.direction,a.profile.range,a.profile.arcDegrees,phaseAlpha,a.phase==='active'?4:2)}
+  if(state.armedSlot<0)return;const i=hotbarInstance(state.armedSlot);if(!i||!i.definition)return;const d=i.definition,t=d.targeting||{},delivery=d.delivery||{},range=t.range||delivery.maxDistance||delivery.distance||300,pos=aimPosition(range);
+  ctx.save();ctx.globalCompositeOperation='lighter';ctx.strokeStyle='rgba(103,216,255,.92)';ctx.fillStyle='rgba(103,216,255,.10)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(localPlayer.x,localPlayer.y-12);ctx.lineTo(pos.x,pos.y);ctx.stroke();
+  if(t.type==='position'){const r=delivery.radius||delivery.activationRadius||26;if(delivery.type==='wall'){const w=delivery.width||150;ctx.save();ctx.translate(pos.x,pos.y);ctx.rotate(Math.atan2(state.aim.y,state.aim.x));ctx.fillRect(-8,-w/2,16,w);ctx.strokeRect(-8,-w/2,16,w);ctx.restore()}else{ctx.beginPath();ctx.arc(pos.x,pos.y,r,0,Math.PI*2);ctx.fill();ctx.stroke()}}
+  else if(delivery.type==='dash'||delivery.type==='blink'){ctx.beginPath();ctx.arc(pos.x,pos.y,18,0,Math.PI*2);ctx.fill();ctx.stroke()}else{ctx.beginPath();ctx.arc(pos.x,pos.y,8,0,Math.PI*2);ctx.fill();ctx.stroke()}ctx.restore();
 }
-function drawSwordWorld(){const s=state.swapSword;if(!s||typeof ctx==='undefined')return;const customThrow=window.KeloProjectileVisualRegistry&&window.KeloProjectileVisualRegistry.get('sword_swap_katana_throw_visual');const customReturn=window.KELO_SWORD_SWAP_PVP_VISUAL_AUDIT&&window.KELO_SWORD_SWAP_PVP_VISUAL_AUDIT.ready;if((s.phase==='flying'&&customThrow)||(s.phase==='returning'&&customReturn))return;const planted=s.phase==='planted',returning=s.phase==='returning',spin=s.phase==='flying'?performance.now()/70:s.angle-Math.PI/2;ctx.save();ctx.translate(s.x,s.y-(planted?20:10));ctx.rotate(planted?-Math.PI/2:spin);ctx.globalCompositeOperation='lighter';ctx.shadowBlur=18;ctx.shadowColor='#64d7ff';ctx.strokeStyle='#64d7ff';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(-18,0);ctx.lineTo(20,0);ctx.stroke();ctx.shadowBlur=8;ctx.strokeStyle='#e7c56a';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-16,0);ctx.lineTo(19,0);ctx.stroke();ctx.fillStyle='#e7c56a';ctx.beginPath();ctx.moveTo(22,0);ctx.lineTo(15,-5);ctx.lineTo(15,5);ctx.closePath();ctx.fill();ctx.strokeStyle='#f7e7a9';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(-13,-7);ctx.lineTo(-13,7);ctx.stroke();ctx.restore();if(planted){ctx.save();ctx.globalAlpha=.75;ctx.strokeStyle='#64d7ff';ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(s.x,s.y+5,30,11,0,0,Math.PI*2);ctx.stroke();ctx.globalAlpha=.28;ctx.beginPath();ctx.ellipse(s.x,s.y+5,42,16,0,0,Math.PI*2);ctx.stroke();ctx.restore()}if(returning){ctx.save();ctx.globalAlpha=.45;ctx.strokeStyle='#64d7ff';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(s.x,s.y);ctx.lineTo(localPlayer.x,localPlayer.y-18);ctx.stroke();ctx.restore()}}
-function drawArenaScene(){
-  if(typeof ctx==='undefined'||!ready())return;
-  ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle='#070b12';ctx.fillRect(0,0,canvas.width||screenW,canvas.height||screenH);ctx.restore();
-  const z=(typeof CONFIG!=='undefined'&&CONFIG.zoom)||1;
-  ctx.save();ctx.translate(screenW/2,screenH/2);ctx.scale(z,z);ctx.translate(-camera.x,-camera.y);
-  if(window.KeloScreenFX&&typeof window.KeloScreenFX.applyWorldTransform==='function')window.KeloScreenFX.applyWorldTransform(ctx);
-  ctx.fillStyle='#101722';ctx.fillRect(WORLD.x,WORLD.y,WORLD.w,WORLD.h);ctx.fillStyle='#162231';ctx.fillRect(WORLD.x+24,WORLD.y+24,WORLD.w-48,WORLD.h-48);ctx.strokeStyle='rgba(231,197,106,.72)';ctx.lineWidth=5;ctx.strokeRect(WORLD.x+18,WORLD.y+18,WORLD.w-36,WORLD.h-36);
-  if(window.KeloVisualSystem){window.KeloVisualSystem.renderWorldLayer('groundFX',ctx);window.KeloVisualSystem.renderWorldLayer('belowActor',ctx)}
-  drawSwordWorld();
-  const d=dummyEntity();
-  if(d){if(state.selected===d&&d.hp>0){ctx.strokeStyle='#ff5d5d';ctx.lineWidth=3;ctx.beginPath();ctx.ellipse(d.x,d.y+12,30,13,0,0,Math.PI*2);ctx.stroke()}if(typeof renderAvatar==='function'&&d.hp>0)renderAvatar(d,false);if(d.hp>0){ctx.fillStyle='rgba(0,0,0,.72)';ctx.fillRect(d.x-34,d.y-58,68,7);ctx.fillStyle='#ef476f';ctx.fillRect(d.x-34,d.y-58,68*clamp(d.hp/d.maxHp,0,1),7)}}
-  if(typeof renderAvatar==='function')renderAvatar(localPlayer,true);
-  if(window.KeloVisualSystem){window.KeloVisualSystem.renderWorldLayer('worldFX',ctx);window.KeloVisualSystem.renderWorldLayer('foregroundFX',ctx)}else if(window.KeloProjectileVisuals)window.KeloProjectileVisuals.drawLayer('worldFX',ctx);
-  state.floats.forEach(f=>{ctx.globalAlpha=clamp(f.life/.8,0,1);ctx.fillStyle='#fff';ctx.font='bold 16px sans-serif';ctx.textAlign='center';ctx.fillText(f.text,f.x,f.y)});ctx.globalAlpha=1;ctx.restore();
-  if(window.KeloVisualSystem)window.KeloVisualSystem.renderScreenLayer('screenFX',ctx);
-}
+function drawAimReticle(){if(!state.combatEnabled||!ready())return;const p=aimPosition(170);ctx.save();ctx.globalAlpha=.55;ctx.strokeStyle='#8edbff';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(localPlayer.x+state.aim.x*30,localPlayer.y+state.aim.y*30);ctx.lineTo(p.x,p.y);ctx.stroke();ctx.beginPath();ctx.arc(p.x,p.y,5,0,Math.PI*2);ctx.stroke();ctx.restore()}
+function drawArenaScene(){if(typeof ctx==='undefined'||!ready())return;ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle='#070b12';ctx.fillRect(0,0,canvas.width||screenW,canvas.height||screenH);ctx.restore();const z=(typeof CONFIG!=='undefined'&&CONFIG.zoom)||1;ctx.save();ctx.translate(screenW/2,screenH/2);ctx.scale(z,z);ctx.translate(-camera.x,-camera.y);if(window.KeloScreenFX&&typeof window.KeloScreenFX.applyWorldTransform==='function')window.KeloScreenFX.applyWorldTransform(ctx);ctx.fillStyle='#101722';ctx.fillRect(WORLD.x,WORLD.y,WORLD.w,WORLD.h);ctx.fillStyle='#162231';ctx.fillRect(WORLD.x+24,WORLD.y+24,WORLD.w-48,WORLD.h-48);ctx.strokeStyle='rgba(231,197,106,.72)';ctx.lineWidth=5;ctx.strokeRect(WORLD.x+18,WORLD.y+18,WORLD.w-36,WORLD.h-36);if(window.KeloVisualSystem){window.KeloVisualSystem.renderWorldLayer('groundFX',ctx);window.KeloVisualSystem.renderWorldLayer('belowActor',ctx)}drawSwordWorld();drawTelegraph();drawAimReticle();const d=dummyEntity();if(d&&typeof renderAvatar==='function'&&d.hp>0){renderAvatar(d,false);ctx.fillStyle='rgba(0,0,0,.72)';ctx.fillRect(d.x-34,d.y-58,68,7);ctx.fillStyle='#ef476f';ctx.fillRect(d.x-34,d.y-58,68*clamp(d.hp/d.maxHp,0,1),7)}if(window.keloNet&&window.keloNet.peers&&typeof renderAvatar==='function')Object.keys(window.keloNet.peers).forEach(id=>{const p=window.keloNet.peers[id];if(p&&p.zone==='pvp')renderAvatar(p,false)});if(typeof renderAvatar==='function')renderAvatar(localPlayer,true);if(window.KeloVisualSystem){window.KeloVisualSystem.renderWorldLayer('worldFX',ctx);window.KeloVisualSystem.renderWorldLayer('foregroundFX',ctx)}else if(window.KeloProjectileVisuals)window.KeloProjectileVisuals.drawLayer('worldFX',ctx);state.impacts.forEach(f=>{const k=clamp(f.life/f.max,0,1);ctx.globalAlpha=k;ctx.strokeStyle='#fff3b0';ctx.lineWidth=3;ctx.beginPath();ctx.arc(f.x,f.y,(1-k)*25+6,0,Math.PI*2);ctx.stroke()});state.floats.forEach(f=>{ctx.globalAlpha=clamp(f.life/.8,0,1);ctx.fillStyle='#fff';ctx.font='bold 16px sans-serif';ctx.textAlign='center';ctx.fillText(f.text,f.x,f.y)});ctx.globalAlpha=1;ctx.restore();if(window.KeloVisualSystem)window.KeloVisualSystem.renderScreenLayer('screenFX',ctx)}
 function drawTeleportFx(){if(!state.transitioning||typeof ctx==='undefined'||!ready())return;const p=progress(),z=(typeof CONFIG!=='undefined'&&CONFIG.zoom)||1,c=p<.72?1:Math.max(.08,1-(p-.72)/.28),pulse=Math.sin(p*Math.PI*7)*.5+.5;ctx.save();ctx.translate(screenW/2,screenH/2);ctx.scale(z,z);ctx.translate(-camera.x,-camera.y);const x=localPlayer.x,y=localPlayer.y+10;ctx.globalCompositeOperation='lighter';for(let i=0;i<3;i++){const r=(26+i*13+p*22)*c;ctx.globalAlpha=(.7-i*.16)*(1-p*.3);ctx.strokeStyle=i===1?'#e7c56a':'#67c8ff';ctx.lineWidth=2.5;ctx.beginPath();ctx.ellipse(x,y,r,r*.34,0,0,Math.PI*2);ctx.stroke()}for(let i=0;i<10;i++){const a=i/10*Math.PI*2+p*Math.PI*4,rr=26+10*p+6*Math.sin(i+p*9);ctx.globalAlpha=.35+.55*pulse;ctx.fillStyle=i%2?'#8bdcff':'#ffe18a';ctx.beginPath();ctx.arc(x+Math.cos(a)*rr,y-22-p*34+Math.sin(a)*rr*.28,1.5+(i%3),0,Math.PI*2);ctx.fill()}ctx.restore()}
-function grantPrototypeStone(){try{if(typeof STATE==='undefined'||!STATE||!window.KeloStones)return;const all=[].concat(STATE.equipped||[],STATE.inventory||[]);if(all.some(s=>s&&(s.abilityKey==='swap_sword'||s.typeId==='swap_sword')))return;STATE.inventory=Array.isArray(STATE.inventory)?STATE.inventory:[];STATE.inventory.push(window.KeloStones.createAbilityStone('swap_sword','Rare',{source:'pvp-prototype'}));if(typeof saveState==='function')saveState();if(window.KeloAbilities&&window.KeloAbilities.syncFromWorldState)window.KeloAbilities.syncFromWorldState(true);toast('Nueva piedra obtenida: Espada de Intercambio')}catch(e){console.warn('[KeloPvP] prototype stone grant failed',e)}}
-function audit(e){const d=dummyEntity(),s=state.swapSword;window.KELO_PVP_AUDIT={version:VERSION,event:e||null,mode:state.mode,combatEnabled:state.combatEnabled,transitioning:state.transitioning,transitionKind:state.transitionKind,transitionMs:TRANSITION_MS,transitionProgress:progress(),dummyAlive:!!(d&&d.hp>0),dummyHp:d?d.hp:null,armedSlot:state.armedSlot,swapSwordActive:!!s,swapSwordPhase:s&&s.phase||null,swapSwordEntityId:s&&s.id||null,swapSwordReturnSec:s&&s.phase==='returning'?s.max:null,swapSwordCooldownResetChance:SWAP_SWORD_RESET_CHANCE,authority:'local-command-combat-engine-v2',commandResultBoundary:true,onlineReadyAbilityContract:true,semanticCombatEvents:true,semanticMeleeVisualEvents:true,combatEngineDelegated:true,directBasicDamage:false,arenaVisualLayers:true,isolatedArenaRender:true,fullScreenLoading:false,inWorldTeleportFx:true,cameraOwner:'KeloCamera',renderOwner:'KeloRender',simulationOwner:'KeloSimulation',lastError:state.lastError}}
-function tickPvP(context){const dt=context.dt;state.basicCooldown=Math.max(0,state.basicCooldown-dt);updateSwapSword(dt);for(let i=state.floats.length-1;i>=0;i--){state.floats[i].life-=dt;state.floats[i].y-=20*dt;if(state.floats[i].life<=0)state.floats.splice(i,1)}if(state.transitioning)freezeMovement();if(state.combatEnabled&&ready()){const r=Number(localPlayer.radius)||20;localPlayer.x=clamp(localPlayer.x,WORLD.x+r,WORLD.x+WORLD.w-r);localPlayer.y=clamp(localPlayer.y,WORLD.y+r,WORLD.y+WORLD.h-r)}audit('tick')}
+
+function grantPrototypeStone(){try{if(typeof STATE==='undefined'||!STATE||!window.KeloStones)return;const all=[].concat(STATE.equipped||[],STATE.inventory||[]);if(all.some(s=>s&&(s.abilityKey==='swap_sword'||s.typeId==='swap_sword')))return;STATE.inventory=Array.isArray(STATE.inventory)?STATE.inventory:[];STATE.inventory.push(window.KeloStones.createAbilityStone('swap_sword','Rare',{source:'pvp-prototype'}));if(typeof saveState==='function')saveState();if(window.KeloAbilities&&window.KeloAbilities.syncFromWorldState)window.KeloAbilities.syncFromWorldState(true)}catch(e){console.warn('[KeloPvP] prototype stone grant failed',e)}}
+function audit(e){const d=dummyEntity(),s=state.swapSword,a=state.basicAttack;window.KELO_PVP_AUDIT={version:VERSION,event:e||null,mode:state.mode,combatEnabled:state.combatEnabled,transitioning:state.transitioning,transitionKind:state.transitionKind,transitionMs:TRANSITION_MS,transitionProgress:progress(),dummyAlive:!!(d&&d.hp>0),dummyHp:d?d.hp:null,armedSlot:state.armedSlot,aim:{x:state.aim.x,y:state.aim.y,source:state.aim.source},basicPhase:a&&a.phase||null,basicCooldown:state.basicCooldown,targetLock:false,aim360:true,meleeGeometry:'KeloHitResolver.resolveMelee',attackPhases:true,movementScaleOwner:'KeloMovement',multitouchPointerEvents:true,telegraphsPresentationOnly:true,swapSwordActive:!!s,swapSwordPhase:s&&s.phase||null,authority:window.KeloNetAuthority&&window.KeloNetAuthority.isOnline&&window.KeloNetAuthority.isOnline()?'server-intent-bridge':'local-command-fallback',cameraOwner:'KeloCamera',renderOwner:'KeloRender',simulationOwner:'KeloSimulation',lastError:state.lastError}}
+function tickPvP(context){const dt=context.dt;state.basicCooldown=Math.max(0,state.basicCooldown-dt);if(state.hitStop>0)state.hitStop=Math.max(0,state.hitStop-dt);updateBasicAttack(dt);updateSwapSword(dt);for(let i=state.floats.length-1;i>=0;i--){state.floats[i].life-=dt;state.floats[i].y-=20*dt;if(state.floats[i].life<=0)state.floats.splice(i,1)}for(let i=state.impacts.length-1;i>=0;i--){state.impacts[i].life-=dt;if(state.impacts[i].life<=0)state.impacts.splice(i,1)}if(state.transitioning)freezeMovement();if(state.combatEnabled&&ready()){const r=Number(localPlayer.radius)||20;localPlayer.x=clamp(localPlayer.x,WORLD.x+r,WORLD.x+WORLD.w-r);localPlayer.y=clamp(localPlayer.y,WORLD.y+r,WORLD.y+WORLD.h-r);localPlayer._face=faceFromDirection(state.basicAttack?state.basicAttack.direction:state.aim)}audit('tick')}
 function interceptPvPFrame(){if(state.combatEnabled||state.mode==='leaving'){drawArenaScene();if(state.transitioning)drawTeleportFx();return true}return false}
 function drawPvPTransition(){if(state.transitioning)drawTeleportFx()}
+
+function movementScaleHook(context){if(!state.combatEnabled||!context||!context.input)return;let scale=1;if(state.hitStop>0)scale=0;else if(state.basicAttack)scale=Number(state.basicAttack.profile.movementScale);if(!Number.isFinite(scale))scale=1;context.input.normX=(Number(context.input.normX)||0)*scale;context.input.normY=(Number(context.input.normY)||0)*scale}
+function facingHook(){if(state.combatEnabled&&ready())localPlayer._face=faceFromDirection(state.basicAttack?state.basicAttack.direction:state.aim)}
+if(window.KeloMovement&&typeof window.KeloMovement.before==='function'){window.KeloMovement.before('pvp-world:movement-scale',movementScaleHook,70);window.KeloMovement.after('pvp-world:combat-facing',facingHook,970)}
 if(!window.KeloSimulation||!window.KeloRender)throw new Error('Foundation render/simulation owners unavailable before pvp-world');
-window.KeloSimulation.after('pvp-world:tick',tickPvP,60);
-window.KeloRender.intercept('pvp-world:arena-exclusive',interceptPvPFrame,10);
-window.KeloRender.afterFrame('pvp-world:transition-fx',drawPvPTransition,150);
-window.addEventListener('pointerdown',function(e){if(!state.combatEnabled||state.transitioning)return;const b=e.target&&e.target.closest&&e.target.closest('.stone-slot');if(b){e.preventDefault();e.stopImmediatePropagation();armAbility(Number(b.dataset.slot));return}if(typeof canvas==='undefined'||e.target!==canvas)return;if(handleCombatTap(e.clientX,e.clientY)){e.preventDefault();e.stopImmediatePropagation()}},true);
-window.enterPvPWorld=enter;window.leavePvPWorld=leave;window.KeloPvPWorld=Object.freeze({version:VERSION,enter,leave,get state(){return Object.freeze({mode:state.mode,combatEnabled:state.combatEnabled,transitioning:state.transitioning,selectedId:state.selected&&state.selected.id,armedSlot:state.armedSlot,swapSword:state.swapSword&&{id:state.swapSword.id,phase:state.swapSword.phase,x:state.swapSword.x,y:state.swapSword.y,slot:state.swapSword.slot,returnDurationSec:state.swapSword.max,cooldownResetOnReturn:!!state.swapSword.cooldownResetOnReturn},lastError:state.lastError})},command,authority:localAuthority});
+window.KeloSimulation.after('pvp-world:tick',tickPvP,60);window.KeloRender.intercept('pvp-world:arena-exclusive',interceptPvPFrame,10);window.KeloRender.afterFrame('pvp-world:transition-fx',drawPvPTransition,150);
+
+function slotFromTarget(target){const b=target&&target.closest&&target.closest('.stone-slot');return b?Number(b.dataset.slot):null}
+window.addEventListener('pointermove',function(e){if(!state.combatEnabled||state.transitioning)return;if(e.pointerType==='mouse'&&typeof canvas!=='undefined'&&e.target===canvas){updateAimScreen(e.clientX,e.clientY,'mouse');return}if(e.pointerId===state.combatPointerId||e.pointerId===state.abilityPointerId)updateAimScreen(e.clientX,e.clientY,e.pointerType||'pointer')},true);
+window.addEventListener('pointerdown',function(e){if(!state.combatEnabled||state.transitioning)return;const slot=slotFromTarget(e.target);state.lastPointerType=e.pointerType;if(slot!=null){e.preventDefault();e.stopImmediatePropagation();if(e.pointerType==='mouse'){quickCastSlot(slot);return}if(armAbility(slot)&&state.armedSlot===slot){state.abilityPointerId=e.pointerId;state.abilityPointerSlot=slot;try{e.target.setPointerCapture(e.pointerId)}catch(_){}}return}if(typeof canvas==='undefined'||e.target!==canvas)return;if(e.pointerType==='touch'&&e.clientX<(window.innerWidth||screenW)*MOBILE_COMBAT_SPLIT&&state.armedSlot<0)return;e.preventDefault();e.stopImmediatePropagation();updateAimScreen(e.clientX,e.clientY,e.pointerType||'pointer');state.combatPointerId=e.pointerId;try{canvas.setPointerCapture(e.pointerId)}catch(_){}},true);
+window.addEventListener('pointerup',function(e){if(!state.combatEnabled||state.transitioning)return;if(e.pointerId===state.abilityPointerId){updateAimScreen(e.clientX,e.clientY,e.pointerType||'pointer');state.abilityPointerId=null;state.abilityPointerSlot=-1;castArmed();e.preventDefault();return}if(e.pointerId===state.combatPointerId){updateAimScreen(e.clientX,e.clientY,e.pointerType||'pointer');state.combatPointerId=null;const w=screenWorld(e.clientX,e.clientY),t=targetAt(w);if(state.swapSword&&state.swapSword.phase==='planted'&&(t||dist(w,state.swapSword)<=42))localAuthority.execute(command('RESOLVE_SWAP_SWORD',{position:w,target:t}));else if(state.armedSlot>=0)castArmed();else startBasicAttack(e.pointerType||'pointer');e.preventDefault()}},true);
+window.addEventListener('pointercancel',function(e){if(e.pointerId===state.combatPointerId)state.combatPointerId=null;if(e.pointerId===state.abilityPointerId){state.abilityPointerId=null;state.abilityPointerSlot=-1;cancelAim()}},true);
+window.addEventListener('keydown',function(e){if(!state.combatEnabled||state.transitioning)return;if(/^Digit[1-5]$/.test(e.code)){quickCastSlot(Number(e.code.slice(-1))-1);e.preventDefault()}else if(e.code==='Escape'){cancelAim();e.preventDefault()}},true);
+
+window.enterPvPWorld=enter;window.leavePvPWorld=leave;
+window.KeloPvPWorld=Object.freeze({version:VERSION,enter,leave,startBasicAttack,quickCastSlot,setAimWorld:updateAimWorld,cancelAim,get state(){return Object.freeze({mode:state.mode,combatEnabled:state.combatEnabled,transitioning:state.transitioning,armedSlot:state.armedSlot,aim:Object.freeze({x:state.aim.x,y:state.aim.y,worldX:state.aim.worldX,worldY:state.aim.worldY}),basicCooldown:state.basicCooldown,basicAttack:state.basicAttack&&Object.freeze({id:state.basicAttack.id,phase:state.basicAttack.phase,direction:Object.freeze({x:state.basicAttack.direction.x,y:state.basicAttack.direction.y})}),swapSword:state.swapSword&&{id:state.swapSword.id,phase:state.swapSword.phase,x:state.swapSword.x,y:state.swapSword.y,slot:state.swapSword.slot},lastError:state.lastError})},command,authority:localAuthority});
 function bootExtras(){ensureFallbackExit();setExitVisible(false);audit('boot');setTimeout(grantPrototypeStone,0)}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bootExtras,{once:true});else bootExtras();
 })();
