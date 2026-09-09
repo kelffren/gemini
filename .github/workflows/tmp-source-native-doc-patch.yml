@@ -1,0 +1,63 @@
+name: Temporary Source Native Architecture Patch
+on:
+  push:
+    branches: ['feature/ability-source-native-cast']
+    paths: ['.github/workflows/tmp-source-native-doc-patch.yml']
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/ability-source-native-cast
+          fetch-depth: 0
+      - name: Patch owner event and architecture docs
+        shell: python
+        run: |
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              p = Path(path)
+              s = p.read_text()
+              if old not in s:
+                  raise SystemExit(f'missing expected text in {path}: {old[:120]}')
+              p.write_text(s.replace(old, new, 1))
+
+          replace_once(
+              'src/abilities/kelo-ability-boot.js',
+              "if(sourceType!=='stone')emit('KELO_ABILITY_SOURCE_CAST',result);return result;",
+              "if(sourceType!=='stone'){emit('KELO_ABILITY_SOURCE_CAST',result);try{window.KeloEvents?.emit?.('KELO_ABILITY_SOURCE_CAST',result);}catch(_e){}}return result;"
+          )
+
+          replace_once(
+              'ENGINE_MAP.md',
+              "**Runtime declarado en `index.html`: Kelo World V6.53.  ",
+              "**Runtime declarado en `index.html`: Kelo World V6.53.  \n**Ability Source-Native:** `KeloAbilities.engine.castSource/predictSource` ejecuta weapon/mount/futuras fuentes no-Stone por el mismo targeting/delivery/effects sin sustituir ningún slot del hotbar Stone; `KeloAbilitySourceCast` queda como shim de compatibilidad.  "
+          )
+
+          replace_once(
+              'docs/KELO_FOUNDATION.md',
+              "| Ability runtime | `KeloAbilities` | OWNER | Delivery/effects/cooldown/collision; mount reutiliza este owner |",
+              "| Ability runtime | `KeloAbilities` | OWNER | Delivery/effects/cooldown/collision; `castSource/predictSource` permite fuentes no-Stone sin tocar hotbar; mount/weapon reutilizan este owner |"
+          )
+          replace_once(
+              'docs/KELO_FOUNDATION.md',
+              "| Mount exclusive ability channel | `KeloMountAbilityChannel` → `KeloAbilities` | SUPPORT CANDIDATE | Exact 3 M1/M2/M3 mounted-only; no MountAbilityEngine |",
+              "| Mount exclusive ability channel | `KeloMountAbilityChannel` → `KeloAbilities.engine.castSource` | SUPPORT CANDIDATE | Exact 3 M1/M2/M3 mounted-only; no MountAbilityEngine ni préstamo de slots Stone |"
+          )
+
+          replace_once(
+              'docs/CODE_INDEX.md',
+              "| CAST ABILITY | delivery VFX/daño compartido | `src/abilities/kelo-ability-boot.js` |",
+              "| CAST ABILITY | delivery/effects compartidos + `castSource/predictSource` para weapon/mount sin tocar Stone hotbar | `src/abilities/kelo-ability-boot.js` |"
+          )
+      - name: Remove temporary workflow and commit patch
+        run: |
+          git rm .github/workflows/tmp-source-native-doc-patch.yml
+          git config user.name "kelo-foundation-bot"
+          git config user.email "68343904+kelffren@users.noreply.github.com"
+          git add src/abilities/kelo-ability-boot.js ENGINE_MAP.md docs/KELO_FOUNDATION.md docs/CODE_INDEX.md
+          git commit -m "docs: register source-native KeloAbilities contract"
+          git push origin HEAD:feature/ability-source-native-cast
