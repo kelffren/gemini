@@ -34,7 +34,7 @@ const boot=await page.evaluate(()=>({
   scene:window.KELO_SCENE_CONTEXT.current(),
   gold:STATE.gold
 }));
-assert.equal(boot.commerce.noLocalFallbackWhenOnline,true);
+assert.equal(boot.commerce.noOnlineLocalFallback,true);
 assert.equal(boot.commerce.tradeDoubleConfirmation,true);
 assert.equal(boot.containers.tradeEscrowImplemented,true);
 assert.equal(boot.containers.checkpointTransactions,true);
