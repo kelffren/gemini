@@ -1,235 +1,33 @@
 {
   "schema": 1,
   "systems": [
-    {
-      "id": "input-locks",
-      "owner": "KeloInputLocks",
-      "source": "src/core/input-lock-system.js",
-      "technicalDoc": "docs/systems/INPUT_LOCK_SYSTEM.md",
-      "playerVisible": true,
-      "playerGuideAnchor": "controles-y-bloqueos-de-interfaz",
-      "status": "foundation-active"
-    },
-    {
-      "id": "input",
-      "owner": "KeloInput",
-      "source": "src/core/input-system.js",
-      "technicalDoc": "docs/systems/INPUT_SYSTEM.md",
-      "playerVisible": true,
-      "playerGuideAnchor": "controles-y-bloqueos-de-interfaz",
-      "status": "foundation-transitional"
-    },
-    {
-      "id": "input-gate-retired",
-      "owner": "none",
-      "source": "src/core/input-gate.js",
-      "technicalDoc": "docs/systems/INPUT_GATE.md",
-      "playerVisible": false,
-      "status": "retired-compat"
-    },
-    {
-      "id": "movement",
-      "owner": "KeloMovement",
-      "source": "src/core/movement-system.js",
-      "technicalDoc": "docs/systems/MOVEMENT_SYSTEM.md",
-      "playerVisible": true,
-      "playerGuideAnchor": "movimiento",
-      "status": "foundation-transitional"
-    },
-    {
-      "id": "camera",
-      "owner": "KeloCamera",
-      "source": "src/core/camera-system.js",
-      "technicalDoc": "docs/systems/CAMERA_SYSTEM.md",
-      "playerVisible": true,
-      "playerGuideAnchor": "camara-y-pantalla",
-      "status": "foundation-transitional"
-    },
-    {
-      "id": "render-extensions",
-      "owner": "KeloRender",
-      "source": "src/core/render-extension-system.js",
-      "technicalDoc": "docs/systems/RENDER_EXTENSION_SYSTEM.md",
-      "playerVisible": false,
-      "status": "foundation-transitional"
-    },
-    {
-      "id": "simulation-extensions",
-      "owner": "KeloSimulation",
-      "source": "src/core/simulation-extension-system.js",
-      "technicalDoc": "docs/systems/SIMULATION_EXTENSION_SYSTEM.md",
-      "playerVisible": false,
-      "status": "foundation-transitional"
-    },
-    {
-      "id": "avatar-render",
-      "owner": "KeloAvatar",
-      "source": "src/core/avatar-render-system.js",
-      "technicalDoc": "docs/systems/AVATAR_RENDER_SYSTEM.md",
-      "playerVisible": false,
-      "status": "foundation-transitional"
-    },
-    {
-      "id": "character-customization",
-      "owner": "KeloCharacterCustomization",
-      "source": "src/characters/character-customization.js",
-      "technicalDoc": "docs/systems/CHARACTER_CUSTOMIZATION_SYSTEM.md",
-      "playerVisible": true,
-      "playerGuideAnchor": "personalizacion-de-personaje",
-      "status": "foundation-active"
-    },
-    {
-      "id": "main-menu",
-      "owner": "KELO_LUXE",
-      "source": "src/ui/luxe-shell.js",
-      "technicalDoc": "docs/systems/MAIN_MENU_SYSTEM.md",
-      "playerVisible": true,
-      "playerGuideAnchor": "menu-principal",
-      "status": "foundation-active"
-    },
-    {
-      "id": "player-stats",
-      "owner": "KeloPlayerStats",
-      "source": "src/systems/player-stats.js",
-      "technicalDoc": "docs/systems/PLAYER_STATS_SYSTEM.md",
-      "playerVisible": false,
-      "status": "foundation-active"
-    },
-    {
-      "id": "titles",
-      "owner": "KeloTitles",
-      "source": "src/systems/title-system.js",
-      "technicalDoc": "docs/systems/TITLE_SYSTEM.md",
-      "playerVisible": true,
-      "playerGuideAnchor": "nobleza-y-titulos",
-      "status": "foundation-active"
-    },
-    {
-      "id": "commerce",
-      "owner": "KeloCommerceAuthority",
-      "source": "src/systems/commerce-authority.js",
-      "technicalDoc": "docs/systems/COMMERCE_SYSTEM.md",
-      "playerVisible": true,
-      "playerGuideAnchor": "mercado-comercio-y-trade",
-      "status": "offline-active-online-ready"
-    },
-    {
-      "id": "arena-ranked",
-      "owner": "KeloArena",
-      "source": "src/systems/arena-system.js",
-      "technicalDoc": "docs/systems/ARENA_SYSTEM.md",
-      "playerVisible": true,
-      "playerGuideAnchor": "arena-ranked",
-      "status": "offline-active-online-authority-pending"
-    },
-    {
-      "id": "arena-telemetry",
-      "owner": "KeloArenaTelemetry",
-      "source": "src/systems/arena-telemetry.js",
-      "technicalDoc": "docs/systems/ARENA_TELEMETRY_SYSTEM.md",
-      "playerVisible": true,
-      "playerGuideAnchor": "arena-ranked",
-      "status": "offline-active-server-validation-pending"
-    },
-    {
-      "id": "arena-progression",
-      "owner": "KeloArenaProgression",
-      "source": "src/systems/arena-progression.js",
-      "technicalDoc": "docs/systems/ARENA_PROGRESSION_SYSTEM.md",
-      "playerVisible": true,
-      "playerGuideAnchor": "arena-ranked",
-      "status": "offline-active-online-authority-pending"
-    },
-    {
-      "id": "map-forge",
-      "owner": "KeloMapForge",
-      "source": "src/world/map-forge/map-forge-core.mjs",
-      "technicalDoc": "docs/systems/MAP_FORGE_SYSTEM.md",
-      "playerVisible": false,
-      "status": "prepared-headless"
-    },
-    {
-      "id": "mounts",
-      "owner": "KeloMounts",
-      "source": "src/mounts/mount-system.js",
-      "technicalDoc": "docs/systems/MOUNT_SYSTEM.md",
-      "playerVisible": true,
-      "playerGuideAnchor": "monturas",
-      "status": "foundation-candidate"
-    },
-    {
-      "id": "equipment-abilities",
-      "owner": "KeloAbilities (cast) + KeloEquipment (weapon state)",
-      "source": "src/abilities/equipment-ability-channel.js",
-      "technicalDoc": "docs/systems/EQUIPMENT_ABILITY_SYSTEM.md",
-      "playerVisible": true,
-      "playerGuideAnchor": "habilidades",
-      "status": "foundation-support-active"
-    },
-    {
-      "id": "stat-modifiers",
-      "owner": "KeloStats",
-      "source": "src/stats/stat-modifier-system.js",
-      "technicalDoc": "docs/systems/STAT_MODIFIER_SYSTEM.md",
-      "playerVisible": false,
-      "status": "foundation-candidate"
-    },
-    {
-      "id": "appearance",
-      "owner": "KeloAppearance",
-      "source": "src/appearance/appearance-system.js",
-      "technicalDoc": "docs/systems/APPEARANCE_SYSTEM.md",
-      "playerVisible": true,
-      "playerGuideAnchor": "atuendos-y-apariencia",
-      "status": "foundation-candidate"
-    },
-    {
-      "id": "mount-creator",
-      "owner": "Kelo Creators / Mount workspace",
-      "source": "src/creators/workspaces/mount-workspace.mjs",
-      "technicalDoc": "docs/systems/MOUNT_CREATOR.md",
-      "playerVisible": false,
-      "status": "creator-candidate"
-    },
-    {
-      "id": "appearance-creator",
-      "owner": "Kelo Creators / Appearance workspace",
-      "source": "src/creators/workspaces/appearance-workspace.mjs",
-      "technicalDoc": "docs/systems/APPEARANCE_CREATOR.md",
-      "playerVisible": false,
-      "status": "creator-candidate"
-    },
-    {
-      "id": "regional-economy",
-      "owner": "KeloRegionalEconomy",
-      "source": "src/systems/regional-economy-system.js",
-      "technicalDoc": "docs/systems/REGIONAL_ECONOMY_LOGISTICS_SYSTEM.md",
-      "playerVisible": false,
-      "status": "foundation-api-live-offline-online-ready"
-    },
-    {
-      "id": "caravans",
-      "owner": "KeloCaravans",
-      "source": "src/systems/caravan-system.js",
-      "technicalDoc": "docs/systems/REGIONAL_ECONOMY_LOGISTICS_SYSTEM.md",
-      "playerVisible": false,
-      "status": "foundation-api-live-offline-online-ready"
-    },
-    {
-      "id": "factions-clans",
-      "owner": "KeloFactions",
-      "source": "src/systems/faction-clan-system.js",
-      "technicalDoc": "docs/systems/REGIONAL_ECONOMY_LOGISTICS_SYSTEM.md",
-      "playerVisible": false,
-      "status": "foundation-api-live-offline-online-ready"
-    },
-    {
-      "id": "logistics-devtools",
-      "owner": "KeloLogisticsDevtools",
-      "source": "src/systems/logistics-devtools.js",
-      "technicalDoc": "docs/systems/REGIONAL_ECONOMY_LOGISTICS_SYSTEM.md",
-      "playerVisible": false,
-      "status": "development-observability"
-    }
+    {"id":"input-locks","owner":"KeloInputLocks","source":"src/core/input-lock-system.js","technicalDoc":"docs/systems/INPUT_LOCK_SYSTEM.md","playerVisible":true,"playerGuideAnchor":"controles-y-bloqueos-de-interfaz","status":"foundation-active"},
+    {"id":"input","owner":"KeloInput","source":"src/core/input-system.js","technicalDoc":"docs/systems/INPUT_SYSTEM.md","playerVisible":true,"playerGuideAnchor":"controles-y-bloqueos-de-interfaz","status":"foundation-transitional"},
+    {"id":"input-gate-retired","owner":"none","source":"src/core/input-gate.js","technicalDoc":"docs/systems/INPUT_GATE.md","playerVisible":false,"status":"retired-compat"},
+    {"id":"movement","owner":"KeloMovement","source":"src/core/movement-system.js","technicalDoc":"docs/systems/MOVEMENT_SYSTEM.md","playerVisible":true,"playerGuideAnchor":"movimiento","status":"foundation-transitional"},
+    {"id":"camera","owner":"KeloCamera","source":"src/core/camera-system.js","technicalDoc":"docs/systems/CAMERA_SYSTEM.md","playerVisible":true,"playerGuideAnchor":"camara-y-pantalla","status":"foundation-transitional"},
+    {"id":"render-extensions","owner":"KeloRender","source":"src/core/render-extension-system.js","technicalDoc":"docs/systems/RENDER_EXTENSION_SYSTEM.md","playerVisible":false,"status":"foundation-transitional"},
+    {"id":"simulation-extensions","owner":"KeloSimulation","source":"src/core/simulation-extension-system.js","technicalDoc":"docs/systems/SIMULATION_EXTENSION_SYSTEM.md","playerVisible":false,"status":"foundation-transitional"},
+    {"id":"avatar-render","owner":"KeloAvatar","source":"src/core/avatar-render-system.js","technicalDoc":"docs/systems/AVATAR_RENDER_SYSTEM.md","playerVisible":false,"status":"foundation-transitional"},
+    {"id":"character-customization","owner":"KeloCharacterCustomization","source":"src/characters/character-customization.js","technicalDoc":"docs/systems/CHARACTER_CUSTOMIZATION_SYSTEM.md","playerVisible":true,"playerGuideAnchor":"personalizacion-de-personaje","status":"foundation-active"},
+    {"id":"main-menu","owner":"KELO_LUXE","source":"src/ui/luxe-shell.js","technicalDoc":"docs/systems/MAIN_MENU_SYSTEM.md","playerVisible":true,"playerGuideAnchor":"menu-principal","status":"foundation-active"},
+    {"id":"player-stats","owner":"KeloPlayerStats","source":"src/systems/player-stats.js","technicalDoc":"docs/systems/PLAYER_STATS_SYSTEM.md","playerVisible":false,"status":"foundation-active"},
+    {"id":"titles","owner":"KeloTitles","source":"src/systems/title-system.js","technicalDoc":"docs/systems/TITLE_SYSTEM.md","playerVisible":true,"playerGuideAnchor":"nobleza-y-titulos","status":"foundation-active"},
+    {"id":"commerce","owner":"KeloCommerceAuthority","source":"src/systems/commerce-authority.js","technicalDoc":"docs/systems/COMMERCE_SYSTEM.md","playerVisible":true,"playerGuideAnchor":"mercado-comercio-y-trade","status":"offline-active-online-ready"},
+    {"id":"arena-ranked","owner":"KeloArena","source":"src/systems/arena-system.js","technicalDoc":"docs/systems/ARENA_SYSTEM.md","playerVisible":true,"playerGuideAnchor":"arena-ranked","status":"offline-active-online-authority-pending"},
+    {"id":"arena-telemetry","owner":"KeloArenaTelemetry","source":"src/systems/arena-telemetry.js","technicalDoc":"docs/systems/ARENA_TELEMETRY_SYSTEM.md","playerVisible":true,"playerGuideAnchor":"arena-ranked","status":"offline-active-server-validation-pending"},
+    {"id":"arena-highlights","owner":"KeloArenaHighlights","source":"src/systems/arena-highlights.js","technicalDoc":"docs/systems/ARENA_HIGHLIGHTS_SYSTEM.md","playerVisible":true,"playerGuideAnchor":"arena-ranked","status":"offline-active-server-validation-pending"},
+    {"id":"arena-progression","owner":"KeloArenaProgression","source":"src/systems/arena-progression.js","technicalDoc":"docs/systems/ARENA_PROGRESSION_SYSTEM.md","playerVisible":true,"playerGuideAnchor":"arena-ranked","status":"offline-active-online-authority-pending"},
+    {"id":"map-forge","owner":"KeloMapForge","source":"src/world/map-forge/map-forge-core.mjs","technicalDoc":"docs/systems/MAP_FORGE_SYSTEM.md","playerVisible":false,"status":"prepared-headless"},
+    {"id":"mounts","owner":"KeloMounts","source":"src/mounts/mount-system.js","technicalDoc":"docs/systems/MOUNT_SYSTEM.md","playerVisible":true,"playerGuideAnchor":"monturas","status":"foundation-candidate"},
+    {"id":"equipment-abilities","owner":"KeloAbilities (cast) + KeloEquipment (weapon state)","source":"src/abilities/equipment-ability-channel.js","technicalDoc":"docs/systems/EQUIPMENT_ABILITY_SYSTEM.md","playerVisible":true,"playerGuideAnchor":"habilidades","status":"foundation-support-active"},
+    {"id":"stat-modifiers","owner":"KeloStats","source":"src/stats/stat-modifier-system.js","technicalDoc":"docs/systems/STAT_MODIFIER_SYSTEM.md","playerVisible":false,"status":"foundation-candidate"},
+    {"id":"appearance","owner":"KeloAppearance","source":"src/appearance/appearance-system.js","technicalDoc":"docs/systems/APPEARANCE_SYSTEM.md","playerVisible":true,"playerGuideAnchor":"atuendos-y-apariencia","status":"foundation-candidate"},
+    {"id":"mount-creator","owner":"Kelo Creators / Mount workspace","source":"src/creators/workspaces/mount-workspace.mjs","technicalDoc":"docs/systems/MOUNT_CREATOR.md","playerVisible":false,"status":"creator-candidate"},
+    {"id":"appearance-creator","owner":"Kelo Creators / Appearance workspace","source":"src/creators/workspaces/appearance-workspace.mjs","technicalDoc":"docs/systems/APPEARANCE_CREATOR.md","playerVisible":false,"status":"creator-candidate"},
+    {"id":"regional-economy","owner":"KeloRegionalEconomy","source":"src/systems/regional-economy-system.js","technicalDoc":"docs/systems/REGIONAL_ECONOMY_LOGISTICS_SYSTEM.md","playerVisible":false,"status":"foundation-api-live-offline-online-ready"},
+    {"id":"caravans","owner":"KeloCaravans","source":"src/systems/caravan-system.js","technicalDoc":"docs/systems/REGIONAL_ECONOMY_LOGISTICS_SYSTEM.md","playerVisible":false,"status":"foundation-api-live-offline-online-ready"},
+    {"id":"factions-clans","owner":"KeloFactions","source":"src/systems/faction-clan-system.js","technicalDoc":"docs/systems/REGIONAL_ECONOMY_LOGISTICS_SYSTEM.md","playerVisible":false,"status":"foundation-api-live-offline-online-ready"},
+    {"id":"logistics-devtools","owner":"KeloLogisticsDevtools","source":"src/systems/logistics-devtools.js","technicalDoc":"docs/systems/REGIONAL_ECONOMY_LOGISTICS_SYSTEM.md","playerVisible":false,"status":"development-observability"}
   ]
 }
