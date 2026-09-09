@@ -35,6 +35,7 @@
   function foundations(){return root.KeloCombatSchema&&root.KeloCombatSchema.events&&root.KeloHitResolver&&root.KeloDamageResolver;}
   function geometry(attacker,target,dir,profile){return profile&&profile.hitShape&&root.KeloHitResolver.resolveMelee?root.KeloHitResolver.resolveMelee(attacker,target,dir,profile):root.KeloHitResolver.withinRange(attacker,target,profile&&profile.range);}
   function reject(reason,events,payload){const p=Object.assign({},payload||{},{ok:false,reason:reason||'REJECTED'});emit(events&&events.ATTACK_REJECTED,p);return p;}
+  function cartBlocksAttack(attacker){return !!(attacker&&root.KeloCaravans?.canActorAttack&&!root.KeloCaravans.canActorAttack(idOf(attacker)));}
   function applyDamageToTarget(target,profile,payload,events){
     emit(events.HIT_CONFIRMED,payload);
     const damage=root.KeloDamageResolver.apply(target,profile.damage,{source:payload.actor,attackId:payload.attackId,kind:payload.kind,damageType:profile.damageType});
@@ -47,7 +48,7 @@
     const o=options||{},attacker=o.attacker,profile=o.profile||{},events=root.KeloCombatSchema&&root.KeloCombatSchema.events;
     if(!foundations())return Object.freeze({ok:false,reason:'COMBAT_FOUNDATION_UNAVAILABLE'});
     if(!attacker){reject('INVALID_ATTACKER',events,{source:o.source});return Object.freeze({ok:false,reason:'INVALID_ATTACKER'});}
-    if(root.KeloCaravans?.canActorAttack&&!root.KeloCaravans.canActorAttack(idOf(attacker))){reject('ATTACHED_CART_COMBAT_BLOCKED',events,{actor:attacker,actorId:idOf(attacker),error:'ACTION_BLOCKED_BY_CART'});return Object.freeze({ok:false,reason:'ATTACHED_CART_COMBAT_BLOCKED',error:'ACTION_BLOCKED_BY_CART'});}
+    if(cartBlocksAttack(attacker)){reject('ACTION_BLOCKED_BY_CART',events,{actor:attacker,actorId:idOf(attacker)});return Object.freeze({ok:false,reason:'ACTION_BLOCKED_BY_CART',error:'ACTION_BLOCKED_BY_CART'});}
     if(Math.max(0,Number(o.cooldownRemaining)||0)>0){reject('COOLDOWN',events,{actor:attacker,actorId:idOf(attacker)});return Object.freeze({ok:false,reason:'COOLDOWN'});}
     const dir=normalizedDirection(attacker,null,o.direction),payload=Object.assign({},basePayload(o,false,dir,null),{confirmedHit:null,phase:'windup'});emit(events.ATTACK_STARTED,payload);
     return Object.freeze({ok:true,type:'ATTACK_STARTED',attackId:payload.attackId,cooldown:Math.max(0,Number(profile.cooldown)||0),payload});
@@ -55,6 +56,7 @@
   function attack(options){
     const o=options||{},attacker=o.attacker,target=o.target,profile=o.profile||{},events=root.KeloCombatSchema&&root.KeloCombatSchema.events;
     if(!foundations())return Object.freeze({ok:false,reason:'COMBAT_FOUNDATION_UNAVAILABLE'});
+    if(cartBlocksAttack(attacker)){reject('ACTION_BLOCKED_BY_CART',events,{actor:attacker,actorId:idOf(attacker),targetActor:target});return Object.freeze({ok:false,reason:'ACTION_BLOCKED_BY_CART',error:'ACTION_BLOCKED_BY_CART'});}
     if(!attacker||!target||(target.hp!=null&&Number(target.hp)<=0)){reject('INVALID_TARGET',events,{actor:attacker,targetActor:target});return Object.freeze({ok:false,reason:'INVALID_TARGET'});}
     if(Math.max(0,Number(o.cooldownRemaining)||0)>0){reject('COOLDOWN',events,{actor:attacker,targetActor:target});return Object.freeze({ok:false,reason:'COOLDOWN'});}
     const dir=normalizedDirection(attacker,target,o.direction),hit=geometry(attacker,target,dir,profile),payload=basePayload(o,hit.hit,dir,target);if(o.skipStart!==true)emit(events.ATTACK_STARTED,payload);
@@ -66,6 +68,7 @@
     const o=options||{},attacker=o.attacker,profile=o.profile||{},events=root.KeloCombatSchema&&root.KeloCombatSchema.events;
     if(!foundations())return Object.freeze({ok:false,reason:'COMBAT_FOUNDATION_UNAVAILABLE',hits:[]});
     if(!attacker){reject('INVALID_ATTACKER',events,{source:o.source});return Object.freeze({ok:false,reason:'INVALID_ATTACKER',hits:[]});}
+    if(cartBlocksAttack(attacker)){reject('ACTION_BLOCKED_BY_CART',events,{actor:attacker,actorId:idOf(attacker)});return Object.freeze({ok:false,reason:'ACTION_BLOCKED_BY_CART',error:'ACTION_BLOCKED_BY_CART',hits:[]});}
     if(Math.max(0,Number(o.cooldownRemaining)||0)>0){reject('COOLDOWN',events,{actor:attacker});return Object.freeze({ok:false,reason:'COOLDOWN',hits:[]});}
     const dir=normalizedDirection(attacker,null,o.direction),targets=(Array.isArray(o.targets)?o.targets:[]).filter(t=>t&&t!==attacker&&(t.hp==null||Number(t.hp)>0));
     const resolved=targets.map(target=>({target,hit:geometry(attacker,target,dir,profile)})).filter(entry=>entry.hit.hit);resolved.sort((a,b)=>(Number(a.hit.distance)||0)-(Number(b.hit.distance)||0));
