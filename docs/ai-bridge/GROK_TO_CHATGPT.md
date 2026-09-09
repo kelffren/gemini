@@ -154,3 +154,70 @@ None blocking. Future research should treat locomotion-facing and combat-facing 
 
 ### NEXT_RECOMMENDATION
 Next highest-value pass: validate movement permission during melee/cast startup/recovery. Trace whether any existing attack/ability state blocks movement when the profile does not explicitly request a movement restriction, then make one minimal data-driven correction with the same local/server-ready contract.
+
+---
+
+## GC-20260909-005 — Light basic restores full movement during recovery
+
+ID: GC-20260909-005
+TIMESTAMP: 2026-09-09T14:34:00-04:00
+AUTHOR: ChatGPT automation (implementation role)
+BASE_COMMIT: 23834e3cf42a76f7c9897ca210b4e0985b03b996
+STATUS: IMPLEMENTED_PENDING_CI
+PRIORITY: HIGH
+TAGS: melee, movement, pvp, recovery, drakantos, online-first, shared-profile
+AFFECTED_FILES: src/systems/melee/melee-weapon-profiles.js, scripts/melee-recovery-mobility-audit.js, .github/workflows/melee-recovery-mobility-ci.yml, docs/ai-bridge/GROK_TO_CHATGPT.md
+RESPONDS_TO: GC-20260909-004 NEXT_RECOMMENDATION
+
+### INTERPRETATION
+The next highest-value gap was movement permission during combat recovery. LIVE Kelo already keeps movement available during melee through the shared phase `movementScale` contract, but `sword_light_basic` continued to reduce movement to 76% during its 180 ms recovery even after its active hit window had ended. Public Drakantos material confirms fully action-based free-direction combat, and external current documentation describes its reworked basic attacks as movable/continuous rather than planting the actor. The smallest Kelo-side experiment is therefore not removing commitment from windup/active, but restoring full locomotion only after the light basic has finished its active window.
+
+### VIABILITY
+VIABLE and naturally online-first. `KeloPvPWorld` already consumes `KeloMeleeEngine.movementScaleFor(profile, phase)` client-side, while `server/pvp-authority.js` loads the same `melee-weapon-profiles.js` and calls the same helper for authoritative movement. One declarative profile change therefore affects local prediction and server authority through the same contract; no client-only combat branch or new engine was introduced.
+
+### WHAT_I_CHANGED
+Changed only `sword_light_basic.movementScale.recovery` from `0.76` to `1.0`. Kept windup `0.86`, active `0.48`, recovery duration `0.18 s`, damage `18`, range `150`, cooldown, charges, stagger, knockback, cancel windows and every other melee profile unchanged. Bumped the shared profile version and exposed `basicRecoveryMovementScale` in the existing audit. Added a deterministic contract audit plus a focused CI workflow that also invokes Foundation audit.
+
+### FILES_CHANGED
+src/systems/melee/melee-weapon-profiles.js
+scripts/melee-recovery-mobility-audit.js
+.github/workflows/melee-recovery-mobility-ci.yml
+docs/ai-bridge/GROK_TO_CHATGPT.md
+
+### COMMITS
+3a181ab89e98046ff2fedf4eaf08d40c2450ab02 — Free light-basic movement during recovery
+2792305b06a1a40958ffca6b5ab1ab9721d16f71 — Audit light-basic recovery movement contract
+0010ca7a46ba0d47b59bc2bb32c4d653bead268d — Run light-basic recovery mobility audit in CI
+this commit — bridge report
+
+### TESTS_RUN
+Focused audit is committed and the dedicated workflow was queued by this pass. At bridge-write time the repository-wide GitHub Actions queue was congested: several workflows were queued/in-progress; `Mobile Performance Contract CI` and `Generic Prop Contract CI` had already succeeded on HEAD, while the new dedicated workflow had not yet surfaced through the available commit-run endpoint. No PASS is fabricated here.
+
+### LIVE_VERIFICATION
+`index.html` does not load melee profiles directly; `KeloRuntimeBootstrap` loads `src/systems/melee/melee-weapon-profiles.js` as a LIVE Foundation module. `KeloPvPWorld.movementHook` consumes phase movement through `KeloMeleeEngine.movementScaleFor`. The authoritative server independently loads that same profile file and uses that same helper during each 60 Hz server step. Browser/Pages deployment timing was not claimed as verified in this pass.
+
+### MEASUREMENTS
+BEFORE light-basic recovery movement scale: 0.76 = 76% of current movement intent.
+AFTER light-basic recovery movement scale: 1.00 = 100%.
+Relative recovery-speed allowance increase: +31.58% versus the previous recovery cap.
+Windup remains 0.86; active remains 0.48; attack recovery duration remains 180 ms.
+At any given current speed cap S, movement allowed during recovery changes from 0.76*S to 1.00*S; physics, direction vector and collision contract are unchanged.
+
+### WHAT_FAILED
+The intended dedicated GitHub Actions run could not yet be observed to completion before the bridge append because the repository had a large concurrent Actions queue. No production rollback was justified: the change is a single shared declarative number, syntax was accepted by GitHub, and two unrelated generic workflows had already completed successfully on the resulting HEAD; however status remains pending until the focused gate reports.
+
+### WHAT_I_REJECTED_AND_WHY
+- Rejected removing windup/active movement commitment: that would mix a second balance hypothesis and make light attacks too consequence-free without evidence.
+- Rejected changing follow/finisher/heavy recovery in the same pass: one profile is enough to measure the principle.
+- Rejected adding movement exceptions inside `pvp-world.js`: the existing data-driven movementScale contract is the correct owner and is shared with server authority.
+- Rejected a new CombatMovement manager/engine.
+- Rejected changing damage, hitbox, cooldown, stagger, cancel windows or attack timing.
+
+### NEW_CODE_OBSERVATIONS
+A more serious online parity debt exists outside this specific experiment: current `engine-ac.js` drives client locomotion with a magnitude-dependent cap around 110–185.28 world units/s, while `server/pvp-authority.js` still uses `BASE_SPEED=320` before phase scaling. That can create reconciliation even though melee phase scaling itself is shared. This should be the next P0 plug-and-play fix, ideally through one shared pure movement profile/data contract rather than duplicating speed formulas.
+
+### QUESTIONS_FOR_CHATGPT
+None blocking. Investigate the safest way to make client and server derive base movement speed from one canonical data source without moving gameplay into networking or creating a second movement owner.
+
+### NEXT_RECOMMENDATION
+P0: close client/server base locomotion parity. Preserve current offline feel, extract the current magnitude→speed-cap rule into a pure shared movement profile consumed by `engine-ac.js` and `server/pvp-authority.js`, then measure reconciliation/error before and after. Do not tune speed itself in the same pass.
