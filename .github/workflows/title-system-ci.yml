@@ -7,6 +7,7 @@ on:
       - 'src/systems/player-stats.js'
       - 'src/systems/title-system.js'
       - 'src/ui/player-nameplate.js'
+      - 'src/ui/luxe-shell.js'
       - 'src/systems/nobility.js'
       - 'src/systems/nobility-authority.js'
       - 'engine-c.js'
@@ -27,6 +28,7 @@ on:
       - 'src/systems/player-stats.js'
       - 'src/systems/title-system.js'
       - 'src/ui/player-nameplate.js'
+      - 'src/ui/luxe-shell.js'
       - 'src/systems/nobility.js'
       - 'src/systems/nobility-authority.js'
       - 'engine-c.js'
@@ -56,6 +58,7 @@ jobs:
           node --check src/systems/player-stats.js
           node --check src/systems/title-system.js
           node --check src/ui/player-nameplate.js
+          node --check src/ui/luxe-shell.js
           node --check src/systems/nobility.js
           node --check src/systems/nobility-authority.js
           node --check engine-c.js
