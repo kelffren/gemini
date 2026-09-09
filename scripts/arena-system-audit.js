@@ -34,6 +34,8 @@ must(highlightUi.includes('gameplayAuthority:false')&&highlightUi.includes('seco
 must(progression.includes('owner: KeloArenaProgression'),'Arena progression owner header missing');
 must(progression.includes('MASTERY_TIERS')&&progression.includes("label:'Leyenda de Arena'"),'Mastery tiers missing');
 must(progression.includes('accurate_fighter')&&progression.includes('objective_anchor')&&progression.includes('siege_pressure')&&progression.includes('effective_dodge'),'telemetry skill objectives missing');
+must(progression.includes('first_blood_master')&&progression.includes('shutdown_hunter')&&progression.includes('tower_breaker')&&progression.includes('sigil_thief')&&progression.includes('critical_survivor'),'highlight Mastery objectives missing');
+must(progression.includes('highlightObjectives:true'),'highlight progression audit invariant missing');
 must(progression.includes('activeSeries')&&progression.includes('playerWins>=2')&&progression.includes('opponentWins>=2'),'BO3 rivalry series missing');
 must(progression.includes('statBuffs:false')&&progression.includes('mmrAuthority:false'),'progression must not affect stats/MMR authority');
 must(progression.includes('.35+.65*quality'),'Mastery quality weighting missing');
@@ -44,6 +46,6 @@ must(ui.includes('OVERTIME')&&ui.includes('War Sigil')&&ui.includes('Mastery')&&
 must(pvp.includes('KeloArena')&&pvp.includes('getHostileActors')&&pvp.includes('drawWorld(ctx)'),'PvP integration missing');
 const arenaPos=index.indexOf('src/systems/arena-system.js'),lanePos=index.indexOf('src/systems/arena-lane-pressure.js'),telemetryPos=index.indexOf('src/systems/arena-telemetry.js'),highlightsPos=index.indexOf('src/systems/arena-highlights.js'),progressionPos=index.indexOf('src/systems/arena-progression.js'),uiPos=index.indexOf('src/ui/arena-ui.js'),highlightUiPos=index.indexOf('src/ui/arena-highlights-ui.js');
 must(arenaPos>=0&&lanePos>arenaPos&&telemetryPos>lanePos&&highlightsPos>telemetryPos&&progressionPos>highlightsPos&&uiPos>progressionPos&&highlightUiPos>uiPos,'Arena LIVE load order must be Arena -> Lane -> Telemetry -> Highlights -> Progression -> UI -> HighlightsUI');
-must(catalog.includes('"id": "arena-ranked"')&&catalog.includes('"id": "arena-telemetry"')&&catalog.includes('"id": "arena-highlights"'),'system catalog missing Arena support systems');
+must(catalog.includes('"id":"arena-ranked"')&&catalog.includes('"id":"arena-telemetry"')&&catalog.includes('"id":"arena-highlights"'),'system catalog missing Arena support systems');
 must(guide.includes('id="arena-ranked"'),'player guide missing Arena section');
-console.log('Arena System Audit OK: Control+MOBA, waves, War Sigil, overtime, telemetry, semantic highlights, coaching, Mastery, objectives, BO3 and PvP integration.');
+console.log('Arena System Audit OK: Control+MOBA, waves, War Sigil, overtime, telemetry, semantic highlights, coaching, Mastery, highlight objectives, BO3 and PvP integration.');
