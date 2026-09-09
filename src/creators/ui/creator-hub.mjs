@@ -8,7 +8,7 @@
 import { bootKeloCreators } from '../creator-entry.mjs';
 let active=null;
 const CATALOG=Object.freeze([
-  {category:'BUILD',items:[['world','World','active'],['parcel','Parcel','soon'],['dungeon','Dungeon','soon'],['game-mode','Game Mode','soon']]},
+  {category:'BUILD',items:[['world','World','active'],['map-forge','Map Forge','active'],['parcel','Parcel','soon'],['dungeon','Dungeon','soon'],['game-mode','Game Mode','soon']]},
   {category:'GAMEPLAY',items:[['mount','Mount','active'],['ability','Ability','soon'],['npc','NPC','soon'],['quest','Quest / Dialogue','soon'],['item','Item','soon'],['crafting','Crafting','soon']]},
   {category:'VISUAL',items:[['appearance','Appearance','active'],['animation','Animation','active'],['vfx','VFX','active'],['cinematic','Cinematic','soon']]},
   {category:'CONTENT',items:[['prefab','Prefab','soon'],['environment','Environment','soon'],['audio','Audio','soon']]}
