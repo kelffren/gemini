@@ -114,6 +114,15 @@
       "status": "offline-active-online-ready"
     },
     {
+      "id": "arena-ranked",
+      "owner": "KeloArena",
+      "source": "src/systems/arena-system.js",
+      "technicalDoc": "docs/systems/ARENA_SYSTEM.md",
+      "playerVisible": true,
+      "playerGuideAnchor": "arena-ranked",
+      "status": "offline-active-online-authority-pending"
+    },
+    {
       "id": "map-forge",
       "owner": "KeloMapForge",
       "source": "src/world/map-forge/map-forge-core.mjs",
