@@ -47,7 +47,7 @@
     const o=options||{},attacker=o.attacker,profile=o.profile||{},events=root.KeloCombatSchema&&root.KeloCombatSchema.events;
     if(!foundations())return Object.freeze({ok:false,reason:'COMBAT_FOUNDATION_UNAVAILABLE'});
     if(!attacker){reject('INVALID_ATTACKER',events,{source:o.source});return Object.freeze({ok:false,reason:'INVALID_ATTACKER'});}
-    if(root.KeloCaravans?.canActorAttack&&!root.KeloCaravans.canActorAttack(idOf(attacker))){reject('ATTACHED_CART_COMBAT_BLOCKED',events,{actor:attacker,actorId:idOf(attacker)});return Object.freeze({ok:false,reason:'ATTACHED_CART_COMBAT_BLOCKED'});}
+    if(root.KeloCaravans?.canActorAttack&&!root.KeloCaravans.canActorAttack(idOf(attacker))){reject('ATTACHED_CART_COMBAT_BLOCKED',events,{actor:attacker,actorId:idOf(attacker),error:'ACTION_BLOCKED_BY_CART'});return Object.freeze({ok:false,reason:'ATTACHED_CART_COMBAT_BLOCKED',error:'ACTION_BLOCKED_BY_CART'});}
     if(Math.max(0,Number(o.cooldownRemaining)||0)>0){reject('COOLDOWN',events,{actor:attacker,actorId:idOf(attacker)});return Object.freeze({ok:false,reason:'COOLDOWN'});}
     const dir=normalizedDirection(attacker,null,o.direction),payload=Object.assign({},basePayload(o,false,dir,null),{confirmedHit:null,phase:'windup'});emit(events.ATTACK_STARTED,payload);
     return Object.freeze({ok:true,type:'ATTACK_STARTED',attackId:payload.attackId,cooldown:Math.max(0,Number(profile.cooldown)||0),payload});
