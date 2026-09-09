@@ -67,6 +67,7 @@ No uses `/*` para apagar código. Los comentarios solo documentan.
 | PROPERTY PARCEL UNITS | balances, placements, autoridad reemplazable | `src/property/property-system.js` |
 | MAP EDITOR | editor mundo/parcela, export/import | `src/ui/property-editor.js` |
 | NOBLEZA | rangos donación | `src/systems/nobility.js` `nobility-authority.js` |
+| LOGISTICS ADMIN UI | QA móvil/desktop de economía, rutas, carretas, facciones y clanes | `src/ui/logistics-admin-ui.js` + `KeloLogisticsDevtools` |
 | FORGE EQUIP | forja / gear | `src/systems/forge-system.js` `equipment-system.js` |
 | SERVER ROOM | autoridad Node | `server/index.js` |
 

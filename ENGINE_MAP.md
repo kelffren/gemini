@@ -358,3 +358,13 @@ Después de cambiar un sistema:
 > **¿SU DOCUMENTO TÉCNICO Y SU GUÍA DE JUGADOR SIGUEN DICIENDO LA VERDAD?**
 
 Para las reglas completas, ver `docs/KELO_FOUNDATION.md`.
+
+
+## Logistics Admin UI — QA interno
+
+- `src/ui/logistics-admin-ui.js` / `KeloLogisticsAdminUI`: **UI OWNER LIVE (DOM/estado efímero solamente)**.
+- Consume `KeloLogisticsDevtools` y nunca escribe `STATE` gameplay directamente.
+- Permiso: reutiliza `KELO_ADMIN_KEYS` con scope root existente `admin.issue`; no crea otra puerta admin.
+- Input: reclama/libera `KeloInputLocks` mediante token `logistics-admin-ui`.
+- Runtime: carga inmediatamente después de `admin-key-system.js`, cuando economía regional/caravanas/facciones/devtools ya están disponibles.
+- Online-first: `UI → KeloLogisticsDevtools → owner.request → local/server authority`; el panel nunca se convierte en autoridad.
