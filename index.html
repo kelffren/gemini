@@ -1,7 +1,7 @@
 <!-- KELO-INDEX
   area: RUNTIME / UI BOOT
   owner: index.html load order
-  keys: HUD LUXE PLAYER GUIDE NOBILITY TITLES MOBILE MOUNTS APPEARANCE ARENA RANKED
+  keys: HUD LUXE PLAYER GUIDE NOBILITY TITLES MOBILE MOUNTS APPEARANCE ARENA RANKED EQUIPMENT WEAPON Q W E
   purpose: carga el runtime LIVE y monta un único HUD superior izquierdo mediante Kelo Luxe
   online: la UI solo consume estado; autoridad permanece en los owners de dominio
 -->
@@ -18,7 +18,7 @@
     html,body{width:100%;height:100%;overflow:hidden;background:#05070a}
     #game-canvas{width:100%;height:100%;display:block;touch-action:none}
     #ui-layer{position:absolute;inset:0;pointer-events:none;z-index:10}
-    body.social-mode #action-bar-container,body.social-mode #mount-action-bar-container{display:none!important}
+    body.social-mode #action-bar-container,body.social-mode #equipment-action-bar-container,body.social-mode #mount-action-bar-container{display:none!important}
     #action-bar-container .stone-slot{position:relative!important}
     #action-bar-container .stone-slot>span[style*="position:absolute"]{pointer-events:none}
     #kelo-online,.lx-mark,#kelo-minimap,#minimap{display:none!important}
@@ -44,8 +44,8 @@
 <!-- KELO-INDEX VISUALS: presentación modular; no autoridad gameplay. -->
 <script src="src/visuals/visual-system.js?v=1"></script><script src="src/visuals/visual-manifests.js?v=1"></script><script src="src/visuals/asset-registry.js?v=1"></script><script src="src/visuals/animation-system.js?v=1"></script><script src="src/visuals/fx-system.js?v=1"></script><script src="src/visuals/sequence-system.js?v=1"></script><script src="src/visuals/melee-visual-manifest.js?v=1"></script><script src="src/visuals/melee-combat-visuals.js?v=1"></script>
 
-<!-- KELO-INDEX ABILITIES/PROGRESSION/NET: Stones conserva 5 slots; Mount aporta M1-M3 separados y reutiliza KeloAbilities. -->
-<script src="src/abilities/abilityData.js?v=154"></script><script src="src/abilities/stone-system.js?v=154"></script><script src="src/mounts/mount-ability-data.js?v=1"></script><script src="src/abilities/stone-backpack-bridge.js?v=2"></script><script src="src/abilities/kelo-ability-boot.js?v=157"></script><script src="src/visuals/ability-visuals.js?v=2"></script><script src="src/abilities/sword-swap-runtime.js?v=2"></script><script src="src/visuals/sword-swap-pvp-visuals.js?v=4"></script><script src="src/systems/title-catalog.js?v=1"></script><script src="src/systems/player-stats.js?v=1"></script><script src="src/systems/title-system.js?v=1"></script><script src="engine-net.js?v=98"></script>
+<!-- KELO-INDEX ABILITIES/PROGRESSION/NET: Stones conserva 5 slots; a pie Weapon aporta Q/W/E; Mount sustituye Q/W/E por M1-M3; todos reutilizan KeloAbilities. -->
+<script src="src/abilities/abilityData.js?v=154"></script><script src="src/abilities/stone-system.js?v=154"></script><script src="src/mounts/mount-ability-data.js?v=1"></script><script src="src/abilities/equipment-ability-data.js?v=1"></script><script src="src/abilities/stone-backpack-bridge.js?v=2"></script><script src="src/abilities/kelo-ability-boot.js?v=157"></script><script src="src/abilities/ability-source-cast.js?v=1"></script><script src="src/visuals/ability-visuals.js?v=2"></script><script src="src/abilities/sword-swap-runtime.js?v=2"></script><script src="src/visuals/sword-swap-pvp-visuals.js?v=4"></script><script src="src/systems/title-catalog.js?v=1"></script><script src="src/systems/player-stats.js?v=1"></script><script src="src/systems/title-system.js?v=1"></script><script src="engine-net.js?v=98"></script>
 
 <!-- KELO-INDEX UI/SYSTEMS: UI consume APIs; shared stats/appearance cargan antes de Equipment/Mount runtime. -->
 <script src="src/ui/luxe-shell.js?v=230"></script>
@@ -65,7 +65,9 @@
 <script src="src/mounts/mount-equipment-catalog.js?v=2"></script>
 <script src="src/systems/equipment-system.js?v=6"></script>
 <script src="src/mounts/mount-system.js?v=2"></script>
-<script src="src/mounts/mount-ability-channel.js?v=1"></script>
+<script src="src/abilities/equipment-ability-channel.js?v=1"></script>
+<script src="src/mounts/mount-ability-channel.js?v=2"></script>
+<script src="src/ui/equipment-action-bar.js?v=1"></script>
 <script src="src/ui/mount-action-bar.js?v=2"></script>
 <script src="src/ui/mount-panel.js?v=2"></script>
 <script src="src/systems/backpack-system.js?v=2"></script>
