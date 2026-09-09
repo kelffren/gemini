@@ -1,0 +1,39 @@
+# KELO-INDEX
+# area: QA / MAP FORGE / STUDIO HANDOFF
+# owner: Map Forge Studio handoff CI
+name: Map Forge Studio Handoff CI
+on:
+  pull_request:
+    paths:
+      - 'src/world/map-forge/**'
+      - 'src/creators/**'
+      - 'src/studio/adapters/map-forge-draft-importer.mjs'
+      - 'scripts/map-forge-studio-handoff-audit.mjs'
+      - '.github/workflows/map-forge-studio-handoff-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'src/world/map-forge/**'
+      - 'src/creators/**'
+      - 'src/studio/adapters/map-forge-draft-importer.mjs'
+      - 'scripts/map-forge-studio-handoff-audit.mjs'
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Syntax
+        run: |
+          node --check src/world/map-forge/map-forge-worker.mjs
+          node --check src/world/map-forge/map-forge-worker-client.mjs
+          node --check src/creators/ui/map-forge-workspace.mjs
+          node --check src/creators/workspaces/map-forge-workspace.mjs
+          node --check src/creators/workspaces/world-workspace.mjs
+          node --check src/studio/adapters/map-forge-draft-importer.mjs
+          node --check scripts/map-forge-studio-handoff-audit.mjs
+      - name: Handoff contract
+        run: node scripts/map-forge-studio-handoff-audit.mjs
