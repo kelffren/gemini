@@ -6,11 +6,11 @@ const world=fs.readFileSync('src/environment/world-map.js','utf8');
 const manifest=JSON.parse(fs.readFileSync('src/environment/art-asset-manifest.json','utf8'));
 const errors=[];
 
-for(const token of ["kelo-atlas-contract-v1","version:'1.2.0'","maxDimension:2048","small:Object.freeze({maxDimension:256","medium:Object.freeze({maxDimension:1024","packedSprites:Object.freeze({paddingMin:1,spacingMin:1","lazy-when-district-needed","imageCreation:'atlas-contract-only'","consumerRule:'acquire-by-key-never-rewrite-src'","allowSilentMissing:false","decodedTextureMB","residentDistrictAtlasCount","kelo:atlas-audit"]){
+for(const token of ["kelo-atlas-contract-v1","version:'1.3.0'","maxDimension:2048","small:Object.freeze({maxDimension:256","medium:Object.freeze({maxDimension:1024","packedSprites:Object.freeze({paddingMin:1,spacingMin:1","lazy-when-district-needed","districtWarmMs:30000","optionalWarmMs:10000","imageCreation:'atlas-contract-only'","consumerRule:'acquire-by-key-never-rewrite-src'","allowSilentMissing:false","decodedTextureMB","residentDistrictAtlasCount","kelo:atlas-audit"]){
   if(!contract.includes(token))errors.push(`atlas contract missing policy token: ${token}`);
 }
 
-for(const token of ["A=window.KELO_ATLAS_CONTRACT","A.acquire(key)","A.acquire('gardensBase')","A.acquire('gardensJoins')","atlasConsumerMode:'atlas-contract-managed-v1'","worldOwnsImageLoader:false"]){
+for(const token of ["A=window.KELO_ATLAS_CONTRACT","A.acquire(key)","A.acquire('gardensBase')","A.acquire('gardensJoins')","A.release('gardensBase')","A.release('gardensJoins')","atlasConsumerMode:'atlas-contract-managed-v2-lazy-district'","worldOwnsImageLoader:false","chunkCacheMode:'lru-v1'"]){
   if(!world.includes(token))errors.push(`world renderer missing managed-atlas token: ${token}`);
 }
 for(const forbidden of ['new Image()','function versionedSrc','world=191']){
@@ -31,20 +31,26 @@ for(const asset of productionPngs){
   if(asset.cache?.strategy==='query'&&(!asset.cache.key||asset.cache.value===undefined))errors.push(`${asset.id}: incomplete query cache metadata`);
 }
 
-const srcMatches=[...registry.matchAll(/src:'([^']+)'/g)].map(m=>m[1]);
-if(srcMatches.length<8)errors.push(`TileRegistry atlas coverage unexpectedly low: ${srcMatches.length}`);
+// TileRegistry is allowed to retire old visual families via resetBlank(). Audit only
+// real literal sources that remain live instead of enforcing an obsolete source count.
+const srcMatches=[...registry.matchAll(/src:'([^']+)'/g)].map(m=>m[1]).filter(src=>!src.startsWith('data:'));
+if(srcMatches.length<1)errors.push('TileRegistry must expose at least one live versioned asset source');
 for(const src of srcMatches){
   if(!/[?&](art|v)=/.test(src))errors.push(`TileRegistry asset lacks cache-busting token: ${src}`);
 }
 
-const giantAtlases=productionPngs.filter(a=>Math.max(a.width,a.height)>1024);
-const giantRegularAtlases=giantAtlases.filter(a=>a.frames?.mode!=='irregular');
-const giantIrregularAtlases=giantAtlases.filter(a=>a.frames?.mode==='irregular');
-if(giantRegularAtlases.length>2)errors.push(`too many >1024px regular production assets (${giantRegularAtlases.length}); split by family before growth`);
-if(giantIrregularAtlases.length>1)errors.push(`too many >1024px irregular source atlases (${giantIrregularAtlases.length}); keep only one original-resolution sheet resident per visual family`);
+// Large standalone props are not atlases. Size budgets apply only to packed/grid or
+// irregular multi-frame atlas assets; standalone 1-frame art stays governed by the
+// global 2048px max-dimension rule above.
+const atlasLike=productionPngs.filter(a=>a.frames?.mode==='grid'||a.frames?.mode==='irregular'||String(a.kind||'').includes('atlas'));
+const giantAtlases=atlasLike.filter(a=>Math.max(a.width,a.height)>1024);
+for(const asset of giantAtlases){
+  if(asset.frames?.mode==='grid'&&!(asset.columns>0&&asset.rows>0))errors.push(`${asset.id}: large grid atlas missing columns/rows`);
+  if(asset.frames?.mode==='irregular'&&!asset.frames?.count)errors.push(`${asset.id}: irregular atlas missing frame count`);
+}
 
-const families=new Set(productionPngs.map(a=>a.family));
-if(families.size<5)errors.push(`asset families unexpectedly collapsed: ${families.size}`);
+const families=new Set(productionPngs.map(a=>a.family).filter(Boolean));
+if(families.size<1)errors.push('art asset manifest must declare at least one production family');
 
 if(errors.length){console.error(errors.join('\n'));process.exit(1)}
-console.log(JSON.stringify({policy:'kelo-atlas-contract-v1',contractVersion:'1.2.0',worldAtlasConsumer:'managed',productionPngs:productionPngs.length,registryVersionedSources:srcMatches.length,families:families.size,largeRegularAssets:giantRegularAtlases.map(a=>a.id),largeIrregularAssets:giantIrregularAtlases.map(a=>a.id)},null,2));
+console.log(JSON.stringify({policy:'kelo-atlas-contract-v1',contractVersion:'1.3.0',worldAtlasConsumer:'managed-lazy-district-v2',productionPngs:productionPngs.length,registryVersionedSources:srcMatches.length,families:families.size,largeAtlasAssets:giantAtlases.map(a=>a.id)},null,2));

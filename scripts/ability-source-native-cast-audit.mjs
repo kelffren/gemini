@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: AUDIT / ABILITY SOURCE CAST
- * keys: AUDIT ABILITY SOURCE CAST STONE WEAPON MOUNT HOTBAR AUTHORITY
- * purpose: demuestra que KeloAbilities castea fuentes no-Stone por su API nativa sin sustituir los 5 slots Stone
+ * keys: AUDIT ABILITY SOURCE CAST STONE WEAPON MOUNT HOTBAR AUTHORITY PERFORMANCE LIFECYCLE
+ * purpose: demuestra que KeloAbilities castea fuentes no-Stone por su API nativa sin sustituir los 5 slots Stone y conserva sleep/wake del runtime
  * online: valida identidad semántica sourceType/sourceId/sourceSlot/sourceFingerprint apta para autoridad server futura
  */
 import assert from 'node:assert/strict';
@@ -30,7 +30,8 @@ const context={
  },
  KELO_COLLISION:{upsert(){},remove(){},clearOwner(){},segmentAabbHitT(){return null;}},
  KeloEffectEngine:{apply(){return{ok:true};}},KeloHitResolver:{sweptCircle(){return{hit:false};}},KeloDamageResolver:{},
- KeloSimulation:{after(id,fn){simulationHooks.set(id,fn);}},KeloRender:{afterFrame(id,fn){renderHooks.set(id,fn);}},
+ KeloSimulation:{after(id,fn){simulationHooks.set(id,fn);return id;},setEnabled(id,enabled){const hook=simulationHooks.get(id);if(hook)hook.enabled=enabled;return true;}},
+ KeloRender:{afterFrame(id,fn){renderHooks.set(id,fn);return id;},setEnabled(id,enabled){const hook=renderHooks.get(id);if(hook)hook.enabled=enabled;return true;}},
  KeloStatusEffects:{isActionBlocked(){return false;},has(){return false;}},
  window:null
 };
@@ -58,5 +59,6 @@ const shim=fs.readFileSync(new URL('../src/abilities/ability-source-cast.js',imp
 assert(shim.includes('castSource'),'compatibility shim must delegate to native owner');
 assert(!shim.includes('hotbar.slots['),'compatibility shim must never borrow a Stone hotbar slot');
 assert(context.KELO_STONE_AUDIT.nativeSourceCast===true);assert(context.KELO_STONE_AUDIT.sourceHotbarMutation===false);
+assert(context.KELO_STONE_AUDIT.sleepWake===true,'source-native runtime must preserve Performance Foundation sleep/wake');
 console.log('KELO_ABILITY_SOURCE_NATIVE_AUDIT=PASS');
-console.log(JSON.stringify({ok:true,stoneSlots:A.hotbar.slots.length,stoneReferencesPreserved:true,nativeSourceCast:true,nativePredictSource:true,sharedManaCost:true,semanticEvents:true,legacyBridge:false},null,2));
+console.log(JSON.stringify({ok:true,stoneSlots:A.hotbar.slots.length,stoneReferencesPreserved:true,nativeSourceCast:true,nativePredictSource:true,sharedManaCost:true,semanticEvents:true,legacyBridge:false,sleepWake:true},null,2));

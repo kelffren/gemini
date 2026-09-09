@@ -46,10 +46,12 @@ jobs:
           require 'tJunctionOrientationCount:4' src/environment/gardens-compositions.js
           require 'gardens-junction-layer-v4' src/environment/gardens-junction-overlay.js
           require 'registryOwned:true' src/environment/gardens-junction-overlay.js
-          require 'world-v1.25' src/environment/world-map.js
+          require 'world-v1.27-performance' src/environment/world-map.js
           require "districtSourceMode:'terrain-contract-district-profiles-v2'" src/environment/world-map.js
           require "districtOverlayMode:'profile-selected-provider-v1'" src/environment/world-map.js
           require 'legacyTJunctionSpecialCase:false' src/environment/world-map.js
+          require "atlasConsumerMode:'atlas-contract-managed-v2-lazy-district'" src/environment/world-map.js
+          require "chunkCacheMode:'lru-v1'" src/environment/world-map.js
           if grep -Fq "d?.id==='gardens'" src/environment/world-map.js; then
             echo 'District-specific Gardens branch returned to world-map.js' >&2
             exit 1
