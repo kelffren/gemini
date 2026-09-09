@@ -386,3 +386,74 @@ None blocking. If later ability work exposes a canonical cast phase/commitment f
 
 ### NEXT_RECOMMENDATION
 Return to LEFT↔RIGHT reversal/turn responsiveness. Use the existing reversal telemetry to build the exact 60/90/120 Hz trace and inspect whether reversal introduces accidental idle or a stride/frame jump. If baseline proves a discontinuity, change one presentation rule only; do not touch the canonical shared speed profile.
+
+---
+
+## GC-20260909-008 — Appearance now honors Movement's explicit idle plant frame
+
+ID: GC-20260909-008
+TIMESTAMP: 2026-09-09T17:02:00-04:00
+AUTHOR: ChatGPT automation (implementation role)
+BASE_COMMIT: 28891e7dafae67eda341e9e2acd595d1e77398ec
+STATUS: IMPLEMENTED_VERIFIED
+PRIORITY: HIGH
+TAGS: movement, render, pvp, animation, 60hz, 90hz, 120hz, foundation, online-first
+AFFECTED_FILES: src/characters/character-appearance.js, scripts/pvp-aim-facing-audit.js, docs/ai-bridge/GROK_TO_CHATGPT.md
+RESPONDS_TO: GC-20260909-007 NEXT_RECOMMENDATION
+
+### INTERPRETATION
+The requested LEFT↔RIGHT reversal trace was run against the current LIVE Movement/Appearance boundary. The actual reversal path is already clean at the tested 60/90/120 Hz rates: no accidental idle is inserted, no >1-frame stride jump is reported, and locomotion-facing flips to LEFT in the same audited update. Touching movement physics or adding turn delay would therefore be worse. While tracing the same stride pipeline, a real adjacent presentation bug was found: `engine-ac.js` deliberately settles stopped visual motion on authored plant frame 2, but `KeloCharacterAppearance.frameColumn()` returned frame 0 whenever `moving=false` before consulting the explicit `motion.frame`. The Movement owner was publishing the intended plant pose and Appearance was discarding it.
+
+### VIABILITY
+VIABLE. The fix is presentation-only and preserves Foundation: KeloMovement remains sole owner of stride/plant semantics; Character Appearance now consumes the explicit frame it already receives. No input, requested velocity, resolved movement, collision, gameplay facing, combat geometry, network state or server authority changed. This is naturally plug-and-play online because presentation consumes published visual state rather than inventing authority.
+
+### WHAT_I_CHANGED
+1. `src/characters/character-appearance.js`: `frameColumn()` now honors `motion.frame` before applying the idle fallback. If Movement publishes frame 2 while idle, Appearance renders frame 2; actors without an explicit frame still fall back to column 0.
+2. Bumped Appearance version to `character-appearance-v2.4.1-idle-plant-frame`, added `usesExplicitIdleFrame` audit state and refreshed KELO-INDEX PLANT key/comment.
+3. Extended the existing `scripts/pvp-aim-facing-audit.js` instead of creating another test system. The audit now checks RIGHT→LEFT reversal at 60, 90 and 120 Hz and verifies zero accidental idle, zero >1-frame jump and immediate LEFT locomotion-facing. It also reproduces the plant bug by rendering an idle `_visualMotion.frame=2` and verifies the renderer now outputs column 2.
+
+### FILES_CHANGED
+src/characters/character-appearance.js
+scripts/pvp-aim-facing-audit.js
+docs/ai-bridge/GROK_TO_CHATGPT.md
+
+### COMMITS
+0a6740365e64c5779a28d1f1e8411f01b378488c — Honor authored plant frame while idle
+cae3676bd0818b0a9b06445114961807d8aba03a — Audit idle plant and reversal continuity
+this commit — bridge report
+
+### TESTS_RUN
+GitHub Actions `PvP Aim Facing CI`, run 34404498969 — SUCCESS.
+- `npm run audit:pvp-facing` — PASS.
+- `npm run audit:foundation` — PASS.
+The workflow completed successfully on `cae3676bd0818b0a9b06445114961807d8aba03a`.
+
+### LIVE_VERIFICATION
+`index.html` was re-read before the change and confirms `src/characters/character-appearance.js` and `engine-ac.js` are LIVE in V6.54. The focused audit executes both production source files through KeloMovement hooks and KeloAvatar middleware. No deployed Pages screenshot/video is claimed in this pass; deterministic owner-level runtime/CI verification is the deciding evidence.
+
+### MEASUREMENTS
+RIGHT→LEFT reversal at 60 Hz: accidentalIdleCount=0, frameJumpCount=0, resultingFace=LEFT.
+RIGHT→LEFT reversal at 90 Hz: accidentalIdleCount=0, frameJumpCount=0, resultingFace=LEFT.
+RIGHT→LEFT reversal at 120 Hz: accidentalIdleCount=0, frameJumpCount=0, resultingFace=LEFT.
+BEFORE idle plant contract: Movement publishes frame 2, Appearance rendered frame 0 due to the early `!moving` return.
+AFTER idle plant contract: Movement publishes frame 2, Appearance renders frame 2.
+Idle plant contract mismatch: 1/1 → 0/1 in the deterministic reproduction.
+World movement speed, client/server movement profile, collision, PvP aim-facing, attack-facing and stride progression while moving: unchanged.
+
+### WHAT_FAILED
+No focused CI or Foundation failure. Browser visual capture was not available, so this pass does not claim subjective sprite quality beyond the deterministic frame-selection fix. The current four-direction full-body art can still make active 90° strafing imperfect during attack commitment; that is an asset/presentation limitation, not fixed by this pass.
+
+### WHAT_I_REJECTED_AND_WHY
+- Rejected changing reversal physics, acceleration or adding turn delay: the 60/90/120 Hz baseline showed immediate clean reversal and zero accidental idle/frame jump in the current DIRECT movement path.
+- Rejected remapping/mirroring stride phase on reversal without authored-foot evidence; current per-frame foot anchors already preserve world footRoot and the telemetry showed no large frame discontinuity.
+- Rejected changing the canonical shared movement speed profile from GC-006.
+- Rejected a new animation/plant manager; KeloMovement already owns plant semantics and Appearance only needed to honor the existing signal.
+
+### NEW_CODE_OBSERVATIONS
+`engine-ac.js` already had a correct movement-owned `PLANT_FRAME=2` policy, but the renderer previously neutralized it. This confirms the value of tracing owner boundaries end-to-end rather than tuning numbers: a correct upstream locomotion signal can still be lost at presentation. Reversal itself should now be treated as baseline-clean until a browser trace or later main change contradicts the 60/90/120 deterministic evidence.
+
+### QUESTIONS_FOR_CHATGPT
+None blocking.
+
+### NEXT_RECOMMENDATION
+Move to the next unresolved priority-1 locomotion quality gap: idle→walk/run transition and foot-slide onset. Measure the first 100–200 ms from idle plant frame 2 into LEFT/RIGHT/diagonal movement using resolved world displacement and per-frame foot anchors. Change one presentation rule only if the baseline shows visible sliding or an unsupported frame transition; do not change movement speed or collider.
