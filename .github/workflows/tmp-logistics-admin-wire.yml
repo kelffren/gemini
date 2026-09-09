@@ -1,0 +1,82 @@
+name: Temporary Wire Logistics Admin UI
+
+on:
+  push:
+    branches:
+      - feat/logistics-admin-panel
+    paths:
+      - '.github/workflows/tmp-logistics-admin-wire.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  wire:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Wire UI, docs and audit registry
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs=require('fs');
+          const read=p=>fs.readFileSync(p,'utf8');
+          const write=(p,s)=>fs.writeFileSync(p,s);
+
+          // LIVE boot: Admin Key must exist before the internal Logistics Admin UI.
+          {
+            const p='index.html';let s=read(p);
+            if(!s.includes('src/ui/logistics-admin-ui.js')){
+              const re=/<script src="src\/systems\/admin-key-system\.js\?v=[^"]+"><\/script>/;
+              const m=s.match(re);if(!m)throw new Error('admin-key boot anchor missing');
+              s=s.replace(re,m[0]+'\n<script src="src/ui/logistics-admin-ui.js?v=1"></script>');
+              write(p,s);
+            }
+          }
+
+          // Package audit command, preserving all current scripts.
+          {
+            const p='package.json',j=JSON.parse(read(p));j.scripts=j.scripts||{};
+            j.scripts['audit:logistics-ui']='node scripts/logistics-admin-ui-audit.js';
+            write(p,JSON.stringify(j,null,2)+'\n');
+          }
+
+          // Documentation catalog: UI owner owns DOM only, never gameplay state.
+          {
+            const p='docs/system-catalog.json',j=JSON.parse(read(p));j.systems=j.systems||[];
+            if(!j.systems.some(x=>x.id==='logistics-admin-ui'))j.systems.push({
+              id:'logistics-admin-ui',owner:'KeloLogisticsAdminUI',source:'src/ui/logistics-admin-ui.js',technicalDoc:'docs/systems/LOGISTICS_ADMIN_UI.md',playerVisible:false,status:'internal-admin-qa-live'
+            });
+            write(p,JSON.stringify(j,null,2)+'\n');
+          }
+
+          // Code navigation index.
+          {
+            const p='docs/CODE_INDEX.md';let s=read(p);
+            if(!s.includes('| LOGISTICS ADMIN UI |')){
+              const anchor='| NOBLEZA | rangos donación | `src/systems/nobility.js` `nobility-authority.js` |';
+              const row='| LOGISTICS ADMIN UI | QA móvil/desktop de economía, rutas, carretas, facciones y clanes | `src/ui/logistics-admin-ui.js` + `KeloLogisticsDevtools` |';
+              if(s.includes(anchor))s=s.replace(anchor,anchor+'\n'+row);else s+='\n\n'+row+'\n';
+              write(p,s);
+            }
+          }
+
+          // Engine map records the new LIVE UI consumer without changing domain ownership.
+          {
+            const p='ENGINE_MAP.md';let s=read(p);
+            if(!s.includes('## Logistics Admin UI — QA interno')){
+              s+='\n\n## Logistics Admin UI — QA interno\n\n- `src/ui/logistics-admin-ui.js` / `KeloLogisticsAdminUI`: **UI OWNER LIVE (DOM/estado efímero solamente)**.\n- Consume `KeloLogisticsDevtools` y nunca escribe `STATE` gameplay directamente.\n- Permiso: reutiliza `KELO_ADMIN_KEYS` con scope root existente `admin.issue`; no crea otra puerta admin.\n- Input: reclama/libera `KeloInputLocks` mediante token `logistics-admin-ui`.\n- Runtime: carga inmediatamente después de `admin-key-system.js`, cuando economía regional/caravanas/facciones/devtools ya están disponibles.\n- Online-first: las acciones siguen `UI → KeloLogisticsDevtools → owner.request → local/server authority`; el panel no se convierte en autoridad por estar visible.\n';
+              write(p,s);
+            }
+          }
+          NODE
+      - name: Commit wiring
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html package.json docs/system-catalog.json docs/CODE_INDEX.md ENGINE_MAP.md
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "feat: wire logistics admin panel into live runtime"
+          git push origin HEAD:feat/logistics-admin-panel
