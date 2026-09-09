@@ -1,8 +1,8 @@
 /* KELO-INDEX
  * area: TEST / UI / LIVE
  * owner: Premium menu + player HUD browser audit
- * keys: MENU HUD PLAYER MOBILE PORTRAIT LANDSCAPE RESPONSIVE ROUTES INPUT PVP CONSOLE SCREENSHOT
- * purpose: valida Luxe real, HUD único, owners consumidos, responsive, locks y smoke de movimiento/PvP
+ * keys: MENU HUD PLAYER MOBILE PORTRAIT LANDSCAPE RESPONSIVE ROUTES INPUT PVP FULLSCREEN CONSOLE SCREENSHOT
+ * purpose: valida Luxe real, HUD único, owners consumidos, responsive, locks y smoke de movimiento/PvP/fullscreen
  * online: prueba presentación/rutas; no altera reglas autoritativas
  */
 import { chromium } from 'playwright';
@@ -19,11 +19,11 @@ const pageErrors=[],consoleErrors=[],httpErrors=[];
 page.on('pageerror',e=>pageErrors.push(String(e?.stack||e)));
 page.on('console',m=>{if(m.type()==='error')consoleErrors.push(m.text());});
 page.on('response',r=>{if(r.status()>=400)httpErrors.push({status:r.status(),url:r.url()});});
-const report={ok:false,url:URL,hud:null,hudWidths:[],portrait:null,landscape:null,routes:{},movement:null,pvp:null,pageErrors,consoleErrors,httpErrors};
+const report={ok:false,url:URL,hud:null,hudWidths:[],portrait:null,landscape:null,routes:{},movement:null,pvp:null,fullscreen:null,pageErrors,consoleErrors,httpErrors};
 const assert=(condition,message)=>{if(!condition)throw new Error(message);};
 
 async function waitRuntime(){
-  await page.waitForFunction(()=>window.KELO_LUXE&&window.KELO_LUXE_PLAYER_HUD&&window.KeloInputLocks&&window.KeloBackpackUI&&window.KeloAbilities&&window.KeloMarketUI&&window.KELO_HOUSE_UI&&window.KeloNobility&&window.KeloTitles&&window.KeloSelfInteractionUI&&window.KeloCharacterCustomizer,null,{timeout:20000});
+  await page.waitForFunction(()=>window.KELO_LUXE&&window.KELO_LUXE_PLAYER_HUD&&window.KeloInputLocks&&window.KeloBackpackUI&&window.KeloAbilities&&window.KeloMarketUI&&window.KeloMarketWorld&&window.KeloCommerceUI&&window.KELO_HOUSE_UI&&window.KeloNobility&&window.KeloTitles&&window.KeloSelfInteractionUI&&window.KeloCharacterCustomizer&&window.KELO_ORIENTATION,null,{timeout:20000});
 }
 async function openMenu(){
   await page.locator('#lx-side-menu').click();
@@ -79,12 +79,14 @@ try{
     input:window.KeloInputLocks.snapshot('audit-baseline'),
     missionsOwner:!!(window.KeloMissionsUI&&typeof window.KeloMissionsUI.open==='function'),
     settingsOwner:!!(window.KeloSettingsUI&&typeof window.KeloSettingsUI.open==='function'),
-    creatorsAllowed:!!window.KELO_CREATORS_LAUNCHER?.allowed
+    creatorsAllowed:!!window.KELO_CREATORS_LAUNCHER?.allowed,
+    fullscreenButton:!!document.getElementById('kelo-orientation-btn')
   }));
   assert(baseline.luxe?.version==='luxe-shell-v4.0.2-premium-menu','Premium Luxe runtime version missing');
   assert(baseline.luxe?.tokenLocks===true,'Premium menu token-lock audit missing');
   assert(baseline.playerHud?.version==='luxe-player-hud-v1.0.0','Premium player HUD runtime version missing');
   assert(baseline.playerHud?.polling===false,'Player HUD must advertise polling=false');
+  assert(baseline.fullscreenButton===true,'Fullscreen button missing from Luxe rail');
 
   report.hud=await inspectHud();
   assertHud(report.hud,'390x844');
@@ -135,7 +137,14 @@ try{
   await route('nobility','nobility','#kelo-nobility',()=>window.KeloNobility.close());
   await route('emotes','emotes','#kelo-emotes-panel',()=>window.KeloSelfInteractionUI.closeEmotes());
   await route('backpack','bag','#kelo-bag',()=>window.KeloBackpackUI.close());
-  await route('market','market','#kelo-market-v1',()=>window.KeloMarketUI.close());
+
+  // El owner actual de Mercado entra a la instancia caminable; ya no abre siempre el panel legacy #kelo-market-v1.
+  await clickRoute('market');
+  await page.waitForFunction(()=>window.KeloMarketWorld?.isActive?.()===true,null,{timeout:6000});
+  report.routes.market=true;
+  await page.evaluate(async()=>{window.KeloCommerceUI?.close?.();await window.KeloMarketWorld?.leave?.();});
+  await page.waitForFunction(()=>window.KeloMarketWorld?.isActive?.()===false,null,{timeout:6000});
+
   await route('properties','properties','#kelo-house-panel',()=>window.KELO_HOUSE_UI.hide());
   await route('profile','profile','#inspect-sheet',()=>{if(typeof closeInspect==='function')closeInspect();});
   await route('abilities','abilities','#kelo-builder',()=>{const p=document.getElementById('kelo-builder');if(p)p.style.display='none';});
@@ -146,6 +155,16 @@ try{
   await page.locator('#lx-chat-close').click();
   assert(await page.evaluate(()=>!window.KeloInputLocks.has('luxe-chat')),'Chat input lock leaked');
   report.routes.chat=true;
+
+  // Fullscreen real: el botón debe activar native fullscreen o el fallback inmersivo y después poder salir.
+  const fsButton=page.locator('#kelo-orientation-btn');
+  await fsButton.click();
+  await page.waitForFunction(()=>window.KELO_ORIENTATION?.fullscreen?.active?.()===true,null,{timeout:5000});
+  const fsEntered=await page.evaluate(()=>({active:window.KELO_ORIENTATION.fullscreen.active(),mode:window.KELO_ORIENTATION.fullscreen.mode(),pressed:document.getElementById('kelo-orientation-btn')?.getAttribute('aria-pressed')}));
+  assert(fsEntered.active===true&&fsEntered.pressed==='true','Fullscreen button did not enter active/native-or-fallback mode');
+  await fsButton.click();
+  await page.waitForFunction(()=>window.KELO_ORIENTATION?.fullscreen?.active?.()===false,null,{timeout:5000});
+  report.fullscreen={entered:true,mode:fsEntered.mode,left:true};
 
   await page.setViewportSize({width:844,height:390});
   await page.waitForTimeout(250);
