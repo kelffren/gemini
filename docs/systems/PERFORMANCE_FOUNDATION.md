@@ -18,6 +18,7 @@ Este documento no crea un nuevo engine. Define cómo los OWNERS existentes coope
 - `KeloRender`: scheduler oficial de extensiones de frame. Sus hooks pueden quedar `enabled=false` sin crear otro loop.
 - `KeloAbilities`: mantiene ownership de cooldowns, recursos y FX legacy; duerme sus propios hooks cuando no queda trabajo real y los despierta bajo cast/cambio de loadout.
 - `KeloVisualSystem`: presentación modular; su fast-path evita updates costosos cuando no hay animaciones/FX/secuencias activas.
+- `KeloPvPWorld`: conserva ownership de la entrada/salida PvP; su bridge `pvp-combat-runtime-loader.js` activa el bootstrap Combat/Effects/Melee únicamente en el primer intento explícito de entrar.
 - `KELO_PERF` / `KELO_PERFORMANCE_GOVERNOR`: calidad, telemetría, LOD espacial y lifecycle de visibilidad.
 - `KELO_ATLAS_CONTRACT`: adquisición, refcount, warm residency y eviction de imágenes/atlases.
 - `KELO_WORLD_RENDERER`: chunks visibles, cache LRU y assets de distrito.
@@ -43,6 +44,8 @@ En JavaScript dinámico, el código importado/cargado normalmente permanece cach
 ### Startup
 
 Features opcionales no pertenecen al critical path. Character Customizer y Studio deben cargar su código pesado solo después de una acción explícita del jugador. Profile no puede arrancar combat/effects/melee como efecto lateral.
+
+Combat/Effects/Melee tampoco pertenecen al boot social. `KeloPvPWorld` mantiene un bridge mínimo cargado junto al owner, pero `src/core/kelo-runtime-bootstrap.js` no aparece como `<script>` eager en `index.html`. En el primer `enterPvPWorld()`, el bridge deduplica intentos simultáneos, carga el bootstrap existente, espera `kelo:runtime-foundations-ready` y solo entonces delega al `enter()` real de `KeloPvPWorld`. Tras el primer uso, el código permanece cacheado y las siguientes entradas son directas. Si la carga falla, no altera gameplay state y permite reintento.
 
 ### CPU
 
@@ -78,6 +81,8 @@ El audit de Performance Foundation debe fallar si reaparece cualquiera de estas 
 
 - Character Customizer vuelve a cargarse eager desde Profile.
 - Profile vuelve a arrancar `kelo-runtime-bootstrap.js`.
+- `index.html` vuelve a cargar `kelo-runtime-bootstrap.js` en el critical path social.
+- PvP pierde su first-use loader, deja de deduplicar la entrada durante la carga o deja de delegar al owner original.
 - KeloSimulation/KeloRender pierden `setEnabled`.
 - `KeloAbilities` vuelve a ejecutar sus hooks completos permanentemente estando idle o pierde el filtro de inventario mixto.
 - Visual System pierde su fast-path/sleep de trabajo vacío.
@@ -92,6 +97,7 @@ Antes y después de cambios grandes se registran, cuando el entorno lo permita:
 
 - requests y bytes antes de PLAYER READY;
 - tiempo hasta PLAYER READY;
+- estado de `KELO_PVP_COMBAT_LOADER_AUDIT` y tiempo first-request -> combat-ready;
 - frame p50/p95/p99 y long frames;
 - hooks activos/dormidos de KeloSimulation/KeloRender;
 - estado awake/sleep y work counters de `KeloAbilities`;
@@ -104,6 +110,8 @@ Antes y después de cambios grandes se registran, cuando el entorno lo permita:
 ## Regla de extensión
 
 Antes de crear cualquier `PerformanceManager`, scheduler, asset loader, network culler o feature loader nuevo, localizar el OWNER existente. Si la capacidad cabe naturalmente en ese owner, se extiende allí. Un nuevo owner requiere demostrar que ninguna responsabilidad actual lo posee.
+
+`pvp-combat-runtime-loader.js` no es un owner nuevo: es un bridge de lifecycle de `KeloPvPWorld` que reutiliza el único bootstrap arquitectónico existente y conserva toda la API/getters del owner original.
 
 ## Estado
 
