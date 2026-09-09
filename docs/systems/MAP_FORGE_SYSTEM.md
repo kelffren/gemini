@@ -4,60 +4,49 @@
 
 `KeloMapForge` es la capacidad data-driven que genera **Base Generated Worlds** deterministas para Kelo World. No es un renderer, no posee cámara, no posee colisión runtime, no posee propiedades de jugadores y no modifica gameplay LIVE por sí mismo.
 
-Su responsabilidad actual es transformar una recipe + seed estable en un `MapDefinition` puro, serializable, validado y puntuado.
+Transforma una recipe + seed estable en un `MapDefinition` puro, serializable, validado y puntuado. Desde Creators existe además una superficie visual para generar y comparar ciudades automáticamente sin escribir código.
 
 ## Estado actual
 
-**PREPARED / HEADLESS CORE.** El core está probado por Node/CI y todavía no está conectado al boot normal de `index.html` ni autorizado a sustituir el mundo LIVE. La integración con worker, Studio/Creators, renderer y `KELO_COLLISION` se hará en passes separados y debe reutilizar esos owners existentes.
+**CREATOR ACTIVE / RUNTIME HEADLESS.**
+
+- Core determinista: activo y protegido por CI.
+- Map Forge Creator workspace: activo y lazy desde Kelo Creators.
+- Web Worker: activo en navegador con fallback síncrono determinista.
+- Preview visual de candidatos: activo.
+- Best-of 4/8/16/32: activo.
+- Export JSON: activo.
+- Aplicación directa al mundo LIVE: **todavía no**. La futura integración debe reutilizar `KELO_WORLD_RENDERER`, `KELO_COLLISION` y World/Studio authority; Map Forge no puede sustituirlos.
 
 ## Owner y archivos
 
-- Owner lógico: `KeloMapForge`.
-- Recipes data-only: `src/world/map-forge/map-forge-recipes.mjs`.
+- Owner lógico de generación: `KeloMapForge`.
+- Recipes: `src/world/map-forge/map-forge-recipes.mjs`.
 - PRNG/hash: `src/world/map-forge/map-forge-prng.mjs`.
-- Geometría reusable: `src/world/map-forge/map-forge-geometry.mjs`.
-- Builder puro: `src/world/map-forge/map-forge-builder.mjs`.
+- Geometría: `src/world/map-forge/map-forge-geometry.mjs`.
+- Builder: `src/world/map-forge/map-forge-builder.mjs`.
 - Validator/scorer: `src/world/map-forge/map-forge-quality.mjs`.
 - Orchestrator/API: `src/world/map-forge/map-forge-core.mjs`.
-- Audit: `scripts/map-forge-core-audit.mjs`.
-- CI: `.github/workflows/map-forge-core-ci.yml`.
+- Worker: `src/world/map-forge/map-forge-worker.mjs`.
+- Worker client: `src/world/map-forge/map-forge-worker-client.mjs`.
+- Creator manifest: `src/creators/workspaces/map-forge-workspace.mjs`.
+- Creator UI: `src/creators/ui/map-forge-workspace.mjs`.
+- Core audit: `scripts/map-forge-core-audit.mjs`.
+- Creator browser audit: `scripts/map-forge-creator-browser-audit.mjs`.
+- CI: `.github/workflows/map-forge-core-ci.yml` y `.github/workflows/map-forge-creator-ci.yml`.
 
-## Estado que posee
+## Ownership
 
-El core **no posee estado mutable runtime**. Todas sus funciones son puras.
-
-Produce datos de base world como:
-
-- metadata;
-- worldBounds;
-- semanticGraph;
-- districts;
-- terrain field;
-- roads;
-- blocks;
-- parcels;
-- landmarks;
-- prefabPlacements;
-- decorations;
-- interactions;
-- spawnPoints;
-- exits;
-- collisionDescriptors;
-- navigation;
-- scenicVistas;
-- chunkIndex;
-- generationStats;
-- validation;
-- quality.
-
-## Estado que NO posee
+Map Forge posee solamente generación y datos de base world. No posee:
 
 - Render final: `KELO_WORLD_RENDERER`.
 - Collision lifecycle runtime: `KELO_COLLISION`.
 - Camera/viewport: `KeloCamera`.
 - Property ownership/build state: Property System.
-- Player buildings, stalls, NPC runtime, resource state, temporary events: authority/runtime deltas.
-- Studio history/UI: Studio/Creators.
+- Player buildings, stalls, NPC runtime, resource state o eventos: authority/runtime deltas.
+- Studio history/authority: Kelo Studio + `KELO_WORLD_EDIT`.
+
+La UI Creator posee exclusivamente controles, preview, selección y exportación.
 
 ## Determinismo
 
@@ -71,11 +60,11 @@ La identidad del mundo base usa:
 - `assetCatalogVersion`;
 - `layoutHash`.
 
-El core no utiliza `Math.random()` ni tiempos de pared dentro del `MapDefinition`. El mismo conjunto de inputs produce el mismo `layoutHash` y la misma serialización.
+El core no usa `Math.random()` ni wall-clock dentro del `MapDefinition`. Mismos inputs producen mismo `layoutHash` y serialización.
 
-Streams actuales derivan del seed principal y nombres estables (`layout`, `roads`, `architecture`, `decoration`). Esto permite desacoplar futuras regeneraciones parciales sin introducir aleatoriedad global.
+Streams actuales se derivan de seed + nombres estables (`layout`, `roads`, `architecture`, `decoration`).
 
-## Pipeline actual
+## Pipeline
 
 ```text
 Map Intent
@@ -83,7 +72,7 @@ Map Intent
 → region anchors + deterministic relaxation
 → weighted power-Voronoi field
 → hero landmark placement
-→ Delaunay candidate graph
+→ Delaunay graph
 → Minimum Spanning Tree
 → strategic loop reinsertion
 → curved road polylines
@@ -94,154 +83,118 @@ Map Intent
 → scenic vistas
 → navigation graph
 → chunk index
-→ pure validator
-→ weighted quality scorer
+→ validator
+→ quality scorer
 → best-of-N
 → MapDefinition
 ```
 
-WFC local, prefab catalog-driven placement, lock/regenerate y Web Worker son capacidades pendientes; no se documentan como implementadas todavía.
-
-## API pública
+## API pública del core
 
 ### `generateMapCandidate(recipe, options)`
-
-Genera un candidato determinista y devuelve un `MapDefinition` congelado.
-
-Opciones actuales:
-
-- `seed`;
-- `assetCatalogVersion`;
-- `style` overrides;
-- `constraints` reservadas para extensión data-driven.
+Genera un candidato determinista.
 
 ### `generateBestOf(recipe, options)`
-
-Genera entre 1 y 32 candidatos, rechaza inválidos, ordena por quality score y expone:
-
-- `bestOverall`;
-- `mostMonumental`;
-- `mostOrganic`;
-- `mostExplorable`;
-- `mostCompact`.
+Genera 1–32 candidatos, rechaza inválidos, ordena por score y expone `bestOverall`, `mostMonumental`, `mostOrganic`, `mostExplorable` y `mostCompact`.
 
 ### `validateMapDefinition(map, recipe)`
-
-Validator puro/headless. Actualmente comprueba required districts, spawn, exits, bounds de landmarks, overlaps de landmarks, parcelas válidas, reachability de distritos/exits y conectividad del semantic graph.
+Comprueba required districts, spawn/exits, bounds, overlaps, parcelas y reachability.
 
 ### `scoreMapDefinition(map, recipe)`
+Puntúa 0–100: playability, connectivity, navigation, visualComposition, landmarkQuality, districtVariety, roadQuality, densityBalance, negativeSpace, assetVariety, scenicVistas y technicalSafety.
 
-Puntuación 0–100 ponderada por recipe con:
+## Creator workspace — uso
 
-- playability;
-- connectivity;
-- navigation;
-- visualComposition;
-- landmarkQuality;
-- districtVariety;
-- roadQuality;
-- densityBalance;
-- negativeSpace;
-- assetVariety;
-- scenicVistas;
-- technicalSafety.
+Ruta:
+
+```text
+Menú Luxe → Creators → BUILD → Map Forge
+```
+
+Controles actuales:
+
+- Recipe: Royal Capital / Village / Forest.
+- Seed reproducible.
+- Best of 4 / 8 / 16 / 32.
+- Monumentalidad.
+- Caminos orgánicos.
+- Densidad urbana.
+- Vegetación.
+- Exploración.
+- Decoración.
+
+La UI genera automáticamente al abrirse, muestra el plano con distritos, roads, parcelas, landmarks, spawn y exits, permite seleccionar cualquier candidato y exportar el `MapDefinition` ganador como JSON.
+
+La generación se ejecuta en Web Worker cuando el navegador lo soporta. El Worker y el path síncrono deben producir el mismo layout hash para los mismos inputs.
 
 ## Recipes actuales
 
-- `KELO_ROYAL_CAPITAL_V1`;
-- `KELO_VILLAGE_V1`;
+- `KELO_ROYAL_CAPITAL_V1`.
+- `KELO_VILLAGE_V1`.
 - `KELO_FOREST_V1`.
 
-La lógica del generador no contiene una Plaza hardcodeada. Las diferencias de composición viven en recipes.
+Las diferencias entre mapa viven en recipes; no se hardcodea una Plaza especial dentro del engine.
 
-## Roads
+## Roads, parcelas, terreno y chunks
 
-El road graph usa Delaunay como conjunto de conexiones candidatas, MST para garantizar conectividad y reinserción de edges para loops. Las carreteras generadas son data (`polyline`, `class`, `width`, `material`, `priority`, `source`), no dibujo Canvas.
+Roads usan Delaunay → MST → reinserción de loops. El resultado es data (`polyline`, `class`, `width`, `material`, `priority`).
 
-## Blocks y parcels
+Blocks/parcels describen terreno base para housing, shops y futuras parcelas sin transferir ownership a Map Forge.
 
-Blocks/parcels son descripción del terreno base. Esto prepara housing, shops y futuras parcelas sin transferir ownership de propiedades al generator.
+Terrain se produce como field asociado a distritos/biome. Decoración usa spacing/clearance tipo Poisson.
 
-`roadFrontage`, `buildableArea`, `orientation`, familias permitidas y density son metadata generativa; ownership, compra, construcción y estado persistente siguen fuera de Map Forge.
-
-## Terrain y decoración
-
-Terrain se produce como coarse field asociado a distritos/biome. No existe un segundo terrain renderer.
-
-Decoración usa colocación Poisson-style con spacing, clearance de landmarks y separación de roads. En este pass solo produce familias semánticas; resolver assets reales será una capa de catálogo posterior.
-
-## Chunks
-
-Cada `MapDefinition` incluye lookup espacial determinista con chunk size 512 para terrain, roads, blocks, parcels, landmarks y decorations. El renderer futuro debe consumir esta indexación en vez de generar una megatextura.
+Cada `MapDefinition` incluye lookup espacial determinista con chunk size 512 para terrain, roads, blocks, parcels, landmarks y decorations.
 
 ## Online-first
 
-Map Forge define solamente **BASE GENERATED WORLD**.
-
-La arquitectura online futura debe mantener separado:
+Map Forge define **BASE GENERATED WORLD**.
 
 ```text
 Base Generated World
 + Server / Runtime Deltas
 ```
 
-Deltas como player buildings, property ownership, market stalls, temporary events, resource state, NPC state y destroyed objects no deben incorporarse al layoutHash del mundo base.
-
-La futura autoridad puede ser `LocalMapAuthority` hoy y `ServerMapAuthority` mañana sin cambiar IDs ni `MapDefinition`.
+Player buildings, property ownership, market stalls, temporary events, resource state, NPC state y destructibles no forman parte del `layoutHash` del mundo base.
 
 ## Invariantes
 
 1. No `Math.random()` dentro del procedural core.
-2. No DOM ni Canvas dentro del core.
+2. No DOM/Canvas dentro del core.
 3. No writes a `obstacles`.
 4. No writes a `KELO_COLLISION` desde el core.
 5. No mutación de Property System.
-6. No dependencia de cámara/input/UI.
-7. Same inputs ⇒ same layoutHash y misma serialización.
-8. Un mapa no pasa a best-of si validator lo marca inválido.
-9. Performance wall-clock se mide fuera del MapDefinition para no romper determinismo.
+6. Same inputs ⇒ same layoutHash.
+7. Un candidato inválido no entra al best-of.
+8. Worker y sync deben mantener paridad.
+9. Creator UI debe adquirir y liberar `KeloInputLocks` sin leaks.
+10. Exportar/generar no publica ni cambia el mundo LIVE.
 
 ## Tests y CI
 
-`node scripts/map-forge-core-audit.mjs` cubre:
+`map-forge-core-audit.mjs` cubre determinismo, serialización, MST/loops, parcelas, vistas, chunks, best-of y 300 seeds.
 
-- same seed == same layoutHash;
-- serialización determinista;
-- different seed cambia hash;
-- required districts;
-- semantic nodes;
-- MST;
-- loops en Royal Capital;
-- parcels;
-- scenic vistas requeridas;
-- chunk lookup determinista;
-- serialization roundtrip;
-- best-of-8;
-- 100 seeds Royal Capital;
-- 100 seeds Village;
-- 100 seeds Forest;
-- gate de valid rate >= 99%;
-- gate que el scorer distinga candidatos reales.
+`map-forge-creator-browser-audit.mjs` cubre:
 
-`Map Forge Core CI` ejecuta este audit en PRs que toquen Map Forge.
+- Worker real en Chromium;
+- Worker == sync layoutHash;
+- primera generación automática;
+- 8 candidatos por defecto;
+- selección y score;
+- preview canvas móvil 390×844;
+- cambio de recipe a Village;
+- cambio de count a 4;
+- generación posterior;
+- input lock acquire/release.
 
 ## Deuda pendiente real
 
 - WFC local con budget/retry/fallback.
-- Prefab generation metadata conectado a `KELO_PREFAB_CONTRACT`.
+- Metadata generativa conectada a `KELO_PREFAB_CONTRACT`.
 - lock + regenerate parcial.
-- Web Worker y parity sync/worker.
-- runtime adapter hacia `KELO_WORLD_RENDERER` y `KELO_COLLISION`.
-- Creator/Studio workspace y overlays.
-- golden seeds con assetCatalogVersion real.
-- LIVE/mobile validation después de la integración visible.
+- importar MapDefinition al World Studio como draft editable.
+- runtime adapter final hacia `KELO_WORLD_RENDERER` y `KELO_COLLISION`.
+- resolver prefabs/assets reales para buildings/landmarks por tags.
+- golden seeds con `assetCatalogVersion` real.
+- validación LIVE/mobile después de publicar mapas generados al runtime.
 
-Estas capacidades están pendientes y no deben tratarse como LIVE.
-
-## Cómo extender sin duplicar owner
-
-- Nueva recipe: añadir data a `map-forge-recipes.mjs`.
-- Nueva métrica: extender `map-forge-quality.mjs`.
-- Nueva primitive geométrica reusable: `map-forge-geometry.mjs`.
-- Nueva fase procedural: extender el builder manteniendo serialización determinista.
-- Render/collision/property/UI: **no implementar aquí**; conectar por el owner existente correspondiente.
+No tratar estas capacidades como implementadas hasta superar sus propios gates.
