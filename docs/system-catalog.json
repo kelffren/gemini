@@ -112,6 +112,14 @@
       "playerVisible": true,
       "playerGuideAnchor": "mercado-comercio-y-trade",
       "status": "offline-active-online-ready"
+    },
+    {
+      "id": "map-forge",
+      "owner": "KeloMapForge",
+      "source": "src/world/map-forge/map-forge-core.mjs",
+      "technicalDoc": "docs/systems/MAP_FORGE_SYSTEM.md",
+      "playerVisible": false,
+      "status": "prepared-headless"
     }
   ]
 }
