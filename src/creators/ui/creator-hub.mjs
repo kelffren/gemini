@@ -3,14 +3,14 @@
  * owner: Kelo Creator Hub
  * owns: creator project navigation shell only
  * does-not-own: global navigation, Studio implementation, project persistence, permissions or publish policy
- * lazy: imported only after explicit CREATORS action
+ * lazy: imported only after explicit CREATORS action; active cards dispatch through workspace registry
  */
 import { bootKeloCreators } from '../creator-entry.mjs';
 let active=null;
 const CATALOG=Object.freeze([
   {category:'BUILD',items:[['world','World','active'],['parcel','Parcel','soon'],['dungeon','Dungeon','soon'],['game-mode','Game Mode','soon']]},
-  {category:'GAMEPLAY',items:[['ability','Ability','soon'],['npc','NPC','soon'],['quest','Quest / Dialogue','soon'],['item','Item','soon'],['crafting','Crafting','soon']]},
-  {category:'VISUAL',items:[['animation','Animation','active'],['vfx','VFX','soon'],['cinematic','Cinematic','soon']]},
+  {category:'GAMEPLAY',items:[['mount','Mount','active'],['ability','Ability','soon'],['npc','NPC','soon'],['quest','Quest / Dialogue','soon'],['item','Item','soon'],['crafting','Crafting','soon']]},
+  {category:'VISUAL',items:[['appearance','Appearance','active'],['animation','Animation','active'],['vfx','VFX','soon'],['cinematic','Cinematic','soon']]},
   {category:'CONTENT',items:[['prefab','Prefab','soon'],['environment','Environment','soon'],['audio','Audio','soon']]}
 ]);
 function css(){return `
@@ -32,26 +32,27 @@ export async function openCreatorHub({root=globalThis}={}){
   const hub=make('section',{id:'kelo-creators-hub'});hub.setAttribute('data-kelo-creators-ui','');hub.setAttribute('role','dialog');hub.setAttribute('aria-modal','true');hub.setAttribute('aria-label','Kelo Creators');
   const mark=make('div',{class:'kc-mark'},make('span',{text:'KC'})),title=make('div',{class:'kc-title'},[make('strong',{text:'KELO CREATORS'}),make('small',{text:'One studio. Many workspaces.'})]),close=make('button',{class:'kc-close',text:'CLOSE','aria-label':'Cerrar Kelo Creators'}),head=make('header',{class:'kc-head'},[mark,title,close]);
   const nav=make('nav',{class:'kc-nav','aria-label':'Creator sections'}),main=make('main',{class:'kc-main'}),layout=make('div',{class:'kc-layout'},[nav,main]);hub.append(head,layout);doc.body.append(hub);
-  const sections=[['create','CREATE'],['projects','MY PROJECTS'],['assets','MY ASSETS'],['shared','SHARED WITH ME'],['invites','TEST INVITES'],['reviews','REVIEWS'],['published','PUBLISHED']],buttons=new Map(),opening=new Set();let current='create';
-  function reportError(label,error){console.error(`[Kelo Creators → ${label}]`,error);if(typeof root.showToast==='function')root.showToast(error?.message||`No se pudo abrir ${label} Creator`);}
-  async function openWorld(){if(opening.has('world'))return;opening.add('world');try{await platform.openWorkspace('world');destroy();}catch(error){reportError('World',error);}finally{opening.delete('world');}}
-  async function openAnimation(projectId=null){if(opening.has('animation'))return;opening.add('animation');try{let id=projectId;if(!id){const existing=await platform.projects.list({ownerId:platform.permission.actorId(),type:'ANIMATION'}),project=await platform.projects.create({type:'ANIMATION',name:`Animation ${existing.length+1}`,ownerId:platform.permission.actorId()});id=project.projectId;}await platform.openWorkspace('animation',{projectId:id});destroy();}catch(error){reportError('Animation',error);}finally{opening.delete('animation');}}
-  async function openById(id,projectId=null){if(id==='world')return openWorld();if(id==='animation')return openAnimation(projectId);}
-  async function renderCreate(){
-    main.replaceChildren(make('h1',{text:'Create'}),make('p',{class:'kc-lead',text:'Choose a workspace. Every active Creator reuses shared Kelo Studio infrastructure and its runtime owner.'}));
-    for(const group of CATALOG){const sec=make('section',{class:'kc-section'},[make('h2',{text:group.category})]),grid=make('div',{class:'kc-grid'});for(const [wid,label,state] of group.items){const manifest=platform.workspaces.resolve(wid),implemented=state==='active'&&manifest?.availability==='active',permitted=implemented&&(!manifest.capability||platform.permission.can(manifest.capability,platform.permission.actorId())),status=implemented?(permitted?'ACTIVE':'NO ACCESS'):'COMING SOON';const card=make('button',{class:`kc-card ${permitted?'active':''}`,disabled:!permitted,'aria-label':permitted?`Abrir ${label}`:`${label} ${status.toLowerCase()}`},[make('span',{class:'kc-pill',text:status}),make('strong',{text:label}),make('small',{text:implemented?(permitted?'Shared Studio core · private draft':'Your key does not grant this workspace'):'Workspace not implemented yet'})]);if(permitted)card.onclick=()=>void openById(wid);grid.append(card);}sec.append(grid);main.append(sec);}
+  const sections=[['create','CREATE'],['projects','MY PROJECTS'],['assets','MY ASSETS'],['shared','SHARED WITH ME'],['invites','TEST INVITES'],['reviews','REVIEWS'],['published','PUBLISHED']];
+  const buttons=new Map(),opening=new Set();let current='create';
+  async function openWorkspace(id,{projectId=null}={}){
+    if(opening.has(id))return;opening.add(id);
+    try{
+      let resolvedProjectId=projectId;
+      if(id==='animation'&&!resolvedProjectId){
+        const ownerId=platform.permission.actorId(),existing=await platform.projects.list({ownerId,type:'ANIMATION'}),project=await platform.projects.create({type:'ANIMATION',name:`Animation ${existing.length+1}`,ownerId});
+        resolvedProjectId=project.projectId;
+      }
+      await platform.openWorkspace(id,resolvedProjectId?{projectId:resolvedProjectId}:{});destroy();
+    }catch(error){console.error(`[Kelo Creators → ${id}]`,error);if(typeof root.showToast==='function')root.showToast(error?.message||`No se pudo abrir ${id}`);}finally{opening.delete(id);}
   }
-  async function renderProjects(){
-    main.replaceChildren(make('h1',{text:'My Projects'}),make('p',{class:'kc-lead',text:'Private drafts available through the repository boundary.'}));
-    const rows=await platform.projects.list({ownerId:platform.permission.actorId()});if(!rows.length)return main.append(make('div',{class:'kc-empty',text:'No projects yet.'}));
-    for(const p of rows){const row=make('div',{class:'kc-project'},[make('div',{},[make('strong',{text:p.name}),make('div',{class:'kc-lead',text:`${p.type} · ${p.status}`})])]),workspace=p.type==='WORLD'?'world':p.type==='ANIMATION'?'animation':null,manifest=workspace?platform.workspaces.resolve(workspace):null,permitted=!!workspace&&(!manifest?.capability||platform.permission.can(manifest.capability,platform.permission.actorId(),p.projectId));if(permitted){const b=make('button',{text:'OPEN'});b.onclick=()=>void openById(workspace,p.projectId);row.append(b);}main.append(row);}
-  }
+  async function renderCreate(){main.replaceChildren(make('h1',{text:'Create'}),make('p',{class:'kc-lead',text:'Choose a workspace. Every active Creator reuses shared Kelo Studio infrastructure and its runtime owner.'}));for(const group of CATALOG){const sec=make('section',{class:'kc-section'},[make('h2',{text:group.category})]),grid=make('div',{class:'kc-grid'});for(const [wid,label,state] of group.items){const manifest=platform.workspaces.resolve(wid),implemented=state==='active'&&manifest?.availability==='active',permitted=implemented&&(!manifest.capability||platform.permission.can(manifest.capability,platform.permission.actorId())),status=implemented?(permitted?'ACTIVE':'NO ACCESS'):'COMING SOON';const card=make('button',{class:`kc-card ${permitted?'active':''}`,disabled:!permitted,'aria-label':permitted?`Abrir ${label}`:`${label} ${status.toLowerCase()}`},[make('span',{class:'kc-pill',text:status}),make('strong',{text:label}),make('small',{text:implemented?(permitted?'Shared Studio core · private/local draft':'Your key does not grant this workspace'):'Workspace not implemented yet'})]);if(permitted)card.onclick=()=>void openWorkspace(wid);grid.append(card);}sec.append(grid);main.append(sec);}}
+  async function renderProjects(){main.replaceChildren(make('h1',{text:'My Projects'}),make('p',{class:'kc-lead',text:'Projects available through the repository boundary.'}));const rows=await platform.projects.list({ownerId:platform.permission.actorId()});if(!rows.length)return main.append(make('div',{class:'kc-empty',text:'No projects yet.'}));for(const p of rows){const row=make('div',{class:'kc-project'},[make('div',{},[make('strong',{text:p.name}),make('div',{class:'kc-lead',text:`${p.type} · ${p.status}`})])]),workspace=String(p.type||'').toLowerCase(),manifest=platform.workspaces.resolve(workspace),permitted=!!manifest&&(!manifest.capability||platform.permission.can(manifest.capability,platform.permission.actorId(),p.projectId));if(permitted){const b=make('button',{text:'OPEN'});b.onclick=()=>void openWorkspace(workspace,{projectId:p.projectId});row.append(b);}main.append(row);}}
   function renderEmpty(label,detail){main.replaceChildren(make('h1',{text:label}),make('p',{class:'kc-lead',text:detail}),make('div',{class:'kc-empty',text:'Nothing here yet. This surface is ready for its future repository/service adapter.'}));}
   async function render(id){current=id;for(const [key,b] of buttons)b.setAttribute('aria-selected',String(key===id));if(id==='create')return renderCreate();if(id==='projects')return renderProjects();if(id==='assets')return renderEmpty('My Assets','Reusable assets will appear here without replacing runtime registries.');if(id==='shared')return renderEmpty('Shared With Me','Shared projects will plug into the project repository later.');if(id==='invites')return renderEmpty('Test Invites','Private test invitations will arrive through a future invite service.');if(id==='reviews')return renderEmpty('Reviews','Approval remains capability-gated and authority-owned.');if(id==='published')return renderEmpty('Published','Only immutable approved revisions will appear here.');}
   for(const [id,label] of sections){const b=make('button',{text:label,'aria-selected':'false'});if(id==='reviews'&&!platform.permission.can('review.approve'))b.hidden=true;b.onclick=()=>void render(id);buttons.set(id,b);nav.append(b);}
   function destroy(){if(active?.hub!==hub)return;active=null;hub.remove();style.remove();doc.removeEventListener('keydown',onKey,true);}
   const onKey=e=>{if(e.key==='Escape'){e.preventDefault();destroy();}};close.onclick=destroy;doc.addEventListener('keydown',onKey,true);
-  active=Object.freeze({version:'kelo-creator-hub-v1.0.1',hub,platform,get section(){return current;},show:render,close:destroy});await render('create');return active;
+  active=Object.freeze({version:'kelo-creator-hub-v1.2.0',hub,platform,get section(){return current;},show:render,close:destroy});await render('create');return active;
 }
 export function closeCreatorHub(){active?.close?.();}
 export function getCreatorHub(){return active;}
