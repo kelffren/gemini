@@ -20,7 +20,8 @@
     "audit:stats": "node scripts/stat-modifier-audit.mjs",
     "audit:appearance": "node scripts/appearance-foundation-audit.mjs",
     "audit:mount-creator": "node scripts/mount-creator-audit.mjs",
-    "audit:logistics": "node scripts/regional-logistics-audit.js"
+    "audit:logistics": "node scripts/regional-logistics-audit.js",
+    "audit:logistics-ui": "node scripts/logistics-admin-ui-audit.js"
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0"
