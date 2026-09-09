@@ -1,0 +1,64 @@
+name: Implement Studio Pinch Scale V2
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/implement-studio-pinch-scale-v2.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  implement:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Rebase onto live main
+        shell: bash
+        run: |
+          git fetch origin main
+          git checkout -B main origin/main
+
+      - name: Apply pinch-scale patch from canonical one-shot
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          source=Path('.github/workflows/implement-studio-pinch-scale.yml').read_text()
+          marker="          python - <<'PY'\n"
+          start=source.index(marker)+len(marker)
+          end=source.index("\n          PY\n",start)
+          lines=source[start:end].splitlines()
+          payload='\n'.join(line[10:] if line.startswith('          ') else line for line in lines)+'\n'
+          Path('/tmp/kelo-pinch-patch.py').write_text(payload)
+          PY
+          python /tmp/kelo-pinch-patch.py
+
+      - name: Validate Studio scale UX
+        shell: bash
+        run: |
+          node --check src/studio/input/studio-camera-controller.mjs
+          node --check src/studio/integration/authority-command-mirror.mjs
+          node --check src/studio/integration/live-studio-controller.mjs
+          node --check src/studio/ui/studio-live-shell.mjs
+          node scripts/studio-creator-v1-audit.mjs
+          node scripts/property-editor-audit.js
+
+      - name: Commit and publish without losing concurrent work
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo 'No changes produced'
+            exit 1
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/studio/input/studio-camera-controller.mjs src/studio/integration/authority-command-mirror.mjs src/studio/integration/live-studio-controller.mjs src/studio/ui/studio-live-shell.mjs scripts/studio-creator-v1-audit.mjs
+          git commit -m 'feat: add intuitive pinch scaling to Kelo Studio'
+          git fetch origin main
+          git rebase origin/main
+          git push origin HEAD:main
