@@ -1,179 +1,55 @@
 /* KELO-INDEX
  * area: NETWORK
- * keys: WEBSOCKET AUTHORITY POSE VISUAL EVENT CAST PROJECTILE STATUS ONLINE TITLES PROGRESSION COMMERCE TRADE MARKET
- * hace: transporte cliente para pose/sistemas autoritativos y relay semántico de presentación visual
- * online: visual:event jamás decide gameplay; comercio valioso entra por commerce:request y el servidor decide
+ * owner: KeloNetAuthority
+ * keys: WEBSOCKET INPUT INTENT SEQUENCE PREDICTION RECONCILIATION INTERPOLATION SNAPSHOT PVP VISUAL TITLES COMMERCE
+ * purpose: transporte único cliente; mundo social conserva pose transicional y PvP envía input/intent secuenciado al servidor
+ * online: cliente jamás declara daño/HP/kills/posición PvP final; snapshots autoritativos reconcilian local e interpolan remotos
  */
-(function () {
-  const params = new URLSearchParams(location.search);
-  const NET = params.get('net');
-  const PLAYER_KEY_STORAGE = 'kelo_player_key_v1';
-  const pending = new Map();
-  const VISUAL_EVENT_ALLOWLIST = new Set([
-    'CAST_CONFIRMED','PROJECTILE_SPAWNED','PROJECTILE_HIT','PROJECTILE_EXPIRED','ABILITY_IMPACT',
-    'STATUS_APPLIED','STATUS_REMOVED','SHIELD_APPLIED','SHIELD_BROKEN','DASH_STARTED','DASH_ENDED','DEATH'
-  ]);
-  let requestSeq = 1;
-
-  function makePlayerKey() {
-    if (window.crypto && typeof window.crypto.randomUUID === 'function') return window.crypto.randomUUID();
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-      const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
-      return v.toString(16);
-    });
-  }
-  function readPlayerKey() { try { let key = localStorage.getItem(PLAYER_KEY_STORAGE); if (!key) { key = makePlayerKey(); localStorage.setItem(PLAYER_KEY_STORAGE, key); } return key; } catch (e) { return makePlayerKey(); } }
-  function savePlayerKey(key) { if (!key) return; try { localStorage.setItem(PLAYER_KEY_STORAGE, key); } catch (e) {} }
-  window.keloNet = { on: false, id: null, peers: {}, url: NET, playerKey: readPlayerKey(), nobilitySource: 'local-fallback', titleSource: 'local-fallback', forgeSource: 'local-fallback', commerceSource: 'local-fallback', visualEventSource: 'local-fallback' };
-
-  function ensureChip() { let chip = document.getElementById('kelo-online'); if (chip) return chip; chip = document.createElement('div'); chip.id = 'kelo-online'; chip.style.cssText = ['position:absolute','top:max(44px, calc(env(safe-area-inset-top) + 36px))','left:max(8px, env(safe-area-inset-left))','z-index:80','pointer-events:none','display:flex','align-items:center','gap:6px','padding:5px 10px','border-radius:999px','background:rgba(10,13,18,.92)','border:1px solid rgba(231,197,106,.35)','color:#e7c56a','font:700 10px/1.2 -apple-system,sans-serif','white-space:nowrap'].join(';'); document.body.appendChild(chip); return chip; }
-  function paintChip(state, n) { const chip = ensureChip(); const dot = state === 'on' ? '#3ddc84' : (state === 'wait' ? '#e7c56a' : '#8a9099'); const label = state === 'on' ? ('Online ' + n) : state === 'wait' ? 'Conectando' : state === 'err' ? 'Sin señal' : 'Local'; chip.innerHTML = '<span style="width:7px;height:7px;border-radius:50%;background:' + dot + '"></span><span>' + label + '</span>'; }
-  function countOnline() { const others = Object.keys(window.keloNet.peers || {}).length; return window.keloNet.on ? (1 + others) : 0; }
-  let ws = null, myId = null, sendAcc = 0;
-  const peers = window.keloNet.peers;
-  function nextRequestId(prefix) { return prefix + '_' + Date.now().toString(36) + '_' + (requestSeq++).toString(36); }
-  function request(type, payload, timeoutMs) { if (!ws || ws.readyState !== 1) return Promise.reject(new Error('NETWORK_OFFLINE')); const requestId = nextRequestId(type.replace(/[^a-z]/gi, '')); return new Promise(function(resolve, reject) { const timer = setTimeout(function() { pending.delete(requestId); reject(new Error('NETWORK_TIMEOUT')); }, timeoutMs || 8000); pending.set(requestId, { resolve, reject, timer }); ws.send(JSON.stringify(Object.assign({ t: type, requestId }, payload || {}))); }); }
-  function settle(requestId, ok, value) { if (!requestId || !pending.has(requestId)) return; const item = pending.get(requestId); pending.delete(requestId); clearTimeout(item.timer); if (ok) item.resolve(value); else item.reject(value instanceof Error ? value : new Error(String(value || 'SERVER_ERROR'))); }
-  function ingestNobility(snapshot) { if (!snapshot) return; window.keloNet.nobilitySource = snapshot.source || 'server-authoritative'; if (window.KeloNobility && typeof window.KeloNobility.ingestServerSnapshot === 'function') window.KeloNobility.ingestServerSnapshot(snapshot); }
-  function ingestTitles(snapshot) { if (!snapshot) return; window.keloNet.titleSource = snapshot.source || 'server-authoritative'; if (window.KeloTitles && typeof window.KeloTitles.ingestServerSnapshot === 'function') window.KeloTitles.ingestServerSnapshot(snapshot); }
-  function ingestForge(snapshot) { if (!snapshot) return; window.keloNet.forgeSource = 'server-authoritative'; if (typeof STATE !== 'undefined' && Number.isFinite(snapshot.gold)) STATE.gold = snapshot.gold; if (window.KeloEquipment) { if (Array.isArray(snapshot.equipment)) snapshot.equipment.forEach(function(item){ window.KeloEquipment.applyServerItem(item); }); if (typeof localPlayer !== 'undefined') { localPlayer.armorScore = snapshot.armorScore || 0; localPlayer.auraRank = snapshot.auraRank || 0; localPlayer.averageQuality = snapshot.averageQuality || 0; localPlayer.averageGrade = snapshot.averageGrade || 0; localPlayer.equipmentSummary = snapshot.equipmentSummary || []; } } }
-  function ingestCommerce(msg) { if (!msg) return; window.keloNet.commerceSource = 'server-authoritative'; try { window.dispatchEvent(new CustomEvent('kelo:commerce-server-event', { detail: msg })); } catch (e) {} }
-
-  function visualMeta(payload) {
-    const p = payload || {};
-    return {
-      status: typeof p.status === 'string' ? p.status.slice(0, 40) : null,
-      duration: Number.isFinite(Number(p.duration)) ? Number(p.duration) : (p.effect && Number.isFinite(Number(p.effect.duration)) ? Number(p.effect.duration) : null),
-      targetActorId: p.targetActorId == null ? null : String(p.targetActorId).slice(0, 80),
-      amount: Number.isFinite(Number(p.amount)) ? Number(p.amount) : null,
-      reason: p.reason == null ? null : String(p.reason).slice(0, 80)
-    };
-  }
-
-  // KELO-INDEX NETWORK/VISUAL manda eventos semánticos compactos, nunca frames/sprites/partículas/Canvas.
-  function replicateVisualEvent(name, payload) {
-    if (!VISUAL_EVENT_ALLOWLIST.has(name) || !ws || ws.readyState !== 1 || !window.keloNet.on) return false;
-    if (payload && (payload.remote === true || payload.networkReplay === true)) return false;
-    const context = window.KeloVisualContext && typeof window.KeloVisualContext.serialize === 'function'
-      ? window.KeloVisualContext.serialize(payload || {})
-      : null;
-    if (!context) return false;
-    ws.send(JSON.stringify({ t: 'visual:event', name: name, context: context, meta: visualMeta(payload) }));
-    return true;
-  }
-
-  function ingestVisualEvent(msg) {
-    if (!msg || !VISUAL_EVENT_ALLOWLIST.has(msg.name) || !window.KeloVisualEventBus) return;
-    const c = Object.assign({}, msg.context || {}, msg.meta || {}, {
-      remote: true,
-      networkReplay: true,
-      serverTime: Number(msg.serverTime) || null,
-      sourceActorId: msg.actorId || null
-    });
-    if (msg.name === 'CAST_CONFIRMED' || msg.name === 'PROJECTILE_SPAWNED' || msg.name === 'PROJECTILE_HIT' || msg.name === 'PROJECTILE_EXPIRED' || msg.name === 'ABILITY_IMPACT' || msg.name === 'DASH_STARTED' || msg.name === 'DASH_ENDED') {
-      c.actorId = msg.actorId || c.actorId;
-      c.actor = peers[c.actorId] || null;
-    } else if (c.actorId) {
-      c.actor = peers[c.actorId] || null;
-    }
-    window.keloNet.visualEventSource = 'server-relay';
-    window.KeloVisualEventBus.emit(msg.name, c);
-  }
-
-  function connect() {
-    if (!NET) { paintChip('off', 0); return; }
-    try { ws = new WebSocket(NET); } catch (e) { paintChip('err', 0); return; }
-    paintChip('wait', 0);
-    ws.onopen = function () { window.keloNet.on = true; ws.send(JSON.stringify({ t: 'hello', name: (localPlayer && localPlayer.name) || 'Kelo', playerKey: window.keloNet.playerKey })); paintChip('on', countOnline()); };
-    ws.onclose = function () { window.keloNet.on = false; pending.forEach(function(item) { clearTimeout(item.timer); item.reject(new Error('NETWORK_CLOSED')); }); pending.clear(); paintChip('err', 0); setTimeout(connect, 1500); };
-    ws.onerror = function () { paintChip('err', 0); };
-    ws.onmessage = function (ev) {
-      let msg; try { msg = JSON.parse(ev.data); } catch (e) { return; }
-      if (msg.t === 'welcome') { myId = msg.id; window.keloNet.id = myId; window.keloNet.nobilitySource = msg.nobilitySource || window.keloNet.nobilitySource; window.keloNet.titleSource = msg.titleSource || window.keloNet.titleSource; window.keloNet.forgeSource = msg.forgeSource || window.keloNet.forgeSource; window.keloNet.commerceSource = msg.commerceSource || window.keloNet.commerceSource; ingest(msg.players); }
-      if (msg.t === 'identity' && msg.playerKey) { window.keloNet.playerKey = msg.playerKey; savePlayerKey(msg.playerKey); }
-      if (msg.t === 'state') ingest(msg.players);
-      if (msg.t === 'join' && msg.player) upsert(msg.player);
-      if (msg.t === 'leave' && msg.id) { delete peers[msg.id]; paintChip(window.keloNet.on ? 'on' : 'err', countOnline()); }
-      if (msg.t === 'visual:event') ingestVisualEvent(msg);
-      if (msg.t === 'nobility:snapshot') { ingestNobility(msg.snapshot); settle(msg.requestId, true, msg.snapshot); }
-      if (msg.t === 'nobility:donated') { ingestNobility(msg.snapshot); settle(msg.requestId, true, msg); }
-      if (msg.t === 'titles:snapshot') { ingestTitles(msg.snapshot); settle(msg.requestId, true, msg.snapshot); }
-      if (msg.t === 'titles:equipped' || msg.t === 'titles:unequipped') { ingestTitles(msg.snapshot); settle(msg.requestId, true, msg.snapshot); }
-      if (msg.t === 'combat:resolved') settle(msg.requestId, true, msg);
-      if (msg.t === 'forge:snapshot') { ingestForge(msg.snapshot); settle(msg.requestId, true, msg.snapshot); }
-      if (msg.t === 'forge:result') { if (msg.item && window.KeloEquipment) window.KeloEquipment.applyServerItem(msg.item); if (Number.isFinite(msg.gold) && typeof STATE !== 'undefined') STATE.gold = msg.gold; settle(msg.requestId, true, msg); }
-      if (msg.t === 'forge:combined') { ingestForge(msg.snapshot); settle(msg.requestId, true, msg.snapshot); }
-      if (msg.t === 'commerce:result') { ingestCommerce(msg); settle(msg.requestId, true, msg); }
-      if (msg.t === 'commerce:event') ingestCommerce(msg);
-      if (msg.t === 'error') settle(msg.requestId, false, new Error(msg.code || msg.message || 'SERVER_ERROR'));
-    };
-  }
-  function upsert(p) {
-    if (!p || !p.id || p.id === myId) return;
-    const prev = peers[p.id] || { id: p.id, name: p.name || 'Kelo', x: p.x, y: p.y, vx: 0, vy: 0, radius: 20, hp: 100, maxHp: 100, gear: { bodyColor: '#7b6cff', armorColor: '#e7c56a', weaponColor: '#fff' }, _face: p.face || 'down', _gait: p.gait || 'idle', targetX: p.x, targetY: p.y };
-    prev.name = p.name || prev.name; prev.targetX = p.x; prev.targetY = p.y; prev._face = p.face || prev._face; prev._gait = p.gait || 'walk';
-    prev.nobilityRank = p.nobilityRank || prev.nobilityRank || 'none'; prev.nobilityPower = Number(p.nobilityPower) || 0; prev.equippedTitleId = p.equippedTitleId || null;
-    prev.armorScore = Math.max(0, Math.floor(Number(p.armorScore)||0)); prev.auraRank = Math.max(0, Math.min(9, Math.floor(Number(p.auraRank)||0))); prev.averageQuality = Number(p.averageQuality)||0; prev.averageGrade = Number(p.averageGrade)||0; prev.equipmentSummary = Array.isArray(p.equipmentSummary)?p.equipmentSummary:[];
-    peers[p.id] = prev; paintChip('on', countOnline());
-  }
-  function ingest(map) { if (!map) return; const live = {}; Object.keys(map).forEach(function (id) { live[id] = true; upsert(map[id]); }); Object.keys(peers).forEach(function (id) { if (!live[id]) delete peers[id]; }); paintChip(window.keloNet.on ? 'on' : 'wait', countOnline()); }
-  window.KeloNetAuthority = Object.freeze({
-    version: 'net-authority-v5',
-    isOnline: function() { return !!(ws && ws.readyState === 1 && window.keloNet.on); },
-    getNobility: function() { return request('nobility:get'); },
-    donateNobility: function(currency, amount) { return request('nobility:donate', { currency, amount: Math.floor(Number(amount)) }); },
-    getTitles: function() { return request('titles:get'); },
-    equipTitle: function(titleId) { return request('titles:equip', { titleId: String(titleId || '') }); },
-    unequipTitle: function() { return request('titles:unequip'); },
-    resolveDamage: function(baseDamage) { return request('combat:resolve', { baseDamage: Math.floor(Number(baseDamage)) }); },
-    getForge: function() { return request('forge:get'); },
-    attemptForge: function(itemId, forgeType, materialLevel, crystals) { return request('forge:attempt', { itemId, forgeType, materialLevel: Math.floor(Number(materialLevel)), crystals: Array.isArray(crystals)?crystals:[] }); },
-    combineForgeMaterials: function(materialId) { return request('forge:combine', { materialId }); },
-    requestCommerce: function(op, payload) { return request('commerce:request', { op: String(op || ''), payload: payload && typeof payload === 'object' ? payload : {} }); },
-    syncEquipment: function() { return Promise.resolve({ok:true,mode:'server-derived'}); },
-    replicateVisualEvent: replicateVisualEvent
-  });
-
-  if (window.KeloVisualEventBus && typeof window.KeloVisualEventBus.on === 'function') {
-    VISUAL_EVENT_ALLOWLIST.forEach(function (name) {
-      window.KeloVisualEventBus.on(name, function (payload) { replicateVisualEvent(name, payload); });
-    });
-  }
-
-  connect();
-
-  function currentNetworkZone() {
-    try { const scene = window.KELO_SCENE_CONTEXT && window.KELO_SCENE_CONTEXT.current(); if (scene && scene.zoneType === 'instance' && scene.instanceType) return scene.instanceType; } catch (e) {}
-    return window.keloZone || 'plaza';
-  }
-  function tickNetwork(context) {
-    const dt = context.dt;
-    sendAcc += dt;
-    if (ws && ws.readyState === 1 && localPlayer && sendAcc > 0.1) {
-      sendAcc = 0;
-      ws.send(JSON.stringify({ t: 'pose', x: localPlayer.x, y: localPlayer.y, face: localPlayer._face || 'down', gait: localPlayer._gait || 'idle', zone: currentNetworkZone() }));
-    }
-    Object.keys(peers).forEach(function (id) {
-      const p = peers[id], tx = p.targetX != null ? p.targetX : p.x, ty = p.targetY != null ? p.targetY : p.y;
-      p.x += (tx - p.x) * Math.min(1, 12 * dt);
-      p.y += (ty - p.y) * Math.min(1, 12 * dt);
-    });
-  }
-
-  function drawPeers() {
-    if (typeof renderAvatar !== 'function') return;
-    const ids = Object.keys(peers);
-    if (!ids.length) return;
-    const z = CONFIG.zoom || 1;
-    ctx.save();
-    ctx.translate(screenW / 2, screenH / 2);
-    ctx.scale(z, z);
-    ctx.translate(-camera.x, -camera.y);
-    ids.forEach(function (id) { renderAvatar(peers[id], false); });
-    ctx.restore();
-  }
-
-  if (!window.KeloSimulation || !window.KeloRender) throw new Error('Foundation render/simulation owners unavailable before engine-net');
-  window.KeloSimulation.after('engine-net:network', tickNetwork, 300);
-  window.KeloRender.afterFrame('engine-net:peers', drawPeers, 300);
+(function(){
+'use strict';
+const params=new URLSearchParams(location.search),NET=params.get('net'),PLAYER_KEY_STORAGE='kelo_player_key_v1';
+const pending=new Map(),pendingPvpInputs=new Map(),VISUAL_EVENT_ALLOWLIST=new Set(['CAST_CONFIRMED','PROJECTILE_SPAWNED','PROJECTILE_HIT','PROJECTILE_EXPIRED','ABILITY_IMPACT','STATUS_APPLIED','STATUS_REMOVED','SHIELD_APPLIED','SHIELD_BROKEN','DASH_STARTED','DASH_ENDED','DEATH']);
+const INTERPOLATION_DELAY_MS=100,PVP_SEND_HZ=30,PVP_SEND_INTERVAL=1/PVP_SEND_HZ,MAX_PENDING_PVP=128;
+let requestSeq=1,pvpSequence=1,ws=null,myId=null,sendAcc=0,pvpSendAcc=0,lastPvpAck=0,lastServerTick=0;
+function makePlayerKey(){if(window.crypto&&typeof window.crypto.randomUUID==='function')return window.crypto.randomUUID();return'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.random()*16|0,v=c==='x'?r:(r&3|8);return v.toString(16)})}
+function readPlayerKey(){try{let key=localStorage.getItem(PLAYER_KEY_STORAGE);if(!key){key=makePlayerKey();localStorage.setItem(PLAYER_KEY_STORAGE,key)}return key}catch(_){return makePlayerKey()}}
+function savePlayerKey(key){if(!key)return;try{localStorage.setItem(PLAYER_KEY_STORAGE,key)}catch(_){}}
+window.keloNet={on:false,id:null,peers:{},url:NET,playerKey:readPlayerKey(),nobilitySource:'local-fallback',titleSource:'local-fallback',forgeSource:'local-fallback',commerceSource:'local-fallback',visualEventSource:'local-fallback',pvpSource:'local-fallback',pvpProjectiles:[]};
+const peers=window.keloNet.peers;
+function ensureChip(){let chip=document.getElementById('kelo-online');if(chip)return chip;chip=document.createElement('div');chip.id='kelo-online';chip.style.cssText=['position:absolute','top:max(44px, calc(env(safe-area-inset-top) + 36px))','left:max(8px, env(safe-area-inset-left))','z-index:80','pointer-events:none','display:flex','align-items:center','gap:6px','padding:5px 10px','border-radius:999px','background:rgba(10,13,18,.92)','border:1px solid rgba(231,197,106,.35)','color:#e7c56a','font:700 10px/1.2 -apple-system,sans-serif','white-space:nowrap'].join(';');document.body.appendChild(chip);return chip}
+function countOnline(){return window.keloNet.on?1+Object.keys(peers).length:0}
+function paintChip(state,n){const chip=ensureChip(),dot=state==='on'?'#3ddc84':state==='wait'?'#e7c56a':'#8a9099',label=state==='on'?'Online '+n:state==='wait'?'Conectando':state==='err'?'Sin señal':'Local';chip.innerHTML='<span style="width:7px;height:7px;border-radius:50%;background:'+dot+'"></span><span>'+label+'</span>'}
+function nextRequestId(prefix){return prefix+'_'+Date.now().toString(36)+'_'+(requestSeq++).toString(36)}
+function request(type,payload,timeoutMs){if(!ws||ws.readyState!==1)return Promise.reject(new Error('NETWORK_OFFLINE'));const requestId=nextRequestId(type.replace(/[^a-z]/gi,''));return new Promise((resolve,reject)=>{const timer=setTimeout(()=>{pending.delete(requestId);reject(new Error('NETWORK_TIMEOUT'))},timeoutMs||8000);pending.set(requestId,{resolve,reject,timer});ws.send(JSON.stringify(Object.assign({t:type,requestId},payload||{})))})}
+function settle(requestId,ok,value){if(!requestId||!pending.has(requestId))return;const item=pending.get(requestId);pending.delete(requestId);clearTimeout(item.timer);if(ok)item.resolve(value);else item.reject(value instanceof Error?value:new Error(String(value||'SERVER_ERROR')))}
+function ingestNobility(snapshot){if(!snapshot)return;window.keloNet.nobilitySource=snapshot.source||'server-authoritative';if(window.KeloNobility&&typeof window.KeloNobility.ingestServerSnapshot==='function')window.KeloNobility.ingestServerSnapshot(snapshot)}
+function ingestTitles(snapshot){if(!snapshot)return;window.keloNet.titleSource=snapshot.source||'server-authoritative';if(window.KeloTitles&&typeof window.KeloTitles.ingestServerSnapshot==='function')window.KeloTitles.ingestServerSnapshot(snapshot)}
+function ingestForge(snapshot){if(!snapshot)return;window.keloNet.forgeSource='server-authoritative';if(typeof STATE!=='undefined'&&Number.isFinite(snapshot.gold))STATE.gold=snapshot.gold;if(window.KeloEquipment){if(Array.isArray(snapshot.equipment))snapshot.equipment.forEach(item=>window.KeloEquipment.applyServerItem(item));if(typeof localPlayer!=='undefined'){localPlayer.armorScore=snapshot.armorScore||0;localPlayer.auraRank=snapshot.auraRank||0;localPlayer.averageQuality=snapshot.averageQuality||0;localPlayer.averageGrade=snapshot.averageGrade||0;localPlayer.equipmentSummary=snapshot.equipmentSummary||[]}}}
+function ingestCommerce(msg){if(!msg)return;window.keloNet.commerceSource='server-authoritative';try{window.dispatchEvent(new CustomEvent('kelo:commerce-server-event',{detail:msg}))}catch(_){}}
+function visualMeta(payload){const p=payload||{};return{status:typeof p.status==='string'?p.status.slice(0,40):null,duration:Number.isFinite(Number(p.duration))?Number(p.duration):(p.effect&&Number.isFinite(Number(p.effect.duration))?Number(p.effect.duration):null),targetActorId:p.targetActorId==null?null:String(p.targetActorId).slice(0,80),amount:Number.isFinite(Number(p.amount))?Number(p.amount):null,reason:p.reason==null?null:String(p.reason).slice(0,80)}}
+function replicateVisualEvent(name,payload){if(!VISUAL_EVENT_ALLOWLIST.has(name)||!ws||ws.readyState!==1||!window.keloNet.on)return false;if(payload&&(payload.remote===true||payload.networkReplay===true))return false;const context=window.KeloVisualContext&&typeof window.KeloVisualContext.serialize==='function'?window.KeloVisualContext.serialize(payload||{}):null;if(!context)return false;ws.send(JSON.stringify({t:'visual:event',name,context,meta:visualMeta(payload)}));return true}
+function ingestVisualEvent(msg){if(!msg||!VISUAL_EVENT_ALLOWLIST.has(msg.name)||!window.KeloVisualEventBus)return;const c=Object.assign({},msg.context||{},msg.meta||{},{remote:true,networkReplay:true,serverTime:Number(msg.serverTime)||null,sourceActorId:msg.actorId||null});c.actorId=msg.actorId||c.actorId;if(c.actorId)c.actor=peers[c.actorId]||null;window.keloNet.visualEventSource='server-relay';window.KeloVisualEventBus.emit(msg.name,c)}
+function pvpActive(){try{return !!(window.KeloPvPWorld&&window.KeloPvPWorld.state&&window.KeloPvPWorld.state.combatEnabled)}catch(_){return false}}
+function currentAim(){try{const a=window.KeloPvPWorld&&window.KeloPvPWorld.state&&window.KeloPvPWorld.state.aim;if(a&&Number.isFinite(a.x)&&Number.isFinite(a.y))return{x:a.x,y:a.y}}catch(_){}return{x:1,y:0}}
+function currentMove(){return{x:typeof input!=='undefined'?Number(input.normX)||0:0,y:typeof input!=='undefined'?Number(input.normY)||0:0}}
+function sanitizeUnit(x,y){x=Number(x)||0;y=Number(y)||0;const l=Math.hypot(x,y);if(l>1){x/=l;y/=l}return{x,y}}
+function sendCombatIntent(raw){if(!ws||ws.readyState!==1||!window.keloNet.on)return false;const source=raw&&typeof raw==='object'?raw:{},move=sanitizeUnit(source.moveX!=null?source.moveX:currentMove().x,source.moveY!=null?source.moveY:currentMove().y),aim=sanitizeUnit(source.aimX!=null?source.aimX:currentAim().x,source.aimY!=null?source.aimY:currentAim().y),sequence=pvpSequence++,action=String(source.action||'input'),intent={sequence,moveX:move.x,moveY:move.y,aimX:aim.x,aimY:aim.y,action,phase:String(source.phase||'none'),abilityKey:source.abilityKey||null,slot:Number.isInteger(Number(source.slot))?Number(source.slot):null,direction:source.direction||null,position:source.position||null,targetId:source.targetId||null,attackId:source.attackId||null,swordEntityId:source.swordEntityId||null,clientTime:Number(source.clientTime)||Date.now()};const replayDt=action==='input'?PVP_SEND_INTERVAL:0;pendingPvpInputs.set(sequence,{sequence,moveX:move.x,moveY:move.y,aimX:aim.x,aimY:aim.y,replayDt,clientTime:intent.clientTime});while(pendingPvpInputs.size>MAX_PENDING_PVP)pendingPvpInputs.delete(pendingPvpInputs.keys().next().value);ws.send(JSON.stringify({t:'pvp:input',intent}));return sequence}
+function peerBase(p){return{id:p.id,name:p.name||'Kelo',x:Number(p.x)||0,y:Number(p.y)||0,vx:0,vy:0,radius:20,hp:Number.isFinite(Number(p.hp))?Number(p.hp):100,maxHp:Number.isFinite(Number(p.maxHp))?Number(p.maxHp):100,mana:Number.isFinite(Number(p.mana))?Number(p.mana):100,maxMana:Number.isFinite(Number(p.maxMana))?Number(p.maxMana):100,gear:{bodyColor:'#7b6cff',armorColor:'#e7c56a',weaponColor:'#fff'},_face:p.face||'down',_gait:p.gait||'idle',zone:p.zone||'plaza',_snapshots:[]}}
+function pushPeerSnapshot(peer,p,serverTime){const snap={time:Number(serverTime)||Date.now(),x:Number(p.x)||0,y:Number(p.y)||0,face:p.face||peer._face||'down',gait:p.gait||peer._gait||'idle',zone:p.zone||peer.zone||'plaza',hp:Number.isFinite(Number(p.hp))?Number(p.hp):peer.hp,mana:Number.isFinite(Number(p.mana))?Number(p.mana):peer.mana};peer._snapshots=Array.isArray(peer._snapshots)?peer._snapshots:[];peer._snapshots.push(snap);while(peer._snapshots.length>32)peer._snapshots.shift();peer.zone=snap.zone;peer.hp=snap.hp;peer.mana=snap.mana;peer._face=snap.face;peer._gait=snap.gait}
+function upsert(p,serverTime){if(!p||!p.id||p.id===myId)return;const peer=peers[p.id]||peerBase(p);peer.name=p.name||peer.name;peer.nobilityRank=p.nobilityRank||peer.nobilityRank||'none';peer.nobilityPower=Number(p.nobilityPower)||0;peer.equippedTitleId=p.equippedTitleId||null;peer.armorScore=Math.max(0,Math.floor(Number(p.armorScore)||0));peer.auraRank=Math.max(0,Math.min(9,Math.floor(Number(p.auraRank)||0)));peer.averageQuality=Number(p.averageQuality)||0;peer.averageGrade=Number(p.averageGrade)||0;peer.equipmentSummary=Array.isArray(p.equipmentSummary)?p.equipmentSummary:[];pushPeerSnapshot(peer,p,serverTime);peers[p.id]=peer;paintChip('on',countOnline())}
+function ingest(map,serverTime){if(!map)return;const live={};Object.keys(map).forEach(id=>{live[id]=true;upsert(map[id],serverTime)});Object.keys(peers).forEach(id=>{if(!live[id])delete peers[id]});paintChip(window.keloNet.on?'on':'wait',countOnline())}
+function interpolatePeer(peer,nowMs){const snaps=peer._snapshots||[];if(!snaps.length)return;const renderTime=nowMs-INTERPOLATION_DELAY_MS;while(snaps.length>2&&snaps[1].time<=renderTime)snaps.shift();let a=snaps[0],b=snaps[1]||a;if(renderTime<=a.time||a===b){peer.x=a.x;peer.y=a.y}else if(renderTime>=b.time){const dt=Math.max(1,b.time-a.time),extrap=Math.min(50,renderTime-b.time),vx=(b.x-a.x)/dt,vy=(b.y-a.y)/dt;peer.x=b.x+vx*extrap;peer.y=b.y+vy*extrap}else{const t=(renderTime-a.time)/Math.max(1,b.time-a.time);peer.x=a.x+(b.x-a.x)*t;peer.y=a.y+(b.y-a.y)*t}peer._face=b.face||a.face;peer._gait=b.gait||a.gait;peer.zone=b.zone||a.zone;peer.hp=b.hp;peer.mana=b.mana}
+function reconcileLocal(serverPlayer){if(!serverPlayer||typeof localPlayer==='undefined')return;const ack=Math.max(0,Number(serverPlayer.ackSequence)||0);lastPvpAck=Math.max(lastPvpAck,ack);Array.from(pendingPvpInputs.keys()).forEach(seq=>{if(seq<=ack)pendingPvpInputs.delete(seq)});let rx=Number(serverPlayer.x)||localPlayer.x,ry=Number(serverPlayer.y)||localPlayer.y;const speed=typeof CONFIG!=='undefined'&&Number(CONFIG.speed)||320;Array.from(pendingPvpInputs.values()).sort((a,b)=>a.sequence-b.sequence).forEach(item=>{if(item.replayDt>0){rx+=item.moveX*speed*item.replayDt;ry+=item.moveY*speed*item.replayDt}});const error=Math.hypot(rx-localPlayer.x,ry-localPlayer.y),blend=error>80?1:error>8?.5:.2;localPlayer.x+=(rx-localPlayer.x)*blend;localPlayer.y+=(ry-localPlayer.y)*blend;if(Number.isFinite(Number(serverPlayer.hp)))localPlayer.hp=Number(serverPlayer.hp);if(Number.isFinite(Number(serverPlayer.maxHp)))localPlayer.maxHp=Number(serverPlayer.maxHp);if(Number.isFinite(Number(serverPlayer.mana)))localPlayer.mana=Number(serverPlayer.mana);if(Number.isFinite(Number(serverPlayer.maxMana)))localPlayer.maxMana=Number(serverPlayer.maxMana);if(serverPlayer.face)localPlayer._face=serverPlayer.face;window.KELO_PVP_NET_AUDIT={version:'pvp-net-v1',lastAck:lastPvpAck,pending:pendingPvpInputs.size,lastServerTick,reconciliationError:error,interpolationDelayMs:INTERPOLATION_DELAY_MS}}
+const consumedPvpEvents=new Set();
+function ingestPvpEvents(events,serverTime){if(!Array.isArray(events))return;events.forEach(ev=>{if(!ev||!ev.id||consumedPvpEvents.has(ev.id))return;consumedPvpEvents.add(ev.id);if(consumedPvpEvents.size>256)consumedPvpEvents.delete(consumedPvpEvents.values().next().value);if(!window.KeloVisualEventBus)return;const base={remote:true,networkReplay:true,serverTime:Number(serverTime)||Date.now(),actorId:ev.actorId||null,actor:ev.actorId===myId?localPlayer:peers[ev.actorId]||null,targetActorId:ev.targetId||null,targetActor:ev.targetId===myId?localPlayer:peers[ev.targetId]||null,projectileId:ev.projectileId||ev.projectile&&ev.projectile.id||null,abilityKey:ev.abilityKey||ev.projectile&&ev.projectile.abilityKey||null,direction:ev.direction||null,target:ev.target||ev.position||null,origin:ev.position||null,amount:ev.amount||null};if(ev.type==='PROJECTILE_SPAWNED')window.KeloVisualEventBus.emit('PROJECTILE_SPAWNED',Object.assign(base,{gameplayObject:ev.projectile||null}));else if(ev.type==='PROJECTILE_HIT')window.KeloVisualEventBus.emit('PROJECTILE_HIT',base);else if(ev.type==='PROJECTILE_EXPIRED')window.KeloVisualEventBus.emit('PROJECTILE_EXPIRED',base);else if(ev.type==='DASH_STARTED')window.KeloVisualEventBus.emit('DASH_STARTED',base);else if(ev.type==='DASH_ENDED')window.KeloVisualEventBus.emit('DASH_ENDED',base);else if(ev.type==='DEATH')window.KeloVisualEventBus.emit('DEATH',base)})}
+function ingestPvpSnapshot(msg){if(!msg||!msg.players)return;lastServerTick=Math.max(lastServerTick,Number(msg.serverTick)||0);window.keloNet.pvpSource='server-authoritative';window.keloNet.pvpProjectiles=Array.isArray(msg.projectiles)?msg.projectiles.slice():[];const local=msg.players[myId];if(local)reconcileLocal(local);Object.keys(msg.players).forEach(id=>{if(id!==myId)upsert(msg.players[id],msg.serverTime)});ingestPvpEvents(msg.events,msg.serverTime)}
+function connect(){if(!NET){paintChip('off',0);return}try{ws=new WebSocket(NET)}catch(_){paintChip('err',0);return}paintChip('wait',0);ws.onopen=()=>{window.keloNet.on=true;ws.send(JSON.stringify({t:'hello',name:localPlayer&&localPlayer.name||'Kelo',playerKey:window.keloNet.playerKey}));paintChip('on',countOnline())};ws.onclose=()=>{window.keloNet.on=false;pending.forEach(item=>{clearTimeout(item.timer);item.reject(new Error('NETWORK_CLOSED'))});pending.clear();pendingPvpInputs.clear();paintChip('err',0);setTimeout(connect,1500)};ws.onerror=()=>paintChip('err',0);ws.onmessage=ev=>{let msg;try{msg=JSON.parse(ev.data)}catch(_){return}if(msg.t==='welcome'){myId=msg.id;window.keloNet.id=myId;window.keloNet.nobilitySource=msg.nobilitySource||window.keloNet.nobilitySource;window.keloNet.titleSource=msg.titleSource||window.keloNet.titleSource;window.keloNet.forgeSource=msg.forgeSource||window.keloNet.forgeSource;window.keloNet.commerceSource=msg.commerceSource||window.keloNet.commerceSource;ingest(msg.players,msg.serverTime)}if(msg.t==='identity'&&msg.playerKey){window.keloNet.playerKey=msg.playerKey;savePlayerKey(msg.playerKey)}if(msg.t==='state')ingest(msg.players,msg.serverTime);if(msg.t==='join'&&msg.player)upsert(msg.player,msg.serverTime);if(msg.t==='leave'&&msg.id){delete peers[msg.id];paintChip(window.keloNet.on?'on':'err',countOnline())}if(msg.t==='pvp:snapshot')ingestPvpSnapshot(msg);if(msg.t==='pvp:reject'){if(Number.isFinite(Number(msg.ackSequence)))Array.from(pendingPvpInputs.keys()).forEach(seq=>{if(seq<=Number(msg.ackSequence))pendingPvpInputs.delete(seq)});window.KELO_PVP_NET_REJECT={sequence:msg.sequence||null,code:msg.code||'REJECTED',at:Date.now()}}if(msg.t==='visual:event')ingestVisualEvent(msg);if(msg.t==='nobility:snapshot'){ingestNobility(msg.snapshot);settle(msg.requestId,true,msg.snapshot)}if(msg.t==='nobility:donated'){ingestNobility(msg.snapshot);settle(msg.requestId,true,msg)}if(msg.t==='titles:snapshot'){ingestTitles(msg.snapshot);settle(msg.requestId,true,msg.snapshot)}if(msg.t==='titles:equipped'||msg.t==='titles:unequipped'){ingestTitles(msg.snapshot);settle(msg.requestId,true,msg.snapshot)}if(msg.t==='combat:resolved')settle(msg.requestId,true,msg);if(msg.t==='forge:snapshot'){ingestForge(msg.snapshot);settle(msg.requestId,true,msg.snapshot)}if(msg.t==='forge:result'){if(msg.item&&window.KeloEquipment)window.KeloEquipment.applyServerItem(msg.item);if(Number.isFinite(msg.gold)&&typeof STATE!=='undefined')STATE.gold=msg.gold;settle(msg.requestId,true,msg)}if(msg.t==='forge:combined'){ingestForge(msg.snapshot);settle(msg.requestId,true,msg.snapshot)}if(msg.t==='commerce:result'){ingestCommerce(msg);settle(msg.requestId,true,msg)}if(msg.t==='commerce:event')ingestCommerce(msg);if(msg.t==='error')settle(msg.requestId,false,new Error(msg.code||msg.message||'SERVER_ERROR'))}}
+window.KeloNetAuthority=Object.freeze({version:'net-authority-v6-pvp-input',isOnline:()=>!!(ws&&ws.readyState===1&&window.keloNet.on),getNobility:()=>request('nobility:get'),donateNobility:(currency,amount)=>request('nobility:donate',{currency,amount:Math.floor(Number(amount))}),getTitles:()=>request('titles:get'),equipTitle:titleId=>request('titles:equip',{titleId:String(titleId||'')}),unequipTitle:()=>request('titles:unequip'),resolveDamage:baseDamage=>request('combat:resolve',{baseDamage:Math.floor(Number(baseDamage))}),getForge:()=>request('forge:get'),attemptForge:(itemId,forgeType,materialLevel,crystals)=>request('forge:attempt',{itemId,forgeType,materialLevel:Math.floor(Number(materialLevel)),crystals:Array.isArray(crystals)?crystals:[]}),combineForgeMaterials:materialId=>request('forge:combine',{materialId}),requestCommerce:(op,payload)=>request('commerce:request',{op:String(op||''),payload:payload&&typeof payload==='object'?payload:{}}),syncEquipment:()=>Promise.resolve({ok:true,mode:'server-derived'}),replicateVisualEvent,sendCombatIntent,getPvpPendingCount:()=>pendingPvpInputs.size,getLastPvpAck:()=>lastPvpAck});
+if(window.KeloVisualEventBus&&typeof window.KeloVisualEventBus.on==='function')VISUAL_EVENT_ALLOWLIST.forEach(name=>window.KeloVisualEventBus.on(name,payload=>replicateVisualEvent(name,payload)));
+connect();
+function currentNetworkZone(){if(pvpActive())return'pvp';try{const scene=window.KELO_SCENE_CONTEXT&&window.KELO_SCENE_CONTEXT.current();if(scene&&scene.zoneType==='instance'&&scene.instanceType)return scene.instanceType}catch(_){}return window.keloZone||'plaza'}
+function tickNetwork(context){const dt=context.dt;sendAcc+=dt;pvpSendAcc+=dt;if(ws&&ws.readyState===1&&localPlayer){if(pvpActive()){while(pvpSendAcc>=PVP_SEND_INTERVAL){pvpSendAcc-=PVP_SEND_INTERVAL;const move=currentMove(),aim=currentAim();sendCombatIntent({action:'input',phase:'held',moveX:move.x,moveY:move.y,aimX:aim.x,aimY:aim.y,clientTime:Date.now()})}}else if(sendAcc>.1){sendAcc=0;pvpSendAcc=0;ws.send(JSON.stringify({t:'pose',x:localPlayer.x,y:localPlayer.y,face:localPlayer._face||'down',gait:localPlayer._gait||'idle',zone:currentNetworkZone()}))}}const nowMs=Date.now();Object.keys(peers).forEach(id=>interpolatePeer(peers[id],nowMs))}
+function drawPeers(){if(typeof renderAvatar!=='function')return;const ids=Object.keys(peers);if(!ids.length)return;const z=CONFIG.zoom||1;ctx.save();ctx.translate(screenW/2,screenH/2);ctx.scale(z,z);ctx.translate(-camera.x,-camera.y);ids.forEach(id=>{if(!pvpActive()||peers[id].zone!=='pvp')renderAvatar(peers[id],false)});ctx.restore()}
+if(!window.KeloSimulation||!window.KeloRender)throw new Error('Foundation render/simulation owners unavailable before engine-net');window.KeloSimulation.after('engine-net:network',tickNetwork,300);window.KeloRender.afterFrame('engine-net:peers',drawPeers,300);
+window.KELO_NET_AUDIT={version:'net-authority-v6-pvp-input',owner:'KeloNetAuthority',pvpInputIntent:true,sequence:true,reconciliation:true,remoteInterpolation:true,interpolationDelayMs:INTERPOLATION_DELAY_MS,clientDamageAuthority:false,clientPositionAuthorityInPvp:false};
 })();
