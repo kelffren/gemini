@@ -112,6 +112,46 @@
       "playerVisible": true,
       "playerGuideAnchor": "mercado-comercio-y-trade",
       "status": "offline-active-online-ready"
+    },
+    {
+      "id": "mounts",
+      "owner": "KeloMounts",
+      "source": "src/mounts/mount-system.js",
+      "technicalDoc": "docs/systems/MOUNT_SYSTEM.md",
+      "playerVisible": false,
+      "status": "foundation-candidate"
+    },
+    {
+      "id": "stat-modifiers",
+      "owner": "KeloStatModifiers",
+      "source": "src/stats/stat-modifier-system.js",
+      "technicalDoc": "docs/systems/STAT_MODIFIER_SYSTEM.md",
+      "playerVisible": false,
+      "status": "foundation-candidate"
+    },
+    {
+      "id": "appearance",
+      "owner": "KeloAppearance",
+      "source": "src/appearance/appearance-system.js",
+      "technicalDoc": "docs/systems/APPEARANCE_SYSTEM.md",
+      "playerVisible": false,
+      "status": "foundation-candidate"
+    },
+    {
+      "id": "mount-creator",
+      "owner": "Kelo Creators / Mount workspace",
+      "source": "src/creators/workspaces/mount-workspace.mjs",
+      "technicalDoc": "docs/systems/MOUNT_CREATOR.md",
+      "playerVisible": false,
+      "status": "creator-candidate"
+    },
+    {
+      "id": "appearance-creator",
+      "owner": "Kelo Creators / Appearance workspace",
+      "source": "src/creators/workspaces/appearance-workspace.mjs",
+      "technicalDoc": "docs/systems/APPEARANCE_CREATOR.md",
+      "playerVisible": false,
+      "status": "creator-candidate"
     }
   ]
 }
