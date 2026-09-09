@@ -1,3 +1,10 @@
+<!-- KELO-INDEX
+  area: RUNTIME / UI BOOT
+  owner: index.html load order
+  keys: HUD LUXE PLAYER GUIDE NOBILITY TITLES MOBILE
+  purpose: carga el runtime LIVE y monta un único HUD superior izquierdo mediante Kelo Luxe
+  online: la UI solo consume estado; autoridad permanece en los owners de dominio
+-->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -11,8 +18,6 @@
     html,body{width:100%;height:100%;overflow:hidden;background:#05070a}
     #game-canvas{width:100%;height:100%;display:block;touch-action:none}
     #ui-layer{position:absolute;inset:0;pointer-events:none;z-index:10}
-    .hud-badge{position:absolute;top:max(8px,env(safe-area-inset-top));left:max(8px,env(safe-area-inset-left));font:11px ui-monospace,monospace;color:#e7c56a;background:rgba(10,13,18,.88);padding:7px 12px;border-radius:999px;border:1px solid rgba(231,197,106,.26)}
-    #kelo-guide-link{position:absolute;top:max(43px,calc(env(safe-area-inset-top) + 35px));left:max(8px,env(safe-area-inset-left));pointer-events:auto;padding:5px 9px;border-radius:999px;border:1px solid rgba(231,197,106,.28);background:rgba(10,13,18,.84);color:#e7c56a;text-decoration:none;font:800 9px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;letter-spacing:.04em}
     body.social-mode #action-bar-container{display:none!important}
     #action-bar-container .stone-slot{position:relative!important}
     #action-bar-container .stone-slot>span[style*="position:absolute"]{pointer-events:none}
@@ -21,7 +26,7 @@
 </head>
 <body class="social-mode">
 <canvas id="game-canvas"></canvas>
-<div id="ui-layer"><div class="hud-badge" id="telemetry-bar">Oro: 1500 | KC: 200</div><a id="kelo-guide-link" href="guide.html" aria-label="Abrir guía de mecánicas">GUÍA</a><div class="action-bar" id="action-bar-container" aria-label="Barra de habilidades"></div></div>
+<div id="ui-layer"><div class="action-bar" id="action-bar-container" aria-label="Barra de habilidades"></div></div>
 
 <!-- KELO-INDEX CORE: primitives compartidos antes del runtime legacy. Leer docs/KELO_FOUNDATION.md antes de añadir globals/wrappers. -->
 <script src="src/core/events/event-bus.js?v=1"></script>
@@ -49,6 +54,7 @@
 <script src="src/environment/plaza-depth.js?v=219"></script>
 <script src="src/systems/nobility.js?v=4"></script>
 <script src="src/systems/nobility-authority.js?v=2"></script>
+<script src="src/ui/luxe-player-hud.js?v=1"></script>
 <script src="src/ui/player-nameplate.js?v=1"></script>
 <script src="src/systems/nobility-combat.js?v=1"></script>
 <script src="src/systems/equipment-system.js?v=5"></script>
