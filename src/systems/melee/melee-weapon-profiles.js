@@ -1,14 +1,14 @@
 /* KELO-INDEX
  * area: MELEE
  * owner: KeloMeleeProfiles
- * keys: CONTENT PROFILES SWORD DATA ACTION WINDUP ACTIVE RECOVERY ARC COMBO SPECIAL CHARGE
+ * keys: CONTENT PROFILES SWORD DATA ACTION WINDUP ACTIVE RECOVERY ARC COMBO SPECIAL CHARGE MOVEMENT
  * purpose: catálogo declarativo de perfiles melee; armas/combos/specials nuevos no modifican engines
  * gameplay: sword basic conserva identidad ligera y añade combo/charges/timeline por data
  * online: servidor carga los mismos IDs/perfiles; balance competitivo puede resolver modifiers encima
  */
 (function(root){
   'use strict';
-  const VERSION='melee-weapon-profiles-v3.0.0-pvp-bible';
+  const VERSION='melee-weapon-profiles-v3.1.0-light-recovery-mobility';
   const registry=new Map();
   function freezeScale(value){
     if(value&&typeof value==='object')return Object.freeze({windup:value.windup==null?1:Number(value.windup),active:value.active==null?1:Number(value.active),recovery:value.recovery==null?1:Number(value.recovery)});
@@ -34,7 +34,7 @@
   register({
     id:'sword_light_basic',weaponClass:'sword',attackProfile:'light_slash',damage:18,range:150,cooldown:.12,damageType:'physical',
     hitShape:'sector',arcDegrees:92,forwardOffset:18,windup:.085,active:.075,recovery:.18,
-    movementScale:{windup:.86,active:.48,recovery:.76},knockback:15,stagger:.07,
+    movementScale:{windup:.86,active:.48,recovery:1},knockback:15,stagger:.07,
     charges:2,rechargeTime:.58,cancelWindow:.055,comboWindow:.14,comboTimeout:.52,
     combo:['sword_light_basic','sword_light_follow','sword_light_finisher'],canCancelInto:['dodge','special','ability'],specialAttackProfileId:'sword_heavy_charge',visualProfileId:'melee_sword_light_v3'
   });
@@ -58,6 +58,6 @@
     input:{mode:'charge',charge:{minTime:.08,level1Time:.28,level2Time:.62,maxTime:1.05}},visualProfileId:'melee_sword_heavy_charge_v1'
   });
 
-  root.KELO_MELEE_PROFILE_AUDIT={version:VERSION,ready:true,profiles:function(){return registry.size;},basicProfile:'sword_light_basic',basicDamage:18,basicRange:150,basicHitShape:'sector',basicArcDegrees:92,basicCharges:2,comboSteps:3,specialProfile:'sword_heavy_charge'};
+  root.KELO_MELEE_PROFILE_AUDIT={version:VERSION,ready:true,profiles:function(){return registry.size;},basicProfile:'sword_light_basic',basicDamage:18,basicRange:150,basicHitShape:'sector',basicArcDegrees:92,basicCharges:2,comboSteps:3,specialProfile:'sword_heavy_charge',basicRecoveryMovementScale:1};
   root.KeloMeleeProfiles=Object.freeze({version:VERSION,register,get,list});
 })(typeof globalThis!=='undefined'?globalThis:window);
