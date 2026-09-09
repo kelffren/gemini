@@ -5,7 +5,7 @@
 `KeloTitles` es el OWNER único de los títulos personales desbloqueables de Kelo World. Nobleza y Títulos son responsabilidades diferentes:
 
 - `KeloNobility` decide el rango automático de Nobleza (`Caballero`, `Barón`, `Conde`, `Duque`, `Príncipe`, `Rey`).
-- `KeloTitles` gestiona títulos personales ganados por logros (`Combatiente`, `Cazador`, `Asesino`, etc.) y cuál de ellos está equipado.
+- `KeloTitles` gestiona títulos personales ganados por logros (`Combatiente`, `Cazador`, `Asesino`, etc.), cuál está equipado y la superficie `Libro de títulos`.
 
 El jugador puede mostrar ambas capas al mismo tiempo:
 
@@ -20,7 +20,8 @@ Kelo
 **Owner:** `window.KeloTitles`  
 **Fuente:** `src/systems/title-system.js`  
 **Catálogo puro:** `src/systems/title-catalog.js`  
-**Presentación:** `src/ui/player-nameplate.js` consume el estado mediante `KeloAvatar.use(...)`.
+**Presentación nameplate:** `src/ui/player-nameplate.js` consume el estado mediante `KeloAvatar.use(...)`.  
+**Launcher del Libro:** `src/ui/luxe-shell.js` delega en `KeloTitles.openBook()`; no crea otro sistema de títulos.
 
 ## Arquitectura
 
@@ -36,6 +37,7 @@ KeloTitles evaluator
        ├─ unlocked IDs
        └─ equippedTitleId
                 │
+                ├──────────────► Libro de títulos
                 ▼
       KeloActorNameplate
         (presentación)
@@ -64,7 +66,7 @@ Ejemplo:
 }
 ```
 
-Agregar un título futuro no requiere editar el evaluator, el combate ni el nameplate.
+Agregar un título futuro no requiere editar el evaluator, el combate, el Libro ni el nameplate.
 
 El catálogo crea una vez un índice `requirement.stat → títulos relacionados`; el evaluator solo revisa los títulos afectados cuando cambia esa stat. No existe un recorrido del catálogo dentro del frame loop.
 
@@ -78,7 +80,44 @@ El catálogo crea una vez un índice `requirement.stat → títulos relacionados
 | `pvp_executioner` | Verdugo | 500 |
 | `pvp_realm_scourge` | Azote del Reino | 1.000 |
 
-También quedan registradas las categorías futuras: PvP, PvE, bosses, exploración, comercio, economía, profesiones, construcción, Nobleza, clanes, facciones, caravanas, eventos, temporadas, secretos y colecciones.
+## Placeholders de contenido
+
+El catálogo incluye títulos provisionales para diseñar y validar el Libro antes de cerrar el contenido final. Todos llevan `placeholder: true` y pueden reemplazarse únicamente modificando DATA.
+
+| ID | Placeholder | Categoría | Stat provisional |
+| --- | --- | --- | --- |
+| `placeholder_gatherer_01` | Recolector I | Recolección | `resourcesGathered` |
+| `placeholder_forgemaster_01` | Forjador I | Profesiones | `itemsForged` |
+| `placeholder_pve_hunter_01` | Exterminador I | PvE | `pveEnemiesDefeated` |
+| `placeholder_boss_hunter_01` | Cazajefes I | Jefes | `bossesDefeated` |
+| `placeholder_explorer_01` | Explorador I | Exploración | `zonesDiscovered` |
+| `placeholder_merchant_01` | Mercader I | Comercio | `playerTradesCompleted` |
+| `placeholder_builder_01` | Constructor I | Construcción | `structuresPlaced` |
+| `placeholder_magnate_01` | Magnate I | Economía | `goldEarnedLifetime` |
+| `placeholder_caravaneer_01` | Caravanero I | Caravanas | `caravansCompleted` |
+
+Que una stat exista en el catálogo no significa que el cliente pueda inventarla. El progreso solo avanza cuando el owner gameplay correspondiente reporte esa stat mediante `KeloPlayerStats` offline o mediante autoridad server online.
+
+Las categorías preparadas incluyen PvP, PvE, jefes, exploración, recolección, comercio, economía, profesiones, construcción, Nobleza, clanes, facciones, caravanas, eventos, temporadas, secretos y colecciones.
+
+## Libro de títulos
+
+El menú principal Luxe muestra una tarjeta **Libro de títulos**. Esa tarjeta no posee estado de progreso: únicamente llama a `KeloTitles.openBook()`.
+
+El Libro muestra:
+
+- colección desbloqueada / total;
+- título equipado;
+- todos los títulos del catálogo;
+- categoría y rareza;
+- estado bloqueado/desbloqueado/equipado;
+- progreso numérico y barra;
+- detalle al tocar un título;
+- bloque **CÓMO CONSEGUIRLO** con la descripción/requisito;
+- marca **PROVISIONAL** para placeholders;
+- equipar/desequipar cuando corresponde.
+
+El Libro usa `KeloInputLocks` con el owner token `titles-book`, respeta safe areas y tiene layouts específicos para portrait móvil y landscape compacto.
 
 ## API pública
 
@@ -93,6 +132,9 @@ También quedan registradas las categorías futuras: PvP, PvE, bosses, exploraci
 - `KeloTitles.ingestServerSnapshot(snapshot)`
 - `KeloTitles.evaluate(stat)`
 - `KeloTitles.refresh()`
+- `KeloTitles.openBook()`
+- `KeloTitles.closeBook()`
+- `KeloTitles.renderBook()`
 
 La UI del panel de Nobleza consume además `renderNobilityPane()` y `bindNobilityPane()`; estas funciones no convierten Nobleza en owner de títulos.
 
@@ -118,7 +160,7 @@ El transporte público permite solamente:
 - `titles:equip`
 - `titles:unequip`
 
-No existe `titles:unlock` ni una llamada cliente para declarar kills.
+No existe `titles:unlock` ni una llamada cliente para declarar kills o stats.
 
 El snapshot server es compacto:
 
@@ -175,27 +217,20 @@ Las rarezas usan estilos compartidos (`common`, `uncommon`, `rare`, `epic`, `leg
 
 ## Panel de Nobleza
 
-El panel existente añade una pestaña `Títulos` con:
-
-- título equipado;
-- desequipar;
-- títulos desbloqueados;
-- títulos bloqueados;
-- barra/progreso numérico;
-- botón Equipar.
-
-No se crea un segundo acceso principal.
+El panel existente conserva su pestaña `Títulos` como acceso contextual y consume el mismo owner `KeloTitles`. El acceso principal adicional `Libro de títulos` en el menú no duplica lógica ni estado: ambas superficies leen y escriben mediante la misma API.
 
 ## Invariantes
 
 - Nobleza sigue siendo `KeloNobility`.
 - Títulos personales siguen siendo `KeloTitles`.
 - Stats siguen siendo `KeloPlayerStats`.
+- El Libro de títulos es una superficie del mismo owner, no un segundo engine.
 - `KeloTitles` no decide kills.
 - El renderer no decide unlock/equip.
 - Online nunca acepta progreso declarado por el cliente.
 - `visual:event DEATH` jamás cuenta como kill.
 - Nuevos títulos se registran como DATA.
+- Los placeholders también son DATA y pueden reemplazarse sin tocar engine/UI.
 - No se evalúan títulos cada frame.
 - `equippedTitleId` es el ID estable replicado; el texto visible se resuelve localmente.
 
@@ -208,4 +243,4 @@ No se crea un segundo acceso principal.
 
 ## Estado
 
-**FOUNDATION ACTIVE — IDENTITY / PRESTIGE OWNER**
+**FOUNDATION ACTIVE — IDENTITY / PRESTIGE OWNER + TITLE BOOK**
