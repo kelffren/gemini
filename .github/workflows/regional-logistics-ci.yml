@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - fix/regional-logistics-main-integration
+      - fix/regional-logistics-current-main
     paths:
       - 'src/systems/regional-economy-*.js'
       - 'src/systems/caravan-system.js'
