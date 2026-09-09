@@ -1,0 +1,32 @@
+# KELO-INDEX
+# area: QA / MAP FORGE
+# owner: Map Forge CI
+# purpose: protect deterministic Map Forge core, fuzz validity and quality differentiation
+name: Map Forge Core CI
+
+on:
+  pull_request:
+    paths:
+      - 'src/world/map-forge/**'
+      - 'scripts/map-forge-core-audit.mjs'
+      - '.github/workflows/map-forge-core-ci.yml'
+      - 'docs/systems/MAP_FORGE_SYSTEM.md'
+      - 'docs/system-catalog.json'
+  push:
+    branches: [main]
+    paths:
+      - 'src/world/map-forge/**'
+      - 'scripts/map-forge-core-audit.mjs'
+      - '.github/workflows/map-forge-core-ci.yml'
+
+jobs:
+  deterministic-core:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run Map Forge deterministic + 300-seed audit
+        run: node scripts/map-forge-core-audit.mjs
