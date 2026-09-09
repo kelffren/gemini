@@ -11,7 +11,7 @@
 
 import { virtualRange } from './virtual-list.mjs';
 
-const SHELL_VERSION='studio-live-shell-v1.5.0';
+const SHELL_VERSION='studio-live-shell-v1.6.0';
 
 const TOOL_LABELS=Object.freeze({
   select:'Selección',
@@ -26,7 +26,7 @@ const TOOL_LABELS=Object.freeze({
 });
 
 export function createStudioLiveShell({
-  host=globalThis.document?.body,assets=[],onMode,onAsset,onUndo,onRedo,onRotate,onErase,onSave,onClose,
+  host=globalThis.document?.body,assets=[],onMode,onAsset,onUndo,onRedo,onRotate,onScale,onErase,onSave,onClose,
   onSelectEntity,onDuplicate,onDelete,onPropertyChange,onPlay,onBrushSize,onFocus,renderAssetPreview
 }={}){
   const document=host?.ownerDocument||globalThis.document;
@@ -362,6 +362,9 @@ export function createStudioLiveShell({
               <button data-act="undo"><span class="ks-ico">↶</span>UNDO</button>
               <button data-act="redo"><span class="ks-ico">↷</span>REDO</button>
               <button data-act="rotate"><span class="ks-ico">⟳</span>ROTAR</button>
+              <button data-act="scale-down"><span class="ks-ico">−</span>ESCALA</button>
+              <button data-act="scale-reset">100%</button>
+              <button data-act="scale-up"><span class="ks-ico">＋</span>ESCALA</button>
               <button data-act="duplicate"><span class="ks-ico">⧉</span>DUPLICAR</button>
             </div>
           </section>
@@ -509,11 +512,11 @@ export function createStudioLiveShell({
     if(selected.length>1){
       const e=document.createElement('div');
       e.className='ks-empty';
-      e.textContent=`${selected.length} objetos seleccionados. MOVE los arrastra juntos; ROTAR, DUPLICAR y BORRAR cuentan como una sola acción de Undo.`;
+      e.textContent=`${selected.length} objetos seleccionados. MOVE, ROTAR, ESCALA, DUPLICAR y BORRAR mantienen una sola acción de Undo por operación.`;
       hostEl.appendChild(e);
       const a=document.createElement('div');
       a.className='ks-prop-actions';
-      for(const [act,text] of [['focus','ENFOCAR'],['rotate','↻ ROTAR'],['duplicate','DUPLICAR'],['delete','BORRAR']]){
+      for(const [act,text] of [['focus','ENFOCAR'],['rotate','↻ ROTAR'],['scale-down','− ESCALA'],['scale-reset','100%'],['scale-up','＋ ESCALA'],['duplicate','DUPLICAR'],['delete','BORRAR']]){
         const b=document.createElement('button');b.className='ks-mini';b.dataset.act=act;b.textContent=text;a.appendChild(b);
       }
       hostEl.appendChild(a);
@@ -531,9 +534,10 @@ export function createStudioLiveShell({
       const input=document.createElement('input');input.type='number';input.value=Number(value)||0;input.dataset.prop=name;
       row.append(l,input);hostEl.appendChild(row);
     }
+    const scaleRow=document.createElement('div');scaleRow.className='ks-field';const scaleLabel=document.createElement('label');scaleLabel.textContent='ESCALA %';const scaleInput=document.createElement('input');scaleInput.type='number';scaleInput.min='10';scaleInput.max='800';scaleInput.step='5';scaleInput.value=String(Math.round((Number(t.scale)||1)*100));scaleInput.dataset.prop='scalePercent';scaleRow.append(scaleLabel,scaleInput);hostEl.appendChild(scaleRow);
     const actions=document.createElement('div');
     actions.className='ks-prop-actions';
-    for(const [act,text] of [['focus','ENFOCAR'],['rotate','↻ ROTAR'],['duplicate','DUPLICAR'],['delete','BORRAR']]){
+    for(const [act,text] of [['focus','ENFOCAR'],['rotate','↻ ROTAR'],['scale-down','− ESCALA'],['scale-reset','100%'],['scale-up','＋ ESCALA'],['duplicate','DUPLICAR'],['delete','BORRAR']]){
       const b=document.createElement('button');b.className='ks-mini';b.dataset.act=act;b.textContent=text;actions.appendChild(b);
     }
     hostEl.appendChild(actions);
@@ -566,6 +570,7 @@ export function createStudioLiveShell({
       button.disabled=!hasSelection;
     });
     root.querySelectorAll('[data-act="rotate"]').forEach(button=>{button.disabled=!hasSelection&&!selectedAsset;});
+    root.querySelectorAll('[data-act="scale-down"],[data-act="scale-reset"],[data-act="scale-up"]').forEach(button=>{button.disabled=!hasSelection;});
   }
 
   function setCompact(next){
@@ -637,7 +642,7 @@ export function createStudioLiveShell({
       onBrushSize?.(brushSize);
       return;
     }
-    if(e.target.matches('[data-prop]'))onPropertyChange?.(e.target.dataset.prop,Number(e.target.value)||0);
+    if(e.target.matches('[data-prop]')){const prop=e.target.dataset.prop,value=Number(e.target.value)||0;if(prop==='scalePercent')onPropertyChange?.('scale',Math.max(10,Math.min(800,value))/100);else onPropertyChange?.(prop,value);}
   });
 
   root.addEventListener('click',e=>{
@@ -684,6 +689,9 @@ export function createStudioLiveShell({
     else if(a==='redo')onRedo?.();
     else if(a==='rotate')onRotate?.();
     else if(a==='duplicate')onDuplicate?.();
+    else if(a==='scale-down')onScale?.('down');
+    else if(a==='scale-reset')onScale?.('reset');
+    else if(a==='scale-up')onScale?.('up');
     else if(a==='delete')onDelete?.();
     else if(a==='focus')onFocus?.();
     else if(a==='erase'){setErase(!erase);onErase?.(erase);}

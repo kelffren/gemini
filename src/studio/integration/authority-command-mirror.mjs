@@ -7,6 +7,7 @@
  */
 
 const quarter = degrees => ((Math.round((Number(degrees) || 0) / 90) % 4) + 4) % 4;
+const uniformScale = value => { const n=Number(value); return Math.max(.1,Math.min(8,Number.isFinite(n)?Math.round(n*100)/100:1)); };
 const placementIdFromEntity = (entity, ids) => ids.get(String(entity?.id || '')) || entity?.source?.authorityPlacementId || entity?.id || null;
 const surfaceState = value => value == null ? null : (typeof value === 'string' ? { material: value, role: 'terrain' } : value);
 
@@ -16,7 +17,7 @@ export function installStudioAuthorityMirror({ adapter, actorId, getDraftId } = 
   const draft = () => { const id = getDraftId?.(); if (!id) throw new Error('STUDIO_DRAFT_REQUIRED'); return id; };
   const base = extra => ({ actorId: actorId || undefined, draftId: draft(), ...extra });
   async function create(entity) {
-    const result = await adapter.worldEditRequest('world:placement:create', base({ assetId: entity.prefabId, x: Number(entity.transform?.x) || 0, y: Number(entity.transform?.y) || 0, rotation: quarter(entity.transform?.rotation) }));
+    const result = await adapter.worldEditRequest('world:placement:create', base({ assetId: entity.prefabId, x: Number(entity.transform?.x) || 0, y: Number(entity.transform?.y) || 0, rotation: quarter(entity.transform?.rotation), scale: uniformScale(entity.transform?.scale) }));
     const id = result?.placement?.placementId || result?.placementId;
     if (!id) throw new Error('STUDIO_AUTHORITY_PLACEMENT_ID_MISSING');
     authorityIds.set(String(entity.id), String(id));
@@ -37,6 +38,10 @@ export function installStudioAuthorityMirror({ adapter, actorId, getDraftId } = 
     const from = quarter(fromRotation), to = quarter(toRotation), delta = ((to - from) % 4 + 4) % 4;
     if (!delta) return null;
     return adapter.worldEditRequest('world:placement:rotate', base({ placementId: String(id), delta }));
+  }
+  async function scalePlacement(command, value) {
+    const id = authorityIds.get(String(command.id)) || command.id; if (!id) throw new Error('STUDIO_AUTHORITY_PLACEMENT_ID_MISSING');
+    return adapter.worldEditRequest('world:placement:scale', base({ placementId: String(id), scale: uniformScale(value) }));
   }
   async function applySurface(command, value) {
     const state = surfaceState(value);
@@ -77,8 +82,10 @@ export function installStudioAuthorityMirror({ adapter, actorId, getDraftId } = 
     if (command.type === 'entity.remove') return action === 'undo' ? create(command.entity) : remove(command.entity || { id: command.id });
     if (command.type === 'entity.move') return move(command, action === 'undo' ? command.from : command.to);
     if (command.type === 'entity.patch') {
-      const before = command.previous?.transform?.rotation ?? 0, after = command.patch?.transform?.rotation ?? before;
-      return action === 'undo' ? rotate(command, after, before) : rotate(command, before, after);
+      const beforeT=command.previous?.transform||{},afterT=command.patch?.transform||beforeT,from=action==='undo'?afterT:beforeT,to=action==='undo'?beforeT:afterT;let result=null;
+      if(quarter(from.rotation)!==quarter(to.rotation))result=await rotate(command,from.rotation,to.rotation);
+      if(uniformScale(from.scale)!==uniformScale(to.scale))result=await scalePlacement(command,to.scale);
+      return result;
     }
     return null;
   }

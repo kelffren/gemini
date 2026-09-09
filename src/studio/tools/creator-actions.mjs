@@ -11,6 +11,7 @@ import { createCompositeCommand } from '../document/composite-command.mjs';
 
 const copy = value => value == null ? value : (typeof structuredClone === 'function' ? structuredClone(value) : JSON.parse(JSON.stringify(value)));
 function newId() { const uuid = globalThis.crypto?.randomUUID?.(); return `entity:${uuid || `${Date.now().toString(36)}:${Math.random().toString(36).slice(2,10)}`}`; }
+const scaleOf=value=>{const n=Number(value);return Math.max(.1,Math.min(8,Number.isFinite(n)?Math.round(n*100)/100:1));};
 
 export function createCreatorActions(kernel) {
   if (!kernel) throw new Error('STUDIO_CREATOR_ACTIONS_KERNEL_REQUIRED');
@@ -55,11 +56,20 @@ export function createCreatorActions(kernel) {
     return selectedEntities();
   }
 
+  async function scaleSelection({delta=0,value=null}={}) {
+    const rows=selectedEntities(); if(!rows.length)return [];
+    const commands=[];
+    for(const row of rows){const current=scaleOf(row.transform?.scale),next=scaleOf(value==null?current+(Number(delta)||0):value);if(next===current)continue;commands.push(createPatchEntityCommand(row.id,{transform:{...(row.transform||{}),scale:next}}));}
+    if(!commands.length)return rows;
+    await kernel.execute(createCompositeCommand(commands,{type:'entity.batch.scale',label:`Scale ${rows.length} object${rows.length===1?'':'s'}`}));
+    return selectedEntities();
+  }
+
   async function patchPrimary(patch) {
     const id = kernel.selection.get()[0]; if (!id) return null;
     await kernel.execute(createPatchEntityCommand(id, patch));
     return kernel.document.entities.find(e => e.id === id) || null;
   }
 
-  return Object.freeze({ selectedEntities, removeSelection, duplicateSelection, copySelection, pasteClipboard, rotateSelection, patchPrimary, get clipboardSize(){return clipboard.length;} });
+  return Object.freeze({ selectedEntities, removeSelection, duplicateSelection, copySelection, pasteClipboard, rotateSelection, scaleSelection, patchPrimary, get clipboardSize(){return clipboard.length;} });
 }

@@ -7,11 +7,13 @@
  */
 
 const copy = value => value == null ? value : (typeof structuredClone === 'function' ? structuredClone(value) : JSON.parse(JSON.stringify(value)));
-const rectFor = entity => ({ x: Number(entity?.transform?.x) || 0, y: Number(entity?.transform?.y) || 0, w: Math.max(1, Number(entity?.bounds?.w) || 1), h: Math.max(1, Number(entity?.bounds?.h) || 1) });
+const scaleOf = value => { const n=Number(value); return Math.max(.1,Math.min(8,Number.isFinite(n)?Math.round(n*100)/100:1)); };
+const rectFor = entity => { const s=scaleOf(entity?.transform?.scale); return { x: Number(entity?.transform?.x) || 0, y: Number(entity?.transform?.y) || 0, w: Math.max(1, (Number(entity?.bounds?.w) || 1)*s), h: Math.max(1, (Number(entity?.bounds?.h) || 1)*s) }; }; 
 const findIndex = (document, id) => document.entities.findIndex(e => e.id === id);
 const normalizePatch = patch => {
   const next = copy(patch || {});
   if (next?.transform && next.transform.rotation != null) next.transform.rotation = Math.round((Number(next.transform.rotation) || 0) / 90) * 90;
+  if (next?.transform && next.transform.scale != null) next.transform.scale = scaleOf(next.transform.scale);
   return next;
 };
 

@@ -18,7 +18,8 @@ import { createSpatialChunkIndex } from '../spatial/spatial-chunk-index.mjs';
 import { createDirtyChunkManager } from '../spatial/dirty-chunk-manager.mjs';
 import { normalizeWorldDocument } from '../document/world-document.mjs';
 
-const entityRect=e=>({x:Number(e.transform?.x)||0,y:Number(e.transform?.y)||0,w:Math.max(1,Number(e.bounds?.w)||1),h:Math.max(1,Number(e.bounds?.h)||1)});
+const entityScale=e=>{const n=Number(e?.transform?.scale);return Math.max(.1,Math.min(8,Number.isFinite(n)?n:1));};
+const entityRect=e=>{const s=entityScale(e);return{x:Number(e.transform?.x)||0,y:Number(e.transform?.y)||0,w:Math.max(1,(Number(e.bounds?.w)||1)*s),h:Math.max(1,(Number(e.bounds?.h)||1)*s)};};
 function collectEntityIds(command,out=new Set()){if(!command||typeof command!=='object')return out;if(String(command.type||'').startsWith('entity.')){if(command.id)out.add(String(command.id));if(command.entity?.id)out.add(String(command.entity.id));}if(Array.isArray(command.commands))for(const child of command.commands)collectEntityIds(child,out);return out;}
 const worldDocumentModel=Object.freeze({
   id:'world',normalize:normalizeWorldDocument,chunkSize:document=>Number(document?.settings?.chunkSize)||512,

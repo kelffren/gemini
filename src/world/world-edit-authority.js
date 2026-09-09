@@ -23,7 +23,8 @@ function worldBuilder(){return window.KELO_WORLD_BUILDER||null;}
 function layoutsEqual(a,b){
   const norm=rows=>(Array.isArray(rows)?rows:[]).map(r=>({
     placementId:String(r.placementId||''),assetId:String(r.assetId||''),x:Number(r.x)||0,y:Number(r.y)||0,
-    rotation:((Math.floor(Number(r.rotation)||0)%4)+4)%4
+    rotation:((Math.floor(Number(r.rotation)||0)%4)+4)%4,
+    scale:Math.max(.1,Math.min(8,Number.isFinite(Number(r.scale))?Math.round(Number(r.scale)*100)/100:1))
   })).sort((x,y)=>x.placementId.localeCompare(y.placementId));
   return JSON.stringify(norm(a))===JSON.stringify(norm(b));
 }

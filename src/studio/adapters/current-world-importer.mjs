@@ -8,13 +8,14 @@
 
 import { createWorldDocument } from '../document/world-document.mjs';
 const copy = value => value == null ? value : (typeof structuredClone === 'function' ? structuredClone(value) : JSON.parse(JSON.stringify(value)));
+const scaleOf = value => { const n=Number(value); return Math.max(.1,Math.min(8,Number.isFinite(n)?Math.round(n*100)/100:1)); };
 function rotatedBounds(template, quarter) { const w = Math.max(1, Number(template?.width) || 32), h = Math.max(1, Number(template?.height) || 32); return Math.abs(Number(quarter) || 0) % 2 ? { w: h, h: w } : { w, h }; }
 function placementToEntity(placement, catalog) {
   const template = catalog.get(placement.assetId), quarter = ((Math.floor(Number(placement.rotation) || 0) % 4) + 4) % 4;
   const components = { legacyPlacement: { parcelId: placement.parcelId || null, ownerId: placement.ownerId || null, assetId: placement.assetId } };
   if (template?.parts?.length) components.visual = { source: 'property-catalog', parts: copy(template.parts) };
   if (template?.collision) components.collider = { rect: copy(template.collision), blocksMovement: true };
-  return { id: String(placement.placementId), prefabId: String(placement.assetId), transform: { x: Number(placement.x) || 0, y: Number(placement.y) || 0, rotation: quarter * 90 }, bounds: rotatedBounds(template, quarter), components, source: { kind: 'kelo-placement', authorityPlacementId: String(placement.placementId), updatedAt: Number(placement.updatedAt) || 0 } };
+  return { id: String(placement.placementId), prefabId: String(placement.assetId), transform: { x: Number(placement.x) || 0, y: Number(placement.y) || 0, rotation: quarter * 90, scale: scaleOf(placement.scale) }, bounds: rotatedBounds(template, quarter), components, source: { kind: 'kelo-placement', authorityPlacementId: String(placement.placementId), updatedAt: Number(placement.updatedAt) || 0 } };
 }
 export async function importCurrentKeloWorld({ adapter, mode = 'world', actorId = null, parcelId = null, view = 'published', draftId = null } = {}) {
   if (!adapter) throw new Error('STUDIO_IMPORT_ADAPTER_REQUIRED');

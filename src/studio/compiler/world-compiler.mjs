@@ -8,12 +8,14 @@
 
 const clone = value => value == null ? value : (typeof structuredClone === 'function' ? structuredClone(value) : JSON.parse(JSON.stringify(value)));
 const chunkKey = (x, y, chunkSize) => `${Math.floor(x / chunkSize)},${Math.floor(y / chunkSize)}`;
-const rectOf = entity => ({ x: Number(entity.transform?.x) || 0, y: Number(entity.transform?.y) || 0, w: Math.max(1, Number(entity.bounds?.w) || 1), h: Math.max(1, Number(entity.bounds?.h) || 1) });
+const scaleOf = value => { const n=Number(value); return Math.max(.1,Math.min(8,Number.isFinite(n)?n:1)); };
+const rectOf = entity => { const s=scaleOf(entity.transform?.scale); return { x: Number(entity.transform?.x) || 0, y: Number(entity.transform?.y) || 0, w: Math.max(1, (Number(entity.bounds?.w) || 1)*s), h: Math.max(1, (Number(entity.bounds?.h) || 1)*s) }; };
 
-function colliderRect(entityRect, collider) {
+function colliderRect(entityRect, collider, scale=1) {
   const local = collider?.rect;
   if (!local) return clone(entityRect);
-  return { x: entityRect.x + (Number(local.x) || 0), y: entityRect.y + (Number(local.y) || 0), w: Math.max(1, Number(local.w) || entityRect.w), h: Math.max(1, Number(local.h) || entityRect.h) };
+  const s=scaleOf(scale),lw=Number(local.w),lh=Number(local.h);
+  return { x: entityRect.x + (Number(local.x) || 0)*s, y: entityRect.y + (Number(local.y) || 0)*s, w: Math.max(1, Number.isFinite(lw)&&lw>0?lw*s:entityRect.w), h: Math.max(1, Number.isFinite(lh)&&lh>0?lh*s:entityRect.h) };
 }
 function terrainRow(key, source) {
   const [kx,ky]=String(key).split(',').map(Number), rec=typeof source==='string'?{material:source}:source||{};
@@ -38,7 +40,7 @@ export function createWorldCompiler({ resolvePrefab = id => ({ id }) } = {}) {
       (isDynamic ? chunk.dynamicEntities : chunk.staticEntities).push(runtime);
       if (isDynamic) dynamicEntities.push(runtime);
       if (components.interaction || components.container || components.craftingStation) interactables.push(runtime.id);
-      if (components.collider) colliders.push({ id: runtime.id, rect: colliderRect(rect, components.collider), blocksMovement: components.collider.blocksMovement !== false });
+      if (components.collider) colliders.push({ id: runtime.id, rect: colliderRect(rect, components.collider, entity.transform?.scale), blocksMovement: components.collider.blocksMovement !== false });
     }
     for(const [key,source] of Object.entries(document.terrain||{})){
       const row=terrainRow(key,source);if(!row.material)continue;const ck=chunkKey(row.x,row.y,chunkSize);if(allow&&!allow.has(ck))continue;ensureChunk(ck).terrainCells.push(row);

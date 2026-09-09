@@ -29,13 +29,14 @@
   function owned(owner,assetId){return Math.max(0,Math.floor(Number(state.balances?.[owner]?.[assetId])||0));}
   function deployed(owner,assetId,ignorePlacementId){return state.placements.reduce((n,p)=>n+(p.ownerId===owner&&p.assetId===assetId&&p.placementId!==ignorePlacementId?1:0),0);}
   function available(owner,assetId,ignorePlacementId){return Math.max(0,owned(owner,assetId)-deployed(owner,assetId,ignorePlacementId));}
-  function rotatedSize(t,q){q=((Math.floor(Number(q)||0)%4)+4)%4;return(q%2)?{w:t.height,h:t.width}:{w:t.width,h:t.height};}
+  function normalizeScale(v){const n=Number(v);return Math.max(.1,Math.min(8,Number.isFinite(n)?Math.round(n*100)/100:1));}
+  function rotatedSize(t,q,scale=1){q=((Math.floor(Number(q)||0)%4)+4)%4;const s=normalizeScale(scale),w=t.width*s,h=t.height*s;return(q%2)?{w:h,h:w}:{w,h};}
   function snap(v,s){return Math.round((Number(v)||0)/s)*s;}
   function within(b,x,y,w,h){return x>=b.x&&y>=b.y&&x+w<=b.x+b.w&&y+h<=b.y+b.h;}
   function canEdit(p,owner){return !!p&&(p.kind==='world_editor'||p.ownerId===owner);}
   function currentHouseInstance(){const i=window.KELO_INSTANCES?.current?.();return i&&i.type==='house'?i:null;}
   function placementVisible(rec){const p=parcel(rec.parcelId),i=currentHouseInstance();return i?(p?.kind==='house'&&p.houseId===i.resourceId):(p?.kind!=='house');}
-  function isHouseMutation(op,data){if(!['place','move','rotate','remove'].includes(op))return false;let p=null;if(op==='place')p=parcel(data?.parcelId);else{const rec=state.placements.find(x=>x.placementId===data?.placementId);p=rec&&parcel(rec.parcelId);}return p?.kind==='house';}
+  function isHouseMutation(op,data){if(!['place','move','rotate','scale','remove'].includes(op))return false;let p=null;if(op==='place')p=parcel(data?.parcelId);else{const rec=state.placements.find(x=>x.placementId===data?.placementId);p=rec&&parcel(rec.parcelId);}return p?.kind==='house';}
 
   // KELO-INDEX PROPERTY/AUTHORITY operación única de mutación: mañana el servidor implementa la misma boca.
   async function localRequest(op,payload){
@@ -71,29 +72,32 @@
     }
     if(op==='place'){
       const p=parcel(data.parcelId),t=C.get(data.assetId);if(!p)throw new Error('PARCEL_NOT_FOUND');if(!t)throw new Error('ASSET_NOT_FOUND');if(!canEdit(p,owner))throw new Error('NOT_PARCEL_OWNER');
-      const q=((Math.floor(Number(data.rotation)||0)%4)+4)%4,d=rotatedSize(t,q),s=Math.max(1,t.snap||C.tileSize),x=snap(data.x,s),y=snap(data.y,s);
+      const q=((Math.floor(Number(data.rotation)||0)%4)+4)%4,scale=normalizeScale(data.scale),d=rotatedSize(t,q,scale),s=Math.max(1,t.snap||C.tileSize),x=snap(data.x,s),y=snap(data.y,s);
       if(!within(p.bounds,x,y,d.w,d.h))throw new Error('OUTSIDE_PARCEL');
       if(p.kind!=='world_editor'&&available(owner,t.id)<1)throw new Error('NO_OWNED_UNITS');
-      const rec={placementId:id('placement'),parcelId:p.parcelId,ownerId:owner,assetId:t.id,x,y,rotation:q,layer:'property',createdAt:Date.now(),updatedAt:Date.now()};state.placements.push(rec);bump();return clone(rec);
+      const rec={placementId:id('placement'),parcelId:p.parcelId,ownerId:owner,assetId:t.id,x,y,rotation:q,scale,layer:'property',createdAt:Date.now(),updatedAt:Date.now()};state.placements.push(rec);bump();return clone(rec);
     }
     if(op==='move'){
       const rec=state.placements.find(x=>x.placementId===data.placementId);if(!rec)throw new Error('PLACEMENT_NOT_FOUND');const p=parcel(rec.parcelId),t=C.get(rec.assetId);if(!canEdit(p,owner)&&rec.ownerId!==owner)throw new Error('NOT_PLACEMENT_OWNER');
-      const d=rotatedSize(t,rec.rotation),s=Math.max(1,t.snap||C.tileSize),x=snap(data.x,s),y=snap(data.y,s);if(!within(p.bounds,x,y,d.w,d.h))throw new Error('OUTSIDE_PARCEL');rec.x=x;rec.y=y;rec.updatedAt=Date.now();bump();return clone(rec);
+      const d=rotatedSize(t,rec.rotation,rec.scale),s=Math.max(1,t.snap||C.tileSize),x=snap(data.x,s),y=snap(data.y,s);if(!within(p.bounds,x,y,d.w,d.h))throw new Error('OUTSIDE_PARCEL');rec.x=x;rec.y=y;rec.updatedAt=Date.now();bump();return clone(rec);
     }
     if(op==='rotate'){
-      const rec=state.placements.find(x=>x.placementId===data.placementId);if(!rec)throw new Error('PLACEMENT_NOT_FOUND');const p=parcel(rec.parcelId),t=C.get(rec.assetId);if(!canEdit(p,owner)&&rec.ownerId!==owner)throw new Error('NOT_PLACEMENT_OWNER');const q=(rec.rotation+(Number(data.delta)||1)+4)%4,d=rotatedSize(t,q);if(!within(p.bounds,rec.x,rec.y,d.w,d.h))throw new Error('OUTSIDE_PARCEL');rec.rotation=q;rec.updatedAt=Date.now();bump();return clone(rec);
+      const rec=state.placements.find(x=>x.placementId===data.placementId);if(!rec)throw new Error('PLACEMENT_NOT_FOUND');const p=parcel(rec.parcelId),t=C.get(rec.assetId);if(!canEdit(p,owner)&&rec.ownerId!==owner)throw new Error('NOT_PLACEMENT_OWNER');const q=(rec.rotation+(Number(data.delta)||1)+4)%4,d=rotatedSize(t,q,rec.scale);if(!within(p.bounds,rec.x,rec.y,d.w,d.h))throw new Error('OUTSIDE_PARCEL');rec.rotation=q;rec.updatedAt=Date.now();bump();return clone(rec);
+    }
+    if(op==='scale'){
+      const rec=state.placements.find(x=>x.placementId===data.placementId);if(!rec)throw new Error('PLACEMENT_NOT_FOUND');const p=parcel(rec.parcelId),t=C.get(rec.assetId);if(!canEdit(p,owner)&&rec.ownerId!==owner)throw new Error('NOT_PLACEMENT_OWNER');const scale=normalizeScale(data.scale),d=rotatedSize(t,rec.rotation,scale);if(!within(p.bounds,rec.x,rec.y,d.w,d.h))throw new Error('OUTSIDE_PARCEL');rec.scale=scale;rec.updatedAt=Date.now();bump();return clone(rec);
     }
     if(op==='remove'){
       const i=state.placements.findIndex(x=>x.placementId===data.placementId);if(i<0)throw new Error('PLACEMENT_NOT_FOUND');const rec=state.placements[i],p=parcel(rec.parcelId);if(!canEdit(p,owner)&&rec.ownerId!==owner)throw new Error('NOT_PLACEMENT_OWNER');state.placements.splice(i,1);bump();return clone(rec);
     }
     if(op==='replaceHouseLayout'){
       const p=parcel(data.parcelId);if(!p||p.kind!=='house')throw new Error('HOUSE_PARCEL_ONLY');if(!data.authorityRestore&&p.ownerId!==owner)throw new Error('NOT_PARCEL_OWNER');const rows=Array.isArray(data.placements)?data.placements:[];
-      const safe=[];for(const raw of rows){const t=C.get(raw.assetId);if(!t)continue;const q=((Math.floor(Number(raw.rotation)||0)%4)+4)%4,d=rotatedSize(t,q),x=snap(raw.x,t.snap||C.tileSize),y=snap(raw.y,t.snap||C.tileSize);if(!within(p.bounds,x,y,d.w,d.h))continue;safe.push({placementId:String(raw.placementId||id('placement')),parcelId:p.parcelId,ownerId:String(raw.ownerId||p.ownerId),assetId:t.id,x,y,rotation:q,layer:'property',createdAt:Number(raw.createdAt)||Date.now(),updatedAt:Number(raw.updatedAt)||Date.now()});}
+      const safe=[];for(const raw of rows){const t=C.get(raw.assetId);if(!t)continue;const q=((Math.floor(Number(raw.rotation)||0)%4)+4)%4,scale=normalizeScale(raw.scale),d=rotatedSize(t,q,scale),x=snap(raw.x,t.snap||C.tileSize),y=snap(raw.y,t.snap||C.tileSize);if(!within(p.bounds,x,y,d.w,d.h))continue;safe.push({placementId:String(raw.placementId||id('placement')),parcelId:p.parcelId,ownerId:String(raw.ownerId||p.ownerId),assetId:t.id,x,y,rotation:q,scale,layer:'property',createdAt:Number(raw.createdAt)||Date.now(),updatedAt:Number(raw.updatedAt)||Date.now()});}
       state.placements=state.placements.filter(x=>x.parcelId!==p.parcelId).concat(safe);bump();return{count:safe.length};
     }
     if(op==='replaceLayout'){
       if(!data.developer)throw new Error('DEVELOPER_ONLY');const p=parcel(data.parcelId);if(!p||p.kind!=='world_editor')throw new Error('WORLD_EDITOR_ONLY');const rows=Array.isArray(data.placements)?data.placements:[];
-      const safe=[];for(const raw of rows){const t=C.get(raw.assetId);if(!t)continue;const q=((Math.floor(Number(raw.rotation)||0)%4)+4)%4,d=rotatedSize(t,q),x=snap(raw.x,t.snap),y=snap(raw.y,t.snap);if(!within(p.bounds,x,y,d.w,d.h))continue;safe.push({placementId:String(raw.placementId||id('placement')),parcelId:p.parcelId,ownerId:'developer',assetId:t.id,x,y,rotation:q,layer:'property',createdAt:Number(raw.createdAt)||Date.now(),updatedAt:Date.now()});}
+      const safe=[];for(const raw of rows){const t=C.get(raw.assetId);if(!t)continue;const q=((Math.floor(Number(raw.rotation)||0)%4)+4)%4,scale=normalizeScale(raw.scale),d=rotatedSize(t,q,scale),x=snap(raw.x,t.snap),y=snap(raw.y,t.snap);if(!within(p.bounds,x,y,d.w,d.h))continue;safe.push({placementId:String(raw.placementId||id('placement')),parcelId:p.parcelId,ownerId:'developer',assetId:t.id,x,y,rotation:q,scale,layer:'property',createdAt:Number(raw.createdAt)||Date.now(),updatedAt:Date.now()});}
       state.placements=state.placements.filter(x=>x.parcelId!==p.parcelId).concat(safe);bump();return{count:safe.length};
     }
     throw new Error('UNKNOWN_PROPERTY_OPERATION');
@@ -102,10 +106,10 @@
   function installRemoteAdapter(adapter){if(adapter&&typeof adapter.request!=='function')throw new Error('INVALID_PROPERTY_ADAPTER');remoteAdapter=adapter||null;window.KELO_PROPERTY_AUDIT.authority=remoteAdapter?'remote-adapter':'local-fallback';}
   function ingestAuthoritySnapshot(next){if(!next||next.schema!==SCHEMA||!next.parcels||!next.balances||!Array.isArray(next.placements))throw new Error('INVALID_PROPERTY_SNAPSHOT');state=clone(next);persist();return snapshot();}
 
-  function placementBounds(rec){const t=C.get(rec.assetId);if(!t)return null;const d=rotatedSize(t,rec.rotation);return{x:rec.x,y:rec.y,w:d.w,h:d.h};}
+  function placementBounds(rec){const t=C.get(rec.assetId);if(!t)return null;const d=rotatedSize(t,rec.rotation,rec.scale);return{x:rec.x,y:rec.y,w:d.w,h:d.h};}
   function placementForPoint(x,y,pid){const list=state.placements.filter(p=>(!pid||p.parcelId===pid)).slice().reverse();return list.find(p=>{const b=placementBounds(p);return b&&x>=b.x&&x<=b.x+b.w&&y>=b.y&&y<=b.y+b.h;})||null;}
   function transformedRect(rec,t,r){
-    const q=((rec.rotation%4)+4)%4,W=t.width,H=t.height;const pts=[[r.x,r.y],[r.x+r.w,r.y],[r.x,r.y+r.h],[r.x+r.w,r.y+r.h]].map(([px,py])=>{let x=px,y=py;if(q===1){return[H-y,x];}if(q===2){return[W-x,H-y];}if(q===3){return[y,W-x];}return[x,y];});const xs=pts.map(p=>p[0]),ys=pts.map(p=>p[1]);return{x:rec.x+Math.min(...xs),y:rec.y+Math.min(...ys),w:Math.max(...xs)-Math.min(...xs),h:Math.max(...ys)-Math.min(...ys)};
+    const q=((rec.rotation%4)+4)%4,s=normalizeScale(rec.scale),W=t.width*s,H=t.height*s,sr={x:r.x*s,y:r.y*s,w:r.w*s,h:r.h*s};const pts=[[sr.x,sr.y],[sr.x+sr.w,sr.y],[sr.x,sr.y+sr.h],[sr.x+sr.w,sr.y+sr.h]].map(([px,py])=>{let x=px,y=py;if(q===1){return[H-y,x];}if(q===2){return[W-x,H-y];}if(q===3){return[y,W-x];}return[x,y];});const xs=pts.map(p=>p[0]),ys=pts.map(p=>p[1]);return{x:rec.x+Math.min(...xs),y:rec.y+Math.min(...ys),w:Math.max(...xs)-Math.min(...xs),h:Math.max(...ys)-Math.min(...ys)};
   }
   function syncColliders(){
     if(!K||typeof K.replaceOwner!=='function')return 0;
@@ -115,7 +119,7 @@
   }
 
   function drawTemplate(g,t,rec,phase){
-    const q=((rec.rotation%4)+4)%4,d=rotatedSize(t,q);g.save();g.translate(rec.x+d.w/2,rec.y+d.h/2);g.rotate(q*Math.PI/2);g.translate(-t.width/2,-t.height/2);
+    const q=((rec.rotation%4)+4)%4,s=normalizeScale(rec.scale),d=rotatedSize(t,q,s);g.save();g.translate(rec.x+d.w/2,rec.y+d.h/2);g.rotate(q*Math.PI/2);g.scale(s,s);g.translate(-t.width/2,-t.height/2);
     for(const part of t.parts){if(part.phase!==phase)continue;const img=images.get(part.assetKey);if(!img||!readyAssets.has(part.assetKey))continue;const a=g.globalAlpha;g.globalAlpha=a*part.opacity;g.drawImage(img,part.source.x,part.source.y,part.source.w,part.source.h,part.offset.x,part.offset.y,part.size.w,part.size.h);g.globalAlpha=a;}
     g.restore();
   }
@@ -133,7 +137,7 @@
   function suppressLegacyFurniture(plot){const p=state.parcels['parcel:legacy:104'];return !!p&&p.bounds.x===plot?.x&&p.bounds.y===plot?.y&&state.placements.some(x=>x.parcelId===p.parcelId);}
   if(typeof renderPlot==='function'){const legacyRenderPlot=renderPlot;renderPlot=function(plot,isOwn){if(suppressLegacyFurniture(plot))return legacyRenderPlot(Object.assign({},plot,{furniture:[]}),isOwn);return legacyRenderPlot(plot,isOwn);};}
   window.KELO_PROPERTY_SYSTEM=Object.freeze({
-    version:'property-system-v1.2.0',storageMode:'local-fallback-replaceable',collisionOwner:COLLISION_OWNER,request,authorityLocalRequest:localRequest,installRemoteAdapter,ingestAuthoritySnapshot,snapshot,playerId,parcel,getOwnedUnits:(assetId,owner)=>owned(String(owner||playerId()),assetId),getDeployedUnits:(assetId,owner)=>deployed(String(owner||playerId()),assetId),getAvailableUnits:(assetId,owner)=>available(String(owner||playerId()),assetId),getPlacements:(pid)=>state.placements.filter(p=>!pid||p.parcelId===pid).map(clone),placementBounds,placementForPoint,exportLayout,suppressLegacyFurniture,refreshSceneColliders:syncColliders,onChange(fn){if(typeof fn!=='function')return()=>{};listeners.add(fn);return()=>listeners.delete(fn);},get ready(){return true;}
+    version:'property-system-v1.3.0',storageMode:'local-fallback-replaceable',collisionOwner:COLLISION_OWNER,request,authorityLocalRequest:localRequest,installRemoteAdapter,ingestAuthoritySnapshot,snapshot,playerId,parcel,getOwnedUnits:(assetId,owner)=>owned(String(owner||playerId()),assetId),getDeployedUnits:(assetId,owner)=>deployed(String(owner||playerId()),assetId),getAvailableUnits:(assetId,owner)=>available(String(owner||playerId()),assetId),getPlacements:(pid)=>state.placements.filter(p=>!pid||p.parcelId===pid).map(clone),placementBounds,placementForPoint,exportLayout,suppressLegacyFurniture,refreshSceneColliders:syncColliders,onChange(fn){if(typeof fn!=='function')return()=>{};listeners.add(fn);return()=>listeners.delete(fn);},get ready(){return true;}
   });
-  window.KELO_PROPERTY_AUDIT={version:'property-system-v1.2.0',schema:SCHEMA,authority:'local-fallback',serverReplaceable:true,collisionMode:'kelo-collision-owner-v2',collisionOwner:COLLISION_OWNER,parcelCount:Object.keys(state.parcels).length,placementCount:state.placements.length,assetCount:C.list().length};
+  window.KELO_PROPERTY_AUDIT={version:'property-system-v1.3.0',schema:SCHEMA,authority:'local-fallback',serverReplaceable:true,collisionMode:'kelo-collision-owner-v2',collisionOwner:COLLISION_OWNER,parcelCount:Object.keys(state.parcels).length,placementCount:state.placements.length,assetCount:C.list().length};
 })();
