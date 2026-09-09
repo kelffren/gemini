@@ -1,18 +1,18 @@
 /* KELO-INDEX
  * area: AUTH
- * keys: ADMIN KEY CREATORS WORLD EDIT ANIMATION EDIT VFX EDIT PERMISSION BACKPACK OFFLINE ONLINE READY
+ * keys: ADMIN KEY CREATORS WORLD EDIT ANIMATION EDIT VFX EDIT ABILITY EDIT PERMISSION BACKPACK OFFLINE ONLINE READY
  * hace: modela Llave Admin como entitlement/objeto bound y decide capacidades; Creator/Studio posee la UI de autoría
  * online: request() e installRemoteAdapter() permiten sustituir la autoridad local por servidor sin cambiar consumidores
  */
 (function(){
 'use strict';
 
-const VERSION='admin-key-v1.4.0';
+const VERSION='admin-key-v1.5.0';
 const SCHEMA=1;
 const STORAGE='kelo_admin_keys_v1';
 const TEMPLATE_ID='admin-key';
 const DEFAULT_CREATOR_SCOPES=Object.freeze(['creators.access','world.edit','world.export','world.import']);
-const ROOT_SCOPES=Object.freeze(['creators.access','world.edit','world.export','world.import','world.publish','animation.edit','vfx.edit','admin.issue','admin.revoke']);
+const ROOT_SCOPES=Object.freeze(['creators.access','world.edit','world.export','world.import','world.publish','animation.edit','vfx.edit','ability.edit','admin.issue','admin.revoke']);
 let remoteAdapter=null;
 let seq=1;
 const listeners=new Set();
@@ -52,7 +52,7 @@ async function localRequest(op,payload){
     const requested=Array.isArray(data.scopes)&&data.scopes.length?data.scopes:DEFAULT_CREATOR_SCOPES,scopes=Array.from(new Set(requested.map(String)));if(scopes.some(scope=>scope.endsWith('.edit'))&&!scopes.includes('creators.access'))scopes.unshift('creators.access');
     const keyId=newId();state.keys[keyId]={schema:1,keyId,templateId:TEMPLATE_ID,ownerId,label:String(data.label||'Llave Admin · Creador'),scopes,active:true,issuedBy:actorId,createdAt:now(),revokedAt:null};bump();return publicKey(state.keys[keyId]);
   }
-  if(op==='admin-key:revoke'){requireScope('admin.revoke',actorId);const keyId=String(data.keyId||'');const k=state.keys[keyId];if(!k)throw new Error('ADMIN_KEY_NOT_FOUND');k.active=false;k.revokedAt=now();k.revokedBy=actorId;bump();return publicKey(state.keys[keyId]);}
+  if(op==='admin-key:revoke'){requireScope('admin.revoke',actorId);const keyId=String(data.keyId||'');const k=state.keys[keyId];if(!k)throw new Error('ADMIN_KEY_NOT_FOUND');k.active=false;k.revokedAt=now();k.revokedBy=actorId;bump();return publicKey(k);}
   if(op==='admin-key:bootstrap-local-root'){
     if(!data.developer||!new URLSearchParams(location.search).has('mapEditor'))throw new Error('LOCAL_BOOTSTRAP_DISABLED');
     const ownerId=String(data.ownerId||actorId);let k=activeKeys(ownerId).find(x=>(x.scopes||[]).includes('admin.issue'));
@@ -68,7 +68,7 @@ function assert(scope,ownerId){requireScope(scope,String(ownerId||playerId()));r
 
 migrateLocalRootScopes();
 window.KELO_ADMIN_KEYS=Object.freeze({version:VERSION,templateId:TEMPLATE_ID,scopes:Object.freeze({creator:DEFAULT_CREATOR_SCOPES,root:ROOT_SCOPES}),request,installRemoteAdapter,can,assert,hasKey:(ownerId)=>activeKeys(ownerId).length>0,getActiveKeys:(ownerId)=>activeKeys(ownerId).map(publicKey),syncInventory,playerId,onChange(fn){if(typeof fn!=='function')return()=>{};listeners.add(fn);return()=>listeners.delete(fn);},authoritySource:()=>remoteAdapter?'remote-adapter':'local-prototype'});
-window.KELO_ADMIN_KEY_AUDIT=Object.freeze({version:VERSION,itemIdentity:true,bound:true,scopedPermissions:true,serverReplaceable:true,uiTrustOnlyOffline:true,creatorUiOwner:'Kelo Creators',creatorAccessScope:true,animationEditScope:true,vfxEditScope:true,legacyWorldBuilderUiBoot:false,legacyPreviewHotfixBoot:false});
+window.KELO_ADMIN_KEY_AUDIT=Object.freeze({version:VERSION,itemIdentity:true,bound:true,scopedPermissions:true,serverReplaceable:true,uiTrustOnlyOffline:true,creatorUiOwner:'Kelo Creators',creatorAccessScope:true,animationEditScope:true,vfxEditScope:true,abilityEditScope:true,legacyWorldBuilderUiBoot:false,legacyPreviewHotfixBoot:false});
 
 const params=new URLSearchParams(location.search);
 if(params.get('mapEditor')==='1')request('admin-key:bootstrap-local-root',{actorId:playerId(),ownerId:playerId(),developer:true}).then(syncWhenReady).catch(console.error);else syncWhenReady();
