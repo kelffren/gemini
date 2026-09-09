@@ -1,242 +1,43 @@
 /* KELO-INDEX
  * area: ABILITY
- * keys: DATA GAMEPLAY STONE RECIPE DELIVERY EFFECT VISUAL PROFILE
- * hace: fuente data-driven de gameplay; visualProfileId es una referencia opcional y no contiene implementación visual
- * online: servidor futuro puede validar estos IDs/reglas; presentation permanece cliente
+ * owner: KeloAbilityData
+ * keys: DATA GAMEPLAY STONE RECIPE DELIVERY EFFECT ACTION INPUT TELEGRAPH PROJECTILE DASH VISUAL PROFILE
+ * purpose: fuente data-driven de gameplay de habilidades; action/input/telegraph/delivery son contratos, no implementación
+ * public-api: KELO_ABILITY_DATA / STONES / ABILITIES
+ * online: servidor y cliente consumen los mismos IDs/timings; presentation solo consume visualProfileId/telegraph
+ * do-not: NO ejecutar gameplay, NO VFX runtime, NO autoridad
  */
-(function (root, factory) {
-  const data = factory();
-
-  if (root) {
-    root.KELO_ABILITY_DATA = data;
-    root.KELO_ABILITY_DEBUG = root.KELO_ABILITY_DEBUG === true;
-    root.STONE_TYPES = data.STONE_TYPES;
-    root.STONES = data.STONES;
-    root.ABILITIES = data.ABILITIES;
-    root.KELO_STONE_TIERS = data.TIERS;
-  }
-
-  if (typeof module === 'object' && module.exports) {
-    module.exports = data;
-  }
-})(typeof globalThis !== 'undefined' ? globalThis : this, function () {
-  'use strict';
-
-  const VERSION = 3;
-
-  const STONE_TYPES = Object.freeze({
-    ELEMENT: 'element',
-    FORM: 'form',
-  });
-
-  const TIERS = Object.freeze({
-    Common: Object.freeze({ rank: 0, affixes: 0, minRoll: 0, maxRoll: 0 }),
-    Rare: Object.freeze({ rank: 1, affixes: 1, minRoll: 0.03, maxRoll: 0.06 }),
-    Epic: Object.freeze({ rank: 2, affixes: 1, minRoll: 0.06, maxRoll: 0.09 }),
-    Legendary: Object.freeze({ rank: 3, affixes: 2, minRoll: 0.07, maxRoll: 0.11 }),
-    Mythic: Object.freeze({ rank: 4, affixes: 2, minRoll: 0.10, maxRoll: 0.14 }),
-    Divine: Object.freeze({ rank: 5, affixes: 3, minRoll: 0.12, maxRoll: 0.18 }),
-  });
-
-  const STONES = Object.freeze({
-    fire: Object.freeze({ id: 'fire', type: STONE_TYPES.ELEMENT, name: 'Fuego', icon: '🔥' }),
-    ice: Object.freeze({ id: 'ice', type: STONE_TYPES.ELEMENT, name: 'Hielo', icon: '❄️' }),
-    lightning: Object.freeze({ id: 'lightning', type: STONE_TYPES.ELEMENT, name: 'Rayo', icon: '⚡' }),
-    wind: Object.freeze({ id: 'wind', type: STONE_TYPES.ELEMENT, name: 'Viento', icon: '🌪️' }),
-    earth: Object.freeze({ id: 'earth', type: STONE_TYPES.ELEMENT, name: 'Tierra', icon: '🪨' }),
-    shadow: Object.freeze({ id: 'shadow', type: STONE_TYPES.ELEMENT, name: 'Sombra', icon: '🌑' }),
-    poison: Object.freeze({ id: 'poison', type: STONE_TYPES.ELEMENT, name: 'Veneno', icon: '☠️' }),
-    light: Object.freeze({ id: 'light', type: STONE_TYPES.ELEMENT, name: 'Luz', icon: '✨' }),
-
-    projectile: Object.freeze({ id: 'projectile', type: STONE_TYPES.FORM, name: 'Proyectil', icon: '🎯' }),
-    nova: Object.freeze({ id: 'nova', type: STONE_TYPES.FORM, name: 'Nova', icon: '💥' }),
-    chain: Object.freeze({ id: 'chain', type: STONE_TYPES.FORM, name: 'Cadena', icon: '⛓️' }),
-    dash: Object.freeze({ id: 'dash', type: STONE_TYPES.FORM, name: 'Dash', icon: '💨' }),
-    shield: Object.freeze({ id: 'shield', type: STONE_TYPES.FORM, name: 'Escudo', icon: '🛡️' }),
-    vortex: Object.freeze({ id: 'vortex', type: STONE_TYPES.FORM, name: 'Vórtice', icon: '🌀' }),
-    wall: Object.freeze({ id: 'wall', type: STONE_TYPES.FORM, name: 'Muro', icon: '🧱' }),
-    trap: Object.freeze({ id: 'trap', type: STONE_TYPES.FORM, name: 'Trampa', icon: '🪤' }),
-    aura: Object.freeze({ id: 'aura', type: STONE_TYPES.FORM, name: 'Aura', icon: '⭕' }),
-    swap: Object.freeze({ id: 'swap', type: STONE_TYPES.FORM, name: 'Intercambio', icon: '🗡️' }),
-  });
-
-  const ABILITIES = Object.freeze([
-    Object.freeze({
-      id: 1,
-      key: 'fireball',
-      name: 'Bola de Fuego',
-      icon: '🔥',
-      slotType: 'normal',
-      role: 'burst',
-      recipe: Object.freeze(['fire', 'projectile']),
-      targeting: Object.freeze({ type: 'direction', range: 500 }),
-      resource: Object.freeze({ type: 'mana', cost: 20 }),
-      cooldown: 4,
-      delivery: Object.freeze({ type: 'projectile', speed: 420, radius: 16, maxDistance: 500 }),
-      effects: Object.freeze([
-        Object.freeze({ type: 'damage', damageType: 'fire', amount: 35 }),
-        Object.freeze({ type: 'status', status: 'burn', duration: 3, magnitude: 6, tickInterval: 1 }),
-      ]),
-      visualProfileId: 'ability_visual_fireball_01',
-      visuals: Object.freeze({ color: '#ff6b35', fx: 'fireball' }),
-    }),
-    Object.freeze({
-      id: 2,
-      key: 'ice_nova',
-      name: 'Nova de Hielo',
-      icon: '❄️',
-      slotType: 'normal',
-      role: 'control',
-      recipe: Object.freeze(['ice', 'nova']),
-      targeting: Object.freeze({ type: 'self' }),
-      resource: Object.freeze({ type: 'mana', cost: 25 }),
-      cooldown: 7,
-      delivery: Object.freeze({ type: 'self_aoe', radius: 130 }),
-      effects: Object.freeze([
-        Object.freeze({ type: 'damage', damageType: 'ice', amount: 22 }),
-        Object.freeze({ type: 'status', status: 'slow', duration: 2.5, magnitude: 0.4 }),
-      ]),
-      visuals: Object.freeze({ color: '#7ec8ff', fx: 'ice_nova' }),
-    }),
-    Object.freeze({
-      id: 3,
-      key: 'chain_lightning',
-      name: 'Cadena Eléctrica',
-      icon: '⚡',
-      slotType: 'normal',
-      role: 'burst',
-      recipe: Object.freeze(['lightning', 'chain']),
-      targeting: Object.freeze({ type: 'target', range: 400 }),
-      resource: Object.freeze({ type: 'mana', cost: 25 }),
-      cooldown: 6,
-      delivery: Object.freeze({ type: 'chain', maxTargets: 3, jumpRange: 180, damageFalloff: 0.8 }),
-      effects: Object.freeze([Object.freeze({ type: 'damage', damageType: 'lightning', amount: 28 })]),
-      visuals: Object.freeze({ color: '#ffe066', fx: 'chain_lightning' }),
-    }),
-    Object.freeze({
-      id: 4,
-      key: 'wind_dash',
-      name: 'Dash de Viento',
-      icon: '🌪️',
-      slotType: 'normal',
-      role: 'mobility',
-      recipe: Object.freeze(['wind', 'dash']),
-      targeting: Object.freeze({ type: 'direction', range: 160 }),
-      resource: Object.freeze({ type: 'mana', cost: 15 }),
-      cooldown: 5,
-      delivery: Object.freeze({ type: 'dash', distance: 160, duration: 0.18 }),
-      effects: Object.freeze([]),
-      visuals: Object.freeze({ color: '#b8f2e6', fx: 'wind_dash' }),
-    }),
-    Object.freeze({
-      id: 5,
-      key: 'stone_shield',
-      name: 'Escudo de Piedra',
-      icon: '🪨',
-      slotType: 'normal',
-      role: 'defense',
-      recipe: Object.freeze(['earth', 'shield']),
-      targeting: Object.freeze({ type: 'self' }),
-      resource: Object.freeze({ type: 'mana', cost: 30 }),
-      cooldown: 10,
-      delivery: Object.freeze({ type: 'instant' }),
-      effects: Object.freeze([Object.freeze({ type: 'shield', amount: 80, duration: 4 })]),
-      visuals: Object.freeze({ color: '#c9a24a', fx: 'stone_shield' }),
-    }),
-    Object.freeze({
-      id: 6,
-      key: 'fire_tornado',
-      name: 'Tornado Ígneo',
-      icon: '🌋',
-      slotType: 'ultimate',
-      role: 'ultimate',
-      recipe: Object.freeze(['fire', 'vortex']),
-      targeting: Object.freeze({ type: 'position', range: 350 }),
-      resource: Object.freeze({ type: 'mana', cost: 35 }),
-      cooldown: 9,
-      delivery: Object.freeze({ type: 'persistent_area', radius: 90, duration: 3, tickInterval: 0.5 }),
-      effects: Object.freeze([Object.freeze({ type: 'damage', damageType: 'fire', amount: 10, perTick: true })]),
-      visuals: Object.freeze({ color: '#ff8c42', fx: 'fire_tornado' }),
-    }),
-    Object.freeze({
-      id: 7,
-      key: 'ice_wall',
-      name: 'Muro de Hielo',
-      icon: '🧊',
-      slotType: 'normal',
-      role: 'control',
-      recipe: Object.freeze(['ice', 'wall']),
-      targeting: Object.freeze({ type: 'position', range: 300 }),
-      resource: Object.freeze({ type: 'mana', cost: 30 }),
-      cooldown: 12,
-      delivery: Object.freeze({ type: 'wall', width: 150, duration: 4, hp: 250, blocksMovement: true, blocksProjectiles: true }),
-      effects: Object.freeze([]),
-      visuals: Object.freeze({ color: '#a8d8ff', fx: 'ice_wall' }),
-    }),
-    Object.freeze({
-      id: 8,
-      key: 'shadow_step',
-      name: 'Paso Sombrío',
-      icon: '🌑',
-      slotType: 'normal',
-      role: 'mobility',
-      recipe: Object.freeze(['shadow', 'dash']),
-      targeting: Object.freeze({ type: 'direction', range: 130 }),
-      resource: Object.freeze({ type: 'mana', cost: 25 }),
-      cooldown: 8,
-      delivery: Object.freeze({ type: 'blink', distance: 130 }),
-      effects: Object.freeze([]),
-      visuals: Object.freeze({ color: '#6c5ce7', fx: 'shadow_step' }),
-    }),
-    Object.freeze({
-      id: 9,
-      key: 'poison_trap',
-      name: 'Trampa Venenosa',
-      icon: '☠️',
-      slotType: 'normal',
-      role: 'control',
-      recipe: Object.freeze(['poison', 'trap']),
-      targeting: Object.freeze({ type: 'position', range: 300 }),
-      resource: Object.freeze({ type: 'mana', cost: 20 }),
-      cooldown: 9,
-      delivery: Object.freeze({ type: 'trap', activationRadius: 55, armTime: 0.5, duration: 15 }),
-      effects: Object.freeze([
-        Object.freeze({ type: 'damage', damageType: 'poison', amount: 12 }),
-        Object.freeze({ type: 'status', status: 'poison', duration: 4, magnitude: 8, tickInterval: 1 }),
-      ]),
-      visuals: Object.freeze({ color: '#8ac926', fx: 'poison_trap' }),
-    }),
-    Object.freeze({
-      id: 10,
-      key: 'light_aura',
-      name: 'Aura de Luz',
-      icon: '✨',
-      slotType: 'normal',
-      role: 'sustain',
-      recipe: Object.freeze(['light', 'aura']),
-      targeting: Object.freeze({ type: 'self' }),
-      resource: Object.freeze({ type: 'mana', cost: 35 }),
-      cooldown: 12,
-      delivery: Object.freeze({ type: 'aura', radius: 100, duration: 4, tickInterval: 1 }),
-      effects: Object.freeze([Object.freeze({ type: 'heal', amount: 12, perTick: true })]),
-      visuals: Object.freeze({ color: '#fff3b0', fx: 'light_aura' }),
-    }),
-    Object.freeze({
-      id: 11,
-      key: 'swap_sword',
-      name: 'Espada de Intercambio',
-      icon: '🗡️',
-      slotType: 'normal',
-      role: 'mobility',
-      recipe: Object.freeze(['shadow', 'swap']),
-      targeting: Object.freeze({ type: 'position', range: 420 }),
-      resource: Object.freeze({ type: 'mana', cost: 30 }),
-      cooldown: 12,
-      delivery: Object.freeze({ type: 'swap_sword', speed: 720, selectRadius: 42, returnDuration: 0.28 }),
-      effects: Object.freeze([]),
-      visuals: Object.freeze({ color: '#64d7ff', accent: '#e7c56a', fx: 'swap_sword' }),
-    }),
-  ]);
-
-  return Object.freeze({ VERSION, STONE_TYPES, TIERS, STONES, ABILITIES });
+(function(root,factory){
+  const data=factory();
+  if(root){root.KELO_ABILITY_DATA=data;root.KELO_ABILITY_DEBUG=root.KELO_ABILITY_DEBUG===true;root.STONE_TYPES=data.STONE_TYPES;root.STONES=data.STONES;root.ABILITIES=data.ABILITIES;root.KELO_STONE_TIERS=data.TIERS;}
+  if(typeof module==='object'&&module.exports)module.exports=data;
+})(typeof globalThis!=='undefined'?globalThis:this,function(){
+'use strict';
+const VERSION=4;
+const freeze=Object.freeze;
+const STONE_TYPES=freeze({ELEMENT:'element',FORM:'form'});
+const TIERS=freeze({Common:freeze({rank:0,affixes:0,minRoll:0,maxRoll:0}),Rare:freeze({rank:1,affixes:1,minRoll:.03,maxRoll:.06}),Epic:freeze({rank:2,affixes:1,minRoll:.06,maxRoll:.09}),Legendary:freeze({rank:3,affixes:2,minRoll:.07,maxRoll:.11}),Mythic:freeze({rank:4,affixes:2,minRoll:.10,maxRoll:.14}),Divine:freeze({rank:5,affixes:3,minRoll:.12,maxRoll:.18})});
+const STONES=freeze({
+ fire:freeze({id:'fire',type:STONE_TYPES.ELEMENT,name:'Fuego',icon:'🔥'}),ice:freeze({id:'ice',type:STONE_TYPES.ELEMENT,name:'Hielo',icon:'❄️'}),lightning:freeze({id:'lightning',type:STONE_TYPES.ELEMENT,name:'Rayo',icon:'⚡'}),wind:freeze({id:'wind',type:STONE_TYPES.ELEMENT,name:'Viento',icon:'🌪️'}),earth:freeze({id:'earth',type:STONE_TYPES.ELEMENT,name:'Tierra',icon:'🪨'}),shadow:freeze({id:'shadow',type:STONE_TYPES.ELEMENT,name:'Sombra',icon:'🌑'}),poison:freeze({id:'poison',type:STONE_TYPES.ELEMENT,name:'Veneno',icon:'☠️'}),light:freeze({id:'light',type:STONE_TYPES.ELEMENT,name:'Luz',icon:'✨'}),
+ projectile:freeze({id:'projectile',type:STONE_TYPES.FORM,name:'Proyectil',icon:'🎯'}),nova:freeze({id:'nova',type:STONE_TYPES.FORM,name:'Nova',icon:'💥'}),chain:freeze({id:'chain',type:STONE_TYPES.FORM,name:'Cadena',icon:'⛓️'}),dash:freeze({id:'dash',type:STONE_TYPES.FORM,name:'Dash',icon:'💨'}),shield:freeze({id:'shield',type:STONE_TYPES.FORM,name:'Escudo',icon:'🛡️'}),vortex:freeze({id:'vortex',type:STONE_TYPES.FORM,name:'Vórtice',icon:'🌀'}),wall:freeze({id:'wall',type:STONE_TYPES.FORM,name:'Muro',icon:'🧱'}),trap:freeze({id:'trap',type:STONE_TYPES.FORM,name:'Trampa',icon:'🪤'}),aura:freeze({id:'aura',type:STONE_TYPES.FORM,name:'Aura',icon:'⭕'}),swap:freeze({id:'swap',type:STONE_TYPES.FORM,name:'Intercambio',icon:'🗡️'})
+});
+const action=(windup,active,recovery,movementScale)=>freeze({windup,active,recovery,movementScale});
+const pressRelease=freeze({mode:'press_release'}),instant=freeze({mode:'instant'});
+const ABILITIES=freeze([
+ freeze({id:1,key:'fireball',name:'Bola de Fuego',icon:'🔥',slotType:'normal',role:'burst',recipe:freeze(['fire','projectile']),targeting:freeze({type:'direction',range:500}),resource:freeze({type:'mana',cost:20}),cooldown:4,
+   input:pressRelease,action:action(.075,.025,.18,.78),telegraph:freeze({shape:'line',range:500,width:18}),
+   delivery:freeze({type:'projectile',speed:420,radius:16,maxDistance:500,pierceCount:0,maxTargets:1,ownerIgnore:true,teamFilter:'enemy',wallCollision:true,actorCollision:true,sweptCollision:true}),
+   effects:freeze([freeze({type:'damage',damageType:'fire',amount:35}),freeze({type:'status',status:'burn',duration:3,magnitude:6,tickInterval:1,refreshPolicy:'refresh',visualProfileId:'cc_burn_fire_01'})]),visualProfileId:'ability_visual_fireball_01',visuals:freeze({color:'#ff6b35',fx:'fireball'})}),
+ freeze({id:2,key:'ice_nova',name:'Nova de Hielo',icon:'❄️',slotType:'normal',role:'control',recipe:freeze(['ice','nova']),targeting:freeze({type:'self'}),resource:freeze({type:'mana',cost:25}),cooldown:7,input:instant,action:action(.06,.04,.24,.64),telegraph:freeze({shape:'circle',radius:130}),delivery:freeze({type:'self_aoe',radius:130,maxTargets:32,teamFilter:'enemy'}),effects:freeze([freeze({type:'damage',damageType:'ice',amount:22}),freeze({type:'status',status:'slow',duration:2.5,magnitude:.4,refreshPolicy:'refresh',visualProfileId:'cc_slow_ice_01'})]),visualProfileId:'ability_visual_ice_nova_01',visuals:freeze({color:'#7ec8ff',fx:'ice_nova'})}),
+ freeze({id:3,key:'chain_lightning',name:'Cadena Eléctrica',icon:'⚡',slotType:'normal',role:'burst',recipe:freeze(['lightning','chain']),targeting:freeze({type:'target',range:400}),resource:freeze({type:'mana',cost:25}),cooldown:6,input:pressRelease,action:action(.08,.02,.22,.72),telegraph:freeze({shape:'line',range:400}),delivery:freeze({type:'chain',maxTargets:3,jumpRange:180,damageFalloff:.8,teamFilter:'enemy'}),effects:freeze([freeze({type:'damage',damageType:'lightning',amount:28})]),visualProfileId:'ability_visual_chain_lightning_01',visuals:freeze({color:'#ffe066',fx:'chain_lightning'})}),
+ freeze({id:4,key:'wind_dash',name:'Dash de Viento',icon:'🌪️',slotType:'normal',role:'mobility',recipe:freeze(['wind','dash']),targeting:freeze({type:'direction',range:160}),resource:freeze({type:'mana',cost:15}),cooldown:5,input:pressRelease,action:action(.02,.18,.13,1),telegraph:freeze({shape:'dash',range:160}),delivery:freeze({type:'dash',distance:160,duration:.18,directionSource:'aim',collision:true,invulnerability:0}),effects:freeze([]),visualProfileId:'ability_visual_wind_dash_01',visuals:freeze({color:'#b8f2e6',fx:'wind_dash'})}),
+ freeze({id:5,key:'stone_shield',name:'Escudo de Piedra',icon:'🪨',slotType:'normal',role:'defense',recipe:freeze(['earth','shield']),targeting:freeze({type:'self'}),resource:freeze({type:'mana',cost:30}),cooldown:10,input:instant,action:action(.09,.02,.22,.55),delivery:freeze({type:'instant'}),effects:freeze([freeze({type:'shield',amount:80,duration:4})]),visualProfileId:'ability_visual_stone_shield_01',visuals:freeze({color:'#c9a24a',fx:'stone_shield'})}),
+ freeze({id:6,key:'fire_tornado',name:'Tornado Ígneo',icon:'🌋',slotType:'ultimate',role:'ultimate',recipe:freeze(['fire','vortex']),targeting:freeze({type:'position',range:350}),resource:freeze({type:'mana',cost:35}),cooldown:9,input:pressRelease,action:action(.18,.05,.34,.38),telegraph:freeze({shape:'circle',radius:90,range:350}),delivery:freeze({type:'persistent_area',radius:90,duration:3,tickInterval:.5,maxTargets:32,teamFilter:'enemy'}),effects:freeze([freeze({type:'damage',damageType:'fire',amount:10,perTick:true})]),visualProfileId:'ability_visual_fire_tornado_01',visuals:freeze({color:'#ff8c42',fx:'fire_tornado'})}),
+ freeze({id:7,key:'ice_wall',name:'Muro de Hielo',icon:'🧊',slotType:'normal',role:'control',recipe:freeze(['ice','wall']),targeting:freeze({type:'position',range:300}),resource:freeze({type:'mana',cost:30}),cooldown:12,input:pressRelease,action:action(.12,.03,.28,.56),telegraph:freeze({shape:'wall',width:150,range:300}),delivery:freeze({type:'wall',width:150,duration:4,hp:250,blocksMovement:true,blocksProjectiles:true}),effects:freeze([]),visualProfileId:'ability_visual_ice_wall_01',visuals:freeze({color:'#a8d8ff',fx:'ice_wall'})}),
+ freeze({id:8,key:'shadow_step',name:'Paso Sombrío',icon:'🌑',slotType:'normal',role:'mobility',recipe:freeze(['shadow','dash']),targeting:freeze({type:'direction',range:130}),resource:freeze({type:'mana',cost:25}),cooldown:8,input:pressRelease,action:action(.045,.01,.18,.9),telegraph:freeze({shape:'blink',range:130}),delivery:freeze({type:'blink',distance:130,directionSource:'aim',collision:true}),effects:freeze([]),visualProfileId:'ability_visual_shadow_step_01',visuals:freeze({color:'#6c5ce7',fx:'shadow_step'})}),
+ freeze({id:9,key:'poison_trap',name:'Trampa Venenosa',icon:'☠️',slotType:'normal',role:'control',recipe:freeze(['poison','trap']),targeting:freeze({type:'position',range:300}),resource:freeze({type:'mana',cost:20}),cooldown:9,input:pressRelease,action:action(.08,.02,.2,.7),telegraph:freeze({shape:'circle',radius:55,range:300}),delivery:freeze({type:'trap',activationRadius:55,armTime:.5,duration:15,maxTargets:1,teamFilter:'enemy'}),effects:freeze([freeze({type:'damage',damageType:'poison',amount:12}),freeze({type:'status',status:'poison',duration:4,magnitude:8,tickInterval:1,refreshPolicy:'refresh',visualProfileId:'cc_poison_01'})]),visualProfileId:'ability_visual_poison_trap_01',visuals:freeze({color:'#8ac926',fx:'poison_trap'})}),
+ freeze({id:10,key:'light_aura',name:'Aura de Luz',icon:'✨',slotType:'normal',role:'sustain',recipe:freeze(['light','aura']),targeting:freeze({type:'self'}),resource:freeze({type:'mana',cost:35}),cooldown:12,input:instant,action:action(.1,.02,.24,.6),telegraph:freeze({shape:'circle',radius:100}),delivery:freeze({type:'aura',radius:100,duration:4,tickInterval:1,teamFilter:'self'}),effects:freeze([freeze({type:'heal',amount:12,perTick:true})]),visualProfileId:'ability_visual_light_aura_01',visuals:freeze({color:'#fff3b0',fx:'light_aura'})}),
+ freeze({id:11,key:'swap_sword',name:'Espada de Intercambio',icon:'🗡️',slotType:'normal',role:'mobility',recipe:freeze(['shadow','swap']),targeting:freeze({type:'position',range:420}),resource:freeze({type:'mana',cost:30}),cooldown:12,input:freeze({mode:'hold_release'}),action:action(.06,.02,.24,.72),telegraph:freeze({shape:'line',range:420}),delivery:freeze({type:'swap_sword',speed:720,selectRadius:42,returnDuration:.28,maxDistance:420,directionSource:'explicit'}),effects:freeze([]),visualProfileId:'ability_visual_swap_sword_01',visuals:freeze({color:'#64d7ff',accent:'#e7c56a',fx:'swap_sword'})})
+]);
+return freeze({VERSION,STONE_TYPES,TIERS,STONES,ABILITIES});
 });

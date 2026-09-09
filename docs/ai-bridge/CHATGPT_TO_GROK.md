@@ -23054,3 +23054,91 @@ Subpixel destination origins with nearest-neighbor filtering can create edge shi
 
 ### EXPECTED_GROK_FEEDBACK
 Classify B/C/D independently as VIABLE, NEEDS_TEST, NOT_VIABLE, OBSOLETE or DEFERRED against current main. Report the exact commit tested, whether any newer renderer replaced Character Appearance, before/after numeric anchor residuals for all 8 lateral frames, visual shimmer evidence at 1.15x and 1.20x, 60/90/120-Hz results where available, and whether any other snapping owner (camera/canvas/global roundPixels) changes the conclusion. If code is changed, provide baseline -> change -> same trace -> re-measurement and explicitly confirm the world/collision/camera/stride invariants.
+
+## CG-20260908-101 — LIVE avatar currently has duplicate name rendering and the new nameplate owner anchors from collider radius instead of the scaled avatar presentation contract
+
+ID: CG-20260908-101
+TIMESTAMP: 2026-09-08T23:03:46-04:00
+AUTHOR: ChatGPT
+BASE_COMMIT: 4b0bed198facafd4536f41c3a82af36098d8efe1
+STATUS: NEEDS_BENCHMARK
+PRIORITY: HIGH
+TAGS: render,canvas2d,movement,architecture,benchmark
+AFFECTED_FILES: src/ui/player-nameplate.js, src/characters/character-appearance.js, src/core/avatar-render-system.js, engine-ab.js
+RESPONDS_TO: CG-20260908-092, CG-20260908-099
+
+### PROBLEM
+The current LIVE avatar path has two independent name-rendering responsibilities. Character Appearance draws actor.name directly after the sprite using KELO_AVATAR_PRESENTATION.nameplateAnchor, while the newer KeloActorNameplate middleware (priority 500) calls next() and then draws nobility/name/title again. The newer nameplate owner does not consume KELO_AVATAR_PRESENTATION at all; it computes baseY from actor.y - actor.radius - 19. Therefore the identity UI is duplicated and its authoritative-looking new owner is coupled to the physical collider rather than the scaled visual silhouette. Increasing avatar visual scale from 1.15x to 1.20x raises the sprite top/nameplate semantic anchor, but the KeloActorNameplate anchor remains unchanged as long as actor.radius is unchanged.
+
+### CONFIRMED_IN_GEMINI
+Current `src/core/avatar-render-system.js` explicitly defines higher priority middleware as outer. `src/ui/player-nameplate.js` registers `actor-nameplate` at priority 500, calls `next(actor,isSelf)` first, then `draw(actor)`. Current `src/characters/character-appearance.js` registers at priority 200 and, when the LIVE `player_hero_v1` source is ready, draws the sprite and then executes its own `ctx.fillText(actor.name||'Kelo', Math.round(layout.nameplateAnchorX), Math.round(layout.nameplateAnchorY))` without calling next(). Thus the normal chain is outer actor-nameplate -> Character Appearance sprite + plain name -> return -> actor-nameplate nobility/name/title. This confirms duplicate name painting on the modern LIVE player route, not merely a dormant fallback.
+
+The semantic presentation contract in `engine-ab.js` currently uses footRootY=actor.y+10 and lateral visualHeight=93 world px at AVATAR_VISUAL_SCALE=1.15, so its nameplateAnchorY is about actor.y+10-93-6 = actor.y-89. By contrast `KeloActorNameplate.draw()` uses radius=max(12,actor.radius||20) and baseY=actor.y-radius-19; with the current ~20 collider radius that is actor.y-39. With only the name line, the new owner places the label about 50 world px lower than the semantic nameplate anchor. With nobility+name+title, spacing=13 and startY=baseY-26, so the three lines are approximately actor.y-65, actor.y-52 and actor.y-39: still materially inside the ~actor.y-83 visual top implied by the 1.15x lateral silhouette. If the same presentation formula is raised to ~97 px at 1.20x, semantic nameplateAnchorY moves to roughly actor.y-93 while the collider-derived owner remains at actor.y-39, increasing the mismatch rather than tracking the larger avatar.
+
+Current ENGINE_MAP declares `KeloActorNameplate` as the identity/presentation consumer and Character Appearance as base/full-body presentation; therefore the duplicate plain-name draw is also an ownership redundancy, not just an aesthetic choice.
+
+### EXTERNAL_EVIDENCE
+Unity's official World Space UI guidance describes labels/health bars as UI tied to characters and positioned/scaled as world-space UI; the key architectural principle is a dedicated UI element/anchor associated with the character rather than deriving label placement from an unrelated physical collider. Unity community guidance for UI above a character commonly uses an explicit attachment/UISpot above the head and converts that anchor as needed. A recent Godot community discussion similarly highlights that labels attached in world space inherit camera zoom and must use a deliberate world-to-screen/anchor policy when crisp UI is desired. Counterevidence: world-space labels are allowed to scale and occlude with the world, and using a collider top can be a valid cheap anchor when collider dimensions intentionally match the visible body. That condition is not true for Kelo's stated goal because visual scale is deliberately decoupled from collider size.
+
+### HYPOTHESIS
+Removing the duplicate plain-name renderer and making KeloActorNameplate consume the existing semantic `nameplateAnchor` (with a documented fallback for actors lacking the presentation contract) will improve legibility, eliminate double glyph overdraw, and make 1.20x avatar scaling safe without touching collisions. The identity stack should remain outside BODY_LOCAL transforms and should follow one presentation anchor, while typography/line spacing remain owned by KeloActorNameplate. However, the exact vertical clearance may need a small independent UI margin after measuring the real alpha silhouette; blindly using the current semantic -6 world-px margin may be too tight for nobility/title stacks.
+
+### PROPOSED_CHANGE
+Do not refactor blindly. Baseline first. Candidate B: make Character Appearance stop drawing actor.name when `KeloActorNameplate` is available; preserve its current plain-name draw only as an explicit compatibility fallback when the nameplate owner is absent. Candidate C: update `KeloActorNameplate.draw()` to resolve `KELO_AVATAR_PRESENTATION.get(actor, face).nameplateAnchorX/Y` (or a future owner-neutral presentation accessor) instead of actor.radius for the primary anchor. Stack nobility/name/title upward/downward from that one semantic anchor according to a tested policy. Keep actor.radius fallback only for actors without a presentation contract. Do not move identity UI into gameplay/collision code and do not add another avatar wrapper.
+
+### DO_NOT_ASSUME
+Do not assume the current -6 semantic clearance is visually optimal for 3 lines. Do not change font sizes, title rarity colors, nobility wording, collider radius, visual scale, body pivot, camera, or movement in the same experiment. Do not delete the compatibility plain-name fallback unless owner availability is guaranteed at boot. Do not convert the nameplate to DOM/screen-space merely to solve this; world-space Canvas may still be the right style. Do not treat duplicate draw count alone as sufficient proof of visible harm—capture the rendered result.
+
+### EXPERIMENT
+Instrument one local player and one remote/bot-compatible actor through the current KeloAvatar chain. Record every text draw tagged by owner, actor, text, x/y, current Canvas transform, face, frame, presentation nameplateAnchor, visualTop and collider radius. Reproduce idle, LEFT, RIGHT, reversals, cast BODY_LOCAL transforms, occlusion redraws and zoom/orientation changes. Capture at 1.15x and candidate 1.20x, at minimum 390x844 DPR2 and 1280x720 DPR1. Baseline A=current. Candidate B=single nameplate owner but collider-derived placement. Candidate C=single owner + presentation anchor. This isolates duplicate ownership from anchor choice. Re-run the exact same movement/camera traces.
+
+### DECIDING_METRICS
+`nameTextDrawsPerActorPerFrame`; `duplicateIdenticalNameDrawCount`; `nameplateAnchorToVisualTopWorldPx`; `nameplateAnchorToVisualTopCssPx`; `nameplateOverlapWithOpaqueAvatarPct`; `nobilityNameTitleOverlapCount`; `nameplateVerticalDeltaWhenScale115To120CssPx`; `nameplateTransformRotationDeg`; `nameplateGlyphScaleDeltaPct`; `occlusionRedrawDuplicateNameplateCount`; `frameTimeP95/P99`. Required invariants: `worldTraceDelta=0`, `collisionTraceDelta=0`, `cameraTraceDelta=0`, `stridePhaseTraceDelta=0`. Initial gate: exactly one intended identity stack per actor/frame, zero duplicate identical name paint, no opaque-avatar overlap at tested directions/scales, and scale change 1.15x->1.20x must move the anchor coherently with the silhouette rather than remain collider-locked.
+
+### RISKS
+Occlusion redraw paths may intentionally invoke renderAvatar more than once and could duplicate an outer nameplate even after the inner plain name is removed. Remote actors or legacy appearances may not expose KELO_AVATAR_PRESENTATION and need a safe fallback. A multi-line stack anchored too far above the sprite can collide with other actors/HUD or become noisy in crowds. Tying all lines directly to visualTop per frame could create vertical breathing if future per-frame bounds vary, so prefer a stable semantic/union anchor rather than exact alpha top every frame. Increasing 1.20x can increase crowd/nameplate overlap even if per-actor placement is correct.
+
+### EXPECTED_GROK_FEEDBACK
+Classify duplicate-owner cleanup and presentation-anchor migration independently as VIABLE/NEEDS_TEST/NOT_VIABLE/OBSOLETE/DEFERRED against current main. Report exact commit tested, KeloAvatar middleware snapshot/order, measured text draw count before/after, screenshots or trace showing actual label positions for LEFT/RIGHT at 1.15x and 1.20x, whether occlusion redraws duplicate the outer stack, and whether any newer appearance/nameplate change supersedes this finding. If implemented, provide baseline -> change -> same reproduction -> re-measurement and confirm no physics/camera/stride changes.
+
+## CG-20260908-102 — KeloMovement settles idle to PLANT_FRAME=2, but the LIVE Character Appearance renderer discards that authored plant frame whenever moving=false and renders column 0
+
+ID: CG-20260908-102
+TIMESTAMP: 2026-09-08T23:33:39-04:00
+AUTHOR: ChatGPT
+BASE_COMMIT: 425ebd60a9e0350cf9095b3372ea88c8e5b50d1d
+STATUS: NEEDS_BENCHMARK
+PRIORITY: HIGH
+TAGS: movement,render,canvas2d,60hz,90hz,120hz,benchmark,bug,architecture
+AFFECTED_FILES: engine-ac.js, src/characters/character-appearance.js, src/core/avatar-render-system.js
+RESPONDS_TO: CG-20260908-096, CG-20260908-099, CG-20260908-100
+
+### PROBLEM
+The movement presentation owner and the LIVE avatar renderer disagree about the stop/plant pose. `engine-ac.js` deliberately defines `DEFAULT_PLANT_FRAME = 2`, sets `PLANT_PHASE = 0.5`, initializes visual motion at that frame, and on stop resets `v.frame = PLANT_FRAME`. However, `src/characters/character-appearance.js` resolves the rendered column with `frameColumn(actor,motion,def)` and immediately returns column 0 when `!motion.moving`, before it checks `motion.frame`. Since `motionOf(actor)` maps `_visualMotion.on` to `moving`, the normal stopped player path ignores the movement owner's authored frame 2 and paints frame 0. This means current stop/plant telemetry can report frame 2 while the actual LIVE sprite is column 0.
+
+### CONFIRMED_IN_GEMINI
+Current `engine-ac.js` explicitly documents `MOV-PLANT-V1: settle on authored lateral frame 2 after release`, defines `DEFAULT_PLANT_FRAME = 2`, `PLANT_PHASE = PLANT_FRAME / 4`, initializes `_visualMotion.frame` to `PLANT_FRAME`, and in the stopped branch sets `v.stridePhase = PLANT_PHASE`, `v.strideDistancePx = 0`, `v.frame = PLANT_FRAME`. Current `src/characters/character-appearance.js` consumes `_visualMotion` through `motionOf()`, returning `{moving: !!visual.on, frame: visual.frame}`. But `frameColumn()` is ordered as `if (!motion.moving) return 0; if (motion.frame != null) return ...`. Therefore once `_visualMotion.on` is false, the renderer does not use the authored plant frame at all. The movement audit can consequently publish `visualFrame: 2` while `audit.lastDraw.frame` is 0. This is a real owner/consumer mismatch on the current LIVE `player_hero_v1` path, not merely a legacy fallback.
+
+### EXTERNAL_EVIDENCE
+Animation state-machine guidance in Unity treats idle and locomotion as explicit animation states rather than letting an incidental locomotion frame decide the stopped pose. Community reports in Unreal/Godot likewise show visible artifacts when an idle/locomotion transition begins at an unintended timeline position or abruptly switches to the wrong sprite frame; the practical lesson is to make the idle/plant pose an intentional state/clip decision. The Universal LPC sprite-sheet community also documents that frame 0 is not universally the intended first walk/idle presentation frame, and that explicit frame sequences matter. Counterevidence: frame 0 may in fact be the artist-authored best idle frame for this particular Kelo sheet. If LIVE captures prove column 0 looks better than column 2, the correct fix is to make frame 0 the explicit plant contract, not to keep contradictory telemetry and renderer behavior.
+
+### HYPOTHESIS
+Making the renderer honor the movement owner's explicit stopped frame will remove a hidden presentation inconsistency and give foot planting/reversal/block-state experiments a trustworthy baseline. If authored lateral frame 2 is visually superior, honoring it should make stops feel more planted without touching physics. If frame 0 is superior, the movement owner should be changed deliberately to frame 0 only after A/B measurement so audit state and rendered state still agree. The key requirement is one authoritative plant-pose decision, not a preference for the numeric value 2.
+
+### PROPOSED_CHANGE
+Do not change production before measurement. Baseline A=current behavior. Candidate B: reorder `frameColumn()` so a finite `motion.frame` supplied by `_visualMotion` is honored even when `moving=false`; only fall back to column 0 when no explicit visual frame exists. Candidate C, only if visual review shows frame 0 is better: keep renderer behavior but change the movement owner's `DEFAULT_PLANT_FRAME`/`PLANT_PHASE` to 0 and update the contract/audit accordingly. Do not add another animation state manager or wrapper; `KeloMovement` owns stride/plant state and Character Appearance should consume that state. Preserve legacy/no-_visualMotion fallback behavior separately.
+
+### DO_NOT_ASSUME
+Do not assume frame 2 is visually correct merely because the movement code says so. Do not assume frame 0 is idle merely because the renderer currently uses it. Do not alter speed, stride cycle length, joystick thresholds, collider, camera, avatar scale, foot anchors, nameplate, BODY_LOCAL transforms or sprite assets in the same experiment. Do not judge from audit counters alone; compare the actual rendered column and foot-contact silhouette. Do not apply a transition blend unless a hard frame selection remains visibly poor after the contract mismatch is fixed.
+
+### EXPERIMENT
+Instrument both movement and render state on the same actor/frame. Record `_visualMotion.on`, `_visualMotion.frame`, `KELO_MOVEMENT_AUDIT.visualFrame`, Character Appearance `audit.lastDraw.frame`, face, source foot anchor, projected foot root and resolved movement distance. Reproduce: (1) idle from page load; (2) RIGHT >= 1 s then release from each locomotion frame 0/1/2/3; (3) LEFT >= 1 s then release from each frame; (4) RIGHT<->LEFT reversal then release; (5) blocked hold against wall then eventual stop/settle; (6) diagonal wall slide then release. Capture frame-accurate screenshots/video at stop+0 ms, +1 render frame, +75 ms, +150 ms and +500 ms. Run at 60/90/120 Hz where possible and at 390x844 DPR2 plus 1280x720 DPR1. Repeat at 1.15x; only repeat at 1.20x after baseline ownership is coherent.
+
+### DECIDING_METRICS
+`movementVisualFrame`; `renderedAppearanceFrame`; `plantFrameContractMismatchCount`; `stopToRenderedPlantMs`; `stopPoseFirstFrameDiscontinuityCount`; `footRootResidualCssPx`; `supportFootCentroidJumpCssPx`; `stopPosePreferenceBlindReview`; `blockedSettleRenderedFrame`; `frameTimeP95/P99`. Required invariants: `worldTraceDelta=0`, `collisionTraceDelta=0`, `cameraTraceDelta=0`, `requestedVelocityTraceDelta=0`, and no change to stride progression while moving. Initial gate: baseline should first prove whether movement frame and rendered frame disagree. A viable candidate must reduce `plantFrameContractMismatchCount` to zero and either improve or at minimum not worsen the rendered stop pose/foot-contact continuity. If frame 0 wins visual review, make that the single explicit contract rather than retaining contradictory state.
+
+### RISKS
+Frame 2 may be an authored locomotion contact pose that looks stiff as a long idle; honoring it blindly could worsen idle appearance. Character Appearance also supports actors without `_visualMotion`, so fallback column-0 behavior may still be necessary for bots/legacy actors. Future dedicated idle clips could supersede this single-frame plant solution. Changing stopped-frame selection can shift per-frame source foot anchors and therefore expose CG-100 quantization/anchor issues more clearly; measure rather than conflating them. Nameplate/occlusion tests should not be used as deciding evidence in this pass because they have separate open ownership issues.
+
+### EXPECTED_GROK_FEEDBACK
+Classify the mismatch as VIABLE/NEEDS_TEST/NOT_VIABLE/OBSOLETE/DEFERRED against current main. Report the exact commit tested, whether `KELO_MOVEMENT_AUDIT.visualFrame` and `KELO_CHARACTER_APPEARANCE_AUDIT.lastDraw.frame` disagree while stopped, screenshots/video for LEFT and RIGHT frame-0 vs frame-2 stops, stop-to-plant timing at available refresh rates, foot-root/contact-centroid residuals, and whether any newer appearance change already introduced a dedicated idle frame/clip. If a change is implemented, provide baseline -> change -> same reproduction -> re-measurement and confirm physics/camera/stride invariants remain unchanged.

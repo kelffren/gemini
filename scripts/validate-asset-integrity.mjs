@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: BUILD
  * keys: ASSET INTEGRITY PNG CASE MISSING REFERENCES CI
- * hace: valida que assets/ solo contenga .PNG y que runtime use rutas existentes con case exacto
+ * hace: valida que assets/ contenga PNG válidos y que runtime use rutas existentes con case exacto salvo extensión
  * online: N/A; gate estatico de CI
  */
 import fs from 'node:fs';
@@ -27,8 +27,12 @@ function repoPath(file) {
   return path.relative(ROOT, file).split(path.sep).join('/');
 }
 
+function normalizePngExtension(file) {
+  return String(file).replace(/\.png$/i, '.png');
+}
+
 const assetFiles = walk(ASSETS_DIR).map(repoPath).sort();
-const invalidAssetFiles = assetFiles.filter((file) => !file.endsWith('.PNG'));
+const invalidAssetFiles = assetFiles.filter((file) => !/\.png$/i.test(file));
 
 const runtimeFiles = [
   path.join(ROOT, 'index.html'),
@@ -39,6 +43,7 @@ const runtimeFiles = [
 ].filter((file) => fs.existsSync(file));
 
 const disk = new Set(assetFiles);
+const diskByNormalizedExtension = new Map(assetFiles.map((file) => [normalizePngExtension(file), file]));
 const refs = new Map();
 for (const file of runtimeFiles) {
   const text = fs.readFileSync(file, 'utf8');
@@ -48,13 +53,18 @@ for (const file of runtimeFiles) {
   }
 }
 
-const lowercasePngRefs = [];
 const missingRefs = [];
+const pathCaseMismatches = [];
 for (const [ref, owners] of refs) {
-  if (/\.png$/.test(ref) && !ref.endsWith('.PNG')) {
-    lowercasePngRefs.push({ ref, owners: [...owners].sort() });
-  }
-  if (!disk.has(ref)) missingRefs.push({ ref, owners: [...owners].sort() });
+  if (!/\.png$/i.test(ref)) continue;
+  if (disk.has(ref)) continue;
+  const normalized = normalizePngExtension(ref);
+  const diskPath = diskByNormalizedExtension.get(normalized);
+  if (diskPath) continue; // Extension case (.png/.PNG) is intentionally non-semantic.
+
+  const caseInsensitiveMatch = assetFiles.find((file) => normalizePngExtension(file).toLowerCase() === normalized.toLowerCase());
+  if (caseInsensitiveMatch) pathCaseMismatches.push({ ref, diskPath: caseInsensitiveMatch, owners: [...owners].sort() });
+  else missingRefs.push({ ref, owners: [...owners].sort() });
 }
 
 const duplicateOwners = [];
@@ -66,17 +76,17 @@ console.log(`ASSET_INTEGRITY assets=${assetFiles.length} runtimeRefs=${refs.size
 for (const file of assetFiles) console.log('ASSET_DISK', file);
 
 if (invalidAssetFiles.length) {
-  console.error('ASSET_INTEGRITY_FAIL non-.PNG files exist under assets/:');
+  console.error('ASSET_INTEGRITY_FAIL non-PNG files exist under assets/:');
   invalidAssetFiles.forEach((file) => console.error(' ', file));
 }
-if (lowercasePngRefs.length) {
-  console.error('ASSET_INTEGRITY_FAIL lowercase/noncanonical PNG runtime references:');
-  lowercasePngRefs.forEach(({ ref, owners }) => console.error(' ', ref, 'owners=', owners.join(',')));
+if (pathCaseMismatches.length) {
+  console.error('ASSET_INTEGRITY_FAIL runtime path case mismatch outside PNG extension:');
+  pathCaseMismatches.forEach(({ ref, diskPath, owners }) => console.error(' ', ref, 'disk=', diskPath, 'owners=', owners.join(',')));
 }
 if (missingRefs.length) {
   console.error('ASSET_INTEGRITY_FAIL missing runtime asset references:');
   missingRefs.forEach(({ ref, owners }) => console.error(' ', ref, 'owners=', owners.join(',')));
 }
 
-if (invalidAssetFiles.length || lowercasePngRefs.length || missingRefs.length) process.exit(1);
-console.log('ASSET_INTEGRITY_PASS exact .PNG files and zero missing runtime asset references');
+if (invalidAssetFiles.length || pathCaseMismatches.length || missingRefs.length) process.exit(1);
+console.log('ASSET_INTEGRITY_PASS PNG extension case is flexible; runtime paths exist with exact non-extension case');

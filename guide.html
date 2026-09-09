@@ -1,7 +1,7 @@
 <!-- KELO-INDEX
   area: PLAYER DOCS
   owner: Documentation / Foundation
-  keys: GUIDE MECHANICS PLAYER DOCS PUBLIC CHARACTER CUSTOMIZATION MENU HUD NOBILITY TITLES COMMERCE MARKET TRADE MOUNTS APPEARANCE
+  keys: GUIDE MECHANICS PLAYER DOCS PUBLIC CHARACTER CUSTOMIZATION MENU HUD NOBILITY TITLES COMMERCE MARKET TRADE MOUNTS APPEARANCE ARENA RANKED
   purpose: guía pública de mecánicas de Kelo World para jugadores
   public-api: página estática guide.html
   consumes: comportamiento LIVE validado y docs/system-catalog.json
@@ -49,7 +49,8 @@
     <a href="#mochila">Mochila<small>Objetos y equipo</small></a>
     <a href="#mercado-comercio-y-trade">Mercado y trade<small>Puestos, alfombras y doble confirmación</small></a>
     <a href="#nobleza-y-titulos">Nobleza y títulos<small>Rango automático y prestigio equipado</small></a>
-    <a href="#pvp">PvP<small>Combate y arena</small></a>
+    <a href="#pvp">PvP<small>Combate de mundo</small></a>
+    <a href="#arena-ranked">Arena Ranked<small>3v3 Control y bots transparentes</small></a>
   </nav>
 
   <section id="movimiento">
@@ -273,11 +274,30 @@
     <h2>Mundo PvP</h2>
     <p>El modo PvP cambia el contexto del jugador desde social a combate. El sistema valida el estado del combate antes de aceptar ataques y habilidades.</p>
     <ul>
-      <li>Los ataques tienen alcance y cooldown.</li>
-      <li>Las habilidades conservan sus propias reglas de targeting y recursos.</li>
+      <li>Los ataques básicos usan acción direccional, ventanas de ataque y recursos propios.</li>
+      <li>Las habilidades conservan sus reglas de targeting, costes, cooldowns y geometría.</li>
       <li>Salir del PvP devuelve al jugador al contexto social correspondiente.</li>
     </ul>
-    <p>Las reglas competitivas definitivas y la autoridad online se documentarán aquí cuando el modo multijugador de producción quede cerrado.</p>
+  </section>
+
+  <section id="arena-ranked">
+    <span class="tag">ARENA RANKED · PROTOTIPO JUGABLE</span>
+    <h2>3v3 Control incluso cuando hay pocos jugadores</h2>
+    <p>La primera Arena competitiva de Kelo World utiliza una sola cola y un único modo principal: <strong>3v3 Control</strong>. El objetivo es mantener la Arena jugable desde el comienzo sin repartir una comunidad pequeña entre muchas colas vacías.</p>
+    <ul>
+      <li>Los dos equipos tienen tres plazas.</li>
+      <li>Control se gana capturando y manteniendo la zona central hasta alcanzar la puntuación objetivo.</li>
+      <li>Si faltan personas en la prueba actual, los huecos pueden cubrirse con combatientes marcados claramente como <strong>[Bot]</strong>.</li>
+      <li>Los bots participan en el mismo espacio de combate y pueden atacar, recibir daño, morir, reaparecer y disputar el objetivo.</li>
+      <li>La Arena normaliza temporalmente los recursos básicos de combate del prototipo para reducir ventajas brutas de progresión.</li>
+      <li>El sistema conserva un rango visible y progreso de RP separado del rating interno de matchmaking.</li>
+      <li>Una partida formada principalmente por bots tiene menor calidad competitiva y, por ello, mueve mucho menos el progreso de rango que una partida humana completa.</li>
+    </ul>
+    <h3>Rangos iniciales</h3>
+    <p>La progresión visible está preparada como: Bronce → Plata → Oro → Platino → Esmeralda → Diamante → Mithril → Adamantita → Etéreo.</p>
+    <h3>Cómo entrar</h3>
+    <p>Pulsa el botón <strong>PVP</strong> del rail. Desde la nueva superficie puedes buscar <strong>Arena Ranked</strong> o entrar al Mundo PvP normal. Al comenzar Arena aparece un marcador superior con el score de ambos equipos, tiempo restante y calidad de la partida.</p>
+    <div class="example"><strong>Importante:</strong> el modo con bots, ranking local y stats normalizados ya sirve como prototipo jugable. El matchmaking, rating persistente y resultado competitivo online definitivo todavía requieren autoridad del servidor antes de considerarse Ranked de producción.</div>
   </section>
 
   <div class="footer">Kelo World · Guía de mecánicas viva · actualizada junto al runtime validado.</div>
