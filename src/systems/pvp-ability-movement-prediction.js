@@ -12,6 +12,7 @@
 const timeline=window.KeloAbilityActionTimeline;
 if(!timeline||!window.KeloMovement||!window.KeloSimulation)return;
 let cast=null,lastAbilityKey=null;
+const audit=window.KELO_PVP_CAST_MOVEMENT_AUDIT={version:'pvp-cast-movement-prediction-v1',ready:true,abilityKey:null,active:false,phase:null,movementScale:1,meleeScale:1};
 function pvpActive(){try{return !!(window.KeloPvPWorld&&window.KeloPvPWorld.state&&window.KeloPvPWorld.state.mode!=='social');}catch(_){return false;}}
 function definitionOf(key){const defs=window.ABILITIES||[];return defs.find(d=>d&&d.key===key)||null;}
 function meleeScale(){
@@ -32,10 +33,10 @@ function movementHook(ctx){
   ctx.input.normY=(Number(ctx.input.normY)||0)*factor;
 }
 function tick(ctx){
-  if(!pvpActive()){cast=null;return;}
-  if(cast&&!cast.done)timeline.advance(cast,Math.max(0,Number(ctx&&ctx.dt)||0));
+  if(!pvpActive()){cast=null;}
+  else if(cast&&!cast.done)timeline.advance(cast,Math.max(0,Number(ctx&&ctx.dt)||0));
   if(cast&&cast.done)cast=null;
-  window.KELO_PVP_CAST_MOVEMENT_AUDIT={version:'pvp-cast-movement-prediction-v1',abilityKey:lastAbilityKey,active:!!cast,phase:cast&&cast.phase||null,movementScale:cast?timeline.movementScaleFor(cast):1,meleeScale:meleeScale()};
+  audit.abilityKey=lastAbilityKey;audit.active=!!cast;audit.phase=cast&&cast.phase||null;audit.movementScale=cast?timeline.movementScaleFor(cast):1;audit.meleeScale=meleeScale();
 }
 window.KeloAbilities&&window.KeloAbilities.bus&&window.KeloAbilities.bus.on('ABILITY_CAST',onCast);
 window.KeloMovement.before('pvp-world:ability-cast-scale',movementHook,69);
