@@ -9,7 +9,7 @@ const values=new Map([
 ]);
 const listeners=new Map();
 const emitted=[];
-let credentialsCalls=0,signOutCalls=0,authListener=null;
+let credentialsCalls=0,signOutCalls=0,reloadCalls=0,authListener=null;
 
 class CustomEventMock{constructor(type,options={}){this.type=type;this.detail=options.detail;}}
 const localStorage={
@@ -27,6 +27,8 @@ const KeloOnlineAuth={
 };
 const window={
   KeloOnlineAuth,
+  keloNet:{on:true},
+  location:{reload(){reloadCalls++;}},
   dispatchEvent(event){emitted.push(event);return true;},
   addEventListener(type,fn){listeners.set(type,fn);},
   removeEventListener(type){listeners.delete(type);}
@@ -45,7 +47,10 @@ authListener('SIGNED_OUT');
 assert.equal(values.has('kelo.active.character.v1'),false,'SIGNED_OUT must clear active character immediately');
 assert.equal(values.has('kelo.supabase.session.v1'),false,'SIGNED_OUT must clear network session immediately');
 await new Promise(resolve=>setTimeout(resolve,15));
+assert.equal(reloadCalls,1,'SIGNED_OUT must tear down an active authorized page when the network owner has no disconnect API');
 assert.equal(signOutCalls,1,'SIGNED_OUT must repair stale KeloOnlineAuth state');
-assert.ok(emitted.some(event=>event.type==='kelo:online-auth-session-ended'),'sign-out must emit a session-ended event');
+const ended=emitted.find(event=>event.type==='kelo:online-auth-session-ended');
+assert.ok(ended,'sign-out must emit a session-ended event');
+assert.equal(ended.detail.transportAction,'page-teardown','session-ended event must report transport cutoff path');
 
 console.log('online auth lifecycle audit: PASS');
