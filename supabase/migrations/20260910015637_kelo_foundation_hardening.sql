@@ -7,7 +7,15 @@ create index if not exists map_publications_published_by_idx on public.map_publi
 create index if not exists nobility_history_player_created_idx on public.nobility_history(player_id,created_at desc);
 create index if not exists server_audit_actor_idx on public.server_audit_events(actor_user_id,created_at desc) where actor_user_id is not null;
 
-revoke execute on function public.rls_auto_enable() from public, anon, authenticated;
+-- The live bootstrap project had this legacy helper. A fresh local Supabase stack
+-- may not, so hardening must remain replay-safe from an empty database.
+do $$
+begin
+  if to_regprocedure('public.rls_auto_enable()') is not null then
+    execute 'revoke execute on function public.rls_auto_enable() from public, anon, authenticated';
+  end if;
+end;
+$$;
 
 create policy equipment_items_service_only_deny on public.equipment_items for all to anon,authenticated using(false) with check(false);
 create policy forge_history_service_only_deny on public.forge_history for all to anon,authenticated using(false) with check(false);
