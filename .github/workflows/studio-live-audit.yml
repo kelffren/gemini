@@ -11,6 +11,7 @@ on:
       - 'src/core/camera-system.js'
       - 'index.html'
       - 'scripts/studio-live-audit.mjs'
+      - 'scripts/studio-mobile-reference-live-audit.mjs'
       - '.github/workflows/studio-live-audit.yml'
   pull_request:
     paths:
@@ -22,6 +23,7 @@ on:
       - 'src/core/camera-system.js'
       - 'index.html'
       - 'scripts/studio-live-audit.mjs'
+      - 'scripts/studio-mobile-reference-live-audit.mjs'
       - '.github/workflows/studio-live-audit.yml'
   workflow_dispatch:
 
@@ -35,7 +37,9 @@ jobs:
         with:
           node-version: '22'
       - name: Syntax
-        run: node --check scripts/studio-live-audit.mjs
+        run: |
+          node --check scripts/studio-live-audit.mjs
+          node --check scripts/studio-mobile-reference-live-audit.mjs
       - name: Install Playwright
         run: npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund playwright@1.55.0
       - name: Serve PR candidate
@@ -45,18 +49,18 @@ jobs:
           for i in {1..20}; do curl -fsS http://127.0.0.1:8000/index.html >/dev/null && exit 0; sleep 1; done
           cat /tmp/studio-live-http.log
           exit 1
-      - name: Audit PR candidate Kelo Studio vertical slice
+      - name: Audit PR candidate Kelo Studio phone-first vertical slice
         if: github.event_name == 'pull_request'
         env:
           AUDIT_URL: http://127.0.0.1:8000/
           CHROME_BIN: /usr/bin/google-chrome
-        run: node scripts/studio-live-audit.mjs
-      - name: Audit deployed Kelo Studio vertical slice
+        run: node scripts/studio-mobile-reference-live-audit.mjs
+      - name: Audit deployed Kelo Studio phone-first vertical slice
         if: github.event_name != 'pull_request'
         env:
           AUDIT_URL: https://kelffren.github.io/gemini/
           CHROME_BIN: /usr/bin/google-chrome
-        run: node scripts/studio-live-audit.mjs
+        run: node scripts/studio-mobile-reference-live-audit.mjs
       - name: Upload Studio LIVE evidence
         if: always()
         uses: actions/upload-artifact@v4
