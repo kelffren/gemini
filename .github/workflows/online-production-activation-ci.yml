@@ -7,6 +7,7 @@ on:
       - 'src/config/online-runtime-config.js'
       - 'src/auth/**'
       - 'src/ui/account-auth-ui.js'
+      - 'src/ui/google-auth-button.js'
       - 'index.html'
       - 'render.yaml'
       - 'docs/ops/RENDER_SERVER.md'
@@ -19,6 +20,7 @@ on:
       - 'src/config/online-runtime-config.js'
       - 'src/auth/**'
       - 'src/ui/account-auth-ui.js'
+      - 'src/ui/google-auth-button.js'
       - 'index.html'
       - 'render.yaml'
       - 'docs/ops/RENDER_SERVER.md'
@@ -42,14 +44,19 @@ jobs:
           node --check src/config/online-runtime-config.js
           node --check src/auth/supabase-auth-runtime.js
           node --check src/ui/account-auth-ui.js
+          node --check src/ui/google-auth-button.js
       - name: Account auth contract
         run: |
-          grep -q "kelo-online-auth-v3" src/auth/supabase-auth-runtime.js
+          grep -q "kelo-online-auth-v4" src/auth/supabase-auth-runtime.js
           grep -q "signInAsGuest" src/auth/supabase-auth-runtime.js
+          grep -q "signInWithGoogle" src/auth/supabase-auth-runtime.js
+          grep -q "provider:'google'" src/auth/supabase-auth-runtime.js
           grep -q "signInWithPassword" src/ui/account-auth-ui.js
           grep -q "protectGuestWithEmail" src/ui/account-auth-ui.js
+          grep -q "Continuar con Google" src/ui/google-auth-button.js
+          grep -q "google-auth-button.js" src/config/online-runtime-config.js
           grep -q "account-auth-ui.js" src/config/online-runtime-config.js
-          ! grep -Eq "(service_role|sb_secret)[[:space:]]*[:=]" src/ui/account-auth-ui.js
+          ! grep -Eq "(service_role|sb_secret)[[:space:]]*[:=]" src/ui/account-auth-ui.js src/ui/google-auth-button.js
       - name: Install server dependencies
         working-directory: server
         run: npm install --omit=dev --no-audit --no-fund
