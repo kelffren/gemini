@@ -1,4 +1,4 @@
-# Avatar Quick Import V1
+# Avatar Quick Import V2 — Auto-Detect
 
 ## Status
 - owner: `KeloCreatorAvatars` adapter over `KeloAvatar`
@@ -7,53 +7,118 @@
 - analyzer/compiler: `src/creators/avatar/avatar-spritesheet-analyzer.mjs`
 - persistence: Supabase `characters.active_avatar_content_id` + Universal Content Registry
 - playerVisible: false
-- status: creator-online-active-v1
+- status: creator-online-active-v2-autodetect
 
 ## Product contract
-The normal path is intentionally three visible actions: **upload → preview → use**. Spreadsheet import remains the batch/pro workflow; it is not required to change one avatar.
+The normal path is deliberately **upload → preview → use**. A creator should not need to know columns, rows, file paths, hashes, rigs, Supabase or revision IDs.
 
-The UI must hide asset IDs, Storage paths, hashes, revisions, rigs and Supabase details. Grid correction and background removal live under `Ajustes avanzados`.
+V2 makes auto-detection the default authority for presentation preparation. Manual controls remain a fallback under `Ajustes avanzados` and open automatically only when detection confidence is low.
 
-## Pipeline
-1. User chooses PNG/WebP/JPEG from phone Files/Photos/Drive.
-2. Analyzer validates <=5 MB and <=2048 px and infers a simple sprite grid. Square large sheets default to 4×4.
-3. A local canvas preview animates before any upload.
-4. Runtime compiler optionally removes a uniform light background, downsizes to <=1024 px and encodes a <=2 MB WebP/PNG derivative.
-5. Public runtime derivative is uploaded to the existing public `avatars` bucket under the authenticated user folder.
-6. The original source still goes through `UniversalContentService` and produces immutable asset/content revisions.
-7. The character revision payload stores `avatarRuntime` metadata: bucket/path/public URL/grid/row map/frame timing.
-8. `set_active_character_avatar` verifies the caller owns both the character and a valid character-content revision, then writes `characters.active_avatar_content_id`.
-9. `KELO_CREATOR_CONTENT_REGISTRY` dispatches character quick-avatar content to `KeloCreatorAvatars`.
-10. `KeloCreatorAvatars` uses `KeloAvatar.use(...)`; it never wraps or replaces `renderAvatar` itself.
+Spreadsheet import remains the batch/pro workflow; it is not required for one avatar.
 
-## Runtime contract
-Default row order for a 4-row sheet:
+## Auto-Detect V2 pipeline
+1. Decode PNG/WebP/JPEG locally. Source remains <=5 MB and <=2048 px per dimension.
+2. Downsample only for analysis; original pixels remain the source of the compiled runtime.
+3. Inspect border pixels to classify transparent vs uniform-color background and estimate background noise/tolerance.
+4. Build a foreground mask without globally deleting white or any other color.
+5. Run connected-component segmentation.
+6. Use large components as frame seeds, cluster their X/Y centers, and infer a variable `columns × rows` grid.
+7. Attach smaller nearby components back to the nearest frame so detached details can remain inside a frame.
+8. Produce per-frame `sourceRects`. Rectangles may overlap; the source does not need exact equal cells.
+9. Score the detection. High confidence keeps Advanced collapsed; low confidence exposes correction controls.
+10. For four-row character sheets, infer side rows from silhouette symmetry and head-vs-torso horizontal shift. Front/back is resolved from upper-body detail when confidence supports it; otherwise the safe conventional row order remains the fallback.
+11. Compile the source into a normalized equal-cell runtime sheet. Each detected frame is cropped independently, centered horizontally and bottom-aligned so generated/collage sheets with uneven margins do not bleed across frames.
+12. Optionally remove only background connected to image edges. Interior white clothing/details are preserved.
+13. Show the normalized runtime as an animated local preview before network upload.
+14. Only after `USAR COMO AVATAR` does the normal online ingest/persistence pipeline run.
+
+## Detection result contract
+`analyzeAvatarSpriteSheet(...)` returns stable preparation metadata including:
+
+- `columns`, `rows`
+- `confidence` + numeric `confidenceScore`
+- `detectionMode`: normally `components`, fallback `regular`, or `manual` after creator correction
+- `autoCrop`
+- `sourceRects`
+- `contentBounds`
+- `backgroundKind`, `backgroundRgb`, `backgroundThreshold`
+- `removeBackground`
+- `rowMap`
+- `directionConfidence` + `directionMode`
+
+No detection field is an identity. Content identity still comes from Universal Content immutable revisions.
+
+## Runtime compiler contract
+When `sourceRects` match the detected grid, `compileAvatarRuntime(...)` repacks the source into a normalized sheet:
+
+- one equal runtime cell per detected source frame;
+- relative sprite size preserved;
+- horizontal centering;
+- bottom alignment;
+- maximum runtime dimension 1024;
+- runtime derivative <=2 MB;
+- WebP preferred, PNG fallback.
+
+If a creator manually changes rows/columns, the UI intentionally drops the auto `sourceRects` and uses regular-grid compilation instead of applying stale detection geometry.
+
+## Default/fallback direction order
+When visual direction confidence is insufficient:
+
 - row 0: down/front
 - row 1: left
 - row 2: right
 - row 3: up/back
 
-Frame 0 is idle. While the actor is moving, frames advance using `frameMs` (default 140 ms). The runtime derives facing from velocity first and existing actor facing second.
+Advanced controls allow explicit row correction without exposing any other engine internals.
 
-The selected manifest is cached in localStorage so the same device restores the avatar during normal boot. Supabase remains the durable per-character selection source.
+## Persistence
+After local validation:
+
+1. Runtime derivative goes to the existing public `avatars` bucket under the authenticated user folder.
+2. Original source goes through `UniversalContentService`.
+3. The character content revision stores `avatarRuntime` plus an `metadata.autoDetect` summary.
+4. `set_active_character_avatar` verifies ownership and writes only immutable `content_id` into `characters.active_avatar_content_id`.
+5. `KeloCreatorAvatars` registers/selects the manifest and reuses `KeloAvatar.use(...)`.
+
+Re-import remains hash/idempotency driven; no filename becomes content identity.
 
 ## Security and online boundary
 - browser uses publishable key + user JWT only;
-- `avatars` is a public-read delivery bucket because equipped avatars are visible content;
-- writes are folder-scoped by existing Storage RLS (`/<auth.uid()>/...`);
-- source revisions remain in the normal Creator content pipeline;
-- browser cannot approve creator content globally;
-- selection RPC accepts only owned `character` content containing a valid `avatarRuntime` manifest.
+- `avatars` is public-read delivery because equipped avatars are visible art;
+- user writes remain folder-scoped through existing Storage RLS;
+- browser cannot approve global Creator content;
+- selection RPC validates character ownership and owned `character` content;
+- Auto-Detect is presentation preparation only and owns no gameplay authority.
 
-## Reuse rules
-Do not create a second character renderer. Do not store raw blob URLs in character state. Do not make avatar selection point at filenames. Do not make the quick UI write directly to game state outside the `KeloAvatar` middleware adapter.
+## Ownership invariants
+- `KeloAvatar` remains the single avatar render owner.
+- `KeloCreatorAvatars` remains an adapter/middleware, not a second renderer.
+- UI never writes character/gameplay state directly.
+- Auto-detection is pure/local until the creator presses USE.
+- Supabase stores durable selection; local cache is only fast restore.
+- Source asset and runtime derivative remain separate concerns.
 
-## V1 limits
-- images only: PNG/WebP/JPEG;
-- source <=5 MB, <=2048×2048;
-- runtime derivative <=2 MB, max dimension 1024;
-- automatic grid inference intentionally favors the common 4×4 character sheet; unusual sheets use Advanced controls;
-- light uniform backgrounds can be removed; complex backgrounds require an already-transparent asset or a future segmentation service.
+## Failure behavior
+V2 does not pretend every arbitrary image is perfectly segmentable.
 
-## Audit
-`npm run audit:avatar-quick`
+If component segmentation is weak:
+- a conservative regular-grid fallback is proposed;
+- confidence drops;
+- Advanced opens automatically;
+- the creator can correct columns, rows, four direction rows, and background removal;
+- preview is always the final gate before USE.
+
+Complex photographic/non-uniform backgrounds can still require a transparent source or a future dedicated segmentation capability; they do not justify embedding arbitrary ML/remote authority into this owner.
+
+## Tests / CI
+- `npm run audit:avatar-quick`
+- `Avatar Quick Import CI`
+- mobile browser proof at 390×844
+- irregular 1254×1254 4×4 sheet whose sprites cross naive equal-cell boundaries
+- transparent non-square 3×4 sheet
+- verifies high-confidence component detection, 16/12 source rects, normalized runtime, direction inference, animated preview, edge-only background cleanup, preservation of interior white, and USE callback
+- `npm run audit:universal-content`
+- `npm run audit:docs`
+
+## Extension rule
+New detection heuristics extend this analyzer/compiler. Do not create `AvatarDetector2`, a second uploader, a second renderer, or per-format runtime owners.
