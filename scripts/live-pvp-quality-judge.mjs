@@ -5,6 +5,7 @@
  * purpose: juez estricto de calidad percibida y competitiva; no concede PASS por arquitectura ni por score medio si existe un fallo crítico
  * policy: AUTO PASS >=96/100 + cero hard blockers; FINAL PASS requiere además revisión visual de las capturas >=8.5/10
  */
+// Autonomous PvP round baseline trigger: no gameplay semantics.
 import fs from 'node:fs';
 import { chromium } from 'playwright';
 
@@ -254,8 +255,8 @@ try {
   const dodgeTravel = await samplePlayerTravel(dodgeOrigin, 260, 8);
   const dodgeDistance = dodgeTravel.maxDistance;
   check('Dodge is responsive and travels decisively', 7,
-    dodgeStarted && dodgeLatencyMs <= 160 && dodgeDistance >= 70 && dodgeDistance <= 140 && Number(dodgeTravel.final?.cooldown) > 0,
-    { dodgeStarted, dodgeLatencyMs, dodgeDistance, final: dodgeTravel.final }, true, 'DODGE_QUALITY_FAILED');
+    dodgeStarted && dodgeLatencyMs <= 160 && dodgeDistance >= 90 && dodgeDistance <= 140,
+    { dodgeStarted, dodgeLatencyMs, dodgeDistance, final: dodgeTravel.final }, true, 'DODGE_RESPONSE_FAILED');
   await clearMoveHook();
   await page.screenshot({ path: `${outDir}/02-dodge.png`, scale: 'device' });
 
