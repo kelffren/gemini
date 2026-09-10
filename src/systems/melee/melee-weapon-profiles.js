@@ -8,7 +8,7 @@
  */
 (function(root){
   'use strict';
-  const VERSION='melee-weapon-profiles-v3.3.1-finisher-recovery-mobility';
+  const VERSION='melee-weapon-profiles-v3.4.0-heavy-recovery-mobility-a';
   const registry=new Map();
   function freezeScale(value){
     if(value&&typeof value==='object')return Object.freeze({windup:value.windup==null?1:Number(value.windup),active:value.active==null?1:Number(value.active),recovery:value.recovery==null?1:Number(value.recovery)});
@@ -53,11 +53,11 @@
   register({
     id:'sword_heavy_charge',weaponClass:'sword',attackProfile:'charged_slash',damage:32,range:172,cooldown:.45,damageType:'physical',
     hitShape:'sector',arcDegrees:108,forwardOffset:20,windup:.12,active:.09,recovery:.34,
-    movementScale:{windup:.58,active:.25,recovery:.55},knockback:46,stagger:.18,
+    movementScale:{windup:.58,active:.25,recovery:.60},knockback:46,stagger:.18,
     charges:1,rechargeTime:1.15,cancelWindow:.03,comboWindow:0,comboTimeout:0,canCancelInto:['dodge'],
     input:{mode:'charge',charge:{minTime:.08,level1Time:.28,level2Time:.62,maxTime:1.05}},visualProfileId:'melee_sword_heavy_charge_v1'
   });
 
-  root.KELO_MELEE_PROFILE_AUDIT={version:VERSION,ready:true,profiles:function(){return registry.size;},basicProfile:'sword_light_basic',basicDamage:18,basicRange:150,basicHitShape:'sector',basicArcDegrees:92,basicCharges:2,comboSteps:3,specialProfile:'sword_heavy_charge',basicRecoveryMovementScale:1,followRecoveryMovementScale:1,finisherRecoveryMovementScale:.76};
+  root.KELO_MELEE_PROFILE_AUDIT={version:VERSION,ready:true,profiles:function(){return registry.size;},basicProfile:'sword_light_basic',basicDamage:18,basicRange:150,basicHitShape:'sector',basicArcDegrees:92,basicCharges:2,comboSteps:3,specialProfile:'sword_heavy_charge',basicRecoveryMovementScale:1,followRecoveryMovementScale:1,finisherRecoveryMovementScale:.76,heavyRecoveryMovementScale:.60};
   root.KeloMeleeProfiles=Object.freeze({version:VERSION,register,get,list});
 })(typeof globalThis!=='undefined'?globalThis:window);
