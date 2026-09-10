@@ -1,0 +1,24 @@
+/* KELO-INDEX
+ * area: CREATORS / AVATAR
+ * owner: Avatar Quick Import orchestration
+ * owns: file -> public runtime derivative -> universal character revision -> active character selection
+ * does-not-own: renderer, auth transport, base content persistence or avatar approval
+ */
+import { compileAvatarRuntime } from './avatar-spritesheet-analyzer.mjs';
+const F=Object.freeze;
+const clean=v=>String(v||'').toLowerCase().replace(/[^a-z0-9_-]+/g,'-').replace(/^-+|-+$/g,'').slice(0,55)||'avatar';
+async function sha256(value,root){const bytes=value?.arrayBuffer?await value.arrayBuffer():new TextEncoder().encode(String(value)).buffer;if(root.crypto?.subtle){const d=await root.crypto.subtle.digest('SHA-256',bytes);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,'0')).join('');}let h=2166136261;for(const b of new Uint8Array(bytes)){h^=b;h=Math.imul(h,16777619);}return (h>>>0).toString(16).padStart(8,'0').repeat(4);}
+export function createAvatarQuickImportService({contentSession,contentRepository,contentService,root=globalThis}={}){
+  if(!contentSession||!contentRepository||!contentService)throw new Error('AVATAR_QUICK_SERVICES_REQUIRED');
+  async function ensureIdentity(){await contentSession.ensureFresh();if(!contentSession.accessToken)await contentSession.signInAnonymously();let chars=await contentRepository.listMyCharacters();let character=Array.isArray(chars)?chars.find(x=>x.status==='active')||chars[0]:null;if(!character){const suffix=String(contentSession.userId||'player').replace(/-/g,'').slice(-6);const made=await contentRepository.createCharacter(`Kelo ${suffix}`);character=Array.isArray(made)?made[0]:made;}if(!character?.id)throw new Error('AVATAR_CHARACTER_REQUIRED');return character;}
+  async function importAndUse(file,analysis,{displayName='Mi Avatar',onProgress=null}={}){
+    const character=await ensureIdentity(),uid=contentRepository.userId();onProgress?.({stage:'compile',message:'Preparando preview de juego…'});const compiled=await compileAvatarRuntime(file,analysis,{root}),sourceHash=await sha256(file,root),runtimeHash=await sha256(compiled.blob,root),ext=compiled.type==='image/png'?'png':'webp',slug=clean(`avatar-${sourceHash.slice(0,16)}`),runtimePath=`${uid}/characters/${runtimeHash.slice(0,24)}.${ext}`,publicUrl=contentRepository.publicUrl('avatars',runtimePath);
+    onProgress?.({stage:'upload-runtime',message:'Subiendo avatar…'});await contentRepository.upload('avatars',runtimePath,compiled.blob,{upsert:true});
+    const payload={rigProfileId:'creator-spritesheet-v1',directions:Math.min(4,compiled.rows),animationSetId:'creator-grid-walk-v1',slots:[],rarity:'custom',metadata:{source:'avatar-quick-import',characterId:character.id},avatarRuntime:{bucket:'avatars',path:runtimePath,publicUrl,columns:compiled.columns,rows:compiled.rows,rowMap:compiled.rowMap,frameMs:compiled.frameMs,renderHeight:82,runtimeHash}};
+    const draft=F({schemaVersion:1,sourceRow:1,contentType:'character',schema:F({label:'Character',owner:'KeloCreatorAvatars',required:F(['primary'])}),slug,displayName:String(displayName||'Mi Avatar').slice(0,100),tags:F(['avatar','quick-import']),publish:false,visibility:'global',assetRefs:F([{role:'primary',file:file.name}]),payload:F(payload)}),job=F({ok:true,draft,resolvedAssets:F([{role:'primary',file,sourceName:file.name}]),errors:F([]),warnings:F([])});
+    onProgress?.({stage:'register',message:'Registrando personaje…'});const result=await contentService.importJob(job,{onProgress:e=>{if(e.stage==='assets')onProgress?.({stage:'source',message:`Guardando fuente ${e.done}/${e.total}…`});}});await contentRepository.setActiveCharacterAvatar(character.id,result.revision.content_id);
+    const manifest={contentId:result.revision.content_id,displayName:draft.displayName,payload};root.KeloCreatorAvatars?.register?.(manifest);root.KeloCreatorAvatars?.select?.(result.revision.content_id,{manifest,persistLocal:true});onProgress?.({stage:'active',message:'Avatar activo'});return F({character,manifest,result});
+  }
+  async function hydrateActive(){if(!contentSession.accessToken)return root.KeloCreatorAvatars?.current?.()||null;await contentSession.ensureFresh();const chars=await contentRepository.listMyCharacters(),character=Array.isArray(chars)?chars.find(x=>x.status==='active')||chars[0]:null;if(!character?.active_avatar_content_id)return null;const manifest=await contentRepository.getAvatarManifest(character.active_avatar_content_id);if(!manifest)return null;const rt=manifest.payload?.avatarRuntime;if(rt?.bucket&&rt?.path&&!rt.publicUrl)rt.publicUrl=contentRepository.publicUrl(rt.bucket,rt.path);root.KeloCreatorAvatars?.register?.(manifest);root.KeloCreatorAvatars?.select?.(manifest.contentId,{manifest,persistLocal:true});return manifest;}
+  return F({version:'avatar-quick-import-service-v1.0.0',importAndUse,hydrateActive});
+}
