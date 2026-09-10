@@ -8,8 +8,8 @@
  */
 
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
-const MIN_ZOOM=.35;
-const MAX_ZOOM=3;
+const MIN_ZOOM=.2;
+const MAX_ZOOM=5;
 
 export function createStudioCameraController({root=globalThis,onNavigateStart=()=>{},isUi=()=>false,onPinchStart=()=>false,onPinchMove=()=>{},onPinchEnd=()=>{}}={}){
   const document=root.document,owner=root.KeloCamera;
