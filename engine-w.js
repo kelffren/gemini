@@ -1,3 +1,11 @@
+/* KELO-INDEX
+ * area: AVATAR / LEGACY BASE
+ * owner: engine-w legacy pixel hero base; identity text delegates to KeloActorNameplate when available
+ * keys: AVATAR BASE PIXEL HERO NAMEPLATE DELEGATION
+ * purpose: dibuja el avatar base legacy sin competir con el owner moderno de identidad
+ * consumes: KeloAvatar; optional KeloActorNameplate
+ * do-not: NO duplicar nombre/título/nobleza cuando KeloActorNameplate está LIVE
+ */
 (function () {
   function px(ctx, x, y, w, h, c) {
     ctx.fillStyle = c;
@@ -65,10 +73,14 @@
     }
     if (isSelf) px(ctx, x - 5, y - 28, 10, 4, gold);
 
-    ctx.fillStyle = isSelf ? '#e7c56a' : '#f3eee4';
-    ctx.font = 'bold 11px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(p.name || 'Kelo', x, y - 34);
+    // Transitional fallback only. Once the modern identity consumer is LIVE,
+    // it owns name/title/nobility presentation and this base must stay silent.
+    if (!window.KeloActorNameplate) {
+      ctx.fillStyle = isSelf ? '#e7c56a' : '#f3eee4';
+      ctx.font = 'bold 11px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(p.name || 'Kelo', x, y - 34);
+    }
     ctx.restore();
   }
 
@@ -79,4 +91,10 @@
 
   if(!window.KeloAvatar) throw new Error('KeloAvatar unavailable before engine-w');
   window.KeloAvatar.setBase('engine-w:legacy-pixel-hero', renderLegacyPixelHero);
+  window.KELO_ENGINE_W_AUDIT = Object.freeze({
+    version: 'engine-w-v2-nameplate-delegation',
+    avatarBase: true,
+    identityFallbackOnly: true,
+    delegatesIdentityWhenNameplateLive: true
+  });
 })();
