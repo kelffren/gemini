@@ -1,3 +1,11 @@
+/* KELO-INDEX
+ * area: PVP / MELEE AUDIT
+ * owner: KeloMeleeProfiles verification
+ * keys: PVP MELEE FOLLOW RECOVERY MOVEMENT FIXED STEP AUDIT
+ * purpose: verifies sword light follow recovery restores full movement without altering attack timings
+ * online: client and server consume the same KeloMeleeProfiles data
+ * do-not: NO runtime gameplay owner; audit only
+ */
 'use strict';
 const fs=require('fs'),path=require('path'),vm=require('vm');
 const root=path.resolve(__dirname,'..');
