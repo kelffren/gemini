@@ -25,12 +25,14 @@ export function createCreatorActions(kernel) {
     kernel.selection.clear(); return rows.map(row => row.id);
   }
 
-  async function duplicateSelection({ offsetX, offsetY } = {}) {
+  async function duplicateSelection({ offsetX, offsetY, armGrab = true } = {}) {
     const rows = selectedEntities(); if (!rows.length) return [];
     const tile = Math.max(1, Number(kernel.document.settings?.tileSize) || 32), dx = Number.isFinite(Number(offsetX)) ? Number(offsetX) : tile, dy = Number.isFinite(Number(offsetY)) ? Number(offsetY) : tile;
     const clones = rows.map(row => { const clone=sanitizeClone(row); clone.transform={...(clone.transform||{}),x:(Number(clone.transform?.x)||0)+dx,y:(Number(clone.transform?.y)||0)+dy}; return clone; });
     await kernel.execute(createCompositeCommand(clones.map(row => createPlaceEntityCommand(row)), { type: 'entity.batch.duplicate', label: `Duplicate ${clones.length} object${clones.length === 1 ? '' : 's'}` }));
-    kernel.selection.set(clones.map(row => row.id)); return clones;
+    const ids=clones.map(row => row.id);kernel.selection.set(ids);
+    if(armGrab)kernel.tools.get?.('select')?.armGrab?.(ids);
+    return clones;
   }
 
   function copySelection() {
