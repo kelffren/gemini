@@ -1,0 +1,47 @@
+name: Online Production Activation CI
+
+on:
+  pull_request:
+    paths:
+      - 'server/**'
+      - 'src/config/online-runtime-config.js'
+      - 'index.html'
+      - 'render.yaml'
+      - 'docs/ops/RENDER_SERVER.md'
+      - 'docs/systems/ONLINE_FOUNDATION.md'
+      - '.github/workflows/online-production-activation-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'server/**'
+      - 'src/config/online-runtime-config.js'
+      - 'index.html'
+      - 'render.yaml'
+      - 'docs/ops/RENDER_SERVER.md'
+      - 'docs/systems/ONLINE_FOUNDATION.md'
+
+jobs:
+  online-runtime:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.20.0'
+      - name: Syntax
+        run: |
+          node --check server/index.js
+          node --check server/smoke-test.js
+          node --check src/config/online-runtime-config.js
+      - name: Install server dependencies
+        working-directory: server
+        run: npm install --omit=dev --no-audit --no-fund
+      - name: Authoritative server smoke
+        working-directory: server
+        run: npm run test:smoke
+      - name: Online Foundation audit
+        run: |
+          npm install --no-audit --no-fund
+          npm run audit:online-foundation
+          npm run audit:foundation
+          npm run audit:docs

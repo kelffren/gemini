@@ -1,12 +1,13 @@
 /* KELO-INDEX
  * area: SERVER / NETWORK
  * owner: Kelo server authority + server/pvp-authority.js for PvP simulation
- * keys: WEBSOCKET AUTHORITY INPUT INTENT FIXED TIMESTEP RECONCILIATION PVP TITLES COMMERCE FORGE AOI SPATIAL GRID HYSTERESIS PERFORMANCE IDENTITY SUPABASE
+ * keys: WEBSOCKET AUTHORITY INPUT INTENT FIXED TIMESTEP RECONCILIATION PVP TITLES COMMERCE FORGE AOI SPATIAL GRID HYSTERESIS PERFORMANCE IDENTITY SUPABASE HEALTH READINESS HEARTBEAT SHUTDOWN
  * purpose: autoridad server-side; PvP acepta inputs/intents y todas las salidas de estado/presentación se filtran por zone + AOI por viewer
  * online: pose sigue para mundo social; dentro de PvP la posición, dash, cooldown, mana, hits, HP, CC, muerte y kills nacen del fixed-step server; hello resuelve identidad Supabase cuando existe
- * do-not: NO broadcast global periódico de actores, NO daño/posición PvP declarados por cliente, NO confiar accountId/characterId enviados sin verificar
+ * do-not: NO broadcast global periódico de actores, NO daño/posición PvP declarados por cliente, NO confiar accountId/characterId enviados sin verificar, NO segundo servidor HTTP paralelo
  */
 'use strict';
+const http = require('http');
 const { WebSocketServer } = require('ws');
 const { createNobilityService, safePlayerId } = require('./nobility-store');
 const { createPlayerEconomyStore } = require('./player-economy-store');
@@ -17,7 +18,9 @@ const { createPvpAuthority, FIXED_DT, SNAPSHOT_HZ } = require('./pvp-authority')
 const { createOnlineIdentityStore } = require('./online-identity-store');
 
 const PORT=Number(process.env.PORT||2567),MAX=32,WORLD={w:3600,h:3200};
-const AOI_CELL=512,AOI_RADIUS=1350,AOI_HYSTERESIS=180;
+const AOI_CELL=512,AOI_RADIUS=1350,AOI_HYSTERESIS=180,MAX_WS_PAYLOAD=64*1024,HEARTBEAT_MS=30000;
+const STARTED_AT=Date.now();
+let shuttingDown=false;
 const VISUAL_EVENT_ALLOWLIST=new Set(['CAST_CONFIRMED','PROJECTILE_SPAWNED','PROJECTILE_HIT','PROJECTILE_EXPIRED','ABILITY_IMPACT','STATUS_APPLIED','STATUS_REMOVED','SHIELD_APPLIED','SHIELD_BROKEN','DASH_STARTED','DASH_ENDED','DEATH']);
 const players=new Map();let seq=1;
 const identity=createOnlineIdentityStore({supabaseUrl:process.env.SUPABASE_URL,supabaseServerKey:process.env.SUPABASE_SECRET_KEY||process.env.SUPABASE_SERVICE_ROLE_KEY,requireAuth:process.env.KELO_REQUIRE_AUTH==='1'});
@@ -54,13 +57,27 @@ async function recordConfirmedKill(killerConnectionId,victimConnectionId,context
 const pvp=createPvpAuthority({onKill:(killer,victim,context)=>recordConfirmedKill(killer.id,victim.id,Object.assign({mode:'pvp',serverConfirmed:true},context||{}))});
 function pvpSnapshotFor(viewer,snapshot,events,index){const playersOut={},visible=new Set();candidatePlayers(viewer,index).forEach(target=>{const row=snapshot.players&&snapshot.players[target.id],was=viewer._aoiRelevant instanceof Set&&viewer._aoiRelevant.has(target.id);if(row&&relevantTo(viewer,target,was)){playersOut[target.id]=row;visible.add(target.id)}});if(snapshot.players&&snapshot.players[viewer.id]){playersOut[viewer.id]=snapshot.players[viewer.id];visible.add(viewer.id)}const projectiles=(snapshot.projectiles||[]).filter(projectile=>{const ownerId=projectile.ownerId||projectile.actorId||projectile.playerId;if(ownerId&&visible.has(ownerId))return true;const x=Number(projectile.x??projectile.position?.x),y=Number(projectile.y??projectile.position?.y);if(!Number.isFinite(x)||!Number.isFinite(y))return false;const dx=x-(Number(viewer.x)||0),dy=y-(Number(viewer.y)||0);return dx*dx+dy*dy<=AOI_RADIUS*AOI_RADIUS});const eventList=(events||[]).filter(ev=>!ev||(!ev.actorId&&!ev.targetId)||visible.has(ev.actorId)||visible.has(ev.targetId)||ev.targetId===viewer.id);return{...snapshot,players:playersOut,projectiles,events:eventList};}
 function sendPvpSnapshots(snapshot,events){const index=buildSpatialIndex();players.forEach(viewer=>{if(!(viewer.zone==='pvp'||viewer._pvpActive))return;send(viewer.ws,{t:'pvp:snapshot',...pvpSnapshotFor(viewer,snapshot,events,index),source:'server-authoritative-aoi'})});}
+function healthPayload(){return{ok:true,service:'kelo-world-server',version:'server-runtime-v2',uptimeMs:Date.now()-STARTED_AT,connections:players.size,shuttingDown,identity:identity.audit(),pvp:pvp.audit(),serverTime:Date.now()};}
 
-const wss=new WebSocketServer({port:PORT});
-wss.keloServerHooks=Object.freeze({recordConfirmedOpenWorldKill:recordConfirmedKill,pvpAuthority:pvp,aoi:Object.freeze({cell:AOI_CELL,radius:AOI_RADIUS,hysteresis:AOI_HYSTERESIS}),identityAuthority:identity});
-console.log(`Kelo room ws://0.0.0.0:${PORT} · fixed PvP ${Math.round(1/FIXED_DT)}Hz · snapshots ${SNAPSHOT_HZ}Hz · AOI ${AOI_RADIUS}px · Identity ${identity.source}${identity.requireAuth?' required':' transition'} · Nobleza ${nobility.source} · Titles ${titles.source} · Forge ${forge.source} · Commerce ${commerce.version}`);
+const httpServer=http.createServer((req,res)=>{
+  const path=String(req.url||'/').split('?')[0];
+  if(path==='/healthz'||path==='/readyz'){
+    const ready=!shuttingDown,status=path==='/readyz'&&!ready?503:200;
+    res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'});
+    res.end(JSON.stringify({...healthPayload(),ready}));
+    return;
+  }
+  res.writeHead(404,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'});
+  res.end(JSON.stringify({ok:false,error:'NOT_FOUND'}));
+});
+const wss=new WebSocketServer({server:httpServer,maxPayload:MAX_WS_PAYLOAD,perMessageDeflate:false});
+wss.keloServerHooks=Object.freeze({recordConfirmedOpenWorldKill:recordConfirmedKill,pvpAuthority:pvp,aoi:Object.freeze({cell:AOI_CELL,radius:AOI_RADIUS,hysteresis:AOI_HYSTERESIS}),identityAuthority:identity,health:healthPayload});
+httpServer.listen(PORT,'0.0.0.0',()=>console.log(`Kelo room ws://0.0.0.0:${PORT} · fixed PvP ${Math.round(1/FIXED_DT)}Hz · snapshots ${SNAPSHOT_HZ}Hz · AOI ${AOI_RADIUS}px · maxPayload ${MAX_WS_PAYLOAD} · Identity ${identity.source}${identity.requireAuth?' required':' transition'} · Nobleza ${nobility.source} · Titles ${titles.source} · Forge ${forge.source} · Commerce ${commerce.version}`));
 
 wss.on('connection',ws=>{
+  if(shuttingDown){ws.close(1012,'server restarting');return;}
   if(players.size>=MAX){ws.close(1013,'room full');return;}
+  ws.isAlive=true;ws.on('pong',()=>{ws.isAlive=true;});
   const id='p'+seq++,me={id,ws,playerKey:null,accountId:null,characterId:null,authSource:'pending',name:'Kelo',x:1400,y:1600,vx:0,vy:0,face:'down',gait:'idle',zone:'plaza',hp:100,maxHp:100,mana:100,maxMana:100,nobilityRank:'none',nobilityPower:0,equippedTitleId:null,armorScore:0,auraRank:0,averageQuality:0,averageGrade:0,equipmentSummary:[],_aoiRelevant:new Set()};
   players.set(id,me);pvp.register(me);send(ws,{t:'welcome',id,players:publicStateFor(me),nobilitySource:nobility.source,titleSource:titles.source,forgeSource:forge.source,commerceSource:'server-authoritative',identityAuthority:identity.audit(),pvpAuthority:pvp.audit(),serverTime:Date.now(),aoi:{cell:AOI_CELL,radius:AOI_RADIUS,hysteresis:AOI_HYSTERESIS}});sendRelevantJoin(me);
   ws.on('message',async buf=>{
@@ -105,8 +122,26 @@ wss.on('connection',ws=>{
 });
 
 let fixedTick=0;
-setInterval(()=>{
+const simulationTimer=setInterval(()=>{
   const now=Date.now();pvp.step(FIXED_DT,now);fixedTick++;
   if(fixedTick%Math.max(1,Math.round((1/FIXED_DT)/SNAPSHOT_HZ))===0&&players.size){const snapshot=pvp.snapshot(now),events=pvp.consumeEvents();sendPvpSnapshots(snapshot,events);}
   if(fixedTick%6===0&&players.size)sendRelevantStates();
 },1000/60);
+const heartbeatTimer=setInterval(()=>{
+  wss.clients.forEach(ws=>{
+    if(ws.isAlive===false){ws.terminate();return;}
+    ws.isAlive=false;try{ws.ping();}catch(_){ws.terminate();}
+  });
+},HEARTBEAT_MS);
+
+function shutdown(signal){
+  if(shuttingDown)return;
+  shuttingDown=true;
+  console.log(`Kelo server shutdown ${signal} · connections ${players.size}`);
+  clearInterval(simulationTimer);clearInterval(heartbeatTimer);
+  wss.clients.forEach(ws=>{try{ws.close(1012,'server restarting');}catch(_){}});
+  const force=setTimeout(()=>process.exit(0),8000);force.unref();
+  wss.close(()=>httpServer.close(()=>process.exit(0)));
+}
+process.once('SIGTERM',()=>shutdown('SIGTERM'));
+process.once('SIGINT',()=>shutdown('SIGINT'));

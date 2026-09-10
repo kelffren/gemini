@@ -4,7 +4,9 @@
 - **Owner persistencia/identidad:** Supabase project `kelo-world` (`iapxdbitjdwvtbpjghct`).
 - **Región actual:** `us-west-2`.
 - **Cliente de transporte:** `engine-net.js` / `KeloNetAuthority`.
+- **Config endpoint cliente:** `src/config/online-runtime-config.js`.
 - **Adaptador de identidad server:** `server/online-identity-store.js`.
+- **Runtime de producción:** Render `kelo-world-server` en Virginia.
 - **Migraciones:** `supabase/migrations/*`.
 - **Player visible:** false.
 
@@ -20,12 +22,14 @@ GitHub Pages / cliente
         +--> Supabase Auth + API + Storage
         |      identidad, metadata, contenido, lectura propia
         |
-        +--> server/* WebSocket
+        +--> server/* WebSocket en Render
                autoridad gameplay
                |
                +--> Supabase
                     persistencia confiable mediante secret key
 ```
+
+`src/config/online-runtime-config.js` solo decide qué endpoint consume `engine-net.js`. No abre sockets, no posee gameplay y no sustituye `KeloNetAuthority`.
 
 ## 2. Invariantes de identidad
 
@@ -130,6 +134,19 @@ Nunca se debe aceptar desde el cliente: `newBalance`, `damage`, `lootGranted`, `
 
 `server_audit_events` es service-only y registra eventos de seguridad/operación sin exponer IP cruda; el campo previsto es `ip_hash`.
 
+### Runtime WebSocket / Render
+
+`server/index.js` usa un único `http.Server` para health/readiness y upgrades WebSocket. No existe un segundo proceso ni una segunda autoridad.
+
+- `/healthz`: proceso vivo + audit mínimo.
+- `/readyz`: `200` cuando acepta tráfico; `503` durante shutdown.
+- límite por mensaje WebSocket: 64 KiB.
+- compresión per-message desactivada para el tráfico corto de gameplay.
+- ping/pong cada 30 s para retirar sockets muertos.
+- `SIGTERM`/`SIGINT`: detiene timers, avisa clientes con 1012 y cierra WebSocket/HTTP limpiamente.
+
+`server/smoke-test.js` valida readiness, handshake, `hello` y shutdown real. El workflow `Online Production Activation CI` ejecuta ese smoke junto con los audits Foundation.
+
 ## 8. Realtime
 
 El loop de juego NO usa Postgres Changes.
@@ -139,6 +156,18 @@ El loop de juego NO usa Postgres Changes.
 - datos privados de economía/moderación: server authority; no Broadcast público.
 
 Los triggers actuales usan Broadcast público únicamente para acontecimientos que ya son públicos (`asset_published` y `map_published`). Si en el futuro un evento contiene datos privados debe usar canal privado con autorización o el WebSocket del servidor.
+
+### Endpoint runtime del cliente
+
+En páginas HTTPS no-locales, la configuración de producción usa:
+
+```text
+wss://kelo-world-server.onrender.com
+```
+
+`?net=<wss-url>` conserva el override de QA y `?offline=1` conserva un escape explícito a fallback local. Localhost no se fuerza contra producción.
+
+La URL del servidor es configuración pública; nunca debe contener secrets ni tokens.
 
 ## 9. RLS y secretos
 
@@ -150,11 +179,15 @@ Los triggers actuales usan Broadcast público únicamente para acontecimientos q
 - Nunca versionar una secret/service-role key.
 - La secret key no es JWT y no se envía como `Authorization: Bearer`.
 
+La activación de `KELO_REQUIRE_AUTH=1` está bloqueada hasta que los secrets estén instalados en Render y se haya verificado access token + ownership de `characterId` de extremo a extremo.
+
 ## 10. Estado legacy
 
 `equipment_items`, `forge_history`, `nobility_players` y `nobility_history` ya existían como owners de persistencia de sistemas activos. No se eliminan ni se reemplazan de golpe. Se mantienen service-only y se migrarán gradualmente a `characters.id`/wallet ledger sin romper los servicios actuales.
 
 No crear tablas paralelas adicionales para resolver temporalmente la transición.
+
+Mientras Supabase no esté conectado al proceso Render, identidad y stores que aún no tienen persistencia activa permanecen explícitamente en transición/RAM. Eso no autoriza a presentar esa RAM como persistencia de producción.
 
 ## 11. APIs de DB relevantes
 
@@ -180,10 +213,13 @@ Trusted-server only:
 - `npm run audit:online-foundation`
 - `npm run audit:foundation`
 - `npm run audit:docs`
+- `cd server && npm run test:smoke`
 - Supabase Security Advisor después de cambios DDL/RLS.
 - Supabase Performance Advisor después de cambios de FK/policies/queries.
 
 El audit local verifica versiones de migraciones únicas, contratos RLS, buckets, versionado de assets/mapas, idempotencia del ledger, ausencia de secrets y semántica de `sb_secret` en `server/online-identity-store.js`.
+
+El smoke de servidor verifica el proceso real y no un mock de WebSocket.
 
 ## 13. Anti-patrones prohibidos
 
@@ -192,10 +228,12 @@ El audit local verifica versiones de migraciones únicas, contratos RLS, buckets
 - que el cliente escriba directamente una publicación global;
 - poner `service_role`/`sb_secret` en Pages, localStorage o repo;
 - crear un segundo servidor multiplayer cuando `server/*` ya es el owner;
+- crear un servidor aparte solo para health/readiness;
 - guardar posiciones PvP cada frame en Postgres;
 - usar Postgres Realtime como sustituto del fixed-step WebSocket;
 - actualizar saldos sin ledger/correlation id;
-- unir para siempre `auth.users.id` y personaje en un solo ID semántico.
+- unir para siempre `auth.users.id` y personaje en un solo ID semántico;
+- esconder una URL WSS dentro de una feature gameplay en vez de usar config runtime.
 
 ## 14. Expansión prevista sin ruptura
 
