@@ -1,7 +1,7 @@
 # KELO-INDEX
 # area: CI / CREATORS
-# keys: SPRITE ABILITY BUILDER SPRITESHEET ANIMATION ABILITY MOBILE
-# purpose: valida contrato y flujo real upload → preview → generate a 390x844
+# keys: SPRITE ABILITY BUILDER SPRITESHEET AUTO FIT ANIMATION ABILITY MOBILE
+# purpose: valida auto-fit + flujo real upload → normalize → preview → generate a 390x844
 name: Sprite Ability Builder CI
 on:
   pull_request:
@@ -41,6 +41,7 @@ jobs:
           node-version: 24
       - name: Syntax
         run: |
+          node --check src/creators/sprite-ability/spritesheet-auto-fit.mjs
           node --check src/creators/sprite-ability/sprite-ability-document.mjs
           node --check src/creators/sprite-ability/sprite-ability-live-controller.mjs
           node --check src/creators/workspaces/sprite-ability-workspace.mjs
@@ -57,6 +58,7 @@ jobs:
           grep -q "SPRITE_ABILITY" src/creators/core/creator-project.mjs
           grep -q "registerSpriteAbilityWorkspace" src/creators/creator-entry.mjs
           grep -q "sprite-ability" src/creators/ui/creator-hub.mjs
+          grep -q "analyzeAndNormalizeSpritesheet" src/creators/sprite-ability/sprite-ability-live-controller.mjs
           ! grep -Eq "\.hp[[:space:]]*=|damageTarget|attackSweep|resolveMelee" src/creators/sprite-ability/sprite-ability-live-controller.mjs
 
   mobile-live:
@@ -75,7 +77,7 @@ jobs:
           for i in {1..20}; do curl -fsS http://127.0.0.1:8000/index.html >/dev/null && exit 0; sleep 1; done
           cat /tmp/sprite-ability-http.log
           exit 1
-      - name: Upload, preview and generate at 390x844
+      - name: Upload irregular sheet, auto-fit, preview and generate at 390x844
         env:
           AUDIT_URL: http://127.0.0.1:8000/
           CHROME_BIN: /usr/bin/google-chrome
