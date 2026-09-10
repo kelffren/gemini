@@ -18,8 +18,8 @@ async function run(name,viewport,opts={}){
   const page=await context.newPage();
   const errors=[];page.on('pageerror',e=>errors.push(String(e?.message||e)));
   await page.goto(url+'?pvpCameraFollowAudit=1',{waitUntil:'domcontentloaded'});
-  await page.waitForFunction(()=>window.KeloCamera&&window.KeloPvPWorld&&window.localPlayer&&window.camera&&window.input,{timeout:20000});
-  await windowReady(page);
+  await page.waitForFunction(()=>window.KeloCamera&&window.KeloPvPWorld&&typeof localPlayer!=='undefined'&&typeof camera!=='undefined'&&typeof input!=='undefined',{timeout:20000});
+  await page.waitForTimeout(300);
   const result=await page.evaluate(async()=>{
     await KeloPvPWorld.ensureCombatReady();
     KeloPvPWorld.enter();
@@ -54,7 +54,6 @@ async function run(name,viewport,opts={}){
   return result;
 }
 
-async function windowReady(page){await page.waitForTimeout(300);}
 const landscape=await run('mobile-landscape',{width:844,height:390},{dpr:2,touch:true,mobile:true});
 const desktop=await run('desktop',{width:1440,height:900},{dpr:1});
 const report={ok:!landscape.errors.length&&!desktop.errors.length,landscape,desktop};
