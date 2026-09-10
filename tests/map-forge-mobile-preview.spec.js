@@ -1,16 +1,21 @@
 /* KELO-INDEX
  * area: TEST / MAP FORGE / MOBILE PREVIEW
  * owner: Map Forge mobile browser smoke
- * purpose: verify real snapshot preview, reversible exterior handoff, camera focus and session restoration at 390x844
+ * purpose: verify live Settlemaker generation, real snapshot preview, reversible exterior handoff, camera focus and session restoration at 390x844
  */
 const { test, expect } = require('@playwright/test');
 const fs = require('fs');
 
 test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 
-test('Map Forge real preview hides before handoff and restores the same candidate', async ({ page }) => {
+test('Map Forge uses live Settlemaker, hides before handoff and restores the same candidate', async ({ page }) => {
   const pageErrors = [];
+  const providerWarnings = [];
   page.on('pageerror', error => pageErrors.push(String(error)));
+  page.on('console', msg => {
+    const text = msg.text();
+    if (text.includes('Settlemaker') || text.includes('Map Forge')) providerWarnings.push(`${msg.type()}: ${text}`);
+  });
   fs.mkdirSync('test-results', { recursive: true });
 
   const response = await page.goto('/?mapEditor=1', { waitUntil: 'domcontentloaded', timeout: 30000 });
@@ -41,18 +46,28 @@ test('Map Forge real preview hides before handoff and restores the same candidat
 
   const before = await page.evaluate(async () => {
     const { getMapForgeWorkspace } = await import('./src/creators/ui/map-forge-workspace.mjs');
-    const selected = getMapForgeWorkspace()?.selected;
+    const workspace = getMapForgeWorkspace();
+    const selected = workspace?.selected;
     return selected ? {
       seed: selected.metadata.seed,
       layoutHash: selected.metadata.layoutHash,
       bounds: selected.worldBounds,
       spawn: selected.spawnPoints?.[0] || null,
+      provider: workspace?.result?.provider || null,
+      workerMode: workspace?.worker?.mode || null,
+      sourceGenerator: selected.metadata.sourceGenerator || null,
+      roadSources: [...new Set((selected.roads || []).map(row => row.source || 'unknown'))],
       propertyCatalogVersion: window.KELO_PROPERTY_CATALOG?.version || null,
       propertyPreviewRenderer: typeof window.KELO_PROPERTY_SYSTEM?.drawPlacements === 'function',
       snapshotPreviewRenderer: typeof window.KELO_WORLD_BUILDER?.renderSnapshotPreview === 'function'
     } : null;
   });
+  console.log('MAP_FORGE_GENERATION_EVIDENCE', JSON.stringify({ before, providerWarnings }));
   expect(before).not.toBeNull();
+  expect(before.provider, `Settlemaker must be primary; warnings=${providerWarnings.join(' | ')}`).toBe('settlemaker');
+  expect(before.workerMode).toBe('settlemaker-cloud');
+  expect(before.sourceGenerator).toMatch(/^settlemaker@/);
+  expect(before.roadSources).toContain('settlemaker');
   expect(before.propertyPreviewRenderer).toBe(true);
   expect(before.snapshotPreviewRenderer).toBe(true);
   await page.screenshot({ path: 'test-results/map-forge-real-preview-390x844.png', fullPage: true });
