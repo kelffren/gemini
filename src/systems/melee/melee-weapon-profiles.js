@@ -8,7 +8,7 @@
  */
 (function(root){
   'use strict';
-  const VERSION='melee-weapon-profiles-v3.1.0-light-recovery-mobility';
+  const VERSION='melee-weapon-profiles-v3.2.0-follow-recovery-mobility';
   const registry=new Map();
   function freezeScale(value){
     if(value&&typeof value==='object')return Object.freeze({windup:value.windup==null?1:Number(value.windup),active:value.active==null?1:Number(value.active),recovery:value.recovery==null?1:Number(value.recovery)});
@@ -41,7 +41,7 @@
   register({
     id:'sword_light_follow',weaponClass:'sword',attackProfile:'light_slash',damage:20,range:154,cooldown:.10,damageType:'physical',
     hitShape:'sector',arcDegrees:104,forwardOffset:20,windup:.07,active:.07,recovery:.17,
-    movementScale:{windup:.9,active:.52,recovery:.8},knockback:18,stagger:.08,
+    movementScale:{windup:.9,active:.52,recovery:1},knockback:18,stagger:.08,
     charges:2,rechargeTime:.58,cancelWindow:.06,comboWindow:.15,comboTimeout:.52,canCancelInto:['dodge','special','ability'],visualProfileId:'melee_sword_light_follow_v1'
   });
   register({
@@ -58,6 +58,6 @@
     input:{mode:'charge',charge:{minTime:.08,level1Time:.28,level2Time:.62,maxTime:1.05}},visualProfileId:'melee_sword_heavy_charge_v1'
   });
 
-  root.KELO_MELEE_PROFILE_AUDIT={version:VERSION,ready:true,profiles:function(){return registry.size;},basicProfile:'sword_light_basic',basicDamage:18,basicRange:150,basicHitShape:'sector',basicArcDegrees:92,basicCharges:2,comboSteps:3,specialProfile:'sword_heavy_charge',basicRecoveryMovementScale:1};
+  root.KELO_MELEE_PROFILE_AUDIT={version:VERSION,ready:true,profiles:function(){return registry.size;},basicProfile:'sword_light_basic',basicDamage:18,basicRange:150,basicHitShape:'sector',basicArcDegrees:92,basicCharges:2,comboSteps:3,specialProfile:'sword_heavy_charge',basicRecoveryMovementScale:1,followRecoveryMovementScale:1};
   root.KeloMeleeProfiles=Object.freeze({version:VERSION,register,get,list});
 })(typeof globalThis!=='undefined'?globalThis:window);
