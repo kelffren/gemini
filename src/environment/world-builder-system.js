@@ -157,11 +157,11 @@ function previewBounds(snapshotValue,requested){
   const rows=Object.values(snapshotValue?.cells||{});if(rows.length){const xs=rows.map(x=>Number(x.x)||0),ys=rows.map(x=>Number(x.y)||0),minX=Math.min(...xs),minY=Math.min(...ys),maxX=Math.max(...xs)+TILE,maxY=Math.max(...ys)+TILE;return{x:minX,y:minY,w:Math.max(TILE,maxX-minX),h:Math.max(TILE,maxY-minY)};}
   return{x:0,y:0,w:Number(window.CONFIG?.worldWidth)||3600,h:Number(window.CONFIG?.worldHeight)||3200};
 }
-function renderSnapshotPreview(canvas,viewSnapshot,{bounds=null,padding=16}={}){
-  if(!canvas?.getContext)throw new Error('WORLD_BUILDER_PREVIEW_CANVAS_REQUIRED');
-  const g=canvas.getContext('2d');if(!g)throw new Error('WORLD_BUILDER_PREVIEW_CONTEXT_REQUIRED');
-  const view=canvas.ownerDocument?.defaultView||window,rect=canvas.getBoundingClientRect(),dpr=Math.min(2,Number(view.devicePixelRatio)||1),cssW=Math.max(1,rect.width||canvas.clientWidth||390),cssH=Math.max(1,rect.height||canvas.clientHeight||390),pixelW=Math.max(1,Math.round(cssW*dpr)),pixelH=Math.max(1,Math.round(cssH*dpr));
-  if(canvas.width!==pixelW||canvas.height!==pixelH){canvas.width=pixelW;canvas.height=pixelH;}
+function renderSnapshotPreview(previewCanvas,viewSnapshot,{bounds=null,padding=16}={}){
+  if(!previewCanvas?.getContext)throw new Error('WORLD_BUILDER_PREVIEW_CANVAS_REQUIRED');
+  const g=previewCanvas.getContext('2d');if(!g)throw new Error('WORLD_BUILDER_PREVIEW_CONTEXT_REQUIRED');
+  const view=previewCanvas.ownerDocument?.defaultView||window,rect=previewCanvas.getBoundingClientRect(),dpr=Math.min(2,Number(view.devicePixelRatio)||1),cssW=Math.max(1,rect.width||previewCanvas.clientWidth||390),cssH=Math.max(1,rect.height||previewCanvas.clientHeight||390),pixelW=Math.max(1,Math.round(cssW*dpr)),pixelH=Math.max(1,Math.round(cssH*dpr));
+  if(previewCanvas.width!==pixelW||previewCanvas.height!==pixelH){previewCanvas.width=pixelW;previewCanvas.height=pixelH;}
   g.setTransform(dpr,0,0,dpr,0,0);g.clearRect(0,0,cssW,cssH);g.fillStyle='#071018';g.fillRect(0,0,cssW,cssH);
   const src=viewSnapshot||{},b=previewBounds(src,bounds),pad=Math.max(6,Math.min(Number(padding)||16,Math.min(cssW,cssH)*.15)),scale=Math.min((cssW-pad*2)/b.w,(cssH-pad*2)/b.h);
   if(!Number.isFinite(scale)||scale<=0)return Object.freeze({cells:0,placements:0,bounds:b,scale:0});
