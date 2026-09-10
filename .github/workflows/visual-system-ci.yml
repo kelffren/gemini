@@ -13,6 +13,7 @@ on:
       - 'src/visuals/melee-assets/**'
       - 'scripts/visual-system-contract-audit.js'
       - 'scripts/melee-visuals-audit.js'
+      - 'scripts/melee-m1-combo-audit.js'
       - '.github/workflows/visual-system-ci.yml'
   pull_request:
     paths:
@@ -26,6 +27,7 @@ on:
       - 'src/visuals/melee-assets/**'
       - 'scripts/visual-system-contract-audit.js'
       - 'scripts/melee-visuals-audit.js'
+      - 'scripts/melee-m1-combo-audit.js'
       - '.github/workflows/visual-system-ci.yml'
   workflow_dispatch:
 
@@ -49,6 +51,7 @@ jobs:
           test -f src/visuals/visual-lab.js
           test -f src/visuals/visual-integration.js
           test -f scripts/melee-visuals-audit.js
+          test -f scripts/melee-m1-combo-audit.js
           test -f src/visuals/melee-assets/sword-light-slash-up.svg
           test -f src/visuals/melee-assets/sword-light-slash-down.svg
           test -f src/visuals/melee-assets/sword-light-slash-left.svg
@@ -78,10 +81,13 @@ jobs:
           node --check server/index.js
           node --check scripts/visual-system-contract-audit.js
           node --check scripts/melee-visuals-audit.js
+          node --check scripts/melee-m1-combo-audit.js
       - name: Modular visual contract
         run: node scripts/visual-system-contract-audit.js
       - name: Melee visual contract
         run: node scripts/melee-visuals-audit.js
+      - name: M1 combo feel contract
+        run: node scripts/melee-m1-combo-audit.js
       - name: Online-first guardrails
         run: |
           grep -Eq "visualProfileId:[[:space:]]*'ability_visual_fireball_01'" src/abilities/abilityData.js
