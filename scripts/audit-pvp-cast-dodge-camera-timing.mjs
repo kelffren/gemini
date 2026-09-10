@@ -1,14 +1,15 @@
 /* KELO-INDEX
  * area: TEST / PVP / CAMERA
  * keys: PVP CAMERA CAST DODGE RELEASE 60HZ 90HZ 120HZ
- * hace: compara el decay baseline vs candidato del framing residual al entrar en dodge
+ * hace: compara baseline, candidate A y candidate B del framing residual al entrar en dodge
  * online: N/A; valida matemática pura de presentación, sin autoridad gameplay
  */
 const START_OFFSET=15.7;
 const SETTLE_PX=4;
 const variants=[
   {name:'baseline',decay:9},
-  {name:'candidateA',decay:18}
+  {name:'candidateA',decay:18},
+  {name:'candidateB',decay:22}
 ];
 function run(hz,decay){
   const dt=1/hz,factor=1-Math.exp(-decay*dt);
@@ -24,11 +25,11 @@ function run(hz,decay){
 }
 const rows=[];
 for(const v of variants)for(const hz of [60,90,120])rows.push({variant:v.name,...run(hz,v.decay)});
-const a=rows.filter(r=>r.variant==='candidateA');
-for(const r of a){
-  if(r.settleMs==null||r.settleMs>90)throw new Error('candidate A release too slow: '+JSON.stringify(r));
-  if(r.maxStep>8)throw new Error('candidate A release snaps: '+JSON.stringify(r));
+const winner=rows.filter(r=>r.variant==='candidateB');
+for(const r of winner){
+  if(r.settleMs==null||r.settleMs>75)throw new Error('candidate B release too slow: '+JSON.stringify(r));
+  if(r.maxStep>8)throw new Error('candidate B release snaps: '+JSON.stringify(r));
 }
 console.table(rows);
 console.log(JSON.stringify(rows,null,2));
-console.log('PVP_CAST_DODGE_CAMERA_TIMING_OK');
+console.log('PVP_CAST_DODGE_CAMERA_TIMING_OK winner=candidateB');
