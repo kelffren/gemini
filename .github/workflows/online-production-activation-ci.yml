@@ -6,6 +6,7 @@ on:
       - 'server/**'
       - 'src/config/online-runtime-config.js'
       - 'src/auth/**'
+      - 'src/ui/account-auth-ui.js'
       - 'index.html'
       - 'render.yaml'
       - 'docs/ops/RENDER_SERVER.md'
@@ -17,6 +18,7 @@ on:
       - 'server/**'
       - 'src/config/online-runtime-config.js'
       - 'src/auth/**'
+      - 'src/ui/account-auth-ui.js'
       - 'index.html'
       - 'render.yaml'
       - 'docs/ops/RENDER_SERVER.md'
@@ -39,6 +41,15 @@ jobs:
           node --check server/online-identity-store.js
           node --check src/config/online-runtime-config.js
           node --check src/auth/supabase-auth-runtime.js
+          node --check src/ui/account-auth-ui.js
+      - name: Account auth contract
+        run: |
+          grep -q "kelo-online-auth-v3" src/auth/supabase-auth-runtime.js
+          grep -q "signInAsGuest" src/auth/supabase-auth-runtime.js
+          grep -q "signInWithPassword" src/ui/account-auth-ui.js
+          grep -q "protectGuestWithEmail" src/ui/account-auth-ui.js
+          grep -q "account-auth-ui.js" src/config/online-runtime-config.js
+          ! grep -Eq "(service_role|sb_secret)[[:space:]]*[:=]" src/ui/account-auth-ui.js
       - name: Install server dependencies
         working-directory: server
         run: npm install --omit=dev --no-audit --no-fund
