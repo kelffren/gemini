@@ -24,12 +24,15 @@ function clientCandidate(d,hz,meleeScale){
   while(!s.done&&steps<1000){const castScale=timeline.movementScaleFor(s),factor=Math.min(meleeScale,castScale)/Math.max(.000001,meleeScale),finalScale=meleeScale*factor;phaseSteps.push({phase:s.phase,scale:finalScale});distance+=SPEED*finalScale*dt;timeline.advance(s,dt);steps++;}
   return{distance,steps,phaseSteps};
 }
-function baselineNoCastPrediction(d,hz,meleeScale){
-  const action=timeline.normalize(d),duration=action.windup+action.active+action.recovery,steps=Math.ceil(duration*hz);return{distance:SPEED*meleeScale*steps/hz,steps};
+function baselineSameTimelineNoCastSlow(d,hz,meleeScale){
+  // Keep the exact same phase-step count as authority; baseline differs only by ignoring cast slowdown.
+  const dt=1/hz,s=timeline.create(d);let distance=0,steps=0;
+  while(!s.done&&steps<1000){distance+=SPEED*meleeScale*dt;timeline.advance(s,dt);steps++;}
+  return{distance,steps};
 }
 const rows=[];
 for(const key of KEYS){for(const hz of [60,90,120]){for(const meleeScale of [1,.52,.34]){
-  const d=def(key),srv=serverRun(d,hz,meleeScale),cli=clientCandidate(d,hz,meleeScale),base=baselineNoCastPrediction(d,hz,meleeScale);
+  const d=def(key),srv=serverRun(d,hz,meleeScale),cli=clientCandidate(d,hz,meleeScale),base=baselineSameTimelineNoCastSlow(d,hz,meleeScale);
   const delta=Math.abs(srv.distance-cli.distance),phaseMismatch=srv.phaseSteps.some((x,i)=>!cli.phaseSteps[i]||x.phase!==cli.phaseSteps[i].phase||Math.abs(x.scale-cli.phaseSteps[i].scale)>1e-12);
   rows.push({key,hz,meleeScale,baselinePx:+base.distance.toFixed(5),serverPx:+srv.distance.toFixed(5),candidatePx:+cli.distance.toFixed(5),candidateServerDeltaPx:+delta.toFixed(12),baselineSemanticErrorPx:+Math.abs(base.distance-srv.distance).toFixed(5),steps:srv.steps,phaseMismatch});
   if(delta>1e-9||phaseMismatch)throw new Error(`CAST_PARITY_FAIL:${key}:${hz}:${meleeScale}:${delta}`);
@@ -37,5 +40,5 @@ for(const key of KEYS){for(const hz of [60,90,120]){for(const meleeScale of [1,.
 const tornado=rows.filter(r=>r.key==='fire_tornado'&&r.meleeScale===1);
 if(!tornado.every(r=>r.baselineSemanticErrorPx>50))throw new Error('TORNADO_BASELINE_GAP_NOT_REPRODUCED');
 const wind=rows.filter(r=>r.key==='wind_dash'&&r.meleeScale===1);
-if(!wind.every(r=>r.baselineSemanticErrorPx<1e-6))throw new Error('WIND_DASH_SHOULD_NOT_SLOW');
-console.log(JSON.stringify({ok:true,version:timeline.version,maxCandidateServerDeltaPx:Math.max(...rows.map(r=>r.candidateServerDeltaPx)),fireTornado:tornado,rows},null,2));
+if(!wind.every(r=>r.baselineSemanticErrorPx<1e-9&&r.candidateServerDeltaPx<1e-9))throw new Error('WIND_DASH_SHOULD_NOT_SLOW');
+console.log(JSON.stringify({ok:true,version:timeline.version,maxCandidateServerDeltaPx:Math.max(...rows.map(r=>r.candidateServerDeltaPx)),fireTornado:tornado,windDash:wind,rows},null,2));
