@@ -18,10 +18,16 @@ assert.match(source,/paintCopies\?\.state\?\.\(\)\.enabled/,'card must hide whil
 assert.match(source,/document\.activeElement!==input/,'live refresh must not overwrite a field while the user is typing');
 assert.match(source,/data-context-close/,'user must be able to hide the contextual inspector without deselecting the object');
 assert.match(source,/data-context-toggle/,'user must be able to collapse the contextual inspector');
+assert.match(source,/data-context-action="pick"/,'context inspector must expose repeat-selected as a direct brush action');
+assert.match(source,/entity\?\.prefabId/,'repeat-selected must derive the reusable asset from the selected entity prefab id');
+assert.match(source,/\.ks-asset-search/,'repeat-selected must reuse the existing asset search bridge instead of inventing placement semantics');
+assert.match(source,/target\.click\(\)/,'repeat-selected must delegate to the existing asset click placement flow');
+assert.match(source,/search\.value=previous/,'repeat-selected must restore the user asset search after delegating placement');
+assert.match(source,/grid-template-columns:repeat\(5,1fr\)/,'context actions must remain compact after adding the brush action');
 
 const entry=fs.readFileSync(new URL('../src/studio/studio-entry.mjs',import.meta.url),'utf8');
 assert.match(entry,/createStudioContextInspector/,'Studio entry must install the contextual inspector');
 assert.match(entry,/contextInspector\.destroy\(\)/,'Studio close must clean up the contextual inspector');
-assert.match(entry,/kelo-studio-foundation-v1\.8\.0/,'Studio foundation version must include contextual inspector release');
+assert.match(entry,/kelo-studio-foundation-v1\.10\.0-nudge/,'context inspector audit must track the current Studio foundation rather than a stale release');
 
-console.log(JSON.stringify({ok:true,contextFields:true,propertyProxy:true,cleanHudReplacement:true,modeAware:true,collapsible:true},null,2));
+console.log(JSON.stringify({ok:true,contextFields:true,propertyProxy:true,cleanHudReplacement:true,modeAware:true,collapsible:true,repeatSelectedBrush:true,placementBridgeReuse:true},null,2));
