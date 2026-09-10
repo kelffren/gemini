@@ -7,6 +7,7 @@ on:
       - 'src/abilities/abilityData.js'
       - 'scripts/audit-fireball-recovery-mobility.mjs'
       - 'scripts/live-fireball-recovery-mobility-judge.mjs'
+      - 'scripts/live-fireball-recovery-mobility-b-judge.mjs'
       - '.github/workflows/tmp-pvp-fireball-recovery-mobility.yml'
 
 permissions:
@@ -39,12 +40,16 @@ jobs:
                   time.sleep(.2)
           raise SystemExit('Kelo checkout server did not start')
           PY
-      - name: Deterministic 60 90 120 A B
+      - name: Deterministic 60 90 120 baseline vs A
         run: node scripts/audit-fireball-recovery-mobility.mjs
-      - name: Live mobile and desktop recovery movement
+      - name: Candidate A live mobile and desktop
         env:
           AUDIT_URL: http://127.0.0.1:8000/
         run: node scripts/live-fireball-recovery-mobility-judge.mjs
+      - name: Candidate B live mobile and desktop same trace
+        env:
+          AUDIT_URL: http://127.0.0.1:8000/
+        run: node scripts/live-fireball-recovery-mobility-b-judge.mjs
       - name: Cast movement parity
         run: node scripts/audit-pvp-cast-movement-parity.js
       - name: Foundation architecture
