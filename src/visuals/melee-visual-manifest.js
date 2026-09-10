@@ -1,17 +1,17 @@
 /* KELO-INDEX
  * area: VISUAL
- * keys: MELEE SWORD ATTACK REACTION SLASH HITSTOP SFX SEQUENCE MOBILE 8WAY SKIN-AGNOSTIC
- * hace: registra el paquete visual data-driven del melee ligero sin tocar daño, hitbox ni cooldown
+ * keys: MELEE SWORD ATTACK REACTION SLASH HITSTOP SFX SEQUENCE MOBILE 8WAY SKIN-AGNOSTIC PERCEPTIBLE IMPACT ALIGNMENT
+ * hace: registra el paquete visual data-driven del melee ligero con anticipación, strike-through e impacto corporal perceptibles sin tocar daño, hitbox ni cooldown
  * online: define únicamente IDs/timings de presentación reconstruibles desde eventos semánticos
  * invariant: VFX y motion se anclan al centro lógico del actor, nunca a una skin concreta
  */
 (function (root) {
   'use strict';
 
-  const VERSION = 'melee-visual-manifest-v1.2.0-universal-8way';
-  const IMPACT_AT_MS = 150;
+  const VERSION = 'melee-visual-manifest-v1.3.0-perceptible-impact-motion';
+  const IMPACT_AT_MS = 90;
   const ATTACK_DURATION = 0.33;
-  const REACTION_DURATION = 0.11;
+  const REACTION_DURATION = 0.13;
   const DIRECTIONS_8 = Object.freeze(['up', 'up_right', 'right', 'down_right', 'down', 'down_left', 'left', 'up_left']);
   const VECTORS = Object.freeze({
     up: Object.freeze({ x: 0, y: -1 }),
@@ -48,26 +48,26 @@
     const v = VECTORS[face] || VECTORS.down;
     const sign = Math.abs(v.x) > 0.01 ? (v.x > 0 ? 1 : -1) : (v.y > 0 ? -1 : 1);
     return Object.freeze({
-      backX: -v.x * 3,
-      backY: -v.y * 3,
+      backX: -v.x * 6,
+      backY: -v.y * 6,
       strikeX: v.x * magnitude,
       strikeY: v.y * magnitude,
-      followX: v.x * magnitude * 0.5,
-      followY: v.y * magnitude * 0.5,
-      rotation: 0.09 * sign
+      followX: v.x * magnitude * 0.56,
+      followY: v.y * magnitude * 0.56,
+      rotation: 0.13 * sign
     });
   }
 
   function reactionFor(face) {
     const v = VECTORS[face] || VECTORS.down;
     const sign = Math.abs(v.x) > 0.01 ? (v.x > 0 ? 1 : -1) : (v.y > 0 ? -1 : 1);
-    return Object.freeze({ x: v.x * 4, y: v.y * 4, rotation: 0.035 * sign });
+    return Object.freeze({ x: v.x * 9, y: v.y * 9, rotation: 0.06 * sign });
   }
 
   const attackMotion = {};
   const reactionMotion = {};
   DIRECTIONS_8.forEach(function (face) {
-    attackMotion[face] = motionFor(face, 8);
+    attackMotion[face] = motionFor(face, 16);
     reactionMotion[face] = reactionFor(face);
   });
 
@@ -115,13 +115,13 @@
       loop: false,
       interruptible: true,
       directions: Object.freeze([face]),
-      markers: Object.freeze({ swing: 0.07, impact: IMPACT_AT_MS / 1000, recover: 0.205 }),
+      markers: Object.freeze({ swing: 0.052, impact: IMPACT_AT_MS / 1000, recover: 0.205 }),
       keyframes: freezeFrames([
         { t: 0.00, scaleX: 1.00, scaleY: 1.00, rotation: 0, offsetX: 0, offsetY: 0 },
-        { t: 0.21, scaleX: 0.975, scaleY: 1.035, rotation: -m.rotation * 0.42, offsetX: m.backX, offsetY: m.backY },
-        { t: 0.46, scaleX: 1.055, scaleY: 0.955, rotation: m.rotation, offsetX: m.strikeX, offsetY: m.strikeY },
-        { t: 0.58, scaleX: 1.045, scaleY: 0.965, rotation: m.rotation * 0.78, offsetX: m.strikeX * 0.92, offsetY: m.strikeY * 0.92 },
-        { t: 0.74, scaleX: 1.015, scaleY: 0.992, rotation: -m.rotation * 0.34, offsetX: m.followX, offsetY: m.followY },
+        { t: 0.12, scaleX: 0.96, scaleY: 1.045, rotation: -m.rotation * 0.52, offsetX: m.backX, offsetY: m.backY },
+        { t: 0.28, scaleX: 1.085, scaleY: 0.93, rotation: m.rotation, offsetX: m.strikeX, offsetY: m.strikeY },
+        { t: 0.40, scaleX: 1.07, scaleY: 0.945, rotation: m.rotation * 0.80, offsetX: m.strikeX * 0.90, offsetY: m.strikeY * 0.90 },
+        { t: 0.66, scaleX: 1.025, scaleY: 0.985, rotation: -m.rotation * 0.30, offsetX: m.followX, offsetY: m.followY },
         { t: 1.00, scaleX: 1.00, scaleY: 1.00, rotation: 0, offsetX: 0, offsetY: 0 }
       ])
     });
@@ -143,9 +143,9 @@
       directions: DIRECTIONS_8,
       keyframes: freezeFrames([
         { t: 0.00, scaleX: 1.00, scaleY: 1.00, rotation: 0, offsetX: 0, offsetY: 0 },
-        { t: 0.22, scaleX: 0.99, scaleY: 1.01, rotation: 0, offsetX: 0, offsetY: 0 },
-        { t: 0.42, scaleX: 1.04, scaleY: 0.96, rotation: m.rotation, offsetX: m.x, offsetY: m.y },
-        { t: 0.62, scaleX: 1.035, scaleY: 0.965, rotation: m.rotation * 0.85, offsetX: m.x * 0.9, offsetY: m.y * 0.9 },
+        { t: 0.10, scaleX: 0.985, scaleY: 1.02, rotation: 0, offsetX: 0, offsetY: 0 },
+        { t: 0.24, scaleX: 1.06, scaleY: 0.94, rotation: m.rotation, offsetX: m.x, offsetY: m.y },
+        { t: 0.52, scaleX: 1.045, scaleY: 0.955, rotation: m.rotation * 0.72, offsetX: m.x * 0.78, offsetY: m.y * 0.78 },
         { t: 1.00, scaleX: 1.00, scaleY: 1.00, rotation: 0, offsetX: 0, offsetY: 0 }
       ])
     });
@@ -205,8 +205,8 @@
       id: id,
       duration: 180,
       cues: Object.freeze([
-        Object.freeze({ at: 62, type: 'sfx', ref: 'melee_swing_light_01' }),
-        Object.freeze({ at: 68, type: 'fx', ref: slashFx[face], socket: 'center' })
+        Object.freeze({ at: 52, type: 'sfx', ref: 'melee_swing_light_01' }),
+        Object.freeze({ at: 58, type: 'fx', ref: slashFx[face], socket: 'center' })
       ])
     });
     swingSequences[face] = id;
@@ -228,10 +228,10 @@
     version: VERSION,
     attackId: 'sword_light_attack_1',
     attackDurationMs: Math.round(ATTACK_DURATION * 1000),
-    anticipationMs: 69,
-    swingMs: 83,
+    anticipationMs: 40,
+    swingMs: 52,
     impactAtMs: IMPACT_AT_MS,
-    recoveryMs: 178,
+    recoveryMs: 240,
     reactionDurationMs: Math.round(REACTION_DURATION * 1000),
     visualThrottleMs: 180,
     directions: DIRECTIONS_8,
@@ -242,7 +242,13 @@
     swingSequences: Object.freeze(swingSequences),
     hitSequence: 'sequence_melee_hit_light_01',
     anchorSocket: 'center',
-    skinAgnostic: true
+    skinAgnostic: true,
+    perceptualMotion: Object.freeze({
+      baseAnticipationPx: 6,
+      baseForwardPeakPx: 16,
+      baseTravelPx: 22,
+      impactAligned: true
+    })
   });
 
   root.KELO_MELEE_VISUAL_AUDIT = Object.assign(root.KELO_MELEE_VISUAL_AUDIT || {}, {
@@ -254,6 +260,7 @@
     impactAtMs: IMPACT_AT_MS,
     directions: DIRECTIONS_8.length,
     anchorSocket: 'center',
-    skinAgnostic: true
+    skinAgnostic: true,
+    perceptualMotion: true
   });
 })(typeof globalThis !== 'undefined' ? globalThis : window);
