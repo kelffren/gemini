@@ -1,14 +1,14 @@
 /* KELO-INDEX
  * area: UI / CREATORS LAUNCHER
  * owner: Kelo Studio Launcher (compat name retained)
- * keys: CREATORS MENU PREMIUM LAZY ADMIN ANIMATION CAPABILITY
- * purpose: añade CREATORS al menú Luxe existente y carga solo Creator Hub tras acción explícita
+ * keys: CREATORS MENU PREMIUM LAZY ADMIN ANIMATION CAPABILITY AVATAR
+ * purpose: añade CREATORS al menú Luxe existente, restaura el adapter ligero de avatar y carga Creator Hub tras acción explícita
  * public-api: KELO_STUDIO_LAUNCHER + KELO_CREATORS_LAUNCHER alias
  * consumes: KELO_ADMIN_KEYS, KELO_LUXE, menú Luxe existente
  * state-owned: solo estado efímero de carga
  * extension-points: Creator Hub / WorkspaceRegistry; no domain logic here
  * reuse: entrada única a herramientas creator
- * do-not: NO mutar mundo, NO duplicar menú, NO cargar src/studio ni src/creators durante boot normal, NO polling
+ * do-not: NO mutar mundo, NO duplicar menú, NO cargar Creator Hub durante boot normal, NO polling
  */
 (function(){
   'use strict';
@@ -50,9 +50,9 @@
     if(!btn){btn=document.createElement('button');btn.id='lx-create-studio';btn.type='button';btn.className='lx-menu-item';btn.onclick=e=>{e.preventDefault();e.stopPropagation();void open();};grid.appendChild(btn);}
     btn.setAttribute('aria-label','Abrir Kelo Creators');paint(btn,loading);return true;
   }
-  function boot(){sync();}
+  function boot(){sync();void import('./../characters/creator-avatar-runtime.mjs').then(m=>m.installCreatorAvatarRuntime({root:window})).catch(e=>console.warn('[Kelo Avatar runtime]',e));}
   window.KELO_ADMIN_KEYS?.onChange?.(sync);
-  const api=Object.freeze({version:'studio-launcher-v1.5.2-creators-capabilities',open,sync,get allowed(){return allowed();}});
+  const api=Object.freeze({version:'studio-launcher-v1.6.0-creators-avatar',open,sync,get allowed(){return allowed();}});
   window.KELO_STUDIO_LAUNCHER=api;
   window.KELO_CREATORS_LAUNCHER=api;
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();

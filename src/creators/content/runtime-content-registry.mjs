@@ -3,7 +3,7 @@
  * owner: KELO_CREATOR_CONTENT_REGISTRY
  * owns: semantic creator definitions + adapter dispatch into existing runtime owners
  * does-not-own: rendering, inventory, stats, game authority, asset bytes or editor state
- * rule: adapt to KELO_PROPERTY_CATALOG/KeloAppearance/KeloMountCatalog; never replace them
+ * rule: adapt to KELO_PROPERTY_CATALOG/KeloAppearance/KeloMountCatalog/KeloCreatorAvatars; never replace them
  */
 const F=Object.freeze;
 const copy=v=>v==null?v:JSON.parse(JSON.stringify(v));
@@ -38,12 +38,17 @@ export function createRuntimeContentRegistry({root=globalThis}={}){
     if(!p.speciesId||!p.movementProfileId||!p.appearanceProfileId||!p.equipmentSlotProfileId||(p.abilityIds||[]).length!==3)return{status:'deferred',reason:'MOUNT_RUNTIME_DEPENDENCIES_REQUIRED'};
     try{const row=M.register({id,displayName:record.displayName,speciesId:p.speciesId,rarity:p.rarity||'common',movementProfileId:p.movementProfileId,abilityIds:p.abilityIds,appearanceProfileId:p.appearanceProfileId,equipmentSlotProfileId:p.equipmentSlotProfileId,assetBundleId:asset.assetId,animationSetId:p.animationSetId||'',riderAnchorProfileId:p.riderAnchorProfileId||p.appearanceProfileId,tags:record.tags||[],baseStats:p.baseStats||{},metadata:{creatorContentId:record.contentId}});return{status:'active',owner:'KeloMountCatalog',runtimeId:row.id};}catch(error){return{status:'deferred',reason:String(error?.message||error)};}
   }
-  function adapt(record){const type=String(record.contentType||'');if(type==='world'||type==='tile')return adaptWorld(record);if(type==='appearance'||type==='equipment')return adaptAppearance(record);if(type==='mount')return adaptMount(record);return{status:'active',owner:'KELO_CREATOR_CONTENT_REGISTRY',runtimeId:runtimeId(record),note:'Semantic definition is live; specialized runtime adapter can consume it by contentType.'};}
+  function adaptCharacter(record){
+    if(!record.payload?.avatarRuntime)return{status:'active',owner:'KELO_CREATOR_CONTENT_REGISTRY',runtimeId:runtimeId(record),note:'Character definition live; no quick-avatar runtime manifest.'};
+    if(!root.KeloCreatorAvatars?.register)return{status:'deferred',reason:'CREATOR_AVATAR_RUNTIME_MISSING'};
+    const row=root.KeloCreatorAvatars.register(record);return row?{status:'active',owner:'KeloCreatorAvatars',runtimeId:record.contentId}:{status:'deferred',reason:'AVATAR_MANIFEST_INVALID'};
+  }
+  function adapt(record){const type=String(record.contentType||'');if(type==='world'||type==='tile')return adaptWorld(record);if(type==='appearance'||type==='equipment')return adaptAppearance(record);if(type==='mount')return adaptMount(record);if(type==='character')return adaptCharacter(record);return{status:'active',owner:'KELO_CREATOR_CONTENT_REGISTRY',runtimeId:runtimeId(record),note:'Semantic definition is live; specialized runtime adapter can consume it by contentType.'};}
   function register(raw,{adaptRuntime=true}={}){
     if(!raw?.contentId)throw new Error('CONTENT_ID_REQUIRED');const key=String(raw.contentId);if(rows.has(key))return rows.get(key);
     const base=F({contentId:key,stableKey:String(raw.stableKey||key),revision:Number(raw.revision)||1,contentType:String(raw.contentType||'generic'),displayName:String(raw.displayName||key),tags:F((raw.tags||[]).map(String)),payload:F(copy(raw.payload||{})),assets:F((raw.assets||[]).map(a=>F(copy(a)))),contentHash:String(raw.contentHash||''),source:String(raw.source||'creator')});
     const activation=adaptRuntime?adapt(base):{status:'registered',owner:'KELO_CREATOR_CONTENT_REGISTRY'};const row=F({...base,activation:F(copy(activation))});rows.set(key,row);listeners.forEach(fn=>{try{fn(row);}catch{}});try{root.dispatchEvent?.(new CustomEvent('kelo:creator-content-ready',{detail:{contentId:key,contentType:row.contentType,activation:row.activation}}));}catch{}return row;
   }
   function query(filter={}){let out=[...rows.values()];if(filter.contentType)out=out.filter(x=>x.contentType===filter.contentType);if(filter.tag)out=out.filter(x=>x.tags.includes(filter.tag));if(filter.owner)out=out.filter(x=>x.activation.owner===filter.owner);return out;}
-  return F({version:'kelo-creator-content-registry-v1.0.1',register,registerMany:(items,opts)=>Array.from(items||[]).map(x=>register(x,opts)),get:id=>rows.get(String(id))||null,has:id=>rows.has(String(id)),list:()=>[...rows.values()],query,onRegister(fn){if(typeof fn==='function')listeners.add(fn);return()=>listeners.delete(fn);},get count(){return rows.size;}});
+  return F({version:'kelo-creator-content-registry-v1.1.0',register,registerMany:(items,opts)=>Array.from(items||[]).map(x=>register(x,opts)),get:id=>rows.get(String(id))||null,has:id=>rows.has(String(id)),list:()=>[...rows.values()],query,onRegister(fn){if(typeof fn==='function')listeners.add(fn);return()=>listeners.delete(fn);},get count(){return rows.size;}});
 }
