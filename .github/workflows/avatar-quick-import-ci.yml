@@ -56,6 +56,7 @@ jobs:
           node --check server/avatar-realtime-fetch-stub.js
           node --check src/characters/creator-avatar-runtime.mjs
           node --check src/creators/avatar/avatar-spritesheet-analyzer.mjs
+          node --check src/creators/avatar/kelo-universal-asset-compiler.mjs
           node --check src/creators/avatar/avatar-quick-import-service.mjs
           node --check src/creators/ui/avatar-workspace.mjs
           node --check src/creators/workspaces/avatar-workspace.mjs
