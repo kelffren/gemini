@@ -38,7 +38,8 @@
     "audit:online-foundation": "node scripts/online-foundation-audit.mjs",
     "audit:universal-content": "node scripts/universal-content-studio-audit.mjs",
     "audit:avatar-quick": "node scripts/avatar-quick-import-audit.mjs",
-    "audit:sprite-compiler": "node scripts/sprite-compiler-audit.mjs"
+    "audit:sprite-compiler": "node scripts/sprite-compiler-audit.mjs",
+    "audit:sprite-compiler-grid": "node scripts/sprite-compiler-grid-audit.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0"
