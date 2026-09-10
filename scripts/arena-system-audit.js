@@ -30,7 +30,7 @@ must(highlights.includes('first_blood')&&highlights.includes('double_kill')&&hig
 must(highlights.includes('tower_break')&&highlights.includes('core_exposed'),'MOBA structure highlights missing');
 must(highlights.includes('war_sigil_steal')&&highlights.includes('comeback')&&highlights.includes('critical_escape'),'objective/clutch highlights missing');
 must(highlights.includes('combatWrapper:false')&&highlights.includes('gameplayAuthority:false'),'highlights crossed authority boundary');
-must(highlightUi.includes('owner: KeloArenaHighlightsUI')&&highlightUi.includes('MOMENTOS DE LA PARTIDA'),'highlight UI/post-match surface missing');
+must(highlightUi.includes('owner: KeloArenaHighlightsUI')&&highlightUi.includes('PLAY OF THE MATCH')&&highlightUi.includes('TIMELINE DE LA PARTIDA'),'highlight UI/post-match surface missing');
 must(highlightUi.includes('gameplayAuthority:false')&&highlightUi.includes('secondMenu:false'),'highlight UI crossed authority boundary');
 must(progression.includes('owner: KeloArenaProgression'),'Arena progression owner header missing');
 must(progression.includes('MASTERY_TIERS')&&progression.includes("label:'Leyenda de Arena'"),'Mastery tiers missing');
