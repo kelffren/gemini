@@ -61,4 +61,4 @@ jobs:
       - name: Foundation architecture
         run: npm run audit:foundation
       - name: Performance Foundation
-        run: npm run audit:performance-foundation
+        run: npm run audit:performance
