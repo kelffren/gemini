@@ -1,8 +1,8 @@
 /* KELO-INDEX
  * area: UI / PVP SUPPORT
  * owner: KeloPvPSocialTouchGuard; core extension owners KeloInputLocks + KeloSimulation
- * keys: PVP SOCIAL TOUCH TRAINING DUMMY INPUT LOCK SIMULATION FOUNDATION
- * purpose: bloquea UI social durante PvP y estabiliza el dummy maestro sin envolver globals core
+ * keys: PVP SOCIAL TOUCH TRAINING DUMMY INPUT LOCK SIMULATION FOUNDATION KNOCKBACK
+ * purpose: bloquea UI social durante PvP y estabiliza el dummy maestro contra wandering legacy sin cancelar desplazamientos válidos producidos por combate moderno
  * public-api: KeloPvPSocialTouchGuard, KeloPvPTrainingDummyGuard
  * consumes: KeloInputLocks, KeloSimulation, KeloPvPWorld, KeloMasterBots
  * state-owned: snapshot/anchor local del dummy de entrenamiento y registro del hook tardío
@@ -13,7 +13,7 @@
  */
 (function(){
 'use strict';
-const VERSION='pvp-social-touch-guard-v1.3.0';
+const VERSION='pvp-social-touch-guard-v1.4.0-combat-displacement';
 const TRAINING_ARENA=Object.freeze({x:2660,y:360,w:720,h:720,padding:56,spawnX:3190,spawnY:720});
 const SOCIAL_LOCK_OWNERS=Object.freeze(['self-actions','emotes','profile-transition']);
 const training={anchorX:TRAINING_ARENA.spawnX,anchorY:TRAINING_ARENA.spawnY,lastCombat:false,lastCorrection:0,adoptedCombatMoves:0,snapshot:null,masterApplied:false};
@@ -69,7 +69,7 @@ function syncMasterRole(){
 }
 function publishTraining(event){
   const d=trainingDummy();
-  window.KELO_PVP_TRAINING_DUMMY_AUDIT=Object.freeze({version:VERSION,event:event||null,combatEnabled:combatSimulationActive(),dummyId:d&&d.id||null,dummyName:d&&d.name||null,masterRole:d&&d.masterRole||null,pipelineId:d&&d.pipelineId||null,x:d&&d.x||null,y:d&&d.y||null,anchorX:training.anchorX,anchorY:training.anchorY,insideArena:!!(d&&d.x>=TRAINING_ARENA.x+TRAINING_ARENA.padding&&d.x<=TRAINING_ARENA.x+TRAINING_ARENA.w-TRAINING_ARENA.padding&&d.y>=TRAINING_ARENA.y+TRAINING_ARENA.padding&&d.y<=TRAINING_ARENA.y+TRAINING_ARENA.h-TRAINING_ARENA.padding),adoptedCombatMoves:training.adoptedCombatMoves,lastCorrection:training.lastCorrection,masterApplied:training.masterApplied,purpose:'dedicated-pvp-master-stationary-training-target-with-server-ready-pipeline'});
+  window.KELO_PVP_TRAINING_DUMMY_AUDIT=Object.freeze({version:VERSION,event:event||null,combatEnabled:combatSimulationActive(),dummyId:d&&d.id||null,dummyName:d&&d.name||null,masterRole:d&&d.masterRole||null,pipelineId:d&&d.pipelineId||null,x:d&&d.x||null,y:d&&d.y||null,anchorX:training.anchorX,anchorY:training.anchorY,insideArena:!!(d&&d.x>=TRAINING_ARENA.x+TRAINING_ARENA.padding&&d.x<=TRAINING_ARENA.x+TRAINING_ARENA.w-TRAINING_ARENA.padding&&d.y>=TRAINING_ARENA.y+TRAINING_ARENA.padding&&d.y<=TRAINING_ARENA.y+TRAINING_ARENA.h-TRAINING_ARENA.padding),adoptedCombatMoves:training.adoptedCombatMoves,lastCorrection:training.lastCorrection,masterApplied:training.masterApplied,purpose:'dedicated-pvp-master-stationary-against-legacy-drift-preserves-modern-combat-displacement'});
 }
 function constrainTrainingDummy(){
   const d=trainingDummy();if(!d)return;
@@ -77,7 +77,10 @@ function constrainTrainingDummy(){
   if(active&&!training.lastCombat){applyPvPMaster();training.anchorX=safeX(d.x);training.anchorY=safeY(d.y);publishTraining('combat-enter');}
   training.lastCombat=active;if(!active)return;
   const candidateX=safeX(d.x),candidateY=safeY(d.y),displacement=Math.hypot(candidateX-training.anchorX,candidateY-training.anchorY);
-  if(displacement>40){training.anchorX=candidateX;training.anchorY=candidateY;training.adoptedCombatMoves++;publishTraining('combat-position-adopted');}
+  // engine-c neutraliza primero el wandering legacy. Cualquier desplazamiento que sobreviva hasta este hook
+  // pertenece a la simulación PvP moderna (knockback/dash/owner futuro) y debe convertirse en el nuevo anchor,
+  // incluso si es menor de 40 px. El umbral antiguo cancelaba precisamente el knockback ligero de 15 px.
+  if(displacement>.01){training.anchorX=candidateX;training.anchorY=candidateY;training.adoptedCombatMoves++;publishTraining('combat-position-adopted');}
   const drift=Math.hypot((Number(d.x)||0)-training.anchorX,(Number(d.y)||0)-training.anchorY);if(drift>.01)training.lastCorrection=performance.now();
   d.x=training.anchorX;d.y=training.anchorY;d.targetX=training.anchorX;d.targetY=training.anchorY;d.vx=0;d.vy=0;if('_dash' in d)d._dash=null;
   publishTraining(drift>.01?'legacy-wander-blocked':'stable');
@@ -102,5 +105,5 @@ window.addEventListener('kelo:pvp-leave',function(){setTimeout(function(){syncMa
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 window.KeloPvPSocialTouchGuard=Object.freeze({version:VERSION,install,closeSocialUi,combatActive});
 window.KeloPvPTrainingDummyGuard=Object.freeze({version:VERSION,install:installTrainingGuard,getState:function(){return Object.freeze({anchorX:training.anchorX,anchorY:training.anchorY,combatEnabled:combatSimulationActive(),adoptedCombatMoves:training.adoptedCombatMoves,masterApplied:training.masterApplied,simulationHookId:trainingSimulationHookId});}});
-window.KELO_PVP_SOCIAL_TOUCH_AUDIT=Object.freeze({version:VERSION,blocksSocialProfilesInCombat:true,closesLegacyInspect:true,closesAllAppPanelsInCombat:true,trainingDummyGuard:true,dedicatedPvPMaster:true,separateMasterPipelines:true,simulationOwner:'KeloSimulation',directSimulationWrapper:false,inputLockOwner:'KeloInputLocks',directLegacyModalWrite:false});
+window.KELO_PVP_SOCIAL_TOUCH_AUDIT=Object.freeze({version:VERSION,blocksSocialProfilesInCombat:true,closesLegacyInspect:true,closesAllAppPanelsInCombat:true,trainingDummyGuard:true,preservesModernCombatDisplacement:true,dedicatedPvPMaster:true,separateMasterPipelines:true,simulationOwner:'KeloSimulation',directSimulationWrapper:false,inputLockOwner:'KeloInputLocks',directLegacyModalWrite:false});
 })();
