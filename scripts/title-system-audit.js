@@ -95,7 +95,7 @@ const validContext = (overrides = {}) => ({
   assert.strictEqual(net.includes("request('titles:equip'"), true, 'cliente solo solicita equip');
   assert.strictEqual(server.includes("msg.t === 'titles:unlock'"), false, 'server no expone titles:unlock');
   assert.strictEqual(server.includes('recordConfirmedKill'), true, 'server tiene hook interno de kill confirmada');
-  assert.strictEqual(server.includes("msg.t === 'visual:event'"), true, 'visual relay existe pero separado');
+  assert.strictEqual(/msg\.t\s*===\s*['"]visual:event['"]/.test(server), true, 'visual relay existe pero separado');
   assert.ok(index.indexOf('src/systems/player-stats.js') < index.indexOf('src/systems/title-system.js'), 'Stats carga antes de Titles');
   assert.ok(index.indexOf('src/systems/title-system.js') < index.indexOf('src/systems/nobility.js'), 'Titles carga antes de panel Nobleza');
   assert.ok(index.indexOf('src/ui/player-nameplate.js') > index.indexOf('src/systems/nobility-authority.js'), 'nameplate resuelve catálogo/rangos tras owners');
