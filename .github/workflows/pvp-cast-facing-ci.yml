@@ -5,6 +5,8 @@ on:
     paths:
       - 'src/characters/character-appearance.js'
       - 'src/systems/pvp-ability-movement-prediction.js'
+      - 'src/abilities/ability-action-timeline.js'
+      - 'scripts/audit-pvp-cast-facing-timing.mjs'
       - 'scripts/live-pvp-cast-facing-judge.mjs'
       - '.github/workflows/pvp-cast-facing-ci.yml'
   workflow_dispatch:
@@ -19,6 +21,8 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: '20' }
       - run: npm install --no-audit --no-fund
+      - name: Cast-facing 60/90/120 timeline audit
+        run: node scripts/audit-pvp-cast-facing-timing.mjs
       - run: npx playwright install --with-deps chromium
       - name: Serve checkout
         run: |
@@ -28,7 +32,7 @@ jobs:
       - name: Cast-facing Chromium judge
         env:
           AUDIT_URL: http://127.0.0.1:8000/
-          CAST_FACING_STRICT: '0'
+          CAST_FACING_STRICT: '1'
         run: node scripts/live-pvp-cast-facing-judge.mjs
       - name: Foundation architecture
         run: npm run audit:foundation
