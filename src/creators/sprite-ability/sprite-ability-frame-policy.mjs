@@ -15,7 +15,7 @@ export function spriteFrameCount(sheet={}){
 }
 
 export function chooseSafeGrid({width=0,height=0,detected=null,confidenceThreshold=.45}={}){
-  const w=Math.max(1,Number(width)||1),h=Math.max(1,Number(height)||1;
+  const w=Math.max(1,Number(width)||1),h=Math.max(1,Number(height)||1);
   const d=detected&&Number.isFinite(Number(detected.cols))&&Number.isFinite(Number(detected.rows))?detected:null;
   if(d&&Number(d.confidence)>=confidenceThreshold)return Object.freeze({cols:d.cols,rows:d.rows,label:`${d.cols}×${d.rows}`,frames:d.cols*d.rows,source:'auto',confidence:clamp(Number(d.confidence)||0,0,1)});
   let best=null;
