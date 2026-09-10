@@ -35,18 +35,18 @@ if(box.KeloMeleeEngine.movementScaleFor(basic,'recovery')!==1)throw new Error('B
 if(basic.damage!==18||basic.range!==150||basic.windup!==.085||basic.active!==.075||basic.recovery!==.18)throw new Error('BASIC_COMBAT_VALUES_CHANGED');
 if(box.KeloMeleeEngine.movementScaleFor(follow,'recovery')!==1)throw new Error('FOLLOW_RECOVERY_WINNER_REGRESSED');
 if(box.KeloMeleeEngine.movementScaleFor(finisher,'recovery')!==.76)throw new Error('FINISHER_RECOVERY_WINNER_REGRESSED');
-if(box.KeloMeleeEngine.movementScaleFor(heavy,'recovery')!==.60)throw new Error('HEAVY_RECOVERY_CANDIDATE_A_REGRESSED');
+if(box.KeloMeleeEngine.movementScaleFor(heavy,'recovery')!==.64)throw new Error('HEAVY_RECOVERY_WINNER_REGRESSED');
 
 const serverSource=fs.readFileSync(path.join(root,'server/pvp-authority.js'),'utf8');
 if(!serverSource.includes("'src/systems/melee/melee-weapon-profiles.js'"))throw new Error('SERVER_DOES_NOT_LOAD_SHARED_MELEE_PROFILES');
 if(!serverSource.includes('shared.KeloMeleeEngine.movementScaleFor(player._pvpAttack.profile,player._pvpAttack.phase)'))throw new Error('SERVER_DOES_NOT_USE_SHARED_PHASE_MOVEMENT');
 
 const result={
-  contract:'melee-recovery-mobility-v3',
+  contract:'melee-recovery-mobility-v4',
   basic:{windup:.86,active:.48,recovery:1},
   follow:{recovery:1},
   finisher:{recovery:.76},
-  heavy:{recovery:.60},
+  heavy:{recovery:.64},
   relativeBasicRecoverySpeedGainPct:Number(relativeRecoverySpeedGainPct.toFixed(2)),
   onlineParity:'server loads shared melee profiles and phase movementScaleFor'
 };
