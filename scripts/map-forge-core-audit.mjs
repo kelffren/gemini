@@ -10,6 +10,7 @@
 import assert from 'node:assert/strict';
 import {MAP_FORGE_RECIPES} from '../src/world/map-forge/map-forge-recipes.mjs';
 import {generateMapCandidate,generateBestOf,serializeMapDefinition,deserializeMapDefinition} from '../src/world/map-forge/map-forge-core.mjs';
+import {scoreMapDefinition,validateMapDefinition} from '../src/world/map-forge/map-forge-quality.mjs';
 
 const cap=MAP_FORGE_RECIPES.KELO_ROYAL_CAPITAL_V1;
 const a=generateMapCandidate(cap,{seed:81746291,assetCatalogVersion:'ci-catalog'});
@@ -35,6 +36,22 @@ const best=generateBestOf(cap,{seed:12345,count:8,assetCatalogVersion:'ci-catalo
 assert.equal(best.requested,8);assert.equal(best.validCount,8);assert.ok(best.best.quality.total>=best.candidates.at(-1).quality.total);
 assert.ok(best.selections.bestOverall&&best.selections.mostMonumental&&best.selections.mostOrganic&&best.selections.mostExplorable&&best.selections.mostCompact,'best-of selectors must resolve');
 
+// Fixed-seed visual-score regressions: structurally valid maps must not earn elite scores
+// after introducing obvious prop spam or breaking semantic landmark placement.
+const spammed=structuredClone(a),spamOrigin=spammed.landmarks.find(l=>l.id==='fountain')?.position||spammed.spawnPoints[0];
+spammed.decorations=[...spammed.decorations,...Array.from({length:900},(_,i)=>({id:`regression-spam:${i}`,district:'central',family:'lamp',x:spamOrigin.x+(i%3),y:spamOrigin.y+(i%5),rotation:0,scale:1}))];
+assert.equal(validateMapDefinition(spammed,cap).valid,true,'prop-spam fixture must stay structurally valid so this tests visual scoring');
+const spamScore=scoreMapDefinition(spammed,cap);
+assert.ok(spamScore.total<95,`visually spammed valid map must never score 95+; got ${spamScore.total}`);
+assert.ok(spamScore.breakdown.densityBalance<60||spamScore.breakdown.negativeSpace<60||spamScore.breakdown.scenicVistas<60,'prop spam must trigger a measurable visual penalty');
+
+const semanticallyBroken=structuredClone(a);
+semanticallyBroken.landmarks=semanticallyBroken.landmarks.map(l=>({...l,district:'central'}));
+assert.equal(validateMapDefinition(semanticallyBroken,cap).valid,true,'semantic-placement fixture must stay structurally valid so this tests visual scoring');
+const semanticScore=scoreMapDefinition(semanticallyBroken,cap);
+assert.ok(semanticScore.total<95,`semantically misplaced landmarks must never score 95+; got ${semanticScore.total}`);
+assert.ok(semanticScore.breakdown.landmarkQuality<60,`semantic landmark penalty must be visible; got ${semanticScore.breakdown.landmarkQuality}`);
+
 const stats={};
 for(const [id,recipe] of Object.entries(MAP_FORGE_RECIPES)){
   const scores=[],times=[];let valid=0,min=Infinity,max=-Infinity;
@@ -50,4 +67,4 @@ for(const [id,recipe] of Object.entries(MAP_FORGE_RECIPES)){
   assert.ok(valid>=99,`${id} valid rate ${valid}/100 is below 99%`);
   assert.ok(max-min>.5,`${id} scorer must distinguish candidate quality; range=${(max-min).toFixed(2)}`);
 }
-console.log(JSON.stringify({ok:true,generator:'map-forge-core-v1',royalCapital:{seed:a.metadata.seed,layoutHash:a.metadata.layoutHash,score:a.quality.total,roads:a.roads.length,loops:a.generationStats.roadLoops,parcels:a.parcels.length,decorations:a.decorations.length},bestOf8:{score:best.best.quality.total,seed:best.best.metadata.seed,layoutHash:best.best.metadata.layoutHash},stats},null,2));
+console.log(JSON.stringify({ok:true,generator:'map-forge-core-v1',royalCapital:{seed:a.metadata.seed,layoutHash:a.metadata.layoutHash,score:a.quality.total,roads:a.roads.length,loops:a.generationStats.roadLoops,parcels:a.parcels.length,decorations:a.decorations.length},bestOf8:{score:best.best.quality.total,seed:best.best.metadata.seed,layoutHash:best.best.metadata.layoutHash},regressions:{spamScore:spamScore.total,semanticScore:semanticScore.total},stats},null,2));
