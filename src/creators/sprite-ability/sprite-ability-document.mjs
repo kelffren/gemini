@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: CREATORS / SPRITE ABILITY
  * owner: Sprite Ability authoring document
- * keys: SPRITESHEET FRAMES AUTO FIT ABILITY PREVIEW IMPACT ACTIVE WINDOW HITBOX DAMAGE RANGE KNOCKBACK EXPORT
+ * keys: SPRITESHEET FRAMES AUTO FIT ABILITY PREVIEW IMPACT ACTIVE WINDOW HITBOX DAMAGE RANGE KNOCKBACK EXPORT EVENTS
  * purpose: define y normaliza el draft combinado usado por Sprite Ability Builder y genera drafts normales ANIMATION + ABILITY
  * does-not-own: runtime combat, damage authority, asset publishing or networking
  */
@@ -9,6 +9,24 @@ const copy=v=>v==null?v:(typeof structuredClone==='function'?structuredClone(v):
 const finite=(v,f=0)=>Number.isFinite(Number(v))?Number(v):f;
 const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
 const key=v=>String(v||'sprite_ability').toLowerCase().replace(/[^a-z0-9_]+/g,'_').replace(/^_+|_+$/g,'')||'sprite_ability';
+const EVENT_TYPES=Object.freeze(['CAST_START','PROJECTILE_SPAWN','IMPACT','DAMAGE','AOE_START','SFX','VFX','MOVEMENT','RECOVERY_START','ANIMATION_END']);
+function normalizeEvent(raw,startFrame,endFrame){
+  const type=EVENT_TYPES.includes(String(raw&&raw.type||'').toUpperCase())?String(raw.type).toUpperCase():'IMPACT';
+  const frame=clamp(Math.round(finite(raw&&raw.frame,startFrame)),startFrame,endFrame);
+  return Object.freeze({id:String(raw&&raw.id||`${type.toLowerCase()}_${frame}`),frame,type,payload:raw&&raw.payload&&typeof raw.payload==='object'?copy(raw.payload):{}});
+}
+export function syncAnimationEvents(events,combat,sheet){
+  const start=clamp(Math.round(finite(sheet&&sheet.startFrame,0)),0,9999),end=Math.max(start,clamp(Math.round(finite(sheet&&sheet.endFrame,start)),start,9999));
+  const impact=clamp(Math.round(finite(combat&&combat.impactFrame,start)),start,end);
+  const list=(Array.isArray(events)?events:[]).map(e=>normalizeEvent(e,start,end)).filter(e=>e.type!=='IMPACT');
+  list.push(normalizeEvent({id:'impact_hit',frame:impact,type:'IMPACT'},start,end));
+  list.sort((a,b)=>a.frame-b.frame||a.type.localeCompare(b.type));
+  return Object.freeze(list);
+}
+export function eventsAtFrame(document,index){
+  const d=normalizeSpriteAbilityDocument(document);
+  return d.events.filter(e=>e.frame===clamp(Math.round(finite(index,d.combat.impactFrame)),d.sheet.startFrame,d.sheet.endFrame));
+}
 
 export function normalizeSpriteAbilityDocument(input={}){
   const sheet=input.sheet||{},combat=input.combat||{},preview=input.preview||{},generated=input.generated||{},autoFit=sheet.autoFit||{};
@@ -41,9 +59,12 @@ export function normalizeSpriteAbilityDocument(input={}){
       hitboxX:finite(combat.hitboxX,0),hitboxY:finite(combat.hitboxY,-frameHeight*.45),hitboxWidth:Math.max(8,finite(combat.hitboxWidth,range)),hitboxHeight:Math.max(8,finite(combat.hitboxHeight,defaultHitboxHeight)),
       deliveryType:['instant','dash','self_aoe','projectile'].includes(String(combat.deliveryType))?String(combat.deliveryType):'instant'
     },
+    events:syncAnimationEvents(input.events, {impactFrame}, {startFrame,endFrame}),
     preview:{
       mode:['sheet','ability','dummy'].includes(String(preview.mode))?String(preview.mode):'dummy',playing:preview.playing!==false,
-      playbackRate:clamp(finite(preview.playbackRate,1),.1,2),showHitbox:preview.showHitbox!==false,onionSkin:preview.onionSkin===true
+      playbackRate:clamp(finite(preview.playbackRate,1),.1,2),showHitbox:preview.showHitbox!==false,onionSkin:preview.onionSkin===true,
+      background:['checker','dark','light','game'].includes(String(preview.background))?String(preview.background):'checker',
+      zoom:clamp(finite(preview.zoom,1),.25,4)
     },
     generated:{animationProjectId:generated.animationProjectId==null?null:String(generated.animationProjectId),abilityProjectId:generated.abilityProjectId==null?null:String(generated.abilityProjectId)},
     meta:{createdAt:finite(input.meta?.createdAt,Date.now()),updatedAt:Date.now()}
@@ -80,7 +101,8 @@ export function validateSpriteAbilityDocument(document,{maxEmbeddedBytes=7_000_0
 
 export function buildGeneratedDrafts(document,{animationProjectId=null,abilityProjectId=null}={}){
   const d=normalizeSpriteAbilityDocument(document),timing=spriteAbilityTiming(d),frames=d.sheet.endFrame-d.sheet.startFrame+1,sequence=Array.from({length:frames},(_,i)=>d.sheet.startFrame+i),assetId=d.sheet.assetId||`${d.combat.key}_sheet`,duration=Math.max(.05,timing.animationMs/1000);
-  const animation={schema:2,documentType:'ANIMATION',clip:{id:`anim_${d.combat.key}`,type:'spritesheet',channel:'action',priority:45,duration,loop:false,interruptible:true,directions:['up','down','left','right'],mirrorLeftFromRight:false,markers:{impact:timing.impactMs/1000,recover:timing.activeEndMs/1000},assetId,frames:d.sheet.columns*d.sheet.rows,fps:d.sheet.fps,frameWidth:d.sheet.frameWidth,frameHeight:d.sheet.frameHeight,frameSequence:sequence,anchor:{x:.5,y:1}},tracks:{hitbox:[{id:'hit-main',start:timing.activeStartMs/1000,end:timing.activeEndMs/1000,label:'hit',payload:{box:{x:d.combat.hitboxX,y:d.combat.hitboxY,width:d.combat.hitboxWidth,height:d.combat.hitboxHeight}}}],hurtbox:[],movement:d.combat.lunge?[{id:'lunge',start:0,end:Math.max(timing.frameMs,timing.impactMs)/1000,label:'lunge',payload:{distance:d.combat.lunge}}]:[],sound:[],vfx:[],event:[{id:'hitstop',start:timing.impactMs/1000,end:timing.impactMs/1000,label:'hitstop',payload:{ms:d.combat.hitstopMs}}],projectile:[],invulnerability:[]},assetSource:{kind:'data_url',dataUrl:d.sheet.dataUrl,fileName:d.sheet.fileName,width:d.sheet.imageWidth,height:d.sheet.imageHeight},authoring:{autoFit:copy(d.sheet.autoFit),activeWindow:{startFrame:d.combat.activeStartFrame,endFrame:d.combat.activeEndFrame},hitbox:{x:d.combat.hitboxX,y:d.combat.hitboxY,width:d.combat.hitboxWidth,height:d.combat.hitboxHeight}}};
+  const animationEvents=d.events.map(e=>({id:e.id,start:(e.frame-d.sheet.startFrame)*timing.frameMs/1000,end:(e.frame-d.sheet.startFrame)*timing.frameMs/1000,label:e.type.toLowerCase(),payload:{frame:e.frame,type:e.type,...(e.payload||{})}}));
+  const animation={schema:2,documentType:'ANIMATION',clip:{id:`anim_${d.combat.key}`,type:'spritesheet',channel:'action',priority:45,duration,loop:d.sheet.loop===true,interruptible:true,directions:['up','down','left','right'],mirrorLeftFromRight:false,markers:{impact:timing.impactMs/1000,recover:timing.activeEndMs/1000},assetId,frames:d.sheet.columns*d.sheet.rows,fps:d.sheet.fps,frameWidth:d.sheet.frameWidth,frameHeight:d.sheet.frameHeight,frameSequence:sequence,anchor:{x:.5,y:1}},tracks:{hitbox:[{id:'hit-main',start:timing.activeStartMs/1000,end:timing.activeEndMs/1000,label:'hit',payload:{box:{x:d.combat.hitboxX,y:d.combat.hitboxY,width:d.combat.hitboxWidth,height:d.combat.hitboxHeight}}}],hurtbox:[],movement:d.combat.lunge?[{id:'lunge',start:0,end:Math.max(timing.frameMs,timing.impactMs)/1000,label:'lunge',payload:{distance:d.combat.lunge}}]:[],sound:[],vfx:[],event:[{id:'hitstop',start:timing.impactMs/1000,end:timing.impactMs/1000,label:'hitstop',payload:{ms:d.combat.hitstopMs}},...animationEvents],projectile:[],invulnerability:[]},assetSource:{kind:'data_url',dataUrl:d.sheet.dataUrl,fileName:d.sheet.fileName,width:d.sheet.imageWidth,height:d.sheet.imageHeight},authoring:{autoFit:copy(d.sheet.autoFit),activeWindow:{startFrame:d.combat.activeStartFrame,endFrame:d.combat.activeEndFrame},hitbox:{x:d.combat.hitboxX,y:d.combat.hitboxY,width:d.combat.hitboxWidth,height:d.combat.hitboxHeight},animationEvents:copy(d.events)}};
   const delivery=d.combat.deliveryType==='dash'?{type:'dash',distance:Math.max(1,d.combat.lunge||80),duration:Math.max(.05,timing.windupMs/1000)}:d.combat.deliveryType==='self_aoe'?{type:'self_aoe',radius:d.combat.range}:d.combat.deliveryType==='projectile'?{type:'projectile',speed:420,radius:16,maxDistance:d.combat.range}:{type:'instant'};
   const ability={schema:1,documentType:'ABILITY',definition:{id:1000,key:d.combat.key,name:d.combat.name,icon:'⚔️',slotType:'normal',role:d.combat.deliveryType==='dash'?'mobility':'burst',recipe:['wind',d.combat.deliveryType==='dash'?'dash':'projectile'],targeting:{type:d.combat.deliveryType==='self_aoe'?'self':'direction',range:d.combat.range},resource:{type:'mana',cost:0},cooldown:d.combat.cooldownMs/1000,input:{mode:'instant'},action:{windup:timing.windupMs/1000,active:timing.activeMs/1000,recovery:timing.recoveryMs/1000,movementScale:d.combat.movementScale},telegraph:{shape:d.combat.deliveryType==='self_aoe'?'circle':'line',range:d.combat.range,radius:d.combat.range,width:Math.max(24,d.combat.range*.3)},delivery,effects:[{type:'damage',damageType:'physical',amount:d.combat.damage},{type:'status',status:'knockback',duration:.01,magnitude:d.combat.knockback}],visualProfileId:null,visuals:{color:'#f2d27e',accent:'#ffffff',fx:d.combat.key}},links:{animationProjectId:animationProjectId||null,castVfxProjectId:null,impactVfxProjectId:null},authoring:{spriteAbilityProjectId:d.documentId,arcDeg:d.combat.arcDeg,hitstopMs:d.combat.hitstopMs,cancelWindowMs:d.combat.cancelWindowMs,lunge:d.combat.lunge,activeStartFrame:d.combat.activeStartFrame,activeEndFrame:d.combat.activeEndFrame,hitbox:{x:d.combat.hitboxX,y:d.combat.hitboxY,width:d.combat.hitboxWidth,height:d.combat.hitboxHeight},spriteAutoFit:copy(d.sheet.autoFit)}};
   return Object.freeze({animation:copy(animation),ability:copy(ability),animationProjectId,abilityProjectId,timing});
