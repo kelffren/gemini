@@ -55,7 +55,10 @@ export function createStudioMultiAlign({root=globalThis,kernel}={}){
   async function align(mode){
     const entities=selected();if(entities.length<2)return false;
     const targets=computeAlignedPositions(entities,mode);
-    const commands=targets.filter(to=>{const e=entities.find(row=>String(row.id)===to.id);return e&&(Number(e.transform?.x)||0)!==to.x||(e&&(Number(e.transform?.y)||0)!==to.y);}).map(to=>createMoveEntityCommand(to.id,to));
+    const commands=targets.filter(to=>{
+      const e=entities.find(row=>String(row.id)===to.id);if(!e)return false;
+      return (Number(e.transform?.x)||0)!==to.x||(Number(e.transform?.y)||0)!==to.y;
+    }).map(to=>createMoveEntityCommand(to.id,to));
     if(!commands.length)return false;
     await kernel.execute(createCompositeCommand(commands,{type:'selection.align',label:`Align ${mode} · ${commands.length} objects`}));
     refresh();return true;
@@ -80,7 +83,7 @@ export function createStudioMultiAlign({root=globalThis,kernel}={}){
   }
   function refresh(){
     attach();if(!bar||!shell)return;const count=selected().length;const allowed=count>1&&!['paint','erase'].includes(String(shell.dataset.activeTool||'select'))&&shell.dataset.sheetOpen!=='1'&&shell.dataset.creatorMinimized!=='1';
-    bar.classList.toggle('on',allowed);const label=bar.querySelector('.ks-multi-align-count');if(label)label.textContent=`${count} SELECTED`;
+    bar.classList.toggle('on',allowed);const label=bar.querySelector('.ks-multi-align-count'),nextLabel=`${count} SELECTED`;if(label&&label.textContent!==nextLabel)label.textContent=nextLabel;
   }
   selectionUnsub=kernel.selection.onChange?.(()=>refresh());attach();
   if(typeof root.MutationObserver==='function'&&document.body){observer=new root.MutationObserver(()=>{if(!destroyed)refresh();});observer.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['data-active-tool','data-sheet-open','data-creator-minimized']});}
