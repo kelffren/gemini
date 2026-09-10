@@ -1,8 +1,8 @@
 /* KELO-INDEX
  * area: CORE
  * owner: legacy render/social core; camera commands after boot owned by KeloCamera
- * keys: RENDER LAYERS VISUAL VFX SCREEN UPDATE SOCIAL CAMERA FOUNDATION
- * hace: orquesta render del mundo/actores/UI y ofrece puntos explícitos para sistemas Foundation
+ * keys: RENDER LAYERS VISUAL VFX SCREEN UPDATE SOCIAL CAMERA FOUNDATION PVP LEGACY BOT GUARD
+ * hace: orquesta render del mundo/actores/UI y ofrece puntos explícitos para sistemas Foundation; congela solo el wandering legacy de simulatedPlayers mientras el PvP moderno controla su fallback
  * online: visuales consumen eventos; este archivo no decide autoridad compartida
  * legacy: CONFIG.zoom/cycleZoom/screenToWorld son bootstrap pre-KeloCamera y quedan reemplazados por el owner tras carga; title Caballero wrapper RETIRED
  * do-not: no añadir nuevos writers camera.* ni wrappers renderAvatar; usar KeloCamera/KeloAvatar
@@ -177,7 +177,14 @@ render = function() {
 };
 const _updateSimulation = updateSimulation;
 updateSimulation = function(dt) {
+  const modernPvp = window.KELO_COMBAT_ENABLED === true;
+  const legacyBotState = modernPvp && Array.isArray(simulatedPlayers) ? simulatedPlayers.map(function(bot){
+    return { bot:bot, x:bot.x, y:bot.y, targetX:bot.targetX, targetY:bot.targetY };
+  }) : null;
   _updateSimulation(dt);
+  if (legacyBotState) legacyBotState.forEach(function(entry){
+    entry.bot.x=entry.x; entry.bot.y=entry.y; entry.bot.targetX=entry.targetX; entry.bot.targetY=entry.targetY;
+  });
   const now = Date.now();
   if (STATE.farm.coop && STATE.farm.coop.fedAt && (now - STATE.farm.coop.fedAt) / 1000 >= STATE.farm.coop.duration) {
     if (!STATE.farm.coop.ready) { STATE.farm.coop.ready = true; STATE.silo.eggs = (STATE.silo.eggs || 0) + 2; STATE.farm.coop.fedAt = 0; saveState(); showToast('+2 huevos'); }
@@ -193,11 +200,12 @@ window.addEventListener('keydown', function(e) {
 const _feedAnimals = feedAnimals;
 feedAnimals = function(type) { _feedAnimals(type); if (type === 'chickens' && STATE.farm.coop) STATE.farm.coop.ready = false; if (type === 'pigs' && STATE.farm.pen) STATE.farm.pen.ready = false; };
 window.KELO_LEGACY_WORLD_DRAW_AUDIT = Object.freeze({
-  version:'legacy-world-reset-guard-v1',
+  version:'legacy-world-reset-guard-v2-pvp-bot-freeze',
   get decorationReset(){ return decorationResetActive(); },
   farmSuppressed:true,
   plotSuppressed:true,
   arenaFrameSuppressed:true,
   simulatedPlayersSuppressed:true,
+  pvpLegacyBotWanderingSuppressed:true,
   baseObstaclesSuppressed:true
 });
