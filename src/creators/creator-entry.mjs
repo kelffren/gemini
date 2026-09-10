@@ -18,7 +18,6 @@ import { createAvatarQuickImportService } from './avatar/avatar-quick-import-ser
 import { installCreatorAvatarRuntime } from '../characters/creator-avatar-runtime.mjs';
 import { createKeloSupabaseBrowserSession } from '../online/kelo-supabase-browser-session.mjs';
 import { KELO_SUPABASE_PUBLIC_CONFIG } from '../online/kelo-supabase-public-config.mjs';
-import { installSpriteAbilityVisualUI } from './sprite-ability/sprite-ability-visual-ui.mjs';
 import { registerWorldWorkspace } from './workspaces/world-workspace.mjs';
 import { registerMapForgeWorkspace } from './workspaces/map-forge-workspace.mjs';
 import { registerMountWorkspace } from './workspaces/mount-workspace.mjs';
@@ -32,7 +31,11 @@ import { registerAvatarWorkspace } from './workspaces/avatar-workspace.mjs';
 let platform=null;
 export async function bootKeloCreators({root=globalThis,stateAdapter=null}={}){
   if(platform)return platform;
-  let visualUiDispose=()=>{};try{visualUiDispose=installSpriteAbilityVisualUI({root});}catch(error){console.warn('[Creators] Sprite Ability visual UI unavailable',error);}
+  let visualUiDispose=()=>{};
+  try{
+    const visualUi=await import('./sprite-ability/sprite-ability-visual-ui.mjs');
+    if(typeof visualUi.installSpriteAbilityVisualUI==='function')visualUiDispose=visualUi.installSpriteAbilityVisualUI({root});
+  }catch(error){console.warn('[Creators] Sprite Ability visual UI unavailable',error);}
   const permission=createCreatorPermissionAdapter(root),world=createWorldCreatorAdapter({root,permission}),localState=stateAdapter||createIndexedDbCreatorStateAdapter({indexedDBFactory:root.indexedDB}),projects=createLocalCreatorProjectRepository({domainAdapters:[world],stateAdapter:localState}),workspaces=createCreatorWorkspaceRegistry(),dependencies=createCreatorDependencyGraph();
   const fetchImpl=root.fetch?.bind?.(root)||globalThis.fetch?.bind?.(globalThis),contentSession=createKeloSupabaseBrowserSession({root,fetchImpl,config:KELO_SUPABASE_PUBLIC_CONFIG}),avatarRuntime=installCreatorAvatarRuntime({root}),runtimeContent=createRuntimeContentRegistry({root}),contentRepository=createSupabaseCreatorContentRepository({url:KELO_SUPABASE_PUBLIC_CONFIG.url,publishableKey:KELO_SUPABASE_PUBLIC_CONFIG.publishableKey,getAccessToken:()=>contentSession.accessToken,fetchImpl}),contentService=createUniversalContentService({repository:contentRepository,runtimeRegistry:runtimeContent,root}),avatarQuick=createAvatarQuickImportService({contentSession,contentRepository,contentService,root});
   try{root.KELO_CREATOR_CONTENT_REGISTRY=runtimeContent;}catch{}
@@ -42,7 +45,7 @@ export async function bootKeloCreators({root=globalThis,stateAdapter=null}={}){
     if(manifest.capability)permission.require(manifest.capability,permission.actorId(),context.projectId||null);
     return workspaces.open(id,{root,projects,permission,dependencies,contentSession,contentRepository,contentService,runtimeContent,avatarRuntime,avatarQuick,openWorkspace,...context});
   }
-  platform=Object.freeze({version:'kelo-creators-core-v1.9.0-sprite-ability-visual',permission,projects,workspaces,dependencies,contentSession,contentRepository,contentService,runtimeContent,avatarRuntime,avatarQuick,openWorkspace,close(){try{visualUiDispose?.();}catch{}try{localState.close?.();}catch{}platform=null;}});
+  platform=Object.freeze({version:'kelo-creators-core-v1.9.1-isolated-sprite-ability-visual',permission,projects,workspaces,dependencies,contentSession,contentRepository,contentService,runtimeContent,avatarRuntime,avatarQuick,openWorkspace,close(){try{visualUiDispose?.();}catch{}try{localState.close?.();}catch{}platform=null;}});
   return platform;
 }
 export function getKeloCreatorsPlatform(){return platform;}
