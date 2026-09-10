@@ -1,0 +1,22 @@
+# Kelo World authoritative server deployment
+# Infrastructure-as-code only: gameplay authority remains server/*.
+services:
+  - type: web
+    name: kelo-world-server
+    runtime: node
+    plan: free
+    region: virginia
+    branch: main
+    rootDir: server
+    buildCommand: npm install --omit=dev
+    startCommand: npm start
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: 24.20.0
+      - key: NODE_ENV
+        value: production
+      - key: KELO_REQUIRE_AUTH
+        value: "0"
+      - key: KELO_TITLES_SUPABASE
+        value: "0"
