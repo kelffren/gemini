@@ -17,6 +17,7 @@
     "audit:studio": "node scripts/studio-foundation-audit.mjs",
     "audit:studio:creator": "node scripts/studio-creator-v1-audit.mjs",
     "audit:studio:drag": "node scripts/studio-smooth-drag-audit.mjs",
+    "audit:studio:duplicate-grab": "node scripts/studio-duplicate-grab-audit.mjs",
     "audit:mounts": "node scripts/mount-foundation-audit.mjs",
     "audit:ability-source-native": "node scripts/ability-source-native-cast-audit.mjs",
     "audit:equipment-abilities": "node scripts/equipment-ability-audit.mjs",
