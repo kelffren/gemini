@@ -36,6 +36,27 @@ const best=generateBestOf(cap,{seed:12345,count:8,assetCatalogVersion:'ci-catalo
 assert.equal(best.requested,8);assert.equal(best.validCount,8);assert.ok(best.best.quality.total>=best.candidates.at(-1).quality.total);
 assert.ok(best.selections.bestOverall&&best.selections.mostMonumental&&best.selections.mostOrganic&&best.selections.mostExplorable&&best.selections.mostCompact,'best-of selectors must resolve');
 
+const visualTieScore=map=>{const m=map?.quality?.breakdown||{};return Number(m.visualComposition||0)*1.35+Number(m.scenicVistas||0)*1.25+Number(m.negativeSpace||0)*1.05+Number(m.assetVariety||0)+Number(m.districtCoherence||0);};
+const legacyComparator=(x,y)=>y.quality.total-x.quality.total||String(x.metadata.layoutHash).localeCompare(String(y.metadata.layoutHash));
+const tieBreakRegression={runs:0,tieCases:0,changedSelections:0,improvedSelections:0,legacyVisualSum:0,currentVisualSum:0};
+for(const recipe of Object.values(MAP_FORGE_RECIPES))for(let seed=1;seed<=20;seed++){
+  const result=generateBestOf(recipe,{seed,count:8,assetCatalogVersion:'ci-catalog'}),legacy=[...result.candidates].sort(legacyComparator)[0],current=result.best;
+  const legacyVisual=visualTieScore(legacy),currentVisual=visualTieScore(current),ties=result.candidates.filter(candidate=>candidate.quality.total===current.quality.total).length;
+  assert.equal(current.quality.total,legacy.quality.total,`${recipe.id}:${seed}: tie-break must never trade away total quality`);
+  assert.ok(currentVisual+1e-9>=legacyVisual,`${recipe.id}:${seed}: visual tie-break selected a worse equal-score map`);
+  if(ties>1)tieBreakRegression.tieCases++;
+  if(current.metadata.layoutHash!==legacy.metadata.layoutHash){tieBreakRegression.changedSelections++;if(currentVisual>legacyVisual+1e-9)tieBreakRegression.improvedSelections++;}
+  tieBreakRegression.legacyVisualSum+=legacyVisual;tieBreakRegression.currentVisualSum+=currentVisual;tieBreakRegression.runs++;
+  if(seed<=2){const repeat=generateBestOf(recipe,{seed,count:8,assetCatalogVersion:'ci-catalog'});assert.equal(repeat.best.metadata.layoutHash,current.metadata.layoutHash,`${recipe.id}:${seed}: best-of tie-break must stay deterministic`);}
+}
+assert.equal(tieBreakRegression.runs,60,'expected 60 representative best-of runs');
+assert.ok(tieBreakRegression.tieCases>0,'fixed corpus must exercise equal-total best-of ties');
+assert.ok(tieBreakRegression.changedSelections>0,'visual tie-break must change at least one legacy hash-selected map');
+assert.ok(tieBreakRegression.improvedSelections>0,'visual tie-break must measurably improve at least one equal-score selection');
+tieBreakRegression.legacyVisualAvg=+(tieBreakRegression.legacyVisualSum/tieBreakRegression.runs).toFixed(3);
+tieBreakRegression.currentVisualAvg=+(tieBreakRegression.currentVisualSum/tieBreakRegression.runs).toFixed(3);
+tieBreakRegression.visualDelta=+(tieBreakRegression.currentVisualAvg-tieBreakRegression.legacyVisualAvg).toFixed(3);
+
 const clone=value=>JSON.parse(JSON.stringify(value));
 const disconnected=clone(a);
 disconnected.navigation.edges=[];
@@ -89,4 +110,4 @@ for(const [id,recipe] of Object.entries(MAP_FORGE_RECIPES)){
 }
 assert.ok(totalBlockRejects>0,'fixed-seed fuzz must exercise the decoration-vs-block collision guard');
 assert.equal(totalBlockOverlaps,0,'300 fixed-seed maps must have zero decoration anchors inside block envelopes');
-console.log(JSON.stringify({ok:true,generator:'map-forge-core-v1',royalCapital:{seed:a.metadata.seed,layoutHash:a.metadata.layoutHash,score:a.quality.total,roads:a.roads.length,loops:a.generationStats.roadLoops,parcels:a.parcels.length,decorations:a.decorations.length,decorationBlockRejects:a.generationStats.decorationBlockRejects||0},qualityRegressions:{invalidCap:disconnectedScore.total,visualSpamCap:noisyScore.total,semanticLandmarkCap:semanticScore.total,localVarietyMixed:mixedLocalScore.breakdown.assetVariety,localVarietyClustered:clusteredLocalScore.breakdown.assetVariety,localVarietyDelta},placementRegression:{decorationBlockRejects:totalBlockRejects,decorationBlockOverlaps:totalBlockOverlaps},bestOf8:{score:best.best.quality.total,seed:best.best.metadata.seed,layoutHash:best.best.metadata.layoutHash},stats},null,2));
+console.log(JSON.stringify({ok:true,generator:'map-forge-core-v1',royalCapital:{seed:a.metadata.seed,layoutHash:a.metadata.layoutHash,score:a.quality.total,roads:a.roads.length,loops:a.generationStats.roadLoops,parcels:a.parcels.length,decorations:a.decorations.length,decorationBlockRejects:a.generationStats.decorationBlockRejects||0},qualityRegressions:{invalidCap:disconnectedScore.total,visualSpamCap:noisyScore.total,semanticLandmarkCap:semanticScore.total,localVarietyMixed:mixedLocalScore.breakdown.assetVariety,localVarietyClustered:clusteredLocalScore.breakdown.assetVariety,localVarietyDelta},bestOfTieBreak:tieBreakRegression,placementRegression:{decorationBlockRejects:totalBlockRejects,decorationBlockOverlaps:totalBlockOverlaps},bestOf8:{score:best.best.quality.total,seed:best.best.metadata.seed,layoutHash:best.best.metadata.layoutHash},stats},null,2));
