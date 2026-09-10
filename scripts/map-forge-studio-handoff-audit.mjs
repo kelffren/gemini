@@ -40,6 +40,7 @@ assert(visual.placements.length>0,'semantic Map Forge landmarks/decorations must
 assert(visual.placements.some(x=>x.assetId==='imperial:fuente-justicia'),'central fountain landmark must become a real exterior Property placement');
 assert(visual.placements.some(x=>x.assetId==='imperial:farola'),'generated lamp decorations must become real exterior Property placements');
 assert(visual.placements.every(x=>Number.isFinite(x.x)&&Number.isFinite(x.y)&&x.x>=0&&x.y>=0),'derived placements must stay inside world coordinates');
+assert(visual.placements.filter(x=>String(x.placementId).startsWith('map-forge:landmark:')||String(x.placementId).startsWith('map-forge:decoration:')).every(x=>x.rotation===0),'semantic Property sprites are authored upright and must not inherit quarter-turn generator metadata');
 
 const meta=mapForgeDocumentMetadata(map);
 assert(meta.tags.includes('map-forge')&&meta.tags.some(x=>x.startsWith('seed:'))&&meta.tags.some(x=>x.startsWith('layout:')));
