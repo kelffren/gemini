@@ -30,7 +30,7 @@ assert.deepEqual(hit.payload.box,{x:12,y:-44,width:156,height:72});
 assert.equal(built.animation.clip.markers.impact,.15);
 assert.equal(built.animation.clip.markers.recover,.25);
 assert.equal(built.ability.definition.action.active,.15);
-assert.deepEqual(built.ability.definition.authoring.hitbox,{x:12,y:-44,width:156,height:72});
+assert.deepEqual(built.ability.authoring.hitbox,{x:12,y:-44,width:156,height:72});
 assert.equal(validateSpriteAbilityDocument(draft).ok,true);
 
 const controller=await readFile(new URL('../src/creators/sprite-ability/sprite-ability-live-controller.mjs',import.meta.url),'utf8');
