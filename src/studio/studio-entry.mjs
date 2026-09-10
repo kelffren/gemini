@@ -28,6 +28,7 @@ import { createStudioCleanWorkspace } from './ui/studio-clean-workspace.mjs';
 import { createStudioContextInspector } from './ui/studio-context-inspector.mjs';
 import { createStudioContextSnapChip } from './ui/studio-context-snap-chip.mjs';
 import { createStudioAssetFavorites } from './ui/studio-asset-favorites.mjs';
+import { createStudioMultiAlign } from './ui/studio-multi-align.mjs';
 
 const NOOP_ASSET_PALETTE=Object.freeze({
   attach:()=>false,open:()=>false,close:()=>false,toggle:()=>false,refresh:()=>false,choose:()=>false,destroy:()=>{},
@@ -75,6 +76,7 @@ export async function bootKeloStudio({ mode = 'world', actorId = null, document 
   const cleanWorkspace=createStudioCleanWorkspace({root,kernel});
   const contextInspector=createStudioContextInspector({root,kernel,tools});
   const contextSnapChip=createStudioContextSnapChip({root});
+  const multiAlign=createStudioMultiAlign({root,kernel});
   const nudgeController=createStudioNudgeController({root,kernel});
   const overlapCycleController=createStudioOverlapCycleController({root,kernel});
   const precisionSnapController=createStudioPrecisionSnapController({root});
@@ -83,11 +85,11 @@ export async function bootKeloStudio({ mode = 'world', actorId = null, document 
   const worker = createStudioWorkerClient({ resolvePrefab, prefabSnapshot: () => Object.fromEntries(kernel.prefabs.list().map(p => [p.id, kernel.prefabs.resolve(p.id)])) });
   const store = createStudioStore(), profiler = createStudioProfiler();
   const unsubscribeJournal = kernel.commands.on(event => { store.appendCommand(kernel.document.worldId, { action: event.type, command: event.command }).catch(() => {}); });
-  session = Object.freeze({ version: 'kelo-studio-foundation-v1.15.0-precision-snap', mode, actorId, kernel, tools, overlayRenderer, assetPreview, assetPalette, assetFavorites, assetKeyboardController, menuMinimizer, cleanWorkspace, contextInspector, contextSnapChip, nudgeController, overlapCycleController, precisionSnapController, compiler, worker, store, profiler, adapter,
+  session = Object.freeze({ version: 'kelo-studio-foundation-v1.16.0-multi-align', mode, actorId, kernel, tools, overlayRenderer, assetPreview, assetPalette, assetFavorites, assetKeyboardController, menuMinimizer, cleanWorkspace, contextInspector, contextSnapChip, multiAlign, nudgeController, overlapCycleController, precisionSnapController, compiler, worker, store, profiler, adapter,
     compile: options => profiler.measure('compile.sync', () => compiler.compile(kernel.document, options)), compileAsync: options => profiler.measure('compile.worker', () => worker.compile(kernel.document, options)),
-    async importCurrent(options={}) { const next=await profiler.measure('import.current',()=>importCurrentKeloWorld({adapter,mode,actorId,...options})); kernel.setDocument(next); seedCatalogPrefabs({prefabRegistry:kernel.prefabs,assetCatalog:adapter.assetCatalog}); try{assetPalette.refresh();assetFavorites.refresh();}catch{} return next; },
+    async importCurrent(options={}) { const next=await profiler.measure('import.current',()=>importCurrentKeloWorld({adapter,mode,actorId,...options})); kernel.setDocument(next); seedCatalogPrefabs({prefabRegistry:kernel.prefabs,assetCatalog:adapter.assetCatalog}); try{assetPalette.refresh();assetFavorites.refresh();multiAlign.refresh();}catch{} return next; },
     checkpoint: () => store.saveCheckpoint(kernel.document.worldId,kernel.document), recover: () => store.loadRecovery(kernel.document.worldId),
-    close(){unsubscribeJournal();precisionSnapController.destroy();overlapCycleController.destroy();nudgeController.destroy();contextSnapChip.destroy();contextInspector.destroy();cleanWorkspace.destroy();menuMinimizer.destroy();assetKeyboardController.destroy();try{assetFavorites.destroy();}catch{}try{assetPalette.destroy();}catch{}worker.close();profiler.close();assetPreview.close();store.close().catch(()=>{});session=null;}
+    close(){unsubscribeJournal();precisionSnapController.destroy();overlapCycleController.destroy();nudgeController.destroy();multiAlign.destroy();contextSnapChip.destroy();contextInspector.destroy();cleanWorkspace.destroy();menuMinimizer.destroy();assetKeyboardController.destroy();try{assetFavorites.destroy();}catch{}try{assetPalette.destroy();}catch{}worker.close();profiler.close();assetPreview.close();store.close().catch(()=>{});session=null;}
   });
   return session;
 }
