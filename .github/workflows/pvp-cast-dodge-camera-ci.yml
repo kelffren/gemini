@@ -5,6 +5,7 @@ on:
     paths:
       - 'src/core/camera-system.js'
       - 'scripts/live-pvp-cast-dodge-camera-judge.mjs'
+      - 'scripts/audit-pvp-cast-dodge-camera-timing.mjs'
       - '.github/workflows/pvp-cast-dodge-camera-ci.yml'
   workflow_dispatch:
 permissions:
@@ -18,6 +19,8 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: '20' }
       - run: npm install --no-audit --no-fund
+      - name: Cast-to-dodge 60/90/120 timing audit
+        run: node scripts/audit-pvp-cast-dodge-camera-timing.mjs
       - run: npx playwright install --with-deps chromium
       - name: Serve checkout
         run: |
@@ -27,7 +30,7 @@ jobs:
       - name: Cast to dodge Chromium judge
         env:
           AUDIT_URL: http://127.0.0.1:8000/
-          CAST_DODGE_CAMERA_STRICT: '0'
+          CAST_DODGE_CAMERA_STRICT: '1'
         run: node scripts/live-pvp-cast-dodge-camera-judge.mjs
       - name: Foundation architecture
         run: npm run audit:foundation
