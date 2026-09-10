@@ -26,7 +26,8 @@
     "audit:logistics-ui": "node scripts/logistics-admin-ui-audit.js",
     "audit:performance": "node scripts/performance-foundation-audit.js",
     "audit:online-foundation": "node scripts/online-foundation-audit.mjs",
-    "audit:universal-content": "node scripts/universal-content-studio-audit.mjs"
+    "audit:universal-content": "node scripts/universal-content-studio-audit.mjs",
+    "audit:avatar-quick": "node scripts/avatar-quick-import-audit.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0"
