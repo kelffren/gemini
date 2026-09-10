@@ -24,6 +24,8 @@ assert.match(source,/type:'selection\.align'/,'authority serialization must have
 assert.match(source,/kernel\.selection\.onChange/,'toolbar must react immediately to multi-selection changes');
 assert.match(source,/count>1/,'toolbar must stay hidden for single selection');
 assert.match(source,/@media\(max-width:760px\)/,'touch layout must have an explicit mobile treatment');
+assert.match(source,/label\.textContent!==nextLabel/,'observer-driven refresh must not rewrite its own label on every pass');
+assert.match(source,/attributeFilter:\['data-active-tool','data-sheet-open','data-creator-minimized'\]/,'observer must ignore cosmetic class mutations');
 assert.doesNotMatch(source,/KELO_WORLD_EDIT\s*\./,'UI must not bypass authority with direct world writes');
 
 const entry=fs.readFileSync(new URL('../src/studio/studio-entry.mjs',import.meta.url),'utf8');
@@ -31,4 +33,4 @@ assert.match(entry,/createStudioMultiAlign/,'Studio boot must install multi alig
 assert.match(entry,/multiAlign\.destroy\(\)/,'Studio close must cleanup multi align');
 assert.match(entry,/kelo-studio-foundation-v1\.16\.0-multi-align/,'Studio version must expose the multi-align release');
 
-console.log(JSON.stringify({ok:true,left:true,rightScaled:true,centers:true,top:true,bottom:true,commandBus:true,compositeUndo:true,mobile:true,cleanup:true},null,2));
+console.log(JSON.stringify({ok:true,left:true,rightScaled:true,centers:true,top:true,bottom:true,commandBus:true,compositeUndo:true,mobile:true,observerStable:true,cleanup:true},null,2));
