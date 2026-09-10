@@ -20,10 +20,10 @@ const BASE_KEY='capitalTestPlazaBase';
 const BASE_ASSET=Object.freeze({
   id:'capital-test-plaza-base',
   src:'assets/plaza.PNG?art=215cfdef',
-  width:800,height:560,worldWidth:800,worldHeight:560,
+  width:1254,height:1254,worldWidth:800,worldHeight:800,
   family:'capital-test-floor'
 });
-const PLAZA=Object.freeze({x:1040,y:1240,w:800,h:560});
+const PLAZA=Object.freeze({x:1040,y:1120,w:800,h:800});
 const NATURE=R.atlases.plazaNature;
 
 const CAPITAL_TREES=Object.freeze([
@@ -41,8 +41,8 @@ const CAPITAL_TREES=Object.freeze([
 
 let plazaImg=null,natureImg=null,ready=false,failed=false;
 const audit=window.KELO_CAPITAL_TEST_MAP_AUDIT={
-  version:'capital-test-map-v1',ready:false,failed:false,mode:'asset-composition-test-v1',
-  plazaAsset:BASE_ASSET.src,plazaBounds:PLAZA,treeCount:CAPITAL_TREES.length,
+  version:'capital-test-map-v1.0.1',ready:false,failed:false,mode:'asset-composition-test-v1',
+  plazaAsset:BASE_ASSET.src,sourceSize:Object.freeze({w:BASE_ASSET.width,h:BASE_ASSET.height}),plazaBounds:PLAZA,treeCount:CAPITAL_TREES.length,
   layers:Object.freeze(['paths_floors','props_back','props_front']),
   usesRealAssets:true,rendererWrapper:false,collisionWrites:false,visibleDuringReset:true,
   lastFrontOccluderCount:0
