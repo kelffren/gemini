@@ -39,7 +39,7 @@ assert.ok(best.selections.bestOverall&&best.selections.mostMonumental&&best.sele
 const visualTieScore=map=>{const m=map?.quality?.breakdown||{};return Number(m.visualComposition||0)*1.35+Number(m.scenicVistas||0)*1.25+Number(m.negativeSpace||0)*1.05+Number(m.assetVariety||0)+Number(m.districtCoherence||0);};
 const legacyComparator=(x,y)=>y.quality.total-x.quality.total||String(x.metadata.layoutHash).localeCompare(String(y.metadata.layoutHash));
 const tieBreakRegression={runs:0,tieCases:0,changedSelections:0,improvedSelections:0,legacyVisualSum:0,currentVisualSum:0};
-for(const recipe of Object.values(MAP_FORGE_RECIPES))for(let seed=1;seed<=20;seed++){
+for(const recipe of Object.values(MAP_FORGE_RECIPES))for(let seed=1;seed<=100;seed++){
   const result=generateBestOf(recipe,{seed,count:8,assetCatalogVersion:'ci-catalog'}),legacy=[...result.candidates].sort(legacyComparator)[0],current=result.best;
   const legacyVisual=visualTieScore(legacy),currentVisual=visualTieScore(current),ties=result.candidates.filter(candidate=>candidate.quality.total===current.quality.total).length;
   assert.equal(current.quality.total,legacy.quality.total,`${recipe.id}:${seed}: tie-break must never trade away total quality`);
@@ -49,7 +49,7 @@ for(const recipe of Object.values(MAP_FORGE_RECIPES))for(let seed=1;seed<=20;see
   tieBreakRegression.legacyVisualSum+=legacyVisual;tieBreakRegression.currentVisualSum+=currentVisual;tieBreakRegression.runs++;
   if(seed<=2){const repeat=generateBestOf(recipe,{seed,count:8,assetCatalogVersion:'ci-catalog'});assert.equal(repeat.best.metadata.layoutHash,current.metadata.layoutHash,`${recipe.id}:${seed}: best-of tie-break must stay deterministic`);}
 }
-assert.equal(tieBreakRegression.runs,60,'expected 60 representative best-of runs');
+assert.equal(tieBreakRegression.runs,300,'expected 300 representative best-of runs');
 assert.ok(tieBreakRegression.tieCases>0,'fixed corpus must exercise equal-total best-of ties');
 assert.ok(tieBreakRegression.changedSelections>0,'visual tie-break must change at least one legacy hash-selected map');
 assert.ok(tieBreakRegression.improvedSelections>0,'visual tie-break must measurably improve at least one equal-score selection');
