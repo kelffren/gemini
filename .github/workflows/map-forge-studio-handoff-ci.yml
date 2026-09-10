@@ -13,6 +13,7 @@ on:
       - 'index.html'
       - 'tests/map-forge-mobile-preview.spec.js'
       - 'scripts/map-forge-studio-handoff-audit.mjs'
+      - 'scripts/map-forge-settlemaker-provider-audit.mjs'
       - '.github/workflows/map-forge-studio-handoff-ci.yml'
   push:
     branches: [main]
@@ -25,6 +26,7 @@ on:
       - 'index.html'
       - 'tests/map-forge-mobile-preview.spec.js'
       - 'scripts/map-forge-studio-handoff-audit.mjs'
+      - 'scripts/map-forge-settlemaker-provider-audit.mjs'
 jobs:
   contract:
     runs-on: ubuntu-latest
@@ -38,6 +40,7 @@ jobs:
         run: |
           node --check src/world/map-forge/map-forge-worker.mjs
           node --check src/world/map-forge/map-forge-worker-client.mjs
+          node --check src/world/map-forge/map-forge-settlemaker-provider.mjs
           node --check src/creators/ui/map-forge-workspace.mjs
           node --check src/creators/workspaces/map-forge-workspace.mjs
           node --check src/creators/workspaces/world-workspace.mjs
@@ -46,6 +49,9 @@ jobs:
           node --check src/property/property-system.js
           node --check tests/map-forge-mobile-preview.spec.js
           node --check scripts/map-forge-studio-handoff-audit.mjs
+          node --check scripts/map-forge-settlemaker-provider-audit.mjs
+      - name: Settlemaker provider contract
+        run: node scripts/map-forge-settlemaker-provider-audit.mjs
       - name: Handoff contract
         run: node scripts/map-forge-studio-handoff-audit.mjs
 
