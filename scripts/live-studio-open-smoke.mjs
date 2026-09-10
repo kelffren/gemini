@@ -1,4 +1,5 @@
 // Focused live smoke: prove the deployed World editor opens and closes.
+// 2026-09-10: re-run exact Creator Hub → World tap path after real iPhone failure report.
 import { chromium } from 'playwright';
 
 const base=process.env.AUDIT_URL||'https://kelffren.github.io/gemini/';
