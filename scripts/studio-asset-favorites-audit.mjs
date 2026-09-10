@@ -1,0 +1,25 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import { normalizeFavoriteIds } from '../src/studio/ui/studio-asset-favorites.mjs';
+
+assert.deepEqual(normalizeFavoriteIds(['tree','tree','wall','','shop']),['tree','wall','shop'],'favorites must deduplicate while preserving priority');
+assert.equal(normalizeFavoriteIds(Array.from({length:30},(_,i)=>`asset:${i}`)).length,18,'favorites must stay compact and bounded');
+assert.deepEqual(normalizeFavoriteIds(null),[],'invalid persisted data must normalize safely');
+
+const source=fs.readFileSync(new URL('../src/studio/ui/studio-asset-favorites.mjs',import.meta.url),'utf8');
+assert.match(source,/localStorage\?\.setItem/,'favorites must persist locally across Studio sessions');
+assert.match(source,/kelo\.studio\.assetFavorites\.v1/,'favorites persistence must be versioned');
+assert.match(source,/data-favorite-toggle/,'each palette card must expose a favorite toggle');
+assert.match(source,/data-favorite-asset-id/,'favorite shortcuts must remain directly selectable');
+assert.match(source,/paletteApi\.choose/,'favorite shortcut must reuse the existing asset placement bridge');
+assert.doesNotMatch(source,/kernel\.execute|CommandBus|worldEditRequest|KELO_WORLD_EDIT\.request/,'favorites must not mutate world state or authority');
+assert.match(source,/MutationObserver/,'favorites must survive dynamic palette rerenders');
+assert.match(source,/removeEventListener\('click'/,'favorites must clean up global interaction hooks');
+
+const entry=fs.readFileSync(new URL('../src/studio/studio-entry.mjs',import.meta.url),'utf8');
+assert.match(entry,/createStudioAssetFavorites/,'Studio boot must install asset favorites');
+assert.match(entry,/assetFavorites\.refresh\(\)/,'world import must refresh favorite shortcuts');
+assert.match(entry,/assetFavorites\.destroy\(\)/,'Studio close must clean up favorites');
+assert.match(entry,/kelo-studio-foundation-v1\.13\.0-asset-favorites/,'Studio version must identify the favorites release');
+
+console.log(JSON.stringify({ok:true,persistent:true,deduped:true,bounded:true,placementBridge:true,worldMutationFree:true,dynamicUi:true,cleanup:true},null,2));
