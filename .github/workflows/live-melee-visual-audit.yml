@@ -9,6 +9,7 @@ on:
       - 'src/visuals/visual-manifests.js'
       - 'src/visuals/melee-visual-manifest.js'
       - 'src/visuals/melee-combat-visuals.js'
+      - 'src/visuals/combat-presentation-bridge.js'
       - 'src/visuals/melee-assets/**'
       - 'assets/fx/melee/**'
       - 'scripts/live-melee-visual-audit.mjs'
@@ -44,6 +45,7 @@ jobs:
               'src/systems/melee/melee-weapon-profiles.js',
               'src/visuals/melee-visual-manifest.js',
               'src/visuals/melee-combat-visuals.js',
+              'src/visuals/combat-presentation-bridge.js',
           ]
           expected={p:hashlib.sha256(pathlib.Path(p).read_bytes()).hexdigest() for p in targets}
           for attempt in range(48):
