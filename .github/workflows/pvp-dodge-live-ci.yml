@@ -4,6 +4,7 @@ on:
     branches: [main]
     paths:
       - 'src/systems/pvp-world.js'
+      - 'src/systems/pvp-combat-runtime-loader.js'
       - 'src/abilities/kelo-ability-boot.js'
       - 'tests/pvp-dodge-live.spec.js'
       - '.github/workflows/pvp-dodge-live-ci.yml'
