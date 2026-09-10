@@ -1,10 +1,11 @@
-name: Live Melee Visual Audit
+name: Live Combat Feel Agent
 on:
   push:
     branches: [main]
     paths:
       - 'index.html'
       - 'src/systems/pvp-world.js'
+      - 'src/systems/melee/**'
       - 'src/visuals/visual-manifests.js'
       - 'src/visuals/melee-visual-manifest.js'
       - 'src/visuals/melee-combat-visuals.js'
@@ -14,42 +15,65 @@ on:
       - '.github/workflows/live-melee-visual-audit.yml'
   workflow_dispatch:
 
+concurrency:
+  group: live-combat-feel-main
+  cancel-in-progress: true
+
 jobs:
-  live-mobile-melee:
+  live-mobile-combat-feel:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
       - name: Install dependencies
         run: npm install --no-audit --no-fund
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
-      - name: Wait for current Pages build
-        shell: bash
+      - name: Wait for exact Pages runtime
         run: |
-          set -euo pipefail
-          for i in $(seq 1 36); do
-            body="$(curl -fsSL --retry 2 --retry-delay 1 "https://kelffren.github.io/gemini/?melee-deploy-check=${GITHUB_SHA}-${i}" || true)"
-            if printf '%s' "$body" | grep -q 'Kelo World — V6.39' && printf '%s' "$body" | grep -q 'melee-combat-visuals.js?v=1'; then
-              echo "Current melee build is live"
-              exit 0
-            fi
-            sleep 10
-          done
-          echo "Current melee build did not appear on Pages"
-          exit 1
-      - name: Live mobile melee audit
+          python3 - <<'PY'
+          import hashlib, pathlib, time, urllib.request
+
+          base='https://kelffren.github.io/gemini/'
+          targets=[
+              'src/systems/pvp-world.js',
+              'src/systems/melee/melee-engine.js',
+              'src/systems/melee/melee-weapon-profiles.js',
+              'src/visuals/melee-visual-manifest.js',
+              'src/visuals/melee-combat-visuals.js',
+          ]
+          expected={p:hashlib.sha256(pathlib.Path(p).read_bytes()).hexdigest() for p in targets}
+          for attempt in range(48):
+              mismatches=[]
+              for path in targets:
+                  try:
+                      url=base+path+'?deploy-sha='+str(time.time_ns())
+                      body=urllib.request.urlopen(url, timeout=15).read()
+                      actual=hashlib.sha256(body).hexdigest()
+                      if actual != expected[path]:
+                          mismatches.append((path, expected[path][:10], actual[:10]))
+                  except Exception as exc:
+                      mismatches.append((path, 'fetch', str(exc)[:40]))
+              if not mismatches:
+                  print('Exact combat runtime from this checkout is live on Pages')
+                  raise SystemExit(0)
+              print('Pages not current yet', attempt+1, mismatches)
+              time.sleep(10)
+          raise SystemExit('Exact combat runtime did not appear on Pages')
+          PY
+      - name: Play and score live mobile PvP
         env:
           AUDIT_URL: https://kelffren.github.io/gemini/
+          COMBAT_FEEL_THRESHOLD: '90'
         run: node scripts/live-melee-visual-audit.mjs
-      - name: Upload melee audit evidence
+      - name: Upload combat feel evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: live-melee-visual-audit
+          name: live-combat-feel-agent
           path: artifacts/melee-live/
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 14
