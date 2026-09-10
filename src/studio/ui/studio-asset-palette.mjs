@@ -2,14 +2,22 @@
  * area: STUDIO / ASSET PALETTE
  * owns: compact searchable floating asset browser for clean workspace
  * does-not-own: placement semantics, asset catalog, authority or world mutations
- * public-api: createStudioAssetPalette(), filterAssetPaletteRows(), assetPaletteCategories()
- * online: no; selecting delegates to existing Studio placement flow
+ * public-api: createStudioAssetPalette(), filterAssetPaletteRows(), assetPaletteCategories(), sanitizeRecentAssetIds()
+ * online: no; selecting delegates to existing Studio placement flow; recent choices persist locally only
  */
 
 const STYLE_ID='kelo-studio-asset-palette-style';
+const RECENT_STORAGE_KEY='kelo.studio.assetPalette.recent.v1';
+const MAX_RECENT=10;
 const MAX_VISIBLE=72;
 const copyRows=rows=>(Array.isArray(rows)?rows:[]).filter(Boolean);
 const text=value=>String(value??'').trim();
+
+export function sanitizeRecentAssetIds(ids=[],limit=MAX_RECENT){
+  const out=[],seen=new Set();
+  for(const raw of Array.isArray(ids)?ids:[]){const id=text(raw);if(!id||seen.has(id))continue;seen.add(id);out.push(id);if(out.length>=Math.max(1,Number(limit)||MAX_RECENT))break;}
+  return out;
+}
 
 export function assetPaletteCategories(rows=[],limit=7){
   const counts=new Map();
@@ -23,7 +31,7 @@ export function assetPaletteCategories(rows=[],limit=7){
 export function filterAssetPaletteRows(rows=[],{query='',category='all',recentIds=[],limit=MAX_VISIBLE}={}){
   const q=text(query).toLowerCase();
   const cat=text(category).toLowerCase()||'all';
-  const recent=new Map((Array.isArray(recentIds)?recentIds:[]).map((id,index)=>[String(id),index]));
+  const recent=new Map(sanitizeRecentAssetIds(recentIds,MAX_RECENT).map((id,index)=>[id,index]));
   let out=copyRows(rows).filter(row=>{
     const id=String(row.id||'');
     const rowCategory=text(row.category||row.group||'general').toLowerCase()||'general';
@@ -34,6 +42,13 @@ export function filterAssetPaletteRows(rows=[],{query='',category='all',recentId
   });
   if(cat==='recent')out.sort((a,b)=>(recent.get(String(a.id))??999)-(recent.get(String(b.id))??999));
   return out.slice(0,Math.max(1,Number(limit)||MAX_VISIBLE));
+}
+
+function loadRecentIds(root){
+  try{return sanitizeRecentAssetIds(JSON.parse(root?.localStorage?.getItem?.(RECENT_STORAGE_KEY)||'[]'));}catch{return [];}
+}
+function persistRecentIds(root,ids){
+  try{root?.localStorage?.setItem?.(RECENT_STORAGE_KEY,JSON.stringify(sanitizeRecentAssetIds(ids)));return true;}catch{return false;}
 }
 
 function ensureStyle(document){
@@ -93,12 +108,12 @@ export function createStudioAssetPalette({root=globalThis,getAssets=()=>[],onSel
   ensureStyle(document);
 
   let shell=null,palette=null,toggleButton=null,observer=null,destroyed=false,opened=false,query='',category='all',bypassLegacy=false;
-  const recentIds=[];
+  const recentIds=loadRecentIds(root);
   const allRows=()=>copyRows(getAssets?.()).filter(row=>row?.id!=null);
   const isMobile=()=>typeof root.matchMedia==='function'?root.matchMedia('(max-width:760px)').matches:Number(root.innerWidth||0)<=760;
 
   function remember(id){
-    id=String(id);const index=recentIds.indexOf(id);if(index>=0)recentIds.splice(index,1);recentIds.unshift(id);if(recentIds.length>10)recentIds.length=10;
+    const next=sanitizeRecentAssetIds([String(id),...recentIds]);recentIds.splice(0,recentIds.length,...next);persistRecentIds(root,recentIds);
   }
   function dispatchInput(input){const EventCtor=root.Event||globalThis.Event;input?.dispatchEvent?.(new EventCtor('input',{bubbles:true}));}
   function selectThroughShell(id){
