@@ -126,7 +126,7 @@ jobs:
           grep -q "commerce:request" server/index.js
           grep -q "commerce:result" server/index.js
           grep -q "commerce:event" server/index.js
-          grep -q "player-economy-store-v1.0.0" server/player-economy-store.js
+          grep -q "player-economy-store-v1.1.0" server/player-economy-store.js
           grep -q "commerce-server-v1.1.0" server/commerce-store.js
       - name: Boot and docs commerce contract
         run: |
