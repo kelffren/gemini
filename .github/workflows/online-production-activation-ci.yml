@@ -8,6 +8,7 @@ on:
       - 'src/auth/**'
       - 'src/ui/account-auth-ui.js'
       - 'src/ui/google-auth-button.js'
+      - 'scripts/audit-online-auth-lifecycle.mjs'
       - 'index.html'
       - 'render.yaml'
       - 'docs/ops/RENDER_SERVER.md'
@@ -21,6 +22,7 @@ on:
       - 'src/auth/**'
       - 'src/ui/account-auth-ui.js'
       - 'src/ui/google-auth-button.js'
+      - 'scripts/audit-online-auth-lifecycle.mjs'
       - 'index.html'
       - 'render.yaml'
       - 'docs/ops/RENDER_SERVER.md'
@@ -44,8 +46,10 @@ jobs:
           node --check server/online-identity-store.js
           node --check src/config/online-runtime-config.js
           node --check src/auth/supabase-auth-runtime.js
+          node --check src/auth/online-auth-lifecycle-bridge.js
           node --check src/ui/account-auth-ui.js
           node --check src/ui/google-auth-button.js
+          node --check scripts/audit-online-auth-lifecycle.mjs
       - name: Account auth contract
         run: |
           grep -q "kelo-online-auth-v5" src/auth/supabase-auth-runtime.js
@@ -56,6 +60,9 @@ jobs:
           grep -q "kelo.supabase.session.v1" src/auth/supabase-auth-runtime.js
           grep -q "syncNetSession(session,characterId)" src/auth/supabase-auth-runtime.js
           grep -q "ready(9000)" src/auth/supabase-auth-runtime.js
+          grep -q "kelo-online-auth-lifecycle-v1" src/auth/online-auth-lifecycle-bridge.js
+          grep -q "TOKEN_REFRESHED" src/auth/online-auth-lifecycle-bridge.js
+          grep -q "SIGNED_OUT" src/auth/online-auth-lifecycle-bridge.js
           grep -q "signInWithPassword" src/ui/account-auth-ui.js
           grep -q "protectGuestWithEmail" src/ui/account-auth-ui.js
           grep -q "Continuar con Google" src/ui/google-auth-button.js
@@ -64,6 +71,7 @@ jobs:
           ! grep -q "document.write" src/config/online-runtime-config.js
           grep -q "@supabase/supabase-js@2.116.0" index.html
           grep -q "src/auth/supabase-auth-runtime.js?v=5&boot=7" index.html
+          grep -q "src/auth/online-auth-lifecycle-bridge.js?v=1" index.html
           grep -q "src/ui/account-auth-ui.js?v=1&boot=7" index.html
           grep -q "src/ui/google-auth-button.js?v=1&boot=7" index.html
           node - <<'NODE'
@@ -73,6 +81,7 @@ jobs:
             'src/config/online-runtime-config.js?v=6',
             '@supabase/supabase-js@2.116.0',
             'src/auth/supabase-auth-runtime.js?v=5&boot=7',
+            'src/auth/online-auth-lifecycle-bridge.js?v=1',
             'src/ui/account-auth-ui.js?v=1&boot=7',
             'src/ui/google-auth-button.js?v=1&boot=7',
             'engine-net.js?v=101'
@@ -84,7 +93,9 @@ jobs:
             last=pos;
           }
           NODE
-          ! grep -Eq "(service_role|sb_secret)[[:space:]]*[:=]" src/auth/supabase-auth-runtime.js src/ui/account-auth-ui.js src/ui/google-auth-button.js
+          ! grep -Eq "(service_role|sb_secret)[[:space:]]*[:=]" src/auth/supabase-auth-runtime.js src/auth/online-auth-lifecycle-bridge.js src/ui/account-auth-ui.js src/ui/google-auth-button.js
+      - name: Auth lifecycle audit
+        run: node scripts/audit-online-auth-lifecycle.mjs
       - name: Install server dependencies
         working-directory: server
         run: npm install --omit=dev --no-audit --no-fund

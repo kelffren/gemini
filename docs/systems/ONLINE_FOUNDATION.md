@@ -7,6 +7,7 @@
 - **Transporte cliente:** `engine-net.js` / `KeloNetAuthority`.
 - **Config:** `src/config/online-runtime-config.js`.
 - **Auth browser:** `src/auth/supabase-auth-runtime.js`.
+- **Continuidad auth:** `src/auth/online-auth-lifecycle-bridge.js`.
 - **Identidad server:** `server/online-identity-store.js`.
 - **Persistencia bridge:** `server/server-state-bridge.js` -> Edge Function `kelo-server-state`.
 - **Migraciones:** `supabase/migrations/*`.
@@ -39,11 +40,13 @@ No existe un segundo servidor multiplayer.
 - `characters.legacy_player_key` solo sirve para migrar el UUID local anterior.
 - El navegador nunca declara un `account_id` confiable.
 
-`src/auth/supabase-auth-runtime.js` usa únicamente la publishable key. Mantiene sesión con `supabase-js`, intenta sesión anónima cuando no existe una, verifica al usuario, selecciona/crea un character propio y, cuando aplica, reclama el legacy player key mediante RPC validada por `auth.uid()`.
+`src/auth/supabase-auth-runtime.js` usa únicamente la publishable key. Mantiene sesión con `supabase-js`, no crea invitado salvo acción explícita, verifica al usuario, selecciona/crea un character propio y, cuando aplica, reclama el legacy player key mediante RPC validada por `auth.uid()`.
 
 El mismo `hello` de `engine-net.js` recibe `accessToken + characterId`. No se crea otro WebSocket. `server/online-identity-store.js` verifica el JWT contra Auth y consulta `characters` con publishable key + el mismo JWT; RLS vuelve a validar ownership.
 
-Durante rollout `KELO_REQUIRE_AUTH=0`: si Auth falla, el modo legacy sigue funcionando. Después de verificar Pages end-to-end se promueve a `1`.
+`src/auth/online-auth-lifecycle-bridge.js` conserva esa identidad durante sesiones largas: al recibir `TOKEN_REFRESHED` pide credenciales frescas al owner `KeloOnlineAuth`, que vuelve a sincronizar únicamente `accessToken + characterId` para el transporte existente. En `SIGNED_OUT` elimina inmediatamente las credenciales de red y repara cualquier estado local de auth que hubiese quedado stale. No copia refresh tokens ni abre sockets.
+
+Producción opera con `KELO_REQUIRE_AUTH=1`: una conexión sin sesión Supabase válida no puede promoverse a identidad de juego online.
 
 ## 3. Roles y autorización
 
@@ -168,6 +171,7 @@ Trusted-server only:
 - `npm run audit:online-foundation`
 - `npm run audit:foundation`
 - `npm run audit:docs`
+- `node scripts/audit-online-auth-lifecycle.mjs`
 - `cd server && npm run test:smoke`
 - `cd server && npm run test:persistence`
 - Supabase Security Advisor después de DDL/RLS.
