@@ -27,6 +27,7 @@
     "audit:studio:context-snap": "node scripts/studio-context-snap-audit.mjs",
     "audit:studio:assets": "node scripts/studio-asset-palette-audit.mjs",
     "audit:studio:asset-favorites": "node scripts/studio-asset-favorites-audit.mjs",
+    "audit:studio:asset-keyboard": "node scripts/studio-asset-keyboard-audit.mjs",
     "audit:studio:nudge": "node scripts/studio-nudge-audit.mjs",
     "audit:studio:overlap": "node scripts/studio-overlap-cycle-audit.mjs",
     "audit:mounts": "node scripts/mount-foundation-audit.mjs",
