@@ -1,14 +1,14 @@
 /* KELO-INDEX
  * area: CORE / CAMERA
  * owner: KeloCamera
- * keys: CAMERA VIEWPORT ZOOM DPR FOCUS RESTORE SCREEN WORLD ORIENTATION FOUNDATION DEADZONE REVERSAL LOOKAHEAD PVP AIM COMPOSITION
- * purpose: owner único para comandos de cámara, zoom, viewport/Canvas y conversiones screen↔world; compensa dead-zone legacy, acelera carry contrario al invertir y compone aim PvP perpendicular sin tocar gameplay
+ * keys: CAMERA VIEWPORT ZOOM DPR FOCUS RESTORE SCREEN WORLD ORIENTATION FOUNDATION DEADZONE REVERSAL LOOKAHEAD PVP AIM COMPOSITION ACTION FRAMING
+ * purpose: owner único para comandos de cámara, zoom, viewport/Canvas y conversiones screen↔world; compensa dead-zone legacy, acelera carry contrario al invertir y compone aim PvP sin tocar gameplay
  * public-api: KeloCamera
- * consumes: camera, CONFIG, canvas, ctx, screenW/screenH, KeloInput combat snapshot y updateCamera legacy de engine-a
- * state-owned: targetX/Y, posición comandada, follow tuning, zoom efectivo/base, viewport policy, DPR policy, foco y transient camera follow intent
+ * consumes: camera, CONFIG, canvas, ctx, screenW/screenH, KeloInput combat snapshot, KeloPvPWorld state, KeloPvPCastMovementPrediction y updateCamera legacy de engine-a
+ * state-owned: targetX/Y, posición comandada, follow tuning, zoom efectivo/base, viewport policy, DPR policy, foco y transient camera follow/action framing intent
  * extension-points: setTarget/focus/restoreState/setBaseZoom/configureViewport/syncViewport/setFollowTuning/worldView
  * reuse: gameplay pide foco/restore/zoom al owner; render/culling consulta worldView(); UI/orientación delegan viewport y framing aquí
- * legacy: engine-a conserva temporalmente la matemática interna de follow; deadXRatio/deadYRatio se adaptan a world-space, lookAheadDecay recibe boost transitorio en reversal y el input de cámara se adapta solo durante legacyUpdateCamera
+ * legacy: engine-a conserva temporalmente la matemática interna de follow; deadXRatio/deadYRatio se adaptan a world-space, lookAheadDecay recibe boost transitorio en reversal y KeloCamera compone una capa visual screen-space durante acciones PvP estacionarias
  * do-not: NO escribir camera.targetX/Y, camera.x/y por comandos externos, CONFIG.zoom/camera tuning, canvas.width/height o reemplazar resize desde features nuevas
  */
 (function(root){
@@ -16,7 +16,7 @@
   if(root.KeloCamera)return;
   if(typeof camera==='undefined'||typeof CONFIG==='undefined'||typeof canvas==='undefined'||typeof ctx==='undefined')throw new Error('KeloCamera: legacy camera/canvas core unavailable');
 
-  const VERSION='kelo-camera-v1.7.0-screen-deadzone-pvp-aim-composition-winner';
+  const VERSION='kelo-camera-v1.8.0-stationary-action-framing-a';
   const ZOOM_PRESETS=Object.freeze([0.7,0.82,1]);
   const TUNING_KEYS=Object.freeze(['dampX','dampY','deadXRatio','deadYRatio','lookAheadDist','lookAheadDecay']);
   const SCREEN_SPACE_DEADZONE_KEYS=new Set(['deadXRatio','deadYRatio']);
@@ -24,6 +24,9 @@
   const REVERSAL_EPSILON=0.01;
   const PVP_AIM_PERP_WEIGHT=0.5;
   const PVP_AIM_EPSILON=0.18;
+  const PVP_ACTION_SCREEN_LEAD_PX=28;
+  const PVP_ACTION_FRAMING_DECAY=12;
+  const COMMITTED_ACTION_PHASES=new Set(['windup','active']);
   const legacyUpdateCamera=typeof updateCamera==='function'?updateCamera:null;
   let baseZoom=Number.isFinite(Number(CONFIG.zoom))&&Number(CONFIG.zoom)>0?Number(CONFIG.zoom):0.82;
   let effectiveZoom=baseZoom;
@@ -32,6 +35,7 @@
   let transientLookAheadDecayMultiplier=1;
   let reversalActiveX=false,reversalActiveY=false;
   let combatFramingActive=false,lastCameraIntentX=0,lastCameraIntentY=0;
+  let actionFramingActive=false,actionFramingOffsetX=0,actionFramingOffsetY=0,lastActionAimX=0,lastActionAimY=0;
   let dprCap=3,pixelPerfect=false,roundPixels=!!CONFIG.roundPixels,smoothing=true,imageRendering='auto',viewportScheduled=false,lastEffectiveZoom=null,lastViewportKey='';
 
   Object.defineProperty(camera,'targetX',{configurable:true,enumerable:true,get:()=>managedTargetX,set:value=>{const n=Number(value);if(Number.isFinite(n))managedTargetX=n;}});
@@ -59,20 +63,22 @@
   function setBaseZoom(value,source){const next=Number(value);if(!Number.isFinite(next)||next<=0)return applyZoom(source||'invalid-base');baseZoom=next;return applyZoom(source||'set-base');}
   function nearestPresetIndex(value){let best=0,dist=Infinity;ZOOM_PRESETS.forEach((z,i)=>{const d=Math.abs(z-value);if(d<dist){dist=d;best=i;}});return best;}
   function cycleZoom(source){const i=nearestPresetIndex(baseZoom),next=ZOOM_PRESETS[(i+1)%ZOOM_PRESETS.length];setBaseZoom(next,source||'cycle');if(typeof showToast==='function')showToast('Zoom '+next+(orientation()==='landscape'?' · cámara adaptada':''));if(typeof closeMenu==='function')closeMenu();return next;}
-  function setTarget(x,y,options){const nx=Number(x),ny=Number(y),opts=options||{};if(!Number.isFinite(nx)||!Number.isFinite(ny))return false;managedTargetX=nx;managedTargetY=ny;if(opts.snap===true){camera.x=nx;camera.y=ny;camera.lookOffsetX=0;camera.lookOffsetY=0;}emit('kelo:cameratargetchange',{source:opts.source||'api',x:nx,y:ny,snap:opts.snap===true});return true;}
+  function clearActionFramingOffset(){actionFramingActive=false;actionFramingOffsetX=0;actionFramingOffsetY=0;lastActionAimX=0;lastActionAimY=0;}
+  function setTarget(x,y,options){const nx=Number(x),ny=Number(y),opts=options||{};if(!Number.isFinite(nx)||!Number.isFinite(ny))return false;managedTargetX=nx;managedTargetY=ny;if(opts.snap===true){camera.x=nx;camera.y=ny;camera.lookOffsetX=0;camera.lookOffsetY=0;clearActionFramingOffset();}emit('kelo:cameratargetchange',{source:opts.source||'api',x:nx,y:ny,snap:opts.snap===true});return true;}
   function focus(value,options){if(!value)return false;return setTarget(value.x,value.y,options);}
-  function restoreState(value,options){const v=value||{},opts=options||{};const x=Number(v.x),y=Number(v.y),tx=Number(v.targetX),ty=Number(v.targetY);if(!Number.isFinite(x)||!Number.isFinite(y))return false;camera.x=x;camera.y=y;managedTargetX=Number.isFinite(tx)?tx:x;managedTargetY=Number.isFinite(ty)?ty:y;if(Number.isFinite(Number(v.lookOffsetX)))camera.lookOffsetX=Number(v.lookOffsetX);else if(opts.resetLook!==false)camera.lookOffsetX=0;if(Number.isFinite(Number(v.lookOffsetY)))camera.lookOffsetY=Number(v.lookOffsetY);else if(opts.resetLook!==false)camera.lookOffsetY=0;emit('kelo:camerarestore',{source:opts.source||'restore',x,y,targetX:managedTargetX,targetY:managedTargetY});return true;}
+  function restoreState(value,options){const v=value||{},opts=options||{};const x=Number(v.x),y=Number(v.y),tx=Number(v.targetX),ty=Number(v.targetY);if(!Number.isFinite(x)||!Number.isFinite(y))return false;clearActionFramingOffset();camera.x=x;camera.y=y;managedTargetX=Number.isFinite(tx)?tx:x;managedTargetY=Number.isFinite(ty)?ty:y;if(Number.isFinite(Number(v.lookOffsetX)))camera.lookOffsetX=Number(v.lookOffsetX);else if(opts.resetLook!==false)camera.lookOffsetX=0;if(Number.isFinite(Number(v.lookOffsetY)))camera.lookOffsetY=Number(v.lookOffsetY);else if(opts.resetLook!==false)camera.lookOffsetY=0;emit('kelo:camerarestore',{source:opts.source||'restore',x,y,targetX:managedTargetX,targetY:managedTargetY});return true;}
   function setFollowTuning(next){const values=next||{};for(const key of TUNING_KEYS){const value=Number(values[key]);if(Number.isFinite(value))managedTuning[key]=value;}return getFollowTuning();}
   function getFollowTuning(){return Object.freeze(Object.fromEntries(TUNING_KEYS.map(key=>[key,managedTuning[key]])));}
   function screenToWorldPoint(sx,sy){const z=effectiveZoom||1;return{x:camera.x+(Number(sx)-screenW/2)/z,y:camera.y+(Number(sy)-screenH/2)/z};}
   function worldToScreenPoint(wx,wy){const z=effectiveZoom||1;return{x:(Number(wx)-camera.x)*z+screenW/2,y:(Number(wy)-camera.y)*z+screenH/2};}
   function worldView(){const z=effectiveZoom||1,w=screenW/z,h=screenH/z,cx=Number(camera.x)||0,cy=Number(camera.y)||0,left=cx-w/2,top=cy-h/2;return Object.freeze({x:left,y:top,w,h,left,top,right:left+w,bottom:top+h,centerX:cx,centerY:cy,zoom:z,screenW,screenH});}
   function axisReversing(inputAxis,lookOffset){return Math.abs(Number(inputAxis)||0)>REVERSAL_EPSILON&&Math.abs(Number(lookOffset)||0)>REVERSAL_EPSILON&&Number(inputAxis)*Number(lookOffset)<0;}
+  function combatSnapshot(){try{return root.KeloInput?.combat?.snapshot?.()||null;}catch(e){return null;}}
   function combatCameraIntent(ix,iy){
     combatFramingActive=false;
     const moveLen=Math.hypot(ix,iy);
-    if(moveLen<=REVERSAL_EPSILON||!root.KELO_COMBAT_ENABLED||!root.KeloInput||!root.KeloInput.combat||typeof root.KeloInput.combat.snapshot!=='function')return{x:ix,y:iy};
-    let snap=null;try{snap=root.KeloInput.combat.snapshot();}catch(e){return{x:ix,y:iy};}
+    if(moveLen<=REVERSAL_EPSILON||!root.KELO_COMBAT_ENABLED)return{x:ix,y:iy};
+    const snap=combatSnapshot();
     const aim=snap&&snap.aim||{},aimMag=Number(aim.magnitude)||0,ax=Number(aim.x)||0,ay=Number(aim.y)||0;
     if(aimMag<PVP_AIM_EPSILON||Math.hypot(ax,ay)<=REVERSAL_EPSILON)return{x:ix,y:iy};
     const mx=ix/moveLen,my=iy/moveLen,dot=ax*mx+ay*my,px=ax-mx*dot,py=ay-my*dot;
@@ -81,8 +87,34 @@
     combatFramingActive=Math.abs(x-ix)>REVERSAL_EPSILON||Math.abs(y-iy)>REVERSAL_EPSILON;
     return{x,y};
   }
+  function committedActionActive(){
+    const basicPhase=root.KeloPvPWorld?.state?.basicAttack?.phase;
+    if(COMMITTED_ACTION_PHASES.has(basicPhase))return true;
+    const castPhase=root.KeloPvPCastMovementPrediction?.phase;
+    return COMMITTED_ACTION_PHASES.has(castPhase);
+  }
+  function stationaryActionAim(ix,iy){
+    const moveLen=Math.hypot(ix,iy);
+    if(moveLen>REVERSAL_EPSILON||!root.KELO_COMBAT_ENABLED||!committedActionActive())return{x:0,y:0,active:false};
+    const snap=combatSnapshot(),aim=snap&&snap.aim||{},mag=Number(aim.magnitude)||0,ax=Number(aim.x)||0,ay=Number(aim.y)||0,len=Math.hypot(ax,ay);
+    if(mag<PVP_AIM_EPSILON||len<=REVERSAL_EPSILON)return{x:0,y:0,active:false};
+    return{x:ax/len,y:ay/len,active:true};
+  }
+  function applyStationaryActionFraming(dt,ix,iy){
+    const aim=stationaryActionAim(ix,iy),zoom=Math.max(.0001,Number(effectiveZoom)||1),factor=1-Math.exp(-PVP_ACTION_FRAMING_DECAY*Math.max(0,Number(dt)||0));
+    const targetWorld=PVP_ACTION_SCREEN_LEAD_PX/zoom;
+    const targetX=aim.active?aim.x*targetWorld:0,targetY=aim.active?aim.y*targetWorld:0;
+    actionFramingOffsetX+=(targetX-actionFramingOffsetX)*factor;
+    actionFramingOffsetY+=(targetY-actionFramingOffsetY)*factor;
+    if(Math.abs(actionFramingOffsetX)<.0001&&!aim.active)actionFramingOffsetX=0;
+    if(Math.abs(actionFramingOffsetY)<.0001&&!aim.active)actionFramingOffsetY=0;
+    actionFramingActive=aim.active;
+    lastActionAimX=aim.active?aim.x:0;lastActionAimY=aim.active?aim.y:0;
+    camera.x+=actionFramingOffsetX;camera.y+=actionFramingOffsetY;
+  }
   function update(dt){
     const ix=typeof input!=='undefined'?Number(input.normX)||0:0,iy=typeof input!=='undefined'?Number(input.normY)||0:0;
+    if(actionFramingOffsetX||actionFramingOffsetY){camera.x-=actionFramingOffsetX;camera.y-=actionFramingOffsetY;}
     reversalActiveX=axisReversing(ix,camera.lookOffsetX);
     reversalActiveY=axisReversing(iy,camera.lookOffsetY);
     transientLookAheadDecayMultiplier=(reversalActiveX||reversalActiveY)?LOOKAHEAD_REVERSAL_DECAY_MULTIPLIER:1;
@@ -90,9 +122,10 @@
     const canAdapt=typeof input!=='undefined'&&input&&combatFramingActive;
     if(canAdapt){input.normX=intent.x;input.normY=intent.y;}
     try{if(legacyUpdateCamera)legacyUpdateCamera(dt);}finally{if(canAdapt){input.normX=ix;input.normY=iy;}transientLookAheadDecayMultiplier=1;}
+    applyStationaryActionFraming(dt,ix,iy);
   }
   function refreshZoom(source){return applyZoom(source||'refresh');}
-  function snapshot(){return Object.freeze({version:VERSION,x:camera.x,y:camera.y,targetX:managedTargetX,targetY:managedTargetY,lookOffsetX:Number(camera.lookOffsetX)||0,lookOffsetY:Number(camera.lookOffsetY)||0,baseZoom,effectiveZoom,orientation:orientation(),screenW,screenH,dpr:activeDpr(),dprCap,pixelPerfect,roundPixels,smoothing,follow:getFollowTuning(),reversalResponse:Object.freeze({multiplier:LOOKAHEAD_REVERSAL_DECAY_MULTIPLIER,activeX:reversalActiveX,activeY:reversalActiveY}),combatFraming:Object.freeze({active:combatFramingActive,aimPerpWeight:PVP_AIM_PERP_WEIGHT,intentX:lastCameraIntentX,intentY:lastCameraIntentY})});}
+  function snapshot(){return Object.freeze({version:VERSION,x:camera.x,y:camera.y,targetX:managedTargetX,targetY:managedTargetY,lookOffsetX:Number(camera.lookOffsetX)||0,lookOffsetY:Number(camera.lookOffsetY)||0,baseZoom,effectiveZoom,orientation:orientation(),screenW,screenH,dpr:activeDpr(),dprCap,pixelPerfect,roundPixels,smoothing,follow:getFollowTuning(),reversalResponse:Object.freeze({multiplier:LOOKAHEAD_REVERSAL_DECAY_MULTIPLIER,activeX:reversalActiveX,activeY:reversalActiveY}),combatFraming:Object.freeze({active:combatFramingActive,aimPerpWeight:PVP_AIM_PERP_WEIGHT,intentX:lastCameraIntentX,intentY:lastCameraIntentY,stationaryActionActive:actionFramingActive,stationaryActionLeadPx:PVP_ACTION_SCREEN_LEAD_PX,stationaryActionOffsetScreenX:actionFramingOffsetX*effectiveZoom,stationaryActionOffsetScreenY:actionFramingOffsetY*effectiveZoom,stationaryActionAimX:lastActionAimX,stationaryActionAimY:lastActionAimY})});}
 
   root.updateCamera=update;
   root.resize=()=>syncViewport('legacy-resize-call');
@@ -103,5 +136,5 @@
   root.visualViewport?.addEventListener('resize',()=>scheduleViewportSync('visualViewport'),{passive:true});
 
   root.KeloCamera=Object.freeze({version:VERSION,setTarget,focus,restoreState,setFollowTuning,getFollowTuning,setBaseZoom,getBaseZoom:()=>baseZoom,getEffectiveZoom:()=>effectiveZoom,cycleZoom,refreshZoom,getOrientation:orientation,configureViewport,syncViewport,scheduleViewportSync,syncViewportCss,activeDpr,pixelPerfectZoom,screenToWorld:screenToWorldPoint,worldToScreen:worldToScreenPoint,worldView,snapshot});
-  root.KELO_CAMERA_AUDIT=Object.freeze({version:VERSION,owner:'KeloCamera',legacyFollowMath:true,screenSpaceDeadZone:true,lookAheadReversalResponse:true,lookAheadReversalDecayMultiplier:LOOKAHEAD_REVERSAL_DECAY_MULTIPLIER,pvpAimComposition:true,pvpAimPerpWeight:PVP_AIM_PERP_WEIGHT,legacyTargetAdapter:true,legacyZoomAdapter:true,legacyTuningAdapter:true,updateCameraOwner:true,viewportOwner:true,zoomOwner:true,targetOwner:true,restoreOwner:true,screenWorldOwner:true,worldViewOwner:true});
+  root.KELO_CAMERA_AUDIT=Object.freeze({version:VERSION,owner:'KeloCamera',legacyFollowMath:true,screenSpaceDeadZone:true,lookAheadReversalResponse:true,lookAheadReversalDecayMultiplier:LOOKAHEAD_REVERSAL_DECAY_MULTIPLIER,pvpAimComposition:true,pvpAimPerpWeight:PVP_AIM_PERP_WEIGHT,pvpStationaryActionFraming:true,pvpStationaryActionLeadPx:PVP_ACTION_SCREEN_LEAD_PX,legacyTargetAdapter:true,legacyZoomAdapter:true,legacyTuningAdapter:true,updateCameraOwner:true,viewportOwner:true,zoomOwner:true,targetOwner:true,restoreOwner:true,screenWorldOwner:true,worldViewOwner:true});
 })(typeof globalThis!=='undefined'?globalThis:window);
