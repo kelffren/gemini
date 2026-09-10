@@ -31,6 +31,7 @@ const NOOP_ASSET_PALETTE=Object.freeze({
   attach:()=>false,open:()=>false,close:()=>false,toggle:()=>false,refresh:()=>false,choose:()=>false,destroy:()=>{},
   get openState(){return false;},get category(){return 'all';},get query(){return '';},get recent(){return [];}
 });
+const NOOP_ASSET_FAVORITES=Object.freeze({refresh:()=>{},destroy:()=>{},toggle:()=>false,get ids(){return [];}});
 
 let session = null;
 export async function bootKeloStudio({ mode = 'world', actorId = null, document = null, root = globalThis } = {}) {
@@ -61,7 +62,12 @@ export async function bootKeloStudio({ mode = 'world', actorId = null, document 
   }catch(error){
     console.warn('[Kelo Studio] optional asset palette unavailable; continuing without it',error);
   }
-  const assetFavorites=createStudioAssetFavorites({root,paletteApi:assetPalette,getAssets:paletteAssets});
+  let assetFavorites=NOOP_ASSET_FAVORITES;
+  try{
+    assetFavorites=createStudioAssetFavorites({root,paletteApi:assetPalette,getAssets:paletteAssets});
+  }catch(error){
+    console.warn('[Kelo Studio] optional asset favorites unavailable; continuing without it',error);
+  }
   const menuMinimizer=createStudioMenuMinimizer({root});
   const cleanWorkspace=createStudioCleanWorkspace({root,kernel});
   const contextInspector=createStudioContextInspector({root,kernel,tools});
@@ -77,7 +83,7 @@ export async function bootKeloStudio({ mode = 'world', actorId = null, document 
     compile: options => profiler.measure('compile.sync', () => compiler.compile(kernel.document, options)), compileAsync: options => profiler.measure('compile.worker', () => worker.compile(kernel.document, options)),
     async importCurrent(options={}) { const next=await profiler.measure('import.current',()=>importCurrentKeloWorld({adapter,mode,actorId,...options})); kernel.setDocument(next); seedCatalogPrefabs({prefabRegistry:kernel.prefabs,assetCatalog:adapter.assetCatalog}); try{assetPalette.refresh();assetFavorites.refresh();}catch{} return next; },
     checkpoint: () => store.saveCheckpoint(kernel.document.worldId,kernel.document), recover: () => store.loadRecovery(kernel.document.worldId),
-    close(){unsubscribeJournal();overlapCycleController.destroy();nudgeController.destroy();contextSnapChip.destroy();contextInspector.destroy();cleanWorkspace.destroy();menuMinimizer.destroy();assetFavorites.destroy();try{assetPalette.destroy();}catch{}worker.close();profiler.close();assetPreview.close();store.close().catch(()=>{});session=null;}
+    close(){unsubscribeJournal();overlapCycleController.destroy();nudgeController.destroy();contextSnapChip.destroy();contextInspector.destroy();cleanWorkspace.destroy();menuMinimizer.destroy();try{assetFavorites.destroy();}catch{}try{assetPalette.destroy();}catch{}worker.close();profiler.close();assetPreview.close();store.close().catch(()=>{});session=null;}
   });
   return session;
 }
