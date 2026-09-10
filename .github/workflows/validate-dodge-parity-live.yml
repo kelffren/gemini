@@ -23,9 +23,9 @@ jobs:
         run: |
           python3 -m http.server 4173 >/tmp/kelo-http.log 2>&1 &
           SERVER_PID=$!
-          trap 'kill $SERVER_PID || true' EXIT
+          trap 'kill $SERVER_PID || true; rm -f scripts/.tmp-dodge-live.mjs' EXIT
           sleep 2
-          cat > /tmp/dodge-live.mjs <<'NODE'
+          cat > scripts/.tmp-dodge-live.mjs <<'NODE'
           import { chromium } from 'playwright';
           const browser=await chromium.launch({headless:true,args:['--no-sandbox','--disable-dev-shm-usage']});
           const cases=[
@@ -78,4 +78,4 @@ jobs:
           await browser.close();
           console.log('DODGE_LIVE_PARITY_OK '+JSON.stringify(results,null,2));
           NODE
-          node /tmp/dodge-live.mjs
+          node scripts/.tmp-dodge-live.mjs
