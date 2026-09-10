@@ -1,3 +1,10 @@
+/* KELO-INDEX
+ * area: QA / SERVER PERSISTENCE
+ * owner: Online Production Activation CI
+ * keys: SUPABASE EDGE PERSISTENCE ECONOMY FORGE TITLES NOBILITY LEGACY FALLBACK
+ * purpose: smoke determinista del bridge durable y de los stores autoritativos sin tocar servicios externos reales
+ * do-not: NO usar credenciales reales, NO sustituir tests end-to-end de producción
+ */
 'use strict';
 const assert=require('assert');
 const http=require('http');
