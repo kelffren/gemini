@@ -51,14 +51,12 @@ function ensureStyle(document){
     #kelo-studio-live.ks-clean-workspace .ks-right{display:none}
     #kelo-studio-live.ks-clean-workspace.ks-clean-show-assets .ks-left{display:block}
     #kelo-studio-live.ks-clean-workspace.ks-clean-show-inspector .ks-right{display:block}
-    #kelo-studio-live.ks-clean-workspace .ks-bottom:not(.ks-compact):not(.ks-menu-minimized){
+    #kelo-studio-live.ks-clean-workspace[data-sheet-open="0"] .ks-bottom:not(.ks-compact):not(.ks-menu-minimized){
       width:min(690px,calc(100vw - 24px));max-height:76px;overflow:visible;padding:7px 9px
     }
     #kelo-studio-live.ks-clean-workspace .ks-bottom:not(.ks-compact) .ks-deck-body,
-    #kelo-studio-live.ks-clean-workspace .ks-bottom:not(.ks-compact)>.ks-status,
-    #kelo-studio-live.ks-clean-workspace .ks-bottom:not(.ks-compact)>.ks-tabs,
-    #kelo-studio-live.ks-clean-workspace .ks-bottom:not(.ks-compact)>.ks-mobile-sheet{display:none}
-    #kelo-studio-live.ks-clean-workspace .ks-bottom:not(.ks-compact) .ks-deck-head{min-height:56px;padding:0;border-bottom:0;gap:7px}
+    #kelo-studio-live.ks-clean-workspace .ks-bottom:not(.ks-compact)>.ks-status{display:none}
+    #kelo-studio-live.ks-clean-workspace[data-sheet-open="0"] .ks-bottom:not(.ks-compact) .ks-deck-head{min-height:56px;padding:0;border-bottom:0;gap:7px}
     #kelo-studio-live.ks-clean-workspace .ks-bottom:not(.ks-compact) .ks-deck-emblem{width:34px;height:34px;flex-basis:34px;font-size:14px}
     #kelo-studio-live.ks-clean-workspace .ks-bottom:not(.ks-compact) .ks-deck-brand small{display:none}
     #kelo-studio-live.ks-clean-workspace .ks-bottom:not(.ks-compact) .ks-deck-brand strong{font-size:9px}
@@ -104,8 +102,8 @@ function ensureStyle(document){
     @media(max-width:760px){
       #kelo-studio-live.ks-clean-workspace.ks-clean-show-assets .ks-left,
       #kelo-studio-live.ks-clean-workspace.ks-clean-show-inspector .ks-right{display:none}
-      #kelo-studio-live.ks-clean-workspace .ks-bottom:not(.ks-compact):not(.ks-menu-minimized){left:8px;right:8px;width:auto;max-height:68px;padding:6px 7px}
-      #kelo-studio-live.ks-clean-workspace .ks-bottom:not(.ks-compact) .ks-deck-head{min-height:54px;gap:4px}
+      #kelo-studio-live.ks-clean-workspace[data-sheet-open="0"] .ks-bottom:not(.ks-compact):not(.ks-menu-minimized){left:8px;right:8px;width:auto;max-height:68px;padding:6px 7px}
+      #kelo-studio-live.ks-clean-workspace[data-sheet-open="0"] .ks-bottom:not(.ks-compact) .ks-deck-head{min-height:54px;gap:4px}
       #kelo-studio-live.ks-clean-workspace .ks-bottom:not(.ks-compact) .ks-deck-emblem,
       #kelo-studio-live.ks-clean-workspace .ks-bottom:not(.ks-compact) .ks-deck-brand{display:none}
       #kelo-studio-live.ks-clean-workspace .ks-bottom:not(.ks-compact) .ks-active-tool{min-width:0;max-width:31%;padding:5px 7px;margin-left:0}
@@ -139,7 +137,7 @@ export function createStudioCleanWorkspace({root=globalThis,kernel}={}){
   let shell=null,toolbar=null,hud=null,observer=null,selectionUnsub=null,frame=0,destroyed=false,openMenu=null,lastHudKey='';
 
   const isMobile=()=>typeof root.matchMedia==='function'?root.matchMedia('(max-width:760px)').matches:Number(root.innerWidth||0)<=760;
-  const findProxy=selector=>[...shell.querySelectorAll(selector)].find(node=>!node.closest('.ks-clean-toolbar,.ks-selection-float'))||null;
+  const findProxy=selector=>selector&&shell?[...shell.querySelectorAll(selector)].find(node=>!node.closest('.ks-clean-toolbar,.ks-selection-float'))||null:null;
   const proxy=(action)=>{
     if(action==='assets'){
       if(isMobile()){findProxy('[data-act="edit-assets"]')?.click();return true;}
@@ -153,7 +151,7 @@ export function createStudioCleanWorkspace({root=globalThis,kernel}={}){
       if(isMobile()){shell.querySelector('[data-tab="explorer"]')?.click();return true;}
       shell.classList.toggle('ks-clean-show-inspector');shell.classList.remove('ks-clean-show-assets');return true;
     }
-    const target=findProxy(ACTION_SELECTORS[action]||'');
+    const target=findProxy(ACTION_SELECTORS[action]);
     if(!target||target.disabled)return false;
     target.click();return true;
   };
@@ -168,7 +166,7 @@ export function createStudioCleanWorkspace({root=globalThis,kernel}={}){
     shell.querySelectorAll('[data-clean-action]').forEach(button=>{
       const action=button.dataset.cleanAction;
       if(['assets','inspector','explorer'].includes(action)){button.disabled=false;return;}
-      const target=findProxy(ACTION_SELECTORS[action]||'');
+      const target=findProxy(ACTION_SELECTORS[action]);
       button.disabled=!target||!!target.disabled;
       button.classList.toggle('on',!!target?.classList?.contains('on'));
     });
@@ -212,7 +210,7 @@ export function createStudioCleanWorkspace({root=globalThis,kernel}={}){
     if(!shell||!hud)return;
     const rect=unionSelectionRect(kernel),tool=String(shell.dataset.activeTool||'select');
     const allowed=['select','move'].includes(tool);
-    if(!rect||!allowed||shell.dataset.creatorMinimized==='1'){hud.classList.remove('on');lastHudKey='';return;}
+    if(!rect||!allowed||shell.dataset.creatorMinimized==='1'||shell.dataset.sheetOpen==='1'){hud.classList.remove('on');lastHudKey='';return;}
     const camera=root.KeloCamera?.snapshot?.();if(!camera){hud.classList.remove('on');return;}
     const p=worldRectToScreen(rect,camera),vw=Number(camera.screenW)||root.innerWidth||1,vh=Number(camera.screenH)||root.innerHeight||1;
     if(!p||p.bottom<58||p.y>vh-64||p.x<-30||p.x>vw+30){hud.classList.remove('on');lastHudKey='';return;}
@@ -223,31 +221,40 @@ export function createStudioCleanWorkspace({root=globalThis,kernel}={}){
   function update(){attach();syncDisabled();updateHud();}
   function loop(){if(destroyed)return;updateHud();frame=root.requestAnimationFrame?.(loop)||setTimeout(loop,32);}
 
-  document.addEventListener('pointerdown',event=>{
+  function onPointerDown(event){
     if(!shell||event.target?.closest?.('.ks-clean-toolbar,.ks-selection-float'))return;
     closeMenus();
-  },true);
-  document.addEventListener('keydown',event=>{if(event.key==='Escape')closeMenus();},true);
+  }
+  function onKeyDown(event){if(event.key==='Escape')closeMenus();}
+  function onClick(event){
+    if(!shell||!event.target?.closest?.('#kelo-studio-live'))return;
+    const trigger=event.target.closest('[data-clean-menu]');
+    if(trigger){event.preventDefault();event.stopPropagation();const key=trigger.dataset.cleanMenu,same=openMenu===key;closeMenus();if(!same){openMenu=key;trigger.classList.add('on');toolbar?.querySelector(`[data-clean-popover="${key}"]`)?.classList.add('on');syncDisabled();}return;}
+    const more=event.target.closest('[data-selection-more]');
+    if(more){event.preventDefault();event.stopPropagation();hud?.querySelector('.ks-selection-more')?.classList.toggle('on');return;}
+    const action=event.target.closest('[data-clean-action]')?.dataset.cleanAction;
+    if(action){event.preventDefault();event.stopPropagation();proxy(action);if(!['scale-down','scale-up'].includes(action))closeMenus();syncDisabled();}
+  }
+
+  document.addEventListener('pointerdown',onPointerDown,true);
+  document.addEventListener('keydown',onKeyDown,true);
+  document.addEventListener('click',onClick,true);
   selectionUnsub=kernel.selection.onChange(()=>{syncDisabled();updateHud();});
-  toolbar=null;attach();
+  attach();
   if(typeof root.MutationObserver==='function'&&document.body){
     observer=new root.MutationObserver(()=>{if(!destroyed)attach();});observer.observe(document.body,{childList:true,subtree:true});
   }
-  shell?.addEventListener('click',event=>{
-    const trigger=event.target.closest('[data-clean-menu]');
-    if(trigger){event.preventDefault();event.stopPropagation();const key=trigger.dataset.cleanMenu;const same=openMenu===key;closeMenus();if(!same){openMenu=key;trigger.classList.add('on');toolbar.querySelector(`[data-clean-popover="${key}"]`)?.classList.add('on');syncDisabled();}return;}
-    const more=event.target.closest('[data-selection-more]');
-    if(more){event.preventDefault();event.stopPropagation();const panel=hud.querySelector('.ks-selection-more');panel.classList.toggle('on');return;}
-    const action=event.target.closest('[data-clean-action]')?.dataset.cleanAction;
-    if(action){event.preventDefault();event.stopPropagation();proxy(action);if(!['scale-down','scale-up'].includes(action))closeMenus();syncDisabled();}
-  });
   loop();
 
   return Object.freeze({
     attach,update,closeMenus,
     showAssets(value=true){if(shell){shell.classList.toggle('ks-clean-show-assets',!!value);if(value)shell.classList.remove('ks-clean-show-inspector');}},
     showInspector(value=true){if(shell){shell.classList.toggle('ks-clean-show-inspector',!!value);if(value)shell.classList.remove('ks-clean-show-assets');}},
-    destroy(){destroyed=true;selectionUnsub?.();observer?.disconnect?.();if(typeof root.cancelAnimationFrame==='function')root.cancelAnimationFrame(frame);else clearTimeout(frame);toolbar?.remove();hud?.remove();shell?.classList?.remove('ks-clean-workspace','ks-clean-show-assets','ks-clean-show-inspector');},
+    destroy(){
+      destroyed=true;selectionUnsub?.();observer?.disconnect?.();document.removeEventListener('pointerdown',onPointerDown,true);document.removeEventListener('keydown',onKeyDown,true);document.removeEventListener('click',onClick,true);
+      if(typeof root.cancelAnimationFrame==='function')root.cancelAnimationFrame(frame);else clearTimeout(frame);
+      toolbar?.remove();hud?.remove();shell?.classList?.remove('ks-clean-workspace','ks-clean-show-assets','ks-clean-show-inspector');
+    },
     get shell(){return shell;}
   });
 }
