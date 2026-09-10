@@ -25,6 +25,7 @@ on:
       - 'render.yaml'
       - 'docs/ops/RENDER_SERVER.md'
       - 'docs/systems/ONLINE_FOUNDATION.md'
+      - '.github/workflows/online-production-activation-ci.yml'
 
 jobs:
   online-runtime:
@@ -54,8 +55,31 @@ jobs:
           grep -q "signInWithPassword" src/ui/account-auth-ui.js
           grep -q "protectGuestWithEmail" src/ui/account-auth-ui.js
           grep -q "Continuar con Google" src/ui/google-auth-button.js
-          grep -q "google-auth-button.js" src/config/online-runtime-config.js
-          grep -q "account-auth-ui.js" src/config/online-runtime-config.js
+          grep -q "kelo-online-runtime-config-v6" src/config/online-runtime-config.js
+          grep -q "static-supabase-pinned-2.116.0" src/config/online-runtime-config.js
+          ! grep -q "document.write" src/config/online-runtime-config.js
+          grep -q "@supabase/supabase-js@2.116.0" index.html
+          grep -q "src/auth/supabase-auth-runtime.js?v=4&boot=6" index.html
+          grep -q "src/ui/account-auth-ui.js?v=1&boot=6" index.html
+          grep -q "src/ui/google-auth-button.js?v=1&boot=6" index.html
+          node - <<'NODE'
+          const fs=require('fs');
+          const html=fs.readFileSync('index.html','utf8');
+          const order=[
+            'src/config/online-runtime-config.js?v=6',
+            '@supabase/supabase-js@2.116.0',
+            'src/auth/supabase-auth-runtime.js?v=4&boot=6',
+            'src/ui/account-auth-ui.js?v=1&boot=6',
+            'src/ui/google-auth-button.js?v=1&boot=6',
+            'engine-net.js?v=101'
+          ];
+          let last=-1;
+          for(const token of order){
+            const pos=html.indexOf(token);
+            if(pos<0||pos<=last)throw new Error('Auth bootstrap order invalid at '+token);
+            last=pos;
+          }
+          NODE
           ! grep -Eq "(service_role|sb_secret)[[:space:]]*[:=]" src/ui/account-auth-ui.js src/ui/google-auth-button.js
       - name: Install server dependencies
         working-directory: server
