@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: CREATORS / AVATAR QA
- * keys: AVATAR UNIVERSAL-COMPILER MOBILE CANONICAL-RIG STRIP READY-STATE
- * purpose: real mobile-browser proof for V5 upload, canonical preview, transparent grids and strips
+ * keys: AVATAR UNIVERSAL-COMPILER MOBILE CANONICAL-RIG STRIP HORIZONTAL VERTICAL READY-STATE
+ * purpose: real mobile-browser proof for V5 upload, canonical preview, transparent grids and horizontal/vertical strips
  * online: N/A; network is stubbed so the test isolates the browser compiler/UI
  */
 import {chromium} from 'playwright';
@@ -43,12 +43,13 @@ try{
   if(!ui.chips.some(x=>x.startsWith('SALUD ')))throw new Error(`AVATAR_V5_HEALTH_MISSING:${ui.chips.join(',')}`);
   await page.waitForTimeout(190);const frame2=await page.locator('.kaq-preview canvas').evaluate(c=>c.toDataURL());if(frame2===ui.firstFrame)throw new Error('AVATAR_V5_PREVIEW_NOT_ANIMATING');
 
-  const direct=await page.evaluate(async payload=>{const mod=await import(`/src/creators/avatar/kelo-universal-asset-compiler.mjs?v5-proof=${Date.now()}`),run=async(name,bytes)=>{const file=new File([new Uint8Array(bytes)],name,{type:'image/png'}),a=await mod.analyzeUniversalAvatarAsset(file,{root:window}),c=await mod.compileUniversalAvatarRuntime(file,a,{root:window});return{source:[a.columns,a.rows],hypotheses:a.hypotheses?.map(x=>x.mode)||[],compilerVersion:a.compilerVersion,compiled:[c.columns,c.rows],rowMap:c.rowMap,canonicalRig:c.canonicalRig,health:c.validation?.health,strategy:c.strategy};};return{transparent:await run('transparent-3x4.png',payload.transparent),strip:await run('walk-strip-6x1.png',payload.strip)};},{transparent:[...makeSheet({width:360,height:480,columns:3,rows:4,transparent:true})],strip:[...makeSheet({width:480,height:80,columns:6,rows:1,transparent:true})]});
+  const direct=await page.evaluate(async payload=>{const mod=await import(`/src/creators/avatar/kelo-universal-asset-compiler.mjs?v5-proof=${Date.now()}`),run=async(name,bytes)=>{const file=new File([new Uint8Array(bytes)],name,{type:'image/png'}),a=await mod.analyzeUniversalAvatarAsset(file,{root:window}),c=await mod.compileUniversalAvatarRuntime(file,a,{root:window});return{source:[a.columns,a.rows],hypotheses:a.hypotheses?.map(x=>x.mode)||[],stripHint:a.stripHint?{mode:a.stripHint.mode,frames:a.stripHint.frames,score:a.stripHint.score}:null,compilerVersion:a.compilerVersion,compiled:[c.columns,c.rows],rowMap:c.rowMap,canonicalRig:c.canonicalRig,scaleLocked:c.scaleLocked,footAnchor:c.footAnchor,health:c.validation?.health,strategy:c.strategy};};return{transparent:await run('transparent-3x4.png',payload.transparent),horizontal:await run('walk-strip-6x1.png',payload.horizontal),vertical:await run('walk-strip-1x6.png',payload.vertical)};},{transparent:[...makeSheet({width:360,height:480,columns:3,rows:4,transparent:true})],horizontal:[...makeSheet({width:480,height:80,columns:6,rows:1,transparent:true})],vertical:[...makeSheet({width:80,height:480,columns:1,rows:6,transparent:true})]});
   if(!/^5\./.test(String(direct.transparent.compilerVersion||''))||direct.transparent.source[0]!==3||direct.transparent.source[1]!==4||direct.transparent.compiled[1]!==4||!direct.transparent.canonicalRig)throw new Error(`AVATAR_V5_TRANSPARENT_FAILED:${JSON.stringify(direct.transparent)}`);
-  if(!direct.strip.hypotheses.includes('horizontal-strip')||direct.strip.compiled[1]!==4||!direct.strip.canonicalRig)throw new Error(`AVATAR_V5_STRIP_FAILED:${JSON.stringify(direct.strip)}`);
+  if(direct.horizontal.compiled[0]!==6||direct.horizontal.compiled[1]!==4||direct.horizontal.strategy!=='projection-strip-horizontal'||direct.horizontal.stripHint?.frames!==6||!direct.horizontal.canonicalRig)throw new Error(`AVATAR_V5_HORIZONTAL_STRIP_FAILED:${JSON.stringify(direct.horizontal)}`);
+  if(direct.vertical.compiled[0]!==6||direct.vertical.compiled[1]!==4||direct.vertical.strategy!=='projection-strip-vertical'||direct.vertical.stripHint?.frames!==6||!direct.vertical.canonicalRig)throw new Error(`AVATAR_V5_VERTICAL_STRIP_FAILED:${JSON.stringify(direct.vertical)}`);
   for(const face of ['left','down','up','right']){await page.locator(`.kaq-directions button[data-face="${face}"]`).click();if(!await page.locator(`.kaq-directions button[data-face="${face}"]`).evaluate(b=>b.classList.contains('on')))throw new Error(`AVATAR_V5_DIRECTION_PREVIEW_FAILED:${face}`);}
   await page.getByRole('button',{name:'USAR COMO AVATAR'}).click();await page.waitForFunction(()=>document.querySelector('.kaq-use')?.textContent?.includes('AVATAR ACTIVO'),null,{timeout:5000});
   const used=await page.evaluate(()=>window.__avatarV5Use);if(!used||used.columns!==4||used.rows!==4||used.sourceRects!==16||!/^5\./.test(String(used.compilerVersion||''))||used.universalAuto!==true)throw new Error(`AVATAR_V5_USE_FAILED:${JSON.stringify(used)}`);
   if(pageErrors.length)throw new Error(`AVATAR_V5_PAGE_ERRORS:${pageErrors.join(' | ')}`);
-  console.log(JSON.stringify({ok:true,ui:{status:ui.status,chips:ui.chips},transparent:direct.transparent,strip:direct.strip,activated:used},null,2));
+  console.log(JSON.stringify({ok:true,ui:{status:ui.status,chips:ui.chips},transparent:direct.transparent,horizontalStrip:direct.horizontal,verticalStrip:direct.vertical,activated:used},null,2));
 }finally{await browser.close();}
