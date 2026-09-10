@@ -1,8 +1,8 @@
 /* KELO-INDEX
  * area: CORE
  * owner: KeloRuntimeBootstrap
- * keys: BOOTSTRAP MODULE ORDER COMBAT EFFECTS STATUS MELEE LAZY FIRST-USE PERFORMANCE
- * purpose: expone un único loader idempotente para foundations Combat/Effects/Status/Melee; el script es core-ligero y los módulos pesados cargan solo bajo `ensure()`
+ * keys: BOOTSTRAP MODULE ORDER COMBAT EFFECTS STATUS MELEE ABILITY TIMELINE LAZY FIRST-USE PERFORMANCE
+ * purpose: expone un único loader idempotente para foundations Combat/Effects/Status/Melee y primitives compartidas de timeline; los módulos pesados cargan solo bajo `ensure()`
  * public-api: KeloRuntimeBootstrap.ensure/isReady/modules
  * state-owned: progreso/promesa efímera del late boot
  * online: carga contratos compartidos que también usa server; no es authority
@@ -11,9 +11,10 @@
  */
 (function(root){
   'use strict';
-  const VERSION='kelo-runtime-bootstrap-v1.2.0-demand';
+  const VERSION='kelo-runtime-bootstrap-v1.3.0-ability-timeline';
   const MODULES=Object.freeze([
     'src/core/events/event-bus.js?v=1',
+    'src/abilities/ability-action-timeline.js?v=1',
     'src/systems/combat/combat-schema.js?v=2',
     'src/systems/combat/hit-resolver.js?v=2',
     'src/systems/combat/damage-resolver.js?v=1',
