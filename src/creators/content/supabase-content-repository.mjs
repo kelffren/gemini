@@ -19,12 +19,17 @@ export function createSupabaseCreatorContentRepository({url,publishableKey,getAc
   async function upload(bucket,path,file,{upsert=false}={}){const r=await fetchImpl(`${base}/storage/v1/object/${encodeURIComponent(bucket)}/${encPath(path)}`,{method:'POST',headers:headers({'Content-Type':file.type||'application/octet-stream','x-upsert':String(!!upsert)}),body:file});return bodyJson(r);}
   async function remove(bucket,paths){const r=await fetchImpl(`${base}/storage/v1/object/${encodeURIComponent(bucket)}`,{method:'DELETE',headers:headers({'Content-Type':'application/json'}),body:JSON.stringify({prefixes:Array.from(paths||[])})});return bodyJson(r);}
   async function signedUrl(bucket,path,expiresIn=3600){const r=await fetchImpl(`${base}/storage/v1/object/sign/${encodeURIComponent(bucket)}/${encPath(path)}`,{method:'POST',headers:headers({'Content-Type':'application/json'}),body:JSON.stringify({expiresIn:Math.max(60,Number(expiresIn)||3600)})});const data=await bodyJson(r),signed=data?.signedURL||data?.signedUrl;return signed?`${base}/storage/v1${signed.startsWith('/')?'':'/'}${signed}`:null;}
+  const publicUrl=(bucket,path)=>`${base}/storage/v1/object/public/${encodeURIComponent(bucket)}/${encPath(path)}`;
   const userId=()=>decodeJwt(token()).sub||null;
   return Object.freeze({
-    version:'supabase-creator-content-repository-v1.0.0',userId,rpc,select,upload,remove,signedUrl,
+    version:'supabase-creator-content-repository-v1.1.0',userId,rpc,select,upload,remove,signedUrl,publicUrl,
     createAssetFamily:p=>rpc('create_asset_family',p),registerAssetRevision:p=>rpc('register_asset_revision',p),submitAssetRevision:id=>rpc('submit_asset_revision',{p_revision_id:id}),
     createContentDefinition:p=>rpc('create_content_definition',p),registerContentRevision:p=>rpc('register_content_revision',p),submitContentRevision:id=>rpc('submit_content_revision',{p_revision_id:id}),
     listMyRoles:()=>select('account_roles?select=role_key&order=role_key.asc'),
-    listMyContent:()=>select('content_definition_revisions?select=id,definition_id,revision,content_id,schema_version,content_hash,payload,created_at&order=created_at.desc&limit=500')
+    listMyContent:()=>select('content_definition_revisions?select=id,definition_id,revision,content_id,schema_version,content_hash,payload,created_at&order=created_at.desc&limit=500'),
+    listMyCharacters:()=>select('characters?select=id,name,status,active_avatar_content_id,created_at&status=eq.active&order=created_at.asc&limit=3'),
+    createCharacter:name=>rpc('create_character',{p_name:name}),
+    setActiveCharacterAvatar:(characterId,contentId)=>rpc('set_active_character_avatar',{p_character_id:characterId,p_content_id:contentId}),
+    getAvatarManifest:contentId=>rpc('get_avatar_manifest',{p_content_id:contentId})
   });
 }
