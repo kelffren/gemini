@@ -15,7 +15,7 @@ on:
 jobs:
   open-live:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 7
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -23,9 +23,24 @@ jobs:
           node-version: '22'
       - name: Install Playwright
         run: npm install --no-save playwright@1.55.0
-      - name: Verify deployed editor bypass
+      - name: Wait for exact Studio fixes on deployed Pages
         run: |
-          curl --max-time 10 -fsSL "https://kelffren.github.io/gemini/src/ui/account-auth-ui.js?smoke=${GITHUB_SHA}" | grep -q 'kelo-account-auth-ui-v1.0.1-editor-bypass'
+          set -euo pipefail
+          for i in $(seq 1 45); do
+            auth="$(curl --max-time 10 -fsSL "https://kelffren.github.io/gemini/src/ui/account-auth-ui.js?smoke=${GITHUB_SHA}-${i}" || true)"
+            snap="$(curl --max-time 10 -fsSL "https://kelffren.github.io/gemini/src/studio/ui/studio-context-snap-chip.mjs?smoke=${GITHUB_SHA}-${i}" || true)"
+            multi="$(curl --max-time 10 -fsSL "https://kelffren.github.io/gemini/src/studio/ui/studio-multi-align.mjs?smoke=${GITHUB_SHA}-${i}" || true)"
+            if grep -q 'kelo-account-auth-ui-v1.0.1-editor-bypass' <<<"$auth" \
+              && grep -q 'mutationNeedsAttach(mutations=\[\])' <<<"$snap" \
+              && grep -q 'mutationNeedsRefresh(mutations=\[\])' <<<"$multi"; then
+              echo "PASS deployed Pages contains the exact World-open observer fixes"
+              exit 0
+            fi
+            echo "Waiting for Pages to publish exact Studio fix ($i/45)..."
+            sleep 4
+          done
+          echo 'FAIL Pages never exposed the exact Studio fixes in time'
+          exit 1
       - name: Open World editor in live Chrome
         env:
           AUDIT_URL: https://kelffren.github.io/gemini/
