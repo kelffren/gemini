@@ -1,0 +1,60 @@
+/* KELO-INDEX
+ * area: CREATORS / SPRITE ABILITY
+ * owner: Sprite Ability authoring document
+ * keys: SPRITESHEET FRAMES ABILITY PREVIEW IMPACT DAMAGE RANGE KNOCKBACK EXPORT
+ * purpose: define y normaliza el draft combinado usado por Sprite Ability Builder y genera drafts normales ANIMATION + ABILITY
+ * does-not-own: runtime combat, damage authority, asset publishing or networking
+ */
+const copy=v=>v==null?v:(typeof structuredClone==='function'?structuredClone(v):JSON.parse(JSON.stringify(v)));
+const finite=(v,f=0)=>Number.isFinite(Number(v))?Number(v):f;
+const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
+const key=v=>String(v||'sprite_ability').toLowerCase().replace(/[^a-z0-9_]+/g,'_').replace(/^_+|_+$/g,'')||'sprite_ability';
+
+export function normalizeSpriteAbilityDocument(input={}){
+  const sheet=input.sheet||{},combat=input.combat||{},preview=input.preview||{},generated=input.generated||{};
+  const frameWidth=Math.max(1,Math.round(finite(sheet.frameWidth,128))),frameHeight=Math.max(1,Math.round(finite(sheet.frameHeight,192)));
+  const columns=Math.max(1,Math.round(finite(sheet.columns,4))),rows=Math.max(1,Math.round(finite(sheet.rows,4))),cells=columns*rows;
+  const startFrame=clamp(Math.round(finite(sheet.startFrame,0)),0,Math.max(0,cells-1)),endFrame=clamp(Math.round(finite(sheet.endFrame,Math.min(cells-1,5))),startFrame,Math.max(startFrame,cells-1));
+  const frameCount=Math.max(1,endFrame-startFrame+1),fps=Math.max(1,finite(sheet.fps,16)),impactFrame=clamp(Math.round(finite(combat.impactFrame,startFrame+Math.min(2,frameCount-1))),startFrame,endFrame);
+  return {
+    schema:1,documentType:'SPRITE_ABILITY',documentId:String(input.documentId||`sprite-ability:${Date.now().toString(36)}`),
+    name:String(input.name||'Sprite Ability'),
+    sheet:{assetId:key(sheet.assetId||'sprite_ability_sheet'),fileName:String(sheet.fileName||''),dataUrl:String(sheet.dataUrl||''),imageWidth:Math.max(0,Math.round(finite(sheet.imageWidth,0))),imageHeight:Math.max(0,Math.round(finite(sheet.imageHeight,0))),frameWidth,frameHeight,columns,rows,startFrame,endFrame,fps,loop:sheet.loop===true,scale:clamp(finite(sheet.scale,1),.1,6),offsetX:finite(sheet.offsetX,0),offsetY:finite(sheet.offsetY,0)},
+    combat:{key:key(combat.key||input.name||'sprite_ability'),name:String(combat.name||input.name||'Sprite Ability'),impactFrame,damage:Math.max(0,finite(combat.damage,18)),range:Math.max(1,finite(combat.range,120)),arcDeg:clamp(finite(combat.arcDeg,92),1,360),knockback:Math.max(0,finite(combat.knockback,18)),hitstopMs:clamp(finite(combat.hitstopMs,45),0,250),cooldownMs:Math.max(0,finite(combat.cooldownMs,350)),lunge:Math.max(0,finite(combat.lunge,12)),cancelWindowMs:Math.max(0,finite(combat.cancelWindowMs,80)),recoveryMs:Math.max(0,finite(combat.recoveryMs,180)),movementScale:clamp(finite(combat.movementScale,.72),0,1.5),deliveryType:['instant','dash','self_aoe','projectile'].includes(String(combat.deliveryType))?String(combat.deliveryType):'instant'},
+    preview:{mode:['sheet','ability','dummy'].includes(String(preview.mode))?String(preview.mode):'dummy',playing:preview.playing!==false},
+    generated:{animationProjectId:generated.animationProjectId==null?null:String(generated.animationProjectId),abilityProjectId:generated.abilityProjectId==null?null:String(generated.abilityProjectId)},
+    meta:{createdAt:finite(input.meta?.createdAt,Date.now()),updatedAt:Date.now()}
+  };
+}
+
+export function frameRect(document,index){
+  const d=normalizeSpriteAbilityDocument(document),i=clamp(Math.round(finite(index,d.sheet.startFrame)),0,d.sheet.columns*d.sheet.rows-1);
+  return Object.freeze({sx:(i%d.sheet.columns)*d.sheet.frameWidth,sy:Math.floor(i/d.sheet.columns)*d.sheet.frameHeight,sw:d.sheet.frameWidth,sh:d.sheet.frameHeight});
+}
+
+export function spriteAbilityTiming(document){
+  const d=normalizeSpriteAbilityDocument(document),count=d.sheet.endFrame-d.sheet.startFrame+1,frameMs=1000/d.sheet.fps,impactIndex=d.combat.impactFrame-d.sheet.startFrame;
+  const impactMs=impactIndex*frameMs,animationMs=count*frameMs,activeMs=Math.max(frameMs,Math.min(frameMs*1.1,animationMs-impactMs));
+  const windupMs=Math.max(0,impactMs),recoveryMs=Math.max(d.combat.recoveryMs,animationMs-impactMs-activeMs);
+  return Object.freeze({frameMs,impactMs,animationMs,windupMs,activeMs,recoveryMs,totalMs:windupMs+activeMs+recoveryMs});
+}
+
+export function validateSpriteAbilityDocument(document,{maxEmbeddedBytes=7_000_000}={}){
+  const d=normalizeSpriteAbilityDocument(document),errors=[],warnings=[];
+  if(!d.sheet.dataUrl)errors.push('SPRITESHEET_REQUIRED');
+  if(d.sheet.dataUrl.length>maxEmbeddedBytes)errors.push('SPRITESHEET_EMBED_TOO_LARGE');
+  if(d.sheet.imageWidth&&d.sheet.frameWidth*d.sheet.columns>d.sheet.imageWidth)errors.push('GRID_W_EXCEEDS_IMAGE');
+  if(d.sheet.imageHeight&&d.sheet.frameHeight*d.sheet.rows>d.sheet.imageHeight)errors.push('GRID_H_EXCEEDS_IMAGE');
+  if(d.combat.impactFrame<d.sheet.startFrame||d.combat.impactFrame>d.sheet.endFrame)errors.push('IMPACT_FRAME_OUT_OF_RANGE');
+  if(d.combat.hitstopMs>100)warnings.push('HITSTOP_HIGH');
+  if(d.combat.arcDeg>180)warnings.push('ARC_WIDE');
+  return Object.freeze({ok:errors.length===0,errors:Object.freeze(errors),warnings:Object.freeze(warnings)});
+}
+
+export function buildGeneratedDrafts(document,{animationProjectId=null,abilityProjectId=null}={}){
+  const d=normalizeSpriteAbilityDocument(document),timing=spriteAbilityTiming(d),frames=d.sheet.endFrame-d.sheet.startFrame+1,sequence=Array.from({length:frames},(_,i)=>d.sheet.startFrame+i),assetId=d.sheet.assetId||`${d.combat.key}_sheet`,duration=Math.max(.05,timing.animationMs/1000);
+  const animation={schema:2,documentType:'ANIMATION',clip:{id:`anim_${d.combat.key}`,type:'spritesheet',channel:'action',priority:45,duration,loop:false,interruptible:true,directions:['up','down','left','right'],mirrorLeftFromRight:false,markers:{impact:timing.impactMs/1000,recover:(timing.impactMs+timing.activeMs)/1000},assetId,frames:d.sheet.columns*d.sheet.rows,fps:d.sheet.fps,frameWidth:d.sheet.frameWidth,frameHeight:d.sheet.frameHeight,frameSequence:sequence,anchor:{x:.5,y:1}},tracks:{hitbox:[{id:'hit-main',start:timing.impactMs/1000,end:(timing.impactMs+timing.activeMs)/1000,label:'hit',payload:{box:{x:0,y:-d.sheet.frameHeight*.45,width:d.combat.range,height:Math.max(24,d.combat.range*.55)}}}],hurtbox:[],movement:d.combat.lunge?[{id:'lunge',start:0,end:timing.impactMs/1000,label:'lunge',payload:{distance:d.combat.lunge}}]:[],sound:[],vfx:[],event:[{id:'hitstop',start:timing.impactMs/1000,end:timing.impactMs/1000,label:'hitstop',payload:{ms:d.combat.hitstopMs}}],projectile:[],invulnerability:[]},assetSource:{kind:'data_url',dataUrl:d.sheet.dataUrl,fileName:d.sheet.fileName,width:d.sheet.imageWidth,height:d.sheet.imageHeight}};
+  const delivery=d.combat.deliveryType==='dash'?{type:'dash',distance:Math.max(1,d.combat.lunge||80),duration:Math.max(.05,timing.windupMs/1000)}:d.combat.deliveryType==='self_aoe'?{type:'self_aoe',radius:d.combat.range}:d.combat.deliveryType==='projectile'?{type:'projectile',speed:420,radius:16,maxDistance:d.combat.range}:{type:'instant'};
+  const ability={schema:1,documentType:'ABILITY',definition:{id:1000,key:d.combat.key,name:d.combat.name,icon:'⚔️',slotType:'normal',role:d.combat.deliveryType==='dash'?'mobility':'burst',recipe:['wind',d.combat.deliveryType==='dash'?'dash':'projectile'],targeting:{type:d.combat.deliveryType==='self_aoe'?'self':'direction',range:d.combat.range},resource:{type:'mana',cost:0},cooldown:d.combat.cooldownMs/1000,input:{mode:'instant'},action:{windup:timing.windupMs/1000,active:timing.activeMs/1000,recovery:timing.recoveryMs/1000,movementScale:d.combat.movementScale},telegraph:{shape:d.combat.deliveryType==='self_aoe'?'circle':'line',range:d.combat.range,radius:d.combat.range,width:Math.max(24,d.combat.range*.3)},delivery,effects:[{type:'damage',damageType:'physical',amount:d.combat.damage},{type:'status',status:'knockback',duration:.01,magnitude:d.combat.knockback}],visualProfileId:null,visuals:{color:'#f2d27e',accent:'#ffffff',fx:d.combat.key}},links:{animationProjectId:animationProjectId||null,castVfxProjectId:null,impactVfxProjectId:null},authoring:{spriteAbilityProjectId:d.documentId,arcDeg:d.combat.arcDeg,hitstopMs:d.combat.hitstopMs,cancelWindowMs:d.combat.cancelWindowMs,lunge:d.combat.lunge}};
+  return Object.freeze({animation:copy(animation),ability:copy(ability),animationProjectId,abilityProjectId,timing});
+}
