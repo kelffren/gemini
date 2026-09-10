@@ -34,7 +34,17 @@ export async function bootKeloStudio({ mode = 'world', actorId = null, document 
   const tools = registerBasicTools(kernel);
   const assetPreview=createStudioAssetPreviewService({assetCatalog:adapter.assetCatalog,atlasContract:root.KELO_ATLAS_CONTRACT});
   const overlayRenderer = createStudioOverlayRenderer({ kernel, tools, assetPreview });
-  const assetPalette=createStudioAssetPalette({root,getAssets:()=>adapter.assetCatalog.list()||[],renderAssetPreview:(canvas,asset)=>assetPreview.renderThumbnail(canvas,asset)});
+  const paletteAssets=()=>{
+    const personal=(tools.prefabStamp.list?.()||[]).map(def=>({
+      id:String(def.id),label:String(def.label||def.id),category:'My Prefabs',
+      width:Math.max(1,Number(def.bounds?.w)||32),height:Math.max(1,Number(def.bounds?.h)||32),
+      creatorPrefab:true,previewChildren:Array.isArray(def.children)?def.children:[]
+    }));
+    const catalog=adapter.assetCatalog.list?.()||[];
+    const seen=new Set();
+    return [...personal,...catalog].filter(asset=>{const id=String(asset?.id||'');if(!id||seen.has(id))return false;seen.add(id);return true;});
+  };
+  const assetPalette=createStudioAssetPalette({root,getAssets:paletteAssets,renderAssetPreview:(canvas,asset)=>assetPreview.renderThumbnail(canvas,asset)});
   const menuMinimizer=createStudioMenuMinimizer({root});
   const cleanWorkspace=createStudioCleanWorkspace({root,kernel});
   const contextInspector=createStudioContextInspector({root,kernel,tools});
@@ -43,7 +53,7 @@ export async function bootKeloStudio({ mode = 'world', actorId = null, document 
   const worker = createStudioWorkerClient({ resolvePrefab, prefabSnapshot: () => Object.fromEntries(kernel.prefabs.list().map(p => [p.id, kernel.prefabs.resolve(p.id)])) });
   const store = createStudioStore(), profiler = createStudioProfiler();
   const unsubscribeJournal = kernel.commands.on(event => { store.appendCommand(kernel.document.worldId, { action: event.type, command: event.command }).catch(() => {}); });
-  session = Object.freeze({ version: 'kelo-studio-foundation-v1.9.0', mode, actorId, kernel, tools, overlayRenderer, assetPreview, assetPalette, menuMinimizer, cleanWorkspace, contextInspector, compiler, worker, store, profiler, adapter,
+  session = Object.freeze({ version: 'kelo-studio-foundation-v1.9.1', mode, actorId, kernel, tools, overlayRenderer, assetPreview, assetPalette, menuMinimizer, cleanWorkspace, contextInspector, compiler, worker, store, profiler, adapter,
     compile: options => profiler.measure('compile.sync', () => compiler.compile(kernel.document, options)), compileAsync: options => profiler.measure('compile.worker', () => worker.compile(kernel.document, options)),
     async importCurrent(options={}) { const next=await profiler.measure('import.current',()=>importCurrentKeloWorld({adapter,mode,actorId,...options})); kernel.setDocument(next); seedCatalogPrefabs({prefabRegistry:kernel.prefabs,assetCatalog:adapter.assetCatalog}); assetPalette.refresh(); return next; },
     checkpoint: () => store.saveCheckpoint(kernel.document.worldId,kernel.document), recover: () => store.loadRecovery(kernel.document.worldId),
