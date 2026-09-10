@@ -53,7 +53,7 @@ assert(server.includes("msg.t==='visual:event'")&&server.includes('sanitizeVisua
 assert(server.includes('VISUAL_EVENT_ALLOWLIST')&&server.includes('server-visual-relay-v2-aoi'),'visual relay is allowlisted and AOI scoped');
 
 assert(engine.includes('KeloVisualSystem.update(dt)'),'central game loop owns visual update');
-assert(integration.includes('renderAvatar.__keloVisualBridge'),'final avatar integration stays idempotent');
+assert(integration.includes("KeloAvatar.use('visual-integration:actor-fx-transform'")&&integration.includes('renderActorLayer'),'final actor visuals use the shared KeloAvatar middleware owner');
 assert(!integration.includes('const _render = render')&&!integration.includes('render = function'),'visual integration does not wrap the global renderer again');
 
 const coreAt=index.indexOf('src/visuals/visual-system.js');
@@ -64,4 +64,4 @@ const finalAt=index.indexOf('src/visuals/visual-integration.js');
 assert(coreAt>0&&coreAt<abilityAt&&abilityAt<resolverAt&&resolverAt<netAt&&finalAt>netAt,'visual load order preserves core -> gameplay -> resolver/network -> final bridge');
 
 console.log('PASS visual system architecture contract');
-console.log(JSON.stringify({semanticBus:true,semanticAnchors:true,stoneDecoupled:true,combatPresentationBridge:true,onlineRelaySanitized:true,centralVisualLoop:true},null,2));
+console.log(JSON.stringify({semanticBus:true,semanticAnchors:true,stoneDecoupled:true,combatPresentationBridge:true,onlineRelaySanitized:true,keloAvatarMiddleware:true,centralVisualLoop:true},null,2));
