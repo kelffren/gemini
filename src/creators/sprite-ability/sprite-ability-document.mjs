@@ -14,7 +14,7 @@ export function normalizeSpriteAbilityDocument(input={}){
   const sheet=input.sheet||{},combat=input.combat||{},preview=input.preview||{},generated=input.generated||{},autoFit=sheet.autoFit||{};
   const frameWidth=Math.max(1,Math.round(finite(sheet.frameWidth,128))),frameHeight=Math.max(1,Math.round(finite(sheet.frameHeight,192)));
   const columns=Math.max(1,Math.round(finite(sheet.columns,4))),rows=Math.max(1,Math.round(finite(sheet.rows,4))),cells=columns*rows;
-  const startFrame=clamp(Math.round(finite(sheet.startFrame,0)),0,Math.max(0,cells-1)),endFrame=clamp(Math.round(finite(sheet.endFrame,Math.min(cells-1,5))),startFrame,Math.max(startFrame,cells-1));
+  const startFrame=clamp(Math.round(finite(sheet.startFrame,0)),0,Math.max(0,cells-1)),endFrame=clamp(Math.round(finite(sheet.endFrame,cells-1)),startFrame,Math.max(startFrame,cells-1));
   const frameCount=Math.max(1,endFrame-startFrame+1),fps=Math.max(1,finite(sheet.fps,16)),impactFrame=clamp(Math.round(finite(combat.impactFrame,startFrame+Math.min(2,frameCount-1))),startFrame,endFrame);
   const activeStartFrame=clamp(Math.round(finite(combat.activeStartFrame,impactFrame)),startFrame,impactFrame),activeEndFrame=clamp(Math.round(finite(combat.activeEndFrame,impactFrame)),impactFrame,endFrame);
   const range=Math.max(1,finite(combat.range,120)),defaultHitboxHeight=Math.max(24,range*.55);
