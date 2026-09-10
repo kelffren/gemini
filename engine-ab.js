@@ -1,3 +1,11 @@
+/* KELO-INDEX
+ * area: AVATAR / HERO PRESENTATION
+ * owner: engine-ab production hero sprite middleware; identity text delegates to KeloActorNameplate when available
+ * keys: HERO SPRITE FOOT ROOT VISUAL SCALE NAMEPLATE DELEGATION
+ * purpose: renderiza el hero de producción y publica anchors semánticos sin competir con el owner moderno de identidad
+ * consumes: KeloAvatar; optional KeloActorNameplate
+ * do-not: NO duplicar nombre/título/nobleza cuando KeloActorNameplate está LIVE
+ */
 (function () {
   const raw = new Image();
   raw.decoding = 'async';
@@ -8,7 +16,7 @@
   const FOOT_ROOT_OFFSET_Y = 10;
   const AVATAR_VISUAL_SCALE = 1.15;
   const HERO_AUDIT = window.KELO_HERO_SPRITE_AUDIT = {
-    version: 'hero-preprocess-audit-v5',
+    version: 'hero-preprocess-audit-v6-nameplate-delegation',
     source: 'assets/hero.PNG',
     loaded: false,
     processed: false,
@@ -32,6 +40,8 @@
     avatarVisualScale: AVATAR_VISUAL_SCALE,
     sheetMutationAfterIdle: false,
     visibleAlphaMutationAfterIdle: false,
+    identityFallbackOnly: true,
+    delegatesIdentityWhenNameplateLive: true,
     preprocessMs: 0,
     error: null
   };
@@ -331,12 +341,14 @@
     );
     ctx.imageSmoothingEnabled = prevSmooth;
     ctx.restore();
-    ctx.save();
-    ctx.fillStyle = isSelf ? '#e7c56a' : '#f3eee4';
-    ctx.font = 'bold 11px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(p.name || 'Kelo', Math.round(layout.nameplateAnchorX), Math.round(layout.nameplateAnchorY));
-    ctx.restore();
+    if (!window.KeloActorNameplate) {
+      ctx.save();
+      ctx.fillStyle = isSelf ? '#e7c56a' : '#f3eee4';
+      ctx.font = 'bold 11px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(p.name || 'Kelo', Math.round(layout.nameplateAnchorX), Math.round(layout.nameplateAnchorY));
+      ctx.restore();
+    }
   }
 
   if(!window.KeloAvatar) throw new Error('KeloAvatar unavailable before engine-ab');
