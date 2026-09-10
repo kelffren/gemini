@@ -5,6 +5,7 @@ on:
     paths:
       - 'server/**'
       - 'src/config/online-runtime-config.js'
+      - 'src/auth/**'
       - 'index.html'
       - 'render.yaml'
       - 'docs/ops/RENDER_SERVER.md'
@@ -15,6 +16,7 @@ on:
     paths:
       - 'server/**'
       - 'src/config/online-runtime-config.js'
+      - 'src/auth/**'
       - 'index.html'
       - 'render.yaml'
       - 'docs/ops/RENDER_SERVER.md'
@@ -32,13 +34,20 @@ jobs:
         run: |
           node --check server/index.js
           node --check server/smoke-test.js
+          node --check server/persistence-smoke-test.js
+          node --check server/server-state-bridge.js
+          node --check server/online-identity-store.js
           node --check src/config/online-runtime-config.js
+          node --check src/auth/supabase-auth-runtime.js
       - name: Install server dependencies
         working-directory: server
         run: npm install --omit=dev --no-audit --no-fund
       - name: Authoritative server smoke
         working-directory: server
         run: npm run test:smoke
+      - name: Persistence bridge smoke
+        working-directory: server
+        run: npm run test:persistence
       - name: Online Foundation audit
         run: |
           npm install --no-audit --no-fund
