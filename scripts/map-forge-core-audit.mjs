@@ -65,19 +65,28 @@ for(let i=0;i<fixtureCount;i++){
 const mixedLocalScore=scoreMapDefinition(mixedLocal,cap),clusteredLocalScore=scoreMapDefinition(clusteredLocal,cap),localVarietyDelta=+(mixedLocalScore.breakdown.assetVariety-clusteredLocalScore.breakdown.assetVariety).toFixed(2);
 assert.ok(localVarietyDelta>=2.5,`local repetition must lower asset variety by a material measured margin; delta=${localVarietyDelta} mixed=${mixedLocalScore.breakdown.assetVariety} clustered=${clusteredLocalScore.breakdown.assetVariety}`);
 
-const stats={};
+const decorInsideBlock=(map,pad=16)=>map.decorations.filter(d=>map.blocks.some(block=>d.x>=block.bounds.x-pad&&d.x<=block.bounds.x+block.bounds.w+pad&&d.y>=block.bounds.y-pad&&d.y<=block.bounds.y+block.bounds.h+pad));
+assert.equal(decorInsideBlock(a).length,0,'fixed-seed Royal Capital must keep decoration anchors outside buildable blocks');
+
+const stats={};let totalBlockRejects=0,totalBlockOverlaps=0;
 for(const [id,recipe] of Object.entries(MAP_FORGE_RECIPES)){
-  const scores=[],times=[];let valid=0,min=Infinity,max=-Infinity;
+  const scores=[],times=[];let valid=0,min=Infinity,max=-Infinity,blockRejects=0,blockOverlaps=0;
   for(let seed=1;seed<=100;seed++){
     const t0=performance.now();
     const map=generateMapCandidate(recipe,{seed,assetCatalogVersion:'ci-catalog'});
     times.push(performance.now()-t0);
     if(map.validation.valid)valid++;
     scores.push(map.quality.total);min=Math.min(min,map.quality.total);max=Math.max(max,map.quality.total);
+    blockRejects+=map.generationStats.decorationBlockRejects||0;
+    blockOverlaps+=decorInsideBlock(map).length;
   }
+  totalBlockRejects+=blockRejects;totalBlockOverlaps+=blockOverlaps;
   scores.sort((x,y)=>x-y);
-  stats[id]={validRate:valid/100,avgScore:+(scores.reduce((s,x)=>s+x,0)/100).toFixed(2),medianScore:+scores[49].toFixed(2),minScore:+min.toFixed(2),bestScore:+max.toFixed(2),avgGenerationMs:+(times.reduce((s,x)=>s+x,0)/100).toFixed(2)};
+  stats[id]={validRate:valid/100,avgScore:+(scores.reduce((s,x)=>s+x,0)/100).toFixed(2),medianScore:+scores[49].toFixed(2),minScore:+min.toFixed(2),bestScore:+max.toFixed(2),avgGenerationMs:+(times.reduce((s,x)=>s+x,0)/100).toFixed(2),decorationBlockRejects:blockRejects,decorationBlockOverlaps:blockOverlaps};
   assert.ok(valid>=99,`${id} valid rate ${valid}/100 is below 99%`);
   assert.ok(max-min>.5,`${id} scorer must distinguish candidate quality; range=${(max-min).toFixed(2)}`);
+  assert.equal(blockOverlaps,0,`${id} generated decorations must stay outside block envelopes`);
 }
-console.log(JSON.stringify({ok:true,generator:'map-forge-core-v1',royalCapital:{seed:a.metadata.seed,layoutHash:a.metadata.layoutHash,score:a.quality.total,roads:a.roads.length,loops:a.generationStats.roadLoops,parcels:a.parcels.length,decorations:a.decorations.length},qualityRegressions:{invalidCap:disconnectedScore.total,visualSpamCap:noisyScore.total,semanticLandmarkCap:semanticScore.total,localVarietyMixed:mixedLocalScore.breakdown.assetVariety,localVarietyClustered:clusteredLocalScore.breakdown.assetVariety,localVarietyDelta},bestOf8:{score:best.best.quality.total,seed:best.best.metadata.seed,layoutHash:best.best.metadata.layoutHash},stats},null,2));
+assert.ok(totalBlockRejects>0,'fixed-seed fuzz must exercise the decoration-vs-block collision guard');
+assert.equal(totalBlockOverlaps,0,'300 fixed-seed maps must have zero decoration anchors inside block envelopes');
+console.log(JSON.stringify({ok:true,generator:'map-forge-core-v1',royalCapital:{seed:a.metadata.seed,layoutHash:a.metadata.layoutHash,score:a.quality.total,roads:a.roads.length,loops:a.generationStats.roadLoops,parcels:a.parcels.length,decorations:a.decorations.length,decorationBlockRejects:a.generationStats.decorationBlockRejects||0},qualityRegressions:{invalidCap:disconnectedScore.total,visualSpamCap:noisyScore.total,semanticLandmarkCap:semanticScore.total,localVarietyMixed:mixedLocalScore.breakdown.assetVariety,localVarietyClustered:clusteredLocalScore.breakdown.assetVariety,localVarietyDelta},placementRegression:{decorationBlockRejects:totalBlockRejects,decorationBlockOverlaps:totalBlockOverlaps},bestOf8:{score:best.best.quality.total,seed:best.best.metadata.seed,layoutHash:best.best.metadata.layoutHash},stats},null,2));
