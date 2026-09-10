@@ -8,7 +8,7 @@
 (function (root) {
   'use strict';
 
-  const VERSION = 'melee-combat-visuals-v1.3.0-reaction-hierarchy';
+  const VERSION = 'melee-combat-visuals-v1.3.1-finisher-reaction-refine';
   const manifest = root.KELO_MELEE_VISUAL_MANIFEST;
   const bus = root.KeloVisualEventBus;
   const contextApi = root.KeloVisualContext;
@@ -22,7 +22,7 @@
   const COMBO_STYLES = Object.freeze({
     1: Object.freeze({ id: 'opener', impactAtMs: 90, slashScale: 0.96, sequenceSpeed: 1.0, reactionSpeed: 1.06, reactionScale: 1.00, heavyImpact: false }),
     2: Object.freeze({ id: 'follow', impactAtMs: 78, slashScale: 1.06, sequenceSpeed: 1.15, reactionSpeed: 1.0, reactionScale: 1.10, heavyImpact: false }),
-    3: Object.freeze({ id: 'finisher', impactAtMs: 118, slashScale: 1.28, sequenceSpeed: 0.78, reactionSpeed: 0.82, reactionScale: 1.35, heavyImpact: true })
+    3: Object.freeze({ id: 'finisher', impactAtMs: 118, slashScale: 1.28, sequenceSpeed: 0.78, reactionSpeed: 0.82, reactionScale: 1.45, heavyImpact: true })
   });
   const PROFILE_TO_STAGE = Object.freeze({
     sword_light_basic: 1,
@@ -55,7 +55,7 @@
     directionCount: 8,
     comboStages: 3,
     comboFeelProfile: 'opener-follow-finisher',
-    reactionHierarchy: Object.freeze({ opener: 1.00, follow: 1.10, finisher: 1.35 })
+    reactionHierarchy: Object.freeze({ opener: 1.00, follow: 1.10, finisher: 1.45 })
   });
 
   function nowMs() {
