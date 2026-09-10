@@ -21,6 +21,7 @@ import { createStudioOverlayRenderer } from './render/studio-overlay-renderer.mj
 import { createStudioAssetPreviewService } from './render/studio-asset-preview-service.mjs';
 import { createStudioMenuMinimizer } from './ui/studio-menu-minimizer.mjs';
 import { createStudioCleanWorkspace } from './ui/studio-clean-workspace.mjs';
+import { createStudioContextInspector } from './ui/studio-context-inspector.mjs';
 
 let session = null;
 export async function bootKeloStudio({ mode = 'world', actorId = null, document = null, root = globalThis } = {}) {
@@ -34,16 +35,17 @@ export async function bootKeloStudio({ mode = 'world', actorId = null, document 
   const overlayRenderer = createStudioOverlayRenderer({ kernel, tools, assetPreview });
   const menuMinimizer=createStudioMenuMinimizer({root});
   const cleanWorkspace=createStudioCleanWorkspace({root,kernel});
+  const contextInspector=createStudioContextInspector({root,kernel,tools});
   const resolvePrefab = id => kernel.prefabs.resolve(id) || adapter.assetCatalog.get(id) || { id };
   const compiler = createWorldCompiler({ resolvePrefab });
   const worker = createStudioWorkerClient({ resolvePrefab, prefabSnapshot: () => Object.fromEntries(kernel.prefabs.list().map(p => [p.id, kernel.prefabs.resolve(p.id)])) });
   const store = createStudioStore(), profiler = createStudioProfiler();
   const unsubscribeJournal = kernel.commands.on(event => { store.appendCommand(kernel.document.worldId, { action: event.type, command: event.command }).catch(() => {}); });
-  session = Object.freeze({ version: 'kelo-studio-foundation-v1.7.0', mode, actorId, kernel, tools, overlayRenderer, assetPreview, menuMinimizer, cleanWorkspace, compiler, worker, store, profiler, adapter,
+  session = Object.freeze({ version: 'kelo-studio-foundation-v1.8.0', mode, actorId, kernel, tools, overlayRenderer, assetPreview, menuMinimizer, cleanWorkspace, contextInspector, compiler, worker, store, profiler, adapter,
     compile: options => profiler.measure('compile.sync', () => compiler.compile(kernel.document, options)), compileAsync: options => profiler.measure('compile.worker', () => worker.compile(kernel.document, options)),
     async importCurrent(options={}) { const next=await profiler.measure('import.current',()=>importCurrentKeloWorld({adapter,mode,actorId,...options})); kernel.setDocument(next); seedCatalogPrefabs({prefabRegistry:kernel.prefabs,assetCatalog:adapter.assetCatalog}); return next; },
     checkpoint: () => store.saveCheckpoint(kernel.document.worldId,kernel.document), recover: () => store.loadRecovery(kernel.document.worldId),
-    close(){unsubscribeJournal();cleanWorkspace.destroy();menuMinimizer.destroy();worker.close();profiler.close();assetPreview.close();store.close().catch(()=>{});session=null;}
+    close(){unsubscribeJournal();contextInspector.destroy();cleanWorkspace.destroy();menuMinimizer.destroy();worker.close();profiler.close();assetPreview.close();store.close().catch(()=>{});session=null;}
   });
   return session;
 }
