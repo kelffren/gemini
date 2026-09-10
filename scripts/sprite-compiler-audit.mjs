@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import {estimateCornerBackground,cleanBackgroundPixels,analyzeGridCells,planFrameNormalization,buildRepairReport} from '../src/creators/sprite-compiler/sprite-compiler-core.mjs';
+const W=40,H=40,COLS=2,ROWS=2,data=new Uint8ClampedArray(W*H*4);for(let i=0;i<data.length;i+=4){data[i]=248;data[i+1]=248;data[i+2]=248;data[i+3]=255;}
+const rect=(x0,y0,x1,y1,r=30,g=40,b=50)=>{for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){const i=(y*W+x)*4;data[i]=r;data[i+1]=g;data[i+2]=b;data[i+3]=255;}};rect(3,4,12,17);rect(24,2,35,18);rect(1,24,13,38);rect(25,23,37,37);
+const bg=estimateCornerBackground(data,W,H,{patch:0});assert.ok(bg&&bg.r>240);const cleaned=cleanBackgroundPixels(data,W,H,{background:'auto',colorThreshold:20,softEdge:0});assert.equal(cleaned.mode,'solid-corner');assert.ok(cleaned.removed>800);
+const frames=analyzeGridCells(cleaned.data,W,H,{columns:COLS,rows:ROWS});assert.equal(frames.length,4);assert.equal(frames.filter(f=>f.bounds).length,4);assert.equal(frames.filter(f=>f.clipped).length,0);
+const plan=planFrameNormalization(frames,{targetWidth:32,targetHeight:32,padding:3,maxUpscale:4});assert.equal(plan.frames.length,4);const feet=new Set(plan.frames.map(f=>f.destination.feetY));assert.equal(feet.size,1);
+const fakeOutput=plan.frames.map(f=>Object.freeze({...f,clipped:false}));const report=buildRepairReport({sourceFrames:frames,outputFrames:fakeOutput,plan,backgroundCleanup:cleaned});assert.equal(report.pass,true);assert.equal(report.feetSpread,0);assert.equal(report.clippedAfter,0);
+const alpha=new Uint8ClampedArray(8*8*4);for(let y=2;y<7;y++)for(let x=2;x<6;x++){const i=(y*8+x)*4;alpha[i]=255;alpha[i+3]=255;}assert.equal(estimateCornerBackground(alpha,8,8,{patch:0}),null);const alphaClean=cleanBackgroundPixels(alpha,8,8);assert.equal(alphaClean.mode,'alpha');assert.equal(alphaClean.removed,0);
+console.log(JSON.stringify({ok:true,frames:report.frameCount,clippedBefore:report.clippedBefore,clippedAfter:report.clippedAfter,feetSpread:report.feetSpread,backgroundPixelsRemoved:report.backgroundPixelsRemoved,commonScale:Number(report.commonScale.toFixed(3))}));
