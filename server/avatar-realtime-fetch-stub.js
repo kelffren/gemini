@@ -1,4 +1,11 @@
-/* test-only fetch stub for avatar realtime smoke */
+/* KELO-INDEX
+ * area: TEST / AVATAR REALTIME
+ * owner: Avatar realtime contract proof
+ * keys: SUPABASE FETCH STUB AUTH CHARACTER AVATAR
+ * purpose: deterministic Supabase transport stub for authoritative avatar sync smoke tests
+ * online: test-only; production keeps Supabase/Auth and Kelo server authority unchanged
+ * do-not: NO production network changes, NO secrets, NO runtime authority
+ */
 'use strict';
 const userByToken={tokenA:'11111111-1111-4111-8111-111111111111',tokenB:'22222222-2222-4222-8222-222222222222'};
 const charByUser={'11111111-1111-4111-8111-111111111111':'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','22222222-2222-4222-8222-222222222222':'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'};
