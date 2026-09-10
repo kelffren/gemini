@@ -7,10 +7,11 @@
  * do-not: NO gameplay writes, NO production state
  */
 import { createRequire } from 'node:module';
+import fs from 'node:fs';
 const require=createRequire(import.meta.url);
 const data=require('../src/abilities/abilityData.js');
 const timeline=require('../src/abilities/ability-action-timeline.js');
-const SPEED=185.28, BASELINE=.56, CANDIDATE_A=.74, CANDIDATE_B=.80;
+const SPEED=185.28, BASELINE=.56, CANDIDATE_A=.74, CANDIDATE_B=.80, WINNER=CANDIDATE_B;
 const src=(data.ABILITIES||[]).find(x=>x.key==='ice_wall');
 if(!src) throw new Error('ICE_WALL_MISSING');
 function def(scale){return {...src,action:{...src.action,movementScale:{windup:BASELINE,active:BASELINE,recovery:scale}}};}
@@ -40,6 +41,10 @@ for(let i=0;i<3;i++){
 }
 if(spread(b)>=2) throw new Error('CANDIDATE_B_REFRESH_SPREAD');
 const current=timeline.normalize(src).movementScale;
-const result={ok:true,baseline:BASELINE,candidateA:CANDIDATE_A,candidateB:CANDIDATE_B,currentProduction:current,rows,refreshSpreadPx:+spread(b).toFixed(4),verdictA:'GANA_PROVISIONAL',verdictB:'GANA'};
+if(!current||typeof current!=='object') throw new Error('ICE_WALL_PRODUCTION_POLICY_NOT_PHASE_AWARE');
+if(Math.abs(current.windup-BASELINE)>1e-9||Math.abs(current.active-BASELINE)>1e-9||Math.abs(current.recovery-WINNER)>1e-9) throw new Error('ICE_WALL_PRODUCTION_POLICY_DRIFT');
+const result={ok:true,baseline:BASELINE,candidateA:CANDIDATE_A,candidateB:CANDIDATE_B,winner:WINNER,currentProduction:current,rows,refreshSpreadPx:+spread(b).toFixed(4),verdictA:'GANA_PROVISIONAL',verdictB:'GANA'};
+fs.mkdirSync('audit-artifacts',{recursive:true});
+fs.writeFileSync('audit-artifacts/ice-wall-recovery-deterministic.json',JSON.stringify(result,null,2));
 console.log(JSON.stringify(result,null,2));
 console.log('ICE_WALL_RECOVERY_MOBILITY_AB_OK');
