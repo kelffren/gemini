@@ -35,7 +35,7 @@ jobs:
           node-version: 24
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 2.117.0
       - run: node --check server/online-identity-store.js
       - run: node --check scripts/online-foundation-audit.mjs
       - run: npm run audit:online-foundation
