@@ -107,11 +107,11 @@ jobs:
           grep -q "backpack-v1.1.0" src/systems/backpack-system.js
           grep -q "stacksImplemented:true" src/systems/backpack-system.js
           grep -q "splitImplemented:true" src/systems/backpack-system.js
-          grep -q "container-v1.3.0" src/systems/container-system.js
+          grep -q "container-v1.4.0" src/systems/container-system.js
           grep -q "strictDestinationCapacity:true" src/systems/container-system.js
           grep -q "warehouseImplemented:true" src/systems/container-system.js
           grep -q "marketEscrowImplemented:true" src/systems/container-system.js
-          grep -q "marketEscrowMerge:false" src/systems/container-system.js
+          grep -q "escrowMerge:false" src/systems/market-escrow-system.js
           grep -q "tradeEscrowImplemented:true" src/systems/container-system.js
           grep -q "checkpointTransactions:true" src/systems/container-system.js
           grep -q "emoteLoadoutImplemented:true" src/systems/container-system.js
