@@ -1,3 +1,10 @@
+/* KELO-INDEX
+ * area: QA / VISUAL
+ * owner: melee-presentation-bridge-audit
+ * keys: MELEE PRESENTATION BRIDGE BASIC SPECIAL SEMANTIC FAMILY HIT CONFIRMED
+ * purpose: prueba que perfiles melee registrados atraviesan la frontera combat -> presentation sin mutar gameplay
+ * online: valida el mismo payload semántico que puede reconstruirse desde autoridad servidor
+ */
 'use strict';
 const fs=require('fs');
 const path=require('path');
