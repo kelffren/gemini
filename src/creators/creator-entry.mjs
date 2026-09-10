@@ -34,7 +34,7 @@ export async function bootKeloCreators({root=globalThis,stateAdapter=null}={}){
   async function openWorkspace(id,context={}){
     const manifest=workspaces.resolve(id);if(!manifest)throw new Error(`CREATOR_WORKSPACE_NOT_FOUND:${id}`);
     if(manifest.capability)permission.require(manifest.capability,permission.actorId(),context.projectId||null);
-    return workspaces.open(id,{root,projects,permission,dependencies,openWorkspace,contentSession,contentRepository,contentService,runtimeContent,...context});
+    return workspaces.open(id,{root,projects,permission,dependencies,contentSession,contentRepository,contentService,runtimeContent,openWorkspace,...context});
   }
   platform=Object.freeze({version:'kelo-creators-core-v1.6.0',permission,projects,workspaces,dependencies,contentSession,contentRepository,contentService,runtimeContent,openWorkspace,close(){try{localState.close?.();}catch{}platform=null;}});
   return platform;
