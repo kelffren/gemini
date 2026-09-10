@@ -41,7 +41,10 @@ for(let i=0;i<3;i++){
 }
 if(spread(b)>=2) throw new Error('CANDIDATE_B_REFRESH_SPREAD');
 const current=timeline.normalize(src).movementScale;
-const result={ok:true,baseline:BASELINE,candidateA:CANDIDATE_A,candidateB:CANDIDATE_B,currentProduction:current,rows,refreshSpreadPx:+spread(b).toFixed(4)};
+if(Math.abs(current.windup-BASELINE)>1e-9||Math.abs(current.active-BASELINE)>1e-9||Math.abs(current.recovery-CANDIDATE_B)>1e-9){
+  throw new Error(`STONE_SHIELD_PRODUCTION_WINNER_DRIFT:${JSON.stringify(current)}`);
+}
+const result={ok:true,baseline:BASELINE,candidateA:CANDIDATE_A,candidateB:CANDIDATE_B,verdictA:'GANA_PROVISIONAL',verdictB:'GANA',currentProduction:current,rows,refreshSpreadPx:+spread(b).toFixed(4)};
 fs.mkdirSync('audit-artifacts',{recursive:true});
 fs.writeFileSync('audit-artifacts/stone-shield-recovery-deterministic.json',JSON.stringify(result,null,2));
 console.log(JSON.stringify(result,null,2));
