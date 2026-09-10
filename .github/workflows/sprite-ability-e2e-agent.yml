@@ -1,0 +1,74 @@
+# KELO-INDEX
+# area: CI / CREATORS / SPRITE ABILITY E2E
+# keys: AUTONOMOUS AGENT MOBILE AUTOFIT MINIMIZE RUNTIME AVATAR GENERATED ABILITY HARD FAIL
+# purpose: binary acceptance gate for upload → preview → minimize → generate → live actor animation → open ability
+name: Sprite Ability Autonomous E2E Agent
+on:
+  pull_request:
+    paths:
+      - 'src/creators/sprite-ability/**'
+      - 'src/creators/animation/**'
+      - 'src/creators/workspaces/sprite-ability-workspace.mjs'
+      - 'src/studio/ui/studio-workspace-shell.mjs'
+      - 'src/visuals/animation-system.js'
+      - 'src/visuals/asset-registry.js'
+      - 'src/visuals/spritesheet-avatar-bridge.js'
+      - 'src/core/avatar-render-system.js'
+      - 'scripts/sprite-ability-e2e-agent.mjs'
+      - '.github/workflows/sprite-ability-e2e-agent.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'src/creators/sprite-ability/**'
+      - 'src/creators/animation/**'
+      - 'src/creators/workspaces/sprite-ability-workspace.mjs'
+      - 'src/studio/ui/studio-workspace-shell.mjs'
+      - 'src/visuals/animation-system.js'
+      - 'src/visuals/asset-registry.js'
+      - 'src/visuals/spritesheet-avatar-bridge.js'
+      - 'src/core/avatar-render-system.js'
+      - 'scripts/sprite-ability-e2e-agent.mjs'
+      - '.github/workflows/sprite-ability-e2e-agent.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: sprite-ability-autonomous-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  strict-mobile-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Syntax hard gate
+        run: |
+          node --check src/creators/sprite-ability/sprite-ability-live-controller.mjs
+          node --check src/creators/sprite-ability/sprite-ability-runtime-extension.mjs
+          node --check src/creators/workspaces/sprite-ability-workspace.mjs
+          node --check src/visuals/spritesheet-avatar-bridge.js
+          node --check scripts/sprite-ability-e2e-agent.mjs
+      - name: Install Playwright
+        run: npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund playwright@1.55.0
+      - name: Serve exact candidate
+        run: |
+          python3 -m http.server 8000 --bind 127.0.0.1 >/tmp/sprite-e2e-http.log 2>&1 &
+          for i in {1..20}; do curl -fsS http://127.0.0.1:8000/index.html >/dev/null && exit 0; sleep 1; done
+          cat /tmp/sprite-e2e-http.log
+          exit 1
+      - name: Complete autonomous authoring and runtime proof
+        env:
+          AUDIT_URL: http://127.0.0.1:8000/
+          CHROME_BIN: /usr/bin/google-chrome
+        run: node scripts/sprite-ability-e2e-agent.mjs
+      - name: Upload mandatory evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sprite-ability-autonomous-e2e-evidence
+          path: artifacts/sprite-ability-e2e/
+          if-no-files-found: error
+          retention-days: 14
