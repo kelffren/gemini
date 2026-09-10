@@ -84,7 +84,7 @@ jobs:
         run: node scripts/melee-visuals-audit.js
       - name: Online-first guardrails
         run: |
-          grep -q "visualProfileId: 'ability_visual_fireball_01'" src/abilities/abilityData.js
+          grep -Eq "visualProfileId:[[:space:]]*'ability_visual_fireball_01'" src/abilities/abilityData.js
           grep -q "fire_explosion_medium" src/visuals/visual-manifests.js
           grep -q "sequence_debug_explosion_reuse" src/visuals/visual-manifests.js
           grep -q "impact_melee_light" src/visuals/visual-manifests.js
