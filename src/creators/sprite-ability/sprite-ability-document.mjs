@@ -44,6 +44,8 @@ export function normalizeSpriteAbilityDocument(input={}){
       imageWidth:Math.max(0,Math.round(finite(sheet.imageWidth,0))),imageHeight:Math.max(0,Math.round(finite(sheet.imageHeight,0))),
       frameWidth,frameHeight,columns,rows,startFrame,endFrame,fps,loop:sheet.loop===true,
       scale:clamp(finite(sheet.scale,1),.1,6),offsetX:finite(sheet.offsetX,0),offsetY:finite(sheet.offsetY,0),
+      spacingX:Math.max(0,Math.round(finite(sheet.spacingX,0))),spacingY:Math.max(0,Math.round(finite(sheet.spacingY,0))),
+      originX:clamp(finite(sheet.originX,.5),0,1),originY:clamp(finite(sheet.originY,1),0,1),
       autoFit:{
         applied:autoFit.applied===true,
         sourceWidth:Math.max(0,Math.round(finite(autoFit.sourceWidth,0))),sourceHeight:Math.max(0,Math.round(finite(autoFit.sourceHeight,0))),
@@ -73,7 +75,25 @@ export function normalizeSpriteAbilityDocument(input={}){
 
 export function frameRect(document,index){
   const d=normalizeSpriteAbilityDocument(document),i=clamp(Math.round(finite(index,d.sheet.startFrame)),0,d.sheet.columns*d.sheet.rows-1);
-  return Object.freeze({sx:(i%d.sheet.columns)*d.sheet.frameWidth,sy:Math.floor(i/d.sheet.columns)*d.sheet.frameHeight,sw:d.sheet.frameWidth,sh:d.sheet.frameHeight});
+  const col=i%d.sheet.columns,row=Math.floor(i/d.sheet.columns);
+  return Object.freeze({
+    sx:col*(d.sheet.frameWidth+d.sheet.spacingX),
+    sy:row*(d.sheet.frameHeight+d.sheet.spacingY),
+    sw:d.sheet.frameWidth,sh:d.sheet.frameHeight
+  });
+}
+
+export function addAnimationEvent(document,type,frame,payload){
+  const d=normalizeSpriteAbilityDocument(document);
+  const next=normalizeEvent({type,frame:frame==null?d.combat.impactFrame:frame,payload},d.sheet.startFrame,d.sheet.endFrame);
+  if(next.type==='IMPACT')return normalizeSpriteAbilityDocument({...d,combat:{...d.combat,impactFrame:next.frame}});
+  const events=d.events.filter(e=>!(e.type===next.type&&e.frame===next.frame)).concat(next);
+  return normalizeSpriteAbilityDocument({...d,events});
+}
+
+export function removeAnimationEvent(document,id){
+  const d=normalizeSpriteAbilityDocument(document);
+  return normalizeSpriteAbilityDocument({...d,events:d.events.filter(e=>e.id!==id||e.type==='IMPACT')});
 }
 
 export function spriteAbilityTiming(document){
