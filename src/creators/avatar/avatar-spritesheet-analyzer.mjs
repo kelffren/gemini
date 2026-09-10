@@ -1,12 +1,12 @@
 /* KELO-INDEX
  * area: CREATORS / AVATAR
  * owner: Avatar Auto-Detect analyzer/compiler
- * keys: AVATAR AUTODETECT GRID SEGMENT BACKGROUND NORMALIZE PREVIEW V3
- * purpose: el jugador solo sube el spritesheet; detecta grid, fondo, frames y orientación, valida todos los frames y normaliza por pies
+ * keys: AVATAR AUTODETECT GRID SEGMENT BACKGROUND NORMALIZE PREVIEW V4 ADAPTIVE-CUTS BLEED-GUARD
+ * purpose: el jugador solo sube el spritesheet; detecta grid, gutters reales, fondo, frames y orientación, elimina bleed entre celdas y normaliza por pies
  * public-api: analyzeAvatarSpriteSheet(file), compileAvatarRuntime(file,config)
  * consumes: browser image decode + Canvas only
  * state-owned: ninguno; análisis puro por archivo
- * extension-points: grid candidates / direction heuristics / frame health
+ * extension-points: grid candidates / adaptive separators / direction heuristics / frame health
  * online: N/A; la persistencia sigue en Avatar Quick Import service
  * do-not: no persistir, no seleccionar personaje, no crear renderer paralelo
  */
@@ -98,6 +98,34 @@ function componentGrid(mask,width,height,components,sourceW,sourceH){
   if(columns<1||rows<1||columns>8||rows>8||columns*rows>48)return null;
   return{columns,rows,score:clamp(.62+.19*regularity(xs)+.19*regularity(ys),0,1),rects:equalRects(columns,rows,sourceW,sourceH),bounds:{x:0,y:0,w:sourceW,h:sourceH},mode:'components'};
 }
+
+function projection(mask,width,height,axis){
+  const len=axis==='x'?width:height,out=new Float32Array(len);
+  if(axis==='x')for(let x=0;x<width;x++){let n=0;for(let y=0;y<height;y++)n+=mask[y*width+x];out[x]=n/Math.max(1,height);}
+  else for(let y=0;y<height;y++){let n=0;for(let x=0;x<width;x++)n+=mask[y*width+x];out[y]=n/Math.max(1,width);}
+  const smoothed=new Float32Array(len),radius=Math.max(1,Math.round(len/180));
+  for(let i=0;i<len;i++){let s=0,c=0;for(let j=Math.max(0,i-radius);j<=Math.min(len-1,i+radius);j++){s+=out[j];c++;}smoothed[i]=s/Math.max(1,c);}return smoothed;
+}
+function adaptiveCuts(mask,width,height,count,axis){
+  const len=axis==='x'?width:height;if(count<=1)return[0,len];const density=projection(mask,width,height,axis),cell=len/count,cuts=[0];
+  for(let i=1;i<count;i++){
+    const expected=i*cell,lo=Math.max(cuts[cuts.length-1]+cell*.34,expected-cell*.30),hi=Math.min(len-(count-i)*cell*.34,expected+cell*.30);let best=Math.round(expected),bestScore=Infinity;
+    for(let p=Math.ceil(lo);p<=Math.floor(hi);p++){
+      const proximity=Math.abs(p-expected)/cell,score=density[p]+proximity*.035;
+      if(score<bestScore){best=p;bestScore=score;}
+    }
+    cuts.push(clamp(best,cuts[cuts.length-1]+2,len-2));
+  }
+  cuts.push(len);return cuts;
+}
+function adaptiveRects(mask,width,height,columns,rows,sourceW,sourceH){
+  const xs=adaptiveCuts(mask,width,height,columns,'x'),ys=adaptiveCuts(mask,width,height,rows,'y'),sx=sourceW/width,sy=sourceH/height,out=[];
+  for(let y=0;y<rows;y++)for(let x=0;x<columns;x++){
+    const x0=xs[x]*sx,y0=ys[y]*sy,x1=xs[x+1]*sx,y1=ys[y+1]*sy;
+    out.push({x:x0,y:y0,w:Math.max(1,x1-x0),h:Math.max(1,y1-y0),fallback:false});
+  }
+  return{rects:out,xCuts:xs,yCuts:ys};
+}
 function rectStats(mask,width,height,x0,y0,x1,y1){
   x0=Math.max(0,Math.floor(x0));y0=Math.max(0,Math.floor(y0));x1=Math.min(width,Math.ceil(x1));y1=Math.min(height,Math.ceil(y1));
   let area=0,minX=x1,minY=y1,maxX=x0-1,maxY=y0-1;const localW=x1-x0,localH=y1-y0;
@@ -128,7 +156,8 @@ function chooseGrid(mask,width,height,sourceW,sourceH,legacy){
   candidates.sort((a,b)=>b.score-a.score||Math.abs(a.columns-a.rows)-Math.abs(b.columns-b.rows));
   let best=candidates[0];
   if(!best||best.score<.56){const ratio=sourceW/sourceH,basic=ratio>.74&&ratio<1.34?{columns:4,rows:4}:{columns:1,rows:1};best={...basic,score:.52,occupancy:.5,consistency:.5,bottomConsistency:.5,healthySpan:.5,edgeSafe:.5,medianFill:.2,stats:[]};}
-  return{...best,rects:equalRects(best.columns,best.rows,sourceW,sourceH),mode:'components',candidates:candidates.slice(0,5)};
+  const adaptive=adaptiveRects(mask,width,height,best.columns,best.rows,sourceW,sourceH);
+  return{...best,rects:adaptive.rects,mode:'components',candidates:candidates.slice(0,5),xCuts:adaptive.xCuts,yCuts:adaptive.yCuts};
 }
 function sampleMaskInRect(mask,width,height,rect,sourceW,sourceH,outSize=64){
   const out=new Uint8Array(outSize*outSize),sx=width/sourceW,sy=height/sourceH;
@@ -167,7 +196,7 @@ export async function analyzeAvatarSpriteSheet(file,{root=globalThis}={}){
   const scale=Math.min(1,PROBE_MAX/Math.max(width,height)),pw=Math.max(1,Math.round(width*scale)),ph=Math.max(1,Math.round(height*scale)),probe=canvasFor(root,pw,ph),ctx=probe.getContext('2d',{willReadFrequently:true});ctx.imageSmoothingEnabled=true;ctx.drawImage(bitmap,0,0,pw,ph);bitmap.close?.();
   const image=ctx.getImageData(0,0,pw,ph),background=borderModel(image,pw,ph),mask=foregroundMask(image,pw,ph,background,root),components=connectedComponents(mask,pw,ph),legacy=componentGrid(mask,pw,ph,components,width,height),grid=chooseGrid(mask,pw,ph,width,height,legacy),directions=inferDirections(mask,pw,ph,grid,width,height,image);
   const q=scoreGrid(mask,pw,ph,grid.columns,grid.rows,legacy)||{consistency:.5,occupancy:.5,healthySpan:.5,edgeSafe:.5,bottomConsistency:.5},frameHealth=clamp(.32*q.consistency+.22*q.occupancy+.18*q.healthySpan+.14*q.edgeSafe+.14*q.bottomConsistency,0,1),confidenceScore=clamp(.54*grid.score+.38*frameHealth+.08*(background.uniform?1:.55),.35,.98);
-  const sourceRects=grid.rects,analysis=Object.freeze({version:'avatar-auto-detect-v3.0.0',width,height,columns:grid.columns,rows:grid.rows,rowMap:Object.freeze(directions.rowMap),directionConfidence:directions.confidence,directionMode:directions.mode,detectionMode:'components',confidenceScore,autoCrop:grid.columns*grid.rows>1,removeBackground:background.kind==='color'&&background.uniform,backgroundKind:background.kind,backgroundRgb:Object.freeze([...background.rgb]),backgroundThreshold:background.threshold,backgroundUniform:background.uniform,sourceRects:Object.freeze(sourceRects.map(r=>Object.freeze({...r}))),contentBounds:Object.freeze(contentBounds(sourceRects)),frameHealth,gridCandidates:Object.freeze((grid.candidates||[]).map(c=>Object.freeze({columns:c.columns,rows:c.rows,score:c.score}))),frameMs:140});
+  const sourceRects=grid.rects,analysis=Object.freeze({version:'avatar-auto-detect-v4.0.0',width,height,columns:grid.columns,rows:grid.rows,rowMap:Object.freeze(directions.rowMap),directionConfidence:directions.confidence,directionMode:directions.mode,detectionMode:'components',confidenceScore,autoCrop:grid.columns*grid.rows>1,removeBackground:background.kind==='color'&&background.uniform,backgroundKind:background.kind,backgroundRgb:Object.freeze([...background.rgb]),backgroundThreshold:background.threshold,backgroundUniform:background.uniform,sourceRects:Object.freeze(sourceRects.map(r=>Object.freeze({...r}))),contentBounds:Object.freeze(contentBounds(sourceRects)),frameHealth,gridCandidates:Object.freeze((grid.candidates||[]).map(c=>Object.freeze({columns:c.columns,rows:c.rows,score:c.score}))),adaptiveCuts:Object.freeze({x:Object.freeze([...(grid.xCuts||[])]),y:Object.freeze([...(grid.yCuts||[])])}),frameMs:140});
   return analysis;
 }
 
@@ -175,13 +204,34 @@ function alphaBounds(image,width,height){
   const d=image.data;let area=0,minX=width,minY=height,maxX=-1,maxY=-1;for(let y=0;y<height;y++)for(let x=0;x<width;x++){const i=(y*width+x)*4;if(d[i+3]<=18)continue;area++;minX=Math.min(minX,x);minY=Math.min(minY,y);maxX=Math.max(maxX,x);maxY=Math.max(maxY,y);}return area?{x:minX,y:minY,w:maxX-minX+1,h:maxY-minY+1,area}:{x:0,y:0,w:width,h:height,area:0};
 }
 function paddedBounds(b,w,h){const px=Math.max(1,Math.round(b.w*.035)),py=Math.max(1,Math.round(b.h*.025)),x=clamp(b.x-px,0,w),y=clamp(b.y-py,0,h),x2=clamp(b.x+b.w+px,0,w),y2=clamp(b.y+b.h+py,0,h);return{x,y,w:Math.max(1,x2-x),h:Math.max(1,y2-y),area:b.area};}
+function alphaComponents(image,width,height){
+  const d=image.data,total=width*height,seen=new Uint8Array(total),queue=new Int32Array(total),out=[];
+  for(let start=0;start<total;start++){
+    if(seen[start]||d[start*4+3]<=18)continue;let head=0,tail=0,area=0,minX=width,minY=height,maxX=0,maxY=0;const pixels=[];seen[start]=1;queue[tail++]=start;
+    while(head<tail){const p=queue[head++],x=p%width,y=(p/width)|0;pixels.push(p);area++;minX=Math.min(minX,x);minY=Math.min(minY,y);maxX=Math.max(maxX,x);maxY=Math.max(maxY,y);
+      for(let oy=-1;oy<=1;oy++)for(let ox=-1;ox<=1;ox++){if(!ox&&!oy)continue;const nx=x+ox,ny=y+oy;if(nx<0||ny<0||nx>=width||ny>=height)continue;const n=ny*width+nx;if(!seen[n]&&d[n*4+3]>18){seen[n]=1;queue[tail++]=n;}}
+    }
+    out.push({area,x:minX,y:minY,w:maxX-minX+1,h:maxY-minY+1,pixels});
+  }
+  return out.sort((a,b)=>b.area-a.area);
+}
+function stripDetachedEdgeBleed(image,width,height){
+  const comps=alphaComponents(image,width,height);if(comps.length<2)return 0;const main=comps[0],mainX0=main.x,mainX1=main.x+main.w,mainY0=main.y,mainY1=main.y+main.h,d=image.data;let removed=0;
+  for(const c of comps.slice(1)){
+    const small=c.area<main.area*.24,top=c.y+c.h<=height*.19,bottom=c.y>=height*.81,left=c.x+c.w<=width*.16,right=c.x>=width*.84;
+    const vGap=Math.max(mainY0-(c.y+c.h),c.y-mainY1,0),hGap=Math.max(mainX0-(c.x+c.w),c.x-mainX1,0),detached=(top||bottom)?vGap>height*.025:(left||right)?hGap>width*.025:false;
+    if(!small||!detached||!(top||bottom||left||right))continue;
+    for(const p of c.pixels)d[p*4+3]=0;removed+=c.area;
+  }
+  return removed;
+}
 function renderSourceFrame(sourceCanvas,r,frameW,frameH,removeBackground,bg,threshold,root){
   const c=canvasFor(root,frameW,frameH),ctx=c.getContext('2d',{willReadFrequently:true});ctx.clearRect(0,0,frameW,frameH);ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(sourceCanvas,r.x,r.y,r.w,r.h,0,0,frameW,frameH);
-  if(removeBackground){const im=ctx.getImageData(0,0,frameW,frameH);removeConnectedBackground(im,frameW,frameH,bg,threshold);ctx.putImageData(im,0,0);}return c;
+  const im=ctx.getImageData(0,0,frameW,frameH);if(removeBackground)removeConnectedBackground(im,frameW,frameH,bg,threshold);stripDetachedEdgeBleed(im,frameW,frameH);ctx.putImageData(im,0,0);return c;
 }
 function validateFrames(frames){
   const useful=frames.filter(f=>f.bounds.area>0),medH=median(useful.map(f=>f.bounds.h)),medA=median(useful.map(f=>f.bounds.area)),medW=median(useful.map(f=>f.bounds.w));
-  for(const f of frames){f.suspicious=!f.bounds.area||f.bounds.h<medH*.70||f.bounds.area<medA*.52||f.bounds.w<medW*.48;}
+  for(const f of frames){f.suspicious=!f.bounds.area||f.bounds.h<medH*.70||f.bounds.area<medA*.52||f.bounds.w<medW*.48||f.bounds.h>medH*1.34;}
   const healthy=frames.filter(f=>!f.suspicious).length/Math.max(1,frames.length);return{medH,medA,medW,healthy};
 }
 async function normalizeRuntime(sourceCanvas,config,{root}){
@@ -192,7 +242,7 @@ async function normalizeRuntime(sourceCanvas,config,{root}){
   const frames=sourceRects.map(r=>{const canvas=renderSourceFrame(sourceCanvas,r,frameW,frameH,removeBackground,bg,threshold,root),im=canvas.getContext('2d',{willReadFrequently:true}).getImageData(0,0,frameW,frameH);return{canvas,bounds:paddedBounds(alphaBounds(im,frameW,frameH),frameW,frameH),r,suspicious:false};});
   let validation=validateFrames(frames);
   if(removeBackground&&validation.healthy<1){
-    for(const f of frames.filter(x=>x.suspicious)){const repaired=renderSourceFrame(sourceCanvas,f.r,frameW,frameH,true,bg,Math.max(30,threshold*.58),root),im=repaired.getContext('2d',{willReadFrequently:true}).getImageData(0,0,frameW,frameH),b=paddedBounds(alphaBounds(im,frameW,frameH),frameW,frameH);if(b.h>=validation.medH*.70&&b.area>=validation.medA*.52){f.canvas=repaired;f.bounds=b;f.suspicious=false;}}
+    for(const f of frames.filter(x=>x.suspicious)){const repaired=renderSourceFrame(sourceCanvas,f.r,frameW,frameH,true,bg,Math.max(30,threshold*.58),root),im=repaired.getContext('2d',{willReadFrequently:true}).getImageData(0,0,frameW,frameH),b=paddedBounds(alphaBounds(im,frameW,frameH),frameW,frameH);if(b.h>=validation.medH*.70&&b.h<=validation.medH*1.34&&b.area>=validation.medA*.52){f.canvas=repaired;f.bounds=b;f.suspicious=false;}}
     validation=validateFrames(frames);
   }
   const good=frames.filter(f=>!f.suspicious),maxW=Math.max(1,...good.map(f=>f.bounds.w)),maxH=Math.max(1,...good.map(f=>f.bounds.h)),commonScale=clamp(Math.min(frameW*.90/maxW,frameH*.90/maxH),.55,1.35),out=canvasFor(root,runtimeW,runtimeH),octx=out.getContext('2d');octx.imageSmoothingEnabled=true;octx.imageSmoothingQuality='high';
@@ -211,3 +261,4 @@ export async function compileAvatarRuntime(file,config,{root=globalThis}={}){
 }
 
 export const __avatarAutoDetectV3=Object.freeze({connectedComponents,componentGrid,clusterAxis,inferDirections,removeConnectedBackground,normalizeRuntime});
+export const __avatarAutoDetectV4=Object.freeze({connectedComponents,componentGrid,clusterAxis,adaptiveCuts,adaptiveRects,inferDirections,removeConnectedBackground,stripDetachedEdgeBleed,normalizeRuntime});
