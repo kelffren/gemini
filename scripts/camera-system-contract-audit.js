@@ -1,14 +1,14 @@
 /* KELO-INDEX
  * area: QA / CAMERA
  * owner: FOUNDATION CI
- * keys: CAMERA VIEWPORT WORLDVIEW ZOOM DPR TARGET RESTORE SCREEN WORLD ORIENTATION LIVE WRITERS CONTRACT
- * purpose: valida owner único KeloCamera, viewport world-space reusable, compatibilidad determinista y ausencia de nuevos owners paralelos en scripts LIVE
+ * keys: CAMERA VIEWPORT WORLDVIEW ZOOM DPR TARGET RESTORE SCREEN WORLD ORIENTATION LIVE WRITERS CONTRACT DEADZONE
+ * purpose: valida owner único KeloCamera, viewport world-space reusable, dead-zone screen-space estable, compatibilidad determinista y ausencia de nuevos owners paralelos en scripts LIVE
  * public-api: CLI
  * consumes: camera-system, world-map, engine-h, mobile-orientation, index.html y scripts runtime directos
  * state-owned: ninguno
  * extension-points: invariantes KeloCamera + allowlist legacy explícita y temporal
  * reuse: Foundation CI
- * legacy: engine-a conserva follow/Canvas bootstrap; engine-b es el único writer legacy directo de target tolerado temporalmente
+ * legacy: engine-a conserva follow/Canvas bootstrap; KeloCamera compensa dead-zone legacy world-space; engine-b es el único writer legacy directo de target tolerado temporalmente
  * do-not: no sustituir browser smoke de rotación/viewport
  */
 'use strict';
@@ -41,6 +41,7 @@ vm.createContext(context);
 vm.runInContext(source,context,{filename:'camera-system.js'});
 ok(context.KeloCamera&&context.KELO_CAMERA_AUDIT?.owner==='KeloCamera','OWNER_NOT_INSTALLED');
 ok(context.KeloCamera.version.startsWith('kelo-camera-v1.'),'VERSION');
+ok(context.KELO_CAMERA_AUDIT.screenSpaceDeadZone===true,'SCREEN_SPACE_DEADZONE_AUDIT');
 ok(typeof context.KeloCamera.setTarget==='function'&&typeof context.KeloCamera.restoreState==='function'&&typeof context.KeloCamera.screenToWorld==='function'&&typeof context.KeloCamera.worldToScreen==='function'&&typeof context.KeloCamera.worldView==='function','PUBLIC_API');
 context.KeloCamera.setTarget(500,600,{source:'test'});
 ok(context.camera.targetX===500&&context.camera.targetY===600,'TARGET_API');
@@ -57,6 +58,7 @@ context.KeloCamera.configureViewport({dprCap:2,pixelPerfect:true,roundPixels:tru
 context.KeloCamera.setBaseZoom(1,'test-portrait');context.KeloCamera.syncViewport('test-portrait');
 ok(context.canvas.width===780&&context.canvas.height===1688,'PORTRAIT_DPR_VIEWPORT');
 ok(Math.abs(context.KeloCamera.getEffectiveZoom()-1)<1e-9,'PORTRAIT_ZOOM');
+ok(Math.abs(context.CONFIG.deadXRatio-context.KeloCamera.getFollowTuning().deadXRatio)<1e-9&&Math.abs(context.CONFIG.deadYRatio-context.KeloCamera.getFollowTuning().deadYRatio)<1e-9,'PORTRAIT_DEADZONE_SCREEN_PARITY');
 ok(context.CONFIG.roundPixels===true&&context.ctx.imageSmoothingEnabled===false,'HD_POLICY');
 const portraitView=context.KeloCamera.worldView();
 ok(Object.isFrozen(portraitView),'WORLD_VIEW_READ_ONLY');
@@ -69,6 +71,8 @@ const portraitBase=context.KeloCamera.getBaseZoom();context.innerWidth=844;conte
 const expected=portraitBase*(390/844);
 ok(Math.abs(context.KeloCamera.getBaseZoom()-portraitBase)<1e-9,'BASE_ZOOM_STABLE_ON_ROTATE');
 ok(Math.abs(context.KeloCamera.getEffectiveZoom()-expected)<1e-9,'LANDSCAPE_EQUIVALENT_ZOOM');
+const landscapeFollow=context.KeloCamera.getFollowTuning();
+ok(Math.abs(context.CONFIG.deadXRatio*expected-landscapeFollow.deadXRatio)<1e-9&&Math.abs(context.CONFIG.deadYRatio*expected-landscapeFollow.deadYRatio)<1e-9,'LANDSCAPE_DEADZONE_SCREEN_PARITY');
 ok(context.canvas.width===1688&&context.canvas.height===780,'LANDSCAPE_DPR_VIEWPORT');
 const landscapeView=context.KeloCamera.worldView();
 ok(Math.abs(landscapeView.w-(844/expected))<1e-9&&Math.abs(landscapeView.h-(390/expected))<1e-9,'LANDSCAPE_WORLD_VIEW_SPAN');
@@ -140,4 +144,4 @@ exactWriters(/\bCONFIG\.zoom\s*=/g,['engine-c.js'],'LIVE_CAMERA_ZOOM_WRITERS');
 exactWriters(/\bcanvas\.(?:width|height)\s*=/g,['engine-a.js','src/core/camera-system.js'],'LIVE_CANVAS_SIZE_WRITERS');
 exactWriters(globalAssignment('resize'),['src/core/camera-system.js'],'LIVE_RESIZE_OWNERS');
 exactWriters(globalAssignment('cycleZoom'),['src/core/camera-system.js'],'LIVE_CYCLE_ZOOM_OWNERS');
-console.log('CAMERA_SYSTEM_OK: owner + worldView + world-map consumer + target + restore + tuning + viewport + DPR + orientation + screen/world + LIVE writer guard passed');
+console.log('CAMERA_SYSTEM_OK: owner + worldView + screen-space dead-zone + target + restore + tuning + viewport + DPR + orientation + screen/world + LIVE writer guard passed');
