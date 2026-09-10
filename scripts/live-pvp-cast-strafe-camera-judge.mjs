@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: TEST / PVP / CAMERA
- * keys: PVP CAMERA CAST STRAFE REVERSAL RECOVERY MOBILE DESKTOP PLAYWRIGHT INPUT
- * hace: reproduce cast estacionario -> recovery -> strafe contrario y mide cuánto framing residual del cast sobrevive usando el input LIVE que processInput consume
+ * keys: PVP CAMERA CAST STRAFE REVERSAL RECOVERY MOBILE DESKTOP PLAYWRIGHT INPUT RAF
+ * hace: reproduce cast estacionario -> recovery -> strafe contrario y mide framing residual frame a frame usando el key-state LIVE que processInput consume
  * online: N/A; valida presentación local sobre owners LIVE sin cambiar autoridad gameplay
  */
 import fs from 'node:fs';
@@ -33,7 +33,7 @@ async function scenario(label,viewport,hasTouch){
   await ready(page);
   await page.evaluate(()=>{
     localPlayer.x=2860; localPlayer.y=700; localPlayer.vx=0; localPlayer.vy=0;
-    if(typeof input!=='undefined'&&input){input.normX=0;input.normY=0;input.keys.a=false;input.keys.ArrowLeft=false;}
+    input.normX=0;input.normY=0;input.keys.a=false;input.keys.ArrowLeft=false;
     window.KeloInput.combat.setAxes({source:'cast-strafe-camera-audit',move:{x:0,y:0,magnitude:0}});
     window.KeloPvPWorld.setAimWorld({x:localPlayer.x+240,y:localPlayer.y},'cast-strafe-camera-audit',1);
     window.KeloAbilities.bus.emit('ABILITY_CAST',{abilityKey:'fireball',abilityId:1,actor:localPlayer,actorId:String(localPlayer.id||'local'),direction:{x:1,y:0},predicted:true});
@@ -42,33 +42,35 @@ async function scenario(label,viewport,hasTouch){
   await page.waitForTimeout(45);
   const peak=await page.evaluate(()=>window.KeloCamera.snapshot().combatFraming.stationaryActionOffsetScreenX);
   await page.waitForFunction(()=>window.KeloPvPCastMovementPrediction?.phase==='recovery',{timeout:1500});
-  const beforeMove=await page.evaluate(()=>({
-    t:performance.now(),offset:window.KeloCamera.snapshot().combatFraming.stationaryActionOffsetScreenX,
-    x:localPlayer.x,y:localPlayer.y,phase:window.KeloPvPCastMovementPrediction?.phase,
-    cameraVersion:window.KeloCamera.version
+
+  const trace=await page.evaluate(()=>new Promise(resolve=>{
+    const before={t:performance.now(),offset:window.KeloCamera.snapshot().combatFraming.stationaryActionOffsetScreenX,x:localPlayer.x,y:localPlayer.y,phase:window.KeloPvPCastMovementPrediction?.phase,cameraVersion:window.KeloCamera.version};
+    // Canonical processInput consumes this key state on the next simulation frame.
+    input.keys.ArrowLeft=true;
+    const samples=[];
+    const start=performance.now();
+    function step(){
+      const snap=window.KeloCamera.snapshot();
+      samples.push({t:performance.now(),offset:snap.combatFraming.stationaryActionOffsetScreenX,x:localPlayer.x,y:localPlayer.y,lookX:snap.lookOffsetX,intentX:snap.combatFraming.intentX,normX:input.normX});
+      if(performance.now()-start<260){requestAnimationFrame(step);return;}
+      input.keys.ArrowLeft=false;
+      resolve({before,samples});
+    }
+    requestAnimationFrame(step);
   }));
 
-  // Use the same key state consumed by legacy processInput -> KeloMovement.
-  // Directly assigning input.normX is invalid because processInput rewrites it every simulation frame.
-  await page.keyboard.down('ArrowLeft');
-  await page.waitForFunction(()=>typeof input!=='undefined'&&input.normX < -0.9,{timeout:500});
-  const accepted=await page.evaluate(()=>({t:performance.now(),normX:input.normX,normY:input.normY,x:localPlayer.x,y:localPlayer.y}));
-
-  const samples=[];
-  for(let i=0;i<16;i++){
-    samples.push(await page.evaluate(()=>({t:performance.now(),offset:window.KeloCamera.snapshot().combatFraming.stationaryActionOffsetScreenX,x:localPlayer.x,y:localPlayer.y,lookX:window.KeloCamera.snapshot().lookOffsetX,intentX:window.KeloCamera.snapshot().combatFraming.intentX,normX:input.normX})));
-    await page.waitForTimeout(16);
-  }
-  await page.keyboard.up('ArrowLeft');
-  const startT=samples[0]?.t||accepted.t;
-  const settle=samples.find(s=>Math.abs(s.offset)<=4);
-  const settleMs=settle?settle.t-startT:null;
+  const acceptedIndex=trace.samples.findIndex(s=>s.normX < -0.9);
+  const accepted=acceptedIndex>=0?trace.samples[acceptedIndex]:null;
+  const post=acceptedIndex>=0?trace.samples.slice(acceptedIndex):[];
+  const settle=post.find(s=>Math.abs(s.offset)<=4);
+  const settleMs=accepted&&settle?settle.t-accepted.t:null;
   let maxStep=0;
-  for(let i=1;i<samples.length;i++)maxStep=Math.max(maxStep,Math.abs(samples[i].offset-samples[i-1].offset));
-  const travel=Math.hypot((samples.at(-1)?.x??accepted.x)-accepted.x,(samples.at(-1)?.y??accepted.y)-accepted.y);
-  const movedLeft=(samples.at(-1)?.x??accepted.x)<accepted.x;
+  for(let i=1;i<post.length;i++)maxStep=Math.max(maxStep,Math.abs(post[i].offset-post[i-1].offset));
+  const last=post.at(-1)||trace.samples.at(-1)||trace.before;
+  const travel=accepted?Math.hypot(last.x-accepted.x,last.y-accepted.y):0;
+  const movedLeft=accepted?last.x<accepted.x:false;
   await page.screenshot({path:path.join(OUT,`${label}-cast-strafe-camera.png`),fullPage:true});
-  report.runs.push({label,viewport,hasTouch,errors,peak,beforeMove,accepted,samples,settleMs,maxStep,travel,movedLeft});
+  report.runs.push({label,viewport,hasTouch,errors,peak,beforeMove:trace.before,acceptedIndex,accepted,samples:trace.samples,settleMs,maxStep,travel,movedLeft});
   await context.close();
 }
 
