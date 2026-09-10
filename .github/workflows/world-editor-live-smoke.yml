@@ -1,6 +1,17 @@
 name: World Editor Live Smoke
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/creators/adapters/world-creator-adapter.mjs'
+      - 'src/creators/workspaces/world-workspace.mjs'
+      - 'src/world/world-draft-store.js'
+      - 'src/world/world-revision-system.js'
+      - 'src/world/world-edit-authority.js'
+      - 'src/world/authorities/local-world-edit-authority.js'
+      - 'tests/world-editor-live-open.spec.js'
+      - '.github/workflows/world-editor-live-smoke.yml'
   workflow_run:
     workflows: ["pages build and deployment"]
     types: [completed]
@@ -11,7 +22,7 @@ permissions:
 
 jobs:
   live-world-editor-smoke:
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
