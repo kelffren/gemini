@@ -8,10 +8,12 @@ on:
       - 'src/characters/character-appearance.js'
       - 'src/systems/pvp-world.js'
       - 'src/systems/melee/melee-weapon-profiles.js'
+      - 'src/ui/player-nameplate.js'
       - 'scripts/pvp-aim-facing-audit.js'
       - 'scripts/movement-onset-audit.js'
       - 'scripts/pixel-phase-audit.js'
       - 'scripts/audit-pvp-follow-recovery.js'
+      - 'scripts/nameplate-avatar-anchor-audit.js'
       - 'package.json'
       - '.github/workflows/pvp-aim-facing-ci.yml'
   pull_request:
@@ -20,10 +22,12 @@ on:
       - 'src/characters/character-appearance.js'
       - 'src/systems/pvp-world.js'
       - 'src/systems/melee/melee-weapon-profiles.js'
+      - 'src/ui/player-nameplate.js'
       - 'scripts/pvp-aim-facing-audit.js'
       - 'scripts/movement-onset-audit.js'
       - 'scripts/pixel-phase-audit.js'
       - 'scripts/audit-pvp-follow-recovery.js'
+      - 'scripts/nameplate-avatar-anchor-audit.js'
       - 'package.json'
       - '.github/workflows/pvp-aim-facing-ci.yml'
 
@@ -46,5 +50,7 @@ jobs:
         run: node scripts/pixel-phase-audit.js
       - name: Measure light combo recovery mobility
         run: node scripts/audit-pvp-follow-recovery.js
+      - name: Verify avatar semantic nameplate anchoring
+        run: node scripts/nameplate-avatar-anchor-audit.js
       - name: Verify Foundation architecture
         run: npm run audit:foundation
