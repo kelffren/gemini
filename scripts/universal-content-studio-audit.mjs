@@ -30,7 +30,7 @@ assert.equal(repo.userId(),'11111111-1111-1111-1111-111111111111');await repo.rp
 
 const migration=fs.readFileSync('supabase/migrations/20260910024046_universal_content_registry.sql','utf8');
 for(const needle of ['content_definitions','content_definition_revisions','content_asset_bindings','content_review_requests','content_publications','register_content_revision','content:global:published'])assert.ok(migration.includes(needle),`missing ${needle}`);
-const idempotent=fs.readFileSync('supabase/migrations/20260910032200_universal_content_idempotent_reimport.sql','utf8');
+const idempotent=fs.readFileSync('supabase/migrations/20260910032354_universal_content_idempotent_reimport.sql','utf8');
 for(const needle of ['on conflict (owner_user_id, slug) do update','metadata = public.asset_families.metadata || excluded.metadata','returning * into v_row'])assert.ok(idempotent.includes(needle),`idempotent reimport contract missing ${needle}`);
 const entry=fs.readFileSync('src/creators/creator-entry.mjs','utf8'),hub=fs.readFileSync('src/creators/ui/creator-hub.mjs','utf8'),ui=fs.readFileSync('src/creators/ui/content-studio-workspace.mjs','utf8'),config=fs.readFileSync('src/online/kelo-supabase-public-config.mjs','utf8');
 assert.ok(entry.includes('registerContentStudioWorkspace'));assert.ok(hub.includes("['content-studio','Content Studio','active']"));assert.ok(ui.includes('.xlsx'));assert.ok(ui.includes('multiple:true'));assert.ok(!/sb_secret_|SUPABASE_SERVICE_ROLE_KEY\s*=\s*[^\s]/.test(config));
