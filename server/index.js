@@ -1,10 +1,10 @@
 /* KELO-INDEX
  * area: SERVER / NETWORK
  * owner: Kelo server authority + server/pvp-authority.js for PvP simulation
- * keys: WEBSOCKET AUTHORITY INPUT INTENT FIXED TIMESTEP RECONCILIATION PVP TITLES COMMERCE FORGE AOI SPATIAL GRID HYSTERESIS PERFORMANCE IDENTITY SUPABASE HEALTH READINESS HEARTBEAT SHUTDOWN
+ * keys: WEBSOCKET AUTHORITY INPUT INTENT FIXED TIMESTEP RECONCILIATION PVP TITLES COMMERCE FORGE AOI SPATIAL GRID HYSTERESIS PERFORMANCE IDENTITY SUPABASE AVATAR HEALTH READINESS HEARTBEAT SHUTDOWN
  * purpose: autoridad server-side; PvP acepta inputs/intents y todas las salidas de estado/presentación se filtran por zone + AOI por viewer
- * online: pose sigue para mundo social; dentro de PvP la posición, dash, cooldown, mana, hits, HP, CC, muerte y kills nacen del fixed-step server; hello resuelve identidad Supabase cuando existe
- * do-not: NO broadcast global periódico de actores, NO daño/posición PvP declarados por cliente, NO confiar accountId/characterId enviados sin verificar, NO segundo servidor HTTP paralelo
+ * online: pose sigue para mundo social; dentro de PvP la posición, dash, cooldown, mana, hits, HP, CC, muerte y kills nacen del fixed-step server; hello resuelve identidad Supabase y avatar persistido cuando existe
+ * do-not: NO broadcast global periódico de actores, NO daño/posición PvP declarados por cliente, NO confiar accountId/characterId/avatar URL enviados sin verificar, NO segundo servidor HTTP paralelo
  */
 'use strict';
 const http = require('http');
@@ -16,6 +16,7 @@ const { createCommerceService } = require('./commerce-store');
 const { createTitleService } = require('./title-store');
 const { createPvpAuthority, FIXED_DT, SNAPSHOT_HZ } = require('./pvp-authority');
 const { createOnlineIdentityStore } = require('./online-identity-store');
+const { createAvatarSyncStore } = require('./avatar-sync-store');
 
 const PORT=Number(process.env.PORT||2567),MAX=32,WORLD={w:3600,h:3200};
 const AOI_CELL=512,AOI_RADIUS=1350,AOI_HYSTERESIS=180,MAX_WS_PAYLOAD=64*1024,HEARTBEAT_MS=30000;
@@ -24,6 +25,7 @@ let shuttingDown=false;
 const VISUAL_EVENT_ALLOWLIST=new Set(['CAST_CONFIRMED','PROJECTILE_SPAWNED','PROJECTILE_HIT','PROJECTILE_EXPIRED','ABILITY_IMPACT','STATUS_APPLIED','STATUS_REMOVED','SHIELD_APPLIED','SHIELD_BROKEN','DASH_STARTED','DASH_ENDED','DEATH']);
 const players=new Map();let seq=1;
 const identity=createOnlineIdentityStore({supabaseUrl:process.env.SUPABASE_URL,supabaseServerKey:process.env.SUPABASE_SECRET_KEY||process.env.SUPABASE_SERVICE_ROLE_KEY,requireAuth:process.env.KELO_REQUIRE_AUTH==='1'});
+const avatarSync=createAvatarSyncStore({supabaseUrl:process.env.SUPABASE_URL,supabaseApiKey:process.env.SUPABASE_PUBLISHABLE_KEY||process.env.SUPABASE_SECRET_KEY||process.env.SUPABASE_SERVICE_ROLE_KEY});
 const economy=createPlayerEconomyStore({supabaseUrl:process.env.SUPABASE_URL,supabaseServiceKey:process.env.SUPABASE_SERVICE_ROLE_KEY});
 const nobility=createNobilityService({supabaseUrl:process.env.SUPABASE_URL,supabaseServiceKey:process.env.SUPABASE_SERVICE_ROLE_KEY});
 const forge=createForgeService({supabaseUrl:process.env.SUPABASE_URL,supabaseServiceKey:process.env.SUPABASE_SERVICE_ROLE_KEY,economyStore:economy});
@@ -35,7 +37,7 @@ function shortId(value,max){return value==null?null:String(value).replace(/[^a-z
 function safeVec(value){if(!value||!Number.isFinite(Number(value.x))||!Number.isFinite(Number(value.y)))return null;return{x:clamp(Number(value.x),-256,WORLD.w+256),y:clamp(Number(value.y),-256,WORLD.h+256)};}
 function safeDirection(value){if(!value||!Number.isFinite(Number(value.x))||!Number.isFinite(Number(value.y)))return null;const x=Number(value.x),y=Number(value.y),len=Math.hypot(x,y);if(!len||len>1000)return null;return{x:Number((x/len).toFixed(5)),y:Number((y/len).toFixed(5))};}
 function send(ws,obj){if(ws&&ws.readyState===1)ws.send(JSON.stringify(obj));}
-function serializePlayer(p){return{id:p.id,playerKey:p.playerKey,name:p.name,x:p.x,y:p.y,face:p.face,gait:p.gait,zone:p.zone,hp:Number.isFinite(p.hp)?p.hp:100,maxHp:Number.isFinite(p.maxHp)?p.maxHp:100,mana:Number.isFinite(p.mana)?p.mana:100,maxMana:Number.isFinite(p.maxMana)?p.maxMana:100,nobilityRank:p.nobilityRank||'none',nobilityPower:p.nobilityPower||0,equippedTitleId:p.equippedTitleId||null,armorScore:p.armorScore||0,auraRank:p.auraRank||0,averageQuality:p.averageQuality||0,averageGrade:p.averageGrade||0,equipmentSummary:Array.isArray(p.equipmentSummary)?p.equipmentSummary:[]};}
+function serializePlayer(p){return{id:p.id,playerKey:p.playerKey,name:p.name,x:p.x,y:p.y,face:p.face,gait:p.gait,zone:p.zone,hp:Number.isFinite(p.hp)?p.hp:100,maxHp:Number.isFinite(p.maxHp)?p.maxHp:100,mana:Number.isFinite(p.mana)?p.mana:100,maxMana:Number.isFinite(p.maxMana)?p.maxMana:100,nobilityRank:p.nobilityRank||'none',nobilityPower:p.nobilityPower||0,equippedTitleId:p.equippedTitleId||null,armorScore:p.armorScore||0,auraRank:p.auraRank||0,averageQuality:p.averageQuality||0,averageGrade:p.averageGrade||0,equipmentSummary:Array.isArray(p.equipmentSummary)?p.equipmentSummary:[],avatarManifest:p.avatarManifest||null};}
 function publicState(){const out={};players.forEach((p,id)=>{out[id]=serializePlayer(p)});return out;}
 function cellKey(zone,x,y){return String(zone||'plaza')+'|'+Math.floor((Number(x)||0)/AOI_CELL)+'|'+Math.floor((Number(y)||0)/AOI_CELL);}
 function buildSpatialIndex(){const index=new Map();players.forEach(p=>{const key=cellKey(p.zone,p.x,p.y);if(!index.has(key))index.set(key,[]);index.get(key).push(p)});return index;}
@@ -53,11 +55,12 @@ function protocolError(ws,requestId,code,message){send(ws,{t:'error',requestId:r
 async function refreshNobility(me,requestId){const snapshot=await nobility.snapshot(me.playerKey,me.name);me.nobilityRank=snapshot.rank.id;me.nobilityPower=snapshot.rank.power;send(me.ws,{t:'nobility:snapshot',requestId:requestId||null,snapshot});return snapshot;}
 async function refreshTitles(me,requestId){const snapshot=await titles.snapshot(me.playerKey);me.equippedTitleId=snapshot.equippedTitleId||null;send(me.ws,{t:'titles:snapshot',requestId:requestId||null,snapshot});return snapshot;}
 async function refreshForge(me,requestId){const snapshot=await forge.snapshot(me.playerKey);me.armorScore=snapshot.armorScore;me.auraRank=snapshot.auraRank;me.averageQuality=snapshot.averageQuality;me.averageGrade=snapshot.averageGrade;me.equipmentSummary=snapshot.equipmentSummary;send(me.ws,{t:'forge:snapshot',requestId:requestId||null,snapshot,source:forge.source});return snapshot;}
+async function refreshAvatar(me,accessToken,requestId){if(!me.characterId||!accessToken){me.avatarManifest=null;return null;}me._avatarAccessToken=String(accessToken);me.avatarManifest=await avatarSync.resolve(me.characterId,me._avatarAccessToken);send(me.ws,{t:'avatar:refreshed',requestId:requestId||null,avatarManifest:me.avatarManifest,characterId:me.characterId,source:'server-authoritative'});return me.avatarManifest;}
 async function recordConfirmedKill(killerConnectionId,victimConnectionId,context){const killer=players.get(String(killerConnectionId||'')),victim=players.get(String(victimConnectionId||''));if(!killer||!victim||!killer.playerKey||!victim.playerKey)return{counted:false,reason:'PLAYER_NOT_CONNECTED'};const result=await titles.recordConfirmedKill(killer.playerKey,victim.playerKey,context);killer.equippedTitleId=result.snapshot.equippedTitleId||null;send(killer.ws,{t:'titles:snapshot',requestId:null,snapshot:result.snapshot,newUnlocks:result.newUnlocks||[]});if(result.counted)sendRelevantStates();return result;}
 const pvp=createPvpAuthority({onKill:(killer,victim,context)=>recordConfirmedKill(killer.id,victim.id,Object.assign({mode:'pvp',serverConfirmed:true},context||{}))});
 function pvpSnapshotFor(viewer,snapshot,events,index){const playersOut={},visible=new Set();candidatePlayers(viewer,index).forEach(target=>{const row=snapshot.players&&snapshot.players[target.id],was=viewer._aoiRelevant instanceof Set&&viewer._aoiRelevant.has(target.id);if(row&&relevantTo(viewer,target,was)){playersOut[target.id]=row;visible.add(target.id)}});if(snapshot.players&&snapshot.players[viewer.id]){playersOut[viewer.id]=snapshot.players[viewer.id];visible.add(viewer.id)}const projectiles=(snapshot.projectiles||[]).filter(projectile=>{const ownerId=projectile.ownerId||projectile.actorId||projectile.playerId;if(ownerId&&visible.has(ownerId))return true;const x=Number(projectile.x??projectile.position?.x),y=Number(projectile.y??projectile.position?.y);if(!Number.isFinite(x)||!Number.isFinite(y))return false;const dx=x-(Number(viewer.x)||0),dy=y-(Number(viewer.y)||0);return dx*dx+dy*dy<=AOI_RADIUS*AOI_RADIUS});const eventList=(events||[]).filter(ev=>!ev||(!ev.actorId&&!ev.targetId)||visible.has(ev.actorId)||visible.has(ev.targetId)||ev.targetId===viewer.id);return{...snapshot,players:playersOut,projectiles,events:eventList};}
 function sendPvpSnapshots(snapshot,events){const index=buildSpatialIndex();players.forEach(viewer=>{if(!(viewer.zone==='pvp'||viewer._pvpActive))return;send(viewer.ws,{t:'pvp:snapshot',...pvpSnapshotFor(viewer,snapshot,events,index),source:'server-authoritative-aoi'})});}
-function healthPayload(){return{ok:true,service:'kelo-world-server',version:'server-runtime-v2',uptimeMs:Date.now()-STARTED_AT,connections:players.size,shuttingDown,identity:identity.audit(),pvp:pvp.audit(),serverTime:Date.now()};}
+function healthPayload(){return{ok:true,service:'kelo-world-server',version:'server-runtime-v2',uptimeMs:Date.now()-STARTED_AT,connections:players.size,shuttingDown,identity:identity.audit(),avatarSync:avatarSync.audit(),pvp:pvp.audit(),serverTime:Date.now()};}
 
 const httpServer=http.createServer((req,res)=>{
   const path=String(req.url||'/').split('?')[0];
@@ -71,25 +74,25 @@ const httpServer=http.createServer((req,res)=>{
   res.end(JSON.stringify({ok:false,error:'NOT_FOUND'}));
 });
 const wss=new WebSocketServer({server:httpServer,maxPayload:MAX_WS_PAYLOAD,perMessageDeflate:false});
-wss.keloServerHooks=Object.freeze({recordConfirmedOpenWorldKill:recordConfirmedKill,pvpAuthority:pvp,aoi:Object.freeze({cell:AOI_CELL,radius:AOI_RADIUS,hysteresis:AOI_HYSTERESIS}),identityAuthority:identity,health:healthPayload});
-httpServer.listen(PORT,'0.0.0.0',()=>console.log(`Kelo room ws://0.0.0.0:${PORT} · fixed PvP ${Math.round(1/FIXED_DT)}Hz · snapshots ${SNAPSHOT_HZ}Hz · AOI ${AOI_RADIUS}px · maxPayload ${MAX_WS_PAYLOAD} · Identity ${identity.source}${identity.requireAuth?' required':' transition'} · Nobleza ${nobility.source} · Titles ${titles.source} · Forge ${forge.source} · Commerce ${commerce.version}`));
+wss.keloServerHooks=Object.freeze({recordConfirmedOpenWorldKill:recordConfirmedKill,pvpAuthority:pvp,aoi:Object.freeze({cell:AOI_CELL,radius:AOI_RADIUS,hysteresis:AOI_HYSTERESIS}),identityAuthority:identity,avatarSyncAuthority:avatarSync,health:healthPayload});
+httpServer.listen(PORT,'0.0.0.0',()=>console.log(`Kelo room ws://0.0.0.0:${PORT} · fixed PvP ${Math.round(1/FIXED_DT)}Hz · snapshots ${SNAPSHOT_HZ}Hz · AOI ${AOI_RADIUS}px · maxPayload ${MAX_WS_PAYLOAD} · Identity ${identity.source}${identity.requireAuth?' required':' transition'} · Avatar ${avatarSync.configured?'ready':'local'} · Nobleza ${nobility.source} · Titles ${titles.source} · Forge ${forge.source} · Commerce ${commerce.version}`));
 
 wss.on('connection',ws=>{
   if(shuttingDown){ws.close(1012,'server restarting');return;}
   if(players.size>=MAX){ws.close(1013,'room full');return;}
   ws.isAlive=true;ws.on('pong',()=>{ws.isAlive=true;});
-  const id='p'+seq++,me={id,ws,playerKey:null,accountId:null,characterId:null,authSource:'pending',name:'Kelo',x:1400,y:1600,vx:0,vy:0,face:'down',gait:'idle',zone:'plaza',hp:100,maxHp:100,mana:100,maxMana:100,nobilityRank:'none',nobilityPower:0,equippedTitleId:null,armorScore:0,auraRank:0,averageQuality:0,averageGrade:0,equipmentSummary:[],_aoiRelevant:new Set()};
-  players.set(id,me);pvp.register(me);send(ws,{t:'welcome',id,players:publicStateFor(me),nobilitySource:nobility.source,titleSource:titles.source,forgeSource:forge.source,commerceSource:'server-authoritative',identityAuthority:identity.audit(),pvpAuthority:pvp.audit(),serverTime:Date.now(),aoi:{cell:AOI_CELL,radius:AOI_RADIUS,hysteresis:AOI_HYSTERESIS}});sendRelevantJoin(me);
+  const id='p'+seq++,me={id,ws,playerKey:null,accountId:null,characterId:null,authSource:'pending',name:'Kelo',x:1400,y:1600,vx:0,vy:0,face:'down',gait:'idle',zone:'plaza',hp:100,maxHp:100,mana:100,maxMana:100,nobilityRank:'none',nobilityPower:0,equippedTitleId:null,armorScore:0,auraRank:0,averageQuality:0,averageGrade:0,equipmentSummary:[],avatarManifest:null,_avatarAccessToken:null,_aoiRelevant:new Set()};
+  players.set(id,me);pvp.register(me);send(ws,{t:'welcome',id,players:publicStateFor(me),nobilitySource:nobility.source,titleSource:titles.source,forgeSource:forge.source,commerceSource:'server-authoritative',identityAuthority:identity.audit(),avatarSyncAuthority:avatarSync.audit(),pvpAuthority:pvp.audit(),serverTime:Date.now(),aoi:{cell:AOI_CELL,radius:AOI_RADIUS,hysteresis:AOI_HYSTERESIS}});sendRelevantJoin(me);
   ws.on('message',async buf=>{
     let msg;try{msg=JSON.parse(String(buf))}catch(_){return;}
     try{
       if(msg.t==='hello'){
         const resolved=await identity.resolve({accessToken:msg.accessToken,characterId:msg.characterId,name:msg.name});
         if(resolved.authenticated){
-          me.accountId=resolved.accountId;me.characterId=resolved.characterId;me.authSource=resolved.source;me.name=resolved.name;me.playerKey=resolved.playerKey;
+          me.accountId=resolved.accountId;me.characterId=resolved.characterId;me.authSource=resolved.source;me.name=resolved.name;me.playerKey=resolved.playerKey;await refreshAvatar(me,msg.accessToken,null);
         }else{
           if(typeof msg.name==='string'&&msg.name.trim())me.name=msg.name.trim().slice(0,24);
-          me.playerKey=safePlayerId(msg.playerKey);me.accountId=null;me.characterId=null;me.authSource=resolved.source;
+          me.playerKey=safePlayerId(msg.playerKey);me.accountId=null;me.characterId=null;me.authSource=resolved.source;me.avatarManifest=null;me._avatarAccessToken=null;
         }
         economy.ensure(me.playerKey);await nobility.ensurePlayer(me.playerKey,me.name);await titles.ensurePlayer(me.playerKey);await forge.ensurePlayer(me.playerKey);
         send(ws,{t:'identity',playerKey:me.playerKey,accountId:me.accountId,characterId:me.characterId,authSource:me.authSource});
@@ -100,6 +103,13 @@ wss.on('connection',ws=>{
         if(Number.isFinite(msg.x))me.x=clamp(msg.x,20,WORLD.w-20);if(Number.isFinite(msg.y))me.y=clamp(msg.y,20,WORLD.h-20);if(['up','down','left','right'].includes(msg.face))me.face=msg.face;if(['idle','walk','run'].includes(msg.gait))me.gait=msg.gait;if(['plaza','cafe','open-world','market'].includes(msg.zone))me.zone=msg.zone;return;
       }
       if(!me.playerKey){protocolError(ws,msg.requestId,'IDENTITY_REQUIRED','Envía hello antes de usar sistemas autoritativos.');return;}
+      if(msg.t==='avatar:refresh'){
+        const resolved=await identity.resolve({accessToken:msg.accessToken,characterId:msg.characterId,name:me.name});
+        if(!resolved.authenticated)throw new Error('AUTH_TOKEN_REQUIRED');
+        if(me.accountId&&me.accountId!==resolved.accountId)throw new Error('CHARACTER_NOT_OWNED');
+        me.accountId=resolved.accountId;me.characterId=resolved.characterId;me.authSource=resolved.source;me.name=resolved.name;me.playerKey=resolved.playerKey;
+        await refreshAvatar(me,msg.accessToken,msg.requestId);sendRelevantStates();return;
+      }
       if(msg.t==='pvp:input'){
         const result=pvp.ingest(me,msg.intent&&typeof msg.intent==='object'?msg.intent:msg,Date.now());
         if(!result.ok)send(ws,{t:'pvp:reject',sequence:msg.intent&&msg.intent.sequence||msg.sequence||null,code:result.reason,ackSequence:result.ackSequence||me._pvpAck||0,source:'server-authoritative'});
