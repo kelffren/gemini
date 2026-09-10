@@ -1,3 +1,15 @@
+/* KELO-INDEX
+ * area: ENVIRONMENT / WORLD
+ * owner: KELO_ENVIRONMENT_LAYERS ground content
+ * keys: SURFACE GROUND GRASS CHUNK CAPITAL TEST MAP BOOT
+ * purpose: suelo de césped LIVE por chunks y bootstrap temporal de la composición Capital Test V1
+ * public-api: KELO_SURFACE_GROUND_AUDIT
+ * consumes: KELO_TILE_REGISTRY, KELO_ENVIRONMENT_LAYERS, KELO_ATLAS_CONTRACT
+ * state-owned: cache visual de chunks de césped
+ * extension-points: metadata styles.surfaceGround; Capital Test es contenido temporal separado
+ * online: N/A; presentación local
+ * do-not: NO tocar movimiento, economía ni autoridad gameplay
+ */
 (function(){
 'use strict';
 const R=window.KELO_TILE_REGISTRY,L=window.KELO_ENVIRONMENT_LAYERS,A=window.KELO_ATLAS_CONTRACT;
@@ -12,8 +24,19 @@ function drawFrame(g,id,dx,dy){const sx=(id%COLS)*atlas.tileWidth,sy=Math.floor(
 function build(cx,cy){const key=cx+','+cy;if(cache.has(key))return cache.get(key);const c=document.createElement('canvas');c.width=CHUNK;c.height=CHUNK;const g=c.getContext('2d');g.imageSmoothingEnabled=false;const wx=cx*CHUNK,wy=cy*CHUNK,n=Math.ceil(CHUNK/TILE);for(let y=0;y<n;y++)for(let x=0;x<n;x++){const X=Math.floor((wx+x*TILE)/TILE),Y=Math.floor((wy+y*TILE)/TILE);drawFrame(g,frameFor(X,Y),x*TILE,y*TILE)}cache.set(key,c);if(cache.size>MAX)cache.delete(cache.keys().next().value);return c}
 function visibleBounds(){const z=window.CONFIG?.zoom||1,cam=window.camera||{x:1440,y:1520},sw=window.screenW||innerWidth,sh=window.screenH||innerHeight,ww=window.CONFIG?.worldWidth||3600,wh=window.CONFIG?.worldHeight||3200,hw=sw/(2*z)+CHUNK,hh=sh/(2*z)+CHUNK;return{minX:Math.max(0,Math.floor((cam.x-hw)/CHUNK)),maxX:Math.min(Math.ceil(ww/CHUNK)-1,Math.floor((cam.x+hw)/CHUNK)),minY:Math.max(0,Math.floor((cam.y-hh)/CHUNK)),maxY:Math.min(Math.ceil(wh/CHUNK)-1,Math.floor((cam.y+hh)/CHUNK))}}
 function draw(g){if(!ready||failed||!img)return;const b=visibleBounds();for(let y=b.minY;y<=b.maxY;y++)for(let x=b.minX;x<=b.maxX;x++)g.drawImage(build(x,y),x*CHUNK,y*CHUNK);audit.chunkCacheSize=cache.size;audit.lastDrawnTiles=drawnTiles;drawnTiles=0;}
-const audit=window.KELO_SURFACE_GROUND_AUDIT={version:'surface-ground-v1.0.0',mode:style.mode,ready:false,failed:false,asset:style.asset,src:atlas.src,tileCount:atlas.tileCount,baseFrameCount:BASE.length,detailFrameCount:DETAIL.length,detailModulo:MOD,worldTileSize:TILE,chunkSize:CHUNK,chunkCacheCap:MAX,chunkCacheSize:0,lastDrawnTiles:0,worldWidth:window.CONFIG?.worldWidth||3600,worldHeight:window.CONFIG?.worldHeight||3200,visibleDuringReset:true};
+const audit=window.KELO_SURFACE_GROUND_AUDIT={version:'surface-ground-v1.0.1',mode:style.mode,ready:false,failed:false,asset:style.asset,src:atlas.src,tileCount:atlas.tileCount,baseFrameCount:BASE.length,detailFrameCount:DETAIL.length,detailModulo:MOD,worldTileSize:TILE,chunkSize:CHUNK,chunkCacheCap:MAX,chunkCacheSize:0,lastDrawnTiles:0,worldWidth:window.CONFIG?.worldWidth||3600,worldHeight:window.CONFIG?.worldHeight||3200,visibleDuringReset:true,capitalTestBoot:true};
 try{L.register({id:'kelo-surface-ground',phase:'ground',priority:0,required:true,visibleDuringReset:true,ready:()=>ready&&!failed,draw,ownership:'surface-ground-v1',bounds:()=>[{id:'world-surface',x:0,y:0,w:audit.worldWidth,h:audit.worldHeight}]});}catch(err){failed=true;audit.failed=true;console.error('[Kelo surface ground] layer registration failed',err);return;}
 if(!A.describe(style.asset)){failed=true;audit.failed=true;console.error('[Kelo surface ground] atlas not registered',style.asset);return;}
 A.acquire(style.asset).then(image=>{img=image;ready=true;audit.ready=true;try{window.dispatchEvent(new CustomEvent('kelo:surface-ground-ready'))}catch{}}).catch(err=>{failed=true;audit.failed=true;console.error('[Kelo surface ground] atlas load failed',err)});
+})();
+
+/* KELO-INDEX ENVIRONMENT/CAPITAL-TEST temporary content bootstrap: carga la composición por capas después de que KELO_ENVIRONMENT_LAYERS ya existe. */
+(function(){
+  if(window.KELO_CAPITAL_TEST_MAP_BOOTSTRAPPED)return;
+  window.KELO_CAPITAL_TEST_MAP_BOOTSTRAPPED=true;
+  const script=document.createElement('script');
+  script.src='src/environment/capital-test-map.js?v=1';
+  script.async=false;
+  script.onerror=()=>console.error('[Kelo capital test] bootstrap load failed');
+  document.head.appendChild(script);
 })();
