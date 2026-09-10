@@ -69,7 +69,45 @@
     }),
     fire_explosion_medium: Object.freeze({
       id: 'fire_explosion_medium', type: 'burst', space: 'WORLD', layer: 'foregroundFX',
-      duration: 0.48, loop: false, radius: 54, color: '#ff6b35', accent: '#ffd166', rays: 14, alpha: 0.92
+      duration: 0.42, loop: false, radius: 62, color: '#ff6b35', accent: '#ffe08a', rays: 16, alpha: 0.96
+    }),
+    ice_nova_ground_ring: Object.freeze({
+      id: 'ice_nova_ground_ring', type: 'nova', space: 'WORLD', layer: 'groundFX',
+      duration: 0.55, loop: false, radius: 130, color: '#9ad8ff', fill: 'rgba(126,200,255,0.22)',
+      fillAlpha: 0.55, innerRing: true, lineWidth: 3.2, alpha: 0.92, expand: true
+    }),
+    ice_nova_shatter: Object.freeze({
+      id: 'ice_nova_shatter', type: 'burst', space: 'WORLD', layer: 'worldFX',
+      duration: 0.38, loop: false, radius: 78, color: '#d7f3ff', accent: '#7ec8ff', rays: 12, alpha: 0.88
+    }),
+    ice_nova_cast_glow: Object.freeze({
+      id: 'ice_nova_cast_glow', type: 'glow', space: 'ACTOR', layer: 'actorFrontFX',
+      socket: 'center', duration: 0.28, loop: false, radius: 22, color: '#9ad8ff', alpha: 0.62
+    }),
+    wind_dash_gust: Object.freeze({
+      id: 'wind_dash_gust', type: 'afterimage', space: 'ACTOR', layer: 'actorBackFX',
+      socket: 'center', duration: 0.22, loop: false, radius: 26, color: '#b8f2e6', alpha: 0.55
+    }),
+    wind_dash_streak: Object.freeze({
+      id: 'wind_dash_streak', type: 'trail', space: 'WORLD', layer: 'worldFX',
+      duration: 0.28, loop: false, radius: 10, color: '#d8fff6', alpha: 0.5
+    }),
+    poison_trap_idle: Object.freeze({
+      id: 'poison_trap_idle', type: 'trap_mark', space: 'WORLD', layer: 'groundFX',
+      duration: 15, loop: true, radius: 55, color: '#8ac926', fill: 'rgba(138,201,38,0.16)',
+      fillAlpha: 0.45, innerRing: true, lineWidth: 2.6, alpha: 0.78, expand: false
+    }),
+    poison_trap_trigger: Object.freeze({
+      id: 'poison_trap_trigger', type: 'burst', space: 'WORLD', layer: 'worldFX',
+      duration: 0.4, loop: false, radius: 58, color: '#b6e35a', accent: '#3f7a1d', rays: 10, alpha: 0.9
+    }),
+    poison_body_small: Object.freeze({
+      id: 'poison_body_small', type: 'particle_emitter', space: 'ACTOR', layer: 'actorFrontFX',
+      socket: 'center', duration: 1.0, loop: true, radius: 24, color: '#8ac926', particleCount: 7, alpha: 0.7
+    }),
+    slow_body_small: Object.freeze({
+      id: 'slow_body_small', type: 'ring', space: 'ACTOR', layer: 'actorFrontFX',
+      socket: 'center', duration: 2.5, loop: true, radius: 20, color: '#7ec8ff', alpha: 0.5, expand: false
     }),
     burn_body_small: Object.freeze({
       id: 'burn_body_small', type: 'particle_emitter', space: 'ACTOR', layer: 'actorFrontFX',
@@ -156,6 +194,40 @@
         Object.freeze({ at: 20, type: 'screenFx', ref: 'impact_medium' })
       ])
     }),
+    sequence_ice_nova_cast_01: Object.freeze({
+      id: 'sequence_ice_nova_cast_01', duration: 360,
+      cues: Object.freeze([
+        Object.freeze({ at: 0, type: 'actorAnimation', ref: 'cast_self_01' }),
+        Object.freeze({ at: 20, type: 'fx', ref: 'ice_nova_cast_glow', socket: 'center' })
+      ])
+    }),
+    sequence_ice_nova_impact_01: Object.freeze({
+      id: 'sequence_ice_nova_impact_01', duration: 560,
+      cues: Object.freeze([
+        Object.freeze({ at: 0, type: 'fx', ref: 'ice_nova_ground_ring' }),
+        Object.freeze({ at: 40, type: 'fx', ref: 'ice_nova_shatter' }),
+        Object.freeze({ at: 20, type: 'screenFx', ref: 'impact_medium' })
+      ])
+    }),
+    sequence_wind_dash_01: Object.freeze({
+      id: 'sequence_wind_dash_01', duration: 220,
+      cues: Object.freeze([
+        Object.freeze({ at: 0, type: 'fx', ref: 'wind_dash_gust', socket: 'center' }),
+        Object.freeze({ at: 0, type: 'fx', ref: 'wind_dash_streak' })
+      ])
+    }),
+    sequence_poison_trap_place_01: Object.freeze({
+      id: 'sequence_poison_trap_place_01', duration: 280,
+      cues: Object.freeze([
+        Object.freeze({ at: 0, type: 'actorAnimation', ref: 'cast_magic_01' })
+      ])
+    }),
+    sequence_poison_trap_trigger_01: Object.freeze({
+      id: 'sequence_poison_trap_trigger_01', duration: 420,
+      cues: Object.freeze([
+        Object.freeze({ at: 0, type: 'fx', ref: 'poison_trap_trigger' })
+      ])
+    }),
     sequence_debug_explosion_reuse: Object.freeze({
       id: 'sequence_debug_explosion_reuse', duration: 600,
       cues: Object.freeze([
@@ -185,6 +257,24 @@
       impactSequence: 'sequence_fire_impact_01',
       statusVisuals: Object.freeze({ burn: 'burn_body_small' })
     }),
+    ability_visual_ice_nova_01: Object.freeze({
+      id: 'ability_visual_ice_nova_01', abilityKey: 'ice_nova',
+      castSequence: 'sequence_ice_nova_cast_01',
+      impactSequence: 'sequence_ice_nova_impact_01',
+      statusVisuals: Object.freeze({ slow: 'slow_body_small' })
+    }),
+    ability_visual_wind_dash_01: Object.freeze({
+      id: 'ability_visual_wind_dash_01', abilityKey: 'wind_dash',
+      castSequence: 'sequence_wind_dash_01',
+      dashFx: 'wind_dash_gust'
+    }),
+    ability_visual_poison_trap_01: Object.freeze({
+      id: 'ability_visual_poison_trap_01', abilityKey: 'poison_trap',
+      castSequence: 'sequence_poison_trap_place_01',
+      persistentFx: 'poison_trap_idle',
+      impactSequence: 'sequence_poison_trap_trigger_01',
+      statusVisuals: Object.freeze({ poison: 'poison_body_small' })
+    }),
     ability_visual_sword_swap_01: Object.freeze({
       id: 'ability_visual_sword_swap_01', abilityKey: 'swap_sword',
       castSequence: 'sequence_sword_swap_activation_eye_anim',
@@ -194,11 +284,13 @@
 
   const STATUS_VISUALS = Object.freeze({
     burn: 'burn_body_small',
-    shield: 'shield_ring_01'
+    shield: 'shield_ring_01',
+    slow: 'slow_body_small',
+    poison: 'poison_body_small'
   });
 
   root.KELO_VISUAL_MANIFESTS = Object.freeze({
-    version: 'visual-manifests-v1.3.2',
+    version: 'visual-manifests-v1.4.0',
     assets: ASSETS,
     animationClips: ANIMATION_CLIPS,
     fx: FX,
