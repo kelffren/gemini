@@ -1,20 +1,20 @@
 /* KELO-INDEX
  * area: UI / AVATAR / IDENTITY
  * owner: KeloActorNameplate (presentation consumer); composition owner remains KeloAvatar
- * keys: NAMEPLATE NOBILITY TITLE NAME AVATAR MIDDLEWARE
- * purpose: dibuja rango de Nobleza + nombre + título equipado para actores locales/remotos sin decidir gameplay
+ * keys: NAMEPLATE NOBILITY TITLE NAME AVATAR MIDDLEWARE ANCHOR BOUNDS COLLIDER SCALE
+ * purpose: dibuja rango de Nobleza + nombre + título equipado usando el anchor visual semántico del avatar, sin acoplar identidad al collider
  * public-api: KeloActorNameplate.resolve/draw
- * consumes: KeloAvatar, KeloNobility rank catalog, KeloTitleCatalog, actor replicated state
+ * consumes: KeloAvatar, KELO_AVATAR_PRESENTATION, KeloNobility rank catalog, KeloTitleCatalog, actor replicated state
  * state-owned: ninguno; solo estilos compartidos de presentación
  * extension-points: resolve() admite futuras líneas clan/faction sin cambiar autoridad gameplay
  * reuse: jugador local, peers online y futuros actores con identidad pública
- * legacy: reemplaza el label self-only hardcodeado de engine-c
- * do-not: NO envolver renderAvatar; NO desbloquear/equipar títulos; NO decidir Nobleza
+ * legacy: fallback collider-based solo cuando un actor no publica presentación semántica
+ * do-not: NO envolver renderAvatar; NO desbloquear/equipar títulos; NO decidir Nobleza; NO usar collider como anchor visual cuando existe KELO_AVATAR_PRESENTATION
  */
 (function (root) {
   'use strict';
   if (root.KeloActorNameplate || !root.KeloAvatar) return;
-  const VERSION = 'actor-nameplate-v1';
+  const VERSION = 'actor-nameplate-v1.1-semantic-anchor';
 
   const RANK_STYLE = Object.freeze({
     knight: '#c9b178', baron: '#d6b77d', earl: '#dfc58d', duke: '#d5bdff', prince: '#f2d58f', king: '#ffd66b'
@@ -55,13 +55,26 @@
     ctx.fillStyle = fill;
     ctx.fillText(text, x, y);
   }
+  function anchorFor(actor) {
+    const presentation = root.KELO_AVATAR_PRESENTATION;
+    if (presentation && typeof presentation.get === 'function') {
+      const motion = actor && actor._visualMotion;
+      const face = motion && motion.face || actor && actor._face || 'down';
+      const layout = presentation.get(actor, face);
+      if (layout && Number.isFinite(Number(layout.nameplateAnchorX)) && Number.isFinite(Number(layout.nameplateAnchorY))) {
+        return { x: Number(layout.nameplateAnchorX), y: Number(layout.nameplateAnchorY), source: 'avatar-presentation' };
+      }
+    }
+    const radius = Math.max(12, Number(actor && actor.radius) || 20);
+    return { x: Number(actor && actor.x) || 0, y: (Number(actor && actor.y) || 0) - radius - 19, source: 'collider-fallback' };
+  }
   function draw(actor) {
     if (!actor || typeof ctx === 'undefined') return;
     const info = resolve(actor);
     if (!info.name) return;
-    const x = Number(actor.x) || 0;
-    const radius = Math.max(12, Number(actor.radius) || 20);
-    const baseY = (Number(actor.y) || 0) - radius - 19;
+    const anchor = anchorFor(actor);
+    const x = anchor.x;
+    const baseY = anchor.y;
     const lines = [];
     if (info.nobility) lines.push({ type: 'nobility', text: '♛ ' + info.nobility.toUpperCase() + ' ♛' });
     lines.push({ type: 'name', text: info.name });
@@ -86,6 +99,6 @@
     return result;
   }, 500);
 
-  root.KeloActorNameplate = Object.freeze({ version: VERSION, resolve: resolve, draw: draw, middlewareId: middlewareId });
-  root.KELO_ACTOR_NAMEPLATE_AUDIT = Object.freeze({ version: VERSION, ready: true, middleware: true, priority: 500, localAndRemote: true, gameplayAuthority: false });
+  root.KeloActorNameplate = Object.freeze({ version: VERSION, resolve: resolve, draw: draw, anchorFor: anchorFor, middlewareId: middlewareId });
+  root.KELO_ACTOR_NAMEPLATE_AUDIT = Object.freeze({ version: VERSION, ready: true, middleware: true, priority: 500, localAndRemote: true, gameplayAuthority: false, semanticAvatarAnchor: true, colliderFallbackOnly: true });
 })(typeof globalThis !== 'undefined' ? globalThis : window);
