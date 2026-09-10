@@ -18,7 +18,7 @@ assert(pvp.includes("addEventListener('pointerdown'")&&pvp.includes('setPointerC
 assert(pvp.includes('drawTelegraph')&&pvp.includes('telegraphsPresentationOnly:true'),'telegraphs exist and are presentation-only by contract');
 assert(pvp.includes("phase:'windup'")&&pvp.includes("a.phase='active'")&&pvp.includes("a.phase='recovery'"),'basic attack has windup/active/recovery phases');
 assert(hitSrc.includes('withinSector')&&hitSrc.includes('withinCapsule')&&hitSrc.includes('withinOrientedRect')&&hitSrc.includes('sweptCircle'),'HitResolver exposes required action geometry');
-assert(profileSrc.includes("hitShape:'sector'")&&profileSrc.includes('movementScale:0.72'),'sword profile is directional and movement-scaled');
+assert(profileSrc.includes("hitShape:'sector'")&&profileSrc.includes('movementScale:{windup:'),'sword profile is directional and phase movement-scaled');
 const sandbox={console,Map,Set,Math,Date,Object,Array,String,Number,Boolean,JSON,performance:{now:()=>1000}};sandbox.globalThis=sandbox;sandbox.window=sandbox;vm.createContext(sandbox);
 [P.hit,P.schema,P.damage,P.combat,P.meleeSchema,P.profiles,P.melee].forEach(p=>vm.runInContext(read(p),sandbox,{filename:p}));
 const attacker={id:'a',x:0,y:0,hp:100,radius:20};
@@ -27,6 +27,7 @@ const diagonal={id:'diag',x:90,y:70,hp:100,maxHp:100,radius:20};
 const behind={id:'behind',x:-90,y:0,hp:100,maxHp:100,radius:20};
 const profile=sandbox.KeloMeleeEngine.getProfile('sword_light_basic');
 assert(profile.windup>0&&profile.active>0&&profile.recovery>0,'profile phases are positive');
+assert(sandbox.KeloMeleeEngine.movementScaleFor(profile,'windup')===.86&&sandbox.KeloMeleeEngine.movementScaleFor(profile,'active')===.52&&sandbox.KeloMeleeEngine.movementScaleFor(profile,'recovery')===1,'basic phase movement contract matches tested winner');
 assert(sandbox.KeloHitResolver.resolveMelee(attacker,front,{x:1,y:0},profile).hit===true,'target in front is inside sword arc');
 assert(sandbox.KeloHitResolver.resolveMelee(attacker,behind,{x:1,y:0},profile).hit===false,'target behind is outside sword arc');
 const hpBehind=behind.hp;
