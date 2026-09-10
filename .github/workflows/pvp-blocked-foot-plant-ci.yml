@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'engine-ac.js'
+      - 'scripts/audit-blocked-foot-plant-timing.mjs'
       - 'scripts/live-pvp-blocked-foot-plant-judge.mjs'
       - '.github/workflows/pvp-blocked-foot-plant-ci.yml'
   workflow_dispatch:
@@ -20,6 +21,8 @@ jobs:
           node-version: 24
       - name: Foundation architecture audit
         run: node scripts/foundation-architecture-audit.js
+      - name: Audit blocked plant timing at 60 90 120 Hz
+        run: node scripts/audit-blocked-foot-plant-timing.mjs
       - name: Install dependencies
         run: npm install --no-audit --no-fund
       - name: Install Chromium
