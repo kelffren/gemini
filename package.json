@@ -24,6 +24,7 @@
     "audit:studio:menu": "node scripts/studio-menu-minimizer-audit.mjs",
     "audit:studio:clean": "node scripts/studio-clean-workspace-audit.mjs",
     "audit:studio:context": "node scripts/studio-context-inspector-audit.mjs",
+    "audit:studio:assets": "node scripts/studio-asset-palette-audit.mjs",
     "audit:mounts": "node scripts/mount-foundation-audit.mjs",
     "audit:ability-source-native": "node scripts/ability-source-native-cast-audit.mjs",
     "audit:equipment-abilities": "node scripts/equipment-ability-audit.mjs",
