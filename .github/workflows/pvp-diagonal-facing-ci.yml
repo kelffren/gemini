@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'engine-ac.js'
+      - 'scripts/audit-pvp-diagonal-facing-timing.mjs'
       - 'scripts/live-pvp-diagonal-facing-judge.mjs'
       - '.github/workflows/pvp-diagonal-facing-ci.yml'
   workflow_dispatch:
@@ -18,6 +19,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
+      - name: Audit deterministic 60 90 120 Hz contract
+        run: node scripts/audit-pvp-diagonal-facing-timing.mjs
       - name: Install dependencies
         run: npm install --no-audit --no-fund
       - name: Install Chromium
