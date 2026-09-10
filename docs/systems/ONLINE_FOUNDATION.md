@@ -1,205 +1,159 @@
 # Kelo Online Foundation
 
-- **Owner gameplay online:** `server/*` (no cambia).
-- **Owner persistencia/identidad:** Supabase project `kelo-world` (`iapxdbitjdwvtbpjghct`).
-- **Región actual:** `us-west-2`.
-- **Cliente de transporte:** `engine-net.js` / `KeloNetAuthority`.
-- **Config endpoint cliente:** `src/config/online-runtime-config.js`.
-- **Adaptador de identidad server:** `server/online-identity-store.js`.
-- **Runtime de producción:** Render `kelo-world-server` en Virginia.
+- **Owner gameplay online:** `server/*`.
+- **Owner identidad/persistencia:** Supabase `kelo-world` (`iapxdbitjdwvtbpjghct`).
+- **Región DB:** `us-west-2`.
+- **Runtime gameplay:** Render `kelo-world-server` en Virginia.
+- **Transporte cliente:** `engine-net.js` / `KeloNetAuthority`.
+- **Config:** `src/config/online-runtime-config.js`.
+- **Auth browser:** `src/auth/supabase-auth-runtime.js`.
+- **Identidad server:** `server/online-identity-store.js`.
+- **Persistencia bridge:** `server/server-state-bridge.js` -> Edge Function `kelo-server-state`.
 - **Migraciones:** `supabase/migrations/*`.
-- **Player visible:** false.
 
 ## 1. Propósito
 
-Esta capa convierte Supabase en la persistencia, identidad, catálogo de contenido y almacenamiento compartido de Kelo World sin convertir Postgres en el game loop. El servidor WebSocket existente sigue siendo la autoridad de movimiento, PvP, daño, cooldowns y demás estado vivo de combate.
-
-La separación obligatoria es:
+Supabase aporta identidad, persistencia, catálogo y storage sin entrar en el game loop. `server/*` conserva movimiento, PvP, hits, daño, cooldowns, loot/forge/commerce valioso y estado vivo.
 
 ```text
-GitHub Pages / cliente
-        |
-        +--> Supabase Auth + API + Storage
-        |      identidad, metadata, contenido, lectura propia
-        |
-        +--> server/* WebSocket en Render
-               autoridad gameplay
-               |
-               +--> Supabase
-                    persistencia confiable mediante secret key
+GitHub Pages
+  +--> Supabase Auth/API con publishable key + RLS
+  |      cuenta, character, creator data propia
+  |
+  +--> KeloNetAuthority -> WSS Render / server/*
+                           autoridad gameplay
+                           |
+                           +--> Edge Function kelo-server-state
+                                  credenciales privileged viven en Supabase
+                                  -> Postgres
 ```
 
-`src/config/online-runtime-config.js` solo decide qué endpoint consume `engine-net.js`. No abre sockets, no posee gameplay y no sustituye `KeloNetAuthority`.
+No existe un segundo servidor multiplayer.
 
-## 2. Invariantes de identidad
+## 2. Identidad
 
 - `auth.users.id` = cuenta.
-- `profiles.user_id` = perfil público de la cuenta.
-- `characters.id` = identidad canónica del personaje dentro del juego.
-- Una cuenta puede tener varios personajes; V1 limita creación a 3 mediante `create_character`.
-- `characters.legacy_player_key` existe únicamente como puente de migración desde el UUID local que usa actualmente `engine-net.js`.
-- El servidor nunca debe aceptar `account_id`, roles o ownership declarados por el navegador.
-- `server/online-identity-store.js` verifica el access token contra Supabase Auth y después resuelve que `characterId` pertenezca a esa cuenta.
+- `profiles.user_id` = perfil público.
+- `characters.id` = identidad canónica del personaje.
+- Una cuenta puede crear hasta 3 personajes mediante `create_character`.
+- `characters.legacy_player_key` solo sirve para migrar el UUID local anterior.
+- El navegador nunca declara un `account_id` confiable.
+
+`src/auth/supabase-auth-runtime.js` usa únicamente la publishable key. Mantiene sesión con `supabase-js`, intenta sesión anónima cuando no existe una, verifica al usuario, selecciona/crea un character propio y, cuando aplica, reclama el legacy player key mediante RPC validada por `auth.uid()`.
+
+El mismo `hello` de `engine-net.js` recibe `accessToken + characterId`. No se crea otro WebSocket. `server/online-identity-store.js` verifica el JWT contra Auth y consulta `characters` con publishable key + el mismo JWT; RLS vuelve a validar ownership.
+
+Durante rollout `KELO_REQUIRE_AUTH=0`: si Auth falla, el modo legacy sigue funcionando. Después de verificar Pages end-to-end se promueve a `1`.
 
 ## 3. Roles y autorización
 
-Roles base:
+Roles base: `player`, `creator`, `moderator`, `admin`, `official`.
 
-- `player`
-- `creator`
-- `moderator`
-- `admin`
-- `official`
+`account_roles` es server-managed. `kelo_private.has_role()` permanece fuera del schema expuesto. Las RPC `SECURITY DEFINER` accesibles a `authenticated` son intencionales únicamente cuando aplican reglas atómicas, fijan `search_path=''` y verifican `auth.uid()`/ownership.
 
-`account_roles` es server-managed. El usuario autenticado puede leer sus roles pero no otorgárselos. `kelo_private.has_role()` es helper de autorización en un schema no expuesto.
+## 4. Creator Asset Library
 
-Las RPC públicas `SECURITY DEFINER` que puede ejecutar `authenticated` son una excepción intencional: existen para aplicar validaciones y límites atómicos sin otorgar INSERT directo a las tablas. Todas usan `set search_path = ''` y validan `auth.uid()`.
-
-## 4. Creator Asset Library backend
-
-### Identidad estable vs bytes
-
-`asset_families` mantiene la identidad/metadata editable del asset.
-
-`asset_revisions` mantiene revisiones inmutables de bytes. Cada revisión tiene un `asset_id` estable para mapas/runtime:
+`asset_families` mantiene identidad/metadata editable; `asset_revisions` mantiene revisiones inmutables. Los mapas guardan `asset_id`/revision, nunca blob URLs o filenames como identidad.
 
 ```text
-creator:<owner-user-uuid>:<slug>@r<revision>-<hash-prefix>
+archivo
+ -> creator-private/<auth.uid()>/...
+ -> register_asset_revision()
+ -> review
+ -> moderación trusted-server
+ -> creator-global/...
+ -> asset_publications
 ```
 
-Un mapa no guarda URL, `blob:` URL ni filename como identidad. Guarda `asset_id`/revision.
+`publish_asset_revision()` sigue siendo trusted-server only.
 
-### Flujo
-
-```text
-archivo local
-  -> creator-private/<auth.uid()>/...
-  -> register_asset_revision()
-  -> asset_review_requests
-  -> moderación server-side
-  -> creator-global/...
-  -> asset_publications
-  -> Broadcast asset_published
-```
-
-`publish_asset_revision()` es **service_role only**. El navegador no puede promover un draft a global/official.
-
-### Storage buckets
+Buckets V1:
 
 | Bucket | Público | Límite | Escritura |
 |---|---:|---:|---|
-| `creator-private` | no | 5 MiB | usuario autenticado, solo su carpeta UUID |
-| `creator-global` | sí | 5 MiB | backend/moderación únicamente |
-| `avatars` | sí | 2 MiB | usuario, solo su carpeta UUID |
-| `map-previews` | sí | 5 MiB | usuario, solo su carpeta UUID |
+| `creator-private` | no | 5 MiB | dueño autenticado |
+| `creator-global` | sí | 5 MiB | backend/moderación |
+| `avatars` | sí | 2 MiB | dueño autenticado |
+| `map-previews` | sí | 5 MiB | dueño autenticado |
 
-Imágenes permitidas en V1: PNG, WebP y JPEG. El contrato de assets limita dimensiones a 2048×2048.
+## 5. Mapas
 
-## 5. Mapas y expansión de mundos
+`maps` es identidad estable; `map_versions` es cabecera inmutable; `map_version_chunks` divide payload; `map_asset_refs` fija dependencias exactas; `map_publications` publica una versión sin reescribir las anteriores.
 
-`maps` = identidad estable del mapa.
+## 6. Economía y progreso persistentes
 
-`map_versions` = cabecera de versión inmutable.
+La DB no sustituye a los owners del servidor; los hace durables.
 
-`map_version_chunks` = payload dividido por `chunk_key`, evitando que el diseño dependa para siempre de un JSON gigante por mapa.
+- `PlayerEconomyStore` sigue siendo el único owner de saldo/inventario/equipment usado por Forge y Commerce.
+- Al autenticar un `characters.id`, hidrata desde `character_state_snapshots.payload.economy` y hace flush durable detrás de la misma API.
+- Forge espera hidratación antes de leer/mutar y hace flush antes de devolver operaciones de forja/combinación.
+- Commerce sigue mutando el mismo `PlayerEconomyStore`; el proxy de persistencia captura mutaciones anidadas y las agrupa con debounce.
+- Nobleza usa su tabla/RPC especializada existente mediante `kelo-server-state`.
+- Títulos usan temporalmente `character_state_snapshots.payload.titles`; no existe todavía `title_players`, por lo que no se inventó una tabla paralela.
+- El bridge serializa saves por character para evitar que economía y títulos se pisen al actualizar el mismo snapshot.
 
-`map_asset_refs` = dependencias exactas a revisiones de assets. Esto permite prefetch, auditoría de dependencias y detectar si un asset está en uso antes de retirarlo.
+`character_wallets`, `wallet_ledger`, `item_instances` y `character_equipment` siguen siendo la dirección canónica de migración especializada. `character_state_snapshots` no debe convertirse en una bolsa infinita de JSON; cada dominio se promueve a tabla propia cuando su semántica lo exige.
 
-`map_publications` = versiones publicadas (`unlisted`, `global`, `official`). Publicar una versión no modifica la versión anterior.
+Nunca aceptar del cliente resultados finales como `newBalance`, `damage`, `lootGranted`, `forgeSuccess` o `marketSettlement`.
 
-## 6. Economía persistente
+## 7. Bridge privado y secretos
 
-La DB no sustituye a `PlayerEconomyStore`; es su capa de persistencia futura.
+La Edge Function `kelo-server-state` recibe las credenciales privilegiadas desde el runtime administrado de Supabase. Render no necesita almacenar `sb_secret` ni `service_role` para esta ruta.
 
-- `character_wallets`: saldo materializado actual.
-- `wallet_ledger`: historial append-only de cambios.
-- `apply_wallet_delta()`: RPC **service_role only**, atómica, evita saldo negativo y usa `correlation_id` para idempotencia.
-- `item_instances`: ownership canónico de items por UUID.
-- `character_equipment`: slots equipados apuntan a `item_instances` y un trigger comprueba que item/personaje coincidan.
-- `character_state_snapshots`: snapshot versionado para estado persistente que todavía no tenga tabla especializada.
+Render guarda `KELO_SERVER_BRIDGE_KEY`, una credencial propia server-to-server. La Edge Function solo acepta operaciones si su hash coincide. El valor real nunca entra al repo, al navegador ni a logs; `render.yaml` la declara `sync: false`.
 
-Nunca se debe aceptar desde el cliente: `newBalance`, `damage`, `lootGranted`, `forgeSuccess`, `marketSettlement` ni cualquier resultado valioso final.
+La función:
 
-## 7. Confiabilidad y operaciones
+- valida el character activo;
+- opcionalmente valida un Bearer JWT contra el dueño del character;
+- limita tamaño de body/state;
+- load/save de snapshots con revisión creciente;
+- accede a Nobleza/RPC mediante credenciales privilegiadas internas.
 
-### Idempotencia
+## 8. Confiabilidad
 
-`server_idempotency` guarda resultados de requests de backend que no deben ejecutarse dos veces.
+`server_idempotency`, `server_outbox` y `server_audit_events` permanecen disponibles para operaciones que requieran idempotencia, delivery confiable y auditoría.
 
-### Transactional outbox
+Runtime Render:
 
-`server_outbox` permite escribir un cambio y el evento que debe salir de la DB dentro de la misma transacción. Un worker puede entregar esos eventos y reintentarlos sin perderlos.
+- `/healthz` y `/readyz` en el mismo `http.Server` que recibe upgrades WebSocket;
+- 64 KiB max WebSocket payload;
+- sin per-message compression;
+- ping/pong cada 30 s;
+- SIGTERM/SIGINT cierra clientes con 1012 y detiene timers limpiamente.
 
-### Auditoría
+## 9. Realtime
 
-`server_audit_events` es service-only y registra eventos de seguridad/operación sin exponer IP cruda; el campo previsto es `ip_hash`.
+- movimiento/PvP/skills: `server/*` WebSocket;
+- publicación pública de assets/mapas: Realtime Broadcast mínimo;
+- economía/progreso privado: server authority + persistencia server-to-server.
 
-### Runtime WebSocket / Render
+Nunca usar Postgres Changes como game loop.
 
-`server/index.js` usa un único `http.Server` para health/readiness y upgrades WebSocket. No existe un segundo proceso ni una segunda autoridad.
+Producción usa `wss://kelo-world-server.onrender.com`; `?net=` es override QA y `?offline=1` fuerza local.
 
-- `/healthz`: proceso vivo + audit mínimo.
-- `/readyz`: `200` cuando acepta tráfico; `503` durante shutdown.
-- límite por mensaje WebSocket: 64 KiB.
-- compresión per-message desactivada para el tráfico corto de gameplay.
-- ping/pong cada 30 s para retirar sockets muertos.
-- `SIGTERM`/`SIGINT`: detiene timers, avisa clientes con 1012 y cierra WebSocket/HTTP limpiamente.
+## 10. RLS y claves
 
-`server/smoke-test.js` valida readiness, handshake, `hello` y shutdown real. El workflow `Online Production Activation CI` ejecuta ese smoke junto con los audits Foundation.
+- RLS activo en tablas públicas de la Foundation.
+- Tablas service-only niegan `anon`/`authenticated` cuando corresponde.
+- Browser: solo `sb_publishable_*`.
+- Render: publishable key para verificar JWT/RLS + `KELO_SERVER_BRIDGE_KEY` para llamar a la Edge Function.
+- Supabase privileged key: permanece dentro del runtime de Supabase Edge.
+- Nunca guardar `sb_secret`, service-role, bridge key, access token o refresh token en Pages/repo/logs.
 
-## 8. Realtime
+## 11. Estado legacy / degradación
 
-El loop de juego NO usa Postgres Changes.
+`equipment_items`, `forge_history`, `nobility_players` y `nobility_history` no se eliminan de golpe. Las identidades legacy que todavía no correspondan a un `characters.id` usan RAM de transición en vez de fallar. Cuando el navegador consigue sesión + character válido, los adapters promueven automáticamente esa conexión al camino durable.
 
-- movimiento/PvP/skills: `server/*` WebSocket.
-- publicación pública de assets/mapas: Supabase Realtime Broadcast con payload mínimo.
-- datos privados de economía/moderación: server authority; no Broadcast público.
+Esto permite rollout sin apagar jugadores y sin fingir que RAM es persistencia de producción.
 
-Los triggers actuales usan Broadcast público únicamente para acontecimientos que ya son públicos (`asset_published` y `map_published`). Si en el futuro un evento contiene datos privados debe usar canal privado con autorización o el WebSocket del servidor.
-
-### Endpoint runtime del cliente
-
-En páginas HTTPS no-locales, la configuración de producción usa:
-
-```text
-wss://kelo-world-server.onrender.com
-```
-
-`?net=<wss-url>` conserva el override de QA y `?offline=1` conserva un escape explícito a fallback local. Localhost no se fuerza contra producción.
-
-La URL del servidor es configuración pública; nunca debe contener secrets ni tokens.
-
-## 9. RLS y secretos
-
-- Todas las tablas públicas de la fundación tienen RLS activo.
-- Las tablas exclusivamente server-side tienen políticas deny explícitas para `anon`/`authenticated`.
-- Las columnas usadas por FK/RLS/feeds importantes tienen índices desde V1.
-- Browser: `SUPABASE_PUBLISHABLE_KEY` (`sb_publishable_*`) solamente.
-- Server: `SUPABASE_SECRET_KEY` (`sb_secret_*`) preferida; `SUPABASE_SERVICE_ROLE_KEY` solo como compatibilidad temporal.
-- Nunca versionar una secret/service-role key.
-- La secret key no es JWT y no se envía como `Authorization: Bearer`.
-
-La activación de `KELO_REQUIRE_AUTH=1` está bloqueada hasta que los secrets estén instalados en Render y se haya verificado access token + ownership de `characterId` de extremo a extremo.
-
-## 10. Estado legacy
-
-`equipment_items`, `forge_history`, `nobility_players` y `nobility_history` ya existían como owners de persistencia de sistemas activos. No se eliminan ni se reemplazan de golpe. Se mantienen service-only y se migrarán gradualmente a `characters.id`/wallet ledger sin romper los servicios actuales.
-
-No crear tablas paralelas adicionales para resolver temporalmente la transición.
-
-Mientras Supabase no esté conectado al proceso Render, identidad y stores que aún no tienen persistencia activa permanecen explícitamente en transición/RAM. Eso no autoriza a presentar esa RAM como persistencia de producción.
-
-## 11. APIs de DB relevantes
+## 12. APIs relevantes
 
 Client-authenticated controladas:
 
 - `create_character(name)`
 - `claim_legacy_player_key(character_id, player_key)`
-- `create_asset_family(...)`
-- `register_asset_revision(...)`
-- `submit_asset_revision(revision_id)`
-- `create_map(...)`
-- `register_map_version(...)`
+- creator/map RPCs ya documentadas.
 
 Trusted-server only:
 
@@ -207,48 +161,32 @@ Trusted-server only:
 - `publish_map_version(...)`
 - `apply_wallet_delta(...)`
 - `nobility_donate(...)`
+- Edge Function `kelo-server-state` mediante bridge key privada.
 
-## 12. Tests / auditoría
+## 13. Tests / auditoría
 
 - `npm run audit:online-foundation`
 - `npm run audit:foundation`
 - `npm run audit:docs`
 - `cd server && npm run test:smoke`
-- Supabase Security Advisor después de cambios DDL/RLS.
-- Supabase Performance Advisor después de cambios de FK/policies/queries.
+- `cd server && npm run test:persistence`
+- Supabase Security Advisor después de DDL/RLS.
+- Supabase Performance Advisor después de cambios de índices/queries.
 
-El audit local verifica versiones de migraciones únicas, contratos RLS, buckets, versionado de assets/mapas, idempotencia del ledger, ausencia de secrets y semántica de `sb_secret` en `server/online-identity-store.js`.
+El persistence smoke usa un backend local controlado para validar hydrate/flush, serialización del snapshot, Forge, Titles, Nobleza persistente y fallback legacy sin tocar producción.
 
-El smoke de servidor verifica el proceso real y no un mock de WebSocket.
+## 14. Anti-patrones prohibidos
 
-## 13. Anti-patrones prohibidos
+- segundo servidor/transport multiplayer;
+- client-authoritative daño, saldo, forge o loot;
+- posiciones PvP por frame en Postgres;
+- `service_role`/`sb_secret` en Render o Pages para este flujo;
+- `KELO_SERVER_BRIDGE_KEY` en GitHub/cliente;
+- múltiples owners de saldo/inventario;
+- convertir snapshot JSON en almacenamiento universal permanente;
+- borrar índices nuevos solo porque todavía no registran uso;
+- usar `user_metadata` como autorización.
 
-- guardar URLs/blob URLs en mapas como identidad;
-- reemplazar bytes de una revisión publicada;
-- que el cliente escriba directamente una publicación global;
-- poner `service_role`/`sb_secret` en Pages, localStorage o repo;
-- crear un segundo servidor multiplayer cuando `server/*` ya es el owner;
-- crear un servidor aparte solo para health/readiness;
-- guardar posiciones PvP cada frame en Postgres;
-- usar Postgres Realtime como sustituto del fixed-step WebSocket;
-- actualizar saldos sin ledger/correlation id;
-- unir para siempre `auth.users.id` y personaje en un solo ID semántico;
-- esconder una URL WSS dentro de una feature gameplay en vez de usar config runtime.
+## 15. Expansión sin ruptura
 
-## 14. Expansión prevista sin ruptura
-
-Esta base admite agregar después sin cambiar los IDs actuales:
-
-- guilds/clanes;
-- friendships/social graph;
-- housing/properties;
-- mail;
-- quests/achievements;
-- market/order books;
-- creator packs/collections;
-- moderation/reporting;
-- world shards/regions;
-- CDN/R2 para bytes grandes manteniendo los mismos `asset_id`;
-- jobs/workers que consuman `server_outbox`.
-
-Las nuevas áreas deben crear tablas especializadas cuando tengan semántica propia, en vez de convertir `character_state_snapshots.payload` en una bolsa infinita de JSON.
+Esta base admite guilds, social graph, housing, mail, quests, market/order books, creator packs, moderation, shards/regions, CDN/R2 y workers de outbox manteniendo IDs actuales. Las áreas con semántica propia deben migrar a tablas especializadas sin cambiar la autoridad gameplay.
