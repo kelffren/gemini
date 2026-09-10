@@ -17,6 +17,14 @@ services:
         value: 24.20.0
       - key: NODE_ENV
         value: production
+      - key: SUPABASE_URL
+        value: https://iapxdbitjdwvtbpjghct.supabase.co
+      - key: SUPABASE_PUBLISHABLE_KEY
+        value: sb_publishable_t0RI7co82Rh1wOAWUIo4Zg_rZK5EQ9S
+      - key: KELO_SERVER_STATE_URL
+        value: https://iapxdbitjdwvtbpjghct.supabase.co/functions/v1/kelo-server-state
+      - key: KELO_SERVER_BRIDGE_KEY
+        sync: false
       - key: KELO_REQUIRE_AUTH
         value: "0"
       - key: KELO_TITLES_SUPABASE
