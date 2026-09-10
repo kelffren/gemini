@@ -1,58 +1,66 @@
 /* KELO-INDEX
  * area: TEST / MAP FORGE / STUDIO HANDOFF
  * owner: Map Forge Studio handoff contract audit
- * purpose: prove declared semantic asset variants are actually used deterministically across real generated worlds
+ * purpose: prove district labels cannot override the intrinsic semantic kind of real generated props/landmarks
  */
 import assert from 'node:assert/strict';
 import {generateBestOf} from '../src/world/map-forge/map-forge-core.mjs';
 import {getMapForgeRecipe} from '../src/world/map-forge/map-forge-recipes.mjs';
 import {mapDefinitionToWorldDraftSnapshot} from '../src/studio/adapters/map-forge-draft-importer.mjs';
 
-const VARIANTS=Object.freeze({
+const EXPECTED=Object.freeze({
   fountain:['imperial:fuente-justicia','imperial:fuente-astral','imperial:fuente-leones'],
+  market:['imperial:kiosco'],
   tree:['imperial:arbol-florido-blanco','imperial:arbol-florido-azul'],
-  lamp:['imperial:farola','imperial:farola-monumental']
+  lamp:['imperial:farola','imperial:farola-monumental'],
+  bench:['imperial:banco'],
+  flower:['imperial:jardinera-curva'],
+  bush:['imperial:topiario']
 });
-const SIZES=Object.freeze({
-  'imperial:fuente-justicia':[128,128],
-  'imperial:fuente-astral':[128,128],
-  'imperial:fuente-leones':[128,128],
-  'imperial:arbol-florido-blanco':[128,128],
-  'imperial:arbol-florido-azul':[128,128],
-  'imperial:farola':[64,96],
-  'imperial:farola-monumental':[64,96]
-});
-const extras=[
-  ['imperial:kiosco',160,160],['imperial:banco',128,96],['imperial:jardinera-curva',160,160],
-  ['imperial:topiario',96,96],['imperial:puente',160,128],['imperial:obelisco',96,128]
-];
 const templates=[
-  ...Object.entries(SIZES).map(([id,[width,height]])=>({id,label:id,family:id,category:'decor',width,height,placeable:true})),
-  ...extras.map(([id,width,height])=>({id,label:id,family:id,category:'decor',width,height,placeable:true}))
-];
-const catalog={version:'semantic-variety-audit-v1',list:()=>templates,get:id=>templates.find(row=>row.id===id)||null};
+  ['imperial:fuente-justicia',128,128],['imperial:fuente-astral',128,128],['imperial:fuente-leones',128,128],
+  ['imperial:kiosco',160,160],['imperial:arbol-florido-blanco',128,128],['imperial:arbol-florido-azul',128,128],
+  ['imperial:farola',64,96],['imperial:farola-monumental',64,96],['imperial:banco',128,96],
+  ['imperial:jardinera-curva',160,160],['imperial:topiario',96,96],['imperial:puente',160,128],['imperial:obelisco',96,128]
+].map(([id,width,height])=>({id,label:id,family:id,category:'decor',width,height,placeable:true}));
+const catalog={version:'semantic-kind-audit-v1',list:()=>templates,get:id=>templates.find(row=>row.id===id)||null};
 const recipes=['KELO_ROYAL_CAPITAL_V1','KELO_VILLAGE_V1','KELO_FOREST_V1'];
-const usage=Object.fromEntries(Object.keys(VARIANTS).map(kind=>[kind,new Map()]));
-const counts=Object.fromEntries(Object.keys(VARIANTS).map(kind=>[kind,0]));
-let worlds=0;
+const legacyRules=[
+  [/\b(fountain|fuente)\b/,'imperial:fuente-justicia'],[/\b(market|mercado|commerce|shop)\b/,'imperial:kiosco'],
+  [/\b(ancient tree|tree|arbol|grove)\b/,'imperial:arbol-florido-blanco'],[/\b(lamp|farola|light)\b/,'imperial:farola'],
+  [/\b(bench|banco)\b/,'imperial:banco'],[/\b(flower|floral|garden|jardin)\b/,'imperial:jardinera-curva'],[/\b(bush|topiary|topiario)\b/,'imperial:topiario']
+];
+const normalize=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[_-]+/g,' ').replace(/[^a-z0-9 ]+/g,' ').replace(/\s+/g,' ').trim();
+let worlds=0,checked=0,beforeWrong=0,afterWrong=0,beforeWrongKiosk=0,afterWrongKiosk=0;
+const byKind={};
 
-function semanticKind(row){
-  const text=String([row?.kind,row?.type,row?.family,row?.name,row?.label,row?.role].filter(Boolean).join(' ')).toLowerCase();
+function authoritativeKind(row){
+  const text=normalize([row?.kind,row?.type,row?.family,row?.name,row?.label,row?.role].filter(Boolean).join(' '));
   if(/\b(fountain|fuente)\b/.test(text))return'fountain';
+  if(/\b(market|mercado|shop)\b/.test(text))return'market';
   if(/\b(ancient tree|tree|arbol|grove)\b/.test(text))return'tree';
   if(/\b(lamp|farola|light)\b/.test(text))return'lamp';
+  if(/\b(bench|banco)\b/.test(text))return'bench';
+  if(/\b(flower|floral|garden|jardin)\b/.test(text))return'flower';
+  if(/\b(bush|topiary|topiario)\b/.test(text))return'bush';
   return null;
 }
-function inspectRows(map,snapshot,collection,placementKind){
-  const byId=new Map(snapshot.placements.map(row=>[row.placementId,row]));
+function legacyAsset(row){
+  const text=normalize([row?.type,row?.family,row?.id,row?.name,row?.label,row?.role,row?.district].filter(Boolean).join(' '));
+  for(const [test,assetId] of legacyRules)if(test.test(text))return assetId;
+  return null;
+}
+function inspect(collection,placementKind,snapshot){
+  const placements=new Map(snapshot.placements.map(row=>[row.placementId,row]));
   for(const [index,row] of collection.entries()){
-    const kind=semanticKind(row); if(!kind)continue;
+    const kind=authoritativeKind(row); if(!kind)continue;
     const placementId=`map-forge:${placementKind}:${String(row?.id||index)}`;
-    const placement=byId.get(placementId);
+    const placement=placements.get(placementId);
     assert(placement,`missing semantic placement ${placementId}`);
-    assert(VARIANTS[kind].includes(placement.assetId),`${kind} resolved unexpected asset ${placement.assetId}`);
-    counts[kind]+=1;
-    usage[kind].set(placement.assetId,(usage[kind].get(placement.assetId)||0)+1);
+    checked+=1; byKind[kind]=(byKind[kind]||0)+1;
+    const before=legacyAsset(row);
+    if(before&&!EXPECTED[kind].includes(before)){beforeWrong+=1;if(before==='imperial:kiosco'&&kind!=='market')beforeWrongKiosk+=1;}
+    if(!EXPECTED[kind].includes(placement.assetId)){afterWrong+=1;if(placement.assetId==='imperial:kiosco'&&kind!=='market')afterWrongKiosk+=1;}
   }
 }
 
@@ -60,45 +68,22 @@ for(const recipeId of recipes){
   const recipe=getMapForgeRecipe(recipeId);
   for(let seed=1;seed<=20;seed++){
     const run=generateBestOf(recipe,{seed,count:4,assetCatalogVersion:catalog.version});
-    assert(run.best?.validation?.valid,`${recipeId} seed ${seed} must produce a valid best candidate`);
+    assert(run.best?.validation?.valid,`${recipeId} seed ${seed} must produce a valid candidate`);
     const snapshot=mapDefinitionToWorldDraftSnapshot(run.best,{assetCatalog:catalog});
-    inspectRows(run.best,snapshot,run.best.landmarks||[],'landmark');
-    inspectRows(run.best,snapshot,run.best.decorations||[],'decoration');
+    inspect(run.best.landmarks||[],'landmark',snapshot);
+    inspect(run.best.decorations||[],'decoration',snapshot);
     if(seed===1){
       const replay=generateBestOf(recipe,{seed,count:4,assetCatalogVersion:catalog.version});
       const replaySnapshot=mapDefinitionToWorldDraftSnapshot(replay.best,{assetCatalog:catalog});
-      assert.deepEqual(replaySnapshot.placements,snapshot.placements,`${recipeId} semantic asset selection must be seed deterministic`);
+      assert.deepEqual(replaySnapshot.placements,snapshot.placements,`${recipeId} projection must remain deterministic`);
     }
     worlds+=1;
   }
 }
+assert(checked>100,'corpus must exercise semantic placements heavily');
+assert(beforeWrong>0,'legacy district-contaminated resolver must reproduce at least one wrong semantic placement');
+assert(beforeWrongKiosk>0,'legacy resolver must reproduce non-market props becoming the oversized kiosk');
+assert.equal(afterWrong,0,'intrinsic semantic kind must win over district labels');
+assert.equal(afterWrongKiosk,0,'non-market props must never resolve to imperial:kiosco');
 
-const observedKinds=Object.keys(VARIANTS).filter(kind=>counts[kind]>0);
-assert(observedKinds.length>=2,'representative corpus must exercise at least two multi-variant semantic families');
-let available=0,beforeDistinct=0,afterDistinct=0;
-const families={};
-for(const kind of observedKinds){
-  const allowed=VARIANTS[kind];
-  const used=usage[kind];
-  available+=allowed.length;
-  beforeDistinct+=1;
-  afterDistinct+=used.size;
-  const dominant=Math.max(...used.values())/counts[kind];
-  families[kind]={count:counts[kind],beforeDistinct:1,afterDistinct:used.size,available:allowed.length,dominantShare:Number(dominant.toFixed(4)),usage:Object.fromEntries(used)};
-  assert(used.size>=2,`${kind} must use more than the legacy first semantic asset`);
-}
-const beforeCoverage=beforeDistinct/available;
-const afterCoverage=afterDistinct/available;
-assert(afterCoverage>beforeCoverage,`semantic asset variety must improve: ${beforeCoverage} -> ${afterCoverage}`);
-
-console.log(JSON.stringify({
-  ok:true,
-  worlds,
-  recipes:recipes.length,
-  seedsPerRecipe:20,
-  deterministicReplays:recipes.length,
-  metric:'declared semantic variant coverage',
-  before:Number((beforeCoverage*100).toFixed(2)),
-  after:Number((afterCoverage*100).toFixed(2)),
-  families
-},null,2));
+console.log(JSON.stringify({ok:true,worlds,recipes:recipes.length,seedsPerRecipe:20,deterministicReplays:recipes.length,checked,before:{wrongSemanticPlacements:beforeWrong,wrongKioskConversions:beforeWrongKiosk,errorRatePct:Number((beforeWrong/checked*100).toFixed(2))},after:{wrongSemanticPlacements:afterWrong,wrongKioskConversions:afterWrongKiosk,errorRatePct:Number((afterWrong/checked*100).toFixed(2))},byKind},null,2));
