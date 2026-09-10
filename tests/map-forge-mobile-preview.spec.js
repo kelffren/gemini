@@ -1,3 +1,8 @@
+/* KELO-INDEX
+ * area: TEST / MAP FORGE / MOBILE PREVIEW
+ * owner: Map Forge mobile browser smoke
+ * purpose: verify real snapshot preview, reversible exterior handoff, camera focus and session restoration at 390x844
+ */
 const { test, expect } = require('@playwright/test');
 const fs = require('fs');
 
