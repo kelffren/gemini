@@ -5,9 +5,10 @@
  * do-not: NO provider secret in browser, NO second auth system, NO gameplay authority
  */
 import {openSpriteFactory} from './sprite-factory-workspace.mjs';
-import {repairSpritesheetImage} from '../sprite-compiler/sprite-compiler-core.mjs';
+import {repairSpritesheetImage,analyzeGridCells} from '../sprite-compiler/sprite-compiler-core.mjs';
 import {detectSpriteCompilerGrid,selectSpriteCompilerGrid} from '../sprite-compiler/sprite-compiler-grid.mjs';
 import {diagnoseSpriteFrames,buildSelectiveRepairTargets} from '../sprite-compiler/sprite-frame-doctor.mjs';
+import {planLocalFrameGeometryRepairs,applyFrameGeometryRepairs} from '../sprite-compiler/sprite-frame-geometry-repair.mjs';
 const DIRECTIONS=['N','NE','E','SE','S','SW','W','NW'];
 function endpointFromRuntime(root){
   const raw=root.KELO_ONLINE_RUNTIME_CONFIG?.defaultWsUrl||root.KELO_ONLINE_RUNTIME_CONFIG?.effectiveNet||'wss://kelo-world-server.onrender.com';
@@ -34,7 +35,7 @@ async function credentials(root){const auth=await root.KeloOnlineAuth?.credentia
 export async function openSpriteFactoryOnline({root=globalThis}={}){
   const factory=await openSpriteFactory({root}),shell=factory.shell,endpointInput=shell.querySelector('.ksf-endpoint input'),aiBtn=shell.querySelector('.ksf-endpoint button'),fileInput=shell.querySelector('.ksf-file'),settingsPanel=shell.querySelector('.ksf-settings')?.closest('.ksf-panel'),sheetPanel=shell.querySelector('.ksf-sheet')?.closest('.ksf-panel'),note=shell.querySelector('.ksf-note');
   if(!endpointInput||!aiBtn)return factory;
-  const endpoint=endpointFromRuntime(root);endpointInput.value=endpoint;endpointInput.readOnly=true;if(note)note.textContent='Online mode: Sprite Compiler detects the atlas grid, repairs geometry, then Frame Doctor identifies the exact bad direction/frame so retries can target only failed cells instead of blindly replacing the whole result.';
+  const endpoint=endpointFromRuntime(root);endpointInput.value=endpoint;endpointInput.readOnly=true;if(note)note.textContent='Online mode: Sprite Compiler detects the atlas grid, repairs geometry, then Frame Doctor auto-fixes safe scale/center defects locally for free and identifies the exact remaining direction/frame without touching healthy cells.';
   let sourceImageDataUrl=null,busy=false;
   fileInput?.addEventListener('change',async()=>{const file=fileInput.files?.[0];if(!file){sourceImageDataUrl=null;return;}try{sourceImageDataUrl=await readDataUrl(root,file);}catch(error){console.warn('[Sprite Factory source]',error);sourceImageDataUrl=null;}},{passive:true});
   async function installGenerated(data){
@@ -43,15 +44,17 @@ export async function openSpriteFactoryOnline({root=globalThis}={}){
     if(!grid.reviewRequired&&(grid.columns!==4||grid.rows!==8)){
       const compiler=Object.freeze({pass:false,clippedAfter:0,feetSpread:0,grid:detection,frameDoctor:null,repairTargets:Object.freeze([])});
       if(tag)tag.textContent=`AI · GRID ${grid.columns}×${grid.rows} · RETRY`;
-      try{root.__KELO_SPRITE_COMPILER_LAST__={version:'v1.3-frame-doctor',report:compiler,source:[img.naturalWidth||img.width,img.naturalHeight||img.height],output:null};}catch{}
+      try{root.__KELO_SPRITE_COMPILER_LAST__={version:'v1.4-local-frame-repair',report:compiler,source:[img.naturalWidth||img.width,img.naturalHeight||img.height],output:null};}catch{}
       return Object.freeze({frameCount:32,nonEmpty:0,clipped:0,passTechnical:false,passArt:false,passMotion:false,compiler});
     }
     const repaired=repairSpritesheetImage(root,img,{columns:grid.columns,rows:grid.rows,targetWidth:64,targetHeight:64,padding:4,removeBackground:true,colorThreshold:34,softEdge:14,imageSmoothing:true});
-    const frameDoctor=diagnoseSpriteFrames(repaired.outputFrames,{columns:grid.columns,directions:DIRECTIONS}),repairTargets=buildSelectiveRepairTargets(frameDoctor,{maxTargets:8});
-    const compiler=Object.freeze({...repaired.report,pass:repaired.report.pass&&!grid.reviewRequired&&frameDoctor.pass,grid:Object.freeze({...detection,selectedSource:grid.source}),frameDoctor,repairTargets});
+    const beforeDoctor=diagnoseSpriteFrames(repaired.outputFrames,{columns:grid.columns,directions:DIRECTIONS}),localPlan=planLocalFrameGeometryRepairs(repaired.outputFrames,beforeDoctor,{maxRepairs:8}),localApplied=applyFrameGeometryRepairs(root,repaired.canvas,localPlan.operations,{imageSmoothing:true});
+    const repairedCtx=repaired.canvas.getContext('2d',{willReadFrequently:true}),repairedPixels=repairedCtx.getImageData(0,0,repaired.canvas.width,repaired.canvas.height),postFrames=analyzeGridCells(repairedPixels.data,repaired.canvas.width,repaired.canvas.height,{columns:grid.columns,rows:grid.rows});
+    const frameDoctor=diagnoseSpriteFrames(postFrames,{columns:grid.columns,directions:DIRECTIONS}),repairTargets=buildSelectiveRepairTargets(frameDoctor,{maxTargets:8}),localGeometryRepair=Object.freeze({attempted:localPlan.operations.length,applied:localApplied.applied,skipped:localPlan.skipped.map(x=>x.index),beforeDefects:beforeDoctor.defectiveCount,afterDefects:frameDoctor.defectiveCount});
+    const compiler=Object.freeze({...repaired.report,pass:repaired.report.pass&&!grid.reviewRequired&&frameDoctor.pass,grid:Object.freeze({...detection,selectedSource:grid.source}),frameDoctor,repairTargets,localGeometryRepair});
     const ctx=factory.sheet.getContext('2d');ctx.clearRect(0,0,factory.sheet.width,factory.sheet.height);ctx.imageSmoothingEnabled=false;ctx.drawImage(repaired.canvas,0,0,factory.sheet.width,factory.sheet.height);
-    const baseQA=factory.runQA(),qa=Object.freeze({...baseQA,compiler});if(tag)tag.textContent=`${data.sourceMode==='reference-edit'?'AI · REFERENCE':'AI · GENERATED'} · ${compiler.pass?'FRAME QA PASS':`${frameDoctor.defectiveCount} FRAME${frameDoctor.defectiveCount===1?'':'S'} TO FIX`}`;
-    try{root.__KELO_SPRITE_COMPILER_LAST__={version:'v1.3-frame-doctor',report:compiler,source:[repaired.sourceWidth,repaired.sourceHeight],output:[repaired.canvas.width,repaired.canvas.height],repairTargets};}catch{}
+    const baseQA=factory.runQA(),qa=Object.freeze({...baseQA,compiler});if(tag)tag.textContent=`${data.sourceMode==='reference-edit'?'AI · REFERENCE':'AI · GENERATED'} · ${compiler.pass?'FRAME QA PASS':`${frameDoctor.defectiveCount} FRAME${frameDoctor.defectiveCount===1?'':'S'} TO FIX`} · LOCAL ${localApplied.applied.length}`;
+    try{root.__KELO_SPRITE_COMPILER_LAST__={version:'v1.4-local-frame-repair',report:compiler,source:[repaired.sourceWidth,repaired.sourceHeight],output:[repaired.canvas.width,repaired.canvas.height],repairTargets};}catch{}
     return qa;
   }
   async function generateOnce(token,retryHint=''){
@@ -68,6 +71,6 @@ export async function openSpriteFactoryOnline({root=globalThis}={}){
     finally{busy=false;aiBtn.disabled=false;aiBtn.textContent='GENERATE WITH AI';}
   };
   aiBtn.textContent='GENERATE WITH AI';
-  const status=await fetchStatus(root,endpoint,settingsPanel);try{root.__KELO_SPRITE_FACTORY_ONLINE__={version:'v1.3-frame-doctor',endpoint,status};}catch{}
+  const status=await fetchStatus(root,endpoint,settingsPanel);try{root.__KELO_SPRITE_FACTORY_ONLINE__={version:'v1.4-local-frame-repair',endpoint,status};}catch{}
   return factory;
 }
