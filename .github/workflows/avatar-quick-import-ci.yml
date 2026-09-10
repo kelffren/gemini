@@ -14,6 +14,7 @@ on:
       - 'src/ui/studio-launcher.js'
       - 'supabase/migrations/*avatar*'
       - 'scripts/avatar-quick-import-audit.mjs'
+      - 'scripts/avatar-quick-import-live-audit.mjs'
       - 'docs/systems/AVATAR_QUICK_IMPORT.md'
       - 'docs/system-catalog.json'
       - 'package.json'
@@ -26,6 +27,7 @@ on:
       - 'src/creators/ui/avatar-workspace.mjs'
       - 'src/creators/workspaces/avatar-workspace.mjs'
       - 'supabase/migrations/*avatar*'
+      - 'scripts/avatar-quick-import-live-audit.mjs'
 
 jobs:
   avatar-quick:
@@ -47,9 +49,23 @@ jobs:
           node --check src/creators/content/supabase-content-repository.mjs
           node --check src/ui/studio-launcher.js
           node --check scripts/avatar-quick-import-audit.mjs
+          node --check scripts/avatar-quick-import-live-audit.mjs
       - name: Avatar architecture
         run: npm run audit:avatar-quick
       - name: Universal content compatibility
         run: npm run audit:universal-content
       - name: Documentation contract
         run: npm run audit:docs
+      - name: Install browser audit dependency
+        run: npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund playwright@1.55.0
+      - name: Mobile upload preview and use proof
+        run: |
+          set -euo pipefail
+          python3 -m http.server 4173 --bind 127.0.0.1 >/tmp/avatar-quick-http.log 2>&1 &
+          server_pid=$!
+          trap 'kill ${server_pid} >/dev/null 2>&1 || true' EXIT
+          for i in $(seq 1 20); do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then break; fi
+            sleep 1
+          done
+          AUDIT_URL=http://127.0.0.1:4173/ CHROME_BIN=/usr/bin/google-chrome node scripts/avatar-quick-import-live-audit.mjs
