@@ -2,140 +2,93 @@
 
 ## Propósito
 
-Este documento describe cómo se despliega el owner autoritativo existente de Kelo World (`server/*`) en Render. No crea un segundo servidor ni cambia la autoridad gameplay.
-
-## Arquitectura
+Render ejecuta el único owner online de gameplay de Kelo World: `server/*`. Supabase aporta identidad y persistencia; no sustituye el fixed-step WebSocket ni crea otra autoridad de combate.
 
 ```text
-GitHub Pages / cliente
-  -> WSS Render (`server/*`)
-       -> autoridad PvP, movimiento, daño, cooldowns, economía/progreso online donde aplique
-       -> Supabase para identidad y persistencia confiable
+GitHub Pages
+  -> KeloNetAuthority / engine-net.js
+       -> WSS Render / server/*
+            -> PvP + movimiento + economía/progreso autoritativos
+            -> Supabase Auth (JWT + RLS)
+            -> kelo-server-state Edge Function
+                 -> persistencia trusted-server en Postgres
 ```
 
-Supabase no sustituye el fixed-step WebSocket. Render no sustituye los owners de dominio en `server/*`; solo ejecuta el proceso Node.
+## Runtime de producción
 
-## Fuente de verdad de infraestructura
-
-- Blueprint: `/render.yaml`
-- Código ejecutado: `/server`
-- Config endpoint cliente: `/src/config/online-runtime-config.js`
-- Branch de producción: `main`
-- Región inicial: `virginia`
-- Runtime fijado: Node `24.20.0`
-- WebSocket package fijado en `server/package.json`
-- Auto deploy deseado: sí, desde `main`
+- Servicio: `kelo-world-server`
+- Región: `virginia`
+- Branch: `main`
+- Root: `server`
+- Node: `24.20.0`
 - Health: `/healthz`
 - Readiness: `/readyz`
+- WebSocket: 64 KiB max payload, sin per-message compression, ping/pong 30 s.
+- PvP: fixed step 60 Hz; snapshots 20 Hz.
 
-## Cliente online por defecto
-
-En HTTPS no-local, `src/config/online-runtime-config.js` prepara el endpoint:
+Cliente HTTPS no-local usa por defecto:
 
 ```text
 wss://kelo-world-server.onrender.com
 ```
 
-`engine-net.js` sigue siendo el único transporte. La config no abre sockets ni posee gameplay.
+`?net=` conserva override QA y `?offline=1` fuerza fallback local.
 
-Overrides de QA:
+## Auth
 
-- `?net=wss://otro-endpoint` sobrescribe el default.
-- `?offline=1` evita insertar el endpoint y deja el fallback local.
-- localhost/127.0.0.1 no fuerzan producción automáticamente.
+El navegador usa únicamente la publishable key de Supabase. `src/auth/supabase-auth-runtime.js` mantiene la sesión, intenta identidad anónima cuando no existe sesión, resuelve/crea un `characters.id` propio mediante RLS/RPC y adjunta `accessToken + characterId` al mismo mensaje `hello` que ya envía `engine-net.js`.
 
-No guardar tokens, claves o secretos en esta config.
+`server/online-identity-store.js` valida el JWT contra Supabase Auth y consulta `characters` usando el mismo JWT + publishable key, por lo que RLS vuelve a verificar ownership. Render no necesita `SUPABASE_SECRET_KEY` para autenticar jugadores.
 
-## Comandos
+Mientras `KELO_REQUIRE_AUTH=0`, si Auth no está disponible el jugador puede entrar por el camino legacy de transición. Cuando el flujo real de Pages esté verificado end-to-end se puede cambiar a `1`.
 
-Con `rootDir: server`:
+## Persistencia privada sin service-role en Render
+
+La Edge Function `kelo-server-state` vive en el proyecto Supabase y recibe las credenciales privilegiadas desde el runtime de Supabase. Render no almacena una Supabase secret/service-role key.
+
+Render sí mantiene una credencial propia `KELO_SERVER_BRIDGE_KEY`, usada únicamente para autorizar llamadas server-to-server a esa Edge Function. Su valor nunca se versiona ni se envía al navegador.
+
+Variables públicas/configurables:
+
+- `SUPABASE_URL=https://iapxdbitjdwvtbpjghct.supabase.co`
+- `SUPABASE_PUBLISHABLE_KEY=sb_publishable_...`
+- `KELO_SERVER_STATE_URL=https://iapxdbitjdwvtbpjghct.supabase.co/functions/v1/kelo-server-state`
+- `KELO_REQUIRE_AUTH=0` durante el rollout.
+
+Secreto Render:
+
+- `KELO_SERVER_BRIDGE_KEY` (`sync: false` en `render.yaml`).
+
+No guardar `sb_secret`, `service_role`, `KELO_SERVER_BRIDGE_KEY`, access tokens ni refresh tokens en GitHub, Pages o logs.
+
+## Stores
+
+- `PlayerEconomyStore`: owner RAM activo durante la sesión + hidratación/flush durable en `character_state_snapshots.payload.economy`.
+- Forge/Commerce: siguen reutilizando `PlayerEconomyStore`; no tienen un segundo saldo/inventario.
+- Nobleza: usa la tabla/RPC especializada existente mediante la Edge Function; fallback RAM solo para identidad legacy/transición.
+- Títulos: usa `character_state_snapshots.payload.titles` hasta promoverlo a una tabla especializada; kills continúan naciendo exclusivamente del combate confirmado por servidor.
+
+El bridge serializa saves por `characterId` para que economía y títulos no se pisen al actualizar el mismo snapshot.
+
+## Comandos y CI
 
 ```text
 build: npm install --omit=dev
 start: npm start
-test: npm run test:smoke
+lifecycle smoke: npm run test:smoke
+persistence smoke: npm run test:persistence
 ```
 
-El server escucha `process.env.PORT`, que Render inyecta automáticamente.
-
-## Health, readiness y lifecycle
-
-El mismo proceso HTTP que recibe upgrades WebSocket responde:
-
-- `GET /healthz` -> proceso vivo, métricas operativas mínimas y audit de owners.
-- `GET /readyz` -> `200` mientras acepta tráfico; `503` durante shutdown.
-
-No existe un segundo servidor para health.
-
-Protecciones runtime:
-
-- WebSocket `maxPayload = 64 KiB`.
-- `perMessageDeflate` desactivado para evitar costo/abuso innecesario en mensajes pequeños de gameplay.
-- ping/pong cada 30 s para limpiar conexiones muertas.
-- `SIGTERM`/`SIGINT`: detiene simulation/heartbeat, cierra clientes con código 1012 y cierra HTTP/WebSocket limpiamente.
-
-`server/smoke-test.js` levanta el proceso real, prueba `/readyz`, handshake WebSocket, `hello` y shutdown por `SIGTERM`.
-
-## Variables de entorno
-
-No guardar secretos en GitHub.
-
-Variables no secretas:
-
-- `NODE_ENV=production`
-- `KELO_REQUIRE_AUTH=0` durante transición controlada; cambiar a `1` cuando Auth/character selection estén validados end-to-end.
-- `KELO_TITLES_SUPABASE=0` hasta validar persistencia de títulos en producción.
-
-Secretas / configuradas en Render:
-
-- `SUPABASE_URL`
-- `SUPABASE_SECRET_KEY` (preferida)
-
-Compatibilidad temporal:
-
-- `SUPABASE_SERVICE_ROLE_KEY`
-
-Nunca exponer `SUPABASE_SECRET_KEY` ni service-role en Pages, localStorage, logs o commits.
-
-## Fases de activación
-
-### Fase A — Server online / transición
-
-El proceso puede arrancar sin Supabase secrets. `server/online-identity-store.js` permanece en modo legacy-transition y el gameplay WebSocket se puede probar sin convertir el navegador en autoridad.
-
-### Fase B — Persistencia conectada
-
-Añadir `SUPABASE_URL` + `SUPABASE_SECRET_KEY` en Render. Verificar logs, identity audit y operaciones persistentes antes de exigir autenticación.
-
-### Fase C — Auth obligatoria
-
-Solo después de validar login, access token y ownership de character de extremo a extremo, cambiar `KELO_REQUIRE_AUTH=1`.
+`Online Production Activation CI` valida sintaxis, lifecycle real del WebSocket, bridge de persistencia, Foundation y documentación.
 
 ## Operación y rollback
 
-- Cada push a `main` debe desplegar automáticamente cuando la integración GitHub de Render esté autorizada.
-- Mientras el webhook no esté autorizado, el deploy se dispara explícitamente por la API de Render después de un merge validado.
-- No desplegar una rama experimental como producción permanente.
-- Si un deploy falla, revisar build/runtime logs antes de reintentar.
-- Para rollback, redeploy de un commit/deploy previamente validado; no parchear producción con código fuera de Git.
-- Antes de escalar, observar CPU, memoria, conexiones y latencia.
+- Cada cambio pasa por Git + CI antes de `main`.
+- Si el webhook de Render no dispara el deploy, usar el deploy API sobre el commit ya fusionado; no parchear producción fuera de Git.
+- En shutdown se detienen timers, los clientes reciben 1012 y HTTP/WebSocket cierran limpiamente.
+- En fallo temporal de Supabase, el rollout actual degrada a transición/RAM en vez de tumbar el PvP.
+- `KELO_REQUIRE_AUTH=1` solo después de verificar Pages -> Auth -> character ownership -> WSS -> persistencia real.
 
-## Límites actuales conocidos
+## Escalado
 
-- Plan Free puede dormir cuando no hay tráfico; es adecuado para desarrollo/pruebas, no para PvP competitivo continuo.
-- El server actual usa un único proceso/room con `MAX=32`; sharding/rooms múltiples se agregan detrás del mismo owner cuando una métrica real lo exija.
-- Persistencia Supabase se activa gradualmente; no crear una segunda DB o un segundo multiplayer server para saltarse esta transición.
-- Online por defecto ya apunta al servidor Render, pero Auth/persistencia valiosa continúan en transición hasta instalar y verificar secrets Supabase.
-
-## Definition of Done de infraestructura
-
-- Render Web Service desplegado desde `main`.
-- Puerto detectado y proceso estable.
-- Conexión WSS comprobada.
-- `/readyz` verde.
-- Logs sin crash loop.
-- Cliente production HTTPS usa WSS por defecto con overrides QA preservados.
-- Smoke test lifecycle verde.
-- Secretos solo en Render.
-- Supabase conectado antes de habilitar `KELO_REQUIRE_AUTH=1`.
-- Cambios futuros reproducibles desde Git + `render.yaml`.
+El plan Free sirve para desarrollo y pruebas y puede dormir sin tráfico. El servidor actual sigue siendo una sola autoridad con `MAX=32`; rooms/shards se añaden detrás del mismo contrato cuando métricas reales lo requieran, sin introducir un segundo transporte ni otra autoridad gameplay.
