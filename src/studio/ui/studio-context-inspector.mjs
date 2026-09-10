@@ -2,7 +2,7 @@
  * area: STUDIO / CONTEXT INSPECTOR
  * owns: compact on-canvas object properties card and proxying to existing Studio property/actions UI
  * does-not-own: world mutations, command history, authority or property semantics
- * public-api: createStudioContextInspector(), contextInspectorFields()
+ * public-api: createStudioContextInspector(), contextInspectorFields(), selectSimilarEntityIds()
  * online: no; UI delegates all persistent edits to existing Studio controls
  */
 
@@ -19,6 +19,15 @@ export function contextInspectorFields(entity={}){
     rotation:Number(t.rotation)||0,
     scalePercent:Math.round((Number(t.scale)||1)*100)
   });
+}
+
+export function selectSimilarEntityIds(document,entity={}){
+  const prefabId=String(entity?.prefabId||'');
+  if(!prefabId)return [];
+  return (document?.entities||[])
+    .filter(row=>String(row?.prefabId||'')===prefabId)
+    .map(row=>String(row?.id||''))
+    .filter(Boolean);
 }
 
 function ensureStyle(document){
@@ -46,10 +55,11 @@ function ensureStyle(document){
     #kelo-studio-live .ks-context-field label{font-size:5.5px;font-weight:950;color:#78958b;text-align:center}
     #kelo-studio-live .ks-context-field input{width:100%;height:28px;border:0;background:transparent;color:#f3f7f5;font-size:9px;font-weight:800;outline:none;padding:0 3px;min-width:0}
     #kelo-studio-live .ks-context-field:focus-within{border-color:rgba(231,197,106,.45);background:rgba(21,39,35,.9)}
-    #kelo-studio-live .ks-context-actions{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-top:6px}
+    #kelo-studio-live .ks-context-actions{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;margin-top:6px}
     #kelo-studio-live .ks-context-actions button{height:34px;border:1px solid rgba(255,255,255,.07);border-radius:8px;background:#0f1b1d;color:#e5eee9;font-size:13px;font-weight:900;padding:0}
     #kelo-studio-live .ks-context-actions button:hover{border-color:rgba(231,197,106,.38)}
     #kelo-studio-live .ks-context-actions [data-context-action="pick"]{color:#f4dfa0;border-color:rgba(231,197,106,.24)}
+    #kelo-studio-live .ks-context-actions [data-context-action="similar"]{color:#d8ecff;border-color:rgba(123,187,255,.24)}
     #kelo-studio-live .ks-context-actions [data-context-action="delete"]{color:#ffc8c3;border-color:rgba(255,122,112,.22)}
     #kelo-studio-live .ks-context-inspector.collapsed{width:206px}
     #kelo-studio-live .ks-context-inspector.collapsed .ks-context-body{display:none}
@@ -105,6 +115,12 @@ export function createStudioContextInspector({root=globalThis,kernel,tools}={}){
     search.value=previous;dispatchInput(search);
     return !!target;
   }
+  function selectSimilar(){
+    const entity=selectedEntity(),ids=selectSimilarEntityIds(kernel.document,entity);
+    if(!ids.length)return 0;
+    kernel.selection.set(ids);
+    return ids.length;
+  }
   function proxyProperty(prop,value){
     const selector=prop==='scalePercent'?'[data-prop="scalePercent"]':`[data-prop="${prop}"]`;
     const target=sourceControl(`.ks-right .ks-properties ${selector}`)||sourceControl(selector);
@@ -140,6 +156,7 @@ export function createStudioContextInspector({root=globalThis,kernel,tools}={}){
         </div>
         <div class="ks-context-actions">
           <button type="button" data-context-action="pick" aria-label="Usar como pincel" title="Usar este objeto como pincel">✣</button>
+          <button type="button" data-context-action="similar" aria-label="Seleccionar iguales" title="Seleccionar todas las instancias del mismo asset">≋</button>
           <button type="button" data-context-action="duplicate" aria-label="Duplicar" title="Duplicar">⧉</button>
           <button type="button" data-context-action="rotate" aria-label="Rotar" title="Rotar">⟳</button>
           <button type="button" data-context-action="focus" aria-label="Enfocar" title="Enfocar">◎</button>
@@ -153,7 +170,7 @@ export function createStudioContextInspector({root=globalThis,kernel,tools}={}){
       if(toggle){event.preventDefault();event.stopPropagation();collapsed=!collapsed;card.classList.toggle('collapsed',collapsed);toggle.textContent=collapsed?'⌄':'⌃';toggle.setAttribute('aria-label',collapsed?'Expandir inspector':'Contraer inspector');return;}
       if(event.target.closest('[data-context-close]')){event.preventDefault();event.stopPropagation();const entity=selectedEntity();suppressedId=entity?String(entity.id):null;card.classList.remove('on');return;}
       const action=event.target.closest('[data-context-action]')?.dataset.contextAction;
-      if(action){event.preventDefault();event.stopPropagation();if(action==='pick')pickSelected();else proxyAction(action);}
+      if(action){event.preventDefault();event.stopPropagation();if(action==='pick')pickSelected();else if(action==='similar')selectSimilar();else proxyAction(action);}
     });
     card.addEventListener('change',event=>{
       const input=event.target.closest('[data-context-prop]');if(!input)return;
