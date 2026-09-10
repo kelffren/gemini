@@ -21,6 +21,7 @@
     "audit:studio:guides": "node scripts/studio-smart-guides-audit.mjs",
     "audit:studio:spacing": "node scripts/studio-smart-spacing-audit.mjs",
     "audit:studio:paint-copies": "node scripts/studio-paint-copies-audit.mjs",
+    "audit:studio:menu": "node scripts/studio-menu-minimizer-audit.mjs",
     "audit:mounts": "node scripts/mount-foundation-audit.mjs",
     "audit:ability-source-native": "node scripts/ability-source-native-cast-audit.mjs",
     "audit:equipment-abilities": "node scripts/equipment-ability-audit.mjs",
