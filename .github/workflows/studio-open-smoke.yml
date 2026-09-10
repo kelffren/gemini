@@ -30,10 +30,13 @@ jobs:
             auth="$(curl --max-time 10 -fsSL "https://kelffren.github.io/gemini/src/ui/account-auth-ui.js?smoke=${GITHUB_SHA}-${i}" || true)"
             snap="$(curl --max-time 10 -fsSL "https://kelffren.github.io/gemini/src/studio/ui/studio-context-snap-chip.mjs?smoke=${GITHUB_SHA}-${i}" || true)"
             multi="$(curl --max-time 10 -fsSL "https://kelffren.github.io/gemini/src/studio/ui/studio-multi-align.mjs?smoke=${GITHUB_SHA}-${i}" || true)"
+            paint="$(curl --max-time 10 -fsSL "https://kelffren.github.io/gemini/src/studio/tools/paint-copies-tool.mjs?smoke=${GITHUB_SHA}-${i}" || true)"
             if grep -q 'kelo-account-auth-ui-v1.0.1-editor-bypass' <<<"$auth" \
               && grep -q 'mutationNeedsAttach(mutations=\[\])' <<<"$snap" \
-              && grep -q 'mutationNeedsRefresh(mutations=\[\])' <<<"$multi"; then
-              echo "PASS deployed Pages contains the exact World-open observer fixes"
+              && grep -q 'mutationNeedsRefresh(mutations=\[\])' <<<"$multi" \
+              && grep -q 'button.innerHTML !== nextHtml' <<<"$paint" \
+              && ! grep -q 'else syncButton();' <<<"$paint"; then
+              echo "PASS deployed Pages contains the exact World-open observer fixes including Paint Copies"
               exit 0
             fi
             echo "Waiting for Pages to publish exact Studio fix ($i/45)..."
