@@ -1,10 +1,10 @@
 /* KELO-INDEX
  * area: QA / PVP CAST RECOVERY MOBILITY
  * owner: browser integration judge only
- * keys: FIRE TORNADO RECOVERY MOVEMENT MOBILE DESKTOP PLAYWRIGHT
+ * keys: FIRE TORNADO RECOVERY MOVEMENT MOBILE DESKTOP PLAYWRIGHT CANDIDATE
  * purpose: reproduce movimiento LEFT durante recovery de Fire Tornado y medir desplazamiento físico real
  * consumes: KeloPvPWorld, KeloAbilities, KeloPvPCastMovementPrediction, KeloInput
- * online: verifica la predicción local que comparte semántica de fase con autoridad futura
+ * online: verifica predicción local con la misma semántica de fase consumible por server
  * do-not: NO production writes, NO gameplay tuning
  */
 import fs from 'node:fs';
@@ -40,13 +40,13 @@ for(const cfg of viewports){
   const end=await page.evaluate(()=>({x:localPlayer.x,t:performance.now(),audit:{...window.KELO_PVP_CAST_MOVEMENT_AUDIT},vx:localPlayer.vx}));
   const elapsed=end.t-start.t,dx=start.x-end.x,velocity=elapsed>0?dx/(elapsed/1000):0;
   const scale=Number(start.audit.movementScale);
-  const ok=cast.result?.valid!==false&&scale>.515&&scale<.525&&dx>7.5&&dx<13&&velocity>80&&velocity<125&&errors.length===0;
+  const ok=cast.result?.valid!==false&&scale>.715&&scale<.725&&dx>11.5&&dx<17.5&&velocity>115&&velocity<150&&errors.length===0;
   const row={viewport:cfg.name,scale:+scale.toFixed(3),elapsedMs:+elapsed.toFixed(2),leftDistancePx:+dx.toFixed(3),observedVelocity:+velocity.toFixed(2),pageErrors:errors,ok};
   results.push(row);
-  if(!ok)throw new Error(`FIRE_TORNADO_RECOVERY_BASELINE_FAIL:${cfg.name}:${JSON.stringify(row)}`);
+  if(!ok)throw new Error(`FIRE_TORNADO_RECOVERY_CANDIDATE_A_FAIL:${cfg.name}:${JSON.stringify(row)}`);
   await context.close();
 }
 await browser.close();
 fs.mkdirSync('audit-artifacts',{recursive:true});
-fs.writeFileSync('audit-artifacts/fire-tornado-recovery-baseline.json',JSON.stringify({ok:true,results},null,2));
+fs.writeFileSync('audit-artifacts/fire-tornado-recovery-candidate-a.json',JSON.stringify({ok:true,results},null,2));
 console.log(JSON.stringify({ok:true,results},null,2));
