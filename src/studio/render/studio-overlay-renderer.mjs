@@ -1,6 +1,6 @@
 /* KELO-INDEX
  * area: STUDIO / OVERLAY RENDERER
- * owns: transient editor-only selection/ghost/gizmo/surface/collision/prefab/smart-guide primitives
+ * owns: transient editor-only selection/ghost/gizmo/surface/collision/prefab/smart-guide/spacing primitives
  * does-not-own: world rendering, terrain textures, gameplay sprites or physics
  * public-api: createStudioOverlayRenderer()
  * online: local-only
@@ -22,10 +22,25 @@ export function createStudioOverlayRenderer({ kernel, tools, assetPreview } = {}
     if(!drew){ctx.save();ctx.globalAlpha=.14;ctx.fillStyle='#e7c56a';ctx.fillRect(preview.x,preview.y,preview.w,preview.h);ctx.restore();}
     ctx.save();ctx.strokeStyle='rgba(231,197,106,.95)';drawRect(ctx,preview,{dashed:true});ctx.restore();
   }
-  function drawSmartGuides(ctx,guides){
-    if(!guides?.length)return;ctx.save();ctx.strokeStyle='rgba(244,221,141,.96)';ctx.fillStyle='rgba(244,221,141,.96)';ctx.lineWidth=1.5;ctx.setLineDash([5,4]);
-    for(const guide of guides){ctx.beginPath();if(guide.axis==='x'){ctx.moveTo(guide.position,guide.from);ctx.lineTo(guide.position,guide.to);}else{ctx.moveTo(guide.from,guide.position);ctx.lineTo(guide.to,guide.position);}ctx.stroke();ctx.setLineDash([]);ctx.beginPath();ctx.arc(guide.axis==='x'?guide.position:guide.from,guide.axis==='x'?guide.from:guide.position,2.5,0,Math.PI*2);ctx.fill();ctx.setLineDash([5,4]);}
+  function drawSpacingGuide(ctx,guide){
+    const from=Number(guide.from)||0,to=Number(guide.to)||0,cross=Number(guide.cross)||0,mid=(from+to)/2,label=`${Math.round(Number(guide.gap)||0)}px`,tick=4;
+    ctx.save();ctx.strokeStyle='rgba(244,221,141,.98)';ctx.fillStyle='rgba(244,221,141,.98)';ctx.lineWidth=1.4;ctx.setLineDash([]);ctx.beginPath();
+    if(guide.axis==='x'){
+      ctx.moveTo(from,cross);ctx.lineTo(to,cross);ctx.moveTo(from,cross-tick);ctx.lineTo(from,cross+tick);ctx.moveTo(to,cross-tick);ctx.lineTo(to,cross+tick);
+    }else{
+      ctx.moveTo(cross,from);ctx.lineTo(cross,to);ctx.moveTo(cross-tick,from);ctx.lineTo(cross+tick,from);ctx.moveTo(cross-tick,to);ctx.lineTo(cross+tick,to);
+    }
+    ctx.stroke();ctx.font='700 9px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';ctx.textAlign='center';ctx.textBaseline='bottom';
+    if(guide.axis==='x')ctx.fillText(label,mid,cross-3);else{ctx.save();ctx.translate(cross-3,mid);ctx.rotate(-Math.PI/2);ctx.fillText(label,0,0);ctx.restore();}
     ctx.restore();
+  }
+  function drawSmartGuides(ctx,guides){
+    if(!guides?.length)return;
+    for(const guide of guides){
+      if(guide.kind==='spacing'){drawSpacingGuide(ctx,guide);continue;}
+      ctx.save();ctx.strokeStyle='rgba(244,221,141,.96)';ctx.fillStyle='rgba(244,221,141,.96)';ctx.lineWidth=1.5;ctx.setLineDash([5,4]);ctx.beginPath();
+      if(guide.axis==='x'){ctx.moveTo(guide.position,guide.from);ctx.lineTo(guide.position,guide.to);}else{ctx.moveTo(guide.from,guide.position);ctx.lineTo(guide.to,guide.position);}ctx.stroke();ctx.setLineDash([]);ctx.beginPath();ctx.arc(guide.axis==='x'?guide.position:guide.from,guide.axis==='x'?guide.from:guide.position,2.5,0,Math.PI*2);ctx.fill();ctx.restore();
+    }
   }
   function draw(ctx) {
     if (!ctx) return;ctx.save();ctx.lineWidth = 2;
