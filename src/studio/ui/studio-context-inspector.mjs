@@ -46,9 +46,10 @@ function ensureStyle(document){
     #kelo-studio-live .ks-context-field label{font-size:5.5px;font-weight:950;color:#78958b;text-align:center}
     #kelo-studio-live .ks-context-field input{width:100%;height:28px;border:0;background:transparent;color:#f3f7f5;font-size:9px;font-weight:800;outline:none;padding:0 3px;min-width:0}
     #kelo-studio-live .ks-context-field:focus-within{border-color:rgba(231,197,106,.45);background:rgba(21,39,35,.9)}
-    #kelo-studio-live .ks-context-actions{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:6px}
+    #kelo-studio-live .ks-context-actions{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-top:6px}
     #kelo-studio-live .ks-context-actions button{height:34px;border:1px solid rgba(255,255,255,.07);border-radius:8px;background:#0f1b1d;color:#e5eee9;font-size:13px;font-weight:900;padding:0}
     #kelo-studio-live .ks-context-actions button:hover{border-color:rgba(231,197,106,.38)}
+    #kelo-studio-live .ks-context-actions [data-context-action="pick"]{color:#f4dfa0;border-color:rgba(231,197,106,.24)}
     #kelo-studio-live .ks-context-actions [data-context-action="delete"]{color:#ffc8c3;border-color:rgba(255,122,112,.22)}
     #kelo-studio-live .ks-context-inspector.collapsed{width:206px}
     #kelo-studio-live .ks-context-inspector.collapsed .ks-context-body{display:none}
@@ -88,6 +89,22 @@ export function createStudioContextInspector({root=globalThis,kernel,tools}={}){
     if(!target||target.disabled)return false;
     target.click();return true;
   }
+  function dispatchInput(input){
+    const EventCtor=root.Event||globalThis.Event;
+    input?.dispatchEvent?.(new EventCtor('input',{bubbles:true}));
+  }
+  function pickSelected(){
+    const entity=selectedEntity(),assetId=String(entity?.prefabId||'');
+    if(!assetId)return false;
+    const search=sourceControl('.ks-asset-search')||sourceControl('.ks-asset-search-mobile');
+    if(!search)return false;
+    const previous=search.value;
+    search.value=assetId;dispatchInput(search);
+    const target=[...shell.querySelectorAll('[data-asset]')].find(node=>!node.closest('.ks-context-inspector')&&String(node.dataset.asset)===assetId)||null;
+    if(target)target.click();
+    search.value=previous;dispatchInput(search);
+    return !!target;
+  }
   function proxyProperty(prop,value){
     const selector=prop==='scalePercent'?'[data-prop="scalePercent"]':`[data-prop="${prop}"]`;
     const target=sourceControl(`.ks-right .ks-properties ${selector}`)||sourceControl(selector);
@@ -122,6 +139,7 @@ export function createStudioContextInspector({root=globalThis,kernel,tools}={}){
           ${fieldMarkup('x','X')}${fieldMarkup('y','Y')}${fieldMarkup('rotation','ROT','15')}${fieldMarkup('scalePercent','ESC','5')}
         </div>
         <div class="ks-context-actions">
+          <button type="button" data-context-action="pick" aria-label="Usar como pincel" title="Usar este objeto como pincel">✣</button>
           <button type="button" data-context-action="duplicate" aria-label="Duplicar" title="Duplicar">⧉</button>
           <button type="button" data-context-action="rotate" aria-label="Rotar" title="Rotar">⟳</button>
           <button type="button" data-context-action="focus" aria-label="Enfocar" title="Enfocar">◎</button>
@@ -135,7 +153,7 @@ export function createStudioContextInspector({root=globalThis,kernel,tools}={}){
       if(toggle){event.preventDefault();event.stopPropagation();collapsed=!collapsed;card.classList.toggle('collapsed',collapsed);toggle.textContent=collapsed?'⌄':'⌃';toggle.setAttribute('aria-label',collapsed?'Expandir inspector':'Contraer inspector');return;}
       if(event.target.closest('[data-context-close]')){event.preventDefault();event.stopPropagation();const entity=selectedEntity();suppressedId=entity?String(entity.id):null;card.classList.remove('on');return;}
       const action=event.target.closest('[data-context-action]')?.dataset.contextAction;
-      if(action){event.preventDefault();event.stopPropagation();proxyAction(action);}
+      if(action){event.preventDefault();event.stopPropagation();if(action==='pick')pickSelected();else proxyAction(action);}
     });
     card.addEventListener('change',event=>{
       const input=event.target.closest('[data-context-prop]');if(!input)return;
