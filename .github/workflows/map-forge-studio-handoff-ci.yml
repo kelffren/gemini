@@ -14,6 +14,7 @@ on:
       - 'tests/map-forge-mobile-preview.spec.js'
       - 'tests/map-forge-paving-visual.spec.js'
       - 'scripts/map-forge-studio-handoff-audit.mjs'
+      - 'scripts/map-forge-semantic-variety-audit.mjs'
       - '.github/workflows/map-forge-studio-handoff-ci.yml'
   push:
     branches: [main]
@@ -27,6 +28,8 @@ on:
       - 'tests/map-forge-mobile-preview.spec.js'
       - 'tests/map-forge-paving-visual.spec.js'
       - 'scripts/map-forge-studio-handoff-audit.mjs'
+      - 'scripts/map-forge-semantic-variety-audit.mjs'
+      - '.github/workflows/map-forge-studio-handoff-ci.yml'
 jobs:
   contract:
     runs-on: ubuntu-latest
@@ -49,8 +52,11 @@ jobs:
           node --check tests/map-forge-mobile-preview.spec.js
           node --check tests/map-forge-paving-visual.spec.js
           node --check scripts/map-forge-studio-handoff-audit.mjs
+          node --check scripts/map-forge-semantic-variety-audit.mjs
       - name: Handoff contract
         run: node scripts/map-forge-studio-handoff-audit.mjs
+      - name: Semantic asset variety across real generated worlds
+        run: node scripts/map-forge-semantic-variety-audit.mjs
 
   mobile-preview:
     runs-on: ubuntu-latest
