@@ -1,0 +1,37 @@
+name: Kelo Online Foundation
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/**'
+      - 'server/online-identity-store.js'
+      - 'scripts/online-foundation-audit.mjs'
+      - 'docs/systems/ONLINE_FOUNDATION.md'
+      - 'docs/system-catalog.json'
+      - 'docs/CODE_INDEX.md'
+      - 'package.json'
+      - '.github/workflows/online-foundation-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/**'
+      - 'server/online-identity-store.js'
+      - 'scripts/online-foundation-audit.mjs'
+      - 'docs/systems/ONLINE_FOUNDATION.md'
+      - 'docs/system-catalog.json'
+      - 'docs/CODE_INDEX.md'
+      - 'package.json'
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: node --check server/online-identity-store.js
+      - run: node --check scripts/online-foundation-audit.mjs
+      - run: npm run audit:online-foundation
+      - run: npm run audit:docs
+      - run: npm run audit:foundation
