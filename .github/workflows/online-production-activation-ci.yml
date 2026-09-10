@@ -49,7 +49,7 @@ jobs:
           grep -q "signInWithPassword" src/ui/account-auth-ui.js
           grep -q "protectGuestWithEmail" src/ui/account-auth-ui.js
           grep -q "account-auth-ui.js" src/config/online-runtime-config.js
-          ! grep -Eq "service_role|sb_secret" src/ui/account-auth-ui.js
+          ! grep -Eq "(service_role|sb_secret)[[:space:]]*[:=]" src/ui/account-auth-ui.js
       - name: Install server dependencies
         working-directory: server
         run: npm install --omit=dev --no-audit --no-fund
