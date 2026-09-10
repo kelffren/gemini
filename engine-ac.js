@@ -32,7 +32,7 @@
   const RUN_CYCLE_WORLD_PX = 90;
   const MIN_VISUAL_MOVE_PX = 0.12;
   const DIRECTION_BASELINE_RATIO = 1.15;
-  const DIRECTION_HYSTERESIS_RATIO = 1.20;
+  const DIRECTION_HYSTERESIS_RATIO = 1.18;
   const DEFAULT_PLANT_FRAME = 2;
   const params = new URLSearchParams(window.location.search);
   const MOV_CADENCE_V2 = params.get('movCadenceV2') !== '0';
