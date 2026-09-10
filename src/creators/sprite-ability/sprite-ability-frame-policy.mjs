@@ -1,0 +1,36 @@
+/* KELO-INDEX
+ * area: CREATORS / SPRITE ABILITY / FRAME POLICY
+ * purpose: make frame-count/grid decisions explicit instead of letting low-confidence auto-fit silently guess
+ */
+const PRESETS=Object.freeze([
+  Object.freeze({cols:8,rows:4,label:'8×4',frames:32}),
+  Object.freeze({cols:6,rows:4,label:'6×4',frames:24}),
+  Object.freeze({cols:4,rows:6,label:'4×6',frames:24}),
+  Object.freeze({cols:4,rows:4,label:'4×4',frames:16}),
+]);
+const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
+
+export function spriteFrameCount(sheet={}){
+  return Math.max(1,Math.round(Number(sheet.columns)||1)*Math.round(Number(sheet.rows)||1));
+}
+
+export function chooseSafeGrid({width=0,height=0,detected=null,confidenceThreshold=.45}={}){
+  const w=Math.max(1,Number(width)||1),h=Math.max(1,Number(height)||1;
+  const d=detected&&Number.isFinite(Number(detected.cols))&&Number.isFinite(Number(detected.rows))?detected:null;
+  if(d&&Number(d.confidence)>=confidenceThreshold)return Object.freeze({cols:d.cols,rows:d.rows,label:`${d.cols}×${d.rows}`,frames:d.cols*d.rows,source:'auto',confidence:clamp(Number(d.confidence)||0,0,1)});
+  let best=null;
+  for(const p of PRESETS){
+    const cellRatio=(w/p.cols)/(h/p.rows),ratioPenalty=Math.abs(Math.log(Math.max(.05,cellRatio)/.9));
+    const score=1/(1+ratioPenalty);
+    if(!best||score>best.score)best={...p,score};
+  }
+  return Object.freeze({cols:best.cols,rows:best.rows,label:best.label,frames:best.frames,source:'preset-fallback',confidence:d?clamp(Number(d.confidence)||0,0,1):0});
+}
+
+export function playbackLabel(sheet={}){
+  const frames=spriteFrameCount(sheet),cols=Math.max(1,Math.round(Number(sheet.columns)||1)),rows=Math.max(1,Math.round(Number(sheet.rows)||1));
+  const start=Math.max(0,Math.round(Number(sheet.startFrame)||0)),end=Math.max(start,Math.round(Number(sheet.endFrame)||frames-1));
+  return `${frames} FRAMES · ${cols}×${rows} · ${start}→${end}`;
+}
+
+export const SPRITE_ABILITY_GRID_PRESETS=PRESETS;
