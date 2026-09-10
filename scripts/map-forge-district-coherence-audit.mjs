@@ -9,41 +9,40 @@
 import assert from 'node:assert/strict';
 import {MAP_FORGE_RECIPES} from '../src/world/map-forge/map-forge-recipes.mjs';
 import {generateMapCandidate} from '../src/world/map-forge/map-forge-core.mjs';
-import {scoreMapDefinition} from '../src/world/map-forge/map-forge-quality.mjs';
 
 function ownerAt(map,p){let owner=null,best=Infinity;for(const d of map.districts||[]){const dx=p.x-d.center.x,dy=p.y-d.center.y,cost=(dx*dx+dy*dy)/Math.max(.2,Number(d.weight)||1);if(cost<best){best=cost;owner=d.id;}}return owner;}
 function mismatchCount(map){let n=0;for(const row of map.decorations||[])if(ownerAt(map,row)!==row.district)n++;return n;}
 
+const BASELINE_DECORATIONS=54597;
+const BASELINE_MISMATCHES=13052;
 const stats={};
-let mapsChecked=0,totalDecorations=0,totalMismatches=0,totalDeterminismChecks=0,sensitivityChecks=0;
+let mapsChecked=0,totalDecorations=0,totalMismatches=0,totalDistrictRejects=0,totalDeterminismChecks=0,validMaps=0;
 for(const [id,recipe] of Object.entries(MAP_FORGE_RECIPES)){
-  let decorations=0,mismatches=0,minCoherence=100,maxCoherence=0;
+  let decorations=0,mismatches=0,districtRejects=0,minCoherence=100,maxCoherence=0,valid=0;
   for(let seed=1;seed<=100;seed++){
     const map=generateMapCandidate(recipe,{seed,assetCatalogVersion:'ci-catalog'});
-    const mismatch=mismatchCount(map),coherence=map.quality?.breakdown?.districtCoherence;
+    const mismatch=mismatchCount(map),coherence=map.quality?.breakdown?.districtCoherence,rejects=map.generationStats?.decorationDistrictRejects;
     assert.ok(Number.isFinite(coherence),`${id}/${seed} must expose districtCoherence`);
-    assert.ok(coherence>=45&&coherence<=100,`${id}/${seed} districtCoherence must stay normalized`);
-    mapsChecked++;decorations+=map.decorations.length;mismatches+=mismatch;totalDecorations+=map.decorations.length;totalMismatches+=mismatch;
+    assert.equal(mismatch,0,`${id}/${seed} decorations must remain inside their weighted spatial district`);
+    assert.equal(coherence,100,`${id}/${seed} districtCoherence must be perfect after placement filtering`);
+    assert.ok(Number.isFinite(rejects)&&rejects>=0,`${id}/${seed} must expose decorationDistrictRejects`);
+    if(map.validation?.valid){valid++;validMaps++;}
+    mapsChecked++;decorations+=map.decorations.length;mismatches+=mismatch;districtRejects+=rejects;totalDecorations+=map.decorations.length;totalMismatches+=mismatch;totalDistrictRejects+=rejects;
     minCoherence=Math.min(minCoherence,coherence);maxCoherence=Math.max(maxCoherence,coherence);
-    if(mismatch>0){
-      const corrected=structuredClone(map);
-      for(const row of corrected.decorations)row.district=ownerAt(corrected,row);
-      const correctedScore=scoreMapDefinition(corrected,recipe).breakdown.districtCoherence;
-      assert.equal(correctedScore,100,`${id}/${seed} corrected ownership should score 100`);
-      assert.ok(correctedScore>coherence,`${id}/${seed} scorer must prefer coherent decoration ownership`);
-      sensitivityChecks++;
-    }
   }
-  stats[id]={seeds:100,decorations,mismatches,mismatchRate:Number((mismatches/Math.max(1,decorations)*100).toFixed(2)),coherenceRange:[minCoherence,maxCoherence]};
+  assert.equal(valid,100,`${id} must keep 100/100 fixed-seed maps valid`);
+  stats[id]={seeds:100,valid,decorations,mismatches,mismatchRate:Number((mismatches/Math.max(1,decorations)*100).toFixed(2)),districtRejects,coherenceRange:[minCoherence,maxCoherence]};
 }
 for(const [id,recipe] of Object.entries(MAP_FORGE_RECIPES))for(const seed of [7,42,1337,20260910]){
   const a=generateMapCandidate(recipe,{seed,assetCatalogVersion:'ci-catalog'}),b=generateMapCandidate(recipe,{seed,assetCatalogVersion:'ci-catalog'});
-  assert.equal(a.layoutHash,b.layoutHash,`${id}/${seed} layout hash must stay deterministic`);
+  assert.equal(a.metadata.layoutHash,b.metadata.layoutHash,`${id}/${seed} layout hash must stay deterministic`);
   assert.equal(a.quality.breakdown.districtCoherence,b.quality.breakdown.districtCoherence,`${id}/${seed} coherence score must stay deterministic`);
+  assert.equal(a.generationStats.decorationDistrictRejects,b.generationStats.decorationDistrictRejects,`${id}/${seed} district rejects must stay deterministic`);
   totalDeterminismChecks++;
 }
 assert.equal(mapsChecked,Object.keys(MAP_FORGE_RECIPES).length*100,'audit must inspect 100 seeds per recipe');
-assert.ok(totalDecorations>0,'audit must inspect generated decorations');
-assert.ok(totalMismatches>0,'fixed-seed corpus must exercise cross-district decoration leakage');
-assert.ok(sensitivityChecks>0,'new scorer must be sensitivity-tested on at least one leaky map');
-console.log(JSON.stringify({ok:true,mapsChecked,totalDecorations,totalMismatches,mismatchRate:Number((totalMismatches/totalDecorations*100).toFixed(2)),sensitivityChecks,determinismChecks:totalDeterminismChecks,stats},null,2));
+assert.equal(validMaps,mapsChecked,'all fixed-seed maps must remain valid');
+assert.ok(totalDecorations>=BASELINE_DECORATIONS*.8,`decoration population collapsed: ${totalDecorations} vs baseline ${BASELINE_DECORATIONS}`);
+assert.equal(totalMismatches,0,`district leakage regressed from expected 0: ${totalMismatches}`);
+assert.ok(totalDistrictRejects>0,'fixed-seed corpus must exercise the district placement guard');
+console.log(JSON.stringify({ok:true,mapsChecked,validMaps,totalDecorations,baselineDecorations:BASELINE_DECORATIONS,decorationRetentionPct:Number((totalDecorations/BASELINE_DECORATIONS*100).toFixed(2)),baselineMismatches:BASELINE_MISMATCHES,totalMismatches,mismatchRate:Number((totalMismatches/Math.max(1,totalDecorations)*100).toFixed(2)),totalDistrictRejects,determinismChecks:totalDeterminismChecks,stats},null,2));
