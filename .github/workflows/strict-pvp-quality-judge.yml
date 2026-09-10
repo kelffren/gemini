@@ -8,6 +8,7 @@ on:
       - 'src/core/**'
       - 'src/systems/pvp-world.js'
       - 'src/systems/melee/**'
+      - 'src/ui/pvp-social-touch-guard.js'
       - 'src/visuals/**'
       - 'src/abilities/**'
       - 'scripts/live-pvp-quality-judge.mjs'
@@ -20,6 +21,7 @@ on:
       - 'src/core/**'
       - 'src/systems/pvp-world.js'
       - 'src/systems/melee/**'
+      - 'src/ui/pvp-social-touch-guard.js'
       - 'src/visuals/**'
       - 'src/abilities/**'
       - 'scripts/live-pvp-quality-judge.mjs'
@@ -111,11 +113,13 @@ jobs:
           base='https://kelffren.github.io/gemini/'
           targets=[
               'index.html',
+              'engine-c.js',
               'src/core/input-system.js',
               'src/core/movement-system.js',
               'src/systems/pvp-world.js',
               'src/systems/melee/melee-engine.js',
               'src/systems/melee/melee-weapon-profiles.js',
+              'src/ui/pvp-social-touch-guard.js',
               'src/visuals/melee-visual-manifest.js',
               'src/visuals/melee-combat-visuals.js',
               'src/visuals/combat-presentation-bridge.js',
