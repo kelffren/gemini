@@ -4,7 +4,7 @@
  * purpose: lazy route to Sprite Ability Builder using existing Creator registry
  * reuse: Kelo Creators WorkspaceRegistry
  */
-export function createSpriteAbilityWorkspaceManifest({loader=()=>import('../sprite-ability/sprite-ability-live-controller.mjs')}={}){
+export function createSpriteAbilityWorkspaceManifest({loader=()=>import('../sprite-ability/sprite-ability-runtime-extension.mjs')}={}){
   return Object.freeze({id:'sprite-ability',label:'Sprite Ability',category:'gameplay',projectTypes:['SPRITE_ABILITY'],capability:'ability.edit',availability:'active',async open(context={}){const mod=await loader();if(typeof mod.openSpriteAbilityBuilder!=='function')throw new Error('CREATOR_SPRITE_ABILITY_ENTRY_MISSING');return mod.openSpriteAbilityBuilder(context);}});
 }
 export function registerSpriteAbilityWorkspace(registry,options={}){return registry.register(createSpriteAbilityWorkspaceManifest(options));}
