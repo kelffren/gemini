@@ -2,10 +2,13 @@
   "name": "kelo-world-server",
   "private": true,
   "type": "commonjs",
+  "engines": {
+    "node": ">=24.20.0 <25"
+  },
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
-    "ws": "^8.18.0"
+    "ws": "8.21.3"
   }
 }
