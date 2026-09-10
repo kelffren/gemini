@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: STUDIO / PAINT COPIES TOOL
- * owns: local copy-stroke preview, automatic spacing and one-history-action batch commit
- * does-not-own: pointer transport, renderer or authority transport
+ * owns: local copy-stroke preview, automatic spacing, Studio input takeover and one-history-action batch commit
+ * does-not-own: camera math, renderer or authority transport
  * public-api: createPaintCopiesTool()
  * online: stroke preview is local; commit becomes one CompositeCommand mirrored by Studio authority
  */
@@ -10,6 +10,7 @@ import { createPlaceEntityCommand } from '../document/document-commands.mjs';
 import { createCompositeCommand } from '../document/composite-command.mjs';
 
 const MAX_PREVIEW_ENTITIES = 500;
+const INPUT_CONTEXT = 'studio-paint-copies';
 const copy = value => value == null ? value : (typeof structuredClone === 'function' ? structuredClone(value) : JSON.parse(JSON.stringify(value)));
 function newId() {
   const uuid = globalThis.crypto?.randomUUID?.();
@@ -22,6 +23,14 @@ export function createPaintCopiesTool(kernel) {
 
   let template = null;
   let stroke = null;
+  let enabled = false;
+  let committing = false;
+  let unregisterInput = null;
+  let button = null;
+  let domObserver = null;
+  let selectionUnsub = null;
+  let sawShell = false;
+  const pointers = new Set();
 
   const selectedEntities = () => kernel.selection.get().map(id => kernel.document.entities.find(e => String(e.id) === String(id))).filter(Boolean);
   const entitySize = row => {
@@ -31,6 +40,14 @@ export function createPaintCopiesTool(kernel) {
       w: Math.max(1, Number(spatial?.w) || (Number(row.bounds?.w) || 1) * scale),
       h: Math.max(1, Number(spatial?.h) || (Number(row.bounds?.h) || 1) * scale)
     };
+  };
+  const currentSnap = () => {
+    const value = globalThis.document?.querySelector?.('#kelo-studio-live [data-ext="snap"]')?.value;
+    return Math.max(1, Number(value) || Number(kernel.document.settings?.tileSize) || 32);
+  };
+  const notify = message => {
+    if (typeof globalThis.showToast === 'function') globalThis.showToast(message);
+    else if (typeof console !== 'undefined') console.info('[Kelo Studio]', message);
   };
 
   function start({ spacing = 'auto', snap = null } = {}) {
@@ -146,6 +163,7 @@ export function createPaintCopiesTool(kernel) {
   async function commit() {
     if (!stroke?.active) throw new Error('STUDIO_PAINT_COPIES_STROKE_NOT_ACTIVE');
     const rows = stroke.previews.map(copy);
+    const stampCount = stroke.stamps;
     const wasCapped = stroke.capped;
     stroke = null;
     if (!rows.length) return { rows: [], stamps: 0, capped: wasCapped };
@@ -156,12 +174,161 @@ export function createPaintCopiesTool(kernel) {
       label: `Paint ${rows.length} object${rows.length === 1 ? '' : 's'}`
     }));
     kernel.selection.set(rows.map(row => row.id));
-    return { rows, stamps: Math.ceil(rows.length / Math.max(1, template?.rows.length || 1)), capped: wasCapped };
+    return { rows, stamps: stampCount, capped: wasCapped };
+  }
+
+  function ensureInput() {
+    if (unregisterInput) return;
+    unregisterInput = kernel.input.register(INPUT_CONTEXT, {
+      pointerdown: event => {
+        if (!enabled) return false;
+        pointers.add(event.pointerId ?? 'mouse');
+        if (pointers.size > 1) {
+          cancelStroke();
+          return true;
+        }
+        if (committing) return true;
+        beginAt(event.worldX, event.worldY, { snap: currentSnap() });
+        return true;
+      },
+      pointermove: event => {
+        if (!enabled) return false;
+        if (pointers.size > 1 || !stroke?.active || committing) return true;
+        strokeTo(event.worldX, event.worldY, { snap: currentSnap() });
+        return true;
+      },
+      pointerup: event => {
+        if (!enabled) return false;
+        pointers.delete(event.pointerId ?? 'mouse');
+        if (pointers.size > 0 || !stroke?.active || committing) return true;
+        committing = true;
+        void commit().then(result => {
+          if (result?.capped) notify('Paint Copies limitado a 500 objetos por trazo');
+        }).catch(error => notify(error?.message || String(error))).finally(() => {
+          committing = false;
+          syncButton();
+        });
+        return true;
+      },
+      pointercancel: event => {
+        pointers.delete(event.pointerId ?? 'mouse');
+        cancelStroke();
+        return enabled;
+      }
+    }, 1200);
+  }
+
+  function activate() {
+    if (enabled) return true;
+    try {
+      start({ snap: currentSnap() });
+    } catch (error) {
+      notify('Selecciona un objeto o grupo antes de usar PAINT COPIES');
+      syncButton();
+      return false;
+    }
+    ensureInput();
+    kernel.input.push(INPUT_CONTEXT);
+    enabled = true;
+    pointers.clear();
+    syncButton();
+    const spacing = Math.round(template?.spacing || 0);
+    notify(`Paint Copies activo · separación auto ${spacing}px`);
+    return true;
+  }
+
+  function deactivate() {
+    kernel.input.pop(INPUT_CONTEXT);
+    pointers.clear();
+    cancel();
+    enabled = false;
+    syncButton();
+    return false;
+  }
+
+  function toggle() {
+    return enabled ? deactivate() : activate();
+  }
+
+  function syncButton() {
+    if (!button?.isConnected) return;
+    button.classList.toggle('on', enabled);
+    button.disabled = !enabled && selectedEntities().length === 0;
+    button.innerHTML = enabled ? '<span class="ks-ico">✣</span>PAINT ON' : '<span class="ks-ico">✣</span>PAINT COPIES';
+    button.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+    button.title = enabled ? 'Toca para salir de Paint Copies' : 'Pinta copias arrastrando por el mapa';
+  }
+
+  function installButton() {
+    const document = globalThis.document;
+    if (!document) return false;
+    const shell = document.querySelector('#kelo-studio-live');
+    if (!shell) return false;
+    sawShell = true;
+    const editBar = shell.querySelector('.ks-ext-edit');
+    if (!editBar) return false;
+    const existing = editBar.querySelector('[data-ext-paint-copies]');
+    if (existing) {
+      button = existing;
+      syncButton();
+      return true;
+    }
+    button = document.createElement('button');
+    button.type = 'button';
+    button.dataset.extPaintCopies = '1';
+    button.setAttribute('aria-pressed', 'false');
+    button.addEventListener('click', event => {
+      event.preventDefault();
+      event.stopPropagation();
+      toggle();
+    });
+    editBar.appendChild(button);
+    syncButton();
+    return true;
+  }
+
+  function installDomBridge() {
+    const document = globalThis.document;
+    if (!document?.body || typeof globalThis.MutationObserver !== 'function') return;
+    ensureInput();
+    const onKey = event => {
+      if (!document.querySelector('#kelo-studio-live')) return;
+      const key = String(event.key || '').toLowerCase();
+      if (enabled && key === 'escape') {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        deactivate();
+        notify('Paint Copies desactivado');
+      } else if (key === 'b' && !event.metaKey && !event.ctrlKey && !event.altKey && !event.target?.closest?.('input,textarea,select,[contenteditable="true"]')) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        toggle();
+      }
+    };
+    document.addEventListener('keydown', onKey, true);
+    selectionUnsub = kernel.selection.onChange(syncButton);
+    installButton();
+    domObserver = new globalThis.MutationObserver(() => {
+      const shell = document.querySelector('#kelo-studio-live');
+      if (!shell && sawShell) {
+        deactivate();
+        domObserver?.disconnect();
+        selectionUnsub?.();
+        document.removeEventListener('keydown', onKey, true);
+        button = null;
+        return;
+      }
+      if (!button?.isConnected) installButton();
+      else syncButton();
+    });
+    domObserver.observe(document.body, { childList: true, subtree: true });
   }
 
   function state() {
     return {
       ready: !!template,
+      enabled,
+      committing,
       active: !!stroke?.active,
       spacing: template?.spacing || null,
       snap: stroke?.snap || template?.snap || null,
@@ -173,9 +340,14 @@ export function createPaintCopiesTool(kernel) {
     };
   }
 
+  installDomBridge();
+
   return Object.freeze({
     id: 'paintCopies',
     start,
+    activate,
+    deactivate,
+    toggle,
     beginAt,
     strokeTo,
     commit,
