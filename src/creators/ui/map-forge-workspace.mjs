@@ -83,7 +83,7 @@ export async function openMapForgeWorkspace({root=globalThis,onOpenWorld=null}={
   function attachListeners(){if(listenersAttached)return;listenersAttached=true;root.addEventListener?.('resize',schedule);root.addEventListener?.('kelo:world-builder-render-assets-ready',onRenderAssetReady);root.addEventListener?.('kelo:property-render-assets-ready',onRenderAssetReady);doc.addEventListener('keydown',onKey,true);}
   function detachListeners(){if(!listenersAttached)return;listenersAttached=false;root.removeEventListener?.('resize',schedule);root.removeEventListener?.('kelo:world-builder-render-assets-ready',onRenderAssetReady);root.removeEventListener?.('kelo:property-render-assets-ready',onRenderAssetReady);doc.removeEventListener('keydown',onKey,true);}
   function detachWorkspace(){root.cancelAnimationFrame?.(raf);raf=0;detachListeners();releaseInput();shell.remove();}
-  function resumeWorkspace(){if(destroyed)return;if(!style.isConnected)doc.head.append(style);if(!shell.isConnected)doc.body.append(shell);acquireInput();attachListeners();schedule();}
+  function resumeWorkspace(){if(destroyed)return;if(!style.isConnected)doc.head.append(style);if(!shell.isConnected)doc.body.append(shell);acquireInput();attachListeners();if(selected)renderSelected();else schedule();}
   function clearExteriorChrome(){exteriorStatus?.remove();returnButton?.remove();exteriorStatus=null;returnButton=null;}
   function showExteriorStatus(text){exteriorStatus?.remove();exteriorStatus=make(doc,'div',{class:'kmf-exterior-status',text});exteriorStatus.setAttribute('data-kelo-map-forge-ui','');doc.body.append(exteriorStatus);return exteriorStatus;}
   async function returnFromExterior(){
