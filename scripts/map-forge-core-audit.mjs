@@ -54,6 +54,16 @@ hero.roadConnection=false;
 const semanticScore=scoreMapDefinition(semanticDrift,cap);
 assert.ok(semanticScore.total<=89,`major landmark without road connection must not score 90+, got ${semanticScore.total}`);
 
+const mixedLocal=clone(a),clusteredLocal=clone(a),fixtureDistrict=mixedLocal.districts[0],fixtureCount=Math.min(60,mixedLocal.decorations.length),fixtureFamilies=['bench','lamp','tree'];
+const fixtureLabels=Array.from({length:fixtureCount},(_,i)=>fixtureFamilies[i%fixtureFamilies.length]);
+for(let i=0;i<fixtureCount;i++){
+  const x=fixtureDistrict.bounds.x+(i%10)*100+80,y=fixtureDistrict.bounds.y+Math.floor(i/10)*100+80;
+  Object.assign(mixedLocal.decorations[i],{district:fixtureDistrict.id,x,y,family:fixtureLabels[i]});
+  Object.assign(clusteredLocal.decorations[i],{district:fixtureDistrict.id,x,y,family:[...fixtureLabels].sort()[i]});
+}
+const mixedLocalScore=scoreMapDefinition(mixedLocal,cap),clusteredLocalScore=scoreMapDefinition(clusteredLocal,cap);
+assert.ok(mixedLocalScore.breakdown.assetVariety>=clusteredLocalScore.breakdown.assetVariety+4,`local repetition must lower asset variety; mixed=${mixedLocalScore.breakdown.assetVariety} clustered=${clusteredLocalScore.breakdown.assetVariety}`);
+
 const stats={};
 for(const [id,recipe] of Object.entries(MAP_FORGE_RECIPES)){
   const scores=[],times=[];let valid=0,min=Infinity,max=-Infinity;
@@ -69,4 +79,4 @@ for(const [id,recipe] of Object.entries(MAP_FORGE_RECIPES)){
   assert.ok(valid>=99,`${id} valid rate ${valid}/100 is below 99%`);
   assert.ok(max-min>.5,`${id} scorer must distinguish candidate quality; range=${(max-min).toFixed(2)}`);
 }
-console.log(JSON.stringify({ok:true,generator:'map-forge-core-v1',royalCapital:{seed:a.metadata.seed,layoutHash:a.metadata.layoutHash,score:a.quality.total,roads:a.roads.length,loops:a.generationStats.roadLoops,parcels:a.parcels.length,decorations:a.decorations.length},qualityRegressions:{invalidCap:disconnectedScore.total,visualSpamCap:noisyScore.total,semanticLandmarkCap:semanticScore.total},bestOf8:{score:best.best.quality.total,seed:best.best.metadata.seed,layoutHash:best.best.metadata.layoutHash},stats},null,2));
+console.log(JSON.stringify({ok:true,generator:'map-forge-core-v1',royalCapital:{seed:a.metadata.seed,layoutHash:a.metadata.layoutHash,score:a.quality.total,roads:a.roads.length,loops:a.generationStats.roadLoops,parcels:a.parcels.length,decorations:a.decorations.length},qualityRegressions:{invalidCap:disconnectedScore.total,visualSpamCap:noisyScore.total,semanticLandmarkCap:semanticScore.total,localVarietyMixed:mixedLocalScore.breakdown.assetVariety,localVarietyClustered:clusteredLocalScore.breakdown.assetVariety},bestOf8:{score:best.best.quality.total,seed:best.best.metadata.seed,layoutHash:best.best.metadata.layoutHash},stats},null,2));
