@@ -13,6 +13,8 @@ const {createSpriteAiHttpHandler}=require('./sprite-ai-http');
 const identity=createOnlineIdentityStore({supabaseUrl:process.env.SUPABASE_URL,supabasePublishableKey:process.env.SUPABASE_PUBLISHABLE_KEY,requireAuth:false});
 const spriteAi=createSpriteAiService();
 const handleSpriteAi=createSpriteAiHttpHandler({service:spriteAi,identity});
+const spriteAiStatus=spriteAi.status();
+console.log(`[Sprite AI] HTTP ready · provider ${spriteAiStatus.provider} · model ${spriteAiStatus.model} · ${spriteAiStatus.configured?'configured':'key-missing'}`);
 const nativeCreateServer=http.createServer;
 http.createServer=function patchedCreateServer(...args){
   let listenerIndex=-1;for(let i=args.length-1;i>=0;i--)if(typeof args[i]==='function'){listenerIndex=i;break;}
