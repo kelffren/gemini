@@ -1,6 +1,6 @@
 /* KELO-INDEX
  * area: TEST / PVP / VISUAL
- * keys: PVP VISUAL MOBILE DESKTOP SCREENSHOT SWORD FIREBALL DASH TELEGRAPH
+ * keys: PVP VISUAL MOBILE DESKTOP SCREENSHOT SWORD FIREBALL DASH TELEGRAPH BOOTSTRAP
  * hace: abre el juego real, entra a PvP, ejecuta la vertical slice y genera evidencia visual revisable
  * online: N/A; valida presentación local separada de autoridad
  */
@@ -12,7 +12,11 @@ const OUT=process.env.AUDIT_OUT||'artifacts/pvp-action-live';
 fs.mkdirSync(OUT,{recursive:true});
 const browser=await chromium.launch({headless:true});
 const report={url:URL,runs:[],createdAt:new Date().toISOString()};
-async function waitReady(page){await page.waitForFunction(()=>window.KeloPvPWorld&&window.KeloMeleeEngine&&window.KeloCombatEngine&&window.KeloHitResolver&&window.KeloAbilities&&window.KeloStones&&typeof window.enterPvPWorld==='function',{timeout:30000});}
+async function waitReady(page){
+  await page.waitForFunction(()=>window.KeloRuntimeBootstrap&&typeof window.KeloRuntimeBootstrap.ensure==='function',{timeout:30000});
+  await page.evaluate(async()=>{await window.KeloRuntimeBootstrap.ensure();});
+  await page.waitForFunction(()=>window.KeloPvPWorld&&window.KeloMeleeEngine&&window.KeloCombatEngine&&window.KeloHitResolver&&window.KeloAbilities&&window.KeloStones&&typeof window.enterPvPWorld==='function',{timeout:30000});
+}
 async function equipSlice(page){await page.evaluate(()=>{const mk=(key)=>window.KeloStones.createAbilityStone(key,'Common',{source:'visual-audit'});STATE.equipped=[mk('fireball'),mk('wind_dash')];STATE.inventory=Array.isArray(STATE.inventory)?STATE.inventory:[];window.KeloAbilities.syncFromWorldState(true);});}
 async function enter(page){await page.evaluate(()=>window.enterPvPWorld());await page.waitForFunction(()=>window.KeloPvPWorld&&window.KeloPvPWorld.state.mode==='pvp',{timeout:5000});}
 async function shot(page,name){const p=path.join(OUT,name);await page.screenshot({path:p,fullPage:true});return p;}
