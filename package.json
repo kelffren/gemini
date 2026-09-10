@@ -31,6 +31,7 @@
     "audit:studio:precision-snap": "node scripts/studio-precision-snap-audit.mjs",
     "audit:studio:nudge": "node scripts/studio-nudge-audit.mjs",
     "audit:studio:overlap": "node scripts/studio-overlap-cycle-audit.mjs",
+    "audit:studio:multi-align": "node scripts/studio-multi-align-audit.mjs",
     "audit:mounts": "node scripts/mount-foundation-audit.mjs",
     "audit:ability-source-native": "node scripts/ability-source-native-cast-audit.mjs",
     "audit:equipment-abilities": "node scripts/equipment-ability-audit.mjs",
