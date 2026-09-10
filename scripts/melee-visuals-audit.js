@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: QA
- * keys: MELEE VISUAL TEST HIT MISS DIRECTION GAMEPLAY DECOUPLING MOBILE 8WAY SKIN-AGNOSTIC
- * hace: valida en Node el contrato visual melee, sus 8 direcciones y que no mute gameplay
+ * keys: MELEE VISUAL TEST HIT MISS DIRECTION GAMEPLAY DECOUPLING MOBILE 8WAY SKIN-AGNOSTIC PERCEPTIBLE IMPACT ALIGNMENT
+ * hace: valida en Node el contrato visual melee, sus 8 direcciones, amplitud corporal perceptible y que no mute gameplay
  * online: prueba eventos semánticos; no introduce autoridad visual sobre daño/cooldown
  */
 'use strict';
@@ -60,15 +60,32 @@ async function main() {
   const manifest = sandbox.KELO_MELEE_VISUAL_MANIFEST;
   assert(manifest, 'melee manifest must boot');
   assert.strictEqual(manifest.attackDurationMs, 330, 'attack duration drifted');
-  assert.strictEqual(manifest.impactAtMs, 150, 'impact timing drifted');
+  assert.strictEqual(manifest.impactAtMs, 90, 'body impact timing must stay aligned to opener hit');
   assert.strictEqual(Object.keys(manifest.attackClips).length, 8, 'eight directional attack clips required');
   assert.strictEqual(Object.keys(manifest.reactionClips).length, 8, 'eight directional reaction clips required');
   assert.strictEqual(Object.keys(manifest.slashAssets).length, 8, 'eight directional slash assets required');
   assert.strictEqual(manifest.anchorSocket, 'center', 'universal melee must use generic center anchor');
   assert.strictEqual(manifest.skinAgnostic, true, 'melee manifest must declare skin independence');
   assert.strictEqual(manifest.directions.length, 8, 'manifest must expose eight presentation directions');
+  assert(manifest.perceptualMotion && manifest.perceptualMotion.impactAligned === true, 'perceptual body-motion contract missing');
   assert(sandbox.KeloScreenFX.get('impact_melee_light'), 'light melee shake missing');
   assert(sandbox.KeloScreenFX.get('flash_melee_light'), 'light melee flash missing');
+
+  const rightClip = sandbox.KeloAnimationRegistry.get(manifest.attackClips.right);
+  assert(rightClip && Array.isArray(rightClip.keyframes), 'right attack transform clip missing');
+  const rightProjections = rightClip.keyframes.map(k => Number(k.offsetX) || 0);
+  const rightPeak = Math.max(...rightProjections);
+  const rightBack = Math.abs(Math.min(...rightProjections));
+  const rightPeakFrame = rightClip.keyframes.reduce((best, k) => (Number(k.offsetX) || 0) > (Number(best.offsetX) || 0) ? k : best, rightClip.keyframes[0]);
+  const rightStrikeAtMs = Number(rightPeakFrame.t) * Number(rightClip.duration) * 1000;
+  assert(rightPeak >= 16, 'base melee body strike is still visually too small');
+  assert(rightBack >= 6, 'base melee anticipation is still visually too small');
+  assert(rightPeak + rightBack >= 22, 'base melee body travel must be perceptible');
+  assert(Math.abs(rightStrikeAtMs - manifest.impactAtMs) <= 5, 'body strike peak must land on the hit frame');
+
+  const reactionRight = sandbox.KeloAnimationRegistry.get(manifest.reactionClips.right);
+  const reactionPeak = Math.max(...reactionRight.keyframes.map(k => Math.hypot(Number(k.offsetX) || 0, Number(k.offsetY) || 0)));
+  assert(reactionPeak >= 9, 'hit reaction displacement must be visible');
 
   const directions = {
     right: { dir: { x: 1, y: 0 }, face: 'right' },
@@ -166,6 +183,11 @@ async function main() {
     anticipationMs: manifest.anticipationMs,
     impactAtMs: manifest.impactAtMs,
     recoveryMs: manifest.recoveryMs,
+    baseAnticipationPx: rightBack,
+    baseForwardPeakPx: rightPeak,
+    baseTravelPx: rightPeak + rightBack,
+    strikeAtMs: rightStrikeAtMs,
+    reactionPeakPx: reactionPeak,
     attackClips: Object.keys(manifest.attackClips).length,
     reactionClips: Object.keys(manifest.reactionClips).length,
     slashAssets: Object.keys(manifest.slashAssets).length,
