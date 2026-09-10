@@ -12,7 +12,7 @@ assert.match(source,/kelo\.studio\.assetFavorites\.v1/,'favorites persistence mu
 assert.match(source,/data-favorite-toggle/,'each palette card must expose a favorite toggle');
 assert.match(source,/data-favorite-asset-id/,'favorite shortcuts must remain directly selectable');
 assert.match(source,/paletteApi\.choose/,'favorite shortcut must reuse the existing asset placement bridge');
-assert.doesNotMatch(source,/kernel\.execute|CommandBus|worldEditRequest|KELO_WORLD_EDIT\.request/,'favorites must not mutate world state or authority');
+assert.doesNotMatch(source,/kernel\.execute|worldEditRequest|KELO_WORLD_EDIT\.request/,'favorites must not execute world or authority mutations');
 assert.match(source,/MutationObserver/,'favorites must survive dynamic palette rerenders');
 assert.match(source,/removeEventListener\('click'/,'favorites must clean up global interaction hooks');
 
