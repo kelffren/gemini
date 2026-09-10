@@ -1,17 +1,17 @@
 /* KELO-INDEX
  * area: CORE
  * owner: KeloRuntimeBootstrap
- * keys: BOOTSTRAP MODULE ORDER COMBAT EFFECTS STATUS MELEE ABILITY TIMELINE LAZY FIRST-USE PERFORMANCE
- * purpose: expone un único loader idempotente para foundations Combat/Effects/Status/Melee y primitives compartidas de timeline; los módulos pesados cargan solo bajo `ensure()`
+ * keys: BOOTSTRAP MODULE ORDER COMBAT EFFECTS STATUS MELEE ABILITY TIMELINE PVP PREDICTION LAZY FIRST-USE PERFORMANCE
+ * purpose: expone un único loader idempotente para foundations Combat/Effects/Status/Melee y soporte compartido de prediction; los módulos pesados cargan solo bajo `ensure()`
  * public-api: KeloRuntimeBootstrap.ensure/isReady/modules
  * state-owned: progreso/promesa efímera del late boot
- * online: carga contratos compartidos que también usa server; no es authority
+ * online: carga contratos compartidos y soporte cliente sin asumir autoridad
  * extension-points: features llaman ensure(); no crean loaders paralelos
  * do-not: NO gameplay específico, NO auto-load de módulos al evaluar, NO segundo loop, NO polling
  */
 (function(root){
   'use strict';
-  const VERSION='kelo-runtime-bootstrap-v1.3.0-ability-timeline';
+  const VERSION='kelo-runtime-bootstrap-v1.4.0-cast-prediction';
   const MODULES=Object.freeze([
     'src/core/events/event-bus.js?v=1',
     'src/abilities/ability-action-timeline.js?v=1',
@@ -25,7 +25,8 @@
     'src/systems/melee/melee-schema.js?v=3',
     'src/systems/melee/melee-weapon-profiles.js?v=3',
     'src/systems/melee/melee-engine.js?v=3',
-    'src/visuals/combat-presentation-bridge.js?v=2'
+    'src/visuals/combat-presentation-bridge.js?v=2',
+    'src/systems/pvp-ability-movement-prediction.js?v=1'
   ]);
   const audit=root.KELO_RUNTIME_BOOTSTRAP_AUDIT={version:VERSION,ready:false,loading:false,loaded:0,total:MODULES.length,failed:[],requestedAt:0,readyAt:0};
   let promise=null;
