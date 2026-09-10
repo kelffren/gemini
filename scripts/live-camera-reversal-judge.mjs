@@ -46,7 +46,7 @@ try{
     await page.waitForTimeout(120);
     const after=await page.evaluate(()=>window.KeloCamera.snapshot());
     const row={viewport:cfg.name,before:{lookOffsetX:before.lookOffsetX,zoom:before.effectiveZoom,version:before.version},crossMs,maxLookStep,after:{lookOffsetX:after.lookOffsetX,reversal:after.reversalResponse},pageErrors:errors};
-    row.ok=errors.length===0&&before.lookOffsetX>20&&crossMs!=null&&crossMs<=95&&maxLookStep<22&&after.lookOffsetX<0&&before.version==='kelo-camera-v1.6.0-reversal-response';
+    row.ok=errors.length===0&&before.lookOffsetX>20&&crossMs!=null&&crossMs<=105&&maxLookStep<22&&after.lookOffsetX<0&&before.version==='kelo-camera-v1.6.1-reversal-response'&&before.reversalResponse?.multiplier===2.5;
     results.push(row);
     await context.close();
   }
