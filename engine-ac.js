@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: MOVEMENT / PRESENTATION
  * owner: KeloMovement consumer
- * keys: MOVEMENT GAIT SPEED STRIDE PLANT ONSET STEP-OFF AUDIT AIM FACING PVP PARITY
+ * keys: MOVEMENT GAIT SPEED STRIDE PLANT ONSET STEP-OFF AUDIT AIM FACING PVP PARITY DIAGONAL HYSTERESIS
  * purpose: calcula gait/velocidad objetivo y estado visual de zancada usando hooks del owner KeloMovement
  * public-api: KELO_MOVEMENT_AUDIT
  * consumes: KeloMovementProfile, KeloMovement, input, CONFIG, localPlayer, KELO_COMBAT_ENABLED
@@ -21,6 +21,7 @@
   // MOV-ONSET-V1: first real resolved displacement steps off the plant pose immediately; blocked intent cannot advance stride.
   // MOV-COMBAT-FACING-V1: movement presentation never overwrites PvP aim-facing; combat geometry remains authority-owned elsewhere.
   // MOV-PARITY-V1: speed/gait semantics come from KeloMovementProfile, shared with server authority.
+  // MOV-DIAGONAL-HYSTERESIS-V1: preserve the current locomotion axis through small analog jitter around 45 degrees.
   const movementProfile = window.KeloMovementProfile;
   if (!movementProfile) throw new Error('KeloMovementProfile unavailable before engine-ac');
   const PROFILE = movementProfile.profile;
@@ -30,6 +31,8 @@
   const WALK_CYCLE_WORLD_PX = 50;
   const RUN_CYCLE_WORLD_PX = 90;
   const MIN_VISUAL_MOVE_PX = 0.12;
+  const DIRECTION_BASELINE_RATIO = 1.15;
+  const DIRECTION_HYSTERESIS_RATIO = 1.20;
   const DEFAULT_PLANT_FRAME = 2;
   const params = new URLSearchParams(window.location.search);
   const MOV_CADENCE_V2 = params.get('movCadenceV2') !== '0';
@@ -81,9 +84,24 @@
     return window.KELO_COMBAT_ENABLED === true && p && isCardinalFace(p._face) ? p._face : null;
   }
 
+  function locomotionFace(v, dx, dy) {
+    const ax = Math.abs(dx), ay = Math.abs(dy);
+    let axis = v.directionAxis;
+    if (axis === 'horizontal') {
+      if (ay > ax * DIRECTION_HYSTERESIS_RATIO) axis = 'vertical';
+    } else if (axis === 'vertical') {
+      if (ax > ay * DIRECTION_HYSTERESIS_RATIO) axis = 'horizontal';
+    } else {
+      axis = ax * DIRECTION_BASELINE_RATIO >= ay ? 'horizontal' : 'vertical';
+    }
+    if (axis !== v.directionAxis && v.directionAxis) v.directionFaceSwitchCount += 1;
+    v.directionAxis = axis;
+    return axis === 'horizontal' ? (dx >= 0 ? 'right' : 'left') : (dy >= 0 ? 'down' : 'up');
+  }
+
   function publishAudit(mag, gait, speedCap, visual) {
     window.KELO_MOVEMENT_AUDIT = {
-      version: 'MOV-shared-profile-v1-onset-step-off',
+      version: 'MOV-shared-profile-v1-diagonal-hysteresis',
       movementProfileVersion: movementProfile.version,
       rawTouchMag: rawTouchMag(),
       processedMag: mag,
@@ -96,6 +114,10 @@
       stopV2: MOV_STOP_V2,
       plantFrame: PLANT_FRAME,
       plantPhase: PLANT_PHASE,
+      directionBaselineRatio: DIRECTION_BASELINE_RATIO,
+      directionHysteresisRatio: DIRECTION_HYSTERESIS_RATIO,
+      directionAxis: visual ? visual.directionAxis : null,
+      directionFaceSwitchCount: visual ? visual.directionFaceSwitchCount : 0,
       combatAimFacingActive: !!combatAimFacing(localPlayer),
       movementFace: visual ? visual.face : localPlayer._face || 'down',
       actorFace: localPlayer._face || 'down',
@@ -132,6 +154,8 @@
         dy: 0,
         on: false,
         face: p._face || 'down',
+        directionAxis: null,
+        directionFaceSwitchCount: 0,
         gait: 'idle',
         frame: PLANT_FRAME,
         stopElapsed: VISUAL_STOP_HOLD_SEC,
@@ -162,6 +186,8 @@
 
   function updateVisualMotion(p, dt, gait, mag) {
     const v = visualStateOf(p);
+    if (v.directionAxis === undefined) v.directionAxis = null;
+    if (!Number.isFinite(v.directionFaceSwitchCount)) v.directionFaceSwitchCount = 0;
     const dx = p.x - v.lastX;
     const dy = p.y - v.lastY;
     const dist = Math.hypot(dx, dy);
@@ -182,6 +208,7 @@
       v.stopElapsed = 0;
       v.on = true;
       if (!wasOn) {
+        v.directionAxis = null;
         v.pendingStepOff = true;
         v.onsetCount += 1;
         v.lastOnsetFromFrame = v.frame;
@@ -194,13 +221,17 @@
       }
       v.stopElapsed = VISUAL_STOP_HOLD_SEC;
       v.on = false;
+      v.directionAxis = null;
       v.pendingStepOff = false;
       v.unsupportedPoseFreezeMs = 0;
       v.releaseToStablePlantMs = 0;
     } else {
       v.stopElapsed += Math.max(0, dt || 0);
       v.on = v.stopElapsed < VISUAL_STOP_HOLD_SEC;
-      if (!v.on) v.pendingStepOff = false;
+      if (!v.on) {
+        v.directionAxis = null;
+        v.pendingStepOff = false;
+      }
       v.unsupportedPoseFreezeMs = v.on ? v.stopElapsed * 1000 : 0;
       v.releaseToStablePlantMs = v.on ? v.stopElapsed * 1000 : VISUAL_STOP_HOLD_SEC * 1000;
     }
@@ -217,8 +248,7 @@
     }
 
     if (v.on && (Math.abs(v.dx) > 0.0001 || Math.abs(v.dy) > 0.0001)) {
-      const side = Math.abs(v.dx) * 1.15 >= Math.abs(v.dy);
-      v.face = side ? (v.dx >= 0 ? 'right' : 'left') : (v.dy >= 0 ? 'down' : 'up');
+      v.face = locomotionFace(v, v.dx, v.dy);
       // En social/exploración, movement posee el facing visual normal.
       // En PvP, `_face` ya representa la intención de aim de KeloPvPWorld y no debe ser sobrescrita por locomoción.
       if (!combatAimFacing(p)) p._face = v.face;
