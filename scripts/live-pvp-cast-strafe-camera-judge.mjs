@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: TEST / PVP / CAMERA
- * keys: PVP CAMERA CAST STRAFE REVERSAL RECOVERY MOBILE DESKTOP PLAYWRIGHT
- * hace: reproduce cast estacionario -> recovery -> strafe contrario y mide cuánto framing residual del cast sobrevive
+ * keys: PVP CAMERA CAST STRAFE REVERSAL RECOVERY MOBILE DESKTOP PLAYWRIGHT INPUT
+ * hace: reproduce cast estacionario -> recovery -> strafe contrario y mide cuánto framing residual del cast sobrevive usando el input LIVE que processInput consume
  * online: N/A; valida presentación local sobre owners LIVE sin cambiar autoridad gameplay
  */
 import fs from 'node:fs';
@@ -33,7 +33,7 @@ async function scenario(label,viewport,hasTouch){
   await ready(page);
   await page.evaluate(()=>{
     localPlayer.x=2860; localPlayer.y=700; localPlayer.vx=0; localPlayer.vy=0;
-    if(typeof input!=='undefined'&&input){input.normX=0;input.normY=0;}
+    if(typeof input!=='undefined'&&input){input.normX=0;input.normY=0;input.keys.a=false;input.keys.ArrowLeft=false;}
     window.KeloInput.combat.setAxes({source:'cast-strafe-camera-audit',move:{x:0,y:0,magnitude:0}});
     window.KeloPvPWorld.setAimWorld({x:localPlayer.x+240,y:localPlayer.y},'cast-strafe-camera-audit',1);
     window.KeloAbilities.bus.emit('ABILITY_CAST',{abilityKey:'fireball',abilityId:1,actor:localPlayer,actorId:String(localPlayer.id||'local'),direction:{x:1,y:0},predicted:true});
@@ -47,24 +47,28 @@ async function scenario(label,viewport,hasTouch){
     x:localPlayer.x,y:localPlayer.y,phase:window.KeloPvPCastMovementPrediction?.phase,
     cameraVersion:window.KeloCamera.version
   }));
-  await page.evaluate(()=>{
-    if(typeof input!=='undefined'&&input){input.normX=-1;input.normY=0;}
-    window.KeloInput.combat.setAxes({source:'cast-strafe-camera-audit',move:{x:-1,y:0,magnitude:1}});
-  });
+
+  // Use the same key state consumed by legacy processInput -> KeloMovement.
+  // Directly assigning input.normX is invalid because processInput rewrites it every simulation frame.
+  await page.keyboard.down('ArrowLeft');
+  await page.waitForFunction(()=>typeof input!=='undefined'&&input.normX < -0.9,{timeout:500});
+  const accepted=await page.evaluate(()=>({t:performance.now(),normX:input.normX,normY:input.normY,x:localPlayer.x,y:localPlayer.y}));
+
   const samples=[];
   for(let i=0;i<16;i++){
-    samples.push(await page.evaluate(()=>({t:performance.now(),offset:window.KeloCamera.snapshot().combatFraming.stationaryActionOffsetScreenX,x:localPlayer.x,y:localPlayer.y,lookX:window.KeloCamera.snapshot().lookOffsetX,intentX:window.KeloCamera.snapshot().combatFraming.intentX})));
+    samples.push(await page.evaluate(()=>({t:performance.now(),offset:window.KeloCamera.snapshot().combatFraming.stationaryActionOffsetScreenX,x:localPlayer.x,y:localPlayer.y,lookX:window.KeloCamera.snapshot().lookOffsetX,intentX:window.KeloCamera.snapshot().combatFraming.intentX,normX:input.normX})));
     await page.waitForTimeout(16);
   }
-  const startT=samples[0]?.t||beforeMove.t;
+  await page.keyboard.up('ArrowLeft');
+  const startT=samples[0]?.t||accepted.t;
   const settle=samples.find(s=>Math.abs(s.offset)<=4);
   const settleMs=settle?settle.t-startT:null;
   let maxStep=0;
   for(let i=1;i<samples.length;i++)maxStep=Math.max(maxStep,Math.abs(samples[i].offset-samples[i-1].offset));
-  const travel=Math.hypot((samples.at(-1)?.x??beforeMove.x)-beforeMove.x,(samples.at(-1)?.y??beforeMove.y)-beforeMove.y);
-  const movedLeft=(samples.at(-1)?.x??beforeMove.x)<beforeMove.x;
+  const travel=Math.hypot((samples.at(-1)?.x??accepted.x)-accepted.x,(samples.at(-1)?.y??accepted.y)-accepted.y);
+  const movedLeft=(samples.at(-1)?.x??accepted.x)<accepted.x;
   await page.screenshot({path:path.join(OUT,`${label}-cast-strafe-camera.png`),fullPage:true});
-  report.runs.push({label,viewport,hasTouch,errors,peak,beforeMove,samples,settleMs,maxStep,travel,movedLeft});
+  report.runs.push({label,viewport,hasTouch,errors,peak,beforeMove,accepted,samples,settleMs,maxStep,travel,movedLeft});
   await context.close();
 }
 
@@ -78,6 +82,7 @@ if(hardErrors.length){console.error(hardErrors.join('\n'));process.exit(1);}
 for(const run of report.runs){
   if(run.peak<8)throw new Error('stationary cast framing did not reproduce: '+run.label+' peak='+run.peak);
   if(run.beforeMove.phase!=='recovery')throw new Error('strafe did not start from recovery: '+run.label);
+  if(!(run.accepted?.normX < -0.9))throw new Error('LEFT input was not accepted by processInput: '+run.label);
   if(!run.movedLeft||run.travel<20)throw new Error('LEFT strafe did not resolve physically: '+run.label+' travel='+run.travel);
   if(run.maxStep>8)throw new Error('camera release snaps: '+run.label+' maxStep='+run.maxStep);
   if(STRICT&&(run.settleMs==null||run.settleMs>75))throw new Error('camera carry survives too long into opposite strafe: '+run.label+' settleMs='+run.settleMs);
