@@ -1,16 +1,28 @@
 /* KELO-INDEX
  * area: VISUAL
- * keys: MELEE SWORD ATTACK REACTION SLASH HITSTOP SFX SEQUENCE MOBILE
+ * keys: MELEE SWORD ATTACK REACTION SLASH HITSTOP SFX SEQUENCE MOBILE 8WAY SKIN-AGNOSTIC
  * hace: registra el paquete visual data-driven del melee ligero sin tocar daño, hitbox ni cooldown
  * online: define únicamente IDs/timings de presentación reconstruibles desde eventos semánticos
+ * invariant: VFX y motion se anclan al centro lógico del actor, nunca a una skin concreta
  */
 (function (root) {
   'use strict';
 
-  const VERSION = 'melee-visual-manifest-v1.1.3';
+  const VERSION = 'melee-visual-manifest-v1.2.0-universal-8way';
   const IMPACT_AT_MS = 150;
   const ATTACK_DURATION = 0.33;
   const REACTION_DURATION = 0.11;
+  const DIRECTIONS_8 = Object.freeze(['up', 'up_right', 'right', 'down_right', 'down', 'down_left', 'left', 'up_left']);
+  const VECTORS = Object.freeze({
+    up: Object.freeze({ x: 0, y: -1 }),
+    up_right: Object.freeze({ x: Math.SQRT1_2, y: -Math.SQRT1_2 }),
+    right: Object.freeze({ x: 1, y: 0 }),
+    down_right: Object.freeze({ x: Math.SQRT1_2, y: Math.SQRT1_2 }),
+    down: Object.freeze({ x: 0, y: 1 }),
+    down_left: Object.freeze({ x: -Math.SQRT1_2, y: Math.SQRT1_2 }),
+    left: Object.freeze({ x: -1, y: 0 }),
+    up_left: Object.freeze({ x: -Math.SQRT1_2, y: -Math.SQRT1_2 })
+  });
 
   const assetRegistry = root.KeloAssetRegistry;
   const animationRegistry = root.KeloAnimationRegistry;
@@ -32,29 +44,43 @@
     return registry.register(Object.freeze(def));
   }
 
-  const attackMotion = Object.freeze({
-    down: Object.freeze({ backX: 0, backY: -3, strikeX: 0, strikeY: 8, followX: 0, followY: 4, rotation: -0.09 }),
-    up: Object.freeze({ backX: 0, backY: 3, strikeX: 0, strikeY: -8, followX: 0, followY: -4, rotation: 0.09 }),
-    right: Object.freeze({ backX: -3, backY: 0, strikeX: 8, strikeY: 0, followX: 4, followY: 0, rotation: 0.09 }),
-    left: Object.freeze({ backX: 3, backY: 0, strikeX: -8, strikeY: 0, followX: -4, followY: 0, rotation: -0.09 })
-  });
+  function motionFor(face, magnitude) {
+    const v = VECTORS[face] || VECTORS.down;
+    const sign = Math.abs(v.x) > 0.01 ? (v.x > 0 ? 1 : -1) : (v.y > 0 ? -1 : 1);
+    return Object.freeze({
+      backX: -v.x * 3,
+      backY: -v.y * 3,
+      strikeX: v.x * magnitude,
+      strikeY: v.y * magnitude,
+      followX: v.x * magnitude * 0.5,
+      followY: v.y * magnitude * 0.5,
+      rotation: 0.09 * sign
+    });
+  }
 
-  const reactionMotion = Object.freeze({
-    down: Object.freeze({ x: 0, y: 4, rotation: 0.035 }),
-    up: Object.freeze({ x: 0, y: -4, rotation: -0.035 }),
-    right: Object.freeze({ x: 4, y: 0, rotation: 0.035 }),
-    left: Object.freeze({ x: -4, y: 0, rotation: -0.035 })
+  function reactionFor(face) {
+    const v = VECTORS[face] || VECTORS.down;
+    const sign = Math.abs(v.x) > 0.01 ? (v.x > 0 ? 1 : -1) : (v.y > 0 ? -1 : 1);
+    return Object.freeze({ x: v.x * 4, y: v.y * 4, rotation: 0.035 * sign });
+  }
+
+  const attackMotion = {};
+  const reactionMotion = {};
+  DIRECTIONS_8.forEach(function (face) {
+    attackMotion[face] = motionFor(face, 8);
+    reactionMotion[face] = reactionFor(face);
   });
 
   const slashAssets = {};
   const slashFx = {};
-  ['up', 'down', 'left', 'right'].forEach(function (face) {
+  DIRECTIONS_8.forEach(function (face) {
+    const slug = face.replace('_', '-');
     const assetId = 'melee_slash_sword_light_01_' + face + '_asset';
     const fxId = 'melee_slash_sword_light_01_' + face;
     registerSafe(assetRegistry, {
       id: assetId,
       type: 'image',
-      src: 'src/visuals/melee-assets/sword-light-slash-' + face + '.svg',
+      src: 'src/visuals/melee-assets/sword-light-slash-' + slug + '.svg',
       preload: true
     });
     registerSafe(fxRegistry, {
@@ -63,7 +89,7 @@
       assetId: assetId,
       space: 'ACTOR',
       layer: 'actorFrontFX',
-      socket: 'weapon',
+      socket: 'center',
       duration: 0.11,
       loop: false,
       width: 94,
@@ -77,7 +103,7 @@
   });
 
   const attackClips = {};
-  Object.keys(attackMotion).forEach(function (face) {
+  DIRECTIONS_8.forEach(function (face) {
     const m = attackMotion[face];
     const id = 'melee_sword_light_01_' + face;
     registerSafe(animationRegistry, {
@@ -103,7 +129,7 @@
   });
 
   const reactionClips = {};
-  Object.keys(reactionMotion).forEach(function (face) {
+  DIRECTIONS_8.forEach(function (face) {
     const m = reactionMotion[face];
     const id = 'melee_hit_reaction_light_' + face;
     registerSafe(animationRegistry, {
@@ -114,7 +140,7 @@
       duration: REACTION_DURATION,
       loop: false,
       interruptible: true,
-      directions: Object.freeze(['up', 'down', 'left', 'right']),
+      directions: DIRECTIONS_8,
       keyframes: freezeFrames([
         { t: 0.00, scaleX: 1.00, scaleY: 1.00, rotation: 0, offsetX: 0, offsetY: 0 },
         { t: 0.22, scaleX: 0.99, scaleY: 1.01, rotation: 0, offsetX: 0, offsetY: 0 },
@@ -173,14 +199,14 @@
   });
 
   const swingSequences = {};
-  ['up', 'down', 'left', 'right'].forEach(function (face) {
+  DIRECTIONS_8.forEach(function (face) {
     const id = 'sequence_melee_sword_light_01_' + face;
     registerSafe(sequenceRegistry, {
       id: id,
       duration: 180,
       cues: Object.freeze([
         Object.freeze({ at: 62, type: 'sfx', ref: 'melee_swing_light_01' }),
-        Object.freeze({ at: 68, type: 'fx', ref: slashFx[face], socket: 'weapon' })
+        Object.freeze({ at: 68, type: 'fx', ref: slashFx[face], socket: 'center' })
       ])
     });
     swingSequences[face] = id;
@@ -208,12 +234,15 @@
     recoveryMs: 178,
     reactionDurationMs: Math.round(REACTION_DURATION * 1000),
     visualThrottleMs: 180,
+    directions: DIRECTIONS_8,
     attackClips: Object.freeze(attackClips),
     reactionClips: Object.freeze(reactionClips),
     slashAssets: Object.freeze(slashAssets),
     slashFx: Object.freeze(slashFx),
     swingSequences: Object.freeze(swingSequences),
-    hitSequence: 'sequence_melee_hit_light_01'
+    hitSequence: 'sequence_melee_hit_light_01',
+    anchorSocket: 'center',
+    skinAgnostic: true
   });
 
   root.KELO_MELEE_VISUAL_AUDIT = Object.assign(root.KELO_MELEE_VISUAL_AUDIT || {}, {
@@ -222,6 +251,9 @@
     attackClips: Object.keys(attackClips).length,
     reactionClips: Object.keys(reactionClips).length,
     slashAssets: Object.keys(slashAssets).length,
-    impactAtMs: IMPACT_AT_MS
+    impactAtMs: IMPACT_AT_MS,
+    directions: DIRECTIONS_8.length,
+    anchorSocket: 'center',
+    skinAgnostic: true
   });
 })(typeof globalThis !== 'undefined' ? globalThis : window);

@@ -45,6 +45,7 @@ jobs:
           test -f src/visuals/ability-visuals.js
           test -f src/visuals/melee-visual-manifest.js
           test -f src/visuals/melee-combat-visuals.js
+          test -f src/visuals/combat-presentation-bridge.js
           test -f src/visuals/visual-lab.js
           test -f src/visuals/visual-integration.js
           test -f scripts/melee-visuals-audit.js
@@ -52,6 +53,10 @@ jobs:
           test -f src/visuals/melee-assets/sword-light-slash-down.svg
           test -f src/visuals/melee-assets/sword-light-slash-left.svg
           test -f src/visuals/melee-assets/sword-light-slash-right.svg
+          test -f src/visuals/melee-assets/sword-light-slash-up-right.svg
+          test -f src/visuals/melee-assets/sword-light-slash-down-right.svg
+          test -f src/visuals/melee-assets/sword-light-slash-down-left.svg
+          test -f src/visuals/melee-assets/sword-light-slash-up-left.svg
       - name: Syntax
         run: |
           node --check src/visuals/visual-system.js
@@ -63,6 +68,7 @@ jobs:
           node --check src/visuals/ability-visuals.js
           node --check src/visuals/melee-visual-manifest.js
           node --check src/visuals/melee-combat-visuals.js
+          node --check src/visuals/combat-presentation-bridge.js
           node --check src/visuals/visual-lab.js
           node --check src/visuals/visual-integration.js
           node --check src/abilities/abilityData.js
@@ -78,12 +84,15 @@ jobs:
         run: node scripts/melee-visuals-audit.js
       - name: Online-first guardrails
         run: |
-          grep -q "visualProfileId: 'ability_visual_fireball_01'" src/abilities/abilityData.js
+          grep -Eq "visualProfileId:[[:space:]]*'ability_visual_fireball_01'" src/abilities/abilityData.js
           grep -q "fire_explosion_medium" src/visuals/visual-manifests.js
           grep -q "sequence_debug_explosion_reuse" src/visuals/visual-manifests.js
           grep -q "impact_melee_light" src/visuals/visual-manifests.js
-          grep -q "MELEE_ATTACK_STARTED" src/systems/pvp-world.js
-          grep -q "MELEE_HIT_CONFIRMED" src/systems/pvp-world.js
+          grep -q "MELEE_ATTACK_STARTED" src/visuals/combat-presentation-bridge.js
+          grep -q "MELEE_HIT_CONFIRMED" src/visuals/combat-presentation-bridge.js
+          ! grep -q "emitVisual(" src/systems/pvp-world.js
+          grep -q "KeloMeleeEngine.beginAttack" src/systems/pvp-world.js
+          grep -q "KeloCombatEngine.attackSweep" src/systems/pvp-world.js
           grep -q "visual:event" engine-net.js
           grep -q "sanitizeVisualContext" server/index.js
           grep -q "visual-integration.js?v=2" index.html
