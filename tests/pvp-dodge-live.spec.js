@@ -26,13 +26,13 @@ async function runDodge(page,label){
       for(const box of obstacles){
         if(!box||box.blocksMovement===false)continue;
         const t=window.KELO_COLLISION.segmentAabbHitT(start.x,start.y,dash.tx,dash.ty,box,localPlayer.radius||20);
-        if(t!=null)hits.push({t,x:box.x,y:box.y,w:box.w,h:box.h,owner:box.__keloCollisionOwner||box.owner||null,id:box.id||null});
+        if(t!=null)hits.push({t,x:box.x,y:box.y,w:box.w,h:box.h,owner:box._keloCollisionOwner||box.owner||null,id:box.id||null});
       }
       hits.sort((a,b)=>a.t-b.t);
     }
     await new Promise(r=>setTimeout(r,240));
     const end={x:localPlayer.x,y:localPlayer.y};
-    return{start,dash,end,distance:Math.hypot(end.x-start.x,end.y-start.y),hits:hits.slice(0,8),audit:window.KELO_PVP_AUDIT||null};
+    return{start,dash,end,distance:Math.hypot(end.x-start.x,end.y-start.y),hits:hits.slice(0,8),collisionOwners:window.KELO_COLLISION&&window.KELO_COLLISION.ownerSnapshot?window.KELO_COLLISION.ownerSnapshot():null,audit:window.KELO_PVP_AUDIT||null};
   });
   console.log('PVP_DODGE_LIVE',JSON.stringify({label,baseline,errors},null,2));
   expect(errors).toEqual([]);
