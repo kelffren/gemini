@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: QA / PVP ABILITY MOVEMENT
  * owner: deterministic audit only
- * keys: PVP CAST MOVEMENT PARITY FIREBALL FIRE TORNADO ICE WALL 60HZ 90HZ 120HZ PHASE AWARE
+ * keys: PVP CAST MOVEMENT PARITY FIREBALL FIRE TORNADO ICE WALL STONE SHIELD 60HZ 90HZ 120HZ PHASE AWARE
  * purpose: compara baseline sin prediction contra candidate shared timeline y semántica autoritativa para movementScale de casts
  * consumes: abilityData + ability-action-timeline
  * do-not: NO gameplay writes, NO production state
@@ -11,7 +11,7 @@ const path=require('path');
 const data=require(path.resolve(__dirname,'../src/abilities/abilityData.js'));
 const timeline=require(path.resolve(__dirname,'../src/abilities/ability-action-timeline.js'));
 const SPEED=185.28;
-const KEYS=['fireball','fire_tornado','ice_wall','shadow_step','wind_dash'];
+const KEYS=['fireball','fire_tornado','ice_wall','stone_shield','shadow_step','wind_dash'];
 function def(key){const d=(data.ABILITIES||[]).find(x=>x.key===key);if(!d)throw new Error('ABILITY_MISSING:'+key);return d;}
 function serverRun(d,hz,meleeScale){
   const dt=1/hz,s=timeline.create(d);let distance=0,steps=0,phaseSteps=[];
@@ -45,6 +45,10 @@ if(Math.abs(tornadoAction.movementScale.windup-.52)>1e-9||Math.abs(tornadoAction
 if(!tornado.every(r=>r.baselineSemanticErrorPx>20))throw new Error('TORNADO_COMMITMENT_GAP_NOT_REPRODUCED');
 const tornadoRecoveryParity=tornado.every(r=>r.candidateServerDeltaPx<1e-9&&!r.phaseMismatch);
 if(!tornadoRecoveryParity)throw new Error('TORNADO_PHASE_PARITY_FAILED');
+const stoneDef=def('stone_shield'),stoneAction=timeline.normalize(stoneDef),stone=rows.filter(r=>r.key==='stone_shield'&&r.meleeScale===1);
+if(!stoneAction.movementScale||typeof stoneAction.movementScale!=='object')throw new Error('STONE_SHIELD_PHASE_POLICY_MISSING');
+if(Math.abs(stoneAction.movementScale.windup-.55)>1e-9||Math.abs(stoneAction.movementScale.active-.55)>1e-9||Math.abs(stoneAction.movementScale.recovery-.80)>1e-9)throw new Error('STONE_SHIELD_PHASE_POLICY_CHANGED');
+if(!stone.every(r=>r.candidateServerDeltaPx<1e-9&&!r.phaseMismatch))throw new Error('STONE_SHIELD_PHASE_PARITY_FAILED');
 const wind=rows.filter(r=>r.key==='wind_dash'&&r.meleeScale===1);
 if(!wind.every(r=>r.baselineSemanticErrorPx<1e-9&&r.candidateServerDeltaPx<1e-9))throw new Error('WIND_DASH_SHOULD_NOT_SLOW');
-console.log(JSON.stringify({ok:true,version:timeline.version,maxCandidateServerDeltaPx:Math.max(...rows.map(r=>r.candidateServerDeltaPx)),fireTornadoAction:tornadoAction,fireTornado:tornado,windDash:wind,rows},null,2));
+console.log(JSON.stringify({ok:true,version:timeline.version,maxCandidateServerDeltaPx:Math.max(...rows.map(r=>r.candidateServerDeltaPx)),fireTornadoAction:tornadoAction,fireTornado:tornado,stoneShieldAction:stoneAction,stoneShield:stone,windDash:wind,rows},null,2));
