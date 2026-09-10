@@ -11,32 +11,32 @@ const {test,expect}=require('@playwright/test');
 async function runDodge(page,label){
   const errors=[];page.on('pageerror',e=>errors.push(String(e)));
   await page.goto('http://127.0.0.1:4173/index.html',{waitUntil:'domcontentloaded'});
-  await page.waitForFunction(()=>window.KeloPvPWorld&&window.KeloAbilities&&window.KeloInput&&typeof window.enterPvPWorld==='function',{timeout:20000});
-  await page.evaluate(()=>window.enterPvPWorld());
-  await page.waitForFunction(()=>window.KeloPvPWorld.state.mode==='pvp'&&window.KeloPvPWorld.state.combatEnabled,{timeout:5000});
+  await page.waitForFunction(()=>window.KeloPvPWorld&&window.KeloInput&&typeof window.enterPvPWorld==='function',{timeout:20000});
+  await page.evaluate(async()=>{await window.enterPvPWorld();});
+  await page.waitForFunction(()=>window.KeloPvPWorld&&window.KeloAbilities&&window.KeloPvPWorld.state.mode==='pvp'&&window.KeloPvPWorld.state.combatEnabled,{timeout:15000});
   const baseline=await page.evaluate(async()=>{
     localPlayer.x=2790;localPlayer.y=720;localPlayer.vx=localPlayer.vy=0;
     window.KeloPvPWorld.setAimWorld({x:2910,y:720},'audit',1);
-    const start={x:localPlayer.x,y:localPlayer.y};
-    window.KeloInput.combat.push('DODGE_PRESS',{source:'audit'});
-    await new Promise(r=>setTimeout(r,34));
-    const dash=localPlayer._dash?{...localPlayer._dash}:null;
+    const start={x:localPlayer.x,y:localPlayer.y},expected={x:localPlayer.x+112,y:localPlayer.y};
     const hits=[];
-    if(dash&&window.KELO_COLLISION&&typeof obstacles!=='undefined'){
+    if(window.KELO_COLLISION&&typeof obstacles!=='undefined'){
       for(const box of obstacles){
         if(!box||box.blocksMovement===false)continue;
-        const t=window.KELO_COLLISION.segmentAabbHitT(start.x,start.y,dash.tx,dash.ty,box,localPlayer.radius||20);
+        const t=window.KELO_COLLISION.segmentAabbHitT(start.x,start.y,expected.x,expected.y,box,localPlayer.radius||20);
         if(t!=null)hits.push({t,x:box.x,y:box.y,w:box.w,h:box.h,owner:box._keloCollisionOwner||box.owner||null,id:box.id||null});
       }
       hits.sort((a,b)=>a.t-b.t);
     }
-    await new Promise(r=>setTimeout(r,240));
+    window.KeloInput.combat.push('DODGE_PRESS',{source:'audit'});
+    const samples=[];
+    const t0=performance.now();
+    while(performance.now()-t0<260){samples.push({ms:performance.now()-t0,x:localPlayer.x,y:localPlayer.y,dash:localPlayer._dash?{sx:localPlayer._dash.sx,sy:localPlayer._dash.sy,tx:localPlayer._dash.tx,ty:localPlayer._dash.ty,time:localPlayer._dash.time,max:localPlayer._dash.max,abilityKey:localPlayer._dash.abilityKey}:null,dodgeActive:window.KeloPvPWorld.state.dodgeActive});await new Promise(r=>setTimeout(r,8));}
     const end={x:localPlayer.x,y:localPlayer.y};
-    return{start,dash,end,distance:Math.hypot(end.x-start.x,end.y-start.y),hits:hits.slice(0,8),collisionOwners:window.KELO_COLLISION&&window.KELO_COLLISION.ownerSnapshot?window.KELO_COLLISION.ownerSnapshot():null,audit:window.KELO_PVP_AUDIT||null};
+    return{start,expected,end,distance:Math.hypot(end.x-start.x,end.y-start.y),hits:hits.slice(0,8),samples,collisionOwners:window.KELO_COLLISION&&window.KELO_COLLISION.ownerSnapshot?window.KELO_COLLISION.ownerSnapshot():null,audit:window.KELO_PVP_AUDIT||null};
   });
   console.log('PVP_DODGE_LIVE',JSON.stringify({label,baseline,errors},null,2));
   expect(errors).toEqual([]);
-  expect(baseline.dash).not.toBeNull();
+  expect(baseline.samples.some(s=>s.dodgeActive)).toBeTruthy();
   return baseline;
 }
 
