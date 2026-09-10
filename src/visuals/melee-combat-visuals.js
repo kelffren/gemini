@@ -8,7 +8,7 @@
 (function (root) {
   'use strict';
 
-  const VERSION = 'melee-combat-visuals-v1.2.0-m1-combo-feel';
+  const VERSION = 'melee-combat-visuals-v1.3.0-reaction-hierarchy';
   const manifest = root.KELO_MELEE_VISUAL_MANIFEST;
   const bus = root.KeloVisualEventBus;
   const contextApi = root.KeloVisualContext;
@@ -20,9 +20,9 @@
   }
 
   const COMBO_STYLES = Object.freeze({
-    1: Object.freeze({ id: 'opener', impactAtMs: 90, slashScale: 0.96, sequenceSpeed: 1.0, reactionSpeed: 1.06, heavyImpact: false }),
-    2: Object.freeze({ id: 'follow', impactAtMs: 78, slashScale: 1.06, sequenceSpeed: 1.15, reactionSpeed: 1.0, heavyImpact: false }),
-    3: Object.freeze({ id: 'finisher', impactAtMs: 118, slashScale: 1.28, sequenceSpeed: 0.78, reactionSpeed: 0.82, heavyImpact: true })
+    1: Object.freeze({ id: 'opener', impactAtMs: 90, slashScale: 0.96, sequenceSpeed: 1.0, reactionSpeed: 1.06, reactionScale: 1.00, heavyImpact: false }),
+    2: Object.freeze({ id: 'follow', impactAtMs: 78, slashScale: 1.06, sequenceSpeed: 1.15, reactionSpeed: 1.0, reactionScale: 1.10, heavyImpact: false }),
+    3: Object.freeze({ id: 'finisher', impactAtMs: 118, slashScale: 1.28, sequenceSpeed: 0.78, reactionSpeed: 0.82, reactionScale: 1.35, heavyImpact: true })
   });
   const PROFILE_TO_STAGE = Object.freeze({
     sword_light_basic: 1,
@@ -34,6 +34,7 @@
   const acceptedAttackIds = new Map();
   const timers = new Set();
   const comboClips = { 1: Object.create(null), 2: Object.create(null), 3: Object.create(null) };
+  const comboReactionClips = { 1: Object.create(null), 2: Object.create(null), 3: Object.create(null) };
   let syntheticSeq = 1;
 
   const audit = root.KELO_MELEE_VISUAL_AUDIT = Object.assign(root.KELO_MELEE_VISUAL_AUDIT || {}, {
@@ -53,7 +54,8 @@
     skinAgnostic: true,
     directionCount: 8,
     comboStages: 3,
-    comboFeelProfile: 'opener-follow-finisher'
+    comboFeelProfile: 'opener-follow-finisher',
+    reactionHierarchy: Object.freeze({ opener: 1.00, follow: 1.10, finisher: 1.35 })
   });
 
   function nowMs() {
@@ -87,14 +89,11 @@
     return { x: x / len, y: y / len };
   }
 
-  // Keep the avatar renderer on its legacy-safe 4-way facing. No skin is required
-  // to implement diagonal sprite sheets for this melee attack to work.
   function faceFromDirection(direction) {
     if (Math.abs(direction.x) > Math.abs(direction.y)) return direction.x < 0 ? 'left' : 'right';
     return direction.y < 0 ? 'up' : 'down';
   }
 
-  // Presentation selects one of eight clips independently from the skin facing.
   function direction8FromDirection(direction) {
     const angle = Math.atan2(direction.y, direction.x);
     const octant = (Math.round(angle / (Math.PI / 4)) + 8) % 8;
@@ -136,6 +135,19 @@
     }));
   }
 
+  function transformedReactionKeyframes(frames, scale) {
+    const s = Math.max(1, Number(scale) || 1);
+    return Object.freeze((Array.isArray(frames) ? frames : []).map(function (frame) {
+      const out = Object.assign({}, frame);
+      out.offsetX = (Number(frame.offsetX) || 0) * s;
+      out.offsetY = (Number(frame.offsetY) || 0) * s;
+      out.rotation = (Number(frame.rotation) || 0) * (1 + (s - 1) * 0.70);
+      out.scaleX = 1 + ((Number(frame.scaleX) || 1) - 1) * (1 + (s - 1) * 0.45);
+      out.scaleY = 1 + ((Number(frame.scaleY) || 1) - 1) * (1 + (s - 1) * 0.45);
+      return Object.freeze(out);
+    }));
+  }
+
   function ensureComboClips() {
     if (!animationRegistry || typeof animationRegistry.get !== 'function' || typeof animationRegistry.register !== 'function') return;
     (manifest.directions || []).forEach(function (direction8) {
@@ -162,6 +174,27 @@
     });
   }
   ensureComboClips();
+
+  function ensureComboReactionClips() {
+    if (!animationRegistry || typeof animationRegistry.get !== 'function' || typeof animationRegistry.register !== 'function') return;
+    (manifest.directions || []).forEach(function (direction8) {
+      const baseId = manifest.reactionClips[direction8];
+      const base = animationRegistry.get(baseId);
+      if (!base) return;
+      comboReactionClips[1][direction8] = baseId;
+      [2, 3].forEach(function (stage) {
+        const id = baseId + '_m1_' + stage;
+        if (!animationRegistry.get(id)) {
+          animationRegistry.register(Object.assign({}, base, {
+            id: id,
+            keyframes: transformedReactionKeyframes(base.keyframes, COMBO_STYLES[stage].reactionScale)
+          }));
+        }
+        comboReactionClips[stage][direction8] = id;
+      });
+    });
+  }
+  ensureComboReactionClips();
 
   function attackIdOf(payload) {
     return String(payload && (payload.attackId || payload.castId) || ('melee_visual_' + (syntheticSeq++).toString(36)));
@@ -265,7 +298,7 @@
     context.visual.comboStage = comboStage;
     context.visual.comboStyle = style.id;
 
-    const clipId = manifest.reactionClips[direction8] || manifest.reactionClips[face] || manifest.reactionClips.down;
+    const clipId = comboReactionClips[comboStage] && comboReactionClips[comboStage][direction8] || manifest.reactionClips[direction8] || manifest.reactionClips[face] || manifest.reactionClips.down;
     const reactionId = root.KeloAnimation.play(target, clipId, { channel: 'reaction', speed: style.reactionSpeed, context: context });
     const sequenceId = root.KeloSequence.play(manifest.hitSequence, context);
     if (style.heavyImpact && root.KeloScreenFX && typeof root.KeloScreenFX.play === 'function' && (!root.KeloScreenFX.get || root.KeloScreenFX.get('impact_medium'))) {
@@ -275,7 +308,7 @@
     audit.hitsPresented += 1;
     audit.lastHitTargetId = actorId(target);
     audit.lastHitComboStage = comboStage;
-    return { reactionId: reactionId, sequenceId: sequenceId, face: face, direction8: direction8, comboStage: comboStage, comboStyle: style.id };
+    return { reactionId: reactionId, sequenceId: sequenceId, face: face, direction8: direction8, comboStage: comboStage, comboStyle: style.id, reactionScale: style.reactionScale };
   }
 
   function impactDelayFor(payload) {
