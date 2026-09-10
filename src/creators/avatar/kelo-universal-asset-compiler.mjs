@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: CREATORS / AVATAR
  * owner: Kelo Universal Asset Compiler V5
- * keys: AVATAR UNIVERSAL COMPILER HYPOTHESES SELF-HEAL VALIDATE CANONICAL-RIG
+ * keys: AVATAR UNIVERSAL COMPILER HYPOTHESES SELF-HEAL VALIDATE CANONICAL-RIG EARLY-ACCEPT
  * purpose: accept heterogeneous avatar sprite sheets, generate competing interpretations, repair/normalize them, validate the result and emit one canonical Kelo runtime sheet
  * public-api: analyzeUniversalAvatarAsset(file), compileUniversalAvatarRuntime(file,config)
  * consumes: avatar-spritesheet-analyzer V4 + browser Canvas/ImageBitmap
@@ -15,6 +15,7 @@ import {analyzeAvatarSpriteSheet,compileAvatarRuntime} from './avatar-spriteshee
 const F=Object.freeze;
 const FACE_ROWS=F({down:0,left:1,right:2,up:3});
 const MAX_TRIALS=10;
+const VALIDATION_MAX=512;
 const MAX_RUNTIME_BYTES=2*1024*1024;
 const clamp=(n,a=0,b=1)=>Math.max(a,Math.min(b,Number(n)||0));
 const mean=a=>a.length?a.reduce((s,n)=>s+n,0)/a.length:0;
@@ -48,12 +49,12 @@ function alphaStats(data,w,h){
   return{area,w:maxX-minX+1,h:maxY-minY+1,bottom:(maxY+1)/h,borderRatio:border/area,opaqueRatio:opaque/area};
 }
 async function validateCompiled(compiled,{root=globalThis}={}){
-  const bitmap=await bitmapFor(compiled.blob,root),width=bitmap.width||bitmap.naturalWidth,height=bitmap.height||bitmap.naturalHeight,columns=Math.max(1,compiled.columns||1),rows=Math.max(1,compiled.rows||1),canvas=canvasFor(root,width,height),ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.clearRect(0,0,width,height);ctx.drawImage(bitmap,0,0);bitmap.close?.();
+  const bitmap=await bitmapFor(compiled.blob,root),sourceW=bitmap.width||bitmap.naturalWidth,sourceH=bitmap.height||bitmap.naturalHeight,scale=Math.min(1,VALIDATION_MAX/Math.max(sourceW,sourceH)),width=Math.max(1,Math.round(sourceW*scale)),height=Math.max(1,Math.round(sourceH*scale)),columns=Math.max(1,compiled.columns||1),rows=Math.max(1,compiled.rows||1),canvas=canvasFor(root,width,height),ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.clearRect(0,0,width,height);ctx.imageSmoothingEnabled=true;ctx.drawImage(bitmap,0,0,width,height);bitmap.close?.();
   const fw=width/columns,fh=height/rows,stats=[];
   for(let row=0;row<rows;row++)for(let col=0;col<columns;col++){const x0=Math.floor(col*fw),y0=Math.floor(row*fh),x1=Math.ceil((col+1)*fw),y1=Math.ceil((row+1)*fh),im=ctx.getImageData(x0,y0,Math.max(1,x1-x0),Math.max(1,y1-y0));stats.push(alphaStats(im.data,im.width,im.height));}
   const alive=stats.filter(s=>s.area>0),occupancy=alive.length/Math.max(1,stats.length),sizeConsistency=alive.length?clamp(1-(cv(alive.map(s=>s.h))*.55+cv(alive.map(s=>s.w))*.45)):0,bottomConsistency=alive.length?clamp(1-cv(alive.map(s=>s.bottom))*1.45):0,edgeSafety=alive.length?clamp(1-mean(alive.map(s=>Math.min(1,s.borderRatio*12)))):0,alphaQuality=alive.length?clamp(mean(alive.map(s=>s.opaqueRatio))*1.15):0;
   const health=clamp(.32*occupancy+.24*sizeConsistency+.16*bottomConsistency+.16*edgeSafety+.12*alphaQuality),suspicious=stats.filter(s=>!s.area||s.borderRatio>.09).length;
-  return F({health,occupancy,sizeConsistency,bottomConsistency,edgeSafety,alphaQuality,suspicious,total:stats.length});
+  return F({health,occupancy,sizeConsistency,bottomConsistency,edgeSafety,alphaQuality,suspicious,total:stats.length,probeScale:scale});
 }
 
 function hypothesisConfig(base,h,thresholdScale=1){
@@ -90,16 +91,20 @@ export async function analyzeUniversalAvatarAsset(file,{root=globalThis}={}){
 export async function compileUniversalAvatarRuntime(file,config,{root=globalThis,onProgress=null}={}){
   if(!file)throw new Error('UNIVERSAL_FILE_REQUIRED');
   if(config?.detectionMode==='manual'||config?.universalAuto===false){const direct=await compileAvatarRuntime(file,config,{root}),canonical=await canonicalize(direct,{root}),validation=await validateCompiled(canonical,{root});return F({...canonical,compilerVersion:'5.0.0',strategy:'manual',validation,confidenceScore:validation.health,selfHealed:false});}
-  const base=config?.compilerVersion?config:await analyzeUniversalAvatarAsset(file,{root}),hypotheses=buildHypotheses(base),trials=[];
-  const total=Math.min(MAX_TRIALS,hypotheses.length);for(let i=0;i<total;i++){const h=hypotheses[i];try{trials.push(await runTrial(file,base,h,{root,onProgress,index:i+1,total}));}catch(error){trials.push(F({h,error:String(error?.message||error),confidence:0}));}}
-  let viable=trials.filter(t=>t.compiled).sort((a,b)=>b.confidence-a.confidence);if(!viable.length)throw new Error('UNIVERSAL_NO_VALID_INTERPRETATION');
+  const base=config?.compilerVersion?config:await analyzeUniversalAvatarAsset(file,{root}),hypotheses=buildHypotheses(base),trials=[],total=Math.min(MAX_TRIALS,hypotheses.length);
+  if(!total)throw new Error('UNIVERSAL_NO_HYPOTHESES');
+  try{trials.push(await runTrial(file,base,hypotheses[0],{root,onProgress,index:1,total}));}catch(error){trials.push(F({h:hypotheses[0],error:String(error?.message||error),confidence:0}));}
+  const first=trials[0],earlyAccept=!!first?.compiled&&first.validation.health>=.84&&first.h.prior>=.82&&first.confidence>=.80;
+  if(earlyAccept)onProgress?.({stage:'early-accept',message:'Interpretación principal validada · no hacen falta más pruebas'});
+  else for(let i=1;i<total;i++){const h=hypotheses[i];try{trials.push(await runTrial(file,base,h,{root,onProgress,index:i+1,total}));}catch(error){trials.push(F({h,error:String(error?.message||error),confidence:0}));}}
+  const viable=trials.filter(t=>t.compiled).sort((a,b)=>b.confidence-a.confidence);if(!viable.length)throw new Error('UNIVERSAL_NO_VALID_INTERPRETATION');
   let best=viable[0],selfHealed=false;
   if(best.validation.health<.82&&base.removeBackground&&base.backgroundKind==='color'){
     const repairs=[];for(const scale of [.72,1.22]){try{repairs.push(await runTrial(file,base,best.h,{root,onProgress,index:1,total:2,thresholdScale:scale}));}catch{}}
     const repaired=repairs.sort((a,b)=>b.confidence-a.confidence)[0];if(repaired&&repaired.confidence>best.confidence+.015){best=repaired;selfHealed=true;}
   }
   onProgress?.({stage:'canonicalize',message:'Adaptando al rig universal de Kelo World…'});const canonical=await canonicalize(best.compiled,{root}),validation=await validateCompiled(canonical,{root}),confidenceScore=clamp(.72*validation.health+.28*best.confidence);
-  const audit=F({selected:F({mode:best.h.mode,columns:best.h.columns,rows:best.h.rows,thresholdScale:best.thresholdScale||1}),tested:F(trials.map(t=>F({mode:t.h.mode,columns:t.h.columns,rows:t.h.rows,confidence:Number(t.confidence)||0,health:Number(t.validation?.health)||0,error:t.error||null}))),selfHealed,finalHealth:validation.health});
+  const audit=F({selected:F({mode:best.h.mode,columns:best.h.columns,rows:best.h.rows,thresholdScale:best.thresholdScale||1}),tested:F(trials.map(t=>F({mode:t.h.mode,columns:t.h.columns,rows:t.h.rows,confidence:Number(t.confidence)||0,health:Number(t.validation?.health)||0,error:t.error||null}))),earlyAccept,selfHealed,finalHealth:validation.health});
   return F({...canonical,compilerVersion:'5.0.0',strategy:best.h.mode,detectionMode:`universal:${best.h.mode}`,confidenceScore,validation,audit,selfHealed,canonicalRig:true});
 }
 
