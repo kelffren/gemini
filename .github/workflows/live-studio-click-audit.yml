@@ -11,6 +11,7 @@ on:
       - 'src/ui/account-auth-ui.js'
       - 'src/core/camera-system.js'
       - 'index.html'
+      - 'scripts/live-studio-open-smoke.mjs'
       - 'scripts/live-studio-click-audit.mjs'
       - '.github/workflows/live-studio-click-audit.yml'
 
@@ -29,8 +30,10 @@ jobs:
           node-version: '22'
       - name: Install Playwright
         run: npm install --no-save playwright@1.55.0
-      - name: Syntax check click audit
-        run: node --check scripts/live-studio-click-audit.mjs
+      - name: Syntax check live audits
+        run: |
+          node --check scripts/live-studio-open-smoke.mjs
+          node --check scripts/live-studio-click-audit.mjs
       - name: Wait for editor account-gate hotfix on Pages
         run: |
           for i in $(seq 1 180); do
@@ -41,7 +44,12 @@ jobs:
           done
           echo 'Timed out waiting for account-auth-ui editor bypass deployment' >&2
           exit 1
-      - name: Click MENÚ → CREATORS → World on GitHub Pages
+      - name: Smoke open MENÚ → CREATORS → World on GitHub Pages
+        env:
+          AUDIT_URL: https://kelffren.github.io/gemini/
+          CHROME_BIN: /usr/bin/google-chrome
+        run: node scripts/live-studio-open-smoke.mjs
+      - name: Deep interaction audit on GitHub Pages
         env:
           AUDIT_URL: https://kelffren.github.io/gemini/
           CHROME_BIN: /usr/bin/google-chrome
