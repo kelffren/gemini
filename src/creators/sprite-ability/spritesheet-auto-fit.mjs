@@ -1,10 +1,11 @@
 /* KELO-INDEX
  * area: CREATORS / SPRITE ABILITY / AUTO FIT
  * owner: Sprite Ability Builder import normalization
- * keys: SPRITESHEET AUTO DETECT GRID TRANSPARENCY BACKGROUND NORMALIZE SLICE
+ * keys: SPRITESHEET AUTO DETECT GRID TRANSPARENCY BACKGROUND NORMALIZE SLICE SAFE GRID
  * purpose: acepta hojas con tamaños irregulares, detecta una rejilla probable y genera una hoja PNG exacta divisible por filas/columnas
  * does-not-own: animation timing, combat authority, publishing
  */
+import { chooseSafeGrid } from './sprite-ability-frame-policy.mjs';
 const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
 const finite=(v,f=0)=>Number.isFinite(Number(v))?Number(v):f;
 
@@ -129,20 +130,37 @@ export function normalizeSpritesheetPixels({sourceData,width,height,cols,rows,ba
   return Object.freeze({canvas:out,...target,cols,rows,backgroundRemoved:!!background});
 }
 
+function gridAspectPenalty(width,height,cols,rows){
+  const cellRatio=(width/Math.max(1,cols))/(height/Math.max(1,rows));
+  return Math.abs(Math.log(Math.max(.05,cellRatio)/.9));
+}
+
+export function resolveSpritesheetGrid(width,height,detected){
+  const fallback=chooseSafeGrid({width,height,detected,confidenceThreshold:.45});
+  if(!detected)return fallback;
+  const detectedPenalty=gridAspectPenalty(width,height,detected.cols,detected.rows);
+  const fallbackPenalty=gridAspectPenalty(width,height,fallback.cols,fallback.rows);
+  const geometryClearlyBetter=fallback.source==='preset-fallback'&&fallbackPenalty+.34<detectedPenalty;
+  if(Number(detected.confidence)<.45||geometryClearlyBetter)return Object.freeze({...fallback,reason:Number(detected.confidence)<.45?'low-confidence':'geometry-mismatch'});
+  return Object.freeze({cols:detected.cols,rows:detected.rows,label:`${detected.cols}×${detected.rows}`,frames:detected.cols*detected.rows,source:'auto',confidence:detected.confidence,reason:'detected'});
+}
+
 export function analyzeAndNormalizeSpritesheet(root,image,{minCols=2,maxCols=12,minRows=1,maxRows=8}={}){
   const width=image.naturalWidth||image.width,height=image.naturalHeight||image.height;
   const source=root.document.createElement('canvas');source.width=width;source.height=height;
   const sctx=source.getContext('2d',{willReadFrequently:true});sctx.clearRect(0,0,width,height);sctx.drawImage(image,0,0);
   const pixels=sctx.getImageData(0,0,width,height);
   const detected=detectSpritesheetGrid(pixels,width,height,{minCols,maxCols,minRows,maxRows});
-  const normalized=normalizeSpritesheetPixels({sourceData:pixels.data,width,height,cols:detected.cols,rows:detected.rows,background:detected.background,createCanvas:(w,h)=>{const c=root.document.createElement('canvas');c.width=w;c.height=h;return c;}});
+  const resolved=resolveSpritesheetGrid(width,height,detected);
+  const normalized=normalizeSpritesheetPixels({sourceData:pixels.data,width,height,cols:resolved.cols,rows:resolved.rows,background:detected.background,createCanvas:(w,h)=>{const c=root.document.createElement('canvas');c.width=w;c.height=h;return c;}});
   return Object.freeze({
     dataUrl:normalized.canvas.toDataURL('image/png'),
     sourceWidth:width,sourceHeight:height,
     width:normalized.width,height:normalized.height,
     frameWidth:normalized.cellWidth,frameHeight:normalized.cellHeight,
-    columns:detected.cols,rows:detected.rows,
+    columns:resolved.cols,rows:resolved.rows,frames:resolved.frames,
     confidence:detected.confidence,score:detected.score,
+    gridSource:resolved.source,gridReason:resolved.reason,
     backgroundMode:detected.backgroundMode,backgroundRemoved:normalized.backgroundRemoved,
     candidates:detected.candidates
   });
