@@ -8,15 +8,27 @@
  */
 (function(){
 'use strict';
-const VERSION='kelo-online-auth-v4';
+const VERSION='kelo-online-auth-v5';
 const SUPABASE_URL='https://iapxdbitjdwvtbpjghct.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY='sb_publishable_t0RI7co82Rh1wOAWUIo4Zg_rZK5EQ9S';
 const CHARACTER_STORAGE_KEY='kelo_character_id_v1',LEGACY_PLAYER_KEY='kelo_player_key_v1',PLAYER_NAME_KEY='kelo_player_name_v1';
+const NET_CHARACTER_STORAGE_KEY='kelo.active.character.v1',NET_SESSION_STORAGE_KEY='kelo.supabase.session.v1';
 const UUID_RE=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 let client=null,current=null,state='booting',lastError=null,bootPromise=null;
 function emit(name,detail){try{window.dispatchEvent(new CustomEvent(name,{detail}))}catch(_){}}
 function stored(key){try{return localStorage.getItem(key)}catch(_){return null}}
 function store(key,value){try{if(value)localStorage.setItem(key,value);else localStorage.removeItem(key)}catch(_){}}
+function syncNetSession(session,characterId){
+  try{
+    if(session?.access_token&&UUID_RE.test(String(characterId||''))){
+      localStorage.setItem(NET_CHARACTER_STORAGE_KEY,String(characterId).toLowerCase());
+      localStorage.setItem(NET_SESSION_STORAGE_KEY,JSON.stringify({access_token:String(session.access_token),expires_at:Number(session.expires_at)||0}));
+      return true;
+    }
+    localStorage.removeItem(NET_CHARACTER_STORAGE_KEY);localStorage.removeItem(NET_SESSION_STORAGE_KEY);
+  }catch(_){}
+  return false;
+}
 function cleanEmail(value){return String(value||'').trim().toLowerCase()}
 function cleanPassword(value){return String(value||'')}
 function cleanDisplayName(value){const raw=String(value||'').trim().replace(/[^\p{L}\p{N} _.-]/gu,'').slice(0,24);return raw.length>=3?raw:null}
@@ -42,16 +54,16 @@ async function ensureCharacter(session){
   const rows=Array.isArray(query.data)?query.data:[],storedId=String(stored(CHARACTER_STORAGE_KEY)||'').toLowerCase();let character=rows.find(row=>String(row.id).toLowerCase()===storedId)||rows[0]||null;
   if(!character){const created=await client.rpc('create_character',{p_name:initialName});if(created.error)throw created.error;character=Array.isArray(created.data)?created.data[0]:created.data;}
   if(!character?.id||!UUID_RE.test(String(character.id)))throw new Error('CHARACTER_RESOLUTION_FAILED');
-  const characterId=String(character.id).toLowerCase();store(CHARACTER_STORAGE_KEY,characterId);
+  const characterId=String(character.id).toLowerCase();store(CHARACTER_STORAGE_KEY,characterId);syncNetSession(session,characterId);
   const legacy=String(stored(LEGACY_PLAYER_KEY)||'').toLowerCase();if(UUID_RE.test(legacy)&&!character.legacy_player_key){const claimed=await client.rpc('claim_legacy_player_key',{p_character_id:characterId,p_player_key:legacy});if(!claimed.error){const row=Array.isArray(claimed.data)?claimed.data[0]:claimed.data;if(row)character=row;}}
   return{accessToken:token,accountId,characterId,characterName:String(character.name||initialName).slice(0,24),email:verified.data.user.email||null,isAnonymous:Boolean(verified.data.user.is_anonymous)};
 }
 async function resolveSession(){
   initClient();const result=await client.auth.getSession();if(result.error)throw result.error;const session=result.data?.session||null;
-  if(!session){current=null;setState('signed-out');emit('kelo:online-auth-required',publicState());return null;}
+  if(!session){current=null;syncNetSession(null,null);setState('signed-out');emit('kelo:online-auth-required',publicState());return null;}
   current=await ensureCharacter(session);setState('ready');emit('kelo:online-auth-ready',publicState());return current;
 }
-function ensureBoot(){if(!bootPromise)bootPromise=resolveSession().catch(error=>{current=null;setState('transition',error);emit('kelo:online-auth-error',publicState());return null;});return bootPromise;}
+function ensureBoot(){if(!bootPromise)bootPromise=resolveSession().catch(error=>{current=null;syncNetSession(null,null);setState('transition',error);emit('kelo:online-auth-error',publicState());return null;});return bootPromise;}
 async function credentials(){
   initClient();const result=await client.auth.getSession();if(result.error||!result.data?.session)return current;
   try{current=await ensureCharacter(result.data.session);setState('ready');return current}catch(error){setState('transition',error);return current;}
@@ -76,7 +88,7 @@ async function signUp(email,password,displayName){
   store(PLAYER_NAME_KEY,name);
   const result=await client.auth.signUp({email:normalized,password:secret,options:{data:{display_name:name},emailRedirectTo:appRedirectUrl()}});if(result.error)throw result.error;
   if(result.data?.session){current=await ensureCharacter(result.data.session);setState('ready');emit('kelo:account-created',publicState());return publicState();}
-  current=null;setState('confirmation-required');emit('kelo:account-confirmation-required',{email:normalized});return publicState();
+  current=null;syncNetSession(null,null);setState('confirmation-required');emit('kelo:account-confirmation-required',{email:normalized});return publicState();
 }
 async function signInWithOtp(email){
   initClient();const normalized=cleanEmail(email);if(!normalized)throw new Error('EMAIL_REQUIRED');
@@ -101,7 +113,7 @@ async function protectGuestWithEmail(email,displayName){
 async function setPassword(password){
   initClient();const secret=cleanPassword(password);if(secret.length<6)throw new Error('PASSWORD_TOO_SHORT');const result=await client.auth.updateUser({password:secret});if(result.error)throw result.error;await credentials();return publicState();
 }
-async function signOut(){if(client)await client.auth.signOut();current=null;store(CHARACTER_STORAGE_KEY,null);setState('signed-out');emit('kelo:account-signed-out',publicState());return publicState();}
+async function signOut(){if(client)await client.auth.signOut();current=null;store(CHARACTER_STORAGE_KEY,null);syncNetSession(null,null);setState('signed-out');emit('kelo:account-signed-out',publicState());return publicState();}
 const api=Object.freeze({version:VERSION,ready,credentials,state:publicState,signInWithPassword,signInWithGoogle,signUp,signInWithOtp,resetPassword,signInAsGuest,protectGuestWithEmail,setPassword,signOut,getClient:()=>client});window.KeloOnlineAuth=api;ensureBoot();
 
 // Compatibility bridge for the existing KeloNetAuthority. It modifies only the existing hello payload; it never creates a socket.
@@ -111,8 +123,9 @@ const api=Object.freeze({version:VERSION,ready,credentials,state:publicState,sig
   function send(data){
     let msg=null;try{if(typeof data==='string')msg=JSON.parse(data)}catch(_){}
     if(!msg||msg.t!=='hello'||msg.accessToken||msg.characterId)return nativeSend.call(this,data);
-    const socket=this,sendHello=auth=>{if(socket.readyState!==Native.OPEN)return;const out={...msg};if(auth?.accessToken&&auth?.characterId){out.accessToken=auth.accessToken;out.characterId=auth.characterId;if(auth.characterName)out.name=auth.characterName;}nativeSend.call(socket,JSON.stringify(out));};
-    if(current){sendHello(current);return;}ready(4500).then(sendHello).catch(()=>sendHello(null));
+    const socket=this,sendHello=auth=>{if(!auth?.accessToken||!auth?.characterId||socket.readyState!==Native.OPEN)return false;const out={...msg,accessToken:auth.accessToken,characterId:auth.characterId};if(auth.characterName)out.name=auth.characterName;nativeSend.call(socket,JSON.stringify(out));return true;};
+    if(current){sendHello(current);return;}
+    ready(9000).then(auth=>{if(auth)sendHello(auth)}).catch(()=>{});
   }
   Object.defineProperty(send,'__keloAuthWrapped',{value:true});Native.prototype.send=send;
 })();
