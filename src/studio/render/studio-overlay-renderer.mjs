@@ -1,6 +1,6 @@
 /* KELO-INDEX
  * area: STUDIO / OVERLAY RENDERER
- * owns: transient editor-only selection/ghost/gizmo/surface/collision/prefab/smart-guide/spacing primitives
+ * owns: transient editor-only selection/ghost/gizmo/surface/collision/prefab/smart-guide/spacing/paint-copy primitives
  * does-not-own: world rendering, terrain textures, gameplay sprites or physics
  * public-api: createStudioOverlayRenderer()
  * online: local-only
@@ -21,6 +21,17 @@ export function createStudioOverlayRenderer({ kernel, tools, assetPreview } = {}
     if(def?.children?.length){for(const child of def.children)drew=assetPreview?.drawAsset?.(ctx,child.prefabId,preview.x+(Number(child.dx)||0),preview.y+(Number(child.dy)||0),{rotation:Number(child.rotation)||0,alpha:.68,placeholder:false})||drew;}
     if(!drew){ctx.save();ctx.globalAlpha=.14;ctx.fillStyle='#e7c56a';ctx.fillRect(preview.x,preview.y,preview.w,preview.h);ctx.restore();}
     ctx.save();ctx.strokeStyle='rgba(231,197,106,.95)';drawRect(ctx,preview,{dashed:true});ctx.restore();
+  }
+  function drawPaintCopies(ctx,rows){
+    if(!rows?.length)return;
+    ctx.save();ctx.strokeStyle='rgba(131,235,175,.88)';
+    for(const row of rows){
+      const scale=Math.max(.1,Number(row.transform?.scale)||1),rect={x:Number(row.transform?.x)||0,y:Number(row.transform?.y)||0,w:Math.max(1,(Number(row.bounds?.w)||1)*scale),h:Math.max(1,(Number(row.bounds?.h)||1)*scale)};
+      const drew=assetPreview?.drawAsset?.(ctx,row.prefabId,rect.x,rect.y,{rotation:Number(row.transform?.rotation)||0,alpha:.56,placeholder:false});
+      if(!drew){ctx.save();ctx.globalAlpha=.12;ctx.fillRect(rect.x,rect.y,rect.w,rect.h);ctx.restore();}
+      drawRect(ctx,rect,{dashed:true,alpha:.6});
+    }
+    ctx.restore();
   }
   function drawSpacingGuide(ctx,guide){
     const from=Number(guide.from)||0,to=Number(guide.to)||0,cross=Number(guide.cross)||0,mid=(from+to)/2,label=`${Math.round(Number(guide.gap)||0)}px`,tick=4;
@@ -48,6 +59,7 @@ export function createStudioOverlayRenderer({ kernel, tools, assetPreview } = {}
     const marquee=tools?.marquee?.getPreview?.();if(marquee){ctx.save();ctx.fillStyle='rgba(231,197,106,.10)';ctx.fillRect(marquee.x,marquee.y,marquee.w,marquee.h);ctx.strokeStyle='rgba(231,197,106,.85)';drawRect(ctx,marquee,{dashed:true});ctx.restore();}
     const placement = tools?.placement?.getPreview?.();if (placement) drawPlacement(ctx,placement);
     const prefab = tools?.prefabStamp?.getPreview?.();if(prefab)drawCreatorPrefab(ctx,prefab);
+    drawPaintCopies(ctx,tools?.paintCopies?.getPreviews?.()||[]);
     const transforms=tools?.transform?.getPreviews?.()||[];if(transforms.length){for(const transform of transforms){const row=kernel.spatial.get(transform.entityId);if(row?.rect)drawRect(ctx,{...row.rect,x:transform.x??row.rect.x,y:transform.y??row.rect.y},{dashed:true,alpha:.7});}drawSmartGuides(ctx,tools?.transform?.getGuides?.()||[]);}
     const stroke=tools?.terrain?.getStrokePreview?.();if(stroke?.cells?.length){for(const cell of stroke.cells)drawSurfaceCell(ctx,cell,{alpha:.20});}
     const terrain=tools?.terrain?.getPreview?.();if(terrain){const cells=terrain.cells?.length?terrain.cells:[terrain];for(const cell of cells)drawSurfaceCell(ctx,cell,{alpha:.28,dashed:true});}
