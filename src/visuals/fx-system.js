@@ -152,17 +152,134 @@
   }
 
   function alphaOf(item) {
-    const p = Math.max(0, Math.min(1, item.elapsed / item.duration));
-    return Math.max(0, Number(item.def.alpha == null ? 1 : item.def.alpha)) * (item.loop ? 1 : (1 - p));
+    const base = Math.max(0, Number(item.def.alpha == null ? 1 : item.def.alpha));
+    const p = Math.max(0, Math.min(1, item.elapsed / Math.max(0.001, item.duration)));
+    const fade = String(item.def.fade || (item.loop ? 'pulse' : 'out'));
+    if (fade === 'hold') return base;
+    if (fade === 'pulse') return base * (0.58 + 0.42 * (0.5 + 0.5 * Math.sin(p * Math.PI * 2)));
+    if (fade === 'in-out') return base * Math.sin(Math.max(0, Math.min(1, p)) * Math.PI);
+    return base * (item.loop ? 1 : (1 - p));
+  }
+
+  function aspectOf(item) {
+    const a = Number(item.def.aspect);
+    return Number.isFinite(a) ? Math.max(0.18, Math.min(1, a)) : 0.38;
+  }
+
+  function dirOf(item) {
+    const d = item.context && item.context.direction;
+    const x = Number(d && d.x);
+    const y = Number(d && d.y);
+    const len = Math.hypot(x || 0, y || 0);
+    if (!len) return { x: 1, y: 0 };
+    return { x: x / len, y: y / len };
   }
 
   function drawRing(g, item, p) {
     const progress = Math.max(0, Math.min(1, item.elapsed / item.duration));
     const radius = (Number(item.def.radius) || 24) * item.scale * (0.7 + progress * 0.5);
+    const aspect = aspectOf(item);
     g.globalAlpha = alphaOf(item);
     g.strokeStyle = item.def.color || '#fff';
-    g.lineWidth = Math.max(1, 2 * item.scale);
-    g.beginPath(); g.ellipse(p.x, p.y, radius, radius * 0.38, 0, 0, Math.PI * 2); g.stroke();
+    g.lineWidth = Math.max(1, Number(item.def.lineWidth) || 2 * item.scale);
+    g.beginPath(); g.ellipse(p.x, p.y, radius, radius * aspect, 0, 0, Math.PI * 2); g.stroke();
+  }
+
+  function drawExpandingRing(g, item, p) {
+    const raw = Math.max(0, Math.min(1, item.elapsed / item.duration));
+    const progress = 1 - Math.pow(1 - raw, 2);
+    const maxR = (Number(item.def.radius) || 48) * item.scale;
+    const start = Number.isFinite(Number(item.def.startScale)) ? Number(item.def.startScale) : 0.08;
+    const radius = maxR * (start + (1 - start) * progress);
+    const aspect = aspectOf(item);
+    g.globalAlpha = alphaOf(item);
+    g.strokeStyle = item.def.color || '#fff';
+    g.lineWidth = Math.max(1.4, (Number(item.def.lineWidth) || 3.2) * item.scale * (1.15 - progress * 0.45));
+    g.beginPath(); g.ellipse(p.x, p.y, radius, radius * aspect, 0, 0, Math.PI * 2); g.stroke();
+    if (item.def.innerColor) {
+      g.globalAlpha = alphaOf(item) * 0.35;
+      g.strokeStyle = item.def.innerColor;
+      g.lineWidth = Math.max(1, 1.4 * item.scale);
+      g.beginPath(); g.ellipse(p.x, p.y, radius * 0.82, radius * aspect * 0.82, 0, 0, Math.PI * 2); g.stroke();
+    }
+  }
+
+  function drawAreaDisk(g, item, p) {
+    const raw = Math.max(0, Math.min(1, item.elapsed / item.duration));
+    const progress = item.loop ? (0.88 + 0.12 * Math.sin(raw * Math.PI * 2)) : (0.55 + 0.45 * (1 - Math.pow(1 - raw, 2)));
+    const radius = (Number(item.def.radius) || 40) * item.scale * progress;
+    const aspect = aspectOf(item);
+    g.globalAlpha = alphaOf(item) * 0.85;
+    g.fillStyle = item.def.color || '#fff';
+    g.beginPath(); g.ellipse(p.x, p.y, radius, radius * aspect, 0, 0, Math.PI * 2); g.fill();
+    g.globalAlpha = alphaOf(item);
+    g.strokeStyle = item.def.accent || item.def.color || '#fff';
+    g.lineWidth = Math.max(1.2, (Number(item.def.lineWidth) || 2.4) * item.scale);
+    g.beginPath(); g.ellipse(p.x, p.y, radius, radius * aspect, 0, 0, Math.PI * 2); g.stroke();
+  }
+
+  function drawCrystalBurst(g, item, p) {
+    const progress = Math.max(0, Math.min(1, item.elapsed / item.duration));
+    const radius = (Number(item.def.radius) || 36) * item.scale * (0.2 + progress * 0.9);
+    const shards = Math.max(5, Math.min(14, Number(item.def.shards) || 8));
+    const aspect = aspectOf(item);
+    g.strokeStyle = item.def.color || '#fff';
+    g.fillStyle = item.def.accent || item.def.color || '#fff';
+    for (let i = 0; i < shards; i++) {
+      const a = (i / shards) * Math.PI * 2 + item.seed * 0.01;
+      const spread = 0.72 + (i % 3) * 0.12;
+      const x1 = p.x + Math.cos(a) * radius * 0.18;
+      const y1 = p.y + Math.sin(a) * radius * 0.18 * aspect;
+      const x2 = p.x + Math.cos(a) * radius * spread;
+      const y2 = p.y + Math.sin(a) * radius * spread * aspect;
+      g.globalAlpha = alphaOf(item) * (i % 2 ? 1 : 0.72);
+      g.lineWidth = Math.max(1, (2.1 - progress) * item.scale);
+      g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke();
+    }
+  }
+
+  function drawSigil(g, item, p) {
+    const pulse = 0.86 + 0.14 * Math.sin((item.elapsed / Math.max(0.001, item.duration)) * Math.PI * 2);
+    const radius = (Number(item.def.radius) || 22) * item.scale * pulse;
+    const armed = item.def.armed === true || (item.context && item.context.visual && item.context.visual.armed === true);
+    g.globalAlpha = alphaOf(item);
+    g.strokeStyle = item.def.color || '#8ac926';
+    g.fillStyle = item.def.color || '#8ac926';
+    g.lineWidth = Math.max(1.4, 2.1 * item.scale);
+    g.beginPath();
+    g.moveTo(p.x, p.y - radius);
+    g.lineTo(p.x + radius * 0.78, p.y);
+    g.lineTo(p.x, p.y + radius);
+    g.lineTo(p.x - radius * 0.78, p.y);
+    g.closePath();
+    g.globalAlpha = alphaOf(item) * 0.22;
+    g.fill();
+    g.globalAlpha = alphaOf(item);
+    g.stroke();
+    g.beginPath(); g.arc(p.x, p.y, radius * 0.34, 0, Math.PI * 2); g.stroke();
+    if (armed) {
+      g.globalAlpha = alphaOf(item) * 0.9;
+      g.strokeStyle = item.def.accent || '#d8ff8a';
+      g.beginPath(); g.arc(p.x, p.y, radius * 1.18, 0, Math.PI * 2); g.stroke();
+    }
+  }
+
+  function drawStreak(g, item, p) {
+    const dir = dirOf(item);
+    const progress = Math.max(0, Math.min(1, item.elapsed / item.duration));
+    const length = (Number(item.def.length) || Number(item.def.radius) || 48) * item.scale;
+    const width = Math.max(3, (Number(item.def.width) || 10) * item.scale * (1 - progress * 0.35));
+    const x2 = p.x - dir.x * length * (0.55 + progress * 0.45);
+    const y2 = p.y - dir.y * length * (0.55 + progress * 0.45);
+    g.globalAlpha = alphaOf(item);
+    g.strokeStyle = item.def.color || '#b8f2e6';
+    g.lineWidth = width;
+    g.lineCap = 'round';
+    g.beginPath(); g.moveTo(p.x, p.y); g.lineTo(x2, y2); g.stroke();
+    g.globalAlpha = alphaOf(item) * 0.55;
+    g.strokeStyle = item.def.accent || '#ffffff';
+    g.lineWidth = Math.max(1.5, width * 0.35);
+    g.beginPath(); g.moveTo(p.x, p.y); g.lineTo(x2, y2); g.stroke();
   }
 
   function drawGlow(g, item, p) {
@@ -271,6 +388,11 @@
     g.save();
     const type = item.def.type;
     if (type === 'ring' || type === 'decal') drawRing(g, item, p);
+    else if (type === 'expanding_ring' || type === 'nova') drawExpandingRing(g, item, p);
+    else if (type === 'area_disk' || type === 'aoe') drawAreaDisk(g, item, p);
+    else if (type === 'crystal_burst' || type === 'shards') drawCrystalBurst(g, item, p);
+    else if (type === 'sigil') drawSigil(g, item, p);
+    else if (type === 'streak' || type === 'dash_streak') drawStreak(g, item, p);
     else if (type === 'glow' || type === 'flash') drawGlow(g, item, p);
     else if (type === 'burst' || type === 'lightning') drawBurst(g, item, p);
     else if (type === 'particle_emitter') drawParticles(g, item, p);
@@ -544,7 +666,7 @@
   }
 
   root.KeloFXRegistry = Object.freeze({ version: 'fx-registry-v1.1.0', get: function (id) { return fxDefs.get(String(id || '')) || null; }, list: function () { return Array.from(fxDefs.values()); }, register: function (def) { return registerInto(fxDefs, def, 'FX'); } });
-  root.KeloFX = Object.freeze({ version: 'fx-runtime-v1.2.0', spawn: spawnFx, preview: previewFx, stop: stopFx, update: updateFx, drawLayer: drawLayer, drawActorLayer: drawActorLayer, metrics: fxMetrics });
+  root.KeloFX = Object.freeze({ version: 'fx-runtime-v1.3.0', spawn: spawnFx, preview: previewFx, stop: stopFx, update: updateFx, drawLayer: drawLayer, drawActorLayer: drawActorLayer, metrics: fxMetrics });
   root.KeloProjectileVisualRegistry = Object.freeze({ version: 'projectile-visual-registry-v1.1.1', get: function (id) { return projectileDefs.get(String(id || '')) || null; }, list: function () { return Array.from(projectileDefs.values()); }, register: function (def) { return registerInto(projectileDefs, def, 'PROJECTILE_VISUAL'); } });
   root.KeloProjectileVisuals = Object.freeze({ version: 'projectile-visual-runtime-v1.1.1', attach: attachProjectile, preview: previewProjectile, stop: stopProjectile, update: updateProjectiles, drawLayer: drawProjectileLayer, metrics: projectileMetrics });
   root.KeloSFXRegistry = Object.freeze({ version: 'sfx-registry-v1.0.0', get: function (id) { return sfxDefs.get(String(id || '')) || null; }, list: function () { return Array.from(sfxDefs.values()); }, register: function (def) { return registerInto(sfxDefs, def, 'SFX'); } });
