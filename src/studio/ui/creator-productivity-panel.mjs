@@ -536,7 +536,7 @@ export function createCreatorProductivityPanel({
   }
 
   function extClickHandler(e){
-    const target=e.target.closest('[data-ext]');if(!target)return;
+    const target=e.target.closest('button[data-ext]');if(!target)return;
     e.preventDefault();e.stopPropagation();handleAction(target.dataset.ext,target);
   }
   editBar.addEventListener('click',extClickHandler);
@@ -547,8 +547,8 @@ export function createCreatorProductivityPanel({
     if(tab)queueMicrotask(()=>syncTabPeers(tab.dataset.tab));
   });
   zoomDock.addEventListener('click',extClickHandler);
-  mapPane.addEventListener('click',e=>{const target=e.target.closest('[data-ext]');if(target){e.preventDefault();e.stopPropagation();handleAction(target.dataset.ext,target);}});
-  settingsPane.addEventListener('click',e=>{const target=e.target.closest('[data-ext]');if(target){e.preventDefault();e.stopPropagation();handleAction(target.dataset.ext,target);}});
+  mapPane.addEventListener('click',e=>{const target=e.target.closest('button[data-ext]');if(target){e.preventDefault();e.stopPropagation();handleAction(target.dataset.ext,target);}});
+  settingsPane.addEventListener('click',e=>{const target=e.target.closest('button[data-ext]');if(target){e.preventDefault();e.stopPropagation();handleAction(target.dataset.ext,target);}});
 
   function snapChangeHandler(e){
     if(!e.target.matches('select[data-ext="snap"]'))return;
