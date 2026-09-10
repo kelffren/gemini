@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: UI / CREATORS LAUNCHER
  * owner: Kelo Studio Launcher (compat name retained)
- * keys: CREATORS MENU PREMIUM LAZY ADMIN ANIMATION CAPABILITY AVATAR SPRITE FACTORY
+ * keys: CREATORS MENU PREMIUM LAZY ADMIN ANIMATION CAPABILITY AVATAR SPRITE FACTORY ONLINE
  * purpose: añade CREATORS y Sprite Factory al menú Luxe, restaura el adapter ligero de avatar y carga herramientas tras acción explícita
  * public-api: KELO_STUDIO_LAUNCHER + KELO_CREATORS_LAUNCHER alias
  * consumes: KELO_ADMIN_KEYS, KELO_LUXE, menú Luxe existente
@@ -29,7 +29,7 @@
   }
   function paintFactory(button,busy){
     if(!button)return;
-    button.innerHTML='<span class="lx-menu-icon" aria-hidden="true">▦</span><span class="lx-menu-copy"><b>'+(busy?'Abriendo…':'Sprite Factory')+'</b><small>'+(busy?'Preparando pipeline':'Sprites 8D · preview · QA · PNG')+'</small></span>';
+    button.innerHTML='<span class="lx-menu-icon" aria-hidden="true">▦</span><span class="lx-menu-copy"><b>'+(busy?'Abriendo…':'Sprite Factory')+'</b><small>'+(busy?'Preparando pipeline':'Sprites 8D · AI · preview · QA')+'</small></span>';
     button.disabled=!!busy;
     if(busy)button.setAttribute('aria-busy','true');else button.removeAttribute('aria-busy');
   }
@@ -55,8 +55,8 @@
     const btn=document.getElementById('lx-create-sprite-factory');paintFactory(btn,true);
     try{
       window.KELO_LUXE?.closeMenu?.();
-      const mod=await import('./../creators/ui/sprite-factory-workspace.mjs');
-      await mod.openSpriteFactory({root:window});
+      const mod=await import('./../creators/ui/sprite-factory-online.mjs');
+      await mod.openSpriteFactoryOnline({root:window});
     }catch(e){
       console.error('[Kelo Sprite Factory launcher]',e);toast(friendlyError(e));
     }finally{
@@ -76,7 +76,7 @@
   }
   function boot(){sync();void import('./../characters/creator-avatar-runtime.mjs').then(m=>m.installCreatorAvatarRuntime({root:window})).catch(e=>console.warn('[Kelo Avatar runtime]',e));}
   window.KELO_ADMIN_KEYS?.onChange?.(sync);
-  const api=Object.freeze({version:'studio-launcher-v1.7.0-sprite-factory',open,openSpriteFactory:openFactory,sync,get allowed(){return allowed();}});
+  const api=Object.freeze({version:'studio-launcher-v1.8.0-sprite-factory-online',open,openSpriteFactory:openFactory,sync,get allowed(){return allowed();}});
   window.KELO_STUDIO_LAUNCHER=api;
   window.KELO_CREATORS_LAUNCHER=api;
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
