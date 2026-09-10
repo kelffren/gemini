@@ -51,7 +51,7 @@ async function scenario(label,viewport,hasTouch){
     const start=performance.now();
     function step(){
       const snap=window.KeloCamera.snapshot();
-      samples.push({t:performance.now(),offset:snap.combatFraming.stationaryActionOffsetScreenX,x:localPlayer.x,y:localPlayer.y,lookX:snap.lookOffsetX,intentX:snap.combatFraming.intentX,normX:input.normX});
+      samples.push({t:performance.now(),offset:snap.combatFraming.stationaryActionOffsetScreenX,x:localPlayer.x,y:localPlayer.y,lookX:snap.lookOffsetX,intentX:snap.combatFraming.intentX,normX:input.normX,castPhase:window.KeloPvPCastMovementPrediction?.phase});
       if(performance.now()-start<260){requestAnimationFrame(step);return;}
       input.keys.ArrowLeft=false;
       resolve({before,samples});
@@ -59,7 +59,9 @@ async function scenario(label,viewport,hasTouch){
     requestAnimationFrame(step);
   }));
 
-  const acceptedIndex=trace.samples.findIndex(s=>s.normX < -0.9);
+  // Recovery intentionally scales movement (observed ~0.78), so any clear negative
+  // normX is accepted intent. Waiting for -1 would skip the exact transition under test.
+  const acceptedIndex=trace.samples.findIndex(s=>s.normX < -0.1);
   const accepted=acceptedIndex>=0?trace.samples[acceptedIndex]:null;
   const post=acceptedIndex>=0?trace.samples.slice(acceptedIndex):[];
   const settle=post.find(s=>Math.abs(s.offset)<=4);
@@ -67,8 +69,8 @@ async function scenario(label,viewport,hasTouch){
   let maxStep=0;
   for(let i=1;i<post.length;i++)maxStep=Math.max(maxStep,Math.abs(post[i].offset-post[i-1].offset));
   const last=post.at(-1)||trace.samples.at(-1)||trace.before;
-  const travel=accepted?Math.hypot(last.x-accepted.x,last.y-accepted.y):0;
-  const movedLeft=accepted?last.x<accepted.x:false;
+  const travel=Math.hypot(last.x-trace.before.x,last.y-trace.before.y);
+  const movedLeft=last.x<trace.before.x;
   await page.screenshot({path:path.join(OUT,`${label}-cast-strafe-camera.png`),fullPage:true});
   report.runs.push({label,viewport,hasTouch,errors,peak,beforeMove:trace.before,acceptedIndex,accepted,samples:trace.samples,settleMs,maxStep,travel,movedLeft});
   await context.close();
@@ -84,8 +86,8 @@ if(hardErrors.length){console.error(hardErrors.join('\n'));process.exit(1);}
 for(const run of report.runs){
   if(run.peak<8)throw new Error('stationary cast framing did not reproduce: '+run.label+' peak='+run.peak);
   if(run.beforeMove.phase!=='recovery')throw new Error('strafe did not start from recovery: '+run.label);
-  if(!(run.accepted?.normX < -0.9))throw new Error('LEFT input was not accepted by processInput: '+run.label);
-  if(!run.movedLeft||run.travel<20)throw new Error('LEFT strafe did not resolve physically: '+run.label+' travel='+run.travel);
+  if(!(run.accepted?.normX < -0.1))throw new Error('LEFT input was not accepted by processInput: '+run.label);
+  if(!run.movedLeft||run.travel<35)throw new Error('LEFT strafe did not resolve physically: '+run.label+' travel='+run.travel);
   if(run.maxStep>8)throw new Error('camera release snaps: '+run.label+' maxStep='+run.maxStep);
   if(STRICT&&(run.settleMs==null||run.settleMs>75))throw new Error('camera carry survives too long into opposite strafe: '+run.label+' settleMs='+run.settleMs);
 }
