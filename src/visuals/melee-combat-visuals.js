@@ -1,13 +1,14 @@
 /* KELO-INDEX
  * area: VISUAL
- * keys: MELEE EVENT ATTACK HIT MISS REACTION DIRECTION ONLINE PRESENTATION
+ * keys: MELEE EVENT ATTACK HIT MISS REACTION DIRECTION ONLINE PRESENTATION 8WAY SKIN-AGNOSTIC
  * hace: traduce eventos semánticos melee a clips/FX/SFX sin poseer gameplay
  * online: acepta actor/target por referencia local o ID remoto; no calcula hit, daño, cooldown ni posición
+ * invariant: actor._face permanece cardinal para compatibilidad de skins; el action clip usa dirección visual de 8 vías
  */
 (function (root) {
   'use strict';
 
-  const VERSION = 'melee-combat-visuals-v1.0.1';
+  const VERSION = 'melee-combat-visuals-v1.1.0-universal-8way';
   const manifest = root.KELO_MELEE_VISUAL_MANIFEST;
   const bus = root.KeloVisualEventBus;
   const contextApi = root.KeloVisualContext;
@@ -31,8 +32,11 @@
     throttled: 0,
     lastAttackId: null,
     lastDirection: null,
+    lastCardinalFace: null,
     lastHitTargetId: null,
-    gameplayMutation: false
+    gameplayMutation: false,
+    skinAgnostic: true,
+    directionCount: 8
   });
 
   function nowMs() {
@@ -66,16 +70,25 @@
     return { x: x / len, y: y / len };
   }
 
+  // Keep the avatar renderer on its legacy-safe 4-way facing. No skin is required
+  // to implement diagonal sprite sheets for this melee attack to work.
   function faceFromDirection(direction) {
     if (Math.abs(direction.x) > Math.abs(direction.y)) return direction.x < 0 ? 'left' : 'right';
     return direction.y < 0 ? 'up' : 'down';
+  }
+
+  // Presentation selects one of eight clips independently from the skin facing.
+  function direction8FromDirection(direction) {
+    const angle = Math.atan2(direction.y, direction.x);
+    const octant = (Math.round(angle / (Math.PI / 4)) + 8) % 8;
+    return ['right', 'down_right', 'down', 'down_left', 'left', 'up_left', 'up', 'up_right'][octant];
   }
 
   function attackIdOf(payload) {
     return String(payload && (payload.attackId || payload.castId) || ('melee_visual_' + (syntheticSeq++).toString(36)));
   }
 
-  function baseContext(payload, actor, direction) {
+  function baseContext(payload, actor, direction, direction8) {
     const targetActor = resolveActor(payload && payload.targetActor, payload && payload.targetActorId);
     const targetPoint = payload && payload.target && Number.isFinite(Number(payload.target.x)) && Number.isFinite(Number(payload.target.y))
       ? { x: Number(payload.target.x), y: Number(payload.target.y) }
@@ -88,7 +101,11 @@
       target: targetPoint,
       direction: direction,
       gameplay: Object.assign({}, payload && payload.gameplay || {}),
-      visual: Object.assign({ scale: 1, seed: Number(payload && payload.seed) || (Date.now() & 65535) }, payload && payload.visual || {}),
+      visual: Object.assign({
+        scale: 1,
+        seed: Number(payload && payload.seed) || (Date.now() & 65535),
+        direction8: direction8 || direction8FromDirection(direction)
+      }, payload && payload.visual || {}),
       source: payload && payload.source || 'melee',
       predicted: payload && payload.predicted === true,
       confirmed: payload && payload.confirmedHit === true,
@@ -103,6 +120,7 @@
     const targetActor = resolveActor(payload && payload.targetActor, payload && payload.targetActorId);
     const direction = normalizedDirection(payload && payload.direction, actor, targetActor);
     const face = faceFromDirection(direction);
+    const direction8 = direction8FromDirection(direction);
     const id = attackIdOf(payload);
     const key = actorId(actor);
     const now = nowMs();
@@ -121,18 +139,19 @@
     }
 
     actor._face = face;
-    const context = baseContext(Object.assign({}, payload, { attackId: id }), actor, direction);
-    const clipId = manifest.attackClips[face] || manifest.attackClips.down;
-    const sequenceRef = manifest.swingSequences[face] || manifest.swingSequences.down;
+    const context = baseContext(Object.assign({}, payload, { attackId: id }), actor, direction, direction8);
+    const clipId = manifest.attackClips[direction8] || manifest.attackClips[face] || manifest.attackClips.down;
+    const sequenceRef = manifest.swingSequences[direction8] || manifest.swingSequences[face] || manifest.swingSequences.down;
     const animationId = root.KeloAnimation.play(actor, clipId, { channel: 'action', context: context });
     const sequenceId = root.KeloSequence.play(sequenceRef, context);
 
     audit.attacksStarted += 1;
     audit.lastAttackId = id;
-    audit.lastDirection = face;
+    audit.lastDirection = direction8;
+    audit.lastCardinalFace = face;
     if (payload && payload.confirmedHit === false) audit.missesPresented += 1;
 
-    return { attackId: id, animationId: animationId, sequenceId: sequenceId, face: face };
+    return { attackId: id, animationId: animationId, sequenceId: sequenceId, face: face, direction8: direction8 };
   }
 
   function playHitNow(payload) {
@@ -141,6 +160,7 @@
     if (!target) return null;
     const direction = normalizedDirection(payload && payload.direction, attacker, target);
     const face = faceFromDirection(direction);
+    const direction8 = direction8FromDirection(direction);
     const context = baseContext({
       attackId: payload && (payload.attackId || payload.castId),
       targetActor: attacker,
@@ -153,15 +173,15 @@
       remote: payload && payload.remote,
       serverTime: payload && payload.serverTime,
       confirmedHit: true
-    }, target, direction);
+    }, target, direction, direction8);
 
-    const clipId = manifest.reactionClips[face] || manifest.reactionClips.down;
+    const clipId = manifest.reactionClips[direction8] || manifest.reactionClips[face] || manifest.reactionClips.down;
     const reactionId = root.KeloAnimation.play(target, clipId, { channel: 'reaction', context: context });
     const sequenceId = root.KeloSequence.play(manifest.hitSequence, context);
 
     audit.hitsPresented += 1;
     audit.lastHitTargetId = actorId(target);
-    return { reactionId: reactionId, sequenceId: sequenceId, face: face };
+    return { reactionId: reactionId, sequenceId: sequenceId, face: face, direction8: direction8 };
   }
 
   function playHit(payload) {
@@ -212,6 +232,7 @@
     playHit: playHit,
     preview: preview,
     faceFromDirection: faceFromDirection,
+    direction8FromDirection: direction8FromDirection,
     get impactDelayMs() { return manifest.impactAtMs; }
   });
 })(typeof globalThis !== 'undefined' ? globalThis : window);
