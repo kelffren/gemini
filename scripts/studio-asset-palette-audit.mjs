@@ -28,8 +28,12 @@ assert.match(source,/grid-template-columns:repeat\(3/,'mobile palette must use a
 
 const entry=fs.readFileSync(new URL('../src/studio/studio-entry.mjs',import.meta.url),'utf8');
 assert.match(entry,/createStudioAssetPalette/,'Studio boot must install the floating asset palette');
+assert.match(entry,/tools\.prefabStamp\.list/,'floating palette must include registered creator prefabs');
+assert.match(entry,/category:'My Prefabs'/,'creator prefab rows must be grouped visibly in the palette');
+assert.match(entry,/creatorPrefab:true/,'creator prefab rows must use the creator thumbnail path');
+assert.match(entry,/previewChildren/,'creator prefab thumbnails must retain their child composition');
 assert.match(entry,/assetPalette\.destroy\(\)/,'Studio close must clean up the palette');
 assert.match(entry,/assetPalette\.refresh\(\)/,'world import must refresh palette data');
-assert.match(entry,/kelo-studio-foundation-v1\.9\.0/,'Studio version must include the asset palette release');
+assert.match(entry,/kelo-studio-foundation-v1\.9\.1/,'Studio version must include creator prefabs in the floating palette');
 
-console.log(JSON.stringify({ok:true,search:true,categories:true,recent:true,renderCap:true,legacyPlacementProxy:true,fullLibraryFallback:true,mobileGrid:true},null,2));
+console.log(JSON.stringify({ok:true,search:true,categories:true,recent:true,renderCap:true,legacyPlacementProxy:true,creatorPrefabs:true,fullLibraryFallback:true,mobileGrid:true},null,2));
