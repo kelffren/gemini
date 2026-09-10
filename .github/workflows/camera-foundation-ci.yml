@@ -14,6 +14,7 @@ on:
       - 'scripts/camera-system-contract-audit.js'
       - 'scripts/camera-viewport-browser-audit.mjs'
       - 'scripts/live-pvp-camera-follow-judge.mjs'
+      - 'scripts/audit-pvp-camera-follow-timing.mjs'
       - 'docs/systems/CAMERA_SYSTEM.md'
       - 'docs/system-catalog.json'
       - 'guide.html'
@@ -32,6 +33,7 @@ on:
       - 'scripts/camera-system-contract-audit.js'
       - 'scripts/camera-viewport-browser-audit.mjs'
       - 'scripts/live-pvp-camera-follow-judge.mjs'
+      - 'scripts/audit-pvp-camera-follow-timing.mjs'
       - 'docs/systems/CAMERA_SYSTEM.md'
       - 'docs/system-catalog.json'
       - 'guide.html'
@@ -57,7 +59,9 @@ jobs:
           node --check scripts/camera-system-contract-audit.js
           node --check scripts/camera-viewport-browser-audit.mjs
           node --check scripts/live-pvp-camera-follow-judge.mjs
+          node --check scripts/audit-pvp-camera-follow-timing.mjs
           node scripts/camera-system-contract-audit.js
+          node scripts/audit-pvp-camera-follow-timing.mjs
       - name: Install Playwright
         run: npm install --no-save playwright@1.55.0
       - name: Serve candidate
