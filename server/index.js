@@ -1,10 +1,10 @@
 /* KELO-INDEX
  * area: SERVER / NETWORK
  * owner: Kelo server authority + server/pvp-authority.js for PvP simulation
- * keys: WEBSOCKET AUTHORITY INPUT INTENT FIXED TIMESTEP RECONCILIATION PVP TITLES COMMERCE FORGE AOI SPATIAL GRID HYSTERESIS PERFORMANCE
+ * keys: WEBSOCKET AUTHORITY INPUT INTENT FIXED TIMESTEP RECONCILIATION PVP TITLES COMMERCE FORGE AOI SPATIAL GRID HYSTERESIS PERFORMANCE IDENTITY SUPABASE
  * purpose: autoridad server-side; PvP acepta inputs/intents y todas las salidas de estado/presentación se filtran por zone + AOI por viewer
- * online: pose sigue para mundo social; dentro de PvP la posición, dash, cooldown, mana, hits, HP, CC, muerte y kills nacen del fixed-step server
- * do-not: NO broadcast global periódico de actores, NO daño/posición PvP declarados por cliente
+ * online: pose sigue para mundo social; dentro de PvP la posición, dash, cooldown, mana, hits, HP, CC, muerte y kills nacen del fixed-step server; hello resuelve identidad Supabase cuando existe
+ * do-not: NO broadcast global periódico de actores, NO daño/posición PvP declarados por cliente, NO confiar accountId/characterId enviados sin verificar
  */
 'use strict';
 const { WebSocketServer } = require('ws');
@@ -14,11 +14,13 @@ const { createForgeService } = require('./forge-store');
 const { createCommerceService } = require('./commerce-store');
 const { createTitleService } = require('./title-store');
 const { createPvpAuthority, FIXED_DT, SNAPSHOT_HZ } = require('./pvp-authority');
+const { createOnlineIdentityStore } = require('./online-identity-store');
 
 const PORT=Number(process.env.PORT||2567),MAX=32,WORLD={w:3600,h:3200};
 const AOI_CELL=512,AOI_RADIUS=1350,AOI_HYSTERESIS=180;
 const VISUAL_EVENT_ALLOWLIST=new Set(['CAST_CONFIRMED','PROJECTILE_SPAWNED','PROJECTILE_HIT','PROJECTILE_EXPIRED','ABILITY_IMPACT','STATUS_APPLIED','STATUS_REMOVED','SHIELD_APPLIED','SHIELD_BROKEN','DASH_STARTED','DASH_ENDED','DEATH']);
 const players=new Map();let seq=1;
+const identity=createOnlineIdentityStore({supabaseUrl:process.env.SUPABASE_URL,supabaseServerKey:process.env.SUPABASE_SECRET_KEY||process.env.SUPABASE_SERVICE_ROLE_KEY,requireAuth:process.env.KELO_REQUIRE_AUTH==='1'});
 const economy=createPlayerEconomyStore({supabaseUrl:process.env.SUPABASE_URL,supabaseServiceKey:process.env.SUPABASE_SERVICE_ROLE_KEY});
 const nobility=createNobilityService({supabaseUrl:process.env.SUPABASE_URL,supabaseServiceKey:process.env.SUPABASE_SERVICE_ROLE_KEY});
 const forge=createForgeService({supabaseUrl:process.env.SUPABASE_URL,supabaseServiceKey:process.env.SUPABASE_SERVICE_ROLE_KEY,economyStore:economy});
@@ -54,17 +56,28 @@ function pvpSnapshotFor(viewer,snapshot,events,index){const playersOut={},visibl
 function sendPvpSnapshots(snapshot,events){const index=buildSpatialIndex();players.forEach(viewer=>{if(!(viewer.zone==='pvp'||viewer._pvpActive))return;send(viewer.ws,{t:'pvp:snapshot',...pvpSnapshotFor(viewer,snapshot,events,index),source:'server-authoritative-aoi'})});}
 
 const wss=new WebSocketServer({port:PORT});
-wss.keloServerHooks=Object.freeze({recordConfirmedOpenWorldKill:recordConfirmedKill,pvpAuthority:pvp,aoi:Object.freeze({cell:AOI_CELL,radius:AOI_RADIUS,hysteresis:AOI_HYSTERESIS})});
-console.log(`Kelo room ws://0.0.0.0:${PORT} · fixed PvP ${Math.round(1/FIXED_DT)}Hz · snapshots ${SNAPSHOT_HZ}Hz · AOI ${AOI_RADIUS}px · Nobleza ${nobility.source} · Titles ${titles.source} · Forge ${forge.source} · Commerce ${commerce.version}`);
+wss.keloServerHooks=Object.freeze({recordConfirmedOpenWorldKill:recordConfirmedKill,pvpAuthority:pvp,aoi:Object.freeze({cell:AOI_CELL,radius:AOI_RADIUS,hysteresis:AOI_HYSTERESIS}),identityAuthority:identity});
+console.log(`Kelo room ws://0.0.0.0:${PORT} · fixed PvP ${Math.round(1/FIXED_DT)}Hz · snapshots ${SNAPSHOT_HZ}Hz · AOI ${AOI_RADIUS}px · Identity ${identity.source}${identity.requireAuth?' required':' transition'} · Nobleza ${nobility.source} · Titles ${titles.source} · Forge ${forge.source} · Commerce ${commerce.version}`);
 
 wss.on('connection',ws=>{
   if(players.size>=MAX){ws.close(1013,'room full');return;}
-  const id='p'+seq++,me={id,ws,playerKey:null,name:'Kelo',x:1400,y:1600,vx:0,vy:0,face:'down',gait:'idle',zone:'plaza',hp:100,maxHp:100,mana:100,maxMana:100,nobilityRank:'none',nobilityPower:0,equippedTitleId:null,armorScore:0,auraRank:0,averageQuality:0,averageGrade:0,equipmentSummary:[],_aoiRelevant:new Set()};
-  players.set(id,me);pvp.register(me);send(ws,{t:'welcome',id,players:publicStateFor(me),nobilitySource:nobility.source,titleSource:titles.source,forgeSource:forge.source,commerceSource:'server-authoritative',pvpAuthority:pvp.audit(),serverTime:Date.now(),aoi:{cell:AOI_CELL,radius:AOI_RADIUS,hysteresis:AOI_HYSTERESIS}});sendRelevantJoin(me);
+  const id='p'+seq++,me={id,ws,playerKey:null,accountId:null,characterId:null,authSource:'pending',name:'Kelo',x:1400,y:1600,vx:0,vy:0,face:'down',gait:'idle',zone:'plaza',hp:100,maxHp:100,mana:100,maxMana:100,nobilityRank:'none',nobilityPower:0,equippedTitleId:null,armorScore:0,auraRank:0,averageQuality:0,averageGrade:0,equipmentSummary:[],_aoiRelevant:new Set()};
+  players.set(id,me);pvp.register(me);send(ws,{t:'welcome',id,players:publicStateFor(me),nobilitySource:nobility.source,titleSource:titles.source,forgeSource:forge.source,commerceSource:'server-authoritative',identityAuthority:identity.audit(),pvpAuthority:pvp.audit(),serverTime:Date.now(),aoi:{cell:AOI_CELL,radius:AOI_RADIUS,hysteresis:AOI_HYSTERESIS}});sendRelevantJoin(me);
   ws.on('message',async buf=>{
     let msg;try{msg=JSON.parse(String(buf))}catch(_){return;}
     try{
-      if(msg.t==='hello'){if(typeof msg.name==='string'&&msg.name.trim())me.name=msg.name.trim().slice(0,24);me.playerKey=safePlayerId(msg.playerKey);economy.ensure(me.playerKey);await nobility.ensurePlayer(me.playerKey,me.name);await titles.ensurePlayer(me.playerKey);await forge.ensurePlayer(me.playerKey);send(ws,{t:'identity',playerKey:me.playerKey});await refreshNobility(me,msg.requestId);await refreshTitles(me,msg.requestId);await refreshForge(me,msg.requestId);send(ws,{t:'commerce:event',reason:'hello',snapshot:commerce.snapshot(me.playerKey),source:'server-authoritative'});sendRelevantStates();return;}
+      if(msg.t==='hello'){
+        const resolved=await identity.resolve({accessToken:msg.accessToken,characterId:msg.characterId,name:msg.name});
+        if(resolved.authenticated){
+          me.accountId=resolved.accountId;me.characterId=resolved.characterId;me.authSource=resolved.source;me.name=resolved.name;me.playerKey=resolved.playerKey;
+        }else{
+          if(typeof msg.name==='string'&&msg.name.trim())me.name=msg.name.trim().slice(0,24);
+          me.playerKey=safePlayerId(msg.playerKey);me.accountId=null;me.characterId=null;me.authSource=resolved.source;
+        }
+        economy.ensure(me.playerKey);await nobility.ensurePlayer(me.playerKey,me.name);await titles.ensurePlayer(me.playerKey);await forge.ensurePlayer(me.playerKey);
+        send(ws,{t:'identity',playerKey:me.playerKey,accountId:me.accountId,characterId:me.characterId,authSource:me.authSource});
+        await refreshNobility(me,msg.requestId);await refreshTitles(me,msg.requestId);await refreshForge(me,msg.requestId);send(ws,{t:'commerce:event',reason:'hello',snapshot:commerce.snapshot(me.playerKey),source:'server-authoritative'});sendRelevantStates();return;
+      }
       if(msg.t==='pose'){
         if(me.zone==='pvp'||me._pvpActive)return;
         if(Number.isFinite(msg.x))me.x=clamp(msg.x,20,WORLD.w-20);if(Number.isFinite(msg.y))me.y=clamp(msg.y,20,WORLD.h-20);if(['up','down','left','right'].includes(msg.face))me.face=msg.face;if(['idle','walk','run'].includes(msg.gait))me.gait=msg.gait;if(['plaza','cafe','open-world','market'].includes(msg.zone))me.zone=msg.zone;return;
@@ -86,7 +99,7 @@ wss.on('connection',ws=>{
       if(msg.t==='forge:get'){await refreshForge(me,msg.requestId);return;}
       if(msg.t==='forge:attempt'){const result=await forge.attempt(me.playerKey,{itemId:msg.itemId,forgeType:msg.forgeType,materialLevel:msg.materialLevel,crystals:msg.crystals});me.armorScore=result.armorScore;me.auraRank=result.auraRank;me.averageQuality=result.averageQuality;me.averageGrade=result.averageGrade;me.equipmentSummary=result.equipmentSummary;send(ws,{t:'forge:result',requestId:msg.requestId||null,...result,source:'server-authoritative'});send(ws,{t:'commerce:event',reason:'forge:attempt',snapshot:commerce.snapshot(me.playerKey),source:'server-authoritative'});sendRelevantStates();return;}
       if(msg.t==='forge:combine'){const snapshot=await forge.combine(me.playerKey,msg.materialId);me.armorScore=snapshot.armorScore;me.auraRank=snapshot.auraRank;me.averageQuality=snapshot.averageQuality;me.averageGrade=snapshot.averageGrade;me.equipmentSummary=snapshot.equipmentSummary;send(ws,{t:'forge:combined',requestId:msg.requestId||null,snapshot});return;}
-    }catch(err){const raw=String(err&&err.message||err),known=['INSUFFICIENT_GOLD','INSUFFICIENT_KC','INVALID_AMOUNT','INVALID_CURRENCY','ITEM_NOT_OWNED','INVALID_FORGE_TYPE','INVALID_TIER','MAX_TIER','INVALID_MATERIAL_LEVEL','TOO_MANY_CRYSTALS','INVALID_CRYSTAL','MATERIAL_REQUIRED','CRYSTAL_REQUIRED','INVALID_MATERIAL','MAX_MATERIAL_LEVEL','NEED_SIX','INVALID_VISUAL_EVENT','UNKNOWN_TITLE','TITLE_LOCKED','INVALID_PLAYER_ID','UNKNOWN_COMMERCE_OPERATION'],code=known.find(k=>raw.includes(k))||'SERVER_ERROR';console.error('protocol error',msg&&msg.t,raw);protocolError(ws,msg&&msg.requestId,code,code);}
+    }catch(err){const raw=String(err&&err.message||err),known=['INSUFFICIENT_GOLD','INSUFFICIENT_KC','INVALID_AMOUNT','INVALID_CURRENCY','ITEM_NOT_OWNED','INVALID_FORGE_TYPE','INVALID_TIER','MAX_TIER','INVALID_MATERIAL_LEVEL','TOO_MANY_CRYSTALS','INVALID_CRYSTAL','MATERIAL_REQUIRED','CRYSTAL_REQUIRED','INVALID_MATERIAL','MAX_MATERIAL_LEVEL','NEED_SIX','INVALID_VISUAL_EVENT','UNKNOWN_TITLE','TITLE_LOCKED','INVALID_PLAYER_ID','UNKNOWN_COMMERCE_OPERATION','SUPABASE_NOT_CONFIGURED','AUTH_TOKEN_REQUIRED','INVALID_AUTH_USER','CHARACTER_REQUIRED','INVALID_CHARACTER_ID','CHARACTER_NOT_OWNED'],code=known.find(k=>raw.includes(k))||'SERVER_ERROR';console.error('protocol error',msg&&msg.t,raw);protocolError(ws,msg&&msg.requestId,code,code);}
   });
   ws.on('close',()=>{const playerKey=me.playerKey;pvp.unregister(me);sendRelevantLeave(me);players.delete(id);if(playerKey&&!connectionsForPlayerKey(playerKey).length){const result=commerce.disconnect(playerKey);notifyCommerce(result.notifyPlayerIds||[],'disconnect',playerKey);}});
 });

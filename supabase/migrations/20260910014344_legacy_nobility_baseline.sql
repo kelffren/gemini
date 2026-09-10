@@ -26,9 +26,6 @@ create table if not exists public.nobility_history (
 alter table public.nobility_players enable row level security;
 alter table public.nobility_history enable row level security;
 
--- No anon/authenticated policies are intentionally created. The browser cannot
--- mutate Nobleza directly. Only the trusted game server uses the service-role key.
-
 create or replace function public.nobility_donate(
   p_player_id uuid,
   p_currency text,
@@ -53,21 +50,15 @@ declare
   v_player public.nobility_players%rowtype;
   v_added bigint;
 begin
-  if p_amount is null or p_amount <= 0 then
-    raise exception 'INVALID_AMOUNT';
-  end if;
-  if p_currency not in ('gold','kc') then
-    raise exception 'INVALID_CURRENCY';
-  end if;
+  if p_amount is null or p_amount <= 0 then raise exception 'INVALID_AMOUNT'; end if;
+  if p_currency not in ('gold','kc') then raise exception 'INVALID_CURRENCY'; end if;
 
   select * into v_player
   from public.nobility_players
   where nobility_players.player_id = p_player_id
   for update;
 
-  if not found then
-    raise exception 'PLAYER_NOT_FOUND';
-  end if;
+  if not found then raise exception 'PLAYER_NOT_FOUND'; end if;
 
   if v_player.donation_day <> current_date then
     update public.nobility_players

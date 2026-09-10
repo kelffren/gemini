@@ -63,6 +63,11 @@ No uses `/*` para apagar código. Los comentarios solo documentan.
 | VISUAL ACTOR BRIDGE | actorBackFX/actorFrontFX final | `src/visuals/visual-integration.js` |
 | NET VISUAL EVENT | relay semántico presentation-only | `engine-net.js` + `server/index.js` |
 | AUTHORITY | boca única client→server | `engine-net.js` `KeloNetAuthority` |
+| ONLINE IDENTITY | Supabase account → personaje; verificación server-side | `server/online-identity-store.js` + `profiles` `characters` `account_roles` |
+| SUPABASE FOUNDATION | persistencia, RLS, Storage, versionado, idempotencia y outbox | `supabase/migrations/*` `docs/systems/ONLINE_FOUNDATION.md` |
+| CREATOR ASSET BACKEND | familia estable → revisiones inmutables → review/publicación | `asset_families` `asset_revisions` `asset_review_requests` `asset_publications` + `creator-private`/`creator-global` |
+| MAP PERSISTENCE | mapa estable → versiones/chunks/dependencias exactas de assets | `maps` `map_versions` `map_version_chunks` `map_asset_refs` `map_publications` |
+| ECONOMY PERSISTENCE | wallets materializados + ledger append-only + item instances | `character_wallets` `wallet_ledger` `item_instances` `character_equipment` |
 | PROPERTY CATALOG | templates placeables desde props/prefabs | `src/property/property-asset-catalog.js` |
 | PROPERTY PARCEL UNITS | balances, placements, autoridad reemplazable | `src/property/property-system.js` |
 | MAP EDITOR | editor mundo/parcela, export/import | `src/ui/property-editor.js` |
@@ -75,7 +80,7 @@ No uses `/*` para apagar código. Los comentarios solo documentan.
 
 ## Áreas (primera palabra después de KELO-INDEX)
 
-`CORE` `NET` `AUTH` `CAST` `STONES` `MOUNTS` `STATS` `APPEARANCE` `CREATORS` `MOVE` `HERO` `PLAZA` `LUXE` `HUD` `ECON` `COMBAT` `SERVER` `UI` `PROPERTY`
+`CORE` `NET` `AUTH` `CAST` `STONES` `MOUNTS` `STATS` `APPEARANCE` `CREATORS` `MOVE` `HERO` `PLAZA` `LUXE` `HUD` `ECON` `COMBAT` `SERVER` `UI` `PROPERTY` `DB` `SUPABASE`
 
 Grep rápido:
 
@@ -89,7 +94,22 @@ KELO-INDEX CREATORS
 KELO-INDEX MOVE
 KELO-INDEX PROPERTY
 KELO-INDEX UI
+KELO-INDEX SERVER
 ```
+
+## ONLINE FOUNDATION V1
+- `server/*` sigue siendo el único owner de autoridad gameplay online; Supabase no simula PvP ni movimiento por frame.
+- `server/online-identity-store.js`: verifica access token de Supabase y resuelve `accountId → characterId` sin confiar IDs declarados por cliente.
+- `auth.users.id` identifica cuenta; `characters.id` identifica personaje. `legacy_player_key` es solo puente de migración.
+- `supabase/migrations/*`: fuente versionada de schema/RLS/Storage; las versiones de migración son únicas.
+- Assets: `asset_families` conserva identidad editable; `asset_revisions` conserva bytes/versiones inmutables; mapas referencian `asset_id`, nunca URL.
+- Mapas: `maps → map_versions → map_version_chunks`; `map_asset_refs` fija dependencias reproducibles.
+- Economía: `character_wallets` es saldo materializado; `wallet_ledger` es historial append-only e idempotente por correlation ID.
+- Confiabilidad: `server_idempotency`, `server_outbox`, `server_audit_events` son service-only.
+- Storage: `creator-private`, `creator-global`, `avatars`, `map-previews`; las escrituras de usuario se limitan por carpeta `auth.uid()`.
+- Realtime Broadcast se reserva para publicación pública de assets/mapas; PvP y datos privados siguen por server WebSocket.
+- Browser: publishable key. Server: secret/service-role; una key secreta nunca entra en Pages, localStorage ni GitHub.
+- Audit: `npm run audit:online-foundation`.
 
 ## MOUNT / STATS / APPEARANCE FOUNDATION V1
 - `src/mounts/mount-catalog.js`: definiciones ligeras; una montura nueva es data, no clase.

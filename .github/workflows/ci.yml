@@ -28,7 +28,7 @@ jobs:
           test -f server/index.js
           test -f server/package.json
           test -f server/nobility-store.js
-          test -f supabase/migrations/20260903_nobility.sql
+          test -f supabase/migrations/20260910014344_legacy_nobility_baseline.sql
           test -f src/systems/nobility.js
           test -f src/systems/nobility-authority.js
           test -f src/systems/nobility-combat.js
