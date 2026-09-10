@@ -9,6 +9,7 @@ on:
     paths:
       - 'src/world/map-forge/**'
       - 'scripts/map-forge-core-audit.mjs'
+      - 'scripts/map-forge-block-road-clearance-audit.mjs'
       - '.github/workflows/map-forge-core-ci.yml'
       - 'docs/systems/MAP_FORGE_SYSTEM.md'
       - 'docs/system-catalog.json'
@@ -17,6 +18,7 @@ on:
     paths:
       - 'src/world/map-forge/**'
       - 'scripts/map-forge-core-audit.mjs'
+      - 'scripts/map-forge-block-road-clearance-audit.mjs'
       - '.github/workflows/map-forge-core-ci.yml'
 
 jobs:
@@ -30,3 +32,5 @@ jobs:
           node-version: '22'
       - name: Run Map Forge deterministic + 300-seed audit
         run: node scripts/map-forge-core-audit.mjs
+      - name: Run buildable block road-clearance audit
+        run: node scripts/map-forge-block-road-clearance-audit.mjs
