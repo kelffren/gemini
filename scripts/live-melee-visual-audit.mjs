@@ -39,6 +39,8 @@ try {
   const response = await page.goto(`${base}?combat-feel-agent=${Date.now()}`, { waitUntil: 'domcontentloaded', timeout: 45000 });
   if (!response || response.status() >= 400) throw new Error(`LIVE_PAGE_HTTP_${response?.status() || 'NO_RESPONSE'}`);
   await page.waitForFunction(() => /^Kelo World — V/i.test(document.title), null, { timeout: 30000 });
+  await page.waitForFunction(() => !!window.KeloRuntimeBootstrap && typeof window.KeloRuntimeBootstrap.ensure === 'function', null, { timeout: 15000 });
+  await page.evaluate(async () => { await window.KeloRuntimeBootstrap.ensure(); });
   await page.waitForFunction(() => {
     return !!(
       window.KeloPvPWorld &&
@@ -98,7 +100,6 @@ try {
 
   await page.screenshot({ path: `${outDir}/00-live-boot.png`, fullPage: false, scale: 'device' });
 
-  // 1) Same deterministic 8-way presentation trace every run.
   const directionVectors = {
     right: { x: 1, y: 0 },
     down_right: { x: 1, y: 1 },
@@ -126,7 +127,6 @@ try {
     return rows;
   }, directionVectors);
 
-  // 2) Enter the actual PvP mode and play the M1 chain through the public command boundary.
   await page.evaluate(() => window.enterPvPWorld());
   await page.waitForFunction(() => window.KeloPvPWorld?.state?.combatEnabled === true, null, { timeout: 7000 });
   await page.waitForTimeout(250);
@@ -231,7 +231,6 @@ try {
 
   await page.screenshot({ path: `${outDir}/04-combo-finished.png`, fullPage: false, scale: 'device' });
 
-  // 3) Immediate reversal after the chain: action combat must return control cleanly.
   const reversalBefore = await page.evaluate(() => {
     const p = typeof localPlayer !== 'undefined' ? localPlayer : window.localPlayer;
     return { x: p.x, y: p.y };
@@ -246,7 +245,6 @@ try {
   const reversalPx = Math.hypot(reversalAfter.x - reversalBefore.x, reversalAfter.y - reversalBefore.y);
   const reversalCorrect = reversalAfter.x < reversalBefore.x;
 
-  // 4) Frame-time and cleanup check on the same live mobile build.
   await page.waitForTimeout(700);
   const performanceResult = await page.evaluate(async () => {
     const frames = [];
@@ -321,7 +319,7 @@ try {
   const weakest = dims.slice().sort((a, b) => (a.points / a.max) - (b.points / b.max))[0];
   const verdict = score >= threshold ? 'ACCEPTED_DRAKANTOS_STYLE' : score >= threshold - 10 ? 'CLOSE_TUNE_NEXT_GAP' : 'REJECTED_COMBAT_FEEL_GAP';
   const report = {
-    version: 'live-combat-feel-agent-v1.0.0',
+    version: 'live-combat-feel-agent-v1.0.1-lazy-bootstrap',
     generatedAt: new Date().toISOString(),
     url: page.url(),
     threshold,
