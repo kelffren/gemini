@@ -48,7 +48,8 @@ async function main() {
     setTimeout, clearTimeout, setInterval, clearInterval,
     Image: FakeImage, Audio: FakeAudio, AudioContext: FakeAudioContext,
     location: { search: '' }, innerWidth: 390, innerHeight: 844,
-    document: { readyState: 'loading', addEventListener() {}, body: null }
+    document: { readyState: 'loading', hidden: false, addEventListener() {}, body: null },
+    addEventListener() {}
   };
   sandbox.window = sandbox;
   sandbox.globalThis = sandbox;
