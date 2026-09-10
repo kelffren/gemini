@@ -7,9 +7,11 @@ on:
       - 'engine-ac.js'
       - 'src/characters/character-appearance.js'
       - 'src/systems/pvp-world.js'
+      - 'src/systems/melee/melee-weapon-profiles.js'
       - 'scripts/pvp-aim-facing-audit.js'
       - 'scripts/movement-onset-audit.js'
       - 'scripts/pixel-phase-audit.js'
+      - 'scripts/audit-pvp-follow-recovery.js'
       - 'package.json'
       - '.github/workflows/pvp-aim-facing-ci.yml'
   pull_request:
@@ -17,9 +19,11 @@ on:
       - 'engine-ac.js'
       - 'src/characters/character-appearance.js'
       - 'src/systems/pvp-world.js'
+      - 'src/systems/melee/melee-weapon-profiles.js'
       - 'scripts/pvp-aim-facing-audit.js'
       - 'scripts/movement-onset-audit.js'
       - 'scripts/pixel-phase-audit.js'
+      - 'scripts/audit-pvp-follow-recovery.js'
       - 'package.json'
       - '.github/workflows/pvp-aim-facing-ci.yml'
 
@@ -40,5 +44,7 @@ jobs:
         run: node scripts/movement-onset-audit.js
       - name: Measure avatar screen pixel phase
         run: node scripts/pixel-phase-audit.js
+      - name: Measure light combo recovery mobility
+        run: node scripts/audit-pvp-follow-recovery.js
       - name: Verify Foundation architecture
         run: npm run audit:foundation
