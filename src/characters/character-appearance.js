@@ -1,16 +1,16 @@
 /* KELO-INDEX
  * area: CHARACTERS
  * owner: KeloCharacterAppearance; avatar composition owned by KeloAvatar
- * keys: APPEARANCE PLAYER BOT HERO SPRITE FALLBACK FOUNDATION PVP AIM FACING STRAFE LOCOMOTION PLANT PIXEL PHASE DPR CAMERA
+ * keys: APPEARANCE PLAYER BOT HERO SPRITE FALLBACK FOUNDATION PVP AIM FACING STRAFE LOCOMOTION PLANT PIXEL PHASE DPR CAMERA CAST
  * hace: asigna y renderiza sprites de apariencia; el hero.PNG subido usa el owner modular con 4 direcciones
- * online: visual cliente; autoridad de actor fuera de este modulo; en PvP conserva aim de gameplay y usa fila de aim solo durante compromiso de ataque/aim explícito
+ * online: visual cliente; autoridad de actor fuera de este modulo; en PvP conserva aim de gameplay y usa fila de aim solo durante compromiso de ataque/aim/cast explícito
  * extension-points: KeloAvatar.use como middleware condicional de apariencia
  * do-not: NO envolver renderAvatar, NO decidir aim ni gameplay desde apariencia
  */
 (function () {
   'use strict';
 
-  const VERSION = 'character-appearance-v2.5.0-physical-pixel-phase';
+  const VERSION = 'character-appearance-v2.6.0-cast-aim-facing';
   const DEFAULT_PLAYER = 'player_hero_v1';
   const DEFAULT_BOT = DEFAULT_PLAYER;
   const ALPHA_CLEANUP_THRESHOLD = 8;
@@ -48,7 +48,7 @@
     drawCountByAppearance: {}, fallbackDraws: 0, imageSmoothingDisabled: true,
     usesSingleImagePerAppearance: true, usesActorAppearanceId: true, usesPerFrameFootAnchor: true,
     usesExplicitIdleFrame: true,
-    usesCombatAimFacing: true, combatAimFacingPolicy: 'idle-or-attack-commitment',
+    usesCombatAimFacing: true, combatAimFacingPolicy: 'idle-or-attack-or-cast-commitment',
     adaptivePhysicalPixelSnap: true, physicalPixelSnapCount: 0, worldPixelFallbackCount: 0,
     avatarOwner: 'KeloAvatar', avatarMiddleware: 'character-appearance:custom-sprite', lastDraw: null
   };
@@ -138,14 +138,19 @@
     return HERO_FACE_ROWS[face] == null ? null : face;
   }
 
+  function abilityCastAimCommitted() {
+    const predictor = window.KeloPvPCastMovementPrediction;
+    return !!(predictor && predictor.active);
+  }
+
   function combatAimCommitted(actor, visual) {
     if (window.KELO_COMBAT_ENABLED !== true || !actorFace(actor)) return false;
     if (!visual || !visual.on) return true;
     try {
       const pvp = window.KeloPvPWorld && window.KeloPvPWorld.state;
-      return !!(pvp && (pvp.basicAttack || pvp.specialHolding || Number(pvp.armedSlot) >= 0));
+      return !!(pvp && (pvp.basicAttack || pvp.specialHolding || Number(pvp.armedSlot) >= 0)) || abilityCastAimCommitted();
     } catch (_) {
-      return false;
+      return abilityCastAimCommitted();
     }
   }
 
