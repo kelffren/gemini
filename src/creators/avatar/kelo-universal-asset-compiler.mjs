@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: CREATORS / AVATAR
  * owner: Kelo Universal Asset Compiler V5
- * keys: AVATAR UNIVERSAL COMPILER HYPOTHESES SELF-HEAL VALIDATE CANONICAL-RIG EARLY-ACCEPT
+ * keys: AVATAR UNIVERSAL COMPILER HYPOTHESES SELF-HEAL VALIDATE CANONICAL-RIG EARLY-ACCEPT SCALE-LOCK FOOT-ANCHOR
  * purpose: accept heterogeneous avatar sprite sheets, generate competing interpretations, repair/normalize them, validate the result and emit one canonical Kelo runtime sheet
  * public-api: analyzeUniversalAvatarAsset(file), compileUniversalAvatarRuntime(file,config)
  * consumes: avatar-spritesheet-analyzer V4 + browser Canvas/ImageBitmap
@@ -68,29 +68,37 @@ async function runTrial(file,base,h,{root,onProgress,index,total,thresholdScale=
   return F({h,cfg,compiled,validation,confidence,thresholdScale});
 }
 
-async function canonicalize(compiled,{root=globalThis}={}){
+function sourceRectScaleLock(sourceRects,columns,rows){
+  if(!Array.isArray(sourceRects)||sourceRects.length!==columns*rows)return null;
+  const widths=sourceRects.map(r=>Number(r?.w)||0).filter(Boolean),heights=sourceRects.map(r=>Number(r?.h)||0).filter(Boolean);
+  if(widths.length!==sourceRects.length||heights.length!==sourceRects.length)return null;
+  const medW=median(widths),medH=median(heights);if(!medW||!medH)return null;
+  return F({medW,medH,forFrame(row,col){const r=sourceRects[row*columns+col];return F({x:clamp((Number(r?.w)||medW)/medW,.72,1.28),y:clamp((Number(r?.h)||medH)/medH,.72,1.28)});}});
+}
+
+async function canonicalize(compiled,{root=globalThis,sourceRects=null}={}){
   const bitmap=await bitmapFor(compiled.blob,root),sourceW=bitmap.width||bitmap.naturalWidth,sourceH=bitmap.height||bitmap.naturalHeight,columns=Math.max(1,compiled.columns||1),rows=Math.max(1,compiled.rows||1),fw=sourceW/columns,fh=sourceH/rows,out=canvasFor(root,Math.round(fw*columns),Math.round(fh*4)),ctx=out.getContext('2d');ctx.clearRect(0,0,out.width,out.height);ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
-  const map=rowMapFor(rows,{rowMap:compiled.rowMap||{}}),faces=['down','left','right','up'];
+  const map=rowMapFor(rows,{rowMap:compiled.rowMap||{}}),faces=['down','left','right','up'],scaleLock=sourceRectScaleLock(sourceRects,columns,rows);
   for(let destRow=0;destRow<4;destRow++){
     const face=faces[destRow],srcRow=clamp(Math.round(map[face]??0),0,rows-1),mirror=(face==='left'&&map.left===map.right&&rows<3);
     for(let col=0;col<columns;col++){
-      const sx=col*fw,sy=srcRow*fh,dx=col*fw,dy=destRow*fh;
-      if(mirror){ctx.save();ctx.translate(dx+fw,dy);ctx.scale(-1,1);ctx.drawImage(bitmap,sx,sy,fw,fh,0,0,fw,fh);ctx.restore();}
-      else ctx.drawImage(bitmap,sx,sy,fw,fh,dx,dy,fw,fh);
+      const sx=col*fw,sy=srcRow*fh,cellX=col*fw,cellY=destRow*fh,correction=scaleLock?.forFrame(srcRow,col)||{x:1,y:1},dw=fw*correction.x,dh=fh*correction.y,dx=cellX+(fw-dw)/2,dy=cellY+fh-dh;
+      if(mirror){ctx.save();ctx.translate(dx+dw,dy);ctx.scale(-1,1);ctx.drawImage(bitmap,sx,sy,fw,fh,0,0,dw,dh);ctx.restore();}
+      else ctx.drawImage(bitmap,sx,sy,fw,fh,dx,dy,dw,dh);
     }
   }
   bitmap.close?.();let blob=await canvasBlob(out,'image/png');let type='image/png';if(blob.size>MAX_RUNTIME_BYTES){blob=await canvasBlob(out,'image/webp',.92);type='image/webp';}
-  return F({...compiled,blob,type,width:out.width,height:out.height,rows:4,rowMap:FACE_ROWS,normalized:true,canonicalRig:true});
+  return F({...compiled,blob,type,width:out.width,height:out.height,rows:4,rowMap:FACE_ROWS,normalized:true,canonicalRig:true,scaleLocked:!!scaleLock,footAnchor:'bottom-center'});
 }
 
 export async function analyzeUniversalAvatarAsset(file,{root=globalThis}={}){
   const base=await analyzeAvatarSpriteSheet(file,{root}),hypotheses=buildHypotheses(base);
-  return F({...base,version:'kelo-universal-asset-compiler-v5.0.0',compilerVersion:'5.0.0',universalAuto:true,strategy:String(hypotheses[0]?.mode||base.detectionMode||'adaptive-v4'),hypotheses:F(hypotheses.map(h=>F({columns:h.columns,rows:h.rows,mode:h.mode,prior:h.prior,why:h.why}))),selfHealing:true,canonicalRig:true});
+  return F({...base,version:'kelo-universal-asset-compiler-v5.1.0',compilerVersion:'5.1.0',universalAuto:true,strategy:String(hypotheses[0]?.mode||base.detectionMode||'adaptive-v4'),hypotheses:F(hypotheses.map(h=>F({columns:h.columns,rows:h.rows,mode:h.mode,prior:h.prior,why:h.why}))),selfHealing:true,canonicalRig:true,scaleLock:true});
 }
 
 export async function compileUniversalAvatarRuntime(file,config,{root=globalThis,onProgress=null}={}){
   if(!file)throw new Error('UNIVERSAL_FILE_REQUIRED');
-  if(config?.detectionMode==='manual'||config?.universalAuto===false){const direct=await compileAvatarRuntime(file,config,{root}),canonical=await canonicalize(direct,{root}),validation=await validateCompiled(canonical,{root});return F({...canonical,compilerVersion:'5.0.0',strategy:'manual',validation,confidenceScore:validation.health,selfHealed:false});}
+  if(config?.detectionMode==='manual'||config?.universalAuto===false){const direct=await compileAvatarRuntime(file,config,{root}),canonical=await canonicalize(direct,{root,sourceRects:config?.sourceRects}),validation=await validateCompiled(canonical,{root});return F({...canonical,compilerVersion:'5.1.0',strategy:'manual',validation,confidenceScore:validation.health,selfHealed:false});}
   const base=config?.compilerVersion?config:await analyzeUniversalAvatarAsset(file,{root}),hypotheses=buildHypotheses(base),trials=[],total=Math.min(MAX_TRIALS,hypotheses.length);
   if(!total)throw new Error('UNIVERSAL_NO_HYPOTHESES');
   try{trials.push(await runTrial(file,base,hypotheses[0],{root,onProgress,index:1,total}));}catch(error){trials.push(F({h:hypotheses[0],error:String(error?.message||error),confidence:0}));}
@@ -103,9 +111,9 @@ export async function compileUniversalAvatarRuntime(file,config,{root=globalThis
     const repairs=[];for(const scale of [.72,1.22]){try{repairs.push(await runTrial(file,base,best.h,{root,onProgress,index:1,total:2,thresholdScale:scale}));}catch{}}
     const repaired=repairs.sort((a,b)=>b.confidence-a.confidence)[0];if(repaired&&repaired.confidence>best.confidence+.015){best=repaired;selfHealed=true;}
   }
-  onProgress?.({stage:'canonicalize',message:'Adaptando al rig universal de Kelo World…'});const canonical=await canonicalize(best.compiled,{root}),validation=await validateCompiled(canonical,{root}),confidenceScore=clamp(.72*validation.health+.28*best.confidence);
-  const audit=F({selected:F({mode:best.h.mode,columns:best.h.columns,rows:best.h.rows,thresholdScale:best.thresholdScale||1}),tested:F(trials.map(t=>F({mode:t.h.mode,columns:t.h.columns,rows:t.h.rows,confidence:Number(t.confidence)||0,health:Number(t.validation?.health)||0,error:t.error||null}))),earlyAccept,selfHealed,finalHealth:validation.health});
-  return F({...canonical,compilerVersion:'5.0.0',strategy:best.h.mode,detectionMode:`universal:${best.h.mode}`,confidenceScore,validation,audit,selfHealed,canonicalRig:true});
+  onProgress?.({stage:'canonicalize',message:'Bloqueando escala corporal y alineando pies…'});const canonical=await canonicalize(best.compiled,{root,sourceRects:best.cfg?.sourceRects}),validation=await validateCompiled(canonical,{root}),confidenceScore=clamp(.72*validation.health+.28*best.confidence);
+  const audit=F({selected:F({mode:best.h.mode,columns:best.h.columns,rows:best.h.rows,thresholdScale:best.thresholdScale||1}),tested:F(trials.map(t=>F({mode:t.h.mode,columns:t.h.columns,rows:t.h.rows,confidence:Number(t.confidence)||0,health:Number(t.validation?.health)||0,error:t.error||null}))),earlyAccept,selfHealed,scaleLocked:canonical.scaleLocked,finalHealth:validation.health});
+  return F({...canonical,compilerVersion:'5.1.0',strategy:best.h.mode,detectionMode:`universal:${best.h.mode}`,confidenceScore,validation,audit,selfHealed,canonicalRig:true});
 }
 
-export const __universalAssetCompilerV5=F({buildHypotheses,validateCompiled,equalRects,rowMapFor});
+export const __universalAssetCompilerV5=F({buildHypotheses,validateCompiled,equalRects,rowMapFor,sourceRectScaleLock});
