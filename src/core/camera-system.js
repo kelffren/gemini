@@ -1,14 +1,14 @@
 /* KELO-INDEX
  * area: CORE / CAMERA
  * owner: KeloCamera
- * keys: CAMERA VIEWPORT ZOOM DPR FOCUS RESTORE SCREEN WORLD ORIENTATION FOUNDATION DEADZONE
- * purpose: owner único para comandos de cámara, zoom, viewport/Canvas y conversiones screen↔world; compensa la dead-zone legacy para que sus ratios sigan siendo screen-space bajo cualquier zoom
+ * keys: CAMERA VIEWPORT ZOOM DPR FOCUS RESTORE SCREEN WORLD ORIENTATION FOUNDATION DEADZONE REVERSAL LOOKAHEAD
+ * purpose: owner único para comandos de cámara, zoom, viewport/Canvas y conversiones screen↔world; compensa la dead-zone legacy y acelera solo el carry contrario de look-ahead al invertir dirección
  * public-api: KeloCamera
  * consumes: camera, CONFIG, canvas, ctx, screenW/screenH y updateCamera legacy de engine-a
- * state-owned: targetX/Y, posición comandada, follow tuning, zoom efectivo/base, viewport policy, DPR policy y foco
+ * state-owned: targetX/Y, posición comandada, follow tuning, zoom efectivo/base, viewport policy, DPR policy, foco y transient reversal response
  * extension-points: setTarget/focus/restoreState/setBaseZoom/configureViewport/syncViewport/setFollowTuning/worldView
  * reuse: gameplay pide foco/restore/zoom al owner; render/culling consulta worldView(); UI/orientación delegan viewport y framing aquí
- * legacy: engine-a conserva temporalmente la matemática interna de follow; deadXRatio/deadYRatio se adaptan a world-space en el getter legacy porque engine-a compara contra deltas world-space
+ * legacy: engine-a conserva temporalmente la matemática interna de follow; deadXRatio/deadYRatio se adaptan a world-space y lookAheadDecay recibe boost transitorio solo mientras el offset contradice el input actual
  * do-not: NO escribir camera.targetX/Y, camera.x/y por comandos externos, CONFIG.zoom/camera tuning, canvas.width/height o reemplazar resize desde features nuevas
  */
 (function(root){
@@ -16,15 +16,19 @@
   if(root.KeloCamera)return;
   if(typeof camera==='undefined'||typeof CONFIG==='undefined'||typeof canvas==='undefined'||typeof ctx==='undefined')throw new Error('KeloCamera: legacy camera/canvas core unavailable');
 
-  const VERSION='kelo-camera-v1.5.0-screen-deadzone';
+  const VERSION='kelo-camera-v1.6.0-reversal-response';
   const ZOOM_PRESETS=Object.freeze([0.7,0.82,1]);
   const TUNING_KEYS=Object.freeze(['dampX','dampY','deadXRatio','deadYRatio','lookAheadDist','lookAheadDecay']);
   const SCREEN_SPACE_DEADZONE_KEYS=new Set(['deadXRatio','deadYRatio']);
+  const LOOKAHEAD_REVERSAL_DECAY_MULTIPLIER=3;
+  const REVERSAL_EPSILON=0.01;
   const legacyUpdateCamera=typeof updateCamera==='function'?updateCamera:null;
   let baseZoom=Number.isFinite(Number(CONFIG.zoom))&&Number(CONFIG.zoom)>0?Number(CONFIG.zoom):0.82;
   let effectiveZoom=baseZoom;
   let managedTargetX=Number(camera.targetX)||0,managedTargetY=Number(camera.targetY)||0;
   const managedTuning=Object.fromEntries(TUNING_KEYS.map(key=>[key,Number(CONFIG[key])]));
+  let transientLookAheadDecayMultiplier=1;
+  let reversalActiveX=false,reversalActiveY=false;
   let dprCap=3,pixelPerfect=false,roundPixels=!!CONFIG.roundPixels,smoothing=true,imageRendering='auto',viewportScheduled=false,lastEffectiveZoom=null,lastViewportKey='';
 
   Object.defineProperty(camera,'targetX',{configurable:true,enumerable:true,get:()=>managedTargetX,set:value=>{const n=Number(value);if(Number.isFinite(n))managedTargetX=n;}});
@@ -32,6 +36,7 @@
   Object.defineProperty(CONFIG,'zoom',{configurable:true,enumerable:true,get:()=>effectiveZoom,set:value=>{const n=Number(value);if(Number.isFinite(n)&&n>0)effectiveZoom=n;}});
   function legacyTuningValue(key){
     const value=managedTuning[key];
+    if(key==='lookAheadDecay')return value*transientLookAheadDecayMultiplier;
     if(!SCREEN_SPACE_DEADZONE_KEYS.has(key))return value;
     const zoom=Math.max(0.0001,Number(effectiveZoom)||1);
     return value/zoom;
@@ -59,9 +64,16 @@
   function screenToWorldPoint(sx,sy){const z=effectiveZoom||1;return{x:camera.x+(Number(sx)-screenW/2)/z,y:camera.y+(Number(sy)-screenH/2)/z};}
   function worldToScreenPoint(wx,wy){const z=effectiveZoom||1;return{x:(Number(wx)-camera.x)*z+screenW/2,y:(Number(wy)-camera.y)*z+screenH/2};}
   function worldView(){const z=effectiveZoom||1,w=screenW/z,h=screenH/z,cx=Number(camera.x)||0,cy=Number(camera.y)||0,left=cx-w/2,top=cy-h/2;return Object.freeze({x:left,y:top,w,h,left,top,right:left+w,bottom:top+h,centerX:cx,centerY:cy,zoom:z,screenW,screenH});}
-  function update(dt){if(legacyUpdateCamera)legacyUpdateCamera(dt);}
+  function axisReversing(inputAxis,lookOffset){return Math.abs(Number(inputAxis)||0)>REVERSAL_EPSILON&&Math.abs(Number(lookOffset)||0)>REVERSAL_EPSILON&&Number(inputAxis)*Number(lookOffset)<0;}
+  function update(dt){
+    const ix=typeof input!=='undefined'?Number(input.normX)||0:0,iy=typeof input!=='undefined'?Number(input.normY)||0:0;
+    reversalActiveX=axisReversing(ix,camera.lookOffsetX);
+    reversalActiveY=axisReversing(iy,camera.lookOffsetY);
+    transientLookAheadDecayMultiplier=(reversalActiveX||reversalActiveY)?LOOKAHEAD_REVERSAL_DECAY_MULTIPLIER:1;
+    try{if(legacyUpdateCamera)legacyUpdateCamera(dt);}finally{transientLookAheadDecayMultiplier=1;}
+  }
   function refreshZoom(source){return applyZoom(source||'refresh');}
-  function snapshot(){return Object.freeze({version:VERSION,x:camera.x,y:camera.y,targetX:managedTargetX,targetY:managedTargetY,lookOffsetX:Number(camera.lookOffsetX)||0,lookOffsetY:Number(camera.lookOffsetY)||0,baseZoom,effectiveZoom,orientation:orientation(),screenW,screenH,dpr:activeDpr(),dprCap,pixelPerfect,roundPixels,smoothing,follow:getFollowTuning()});}
+  function snapshot(){return Object.freeze({version:VERSION,x:camera.x,y:camera.y,targetX:managedTargetX,targetY:managedTargetY,lookOffsetX:Number(camera.lookOffsetX)||0,lookOffsetY:Number(camera.lookOffsetY)||0,baseZoom,effectiveZoom,orientation:orientation(),screenW,screenH,dpr:activeDpr(),dprCap,pixelPerfect,roundPixels,smoothing,follow:getFollowTuning(),reversalResponse:Object.freeze({multiplier:LOOKAHEAD_REVERSAL_DECAY_MULTIPLIER,activeX:reversalActiveX,activeY:reversalActiveY})});}
 
   root.updateCamera=update;
   root.resize=()=>syncViewport('legacy-resize-call');
@@ -72,5 +84,5 @@
   root.visualViewport?.addEventListener('resize',()=>scheduleViewportSync('visualViewport'),{passive:true});
 
   root.KeloCamera=Object.freeze({version:VERSION,setTarget,focus,restoreState,setFollowTuning,getFollowTuning,setBaseZoom,getBaseZoom:()=>baseZoom,getEffectiveZoom:()=>effectiveZoom,cycleZoom,refreshZoom,getOrientation:orientation,configureViewport,syncViewport,scheduleViewportSync,syncViewportCss,activeDpr,pixelPerfectZoom,screenToWorld:screenToWorldPoint,worldToScreen:worldToScreenPoint,worldView,snapshot});
-  root.KELO_CAMERA_AUDIT=Object.freeze({version:VERSION,owner:'KeloCamera',legacyFollowMath:true,screenSpaceDeadZone:true,legacyTargetAdapter:true,legacyZoomAdapter:true,legacyTuningAdapter:true,updateCameraOwner:true,viewportOwner:true,zoomOwner:true,targetOwner:true,restoreOwner:true,screenWorldOwner:true,worldViewOwner:true});
+  root.KELO_CAMERA_AUDIT=Object.freeze({version:VERSION,owner:'KeloCamera',legacyFollowMath:true,screenSpaceDeadZone:true,lookAheadReversalResponse:true,lookAheadReversalDecayMultiplier:LOOKAHEAD_REVERSAL_DECAY_MULTIPLIER,legacyTargetAdapter:true,legacyZoomAdapter:true,legacyTuningAdapter:true,updateCameraOwner:true,viewportOwner:true,zoomOwner:true,targetOwner:true,restoreOwner:true,screenWorldOwner:true,worldViewOwner:true});
 })(typeof globalThis!=='undefined'?globalThis:window);
