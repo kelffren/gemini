@@ -1,7 +1,7 @@
 # KELO-INDEX
 # area: CI / CREATORS
-# keys: SPRITE ABILITY BUILDER SPRITESHEET ANIMATION ABILITY
-# purpose: valida sintaxis y contrato de generación del Sprite Ability Builder
+# keys: SPRITE ABILITY BUILDER SPRITESHEET ANIMATION ABILITY MOBILE
+# purpose: valida contrato y flujo real upload → preview → generate a 390x844
 name: Sprite Ability Builder CI
 on:
   pull_request:
@@ -14,6 +14,7 @@ on:
       - 'src/creators/animation/animation-document.mjs'
       - 'src/creators/animation/animation-preview-adapter.mjs'
       - 'scripts/sprite-ability-builder-audit.mjs'
+      - 'scripts/sprite-ability-builder-live-audit.mjs'
       - '.github/workflows/sprite-ability-builder-ci.yml'
   push:
     branches: [main]
@@ -26,6 +27,7 @@ on:
       - 'src/creators/animation/animation-document.mjs'
       - 'src/creators/animation/animation-preview-adapter.mjs'
       - 'scripts/sprite-ability-builder-audit.mjs'
+      - 'scripts/sprite-ability-builder-live-audit.mjs'
       - '.github/workflows/sprite-ability-builder-ci.yml'
   workflow_dispatch:
 
@@ -47,6 +49,7 @@ jobs:
           node --check src/creators/animation/animation-document.mjs
           node --check src/creators/animation/animation-preview-adapter.mjs
           node --check scripts/sprite-ability-builder-audit.mjs
+          node --check scripts/sprite-ability-builder-live-audit.mjs
       - name: Builder contract
         run: node scripts/sprite-ability-builder-audit.mjs
       - name: Architecture guardrails
@@ -55,3 +58,33 @@ jobs:
           grep -q "registerSpriteAbilityWorkspace" src/creators/creator-entry.mjs
           grep -q "sprite-ability" src/creators/ui/creator-hub.mjs
           ! grep -Eq "\.hp[[:space:]]*=|damageTarget|attackSweep|resolveMelee" src/creators/sprite-ability/sprite-ability-live-controller.mjs
+
+  mobile-live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install Playwright
+        run: npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund playwright@1.55.0
+      - name: Serve candidate
+        run: |
+          python3 -m http.server 8000 --bind 127.0.0.1 >/tmp/sprite-ability-http.log 2>&1 &
+          for i in {1..20}; do curl -fsS http://127.0.0.1:8000/index.html >/dev/null && exit 0; sleep 1; done
+          cat /tmp/sprite-ability-http.log
+          exit 1
+      - name: Upload, preview and generate at 390x844
+        env:
+          AUDIT_URL: http://127.0.0.1:8000/
+          CHROME_BIN: /usr/bin/google-chrome
+        run: node scripts/sprite-ability-builder-live-audit.mjs
+      - name: Upload mobile evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sprite-ability-builder-mobile
+          path: artifacts/sprite-ability-builder/
+          if-no-files-found: warn
+          retention-days: 14
