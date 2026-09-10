@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: MOVEMENT / PRESENTATION
  * owner: KeloMovement consumer
- * keys: MOVEMENT GAIT SPEED STRIDE PLANT ONSET STEP-OFF AUDIT AIM FACING PVP PARITY DIAGONAL HYSTERESIS
+ * keys: MOVEMENT GAIT SPEED STRIDE PLANT ONSET STEP-OFF AUDIT AIM FACING PVP PARITY DIAGONAL HYSTERESIS BLOCKED FOOT-PLANT
  * purpose: calcula gait/velocidad objetivo y estado visual de zancada usando hooks del owner KeloMovement
  * public-api: KELO_MOVEMENT_AUDIT
  * consumes: KeloMovementProfile, KeloMovement, input, CONFIG, localPlayer, KELO_COMBAT_ENABLED
@@ -22,12 +22,14 @@
   // MOV-COMBAT-FACING-V1: movement presentation never overwrites PvP aim-facing; combat geometry remains authority-owned elsewhere.
   // MOV-PARITY-V1: speed/gait semantics come from KeloMovementProfile, shared with server authority.
   // MOV-DIAGONAL-HYSTERESIS-V1: preserve the current locomotion axis through small analog jitter around 45 degrees.
+  // MOV-BLOCKED-PLANT-V2: sustained intent without resolved displacement settles to authored plant instead of freezing a walk pose.
   const movementProfile = window.KeloMovementProfile;
   if (!movementProfile) throw new Error('KeloMovementProfile unavailable before engine-ac');
   const PROFILE = movementProfile.profile;
   const WALK_SPEED = PROFILE.walkSpeed;
   const GAIT_RUN_START = PROFILE.gaitRunStart;
   const VISUAL_STOP_HOLD_SEC = 0.075;
+  const BLOCKED_SETTLE_SEC = 0.04;
   const WALK_CYCLE_WORLD_PX = 50;
   const RUN_CYCLE_WORLD_PX = 90;
   const MIN_VISUAL_MOVE_PX = 0.12;
@@ -37,6 +39,7 @@
   const params = new URLSearchParams(window.location.search);
   const MOV_CADENCE_V2 = params.get('movCadenceV2') !== '0';
   const MOV_STOP_V2 = params.get('movStopV2') !== '0';
+  const BLOCKED_PLANT_V2 = params.get('blockedPlantV2') !== '0';
   const rawPlantFrame = params.get('plantFrame');
   const requestedPlantFrame = rawPlantFrame == null ? NaN : Number(rawPlantFrame);
   const PLANT_FRAME = Number.isInteger(requestedPlantFrame) && requestedPlantFrame >= 0 && requestedPlantFrame < 4
@@ -101,7 +104,7 @@
 
   function publishAudit(mag, gait, speedCap, visual) {
     window.KELO_MOVEMENT_AUDIT = {
-      version: 'MOV-shared-profile-v1-diagonal-hysteresis',
+      version: 'MOV-shared-profile-v1-diagonal-hysteresis-blocked-plant-v2',
       movementProfileVersion: movementProfile.version,
       rawTouchMag: rawTouchMag(),
       processedMag: mag,
@@ -112,6 +115,10 @@
       colliderRadius: localPlayer.radius,
       cadenceV2: MOV_CADENCE_V2,
       stopV2: MOV_STOP_V2,
+      blockedPlantV2: BLOCKED_PLANT_V2,
+      blockedSettleMs: BLOCKED_SETTLE_SEC * 1000,
+      blockedIntentElapsedMs: visual ? visual.blockedIntentElapsed * 1000 : 0,
+      blockedSettled: !!(visual && visual.blockedSettled),
       plantFrame: PLANT_FRAME,
       plantPhase: PLANT_PHASE,
       directionBaselineRatio: DIRECTION_BASELINE_RATIO,
@@ -173,6 +180,8 @@
         lastReleaseFromPhase: PLANT_PHASE,
         unsupportedPoseFreezeMs: 0,
         releaseToStablePlantMs: 0,
+        blockedIntentElapsed: 0,
+        blockedSettled: false,
         reversalCount: 0,
         reversalAccidentalIdleCount: 0,
         reversalFrameJumpCount: 0,
@@ -188,12 +197,18 @@
     const v = visualStateOf(p);
     if (v.directionAxis === undefined) v.directionAxis = null;
     if (!Number.isFinite(v.directionFaceSwitchCount)) v.directionFaceSwitchCount = 0;
+    if (!Number.isFinite(v.blockedIntentElapsed)) v.blockedIntentElapsed = 0;
     const dx = p.x - v.lastX;
     const dy = p.y - v.lastY;
     const dist = Math.hypot(dx, dy);
     const spd = Math.hypot(p.vx || 0, p.vy || 0);
     const hasIntent = gait !== 'idle';
-    const physicallyMoving = dist > MIN_VISUAL_MOVE_PX || spd > 16;
+    const resolvedMoving = dist > MIN_VISUAL_MOVE_PX;
+    const legacyVelocityEvidence = spd > 16;
+    const physicallyMoving = resolvedMoving || (!BLOCKED_PLANT_V2 && legacyVelocityEvidence);
+    if (BLOCKED_PLANT_V2 && hasIntent && !resolvedMoving) v.blockedIntentElapsed += Math.max(0, dt || 0);
+    else v.blockedIntentElapsed = 0;
+    v.blockedSettled = BLOCKED_PLANT_V2 && hasIntent && !resolvedMoving && v.blockedIntentElapsed >= BLOCKED_SETTLE_SEC;
     const wasOn = v.on;
     const intentX = input.normX || 0;
     const intentY = input.normY || 0;
@@ -204,7 +219,7 @@
     const lateralReversal = horizontalIntentSign !== 0 && v.lastIntentHorizontalSign !== 0 && horizontalIntentSign !== v.lastIntentHorizontalSign;
     if (horizontalIntentSign !== 0) v.lastIntentHorizontalSign = horizontalIntentSign;
 
-    if (hasIntent || physicallyMoving) {
+    if ((hasIntent && !v.blockedSettled) || physicallyMoving) {
       v.stopElapsed = 0;
       v.on = true;
       if (!wasOn) {
@@ -236,13 +251,13 @@
       v.releaseToStablePlantMs = v.on ? v.stopElapsed * 1000 : VISUAL_STOP_HOLD_SEC * 1000;
     }
 
-    if (dist > MIN_VISUAL_MOVE_PX) {
+    if (resolvedMoving) {
       v.dx = dx;
       v.dy = dy;
-    } else if (spd > 16) {
+    } else if (!v.blockedSettled && legacyVelocityEvidence) {
       v.dx = p.vx || 0;
       v.dy = p.vy || 0;
-    } else if (hasIntent) {
+    } else if (!v.blockedSettled && hasIntent) {
       v.dx = input.normX || 0;
       v.dy = input.normY || 0;
     }
@@ -254,7 +269,7 @@
       if (!combatAimFacing(p)) p._face = v.face;
     }
 
-    v.lastStepDistancePx = dist > MIN_VISUAL_MOVE_PX ? dist : 0;
+    v.lastStepDistancePx = resolvedMoving ? dist : 0;
     v.cycleWorldPx = cycleWorldPxFor(mag, gait);
     if (v.on && v.lastStepDistancePx > 0) {
       if (v.pendingStepOff) {
