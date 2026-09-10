@@ -62,7 +62,8 @@ assert(shieldHit.requested===18&&shieldHit.absorbed===5&&shieldHit.amount===13&&
 const healTarget={hp:50,maxHp:100};
 const healed=sandbox.KeloEffectEngine.apply({type:'heal',amount:20},{target:healTarget});
 assert(healed.ok===true&&healTarget.hp===70,'EffectEngine reusable heal handler works');
-const unknown=sandbox.KeloEffectEngine.apply({type:'burn',amount:2},{target:healTarget});
-assert(unknown.ok===false&&unknown.reason==='EFFECT_RUNTIME_NOT_REGISTERED','unimplemented status-like effect fails explicitly instead of inventing runtime');
+assert(sandbox.KeloEffectEngine.has('burn'),'status-like handlers are registered generically');
+const burnWithoutStatusRuntime=sandbox.KeloEffectEngine.apply({type:'burn',amount:2},{target:healTarget});
+assert(burnWithoutStatusRuntime.ok===false&&burnWithoutStatusRuntime.reason==='STATUS_ENGINE_UNAVAILABLE','registered status effect fails explicitly when StatusEngine is absent from the isolated sandbox');
 
 if(process.exitCode){console.error('\nCombat architecture audit FAILED');process.exit(process.exitCode);}else console.log('\nCombat architecture audit OK');
