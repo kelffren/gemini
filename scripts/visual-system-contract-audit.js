@@ -141,10 +141,10 @@ async function main() {
   const coreAt = index.indexOf('src/visuals/visual-system.js');
   const abilityAt = index.indexOf('src/abilities/kelo-ability-boot.js');
   const resolverAt = index.indexOf('src/visuals/ability-visuals.js');
-  const netAt = index.indexOf('engine-net.js?v=96');
+  const netAt = index.indexOf('engine-net.js');
   const finalAt = index.indexOf('src/visuals/visual-integration.js');
   assert(coreAt > 0 && coreAt < abilityAt && abilityAt < resolverAt && resolverAt < netAt && finalAt > netAt, 'visual load order must preserve gameplay then resolver/network then final actor bridge');
-  assert(index.includes('src/visuals/visual-lab.js'), 'Visual Lab must be loaded behind query flag');
+  assert(index.includes('src/visuals/visual-lab.js'), 'Visual Lab must remain available');
 
   console.log('PASS visual system contract audit');
   console.log(JSON.stringify({
