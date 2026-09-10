@@ -10,7 +10,7 @@
 (function () {
   'use strict';
 
-  const VERSION = 'character-appearance-v2.6.0-cast-aim-facing';
+  const VERSION = 'character-appearance-v2.7.0-cast-active-aim-facing';
   const DEFAULT_PLAYER = 'player_hero_v1';
   const DEFAULT_BOT = DEFAULT_PLAYER;
   const ALPHA_CLEANUP_THRESHOLD = 8;
@@ -48,7 +48,7 @@
     drawCountByAppearance: {}, fallbackDraws: 0, imageSmoothingDisabled: true,
     usesSingleImagePerAppearance: true, usesActorAppearanceId: true, usesPerFrameFootAnchor: true,
     usesExplicitIdleFrame: true,
-    usesCombatAimFacing: true, combatAimFacingPolicy: 'idle-or-attack-or-cast-commitment',
+    usesCombatAimFacing: true, combatAimFacingPolicy: 'idle-or-attack-or-cast-windup-active',
     adaptivePhysicalPixelSnap: true, physicalPixelSnapCount: 0, worldPixelFallbackCount: 0,
     avatarOwner: 'KeloAvatar', avatarMiddleware: 'character-appearance:custom-sprite', lastDraw: null
   };
@@ -140,7 +140,8 @@
 
   function abilityCastAimCommitted() {
     const predictor = window.KeloPvPCastMovementPrediction;
-    return !!(predictor && predictor.active);
+    if (!predictor || !predictor.active) return false;
+    return predictor.phase === 'windup' || predictor.phase === 'active';
   }
 
   function combatAimCommitted(actor, visual) {
