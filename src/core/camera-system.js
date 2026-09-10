@@ -16,7 +16,7 @@
   if(root.KeloCamera)return;
   if(typeof camera==='undefined'||typeof CONFIG==='undefined'||typeof canvas==='undefined'||typeof ctx==='undefined')throw new Error('KeloCamera: legacy camera/canvas core unavailable');
 
-  const VERSION='kelo-camera-v1.10.0-screen-deadzone-pvp-aim-composition-stationary-action-framing-cast-dodge-release-strafe-release-a';
+  const VERSION='kelo-camera-v1.10.1-screen-deadzone-pvp-aim-composition-stationary-action-framing-cast-dodge-release-strafe-release-winner';
   const ZOOM_PRESETS=Object.freeze([0.7,0.82,1]);
   const TUNING_KEYS=Object.freeze(['dampX','dampY','deadXRatio','deadYRatio','lookAheadDist','lookAheadDecay']);
   const SCREEN_SPACE_DEADZONE_KEYS=new Set(['deadXRatio','deadYRatio']);
@@ -27,7 +27,7 @@
   const PVP_ACTION_SCREEN_LEAD_PX=28;
   const PVP_ACTION_FRAMING_DECAY=9;
   const PVP_ACTION_DODGE_RELEASE_DECAY=22;
-  const PVP_ACTION_STRAFE_RELEASE_DECAY=18;
+  const PVP_ACTION_STRAFE_RELEASE_DECAY=22;
   const PVP_ACTION_STRAFE_RELEASE_DOT=-0.15;
   const COMMITTED_ACTION_PHASES=new Set(['windup','active']);
   const legacyUpdateCamera=typeof updateCamera==='function'?updateCamera:null;
