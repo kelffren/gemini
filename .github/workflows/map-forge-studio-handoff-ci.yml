@@ -12,6 +12,7 @@ on:
       - 'src/property/property-system.js'
       - 'index.html'
       - 'tests/map-forge-mobile-preview.spec.js'
+      - 'tests/map-forge-paving-visual.spec.js'
       - 'scripts/map-forge-studio-handoff-audit.mjs'
       - '.github/workflows/map-forge-studio-handoff-ci.yml'
   push:
@@ -24,6 +25,7 @@ on:
       - 'src/property/property-system.js'
       - 'index.html'
       - 'tests/map-forge-mobile-preview.spec.js'
+      - 'tests/map-forge-paving-visual.spec.js'
       - 'scripts/map-forge-studio-handoff-audit.mjs'
 jobs:
   contract:
@@ -45,6 +47,7 @@ jobs:
           node --check src/environment/world-builder-system.js
           node --check src/property/property-system.js
           node --check tests/map-forge-mobile-preview.spec.js
+          node --check tests/map-forge-paving-visual.spec.js
           node --check scripts/map-forge-studio-handoff-audit.mjs
       - name: Handoff contract
         run: node scripts/map-forge-studio-handoff-audit.mjs
@@ -65,15 +68,15 @@ jobs:
         run: |
           python3 -m http.server 4173 --bind 127.0.0.1 > /tmp/kelo-map-forge-http.log 2>&1 &
           echo $! > /tmp/kelo-map-forge-http.pid
-      - name: Mobile 390x844 handoff
+      - name: Mobile + desktop fixed-seed preview and handoff
         env:
           KELO_PAGES: http://127.0.0.1:4173/
-        run: npx playwright test tests/map-forge-mobile-preview.spec.js --project=chromium
+        run: npx playwright test tests/map-forge-mobile-preview.spec.js tests/map-forge-paving-visual.spec.js --project=chromium
       - name: Upload visual evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: map-forge-mobile-preview
+          name: map-forge-mobile-desktop-preview
           path: |
             test-results/**
             playwright-report.json

@@ -10,6 +10,7 @@ on:
       - 'src/world/map-forge/**'
       - 'scripts/map-forge-core-audit.mjs'
       - 'scripts/map-forge-block-road-clearance-audit.mjs'
+      - 'scripts/map-forge-paving-intent-audit.mjs'
       - '.github/workflows/map-forge-core-ci.yml'
       - 'docs/systems/MAP_FORGE_SYSTEM.md'
       - 'docs/system-catalog.json'
@@ -19,6 +20,7 @@ on:
       - 'src/world/map-forge/**'
       - 'scripts/map-forge-core-audit.mjs'
       - 'scripts/map-forge-block-road-clearance-audit.mjs'
+      - 'scripts/map-forge-paving-intent-audit.mjs'
       - '.github/workflows/map-forge-core-ci.yml'
 
 jobs:
@@ -34,3 +36,5 @@ jobs:
         run: node scripts/map-forge-core-audit.mjs
       - name: Run buildable block road-clearance audit
         run: node scripts/map-forge-block-road-clearance-audit.mjs
+      - name: Run semantic paving + PAVING_BLOB hard-gate audit
+        run: node scripts/map-forge-paving-intent-audit.mjs

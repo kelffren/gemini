@@ -83,7 +83,7 @@ Map Intent
 → curved road polylines
 → blocks
 → road-facing parcels
-→ coarse terrain field
+→ semantic terrain + compact civic paving plans
 → Poisson-style decoration placement
 → scenic vistas
 → navigation graph
@@ -163,6 +163,8 @@ No se mezcla con la preview exterior.
 
 El runtime editable actual normaliza los materiales generados al conjunto que World Builder soporta hoy (`grass` y `marble`). Cuando existe un atlas aprobado y no retirado se utiliza el atlas real. Para grass, World Builder puede reutilizar `styles.surfaceGround`/`cesped`.
 
+El pavimento cívico ya no nace de una probabilidad por celda. Los distritos `plaza`, `royal` y `commerce` declaran planes compactos y conectados (`terrain.pavingPlans`); cada celda de piedra conserva un `pavingIntent` que explica su plan, distrito y propósito. El validator invalida con códigos estables cualquier piedra sin intención (`paving_intent_missing`) o componente conectado que supere el 10 % del campo útil o duplique el footprint declarado (`paving_blob_excessive`). Como `generateBestOf()` solo conserva candidatos válidos, estos defectos bloquean AUTO en vez de limitarse a reducir el score.
+
 El contrato actual no ofrece todavía un atlas marble/path activo y aprobado equivalente al suelo real; por eso World Builder conserva un fallback visual centralizado para esas celdas. Ese fallback pertenece al owner World Builder y no crea un segundo tileset ni un renderer paralelo.
 
 ## Online-first
@@ -193,6 +195,8 @@ El UI no publica ni muta LIVE directamente. Las mutaciones pasan por `KELO_WORLD
 ## Tests y CI
 
 `node scripts/map-forge-core-audit.mjs` valida determinismo, recipes, conectividad, quality y best-of.
+
+`node scripts/map-forge-paving-intent-audit.mjs` ejecuta 300 mapas, conserva las seeds históricas de `PAVING_BLOB`, verifica planes conectados y demuestra que los hard gates rechazan pavimento no declarado y dominante.
 
 `node scripts/map-forge-studio-handoff-audit.mjs` valida proyección determinista, terrain/path, semantic Property placements, uso del catálogo LIVE correcto, ausencia de mutaciones directas, orden del lifecycle exterior, restauración de sesión, reuse de World Builder/Property y foco por `KeloCamera`.
 
