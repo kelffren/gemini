@@ -22,7 +22,11 @@ import { createStudioAssetPreviewService } from './render/studio-asset-preview-s
 import { createStudioMenuMinimizer } from './ui/studio-menu-minimizer.mjs';
 import { createStudioCleanWorkspace } from './ui/studio-clean-workspace.mjs';
 import { createStudioContextInspector } from './ui/studio-context-inspector.mjs';
-import { createStudioAssetPalette } from './ui/studio-asset-palette.mjs';
+
+const NOOP_ASSET_PALETTE=Object.freeze({
+  attach:()=>false,open:()=>false,close:()=>false,toggle:()=>false,refresh:()=>false,choose:()=>false,destroy:()=>{},
+  get openState(){return false;},get category(){return 'all';},get query(){return '';},get recent(){return [];}
+});
 
 let session = null;
 export async function bootKeloStudio({ mode = 'world', actorId = null, document = null, root = globalThis } = {}) {
@@ -35,7 +39,7 @@ export async function bootKeloStudio({ mode = 'world', actorId = null, document 
   const assetPreview=createStudioAssetPreviewService({assetCatalog:adapter.assetCatalog,atlasContract:root.KELO_ATLAS_CONTRACT});
   const overlayRenderer = createStudioOverlayRenderer({ kernel, tools, assetPreview });
   const paletteAssets=()=>{
-    const personal=(tools.prefabStamp.list?.()||[]).map(def=>({
+    const personal=(tools.prefabStamp?.list?.()||[]).map(def=>({
       id:String(def.id),label:String(def.label||def.id),category:'My Prefabs',
       width:Math.max(1,Number(def.bounds?.w)||32),height:Math.max(1,Number(def.bounds?.h)||32),
       creatorPrefab:true,previewChildren:Array.isArray(def.children)?def.children:[]
@@ -44,7 +48,15 @@ export async function bootKeloStudio({ mode = 'world', actorId = null, document 
     const seen=new Set();
     return [...personal,...catalog].filter(asset=>{const id=String(asset?.id||'');if(!id||seen.has(id))return false;seen.add(id);return true;});
   };
-  const assetPalette=createStudioAssetPalette({root,getAssets:paletteAssets,renderAssetPreview:(canvas,asset)=>assetPreview.renderThumbnail(canvas,asset)});
+  let assetPalette=NOOP_ASSET_PALETTE;
+  try{
+    const paletteUi=await import('./ui/studio-asset-palette.mjs');
+    if(typeof paletteUi.createStudioAssetPalette==='function'){
+      assetPalette=paletteUi.createStudioAssetPalette({root,getAssets:paletteAssets,renderAssetPreview:(canvas,asset)=>assetPreview.renderThumbnail(canvas,asset)});
+    }
+  }catch(error){
+    console.warn('[Kelo Studio] optional asset palette unavailable; continuing without it',error);
+  }
   const menuMinimizer=createStudioMenuMinimizer({root});
   const cleanWorkspace=createStudioCleanWorkspace({root,kernel});
   const contextInspector=createStudioContextInspector({root,kernel,tools});
@@ -53,11 +65,11 @@ export async function bootKeloStudio({ mode = 'world', actorId = null, document 
   const worker = createStudioWorkerClient({ resolvePrefab, prefabSnapshot: () => Object.fromEntries(kernel.prefabs.list().map(p => [p.id, kernel.prefabs.resolve(p.id)])) });
   const store = createStudioStore(), profiler = createStudioProfiler();
   const unsubscribeJournal = kernel.commands.on(event => { store.appendCommand(kernel.document.worldId, { action: event.type, command: event.command }).catch(() => {}); });
-  session = Object.freeze({ version: 'kelo-studio-foundation-v1.9.1', mode, actorId, kernel, tools, overlayRenderer, assetPreview, assetPalette, menuMinimizer, cleanWorkspace, contextInspector, compiler, worker, store, profiler, adapter,
+  session = Object.freeze({ version: 'kelo-studio-foundation-v1.9.2-resilient-launch', mode, actorId, kernel, tools, overlayRenderer, assetPreview, assetPalette, menuMinimizer, cleanWorkspace, contextInspector, compiler, worker, store, profiler, adapter,
     compile: options => profiler.measure('compile.sync', () => compiler.compile(kernel.document, options)), compileAsync: options => profiler.measure('compile.worker', () => worker.compile(kernel.document, options)),
-    async importCurrent(options={}) { const next=await profiler.measure('import.current',()=>importCurrentKeloWorld({adapter,mode,actorId,...options})); kernel.setDocument(next); seedCatalogPrefabs({prefabRegistry:kernel.prefabs,assetCatalog:adapter.assetCatalog}); assetPalette.refresh(); return next; },
+    async importCurrent(options={}) { const next=await profiler.measure('import.current',()=>importCurrentKeloWorld({adapter,mode,actorId,...options})); kernel.setDocument(next); seedCatalogPrefabs({prefabRegistry:kernel.prefabs,assetCatalog:adapter.assetCatalog}); try{assetPalette.refresh();}catch{} return next; },
     checkpoint: () => store.saveCheckpoint(kernel.document.worldId,kernel.document), recover: () => store.loadRecovery(kernel.document.worldId),
-    close(){unsubscribeJournal();contextInspector.destroy();cleanWorkspace.destroy();menuMinimizer.destroy();assetPalette.destroy();worker.close();profiler.close();assetPreview.close();store.close().catch(()=>{});session=null;}
+    close(){unsubscribeJournal();contextInspector.destroy();cleanWorkspace.destroy();menuMinimizer.destroy();try{assetPalette.destroy();}catch{}worker.close();profiler.close();assetPreview.close();store.close().catch(()=>{});session=null;}
   });
   return session;
 }
