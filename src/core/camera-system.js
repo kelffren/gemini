@@ -16,7 +16,7 @@
   if(root.KeloCamera)return;
   if(typeof camera==='undefined'||typeof CONFIG==='undefined'||typeof canvas==='undefined'||typeof ctx==='undefined')throw new Error('KeloCamera: legacy camera/canvas core unavailable');
 
-  const VERSION='kelo-camera-v1.9.0-screen-deadzone-pvp-aim-composition-stationary-action-framing-cast-dodge-release-a';
+  const VERSION='kelo-camera-v1.9.1-screen-deadzone-pvp-aim-composition-stationary-action-framing-cast-dodge-release-winner';
   const ZOOM_PRESETS=Object.freeze([0.7,0.82,1]);
   const TUNING_KEYS=Object.freeze(['dampX','dampY','deadXRatio','deadYRatio','lookAheadDist','lookAheadDecay']);
   const SCREEN_SPACE_DEADZONE_KEYS=new Set(['deadXRatio','deadYRatio']);
@@ -26,7 +26,7 @@
   const PVP_AIM_EPSILON=0.18;
   const PVP_ACTION_SCREEN_LEAD_PX=28;
   const PVP_ACTION_FRAMING_DECAY=9;
-  const PVP_ACTION_DODGE_RELEASE_DECAY=18;
+  const PVP_ACTION_DODGE_RELEASE_DECAY=22;
   const COMMITTED_ACTION_PHASES=new Set(['windup','active']);
   const legacyUpdateCamera=typeof updateCamera==='function'?updateCamera:null;
   let baseZoom=Number.isFinite(Number(CONFIG.zoom))&&Number(CONFIG.zoom)>0?Number(CONFIG.zoom):0.82;
