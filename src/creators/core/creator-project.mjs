@@ -11,7 +11,7 @@ const copy = value => value == null ? value : (typeof structuredClone === 'funct
 const id = prefix => `${prefix}:${globalThis.crypto?.randomUUID?.() || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`}`;
 
 export const CREATOR_PROJECT_TYPES = Object.freeze([
-  'WORLD','PARCEL','DUNGEON','GAME_MODE','ANIMATION','VFX','ABILITY','NPC','QUEST','ITEM','CRAFTING','CINEMATIC','AUDIO','PREFAB','ENVIRONMENT'
+  'WORLD','PARCEL','DUNGEON','GAME_MODE','ANIMATION','VFX','ABILITY','SPRITE_ABILITY','NPC','QUEST','ITEM','CRAFTING','CINEMATIC','AUDIO','PREFAB','ENVIRONMENT'
 ]);
 export const CREATOR_PROJECT_STATUSES = Object.freeze([
   'PRIVATE_DRAFT','TEAM_DRAFT','READY_FOR_TEST','IN_REVIEW','CHANGES_REQUESTED','APPROVED','PUBLISHED','ARCHIVED'
