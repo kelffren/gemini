@@ -1,134 +1,67 @@
 /* KELO-INDEX
  * area: QA
- * keys: VISUAL TEST CONTRACT DECOUPLING ANIMATION VFX PROJECTILE SFX SEQUENCE ONLINE
- * hace: prueba contratos modulares estables sin fijar cache-bust versions ni ownership legacy
- * online: comprueba relay semántico sanitizado y separación gameplay/presentation
+ * keys: VISUAL CONTRACT DECOUPLING ANIMATION VFX PROJECTILE SFX SEQUENCE ONLINE
+ * purpose: valida fronteras estáticas estables; los runtimes visuales específicos tienen sus propios audits ejecutables
  */
 'use strict';
 
-const fs = require('fs');
-const path = require('path');
-const vm = require('vm');
-const assert = require('assert');
+const fs=require('fs');
+const path=require('path');
+const assert=require('assert');
+const ROOT=path.resolve(__dirname,'..');
+const read=rel=>fs.readFileSync(path.join(ROOT,rel),'utf8');
+const exists=rel=>fs.existsSync(path.join(ROOT,rel));
 
-const ROOT = path.resolve(__dirname, '..');
-function source(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
-function run(rel, sandbox) { vm.runInContext(source(rel), sandbox, { filename: rel }); }
+const required=[
+  'src/visuals/visual-system.js','src/visuals/visual-manifests.js','src/visuals/asset-registry.js',
+  'src/visuals/animation-system.js','src/visuals/fx-system.js','src/visuals/sequence-system.js',
+  'src/visuals/ability-visuals.js','src/visuals/combat-presentation-bridge.js','src/visuals/visual-integration.js'
+];
+required.forEach(rel=>assert(exists(rel),'missing visual foundation: '+rel));
 
-class FakeParam { setValueAtTime() {} exponentialRampToValueAtTime() {} }
-class FakeOscillator { constructor() { this.frequency = new FakeParam(); this.type = 'sine'; } connect() {} start() {} stop() {} }
-class FakeGain { constructor() { this.gain = new FakeParam(); } connect() {} }
-class FakeAudioContext {
-  constructor() { this.currentTime = 0; this.state = 'running'; this.destination = {}; }
-  createOscillator() { return new FakeOscillator(); }
-  createGain() { return new FakeGain(); }
-  resume() { return Promise.resolve(); }
-}
-class FakeImage {
-  constructor() { this.width = 64; this.height = 64; this.naturalWidth = 64; this.naturalHeight = 64; this.decoding = 'async'; }
-  set src(value) { this._src = value; setTimeout(() => { if (this.onload) this.onload(); }, 0); }
-  get src() { return this._src; }
-}
-class FakeAudio { addEventListener() {} load() {} cloneNode() { return this; } play() { return Promise.resolve(); } }
+const core=read('src/visuals/visual-system.js');
+const manifests=read('src/visuals/visual-manifests.js');
+const animation=read('src/visuals/animation-system.js');
+const fx=read('src/visuals/fx-system.js');
+const sequence=read('src/visuals/sequence-system.js');
+const abilityVisuals=read('src/visuals/ability-visuals.js');
+const bridge=read('src/visuals/combat-presentation-bridge.js');
+const stone=read('src/abilities/stone-system.js');
+const pvp=read('src/systems/pvp-world.js');
+const net=read('engine-net.js');
+const server=read('server/index.js');
+const engine=read('engine-c.js');
+const integration=read('src/visuals/visual-integration.js');
+const index=read('index.html');
 
-async function main() {
-  const sandbox = {
-    console, URLSearchParams, performance: { now: () => 1000 },
-    setTimeout, clearTimeout, setInterval, clearInterval,
-    Image: FakeImage, Audio: FakeAudio, AudioContext: FakeAudioContext,
-    location: { search: '' }, innerWidth: 390, innerHeight: 844,
-    document: { readyState: 'loading', hidden: false, addEventListener() {}, body: null },
-    addEventListener() {}
-  };
-  sandbox.window = sandbox;
-  sandbox.globalThis = sandbox;
-  vm.createContext(sandbox);
+assert(core.includes('KeloVisualEventBus')&&core.includes('KeloVisualContext'),'visual core exposes semantic bus/context');
+assert(core.includes("'groundFX'")&&core.includes("'foregroundFX'")&&core.includes("'actorFrontFX'"),'visual core owns explicit render layers');
+assert(manifests.includes('hero_default_sheet')&&manifests.includes('cast_magic_01')&&manifests.includes('fire_explosion_medium'),'data-driven visual manifests remain registered');
+assert(animation.includes('root.KeloAnchors')&&animation.includes('center: center')&&animation.includes('weapon:'),'animation foundation exposes semantic anchors independent from skin IDs');
+assert(animation.includes('sampleTransform')&&animation.includes('frameOverride'),'animation system supports transform and sprite presentation');
+assert(fx.includes('root.KeloFX')&&fx.includes('drawActorLayer'),'FX system owns actor/world presentation');
+assert(sequence.includes('function play(')&&sequence.includes("cue.type === 'actorAnimation'")&&sequence.includes("cue.type === 'fx'"),'sequence system composes reusable presentation pieces');
+assert(abilityVisuals.includes('KeloVisualProfileRegistry'),'ability visuals resolve optional profiles instead of owning gameplay');
 
-  [
-    'src/visuals/visual-system.js',
-    'src/visuals/visual-manifests.js',
-    'src/visuals/asset-registry.js',
-    'src/visuals/animation-system.js',
-    'src/visuals/fx-system.js',
-    'src/visuals/sequence-system.js'
-  ].forEach(rel => run(rel, sandbox));
+['KeloAnimation','KeloFX','KeloSequence','KeloVisualProfile'].forEach(token=>assert(!stone.includes(token),'StoneSystem must not know visual runtime: '+token));
+assert(!pvp.includes('emitVisual('),'PvP gameplay must not emit visual bus directly');
+assert(bridge.includes("visualEmit('MELEE_ATTACK_STARTED'")&&bridge.includes("visualEmit('MELEE_HIT_CONFIRMED'"),'combat presentation bridge owns melee semantic translation');
+assert(!/\.hp\s*=|keloShield\s*=/.test(bridge),'presentation bridge cannot mutate health/shield');
 
-  assert(sandbox.KeloAssetRegistry.get('hero_default_sheet'), 'asset registry exposes stable IDs');
-  assert(sandbox.KeloAnimationRegistry.get('cast_magic_01'), 'animation registry exposes reusable clips');
-  assert(sandbox.KeloFXRegistry.get('fire_explosion_medium'), 'FX registry exposes reusable impacts');
-  assert(sandbox.KeloProjectileVisualRegistry.get('projectile_fire_orb_01'), 'projectile visual registry exposes pilot');
-  assert(sandbox.KeloSequenceRegistry.get('sequence_fire_cast_01'), 'sequence registry exposes pilot');
-  assert(sandbox.KeloSFXRegistry.get('fire_cast_01'), 'SFX registry exposes pilot');
-  assert(sandbox.KeloAnchors && sandbox.KeloAnchors.get, 'semantic actor anchors are available');
+assert(net.includes("t: 'visual:event'")&&net.includes('VISUAL_EVENT_ALLOWLIST'),'client transports allowlisted semantic visual events');
+assert(server.includes("msg.t==='visual:event'")&&server.includes('sanitizeVisualContext'),'server sanitizes relayed visual context');
+assert(server.includes('VISUAL_EVENT_ALLOWLIST')&&server.includes('server-visual-relay-v2-aoi'),'visual relay is allowlisted and AOI scoped');
 
-  const actor = { id: 'audit_actor', x: 100, y: 100, radius: 20, _face: 'right' };
-  const center = sandbox.KeloAnchors.get(actor, 'center');
-  assert(center && Number.isFinite(center.x) && Number.isFinite(center.y), 'generic center anchor resolves without skin-specific data');
+assert(engine.includes('KeloVisualSystem.update(dt)'),'central game loop owns visual update');
+assert(integration.includes('renderAvatar.__keloVisualBridge'),'final avatar integration stays idempotent');
+assert(!integration.includes('const _render = render')&&!integration.includes('render = function'),'visual integration does not wrap the global renderer again');
 
-  const animId = sandbox.KeloAnimation.play(actor, 'cast_magic_01');
-  assert(animId, 'AnimationClip plays independently from gameplay ability runtime');
-  sandbox.KeloAnimation.update(0.05);
-  assert(sandbox.KeloAnimation.sampleTransform(actor), 'animation produces presentation transform only');
+const coreAt=index.indexOf('src/visuals/visual-system.js');
+const abilityAt=index.indexOf('src/abilities/kelo-ability-boot.js');
+const resolverAt=index.indexOf('src/visuals/ability-visuals.js');
+const netAt=index.indexOf('engine-net.js');
+const finalAt=index.indexOf('src/visuals/visual-integration.js');
+assert(coreAt>0&&coreAt<abilityAt&&abilityAt<resolverAt&&resolverAt<netAt&&finalAt>netAt,'visual load order preserves core -> gameplay -> resolver/network -> final bridge');
 
-  const fxId = sandbox.KeloFX.spawn('fire_explosion_medium', { origin: { x: 120, y: 100 }, visual: { seed: 7, scale: 1 } });
-  assert(fxId, 'FX spawns independently from gameplay');
-  const projectileId = sandbox.KeloProjectileVisuals.preview('projectile_fire_orb_01', { origin: { x: 100, y: 100 }, direction: { x: 1, y: 0 }, gameplay: { speed: 420, range: 300 }, visual: { seed: 8 } });
-  assert(projectileId, 'ProjectileVisual previews independently from authoritative projectile');
-  assert.strictEqual(sandbox.KeloSFX.play('fire_cast_01', { actor }), true, 'SFX plays independently');
-
-  const seqId = sandbox.KeloSequence.play('sequence_debug_explosion_reuse', { actor, origin: { x: 100, y: 100 }, visual: { seed: 9 } });
-  assert(seqId, 'Sequence plays without AbilityEngine');
-  sandbox.KeloSequence.update(0.2);
-  assert(sandbox.KeloFX.metrics().active >= 1, 'sequence dispatches reusable FX');
-
-  sandbox.ABILITIES = [{ id: 1, key: 'fireball', visualProfileId: 'ability_visual_fireball_01' }];
-  sandbox.KeloAbilities = {
-    registry: {
-      getById(id) { return sandbox.ABILITIES.find(d => d.id === Number(id)) || null; },
-      getByKey(key) { return sandbox.ABILITIES.find(d => d.key === key) || null; }
-    },
-    hotbar: { slots: [] }, bus: { on() {} }
-  };
-  run('src/visuals/ability-visuals.js', sandbox);
-  assert(sandbox.KeloAbilityVisuals.hasProfile('fireball'), 'optional ability visual profile resolves');
-
-  const stoneSource = source('src/abilities/stone-system.js');
-  ['KeloAnimation','KeloFX','KeloSequence','KeloVisualProfile'].forEach(token => assert(!stoneSource.includes(token), 'StoneSystem stays decoupled from visual runtime: ' + token));
-
-  const engineC = source('engine-c.js');
-  assert(engineC.includes('KeloVisualSystem.update(dt)'), 'central engine owns visual update');
-  const orderedLayers = ['groundFX','belowActor','worldFX','foregroundFX','screenFX'];
-  let last = -1;
-  orderedLayers.forEach(layer => { const at = engineC.indexOf("'" + layer + "'"); assert(at > last, 'explicit visual layer order broken at ' + layer); last = at; });
-
-  const integration = source('src/visuals/visual-integration.js');
-  assert(integration.includes('renderAvatar.__keloVisualBridge'), 'actor render bridge remains idempotent');
-  assert(!integration.includes('const _render = render') && !integration.includes('render = function'), 'visual integration does not create another global render wrapper');
-
-  const net = source('engine-net.js');
-  const server = source('server/index.js');
-  assert(net.includes("t: 'visual:event'") && net.includes('VISUAL_EVENT_ALLOWLIST'), 'client transports allowlisted semantic visual events');
-  assert(server.includes("msg.t==='visual:event'") && server.includes('sanitizeVisualContext'), 'server sanitizes visual relay context');
-  assert(server.includes('VISUAL_EVENT_ALLOWLIST') && server.includes('server-visual-relay-v2-aoi'), 'server visual relay is allowlisted and AOI-scoped');
-
-  const index = source('index.html');
-  const coreAt = index.indexOf('src/visuals/visual-system.js');
-  const abilityAt = index.indexOf('src/abilities/kelo-ability-boot.js');
-  const resolverAt = index.indexOf('src/visuals/ability-visuals.js');
-  const netAt = index.indexOf('engine-net.js');
-  const finalAt = index.indexOf('src/visuals/visual-integration.js');
-  assert(coreAt > 0 && coreAt < abilityAt && abilityAt < resolverAt && resolverAt < netAt && finalAt > netAt, 'visual load order preserves core -> gameplay -> resolver/network -> final bridge');
-
-  console.log('PASS visual system contract audit');
-  console.log(JSON.stringify({
-    animation: sandbox.KeloAnimation.metrics(),
-    fx: sandbox.KeloFX.metrics(),
-    projectile: sandbox.KeloProjectileVisuals.metrics(),
-    sequence: sandbox.KeloSequence.metrics(),
-    semanticAnchor: center,
-    decoupledStoneSystem: true,
-    semanticOnlineRelay: true
-  }, null, 2));
-}
-
-main().catch(error => { console.error(error && error.stack || error); process.exit(1); });
+console.log('PASS visual system architecture contract');
+console.log(JSON.stringify({semanticBus:true,semanticAnchors:true,stoneDecoupled:true,combatPresentationBridge:true,onlineRelaySanitized:true,centralVisualLoop:true},null,2));
