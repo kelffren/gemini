@@ -2,7 +2,7 @@
  * area: QA / CAMERA / PVP
  * owner: Camera Foundation CI
  * keys: CAMERA PVP DEADZONE FOLLOW LOOKAHEAD LANDSCAPE DESKTOP PLAYWRIGHT
- * purpose: mide en Chromium cuándo empieza a seguir la cámara durante strafe PvP y expresa la dead-zone efectiva en píxeles de pantalla
+ * purpose: mide en Chromium cuándo empieza a seguir la cámara durante strafe PvP y bloquea la paridad screen-space de la dead-zone en mobile landscape y desktop
  * online: N/A; solo QA de presentación local
  */
 import fs from 'node:fs';
@@ -30,7 +30,7 @@ async function run(name,viewport,opts={}){
     input.normX=0;input.normY=0;input.keys.d=false;
     KeloCamera.setTarget(localPlayer.x,localPlayer.y,{snap:true,source:'pvp-camera-follow-audit'});
     await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
-    const start={t:performance.now(),playerX:localPlayer.x,cameraX:camera.x,targetX:camera.targetX,zoom:KeloCamera.getEffectiveZoom(),follow:KeloCamera.getFollowTuning(),legacyDeadRatio:Number(CONFIG.deadXRatio)};
+    const start={t:performance.now(),playerX:localPlayer.x,cameraX:camera.x,targetX:camera.targetX,zoom:KeloCamera.getEffectiveZoom(),follow:KeloCamera.getFollowTuning(),legacyDeadRatio:Number(CONFIG.deadXRatio),screenSpaceDeadZone:KeloCamera.snapshot().version.includes('screen-deadzone')};
     input.keys.d=true;
     const samples=[];
     let onset=null;
@@ -56,7 +56,8 @@ async function run(name,viewport,opts={}){
 
 const landscape=await run('mobile-landscape',{width:844,height:390},{dpr:2,touch:true,mobile:true});
 const desktop=await run('desktop',{width:1440,height:900},{dpr:1});
-const report={ok:!landscape.errors.length&&!desktop.errors.length,landscape,desktop};
+function winnerOk(sample){return sample.errors.length===0&&!!sample.onset&&sample.start.screenSpaceDeadZone===true&&Math.abs(sample.legacyPx-sample.semanticPx)<=0.25;}
+const report={ok:winnerOk(landscape)&&winnerOk(desktop),landscape,desktop};
 fs.writeFileSync('artifacts/pvp-camera-follow-report.json',JSON.stringify(report,null,2));
 console.log('PVP_CAMERA_FOLLOW_REPORT '+JSON.stringify(report));
 await browser.close();
