@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: QA / MAP FORGE
  * owner: Map Forge CI
- * purpose: fixed-seed regression guard for decoration and building-block district spatial coherence
+ * purpose: fixed-seed regression guard for decoration, building-block and parcel district spatial coherence
  * public-api: CLI
  * consumes: map-forge recipes + pure core + quality scorer
  * state-owned: none
@@ -13,18 +13,20 @@ import {generateMapCandidate} from '../src/world/map-forge/map-forge-core.mjs';
 function ownerAt(map,p){let owner=null,best=Infinity;for(const d of map.districts||[]){const dx=p.x-d.center.x,dy=p.y-d.center.y,cost=(dx*dx+dy*dy)/Math.max(.2,Number(d.weight)||1);if(cost<best){best=cost;owner=d.id;}}return owner;}
 function mismatchCount(map){let n=0;for(const row of map.decorations||[])if(ownerAt(map,row)!==row.district)n++;return n;}
 function blockMismatchCount(map){let n=0;for(const block of map.blocks||[]){const r=block.bounds,p={x:r.x+r.w/2,y:r.y+r.h/2};if(ownerAt(map,p)!==block.district)n++;}return n;}
+function rectInsetCorners(r,inset=4){const x0=r.x+Math.min(inset,r.w/2),x1=r.x+r.w-Math.min(inset,r.w/2),y0=r.y+Math.min(inset,r.h/2),y1=r.y+r.h-Math.min(inset,r.h/2);return[{x:x0,y:y0},{x:x1,y:y0},{x:x0,y:y1},{x:x1,y:y1}];}
+function parcelBoundaryMismatchCount(map){let n=0;for(const parcel of map.parcels||[])if(rectInsetCorners(parcel.buildableArea).some(p=>ownerAt(map,p)!==parcel.district))n++;return n;}
 
 const BASELINE_DECORATIONS=54597;
 const BASELINE_MISMATCHES=13052;
 const BASELINE_BLOCKS=4567;
 const BASELINE_BLOCK_MISMATCHES=1;
 const stats={};
-let mapsChecked=0,totalDecorations=0,totalMismatches=0,totalDistrictRejects=0,totalBlocks=0,totalBlockMismatches=0,totalBlockDistrictRejects=0,totalDeterminismChecks=0,validMaps=0;
+let mapsChecked=0,totalDecorations=0,totalMismatches=0,totalDistrictRejects=0,totalBlocks=0,totalBlockMismatches=0,totalBlockDistrictRejects=0,totalParcels=0,totalParcelBoundaryMismatches=0,totalDeterminismChecks=0,validMaps=0;
 for(const [id,recipe] of Object.entries(MAP_FORGE_RECIPES)){
-  let decorations=0,mismatches=0,districtRejects=0,blocks=0,blockMismatches=0,blockDistrictRejects=0,minCoherence=100,maxCoherence=0,valid=0;
+  let decorations=0,mismatches=0,districtRejects=0,blocks=0,blockMismatches=0,blockDistrictRejects=0,parcels=0,parcelBoundaryMismatches=0,minCoherence=100,maxCoherence=0,valid=0;
   for(let seed=1;seed<=100;seed++){
     const map=generateMapCandidate(recipe,{seed,assetCatalogVersion:'ci-catalog'});
-    const mismatch=mismatchCount(map),blockMismatch=blockMismatchCount(map),coherence=map.quality?.breakdown?.districtCoherence,rejects=map.generationStats?.decorationDistrictRejects,blockRejects=map.generationStats?.blockDistrictRejects;
+    const mismatch=mismatchCount(map),blockMismatch=blockMismatchCount(map),parcelBoundaryMismatch=parcelBoundaryMismatchCount(map),coherence=map.quality?.breakdown?.districtCoherence,rejects=map.generationStats?.decorationDistrictRejects,blockRejects=map.generationStats?.blockDistrictRejects;
     assert.ok(Number.isFinite(coherence),`${id}/${seed} must expose districtCoherence`);
     assert.equal(mismatch,0,`${id}/${seed} decorations must remain inside their weighted spatial district`);
     assert.equal(blockMismatch,0,`${id}/${seed} building blocks must remain centered inside their weighted spatial district`);
@@ -32,11 +34,11 @@ for(const [id,recipe] of Object.entries(MAP_FORGE_RECIPES)){
     assert.ok(Number.isFinite(rejects)&&rejects>=0,`${id}/${seed} must expose decorationDistrictRejects`);
     assert.ok(Number.isFinite(blockRejects)&&blockRejects>=0,`${id}/${seed} must expose blockDistrictRejects`);
     if(map.validation?.valid){valid++;validMaps++;}
-    mapsChecked++;decorations+=map.decorations.length;mismatches+=mismatch;districtRejects+=rejects;blocks+=map.blocks.length;blockMismatches+=blockMismatch;blockDistrictRejects+=blockRejects;totalDecorations+=map.decorations.length;totalMismatches+=mismatch;totalDistrictRejects+=rejects;totalBlocks+=map.blocks.length;totalBlockMismatches+=blockMismatch;totalBlockDistrictRejects+=blockRejects;
+    mapsChecked++;decorations+=map.decorations.length;mismatches+=mismatch;districtRejects+=rejects;blocks+=map.blocks.length;blockMismatches+=blockMismatch;blockDistrictRejects+=blockRejects;parcels+=map.parcels.length;parcelBoundaryMismatches+=parcelBoundaryMismatch;totalDecorations+=map.decorations.length;totalMismatches+=mismatch;totalDistrictRejects+=rejects;totalBlocks+=map.blocks.length;totalBlockMismatches+=blockMismatch;totalBlockDistrictRejects+=blockRejects;totalParcels+=map.parcels.length;totalParcelBoundaryMismatches+=parcelBoundaryMismatch;
     minCoherence=Math.min(minCoherence,coherence);maxCoherence=Math.max(maxCoherence,coherence);
   }
   assert.equal(valid,100,`${id} must keep 100/100 fixed-seed maps valid`);
-  stats[id]={seeds:100,valid,decorations,mismatches,mismatchRate:Number((mismatches/Math.max(1,decorations)*100).toFixed(2)),districtRejects,blocks,blockMismatches,blockMismatchRate:Number((blockMismatches/Math.max(1,blocks)*100).toFixed(2)),blockDistrictRejects,coherenceRange:[minCoherence,maxCoherence]};
+  stats[id]={seeds:100,valid,decorations,mismatches,mismatchRate:Number((mismatches/Math.max(1,decorations)*100).toFixed(2)),districtRejects,blocks,blockMismatches,blockMismatchRate:Number((blockMismatches/Math.max(1,blocks)*100).toFixed(2)),blockDistrictRejects,parcels,parcelBoundaryMismatches,parcelBoundaryMismatchRate:Number((parcelBoundaryMismatches/Math.max(1,parcels)*100).toFixed(2)),coherenceRange:[minCoherence,maxCoherence]};
 }
 for(const [id,recipe] of Object.entries(MAP_FORGE_RECIPES))for(const seed of [7,42,1337,20260910]){
   const a=generateMapCandidate(recipe,{seed,assetCatalogVersion:'ci-catalog'}),b=generateMapCandidate(recipe,{seed,assetCatalogVersion:'ci-catalog'});
@@ -54,4 +56,4 @@ assert.ok(totalDistrictRejects>0,'fixed-seed corpus must exercise the decoration
 assert.ok(totalBlocks>=BASELINE_BLOCKS*.98,`building-block population collapsed: ${totalBlocks} vs baseline ${BASELINE_BLOCKS}`);
 assert.equal(totalBlockMismatches,0,`building-block district leakage regressed from expected 0: ${totalBlockMismatches}`);
 assert.ok(totalBlockDistrictRejects>0,'fixed-seed corpus must exercise the building-block district placement guard');
-console.log(JSON.stringify({ok:true,mapsChecked,validMaps,totalDecorations,baselineDecorations:BASELINE_DECORATIONS,decorationRetentionPct:Number((totalDecorations/BASELINE_DECORATIONS*100).toFixed(2)),baselineMismatches:BASELINE_MISMATCHES,totalMismatches,mismatchRate:Number((totalMismatches/Math.max(1,totalDecorations)*100).toFixed(2)),totalDistrictRejects,totalBlocks,baselineBlocks:BASELINE_BLOCKS,blockRetentionPct:Number((totalBlocks/BASELINE_BLOCKS*100).toFixed(2)),baselineBlockMismatches:BASELINE_BLOCK_MISMATCHES,totalBlockMismatches,blockMismatchRate:Number((totalBlockMismatches/Math.max(1,totalBlocks)*100).toFixed(2)),totalBlockDistrictRejects,determinismChecks:totalDeterminismChecks,stats},null,2));
+console.log(JSON.stringify({ok:true,mapsChecked,validMaps,totalDecorations,baselineDecorations:BASELINE_DECORATIONS,decorationRetentionPct:Number((totalDecorations/BASELINE_DECORATIONS*100).toFixed(2)),baselineMismatches:BASELINE_MISMATCHES,totalMismatches,mismatchRate:Number((totalMismatches/Math.max(1,totalDecorations)*100).toFixed(2)),totalDistrictRejects,totalBlocks,baselineBlocks:BASELINE_BLOCKS,blockRetentionPct:Number((totalBlocks/BASELINE_BLOCKS*100).toFixed(2)),baselineBlockMismatches:BASELINE_BLOCK_MISMATCHES,totalBlockMismatches,blockMismatchRate:Number((totalBlockMismatches/Math.max(1,totalBlocks)*100).toFixed(2)),totalBlockDistrictRejects,totalParcels,totalParcelBoundaryMismatches,parcelBoundaryMismatchRate:Number((totalParcelBoundaryMismatches/Math.max(1,totalParcels)*100).toFixed(2)),determinismChecks:totalDeterminismChecks,stats},null,2));
