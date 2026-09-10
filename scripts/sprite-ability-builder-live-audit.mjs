@@ -15,7 +15,8 @@ const page=await context.newPage(),pageErrors=[];page.on('pageerror',e=>pageErro
 try{
   await page.goto(`${BASE}?offline=1&mapEditor=1&sprite-ability-audit=${Date.now()}`,{waitUntil:'domcontentloaded',timeout:30000});
   await page.waitForFunction(()=>window.KELO_CREATORS_LAUNCHER&&window.KELO_ADMIN_KEYS?.can?.('ability.edit',window.KELO_ADMIN_KEYS.playerId())===true&&window.KeloInputLocks,{timeout:20000});
-  // Bypass unrelated account modal by invoking the creator launcher directly; this tests the same lazy workspace route without pretending the modal is part of this feature.
+  // Account/auth is a separate surface. Hide its gate explicitly so pointer tests are scoped only to the Builder.
+  await page.evaluate(()=>{document.documentElement.dataset.keloAuthGate='off';});
   await page.evaluate(()=>window.KELO_CREATORS_LAUNCHER.open());
   await page.waitForSelector('#kelo-creators-hub',{state:'visible',timeout:10000});
   const spriteButton=page.getByRole('button',{name:'Abrir Sprite Ability'});if(!await spriteButton.isEnabled())throw new Error('SPRITE_ABILITY_CARD_NOT_ACTIVE');
@@ -25,7 +26,6 @@ try{
   await page.getByRole('button',{name:'CLIP'}).click();
   const upload=page.locator('.ksw-left input[type=file]');await upload.setInputFiles({name:'test-sword.png',mimeType:'image/png',buffer:png});
   await page.waitForFunction(async()=>{const s=(await import('./src/creators/sprite-ability/sprite-ability-live-controller.mjs')).getSpriteAbilityBuilder();return s?.draft?.sheet?.fileName==='test-sword.png'&&s.draft.sheet.imageWidth===4&&s.draft.sheet.imageHeight===4;},null,{timeout:5000});
-  // A 4x4 source with the 4x4 preset gives 1px cells; enough to exercise slicing deterministically.
   const fps=page.locator('.ksw-left .ksw-field').filter({hasText:'FPS'}).locator('input');await fps.evaluate(el=>{el.value='20';el.dispatchEvent(new Event('change',{bubbles:true}));});
   await page.getByRole('button',{name:'EVENTS'}).click();
   const impact=page.locator('.ksw-right .ksw-field').filter({hasText:'Impact Frame'}).locator('input');await impact.evaluate(el=>{el.value='3';el.dispatchEvent(new Event('change',{bubbles:true}));});
