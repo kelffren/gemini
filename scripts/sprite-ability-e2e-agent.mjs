@@ -60,7 +60,7 @@ try{
   const launcher=page.getByRole('button',{name:'Abrir Sprite Ability'});fail(await launcher.isEnabled(),'SPRITE_ABILITY_WORKSPACE_UNAVAILABLE');await launcher.click();
   await page.waitForSelector('#kelo-studio-workspace',{state:'visible',timeout:10000});
   const initial=await waitState(s=>s?.version==='sprite-ability-runtime-extension-v1.0.0','RUNTIME_EXTENSION_NOT_ACTIVE');
-  fail(/^sprite-ability-builder-v1\.2\.0-combat-lab/.test(initial.coreVersion),`COMBAT_LAB_NOT_PRESERVED:${initial.coreVersion}`);
+  fail(await page.locator('.sab-timeline').count()===1,'COMBAT_LAB_TIMELINE_MISSING');
   await page.waitForFunction(()=>document.querySelector('.ksw-mobile-tabs [data-act="preview-mobile"]')?.textContent?.trim()==='MINIMIZE');
   fail(await canvas().count()===1,'PREVIEW_CANVAS_NOT_EXPOSED');
 
