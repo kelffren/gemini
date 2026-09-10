@@ -1,4 +1,4 @@
-name: Live Combat Feel Agent
+name: Live Perceptual Combat Feel Agent
 on:
   push:
     branches: [main]
@@ -12,16 +12,16 @@ on:
       - 'src/visuals/combat-presentation-bridge.js'
       - 'src/visuals/melee-assets/**'
       - 'assets/fx/melee/**'
-      - 'scripts/live-melee-visual-audit.mjs'
+      - 'scripts/live-melee-perceptual-audit.mjs'
       - '.github/workflows/live-melee-visual-audit.yml'
   workflow_dispatch:
 
 concurrency:
-  group: live-combat-feel-main
+  group: live-perceptual-combat-feel-main
   cancel-in-progress: true
 
 jobs:
-  live-mobile-combat-feel:
+  live-mobile-perceptual-combat-feel:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -33,13 +33,14 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
-      - name: Wait for exact Pages runtime
+      - name: Wait for exact Pages combat runtime
         run: |
           python3 - <<'PY'
           import hashlib, pathlib, time, urllib.request
 
           base='https://kelffren.github.io/gemini/'
           targets=[
+              'index.html',
               'src/systems/pvp-world.js',
               'src/systems/melee/melee-engine.js',
               'src/systems/melee/melee-weapon-profiles.js',
@@ -60,22 +61,22 @@ jobs:
                   except Exception as exc:
                       mismatches.append((path, 'fetch', str(exc)[:40]))
               if not mismatches:
-                  print('Exact combat runtime from this checkout is live on Pages')
+                  print('Exact perceptual combat runtime from this checkout is live on Pages')
                   raise SystemExit(0)
               print('Pages not current yet', attempt+1, mismatches)
               time.sleep(10)
-          raise SystemExit('Exact combat runtime did not appear on Pages')
+          raise SystemExit('Exact perceptual combat runtime did not appear on Pages')
           PY
-      - name: Play and score live mobile PvP
+      - name: Play and score perceptible mobile melee
         env:
           AUDIT_URL: https://kelffren.github.io/gemini/
-          COMBAT_FEEL_THRESHOLD: '90'
-        run: node scripts/live-melee-visual-audit.mjs
-      - name: Upload combat feel evidence
+          PERCEPTUAL_MOTION_THRESHOLD: '90'
+        run: node scripts/live-melee-perceptual-audit.mjs
+      - name: Upload perceptual combat evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: live-combat-feel-agent
-          path: artifacts/melee-live/
+          name: live-perceptual-combat-feel-agent
+          path: artifacts/melee-live-perceptual/
           if-no-files-found: error
           retention-days: 14
