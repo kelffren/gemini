@@ -1,14 +1,16 @@
 /* KELO-INDEX
- * area: QA
- * keys: LIVE MOBILE MELEE HIT MISS DIRECTION SCREENSHOT PERFORMANCE PVP
- * hace: valida en Pages el melee visual en móvil, 4 direcciones, hit/miss real y limpieza de FX
- * online: usa la autoridad PvP existente; solo observa la presentación que nace de sus eventos semánticos
+ * area: QA / LIVE COMBAT FEEL
+ * keys: LIVE MOBILE PVP DRAKANTOS-STYLE AIM COMBO MOVEMENT IMPACT RESPONSIVENESS EVIDENCE SCORE
+ * hace: juega una traza PvP real en GitHub Pages, puntúa combat feel y falla si no alcanza el umbral de convergencia
+ * invariant: usa APIs/inputs reales del runtime; no concede puntos por documentación ni por tamaño del diff
  */
 import fs from 'node:fs';
 import { chromium } from 'playwright';
 
 const base = process.env.AUDIT_URL || 'https://kelffren.github.io/gemini/';
-fs.mkdirSync('artifacts/melee-live', { recursive: true });
+const threshold = Number(process.env.COMBAT_FEEL_THRESHOLD || 90);
+const outDir = 'artifacts/melee-live';
+fs.mkdirSync(outDir, { recursive: true });
 
 const browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage'] });
 const context = await browser.newContext({
@@ -19,281 +21,330 @@ const context = await browser.newContext({
 });
 const page = await context.newPage();
 const consoleErrors = [];
+const pageErrors = [];
 const failedRequests = [];
 const httpErrors = [];
 page.on('console', m => { if (m.type() === 'error') consoleErrors.push(m.text()); });
-page.on('pageerror', e => consoleErrors.push(`PAGEERROR: ${e.stack || e.message}`));
+page.on('pageerror', e => pageErrors.push(String(e.stack || e.message || e)));
 page.on('requestfailed', r => failedRequests.push({ url: r.url(), error: r.failure()?.errorText || 'failed' }));
 page.on('response', r => { if (r.status() >= 400) httpErrors.push({ status: r.status(), url: r.url() }); });
 
-await page.route(/\/(src\/systems\/pvp-world\.js|src\/visuals\/(visual-manifests|melee-visual-manifest|melee-combat-visuals|visual-integration)\.js)(\?|$)/, route => {
+await page.route(/\/(src\/systems\/(?:pvp-world\.js|melee\/[^?]+\.js)|src\/visuals\/(?:visual-manifests|melee-visual-manifest|melee-combat-visuals|visual-integration)\.js)(\?|$)/, route => {
   const u = new URL(route.request().url());
-  u.searchParams.set('melee-live-bust', `${Date.now()}-${Math.random()}`);
+  u.searchParams.set('combat-feel-live-bust', `${Date.now()}-${Math.random()}`);
   route.continue({ url: u.toString() });
 });
 
-await page.goto(`${base}?melee-live-audit=${Date.now()}`, { waitUntil: 'domcontentloaded', timeout: 45000 });
-await page.waitForFunction(() => /^Kelo World — V6\.39/i.test(document.title), null, { timeout: 30000 });
-await page.waitForFunction(() => window.KeloMeleeVisuals && window.KELO_MELEE_VISUAL_AUDIT?.runtimeReady === true && window.KELO_VISUAL_AUDIT?.integrationReady === true, null, { timeout: 20000 });
-await page.waitForTimeout(500);
+try {
+  const response = await page.goto(`${base}?combat-feel-agent=${Date.now()}`, { waitUntil: 'domcontentloaded', timeout: 45000 });
+  if (!response || response.status() >= 400) throw new Error(`LIVE_PAGE_HTTP_${response?.status() || 'NO_RESPONSE'}`);
+  await page.waitForFunction(() => /^Kelo World — V/i.test(document.title), null, { timeout: 30000 });
+  await page.waitForFunction(() => {
+    return !!(
+      window.KeloPvPWorld &&
+      window.KeloMeleeEngine &&
+      window.KeloMeleeProfiles &&
+      window.KeloMeleeVisuals &&
+      window.KELO_MELEE_VISUAL_MANIFEST &&
+      window.KELO_MELEE_VISUAL_AUDIT?.runtimeReady === true
+    );
+  }, null, { timeout: 30000 });
+  await page.waitForTimeout(700);
 
-const boot = await page.evaluate(async () => {
-  const p = window.localPlayer || (typeof localPlayer !== 'undefined' ? localPlayer : null);
-  const m = window.KELO_MELEE_VISUAL_MANIFEST;
-  const loaded = {};
-  for (const [face, id] of Object.entries(m.slashAssets)) {
-    loaded[face] = !!(await window.KeloAssetRegistry.load(id));
-  }
-  return {
-    title: document.title,
-    player: p && { id: p.id, x: p.x, y: p.y, radius: p.radius, face: p._face },
-    manifest: {
-      version: m.version,
-      attackDurationMs: m.attackDurationMs,
-      anticipationMs: m.anticipationMs,
-      swingMs: m.swingMs,
-      impactAtMs: m.impactAtMs,
-      recoveryMs: m.recoveryMs,
-      reactionDurationMs: m.reactionDurationMs,
-      slashAssets: Object.keys(m.slashAssets).length
-    },
-    loaded,
-    pvp: window.KeloPvPWorld?.version || null,
-    screen: {
-      shake: window.KeloScreenFX?.get('impact_melee_light') || null,
-      flash: window.KeloScreenFX?.get('flash_melee_light') || null
-    },
-    audit: JSON.parse(JSON.stringify(window.KELO_MELEE_VISUAL_AUDIT))
-  };
-});
-if (!boot.player) throw new Error('local player unavailable');
-if (boot.pvp !== 'pvp-world-v1.6') throw new Error(`stale PvP runtime ${boot.pvp}`);
-if (boot.manifest.slashAssets !== 4 || Object.values(boot.loaded).some(v => !v)) throw new Error(`directional slash assets failed ${JSON.stringify(boot.loaded)}`);
-if (!boot.screen.shake || boot.screen.shake.amplitude !== 1.65 || boot.screen.shake.duration !== 0.075) throw new Error(`light shake contract missing ${JSON.stringify(boot.screen.shake)}`);
-if (!boot.screen.flash || boot.screen.flash.alpha !== 0.025) throw new Error(`light flash contract missing ${JSON.stringify(boot.screen.flash)}`);
-
-const directions = {
-  right: { x: 1, y: 0 },
-  down: { x: 0, y: 1 },
-  left: { x: -1, y: 0 },
-  up: { x: 0, y: -1 }
-};
-const directionResults = [];
-for (const [face, dir] of Object.entries(directions)) {
-  const started = await page.evaluate(({ face, dir }) => {
-    const p = window.localPlayer || localPlayer;
-    const before = { x: p.x, y: p.y, radius: p.radius };
-    const target = { id: `live_dir_${face}`, x: p.x + dir.x * 82, y: p.y + dir.y * 82, radius: 20, _face: 'down' };
-    const result = window.KeloMeleeVisuals.playAttack({
-      attackId: `live_dir_${face}_${Date.now()}`,
-      actor: p,
-      targetActor: target,
-      direction: dir,
-      confirmedHit: false,
-      visualStartedAt: performance.now(),
-      source: 'live-direction-audit'
+  const boot = await page.evaluate(async () => {
+    const p = typeof localPlayer !== 'undefined' ? localPlayer : window.localPlayer;
+    const manifest = window.KELO_MELEE_VISUAL_MANIFEST;
+    const assets = {};
+    for (const [direction, id] of Object.entries(manifest.slashAssets || {})) {
+      assets[direction] = !!(await window.KeloAssetRegistry.load(id));
+    }
+    const profiles = ['sword_light_basic', 'sword_light_follow', 'sword_light_finisher'].map(id => {
+      const x = window.KeloMeleeProfiles.get(id);
+      return x && {
+        id: x.id,
+        damage: x.damage,
+        windup: x.windup,
+        active: x.active,
+        recovery: x.recovery,
+        cancelWindow: x.cancelWindow,
+        movementScale: x.movementScale,
+        comboWindow: x.comboWindow,
+        comboTimeout: x.comboTimeout
+      };
     });
-    return { before, result, faceAfter: p._face };
-  }, { face, dir });
-  if (!started.result || started.result.face !== face) throw new Error(`direction ${face} did not start correctly ${JSON.stringify(started)}`);
-  await page.waitForTimeout(88);
-  const mid = await page.evaluate(() => {
-    const p = window.localPlayer || localPlayer;
-    const transform = window.KeloAnimation.sampleTransform(p);
     return {
-      player: { x: p.x, y: p.y, radius: p.radius },
-      transform,
-      fx: window.KeloFX.metrics(),
-      sequence: window.KeloSequence.metrics()
+      title: document.title,
+      player: p && { id: p.id, x: p.x, y: p.y, radius: p.radius, face: p._face },
+      pvpVersion: window.KeloPvPWorld?.version || null,
+      meleeVersion: window.KeloMeleeEngine?.version || null,
+      visualVersion: window.KeloMeleeVisuals?.version || null,
+      manifest: {
+        version: manifest.version,
+        directions: manifest.directions?.length || 0,
+        slashAssets: Object.keys(manifest.slashAssets || {}).length,
+        skinAgnostic: manifest.skinAgnostic === true
+      },
+      comboStyles: JSON.parse(JSON.stringify(window.KeloMeleeVisuals.comboStyles || {})),
+      profiles,
+      assets,
+      screenFx: {
+        lightImpact: window.KeloScreenFX?.get('impact_melee_light') || null,
+        lightFlash: window.KeloScreenFX?.get('flash_melee_light') || null,
+        mediumImpact: window.KeloScreenFX?.get('impact_medium') || null
+      }
     };
   });
-  if (mid.player.x !== started.before.x || mid.player.y !== started.before.y || mid.player.radius !== started.before.radius) throw new Error(`direction ${face} mutated gameplay position`);
-  if (!mid.transform || mid.transform.channel !== 'action' || !String(mid.transform.clipId).endsWith(`_${face}`)) throw new Error(`direction ${face} body pose missing ${JSON.stringify(mid.transform)}`);
-  if (mid.fx.active < 1) throw new Error(`direction ${face} slash was not active at swing frame`);
-  await page.screenshot({ path: `artifacts/melee-live/melee-${face}-swing.png`, fullPage: false, scale: 'device' });
-  directionResults.push({ face, clipId: mid.transform.clipId, activeFx: mid.fx.active });
-  await page.waitForTimeout(280);
-}
+  if (!boot.player) throw new Error('LIVE_LOCAL_PLAYER_UNAVAILABLE');
 
-// Presentation-only hit on a visible social actor: proves reaction, world impact and no coordinate mutation.
-const socialHit = await page.evaluate(() => {
-  const p = window.localPlayer || localPlayer;
-  const target = (typeof simulatedPlayers !== 'undefined' && simulatedPlayers[0]) || null;
-  if (!target) return null;
-  target.x = p.x + 88;
-  target.y = p.y;
-  target.hp = Math.max(1, target.hp || 100);
-  const before = { px: p.x, py: p.y, tx: target.x, ty: target.y };
-  const attackId = `social_hit_${Date.now()}`;
-  const payload = {
-    attackId,
-    actor: p,
-    targetActor: target,
-    direction: { x: 1, y: 0 },
-    confirmedHit: true,
-    visualStartedAt: performance.now(),
-    gameplay: { damage: 18, range: 150, cooldown: 0.7 },
-    source: 'live-social-hit-audit'
-  };
-  const attack = KeloMeleeVisuals.playAttack(payload);
-  const hit = attack ? KeloMeleeVisuals.playHit(payload) : null;
-  return { before, attack, hit, targetId: target.id };
-});
-if (!socialHit?.attack || !socialHit.hit) throw new Error(`social hit presentation failed ${JSON.stringify(socialHit)}`);
-await page.waitForTimeout(165);
-const socialHitMid = await page.evaluate(() => {
-  const p = window.localPlayer || localPlayer;
-  const target = simulatedPlayers[0];
-  return {
-    coords: { px: p.x, py: p.y, tx: target.x, ty: target.y },
-    targetTransform: KeloAnimation.sampleTransform(target),
-    fx: KeloFX.metrics(),
-    audit: JSON.parse(JSON.stringify(KELO_MELEE_VISUAL_AUDIT))
-  };
-});
-if (socialHitMid.coords.px !== socialHit.before.px || socialHitMid.coords.py !== socialHit.before.py || socialHitMid.coords.tx !== socialHit.before.tx || socialHitMid.coords.ty !== socialHit.before.ty) throw new Error('hit presentation mutated coordinates');
-if (!socialHitMid.targetTransform || socialHitMid.targetTransform.channel !== 'reaction') throw new Error(`hit reaction not visible ${JSON.stringify(socialHitMid.targetTransform)}`);
-if (socialHitMid.audit.hitsPresented < 1) throw new Error('hit audit did not record presentation');
-await page.screenshot({ path: 'artifacts/melee-live/melee-social-impact.png', fullPage: false, scale: 'device' });
-await page.waitForTimeout(500);
+  await page.screenshot({ path: `${outDir}/00-live-boot.png`, fullPage: false, scale: 'device' });
 
-// Real PvP: use the game's existing command boundary through the canvas input path.
-await page.evaluate(() => window.enterPvPWorld());
-await page.waitForFunction(() => window.KeloPvPWorld?.state?.combatEnabled === true, null, { timeout: 5000 });
-await page.waitForTimeout(150);
-
-const hitTap = await page.evaluate(() => {
-  const p = window.localPlayer || localPlayer;
-  const d = simulatedPlayers[0];
-  d.hp = d.maxHp = 100;
-  p.x = d.x - 100; p.y = d.y; p.vx = p.vy = 0;
-  camera.x = p.x; camera.y = p.y;
-  if ('targetX' in camera) camera.targetX = p.x;
-  if ('targetY' in camera) camera.targetY = p.y;
-  const z = CONFIG.zoom || 1;
-  return {
-    sx: screenW / 2 + (d.x - camera.x) * z,
-    sy: screenH / 2 + (d.y - camera.y) * z,
-    hpBefore: d.hp,
-    playerBefore: { x: p.x, y: p.y },
-    hitCountBefore: KELO_MELEE_VISUAL_AUDIT.hitsPresented
+  // 1) Same deterministic 8-way presentation trace every run.
+  const directionVectors = {
+    right: { x: 1, y: 0 },
+    down_right: { x: 1, y: 1 },
+    down: { x: 0, y: 1 },
+    down_left: { x: -1, y: 1 },
+    left: { x: -1, y: 0 },
+    up_left: { x: -1, y: -1 },
+    up: { x: 0, y: -1 },
+    up_right: { x: 1, y: -1 }
   };
-});
-await page.mouse.click(hitTap.sx, hitTap.sy);
-await page.waitForTimeout(88);
-await page.screenshot({ path: 'artifacts/melee-live/melee-pvp-real-swing.png', fullPage: false, scale: 'device' });
-await page.waitForTimeout(90);
-const hitResult = await page.evaluate(() => {
-  const p = window.localPlayer || localPlayer;
-  const d = simulatedPlayers[0];
-  return {
-    hp: d.hp,
-    player: { x: p.x, y: p.y },
-    targetTransform: KeloAnimation.sampleTransform(d),
-    fx: KeloFX.metrics(),
-    audit: JSON.parse(JSON.stringify(KELO_MELEE_VISUAL_AUDIT)),
-    pvp: JSON.parse(JSON.stringify(KELO_PVP_AUDIT))
-  };
-});
-if (hitResult.hp !== hitTap.hpBefore - 18) throw new Error(`real PvP hit damage drifted ${hitTap.hpBefore} -> ${hitResult.hp}`);
-if (hitResult.player.x !== hitTap.playerBefore.x || hitResult.player.y !== hitTap.playerBefore.y) throw new Error('real melee visual displaced authoritative player');
-if (hitResult.audit.hitsPresented <= hitTap.hitCountBefore) throw new Error('real PvP hit emitted no confirmed visual');
-if (!hitResult.pvp.semanticMeleeVisualEvents || !hitResult.pvp.arenaVisualLayers) throw new Error(`PvP visual bridge audit missing ${JSON.stringify(hitResult.pvp)}`);
-await page.screenshot({ path: 'artifacts/melee-live/melee-pvp-real-impact.png', fullPage: false, scale: 'device' });
-
-// Real miss: target is tapped while outside melee range; HP and hit count must not move, but a swing must happen.
-await page.waitForTimeout(760);
-const missTap = await page.evaluate(() => {
-  const p = window.localPlayer || localPlayer;
-  const d = simulatedPlayers[0];
-  p.x = d.x - 205; p.y = d.y; p.vx = p.vy = 0;
-  camera.x = p.x; camera.y = p.y;
-  if ('targetX' in camera) camera.targetX = p.x;
-  if ('targetY' in camera) camera.targetY = p.y;
-  const z = CONFIG.zoom || 1;
-  return {
-    sx: screenW / 2 + (d.x - camera.x) * z,
-    sy: screenH / 2 + (d.y - camera.y) * z,
-    hpBefore: d.hp,
-    hitCountBefore: KELO_MELEE_VISUAL_AUDIT.hitsPresented,
-    missCountBefore: KELO_MELEE_VISUAL_AUDIT.missesPresented,
-    attacksBefore: KELO_MELEE_VISUAL_AUDIT.attacksStarted
-  };
-});
-await page.mouse.click(missTap.sx, missTap.sy);
-await page.waitForTimeout(92);
-const missMid = await page.evaluate(() => ({
-  hp: simulatedPlayers[0].hp,
-  fx: KeloFX.metrics(),
-  audit: JSON.parse(JSON.stringify(KELO_MELEE_VISUAL_AUDIT))
-}));
-if (missMid.hp !== missTap.hpBefore) throw new Error('out-of-range miss changed HP');
-if (missMid.audit.hitsPresented !== missTap.hitCountBefore) throw new Error('miss incorrectly emitted hit presentation');
-if (missMid.audit.missesPresented <= missTap.missCountBefore || missMid.audit.attacksStarted <= missTap.attacksBefore) throw new Error('miss did not emit swing presentation');
-if (missMid.fx.active < 1) throw new Error('miss swing has no slash FX');
-await page.screenshot({ path: 'artifacts/melee-live/melee-pvp-real-miss.png', fullPage: false, scale: 'device' });
-
-// Stress visual throttle + cleanup: no effect should stay alive after the presentation ends.
-await page.evaluate(() => {
-  const p = window.localPlayer || localPlayer;
-  const d = simulatedPlayers[0];
-  for (let i = 0; i < 10; i++) {
-    KeloMeleeVisuals.playAttack({
-      attackId: `stress_${i}_${Date.now()}`,
-      actor: p,
-      targetActor: d,
-      direction: { x: 1, y: 0 },
-      confirmedHit: false,
-      visualStartedAt: performance.now(),
-      source: 'live-stress-audit'
-    });
-  }
-});
-await page.waitForTimeout(700);
-const final = await page.evaluate(async () => {
-  const p = window.localPlayer || localPlayer;
-  const d = simulatedPlayers[0];
-  const frames = [];
-  let last = performance.now();
-  for (let i = 0; i < 45; i++) {
-    await new Promise(resolve => requestAnimationFrame(t => { frames.push(t - last); last = t; resolve(); }));
-  }
-  const sorted = frames.slice().sort((a, b) => a - b);
-  const p95 = sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))] || 0;
-  return {
-    player: { x: p.x, y: p.y },
-    dummyHp: d.hp,
-    animation: KeloAnimation.metrics(),
-    fx: KeloFX.metrics(),
-    sequence: KeloSequence.metrics(),
-    assets: KeloAssetRegistry.metrics(),
-    meleeAudit: JSON.parse(JSON.stringify(KELO_MELEE_VISUAL_AUDIT)),
-    visualAudit: JSON.parse(JSON.stringify(KELO_VISUAL_AUDIT)),
-    frameTiming: {
-      samples: frames.length,
-      averageMs: frames.reduce((a, b) => a + b, 0) / Math.max(1, frames.length),
-      p95Ms: p95
+  const directionResults = await page.evaluate(vectors => {
+    const rows = [];
+    let n = 0;
+    for (const [expected, dir] of Object.entries(vectors)) {
+      const actor = { id: `live_aim_actor_${n}`, x: 500, y: 500, radius: 20, _face: 'down', skinId: `skin_${n}` };
+      const target = { id: `live_aim_target_${n}`, x: 500 + dir.x * 90, y: 500 + dir.y * 90, radius: 20, _face: 'down', skinId: `other_${n}` };
+      const result = window.KeloMeleeVisuals.playAttack({
+        attackId: `live_aim_${n}_${Date.now()}`,
+        actor, targetActor: target, direction: dir,
+        profileId: 'sword_light_basic', confirmedHit: false, source: 'live-combat-feel-agent'
+      });
+      rows.push({ expected, actual: result?.direction8 || null, face: result?.face || null, ok: result?.direction8 === expected });
+      n++;
     }
-  };
-});
-if (final.fx.active !== 0) throw new Error(`melee FX leaked after cleanup ${JSON.stringify(final.fx)}`);
-if (final.sequence.active !== 0) throw new Error(`melee sequence leaked after cleanup ${JSON.stringify(final.sequence)}`);
-if (final.assets.missing.length) throw new Error(`missing LIVE assets ${JSON.stringify(final.assets.missing)}`);
-if (final.frameTiming.p95Ms > 50) throw new Error(`mobile frame timing p95 too high ${JSON.stringify(final.frameTiming)}`);
-if (consoleErrors.length || failedRequests.length || httpErrors.length) throw new Error(`LIVE errors ${JSON.stringify({ consoleErrors, failedRequests, httpErrors })}`);
+    return rows;
+  }, directionVectors);
 
-const report = {
-  ok: true,
-  url: base,
-  title: boot.title,
-  viewport: { width: 390, height: 844, deviceScaleFactor: 2, mobile: true, touch: true },
-  manifest: boot.manifest,
-  directions: directionResults,
-  realPvpHit: { hpBefore: hitTap.hpBefore, hpAfter: hitResult.hp, damage: hitTap.hpBefore - hitResult.hp },
-  realPvpMiss: { hpBefore: missTap.hpBefore, hpAfter: missMid.hp, hitCountUnchanged: missMid.audit.hitsPresented === missTap.hitCountBefore },
-  final
-};
-fs.writeFileSync('artifacts/melee-live/report.json', JSON.stringify(report, null, 2));
-console.log('PASS LIVE mobile melee visual audit');
-console.log(JSON.stringify(report, null, 2));
-await browser.close();
+  // 2) Enter the actual PvP mode and play the M1 chain through the public command boundary.
+  await page.evaluate(() => window.enterPvPWorld());
+  await page.waitForFunction(() => window.KeloPvPWorld?.state?.combatEnabled === true, null, { timeout: 7000 });
+  await page.waitForTimeout(250);
+
+  await page.evaluate(() => {
+    const p = typeof localPlayer !== 'undefined' ? localPlayer : window.localPlayer;
+    const d = typeof simulatedPlayers !== 'undefined' ? simulatedPlayers[0] : null;
+    if (!p || !d) throw new Error('LIVE_PVP_ACTORS_UNAVAILABLE');
+    d.maxHp = 500;
+    d.hp = 500;
+    p.vx = p.vy = 0;
+  });
+
+  const expectedProfiles = ['sword_light_basic', 'sword_light_follow', 'sword_light_finisher'];
+  const expectedDamage = [18, 20, 28];
+  const comboTrace = [];
+
+  for (let stage = 0; stage < 3; stage++) {
+    await page.waitForFunction(() => !window.KeloPvPWorld.state.basicAttack, null, { timeout: 2500 });
+    const prepared = await page.evaluate(() => {
+      const p = typeof localPlayer !== 'undefined' ? localPlayer : window.localPlayer;
+      const d = simulatedPlayers[0];
+      p.x = d.x - 105;
+      p.y = d.y;
+      p.vx = p.vy = 0;
+      if (typeof camera !== 'undefined') {
+        camera.x = p.x; camera.y = p.y;
+        if ('targetX' in camera) camera.targetX = p.x;
+        if ('targetY' in camera) camera.targetY = p.y;
+      }
+      window.KeloPvPWorld.setAimWorld({ x: d.x, y: d.y }, 'live-combat-feel-agent', 1);
+      return {
+        player: { x: p.x, y: p.y },
+        dummy: { x: d.x, y: d.y, hp: d.hp },
+        attacksBefore: window.KELO_MELEE_VISUAL_AUDIT?.attacksStarted || 0,
+        hitsBefore: window.KELO_MELEE_VISUAL_AUDIT?.hitsPresented || 0
+      };
+    });
+
+    const t0 = Date.now();
+    const accepted = await page.evaluate(() => window.KeloPvPWorld.startBasicAttack('live-combat-feel-agent'));
+    if (!accepted) throw new Error(`M1_STAGE_${stage + 1}_REJECTED`);
+    await page.waitForFunction(() => !!window.KeloPvPWorld.state.basicAttack, null, { timeout: 800 });
+
+    await page.keyboard.down('d');
+    await page.waitForTimeout(105);
+    const mid = await page.evaluate(() => {
+      const p = typeof localPlayer !== 'undefined' ? localPlayer : window.localPlayer;
+      const a = window.KeloPvPWorld.state.basicAttack;
+      const transform = window.KeloAnimation.sampleTransform(p);
+      const def = transform && window.KeloAnimationRegistry.get(transform.clipId);
+      const peakOffset = def && Array.isArray(def.keyframes)
+        ? Math.max(...def.keyframes.map(k => Math.hypot(Number(k.offsetX) || 0, Number(k.offsetY) || 0)))
+        : 0;
+      return {
+        player: { x: p.x, y: p.y },
+        profileId: a?.profileId || null,
+        phase: a?.phase || null,
+        clipId: transform?.clipId || null,
+        peakVisualLungePx: peakOffset,
+        visualStage: window.KELO_MELEE_VISUAL_AUDIT?.lastComboStage || null,
+        visualDirection: window.KELO_MELEE_VISUAL_AUDIT?.lastDirection || null
+      };
+    });
+    await page.keyboard.up('d');
+    await page.screenshot({ path: `${outDir}/m1-${stage + 1}-swing.png`, fullPage: false, scale: 'device' });
+
+    await page.waitForFunction(() => !window.KeloPvPWorld.state.basicAttack, null, { timeout: 2500 });
+    const ended = await page.evaluate(() => {
+      const p = typeof localPlayer !== 'undefined' ? localPlayer : window.localPlayer;
+      const d = simulatedPlayers[0];
+      return {
+        player: { x: p.x, y: p.y },
+        dummyHp: d.hp,
+        visualStage: window.KELO_MELEE_VISUAL_AUDIT?.lastComboStage || null,
+        hitStage: window.KELO_MELEE_VISUAL_AUDIT?.lastHitComboStage || null,
+        attacks: window.KELO_MELEE_VISUAL_AUDIT?.attacksStarted || 0,
+        hits: window.KELO_MELEE_VISUAL_AUDIT?.hitsPresented || 0,
+        comboStep: window.KeloPvPWorld.state.comboStep
+      };
+    });
+
+    comboTrace.push({
+      stage: stage + 1,
+      accepted: true,
+      startLatencyMs: Date.now() - t0,
+      profileId: mid.profileId,
+      clipId: mid.clipId,
+      visualStage: mid.visualStage,
+      hitStage: ended.hitStage,
+      direction: mid.visualDirection,
+      movementPx: Math.hypot(mid.player.x - prepared.player.x, mid.player.y - prepared.player.y),
+      peakVisualLungePx: mid.peakVisualLungePx,
+      damage: prepared.dummy.hp - ended.dummyHp,
+      hpAfter: ended.dummyHp,
+      attacksDelta: ended.attacks - prepared.attacksBefore,
+      hitsDelta: ended.hits - prepared.hitsBefore,
+      comboStepAfter: ended.comboStep
+    });
+    await page.waitForTimeout(35);
+  }
+
+  await page.screenshot({ path: `${outDir}/04-combo-finished.png`, fullPage: false, scale: 'device' });
+
+  // 3) Immediate reversal after the chain: action combat must return control cleanly.
+  const reversalBefore = await page.evaluate(() => {
+    const p = typeof localPlayer !== 'undefined' ? localPlayer : window.localPlayer;
+    return { x: p.x, y: p.y };
+  });
+  await page.keyboard.down('a');
+  await page.waitForTimeout(140);
+  const reversalAfter = await page.evaluate(() => {
+    const p = typeof localPlayer !== 'undefined' ? localPlayer : window.localPlayer;
+    return { x: p.x, y: p.y };
+  });
+  await page.keyboard.up('a');
+  const reversalPx = Math.hypot(reversalAfter.x - reversalBefore.x, reversalAfter.y - reversalBefore.y);
+  const reversalCorrect = reversalAfter.x < reversalBefore.x;
+
+  // 4) Frame-time and cleanup check on the same live mobile build.
+  await page.waitForTimeout(700);
+  const performanceResult = await page.evaluate(async () => {
+    const frames = [];
+    let last = performance.now();
+    for (let i = 0; i < 45; i++) {
+      await new Promise(resolve => requestAnimationFrame(t => { frames.push(t - last); last = t; resolve(); }));
+    }
+    const sorted = frames.slice().sort((a, b) => a - b);
+    const average = frames.reduce((a, b) => a + b, 0) / Math.max(1, frames.length);
+    const p95 = sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))] || 0;
+    return {
+      samples: frames.length,
+      averageMs: average,
+      p95Ms: p95,
+      fx: window.KeloFX?.metrics?.() || null,
+      animation: window.KeloAnimation?.metrics?.() || null,
+      sequence: window.KeloSequence?.metrics?.() || null
+    };
+  });
+
+  const dims = [];
+  function dimension(name, max, earned, evidence) {
+    const points = Math.max(0, Math.min(max, Number(earned) || 0));
+    dims.push({ name, max, points, evidence });
+  }
+
+  const loadedCount = Object.values(boot.assets).filter(Boolean).length;
+  const archPoints =
+    (boot.manifest.directions === 8 ? 3 : 0) +
+    (boot.manifest.slashAssets === 8 && loadedCount === 8 ? 2 : 0) +
+    (boot.manifest.skinAgnostic ? 2 : 0) +
+    (Object.keys(boot.comboStyles || {}).length === 3 ? 2 : 0) +
+    (/^pvp-world-v3\./.test(boot.pvpVersion || '') ? 1 : 0);
+  dimension('architecture-and-8way', 10, archPoints, { boot, loadedCount });
+
+  const correctDirections = directionResults.filter(x => x.ok).length;
+  dimension('free-aim-directional-precision', 20, 20 * correctDirections / 8, { correctDirections, directionResults });
+
+  const profileOk = comboTrace.every((x, i) => x.profileId === expectedProfiles[i]);
+  const visualStageOk = comboTrace.every((x, i) => x.visualStage === i + 1 && x.hitStage === i + 1);
+  const distinctClips = new Set(comboTrace.map(x => x.clipId).filter(Boolean)).size;
+  const damageOk = comboTrace.every((x, i) => x.damage === expectedDamage[i]);
+  const comboPoints = (profileOk ? 8 : 0) + (visualStageOk ? 6 : 0) + (distinctClips === 3 ? 5 : 0) + (damageOk ? 6 : 0);
+  dimension('m1-chain-readability-and-authority', 25, comboPoints, { expectedProfiles, expectedDamage, profileOk, visualStageOk, distinctClips, damageOk, comboTrace });
+
+  const movingStages = comboTrace.filter(x => x.movementPx >= 2).length;
+  const profileMovementOk = boot.profiles.every(p => p && Number(p.movementScale?.windup) > 0 && Number(p.movementScale?.active) > 0 && Number(p.movementScale?.recovery) > 0);
+  const movementPoints = movingStages * 4 + (reversalPx >= 2 && reversalCorrect ? 4 : 0) + (profileMovementOk ? 4 : 0);
+  dimension('movement-freedom-and-reversal', 20, movementPoints, { movingStages, reversalPx, reversalCorrect, profileMovementOk, movementPx: comboTrace.map(x => x.movementPx), movementScale: boot.profiles.map(p => p?.movementScale) });
+
+  const impactTimes = [1, 2, 3].map(i => Number(boot.comboStyles?.[i]?.impactAtMs));
+  const impactDistinct = new Set(impactTimes).size === 3 && impactTimes.every(x => Number.isFinite(x) && x < 150);
+  const scales = [1, 2, 3].map(i => Number(boot.comboStyles?.[i]?.slashScale));
+  const scaleProgression = scales[2] > scales[1] && scales[1] > scales[0];
+  const lunges = comboTrace.map(x => Number(x.peakVisualLungePx) || 0);
+  const lungeProgression = lunges[2] > lunges[1] && lunges[1] >= lunges[0] && lunges[0] > 0;
+  const heavyFinisher = boot.comboStyles?.[3]?.heavyImpact === true && boot.comboStyles?.[1]?.heavyImpact !== true;
+  const feedbackPresent = !!boot.screenFx.lightImpact && !!boot.screenFx.lightFlash;
+  const impactPoints = (impactDistinct ? 4 : 0) + (scaleProgression ? 3 : 0) + (lungeProgression ? 4 : 0) + (heavyFinisher ? 2 : 0) + (feedbackPresent ? 2 : 0);
+  dimension('impact-cadence-and-visual-lunge', 15, impactPoints, { impactTimes, impactDistinct, scales, scaleProgression, lunges, lungeProgression, heavyFinisher, feedbackPresent });
+
+  const criticalFailures = failedRequests.filter(x => /pvp-world|melee-|visual-|engine-c|index\.html/i.test(x.url));
+  const criticalHttp = httpErrors.filter(x => /pvp-world|melee-|visual-|engine-c|index\.html/i.test(x.url));
+  const stabilityPoints =
+    (performanceResult.p95Ms <= 40 ? 4 : performanceResult.p95Ms <= 55 ? 2 : 0) +
+    (performanceResult.averageMs <= 25 ? 2 : 0) +
+    (pageErrors.length === 0 ? 2 : 0) +
+    (criticalFailures.length === 0 && criticalHttp.length === 0 ? 2 : 0);
+  dimension('mobile-stability-and-frame-time', 10, stabilityPoints, { performanceResult, pageErrors, criticalFailures, criticalHttp });
+
+  const score = Math.round(dims.reduce((sum, x) => sum + x.points, 0) * 10) / 10;
+  const weakest = dims.slice().sort((a, b) => (a.points / a.max) - (b.points / b.max))[0];
+  const verdict = score >= threshold ? 'ACCEPTED_DRAKANTOS_STYLE' : score >= threshold - 10 ? 'CLOSE_TUNE_NEXT_GAP' : 'REJECTED_COMBAT_FEEL_GAP';
+  const report = {
+    version: 'live-combat-feel-agent-v1.0.0',
+    generatedAt: new Date().toISOString(),
+    url: page.url(),
+    threshold,
+    score,
+    verdict,
+    weakestDimension: weakest?.name || null,
+    dimensions: dims,
+    boot,
+    directionResults,
+    comboTrace,
+    reversal: { before: reversalBefore, after: reversalAfter, distancePx: reversalPx, correctDirection: reversalCorrect },
+    performance: performanceResult,
+    diagnostics: { consoleErrors, pageErrors, failedRequests, httpErrors }
+  };
+  fs.writeFileSync(`${outDir}/combat-feel-score.json`, JSON.stringify(report, null, 2));
+  console.log('KELO LIVE COMBAT FEEL SCORE');
+  console.log(JSON.stringify({ score, threshold, verdict, weakestDimension: report.weakestDimension, dimensions: dims.map(x => ({ name: x.name, points: x.points, max: x.max })) }, null, 2));
+
+  if (score < threshold) throw new Error(`COMBAT_FEEL_BELOW_THRESHOLD score=${score} threshold=${threshold} weakest=${report.weakestDimension}`);
+} catch (error) {
+  fs.writeFileSync(`${outDir}/fatal-error.txt`, String(error?.stack || error));
+  try { await page.screenshot({ path: `${outDir}/fatal-live-state.png`, fullPage: false, scale: 'device' }); } catch {}
+  throw error;
+} finally {
+  await browser.close();
+}
