@@ -1,0 +1,55 @@
+name: Avatar Quick Import CI
+
+on:
+  pull_request:
+    paths:
+      - 'src/characters/creator-avatar-runtime.mjs'
+      - 'src/creators/avatar/**'
+      - 'src/creators/ui/avatar-workspace.mjs'
+      - 'src/creators/workspaces/avatar-workspace.mjs'
+      - 'src/creators/creator-entry.mjs'
+      - 'src/creators/ui/creator-hub.mjs'
+      - 'src/creators/content/runtime-content-registry.mjs'
+      - 'src/creators/content/supabase-content-repository.mjs'
+      - 'src/ui/studio-launcher.js'
+      - 'supabase/migrations/*avatar*'
+      - 'scripts/avatar-quick-import-audit.mjs'
+      - 'docs/systems/AVATAR_QUICK_IMPORT.md'
+      - 'docs/system-catalog.json'
+      - 'package.json'
+      - '.github/workflows/avatar-quick-import-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'src/characters/creator-avatar-runtime.mjs'
+      - 'src/creators/avatar/**'
+      - 'src/creators/ui/avatar-workspace.mjs'
+      - 'src/creators/workspaces/avatar-workspace.mjs'
+      - 'supabase/migrations/*avatar*'
+
+jobs:
+  avatar-quick:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Syntax
+        run: |
+          node --check src/characters/creator-avatar-runtime.mjs
+          node --check src/creators/avatar/avatar-spritesheet-analyzer.mjs
+          node --check src/creators/avatar/avatar-quick-import-service.mjs
+          node --check src/creators/ui/avatar-workspace.mjs
+          node --check src/creators/workspaces/avatar-workspace.mjs
+          node --check src/creators/creator-entry.mjs
+          node --check src/creators/content/runtime-content-registry.mjs
+          node --check src/creators/content/supabase-content-repository.mjs
+          node --check src/ui/studio-launcher.js
+          node --check scripts/avatar-quick-import-audit.mjs
+      - name: Avatar architecture
+        run: npm run audit:avatar-quick
+      - name: Universal content compatibility
+        run: npm run audit:universal-content
+      - name: Documentation contract
+        run: npm run audit:docs
