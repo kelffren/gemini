@@ -1,6 +1,6 @@
 /* KELO-INDEX
  * area: CREATORS / AVATAR QA
- * keys: AVATAR UNIVERSAL COMPILER SELF-HEAL VALIDATE CANONICAL-RIG OWNER
+ * keys: AVATAR UNIVERSAL COMPILER SELF-HEAL VALIDATE CANONICAL-RIG STRIP-PROJECTION SCALE-LOCK OWNER
  * purpose: static architecture contract for Kelo Universal Asset Compiler V5
  * online: validates that persistence/selection remain behind repository/service
  */
@@ -21,9 +21,15 @@ ok('runtime selection restores locally',runtime.includes('kelo.creator.avatar.se
 ok('V4 remains available as deterministic strategy',analyzer.includes('connectedComponents')&&analyzer.includes('adaptiveCuts')&&analyzer.includes('sourceRects'));
 ok('universal compiler wraps V4 instead of duplicating renderer ownership',compiler.includes("from './avatar-spritesheet-analyzer.mjs'")&&compiler.includes('analyzeAvatarSpriteSheet')&&compiler.includes('compileAvatarRuntime'));
 ok('compiler generates competing hypotheses',compiler.includes('buildHypotheses')&&compiler.includes('grid-candidate')&&compiler.includes('horizontal-strip')&&compiler.includes('single-character'));
+ok('compiler probes separated strip frames by foreground projection',compiler.includes('probeStripLayout')&&compiler.includes('runsFromProjection')&&compiler.includes('rectsFromRuns'));
+ok('compiler detects horizontal projection strips',compiler.includes('projection-strip-horizontal')&&compiler.includes("axis=ratio>=1.55?'x'"));
+ok('compiler detects vertical projection strips',compiler.includes('projection-strip-vertical')&&compiler.includes('verticalRects'));
+ok('vertical strips are repacked to horizontal runtime frames',compiler.includes("push(frames,1,'vertical-strip'")&&compiler.includes('verticalRects(frames,width,height)'));
 ok('compiler validates compiled frames before acceptance',compiler.includes('validateCompiled')&&compiler.includes('sizeConsistency')&&compiler.includes('bottomConsistency')&&compiler.includes('edgeSafety'));
 ok('compiler self-heals weak background interpretation',compiler.includes("best.validation.health<.82")&&compiler.includes("[.72,1.22]")&&compiler.includes('selfHealed'));
 ok('compiler emits canonical four-direction Kelo rig',compiler.includes("faces=['down','left','right','up']")&&compiler.includes('rows:4')&&compiler.includes('canonicalRig:true'));
+ok('compiler locks source frame scale during canonicalization',compiler.includes('sourceRectScaleLock')&&compiler.includes('scaleLocked:!!scaleLock'));
+ok('compiler anchors normalized frames at bottom center',compiler.includes("footAnchor:'bottom-center'"));
 ok('compiler mirrors missing side direction only as fallback',compiler.includes("face==='left'")&&compiler.includes('map.left===map.right'));
 ok('manual corrections bypass hypothesis tournament but still canonicalize',compiler.includes("config?.detectionMode==='manual'")&&compiler.includes("strategy:'manual'"));
 ok('quick service persists universal compiler metadata',service.includes('compilerVersion')&&service.includes('canonicalRig')&&service.includes('selfHealed')&&service.includes('validation'));
