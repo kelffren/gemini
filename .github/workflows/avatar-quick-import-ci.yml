@@ -72,7 +72,7 @@ jobs:
       - name: Documentation contract
         run: npm run audit:docs
       - name: Install server dependencies
-        run: npm --prefix server ci --ignore-scripts --no-audit --no-fund
+        run: npm --prefix server install --ignore-scripts --no-audit --no-fund --no-package-lock
       - name: Two-player authoritative avatar realtime proof
         run: npm --prefix server run test:avatar-realtime
       - name: Install browser audit dependency
