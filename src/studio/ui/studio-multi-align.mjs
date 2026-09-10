@@ -85,7 +85,20 @@ export function createStudioMultiAlign({root=globalThis,kernel}={}){
     attach();if(!bar||!shell)return;const count=selected().length;const allowed=count>1&&!['paint','erase'].includes(String(shell.dataset.activeTool||'select'))&&shell.dataset.sheetOpen!=='1'&&shell.dataset.creatorMinimized!=='1';
     bar.classList.toggle('on',allowed);const label=bar.querySelector('.ks-multi-align-count'),nextLabel=`${count} SELECTED`;if(label&&label.textContent!==nextLabel)label.textContent=nextLabel;
   }
+  function mutationNeedsRefresh(mutations=[]){
+    for(const mutation of mutations){
+      if(mutation.type==='attributes'){
+        if(shell&&mutation.target===shell)return true;
+        continue;
+      }
+      if(mutation.type!=='childList'||bar?.isConnected)continue;
+      for(const node of mutation.addedNodes||[]){
+        if(node?.id==='kelo-studio-live'||node?.querySelector?.('#kelo-studio-live'))return true;
+      }
+    }
+    return false;
+  }
   selectionUnsub=kernel.selection.onChange?.(()=>refresh());attach();
-  if(typeof root.MutationObserver==='function'&&document.body){observer=new root.MutationObserver(()=>{if(!destroyed)refresh();});observer.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['data-active-tool','data-sheet-open','data-creator-minimized']});}
+  if(typeof root.MutationObserver==='function'&&document.body){observer=new root.MutationObserver(mutations=>{if(!destroyed&&mutationNeedsRefresh(mutations))refresh();});observer.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['data-active-tool','data-sheet-open','data-creator-minimized']});}
   return Object.freeze({align,refresh,destroy(){destroyed=true;selectionUnsub?.();observer?.disconnect?.();bar?.remove();bar=null;shell=null;}});
 }
