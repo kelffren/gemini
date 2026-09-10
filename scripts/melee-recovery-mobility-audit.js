@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: PVP / MELEE / AUDIT
- * keys: RECOVERY MOVEMENT BASIC FOLLOW FINISHER HEAVY NETWORKING PARITY ACTIVE
- * purpose: protege movement scales ganadores del combo melee y confirma que server usa los mismos perfiles melee
+ * keys: RECOVERY MOVEMENT BASIC FOLLOW FINISHER HEAVY NETWORKING PARITY ACTIVE 60HZ 90HZ 120HZ
+ * purpose: protege movement scales ganadores del combo melee, compara A/B de movilidad y confirma paridad de perfiles con server
  * online: server/pvp-authority carga KeloMeleeProfiles y KeloMeleeEngine compartidos
  */
 'use strict';
@@ -42,12 +42,50 @@ const serverSource=fs.readFileSync(path.join(root,'server/pvp-authority.js'),'ut
 if(!serverSource.includes("'src/systems/melee/melee-weapon-profiles.js'"))throw new Error('SERVER_DOES_NOT_LOAD_SHARED_MELEE_PROFILES');
 if(!serverSource.includes('shared.KeloMeleeEngine.movementScaleFor(player._pvpAttack.profile,player._pvpAttack.phase)'))throw new Error('SERVER_DOES_NOT_USE_SHARED_PHASE_MOVEMENT');
 
+const SPEED=185.28;
+const BASELINE_ACTIVE=.48;
+const WINNER_ACTIVE=.52;
+const REFINEMENT_ACTIVE=.55;
+function simulateBasic(hz,activeScale){
+  const dt=1/hz;
+  const windup=.085,active=.075,recovery=.18,total=windup+active+recovery;
+  let t=0,dist=0;
+  while(t<total-1e-12){
+    const scale=t<windup?.86:t<windup+active?activeScale:1;
+    const step=Math.min(dt,total-t);
+    dist+=SPEED*scale*step;
+    t+=step;
+  }
+  return Number(dist.toFixed(6));
+}
+const fixedStep={};
+for(const hz of [60,90,120]){
+  const baseline=simulateBasic(hz,BASELINE_ACTIVE);
+  const winner=simulateBasic(hz,WINNER_ACTIVE);
+  const refinement=simulateBasic(hz,REFINEMENT_ACTIVE);
+  if(!(winner>baseline))throw new Error('BASIC_ACTIVE_WINNER_DOES_NOT_IMPROVE_CONTROL_'+hz+'HZ');
+  if(!(refinement>winner))throw new Error('BASIC_ACTIVE_REFINEMENT_TRACE_INVALID_'+hz+'HZ');
+  fixedStep[hz]={baseline48:baseline,winner52:winner,refinement55:refinement,winnerGainPx:Number((winner-baseline).toFixed(6)),refinementExtraPx:Number((refinement-winner).toFixed(6))};
+}
+const total=.085+.075+.18;
+const weighted=(activeScale)=>(.085*.86+.075*activeScale+.18)/total;
+const hierarchy={
+  baselineWeightedFreedom:Number(weighted(BASELINE_ACTIVE).toFixed(6)),
+  winnerWeightedFreedom:Number(weighted(WINNER_ACTIVE).toFixed(6)),
+  refinementWeightedFreedom:Number(weighted(REFINEMENT_ACTIVE).toFixed(6)),
+  followActive:Number(box.KeloMeleeEngine.movementScaleFor(follow,'active'))
+};
+if(hierarchy.followActive!==WINNER_ACTIVE)throw new Error('LIGHT_COMBO_ACTIVE_HIERARCHY_DIVERGED');
+
 const result={
-  contract:'melee-recovery-mobility-v5-light-active',
+  contract:'melee-recovery-mobility-v6-light-active-ab-60-90-120',
   basic:{windup:.86,active:.52,recovery:1},
   follow:{active:.52,recovery:1},
   finisher:{recovery:.76},
   heavy:{recovery:.64},
+  ab:{baselineActive:BASELINE_ACTIVE,winnerActive:WINNER_ACTIVE,refinementActive:REFINEMENT_ACTIVE,decision:'0.52 wins: measurable control gain over 0.48 while preserving opener/follow active-weight coherence; 0.55 extra gain is marginal'},
+  fixedStep,
+  hierarchy,
   relativeBasicRecoverySpeedGainPct:Number(relativeRecoverySpeedGainPct.toFixed(2)),
   onlineParity:'server loads shared melee profiles and phase movementScaleFor'
 };
