@@ -6,7 +6,9 @@ on:
       - 'src/systems/pvp-world.js'
       - 'src/systems/pvp-combat-runtime-loader.js'
       - 'src/abilities/kelo-ability-boot.js'
+      - 'server/pvp-authority.js'
       - 'tests/pvp-dodge-live.spec.js'
+      - 'scripts/audit-pvp-dodge-timing.js'
       - '.github/workflows/pvp-dodge-live-ci.yml'
   workflow_dispatch:
 permissions:
@@ -22,6 +24,8 @@ jobs:
           node-version: 24
       - run: npm install --no-audit --no-fund
       - run: npx playwright install --with-deps chromium
+      - name: Deterministic dodge timing 60 90 120 Hz
+        run: node scripts/audit-pvp-dodge-timing.js
       - name: Serve exact checkout
         run: |
           python3 -m http.server 4173 >/tmp/kelo-http.log 2>&1 &
