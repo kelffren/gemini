@@ -55,8 +55,10 @@ jobs:
             echo 'blank=false' >> "$GITHUB_OUTPUT"
           fi
       - name: Audit legacy render hot path on LIVE
+        # World-render audits intentionally use the public offline QA override so the
+        # permanent account gate remains intact while renderer/gameplay presentation is inspected.
         env: &liveenv
-          AUDIT_URL: https://kelffren.github.io/gemini/
+          AUDIT_URL: https://kelffren.github.io/gemini/?offline=1&qa-live-audit=1
           CHROME_BIN: /usr/bin/google-chrome
         run: node scripts/live-render-hotpath-audit.mjs
       - name: Audit live hero sprite on mobile and desktop
