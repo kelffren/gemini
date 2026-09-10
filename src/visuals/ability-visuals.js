@@ -1,6 +1,6 @@
 /* KELO-INDEX
  * area: VISUAL
- * keys: ABILITY PROFILE CAST PROJECTILE IMPACT STATUS PREDICTION REMOTE LEGACY ADAPTER AIM
+ * keys: ABILITY PROFILE CAST PROJECTILE IMPACT STATUS PREDICTION REMOTE LEGACY ADAPTER AIM DASH TRAP AREA PERSISTENT
  * hace: resuelve eventos de ability a perfiles visuales opcionales y adapta el runtime actual sin meter visuales en StoneSystem
  * online: local y remoto terminan en los mismos eventos semánticos; no decide daño/cooldown/validez
  */
@@ -24,6 +24,9 @@
   const activeCastByAbility = new Map();
   const pendingBySlot = new Map();
   const maskedLegacyColors = new Map();
+  const activeTrapVisuals = new Map();
+  const activeDashTravel = new Map();
+  const impactPlayedAt = new Map();
   let enabled = true;
   let fallbackSeq = 1;
   let pointerAim = null;
@@ -87,6 +90,15 @@
     if (cue === 'impact' && profile.impactSequence && root.KeloSequence) return root.KeloSequence.play(profile.impactSequence, c);
     if (cue === 'projectile' && profile.projectileVisual && root.KeloProjectileVisuals) return root.KeloProjectileVisuals.preview(profile.projectileVisual, c, { speed: c.gameplay.speed, maxDistance: c.gameplay.range });
     if (cue === 'throw' && profile.throwVisual && root.KeloProjectileVisuals) return root.KeloProjectileVisuals.preview(profile.throwVisual, c, { speed: c.gameplay.speed, maxDistance: c.gameplay.range, loop: true });
+    if ((cue === 'dash' || cue === 'start') && (profile.dashSequence || profile.castSequence) && root.KeloSequence) return root.KeloSequence.play(profile.dashSequence || profile.castSequence, c);
+    if ((cue === 'dashEnd' || cue === 'end') && profile.dashEndSequence && root.KeloSequence) return root.KeloSequence.play(profile.dashEndSequence, c);
+    if (cue === 'place' && profile.placeSequence && root.KeloSequence) return root.KeloSequence.play(profile.placeSequence, c);
+    if (cue === 'trigger' && profile.triggerSequence && root.KeloSequence) return root.KeloSequence.play(profile.triggerSequence, c);
+    if (cue === 'persistent' && profile.persistentFx && root.KeloFX) return root.KeloFX.spawn(profile.persistentFx, c, { loop: true, x: c.origin && c.origin.x, y: c.origin && c.origin.y });
+    if (cue === 'area' && profile.areaFx && root.KeloFX) {
+      const areaDef = root.KeloFXRegistry && root.KeloFXRegistry.get(profile.areaFx);
+      return root.KeloFX.spawn(profile.areaFx, c, { loop: !!(areaDef && areaDef.loop), x: c.origin && c.origin.x, y: c.origin && c.origin.y });
+    }
     const ref = profile[cue];
     if (ref && root.KeloFX) return root.KeloFX.spawn(ref, c);
     return null;
@@ -97,6 +109,8 @@
     const c = normalizedEvent(payload);
     const profile = resolveProfile(c.abilityId, c.abilityKey);
     if (!profile || !profile.castSequence || !root.KeloSequence) return;
+    const def = abilityDef(c.abilityId, c.abilityKey);
+    if (def && def.delivery && def.delivery.type === 'dash') return;
     const sequenceId = root.KeloSequence.play(profile.castSequence, c);
     if (c.castId && sequenceId) activeCastSequences.set(c.castId, sequenceId);
   }
@@ -108,6 +122,8 @@
     if (!profile) return;
     // Local prediction already started the cast presentation. Remote confirms enter here without prediction.
     if (!payload || payload.visualPredicted !== true) {
+      const def = abilityDef(c.abilityId, c.abilityKey);
+      if (def && def.delivery && def.delivery.type === 'dash') return;
       if (profile.castSequence && root.KeloSequence) {
         const sequenceId = root.KeloSequence.play(profile.castSequence, c);
         if (c.castId && sequenceId) activeCastSequences.set(c.castId, sequenceId);
@@ -212,6 +228,119 @@
     if (ref) root.KeloFX.spawn(ref, c);
   }
 
+  // KELO-INDEX VISUAL/IMPACT un solo impacto por castId; los proyectiles ya explotan en PROJECTILE_HIT.
+  function onAbilityImpact(payload) {
+    if (!enabled) return;
+    const c = normalizedEvent(payload);
+    const profile = resolveProfile(c.abilityId, c.abilityKey);
+    if (!profile || !profile.impactSequence || !root.KeloSequence) return;
+    const def = abilityDef(c.abilityId, c.abilityKey);
+    const delivery = def && def.delivery && def.delivery.type;
+    if (delivery === 'projectile') return;
+    const key = String(c.castId || (c.abilityKey || c.abilityId || 'impact') + ':' + Math.round((c.origin && c.origin.x) || 0));
+    const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+    const prev = impactPlayedAt.get(key);
+    if (prev && now - prev < 420) return;
+    impactPlayedAt.set(key, now);
+    if (impactPlayedAt.size > 48) {
+      const first = impactPlayedAt.keys().next().value;
+      impactPlayedAt.delete(first);
+    }
+    const origin = c.target || c.origin;
+    root.KeloSequence.play(profile.impactSequence, Object.assign({}, c, { origin: origin, target: origin }));
+  }
+
+  function stopDashTravel(actorId) {
+    const key = String(actorId || 'actor');
+    const id = activeDashTravel.get(key);
+    if (id && root.KeloFX) root.KeloFX.stop(id);
+    activeDashTravel.delete(key);
+  }
+
+  // KELO-INDEX VISUAL/DASH trail de movilidad; el cast local ya reprodujo la sequence de inicio.
+  function onDashStarted(payload) {
+    if (!enabled) return;
+    const c = normalizedEvent(payload);
+    const profile = resolveProfile(c.abilityId, c.abilityKey);
+    if (!profile) return;
+    const seq = profile.dashSequence || profile.castSequence;
+    if (seq && root.KeloSequence) root.KeloSequence.play(seq, c);
+    if (profile.travelEffect && root.KeloFX) {
+      const key = String(c.actorId || 'actor');
+      stopDashTravel(key);
+      const id = root.KeloFX.spawn(profile.travelEffect, c, { space: 'ACTOR', socket: 'center', loop: true, duration: 0.22 });
+      if (id) activeDashTravel.set(key, id);
+    }
+  }
+
+  function onDashEnded(payload) {
+    if (!enabled) return;
+    const c = normalizedEvent(payload);
+    stopDashTravel(c.actorId);
+    const profile = resolveProfile(c.abilityId, c.abilityKey);
+    if (profile && profile.dashEndSequence && root.KeloSequence) {
+      const origin = c.target || c.origin;
+      root.KeloSequence.play(profile.dashEndSequence, Object.assign({}, c, { origin: origin, target: origin }));
+    }
+  }
+
+  function trapOrigin(payload, c) {
+    return (payload && (payload.origin || payload.target || payload.position)) || (c && (c.origin || c.target)) || null;
+  }
+
+  function stopTrapVisuals(trapId) {
+    const key = String(trapId || '');
+    if (!key) return;
+    const rec = activeTrapVisuals.get(key);
+    if (!rec) return;
+    if (rec.sigil && root.KeloFX) root.KeloFX.stop(rec.sigil);
+    if (rec.area && root.KeloFX) root.KeloFX.stop(rec.area);
+    activeTrapVisuals.delete(key);
+  }
+
+  // KELO-INDEX VISUAL/TRAP sigilo + radio persistente keyed por trapId; el gameplay no pinta el placeholder si hay profile.
+  function onTrapPlaced(payload) {
+    if (!enabled) return;
+    const c = normalizedEvent(payload);
+    const profile = resolveProfile(c.abilityId, c.abilityKey);
+    if (!profile) return;
+    const origin = trapOrigin(payload, c);
+    const ctx = Object.assign({}, c, { origin: origin, target: origin, trapId: payload && payload.trapId || c.trapId });
+    if (profile.placeSequence && root.KeloSequence) root.KeloSequence.play(profile.placeSequence, ctx);
+    const trapId = String(ctx.trapId || ('trap_' + (fallbackSeq++).toString(36)));
+    stopTrapVisuals(trapId);
+    const rec = {};
+    const spawnAt = { x: origin && origin.x, y: origin && origin.y, loop: true };
+    if (profile.persistentFx && root.KeloFX) rec.sigil = root.KeloFX.spawn(profile.persistentFx, ctx, spawnAt);
+    if (profile.areaFx && root.KeloFX) rec.area = root.KeloFX.spawn(profile.areaFx, ctx, spawnAt);
+    activeTrapVisuals.set(trapId, rec);
+  }
+
+  function onTrapArmed(payload) {
+    if (!enabled) return;
+    const c = normalizedEvent(payload);
+    const profile = resolveProfile(c.abilityId, c.abilityKey);
+    if (!profile || !root.KeloFX) return;
+    const origin = trapOrigin(payload, c);
+    const ctx = Object.assign({}, c, { origin: origin, target: origin, visual: Object.assign({}, c.visual || {}, { armed: true }) });
+    if (profile.armedFx) root.KeloFX.spawn(profile.armedFx, ctx);
+  }
+
+  function onTrapTriggered(payload) {
+    if (!enabled) return;
+    const c = normalizedEvent(payload);
+    stopTrapVisuals(payload && payload.trapId || c.trapId);
+    const profile = resolveProfile(c.abilityId, c.abilityKey);
+    if (!profile || !profile.triggerSequence || !root.KeloSequence) return;
+    const origin = trapOrigin(payload, c);
+    root.KeloSequence.play(profile.triggerSequence, Object.assign({}, c, { origin: origin, target: origin }));
+  }
+
+  function onTrapExpired(payload) {
+    const c = normalizedEvent(payload);
+    stopTrapVisuals(payload && payload.trapId || c.trapId);
+  }
+
   bus.on('CAST_STARTED', onCastStarted);
   bus.on('CAST_CONFIRMED', onCastConfirmed);
   bus.on('CAST_REJECTED', onCastRejected);
@@ -224,6 +353,13 @@
   bus.on('STATUS_APPLIED', onStatusApplied);
   bus.on('STATUS_REMOVED', onStatusRemoved);
   bus.on('SHIELD_APPLIED', onShield);
+  bus.on('ABILITY_IMPACT', onAbilityImpact);
+  bus.on('DASH_STARTED', onDashStarted);
+  bus.on('DASH_ENDED', onDashEnded);
+  bus.on('TRAP_PLACED', onTrapPlaced);
+  bus.on('TRAP_ARMED', onTrapArmed);
+  bus.on('TRAP_TRIGGERED', onTrapTriggered);
+  bus.on('TRAP_EXPIRED', onTrapExpired);
 
   function faceDirection(actor) {
     const face = actor && actor._face || 'right';
@@ -420,9 +556,15 @@
     abilityBus.on('DEATH', function (payload) {
       const target = payload.target; bus.emit('DEATH', { actor: target, actorId: target && String(target.id || ''), origin: target ? { x: target.x, y: target.y } : null, abilityId: payload.abilityId });
     });
+    abilityBus.on('DASH_STARTED', function (payload) { bus.emit('DASH_STARTED', Object.assign({}, payload || {})); });
+    abilityBus.on('DASH_ENDED', function (payload) { bus.emit('DASH_ENDED', Object.assign({}, payload || {})); });
+    abilityBus.on('TRAP_PLACED', function (payload) { bus.emit('TRAP_PLACED', Object.assign({}, payload || {})); });
+    abilityBus.on('TRAP_ARMED', function (payload) { bus.emit('TRAP_ARMED', Object.assign({}, payload || {})); });
+    abilityBus.on('TRAP_TRIGGERED', function (payload) { bus.emit('TRAP_TRIGGERED', Object.assign({}, payload || {})); });
+    abilityBus.on('TRAP_EXPIRED', function (payload) { bus.emit('TRAP_EXPIRED', Object.assign({}, payload || {})); });
 
     root.KELO_ABILITY_SEMANTIC_EVENTS = true;
-    if (root.KELO_VISUAL_AUDIT) root.KELO_VISUAL_AUDIT.legacyAbilityAdapter = 'semantic-event-bridge-v1.1';
+    if (root.KELO_VISUAL_AUDIT) root.KELO_VISUAL_AUDIT.legacyAbilityAdapter = 'semantic-event-bridge-v1.2';
   }
 
   function collectProfileAssets(profile) {
@@ -438,7 +580,20 @@
         if (cue.type === 'sfx') { const sfx = root.KeloSFXRegistry && root.KeloSFXRegistry.get(cue.ref); if (sfx && sfx.assetId) ids.add(sfx.assetId); }
       });
     }
-    if (profile) { addSequence(profile.castSequence); addSequence(profile.impactSequence); addFromProjectile(profile.projectileVisual); addFromProjectile(profile.throwVisual); }
+    if (profile) {
+      addSequence(profile.castSequence);
+      addSequence(profile.impactSequence);
+      addSequence(profile.dashSequence);
+      addSequence(profile.dashEndSequence);
+      addSequence(profile.placeSequence);
+      addSequence(profile.triggerSequence);
+      addFromProjectile(profile.projectileVisual);
+      addFromProjectile(profile.throwVisual);
+      addFromFx(profile.persistentFx);
+      addFromFx(profile.areaFx);
+      addFromFx(profile.travelEffect);
+      addFromFx(profile.armedFx);
+    }
     return Array.from(ids);
   }
 
@@ -456,7 +611,7 @@
 
   root.KeloVisualProfileRegistry = Object.freeze({ version: 'visual-profile-registry-v1.0.0', register: register, get: get, list: list, resolve: resolveProfile });
   root.KeloAbilityVisuals = Object.freeze({
-    version: 'ability-visual-resolver-v1.2.0',
+    version: 'ability-visual-resolver-v1.3.0',
     setEnabled: setEnabled,
     get enabled() { return enabled; },
     hasProfile: hasProfile,

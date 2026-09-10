@@ -12,6 +12,7 @@ on:
       - 'src/systems/pvp-world.js'
       - 'src/visuals/melee-assets/**'
       - 'scripts/visual-system-contract-audit.js'
+      - 'scripts/ability-visual-profiles-audit.js'
       - 'scripts/melee-visuals-audit.js'
       - 'scripts/melee-m1-combo-audit.js'
       - 'scripts/melee-presentation-bridge-audit.js'
@@ -27,6 +28,7 @@ on:
       - 'src/systems/pvp-world.js'
       - 'src/visuals/melee-assets/**'
       - 'scripts/visual-system-contract-audit.js'
+      - 'scripts/ability-visual-profiles-audit.js'
       - 'scripts/melee-visuals-audit.js'
       - 'scripts/melee-m1-combo-audit.js'
       - 'scripts/melee-presentation-bridge-audit.js'
@@ -83,11 +85,14 @@ jobs:
           node --check engine-net.js
           node --check server/index.js
           node --check scripts/visual-system-contract-audit.js
+          node --check scripts/ability-visual-profiles-audit.js
           node --check scripts/melee-visuals-audit.js
           node --check scripts/melee-m1-combo-audit.js
           node --check scripts/melee-presentation-bridge-audit.js
       - name: Modular visual contract
         run: node scripts/visual-system-contract-audit.js
+      - name: Ability visual profiles
+        run: node scripts/ability-visual-profiles-audit.js
       - name: Melee visual contract
         run: node scripts/melee-visuals-audit.js
       - name: M1 combo feel contract

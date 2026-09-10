@@ -121,6 +121,76 @@
     katanaQuick.style.cssText += ';display:block;width:100%;margin:0 0 10px;background:#21152f;border-color:#a774ff;color:#f0ddff;font-size:11px';
     body.appendChild(katanaQuick);
 
+    const profile = document.createElement('select');
+    options(profile, root.KeloVisualProfileRegistry ? root.KeloVisualProfileRegistry.list() : []);
+    const fireProfileIndex = Array.from(profile.options).findIndex(function (option) { return option.value === 'ability_visual_fireball_01'; });
+    if (fireProfileIndex >= 0) profile.selectedIndex = fireProfileIndex;
+    body.appendChild(row('Ability', profile));
+
+    function labContext(extra) {
+      const p = actor();
+      const dir = directionOf(direction.value);
+      const origin = p ? { x: p.x, y: p.y } : originFor(dir, 0);
+      const prof = root.KeloVisualProfileRegistry && root.KeloVisualProfileRegistry.get(profile.value);
+      const key = prof && prof.abilityKey || null;
+      const def = key && root.KeloAbilities && root.KeloAbilities.registry && root.KeloAbilities.registry.getByKey
+        ? root.KeloAbilities.registry.getByKey(key)
+        : (root.ABILITIES || []).find(function (item) { return item.key === key; });
+      const delivery = def && def.delivery || {};
+      const targeting = def && def.targeting || {};
+      return Object.assign({
+        actor: p, actorId: p && p.id, abilityId: def && def.id, abilityKey: key,
+        origin: origin, target: originFor(dir, Number(delivery.maxDistance || targeting.range || delivery.distance) || 140),
+        direction: dir,
+        gameplay: {
+          speed: (Number(delivery.speed) || 420) * Number(speed.value),
+          range: Number(delivery.maxDistance || targeting.range || delivery.distance) || 320,
+          radius: Number(delivery.radius || delivery.activationRadius) || 80
+        },
+        visual: { scale: Number(scale.value), seed: Date.now() & 65535 },
+        trapId: 'lab_trap'
+      }, extra || {});
+    }
+    function playAbilityCue(cue) {
+      if (!root.KeloAbilityVisuals) return;
+      const ctx = labContext();
+      root.KeloAbilityVisuals.playCue(ctx.abilityId, cue, ctx);
+      collapseAfterPreview();
+    }
+    const abilityActions = document.createElement('div');
+    abilityActions.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:6px 0 10px';
+    abilityActions.appendChild(button('▶ CAST', function () { playAbilityCue('cast'); }));
+    abilityActions.appendChild(button('➜ PROJECTILE', function () { playAbilityCue('projectile'); }));
+    abilityActions.appendChild(button('✸ IMPACT', function () { playAbilityCue('impact'); }));
+    abilityActions.appendChild(button('💥 AOE', function () { playAbilityCue('impact'); playAbilityCue('area'); }));
+    abilityActions.appendChild(button('💨 DASH', function () {
+      const ctx = labContext();
+      if (root.KeloVisualEventBus) {
+        root.KeloVisualEventBus.emit('DASH_STARTED', ctx);
+        setTimeout(function () { root.KeloVisualEventBus.emit('DASH_ENDED', ctx); }, 180);
+      } else {
+        root.KeloAbilityVisuals.playCue(ctx.abilityId, 'dash', ctx);
+        setTimeout(function () { root.KeloAbilityVisuals.playCue(ctx.abilityId, 'dashEnd', ctx); }, 180);
+      }
+      collapseAfterPreview();
+    }));
+    abilityActions.appendChild(button('🪤 TRAP', function () {
+      const ctx = labContext({ trapId: 'lab_trap' });
+      if (root.KeloVisualEventBus) root.KeloVisualEventBus.emit('TRAP_PLACED', ctx);
+      else {
+        root.KeloAbilityVisuals.playCue(ctx.abilityId, 'place', ctx);
+        root.KeloAbilityVisuals.playCue(ctx.abilityId, 'persistent', ctx);
+        root.KeloAbilityVisuals.playCue(ctx.abilityId, 'area', ctx);
+      }
+      collapseAfterPreview();
+    }));
+    body.appendChild(abilityActions);
+    body.appendChild(button('☠ TRIGGER TRAP', function () {
+      const ctx = labContext({ trapId: 'lab_trap' });
+      if (root.KeloVisualEventBus) root.KeloVisualEventBus.emit('TRAP_TRIGGERED', ctx);
+      else playAbilityCue('trigger');
+    }));
+
     const direction = document.createElement('select'); options(direction, ['right','down','left','up']);
     const scale = document.createElement('input'); scale.type = 'range'; scale.min = '0.5'; scale.max = '2'; scale.step = '0.1'; scale.value = '1';
     const speed = document.createElement('input'); speed.type = 'range'; speed.min = '0.25'; speed.max = '2'; speed.step = '0.25'; speed.value = '1';
@@ -181,7 +251,7 @@
   }
 
   root.KeloVisualLab = Object.freeze({
-    version: 'visual-lab-v1.3.0',
+    version: 'visual-lab-v1.4.0',
     open: build,
     minimize: function () { setCollapsed(true); },
     expand: function () { setCollapsed(false); },

@@ -150,6 +150,21 @@ visualProfileId: ability_visual_fireball_01
 
 `fire_explosion_medium`, `cast_magic_01`, el projectile visual y cualquier otra pieza pueden ejecutarse sin Fireball.
 
+## Familias LIVE (V1.4)
+
+Los perfiles reutilizan primitives de FX (`expanding_ring`, `area_disk`, `crystal_burst`, `sigil`, `streak`) en vez de hardcodear cada habilidad:
+
+| Ability | Delivery | Profile | Qué comunica |
+|---|---|---|---|
+| fireball | projectile | `ability_visual_fireball_01` | cast → orb + trail → impacto + anillo |
+| ice_nova | self_aoe | `ability_visual_ice_nova_01` | carga → disco/anillo 130px → shards |
+| wind_dash | dash | `ability_visual_wind_dash_01` | burst + rastro → afterimage → aterrizaje |
+| poison_trap | trap | `ability_visual_poison_trap_01` | place → sigilo + radio persistente → trigger |
+
+El Visual Lab (`?visualLab=1`) reproduce las mismas cues (`cast` / `projectile` / `impact` / `dash` / `place` / `trigger`) vía `KeloAbilityVisuals.playCue` y los mismos eventos semánticos.
+
+Eventos nuevos del adapter: `ABILITY_IMPACT`, `DASH_STARTED`, `DASH_ENDED`, `TRAP_PLACED`, `TRAP_ARMED`, `TRAP_TRIGGERED`, `TRAP_EXPIRED`.
+
 ## Compatibilidad temporal
 
 `kelo-ability-boot.js` aún contiene el gameplay cliente/fallback y sus primitives visuales antiguas. `ability-visuals.js` actúa como adapter:

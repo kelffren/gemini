@@ -108,6 +108,7 @@
       abilityId: input.abilityId == null ? null : Number(input.abilityId), abilityKey: input.abilityKey == null ? null : String(input.abilityKey),
       origin: origin, target: target, direction: direction, gameplay: gameplay, visual: visual,
       projectileId: input.projectileId == null ? null : String(input.projectileId), statusId: input.statusId == null ? null : String(input.statusId),
+      trapId: input.trapId == null ? null : String(input.trapId),
       source: input.source || null, predicted: input.predicted === true, confirmed: input.confirmed === true, rejected: input.rejected === true,
       remote: input.remote === true, serverTime: Number.isFinite(Number(input.serverTime)) ? Number(input.serverTime) : null
     };
@@ -115,7 +116,7 @@
 
   function serializableContext(raw) {
     const c = normalizeContext(raw);
-    return { actorId:c.actorId, castId:c.castId, abilityId:c.abilityId, abilityKey:c.abilityKey, origin:c.origin, target:c.target, direction:c.direction, gameplay:c.gameplay, visual:c.visual, projectileId:c.projectileId, statusId:c.statusId, predicted:c.predicted, confirmed:c.confirmed, rejected:c.rejected, serverTime:c.serverTime };
+    return { actorId:c.actorId, castId:c.castId, abilityId:c.abilityId, abilityKey:c.abilityKey, origin:c.origin, target:c.target, direction:c.direction, gameplay:c.gameplay, visual:c.visual, projectileId:c.projectileId, statusId:c.statusId, trapId:c.trapId, predicted:c.predicted, confirmed:c.confirmed, rejected:c.rejected, serverTime:c.serverTime };
   }
 
   function qualityName() {

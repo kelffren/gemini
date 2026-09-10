@@ -9,7 +9,7 @@
 (function(){
 'use strict';
 const params=new URLSearchParams(location.search),NET=params.get('net'),PLAYER_KEY_STORAGE='kelo_player_key_v1',ACTIVE_CHARACTER_STORAGE='kelo.active.character.v1',SESSION_STORAGE='kelo.supabase.session.v1';
-const pending=new Map(),pendingPvpInputs=new Map(),VISUAL_EVENT_ALLOWLIST=new Set(['CAST_CONFIRMED','PROJECTILE_SPAWNED','PROJECTILE_HIT','PROJECTILE_EXPIRED','ABILITY_IMPACT','STATUS_APPLIED','STATUS_REMOVED','SHIELD_APPLIED','SHIELD_BROKEN','DASH_STARTED','DASH_ENDED','DEATH']);
+const pending=new Map(),pendingPvpInputs=new Map(),VISUAL_EVENT_ALLOWLIST=new Set(['CAST_CONFIRMED','PROJECTILE_SPAWNED','PROJECTILE_HIT','PROJECTILE_EXPIRED','ABILITY_IMPACT','STATUS_APPLIED','STATUS_REMOVED','SHIELD_APPLIED','SHIELD_BROKEN','DASH_STARTED','DASH_ENDED','TRAP_PLACED','TRAP_ARMED','TRAP_TRIGGERED','TRAP_EXPIRED','DEATH']);
 const INTERPOLATION_DELAY_MS=100,PVP_SEND_HZ=30,PVP_SEND_INTERVAL=1/PVP_SEND_HZ,MAX_PENDING_PVP=128,POSE_CHECK_INTERVAL=.1,POSE_HEARTBEAT_INTERVAL=1;
 let requestSeq=1,pvpSequence=1,ws=null,myId=null,sendAcc=0,pvpSendAcc=0,lastPvpAck=0,lastServerTick=0,lastPose=null,lastPoseSentAt=0,onlineIdentity=null,avatarRuntimePromise=null;
 const perfCounters={poseSent:0,poseSkippedUnchanged:0,peerUpdates:0,peerUpdateSkipped:0,peerDrawn:0,peerDrawSkipped:0};

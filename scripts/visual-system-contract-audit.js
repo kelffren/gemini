@@ -42,6 +42,10 @@ assert(animation.includes('sampleTransform')&&animation.includes('frameOverride'
 assert(fx.includes('root.KeloFX')&&fx.includes('drawActorLayer'),'FX system owns actor/world presentation');
 assert(sequence.includes('function play(')&&sequence.includes("cue.type === 'actorAnimation'")&&sequence.includes("cue.type === 'fx'"),'sequence system composes reusable presentation pieces');
 assert(abilityVisuals.includes('KeloVisualProfileRegistry'),'ability visuals resolve optional profiles instead of owning gameplay');
+assert(abilityVisuals.includes("bus.on('ABILITY_IMPACT'")&&abilityVisuals.includes("bus.on('DASH_STARTED'")&&abilityVisuals.includes("bus.on('TRAP_PLACED'"),'ability visuals subscribe to impact/dash/trap semantic events');
+assert(fx.includes('drawExpandingRing')&&fx.includes('drawAreaDisk')&&fx.includes('drawCrystalBurst')&&fx.includes('drawSigil')&&fx.includes('drawStreak'),'FX runtime owns reusable expanding_ring/area_disk/crystal_burst/sigil/streak primitives');
+assert(manifests.includes('ability_visual_fireball_01')&&manifests.includes('ability_visual_ice_nova_01')&&manifests.includes('ability_visual_wind_dash_01')&&manifests.includes('ability_visual_poison_trap_01'),'fireball/ice nova/wind dash/poison trap share data-driven visual profiles');
+assert(manifests.includes("type: 'expanding_ring'")&&manifests.includes("type: 'sigil'")&&manifests.includes("type: 'streak'"),'manifests register the reusable FX types used by ability profiles');
 
 ['KeloAnimation','KeloFX','KeloSequence','KeloVisualProfile'].forEach(token=>assert(!stone.includes(token),'StoneSystem must not know visual runtime: '+token));
 assert(!pvp.includes('emitVisual('),'PvP gameplay must not emit visual bus directly');
@@ -49,6 +53,7 @@ assert(bridge.includes("visualEmit('MELEE_ATTACK_STARTED'")&&bridge.includes("vi
 assert(!/\.hp\s*=|keloShield\s*=/.test(bridge),'presentation bridge cannot mutate health/shield');
 
 assert(net.includes("t:'visual:event'")&&net.includes('VISUAL_EVENT_ALLOWLIST'),'client transports allowlisted semantic visual events');
+assert(net.includes('TRAP_PLACED')&&server.includes('TRAP_PLACED')&&server.includes('trapId'),'trap visual events are allowlisted and sanitized for online relay');
 assert(server.includes("msg.t==='visual:event'")&&server.includes('sanitizeVisualContext'),'server sanitizes relayed visual context');
 assert(server.includes('VISUAL_EVENT_ALLOWLIST')&&server.includes('server-visual-relay-v2-aoi'),'visual relay is allowlisted and AOI scoped');
 
