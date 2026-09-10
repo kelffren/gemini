@@ -10,6 +10,7 @@
 import assert from 'node:assert/strict';
 import {MAP_FORGE_RECIPES} from '../src/world/map-forge/map-forge-recipes.mjs';
 import {generateMapCandidate,generateBestOf,serializeMapDefinition,deserializeMapDefinition} from '../src/world/map-forge/map-forge-core.mjs';
+import {scoreMapDefinition} from '../src/world/map-forge/map-forge-quality.mjs';
 
 const cap=MAP_FORGE_RECIPES.KELO_ROYAL_CAPITAL_V1;
 const a=generateMapCandidate(cap,{seed:81746291,assetCatalogVersion:'ci-catalog'});
@@ -35,6 +36,24 @@ const best=generateBestOf(cap,{seed:12345,count:8,assetCatalogVersion:'ci-catalo
 assert.equal(best.requested,8);assert.equal(best.validCount,8);assert.ok(best.best.quality.total>=best.candidates.at(-1).quality.total);
 assert.ok(best.selections.bestOverall&&best.selections.mostMonumental&&best.selections.mostOrganic&&best.selections.mostExplorable&&best.selections.mostCompact,'best-of selectors must resolve');
 
+const clone=value=>JSON.parse(JSON.stringify(value));
+const disconnected=clone(a);
+disconnected.navigation.edges=[];
+const disconnectedScore=scoreMapDefinition(disconnected,cap);
+assert.equal(disconnectedScore.valid,false,'disconnected fixed-seed map must be invalid');
+assert.ok(disconnectedScore.total<=69,`invalid map must be hard-capped below elite quality; got ${disconnectedScore.total}`);
+
+const noisy=clone(a),central=noisy.districts.find(d=>d.id==='central')||noisy.districts[0];
+for(let i=0;i<120;i++)noisy.decorations.push({id:`regression:spam:${i}`,district:central.id,family:'lamp',x:central.center.x+(i%12)*4,y:central.center.y+Math.floor(i/12)*4,rotation:0,scale:1});
+const noisyScore=scoreMapDefinition(noisy,cap);
+assert.equal(noisyScore.valid,true,'visual spam fixture stays structurally valid so the quality gate is exercised');
+assert.ok(noisyScore.total<=89,`visually spammed map must not score 90+, got ${noisyScore.total}`);
+
+const semanticDrift=clone(a),hero=semanticDrift.landmarks.find(l=>l.hero)||semanticDrift.landmarks[0];
+hero.roadConnection=false;
+const semanticScore=scoreMapDefinition(semanticDrift,cap);
+assert.ok(semanticScore.total<=89,`major landmark without road connection must not score 90+, got ${semanticScore.total}`);
+
 const stats={};
 for(const [id,recipe] of Object.entries(MAP_FORGE_RECIPES)){
   const scores=[],times=[];let valid=0,min=Infinity,max=-Infinity;
@@ -50,4 +69,4 @@ for(const [id,recipe] of Object.entries(MAP_FORGE_RECIPES)){
   assert.ok(valid>=99,`${id} valid rate ${valid}/100 is below 99%`);
   assert.ok(max-min>.5,`${id} scorer must distinguish candidate quality; range=${(max-min).toFixed(2)}`);
 }
-console.log(JSON.stringify({ok:true,generator:'map-forge-core-v1',royalCapital:{seed:a.metadata.seed,layoutHash:a.metadata.layoutHash,score:a.quality.total,roads:a.roads.length,loops:a.generationStats.roadLoops,parcels:a.parcels.length,decorations:a.decorations.length},bestOf8:{score:best.best.quality.total,seed:best.best.metadata.seed,layoutHash:best.best.metadata.layoutHash},stats},null,2));
+console.log(JSON.stringify({ok:true,generator:'map-forge-core-v1',royalCapital:{seed:a.metadata.seed,layoutHash:a.metadata.layoutHash,score:a.quality.total,roads:a.roads.length,loops:a.generationStats.roadLoops,parcels:a.parcels.length,decorations:a.decorations.length},qualityRegressions:{invalidCap:disconnectedScore.total,visualSpamCap:noisyScore.total,semanticLandmarkCap:semanticScore.total},bestOf8:{score:best.best.quality.total,seed:best.best.metadata.seed,layoutHash:best.best.metadata.layoutHash},stats},null,2));
