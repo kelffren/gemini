@@ -11,7 +11,7 @@
 'use strict';
 const VERSION='pvp-world-v3.2.0-arena-actors',TRANSITION_MS=650;
 const WORLD=Object.freeze({x:2660,y:360,w:720,h:720,spawnX:2790,spawnY:720,dummyX:3190,dummyY:720});
-const TUNING=Object.freeze({mobileCombatSplit:.55,inputBufferMs:125,comboGraceMs:20,aimIndicator:Object.freeze({min:52,max:88,start:32,idleAlpha:.10,activeAlpha:.62,fadeMs:900}),aimAssist:Object.freeze({touch:Object.freeze({maxAngleDeg:12,maxDistance:360,strength:.18,hysteresis:1.55}),controller:Object.freeze({maxAngleDeg:15,maxDistance:390,strength:.23,hysteresis:1.55}),mouse:Object.freeze({maxAngleDeg:5,maxDistance:320,strength:0,hysteresis:1.4})}),dodge:Object.freeze({distance:112,duration:.16,iFrames:.105,recovery:.15,cooldown:.85,directionSource:'move'})});
+const TUNING=Object.freeze({mobileCombatSplit:.55,inputBufferMs:125,comboGraceMs:20,aimIndicator:Object.freeze({min:52,max:88,start:32,idleAlpha:.10,activeAlpha:.62,fadeMs:900}),aimAssist:Object.freeze({touch:Object.freeze({maxAngleDeg:12,maxDistance:360,strength:.18,hysteresis:1.55}),controller:Object.freeze({maxAngleDeg:15,maxDistance:390,strength:.23,hysteresis:1.55}),mouse:Object.freeze({maxAngleDeg:5,maxDistance:320,strength:0,hysteresis:1.4})}),dodge:Object.freeze({distance:112,duration:.16,iFrames:.105,recovery:0,cooldown:.85,directionSource:'move'})});
 const cameraOwner=window.KeloCamera,inputOwner=window.KeloInput;
 if(!cameraOwner||!inputOwner||!inputOwner.combat)throw new Error('PvP Foundation input/camera unavailable');
 inputOwner.combat.configure({bufferMs:TUNING.inputBufferMs,aimDeadzone:.18,moveDeadzone:.14});

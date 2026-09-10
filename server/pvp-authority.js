@@ -12,7 +12,7 @@ const abilityData=require('../src/abilities/abilityData.js');
 const movementProfile=require('../src/core/movement-profile.js');
 const FIXED_DT=1/60,SNAPSHOT_HZ=20,MAX_REWIND_MS=200,HISTORY_MS=350,PLAYER_RADIUS=20,INPUT_BUFFER_MS=125,BASIC_ID='sword_light_basic';
 const ARENA=Object.freeze({x:2660,y:360,w:720,h:720,spawnX:2790,spawnY:720});
-const DODGE=Object.freeze({distance:112,duration:.16,iFrames:.105,recovery:.15,cooldown:.85});
+const DODGE=Object.freeze({distance:112,duration:.16,iFrames:.105,recovery:0,cooldown:.85});
 const ACTIONS=new Set(['input','enter_pvp','leave_pvp','basic_attack','special_attack','ability','dodge']);
 const PHASES=new Set(['pressed','held','active','released','cast','cancel','recall','swap','none']);
 function loadSharedCombat(){
