@@ -22,6 +22,9 @@ on:
       - 'docs/CODE_INDEX.md'
       - 'package.json'
 
+permissions:
+  contents: read
+
 jobs:
   audit:
     runs-on: ubuntu-latest
@@ -30,8 +33,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
       - run: node --check server/online-identity-store.js
       - run: node --check scripts/online-foundation-audit.mjs
       - run: npm run audit:online-foundation
       - run: npm run audit:docs
       - run: npm run audit:foundation
+      - name: Replay database from empty local Supabase
+        run: |
+          supabase db start
+          supabase db reset
