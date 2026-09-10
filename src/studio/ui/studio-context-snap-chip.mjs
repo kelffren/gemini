@@ -36,7 +36,10 @@ export function createStudioContextSnapChip({root=globalThis}={}){
   function label(value){return Number(value)===1?'SNAP FREE':`SNAP ${Number(value)||32}`;}
   function sync(){
     const select=sourceSelect();if(!button||!select)return;
-    const value=Number(select.value)||32;button.dataset.snap=String(value);button.textContent=label(value);button.title=`Snap actual: ${value===1?'libre':`${value}px`} · toca para cambiar`;
+    const value=Number(select.value)||32,nextSnap=String(value),nextText=label(value),nextTitle=`Snap actual: ${value===1?'libre':`${value}px`} · toca para cambiar`;
+    if(button.dataset.snap!==nextSnap)button.dataset.snap=nextSnap;
+    if(button.textContent!==nextText)button.textContent=nextText;
+    if(button.title!==nextTitle)button.title=nextTitle;
   }
   function bindSelect(){
     const select=sourceSelect();if(select===boundSelect)return;
@@ -62,8 +65,18 @@ export function createStudioContextSnapChip({root=globalThis}={}){
     button=document.createElement('button');button.type='button';button.className='ks-context-snap-chip';button.dataset.contextSnap='1';button.setAttribute('aria-label','Cambiar Snap');button.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();cycle();});
     head.insertBefore(button,toggle||null);bindSelect();sync();return true;
   }
+  function mutationNeedsAttach(mutations=[]){
+    if(!button?.isConnected)return true;
+    for(const mutation of mutations){
+      if(mutation.type!=='childList')continue;
+      for(const node of mutation.addedNodes||[]){
+        if(node?.id==='kelo-studio-live'||node?.classList?.contains?.('ks-context-inspector')||node?.querySelector?.('#kelo-studio-live,.ks-context-inspector'))return true;
+      }
+    }
+    return false;
+  }
   attach();
-  if(typeof root.MutationObserver==='function'&&document.body){observer=new root.MutationObserver(()=>{if(!destroyed)attach();});observer.observe(document.body,{childList:true,subtree:true});}
+  if(typeof root.MutationObserver==='function'&&document.body){observer=new root.MutationObserver(mutations=>{if(!destroyed&&mutationNeedsAttach(mutations))attach();});observer.observe(document.body,{childList:true,subtree:true});}
   return Object.freeze({
     attach,sync,cycle,
     destroy(){destroyed=true;observer?.disconnect?.();boundSelect?.removeEventListener?.('change',sync);button?.remove();boundSelect=null;button=null;card=null;shell=null;},
