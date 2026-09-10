@@ -48,7 +48,7 @@ assert(!pvp.includes('emitVisual('),'PvP gameplay must not emit visual bus direc
 assert(bridge.includes("visualEmit('MELEE_ATTACK_STARTED'")&&bridge.includes("visualEmit('MELEE_HIT_CONFIRMED'"),'combat presentation bridge owns melee semantic translation');
 assert(!/\.hp\s*=|keloShield\s*=/.test(bridge),'presentation bridge cannot mutate health/shield');
 
-assert(net.includes("t: 'visual:event'")&&net.includes('VISUAL_EVENT_ALLOWLIST'),'client transports allowlisted semantic visual events');
+assert(net.includes("t:'visual:event'")&&net.includes('VISUAL_EVENT_ALLOWLIST'),'client transports allowlisted semantic visual events');
 assert(server.includes("msg.t==='visual:event'")&&server.includes('sanitizeVisualContext'),'server sanitizes relayed visual context');
 assert(server.includes('VISUAL_EVENT_ALLOWLIST')&&server.includes('server-visual-relay-v2-aoi'),'visual relay is allowlisted and AOI scoped');
 
