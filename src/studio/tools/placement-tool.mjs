@@ -29,8 +29,11 @@ export function createPlacementTool(kernel) {
   function move(x, y, { snap = 32 } = {}) {
     if (!preview) return null;
     const s = Math.max(1, Number(snap) || 1);
-    preview.transform.x = Math.round((Number(x) || 0) / s) * s;
-    preview.transform.y = Math.round((Number(y) || 0) / s) * s;
+    const nextX = Math.round((Number(x) || 0) / s) * s;
+    const nextY = Math.round((Number(y) || 0) / s) * s;
+    if (preview.transform.x === nextX && preview.transform.y === nextY) return { ...preview, transform: { ...preview.transform } };
+    preview.transform.x = nextX;
+    preview.transform.y = nextY;
     emit(); return { ...preview, transform: { ...preview.transform } };
   }
 
