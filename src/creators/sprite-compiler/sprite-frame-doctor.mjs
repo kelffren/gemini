@@ -11,17 +11,17 @@ const ratioDistance=(value,reference)=>reference>0&&value>0?Math.abs(Math.log(va
 
 export function diagnoseSpriteFrames(frames,{columns=4,directions=['N','NE','E','SE','S','SW','W','NW'],emptyPixelFloor=20,sizeTolerance=.38,pixelTolerance=.62,centerTolerance=.14}={}){
   const usable=frames.filter(f=>f?.bounds&&finite(f.pixels)>emptyPixelFloor);
-  const medianW=median(usable.map(f=>f.bounds.width));
-  const medianH=median(usable.map(f=>f.bounds.height));
-  const medianPixels=median(usable.map(f=>f.pixels));
-  const medianAspect=median(usable.map(f=>f.bounds.width/Math.max(1,f.bounds.height)));
+  const globalBaseline=Object.freeze({width:median(usable.map(f=>f.bounds.width)),height:median(usable.map(f=>f.bounds.height)),pixels:median(usable.map(f=>f.pixels)),aspect:median(usable.map(f=>f.bounds.width/Math.max(1,f.bounds.height)))});
+  const rowBaselines=new Map();
+  const rowCount=Math.max(1,Math.ceil(frames.length/Math.max(1,columns)));
+  for(let row=0;row<rowCount;row++){const rowFrames=frames.filter((f,i)=>(Number.isFinite(f?.row)?f.row:Math.floor(i/columns))===row&&f?.bounds&&finite(f.pixels)>emptyPixelFloor);rowBaselines.set(row,Object.freeze({width:median(rowFrames.map(f=>f.bounds.width))||globalBaseline.width,height:median(rowFrames.map(f=>f.bounds.height))||globalBaseline.height,pixels:median(rowFrames.map(f=>f.pixels))||globalBaseline.pixels,aspect:median(rowFrames.map(f=>f.bounds.width/Math.max(1,f.bounds.height)))||globalBaseline.aspect}));}
   const findings=frames.map((frame,index)=>{
     const row=Number.isFinite(frame?.row)?frame.row:Math.floor(index/columns),column=Number.isFinite(frame?.column)?frame.column:index%columns;
     const direction=directions[row]||`ROW_${row+1}`,phase=column+1,reasons=[];let severity=0;
     if(!frame?.bounds||finite(frame.pixels)<=emptyPixelFloor){reasons.push('empty');severity=1;}
     else{
       if(frame.clipped||finite(frame.edgePixels)>0){reasons.push('clipped');severity=Math.max(severity,.95);}
-      const wd=ratioDistance(frame.bounds.width,medianW),hd=ratioDistance(frame.bounds.height,medianH),pd=ratioDistance(frame.pixels,medianPixels),aspect=frame.bounds.width/Math.max(1,frame.bounds.height),ad=ratioDistance(aspect,medianAspect);
+      const baseline=rowBaselines.get(row)||globalBaseline,wd=ratioDistance(frame.bounds.width,baseline.width),hd=ratioDistance(frame.bounds.height,baseline.height),pd=ratioDistance(frame.pixels,baseline.pixels),aspect=frame.bounds.width/Math.max(1,frame.bounds.height),ad=ratioDistance(aspect,baseline.aspect);
       if(wd>sizeTolerance||hd>sizeTolerance){reasons.push('scale-outlier');severity=Math.max(severity,clamp(Math.max(wd,hd),.45,.9));}
       if(pd>pixelTolerance){reasons.push('occupancy-outlier');severity=Math.max(severity,clamp(pd*.72,.4,.85));}
       if(ad>sizeTolerance*1.15){reasons.push('shape-outlier');severity=Math.max(severity,clamp(ad*.68,.4,.82));}
@@ -30,7 +30,7 @@ export function diagnoseSpriteFrames(frames,{columns=4,directions=['N','NE','E',
     return Object.freeze({index,row,column,direction,phase,healthy:reasons.length===0,severity:Number(severity.toFixed(3)),reasons:Object.freeze(reasons),label:`${direction} · frame ${phase}`});
   });
   const defective=findings.filter(x=>!x.healthy).sort((a,b)=>b.severity-a.severity||a.index-b.index);
-  return Object.freeze({pass:defective.length===0,total:frames.length,defectiveCount:defective.length,healthyCount:frames.length-defective.length,medians:Object.freeze({width:medianW,height:medianH,pixels:medianPixels,aspect:medianAspect}),frames:Object.freeze(findings),defective:Object.freeze(defective)});
+  return Object.freeze({pass:defective.length===0,total:frames.length,defectiveCount:defective.length,healthyCount:frames.length-defective.length,medians:globalBaseline,rowBaselines:Object.freeze([...rowBaselines.entries()].map(([row,value])=>Object.freeze({row,...value}))),frames:Object.freeze(findings),defective:Object.freeze(defective)});
 }
 
 export function buildSelectiveRepairTargets(diagnosis,{maxTargets=8}={}){
