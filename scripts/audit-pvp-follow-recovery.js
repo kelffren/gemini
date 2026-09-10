@@ -1,8 +1,8 @@
 /* KELO-INDEX
  * area: PVP / MELEE AUDIT
  * owner: KeloMeleeProfiles verification
- * keys: PVP MELEE FOLLOW RECOVERY MOVEMENT FIXED STEP AUDIT
- * purpose: verifies sword light follow recovery restores full movement without altering attack timings
+ * keys: PVP MELEE FOLLOW FINISHER RECOVERY MOVEMENT FIXED STEP AUDIT
+ * purpose: verifies light-combo recovery mobility at 60/90/120 Hz without altering attack timings
  * online: client and server consume the same KeloMeleeProfiles data
  * do-not: NO runtime gameplay owner; audit only
  */
@@ -11,16 +11,26 @@ const fs=require('fs'),path=require('path'),vm=require('vm');
 const root=path.resolve(__dirname,'..');
 const box={console,Map,Set,WeakMap,Math,Date,Object,Array,String,Number,Boolean,JSON};box.globalThis=box;box.window=box;vm.createContext(box);
 for(const rel of ['src/systems/melee/melee-schema.js','src/systems/melee/melee-weapon-profiles.js'])vm.runInContext(fs.readFileSync(path.join(root,rel),'utf8'),box,{filename:rel});
-const p=box.KeloMeleeProfiles&&box.KeloMeleeProfiles.get('sword_light_follow');
-if(!p)throw new Error('FOLLOW_PROFILE_MISSING');
-if(!p.movementScale||Number(p.movementScale.recovery)!==1)throw new Error('FOLLOW_RECOVERY_NOT_FULL_MOBILITY');
+const profiles=box.KeloMeleeProfiles;
+const follow=profiles&&profiles.get('sword_light_follow'),finisher=profiles&&profiles.get('sword_light_finisher');
+if(!follow)throw new Error('FOLLOW_PROFILE_MISSING');
+if(!finisher)throw new Error('FINISHER_PROFILE_MISSING');
+if(!follow.movementScale||Number(follow.movementScale.recovery)!==1)throw new Error('FOLLOW_RECOVERY_NOT_FULL_MOBILITY');
+if(!finisher.movementScale||Number(finisher.movementScale.recovery)!==.76)throw new Error('FINISHER_RECOVERY_NOT_TUNED');
 const SPEED=185.28;
-const before={windup:.9,active:.52,recovery:.8};
-const after=p.movementScale;
-const duration={windup:p.windup,active:p.active,recovery:p.recovery};
-function continuousDistance(scale){return SPEED*(duration.windup*scale.windup+duration.active*scale.active+duration.recovery*scale.recovery);}
-function fixedStep(hz,scale){const dt=1/hz,phases=['windup','active','recovery'];let phase=0,time=0,distance=0,steps=0;while(phase<phases.length&&steps<1000){const key=phases[phase];distance+=SPEED*Number(scale[key])*dt;time+=dt;steps++;if(time>=duration[key]){phase++;time=0;}}return{hz,distance,steps};}
-const baseline=continuousDistance(before),candidate=continuousDistance(after),free=SPEED*(p.windup+p.active+p.recovery);
-const result={profile:p.id,recoveryScaleBefore:.8,recoveryScaleAfter:p.movementScale.recovery,continuous:{baselineDistancePx:baseline,candidateDistancePx:candidate,gainPx:candidate-baseline,freeDistancePx:free,baselineSuppressionPx:free-baseline,candidateSuppressionPx:free-candidate},fixed:[60,90,120].map(hz=>({hz,before:fixedStep(hz,before).distance,after:fixedStep(hz,after).distance,gain:fixedStep(hz,after).distance-fixedStep(hz,before).distance}))};
-if(result.continuous.gainPx<=0)throw new Error('FOLLOW_RECOVERY_NO_MOBILITY_GAIN');
+function distance(profile,scale){return SPEED*(profile.windup*scale.windup+profile.active*scale.active+profile.recovery*scale.recovery);}
+function fixedStep(profile,hz,scale){const dt=1/hz,phases=['windup','active','recovery'];let phase=0,time=0,distancePx=0,steps=0;while(phase<phases.length&&steps<1000){const key=phases[phase];distancePx+=SPEED*Number(scale[key])*dt;time+=dt;steps++;if(time>=profile[key]){phase++;time=0;}}return{hz,distancePx,steps};}
+function sample(profile,scale){return{continuousDistancePx:distance(profile,scale),fixed:[60,90,120].map(hz=>fixedStep(profile,hz,scale))};}
+const followBefore={windup:.9,active:.52,recovery:.8},followAfter=follow.movementScale;
+const finisherBefore={windup:.76,active:.34,recovery:.64},finisherA={windup:.76,active:.34,recovery:.72},finisherB=finisher.movementScale;
+const followBaseline=sample(follow,followBefore),followCandidate=sample(follow,followAfter);
+const finisherBaseline=sample(finisher,finisherBefore),finisherCandidateA=sample(finisher,finisherA),finisherCandidateB=sample(finisher,finisherB);
+const result={
+  speedPxPerSec:SPEED,
+  follow:{recoveryScaleBefore:.8,recoveryScaleAfter:follow.movementScale.recovery,baseline:followBaseline,candidate:followCandidate,gainPx:followCandidate.continuousDistancePx-followBaseline.continuousDistancePx},
+  finisher:{recoveryScaleBefore:.64,candidateARecoveryScale:.72,candidateBRecoveryScale:finisher.movementScale.recovery,baseline:finisherBaseline,candidateA:finisherCandidateA,candidateB:finisherCandidateB,gainAFromBaselinePx:finisherCandidateA.continuousDistancePx-finisherBaseline.continuousDistancePx,gainBFromBaselinePx:finisherCandidateB.continuousDistancePx-finisherBaseline.continuousDistancePx,gainBOverAPx:finisherCandidateB.continuousDistancePx-finisherCandidateA.continuousDistancePx}
+};
+if(result.follow.gainPx<=0)throw new Error('FOLLOW_RECOVERY_NO_MOBILITY_GAIN');
+if(result.finisher.gainAFromBaselinePx<=0||result.finisher.gainBFromBaselinePx<=result.finisher.gainAFromBaselinePx)throw new Error('FINISHER_RECOVERY_REFINEMENT_INVALID');
+if(finisher.movementScale.recovery>=1)throw new Error('FINISHER_RECOVERY_LOST_WEIGHT_DIFFERENTIATION');
 console.log(JSON.stringify(result,null,2));
