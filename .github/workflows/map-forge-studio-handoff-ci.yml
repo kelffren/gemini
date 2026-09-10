@@ -8,6 +8,10 @@ on:
       - 'src/world/map-forge/**'
       - 'src/creators/**'
       - 'src/studio/adapters/map-forge-draft-importer.mjs'
+      - 'src/environment/world-builder-system.js'
+      - 'src/property/property-system.js'
+      - 'index.html'
+      - 'tests/map-forge-mobile-preview.spec.js'
       - 'scripts/map-forge-studio-handoff-audit.mjs'
       - '.github/workflows/map-forge-studio-handoff-ci.yml'
   push:
@@ -16,6 +20,10 @@ on:
       - 'src/world/map-forge/**'
       - 'src/creators/**'
       - 'src/studio/adapters/map-forge-draft-importer.mjs'
+      - 'src/environment/world-builder-system.js'
+      - 'src/property/property-system.js'
+      - 'index.html'
+      - 'tests/map-forge-mobile-preview.spec.js'
       - 'scripts/map-forge-studio-handoff-audit.mjs'
 jobs:
   contract:
@@ -34,6 +42,39 @@ jobs:
           node --check src/creators/workspaces/map-forge-workspace.mjs
           node --check src/creators/workspaces/world-workspace.mjs
           node --check src/studio/adapters/map-forge-draft-importer.mjs
+          node --check src/environment/world-builder-system.js
+          node --check src/property/property-system.js
+          node --check tests/map-forge-mobile-preview.spec.js
           node --check scripts/map-forge-studio-handoff-audit.mjs
       - name: Handoff contract
         run: node scripts/map-forge-studio-handoff-audit.mjs
+
+  mobile-preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install Playwright
+        run: |
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: Serve branch checkout
+        run: |
+          python3 -m http.server 4173 --bind 127.0.0.1 > /tmp/kelo-map-forge-http.log 2>&1 &
+          echo $! > /tmp/kelo-map-forge-http.pid
+      - name: Mobile 390x844 handoff
+        env:
+          KELO_PAGES: http://127.0.0.1:4173/
+        run: npx playwright test tests/map-forge-mobile-preview.spec.js --project=chromium
+      - name: Upload visual evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: map-forge-mobile-preview
+          path: |
+            test-results/**
+            playwright-report.json
+          if-no-files-found: ignore

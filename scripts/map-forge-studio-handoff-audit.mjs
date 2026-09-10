@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: TEST / MAP FORGE / STUDIO HANDOFF
  * owner: Map Forge Studio handoff contract audit
- * purpose: prove deterministic city projection into an authority-compatible editable draft without direct LIVE mutation
+ * purpose: prove deterministic normalized preview + authority exterior handoff without direct LIVE mutation or parallel renderers
  * online: validates replaceable KELO_WORLD_EDIT import boundary
  */
 import fs from 'node:fs';
@@ -34,7 +34,7 @@ const mockTemplates=[
   {id:'imperial:puente',label:'Puente Imperial',family:'harbor bridge',category:'architecture',width:160,height:128,placeable:true},
   {id:'imperial:obelisco',label:'Obelisco Imperial',family:'tower monument',category:'architecture',width:96,height:128,placeable:true}
 ];
-const mockCatalog={list:()=>mockTemplates,get:id=>mockTemplates.find(x=>x.id===id)||null};
+const mockCatalog={version:'mock-property-catalog-v1',list:()=>mockTemplates,get:id=>mockTemplates.find(x=>x.id===id)||null};
 const visual=mapDefinitionToWorldDraftSnapshot(map,{assetCatalog:mockCatalog});
 assert(visual.placements.length>0,'semantic Map Forge landmarks/decorations must project into Property placements for exterior preview');
 assert(visual.placements.some(x=>x.assetId==='imperial:fuente-justicia'),'central fountain landmark must become a real exterior Property placement');
@@ -49,14 +49,43 @@ const mapWorkspace=fs.readFileSync('src/creators/workspaces/map-forge-workspace.
 const entry=fs.readFileSync('src/creators/creator-entry.mjs','utf8');
 const hub=fs.readFileSync('src/creators/ui/creator-hub.mjs','utf8');
 const ui=fs.readFileSync('src/creators/ui/map-forge-workspace.mjs','utf8');
+const builder=fs.readFileSync('src/environment/world-builder-system.js','utf8');
+const property=fs.readFileSync('src/property/property-system.js','utf8');
+const index=fs.readFileSync('index.html','utf8');
+
 assert(importer.includes("world:draft:create")&&importer.includes('forceNew:true')&&importer.includes("world:draft:import"),'handoff must use World authority draft boundary');
-assert(importer.includes('KELO_PROPERTY_ASSET_CATALOG'),'semantic visual projection must reuse the Property asset catalog rather than inventing another asset owner');
-for(const bad of['KELO_COLLISION.replaceOwner','KELO_WORLD_RENDERER=','KELO_PROPERTY_SYSTEM.request','obstacles.push'])assert(!importer.includes(bad),`direct LIVE mutation forbidden: ${bad}`);
+assert(importer.includes('root.KELO_PROPERTY_CATALOG'),'semantic visual projection must reuse the LIVE Property catalog owner');
+for(const bad of['KELO_COLLISION.replaceOwner','KELO_WORLD_RENDERER=','KELO_PROPERTY_SYSTEM.request','obstacles.push'])assert(!importer.includes(bad),`direct LIVE mutation forbidden in importer: ${bad}`);
 assert(world.includes('importMapForgeIntoWorldDraft')&&world.includes('openKeloStudioLive'),'World workspace must remain final consumer');
 assert(world.includes('previewOnly')&&world.includes("world:preview:enter"),'generated exterior preview must use the existing World authority preview boundary');
+assert(world.includes('entered?.viewSnapshot')&&world.includes('MAP_FORGE_PREVIEW_RUNTIME_PROJECTION_MISSING'),'exterior handoff must verify authority snapshot and runtime projection before success');
+assert(world.includes('root.KeloCamera.focus')&&world.includes("source:'map-forge-exterior-preview'"),'exterior preview must focus through KeloCamera owner');
 assert(mapWorkspace.includes('options={}')&&mapWorkspace.includes('...options'),'Map Forge workspace must forward handoff mode without creating another authority');
 assert(entry.includes('registerMapForgeWorkspace')&&entry.includes('openWorkspace,...context'),'Creators must register Map Forge and inject generic workspace routing');
 assert(hub.includes("['map-forge','Map Forge','active']"),'Creator Hub must expose Map Forge');
-assert(ui.includes('ABRIR EN WORLD EDITOR')&&ui.includes('VER EN MAPA EXTERIOR')&&ui.includes('createMapForgeWorkerClient'),'Map Forge UI must expose generator, editor handoff and exterior preview');
-assert(ui.includes('for(const [i,d] of (map.districts||[]).entries())'),'Map Forge preview must destructure Array.entries() as [index,district] so canvas rendering cannot crash on d.bounds');
-console.log(JSON.stringify({ok:true,seed:map.metadata.seed,score:map.quality.total,cells:rows.length,paths:rows.filter(x=>x.role==='path').length,terrain:rows.filter(x=>x.role==='terrain').length,placements:visual.placements.length,layoutHash:map.metadata.layoutHash},null,2));
+
+assert(ui.includes('mapDefinitionToWorldDraftSnapshot'),'Map Forge preview must consume the same normalized snapshot projection as exterior handoff');
+assert(ui.includes('KELO_WORLD_BUILDER?.renderSnapshotPreview'),'Map Forge preview must reuse World Builder renderer capability');
+assert(!ui.includes('TERRAIN_COLORS'),'diagram-only terrain color preview must not remain the default renderer');
+assert(ui.includes('VER EN MAPA EXTERIOR')&&ui.includes('ABRIR EN WORLD EDITOR')&&ui.includes('createMapForgeWorkerClient'),'Map Forge UI must preserve generator, editor and exterior actions');
+assert(ui.includes('VOLVER A MAP FORGE')&&ui.includes("world:preview:exit"),'exterior preview must provide a reversible return path without regeneration');
+assert(ui.includes('WeakMap()')&&ui.includes('previewCache'),'normalized candidate preview snapshots must be cached per generated candidate');
+assert(ui.includes("KeloInputLocks.release")&&ui.includes('releaseInput()'),'detaching Map Forge must release its input claim');
+const exteriorStart=ui.indexOf('async function handoffExterior');
+const detachAt=ui.indexOf('detachWorkspace();',exteriorStart);
+const awaitAt=ui.indexOf('await onOpenWorld',exteriorStart);
+assert(exteriorStart>=0&&detachAt>exteriorStart&&awaitAt>detachAt,'Map Forge fullscreen shell must detach before awaiting exterior handoff');
+assert(ui.slice(exteriorStart,awaitAt).includes('busy=true'),'double-tap guard must be armed before detaching the shell');
+assert(ui.includes('resumeWorkspace();status.textContent'),'failed exterior handoff must restore the same Map Forge session');
+
+assert(builder.includes('renderSnapshotPreview'),'World Builder owner must expose read-only normalized snapshot preview rendering');
+assert(builder.includes('window.KELO_PROPERTY_SYSTEM')&&builder.includes('.drawPlacements'),'World Builder preview must reuse Property renderer for snapshot placements');
+assert(builder.includes('SURFACE_ATLAS_KEY')&&builder.includes('surfaceGround'),'World Builder must reuse the approved live ground atlas when legacy terrain atlases are retired');
+assert(builder.includes('atlasUsable')&&builder.includes('retiredVisual'),'retired/reset terrain atlases must not silently draw transparent tiles');
+assert(property.includes('function drawPlacements')&&property.includes('drawPlacements,exportLayout'),'Property owner must expose one read-only placement renderer instead of duplicating template drawing');
+assert(property.includes('kelo:property-render-assets-ready'),'preview must redraw when real Property assets finish loading');
+for(const bad of['obstacles.push','KELO_WORLD_RENDERER='])assert(!property.includes(bad),`Property preview capability must not add forbidden ownership writes: ${bad}`);
+
+assert(index.includes('src/property/property-system.js')&&index.includes('src/environment/world-builder-system.js'),'runtime must still load the existing Property and World Builder owners');
+
+console.log(JSON.stringify({ok:true,seed:map.metadata.seed,score:map.quality.total,cells:rows.length,paths:rows.filter(x=>x.role==='path').length,terrain:rows.filter(x=>x.role==='terrain').length,placements:visual.placements.length,layoutHash:map.metadata.layoutHash,realPreview:true,reversibleExteriorPreview:true,cameraOwner:'KeloCamera'},null,2));
