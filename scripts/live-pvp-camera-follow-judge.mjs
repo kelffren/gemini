@@ -22,16 +22,15 @@ async function boot(name,viewport,opts,fn){
   const result=await page.evaluate(fn);result.errors=errors;
   await page.screenshot({path:`artifacts/pvp-camera-follow-${name}.png`,fullPage:true});await context.close();return result;
 }
-const enterPvp=async()=>{await KeloPvPWorld.ensureCombatReady();KeloPvPWorld.enter();let deadline=performance.now()+5000;while(KeloPvPWorld.state.mode!=='pvp'&&performance.now()<deadline)await new Promise(r=>setTimeout(r,25));if(KeloPvPWorld.state.mode!=='pvp')throw new Error('PVP_ENTER_TIMEOUT');};
 const deadzoneFn=async()=>{
-  await enterPvp();
+  await KeloPvPWorld.ensureCombatReady();KeloPvPWorld.enter();let deadline=performance.now()+5000;while(KeloPvPWorld.state.mode!=='pvp'&&performance.now()<deadline)await new Promise(r=>setTimeout(r,25));if(KeloPvPWorld.state.mode!=='pvp')throw new Error('PVP_ENTER_TIMEOUT');
   localPlayer.x=2900;localPlayer.y=720;localPlayer.vx=0;localPlayer.vy=0;input.normX=0;input.normY=0;input.keys.d=false;KeloCamera.setTarget(localPlayer.x,localPlayer.y,{snap:true,source:'pvp-camera-follow-audit'});await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
   const start={t:performance.now(),playerX:localPlayer.x,cameraX:camera.x,targetX:camera.targetX,zoom:KeloCamera.getEffectiveZoom(),follow:KeloCamera.getFollowTuning(),legacyDeadRatio:Number(CONFIG.deadXRatio),screenSpaceDeadZone:KeloCamera.snapshot().version.includes('screen-deadzone')};input.keys.d=true;const samples=[];let onset=null;const until=start.t+1800;
   while(performance.now()<until){await new Promise(r=>requestAnimationFrame(r));const t=performance.now()-start.t;const sample={t,playerX:localPlayer.x,cameraX:camera.x,targetX:camera.targetX,lookOffsetX:camera.lookOffsetX,screenOffsetX:(localPlayer.x-camera.x)*KeloCamera.getEffectiveZoom()};samples.push(sample);if(!onset&&Math.abs(camera.targetX-start.targetX)>.5)onset=sample;if(onset&&t>onset.t+220)break;}
   input.keys.d=false;input.normX=0;const semanticPx=innerWidth*start.follow.deadXRatio;const legacyPx=innerWidth*start.legacyDeadRatio*start.zoom;return{viewport:{w:innerWidth,h:innerHeight},start,onset,semanticPx,legacyPx,samples:samples.slice(-12)};
 };
 const aimFn=async()=>{
-  await enterPvp();
+  await KeloPvPWorld.ensureCombatReady();KeloPvPWorld.enter();let deadline=performance.now()+5000;while(KeloPvPWorld.state.mode!=='pvp'&&performance.now()<deadline)await new Promise(r=>setTimeout(r,25));if(KeloPvPWorld.state.mode!=='pvp')throw new Error('PVP_ENTER_TIMEOUT');
   localPlayer.x=2900;localPlayer.y=720;localPlayer.vx=0;localPlayer.vy=0;input.normX=0;input.normY=0;input.keys.d=false;KeloCamera.setTarget(localPlayer.x,localPlayer.y,{snap:true,source:'pvp-camera-aim-audit'});
   KeloInput.combat.setAxes({aim:{x:0,y:-1,magnitude:1,source:'audit'},source:'audit'});input.keys.d=true;
   const startPlayer={x:localPlayer.x,y:localPlayer.y};const up=[];for(let i=0;i<36;i++){await new Promise(r=>requestAnimationFrame(r));up.push({x:Number(camera.lookOffsetX)||0,y:Number(camera.lookOffsetY)||0,px:localPlayer.x,py:localPlayer.y,framing:KeloCamera.snapshot().combatFraming});}
@@ -39,7 +38,7 @@ const aimFn=async()=>{
   input.keys.d=false;input.normX=0;const endPlayer={x:localPlayer.x,y:localPlayer.y};return{viewport:{w:innerWidth,h:innerHeight},version:KeloCamera.snapshot().version,weight:KeloCamera.snapshot().combatFraming?.aimPerpWeight,beforeFlip,afterFlip:down.at(-1),maxStep,playerDeltaY:endPlayer.y-startPlayer.y,upTail:up.slice(-6),downTail:down.slice(-6)};
 };
 const stationaryActionFn=async()=>{
-  await enterPvp();
+  await KeloPvPWorld.ensureCombatReady();KeloPvPWorld.enter();let deadline=performance.now()+5000;while(KeloPvPWorld.state.mode!=='pvp'&&performance.now()<deadline)await new Promise(r=>setTimeout(r,25));if(KeloPvPWorld.state.mode!=='pvp')throw new Error('PVP_ENTER_TIMEOUT');
   localPlayer.x=2900;localPlayer.y=720;localPlayer.vx=0;localPlayer.vy=0;input.normX=0;input.normY=0;input.keys.a=false;input.keys.d=false;input.keys.w=false;input.keys.s=false;KeloCamera.setTarget(localPlayer.x,localPlayer.y,{snap:true,source:'pvp-camera-stationary-action-audit'});
   KeloInput.combat.setAxes({aim:{x:1,y:0,magnitude:1,source:'audit'},move:{x:0,y:0,magnitude:0,source:'audit'},source:'audit'});await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
   const before={x:Number(camera.lookOffsetX)||0,y:Number(camera.lookOffsetY)||0,snapshot:KeloCamera.snapshot()};
