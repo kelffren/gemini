@@ -252,11 +252,15 @@ export function createPaintCopiesTool(kernel) {
 
   function syncButton() {
     if (!button?.isConnected) return;
+    const nextDisabled = !enabled && selectedEntities().length === 0;
+    const nextHtml = enabled ? '<span class="ks-ico">✣</span>PAINT ON' : '<span class="ks-ico">✣</span>PAINT COPIES';
+    const nextPressed = enabled ? 'true' : 'false';
+    const nextTitle = enabled ? 'Toca para salir de Paint Copies' : 'Pinta copias arrastrando por el mapa';
     button.classList.toggle('on', enabled);
-    button.disabled = !enabled && selectedEntities().length === 0;
-    button.innerHTML = enabled ? '<span class="ks-ico">✣</span>PAINT ON' : '<span class="ks-ico">✣</span>PAINT COPIES';
-    button.setAttribute('aria-pressed', enabled ? 'true' : 'false');
-    button.title = enabled ? 'Toca para salir de Paint Copies' : 'Pinta copias arrastrando por el mapa';
+    if (button.disabled !== nextDisabled) button.disabled = nextDisabled;
+    if (button.innerHTML !== nextHtml) button.innerHTML = nextHtml;
+    if (button.getAttribute('aria-pressed') !== nextPressed) button.setAttribute('aria-pressed', nextPressed);
+    if (button.title !== nextTitle) button.title = nextTitle;
   }
 
   function installButton() {
@@ -319,7 +323,6 @@ export function createPaintCopiesTool(kernel) {
         return;
       }
       if (!button?.isConnected) installButton();
-      else syncButton();
     });
     domObserver.observe(document.body, { childList: true, subtree: true });
   }
