@@ -6,6 +6,7 @@ on:
     paths:
       - 'src/visuals/melee-combat-visuals.js'
       - 'src/visuals/melee-visual-manifest.js'
+      - 'scripts/audit-pvp-reaction-hierarchy.js'
       - 'scripts/live-pvp-reaction-hierarchy-judge.mjs'
       - '.github/workflows/pvp-reaction-hierarchy-ci.yml'
   workflow_dispatch:
@@ -19,6 +20,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
+      - name: Audit 60 90 120 Hz reaction hierarchy
+        run: node scripts/audit-pvp-reaction-hierarchy.js
       - name: Install dependencies
         run: npm install --no-audit --no-fund
       - name: Install Chromium
