@@ -14,6 +14,7 @@
   'use strict';
   if(window.KELO_STUDIO_LAUNCHER)return;
   let loading=false,factoryLoading=false;
+  const CREATOR_BUILD='world-recovery-20260910-1';
   const actor=()=>String(window.KELO_ADMIN_KEYS?.playerId?.()||window.keloNet?.playerKey||window.localPlayer?.id||'local_pioneer');
   const allowed=()=>{
     const keys=window.KELO_ADMIN_KEYS,who=actor();
@@ -33,6 +34,13 @@
     button.disabled=!!busy;
     if(busy)button.setAttribute('aria-busy','true');else button.removeAttribute('aria-busy');
   }
+  async function loadCreatorHub(){
+    try{return await import(`./../creators/ui/creator-hub.mjs?v=${CREATOR_BUILD}`);}
+    catch(firstError){
+      console.warn('[Kelo Creators launcher] retrying fresh Creator Hub',firstError);
+      return import(`./../creators/ui/creator-hub.mjs?v=${CREATOR_BUILD}-${Date.now()}`);
+    }
+  }
   async function open(){
     if(loading)return;
     if(!allowed())return toast('Necesitas acceso a Kelo Creators');
@@ -40,7 +48,7 @@
     const btn=document.getElementById('lx-create-studio');paint(btn,true);
     try{
       window.KELO_LUXE?.closeMenu?.();
-      const mod=await import('./../creators/ui/creator-hub.mjs');
+      const mod=await loadCreatorHub();
       await mod.openCreatorHub({root:window});
     }catch(e){
       console.error('[Kelo Creators launcher]',e);toast(friendlyError(e));
@@ -76,7 +84,7 @@
   }
   function boot(){sync();void import('./../characters/creator-avatar-runtime.mjs').then(m=>m.installCreatorAvatarRuntime({root:window})).catch(e=>console.warn('[Kelo Avatar runtime]',e));}
   window.KELO_ADMIN_KEYS?.onChange?.(sync);
-  const api=Object.freeze({version:'studio-launcher-v1.8.0-sprite-factory-online',open,openSpriteFactory:openFactory,sync,get allowed(){return allowed();}});
+  const api=Object.freeze({version:'studio-launcher-v1.8.1-world-recovery',open,openSpriteFactory:openFactory,sync,get allowed(){return allowed();}});
   window.KELO_STUDIO_LAUNCHER=api;
   window.KELO_CREATORS_LAUNCHER=api;
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
