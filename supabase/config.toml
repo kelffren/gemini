@@ -1,5 +1,7 @@
-# Kelo World Supabase local-development configuration.
-# Production linking/deploy target is declared below; secrets never live here.
+# Kelo World Supabase configuration.
+# Production auth URLs are canonical here so automated Supabase config syncs
+# cannot reset the live project back to localhost. Localhost remains allowlisted
+# for local development, but the default auth redirect always targets GitHub Pages.
 project_id = "kelo-world"
 
 [api]
@@ -23,8 +25,12 @@ file_size_limit = "50MiB"
 
 [auth]
 enabled = true
-site_url = "http://127.0.0.1:3000"
-additional_redirect_urls = ["http://localhost:3000", "http://127.0.0.1:3000"]
+site_url = "https://kelffren.github.io/gemini/"
+additional_redirect_urls = [
+  "https://kelffren.github.io/gemini/",
+  "http://localhost:3000",
+  "http://127.0.0.1:3000"
+]
 enable_signup = true
 
 # The GitHub integration currently has production deployment disabled while
