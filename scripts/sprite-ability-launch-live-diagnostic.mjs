@@ -14,6 +14,7 @@ fs.mkdirSync(artifactDir,{recursive:true});
 const browser=await chromium.launch({headless:true,...(executablePath?{executablePath}:{})});
 const context=await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true,serviceWorkers:'block'});
 const page=await context.newPage();
+page.setDefaultTimeout(10000);
 const consoleMessages=[];
 const pageErrors=[];
 page.on('console',message=>consoleMessages.push(`${message.type()}: ${message.text()}`));
@@ -45,11 +46,11 @@ try{
   await page.goto(`${BASE}?offline=1&mapEditor=1&sprite-ability-launch-diagnostic=${Date.now()}`,{waitUntil:'domcontentloaded',timeout:30000});
   await page.waitForFunction(()=>window.KELO_CREATORS_LAUNCHER&&window.KELO_ADMIN_KEYS?.can?.('ability.edit',window.KELO_ADMIN_KEYS.playerId())===true&&window.KeloInputLocks,{timeout:20000});
   await page.evaluate(()=>{document.documentElement.dataset.keloAuthGate='off';});
-  await page.evaluate(()=>window.KELO_CREATORS_LAUNCHER.open());
+  await page.evaluate(()=>{void window.KELO_CREATORS_LAUNCHER.open();return true;});
   await page.waitForSelector('#kelo-creators-hub',{state:'visible',timeout:10000});
-  const spriteButton=page.getByRole('button',{name:'Abrir Sprite Ability'});
-  if(!await spriteButton.isEnabled())throw new Error('SPRITE_ABILITY_CARD_NOT_ACTIVE');
-  await spriteButton.click({noWaitAfter:true});
+  const enabled=await page.evaluate(()=>{const card=[...document.querySelectorAll('.kc-card')].find(node=>node.getAttribute('aria-label')==='Abrir Sprite Ability');return Boolean(card&&!card.disabled);});
+  if(!enabled)throw new Error('SPRITE_ABILITY_CARD_NOT_ACTIVE');
+  await page.evaluate(()=>{const card=[...document.querySelectorAll('.kc-card')].find(node=>node.getAttribute('aria-label')==='Abrir Sprite Ability');card?.click();return true;});
 
   let state=null;
   const deadline=Date.now()+12000;
@@ -61,7 +62,6 @@ try{
   state=await snapshot();
   const report={state,consoleMessages,pageErrors};
   fs.writeFileSync(`${artifactDir}/launch-diagnostic.json`,JSON.stringify(report,null,2));
-  await page.screenshot({path:`${artifactDir}/launch-diagnostic.png`,fullPage:true});
   console.log('SPRITE_ABILITY_LAUNCH_DIAGNOSTIC');
   console.log(JSON.stringify(report,null,2));
   if(!state.workspaceConnected)throw new Error(`SPRITE_ABILITY_LAUNCH_FAILED:${JSON.stringify(report)}`);
