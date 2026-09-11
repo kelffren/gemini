@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import { alphaBoundsFromImageData,reorderItems } from '../src/creators/sprite-ability/sprite-ability-repair-studio.mjs';
-import { pinchScale,pinchBrushSize,pinchMidpoint } from '../src/creators/sprite-ability/sprite-ability-repair-touch.mjs';
+import { pinchScale,pinchBrushSize,pinchMidpoint,brushScreenDiameter } from '../src/creators/sprite-ability/sprite-ability-repair-touch.mjs';
 
 const rgba=new Uint8ClampedArray(6*5*4);
 for(let y=1;y<=3;y++)for(let x=2;x<=4;x++)rgba[(y*6+x)*4+3]=255;
@@ -15,6 +15,8 @@ assert.equal(pinchScale(.3,100,10),.25);
 assert.equal(pinchBrushSize(12,100,200),24);
 assert.equal(pinchBrushSize(40,100,200),48);
 assert.equal(pinchBrushSize(4,100,10),2);
+assert.equal(Math.round(brushScreenDiameter(12,{stageCssWidth:320,stageLogicalWidth:640,frameWidth:128,frameHeight:128})),43);
+assert.ok(brushScreenDiameter(24,{stageCssWidth:320,stageLogicalWidth:640,frameWidth:128,frameHeight:128})>brushScreenDiameter(12,{stageCssWidth:320,stageLogicalWidth:640,frameWidth:128,frameHeight:128}));
 assert.deepEqual(pinchMidpoint({x:10,y:20},{x:30,y:60}),{x:20,y:40});
 
 const source=fs.readFileSync(new URL('../src/creators/sprite-ability/sprite-ability-repair-studio.mjs',import.meta.url),'utf8');
@@ -25,7 +27,7 @@ assert.ok(source.includes("setField(workspace,'.ksw-right','Impact Frame'"),'rep
 assert.ok(source.includes("setField(workspace,'.ksw-right','Hitbox W'"),'repair must restore hitbox');
 
 const touch=fs.readFileSync(new URL('../src/creators/sprite-ability/sprite-ability-repair-touch.mjs',import.meta.url),'utf8');
-for(const token of ['pointerType','touch','srTouchGestures','srGesture','pinchScale','pinchBrushSize','pinch-scale','pinch-brush','MOVER: escala','BORRAR: tamaño'])assert.ok(touch.includes(token),`missing touch contract ${token}`);
+for(const token of ['pointerType','touch','srTouchGestures','srGesture','pinchScale','pinchBrushSize','brushScreenDiameter','sr-touch-brush-ring','pinch-scale','pinch-brush','MOVER: escala','BORRAR: tamaño'])assert.ok(touch.includes(token),`missing touch contract ${token}`);
 assert.ok(touch.includes("dispatchEvent(new root.Event('input'"),'pinch must drive canonical range inputs');
 assert.ok(touch.includes('stage.onpointermove?.'),'pinch centroid must reuse canonical move handler');
 
