@@ -18,7 +18,11 @@ function parcelBoundaryMismatchCount(map){let n=0;for(const parcel of map.parcel
 
 const BASELINE_DECORATIONS=54597;
 const BASELINE_MISMATCHES=13052;
-const BASELINE_BLOCKS=4567;
+// Rebased after the district-ownership + semantic-paving guards became the production generator baseline.
+// The old 4567 count represented pre-guard blocks that are now intentionally rejected; 3954 is the
+// measured 300-map, zero-leakage corpus on current main. Keep the 98% retention gate so future density
+// losses still fail instead of silently redefining the baseline.
+const BASELINE_BLOCKS=3954;
 const BASELINE_BLOCK_MISMATCHES=1;
 const BASELINE_PARCELS=5096;
 const BASELINE_PARCEL_BOUNDARY_MISMATCHES=34;
