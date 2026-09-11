@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: CREATORS / SPRITE ABILITY / REPAIR TOUCH
  * owner: mobile pointer gestures layered over Sprite Repair Studio
- * keys: TOUCH PINCH SCALE PAN ERASER BRUSH SIZE MOBILE POINTER
+ * keys: TOUCH PINCH SCALE PAN ERASER BRUSH SIZE CURSOR MOBILE POINTER
  * purpose: keep Repair Studio canonical while making its existing move/scale/erase controls directly operable with fingers
  * does-not-own: frame pixels, repair persistence, spritesheet generation or combat data
  */
@@ -18,6 +18,10 @@ export function pinchBrushSize(startSize,startDistance,currentDistance,{min=2,ma
   return Math.round(pinchScale(startSize,startDistance,currentDistance,{min,max}));
 }
 export function pinchMidpoint(a,b){return mid(a,b);}
+export function brushScreenDiameter(brush,{stageCssWidth=320,stageLogicalWidth=640,frameWidth=128,frameHeight=128}={}){
+  const size=Math.min(stageLogicalWidth,stageLogicalWidth)*.72,ratio=Math.min(size/Math.max(1,frameWidth),size/Math.max(1,frameHeight)),cssScale=stageCssWidth/Math.max(1,stageLogicalWidth);
+  return Math.max(6,Number(brush||12)*ratio*cssScale*2);
+}
 
 function activeTool(overlay){return overlay?.querySelector('.sr-mode button.on')?.textContent?.trim()||'';}
 function rangeInputFor(overlay,label){
@@ -26,18 +30,24 @@ function rangeInputFor(overlay,label){
 }
 const scaleInputFor=overlay=>rangeInputFor(overlay,'ESCALA');
 const brushInputFor=overlay=>rangeInputFor(overlay,'BORRADOR');
+function cellSizeFor(overlay){const text=overlay?.querySelector('.sr-ref')?.textContent||'',m=text.match(/celda\s+(\d+)×(\d+)/i);return m?{frameWidth:Number(m[1])||128,frameHeight:Number(m[2])||128}:{frameWidth:128,frameHeight:128};}
 function addHint(stage){
   const overlay=stage.closest('.sab-repair');if(!overlay||overlay.querySelector('.sr-touch-help'))return;
   const card=overlay.querySelector('.sr-side .sr-card');if(!card)return;
   const p=overlay.ownerDocument.createElement('p');p.className='sr-help sr-touch-help';p.textContent='☝️ MOVER: arrastra · 🤏 MOVER: escala · ⌫ BORRAR: 1 dedo borra · 🤏 BORRAR: tamaño';card.append(p);
 }
+function createBrushRing(stage){
+  const wrap=stage.parentElement,doc=stage.ownerDocument,ring=doc.createElement('div');ring.className='sr-touch-brush-ring';ring.hidden=true;Object.assign(ring.style,{position:'absolute',zIndex:'8',border:'2px solid rgba(255,235,155,.95)',boxShadow:'0 0 0 1px rgba(0,0,0,.7),borderRadius:'50%',pointerEvents:'none',transform:'translate(-50%,-50%)',background:'rgba(255,255,255,.035)'});wrap?.append(ring);return ring;
+}
 
 function attachStage(stage,root){
   if(stage.dataset.srTouchGestures==='1')return()=>{};
   stage.dataset.srTouchGestures='1';addHint(stage);
-  const pointers=new Map(),blocked=new Set();let gesture=null;
+  const pointers=new Map(),blocked=new Set(),ring=createBrushRing(stage);let gesture=null;
   const point=e=>({x:e.clientX,y:e.clientY});
   const stop=e=>{e.preventDefault?.();e.stopImmediatePropagation?.();};
+  const hideRing=()=>{ring.hidden=true;};
+  const showRing=(clientX,clientY)=>{const overlay=stage.closest('.sab-repair'),brush=Number(brushInputFor(overlay)?.value)||12,stageRect=stage.getBoundingClientRect(),wrapRect=stage.parentElement?.getBoundingClientRect?.()||stageRect,{frameWidth,frameHeight}=cellSizeFor(overlay),diameter=brushScreenDiameter(brush,{stageCssWidth:stageRect.width,stageLogicalWidth:stage.width||640,frameWidth,frameHeight});ring.style.width=`${diameter}px`;ring.style.height=`${diameter}px`;ring.style.left=`${clientX-wrapRect.left}px`;ring.style.top=`${clientY-wrapRect.top}px`;ring.hidden=false;};
   const clearGesture=()=>{
     if(!gesture)return;
     try{stage.onpointerup?.({pointerId:gesture.primaryId,preventDefault(){}});}catch{}
@@ -46,9 +56,12 @@ function attachStage(stage,root){
   const down=e=>{
     if(e.pointerType!=='touch')return;
     pointers.set(e.pointerId,point(e));
+    const overlay=stage.closest('.sab-repair'),tool=activeTool(overlay);
+    if(tool.includes('BORRAR')&&pointers.size===1)showRing(e.clientX,e.clientY);
     if(pointers.size<2)return;
+    hideRing();
     if(gesture){stop(e);return;}
-    const overlay=stage.closest('.sab-repair'),tool=activeTool(overlay),entries=[...pointers.entries()].slice(0,2),[first,second]=entries,startDistance=dist(first[1],second[1]);
+    const entries=[...pointers.entries()].slice(0,2),[first,second]=entries,startDistance=dist(first[1],second[1]);
     if(!(startDistance>0)){blocked.add(e.pointerId);stop(e);return;}
     if(tool.includes('MOVER')){
       const scaleInput=scaleInputFor(overlay);if(!scaleInput){blocked.add(e.pointerId);stop(e);return;}
@@ -67,6 +80,8 @@ function attachStage(stage,root){
     if(blocked.has(e.pointerId)){stop(e);return;}
     if(!pointers.has(e.pointerId))return;
     pointers.set(e.pointerId,point(e));
+    const overlay=stage.closest('.sab-repair'),tool=activeTool(overlay);
+    if(!gesture&&tool.includes('BORRAR')&&pointers.size===1)showRing(e.clientX,e.clientY);
     if(!gesture||!gesture.ids.includes(e.pointerId))return;
     const a=pointers.get(gesture.ids[0]),b=pointers.get(gesture.ids[1]);if(!a||!b)return;
     stop(e);
@@ -87,10 +102,10 @@ function attachStage(stage,root){
     const wasBlocked=blocked.delete(e.pointerId),wasGesture=Boolean(gesture?.ids.includes(e.pointerId));
     if(wasBlocked)stop(e);
     if(wasGesture){stop(e);clearGesture();}
-    pointers.delete(e.pointerId);
+    pointers.delete(e.pointerId);if(pointers.size===0)hideRing();
   };
   stage.addEventListener('pointerdown',down,true);stage.addEventListener('pointermove',move,true);stage.addEventListener('pointerup',up,true);stage.addEventListener('pointercancel',up,true);
-  return()=>{stage.removeEventListener('pointerdown',down,true);stage.removeEventListener('pointermove',move,true);stage.removeEventListener('pointerup',up,true);stage.removeEventListener('pointercancel',up,true);pointers.clear();blocked.clear();clearGesture();delete stage.dataset.srTouchGestures;};
+  return()=>{stage.removeEventListener('pointerdown',down,true);stage.removeEventListener('pointermove',move,true);stage.removeEventListener('pointerup',up,true);stage.removeEventListener('pointercancel',up,true);pointers.clear();blocked.clear();clearGesture();ring.remove();delete stage.dataset.srTouchGestures;};
 }
 
 export function installSpriteAbilityRepairTouch({root=globalThis}={}){
