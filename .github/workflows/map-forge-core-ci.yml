@@ -73,16 +73,16 @@ jobs:
         run: |
           cp src/world/map-forge/map-forge-champion-overrides.mjs /tmp/map-forge-champion-after.mjs
           cp src/world/map-forge/map-forge-core.mjs /tmp/map-forge-core-after.mjs
-          CORE_BEFORE_COMMIT="$(git log -2 --format=%H -- src/world/map-forge/map-forge-core.mjs | tail -1)"
-          test -n "$CORE_BEFORE_COMMIT"
-          git show "$CORE_BEFORE_COMMIT:src/world/map-forge/map-forge-core.mjs" > /tmp/map-forge-core-before.mjs
-          echo "Comparing core states: $CORE_BEFORE_COMMIT -> $(git log -1 --format=%H -- src/world/map-forge/map-forge-core.mjs)"
+          BASE_COMMIT="$(git rev-parse HEAD^)"
+          git show "$BASE_COMMIT:src/world/map-forge/map-forge-champion-overrides.mjs" > /tmp/map-forge-champion-before.mjs
+          git show "$BASE_COMMIT:src/world/map-forge/map-forge-core.mjs" > /tmp/map-forge-core-before.mjs
+          echo "Comparing complete generator state: $BASE_COMMIT -> $(git rev-parse HEAD)"
       - name: Capture fixed-seed BEFORE preview and runtime evidence
         env:
           KELO_PAGES: http://127.0.0.1:4173/
           KELO_VISUAL_STAGE: before
         run: |
-          cp /tmp/map-forge-champion-after.mjs src/world/map-forge/map-forge-champion-overrides.mjs
+          cp /tmp/map-forge-champion-before.mjs src/world/map-forge/map-forge-champion-overrides.mjs
           cp /tmp/map-forge-core-before.mjs src/world/map-forge/map-forge-core.mjs
           npx playwright test tests/map-forge-visual-round.spec.js --project=chromium --output=playwright-results/before
       - name: Capture fixed-seed AFTER preview and runtime evidence
