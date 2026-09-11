@@ -61,9 +61,9 @@ jobs:
           grep -q "kelo.supabase.session.v1" src/auth/supabase-auth-runtime.js
           grep -q "syncNetSession(session,characterId)" src/auth/supabase-auth-runtime.js
           grep -q "ready(9000)" src/auth/supabase-auth-runtime.js
-          grep -q "kelo-online-auth-lifecycle-v1" src/auth/online-auth-lifecycle-bridge.js
           grep -q "TOKEN_REFRESHED" src/auth/online-auth-lifecycle-bridge.js
           grep -q "SIGNED_OUT" src/auth/online-auth-lifecycle-bridge.js
+          grep -q "disconnectForAuth" src/auth/online-auth-lifecycle-bridge.js
           grep -q "signInWithPassword" src/ui/account-auth-ui.js
           grep -q "protectGuestWithEmail" src/ui/account-auth-ui.js
           grep -q "Continuar con Google" src/ui/google-auth-button.js
