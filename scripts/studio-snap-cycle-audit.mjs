@@ -25,16 +25,17 @@ const document={
 const root={document,Event:FakeEvent};
 const controller=createStudioSnapCycleController({root});
 
-const event=(key,extra={})=>({key,defaultPrevented:false,repeat:false,metaKey:false,ctrlKey:false,altKey:false,shiftKey:false,target:{closest:()=>null},prevented:false,stopped:false,preventDefault(){this.prevented=true;},stopImmediatePropagation(){this.stopped=true;},...extra});
+const event=(key,extra={})=>({key,defaultPrevented:false,repeat:false,metaKey:false,ctrlKey:false,altKey:false,shiftKey:false,getModifierState:()=>false,target:{closest:()=>null},prevented:false,stopped:false,preventDefault(){this.prevented=true;},stopImmediatePropagation(){this.stopped=true;},...extra});
 let e=event(']');keydown(e);assert.equal(select.value,'16');assert.equal(changes,1);assert.equal(e.prevented,true);assert.equal(e.stopped,true);
 e=event('[');keydown(e);assert.equal(select.value,'8');assert.equal(changes,2);
 select.value='64';e=event(']');keydown(e);assert.equal(select.value,'1');assert.equal(changes,3);
+select.value='8';e=event(']',{ctrlKey:true,altKey:true,getModifierState:name=>name==='AltGraph'});keydown(e);assert.equal(select.value,'16');assert.equal(changes,4);assert.equal(e.prevented,true);
 
 for(const blocked of [
   event(']',{repeat:true}),event(']',{ctrlKey:true}),event(']',{metaKey:true}),event(']',{altKey:true}),event(']',{shiftKey:true}),event(']',{defaultPrevented:true}),
   event(']',{target:{closest:()=>({tagName:'INPUT'})}}),event('x')
 ]){const before=changes;keydown(blocked);assert.equal(changes,before);}
-select.disabled=true;const disabled=event(']');keydown(disabled);assert.equal(changes,3);assert.equal(disabled.prevented,false);select.disabled=false;
+select.disabled=true;const disabled=event(']');keydown(disabled);assert.equal(changes,4);assert.equal(disabled.prevented,false);select.disabled=false;
 
 controller.destroy();assert.equal(removed,true);
 assert.match(entry,/createStudioSnapCycleController/);
