@@ -84,6 +84,10 @@
       window.KELO_LUXE?.closeMenu?.();
       const mod=await import(`./../studio/ui/studio-asset-repairer.mjs?v=${CREATOR_BUILD}`);
       const repairer=mod.createStudioAssetRepairer({root:window});
+      const actions=repairer.element?.querySelector?.('.kar-actions');
+      if(actions&&!actions.querySelector('[data-repair-close]')){
+        const close=document.createElement('button');close.type='button';close.className='kar-btn';close.dataset.repairClose='1';close.textContent='CLOSE';close.onclick=()=>repairer.destroy();actions.prepend(close);
+      }
       window.KELO_ASSET_REPAIRER=repairer;
     }catch(e){
       console.error('[Kelo Asset Repairer launcher]',e);toast(friendlyError(e));
