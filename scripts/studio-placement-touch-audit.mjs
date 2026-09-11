@@ -29,9 +29,9 @@ assert.match(source,/studio-placement-touch-v1\.1\.0-continuous/,'controller ver
 assert.doesNotMatch(source,/KELO_WORLD_EDIT/,'touch layer must not write authority directly');
 assert.doesNotMatch(source,/kernel\.execute/,'touch layer must not bypass placement tool / CommandBus');
 
-assert.match(entry,/createStudioPlacementTouchController/,'Studio entry must install placement touch controller');
-assert.match(entry,/placement:tools\.placement/,'Studio entry must reuse the registered canonical placement tool');
+assert.match(entry,/import \{ createStudioPlacementTouchController \}/,'Studio entry must import placement touch integration');
+assert.match(entry,/createStudioPlacementTouchController\(\{root,placement:tools\.placement\}\)/,'Studio entry must reuse the registered canonical placement tool');
+assert.match(entry,/placementTouchController/,'Studio session must retain the placement touch controller');
 assert.match(entry,/placementTouchController\.destroy\(\)/,'Studio close must release placement touch UI');
-assert.match(entry,/kelo-studio-foundation-v1\.20\.0-placement-touch/,'foundation version must expose placement touch integration');
 
-console.log(JSON.stringify({ok:true,mobilePlacementPad:true,directions:4,explicitCommit:true,continuousStamping:true,preservesRotation:true,preservesOverrides:true,stepModes:['snap','1px','4x'],canonicalPlacement:true,commandBusPreserved:true,touchTargetPx:46,safeArea:true,cleanup:true},null,2));
+console.log(JSON.stringify({ok:true,mobilePlacementPad:true,directions:4,explicitCommit:true,continuousStamping:true,preservesRotation:true,preservesOverrides:true,stepModes:['snap','1px','4x'],canonicalPlacement:true,commandBusPreserved:true,touchTargetPx:46,safeArea:true,cleanup:true,versionIndependentIntegration:true},null,2));
