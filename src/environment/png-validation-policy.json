@@ -7,6 +7,11 @@
       "reason": "Player/UI sprite is outside the Kelo World environment asset contract."
     },
     {
+      "path": "assets/hero-spartan-spritesheet.png",
+      "scope": "source-sheet",
+      "reason": "New hero spritesheet is retained as authoring input until it is processed into the runtime character pipeline; it is not a world environment asset."
+    },
+    {
       "path": "assets/fx/sword-swap/activation-eye.PNG",
       "scope": "non-world-ui",
       "reason": "Sword Swap activation eye is an actor presentation VFX asset owned by the modular Visual System, not the environment art contract."
