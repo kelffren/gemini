@@ -1,7 +1,7 @@
 # KELO-INDEX
 # area: CI / CREATORS
-# keys: SPRITE ABILITY BUILDER SPRITESHEET AUTO FIT MANUAL CUT ANIMATION ABILITY MOBILE EVENT LAB LAUNCH TRANSACTION
-# purpose: valida launcher + persistence + auto-fit + corte manual + eventos de preview + flujo real upload → normalize → preview → generate a 390x844
+# keys: SPRITE ABILITY BUILDER SPRITESHEET AUTO FIT MANUAL CUT REPAIR ANIMATION ABILITY MOBILE EVENT LAB LAUNCH TRANSACTION
+# purpose: valida launcher + persistence + auto-fit + corte/reparación manual + eventos + flujo real upload → repair → normalize → preview → generate a 390x844
 name: Sprite Ability Builder CI
 on:
   pull_request:
@@ -21,6 +21,8 @@ on:
       - 'scripts/sprite-ability-builder-live-audit.mjs'
       - 'scripts/sprite-ability-event-lab-audit.mjs'
       - 'scripts/sprite-ability-manual-cutter-audit.mjs'
+      - 'scripts/sprite-ability-repair-audit.mjs'
+      - 'scripts/sprite-ability-repair-live-audit.mjs'
       - '.github/workflows/sprite-ability-builder-ci.yml'
   push:
     branches: [main]
@@ -40,6 +42,8 @@ on:
       - 'scripts/sprite-ability-builder-live-audit.mjs'
       - 'scripts/sprite-ability-event-lab-audit.mjs'
       - 'scripts/sprite-ability-manual-cutter-audit.mjs'
+      - 'scripts/sprite-ability-repair-audit.mjs'
+      - 'scripts/sprite-ability-repair-live-audit.mjs'
       - '.github/workflows/sprite-ability-builder-ci.yml'
   workflow_dispatch:
 
@@ -58,6 +62,7 @@ jobs:
           node --check src/creators/sprite-ability/sprite-ability-live-controller.mjs
           node --check src/creators/sprite-ability/sprite-ability-event-lab.mjs
           node --check src/creators/sprite-ability/sprite-ability-manual-cutter.mjs
+          node --check src/creators/sprite-ability/sprite-ability-repair-studio.mjs
           node --check src/creators/workspaces/sprite-ability-workspace.mjs
           node --check src/creators/creator-entry.mjs
           node --check src/creators/repository/indexeddb-creator-state-adapter.mjs
@@ -71,18 +76,23 @@ jobs:
           node --check scripts/sprite-ability-builder-live-audit.mjs
           node --check scripts/sprite-ability-event-lab-audit.mjs
           node --check scripts/sprite-ability-manual-cutter-audit.mjs
+          node --check scripts/sprite-ability-repair-audit.mjs
+          node --check scripts/sprite-ability-repair-live-audit.mjs
       - name: Launcher transaction contract
         run: node scripts/creator-hub-sprite-launch-audit.mjs
       - name: Builder contract
         run: node scripts/sprite-ability-builder-audit.mjs
       - name: Manual cutter contract
         run: node scripts/sprite-ability-manual-cutter-audit.mjs
+      - name: Sprite Repair contract
+        run: node scripts/sprite-ability-repair-audit.mjs
       - name: Event preview regression
         run: node scripts/sprite-ability-event-lab-audit.mjs
       - name: Architecture guardrails
         run: |
           grep -q "SPRITE_ABILITY" src/creators/core/creator-project.mjs
           grep -q "registerSpriteAbilityWorkspace" src/creators/creator-entry.mjs
+          grep -q "installSpriteAbilityRepairStudio" src/creators/creator-entry.mjs
           grep -q "bounded-transactions" src/creators/repository/indexeddb-creator-state-adapter.mjs
           grep -q "persistAfterMutation" src/creators/repository/local-creator-project-repository.mjs
           grep -q "sprite-ability" src/creators/ui/creator-hub.mjs
@@ -110,6 +120,11 @@ jobs:
           AUDIT_URL: http://127.0.0.1:8000/
           CHROME_BIN: /usr/bin/google-chrome
         run: node scripts/sprite-ability-launch-live-diagnostic.mjs
+      - name: Repair bad sprite manually at 390x844
+        env:
+          AUDIT_URL: http://127.0.0.1:8000/
+          CHROME_BIN: /usr/bin/google-chrome
+        run: node scripts/sprite-ability-repair-live-audit.mjs
       - name: Upload irregular sheet, auto-fit, preview and generate at 390x844
         env:
           AUDIT_URL: http://127.0.0.1:8000/
@@ -120,6 +135,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: sprite-ability-builder-mobile
-          path: artifacts/sprite-ability-builder/
+          path: |
+            artifacts/sprite-ability-builder/
+            artifacts/sprite-ability-repair/
           if-no-files-found: warn
           retention-days: 14
