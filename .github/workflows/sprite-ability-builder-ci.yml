@@ -1,7 +1,7 @@
 # KELO-INDEX
 # area: CI / CREATORS
-# keys: SPRITE ABILITY BUILDER SPRITESHEET AUTO FIT ANIMATION ABILITY MOBILE
-# purpose: valida auto-fit + flujo real upload → normalize → preview → generate a 390x844
+# keys: SPRITE ABILITY BUILDER SPRITESHEET AUTO FIT ANIMATION ABILITY MOBILE EVENT LAB
+# purpose: valida auto-fit + eventos de preview + flujo real upload → normalize → preview → generate a 390x844
 name: Sprite Ability Builder CI
 on:
   pull_request:
@@ -15,6 +15,7 @@ on:
       - 'src/creators/animation/animation-preview-adapter.mjs'
       - 'scripts/sprite-ability-builder-audit.mjs'
       - 'scripts/sprite-ability-builder-live-audit.mjs'
+      - 'scripts/sprite-ability-event-lab-audit.mjs'
       - '.github/workflows/sprite-ability-builder-ci.yml'
   push:
     branches: [main]
@@ -28,6 +29,7 @@ on:
       - 'src/creators/animation/animation-preview-adapter.mjs'
       - 'scripts/sprite-ability-builder-audit.mjs'
       - 'scripts/sprite-ability-builder-live-audit.mjs'
+      - 'scripts/sprite-ability-event-lab-audit.mjs'
       - '.github/workflows/sprite-ability-builder-ci.yml'
   workflow_dispatch:
 
@@ -44,6 +46,7 @@ jobs:
           node --check src/creators/sprite-ability/spritesheet-auto-fit.mjs
           node --check src/creators/sprite-ability/sprite-ability-document.mjs
           node --check src/creators/sprite-ability/sprite-ability-live-controller.mjs
+          node --check src/creators/sprite-ability/sprite-ability-event-lab.mjs
           node --check src/creators/workspaces/sprite-ability-workspace.mjs
           node --check src/creators/creator-entry.mjs
           node --check src/creators/ui/creator-hub.mjs
@@ -51,8 +54,11 @@ jobs:
           node --check src/creators/animation/animation-preview-adapter.mjs
           node --check scripts/sprite-ability-builder-audit.mjs
           node --check scripts/sprite-ability-builder-live-audit.mjs
+          node --check scripts/sprite-ability-event-lab-audit.mjs
       - name: Builder contract
         run: node scripts/sprite-ability-builder-audit.mjs
+      - name: Event preview regression
+        run: node scripts/sprite-ability-event-lab-audit.mjs
       - name: Architecture guardrails
         run: |
           grep -q "SPRITE_ABILITY" src/creators/core/creator-project.mjs
