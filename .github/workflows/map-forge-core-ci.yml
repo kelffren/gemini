@@ -13,6 +13,7 @@ on:
       - 'scripts/map-forge-block-road-clearance-audit.mjs'
       - 'scripts/map-forge-paving-intent-audit.mjs'
       - 'tests/map-forge-visual-round.spec.js'
+      - 'tests/map-forge-fountain-clearance.spec.js'
       - 'tests/map-forge-orientation-visual.spec.js'
       - '.github/workflows/map-forge-core-ci.yml'
       - 'docs/systems/MAP_FORGE_SYSTEM.md'
@@ -26,6 +27,7 @@ on:
       - 'scripts/map-forge-block-road-clearance-audit.mjs'
       - 'scripts/map-forge-paving-intent-audit.mjs'
       - 'tests/map-forge-visual-round.spec.js'
+      - 'tests/map-forge-fountain-clearance.spec.js'
       - 'tests/map-forge-orientation-visual.spec.js'
       - '.github/workflows/map-forge-core-ci.yml'
 
@@ -63,24 +65,27 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Serve branch checkout
         run: python3 -m http.server 4173 --bind 127.0.0.1 > /tmp/kelo-map-forge-http.log 2>&1 &
-      - name: Prepare paired generator cores
+      - name: Prepare paired champion states
         run: |
-          cp src/world/map-forge/map-forge-core.mjs /tmp/map-forge-core-after.mjs
-          git show e36fa5f2d6faac89a41936f0ec8c9332fdc9b924:src/world/map-forge/map-forge-core.mjs > /tmp/map-forge-core-before.mjs
+          cp src/world/map-forge/map-forge-champion-overrides.mjs /tmp/map-forge-champion-after.mjs
+          BEFORE_COMMIT="$(git log -2 --format=%H -- src/world/map-forge/map-forge-champion-overrides.mjs | tail -1)"
+          test -n "$BEFORE_COMMIT"
+          git show "$BEFORE_COMMIT:src/world/map-forge/map-forge-champion-overrides.mjs" > /tmp/map-forge-champion-before.mjs
+          echo "Comparing champion states: $BEFORE_COMMIT -> $(git log -1 --format=%H -- src/world/map-forge/map-forge-champion-overrides.mjs)"
       - name: Capture fixed-seed BEFORE preview and runtime evidence
         env:
           KELO_PAGES: http://127.0.0.1:4173/
           KELO_VISUAL_STAGE: before
         run: |
-          cp /tmp/map-forge-core-before.mjs src/world/map-forge/map-forge-core.mjs
+          cp /tmp/map-forge-champion-before.mjs src/world/map-forge/map-forge-champion-overrides.mjs
           npx playwright test tests/map-forge-visual-round.spec.js --project=chromium --output=playwright-results/before
       - name: Capture fixed-seed AFTER preview and runtime evidence
         env:
           KELO_PAGES: http://127.0.0.1:4173/
           KELO_VISUAL_STAGE: after
         run: |
-          cp /tmp/map-forge-core-after.mjs src/world/map-forge/map-forge-core.mjs
-          npx playwright test tests/map-forge-visual-round.spec.js --project=chromium --output=playwright-results/after
+          cp /tmp/map-forge-champion-after.mjs src/world/map-forge/map-forge-champion-overrides.mjs
+          npx playwright test tests/map-forge-visual-round.spec.js tests/map-forge-fountain-clearance.spec.js --project=chromium --output=playwright-results/after
       - name: Capture directional prop evidence
         continue-on-error: true
         env:
