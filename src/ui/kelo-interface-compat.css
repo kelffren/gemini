@@ -16,7 +16,9 @@
 #kelo-account-auth button:focus-visible,
 #kelo-account-auth input:focus-visible,
 #kelo-commerce-modal button:focus-visible,
-#kelo-commerce-modal input:focus-visible{
+#kelo-commerce-modal input:focus-visible,
+#kelo-arena-panel button:focus-visible,
+#kelo-boutique button:focus-visible{
   outline:3px solid color-mix(in srgb,var(--kui-focus) 72%,transparent)!important;
   outline-offset:2px!important;
 }
@@ -83,10 +85,97 @@
   font-size:10px!important;
 }
 
+/* 18+ profile: use the same calm account-sheet hierarchy. */
+#kelo-profile-18{
+  background:rgba(5,5,7,.84)!important;
+  color:var(--kui-text)!important;
+  font-family:var(--kui-font)!important;
+  backdrop-filter:blur(28px)!important;
+  -webkit-backdrop-filter:blur(28px)!important;
+}
+#kelo-profile-18 .kap-card{
+  border:1px solid var(--kui-border)!important;
+  border-radius:var(--kui-r-xl)!important;
+  background:rgba(24,25,29,.95)!important;
+  box-shadow:var(--kui-shadow)!important;
+}
+#kelo-profile-18 .kap-mark{
+  border:0!important;border-radius:14px!important;background:var(--kui-accent-soft)!important;
+  color:var(--kui-accent)!important;font-family:var(--kui-font)!important;box-shadow:none!important;
+}
+#kelo-profile-18 .kap-title{
+  color:var(--kui-text)!important;font-family:var(--kui-font)!important;font-size:28px!important;
+  font-weight:760!important;letter-spacing:-.035em!important;
+}
+#kelo-profile-18 .kap-sub{color:var(--kui-text-3)!important;font-size:14px!important}
+#kelo-profile-18 .kap-label{color:var(--kui-text-2)!important;font-size:12px!important;letter-spacing:0!important;text-transform:none!important}
+#kelo-profile-18 .kap-input{
+  min-height:50px!important;border:1px solid var(--kui-border)!important;border-radius:12px!important;
+  background:rgba(255,255,255,.055)!important;color:var(--kui-text)!important;font-family:var(--kui-font)!important;
+}
+#kelo-profile-18 .kap-primary,#kelo-profile-18 .kap-ghost{min-height:48px!important;border-radius:12px!important;font-size:14px!important;font-weight:680!important}
+#kelo-profile-18 .kap-primary{border:0!important;background:var(--kui-accent)!important;color:#18150d!important;box-shadow:none!important}
+#kelo-profile-18 .kap-ghost{background:transparent!important;color:var(--kui-text-2)!important}
+#kelo-profile-18 .kap-note{background:rgba(255,255,255,.04)!important;color:var(--kui-text-3)!important;font-size:12px!important}
+
+/* Arena: competitive content remains expressive; software chrome becomes calm and familiar. */
+#kelo-arena-panel{background:rgba(4,4,6,.70)!important;font-family:var(--kui-font)!important;color:var(--kui-text)!important;backdrop-filter:blur(20px)!important;-webkit-backdrop-filter:blur(20px)!important}
+#kelo-arena-panel .ka-card{
+  border:1px solid var(--kui-border)!important;border-radius:var(--kui-r-xl)!important;
+  background:rgba(22,23,27,.97)!important;box-shadow:var(--kui-shadow)!important;
+}
+#kelo-arena-panel .ka-title small{color:var(--kui-text-3)!important;font-size:11px!important;letter-spacing:.03em!important}
+#kelo-arena-panel .ka-title h2{
+  color:var(--kui-text)!important;font-family:var(--kui-font)!important;font-size:26px!important;
+  font-weight:760!important;letter-spacing:-.035em!important;
+}
+#kelo-arena-panel .ka-close{
+  width:44px!important;height:44px!important;border:0!important;border-radius:999px!important;
+  background:rgba(255,255,255,.07)!important;color:var(--kui-text)!important;box-shadow:none!important;
+}
+#kelo-arena-panel .ka-rank,#kelo-arena-panel .ka-mastery,#kelo-arena-panel .ka-mode,
+#kelo-arena-panel .ka-status,#kelo-arena-panel .ka-series,#kelo-arena-panel .ka-stat,
+#kelo-arena-panel .ka-focus,#kelo-arena-panel .ka-coach,#kelo-arena-panel .ka-best{
+  border-color:var(--kui-border)!important;background:rgba(255,255,255,.04)!important;box-shadow:none!important;
+}
+#kelo-arena-panel .ka-rank b,#kelo-arena-panel .ka-result h3{
+  font-family:var(--kui-font)!important;letter-spacing:-.025em!important;
+}
+#kelo-arena-panel .ka-mode button,#kelo-arena-panel .ka-btn{
+  min-height:46px!important;border:0!important;border-radius:11px!important;background:var(--kui-accent)!important;
+  color:#18150d!important;font-family:var(--kui-font)!important;font-size:13px!important;font-weight:700!important;
+}
+
+/* Boutique: product cards can feel luxurious without separate software grammar. */
+#kelo-boutique{
+  border:1px solid var(--kui-border)!important;border-radius:var(--kui-r-lg)!important;
+  background:rgba(24,25,29,.96)!important;color:var(--kui-text)!important;font-family:var(--kui-font)!important;
+  box-shadow:var(--kui-shadow)!important;backdrop-filter:blur(24px)!important;-webkit-backdrop-filter:blur(24px)!important;
+}
+#kelo-boutique .lx-b-head{border-bottom:1px solid var(--kui-border)!important;align-items:center!important}
+#kelo-boutique .lx-b-title{
+  color:var(--kui-text)!important;font-family:var(--kui-font)!important;font-size:18px!important;
+  font-weight:720!important;letter-spacing:-.02em!important;
+}
+#kelo-boutique .lx-b-close{
+  width:44px!important;height:44px!important;border:0!important;border-radius:999px!important;
+  background:rgba(255,255,255,.07)!important;color:var(--kui-text)!important;
+}
+#kelo-boutique .lx-b-note{color:var(--kui-text-3)!important;font-size:12px!important}
+#kelo-boutique .lx-b-card{
+  min-height:112px!important;border:1px solid var(--kui-border)!important;border-radius:14px!important;
+  background:rgba(255,255,255,.045)!important;color:var(--kui-text)!important;box-shadow:none!important;
+}
+#kelo-boutique .lx-b-card:hover{background:rgba(255,255,255,.075)!important;border-color:var(--kui-border-strong)!important}
+#kelo-boutique .lx-b-name{font-size:14px!important;font-weight:700!important}
+#kelo-boutique .lx-b-type{font-size:11px!important;color:var(--kui-text-3)!important}
+#kelo-boutique .lx-b-price{font-size:12px!important;color:var(--kui-accent)!important}
+
 @media(max-width:700px){
   .sab-event-actions button,.sab-event-chip button,.sab-grid button,.sab-timeline-tools button,
   #kelo-studio-live .ks-context-head button,#kelo-studio-live .ks-multi-align button,.kst-head button,.ksw-actions button{
     min-width:44px!important;
     min-height:44px!important;
   }
+  #kelo-boutique{max-width:none!important}
 }
