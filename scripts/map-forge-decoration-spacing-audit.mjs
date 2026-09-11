@@ -14,6 +14,7 @@ import {scoreMapDefinition,validateMapDefinition} from '../src/world/map-forge/m
 const recipe=MAP_FORGE_RECIPES.KELO_ROYAL_CAPITAL_V1;
 const seeds=[81746291,12345,424242,29011987];
 const clone=value=>JSON.parse(JSON.stringify(value));
+const familyHistogram=rows=>Object.fromEntries([...rows.reduce((m,row)=>m.set(row.family,(m.get(row.family)||0)+1),new Map()).entries()].sort(([a],[b])=>String(a).localeCompare(String(b))));
 const results=[];
 
 for(const seed of seeds){
@@ -22,6 +23,7 @@ for(const seed of seeds){
   assert.ok(map.quality.breakdown.decorationSpacing>=88,`${seed}: production candidate has excessive prop overlap: ${map.quality.breakdown.decorationSpacing}`);
 
   const stacked=clone(map);
+  const originalFamilies=familyHistogram(map.decorations||[]);
   const byDistrict=new Map();
   for(const row of stacked.decorations||[]){
     if(!byDistrict.has(row.district))byDistrict.set(row.district,[]);
@@ -35,11 +37,11 @@ for(const seed of seeds){
   const structural=validateMapDefinition(stacked,recipe);
   assert.equal(structural.valid,true,`${seed}: adversarial overlap fixture must stay structurally valid so scoring gate is exercised`);
   const score=scoreMapDefinition(stacked,recipe,structural);
-  assert.equal(score.breakdown.assetVariety,map.quality.breakdown.assetVariety,`${seed}: fixture must preserve family variety and isolate spatial overlap`);
+  assert.deepEqual(familyHistogram(stacked.decorations||[]),originalFamilies,`${seed}: fixture must preserve exact decoration-family counts while changing only positions`);
   assert.equal(stacked.decorations.length,map.decorations.length,`${seed}: fixture must preserve decoration density`);
   assert.ok(score.breakdown.decorationSpacing<=65,`${seed}: stacked fixture must expose severe spacing defect, got ${score.breakdown.decorationSpacing}`);
   assert.ok(score.total<=89,`${seed}: visually stacked but structurally valid map must not score 90+, got ${score.total}`);
-  results.push({seed,normalScore:map.quality.total,normalSpacing:map.quality.breakdown.decorationSpacing,stackedScore:score.total,stackedSpacing:score.breakdown.decorationSpacing,decorations:map.decorations.length});
+  results.push({seed,normalScore:map.quality.total,normalSpacing:map.quality.breakdown.decorationSpacing,stackedScore:score.total,stackedSpacing:score.breakdown.decorationSpacing,decorations:map.decorations.length,families:originalFamilies});
 }
 
 console.log(JSON.stringify({ok:true,seeds:results},null,2));
