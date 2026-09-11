@@ -36,9 +36,26 @@ export function createSelectTool(kernel) {
     return row?.data || row || kernel.document.entities.find(entity => String(entity.id) === String(id)) || null;
   }
 
+  function hitDistanceSquared(hit, x, y) {
+    const rect=hit?.rect||{};
+    const left=Number(rect.x)||0,top=Number(rect.y)||0,right=left+Math.max(1,Number(rect.w)||1),bottom=top+Math.max(1,Number(rect.h)||1);
+    const dx=x<left?left-x:x>right?x-right:0,dy=y<top?top-y:y>bottom?y-bottom:0;
+    return dx*dx+dy*dy;
+  }
+
+  function pointHits(px,py,radius=0){
+    const r=Math.max(0,Number(radius)||0);
+    if(r<=0)return kernel.spatial.queryPoint(px,py,{category:'entity'}).slice().reverse();
+    const hits=kernel.spatial.queryRect({x:px-r,y:py-r,w:r*2+1,h:r*2+1},{category:'entity'}).slice().reverse();
+    return hits.map((hit,index)=>({hit,index,d:hitDistanceSquared(hit,px,py)}))
+      .filter(row=>row.d<=r*r)
+      .sort((a,b)=>a.d-b.d||a.index-b.index)
+      .map(row=>row.hit);
+  }
+
   return Object.freeze({
     id: 'select',
-    selectPoint(x, y, { append = false, preserveExisting = true, cycle = true } = {}) {
+    selectPoint(x, y, { append = false, preserveExisting = true, cycle = true, radius = 0 } = {}) {
       const px = Number(x) || 0;
       const py = Number(y) || 0;
 
@@ -49,8 +66,7 @@ export function createSelectTool(kernel) {
         cancelGrab();
       }
 
-      const hits = kernel.spatial.queryPoint(px, py, { category: 'entity' });
-      const ordered = hits.slice().reverse();
+      const ordered = pointHits(px,py,radius);
 
       if (!ordered.length) {
         lastPick = null;
