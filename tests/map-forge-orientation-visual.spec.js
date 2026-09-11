@@ -21,7 +21,7 @@ function nearestRoadFrame(p,roads){
     for(let i=1;i<points.length;i++){
       const a=points[i-1],b=points[i],dx=b.x-a.x,dy=b.y-a.y,den=dx*dx+dy*dy;
       const t=den?Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/den)):0;
-      const point={x:a.x+dx*t,y:a.y+dy*t},vx=point.x-p.x,vy=point.y-p.y,distance:Math.hypot(vx,vy);
+      const point={x:a.x+dx*t,y:a.y+dy*t},vx=point.x-p.x,vy=point.y-p.y,distance=Math.hypot(vx,vy);
       if(!best||distance<best.distance)best={distance,point,vx,vy};
     }
   }
