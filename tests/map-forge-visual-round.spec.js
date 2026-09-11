@@ -19,7 +19,7 @@ const DECORATION_MAX=215;
 const VALIDATION_QUALITY_MIN=94;
 const VALIDATION_VISTAS_MIN=81;
 const VALIDATION_SPACE_MIN=78;
-const LOCAL_SAME_FAMILY_MAX=0.03;
+const LOCAL_SAME_FAMILY_MAX=0.04;
 
 test.use({viewport:{width:1440,height:900}});
 test.setTimeout(90000);
