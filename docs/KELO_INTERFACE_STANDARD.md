@@ -122,9 +122,17 @@ New UI work should not introduce:
 - decorative infinite animation not tied to progress/state;
 - a new modal without a clear close/back route.
 
-## 11. Shared owner
+## 11. Shared ownership
 
-`src/ui/kelo-interface-system.css` is the top-level presentation contract. Feature styles can define structure and special visuals, but shared hierarchy should converge toward these tokens instead of building another visual language.
+The interface hierarchy has three owners with different jobs:
+
+- `src/ui/kelo-interface-system.css` — canonical tokens and presentation hierarchy for current surfaces.
+- `src/ui/kelo-interface-compat.css` — migration bridge for legacy surfaces that still contain old tiny controls, ornamental chrome or focus resets. It may only reuse shared `--kui-*` tokens. It must not become a second design system.
+- `src/ui/kelo-interface-runtime.js` — progressive disclosure, contextual action state, accessibility labels and interaction language for dynamic surfaces.
+
+Feature styles still own their layout and domain-specific visuals. Fantasy content such as items, rarity, combat identity and world art may remain expressive. Software chrome—navigation, buttons, modal structure, typography, focus, close/back and action hierarchy—must converge through the shared owners above.
+
+When a legacy module is rewritten cleanly, move its necessary rules into the feature/shared system and delete the corresponding compatibility rules. The compatibility bridge is a migration layer, not permanent permission to keep duplicating design languages.
 
 ## 12. Review rule
 
@@ -138,3 +146,5 @@ A UI improvement only counts when at least one of these becomes measurably bette
 - fewer inconsistent hard-coded design values;
 - better mobile layout;
 - verified reduction in UI-audit warnings.
+
+The project-wide audit must evaluate effective shared overrides. A legacy declaration is only considered resolved when the loaded shared cascade contains a concrete selector that actually overrides the unsafe metric or restores focus behavior.
