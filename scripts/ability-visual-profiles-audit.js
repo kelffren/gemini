@@ -54,6 +54,9 @@ assert(lab.includes('visualLabPin') && lab.includes('visualLabLoop') && lab.incl
 assert(lab.includes('lab_radius_ghost') && lab.includes('lab_dummy_hit'), 'Visual Lab draws combat-range ghost and dummy hit');
 assert(lab.includes("dataset.visualLabCue = 'area'") || lab.includes("addCue('area'"), 'Visual Lab exposes AREA cue');
 assert(lab.includes("addCue('arm'") && lab.includes("addCue('end'"), 'Visual Lab exposes ARM and END cues');
+assert(lab.includes('visualLabPad') && lab.includes('up-right'), 'Visual Lab exposes 8-direction pad');
+assert(lab.includes('visualLabFamily') && lab.includes('visualLabTap') && lab.includes('visualLabCam'), 'Visual Lab exposes family filter, tap-set dummy and camera peek');
+assert(lab.includes('lab_origin_ghost') && lab.includes('kelo-visual-lab-prefs-v1'), 'Visual Lab draws origin ghost and persists prefs');
 assert(fx.includes('stopAllFx') && fx.includes('stopAll: stopAllFx'), 'FX runtime can stop all preview instances');
 assert(abilityVisuals.includes("cue === 'arm'") || abilityVisuals.includes("'arm'"), 'playCue covers trap ARM');
 
