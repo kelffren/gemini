@@ -153,3 +153,30 @@ test('mobile interaction behavior stays calm, readable and state-aware', async (
   const durationValues = primary.transitionDuration.split(',').map(value => parseFloat(value) || 0);
   expect(Math.max(...durationValues), 'reduced-motion users should get near-instant UI transitions').toBeLessThanOrEqual(.001);
 });
+
+test('dynamic UI mutation bursts are coalesced into very few full interface scans', async ({ page }) => {
+  await loadSharedInterface(page, '<main id="mutationHost"></main>');
+  await page.addScriptTag({ path: runtimeJs });
+  const before = await page.evaluate(() => window.KELO_INTERFACE_RUNTIME.snapshot());
+
+  await page.evaluate(() => new Promise((resolve) => {
+    const host = document.querySelector('#mutationHost');
+    let finished = 0;
+    for (let i = 0; i < 30; i += 1) {
+      setTimeout(() => {
+        const node = document.createElement('span');
+        node.textContent = String(i);
+        host.appendChild(node);
+        finished += 1;
+        if (finished === 30) requestAnimationFrame(() => requestAnimationFrame(resolve));
+      }, 0);
+    }
+  }));
+
+  const after = await page.evaluate(() => window.KELO_INTERFACE_RUNTIME.snapshot());
+  const callbacks = after.observerCallbacks - before.observerCallbacks;
+  const scans = after.scanRuns - before.scanRuns;
+  expect(callbacks, 'the observer should see the mutation burst').toBeGreaterThan(0);
+  expect(scans, 'the runtime should coalesce mutation work by frame').toBeLessThanOrEqual(2);
+  expect(scans).toBeLessThanOrEqual(callbacks);
+});
