@@ -28,7 +28,7 @@ async function metric(page, selector) {
   });
 }
 
-test('shared UI chrome renders with safe computed targets and system software typography', async ({ page }) => {
+test('shared UI chrome renders with 44px targets and system software typography', async ({ page }) => {
   await loadSharedInterface(page, `
     <section id="kelo-luxe"><button id="menuClose" class="lx-menu-close">×</button></section>
     <section id="kelo-account-auth"><button id="authPrimary" class="ka-primary">Entrar</button></section>
@@ -39,15 +39,19 @@ test('shared UI chrome renders with safe computed targets and system software ty
     <section id="kelo-arena-panel"><button id="arenaClose" class="ka-close">×</button></section>
     <section id="kelo-boutique"><button id="boutiqueClose" class="lx-b-close">×</button></section>
     <section id="kelo-house-panel"><button id="housePrimary" class="hi-btn primary">Entrar</button></section>
+    <section id="kelo-studio-live"><div class="ks-top"><button id="studioPrimary" class="primary">Save</button><input id="studioSearch" class="ks-search" /></div></section>
   `);
 
-  for (const selector of ['#menuClose','#authPrimary','#creatorClose','#profilePrimary','#marketClose','#warehouseClose','#arenaClose','#boutiqueClose','#housePrimary']) {
+  for (const selector of ['#menuClose','#authPrimary','#creatorClose','#profilePrimary','#marketClose','#warehouseClose','#arenaClose','#boutiqueClose','#housePrimary','#studioPrimary']) {
     const m = await metric(page, selector);
-    expect(m.height, `${selector} should have a comfortable touch target`).toBeGreaterThanOrEqual(44);
+    expect(m.height, `${selector} should have a 44px minimum touch target`).toBeGreaterThanOrEqual(44);
     expect(m.fontFamily.toLowerCase(), `${selector} should not use ornamental serif software typography`).not.toContain('georgia');
     expect(m.fontFamily.toLowerCase()).not.toContain('times new roman');
     expect(m.fontSize, `${selector} should remain readable`).toBeGreaterThanOrEqual(11);
   }
+
+  const search = await metric(page, '#studioSearch');
+  expect(search.height, 'Studio search should use the same 44px control tier').toBeGreaterThanOrEqual(44);
 
   await page.evaluate(() => document.activeElement?.blur?.());
   for (let i = 0; i < 5; i += 1) await page.keyboard.press('Tab');
@@ -116,6 +120,6 @@ test('Asset Repairer defaults to a calm task path and reveals advanced tools on 
   await expect(page.locator('[data-act="reset"]')).toBeEnabled();
 
   const primary = await metric(page, '[data-act="open"]');
-  expect(primary.height).toBeGreaterThanOrEqual(40);
+  expect(primary.height, 'Asset Repairer primary action should meet the shared 44px target').toBeGreaterThanOrEqual(44);
   expect(primary.fontFamily.toLowerCase()).not.toContain('georgia');
 });
