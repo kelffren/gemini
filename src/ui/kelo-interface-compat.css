@@ -171,6 +171,50 @@
 #kelo-boutique .lx-b-type{font-size:11px!important;color:var(--kui-text-3)!important}
 #kelo-boutique .lx-b-price{font-size:12px!important;color:var(--kui-accent)!important}
 
+/* Luxe mobile hierarchy pass: preserve the existing shell owner, improve scanning and narrow-phone ergonomics. */
+#kelo-luxe .lx-menu-scroll{
+  padding:4px 2px 8px!important;
+  scroll-padding-block:8px!important;
+}
+#kelo-luxe .lx-menu-item{
+  min-height:80px!important;
+  align-content:center!important;
+}
+#kelo-luxe .lx-menu-copy b{line-height:1.15!important}
+#kelo-luxe .lx-menu-copy small{line-height:1.35!important}
+#kelo-luxe .lx-menu-close,
+#kelo-luxe .lx-side-menu,
+#kelo-luxe .lx-side-pvp,
+#kelo-luxe .lx-top-btn{
+  touch-action:manipulation!important;
+}
+
+/* Disabled and busy states are visually and behaviorally consistent across the product shell. */
+#kelo-luxe button:disabled,
+#kelo-profile-18 button:disabled,
+#kelo-account-auth button:disabled,
+#kelo-commerce-modal button:disabled,
+#kelo-arena-panel button:disabled,
+#kelo-boutique button:disabled,
+#kelo-studio-live button:disabled,
+#kelo-creators-hub button:disabled,
+#kelo-asset-repairer button:disabled{
+  opacity:.42!important;
+  cursor:not-allowed!important;
+  filter:saturate(.7)!important;
+  transform:none!important;
+  box-shadow:none!important;
+}
+#kelo-luxe button[aria-busy="true"],
+#kelo-profile-18 button[aria-busy="true"],
+#kelo-account-auth button[aria-busy="true"],
+#kelo-commerce-modal button[aria-busy="true"],
+#kelo-studio-live button[aria-busy="true"]{
+  pointer-events:none!important;
+  opacity:.68!important;
+  cursor:progress!important;
+}
+
 @media(max-width:700px){
   .sab-event-actions button,.sab-event-chip button,.sab-grid button,.sab-timeline-tools button,
   #kelo-studio-live .ks-context-head button,#kelo-studio-live .ks-multi-align button,.kst-head button,.ksw-actions button{
@@ -178,4 +222,43 @@
     min-height:44px!important;
   }
   #kelo-boutique{max-width:none!important}
+}
+
+/* Portrait/narrow phones: a single readable menu column beats two cramped columns. */
+@media(max-width:540px){
+  #kelo-luxe .lx-menu-panel{
+    left:max(8px,env(safe-area-inset-left))!important;
+    right:max(76px,calc(env(safe-area-inset-right) + 68px))!important;
+    padding:12px!important;
+    border-radius:22px!important;
+  }
+  #kelo-luxe .lx-menu-head{
+    min-height:48px!important;
+    margin-bottom:8px!important;
+    padding-right:52px!important;
+    font-size:19px!important;
+  }
+  #kelo-luxe .lx-menu-grid{
+    grid-template-columns:minmax(0,1fr)!important;
+    gap:8px!important;
+  }
+  #kelo-luxe .lx-menu-item{
+    min-height:62px!important;
+    padding:10px 34px 10px 10px!important;
+    grid-template-columns:36px minmax(0,1fr)!important;
+    gap:10px!important;
+  }
+  #kelo-luxe .lx-menu-icon{width:36px!important;height:36px!important}
+  #kelo-luxe .lx-menu-copy b{font-size:14px!important}
+  #kelo-luxe .lx-menu-copy small{font-size:11px!important}
+}
+
+@media(prefers-reduced-motion:reduce){
+  #kelo-luxe *,#kelo-profile-18 *,#kelo-account-auth *,#kelo-commerce-modal *,
+  #kelo-arena-panel *,#kelo-boutique *,#kelo-studio-live *,#kelo-creators-hub *{
+    animation-duration:.001ms!important;
+    animation-iteration-count:1!important;
+    transition-duration:.001ms!important;
+    scroll-behavior:auto!important;
+  }
 }
