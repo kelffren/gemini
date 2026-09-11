@@ -45,6 +45,11 @@ export async function bootKeloStudio({ mode = 'world', actorId = null, document 
   if (session) return session;
   if(mode==='asset-repair'||mode==='asset-repairer'){
     const assetRepairer=createStudioAssetRepairer({root});
+    const actions=assetRepairer.element?.querySelector?.('.kar-actions');
+    if(actions&&!actions.querySelector('[data-repair-close]')){
+      const close=root.document?.createElement?.('button');
+      if(close){close.type='button';close.className='kar-btn';close.dataset.repairClose='1';close.textContent='CLOSE';close.onclick=()=>{assetRepairer.destroy();session=null;};actions.prepend(close);}
+    }
     session=Object.freeze({
       version:'kelo-studio-asset-repairer-v1.0.0',mode:'asset-repair',actorId,assetRepairer,
       close(){assetRepairer.destroy();session=null;}
