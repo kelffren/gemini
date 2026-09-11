@@ -2,8 +2,8 @@
  * area: STUDIO / NUDGE INPUT
  * owns: precise keyboard nudging for selected objects
  * does-not-own: selection, authority transport, rendering or document persistence
- * public-api: createStudioNudgeController(), resolveStudioNudgeStep()
- * online: persistent moves flow through Kernel CommandBus as reversible batches; held-key bursts coalesce only in local history
+ * public-api: createStudioNudgeController(), resolveStudioNudgeStep(), mergeStudioNudgeSerialization()
+ * online: persistent moves flow through Kernel CommandBus as reversible batches; held-key history preserves normal entity.move serialization
  */
 
 import { createMoveEntityCommand } from '../document/document-commands.mjs';
@@ -15,6 +15,24 @@ const ARROWS=Object.freeze({
 const COARSE_MULTIPLIER=4;
 const HOLD_REPEAT_INTERVAL_MS=70;
 const HOLD_MERGE_WINDOW_MS=900;
+
+const moveRows=serialized=>{
+  if(serialized?.type==='entity.move')return [serialized];
+  if(serialized?.type==='entity.batch.nudge'&&Array.isArray(serialized.commands)&&serialized.commands.every(row=>row?.type==='entity.move'))return serialized.commands;
+  return null;
+};
+
+export function mergeStudioNudgeSerialization(previous,latest){
+  const before=moveRows(previous),after=moveRows(latest);
+  if(!before||!after||before.length!==after.length)return null;
+  const previousById=new Map(before.map(row=>[String(row.id),row]));
+  const commands=after.map(row=>{
+    const first=previousById.get(String(row.id));
+    return first?{...row,from:first.from}:null;
+  });
+  if(commands.some(row=>!row))return null;
+  return latest.type==='entity.move'?commands[0]:{...latest,commands};
+}
 
 export function resolveStudioNudgeStep({root=globalThis,kernel,shiftKey=false,altKey=false}={}){
   if(shiftKey)return 1;
@@ -44,7 +62,7 @@ export function createStudioNudgeController({root=globalThis,kernel}={}){
     busy=true;
     try{
       const command=commands.length===1?commands[0]:createCompositeCommand(commands,{type:'entity.batch.nudge',label:`Nudge ${rows.length} object${rows.length===1?'':'s'}`});
-      if(historyMergeKey){command.historyMergeKey=historyMergeKey;command.historyMergeWindowMs=HOLD_MERGE_WINDOW_MS;}
+      if(historyMergeKey){command.historyMergeKey=historyMergeKey;command.historyMergeWindowMs=HOLD_MERGE_WINDOW_MS;command.historyMergeSerialized=mergeStudioNudgeSerialization;}
       await kernel.execute(command);
       return selectedEntities();
     }finally{busy=false;}
