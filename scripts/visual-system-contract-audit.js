@@ -39,7 +39,7 @@ assert(core.includes("'groundFX'")&&core.includes("'foregroundFX'")&&core.includ
 assert(manifests.includes('hero_default_sheet')&&manifests.includes('cast_magic_01')&&manifests.includes('fire_explosion_medium'),'data-driven visual manifests remain registered');
 assert(animation.includes('root.KeloAnchors')&&animation.includes('center: center')&&animation.includes('weapon:'),'animation foundation exposes semantic anchors independent from skin IDs');
 assert(animation.includes('sampleTransform')&&animation.includes('frameOverride'),'animation system supports transform and sprite presentation');
-assert(fx.includes('root.KeloFX')&&fx.includes('drawActorLayer'),'FX system owns actor/world presentation');
+assert(fx.includes('root.KeloFX')&&fx.includes('drawActorLayer')&&fx.includes('stopAllFx'),'FX system owns actor/world presentation and stopAll');
 assert(sequence.includes('function play(')&&sequence.includes("cue.type === 'actorAnimation'")&&sequence.includes("cue.type === 'fx'"),'sequence system composes reusable presentation pieces');
 assert(abilityVisuals.includes('KeloVisualProfileRegistry'),'ability visuals resolve optional profiles instead of owning gameplay');
 assert(abilityVisuals.includes("bus.on('ABILITY_IMPACT'")&&abilityVisuals.includes("bus.on('DASH_STARTED'")&&abilityVisuals.includes("bus.on('TRAP_PLACED'"),'ability visuals subscribe to impact/dash/trap semantic events');

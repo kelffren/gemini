@@ -91,6 +91,15 @@
     return true;
   }
 
+  function stopAll() {
+    while (active.length) {
+      const item = active.pop();
+      item.stopped = true;
+      if (root.KeloVisualEventBus) root.KeloVisualEventBus.emit('SEQUENCE_STOPPED', { sequenceId: item.id, definitionId: item.definitionId, context: item.context });
+    }
+    return true;
+  }
+
   function update(dt) {
     const stepMs = Math.max(0, Number(dt) || 0) * 1000;
     for (let i = active.length - 1; i >= 0; i--) {
@@ -113,5 +122,5 @@
   function metrics() { return { definitions: defs.size, active: active.length }; }
 
   root.KeloSequenceRegistry = Object.freeze({ version: 'sequence-registry-v1.0.0', register: register, get: get, list: list });
-  root.KeloSequence = Object.freeze({ version: 'sequence-player-v1.0.0', play: play, stop: stop, update: update, metrics: metrics });
+  root.KeloSequence = Object.freeze({ version: 'sequence-player-v1.1.0', play: play, stop: stop, stopAll: stopAll, update: update, metrics: metrics });
 })(typeof globalThis !== 'undefined' ? globalThis : window);

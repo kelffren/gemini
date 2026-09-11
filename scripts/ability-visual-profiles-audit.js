@@ -47,8 +47,10 @@ assert(abilityVisuals.includes('activeTrapVisuals') && abilityVisuals.includes('
 assert(boot.includes('TRAP_PLACED') && boot.includes('TRAP_ARMED') && boot.includes('TRAP_TRIGGERED') && boot.includes('TRAP_EXPIRED'), 'boot emits trap semantic events');
 assert(boot.includes('DASH_STARTED') && boot.includes('DASH_ENDED'), 'boot emits dash semantic events');
 assert(!stone.includes('KeloFX') && !stone.includes('KeloSequence') && !stone.includes('KeloVisualProfile'), 'StoneSystem stays visual-agnostic');
-assert(lab.includes('playAbilityCue') || lab.includes("playCue(ctx.abilityId"), 'Visual Lab can preview ability profiles with the same playCue path');
-assert(lab.includes('ability_visual_fireball_01'), 'Visual Lab lists ability profiles');
+assert(lab.includes('playAbilityCue') || lab.includes('playFull'), 'Visual Lab can preview ability profiles with the same playCue path');
+assert(lab.includes('PLAY FULL') && lab.includes('TEST IN GAME') && lab.includes('visualLabStop'), 'Visual Lab exposes play-full, in-game and stop');
+assert(lab.includes('MISSING') && lab.includes('visualLabTab'), 'Visual Lab lists missing profiles and splits Abilities/Piezas');
+assert(fx.includes('stopAllFx') && fx.includes('stopAll: stopAllFx'), 'FX runtime can stop all preview instances');
 
 console.log('PASS ability visual profiles (fireball/ice_nova/wind_dash/poison_trap)');
 console.log(JSON.stringify({

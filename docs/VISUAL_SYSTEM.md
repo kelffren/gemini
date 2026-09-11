@@ -50,6 +50,7 @@ KeloAnchors.get(actor, socket)
 
 KeloFX.spawn(fxId, context, options)
 KeloFX.stop(instanceId)
+KeloFX.stopAll()
 
 KeloProjectileVisuals.attach(gameplayObject, visualId, context)
 KeloProjectileVisuals.preview(visualId, context)
@@ -161,7 +162,7 @@ Los perfiles reutilizan primitives de FX (`expanding_ring`, `area_disk`, `crysta
 | wind_dash | dash | `ability_visual_wind_dash_01` | burst + rastro → afterimage → aterrizaje |
 | poison_trap | trap | `ability_visual_poison_trap_01` | place → sigilo + radio persistente → trigger |
 
-El Visual Lab (`?visualLab=1`) reproduce las mismas cues (`cast` / `projectile` / `impact` / `dash` / `place` / `trigger`) vía `KeloAbilityVisuals.playCue` y los mismos eventos semánticos.
+El Visual Lab (`?visualLab=1`) tiene dos pestañas. **SKILL** reproduce un VisualProfile con `playCue` / eventos semánticos (`PLAY FULL`, cues honestas, `TEST IN GAME` via `engine.predict`). **PIEZAS** sigue siendo la galería de componentes sueltos. `■` en la barra para el preview (usa `KeloFX.stopAll`). Un dummy de impacto marca el target. Los profiles faltantes del catálogo se listan como `MISSING`.
 
 Eventos nuevos del adapter: `ABILITY_IMPACT`, `DASH_STARTED`, `DASH_ENDED`, `TRAP_PLACED`, `TRAP_ARMED`, `TRAP_TRIGGERED`, `TRAP_EXPIRED`.
 
@@ -244,16 +245,12 @@ Activar únicamente en desarrollo:
 ?visualLab=1
 ```
 
-Permite probar de manera aislada:
+Permite:
 
-- AnimationClip;
-- VFX;
-- ProjectileVisual;
-- Sequence;
-- StatusVisual;
-- SFX;
-- screen shake / flash;
-- dirección, escala, velocidad, loop y anchor.
+- pestaña **SKILL**: PLAY FULL / TEST IN GAME / cues honestas por profile / dummy de impacto / MISSING;
+- pestaña **PIEZAS**: AnimationClip, VFX, ProjectileVisual, Sequence, Status, SFX, shake/flash;
+- `■` en la barra (no se esconde al minimizar);
+- dirección, escala, velocidad.
 
 ## QA validada
 
@@ -273,7 +270,7 @@ LIVE móvil `390×844` validó:
 ## Deuda deliberada
 
 1. `kelo-ability-boot.js` todavía mezcla gameplay, UI/input y primitives legacy. Es fallback durante la migración, no arquitectura objetivo.
-2. Solo Fireball tiene perfil piloto nuevo. Las demás abilities conservan primitives legacy hasta migrarse.
+2. Fireball, Ice Nova, Wind Dash y Poison Trap tienen profile LIVE. Chain / Shield / Tornado / Wall / Blink / Aura siguen en MISSING del Visual Lab.
 3. Los FX y SFX piloto son representación procedural/synth de validación. El siguiente paso es sustituirlos por assets finales authored sin cambiar APIs.
 4. Ability gameplay aún no es server-authoritative. El relay visual online ya usa la frontera correcta, pero cast/hit/cooldown reales deben migrar al server más adelante.
 

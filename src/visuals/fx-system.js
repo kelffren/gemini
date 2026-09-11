@@ -133,6 +133,15 @@
     return true;
   }
 
+  function stopAllFx() {
+    while (activeFx.length) {
+      const item = activeFx.pop();
+      item.dead = true;
+      fxPool.push(item);
+    }
+    return true;
+  }
+
   function updateFx(dt) {
     for (let i = activeFx.length - 1; i >= 0; i--) {
       const item = activeFx[i];
@@ -468,6 +477,15 @@
     item.dead = true; projectilePool.push(item); return true;
   }
 
+  function stopAllProjectiles() {
+    while (activeProjectiles.length) {
+      const item = activeProjectiles.pop();
+      item.dead = true;
+      projectilePool.push(item);
+    }
+    return true;
+  }
+
   function updateProjectiles(dt) {
     for (let i = activeProjectiles.length - 1; i >= 0; i--) {
       const item = activeProjectiles[i];
@@ -666,9 +684,9 @@
   }
 
   root.KeloFXRegistry = Object.freeze({ version: 'fx-registry-v1.1.0', get: function (id) { return fxDefs.get(String(id || '')) || null; }, list: function () { return Array.from(fxDefs.values()); }, register: function (def) { return registerInto(fxDefs, def, 'FX'); } });
-  root.KeloFX = Object.freeze({ version: 'fx-runtime-v1.3.0', spawn: spawnFx, preview: previewFx, stop: stopFx, update: updateFx, drawLayer: drawLayer, drawActorLayer: drawActorLayer, metrics: fxMetrics });
+  root.KeloFX = Object.freeze({ version: 'fx-runtime-v1.3.1', spawn: spawnFx, preview: previewFx, stop: stopFx, stopAll: stopAllFx, update: updateFx, drawLayer: drawLayer, drawActorLayer: drawActorLayer, metrics: fxMetrics });
   root.KeloProjectileVisualRegistry = Object.freeze({ version: 'projectile-visual-registry-v1.1.1', get: function (id) { return projectileDefs.get(String(id || '')) || null; }, list: function () { return Array.from(projectileDefs.values()); }, register: function (def) { return registerInto(projectileDefs, def, 'PROJECTILE_VISUAL'); } });
-  root.KeloProjectileVisuals = Object.freeze({ version: 'projectile-visual-runtime-v1.1.1', attach: attachProjectile, preview: previewProjectile, stop: stopProjectile, update: updateProjectiles, drawLayer: drawProjectileLayer, metrics: projectileMetrics });
+  root.KeloProjectileVisuals = Object.freeze({ version: 'projectile-visual-runtime-v1.1.2', attach: attachProjectile, preview: previewProjectile, stop: stopProjectile, stopAll: stopAllProjectiles, update: updateProjectiles, drawLayer: drawProjectileLayer, metrics: projectileMetrics });
   root.KeloSFXRegistry = Object.freeze({ version: 'sfx-registry-v1.0.0', get: function (id) { return sfxDefs.get(String(id || '')) || null; }, list: function () { return Array.from(sfxDefs.values()); }, register: function (def) { return registerInto(sfxDefs, def, 'SFX'); } });
   root.KeloSFX = Object.freeze({ version: 'sfx-runtime-v1.0.0', play: playSfx });
   root.KeloScreenFX = Object.freeze({ version: 'screen-fx-v1.0.0', get: function (id) { return screenDefs.get(String(id || '')) || null; }, shake: shake, flash: flash, play: spawnScreen, update: updateScreen, draw: drawScreen, worldOffset: worldOffset, applyWorldTransform: applyWorldTransform });
