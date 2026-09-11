@@ -1,7 +1,7 @@
 # KELO-INDEX
 # area: CI / CREATORS
 # keys: SPRITE ABILITY BUILDER SPRITESHEET AUTO FIT MANUAL CUT ANIMATION ABILITY MOBILE EVENT LAB
-# purpose: valida auto-fit + corte manual + eventos de preview + flujo real upload → normalize → preview → generate a 390x844
+# purpose: valida auto-fit + corte manual + eventos de preview + flujo real upload → normalize → preview → generate a 390x844; revalida apertura no bloqueante
 name: Sprite Ability Builder CI
 on:
   pull_request:
