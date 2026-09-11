@@ -9,11 +9,21 @@ import { createCreatorProject, transitionCreatorProject } from '../core/creator-
 import { assertCreatorProjectRepository } from './creator-project-repository.mjs';
 const copy=v=>v==null?v:(typeof structuredClone==='function'?structuredClone(v):JSON.parse(JSON.stringify(v)));
 export function createLocalCreatorProjectRepository({domainAdapters=[],stateAdapter=null}={}){
-  const projects=new Map(),drafts=new Map();let hydrated=false;
+  const projects=new Map(),drafts=new Map();let hydrated=false,persistenceHealthy=true;
   const adapterForType=type=>domainAdapters.find(a=>a?.handlesType?.(String(type).toUpperCase()))||null;
   const adapterForProject=project=>project?adapterForType(project.type):null;
-  async function hydrate(){if(hydrated)return;hydrated=true;const state=await stateAdapter?.load?.();for(const p of state?.projects||[])projects.set(String(p.projectId),createCreatorProject(p));for(const [k,v] of Object.entries(state?.drafts||{}))drafts.set(k,copy(v));}
-  async function persist(){if(!stateAdapter?.save)return;await stateAdapter.save({projects:[...projects.values()].map(copy),drafts:Object.fromEntries([...drafts.entries()].map(([k,v])=>[k,copy(v)]))});}
+  const warn=(message,error)=>{try{console.warn(`[Kelo Creators] ${message}`,error);}catch{}};
+  async function hydrate(){
+    if(hydrated)return;hydrated=true;let state=null;
+    try{state=await stateAdapter?.load?.();}catch(error){persistenceHealthy=false;warn('local project state unavailable; continuing in memory',error);return;}
+    for(const raw of state?.projects||[]){try{const p=createCreatorProject(raw);projects.set(String(p.projectId),p);}catch(error){warn('ignored invalid persisted Creator project',error);}}
+    for(const [k,v] of Object.entries(state?.drafts||{}))drafts.set(k,copy(v));
+  }
+  async function persist(){
+    if(!stateAdapter?.save||!persistenceHealthy)return;
+    try{await stateAdapter.save({projects:[...projects.values()].map(copy),drafts:Object.fromEntries([...drafts.entries()].map(([k,v])=>[k,copy(v)]))});}
+    catch(error){persistenceHealthy=false;warn('local project persistence unavailable; keeping this session in memory',error);}
+  }
   async function list(filter={}){await hydrate();let rows=[...projects.values()].map(copy);for(const a of domainAdapters)if(typeof a.list==='function')rows.push(...((await a.list(filter))||[]));const seen=new Set();rows=rows.filter(p=>p?.projectId&&!seen.has(p.projectId)&&seen.add(p.projectId));if(filter.ownerId)rows=rows.filter(p=>p.ownerId===String(filter.ownerId));if(filter.type)rows=rows.filter(p=>p.type===String(filter.type).toUpperCase());return rows;}
   async function get(projectId){await hydrate();projectId=String(projectId);if(projects.has(projectId))return copy(projects.get(projectId));for(const a of domainAdapters){const p=await a.get?.(projectId);if(p)return p;}return null;}
   async function create(input){await hydrate();const domain=adapterForType(input?.type);if(domain?.create)return domain.create(input);const p=createCreatorProject(input);if(projects.has(p.projectId))throw new Error(`CREATOR_PROJECT_EXISTS:${p.projectId}`);projects.set(p.projectId,p);await persist();return copy(p);}
