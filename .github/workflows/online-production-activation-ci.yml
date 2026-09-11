@@ -52,7 +52,8 @@ jobs:
           node --check scripts/audit-online-auth-lifecycle.mjs
       - name: Account auth contract
         run: |
-          grep -q "kelo-online-auth-v5" src/auth/supabase-auth-runtime.js
+          grep -q "PRODUCTION_APP_URL='https://kelffren.github.io/gemini/'" src/auth/supabase-auth-runtime.js
+          grep -q "params.get('authLocal')==='1'" src/auth/supabase-auth-runtime.js
           grep -q "signInAsGuest" src/auth/supabase-auth-runtime.js
           grep -q "signInWithGoogle" src/auth/supabase-auth-runtime.js
           grep -q "provider:'google'" src/auth/supabase-auth-runtime.js
@@ -70,21 +71,21 @@ jobs:
           grep -q "static-supabase-pinned-2.116.0" src/config/online-runtime-config.js
           ! grep -q "document.write" src/config/online-runtime-config.js
           grep -q "@supabase/supabase-js@2.116.0" index.html
-          grep -q "src/auth/supabase-auth-runtime.js?v=5&boot=7" index.html
-          grep -q "src/auth/online-auth-lifecycle-bridge.js?v=1" index.html
-          grep -q "src/ui/account-auth-ui.js?v=1&boot=7" index.html
-          grep -q "src/ui/google-auth-button.js?v=1&boot=7" index.html
+          grep -q "src/auth/supabase-auth-runtime.js" index.html
+          grep -q "src/auth/online-auth-lifecycle-bridge.js" index.html
+          grep -q "src/ui/account-auth-ui.js" index.html
+          grep -q "src/ui/google-auth-button.js" index.html
           node - <<'NODE'
           const fs=require('fs');
           const html=fs.readFileSync('index.html','utf8');
           const order=[
-            'src/config/online-runtime-config.js?v=6',
+            'src/config/online-runtime-config.js',
             '@supabase/supabase-js@2.116.0',
-            'src/auth/supabase-auth-runtime.js?v=5&boot=7',
-            'src/auth/online-auth-lifecycle-bridge.js?v=1',
-            'src/ui/account-auth-ui.js?v=1&boot=7',
-            'src/ui/google-auth-button.js?v=1&boot=7',
-            'engine-net.js?v=101'
+            'src/auth/supabase-auth-runtime.js',
+            'src/auth/online-auth-lifecycle-bridge.js',
+            'src/ui/account-auth-ui.js',
+            'src/ui/google-auth-button.js',
+            'engine-net.js'
           ];
           let last=-1;
           for(const token of order){
