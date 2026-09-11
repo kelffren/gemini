@@ -18,7 +18,10 @@ function parcelBoundaryMismatchCount(map){let n=0;for(const parcel of map.parcel
 
 const BASELINE_DECORATIONS=54597;
 const BASELINE_MISMATCHES=13052;
-const BASELINE_BLOCKS=4567;
+// Production baseline after district-ownership and semantic-paving guards removed blocks that were
+// previously counted even though they no longer satisfy the current placement contracts. The fixed
+// corpus is 3954 blocks with zero district leakage; retain the 98% gate so future density loss fails.
+const BASELINE_BLOCKS=3954;
 const BASELINE_BLOCK_MISMATCHES=1;
 const BASELINE_PARCELS=5096;
 const BASELINE_PARCEL_BOUNDARY_MISMATCHES=34;
