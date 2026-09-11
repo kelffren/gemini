@@ -34,8 +34,8 @@ for(const seed of SEEDS){
   const benchRoadGain=map.generationStats.decorationStreetBenchRoadGain||0;
   representativeBenchSwaps+=benchSwaps;
   if(seed===PRIMARY_SEED){
-    assert.ok(benchSwaps>=2,`${seed}: primary visual seed must keep at least two roadside bench improvements`);
-    assert.ok(benchRoadGain>=100,`${seed}: primary visual seed must keep the approved bench road-affinity gain`);
+    assert.ok(benchSwaps>=3,`${seed}: primary visual seed must keep the approved second-pass roadside seating improvement`);
+    assert.ok(benchRoadGain>=170,`${seed}: primary visual seed must keep the expanded bench road-affinity gain`);
   }
   const lampCount=map.decorations.filter(row=>row.family==='lamp').length;
   const flowerCount=map.decorations.filter(row=>row.family==='flower').length;
@@ -43,5 +43,5 @@ for(const seed of SEEDS){
   assert.ok(lampCount>0&&flowerCount>0&&benchCount>0,`${seed}: representative map must retain lamps, flowers and benches`);
   results.push({seed,roadCount:map.roads.length,blockCount:map.blocks.length,decorationCount:map.decorations.length,arterialCount:arterials.length,collectorCount:collectors.length,arterialWidths:[...new Set(arterials.map(road=>road.width))],collectorWidths:[...new Set(collectors.map(road=>road.width))],decoration:recipe.style.decoration,streetFamilySwaps:map.generationStats.decorationStreetFamilySwapCount,streetFamilyRoadGain:map.generationStats.decorationStreetFamilyRoadGain,lampSwaps:map.generationStats.decorationStreetLampSwapCount,lampRoadGain:map.generationStats.decorationStreetLampRoadGain,benchSwaps,benchRoadGain,lampCount,flowerCount,benchCount,quality:map.quality.total});
 }
-assert.ok(representativeBenchSwaps>=3,'Representative seeds must retain multiple roadside bench improvements, not a single-seed accident');
+assert.ok(representativeBenchSwaps>=4,'Representative seeds must retain the approved second-pass roadside seating improvement');
 console.log(JSON.stringify({ok:true,expectedArterialWidth:EXPECTED_ARTERIAL_WIDTH,expectedCollectorWidth:EXPECTED_COLLECTOR_WIDTH,expectedDecoration:EXPECTED_DECORATION,primarySeed:PRIMARY_SEED,seeds:SEEDS,representativeBenchSwaps,results},null,2));
