@@ -12,13 +12,14 @@ import { createCompositeCommand } from '../document/composite-command.mjs';
 const ARROWS=Object.freeze({
   ArrowLeft:{x:-1,y:0},ArrowRight:{x:1,y:0},ArrowUp:{x:0,y:-1},ArrowDown:{x:0,y:1}
 });
+const COARSE_MULTIPLIER=4;
 
-export function resolveStudioNudgeStep({root=globalThis,kernel,shiftKey=false}={}){
+export function resolveStudioNudgeStep({root=globalThis,kernel,shiftKey=false,altKey=false}={}){
   if(shiftKey)return 1;
   const select=root?.document?.querySelector?.('#kelo-studio-live [data-ext="snap"]');
   const live=Number(select?.value);
-  if(Number.isFinite(live)&&live>0)return live;
-  return Math.max(1,Number(kernel?.document?.settings?.tileSize)||32);
+  const base=Number.isFinite(live)&&live>0?live:Math.max(1,Number(kernel?.document?.settings?.tileSize)||32);
+  return altKey?base*COARSE_MULTIPLIER:base;
 }
 
 export function createStudioNudgeController({root=globalThis,kernel}={}){
@@ -47,14 +48,14 @@ export function createStudioNudgeController({root=globalThis,kernel}={}){
 
   function editableTarget(target){return !!target?.closest?.('input,textarea,select,[contenteditable="true"]');}
   function onKey(event){
-    const dir=ARROWS[event.key];if(!dir||event.metaKey||event.ctrlKey||event.altKey||editableTarget(event.target))return;
+    const dir=ARROWS[event.key];if(!dir||event.metaKey||event.ctrlKey||editableTarget(event.target))return;
     const shell=document.getElementById('kelo-studio-live');if(!shell)return;
     if(shell.dataset.sheetOpen==='1'||shell.dataset.creatorMinimized==='1')return;
     if(!['select','move'].includes(String(shell.dataset.activeTool||'select')))return;
     if(!kernel.selection.get().length)return;
     event.preventDefault();event.stopImmediatePropagation?.();
     if(event.repeat)return;
-    const step=resolveStudioNudgeStep({root,kernel,shiftKey:event.shiftKey});
+    const step=resolveStudioNudgeStep({root,kernel,shiftKey:event.shiftKey,altKey:event.altKey});
     void nudge(dir.x,dir.y,{step}).catch(error=>console.warn('[Kelo Studio] nudge failed',error));
   }
 
