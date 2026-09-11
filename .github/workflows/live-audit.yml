@@ -83,6 +83,9 @@ jobs:
           AUDIT_URL: https://kelffren.github.io/gemini/?offline=1&qa-live-audit=1&
           CHROME_BIN: /usr/bin/google-chrome
         run: node scripts/live-hero-audit.mjs
+      - name: Prove deployed mobile game is playable with real touch
+        env: *liveenv
+        run: node scripts/live-playability-audit.mjs
       - name: Audit blank world reset
         if: steps.mode.outputs.blank == 'true'
         env: *liveenv
