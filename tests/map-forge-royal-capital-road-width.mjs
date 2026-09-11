@@ -9,7 +9,7 @@ import {generateMapCandidate} from '../src/world/map-forge/map-forge-core.mjs';
 
 const EXPECTED_ARTERIAL_WIDTH=104;
 const EXPECTED_COLLECTOR_WIDTH=74;
-const EXPECTED_DECORATION=0.60;
+const EXPECTED_DECORATION=0.62;
 const SEEDS=[81746291,12345,424242,29011987];
 const recipe=MAP_FORGE_RECIPES.KELO_ROYAL_CAPITAL_V1;
 
@@ -26,6 +26,7 @@ for(const seed of SEEDS){
   assert.ok(collectors.length>0,`${seed}: representative map must contain collector roads`);
   assert.ok(arterials.every(road=>road.width===EXPECTED_ARTERIAL_WIDTH),`${seed}: every arterial must use ${EXPECTED_ARTERIAL_WIDTH}px`);
   assert.ok(collectors.every(road=>road.width===EXPECTED_COLLECTOR_WIDTH),`${seed}: every collector must use ${EXPECTED_COLLECTOR_WIDTH}px`);
+  assert.ok(map.decorations.length>=200&&map.decorations.length<=215,`${seed}: decoration enrichment must stay inside the approved visual density band`);
   results.push({seed,roadCount:map.roads.length,blockCount:map.blocks.length,decorationCount:map.decorations.length,arterialCount:arterials.length,collectorCount:collectors.length,arterialWidths:[...new Set(arterials.map(road=>road.width))],collectorWidths:[...new Set(collectors.map(road=>road.width))],decoration:recipe.style.decoration,quality:map.quality.total});
 }
 console.log(JSON.stringify({ok:true,expectedArterialWidth:EXPECTED_ARTERIAL_WIDTH,expectedCollectorWidth:EXPECTED_COLLECTOR_WIDTH,expectedDecoration:EXPECTED_DECORATION,seeds:SEEDS,results},null,2));
