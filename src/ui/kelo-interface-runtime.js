@@ -8,7 +8,7 @@
 'use strict';
 if(window.KELO_INTERFACE_RUNTIME)return;
 
-const VERSION='kelo-interface-runtime-v1.3.0';
+const VERSION='kelo-interface-runtime-v1.4.0';
 const RUNTIME_STYLE_ID='kelo-interface-runtime-style';
 
 function ensureStyle(){
@@ -275,7 +275,15 @@ function enhanceHouse(host,exit){
   if(exit){text(exit,'Salir de casa');aria(exit,'Salir de casa');}
 }
 
+let disposed=false;
+let scanPending=false;
+let scanFrame=0;
+let scanRuns=0;
+let observerCallbacks=0;
+
 function scan(root=document){
+  if(disposed)return;
+  scanRuns++;
   ensureStyle();
   enhanceLuxe(root.querySelector?.('#kelo-luxe'));
   enhanceAccount(root.querySelector?.('#kelo-account-auth'));
@@ -290,13 +298,35 @@ function scan(root=document){
   enhanceHouse(root.querySelector?.('#kelo-house-panel'),root.querySelector?.('#hi-exit'));
 }
 
-const observer=new MutationObserver(()=>scan(document));
+function scheduleScan(){
+  observerCallbacks++;
+  if(disposed||scanPending)return;
+  scanPending=true;
+  const run=()=>{
+    scanPending=false;
+    scanFrame=0;
+    if(!disposed)scan(document);
+  };
+  if(typeof requestAnimationFrame==='function')scanFrame=requestAnimationFrame(run);
+  else Promise.resolve().then(run);
+}
+
+const observer=new MutationObserver(scheduleScan);
 observer.observe(document.documentElement,{childList:true,subtree:true});
 scan(document);
 
 window.KELO_INTERFACE_RUNTIME=Object.freeze({
   version:VERSION,
   scan:()=>scan(document),
-  destroy(){observer.disconnect();document.getElementById(RUNTIME_STYLE_ID)?.remove();delete window.KELO_INTERFACE_RUNTIME;}
+  snapshot:()=>Object.freeze({version:VERSION,scanRuns,observerCallbacks,scanPending}),
+  destroy(){
+    disposed=true;
+    observer.disconnect();
+    if(scanFrame&&typeof cancelAnimationFrame==='function')cancelAnimationFrame(scanFrame);
+    scanFrame=0;
+    scanPending=false;
+    document.getElementById(RUNTIME_STYLE_ID)?.remove();
+    delete window.KELO_INTERFACE_RUNTIME;
+  }
 });
 })();
