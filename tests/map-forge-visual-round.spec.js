@@ -19,6 +19,7 @@ const DECORATION_MAX=215;
 const VALIDATION_QUALITY_MIN=94;
 const VALIDATION_VISTAS_MIN=81;
 const VALIDATION_SPACE_MIN=78;
+const LOCAL_SAME_FAMILY_MAX=0.04;
 
 test.use({viewport:{width:1440,height:900}});
 test.setTimeout(90000);
@@ -125,6 +126,7 @@ test(`Map Forge ${STAGE} fixed-seed preview/runtime visual evidence`,async({page
     expect(mainMetrics.scenicVistas).toBeGreaterThanOrEqual(82);
     expect(mainMetrics.negativeSpace).toBeGreaterThanOrEqual(78);
     expect(mainMetrics.declusterSwapCount).toBeGreaterThan(0);
+    expect(mainMetrics.localSameFamilyRatio).toBeLessThanOrEqual(LOCAL_SAME_FAMILY_MAX);
   }
   await page.screenshot({path:`test-results/screenshot_preview_${STAGE}.png`,fullPage:true});
 
@@ -149,10 +151,11 @@ test(`Map Forge ${STAGE} fixed-seed preview/runtime visual evidence`,async({page
       expect(metrics.scenicVistas).toBeGreaterThanOrEqual(VALIDATION_VISTAS_MIN);
       expect(metrics.negativeSpace).toBeGreaterThanOrEqual(VALIDATION_SPACE_MIN);
       expect(metrics.declusterSwapCount).toBeGreaterThan(0);
+      expect(metrics.localSameFamilyRatio).toBeLessThanOrEqual(LOCAL_SAME_FAMILY_MAX);
     }
     validation.push(metrics);
   }
-  const evidence={stage:STAGE,mainSeed:MAIN_SEED,validationSeeds:VALIDATION_SEEDS,decorationBand:[DECORATION_MIN,DECORATION_MAX],main:mainMetrics,runtime,validation,pageErrors};
+  const evidence={stage:STAGE,mainSeed:MAIN_SEED,validationSeeds:VALIDATION_SEEDS,decorationBand:[DECORATION_MIN,DECORATION_MAX],localSameFamilyMax:LOCAL_SAME_FAMILY_MAX,main:mainMetrics,runtime,validation,pageErrors};
   fs.writeFileSync(`test-results/map-forge-visual-metrics-${STAGE}.json`,JSON.stringify(evidence,null,2));
   expect(pageErrors).toEqual([]);
 });
