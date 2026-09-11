@@ -75,6 +75,7 @@ test(`Map Forge ${STAGE} fixed-seed preview/runtime visual evidence`,async({page
   const mainMap=await generateSelected(page,forge,MAIN_SEED);
   const mainMetrics=mapMetrics(mainMap);
   expect(mainMetrics.valid).toBe(true);expect(mainMetrics.errors).toEqual([]);
+  if(STAGE==='after'){expect(mainMetrics.urbanStreetscapeRatio).toBe(1);expect(mainMetrics.decorationCount).toBeGreaterThanOrEqual(200);}
   await page.screenshot({path:`test-results/screenshot_preview_${STAGE}.png`,fullPage:true});
 
   await page.getByRole('button',{name:'VER EN MAPA EXTERIOR'}).click();
@@ -87,7 +88,12 @@ test(`Map Forge ${STAGE} fixed-seed preview/runtime visual evidence`,async({page
   await page.getByRole('button',{name:'VOLVER A MAP FORGE'}).click();
   await expect(page.locator('#kelo-map-forge')).toBeVisible({timeout:15000});
   const validation=[];
-  for(const seed of VALIDATION_SEEDS){const map=await generateSelected(page,page.locator('#kelo-map-forge'),seed);const metrics=mapMetrics(map);expect(metrics.valid).toBe(true);expect(metrics.errors).toEqual([]);validation.push(metrics);}
+  for(const seed of VALIDATION_SEEDS){
+    const map=await generateSelected(page,page.locator('#kelo-map-forge'),seed),metrics=mapMetrics(map);
+    expect(metrics.valid).toBe(true);expect(metrics.errors).toEqual([]);
+    if(STAGE==='after'){expect(metrics.urbanStreetscapeRatio).toBe(1);expect(metrics.decorationCount).toBeGreaterThanOrEqual(200);}
+    validation.push(metrics);
+  }
   const evidence={stage:STAGE,mainSeed:MAIN_SEED,validationSeeds:VALIDATION_SEEDS,main:mainMetrics,runtime,validation,pageErrors};
   fs.writeFileSync(`test-results/map-forge-visual-metrics-${STAGE}.json`,JSON.stringify(evidence,null,2));
   expect(pageErrors).toEqual([]);
