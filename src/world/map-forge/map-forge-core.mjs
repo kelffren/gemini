@@ -12,7 +12,7 @@
 import {clamp,freezeDeep,stableStringify,hashString,seed32,createRng} from './map-forge-prng.mjs';
 import {createMapIntent,buildCandidateParts} from './map-forge-builder.mjs';
 import {validateMapDefinition,scoreMapDefinition} from './map-forge-quality.mjs';
-export const MAP_FORGE_GENERATOR_VERSION='1.1.7';
+export const MAP_FORGE_GENERATOR_VERSION='1.1.8';
 export {createMapIntent} from './map-forge-builder.mjs';
 export {createRng,stableStringify} from './map-forge-prng.mjs';
 export {validateMapDefinition,scoreMapDefinition} from './map-forge-quality.mjs';
@@ -20,8 +20,8 @@ export {validateMapDefinition,scoreMapDefinition} from './map-forge-quality.mjs'
 const DIRECTIONAL_DECORATION_FAMILIES=new Set(['bench','market_prop']);
 const DECORATION_DECLUSTER_RADIUS=240;
 const DECORATION_DECLUSTER_GAIN=23;
-const STREET_FURNITURE_ROAD_GAIN=24;
-const STREET_FURNITURE_SWAPS_PER_DISTRICT=2;
+const STREET_LAMP_ROAD_GAIN=36;
+const STREET_BENCH_ROAD_GAIN=36;
 const decorationDistance=(a,b)=>Math.hypot(Number(a?.x||0)-Number(b?.x||0),Number(a?.y||0)-Number(b?.y||0));
 function nearestFamilyDistance(rows,index,family){const current=rows[index];let best=Infinity;for(let i=0;i<rows.length;i++){if(i===index)continue;const row=rows[i];if(row.district!==current.district||row.family!==family)continue;best=Math.min(best,decorationDistance(current,row));}return best;}
 function declusterDecorationFamilies(parts){
@@ -47,30 +47,15 @@ function declusterDecorationFamilies(parts){
 }
 function nearestRoadVector(p,roads){let best=null;for(const road of roads||[]){const points=road.polyline||[];for(let i=1;i<points.length;i++){const a=points[i-1],b=points[i],dx=b.x-a.x,dy=b.y-a.y,den=dx*dx+dy*dy,t=den?clamp(((p.x-a.x)*dx+(p.y-a.y)*dy)/den,0,1):0,x=a.x+dx*t,y=a.y+dy*t,vx=x-p.x,vy=y-p.y,distance=Math.hypot(vx,vy);if(!best||distance<best.distance)best={vx,vy,distance};}}return best;}
 function swapDecorationIdentity(a,b){const family=a.family,assetRef=a.assetRef;a.family=b.family;a.assetRef=b.assetRef;b.family=family;b.assetRef=assetRef;}
+function findRoadAffinitySwap(rows,roads,district,targetFamily,donorFamily,minGain){let best=null;for(let i=0;i<rows.length;i++){const target=rows[i];if(target.district!==district||target.family!==targetFamily)continue;const targetRoad=nearestRoadVector(target,roads)?.distance??Infinity;for(let j=0;j<rows.length;j++){if(i===j)continue;const donor=rows[j];if(donor.district!==district||donor.family!==donorFamily)continue;const donorRoad=nearestRoadVector(donor,roads)?.distance??Infinity,gain=targetRoad-donorRoad;if(!Number.isFinite(gain)||gain<minGain)continue;const before=Math.min(nearestFamilyDistance(rows,i,targetFamily),nearestFamilyDistance(rows,j,donorFamily));swapDecorationIdentity(target,donor);const after=Math.min(nearestFamilyDistance(rows,i,target.family),nearestFamilyDistance(rows,j,donor.family));swapDecorationIdentity(target,donor);if(after+0.1<before)continue;if(!best||gain>best.gain+1e-6||Math.abs(gain-best.gain)<=1e-6&&(i<best.i||i===best.i&&j<best.j))best={i,j,gain};}}return best;}
 function organizeStreetFurnitureFamilies(parts){
-  const rows=(parts.decorations||[]).map(row=>({...row})),districts=[...new Set(rows.map(row=>row.district))].sort();let swaps=0,totalRoadGain=0;
+  const rows=(parts.decorations||[]).map(row=>({...row})),districts=[...new Set(rows.map(row=>row.district))].sort();let lampSwaps=0,lampRoadGain=0,benchSwaps=0,benchRoadGain=0;
   for(const district of districts){
-    for(let pass=0;pass<STREET_FURNITURE_SWAPS_PER_DISTRICT;pass++){
-      let best=null;
-      for(let i=0;i<rows.length;i++){
-        const lamp=rows[i];if(lamp.district!==district||lamp.family!=='lamp')continue;
-        const lampRoad=nearestRoadVector(lamp,parts.roads)?.distance??Infinity;
-        for(let j=0;j<rows.length;j++){
-          if(i===j)continue;const flower=rows[j];if(flower.district!==district||flower.family!=='flower')continue;
-          const flowerRoad=nearestRoadVector(flower,parts.roads)?.distance??Infinity,gain=lampRoad-flowerRoad;
-          if(!Number.isFinite(gain)||gain<STREET_FURNITURE_ROAD_GAIN)continue;
-          const before=Math.min(nearestFamilyDistance(rows,i,'lamp'),nearestFamilyDistance(rows,j,'flower'));
-          swapDecorationIdentity(lamp,flower);
-          const after=Math.min(nearestFamilyDistance(rows,i,lamp.family),nearestFamilyDistance(rows,j,flower.family));
-          swapDecorationIdentity(lamp,flower);
-          if(after+0.1<before)continue;
-          if(!best||gain>best.gain+1e-6||Math.abs(gain-best.gain)<=1e-6&&(i<best.i||i===best.i&&j<best.j))best={i,j,gain};
-        }
-      }
-      if(!best)break;swapDecorationIdentity(rows[best.i],rows[best.j]);swaps++;totalRoadGain+=best.gain;
-    }
+    const lampBest=findRoadAffinitySwap(rows,parts.roads,district,'lamp','flower',STREET_LAMP_ROAD_GAIN);if(lampBest){swapDecorationIdentity(rows[lampBest.i],rows[lampBest.j]);lampSwaps++;lampRoadGain+=lampBest.gain;}
+    const benchBest=findRoadAffinitySwap(rows,parts.roads,district,'bench','flower',STREET_BENCH_ROAD_GAIN);if(benchBest){swapDecorationIdentity(rows[benchBest.i],rows[benchBest.j]);benchSwaps++;benchRoadGain+=benchBest.gain;}
   }
-  return{...parts,decorations:rows,generationStats:{...parts.generationStats,decorationStreetFamilySwapCount:swaps,decorationStreetFamilyRoadGain:Math.round(totalRoadGain*10)/10}};
+  const swaps=lampSwaps+benchSwaps,totalRoadGain=lampRoadGain+benchRoadGain;
+  return{...parts,decorations:rows,generationStats:{...parts.generationStats,decorationStreetFamilySwapCount:swaps,decorationStreetFamilyRoadGain:Math.round(totalRoadGain*10)/10,decorationStreetLampSwapCount:lampSwaps,decorationStreetLampRoadGain:Math.round(lampRoadGain*10)/10,decorationStreetBenchSwapCount:benchSwaps,decorationStreetBenchRoadGain:Math.round(benchRoadGain*10)/10}};
 }
 function roadFacingRotation(p,roads,fallback=0){const frame=nearestRoadVector(p,roads);if(!frame||frame.distance<1e-6)return fallback;const degrees=Math.atan2(-frame.vx,frame.vy)*180/Math.PI;return((Math.round(degrees/90)*90)%360+360)%360;}
 function orientDirectionalDecorations(parts){let oriented=0;const decorations=(parts.decorations||[]).map(row=>{if(!DIRECTIONAL_DECORATION_FAMILIES.has(row.family))return row;oriented++;return{...row,rotation:roadFacingRotation(row,parts.roads,row.rotation)};});return{...parts,decorations,generationStats:{...parts.generationStats,decorationRoadFacingCount:oriented}};}
