@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: QA / CREATORS / SPRITE ABILITY
- * keys: MOBILE LIVE UPLOAD IRREGULAR SPRITESHEET AUTO FIT PREVIEW DUMMY GENERATE ANIMATION ABILITY COMBAT LAB
- * purpose: abre el Builder exacto a 390x844, sube una hoja 1983x793 no divisible, exige auto-fit 8x4 y verifica generación de drafts
+ * keys: MOBILE LIVE EASY MODE UPLOAD IRREGULAR SPRITESHEET AUTO FIT PREVIEW DUMMY GENERATE ANIMATION ABILITY COMBAT LAB
+ * purpose: abre el Builder exacto a 390x844, valida Easy Mode, sube una hoja 1983x793 no divisible, exige auto-fit 8x4 y verifica generación de drafts
  */
 import fs from 'node:fs';
 import { chromium } from 'playwright';
@@ -33,6 +33,11 @@ try{
   await spriteButton.click();await page.waitForSelector('#kelo-studio-workspace',{state:'visible',timeout:10000});
   const initial=await page.evaluate(async()=>{const m=await import('./src/creators/sprite-ability/sprite-ability-live-controller.mjs'),s=m.getSpriteAbilityBuilder();return{version:s?.version,projectId:s?.projectId,lockOwners:window.KeloInputLocks.snapshot().owners||[]};});
   if(initial.version!=='sprite-ability-builder-v1.2.0-combat-lab'||!initial.projectId||!initial.lockOwners.includes('kelo-sprite-ability-builder'))throw new Error(`SPRITE_ABILITY_BOOT_FAILED:${JSON.stringify(initial)}`);
+  await page.waitForSelector('#kelo-studio-workspace.sab-easy-ready[data-sab-easy="1"]',{state:'attached',timeout:5000});
+  const easyDock=page.locator('.sab-easy-dock');if(!await easyDock.isVisible())throw new Error('SPRITE_ABILITY_EASY_DOCK_NOT_VISIBLE');
+  const easyLabels=await easyDock.locator('button span').allTextContents();for(const label of ['SUBIR','VER','PROBAR','AJUSTAR','GUARDAR'])if(!easyLabels.includes(label))throw new Error(`SPRITE_ABILITY_EASY_FLOW_MISSING:${label}`);
+  const advancedToggle=page.getByRole('button',{name:'⚙ AVANZADO'});if(!await advancedToggle.isVisible())throw new Error('SPRITE_ABILITY_ADVANCED_TOGGLE_NOT_VISIBLE');await advancedToggle.click();
+  await page.waitForFunction(()=>document.getElementById('kelo-studio-workspace')?.dataset?.sabEasy==='0',null,{timeout:5000});
   await page.waitForSelector('.ksw-left.mobile-open',{state:'attached',timeout:3000});
   const upload=page.locator('.ksw-left input[type=file]');await upload.setInputFiles({name:'irregular-1983x793.png',mimeType:'image/png',buffer:irregularPng});
   const uploaded=await waitBuilder(s=>s?.draft?.sheet?.autoFit?.applied===true&&s.draft.sheet.columns===8&&s.draft.sheet.rows===4,{timeout:15000,label:'auto-fit 8x4'});
@@ -60,5 +65,5 @@ try{
   await page.locator('.ksw-top [data-act="close"]').click();await page.waitForFunction(()=>!document.getElementById('kelo-studio-workspace'),null,{timeout:5000});
   const locks=await page.evaluate(()=>window.KeloInputLocks.snapshot().owners||[]);if(locks.includes('kelo-sprite-ability-builder'))throw new Error('SPRITE_ABILITY_LOCK_LEAK');
   if(pageErrors.length)throw new Error(`SPRITE_ABILITY_PAGE_ERRORS:${pageErrors.join(' | ')}`);
-  const report={ok:true,viewport:'390x844',initial,autoFit:{source:`${sheet.autoFit.sourceWidth}x${sheet.autoFit.sourceHeight}`,detected:`${sheet.columns}x${sheet.rows}`,normalized:`${sheet.imageWidth}x${sheet.imageHeight}`,cell:`${sheet.frameWidth}x${sheet.frameHeight}`,confidence:sheet.autoFit.confidence},beforeGenerate:{fps:beforeGenerate.sheet.fps,activeStart:beforeGenerate.combat.activeStartFrame,impact:beforeGenerate.combat.impactFrame,activeEnd:beforeGenerate.combat.activeEndFrame,damage:beforeGenerate.combat.damage,knockback:beforeGenerate.combat.knockback,mode:beforeGenerate.preview.mode},generated,locksAfterClose:locks,pageErrors};fs.writeFileSync('artifacts/sprite-ability-builder/report.json',JSON.stringify(report,null,2));console.log('KELO SPRITE ABILITY BUILDER COMBAT LAB MOBILE AUDIT: PASS');console.log(JSON.stringify(report,null,2));
+  const report={ok:true,viewport:'390x844',initial,easyMode:{labels:easyLabels,advancedEntered:true},autoFit:{source:`${sheet.autoFit.sourceWidth}x${sheet.autoFit.sourceHeight}`,detected:`${sheet.columns}x${sheet.rows}`,normalized:`${sheet.imageWidth}x${sheet.imageHeight}`,cell:`${sheet.frameWidth}x${sheet.frameHeight}`,confidence:sheet.autoFit.confidence},beforeGenerate:{fps:beforeGenerate.sheet.fps,activeStart:beforeGenerate.combat.activeStartFrame,impact:beforeGenerate.combat.impactFrame,activeEnd:beforeGenerate.combat.activeEndFrame,damage:beforeGenerate.combat.damage,knockback:beforeGenerate.combat.knockback,mode:beforeGenerate.preview.mode},generated,locksAfterClose:locks,pageErrors};fs.writeFileSync('artifacts/sprite-ability-builder/report.json',JSON.stringify(report,null,2));console.log('KELO SPRITE ABILITY BUILDER COMBAT LAB MOBILE AUDIT: PASS');console.log(JSON.stringify(report,null,2));
 }finally{await browser.close();}
