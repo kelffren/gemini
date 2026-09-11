@@ -8,8 +8,8 @@
     },
     {
       "path": "assets/hero-spartan-spritesheet.png",
-      "scope": "source-sheet",
-      "reason": "New hero spritesheet is retained as authoring input until it is processed into the runtime character pipeline; it is not a world environment asset."
+      "scope": "non-world-ui",
+      "reason": "Main player character spritesheet is owned by KeloAvatar actor presentation, not the environment world-art contract."
     },
     {
       "path": "assets/fx/sword-swap/activation-eye.PNG",
