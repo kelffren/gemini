@@ -11,6 +11,7 @@ on:
       - 'src/core/camera-system.js'
       - 'index.html'
       - 'scripts/studio-live-audit.mjs'
+      - 'scripts/studio-smart-duplicate-placement-audit.mjs'
       - '.github/workflows/studio-live-audit.yml'
   pull_request:
     paths:
@@ -22,6 +23,7 @@ on:
       - 'src/core/camera-system.js'
       - 'index.html'
       - 'scripts/studio-live-audit.mjs'
+      - 'scripts/studio-smart-duplicate-placement-audit.mjs'
       - '.github/workflows/studio-live-audit.yml'
   workflow_dispatch:
 
@@ -35,7 +37,12 @@ jobs:
         with:
           node-version: '22'
       - name: Syntax
-        run: node --check scripts/studio-live-audit.mjs
+        run: |
+          node --check scripts/studio-live-audit.mjs
+          node --check scripts/studio-smart-duplicate-placement-audit.mjs
+          node --check src/studio/tools/creator-actions.mjs
+      - name: Smart duplicate placement contract
+        run: node scripts/studio-smart-duplicate-placement-audit.mjs
       - name: Install Playwright
         run: npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund playwright@1.55.0
       - name: Serve PR candidate
