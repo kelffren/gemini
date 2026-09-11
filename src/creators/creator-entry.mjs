@@ -29,8 +29,24 @@ import { registerSpriteAbilityWorkspace } from './workspaces/sprite-ability-work
 import { registerContentStudioWorkspace } from './workspaces/content-studio-workspace.mjs';
 import { registerAvatarWorkspace } from './workspaces/avatar-workspace.mjs';
 let platform=null;
+function ensureCreatorInputLocks(root){
+  if(root?.KeloInputLocks?.acquire&&root?.KeloInputLocks?.release)return()=>{};
+  const held=new Set();let seq=0;
+  const fallback={
+    __keloCreatorFallback:true,
+    acquire(owner='creator-workspace',meta=null){const token=Object.freeze({id:`creator-lock-${++seq}`,owner:String(owner),meta});held.add(token);return token;},
+    release(token){return held.delete(token);},
+    isLocked(){return held.size>0;},
+    has(token){return held.has(token);},
+    clear(){held.clear();},
+    get size(){return held.size;}
+  };
+  try{root.KeloInputLocks=fallback;}catch{}
+  return()=>{held.clear();try{if(root.KeloInputLocks===fallback)delete root.KeloInputLocks;}catch{}};
+}
 export async function bootKeloCreators({root=globalThis,stateAdapter=null}={}){
   if(platform)return platform;
+  const inputLocksDispose=ensureCreatorInputLocks(root);
   let visualUiDispose=()=>{},eventLabDispose=()=>{},easyUiDispose=()=>{},manualCutterDispose=()=>{};
   try{
     const visualUi=await import('./sprite-ability/sprite-ability-visual-ui.mjs');
@@ -57,7 +73,7 @@ export async function bootKeloCreators({root=globalThis,stateAdapter=null}={}){
     if(manifest.capability)permission.require(manifest.capability,permission.actorId(),context.projectId||null);
     return workspaces.open(id,{root,projects,permission,dependencies,contentSession,contentRepository,contentService,runtimeContent,avatarRuntime,avatarQuick,openWorkspace,...context});
   }
-  platform=Object.freeze({version:'kelo-creators-core-v1.12.0-sprite-manual-cutter',permission,projects,workspaces,dependencies,contentSession,contentRepository,contentService,runtimeContent,avatarRuntime,avatarQuick,openWorkspace,close(){try{manualCutterDispose?.();}catch{}try{easyUiDispose?.();}catch{}try{eventLabDispose?.();}catch{}try{visualUiDispose?.();}catch{}try{localState.close?.();}catch{}platform=null;}});
+  platform=Object.freeze({version:'kelo-creators-core-v1.12.1-sprite-easy-open',permission,projects,workspaces,dependencies,contentSession,contentRepository,contentService,runtimeContent,avatarRuntime,avatarQuick,openWorkspace,close(){try{manualCutterDispose?.();}catch{}try{easyUiDispose?.();}catch{}try{eventLabDispose?.();}catch{}try{visualUiDispose?.();}catch{}try{localState.close?.();}catch{}try{inputLocksDispose?.();}catch{}platform=null;}});
   return platform;
 }
 export function getKeloCreatorsPlatform(){return platform;}
