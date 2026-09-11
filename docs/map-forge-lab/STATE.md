@@ -3,9 +3,10 @@
 ## Resume point
 
 - Current cycle: **02 — ASSET_SCALE_WRONG for ordinary market props**.
-- Phase: **cycle 01 interactive LIVE gate queued; cycle 02 candidate implemented locally**.
+- Phase: **cycles 01 and 02 integrated; visual/LIVE acceptance queued**.
 - Baseline commit verified in LIVE: `05cb1e2b8f78a83d44fa794a984167c17f9f7eb8`.
 - Cycle 01 implementation commit on `main`: `3bc05bf842ff3fa320a0be636a97f4617fae0fb7`.
+- Cycle 02 implementation commit on `main`: `3d3f5c794a1d529f225413a30826526da1d8a60c`.
 - GitHub Pages deployed that commit successfully in run `34542519251`; the served modules report generator `1.1.0` and contain both paving hard gates.
 - LIVE URL: `https://kelffren.github.io/gemini/?mapEditor=1&offline=1`.
 - LIVE title at baseline: `Kelo World — V6.54`.

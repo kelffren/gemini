@@ -65,9 +65,9 @@
     },
     {
       "cycle": 2,
-      "status": "IMPLEMENTED_LOCAL",
+      "status": "DEPLOY_PENDING",
       "baseCommit": "1e59df7b6abaa67e1c65d6d757f1f8a2987334cc",
-      "finalCommit": null,
+      "finalCommit": "3d3f5c794a1d529f225413a30826526da1d8a60c",
       "defect": "ASSET_SCALE_WRONG",
       "relatedDefect": "PROP_REPETITION",
       "severity": "high",
