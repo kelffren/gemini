@@ -12,10 +12,15 @@ import { createCompositeCommand } from '../document/composite-command.mjs';
 const DEFAULT_MAGNET=10;
 const DEFAULT_GUIDE_RANGE=256;
 const SPACING_ALIGN_TOLERANCE=48;
+const CANDIDATE_CACHE_MARGIN=96;
+
+const rectIntersects=(a,b)=>a.x<a.x+a.w&&b.x<b.x+b.w&&a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;
+const rectContains=(outer,inner)=>inner.x>=outer.x&&inner.y>=outer.y&&inner.x+inner.w<=outer.x+outer.w&&inner.y+inner.h<=outer.y+outer.h;
 
 export function createTransformTool(kernel) {
   if (!kernel) throw new Error('STUDIO_TRANSFORM_KERNEL_REQUIRED');
   let state = null;
+  const diagnostics={candidateQueries:0,candidateCacheHits:0};
   const find = id => kernel.document.entities.find(e => e.id === String(id)) || null;
   const n = value => Number(value) || 0;
 
@@ -45,8 +50,15 @@ export function createTransformTool(kernel) {
     return best;
   }
   function nearbyCandidates(moving,range){
-    const selected=new Set(state.rows.map(row=>String(row.entityId))),pad=Math.max(DEFAULT_GUIDE_RANGE,Number(range)||DEFAULT_GUIDE_RANGE),area={x:moving.x-pad,y:moving.y-pad,w:moving.w+pad*2,h:moving.h+pad*2};
-    return kernel.spatial.queryRect(area,{category:'entity'}).filter(row=>!selected.has(String(row.id))&&row.rect);
+    const selected=new Set(state.rows.map(row=>String(row.entityId))),pad=Math.max(DEFAULT_GUIDE_RANGE,Number(range)||DEFAULT_GUIDE_RANGE),requested={x:moving.x-pad,y:moving.y-pad,w:moving.w+pad*2,h:moving.h+pad*2};
+    let rows;
+    if(state.candidateCache&&rectContains(state.candidateCache.area,requested)){
+      diagnostics.candidateCacheHits++;rows=state.candidateCache.rows;
+    }else{
+      const margin=Math.max(CANDIDATE_CACHE_MARGIN,pad*.25),area={x:requested.x-margin,y:requested.y-margin,w:requested.w+margin*2,h:requested.h+margin*2};
+      rows=kernel.spatial.queryRect(area,{category:'entity'});diagnostics.candidateQueries++;state.candidateCache={area,rows};
+    }
+    return rows.filter(row=>!selected.has(String(row.id))&&row.rect&&rectIntersects(row.rect,requested));
   }
   function guideFromSnap(snap,moving){
     if(!snap||snap.type!=='align')return null;const target=snap.candidateRect;
@@ -120,7 +132,7 @@ export function createTransformTool(kernel) {
     const entity=find(entityId);if(!entity)throw new Error('STUDIO_ENTITY_NOT_FOUND');
     const selected=kernel.selection.get(),ids=useSelection&&selected.includes(entity.id)&&selected.length>1?selected.slice():[entity.id];
     const rows=ids.map(id=>{const e=find(id);return e?{entityId:id,from:{...(e.transform||{})},preview:{...(e.transform||{})}}:null;}).filter(Boolean);
-    const anchor=rows.find(row=>row.entityId===entity.id)||rows[0];state={entityId:entity.id,anchorFrom:{...anchor.from},rows,snapTarget:null,guides:[]};return snapshot();
+    const anchor=rows.find(row=>row.entityId===entity.id)||rows[0];state={entityId:entity.id,anchorFrom:{...anchor.from},rows,snapTarget:null,guides:[],candidateCache:null};return snapshot();
   }
 
   function previewMove(x,y,{snap=1,smart=true,magnet=DEFAULT_MAGNET,guideRange=DEFAULT_GUIDE_RANGE,spacing=true}={}){
@@ -152,5 +164,5 @@ export function createTransformTool(kernel) {
     return{entityIds:current.rows.map(x=>x.entityId),commands:commands.length};
   }
 
-  return Object.freeze({id:'transform',begin,previewMove,previewRotate,commit,cancel,getPreview:snapshot,getPreviews:()=>state?state.rows.map(row=>({entityId:row.entityId,...row.preview})):[],getGuides:()=>state?state.guides.map(guide=>({...guide})):[]});
+  return Object.freeze({id:'transform',begin,previewMove,previewRotate,commit,cancel,getPreview:snapshot,getPreviews:()=>state?state.rows.map(row=>({entityId:row.entityId,...row.preview})):[],getGuides:()=>state?state.guides.map(guide=>({...guide})):[],getDiagnostics:()=>({...diagnostics})});
 }
