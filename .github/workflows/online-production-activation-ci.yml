@@ -9,6 +9,7 @@ on:
       - 'src/ui/account-auth-ui.js'
       - 'src/ui/google-auth-button.js'
       - 'scripts/audit-online-auth-lifecycle.mjs'
+      - 'scripts/online-foundation-audit.mjs'
       - 'index.html'
       - 'render.yaml'
       - 'docs/ops/RENDER_SERVER.md'
@@ -23,6 +24,7 @@ on:
       - 'src/ui/account-auth-ui.js'
       - 'src/ui/google-auth-button.js'
       - 'scripts/audit-online-auth-lifecycle.mjs'
+      - 'scripts/online-foundation-audit.mjs'
       - 'index.html'
       - 'render.yaml'
       - 'docs/ops/RENDER_SERVER.md'
@@ -50,6 +52,7 @@ jobs:
           node --check src/ui/account-auth-ui.js
           node --check src/ui/google-auth-button.js
           node --check scripts/audit-online-auth-lifecycle.mjs
+          node --check scripts/online-foundation-audit.mjs
       - name: Account auth contract
         run: |
           grep -q "PRODUCTION_APP_URL='https://kelffren.github.io/gemini/'" src/auth/supabase-auth-runtime.js
