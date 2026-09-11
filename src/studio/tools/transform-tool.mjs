@@ -128,8 +128,8 @@ export function createTransformTool(kernel) {
     const s=Math.max(1,Number(snap)||1),tx=n(x),ty=n(y),anchorX=n(state.anchorFrom.x),anchorY=n(state.anchorFrom.y),rawDx=tx-anchorX,rawDy=ty-anchorY;
     const rawGroup=groupRect(state.rows,rawDx,rawDy),threshold=Math.max(0,Number(magnet)||0),candidates=smart&&threshold>0?nearbyCandidates(rawGroup,guideRange):[];
     const xAlign=bestAxisSnap('x',rawGroup,candidates,threshold),yAlign=bestAxisSnap('y',rawGroup,candidates,threshold),xSpacing=spacing?bestSpacingSnap('x',rawGroup,candidates,threshold):null,ySpacing=spacing?bestSpacingSnap('y',rawGroup,candidates,threshold):null;
-    const xSnap=chooseAxisSnap(xAlign,xSpacing),ySnap=chooseAxisSnap(yAlign,ySpacing),finalTx=tx+(xSnap?.delta||0),finalTy=ty+(ySnap?.delta||0),dx=finalTx-anchorX,dy=finalTy-anchorY,previewGroup=groupRect(state.rows,dx,dy);
-    state.snapTarget={x:xSnap?finalTx:Math.round(tx/s)*s,y:ySnap?finalTy:Math.round(ty/s)*s,snap:s,magneticX:!!xSnap,magneticY:!!ySnap,spacingX:xSnap?.type==='spacing',spacingY:ySnap?.type==='spacing'};
+    const xSnap=chooseAxisSnap(xAlign,xSpacing),ySnap=chooseAxisSnap(yAlign,ySpacing),finalTx=xSnap?tx+xSnap.delta:Math.round(tx/s)*s,finalTy=ySnap?ty+ySnap.delta:Math.round(ty/s)*s,dx=finalTx-anchorX,dy=finalTy-anchorY,previewGroup=groupRect(state.rows,dx,dy);
+    state.snapTarget={x:finalTx,y:finalTy,snap:s,magneticX:!!xSnap,magneticY:!!ySnap,spacingX:xSnap?.type==='spacing',spacingY:ySnap?.type==='spacing'};
     state.guides=[guideFromSnap(xSnap,previewGroup),guideFromSnap(ySnap,previewGroup),...guidesFromSpacing(xSnap,previewGroup),...guidesFromSpacing(ySnap,previewGroup)].filter(Boolean);
     for(const row of state.rows){row.preview.x=n(row.from.x)+dx;row.preview.y=n(row.from.y)+dy;}
     return snapshot();
