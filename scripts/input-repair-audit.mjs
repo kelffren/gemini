@@ -1,4 +1,5 @@
 import { chromium } from 'playwright';
+import fs from 'node:fs/promises';
 
 const url = process.env.AUDIT_URL || 'http://127.0.0.1:4173/';
 const executablePath = process.env.CHROME_BIN || undefined;
@@ -16,6 +17,7 @@ const context = await browser.newContext({
 });
 const page = await context.newPage();
 const pageErrors = [];
+await fs.mkdir('artifacts', { recursive: true });
 page.on('pageerror', (error) => pageErrors.push(String(error?.stack || error?.message || error)));
 
 try {
@@ -164,6 +166,15 @@ try {
     chatOpen,
     chatClosed
   }, null, 2));
+} catch (error) {
+  const diagnostic = {
+    message: String(error?.message || error),
+    stack: String(error?.stack || ''),
+    pageErrors
+  };
+  try { await page.screenshot({ path: 'artifacts/input-hub-failure.png', fullPage: true }); } catch {}
+  await fs.writeFile('artifacts/input-hub-failure.json', JSON.stringify(diagnostic, null, 2));
+  throw error;
 } finally {
   await browser.close();
 }
