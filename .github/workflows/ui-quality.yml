@@ -27,6 +27,10 @@ on:
       - 'docs/KELO_INTERFACE_STANDARD.md'
       - '.github/workflows/ui-quality.yml'
 
+concurrency:
+  group: kelo-ui-quality-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
