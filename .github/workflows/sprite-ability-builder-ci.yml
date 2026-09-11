@@ -1,7 +1,7 @@
 # KELO-INDEX
 # area: CI / CREATORS
-# keys: SPRITE ABILITY BUILDER SPRITESHEET AUTO FIT MANUAL CUT ANIMATION ABILITY MOBILE EVENT LAB
-# purpose: valida auto-fit + corte manual + eventos de preview + flujo real upload → normalize → preview → generate a 390x844
+# keys: SPRITE ABILITY BUILDER SPRITESHEET AUTO FIT MANUAL CUT ANIMATION ABILITY MOBILE EVENT LAB LAUNCH TRANSACTION
+# purpose: valida launcher + auto-fit + corte manual + eventos de preview + flujo real upload → normalize → preview → generate a 390x844
 name: Sprite Ability Builder CI
 on:
   pull_request:
@@ -13,6 +13,7 @@ on:
       - 'src/creators/ui/creator-hub.mjs'
       - 'src/creators/animation/animation-document.mjs'
       - 'src/creators/animation/animation-preview-adapter.mjs'
+      - 'scripts/creator-hub-sprite-launch-audit.mjs'
       - 'scripts/sprite-ability-builder-audit.mjs'
       - 'scripts/sprite-ability-builder-live-audit.mjs'
       - 'scripts/sprite-ability-event-lab-audit.mjs'
@@ -28,6 +29,7 @@ on:
       - 'src/creators/ui/creator-hub.mjs'
       - 'src/creators/animation/animation-document.mjs'
       - 'src/creators/animation/animation-preview-adapter.mjs'
+      - 'scripts/creator-hub-sprite-launch-audit.mjs'
       - 'scripts/sprite-ability-builder-audit.mjs'
       - 'scripts/sprite-ability-builder-live-audit.mjs'
       - 'scripts/sprite-ability-event-lab-audit.mjs'
@@ -55,10 +57,13 @@ jobs:
           node --check src/creators/ui/creator-hub.mjs
           node --check src/creators/animation/animation-document.mjs
           node --check src/creators/animation/animation-preview-adapter.mjs
+          node --check scripts/creator-hub-sprite-launch-audit.mjs
           node --check scripts/sprite-ability-builder-audit.mjs
           node --check scripts/sprite-ability-builder-live-audit.mjs
           node --check scripts/sprite-ability-event-lab-audit.mjs
           node --check scripts/sprite-ability-manual-cutter-audit.mjs
+      - name: Launcher transaction contract
+        run: node scripts/creator-hub-sprite-launch-audit.mjs
       - name: Builder contract
         run: node scripts/sprite-ability-builder-audit.mjs
       - name: Manual cutter contract
