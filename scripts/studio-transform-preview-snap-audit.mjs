@@ -33,10 +33,10 @@ const b={id:'b',transform:{x:37,y:39},bounds:{w:16,h:16}};
 const group=createTransformTool(kernelFor([a,b],['a','b']));
 group.begin('a');
 preview=group.previewMove(22,50,{snap:16,smart:false});
-assert.equal(preview.rows[0].preview.x,21,'group anchor must move by the snapped delta, not the raw pointer delta');
-assert.equal(preview.rows[0].preview.y,55,'group anchor y must use the snapped delta');
-assert.equal(preview.rows[1].preview.x,53,'group members must preserve their relative x offset');
-assert.equal(preview.rows[1].preview.y,87,'group members must preserve their relative y offset');
+assert.equal(preview.rows[0].preview.x,16,'group anchor x must visibly resolve to the snapped pointer target');
+assert.equal(preview.rows[0].preview.y,48,'group anchor y must visibly resolve to the snapped pointer target');
+assert.equal(preview.rows[1].preview.x,48,'group members must preserve their 32px relative x offset');
+assert.equal(preview.rows[1].preview.y,80,'group members must preserve their 32px relative y offset');
 
 const source=fs.readFileSync(new URL('../src/studio/tools/transform-tool.mjs',import.meta.url),'utf8');
 assert.match(source,/finalTx=xSnap\?tx\+xSnap\.delta:Math\.round\(tx\/s\)\*s/,'unsnapped x preview must round to grid before rendering');
