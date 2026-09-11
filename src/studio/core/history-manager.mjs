@@ -3,7 +3,7 @@
  * owns: undo/redo journal, explicit burst coalescing and memory budget
  * does-not-own: document mutation, persistence, networking
  * public-api: createHistoryManager()
- * online: no
+ * online: coalescing requires a domain serializer so authority sees a normal command shape
  */
 
 const DEFAULT_BUDGET_BYTES = 8 * 1024 * 1024;
@@ -33,9 +33,9 @@ export function createHistoryManager({ budgetBytes = DEFAULT_BUDGET_BYTES } = {}
     const wrapped = { ...entry, __bytes: Math.max(64, Number(entry.bytes) || byteSize(entry.serialized)), __pushedAt: now };
     const previous = undoStack[undoStack.length - 1];
     const mergeWindowMs = Math.max(0, Number(wrapped.mergeWindowMs) || 0);
-    if (wrapped.mergeKey && previous?.mergeKey === wrapped.mergeKey && mergeWindowMs > 0 && now - (previous.__pushedAt || 0) <= mergeWindowMs) {
-      const first = previous.serialized?.type === 'history.coalesced' ? previous.serialized.first : previous.serialized;
-      const serialized = { type: 'history.coalesced', key: wrapped.mergeKey, first, last: wrapped.serialized };
+    if (wrapped.mergeKey && previous?.mergeKey === wrapped.mergeKey && mergeWindowMs > 0 && typeof wrapped.mergeSerialized === 'function' && now - (previous.__pushedAt || 0) <= mergeWindowMs) {
+      const serialized = wrapped.mergeSerialized(previous.serialized, wrapped.serialized);
+      if (!serialized) throw new Error('STUDIO_HISTORY_MERGE_SERIALIZATION_REQUIRED');
       const affectedRects = [...(previous.affectedRects || []), ...(wrapped.affectedRects || [])];
       const merged = { ...wrapped, undo: previous.undo, serialized, affectedRects, __bytes: Math.max(64, byteSize(serialized)), __pushedAt: now };
       usedBytes -= previous.__bytes || 0;
