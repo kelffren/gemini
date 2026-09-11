@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: CREATORS / SPRITE ABILITY / AUTO FIT
  * owner: Sprite Ability Builder import normalization
- * keys: SPRITESHEET AUTO DETECT GRID TRANSPARENCY BACKGROUND NORMALIZE SLICE SAFE GRID
+ * keys: SPRITESHEET AUTO DETECT GRID TRANSPARENCY BACKGROUND NORMALIZE SLICE SAFE GRID MANUAL CUT
  * purpose: acepta hojas con tamaños irregulares, detecta una rejilla probable y genera una hoja PNG exacta divisible por filas/columnas
  * does-not-own: animation timing, combat authority, publishing
  */
@@ -145,10 +145,26 @@ export function resolveSpritesheetGrid(width,height,detected){
   return Object.freeze({cols:detected.cols,rows:detected.rows,label:`${detected.cols}×${detected.rows}`,frames:detected.cols*detected.rows,source:'auto',confidence:detected.confidence,reason:'detected'});
 }
 
+export function consumeManualGridHint(root,width,height,{maxAgeMs=30000}={}){
+  const hint=root?.__KELO_SPRITE_MANUAL_GRID;if(!hint)return null;
+  try{delete root.__KELO_SPRITE_MANUAL_GRID;}catch{root.__KELO_SPRITE_MANUAL_GRID=null;}
+  const columns=clamp(Math.round(finite(hint.columns,0)),1,12),rows=clamp(Math.round(finite(hint.rows,0)),1,8),age=Math.max(0,Date.now()-finite(hint.createdAt,0));
+  if(columns*rows>72||age>maxAgeMs)return null;
+  if(Math.round(finite(hint.width,-1))!==Math.round(width)||Math.round(finite(hint.height,-1))!==Math.round(height))return null;
+  if(width%columns!==0||height%rows!==0)return null;
+  return Object.freeze({columns,rows,frames:columns*rows,frameWidth:width/columns,frameHeight:height/rows});
+}
+
 export function analyzeAndNormalizeSpritesheet(root,image,{minCols=2,maxCols=12,minRows=1,maxRows=8}={}){
   const width=image.naturalWidth||image.width,height=image.naturalHeight||image.height;
   const source=root.document.createElement('canvas');source.width=width;source.height=height;
   const sctx=source.getContext('2d',{willReadFrequently:true});sctx.clearRect(0,0,width,height);sctx.drawImage(image,0,0);
+  const manual=consumeManualGridHint(root,width,height);
+  if(manual)return Object.freeze({
+    dataUrl:source.toDataURL('image/png'),sourceWidth:width,sourceHeight:height,width,height,
+    frameWidth:manual.frameWidth,frameHeight:manual.frameHeight,columns:manual.columns,rows:manual.rows,frames:manual.frames,
+    confidence:1,score:1,gridSource:'manual',gridReason:'manual-cuts',backgroundMode:'alpha',backgroundRemoved:false,candidates:Object.freeze([])
+  });
   const pixels=sctx.getImageData(0,0,width,height);
   const detected=detectSpritesheetGrid(pixels,width,height,{minCols,maxCols,minRows,maxRows});
   const resolved=resolveSpritesheetGrid(width,height,detected);
