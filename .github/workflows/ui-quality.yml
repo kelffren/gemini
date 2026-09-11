@@ -51,7 +51,7 @@ jobs:
           # UI exists outside the canonical folders too (creator labs, system HUDs,
           # visual/debug tools). Inspect every changed source file instead of relying
           # on directory names so those surfaces cannot escape the shared hierarchy.
-          ui_pattern='(<button|createElement\(["'"']button|role=["'"']dialog|aria-label|position[[:space:]]*:[[:space:]]*fixed|\.([A-Za-z0-9_-]*)(btn|button|tab|menu|card|panel|modal|drawer|sheet|dock|toolbar))'
+          ui_pattern="(<button|createElement\\(['\\\"]button|role=['\\\"]dialog|aria-label|position[[:space:]]*:[[:space:]]*fixed|\\.([A-Za-z0-9_-]*)(btn|button|tab|menu|card|panel|modal|drawer|sheet|dock|toolbar))"
           while IFS= read -r file; do
             [ -z "$file" ] && continue
             case "$file" in
