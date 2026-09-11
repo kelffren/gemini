@@ -1,14 +1,14 @@
 /* KELO-INDEX
  * area: CORE / CAMERA
  * owner: KeloCamera
- * keys: CAMERA VIEWPORT ZOOM DPR FOCUS RESTORE SCREEN WORLD ORIENTATION FOUNDATION DEADZONE REVERSAL LOOKAHEAD PVP AIM COMPOSITION ACTION FRAMING DODGE RELEASE STRAFE RELEASE
- * purpose: owner único para comandos de cámara, zoom, viewport/Canvas y conversiones screen↔world; compensa dead-zone legacy, acelera carry contrario al invertir y compone aim PvP con liberación rápida al esquivar o salir en strafe contrario sin tocar gameplay
+ * keys: CAMERA VIEWPORT ZOOM DPR FOCUS RESTORE SCREEN WORLD ORIENTATION FOUNDATION DEADZONE REVERSAL LOOKAHEAD PVP AIM COMPOSITION ACTION FRAMING DODGE RELEASE STRAFE RELEASE LIVE ACTION DIRECTOR CRITICAL
+ * purpose: owner único para comandos de cámara, zoom, viewport/Canvas y conversiones screen↔world; compone aim/acción PvP y un director contextual player↔enemy sin tocar simulación
  * public-api: KeloCamera
  * consumes: camera, CONFIG, canvas, ctx, screenW/screenH, KeloInput combat snapshot, KeloPvPWorld state, KeloPvPCastMovementPrediction y updateCamera legacy de engine-a
- * state-owned: targetX/Y, posición comandada, follow tuning, zoom efectivo/base, viewport policy, DPR policy, foco y transient camera follow/action framing intent
- * extension-points: setTarget/focus/restoreState/setBaseZoom/configureViewport/syncViewport/setFollowTuning/worldView
- * reuse: gameplay pide foco/restore/zoom al owner; render/culling consulta worldView(); UI/orientación delegan viewport y framing aquí
- * legacy: engine-a conserva temporalmente la matemática interna de follow; deadXRatio/deadYRatio se adaptan a world-space, lookAheadDecay recibe boost transitorio en reversal y KeloCamera compone una capa visual screen-space durante acciones PvP estacionarias con decay de salida específico durante dodge/strafe contrario
+ * state-owned: targetX/Y, posición comandada, follow tuning, zoom efectivo/base, viewport policy, DPR policy, foco, transient camera follow/action framing intent y PvP director presentation intent
+ * extension-points: setTarget/focus/restoreState/setBaseZoom/configureViewport/syncViewport/setFollowTuning/worldView/setPvPDirectorIntent/clearPvPDirectorIntent/pulsePvPImpact
+ * reuse: gameplay/presentation publica intent; KeloCamera aplica framing/zoom; render/culling consulta worldView(); UI/orientación delegan viewport aquí
+ * legacy: engine-a conserva temporalmente la matemática interna de follow; KeloCamera adapta dead-zone/look-ahead y compone capas de presentación PvP
  * do-not: NO escribir camera.targetX/Y, camera.x/y por comandos externos, CONFIG.zoom/camera tuning, canvas.width/height o reemplazar resize desde features nuevas
  */
 (function(root){
@@ -16,7 +16,7 @@
   if(root.KeloCamera)return;
   if(typeof camera==='undefined'||typeof CONFIG==='undefined'||typeof canvas==='undefined'||typeof ctx==='undefined')throw new Error('KeloCamera: legacy camera/canvas core unavailable');
 
-  const VERSION='kelo-camera-v1.10.1-screen-deadzone-pvp-aim-composition-stationary-action-framing-cast-dodge-release-strafe-release-winner';
+  const VERSION='kelo-camera-v1.11.0-pvp-live-action-director-a';
   const ZOOM_PRESETS=Object.freeze([0.7,0.82,1]);
   const TUNING_KEYS=Object.freeze(['dampX','dampY','deadXRatio','deadYRatio','lookAheadDist','lookAheadDecay']);
   const SCREEN_SPACE_DEADZONE_KEYS=new Set(['deadXRatio','deadYRatio']);
@@ -30,6 +30,7 @@
   const PVP_ACTION_STRAFE_RELEASE_DECAY=22;
   const PVP_ACTION_STRAFE_RELEASE_DOT=-0.15;
   const COMMITTED_ACTION_PHASES=new Set(['windup','active']);
+  const PVP_DIRECTOR=Object.freeze({enemyWeight:.24,targetDecay:8.5,zoomDecay:7,nearDistance:140,farDistance:360,nearZoom:1.025,farZoom:.93,criticalZoom:.94,impactZoom:.035,maxOffsetPx:104,aimLeadPx:14});
   const legacyUpdateCamera=typeof updateCamera==='function'?updateCamera:null;
   let baseZoom=Number.isFinite(Number(CONFIG.zoom))&&Number(CONFIG.zoom)>0?Number(CONFIG.zoom):0.82;
   let effectiveZoom=baseZoom;
@@ -39,6 +40,7 @@
   let reversalActiveX=false,reversalActiveY=false;
   let combatFramingActive=false,lastCameraIntentX=0,lastCameraIntentY=0;
   let actionFramingActive=false,actionFramingOffsetX=0,actionFramingOffsetY=0,lastActionAimX=0,lastActionAimY=0;
+  let pvpDirectorIntent=null,pvpDirectorState='NORMAL',pvpDirectorOffsetX=0,pvpDirectorOffsetY=0,pvpDirectorZoomFactor=1,pvpImpactFocus=0;
   let dprCap=3,pixelPerfect=false,roundPixels=!!CONFIG.roundPixels,smoothing=true,imageRendering='auto',viewportScheduled=false,lastEffectiveZoom=null,lastViewportKey='';
 
   Object.defineProperty(camera,'targetX',{configurable:true,enumerable:true,get:()=>managedTargetX,set:value=>{const n=Number(value);if(Number.isFinite(n))managedTargetX=n;}});
@@ -59,7 +61,8 @@
   function effectiveZoomFor(base,mode){const b=Math.max(0.05,Number(base)||1);if(mode!=='landscape')return b;const w=Math.max(1,root.innerWidth),h=Math.max(1,root.innerHeight);return b*(h/w);}
   function emit(name,detail){try{root.dispatchEvent(new CustomEvent(name,{detail}));}catch(e){}}
   function syncViewportCss(){const rootEl=document.documentElement;rootEl.style.setProperty('--kelo-vw',`${root.innerWidth}px`);rootEl.style.setProperty('--kelo-vh',`${root.innerHeight}px`);}
-  function applyZoom(source){const mode=orientation();effectiveZoom=effectiveZoomFor(baseZoom,mode);document.documentElement.style.setProperty('--kelo-camera-zoom',String(effectiveZoom));const changed=!Number.isFinite(lastEffectiveZoom)||Math.abs(lastEffectiveZoom-effectiveZoom)>0.0001;lastEffectiveZoom=effectiveZoom;if(changed)emit('kelo:camerazoomchange',{source:source||'camera',orientation:mode,baseZoom,effectiveZoom,verticalWorldSpan:root.innerHeight/effectiveZoom,portraitReferenceWorldSpan:Math.max(root.innerWidth,root.innerHeight)/baseZoom});return effectiveZoom;}
+  function recomputeZoom(source,emitChange){const mode=orientation();effectiveZoom=effectiveZoomFor(baseZoom,mode)*pvpDirectorZoomFactor;document.documentElement.style.setProperty('--kelo-camera-zoom',String(effectiveZoom));const changed=!Number.isFinite(lastEffectiveZoom)||Math.abs(lastEffectiveZoom-effectiveZoom)>0.0001;lastEffectiveZoom=effectiveZoom;if(changed&&emitChange!==false)emit('kelo:camerazoomchange',{source:source||'camera',orientation:mode,baseZoom,effectiveZoom,verticalWorldSpan:root.innerHeight/effectiveZoom,portraitReferenceWorldSpan:Math.max(root.innerWidth,root.innerHeight)/baseZoom,pvpDirectorZoomFactor});return effectiveZoom;}
+  function applyZoom(source){return recomputeZoom(source,true);}
   function configureViewport(options){const opts=options||{};if(Number.isFinite(Number(opts.dprCap))&&Number(opts.dprCap)>0)dprCap=Number(opts.dprCap);if(typeof opts.pixelPerfect==='boolean')pixelPerfect=opts.pixelPerfect;if(typeof opts.roundPixels==='boolean')roundPixels=opts.roundPixels;if(typeof opts.smoothing==='boolean')smoothing=opts.smoothing;if(typeof opts.imageRendering==='string')imageRendering=opts.imageRendering;CONFIG.roundPixels=roundPixels;return snapshot();}
   function syncViewport(source){screenW=root.innerWidth;screenH=root.innerHeight;const dpr=activeDpr(),width=Math.max(1,Math.floor(screenW*dpr)),height=Math.max(1,Math.floor(screenH*dpr));if(canvas.width!==width)canvas.width=width;if(canvas.height!==height)canvas.height=height;canvas.style.width=screenW+'px';canvas.style.height=screenH+'px';canvas.style.imageRendering=imageRendering;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.imageSmoothingEnabled=smoothing;CONFIG.roundPixels=roundPixels;syncViewportCss();const zoom=applyZoom(source||'viewport'),key=[screenW,screenH,dpr,zoom].join(':');if(key!==lastViewportKey){lastViewportKey=key;emit('kelo:viewportchange',{source:source||'viewport',width:screenW,height:screenH,dpr,orientation:orientation(),baseZoom,effectiveZoom:zoom});try{root.dispatchEvent(new CustomEvent('kelo:world-audit'));}catch(e){}}return snapshot();}
   function scheduleViewportSync(source){if(viewportScheduled)return;viewportScheduled=true;requestAnimationFrame(()=>{viewportScheduled=false;syncViewport(source||'scheduled-resize');});}
@@ -77,6 +80,37 @@
   function worldView(){const z=effectiveZoom||1,w=screenW/z,h=screenH/z,cx=Number(camera.x)||0,cy=Number(camera.y)||0,left=cx-w/2,top=cy-h/2;return Object.freeze({x:left,y:top,w,h,left,top,right:left+w,bottom:top+h,centerX:cx,centerY:cy,zoom:z,screenW,screenH});}
   function axisReversing(inputAxis,lookOffset){return Math.abs(Number(inputAxis)||0)>REVERSAL_EPSILON&&Math.abs(Number(lookOffset)||0)>REVERSAL_EPSILON&&Number(inputAxis)*Number(lookOffset)<0;}
   function combatSnapshot(){try{return root.KeloInput?.combat?.snapshot?.()||null;}catch(e){return null;}}
+  function setPvPDirectorIntent(value){
+    if(!value||value.active===false){pvpDirectorIntent=null;return false;}
+    const n=v=>Number.isFinite(Number(v))?Number(v):0;
+    pvpDirectorIntent={active:true,playerX:n(value.playerX),playerY:n(value.playerY),enemyX:n(value.enemyX),enemyY:n(value.enemyY),aimX:n(value.aimX),aimY:n(value.aimY),velocityX:n(value.velocityX),velocityY:n(value.velocityY),distance:Math.max(0,n(value.distance)),critical:!!value.critical,hpRatio:Math.max(0,Math.min(1,n(value.hpRatio)||1)),engaged:value.engaged!==false};
+    return true;
+  }
+  function clearPvPDirectorIntent(){pvpDirectorIntent=null;}
+  function pulsePvPImpact(strength){pvpImpactFocus=Math.max(pvpImpactFocus,Math.max(0,Math.min(1,Number(strength)||1)));}
+  function applyPvPDirector(dt){
+    const d=Math.max(0,Number(dt)||0),intent=pvpDirectorIntent,combat=!!root.KELO_COMBAT_ENABLED;
+    const active=!!(combat&&intent&&intent.active&&intent.engaged);
+    let targetOffsetX=0,targetOffsetY=0,targetZoom=1;
+    if(active){
+      const z=Math.max(.0001,effectiveZoomFor(baseZoom,orientation())||1),dx=intent.enemyX-intent.playerX,dy=intent.enemyY-intent.playerY;
+      const screenX=dx*z*PVP_DIRECTOR.enemyWeight+intent.aimX*PVP_DIRECTOR.aimLeadPx;
+      const screenY=dy*z*PVP_DIRECTOR.enemyWeight+intent.aimY*PVP_DIRECTOR.aimLeadPx*.72;
+      const mag=Math.hypot(screenX,screenY),scale=mag>PVP_DIRECTOR.maxOffsetPx?PVP_DIRECTOR.maxOffsetPx/mag:1;
+      targetOffsetX=screenX*scale/z;targetOffsetY=screenY*scale/z;
+      const span=Math.max(1,PVP_DIRECTOR.farDistance-PVP_DIRECTOR.nearDistance),u=Math.max(0,Math.min(1,(intent.distance-PVP_DIRECTOR.nearDistance)/span));
+      targetZoom=PVP_DIRECTOR.nearZoom+(PVP_DIRECTOR.farZoom-PVP_DIRECTOR.nearZoom)*u;
+      if(intent.critical)targetZoom=Math.min(targetZoom,PVP_DIRECTOR.criticalZoom);
+      targetZoom+=PVP_DIRECTOR.impactZoom*pvpImpactFocus;
+      pvpDirectorState=intent.critical?'CRITICAL':'ENGAGED';
+    }else pvpDirectorState='NORMAL';
+    const posFactor=1-Math.exp(-PVP_DIRECTOR.targetDecay*d),zoomFactor=1-Math.exp(-PVP_DIRECTOR.zoomDecay*d);
+    pvpDirectorOffsetX+=(targetOffsetX-pvpDirectorOffsetX)*posFactor;pvpDirectorOffsetY+=(targetOffsetY-pvpDirectorOffsetY)*posFactor;
+    pvpDirectorZoomFactor+=(targetZoom-pvpDirectorZoomFactor)*zoomFactor;
+    pvpImpactFocus*=Math.exp(-10*d);
+    if(active){managedTargetX=intent.playerX+pvpDirectorOffsetX;managedTargetY=intent.playerY+pvpDirectorOffsetY;}
+    recomputeZoom('pvp-director',false);
+  }
   function combatCameraIntent(ix,iy){
     combatFramingActive=false;
     const moveLen=Math.hypot(ix,iy);
@@ -129,6 +163,7 @@
   function update(dt){
     const ix=typeof input!=='undefined'?Number(input.normX)||0:0,iy=typeof input!=='undefined'?Number(input.normY)||0:0;
     if(actionFramingOffsetX||actionFramingOffsetY){camera.x-=actionFramingOffsetX;camera.y-=actionFramingOffsetY;}
+    applyPvPDirector(dt);
     reversalActiveX=axisReversing(ix,camera.lookOffsetX);
     reversalActiveY=axisReversing(iy,camera.lookOffsetY);
     transientLookAheadDecayMultiplier=(reversalActiveX||reversalActiveY)?LOOKAHEAD_REVERSAL_DECAY_MULTIPLIER:1;
@@ -139,7 +174,7 @@
     applyStationaryActionFraming(dt,ix,iy);
   }
   function refreshZoom(source){return applyZoom(source||'refresh');}
-  function snapshot(){return Object.freeze({version:VERSION,x:camera.x,y:camera.y,targetX:managedTargetX,targetY:managedTargetY,lookOffsetX:Number(camera.lookOffsetX)||0,lookOffsetY:Number(camera.lookOffsetY)||0,baseZoom,effectiveZoom,orientation:orientation(),screenW,screenH,dpr:activeDpr(),dprCap,pixelPerfect,roundPixels,smoothing,follow:getFollowTuning(),reversalResponse:Object.freeze({multiplier:LOOKAHEAD_REVERSAL_DECAY_MULTIPLIER,activeX:reversalActiveX,activeY:reversalActiveY}),combatFraming:Object.freeze({active:combatFramingActive,aimPerpWeight:PVP_AIM_PERP_WEIGHT,intentX:lastCameraIntentX,intentY:lastCameraIntentY,stationaryActionActive:actionFramingActive,stationaryActionLeadPx:PVP_ACTION_SCREEN_LEAD_PX,stationaryActionDodgeReleaseDecay:PVP_ACTION_DODGE_RELEASE_DECAY,stationaryActionStrafeReleaseDecay:PVP_ACTION_STRAFE_RELEASE_DECAY,stationaryActionStrafeReleaseDot:PVP_ACTION_STRAFE_RELEASE_DOT,stationaryActionOffsetScreenX:actionFramingOffsetX*effectiveZoom,stationaryActionOffsetScreenY:actionFramingOffsetY*effectiveZoom,stationaryActionAimX:lastActionAimX,stationaryActionAimY:lastActionAimY})});}
+  function snapshot(){return Object.freeze({version:VERSION,x:camera.x,y:camera.y,targetX:managedTargetX,targetY:managedTargetY,lookOffsetX:Number(camera.lookOffsetX)||0,lookOffsetY:Number(camera.lookOffsetY)||0,baseZoom,effectiveZoom,orientation:orientation(),screenW,screenH,dpr:activeDpr(),dprCap,pixelPerfect,roundPixels,smoothing,follow:getFollowTuning(),reversalResponse:Object.freeze({multiplier:LOOKAHEAD_REVERSAL_DECAY_MULTIPLIER,activeX:reversalActiveX,activeY:reversalActiveY}),combatFraming:Object.freeze({active:combatFramingActive,aimPerpWeight:PVP_AIM_PERP_WEIGHT,intentX:lastCameraIntentX,intentY:lastCameraIntentY,stationaryActionActive:actionFramingActive,stationaryActionLeadPx:PVP_ACTION_SCREEN_LEAD_PX,stationaryActionDodgeReleaseDecay:PVP_ACTION_DODGE_RELEASE_DECAY,stationaryActionStrafeReleaseDecay:PVP_ACTION_STRAFE_RELEASE_DECAY,stationaryActionStrafeReleaseDot:PVP_ACTION_STRAFE_RELEASE_DOT,stationaryActionOffsetScreenX:actionFramingOffsetX*effectiveZoom,stationaryActionOffsetScreenY:actionFramingOffsetY*effectiveZoom,stationaryActionAimX:lastActionAimX,stationaryActionAimY:lastActionAimY}),pvpDirector:Object.freeze({state:pvpDirectorState,active:!!(pvpDirectorIntent&&root.KELO_COMBAT_ENABLED),offsetScreenX:pvpDirectorOffsetX*effectiveZoom,offsetScreenY:pvpDirectorOffsetY*effectiveZoom,zoomFactor:pvpDirectorZoomFactor,impactFocus:pvpImpactFocus,config:PVP_DIRECTOR})});}
 
   root.updateCamera=update;
   root.resize=()=>syncViewport('legacy-resize-call');
@@ -149,6 +184,6 @@
   root.addEventListener('resize',()=>scheduleViewportSync('resize'),{passive:true});
   root.visualViewport?.addEventListener('resize',()=>scheduleViewportSync('visualViewport'),{passive:true});
 
-  root.KeloCamera=Object.freeze({version:VERSION,setTarget,focus,restoreState,setFollowTuning,getFollowTuning,setBaseZoom,getBaseZoom:()=>baseZoom,getEffectiveZoom:()=>effectiveZoom,cycleZoom,refreshZoom,getOrientation:orientation,configureViewport,syncViewport,scheduleViewportSync,syncViewportCss,activeDpr,pixelPerfectZoom,screenToWorld:screenToWorldPoint,worldToScreen:worldToScreenPoint,worldView,snapshot});
-  root.KELO_CAMERA_AUDIT=Object.freeze({version:VERSION,owner:'KeloCamera',legacyFollowMath:true,screenSpaceDeadZone:true,lookAheadReversalResponse:true,lookAheadReversalDecayMultiplier:LOOKAHEAD_REVERSAL_DECAY_MULTIPLIER,pvpAimComposition:true,pvpAimPerpWeight:PVP_AIM_PERP_WEIGHT,pvpStationaryActionFraming:true,pvpStationaryActionLeadPx:PVP_ACTION_SCREEN_LEAD_PX,pvpStationaryActionDodgeReleaseDecay:PVP_ACTION_DODGE_RELEASE_DECAY,pvpStationaryActionStrafeReleaseDecay:PVP_ACTION_STRAFE_RELEASE_DECAY,pvpStationaryActionStrafeReleaseDot:PVP_ACTION_STRAFE_RELEASE_DOT,legacyTargetAdapter:true,legacyZoomAdapter:true,legacyTuningAdapter:true,updateCameraOwner:true,viewportOwner:true,zoomOwner:true,targetOwner:true,restoreOwner:true,screenWorldOwner:true,worldViewOwner:true});
+  root.KeloCamera=Object.freeze({version:VERSION,setTarget,focus,restoreState,setFollowTuning,getFollowTuning,setBaseZoom,getBaseZoom:()=>baseZoom,getEffectiveZoom:()=>effectiveZoom,cycleZoom,refreshZoom,getOrientation:orientation,configureViewport,syncViewport,scheduleViewportSync,syncViewportCss,activeDpr,pixelPerfectZoom,screenToWorld:screenToWorldPoint,worldToScreen:worldToScreenPoint,worldView,setPvPDirectorIntent,clearPvPDirectorIntent,pulsePvPImpact,snapshot});
+  root.KELO_CAMERA_AUDIT=Object.freeze({version:VERSION,owner:'KeloCamera',legacyFollowMath:true,screenSpaceDeadZone:true,lookAheadReversalResponse:true,lookAheadReversalDecayMultiplier:LOOKAHEAD_REVERSAL_DECAY_MULTIPLIER,pvpAimComposition:true,pvpAimPerpWeight:PVP_AIM_PERP_WEIGHT,pvpStationaryActionFraming:true,pvpStationaryActionLeadPx:PVP_ACTION_SCREEN_LEAD_PX,pvpStationaryActionDodgeReleaseDecay:PVP_ACTION_DODGE_RELEASE_DECAY,pvpStationaryActionStrafeReleaseDecay:PVP_ACTION_STRAFE_RELEASE_DECAY,pvpStationaryActionStrafeReleaseDot:PVP_ACTION_STRAFE_RELEASE_DOT,pvpLiveActionDirector:true,pvpDirectorConfig:PVP_DIRECTOR,legacyTargetAdapter:true,legacyZoomAdapter:true,legacyTuningAdapter:true,updateCameraOwner:true,viewportOwner:true,zoomOwner:true,targetOwner:true,restoreOwner:true,screenWorldOwner:true,worldViewOwner:true});
 })(typeof globalThis!=='undefined'?globalThis:window);
