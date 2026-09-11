@@ -12,7 +12,7 @@
 import {clamp,freezeDeep,stableStringify,hashString,seed32,createRng} from './map-forge-prng.mjs';
 import {createMapIntent,buildCandidateParts} from './map-forge-builder.mjs';
 import {validateMapDefinition,scoreMapDefinition} from './map-forge-quality.mjs';
-export const MAP_FORGE_GENERATOR_VERSION='1.1.8';
+export const MAP_FORGE_GENERATOR_VERSION='1.1.9';
 export {createMapIntent} from './map-forge-builder.mjs';
 export {createRng,stableStringify} from './map-forge-prng.mjs';
 export {validateMapDefinition,scoreMapDefinition} from './map-forge-quality.mjs';
@@ -22,6 +22,7 @@ const DECORATION_DECLUSTER_RADIUS=240;
 const DECORATION_DECLUSTER_GAIN=23;
 const STREET_LAMP_ROAD_GAIN=36;
 const STREET_BENCH_ROAD_GAIN=36;
+const STREET_BENCH_SWAPS_PER_DISTRICT=2;
 const decorationDistance=(a,b)=>Math.hypot(Number(a?.x||0)-Number(b?.x||0),Number(a?.y||0)-Number(b?.y||0));
 function nearestFamilyDistance(rows,index,family){const current=rows[index];let best=Infinity;for(let i=0;i<rows.length;i++){if(i===index)continue;const row=rows[i];if(row.district!==current.district||row.family!==family)continue;best=Math.min(best,decorationDistance(current,row));}return best;}
 function declusterDecorationFamilies(parts){
@@ -52,7 +53,7 @@ function organizeStreetFurnitureFamilies(parts){
   const rows=(parts.decorations||[]).map(row=>({...row})),districts=[...new Set(rows.map(row=>row.district))].sort();let lampSwaps=0,lampRoadGain=0,benchSwaps=0,benchRoadGain=0;
   for(const district of districts){
     const lampBest=findRoadAffinitySwap(rows,parts.roads,district,'lamp','flower',STREET_LAMP_ROAD_GAIN);if(lampBest){swapDecorationIdentity(rows[lampBest.i],rows[lampBest.j]);lampSwaps++;lampRoadGain+=lampBest.gain;}
-    const benchBest=findRoadAffinitySwap(rows,parts.roads,district,'bench','flower',STREET_BENCH_ROAD_GAIN);if(benchBest){swapDecorationIdentity(rows[benchBest.i],rows[benchBest.j]);benchSwaps++;benchRoadGain+=benchBest.gain;}
+    for(let pass=0;pass<STREET_BENCH_SWAPS_PER_DISTRICT;pass++){const benchBest=findRoadAffinitySwap(rows,parts.roads,district,'bench','flower',STREET_BENCH_ROAD_GAIN);if(!benchBest)break;swapDecorationIdentity(rows[benchBest.i],rows[benchBest.j]);benchSwaps++;benchRoadGain+=benchBest.gain;}
   }
   const swaps=lampSwaps+benchSwaps,totalRoadGain=lampRoadGain+benchRoadGain;
   return{...parts,decorations:rows,generationStats:{...parts.generationStats,decorationStreetFamilySwapCount:swaps,decorationStreetFamilyRoadGain:Math.round(totalRoadGain*10)/10,decorationStreetLampSwapCount:lampSwaps,decorationStreetLampRoadGain:Math.round(lampRoadGain*10)/10,decorationStreetBenchSwapCount:benchSwaps,decorationStreetBenchRoadGain:Math.round(benchRoadGain*10)/10}};
