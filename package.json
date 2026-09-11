@@ -40,6 +40,7 @@
     "audit:studio:keyboard-delete": "node scripts/studio-keyboard-delete-audit.mjs",
     "audit:studio:keyboard-duplicate": "node scripts/studio-keyboard-duplicate-audit.mjs",
     "audit:studio:keyboard-history": "node scripts/studio-keyboard-history-audit.mjs",
+    "audit:studio:keyboard-clipboard": "node scripts/studio-keyboard-clipboard-audit.mjs",
     "audit:studio:explorer-reveal": "node scripts/studio-explorer-reveal-audit.mjs",
     "audit:studio:property-commit": "node scripts/studio-property-commit-audit.mjs",
     "audit:studio:snap-cycle": "node scripts/studio-snap-cycle-audit.mjs",
