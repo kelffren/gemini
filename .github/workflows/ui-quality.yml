@@ -8,6 +8,9 @@ on:
       - 'src/ui/**'
       - 'src/studio/ui/**'
       - 'src/creators/ui/**'
+      - 'tests/ui-interface-runtime.spec.js'
+      - 'playwright.config.js'
+      - 'package.json'
       - 'scripts/ui-quality-audit.mjs'
       - 'docs/KELO_INTERFACE_STANDARD.md'
       - '.github/workflows/ui-quality.yml'
@@ -17,6 +20,9 @@ on:
       - 'src/ui/**'
       - 'src/studio/ui/**'
       - 'src/creators/ui/**'
+      - 'tests/ui-interface-runtime.spec.js'
+      - 'playwright.config.js'
+      - 'package.json'
       - 'scripts/ui-quality-audit.mjs'
       - 'docs/KELO_INTERFACE_STANDARD.md'
       - '.github/workflows/ui-quality.yml'
@@ -40,6 +46,7 @@ jobs:
           test -f src/ui/kelo-interface-compat.css
           test -f src/ui/kelo-interface-runtime.js
           test -f docs/KELO_INTERFACE_STANDARD.md
+          test -f tests/ui-interface-runtime.spec.js
           grep -q 'kelo-interface-system.css' index.html
           grep -q 'kelo-interface-compat.css' index.html
           grep -q 'kelo-interface-runtime.js' index.html
@@ -51,6 +58,7 @@ jobs:
         run: |
           node --check src/ui/kelo-interface-runtime.js
           node --check scripts/ui-quality-audit.mjs
+          node --check tests/ui-interface-runtime.spec.js
           node --check src/ui/luxe-shell.js
           node --check src/ui/account-auth-ui.js
           node --check src/creators/ui/creator-hub.mjs
@@ -58,6 +66,12 @@ jobs:
           node --check src/studio/ui/studio-asset-repairer-v2.mjs
       - name: Project-wide UI audit
         run: node scripts/ui-quality-audit.mjs | tee ui-quality-report.txt
+      - name: Install browser contract dependencies
+        run: |
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: Computed browser hierarchy contract
+        run: npx playwright test tests/ui-interface-runtime.spec.js --project=chromium --reporter=list
       - name: Publish UI quality report
         if: always()
         uses: actions/upload-artifact@v4
