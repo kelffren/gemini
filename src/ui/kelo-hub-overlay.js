@@ -10,7 +10,7 @@
 'use strict';
 if(root.KeloHubOverlay)return;
 
-const VERSION='kelo-hub-overlay-v1.0.0';
+const VERSION='kelo-hub-overlay-v1.0.1';
 const native=new Map();
 let activeCategory='game';
 const $=id=>document.getElementById(id);
@@ -40,9 +40,9 @@ const GROUPS=Object.freeze([
     ['titles','Títulos','Prestigio y logros','tool']
   ]},
   {id:'create',label:'Creadores',icon:'✦',items:[
-    ['creators','Creators','Herramientas de creación','external:lx-create-studio'],
-    ['sprite','Sprite Factory','Sprites · preview · QA','external:lx-create-sprite-factory'],
-    ['admin','Administrador','Cuentas · permisos · sanciones','external:lx-admin-control']
+    ['creators','Creators','Herramientas de creación','creators'],
+    ['sprite','Sprite Factory','Sprites · preview · QA','sprite'],
+    ['admin','Administrador','Cuentas · permisos · sanciones','admin']
   ]},
   {id:'system',label:'Sistema',icon:'⚙',items:[
     ['missions','Misiones','Aventuras y desafíos','toolOptional'],
@@ -59,7 +59,7 @@ const LABELS=Object.freeze({
 });
 
 function hideNative(key,el){
-  if(!el||el.closest?.('#kelo-hub-sections')||el.id==='lx-side-menu'||el.id==='lx-menu-close')return;
+  if(!el||el.closest?.('#kelo-hub-sections')||el.id==='lx-side-menu'||el.id==='lx-menu-close'||el.id==='lx-chat-tab')return;
   if(!native.has(key))native.set(key,el);
   el.dataset.keloHubNative='1';
   el.style.setProperty('display','none','important');
@@ -71,37 +71,35 @@ function captureNative(){
   hideNative('logistics',$('kelo-logistics-admin-fab'));
   document.querySelectorAll('button,[role="button"]').forEach(el=>{
     if(el.closest?.('#kelo-hub-sections')||el.id==='lx-side-menu'||el.id==='lx-menu-close'||el.id==='lx-chat-tab')return;
-    const text=norm(el.textContent);
-    if(!text)return;
-    for(const [key,labels] of Object.entries(LABELS)){
-      if(labels.includes(text)){hideNative(key,el);break;}
-    }
+    const text=norm(el.textContent);if(!text)return;
+    for(const [key,labels] of Object.entries(LABELS)){if(labels.includes(text)){hideNative(key,el);break;}}
   });
 }
 function nativeFor(key){captureNative();const el=native.get(key);return el?.isConnected?el:null;}
-function sourceTool(id){
-  root.KELO_LUXE?.renderMenu?.();
-  return document.querySelector(`#lx-menu-grid [data-tool="${CSS.escape(id)}"]`);
-}
+function sourceTool(id){return document.querySelector(`#lx-menu-grid [data-tool="${CSS.escape(id)}"]`);}
+function creatorAllowed(){return !!root.KELO_CREATORS_LAUNCHER?.allowed;}
+function adminAllowed(){const p=root.KeloAccountPermissions||root.KeloPermissions;return !!(p?.hasRole?.('admin')||p?.can?.('admin.panel'));}
 function itemAvailable(item){
-  const [, , ,kind]=item;
-  if(kind==='nativeOptional')return !!nativeFor(item[0]);
-  if(kind==='toolOptional')return !!sourceTool(item[0]);
-  if(kind.startsWith('external:'))return !!$(kind.slice(9));
+  const [id,,,kind]=item;
+  if(kind==='nativeOptional')return !!nativeFor(id);
+  if(kind==='toolOptional')return !!sourceTool(id);
+  if(kind==='creators'||kind==='sprite')return creatorAllowed();
+  if(kind==='admin')return adminAllowed();
   return true;
 }
 function invoke(item){
   const [id,,,kind]=item;
   root.KELO_LUXE?.closeMenu?.();
   if(kind==='tool'||kind==='toolOptional'){
-    const el=sourceTool(id);
-    if(el){el.click();return;}
+    root.KELO_LUXE?.renderMenu?.();const el=sourceTool(id);if(el){el.click();return;}
   }else if(kind==='native'||kind==='nativeOptional'){
-    const el=nativeFor(id);
-    if(el){el.click();return;}
-  }else if(kind.startsWith('external:')){
-    const el=$(kind.slice(9));
-    if(el){el.click();return;}
+    const el=nativeFor(id);if(el){el.click();return;}
+  }else if(kind==='creators'){
+    if(root.KELO_CREATORS_LAUNCHER?.open){void root.KELO_CREATORS_LAUNCHER.open();return;}
+  }else if(kind==='sprite'){
+    if(root.KELO_CREATORS_LAUNCHER?.openSpriteFactory){void root.KELO_CREATORS_LAUNCHER.openSpriteFactory();return;}
+  }else if(kind==='admin'){
+    if(root.KeloAccountAdminPanel?.open){void root.KeloAccountAdminPanel.open();return;}
   }
   toast('Esta opción todavía no está disponible');
 }
@@ -111,7 +109,6 @@ function ensureStyle(){
   const style=document.createElement('style');
   style.id='kelo-hub-overlay-style';
   style.textContent=`
-/* Keep the legacy trigger contract, but make it the single social-app launcher. */
 #lx-shop,#lx-side-pvp,#kelo-logistics-admin-fab{display:none!important}
 .lx-top{display:none!important}
 .lx-rail{top:max(9px,env(safe-area-inset-top))!important;right:max(9px,env(safe-area-inset-right))!important;gap:0!important}
@@ -139,76 +136,54 @@ function ensureStyle(){
 }
 
 function ensureHubHost(){
-  const scroll=document.querySelector('#lx-menu-panel .lx-menu-scroll');
-  if(!scroll)return null;
-  let host=$('kelo-hub-sections');
-  if(!host){host=document.createElement('div');host.id='kelo-hub-sections';scroll.appendChild(host);}
-  return host;
+  const scroll=document.querySelector('#lx-menu-panel .lx-menu-scroll');if(!scroll)return null;
+  let host=$('kelo-hub-sections');if(!host){host=document.createElement('div');host.id='kelo-hub-sections';scroll.appendChild(host);}return host;
 }
 function renderHub(){
-  captureNative();
-  const host=ensureHubHost();if(!host)return false;
-  const blocks=[];
+  captureNative();const host=ensureHubHost();if(!host)return false;const blocks=[];
   for(const group of GROUPS){
-    const items=group.items.filter(itemAvailable);
-    if(!items.length)continue;
+    const items=group.items.filter(itemAvailable);if(!items.length)continue;
     blocks.push(`<section class="kh-group ${activeCategory===group.id?'open':''}" data-kh-group="${group.id}"><button type="button" class="kh-group-head" data-kh-toggle="${group.id}"><i>${group.icon}</i><span>${group.label}</span><b>›</b></button><div class="kh-group-items">${items.map(item=>`<button type="button" class="kh-app" data-kh-app="${item[0]}" data-kh-group-id="${group.id}"><strong>${item[1]}</strong><small>${item[2]}</small></button>`).join('')}</div></section>`);
   }
-  host.innerHTML=blocks.join('');
-  return true;
+  host.innerHTML=blocks.join('');return true;
 }
 function findItem(groupId,itemId){return GROUPS.find(g=>g.id===groupId)?.items.find(i=>i[0]===itemId)||null;}
-
 function openChat(){
-  root.KELO_LUXE?.closeMenu?.();
-  const chat=sourceTool('chat');
-  if(chat){chat.click();syncChatTab();return true;}
-  toast('El chat todavía no está disponible');return false;
+  root.KELO_LUXE?.closeMenu?.();root.KELO_LUXE?.renderMenu?.();const chat=sourceTool('chat');
+  if(chat){chat.click();syncChatTab();return true;}toast('El chat todavía no está disponible');return false;
 }
-function syncChatTab(){
-  const drawer=$('lx-chat-drawer'),tab=$('lx-chat-tab');if(!tab)return;
-  const open=!!drawer?.classList.contains('open');tab.classList.toggle('hidden',open);if(open)tab.classList.remove('unread');
-}
+function syncChatTab(){const drawer=$('lx-chat-drawer'),tab=$('lx-chat-tab');if(!tab)return;const open=!!drawer?.classList.contains('open');tab.classList.toggle('hidden',open);if(open)tab.classList.remove('unread');}
 function ensureChatTab(){
-  const luxe=$('kelo-luxe');if(!luxe)return false;
-  let tab=$('lx-chat-tab');
+  const luxe=$('kelo-luxe');if(!luxe)return false;let tab=$('lx-chat-tab');
   if(!tab){tab=document.createElement('button');tab.id='lx-chat-tab';tab.type='button';tab.setAttribute('aria-label','Abrir chat');tab.title='Chat';tab.textContent='●';tab.onclick=openChat;luxe.appendChild(tab);}
-  const drawer=$('lx-chat-drawer');
-  if(drawer&&!drawer.dataset.keloHubWatch){drawer.dataset.keloHubWatch='1';new MutationObserver(syncChatTab).observe(drawer,{attributes:true,attributeFilter:['class']});}
-  const log=$('lx-log');
-  if(log&&!log.dataset.keloHubWatch){log.dataset.keloHubWatch='1';new MutationObserver(()=>{if(!drawer?.classList.contains('open'))tab.classList.add('unread');}).observe(log,{childList:true});}
+  const drawer=$('lx-chat-drawer');if(drawer&&!drawer.dataset.keloHubWatch){drawer.dataset.keloHubWatch='1';new MutationObserver(syncChatTab).observe(drawer,{attributes:true,attributeFilter:['class']});}
+  const log=$('lx-log');if(log&&!log.dataset.keloHubWatch){log.dataset.keloHubWatch='1';new MutationObserver(()=>{if(!drawer?.classList.contains('open'))tab.classList.add('unread');}).observe(log,{childList:true});}
   syncChatTab();return true;
 }
-
 function bind(){
-  const menu=$('lx-side-menu'),panel=$('lx-menu-panel'),host=ensureHubHost();
-  if(!menu||!panel||!host)return false;
-  menu.innerHTML='<b>◆</b><span>HUB</span>';
-  menu.setAttribute('aria-label','Abrir Kelo Hub');
-  if(!host.dataset.keloHubBound){
-    host.dataset.keloHubBound='1';
-    host.addEventListener('click',event=>{
-      const toggle=event.target.closest('[data-kh-toggle]');
-      if(toggle){event.preventDefault();event.stopPropagation();activeCategory=activeCategory===toggle.dataset.khToggle?'':toggle.dataset.khToggle;renderHub();return;}
-      const app=event.target.closest('[data-kh-app]');
-      if(!app)return;
-      event.preventDefault();event.stopPropagation();const item=findItem(app.dataset.khGroupId,app.dataset.khApp);if(item)invoke(item);
-    });
-  }
-  const title=$('lx-menu-title');if(title)title.setAttribute('aria-label','Kelo Hub');
-  renderHub();ensureChatTab();return true;
+  const menu=$('lx-side-menu'),panel=$('lx-menu-panel'),host=ensureHubHost();if(!menu||!panel||!host)return false;
+  menu.innerHTML='<b>◆</b><span>HUB</span>';menu.setAttribute('aria-label','Abrir Kelo Hub');
+  if(!host.dataset.keloHubBound){host.dataset.keloHubBound='1';host.addEventListener('click',event=>{
+    const toggle=event.target.closest('[data-kh-toggle]');if(toggle){event.preventDefault();event.stopPropagation();activeCategory=activeCategory===toggle.dataset.khToggle?'':toggle.dataset.khToggle;renderHub();return;}
+    const app=event.target.closest('[data-kh-app]');if(!app)return;event.preventDefault();event.stopPropagation();const item=findItem(app.dataset.khGroupId,app.dataset.khApp);if(item)invoke(item);
+  });}
+  const title=$('lx-menu-title');if(title)title.setAttribute('aria-label','Kelo Hub');renderHub();ensureChatTab();return true;
 }
 
 function boot(){
   ensureStyle();captureNative();bind();
   const grid=$('lx-menu-grid');if(grid)new MutationObserver(()=>renderHub()).observe(grid,{childList:true,subtree:false});
   const bodyObserver=new MutationObserver(mutations=>{
-    let changed=false;
-    for(const mutation of mutations){for(const node of mutation.addedNodes){if(!(node instanceof HTMLElement))continue;changed=true;if(node.matches?.('button,[role="button"]'))captureNative();node.querySelectorAll?.('button,[role="button"]').forEach(()=>captureNative());}}
-    if(changed){captureNative();bind();renderHub();}
+    let relevant=false;
+    for(const mutation of mutations){for(const node of mutation.addedNodes){
+      if(!(node instanceof HTMLElement)||node.closest?.('#kelo-hub-sections')||node.id==='kelo-hub-sections')continue;
+      if(node.matches?.('button,[role="button"],#kelo-logistics-admin-fab')||node.querySelector?.('button,[role="button"],#kelo-logistics-admin-fab'))relevant=true;
+    }}
+    if(relevant){captureNative();renderHub();ensureChatTab();}
   });
   bodyObserver.observe(document.body,{childList:true,subtree:true});
   root.addEventListener('kelo:online-auth-ready',()=>{captureNative();renderHub();});
+  root.addEventListener('kelo:permissions-changed',()=>renderHub());
 }
 
 root.KeloHubOverlay=Object.freeze({version:VERSION,refresh(){captureNative();bind();renderHub();ensureChatTab();},openChat,audit:Object.freeze({singleLauncher:true,preservesLuxeContracts:true,accordionSubmenus:true,minimizedChat:true,noPolling:true,mobileFirst:true})});
