@@ -10,7 +10,7 @@
 'use strict';
 if(root.KeloHubOverlay)return;
 
-const VERSION='kelo-hub-overlay-v1.0.1';
+const VERSION='kelo-hub-overlay-v1.0.2';
 const native=new Map();
 let activeCategory='game';
 const $=id=>document.getElementById(id);
@@ -58,19 +58,38 @@ const LABELS=Object.freeze({
   logistics:['LOGISTICA']
 });
 
+function ignored(el){return !el||el.closest?.('#kelo-hub-sections')||el.id==='lx-side-menu'||el.id==='lx-menu-close'||el.id==='lx-chat-tab';}
+function clickSurface(el){
+  if(!el)return null;
+  const label=norm(el.textContent),isAction=node=>node&&(node.matches?.('button,a,[role="button"],[onclick]')||typeof node.onclick==='function');
+  let node=el,best=isAction(el)?el:null;
+  for(let i=0;i<5&&node?.parentElement;i++){
+    const parent=node.parentElement;
+    if(ignored(parent)||norm(parent.textContent)!==label)break;
+    const rect=parent.getBoundingClientRect();
+    if(rect.width>=28&&rect.height>=28&&rect.width<=220&&rect.height<=220){
+      if(isAction(parent))best=parent;
+      else if(!best)best=parent;
+    }
+    node=parent;
+  }
+  return best||el;
+}
 function hideNative(key,el){
-  if(!el||el.closest?.('#kelo-hub-sections')||el.id==='lx-side-menu'||el.id==='lx-menu-close'||el.id==='lx-chat-tab')return;
-  if(!native.has(key))native.set(key,el);
-  el.dataset.keloHubNative='1';
-  el.style.setProperty('display','none','important');
-  el.setAttribute('aria-hidden','true');
+  if(ignored(el))return;
+  const surface=clickSurface(el);
+  if(ignored(surface))return;
+  if(!native.has(key))native.set(key,surface);
+  surface.dataset.keloHubNative='1';
+  surface.style.setProperty('display','none','important');
+  surface.setAttribute('aria-hidden','true');
 }
 function captureNative(){
   hideNative('boutique',$('lx-shop'));
   hideNative('pvp',$('lx-side-pvp'));
   hideNative('logistics',$('kelo-logistics-admin-fab'));
-  document.querySelectorAll('button,[role="button"]').forEach(el=>{
-    if(el.closest?.('#kelo-hub-sections')||el.id==='lx-side-menu'||el.id==='lx-menu-close'||el.id==='lx-chat-tab')return;
+  document.querySelectorAll('button,[role="button"],[onclick],a,div,span').forEach(el=>{
+    if(ignored(el))return;
     const text=norm(el.textContent);if(!text)return;
     for(const [key,labels] of Object.entries(LABELS)){if(labels.includes(text)){hideNative(key,el);break;}}
   });
@@ -109,7 +128,7 @@ function ensureStyle(){
   const style=document.createElement('style');
   style.id='kelo-hub-overlay-style';
   style.textContent=`
-#lx-shop,#lx-side-pvp,#kelo-logistics-admin-fab{display:none!important}
+#lx-shop,#lx-side-pvp,#kelo-logistics-admin-fab,[data-kelo-hub-native="1"]{display:none!important}
 .lx-top{display:none!important}
 .lx-rail{top:max(9px,env(safe-area-inset-top))!important;right:max(9px,env(safe-area-inset-right))!important;gap:0!important}
 #lx-side-menu{width:68px!important;height:44px!important;border-radius:15px!important;box-shadow:0 8px 26px rgba(0,0,0,.34)!important;opacity:.9}
@@ -177,7 +196,7 @@ function boot(){
     let relevant=false;
     for(const mutation of mutations){for(const node of mutation.addedNodes){
       if(!(node instanceof HTMLElement)||node.closest?.('#kelo-hub-sections')||node.id==='kelo-hub-sections')continue;
-      if(node.matches?.('button,[role="button"],#kelo-logistics-admin-fab')||node.querySelector?.('button,[role="button"],#kelo-logistics-admin-fab'))relevant=true;
+      if(node.matches?.('button,[role="button"],[onclick],a,div,span,#kelo-logistics-admin-fab')||node.querySelector?.('button,[role="button"],[onclick],a,div,span,#kelo-logistics-admin-fab'))relevant=true;
     }}
     if(relevant){captureNative();renderHub();ensureChatTab();}
   });
