@@ -20,7 +20,7 @@ export function createCommandBus({ history, onAfterExecute, onRollback } = {}) {
       const event = { type: 'execute', command: serialized, affectedRects: typeof command.affectedRects === 'function' ? command.affectedRects(context) : [] };
       try { if (typeof onAfterExecute === 'function') await onAfterExecute(event, context, command); }
       catch (error) { try { await command.undo(context); } catch {} try { if (typeof onRollback === 'function') await onRollback(event, context, command, error); } catch {} throw error; }
-      history.push({ type: command.type || 'anonymous', label: command.label || command.type || 'Command', serialized, affectedRects: event.affectedRects, undo: () => command.undo(context), redo: () => typeof command.redo === 'function' ? command.redo(context) : command.execute(context) });
+      history.push({ type: command.type || 'anonymous', label: command.label || command.type || 'Command', serialized, affectedRects: event.affectedRects, mergeKey: command.historyMergeKey || null, mergeWindowMs: command.historyMergeWindowMs || 0, undo: () => command.undo(context), redo: () => typeof command.redo === 'function' ? command.redo(context) : command.execute(context) });
       emit(event); return serialized;
     } finally { executing = false; }
   }
