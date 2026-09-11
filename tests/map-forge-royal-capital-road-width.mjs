@@ -8,7 +8,7 @@ import {MAP_FORGE_RECIPES} from '../src/world/map-forge/map-forge-recipes.mjs';
 import {generateMapCandidate} from '../src/world/map-forge/map-forge-core.mjs';
 
 const EXPECTED_ARTERIAL_WIDTH=104;
-const EXPECTED_COLLECTOR_WIDTH=76;
+const EXPECTED_COLLECTOR_WIDTH=74;
 const EXPECTED_DECORATION=0.60;
 const SEEDS=[81746291,12345,424242,29011987];
 const recipe=MAP_FORGE_RECIPES.KELO_ROYAL_CAPITAL_V1;
