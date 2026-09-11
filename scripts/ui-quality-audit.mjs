@@ -86,13 +86,14 @@ const score=Math.max(0,Math.round(100-debt/Math.max(1,uiFiles)*2));
 const counts=warnings.reduce((a,w)=>(a[w.severity]=(a[w.severity]||0)+1,a),{});
 const changedCritical=warnings.filter(w=>w.severity==='critical'&&changed.has(w.file));
 
-console.log(`Kelo UI Quality Audit`);
+console.log('Kelo UI Quality Audit');
 console.log(`Scanned UI files: ${uiFiles}`);
 console.log(`Score: ${score}/100`);
 console.log(`Warnings: ${warnings.length} (critical ${counts.critical||0}, warn ${counts.warn||0}, info ${counts.info||0})`);
 if(changed.size)console.log(`Latest commit changed ${changed.size} file(s); critical UI regressions: ${changedCritical.length}`);
 
-const ordered=[...warnings].sort((a,b)=>({critical:0,warn:1,info:2}[a.severity]-({critical:0,warn:1,info:2}[b.severity])||a.file.localeCompare(b.file));
+const severityRank={critical:0,warn:1,info:2};
+const ordered=[...warnings].sort((a,b)=>(severityRank[a.severity]??9)-(severityRank[b.severity]??9)||a.file.localeCompare(b.file));
 for(const w of ordered.slice(0,60))console.log(`[${w.severity.toUpperCase()}] ${w.code} ${w.file}: ${w.message}`);
 if(ordered.length>60)console.log(`... ${ordered.length-60} additional warning(s) omitted from console output.`);
 
