@@ -67,6 +67,7 @@ jobs:
           KELO_VISUAL_STAGE: after
         run: npx playwright test tests/map-forge-visual-round.spec.js --project=chromium
       - name: Capture directional prop BEFORE evidence
+        if: always()
         env:
           KELO_PAGES: http://127.0.0.1:4173/
           KELO_ORIENTATION_STAGE: before
