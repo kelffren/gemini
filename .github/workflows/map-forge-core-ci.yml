@@ -9,6 +9,7 @@ on:
     paths:
       - 'src/world/map-forge/**'
       - 'scripts/map-forge-core-audit.mjs'
+      - 'scripts/map-forge-selection-diversity-audit.mjs'
       - 'scripts/map-forge-block-road-clearance-audit.mjs'
       - 'scripts/map-forge-paving-intent-audit.mjs'
       - '.github/workflows/map-forge-core-ci.yml'
@@ -19,6 +20,7 @@ on:
     paths:
       - 'src/world/map-forge/**'
       - 'scripts/map-forge-core-audit.mjs'
+      - 'scripts/map-forge-selection-diversity-audit.mjs'
       - 'scripts/map-forge-block-road-clearance-audit.mjs'
       - 'scripts/map-forge-paving-intent-audit.mjs'
       - '.github/workflows/map-forge-core-ci.yml'
@@ -34,6 +36,8 @@ jobs:
           node-version: '22'
       - name: Run Map Forge deterministic + 300-seed audit
         run: node scripts/map-forge-core-audit.mjs
+      - name: Run best-of selection diversity audit
+        run: node scripts/map-forge-selection-diversity-audit.mjs
       - name: Run buildable block road-clearance audit
         run: node scripts/map-forge-block-road-clearance-audit.mjs
       - name: Run semantic paving + PAVING_BLOB hard-gate audit
