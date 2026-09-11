@@ -65,19 +65,21 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Serve branch checkout
         run: python3 -m http.server 4173 --bind 127.0.0.1 > /tmp/kelo-map-forge-http.log 2>&1 &
-      - name: Prepare paired champion states
+      - name: Prepare paired generator states
         run: |
           cp src/world/map-forge/map-forge-champion-overrides.mjs /tmp/map-forge-champion-after.mjs
-          BEFORE_COMMIT="$(git log -2 --format=%H -- src/world/map-forge/map-forge-champion-overrides.mjs | tail -1)"
-          test -n "$BEFORE_COMMIT"
-          git show "$BEFORE_COMMIT:src/world/map-forge/map-forge-champion-overrides.mjs" > /tmp/map-forge-champion-before.mjs
-          echo "Comparing champion states: $BEFORE_COMMIT -> $(git log -1 --format=%H -- src/world/map-forge/map-forge-champion-overrides.mjs)"
+          cp src/world/map-forge/map-forge-core.mjs /tmp/map-forge-core-after.mjs
+          CORE_BEFORE_COMMIT="$(git log -2 --format=%H -- src/world/map-forge/map-forge-core.mjs | tail -1)"
+          test -n "$CORE_BEFORE_COMMIT"
+          git show "$CORE_BEFORE_COMMIT:src/world/map-forge/map-forge-core.mjs" > /tmp/map-forge-core-before.mjs
+          echo "Comparing core states: $CORE_BEFORE_COMMIT -> $(git log -1 --format=%H -- src/world/map-forge/map-forge-core.mjs)"
       - name: Capture fixed-seed BEFORE preview and runtime evidence
         env:
           KELO_PAGES: http://127.0.0.1:4173/
           KELO_VISUAL_STAGE: before
         run: |
-          cp /tmp/map-forge-champion-before.mjs src/world/map-forge/map-forge-champion-overrides.mjs
+          cp /tmp/map-forge-champion-after.mjs src/world/map-forge/map-forge-champion-overrides.mjs
+          cp /tmp/map-forge-core-before.mjs src/world/map-forge/map-forge-core.mjs
           npx playwright test tests/map-forge-visual-round.spec.js --project=chromium --output=playwright-results/before
       - name: Capture fixed-seed AFTER preview and runtime evidence
         env:
@@ -85,6 +87,7 @@ jobs:
           KELO_VISUAL_STAGE: after
         run: |
           cp /tmp/map-forge-champion-after.mjs src/world/map-forge/map-forge-champion-overrides.mjs
+          cp /tmp/map-forge-core-after.mjs src/world/map-forge/map-forge-core.mjs
           npx playwright test tests/map-forge-visual-round.spec.js tests/map-forge-fountain-clearance.spec.js --project=chromium --output=playwright-results/after
       - name: Capture directional prop evidence
         continue-on-error: true
