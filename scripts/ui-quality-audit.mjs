@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /* KELO-INDEX
  * area: TOOLING / UI QUALITY
- * purpose: scan Kelo UI surfaces for hierarchy, accessibility and consistency drift
+ * purpose: scan every Kelo source module that constructs UI for hierarchy, accessibility and consistency drift
  * policy: report whole project; fail only on critical regressions in UI files changed by the latest commit
  */
 
@@ -10,15 +10,19 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 
 const ROOT=process.cwd();
-const UI_ROOTS=['src/ui','src/studio/ui','src/creators/ui'];
+const SCAN_ROOTS=['src','index.html'];
 const EXTENSIONS=new Set(['.js','.mjs','.css','.html']);
+const SKIP_DIRS=new Set(['node_modules','vendor','generated']);
 
 function walk(rel){
   const abs=path.join(ROOT,rel);
   if(!fs.existsSync(abs))return [];
   const stat=fs.statSync(abs);
   if(stat.isFile())return EXTENSIONS.has(path.extname(abs))?[rel]:[];
-  return fs.readdirSync(abs,{withFileTypes:true}).flatMap(entry=>walk(path.join(rel,entry.name)));
+  return fs.readdirSync(abs,{withFileTypes:true}).flatMap(entry=>{
+    if(entry.isDirectory()&&SKIP_DIRS.has(entry.name))return [];
+    return walk(path.join(rel,entry.name));
+  });
 }
 
 function changedFiles(){
@@ -28,7 +32,7 @@ function changedFiles(){
   }catch{return new Set();}
 }
 
-const isUiText=text=>/(<button|createElement\(['"]button|\.\w*(?:btn|button|tab|menu|card|panel)|role=['"]dialog|position\s*:\s*fixed)/i.test(text);
+const isUiText=text=>/(<button|createElement\(['"]button|\.\w*(?:btn|button|tab|menu|card|panel)|role=['"]dialog|aria-label|position\s*:\s*fixed)/i.test(text);
 const hexColors=text=>new Set(text.match(/#[0-9a-f]{3,8}\b/ig)||[]);
 
 function cssBlocks(text){
@@ -69,17 +73,18 @@ function auditFile(file,text){
   return warnings;
 }
 
-const files=UI_ROOTS.flatMap(walk).sort();
+const files=[...new Set(SCAN_ROOTS.flatMap(walk))].sort();
 const changed=changedFiles();
 const warnings=[];
-let uiFiles=0;
+const auditedFiles=[];
 for(const file of files){
   const text=fs.readFileSync(path.join(ROOT,file),'utf8');
   if(!isUiText(text))continue;
-  uiFiles++;
+  auditedFiles.push(file);
   warnings.push(...auditFile(file,text));
 }
 
+const uiFiles=auditedFiles.length;
 const weight={critical:8,warn:2,info:.5};
 const debt=warnings.reduce((sum,w)=>sum+(weight[w.severity]||0),0);
 const score=Math.max(0,Math.round(100-debt/Math.max(1,uiFiles)*2));
@@ -87,22 +92,24 @@ const counts=warnings.reduce((a,w)=>(a[w.severity]=(a[w.severity]||0)+1,a),{});
 const changedCritical=warnings.filter(w=>w.severity==='critical'&&changed.has(w.file));
 
 console.log('Kelo UI Quality Audit');
-console.log(`Scanned UI files: ${uiFiles}`);
+console.log(`Source files considered: ${files.length}`);
+console.log(`UI-producing files audited: ${uiFiles}`);
 console.log(`Score: ${score}/100`);
 console.log(`Warnings: ${warnings.length} (critical ${counts.critical||0}, warn ${counts.warn||0}, info ${counts.info||0})`);
 if(changed.size)console.log(`Latest commit changed ${changed.size} file(s); critical UI regressions: ${changedCritical.length}`);
 
 const severityRank={critical:0,warn:1,info:2};
 const ordered=[...warnings].sort((a,b)=>(severityRank[a.severity]??9)-(severityRank[b.severity]??9)||a.file.localeCompare(b.file));
-for(const w of ordered.slice(0,60))console.log(`[${w.severity.toUpperCase()}] ${w.code} ${w.file}: ${w.message}`);
-if(ordered.length>60)console.log(`... ${ordered.length-60} additional warning(s) omitted from console output.`);
+for(const w of ordered.slice(0,80))console.log(`[${w.severity.toUpperCase()}] ${w.code} ${w.file}: ${w.message}`);
+if(ordered.length>80)console.log(`... ${ordered.length-80} additional warning(s) omitted from console output.`);
 
-const contractFiles=['src/ui/kelo-interface-system.css','docs/KELO_INTERFACE_STANDARD.md'];
+const contractFiles=['src/ui/kelo-interface-system.css','src/ui/kelo-interface-runtime.js','docs/KELO_INTERFACE_STANDARD.md'];
 const missing=contractFiles.filter(file=>!fs.existsSync(path.join(ROOT,file)));
 if(missing.length){console.error(`Missing UI contract file(s): ${missing.join(', ')}`);process.exit(2);}
 
 const index=fs.readFileSync(path.join(ROOT,'index.html'),'utf8');
 if(!index.includes('src/ui/kelo-interface-system.css')){console.error('index.html does not load the shared Kelo Interface System.');process.exit(3);}
+if(!index.includes('src/ui/kelo-interface-runtime.js')){console.error('index.html does not load the shared Kelo Interface Runtime.');process.exit(4);}
 
 if(changedCritical.length){
   console.error('\nCritical UI regression introduced in the latest commit. Fix before merging.');
