@@ -7,6 +7,7 @@ on:
       - 'engine-*.js'
       - 'src/core/**'
       - 'src/systems/pvp-world.js'
+      - 'src/systems/pvp-visual-competitive-pass.js'
       - 'src/systems/melee/**'
       - 'src/ui/pvp-social-touch-guard.js'
       - 'src/visuals/**'
@@ -20,6 +21,7 @@ on:
       - 'engine-*.js'
       - 'src/core/**'
       - 'src/systems/pvp-world.js'
+      - 'src/systems/pvp-visual-competitive-pass.js'
       - 'src/systems/melee/**'
       - 'src/ui/pvp-social-touch-guard.js'
       - 'src/visuals/**'
@@ -116,7 +118,9 @@ jobs:
               'engine-c.js',
               'src/core/input-system.js',
               'src/core/movement-system.js',
+              'src/core/kelo-runtime-bootstrap.js',
               'src/systems/pvp-world.js',
+              'src/systems/pvp-visual-competitive-pass.js',
               'src/systems/melee/melee-engine.js',
               'src/systems/melee/melee-weapon-profiles.js',
               'src/ui/pvp-social-touch-guard.js',
