@@ -6,22 +6,51 @@
  * online: replace the repository/state adapter with remote infrastructure; workspaces remain unchanged
  */
 const copy=value=>value==null?value:(typeof structuredClone==='function'?structuredClone(value):JSON.parse(JSON.stringify(value)));
-export function createIndexedDbCreatorStateAdapter({indexedDBFactory=globalThis.indexedDB,dbName='kelo-creators-v1'}={}){
+export function createIndexedDbCreatorStateAdapter({indexedDBFactory=globalThis.indexedDB,dbName='kelo-creators-v1',openTimeoutMs=1200}={}){
   let memory={projects:[],drafts:{}},dbPromise=null;
   function open(){
     if(!indexedDBFactory)return Promise.resolve(null);
     if(dbPromise)return dbPromise;
-    dbPromise=new Promise((resolve,reject)=>{const request=indexedDBFactory.open(dbName,1);request.onupgradeneeded=()=>{const db=request.result;if(!db.objectStoreNames.contains('state'))db.createObjectStore('state',{keyPath:'key'});};request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error||new Error('CREATOR_INDEXEDDB_OPEN_FAILED'));});
+    dbPromise=new Promise(resolve=>{
+      let request=null,settled=false,timer=null;
+      const finish=value=>{if(settled){try{value?.close?.();}catch{}return;}settled=true;if(timer)clearTimeout(timer);resolve(value||null);};
+      try{
+        request=indexedDBFactory.open(dbName,1);
+        request.onupgradeneeded=()=>{try{const db=request.result;if(!db.objectStoreNames.contains('state'))db.createObjectStore('state',{keyPath:'key'});}catch{}};
+        request.onsuccess=()=>{const db=request.result;if(!db.objectStoreNames.contains('state')){try{db.close();}catch{}finish(null);return;}finish(db);};
+        request.onerror=()=>finish(null);
+        request.onblocked=()=>finish(null);
+        timer=setTimeout(()=>finish(null),Math.max(250,Number(openTimeoutMs)||1200));
+      }catch{finish(null);}
+    });
     return dbPromise;
   }
   async function load(){
     const db=await open();if(!db)return copy(memory);
-    return new Promise((resolve,reject)=>{const tx=db.transaction('state','readonly'),request=tx.objectStore('state').get('repository');request.onsuccess=()=>{const state=request.result?.value||memory;memory=copy(state);resolve(copy(memory));};request.onerror=()=>reject(request.error||new Error('CREATOR_INDEXEDDB_LOAD_FAILED'));});
+    try{
+      return await new Promise(resolve=>{
+        let settled=false;const finish=value=>{if(settled)return;settled=true;resolve(value);};
+        try{
+          const tx=db.transaction('state','readonly'),request=tx.objectStore('state').get('repository');
+          request.onsuccess=()=>{const state=request.result?.value||memory;memory=copy(state);finish(copy(memory));};
+          request.onerror=()=>finish(copy(memory));
+          tx.onabort=()=>finish(copy(memory));
+        }catch{finish(copy(memory));}
+      });
+    }catch{return copy(memory);}
   }
   async function save(state){
     memory=copy(state||{projects:[],drafts:{}});const db=await open();if(!db)return copy(memory);
-    await new Promise((resolve,reject)=>{const tx=db.transaction('state','readwrite');tx.objectStore('state').put({key:'repository',updatedAt:Date.now(),value:copy(memory)});tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error||new Error('CREATOR_INDEXEDDB_SAVE_FAILED'));});return copy(memory);
+    try{
+      await new Promise(resolve=>{
+        let settled=false;const finish=()=>{if(settled)return;settled=true;resolve();};
+        try{
+          const tx=db.transaction('state','readwrite');tx.objectStore('state').put({key:'repository',updatedAt:Date.now(),value:copy(memory)});tx.oncomplete=finish;tx.onerror=finish;tx.onabort=finish;
+        }catch{finish();}
+      });
+    }catch{}
+    return copy(memory);
   }
   async function close(){const db=await open();db?.close?.();dbPromise=null;}
-  return Object.freeze({version:'creator-indexeddb-state-v1.0.0',load,save,close});
+  return Object.freeze({version:'creator-indexeddb-state-v1.1.0-nonblocking',load,save,close});
 }
