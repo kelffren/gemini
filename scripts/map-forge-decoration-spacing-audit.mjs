@@ -21,7 +21,7 @@ for(const seed of seeds){
   const map=generateMapCandidate(recipe,{seed,assetCatalogVersion:'ci-catalog'});
   assert.equal(map.validation.valid,true,`${seed}: production candidate must remain valid`);
   assert.ok(map.quality.breakdown.decorationSpacing>=35,`${seed}: production candidate spacing metric escaped normalized bounds: ${map.quality.breakdown.decorationSpacing}`);
-  if(seed===81746291)assert.ok(map.quality.total<=94,`${seed}: fixed-seed runtime evidence is visibly crowded and must not retain a 95+ score, got ${map.quality.total}`);
+  if(seed===81746291)assert.ok(map.quality.total<95,`${seed}: fixed-seed runtime evidence is visibly crowded and must not retain a 95+ score, got ${map.quality.total}`);
 
   const crowded=clone(map),originalFamilies=familyHistogram(map.decorations||[]),byDistrict=new Map();
   for(const row of crowded.decorations||[]){if(!byDistrict.has(row.district))byDistrict.set(row.district,[]);byDistrict.get(row.district).push(row);}
