@@ -1,3 +1,4 @@
+// Focused regression: stale Creator sessions must never make the Hub disappear into a blank screen.
 import assert from 'node:assert/strict';
 import {createCreatorWorkspaceRegistry} from '../src/creators/core/workspace-registry.mjs';
 import {createAvatarWorkspaceManifest} from '../src/creators/workspaces/avatar-workspace.mjs';
