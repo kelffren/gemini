@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: TEST / MAP FORGE / ROYAL CAPITAL
  * owner: Map Forge CI
- * purpose: lock the visually approved Royal Capital road hierarchy and decoration density across representative deterministic seeds
+ * purpose: lock the visually approved Royal Capital road hierarchy and street-furniture composition across representative deterministic seeds
  */
 import assert from 'node:assert/strict';
 import {MAP_FORGE_RECIPES} from '../src/world/map-forge/map-forge-recipes.mjs';
@@ -26,6 +26,10 @@ for(const seed of SEEDS){
   assert.ok(collectors.length>0,`${seed}: representative map must contain collector roads`);
   assert.ok(arterials.every(road=>road.width===EXPECTED_ARTERIAL_WIDTH),`${seed}: every arterial must use ${EXPECTED_ARTERIAL_WIDTH}px`);
   assert.ok(collectors.every(road=>road.width===EXPECTED_COLLECTOR_WIDTH),`${seed}: every collector must use ${EXPECTED_COLLECTOR_WIDTH}px`);
-  results.push({seed,roadCount:map.roads.length,blockCount:map.blocks.length,decorationCount:map.decorations.length,arterialCount:arterials.length,collectorCount:collectors.length,arterialWidths:[...new Set(arterials.map(road=>road.width))],collectorWidths:[...new Set(collectors.map(road=>road.width))],decoration:recipe.style.decoration,quality:map.quality.total});
+  assert.ok((map.generationStats.decorationStreetFamilySwapCount||0)>0,`${seed}: street-furniture organizer must improve at least one lamp/flower relationship`);
+  assert.ok((map.generationStats.decorationStreetFamilyRoadGain||0)>=36,`${seed}: street-furniture organizer must produce a meaningful road-affinity gain`);
+  const lampCount=map.decorations.filter(row=>row.family==='lamp').length,flowerCount=map.decorations.filter(row=>row.family==='flower').length;
+  assert.ok(lampCount>0&&flowerCount>0,`${seed}: representative map must retain lamps and flowers`);
+  results.push({seed,roadCount:map.roads.length,blockCount:map.blocks.length,decorationCount:map.decorations.length,arterialCount:arterials.length,collectorCount:collectors.length,arterialWidths:[...new Set(arterials.map(road=>road.width))],collectorWidths:[...new Set(collectors.map(road=>road.width))],decoration:recipe.style.decoration,streetFamilySwaps:map.generationStats.decorationStreetFamilySwapCount,streetFamilyRoadGain:map.generationStats.decorationStreetFamilyRoadGain,lampCount,flowerCount,quality:map.quality.total});
 }
 console.log(JSON.stringify({ok:true,expectedArterialWidth:EXPECTED_ARTERIAL_WIDTH,expectedCollectorWidth:EXPECTED_COLLECTOR_WIDTH,expectedDecoration:EXPECTED_DECORATION,seeds:SEEDS,results},null,2));
