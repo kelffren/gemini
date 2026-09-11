@@ -14,7 +14,7 @@ import {scoreMapDefinition,validateMapDefinition} from '../src/world/map-forge/m
 const recipe=MAP_FORGE_RECIPES.KELO_ROYAL_CAPITAL_V1;
 const seeds=[81746291,12345,424242,29011987];
 const clone=value=>JSON.parse(JSON.stringify(value));
-const familyHistogram=rows=>Object.fromEntries([...rows.reduce((m,row)=>m.set(row.family,(m.get(row.family)||0)+1,new Map()).entries()].sort(([a],[b])=>String(a).localeCompare(String(b))));
+const familyHistogram=rows=>Object.fromEntries([...rows.reduce((m,row)=>m.set(row.family,(m.get(row.family)||0)+1),new Map()).entries()].sort(([a],[b])=>String(a).localeCompare(String(b))));
 const results=[];
 
 for(const seed of seeds){
