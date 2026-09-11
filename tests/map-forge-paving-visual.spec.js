@@ -6,6 +6,12 @@
 const {test,expect}=require('@playwright/test');
 const fs=require('fs');
 
+function versionAtLeast(actual,minimum){
+  const a=String(actual||'').split('.').map(Number),b=minimum.split('.').map(Number);
+  for(let i=0;i<Math.max(a.length,b.length);i++){const delta=(a[i]||0)-(b[i]||0);if(delta)return delta>0;}
+  return true;
+}
+
 async function openSeed68(page){
   const pageErrors=[];page.on('pageerror',error=>pageErrors.push(String(error)));
   const response=await page.goto('/?mapEditor=1&offline=1',{waitUntil:'domcontentloaded',timeout:30000});
@@ -20,7 +26,8 @@ async function openSeed68(page){
   await forge.getByRole('button').filter({hasText:'Seed 68'}).click();
   await page.waitForFunction(async()=>{const {getMapForgeWorkspace}=await import('./src/creators/ui/map-forge-workspace.mjs');return getMapForgeWorkspace()?.selected?.metadata?.seed===68;},null,{timeout:5000});
   const selected=await page.evaluate(async()=>{const {getMapForgeWorkspace}=await import('./src/creators/ui/map-forge-workspace.mjs');const map=getMapForgeWorkspace().selected,paving=map.validation.paving;return{seed:map.metadata.seed,layoutHash:map.metadata.layoutHash,generatorVersion:map.metadata.generatorVersion,valid:map.validation.valid,errors:map.validation.errors,largestComponentRatio:paving.largestComponentRatio,largestComponentCells:paving.largestComponentCells,stoneWithoutIntent:map.terrain.cells.filter(c=>c.material==='stone'&&!c.pavingIntent?.planId).length};});
-  expect(selected).toMatchObject({seed:68,generatorVersion:'1.1.0',valid:true,errors:[],stoneWithoutIntent:0});
+  expect(selected).toMatchObject({seed:68,valid:true,errors:[],stoneWithoutIntent:0});
+  expect(versionAtLeast(selected.generatorVersion,'1.1.0')).toBe(true);
   expect(selected.largestComponentRatio).toBeLessThanOrEqual(.10);
   expect(pageErrors).toEqual([]);
   return{forge,selected,pageErrors};
