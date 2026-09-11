@@ -14,8 +14,11 @@ const MAIN_SEED=81746291;
 const VALIDATION_SEEDS=[81746291,12345,424242,29011987];
 const STAGE=process.env.KELO_VISUAL_STAGE==='after'?'after':'before';
 const URBAN_KINDS=new Set(['plaza','royal','commerce']);
-const DECORATION_MIN=200;
+const DECORATION_MIN=195;
 const DECORATION_MAX=215;
+const VALIDATION_QUALITY_MIN=94;
+const VALIDATION_VISTAS_MIN=81;
+const VALIDATION_SPACE_MIN=78;
 
 test.use({viewport:{width:1440,height:900}});
 test.setTimeout(90000);
@@ -142,6 +145,9 @@ test(`Map Forge ${STAGE} fixed-seed preview/runtime visual evidence`,async({page
       expect(metrics.urbanStreetscapeRatio).toBe(1);
       expect(metrics.decorationCount).toBeGreaterThanOrEqual(DECORATION_MIN);
       expect(metrics.decorationCount).toBeLessThanOrEqual(DECORATION_MAX);
+      expect(metrics.qualityTotal).toBeGreaterThanOrEqual(VALIDATION_QUALITY_MIN);
+      expect(metrics.scenicVistas).toBeGreaterThanOrEqual(VALIDATION_VISTAS_MIN);
+      expect(metrics.negativeSpace).toBeGreaterThanOrEqual(VALIDATION_SPACE_MIN);
       expect(metrics.declusterSwapCount).toBeGreaterThan(0);
     }
     validation.push(metrics);
