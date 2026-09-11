@@ -5,6 +5,7 @@
  * public-api: CLI
  * consumes: Map Forge recipes + core + quality scorer
  * state-owned: none
+ * fixture: preserves density/family counts while compressing same-district props onto a realistic 90px grid
  */
 import assert from 'node:assert/strict';
 import {MAP_FORGE_RECIPES} from '../src/world/map-forge/map-forge-recipes.mjs';
