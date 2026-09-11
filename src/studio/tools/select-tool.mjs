@@ -2,18 +2,27 @@
  * area: STUDIO / SELECT TOOL
  * owns: entity selection from spatial hit testing and one-shot armed grab handoff
  * does-not-own: pointer listeners, drawing or persistent document mutation
- * public-api: createSelectTool(), resolveSelectHitRadius()
+ * public-api: createSelectTool(), resolveSelectHitRadius(), screenRadiusToWorld()
  * online: local transient state only
  */
 
 const MOBILE_MAX=760;
-const MOBILE_HIT_RADIUS=18;
+const MOBILE_HIT_RADIUS_PX=18;
+const MIN_EFFECTIVE_ZOOM=.25;
+
+export function screenRadiusToWorld(screenRadius,zoom=1){
+  const px=Math.max(0,Number(screenRadius)||0);
+  const z=Math.max(MIN_EFFECTIVE_ZOOM,Number(zoom)||1);
+  return px/z;
+}
 
 export function resolveSelectHitRadius(radius,{root=globalThis}={}){
   if(radius!=null)return Math.max(0,Number(radius)||0);
   const coarse=!!root?.matchMedia?.('(pointer: coarse)')?.matches;
   const mobile=Number(root?.innerWidth||9999)<=MOBILE_MAX;
-  return coarse&&mobile?MOBILE_HIT_RADIUS:0;
+  if(!coarse||!mobile)return 0;
+  const zoom=Number(root?.KeloCamera?.snapshot?.()?.effectiveZoom)||1;
+  return screenRadiusToWorld(MOBILE_HIT_RADIUS_PX,zoom);
 }
 
 export function createSelectTool(kernel) {
