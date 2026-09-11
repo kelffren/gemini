@@ -1,0 +1,92 @@
+/* KELO-INDEX
+ * area: UI / INTERFACE COMPATIBILITY
+ * owner: Kelo Interface System
+ * purpose: normalize legacy UI controls without duplicating feature logic or inventing another visual language
+ * lifecycle: bridge legacy surfaces toward KELO_INTERFACE_STANDARD; use shared --kui-* tokens only
+ */
+
+/* Legacy focus resets are overridden centrally so keyboard focus is never lost. */
+#kelo-luxe input:focus-visible,
+#kelo-profile-18 button:focus-visible,
+#kelo-profile-18 input:focus-visible,
+#kelo-profile-18 select:focus-visible,
+#kelo-studio-live button:focus-visible,
+#kelo-studio-live input:focus-visible,
+#kelo-studio-live select:focus-visible,
+#kelo-account-auth button:focus-visible,
+#kelo-account-auth input:focus-visible,
+#kelo-commerce-modal button:focus-visible,
+#kelo-commerce-modal input:focus-visible{
+  outline:3px solid color-mix(in srgb,var(--kui-focus) 72%,transparent)!important;
+  outline-offset:2px!important;
+}
+
+/* Compact creator/studio controls keep their visual density but gain a safe hit target. */
+.sab-event-actions button,
+.sab-event-chip button,
+.sab-grid button,
+.sab-timeline-tools button,
+#kelo-studio-live .ks-context-head button,
+#kelo-studio-live .ks-multi-align button,
+.kst-head button,
+.ksw-actions button{
+  min-width:40px!important;
+  min-height:40px!important;
+  height:auto!important;
+  font-size:11px!important;
+}
+
+/* Frequent near-critical compact controls converge on the same control tier. */
+.kelo-ability-creator-active #kelo-studio-workspace .ksw-actions button,
+.sab-event-run button,
+.sii-head button,.sii-foot button,.sii-actions button,
+.sab-cut-head button,.sab-cut-foot button,.sab-cut-tools button,
+.sab-cut-grid-form button,.sab-cut-playrow button,
+.sr-head button,.sr-foot button,.sr-tools button,.sr-actions button,
+.sab-v-tools button,
+#kelo-studio-live .ks-quick-select button,
+#kelo-studio-live .ks-ext-strip button,
+#kelo-studio-live .ks-ext-strip select,
+#kelo-studio-live .ks-modal-actions button,
+#kelo-studio-live .ks-clean-popover button,
+#kelo-studio-live .ks-selection-float>button,
+#kelo-studio-live .ks-selection-more button,
+#kelo-studio-live .ks-context-actions button,
+#kelo-studio-live .ks-deck button,
+#kelo-studio-live .ks-mini,
+#kelo-studio-live .ks-tabs button,
+#kelo-studio-live .ks-compact-bar button,
+.ksw-top button,.ksw-mobile-tabs button,.ksw-list button,
+.titles-equipped button,.title-action,
+.kelo-fullscreen-help-card button{
+  min-height:40px!important;
+  font-size:max(10px,1em)!important;
+}
+
+/* Creator labels previously rendered below readable software size. */
+.sab-easy-dock button,
+.sab-mode button,
+.sab-cut-tools button,
+#kelo-studio-workspace.sab-visual-v13 .ksw-top button,
+#kelo-studio-workspace.sab-visual-v13 .ksw-mobile-tabs>button,
+.ksw-mobile-tabs .sab-mode button,
+#kelo-studio-live .ks-quick-select button,
+#kelo-studio-live .ks-ext-strip button,
+#kelo-studio-live .ks-ext-strip select,
+#kelo-studio-live .ks-modal-actions button,
+#kelo-studio-live .ks-clean-popover button,
+#kelo-studio-live .ks-selection-more button,
+#kelo-studio-live .ks-bottom.ks-compact .ks-compact-bar button,
+.ksw-actions button,.ksw-list button,.ksw-top button,
+#kelo-parcel-acl button,
+.wb-flow-actions button,.wb-history button{
+  font-size:10px!important;
+}
+
+@media(max-width:700px){
+  .sab-event-actions button,.sab-event-chip button,.sab-grid button,.sab-timeline-tools button,
+  #kelo-studio-live .ks-context-head button,#kelo-studio-live .ks-multi-align button,.kst-head button,.ksw-actions button{
+    min-width:44px!important;
+    min-height:44px!important;
+  }
+}
