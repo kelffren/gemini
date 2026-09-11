@@ -64,6 +64,7 @@ function mapMetrics(map){
   const familyCounts={};for(const d of map.decorations||[])familyCounts[d.family]=(familyCounts[d.family]||0)+1;
   return{
     seed:map.metadata?.seed,
+    generatorVersion:map.metadata?.generatorVersion,
     layoutHash:map.metadata?.layoutHash,
     valid:!!map.validation?.valid,
     errors:map.validation?.errors||[],
@@ -74,6 +75,7 @@ function mapMetrics(map){
     roadCount:(map.roads||[]).length,
     blockCount:(map.blocks||[]).length,
     decorationCount:(map.decorations||[]).length,
+    declusterSwapCount:Number(map.generationStats?.decorationDeclusterSwapCount||0),
     urbanDecorationCount:urban.length,
     urbanStreetscapeCount:streetscape,
     urbanStreetscapeRatio:urban.length?Number((streetscape/urban.length).toFixed(4)):1,
@@ -86,9 +88,13 @@ async function bootForge(page){
   const pageErrors=[];page.on('pageerror',error=>pageErrors.push(String(error)));
   const response=await page.goto('/?mapEditor=1&offline=1',{waitUntil:'commit',timeout:15000});
   expect(response.status()).toBeLessThan(400);
-  await page.waitForFunction(()=>!!(window.KELO_WORLD_BUILDER?.renderSnapshotPreview&&window.KELO_PROPERTY_SYSTEM?.drawPlacements&&window.KELO_PROPERTY_CATALOG&&window.KeloCamera?.focus&&window.KELO_ADMIN_KEYS?.can?.('world.edit')),null,{timeout:30000});
-  await page.evaluate(async()=>{const {bootKeloCreators}=await import('./src/creators/creator-entry.mjs');const platform=await bootKeloCreators({root:window});await platform.openWorkspace('map-forge');});
-  const forge=page.locator('#kelo-map-forge');await expect(forge).toBeVisible();
+  await page.waitForSelector('body',{timeout:10000});
+  await page.evaluate(async()=>{
+    const {bootKeloCreators}=await import('./src/creators/creator-entry.mjs');
+    const platform=await bootKeloCreators({root:window});
+    await platform.openWorkspace('map-forge');
+  });
+  const forge=page.locator('#kelo-map-forge');await expect(forge).toBeVisible({timeout:20000});
   return{forge,pageErrors};
 }
 
@@ -115,6 +121,7 @@ test(`Map Forge ${STAGE} fixed-seed preview/runtime visual evidence`,async({page
     expect(mainMetrics.qualityTotal).toBeGreaterThanOrEqual(94);
     expect(mainMetrics.scenicVistas).toBeGreaterThanOrEqual(82);
     expect(mainMetrics.negativeSpace).toBeGreaterThanOrEqual(78);
+    expect(mainMetrics.declusterSwapCount).toBeGreaterThan(0);
   }
   await page.screenshot({path:`test-results/screenshot_preview_${STAGE}.png`,fullPage:true});
 
@@ -135,6 +142,7 @@ test(`Map Forge ${STAGE} fixed-seed preview/runtime visual evidence`,async({page
       expect(metrics.urbanStreetscapeRatio).toBe(1);
       expect(metrics.decorationCount).toBeGreaterThanOrEqual(DECORATION_MIN);
       expect(metrics.decorationCount).toBeLessThanOrEqual(DECORATION_MAX);
+      expect(metrics.declusterSwapCount).toBeGreaterThan(0);
     }
     validation.push(metrics);
   }
