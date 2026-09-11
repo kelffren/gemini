@@ -20,10 +20,7 @@ page.on('console',message=>consoleMessages.push(`${message.type()}: ${message.te
 page.on('pageerror',error=>pageErrors.push(String(error?.stack||error?.message||error)));
 
 async function snapshot(){
-  return page.evaluate(async()=>{
-    let platform=null,builder=null;
-    try{platform=(await import('./src/creators/creator-entry.mjs')).getKeloCreatorsPlatform();}catch{}
-    try{builder=(await import('./src/creators/sprite-ability/sprite-ability-live-controller.mjs')).getSpriteAbilityBuilder();}catch{}
+  return page.evaluate(()=>{
     const workspace=document.getElementById('kelo-studio-workspace');
     const hub=document.getElementById('kelo-creators-hub');
     const card=[...document.querySelectorAll('.kc-card')].find(node=>node.getAttribute('aria-label')==='Abrir Sprite Ability');
@@ -37,9 +34,6 @@ async function snapshot(){
       cardBusy:card?.getAttribute('aria-busy')||null,
       cardDisabled:Boolean(card?.disabled),
       bodyClass:document.body.className,
-      builderVersion:builder?.version||null,
-      builderProjectId:builder?.projectId||null,
-      platformVersion:platform?.version||null,
       inputLocks:window.KeloInputLocks?.snapshot?.()||null,
       adminPlayerId:window.KELO_ADMIN_KEYS?.playerId?.()||null,
       abilityEditGlobal:window.KELO_ADMIN_KEYS?.can?.('ability.edit',window.KELO_ADMIN_KEYS?.playerId?.())??null
@@ -55,7 +49,7 @@ try{
   await page.waitForSelector('#kelo-creators-hub',{state:'visible',timeout:10000});
   const spriteButton=page.getByRole('button',{name:'Abrir Sprite Ability'});
   if(!await spriteButton.isEnabled())throw new Error('SPRITE_ABILITY_CARD_NOT_ACTIVE');
-  await spriteButton.click();
+  await spriteButton.click({noWaitAfter:true});
 
   let state=null;
   const deadline=Date.now()+12000;
