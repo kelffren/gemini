@@ -14,7 +14,7 @@ const newId = () => `studio-collision:${globalThis.crypto?.randomUUID?.() || `${
 
 export function createCollisionTool(kernel) {
   if (!kernel) throw new Error('STUDIO_COLLISION_KERNEL_REQUIRED');
-  let preview = null, selectedId = null, action = null, visible = false, defaultSize = { w: 64, h: 64 };
+  let preview = null, selectedId = null, action = null, visible = false, grabOffset = { x: 0, y: 0 }, defaultSize = { w: 64, h: 64 };
   const tileSize = () => Math.max(1, Number(kernel.document.settings?.tileSize) || 32);
   const collisions = () => Object.values(kernel.document.navigation?.collisions || {});
   const byId = id => kernel.document.navigation?.collisions?.[String(id)] || null;
@@ -28,21 +28,30 @@ export function createCollisionTool(kernel) {
   function beginAt(x, y) {
     const row = selectPoint(x, y), t = tileSize();
     if (row) {
-      action = 'move'; preview = { ...clone(row), x: snap(row.x, t), y: snap(row.y, t) };
+      action = 'move';
+      grabOffset = { x: (Number(x) || 0) - (Number(row.x) || 0), y: (Number(y) || 0) - (Number(row.y) || 0) };
+      preview = { ...clone(row), x: snap(row.x, t), y: snap(row.y, t) };
     } else {
-      action = 'create'; selectedId = newId(); preview = { collisionId: selectedId, x: snap(x, t), y: snap(y, t), w: defaultSize.w, h: defaultSize.h, label: 'Studio Collision' };
+      action = 'create'; selectedId = newId(); grabOffset = { x: 0, y: 0 };
+      preview = { collisionId: selectedId, x: snap(x, t), y: snap(y, t), w: defaultSize.w, h: defaultSize.h, label: 'Studio Collision' };
     }
     return clone(preview);
   }
-  function move(x, y) { if (!preview) return null; const t = tileSize(); preview.x = snap(x, t); preview.y = snap(y, t); return clone(preview); }
+  function move(x, y) {
+    if (!preview) return null;
+    const t = tileSize(), ox = action === 'move' ? grabOffset.x : 0, oy = action === 'move' ? grabOffset.y : 0;
+    preview.x = snap((Number(x) || 0) - ox, t);
+    preview.y = snap((Number(y) || 0) - oy, t);
+    return clone(preview);
+  }
   async function commit() {
     if (!preview || !action) return null;
     const row = clone(preview); let result = null;
     if (action === 'create') result = await kernel.execute(createCreateWorldCollisionCommand(row));
     else if (action === 'move') result = await kernel.execute(createMoveWorldCollisionCommand(row.collisionId, row));
-    action = null; preview = null; selectedId = row.collisionId; return result;
+    action = null; preview = null; grabOffset = { x: 0, y: 0 }; selectedId = row.collisionId; return result;
   }
-  async function removeSelected() { if (!selectedId || !byId(selectedId)) return null; const id = selectedId; const result = await kernel.execute(createRemoveWorldCollisionCommand(id)); selectedId = null; preview = null; action = null; return result; }
-  function cancel() { preview = null; action = null; }
+  async function removeSelected() { if (!selectedId || !byId(selectedId)) return null; const id = selectedId; const result = await kernel.execute(createRemoveWorldCollisionCommand(id)); selectedId = null; preview = null; action = null; grabOffset = { x: 0, y: 0 }; return result; }
+  function cancel() { preview = null; action = null; grabOffset = { x: 0, y: 0 }; }
   return Object.freeze({ id: 'collision', setVisible, setDefaultSize, selectPoint, beginAt, move, commit, removeSelected, cancel, hitTest: (x,y)=>clone(hitTest(x,y)), getPreview: ()=>clone(preview), getSelected: ()=>clone(byId(selectedId)), get selectedId(){return selectedId;}, get visible(){return visible;}, list: ()=>clone(collisions()) });
 }
