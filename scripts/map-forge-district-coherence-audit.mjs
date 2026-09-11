@@ -18,9 +18,12 @@ function parcelBoundaryMismatchCount(map){let n=0;for(const parcel of map.parcel
 
 const BASELINE_DECORATIONS=54597;
 const BASELINE_MISMATCHES=13052;
-const BASELINE_BLOCKS=4567;
+// Production baselines after district-ownership and semantic-paving guards removed geometry that no
+// longer satisfies current placement contracts. Preserve the 98% retention gates so future density
+// losses still fail instead of silently redefining the corpus.
+const BASELINE_BLOCKS=3954;
 const BASELINE_BLOCK_MISMATCHES=1;
-const BASELINE_PARCELS=5096;
+const BASELINE_PARCELS=4567;
 const BASELINE_PARCEL_BOUNDARY_MISMATCHES=34;
 const stats={};
 let mapsChecked=0,totalDecorations=0,totalMismatches=0,totalDistrictRejects=0,totalBlocks=0,totalBlockMismatches=0,totalBlockDistrictRejects=0,totalParcels=0,totalParcelBoundaryMismatches=0,totalParcelDistrictRejects=0,totalDeterminismChecks=0,validMaps=0;
