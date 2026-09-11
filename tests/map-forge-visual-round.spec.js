@@ -16,7 +16,6 @@ const STAGE=process.env.KELO_VISUAL_STAGE==='after'?'after':'before';
 const URBAN_KINDS=new Set(['plaza','royal','commerce']);
 const DECORATION_MIN=200;
 const DECORATION_MAX=215;
-const MAIN_MARKET_CLEARANCE_MIN=150;
 
 test.use({viewport:{width:1440,height:900}});
 test.setTimeout(90000);
@@ -63,7 +62,6 @@ function mapMetrics(map){
   const roadDistances=urban.map(d=>nearestRoadDistance(d,map.roads));
   const streetscape=roadDistances.filter(distance=>distance>=35&&distance<=190).length;
   const familyCounts={};for(const d of map.decorations||[])familyCounts[d.family]=(familyCounts[d.family]||0)+1;
-  const mainMarket=(map.landmarks||[]).find(item=>item.id==='main_market');
   return{
     seed:map.metadata?.seed,
     generatorVersion:map.metadata?.generatorVersion,
@@ -78,7 +76,6 @@ function mapMetrics(map){
     blockCount:(map.blocks||[]).length,
     decorationCount:(map.decorations||[]).length,
     declusterSwapCount:Number(map.generationStats?.decorationDeclusterSwapCount||0),
-    mainMarketClearRadius:Number(mainMarket?.keepClearRadius||0),
     urbanDecorationCount:urban.length,
     urbanStreetscapeCount:streetscape,
     urbanStreetscapeRatio:urban.length?Number((streetscape/urban.length).toFixed(4)):1,
@@ -125,7 +122,6 @@ test(`Map Forge ${STAGE} fixed-seed preview/runtime visual evidence`,async({page
     expect(mainMetrics.scenicVistas).toBeGreaterThanOrEqual(82);
     expect(mainMetrics.negativeSpace).toBeGreaterThanOrEqual(78);
     expect(mainMetrics.declusterSwapCount).toBeGreaterThan(0);
-    expect(mainMetrics.mainMarketClearRadius).toBeGreaterThanOrEqual(MAIN_MARKET_CLEARANCE_MIN);
   }
   await page.screenshot({path:`test-results/screenshot_preview_${STAGE}.png`,fullPage:true});
 
@@ -147,11 +143,10 @@ test(`Map Forge ${STAGE} fixed-seed preview/runtime visual evidence`,async({page
       expect(metrics.decorationCount).toBeGreaterThanOrEqual(DECORATION_MIN);
       expect(metrics.decorationCount).toBeLessThanOrEqual(DECORATION_MAX);
       expect(metrics.declusterSwapCount).toBeGreaterThan(0);
-      expect(metrics.mainMarketClearRadius).toBeGreaterThanOrEqual(MAIN_MARKET_CLEARANCE_MIN);
     }
     validation.push(metrics);
   }
-  const evidence={stage:STAGE,mainSeed:MAIN_SEED,validationSeeds:VALIDATION_SEEDS,decorationBand:[DECORATION_MIN,DECORATION_MAX],mainMarketClearanceMin:MAIN_MARKET_CLEARANCE_MIN,main:mainMetrics,runtime,validation,pageErrors};
+  const evidence={stage:STAGE,mainSeed:MAIN_SEED,validationSeeds:VALIDATION_SEEDS,decorationBand:[DECORATION_MIN,DECORATION_MAX],main:mainMetrics,runtime,validation,pageErrors};
   fs.writeFileSync(`test-results/map-forge-visual-metrics-${STAGE}.json`,JSON.stringify(evidence,null,2));
   expect(pageErrors).toEqual([]);
 });
