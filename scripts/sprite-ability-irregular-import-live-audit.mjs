@@ -16,9 +16,8 @@ try{
   await page.waitForSelector('.sab-easy-mode-toggle',{state:'visible',timeout:5000});
   await page.getByRole('button',{name:'⚙ AVANZADO'}).click();
   await page.waitForFunction(()=>document.getElementById('kelo-studio-workspace')?.dataset?.sabEasy==='0');
-  await page.locator('[data-panel="left"]').click();
-  await page.waitForSelector('.ksw-left.mobile-open',{state:'visible',timeout:5000});
-  await page.waitForSelector('.sab-irregular-launch',{state:'visible',timeout:5000});
+  await page.waitForSelector('.sab-irregular-launch',{state:'attached',timeout:5000});
+  await page.waitForSelector('.sab-irregular-file',{state:'attached',timeout:5000});
 
   const png=Buffer.from(await page.evaluate(()=>{const c=document.createElement('canvas');c.width=920;c.height=520;const x=c.getContext('2d');const boxes=[[26,28,92,132],[205,52,118,96],[446,16,82,154],[706,60,112,118],[42,292,128,102],[266,254,88,142],[506,306,122,92],[750,268,96,136]];boxes.forEach((b,i)=>{x.fillStyle=`rgba(${60+i*20},${95+i*13},${210-i*9},1)`;x.fillRect(...b);x.fillStyle='rgba(255,255,255,.95)';x.fillRect(b[0]+Math.round(b[2]*.28),b[1]+Math.round(b[3]*.18),Math.max(12,Math.round(b[2]*.3)),Math.max(12,Math.round(b[3]*.22)));});return c.toDataURL('image/png').split(',')[1];}),'base64');
   await page.locator('.sab-irregular-file').setInputFiles({name:'irregular-freeform.png',mimeType:'image/png',buffer:png});
