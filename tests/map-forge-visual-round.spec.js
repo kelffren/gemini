@@ -14,6 +14,8 @@ const MAIN_SEED=81746291;
 const VALIDATION_SEEDS=[81746291,12345,424242,29011987];
 const STAGE=process.env.KELO_VISUAL_STAGE==='after'?'after':'before';
 const URBAN_KINDS=new Set(['plaza','royal','commerce']);
+const DECORATION_MIN=200;
+const DECORATION_MAX=215;
 
 test.use({viewport:{width:1440,height:900}});
 test.setTimeout(60000);
@@ -81,7 +83,8 @@ test(`Map Forge ${STAGE} fixed-seed preview/runtime visual evidence`,async({page
   expect(mainMetrics.valid).toBe(true);expect(mainMetrics.errors).toEqual([]);
   if(STAGE==='after'){
     expect(mainMetrics.urbanStreetscapeRatio).toBe(1);
-    expect(mainMetrics.decorationCount).toBeGreaterThanOrEqual(200);
+    expect(mainMetrics.decorationCount).toBeGreaterThanOrEqual(DECORATION_MIN);
+    expect(mainMetrics.decorationCount).toBeLessThanOrEqual(DECORATION_MAX);
     expect(mainMetrics.qualityTotal).toBeGreaterThanOrEqual(94);
     expect(mainMetrics.scenicVistas).toBeGreaterThanOrEqual(82);
     expect(mainMetrics.negativeSpace).toBeGreaterThanOrEqual(78);
@@ -101,10 +104,14 @@ test(`Map Forge ${STAGE} fixed-seed preview/runtime visual evidence`,async({page
   for(const seed of VALIDATION_SEEDS){
     const map=await generateSelected(page,page.locator('#kelo-map-forge'),seed),metrics=mapMetrics(map);
     expect(metrics.valid).toBe(true);expect(metrics.errors).toEqual([]);
-    if(STAGE==='after'){expect(metrics.urbanStreetscapeRatio).toBe(1);expect(metrics.decorationCount).toBeGreaterThanOrEqual(200);}
+    if(STAGE==='after'){
+      expect(metrics.urbanStreetscapeRatio).toBe(1);
+      expect(metrics.decorationCount).toBeGreaterThanOrEqual(DECORATION_MIN);
+      expect(metrics.decorationCount).toBeLessThanOrEqual(DECORATION_MAX);
+    }
     validation.push(metrics);
   }
-  const evidence={stage:STAGE,mainSeed:MAIN_SEED,validationSeeds:VALIDATION_SEEDS,main:mainMetrics,runtime,validation,pageErrors};
+  const evidence={stage:STAGE,mainSeed:MAIN_SEED,validationSeeds:VALIDATION_SEEDS,decorationBand:[DECORATION_MIN,DECORATION_MAX],main:mainMetrics,runtime,validation,pageErrors};
   fs.writeFileSync(`test-results/map-forge-visual-metrics-${STAGE}.json`,JSON.stringify(evidence,null,2));
   expect(pageErrors).toEqual([]);
 });
