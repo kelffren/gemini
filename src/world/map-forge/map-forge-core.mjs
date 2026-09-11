@@ -12,7 +12,7 @@
 import {clamp,freezeDeep,stableStringify,hashString,seed32,createRng} from './map-forge-prng.mjs';
 import {createMapIntent,buildCandidateParts} from './map-forge-builder.mjs';
 import {validateMapDefinition,scoreMapDefinition} from './map-forge-quality.mjs';
-export const MAP_FORGE_GENERATOR_VERSION='1.1.4';
+export const MAP_FORGE_GENERATOR_VERSION='1.1.5';
 export {createMapIntent} from './map-forge-builder.mjs';
 export {createRng,stableStringify} from './map-forge-prng.mjs';
 export {validateMapDefinition,scoreMapDefinition} from './map-forge-quality.mjs';
@@ -21,6 +21,7 @@ const DIRECTIONAL_DECORATION_FAMILIES=new Set(['bench','market_prop']);
 const DECORATION_DECLUSTER_RADIUS=240;
 const DECORATION_DECLUSTER_GAIN=23;
 const STREET_FURNITURE_ROAD_GAIN=36;
+const STREET_FURNITURE_SWAPS_PER_DISTRICT=2;
 const decorationDistance=(a,b)=>Math.hypot(Number(a?.x||0)-Number(b?.x||0),Number(a?.y||0)-Number(b?.y||0));
 function nearestFamilyDistance(rows,index,family){const current=rows[index];let best=Infinity;for(let i=0;i<rows.length;i++){if(i===index)continue;const row=rows[i];if(row.district!==current.district||row.family!==family)continue;best=Math.min(best,decorationDistance(current,row));}return best;}
 function declusterDecorationFamilies(parts){
@@ -49,23 +50,25 @@ function swapDecorationIdentity(a,b){const family=a.family,assetRef=a.assetRef;a
 function organizeStreetFurnitureFamilies(parts){
   const rows=(parts.decorations||[]).map(row=>({...row})),districts=[...new Set(rows.map(row=>row.district))].sort();let swaps=0,totalRoadGain=0;
   for(const district of districts){
-    let best=null;
-    for(let i=0;i<rows.length;i++){
-      const lamp=rows[i];if(lamp.district!==district||lamp.family!=='lamp')continue;
-      const lampRoad=nearestRoadVector(lamp,parts.roads)?.distance??Infinity;
-      for(let j=0;j<rows.length;j++){
-        if(i===j)continue;const flower=rows[j];if(flower.district!==district||flower.family!=='flower')continue;
-        const flowerRoad=nearestRoadVector(flower,parts.roads)?.distance??Infinity,gain=lampRoad-flowerRoad;
-        if(!Number.isFinite(gain)||gain<STREET_FURNITURE_ROAD_GAIN)continue;
-        const before=Math.min(nearestFamilyDistance(rows,i,'lamp'),nearestFamilyDistance(rows,j,'flower'));
-        swapDecorationIdentity(lamp,flower);
-        const after=Math.min(nearestFamilyDistance(rows,i,lamp.family),nearestFamilyDistance(rows,j,flower.family));
-        swapDecorationIdentity(lamp,flower);
-        if(after+0.1<before)continue;
-        if(!best||gain>best.gain+1e-6||Math.abs(gain-best.gain)<=1e-6&&(i<best.i||i===best.i&&j<best.j))best={i,j,gain};
+    for(let pass=0;pass<STREET_FURNITURE_SWAPS_PER_DISTRICT;pass++){
+      let best=null;
+      for(let i=0;i<rows.length;i++){
+        const lamp=rows[i];if(lamp.district!==district||lamp.family!=='lamp')continue;
+        const lampRoad=nearestRoadVector(lamp,parts.roads)?.distance??Infinity;
+        for(let j=0;j<rows.length;j++){
+          if(i===j)continue;const flower=rows[j];if(flower.district!==district||flower.family!=='flower')continue;
+          const flowerRoad=nearestRoadVector(flower,parts.roads)?.distance??Infinity,gain=lampRoad-flowerRoad;
+          if(!Number.isFinite(gain)||gain<STREET_FURNITURE_ROAD_GAIN)continue;
+          const before=Math.min(nearestFamilyDistance(rows,i,'lamp'),nearestFamilyDistance(rows,j,'flower'));
+          swapDecorationIdentity(lamp,flower);
+          const after=Math.min(nearestFamilyDistance(rows,i,lamp.family),nearestFamilyDistance(rows,j,flower.family));
+          swapDecorationIdentity(lamp,flower);
+          if(after+0.1<before)continue;
+          if(!best||gain>best.gain+1e-6||Math.abs(gain-best.gain)<=1e-6&&(i<best.i||i===best.i&&j<best.j))best={i,j,gain};
+        }
       }
+      if(!best)break;swapDecorationIdentity(rows[best.i],rows[best.j]);swaps++;totalRoadGain+=best.gain;
     }
-    if(!best)continue;swapDecorationIdentity(rows[best.i],rows[best.j]);swaps++;totalRoadGain+=best.gain;
   }
   return{...parts,decorations:rows,generationStats:{...parts.generationStats,decorationStreetFamilySwapCount:swaps,decorationStreetFamilyRoadGain:Math.round(totalRoadGain*10)/10}};
 }
