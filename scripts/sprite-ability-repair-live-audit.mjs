@@ -12,6 +12,7 @@ const stageImage=()=>page.locator('.sr-stage').evaluate(c=>c.toDataURL());
 const frameThumbs=()=>page.locator('.sr-frame canvas').evaluateAll(nodes=>nodes.map(c=>c.toDataURL()));
 async function dragStage(fromX,fromY,toX,toY){const box=await page.locator('.sr-stage').boundingBox();if(!box)throw new Error('REPAIR_STAGE_BOX_MISSING');const ax=box.x+box.width*fromX,ay=box.y+box.height*fromY,bx=box.x+box.width*toX,by=box.y+box.height*toY;await page.mouse.move(ax,ay);await page.mouse.down();await page.mouse.move(bx,by,{steps:5});await page.mouse.up();await page.waitForTimeout(80);}
 async function clickStage(x=.5,y=.72){const box=await page.locator('.sr-stage').boundingBox();if(!box)throw new Error('REPAIR_STAGE_BOX_MISSING');await page.mouse.click(box.x+box.width*x,box.y+box.height*y);await page.waitForTimeout(80);}
+async function touchStage(events){await page.locator('.sr-stage').evaluate((stage,items)=>{const r=stage.getBoundingClientRect();for(const item of items){const up=item.type==='pointerup'||item.type==='pointercancel';stage.dispatchEvent(new PointerEvent(item.type,{bubbles:true,cancelable:true,pointerId:item.id,pointerType:'touch',isPrimary:item.primary===true,clientX:r.left+r.width*item.x,clientY:r.top+r.height*item.y,buttons:up?0:1,pressure:up?0:.5,width:18,height:18}));}},events);await page.waitForTimeout(100);}
 try{
   await page.goto(`${BASE}?offline=1&mapEditor=1&sprite-repair-audit=${Date.now()}`,{waitUntil:'domcontentloaded',timeout:30000});
   await page.waitForFunction(()=>window.KELO_CREATORS_LAUNCHER&&window.KELO_ADMIN_KEYS?.can?.('ability.edit',window.KELO_ADMIN_KEYS.playerId())===true&&window.KeloInputLocks,{timeout:20000});
@@ -35,14 +36,25 @@ try{
   const before=await snap();
   await page.getByRole('button',{name:/REPARAR SPRITE/}).click();
   await page.waitForSelector('.sab-repair',{state:'visible',timeout:5000});
+  await page.waitForSelector('.sr-stage[data-sr-touch-gestures="1"]',{state:'visible',timeout:5000});
+  const touchHelp=await page.locator('.sr-touch-help').textContent();if(!touchHelp?.includes('2 dedos: escalar')||!touchHelp?.includes('BORRAR'))throw new Error(`REPAIR_TOUCH_HELP_MISSING:${touchHelp}`);
   const tools=await page.locator('.sr-mode button').allTextContents();
   for(const label of ['✥ MOVER','⌖ PIVOT','✂ CROP','⌫ BORRAR'])if(!tools.includes(label))throw new Error(`REPAIR_TOOL_MISSING:${label}`);
   const count0=await page.locator('.sr-frame').count();if(count0!==8)throw new Error(`REPAIR_FRAME_COUNT:${count0}`);
+  const scale=page.locator('.sr-range input[type=range]').first();
 
-  // Exercise the real manual tools, not just their presence.
+  // One-finger drag remains canonical move behavior.
   await page.getByRole('button',{name:'✥ MOVER',exact:true}).click();
   let pixelBefore=await selectedThumb();await dragStage(.50,.50,.60,.46);let pixelAfter=await selectedThumb();if(pixelAfter===pixelBefore)throw new Error('REPAIR_MOVE_NO_PIXEL_CHANGE');
   if(!(await page.locator('.sr-preview-badge').textContent())?.includes('MOVE'))throw new Error('REPAIR_MOVE_MODE_NOT_ACTIVE');
+
+  // Two real touch pointers must pinch-scale and move the midpoint through the existing Repair controls.
+  const scaleBefore=Number(await scale.inputValue()),pinchThumbBefore=await selectedThumb();
+  await touchStage([{type:'pointerdown',id:31,primary:true,x:.42,y:.52},{type:'pointerdown',id:32,x:.58,y:.52},{type:'pointermove',id:31,primary:true,x:.31,y:.47},{type:'pointermove',id:32,x:.69,y:.43},{type:'pointerup',id:31,primary:true,x:.31,y:.47},{type:'pointerup',id:32,x:.69,y:.43}]);
+  const scaleAfterPinch=Number(await scale.inputValue()),pinchThumbAfter=await selectedThumb();
+  if(!(scaleAfterPinch>scaleBefore+.08))throw new Error(`REPAIR_TOUCH_PINCH_NO_SCALE:${scaleBefore}->${scaleAfterPinch}`);
+  if(pinchThumbAfter===pinchThumbBefore)throw new Error('REPAIR_TOUCH_PINCH_NO_PIXEL_CHANGE');
+  if(await page.locator('.sr-stage').getAttribute('data-sr-gesture'))throw new Error('REPAIR_TOUCH_PINCH_STUCK');
 
   await page.getByRole('button',{name:'⌖ PIVOT',exact:true}).click();
   const pivotThumbBefore=await selectedThumb(),pivotStageBefore=await stageImage();await clickStage(.56,.70);const pivotThumbAfter=await selectedThumb(),pivotStageAfter=await stageImage();
@@ -54,8 +66,9 @@ try{
   pixelBefore=await selectedThumb();await dragStage(.38,.34,.66,.72);pixelAfter=await selectedThumb();if(pixelAfter===pixelBefore)throw new Error('REPAIR_CROP_NO_PIXEL_CHANGE');
   if(!(await page.locator('.sr-preview-badge').textContent())?.includes('CROP'))throw new Error('REPAIR_CROP_MODE_NOT_ACTIVE');
 
+  // Eraser must work from a finger pointer, not only a mouse drag.
   await page.getByRole('button',{name:'⌫ BORRAR',exact:true}).click();
-  pixelBefore=await selectedThumb();await dragStage(.50,.50,.54,.55);pixelAfter=await selectedThumb();if(pixelAfter===pixelBefore)throw new Error('REPAIR_ERASER_NO_PIXEL_CHANGE');
+  pixelBefore=await selectedThumb();await touchStage([{type:'pointerdown',id:41,primary:true,x:.49,y:.49},{type:'pointermove',id:41,primary:true,x:.52,y:.52},{type:'pointermove',id:41,primary:true,x:.55,y:.55},{type:'pointerup',id:41,primary:true,x:.55,y:.55}]);pixelAfter=await selectedThumb();if(pixelAfter===pixelBefore)throw new Error('REPAIR_TOUCH_ERASER_NO_PIXEL_CHANGE');
   if(!(await page.locator('.sr-preview-badge').textContent())?.includes('ERASER'))throw new Error('REPAIR_ERASER_MODE_NOT_ACTIVE');
 
   pixelBefore=await selectedThumb();
@@ -75,7 +88,7 @@ try{
   await page.getByRole('button',{name:'ALINEAR TODOS'}).click();
   await page.getByRole('button',{name:'TRIM TODOS'}).click();
   await page.getByRole('button',{name:'CENTRAR'}).click();
-  const scale=page.locator('.sr-range input[type=range]').first();await scale.evaluate(el=>{el.value='1.17';el.dispatchEvent(new Event('input',{bubbles:true}));});
+  await scale.evaluate(el=>{el.value='1.17';el.dispatchEvent(new Event('input',{bubbles:true}));});
   await page.getByRole('button',{name:'▶ PLAY',exact:true}).click();await page.waitForTimeout(180);await page.getByRole('button',{name:'Ⅱ PAUSE',exact:true}).click();
   await page.screenshot({path:'artifacts/sprite-ability-repair/repair-studio.png',fullPage:true});
   await page.evaluate(()=>{window.__spriteRepairToasts=[];const original=window.showToast;window.showToast=function(message,...args){window.__spriteRepairToasts.push(String(message));try{return original?.call(this,message,...args);}catch{return undefined;}};});
@@ -87,6 +100,6 @@ try{
   if(after.sheet.endFrame!==7)throw new Error(`REPAIR_FRAME_RANGE_LOST:${after.sheet.endFrame}`);
   for(const [k,v] of Object.entries({impactFrame:3,activeStartFrame:2,activeEndFrame:4,hitboxX:11,hitboxY:-33,hitboxWidth:77,hitboxHeight:55}))if(after.combat[k]!==v)throw new Error(`REPAIR_COMBAT_NOT_PRESERVED:${k}:${after.combat[k]}!=${v}`);
   if(pageErrors.length)throw new Error(`REPAIR_PAGE_ERRORS:${pageErrors.join(' | ')}`);
-  const report={ok:true,viewport:'390x844',frames:8,tools,exercised:['move','pivot','crop','eraser','replace','reorder','duplicate','delete','onion','reference','align-all','trim-all','center','scale','preview','apply'],before:{impact:before.combat.impactFrame,hitbox:[before.combat.hitboxX,before.combat.hitboxY,before.combat.hitboxWidth,before.combat.hitboxHeight]},after:{impact:after.combat.impactFrame,hitbox:[after.combat.hitboxX,after.combat.hitboxY,after.combat.hitboxWidth,after.combat.hitboxHeight],columns:after.sheet.columns,rows:after.sheet.rows,frame:`${after.sheet.frameWidth}x${after.sheet.frameHeight}`},pageErrors};
-  fs.writeFileSync('artifacts/sprite-ability-repair/report.json',JSON.stringify(report,null,2));console.log('SPRITE REPAIR STUDIO MOBILE AUDIT: PASS');console.log(JSON.stringify(report,null,2));
+  const report={ok:true,viewport:'390x844',frames:8,tools,touchHelp,scaleBefore,scaleAfterPinch,exercised:['one-finger-move','touch-pinch-scale','touch-midpoint-pan','pivot','crop','touch-eraser','replace','reorder','duplicate','delete','onion','reference','align-all','trim-all','center','scale-slider','preview','apply'],before:{impact:before.combat.impactFrame,hitbox:[before.combat.hitboxX,before.combat.hitboxY,before.combat.hitboxWidth,before.combat.hitboxHeight]},after:{impact:after.combat.impactFrame,hitbox:[after.combat.hitboxX,after.combat.hitboxY,after.combat.hitboxWidth,after.combat.hitboxHeight],columns:after.sheet.columns,rows:after.sheet.rows,frame:`${after.sheet.frameWidth}x${after.sheet.frameHeight}`},pageErrors};
+  fs.writeFileSync('artifacts/sprite-ability-repair/report.json',JSON.stringify(report,null,2));console.log('SPRITE REPAIR STUDIO MOBILE TOUCH AUDIT: PASS');console.log(JSON.stringify(report,null,2));
 }finally{await browser.close();}
