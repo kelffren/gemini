@@ -14,6 +14,7 @@ on:
       - 'assets/**/*.PNG'
       - 'scripts/live-*.mjs'
       - 'scripts/input-repair-audit.mjs'
+      - 'scripts/kelo-hub-audit.mjs'
       - 'scripts/png-validation-core.mjs'
       - 'scripts/validate-png-pipeline.mjs'
       - 'scripts/test-png-validation.mjs'
@@ -48,6 +49,18 @@ jobs:
           done
           set -o pipefail
           AUDIT_URL='http://127.0.0.1:4173/?offline=1&qa-live-audit=1' node scripts/input-repair-audit.mjs 2>&1 | tee artifacts/input-repair-audit.log
+      - name: Audit Kelo Hub and collapsible chat
+        env:
+          CHROME_BIN: /usr/bin/google-chrome
+        run: |
+          python3 -m http.server 4173 >/tmp/kelo-hub-audit-server.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+          for i in {1..20}; do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then break; fi
+            sleep 0.25
+          done
+          AUDIT_URL='http://127.0.0.1:4173/?offline=1&qa-live-audit=1' node scripts/kelo-hub-audit.mjs
       - name: Detect world decoration mode
         id: mode
         run: |
