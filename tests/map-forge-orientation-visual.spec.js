@@ -10,7 +10,6 @@ const MAIN_SEED=81746291;
 const VALIDATION_SEEDS=[81746291,12345,424242,29011987];
 const STAGE=process.env.KELO_ORIENTATION_STAGE==='after'?'after':'before';
 const DIRECTIONAL_FAMILIES=new Set(['bench','market_prop']);
-const ROAD_FACING_MIN_SCORE=Math.cos(Math.PI/8)-.001;
 
 test.use({viewport:{width:1440,height:900}});
 test.setTimeout(60000);
@@ -37,7 +36,7 @@ function roadFacingScore(row,roads){
 function mapMetrics(map){
   const directional=(map.decorations||[]).filter(row=>DIRECTIONAL_FAMILIES.has(row.family));
   const scores=directional.map(row=>roadFacingScore(row,map.roads));
-  const roadFacingCount=scores.filter(score=>score>=ROAD_FACING_MIN_SCORE).length;
+  const roadFacingCount=scores.filter(score=>score>=Math.SQRT1_2-.001).length;
   const rotationCounts={};for(const row of directional){const key=String(row.rotation);rotationCounts[key]=(rotationCounts[key]||0)+1;}
   const geometryChecksum=(map.decorations||[]).reduce((sum,row)=>sum+Math.round(row.x*10)*17+Math.round(row.y*10)*31+Math.round(row.scale*100)*13,0);
   return{
@@ -92,6 +91,6 @@ test(`Map Forge directional props ${STAGE}`,async({page})=>{
   await page.getByRole('button',{name:'VOLVER A MAP FORGE'}).click();await expect(page.locator('#kelo-map-forge')).toBeVisible({timeout:15000});
   const validation=[];
   for(const seed of VALIDATION_SEEDS){const map=await generateSelected(page,page.locator('#kelo-map-forge'),seed),metrics=mapMetrics(map);expect(metrics.valid).toBe(true);expect(metrics.errors).toEqual([]);if(STAGE==='after')expect(metrics.roadFacingRatio).toBe(1);validation.push(metrics);}
-  fs.writeFileSync(`test-results/orientation/map-forge-orientation-metrics-${STAGE}.json`,JSON.stringify({stage:STAGE,mainSeed:MAIN_SEED,validationSeeds:VALIDATION_SEEDS,roadFacingMinScore:ROAD_FACING_MIN_SCORE,main,runtime,validation,pageErrors},null,2));
+  fs.writeFileSync(`test-results/orientation/map-forge-orientation-metrics-${STAGE}.json`,JSON.stringify({stage:STAGE,mainSeed:MAIN_SEED,validationSeeds:VALIDATION_SEEDS,main,runtime,validation,pageErrors},null,2));
   expect(pageErrors).toEqual([]);
 });
