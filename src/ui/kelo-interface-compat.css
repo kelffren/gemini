@@ -262,3 +262,63 @@
     scroll-behavior:auto!important;
   }
 }
+
+/* Apple-grade interaction tier: every recurring software action must expose a comfortable 44px target. */
+.sab-event-actions button,
+.sab-event-chip button,
+.sab-grid button,
+.sab-timeline-tools button,
+#kelo-studio-live .ks-context-head button,
+#kelo-studio-live .ks-multi-align button,
+.kst-head button,
+.ksw-actions button,
+.kelo-ability-creator-active #kelo-studio-workspace .ksw-actions button,
+.sab-event-run button,
+.sii-head button,.sii-foot button,.sii-actions button,
+.sab-cut-head button,.sab-cut-foot button,.sab-cut-tools button,
+.sab-cut-grid-form button,.sab-cut-playrow button,
+.sr-head button,.sr-foot button,.sr-tools button,.sr-actions button,
+.sab-v-tools button,
+#kelo-studio-live .ks-quick-select button,
+#kelo-studio-live .ks-ext-strip button,
+#kelo-studio-live .ks-ext-strip select,
+#kelo-studio-live .ks-modal-actions button,
+#kelo-studio-live .ks-clean-popover button,
+#kelo-studio-live .ks-selection-float>button,
+#kelo-studio-live .ks-selection-more button,
+#kelo-studio-live .ks-context-actions button,
+#kelo-studio-live .ks-deck button,
+#kelo-studio-live .ks-mini,
+#kelo-studio-live .ks-tabs button,
+#kelo-studio-live .ks-compact-bar button,
+#kelo-studio-live .ks-top button,
+.ksw-top button,.ksw-mobile-tabs button,.ksw-list button,
+.titles-equipped button,.title-action,
+.kelo-fullscreen-help-card button,
+#kelo-account-auth .ka-tab,
+#kelo-asset-repairer .kar-btn{
+  min-height:44px!important;
+  height:auto!important;
+}
+#kelo-asset-repairer .kar-btn{height:44px!important}
+#kelo-studio-live .ks-search{min-height:44px!important;height:44px!important}
+
+/* Small creator labels stay compact without dropping below calm software legibility. */
+.sab-easy-dock button,
+.sab-mode button,
+.sab-cut-tools button,
+#kelo-studio-workspace.sab-visual-v13 .ksw-top button,
+#kelo-studio-workspace.sab-visual-v13 .ksw-mobile-tabs>button,
+.ksw-mobile-tabs .sab-mode button,
+#kelo-studio-live .ks-quick-select button,
+#kelo-studio-live .ks-ext-strip button,
+#kelo-studio-live .ks-ext-strip select,
+#kelo-studio-live .ks-modal-actions button,
+#kelo-studio-live .ks-clean-popover button,
+#kelo-studio-live .ks-selection-more button,
+#kelo-studio-live .ks-bottom.ks-compact .ks-compact-bar button,
+.ksw-actions button,.ksw-list button,.ksw-top button,
+#kelo-parcel-acl button,
+.wb-flow-actions button,.wb-history button{
+  font-size:11px!important;
+}
