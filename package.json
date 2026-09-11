@@ -34,6 +34,7 @@
     "audit:studio:mobile-hit-slop": "node scripts/studio-mobile-hit-slop-audit.mjs",
     "audit:studio:history-hints": "node scripts/studio-history-hints-audit.mjs",
     "audit:studio:directional-marquee": "node scripts/studio-directional-marquee-audit.mjs",
+    "audit:studio:transform-preview-snap": "node scripts/studio-transform-preview-snap-audit.mjs",
     "audit:studio:overlap": "node scripts/studio-overlap-cycle-audit.mjs",
     "audit:studio:multi-align": "node scripts/studio-multi-align-audit.mjs",
     "audit:studio:selection-history": "node scripts/studio-selection-history-audit.mjs",
