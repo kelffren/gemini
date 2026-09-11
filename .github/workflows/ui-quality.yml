@@ -41,11 +41,36 @@ jobs:
 
           files="$(git diff --name-only "$before" HEAD || true)"
           printf '%s\n' "$files"
+
+          # Canonical UI owners and quality contracts always require the full gate.
           if printf '%s\n' "$files" | grep -Eq '^(index\.html|src/ui/|src/studio/ui/|src/creators/ui/|tests/ui-interface-runtime\.spec\.js$|playwright\.config\.js$|package\.json$|scripts/ui-quality-audit\.mjs$|docs/KELO_INTERFACE_STANDARD\.md$|\.github/workflows/ui-quality\.yml$)'; then
             echo "changed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
+
+          # UI exists outside the canonical folders too (creator labs, system HUDs,
+          # visual/debug tools). Inspect every changed source file instead of relying
+          # on directory names so those surfaces cannot escape the shared hierarchy.
+          ui_pattern='(<button|createElement\(["'"']button|role=["'"']dialog|aria-label|position[[:space:]]*:[[:space:]]*fixed|\.([A-Za-z0-9_-]*)(btn|button|tab|menu|card|panel|modal|drawer|sheet|dock|toolbar))'
+          while IFS= read -r file; do
+            [ -z "$file" ] && continue
+            case "$file" in
+              src/*.js|src/*.mjs|src/*.css|src/*.html|src/**/*.js|src/**/*.mjs|src/**/*.css|src/**/*.html)
+                if [ -f "$file" ] && grep -Eqi "$ui_pattern" "$file"; then
+                  echo "UI-producing source changed: $file"
+                  echo "changed=true" >> "$GITHUB_OUTPUT"
+                  exit 0
+                fi
+                if git cat-file -e "$before:$file" 2>/dev/null && git show "$before:$file" | grep -Eqi "$ui_pattern"; then
+                  echo "UI-producing source removed/changed: $file"
+                  echo "changed=true" >> "$GITHUB_OUTPUT"
+                  exit 0
+                fi
+                ;;
+            esac
+          done <<< "$files"
+
+          echo "changed=false" >> "$GITHUB_OUTPUT"
 
       - name: Shared interface contract
         if: steps.ui_changes.outputs.changed == 'true'
