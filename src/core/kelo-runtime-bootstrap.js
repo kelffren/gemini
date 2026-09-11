@@ -11,7 +11,7 @@
  */
 (function(root){
   'use strict';
-  const VERSION='kelo-runtime-bootstrap-v1.4.0-cast-prediction';
+  const VERSION='kelo-runtime-bootstrap-v1.5.0-pvp-visual-competitive';
   const MODULES=Object.freeze([
     'src/core/events/event-bus.js?v=1',
     'src/abilities/ability-action-timeline.js?v=1',
@@ -26,7 +26,8 @@
     'src/systems/melee/melee-weapon-profiles.js?v=3',
     'src/systems/melee/melee-engine.js?v=3',
     'src/visuals/combat-presentation-bridge.js?v=2',
-    'src/systems/pvp-ability-movement-prediction.js?v=1'
+    'src/systems/pvp-ability-movement-prediction.js?v=1',
+    'src/systems/pvp-visual-competitive-pass.js?v=1'
   ]);
   const audit=root.KELO_RUNTIME_BOOTSTRAP_AUDIT={version:VERSION,ready:false,loading:false,loaded:0,total:MODULES.length,failed:[],requestedAt:0,readyAt:0};
   let promise=null;
