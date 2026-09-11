@@ -19,7 +19,7 @@ concurrency:
 jobs:
   evolve-map-forge:
     runs-on: ubuntu-latest
-    timeout-minutes: 18
+    timeout-minutes: 22
     steps:
       - uses: actions/checkout@v4
         with:
@@ -28,9 +28,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Baseline evolution safety gate
+      - name: Baseline evolution V3 safety gate
         run: npm run audit:evolution
-      - name: Champion versus challengers on golden seeds
+      - name: Search champion and validate on unseen holdout seeds
         run: npm run evolution:map-forge
       - name: Detect accepted champion changes
         id: changes
@@ -41,7 +41,7 @@ jobs:
           else
             echo "accepted=true" >> "$GITHUB_OUTPUT"
           fi
-      - name: Re-run core and evolution gates on candidate
+      - name: Re-run core, holdout evolution and docs gates on candidate
         if: steps.changes.outputs.accepted == 'true'
         run: |
           node scripts/map-forge-core-audit.mjs
@@ -52,12 +52,12 @@ jobs:
         id: branch
         shell: bash
         run: |
-          BRANCH="evolution/map-forge-${GITHUB_RUN_ID}"
+          BRANCH="evolution/map-forge-v3-${GITHUB_RUN_ID}"
           git config user.name "kelo-evolution-bot"
           git config user.email "actions@users.noreply.github.com"
           git checkout -b "$BRANCH"
           git add src/world/map-forge/map-forge-champion-overrides.mjs docs/evolution/map-forge-memory.json
-          git commit -m "chore(map-forge): promote measured evolution champion"
+          git commit -m "chore(map-forge): promote holdout-verified evolution champion"
           git push origin "$BRANCH"
           echo "name=$BRANCH" >> "$GITHUB_OUTPUT"
       - name: Open gated pull request
@@ -67,13 +67,14 @@ jobs:
           BRANCH: ${{ steps.branch.outputs.name }}
         shell: bash
         run: |
+          EVIDENCE=$(node -e "const fs=require('fs');const r=JSON.parse(fs.readFileSync('test-results/map-forge-evolution-autopilot.json','utf8'));console.log(r.reports.filter(x=>x.accepted).map(x=>x.recipeId+': '+x.evidence.fingerprint+' holdoutΔ='+x.holdoutImprovement).join('\\n'))")
           gh pr create --base main --head "$BRANCH" \
-            --title "chore: promote Map Forge evolution champion" \
-            --body "Automated KeloEvolution candidate. Golden-seed champion/challenger gate passed before commit. This workflow never merges its own PR; normal CI/review still decides promotion. Evidence is attached to the workflow run."
-      - name: Upload experiment evidence
+            --title "chore: promote holdout-verified Map Forge evolution champion" \
+            --body "Automated KeloEvolution V3 candidate. Search-bank champion/challenger, unseen holdout seeds, paired seed regression gate, winner minimization, Map Forge core, Evolution and docs gates passed before commit. This workflow never merges its own PR.\n\nEvidence fingerprints:\n${EVIDENCE}\n\nNormal CI/review remains the promotion authority."
+      - name: Upload reproducibility and experiment evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: map-forge-evolution-autopilot-${{ github.run_id }}
+          name: map-forge-evolution-v3-autopilot-${{ github.run_id }}
           path: test-results/map-forge-evolution-autopilot.json
           if-no-files-found: ignore
