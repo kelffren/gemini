@@ -7,6 +7,10 @@ const browser=await chromium.launch({headless:true,...(executablePath?{executabl
 const context=await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true,serviceWorkers:'block'});
 const page=await context.newPage(),pageErrors=[];page.on('pageerror',e=>pageErrors.push(String(e?.stack||e?.message||e)));
 const snap=()=>page.evaluate(async()=>{const b=(await import('./src/creators/sprite-ability/sprite-ability-live-controller.mjs')).getSpriteAbilityBuilder();return b?{projectId:b.projectId,sheet:{...b.draft.sheet},combat:{...b.draft.combat}}:null;});
+const selectedThumb=()=>page.locator('.sr-frame.selected canvas').evaluate(c=>c.toDataURL());
+const frameThumbs=()=>page.locator('.sr-frame canvas').evaluateAll(nodes=>nodes.map(c=>c.toDataURL()));
+async function dragStage(fromX,fromY,toX,toY){const box=await page.locator('.sr-stage').boundingBox();if(!box)throw new Error('REPAIR_STAGE_BOX_MISSING');const ax=box.x+box.width*fromX,ay=box.y+box.height*fromY,bx=box.x+box.width*toX,by=box.y+box.height*toY;await page.mouse.move(ax,ay);await page.mouse.down();await page.mouse.move(bx,by,{steps:5});await page.mouse.up();await page.waitForTimeout(80);}
+async function clickStage(x=.5,y=.72){const box=await page.locator('.sr-stage').boundingBox();if(!box)throw new Error('REPAIR_STAGE_BOX_MISSING');await page.mouse.click(box.x+box.width*x,box.y+box.height*y);await page.waitForTimeout(80);}
 try{
   await page.goto(`${BASE}?offline=1&mapEditor=1&sprite-repair-audit=${Date.now()}`,{waitUntil:'domcontentloaded',timeout:30000});
   await page.waitForFunction(()=>window.KELO_CREATORS_LAUNCHER&&window.KELO_ADMIN_KEYS?.can?.('ability.edit',window.KELO_ADMIN_KEYS.playerId())===true&&window.KeloInputLocks,{timeout:20000});
@@ -18,7 +22,8 @@ try{
   await page.getByRole('button',{name:'⚙ AVANZADO'}).click();
   await page.waitForFunction(()=>document.getElementById('kelo-studio-workspace')?.dataset?.sabEasy==='0');
 
-  const png=Buffer.from(await page.evaluate(()=>{const c=document.createElement('canvas');c.width=512;c.height=256;const x=c.getContext('2d');for(let r=0;r<2;r++)for(let col=0;col<4;col++){const ox=col*128,oy=r*128;x.fillStyle=`rgba(${70+col*30},${120+r*60},220,1)`;x.fillRect(ox+34,oy+24,60,88);x.clearRect(ox,oy,10,10);}return c.toDataURL('image/png').split(',')[1];}),'base64');
+  const png=Buffer.from(await page.evaluate(()=>{const c=document.createElement('canvas');c.width=512;c.height=256;const x=c.getContext('2d');for(let r=0;r<2;r++)for(let col=0;col<4;col++){const ox=col*128,oy=r*128;x.fillStyle=`rgba(${70+col*30},${120+r*60},220,1)`;x.fillRect(ox+34,oy+24,60,88);x.fillStyle='rgba(255,255,255,.9)';x.fillRect(ox+52,oy+35,24,24);x.clearRect(ox,oy,10,10);}return c.toDataURL('image/png').split(',')[1];}),'base64');
+  const replacementPng=Buffer.from(await page.evaluate(()=>{const c=document.createElement('canvas');c.width=96;c.height=96;const x=c.getContext('2d');x.clearRect(0,0,96,96);x.fillStyle='rgba(245,70,90,1)';x.fillRect(15,10,66,78);x.fillStyle='rgba(255,225,80,1)';x.beginPath();x.arc(48,38,15,0,Math.PI*2);x.fill();return c.toDataURL('image/png').split(',')[1];}),'base64');
   await page.locator('.ksw-left input[type=file]').setInputFiles({name:'repair-source.png',mimeType:'image/png',buffer:png});
   await page.waitForFunction(async()=>{const b=(await import('./src/creators/sprite-ability/sprite-ability-live-controller.mjs')).getSpriteAbilityBuilder();return !!b?.draft?.sheet?.dataUrl&&b.draft.sheet.endFrame>=7;},null,{timeout:12000});
 
@@ -32,6 +37,34 @@ try{
   const tools=await page.locator('.sr-mode button').allTextContents();
   for(const label of ['✥ MOVER','⌖ PIVOT','✂ CROP','⌫ BORRAR'])if(!tools.includes(label))throw new Error(`REPAIR_TOOL_MISSING:${label}`);
   const count0=await page.locator('.sr-frame').count();if(count0!==8)throw new Error(`REPAIR_FRAME_COUNT:${count0}`);
+
+  // Exercise the real manual tools, not just their presence.
+  await page.getByRole('button',{name:'✥ MOVER',exact:true}).click();
+  let pixelBefore=await selectedThumb();await dragStage(.50,.50,.60,.46);let pixelAfter=await selectedThumb();if(pixelAfter===pixelBefore)throw new Error('REPAIR_MOVE_NO_PIXEL_CHANGE');
+  if(!(await page.locator('.sr-preview-badge').textContent())?.includes('MOVE'))throw new Error('REPAIR_MOVE_MODE_NOT_ACTIVE');
+
+  await page.getByRole('button',{name:'⌖ PIVOT',exact:true}).click();
+  pixelBefore=await selectedThumb();await clickStage(.56,.70);pixelAfter=await selectedThumb();if(pixelAfter===pixelBefore)throw new Error('REPAIR_PIVOT_NO_PIXEL_CHANGE');
+  if(!(await page.locator('.sr-preview-badge').textContent())?.includes('PIVOT'))throw new Error('REPAIR_PIVOT_MODE_NOT_ACTIVE');
+
+  await page.getByRole('button',{name:'✂ CROP',exact:true}).click();
+  pixelBefore=await selectedThumb();await dragStage(.38,.34,.66,.72);pixelAfter=await selectedThumb();if(pixelAfter===pixelBefore)throw new Error('REPAIR_CROP_NO_PIXEL_CHANGE');
+  if(!(await page.locator('.sr-preview-badge').textContent())?.includes('CROP'))throw new Error('REPAIR_CROP_MODE_NOT_ACTIVE');
+
+  await page.getByRole('button',{name:'⌫ BORRAR',exact:true}).click();
+  pixelBefore=await selectedThumb();await dragStage(.50,.50,.54,.55);pixelAfter=await selectedThumb();if(pixelAfter===pixelBefore)throw new Error('REPAIR_ERASER_NO_PIXEL_CHANGE');
+  if(!(await page.locator('.sr-preview-badge').textContent())?.includes('ERASER'))throw new Error('REPAIR_ERASER_MODE_NOT_ACTIVE');
+
+  pixelBefore=await selectedThumb();
+  await page.locator('.sab-repair input[type=file]').setInputFiles({name:'single-frame-replacement.png',mimeType:'image/png',buffer:replacementPng});
+  await page.waitForTimeout(180);pixelAfter=await selectedThumb();if(pixelAfter===pixelBefore)throw new Error('REPAIR_REPLACE_NO_PIXEL_CHANGE');
+
+  const orderBefore=await frameThumbs();
+  await page.getByRole('button',{name:'MOVER →',exact:true}).click();
+  const orderAfter=await frameThumbs();
+  if(orderAfter.length!==orderBefore.length||orderAfter[0]!==orderBefore[1]||orderAfter[1]!==orderBefore[0])throw new Error('REPAIR_REORDER_FAILED');
+  await page.getByRole('button',{name:'← MOVER',exact:true}).click();
+
   await page.getByRole('button',{name:'DUPLICAR'}).click();if(await page.locator('.sr-frame').count()!==9)throw new Error('REPAIR_DUPLICATE_FAILED');
   await page.getByRole('button',{name:'ELIMINAR'}).click();if(await page.locator('.sr-frame').count()!==8)throw new Error('REPAIR_DELETE_FAILED');
   await page.getByRole('button',{name:'ONION SKIN'}).click();
@@ -51,6 +84,6 @@ try{
   if(after.sheet.endFrame!==7)throw new Error(`REPAIR_FRAME_RANGE_LOST:${after.sheet.endFrame}`);
   for(const [k,v] of Object.entries({impactFrame:3,activeStartFrame:2,activeEndFrame:4,hitboxX:11,hitboxY:-33,hitboxWidth:77,hitboxHeight:55}))if(after.combat[k]!==v)throw new Error(`REPAIR_COMBAT_NOT_PRESERVED:${k}:${after.combat[k]}!=${v}`);
   if(pageErrors.length)throw new Error(`REPAIR_PAGE_ERRORS:${pageErrors.join(' | ')}`);
-  const report={ok:true,viewport:'390x844',frames:8,tools,before:{impact:before.combat.impactFrame,hitbox:[before.combat.hitboxX,before.combat.hitboxY,before.combat.hitboxWidth,before.combat.hitboxHeight]},after:{impact:after.combat.impactFrame,hitbox:[after.combat.hitboxX,after.combat.hitboxY,after.combat.hitboxWidth,after.combat.hitboxHeight],columns:after.sheet.columns,rows:after.sheet.rows,frame:`${after.sheet.frameWidth}x${after.sheet.frameHeight}`},pageErrors};
+  const report={ok:true,viewport:'390x844',frames:8,tools,exercised:['move','pivot','crop','eraser','replace','reorder','duplicate','delete','onion','reference','align-all','trim-all','center','scale','preview','apply'],before:{impact:before.combat.impactFrame,hitbox:[before.combat.hitboxX,before.combat.hitboxY,before.combat.hitboxWidth,before.combat.hitboxHeight]},after:{impact:after.combat.impactFrame,hitbox:[after.combat.hitboxX,after.combat.hitboxY,after.combat.hitboxWidth,after.combat.hitboxHeight],columns:after.sheet.columns,rows:after.sheet.rows,frame:`${after.sheet.frameWidth}x${after.sheet.frameHeight}`},pageErrors};
   fs.writeFileSync('artifacts/sprite-ability-repair/report.json',JSON.stringify(report,null,2));console.log('SPRITE REPAIR STUDIO MOBILE AUDIT: PASS');console.log(JSON.stringify(report,null,2));
 }finally{await browser.close();}
