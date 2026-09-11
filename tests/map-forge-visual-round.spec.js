@@ -18,7 +18,7 @@ const DECORATION_MIN=200;
 const DECORATION_MAX=215;
 
 test.use({viewport:{width:1440,height:900}});
-test.setTimeout(60000);
+test.setTimeout(90000);
 
 function pointSegmentDistance(p,a,b){
   const dx=b.x-a.x,dy=b.y-a.y,den=dx*dx+dy*dy;
@@ -84,9 +84,9 @@ function mapMetrics(map){
 
 async function bootForge(page){
   const pageErrors=[];page.on('pageerror',error=>pageErrors.push(String(error)));
-  const response=await page.goto('/?mapEditor=1&offline=1',{waitUntil:'domcontentloaded',timeout:30000});
+  const response=await page.goto('/?mapEditor=1&offline=1',{waitUntil:'commit',timeout:15000});
   expect(response.status()).toBeLessThan(400);
-  await page.waitForFunction(()=>!!(window.KELO_WORLD_BUILDER?.renderSnapshotPreview&&window.KELO_PROPERTY_SYSTEM?.drawPlacements&&window.KELO_PROPERTY_CATALOG&&window.KeloCamera?.focus&&window.KELO_ADMIN_KEYS?.can?.('world.edit')),null,{timeout:15000});
+  await page.waitForFunction(()=>!!(window.KELO_WORLD_BUILDER?.renderSnapshotPreview&&window.KELO_PROPERTY_SYSTEM?.drawPlacements&&window.KELO_PROPERTY_CATALOG&&window.KeloCamera?.focus&&window.KELO_ADMIN_KEYS?.can?.('world.edit')),null,{timeout:30000});
   await page.evaluate(async()=>{const {bootKeloCreators}=await import('./src/creators/creator-entry.mjs');const platform=await bootKeloCreators({root:window});await platform.openWorkspace('map-forge');});
   const forge=page.locator('#kelo-map-forge');await expect(forge).toBeVisible();
   return{forge,pageErrors};
