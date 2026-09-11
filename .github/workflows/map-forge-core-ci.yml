@@ -1,7 +1,7 @@
 # KELO-INDEX
 # area: QA / MAP FORGE
 # owner: Map Forge CI
-# purpose: protect deterministic Map Forge core, fuzz validity and quality differentiation
+# purpose: protect deterministic Map Forge core, fuzz validity, quality differentiation and fixed-seed visual evidence
 name: Map Forge Core CI
 
 on:
@@ -12,6 +12,7 @@ on:
       - 'scripts/map-forge-selection-diversity-audit.mjs'
       - 'scripts/map-forge-block-road-clearance-audit.mjs'
       - 'scripts/map-forge-paving-intent-audit.mjs'
+      - 'tests/map-forge-visual-round.spec.js'
       - '.github/workflows/map-forge-core-ci.yml'
       - 'docs/systems/MAP_FORGE_SYSTEM.md'
       - 'docs/system-catalog.json'
@@ -23,6 +24,7 @@ on:
       - 'scripts/map-forge-selection-diversity-audit.mjs'
       - 'scripts/map-forge-block-road-clearance-audit.mjs'
       - 'scripts/map-forge-paving-intent-audit.mjs'
+      - 'tests/map-forge-visual-round.spec.js'
       - '.github/workflows/map-forge-core-ci.yml'
 
 jobs:
@@ -42,3 +44,30 @@ jobs:
         run: node scripts/map-forge-block-road-clearance-audit.mjs
       - name: Run semantic paving + PAVING_BLOB hard-gate audit
         run: node scripts/map-forge-paving-intent-audit.mjs
+
+  visual-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install Playwright
+        run: |
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: Serve branch checkout
+        run: python3 -m http.server 4173 --bind 127.0.0.1 > /tmp/kelo-map-forge-http.log 2>&1 &
+      - name: Capture fixed-seed preview and runtime evidence
+        env:
+          KELO_PAGES: http://127.0.0.1:4173/
+          KELO_VISUAL_STAGE: after
+        run: npx playwright test tests/map-forge-visual-round.spec.js --project=chromium
+      - name: Upload Map Forge visual evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: map-forge-visual-round
+          path: test-results/**
+          if-no-files-found: ignore
