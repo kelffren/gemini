@@ -5,6 +5,7 @@
  * public-api: CLI
  * consumes: map-forge recipes + deterministic core
  * state-owned: none
+ * baseline-mode: reports current intrusion rate before the placement guard is tightened
  */
 import assert from 'node:assert/strict';
 import {MAP_FORGE_RECIPES} from '../src/world/map-forge/map-forge-recipes.mjs';
