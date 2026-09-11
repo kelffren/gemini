@@ -26,11 +26,13 @@ try{
   }
   await page.locator('.sab-loose-file').setInputFiles(files);
   await page.waitForFunction(async()=>{const b=(await import('./src/creators/sprite-ability/sprite-ability-live-controller.mjs')).getSpriteAbilityBuilder();return Boolean(b?.draft?.sheet?.dataUrl)&&String(b?.draft?.sheet?.fileName||'').includes('loose-4-frames')&&b.draft.sheet.endFrame>=3;},null,{timeout:15000});
-  const report=await page.evaluate(async()=>{const b=(await import('./src/creators/sprite-ability/sprite-ability-live-controller.mjs')).getSpriteAbilityBuilder();return{loose:window.__KELO_SPRITE_LOOSE_LAST__||null,sheet:{fileName:b.draft.sheet.fileName,columns:b.draft.sheet.columns,rows:b.draft.sheet.rows,startFrame:b.draft.sheet.startFrame,endFrame:b.draft.sheet.endFrame,frameWidth:b.draft.sheet.frameWidth,frameHeight:b.draft.sheet.frameHeight,autoFit:b.draft.sheet.autoFit}};});
+  const report=await page.evaluate(async()=>{
+    const b=(await import('./src/creators/sprite-ability/sprite-ability-live-controller.mjs')).getSpriteAbilityBuilder(),s=b.draft.sheet,img=await new Promise((resolve,reject)=>{const i=new Image();i.onload=()=>resolve(i);i.onerror=reject;i.src=s.dataUrl;}),c=document.createElement('canvas');c.width=img.naturalWidth;c.height=img.naturalHeight;const x=c.getContext('2d',{willReadFrequently:true});x.drawImage(img,0,0);const pixels=x.getImageData(0,0,c.width,c.height).data;let transparentCornerFrames=0,opaquePixels=0,transparentPixels=0;for(let f=s.startFrame;f<=s.endFrame;f++){const local=f-s.startFrame,col=local%s.columns,row=Math.floor(local/s.columns),sx=Math.min(c.width-1,col*s.frameWidth+2),sy=Math.min(c.height-1,row*s.frameHeight+2),a=pixels[(sy*c.width+sx)*4+3];if(a<20)transparentCornerFrames++;}for(let p=3;p<pixels.length;p+=4){if(pixels[p]<20)transparentPixels++;else opaquePixels++;}return{sheet:{fileName:s.fileName,columns:s.columns,rows:s.rows,startFrame:s.startFrame,endFrame:s.endFrame,frameWidth:s.frameWidth,frameHeight:s.frameHeight,autoFit:s.autoFit},pixels:{transparentCornerFrames,opaquePixels,transparentPixels,width:c.width,height:c.height}};
+  });
   report.pageErrors=pageErrors;
-  if(!report.loose||report.loose.input!==4||report.loose.usable!==4||report.loose.cleaned!==4)throw new Error(`LOOSE_REPORT:${JSON.stringify(report.loose)}`);
-  if(report.loose.grid[0]!==4||report.loose.grid[1]!==1)throw new Error(`LOOSE_GRID:${JSON.stringify(report.loose.grid)}`);
-  if(report.loose.removedPixels<=0)throw new Error('LOOSE_NO_BACKGROUND_PIXELS_REMOVED');
+  if(report.sheet.columns!==4||report.sheet.rows!==1||report.sheet.endFrame!==3)throw new Error(`LOOSE_GRID:${report.sheet.columns}x${report.sheet.rows}:${report.sheet.endFrame}`);
+  if(report.pixels.transparentCornerFrames!==4)throw new Error(`LOOSE_BACKGROUND_NOT_TRANSPARENT:${report.pixels.transparentCornerFrames}/4`);
+  if(report.pixels.transparentPixels<=0||report.pixels.opaquePixels<=0)throw new Error(`LOOSE_PIXEL_BALANCE:${JSON.stringify(report.pixels)}`);
   if(pageErrors.length)throw new Error(`LOOSE_PAGE_ERRORS:${pageErrors.join(' | ')}`);
   await page.screenshot({path:'artifacts/sprite-ability-loose/loose-import-builder.png',fullPage:true});
   fs.writeFileSync('artifacts/sprite-ability-loose/report.json',JSON.stringify(report,null,2));
