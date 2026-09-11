@@ -24,6 +24,9 @@ async function metric(page, selector) {
       outlineStyle: style.outlineStyle,
       outlineWidth: parseFloat(style.outlineWidth) || 0,
       backgroundColor: style.backgroundColor,
+      opacity: parseFloat(style.opacity),
+      transform: style.transform,
+      transitionDuration: style.transitionDuration,
     };
   });
 }
@@ -122,4 +125,31 @@ test('Asset Repairer defaults to a calm task path and reveals advanced tools on 
   const primary = await metric(page, '[data-act="open"]');
   expect(primary.height, 'Asset Repairer primary action should meet the shared 44px target').toBeGreaterThanOrEqual(44);
   expect(primary.fontFamily.toLowerCase()).not.toContain('georgia');
+});
+
+test('mobile interaction behavior stays calm, readable and state-aware', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await loadSharedInterface(page, `
+    <section id="kelo-account-auth">
+      <input id="mobileEmail" class="ka-input" type="email" />
+      <button id="mobilePrimary" class="ka-primary">Continue</button>
+      <button id="mobileSecondary" class="ka-secondary">Later</button>
+      <button id="mobileDisabled" class="ka-secondary" disabled>Unavailable</button>
+    </section>
+  `);
+  await page.addScriptTag({ path: runtimeJs });
+
+  const input = await metric(page, '#mobileEmail');
+  expect(input.fontSize, 'mobile forms should not trigger iOS focus zoom').toBeGreaterThanOrEqual(16);
+
+  const disabled = await metric(page, '#mobileDisabled');
+  expect(disabled.opacity, 'disabled controls should be visibly de-emphasized').toBeLessThanOrEqual(.45);
+  expect(disabled.transform, 'disabled controls should not look pressed or animated').toBe('none');
+
+  const primary = await metric(page, '#mobilePrimary');
+  const secondary = await metric(page, '#mobileSecondary');
+  expect(primary.backgroundColor, 'primary and secondary actions need clear visual hierarchy').not.toBe(secondary.backgroundColor);
+
+  const durationValues = primary.transitionDuration.split(',').map(value => parseFloat(value) || 0);
+  expect(Math.max(...durationValues), 'reduced-motion users should get near-instant UI transitions').toBeLessThanOrEqual(.001);
 });
