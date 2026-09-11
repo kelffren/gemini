@@ -49,13 +49,18 @@ test('shared UI chrome renders with safe computed targets and system software ty
     expect(m.fontSize, `${selector} should remain readable`).toBeGreaterThanOrEqual(11);
   }
 
-  await page.locator('#marketClose').focus();
-  await page.evaluate(() => document.querySelector('#marketClose').setAttribute('data-test-focused','1'));
+  await page.evaluate(() => document.activeElement?.blur?.());
+  for (let i = 0; i < 5; i += 1) await page.keyboard.press('Tab');
+  await expect(page.locator('#marketClose')).toBeFocused();
   const focusStyle = await page.locator('#marketClose').evaluate((el) => {
-    el.matches(':focus-visible') || el.focus({ focusVisible: true });
     const style = getComputedStyle(el);
-    return { style: style.outlineStyle, width: parseFloat(style.outlineWidth) || 0 };
+    return {
+      focusVisible: el.matches(':focus-visible'),
+      style: style.outlineStyle,
+      width: parseFloat(style.outlineWidth) || 0,
+    };
   });
+  expect(focusStyle.focusVisible).toBe(true);
   expect(focusStyle.style).not.toBe('none');
   expect(focusStyle.width).toBeGreaterThanOrEqual(2);
 });
