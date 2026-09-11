@@ -16,6 +16,7 @@ const cellKey=(x,y)=>`${x},${y}`;
 const normalize=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[_-]+/g,' ').replace(/[^a-z0-9 ]+/g,' ').replace(/\s+/g,' ').trim();
 const SEMANTIC_ASSET_RULES=Object.freeze([
   {test:/\b(fountain|fuente)\b/,ids:['imperial:fuente-justicia','imperial:fuente-astral','imperial:fuente-leones']},
+  {test:/\bmarket prop\b/,ids:['imperial:carrito-mercado']},
   {test:/\b(market|mercado|commerce|shop)\b/,ids:['imperial:kiosco']},
   {test:/\b(ancient tree|tree|arbol|grove)\b/,ids:['imperial:arbol-florido-blanco','imperial:arbol-florido-azul']},
   {test:/\b(lamp|farola|light)\b/,ids:['imperial:farola','imperial:farola-monumental']},
