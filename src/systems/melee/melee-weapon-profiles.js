@@ -1,14 +1,14 @@
 /* KELO-INDEX
  * area: MELEE
  * owner: KeloMeleeProfiles
- * keys: CONTENT PROFILES SWORD DATA ACTION WINDUP ACTIVE RECOVERY ARC COMBO SPECIAL CHARGE MOVEMENT
+ * keys: CONTENT PROFILES SWORD DATA ACTION WINDUP ACTIVE RECOVERY ARC COMBO SPECIAL CHARGE MOVEMENT CANCEL REACTION
  * purpose: catálogo declarativo de perfiles melee; armas/combos/specials nuevos no modifican engines
  * gameplay: sword basic conserva identidad ligera y añade combo/charges/timeline por data
  * online: servidor carga los mismos IDs/perfiles; balance competitivo puede resolver modifiers encima
  */
 (function(root){
   'use strict';
-  const VERSION='melee-weapon-profiles-v3.6.0-control-pass';
+  const VERSION='melee-weapon-profiles-v3.7.0-pvp-response-pass';
   const registry=new Map();
   function freezeScale(value){
     if(value&&typeof value==='object')return Object.freeze({windup:value.windup==null?1:Number(value.windup),active:value.active==null?1:Number(value.active),recovery:value.recovery==null?1:Number(value.recovery)});
@@ -34,21 +34,21 @@
   register({
     id:'sword_light_basic',weaponClass:'sword',attackProfile:'light_slash',damage:18,range:150,cooldown:.12,damageType:'physical',
     hitShape:'sector',arcDegrees:92,forwardOffset:18,windup:.085,active:.075,recovery:.18,
-    movementScale:{windup:.86,active:.52,recovery:1},knockback:15,stagger:.07,
-    charges:2,rechargeTime:.58,cancelWindow:.055,comboWindow:.14,comboTimeout:.52,
+    movementScale:{windup:.86,active:.52,recovery:1},knockback:15,stagger:.085,
+    charges:2,rechargeTime:.58,cancelWindow:.07,comboWindow:.17,comboTimeout:.60,
     combo:['sword_light_basic','sword_light_follow','sword_light_finisher'],canCancelInto:['dodge','special','ability'],specialAttackProfileId:'sword_heavy_charge',visualProfileId:'melee_sword_light_v3'
   });
   register({
     id:'sword_light_follow',weaponClass:'sword',attackProfile:'light_slash',damage:20,range:154,cooldown:.10,damageType:'physical',
     hitShape:'sector',arcDegrees:104,forwardOffset:20,windup:.07,active:.07,recovery:.17,
-    movementScale:{windup:.9,active:.52,recovery:1},knockback:18,stagger:.08,
-    charges:2,rechargeTime:.58,cancelWindow:.06,comboWindow:.15,comboTimeout:.52,canCancelInto:['dodge','special','ability'],visualProfileId:'melee_sword_light_follow_v1'
+    movementScale:{windup:.9,active:.52,recovery:1},knockback:18,stagger:.095,
+    charges:2,rechargeTime:.58,cancelWindow:.075,comboWindow:.18,comboTimeout:.60,canCancelInto:['dodge','special','ability'],visualProfileId:'melee_sword_light_follow_v1'
   });
   register({
     id:'sword_light_finisher',weaponClass:'sword',attackProfile:'heavy_slash',damage:28,range:164,cooldown:.16,damageType:'physical',
     hitShape:'sector',arcDegrees:116,forwardOffset:22,windup:.11,active:.085,recovery:.26,
-    movementScale:{windup:.80,active:.34,recovery:.80},knockback:34,stagger:.13,
-    charges:2,rechargeTime:.58,cancelWindow:.045,comboWindow:0,comboTimeout:.52,canCancelInto:['dodge'],visualProfileId:'melee_sword_finisher_v1'
+    movementScale:{windup:.80,active:.34,recovery:.80},knockback:34,stagger:.15,
+    charges:2,rechargeTime:.58,cancelWindow:.045,comboWindow:0,comboTimeout:.60,canCancelInto:['dodge'],visualProfileId:'melee_sword_finisher_v1'
   });
   register({
     id:'sword_heavy_charge',weaponClass:'sword',attackProfile:'charged_slash',damage:32,range:172,cooldown:.45,damageType:'physical',
@@ -58,6 +58,6 @@
     input:{mode:'charge',charge:{minTime:.08,level1Time:.28,level2Time:.62,maxTime:1.05}},visualProfileId:'melee_sword_heavy_charge_v1'
   });
 
-  root.KELO_MELEE_PROFILE_AUDIT={version:VERSION,ready:true,profiles:function(){return registry.size;},basicProfile:'sword_light_basic',basicDamage:18,basicRange:150,basicHitShape:'sector',basicArcDegrees:92,basicCharges:2,comboSteps:3,specialProfile:'sword_heavy_charge',basicActiveMovementScale:.52,basicRecoveryMovementScale:1,followRecoveryMovementScale:1,finisherWindupMovementScale:.80,finisherRecoveryMovementScale:.80,heavyWindupMovementScale:.62,heavyRecoveryMovementScale:.68};
+  root.KELO_MELEE_PROFILE_AUDIT={version:VERSION,ready:true,profiles:function(){return registry.size;},basicProfile:'sword_light_basic',basicDamage:18,basicRange:150,basicHitShape:'sector',basicArcDegrees:92,basicCharges:2,comboSteps:3,specialProfile:'sword_heavy_charge',basicActiveMovementScale:.52,basicRecoveryMovementScale:1,followRecoveryMovementScale:1,finisherWindupMovementScale:.80,finisherRecoveryMovementScale:.80,heavyWindupMovementScale:.62,heavyRecoveryMovementScale:.68,basicCancelWindow:.07,followCancelWindow:.075,basicComboWindow:.17,followComboWindow:.18,comboTimeout:.60,basicStagger:.085,followStagger:.095,finisherStagger:.15};
   root.KeloMeleeProfiles=Object.freeze({version:VERSION,register,get,list});
 })(typeof globalThis!=='undefined'?globalThis:window);
