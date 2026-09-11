@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-09-10",
+  "updatedAt": "2026-09-11",
   "cycles": [
     {
       "cycle": 1,
@@ -62,6 +62,49 @@
       "knownPreExistingRegressions": [
         "map-forge-block-overlap-audit reports 70 Royal Capital near-touching pairs on both the baseline and candidate"
       ]
+    },
+    {
+      "cycle": 2,
+      "status": "IMPLEMENTED_LOCAL",
+      "baseCommit": "1e59df7b6abaa67e1c65d6d757f1f8a2987334cc",
+      "finalCommit": null,
+      "defect": "ASSET_SCALE_WRONG",
+      "relatedDefect": "PROP_REPETITION",
+      "severity": "high",
+      "owner": "Map Forge World Draft semantic importer",
+      "hypothesis": "Ordinary market_prop decorations look like repeated buildings because the generic market rule projects each one as a 160x160 kiosk; a specific rule using the real 128x96 market cart will reduce visual mass while preserving kiosks for market landmarks.",
+      "seeds": {
+        "rangePerRecipe": [1, 20],
+        "recipes": ["KELO_ROYAL_CAPITAL_V1", "KELO_VILLAGE_V1", "KELO_FOREST_V1"]
+      },
+      "before": {
+        "marketPropAsset": "imperial:kiosco",
+        "marketPropCount": 257,
+        "projectedFootprintPixels": 6579200
+      },
+      "afterLocal": {
+        "marketPropAsset": "imperial:carrito-mercado",
+        "marketPropCount": 257,
+        "projectedFootprintPixels": 3158016,
+        "footprintReductionPercent": 52,
+        "semanticPlacementsChecked": 7383,
+        "wrongSemanticPlacements": 0,
+        "deterministicReplays": 3
+      },
+      "tests": [
+        "map-forge-semantic-variety-audit",
+        "map-forge-studio-handoff-audit",
+        "map-forge-paving-intent-audit",
+        "map-forge-core-audit"
+      ],
+      "artifacts": {
+        "beforeDesktop": "actions:10177815921/map-forge-paving-after-seed-68-1440x900.png",
+        "afterDesktop": null,
+        "afterMobile": null,
+        "afterExteriorDesktop": null,
+        "afterExteriorMobile": null
+      },
+      "decision": "DEPLOY_PENDING"
     }
   ]
 }

@@ -2,8 +2,8 @@
 
 ## Resume point
 
-- Current cycle: **01 — PAVING_BLOB hard rejection**; cycle 02 orientation is staged behind the LIVE gate.
-- Phase: **deployed payload verified; interactive LIVE gate queued**.
+- Current cycle: **02 — ASSET_SCALE_WRONG for ordinary market props**.
+- Phase: **cycle 01 interactive LIVE gate queued; cycle 02 candidate implemented locally**.
 - Baseline commit verified in LIVE: `05cb1e2b8f78a83d44fa794a984167c17f9f7eb8`.
 - Cycle 01 implementation commit on `main`: `3bc05bf842ff3fa320a0be636a97f4617fae0fb7`.
 - GitHub Pages deployed that commit successfully in run `34542519251`; the served modules report generator `1.1.0` and contain both paving hard gates.
@@ -27,6 +27,12 @@ Across seeds `1..100` for each current recipe:
 
 Canary Royal Capital seed `68` moves from `60/168` connected stone cells (`35.71%`) to `4/168` (`2.38%`).
 
+## Cycle 02 candidate
+
+The real catalog contains both `imperial:kiosco` (`160x160`) and `imperial:carrito-mercado` (`128x96`). The importer previously resolved both a market landmark and every ordinary `market_prop` decoration to the kiosk. The candidate adds a more specific semantic rule so only ordinary props use the cart; market landmarks continue using the kiosk.
+
+Across the fixed development corpus (20 seeds for each of Royal Capital, Village and Forest), 257 ordinary market props move from `6,579,200 px²` of projected kiosk footprint to `3,158,016 px²` of cart footprint: a deterministic **52% reduction**. All 7,383 inspected semantic placements resolve to the intended intrinsic family, and three deterministic replays are identical.
+
 ## Owners confirmed
 
 - Generation: `src/world/map-forge/map-forge-core.mjs` + builder/recipes/quality.
@@ -39,7 +45,7 @@ Canary Royal Capital seed `68` moves from `60/168` connected stone cells (`35.71
 
 ## Known defects and next hypothesis
 
-1. `PROP_REPETITION` / `ASSET_SCALE_WRONG`: semantic `market_prop` currently resolves to `imperial:kiosco` (160×160), so ordinary decoration becomes repeated architecture. Commit `2690c673719e51cf885666e50cc157fdb5d1bd53` subsequently added family declustering; cycle 02 must rebaseline that deployed version before changing the resolver instead of duplicating the experiment.
+1. `PROP_REPETITION` / `ASSET_SCALE_WRONG`: active cycle 02 candidate maps `market_prop` to `imperial:carrito-mercado` while preserving `imperial:kiosco` for market landmarks. It is measured locally but still needs paired visual and LIVE verification.
 2. `ASSET_UNUSED`: Map Forge emits `rock`, `crate` and `barrel`, plus castle/barn landmarks, but the current semantic resolver has no reliable active catalog match for them.
 3. `ASSET_VARIETY_LOW`: tree/lamp/fountain rules list variants but deterministic resolution always chooses the first available ID.
 4. `BAD_TRANSITION`: no approved active marble/path atlas equivalent to `surfaceGround`; World Builder owns the centralized fallback.
@@ -50,6 +56,7 @@ Canary Royal Capital seed `68` moves from `60/168` connected stone cells (`35.71
 - The deployed source payload and exact 390×844 / 1440×900 branch captures are verified. The final interactive check against the public URL remains queued.
 - Post-Pages LIVE verification was added in merge `f93b652b9294a7bf05c3957092d4c9172d3e8da5` and made forward-compatible in `07336cd31ee800cd015a2ff33dd11517b9ca8db4`.
 - At `2026-09-11T07:09Z`, GitHub Actions had 18 runs in progress and 140 queued due concurrent repository work; intermediate Pages deployments were being cancelled. Keep cycle 01 at `DEPLOY_PENDING` until `Map Forge Live Paving` completes against a successful Pages run.
+- Cycle 02 cannot be accepted from footprint metrics alone. Its exact mobile/desktop before/after and exterior artifacts remain pending in the same saturated Actions queue.
 - Pre-existing regression at the baseline commit: `scripts/map-forge-block-overlap-audit.mjs` reports 70 Royal Capital near-touching pairs because its 24 px effective separation rule is stricter than the builder's 14 px rejection pad. The cycle-01 terrain change does not alter this count; track it separately instead of attributing it to semantic paving.
 
 ## Performance and holdout
@@ -62,4 +69,4 @@ Canary Royal Capital seed `68` moves from `60/168` connected stone cells (`35.71
 1. Read this file and the three JSON ledgers in this directory.
 2. Confirm the deployed commit/version before generating anything.
 3. Read the first completed `Map Forge Live Paving` run and attach its artifact IDs; then change cycle 01 to `ACCEPTED` only if it passed.
-4. Rebaseline cycle 02 after the already-landed decoration declustering change, then isolate the remaining `market_prop → imperial:kiosco` repetition/scale defect.
+4. Run the cycle 02 semantic variety audit and paired visual suite on its integrated commit; accept or revert from that evidence.
