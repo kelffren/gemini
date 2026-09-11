@@ -137,7 +137,7 @@ assert.equal(weakCalls,2);
 assert.equal(weakObjective.accepted,false);
 assert.equal(weakObjective.stage,'exhausted');
 assert.equal(weakObjective.attempts[0].stage,'evaluated');
-assert.ok(weakObjective.attempts[0].failures.some(error=>error.startsWith('objectiveScore_below_hard_min:')));
+assert.ok(weakObjective.attempts[0].failures.some(error=>error.startsWith('metric_below_hard_min:objectiveScore:')));
 assert.equal(weakObjective.attempts[1].stage,'dedupe');
 assert.ok(weakObjective.attempts[1].failures.includes('candidate_duplicate'));
 
