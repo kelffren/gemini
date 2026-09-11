@@ -28,6 +28,7 @@ import { registerAbilityWorkspace } from './workspaces/ability-workspace.mjs';
 import { registerSpriteAbilityWorkspace } from './workspaces/sprite-ability-workspace.mjs';
 import { registerContentStudioWorkspace } from './workspaces/content-studio-workspace.mjs';
 import { registerAvatarWorkspace } from './workspaces/avatar-workspace.mjs';
+import { registerDefinitionWorkspaces } from './workspaces/definition-workspaces.mjs';
 let platform=null;
 function ensureCreatorInputLocks(root){
   if(root?.KeloInputLocks?.acquire&&root?.KeloInputLocks?.release)return()=>{};
@@ -67,13 +68,13 @@ export async function bootKeloCreators({root=globalThis,stateAdapter=null}={}){
   const permission=createCreatorPermissionAdapter(root),world=createWorldCreatorAdapter({root,permission}),localState=stateAdapter||createIndexedDbCreatorStateAdapter({indexedDBFactory:root.indexedDB}),projects=createLocalCreatorProjectRepository({domainAdapters:[world],stateAdapter:localState}),workspaces=createCreatorWorkspaceRegistry(),dependencies=createCreatorDependencyGraph();
   const fetchImpl=root.fetch?.bind?.(root)||globalThis.fetch?.bind?.(globalThis),contentSession=createKeloSupabaseBrowserSession({root,fetchImpl,config:KELO_SUPABASE_PUBLIC_CONFIG}),avatarRuntime=installCreatorAvatarRuntime({root}),runtimeContent=createRuntimeContentRegistry({root}),contentRepository=createSupabaseCreatorContentRepository({url:KELO_SUPABASE_PUBLIC_CONFIG.url,publishableKey:KELO_SUPABASE_PUBLIC_CONFIG.publishableKey,getAccessToken:()=>contentSession.accessToken,fetchImpl}),contentService=createUniversalContentService({repository:contentRepository,runtimeRegistry:runtimeContent,root}),avatarQuick=createAvatarQuickImportService({contentSession,contentRepository,contentService,root});
   try{root.KELO_CREATOR_CONTENT_REGISTRY=runtimeContent;}catch{}
-  registerWorldWorkspace(workspaces);registerMapForgeWorkspace(workspaces);registerMountWorkspace(workspaces);registerAppearanceWorkspace(workspaces);registerAnimationWorkspace(workspaces);registerVfxWorkspace(workspaces);registerAbilityWorkspace(workspaces);registerSpriteAbilityWorkspace(workspaces);registerContentStudioWorkspace(workspaces);registerAvatarWorkspace(workspaces);
+  registerWorldWorkspace(workspaces);registerMapForgeWorkspace(workspaces);registerMountWorkspace(workspaces);registerAppearanceWorkspace(workspaces);registerAnimationWorkspace(workspaces);registerVfxWorkspace(workspaces);registerAbilityWorkspace(workspaces);registerSpriteAbilityWorkspace(workspaces);registerContentStudioWorkspace(workspaces);registerAvatarWorkspace(workspaces);registerDefinitionWorkspaces(workspaces);
   async function openWorkspace(id,context={}){
     const manifest=workspaces.resolve(id);if(!manifest)throw new Error(`CREATOR_WORKSPACE_NOT_FOUND:${id}`);
     if(manifest.capability)permission.require(manifest.capability,permission.actorId(),context.projectId||null);
     return workspaces.open(id,{root,projects,permission,dependencies,contentSession,contentRepository,contentService,runtimeContent,avatarRuntime,avatarQuick,openWorkspace,...context});
   }
-  platform=Object.freeze({version:'kelo-creators-core-v1.12.1-sprite-easy-open',permission,projects,workspaces,dependencies,contentSession,contentRepository,contentService,runtimeContent,avatarRuntime,avatarQuick,openWorkspace,close(){try{manualCutterDispose?.();}catch{}try{easyUiDispose?.();}catch{}try{eventLabDispose?.();}catch{}try{visualUiDispose?.();}catch{}try{localState.close?.();}catch{}try{inputLocksDispose?.();}catch{}platform=null;}});
+  platform=Object.freeze({version:'kelo-creators-core-v1.13.0-definition-suite',permission,projects,workspaces,dependencies,contentSession,contentRepository,contentService,runtimeContent,avatarRuntime,avatarQuick,openWorkspace,close(){try{manualCutterDispose?.();}catch{}try{easyUiDispose?.();}catch{}try{eventLabDispose?.();}catch{}try{visualUiDispose?.();}catch{}try{localState.close?.();}catch{}try{inputLocksDispose?.();}catch{}platform=null;}});
   return platform;
 }
 export function getKeloCreatorsPlatform(){return platform;}

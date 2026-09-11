@@ -48,7 +48,8 @@
     "audit:avatar-quick": "node scripts/avatar-quick-import-audit.mjs",
     "audit:sprite-compiler": "node scripts/sprite-compiler-audit.mjs",
     "audit:sprite-compiler-grid": "node scripts/sprite-compiler-grid-audit.mjs",
-    "audit:sprite-frame-doctor": "node scripts/sprite-frame-doctor-audit.mjs"
+    "audit:sprite-frame-doctor": "node scripts/sprite-frame-doctor-audit.mjs",
+    "audit:creator-suite": "node scripts/creator-definition-suite-audit.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0"
