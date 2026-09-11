@@ -37,6 +37,7 @@
     "audit:studio:transform-preview-snap": "node scripts/studio-transform-preview-snap-audit.mjs",
     "audit:studio:transform-candidate-cache": "node scripts/studio-transform-candidate-cache-audit.mjs",
     "audit:studio:transform-presets": "node scripts/studio-transform-presets-audit.mjs",
+    "audit:studio:keyboard-delete": "node scripts/studio-keyboard-delete-audit.mjs",
     "audit:studio:spatial-query": "node scripts/studio-spatial-query-audit.mjs",
     "audit:studio:camera-focus-loss": "node scripts/studio-camera-focus-loss-audit.mjs",
     "audit:studio:collision-grab": "node scripts/studio-collision-grab-offset-audit.mjs",
