@@ -12,6 +12,7 @@ on:
       - 'scripts/map-forge-selection-diversity-audit.mjs'
       - 'scripts/map-forge-block-road-clearance-audit.mjs'
       - 'scripts/map-forge-paving-intent-audit.mjs'
+      - 'scripts/map-forge-decoration-spacing-audit.mjs'
       - 'tests/map-forge-visual-round.spec.js'
       - 'tests/map-forge-fountain-clearance.spec.js'
       - 'tests/map-forge-orientation-visual.spec.js'
@@ -26,6 +27,7 @@ on:
       - 'scripts/map-forge-selection-diversity-audit.mjs'
       - 'scripts/map-forge-block-road-clearance-audit.mjs'
       - 'scripts/map-forge-paving-intent-audit.mjs'
+      - 'scripts/map-forge-decoration-spacing-audit.mjs'
       - 'tests/map-forge-visual-round.spec.js'
       - 'tests/map-forge-fountain-clearance.spec.js'
       - 'tests/map-forge-orientation-visual.spec.js'
@@ -48,6 +50,8 @@ jobs:
         run: node scripts/map-forge-block-road-clearance-audit.mjs
       - name: Run semantic paving + PAVING_BLOB hard-gate audit
         run: node scripts/map-forge-paving-intent-audit.mjs
+      - name: Run decoration overlap score-gate audit
+        run: node scripts/map-forge-decoration-spacing-audit.mjs
 
   visual-evidence:
     runs-on: ubuntu-latest
