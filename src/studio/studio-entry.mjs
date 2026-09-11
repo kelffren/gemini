@@ -34,6 +34,7 @@ import { createStudioContextSnapChip } from './ui/studio-context-snap-chip.mjs';
 import { createStudioAssetFavorites } from './ui/studio-asset-favorites.mjs';
 import { createStudioMultiAlign } from './ui/studio-multi-align.mjs';
 import { createStudioHistoryHints } from './ui/studio-history-hints.mjs';
+import { createStudioTransformPresets } from './ui/studio-transform-presets.mjs';
 import { createStudioAssetRepairer } from './ui/studio-asset-repairer.mjs';
 
 const NOOP_ASSET_PALETTE=Object.freeze({
@@ -97,6 +98,7 @@ export async function bootKeloStudio({ mode = 'world', actorId = null, document 
   const contextSnapChip=createStudioContextSnapChip({root});
   const multiAlign=createStudioMultiAlign({root,kernel});
   const historyHints=createStudioHistoryHints({root,kernel});
+  const transformPresets=createStudioTransformPresets({root,kernel});
   const nudgeController=createStudioNudgeController({root,kernel});
   const placementTouchController=createStudioPlacementTouchController({root,placement:tools.placement});
   const overlapCycleController=createStudioOverlapCycleController({root,kernel});
@@ -109,11 +111,11 @@ export async function bootKeloStudio({ mode = 'world', actorId = null, document 
   const worker = createStudioWorkerClient({ resolvePrefab, prefabSnapshot: () => Object.fromEntries(kernel.prefabs.list().map(p => [p.id, kernel.prefabs.resolve(p.id)])) });
   const store = createStudioStore(), profiler = createStudioProfiler();
   const unsubscribeJournal = kernel.commands.on(event => { store.appendCommand(kernel.document.worldId, { action: event.type, command: event.command }).catch(() => {}); });
-  session = Object.freeze({ version: 'kelo-studio-foundation-v1.21.0-history-hints', mode, actorId, kernel, tools, overlayRenderer, assetPreview, assetPalette, assetFavorites, assetKeyboardController, menuMinimizer, cleanWorkspace, contextInspector, contextSnapChip, multiAlign, historyHints, nudgeController, placementTouchController, overlapCycleController, precisionSnapController, selectionHistoryController, focusShortcutController, quickActionsController, compiler, worker, store, profiler, adapter,
+  session = Object.freeze({ version: 'kelo-studio-foundation-v1.22.0-transform-presets', mode, actorId, kernel, tools, overlayRenderer, assetPreview, assetPalette, assetFavorites, assetKeyboardController, menuMinimizer, cleanWorkspace, contextInspector, contextSnapChip, multiAlign, historyHints, transformPresets, nudgeController, placementTouchController, overlapCycleController, precisionSnapController, selectionHistoryController, focusShortcutController, quickActionsController, compiler, worker, store, profiler, adapter,
     compile: options => profiler.measure('compile.sync', () => compiler.compile(kernel.document, options)), compileAsync: options => profiler.measure('compile.worker', () => worker.compile(kernel.document, options)),
     async importCurrent(options={}) { const next=await profiler.measure('import.current',()=>importCurrentKeloWorld({adapter,mode,actorId,...options})); kernel.setDocument(next); seedCatalogPrefabs({prefabRegistry:kernel.prefabs,assetCatalog:adapter.assetCatalog}); try{assetPalette.refresh();assetFavorites.refresh();multiAlign.refresh();historyHints.refresh();}catch{} return next; },
     checkpoint: () => store.saveCheckpoint(kernel.document.worldId,kernel.document), recover: () => store.loadRecovery(kernel.document.worldId),
-    close(){unsubscribeJournal();quickActionsController.destroy();focusShortcutController.destroy();selectionHistoryController.destroy();precisionSnapController.destroy();overlapCycleController.destroy();placementTouchController.destroy();nudgeController.destroy();historyHints.destroy();multiAlign.destroy();contextSnapChip.destroy();contextInspector.destroy();cleanWorkspace.destroy();menuMinimizer.destroy();assetKeyboardController.destroy();try{assetFavorites.destroy();}catch{}try{assetPalette.destroy();}catch{}worker.close();profiler.close();assetPreview.close();store.close().catch(()=>{});session=null;}
+    close(){unsubscribeJournal();quickActionsController.destroy();focusShortcutController.destroy();selectionHistoryController.destroy();precisionSnapController.destroy();overlapCycleController.destroy();placementTouchController.destroy();nudgeController.destroy();transformPresets.destroy();historyHints.destroy();multiAlign.destroy();contextSnapChip.destroy();contextInspector.destroy();cleanWorkspace.destroy();menuMinimizer.destroy();assetKeyboardController.destroy();try{assetFavorites.destroy();}catch{}try{assetPalette.destroy();}catch{}worker.close();profiler.close();assetPreview.close();store.close().catch(()=>{});session=null;}
   });
   return session;
 }
