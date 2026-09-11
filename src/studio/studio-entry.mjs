@@ -29,6 +29,7 @@ import { createStudioFocusShortcutController } from './input/studio-focus-shortc
 import { createStudioQuickActionsController } from './input/studio-quick-actions-controller.mjs';
 import { createStudioKeyboardDeleteController } from './input/studio-keyboard-delete-controller.mjs';
 import { createStudioKeyboardDuplicateController } from './input/studio-keyboard-duplicate-controller.mjs';
+import { createStudioKeyboardHistoryController } from './input/studio-keyboard-history-controller.mjs';
 import { createStudioExplorerRevealController } from './input/studio-explorer-reveal-controller.mjs';
 import { createStudioMenuMinimizer } from './ui/studio-menu-minimizer.mjs';
 import { createStudioCleanWorkspace } from './ui/studio-clean-workspace.mjs';
@@ -111,17 +112,18 @@ export async function bootKeloStudio({ mode = 'world', actorId = null, document 
   const quickActionsController=createStudioQuickActionsController({root,kernel,assetPalette});
   const keyboardDeleteController=createStudioKeyboardDeleteController({root,kernel});
   const keyboardDuplicateController=createStudioKeyboardDuplicateController({root,kernel});
+  const keyboardHistoryController=createStudioKeyboardHistoryController({root});
   const explorerRevealController=createStudioExplorerRevealController({root,kernel});
   const resolvePrefab = id => kernel.prefabs.resolve(id) || adapter.assetCatalog.get(id) || { id };
   const compiler = createWorldCompiler({ resolvePrefab });
   const worker = createStudioWorkerClient({ resolvePrefab, prefabSnapshot: () => Object.fromEntries(kernel.prefabs.list().map(p => [p.id, kernel.prefabs.resolve(p.id)])) });
   const store = createStudioStore(), profiler = createStudioProfiler();
   const unsubscribeJournal = kernel.commands.on(event => { store.appendCommand(kernel.document.worldId, { action: event.type, command: event.command }).catch(() => {}); });
-  session = Object.freeze({ version: 'kelo-studio-foundation-v1.25.0-keyboard-duplicate', mode, actorId, kernel, tools, overlayRenderer, assetPreview, assetPalette, assetFavorites, assetKeyboardController, menuMinimizer, cleanWorkspace, contextInspector, contextSnapChip, multiAlign, historyHints, transformPresets, nudgeController, placementTouchController, overlapCycleController, precisionSnapController, selectionHistoryController, focusShortcutController, quickActionsController, keyboardDeleteController, keyboardDuplicateController, explorerRevealController, compiler, worker, store, profiler, adapter,
+  session = Object.freeze({ version: 'kelo-studio-foundation-v1.26.0-keyboard-history', mode, actorId, kernel, tools, overlayRenderer, assetPreview, assetPalette, assetFavorites, assetKeyboardController, menuMinimizer, cleanWorkspace, contextInspector, contextSnapChip, multiAlign, historyHints, transformPresets, nudgeController, placementTouchController, overlapCycleController, precisionSnapController, selectionHistoryController, focusShortcutController, quickActionsController, keyboardDeleteController, keyboardDuplicateController, keyboardHistoryController, explorerRevealController, compiler, worker, store, profiler, adapter,
     compile: options => profiler.measure('compile.sync', () => compiler.compile(kernel.document, options)), compileAsync: options => profiler.measure('compile.worker', () => worker.compile(kernel.document, options)),
     async importCurrent(options={}) { const next=await profiler.measure('import.current',()=>importCurrentKeloWorld({adapter,mode,actorId,...options})); kernel.setDocument(next); seedCatalogPrefabs({prefabRegistry:kernel.prefabs,assetCatalog:adapter.assetCatalog}); try{assetPalette.refresh();assetFavorites.refresh();multiAlign.refresh();historyHints.refresh();}catch{} return next; },
     checkpoint: () => store.saveCheckpoint(kernel.document.worldId,kernel.document), recover: () => store.loadRecovery(kernel.document.worldId),
-    close(){unsubscribeJournal();explorerRevealController.destroy();keyboardDuplicateController.destroy();keyboardDeleteController.destroy();quickActionsController.destroy();focusShortcutController.destroy();selectionHistoryController.destroy();precisionSnapController.destroy();overlapCycleController.destroy();placementTouchController.destroy();nudgeController.destroy();transformPresets.destroy();historyHints.destroy();multiAlign.destroy();contextSnapChip.destroy();contextInspector.destroy();cleanWorkspace.destroy();menuMinimizer.destroy();assetKeyboardController.destroy();try{assetFavorites.destroy();}catch{}try{assetPalette.destroy();}catch{}worker.close();profiler.close();assetPreview.close();store.close().catch(()=>{});session=null;}
+    close(){unsubscribeJournal();explorerRevealController.destroy();keyboardHistoryController.destroy();keyboardDuplicateController.destroy();keyboardDeleteController.destroy();quickActionsController.destroy();focusShortcutController.destroy();selectionHistoryController.destroy();precisionSnapController.destroy();overlapCycleController.destroy();placementTouchController.destroy();nudgeController.destroy();transformPresets.destroy();historyHints.destroy();multiAlign.destroy();contextSnapChip.destroy();contextInspector.destroy();cleanWorkspace.destroy();menuMinimizer.destroy();assetKeyboardController.destroy();try{assetFavorites.destroy();}catch{}try{assetPalette.destroy();}catch{}worker.close();profiler.close();assetPreview.close();store.close().catch(()=>{});session=null;}
   });
   return session;
 }
