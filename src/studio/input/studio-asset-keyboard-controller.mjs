@@ -23,7 +23,7 @@ export function nextAssetPaletteIndex(current,count,key,columns=4){
 export function createStudioAssetKeyboardController({root=globalThis,assetPalette}={}){
   const document=root?.document;
   if(!document||!assetPalette)return Object.freeze({destroy(){},open:()=>false});
-  let destroyed=false;
+  let destroyed=false,lastOpener=null;
 
   const shell=()=>document.getElementById?.('kelo-studio-live')||document.querySelector?.('#kelo-studio-live');
   const palette=()=>shell()?.querySelector?.('.ks-asset-palette')||null;
@@ -36,7 +36,9 @@ export function createStudioAssetKeyboardController({root=globalThis,assetPalett
     return Math.max(1,n||1);
   };
   function focusIndex(index){const items=visibleItems();if(!items.length)return false;const next=Math.max(0,Math.min(items.length-1,index));items[next].focus?.({preventScroll:true});items[next].scrollIntoView?.({block:'nearest',inline:'nearest'});return true;}
-  function open(){const value=assetPalette.open?.();root.requestAnimationFrame?.(()=>searchInput()?.focus?.());return value!==false;}
+  function restoreOpener(){const target=lastOpener;lastOpener=null;if(!target||target.isConnected===false||target.closest?.('.ks-asset-palette'))return false;target.focus?.({preventScroll:true});return true;}
+  function open(){const active=document.activeElement;if(active&&!active.closest?.('.ks-asset-palette'))lastOpener=active;const value=assetPalette.open?.();root.requestAnimationFrame?.(()=>searchInput()?.focus?.());return value!==false;}
+  function closeAndRestore(){const value=assetPalette.close?.();root.requestAnimationFrame?.(restoreOpener);return value!==false;}
   function onKey(event){
     if(destroyed||event.defaultPrevented||event.metaKey||event.ctrlKey||event.altKey)return;
     const target=event.target;
@@ -46,6 +48,9 @@ export function createStudioAssetKeyboardController({root=globalThis,assetPalett
         event.preventDefault();event.stopPropagation();open();
       }
       return;
+    }
+    if(event.key==='Escape'){
+      event.preventDefault();event.stopImmediatePropagation?.();event.stopPropagation?.();closeAndRestore();return;
     }
     if(event.key==='Enter'&&inPalette){
       const item=target?.closest?.('[data-asset-palette-id]')||visibleItems()[0];
@@ -60,5 +65,5 @@ export function createStudioAssetKeyboardController({root=globalThis,assetPalett
     focusIndex(nextAssetPaletteIndex(start,items.length,event.key,columns()));
   }
   document.addEventListener('keydown',onKey,true);
-  return Object.freeze({open,destroy(){destroyed=true;document.removeEventListener('keydown',onKey,true);}});
+  return Object.freeze({open,close:closeAndRestore,destroy(){destroyed=true;lastOpener=null;document.removeEventListener('keydown',onKey,true);}});
 }
