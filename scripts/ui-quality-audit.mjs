@@ -2,7 +2,7 @@
 /* KELO-INDEX
  * area: TOOLING / UI QUALITY
  * purpose: scan every Kelo source module that constructs UI for hierarchy, accessibility and consistency drift
- * policy: evaluate effective shared overrides; report whole project; fail on critical regressions in latest UI work
+ * policy: evaluate effective shared overrides; report whole project; fail on any critical UI debt
  */
 
 import fs from 'node:fs';
@@ -14,6 +14,8 @@ const SCAN_ROOTS=['src','index.html'];
 const EXTENSIONS=new Set(['.js','.mjs','.css','.html']);
 const SKIP_DIRS=new Set(['node_modules','vendor','generated']);
 const SHARED_CSS_FILES=['src/ui/kelo-interface-system.css','src/ui/kelo-interface-compat.css'];
+const MIN_COMFORTABLE_TARGET_PX=44;
+const CRITICAL_TARGET_PX=32;
 
 function walk(rel){
   const abs=path.join(ROOT,rel);
@@ -114,12 +116,13 @@ function auditFile(file,text){
       const sharedHeight=Math.max(maxSharedMetric(selector,'min-height'),maxSharedMetric(selector,'height'));
       const sharedFont=maxSharedMetric(selector,'font-size');
       const sourceHeight=heights.length?Math.max(...heights):0;
+      const effectiveHeight=Math.max(sourceHeight,sharedHeight);
       const sourceTinyText=sizes.some(v=>v<9);
 
-      if(sourceHeight&&sourceHeight<32&&sharedHeight<32)
-        add('TINY_CONTROL_TARGET','critical',`${selector.slice(0,90)} has an effective declared control height below 32px.`);
-      else if(sourceHeight&&sourceHeight<40&&sharedHeight<40)
-        add('SMALL_CONTROL_TARGET','warn',`${selector.slice(0,90)} has an effective declared control height below 40px.`);
+      if(sourceHeight&&effectiveHeight<CRITICAL_TARGET_PX)
+        add('TINY_CONTROL_TARGET','critical',`${selector.slice(0,90)} has an effective declared control height below ${CRITICAL_TARGET_PX}px.`);
+      else if(sourceHeight&&effectiveHeight<MIN_COMFORTABLE_TARGET_PX)
+        add('SMALL_CONTROL_TARGET','warn',`${selector.slice(0,90)} has an effective declared control height below the ${MIN_COMFORTABLE_TARGET_PX}px interaction standard.`);
 
       if(sourceTinyText&&sharedFont<9)
         add('TINY_CONTROL_TEXT','warn',`${selector.slice(0,90)} has effective control text below 9px.`);
@@ -150,11 +153,13 @@ const weight={critical:8,warn:2,info:.5};
 const debt=warnings.reduce((sum,w)=>sum+(weight[w.severity]||0),0);
 const score=Math.max(0,Math.round(100-debt/Math.max(1,uiFiles)*2));
 const counts=warnings.reduce((a,w)=>(a[w.severity]=(a[w.severity]||0)+1,a),{});
-const changedCritical=warnings.filter(w=>w.severity==='critical'&&changed.has(w.file));
+const globalCritical=warnings.filter(w=>w.severity==='critical');
+const changedCritical=globalCritical.filter(w=>changed.has(w.file));
 
 console.log('Kelo UI Quality Audit');
 console.log(`Source files considered: ${files.length}`);
 console.log(`UI-producing files audited: ${uiFiles}`);
+console.log(`Interaction standard: ${MIN_COMFORTABLE_TARGET_PX}px minimum comfortable target`);
 console.log(`Score: ${score}/100`);
 console.log(`Warnings: ${warnings.length} (critical ${counts.critical||0}, warn ${counts.warn||0}, info ${counts.info||0})`);
 if(changed.size)console.log(`Latest commit changed ${changed.size} file(s); critical UI regressions: ${changedCritical.length}`);
@@ -173,7 +178,7 @@ if(!index.includes('src/ui/kelo-interface-system.css')){console.error('index.htm
 if(!index.includes('src/ui/kelo-interface-compat.css')){console.error('index.html does not load the Kelo Interface compatibility bridge.');process.exit(4);}
 if(!index.includes('src/ui/kelo-interface-runtime.js')){console.error('index.html does not load the shared Kelo Interface Runtime.');process.exit(5);}
 
-if(changedCritical.length){
-  console.error('\nCritical UI regression introduced in the latest commit. Fix before merging.');
+if(globalCritical.length){
+  console.error(`\nCritical UI debt remains anywhere in the product (${globalCritical.length}). Fix before merging.`);
   process.exit(1);
 }
