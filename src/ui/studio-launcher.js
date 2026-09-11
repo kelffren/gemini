@@ -1,12 +1,12 @@
 /* KELO-INDEX
  * area: UI / CREATORS LAUNCHER
  * owner: Kelo Studio Launcher (compat name retained)
- * keys: CREATORS MENU PREMIUM LAZY ADMIN ANIMATION CAPABILITY AVATAR SPRITE FACTORY ONLINE PERMISSIONS HUB CHAT
- * purpose: añade CREATORS y Sprite Factory al menú Luxe, carga permisos online, panel admin y Kelo Hub bajo acción/rol
+ * keys: CREATORS MENU PREMIUM LAZY ADMIN ANIMATION CAPABILITY AVATAR SPRITE FACTORY ONLINE PERMISSIONS
+ * purpose: añade CREATORS y Sprite Factory al menú Luxe, carga permisos online y panel admin bajo acción/rol
  * public-api: KELO_STUDIO_LAUNCHER + KELO_CREATORS_LAUNCHER alias
  * consumes: KELO_ADMIN_KEYS, KeloAccountPermissions, KELO_LUXE, menú Luxe existente
  * state-owned: solo estado efímero de carga
- * extension-points: Creator Hub / Sprite Factory / WorkspaceRegistry / Account Admin / Kelo Hub
+ * extension-points: Creator Hub / Sprite Factory / WorkspaceRegistry / Account Admin
  */
 (function(){
   'use strict';
@@ -87,17 +87,11 @@
       sync();
       const adminModule=await import('./account-admin-panel.mjs?v=1');
       await adminModule.installAccountAdminPanel({root:window});
-      window.KeloHubShell?.refresh?.();
     }catch(error){console.warn('[Kelo online authorization boot]',error);}
   }
-  function boot(){
-    sync();
-    void import('./kelo-hub-shell.js?v=1').catch(e=>console.warn('[Kelo Hub shell]',e));
-    void bootOnlineAuthorization();
-    void import('./../characters/creator-avatar-runtime.mjs').then(m=>m.installCreatorAvatarRuntime({root:window})).catch(e=>console.warn('[Kelo Avatar runtime]',e));
-  }
-  window.KELO_ADMIN_KEYS?.onChange?.(()=>{sync();window.KeloHubShell?.refresh?.();});
-  const api=Object.freeze({version:'studio-launcher-v1.10.0-kelo-hub',open,openSpriteFactory:openFactory,sync,get allowed(){return allowed();}});
+  function boot(){sync();void bootOnlineAuthorization();void import('./../characters/creator-avatar-runtime.mjs').then(m=>m.installCreatorAvatarRuntime({root:window})).catch(e=>console.warn('[Kelo Avatar runtime]',e));}
+  window.KELO_ADMIN_KEYS?.onChange?.(sync);
+  const api=Object.freeze({version:'studio-launcher-v1.9.0-admin-control-plane',open,openSpriteFactory:openFactory,sync,get allowed(){return allowed();}});
   window.KELO_STUDIO_LAUNCHER=api;
   window.KELO_CREATORS_LAUNCHER=api;
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
