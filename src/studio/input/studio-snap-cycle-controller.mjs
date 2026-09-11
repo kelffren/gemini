@@ -39,7 +39,8 @@ export function createStudioSnapCycleController({root=globalThis}={}){
   }
 
   function onKey(event){
-    if(destroyed||event.defaultPrevented||event.repeat||event.metaKey||event.ctrlKey||event.altKey||event.shiftKey)return;
+    const altGraph=!!event.getModifierState?.('AltGraph');
+    if(destroyed||event.defaultPrevented||event.repeat||event.metaKey||event.shiftKey||(!altGraph&&(event.ctrlKey||event.altKey)))return;
     if(event.target?.closest?.(EDITABLE))return;
     if(event.key!==']'&&event.key!=='[')return;
     const changed=cycle(event.key===']'?1:-1);
@@ -50,7 +51,7 @@ export function createStudioSnapCycleController({root=globalThis}={}){
 
   document.addEventListener('keydown',onKey,true);
   return Object.freeze({
-    version:'studio-snap-cycle-v1.0.0',cycle,
+    version:'studio-snap-cycle-v1.0.1',cycle,
     destroy(){if(destroyed)return;destroyed=true;document.removeEventListener?.('keydown',onKey,true);}
   });
 }
