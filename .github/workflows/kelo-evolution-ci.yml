@@ -1,0 +1,41 @@
+name: Kelo Evolution Engine CI
+
+on:
+  pull_request:
+    paths:
+      - 'src/creators/evolution/**'
+      - 'src/world/map-forge/map-forge-evolution.mjs'
+      - 'scripts/kelo-evolution-audit.mjs'
+      - 'docs/systems/KELO_EVOLUTION_ENGINE.md'
+      - 'docs/systems/MAP_FORGE_SYSTEM.md'
+      - 'docs/system-catalog.json'
+      - 'package.json'
+      - '.github/workflows/kelo-evolution-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'src/creators/evolution/**'
+      - 'src/world/map-forge/map-forge-evolution.mjs'
+      - 'scripts/kelo-evolution-audit.mjs'
+      - 'docs/systems/KELO_EVOLUTION_ENGINE.md'
+      - 'docs/system-catalog.json'
+      - 'package.json'
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Syntax check evolution modules
+        run: |
+          node --check src/creators/evolution/evolution-engine.mjs
+          node --check src/world/map-forge/map-forge-evolution.mjs
+          node --check scripts/kelo-evolution-audit.mjs
+      - name: Run evolution acceptance / rollback audit
+        run: npm run audit:evolution
+      - name: Verify system documentation catalog
+        run: npm run audit:docs
