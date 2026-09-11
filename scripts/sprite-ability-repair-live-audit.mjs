@@ -40,7 +40,7 @@ try{
   await page.getByRole('button',{name:'TRIM TODOS'}).click();
   await page.getByRole('button',{name:'CENTRAR'}).click();
   const scale=page.locator('.sr-range input[type=range]').first();await scale.evaluate(el=>{el.value='1.17';el.dispatchEvent(new Event('input',{bubbles:true}));});
-  await page.getByRole('button',{name:'▶ PLAY'}).click();await page.waitForTimeout(180);await page.getByRole('button',{name:'Ⅱ PAUSE'}).click();
+  await page.getByRole('button',{name:'▶ PLAY',exact:true}).click();await page.waitForTimeout(180);await page.getByRole('button',{name:'Ⅱ PAUSE',exact:true}).click();
   await page.screenshot({path:'artifacts/sprite-ability-repair/repair-studio.png',fullPage:true});
   await page.getByRole('button',{name:'APLICAR REPARACIÓN'}).click();
   await page.waitForFunction(()=>!document.querySelector('.sab-repair'),null,{timeout:12000});
