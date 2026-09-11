@@ -322,3 +322,119 @@
 .wb-flow-actions button,.wb-history button{
   font-size:11px!important;
 }
+
+/* Unified Luxe navigation + modal hierarchy: one software grammar across runtime surfaces. */
+#kelo-luxe .lx-side-menu:before,
+#kelo-luxe .lx-side-pvp:before{display:none!important}
+#kelo-luxe .lx-side-menu,
+#kelo-luxe .lx-side-pvp,
+#kelo-luxe .lx-top-btn{
+  border-color:var(--kui-border)!important;
+  background:rgba(24,25,29,.90)!important;
+  color:var(--kui-text-2)!important;
+  box-shadow:0 10px 34px rgba(0,0,0,.28)!important;
+  backdrop-filter:blur(24px) saturate(125%)!important;
+  -webkit-backdrop-filter:blur(24px) saturate(125%)!important;
+}
+#kelo-luxe .lx-top-btn{min-height:44px!important;border-radius:14px!important;font-family:var(--kui-font)!important;font-size:12px!important;font-weight:680!important}
+#kelo-luxe .lx-side-menu span,
+#kelo-luxe .lx-side-pvp span{font-family:var(--kui-font)!important;letter-spacing:.06em!important;color:var(--kui-text-2)!important}
+#kelo-luxe .lx-chat-drawer{
+  border:1px solid var(--kui-border)!important;
+  border-radius:var(--kui-r-lg)!important;
+  background:rgba(24,25,29,.94)!important;
+  color:var(--kui-text)!important;
+  box-shadow:var(--kui-shadow)!important;
+  backdrop-filter:blur(28px) saturate(130%)!important;
+  -webkit-backdrop-filter:blur(28px) saturate(130%)!important;
+}
+#kelo-luxe .lx-chat-head{min-height:44px!important;color:var(--kui-text)!important;font-family:var(--kui-font)!important;font-size:13px!important;font-weight:700!important;letter-spacing:0!important}
+#kelo-luxe .lx-chat-close{width:44px!important;height:44px!important;border:0!important;border-radius:999px!important;background:rgba(255,255,255,.07)!important;color:var(--kui-text)!important}
+#kelo-luxe .lx-chat-form input{min-height:46px!important;border:1px solid var(--kui-border)!important;border-radius:12px!important;background:var(--kui-surface-soft)!important;color:var(--kui-text)!important;font-family:var(--kui-font)!important;font-size:14px!important}
+#kelo-luxe .lx-chat-form button{min-width:52px!important;min-height:46px!important;border:0!important;border-radius:12px!important;background:var(--kui-accent)!important;color:#18150d!important;font-family:var(--kui-font)!important;font-size:13px!important;font-weight:720!important}
+
+/* Commerce is a primary modal surface, so its hierarchy follows the same sheet contract. */
+#kelo-commerce-modal{
+  background:rgba(5,5,7,.76)!important;
+  font-family:var(--kui-font)!important;
+  backdrop-filter:blur(22px) saturate(120%)!important;
+  -webkit-backdrop-filter:blur(22px) saturate(120%)!important;
+}
+#kelo-commerce-modal .kc-shell{
+  width:min(720px,100%)!important;
+  max-height:min(780px,calc(100dvh - max(88px,calc(env(safe-area-inset-top) + env(safe-area-inset-bottom) + 72px))))!important;
+  border:1px solid var(--kui-border)!important;
+  border-radius:var(--kui-r-xl)!important;
+  background:rgba(24,25,29,.97)!important;
+  color:var(--kui-text)!important;
+  box-shadow:var(--kui-shadow)!important;
+  scrollbar-gutter:stable!important;
+}
+#kelo-commerce-modal .kc-head{
+  min-height:62px!important;
+  top:-13px!important;
+  padding:11px 2px 12px!important;
+  border-bottom:1px solid var(--kui-border)!important;
+  background:linear-gradient(180deg,rgba(24,25,29,.99) 82%,rgba(24,25,29,0))!important;
+}
+#kelo-commerce-modal .kc-kicker{color:var(--kui-text-3)!important;font-family:var(--kui-font)!important;font-size:11px!important;font-weight:650!important;letter-spacing:.04em!important}
+#kelo-commerce-modal .kc-title{margin-top:5px!important;color:var(--kui-text)!important;font-family:var(--kui-font)!important;font-size:22px!important;font-weight:760!important;letter-spacing:-.03em!important}
+#kelo-commerce-modal .kc-close{width:44px!important;height:44px!important;border:0!important;border-radius:999px!important;background:rgba(255,255,255,.07)!important;color:var(--kui-text)!important;font-size:20px!important}
+#kelo-commerce-modal .kc-sub{color:var(--kui-text-3)!important;font-family:var(--kui-font)!important;font-size:12px!important;line-height:1.45!important}
+#kelo-commerce-modal .kc-status,
+#kelo-commerce-modal .kc-card,
+#kelo-commerce-modal .kc-final,
+#kelo-commerce-modal .kc-request{
+  border-color:var(--kui-border)!important;
+  background:rgba(255,255,255,.045)!important;
+  box-shadow:none!important;
+}
+#kelo-commerce-modal .kc-card{border-radius:14px!important}
+#kelo-commerce-modal .kc-card h3{color:var(--kui-text-2)!important;font-family:var(--kui-font)!important;font-size:13px!important;font-weight:700!important}
+#kelo-commerce-modal .kc-name{color:var(--kui-text)!important;font-family:var(--kui-font)!important;font-size:12px!important;font-weight:680!important}
+#kelo-commerce-modal .kc-meta,
+#kelo-commerce-modal .kc-mini,
+#kelo-commerce-modal .kc-distance{color:var(--kui-text-3)!important;font-family:var(--kui-font)!important;font-size:11px!important}
+#kelo-commerce-modal .kc-btn{
+  min-height:44px!important;
+  padding:0 14px!important;
+  border:1px solid var(--kui-border)!important;
+  border-radius:11px!important;
+  background:rgba(255,255,255,.055)!important;
+  color:var(--kui-text-2)!important;
+  font-family:var(--kui-font)!important;
+  font-size:12px!important;
+  font-weight:680!important;
+  letter-spacing:0!important;
+}
+#kelo-commerce-modal .kc-btn.primary{border-color:transparent!important;background:var(--kui-accent)!important;color:#18150d!important}
+#kelo-commerce-modal .kc-btn.good{border-color:color-mix(in srgb,var(--kui-success) 36%,transparent)!important;background:color-mix(in srgb,var(--kui-success) 10%,transparent)!important;color:var(--kui-success)!important}
+#kelo-commerce-modal .kc-btn.danger{border-color:color-mix(in srgb,var(--kui-danger) 36%,transparent)!important;background:color-mix(in srgb,var(--kui-danger) 9%,transparent)!important;color:var(--kui-danger)!important}
+#kelo-commerce-modal .kc-input{min-height:46px!important;height:46px!important;border:1px solid var(--kui-border)!important;border-radius:11px!important;background:var(--kui-surface-soft)!important;color:var(--kui-text)!important;font-family:var(--kui-font)!important;font-size:13px!important}
+#kelo-commerce-dock{
+  border:1px solid var(--kui-border)!important;
+  border-radius:16px!important;
+  background:rgba(24,25,29,.92)!important;
+  box-shadow:0 12px 38px rgba(0,0,0,.32)!important;
+  backdrop-filter:blur(24px) saturate(125%)!important;
+  -webkit-backdrop-filter:blur(24px) saturate(125%)!important;
+}
+#kelo-commerce-dock button{min-height:44px!important;border:1px solid transparent!important;border-radius:11px!important;background:transparent!important;color:var(--kui-text-2)!important;font-family:var(--kui-font)!important;font-size:11px!important;font-weight:680!important;letter-spacing:0!important}
+#kelo-commerce-dock button.primary{border-color:rgba(231,197,106,.18)!important;background:var(--kui-accent-soft)!important;color:var(--kui-accent)!important}
+
+@media(max-width:620px){
+  #kelo-commerce-modal{
+    padding:max(8px,env(safe-area-inset-top)) 8px max(8px,env(safe-area-inset-bottom))!important;
+    align-items:flex-end!important;
+  }
+  #kelo-commerce-modal .kc-shell{
+    width:100%!important;
+    max-height:calc(100dvh - max(16px,calc(env(safe-area-inset-top) + env(safe-area-inset-bottom) + 12px)))!important;
+    border-radius:24px!important;
+    padding:12px!important;
+  }
+  #kelo-commerce-modal .kc-head{top:-12px!important;padding-top:10px!important}
+  #kelo-commerce-modal .kc-actions{gap:8px!important}
+  #kelo-commerce-modal .kc-actions .kc-btn{flex:1 1 130px!important}
+  #kelo-luxe .lx-chat-drawer{left:max(8px,env(safe-area-inset-left))!important;right:max(8px,env(safe-area-inset-right))!important;border-radius:20px!important}
+}
