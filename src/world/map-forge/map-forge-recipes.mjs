@@ -1,21 +1,30 @@
 /* KELO-INDEX
  * area: WORLD / MAP FORGE
  * owner: KeloMapForge recipe catalog
- * purpose: data-only recipes for deterministic world generation
+ * purpose: data-only recipes plus reviewed evolution champion overrides for deterministic world generation
  * public-api: MAP_FORGE_RECIPES, getMapForgeRecipe(), listMapForgeRecipes()
- * consumes: none
+ * consumes: MAP_FORGE_CHAMPION_OVERRIDES data only
  * state-owned: immutable recipe data only
- * extension-points: add recipes/content; do not add generation logic here
- * online: recipeId + recipeVersion are stable serialization inputs
- * do-not: no DOM, no renderer, no collision writes, no Math.random
+ * extension-points: add recipes/content; approved evolution changes enter as genome overrides
+ * online: recipeId + effective recipeVersion remain stable serialization inputs
+ * do-not: no DOM, renderer, collision writes, Math.random or automatic promotion
  */
+import {MAP_FORGE_CHAMPION_OVERRIDES} from './map-forge-champion-overrides.mjs';
 
-const freezeDeep=value=>{
-  if(!value||typeof value!=='object'||Object.isFrozen(value))return value;
-  Object.freeze(value);
-  for(const item of Object.values(value))freezeDeep(item);
-  return value;
-};
+const freezeDeep=value=>{if(!value||typeof value!=='object'||Object.isFrozen(value))return value;Object.freeze(value);for(const item of Object.values(value))freezeDeep(item);return value;};
+const clone=value=>JSON.parse(JSON.stringify(value));
+function applyChampionOverride(recipe){
+  const row=MAP_FORGE_CHAMPION_OVERRIDES[recipe.id];if(!row?.genes)return recipe;
+  const out=clone(recipe);
+  for(const [id,value] of Object.entries(row.genes)){
+    const parts=id.split('.');
+    if(parts[0]==='style'&&Object.prototype.hasOwnProperty.call(out.style,parts[1]))out.style[parts[1]]=value;
+    else if(parts[0]==='road'&&Object.prototype.hasOwnProperty.call(out.road,parts[1]))out.road[parts[1]]=value;
+    else if(parts[0]==='district'){const target=out.districts.find(item=>item.id===parts[1]);if(target&&parts[2]==='weight')target.weight=value;}
+    else if(parts[0]==='landmark'){const target=out.landmarks.find(item=>item.id===parts[1]);if(target&&parts[2]==='keepClearRadius')target.keepClearRadius=value;}
+  }
+  const revision=Math.max(1,Math.floor(Number(row.revision)||1));out.version=`${recipe.version}-evo.${revision}`;return out;
+}
 
 const capital={
   id:'KELO_ROYAL_CAPITAL_V1',version:'1.0.0',type:'capital',label:'Royal Capital',biome:'temperate_royal',
@@ -47,9 +56,7 @@ const capital={
     {id:'exit_northeast',direction:'northeast',target:'coast_route',district:'harbor'},
     {id:'exit_southwest',direction:'southwest',target:'mountain_route',district:'mining'}
   ],
-  scenicAxes:[
-    {from:'spawn',to:'fountain',weight:1},{from:'fountain',to:'castle',weight:1},{from:'commerce',to:'harbor_gate',weight:.72},{from:'farms',to:'windmill',weight:.55}
-  ],
+  scenicAxes:[{from:'spawn',to:'fountain',weight:1},{from:'fountain',to:'castle',weight:1},{from:'commerce',to:'harbor_gate',weight:.72},{from:'farms',to:'windmill',weight:.55}],
   qualityWeights:{playability:1.25,connectivity:1.2,navigation:1.12,visualComposition:1.35,landmarkQuality:1.45,districtVariety:1.12,roadQuality:1.15,densityBalance:.9,negativeSpace:1.08,assetVariety:.72,scenicVistas:1.35,technicalSafety:1.3}
 };
 
@@ -96,6 +103,7 @@ const forest={
   qualityWeights:{playability:1.18,connectivity:1.1,navigation:1.05,visualComposition:1.05,landmarkQuality:1.08,districtVariety:1.12,roadQuality:1.02,densityBalance:1.15,negativeSpace:1.12,assetVariety:.78,scenicVistas:1.05,technicalSafety:1.28}
 };
 
-export const MAP_FORGE_RECIPES=freezeDeep({[capital.id]:capital,[village.id]:village,[forest.id]:forest});
+const recipes=[capital,village,forest].map(applyChampionOverride);
+export const MAP_FORGE_RECIPES=freezeDeep(Object.fromEntries(recipes.map(recipe=>[recipe.id,recipe])));
 export function getMapForgeRecipe(id){return MAP_FORGE_RECIPES[id]||null;}
 export function listMapForgeRecipes(){return Object.values(MAP_FORGE_RECIPES);}
