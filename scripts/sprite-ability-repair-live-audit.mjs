@@ -23,6 +23,8 @@ try{
   await page.waitForFunction(async()=>{const b=(await import('./src/creators/sprite-ability/sprite-ability-live-controller.mjs')).getSpriteAbilityBuilder();return !!b?.draft?.sheet?.dataUrl&&b.draft.sheet.endFrame>=7;},null,{timeout:12000});
 
   await page.evaluate(()=>{const ws=document.getElementById('kelo-studio-workspace');const set=(label,value)=>{for(const row of ws.querySelectorAll('.ksw-right .ksw-field'))if(row.querySelector('label')?.textContent?.trim()===label){const i=row.querySelector('input,select');i.value=String(value);i.dispatchEvent(new Event('change',{bubbles:true}));return;}};set('Impact Frame',3);set('Active Start',2);set('Active End',4);set('Hitbox X',11);set('Hitbox Y',-33);set('Hitbox W',77);set('Hitbox H',55);});
+  await page.locator('[data-panel="left"]').click();
+  await page.waitForSelector('.ksw-left.mobile-open',{state:'visible',timeout:5000});
   await page.waitForSelector('.sab-repair-launch',{state:'visible',timeout:5000});
   const before=await snap();
   await page.getByRole('button',{name:/REPARAR SPRITE/}).click();
