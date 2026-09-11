@@ -2,7 +2,7 @@
 'use strict';
 const base=window.KELO_WORLD_RENDERER;
 if(!base||typeof base.draw!=='function'){console.error('[Kelo environment layers] world renderer missing');return;}
-const DECORATION_RESET=true;
+const DECORATION_RESET=false;
 window.KELO_WORLD_DECORATION_RESET=DECORATION_RESET;
 const PHASES=Object.freeze(['ground','ground_variation','transitions','paths_floors','decals_details','props_back','props_front','vfx_weather_lighting']);
 const PRE_ACTOR_PHASES=new Set(['props_back']);
@@ -41,7 +41,7 @@ function spatialOverlaps(){
     if(a.phase!==b.phase)continue;
     const ab=normalizeBounds(a.bounds),bb=normalizeBounds(b.bounds);
     const hits=[];
-    for(const x of ab)for(const y of bb)if(overlaps(x,y))hits.push(Object.freeze({a:x.id,b:y.id,x:Math.max(x.x,y.x),y:Math.max(x.y,y.y),w:Math.min(x.x+x.w,y.x+y.w)-Math.max(x.x,y.x),h:Math.min(x.y+x.h,y.y+y.h)-Math.max(x.y,y.y)}));
+    for(const x of ab)for(const y of bb)if(overlaps(x,y))hits.push(Object.freeze({a:x.id,b:y.id,x:Math.max(x.x,y.x),y:Math.max(x.y,y.y),w:Math.min(x.x+x.w,y.x+y.w)-Math.max(x.x,y.x),h:Math.min(x.y+x.h,y.y+h)-Math.max(x.y,y.y)}));
     if(hits.length){
       const ambiguous=a.priority===b.priority;
       out.push(Object.freeze({phase:a.phase,a:a.id,b:b.id,aPriority:a.priority,bPriority:b.priority,aOwnership:a.ownership,bOwnership:b.ownership,ambiguous,resolvedBy:ambiguous?'id-tiebreak':'priority',overlapCount:hits.length,overlaps:Object.freeze(hits)}));
