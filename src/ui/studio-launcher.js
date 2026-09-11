@@ -13,6 +13,7 @@
   if(window.KELO_STUDIO_LAUNCHER)return;
   let loading=false,factoryLoading=false,repairLoading=false;
   const CREATOR_BUILD='world-recovery-20260911-admin-1';
+  const HUB_BUILD='hub-v1.1.0-20260911';
   const actor=()=>String(window.KELO_ADMIN_KEYS?.playerId?.()||window.keloNet?.playerKey||window.localPlayer?.id||'local_pioneer');
   const allowed=()=>{
     const keys=window.KELO_ADMIN_KEYS,who=actor();
@@ -120,12 +121,12 @@
   }
   function boot(){
     sync();
-    void import('./kelo-hub-overlay.js?v=1').then(()=>window.KeloHubOverlay?.refresh?.()).catch(e=>console.warn('[Kelo Hub overlay]',e));
+    void import(`./kelo-hub-overlay.js?v=${HUB_BUILD}`).then(()=>window.KeloHubOverlay?.refresh?.()).catch(e=>console.warn('[Kelo Hub overlay]',e));
     void bootOnlineAuthorization();
     void import('./../characters/creator-avatar-runtime.mjs').then(m=>m.installCreatorAvatarRuntime({root:window})).catch(e=>console.warn('[Kelo Avatar runtime]',e));
   }
   window.KELO_ADMIN_KEYS?.onChange?.(()=>{sync();window.KeloHubOverlay?.refresh?.();});
-  const api=Object.freeze({version:'studio-launcher-v1.10.0-asset-repairer',open,openSpriteFactory:openFactory,openAssetRepairer:openRepair,sync,get allowed(){return allowed();}});
+  const api=Object.freeze({version:'studio-launcher-v1.10.1-hub-cache-bust',open,openSpriteFactory:openFactory,openAssetRepairer:openRepair,sync,get allowed(){return allowed();}});
   window.KELO_STUDIO_LAUNCHER=api;
   window.KELO_CREATORS_LAUNCHER=api;
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
