@@ -22,16 +22,21 @@ La preview de Map Forge y la preview exterior consumen la misma proyección norm
 
 ## Estado actual
 
-**CREATOR ACTIVE / DRAFT PREVIEW LIVE / ONLINE-FIRST.**
+**CREATOR ACTIVE / DRAFT PREVIEW LIVE / EVOLUTION V2 GATED / ONLINE-FIRST.**
 
 El core procedural es determinista y probado por Node/CI. Kelo Creators expone Map Forge, genera en Worker cuando está disponible, permite seleccionar candidatos, muestra una preview visual read-only reutilizando World Builder + Property y puede entregar el candidato al World Editor o a `world:preview:enter` sin publicar el LIVE.
 
 La preview exterior es reversible: Map Forge se separa del DOM y libera su input lock antes de esperar el handoff, conserva la sesión generada en memoria y ofrece `VOLVER A MAP FORGE`. El retorno sale de la preview mediante `world:preview:exit` y restaura el mismo candidato sin regenerar.
 
+Map Forge también consume `KeloEvolution` fuera del runtime crítico para enfrentar un champion contra challengers de recipe/genoma. Esa capa no reemplaza el scorer ni el generator owner y no puede publicar ni auto-mergear cambios.
+
 ## Owners y archivos
 
 - Core procedural: `src/world/map-forge/map-forge-core.mjs`.
 - Recipes: `src/world/map-forge/map-forge-recipes.mjs`.
+- Champion overrides aprobados: `src/world/map-forge/map-forge-champion-overrides.mjs`.
+- Evolution adapter: `src/world/map-forge/map-forge-evolution.mjs`.
+- Golden seed corpus: `src/world/map-forge/map-forge-golden-seeds.mjs`.
 - Builder: `src/world/map-forge/map-forge-builder.mjs`.
 - Validator/scorer: `src/world/map-forge/map-forge-quality.mjs`.
 - Worker: `src/world/map-forge/map-forge-worker.mjs` + `map-forge-worker-client.mjs`.
@@ -44,15 +49,21 @@ La preview exterior es reversible: Map Forge se separa del DOM y libera su input
 - Real placement rendering: `src/property/property-system.js`.
 - Real placement catalog: `KELO_PROPERTY_CATALOG` / `src/property/property-asset-catalog.js`.
 - Camera: `KeloCamera` / `src/core/camera-system.js`.
-- Contract audit: `scripts/map-forge-studio-handoff-audit.mjs`.
+- Evolution memory artifact/source: `docs/evolution/map-forge-memory.json`.
+- Autopilot runner: `scripts/map-forge-evolution-autopilot.mjs`.
+- Core contract audit: `scripts/map-forge-core-audit.mjs`.
+- Studio handoff audit: `scripts/map-forge-studio-handoff-audit.mjs`.
+- Evolution audit: `scripts/kelo-evolution-audit.mjs`.
 - Mobile visual smoke: `tests/map-forge-mobile-preview.spec.js`.
-- CI: `.github/workflows/map-forge-studio-handoff-ci.yml`.
+- Evolution visual evidence: `tests/map-forge-evolution-visual.spec.js`.
 
 ## Estado que posee el core
 
 El core no posee estado mutable runtime. Produce un `MapDefinition` serializable con metadata, `worldBounds`, semantic graph, districts, terrain, roads, blocks, parcels, landmarks, prefab placements, decorations, interactions, spawns, exits, collision descriptors, navigation, scenic vistas, chunk index, generation stats, validation y quality.
 
 El estado temporal de la interfaz —recipe, seed, candidates, selected candidate y sliders— pertenece al workspace de Creator, no al core ni al mundo LIVE.
+
+La capa de evolución posee cero state runtime. Champion overrides son data de recipe versionada por Git y la memoria de experimentos pertenece al pipeline externo.
 
 ## Estado que NO posee
 
@@ -61,6 +72,7 @@ El estado temporal de la interfaz —recipe, seed, candidates, selected candidat
 - Camera/viewport: `KeloCamera`.
 - Property ownership/build state: `KELO_PROPERTY_SYSTEM`.
 - World draft/publish state: `KELO_WORLD_EDIT`.
+- Git merge/deploy authority.
 - Player buildings, stalls, NPC runtime, resource state y eventos: runtime/server deltas.
 
 ## Determinismo
@@ -68,6 +80,8 @@ El estado temporal de la interfaz —recipe, seed, candidates, selected candidat
 La identidad del Base Generated World usa `mapId`, `seed`, `generatorVersion`, `recipeId`, `recipeVersion`, `assetCatalogVersion` y `layoutHash`. El core no usa `Math.random()` ni tiempos de pared dentro del `MapDefinition`.
 
 El mismo conjunto de inputs produce el mismo `layoutHash` y la misma serialización. Streams internos derivan del seed principal con nombres estables.
+
+Cuando una champion override aprobada existe, `map-forge-recipes.mjs` deriva una versión efectiva `recipeVersion-evo.<revision>` para que un cambio de genoma no quede escondido detrás de la misma identidad de recipe.
 
 ## Pipeline procedural
 
@@ -94,6 +108,41 @@ Map Intent
 → MapDefinition
 ```
 
+## Evolution V2
+
+`map-forge-evolution.mjs` trata la recipe actual como champion y propone challengers deterministas. El genoma V2 puede expresar:
+
+```text
+style.monumentality / organicRoads / density / vegetation / exploration / decoration
+road.loopRatio / road.curvature
+district.<id>.weight
+landmark.<id>.keepClearRadius
+```
+
+La recipe original nunca se muta. `applyMapForgeGenome()` deriva una recipe candidata y luego reutiliza **el mismo** `generateBestOf()`, validator y scorer de Map Forge.
+
+### Golden seeds + validation seeds
+
+`map-forge-golden-seeds.mjs` fija casos representativos por recipe. Cada challenger se evalúa con golden seeds más validation seeds derivadas. `validRate` tiene hard gate de 100 %.
+
+### Evolución parcial
+
+La búsqueda admite `lockedGenes`, `focusScopes` y `focusGenes`. Esto permite congelar partes ya buenas y trabajar, por ejemplo, solo roads, solo landmarks o el peso espacial de un distrito concreto.
+
+La regeneración computacional sigue reconstruyendo el candidato completo; todavía no existe un regenerador físico de chunk/district que recalcule únicamente esa subregión.
+
+### Métricas de evolución
+
+La decisión combina calidad media y peor caso, visual medio y peor caso, floor de navegación, safety de complejidad, estabilidad y valid rate. Tiempos reales de generación se registran como telemetría pero no pesan el score determinista porque dependen del runner.
+
+### Champion overrides
+
+`map-forge-champion-overrides.mjs` solo contiene overrides que hayan llegado a `main`. Empieza vacío en V2. El autopilot puede proponer una nueva revision, pero el runtime únicamente la consume después del flujo normal de PR/CI/merge.
+
+### Autopilot
+
+`.github/workflows/kelo-evolution-autopilot.yml` ejecuta champion vs challengers sobre `main`. Si ningún challenger supera `minImprovement`, no crea cambios. Si uno gana, vuelve a correr Map Forge core + Evolution + docs, crea una rama/commit y abre PR. **No existe paso de auto-merge.**
+
 ## Proyección a World Draft Snapshot
 
 `mapDefinitionToWorldDraftSnapshot()` es la única traducción compartida entre Map Forge y el World Draft actual.
@@ -111,20 +160,15 @@ Los tipos semánticos sin template real compatible se omiten de forma segura en 
 
 ## Preview visual dentro de Map Forge
 
-La preview principal ya no interpreta `terrain` con una tabla independiente de colores ni dibuja landmarks como círculos. El workspace crea el mismo World Draft Snapshot normalizado y delega en:
+La preview principal no interpreta `terrain` con una tabla independiente de colores ni dibuja landmarks como círculos. El workspace crea el mismo World Draft Snapshot normalizado y delega en:
 
 ```text
 KELO_WORLD_BUILDER.renderSnapshotPreview(canvas, snapshot, bounds)
 ```
 
-World Builder reutiliza:
+World Builder reutiliza su terrain/path, `KELO_TILE_REGISTRY`, `KELO_ATLAS_CONTRACT`, el suelo aprobado y `KELO_PROPERTY_SYSTEM.drawPlacements()` sin modificar state. La carga de assets es asíncrona y la preview se redibuja por eventos asset-ready.
 
-- su lógica de terrain/path;
-- `KELO_TILE_REGISTRY` y `KELO_ATLAS_CONTRACT`;
-- el atlas real de suelo aprobado por `surfaceGround` cuando el atlas legacy de terrain está retirado/reset;
-- `KELO_PROPERTY_SYSTEM.drawPlacements()` para dibujar los mismos templates/parts reales de Property sin modificar state.
-
-La carga de assets es asíncrona y la preview se redibuja por eventos de asset-ready; no depende de un timeout arbitrario.
+`tests/map-forge-evolution-visual.spec.js` reutiliza exactamente esta ruta para capturar baseline/champion, no un renderer especial de test.
 
 ## Preview exterior
 
@@ -143,13 +187,11 @@ Flujo:
 9. enfoca `KeloCamera` en el spawn principal o centro de bounds;
 10. muestra `VOLVER A MAP FORGE`.
 
-Si el handoff falla, se restaura el mismo workspace y candidato. No se oculta el error ni se destruye la sesión.
-
-`VOLVER A MAP FORGE` usa `world:preview:exit`, elimina el chrome temporal de preview y vuelve a montar el mismo shell y controles sin regenerar.
+Si el handoff falla, se restaura el mismo workspace y candidato. `VOLVER A MAP FORGE` usa `world:preview:exit` y vuelve a montar la misma sesión sin regenerar.
 
 ## World Editor
 
-`ABRIR EN WORLD EDITOR` sigue siendo un flujo separado:
+`ABRIR EN WORLD EDITOR` sigue separado de preview exterior:
 
 ```text
 Map Forge
@@ -157,26 +199,24 @@ Map Forge
 → openKeloStudioLive()
 ```
 
-No se mezcla con la preview exterior.
-
 ## Terrain y caminos
 
-El runtime editable actual normaliza los materiales generados al conjunto que World Builder soporta hoy (`grass` y `marble`). Cuando existe un atlas aprobado y no retirado se utiliza el atlas real. Para grass, World Builder puede reutilizar `styles.surfaceGround`/`cesped`.
+El runtime editable actual normaliza materiales al conjunto que World Builder soporta hoy (`grass` y `marble`). Cuando existe atlas aprobado se utiliza; grass puede reutilizar `styles.surfaceGround`/`cesped`.
 
-El pavimento cívico ya no nace de una probabilidad por celda. Los distritos `plaza`, `royal` y `commerce` declaran planes compactos y conectados (`terrain.pavingPlans`); cada celda de piedra conserva un `pavingIntent` que explica su plan, distrito y propósito. El validator invalida con códigos estables cualquier piedra sin intención (`paving_intent_missing`) o componente conectado que supere el 10 % del campo útil o duplique el footprint declarado (`paving_blob_excessive`). Como `generateBestOf()` solo conserva candidatos válidos, estos defectos bloquean AUTO en vez de limitarse a reducir el score.
+El pavimento cívico usa planes compactos y conectados (`terrain.pavingPlans`). Cada celda stone conserva `pavingIntent`. El validator invalida piedra sin intención (`paving_intent_missing`) o componentes excesivos (`paving_blob_excessive`). `generateBestOf()` solo conserva candidatos válidos.
 
-El contrato actual no ofrece todavía un atlas marble/path activo y aprobado equivalente al suelo real; por eso World Builder conserva un fallback visual centralizado para esas celdas. Ese fallback pertenece al owner World Builder y no crea un segundo tileset ni un renderer paralelo.
+El contrato actual todavía no ofrece un atlas marble/path authored activo equivalente al suelo real; World Builder conserva un fallback visual centralizado para esas celdas.
 
 ## Online-first
 
-Map Forge define solamente el **BASE GENERATED WORLD**. La arquitectura conserva:
+Map Forge define solamente el **BASE GENERATED WORLD**:
 
 ```text
 Base Generated World
 + Server / Runtime Deltas
 ```
 
-El UI no publica ni muta LIVE directamente. Las mutaciones pasan por `KELO_WORLD_EDIT.request()`, cuya autoridad local puede ser sustituida por `RemoteWorldEditAuthority` manteniendo formatos y consumers.
+El UI no publica ni muta LIVE directamente. Las mutaciones pasan por `KELO_WORLD_EDIT.request()`, cuya autoridad local puede reemplazarse por `RemoteWorldEditAuthority` manteniendo formatos y consumers. Evolution tampoco obtiene autoridad gameplay ni publish.
 
 ## Invariantes
 
@@ -184,52 +224,44 @@ El UI no publica ni muta LIVE directamente. Las mutaciones pasan por `KELO_WORLD
 2. No DOM ni Canvas dentro del core.
 3. No writes a `obstacles` desde Map Forge/importer.
 4. No writes directos a `KELO_COLLISION` desde Map Forge/importer.
-5. No mutación directa de Property desde el importer.
+5. No mutación directa de Property desde importer.
 6. Camera solo mediante `KeloCamera`.
-7. Preview Map Forge y exterior usan la misma proyección normalizada.
-8. `VER EN MAPA EXTERIOR` quita el shell fullscreen antes del await de handoff.
-9. El candidato debe sobrevivir a preview exterior/fallo/retorno.
-10. Same inputs ⇒ same layoutHash y serialización.
-11. Un candidato inválido no puede entrar en handoff.
+7. Preview Map Forge, evidencia visual y exterior usan la proyección/renderer owners existentes.
+8. El candidato debe sobrevivir a preview exterior/fallo/retorno.
+9. Same inputs ⇒ same layoutHash y serialización.
+10. Un candidato inválido no puede entrar en handoff ni ser champion.
+11. Evolution no duplica Map Forge scorer/generator.
+12. Autopilot nunca mergea su propio candidato.
 
 ## Tests y CI
 
-`node scripts/map-forge-core-audit.mjs` valida determinismo, recipes, conectividad, quality y best-of.
+- `node scripts/map-forge-core-audit.mjs`: determinismo, recipes, conectividad, quality y best-of.
+- `node scripts/map-forge-paving-intent-audit.mjs`: corpus de pavimento y hard gates.
+- `node scripts/map-forge-studio-handoff-audit.mjs`: proyección, handoff, owners y lifecycle.
+- `npm run audit:evolution`: genome/golden seeds/locks/tournament/no-regression.
+- `npm run audit:evolution:sandbox`: code-patch worktree aislado.
+- `tests/map-forge-mobile-preview.spec.js`: preview/handoff móvil real.
+- `tests/map-forge-evolution-visual.spec.js`: screenshots baseline/champion + telemetría de render/generación.
 
-`node scripts/map-forge-paving-intent-audit.mjs` ejecuta 300 mapas, conserva las seeds históricas de `PAVING_BLOB`, verifica planes conectados y demuestra que los hard gates rechazan pavimento no declarado y dominante.
-
-`node scripts/map-forge-studio-handoff-audit.mjs` valida proyección determinista, terrain/path, semantic Property placements, uso del catálogo LIVE correcto, ausencia de mutaciones directas, orden del lifecycle exterior, restauración de sesión, reuse de World Builder/Property y foco por `KeloCamera`.
-
-`tests/map-forge-mobile-preview.spec.js` ejecuta el flujo visible en viewport 390×844:
-
-```text
-Map Forge
-→ generar
-→ preview con assets reales
-→ Ver en mapa exterior
-→ shell fullscreen desaparece
-→ world preview visible
-→ camera dentro de bounds
-→ Volver a Map Forge
-→ mismo seed/layoutHash
-```
-
-El workflow guarda screenshots de la preview, exterior y sesión restaurada como evidencia visual.
+Los workflows guardan screenshots y JSON de evidencia como artifacts.
 
 ## Deuda pendiente real
 
 - WFC local con budget/retry/fallback.
-- Lock + regenerate parcial.
-- Golden seeds con `assetCatalogVersion` LIVE estable.
+- Regeneración física parcial de chunks/distritos; V2 ya puede focalizar genes pero reconstruye el candidato completo.
 - Atlas/path authored activo para que roads/marble no necesiten fallback visual.
-- Más templates reales para semantic landmark families que hoy no tengan match en Property Catalog.
+- Más templates reales para semantic landmark families sin match en Property Catalog.
+- Benchmark de FPS del runtime jugable como métrica adicional; V2 mide generation + preview render telemetry.
+- Visual judge semántico externo como métrica secundaria.
 - Validación online contra autoridad remota cuando exista servidor.
 
 ## Cómo extender sin duplicar owner
 
 - Nueva recipe: `map-forge-recipes.mjs`.
-- Nueva métrica: `map-forge-quality.mjs`.
+- Nuevo gene de recipe: `map-forge-evolution.mjs`; no meter search logic en builder.
+- Nueva métrica de calidad del mapa: `map-forge-quality.mjs`.
+- Nueva métrica de tournament/evolution: perfil en `map-forge-evolution.mjs`.
 - Nueva primitive geométrica: `map-forge-geometry.mjs`.
 - Nueva fase procedural: builder manteniendo determinismo.
-- Nueva traducción visual/editable: extender el importer o el owner runtime correspondiente, no el core.
-- Nuevos assets: registrar en Property/Tile/Atlas owners existentes; Map Forge solo referencia semántica/data.
+- Nueva traducción visual/editable: importer u owner runtime correspondiente.
+- Nuevos assets: Property/Tile/Atlas owners; Map Forge solo referencia semántica/data.

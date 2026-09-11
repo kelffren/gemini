@@ -2,217 +2,277 @@
 
 ## Propósito
 
-`KeloEvolution` es una capacidad interna para que Kelo World pueda probar variantes y conservar únicamente cambios que demuestran una mejora medible frente a un baseline.
-
-No es un segundo game engine y no permite que código de producción se reescriba sin control. Su responsabilidad termina en el ciclo:
+`KeloEvolution` es la capacidad interna de Kelo World para ejecutar el ciclo **champion → challengers → sandbox → evaluación → keep/revert**. Permite que parámetros, recipes y parches de código puedan tratarse como candidatos medibles sin convertir el runtime del juego en autoridad de Git, deploy o producción.
 
 ```text
-baseline
-→ proposer produce candidatos
-→ evaluator mide baseline y candidatos
+champion baseline
+→ proposer genera challengers
+→ prepare crea sandbox opcional
+→ evaluator ejecuta métricas / tests
 → hard gates + score + mejora mínima
-→ seleccionar mejor candidato aceptable
+→ ranking champion/challenger
 → apply opcional
 → rollback si apply falla
+→ experiment record
 ```
 
-El tipo de candidato es genérico. Hoy el primer consumidor real es Map Forge, donde los candidatos son perfiles de estilo. En el futuro un agente autorizado puede representar un parche de código como candidato y usar exactamente el mismo gate, siempre que proporcione tests/evaluación y una operación segura de apply/rollback.
+No es un segundo game engine. No modifica gameplay por sí mismo y no concede credenciales ni acceso irrestricto al repositorio.
 
 ## Estado actual
 
-**INTERNAL CREATOR CAPABILITY / ACTIVE / HEADLESS / ONLINE-NEUTRAL.**
+**V2 / INTERNAL CREATOR CAPABILITY / ACTIVE / HEADLESS / GATED CODE-CANDIDATE READY.**
 
-La implementación es ESM pura, sin DOM, Canvas, gameplay state, persistencia ni red. El caller inyecta propuesta, evaluación, apply y rollback.
+V2 añade diez capacidades sobre V1:
+
+1. candidatos de parche de código completos y serializables;
+2. sandbox aislado en Git worktree;
+3. evidencia visual Playwright baseline/champion con screenshots reales;
+4. golden seed bank Map Forge;
+5. genoma Map Forge ampliado a estilo, carreteras, distritos y landmarks;
+6. evolución parcial mediante locks, scopes y genes focales;
+7. memoria de experimentos y penalización de mutaciones fallidas;
+8. champion/challenger tournament genérico;
+9. score multidimensional + telemetría de generación/render;
+10. autopilot GitHub que crea rama/commit/PR únicamente tras gates y nunca hace auto-merge.
 
 ## Owner y archivos
 
-- Owner de aceptación genérica: `src/creators/evolution/evolution-engine.mjs` / `KeloEvolution` conceptualmente.
-- Primer adapter: `src/world/map-forge/map-forge-evolution.mjs`.
-- Scorer real de mapas reutilizado: `src/world/map-forge/map-forge-quality.mjs`.
-- Generator reutilizado: `src/world/map-forge/map-forge-core.mjs`.
-- Audit determinista: `scripts/kelo-evolution-audit.mjs`.
-- CI: `.github/workflows/kelo-evolution-ci.yml`.
+- Gate genérico: `src/creators/evolution/evolution-engine.mjs`.
+- Memoria pura: `src/creators/evolution/evolution-memory.mjs`.
+- Contrato de code-patch: `src/creators/evolution/code-patch-candidate.mjs`.
+- Sandbox Git externo: `scripts/kelo-code-evolution-sandbox.mjs`.
+- Sandbox audit: `scripts/kelo-evolution-sandbox-audit.mjs`.
+- Map Forge adapter V2: `src/world/map-forge/map-forge-evolution.mjs`.
+- Golden seeds: `src/world/map-forge/map-forge-golden-seeds.mjs`.
+- Champion overrides: `src/world/map-forge/map-forge-champion-overrides.mjs`.
+- Memoria persistible actual: `docs/evolution/map-forge-memory.json`.
+- Autopilot runner: `scripts/map-forge-evolution-autopilot.mjs`.
+- CI normal: `.github/workflows/kelo-evolution-ci.yml`.
+- Autopilot: `.github/workflows/kelo-evolution-autopilot.yml`.
+- Evidencia visual: `tests/map-forge-evolution-visual.spec.js`.
 
 ## Estado que posee
 
-Ningún estado runtime persistente.
+El core `KeloEvolution` no posee estado persistente. Cada llamada devuelve estructuras inmutables.
 
-Cada ciclo devuelve un reporte inmutable con:
+La memoria es también funcional: `recordEvolutionExperiment()` devuelve un snapshot nuevo. El lugar que invoque el engine decide si esa memoria vive en un artifact, archivo Git o almacenamiento remoto.
 
-- evaluación del baseline;
-- candidatos evaluados;
-- ganador aceptado, si existe;
-- delta contra baseline;
-- resultado aplicado o baseline conservado;
-- estado de rollback cuando apply falla.
+GitHub Actions posee temporalmente worktrees, commits y ramas de candidatos. El runtime del navegador nunca recibe esa autoridad.
 
 ## Estado que NO posee
 
-- gameplay;
+- gameplay o economía;
 - mundo LIVE;
+- renderer/cámara/colisión;
 - Map Forge procedural core;
-- repositorio Git/GitHub;
+- credenciales GitHub;
+- merge authority;
 - deploy;
-- server authority;
-- persistencia;
-- UI;
-- publicación de mapas/assets;
-- definición de qué métricas pertenecen a cada subsistema.
+- secretos;
+- server authority gameplay.
 
-## API pública
+## API genérica
 
-### `createEvolutionMetricProfile(definitions)`
+### `createEvolutionMetricProfile()` / `scoreEvolutionMetrics()`
 
-Crea un perfil validado de métricas. Cada métrica puede declarar:
+Define métricas ponderadas `maximize|minimize`, normalización y hard gates `hardMin` / `hardMax`.
 
-- `id`;
-- `weight`;
-- `min` / `max` para normalización;
-- `direction: maximize | minimize`;
-- `required`;
-- `hardMin`;
-- `hardMax`.
+### `compareEvolutionEvaluations()`
 
-### `scoreEvolutionMetrics(profile, measurements)`
+Un challenger solo gana si es válido, supera `minScore` y mejora al champion al menos `minImprovement`.
 
-Normaliza métricas a 0–100, calcula score ponderado y falla cerrado cuando una métrica requerida falta o viola un hard gate.
+### `selectEvolutionCandidate()`
 
-### `compareEvolutionEvaluations(baseline, candidate, policy)`
+Devuelve evaluación completa, ranking y mejor challenger aceptable. Empates preservan orden determinista.
 
-Acepta solo si:
+### `runEvolutionCycle()`
 
-1. el candidato es válido;
-2. supera `minScore`;
-3. mejora al baseline al menos `minImprovement`.
-
-### `selectEvolutionCandidate(...)`
-
-Entre candidatos aceptables elige el score más alto. Empates conservan orden determinista.
-
-### `runEvolutionCycle(...)`
-
-Ejecuta un ciclo completo con callbacks inyectados:
+V2 admite:
 
 ```js
 await runEvolutionCycle({
   baseline,
   propose,
+  prepare,   // sandbox opcional
   evaluate,
+  cleanup,   // obligatorio para callers con sandbox
   policy: { minImprovement: 0.5 },
   apply,
-  rollback
+  rollback,
+  onExperiment
 });
 ```
 
-`apply` nunca se llama antes de que el candidato gane evaluación. Si `apply` lanza error, se intenta `rollback(baseline)` y el resultado lógico vuelve al baseline.
+`prepare` también se aplica al baseline para que champion y challengers se midan bajo la misma frontera. Un error de preparación/evaluación invalida el candidato. Un error de cleanup también lo invalida. `apply` nunca ocurre antes del gate.
 
-## Adapter Map Forge V1
+### `runChampionChallengerTournament()`
 
-`map-forge-evolution.mjs` convierte la capacidad genérica en autoajuste real del generador sin cambiar ownership del procedural core.
+Compara un champion con varios challengers y devuelve `championBefore`, `championAfter`, `ranking` y `changed`. No aplica cambios por sí solo.
 
-Parámetros evolvables actuales:
+## Code Patch Candidate V1
 
-- `monumentality`;
-- `organicRoads`;
-- `density`;
-- `vegetation`;
-- `exploration`;
-- `decoration`.
-
-El adapter genera mutaciones deterministas con PRNG seeded, no `Math.random()`.
-
-### Evaluación multi-seed
-
-Una variante no se juzga por un solo mapa. `evaluateMapForgeStyle()` ejecuta el mismo perfil sobre un banco determinista de validation seeds y reutiliza `generateBestOf()`.
-
-Métricas V1:
-
-| Métrica | Peso | Regla |
-|---|---:|---|
-| `meanQuality` | 4.5 | score medio real de Map Forge |
-| `worstQuality` | 2.5 | protege contra una seed mala |
-| `meanVisual` | 2.0 | composición/landmarks/variedad/espacio/vistas/coherencia |
-| `stability` | 1.0 | penaliza dispersión entre seeds |
-| `validRate` | 1.5 | hard gate = 100% de runs evaluadas válidas |
-
-El resultado de `evolveMapForgeStyle()` nunca sustituye el baseline por una variante con score inferior. Si ninguna mutación supera la mejora mínima, devuelve el estilo original.
-
-## Flujo Map Forge
+`createCodePatchCandidate()` representa un cambio como reemplazos de texto completos:
 
 ```text
-recipe.style / style actual
-→ baseline evaluado en las mismas validation seeds
-→ N mutaciones seeded
-→ cada mutación genera best-of-N mapas
-→ validator Map Forge elimina mapas inválidos
-→ scorer Map Forge calcula quality real
-→ KeloEvolution agrega calidad + robustez
-→ candidato ganador debe superar minImprovement
-→ nuevo baseline para la siguiente generación
-→ si no mejora, baseline permanece intacto y el step se reduce
+id
+baseSha
+objective
+changes[] = path + beforeHash + afterContent
+tests[] = IDs registrados
 ```
 
-Esto es hill-climbing controlado con validación multi-seed, no aprendizaje de pesos neuronales.
+`validateCodePatchCandidate()` aplica límites de cantidad/tamaño, path traversal, allowlist y denylist. Por defecto quedan fuera `.env`, `.git`, `node_modules`, `server`, `supabase`, secretos/credenciales y otras rutas sensibles.
+
+El candidato **no puede incluir comandos shell arbitrarios**. Solo puede pedir IDs de tests que el sandbox ya conozca.
+
+## Sandbox de código
+
+`scripts/kelo-code-evolution-sandbox.mjs`:
+
+1. valida contrato/allowlist;
+2. verifica que `baseSha` coincide con el checkout;
+3. crea un `git worktree --detach` temporal;
+4. verifica SHA-256 del contenido previo de cada archivo;
+5. aplica el candidate únicamente al worktree;
+6. ejecuta `node --check` y tests registrados;
+7. captura diff/reporte;
+8. elimina el worktree incluso cuando falla.
+
+El sandbox no empuja ramas, no hace merge y no despliega.
+
+## Memoria de experimentos
+
+`evolution-memory.mjs` conserva records de candidato, score, delta, métricas, fallos, mutaciones y artifacts. `mutationFailureCount()` permite que un proposer reduzca la probabilidad de repetir genes que ya han fallado.
+
+V2 no convierte memoria histórica en verdad absoluta: una mutación penalizada puede volver a probarse; solamente recibe menor prioridad.
+
+## Map Forge Genome V2
+
+El adapter ya no evoluciona solo seis sliders. `createMapForgeGeneCatalog()` expone genes de:
+
+- `style.*`: monumentalidad, organic roads, density, vegetation, exploration, decoration;
+- `road.loopRatio` y `road.curvature`;
+- `district.<id>.weight` para cada distrito;
+- `landmark.<id>.keepClearRadius` para cada landmark.
+
+`applyMapForgeGenome()` deriva una recipe candidata sin mutar la recipe original.
+
+### Evolución parcial
+
+`proposeMapForgeGenomeMutations()` acepta:
+
+- `lockedGenes`: nunca tocar genes concretos/prefijos;
+- `focusScopes`: limitar búsqueda a `style`, `roads`, `districts` o `landmarks`;
+- `focusGenes`: limitar a un distrito/landmark/gen concreto.
+
+Ejemplos conceptuales:
+
+```text
+lockedGenes: ['district.central.*']
+focusScopes: ['roads']
+focusGenes: ['district.harbor.*']
+```
+
+Esto permite preservar partes que funcionan y concentrar la búsqueda sin reescribir el generator core.
+
+## Golden seeds
+
+`map-forge-golden-seeds.mjs` contiene un corpus fijo por recipe. La evaluación V2 mezcla golden seeds con validation seeds derivadas de un seed del experimento.
+
+Un challenger no puede ganar porque tuvo suerte en una sola seed. `validRate` mantiene hard gate de 100 % sobre el banco ejecutado.
+
+## Score multidimensional Map Forge V2
+
+| Métrica | Peso | Gate |
+|---|---:|---|
+| `meanQuality` | 4.0 | — |
+| `worstQuality` | 2.5 | — |
+| `meanVisual` | 2.0 | — |
+| `worstVisual` | 1.25 | — |
+| `navigationFloor` | 1.5 | `>=60` |
+| `complexitySafety` | 1.0 | `>=55` |
+| `stability` | 1.0 | — |
+| `validRate` | 2.0 | `100%` |
+
+`generationMs` se registra como telemetría de rendimiento pero deliberadamente no entra todavía al score determinista: el tiempo de runner puede variar aunque el algoritmo no cambie. La evidencia Playwright registra además tiempo de render de preview.
+
+## Evidencia visual real
+
+`tests/map-forge-evolution-visual.spec.js` abre el checkout servido en Chromium, reutiliza `KELO_WORLD_BUILDER.renderSnapshotPreview()` y `mapDefinitionToWorldDraftSnapshot()`, renderiza baseline y resultado a Canvas y guarda:
+
+- `map-forge-evolution-baseline.png`;
+- `map-forge-evolution-champion.png`;
+- `map-forge-evolution-side-by-side.png`;
+- JSON con métricas de píxeles, scores y tiempos de generación/render.
+
+Las métricas de píxeles prueban que los renders no están vacíos; el scorer estructural sigue siendo la autoridad de aceptación. Un visual judge futuro puede añadirse como métrica adicional, no como sustituto de validez/navegación.
+
+## Champion overrides
+
+`map-forge-champion-overrides.mjs` empieza vacío. `map-forge-recipes.mjs` solo aplica entries que ya hayan llegado a `main` mediante revisión/CI. Cuando hay override, la recipe efectiva incorpora `-evo.<revision>` en su versión para que identidad/serialización no oculten el cambio.
+
+## Autopilot GitHub
+
+`.github/workflows/kelo-evolution-autopilot.yml` corre por `workflow_dispatch` y una vez al día.
+
+Flujo:
+
+```text
+checkout main
+→ audit:evolution
+→ champion vs challengers
+→ golden seed gate
+→ si no mejora: cero cambios
+→ si mejora: escribir champion + memory
+→ map-forge core audit + evolution audit + docs audit
+→ crear branch
+→ commit
+→ push branch
+→ abrir PR
+→ STOP
+```
+
+El workflow **no tiene paso de merge**. Normal CI/revisión sigue siendo la autoridad de promoción a `main`.
 
 ## Invariantes
 
-1. Ningún candidato se aplica antes de ser evaluado.
-2. Un hard gate fallido invalida el candidato aunque el promedio sea alto.
-3. Un candidato que no supera `minImprovement` no reemplaza baseline.
-4. Fallo en `apply` intenta rollback explícito.
-5. Sin candidato aceptado, `result === baseline` lógicamente.
-6. Map Forge conserva determinismo: mismos inputs ⇒ mismas propuestas, evaluaciones y estilo final.
-7. Map Forge Evolution no modifica renderer, Property, collision, camera ni publish.
-8. El adapter reutiliza `generateBestOf()` y el scorer owner; no crea un segundo quality engine.
-
-## Online-first
-
-`KeloEvolution` no decide autoridad. El contrato separa evaluación de aplicación.
-
-Hoy un caller local puede evaluar parámetros sin persistir nada. Para cambios valiosos/compartidos, el futuro server/CI puede ser quien ejecute o autorice `apply`. El candidato, sus métricas y la decisión de aceptación pueden serializarse sin cambiar el algoritmo de comparación.
-
-Para evolución de código, Git/CI/deploy siguen siendo capas externas. El engine solo puede aceptar un candidato que un agente externo le presente; no obtiene por sí mismo credenciales ni permisos de repositorio.
+1. Ningún challenger se aplica antes de evaluación.
+2. Hard gate fallido gana sobre promedio alto.
+3. `minImprovement` evita churn por diferencias insignificantes.
+4. `apply` fallido intenta rollback.
+5. Sandbox no escribe el checkout principal.
+6. Code candidate no puede ejecutar comandos arbitrarios.
+7. Paths sensibles se rechazan antes de materializar.
+8. Golden seeds se mantienen fijas y validation seeds complementan el corpus.
+9. Performance wall-clock es telemetría, no score determinista V2.
+10. Autopilot crea PR; nunca auto-merge.
+11. Runtime/browser no posee GitHub authority.
+12. Map Forge scorer/generator siguen siendo sus owners; Evolution orquesta, no duplica.
 
 ## Tests / CI
 
-`npm run audit:evolution` prueba:
+`npm run audit:evolution` cubre scoring, hard gates, sandbox hooks, champion/challenger, rollback, memory, path guard, golden seeds, locks/focus y determinismo Map Forge.
 
-- scoring ponderado maximize/minimize;
-- hard gate real;
-- rechazo de regresiones y mejoras demasiado pequeñas;
-- selección del mejor candidato;
-- rollback tras fallo de apply;
-- evolución Map Forge determinista en las recipes registradas;
-- garantía de no-regresión del estilo final contra baseline.
+`npm run audit:evolution:sandbox` crea un parche sintético sobre el checkout, lo ejecuta en un worktree aislado, comprueba el diff y prueba que `.env` es rechazado.
 
-`.github/workflows/kelo-evolution-ci.yml` ejecuta syntax check, `audit:evolution` y `audit:docs`.
+`Kelo Evolution Engine CI` ejecuta además Playwright y sube evidencia visual.
 
-## Observabilidad
+## Online-first
 
-Cada `evolveMapForgeStyle()` devuelve `history[]` con:
+La API separa proposición, evaluación, aplicación y persistencia. Un runner remoto futuro puede reemplazar GitHub Actions conservando candidate IDs, hashes, métricas, memoria y decisiones. Nada del contrato obliga a que autoridad crítica viva en el navegador.
 
-- generation;
-- baselineScore;
-- candidateScore;
-- delta;
-- candidateCount;
-- mutation step;
-- mutaciones del candidato ganador;
-- aceptación/rechazo.
+## Deuda pendiente
 
-No existe telemetría persistente en V1.
-
-## Deuda / siguientes extensiones
-
-- Conectar el adapter a una acción explícita de Map Forge UI/Worker para que el autor pueda lanzar evolución desde el editor sin bloquear el main thread.
-- Añadir golden seed suites separadas de las validation seeds cuando se quiera promover cambios de recipe por CI.
-- Añadir visual judge externo solo como métrica adicional, nunca sustituyendo validación estructural.
-- Crear adapter de code-patch candidate únicamente cuando exista sandbox/CI/apply/rollback seguro; no dar acceso directo del browser al repositorio.
+- visual judge semántico/vision como métrica secundaria;
+- ejecutar benchmarks de FPS del runtime jugable, no solo preview render;
+- adapter de code-patch que reciba propuestas de un agente externo y traduzca resultados de CI a score compuesto;
+- partial regeneration físico de chunks/distritos sin regenerar el mapa completo; V2 ya restringe **qué genes pueden cambiar**, pero el procedural core todavía reconstruye el candidato completo;
+- server/object storage opcional para memoria extensa si supera lo razonable para Git artifacts.
 
 ## Cómo extender sin duplicar owner
 
-- Nueva métrica genérica: usar `createEvolutionMetricProfile()`.
-- Nuevo consumidor: crear un adapter pequeño que produzca candidatos y evaluator; reutilizar `runEvolutionCycle()`.
-- Map Forge: extender `map-forge-evolution.mjs`; no duplicar `map-forge-quality.mjs`.
-- Código generado por IA: representar patch + metadata como candidato y conectar tests/CI como evaluator externo.
-- Nunca crear otro bus, renderer, Map Forge core, scorer o persistence owner para implementar evolución.
+- Nueva métrica: `createEvolutionMetricProfile()`.
+- Nuevo dominio: adapter pequeño + `runEvolutionCycle()`.
+- Nuevo code candidate: `kelo-code-patch-v1` + sandbox; no filesystem/Git dentro del engine.
+- Map Forge: extender gene catalog/evaluator; no duplicar `map-forge-quality.mjs`.
+- Persistencia: adaptar el snapshot de memory; no meter storage dentro del core.
