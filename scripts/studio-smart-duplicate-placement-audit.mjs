@@ -21,7 +21,7 @@ const kernel={
   document,
   selection:{get:()=>[...selection],set:ids=>{selection=[...ids];},clear:()=>{selection=[];}},
   tools:{get:id=>id==='select'?{armGrab:ids=>{armed=[...ids];}}:null},
-  async execute(command){executeCount++;lastSerialized=command.serialize();await command.execute({document});}
+  async execute(command){executeCount++;lastSerialized=command.serialize();}
 };
 const actions=createCreatorActions(kernel);
 const clones=await actions.duplicateSelection();
