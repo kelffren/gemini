@@ -17,12 +17,12 @@ const melee=root.KeloMeleeProfiles;
 const BASE_SPEED=185.28;
 const hz=[60,90,120];
 const expectedAbilities={
-  fireball:{before:.90,after:.96},
   chain_lightning:{before:.72,after:.84},
   shadow_step:{before:.90,after:1.00},
   poison_trap:{before:.70,after:.86},
   light_aura:{before:.60,after:.84},
-  swap_sword:{before:.72,after:.90}
+  swap_sword:{before:.72,after:.90},
+  ice_wall:{before:.80,after:.86}
 };
 const expectedMelee={
   sword_light_finisher:{windup:{before:.76,after:.80},recovery:{before:.76,after:.80}},
