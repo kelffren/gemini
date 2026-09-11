@@ -2,9 +2,19 @@
  * area: STUDIO / SELECT TOOL
  * owns: entity selection from spatial hit testing and one-shot armed grab handoff
  * does-not-own: pointer listeners, drawing or persistent document mutation
- * public-api: createSelectTool()
+ * public-api: createSelectTool(), resolveSelectHitRadius()
  * online: local transient state only
  */
+
+const MOBILE_MAX=760;
+const MOBILE_HIT_RADIUS=18;
+
+export function resolveSelectHitRadius(radius,{root=globalThis}={}){
+  if(radius!=null)return Math.max(0,Number(radius)||0);
+  const coarse=!!root?.matchMedia?.('(pointer: coarse)')?.matches;
+  const mobile=Number(root?.innerWidth||9999)<=MOBILE_MAX;
+  return coarse&&mobile?MOBILE_HIT_RADIUS:0;
+}
 
 export function createSelectTool(kernel) {
   if (!kernel) throw new Error('STUDIO_SELECT_KERNEL_REQUIRED');
@@ -43,8 +53,8 @@ export function createSelectTool(kernel) {
     return dx*dx+dy*dy;
   }
 
-  function pointHits(px,py,radius=0){
-    const r=Math.max(0,Number(radius)||0);
+  function pointHits(px,py,radius){
+    const r=resolveSelectHitRadius(radius);
     if(r<=0)return kernel.spatial.queryPoint(px,py,{category:'entity'}).slice().reverse();
     const hits=kernel.spatial.queryRect({x:px-r,y:py-r,w:r*2+1,h:r*2+1},{category:'entity'}).slice().reverse();
     return hits.map((hit,index)=>({hit,index,d:hitDistanceSquared(hit,px,py)}))
@@ -55,7 +65,7 @@ export function createSelectTool(kernel) {
 
   return Object.freeze({
     id: 'select',
-    selectPoint(x, y, { append = false, preserveExisting = true, cycle = true, radius = 0 } = {}) {
+    selectPoint(x, y, { append = false, preserveExisting = true, cycle = true, radius = null } = {}) {
       const px = Number(x) || 0;
       const py = Number(y) || 0;
 
