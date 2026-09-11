@@ -1,9 +1,9 @@
 /* KELO-INDEX
  * area: SERVER / IDENTITY
  * owner: Kelo server authority
- * keys: SUPABASE AUTH JWT CHARACTER ACCOUNT PUBLISHABLE KEY
- * purpose: verifica sesión Supabase y resuelve account -> character sin necesitar una secret key de Supabase en Render
- * online: Auth valida el JWT; la consulta de characters usa el mismo JWT + RLS; server/index.js conserva autoridad gameplay
+ * keys: SUPABASE AUTH JWT CHARACTER ACCOUNT PUBLISHABLE KEY BAN SUSPENSION ACCESS
+ * purpose: verifica sesión Supabase, estado de cuenta y ownership de personaje sin exponer una secret key al cliente
+ * online: Auth valida JWT; characters y get_my_account_access usan el mismo JWT + RLS/RPC
  * do-not: NO confiar userId/characterId declarados por cliente, NO exponer secret/service-role key, NO usar user_metadata para autorización
  */
 'use strict';
@@ -39,6 +39,21 @@ function createOnlineIdentityStore(options={}){
     const normalized={id:String(user.id).toLowerCase(),email:user.email||null,isAnonymous:Boolean(user.is_anonymous)};cacheSet(token,normalized);return normalized;
   }
 
+  async function getAccountAccess(rawToken){
+    if(!configured)throw new Error('SUPABASE_NOT_CONFIGURED');
+    const token=short(rawToken,8192);if(!token)throw new Error('AUTH_TOKEN_REQUIRED');
+    try{
+      const access=await request(`${supabaseUrl}/rest/v1/rpc/get_my_account_access`,{method:'POST',headers:userHeaders(token),body:'{}'});
+      const row=Array.isArray(access)?access[0]:access;
+      if(!row||typeof row!=='object')return{status:'active',roles:[],permissions:[],legacy:false};
+      return{status:String(row.status||'active'),reason:row.reason||null,expiresAt:row.expires_at||null,roles:Array.isArray(row.roles)?row.roles.map(String):[],permissions:Array.isArray(row.permissions)?row.permissions.map(String):[],legacy:false};
+    }catch(error){
+      const raw=String(error&&error.message||error);
+      if(error?.status===404||raw.includes('PGRST202')||raw.includes('42883'))return{status:'active',roles:[],permissions:[],legacy:true};
+      throw error;
+    }
+  }
+
   async function getCharacter(accountId,characterId,rawToken){
     if(!configured)throw new Error('SUPABASE_NOT_CONFIGURED');
     if(!UUID_RE.test(String(accountId||''))||!UUID_RE.test(String(characterId||'')))throw new Error('INVALID_CHARACTER_ID');
@@ -52,11 +67,15 @@ function createOnlineIdentityStore(options={}){
     const accessToken=short(input.accessToken,8192),characterId=short(input.characterId,80);
     if(!configured){if(requireAuth)throw new Error('SUPABASE_NOT_CONFIGURED');return{authenticated:false,source:'legacy-local'};}
     if(!accessToken){if(requireAuth)throw new Error('AUTH_TOKEN_REQUIRED');return{authenticated:false,source:'legacy-transition'};}
-    const user=await verifyAccessToken(accessToken);if(!characterId)throw new Error('CHARACTER_REQUIRED');
+    const user=await verifyAccessToken(accessToken);
+    const access=await getAccountAccess(accessToken);
+    if(access.status==='banned')throw new Error('ACCOUNT_BANNED');
+    if(access.status==='suspended')throw new Error('ACCOUNT_SUSPENDED');
+    if(!characterId)throw new Error('CHARACTER_REQUIRED');
     const character=await getCharacter(user.id,characterId,accessToken);if(!character)throw new Error('CHARACTER_NOT_OWNED');
-    return{authenticated:true,source:'supabase-auth-rls',accountId:user.id,characterId:String(character.id).toLowerCase(),playerKey:String(character.id).toLowerCase(),name:short(character.name,24)||short(input.name,24)||'Kelo',legacyPlayerKey:character.legacy_player_key||null,isAnonymous:user.isAnonymous};
+    return{authenticated:true,source:'supabase-auth-rls',accountId:user.id,characterId:String(character.id).toLowerCase(),playerKey:String(character.id).toLowerCase(),name:short(character.name,24)||short(input.name,24)||'Kelo',legacyPlayerKey:character.legacy_player_key||null,isAnonymous:user.isAnonymous,roles:access.roles,permissions:access.permissions};
   }
 
-  return Object.freeze({version:'kelo-online-identity-v2',configured,requireAuth,source:configured?'supabase-auth-ready':'legacy-local',verifyAccessToken,getCharacter,resolve,audit:()=>({version:'kelo-online-identity-v2',configured,requireAuth,cacheSize:tokenCache.size,apiKeyModel:keyModel(apiKey)})});
+  return Object.freeze({version:'kelo-online-identity-v3-access-control',configured,requireAuth,source:configured?'supabase-auth-ready':'legacy-local',verifyAccessToken,getAccountAccess,getCharacter,resolve,audit:()=>({version:'kelo-online-identity-v3-access-control',configured,requireAuth,cacheSize:tokenCache.size,apiKeyModel:keyModel(apiKey),accountAccessRpc:true})});
 }
 module.exports={createOnlineIdentityStore};
