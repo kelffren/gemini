@@ -1,6 +1,6 @@
 /* KELO-INDEX
  * area: STUDIO / HISTORY
- * owns: undo/redo journal and memory budget
+ * owns: undo/redo journal, explicit burst coalescing and memory budget
  * does-not-own: document mutation, persistence, networking
  * public-api: createHistoryManager()
  * online: no
@@ -29,7 +29,22 @@ export function createHistoryManager({ budgetBytes = DEFAULT_BUDGET_BYTES } = {}
     if (!entry || typeof entry.undo !== 'function' || typeof entry.redo !== 'function') {
       throw new Error('STUDIO_HISTORY_INVALID_ENTRY');
     }
-    const wrapped = { ...entry, __bytes: Math.max(64, Number(entry.bytes) || byteSize(entry.serialized)) };
+    const now = Date.now();
+    const wrapped = { ...entry, __bytes: Math.max(64, Number(entry.bytes) || byteSize(entry.serialized)), __pushedAt: now };
+    const previous = undoStack[undoStack.length - 1];
+    const mergeWindowMs = Math.max(0, Number(wrapped.mergeWindowMs) || 0);
+    if (wrapped.mergeKey && previous?.mergeKey === wrapped.mergeKey && mergeWindowMs > 0 && now - (previous.__pushedAt || 0) <= mergeWindowMs) {
+      const first = previous.serialized?.type === 'history.coalesced' ? previous.serialized.first : previous.serialized;
+      const serialized = { type: 'history.coalesced', key: wrapped.mergeKey, first, last: wrapped.serialized };
+      const affectedRects = [...(previous.affectedRects || []), ...(wrapped.affectedRects || [])];
+      const merged = { ...wrapped, undo: previous.undo, serialized, affectedRects, __bytes: Math.max(64, byteSize(serialized)), __pushedAt: now };
+      usedBytes -= previous.__bytes || 0;
+      undoStack[undoStack.length - 1] = merged;
+      usedBytes += merged.__bytes;
+      redoStack.length = 0;
+      trim();
+      return merged;
+    }
     undoStack.push(wrapped);
     usedBytes += wrapped.__bytes;
     redoStack.length = 0;
