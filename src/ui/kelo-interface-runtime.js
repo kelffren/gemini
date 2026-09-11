@@ -1,14 +1,14 @@
 /* KELO-INDEX
  * area: UI / INTERFACE RUNTIME
  * owner: Kelo Interface System
- * purpose: progressive disclosure, contextual actions and accessibility upgrades for shared Kelo software surfaces
+ * purpose: progressive disclosure, contextual actions and accessibility upgrades across Kelo software surfaces
  * do-not-own: feature state, gameplay state, persistence or editor mutations
  */
 (function(){
 'use strict';
 if(window.KELO_INTERFACE_RUNTIME)return;
 
-const VERSION='kelo-interface-runtime-v1.1.0';
+const VERSION='kelo-interface-runtime-v1.2.0';
 const RUNTIME_STYLE_ID='kelo-interface-runtime-style';
 
 function ensureStyle(){
@@ -31,6 +31,15 @@ function ensureStyle(){
 
 function text(el,value){if(el&&el.textContent!==value)el.textContent=value;}
 function aria(el,label){if(el&&!el.getAttribute('aria-label'))el.setAttribute('aria-label',label);}
+function relabel(button,map){
+  if(!button)return;
+  const raw=button.textContent?.trim()||'';
+  const next=map[raw];
+  if(next)text(button,next);
+  const label=(next||button.textContent||'').trim();
+  if(label)aria(button,label);
+}
+function relabelAll(host,selector,map){host?.querySelectorAll(selector).forEach(button=>relabel(button,map));}
 
 function enhanceLuxe(host){
   if(!host)return;
@@ -86,7 +95,6 @@ function syncAssetRepairer(host){
   const exportButton=host.querySelector('[data-act="export"]');
   const hasAsset=Boolean(exportButton&&!exportButton.disabled);
   host.dataset.kuiHasAsset=hasAsset?'true':'false';
-
   host.querySelectorAll('[data-tool]').forEach(button=>{button.disabled=!hasAsset;});
   const reset=host.querySelector('[data-act="reset"]');
   const undo=host.querySelector('[data-act="undo"]');
@@ -98,11 +106,9 @@ function enhanceAssetRepairer(host){
   if(!host)return;
   if(host.dataset.kuiEnhanced!=='true'){
     host.dataset.kuiEnhanced='true';
-
     text(host.querySelector('.kar-title small'),'Clean, align and export assets');
     text(host.querySelector('.kar-stage-head h2'),'Preview');
     text(host.querySelector('.kar-kicker'),'Repair');
-
     const steps=[...host.querySelectorAll('.kar-step span')];
     ['Import','Repair','Review','Export'].forEach((label,index)=>text(steps[index],label));
 
@@ -123,19 +129,16 @@ function enhanceAssetRepairer(host){
       auto.dataset.kuiRole='primary';
       aria(auto,'Automatically repair the current asset');
     }
-
     const align=host.querySelector('[data-tool="align"]');
     if(align){
       text(align.querySelector('strong'),'Align Frames');
       text(align.querySelector('small'),'Lock animation to feet');
       aria(align,'Align animation frames to a shared feet anchor');
     }
-
     for(const tool of ['background','edges','pivot','scale','seams']){
       const button=host.querySelector(`[data-tool="${tool}"]`);
       if(button)button.dataset.kuiAdvanced='1';
     }
-
     const tools=host.querySelector('.kar-tools');
     if(tools&&!tools.querySelector('[data-kui-more-tools]')){
       const more=document.createElement('button');
@@ -148,11 +151,95 @@ function enhanceAssetRepairer(host){
       more.addEventListener('click',()=>setAdvanced(host,host.dataset.kuiAdvanced!=='true'));
       tools.appendChild(more);
     }
-
     setAdvanced(host,false);
   }
-
   syncAssetRepairer(host);
+}
+
+const BAG_LABELS=Object.freeze({
+  '⚔ EQUIPO':'⚔ Equipo','♟ APARIENCIA':'♟ Apariencia','☰ ORGANIZAR':'Organizar',
+  'DESEQUIPAR':'Desequipar','EQUIPAR':'Equipar','MOVER':'Mover','CANCELAR MOVER':'Cancelar',
+  'DIVIDIR':'Dividir','CANCELAR DIVIDIR':'Cancelar','DESCARTAR':'Descartar','CANCELAR':'Cancelar',
+  'SEPARAR':'Separar','CONFIRMAR DESCARTE':'Descartar definitivamente','RESTABLECER HABILIDADES':'Restablecer habilidades'
+});
+function enhanceBackpack(host){
+  if(!host)return;
+  aria(host.querySelector('.kb-close'),'Cerrar Mochila');
+  relabelAll(host,'.kb-main-tab,.kb-sort,.kb-action',BAG_LABELS);
+  const filters={all:'Todo',consumables:'Consumibles',materials:'Materiales',missions:'Misiones',others:'Otros'};
+  host.querySelectorAll('.kb-category[data-filter]').forEach(button=>{const label=filters[button.dataset.filter];if(label)text(button,label);aria(button,label||button.textContent?.trim());});
+  host.querySelectorAll('.kb-card-title').forEach(title=>{
+    if(title.textContent==='ATRIBUTOS')text(title,'Atributos');
+    else if(title.textContent==='APARIENCIA')text(title,'Apariencia');
+    else if(title.textContent?.startsWith('HABILIDADES DEL ARMA · '))text(title,title.textContent.replace('HABILIDADES DEL ARMA · ','Habilidades del arma · '));
+  });
+}
+
+function enhanceMarket(host){
+  if(!host)return;
+  text(host.querySelector('.km-title'),'Mercado');
+  aria(host.querySelector('.km-close'),'Cerrar Mercado');
+  const browse=host.querySelector('.km-tab[data-tab="browse"]');
+  if(browse)text(browse,'Explorar');
+  const mine=host.querySelector('.km-tab[data-tab="mine"]');
+  if(mine){const count=mine.textContent?.match(/\((\d+)\)/)?.[1];text(mine,`Mis publicaciones${count?` (${count})`:''}`);}
+  relabelAll(host,'.km-cancel',{'CANCELAR PUBLICACIÓN':'Cancelar publicación'});
+  host.querySelectorAll('button').forEach(button=>aria(button,button.textContent?.trim()));
+}
+
+function enhanceWarehouse(host){
+  if(!host)return;
+  text(host.querySelector('.kw-title'),'Almacén');
+  aria(host.querySelector('.kw-close'),'Cerrar Almacén');
+  const backpack=host.querySelector('.kw-tab[data-c="backpack"]');
+  const warehouse=host.querySelector('.kw-tab[data-c="warehouse"]');
+  if(backpack)text(backpack,'Mochila');
+  if(warehouse)text(warehouse,'Almacén');
+  relabelAll(host,'.kw-go',{'TRANSFERIR':'Transferir'});
+  host.querySelectorAll('button').forEach(button=>aria(button,button.textContent?.trim()));
+}
+
+const MOUNT_LABELS=Object.freeze({'EQUIPAR':'Equipar','MONTAR':'Montar','DESMONTAR':'Desmontar'});
+function enhanceMount(host){
+  if(!host)return;
+  const heading=host.firstElementChild?.querySelector?.('b');
+  if(heading?.textContent==='MONTURAS')text(heading,'Monturas');
+  host.querySelectorAll('button').forEach(button=>{
+    const raw=button.textContent?.trim()||'';
+    if(raw==='MONTAR')button.dataset.kuiRole='primary';
+    relabel(button,MOUNT_LABELS);
+    if(raw==='✕')aria(button,'Cerrar Monturas');
+  });
+  host.querySelectorAll('select').forEach(select=>{
+    if(!select.getAttribute('aria-label')){
+      const label=select.closest('div')?.querySelector('span,b')?.textContent?.trim();
+      if(label)select.setAttribute('aria-label',label);
+    }
+  });
+}
+
+const COMMERCE_LABELS=Object.freeze({
+  'MERCADO':'Mercado','MI PUESTO':'Mi puesto','TRADE DEMO':'Intercambio','SALIR':'Salir',
+  'COMPRAR':'Comprar','PUBLICAR':'Publicar','CANCELAR':'Cancelar','ACEPTAR':'Aceptar','RECHAZAR':'Rechazar',
+  'LISTO':'Listo','CONFIRMAR':'Confirmar','CANCELAR TRADE':'Cancelar intercambio'
+});
+function enhanceCommerce(dock,modal){
+  if(dock)relabelAll(dock,'button',COMMERCE_LABELS);
+  if(!modal)return;
+  aria(modal.querySelector('.kc-close'),'Cerrar Comercio');
+  relabelAll(modal,'button',COMMERCE_LABELS);
+  modal.querySelectorAll('button').forEach(button=>aria(button,button.textContent?.trim()));
+}
+
+function enhanceHouse(host,exit){
+  if(host){
+    text(host.querySelector('.hi-title'),'Mi propiedad');
+    aria(host.querySelector('.hi-close'),'Cerrar Propiedad');
+    relabel(host.querySelector('#hi-enter'),{'ENTRAR A MI CASA':'Entrar a mi casa'});
+    relabel(host.querySelector('#hi-exterior'),{'PARCELA EXTERIOR':'Parcela exterior'});
+    relabel(host.querySelector('#hi-test'),{'ASSETS DE PRUEBA':'Assets de prueba'});
+  }
+  if(exit){text(exit,'Salir de casa');aria(exit,'Salir de casa');}
 }
 
 function scan(root=document){
@@ -162,6 +249,12 @@ function scan(root=document){
   enhanceCreators(root.querySelector?.('#kelo-creators-hub'));
   enhanceStudio(root.querySelector?.('#kelo-studio-live'));
   enhanceAssetRepairer(root.querySelector?.('#kelo-asset-repairer'));
+  enhanceBackpack(root.querySelector?.('#kelo-bag'));
+  enhanceMarket(root.querySelector?.('#kelo-market-v1'));
+  enhanceWarehouse(root.querySelector?.('#kelo-warehouse'));
+  enhanceMount(root.querySelector?.('#kelo-mount-panel'));
+  enhanceCommerce(root.querySelector?.('#kelo-commerce-dock'),root.querySelector?.('#kelo-commerce-modal'));
+  enhanceHouse(root.querySelector?.('#kelo-house-panel'),root.querySelector?.('#hi-exit'));
 }
 
 const observer=new MutationObserver(()=>scan(document));
