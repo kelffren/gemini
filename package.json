@@ -50,7 +50,9 @@
     "audit:sprite-compiler-grid": "node scripts/sprite-compiler-grid-audit.mjs",
     "audit:sprite-frame-doctor": "node scripts/sprite-frame-doctor-audit.mjs",
     "audit:creator-suite": "node scripts/creator-definition-suite-audit.mjs",
-    "audit:evolution": "node scripts/kelo-evolution-audit.mjs"
+    "audit:evolution": "node scripts/kelo-evolution-audit.mjs",
+    "audit:evolution:sandbox": "node scripts/kelo-evolution-sandbox-audit.mjs",
+    "evolution:map-forge": "node scripts/map-forge-evolution-autopilot.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0"
