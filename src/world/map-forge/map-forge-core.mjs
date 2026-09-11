@@ -12,13 +12,13 @@
 import {clamp,freezeDeep,stableStringify,hashString,seed32,createRng} from './map-forge-prng.mjs';
 import {createMapIntent,buildCandidateParts} from './map-forge-builder.mjs';
 import {validateMapDefinition,scoreMapDefinition} from './map-forge-quality.mjs';
-export const MAP_FORGE_GENERATOR_VERSION='1.1.3';
+export const MAP_FORGE_GENERATOR_VERSION='1.1.2';
 export {createMapIntent} from './map-forge-builder.mjs';
 export {createRng,stableStringify} from './map-forge-prng.mjs';
 export {validateMapDefinition,scoreMapDefinition} from './map-forge-quality.mjs';
 
 const DIRECTIONAL_DECORATION_FAMILIES=new Set(['bench','market_prop']);
-const DECORATION_DECLUSTER_RADIUS=250;
+const DECORATION_DECLUSTER_RADIUS=240;
 const DECORATION_DECLUSTER_GAIN=24;
 const decorationDistance=(a,b)=>Math.hypot(Number(a?.x||0)-Number(b?.x||0),Number(a?.y||0)-Number(b?.y||0));
 function nearestFamilyDistance(rows,index,family){const current=rows[index];let best=Infinity;for(let i=0;i<rows.length;i++){if(i===index)continue;const row=rows[i];if(row.district!==current.district||row.family!==family)continue;best=Math.min(best,decorationDistance(current,row));}return best;}
