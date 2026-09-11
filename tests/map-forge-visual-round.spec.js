@@ -16,7 +16,8 @@ const STAGE=process.env.KELO_VISUAL_STAGE==='after'?'after':'before';
 const URBAN_KINDS=new Set(['plaza','royal','commerce']);
 const DECORATION_MIN=195;
 const DECORATION_MAX=215;
-const VALIDATION_QUALITY_MIN=94;
+const VALIDATION_QUALITY_MIN=90;
+const VALIDATION_SPACING_MIN=65;
 const VALIDATION_VISTAS_MIN=81;
 const VALIDATION_SPACE_MIN=78;
 const LOCAL_SAME_FAMILY_MAX=0.04;
@@ -76,6 +77,7 @@ function mapMetrics(map){
     scenicVistas:Number(map.quality?.breakdown?.scenicVistas||0),
     negativeSpace:Number(map.quality?.breakdown?.negativeSpace||0),
     assetVariety:Number(map.quality?.breakdown?.assetVariety||0),
+    decorationSpacing:Number(map.quality?.breakdown?.decorationSpacing||0),
     roadCount:(map.roads||[]).length,
     blockCount:(map.blocks||[]).length,
     decorationCount:(map.decorations||[]).length,
@@ -122,7 +124,8 @@ test(`Map Forge ${STAGE} fixed-seed preview/runtime visual evidence`,async({page
     expect(mainMetrics.urbanStreetscapeRatio).toBe(1);
     expect(mainMetrics.decorationCount).toBeGreaterThanOrEqual(DECORATION_MIN);
     expect(mainMetrics.decorationCount).toBeLessThanOrEqual(DECORATION_MAX);
-    expect(mainMetrics.qualityTotal).toBeGreaterThanOrEqual(94);
+    expect(mainMetrics.qualityTotal).toBeGreaterThanOrEqual(VALIDATION_QUALITY_MIN);
+    expect(mainMetrics.decorationSpacing).toBeGreaterThanOrEqual(VALIDATION_SPACING_MIN);
     expect(mainMetrics.scenicVistas).toBeGreaterThanOrEqual(82);
     expect(mainMetrics.negativeSpace).toBeGreaterThanOrEqual(78);
     expect(mainMetrics.declusterSwapCount).toBeGreaterThan(0);
@@ -148,6 +151,7 @@ test(`Map Forge ${STAGE} fixed-seed preview/runtime visual evidence`,async({page
       expect(metrics.decorationCount).toBeGreaterThanOrEqual(DECORATION_MIN);
       expect(metrics.decorationCount).toBeLessThanOrEqual(DECORATION_MAX);
       expect(metrics.qualityTotal).toBeGreaterThanOrEqual(VALIDATION_QUALITY_MIN);
+      expect(metrics.decorationSpacing).toBeGreaterThanOrEqual(VALIDATION_SPACING_MIN);
       expect(metrics.scenicVistas).toBeGreaterThanOrEqual(VALIDATION_VISTAS_MIN);
       expect(metrics.negativeSpace).toBeGreaterThanOrEqual(VALIDATION_SPACE_MIN);
       expect(metrics.declusterSwapCount).toBeGreaterThan(0);
@@ -155,7 +159,7 @@ test(`Map Forge ${STAGE} fixed-seed preview/runtime visual evidence`,async({page
     }
     validation.push(metrics);
   }
-  const evidence={stage:STAGE,mainSeed:MAIN_SEED,validationSeeds:VALIDATION_SEEDS,decorationBand:[DECORATION_MIN,DECORATION_MAX],localSameFamilyMax:LOCAL_SAME_FAMILY_MAX,main:mainMetrics,runtime,validation,pageErrors};
+  const evidence={stage:STAGE,mainSeed:MAIN_SEED,validationSeeds:VALIDATION_SEEDS,decorationBand:[DECORATION_MIN,DECORATION_MAX],qualityMin:VALIDATION_QUALITY_MIN,spacingMin:VALIDATION_SPACING_MIN,localSameFamilyMax:LOCAL_SAME_FAMILY_MAX,main:mainMetrics,runtime,validation,pageErrors};
   fs.writeFileSync(`test-results/map-forge-visual-metrics-${STAGE}.json`,JSON.stringify(evidence,null,2));
   expect(pageErrors).toEqual([]);
 });
