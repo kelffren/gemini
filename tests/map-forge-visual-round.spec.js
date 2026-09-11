@@ -30,6 +30,32 @@ function nearestRoadDistance(p,roads){
   for(const road of roads||[])for(let i=1;i<(road.polyline||[]).length;i++)best=Math.min(best,pointSegmentDistance(p,road.polyline[i-1],road.polyline[i]));
   return best;
 }
+function decorationRhythmMetrics(map){
+  const decorations=map.decorations||[],nearestDistances=[];
+  let localNeighborCount=0,localSameFamilyCount=0;
+  for(let i=0;i<decorations.length;i++){
+    const current=decorations[i];let nearest=null,best=Infinity;
+    for(let j=0;j<decorations.length;j++){
+      if(i===j)continue;
+      const candidate=decorations[j];
+      if(candidate.district!==current.district)continue;
+      const distance=Math.hypot(candidate.x-current.x,candidate.y-current.y);
+      if(distance<best){best=distance;nearest=candidate;}
+    }
+    if(!nearest||!Number.isFinite(best))continue;
+    nearestDistances.push(best);
+    if(best<=220){localNeighborCount++;if(nearest.family===current.family)localSameFamilyCount++;}
+  }
+  const mean=nearestDistances.length?nearestDistances.reduce((sum,value)=>sum+value,0)/nearestDistances.length:0;
+  const variance=nearestDistances.length?nearestDistances.reduce((sum,value)=>sum+(value-mean)**2,0)/nearestDistances.length:0;
+  return{
+    nearestSpacingMean:Number(mean.toFixed(2)),
+    nearestSpacingCv:mean?Number((Math.sqrt(variance)/mean).toFixed(4)):0,
+    localNeighborCount,
+    localSameFamilyCount,
+    localSameFamilyRatio:localNeighborCount?Number((localSameFamilyCount/localNeighborCount).toFixed(4)):0
+  };
+}
 function mapMetrics(map){
   const districtById=new Map((map.districts||[]).map(d=>[d.id,d]));
   const urban=(map.decorations||[]).filter(d=>URBAN_KINDS.has(districtById.get(d.district)?.kind));
@@ -51,7 +77,8 @@ function mapMetrics(map){
     urbanDecorationCount:urban.length,
     urbanStreetscapeCount:streetscape,
     urbanStreetscapeRatio:urban.length?Number((streetscape/urban.length).toFixed(4)):1,
-    familyCounts
+    familyCounts,
+    ...decorationRhythmMetrics(map)
   };
 }
 
