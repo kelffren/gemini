@@ -10,6 +10,7 @@ export function createSpatialChunkIndex({ chunkSize = 512 } = {}) {
   chunkSize = Math.max(64, Number(chunkSize) || 512);
   const entries = new Map();
   const buckets = new Map();
+  let lastQuery = Object.freeze({ bucketsScanned: 0, membershipChecks: 0, uniqueCandidates: 0, results: 0 });
 
   const key = (x, y) => `${x},${y}`;
   const rangeFor = r => ({ minX: Math.floor(r.x / chunkSize), minY: Math.floor(r.y / chunkSize), maxX: Math.floor((r.x + Math.max(0, r.w - 1)) / chunkSize), maxY: Math.floor((r.y + Math.max(0, r.h - 1)) / chunkSize) });
@@ -32,13 +33,32 @@ export function createSpatialChunkIndex({ chunkSize = 512 } = {}) {
   }
 
   function queryRect(rect, { category } = {}) {
-    const ids = new Set(); for (const k of keysFor(rect)) for (const id of buckets.get(k) || []) ids.add(id);
-    const x2 = rect.x + rect.w, y2 = rect.y + rect.h;
-    return [...ids].map(id => entries.get(id)).filter(e => e && (!category || e.category === category) && e.rect.x < x2 && e.rect.x + e.rect.w > rect.x && e.rect.y < y2 && e.rect.y + e.rect.h > rect.y);
+    const q = rangeFor(rect), seen = new Set(), out = [];
+    const rx = Number(rect.x) || 0, ry = Number(rect.y) || 0, rw = Math.max(1, Number(rect.w) || 1), rh = Math.max(1, Number(rect.h) || 1), x2 = rx + rw, y2 = ry + rh;
+    let bucketsScanned = 0, membershipChecks = 0;
+    for (let cy = q.minY; cy <= q.maxY; cy++) for (let cx = q.minX; cx <= q.maxX; cx++) {
+      bucketsScanned++;
+      const bucket = buckets.get(key(cx, cy));
+      if (!bucket) continue;
+      for (const id of bucket) {
+        membershipChecks++;
+        if (seen.has(id)) continue;
+        seen.add(id);
+        const e = entries.get(id);
+        if (e && (!category || e.category === category) && e.rect.x < x2 && e.rect.x + e.rect.w > rx && e.rect.y < y2 && e.rect.y + e.rect.h > ry) out.push(e);
+      }
+    }
+    lastQuery = Object.freeze({ bucketsScanned, membershipChecks, uniqueCandidates: seen.size, results: out.length });
+    return out;
   }
 
   function queryPoint(x, y, options) { return queryRect({ x, y, w: 1, h: 1 }, options); }
-  function clear() { entries.clear(); buckets.clear(); }
+  function clear() { entries.clear(); buckets.clear(); lastQuery = Object.freeze({ bucketsScanned: 0, membershipChecks: 0, uniqueCandidates: 0, results: 0 }); }
 
-  return Object.freeze({ upsert, remove, queryRect, queryPoint, clear, get: id => entries.get(String(id)) || null, get chunkSize() { return chunkSize; }, stats: () => ({ entries: entries.size, buckets: buckets.size }) });
+  return Object.freeze({
+    upsert, remove, queryRect, queryPoint, clear,
+    get: id => entries.get(String(id)) || null,
+    get chunkSize() { return chunkSize; },
+    stats: () => ({ entries: entries.size, buckets: buckets.size, lastQuery: { ...lastQuery } })
+  });
 }
