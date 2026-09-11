@@ -10,13 +10,13 @@
  */
 export const MAP_FORGE_CHAMPION_OVERRIDES=Object.freeze({
   KELO_ROYAL_CAPITAL_V1:Object.freeze({
-    revision:15,
+    revision:16,
     genes:Object.freeze({
       'road.curvature':0.34,
       'road.arterialWidth':104,
       'road.collectorWidth':72,
-      'style.decoration':0.62,
-      'landmark.fountain.keepClearRadius':210
+      'style.decoration':0.60,
+      'landmark.fountain.keepClearRadius':215
     })
   })
 });
