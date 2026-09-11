@@ -21,6 +21,16 @@ if (r2.sx !== 0 || r2.sy !== 38) throw new Error('SPACING_Y_WRONG');
 const withSpawn = addAnimationEvent(moved, 'PROJECTILE_SPAWN', 1);
 if (!withSpawn.events.some(e => e.type === 'PROJECTILE_SPAWN' && e.frame === 1)) throw new Error('EXTRA_EVENT_MISSING');
 if (withSpawn.events.filter(e => e.type === 'IMPACT').length !== 1) throw new Error('IMPACT_LOST_AFTER_EXTRA_EVENT');
+const looped = normalizeSpriteAbilityDocument({ sheet: { loop: true } });
+if (looped.sheet.loop !== true) throw new Error('LOOP_NOT_PRESERVED');
+const tight = validateSpriteAbilityDocument({
+  sheet: { dataUrl: 'data:image/png;base64,AA==', imageWidth: 68, imageHeight: 32, columns: 2, rows: 1, frameWidth: 32, frameHeight: 32, spacingX: 4 }
+});
+if (!tight.ok) throw new Error('SPACING_GRID_SHOULD_FIT:' + tight.errors.join(','));
+const overflow = validateSpriteAbilityDocument({
+  sheet: { dataUrl: 'data:image/png;base64,AA==', imageWidth: 64, imageHeight: 32, columns: 2, rows: 1, frameWidth: 32, frameHeight: 32, spacingX: 4 }
+});
+if (overflow.ok || !overflow.errors.includes('GRID_W_EXCEEDS_IMAGE')) throw new Error('SPACING_OVERFLOW_NOT_DETECTED');
 const bad = validateSpriteAbilityDocument({ sheet: { dataUrl: '' } });
 if (bad.ok || !bad.errors.includes('SPRITESHEET_REQUIRED')) throw new Error('VALIDATION_SHOULD_FAIL');
 console.log('SPRITE_ABILITY_EVENTS_AUDIT: PASS');

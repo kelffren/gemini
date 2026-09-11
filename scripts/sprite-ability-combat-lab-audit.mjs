@@ -34,7 +34,7 @@ assert.deepEqual(built.ability.authoring.hitbox,{x:12,y:-44,width:156,height:72}
 assert.equal(validateSpriteAbilityDocument(draft).ok,true);
 
 const controller=await readFile(new URL('../src/creators/sprite-ability/sprite-ability-live-controller.mjs',import.meta.url),'utf8');
-assert.match(controller,/BUILDER V1\.2/);
+assert.match(controller,/BUILDER V1\.3/);
 assert.match(controller,/sab-timeline/);
 assert.match(controller,/timelineDrag/);
 assert.match(controller,/active-start/);
@@ -44,5 +44,11 @@ assert.match(controller,/playbackRate/);
 assert.match(controller,/onUndo:undo/);
 assert.match(controller,/ONION/);
 assert.match(controller,/HITBOX/);
+assert.match(controller,/Spacing X/);
+assert.match(controller,/Origin X/);
+assert.match(controller,/TEST IN GAME/);
+assert.match(controller,/LOOP ON/);
+assert.match(controller,/onwheel/);
+assert.match(controller,/setPlaybackRate\(2\)|2\]\)/);
 
 console.log(JSON.stringify({ok:true,spriteAbilityCombatLab:true,timeline:true,scrub:true,activeWindow:true,editableHitbox:true,slowMotion:true,onionSkin:true,undoRedo:true,generatedHitbox:hit.payload.box},null,2));
