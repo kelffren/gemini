@@ -8,4 +8,11 @@
  * online: base-world recipe data only; server/runtime deltas remain separate
  * do-not: no generator logic, runtime writes or auto-merge authority
  */
-export const MAP_FORGE_CHAMPION_OVERRIDES=Object.freeze({});
+export const MAP_FORGE_CHAMPION_OVERRIDES=Object.freeze({
+  KELO_ROYAL_CAPITAL_V1:Object.freeze({
+    revision:1,
+    genes:Object.freeze({
+      'road.curvature':0.34
+    })
+  })
+});
