@@ -46,8 +46,15 @@ export function createStudioCameraController({root=globalThis,onNavigateStart=()
   }
   function setPanMode(value){panMode=!!value;if(!panMode){mousePan=null;touchPan=null;}return panMode;}
   function consume(e){e.preventDefault?.();e.stopImmediatePropagation?.();}
+  function resetTransientNavigation(reason='reset'){
+    const delegated=pinch?.mode==='delegate';
+    space=false;mousePan=null;touchPan=null;pinch=null;pointers.clear();navTouchIds.clear();
+    if(delegated){try{onPinchEnd({cancelled:true,reason});}catch{}}
+  }
   function keydown(e){if(e.code==='Space'&&!isUi(e)){space=true;e.preventDefault();}}
   function keyup(e){if(e.code==='Space')space=false;}
+  function blur(){resetTransientNavigation('blur');}
+  function visibilitychange(){if(document.hidden)resetTransientNavigation('hidden');}
   function wheel(e){if(!enabled||isUi(e))return;onNavigateStart();const factor=Math.exp(-Number(e.deltaY||0)*.0012);setZoom(zoom*factor,{anchorX:e.clientX,anchorY:e.clientY});consume(e);}
   function pointerdown(e){
     if(!enabled||isUi(e))return;
@@ -78,15 +85,17 @@ export function createStudioCameraController({root=globalThis,onNavigateStart=()
     const s=snapshot();owner.setTarget(s.x,s.y,{snap:true,source:'kelo-studio-resume'});
   }
   function suspend(){
-    if(!enabled)return;studioView={camera:snapshot(),zoom};enabled=false;restoreGameplayOwnership();mousePan=null;touchPan=null;pinch=null;pointers.clear();navTouchIds.clear();
+    if(!enabled)return;studioView={camera:snapshot(),zoom};enabled=false;restoreGameplayOwnership();resetTransientNavigation('suspend');
   }
   function destroy(){
     if(enabled)restoreGameplayOwnership();
-    enabled=false;mousePan=null;touchPan=null;pinch=null;pointers.clear();navTouchIds.clear();
+    enabled=false;resetTransientNavigation('destroy');
+    root.removeEventListener?.('blur',blur,true);document.removeEventListener('visibilitychange',visibilitychange,true);
     document.removeEventListener('keydown',keydown,true);document.removeEventListener('keyup',keyup,true);document.removeEventListener('wheel',wheel,true);document.removeEventListener('pointerdown',pointerdown,true);document.removeEventListener('pointermove',pointermove,true);document.removeEventListener('pointerup',pointerup,true);document.removeEventListener('pointercancel',pointerup,true);
   }
 
   freezeFollow();applyStudioZoom();
+  root.addEventListener?.('blur',blur,true);document.addEventListener('visibilitychange',visibilitychange,true);
   document.addEventListener('keydown',keydown,true);document.addEventListener('keyup',keyup,true);document.addEventListener('wheel',wheel,{capture:true,passive:false});document.addEventListener('pointerdown',pointerdown,{capture:true,passive:false});document.addEventListener('pointermove',pointermove,{capture:true,passive:false});document.addEventListener('pointerup',pointerup,{capture:true,passive:false});document.addEventListener('pointercancel',pointerup,{capture:true,passive:false});
 
   return Object.freeze({toWorld,panScreen,setCenter,setZoom,focusRect,setPanMode,resume,suspend,destroy,snapshot,minZoom:MIN_ZOOM,maxZoom:MAX_ZOOM,get zoom(){return zoom;},get effectiveZoom(){return Number(snapshot().effectiveZoom)||1;},get enabled(){return enabled;},get panMode(){return panMode;}});
