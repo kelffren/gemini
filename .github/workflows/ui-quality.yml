@@ -37,11 +37,14 @@ jobs:
       - name: Shared interface contract
         run: |
           test -f src/ui/kelo-interface-system.css
+          test -f src/ui/kelo-interface-compat.css
           test -f src/ui/kelo-interface-runtime.js
           test -f docs/KELO_INTERFACE_STANDARD.md
           grep -q 'kelo-interface-system.css' index.html
+          grep -q 'kelo-interface-compat.css' index.html
           grep -q 'kelo-interface-runtime.js' index.html
           grep -q ':focus-visible' src/ui/kelo-interface-system.css
+          grep -q ':focus-visible' src/ui/kelo-interface-compat.css
           grep -q 'prefers-reduced-motion' src/ui/kelo-interface-system.css
           grep -q 'More Tools' src/ui/kelo-interface-runtime.js
       - name: Interface syntax
