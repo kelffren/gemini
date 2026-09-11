@@ -13,6 +13,7 @@ on:
       - 'src/world/map-forge/map-forge-recipes.mjs'
       - 'scripts/kelo-evolution-*.mjs'
       - 'scripts/kelo-code-evolution-sandbox.mjs'
+      - 'scripts/kelo-source-code-proposer-audit.mjs'
       - 'scripts/map-forge-evolution-autopilot.mjs'
       - 'tests/map-forge-evolution-visual.spec.js'
       - 'docs/evolution/**'
@@ -33,6 +34,7 @@ on:
       - 'src/world/map-forge/map-forge-recipes.mjs'
       - 'scripts/kelo-evolution-*.mjs'
       - 'scripts/kelo-code-evolution-sandbox.mjs'
+      - 'scripts/kelo-source-code-proposer-audit.mjs'
       - 'scripts/map-forge-evolution-autopilot.mjs'
       - 'tests/map-forge-evolution-visual.spec.js'
       - 'docs/evolution/**'
@@ -55,22 +57,26 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Syntax check evolution V3 modules
+      - name: Syntax check evolution V4 modules
         run: |
           node --check src/creators/evolution/evolution-engine.mjs
           node --check src/creators/evolution/evolution-memory.mjs
           node --check src/creators/evolution/code-patch-candidate.mjs
           node --check src/creators/evolution/code-patch-evaluator.mjs
+          node --check src/creators/evolution/source-code-proposer.mjs
           node --check src/world/map-forge/map-forge-golden-seeds.mjs
           node --check src/world/map-forge/map-forge-champion-overrides.mjs
           node --check src/world/map-forge/map-forge-evolution.mjs
           node --check scripts/kelo-code-evolution-sandbox.mjs
           node --check scripts/kelo-evolution-sandbox-audit.mjs
           node --check scripts/kelo-evolution-audit.mjs
+          node --check scripts/kelo-source-code-proposer-audit.mjs
           node --check scripts/map-forge-evolution-autopilot.mjs
           node --check tests/map-forge-evolution-visual.spec.js
       - name: Run evolution V3 search / holdout / Pareto / memory audit
         run: npm run audit:evolution
+      - name: Prove autonomous source repair feedback and objective gate
+        run: node scripts/kelo-source-code-proposer-audit.mjs
       - name: Prove detached code patch sandbox with mandatory test coverage
         run: npm run audit:evolution:sandbox
       - name: Verify system documentation catalog
