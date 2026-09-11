@@ -42,8 +42,10 @@ try{
   const scale=page.locator('.sr-range input[type=range]').first();await scale.evaluate(el=>{el.value='1.17';el.dispatchEvent(new Event('input',{bubbles:true}));});
   await page.getByRole('button',{name:'▶ PLAY',exact:true}).click();await page.waitForTimeout(180);await page.getByRole('button',{name:'Ⅱ PAUSE',exact:true}).click();
   await page.screenshot({path:'artifacts/sprite-ability-repair/repair-studio.png',fullPage:true});
+  await page.evaluate(()=>{window.__spriteRepairToasts=[];const original=window.showToast;window.showToast=function(message,...args){window.__spriteRepairToasts.push(String(message));try{return original?.call(this,message,...args);}catch{return undefined;}};});
   await page.getByRole('button',{name:'APLICAR REPARACIÓN'}).click();
-  await page.waitForFunction(()=>!document.querySelector('.sab-repair'),null,{timeout:12000});
+  try{await page.waitForFunction(()=>!document.querySelector('.sab-repair'),null,{timeout:12000});}
+  catch(error){const debug=await page.evaluate(async()=>{const b=(await import('./src/creators/sprite-ability/sprite-ability-live-controller.mjs')).getSpriteAbilityBuilder();return{overlay:Boolean(document.querySelector('.sab-repair')),toasts:window.__spriteRepairToasts||[],status:document.querySelector('#kelo-studio-workspace .ksw-status')?.textContent||null,sheet:b?{fileName:b.draft.sheet.fileName,dataUrlChanged:Boolean(b.draft.sheet.dataUrl),columns:b.draft.sheet.columns,rows:b.draft.sheet.rows,startFrame:b.draft.sheet.startFrame,endFrame:b.draft.sheet.endFrame,frameWidth:b.draft.sheet.frameWidth,frameHeight:b.draft.sheet.frameHeight}:null,combat:b?{impactFrame:b.draft.combat.impactFrame,activeStartFrame:b.draft.combat.activeStartFrame,activeEndFrame:b.draft.combat.activeEndFrame}:null};});console.log('SPRITE_REPAIR_APPLY_DEBUG');console.log(JSON.stringify(debug,null,2));throw new Error(`SPRITE_REPAIR_APPLY_FAILED:${JSON.stringify(debug)}`,{cause:error});}
   const after=await snap();
   if(after.sheet.dataUrl===before.sheet.dataUrl)throw new Error('REPAIR_SHEET_NOT_REPLACED');
   if(after.sheet.endFrame!==7)throw new Error(`REPAIR_FRAME_RANGE_LOST:${after.sheet.endFrame}`);
