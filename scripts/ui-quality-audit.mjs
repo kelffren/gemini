@@ -2,7 +2,7 @@
 /* KELO-INDEX
  * area: TOOLING / UI QUALITY
  * purpose: scan every Kelo source module that constructs UI for hierarchy, accessibility and consistency drift
- * policy: report whole project; fail only on critical regressions in UI files changed by the latest commit
+ * policy: evaluate effective shared overrides; report whole project; fail on critical regressions in latest UI work
  */
 
 import fs from 'node:fs';
@@ -13,6 +13,7 @@ const ROOT=process.cwd();
 const SCAN_ROOTS=['src','index.html'];
 const EXTENSIONS=new Set(['.js','.mjs','.css','.html']);
 const SKIP_DIRS=new Set(['node_modules','vendor','generated']);
+const SHARED_CSS_FILES=['src/ui/kelo-interface-system.css','src/ui/kelo-interface-compat.css'];
 
 function walk(rel){
   const abs=path.join(ROOT,rel);
@@ -34,6 +35,8 @@ function changedFiles(){
 
 const isUiText=text=>/(<button|createElement\(['"]button|\.\w*(?:btn|button|tab|menu|card|panel)|role=['"]dialog|aria-label|position\s*:\s*fixed)/i.test(text);
 const hexColors=text=>new Set(text.match(/#[0-9a-f]{3,8}\b/ig)||[]);
+const normalizeSelector=s=>String(s||'').replace(/\s+/g,' ').replace(/\s*>\s*/g,'>').trim();
+const splitSelectors=s=>String(s||'').split(',').map(normalizeSelector).filter(Boolean);
 
 function cssBlocks(text){
   const blocks=[];
@@ -42,12 +45,52 @@ function cssBlocks(text){
   return blocks;
 }
 
+const sharedCss=SHARED_CSS_FILES.filter(file=>fs.existsSync(path.join(ROOT,file))).map(file=>fs.readFileSync(path.join(ROOT,file),'utf8')).join('\n');
+const sharedBlocks=cssBlocks(sharedCss);
+
+function selectorCovered(sharedSelector,sourceSelector){
+  const shared=normalizeSelector(sharedSelector),source=normalizeSelector(sourceSelector);
+  return shared===source||shared.endsWith(` ${source}`)||shared.endsWith(`>${source}`);
+}
+
+function maxSharedMetric(selector,property){
+  let max=0;
+  const prop=property.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  const rx=new RegExp(`${prop}\\s*:[^;{}]*?(\\d+(?:\\.\\d+)?)px`,'ig');
+  for(const block of sharedBlocks){
+    const selectors=splitSelectors(block.selector);
+    if(!selectors.some(sharedSelector=>selectorCovered(sharedSelector,selector)))continue;
+    let m;while((m=rx.exec(block.body)))max=Math.max(max,Number(m[1])||0);
+    rx.lastIndex=0;
+  }
+  return max;
+}
+
+function sharedFocusScopeFor(file,text){
+  const ids=new Set([...text.matchAll(/#(kelo-[\w-]+)/g)].map(m=>`#${m[1]}`));
+  if(file.startsWith('src/studio/'))ids.add('#kelo-studio-live');
+  const known={
+    'src/ui/account-auth-ui.js':'#kelo-account-auth',
+    'src/ui/account-profile-18-ui.js':'#kelo-profile-18',
+    'src/ui/commerce-ui.js':'#kelo-commerce-modal',
+    'src/ui/luxe-shell.js':'#kelo-luxe'
+  };
+  if(known[file])ids.add(known[file]);
+  for(const id of ids){
+    const escaped=id.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+    if(new RegExp(`${escaped}[^,{\\n]*:focus-visible`,'i').test(sharedCss))return id;
+  }
+  return null;
+}
+
 function auditFile(file,text){
   const warnings=[];
   const add=(code,severity,message)=>warnings.push({file,code,severity,message});
 
-  if(/outline\s*:\s*none/i.test(text)&&!/:focus-visible/i.test(text))
-    add('FOCUS_REPLACEMENT_MISSING','critical','Uses outline:none without a :focus-visible replacement.');
+  if(/outline\s*:\s*none/i.test(text)&&!/:focus-visible/i.test(text)){
+    const scope=sharedFocusScopeFor(file,text);
+    if(!scope)add('FOCUS_REPLACEMENT_MISSING','critical','Uses outline:none without an effective shared :focus-visible replacement.');
+  }
 
   const colors=hexColors(text);
   if(colors.size>28)add('PALETTE_SPRAWL','info',`Contains ${colors.size} unique hex colors; prefer shared interface tokens.`);
@@ -60,14 +103,32 @@ function auditFile(file,text){
   if(hasFixedOverlay&&!hasClose)add('EXIT_ROUTE_UNCLEAR','warn','Fixed UI surface has no obvious close/back route in the same module.');
 
   for(const block of cssBlocks(text)){
-    const control=/(button|\.\w*(?:btn|button|tab|menu-item|tool|card))/i.test(block.selector);
-    if(!control)continue;
+    const selectors=splitSelectors(block.selector);
+    if(!selectors.some(selector=>/(button|\.\w*(?:btn|button|tab|menu-item|tool|card))/i.test(selector)))continue;
+
     const heights=[...block.body.matchAll(/(?:min-height|height)\s*:\s*(\d+(?:\.\d+)?)px/ig)].map(m=>Number(m[1]));
-    if(heights.length&&Math.max(...heights)<32)add('TINY_CONTROL_TARGET','critical',`${block.selector.slice(0,90)} has a declared control height below 32px.`);
-    else if(heights.length&&Math.max(...heights)<40)add('SMALL_CONTROL_TARGET','warn',`${block.selector.slice(0,90)} declares a control height below 40px.`);
     const sizes=[...block.body.matchAll(/font-size\s*:\s*(\d+(?:\.\d+)?)px/ig)].map(m=>Number(m[1]));
-    if(sizes.some(v=>v<9))add('TINY_CONTROL_TEXT','warn',`${block.selector.slice(0,90)} declares control text below 9px.`);
-    if(/Georgia|Times New Roman/i.test(block.body))add('ORNAMENTAL_CONTROL_FONT','warn',`${block.selector.slice(0,90)} uses an ornamental serif font for a software control.`);
+
+    for(const selector of selectors){
+      if(!/(button|\.\w*(?:btn|button|tab|menu-item|tool|card))/i.test(selector))continue;
+      const sharedHeight=Math.max(maxSharedMetric(selector,'min-height'),maxSharedMetric(selector,'height'));
+      const sharedFont=maxSharedMetric(selector,'font-size');
+      const sourceHeight=heights.length?Math.max(...heights):0;
+      const sourceTinyText=sizes.some(v=>v<9);
+
+      if(sourceHeight&&sourceHeight<32&&sharedHeight<32)
+        add('TINY_CONTROL_TARGET','critical',`${selector.slice(0,90)} has an effective declared control height below 32px.`);
+      else if(sourceHeight&&sourceHeight<40&&sharedHeight<40)
+        add('SMALL_CONTROL_TARGET','warn',`${selector.slice(0,90)} has an effective declared control height below 40px.`);
+
+      if(sourceTinyText&&sharedFont<9)
+        add('TINY_CONTROL_TEXT','warn',`${selector.slice(0,90)} has effective control text below 9px.`);
+
+      if(/Georgia|Times New Roman/i.test(block.body)){
+        const sharedUsesSystemFont=sharedBlocks.some(sharedBlock=>splitSelectors(sharedBlock.selector).some(sharedSelector=>selectorCovered(sharedSelector,selector))&&/font-family\s*:\s*var\(--kui-font\)/i.test(sharedBlock.body));
+        if(!sharedUsesSystemFont)add('ORNAMENTAL_CONTROL_FONT','warn',`${selector.slice(0,90)} uses an ornamental serif font for a software control.`);
+      }
+    }
   }
 
   return warnings;
@@ -103,13 +164,14 @@ const ordered=[...warnings].sort((a,b)=>(severityRank[a.severity]??9)-(severityR
 for(const w of ordered.slice(0,80))console.log(`[${w.severity.toUpperCase()}] ${w.code} ${w.file}: ${w.message}`);
 if(ordered.length>80)console.log(`... ${ordered.length-80} additional warning(s) omitted from console output.`);
 
-const contractFiles=['src/ui/kelo-interface-system.css','src/ui/kelo-interface-runtime.js','docs/KELO_INTERFACE_STANDARD.md'];
+const contractFiles=['src/ui/kelo-interface-system.css','src/ui/kelo-interface-compat.css','src/ui/kelo-interface-runtime.js','docs/KELO_INTERFACE_STANDARD.md'];
 const missing=contractFiles.filter(file=>!fs.existsSync(path.join(ROOT,file)));
 if(missing.length){console.error(`Missing UI contract file(s): ${missing.join(', ')}`);process.exit(2);}
 
 const index=fs.readFileSync(path.join(ROOT,'index.html'),'utf8');
 if(!index.includes('src/ui/kelo-interface-system.css')){console.error('index.html does not load the shared Kelo Interface System.');process.exit(3);}
-if(!index.includes('src/ui/kelo-interface-runtime.js')){console.error('index.html does not load the shared Kelo Interface Runtime.');process.exit(4);}
+if(!index.includes('src/ui/kelo-interface-compat.css')){console.error('index.html does not load the Kelo Interface compatibility bridge.');process.exit(4);}
+if(!index.includes('src/ui/kelo-interface-runtime.js')){console.error('index.html does not load the shared Kelo Interface Runtime.');process.exit(5);}
 
 if(changedCritical.length){
   console.error('\nCritical UI regression introduced in the latest commit. Fix before merging.');
