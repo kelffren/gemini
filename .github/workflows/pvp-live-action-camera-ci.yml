@@ -8,7 +8,7 @@ on:
       - 'src/systems/pvp-visual-competitive-pass.js'
       - 'scripts/live-pvp-live-action-camera-judge.mjs'
       - '.github/workflows/pvp-live-action-camera-ci.yml'
-      - 'docs/systems/pvp-live-action-camera.md'
+      - 'docs/systems/PVP_LIVE_ACTION_CAMERA.md'
       - 'guide.html'
   workflow_dispatch:
 
@@ -32,6 +32,8 @@ jobs:
           node --check scripts/live-pvp-live-action-camera-judge.mjs
       - name: Foundation
         run: npm run audit:foundation
+      - name: Documentation
+        run: npm run audit:docs
       - name: Wait for exact runtime on Pages
         run: |
           python3 - <<'PY'
@@ -56,7 +58,7 @@ jobs:
         env:
           AUDIT_URL: https://kelffren.github.io/gemini/
           PVP_CAMERA_OUT: artifacts/pvp-live-action-camera
-          PVP_CAMERA_STRICT: '0'
+          PVP_CAMERA_STRICT: '1'
         run: node scripts/live-pvp-live-action-camera-judge.mjs
       - name: Upload evidence
         if: always()
