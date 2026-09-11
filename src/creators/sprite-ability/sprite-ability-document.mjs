@@ -108,8 +108,10 @@ export function validateSpriteAbilityDocument(document,{maxEmbeddedBytes=7_000_0
   const d=normalizeSpriteAbilityDocument(document),errors=[],warnings=[];
   if(!d.sheet.dataUrl)errors.push('SPRITESHEET_REQUIRED');
   if(d.sheet.dataUrl.length>maxEmbeddedBytes)errors.push('SPRITESHEET_EMBED_TOO_LARGE');
-  if(d.sheet.imageWidth&&d.sheet.frameWidth*d.sheet.columns>d.sheet.imageWidth)errors.push('GRID_W_EXCEEDS_IMAGE');
-  if(d.sheet.imageHeight&&d.sheet.frameHeight*d.sheet.rows>d.sheet.imageHeight)errors.push('GRID_H_EXCEEDS_IMAGE');
+  const gridW=d.sheet.frameWidth*d.sheet.columns+d.sheet.spacingX*Math.max(0,d.sheet.columns-1);
+  const gridH=d.sheet.frameHeight*d.sheet.rows+d.sheet.spacingY*Math.max(0,d.sheet.rows-1);
+  if(d.sheet.imageWidth&&gridW>d.sheet.imageWidth)errors.push('GRID_W_EXCEEDS_IMAGE');
+  if(d.sheet.imageHeight&&gridH>d.sheet.imageHeight)errors.push('GRID_H_EXCEEDS_IMAGE');
   if(d.combat.impactFrame<d.sheet.startFrame||d.combat.impactFrame>d.sheet.endFrame)errors.push('IMPACT_FRAME_OUT_OF_RANGE');
   if(d.combat.activeStartFrame>d.combat.impactFrame||d.combat.activeEndFrame<d.combat.impactFrame)errors.push('ACTIVE_WINDOW_MUST_INCLUDE_IMPACT');
   if(d.combat.hitstopMs>100)warnings.push('HITSTOP_HIGH');
