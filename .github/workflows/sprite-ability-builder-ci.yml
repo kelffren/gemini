@@ -1,7 +1,7 @@
 # KELO-INDEX
 # area: CI / CREATORS
 # keys: SPRITE ABILITY BUILDER SPRITESHEET AUTO FIT MANUAL CUT ANIMATION ABILITY MOBILE EVENT LAB LAUNCH TRANSACTION
-# purpose: valida launcher + auto-fit + corte manual + eventos de preview + flujo real upload → normalize → preview → generate a 390x844
+# purpose: valida launcher + persistence + auto-fit + corte manual + eventos de preview + flujo real upload → normalize → preview → generate a 390x844
 name: Sprite Ability Builder CI
 on:
   pull_request:
@@ -10,6 +10,7 @@ on:
       - 'src/creators/workspaces/sprite-ability-workspace.mjs'
       - 'src/creators/core/creator-project.mjs'
       - 'src/creators/creator-entry.mjs'
+      - 'src/creators/repository/indexeddb-creator-state-adapter.mjs'
       - 'src/creators/ui/creator-hub.mjs'
       - 'src/creators/animation/animation-document.mjs'
       - 'src/creators/animation/animation-preview-adapter.mjs'
@@ -27,6 +28,7 @@ on:
       - 'src/creators/workspaces/sprite-ability-workspace.mjs'
       - 'src/creators/core/creator-project.mjs'
       - 'src/creators/creator-entry.mjs'
+      - 'src/creators/repository/indexeddb-creator-state-adapter.mjs'
       - 'src/creators/ui/creator-hub.mjs'
       - 'src/creators/animation/animation-document.mjs'
       - 'src/creators/animation/animation-preview-adapter.mjs'
@@ -56,6 +58,7 @@ jobs:
           node --check src/creators/sprite-ability/sprite-ability-manual-cutter.mjs
           node --check src/creators/workspaces/sprite-ability-workspace.mjs
           node --check src/creators/creator-entry.mjs
+          node --check src/creators/repository/indexeddb-creator-state-adapter.mjs
           node --check src/creators/ui/creator-hub.mjs
           node --check src/creators/animation/animation-document.mjs
           node --check src/creators/animation/animation-preview-adapter.mjs
@@ -77,6 +80,7 @@ jobs:
         run: |
           grep -q "SPRITE_ABILITY" src/creators/core/creator-project.mjs
           grep -q "registerSpriteAbilityWorkspace" src/creators/creator-entry.mjs
+          grep -q "bounded-transactions" src/creators/repository/indexeddb-creator-state-adapter.mjs
           grep -q "sprite-ability" src/creators/ui/creator-hub.mjs
           grep -q "analyzeAndNormalizeSpritesheet" src/creators/sprite-ability/sprite-ability-live-controller.mjs
           ! grep -Eq "\.hp[[:space:]]*=|damageTarget|attackSweep|resolveMelee" src/creators/sprite-ability/sprite-ability-live-controller.mjs
