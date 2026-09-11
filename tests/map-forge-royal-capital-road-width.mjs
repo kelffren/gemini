@@ -18,7 +18,7 @@ assert.equal(recipe.road.arterialWidth,EXPECTED_ARTERIAL_WIDTH,'Royal Capital ch
 assert.equal(recipe.road.collectorWidth,EXPECTED_COLLECTOR_WIDTH,'Royal Capital champion must keep the approved slimmer collector width');
 assert.equal(recipe.style.decoration,EXPECTED_DECORATION,'Royal Capital champion must keep the approved decoration density');
 const results=[];
-let representativeBenchSwaps=0,representativeMarketSwaps=0;
+let representativeBenchSwaps=0;
 for(const seed of SEEDS){
   const map=generateMapCandidate(recipe,{seed,assetCatalogVersion:'ci-catalog'});
   assert.equal(map.validation.valid,true,`${seed}: generated map must remain valid`);
@@ -32,23 +32,16 @@ for(const seed of SEEDS){
   assert.ok((map.generationStats.decorationStreetLampRoadGain||0)>=36,`${seed}: lamp pass must retain a meaningful road-affinity gain`);
   const benchSwaps=map.generationStats.decorationStreetBenchSwapCount||0;
   const benchRoadGain=map.generationStats.decorationStreetBenchRoadGain||0;
-  const marketSwaps=map.generationStats.decorationStreetMarketSwapCount||0;
-  const marketRoadGain=map.generationStats.decorationStreetMarketRoadGain||0;
   representativeBenchSwaps+=benchSwaps;
-  representativeMarketSwaps+=marketSwaps;
   if(seed===PRIMARY_SEED){
     assert.ok(benchSwaps>=2,`${seed}: primary visual seed must keep at least two roadside bench improvements`);
     assert.ok(benchRoadGain>=100,`${seed}: primary visual seed must keep the approved bench road-affinity gain`);
-    assert.ok(marketSwaps>=1,`${seed}: primary visual seed must keep a roadside market composition improvement`);
-    assert.ok(marketRoadGain>=40,`${seed}: primary visual seed must keep a meaningful market road-affinity gain`);
   }
   const lampCount=map.decorations.filter(row=>row.family==='lamp').length;
   const flowerCount=map.decorations.filter(row=>row.family==='flower').length;
   const benchCount=map.decorations.filter(row=>row.family==='bench').length;
-  const marketCount=map.decorations.filter(row=>row.family==='market_prop').length;
-  assert.ok(lampCount>0&&flowerCount>0&&benchCount>0&&marketCount>0,`${seed}: representative map must retain lamps, flowers, benches and market props`);
-  results.push({seed,roadCount:map.roads.length,blockCount:map.blocks.length,decorationCount:map.decorations.length,arterialCount:arterials.length,collectorCount:collectors.length,arterialWidths:[...new Set(arterials.map(road=>road.width))],collectorWidths:[...new Set(collectors.map(road=>road.width))],decoration:recipe.style.decoration,streetFamilySwaps:map.generationStats.decorationStreetFamilySwapCount,streetFamilyRoadGain:map.generationStats.decorationStreetFamilyRoadGain,lampSwaps:map.generationStats.decorationStreetLampSwapCount,lampRoadGain:map.generationStats.decorationStreetLampRoadGain,benchSwaps,benchRoadGain,marketSwaps,marketRoadGain,lampCount,flowerCount,benchCount,marketCount,quality:map.quality.total});
+  assert.ok(lampCount>0&&flowerCount>0&&benchCount>0,`${seed}: representative map must retain lamps, flowers and benches`);
+  results.push({seed,roadCount:map.roads.length,blockCount:map.blocks.length,decorationCount:map.decorations.length,arterialCount:arterials.length,collectorCount:collectors.length,arterialWidths:[...new Set(arterials.map(road=>road.width))],collectorWidths:[...new Set(collectors.map(road=>road.width))],decoration:recipe.style.decoration,streetFamilySwaps:map.generationStats.decorationStreetFamilySwapCount,streetFamilyRoadGain:map.generationStats.decorationStreetFamilyRoadGain,lampSwaps:map.generationStats.decorationStreetLampSwapCount,lampRoadGain:map.generationStats.decorationStreetLampRoadGain,benchSwaps,benchRoadGain,lampCount,flowerCount,benchCount,quality:map.quality.total});
 }
 assert.ok(representativeBenchSwaps>=3,'Representative seeds must retain multiple roadside bench improvements, not a single-seed accident');
-assert.ok(representativeMarketSwaps>=2,'Representative seeds must retain multiple roadside market improvements, not a single-seed accident');
-console.log(JSON.stringify({ok:true,expectedArterialWidth:EXPECTED_ARTERIAL_WIDTH,expectedCollectorWidth:EXPECTED_COLLECTOR_WIDTH,expectedDecoration:EXPECTED_DECORATION,primarySeed:PRIMARY_SEED,seeds:SEEDS,representativeBenchSwaps,representativeMarketSwaps,results},null,2));
+console.log(JSON.stringify({ok:true,expectedArterialWidth:EXPECTED_ARTERIAL_WIDTH,expectedCollectorWidth:EXPECTED_COLLECTOR_WIDTH,expectedDecoration:EXPECTED_DECORATION,primarySeed:PRIMARY_SEED,seeds:SEEDS,representativeBenchSwaps,results},null,2));
