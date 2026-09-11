@@ -71,8 +71,14 @@ try{
   if(!(brushAfterPinch>brushBefore))throw new Error(`REPAIR_TOUCH_BRUSH_NO_RESIZE:${brushBefore}->${brushAfterPinch}`);
   if(await page.locator('.sr-stage').getAttribute('data-sr-gesture'))throw new Error('REPAIR_TOUCH_BRUSH_STUCK');
 
-  pixelBefore=await selectedThumb();await touchStage([{type:'pointerdown',id:41,primary:true,x:.49,y:.49},{type:'pointermove',id:41,primary:true,x:.52,y:.52},{type:'pointermove',id:41,primary:true,x:.55,y:.55},{type:'pointerup',id:41,primary:true,x:.55,y:.55}]);pixelAfter=await selectedThumb();if(pixelAfter===pixelBefore)throw new Error('REPAIR_TOUCH_ERASER_NO_PIXEL_CHANGE');
+  pixelBefore=await selectedThumb();
+  await touchStage([{type:'pointerdown',id:41,primary:true,x:.49,y:.49},{type:'pointermove',id:41,primary:true,x:.52,y:.52}]);
+  const ringState=await page.locator('.sr-touch-brush-ring').evaluate(el=>({hidden:el.hidden,width:parseFloat(el.style.width)||0,height:parseFloat(el.style.height)||0,left:el.style.left,top:el.style.top}));
+  if(ringState.hidden||ringState.width<6||ringState.height<6)throw new Error(`REPAIR_TOUCH_BRUSH_RING_MISSING:${JSON.stringify(ringState)}`);
+  await touchStage([{type:'pointermove',id:41,primary:true,x:.55,y:.55},{type:'pointerup',id:41,primary:true,x:.55,y:.55}]);
+  pixelAfter=await selectedThumb();if(pixelAfter===pixelBefore)throw new Error('REPAIR_TOUCH_ERASER_NO_PIXEL_CHANGE');
   if(!(await page.locator('.sr-preview-badge').textContent())?.includes('ERASER'))throw new Error('REPAIR_ERASER_MODE_NOT_ACTIVE');
+  if(!(await page.locator('.sr-touch-brush-ring').evaluate(el=>el.hidden)))throw new Error('REPAIR_TOUCH_BRUSH_RING_STUCK');
 
   pixelBefore=await selectedThumb();
   await page.locator('.sab-repair input[type=file]').setInputFiles({name:'single-frame-replacement.png',mimeType:'image/png',buffer:replacementPng});
@@ -103,6 +109,6 @@ try{
   if(after.sheet.endFrame!==7)throw new Error(`REPAIR_FRAME_RANGE_LOST:${after.sheet.endFrame}`);
   for(const [k,v] of Object.entries({impactFrame:3,activeStartFrame:2,activeEndFrame:4,hitboxX:11,hitboxY:-33,hitboxWidth:77,hitboxHeight:55}))if(after.combat[k]!==v)throw new Error(`REPAIR_COMBAT_NOT_PRESERVED:${k}:${after.combat[k]}!=${v}`);
   if(pageErrors.length)throw new Error(`REPAIR_PAGE_ERRORS:${pageErrors.join(' | ')}`);
-  const report={ok:true,viewport:'390x844',frames:8,tools,touchHelp,scaleBefore,scaleAfterPinch,brushBefore,brushAfterPinch,exercised:['one-finger-move','touch-pinch-scale','touch-midpoint-pan','pivot','crop','touch-pinch-brush-size','touch-eraser','replace','reorder','duplicate','delete','onion','reference','align-all','trim-all','center','scale-slider','preview','apply'],before:{impact:before.combat.impactFrame,hitbox:[before.combat.hitboxX,before.combat.hitboxY,before.combat.hitboxWidth,before.combat.hitboxHeight]},after:{impact:after.combat.impactFrame,hitbox:[after.combat.hitboxX,after.combat.hitboxY,after.combat.hitboxWidth,after.combat.hitboxHeight],columns:after.sheet.columns,rows:after.sheet.rows,frame:`${after.sheet.frameWidth}x${after.sheet.frameHeight}`},pageErrors};
+  const report={ok:true,viewport:'390x844',frames:8,tools,touchHelp,scaleBefore,scaleAfterPinch,brushBefore,brushAfterPinch,brushRing:ringState,exercised:['one-finger-move','touch-pinch-scale','touch-midpoint-pan','pivot','crop','touch-pinch-brush-size','touch-eraser-footprint','touch-eraser','replace','reorder','duplicate','delete','onion','reference','align-all','trim-all','center','scale-slider','preview','apply'],before:{impact:before.combat.impactFrame,hitbox:[before.combat.hitboxX,before.combat.hitboxY,before.combat.hitboxWidth,before.combat.hitboxHeight]},after:{impact:after.combat.impactFrame,hitbox:[after.combat.hitboxX,after.combat.hitboxY,after.combat.hitboxWidth,after.combat.hitboxHeight],columns:after.sheet.columns,rows:after.sheet.rows,frame:`${after.sheet.frameWidth}x${after.sheet.frameHeight}`},pageErrors};
   fs.writeFileSync('artifacts/sprite-ability-repair/report.json',JSON.stringify(report,null,2));console.log('SPRITE REPAIR STUDIO MOBILE TOUCH AUDIT: PASS');console.log(JSON.stringify(report,null,2));
 }finally{await browser.close();}
