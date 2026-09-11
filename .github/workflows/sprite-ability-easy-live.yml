@@ -25,6 +25,7 @@ jobs:
         run: |
           node --check src/creators/sprite-ability/sprite-ability-easy-ui.mjs
           node --check src/creators/repository/indexeddb-creator-state-adapter.mjs
+          node --check src/creators/ui/creator-hub.mjs
           node --check scripts/live-sprite-ability-easy-smoke.mjs
       - name: Install Playwright
         run: npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund playwright@1.55.0
@@ -35,12 +36,14 @@ jobs:
             easy="$(curl --max-time 10 -fsSL "https://kelffren.github.io/gemini/src/creators/sprite-ability/sprite-ability-easy-ui.mjs?smoke=${GITHUB_SHA}-${i}" || true)"
             entry="$(curl --max-time 10 -fsSL "https://kelffren.github.io/gemini/src/creators/creator-entry.mjs?smoke=${GITHUB_SHA}-${i}" || true)"
             state="$(curl --max-time 10 -fsSL "https://kelffren.github.io/gemini/src/creators/repository/indexeddb-creator-state-adapter.mjs?smoke=${GITHUB_SHA}-${i}" || true)"
+            hub="$(curl --max-time 10 -fsSL "https://kelffren.github.io/gemini/src/creators/ui/creator-hub.mjs?smoke=${GITHUB_SHA}-${i}" || true)"
             if grep -q 'kelo-sprite-ability-easy-v1-style' <<<"$easy" \
               && grep -q 'installSpriteAbilityEasyUI' <<<"$entry" \
               && grep -q 'kelo-creators-core-v1.12.1-sprite-easy-open' <<<"$entry" \
               && grep -q 'ensureCreatorInputLocks' <<<"$entry" \
-              && grep -q 'creator-indexeddb-state-v1.1.0-nonblocking' <<<"$state"; then
-              echo 'PASS deployed Pages contains exact Sprite Ability Easy + nonblocking state version'
+              && grep -q 'creator-indexeddb-state-v1.1.0-nonblocking' <<<"$state" \
+              && grep -q 'kelo-creator-hub-v1.9.0-sprite-ability-direct' <<<"$hub"; then
+              echo 'PASS deployed Pages contains exact direct-open Easy Sprite Ability version'
               exit 0
             fi
             echo "Waiting for exact Sprite Ability Easy version on Pages ($i/45)..."
@@ -52,4 +55,4 @@ jobs:
         env:
           AUDIT_URL: https://kelffren.github.io/gemini/
           CHROME_BIN: /usr/bin/google-chrome
-        run: node scripts/live-sprite-ability-easy-smoke.mjs
+        run: timeout 75s node scripts/live-sprite-ability-easy-smoke.mjs
