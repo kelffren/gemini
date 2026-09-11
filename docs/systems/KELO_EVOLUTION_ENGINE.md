@@ -2,19 +2,19 @@
 
 ## Propósito
 
-`KeloEvolution` es la capacidad interna de Kelo World para ejecutar un ciclo de mejora medible y reversible:
+`KeloEvolution` es la capacidad interna de Kelo World para ejecutar mejora medible, reversible y segura sobre candidatos de datos y código:
 
 ```text
-champion
-→ generar challengers diversos
-→ search evaluation
-→ hard gates + Pareto + score
-→ ganador provisional
-→ holdout no visto
-→ paired regression gate
-→ minimizar el cambio ganador
-→ sandbox/apply externo
-→ keep / rollback
+champion / baseline
+→ detectar problema o oportunidad con evidencia
+→ generar challengers o propuesta de código
+→ validar contrato + riesgo + paths + tests
+→ sandbox / search evaluation
+→ hard gates + score
+→ holdout / evidencia independiente cuando aplica
+→ feedback al proposer si falla
+→ reintento acotado
+→ keep / rollback / PR
 → memoria + evidencia reproducible
 ```
 
@@ -22,20 +22,31 @@ No es un segundo game engine. No posee gameplay, renderer, mundo LIVE, Git, secr
 
 ## Estado actual
 
-**V3 / INTERNAL CREATOR CAPABILITY / ACTIVE / HEADLESS / HOLDOUT-GATED / CODE-CANDIDATE READY.**
+**V4 / INTERNAL CREATOR CAPABILITY / ACTIVE / HEADLESS / HOLDOUT-GATED / AUTONOMOUS SOURCE-REPAIR READY.**
 
-V3 conserva las diez capacidades de V2 (code candidates, worktree sandbox, Playwright evidence, golden seeds, genoma estructural, locks/focus, memoria, tournament, score multidimensional y PR-only autopilot) y añade diez mejoras acumulativas:
+V4 conserva todo V3 y añade un loop genérico de reparación de source code para un agente externo autorizado. El agente puede recibir evidencia + snapshots acotados, proponer un `kelo-code-patch-v2`, recibir feedback de fallos y volver a intentarlo. La aceptación no depende de la confianza del agente: requiere el sandbox existente y un `objectiveScore` producido por el evaluador independiente del caller.
 
-1. **Search vs holdout**: los challengers se eligen con un banco de búsqueda y solo el ganador provisional ve seeds holdout separadas.
-2. **Paired seed gate**: champion y challenger se comparan seed por seed para impedir que un promedio oculte regresiones fuertes.
-3. **Pareto frontier**: candidatos dominados en métricas críticas pierden prioridad antes del desempate por score escalar.
-4. **Fingerprint + novelty**: dedupe determinista, distancia mínima de genoma y rechazo de fingerprints ya probados.
-5. **Mutation bandit memory**: cada gen aprende intentos, aceptación y delta medio; el selector equilibra explotación y exploración.
-6. **Stagnation escape**: tras varias generaciones sin avance, Map Forge rota scope y amplía el paso de mutación bajo límites.
-7. **Winner minimization**: un ganador se poda revirtiendo genes innecesarios y conservando solo los cambios que siguen pasando search + holdout + paired gates.
-8. **Code patch V2 risk/coverage**: fingerprint, objetivo obligatorio, tests mínimos inferidos por ruta y presupuesto de riesgo.
-9. **Code patch evaluator**: sandbox, syntax, tests, riesgo, compactness y objetivo se traducen al contrato común de score.
-10. **Evidence manifest**: evaluator version, fingerprints de seed banks/genomas y un evidence fingerprint reproducible acompañan cada propuesta.
+### Capacidades acumuladas V3
+
+1. Search seeds separados de holdout seeds.
+2. Paired seed-by-seed regression gate.
+3. Pareto frontier antes del desempate escalar.
+4. Fingerprint + novelty + dedupe.
+5. Mutation bandit memory.
+6. Stagnation escape.
+7. Winner minimization.
+8. Code Patch Candidate V2 con objective/tests/risk budget.
+9. Code Patch Evaluator común.
+10. Evidence manifest reproducible.
+
+### Mejora principal V4
+
+V4 cierra la deuda de “tener evaluador pero no loop de proposer”. El nuevo source proposer no da filesystem/Git/network al core. En su lugar orquesta dos callbacks inyectados:
+
+- `agent(context)` — genera la propuesta dentro de un contexto acotado;
+- `evaluate(candidate)` — produce sandbox report + objective score independiente.
+
+Esto permite usar ChatGPT, otro agente autorizado o un runner remoto sin cambiar el contrato de seguridad de KeloEvolution.
 
 ## Owner y archivos
 
@@ -43,19 +54,23 @@ V3 conserva las diez capacidades de V2 (code candidates, worktree sandbox, Playw
 - Memoria pura: `src/creators/evolution/evolution-memory.mjs`.
 - Contrato code patch: `src/creators/evolution/code-patch-candidate.mjs`.
 - Evaluador code patch: `src/creators/evolution/code-patch-evaluator.mjs`.
+- **Source proposer V4:** `src/creators/evolution/source-code-proposer.mjs`.
 - Sandbox Git externo: `scripts/kelo-code-evolution-sandbox.mjs`.
 - Sandbox audit: `scripts/kelo-evolution-sandbox-audit.mjs`.
+- **Source proposer audit:** `scripts/kelo-source-code-proposer-audit.mjs`.
 - Map Forge adapter: `src/world/map-forge/map-forge-evolution.mjs`.
 - Golden seeds: `src/world/map-forge/map-forge-golden-seeds.mjs`.
 - Champion overrides: `src/world/map-forge/map-forge-champion-overrides.mjs`.
-- Memoria persistible actual: `docs/evolution/map-forge-memory.json`.
-- Autopilot: `scripts/map-forge-evolution-autopilot.mjs` + `.github/workflows/kelo-evolution-autopilot.yml`.
+- Memoria persistible Map Forge: `docs/evolution/map-forge-memory.json`.
+- Map Forge autopilot: `scripts/map-forge-evolution-autopilot.mjs` + `.github/workflows/kelo-evolution-autopilot.yml`.
 - CI: `.github/workflows/kelo-evolution-ci.yml`.
 - Evidencia visual: `tests/map-forge-evolution-visual.spec.js`.
 
 ## Estado que posee
 
-El core no posee estado persistente. Toda API devuelve objetos inmutables. La memoria también es funcional: el caller decide si el snapshot se guarda en Git artifact, archivo versionado o storage remoto. GitHub Actions puede poseer temporalmente worktrees/branches de candidato; el browser nunca recibe esa autoridad.
+El core no posee estado persistente. Toda API devuelve estructuras inmutables. Los callers deciden dónde persisten memoria/evidencia y quién tiene autoridad de Git.
+
+El source proposer V4 tampoco posee state: devuelve contexto, intentos, feedback, evaluación y candidato final.
 
 ## Estado que NO posee
 
@@ -64,6 +79,7 @@ El core no posee estado persistente. Toda API devuelve objetos inmutables. La me
 - renderer/cámara/colisión/Property;
 - publish del mundo;
 - Git credentials o filesystem del runtime;
+- shell arbitrario;
 - merge/deploy;
 - secretos;
 - server gameplay authority.
@@ -80,15 +96,15 @@ Un challenger solo pasa si es válido, supera `minScore` y mejora al baseline al
 
 ### `evolutionFingerprint(value)`
 
-Huella determinista de una estructura serializable. El orden de claves no altera el fingerprint.
+Huella determinista de una estructura serializable.
 
 ### `computeEvolutionParetoFrontier(rows, objectives)`
 
-Clasifica candidatos no dominados. Un candidato está dominado si otro es igual o mejor en todos los objetivos y estrictamente mejor en al menos uno.
+Clasifica candidatos no dominados.
 
 ### `selectEvolutionCandidate()`
 
-Aplica hard gates/score y, cuando `policy.paretoObjectives` existe, prioriza el Pareto frontier entre challengers aceptables.
+Aplica hard gates/score y puede priorizar Pareto frontier.
 
 ### `runEvolutionCycle()`
 
@@ -109,23 +125,35 @@ await runEvolutionCycle({
 });
 ```
 
-El baseline y challengers atraviesan la misma frontera de `prepare/evaluate/cleanup`. Si hay holdout, solo el ganador provisional se compara contra baseline en esa segunda fase. `apply` nunca corre antes de ambos gates.
+El baseline y challengers atraviesan la misma frontera de preparación/evaluación. Si hay holdout, solo el ganador provisional se valida allí. `apply` nunca corre antes de los gates.
 
 ### `runChampionChallengerTournament()`
 
-Devuelve champion antes/después, ranking, Pareto frontier, duplicados, holdout y `rejectedStage` (`search`, `holdout` o `apply`).
+Devuelve champion antes/después, ranking, Pareto frontier, duplicados, holdout y `rejectedStage`.
 
-## Memoria V2 del contrato de experimentos
+## Memoria V2
 
-`createEvolutionMemory()` normaliza snapshots a `kelo-evolution-memory-v2` y conserva compatibilidad de datos previos. Los records pueden guardar candidate ID + fingerprint, accepted/rejected stage, baseline/candidate score, holdout evidence, mutations, metrics/failures y artifacts/evidence fingerprints.
+`createEvolutionMemory()` normaliza snapshots a `kelo-evolution-memory-v2`. Los records pueden guardar candidate ID/fingerprint, stage, score, holdout, mutaciones, métricas/fallos y evidence fingerprints.
 
-`mutationPerformance()` calcula intentos, accepted/rejected, acceptance rate y delta medio por gen. `mutationPriority()` añade exploración decreciente para que genes poco estudiados sigan teniendo oportunidad. `candidateSeenCount()` evita gastar presupuesto en el mismo candidato histórico.
+`mutationPerformance()` calcula intentos/aceptación/delta. `mutationPriority()` añade exploración. `candidateSeenCount()` evita repetir candidatos históricos.
 
 ## Code Patch Candidate V2
 
-`kelo-code-patch-v2` mantiene `baseSha`, `beforeHash`, full-text replacements y test IDs registrados, y añade fingerprint estable, `objective` obligatorio por defecto, tests requeridos según rutas tocadas y `risk.score` con `maxRiskScore` configurable.
+`kelo-code-patch-v2` usa:
 
-Reglas por defecto relevantes:
+```text
+baseSha
+objective
+changes[].path
+changes[].beforeHash
+changes[].afterContent
+tests[]
+fingerprint
+```
+
+Los paths están allowlisted, los paths sensibles están denegados, los tests mínimos se infieren por ruta y el risk budget se calcula antes del sandbox.
+
+Defaults relevantes:
 
 ```text
 src/creators/evolution/* → evolution
@@ -134,128 +162,195 @@ docs/systems/*           → docs
 tests/map-forge/*        → evolution + map-forge-handoff
 ```
 
-Los paths sensibles (`.env`, `.git`, `server/`, `supabase/`, secrets/credentials, etc.) siguen rechazándose antes de materializar.
+Paths sensibles como `.env`, `.git`, `server/`, `supabase/`, secrets/credentials y service-role se rechazan antes de materializar.
 
-## Evaluador de code patches
+## Code Patch Evaluator
 
-`evaluateCodePatchSandboxReport()` convierte evidencia objetiva en métricas Evolution: validationSafety, syntaxPassRate, testPassRate, riskSafety, compactness del diff y objectiveScore opcional/obligatorio según caller. Validation, syntax y tests tienen hard gate 100 %. El evaluador es puro: no ejecuta Git/shell ni aplica cambios.
+`evaluateCodePatchSandboxReport()` traduce evidencia a métricas Evolution:
+
+- validationSafety;
+- syntaxPassRate;
+- testPassRate;
+- riskSafety;
+- compactness;
+- objectiveScore.
+
+Validation, syntax y tests tienen hard gate 100 %. Para source repair V4, `objectiveScore` también es obligatorio y tiene un hard minimum configurado por el caller.
+
+## Source Code Proposer V4
+
+### `createSourceRepairPolicy()`
+
+Define límites del agente:
+
+- máximo de intentos;
+- máximo de archivos de contexto;
+- máximo de caracteres de contexto;
+- minimum objective score;
+- policy `kelo-code-patch-v2` reutilizada.
+
+Defaults V4:
+
+```text
+maxAttempts = 3
+maxContextFiles = 8
+maxContextChars = 80,000
+minObjectiveScore = 60
+problem evidence = required
+```
+
+### `normalizeSourceProblem()`
+
+Acepta únicamente problemas tipados:
+
+```text
+ci_failure
+regression
+measured_opportunity
+```
+
+Cada problema tiene `id`, `summary`, `baselineSha`, paths relevantes y evidencia.
+
+### `buildSourceRepairContext()`
+
+Recibe snapshots explícitos proporcionados por un runner autorizado. No busca archivos por sí mismo.
+
+Reglas:
+
+1. Filtra por el mismo allowlist/denylist del code patch.
+2. Prioriza paths relacionados con el problema.
+3. Solo un archivo con contenido completo + `beforeHash` entra en `writablePaths`.
+4. Archivos fuera del presupuesto pueden aparecer omitidos, pero no se pueden modificar.
+5. `server/`, `supabase/`, secretos y credenciales nunca entran al contexto.
+
+### `validateSourceAgentProposal()`
+
+Convierte la salida del agente en `kelo-code-patch-v2` y verifica:
+
+- path presente en `writablePaths`;
+- beforeHash idéntico al snapshot;
+- no-op rechazado;
+- objective requerido;
+- rationale requerido;
+- tests requeridos por path;
+- file/byte/risk budget;
+- denylist y path traversal.
+
+### `runAutonomousSourceRepairCycle()`
+
+```js
+const result = await runAutonomousSourceRepairCycle({
+  problem,
+  snapshot,
+  policy,
+  agent: async ({ context, attempt, feedback }) => proposal,
+  evaluate: async ({ candidate, problem, attempt }) => ({
+    report: sandboxReport,
+    objectiveScore
+  })
+});
+```
+
+Flujo:
+
+```text
+problema con evidencia
+→ construir contexto mínimo
+→ agent attempt 1
+→ validar proposal
+→ si falla: devolver failures al agente
+→ si pasa: sandbox + objective evaluation
+→ si falla: devolver failures al agente
+→ bloquear fingerprints repetidos
+→ agent attempt N
+→ aceptar solo si sandbox + tests + objective hard gate pasan
+→ devolver candidato; NO aplicar
+```
+
+### Regla de independencia
+
+El agente **no puede darse a sí mismo el objective score**. El score solo entra desde `evaluate()`, que es una frontera separada. El caller puede usar CI, benchmark, evaluación funcional, paired metric u otro judge reproducible.
+
+### Regla de reparación
+
+Un intento fallido no habilita al agente a ampliar scope. Los mismos `writablePaths`, policy y límites continúan vigentes. Si el agente devuelve el mismo fingerprint, el intento se rechaza como `candidate_duplicate`.
 
 ## Sandbox
 
-`scripts/kelo-code-evolution-sandbox.mjs` conserva el contrato V2: valida candidate/policy/risk/test coverage, verifica `baseSha`, crea `git worktree --detach`, verifica SHA-256 previo, aplica solo dentro del worktree, corre syntax + test IDs registrados, captura diff/report y limpia siempre. No ejecuta comandos arbitrarios del candidato y no hace push/merge/deploy.
+`scripts/kelo-code-evolution-sandbox.mjs` valida candidate/policy/risk/test coverage, verifica `baseSha`, crea `git worktree --detach`, verifica SHA-256 previo, aplica dentro del worktree, corre syntax + test IDs registrados, captura diff/report y limpia siempre.
+
+No ejecuta shell commands provenientes del candidato.
 
 ## Map Forge Evolution V3
 
-El genoma sigue expresando:
+Map Forge conserva su genoma estructural, search bank + unseen holdout, paired regression gate, Pareto, novelty/dedupe, bandit de mutaciones, stagnation escape, winner minimization y evidence manifest.
+
+V4 no reemplaza ese proposer especializado. El source proposer se usa cuando la hipótesis exige **cambiar código fuente**, mientras Map Forge V3 sigue prefiriendo evolución de datos/parámetros cuando ese contrato puede expresar la mejora.
+
+## Autopilot y autoridad
+
+Map Forge autopilot sigue:
 
 ```text
-style.monumentality / organicRoads / density / vegetation / exploration / decoration
-road.loopRatio / road.curvature
-district.<id>.weight
-landmark.<id>.keepClearRadius
+search → holdout → paired gate → minimization → PR → STOP
 ```
 
-### Search bank y holdout bank
-
-El search bank combina golden seeds + validation seeds. El holdout bank se deriva de un namespace distinto y excluye explícitamente todas las search seeds. Los challengers compiten solo en search; el ganador provisional debe sobrevivir después al holdout.
-
-### Paired regression gate
-
-`compareMapForgePairedEvaluations()` compara la misma seed en baseline y challenger usando una utilidad compuesta de quality/visual/navigation/complexity. Reporta wins/losses/ties, winRate, mean/median delta y worst regression. Defaults:
+Source repair V4 sigue:
 
 ```text
-winRate >= 50%
-meanDelta >= 0
-medianDelta >= -0.1
-worst regression <= 5 points
+problema/evidencia → agent → candidate → sandbox/objective → feedback/retry → candidate accepted → caller puede crear PR → STOP
 ```
 
-El autopilot usa un máximo de regresión todavía más estricto.
-
-### Pareto
-
-Antes del score final se consideran meanQuality, worstQuality, meanVisual, navigationFloor y complexitySafety. Esto reduce la posibilidad de que un challenger gane sacrificando una dimensión crítica para inflar otra.
-
-### Novelty + dedupe
-
-`mapForgeGenomeFingerprint()` identifica el genoma. `mapForgeGenomeDistance()` normaliza distancia por rango de cada gen. El proposer rechaza duplicados, candidatos demasiado cercanos al champion, variantes demasiado cercanas entre sí y fingerprints ya vistos en memoria.
-
-### Bandit de mutaciones
-
-El picker usa `mutationPriority()` en lugar de contar únicamente fallos. Genes con buen historial reciben más probabilidad, pero un exploration bonus evita cerrar la búsqueda demasiado pronto.
-
-### Escape de estancamiento
-
-Dos generaciones fallidas habilitan una estrategia de escape si el caller no fijó focus explícito: se selecciona un scope (`style`, `roads`, `districts`, `landmarks`) y se aumenta de forma acotada el mutation step. Cualquier variante resultante sigue pasando todos los gates normales.
-
-### Winner minimization
-
-`minimizeMapForgeWinner()` intenta revertir genes del challenger al baseline. Una reversión se conserva únicamente si el candidato reducido sigue pasando search improvement, holdout improvement y paired gate. El objetivo es promover el cambio mínimo suficiente.
-
-### Evidencia reproducible
-
-Cada resultado V3 incluye evaluatorVersion, searchSeedFingerprint, holdoutSeedFingerprint, baseline/champion genome fingerprint, scores search/holdout y evidence fingerprint. El autopilot guarda estos datos en su JSON artifact y en metadata del champion/memory.
-
-## Autopilot GitHub
-
-```text
-checkout main
-→ audit:evolution V3
-→ search champion/challengers
-→ unseen holdout + paired regression gate
-→ winner minimization
-→ si no mejora: cero cambios
-→ si mejora: champion + memory + evidence manifest
-→ Map Forge core + Evolution + docs
-→ branch + commit + PR
-→ STOP
-```
-
-No existe auto-merge. El PR normal y sus checks siguen siendo la autoridad de promoción.
+**Ningún flujo de KeloEvolution auto-mergea.** GitHub PR + CI siguen siendo la autoridad de promoción.
 
 ## Invariantes
 
-1. Ningún challenger se aplica antes de search gate.
-2. Un search winner no se aplica antes del holdout gate cuando este existe.
-3. Hard gate siempre prevalece sobre score alto.
-4. Duplicate fingerprints no consumen evaluación innecesaria.
-5. Pareto no sustituye los hard gates; solo ordena candidatos válidos.
-6. Holdout no se usa para escoger entre toda la población.
-7. Map Forge promotion exige comparación seed-pareada además de score agregado.
-8. Winner minimization nunca puede debilitar gates para reducir el patch/genome.
-9. Apply fallido intenta rollback.
-10. Sandbox nunca escribe el checkout principal.
-11. Code candidates no incluyen shell commands arbitrarios.
-12. Tests mínimos y risk budget se validan antes del worktree.
-13. Browser/runtime no posee Git authority.
-14. Autopilot crea PR y nunca se auto-mergea.
-15. Map Forge generator/scorer siguen siendo sus owners.
+1. Hard gate prevalece sobre score alto.
+2. Ningún code candidate se aplica antes de validación y sandbox.
+3. Source agent solo puede modificar archivos visibles completos en `writablePaths`.
+4. beforeHash del agente debe coincidir con el snapshot.
+5. El agente no controla su objective score.
+6. Un fingerprint repetido no se reevalúa dentro del mismo repair cycle.
+7. Feedback de un fallo puede causar reintento, pero no ampliar authority/scope.
+8. Code candidates no contienen shell commands arbitrarios.
+9. Tests mínimos y risk budget se validan antes de promoción.
+10. Browser/runtime no posee Git authority.
+11. Autopilots crean PR y nunca auto-mergean.
+12. Map Forge generator/scorer siguen siendo sus owners.
+13. El source proposer no reemplaza proposers especializados cuando un contrato de datos ya existe.
+14. Secrets/server/Supabase quedan fuera del scope por defecto.
+15. Un caller remoto debe preservar los mismos IDs, hashes, policies y evidence contracts.
 
 ## Tests / CI
 
-- `npm run audit:evolution`: weighted/hard gates, fingerprints, dedupe, Pareto, generic holdout, rollback, memory bandit, code patch risk/coverage/evaluator, Map Forge novelty, holdout separation, paired gates, determinismo, evidence manifest y minimización.
+- `npm run audit:evolution`: gates, fingerprint/dedupe, Pareto, holdout, rollback, memory, code patch evaluator y Map Forge V3.
+- `node scripts/kelo-source-code-proposer-audit.mjs`: contexto acotado, denylist, evidencia requerida, feedback de proposal inválida, segundo intento corregido, objective hard gate y dedupe de reintento.
 - `npm run audit:evolution:sandbox`: detached worktree + beforeHash + mandatory tests + denied paths.
-- `Kelo Evolution Engine CI`: syntax, ambos audits, docs y Playwright baseline/champion evidence.
-- Map Forge workflows existentes continúan protegiendo generator/handoff.
+- `Kelo Evolution Engine CI`: syntax V4, V3 core audits, source proposer audit, sandbox audit, docs y Playwright Map Forge visual evidence.
 
 ## Online-first
 
-Proposición, evaluación, aplicación y persistencia siguen desacopladas. Un runner remoto puede reemplazar GitHub Actions manteniendo IDs, fingerprints, policies, seed manifests, métricas y decisions. Nada obliga a colocar autoridad crítica en el browser.
+Proposición, evaluación, aplicación y persistencia permanecen desacopladas. Un agent/runner remoto puede reemplazar cualquier caller manteniendo problem IDs, baseline SHA, beforeHash, candidate fingerprints, policies, test IDs y objective evidence.
+
+Nada obliga a colocar autoridad crítica en el browser.
 
 ## Deuda pendiente real
 
-- visual judge semántico/vision como métrica secundaria, nunca sustituto de validez estructural;
-- benchmark de FPS del runtime jugable, no solo preview render/generation telemetry;
-- adapter externo que **genere** propuestas de source code automáticamente; V3 ya evalúa su evidencia pero no inventa patches por sí mismo;
-- regeneración física parcial de chunks/distritos; el focus V3 limita genes, no el costo procedural de recalcular el candidato completo;
-- storage remoto/object storage si la memoria supera un tamaño razonable para Git artifacts;
-- protección de `main` sigue siendo una configuración de repo separada de KeloEvolution.
+- conectar un runner/agente persistente a V4 para vigilancia continua de CI y measured opportunities;
+- visual judge semántico/vision como métrica secundaria;
+- benchmark de FPS del runtime jugable;
+- objective probes especializados adicionales para source patches fuera de Evolution/Map Forge;
+- regeneración física parcial de chunks/distritos;
+- storage remoto si experiment memory crece demasiado;
+- protección de `main` sigue siendo configuración separada del repo.
 
 ## Cómo extender sin duplicar owner
 
 - Nueva métrica: ampliar profile del owner.
-- Nuevo dominio: adapter pequeño + `runEvolutionCycle()`.
-- Nuevo code candidate: extender `kelo-code-patch-v2`; no meter filesystem/Git dentro del core.
+- Nuevo dominio data-driven: adapter pequeño + `runEvolutionCycle()`.
+- Nuevo source proposer: reutilizar `runAutonomousSourceRepairCycle()`; no crear otro repair engine.
+- Nuevo code candidate: extender `kelo-code-patch-v2`; no meter filesystem/Git en el core.
 - Nueva policy de tests/riesgo: `createCodePatchPolicy()`.
+- Nuevo objective judge: implementarlo fuera del core y devolver `{report, objectiveScore}`.
 - Map Forge: extender gene catalog/evaluator; no duplicar `map-forge-quality.mjs`.
 - Persistencia: adaptar snapshots de memory; no meter storage en el core.
