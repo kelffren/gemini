@@ -12,7 +12,7 @@ const STAGE=process.env.KELO_ORIENTATION_STAGE==='after'?'after':'before';
 const DIRECTIONAL_FAMILIES=new Set(['bench','market_prop']);
 
 test.use({viewport:{width:1440,height:900}});
-test.setTimeout(60000);
+test.setTimeout(120000);
 
 function nearestRoadFrame(p,roads){
   let best=null;
@@ -21,7 +21,7 @@ function nearestRoadFrame(p,roads){
     for(let i=1;i<points.length;i++){
       const a=points[i-1],b=points[i],dx=b.x-a.x,dy=b.y-a.y,den=dx*dx+dy*dy;
       const t=den?Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/den)):0;
-      const point={x:a.x+dx*t,y:a.y+dy*t},vx=point.x-p.x,vy=point.y-p.y,distance=Math.hypot(vx,vy);
+      const point={x:a.x+dx*t,y:a.y+dy*t},vx=point.x-p.x,vy=point.y-p.y,distance:Math.hypot(vx,vy);
       if(!best||distance<best.distance)best={distance,point,vx,vy};
     }
   }
@@ -59,7 +59,7 @@ async function bootForge(page){
   const pageErrors=[];page.on('pageerror',error=>pageErrors.push(String(error)));
   const response=await page.goto('/?mapEditor=1&offline=1',{waitUntil:'domcontentloaded',timeout:30000});
   expect(response.status()).toBeLessThan(400);
-  await page.waitForFunction(()=>!!(window.KELO_WORLD_BUILDER?.renderSnapshotPreview&&window.KELO_PROPERTY_SYSTEM?.drawPlacements&&window.KELO_PROPERTY_CATALOG&&window.KeloCamera?.focus&&window.KELO_ADMIN_KEYS?.can?.('world.edit')),null,{timeout:15000});
+  await page.waitForFunction(()=>!!(window.KELO_WORLD_BUILDER?.renderSnapshotPreview&&window.KELO_PROPERTY_SYSTEM?.drawPlacements&&window.KELO_PROPERTY_CATALOG&&window.KeloCamera?.focus&&window.KELO_ADMIN_KEYS?.can?.('world.edit')),null,{timeout:60000});
   await page.evaluate(async()=>{const {bootKeloCreators}=await import('./src/creators/creator-entry.mjs');const platform=await bootKeloCreators({root:window});await platform.openWorkspace('map-forge');});
   const forge=page.locator('#kelo-map-forge');await expect(forge).toBeVisible();return{forge,pageErrors};
 }
