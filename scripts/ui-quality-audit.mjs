@@ -47,6 +47,22 @@ function cssBlocks(text){
   return blocks;
 }
 
+function hasInteractiveFixedSurface(text){
+  const passive=/pointer-events\s*:\s*none/i;
+  const interactiveCue=/(pointer-events\s*:\s*(?:auto|all)|overflow(?:-y|-x)?\s*:\s*(?:auto|scroll)|display\s*:\s*(?:grid|flex))/i;
+  const surfaceName=/(panel|modal|menu|dialog|sheet|drawer|dock|workspace|lab|overlay|card|profile)/i;
+  for(const block of cssBlocks(text)){
+    if(!/position\s*:\s*fixed/i.test(block.body)||passive.test(block.body))continue;
+    if(interactiveCue.test(block.body)||surfaceName.test(block.selector))return true;
+  }
+  const inline=/(?:style\.cssText\s*(?:\+?=)\s*)['"`]([^'"`]*position\s*:\s*fixed[^'"`]*)['"`]/ig;
+  let m;
+  while((m=inline.exec(text))){
+    if(!passive.test(m[1]))return true;
+  }
+  return false;
+}
+
 const sharedCss=SHARED_CSS_FILES.filter(file=>fs.existsSync(path.join(ROOT,file))).map(file=>fs.readFileSync(path.join(ROOT,file),'utf8')).join('\n');
 const sharedBlocks=cssBlocks(sharedCss);
 
@@ -100,9 +116,9 @@ function auditFile(file,text){
   const infinite=(text.match(/\binfinite\b/gi)||[]).length;
   if(infinite>2)add('MOTION_SPRAWL','warn',`Contains ${infinite} infinite animations; continuous motion should communicate active state only.`);
 
-  const hasFixedOverlay=/position\s*:\s*fixed/i.test(text);
-  const hasClose=/\b(close|cerrar|back|volver|destroy)\b/i.test(text);
-  if(hasFixedOverlay&&!hasClose)add('EXIT_ROUTE_UNCLEAR','warn','Fixed UI surface has no obvious close/back route in the same module.');
+  const hasExitRoute=/\b(close|cerrar|back|volver|destroy|logout|signout|sign-out|hide|hidden|minimi[sz]|collaps|dismiss|exit|salir|cancel|remove)\b/i.test(text);
+  if(hasInteractiveFixedSurface(text)&&!hasExitRoute)
+    add('EXIT_ROUTE_UNCLEAR','warn','Interactive fixed UI surface has no obvious close/back/minimize route in the same module.');
 
   for(const block of cssBlocks(text)){
     const selectors=splitSelectors(block.selector);
