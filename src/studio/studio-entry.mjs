@@ -32,6 +32,7 @@ import { createStudioContextInspector } from './ui/studio-context-inspector.mjs'
 import { createStudioContextSnapChip } from './ui/studio-context-snap-chip.mjs';
 import { createStudioAssetFavorites } from './ui/studio-asset-favorites.mjs';
 import { createStudioMultiAlign } from './ui/studio-multi-align.mjs';
+import { createStudioAssetRepairer } from './ui/studio-asset-repairer.mjs';
 
 const NOOP_ASSET_PALETTE=Object.freeze({
   attach:()=>false,open:()=>false,close:()=>false,toggle:()=>false,refresh:()=>false,choose:()=>false,destroy:()=>{},
@@ -42,6 +43,14 @@ const NOOP_ASSET_FAVORITES=Object.freeze({refresh:()=>{},destroy:()=>{},toggle:(
 let session = null;
 export async function bootKeloStudio({ mode = 'world', actorId = null, document = null, root = globalThis } = {}) {
   if (session) return session;
+  if(mode==='asset-repair'||mode==='asset-repairer'){
+    const assetRepairer=createStudioAssetRepairer({root});
+    session=Object.freeze({
+      version:'kelo-studio-asset-repairer-v1.0.0',mode:'asset-repair',actorId,assetRepairer,
+      close(){assetRepairer.destroy();session=null;}
+    });
+    return session;
+  }
   const adapter = createKeloRuntimeAdapter(root);
   const initial = document || createWorldDocument({ worldId: mode === 'parcel' ? `parcel:${actorId || 'local'}` : 'world:kelo-main', metadata: { name: mode === 'parcel' ? 'My Parcel' : 'Kelo World', description: '', tags: [mode] }, settings: { tileSize: root.KELO_TILE_REGISTRY?.worldTileSize || 32, chunkSize: root.KELO_WORLD_RENDERER?.chunkSize || 512 } });
   const kernel = createStudioKernel({ document: initial, adapter });
