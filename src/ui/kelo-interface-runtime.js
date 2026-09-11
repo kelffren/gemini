@@ -8,7 +8,7 @@
 'use strict';
 if(window.KELO_INTERFACE_RUNTIME)return;
 
-const VERSION='kelo-interface-runtime-v1.2.0';
+const VERSION='kelo-interface-runtime-v1.3.0';
 const RUNTIME_STYLE_ID='kelo-interface-runtime-style';
 
 function ensureStyle(){
@@ -24,7 +24,40 @@ function ensureStyle(){
     }
     #kelo-asset-repairer .kui-more-tools:hover{background:rgba(255,255,255,.045)!important;color:var(--kui-text-2,#c7c7cc)!important}
     #kelo-asset-repairer[data-kui-has-asset="false"] .kar-tool{opacity:.42}
-    @media(max-width:700px){#kelo-asset-repairer .kui-more-tools{grid-column:1/-1}}
+
+    /* KELO-INDEX UI/IOS interaction quality: native-feeling taps, editable text and predictable disabled controls. */
+    :is(#kelo-luxe,#kelo-account-auth,#kelo-creators-hub,#kelo-studio-live,#kelo-asset-repairer,#kelo-bag,#kelo-market-v1,#kelo-warehouse,#kelo-mount-panel,#kelo-commerce-dock,#kelo-commerce-modal,#kelo-house-panel) :is(button,[role="button"]){
+      touch-action:manipulation;
+    }
+    :is(#kelo-account-auth,#kelo-studio-live,#kelo-asset-repairer,#kelo-commerce-modal,#kelo-mount-panel) :is(input,textarea){
+      user-select:text!important;
+      -webkit-user-select:text!important;
+      caret-color:var(--kui-accent,#e7c56a);
+    }
+    :is(#kelo-luxe,#kelo-account-auth,#kelo-creators-hub,#kelo-studio-live,#kelo-asset-repairer,#kelo-bag,#kelo-market-v1,#kelo-warehouse,#kelo-mount-panel,#kelo-commerce-dock,#kelo-commerce-modal,#kelo-house-panel) :is(button,input,select,textarea):disabled,
+    :is(#kelo-luxe,#kelo-account-auth,#kelo-creators-hub,#kelo-studio-live,#kelo-asset-repairer,#kelo-bag,#kelo-market-v1,#kelo-warehouse,#kelo-mount-panel,#kelo-commerce-dock,#kelo-commerce-modal,#kelo-house-panel) [aria-disabled="true"]{
+      opacity:.42!important;
+      cursor:default!important;
+      transform:none!important;
+      box-shadow:none!important;
+      filter:saturate(.65);
+    }
+
+    @media(max-width:700px){
+      #kelo-asset-repairer .kui-more-tools{grid-column:1/-1}
+      /* iOS Safari auto-zooms focused form fields below 16px; keep forms stable like a native app. */
+      #kelo-account-auth :is(input,textarea,select),
+      #kelo-studio-live :is(input,textarea,select),
+      #kelo-asset-repairer :is(input,textarea,select),
+      #kelo-commerce-modal :is(input,textarea,select),
+      #kelo-mount-panel :is(input,textarea,select){font-size:16px!important}
+      #kelo-account-auth,#kelo-commerce-modal{
+        padding-top:max(12px,env(safe-area-inset-top))!important;
+        padding-bottom:max(12px,env(safe-area-inset-bottom))!important;
+        padding-left:max(12px,env(safe-area-inset-left))!important;
+        padding-right:max(12px,env(safe-area-inset-right))!important;
+      }
+    }
   `;
   document.head.appendChild(style);
 }
