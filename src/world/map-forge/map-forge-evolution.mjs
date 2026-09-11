@@ -71,7 +71,7 @@ export function mapForgeGenomeFingerprint(recipe,genomeInput){
 export function mapForgeGenomeDistance(recipe,aInput,bInput){
   const a=createMapForgeGenome(recipe,{genes:aInput?.genes||aInput||{}}),b=createMapForgeGenome(recipe,{genes:bInput?.genes||bInput||{}}),catalog=createMapForgeGeneCatalog(recipe);
   if(!catalog.length)return 0;
-  return round(mean(catalog.map(row=>Math.abs(a.genes[row.id]-b.genes[row.id])/(row.max-row.min))),6);
+  return round(Math.sqrt(mean(catalog.map(row=>(Math.abs(a.genes[row.id]-b.genes[row.id])/(row.max-row.min))**2))),6);
 }
 
 export function applyMapForgeGenome(recipe,genomeInput){
@@ -110,16 +110,7 @@ export function evaluateMapForgeGenome(recipe,{genome=null,style={},seed=1,valid
     runs.push(Object.freeze({seed:validationSeed,valid:Boolean(best?.validation?.valid),quality:numeric(best?.quality?.total,0),visual:best?round(visualScore(best),3):0,navigation:best?round(navigationFloor(best),3):0,complexity:best?round(complexityScore(best),3):0,generationMs:round(elapsed,3),layoutHash:best?.metadata?.layoutHash||null,validCount:batch.validCount,rejectedCount:batch.rejectedCount}));
   }
   const validRuns=runs.filter(run=>run.valid),qualities=validRuns.map(run=>run.quality),visuals=validRuns.map(run=>run.visual);
-  const measurements={
-    meanQuality:round(mean(qualities),3),
-    worstQuality:round(qualities.length?Math.min(...qualities):0,3),
-    meanVisual:round(mean(visuals),3),
-    worstVisual:round(visuals.length?Math.min(...visuals):0,3),
-    navigationFloor:round(validRuns.length?Math.min(...validRuns.map(run=>run.navigation)):0,3),
-    complexitySafety:round(mean(validRuns.map(run=>run.complexity)),3),
-    stability:round(clamp(100-standardDeviation(qualities)*5,0,100),3),
-    validRate:round(runs.length?validRuns.length/runs.length*100:0,3)
-  };
+  const measurements={meanQuality:round(mean(qualities),3),worstQuality:round(qualities.length?Math.min(...qualities):0,3),meanVisual:round(mean(visuals),3),worstVisual:round(visuals.length?Math.min(...visuals):0,3),navigationFloor:round(validRuns.length?Math.min(...validRuns.map(run=>run.navigation)):0,3),complexitySafety:round(mean(validRuns.map(run=>run.complexity)),3),stability:round(clamp(100-standardDeviation(qualities)*5,0,100),3),validRate:round(runs.length?validRuns.length/runs.length*100:0,3)};
   const scored=scoreEvolutionMetrics(MAP_FORGE_EVOLUTION_PROFILE,measurements),performance={meanGenerationMs:round(mean(runs.map(run=>run.generationMs)),3),worstGenerationMs:round(Math.max(0,...runs.map(run=>run.generationMs)),3)};
   return freezeDeep({valid:scored.valid,score:scored.score,metrics:measurements,performance,failures:scored.failures,genome:normalized,genomeFingerprint:mapForgeGenomeFingerprint(recipe,normalized),seedBankFingerprint:hashString(stableStringify(seeds)),style:Object.fromEntries(MAP_FORGE_EVOLVABLE_STYLE_KEYS.map(key=>[key,normalized.genes[`style.${key}`]])),runs});
 }
@@ -142,8 +133,7 @@ export function compareMapForgePairedEvaluations(baseline,candidate,{minWinRate=
 
 function weightedPick(rng,rows,memory){
   const weights=rows.map(row=>mutationPriority(memory||{},row.id)),total=weights.reduce((a,b)=>a+b,0),needle=rng.float(0,total);let cursor=0;
-  for(let i=0;i<rows.length;i++){cursor+=weights[i];if(needle<=cursor)return rows[i];}
-  return rows.at(-1);
+  for(let i=0;i<rows.length;i++){cursor+=weights[i];if(needle<=cursor)return rows[i];}return rows.at(-1);
 }
 export function proposeMapForgeGenomeMutations(recipe,{genome=null,style={},seed=1,generation=0,population=8,mutationStep=1,minimumNovelty=.018,lockedGenes=[],focusScopes=[],focusGenes=[],memory=null}={}){
   const base=createMapForgeGenome(recipe,genome?{genes:genome.genes||genome}:{style}),catalog=createMapForgeGeneCatalog(recipe),eligible=catalog.filter(row=>!geneMatches(row.id,lockedGenes)&&(!focusScopes.length||focusScopes.includes(row.scope))&&(!focusGenes.length||geneMatches(row.id,focusGenes)));
@@ -155,14 +145,12 @@ export function proposeMapForgeGenomeMutations(recipe,{genome=null,style={},seed
       const draft={...base.genes},mutationCount=rng.chance(.22)?3:(rng.chance(.38)?2:1),used=new Set();mutations=[];
       for(let m=0;m<Math.min(mutationCount,eligible.length);m++){
         const descriptor=weightedPick(rng,eligible.filter(row=>!used.has(row.id)),memory);if(!descriptor)break;used.add(descriptor.id);
-        const before=draft[descriptor.id],magnitude=descriptor.step*scale*rng.float(.55,1.2),after=round(clamp(before+(rng.chance(.5)?-1:1)*magnitude,descriptor.min,descriptor.max),4);
-        draft[descriptor.id]=after;mutations.push(Object.freeze({geneId:descriptor.id,scope:descriptor.scope,before,after,delta:round(after-before,4)}));
+        const before=draft[descriptor.id],magnitude=descriptor.step*scale*rng.float(.55,1.2),after=round(clamp(before+(rng.chance(.5)?-1:1)*magnitude,descriptor.min,descriptor.max),4);draft[descriptor.id]=after;mutations.push(Object.freeze({geneId:descriptor.id,scope:descriptor.scope,before,after,delta:round(after-before,4)}));
       }
       candidateGenes=draft;novelty=mapForgeGenomeDistance(recipe,base,{genes:candidateGenes});fingerprint=mapForgeGenomeFingerprint(recipe,{genes:candidateGenes});attempts++;
     }while((seen.has(stableStringify(candidateGenes))||novelty<noveltyFloor||candidateSeenCount(memory||{},fingerprint)>0||candidates.some(row=>mapForgeGenomeDistance(recipe,row.genome,{genes:candidateGenes})<noveltyFloor*.45))&&attempts<24);
     const signature=stableStringify(candidateGenes),tooClose=candidates.some(row=>mapForgeGenomeDistance(recipe,row.genome,{genes:candidateGenes})<noveltyFloor*.45);
-    if(seen.has(signature)||novelty<noveltyFloor||candidateSeenCount(memory||{},fingerprint)>0||tooClose)continue;
-    seen.add(signature);
+    if(seen.has(signature)||novelty<noveltyFloor||candidateSeenCount(memory||{},fingerprint)>0||tooClose)continue;seen.add(signature);
     candidates.push(freezeDeep({id:`mf-evo:${generation}:${index}:${hashString(signature).slice(0,8)}`,fingerprint,genome:createMapForgeGenome(recipe,{genes:candidateGenes}),novelty,mutations}));
   }
   return freezeDeep(candidates);
@@ -181,8 +169,7 @@ export function minimizeMapForgeWinner(recipe,{baselineGenome,candidateGenome,se
   for(const mutation of originalMutations.slice(0,limit)){
     const trialGenes={...current.genes,[mutation.geneId]:baseline.genes[mutation.geneId]},trial=createMapForgeGenome(recipe,{genes:trialGenes});
     const searchEval=evaluateMapForgeGenome(recipe,{genome:trial,seedBank:searchSeeds,bestOf,assetCatalogVersion,constraints}),holdoutEval=evaluateMapForgeGenome(recipe,{genome:trial,seedBank:holdoutSeeds,bestOf,assetCatalogVersion,constraints}),searchComparison=compareEvolutionEvaluations(baselineSearch,searchEval,{minImprovement}),holdoutComparison=compareEvolutionEvaluations(baselineHoldout,holdoutEval,{minImprovement:minHoldoutImprovement}),paired=compareMapForgePairedEvaluations(baselineHoldout,holdoutEval,pairedPolicy),keepPruned=searchComparison.accepted&&holdoutComparison.accepted&&paired.accepted;
-    checks.push(freezeDeep({geneId:mutation.geneId,pruned:keepPruned,searchDelta:searchComparison.delta,holdoutDelta:holdoutComparison.delta,paired:paired.metrics}));
-    if(keepPruned)current=trial;
+    checks.push(freezeDeep({geneId:mutation.geneId,pruned:keepPruned,searchDelta:searchComparison.delta,holdoutDelta:holdoutComparison.delta,paired:paired.metrics}));if(keepPruned)current=trial;
   }
   return freezeDeep({genome:current,originalMutationCount:originalMutations.length,finalMutationCount:diffGenomes(recipe,baseline,current).length,prunedCount:originalMutations.length-diffGenomes(recipe,baseline,current).length,checks});
 }
@@ -191,19 +178,10 @@ export async function evolveMapForgeStyle(recipe,{genome=null,style={},seed=1,ge
   if(!recipe?.id)throw new Error('MAP_FORGE_EVOLUTION_RECIPE_REQUIRED');
   const original=freezeDeep({id:'baseline',genome:createMapForgeGenome(recipe,genome?{genes:genome.genes||genome}:{style}),mutations:[]}),history=[];let current=original,step=clamp(numeric(mutationStep,1),.1,3),acceptedGenerations=0,stagnation=0,strategyEscalations=0;
   const generationCount=clamp(Math.floor(numeric(generations,3)),1,10),searchSeeds=searchSeedBank(recipe,{seed,validationSeeds,goldenSeeds}),holdoutSeedsBank=holdoutSeedBank(recipe,{seed,holdoutSeeds,exclude:searchSeeds});
-  const evaluateSearch=candidate=>evaluateMapForgeGenome(recipe,{genome:candidate.genome,seedBank:searchSeeds,bestOf,assetCatalogVersion,constraints});
-  const scopes=['style','roads','districts','landmarks'];
+  const evaluateSearch=candidate=>evaluateMapForgeGenome(recipe,{genome:candidate.genome,seedBank:searchSeeds,bestOf,assetCatalogVersion,constraints}),scopes=['style','roads','districts','landmarks'];
   for(let generation=0;generation<generationCount;generation++){
-    const escalated=!focusScopes.length&&stagnation>=2,effectiveScopes=focusScopes.length?[...focusScopes]:(escalated?[scopes[(generation+stagnation)%scopes.length]]:[]);
-    const effectiveStep=clamp(step*(escalated?1.35:1),.1,3);if(escalated)strategyEscalations++;
-    const cycle=await runEvolutionCycle({
-      baseline:current,
-      propose:()=>proposeMapForgeGenomeMutations(recipe,{genome:current.genome,seed,generation,population,mutationStep:effectiveStep,minimumNovelty,lockedGenes,focusScopes:effectiveScopes,focusGenes,memory}),
-      evaluate:evaluateSearch,
-      fingerprintCandidate:candidate=>candidate.fingerprint||mapForgeGenomeFingerprint(recipe,candidate.genome),
-      policy:{minImprovement,minScore,paretoObjectives:MAP_FORGE_PARETO_OBJECTIVES}
-    });
-    const selected=cycle.selected;
+    const escalated=!focusScopes.length&&stagnation>=2,effectiveScopes=focusScopes.length?[...focusScopes]:(escalated?[scopes[(generation+stagnation)%scopes.length]]:[]),effectiveStep=clamp(step*(escalated?1.35:1),.1,3);if(escalated)strategyEscalations++;
+    const cycle=await runEvolutionCycle({baseline:current,propose:()=>proposeMapForgeGenomeMutations(recipe,{genome:current.genome,seed,generation,population,mutationStep:effectiveStep,minimumNovelty,lockedGenes,focusScopes:effectiveScopes,focusGenes,memory}),evaluate:evaluateSearch,fingerprintCandidate:candidate=>candidate.fingerprint||mapForgeGenomeFingerprint(recipe,candidate.genome),policy:{minImprovement,minScore,paretoObjectives:MAP_FORGE_PARETO_OBJECTIVES}}),selected=cycle.selected;
     let accepted=false,holdout=null;
     if(cycle.accepted&&selected){
       const baselineHoldout=evaluateMapForgeGenome(recipe,{genome:current.genome,seedBank:holdoutSeedsBank,bestOf,assetCatalogVersion,constraints}),candidateHoldout=evaluateMapForgeGenome(recipe,{genome:selected.candidate.genome,seedBank:holdoutSeedsBank,bestOf,assetCatalogVersion,constraints}),absolute=compareEvolutionEvaluations(baselineHoldout,candidateHoldout,{minImprovement:minHoldoutImprovement,minScore}),paired=compareMapForgePairedEvaluations(baselineHoldout,candidateHoldout,pairedPolicy);
@@ -214,40 +192,10 @@ export async function evolveMapForgeStyle(recipe,{genome=null,style={},seed=1,ge
     history.push(freezeDeep({generation,accepted,searchAccepted:cycle.accepted,baselineScore:cycle.baselineEvaluation.score,candidateScore:selected?.evaluation?.score??null,delta:selected?.comparison?.delta??0,selectedId:selected?.candidate?.id||null,candidateFingerprint:selected?.candidate?.fingerprint||null,novelty:selected?.candidate?.novelty??null,mutations:selected?.candidate?.mutations||[],candidateCount:cycle.evaluated.length,duplicateCount:cycle.duplicates?.length||0,paretoFrontierCount:cycle.paretoFrontier?.length||0,step:round(effectiveStep,4),stagnation,escalatedScope:effectiveScopes,holdout}));
   }
   let minimization=null;
-  if(acceptedGenerations>0&&minimizeWinner){
-    minimization=minimizeMapForgeWinner(recipe,{baselineGenome:original.genome,candidateGenome:current.genome,searchSeeds,holdoutSeeds:holdoutSeedsBank,bestOf,assetCatalogVersion,constraints,minImprovement,minHoldoutImprovement,pairedPolicy,maxPruneChecks});
-    current=freezeDeep({id:'minimized-champion',genome:minimization.genome,mutations:diffGenomes(recipe,original.genome,minimization.genome)});
-  }
+  if(acceptedGenerations>0&&minimizeWinner){minimization=minimizeMapForgeWinner(recipe,{baselineGenome:original.genome,candidateGenome:current.genome,searchSeeds,holdoutSeeds:holdoutSeedsBank,bestOf,assetCatalogVersion,constraints,minImprovement,minHoldoutImprovement,pairedPolicy,maxPruneChecks});current=freezeDeep({id:'minimized-champion',genome:minimization.genome,mutations:diffGenomes(recipe,original.genome,minimization.genome)});}
   const baselineEvaluation=evaluateMapForgeGenome(recipe,{genome:original.genome,seedBank:searchSeeds,bestOf,assetCatalogVersion,constraints}),bestEvaluation=evaluateMapForgeGenome(recipe,{genome:current.genome,seedBank:searchSeeds,bestOf,assetCatalogVersion,constraints}),baselineHoldout=evaluateMapForgeGenome(recipe,{genome:original.genome,seedBank:holdoutSeedsBank,bestOf,assetCatalogVersion,constraints}),bestHoldout=evaluateMapForgeGenome(recipe,{genome:current.genome,seedBank:holdoutSeedsBank,bestOf,assetCatalogVersion,constraints}),finalPaired=compareMapForgePairedEvaluations(baselineHoldout,bestHoldout,pairedPolicy),finalHoldoutComparison=compareEvolutionEvaluations(baselineHoldout,bestHoldout,{minImprovement:acceptedGenerations>0?minHoldoutImprovement:0,minScore});
-  const finalAccepted=acceptedGenerations>0&&bestEvaluation.score-baselineEvaluation.score>=minImprovement&&finalHoldoutComparison.accepted&&finalPaired.accepted;
-  if(!finalAccepted&&acceptedGenerations>0)current=original;
+  const finalAccepted=acceptedGenerations>0&&bestEvaluation.score-baselineEvaluation.score>=minImprovement&&finalHoldoutComparison.accepted&&finalPaired.accepted;if(!finalAccepted&&acceptedGenerations>0)current=original;
   const finalBestEvaluation=finalAccepted?bestEvaluation:baselineEvaluation,finalBestHoldout=finalAccepted?bestHoldout:baselineHoldout,finalGenome=finalAccepted?current.genome:original.genome,finalStyle=Object.fromEntries(MAP_FORGE_EVOLVABLE_STYLE_KEYS.map(key=>[key,finalGenome.genes[`style.${key}`]]));
-  const evidenceBase={evaluatorVersion:MAP_FORGE_EVOLUTION_EVALUATOR_VERSION,recipeId:recipe.id,searchSeedFingerprint:hashString(stableStringify(searchSeeds)),holdoutSeedFingerprint:hashString(stableStringify(holdoutSeedsBank)),baselineFingerprint:mapForgeGenomeFingerprint(recipe,original.genome),championFingerprint:mapForgeGenomeFingerprint(recipe,finalGenome),baselineScore:baselineEvaluation.score,championScore:finalBestEvaluation.score,holdoutBaselineScore:baselineHoldout.score,holdoutChampionScore:finalBestHoldout.score};
-  const evidence=freezeDeep({...evidenceBase,fingerprint:`mf-evidence-${hashString(stableStringify(evidenceBase)).slice(0,12)}`});
-  return freezeDeep({
-    version:'kelo-map-forge-evolution-v3',
-    evaluatorVersion:MAP_FORGE_EVOLUTION_EVALUATOR_VERSION,
-    recipeId:recipe.id,
-    seed:seed32(seed),
-    accepted:finalAccepted,
-    acceptedGenerations:finalAccepted?acceptedGenerations:0,
-    generations:generationCount,
-    originalGenome:original.genome,
-    bestGenome:finalGenome,
-    originalStyle:Object.fromEntries(MAP_FORGE_EVOLVABLE_STYLE_KEYS.map(key=>[key,original.genome.genes[`style.${key}`]])),
-    bestStyle:finalStyle,
-    baselineEvaluation,
-    bestEvaluation:finalBestEvaluation,
-    baselineHoldout,
-    bestHoldout:finalBestHoldout,
-    pairedHoldout:finalAccepted?finalPaired:compareMapForgePairedEvaluations(baselineHoldout,baselineHoldout,pairedPolicy),
-    improvement:round(finalBestEvaluation.score-baselineEvaluation.score,4),
-    holdoutImprovement:round(finalBestHoldout.score-baselineHoldout.score,4),
-    history,
-    minimization,
-    strategy:{strategyEscalations,finalStagnation:stagnation,finalStep:round(step,4)},
-    evidence,
-    seedBanks:{search:[...searchSeeds],holdout:[...holdoutSeedsBank]},
-    locks:{lockedGenes:[...lockedGenes],focusScopes:[...focusScopes],focusGenes:[...focusGenes]}
-  });
+  const evidenceBase={evaluatorVersion:MAP_FORGE_EVOLUTION_EVALUATOR_VERSION,recipeId:recipe.id,searchSeedFingerprint:hashString(stableStringify(searchSeeds)),holdoutSeedFingerprint:hashString(stableStringify(holdoutSeedsBank)),baselineFingerprint:mapForgeGenomeFingerprint(recipe,original.genome),championFingerprint:mapForgeGenomeFingerprint(recipe,finalGenome),baselineScore:baselineEvaluation.score,championScore:finalBestEvaluation.score,holdoutBaselineScore:baselineHoldout.score,holdoutChampionScore:finalBestHoldout.score},evidence=freezeDeep({...evidenceBase,fingerprint:`mf-evidence-${hashString(stableStringify(evidenceBase)).slice(0,12)}`});
+  return freezeDeep({version:'kelo-map-forge-evolution-v3',evaluatorVersion:MAP_FORGE_EVOLUTION_EVALUATOR_VERSION,recipeId:recipe.id,seed:seed32(seed),accepted:finalAccepted,acceptedGenerations:finalAccepted?acceptedGenerations:0,generations:generationCount,originalGenome:original.genome,bestGenome:finalGenome,originalStyle:Object.fromEntries(MAP_FORGE_EVOLVABLE_STYLE_KEYS.map(key=>[key,original.genome.genes[`style.${key}`]])),bestStyle:finalStyle,baselineEvaluation,bestEvaluation:finalBestEvaluation,baselineHoldout,bestHoldout:finalBestHoldout,pairedHoldout:finalAccepted?finalPaired:compareMapForgePairedEvaluations(baselineHoldout,baselineHoldout,pairedPolicy),improvement:round(finalBestEvaluation.score-baselineEvaluation.score,4),holdoutImprovement:round(finalBestHoldout.score-baselineHoldout.score,4),history,minimization,strategy:{strategyEscalations,finalStagnation:stagnation,finalStep:round(step,4)},evidence,seedBanks:{search:[...searchSeeds],holdout:[...holdoutSeedsBank]},locks:{lockedGenes:[...lockedGenes],focusScopes:[...focusScopes],focusGenes:[...focusGenes]}});
 }
