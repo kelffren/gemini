@@ -14,6 +14,7 @@ on:
       - 'src/creators/animation/animation-document.mjs'
       - 'src/creators/animation/animation-preview-adapter.mjs'
       - 'scripts/creator-hub-sprite-launch-audit.mjs'
+      - 'scripts/sprite-ability-launch-live-diagnostic.mjs'
       - 'scripts/sprite-ability-builder-audit.mjs'
       - 'scripts/sprite-ability-builder-live-audit.mjs'
       - 'scripts/sprite-ability-event-lab-audit.mjs'
@@ -30,6 +31,7 @@ on:
       - 'src/creators/animation/animation-document.mjs'
       - 'src/creators/animation/animation-preview-adapter.mjs'
       - 'scripts/creator-hub-sprite-launch-audit.mjs'
+      - 'scripts/sprite-ability-launch-live-diagnostic.mjs'
       - 'scripts/sprite-ability-builder-audit.mjs'
       - 'scripts/sprite-ability-builder-live-audit.mjs'
       - 'scripts/sprite-ability-event-lab-audit.mjs'
@@ -58,6 +60,7 @@ jobs:
           node --check src/creators/animation/animation-document.mjs
           node --check src/creators/animation/animation-preview-adapter.mjs
           node --check scripts/creator-hub-sprite-launch-audit.mjs
+          node --check scripts/sprite-ability-launch-live-diagnostic.mjs
           node --check scripts/sprite-ability-builder-audit.mjs
           node --check scripts/sprite-ability-builder-live-audit.mjs
           node --check scripts/sprite-ability-event-lab-audit.mjs
@@ -94,6 +97,11 @@ jobs:
           for i in {1..20}; do curl -fsS http://127.0.0.1:8000/index.html >/dev/null && exit 0; sleep 1; done
           cat /tmp/sprite-ability-http.log
           exit 1
+      - name: Diagnose Hub to Sprite Ability launch at 390x844
+        env:
+          AUDIT_URL: http://127.0.0.1:8000/
+          CHROME_BIN: /usr/bin/google-chrome
+        run: node scripts/sprite-ability-launch-live-diagnostic.mjs
       - name: Upload irregular sheet, auto-fit, preview and generate at 390x844
         env:
           AUDIT_URL: http://127.0.0.1:8000/
