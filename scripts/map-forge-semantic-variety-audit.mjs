@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: TEST / MAP FORGE / STUDIO HANDOFF
  * owner: Map Forge Studio handoff contract audit
- * purpose: prove district labels cannot override the intrinsic semantic kind of real generated props/landmarks
+ * purpose: prove district labels cannot override intrinsic semantic kind while unsafe decoration footprints may be culled
  */
 import assert from 'node:assert/strict';
 import {generateBestOf} from '../src/world/map-forge/map-forge-core.mjs';
@@ -31,7 +31,7 @@ const legacyRules=[
   [/\b(bench|banco)\b/,'imperial:banco'],[/\b(flower|floral|garden|jardin)\b/,'imperial:jardinera-curva'],[/\b(bush|topiary|topiario)\b/,'imperial:topiario']
 ];
 const normalize=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[_-]+/g,' ').replace(/[^a-z0-9 ]+/g,' ').replace(/\s+/g,' ').trim();
-let worlds=0,checked=0,beforeWrong=0,afterWrong=0,beforeWrongKiosk=0,afterWrongKiosk=0;
+let worlds=0,checked=0,culledDecorations=0,beforeWrong=0,afterWrong=0,beforeWrongKiosk=0,afterWrongKiosk=0;
 const byKind={};
 
 function authoritativeKind(row){
@@ -54,12 +54,16 @@ function inspect(collection,placementKind,snapshot){
   const placements=new Map(snapshot.placements.map(row=>[row.placementId,row]));
   for(const [index,row] of collection.entries()){
     const kind=authoritativeKind(row); if(!kind)continue;
-    const placementId=`map-forge:${placementKind}:${String(row?.id||index)}`;
-    const placement=placements.get(placementId);
-    assert(placement,`missing semantic placement ${placementId}`);
-    checked+=1; byKind[kind]=(byKind[kind]||0)+1;
     const before=legacyAsset(row);
     if(before&&!EXPECTED[kind].includes(before)){beforeWrong+=1;if(before==='imperial:kiosco'&&kind!=='market')beforeWrongKiosk+=1;}
+    const placementId=`map-forge:${placementKind}:${String(row?.id||index)}`;
+    const placement=placements.get(placementId);
+    if(!placement){
+      assert.equal(placementKind,'decoration',`landmark semantic placement may not disappear: ${placementId}`);
+      culledDecorations+=1;
+      continue;
+    }
+    checked+=1; byKind[kind]=(byKind[kind]||0)+1;
     if(!EXPECTED[kind].includes(placement.assetId)){afterWrong+=1;if(placement.assetId==='imperial:kiosco'&&kind!=='market')afterWrongKiosk+=1;}
   }
 }
@@ -80,10 +84,11 @@ for(const recipeId of recipes){
     worlds+=1;
   }
 }
-assert(checked>100,'corpus must exercise semantic placements heavily');
+assert(checked>100,'corpus must exercise semantic placements heavily after footprint culling');
+assert(culledDecorations>0,'corpus must exercise the real-footprint safety gate');
 assert(beforeWrong>0,'legacy district-contaminated resolver must reproduce at least one wrong semantic placement');
 assert(beforeWrongKiosk>0,'legacy resolver must reproduce non-market props becoming the oversized kiosk');
 assert.equal(afterWrong,0,'intrinsic semantic kind must win over district labels');
 assert.equal(afterWrongKiosk,0,'non-market props must never resolve to imperial:kiosco');
 
-console.log(JSON.stringify({ok:true,worlds,recipes:recipes.length,seedsPerRecipe:20,deterministicReplays:recipes.length,checked,before:{wrongSemanticPlacements:beforeWrong,wrongKioskConversions:beforeWrongKiosk,errorRatePct:Number((beforeWrong/checked*100).toFixed(2))},after:{wrongSemanticPlacements:afterWrong,wrongKioskConversions:afterWrongKiosk,errorRatePct:Number((afterWrong/checked*100).toFixed(2))},byKind},null,2));
+console.log(JSON.stringify({ok:true,worlds,recipes:recipes.length,seedsPerRecipe:20,deterministicReplays:recipes.length,checked,culledDecorations,before:{wrongSemanticPlacements:beforeWrong,wrongKioskConversions:beforeWrongKiosk,errorRatePct:Number((beforeWrong/Math.max(1,checked)*100).toFixed(2))},after:{wrongSemanticPlacements:afterWrong,wrongKioskConversions:afterWrongKiosk,errorRatePct:Number((afterWrong/Math.max(1,checked)*100).toFixed(2))},byKind},null,2));
