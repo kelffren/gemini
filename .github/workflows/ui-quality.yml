@@ -9,20 +9,15 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: kelo-ui-quality-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  interface-quality:
+  detect-ui:
     runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.ui_changes.outputs.changed }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 2
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
 
       - name: Detect interface changes
         id: ui_changes
@@ -33,7 +28,12 @@ jobs:
             exit 0
           fi
 
-          before="${{ github.event.before }}"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            before="${{ github.event.pull_request.base.sha }}"
+          else
+            before="${{ github.event.before }}"
+          fi
+
           if [ -z "$before" ] || [ "$before" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "$before^{commit}" 2>/dev/null; then
             before="$(git rev-parse HEAD^ 2>/dev/null || true)"
           fi
@@ -52,9 +52,9 @@ jobs:
             exit 0
           fi
 
-          # UI exists outside the canonical folders too (creator labs, system HUDs,
-          # visual/debug tools). Inspect every changed source file instead of relying
-          # on directory names so those surfaces cannot escape the shared hierarchy.
+          # UI exists outside canonical folders too (creator labs, system HUDs,
+          # visual/debug tools). Inspect changed source content rather than trusting
+          # directory names so those surfaces cannot escape the shared hierarchy.
           ui_pattern="(<button|createElement\\(['\\\"]button|role=['\\\"]dialog|aria-label|position[[:space:]]*:[[:space:]]*fixed|\\.([A-Za-z0-9_-]*)(btn|button|tab|menu|card|panel|modal|drawer|sheet|dock|toolbar))"
           while IFS= read -r file; do
             [ -z "$file" ] && continue
@@ -76,8 +76,22 @@ jobs:
 
           echo "changed=false" >> "$GITHUB_OUTPUT"
 
+  interface-quality:
+    needs: detect-ui
+    if: needs.detect-ui.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: kelo-ui-quality-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
       - name: Shared interface contract
-        if: steps.ui_changes.outputs.changed == 'true'
         run: |
           test -f src/ui/kelo-interface-system.css
           test -f src/ui/kelo-interface-compat.css
@@ -93,7 +107,6 @@ jobs:
           grep -q 'More Tools' src/ui/kelo-interface-runtime.js
 
       - name: Interface syntax
-        if: steps.ui_changes.outputs.changed == 'true'
         run: |
           node --check src/ui/kelo-interface-runtime.js
           node --check scripts/ui-quality-audit.mjs
@@ -105,21 +118,18 @@ jobs:
           node --check src/studio/ui/studio-asset-repairer-v2.mjs
 
       - name: Project-wide UI audit
-        if: steps.ui_changes.outputs.changed == 'true'
         run: node scripts/ui-quality-audit.mjs | tee ui-quality-report.txt
 
       - name: Install browser contract dependencies
-        if: steps.ui_changes.outputs.changed == 'true'
         run: |
           npm install --no-audit --no-fund
           npx playwright install --with-deps chromium
 
       - name: Computed browser hierarchy contract
-        if: steps.ui_changes.outputs.changed == 'true'
         run: npx playwright test tests/ui-interface-runtime.spec.js --project=chromium --reporter=list
 
       - name: Publish UI quality report
-        if: always() && steps.ui_changes.outputs.changed == 'true'
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: kelo-ui-quality-report
