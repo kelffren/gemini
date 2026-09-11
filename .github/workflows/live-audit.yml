@@ -64,7 +64,11 @@ jobs:
           CHROME_BIN: /usr/bin/google-chrome
         run: node scripts/live-render-hotpath-audit.mjs
       - name: Audit live hero sprite on mobile and desktop
-        env: *liveenv
+        # live-hero-audit appends its own query marker with '?', so a trailing '&'
+        # keeps the QA auth flags intact instead of merging them into that marker.
+        env:
+          AUDIT_URL: https://kelffren.github.io/gemini/?offline=1&qa-live-audit=1&
+          CHROME_BIN: /usr/bin/google-chrome
         run: node scripts/live-hero-audit.mjs
       - name: Audit blank world reset
         if: steps.mode.outputs.blank == 'true'
