@@ -20,9 +20,11 @@ jobs:
       - name: Syntax check
         run: node --check src/world/map-forge/map-forge-builder.mjs && node --check scripts/map-forge-landmark-clearance-audit.mjs && node --check scripts/map-forge-spawn-clearance-audit.mjs
       - name: Audit 300 deterministic worlds
-        run: node scripts/map-forge-landmark-clearance-audit.mjs | tee landmark-clearance.json
+        shell: bash
+        run: set -o pipefail; node scripts/map-forge-landmark-clearance-audit.mjs | tee landmark-clearance.json
       - name: Audit primary spawn clearance
-        run: node scripts/map-forge-spawn-clearance-audit.mjs | tee spawn-clearance.json
+        shell: bash
+        run: set -o pipefail; node scripts/map-forge-spawn-clearance-audit.mjs | tee spawn-clearance.json
       - name: Retain audit metrics
         uses: actions/upload-artifact@v4
         with:
