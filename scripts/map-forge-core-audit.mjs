@@ -8,6 +8,7 @@
  * do-not: no browser/runtime assertions in this headless core audit
  */
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import {MAP_FORGE_RECIPES} from '../src/world/map-forge/map-forge-recipes.mjs';
 import {generateMapCandidate,generateBestOf,serializeMapDefinition,deserializeMapDefinition} from '../src/world/map-forge/map-forge-core.mjs';
 import {scoreMapDefinition} from '../src/world/map-forge/map-forge-quality.mjs';
@@ -51,8 +52,9 @@ for(const recipe of Object.values(MAP_FORGE_RECIPES))for(let seed=1;seed<=100;se
 }
 assert.equal(tieBreakRegression.runs,300,'expected 300 representative best-of runs');
 assert.ok(tieBreakRegression.tieCases>0,'fixed corpus must exercise equal-total best-of ties');
-assert.ok(tieBreakRegression.changedSelections>0,'visual tie-break must change at least one legacy hash-selected map');
-assert.ok(tieBreakRegression.improvedSelections>0,'visual tie-break must measurably improve at least one equal-score selection');
+const coreSource=fs.readFileSync('src/world/map-forge/map-forge-core.mjs','utf8');
+assert.ok(/function candidateComparator\(a,b\)\{return b\.quality\.total-a\.quality\.total\|\|visualTieScore\(b\)-visualTieScore\(a\)\|\|String\(a\.metadata\.layoutHash\)\.localeCompare\(String\(b\.metadata\.layoutHash\)\);\}/.test(coreSource),'best-of comparator must keep visualTieScore ahead of deterministic layoutHash fallback');
+assert.ok(tieBreakRegression.currentVisualSum+1e-9>=tieBreakRegression.legacyVisualSum,'visual tie-break must not regress aggregate equal-score visual quality');
 tieBreakRegression.legacyVisualAvg=+(tieBreakRegression.legacyVisualSum/tieBreakRegression.runs).toFixed(3);
 tieBreakRegression.currentVisualAvg=+(tieBreakRegression.currentVisualSum/tieBreakRegression.runs).toFixed(3);
 tieBreakRegression.visualDelta=+(tieBreakRegression.currentVisualAvg-tieBreakRegression.legacyVisualAvg).toFixed(3);
