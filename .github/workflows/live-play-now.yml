@@ -25,16 +25,11 @@ jobs:
           node-version: '20'
       - name: Install Playwright
         run: npm install --no-save playwright@1.55.0
-      - name: Prove deployed mobile game is playable with real touch
+      - name: Prove deployed mobile world is visible and playable with real touch
         env:
           AUDIT_URL: https://kelffren.github.io/gemini/?offline=1&qa-live-audit=1
           CHROME_BIN: /usr/bin/google-chrome
-        run: node scripts/live-playability-audit.mjs
-      - name: Prove authored world is loaded on deployed mobile game
-        env:
-          AUDIT_URL: https://kelffren.github.io/gemini/?offline=1&qa-live-audit=1
-          CHROME_BIN: /usr/bin/google-chrome
-        run: node scripts/live-world-audit-v2.mjs
+        run: node scripts/live-play-now-audit.mjs
       - name: Upload Playwright proof
         if: always()
         uses: actions/upload-artifact@v4
