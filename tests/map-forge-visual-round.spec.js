@@ -39,6 +39,10 @@ function mapMetrics(map){
     layoutHash:map.metadata?.layoutHash,
     valid:!!map.validation?.valid,
     errors:map.validation?.errors||[],
+    qualityTotal:Number(map.quality?.total||0),
+    scenicVistas:Number(map.quality?.breakdown?.scenicVistas||0),
+    negativeSpace:Number(map.quality?.breakdown?.negativeSpace||0),
+    assetVariety:Number(map.quality?.breakdown?.assetVariety||0),
     roadCount:(map.roads||[]).length,
     blockCount:(map.blocks||[]).length,
     decorationCount:(map.decorations||[]).length,
@@ -75,7 +79,13 @@ test(`Map Forge ${STAGE} fixed-seed preview/runtime visual evidence`,async({page
   const mainMap=await generateSelected(page,forge,MAIN_SEED);
   const mainMetrics=mapMetrics(mainMap);
   expect(mainMetrics.valid).toBe(true);expect(mainMetrics.errors).toEqual([]);
-  if(STAGE==='after'){expect(mainMetrics.urbanStreetscapeRatio).toBe(1);expect(mainMetrics.decorationCount).toBeGreaterThanOrEqual(200);}
+  if(STAGE==='after'){
+    expect(mainMetrics.urbanStreetscapeRatio).toBe(1);
+    expect(mainMetrics.decorationCount).toBeGreaterThanOrEqual(200);
+    expect(mainMetrics.qualityTotal).toBeGreaterThanOrEqual(94);
+    expect(mainMetrics.scenicVistas).toBeGreaterThanOrEqual(82);
+    expect(mainMetrics.negativeSpace).toBeGreaterThanOrEqual(78);
+  }
   await page.screenshot({path:`test-results/screenshot_preview_${STAGE}.png`,fullPage:true});
 
   await page.getByRole('button',{name:'VER EN MAPA EXTERIOR'}).click();
