@@ -1,5 +1,0 @@
-{
-  "hero": "assets/hero-spartan-spritesheet.png",
-  "renderer": "src/characters/main-hero-spartan.js",
-  "requested": "main-player"
-}
