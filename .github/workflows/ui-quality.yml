@@ -54,4 +54,11 @@ jobs:
           node --check src/studio/ui/studio-live-shell.mjs
           node --check src/studio/ui/studio-asset-repairer-v2.mjs
       - name: Project-wide UI audit
-        run: node scripts/ui-quality-audit.mjs
+        run: node scripts/ui-quality-audit.mjs | tee ui-quality-report.txt
+      - name: Publish UI quality report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kelo-ui-quality-report
+          path: ui-quality-report.txt
+          retention-days: 14
