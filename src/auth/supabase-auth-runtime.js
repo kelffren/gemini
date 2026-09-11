@@ -8,9 +8,11 @@
  */
 (function(){
 'use strict';
-const VERSION='kelo-online-auth-v6-profile-18';
+const VERSION='kelo-online-auth-v6-profile-18-redirect-guard';
 const SUPABASE_URL='https://iapxdbitjdwvtbpjghct.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY='sb_publishable_t0RI7co82Rh1wOAWUIo4Zg_rZK5EQ9S';
+const PRODUCTION_APP_URL='https://kelffren.github.io/gemini/';
+const LOCAL_AUTH_HOST_RE=/^(?:localhost|127(?:\.\d{1,3}){3}|\[?::1\]?)$/i;
 const CHARACTER_STORAGE_KEY='kelo_character_id_v1',LEGACY_PLAYER_KEY='kelo_player_key_v1',PLAYER_NAME_KEY='kelo_player_name_v1';
 const NET_CHARACTER_STORAGE_KEY='kelo.active.character.v1',NET_SESSION_STORAGE_KEY='kelo.supabase.session.v1';
 const UUID_RE=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -58,7 +60,15 @@ function preferredCharacterName(user){
   const meta=user?.user_metadata||{};
   return (meta.kelo_name_chosen===true?cleanDisplayName(meta.display_name):null)||cleanDisplayName(stored(PLAYER_NAME_KEY))||'Kelo';
 }
-function appRedirectUrl(){return location.origin+location.pathname}
+function appRedirectUrl(){
+  try{
+    const params=new URLSearchParams(location.search||'');
+    const explicitLocal=params.get('authLocal')==='1';
+    const localHost=LOCAL_AUTH_HOST_RE.test(String(location.hostname||''));
+    if(explicitLocal&&localHost)return location.origin+location.pathname;
+  }catch(_){}
+  return PRODUCTION_APP_URL;
+}
 function setState(next,error){state=next;lastError=error||null;const snapshot=publicState();emit('kelo:online-auth-state',snapshot);return snapshot}
 function initClient(){
   if(client)return client;
