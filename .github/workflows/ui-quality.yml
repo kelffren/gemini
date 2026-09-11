@@ -19,6 +19,7 @@ on:
       - 'src/creators/ui/**'
       - 'scripts/ui-quality-audit.mjs'
       - 'docs/KELO_INTERFACE_STANDARD.md'
+      - '.github/workflows/ui-quality.yml'
 
 permissions:
   contents: read
@@ -36,9 +37,21 @@ jobs:
       - name: Shared interface contract
         run: |
           test -f src/ui/kelo-interface-system.css
+          test -f src/ui/kelo-interface-runtime.js
           test -f docs/KELO_INTERFACE_STANDARD.md
           grep -q 'kelo-interface-system.css' index.html
+          grep -q 'kelo-interface-runtime.js' index.html
           grep -q ':focus-visible' src/ui/kelo-interface-system.css
           grep -q 'prefers-reduced-motion' src/ui/kelo-interface-system.css
+          grep -q 'More Tools' src/ui/kelo-interface-runtime.js
+      - name: Interface syntax
+        run: |
+          node --check src/ui/kelo-interface-runtime.js
+          node --check scripts/ui-quality-audit.mjs
+          node --check src/ui/luxe-shell.js
+          node --check src/ui/account-auth-ui.js
+          node --check src/creators/ui/creator-hub.mjs
+          node --check src/studio/ui/studio-live-shell.mjs
+          node --check src/studio/ui/studio-asset-repairer-v2.mjs
       - name: Project-wide UI audit
         run: node scripts/ui-quality-audit.mjs
