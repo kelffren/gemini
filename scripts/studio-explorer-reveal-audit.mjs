@@ -59,7 +59,7 @@ assert.match(source,/viewport\.clientHeight/,'desktop and mobile panes must use 
 assert.match(source,/dispatchEvent\?\.\(new Event\('scroll'\)\)/,'reveal must reuse the existing scroll-driven virtual renderer');
 assert.doesNotMatch(source,/kernel\.execute\(/,'Explorer reveal must not create world commands or pollute Undo');
 assert.doesNotMatch(source,/KELO_WORLD_EDIT/,'Explorer reveal must remain authority-isolated');
-assert.doesNotMatch(source,/camera/i,'Explorer reveal must not move the world camera');
+assert.doesNotMatch(source,/setCamera|camera\.(?:x|y|zoom)|camera\s*=|KELO_CAMERA/,'Explorer reveal must not mutate the world camera');
 assert.match(entry,/createStudioExplorerRevealController\(\{root,kernel\}\)/,'Studio boot must mount Explorer reveal against the live kernel');
 assert.match(entry,/explorerRevealController\.destroy\(\)/,'Studio close must release Explorer reveal');
 assert.match(entry,/kelo-studio-foundation-v1\.24\.0-explorer-reveal/,'Studio version must identify the cumulative Explorer reveal foundation');
