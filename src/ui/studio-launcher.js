@@ -2,18 +2,17 @@
  * area: UI / CREATORS LAUNCHER
  * owner: Kelo Studio Launcher (compat name retained)
  * keys: CREATORS MENU PREMIUM LAZY ADMIN ANIMATION CAPABILITY AVATAR SPRITE FACTORY ASSET REPAIRER ONLINE PERMISSIONS HUB
- * purpose: añade CREATORS, Sprite Factory y Asset Repairer al menú Luxe, carga permisos online, panel admin y overlay Kelo Hub
+ * purpose: añade CREATORS, Sprite Factory y Asset Repairer al menú Luxe, carga permisos online y panel admin; Kelo Hub se monta directamente desde index
  * public-api: KELO_STUDIO_LAUNCHER + KELO_CREATORS_LAUNCHER alias
  * consumes: KELO_ADMIN_KEYS, KeloAccountPermissions, KELO_LUXE, menú Luxe existente
  * state-owned: solo estado efímero de carga
- * extension-points: Creator Hub / Sprite Factory / Asset Repairer / WorkspaceRegistry / Account Admin / Kelo Hub
+ * extension-points: Creator Hub / Sprite Factory / Asset Repairer / WorkspaceRegistry / Account Admin
  */
 (function(){
   'use strict';
   if(window.KELO_STUDIO_LAUNCHER)return;
   let loading=false,factoryLoading=false,repairLoading=false;
   const CREATOR_BUILD='world-recovery-20260911-admin-1';
-  const HUB_BUILD='hub-v1.1.0-20260911';
   const actor=()=>String(window.KELO_ADMIN_KEYS?.playerId?.()||window.keloNet?.playerKey||window.localPlayer?.id||'local_pioneer');
   const allowed=()=>{
     const keys=window.KELO_ADMIN_KEYS,who=actor();
@@ -121,12 +120,12 @@
   }
   function boot(){
     sync();
-    void import(`./kelo-hub-overlay.js?v=${HUB_BUILD}`).then(()=>window.KeloHubOverlay?.refresh?.()).catch(e=>console.warn('[Kelo Hub overlay]',e));
+    try{window.KeloHubOverlay?.refresh?.();}catch(error){console.warn('[Kelo Hub direct refresh]',error);}
     void bootOnlineAuthorization();
     void import('./../characters/creator-avatar-runtime.mjs').then(m=>m.installCreatorAvatarRuntime({root:window})).catch(e=>console.warn('[Kelo Avatar runtime]',e));
   }
   window.KELO_ADMIN_KEYS?.onChange?.(()=>{sync();window.KeloHubOverlay?.refresh?.();});
-  const api=Object.freeze({version:'studio-launcher-v1.10.1-hub-cache-bust',open,openSpriteFactory:openFactory,openAssetRepairer:openRepair,sync,get allowed(){return allowed();}});
+  const api=Object.freeze({version:'studio-launcher-v1.10.2-safe-direct-hub',open,openSpriteFactory:openFactory,openAssetRepairer:openRepair,sync,get allowed(){return allowed();}});
   window.KELO_STUDIO_LAUNCHER=api;
   window.KELO_CREATORS_LAUNCHER=api;
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
