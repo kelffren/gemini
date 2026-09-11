@@ -4,9 +4,9 @@
   "cycles": [
     {
       "cycle": 1,
-      "status": "IMPLEMENTED_LOCAL",
+      "status": "DEPLOY_PENDING",
       "baseCommit": "05cb1e2b8f78a83d44fa794a984167c17f9f7eb8",
-      "finalCommit": null,
+      "finalCommit": "3bc05bf842ff3fa320a0be636a97f4617fae0fb7",
       "defect": "PAVING_BLOB",
       "severity": "critical",
       "owner": "KeloMapForge candidate builder + validator",
@@ -42,11 +42,23 @@
       "hardGates": ["paving_intent_missing", "paving_blob_excessive"],
       "artifacts": {
         "beforeDesktop": "map-forge-cycle-01-before-seed-68-desktop.jpg",
-        "afterDesktop": null,
+        "afterDesktop": "actions:10177815921/map-forge-paving-after-seed-68-1440x900.png",
         "beforeMobile": null,
-        "afterMobile": null
+        "afterMobile": "actions:10177815921/map-forge-paving-after-seed-68-390x844.png",
+        "afterExteriorDesktop": "actions:10177815921/map-forge-paving-exterior-seed-68-1440x900.png",
+        "afterExteriorMobile": "actions:10177815921/map-forge-paving-exterior-seed-68-390x844.png",
+        "branchWorkflowRun": 34542519816,
+        "pagesDeployRun": 34542519251
       },
       "decision": "DEPLOY_PENDING",
+      "liveVerification": {
+        "servedGeneratorVersion": "1.1.0",
+        "servedHardGates": ["paving_intent_missing", "paving_blob_excessive"],
+        "interactiveWorkflow": "Map Forge Live Paving",
+        "workflowCommit": "f93b652b9294a7bf05c3957092d4c9172d3e8da5",
+        "forwardCompatibilityCommit": "07336cd31ee800cd015a2ff33dd11517b9ca8db4",
+        "status": "QUEUED_BY_ACTIONS_SATURATION"
+      },
       "knownPreExistingRegressions": [
         "map-forge-block-overlap-audit reports 70 Royal Capital near-touching pairs on both the baseline and candidate"
       ]
