@@ -32,6 +32,7 @@
     "audit:studio:nudge": "node scripts/studio-nudge-audit.mjs",
     "audit:studio:placement-touch": "node scripts/studio-placement-touch-audit.mjs",
     "audit:studio:mobile-hit-slop": "node scripts/studio-mobile-hit-slop-audit.mjs",
+    "audit:studio:history-hints": "node scripts/studio-history-hints-audit.mjs",
     "audit:studio:overlap": "node scripts/studio-overlap-cycle-audit.mjs",
     "audit:studio:multi-align": "node scripts/studio-multi-align-audit.mjs",
     "audit:studio:selection-history": "node scripts/studio-selection-history-audit.mjs",
