@@ -13,7 +13,7 @@ export const MAP_FORGE_CHAMPION_OVERRIDES=Object.freeze({
     revision:2,
     genes:Object.freeze({
       'road.curvature':0.34,
-      'style.decoration':0.58
+      'style.decoration':0.64
     })
   })
 });
