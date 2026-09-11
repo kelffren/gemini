@@ -1,19 +1,19 @@
 /* KELO-INDEX
  * area: AUTH
- * keys: ADMIN KEY CREATORS WORLD EDIT ANIMATION EDIT VFX EDIT ABILITY EDIT PERMISSION BACKPACK OFFLINE ONLINE READY
- * hace: modela Llave Admin como entitlement/objeto bound y decide capacidades; Creator/Studio posee la UI de autoría
- * online: request() e installRemoteAdapter() permiten sustituir la autoridad local por servidor sin cambiar consumidores
+ * keys: ADMIN KEY CREATORS WORLD EDIT ANIMATION EDIT VFX EDIT ABILITY EDIT PERMISSION BACKPACK OFFLINE ONLINE READY ROLE SCOPE
+ * hace: modela Llave Admin local y combina scopes autoritativos online mediante un provider; Creator/Studio posee la UI de autoría
+ * online: installScopeProvider() permite que permisos Supabase gobiernen los consumidores existentes sin duplicar lógica
  */
 (function(){
 'use strict';
 
-const VERSION='admin-key-v1.5.0';
+const VERSION='admin-key-v1.6.0-online-scopes';
 const SCHEMA=1;
 const STORAGE='kelo_admin_keys_v1';
 const TEMPLATE_ID='admin-key';
 const DEFAULT_CREATOR_SCOPES=Object.freeze(['creators.access','world.edit','world.export','world.import']);
 const ROOT_SCOPES=Object.freeze(['creators.access','world.edit','world.export','world.import','world.publish','animation.edit','vfx.edit','ability.edit','admin.issue','admin.revoke']);
-let remoteAdapter=null;
+let remoteAdapter=null,scopeProvider=null;
 let seq=1;
 const listeners=new Set();
 const clone=v=>JSON.parse(JSON.stringify(v));
@@ -25,7 +25,15 @@ let state=load();
 function snapshot(){return clone(state);}
 function newId(){return `admin-key:${Date.now().toString(36)}:${(seq++).toString(36)}`;}
 function activeKeys(ownerId){ownerId=String(ownerId||playerId());return Object.values(state.keys).filter(k=>k&&k.active!==false&&k.ownerId===ownerId);}
-function hasScope(scope,ownerId){return activeKeys(ownerId).some(k=>Array.isArray(k.scopes)&&k.scopes.includes(scope));}
+function externalCan(scope,ownerId){
+  const who=String(ownerId||playerId()),me=playerId();
+  if(who!==me||!scopeProvider||typeof scopeProvider.can!=='function')return false;
+  try{return !!scopeProvider.can(String(scope||''));}catch(_){return false;}
+}
+function hasScope(scope,ownerId){
+  const wanted=String(scope||''),who=String(ownerId||playerId());
+  return activeKeys(who).some(k=>Array.isArray(k.scopes)&&k.scopes.includes(wanted))||externalCan(wanted,who);
+}
 function can(scope,ownerId){return hasScope(String(scope||''),ownerId);}
 function publicKey(k){return k?clone(k):null;}
 function keyInventoryRow(k){return{id:k.keyId,uid:k.keyId,templateId:TEMPLATE_ID,kind:'admin_key',name:k.label||'Llave Admin',icon:'🗝',rarity:'ADMIN',quantity:1,maxStack:1,bound:true,adminKeyId:k.keyId,scopes:clone(k.scopes||[]),description:'Permiso especial para herramientas autorizadas de Kelo Creators.'};}
@@ -37,7 +45,8 @@ function syncInventory(){
   if(changed){try{window.KeloBackpack?.ensure?.();}catch(e){};try{if(typeof saveState==='function')saveState();}catch(e){}}
   return true;
 }
-function persist(){try{localStorage.setItem(STORAGE,JSON.stringify(state));}catch(e){};syncInventory();listeners.forEach(fn=>{try{fn(snapshot());}catch(e){}});}
+function notify(){listeners.forEach(fn=>{try{fn(snapshot());}catch(e){}});}
+function persist(){try{localStorage.setItem(STORAGE,JSON.stringify(state));}catch(e){};syncInventory();notify();}
 function bump(){state.revision=(Number(state.revision)||0)+1;persist();}
 function ensureScopes(key,scopes){if(!key)return false;const current=new Set(Array.isArray(key.scopes)?key.scopes.map(String):[]);let changed=false;for(const scope of scopes)if(!current.has(scope)){current.add(scope);changed=true;}if(changed)key.scopes=[...current];return changed;}
 function migrateLocalRootScopes(){let changed=false;for(const key of Object.values(state.keys)){if(key?.active!==false&&(key.scopes||[]).includes('admin.issue'))changed=ensureScopes(key,ROOT_SCOPES)||changed;}if(changed){state.revision=(Number(state.revision)||0)+1;try{localStorage.setItem(STORAGE,JSON.stringify(state));}catch(e){}}}
@@ -45,7 +54,7 @@ function syncWhenReady(){if(syncInventory())return;let tries=0;const timer=setIn
 function requireScope(scope,actorId){if(!can(scope,actorId))throw new Error('ADMIN_KEY_PERMISSION_DENIED');}
 async function localRequest(op,payload){
   const data=payload||{},actorId=String(data.actorId||playerId());
-  if(op==='admin-key:status')return{ownerId:actorId,hasKey:activeKeys(actorId).length>0,scopes:Array.from(new Set(activeKeys(actorId).flatMap(k=>k.scopes||[]))),keys:activeKeys(actorId).map(publicKey),revision:state.revision};
+  if(op==='admin-key:status')return{ownerId:actorId,hasKey:activeKeys(actorId).length>0||externalCan('creators.access',actorId),scopes:Array.from(new Set(activeKeys(actorId).flatMap(k=>k.scopes||[]))),keys:activeKeys(actorId).map(publicKey),revision:state.revision,onlineScopes:!!scopeProvider};
   if(op==='admin-key:list'){requireScope('admin.issue',actorId);return Object.values(state.keys).map(publicKey);}
   if(op==='admin-key:issue'){
     requireScope('admin.issue',actorId);const ownerId=String(data.ownerId||'').trim();if(!ownerId)throw new Error('ADMIN_KEY_OWNER_REQUIRED');
@@ -63,12 +72,13 @@ async function localRequest(op,payload){
   throw new Error('UNKNOWN_ADMIN_KEY_OPERATION');
 }
 async function request(op,payload){if(remoteAdapter&&typeof remoteAdapter.request==='function')return remoteAdapter.request(op,payload||{});return localRequest(op,payload||{});}
-function installRemoteAdapter(adapter){if(adapter&&typeof adapter.request!=='function')throw new Error('INVALID_ADMIN_KEY_ADAPTER');remoteAdapter=adapter||null;}
+function installRemoteAdapter(adapter){if(adapter&&typeof adapter.request!=='function')throw new Error('INVALID_ADMIN_KEY_ADAPTER');remoteAdapter=adapter||null;notify();}
+function installScopeProvider(provider){if(provider&&typeof provider.can!=='function')throw new Error('INVALID_SCOPE_PROVIDER');scopeProvider=provider||null;notify();return true;}
 function assert(scope,ownerId){requireScope(scope,String(ownerId||playerId()));return true;}
 
 migrateLocalRootScopes();
-window.KELO_ADMIN_KEYS=Object.freeze({version:VERSION,templateId:TEMPLATE_ID,scopes:Object.freeze({creator:DEFAULT_CREATOR_SCOPES,root:ROOT_SCOPES}),request,installRemoteAdapter,can,assert,hasKey:(ownerId)=>activeKeys(ownerId).length>0,getActiveKeys:(ownerId)=>activeKeys(ownerId).map(publicKey),syncInventory,playerId,onChange(fn){if(typeof fn!=='function')return()=>{};listeners.add(fn);return()=>listeners.delete(fn);},authoritySource:()=>remoteAdapter?'remote-adapter':'local-prototype'});
-window.KELO_ADMIN_KEY_AUDIT=Object.freeze({version:VERSION,itemIdentity:true,bound:true,scopedPermissions:true,serverReplaceable:true,uiTrustOnlyOffline:true,creatorUiOwner:'Kelo Creators',creatorAccessScope:true,animationEditScope:true,vfxEditScope:true,abilityEditScope:true,legacyWorldBuilderUiBoot:false,legacyPreviewHotfixBoot:false});
+window.KELO_ADMIN_KEYS=Object.freeze({version:VERSION,templateId:TEMPLATE_ID,scopes:Object.freeze({creator:DEFAULT_CREATOR_SCOPES,root:ROOT_SCOPES}),request,installRemoteAdapter,installScopeProvider,can,assert,hasKey:(ownerId)=>activeKeys(ownerId).length>0,getActiveKeys:(ownerId)=>activeKeys(ownerId).map(publicKey),syncInventory,playerId,onChange(fn){if(typeof fn!=='function')return()=>{};listeners.add(fn);return()=>listeners.delete(fn);},authoritySource:()=>scopeProvider?'online-scope-provider':remoteAdapter?'remote-adapter':'local-prototype'});
+window.KELO_ADMIN_KEY_AUDIT=Object.freeze({version:VERSION,itemIdentity:true,bound:true,scopedPermissions:true,serverReplaceable:true,uiTrustOnlyOffline:true,creatorUiOwner:'Kelo Creators',creatorAccessScope:true,animationEditScope:true,vfxEditScope:true,abilityEditScope:true,onlineScopeProvider:true,legacyWorldBuilderUiBoot:false,legacyPreviewHotfixBoot:false});
 
 const params=new URLSearchParams(location.search);
 if(params.get('mapEditor')==='1')request('admin-key:bootstrap-local-root',{actorId:playerId(),ownerId:playerId(),developer:true}).then(syncWhenReady).catch(console.error);else syncWhenReady();
