@@ -8,6 +8,7 @@ const context=await browser.newContext({viewport:{width:390,height:844},deviceSc
 const page=await context.newPage(),pageErrors=[];page.on('pageerror',e=>pageErrors.push(String(e?.stack||e?.message||e)));
 const snap=()=>page.evaluate(async()=>{const b=(await import('./src/creators/sprite-ability/sprite-ability-live-controller.mjs')).getSpriteAbilityBuilder();return b?{projectId:b.projectId,sheet:{...b.draft.sheet},combat:{...b.draft.combat}}:null;});
 const selectedThumb=()=>page.locator('.sr-frame.selected canvas').evaluate(c=>c.toDataURL());
+const stageImage=()=>page.locator('.sr-stage').evaluate(c=>c.toDataURL());
 const frameThumbs=()=>page.locator('.sr-frame canvas').evaluateAll(nodes=>nodes.map(c=>c.toDataURL()));
 async function dragStage(fromX,fromY,toX,toY){const box=await page.locator('.sr-stage').boundingBox();if(!box)throw new Error('REPAIR_STAGE_BOX_MISSING');const ax=box.x+box.width*fromX,ay=box.y+box.height*fromY,bx=box.x+box.width*toX,by=box.y+box.height*toY;await page.mouse.move(ax,ay);await page.mouse.down();await page.mouse.move(bx,by,{steps:5});await page.mouse.up();await page.waitForTimeout(80);}
 async function clickStage(x=.5,y=.72){const box=await page.locator('.sr-stage').boundingBox();if(!box)throw new Error('REPAIR_STAGE_BOX_MISSING');await page.mouse.click(box.x+box.width*x,box.y+box.height*y);await page.waitForTimeout(80);}
@@ -44,7 +45,9 @@ try{
   if(!(await page.locator('.sr-preview-badge').textContent())?.includes('MOVE'))throw new Error('REPAIR_MOVE_MODE_NOT_ACTIVE');
 
   await page.getByRole('button',{name:'⌖ PIVOT',exact:true}).click();
-  pixelBefore=await selectedThumb();await clickStage(.56,.70);pixelAfter=await selectedThumb();if(pixelAfter===pixelBefore)throw new Error('REPAIR_PIVOT_NO_PIXEL_CHANGE');
+  const pivotThumbBefore=await selectedThumb(),pivotStageBefore=await stageImage();await clickStage(.56,.70);const pivotThumbAfter=await selectedThumb(),pivotStageAfter=await stageImage();
+  if(pivotStageAfter===pivotStageBefore)throw new Error('REPAIR_PIVOT_MARKER_DID_NOT_MOVE');
+  if(pivotThumbAfter!==pivotThumbBefore)throw new Error('REPAIR_PIVOT_MOVED_FRAME_PIXELS');
   if(!(await page.locator('.sr-preview-badge').textContent())?.includes('PIVOT'))throw new Error('REPAIR_PIVOT_MODE_NOT_ACTIVE');
 
   await page.getByRole('button',{name:'✂ CROP',exact:true}).click();
