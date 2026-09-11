@@ -94,6 +94,7 @@
     if ((cue === 'dashEnd' || cue === 'end') && profile.dashEndSequence && root.KeloSequence) return root.KeloSequence.play(profile.dashEndSequence, c);
     if (cue === 'place' && profile.placeSequence && root.KeloSequence) return root.KeloSequence.play(profile.placeSequence, c);
     if (cue === 'trigger' && profile.triggerSequence && root.KeloSequence) return root.KeloSequence.play(profile.triggerSequence, c);
+    if ((cue === 'arm' || cue === 'armed') && profile.armedFx && root.KeloFX) return root.KeloFX.spawn(profile.armedFx, c);
     if (cue === 'persistent' && profile.persistentFx && root.KeloFX) return root.KeloFX.spawn(profile.persistentFx, c, { loop: true, x: c.origin && c.origin.x, y: c.origin && c.origin.y });
     if (cue === 'area' && profile.areaFx && root.KeloFX) {
       const areaDef = root.KeloFXRegistry && root.KeloFXRegistry.get(profile.areaFx);

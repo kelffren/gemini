@@ -162,7 +162,7 @@ Los perfiles reutilizan primitives de FX (`expanding_ring`, `area_disk`, `crysta
 | wind_dash | dash | `ability_visual_wind_dash_01` | burst + rastro → afterimage → aterrizaje |
 | poison_trap | trap | `ability_visual_poison_trap_01` | place → sigilo + radio persistente → trigger |
 
-El Visual Lab (`?visualLab=1`) tiene dos pestañas. **SKILL** reproduce un VisualProfile con `playCue` / eventos semánticos (`PLAY FULL`, cues honestas, `TEST IN GAME` via `engine.predict`). **PIEZAS** sigue siendo la galería de componentes sueltos. `■` en la barra para el preview (usa `KeloFX.stopAll`). Un dummy de impacto marca el target. Los profiles faltantes del catálogo se listan como `MISSING`.
+El Visual Lab (`?visualLab=1`, `visual-lab-v1.6.0`) tiene dos pestañas. **SKILL** reproduce un VisualProfile con `playCue` / eventos semánticos (`PLAY FULL`, cues honestas por familia incluyendo AREA/ARM/END, `TEST IN GAME` via `engine.predict`). **PIEZAS** sigue siendo la galería de componentes sueltos y comparte Dirección/Escala/Velocidad/Loop. En móvil el panel se ancla abajo para no tapar el cast. `PLAY` compacta a una barra con `■` y se reabre al terminar; `PIN` lo deja abierto. `LOOP` repite hasta STOP. Un dummy de impacto marca el target y parpadea al IMPACT. `GHOST` pinta rango/radio con los mismos números de delivery del combate. El dropdown lista todo el catálogo y marca `MISSING`. `■` en la barra para el preview (usa `KeloFX.stopAll`).
 
 Eventos nuevos del adapter: `ABILITY_IMPACT`, `DASH_STARTED`, `DASH_ENDED`, `TRAP_PLACED`, `TRAP_ARMED`, `TRAP_TRIGGERED`, `TRAP_EXPIRED`.
 

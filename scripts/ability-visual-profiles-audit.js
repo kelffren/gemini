@@ -50,7 +50,12 @@ assert(!stone.includes('KeloFX') && !stone.includes('KeloSequence') && !stone.in
 assert(lab.includes('playAbilityCue') || lab.includes('playFull'), 'Visual Lab can preview ability profiles with the same playCue path');
 assert(lab.includes('PLAY FULL') && lab.includes('TEST IN GAME') && lab.includes('visualLabStop'), 'Visual Lab exposes play-full, in-game and stop');
 assert(lab.includes('MISSING') && lab.includes('visualLabTab'), 'Visual Lab lists missing profiles and splits Abilities/Piezas');
+assert(lab.includes('visualLabPin') && lab.includes('visualLabLoop') && lab.includes('visualLabGhost'), 'Visual Lab exposes pin, loop and range ghost');
+assert(lab.includes('lab_radius_ghost') && lab.includes('lab_dummy_hit'), 'Visual Lab draws combat-range ghost and dummy hit');
+assert(lab.includes("dataset.visualLabCue = 'area'") || lab.includes("addCue('area'"), 'Visual Lab exposes AREA cue');
+assert(lab.includes("addCue('arm'") && lab.includes("addCue('end'"), 'Visual Lab exposes ARM and END cues');
 assert(fx.includes('stopAllFx') && fx.includes('stopAll: stopAllFx'), 'FX runtime can stop all preview instances');
+assert(abilityVisuals.includes("cue === 'arm'") || abilityVisuals.includes("'arm'"), 'playCue covers trap ARM');
 
 console.log('PASS ability visual profiles (fireball/ice_nova/wind_dash/poison_trap)');
 console.log(JSON.stringify({
