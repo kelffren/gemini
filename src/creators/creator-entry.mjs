@@ -48,7 +48,7 @@ function ensureCreatorInputLocks(root){
 export async function bootKeloCreators({root=globalThis,stateAdapter=null}={}){
   if(platform)return platform;
   const inputLocksDispose=ensureCreatorInputLocks(root);
-  let visualUiDispose=()=>{},eventLabDispose=()=>{},easyUiDispose=()=>{},manualCutterDispose=()=>{},repairStudioDispose=()=>{},irregularImportDispose=()=>{};
+  let visualUiDispose=()=>{},eventLabDispose=()=>{},easyUiDispose=()=>{},manualCutterDispose=()=>{},repairStudioDispose=()=>{},irregularImportDispose=()=>{},looseImportDispose=()=>{};
   try{
     const visualUi=await import('./sprite-ability/sprite-ability-visual-ui.mjs');
     if(typeof visualUi.installSpriteAbilityVisualUI==='function')visualUiDispose=visualUi.installSpriteAbilityVisualUI({root});
@@ -66,6 +66,10 @@ export async function bootKeloCreators({root=globalThis,stateAdapter=null}={}){
     if(typeof irregularImport.installSpriteAbilityIrregularImport==='function')irregularImportDispose=irregularImport.installSpriteAbilityIrregularImport({root});
   }catch(error){console.warn('[Creators] Sprite Ability irregular import unavailable',error);}
   try{
+    const looseImport=await import('./sprite-ability/sprite-ability-loose-import.mjs');
+    if(typeof looseImport.installSpriteAbilityLooseImport==='function')looseImportDispose=looseImport.installSpriteAbilityLooseImport({root});
+  }catch(error){console.warn('[Creators] Sprite Ability loose import unavailable',error);}
+  try{
     const eventLab=await import('./sprite-ability/sprite-ability-event-lab.mjs');
     if(typeof eventLab.installSpriteAbilityEventLab==='function')eventLabDispose=eventLab.installSpriteAbilityEventLab({root});
   }catch(error){console.warn('[Creators] Sprite Ability event lab unavailable',error);}
@@ -82,7 +86,7 @@ export async function bootKeloCreators({root=globalThis,stateAdapter=null}={}){
     if(manifest.capability)permission.require(manifest.capability,permission.actorId(),context.projectId||null);
     return workspaces.open(id,{root,projects,permission,dependencies,contentSession,contentRepository,contentService,runtimeContent,avatarRuntime,avatarQuick,openWorkspace,...context});
   }
-  platform=Object.freeze({version:'kelo-creators-core-v1.15.0-irregular-import',permission,projects,workspaces,dependencies,contentSession,contentRepository,contentService,runtimeContent,avatarRuntime,avatarQuick,openWorkspace,close(){try{irregularImportDispose?.();}catch{}try{repairStudioDispose?.();}catch{}try{manualCutterDispose?.();}catch{}try{easyUiDispose?.();}catch{}try{eventLabDispose?.();}catch{}try{visualUiDispose?.();}catch{}try{localState.close?.();}catch{}try{inputLocksDispose?.();}catch{}platform=null;}});
+  platform=Object.freeze({version:'kelo-creators-core-v1.16.0-loose-sprite-import',permission,projects,workspaces,dependencies,contentSession,contentRepository,contentService,runtimeContent,avatarRuntime,avatarQuick,openWorkspace,close(){try{looseImportDispose?.();}catch{}try{irregularImportDispose?.();}catch{}try{repairStudioDispose?.();}catch{}try{manualCutterDispose?.();}catch{}try{easyUiDispose?.();}catch{}try{eventLabDispose?.();}catch{}try{visualUiDispose?.();}catch{}try{localState.close?.();}catch{}try{inputLocksDispose?.();}catch{}platform=null;}});
   return platform;
 }
 export function getKeloCreatorsPlatform(){return platform;}
