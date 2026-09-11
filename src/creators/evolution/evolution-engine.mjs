@@ -1,13 +1,13 @@
 /* KELO-INDEX
  * area: CREATORS / EVOLUTION
  * owner: KeloEvolution generic candidate evaluation and acceptance gate
- * purpose: compare a baseline against proposed candidates and apply only measured improvements
- * public-api: createEvolutionMetricProfile, scoreEvolutionMetrics, compareEvolutionEvaluations, selectEvolutionCandidate, runEvolutionCycle
- * consumes: injected proposer/evaluator/apply/rollback callbacks; owns no gameplay or editor state
+ * purpose: compare a champion baseline against challengers and apply only measured, sandboxed improvements
+ * public-api: createEvolutionMetricProfile, scoreEvolutionMetrics, compareEvolutionEvaluations, selectEvolutionCandidate, runEvolutionCycle, runChampionChallengerTournament
+ * consumes: injected proposer/evaluator/prepare/cleanup/apply/rollback callbacks; owns no gameplay or editor state
  * state-owned: none
- * extension-points: Map Forge styles today; AI/code patch candidates may use the same gate later
- * online: authority-neutral; caller decides where candidate generation, evaluation and apply execute
- * do-not: never self-apply an unevaluated candidate; never bypass hard metric gates
+ * extension-points: Map Forge genomes, visual candidates and guarded AI/code patch candidates
+ * online: authority-neutral; caller decides where candidate generation, evaluation, persistence and apply execute
+ * do-not: never self-apply an unevaluated candidate; never bypass hard metric gates; never grant filesystem/Git authority here
  */
 
 const clone=value=>value==null?value:(typeof structuredClone==='function'?structuredClone(value):JSON.parse(JSON.stringify(value)));
@@ -15,6 +15,7 @@ const freeze=value=>{if(value&&typeof value==='object'&&!Object.isFrozen(value))
 const finite=value=>Number.isFinite(Number(value));
 const clamp=(value,min,max)=>Math.max(min,Math.min(max,value));
 const round=(value,places=4)=>{const factor=10**places;return Math.round(Number(value)*factor)/factor;};
+const invalidEvaluation=error=>freeze({valid:false,score:0,metrics:{},failures:[`evaluation_error:${String(error?.message||error||'unknown')}`]});
 
 export function createEvolutionMetricProfile(definitions=[]){
   if(!Array.isArray(definitions)||definitions.length===0)throw new Error('EVOLUTION_METRICS_REQUIRED');
@@ -35,10 +36,7 @@ export function scoreEvolutionMetrics(profile,measurements={}){
   const failures=[],normalized={},observed={};let weighted=0,totalWeight=0;
   for(const metric of profile){
     const raw=measurements?.[metric.id];
-    if(!finite(raw)){
-      if(metric.required)failures.push(`metric_missing:${metric.id}`);
-      continue;
-    }
+    if(!finite(raw)){if(metric.required)failures.push(`metric_missing:${metric.id}`);continue;}
     const value=Number(raw);observed[metric.id]=value;
     if(metric.hardMin!==null&&value<metric.hardMin)failures.push(`metric_below_hard_min:${metric.id}:${value}<${metric.hardMin}`);
     if(metric.hardMax!==null&&value>metric.hardMax)failures.push(`metric_above_hard_max:${metric.id}:${value}>${metric.hardMax}`);
@@ -63,32 +61,49 @@ export function compareEvolutionEvaluations(baselineInput,candidateInput,{minImp
 }
 
 export function selectEvolutionCandidate({baselineEvaluation,candidates=[],policy={}}={}){
-  const evaluated=candidates.map((row,index)=>{
-    const comparison=compareEvolutionEvaluations(baselineEvaluation,row.evaluation,policy);
-    return freeze({index,candidate:row.candidate,evaluation:comparison.candidate,comparison});
-  });
-  const accepted=evaluated.filter(row=>row.comparison.accepted).sort((a,b)=>b.evaluation.score-a.evaluation.score||b.comparison.delta-a.comparison.delta||a.index-b.index);
-  return freeze({accepted:accepted.length>0,selected:accepted[0]||null,evaluated});
+  const evaluated=candidates.map((row,index)=>{const comparison=compareEvolutionEvaluations(baselineEvaluation,row.evaluation,policy);return freeze({index,candidate:row.candidate,evaluation:comparison.candidate,comparison});});
+  const ranking=[...evaluated].sort((a,b)=>Number(b.comparison.accepted)-Number(a.comparison.accepted)||b.evaluation.score-a.evaluation.score||b.comparison.delta-a.comparison.delta||a.index-b.index),accepted=ranking.filter(row=>row.comparison.accepted);
+  return freeze({accepted:accepted.length>0,selected:accepted[0]||null,evaluated,ranking});
 }
 
-export async function runEvolutionCycle({baseline,propose,evaluate,apply=null,rollback=null,policy={}}={}){
+async function evaluateOne(candidate,context,{evaluate,prepare,cleanup}){
+  let sandbox=null,evaluation=null,prepareError=null,cleanupError=null;
+  try{
+    if(typeof prepare==='function')sandbox=await prepare(candidate,context);
+    evaluation=normalizeEvaluation(await evaluate(candidate,{...context,sandbox}));
+  }catch(error){prepareError=String(error?.message||error);evaluation=normalizeEvaluation(invalidEvaluation(error));}
+  finally{if(typeof cleanup==='function'&&sandbox!==null)try{await cleanup(sandbox,{candidate,...context});}catch(error){cleanupError=String(error?.message||error);}}
+  if(cleanupError)evaluation=normalizeEvaluation({...evaluation,valid:false,failures:[...evaluation.failures,`cleanup_error:${cleanupError}`]});
+  return freeze({evaluation,sandboxPrepared:sandbox!==null,prepareError,cleanupError});
+}
+
+async function emitExperiment(onExperiment,report){if(typeof onExperiment==='function')await onExperiment(report);return report;}
+
+export async function runEvolutionCycle({baseline,propose,evaluate,prepare=null,cleanup=null,apply=null,rollback=null,policy={},onExperiment=null}={}){
   if(typeof propose!=='function')throw new Error('EVOLUTION_PROPOSER_REQUIRED');
   if(typeof evaluate!=='function')throw new Error('EVOLUTION_EVALUATOR_REQUIRED');
-  const baselineEvaluation=normalizeEvaluation(await evaluate(baseline,{role:'baseline'}));
-  const proposed=await propose({baseline,baselineEvaluation});
-  if(!Array.isArray(proposed))throw new Error('EVOLUTION_PROPOSALS_MUST_BE_ARRAY');
+  const baselinePrepared=await evaluateOne(baseline,{role:'baseline'},{evaluate,prepare,cleanup}),baselineEvaluation=baselinePrepared.evaluation;
+  const proposed=await propose({baseline,baselineEvaluation});if(!Array.isArray(proposed))throw new Error('EVOLUTION_PROPOSALS_MUST_BE_ARRAY');
   const rows=[];
-  for(let index=0;index<proposed.length;index++)rows.push({candidate:proposed[index],evaluation:normalizeEvaluation(await evaluate(proposed[index],{role:'candidate',index,baseline,baselineEvaluation}))});
-  const selection=selectEvolutionCandidate({baselineEvaluation,candidates:rows,policy});
-  if(!selection.selected)return freeze({accepted:false,applied:false,rolledBack:false,baseline,baselineEvaluation,selected:null,evaluated:selection.evaluated,result:baseline});
+  for(let index=0;index<proposed.length;index++){
+    const candidate=proposed[index],prepared=await evaluateOne(candidate,{role:'candidate',index,baseline,baselineEvaluation},{evaluate,prepare,cleanup});
+    rows.push({candidate,evaluation:prepared.evaluation,sandboxPrepared:prepared.sandboxPrepared,prepareError:prepared.prepareError,cleanupError:prepared.cleanupError});
+  }
+  const selection=selectEvolutionCandidate({baselineEvaluation,candidates:rows,policy}),baseReport={baseline,baselineEvaluation,baselineSandboxPrepared:baselinePrepared.sandboxPrepared,evaluated:selection.evaluated,ranking:selection.ranking};
+  if(!selection.selected)return emitExperiment(onExperiment,freeze({accepted:false,applied:false,rolledBack:false,...baseReport,selected:null,result:baseline}));
   const winner=selection.selected;
-  if(typeof apply!=='function')return freeze({accepted:true,applied:false,rolledBack:false,baseline,baselineEvaluation,selected:winner,evaluated:selection.evaluated,result:winner.candidate});
+  if(typeof apply!=='function')return emitExperiment(onExperiment,freeze({accepted:true,applied:false,rolledBack:false,...baseReport,selected:winner,result:winner.candidate}));
   try{
     const appliedResult=await apply(winner.candidate,{baseline,baselineEvaluation,selection:winner});
-    return freeze({accepted:true,applied:true,rolledBack:false,baseline,baselineEvaluation,selected:winner,evaluated:selection.evaluated,result:appliedResult??winner.candidate});
+    return emitExperiment(onExperiment,freeze({accepted:true,applied:true,rolledBack:false,...baseReport,selected:winner,result:appliedResult??winner.candidate}));
   }catch(error){
-    let rolledBack=false,rollbackError=null;
-    if(typeof rollback==='function')try{await rollback(baseline,{error,candidate:winner.candidate,selection:winner});rolledBack=true;}catch(inner){rollbackError=String(inner?.message||inner);}
-    return freeze({accepted:false,applied:false,rolledBack,error:String(error?.message||error),rollbackError,baseline,baselineEvaluation,selected:winner,evaluated:selection.evaluated,result:baseline});
+    let rolledBack=false,rollbackError=null;if(typeof rollback==='function')try{await rollback(baseline,{error,candidate:winner.candidate,selection:winner});rolledBack=true;}catch(inner){rollbackError=String(inner?.message||inner);}
+    return emitExperiment(onExperiment,freeze({accepted:false,applied:false,rolledBack,error:String(error?.message||error),rollbackError,...baseReport,selected:winner,result:baseline}));
   }
+}
+
+export async function runChampionChallengerTournament({champion,challengers=[],evaluate,prepare=null,cleanup=null,policy={}}={}){
+  if(!Array.isArray(challengers))throw new Error('EVOLUTION_CHALLENGERS_ARRAY_REQUIRED');
+  const cycle=await runEvolutionCycle({baseline:champion,propose:()=>challengers,evaluate,prepare,cleanup,policy});
+  return freeze({championBefore:champion,championAfter:cycle.accepted?cycle.result:champion,changed:cycle.accepted,selected:cycle.selected,ranking:cycle.ranking,baselineEvaluation:cycle.baselineEvaluation});
 }
