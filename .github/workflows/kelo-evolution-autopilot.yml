@@ -1,0 +1,79 @@
+# KELO-INDEX
+# area: QA / MAP FORGE / EVOLUTION / AUTOPILOT
+# owner: GitHub CI promotion authority for KeloEvolution candidates
+name: Kelo Evolution Autopilot
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 8 * * *'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: kelo-evolution-autopilot
+  cancel-in-progress: false
+
+jobs:
+  evolve-map-forge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Baseline evolution safety gate
+        run: npm run audit:evolution
+      - name: Champion versus challengers on golden seeds
+        run: npm run evolution:map-forge
+      - name: Detect accepted champion changes
+        id: changes
+        shell: bash
+        run: |
+          if git diff --quiet -- src/world/map-forge/map-forge-champion-overrides.mjs docs/evolution/map-forge-memory.json; then
+            echo "accepted=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "accepted=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Re-run core and evolution gates on candidate
+        if: steps.changes.outputs.accepted == 'true'
+        run: |
+          node scripts/map-forge-core-audit.mjs
+          npm run audit:evolution
+          npm run audit:docs
+      - name: Create candidate branch and commit
+        if: steps.changes.outputs.accepted == 'true'
+        id: branch
+        shell: bash
+        run: |
+          BRANCH="evolution/map-forge-${GITHUB_RUN_ID}"
+          git config user.name "kelo-evolution-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git add src/world/map-forge/map-forge-champion-overrides.mjs docs/evolution/map-forge-memory.json
+          git commit -m "chore(map-forge): promote measured evolution champion"
+          git push origin "$BRANCH"
+          echo "name=$BRANCH" >> "$GITHUB_OUTPUT"
+      - name: Open gated pull request
+        if: steps.changes.outputs.accepted == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ steps.branch.outputs.name }}
+        shell: bash
+        run: |
+          gh pr create --base main --head "$BRANCH" \
+            --title "chore: promote Map Forge evolution champion" \
+            --body "Automated KeloEvolution candidate. Golden-seed champion/challenger gate passed before commit. This workflow never merges its own PR; normal CI/review still decides promotion. Evidence is attached to the workflow run."
+      - name: Upload experiment evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: map-forge-evolution-autopilot-${{ github.run_id }}
+          path: test-results/map-forge-evolution-autopilot.json
+          if-no-files-found: ignore
