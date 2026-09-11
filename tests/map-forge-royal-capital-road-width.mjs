@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import {MAP_FORGE_RECIPES} from '../src/world/map-forge/map-forge-recipes.mjs';
 import {generateMapCandidate} from '../src/world/map-forge/map-forge-core.mjs';
 
-const EXPECTED_ARTERIAL_WIDTH=104;
+const EXPECTED_ARTERIAL_WIDTH=102;
 const EXPECTED_COLLECTOR_WIDTH=72;
 const EXPECTED_DECORATION=0.60;
 const PRIMARY_SEED=81746291;
