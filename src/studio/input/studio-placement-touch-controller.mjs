@@ -60,7 +60,21 @@ export function createStudioPlacementTouchController({root=globalThis,placement}
 
   async function commit(){
     if(!preview||busy)return false;busy=true;
-    try{await placement.commit();pulse();return true;}finally{busy=false;}
+    const current={
+      prefabId:String(preview.prefabId||''),
+      x:Number(preview.transform?.x)||0,
+      y:Number(preview.transform?.y)||0,
+      rotation:Number(preview.transform?.rotation)||0,
+      components:{...(preview.components||{})}
+    };
+    try{
+      await placement.commit();
+      if(!destroyed&&current.prefabId&&placement.start){
+        placement.start(current.prefabId,{rotation:current.rotation,overrides:{components:current.components}});
+        placement.move(current.x,current.y,{snap:1});
+      }
+      pulse();return true;
+    }finally{busy=false;}
   }
   function cycleStep(){mode=mode==='snap'?'fine':mode==='fine'?'coarse':'snap';sync();pulse();return mode;}
   function rotate(){if(!preview)return false;placement.rotate?.(90);pulse();return true;}
@@ -78,7 +92,7 @@ export function createStudioPlacementTouchController({root=globalThis,placement}
   preview=placement.getPreview?.()||null;sync();
 
   return Object.freeze({
-    version:'studio-placement-touch-v1.0.0',move,commit,cancel,rotate,cycleStep,
+    version:'studio-placement-touch-v1.1.0-continuous',move,commit,cancel,rotate,cycleStep,
     get mode(){return mode;},get active(){return !!preview;},
     destroy(){if(destroyed)return;destroyed=true;unsubscribe?.();root.removeEventListener?.('resize',onResize);pad?.removeEventListener?.('click',onClick);pad?.remove();style?.remove();pad=style=null;}
   });
