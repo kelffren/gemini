@@ -47,7 +47,7 @@ try{
   if(sheet.autoFit.confidence<.5)throw new Error(`SPRITE_ABILITY_AUTO_FIT_LOW_CONFIDENCE:${sheet.autoFit.confidence}`);
   await page.getByRole('button',{name:'SHEET'}).click();await page.waitForTimeout(160);await page.screenshot({path:'artifacts/sprite-ability-builder/auto-fit-sheet.png',fullPage:true});
   const fps=page.locator('.ksw-left .ksw-field').filter({hasText:'FPS'}).locator('input');await fps.evaluate(el=>{el.value='20';el.dispatchEvent(new Event('change',{bubbles:true}));});
-  await page.getByRole('button',{name:'EVENTS'}).click();
+  const eventsTab=page.locator('.ksw-mobile-tabs [data-panel="right"]');if(!await eventsTab.isVisible())throw new Error('SPRITE_ABILITY_EVENTS_TAB_NOT_VISIBLE');await eventsTab.click();
   const impact=page.locator('.ksw-right .ksw-field').filter({hasText:'Impact Frame'}).locator('input');await impact.evaluate(el=>{el.value='7';el.dispatchEvent(new Event('change',{bubbles:true}));});
   const activeStart=page.locator('.ksw-right .ksw-field').filter({hasText:'Active Start'}).locator('input');await activeStart.evaluate(el=>{el.value='6';el.dispatchEvent(new Event('change',{bubbles:true}));});
   const activeEnd=page.locator('.ksw-right .ksw-field').filter({hasText:'Active End'}).locator('input');await activeEnd.evaluate(el=>{el.value='8';el.dispatchEvent(new Event('change',{bubbles:true}));});
