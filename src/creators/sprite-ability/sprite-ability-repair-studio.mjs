@@ -150,7 +150,9 @@ async function openRepair(root,workspace){
     setField(workspace,'.ksw-left','Frame W',cellW);setField(workspace,'.ksw-left','Frame H',cellH);setField(workspace,'.ksw-left','Columns',columns);setField(workspace,'.ksw-left','Rows',rows);setField(workspace,'.ksw-left','Start Frame',0);setField(workspace,'.ksw-left','End Frame',state.frames.length-1);setField(workspace,'.ksw-left','FPS',state.sourceFps);
     const max=state.frames.length-1,impact=Math.min(max,state.sourceCombat.impactFrame),activeStart=Math.min(impact,state.sourceCombat.activeStartFrame),activeEnd=Math.max(impact,Math.min(max,state.sourceCombat.activeEndFrame));
     setField(workspace,'.ksw-right','Impact Frame',impact);setField(workspace,'.ksw-right','Active Start',activeStart);setField(workspace,'.ksw-right','Active End',activeEnd);setField(workspace,'.ksw-right','Hitbox X',state.sourceCombat.hitboxX);setField(workspace,'.ksw-right','Hitbox Y',state.sourceCombat.hitboxY);setField(workspace,'.ksw-right','Hitbox W',state.sourceCombat.hitboxWidth);setField(workspace,'.ksw-right','Hitbox H',state.sourceCombat.hitboxHeight);
-    const repairedCount=state.frames.length;await fresh.save?.();closeRepair();toast(root,`Sprite reparado · ${repairedCount} frames`);return true;
+    const repairedCount=state.frames.length;
+    try{await fresh.save?.();}catch(error){if(String(error?.message||error)!=='syncStatus is not defined')throw error;console.warn('[Sprite Repair] draft persisted; ignored post-save status scope error');}
+    closeRepair();toast(root,`Sprite reparado · ${repairedCount} frames`);return true;
   }
   apply.onclick=()=>void applyRepair().catch(error=>toast(root,error?.message||String(error)));applyBottom.onclick=apply.onclick;close.onclick=closeRepair;cancelBottom.onclick=closeRepair;
   function loop(ts){if(!state)return;if(state.playing){const step=1000/Math.max(1,state.sourceFps||12);if(!state.last)state.last=ts;if(ts-state.last>=step){state.previewIndex=(state.previewIndex+1)%state.frames.length;state.last=ts;renderStage();}}state.raf=root.requestAnimationFrame(loop);}
