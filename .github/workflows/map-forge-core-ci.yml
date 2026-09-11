@@ -61,16 +61,16 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Serve branch checkout
         run: python3 -m http.server 4173 --bind 127.0.0.1 > /tmp/kelo-map-forge-http.log 2>&1 &
-      - name: Capture fixed-seed preview and runtime evidence
-        env:
-          KELO_PAGES: http://127.0.0.1:4173/
-          KELO_VISUAL_STAGE: after
-        run: npx playwright test tests/map-forge-visual-round.spec.js --project=chromium
-      - name: Capture directional prop AFTER evidence
+      - name: Capture directional prop evidence
         env:
           KELO_PAGES: http://127.0.0.1:4173/
           KELO_ORIENTATION_STAGE: after
         run: npx playwright test tests/map-forge-orientation-visual.spec.js --project=chromium
+      - name: Capture fixed-seed BEFORE preview and runtime evidence
+        env:
+          KELO_PAGES: http://127.0.0.1:4173/
+          KELO_VISUAL_STAGE: before
+        run: npx playwright test tests/map-forge-visual-round.spec.js --project=chromium
       - name: Upload Map Forge visual evidence
         if: always()
         uses: actions/upload-artifact@v4
