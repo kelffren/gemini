@@ -12,7 +12,7 @@
 import {clamp,freezeDeep,stableStringify,hashString,seed32,createRng} from './map-forge-prng.mjs';
 import {createMapIntent,buildCandidateParts} from './map-forge-builder.mjs';
 import {validateMapDefinition,scoreMapDefinition} from './map-forge-quality.mjs';
-export const MAP_FORGE_GENERATOR_VERSION='1.2.0';
+export const MAP_FORGE_GENERATOR_VERSION='1.3.0';
 export {createMapIntent} from './map-forge-builder.mjs';
 export {createRng,stableStringify} from './map-forge-prng.mjs';
 export {validateMapDefinition,scoreMapDefinition} from './map-forge-quality.mjs';
@@ -25,6 +25,22 @@ const DECORATION_DECLUSTER_GAIN=23;
 const STREET_LAMP_ROAD_GAIN=36;
 const STREET_BENCH_ROAD_GAIN=36;
 const STREET_BENCH_SWAPS_PER_DISTRICT=2;
+const SCENE_SLOT_MAX_DISTANCE=320;
+const SCENE_SLOT_MIN_GAIN=12;
+const LANDMARK_SCENE_PATTERNS=Object.freeze({
+  central_fountain:Object.freeze({id:'fountain-approach-v1',slots:Object.freeze([
+    Object.freeze({role:'approach-lamp-left',family:'lamp',forwardGap:82,lateral:-118}),
+    Object.freeze({role:'approach-lamp-right',family:'lamp',forwardGap:82,lateral:118}),
+    Object.freeze({role:'rest-bench-left',family:'bench',forwardGap:148,lateral:-205}),
+    Object.freeze({role:'rest-bench-right',family:'bench',forwardGap:148,lateral:205})
+  ])}),
+  main_market:Object.freeze({id:'market-threshold-v1',slots:Object.freeze([
+    Object.freeze({role:'entry-lamp-left',family:'lamp',forwardGap:68,lateral:-108}),
+    Object.freeze({role:'entry-lamp-right',family:'lamp',forwardGap:68,lateral:108}),
+    Object.freeze({role:'stall-left',family:'market_prop',forwardGap:132,lateral:-188}),
+    Object.freeze({role:'stall-right',family:'market_prop',forwardGap:132,lateral:188})
+  ])})
+});
 const decorationDistance=(a,b)=>Math.hypot(Number(a?.x||0)-Number(b?.x||0),Number(a?.y||0)-Number(b?.y||0));
 function nearestFamilyDistance(rows,index,family){const current=rows[index];let best=Infinity;for(let i=0;i<rows.length;i++){if(i===index)continue;const row=rows[i];if(row.district!==current.district||row.family!==family)continue;best=Math.min(best,decorationDistance(current,row));}return best;}
 function declusterDecorationFamilies(parts){
@@ -62,9 +78,33 @@ function organizeStreetFurnitureFamilies(parts){
 }
 function roadFacingRotation(p,roads,fallback=0){const frame=nearestRoadVector(p,roads);if(!frame||frame.distance<1e-6)return fallback;const degrees=Math.atan2(-frame.vx,frame.vy)*180/Math.PI;return((Math.round(degrees/90)*90)%360+360)%360;}
 function orientRoadFacingLandmarks(parts){let oriented=0,changed=0;const landmarks=(parts.landmarks||[]).map(row=>{if(!ROAD_FACING_LANDMARK_ROLES.has(row.role)||row.roadConnection===false)return row;const point=row.position||row,frame=nearestRoadVector(point,parts.roads);if(!frame||frame.distance<1)return row;const degrees=roadFacingRotation(point,parts.roads,0),facing=ROTATION_FACING[degrees]||'south',previous=String(row?.frontage?.facing||row?.facing||'south').toLowerCase();oriented++;if(previous!==facing)changed++;return{...row,rotation:degrees,frontage:{...(row.frontage||{}),facing,source:'nearest-road'}};});return{...parts,landmarks,generationStats:{...parts.generationStats,landmarkRoadFacingCount:oriented,landmarkRoadFacingChangedCount:changed}};}
+function rotationAxes(rotation=0){const value=((Number(rotation)||0)%360+360)%360;if(value===90)return{forward:{x:-1,y:0},lateral:{x:0,y:1}};if(value===180)return{forward:{x:0,y:-1},lateral:{x:-1,y:0}};if(value===270)return{forward:{x:1,y:0},lateral:{x:0,y:-1}};return{forward:{x:0,y:1},lateral:{x:1,y:0}};}
+function sceneSlotPoint(landmark,slot){const center=landmark.position||landmark,radius=Math.max(80,Number(landmark?.clearance?.radius)||Math.max(Number(landmark?.bounds?.w)||0,Number(landmark?.bounds?.h)||0)*.7),axes=rotationAxes(landmark.rotation);return{x:center.x+axes.forward.x*(radius+slot.forwardGap)+axes.lateral.x*slot.lateral,y:center.y+axes.forward.y*(radius+slot.forwardGap)+axes.lateral.y*slot.lateral};}
+function pointDistance(a,b){return Math.hypot(Number(a?.x||0)-Number(b?.x||0),Number(a?.y||0)-Number(b?.y||0));}
+function nearestSceneDecoration(rows,district,point,filter,excluded){let best=null;for(let i=0;i<rows.length;i++){if(excluded.has(i))continue;const row=rows[i];if(row.district!==district||filter&&!filter(row))continue;const distance=pointDistance(row,point);if(!best||distance<best.distance-1e-6||Math.abs(distance-best.distance)<=1e-6&&i<best.index)best={index:i,distance};}return best;}
+function composeLandmarkScenes(parts){
+  const rows=(parts.decorations||[]).map(row=>({...row})),scenes=[];let evaluated=0,sceneSwaps=0,slotCount=0,totalGain=0;
+  for(const landmark of parts.landmarks||[]){
+    const pattern=LANDMARK_SCENE_PATTERNS[landmark.type];if(!pattern)continue;evaluated++;
+    const used=new Set(),slots=[];let swaps=0,gain=0;
+    for(const slot of pattern.slots){
+      const ideal=sceneSlotPoint(landmark,slot),before=nearestSceneDecoration(rows,landmark.district,ideal,row=>row.family===slot.family,used),target=nearestSceneDecoration(rows,landmark.district,ideal,null,used);
+      if(!before||!target||target.distance>SCENE_SLOT_MAX_DISTANCE)continue;
+      let changed=false,slotGain=0;
+      if(rows[target.index].family!==slot.family){
+        const donor=nearestSceneDecoration(rows,landmark.district,rows[target.index],row=>row.family===slot.family,used);
+        slotGain=before.distance-target.distance;
+        if(donor&&donor.index!==target.index&&slotGain>=SCENE_SLOT_MIN_GAIN){swapDecorationIdentity(rows[target.index],rows[donor.index]);used.add(donor.index);changed=true;swaps++;sceneSwaps++;gain+=slotGain;totalGain+=slotGain;}
+      }
+      if(rows[target.index].family===slot.family){used.add(target.index);slotCount++;slots.push({role:slot.role,family:slot.family,decorationId:rows[target.index].id,distance:Math.round(target.distance*10)/10,improvedBy:changed?Math.round(slotGain*10)/10:0});}
+    }
+    if(slots.length)scenes.push({id:`scene:${landmark.id}:${pattern.id}`,patternId:pattern.id,landmarkId:landmark.id,district:landmark.district,slotCount:slots.length,swapCount:swaps,distanceGain:Math.round(gain*10)/10,slots});
+  }
+  return{...parts,decorations:rows,sceneCompositions:scenes,generationStats:{...parts.generationStats,sceneGrammarEvaluatedCount:evaluated,sceneGrammarSceneCount:scenes.length,sceneGrammarSlotCount:slotCount,sceneGrammarSwapCount:sceneSwaps,sceneGrammarDistanceGain:Math.round(totalGain*10)/10}};
+}
 function orientDirectionalDecorations(parts){let oriented=0;const decorations=(parts.decorations||[]).map(row=>{if(!DIRECTIONAL_DECORATION_FAMILIES.has(row.family))return row;oriented++;return{...row,rotation:roadFacingRotation(row,parts.roads,row.rotation)};});return{...parts,decorations,generationStats:{...parts.generationStats,decorationRoadFacingCount:oriented}};}
 
-export function generateMapCandidate(recipe,{seed=1,assetCatalogVersion='catalog-unbound',style={},constraints={}}={}){const intent=createMapIntent(recipe,{seed,assetCatalogVersion,style,constraints}),rawParts=buildCandidateParts(recipe,intent,createRng(intent.seed,'map-forge')),declustered=declusterDecorationFamilies(rawParts),organized=organizeStreetFurnitureFamilies(declustered),landmarkOriented=orientRoadFacingLandmarks(organized),parts=orientDirectionalDecorations(landmarkOriented),base={metadata:{mapId:`map:${recipe.id}:${intent.seed}`,seed:intent.seed,generatorVersion:MAP_FORGE_GENERATOR_VERSION,recipeId:recipe.id,recipeVersion:recipe.version,assetCatalogVersion:intent.assetCatalogVersion,layoutHash:null},worldBounds:{...intent.worldBounds},...parts};const hashPayload={...base,metadata:{...base.metadata,layoutHash:null}};base.metadata.layoutHash=hashString(stableStringify(hashPayload));base.validation=validateMapDefinition(base,recipe);base.quality=scoreMapDefinition(base,recipe,base.validation);return freezeDeep(base);}
+export function generateMapCandidate(recipe,{seed=1,assetCatalogVersion='catalog-unbound',style={},constraints={}}={}){const intent=createMapIntent(recipe,{seed,assetCatalogVersion,style,constraints}),rawParts=buildCandidateParts(recipe,intent,createRng(intent.seed,'map-forge')),declustered=declusterDecorationFamilies(rawParts),organized=organizeStreetFurnitureFamilies(declustered),landmarkOriented=orientRoadFacingLandmarks(organized),sceneComposed=composeLandmarkScenes(landmarkOriented),parts=orientDirectionalDecorations(sceneComposed),base={metadata:{mapId:`map:${recipe.id}:${intent.seed}`,seed:intent.seed,generatorVersion:MAP_FORGE_GENERATOR_VERSION,recipeId:recipe.id,recipeVersion:recipe.version,assetCatalogVersion:intent.assetCatalogVersion,layoutHash:null},worldBounds:{...intent.worldBounds},...parts};const hashPayload={...base,metadata:{...base.metadata,layoutHash:null}};base.metadata.layoutHash=hashString(stableStringify(hashPayload));base.validation=validateMapDefinition(base,recipe);base.quality=scoreMapDefinition(base,recipe,base.validation);return freezeDeep(base);}
 function deriveCandidateSeed(seed,index){return seed32(`${seed}|candidate|${index}`);}
 function visualTieScore(map){const m=map?.quality?.breakdown||{};return Number(m.visualComposition||0)*1.35+Number(m.scenicVistas||0)*1.25+Number(m.negativeSpace||0)*1.05+Number(m.assetVariety||0)+Number(m.districtCoherence||0);}
 function candidateComparator(a,b){return b.quality.total-a.quality.total||visualTieScore(b)-visualTieScore(a)||String(a.metadata.layoutHash).localeCompare(String(b.metadata.layoutHash));}
