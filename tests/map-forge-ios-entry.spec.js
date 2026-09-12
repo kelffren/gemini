@@ -61,7 +61,7 @@ function collectErrors(page) {
   return { pageErrors, consoleErrors };
 }
 
-// This test is intentionally UI-only: no direct openCreatorHub/openWorkspace calls.
+// This test is intentionally UI-only after setup: no direct openCreatorHub/openWorkspace calls.
 test('iPhone exact MENÚ to CREATORS to Map Forge tap path', async ({ page }) => {
   const { pageErrors, consoleErrors } = collectErrors(page);
 
@@ -81,9 +81,10 @@ test('iPhone exact MENÚ to CREATORS to Map Forge tap path', async ({ page }) =>
   if (consoleErrors.length) console.log('IOS_ENTRY_CONSOLE_ERRORS', JSON.stringify(consoleErrors));
 });
 
-// Reproduces the user's real URL: seed the same creator permission once, then reload the
-// game WITHOUT mapEditor=1 and perform only visible touch interactions.
-test('iPhone normal game URL opens Map Forge after creator permission persists', async ({ page }) => {
+// Reproduces the user's visible state without mapEditor=1. The auth modal is closed only as
+// test setup because the user's screenshot proves their real session is already past that gate.
+// From MENÚ onward every interaction is a real iPhone/WebKit touch.
+test('iPhone normal game URL past auth gate opens Map Forge with visible taps', async ({ page }) => {
   const { pageErrors, consoleErrors } = collectErrors(page);
 
   let response = await page.goto('./?mapEditor=1&seedCreatorPermission=1', {
@@ -102,8 +103,12 @@ test('iPhone normal game URL opens Map Forge after creator permission persists',
 
   await page.waitForFunction(() => !!(
     window.KeloInputLocks?.acquire &&
-    window.KELO_ADMIN_KEYS?.can?.('world.edit', window.KELO_ADMIN_KEYS?.playerId?.())
+    window.KELO_ADMIN_KEYS?.can?.('world.edit', window.KELO_ADMIN_KEYS?.playerId?.()) &&
+    window.KeloAccountAuthUI?.close
   ), null, { timeout: 15000 });
+
+  await page.evaluate(() => window.KeloAccountAuthUI.close());
+  await expect(page.locator('#kelo-account-auth')).toBeHidden();
 
   await tapExactPath(page, 'map-forge-ios-normal-game-entry.png');
   expect(pageErrors).toEqual([]);
