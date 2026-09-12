@@ -23,8 +23,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-      - run: npm ci
+      - name: Install test dependency without mutating the repo
+        run: npm install --no-package-lock --ignore-scripts
       - name: Syntax gate
         run: |
           node --check src/creators/ui/avatar-frame-surgery-workspace.mjs
