@@ -1,12 +1,49 @@
 /* KELO-INDEX
  * area: TEST / MAP FORGE / MOBILE PREVIEW
  * owner: Map Forge mobile browser smoke
- * purpose: verify real snapshot preview, reversible exterior handoff, camera focus and session restoration at 390x844
+ * purpose: verify Hub launch is independent from generation readiness, plus real preview, reversible exterior handoff, camera focus and session restoration at 390x844
  */
 const { test, expect } = require('@playwright/test');
 const fs = require('fs');
 
 test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+
+test('Map Forge opens from Creator Hub before a stalled first generation settles', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', error => pageErrors.push(String(error)));
+
+  const response = await page.goto('/?offline=1', { waitUntil: 'domcontentloaded', timeout: 30000 });
+  expect(response.status()).toBeLessThan(400);
+  await page.waitForFunction(() => !!window.KeloInputLocks?.acquire, null, { timeout: 15000 });
+
+  await page.evaluate(async () => {
+    const { openCreatorHub } = await import('./src/creators/ui/creator-hub.mjs');
+    await openCreatorHub({ root: window });
+  });
+  await expect(page.locator('#kelo-creators-hub')).toBeVisible();
+
+  await page.evaluate(() => {
+    window.__KELO_TEST_REAL_WORKER__ = window.Worker;
+    window.Worker = class StalledMapForgeWorker {
+      constructor(){ this.onmessage = null; this.onerror = null; }
+      postMessage(){}
+      terminate(){}
+    };
+  });
+
+  await page.locator('#kelo-creators-hub [data-workspace="map-forge"]').click();
+  await expect(page.locator('#kelo-map-forge')).toBeVisible({ timeout: 2000 });
+  await expect(page.locator('#kelo-creators-hub')).toHaveCount(0, { timeout: 2000 });
+  await expect(page.locator('#kelo-map-forge .kmf-canvas')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'GENERANDO…' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'CERRAR' }).click();
+  await page.evaluate(() => {
+    if(window.__KELO_TEST_REAL_WORKER__)window.Worker = window.__KELO_TEST_REAL_WORKER__;
+    delete window.__KELO_TEST_REAL_WORKER__;
+  });
+  expect(pageErrors).toEqual([]);
+});
 
 test('Map Forge real preview hides before handoff and restores the same candidate', async ({ page }) => {
   const pageErrors = [];
