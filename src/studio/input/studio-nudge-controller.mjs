@@ -15,6 +15,8 @@ const ARROWS=Object.freeze({
 const EXPLORER_ENTITY_SELECTOR='#kelo-studio-live [data-entity]';
 const COARSE_MULTIPLIER=4;
 const MOBILE_MODES=Object.freeze(['snap','fine','coarse']);
+const HOLD_DELAY_MS=320;
+const HOLD_REPEAT_MS=90;
 
 export function resolveStudioNudgeStep({root=globalThis,kernel,shiftKey=false,altKey=false,mode=null}={}){
   if(mode==='fine'||shiftKey)return 1;
@@ -45,8 +47,13 @@ export function createStudioNudgeController({root=globalThis,kernel}={}){
   const document=root?.document;
   if(!document||!kernel)return Object.freeze({destroy(){},nudge:async()=>[]});
   let destroyed=false,busy=false,pad=null,style=null,observer=null,mobileMode='snap';
+  let holdTimeout=null,holdInterval=null,holdDir='',suppressDirectionClick=false;
 
   const selectedEntities=()=>resolveSelectedStudioEntities(kernel.document.entities,kernel.selection.get());
+  const later=(fn,ms)=>root.setTimeout?.(fn,ms)??setTimeout(fn,ms);
+  const every=(fn,ms)=>root.setInterval?.(fn,ms)??setInterval(fn,ms);
+  const clearLater=id=>{if(id==null)return;(root.clearTimeout||clearTimeout)(id);};
+  const clearEvery=id=>{if(id==null)return;(root.clearInterval||clearInterval)(id);};
 
   async function nudge(dx,dy,{step=1}={}){
     if(destroyed||busy)return [];
@@ -71,12 +78,16 @@ export function createStudioNudgeController({root=globalThis,kernel}={}){
   function canTouchNudge(){const host=shell();if(!host||host.dataset.sheetOpen==='1'||host.dataset.creatorMinimized==='1')return false;if(!['select','move'].includes(String(host.dataset.activeTool||'select')))return false;return kernel.selection.get().length>0;}
   function mobileStep(){return resolveStudioNudgeStep({root,kernel,mode:mobileMode});}
   function cycleMobileMode(){mobileMode=MOBILE_MODES[(MOBILE_MODES.indexOf(mobileMode)+1)%MOBILE_MODES.length];syncPad();return mobileMode;}
-  function syncPad(){if(!pad)return;const visible=(root.innerWidth||9999)<=760&&canTouchNudge();pad.hidden=!visible;const modeButton=pad.querySelector('[data-nudge-mode]');if(modeButton){const step=mobileStep();modeButton.dataset.mode=mobileMode;modeButton.dataset.step=String(step);modeButton.textContent=`${step} PX`;modeButton.setAttribute('aria-label',`Nudge ${mobileMode}: ${step} pixels`);}pad.querySelectorAll('[data-nudge-dir]').forEach(button=>button.disabled=busy||!visible);}
-  function onPadClick(event){const button=event.target?.closest?.('button');if(!button)return;if(button.dataset.nudgeMode!==undefined){cycleMobileMode();try{root.navigator?.vibrate?.(8);}catch{}return;}const dir=button.dataset.nudgeDir;if(!dir||!canTouchNudge())return;const vector=dir==='left'?[-1,0]:dir==='right'?[1,0]:dir==='up'?[0,-1]:[0,1];try{root.navigator?.vibrate?.(6);}catch{}void nudge(vector[0],vector[1],{step:mobileStep()}).catch(error=>console.warn('[Kelo Studio] mobile nudge failed',error));}
+  function vectorFor(dir){return dir==='left'?[-1,0]:dir==='right'?[1,0]:dir==='up'?[0,-1]:dir==='down'?[0,1]:null;}
+  function stopHold(){clearLater(holdTimeout);clearEvery(holdInterval);holdTimeout=holdInterval=null;holdDir='';}
+  function triggerMobileNudge(dir){const vector=vectorFor(dir);if(!vector||!canTouchNudge())return false;try{root.navigator?.vibrate?.(6);}catch{}void nudge(vector[0],vector[1],{step:mobileStep()}).catch(error=>console.warn('[Kelo Studio] mobile nudge failed',error));return true;}
+  function syncPad(){if(!pad)return;const visible=(root.innerWidth||9999)<=760&&canTouchNudge();if(!visible)stopHold();pad.hidden=!visible;const modeButton=pad.querySelector('[data-nudge-mode]');if(modeButton){const step=mobileStep();modeButton.dataset.mode=mobileMode;modeButton.dataset.step=String(step);modeButton.textContent=`${step} PX`;modeButton.setAttribute('aria-label',`Nudge ${mobileMode}: ${step} pixels`);}pad.querySelectorAll('[data-nudge-dir]').forEach(button=>button.disabled=busy||!visible);}
+  function onPadPointerDown(event){const button=event.target?.closest?.('[data-nudge-dir]');const dir=button?.dataset.nudgeDir;if(!dir||!canTouchNudge()||event.button>0)return;stopHold();holdDir=dir;suppressDirectionClick=true;event.preventDefault?.();try{button.setPointerCapture?.(event.pointerId);}catch{}triggerMobileNudge(dir);holdTimeout=later(()=>{holdTimeout=null;if(!holdDir||destroyed||!canTouchNudge())return;holdInterval=every(()=>{if(holdDir&&canTouchNudge())triggerMobileNudge(holdDir);},HOLD_REPEAT_MS);},HOLD_DELAY_MS);}
+  function onPadClick(event){const button=event.target?.closest?.('button');if(!button)return;if(button.dataset.nudgeMode!==undefined){cycleMobileMode();try{root.navigator?.vibrate?.(8);}catch{}return;}const dir=button.dataset.nudgeDir;if(!dir||!canTouchNudge())return;if(suppressDirectionClick){suppressDirectionClick=false;return;}triggerMobileNudge(dir);}
   function mountPad(){if(destroyed)return;const host=shell();if(!host)return;if(!style){style=document.createElement('style');style.dataset.keloStudioNudgePad='1';style.textContent=`
 #kelo-studio-live .ks-nudge-pad{display:none}
 @media(max-width:760px){#kelo-studio-live .ks-nudge-pad{position:absolute;right:10px;bottom:calc(max(8px,env(safe-area-inset-bottom)) + 126px);z-index:10;display:grid;grid-template-columns:46px 46px 46px;grid-template-rows:46px 46px 46px;gap:4px;padding:6px;border:1px solid rgba(231,197,106,.38);border-radius:16px;background:rgba(5,14,16,.94);box-shadow:0 12px 34px rgba(0,0,0,.48);backdrop-filter:blur(12px);pointer-events:auto}.ks-nudge-pad[hidden]{display:none!important}.ks-nudge-pad button{min-width:46px;min-height:46px;border:1px solid rgba(231,197,106,.24);border-radius:11px;background:#102022;color:#fff0b2;font-weight:900;font-size:18px;touch-action:manipulation;-webkit-tap-highlight-color:transparent}.ks-nudge-pad button:disabled{opacity:.35}.ks-nudge-pad [data-nudge-mode]{font-size:9px;letter-spacing:.04em;color:#e7c56a}.ks-nudge-pad [data-nudge-dir="up"]{grid-column:2;grid-row:1}.ks-nudge-pad [data-nudge-dir="left"]{grid-column:1;grid-row:2}.ks-nudge-pad [data-nudge-mode]{grid-column:2;grid-row:2}.ks-nudge-pad [data-nudge-dir="right"]{grid-column:3;grid-row:2}.ks-nudge-pad [data-nudge-dir="down"]{grid-column:2;grid-row:3}}
-`;document.head.appendChild(style);}if(!pad?.isConnected){pad=document.createElement('div');pad.className='ks-nudge-pad';pad.setAttribute('aria-label','Mover selección con precisión');pad.innerHTML='<button type="button" data-nudge-dir="up" aria-label="Mover arriba">↑</button><button type="button" data-nudge-dir="left" aria-label="Mover izquierda">←</button><button type="button" data-nudge-mode="" aria-label="Nudge snap">SNAP</button><button type="button" data-nudge-dir="right" aria-label="Mover derecha">→</button><button type="button" data-nudge-dir="down" aria-label="Mover abajo">↓</button>';pad.addEventListener('click',onPadClick);host.appendChild(pad);}syncPad();}
+`;document.head.appendChild(style);}if(!pad?.isConnected){pad=document.createElement('div');pad.className='ks-nudge-pad';pad.setAttribute('aria-label','Mover selección con precisión');pad.innerHTML='<button type="button" data-nudge-dir="up" aria-label="Mover arriba">↑</button><button type="button" data-nudge-dir="left" aria-label="Mover izquierda">←</button><button type="button" data-nudge-mode="" aria-label="Nudge snap">SNAP</button><button type="button" data-nudge-dir="right" aria-label="Mover derecha">→</button><button type="button" data-nudge-dir="down" aria-label="Mover abajo">↓</button>';pad.addEventListener('click',onPadClick);pad.addEventListener('pointerdown',onPadPointerDown);pad.addEventListener('pointerup',stopHold);pad.addEventListener('pointercancel',stopHold);pad.addEventListener('lostpointercapture',stopHold);host.appendChild(pad);}syncPad();}
 
   function onKey(event){
     const dir=ARROWS[event.key];if(!dir||event.metaKey||event.ctrlKey||editableTarget(event.target)||explorerTarget(event.target))return;
@@ -95,10 +106,10 @@ export function createStudioNudgeController({root=globalThis,kernel}={}){
   observer=new MutationObserver(()=>{mountPad();syncPad();});observer.observe(document.documentElement||document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['data-active-tool','data-sheet-open','data-creator-minimized']});
   mountPad();
   return Object.freeze({
-    version:'studio-nudge-v1.1.0-linear-selection',
+    version:'studio-nudge-v1.2.0-mobile-hold-repeat',
     nudge,cycleMobileMode,syncPad,
-    get mobileMode(){return mobileMode;},
-    destroy(){destroyed=true;document.removeEventListener('keydown',onKey,true);root.removeEventListener?.('resize',syncPad);observer?.disconnect();pad?.remove();style?.remove();pad=style=null;},
+    get mobileMode(){return mobileMode;},get holding(){return holdDir||'';},
+    destroy(){destroyed=true;stopHold();document.removeEventListener('keydown',onKey,true);root.removeEventListener?.('resize',syncPad);observer?.disconnect();pad?.removeEventListener?.('click',onPadClick);pad?.removeEventListener?.('pointerdown',onPadPointerDown);pad?.removeEventListener?.('pointerup',stopHold);pad?.removeEventListener?.('pointercancel',stopHold);pad?.removeEventListener?.('lostpointercapture',stopHold);pad?.remove();style?.remove();pad=style=null;},
     get busy(){return busy;}
   });
 }
