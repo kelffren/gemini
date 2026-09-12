@@ -15,7 +15,7 @@ import {
 
 const root=path.resolve(path.dirname(new URL(import.meta.url).pathname),'..');
 const read=rel=>fs.readFileSync(path.join(root,rel),'utf8');
-const ui=read('src/creators/ui/avatar-frame-surgery-workspace.mjs');
+const ui=[read('src/creators/ui/avatar-frame-surgery-workspace.mjs'),read('src/creators/ui/avatar-frame-surgery-editor.mjs'),read('src/creators/ui/avatar-frame-surgery-ui-kit.mjs')].join('\n');
 const normalizer=read('src/creators/sprite-compiler/sprite-frame-normalizer.mjs');
 const service=read('src/creators/avatar/avatar-quick-import-service.mjs');
 const manifest=read('src/creators/workspaces/avatar-workspace.mjs');
