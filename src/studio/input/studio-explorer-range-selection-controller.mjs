@@ -77,10 +77,25 @@ export function createStudioExplorerRangeSelectionController({root=globalThis,ke
   }
 
   function onkeydown(event){
-    if(destroyed||event.defaultPrevented||event.ctrlKey||event.metaKey||event.altKey)return;
-    if(!['ArrowUp','ArrowDown','Home','End','PageUp','PageDown'].includes(event.key))return;
+    if(destroyed||event.defaultPrevented||event.altKey)return;
     const row=event.target?.closest?.(ENTITY_SELECTOR);
     if(!row)return;
+
+    const command=!!(event.ctrlKey||event.metaKey);
+    if(command&&String(event.key||'').toLowerCase()==='a'&&!event.shiftKey){
+      const ids=explorerRows().map(candidate=>String(candidate.dataset?.entity||'')).filter(Boolean);
+      if(!ids.length)return;
+      event.preventDefault?.();
+      event.stopImmediatePropagation?.();
+      anchorId=String(row.dataset?.entity||'')||anchorId;
+      const current=(kernel.selection.get?.()||[]).map(String);
+      if(current.length===ids.length&&current.every((id,index)=>id===ids[index]))return;
+      kernel.selection.set(ids);
+      return;
+    }
+
+    if(command)return;
+    if(!['ArrowUp','ArrowDown','Home','End','PageUp','PageDown'].includes(event.key))return;
     const rows=explorerRows();
     if(!rows.length)return;
     let index=rows.indexOf(row);
@@ -117,7 +132,7 @@ export function createStudioExplorerRangeSelectionController({root=globalThis,ke
   document.addEventListener('click',onclick,true);
   document.addEventListener('keydown',onkeydown,true);
   return Object.freeze({
-    version:'studio-explorer-range-selection-v1.4.0-page-navigation',
+    version:'studio-explorer-range-selection-v1.5.0-context-select-all',
     get anchor(){return anchorId;},
     destroy(){
       if(destroyed)return;
