@@ -114,7 +114,7 @@ export function createStudioSelectionHistoryController({root=globalThis,kernel,m
   });
 
   const onKeyDown=event=>{
-    if(destroyed||event.defaultPrevented||event.metaKey||event.ctrlKey||event.altKey)return;
+    if(destroyed||event.defaultPrevented||event.metaKey||event.ctrlKey||!event.altKey)return;
     if(event.target?.closest?.(EDITABLE_SELECTOR))return;
     const shell=document.getElementById?.('kelo-studio-live');
     if(!shell)return;
