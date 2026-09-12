@@ -14,10 +14,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Install Playwright
+      - name: Install matching Playwright browser
         run: |
-          npm install --no-save playwright@1.55.0
-          npx playwright install --with-deps chromium
+          npm install --no-save --package-lock=false playwright@1.55.0
+          node -p "'Playwright ' + require('playwright/package.json').version"
+          node node_modules/playwright/cli.js install --with-deps chromium
       - name: Audit published game as a user
         id: audit
         continue-on-error: true
