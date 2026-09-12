@@ -25,22 +25,22 @@ const VARIANTS=Object.freeze([
 
 const slot=(role,family,forwardGap,lateral)=>Object.freeze({role,family,forwardGap,lateral});
 export const SCENE_PREFAB_PATTERNS=Object.freeze({
-  central_fountain:Object.freeze({id:'royal-fountain-court-v1',kit:'royal-civic',roadBand:[30,230],slots:Object.freeze([
+  central_fountain:Object.freeze({id:'royal-fountain-court-v1',kit:'royal-civic',roadBand:[35,190],slots:Object.freeze([
     slot('approach-lamp-left','lamp',46,-124),slot('approach-lamp-right','lamp',46,124),
     slot('rest-bench-left','bench',132,-192),slot('rest-bench-right','bench',132,192),
     slot('garden-left','flower',72,-244),slot('garden-right','flower',72,244)
   ])}),
-  castle:Object.freeze({id:'royal-castle-forecourt-v1',kit:'royal-civic',roadBand:[30,250],slots:Object.freeze([
+  castle:Object.freeze({id:'royal-castle-forecourt-v1',kit:'royal-civic',roadBand:[35,190],slots:Object.freeze([
     slot('gate-lamp-left','lamp',48,-150),slot('gate-lamp-right','lamp',48,150),
     slot('rest-bench-left','bench',136,-220),slot('rest-bench-right','bench',136,220),
     slot('flower-left','flower',88,-286),slot('flower-right','flower',88,286)
   ])}),
-  main_market:Object.freeze({id:'market-gateway-v1',kit:'commerce',roadBand:[35,235],slots:Object.freeze([
+  main_market:Object.freeze({id:'market-gateway-v1',kit:'commerce',roadBand:[35,190],slots:Object.freeze([
     slot('entry-lamp-left','lamp',38,-112),slot('entry-lamp-right','lamp',38,112),
     slot('stall-left','market_prop',102,-178),slot('stall-right','market_prop',102,178),
     slot('rest-bench-left','bench',166,-126),slot('rest-bench-right','bench',166,126)
   ])}),
-  small_market:Object.freeze({id:'small-market-gateway-v1',kit:'commerce',roadBand:[35,230],slots:Object.freeze([
+  small_market:Object.freeze({id:'small-market-gateway-v1',kit:'commerce',roadBand:[35,190],slots:Object.freeze([
     slot('entry-lamp-left','lamp',34,-94),slot('entry-lamp-right','lamp',34,94),
     slot('stall-left','market_prop',94,-146),slot('stall-right','market_prop',94,146),
     slot('rest-bench','bench',150,0)
@@ -70,6 +70,7 @@ export const SCENE_PREFAB_PATTERNS=Object.freeze({
 
 const pointDistance=(a,b)=>Math.hypot(Number(a?.x||0)-Number(b?.x||0),Number(a?.y||0)-Number(b?.y||0));
 const spacingForKind=kind=>kind==='forest'?70:88;
+const isUrbanKind=kind=>kind==='plaza'||kind==='royal'||kind==='commerce';
 function rotationAxes(rotation=0){const value=((Number(rotation)||0)%360+360)%360;if(value===90)return{forward:{x:-1,y:0},lateral:{x:0,y:1}};if(value===180)return{forward:{x:0,y:-1},lateral:{x:-1,y:0}};if(value===270)return{forward:{x:1,y:0},lateral:{x:0,y:-1}};return{forward:{x:0,y:1},lateral:{x:1,y:0}};}
 function landmarkRadius(landmark){return Math.max(80,Number(landmark?.clearance?.radius)||Math.max(Number(landmark?.bounds?.w)||0,Number(landmark?.bounds?.h)||0)*.7);}
 function variantFor(pattern,landmark){const p=landmark.position||landmark,index=seed32(`${pattern.id}|${landmark.id}|${ROUND(p.x)}|${ROUND(p.y)}`)%VARIANTS.length;return VARIANTS[index];}
@@ -79,7 +80,7 @@ function districtOwnerAt(parts,p){let owner=null,best=Infinity;for(const d of pa
 function pointInsideRect(p,r,pad=0){return p.x>=r.x-pad&&p.x<=r.x+r.w+pad&&p.y>=r.y-pad&&p.y<=r.y+r.h+pad;}
 function localSameFamilyCount(rows){let count=0;for(let i=0;i<rows.length;i++){const current=rows[i];let nearest=null,best=Infinity;for(let j=0;j<rows.length;j++){if(i===j)continue;const candidate=rows[j];if(candidate.district!==current.district)continue;const distance=pointDistance(current,candidate);if(distance<best){best=distance;nearest=candidate;}}if(nearest&&best<=LOCAL_NEIGHBOR_RADIUS&&nearest.family===current.family)count++;}return count;}
 function entersNewVista(parts,from,to){for(const vista of parts.scenicVistas||[]){if(!vista.reserved||!vista.from||!vista.to)continue;const corridor=Math.max(56,90*(Number(vista.weight)||1)),before=pointSegmentDistance(from,vista.from,vista.to),after=pointSegmentDistance(to,vista.from,vista.to);if(before>=corridor&&after<corridor)return true;}return false;}
-function pointSafe(parts,rows,index,landmark,pattern,p,worldBounds){if(!insideBounds(p,worldBounds,36)||districtOwnerAt(parts,p)!==landmark.district)return false;const district=(parts.districts||[]).find(row=>row.id===landmark.district);if(district?.bounds&&!pointInsideRect(p,district.bounds,-18))return false;if((parts.blocks||[]).some(block=>pointInsideRect(p,block.bounds,BLOCK_PAD)))return false;for(const other of parts.landmarks||[]){if(other.id===landmark.id)continue;const radius=Math.max(0,Number(other?.clearance?.radius)||0)+LANDMARK_PAD;if(radius&&pointDistance(p,other.position||other)<radius)return false;}const road=nearestRoadFrame(p,parts.roads),band=pattern.roadBand||[20,340],districtRoadMin=district?.kind==='commerce'?35:22,minRoad=Math.max(Number(band[0])||0,districtRoadMin);if(!road||road.distance<minRoad||road.distance>band[1])return false;const districtKinds=new Map((parts.districts||[]).map(row=>[row.id,row.kind]));for(let i=0;i<rows.length;i++){if(i===index)continue;const other=rows[i],crossDistrict=other.district!==landmark.district,required=crossDistrict?Math.min(spacingForKind(district?.kind),spacingForKind(districtKinds.get(other.district))):MEMBER_MIN_SPACING;if(pointDistance(p,other)<required)return false;}if(entersNewVista(parts,rows[index],p))return false;return true;}
+function pointSafe(parts,rows,index,landmark,pattern,p,worldBounds){if(!insideBounds(p,worldBounds,36)||districtOwnerAt(parts,p)!==landmark.district)return false;const district=(parts.districts||[]).find(row=>row.id===landmark.district);if(district?.bounds&&!pointInsideRect(p,district.bounds,-18))return false;if((parts.blocks||[]).some(block=>pointInsideRect(p,block.bounds,BLOCK_PAD)))return false;for(const other of parts.landmarks||[]){if(other.id===landmark.id)continue;const radius=Math.max(0,Number(other?.clearance?.radius)||0)+LANDMARK_PAD;if(radius&&pointDistance(p,other.position||other)<radius)return false;}const road=nearestRoadFrame(p,parts.roads),band=pattern.roadBand||[20,340],districtRoadMin=isUrbanKind(district?.kind)?35:22,minRoad=Math.max(Number(band[0])||0,districtRoadMin),maxRoad=Math.min(Number(band[1])||340,isUrbanKind(district?.kind)?190:Infinity);if(!road||road.distance<minRoad||road.distance>maxRoad)return false;const districtKinds=new Map((parts.districts||[]).map(row=>[row.id,row.kind]));for(let i=0;i<rows.length;i++){if(i===index)continue;const other=rows[i],crossDistrict=other.district!==landmark.district,required=crossDistrict?Math.min(spacingForKind(district?.kind),spacingForKind(districtKinds.get(other.district))):MEMBER_MIN_SPACING;if(pointDistance(p,other)<required)return false;}if(entersNewVista(parts,rows[index],p))return false;return true;}
 function candidatePoints(from,ideal){return[1,.84,.68].map(t=>({x:ROUND(from.x+(ideal.x-from.x)*t),y:ROUND(from.y+(ideal.y-from.y)*t),t}));}
 function chooseMember(rows,landmark,member,ideal,used){let best=null;for(let i=0;i<rows.length;i++){const row=rows[i];if(used.has(i)||row.district!==landmark.district||row.family!==member.family)continue;const distance=pointDistance(row,ideal);if(distance>MEMBER_MAX_SOURCE_DISTANCE)continue;if(!best||distance<best.distance-1e-6||Math.abs(distance-best.distance)<=1e-6&&i<best.index)best={index:i,distance};}return best;}
 function connectorFor(parts,landmark){const center=landmark.position||landmark,frame=nearestRoadFrame(center,parts.roads);if(!frame)return null;return{id:'road-entry',kind:'road',required:true,roadId:frame.roadId,position:{x:ROUND(frame.x),y:ROUND(frame.y)},distance:ROUND(frame.distance),facing:String(landmark.frontage?.facing||landmark.facing||'south')};}
