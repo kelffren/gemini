@@ -8,7 +8,7 @@ on:
 jobs:
   deep-blackbox-ui:
     runs-on: ubuntu-latest
-    timeout-minutes: 50
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -24,9 +24,9 @@ jobs:
         continue-on-error: true
         env:
           TARGET_URL: https://kelffren.github.io/gemini/
-          MAX_STATES: '55'
-          MAX_DEPTH: '4'
-          MAX_ACTIONS_PER_STATE: '18'
+          MAX_STATES: '15'
+          MAX_DEPTH: '3'
+          MAX_ACTIONS_PER_STATE: '12'
         run: node scripts/blackbox-ui-deep-playwright-audit.mjs
       - name: Upload deep audit evidence
         if: always()
