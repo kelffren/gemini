@@ -41,7 +41,7 @@ test('Map Forge opens from Creator Hub before a stalled first generation settles
   await expect(page.locator('#kelo-map-forge .kmf-canvas')).toBeVisible();
   await expect(page.getByRole('button', { name: 'GENERANDO…' })).toBeVisible();
 
-  await page.getByRole('button', { name: 'CERRAR' }).click();
+  await page.getByRole('button', { name: 'CERRAR', exact: true }).click();
   await page.evaluate(() => {
     if(window.__KELO_TEST_REAL_WORKER__)window.Worker = window.__KELO_TEST_REAL_WORKER__;
     delete window.__KELO_TEST_REAL_WORKER__;
