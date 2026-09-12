@@ -1,18 +1,29 @@
-# Avatar Quick Import V2 — Auto-Detect
+# Avatar Quick Import V6 — Universal Sprite Ingestion
 
 ## Status
 - owner: `KeloCreatorAvatars` adapter over `KeloAvatar`
 - creator UI: `src/creators/ui/avatar-workspace.mjs`
 - ingest owner: `src/creators/avatar/avatar-quick-import-service.mjs`
-- analyzer/compiler: `src/creators/avatar/avatar-spritesheet-analyzer.mjs`
+- analyzer/compiler: `src/creators/avatar/kelo-universal-asset-compiler.mjs`
+- deterministic Sprite Compiler owners: `src/creators/sprite-compiler/`
 - persistence: Supabase `characters.active_avatar_content_id` + Universal Content Registry
 - playerVisible: false
-- status: creator-online-active-v2-autodetect
+- status: creator-online-active-v6-universal-ingestion
 
 ## Product contract
 The normal path is deliberately **upload → preview → use**. A creator should not need to know columns, rows, file paths, hashes, rigs, Supabase or revision IDs.
 
-V2 makes auto-detection the default authority for presentation preparation. Manual controls remain a fallback under `Ajustes avanzados` and open automatically only when detection confidence is low.
+V6 makes deterministic universal ingestion the default authority for presentation preparation. Manual controls remain a fallback under `Ajustes avanzados` and open automatically only when evidence is insufficient.
+
+## Universal Sprite Ingestion V6
+
+The pipeline is intentionally split by responsibility: foreground detection, layout interpretation, rig semantics, normalization, repair, Frame Doctor, validation, then the existing Quick Import persistence owner. It does not assume `width / columns` or a four-row sheet.
+
+`sprite-foreground-analysis.mjs` handles transparent, flat, haloed and imperfect backgrounds with edge-connected flood fill and connected components. `sprite-layout-interpreter.mjs` scores regular/adaptive grids, projections, horizontal/vertical strips, spatial clusters and free-positioned frames. `sprite-rig-interpreter.mjs` preserves 1D, 4D and 8D (including the common 2×4 static contact sheet). `sprite-frame-normalizer.mjs` centers and foot-aligns each frame without redrawing it. `sprite-ingestion-validator.mjs` produces the release gate and explains `REVIEW_REQUIRED` cases.
+
+The result exposes detection percentage, false/missed frames, clipping, height/scale variation, foot-anchor and center drift, occupancy, background residual/transparency, frame consistency, interpretation confidence and a comprehensible `finalHealth` score. Close hypotheses are retained for Advanced review; no low-confidence interpretation is silently accepted.
+
+The runtime manifest carries dynamic `directions` and `frameCounts`, and the existing `KeloAvatar` renderer remains the sole renderer. Diagonals are never collapsed into four directions.
 
 Spreadsheet import remains the batch/pro workflow; it is not required for one avatar.
 
@@ -99,7 +110,7 @@ Re-import remains hash/idempotency driven; no filename becomes content identity.
 - Source asset and runtime derivative remain separate concerns.
 
 ## Failure behavior
-V2 does not pretend every arbitrary image is perfectly segmentable.
+V6 does not pretend every arbitrary image is perfectly segmentable.
 
 If component segmentation is weak:
 - a conservative regular-grid fallback is proposed;
@@ -119,6 +130,9 @@ Complex photographic/non-uniform backgrounds can still require a transparent sou
 - verifies high-confidence component detection, 16/12 source rects, normalized runtime, direction inference, animated preview, edge-only background cleanup, preservation of interior white, and USE callback
 - `npm run audit:universal-content`
 - `npm run audit:docs`
+- `npm run audit:sprite-ingestion` — reproducible 27-case GOOD/IRREGULAR/EXTREME corpus derived from a real sheet.
+- `node scripts/sprite-ingestion-live-audit.mjs` — browser proof with animated BEFORE/AFTER and the real `KeloAvatar` runtime middleware; CI uploads screenshots as an artifact.
+- The corpus deliberately includes white/black/gray/colour backgrounds, halos, variable gutters, shifts, scale and foot drift, free positioning, strips, variable counts, overlap, empty frames and clipping. Extreme cases are expected to become `REVIEW_REQUIRED`, never silently “fixed”.
 
 ## Extension rule
-New detection heuristics extend this analyzer/compiler. Do not create `AvatarDetector2`, a second uploader, a second renderer, or per-format runtime owners.
+New detection heuristics extend the Sprite Compiler owners and their evidence contracts. Do not create `AvatarDetector2`, a second uploader, a second renderer, or per-format runtime owners.

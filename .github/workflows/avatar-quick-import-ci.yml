@@ -21,6 +21,10 @@ on:
       - 'supabase/migrations/*avatar*'
       - 'scripts/avatar-quick-import-audit.mjs'
       - 'scripts/avatar-quick-import-live-audit.mjs'
+      - 'scripts/sprite-ingestion-*.mjs'
+      - 'src/creators/sprite-compiler/**'
+      - 'tests/fixtures/**'
+      - 'sprite-ingestion-lab.html'
       - 'docs/systems/AVATAR_QUICK_IMPORT.md'
       - 'docs/system-catalog.json'
       - 'package.json'
@@ -46,6 +50,10 @@ on:
       - 'supabase/migrations/*avatar*'
       - 'scripts/avatar-quick-import-audit.mjs'
       - 'scripts/avatar-quick-import-live-audit.mjs'
+      - 'scripts/sprite-ingestion-*.mjs'
+      - 'src/creators/sprite-compiler/**'
+      - 'tests/fixtures/**'
+      - 'sprite-ingestion-lab.html'
       - 'docs/systems/AVATAR_QUICK_IMPORT.md'
       - 'docs/system-catalog.json'
       - 'package.json'
@@ -71,6 +79,11 @@ jobs:
           node --check src/creators/avatar/kelo-universal-asset-compiler.mjs
           node --check src/creators/avatar/avatar-quick-import-service.mjs
           node --check src/creators/ui/avatar-workspace.mjs
+          node --check src/creators/sprite-compiler/sprite-foreground-analysis.mjs
+          node --check src/creators/sprite-compiler/sprite-layout-interpreter.mjs
+          node --check src/creators/sprite-compiler/sprite-rig-interpreter.mjs
+          node --check src/creators/sprite-compiler/sprite-frame-normalizer.mjs
+          node --check src/creators/sprite-compiler/sprite-ingestion-validator.mjs
           node --check src/creators/workspaces/avatar-workspace.mjs
           node --check src/creators/creator-entry.mjs
           node --check src/creators/content/runtime-content-registry.mjs
@@ -78,8 +91,13 @@ jobs:
           node --check src/ui/studio-launcher.js
           node --check scripts/avatar-quick-import-audit.mjs
           node --check scripts/avatar-quick-import-live-audit.mjs
+          node --check scripts/sprite-ingestion-adversarial-lab.mjs
+          node --check scripts/sprite-ingestion-live-audit.mjs
+          node --check scripts/sprite-ingestion-core-audit.mjs
       - name: Avatar architecture
         run: npm run audit:avatar-quick
+      - name: Universal sprite ingestion adversarial corpus
+        run: npm run audit:sprite-ingestion
       - name: Universal content compatibility
         run: npm run audit:universal-content
       - name: Documentation contract
@@ -100,4 +118,11 @@ jobs:
             if curl -fsS http://127.0.0.1:4173/ >/dev/null; then break; fi
             sleep 1
           done
-          AUDIT_URL=http://127.0.0.1:4173/ CHROME_BIN=/usr/bin/google-chrome node scripts/avatar-quick-import-live-audit.mjs
+          AUDIT_URL=http://127.0.0.1:4173/ SPRITE_AUDIT_OUTPUT=artifacts/sprite-ingestion CHROME_BIN=/usr/bin/google-chrome node scripts/sprite-ingestion-live-audit.mjs
+      - name: Upload visual ingestion proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sprite-ingestion-before-after
+          path: artifacts/sprite-ingestion
+          if-no-files-found: warn

@@ -54,6 +54,7 @@ Expone base owner, revisión y middleware/prioridades para auditoría.
 - `engine-ab` y `character-appearance` usan middleware y no tocan el global.
 - Un middleware que llama `next()` más de una vez no provoca dobles draws: `next` es idempotente por invocación.
 - Avatar es presentación; no decide daño, economía ni autoridad online.
+- Los manifests de Universal Sprite Ingestion pueden declarar `directions` y `frameCounts` dinámicos para rigs 1D, 4D y 8D; `KeloAvatar` conserva esos datos y resuelve diagonales por octante.
 - El fallback de producción debe conservar `character-appearance → engine-ab → engine-w`.
 
 ## Estado

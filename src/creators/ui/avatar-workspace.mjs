@@ -1,44 +1,392 @@
 /* KELO-INDEX
  * area: CREATORS / AVATAR UI
  * owner: Avatar Quick Import presentation
- * keys: AVATAR UNIVERSAL-COMPILER PREVIEW MOBILE CONFIDENCE SELF-HEAL WALK FOOT-ANCHOR
- * owns: choose-file, animated canonical preview, directional walk test, compiler feedback, tiny correction surface and USE action
- * does-not-own: upload, persistence, renderer or auth rules
+ * keys: UNIVERSAL SPRITE INGESTION UPLOAD PROGRESS HYPOTHESIS METRICS FRAME DOCTOR 1D 4D 8D
+ * owns: zero-adjustment upload path, real animated runtime preview, explicit ambiguity choice and advanced review controls
+ * does-not-own: pixel detection, normalization, persistence, renderer or auth rules
  */
-import { analyzeUniversalAvatarAsset,compileUniversalAvatarRuntime } from '../avatar/kelo-universal-asset-compiler.mjs';
-let active=null;
-const css=`#kelo-avatar-quick{position:fixed;inset:0;z-index:2147482700;background:#08090c;color:#f7f3e9;font-family:Inter,system-ui,-apple-system,sans-serif;overflow:auto}.kaq-wrap{width:min(620px,100%);margin:auto;padding:14px 14px 48px}.kaq-head{display:flex;align-items:center;gap:10px;padding:7px 0 16px}.kaq-head b{letter-spacing:.08em}.kaq-x{margin-left:auto;border:1px solid #30333a;background:#15171c;color:#fff;border-radius:11px;padding:9px 12px;font-weight:900}.kaq-title{text-align:center;margin:18px 0}.kaq-title h1{font-size:clamp(30px,9vw,52px);margin:4px 0}.kaq-title p{color:#989ba3;line-height:1.45}.kaq-drop{display:grid;place-items:center;min-height:150px;border:1px dashed #5d626d;border-radius:22px;background:#101218;text-align:center;padding:24px;cursor:pointer}.kaq-drop strong{font-size:20px}.kaq-drop span{display:block;color:#979aa2;margin-top:6px}.kaq-drop input{position:absolute;opacity:0;width:1px;height:1px}.kaq-preview{margin:14px 0 8px;border:1px solid #282b32;background:linear-gradient(45deg,#17191e 25%,transparent 25%) 0 0/18px 18px,linear-gradient(45deg,transparent 75%,#17191e 75%) 0 0/18px 18px,linear-gradient(45deg,transparent 75%,#17191e 75%) 9px -9px/18px 18px,linear-gradient(45deg,#17191e 25%,#0d0f13 25%) 9px 9px/18px 18px;border-radius:22px;min-height:320px;display:grid;place-items:center;overflow:hidden}.kaq-preview canvas{width:min(84vw,360px);height:min(84vw,360px);display:block}.kaq-playrow{display:flex;align-items:center;justify-content:center;gap:8px;margin:8px 0 4px}.kaq-play{border:1px solid #3b414b;background:#12151b;color:#f5f5f5;border-radius:999px;padding:8px 12px;font-size:11px;font-weight:900;letter-spacing:.03em}.kaq-play.on{border-color:#8e7739;color:#e7c978;background:#211d13}.kaq-walkhint{color:#8f949e;font-size:11px;font-weight:750}.kaq-detect{display:flex;flex-wrap:wrap;gap:6px;margin:9px 0}.kaq-chip{border:1px solid #30343d;border-radius:999px;background:#11141a;color:#c6c9d0;padding:6px 9px;font-size:11px;font-weight:850}.kaq-chip.good{border-color:#28553b;color:#8ce0ad}.kaq-status{border-radius:14px;padding:12px 14px;background:#11141a;border:1px solid #252932;color:#aeb1b8;font-size:13px;line-height:1.35}.kaq-ok{color:#87dda8}.kaq-warn{color:#efcf7b}.kaq-use{width:100%;border:0;border-radius:16px;background:#d1ae58;color:#111;padding:16px;font-size:17px;font-weight:950;margin-top:12px}.kaq-use:disabled{opacity:.38}.kaq-advanced{margin-top:12px;border:1px solid #262a31;border-radius:15px;background:#101218;padding:12px}.kaq-advanced summary{font-weight:850;cursor:pointer}.kaq-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}.kaq-grid label{font-size:11px;color:#9da0a7}.kaq-grid input{width:100%;box-sizing:border-box;margin-top:5px;border:1px solid #373b44;border-radius:10px;background:#090b0f;color:#fff;padding:10px}.kaq-check{display:flex;gap:8px;align-items:center;margin-top:12px;color:#c9cbd0;font-size:13px}.kaq-directions{display:flex;justify-content:center;gap:7px;margin:7px 0 10px}.kaq-directions button{width:48px;height:44px;border-radius:11px;border:1px solid #333741;background:#12151b;color:#fff;font-size:20px;touch-action:none;-webkit-touch-callout:none}.kaq-directions button.on{border-color:#c8a755;color:#e7c978;background:#211d13}.kaq-directions button.hold{transform:scale(.96);box-shadow:0 0 0 2px rgba(200,167,85,.16) inset}@media(max-width:480px){.kaq-walkhint{font-size:10px}.kaq-preview{min-height:300px}}`;
-function node(doc,tag,props={},kids=[]){const n=doc.createElement(tag);for(const[k,v]of Object.entries(props)){if(k==='class')n.className=v;else if(k==='text')n.textContent=v;else if(k==='html')n.innerHTML=v;else n[k]=v;}for(const x of [].concat(kids||[]))if(x)n.append(x);return n;}
-const pct=n=>`${Math.round(Math.max(0,Math.min(1,Number(n)||0))*100)}%`;
-export async function openAvatarQuickImport({root=globalThis,avatarQuick}={}){
-  if(active)return active;if(!root.document||!avatarQuick)throw new Error('AVATAR_QUICK_UI_SERVICES_REQUIRED');const doc=root.document,style=node(doc,'style',{textContent:css}),shell=node(doc,'section',{id:'kelo-avatar-quick'}),wrap=node(doc,'div',{class:'kaq-wrap'}),head=node(doc,'div',{class:'kaq-head'}),brand=node(doc,'b',{text:'KELO AVATAR'}),close=node(doc,'button',{class:'kaq-x',text:'CLOSE'});head.append(brand,close);wrap.append(head,node(doc,'div',{class:'kaq-title'},[node(doc,'div',{text:'UNIVERSAL COMPILER V5'}),node(doc,'h1',{text:'Sube. Detecta. Repara. Usa.'}),node(doc,'p',{text:'El motor prueba varias interpretaciones, repara el archivo, valida la animación y ahora te deja probar la caminata antes de activarlo.'})]));
-  const drop=node(doc,'label',{class:'kaq-drop'},[node(doc,'div',{},[node(doc,'strong',{text:'+ SUBIR AVATAR'}),node(doc,'span',{text:'PNG / WebP / JPEG · Fotos / Files / iCloud / Drive'})])]),input=node(doc,'input',{type:'file',accept:'image/png,image/webp,image/jpeg'});drop.append(input);const preview=node(doc,'div',{class:'kaq-preview'}),canvas=node(doc,'canvas');canvas.width=420;canvas.height=420;preview.append(canvas);const playRow=node(doc,'div',{class:'kaq-playrow'}),play=node(doc,'button',{class:'kaq-play on',text:'⏸ CAMINATA · 8 FPS'}),walkHint=node(doc,'span',{class:'kaq-walkhint',text:'Mantén una flecha para mover'});playRow.append(play,walkHint);const dirs=node(doc,'div',{class:'kaq-directions'}),detect=node(doc,'div',{class:'kaq-detect'}),status=node(doc,'div',{class:'kaq-status',text:'Elige una imagen. El compilador hace el resto.'}),use=node(doc,'button',{class:'kaq-use',text:'USAR COMO AVATAR',disabled:true}),details=node(doc,'details',{class:'kaq-advanced'}),summary=node(doc,'summary',{text:'Ajustes avanzados · solo si algo se ve mal'}),grid=node(doc,'div',{class:'kaq-grid'}),cols=node(doc,'input',{type:'number',min:1,max:12,value:4}),rows=node(doc,'input',{type:'number',min:1,max:12,value:4}),down=node(doc,'input',{type:'number',min:0,max:11,value:0}),left=node(doc,'input',{type:'number',min:0,max:11,value:1}),right=node(doc,'input',{type:'number',min:0,max:11,value:2}),up=node(doc,'input',{type:'number',min:0,max:11,value:3}),remove=node(doc,'input',{type:'checkbox'});
-  for(const [label,el] of [['COLUMNAS',cols],['FILAS',rows],['FRENTE · FILA',down],['IZQUIERDA · FILA',left],['DERECHA · FILA',right],['ESPALDA · FILA',up]])grid.append(node(doc,'label',{text:label},[el]));details.append(summary,grid,node(doc,'label',{class:'kaq-check'},[remove,node(doc,'span',{text:'Quitar fondo automáticamente'})]));wrap.append(drop,preview,playRow,dirs,detect,status,use,details);shell.append(wrap);doc.head.append(style);doc.body.append(shell);
-  let file=null,analysis=null,previewCompiled=null,previewUrl=null,img=null,raf=0,direction='down',busy=false;
-  const faceIcons={down:'↓',left:'←',up:'↑',right:'→'},vectors={down:[0,1],left:[-1,0],up:[0,-1],right:[1,0]};
-  const motion={playing:true,moving:false,frame:0,fps:8,feetX:canvas.width/2,feetY:canvas.height*.84,lastTick:0,frameClock:0,pressTimer:0,pointerId:null,pressedButton:null,speed:72};
-  function paintButtons(){dirs.querySelectorAll('button').forEach(b=>{b.classList.toggle('on',b.dataset.face===direction);b.classList.toggle('hold',b===motion.pressedButton&&motion.moving);});}
-  function stopPress(){if(motion.pressTimer){root.clearTimeout(motion.pressTimer);motion.pressTimer=0;}motion.moving=false;motion.pointerId=null;motion.pressedButton=null;paintButtons();}
-  function chooseDirection(face){direction=face;motion.frame=0;motion.frameClock=0;paintButtons();}
-  for(const face of ['left','down','up','right']){
-    const b=node(doc,'button',{text:faceIcons[face]});b.dataset.face=face;
-    b.onpointerdown=e=>{e.preventDefault();stopPress();chooseDirection(face);motion.pointerId=e.pointerId;motion.pressedButton=b;try{b.setPointerCapture?.(e.pointerId);}catch{}motion.pressTimer=root.setTimeout(()=>{motion.pressTimer=0;motion.moving=true;paintButtons();},130);};
-    const finish=e=>{if(motion.pointerId!==null&&e?.pointerId!==undefined&&e.pointerId!==motion.pointerId)return;stopPress();};
-    b.onpointerup=finish;b.onpointercancel=finish;b.onlostpointercapture=finish;
-    dirs.append(b);
+import {analyzeUniversalAvatarAsset,compileUniversalAvatarRuntime} from '../avatar/kelo-universal-asset-compiler.mjs';
+
+let active = null;
+const css = `
+#kelo-avatar-quick{position:fixed;inset:0;z-index:2147482700;background:#08090c;color:#f7f3e9;font-family:Inter,system-ui,-apple-system,sans-serif;overflow:auto}
+.kaq-wrap{width:min(760px,100%);margin:auto;padding:14px 14px 54px;box-sizing:border-box}.kaq-head{display:flex;align-items:center;gap:10px;padding:7px 0 15px}.kaq-head b{letter-spacing:.08em}.kaq-x{margin-left:auto;border:1px solid #30333a;background:#15171c;color:#fff;border-radius:11px;padding:9px 12px;font-weight:900}
+.kaq-title{text-align:center;margin:16px 0}.kaq-title small{color:#d1ae58;font-weight:900;letter-spacing:.12em}.kaq-title h1{font-size:clamp(28px,8vw,50px);margin:5px 0}.kaq-title p{color:#989ba3;line-height:1.45;margin:8px auto;max-width:620px}
+.kaq-drop{display:grid;place-items:center;min-height:138px;border:1px dashed #5d626d;border-radius:22px;background:#101218;text-align:center;padding:22px;cursor:pointer}.kaq-drop.drag{border-color:#d1ae58;background:#17150f}.kaq-drop strong{font-size:20px}.kaq-drop span{display:block;color:#979aa2;margin-top:6px}.kaq-drop input{position:absolute;opacity:0;width:1px;height:1px}
+.kaq-stage{margin:12px 0;border:1px solid #252932;border-radius:13px;background:#11141a;padding:11px 13px;color:#b9bcc3;font-size:13px;letter-spacing:.035em}.kaq-stage.good{color:#8ce0ad;border-color:#28553b}.kaq-stage.warn{color:#efcf7b;border-color:#66552a}.kaq-stage.bad{color:#ff9696;border-color:#713838}
+.kaq-preview{margin:12px 0 8px;border:1px solid #282b32;background:linear-gradient(45deg,#17191e 25%,transparent 25%) 0 0/18px 18px,linear-gradient(45deg,transparent 75%,#17191e 75%) 0 0/18px 18px,linear-gradient(45deg,transparent 75%,#17191e 75%) 9px -9px/18px 18px,linear-gradient(45deg,#17191e 25%,#0d0f13 25%) 9px 9px/18px 18px;border-radius:22px;min-height:330px;display:grid;place-items:center;overflow:hidden}.kaq-preview canvas{width:min(88vw,440px);height:min(72vw,360px);display:block}
+.kaq-controls{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:7px;margin:8px 0}.kaq-controls button,.kaq-direction{border:1px solid #3b414b;background:#12151b;color:#f5f5f5;border-radius:999px;padding:8px 12px;font-size:11px;font-weight:900}.kaq-controls button.on,.kaq-direction.on{border-color:#8e7739;color:#e7c978;background:#211d13}.kaq-directions{display:flex;justify-content:center;flex-wrap:wrap;gap:7px;margin:7px 0 12px}.kaq-direction{min-width:48px;font-size:15px}
+.kaq-metrics{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;margin:10px 0}.kaq-metric{border:1px solid #2b2f37;border-radius:13px;background:#101218;padding:9px;text-align:center}.kaq-metric b{display:block;color:#8ce0ad;font-size:17px}.kaq-metric span{display:block;color:#90949c;font-size:9px;font-weight:850;margin-top:3px;letter-spacing:.04em}.kaq-metric.warn b{color:#efcf7b}
+.kaq-chips{display:flex;flex-wrap:wrap;gap:6px;margin:9px 0}.kaq-chip{border:1px solid #30343d;border-radius:999px;background:#11141a;color:#c6c9d0;padding:6px 9px;font-size:10px;font-weight:850}.kaq-chip.good{border-color:#28553b;color:#8ce0ad}.kaq-chip.warn{border-color:#66552a;color:#efcf7b}
+.kaq-hypotheses{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;margin:10px 0}.kaq-hypothesis{border:1px solid #30343d;border-radius:13px;background:#101218;color:#d7d9dd;padding:10px;text-align:left}.kaq-hypothesis b,.kaq-hypothesis span{display:block}.kaq-hypothesis span{font-size:10px;color:#92969e;margin-top:4px}.kaq-hypothesis.on{border-color:#d1ae58;background:#1c1911}
+.kaq-doctor{border:1px solid #282c33;background:#101218;border-radius:15px;padding:12px;margin:10px 0}.kaq-doctor h3{font-size:13px;margin:0 0 8px}.kaq-frame{border-top:1px solid #252932;padding:8px 0;font-size:11px;color:#c5c8ce}.kaq-frame b{color:#efcf7b}.kaq-frame.art b{color:#ff9696}
+.kaq-use{width:100%;border:0;border-radius:16px;background:#d1ae58;color:#111;padding:16px;font-size:17px;font-weight:950;margin-top:12px}.kaq-use:disabled{opacity:.38}.kaq-advanced{margin-top:12px;border:1px solid #262a31;border-radius:15px;background:#101218;padding:12px}.kaq-advanced summary{font-weight:850;cursor:pointer}.kaq-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}.kaq-grid label{font-size:10px;color:#9da0a7}.kaq-grid input,.kaq-grid select{width:100%;box-sizing:border-box;margin-top:5px;border:1px solid #373b44;border-radius:10px;background:#090b0f;color:#fff;padding:10px}.kaq-check{display:flex;gap:8px;align-items:flex-start;margin-top:12px;color:#c9cbd0;font-size:12px;line-height:1.35}.kaq-note{color:#858991;font-size:10px;line-height:1.4;margin-top:9px}
+@media(max-width:600px){.kaq-metrics{grid-template-columns:repeat(2,1fr)}.kaq-preview{min-height:300px}.kaq-grid{grid-template-columns:1fr}.kaq-wrap{padding-inline:10px}}
+`;
+
+function node(document, tag, props = {}, children = []) {
+  const element = document.createElement(tag);
+  for (const [key, value] of Object.entries(props)) {
+    if (key === 'class') element.className = value;
+    else if (key === 'text') element.textContent = value;
+    else element[key] = value;
   }
-  paintButtons();
-  play.onclick=()=>{motion.playing=!motion.playing;motion.frame=0;motion.frameClock=0;play.classList.toggle('on',motion.playing);play.textContent=motion.playing?'⏸ CAMINATA · 8 FPS':'▶ CAMINATA · 8 FPS';};
-  function resetMotion(){stopPress();motion.frame=0;motion.frameClock=0;motion.feetX=canvas.width/2;motion.feetY=canvas.height*.84;motion.lastTick=0;}
-  function autoGridStillActive(c,r){return !!analysis&&c===analysis.columns&&r===analysis.rows;}
-  function config(){const c=Math.max(1,Number(cols.value)||1),r=Math.max(1,Number(rows.value)||1),base=analysis||{},auto=autoGridStillActive(c,r),rowMap={down:Math.max(0,Math.min(r-1,Number(down.value)||0)),left:Math.max(0,Math.min(r-1,Number(left.value)||0)),right:Math.max(0,Math.min(r-1,Number(right.value)||0)),up:Math.max(0,Math.min(r-1,Number(up.value)||0))};return{...base,columns:c,rows:r,rowMap,sourceRects:auto?base.sourceRects:null,detectionMode:auto?base.detectionMode:'manual',universalAuto:auto,confidenceScore:auto?base.confidenceScore:.5,removeBackground:remove.checked,frameMs:140};}
-  function drawFrame(c){const ctx=canvas.getContext('2d');ctx.clearRect(0,0,canvas.width,canvas.height);if(!img?.complete||!img.naturalWidth||!c)return;const columns=Math.max(1,Number(c.columns)||1),rowsCount=Math.max(1,Number(c.rows)||4),fw=img.naturalWidth/columns,fh=img.naturalHeight/rowsCount,row=Math.max(0,Math.min(rowsCount-1,c.rowMap?.[direction]??0)),frame=Math.max(0,Math.min(columns-1,motion.frame%columns)),scale=Math.min(310/fw,290/fh),w=fw*scale,h=fh*scale,pad=10;motion.feetX=Math.max(w/2+pad,Math.min(canvas.width-w/2-pad,motion.feetX));motion.feetY=Math.max(h+pad,Math.min(canvas.height-pad,motion.feetY));ctx.drawImage(img,frame*fw,row*fh,fw,fh,motion.feetX-w/2,motion.feetY-h,w,h);}
-  function tick(now){const current=Number(now)||Date.now(),dt=motion.lastTick?Math.min(.05,Math.max(0,(current-motion.lastTick)/1000)):0;motion.lastTick=current;const c=previewCompiled;if(c&&img?.complete){const frameCount=Math.max(1,Number(c.columns)||1);if(motion.playing||motion.moving){motion.frameClock+=dt*1000;const frameMs=1000/motion.fps;if(motion.frameClock>=frameMs){const steps=Math.floor(motion.frameClock/frameMs);motion.frame=(motion.frame+steps)%frameCount;motion.frameClock-=steps*frameMs;}}else{motion.frame=0;motion.frameClock=0;}if(motion.moving){const [vx,vy]=vectors[direction]||[0,0];motion.feetX+=vx*motion.speed*dt;motion.feetY+=vy*motion.speed*dt;}drawFrame(c);}else{const ctx=canvas.getContext('2d');ctx.clearRect(0,0,canvas.width,canvas.height);}raf=root.requestAnimationFrame(tick);}
-  function paintDetection(compiled=null){detect.replaceChildren();if(!analysis)return;const confidence=compiled?.confidenceScore??analysis.confidenceScore,rowsData=[[`${analysis.columns}×${analysis.rows} FUENTE`,true],[`AUTO ${pct(confidence)}`,confidence>=.82],[`V5 ${String(compiled?.strategy||analysis.strategy||'AUTO').toUpperCase()}`,true],[analysis.autoCrop?'AUTO-CROP':'GRID',analysis.autoCrop],[analysis.backgroundKind==='transparent'?'TRANSPARENTE':(analysis.removeBackground?'FONDO AUTO':'FONDO CONSERVADO'),true]];if(compiled?.canonicalRig)rowsData.push(['RIG KELO 4D',true]);if(compiled?.selfHealed)rowsData.push(['AUTO-REPARADO',true]);if(compiled?.validation)rowsData.push([`SALUD ${pct(compiled.validation.health)}`,compiled.validation.health>=.82]);for(const[text,good]of rowsData)detect.append(node(doc,'span',{class:`kaq-chip ${good?'good':''}`,text}));}
-  async function refreshPreview(){if(!file||!analysis)return;status.className='kaq-status';status.textContent='Compilando y probando interpretaciones…';use.disabled=true;try{const compiled=await compileUniversalAvatarRuntime(file,config(),{root,onProgress:e=>{if(e?.message)status.textContent=e.message;}});previewCompiled=compiled;if(previewUrl)root.URL.revokeObjectURL(previewUrl);previewUrl=root.URL.createObjectURL(compiled.blob);img=new Image();await new Promise((res,rej)=>{img.onload=res;img.onerror=rej;img.src=previewUrl;});resetMotion();paintDetection(compiled);const health=Number(compiled.validation?.health)||0,uncertain=(compiled.confidenceScore<.70||health<.72)&&autoGridStillActive(Number(cols.value),Number(rows.value));status.className=`kaq-status ${uncertain?'kaq-warn':'kaq-ok'}`;status.textContent=uncertain?`Preview generado · confianza ${pct(compiled.confidenceScore)} · salud ${pct(health)}. El archivo es ambiguo; revisa el preview.`:`✓ Reparado y adaptado · ${compiled.columns} frames × 4 direcciones · ${pct(compiled.confidenceScore)} confianza · caminata lista`;details.open=!!uncertain;use.disabled=false;}catch(error){previewCompiled=null;status.className='kaq-status';status.textContent=String(error?.message||error);}}
-  input.onchange=async()=>{file=input.files?.[0]||null;if(!file)return;use.disabled=true;previewCompiled=null;resetMotion();detect.replaceChildren();status.className='kaq-status';status.textContent='Detectando formato, fondo, frames y direcciones…';try{analysis=await analyzeUniversalAvatarAsset(file,{root});cols.value=analysis.columns;rows.value=analysis.rows;down.value=analysis.rowMap.down;left.value=analysis.rowMap.left;right.value=analysis.rowMap.right;up.value=analysis.rowMap.up;remove.checked=analysis.removeBackground;paintDetection();await refreshPreview();}catch(error){status.textContent=String(error?.message||error);}};
-  for(const el of [cols,rows,down,left,right,up,remove])el.onchange=()=>void refreshPreview();
-  use.onclick=async()=>{if(!file||!analysis||busy)return;busy=true;use.disabled=true;use.textContent='ACTIVANDO…';try{const out=await avatarQuick.importAndUse(file,config(),{displayName:file.name.replace(/\.[^.]+$/,''),onProgress:e=>{status.textContent=e.message||e.stage;}});status.className='kaq-status kaq-ok';status.textContent=`✓ ${out.manifest.displayName} compilado y activo ahora mismo`;use.textContent='AVATAR ACTIVO ✓';}catch(error){status.className='kaq-status';status.textContent=String(error?.message||error);use.textContent='REINTENTAR';use.disabled=false;}finally{busy=false;}};
-  try{await avatarQuick.hydrateActive();}catch{}
-  function destroy(){if(active?.shell!==shell)return;active=null;stopPress();root.cancelAnimationFrame(raf);if(previewUrl)root.URL.revokeObjectURL(previewUrl);shell.remove();style.remove();}close.onclick=destroy;raf=root.requestAnimationFrame(tick);active=Object.freeze({version:'kelo-avatar-quick-ui-v5.1.0-walk-preview',shell,close:destroy});return active;
+  for (const child of [].concat(children || [])) if (child) element.append(child);
+  return element;
+}
+
+const pct = value => `${Math.round(Math.max(0, Math.min(1, Number(value) || 0)) * 100)}%`;
+const directionLabels = {n:'N ↑',ne:'NE ↗',e:'E →',se:'SE ↘',s:'S ↓',sw:'SW ↙',w:'W ←',nw:'NW ↖'};
+
+export async function openAvatarQuickImport({root = globalThis, avatarQuick} = {}) {
+  if (active) return active;
+  if (!root.document || !avatarQuick) throw new Error('AVATAR_QUICK_UI_SERVICES_REQUIRED');
+  const document = root.document;
+  const style = node(document, 'style', {textContent: css});
+  const shell = node(document, 'section', {id: 'kelo-avatar-quick'});
+  const wrap = node(document, 'div', {class: 'kaq-wrap'});
+  const close = node(document, 'button', {class: 'kaq-x', text: 'CLOSE'});
+  wrap.append(
+    node(document, 'div', {class: 'kaq-head'}, [node(document, 'b', {text: 'KELO AVATAR'}), close]),
+    node(document, 'div', {class: 'kaq-title'}, [
+      node(document, 'small', {text: 'UNIVERSAL SPRITE INGESTION V6'}),
+      node(document, 'h1', {text: 'Sube. Kelo lo resuelve.'}),
+      node(document, 'p', {text: 'Detecta objetos reales, compara varias estructuras, limpia, normaliza y valida el atlas que usará el juego. No necesitas conocer filas, padding ni coordenadas.'})
+    ])
+  );
+  const input = node(document, 'input', {type: 'file', accept: 'image/png,image/webp,image/jpeg'});
+  const drop = node(document, 'label', {class: 'kaq-drop'}, [node(document, 'div', {}, [node(document, 'strong', {text: '+ SUBIR SPRITE'}), node(document, 'span', {text: 'PNG / WebP / JPEG · grid o sheet irregular'})]), input]);
+  const stage = node(document, 'div', {class: 'kaq-stage', text: 'Elige una imagen. Kelo hace el resto.'});
+  const preview = node(document, 'div', {class: 'kaq-preview'});
+  const canvas = node(document, 'canvas');
+  canvas.width = 440;
+  canvas.height = 360;
+  preview.append(canvas);
+  const controls = node(document, 'div', {class: 'kaq-controls'});
+  const play = node(document, 'button', {class: 'on', text: '⏸ ANIMACIÓN REAL'});
+  const reset = node(document, 'button', {text: 'CENTRAR'});
+  controls.append(play, reset);
+  const directions = node(document, 'div', {class: 'kaq-directions'});
+  const chips = node(document, 'div', {class: 'kaq-chips'});
+  const metrics = node(document, 'div', {class: 'kaq-metrics'});
+  const hypotheses = node(document, 'div', {class: 'kaq-hypotheses'});
+  const doctor = node(document, 'div', {class: 'kaq-doctor'});
+  const use = node(document, 'button', {class: 'kaq-use', text: 'USAR COMO AVATAR', disabled: true});
+  const advanced = node(document, 'details', {class: 'kaq-advanced'});
+  const manual = node(document, 'input', {type: 'checkbox'});
+  const columns = node(document, 'input', {type: 'number', min: 1, max: 16, value: 4});
+  const rows = node(document, 'input', {type: 'number', min: 1, max: 12, value: 4});
+  const rig = node(document, 'select');
+  for (const [value, text] of [['','AUTO'],['1','1 DIRECCIÓN'],['4','4 DIRECCIONES'],['8','8 DIRECCIONES']]) rig.append(node(document, 'option', {value, text}));
+  const order = node(document, 'input', {type: 'text', placeholder: 's,se,e,ne,n,nw,w,sw'});
+  const confirm = node(document, 'input', {type: 'checkbox'});
+  const advancedGrid = node(document, 'div', {class: 'kaq-grid'});
+  advancedGrid.append(
+    node(document, 'label', {text: 'COLUMNAS MANUALES'}, [columns]),
+    node(document, 'label', {text: 'FILAS MANUALES'}, [rows]),
+    node(document, 'label', {text: 'RIG'}, [rig]),
+    node(document, 'label', {text: 'ORDEN DE DIRECCIONES'}, [order])
+  );
+  advanced.append(
+    node(document, 'summary', {text: 'AJUSTES AVANZADOS · solo si Kelo pide revisión'}),
+    node(document, 'label', {class: 'kaq-check'}, [manual, node(document, 'span', {text: 'Usar grid manual en vez de la detección visual'})]),
+    advancedGrid,
+    node(document, 'label', {class: 'kaq-check'}, [confirm, node(document, 'span', {text: 'He revisado la animación y confirmo esta interpretación'})]),
+    node(document, 'p', {class: 'kaq-note', text: 'Los defectos de arte o clipping irreversible nunca se ocultan: Kelo señala el frame exacto que necesita regeneración.'})
+  );
+  wrap.append(drop, stage, preview, controls, directions, chips, metrics, hypotheses, doctor, use, advanced);
+  shell.append(wrap);
+  document.head.append(style);
+  document.body.append(shell);
+
+  let file = null;
+  let analysis = null;
+  let compiled = null;
+  let image = null;
+  let imageUrl = null;
+  let selectedLayoutSignature = null;
+  let selectedDirection = 's';
+  let busy = false;
+  let raf = 0;
+  const motion = {playing: true, frame: 0, clock: 0, last: 0};
+
+  function setStage(text, kind = '') {
+    stage.textContent = text;
+    stage.className = `kaq-stage ${kind}`.trim();
+  }
+
+  function config() {
+    const directionOrder = order.value.split(',').map(value => value.trim()).filter(Boolean);
+    const choseAlternative = !!selectedLayoutSignature && selectedLayoutSignature !== analysis?._layoutReport?.best?.signature;
+    return {
+      ...(analysis || {}),
+      universalAuto: !manual.checked,
+      detectionMode: manual.checked ? 'manual' : analysis?.detectionMode,
+      columns: Math.max(1, Number(columns.value) || 1),
+      rows: Math.max(1, Number(rows.value) || 1),
+      selectedLayoutSignature,
+      rigHint: rig.value ? Number(rig.value) : null,
+      sourceDirectionOrder: directionOrder.length ? directionOrder : null,
+      userConfirmedInterpretation: confirm.checked || choseAlternative,
+      frameMs: 140
+    };
+  }
+
+  function resetMotion() {
+    motion.frame = 0;
+    motion.clock = 0;
+    motion.last = 0;
+  }
+
+  function paintDirections() {
+    directions.replaceChildren();
+    const keys = compiled?.directionKeys || analysis?.directionKeys || ['s'];
+    if (!keys.includes(selectedDirection)) selectedDirection = keys[0] || 's';
+    for (const key of keys) {
+      const button = node(document, 'button', {class: `kaq-direction ${key === selectedDirection ? 'on' : ''}`, text: directionLabels[key] || key.toUpperCase()});
+      button.onclick = () => {
+        selectedDirection = key;
+        motion.frame = 0;
+        paintDirections();
+      };
+      directions.append(button);
+    }
+  }
+
+  function metric(label, value, good = .88) {
+    return node(document, 'div', {class: `kaq-metric ${Number(value) < good ? 'warn' : ''}`}, [
+      node(document, 'b', {text: pct(value)}),
+      node(document, 'span', {text: label})
+    ]);
+  }
+
+  function paintMetrics() {
+    metrics.replaceChildren();
+    const scores = compiled?.validation?.scores;
+    if (!scores) return;
+    metrics.append(
+      metric('DETECTION', scores.detection),
+      metric('ALIGNMENT', scores.alignment),
+      metric('BACKGROUND', scores.background),
+      metric('FRAME CONSISTENCY', scores.frameConsistency),
+      metric('FINAL HEALTH', scores.finalHealth, .84)
+    );
+  }
+
+  function paintChips() {
+    chips.replaceChildren();
+    if (!analysis) return;
+    const values = [
+      [`${analysis.detectedFrames} FRAMES`, true],
+      [String(compiled?.strategy || analysis.strategy || '').toUpperCase(), true],
+      [`RIG ${compiled?.directions || analysis.directions}D`, true],
+      [`CONFIANZA ${pct(compiled?.confidenceScore ?? analysis.confidenceScore)}`, (compiled?.confidenceScore ?? analysis.confidenceScore) >= .78],
+      [analysis.backgroundKind === 'transparent' ? 'TRANSPARENTE' : 'FONDO LIMPIADO', true]
+    ];
+    if (compiled?.selfHealed) values.push(['AUTO-REPARADO', true]);
+    if (compiled) values.push([compiled.status, !compiled.reviewRequired]);
+    for (const [text, good] of values) chips.append(node(document, 'span', {class: `kaq-chip ${good ? 'good' : 'warn'}`, text}));
+  }
+
+  function paintHypotheses() {
+    hypotheses.replaceChildren();
+    if (!analysis?.hypotheses?.length) return;
+    const close = analysis.hypotheses.filter((candidate, index) => index < 3 && (index === 0 || analysis.hypotheses[0].score - candidate.score <= .09));
+    if (close.length < 2 && !analysis.reviewRequired) return;
+    for (const candidate of close) {
+      const selected = (selectedLayoutSignature || analysis.hypotheses[0].signature) === candidate.signature;
+      const button = node(document, 'button', {class: `kaq-hypothesis ${selected ? 'on' : ''}`}, [
+        node(document, 'b', {text: `${candidate.mode} · ${candidate.frames} frames`}),
+        node(document, 'span', {text: `${candidate.rows} grupos · ${candidate.frameCounts.join('/')} · ${pct(candidate.score)}`})
+      ]);
+      button.onclick = () => {
+        selectedLayoutSignature = candidate.signature;
+        paintHypotheses();
+        void refreshPreview();
+      };
+      hypotheses.append(button);
+    }
+  }
+
+  function paintDoctor() {
+    doctor.replaceChildren();
+    const report = compiled?.frameDoctor;
+    if (!report) {
+      doctor.hidden = true;
+      return;
+    }
+    doctor.hidden = false;
+    doctor.append(node(document, 'h3', {text: `${report.healthyCount} frames correctos · ${report.defectiveCount} sospechosos`}));
+    if (!report.defective.length) doctor.append(node(document, 'div', {class: 'kaq-frame', text: 'Frame Doctor: ningún salto, clipping ni drift detectado.'}));
+    for (const frame of report.defective.slice(0, 8)) {
+      const frameDetails = [
+        frame.verticalScaleDelta ? `vertical scale ${frame.verticalScaleDelta > 0 ? '+' : ''}${Math.round(frame.verticalScaleDelta * 100)}%` : null,
+        frame.feetOffsetPx ? `feet offset ${Math.round(frame.feetOffsetPx)} px` : null,
+        ...frame.reasons
+      ].filter(Boolean).join(' · ');
+      doctor.append(node(document, 'div', {class: `kaq-frame ${frame.reasons.includes('clipped') ? 'art' : ''}`}, [
+        node(document, 'b', {text: `${frame.direction} / WALK / FRAME ${frame.phase}`}),
+        node(document, 'div', {text: frameDetails})
+      ]));
+    }
+    for (const defect of compiled.validation?.artDefects || []) doctor.append(node(document, 'div', {class: 'kaq-frame art'}, [
+      node(document, 'b', {text: `${defect.direction} / FRAME ${defect.column + 1}`}),
+      node(document, 'div', {text: 'ART DEFECT — REGENERATION REQUIRED'})
+    ]));
+  }
+
+  function drawFrame() {
+    const context = canvas.getContext('2d');
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    if (!compiled || !image?.complete || !image.naturalWidth) return;
+    const row = Math.max(0, Math.min(compiled.rows - 1, Number(compiled.rowMap?.[selectedDirection] ?? 0)));
+    const count = compiled.frameCounts?.[row] || compiled.columns;
+    const frame = motion.frame % Math.max(1, count);
+    const sourceWidth = image.naturalWidth / compiled.columns;
+    const sourceHeight = image.naturalHeight / compiled.rows;
+    const scale = Math.min(270 / sourceWidth, 270 / sourceHeight);
+    const width = sourceWidth * scale;
+    const height = sourceHeight * scale;
+    context.drawImage(image, frame * sourceWidth, row * sourceHeight, sourceWidth, sourceHeight, (canvas.width - width) / 2, canvas.height * .84 - height, width, height);
+  }
+
+  function tick(now) {
+    const current = Number(now) || Date.now();
+    const delta = motion.last ? Math.min(50, current - motion.last) : 0;
+    motion.last = current;
+    if (compiled && motion.playing) {
+      motion.clock += delta;
+      const frameMs = Number(compiled.frameMs) || 140;
+      if (motion.clock >= frameMs) {
+        motion.frame += Math.floor(motion.clock / frameMs);
+        motion.clock %= frameMs;
+      }
+    }
+    drawFrame();
+    raf = root.requestAnimationFrame(tick);
+  }
+
+  function exposeTestState() {
+    root.__KELO_AVATAR_COMPILER_TEST__ = {
+      ready: !!compiled,
+      analysis: analysis ? {frames: analysis.detectedFrames, hypotheses: analysis.hypotheses, directions: analysis.directions, reviewRequired: analysis.reviewRequired} : null,
+      compiled: compiled ? {columns: compiled.columns, rows: compiled.rows, frameCounts: compiled.frameCounts, directionKeys: compiled.directionKeys, status: compiled.status, scores: compiled.validation?.scores, doctor: {healthy: compiled.frameDoctor?.healthyCount, suspicious: compiled.frameDoctor?.defectiveCount}} : null
+    };
+  }
+
+  async function refreshPreview() {
+    if (!file || !analysis) return;
+    use.disabled = true;
+    setStage('NORMALIZANDO…');
+    try {
+      compiled = await compileUniversalAvatarRuntime(file, config(), {root, onProgress: event => event?.message && setStage(event.message)});
+      if (imageUrl) root.URL.revokeObjectURL(imageUrl);
+      imageUrl = root.URL.createObjectURL(compiled.blob);
+      image = new root.Image();
+      await new Promise((resolve, reject) => {
+        image.onload = resolve;
+        image.onerror = reject;
+        image.src = imageUrl;
+      });
+      resetMotion();
+      paintDirections();
+      paintMetrics();
+      paintChips();
+      paintHypotheses();
+      paintDoctor();
+      const artDefect = !!compiled.validation?.artDefects?.length;
+      const acceptedReview = confirm.checked || config().userConfirmedInterpretation;
+      use.disabled = artDefect || (compiled.reviewRequired && !acceptedReview);
+      if (artDefect) setStage('ART DEFECT — REGENERATION REQUIRED · revisa el Frame Doctor', 'bad');
+      else if (compiled.reviewRequired && !acceptedReview) {
+        setStage(`REVIEW REQUIRED · ${compiled.reviewReasons.join(' · ')}`, 'warn');
+        advanced.open = true;
+      } else setStage(`VALIDADO · asset runtime ${compiled.columns}×${compiled.rows} · salud ${pct(compiled.validation.scores.finalHealth)}`, 'good');
+      exposeTestState();
+    } catch (error) {
+      compiled = null;
+      setStage(String(error?.message || error), 'bad');
+      exposeTestState();
+    }
+  }
+
+  async function analyze(selectedFile) {
+    file = selectedFile;
+    analysis = null;
+    compiled = null;
+    selectedLayoutSignature = null;
+    confirm.checked = false;
+    use.disabled = true;
+    chips.replaceChildren();
+    metrics.replaceChildren();
+    hypotheses.replaceChildren();
+    doctor.hidden = true;
+    setStage('ANALIZANDO…');
+    try {
+      analysis = await analyzeUniversalAvatarAsset(file, {root, onProgress: event => event?.message && setStage(event.message)});
+      columns.value = analysis.columns;
+      rows.value = analysis.rows;
+      selectedLayoutSignature = analysis.hypotheses[0]?.signature || null;
+      paintChips();
+      paintHypotheses();
+      await refreshPreview();
+    } catch (error) {
+      setStage(String(error?.message || error), 'bad');
+    }
+  }
+
+  input.onchange = () => {
+    const selected = input.files?.[0];
+    if (selected) void analyze(selected);
+  };
+  for (const eventName of ['dragenter', 'dragover']) drop.addEventListener(eventName, event => {
+    event.preventDefault();
+    drop.classList.add('drag');
+  });
+  for (const eventName of ['dragleave', 'drop']) drop.addEventListener(eventName, event => {
+    event.preventDefault();
+    drop.classList.remove('drag');
+  });
+  drop.addEventListener('drop', event => {
+    const selected = event.dataTransfer?.files?.[0];
+    if (selected) void analyze(selected);
+  });
+  play.onclick = () => {
+    motion.playing = !motion.playing;
+    play.classList.toggle('on', motion.playing);
+    play.textContent = motion.playing ? '⏸ ANIMACIÓN REAL' : '▶ ANIMACIÓN REAL';
+  };
+  reset.onclick = resetMotion;
+  for (const element of [manual, columns, rows, rig, order]) element.onchange = () => void refreshPreview();
+  confirm.onchange = () => void refreshPreview();
+  use.onclick = async () => {
+    if (!file || !compiled || busy || use.disabled) return;
+    busy = true;
+    use.disabled = true;
+    use.textContent = 'ACTIVANDO…';
+    try {
+      const result = await avatarQuick.importAndUse(file, config(), {displayName: file.name.replace(/\.[^.]+$/, ''), onProgress: event => setStage(event.message || event.stage)});
+      setStage(`VALIDADO Y ACTIVO · ${result.manifest.displayName}`, 'good');
+      use.textContent = 'AVATAR ACTIVO ✓';
+    } catch (error) {
+      setStage(String(error?.message || error), 'bad');
+      use.textContent = 'REINTENTAR';
+      use.disabled = false;
+    } finally {
+      busy = false;
+    }
+  };
+  try { await avatarQuick.hydrateActive(); } catch {}
+  function destroy() {
+    if (active?.shell !== shell) return;
+    active = null;
+    root.cancelAnimationFrame(raf);
+    if (imageUrl) root.URL.revokeObjectURL(imageUrl);
+    shell.remove();
+    style.remove();
+  }
+  close.onclick = destroy;
+  raf = root.requestAnimationFrame(tick);
+  active = F({version: 'kelo-avatar-quick-ui-v6.0.0-universal-ingestion', shell, close: destroy});
+  return active;
 }

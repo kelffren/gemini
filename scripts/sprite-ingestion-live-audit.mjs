@@ -1,0 +1,59 @@
+/* KELO-INDEX
+ * area: QA / UNIVERSAL SPRITE INGESTION / BROWSER
+ * owner: Playwright visual and runtime acceptance audit
+ * keys: SPRITE PLAYWRIGHT BEFORE AFTER ANIMATION RUNTIME SCREENSHOT CORPUS
+ * purpose: run the complete adversarial lab, verify real animation and capture durable evidence
+ * online: local static server or deployed GitHub Pages; no auth/persistence
+ */
+import fs from 'node:fs';
+import path from 'node:path';
+import {chromium} from 'playwright';
+
+const base = (process.env.AUDIT_URL || 'http://127.0.0.1:4173/').replace(/\/+$/, '');
+const url = `${base}/sprite-ingestion-lab.html`;
+const outputDirectory = path.resolve(process.env.SPRITE_AUDIT_OUTPUT || 'artifacts/sprite-ingestion');
+fs.mkdirSync(outputDirectory, {recursive: true});
+const executablePath = process.env.CHROME_BIN || undefined;
+const browser = await chromium.launch({headless: true, ...(executablePath ? {executablePath} : {})});
+
+try {
+  const context = await browser.newContext({viewport: {width: 1440, height: 1050}, deviceScaleFactor: 1, serviceWorkers: 'block'});
+  const page = await context.newPage();
+  const pageErrors = [];
+  page.on('pageerror', error => pageErrors.push(String(error?.stack || error)));
+  await page.goto(url, {waitUntil: 'domcontentloaded', timeout: 45_000});
+  await page.waitForFunction(() => globalThis.__KELO_SPRITE_INGESTION_LAB__?.ready, null, {timeout: 240_000});
+  const report = await page.evaluate(() => globalThis.__KELO_SPRITE_INGESTION_LAB__);
+  if (!report.pass) {
+    const failures = report.results?.filter(result => !result.statusMatches || (result.expectedStatus === 'VALIDATED' && (result.counts.missedFrames || result.counts.falseFrames))) || [];
+    throw new Error(`SPRITE_ADVERSARIAL_CORPUS_FAILED:${JSON.stringify(failures)}`);
+  }
+  if (report.summary.completed < 20) throw new Error(`SPRITE_CORPUS_TOO_SMALL:${report.summary.completed}`);
+  if (!report.results.some(result => result.tier === 'GOOD') || !report.results.some(result => result.tier === 'IRREGULAR') || !report.results.some(result => result.tier === 'EXTREME')) throw new Error('SPRITE_CORPUS_TIERS_MISSING');
+
+  const halo = page.locator('.case').filter({hasText: 'White background halos'});
+  await halo.click();
+  await page.waitForTimeout(250);
+  const first = await page.locator('#after canvas').evaluate(canvas => canvas.toDataURL());
+  const runtimeFirst = await page.locator('#game-canvas').evaluate(canvas => canvas.toDataURL());
+  await page.waitForTimeout(340);
+  const second = await page.locator('#after canvas').evaluate(canvas => canvas.toDataURL());
+  const runtimeSecond = await page.locator('#game-canvas').evaluate(canvas => canvas.toDataURL());
+  if (first === second) throw new Error('SPRITE_COMPILED_PREVIEW_NOT_ANIMATING');
+  if (runtimeFirst === runtimeSecond) throw new Error('SPRITE_GAME_RUNTIME_NOT_ANIMATING');
+  const directionButtons = page.locator('#directions button');
+  if (await directionButtons.count() !== 4) throw new Error('SPRITE_4D_PREVIEW_DIRECTIONS_MISSING');
+  await directionButtons.nth(1).click();
+  await page.waitForTimeout(180);
+  const directionFrame = await page.locator('#after canvas').evaluate(canvas => canvas.toDataURL());
+  if (directionFrame === second) throw new Error('SPRITE_DIRECTION_SWITCH_NO_VISUAL_CHANGE');
+
+  await page.screenshot({path: path.join(outputDirectory, 'adversarial-lab-before-after-runtime.png'), fullPage: true});
+  await page.locator('#before').screenshot({path: path.join(outputDirectory, 'before-irregular-halo.png')});
+  await page.locator('#after').screenshot({path: path.join(outputDirectory, 'after-normalized-animation.png')});
+  await page.locator('#game-canvas').screenshot({path: path.join(outputDirectory, 'runtime-kelo-avatar.png')});
+  if (pageErrors.length) throw new Error(`SPRITE_LAB_PAGE_ERRORS:${pageErrors.join(' | ')}`);
+  console.log(JSON.stringify({ok: true, url, report, visual: {animationChanged: first !== second, runtimeChanged: runtimeFirst !== runtimeSecond, directionChanged: directionFrame !== second}, screenshots: fs.readdirSync(outputDirectory).sort()}, null, 2));
+} finally {
+  await browser.close();
+}
