@@ -12,11 +12,18 @@ const TOUCH_RADIUS_PX=24;
 
 export function overlappingEntitiesAtPoint({entities=[],spatial},x,y){
   const rows=Array.isArray(entities)?entities:[];
+  const px=Number(x)||0,py=Number(y)||0;
+  if(typeof spatial?.queryRect==='function'){
+    const nearby=spatial.queryRect({x:px-1,y:py-1,w:2,h:2},{category:'entity'});
+    if(Array.isArray(nearby)&&nearby.every(entry=>Number.isInteger(entry?.order)&&entry?.data)){
+      return nearby.filter(entry=>inside(entry.rect,px,py)).sort((a,b)=>b.order-a.order).map(entry=>entry.data);
+    }
+  }
   const out=[];
   for(let i=rows.length-1;i>=0;i--){
     const entity=rows[i];
     const rect=spatial?.get?.(entity?.id)?.rect;
-    if(inside(rect,Number(x)||0,Number(y)||0))out.push(entity);
+    if(inside(rect,px,py))out.push(entity);
   }
   return out;
 }

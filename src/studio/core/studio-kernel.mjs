@@ -23,8 +23,8 @@ const entityRect=e=>{const s=entityScale(e);return{x:Number(e.transform?.x)||0,y
 function collectEntityIds(command,out=new Set()){if(!command||typeof command!=='object')return out;if(String(command.type||'').startsWith('entity.')){if(command.id)out.add(String(command.id));if(command.entity?.id)out.add(String(command.entity.id));}if(Array.isArray(command.commands))for(const child of command.commands)collectEntityIds(child,out);return out;}
 const worldDocumentModel=Object.freeze({
   id:'world',normalize:normalizeWorldDocument,chunkSize:document=>Number(document?.settings?.chunkSize)||512,
-  rebuildSpatial({document,spatial}){spatial.clear();for(const e of document.entities||[])if(e?.id)spatial.upsert({id:e.id,category:'entity',rect:entityRect(e),data:e});},
-  syncCommand({command,document,spatial}){for(const id of collectEntityIds(command)){const e=(document.entities||[]).find(row=>row.id===id);if(e)spatial.upsert({id:e.id,category:'entity',rect:entityRect(e),data:e});else spatial.remove(id);}}
+  rebuildSpatial({document,spatial}){const rows=document.entities||[];spatial.clear();for(let order=0;order<rows.length;order++){const e=rows[order];if(e?.id)spatial.upsert({id:e.id,category:'entity',rect:entityRect(e),data:e,order});}},
+  syncCommand({command,document,spatial}){const rows=document.entities||[];for(const id of collectEntityIds(command)){const order=rows.findIndex(row=>row.id===id),e=order>=0?rows[order]:null;if(e)spatial.upsert({id:e.id,category:'entity',rect:entityRect(e),data:e,order});else spatial.remove(id);}}
 });
 function resolveDocumentModel(model){if(!model)return worldDocumentModel;if(typeof model.normalize!=='function')throw new Error('STUDIO_DOCUMENT_MODEL_NORMALIZE_REQUIRED');return model;}
 
