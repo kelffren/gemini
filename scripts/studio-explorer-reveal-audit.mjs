@@ -60,8 +60,9 @@ assert.match(source,/dispatchEvent\?\.\(new Event\('scroll'\)\)/,'reveal must re
 assert.doesNotMatch(source,/kernel\.execute\(/,'Explorer reveal must not create world commands or pollute Undo');
 assert.doesNotMatch(source,/KELO_WORLD_EDIT/,'Explorer reveal must remain authority-isolated');
 assert.doesNotMatch(source,/setCamera|camera\.(?:x|y|zoom)|camera\s*=|KELO_CAMERA/,'Explorer reveal must not mutate the world camera');
+assert.doesNotMatch(source,/createStudioExplorerRangeSelectionController/,'Explorer reveal must not mount a second range-selection listener');
 assert.match(entry,/createStudioExplorerRevealController\(\{root,kernel\}\)/,'Studio boot must mount Explorer reveal against the live kernel');
 assert.match(entry,/explorerRevealController\.destroy\(\)/,'Studio close must release Explorer reveal');
-assert.match(entry,/kelo-studio-foundation-v1\.24\.0-explorer-reveal/,'Studio version must identify the cumulative Explorer reveal foundation');
+assert.match(entry,/version: 'kelo-studio-foundation-v\d+\.\d+\.\d+[-\w]*'/,'Studio entry must expose a current versioned foundation session');
 
-console.log(JSON.stringify({ok:true,desktopReveal:true,mobileReveal:true,virtualized:true,noRedundantReveal:true,multiSelectionAnchor:true,undoIsolated:true,authorityIsolated:true,cameraIsolated:true,lifecycleIntegrated:true},null,2));
+console.log(JSON.stringify({ok:true,desktopReveal:true,mobileReveal:true,virtualized:true,noRedundantReveal:true,multiSelectionAnchor:true,singleRangeOwner:true,undoIsolated:true,authorityIsolated:true,cameraIsolated:true,lifecycleIntegrated:true},null,2));

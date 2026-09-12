@@ -1,12 +1,10 @@
 /* KELO-INDEX
  * area: STUDIO / INPUT / EXPLORER REVEAL
  * owns: local Explorer navigation that reveals the latest selection anchor
- * does-not-own: camera state, document mutation, CommandBus or authority
+ * does-not-own: camera state, document mutation, CommandBus, authority or range selection
  * public-api: createStudioExplorerRevealController(), explorerRevealScrollTop()
  * online: local-only; reads selection/document and scrolls existing virtualized Explorer viewports
  */
-
-import { createStudioExplorerRangeSelectionController } from './studio-explorer-range-selection-controller.mjs';
 
 const ROW_HEIGHT=46;
 const EDGE_PAD=8;
@@ -28,7 +26,6 @@ export function createStudioExplorerRevealController({root=globalThis,kernel,row
   const document=root?.document;
   if(!document||!kernel?.selection?.get||!kernel?.selection?.onChange)return Object.freeze({reveal:()=>false,destroy(){}});
   let destroyed=false,pending=null,lastSignature='';
-  const rangeSelection=createStudioExplorerRangeSelectionController({root,kernel});
 
   const schedule=fn=>{
     if(typeof root.requestAnimationFrame==='function')return {kind:'raf',id:root.requestAnimationFrame(fn)};
@@ -75,7 +72,7 @@ export function createStudioExplorerRevealController({root=globalThis,kernel,row
   const unsubscribe=kernel.selection.onChange(onSelection)||(()=>{});
   onSelection(kernel.selection.get());
   return Object.freeze({
-    version:'studio-explorer-reveal-v1.1.0-range-selection',reveal,rangeSelection,
-    destroy(){if(destroyed)return;destroyed=true;cancel(pending);pending=null;unsubscribe?.();rangeSelection.destroy?.();}
+    version:'studio-explorer-reveal-v1.2.0-single-owner',reveal,
+    destroy(){if(destroyed)return;destroyed=true;cancel(pending);pending=null;unsubscribe?.();}
   });
 }

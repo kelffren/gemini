@@ -6,6 +6,7 @@ on:
     paths:
       - 'src/studio/studio-entry.mjs'
       - 'src/studio/input/studio-explorer-range-selection-controller.mjs'
+      - 'src/studio/input/studio-explorer-reveal-controller.mjs'
       - 'scripts/studio-explorer-range-live-audit.mjs'
       - 'package.json'
       - '.github/workflows/studio-explorer-range-live-ci.yml'
@@ -13,6 +14,7 @@ on:
     paths:
       - 'src/studio/studio-entry.mjs'
       - 'src/studio/input/studio-explorer-range-selection-controller.mjs'
+      - 'src/studio/input/studio-explorer-reveal-controller.mjs'
       - 'scripts/studio-explorer-range-live-audit.mjs'
       - 'package.json'
       - '.github/workflows/studio-explorer-range-live-ci.yml'
@@ -29,6 +31,7 @@ jobs:
         run: |
           node --check src/studio/studio-entry.mjs
           node --check src/studio/input/studio-explorer-range-selection-controller.mjs
+          node --check src/studio/input/studio-explorer-reveal-controller.mjs
           node --check scripts/studio-explorer-range-live-audit.mjs
       - name: Explorer range live contract
         run: npm run audit:studio:explorer-range-live
