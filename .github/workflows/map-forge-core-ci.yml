@@ -1,18 +1,22 @@
 # KELO-INDEX
 # area: QA / MAP FORGE
 # owner: Map Forge CI
-# purpose: protect deterministic Map Forge core, fuzz validity, quality differentiation and fixed-seed visual evidence
+# purpose: protect deterministic Map Forge core, Creator Hub launch, fuzz validity, quality differentiation and fixed-seed visual evidence
 name: Map Forge Core CI
 
 on:
   pull_request:
     paths:
       - 'src/world/map-forge/**'
+      - 'src/creators/workspaces/map-forge-workspace.mjs'
+      - 'src/creators/ui/map-forge-workspace.mjs'
+      - 'src/creators/ui/creator-hub.mjs'
       - 'scripts/map-forge-core-audit.mjs'
       - 'scripts/map-forge-selection-diversity-audit.mjs'
       - 'scripts/map-forge-block-road-clearance-audit.mjs'
       - 'scripts/map-forge-paving-intent-audit.mjs'
       - 'scripts/map-forge-decoration-spacing-audit.mjs'
+      - 'tests/map-forge-mobile-preview.spec.js'
       - 'tests/map-forge-visual-round.spec.js'
       - 'tests/map-forge-fountain-clearance.spec.js'
       - 'tests/map-forge-orientation-visual.spec.js'
@@ -24,11 +28,15 @@ on:
     branches: [main]
     paths:
       - 'src/world/map-forge/**'
+      - 'src/creators/workspaces/map-forge-workspace.mjs'
+      - 'src/creators/ui/map-forge-workspace.mjs'
+      - 'src/creators/ui/creator-hub.mjs'
       - 'scripts/map-forge-core-audit.mjs'
       - 'scripts/map-forge-selection-diversity-audit.mjs'
       - 'scripts/map-forge-block-road-clearance-audit.mjs'
       - 'scripts/map-forge-paving-intent-audit.mjs'
       - 'scripts/map-forge-decoration-spacing-audit.mjs'
+      - 'tests/map-forge-mobile-preview.spec.js'
       - 'tests/map-forge-visual-round.spec.js'
       - 'tests/map-forge-fountain-clearance.spec.js'
       - 'tests/map-forge-orientation-visual.spec.js'
@@ -73,6 +81,10 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Serve branch checkout
         run: python3 -m http.server 4173 --bind 127.0.0.1 > /tmp/kelo-map-forge-http.log 2>&1 &
+      - name: Guard Creator Hub launch against stalled first generation
+        env:
+          KELO_PAGES: http://127.0.0.1:4173/
+        run: npx playwright test tests/map-forge-mobile-preview.spec.js --project=chromium --grep "opens from Creator Hub"
       - name: Prepare paired generator states
         run: |
           cp src/world/map-forge/map-forge-champion-overrides.mjs /tmp/map-forge-champion-after.mjs
