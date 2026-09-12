@@ -40,7 +40,7 @@ appearanceReady=true;trace.length=0;out=context.renderAvatar({},true);
 ok(out==='appearance'&&trace.join('|')==='visual-back|armor-back|appearance|armor-front|visual-front','APPEARANCE_OVERRIDE');
 const snap=context.KeloAvatar.snapshot();
 ok(snap.baseOwner==='engine-w','LAST_BASE_WINS');
-ok(snap.middleware.map(x=>x.owner).join('|')==='visual|armor|appearance|main-hero:spartan-spritesheet|engine-ab','MIDDLEWARE_PRIORITY_DESC');
+ok(snap.middleware.map(x=>x.owner).join('|')==='visual|armor|appearance|main-hero:base-zoo|engine-ab','MIDDLEWARE_PRIORITY_DESC');
 migrated.forEach(file=>{const text=fs.readFileSync(file,'utf8');ok(!directAvatarAssignment(text),file+'_MUST_NOT_ASSIGN_RENDER_AVATAR');});
 ok(fs.readFileSync('engine-d.js','utf8').includes("KeloAvatar.setBase('engine-d:rank-jewels'"),'ENGINE_D_BASE');
 ok(fs.readFileSync('engine-e.js','utf8').includes("KeloAvatar.setBase('engine-e:identity-jewels'"),'ENGINE_E_BASE');
