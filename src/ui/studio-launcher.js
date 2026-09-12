@@ -12,7 +12,7 @@
   'use strict';
   if(window.KELO_STUDIO_LAUNCHER)return;
   let loading=false,factoryLoading=false;
-  const CREATOR_BUILD='world-recovery-20260911-admin-1';
+  const CREATOR_BUILD='map-forge-launch-recovery-20260912-1';
   const actor=()=>String(window.KELO_ADMIN_KEYS?.playerId?.()||window.keloNet?.playerKey||window.localPlayer?.id||'local_pioneer');
   const allowed=()=>{
     const keys=window.KELO_ADMIN_KEYS,who=actor();
@@ -91,7 +91,7 @@
   }
   function boot(){sync();void bootOnlineAuthorization();void import('./../characters/creator-avatar-runtime.mjs').then(m=>m.installCreatorAvatarRuntime({root:window})).catch(e=>console.warn('[Kelo Avatar runtime]',e));}
   window.KELO_ADMIN_KEYS?.onChange?.(sync);
-  const api=Object.freeze({version:'studio-launcher-v1.9.0-admin-control-plane',open,openSpriteFactory:openFactory,sync,get allowed(){return allowed();}});
+  const api=Object.freeze({version:'studio-launcher-v1.9.1-map-forge-launch-recovery',open,openSpriteFactory:openFactory,sync,get allowed(){return allowed();}});
   window.KELO_STUDIO_LAUNCHER=api;
   window.KELO_CREATORS_LAUNCHER=api;
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
