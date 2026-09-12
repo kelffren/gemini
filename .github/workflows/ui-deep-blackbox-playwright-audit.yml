@@ -1,0 +1,38 @@
+name: UI Deep Black-box Playwright Audit
+
+on:
+  push:
+    branches:
+      - audit/ui-deep-playwright-20260912
+
+jobs:
+  deep-blackbox-ui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install matching Playwright browser
+        run: |
+          npm install --no-save --package-lock=false playwright@1.55.0
+          node -p "'Playwright ' + require('playwright/package.json').version"
+          node node_modules/playwright/cli.js install --with-deps chromium
+      - name: Explore published UI state graph
+        id: audit
+        continue-on-error: true
+        env:
+          TARGET_URL: https://kelffren.github.io/gemini/
+          MAX_STATES: '55'
+          MAX_DEPTH: '4'
+          MAX_ACTIONS_PER_STATE: '18'
+        run: node scripts/blackbox-ui-deep-playwright-audit.mjs
+      - name: Upload deep audit evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-deep-blackbox-playwright-report
+          path: ui-deep-blackbox-artifacts/
+          if-no-files-found: error
+          retention-days: 14
