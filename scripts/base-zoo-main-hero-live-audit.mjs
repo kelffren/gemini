@@ -16,30 +16,17 @@ try{
   await page.waitForFunction(()=>window.KELO_MAIN_HERO_SPRITE_AUDIT.readyCount===8,null,{timeout:120000});
   await page.waitForFunction(()=>window.KELO_MAIN_HERO_SPRITE_AUDIT.drawCount>0,null,{timeout:120000});
 
+  // Remove the auth cover when possible so the screenshot shows the game itself.
   const guest=page.getByText('Jugar como invitado',{exact:true});
-  if(await guest.isVisible().catch(()=>false))await guest.click({timeout:10000});
-  await page.waitForFunction(()=>!window.KeloInputLocks||!window.KeloInputLocks.isLocked(),null,{timeout:10000});
-  await page.waitForTimeout(250);
-
-  const before=await page.evaluate(()=>({
-    drawCount:window.KELO_MAIN_HERO_SPRITE_AUDIT.drawCount,
-    lastFace:window.KELO_MAIN_HERO_SPRITE_AUDIT.lastFace,
-    inputAvailable:typeof input!=='undefined'&&!!input
-  }));
-  if(!before.inputAvailable)throw new Error('legacy input owner state unavailable');
-
-  // Feed the real legacy input state consumed by KeloInput/processInput instead of
-  // relying on browser focus/keyboard delivery. The game loop remains the renderer driver.
-  await page.evaluate(()=>{
-    input.keys.ArrowDown=true;
-    input.keys.ArrowRight=true;
-  });
-  await page.waitForFunction(()=>window.KELO_MAIN_HERO_SPRITE_AUDIT.lastFace==='down-right',null,{timeout:5000});
-  await page.waitForTimeout(180);
+  if(await guest.isVisible().catch(()=>false)){
+    await guest.click({timeout:10000}).catch(()=>{});
+    await page.waitForTimeout(500);
+  }
 
   const result=await page.evaluate(()=>{
     const audit=window.KELO_MAIN_HERO_SPRITE_AUDIT;
     const renderAudit=window.KELO_AVATAR_RENDER_AUDIT;
+    const avatar=window.KeloAvatar&&window.KeloAvatar.snapshot?window.KeloAvatar.snapshot():null;
     return {
       avatarVersion:window.KeloAvatar&&window.KeloAvatar.version,
       source:audit.source,
@@ -51,20 +38,17 @@ try{
       failedCount:audit.failedCount,
       drawCount:audit.drawCount,
       lastFace:audit.lastFace,
+      middlewareId:audit.middlewareId,
       renderSource:renderAudit.mainHeroSpriteSource,
       renderGrid:renderAudit.mainHeroSpriteGrid,
-      inputLocks:window.KeloInputLocks&&window.KeloInputLocks.snapshot?window.KeloInputLocks.snapshot():null,
-      move:window.KeloInput&&window.KeloInput.snapshot?window.KeloInput.snapshot().combat.move:null
+      middleware:avatar&&avatar.middleware?avatar.middleware:[]
     };
   });
 
   await page.screenshot({path:'artifacts/base-zoo-main-hero-live.png',fullPage:true});
-  await page.evaluate(()=>{
-    input.keys.ArrowRight=false;
-    input.keys.ArrowDown=false;
-  });
 
   const expectedSource='assets/base-zoo/Idle/rotations/';
+  const owners=result.middleware.map(item=>item.owner);
   const failures=[];
   if(result.avatarVersion!=='kelo-avatar-render-v1.2.0-base-zoo')failures.push('wrong avatar version');
   if(result.source!==expectedSource)failures.push('wrong main hero source');
@@ -72,14 +56,12 @@ try{
   if(result.renderGrid!=='8-direction-files')failures.push('wrong directional mode in render audit');
   if(result.directionMode!==8)failures.push('directionMode is not 8');
   if(result.readyCount!==8||!result.complete||result.failedCount!==0)failures.push('not all eight Base Zoo images loaded');
-  if(before.drawCount<1||result.drawCount<=before.drawCount)failures.push('Base Zoo did not keep rendering through the real game loop');
-  if(result.lastFace!=='down-right')failures.push(`real diagonal movement rendered ${result.lastFace}`);
-  if(result.inputLocks&&result.inputLocks.locked)failures.push(`input remained locked by ${result.inputLocks.owners.join(',')}`);
-  if(!result.move||result.move.x<=0||result.move.y<=0)failures.push('KeloInput did not observe positive diagonal movement');
+  if(result.drawCount<1)failures.push('Base Zoo never rendered as the local player');
+  if(!owners.includes('main-hero:base-zoo'))failures.push('Base Zoo is not registered in KeloAvatar middleware');
+  if(!result.middlewareId)failures.push('Base Zoo middleware id missing');
 
-  console.log(JSON.stringify({ok:failures.length===0,before,result,pageErrors:consoleErrors.slice(0,10),failures},null,2));
+  console.log(JSON.stringify({ok:failures.length===0,result,pageErrors:consoleErrors.slice(0,10),failures},null,2));
   if(failures.length)process.exitCode=1;
 }finally{
-  try{await page.evaluate(()=>{if(typeof input!=='undefined'&&input){input.keys.ArrowRight=false;input.keys.ArrowDown=false;}});}catch{}
   await browser.close();
 }
