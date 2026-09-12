@@ -12,12 +12,17 @@ test('Map Forge opens from Creator Hub before a stalled first generation settles
   const pageErrors = [];
   page.on('pageerror', error => pageErrors.push(String(error)));
 
-  const response = await page.goto('./?offline=1', { waitUntil: 'domcontentloaded', timeout: 30000 });
+  const response = await page.goto('./?mapEditor=1', { waitUntil: 'domcontentloaded', timeout: 30000 });
   expect(response.status()).toBeLessThan(400);
   await page.waitForFunction(() => !!(
     window.KeloInputLocks?.acquire &&
     window.KELO_ADMIN_KEYS?.can?.('world.edit')
   ), null, { timeout: 15000 });
+
+  const recoveredForge = page.locator('#kelo-map-forge');
+  await expect(recoveredForge).toBeVisible({ timeout: 15000 });
+  await recoveredForge.getByRole('button', { name: 'CERRAR', exact: true }).click();
+  await expect(recoveredForge).toHaveCount(0);
 
   await page.evaluate(async () => {
     const { openCreatorHub } = await import('./src/creators/ui/creator-hub.mjs');
@@ -39,7 +44,7 @@ test('Map Forge opens from Creator Hub before a stalled first generation settles
   await expect(page.locator('#kelo-map-forge')).toBeVisible({ timeout: 2000 });
   await expect(page.locator('#kelo-creators-hub')).toHaveCount(0, { timeout: 2000 });
   await expect(page.locator('#kelo-map-forge .kmf-canvas')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'GENERANDO…' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'GENERANDOâ¦' })).toBeVisible();
 
   await page.getByRole('button', { name: 'CERRAR', exact: true }).click();
   await page.evaluate(() => {
