@@ -1,6 +1,6 @@
 /* KELO-INDEX
  * area: STUDIO / INPUT / EXPLORER RANGE SELECTION
- * owns: desktop-style Shift range selection inside the virtual Explorer
+ * owns: desktop-style Shift range selection and focused keyboard navigation inside the virtual Explorer
  * does-not-own: document mutation, CommandBus, authority, Explorer rendering or camera
  * public-api: createStudioExplorerRangeSelectionController()
  * online: selection-only state; never writes persistent world data
@@ -26,6 +26,14 @@ export function createStudioExplorerRangeSelectionController({root=globalThis,ke
   if(!document?.addEventListener||!kernel?.selection)return Object.freeze({destroy(){}});
   let destroyed=false,anchorId=null;
   const entityIds=()=>kernel.document?.entities?.map?.(row=>String(row.id))||[];
+  const explorerRows=()=>Array.from(document.querySelectorAll?.(ENTITY_SELECTOR)||[]).filter(row=>String(row?.dataset?.entity||''));
+
+  function focusRow(row,{scroll=false}={}){
+    if(!row)return;
+    if(row.getAttribute?.('tabindex')==null)row.setAttribute?.('tabindex','-1');
+    row.focus?.({preventScroll:true});
+    if(scroll)row.scrollIntoView?.({block:'nearest',inline:'nearest'});
+  }
 
   function onclick(event){
     if(destroyed||event.defaultPrevented)return;
@@ -36,6 +44,7 @@ export function createStudioExplorerRangeSelectionController({root=globalThis,ke
 
     if(!event.shiftKey){
       anchorId=id;
+      focusRow(row);
       return;
     }
 
@@ -51,16 +60,43 @@ export function createStudioExplorerRangeSelectionController({root=globalThis,ke
     event.preventDefault?.();
     event.stopImmediatePropagation?.();
     kernel.selection.set(result.selection);
+    focusRow(row);
+  }
+
+  function onkeydown(event){
+    if(destroyed||event.defaultPrevented||event.ctrlKey||event.metaKey||event.altKey||event.shiftKey)return;
+    if(event.key!=='ArrowUp'&&event.key!=='ArrowDown')return;
+    const row=event.target?.closest?.(ENTITY_SELECTOR);
+    if(!row)return;
+    const rows=explorerRows();
+    if(!rows.length)return;
+    let index=rows.indexOf(row);
+    if(index<0){
+      const id=String(row.dataset?.entity||'');
+      index=rows.findIndex(candidate=>String(candidate.dataset?.entity||'')===id);
+    }
+    if(index<0)return;
+    const nextIndex=Math.max(0,Math.min(rows.length-1,index+(event.key==='ArrowDown'?1:-1)));
+    event.preventDefault?.();
+    event.stopImmediatePropagation?.();
+    if(nextIndex===index)return;
+    const next=rows[nextIndex],id=String(next.dataset?.entity||'');
+    if(!id)return;
+    anchorId=id;
+    kernel.selection.set([id]);
+    focusRow(next,{scroll:true});
   }
 
   document.addEventListener('click',onclick,true);
+  document.addEventListener('keydown',onkeydown,true);
   return Object.freeze({
-    version:'studio-explorer-range-selection-v1.0.0',
+    version:'studio-explorer-range-selection-v1.1.0-keyboard-nav',
     get anchor(){return anchorId;},
     destroy(){
       if(destroyed)return;
       destroyed=true;
       document.removeEventListener?.('click',onclick,true);
+      document.removeEventListener?.('keydown',onkeydown,true);
     }
   });
 }
