@@ -27,6 +27,10 @@ assert.match(source,/data-nudge-dir="down"/,'touch pad must expose down');
 assert.match(source,/min-width:46px;min-height:46px/,'mobile nudge targets must exceed 44px');
 assert.match(source,/env\(safe-area-inset-bottom\)/,'mobile nudge pad must respect iPhone safe area');
 assert.match(source,/mobileStep\(\)/,'touch directions must resolve through the shared nudge step');
+assert.match(source,/const step=mobileStep\(\)/,'mobile mode indicator must resolve the exact active movement distance');
+assert.match(source,/modeButton\.dataset\.step=String\(step\)/,'mobile mode indicator must expose exact step for UI/audit hooks');
+assert.match(source,/modeButton\.textContent=`\$\{step\} PX`/,'mobile pad must show the exact pixel distance instead of an ambiguous mode label');
+assert.match(source,/Nudge \$\{mobileMode\}: \$\{step\} pixels/,'mobile nudge accessibility label must include exact distance');
 assert.match(source,/void nudge\(vector\[0\],vector\[1\],\{step:mobileStep\(\)\}\)/,'touch pad must call the same reversible nudge function');
 assert.match(source,/COARSE_MULTIPLIER=4/,'coarse nudge multiplier must stay explicit and auditable');
 assert.match(source,/input,textarea,select,\[contenteditable="true"\]/,'nudge must never steal arrows while editing UI fields');
@@ -46,4 +50,4 @@ assert.match(entry,/createStudioNudgeController/,'Studio entry must install nudg
 assert.match(entry,/nudgeController\.destroy\(\)/,'Studio close must release nudge input');
 assert.match(entry,/kelo-studio-foundation-v\d+\.\d+\.\d+/,'Studio must expose a current foundation version');
 
-console.log(JSON.stringify({ok:true,keyboardNudge:true,mobileTouchPad:true,modes:['snap','fine','coarse'],minTouchTarget:46,liveSnap:true,multiSelectionBatch:true,commandBus:true,authorityDirectWrite:false,cleanup:true},null,2));
+console.log(JSON.stringify({ok:true,keyboardNudge:true,mobileTouchPad:true,modes:['snap','fine','coarse'],exactMobileStepLabel:true,minTouchTarget:46,liveSnap:true,multiSelectionBatch:true,commandBus:true,authorityDirectWrite:false,cleanup:true},null,2));
