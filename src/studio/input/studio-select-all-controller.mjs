@@ -1,6 +1,6 @@
 /* KELO-INDEX
  * area: STUDIO / INPUT
- * owns: select-all keyboard shortcut for current world entities
+ * owns: select-all and clear-selection keyboard shortcuts for current world entities
  * does-not-own: document mutation, CommandBus commands or persistent history
  * public-api: createStudioSelectAllController()
  * online: local-only transient selection state
@@ -15,10 +15,16 @@ export function createStudioSelectAllController({root=globalThis,kernel}={}){
 
   const onKeyDown=event=>{
     if(destroyed||event.defaultPrevented||event.repeat)return;
-    if(!(event.metaKey||event.ctrlKey)||event.metaKey&&event.ctrlKey||event.shiftKey||event.altKey)return;
+    if(!(event.metaKey||event.ctrlKey)||event.metaKey&&event.ctrlKey||event.altKey)return;
     if(String(event.key||'').toLowerCase()!=='a')return;
     if(event.target?.closest?.(EDITABLE_SELECTOR))return;
     if(!document.getElementById?.('kelo-studio-live'))return;
+
+    if(event.shiftKey){
+      event.preventDefault?.();
+      kernel.selection.set([]);
+      return;
+    }
 
     const ids=[];
     const seen=new Set();
