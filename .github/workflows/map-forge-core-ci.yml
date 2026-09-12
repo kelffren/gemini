@@ -85,6 +85,26 @@ jobs:
         env:
           KELO_PAGES: http://127.0.0.1:4173/
         run: npx playwright test tests/map-forge-mobile-preview.spec.js --project=chromium --grep "opens from Creator Hub"
+      - name: Wait for Map Forge launch fix on live Pages
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 45); do
+            adapter="$(curl --max-time 10 -fsSL "https://kelffren.github.io/gemini/src/creators/workspaces/map-forge-workspace.mjs?smoke=${GITHUB_SHA}-${i}" || true)"
+            testfile="$(curl --max-time 10 -fsSL "https://kelffren.github.io/gemini/tests/map-forge-mobile-preview.spec.js?smoke=${GITHUB_SHA}-${i}" || true)"
+            if grep -q 'generation readiness is editor state' <<<"$adapter" \
+              && grep -q 'Map Forge opens from Creator Hub before a stalled first generation settles' <<<"$testfile"; then
+              echo 'PASS live Pages contains the Map Forge launch fix and regression test'
+              exit 0
+            fi
+            echo "Waiting for Pages to publish Map Forge launch fix ($i/45)..."
+            sleep 4
+          done
+          echo 'FAIL Pages never exposed the Map Forge launch fix in time'
+          exit 1
+      - name: Open Map Forge from Creator Hub on live Pages
+        env:
+          KELO_PAGES: https://kelffren.github.io/gemini/
+        run: npx playwright test tests/map-forge-mobile-preview.spec.js --project=chromium --grep "opens from Creator Hub"
       - name: Prepare paired generator states
         run: |
           cp src/world/map-forge/map-forge-champion-overrides.mjs /tmp/map-forge-champion-after.mjs
