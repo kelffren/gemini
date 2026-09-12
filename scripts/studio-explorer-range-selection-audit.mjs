@@ -67,6 +67,34 @@ const up=keyEvent('c','ArrowUp');
 keyHandler(up);
 assert.deepEqual(sets.at(-1),['b'],'ArrowUp should select the previous visible row');
 
+selection=['b'];
+clickHandler(pointerEvent('b'));
+const shiftDown=keyEvent('b','ArrowDown',{shiftKey:true});
+keyHandler(shiftDown);
+assert.deepEqual(sets.at(-1),['b','c'],'Shift+ArrowDown should extend selection by one visible Explorer row');
+assert.equal(shiftDown.prevented,1,'keyboard range extension must suppress browser/default movement');
+assert.equal(shiftDown.stopped,1,'keyboard range extension must not leak into world nudge');
+assert.equal(rowFor('c').scrollCount>1,true,'keyboard range extension should keep the range endpoint visible');
+
+const shiftDownAgain=keyEvent('c','ArrowDown',{shiftKey:true});
+keyHandler(shiftDownAgain);
+assert.deepEqual(sets.at(-1),['b','c','d'],'repeated Shift+ArrowDown should preserve the original anchor and grow the range');
+
+const shiftUp=keyEvent('d','ArrowUp',{shiftKey:true});
+keyHandler(shiftUp);
+assert.deepEqual(sets.at(-1),['b','c'],'Shift+ArrowUp should shrink the range back toward its preserved anchor');
+
+const shiftEnd=keyEvent('c','End',{shiftKey:true});
+keyHandler(shiftEnd);
+assert.deepEqual(sets.at(-1),['b','c','d','e'],'Shift+End should extend the anchored range directly to the last visible row');
+assert.equal(rowFor('e').scrollCount>0,true,'Shift+End should keep the range endpoint visible');
+
+selection=['c'];
+clickHandler(pointerEvent('c'));
+const shiftHome=keyEvent('c','Home',{shiftKey:true});
+keyHandler(shiftHome);
+assert.deepEqual(sets.at(-1),['a','b','c'],'Shift+Home should extend the anchored range directly to the first visible row');
+
 selection=['c'];
 const home=keyEvent('c','Home');
 keyHandler(home);
@@ -91,17 +119,17 @@ assert.equal(sets.length,beforeBoundarySets,'ArrowDown at the last Explorer row 
 assert.equal(boundary.prevented,1,'boundary arrows should still be consumed inside Explorer');
 assert.equal(boundary.stopped,1,'boundary arrows must not leak into world nudge');
 
-const endBoundary=keyEvent('e','End');
+const endBoundary=keyEvent('e','End',{shiftKey:true});
 keyHandler(endBoundary);
-assert.equal(sets.length,beforeBoundarySets,'End on the last row should clamp without redundant selection updates');
-assert.equal(endBoundary.prevented,1,'End boundary should still be consumed inside Explorer');
-assert.equal(endBoundary.stopped,1,'End boundary must remain isolated from other handlers');
+assert.equal(sets.length,beforeBoundarySets,'Shift+End at the last row should clamp without redundant selection updates');
+assert.equal(endBoundary.prevented,1,'Shift+End boundary should still be consumed inside Explorer');
+assert.equal(endBoundary.stopped,1,'Shift+End boundary must remain isolated from other handlers');
 
-const modified=keyEvent('b','Home',{shiftKey:true});
+const modified=keyEvent('b','Home',{shiftKey:true,ctrlKey:true});
 const beforeModifiedSets=sets.length;
 keyHandler(modified);
-assert.equal(sets.length,beforeModifiedSets,'modified Home/End are reserved for future range gestures and should not change single selection');
-assert.equal(modified.prevented,0,'modified Home/End should remain available to dedicated handlers');
+assert.equal(sets.length,beforeModifiedSets,'Ctrl/Cmd-modified keyboard ranges should remain reserved and must not mutate selection');
+assert.equal(modified.prevented,0,'Ctrl/Cmd-modified keyboard ranges should remain available to dedicated handlers');
 
 controller.destroy();
 assert.equal(clickRemoved,true,'destroy must remove the capture click listener');
@@ -113,7 +141,9 @@ assert.ok(!source.includes('KELO_WORLD_EDIT'),'Explorer selection ergonomics mus
 assert.ok(!source.includes('kernel.execute'),'Explorer selection ergonomics must not create document commands');
 assert.ok(source.includes('kernel.selection.set'),'Explorer navigation must use the canonical local selection store');
 assert.ok(source.includes("'Home','End'"),'Explorer navigation contract must retain direct first/last-row shortcuts');
+assert.ok(source.includes('if(event.shiftKey)'),'Explorer keyboard navigation must retain anchored range extension');
+assert.ok(source.includes('visibleIds'),'keyboard range selection must be scoped to visible Explorer rows');
 assert.ok(nudgeSource.includes("EXPLORER_ENTITY_SELECTOR='#kelo-studio-live [data-entity]'"),'nudge must explicitly recognize focused Explorer entity rows');
 assert.ok(nudgeSource.includes('explorerTarget(event.target)'),'world nudge must yield when arrow keys originate inside Explorer');
 
-console.log('PASS studio explorer selection audit: ranges, ArrowUp/ArrowDown, Home/End jumps, boundary isolation, teardown and CommandBus/authority separation verified.');
+console.log('PASS studio explorer selection audit: click ranges, keyboard range extension, ArrowUp/ArrowDown, Home/End jumps, boundary isolation, teardown and CommandBus/authority separation verified.');
