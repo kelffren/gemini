@@ -89,8 +89,10 @@ export function createStudioPropertyCommitController({root=globalThis}={}){
         index=fields.findIndex(field=>String(field.dataset?.prop??field.getAttribute?.('data-prop')??'')===sourceProp);
       }
       if(index<0&&sourceIndex>=0)index=Math.min(sourceIndex,fields.length-1);
-      const next=fields[index+direction];
-      if(!next)return;
+      if(index<0)return;
+      const nextIndex=(index+direction+fields.length)%fields.length;
+      const next=fields[nextIndex];
+      if(!next||next===input&&fields.length===1)return;
       next.focus?.();
       next.select?.();
     });
@@ -99,7 +101,7 @@ export function createStudioPropertyCommitController({root=globalThis}={}){
   document.addEventListener('focusin',focusin,true);
   document.addEventListener('keydown',keydown,true);
   return Object.freeze({
-    version:'studio-property-commit-v1.2.0-f2-focus',
+    version:'studio-property-commit-v1.3.0-cyclic-navigation',
     focusFirstProperty,
     destroy(){
       if(destroyed)return;
