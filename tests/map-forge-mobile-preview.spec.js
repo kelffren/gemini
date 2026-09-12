@@ -19,6 +19,13 @@ test('Map Forge opens from Creator Hub before a stalled first generation settles
     window.KELO_ADMIN_KEYS?.can?.('world.edit')
   ), null, { timeout: 15000 });
 
+  await page.waitForTimeout(1000);
+  const recoveredPreview = page.locator('#kelo-map-forge');
+  while(await recoveredPreview.count()){
+    await recoveredPreview.first().getByRole('button', { name: 'CERRAR', exact: true }).evaluate(button => button.click());
+  }
+  await expect(recoveredPreview).toHaveCount(0);
+
   await page.evaluate(async () => {
     const { openCreatorHub } = await import('./src/creators/ui/creator-hub.mjs');
     await openCreatorHub({ root: window });
@@ -77,6 +84,13 @@ test('Map Forge real preview exposes scene and sprite requirements, hides before
     window.KeloCamera?.focus &&
     window.KELO_ADMIN_KEYS?.can?.('world.edit')
   ), null, { timeout: 15000 });
+
+  await page.waitForTimeout(1000);
+  const recoveredPreview = page.locator('#kelo-map-forge');
+  while(await recoveredPreview.count()){
+    await recoveredPreview.first().getByRole('button', { name: 'CERRAR', exact: true }).evaluate(button => button.click());
+  }
+  await expect(recoveredPreview).toHaveCount(0);
 
   await page.evaluate(async () => {
     const { bootKeloCreators } = await import('./src/creators/creator-entry.mjs');
