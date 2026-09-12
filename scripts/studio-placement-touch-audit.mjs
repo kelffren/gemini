@@ -25,7 +25,17 @@ assert.match(source,/min-width:46px;min-height:46px/,'touch targets must exceed 
 assert.match(source,/env\(safe-area-inset-bottom\)/,'pad must respect iPhone safe area');
 assert.match(source,/Number\(root\.innerWidth\|\|9999\)>MOBILE_MAX/,'desktop must not mount the mobile placement pad');
 assert.match(source,/unsubscribe\?\.\(\)/,'destroy must release placement preview subscription');
-assert.match(source,/studio-placement-touch-v1\.1\.0-continuous/,'controller version must expose continuous-placement behavior');
+assert.match(source,/studio-placement-touch-v1\.2\.0-hold-repeat/,'controller version must expose continuous placement plus hold repeat');
+assert.match(source,/const HOLD_DELAY_MS=320;/,'hold repeat must not trigger before an intentional hold');
+assert.match(source,/const HOLD_REPEAT_MS=90;/,'hold repeat cadence must stay responsive');
+assert.match(source,/pad\.addEventListener\('pointerdown',onPointerDown\)/,'direction pad must start movement on pointerdown');
+assert.match(source,/pad\.addEventListener\('pointerup',stopHold\)/,'pointerup must stop repeated movement');
+assert.match(source,/pad\.addEventListener\('pointercancel',stopHold\)/,'pointercancel must stop repeated movement');
+assert.match(source,/pad\.addEventListener\('lostpointercapture',stopHold\)/,'lost pointer capture must stop repeated movement');
+assert.match(source,/moveDirection\(dir\);\s*holdTimeout=later/,'first nudge must happen immediately before hold repeat begins');
+assert.match(source,/if\(suppressDirectionClick\)\{suppressDirectionClick=false;return;\}/,'post-pointer click must not double-nudge');
+assert.match(source,/if\(!next\)stopHold\(\)/,'preview cancellation must terminate repeat timers');
+assert.match(source,/destroy\(\)\{if\(destroyed\)return;destroyed=true;stopHold\(\);/,'destroy must terminate repeat timers');
 assert.doesNotMatch(source,/KELO_WORLD_EDIT/,'touch layer must not write authority directly');
 assert.doesNotMatch(source,/kernel\.execute/,'touch layer must not bypass placement tool / CommandBus');
 
@@ -34,4 +44,4 @@ assert.match(entry,/createStudioPlacementTouchController\(\{root,placement:tools
 assert.match(entry,/placementTouchController/,'Studio session must retain the placement touch controller');
 assert.match(entry,/placementTouchController\.destroy\(\)/,'Studio close must release placement touch UI');
 
-console.log(JSON.stringify({ok:true,mobilePlacementPad:true,directions:4,explicitCommit:true,continuousStamping:true,preservesRotation:true,preservesOverrides:true,stepModes:['snap','1px','4x'],canonicalPlacement:true,commandBusPreserved:true,touchTargetPx:46,safeArea:true,cleanup:true,versionIndependentIntegration:true},null,2));
+console.log(JSON.stringify({ok:true,mobilePlacementPad:true,directions:4,explicitCommit:true,continuousStamping:true,holdRepeat:true,holdDelayMs:320,repeatMs:90,preservesRotation:true,preservesOverrides:true,stepModes:['snap','1px','4x'],canonicalPlacement:true,commandBusPreserved:true,touchTargetPx:46,safeArea:true,cleanup:true,versionIndependentIntegration:true},null,2));
