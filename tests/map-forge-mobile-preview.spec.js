@@ -68,7 +68,7 @@ test('Map Forge real preview exposes scene and sprite requirements, hides before
   await page.evaluate(async () => {
     const { bootKeloCreators } = await import('./src/creators/creator-entry.mjs');
     const platform = await bootKeloCreators({ root: window });
-    await platform.openWorkspace('map-forge');
+    window.__KELO_TEST_MAP_FORGE_WORKSPACE__ = await platform.openWorkspace('map-forge');
   });
 
   const forge = page.locator('#kelo-map-forge');
@@ -88,8 +88,7 @@ test('Map Forge real preview exposes scene and sprite requirements, hides before
   }, null, { timeout: 15000 });
 
   const before = await page.evaluate(async () => {
-    const { getMapForgeWorkspace } = await import('./src/creators/ui/map-forge-workspace.mjs');
-    const selected = getMapForgeWorkspace()?.selected;
+    const selected = window.__KELO_TEST_MAP_FORGE_WORKSPACE__?.selected;
     return selected ? {
       seed: selected.metadata.seed,
       layoutHash: selected.metadata.layoutHash,
@@ -121,8 +120,7 @@ test('Map Forge real preview exposes scene and sprite requirements, hides before
   await expect(page.getByRole('button', { name: 'VOLVER A MAP FORGE' })).toBeVisible({ timeout: 15000 });
 
   const exterior = await page.evaluate(async () => {
-    const { getMapForgeWorkspace } = await import('./src/creators/ui/map-forge-workspace.mjs');
-    const selected = getMapForgeWorkspace()?.selected;
+    const selected = window.__KELO_TEST_MAP_FORGE_WORKSPACE__?.selected;
     const runtime = window.KELO_WORLD_BUILDER?.snapshot?.();
     const camera = window.KeloCamera?.snapshot?.();
     const placements = window.KELO_PROPERTY_SYSTEM?.getPlacements?.('parcel:world:editor') || [];
@@ -153,8 +151,7 @@ test('Map Forge real preview exposes scene and sprite requirements, hides before
   await page.getByRole('button', { name: 'VOLVER A MAP FORGE' }).click();
   await expect(forge).toBeVisible({ timeout: 10000 });
   const after = await page.evaluate(async () => {
-    const { getMapForgeWorkspace } = await import('./src/creators/ui/map-forge-workspace.mjs');
-    const selected = getMapForgeWorkspace()?.selected;
+    const selected = window.__KELO_TEST_MAP_FORGE_WORKSPACE__?.selected;
     return selected ? { seed: selected.metadata.seed, layoutHash: selected.metadata.layoutHash } : null;
   });
   expect(after).toEqual({ seed: before.seed, layoutHash: before.layoutHash });

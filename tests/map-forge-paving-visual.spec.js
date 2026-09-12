@@ -17,15 +17,15 @@ async function openSeed68(page){
   const response=await page.goto('/?mapEditor=1&offline=1',{waitUntil:'domcontentloaded',timeout:30000});
   expect(response.status()).toBeLessThan(400);
   await page.waitForFunction(()=>!!(window.KELO_WORLD_BUILDER?.renderSnapshotPreview&&window.KELO_PROPERTY_SYSTEM?.drawPlacements&&window.KELO_PROPERTY_CATALOG&&window.KeloCamera?.focus&&window.KELO_ADMIN_KEYS?.can?.('world.edit')),null,{timeout:15000});
-  await page.evaluate(async()=>{const {bootKeloCreators}=await import('./src/creators/creator-entry.mjs');const platform=await bootKeloCreators({root:window});await platform.openWorkspace('map-forge');});
+  await page.evaluate(async()=>{const {bootKeloCreators}=await import('./src/creators/creator-entry.mjs');const platform=await bootKeloCreators({root:window});window.__KELO_TEST_MAP_FORGE_WORKSPACE__=await platform.openWorkspace('map-forge');});
   const forge=page.locator('#kelo-map-forge');await expect(forge).toBeVisible();
   await page.getByRole('spinbutton',{name:/Seed/}).fill('68');
   await page.getByRole('combobox',{name:'Candidatos'}).selectOption({label:'Best of 4'});
   await page.getByRole('button',{name:'GENERAR'}).click();
   await expect(forge.getByText(/4\/4 válidos/)).toBeVisible({timeout:15000});
   await forge.getByRole('button').filter({hasText:'Seed 68'}).click();
-  await page.waitForFunction(async()=>{const {getMapForgeWorkspace}=await import('./src/creators/ui/map-forge-workspace.mjs');return getMapForgeWorkspace()?.selected?.metadata?.seed===68;},null,{timeout:5000});
-  const selected=await page.evaluate(async()=>{const {getMapForgeWorkspace}=await import('./src/creators/ui/map-forge-workspace.mjs');const map=getMapForgeWorkspace().selected,paving=map.validation.paving;return{seed:map.metadata.seed,layoutHash:map.metadata.layoutHash,generatorVersion:map.metadata.generatorVersion,valid:map.validation.valid,errors:map.validation.errors,largestComponentRatio:paving.largestComponentRatio,largestComponentCells:paving.largestComponentCells,stoneWithoutIntent:map.terrain.cells.filter(c=>c.material==='stone'&&!c.pavingIntent?.planId).length};});
+  await page.waitForFunction(()=>window.__KELO_TEST_MAP_FORGE_WORKSPACE__?.selected?.metadata?.seed===68,null,{timeout:5000});
+  const selected=await page.evaluate(()=>{const map=window.__KELO_TEST_MAP_FORGE_WORKSPACE__.selected,paving=map.validation.paving;return{seed:map.metadata.seed,layoutHash:map.metadata.layoutHash,generatorVersion:map.metadata.generatorVersion,valid:map.validation.valid,errors:map.validation.errors,largestComponentRatio:paving.largestComponentRatio,largestComponentCells:paving.largestComponentCells,stoneWithoutIntent:map.terrain.cells.filter(c=>c.material==='stone'&&!c.pavingIntent?.planId).length};});
   expect(selected).toMatchObject({seed:68,valid:true,errors:[],stoneWithoutIntent:0});
   expect(versionAtLeast(selected.generatorVersion,'1.1.0')).toBe(true);
   expect(selected.largestComponentRatio).toBeLessThanOrEqual(.10);
@@ -40,7 +40,7 @@ async function verifyViewport(page,label,expectedViewport){
   await page.getByRole('button',{name:'VER EN MAPA EXTERIOR'}).click();
   await expect(forge).toHaveCount(0,{timeout:1000});
   await expect(page.getByRole('button',{name:'VOLVER A MAP FORGE'})).toBeVisible({timeout:15000});
-  const exterior=await page.evaluate(async()=>{const {getMapForgeWorkspace}=await import('./src/creators/ui/map-forge-workspace.mjs');const map=getMapForgeWorkspace().selected,runtime=window.KELO_WORLD_BUILDER.snapshot(),placements=window.KELO_PROPERTY_SYSTEM.getPlacements('parcel:world:editor')||[];return{seed:map.metadata.seed,layoutHash:map.metadata.layoutHash,viewKind:runtime?.view?.kind||null,cellCount:Object.keys(runtime?.cells||{}).length,placementCount:placements.length};});
+  const exterior=await page.evaluate(()=>{const map=window.__KELO_TEST_MAP_FORGE_WORKSPACE__.selected,runtime=window.KELO_WORLD_BUILDER.snapshot(),placements=window.KELO_PROPERTY_SYSTEM.getPlacements('parcel:world:editor')||[];return{seed:map.metadata.seed,layoutHash:map.metadata.layoutHash,viewKind:runtime?.view?.kind||null,cellCount:Object.keys(runtime?.cells||{}).length,placementCount:placements.length};});
   expect(exterior).toMatchObject({seed:68,layoutHash:selected.layoutHash,viewKind:'preview'});
   expect(exterior.cellCount).toBeGreaterThan(5000);expect(exterior.placementCount).toBeGreaterThan(0);
   await page.screenshot({path:`test-results/map-forge-paving-exterior-seed-68-${label}.png`,fullPage:true});

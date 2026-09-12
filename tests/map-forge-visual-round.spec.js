@@ -127,7 +127,7 @@ async function bootForge(page){
   await page.evaluate(async()=>{
     const {bootKeloCreators}=await import('./src/creators/creator-entry.mjs');
     const platform=await bootKeloCreators({root:window});
-    await platform.openWorkspace('map-forge');
+    window.__KELO_TEST_MAP_FORGE_WORKSPACE__=await platform.openWorkspace('map-forge');
   });
   const forge=page.locator('#kelo-map-forge');await expect(forge).toBeVisible({timeout:20000});
   return{forge,pageErrors};
@@ -140,7 +140,7 @@ async function generateSelected(page,forge,seed){
   await expect(forge.getByText(/4\/4 válidos/)).toBeVisible({timeout:15000});
   await forge.getByRole('button').filter({hasText:`Seed ${seed}`}).first().click();
   for(let attempt=0;attempt<50;attempt++){
-    const map=await page.evaluate(async expected=>{const {getMapForgeWorkspace}=await import('./src/creators/ui/map-forge-workspace.mjs');const selected=getMapForgeWorkspace()?.selected;return selected?.metadata?.seed===expected?JSON.parse(JSON.stringify(selected)):null;},seed);
+    const map=await page.evaluate(expected=>{const selected=window.__KELO_TEST_MAP_FORGE_WORKSPACE__?.selected;return selected?.metadata?.seed===expected?JSON.parse(JSON.stringify(selected)):null;},seed);
     if(map)return map;
     await page.waitForTimeout(100);
   }

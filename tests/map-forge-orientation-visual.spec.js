@@ -60,7 +60,7 @@ async function bootForge(page){
   const response=await page.goto('/?mapEditor=1&offline=1',{waitUntil:'domcontentloaded',timeout:30000});
   expect(response.status()).toBeLessThan(400);
   await page.waitForFunction(()=>!!(window.KELO_WORLD_BUILDER?.renderSnapshotPreview&&window.KELO_PROPERTY_SYSTEM?.drawPlacements&&window.KELO_PROPERTY_CATALOG&&window.KeloCamera?.focus&&window.KELO_ADMIN_KEYS?.can?.('world.edit')),null,{timeout:15000});
-  await page.evaluate(async()=>{const {bootKeloCreators}=await import('./src/creators/creator-entry.mjs');const platform=await bootKeloCreators({root:window});await platform.openWorkspace('map-forge');});
+  await page.evaluate(async()=>{const {bootKeloCreators}=await import('./src/creators/creator-entry.mjs');const platform=await bootKeloCreators({root:window});window.__KELO_TEST_MAP_FORGE_WORKSPACE__=await platform.openWorkspace('map-forge');});
   const forge=page.locator('#kelo-map-forge');await expect(forge).toBeVisible();return{forge,pageErrors};
 }
 async function generateSelected(page,forge,seed){
@@ -69,8 +69,8 @@ async function generateSelected(page,forge,seed){
   await page.getByRole('button',{name:'GENERAR'}).click();
   await expect(forge.getByText(/4\/4 válidos/)).toBeVisible({timeout:15000});
   await forge.getByRole('button').filter({hasText:`Seed ${seed}`}).first().click();
-  await page.waitForFunction(async expected=>{const {getMapForgeWorkspace}=await import('./src/creators/ui/map-forge-workspace.mjs');return getMapForgeWorkspace()?.selected?.metadata?.seed===expected;},seed,{timeout:5000});
-  return page.evaluate(async()=>{const {getMapForgeWorkspace}=await import('./src/creators/ui/map-forge-workspace.mjs');return JSON.parse(JSON.stringify(getMapForgeWorkspace().selected));});
+  await page.waitForFunction(expected=>window.__KELO_TEST_MAP_FORGE_WORKSPACE__?.selected?.metadata?.seed===expected,seed,{timeout:5000});
+  return page.evaluate(()=>JSON.parse(JSON.stringify(window.__KELO_TEST_MAP_FORGE_WORKSPACE__.selected)));
 }
 
 test(`Map Forge directional props ${STAGE}`,async({page})=>{
