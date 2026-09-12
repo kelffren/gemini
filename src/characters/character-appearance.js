@@ -1,16 +1,16 @@
 /* KELO-INDEX
  * area: CHARACTERS
  * owner: KeloCharacterAppearance; avatar composition owned by KeloAvatar
- * keys: APPEARANCE PLAYER BOT HERO SPRITE FALLBACK FOUNDATION PVP AIM FACING STRAFE LOCOMOTION PLANT PIXEL PHASE DPR CAMERA CAST
- * hace: asigna y renderiza sprites de apariencia; el hero.PNG subido usa el owner modular con 4 direcciones
+ * keys: APPEARANCE PLAYER BOT HERO SPRITE FALLBACK FOUNDATION PVP AIM FACING STRAFE LOCOMOTION PLANT PIXEL PHASE DPR CAMERA CAST BASE ZOO
+ * hace: asigna y renderiza sprites de apariencia; el jugador local delega el cuerpo a Base Zoo y este módulo conserva apariencias de actores no locales
  * online: visual cliente; autoridad de actor fuera de este modulo; en PvP conserva aim de gameplay y usa fila de aim solo durante compromiso de ataque/aim/cast explícito
  * extension-points: KeloAvatar.use como middleware condicional de apariencia
- * do-not: NO envolver renderAvatar, NO decidir aim ni gameplay desde apariencia
+ * do-not: NO envolver renderAvatar, NO decidir aim ni gameplay desde apariencia, NO volver a pintar un full-body encima del Base Zoo local
  */
 (function () {
   'use strict';
 
-  const VERSION = 'character-appearance-v2.7.0-cast-active-aim-facing';
+  const VERSION = 'character-appearance-v2.8.0-base-zoo-main';
   const DEFAULT_PLAYER = 'player_hero_v1';
   const DEFAULT_BOT = DEFAULT_PLAYER;
   const ALPHA_CLEANUP_THRESHOLD = 8;
@@ -50,7 +50,8 @@
     usesExplicitIdleFrame: true,
     usesCombatAimFacing: true, combatAimFacingPolicy: 'idle-or-attack-or-cast-windup-active',
     adaptivePhysicalPixelSnap: true, physicalPixelSnapCount: 0, worldPixelFallbackCount: 0,
-    avatarOwner: 'KeloAvatar', avatarMiddleware: 'character-appearance:custom-sprite', lastDraw: null
+    avatarOwner: 'KeloAvatar', avatarMiddleware: 'character-appearance:custom-sprite',
+    localPlayerBodyOwner: 'main-hero:base-zoo', localPlayerDelegates: 0, lastDraw: null
   };
 
   function getDefinition(id) { return definitions[id] || definitions[DEFAULT_PLAYER]; }
@@ -206,6 +207,13 @@
 
   function renderAppearance(actor, isSelf, next) {
     if (!actor) return next();
+    // Base Zoo is the authoritative full-body owner for the local player. This middleware
+    // must delegate instead of consuming the chain with the historical hero.PNG body.
+    const baseZooAudit = window.KELO_MAIN_HERO_SPRITE_AUDIT;
+    if (isSelf && baseZooAudit && baseZooAudit.version === 'main-hero-base-zoo-v1') {
+      audit.localPlayerDelegates += 1;
+      return next();
+    }
     const def=getDefinition(actor.appearanceId);
     if (!def || def.delegateToLegacyHero) return next();
     const runtime=ensureRuntime(def);
