@@ -65,7 +65,7 @@ check('exact-cover-reports-crop',()=>assert.equal(exactCanvasPlacement(200,100,1
 check('exact-runtime-verifier',()=>{const runtime={columns:4,rows:4,frameWidth:128,frameHeight:192,width:512,height:768,canvas:{width:512,height:768}};assert.equal(verifyExactRuntime(runtime,{enabled:true,width:128,height:192}).ok,true)});
 check('exact-ui-is-real-export',()=>has(ui,['CANVAS EXACTO · RUNTIME REAL','exactCanvasVerification','reframeCompiledRuntimeExact','128','192']));
 check('exact-service-persists-runtime',()=>has(service,['reframeCompiledRuntimeExact','avatarRuntime','exactCanvas']));
-check('lasso-is-exact-mask',()=>{const m=polygonSelectionMask(5,5,[{x:.1,y:.1},{x:.9,y:.1},{x:.9,y:.9},{x:.1,y:.9}]);assert.equal(m[2*5+2],1);assert.equal(m[0],0)});
+check('lasso-is-exact-mask',()=>{const m=polygonSelectionMask(5,5,[{x:.25,y:.25},{x:.75,y:.25},{x:.75,y:.75},{x:.25,y:.75}]);assert.equal(m[2*5+2],1);assert.equal(m[0],0);assert.equal(m[4],0);assert.equal(m[20],0);assert.equal(m[24],0)});
 check('contract-exact-35',()=>{assert.equal(surgeryFeatureContract.required.length,35);assert.equal(new Set(surgeryFeatureContract.required).size,35);assert.deepEqual([...SURGERY_TOOLS],['move','erase','restore','piece','compare'])});
 check('finger-first-safety',()=>has(ui,['touch-action:none','setPointerCapture','pointercancel']));
 check('runtime-gate-not-bypassed',()=>{has(service,['compiled.reviewRequired','compiled.validation?.artDefects']);has(ui,'use.disabled=!pass')});
@@ -73,4 +73,4 @@ check('workspace-routes-to-surgery',()=>has(manifest,'avatar-frame-surgery-works
 check('original-remains-immutable',()=>{const p=createSurgeryPatch({erase:[createStroke([{x:.5,y:.5}])]});assert.equal(serializeSurgeryPatches({0:p})[0].erase.length,1);has(normalizer,'foreground.cleanedData')});
 check('explicit-ambiguous-review',()=>has(ui,['CONFIRMAR INTERPRETACIÓN','reviewConfirmed','userConfirmedInterpretation:reviewConfirmed']));
 
-const promised=checks.slice(0,35),score=promised.filter(x=>x.pass).length,report={ok:failures.length===0,supervisor:'Kelo Frame Surgery Guardian',version:'3.0.0-behavior-exact-canvas',promisedFeatures:35,score:`${score}/35`,astonished:failures.length===0&&score===35,extraGuards:checks.length-35,checks,failures};console.log(JSON.stringify(report,null,2));if(failures.length||score!==35)throw new Error(`FRAME_SURGERY_SUPERVISOR_REJECTED ${score}/35 :: ${failures.join(' | ')}`);
+const promised=checks.slice(0,35),score=promised.filter(x=>x.pass).length,report={ok:failures.length===0,supervisor:'Kelo Frame Surgery Guardian',version:'3.0.1-behavior-exact-canvas',promisedFeatures:35,score:`${score}/35`,astonished:failures.length===0&&score===35,extraGuards:checks.length-35,checks,failures};console.log(JSON.stringify(report,null,2));if(failures.length||score!==35)throw new Error(`FRAME_SURGERY_SUPERVISOR_REJECTED ${score}/35 :: ${failures.join(' | ')}`);
