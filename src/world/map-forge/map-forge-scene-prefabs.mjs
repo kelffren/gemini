@@ -17,7 +17,6 @@ const BLOCK_PAD=24;
 const LANDMARK_PAD=22;
 const LOCAL_NEIGHBOR_RADIUS=220;
 const ROUND=value=>Math.round(Number(value||0)*10)/10;
-const URBAN_KITS=new Set(['royal-civic','commerce']);
 const VARIANTS=Object.freeze([
   Object.freeze({id:'balanced',forwardScale:1,lateralScale:1}),
   Object.freeze({id:'wide',forwardScale:.94,lateralScale:1.12}),
@@ -36,12 +35,12 @@ export const SCENE_PREFAB_PATTERNS=Object.freeze({
     slot('rest-bench-left','bench',136,-220),slot('rest-bench-right','bench',136,220),
     slot('flower-left','flower',88,-286),slot('flower-right','flower',88,286)
   ])}),
-  main_market:Object.freeze({id:'market-gateway-v1',kit:'commerce',roadBand:[28,235],slots:Object.freeze([
+  main_market:Object.freeze({id:'market-gateway-v1',kit:'commerce',roadBand:[35,235],slots:Object.freeze([
     slot('entry-lamp-left','lamp',38,-112),slot('entry-lamp-right','lamp',38,112),
     slot('stall-left','market_prop',102,-178),slot('stall-right','market_prop',102,178),
     slot('rest-bench-left','bench',166,-126),slot('rest-bench-right','bench',166,126)
   ])}),
-  small_market:Object.freeze({id:'small-market-gateway-v1',kit:'commerce',roadBand:[28,230],slots:Object.freeze([
+  small_market:Object.freeze({id:'small-market-gateway-v1',kit:'commerce',roadBand:[35,230],slots:Object.freeze([
     slot('entry-lamp-left','lamp',34,-94),slot('entry-lamp-right','lamp',34,94),
     slot('stall-left','market_prop',94,-146),slot('stall-right','market_prop',94,146),
     slot('rest-bench','bench',150,0)
@@ -79,7 +78,7 @@ function districtOwnerAt(parts,p){let owner=null,best=Infinity;for(const d of pa
 function pointInsideRect(p,r,pad=0){return p.x>=r.x-pad&&p.x<=r.x+r.w+pad&&p.y>=r.y-pad&&p.y<=r.y+r.h+pad;}
 function localSameFamilyCount(rows){let count=0;for(let i=0;i<rows.length;i++){const current=rows[i];let nearest=null,best=Infinity;for(let j=0;j<rows.length;j++){if(i===j)continue;const candidate=rows[j];if(candidate.district!==current.district)continue;const distance=pointDistance(current,candidate);if(distance<best){best=distance;nearest=candidate;}}if(nearest&&best<=LOCAL_NEIGHBOR_RADIUS&&nearest.family===current.family)count++;}return count;}
 function entersNewVista(parts,from,to){for(const vista of parts.scenicVistas||[]){if(!vista.reserved||!vista.from||!vista.to)continue;const corridor=Math.max(56,90*(Number(vista.weight)||1)),before=pointSegmentDistance(from,vista.from,vista.to),after=pointSegmentDistance(to,vista.from,vista.to);if(before>=corridor&&after<corridor)return true;}return false;}
-function pointSafe(parts,rows,index,landmark,pattern,p,worldBounds){if(!insideBounds(p,worldBounds,36)||districtOwnerAt(parts,p)!==landmark.district)return false;const district=(parts.districts||[]).find(row=>row.id===landmark.district);if(district?.bounds&&!pointInsideRect(p,district.bounds,-18))return false;if((parts.blocks||[]).some(block=>pointInsideRect(p,block.bounds,BLOCK_PAD)))return false;for(const other of parts.landmarks||[]){if(other.id===landmark.id)continue;const radius=Math.max(0,Number(other?.clearance?.radius)||0)+LANDMARK_PAD;if(radius&&pointDistance(p,other.position||other)<radius)return false;}const road=nearestRoadFrame(p,parts.roads),band=pattern.roadBand||[20,340];if(!road||road.distance<band[0]||road.distance>band[1])return false;for(let i=0;i<rows.length;i++){if(i===index)continue;if(pointDistance(p,rows[i])<MEMBER_MIN_SPACING)return false;}if(entersNewVista(parts,rows[index],p))return false;return true;}
+function pointSafe(parts,rows,index,landmark,pattern,p,worldBounds){if(!insideBounds(p,worldBounds,36)||districtOwnerAt(parts,p)!==landmark.district)return false;const district=(parts.districts||[]).find(row=>row.id===landmark.district);if(district?.bounds&&!pointInsideRect(p,district.bounds,-18))return false;if((parts.blocks||[]).some(block=>pointInsideRect(p,block.bounds,BLOCK_PAD)))return false;for(const other of parts.landmarks||[]){if(other.id===landmark.id)continue;const radius=Math.max(0,Number(other?.clearance?.radius)||0)+LANDMARK_PAD;if(radius&&pointDistance(p,other.position||other)<radius)return false;}const road=nearestRoadFrame(p,parts.roads),band=pattern.roadBand||[20,340],districtRoadMin=district?.kind==='commerce'?35:22,minRoad=Math.max(Number(band[0])||0,districtRoadMin);if(!road||road.distance<minRoad||road.distance>band[1])return false;for(let i=0;i<rows.length;i++){if(i===index)continue;if(pointDistance(p,rows[i])<MEMBER_MIN_SPACING)return false;}if(entersNewVista(parts,rows[index],p))return false;return true;}
 function candidatePoints(from,ideal){return[1,.84,.68].map(t=>({x:ROUND(from.x+(ideal.x-from.x)*t),y:ROUND(from.y+(ideal.y-from.y)*t),t}));}
 function chooseMember(rows,landmark,member,ideal,used){let best=null;for(let i=0;i<rows.length;i++){const row=rows[i];if(used.has(i)||row.district!==landmark.district||row.family!==member.family)continue;const distance=pointDistance(row,ideal);if(distance>MEMBER_MAX_SOURCE_DISTANCE)continue;if(!best||distance<best.distance-1e-6||Math.abs(distance-best.distance)<=1e-6&&i<best.index)best={index:i,distance};}return best;}
 function connectorFor(parts,landmark){const center=landmark.position||landmark,frame=nearestRoadFrame(center,parts.roads);if(!frame)return null;return{id:'road-entry',kind:'road',required:true,roadId:frame.roadId,position:{x:ROUND(frame.x),y:ROUND(frame.y)},distance:ROUND(frame.distance),facing:String(landmark.frontage?.facing||landmark.facing||'south')};}
