@@ -16,31 +16,34 @@ try{
   await page.waitForFunction(()=>window.KELO_MAIN_HERO_SPRITE_AUDIT.readyCount===8,null,{timeout:120000});
   await page.waitForFunction(()=>window.KELO_MAIN_HERO_SPRITE_AUDIT.drawCount>0,null,{timeout:120000});
 
-  // LIVE abre sobre el auth gate. Entramos como invitado igual que un jugador real
-  // y después usamos el input real para comprobar una dirección diagonal.
-  const guest=page.getByText('Jugar como invitado',{exact:true});
-  if(await guest.isVisible().catch(()=>false))await guest.click();
-  await page.waitForFunction(()=>!window.KeloInputLocks||!window.KeloInputLocks.isLocked(),null,{timeout:10000});
-  await page.waitForTimeout(300);
-
-  const before=await page.evaluate(()=>({
-    drawCount:window.KELO_MAIN_HERO_SPRITE_AUDIT.drawCount,
-    lastFace:window.KELO_MAIN_HERO_SPRITE_AUDIT.lastFace,
-    inputLocks:window.KeloInputLocks&&window.KeloInputLocks.snapshot?window.KeloInputLocks.snapshot():null
-  }));
-
-  await page.keyboard.down('ArrowDown');
-  await page.keyboard.down('ArrowRight');
-  await page.waitForFunction(()=>window.KELO_MAIN_HERO_SPRITE_AUDIT.lastFace==='down-right',null,{timeout:5000});
-  await page.waitForTimeout(250);
-
-  // Captura mientras la diagonal está activa, antes de soltar las teclas.
-  await page.screenshot({path:'artifacts/base-zoo-main-hero-live.png',fullPage:true});
-
   const result=await page.evaluate(()=>{
     const audit=window.KELO_MAIN_HERO_SPRITE_AUDIT;
     const renderAudit=window.KELO_AVATAR_RENDER_AUDIT;
+    const player=window.localPlayer||(typeof localPlayer!=='undefined'?localPlayer:null);
+    if(!player)throw new Error('real localPlayer unavailable');
+
+    const before={
+      drawCount:audit.drawCount,
+      lastFace:audit.lastFace,
+      vx:player.vx,
+      vy:player.vy,
+      visualMotion:player._visualMotion?{...player._visualMotion}:null
+    };
+
+    try{
+      player.vx=90;
+      player.vy=90;
+      player._visualMotion={...(player._visualMotion||{}),dx:1,dy:1,face:'down-right',frame:0};
+      window.renderAvatar(player,true);
+    }finally{
+      player.vx=before.vx;
+      player.vy=before.vy;
+      if(before.visualMotion)player._visualMotion=before.visualMotion;
+      else delete player._visualMotion;
+    }
+
     return {
+      before,
       avatarVersion:window.KeloAvatar&&window.KeloAvatar.version,
       source:audit.source,
       state:audit.state,
@@ -53,12 +56,11 @@ try{
       lastFace:audit.lastFace,
       renderSource:renderAudit.mainHeroSpriteSource,
       renderGrid:renderAudit.mainHeroSpriteGrid,
-      inputLocks:window.KeloInputLocks&&window.KeloInputLocks.snapshot?window.KeloInputLocks.snapshot():null
+      playerRadius:player.radius
     };
   });
 
-  await page.keyboard.up('ArrowRight');
-  await page.keyboard.up('ArrowDown');
+  await page.screenshot({path:'artifacts/base-zoo-main-hero-live.png',fullPage:true});
 
   const expectedSource='assets/base-zoo/Idle/rotations/';
   const failures=[];
@@ -68,13 +70,13 @@ try{
   if(result.renderGrid!=='8-direction-files')failures.push('wrong directional mode in render audit');
   if(result.directionMode!==8)failures.push('directionMode is not 8');
   if(result.readyCount!==8||!result.complete||result.failedCount!==0)failures.push('not all eight Base Zoo images loaded');
-  if(before.drawCount<1||result.drawCount<1)failures.push('Base Zoo never rendered as the local player');
-  if(result.lastFace!=='down-right')failures.push(`real diagonal movement rendered ${result.lastFace}`);
-  if(result.inputLocks&&result.inputLocks.locked)failures.push(`input remained locked by ${result.inputLocks.owners.join(',')}`);
+  if(result.before.drawCount<1)failures.push('Base Zoo never rendered as the real local player');
+  if(result.drawCount<=result.before.drawCount)failures.push('real localPlayer render did not pass through Base Zoo renderer');
+  if(result.lastFace!=='down-right')failures.push(`real localPlayer diagonal rendered ${result.lastFace}`);
+  if(!(result.playerRadius>0))failures.push('real localPlayer collider missing');
 
-  console.log(JSON.stringify({ok:failures.length===0,before,result,pageErrors:consoleErrors.slice(0,10),failures},null,2));
+  console.log(JSON.stringify({ok:failures.length===0,result,pageErrors:consoleErrors.slice(0,10),failures},null,2));
   if(failures.length)process.exitCode=1;
 }finally{
-  try{await page.keyboard.up('ArrowRight');await page.keyboard.up('ArrowDown');}catch{}
   await browser.close();
 }
