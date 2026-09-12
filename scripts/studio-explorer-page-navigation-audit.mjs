@@ -15,7 +15,7 @@ assert.equal(resolveExplorerNavigationIndex({index:17,length,key:'End'}),34,'End
 assert.equal(resolveExplorerNavigationIndex({index:0,length:0,key:'PageDown'}),-1,'empty Explorer navigation should remain a no-op sentinel');
 
 const ids=Array.from({length:25},(_,index)=>`entity-${index}`);
-let keyHandler=null,selection=['entity-4'];
+let keyHandler=null,clickHandler=null,selection=['entity-4'];
 const sets=[];
 const rows=ids.map(id=>({
   dataset:{entity:id},
@@ -23,7 +23,7 @@ const rows=ids.map(id=>({
   getAttribute(){return '-1';},setAttribute(){},focus(){},scrollIntoView(){this.scrolled=(this.scrolled||0)+1;}
 }));
 const document={
-  addEventListener(type,fn,capture){if(type==='keydown'&&capture===true)keyHandler=fn;},
+  addEventListener(type,fn,capture){if(type==='keydown'&&capture===true)keyHandler=fn;if(type==='click'&&capture===true)clickHandler=fn;},
   removeEventListener(){},
   querySelectorAll(selector){return selector==='#kelo-studio-live [data-entity]'?rows:[];}
 };
@@ -39,6 +39,7 @@ assert.equal(down.stopped,1,'PageDown must not leak into other Studio handlers')
 assert.equal(rows[14].scrolled,1,'PageDown must keep the destination row visible');
 
 selection=['entity-4'];
+clickHandler({target:rows[4],defaultPrevented:false,shiftKey:false,ctrlKey:false,metaKey:false,preventDefault(){},stopImmediatePropagation(){}});
 const shiftDown=event(4,'PageDown',{shiftKey:true});
 keyHandler(shiftDown);
 assert.deepEqual(sets.at(-1),ids.slice(4,15),'Shift+PageDown must extend one anchored contiguous range by ten visible rows');
