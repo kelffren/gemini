@@ -14,6 +14,7 @@ const MAIN_SEED=81746291;
 const VALIDATION_SEEDS=[81746291,12345,424242,29011987];
 const STAGE=process.env.KELO_VISUAL_STAGE==='after'?'after':'before';
 const URBAN_KINDS=new Set(['plaza','royal','commerce']);
+const DIRECTIONAL_FAMILIES=new Set(['bench','market_prop']);
 const DECORATION_MIN=195;
 const DECORATION_MAX=215;
 const VALIDATION_QUALITY_MIN=94;
@@ -75,10 +76,14 @@ function scenePairMetrics(map){
 }
 function mapMetrics(map){
   const districtById=new Map((map.districts||[]).map(d=>[d.id,d]));
-  const urban=(map.decorations||[]).filter(d=>URBAN_KINDS.has(districtById.get(d.district)?.kind));
+  const decorations=map.decorations||[];
+  const urban=decorations.filter(d=>URBAN_KINDS.has(districtById.get(d.district)?.kind));
+  const upright=decorations.filter(d=>!DIRECTIONAL_FAMILIES.has(d.family));
+  const uprightRotated=upright.filter(d=>((Number(d.rotation)||0)%360+360)%360!==0);
   const roadDistances=urban.map(d=>nearestRoadDistance(d,map.roads));
   const streetscape=roadDistances.filter(distance=>distance>=35&&distance<=190).length;
-  const familyCounts={};for(const d of map.decorations||[])familyCounts[d.family]=(familyCounts[d.family]||0)+1;
+  const familyCounts={};for(const d of decorations)familyCounts[d.family]=(familyCounts[d.family]||0)+1;
+  const uprightRotationCounts={};for(const d of upright){const key=String(((Number(d.rotation)||0)%360+360)%360);uprightRotationCounts[key]=(uprightRotationCounts[key]||0)+1;}
   return{
     seed:map.metadata?.seed,
     generatorVersion:map.metadata?.generatorVersion,
@@ -91,10 +96,14 @@ function mapMetrics(map){
     assetVariety:Number(map.quality?.breakdown?.assetVariety||0),
     roadCount:(map.roads||[]).length,
     blockCount:(map.blocks||[]).length,
-    decorationCount:(map.decorations||[]).length,
+    decorationCount:decorations.length,
     declusterSwapCount:Number(map.generationStats?.decorationDeclusterSwapCount||0),
     landmarkRoadFacingCount:Number(map.generationStats?.landmarkRoadFacingCount||0),
     landmarkRoadFacingChangedCount:Number(map.generationStats?.landmarkRoadFacingChangedCount||0),
+    uprightDecorationCount:upright.length,
+    uprightRotatedCount:uprightRotated.length,
+    uprightNormalizedCount:Number(map.generationStats?.decorationUprightNormalizedCount||0),
+    uprightRotationCounts,
     urbanDecorationCount:urban.length,
     urbanStreetscapeCount:streetscape,
     urbanStreetscapeRatio:urban.length?Number((streetscape/urban.length).toFixed(4)):1,
@@ -154,6 +163,9 @@ test(`Map Forge ${STAGE} fixed-seed preview/runtime visual evidence`,async({page
     expect(mainMetrics.scenePrefabCount).toBeGreaterThan(0);
     expect(mainMetrics.sceneCompletePairCount).toBeGreaterThan(0);
     expect(mainMetrics.sceneOrphanPairCount).toBe(0);
+    expect(mainMetrics.uprightDecorationCount).toBeGreaterThan(0);
+    expect(mainMetrics.uprightRotatedCount).toBe(0);
+    expect(mainMetrics.uprightNormalizedCount).toBeGreaterThan(0);
   }
   await page.screenshot({path:`test-results/screenshot_preview_${STAGE}.png`,fullPage:true});
 
@@ -189,6 +201,8 @@ test(`Map Forge ${STAGE} fixed-seed preview/runtime visual evidence`,async({page
       expect(metrics.localSameFamilyRatio).toBeLessThanOrEqual(LOCAL_SAME_FAMILY_MAX);
       expect(metrics.landmarkRoadFacingCount).toBeGreaterThanOrEqual(3);
       expect(metrics.sceneOrphanPairCount).toBe(0);
+      expect(metrics.uprightDecorationCount).toBeGreaterThan(0);
+      expect(metrics.uprightRotatedCount).toBe(0);
     }
     validation.push(metrics);
   }
