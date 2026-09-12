@@ -20,6 +20,7 @@ const css = `
 .kaq-chips{display:flex;flex-wrap:wrap;gap:6px;margin:9px 0}.kaq-chip{border:1px solid #30343d;border-radius:999px;background:#11141a;color:#c6c9d0;padding:6px 9px;font-size:10px;font-weight:850}.kaq-chip.good{border-color:#28553b;color:#8ce0ad}.kaq-chip.warn{border-color:#66552a;color:#efcf7b}
 .kaq-hypotheses{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;margin:10px 0}.kaq-hypothesis{border:1px solid #30343d;border-radius:13px;background:#101218;color:#d7d9dd;padding:10px;text-align:left}.kaq-hypothesis b,.kaq-hypothesis span{display:block}.kaq-hypothesis span{font-size:10px;color:#92969e;margin-top:4px}.kaq-hypothesis.on{border-color:#d1ae58;background:#1c1911}
 .kaq-doctor{border:1px solid #282c33;background:#101218;border-radius:15px;padding:12px;margin:10px 0}.kaq-doctor h3{font-size:13px;margin:0 0 8px}.kaq-frame{border-top:1px solid #252932;padding:8px 0;font-size:11px;color:#c5c8ce}.kaq-frame b{color:#efcf7b}.kaq-frame.art b{color:#ff9696}
+.kaq-repair{border-top:1px solid #252932;margin-top:10px;padding-top:10px}.kaq-repair button{border:1px solid #806c38;background:#211d13;color:#efcf7b;border-radius:10px;padding:8px;font-weight:850}.kaq-repair input{width:70px;margin:4px;border:1px solid #373b44;border-radius:8px;background:#090b0f;color:#fff;padding:7px}
 .kaq-use{width:100%;border:0;border-radius:16px;background:#d1ae58;color:#111;padding:16px;font-size:17px;font-weight:950;margin-top:12px}.kaq-use:disabled{opacity:.38}.kaq-advanced{margin-top:12px;border:1px solid #262a31;border-radius:15px;background:#101218;padding:12px}.kaq-advanced summary{font-weight:850;cursor:pointer}.kaq-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}.kaq-grid label{font-size:10px;color:#9da0a7}.kaq-grid input,.kaq-grid select{width:100%;box-sizing:border-box;margin-top:5px;border:1px solid #373b44;border-radius:10px;background:#090b0f;color:#fff;padding:10px}.kaq-check{display:flex;gap:8px;align-items:flex-start;margin-top:12px;color:#c9cbd0;font-size:12px;line-height:1.35}.kaq-note{color:#858991;font-size:10px;line-height:1.4;margin-top:9px}
 @media(max-width:600px){.kaq-metrics{grid-template-columns:repeat(2,1fr)}.kaq-preview{min-height:300px}.kaq-grid{grid-template-columns:1fr}.kaq-wrap{padding-inline:10px}}
 `;
@@ -71,6 +72,7 @@ export async function openAvatarQuickImport({root = globalThis, avatarQuick} = {
   const metrics = node(document, 'div', {class: 'kaq-metrics'});
   const hypotheses = node(document, 'div', {class: 'kaq-hypotheses'});
   const doctor = node(document, 'div', {class: 'kaq-doctor'});
+  const repair = node(document, 'div', {class: 'kaq-repair', hidden: true});
   const use = node(document, 'button', {class: 'kaq-use', text: 'USAR COMO AVATAR', disabled: true});
   const advanced = node(document, 'details', {class: 'kaq-advanced'});
   const manual = node(document, 'input', {type: 'checkbox'});
@@ -94,7 +96,7 @@ export async function openAvatarQuickImport({root = globalThis, avatarQuick} = {
     node(document, 'label', {class: 'kaq-check'}, [confirm, node(document, 'span', {text: 'He revisado la animación y confirmo esta interpretación'})]),
     node(document, 'p', {class: 'kaq-note', text: 'Los defectos de arte o clipping irreversible nunca se ocultan: Kelo señala el frame exacto que necesita regeneración.'})
   );
-  wrap.append(drop, stage, preview, controls, directions, chips, metrics, hypotheses, doctor, use, advanced);
+  wrap.append(drop, stage, preview, controls, directions, chips, metrics, hypotheses, doctor, repair, use, advanced);
   shell.append(wrap);
   document.head.append(style);
   document.body.append(shell);
@@ -107,6 +109,8 @@ export async function openAvatarQuickImport({root = globalThis, avatarQuick} = {
   let selectedLayoutSignature = null;
   let selectedDirection = 's';
   let busy = false;
+  let selectedRepairIndex = null;
+  const framePatches = {};
   let raf = 0;
   const motion = {playing: true, frame: 0, clock: 0, last: 0};
 
@@ -127,6 +131,7 @@ export async function openAvatarQuickImport({root = globalThis, avatarQuick} = {
       selectedLayoutSignature,
       rigHint: rig.value ? Number(rig.value) : null,
       sourceDirectionOrder: directionOrder.length ? directionOrder : null,
+      framePatches,
       userConfirmedInterpretation: confirm.checked || choseAlternative,
       frameMs: 140
     };
@@ -224,15 +229,37 @@ export async function openAvatarQuickImport({root = globalThis, avatarQuick} = {
         frame.feetOffsetPx ? `feet offset ${Math.round(frame.feetOffsetPx)} px` : null,
         ...frame.reasons
       ].filter(Boolean).join(' · ');
-      doctor.append(node(document, 'div', {class: `kaq-frame ${frame.reasons.includes('clipped') ? 'art' : ''}`}, [
+      const row = node(document, 'div', {class: `kaq-frame ${frame.reasons.includes('clipped') ? 'art' : ''}`}, [
         node(document, 'b', {text: `${frame.direction} / WALK / FRAME ${frame.phase}`}),
         node(document, 'div', {text: frameDetails})
-      ]));
+      ]);
+      const edit = node(document, 'button', {text: 'AJUSTAR ESTE FRAME'});
+      edit.onclick = () => openRepair(frame.index, frame.label);
+      row.append(edit);
+      doctor.append(row);
     }
     for (const defect of compiled.validation?.artDefects || []) doctor.append(node(document, 'div', {class: 'kaq-frame art'}, [
       node(document, 'b', {text: `${defect.direction} / FRAME ${defect.column + 1}`}),
       node(document, 'div', {text: 'ART DEFECT — REGENERATION REQUIRED'})
     ]));
+  }
+
+  function openRepair(index, label) {
+    selectedRepairIndex = index;
+    const patch = framePatches[index] || {};
+    repair.replaceChildren(
+      node(document, 'b', {text: `REPARAR · ${label}`}),
+      node(document, 'div', {text: 'Ajuste mecánico local; los demás frames no se recompilan visualmente.'}),
+    );
+    const scale = node(document, 'input', {type: 'number', step: '.01', value: patch.scale || 1});
+    const x = node(document, 'input', {type: 'number', step: '1', value: patch.x || 0});
+    const y = node(document, 'input', {type: 'number', step: '1', value: patch.y || 0});
+    const apply = node(document, 'button', {text: 'APLICAR PATCH'});
+    const copy = node(document, 'button', {text: 'COPIAR FRAME ANTERIOR'});
+    apply.onclick = () => { framePatches[index] = {scale: Number(scale.value) || 1, x: Number(x.value) || 0, y: Number(y.value) || 0}; void refreshPreview(); };
+    copy.onclick = () => { if (index > 0) { framePatches[index] = {copyFrom: index - 1, scale: 1, x: 0, y: 0}; void refreshPreview(); } };
+    repair.append(node(document, 'label', {text: 'ESCALA'}, [scale]), node(document, 'label', {text: 'X'}, [x]), node(document, 'label', {text: 'Y'}, [y]), apply, copy);
+    repair.hidden = false;
   }
 
   function drawFrame() {

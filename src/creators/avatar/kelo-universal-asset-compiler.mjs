@@ -225,7 +225,7 @@ export async function compileUniversalAvatarRuntime(file, config = null, {root =
     if (selected) rigReport = selectedRigReport(rigReport, selected, confirmed);
   }
   onProgress?.({stage: 'normalize', message: 'NORMALIZANDO ESCALA, CENTRO Y PIES…'});
-  const normalized = normalizeSpriteFrameGroups(root, foreground, rigReport.best, {imageSmoothing: config?.imageSmoothing !== false});
+  const normalized = normalizeSpriteFrameGroups(root, foreground, rigReport.best, {imageSmoothing: config?.imageSmoothing !== false, framePatches: config?.framePatches || null});
   onProgress?.({stage: 'validate', message: 'VALIDANDO ANIMACIÓN REAL…'});
   const context = normalized.canvas.getContext('2d', {willReadFrequently: true});
   const outputData = context.getImageData(0, 0, normalized.width, normalized.height).data;

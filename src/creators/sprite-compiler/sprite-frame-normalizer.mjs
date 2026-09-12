@@ -95,7 +95,8 @@ export function planSpriteFrameNormalization(rig, {
   safeScaleMax = 1.18,
   scaleDeadZone = .035,
   footAnchor = .92,
-  horizontalAnchor = .5
+  horizontalAnchor = .5,
+  framePatches = null
 } = {}) {
   if (!rig?.groups?.length) throw new Error('SPRITE_NORMALIZER_RIG_REQUIRED');
   const rows = rig.groups.length;
@@ -105,9 +106,12 @@ export function planSpriteFrameNormalization(rig, {
   const heights = usable.map(frame => frameBounds(frame).h);
   const medianHeight = median(heights);
   const framePlans = [];
+  const allFrames = rig.groups.flat();
   for (let row = 0; row < rig.groups.length; row++) for (let column = 0; column < rig.groups[row].length; column++) {
     const frame = rig.groups[row][column];
-    const bounds = frameBounds(frame);
+    const patch = framePatches?.[row * columns + column] || {};
+    const sourceFrame = Number.isInteger(Number(patch.copyFrom)) ? (allFrames[Number(patch.copyFrom)] || frame) : frame;
+    const bounds = frameBounds(sourceFrame);
     if (!bounds) continue;
     const rawCorrection = medianHeight / Math.max(1, bounds.h);
     const withinDeadZone = Math.abs(rawCorrection - 1) <= scaleDeadZone;
@@ -118,6 +122,8 @@ export function planSpriteFrameNormalization(rig, {
       column,
       direction: rig.directionKeys?.[row] || `row${row + 1}`,
       frame,
+      sourceFrame,
+      patch,
       bounds,
       correction,
       rawCorrection,
@@ -139,13 +145,17 @@ export function planSpriteFrameNormalization(rig, {
   const baseline = frameHeight * clamp(footAnchor, .72, .98);
   const centerX = frameWidth * clamp(horizontalAnchor, .2, .8);
   const plans = framePlans.map(plan => {
-    const scale = plan.correction * atlasScale;
+    const patch = plan.patch || {};
+    const patchScale = clamp(Number(patch.scale) || 1, .5, 1.5);
+    const scale = plan.correction * atlasScale * patchScale;
     const boundsCenterInSource = plan.bounds.x + plan.bounds.w / 2;
     const boundsBottomInSource = plan.bounds.y + plan.bounds.h;
-    const source = sourceRect(plan.frame, plan.bounds, sourceWidth, sourceHeight);
+    const source = sourceRect(plan.sourceFrame || plan.frame, plan.bounds, sourceWidth, sourceHeight);
     const dx = plan.column * frameWidth + centerX - (boundsCenterInSource - source.x) * scale;
     const dy = plan.row * frameHeight + baseline - (boundsBottomInSource - source.y) * scale;
-    return F({...plan, source: F(source), scale, destination: F({x: dx, y: dy, w: source.w * scale, h: source.h * scale})});
+    const offsetX = Number(patch.x) || 0;
+    const offsetY = Number(patch.y) || 0;
+    return F({...plan, source: F(source), patch: F({scale: patchScale, x: offsetX, y: offsetY, copyFrom: Number.isInteger(Number(patch.copyFrom)) ? Number(patch.copyFrom) : null}), scale, destination: F({x: dx + offsetX, y: dy + offsetY, w: source.w * scale, h: source.h * scale})});
   });
   const outputHeights = plans.map(plan => plan.bounds.h * plan.scale);
   const outputWidths = plans.map(plan => plan.bounds.w * plan.scale);

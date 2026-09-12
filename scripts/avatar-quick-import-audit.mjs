@@ -45,9 +45,11 @@ ok('semantic owner supports 1D, 4D and 8D', rig.includes('sprite-rig-1d') && rig
 ok('8D contact sheet preserves eight frames', rig.includes('contactSheet8') && rig.includes('SOUTH_CLOCKWISE') && rig.includes('canonicalDirectionOrder[8]'));
 ok('normalizer has safe scale and foot-anchor policy', normalizer.includes('safeScaleMin') && normalizer.includes('safeScaleMax') && normalizer.includes('baseline') && normalizer.includes('centerX'));
 ok('normalizer preserves variable frame counts', normalizer.includes('frameCounts') && normalizer.includes('rig.groups.map'));
+ok('normalizer accepts selective frame patches', normalizer.includes('framePatches') && normalizer.includes('copyFrom') && normalizer.includes('patchScale'));
 ok('validator emits requested health dimensions', ['detection','alignment','background','frameConsistency','interpretationConfidence','finalHealth'].every(key => validator.includes(key)));
 ok('validator gates uncertainty and art defects', validator.includes("status: uniqueReasons.length ? 'REVIEW_REQUIRED' : 'VALIDATED'") && validator.includes('ART_DEFECT_REGENERATION_REQUIRED'));
 ok('Frame Doctor identifies exact scale and feet offsets', doctor.includes('verticalScaleDelta') && doctor.includes('feetOffsetPx') && doctor.includes('label:'));
+ok('UI exposes local frame repair controls', ui.includes('AJUSTAR ESTE FRAME') && ui.includes('APLICAR PATCH') && ui.includes('COPIAR FRAME ANTERIOR'));
 ok('quick service rejects unreviewed and irreparable output', service.includes('AVATAR_REVIEW_REQUIRED') && service.includes('AVATAR_ART_DEFECT_REGENERATION_REQUIRED'));
 ok('quick service persists 1D/4D/8D runtime contract', service.includes('compiled.rigProfileId') && service.includes('compiled.directions') && service.includes('frameCounts:compiled.frameCounts') && service.includes('directionKeys:compiled.directionKeys'));
 ok('quick service uses universal content service', service.includes('contentService.importJob') && service.includes("contentType:'character'"));
