@@ -171,6 +171,8 @@ El importer resuelve assets semánticos mediante el catálogo real. Cuando una f
 
 La colocación natural reutiliza el Poisson owner existente con propuestas mixtas: bosque y granja combinan muestras globales con microagrupaciones alrededor de puntos ya válidos. Cada propuesta agrupada vuelve a pasar exactamente las mismas fronteras, carreteras, bloques, clearance de landmarks y separación mínima. El resultado conserva densidad y seguridad, pero introduce grupos y claros reproducibles en vez de una dispersión uniformemente independiente.
 
+Los prefabs semánticos se materializan sobre esas decoraciones existentes. Desde el generador `1.6.0`, el owner de escenas busca de forma adaptativa a lo largo del trayecto entre la posición válida original y el slot autorado, en vez de probar solo tres saltos gruesos. Cada paso vuelve a validar distrito, bounds, parcelas, landmarks, carretera, vistas, spacing y ritmo local; no existe un fallback que atraviese una restricción. Esto permite que el `ancient-grove-v1` se resuelva de forma determinista en las seeds representativas de Forest sin crear objetos nuevos ni cambiar densidad, conectividad o RNG base.
+
 ## Online-first
 
 ```text
@@ -202,6 +204,7 @@ Map Forge no posee deltas valiosos. UI pide mutaciones por `KELO_WORLD_EDIT.requ
 - `npm run audit:evolution` — V3 search/holdout, paired, Pareto, novelty, memory, determinismo, evidence y minimización.
 - `npm run audit:evolution:sandbox` — code-patch worktree aislado.
 - `tests/map-forge-mobile-preview.spec.js` — preview/handoff móvil.
+- `tests/map-forge-scene-prefabs.mjs` — escenas autoradas, conectores, pares balanceados y cobertura determinista del bosque ancestral.
 - `tests/map-forge-evolution-visual.spec.js` — screenshots baseline/champion + telemetry.
 
 ## Deuda pendiente real

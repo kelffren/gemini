@@ -30,7 +30,7 @@ function pairBalance(scene){
 for(const seed of SEEDS){
   const map=generateMapCandidate(recipe,{seed,assetCatalogVersion:'ci-catalog'});
   assert.equal(map.validation.valid,true,`${seed}: map must remain valid after authored scene materialization`);
-  assert.equal(map.metadata.generatorVersion,'1.5.0',`${seed}: balanced authored scene guard targets generator 1.5.0`);
+  assert.equal(map.metadata.generatorVersion,'1.6.0',`${seed}: adaptive authored scene guard targets generator 1.6.0`);
 
   const stats=map.generationStats||{};
   const evaluated=Number(stats.scenePrefabEvaluatedCount||0);
@@ -110,4 +110,19 @@ assert.ok(totalMoved>0,'representative seeds must physically use authored placem
 assert.ok(totalConnectors>=totalScenes,'representative authored landmark scenes must remain connected to roads');
 assert.ok(totalImprovement>0,'representative authored landmark scenes must retain positive composition gain');
 assert.ok(totalManifestSprites>0,'representative maps must return sprite requirements');
+
+const forestRecipe=MAP_FORGE_RECIPES.KELO_FOREST_V1;
+let forestAdaptiveBackoffs=0;
+for(const seed of SEEDS){
+  const map=generateMapCandidate(forestRecipe,{seed,assetCatalogVersion:'ci-catalog'});
+  assert.equal(map.validation.valid,true,`${seed}: Forest must remain valid after adaptive scene placement`);
+  const ancient=(map.scenePrefabs||[]).find(scene=>scene.landmarkId==='ancient_tree');
+  assert.ok(ancient,`${seed}: Forest must resolve a recognizable ancient-tree grove`);
+  assert.equal(ancient.prefabId,'ancient-grove-v1',`${seed}: Forest grove must use the existing authored scene owner`);
+  assert.ok(ancient.memberCount>=2&&ancient.movedCount>=1,`${seed}: Forest grove must physically compose at least two existing decorations`);
+  assert.equal(pairBalance(ancient).orphan,0,`${seed}: Forest grove must retain balanced left/right pairs`);
+  assert.equal((ancient.connectors||[]).filter(row=>row.kind==='road'&&row.required===true&&row.roadId).length,1,`${seed}: Forest grove must stay connected to a road`);
+  forestAdaptiveBackoffs+=Number(map.generationStats.scenePrefabAdaptiveBackoffCount||0);
+}
+assert.ok(forestAdaptiveBackoffs>0,'Forest scene coverage must exercise adaptive spatial backoff');
 console.log(JSON.stringify({ok:true,primarySeed:PRIMARY_SEED,seeds:SEEDS,totalScenes,totalArrivalScenes,totalMembers,totalMoved,totalConnectors,totalImprovement,totalPairRollbacks,totalManifestSprites,results},null,2));
