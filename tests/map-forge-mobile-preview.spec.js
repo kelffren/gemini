@@ -44,7 +44,7 @@ test('Map Forge opens from Creator Hub before a stalled first generation settles
   await expect(page.locator('#kelo-map-forge')).toBeVisible({ timeout: 2000 });
   await expect(page.locator('#kelo-creators-hub')).toHaveCount(0, { timeout: 2000 });
   await expect(page.locator('#kelo-map-forge .kmf-canvas')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'GENERANDOâ¦' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'GENERANDO\u2026' })).toBeVisible();
 
   await page.getByRole('button', { name: 'CERRAR', exact: true }).click();
   await page.evaluate(() => {
