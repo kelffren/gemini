@@ -15,14 +15,6 @@ try{
   await page.waitForFunction(()=>window.KELO_MAIN_HERO_SPRITE_AUDIT&&window.KELO_AVATAR_RENDER_AUDIT&&window.KELO_CHARACTER_APPEARANCE_AUDIT,null,{timeout:120000});
   await page.waitForFunction(()=>window.KELO_CHARACTER_APPEARANCE_AUDIT.version==='character-appearance-v2.8.0-base-zoo-main',null,{timeout:120000});
   await page.waitForFunction(()=>window.KELO_MAIN_HERO_SPRITE_AUDIT.readyCount===8,null,{timeout:120000});
-
-  // Remove the auth cover when possible so the screenshot shows the game itself.
-  const guest=page.getByText('Jugar como invitado',{exact:true});
-  if(await guest.isVisible().catch(()=>false)){
-    await guest.click({timeout:10000}).catch(()=>{});
-    await page.waitForTimeout(600);
-  }
-
   await page.waitForFunction(()=>window.KELO_MAIN_HERO_SPRITE_AUDIT.drawCount>0&&window.KELO_CHARACTER_APPEARANCE_AUDIT.localPlayerDelegates>0,null,{timeout:120000});
 
   const before=await page.evaluate(()=>({
@@ -57,6 +49,21 @@ try{
     };
   });
 
+  // Evidence-only visibility: do not create a guest Supabase account just to take a screenshot.
+  // The auth UI is visually removed in this Playwright page after runtime assertions have passed.
+  const evidence=await page.evaluate(()=>{
+    document.documentElement.setAttribute('data-kelo-auth-gate','off');
+    const gate=document.getElementById('kelo-account-auth');
+    if(gate){gate.hidden=true;gate.style.setProperty('display','none','important');}
+    const chip=document.getElementById('kelo-account-chip');
+    if(chip)chip.style.setProperty('display','none','important');
+    return {
+      authGatePresent:!!gate,
+      authGateHidden:!gate||gate.hidden||getComputedStyle(gate).display==='none',
+      canvasPresent:!!document.getElementById('game-canvas')
+    };
+  });
+  await page.waitForTimeout(350);
   await page.screenshot({path:'artifacts/base-zoo-main-hero-live.png',fullPage:true});
 
   const expectedSource='assets/base-zoo/Idle/rotations/';
@@ -75,8 +82,9 @@ try{
   if(!result.middlewareId)failures.push('Base Zoo middleware id missing');
   if(result.drawCount<=before.drawCount)failures.push('Base Zoo stopped drawing after full boot');
   if(result.appearanceDelegateCount<=before.delegateCount)failures.push('character appearance stopped delegating local body after full boot');
+  if(!evidence.canvasPresent||!evidence.authGateHidden)failures.push('visual evidence is still covered by auth UI');
 
-  console.log(JSON.stringify({ok:failures.length===0,before,result,pageErrors:consoleErrors.slice(0,10),failures},null,2));
+  console.log(JSON.stringify({ok:failures.length===0,before,result,evidence,pageErrors:consoleErrors.slice(0,10),failures},null,2));
   if(failures.length)process.exitCode=1;
 }finally{
   await browser.close();
