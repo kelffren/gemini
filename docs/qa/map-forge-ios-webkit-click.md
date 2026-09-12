@@ -1,0 +1,1 @@
+Temporary QA note: this branch adds an iPhone/WebKit Playwright project and runs the live Creator Hub → Map Forge click path against GitHub Pages so the mobile Safari path is tested instead of only Chromium/Pixel emulation.
