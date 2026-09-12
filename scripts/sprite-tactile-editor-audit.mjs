@@ -34,13 +34,14 @@ ok('physical source edge is real missing art',missing.classification==='SOURCE_A
 const memoryRoot={};const store=createAvatarFrameProjectStore({root:memoryRoot});await store.saveProject(project);await store.putSource('src-0',new Blob(['immutable']),{name:'0.png'});const loaded=await store.loadProject(project.id),source=await store.getSource('src-0');ok('draft project survives store roundtrip',loaded.slots[2].sourceKey==='src-2-replaced');ok('source bytes live outside project metadata',await source.blob.text()==='immutable'&&!JSON.stringify(loaded).includes('immutable'));
 
 const ui=fs.readFileSync('src/creators/ui/avatar-frame-editor.mjs','utf8'),builder=fs.readFileSync('src/creators/ui/avatar-frame-builder.mjs','utf8'),compositor=fs.readFileSync('src/creators/avatar/avatar-frame-compositor.mjs','utf8'),hook=fs.readFileSync('src/creators/ui/avatar-frame-builder-hook.mjs','utf8'),doctorBridge=fs.readFileSync('src/creators/ui/avatar-frame-doctor-bridge.mjs','utf8'),quick=fs.readFileSync('src/creators/ui/avatar-workspace.mjs','utf8');
+const compositorRuntime=compositor.replace(/\/\*[\s\S]*?\*\//g,'').replace(/\/\/.*$/gm,'');
 ok('editor confines touch-action none to editor canvases',ui.includes('.kfe-canvas')&&ui.includes('touch-action:none')&&!ui.includes('.kfe{touch-action:none'));
 ok('editor implements Pointer Events and two-pointer pinch',ui.includes('onpointerdown')&&ui.includes('onpointermove')&&ui.includes('applyPinchFromPointers'));
 ok('editor exposes tactile correction toolkit', ['GHOST','MAGIC','RESTORE ORIGINAL','+ PATCH','UNDO','REDO','AUTO MATCH','COPY TRANSFORM','PASTE TRANSFORM','APPLY SCALE ROW','ALIGN FEET ROW'].every(label=>ui.includes(label)));
 ok('builder uses IndexedDB store and exact compositor for preview/export',builder.includes('createAvatarFrameProjectStore')&&builder.includes('composeFrameCell')&&builder.includes('composeFrameProjectAtlas'));
 ok('builder preview supports previous next play and speed',builder.includes('◀ FRAME')&&builder.includes('FRAME ▶')&&builder.includes('FPS')&&builder.includes('project.frameMs'));
 ok('builder publishes through existing Avatar Quick service only',builder.includes('avatarQuick.importAndUse')&&builder.includes('analyzeUniversalAvatarAsset'));
-ok('export compositor has no editor overlay vocabulary',!compositor.includes('GHOST')&&!compositor.includes('guide')&&!compositor.includes('selection'));
+ok('export compositor has no editor overlay vocabulary',!compositorRuntime.includes('GHOST')&&!compositorRuntime.includes('guide')&&!compositorRuntime.includes('selection'));
 ok('Avatar Quick exposes the second CONSTRUIR 4×4 entry',hook.includes('CONSTRUIR 4×4'));
 ok('existing Frame Doctor dispatches to tactile editor while keeping numeric fallback',quick.includes('ABRIR EDITOR TÁCTIL')&&quick.includes('kelo:avatar:tactile-frame')&&quick.includes('APLICAR PATCH NUMÉRICO'));
 ok('Frame Doctor bridge reuses original uploaded sheet source rectangles',doctorBridge.includes("sourceKey:'uploaded-sheet'")&&doctorBridge.includes('sourceRect')&&doctorBridge.includes('detail.apply'));
