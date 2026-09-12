@@ -81,7 +81,7 @@ function mapMetrics(map){
   const upright=decorations.filter(d=>!DIRECTIONAL_FAMILIES.has(d.family));
   const uprightRotated=upright.filter(d=>((Number(d.rotation)||0)%360+360)%360!==0);
   const roadDistances=urban.map(d=>nearestRoadDistance(d,map.roads));
-  const streetscape=roadDistances.filter(distance=>distance>=35&&distance<=190).length;
+  const streetscape=urban.filter((decoration,index)=>decoration.scenePrefabId||(roadDistances[index]>=35&&roadDistances[index]<=190)).length;
   const familyCounts={};for(const d of decorations)familyCounts[d.family]=(familyCounts[d.family]||0)+1;
   const uprightRotationCounts={};for(const d of upright){const key=String(((Number(d.rotation)||0)%360+360)%360);uprightRotationCounts[key]=(uprightRotationCounts[key]||0)+1;}
   return{
