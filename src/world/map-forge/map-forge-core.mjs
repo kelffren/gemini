@@ -12,12 +12,14 @@
 import {clamp,freezeDeep,stableStringify,hashString,seed32,createRng} from './map-forge-prng.mjs';
 import {createMapIntent,buildCandidateParts} from './map-forge-builder.mjs';
 import {validateMapDefinition,scoreMapDefinition} from './map-forge-quality.mjs';
-export const MAP_FORGE_GENERATOR_VERSION='1.1.9';
+export const MAP_FORGE_GENERATOR_VERSION='1.2.0';
 export {createMapIntent} from './map-forge-builder.mjs';
 export {createRng,stableStringify} from './map-forge-prng.mjs';
 export {validateMapDefinition,scoreMapDefinition} from './map-forge-quality.mjs';
 
 const DIRECTIONAL_DECORATION_FAMILIES=new Set(['bench','market_prop']);
+const ROAD_FACING_LANDMARK_ROLES=new Set(['district_anchor']);
+const ROTATION_FACING=Object.freeze({0:'south',90:'west',180:'north',270:'east'});
 const DECORATION_DECLUSTER_RADIUS=240;
 const DECORATION_DECLUSTER_GAIN=23;
 const STREET_LAMP_ROAD_GAIN=36;
@@ -59,9 +61,10 @@ function organizeStreetFurnitureFamilies(parts){
   return{...parts,decorations:rows,generationStats:{...parts.generationStats,decorationStreetFamilySwapCount:swaps,decorationStreetFamilyRoadGain:Math.round(totalRoadGain*10)/10,decorationStreetLampSwapCount:lampSwaps,decorationStreetLampRoadGain:Math.round(lampRoadGain*10)/10,decorationStreetBenchSwapCount:benchSwaps,decorationStreetBenchRoadGain:Math.round(benchRoadGain*10)/10}};
 }
 function roadFacingRotation(p,roads,fallback=0){const frame=nearestRoadVector(p,roads);if(!frame||frame.distance<1e-6)return fallback;const degrees=Math.atan2(-frame.vx,frame.vy)*180/Math.PI;return((Math.round(degrees/90)*90)%360+360)%360;}
+function orientRoadFacingLandmarks(parts){let oriented=0,changed=0;const landmarks=(parts.landmarks||[]).map(row=>{if(!ROAD_FACING_LANDMARK_ROLES.has(row.role)||row.roadConnection===false)return row;const point=row.position||row,frame=nearestRoadVector(point,parts.roads);if(!frame||frame.distance<1)return row;const degrees=roadFacingRotation(point,parts.roads,0),facing=ROTATION_FACING[degrees]||'south',previous=String(row?.frontage?.facing||row?.facing||'south').toLowerCase();oriented++;if(previous!==facing)changed++;return{...row,rotation:degrees,frontage:{...(row.frontage||{}),facing,source:'nearest-road'}};});return{...parts,landmarks,generationStats:{...parts.generationStats,landmarkRoadFacingCount:oriented,landmarkRoadFacingChangedCount:changed}};}
 function orientDirectionalDecorations(parts){let oriented=0;const decorations=(parts.decorations||[]).map(row=>{if(!DIRECTIONAL_DECORATION_FAMILIES.has(row.family))return row;oriented++;return{...row,rotation:roadFacingRotation(row,parts.roads,row.rotation)};});return{...parts,decorations,generationStats:{...parts.generationStats,decorationRoadFacingCount:oriented}};}
 
-export function generateMapCandidate(recipe,{seed=1,assetCatalogVersion='catalog-unbound',style={},constraints={}}={}){const intent=createMapIntent(recipe,{seed,assetCatalogVersion,style,constraints}),rawParts=buildCandidateParts(recipe,intent,createRng(intent.seed,'map-forge')),declustered=declusterDecorationFamilies(rawParts),organized=organizeStreetFurnitureFamilies(declustered),parts=orientDirectionalDecorations(organized),base={metadata:{mapId:`map:${recipe.id}:${intent.seed}`,seed:intent.seed,generatorVersion:MAP_FORGE_GENERATOR_VERSION,recipeId:recipe.id,recipeVersion:recipe.version,assetCatalogVersion:intent.assetCatalogVersion,layoutHash:null},worldBounds:{...intent.worldBounds},...parts};const hashPayload={...base,metadata:{...base.metadata,layoutHash:null}};base.metadata.layoutHash=hashString(stableStringify(hashPayload));base.validation=validateMapDefinition(base,recipe);base.quality=scoreMapDefinition(base,recipe,base.validation);return freezeDeep(base);}
+export function generateMapCandidate(recipe,{seed=1,assetCatalogVersion='catalog-unbound',style={},constraints={}}={}){const intent=createMapIntent(recipe,{seed,assetCatalogVersion,style,constraints}),rawParts=buildCandidateParts(recipe,intent,createRng(intent.seed,'map-forge')),declustered=declusterDecorationFamilies(rawParts),organized=organizeStreetFurnitureFamilies(declustered),landmarkOriented=orientRoadFacingLandmarks(organized),parts=orientDirectionalDecorations(landmarkOriented),base={metadata:{mapId:`map:${recipe.id}:${intent.seed}`,seed:intent.seed,generatorVersion:MAP_FORGE_GENERATOR_VERSION,recipeId:recipe.id,recipeVersion:recipe.version,assetCatalogVersion:intent.assetCatalogVersion,layoutHash:null},worldBounds:{...intent.worldBounds},...parts};const hashPayload={...base,metadata:{...base.metadata,layoutHash:null}};base.metadata.layoutHash=hashString(stableStringify(hashPayload));base.validation=validateMapDefinition(base,recipe);base.quality=scoreMapDefinition(base,recipe,base.validation);return freezeDeep(base);}
 function deriveCandidateSeed(seed,index){return seed32(`${seed}|candidate|${index}`);}
 function visualTieScore(map){const m=map?.quality?.breakdown||{};return Number(m.visualComposition||0)*1.35+Number(m.scenicVistas||0)*1.25+Number(m.negativeSpace||0)*1.05+Number(m.assetVariety||0)+Number(m.districtCoherence||0);}
 function candidateComparator(a,b){return b.quality.total-a.quality.total||visualTieScore(b)-visualTieScore(a)||String(a.metadata.layoutHash).localeCompare(String(b.metadata.layoutHash));}
