@@ -6,7 +6,7 @@
  * public-api: createMapForgeWorkspaceManifest(), registerMapForgeWorkspace()
  * reuse: handoff returns through registered World workspace via openWorkspace()
  */
-export function createMapForgeWorkspaceManifest({loader=()=>import('../ui/map-forge-workspace.mjs')}={}){
+export function createMapForgeWorkspaceManifest({loader=()=>import('../ui/map-forge-workspace.mjs?v=map-forge-launch-recovery-20260912-1')}={}){
   return Object.freeze({
     id:'map-forge',
     label:'Map Forge',
