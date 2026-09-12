@@ -58,6 +58,8 @@ for(const seed of SEEDS){
   assert.ok((arrival.members||[]).length>=2,`${seed}: arrival scene must visibly contain at least one balanced prop pair`);
   assert.equal(pairBalance(arrival).orphan,0,`${seed}: arrival scene must never expose a one-sided pair`);
   assert.equal((arrival.connectors||[]).filter(row=>row.kind==='road'&&row.required===true&&row.roadId).length,1,`${seed}: arrival scene must expose a required road connector`);
+  const landmarkMemberIds=new Set(landmarkPrefabs.flatMap(scene=>(scene.members||[]).map(member=>member.decorationId)));
+  for(const member of arrival.members||[])assert.ok(!landmarkMemberIds.has(member.decorationId),`${seed}: arrival scene cannot steal ${member.decorationId} from an authored landmark scene`);
 
   const manifest=map.spriteManifest;
   assert.ok(manifest&&manifest.version==='map-forge-sprite-manifest-v1',`${seed}: map must return the sprite manifest it needs`);
