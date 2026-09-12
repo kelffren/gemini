@@ -12,7 +12,7 @@
 import {clamp,freezeDeep,stableStringify,hashString,seed32,createRng} from './map-forge-prng.mjs';
 import {createMapIntent,buildCandidateParts} from './map-forge-builder.mjs';
 import {validateMapDefinition,scoreMapDefinition} from './map-forge-quality.mjs';
-export const MAP_FORGE_GENERATOR_VERSION='1.3.0';
+export const MAP_FORGE_GENERATOR_VERSION='1.3.1';
 export {createMapIntent} from './map-forge-builder.mjs';
 export {createRng,stableStringify} from './map-forge-prng.mjs';
 export {validateMapDefinition,scoreMapDefinition} from './map-forge-quality.mjs';
@@ -27,6 +27,7 @@ const STREET_BENCH_ROAD_GAIN=36;
 const STREET_BENCH_SWAPS_PER_DISTRICT=2;
 const SCENE_SLOT_MAX_DISTANCE=320;
 const SCENE_SLOT_MIN_GAIN=12;
+const SCENE_LOCAL_NEIGHBOR_RADIUS=220;
 const LANDMARK_SCENE_PATTERNS=Object.freeze({
   central_fountain:Object.freeze({id:'fountain-approach-v1',slots:Object.freeze([
     Object.freeze({role:'approach-lamp-left',family:'lamp',forwardGap:82,lateral:-118}),
@@ -82,8 +83,10 @@ function rotationAxes(rotation=0){const value=((Number(rotation)||0)%360+360)%36
 function sceneSlotPoint(landmark,slot){const center=landmark.position||landmark,radius=Math.max(80,Number(landmark?.clearance?.radius)||Math.max(Number(landmark?.bounds?.w)||0,Number(landmark?.bounds?.h)||0)*.7),axes=rotationAxes(landmark.rotation);return{x:center.x+axes.forward.x*(radius+slot.forwardGap)+axes.lateral.x*slot.lateral,y:center.y+axes.forward.y*(radius+slot.forwardGap)+axes.lateral.y*slot.lateral};}
 function pointDistance(a,b){return Math.hypot(Number(a?.x||0)-Number(b?.x||0),Number(a?.y||0)-Number(b?.y||0));}
 function nearestSceneDecoration(rows,district,point,filter,excluded){let best=null;for(let i=0;i<rows.length;i++){if(excluded.has(i))continue;const row=rows[i];if(row.district!==district||filter&&!filter(row))continue;const distance=pointDistance(row,point);if(!best||distance<best.distance-1e-6||Math.abs(distance-best.distance)<=1e-6&&i<best.index)best={index:i,distance};}return best;}
+function localSameFamilyCount(rows){let count=0;for(let i=0;i<rows.length;i++){const current=rows[i];let nearest=null,best=Infinity;for(let j=0;j<rows.length;j++){if(i===j)continue;const candidate=rows[j];if(candidate.district!==current.district)continue;const distance=decorationDistance(current,candidate);if(distance<best){best=distance;nearest=candidate;}}if(nearest&&best<=SCENE_LOCAL_NEIGHBOR_RADIUS&&nearest.family===current.family)count++;}return count;}
+function findRhythmSafeSceneDonor(rows,district,targetIndex,family,used){const baseline=localSameFamilyCount(rows);let best=null;for(let i=0;i<rows.length;i++){if(i===targetIndex||used.has(i))continue;const donor=rows[i];if(donor.district!==district||donor.family!==family)continue;swapDecorationIdentity(rows[targetIndex],donor);const after=localSameFamilyCount(rows);swapDecorationIdentity(rows[targetIndex],donor);if(after>baseline)continue;const distance=decorationDistance(rows[targetIndex],donor);if(!best||after<best.after||after===best.after&&distance<best.distance-1e-6||after===best.after&&Math.abs(distance-best.distance)<=1e-6&&i<best.index)best={index:i,after,distance};}return best;}
 function composeLandmarkScenes(parts){
-  const rows=(parts.decorations||[]).map(row=>({...row})),scenes=[];let evaluated=0,sceneSwaps=0,slotCount=0,totalGain=0;
+  const rows=(parts.decorations||[]).map(row=>({...row})),scenes=[];let evaluated=0,sceneSwaps=0,slotCount=0,totalGain=0,rhythmProtected=0;
   for(const landmark of parts.landmarks||[]){
     const pattern=LANDMARK_SCENE_PATTERNS[landmark.type];if(!pattern)continue;evaluated++;
     const used=new Set(),slots=[];let swaps=0,gain=0;
@@ -92,15 +95,14 @@ function composeLandmarkScenes(parts){
       if(!before||!target||target.distance>SCENE_SLOT_MAX_DISTANCE)continue;
       let changed=false,slotGain=0;
       if(rows[target.index].family!==slot.family){
-        const donor=nearestSceneDecoration(rows,landmark.district,rows[target.index],row=>row.family===slot.family,used);
         slotGain=before.distance-target.distance;
-        if(donor&&donor.index!==target.index&&slotGain>=SCENE_SLOT_MIN_GAIN){swapDecorationIdentity(rows[target.index],rows[donor.index]);used.add(donor.index);changed=true;swaps++;sceneSwaps++;gain+=slotGain;totalGain+=slotGain;}
+        if(slotGain>=SCENE_SLOT_MIN_GAIN){const donor=findRhythmSafeSceneDonor(rows,landmark.district,target.index,slot.family,used);if(donor){swapDecorationIdentity(rows[target.index],rows[donor.index]);used.add(donor.index);changed=true;swaps++;sceneSwaps++;gain+=slotGain;totalGain+=slotGain;}else rhythmProtected++;}
       }
       if(rows[target.index].family===slot.family){used.add(target.index);slotCount++;slots.push({role:slot.role,family:slot.family,decorationId:rows[target.index].id,distance:Math.round(target.distance*10)/10,improvedBy:changed?Math.round(slotGain*10)/10:0});}
     }
     if(slots.length)scenes.push({id:`scene:${landmark.id}:${pattern.id}`,patternId:pattern.id,landmarkId:landmark.id,district:landmark.district,slotCount:slots.length,swapCount:swaps,distanceGain:Math.round(gain*10)/10,slots});
   }
-  return{...parts,decorations:rows,sceneCompositions:scenes,generationStats:{...parts.generationStats,sceneGrammarEvaluatedCount:evaluated,sceneGrammarSceneCount:scenes.length,sceneGrammarSlotCount:slotCount,sceneGrammarSwapCount:sceneSwaps,sceneGrammarDistanceGain:Math.round(totalGain*10)/10}};
+  return{...parts,decorations:rows,sceneCompositions:scenes,generationStats:{...parts.generationStats,sceneGrammarEvaluatedCount:evaluated,sceneGrammarSceneCount:scenes.length,sceneGrammarSlotCount:slotCount,sceneGrammarSwapCount:sceneSwaps,sceneGrammarDistanceGain:Math.round(totalGain*10)/10,sceneGrammarRhythmProtectedCount:rhythmProtected}};
 }
 function orientDirectionalDecorations(parts){let oriented=0;const decorations=(parts.decorations||[]).map(row=>{if(!DIRECTIONAL_DECORATION_FAMILIES.has(row.family))return row;oriented++;return{...row,rotation:roadFacingRotation(row,parts.roads,row.rotation)};});return{...parts,decorations,generationStats:{...parts.generationStats,decorationRoadFacingCount:oriented}};}
 
