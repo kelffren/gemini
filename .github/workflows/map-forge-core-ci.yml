@@ -23,6 +23,7 @@ on:
       - 'tests/map-forge-orientation-visual.spec.js'
       - 'tests/map-forge-royal-capital-road-width.mjs'
       - 'tests/map-forge-scene-prefabs.mjs'
+      - 'tests/map-forge-upright-decorations.mjs'
       - '.github/workflows/map-forge-core-ci.yml'
       - 'docs/systems/MAP_FORGE_SYSTEM.md'
       - 'docs/system-catalog.json'
@@ -45,6 +46,7 @@ on:
       - 'tests/map-forge-orientation-visual.spec.js'
       - 'tests/map-forge-royal-capital-road-width.mjs'
       - 'tests/map-forge-scene-prefabs.mjs'
+      - 'tests/map-forge-upright-decorations.mjs'
       - '.github/workflows/map-forge-core-ci.yml'
 
 jobs:
@@ -62,6 +64,8 @@ jobs:
         run: node tests/map-forge-royal-capital-road-width.mjs
       - name: Guard authored scene prefabs and road connectors
         run: node tests/map-forge-scene-prefabs.mjs
+      - name: Guard upright decoration orientation
+        run: node tests/map-forge-upright-decorations.mjs
       - name: Run best-of selection diversity audit
         run: node scripts/map-forge-selection-diversity-audit.mjs
       - name: Run buildable block road-clearance audit
