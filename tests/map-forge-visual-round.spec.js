@@ -20,6 +20,7 @@ const VALIDATION_QUALITY_MIN=94;
 const VALIDATION_VISTAS_MIN=81;
 const VALIDATION_SPACE_MIN=78;
 const LOCAL_SAME_FAMILY_MAX=0.04;
+const FACING_ROTATIONS=Object.freeze({south:0,southwest:1,west:1,northwest:2,north:2,northeast:2,east:3,southeast:3});
 
 test.use({viewport:{width:1440,height:900}});
 test.setTimeout(90000);
@@ -87,6 +88,12 @@ function mapMetrics(map){
     ...decorationRhythmMetrics(map)
   };
 }
+function landmarkFacingEvidence(map,runtime){
+  const expected=(map.landmarks||[]).map(row=>({id:String(row.id||''),facing:String(row.frontage?.facing||row.facing||'south').toLowerCase(),rotation:FACING_ROTATIONS[String(row.frontage?.facing||row.facing||'south').toLowerCase()]??0}));
+  const actual=new Map((runtime.landmarkPlacements||[]).map(row=>[String(row.placementId||'').replace(/^map-forge:landmark:/,''),Number(row.rotation)]));
+  const resolved=expected.filter(row=>actual.has(row.id)).map(row=>({...row,actualRotation:actual.get(row.id),matches:actual.get(row.id)===row.rotation}));
+  return{expected,resolved,resolvedCount:resolved.length,mismatchCount:resolved.filter(row=>!row.matches).length,mismatches:resolved.filter(row=>!row.matches)};
+}
 
 async function bootForge(page){
   const pageErrors=[];page.on('pageerror',error=>pageErrors.push(String(error)));
@@ -133,8 +140,17 @@ test(`Map Forge ${STAGE} fixed-seed preview/runtime visual evidence`,async({page
   await page.getByRole('button',{name:'VER EN MAPA EXTERIOR'}).click();
   await expect(forge).toHaveCount(0,{timeout:1000});
   await expect(page.getByRole('button',{name:'VOLVER A MAP FORGE'})).toBeVisible({timeout:15000});
-  const runtime=await page.evaluate(()=>{const snapshot=window.KELO_WORLD_BUILDER.snapshot(),placements=window.KELO_PROPERTY_SYSTEM.getPlacements('parcel:world:editor')||[];return{viewKind:snapshot?.view?.kind||null,cellCount:Object.keys(snapshot?.cells||{}).length,placementCount:placements.length};});
+  const runtime=await page.evaluate(()=>{const snapshot=window.KELO_WORLD_BUILDER.snapshot(),placements=window.KELO_PROPERTY_SYSTEM.getPlacements('parcel:world:editor')||[];return{viewKind:snapshot?.view?.kind||null,cellCount:Object.keys(snapshot?.cells||{}).length,placementCount:placements.length,landmarkPlacements:placements.filter(p=>String(p?.placementId||'').startsWith('map-forge:landmark:')).map(p=>({placementId:p.placementId,assetId:p.assetId,rotation:Number(p.rotation)}))};});
   expect(runtime.viewKind).toBe('preview');expect(runtime.cellCount).toBeGreaterThan(5000);expect(runtime.placementCount).toBeGreaterThan(0);
+  const landmarkFacing=landmarkFacingEvidence(mainMap,runtime);
+  if(STAGE==='after'){
+    expect(landmarkFacing.resolvedCount).toBeGreaterThan(0);
+    expect(landmarkFacing.mismatchCount).toBe(0);
+    const market=landmarkFacing.resolved.find(row=>row.id==='main_market');
+    expect(market).toBeTruthy();
+    expect(market.facing).toBe('west');
+    expect(market.actualRotation).toBe(1);
+  }
   await page.screenshot({path:`test-results/screenshot_runtime_${STAGE}.png`,fullPage:true});
 
   await page.getByRole('button',{name:'VOLVER A MAP FORGE'}).click();
@@ -155,7 +171,7 @@ test(`Map Forge ${STAGE} fixed-seed preview/runtime visual evidence`,async({page
     }
     validation.push(metrics);
   }
-  const evidence={stage:STAGE,mainSeed:MAIN_SEED,validationSeeds:VALIDATION_SEEDS,decorationBand:[DECORATION_MIN,DECORATION_MAX],localSameFamilyMax:LOCAL_SAME_FAMILY_MAX,main:mainMetrics,runtime,validation,pageErrors};
+  const evidence={stage:STAGE,mainSeed:MAIN_SEED,validationSeeds:VALIDATION_SEEDS,decorationBand:[DECORATION_MIN,DECORATION_MAX],localSameFamilyMax:LOCAL_SAME_FAMILY_MAX,main:mainMetrics,runtime,landmarkFacing,validation,pageErrors};
   fs.writeFileSync(`test-results/map-forge-visual-metrics-${STAGE}.json`,JSON.stringify(evidence,null,2));
   expect(pageErrors).toEqual([]);
 });
