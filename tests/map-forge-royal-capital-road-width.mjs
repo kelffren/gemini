@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: TEST / MAP FORGE / ROYAL CAPITAL
  * owner: Map Forge CI
- * purpose: lock the visually approved Royal Capital road hierarchy, street-furniture composition and road-facing district landmarks across representative deterministic seeds
+ * purpose: lock the visually approved Royal Capital road hierarchy, semantic landmark scenes, street-furniture composition and road-facing district landmarks across representative deterministic seeds
  */
 import assert from 'node:assert/strict';
 import {MAP_FORGE_RECIPES} from '../src/world/map-forge/map-forge-recipes.mjs';
@@ -21,7 +21,7 @@ assert.equal(recipe.road.arterialWidth,EXPECTED_ARTERIAL_WIDTH,'Royal Capital ch
 assert.equal(recipe.road.collectorWidth,EXPECTED_COLLECTOR_WIDTH,'Royal Capital champion must keep the approved slimmer collector width');
 assert.equal(recipe.style.decoration,EXPECTED_DECORATION,'Royal Capital champion must keep the approved decoration density');
 const results=[];
-let representativeBenchSwaps=0,representativeRoadFacing=0,representativeRoadFacingChanges=0;
+let representativeBenchSwaps=0,representativeRoadFacing=0,representativeRoadFacingChanges=0,representativeSceneSwaps=0,representativeSceneGain=0;
 for(const seed of SEEDS){
   const map=generateMapCandidate(recipe,{seed,assetCatalogVersion:'ci-catalog'});
   assert.equal(map.validation.valid,true,`${seed}: generated map must remain valid`);
@@ -40,6 +40,22 @@ for(const seed of SEEDS){
     assert.ok(benchSwaps>=3,`${seed}: primary visual seed must keep the approved second-pass roadside seating improvement`);
     assert.ok(benchRoadGain>=170,`${seed}: primary visual seed must keep the expanded bench road-affinity gain`);
   }
+
+  const sceneEvaluated=map.generationStats.sceneGrammarEvaluatedCount||0;
+  const sceneCount=map.generationStats.sceneGrammarSceneCount||0;
+  const sceneSlots=map.generationStats.sceneGrammarSlotCount||0;
+  const sceneSwaps=map.generationStats.sceneGrammarSwapCount||0;
+  const sceneGain=map.generationStats.sceneGrammarDistanceGain||0;
+  const sceneRhythmProtected=map.generationStats.sceneGrammarRhythmProtectedCount||0;
+  assert.ok(sceneEvaluated>=2,`${seed}: Royal Capital must evaluate the fountain and market semantic scene patterns`);
+  assert.ok(sceneCount>=1,`${seed}: at least one semantic landmark scene must resolve from valid generated decoration slots`);
+  assert.ok(sceneSlots>=1,`${seed}: semantic landmark scenes must retain at least one resolved slot`);
+  representativeSceneSwaps+=sceneSwaps;representativeSceneGain+=sceneGain;
+  if(seed===PRIMARY_SEED){
+    assert.ok(sceneSwaps>0,`${seed}: primary visual seed must materially compose at least one landmark scene`);
+    assert.ok(sceneGain>0,`${seed}: primary visual seed must improve semantic scene-slot proximity`);
+  }
+
   const districtAnchors=(map.landmarks||[]).filter(row=>row.role==='district_anchor'&&row.roadConnection!==false);
   let roadFacingChecked=0;
   for(const landmark of districtAnchors){
@@ -57,9 +73,11 @@ for(const seed of SEEDS){
   const flowerCount=map.decorations.filter(row=>row.family==='flower').length;
   const benchCount=map.decorations.filter(row=>row.family==='bench').length;
   assert.ok(lampCount>0&&flowerCount>0&&benchCount>0,`${seed}: representative map must retain lamps, flowers and benches`);
-  results.push({seed,roadCount:map.roads.length,blockCount:map.blocks.length,decorationCount:map.decorations.length,arterialCount:arterials.length,collectorCount:collectors.length,arterialWidths:[...new Set(arterials.map(road=>road.width))],collectorWidths:[...new Set(collectors.map(road=>road.width))],decoration:recipe.style.decoration,streetFamilySwaps:map.generationStats.decorationStreetFamilySwapCount,streetFamilyRoadGain:map.generationStats.decorationStreetFamilyRoadGain,lampSwaps:map.generationStats.decorationStreetLampSwapCount,lampRoadGain:map.generationStats.decorationStreetLampRoadGain,benchSwaps,benchRoadGain,roadFacingChecked,roadFacingChanged:facingChanged,lampCount,flowerCount,benchCount,quality:map.quality.total});
+  results.push({seed,roadCount:map.roads.length,blockCount:map.blocks.length,decorationCount:map.decorations.length,arterialCount:arterials.length,collectorCount:collectors.length,arterialWidths:[...new Set(arterials.map(road=>road.width))],collectorWidths:[...new Set(collectors.map(road=>road.width))],decoration:recipe.style.decoration,streetFamilySwaps:map.generationStats.decorationStreetFamilySwapCount,streetFamilyRoadGain:map.generationStats.decorationStreetFamilyRoadGain,lampSwaps:map.generationStats.decorationStreetLampSwapCount,lampRoadGain:map.generationStats.decorationStreetLampRoadGain,benchSwaps,benchRoadGain,sceneEvaluated,sceneCount,sceneSlots,sceneSwaps,sceneGain,sceneRhythmProtected,roadFacingChecked,roadFacingChanged:facingChanged,lampCount,flowerCount,benchCount,quality:map.quality.total});
 }
 assert.ok(representativeBenchSwaps>=4,'Representative seeds must retain the approved second-pass roadside seating improvement');
 assert.ok(representativeRoadFacing>=12,'Representative seeds must retain road-facing district landmark orientation');
 assert.ok(representativeRoadFacingChanges>0,'Road-facing orientation must materially correct at least one previous fixed-facing landmark across representative seeds');
-console.log(JSON.stringify({ok:true,expectedArterialWidth:EXPECTED_ARTERIAL_WIDTH,expectedCollectorWidth:EXPECTED_COLLECTOR_WIDTH,expectedDecoration:EXPECTED_DECORATION,primarySeed:PRIMARY_SEED,seeds:SEEDS,representativeBenchSwaps,representativeRoadFacing,representativeRoadFacingChanges,results},null,2));
+assert.ok(representativeSceneSwaps>0,'Representative seeds must materially use semantic landmark scene composition');
+assert.ok(representativeSceneGain>0,'Representative semantic landmark scenes must retain positive slot-proximity gain');
+console.log(JSON.stringify({ok:true,expectedArterialWidth:EXPECTED_ARTERIAL_WIDTH,expectedCollectorWidth:EXPECTED_COLLECTOR_WIDTH,expectedDecoration:EXPECTED_DECORATION,primarySeed:PRIMARY_SEED,seeds:SEEDS,representativeBenchSwaps,representativeRoadFacing,representativeRoadFacingChanges,representativeSceneSwaps,representativeSceneGain,results},null,2));
