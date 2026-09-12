@@ -67,6 +67,22 @@ const up=keyEvent('c','ArrowUp');
 keyHandler(up);
 assert.deepEqual(sets.at(-1),['b'],'ArrowUp should select the previous visible row');
 
+selection=['c'];
+const home=keyEvent('c','Home');
+keyHandler(home);
+assert.deepEqual(sets.at(-1),['a'],'Home should jump directly to the first visible Explorer row');
+assert.equal(home.prevented,1,'Home navigation must suppress browser/default movement');
+assert.equal(home.stopped,1,'Home navigation must stay isolated from other Studio keyboard handlers');
+assert.equal(rowFor('a').scrollCount>0,true,'Home should keep the first row visible');
+
+selection=['b'];
+const end=keyEvent('b','End');
+keyHandler(end);
+assert.deepEqual(sets.at(-1),['e'],'End should jump directly to the last visible Explorer row');
+assert.equal(end.prevented,1,'End navigation must suppress browser/default movement');
+assert.equal(end.stopped,1,'End navigation must stay isolated from other Studio keyboard handlers');
+assert.equal(rowFor('e').scrollCount>0,true,'End should keep the last row visible');
+
 selection=['e'];
 const beforeBoundarySets=sets.length;
 const boundary=keyEvent('e','ArrowDown');
@@ -75,11 +91,17 @@ assert.equal(sets.length,beforeBoundarySets,'ArrowDown at the last Explorer row 
 assert.equal(boundary.prevented,1,'boundary arrows should still be consumed inside Explorer');
 assert.equal(boundary.stopped,1,'boundary arrows must not leak into world nudge');
 
-const modified=keyEvent('b','ArrowDown',{shiftKey:true});
+const endBoundary=keyEvent('e','End');
+keyHandler(endBoundary);
+assert.equal(sets.length,beforeBoundarySets,'End on the last row should clamp without redundant selection updates');
+assert.equal(endBoundary.prevented,1,'End boundary should still be consumed inside Explorer');
+assert.equal(endBoundary.stopped,1,'End boundary must remain isolated from other handlers');
+
+const modified=keyEvent('b','Home',{shiftKey:true});
 const beforeModifiedSets=sets.length;
 keyHandler(modified);
-assert.equal(sets.length,beforeModifiedSets,'modified arrows are reserved for other Explorer gestures and should not change single selection');
-assert.equal(modified.prevented,0,'modified arrows should remain available to dedicated handlers');
+assert.equal(sets.length,beforeModifiedSets,'modified Home/End are reserved for future range gestures and should not change single selection');
+assert.equal(modified.prevented,0,'modified Home/End should remain available to dedicated handlers');
 
 controller.destroy();
 assert.equal(clickRemoved,true,'destroy must remove the capture click listener');
@@ -90,7 +112,8 @@ const nudgeSource=fs.readFileSync(new URL('../src/studio/input/studio-nudge-cont
 assert.ok(!source.includes('KELO_WORLD_EDIT'),'Explorer selection ergonomics must not access world authority');
 assert.ok(!source.includes('kernel.execute'),'Explorer selection ergonomics must not create document commands');
 assert.ok(source.includes('kernel.selection.set'),'Explorer navigation must use the canonical local selection store');
+assert.ok(source.includes("'Home','End'"),'Explorer navigation contract must retain direct first/last-row shortcuts');
 assert.ok(nudgeSource.includes("EXPLORER_ENTITY_SELECTOR='#kelo-studio-live [data-entity]'"),'nudge must explicitly recognize focused Explorer entity rows');
 assert.ok(nudgeSource.includes('explorerTarget(event.target)'),'world nudge must yield when arrow keys originate inside Explorer');
 
-console.log('PASS studio explorer selection audit: ranges, focused ArrowUp/ArrowDown navigation, boundary isolation, teardown and CommandBus/authority separation verified.');
+console.log('PASS studio explorer selection audit: ranges, ArrowUp/ArrowDown, Home/End jumps, boundary isolation, teardown and CommandBus/authority separation verified.');
