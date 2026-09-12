@@ -84,13 +84,30 @@ function pointSafe(parts,rows,index,landmark,pattern,p,worldBounds){if(!insideBo
 function candidatePoints(from,ideal){return[1,.84,.68].map(t=>({x:ROUND(from.x+(ideal.x-from.x)*t),y:ROUND(from.y+(ideal.y-from.y)*t),t}));}
 function chooseMember(rows,landmark,member,ideal,used){let best=null;for(let i=0;i<rows.length;i++){const row=rows[i];if(used.has(i)||row.district!==landmark.district||row.family!==member.family)continue;const distance=pointDistance(row,ideal);if(distance>MEMBER_MAX_SOURCE_DISTANCE)continue;if(!best||distance<best.distance-1e-6||Math.abs(distance-best.distance)<=1e-6&&i<best.index)best={index:i,distance};}return best;}
 function connectorFor(parts,landmark){const center=landmark.position||landmark,frame=nearestRoadFrame(center,parts.roads);if(!frame)return null;return{id:'road-entry',kind:'road',required:true,roadId:frame.roadId,position:{x:ROUND(frame.x),y:ROUND(frame.y)},distance:ROUND(frame.distance),facing:String(landmark.frontage?.facing||landmark.facing||'south')};}
+function pairedRoleKey(role){const match=String(role||'').match(/^(.*)-(left|right)$/);return match?match[1]:null;}
+function rollbackOrphanPairs(pattern,rows,memberRows,originalRows,used,counters){
+  const expected=new Map();
+  for(const member of pattern.slots||[]){const key=pairedRoleKey(member.role);if(!key)continue;const sides=expected.get(key)||new Set();sides.add(member.role.endsWith('-left')?'left':'right');expected.set(key,sides);}
+  const resolved=new Map();
+  for(const member of memberRows){const key=pairedRoleKey(member.role);if(!key)continue;const list=resolved.get(key)||[];list.push(member);resolved.set(key,list);}
+  const orphanIndexes=new Set();
+  for(const [key,sides] of expected){if(sides.size!==2)continue;const list=resolved.get(key)||[];if(list.length===1)orphanIndexes.add(list[0].sourceIndex);}
+  if(!orphanIndexes.size)return 0;
+  for(const sourceIndex of orphanIndexes){
+    const member=memberRows.find(row=>row.sourceIndex===sourceIndex);if(!member)continue;
+    const original=originalRows.get(sourceIndex);if(original)rows[sourceIndex]=original;
+    used.delete(sourceIndex);counters.members--;if(member.movement>=1){counters.moved--;counters.sceneMoved--;counters.totalMovement-=member.movement;counters.sceneMovement-=member.movement;}const improvement=member.sourceDistance-member.finalDistance;if(improvement>0){counters.totalImprovement-=improvement;counters.sceneImprovement-=improvement;}
+  }
+  for(let i=memberRows.length-1;i>=0;i--)if(orphanIndexes.has(memberRows[i].sourceIndex))memberRows.splice(i,1);
+  return orphanIndexes.size;
+}
 
 export function materializeScenePrefabs(parts,{worldBounds}={}){
   if(!worldBounds)return parts;
-  const rows=(parts.decorations||[]).map(row=>({...row})),scenePrefabs=[];let evaluated=0,resolved=0,moved=0,members=0,connectors=0,totalImprovement=0,totalMovement=0,rhythmProtected=0,safetyRejected=0;
+  const rows=(parts.decorations||[]).map(row=>({...row})),scenePrefabs=[];let evaluated=0,resolved=0,moved=0,members=0,connectors=0,totalImprovement=0,totalMovement=0,rhythmProtected=0,safetyRejected=0,pairRollbackCount=0;
   for(const landmark of parts.landmarks||[]){
     const pattern=SCENE_PREFAB_PATTERNS[landmark.type];if(!pattern)continue;evaluated++;
-    const variant=variantFor(pattern,landmark),used=new Set(),memberRows=[],connector=connectorFor(parts,landmark);let sceneMoved=0,sceneImprovement=0,sceneMovement=0;
+    const variant=variantFor(pattern,landmark),used=new Set(),memberRows=[],originalRows=new Map(),connector=connectorFor(parts,landmark);let sceneMoved=0,sceneImprovement=0,sceneMovement=0;
     for(const member of pattern.slots){
       const ideal=authoredPoint(landmark,member,variant),source=chooseMember(rows,landmark,member,ideal,used);if(!source)continue;
       const row=rows[source.index],beforeDistance=pointDistance(row,ideal),beforeRhythm=localSameFamilyCount(rows);let accepted=null;
@@ -100,11 +117,15 @@ export function materializeScenePrefabs(parts,{worldBounds}={}){
         const oldX=row.x,oldY=row.y;row.x=candidate.x;row.y=candidate.y;const afterRhythm=localSameFamilyCount(rows);row.x=oldX;row.y=oldY;if(afterRhythm>beforeRhythm){rhythmProtected++;continue;}accepted=candidate;break;
       }
       if(!accepted)continue;
-      const old={x:row.x,y:row.y},afterDistance=pointDistance(accepted,ideal),improvement=beforeDistance-afterDistance,movement=pointDistance(old,accepted);row.x=accepted.x;row.y=accepted.y;row.scenePrefabId=`scene-prefab:${landmark.id}:${pattern.id}`;row.sceneRole=member.role;row.sceneKit=pattern.kit;row.sceneVariant=variant.id;used.add(source.index);members++;if(movement>=1){moved++;sceneMoved++;totalMovement+=movement;sceneMovement+=movement;}if(improvement>0){totalImprovement+=improvement;sceneImprovement+=improvement;}memberRows.push({role:member.role,family:member.family,decorationId:row.id,position:{x:ROUND(row.x),y:ROUND(row.y)},ideal,sourceDistance:ROUND(beforeDistance),finalDistance:ROUND(afterDistance),movement:ROUND(movement)});
+      originalRows.set(source.index,{...row});
+      const old={x:row.x,y:row.y},afterDistance=pointDistance(accepted,ideal),improvement=beforeDistance-afterDistance,movement=pointDistance(old,accepted);row.x=accepted.x;row.y=accepted.y;row.scenePrefabId=`scene-prefab:${landmark.id}:${pattern.id}`;row.sceneRole=member.role;row.sceneKit=pattern.kit;row.sceneVariant=variant.id;used.add(source.index);members++;if(movement>=1){moved++;sceneMoved++;totalMovement+=movement;sceneMovement+=movement;}if(improvement>0){totalImprovement+=improvement;sceneImprovement+=improvement;}memberRows.push({role:member.role,family:member.family,decorationId:row.id,position:{x:ROUND(row.x),y:ROUND(row.y)},ideal,sourceDistance:ROUND(beforeDistance),finalDistance:ROUND(afterDistance),movement:ROUND(movement),sourceIndex:source.index});
     }
-    if(memberRows.length>=2){resolved++;if(connector)connectors++;scenePrefabs.push({id:`scene-prefab:${landmark.id}:${pattern.id}`,prefabId:pattern.id,kit:pattern.kit,variant:variant.id,landmarkId:landmark.id,district:landmark.district,anchor:{x:ROUND((landmark.position||landmark).x),y:ROUND((landmark.position||landmark).y)},rotation:Number(landmark.rotation)||0,connectors:connector?[connector]:[],members:memberRows,memberCount:memberRows.length,movedCount:sceneMoved,distanceImprovement:ROUND(sceneImprovement),movementDistance:ROUND(sceneMovement)});}
+    const counters={members,moved,sceneMoved,totalMovement,sceneMovement,totalImprovement,sceneImprovement};
+    pairRollbackCount+=rollbackOrphanPairs(pattern,rows,memberRows,originalRows,used,counters);
+    ({members,moved,sceneMoved,totalMovement,sceneMovement,totalImprovement,sceneImprovement}=counters);
+    if(memberRows.length>=2){resolved++;if(connector)connectors++;scenePrefabs.push({id:`scene-prefab:${landmark.id}:${pattern.id}`,prefabId:pattern.id,kit:pattern.kit,variant:variant.id,landmarkId:landmark.id,district:landmark.district,anchor:{x:ROUND((landmark.position||landmark).x),y:ROUND((landmark.position||landmark).y)},rotation:Number(landmark.rotation)||0,connectors:connector?[connector]:[],members:memberRows.map(({sourceIndex,...member})=>member),memberCount:memberRows.length,movedCount:sceneMoved,distanceImprovement:ROUND(sceneImprovement),movementDistance:ROUND(sceneMovement)});}
   }
-  return{...parts,decorations:rows,scenePrefabs,generationStats:{...parts.generationStats,scenePrefabEvaluatedCount:evaluated,scenePrefabSceneCount:resolved,scenePrefabMemberCount:members,scenePrefabMovedCount:moved,scenePrefabConnectorCount:connectors,scenePrefabDistanceImprovement:ROUND(totalImprovement),scenePrefabMovementDistance:ROUND(totalMovement),scenePrefabRhythmProtectedCount:rhythmProtected,scenePrefabSafetyRejectedCount:safetyRejected}};
+  return{...parts,decorations:rows,scenePrefabs,generationStats:{...parts.generationStats,scenePrefabEvaluatedCount:evaluated,scenePrefabSceneCount:resolved,scenePrefabMemberCount:members,scenePrefabMovedCount:moved,scenePrefabConnectorCount:connectors,scenePrefabDistanceImprovement:ROUND(totalImprovement),scenePrefabMovementDistance:ROUND(totalMovement),scenePrefabRhythmProtectedCount:rhythmProtected,scenePrefabSafetyRejectedCount:safetyRejected,scenePrefabPairRollbackCount:pairRollbackCount}};
 }
 
 export function scenePrefabTieScore(map){const s=map?.generationStats||{},scenes=Number(s.scenePrefabSceneCount)||0,members=Number(s.scenePrefabMemberCount)||0,moved=Number(s.scenePrefabMovedCount)||0,connectors=Number(s.scenePrefabConnectorCount)||0,improvement=Number(s.scenePrefabDistanceImprovement)||0;return Math.min(14,scenes*1.2+members*.18+moved*.28+connectors*.45+Math.min(3,improvement/500));}
