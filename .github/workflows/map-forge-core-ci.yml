@@ -24,6 +24,7 @@ on:
       - 'tests/map-forge-royal-capital-road-width.mjs'
       - 'tests/map-forge-scene-prefabs.mjs'
       - 'tests/map-forge-upright-decorations.mjs'
+      - 'tests/map-forge-urban-fabric-score.mjs'
       - '.github/workflows/map-forge-core-ci.yml'
       - 'docs/systems/MAP_FORGE_SYSTEM.md'
       - 'docs/system-catalog.json'
@@ -47,6 +48,7 @@ on:
       - 'tests/map-forge-royal-capital-road-width.mjs'
       - 'tests/map-forge-scene-prefabs.mjs'
       - 'tests/map-forge-upright-decorations.mjs'
+      - 'tests/map-forge-urban-fabric-score.mjs'
       - '.github/workflows/map-forge-core-ci.yml'
 
 jobs:
@@ -74,6 +76,8 @@ jobs:
         run: node scripts/map-forge-paving-intent-audit.mjs
       - name: Run decoration overlap score-gate audit
         run: node scripts/map-forge-decoration-spacing-audit.mjs
+      - name: Run sparse urban fabric elite-score audit
+        run: node tests/map-forge-urban-fabric-score.mjs
 
   visual-evidence:
     runs-on: ubuntu-latest

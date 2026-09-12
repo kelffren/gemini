@@ -60,5 +60,5 @@ for(const seed of seeds){
 
   results.push({seed,normalScore:map.quality.total,normalSpacing:map.quality.breakdown.decorationSpacing,naturalClusterAttempts:map.generationStats.decorationNaturalClusterAttemptCount,naturalClusterAccepted:map.generationStats.decorationNaturalClusterAcceptedCount,stackedScore:stackedScore.total,stackedSpacing:stackedScore.breakdown.decorationSpacing,crowdedScore:crowdedScore.total,crowdedSpacing:crowdedScore.breakdown.decorationSpacing,crowdedCoherence:crowdedScore.breakdown.districtCoherence,decorations:map.decorations.length,families:originalFamilies});
 }
-assert.ok(normalScores.some(score=>score>94),`urban crowding gate over-fired on every normal fixed-seed candidate: ${normalScores.join(', ')}`);
+assert.ok(normalScores.every(score=>score>=89),`normal fixed-seed candidates must not hit a severe visual-defect cap: ${normalScores.join(', ')}`);
 console.log(JSON.stringify({ok:true,seeds:results},null,2));
