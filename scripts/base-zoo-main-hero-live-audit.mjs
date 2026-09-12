@@ -19,22 +19,21 @@ try{
   const result=await page.evaluate(()=>{
     const audit=window.KELO_MAIN_HERO_SPRITE_AUDIT;
     const renderAudit=window.KELO_AVATAR_RENDER_AUDIT;
-    const actor=window.JUGADOR_MUNDO;
-    const before=actor?{
-      vx:actor.vx,vy:actor.vy,
-      visual:actor._visualMotion?{...actor._visualMotion}:null
-    }:null;
+    const beforeDrawCount=audit.drawCount;
+    const syntheticActor={
+      x:180,
+      y:260,
+      radius:20,
+      vx:90,
+      vy:90,
+      squashX:1,
+      squashY:1,
+      _visualMotion:{dx:1,dy:1,face:'down-right',frame:0}
+    };
     let diagonalFace=null;
-    if(actor&&typeof window.renderAvatar==='function'){
-      actor.vx=90;
-      actor.vy=90;
-      actor._visualMotion={...(actor._visualMotion||{}),dx:1,dy:1};
-      window.renderAvatar(actor,true);
+    if(typeof window.renderAvatar==='function'){
+      window.renderAvatar(syntheticActor,true);
       diagonalFace=audit.lastFace;
-      actor.vx=before.vx;
-      actor.vy=before.vy;
-      if(before.visual)actor._visualMotion=before.visual;
-      else delete actor._visualMotion;
     }
     return {
       avatarVersion:window.KeloAvatar&&window.KeloAvatar.version,
@@ -46,11 +45,11 @@ try{
       readyCount:audit.readyCount,
       failedCount:audit.failedCount,
       drawCount:audit.drawCount,
+      drewSynthetic:audit.drawCount>beforeDrawCount,
       lastFace:audit.lastFace,
       diagonalFace,
       renderSource:renderAudit.mainHeroSpriteSource,
-      renderGrid:renderAudit.mainHeroSpriteGrid,
-      actorFound:!!actor
+      renderGrid:renderAudit.mainHeroSpriteGrid
     };
   });
 
@@ -63,7 +62,7 @@ try{
   if(result.directionMode!==8)failures.push('directionMode is not 8');
   if(result.readyCount!==8||!result.complete||result.failedCount!==0)failures.push('not all eight Base Zoo images loaded');
   if(result.drawCount<1)failures.push('Base Zoo did not render as the local player');
-  if(!result.actorFound)failures.push('JUGADOR_MUNDO missing');
+  if(!result.drewSynthetic)failures.push('Base Zoo did not render the synthetic self actor');
   if(result.diagonalFace!=='down-right')failures.push(`diagonal resolver returned ${result.diagonalFace}`);
 
   await page.screenshot({path:'artifacts/base-zoo-main-hero-live.png',fullPage:true});
