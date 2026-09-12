@@ -2,11 +2,24 @@
  * area: STUDIO / INPUT / EXPLORER RANGE SELECTION
  * owns: desktop-style Shift range selection and focused keyboard navigation inside the virtual Explorer
  * does-not-own: document mutation, CommandBus, authority, Explorer rendering or camera
- * public-api: createStudioExplorerRangeSelectionController()
+ * public-api: createStudioExplorerRangeSelectionController(), resolveExplorerNavigationIndex()
  * online: selection-only state; never writes persistent world data
  */
 
 const ENTITY_SELECTOR='#kelo-studio-live [data-entity]';
+const PAGE_STEP=10;
+
+export function resolveExplorerNavigationIndex({index=0,length=0,key}={}){
+  if(length<=0)return -1;
+  const current=Math.max(0,Math.min(length-1,Number(index)||0));
+  if(key==='Home')return 0;
+  if(key==='End')return length-1;
+  if(key==='PageUp')return Math.max(0,current-PAGE_STEP);
+  if(key==='PageDown')return Math.min(length-1,current+PAGE_STEP);
+  if(key==='ArrowUp')return Math.max(0,current-1);
+  if(key==='ArrowDown')return Math.min(length-1,current+1);
+  return current;
+}
 
 export function resolveExplorerRange({ids=[],anchorId=null,targetId=null,current=[],append=false}={}){
   const order=ids.map(String),target=String(targetId??'');
@@ -65,7 +78,7 @@ export function createStudioExplorerRangeSelectionController({root=globalThis,ke
 
   function onkeydown(event){
     if(destroyed||event.defaultPrevented||event.ctrlKey||event.metaKey||event.altKey)return;
-    if(!['ArrowUp','ArrowDown','Home','End'].includes(event.key))return;
+    if(!['ArrowUp','ArrowDown','Home','End','PageUp','PageDown'].includes(event.key))return;
     const row=event.target?.closest?.(ENTITY_SELECTOR);
     if(!row)return;
     const rows=explorerRows();
@@ -76,7 +89,7 @@ export function createStudioExplorerRangeSelectionController({root=globalThis,ke
       index=rows.findIndex(candidate=>String(candidate.dataset?.entity||'')===id);
     }
     if(index<0)return;
-    const nextIndex=event.key==='Home'?0:event.key==='End'?rows.length-1:Math.max(0,Math.min(rows.length-1,index+(event.key==='ArrowDown'?1:-1)));
+    const nextIndex=resolveExplorerNavigationIndex({index,length:rows.length,key:event.key});
     event.preventDefault?.();
     event.stopImmediatePropagation?.();
     if(nextIndex===index)return;
@@ -104,7 +117,7 @@ export function createStudioExplorerRangeSelectionController({root=globalThis,ke
   document.addEventListener('click',onclick,true);
   document.addEventListener('keydown',onkeydown,true);
   return Object.freeze({
-    version:'studio-explorer-range-selection-v1.3.0-keyboard-range',
+    version:'studio-explorer-range-selection-v1.4.0-page-navigation',
     get anchor(){return anchorId;},
     destroy(){
       if(destroyed)return;
