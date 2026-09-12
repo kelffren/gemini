@@ -50,6 +50,16 @@ microtasks.shift()();
 assert.deepEqual(calls,['blur:rotation','focus:y','select:y'],'Shift+Enter must move to the previous enabled property and skip disabled controls');
 
 calls.length=0;
+handlers.get('keydown')(key(rotation));
+microtasks.shift()();
+assert.deepEqual(calls,['blur:rotation','focus:x','select:x'],'Enter on the last enabled property must wrap to the first enabled property');
+
+calls.length=0;
+handlers.get('keydown')(key(x,'Enter',{shiftKey:true}));
+microtasks.shift()();
+assert.deepEqual(calls,['blur:x','focus:rotation','select:rotation'],'Shift+Enter on the first enabled property must wrap to the last enabled property');
+
+calls.length=0;
 fields=[field('x'),field('y'),field('rotation')];
 handlers.get('keydown')(key(y));
 const replacementY=field('y');
@@ -57,6 +67,13 @@ const replacementRotation=field('rotation');
 fields=[field('x'),replacementY,replacementRotation];
 microtasks.shift()();
 assert.deepEqual(calls,['blur:y','focus:rotation','select:rotation'],'navigation must recover by data-prop after a synchronous property-panel rerender');
+
+calls.length=0;
+const solo=field('solo');
+fields=[solo];
+handlers.get('keydown')(key(solo));
+microtasks.shift()();
+assert.deepEqual(calls,['blur:solo'],'single-field panels must commit without pointlessly refocusing the same control');
 
 calls.length=0;
 handlers.get('focusin')({target:x});
@@ -80,6 +97,7 @@ assert.equal(controller.focusFirstProperty(),false,'destroyed controller must no
 
 const source=fs.readFileSync(new URL('../src/studio/input/studio-property-commit-controller.mjs',import.meta.url),'utf8');
 assert.match(source,/input\.blur\?\.\(\)/,'Enter commit must remain delegated to canonical blur/change handling');
+assert.match(source,/\(index\+direction\+fields\.length\)%fields\.length/,'property navigation must use bounded cyclic indexing');
 assert.doesNotMatch(source,/kernel\.execute|KELO_WORLD_EDIT/,'property keyboard ergonomics must not bypass CommandBus or authority');
 
-console.log(JSON.stringify({ok:true,f2DirectFocus:true,f2SkipsDisabled:true,f2EditableGuard:true,f2EmptyNoop:true,enterAdvances:true,shiftEnterReverses:true,skipsDisabled:true,rerenderRecovery:true,escapeCancelPreserved:true,commandBusBypass:false,authorityBypass:false},null,2));
+console.log(JSON.stringify({ok:true,f2DirectFocus:true,f2SkipsDisabled:true,f2EditableGuard:true,f2EmptyNoop:true,enterAdvances:true,shiftEnterReverses:true,cyclicNavigation:true,singleFieldNoRefocus:true,skipsDisabled:true,rerenderRecovery:true,escapeCancelPreserved:true,commandBusBypass:false,authorityBypass:false},null,2));
