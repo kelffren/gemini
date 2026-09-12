@@ -47,7 +47,7 @@ ok('normalizer has safe scale and foot-anchor policy', normalizer.includes('safe
 ok('normalizer preserves variable frame counts', normalizer.includes('frameCounts') && normalizer.includes('rig.groups.map'));
 ok('normalizer accepts selective frame patches', normalizer.includes('framePatches') && normalizer.includes('copyFrom') && normalizer.includes('patchScale'));
 ok('validator emits requested health dimensions', ['detection','alignment','background','frameConsistency','interpretationConfidence','finalHealth'].every(key => validator.includes(key)));
-ok('validator gates uncertainty and art defects', validator.includes("status: uniqueReasons.length ? 'REVIEW_REQUIRED' : 'VALIDATED'") && validator.includes('ART_DEFECT_REGENERATION_REQUIRED'));
+ok('validator gates uncertainty, recoverable crop and irreparable art defects', validator.includes("'REVIEW_REQUIRED'") && validator.includes("'VALIDATED'") && validator.includes('RECOVERABLE_SOURCE_CROP') && validator.includes('ART_DEFECT_REGENERATION_REQUIRED'));
 ok('Frame Doctor identifies exact scale and feet offsets', doctor.includes('verticalScaleDelta') && doctor.includes('feetOffsetPx') && doctor.includes('label:'));
 ok('UI exposes local frame repair controls', ui.includes('AJUSTAR ESTE FRAME') && ui.includes('APLICAR PATCH') && ui.includes('COPIAR FRAME ANTERIOR'));
 ok('quick service rejects unreviewed and irreparable output', service.includes('AVATAR_REVIEW_REQUIRED') && service.includes('AVATAR_ART_DEFECT_REGENERATION_REQUIRED'));
@@ -61,7 +61,7 @@ ok('UI keeps the simple upload path', ui.includes('+ SUBIR SPRITE') && ui.includ
 ok('UI renders real health metrics', ui.includes("metric('DETECTION'") && ui.includes("metric('ALIGNMENT'") && ui.includes("metric('FINAL HEALTH'"));
 ok('UI exposes alternatives only as needed', ui.includes('paintHypotheses') && ui.includes('selectedLayoutSignature') && ui.includes('AJUSTES AVANZADOS'));
 ok('UI previews all compiled directions', ui.includes('compiled?.directionKeys') && ui.includes('compiled.frameCounts?.[row]'));
-ok('UI exposes per-frame doctor output', ui.includes('frames correctos') && ui.includes('vertical scale') && ui.includes('ART DEFECT — REGENERATION REQUIRED'));
+ok('UI exposes per-frame doctor output and source-crop distinction', ui.includes('frames correctos') && ui.includes('vertical scale') && ui.includes('ABRIR EDITOR TÁCTIL') && ui.includes('RECOVERABLE SOURCE CROP') && ui.includes('SOURCE ART MISSING'));
 ok('Creator composition registers Avatar workspace', entry.includes('registerAvatarWorkspace(workspaces)') && entry.includes('avatarQuick'));
 ok('repository exposes avatar APIs', repo.includes('setActiveCharacterAvatar') && repo.includes('getAvatarManifest') && repo.includes('listMyCharacters'));
 ok('character content routes to existing adapter', registry.includes("type==='character'") && registry.includes('KeloCreatorAvatars'));
