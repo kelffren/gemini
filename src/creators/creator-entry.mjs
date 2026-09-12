@@ -19,7 +19,7 @@ import { installCreatorAvatarRuntime } from '../characters/creator-avatar-runtim
 import { createKeloSupabaseBrowserSession } from '../online/kelo-supabase-browser-session.mjs';
 import { KELO_SUPABASE_PUBLIC_CONFIG } from '../online/kelo-supabase-public-config.mjs';
 import { registerWorldWorkspace } from './workspaces/world-workspace.mjs';
-import { registerMapForgeWorkspace } from './workspaces/map-forge-workspace.mjs';
+import { registerMapForgeWorkspace } from './workspaces/map-forge-workspace.mjs?v=map-forge-launch-recovery-20260912-1';
 import { registerMountWorkspace } from './workspaces/mount-workspace.mjs';
 import { registerAppearanceWorkspace } from './workspaces/appearance-workspace.mjs';
 import { registerAnimationWorkspace } from './workspaces/animation-workspace.mjs';
@@ -90,7 +90,7 @@ export async function bootKeloCreators({root=globalThis,stateAdapter=null}={}){
     if(manifest.capability)permission.require(manifest.capability,permission.actorId(),context.projectId||null);
     return workspaces.open(id,{root,projects,permission,dependencies,contentSession,contentRepository,contentService,runtimeContent,avatarRuntime,avatarQuick,openWorkspace,...context});
   }
-  platform=Object.freeze({version:'kelo-creators-core-v1.17.0-touch-repair',permission,projects,workspaces,dependencies,contentSession,contentRepository,contentService,runtimeContent,avatarRuntime,avatarQuick,openWorkspace,close(){try{looseImportDispose?.();}catch{}try{irregularImportDispose?.();}catch{}try{repairTouchDispose?.();}catch{}try{repairStudioDispose?.();}catch{}try{manualCutterDispose?.();}catch{}try{easyUiDispose?.();}catch{}try{eventLabDispose?.();}catch{}try{visualUiDispose?.();}catch{}try{localState.close?.();}catch{}try{inputLocksDispose?.();}catch{}platform=null;}});
+  platform=Object.freeze({version:'kelo-creators-core-v1.17.1-map-forge-launch-recovery',permission,projects,workspaces,dependencies,contentSession,contentRepository,contentService,runtimeContent,avatarRuntime,avatarQuick,openWorkspace,close(){try{looseImportDispose?.();}catch{}try{irregularImportDispose?.();}catch{}try{repairTouchDispose?.();}catch{}try{repairStudioDispose?.();}catch{}try{manualCutterDispose?.();}catch{}try{easyUiDispose?.();}catch{}try{eventLabDispose?.();}catch{}try{visualUiDispose?.();}catch{}try{localState.close?.();}catch{}try{inputLocksDispose?.();}catch{}platform=null;}});
   return platform;
 }
 export function getKeloCreatorsPlatform(){return platform;}
