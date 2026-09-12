@@ -1,0 +1,40 @@
+name: Avatar Frame Surgery Guardian
+
+on:
+  pull_request:
+    paths:
+      - 'src/creators/avatar/**'
+      - 'src/creators/sprite-compiler/**'
+      - 'src/creators/ui/avatar-frame-surgery-workspace.mjs'
+      - 'src/creators/workspaces/avatar-workspace.mjs'
+      - 'scripts/avatar-frame-surgery-supervisor-audit.mjs'
+      - '.github/workflows/avatar-frame-surgery-guardian.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  frame-surgery-guardian:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Syntax gate
+        run: |
+          node --check src/creators/ui/avatar-frame-surgery-workspace.mjs
+          node --check src/creators/sprite-compiler/sprite-frame-surgery-model.mjs
+          node --check src/creators/sprite-compiler/sprite-frame-normalizer.mjs
+      - name: 25-of-25 Frame Surgery supervisor
+        run: node scripts/avatar-frame-surgery-supervisor-audit.mjs
+      - name: Existing adversarial ingestion corpus
+        run: npm run audit:sprite-ingestion
+      - name: Existing Frame Doctor audit
+        run: npm run audit:sprite-frame-doctor
+      - name: Existing Avatar Quick Import audit
+        run: npm run audit:avatar-quick
