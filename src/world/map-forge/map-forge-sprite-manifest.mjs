@@ -14,7 +14,7 @@ const ROUND=value=>Math.round(Number(value||0)*10)/10;
 const DECORATION_SPECS=Object.freeze({
   tree:Object.freeze({label:'Árbol',orientation:'upright',assetCandidates:Object.freeze(['imperial:arbol-florido-blanco','imperial:arbol-florido-azul']),promptHint:'árbol 2D pixel art top-down/3-quarter, tronco centrado, copa legible, fondo transparente'}),
   bush:Object.freeze({label:'Arbusto / topiario',orientation:'upright',assetCandidates:Object.freeze(['imperial:topiario']),promptHint:'arbusto o topiario 2D pixel art, silueta limpia, fondo transparente'}),
-  flower:Object.freeze({label:'Jardinera / flores',orientation:'upright',assetCandidates:Object.freeze(['imperial:jardinera-curva']),promptHint:'jardinera floral 2D pixel art, vista top-down/3-quarter, fondo transparente'}),
+  flower:Object.freeze({label:'Jardinera / flores',orientation:'upright',assetCandidates:Object.freeze(['imperial:jardinera-floral','imperial:jardinera-curva']),promptHint:'jardinera floral 2D pixel art, vista top-down/3-quarter, fondo transparente'}),
   rock:Object.freeze({label:'Roca',orientation:'upright',assetCandidates:Object.freeze([]),promptHint:'roca decorativa 2D pixel art, lectura clara a escala de juego, fondo transparente'}),
   lamp:Object.freeze({label:'Farola',orientation:'upright',assetCandidates:Object.freeze(['imperial:farola','imperial:farola-monumental']),promptHint:'farola 2D pixel art vertical, base visible, fondo transparente'}),
   bench:Object.freeze({label:'Banco',orientation:'directional',assetCandidates:Object.freeze(['imperial:banco']),promptHint:'banco 2D pixel art, vista 3-quarter, orientación frontal consistente, fondo transparente'}),

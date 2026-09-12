@@ -167,6 +167,8 @@ Nunca auto-mergea.
 
 Map Forge reutiliza `KELO_WORLD_BUILDER.renderSnapshotPreview()`; no existe renderer especial de Evolution. Playwright captura baseline/champion por la misma ruta real de World Builder/Property. `VER EN MAPA EXTERIOR` sigue siendo preview reversible, no Publish; `ABRIR EN WORLD EDITOR` importa un draft separado y abre Studio.
 
+El importer resuelve assets semánticos mediante el catálogo real. Cuando una familia declara varias alternativas aprobadas, selecciona una variante de forma determinista a partir de la identidad y posición final del elemento. Esto evita que árboles, farolas, fuentes y jardineras repitan siempre el primer asset del catálogo sin introducir aleatoriedad, alterar el `MapDefinition` ni crear otro renderer.
+
 ## Online-first
 
 ```text

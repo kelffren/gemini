@@ -15,17 +15,18 @@ const EXPECTED=Object.freeze({
   tree:['imperial:arbol-florido-blanco','imperial:arbol-florido-azul'],
   lamp:['imperial:farola','imperial:farola-monumental'],
   bench:['imperial:banco'],
-  flower:['imperial:jardinera-curva'],
+  flower:['imperial:jardinera-floral','imperial:jardinera-curva'],
   bush:['imperial:topiario']
 });
 const templates=[
   ['imperial:fuente-justicia',128,128],['imperial:fuente-astral',128,128],['imperial:fuente-leones',128,128],
   ['imperial:kiosco',160,160],['imperial:carrito-mercado',128,96],['imperial:arbol-florido-blanco',128,128],['imperial:arbol-florido-azul',128,128],
   ['imperial:farola',64,96],['imperial:farola-monumental',64,96],['imperial:banco',128,96],
-  ['imperial:jardinera-curva',160,160],['imperial:topiario',96,96],['imperial:puente',160,128],['imperial:obelisco',96,128]
+  ['imperial:jardinera-floral',128,96],['imperial:jardinera-curva',160,160],['imperial:topiario',96,96],['imperial:puente',160,128],['imperial:obelisco',96,128]
 ].map(([id,width,height])=>({id,label:id,family:id,category:'decor',width,height,placeable:true}));
 const catalog={version:'semantic-kind-audit-v1',list:()=>templates,get:id=>templates.find(row=>row.id===id)||null};
 const recipes=['KELO_ROYAL_CAPITAL_V1','KELO_VILLAGE_V1','KELO_FOREST_V1'];
+const VISUAL_SEED=81746291;
 const legacyRules=[
   [/\b(fountain|fuente)\b/,'imperial:fuente-justicia'],[/\b(market|mercado|commerce|shop)\b/,'imperial:kiosco'],
   [/\b(ancient tree|tree|arbol|grove)\b/,'imperial:arbol-florido-blanco'],[/\b(lamp|farola|light)\b/,'imperial:farola'],
@@ -33,7 +34,7 @@ const legacyRules=[
 ];
 const normalize=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[_-]+/g,' ').replace(/[^a-z0-9 ]+/g,' ').replace(/\s+/g,' ').trim();
 let worlds=0,checked=0,beforeWrong=0,afterWrong=0,beforeWrongKiosk=0,afterWrongKiosk=0,marketProps=0,marketPropBeforeArea=0,marketPropAfterArea=0;
-const byKind={};
+const byKind={},assetCountsByKind={};
 
 function authoritativeKind(row){
   const text=normalize([row?.kind,row?.type,row?.family,row?.name,row?.label,row?.role].filter(Boolean).join(' '));
@@ -60,6 +61,7 @@ function inspect(collection,placementKind,snapshot){
     const placement=placements.get(placementId);
     assert(placement,`missing semantic placement ${placementId}`);
     checked+=1; byKind[kind]=(byKind[kind]||0)+1;
+    assetCountsByKind[kind]??={};assetCountsByKind[kind][placement.assetId]=(assetCountsByKind[kind][placement.assetId]||0)+1;
     if(kind==='market_prop'){
       const template=templates.find(item=>item.id===placement.assetId);
       marketProps+=1;marketPropBeforeArea+=160*160;marketPropAfterArea+=(template?.width||0)*(template?.height||0);
@@ -93,5 +95,15 @@ assert.equal(afterWrong,0,'intrinsic semantic kind must win over district labels
 assert.equal(afterWrongKiosk,0,'non-market props must never resolve to imperial:kiosco');
 assert(marketProps>0,'corpus must exercise ordinary market props');
 assert(marketPropAfterArea<marketPropBeforeArea,'ordinary market props must reduce projected footprint');
+for(const kind of ['fountain','tree','lamp','flower'])assert(Object.keys(assetCountsByKind[kind]||{}).length>1,`${kind} must deterministically use more than the first available semantic asset`);
+const visualRun=generateBestOf(getMapForgeRecipe('KELO_ROYAL_CAPITAL_V1'),{seed:VISUAL_SEED,count:4,assetCatalogVersion:catalog.version});
+const visualSnapshot=mapDefinitionToWorldDraftSnapshot(visualRun.best,{assetCatalog:catalog});
+const visualPlacementById=new Map(visualSnapshot.placements.map(row=>[row.placementId,row]));
+const visualVariantCounts={};let visualResolved=0,visualProjectedArea=0;
+for(const [collection,placementKind] of [[visualRun.best.landmarks||[],'landmark'],[visualRun.best.decorations||[],'decoration']])for(const [index,row] of collection.entries()){
+  const kind=authoritativeKind(row);if(!kind)continue;const placement=visualPlacementById.get(`map-forge:${placementKind}:${String(row?.id||index)}`);if(!placement)continue;
+  const template=templates.find(item=>item.id===placement.assetId);visualVariantCounts[kind]??={};visualVariantCounts[kind][placement.assetId]=(visualVariantCounts[kind][placement.assetId]||0)+1;visualResolved++;visualProjectedArea+=(template?.width||0)*(template?.height||0);
+}
+for(const kind of ['tree','lamp','flower'])assert(Object.keys(visualVariantCounts[kind]||{}).length>1,`visual seed ${VISUAL_SEED} must visibly exercise ${kind} variants`);
 
-console.log(JSON.stringify({ok:true,worlds,recipes:recipes.length,seedsPerRecipe:20,deterministicReplays:recipes.length,checked,before:{wrongSemanticPlacements:beforeWrong,wrongKioskConversions:beforeWrongKiosk,errorRatePct:Number((beforeWrong/checked*100).toFixed(2))},after:{wrongSemanticPlacements:afterWrong,wrongKioskConversions:afterWrongKiosk,errorRatePct:Number((afterWrong/checked*100).toFixed(2))},marketPropFootprint:{count:marketProps,beforePixels:marketPropBeforeArea,afterPixels:marketPropAfterArea,reductionPct:Number((100-marketPropAfterArea/marketPropBeforeArea*100).toFixed(2))},byKind},null,2));
+console.log(JSON.stringify({ok:true,worlds,recipes:recipes.length,seedsPerRecipe:20,deterministicReplays:recipes.length,checked,before:{wrongSemanticPlacements:beforeWrong,wrongKioskConversions:beforeWrongKiosk,errorRatePct:Number((beforeWrong/checked*100).toFixed(2)),semanticVariantsPerFamily:1},after:{wrongSemanticPlacements:afterWrong,wrongKioskConversions:afterWrongKiosk,errorRatePct:Number((afterWrong/checked*100).toFixed(2)),assetCountsByKind},visualSeed:{seed:VISUAL_SEED,layoutHash:visualRun.best.metadata.layoutHash,resolved:visualResolved,projectedArea:visualProjectedArea,variantCounts:visualVariantCounts},marketPropFootprint:{count:marketProps,beforePixels:marketPropBeforeArea,afterPixels:marketPropAfterArea,reductionPct:Number((100-marketPropAfterArea/marketPropBeforeArea*100).toFixed(2))},byKind},null,2));
