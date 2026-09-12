@@ -31,9 +31,9 @@ export function syncWorldSpatialCommand({command,document,spatial}){
   }
   const pending=new Set(ids);
   for(let order=0;order<rows.length&&pending.size;order++){
-    const e=rows[order],id=e?.id==null?'':String(e.id);
+    const e=rows[order],rawId=e?.id,id=rawId==null?'':String(rawId);
     if(!id||!pending.has(id))continue;
-    spatial.upsert({id:e.id,category:'entity',rect:entityRect(e),data:e,order});
+    spatial.upsert({id:rawId,category:'entity',rect:entityRect(e),data:e,order});
     pending.delete(id);
   }
   for(const id of pending)spatial.remove(id);
