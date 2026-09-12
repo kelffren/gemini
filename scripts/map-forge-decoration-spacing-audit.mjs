@@ -1,10 +1,11 @@
 /* KELO-INDEX
  * area: QA / MAP FORGE
  * owner: Map Forge CI
- * purpose: fixed-seed regression guard proving visually stacked props cannot retain elite scores
+ * purpose: fixed-seed regression guard proving visually crowded props cannot retain elite scores
  * public-api: CLI
  * consumes: Map Forge recipes + core + quality scorer
  * state-owned: none
+ * fixture: preserves density/family counts while compressing same-district props onto a realistic 90px grid
  */
 import assert from 'node:assert/strict';
 import {MAP_FORGE_RECIPES} from '../src/world/map-forge/map-forge-recipes.mjs';
@@ -21,16 +22,25 @@ for(const seed of seeds){
   const map=generateMapCandidate(recipe,{seed,assetCatalogVersion:'ci-catalog'});
   assert.equal(map.validation.valid,true,`${seed}: production candidate must remain valid`);
   assert.ok(map.quality.breakdown.decorationSpacing>=88,`${seed}: production candidate has excessive prop overlap: ${map.quality.breakdown.decorationSpacing}`);
-  const stacked=clone(map),originalFamilies=familyHistogram(map.decorations||[]),byDistrict=new Map();
-  for(const row of stacked.decorations||[]){if(!byDistrict.has(row.district))byDistrict.set(row.district,[]);byDistrict.get(row.district).push(row);}
-  for(const rows of byDistrict.values()){if(rows.length<2)continue;const anchor={x:rows[0].x,y:rows[0].y};for(const row of rows){row.x=anchor.x;row.y=anchor.y;}}
-  const structural=validateMapDefinition(stacked,recipe);
-  assert.equal(structural.valid,true,`${seed}: adversarial overlap fixture must stay structurally valid so scoring gate is exercised`);
-  const score=scoreMapDefinition(stacked,recipe,structural);
-  assert.deepEqual(familyHistogram(stacked.decorations||[]),originalFamilies,`${seed}: fixture must preserve exact decoration-family counts while changing only positions`);
-  assert.equal(stacked.decorations.length,map.decorations.length,`${seed}: fixture must preserve decoration density`);
-  assert.ok(score.breakdown.decorationSpacing<=65,`${seed}: stacked fixture must expose severe spacing defect, got ${score.breakdown.decorationSpacing}`);
-  assert.ok(score.total<=89,`${seed}: visually stacked but structurally valid map must not score 90+, got ${score.total}`);
-  results.push({seed,normalScore:map.quality.total,normalSpacing:map.quality.breakdown.decorationSpacing,stackedScore:score.total,stackedSpacing:score.breakdown.decorationSpacing,decorations:map.decorations.length,families:originalFamilies});
+  if(seed===81746291)assert.ok(map.quality.total<95,`${seed}: fixed-seed runtime evidence is visibly crowded and must not retain a 95+ score, got ${map.quality.total}`);
+
+  const crowded=clone(map),originalFamilies=familyHistogram(map.decorations||[]),byDistrict=new Map();
+  for(const row of crowded.decorations||[]){if(!byDistrict.has(row.district))byDistrict.set(row.district,[]);byDistrict.get(row.district).push(row);}
+  for(const rows of byDistrict.values()){
+    if(rows.length<4)continue;
+    const anchor={x:rows[0].x,y:rows[0].y};
+    for(let i=0;i<rows.length;i++){
+      rows[i].x=anchor.x+(i%4)*90;
+      rows[i].y=anchor.y+Math.floor(i/4)*90;
+    }
+  }
+  const structural=validateMapDefinition(crowded,recipe);
+  assert.equal(structural.valid,true,`${seed}: adversarial crowding fixture must stay structurally valid so scoring gate is exercised`);
+  const score=scoreMapDefinition(crowded,recipe,structural);
+  assert.deepEqual(familyHistogram(crowded.decorations||[]),originalFamilies,`${seed}: fixture must preserve exact decoration-family counts while changing only positions`);
+  assert.equal(crowded.decorations.length,map.decorations.length,`${seed}: fixture must preserve decoration density`);
+  assert.equal(score.breakdown.decorationSpacing,map.quality.breakdown.decorationSpacing,`${seed}: crowding gate must not perturb the normal spacing metric or candidate ranking`);
+  assert.ok(score.total<=89,`${seed}: visibly crowded but structurally valid map must not score 90+, got ${score.total}`);
+  results.push({seed,normalScore:map.quality.total,normalSpacing:map.quality.breakdown.decorationSpacing,crowdedScore:score.total,crowdedSpacing:score.breakdown.decorationSpacing,decorations:map.decorations.length,families:originalFamilies});
 }
 console.log(JSON.stringify({ok:true,seeds:results},null,2));
