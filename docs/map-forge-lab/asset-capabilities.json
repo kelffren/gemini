@@ -33,8 +33,9 @@
     "landmarksWithoutReliableActiveMatch": ["barn", "castle"],
     "knownResolutionRisks": [
       {"semantic": "market_prop", "currentFirstMatch": "imperial:kiosco", "worldSize": {"w": 160, "h": 160}, "defects": ["ASSET_SCALE_WRONG", "PROP_REPETITION"]},
-      {"semantic": "tree", "currentFirstMatch": "imperial:arbol-florido-blanco", "defects": ["ASSET_VARIETY_LOW"]},
-      {"semantic": "lamp", "currentFirstMatch": "imperial:farola", "defects": ["ASSET_VARIETY_LOW"]}
+      {"semantic": "tree", "deterministicVariants": ["imperial:arbol-florido-blanco", "imperial:arbol-florido-azul"], "defects": []},
+      {"semantic": "lamp", "deterministicVariants": ["imperial:farola", "imperial:farola-monumental"], "defects": []},
+      {"semantic": "flower", "deterministicVariants": ["imperial:jardinera-floral", "imperial:jardinera-curva"], "defects": []}
     ]
   },
   "familyCoverage": {
@@ -44,12 +45,12 @@
     "terrainTransitions": "registry metadata exists; several legacy/reset atlases are retired",
     "roads": "geometry exists; no approved active authored path atlas",
     "roadEdgesCornersIntersections": "no active Map Forge-aware vocabulary",
-    "trees": "multiple physical/imperial assets exist; resolver uses one first match",
+    "trees": "two approved imperial assets selected deterministically per placement",
     "bushes": "imperial topiary match",
     "rocks": "emitted by generator, no reliable active semantic match",
-    "flowers": "imperial curved planter match",
+    "flowers": "two approved imperial planter variants selected deterministically per placement",
     "fences": "rural metadata exists but runtime reset retires the source visual",
-    "lamps": "two imperial assets exist; resolver uses one first match",
+    "lamps": "two approved imperial assets selected deterministically per placement",
     "benches": "one imperial match",
     "housesShops": "five registered legacy architecture prefabs are retired visuals; Map Forge has no broad building placement vocabulary",
     "farms": "barn semantic output has no reliable active match",

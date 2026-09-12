@@ -12,6 +12,7 @@ import fs from 'node:fs';
 import {MAP_FORGE_RECIPES} from '../src/world/map-forge/map-forge-recipes.mjs';
 import {generateMapCandidate,generateBestOf,serializeMapDefinition,deserializeMapDefinition} from '../src/world/map-forge/map-forge-core.mjs';
 import {scoreMapDefinition} from '../src/world/map-forge/map-forge-quality.mjs';
+import {scenePrefabTieScore} from '../src/world/map-forge/map-forge-scene-prefabs.mjs';
 
 const cap=MAP_FORGE_RECIPES.KELO_ROYAL_CAPITAL_V1;
 const a=generateMapCandidate(cap,{seed:81746291,assetCatalogVersion:'ci-catalog'});
@@ -37,8 +38,9 @@ const best=generateBestOf(cap,{seed:12345,count:8,assetCatalogVersion:'ci-catalo
 assert.equal(best.requested,8);assert.equal(best.validCount,8);assert.ok(best.best.quality.total>=best.candidates.at(-1).quality.total);
 assert.ok(best.selections.bestOverall&&best.selections.mostMonumental&&best.selections.mostOrganic&&best.selections.mostExplorable&&best.selections.mostCompact,'best-of selectors must resolve');
 
-const visualTieScore=map=>{const m=map?.quality?.breakdown||{};return Number(m.visualComposition||0)*1.35+Number(m.scenicVistas||0)*1.25+Number(m.negativeSpace||0)*1.05+Number(m.assetVariety||0)+Number(m.districtCoherence||0);};
+const visualTieScore=map=>{const m=map?.quality?.breakdown||{};return Number(m.visualComposition||0)*1.35+Number(m.scenicVistas||0)*1.25+Number(m.negativeSpace||0)*1.05+Number(m.assetVariety||0)+Number(m.districtCoherence||0)+scenePrefabTieScore(map);};
 const legacyComparator=(x,y)=>y.quality.total-x.quality.total||String(x.metadata.layoutHash).localeCompare(String(y.metadata.layoutHash));
+const currentComparator=(x,y)=>y.quality.total-x.quality.total||visualTieScore(y)-visualTieScore(x)||String(x.metadata.layoutHash).localeCompare(String(y.metadata.layoutHash));
 const tieBreakRegression={runs:0,tieCases:0,changedSelections:0,improvedSelections:0,legacyVisualSum:0,currentVisualSum:0};
 for(const recipe of Object.values(MAP_FORGE_RECIPES))for(let seed=1;seed<=100;seed++){
   const result=generateBestOf(recipe,{seed,count:8,assetCatalogVersion:'ci-catalog'}),legacy=[...result.candidates].sort(legacyComparator)[0],current=result.best;
@@ -51,7 +53,11 @@ for(const recipe of Object.values(MAP_FORGE_RECIPES))for(let seed=1;seed<=100;se
   if(seed<=2){const repeat=generateBestOf(recipe,{seed,count:8,assetCatalogVersion:'ci-catalog'});assert.equal(repeat.best.metadata.layoutHash,current.metadata.layoutHash,`${recipe.id}:${seed}: best-of tie-break must stay deterministic`);}
 }
 assert.equal(tieBreakRegression.runs,300,'expected 300 representative best-of runs');
-assert.ok(tieBreakRegression.tieCases>0,'fixed corpus must exercise equal-total best-of ties');
+const forcedTie=[...best.candidates].sort((x,y)=>visualTieScore(x)-visualTieScore(y)).filter((row,index,rows)=>index===0||visualTieScore(row)>visualTieScore(rows[0])+1e-9).slice(0,2).map(row=>JSON.parse(JSON.stringify(row)));
+assert.equal(forcedTie.length,2,'best-of fixture must expose two candidates with distinct visual tie scores');
+forcedTie[0].quality.total=forcedTie[1].quality.total=95;forcedTie[0].metadata.layoutHash='a';forcedTie[1].metadata.layoutHash='z';
+assert.equal([...forcedTie].sort(legacyComparator)[0].metadata.layoutHash,'a','legacy equal-score fixture must fall back to hash');
+assert.equal([...forcedTie].sort(currentComparator)[0].metadata.layoutHash,'z','current equal-score fixture must prefer the visually stronger candidate');
 const coreSource=fs.readFileSync('src/world/map-forge/map-forge-core.mjs','utf8');
 assert.ok(/function candidateComparator\(a,b\)\{return b\.quality\.total-a\.quality\.total\|\|visualTieScore\(b\)-visualTieScore\(a\)\|\|String\(a\.metadata\.layoutHash\)\.localeCompare\(String\(b\.metadata\.layoutHash\)\);\}/.test(coreSource),'best-of comparator must keep visualTieScore ahead of deterministic layoutHash fallback');
 assert.ok(tieBreakRegression.currentVisualSum+1e-9>=tieBreakRegression.legacyVisualSum,'visual tie-break must not regress aggregate equal-score visual quality');

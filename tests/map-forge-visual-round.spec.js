@@ -14,6 +14,7 @@ const MAIN_SEED=81746291;
 const VALIDATION_SEEDS=[81746291,12345,424242,29011987];
 const STAGE=process.env.KELO_VISUAL_STAGE==='after'?'after':'before';
 const URBAN_KINDS=new Set(['plaza','royal','commerce']);
+const DIRECTIONAL_FAMILIES=new Set(['bench','market_prop']);
 const DECORATION_MIN=195;
 const DECORATION_MAX=215;
 const VALIDATION_QUALITY_MIN=94;
@@ -75,10 +76,14 @@ function scenePairMetrics(map){
 }
 function mapMetrics(map){
   const districtById=new Map((map.districts||[]).map(d=>[d.id,d]));
-  const urban=(map.decorations||[]).filter(d=>URBAN_KINDS.has(districtById.get(d.district)?.kind));
+  const decorations=map.decorations||[];
+  const urban=decorations.filter(d=>URBAN_KINDS.has(districtById.get(d.district)?.kind));
+  const upright=decorations.filter(d=>!DIRECTIONAL_FAMILIES.has(d.family));
+  const uprightRotated=upright.filter(d=>((Number(d.rotation)||0)%360+360)%360!==0);
   const roadDistances=urban.map(d=>nearestRoadDistance(d,map.roads));
-  const streetscape=roadDistances.filter(distance=>distance>=35&&distance<=190).length;
-  const familyCounts={};for(const d of map.decorations||[])familyCounts[d.family]=(familyCounts[d.family]||0)+1;
+  const streetscape=urban.filter((decoration,index)=>decoration.scenePrefabId||(roadDistances[index]>=35&&roadDistances[index]<=190)).length;
+  const familyCounts={};for(const d of decorations)familyCounts[d.family]=(familyCounts[d.family]||0)+1;
+  const uprightRotationCounts={};for(const d of upright){const key=String(((Number(d.rotation)||0)%360+360)%360);uprightRotationCounts[key]=(uprightRotationCounts[key]||0)+1;}
   return{
     seed:map.metadata?.seed,
     generatorVersion:map.metadata?.generatorVersion,
@@ -91,10 +96,16 @@ function mapMetrics(map){
     assetVariety:Number(map.quality?.breakdown?.assetVariety||0),
     roadCount:(map.roads||[]).length,
     blockCount:(map.blocks||[]).length,
-    decorationCount:(map.decorations||[]).length,
+    decorationCount:decorations.length,
     declusterSwapCount:Number(map.generationStats?.decorationDeclusterSwapCount||0),
+    naturalClusterAttemptCount:Number(map.generationStats?.decorationNaturalClusterAttemptCount||0),
+    naturalClusterAcceptedCount:Number(map.generationStats?.decorationNaturalClusterAcceptedCount||0),
     landmarkRoadFacingCount:Number(map.generationStats?.landmarkRoadFacingCount||0),
     landmarkRoadFacingChangedCount:Number(map.generationStats?.landmarkRoadFacingChangedCount||0),
+    uprightDecorationCount:upright.length,
+    uprightRotatedCount:uprightRotated.length,
+    uprightNormalizedCount:Number(map.generationStats?.decorationUprightNormalizedCount||0),
+    uprightRotationCounts,
     urbanDecorationCount:urban.length,
     urbanStreetscapeCount:streetscape,
     urbanStreetscapeRatio:urban.length?Number((streetscape/urban.length).toFixed(4)):1,
@@ -118,7 +129,7 @@ async function bootForge(page){
   await page.evaluate(async()=>{
     const {bootKeloCreators}=await import('./src/creators/creator-entry.mjs');
     const platform=await bootKeloCreators({root:window});
-    await platform.openWorkspace('map-forge');
+    window.__KELO_TEST_MAP_FORGE_WORKSPACE__=await platform.openWorkspace('map-forge');
   });
   const forge=page.locator('#kelo-map-forge');await expect(forge).toBeVisible({timeout:20000});
   return{forge,pageErrors};
@@ -130,8 +141,12 @@ async function generateSelected(page,forge,seed){
   await page.getByRole('button',{name:'GENERAR'}).click();
   await expect(forge.getByText(/4\/4 válidos/)).toBeVisible({timeout:15000});
   await forge.getByRole('button').filter({hasText:`Seed ${seed}`}).first().click();
-  await page.waitForFunction(async expected=>{const {getMapForgeWorkspace}=await import('./src/creators/ui/map-forge-workspace.mjs');return getMapForgeWorkspace()?.selected?.metadata?.seed===expected;},seed,{timeout:5000});
-  return page.evaluate(async()=>{const {getMapForgeWorkspace}=await import('./src/creators/ui/map-forge-workspace.mjs');const map=getMapForgeWorkspace().selected;return JSON.parse(JSON.stringify(map));});
+  for(let attempt=0;attempt<50;attempt++){
+    const map=await page.evaluate(expected=>{const selected=window.__KELO_TEST_MAP_FORGE_WORKSPACE__?.selected;return selected?.metadata?.seed===expected?JSON.parse(JSON.stringify(selected)):null;},seed);
+    if(map)return map;
+    await page.waitForTimeout(100);
+  }
+  throw new Error(`Map Forge selected map ${seed} was not available for visual evidence`);
 }
 
 test(`Map Forge ${STAGE} fixed-seed preview/runtime visual evidence`,async({page})=>{
@@ -148,12 +163,16 @@ test(`Map Forge ${STAGE} fixed-seed preview/runtime visual evidence`,async({page
     expect(mainMetrics.scenicVistas).toBeGreaterThanOrEqual(82);
     expect(mainMetrics.negativeSpace).toBeGreaterThanOrEqual(78);
     expect(mainMetrics.declusterSwapCount).toBeGreaterThan(0);
+    expect(mainMetrics.naturalClusterAcceptedCount).toBeGreaterThanOrEqual(8);
     expect(mainMetrics.localSameFamilyRatio).toBeLessThanOrEqual(LOCAL_SAME_FAMILY_MAX);
     expect(mainMetrics.landmarkRoadFacingCount).toBeGreaterThanOrEqual(3);
     expect(mainMetrics.landmarkRoadFacingChangedCount).toBeGreaterThan(0);
     expect(mainMetrics.scenePrefabCount).toBeGreaterThan(0);
     expect(mainMetrics.sceneCompletePairCount).toBeGreaterThan(0);
     expect(mainMetrics.sceneOrphanPairCount).toBe(0);
+    expect(mainMetrics.uprightDecorationCount).toBeGreaterThan(0);
+    expect(mainMetrics.uprightRotatedCount).toBe(0);
+    expect(mainMetrics.uprightNormalizedCount).toBeGreaterThan(0);
   }
   await page.screenshot({path:`test-results/screenshot_preview_${STAGE}.png`,fullPage:true});
 
@@ -186,9 +205,12 @@ test(`Map Forge ${STAGE} fixed-seed preview/runtime visual evidence`,async({page
       expect(metrics.scenicVistas).toBeGreaterThanOrEqual(VALIDATION_VISTAS_MIN);
       expect(metrics.negativeSpace).toBeGreaterThanOrEqual(VALIDATION_SPACE_MIN);
       expect(metrics.declusterSwapCount).toBeGreaterThan(0);
+      expect(metrics.naturalClusterAcceptedCount).toBeGreaterThanOrEqual(8);
       expect(metrics.localSameFamilyRatio).toBeLessThanOrEqual(LOCAL_SAME_FAMILY_MAX);
       expect(metrics.landmarkRoadFacingCount).toBeGreaterThanOrEqual(3);
       expect(metrics.sceneOrphanPairCount).toBe(0);
+      expect(metrics.uprightDecorationCount).toBeGreaterThan(0);
+      expect(metrics.uprightRotatedCount).toBe(0);
     }
     validation.push(metrics);
   }

@@ -1,10 +1,10 @@
 /* KELO-INDEX
  * area: CORE / AVATAR
  * owner: KeloAvatar
- * keys: AVATAR RENDER BASE MIDDLEWARE FALLBACK FOUNDATION HERO SPRITESHEET FACING FRAME
+ * keys: AVATAR RENDER BASE MIDDLEWARE FALLBACK FOUNDATION HERO BASE ZOO 8-DIRECTION FACING
  * purpose: owner único de la composición renderAvatar y del sprite principal visual del jugador
  * public-api: KeloAvatar.setBase/use/unregister/snapshot
- * consumes: renderAvatar vigente de engine-c como fallback + assets/hero-spartan-spritesheet.png + _face/_visualMotion
+ * consumes: renderAvatar vigente de engine-c como fallback + assets/base-zoo/Idle/rotations/*.png + _face/_visualMotion/velocity
  * state-owned: renderer base actual + middleware ordenado + estado de carga del sprite principal
  * extension-points: setBase para reemplazos históricos; use para fallbacks/overrides condicionales
  * reuse: renderer hero, apariencias y futuras capas de composición de actor
@@ -14,7 +14,7 @@
 (function(root){
   'use strict';
   if(root.KeloAvatar)return;
-  const VERSION='kelo-avatar-render-v1.1.0';
+  const VERSION='kelo-avatar-render-v1.2.0-base-zoo';
   if(typeof renderAvatar!=='function'){
     root.KELO_AVATAR_RENDER_AUDIT=Object.freeze({version:VERSION,installed:false,reason:'renderAvatar-missing'});
     return;
@@ -26,37 +26,72 @@
   let sequence=1;
   const middleware=[];
 
-  // KELO-INDEX AVATAR/HERO sprite oficial 4x4: down, right, left, up; 4 frames por dirección.
-  const HERO_SPRITE_SOURCE='assets/hero-spartan-spritesheet.png?v=20260911-main-v1';
-  const HERO_COLUMNS=4;
-  const HERO_ROWS=4;
-  const HERO_FACE_ROWS=Object.freeze({down:0,right:1,left:2,up:3});
+  // KELO-INDEX AVATAR/HERO Base Zoo oficial: 8 PNG Idle independientes, 152x152, una vista por dirección.
+  const HERO_ROOT='assets/base-zoo/Idle/rotations/';
+  const HERO_DIRECTION_SOURCES=Object.freeze({
+    down:HERO_ROOT+'south.png?v=20260912-base-zoo-v1',
+    'down-right':HERO_ROOT+'south-east.png?v=20260912-base-zoo-v1',
+    right:HERO_ROOT+'east.png?v=20260912-base-zoo-v1',
+    'up-right':HERO_ROOT+'north-east.png?v=20260912-base-zoo-v1',
+    up:HERO_ROOT+'north.png?v=20260912-base-zoo-v1',
+    'up-left':HERO_ROOT+'north-west.png?v=20260912-base-zoo-v1',
+    left:HERO_ROOT+'west.png?v=20260912-base-zoo-v1',
+    'down-left':HERO_ROOT+'south-west.png?v=20260912-base-zoo-v1'
+  });
+  const HERO_FACES=Object.freeze(['down','down-right','right','up-right','up','up-left','left','down-left']);
   const heroSpriteState={
-    version:'main-hero-spartan-v1',
-    source:HERO_SPRITE_SOURCE,
+    version:'main-hero-base-zoo-v1',
+    source:HERO_ROOT,
+    state:'Idle',
+    directionMode:8,
+    frameWidth:152,
+    frameHeight:152,
     ready:false,
+    complete:false,
+    readyCount:0,
+    failedCount:0,
     error:null,
-    columns:HERO_COLUMNS,
-    rows:HERO_ROWS,
     drawCount:0,
     lastFace:'down',
-    lastFrame:2,
+    lastFrame:0,
     middlewareId:null
   };
   const HeroImage=root.Image || (typeof Image==='function'?Image:null);
-  const heroImage=HeroImage?new HeroImage():null;
-  if(heroImage){
-    heroImage.decoding='async';
-    heroImage.onload=function(){
-      heroSpriteState.ready=heroImage.naturalWidth>0&&heroImage.naturalHeight>0;
-      heroSpriteState.error=heroSpriteState.ready?null:'invalid-dimensions';
-    };
-    heroImage.onerror=function(){
-      heroSpriteState.ready=false;
-      heroSpriteState.error='load-failed';
-      if(root.console&&typeof root.console.warn==='function')root.console.warn('[KeloAvatar] main hero sprite failed to load; legacy renderer remains active.');
-    };
-    heroImage.src=HERO_SPRITE_SOURCE;
+  const heroImages=Object.create(null);
+  const heroLoaded=Object.create(null);
+  const heroFailed=Object.create(null);
+
+  function updateHeroLoadState(){
+    heroSpriteState.readyCount=HERO_FACES.reduce(function(total,face){return total+(heroLoaded[face]?1:0);},0);
+    heroSpriteState.failedCount=HERO_FACES.reduce(function(total,face){return total+(heroFailed[face]?1:0);},0);
+    heroSpriteState.ready=heroSpriteState.readyCount>0;
+    heroSpriteState.complete=heroSpriteState.readyCount===HERO_FACES.length;
+    heroSpriteState.error=heroSpriteState.failedCount?(heroSpriteState.complete?null:'partial-load-failed'):null;
+  }
+
+  if(HeroImage){
+    HERO_FACES.forEach(function(face){
+      const image=new HeroImage();
+      heroImages[face]=image;
+      image.decoding='async';
+      image.onload=function(){
+        if(image.naturalWidth>0&&image.naturalHeight>0){
+          heroLoaded[face]=true;
+          delete heroFailed[face];
+        }else{
+          heroFailed[face]=true;
+          delete heroLoaded[face];
+        }
+        updateHeroLoadState();
+      };
+      image.onerror=function(){
+        heroFailed[face]=true;
+        delete heroLoaded[face];
+        updateHeroLoadState();
+        if(root.console&&typeof root.console.warn==='function')root.console.warn('[KeloAvatar] Base Zoo direction failed to load:',face);
+      };
+      image.src=HERO_DIRECTION_SOURCES[face];
+    });
   }else{
     heroSpriteState.error='image-constructor-unavailable';
   }
@@ -88,22 +123,54 @@
     return true;
   }
 
-  function cardinalFace(actor){
-    const direct=String(actor&&actor._face||'').toLowerCase();
-    if(Object.prototype.hasOwnProperty.call(HERO_FACE_ROWS,direct))return direct;
-    const visual=String(actor&&actor._visualMotion&&actor._visualMotion.face||'').toLowerCase();
-    if(Object.prototype.hasOwnProperty.call(HERO_FACE_ROWS,visual))return visual;
-    const vx=Number(actor&&actor.vx)||0;
-    const vy=Number(actor&&actor.vy)||0;
-    if(Math.abs(vx)>Math.abs(vy)&&Math.abs(vx)>0.01)return vx>0?'right':'left';
-    if(Math.abs(vy)>0.01)return vy>0?'down':'up';
+  function normalizeFace(value){
+    const face=String(value||'').trim().toLowerCase().replace(/_/g,'-');
+    const aliases={
+      south:'down',southeast:'down-right','south-east':'down-right',
+      east:'right',northeast:'up-right','north-east':'up-right',
+      north:'up',northwest:'up-left','north-west':'up-left',
+      west:'left',southwest:'down-left','south-west':'down-left'
+    };
+    const normalized=aliases[face]||face;
+    return HERO_FACES.indexOf(normalized)>=0?normalized:'';
+  }
+
+  function vectorToFace(x,y){
+    const vx=Number(x)||0;
+    const vy=Number(y)||0;
+    if(Math.hypot(vx,vy)<=0.01)return '';
+    const octant=Math.round(Math.atan2(vy,vx)/(Math.PI/4));
+    const byOctant={
+      '-4':'left','-3':'up-left','-2':'up','-1':'up-right',
+      '0':'right','1':'down-right','2':'down','3':'down-left','4':'left'
+    };
+    return byOctant[String(octant)]||'';
+  }
+
+  function directionalFace(actor){
+    const visual=actor&&actor._visualMotion||null;
+    if(visual){
+      const visualVector=vectorToFace(visual.dx,visual.dy);
+      if(visualVector)return visualVector;
+    }
+    const velocityFace=vectorToFace(actor&&actor.vx,actor&&actor.vy);
+    if(velocityFace)return velocityFace;
+    const visualFace=normalizeFace(visual&&visual.face);
+    if(visualFace)return visualFace;
+    const directFace=normalizeFace(actor&&actor._face);
+    if(directFace)return directFace;
     return heroSpriteState.lastFace||'down';
   }
 
-  function visualFrame(actor){
-    const raw=Number(actor&&actor._visualMotion&&actor._visualMotion.frame);
-    if(Number.isFinite(raw))return ((Math.round(raw)%HERO_COLUMNS)+HERO_COLUMNS)%HERO_COLUMNS;
-    return 2;
+  function heroImageFor(face){
+    if(heroLoaded[face]&&heroImages[face])return heroImages[face];
+    if(heroLoaded[heroSpriteState.lastFace]&&heroImages[heroSpriteState.lastFace])return heroImages[heroSpriteState.lastFace];
+    if(heroLoaded.down&&heroImages.down)return heroImages.down;
+    for(let i=0;i<HERO_FACES.length;i+=1){
+      const candidate=HERO_FACES[i];
+      if(heroLoaded[candidate]&&heroImages[candidate])return heroImages[candidate];
+    }
+    return null;
   }
 
   function drawHeroName(actor,topY){
@@ -133,23 +200,15 @@
 
   // KELO-INDEX AVATAR/HERO reemplaza solo el cuerpo visual del jugador local; gameplay/collider no cambian.
   function renderMainHeroSprite(actor,isSelf,next){
-    if(!isSelf||!actor||!heroSpriteState.ready||!heroImage||typeof ctx==='undefined'||!ctx){
-      return next();
-    }
+    if(!isSelf||!actor||!heroSpriteState.ready||typeof ctx==='undefined'||!ctx)return next();
 
-    const naturalW=heroImage.naturalWidth;
-    const naturalH=heroImage.naturalHeight;
-    if(!naturalW||!naturalH)return next();
+    const face=directionalFace(actor);
+    const heroImage=heroImageFor(face);
+    if(!heroImage||!heroImage.naturalWidth||!heroImage.naturalHeight)return next();
 
-    const face=cardinalFace(actor);
-    const frame=visualFrame(actor);
-    const sourceW=naturalW/HERO_COLUMNS;
-    const sourceH=naturalH/HERO_ROWS;
-    const sourceX=frame*sourceW;
-    const sourceY=HERO_FACE_ROWS[face]*sourceH;
     const radius=Math.max(1,Number(actor.radius)||20);
     const drawH=Math.max(92,radius*4.8);
-    const drawW=drawH*(sourceW/sourceH);
+    const drawW=drawH*(heroImage.naturalWidth/heroImage.naturalHeight);
     const feetY=actor.y+Math.max(14,radius*0.9);
     const drawX=actor.x-drawW/2;
     const drawY=feetY-drawH;
@@ -173,7 +232,7 @@
       ctx.scale(squashX,squashY);
       ctx.translate(-actor.x,-feetY);
     }
-    ctx.drawImage(heroImage,sourceX,sourceY,sourceW,sourceH,drawX,drawY,drawW,drawH);
+    ctx.drawImage(heroImage,drawX,drawY,drawW,drawH);
     ctx.imageSmoothingEnabled=oldSmoothing;
     ctx.restore();
 
@@ -182,7 +241,7 @@
 
     heroSpriteState.drawCount+=1;
     heroSpriteState.lastFace=face;
-    heroSpriteState.lastFrame=frame;
+    heroSpriteState.lastFrame=0;
     return undefined;
   }
 
@@ -212,7 +271,10 @@
       mainHero:Object.freeze({
         source:heroSpriteState.source,
         ready:heroSpriteState.ready,
+        complete:heroSpriteState.complete,
+        readyCount:heroSpriteState.readyCount,
         error:heroSpriteState.error,
+        lastFace:heroSpriteState.lastFace,
         middlewareId:heroSpriteState.middlewareId
       }),
       middleware:Object.freeze(middleware.map(function(entry){
@@ -223,7 +285,7 @@
 
   // El sprite principal vive dentro del owner y debajo de character-customization (priority 250),
   // para conservar capas back/front de ropa/equipo sin volver a dibujar el cuerpo legacy.
-  heroSpriteState.middlewareId=use('main-hero:spartan-spritesheet',renderMainHeroSprite,100);
+  heroSpriteState.middlewareId=use('main-hero:base-zoo',renderMainHeroSprite,100);
 
   // FOUNDATION-ALLOW: único wrapper autorizado de renderAvatar después de engine-c.
   renderAvatar=function(actor,isSelf){
@@ -245,9 +307,10 @@
     middlewareFallback:true,
     middlewareOrder:'priority-desc',
     mainHeroSprite:true,
-    mainHeroSpriteSource:HERO_SPRITE_SOURCE,
-    mainHeroSpriteGrid:'4x4',
-    mainHeroFaceRows:'down,right,left,up',
+    mainHeroSpriteSource:HERO_ROOT,
+    mainHeroSpriteGrid:'8-direction-files',
+    mainHeroFaceRows:'down,down-right,right,up-right,up,up-left,left,down-left',
+    mainHeroState:'Idle',
     gameplayAuthority:false,
     legacyTarget:'renderAvatar'
   });

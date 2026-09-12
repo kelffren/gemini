@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: TEST / MAP FORGE / SCENE PREFABS
  * owner: Map Forge CI
- * purpose: lock authored scene materialization, balanced paired members, real member movement and road-entry connectors across representative Royal Capital seeds
+ * purpose: lock authored scene materialization, spawn arrival composition, sprite requirements and road-entry connectors across representative Royal Capital seeds
  * public-api: CLI regression guard
  * consumes: Map Forge recipes + pure generator core
  * state-owned: none
@@ -14,7 +14,7 @@ const PRIMARY_SEED=81746291;
 const SEEDS=[PRIMARY_SEED,12345,424242,29011987];
 const recipe=MAP_FORGE_RECIPES.KELO_ROYAL_CAPITAL_V1;
 const results=[];
-let totalScenes=0,totalMembers=0,totalMoved=0,totalConnectors=0,totalImprovement=0,totalPairRollbacks=0;
+let totalScenes=0,totalMembers=0,totalMoved=0,totalConnectors=0,totalImprovement=0,totalPairRollbacks=0,totalArrivalScenes=0,totalManifestSprites=0;
 
 function pairBalance(scene){
   const groups=new Map();
@@ -30,7 +30,7 @@ function pairBalance(scene){
 for(const seed of SEEDS){
   const map=generateMapCandidate(recipe,{seed,assetCatalogVersion:'ci-catalog'});
   assert.equal(map.validation.valid,true,`${seed}: map must remain valid after authored scene materialization`);
-  assert.equal(map.metadata.generatorVersion,'1.4.0',`${seed}: balanced authored scene guard targets generator 1.4.0`);
+  assert.equal(map.metadata.generatorVersion,'1.6.0',`${seed}: adaptive authored scene guard targets generator 1.6.0`);
 
   const stats=map.generationStats||{};
   const evaluated=Number(stats.scenePrefabEvaluatedCount||0);
@@ -41,15 +41,37 @@ for(const seed of SEEDS){
   const improvement=Number(stats.scenePrefabDistanceImprovement||0);
   const movement=Number(stats.scenePrefabMovementDistance||0);
   const pairRollbacks=Number(stats.scenePrefabPairRollbackCount||0);
-  const prefabs=map.scenePrefabs||[];
+  const prefabs=map.scenePrefabs||[],landmarkPrefabs=prefabs.filter(scene=>scene.sceneType!=='arrival'),arrival=prefabs.find(scene=>scene.sceneType==='arrival');
 
   assert.ok(evaluated>=4,`${seed}: Royal Capital must evaluate multiple authored landmark prefab patterns`);
-  assert.equal(prefabs.length,scenes,`${seed}: scenePrefabSceneCount must match scenePrefabs payload`);
-  assert.ok(scenes>=1,`${seed}: at least one authored scene prefab must resolve`);
-  assert.ok(members>=2,`${seed}: resolved authored scenes must contain multiple semantic members`);
-  assert.equal(connectors,scenes,`${seed}: every resolved scene must expose its road-entry connector`);
+  assert.equal(landmarkPrefabs.length,scenes,`${seed}: landmark scenePrefabSceneCount must match landmark scene payload`);
+  assert.ok(scenes>=1,`${seed}: at least one authored landmark scene prefab must resolve`);
+  assert.ok(members>=2,`${seed}: resolved authored landmark scenes must contain multiple semantic members`);
+  assert.equal(connectors,scenes,`${seed}: every resolved landmark scene must expose its road-entry connector`);
   assert.ok(improvement>=0,`${seed}: authored scene distance improvement cannot be negative`);
   assert.ok(movement>=0,`${seed}: authored scene movement cannot be negative`);
+
+  assert.equal(Number(stats.arrivalSceneResolvedCount||0),1,`${seed}: first visible spawn area must resolve an authored arrival scene`);
+  assert.ok(arrival,`${seed}: scenePrefabs must expose the authored arrival scene`);
+  assert.equal(arrival.prefabId,'spawn-arrival-gateway-v1',`${seed}: arrival scene must use the stable gateway prefab`);
+  assert.equal(arrival.district,map.spawnPoints[0].district,`${seed}: arrival scene belongs to the spawn district`);
+  assert.ok((arrival.members||[]).length>=2,`${seed}: arrival scene must visibly contain at least one balanced prop pair`);
+  assert.equal(pairBalance(arrival).orphan,0,`${seed}: arrival scene must never expose a one-sided pair`);
+  assert.equal((arrival.connectors||[]).filter(row=>row.kind==='road'&&row.required===true&&row.roadId).length,1,`${seed}: arrival scene must expose a required road connector`);
+  const landmarkMemberIds=new Set(landmarkPrefabs.flatMap(scene=>(scene.members||[]).map(member=>member.decorationId)));
+  for(const member of arrival.members||[])assert.ok(!landmarkMemberIds.has(member.decorationId),`${seed}: arrival scene cannot steal ${member.decorationId} from an authored landmark scene`);
+
+  const manifest=map.spriteManifest;
+  assert.ok(manifest&&manifest.version==='map-forge-sprite-manifest-v1',`${seed}: map must return the sprite manifest it needs`);
+  assert.equal(manifest.sprites.length,manifest.uniqueSprites,`${seed}: sprite manifest unique count must match payload`);
+  assert.ok(manifest.uniqueSprites>0&&manifest.totalInstances>0,`${seed}: sprite manifest must contain concrete requirements`);
+  assert.ok(Array.isArray(manifest.generationQueue)&&manifest.generationQueue.length>0,`${seed}: Royal Capital must expose sprites that still need art generation`);
+  assert.ok(Array.isArray(manifest.tileMaterials)&&manifest.tileMaterials.length>0,`${seed}: manifest must also expose tile materials used by the map`);
+  assert.equal(map.sceneBuildPlan.length,prefabs.length,`${seed}: every resolved scene must have a practical build plan`);
+  assert.equal(Number(stats.sceneBuildPlanCount||0),map.sceneBuildPlan.length,`${seed}: scene build-plan stat must match payload`);
+  assert.equal(Number(stats.spriteManifestUniqueCount||0),manifest.uniqueSprites,`${seed}: sprite manifest stat must match payload`);
+  assert.equal(Number(stats.spriteManifestNeedsGenerationCount||0),manifest.needsGenerationTypes,`${seed}: missing-art stat must match manifest`);
+  for(const member of arrival.members){const key=`decoration:${member.family}`,sprite=manifest.sprites.find(row=>row.key===key);assert.ok(sprite,`${seed}: arrival member ${member.role} must resolve to ${key} in sprite manifest`);assert.ok(sprite.sceneIds.includes(arrival.id),`${seed}: ${key} must retain arrival-scene usage`);}
 
   const ids=new Set();let completePairs=0,orphanPairs=0;
   for(const scene of prefabs){
@@ -71,19 +93,36 @@ for(const seed of SEEDS){
   }
 
   if(seed===PRIMARY_SEED){
-    assert.ok(scenes>=2,`${seed}: primary visual seed must materially contain multiple authored scenes`);
+    assert.ok(scenes>=2,`${seed}: primary visual seed must materially contain multiple authored landmark scenes`);
     assert.ok(moved>0,`${seed}: primary visual seed must physically move authored scene members`);
     assert.ok(improvement>0,`${seed}: primary visual seed must move members closer to authored targets`);
     assert.ok(connectors>=2,`${seed}: primary visual seed must expose multiple real road-entry connectors`);
     assert.ok(completePairs>0,`${seed}: primary visual seed must retain at least one complete authored left/right pair`);
   }
 
-  totalScenes+=scenes;totalMembers+=members;totalMoved+=moved;totalConnectors+=connectors;totalImprovement+=improvement;totalPairRollbacks+=pairRollbacks;
-  results.push({seed,evaluated,scenes,members,moved,connectors,improvement,movement,pairRollbacks,completePairs,orphanPairs,safetyRejected:Number(stats.scenePrefabSafetyRejectedCount||0),rhythmProtected:Number(stats.scenePrefabRhythmProtectedCount||0),prefabs:prefabs.map(scene=>({id:scene.id,prefabId:scene.prefabId,kit:scene.kit,variant:scene.variant,memberCount:scene.memberCount,movedCount:scene.movedCount,distanceImprovement:scene.distanceImprovement,connectorRoadId:scene.connectors?.[0]?.roadId||null}))});
+  totalScenes+=scenes;totalMembers+=members;totalMoved+=moved;totalConnectors+=connectors;totalImprovement+=improvement;totalPairRollbacks+=pairRollbacks;totalArrivalScenes+=arrival?1:0;totalManifestSprites+=manifest.uniqueSprites;
+  results.push({seed,evaluated,scenes,members,moved,connectors,improvement,movement,pairRollbacks,arrivalMembers:arrival?.memberCount||0,manifestSprites:manifest.uniqueSprites,needsGeneration:manifest.needsGenerationTypes,completePairs,orphanPairs,safetyRejected:Number(stats.scenePrefabSafetyRejectedCount||0),rhythmProtected:Number(stats.scenePrefabRhythmProtectedCount||0),prefabs:prefabs.map(scene=>({id:scene.id,prefabId:scene.prefabId,kit:scene.kit,variant:scene.variant,sceneType:scene.sceneType||'landmark',memberCount:scene.memberCount,movedCount:scene.movedCount,distanceImprovement:scene.distanceImprovement,connectorRoadId:scene.connectors?.[0]?.roadId||null}))});
 }
 
-assert.ok(totalScenes>=SEEDS.length,'representative seeds must all resolve authored scenes');
+assert.ok(totalScenes>=SEEDS.length,'representative seeds must all resolve authored landmark scenes');
+assert.equal(totalArrivalScenes,SEEDS.length,'representative seeds must all resolve the first-minute arrival scene');
 assert.ok(totalMoved>0,'representative seeds must physically use authored placement');
-assert.ok(totalConnectors>=totalScenes,'representative authored scenes must remain connected to roads');
-assert.ok(totalImprovement>0,'representative authored scenes must retain positive composition gain');
-console.log(JSON.stringify({ok:true,primarySeed:PRIMARY_SEED,seeds:SEEDS,totalScenes,totalMembers,totalMoved,totalConnectors,totalImprovement,totalPairRollbacks,results},null,2));
+assert.ok(totalConnectors>=totalScenes,'representative authored landmark scenes must remain connected to roads');
+assert.ok(totalImprovement>0,'representative authored landmark scenes must retain positive composition gain');
+assert.ok(totalManifestSprites>0,'representative maps must return sprite requirements');
+
+const forestRecipe=MAP_FORGE_RECIPES.KELO_FOREST_V1;
+let forestAdaptiveBackoffs=0;
+for(const seed of SEEDS){
+  const map=generateMapCandidate(forestRecipe,{seed,assetCatalogVersion:'ci-catalog'});
+  assert.equal(map.validation.valid,true,`${seed}: Forest must remain valid after adaptive scene placement`);
+  const ancient=(map.scenePrefabs||[]).find(scene=>scene.landmarkId==='ancient_tree');
+  assert.ok(ancient,`${seed}: Forest must resolve a recognizable ancient-tree grove`);
+  assert.equal(ancient.prefabId,'ancient-grove-v1',`${seed}: Forest grove must use the existing authored scene owner`);
+  assert.ok(ancient.memberCount>=2&&ancient.movedCount>=1,`${seed}: Forest grove must physically compose at least two existing decorations`);
+  assert.equal(pairBalance(ancient).orphan,0,`${seed}: Forest grove must retain balanced left/right pairs`);
+  assert.equal((ancient.connectors||[]).filter(row=>row.kind==='road'&&row.required===true&&row.roadId).length,1,`${seed}: Forest grove must stay connected to a road`);
+  forestAdaptiveBackoffs+=Number(map.generationStats.scenePrefabAdaptiveBackoffCount||0);
+}
+assert.ok(forestAdaptiveBackoffs>0,'Forest scene coverage must exercise adaptive spatial backoff');
+console.log(JSON.stringify({ok:true,primarySeed:PRIMARY_SEED,seeds:SEEDS,totalScenes,totalArrivalScenes,totalMembers,totalMoved,totalConnectors,totalImprovement,totalPairRollbacks,totalManifestSprites,results},null,2));

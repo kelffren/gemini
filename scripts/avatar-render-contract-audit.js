@@ -42,7 +42,7 @@ const snap=context.KeloAvatar.snapshot();
 ok(snap.baseOwner==='engine-w','LAST_BASE_WINS');
 ok(snap.middleware.every((entry,index)=>index===0||snap.middleware[index-1].priority>=entry.priority),'MIDDLEWARE_PRIORITY_DESC');
 const owners=new Set(snap.middleware.map(x=>x.owner));
-for(const owner of ['visual','armor','appearance','main-hero:spartan-spritesheet','engine-ab'])ok(owners.has(owner),'MIDDLEWARE_OWNER_'+owner);
+for(const owner of ['visual','armor','appearance','main-hero:base-zoo','engine-ab'])ok(owners.has(owner),'MIDDLEWARE_OWNER_'+owner);
 migrated.forEach(file=>{const text=fs.readFileSync(file,'utf8');ok(!directAvatarAssignment(text),file+'_MUST_NOT_ASSIGN_RENDER_AVATAR');});
 ok(fs.readFileSync('engine-d.js','utf8').includes("KeloAvatar.setBase('engine-d:rank-jewels'"),'ENGINE_D_BASE');
 ok(fs.readFileSync('engine-e.js','utf8').includes("KeloAvatar.setBase('engine-e:identity-jewels'"),'ENGINE_E_BASE');

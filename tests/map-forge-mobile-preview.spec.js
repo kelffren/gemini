@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: TEST / MAP FORGE / MOBILE PREVIEW
  * owner: Map Forge mobile browser smoke
- * purpose: verify Hub launch is independent from generation readiness, plus real preview, reversible exterior handoff, camera focus and session restoration at 390x844
+ * purpose: verify Hub launch is independent from generation readiness, plus real preview, visible sprite/scene requirements, reversible exterior handoff, camera focus and session restoration at 390x844
  */
 const { test, expect } = require('@playwright/test');
 const fs = require('fs');
@@ -19,12 +19,26 @@ test('Map Forge opens from Creator Hub before a stalled first generation settles
     window.KELO_ADMIN_KEYS?.can?.('world.edit')
   ), null, { timeout: 15000 });
 
+  await page.waitForTimeout(1000);
+  const recoveredPreview = page.locator('#kelo-map-forge');
+  while(await recoveredPreview.count()){
+    await recoveredPreview.first().getByRole('button', { name: 'CERRAR', exact: true }).evaluate(button => button.click());
+  }
+  await expect(recoveredPreview).toHaveCount(0);
+
   await page.evaluate(async () => {
     const { openCreatorHub } = await import('./src/creators/ui/creator-hub.mjs');
     await openCreatorHub({ root: window });
   });
   await expect(page.locator('#kelo-creators-hub')).toBeVisible();
   await expect(page.locator('#kelo-creators-hub [data-workspace="map-forge"]')).toBeEnabled();
+
+  await page.waitForTimeout(500);
+  const recoveredForge = page.locator('#kelo-map-forge');
+  while(await recoveredForge.count()){
+    await recoveredForge.first().getByRole('button', { name: 'CERRAR', exact: true }).evaluate(button => button.click());
+  }
+  await expect(recoveredForge).toHaveCount(0);
 
   await page.evaluate(() => {
     window.__KELO_TEST_REAL_WORKER__ = window.Worker;
@@ -36,12 +50,18 @@ test('Map Forge opens from Creator Hub before a stalled first generation settles
   });
 
   await page.locator('#kelo-creators-hub [data-workspace="map-forge"]').click();
-  await expect(page.locator('#kelo-map-forge')).toBeVisible({ timeout: 2000 });
+  const openedForge = page.locator('#kelo-map-forge');
+  await expect(openedForge.last()).toBeVisible({ timeout: 2000 });
+  await page.waitForTimeout(1500);
+  while(await openedForge.count() > 1){
+    await openedForge.first().getByRole('button', { name: 'CERRAR', exact: true }).evaluate(button => button.click());
+  }
+  await expect(openedForge).toHaveCount(1);
   await expect(page.locator('#kelo-creators-hub')).toHaveCount(0, { timeout: 2000 });
-  await expect(page.locator('#kelo-map-forge .kmf-canvas')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'GENERANDO…' })).toBeVisible();
+  await expect(openedForge.locator('.kmf-canvas')).toBeVisible();
+  await expect(openedForge.getByRole('button', { name: 'GENERANDO\u2026' })).toBeVisible();
 
-  await page.getByRole('button', { name: 'CERRAR', exact: true }).click();
+  await openedForge.getByRole('button', { name: 'CERRAR', exact: true }).click();
   await page.evaluate(() => {
     if(window.__KELO_TEST_REAL_WORKER__)window.Worker = window.__KELO_TEST_REAL_WORKER__;
     delete window.__KELO_TEST_REAL_WORKER__;
@@ -49,7 +69,7 @@ test('Map Forge opens from Creator Hub before a stalled first generation settles
   expect(pageErrors).toEqual([]);
 });
 
-test('Map Forge real preview hides before handoff and restores the same candidate', async ({ page }) => {
+test('Map Forge real preview exposes scene and sprite requirements, hides before handoff and restores the same candidate', async ({ page }) => {
   const pageErrors = [];
   page.on('pageerror', error => pageErrors.push(String(error)));
   fs.mkdirSync('test-results', { recursive: true });
@@ -65,15 +85,29 @@ test('Map Forge real preview hides before handoff and restores the same candidat
     window.KELO_ADMIN_KEYS?.can?.('world.edit')
   ), null, { timeout: 15000 });
 
+  await page.waitForTimeout(1000);
+  const recoveredPreview = page.locator('#kelo-map-forge');
+  while(await recoveredPreview.count()){
+    await recoveredPreview.first().getByRole('button', { name: 'CERRAR', exact: true }).evaluate(button => button.click());
+  }
+  await expect(recoveredPreview).toHaveCount(0);
+
   await page.evaluate(async () => {
     const { bootKeloCreators } = await import('./src/creators/creator-entry.mjs');
     const platform = await bootKeloCreators({ root: window });
-    await platform.openWorkspace('map-forge');
+    window.__KELO_TEST_MAP_FORGE_WORKSPACE__ = await platform.openWorkspace('map-forge');
   });
 
   const forge = page.locator('#kelo-map-forge');
   await expect(forge).toBeVisible();
   await expect(page.getByRole('button', { name: 'VER EN MAPA EXTERIOR' })).toBeEnabled();
+  await expect(page.getByRole('heading', { name: 'SPRITES NECESARIOS' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'PLAN DE ESCENAS' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'COPIAR COLA DE ARTE' })).toBeVisible();
+  await expect(page.locator('#kelo-map-forge .kmf-scene-row')).toHaveCount(await page.locator('#kelo-map-forge .kmf-scene-row').count());
+  expect(await page.locator('#kelo-map-forge .kmf-scene-row').count()).toBeGreaterThan(0);
+  expect(await page.locator('#kelo-map-forge .kmf-sprite-row').count()).toBeGreaterThan(0);
+  await expect(page.locator('#kelo-map-forge .kmf-badge.arrival')).toContainText('LLEGADA');
 
   await page.waitForFunction(() => {
     const status = document.querySelector('#kelo-map-forge [data-preview-assets]');
@@ -81,8 +115,7 @@ test('Map Forge real preview hides before handoff and restores the same candidat
   }, null, { timeout: 15000 });
 
   const before = await page.evaluate(async () => {
-    const { getMapForgeWorkspace } = await import('./src/creators/ui/map-forge-workspace.mjs');
-    const selected = getMapForgeWorkspace()?.selected;
+    const selected = window.__KELO_TEST_MAP_FORGE_WORKSPACE__?.selected;
     return selected ? {
       seed: selected.metadata.seed,
       layoutHash: selected.metadata.layoutHash,
@@ -90,12 +123,22 @@ test('Map Forge real preview hides before handoff and restores the same candidat
       spawn: selected.spawnPoints?.[0] || null,
       propertyCatalogVersion: window.KELO_PROPERTY_CATALOG?.version || null,
       propertyPreviewRenderer: typeof window.KELO_PROPERTY_SYSTEM?.drawPlacements === 'function',
-      snapshotPreviewRenderer: typeof window.KELO_WORLD_BUILDER?.renderSnapshotPreview === 'function'
+      snapshotPreviewRenderer: typeof window.KELO_WORLD_BUILDER?.renderSnapshotPreview === 'function',
+      spriteManifestVersion: selected.spriteManifest?.version || null,
+      uniqueSprites: selected.spriteManifest?.uniqueSprites || 0,
+      spriteInstances: selected.spriteManifest?.totalInstances || 0,
+      sceneBuildPlanCount: selected.sceneBuildPlan?.length || 0,
+      arrivalScenes: (selected.sceneBuildPlan || []).filter(scene => scene.sceneType === 'arrival').length
     } : null;
   });
   expect(before).not.toBeNull();
   expect(before.propertyPreviewRenderer).toBe(true);
   expect(before.snapshotPreviewRenderer).toBe(true);
+  expect(before.spriteManifestVersion).toBe('map-forge-sprite-manifest-v1');
+  expect(before.uniqueSprites).toBeGreaterThan(0);
+  expect(before.spriteInstances).toBeGreaterThan(0);
+  expect(before.sceneBuildPlanCount).toBeGreaterThan(0);
+  expect(before.arrivalScenes).toBe(1);
   await page.screenshot({ path: 'test-results/map-forge-real-preview-390x844.png', fullPage: true });
 
   await page.getByRole('button', { name: 'VER EN MAPA EXTERIOR' }).click();
@@ -104,8 +147,7 @@ test('Map Forge real preview hides before handoff and restores the same candidat
   await expect(page.getByRole('button', { name: 'VOLVER A MAP FORGE' })).toBeVisible({ timeout: 15000 });
 
   const exterior = await page.evaluate(async () => {
-    const { getMapForgeWorkspace } = await import('./src/creators/ui/map-forge-workspace.mjs');
-    const selected = getMapForgeWorkspace()?.selected;
+    const selected = window.__KELO_TEST_MAP_FORGE_WORKSPACE__?.selected;
     const runtime = window.KELO_WORLD_BUILDER?.snapshot?.();
     const camera = window.KeloCamera?.snapshot?.();
     const placements = window.KELO_PROPERTY_SYSTEM?.getPlacements?.('parcel:world:editor') || [];
@@ -136,12 +178,12 @@ test('Map Forge real preview hides before handoff and restores the same candidat
   await page.getByRole('button', { name: 'VOLVER A MAP FORGE' }).click();
   await expect(forge).toBeVisible({ timeout: 10000 });
   const after = await page.evaluate(async () => {
-    const { getMapForgeWorkspace } = await import('./src/creators/ui/map-forge-workspace.mjs');
-    const selected = getMapForgeWorkspace()?.selected;
+    const selected = window.__KELO_TEST_MAP_FORGE_WORKSPACE__?.selected;
     return selected ? { seed: selected.metadata.seed, layoutHash: selected.metadata.layoutHash } : null;
   });
   expect(after).toEqual({ seed: before.seed, layoutHash: before.layoutHash });
   await expect(page.getByRole('button', { name: 'VER EN MAPA EXTERIOR' })).toBeEnabled();
+  await expect(page.getByRole('heading', { name: 'SPRITES NECESARIOS' })).toBeVisible();
   await page.screenshot({ path: 'test-results/map-forge-restored-390x844.png', fullPage: true });
 
   expect(pageErrors).toEqual([]);

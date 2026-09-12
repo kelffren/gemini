@@ -2,7 +2,7 @@
  * area: STUDIO / NUDGE INPUT
  * owns: precise keyboard + mobile touch nudging for selected objects
  * does-not-own: selection, authority transport, rendering or document persistence
- * public-api: createStudioNudgeController(), resolveStudioNudgeStep()
+ * public-api: createStudioNudgeController(), resolveStudioNudgeStep(), resolveSelectedStudioEntities()
  * online: persistent moves flow through Kernel CommandBus as one reversible batch
  */
 
@@ -12,6 +12,7 @@ import { createCompositeCommand } from '../document/composite-command.mjs';
 const ARROWS=Object.freeze({
   ArrowLeft:{x:-1,y:0},ArrowRight:{x:1,y:0},ArrowUp:{x:0,y:-1},ArrowDown:{x:0,y:1}
 });
+const EXPLORER_ENTITY_SELECTOR='#kelo-studio-live [data-entity]';
 const COARSE_MULTIPLIER=4;
 const MOBILE_MODES=Object.freeze(['snap','fine','coarse']);
 
@@ -23,12 +24,29 @@ export function resolveStudioNudgeStep({root=globalThis,kernel,shiftKey=false,al
   return mode==='coarse'||altKey?base*COARSE_MULTIPLIER:base;
 }
 
+export function resolveSelectedStudioEntities(entities=[],selection=[]){
+  if(!selection?.length||!entities?.length)return [];
+  const byId=new Map();
+  for(const entity of entities){
+    const rawId=entity?.id;
+    if(rawId==null)continue;
+    const id=String(rawId);
+    if(!byId.has(id))byId.set(id,entity);
+  }
+  const rows=[];
+  for(const id of selection){
+    const entity=byId.get(String(id));
+    if(entity)rows.push(entity);
+  }
+  return rows;
+}
+
 export function createStudioNudgeController({root=globalThis,kernel}={}){
   const document=root?.document;
   if(!document||!kernel)return Object.freeze({destroy(){},nudge:async()=>[]});
   let destroyed=false,busy=false,pad=null,style=null,observer=null,mobileMode='snap';
 
-  const selectedEntities=()=>kernel.selection.get().map(id=>kernel.document.entities.find(row=>String(row.id)===String(id))).filter(Boolean);
+  const selectedEntities=()=>resolveSelectedStudioEntities(kernel.document.entities,kernel.selection.get());
 
   async function nudge(dx,dy,{step=1}={}){
     if(destroyed||busy)return [];
@@ -48,6 +66,7 @@ export function createStudioNudgeController({root=globalThis,kernel}={}){
   }
 
   function editableTarget(target){return !!target?.closest?.('input,textarea,select,[contenteditable="true"]');}
+  function explorerTarget(target){return !!target?.closest?.(EXPLORER_ENTITY_SELECTOR);}
   function shell(){return document.getElementById('kelo-studio-live');}
   function canTouchNudge(){const host=shell();if(!host||host.dataset.sheetOpen==='1'||host.dataset.creatorMinimized==='1')return false;if(!['select','move'].includes(String(host.dataset.activeTool||'select')))return false;return kernel.selection.get().length>0;}
   function mobileStep(){return resolveStudioNudgeStep({root,kernel,mode:mobileMode});}
@@ -60,7 +79,7 @@ export function createStudioNudgeController({root=globalThis,kernel}={}){
 `;document.head.appendChild(style);}if(!pad?.isConnected){pad=document.createElement('div');pad.className='ks-nudge-pad';pad.setAttribute('aria-label','Mover selección con precisión');pad.innerHTML='<button type="button" data-nudge-dir="up" aria-label="Mover arriba">↑</button><button type="button" data-nudge-dir="left" aria-label="Mover izquierda">←</button><button type="button" data-nudge-mode="" aria-label="Nudge snap">SNAP</button><button type="button" data-nudge-dir="right" aria-label="Mover derecha">→</button><button type="button" data-nudge-dir="down" aria-label="Mover abajo">↓</button>';pad.addEventListener('click',onPadClick);host.appendChild(pad);}syncPad();}
 
   function onKey(event){
-    const dir=ARROWS[event.key];if(!dir||event.metaKey||event.ctrlKey||editableTarget(event.target))return;
+    const dir=ARROWS[event.key];if(!dir||event.metaKey||event.ctrlKey||editableTarget(event.target)||explorerTarget(event.target))return;
     const host=shell();if(!host)return;
     if(host.dataset.sheetOpen==='1'||host.dataset.creatorMinimized==='1')return;
     if(!['select','move'].includes(String(host.dataset.activeTool||'select')))return;
@@ -76,6 +95,7 @@ export function createStudioNudgeController({root=globalThis,kernel}={}){
   observer=new MutationObserver(()=>{mountPad();syncPad();});observer.observe(document.documentElement||document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['data-active-tool','data-sheet-open','data-creator-minimized']});
   mountPad();
   return Object.freeze({
+    version:'studio-nudge-v1.1.0-linear-selection',
     nudge,cycleMobileMode,syncPad,
     get mobileMode(){return mobileMode;},
     destroy(){destroyed=true;document.removeEventListener('keydown',onKey,true);root.removeEventListener?.('resize',syncPad);observer?.disconnect();pad?.remove();style?.remove();pad=style=null;},

@@ -4,6 +4,8 @@
   "scripts": {
     "test": "playwright test",
     "test:live": "playwright test",
+    "test:browserstack": "browserstack-node-sdk playwright test",
+    "test:browserstack:map-forge": "browserstack-node-sdk playwright test tests/map-forge-mobile-preview.spec.js tests/map-forge-evolution-visual.spec.js tests/map-forge-orientation-visual.spec.js",
     "audit:stones": "node scripts/audit-stones.js",
     "audit:property": "node scripts/property-editor-audit.js",
     "audit:character": "node scripts/character-customization-audit.js",
@@ -74,6 +76,7 @@
     "evolution:map-forge": "node scripts/map-forge-evolution-autopilot.mjs"
   },
   "devDependencies": {
-    "@playwright/test": "^1.55.0"
+    "@playwright/test": "^1.55.0",
+    "browserstack-node-sdk": "^1.69.0"
   }
 }

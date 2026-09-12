@@ -23,6 +23,7 @@ on:
       - 'tests/map-forge-orientation-visual.spec.js'
       - 'tests/map-forge-royal-capital-road-width.mjs'
       - 'tests/map-forge-scene-prefabs.mjs'
+      - 'tests/map-forge-upright-decorations.mjs'
       - '.github/workflows/map-forge-core-ci.yml'
       - 'docs/systems/MAP_FORGE_SYSTEM.md'
       - 'docs/system-catalog.json'
@@ -45,12 +46,13 @@ on:
       - 'tests/map-forge-orientation-visual.spec.js'
       - 'tests/map-forge-royal-capital-road-width.mjs'
       - 'tests/map-forge-scene-prefabs.mjs'
+      - 'tests/map-forge-upright-decorations.mjs'
       - '.github/workflows/map-forge-core-ci.yml'
 
 jobs:
   deterministic-core:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -62,6 +64,8 @@ jobs:
         run: node tests/map-forge-royal-capital-road-width.mjs
       - name: Guard authored scene prefabs and road connectors
         run: node tests/map-forge-scene-prefabs.mjs
+      - name: Guard upright decoration orientation
+        run: node tests/map-forge-upright-decorations.mjs
       - name: Run best-of selection diversity audit
         run: node scripts/map-forge-selection-diversity-audit.mjs
       - name: Run buildable block road-clearance audit
@@ -114,12 +118,16 @@ jobs:
       - name: Prepare paired visual pipeline states
         run: |
           cp src/world/map-forge/map-forge-champion-overrides.mjs /tmp/map-forge-champion-after.mjs
+          cp src/world/map-forge/map-forge-builder.mjs /tmp/map-forge-builder-after.mjs
           cp src/world/map-forge/map-forge-core.mjs /tmp/map-forge-core-after.mjs
+          cp src/world/map-forge/map-forge-scene-prefabs.mjs /tmp/map-forge-scene-prefabs-after.mjs
           cp src/studio/adapters/map-forge-draft-importer.mjs /tmp/map-forge-importer-after.mjs
-          SOURCE_CHANGE_COMMIT="$(git log -1 --format=%H -- src/world/map-forge/map-forge-champion-overrides.mjs src/world/map-forge/map-forge-core.mjs src/studio/adapters/map-forge-draft-importer.mjs)"
+          SOURCE_CHANGE_COMMIT="$(git log -1 --format=%H -- src/world/map-forge/map-forge-core.mjs)"
           BASE_COMMIT="${SOURCE_CHANGE_COMMIT}^"
           git show "$BASE_COMMIT:src/world/map-forge/map-forge-champion-overrides.mjs" > /tmp/map-forge-champion-before.mjs
+          git show "$BASE_COMMIT:src/world/map-forge/map-forge-builder.mjs" > /tmp/map-forge-builder-before.mjs
           git show "$BASE_COMMIT:src/world/map-forge/map-forge-core.mjs" > /tmp/map-forge-core-before.mjs
+          git show "$BASE_COMMIT:src/world/map-forge/map-forge-scene-prefabs.mjs" > /tmp/map-forge-scene-prefabs-before.mjs
           git show "$BASE_COMMIT:src/studio/adapters/map-forge-draft-importer.mjs" > /tmp/map-forge-importer-before.mjs
           echo "Comparing complete visual pipeline around source change: $BASE_COMMIT -> $SOURCE_CHANGE_COMMIT (current $(git rev-parse HEAD))"
       - name: Capture fixed-seed BEFORE preview and runtime evidence
@@ -128,7 +136,9 @@ jobs:
           KELO_VISUAL_STAGE: before
         run: |
           cp /tmp/map-forge-champion-before.mjs src/world/map-forge/map-forge-champion-overrides.mjs
+          cp /tmp/map-forge-builder-before.mjs src/world/map-forge/map-forge-builder.mjs
           cp /tmp/map-forge-core-before.mjs src/world/map-forge/map-forge-core.mjs
+          cp /tmp/map-forge-scene-prefabs-before.mjs src/world/map-forge/map-forge-scene-prefabs.mjs
           cp /tmp/map-forge-importer-before.mjs src/studio/adapters/map-forge-draft-importer.mjs
           npx playwright test tests/map-forge-visual-round.spec.js --project=chromium --output=playwright-results/before
       - name: Capture fixed-seed AFTER preview and runtime evidence
@@ -137,7 +147,9 @@ jobs:
           KELO_VISUAL_STAGE: after
         run: |
           cp /tmp/map-forge-champion-after.mjs src/world/map-forge/map-forge-champion-overrides.mjs
+          cp /tmp/map-forge-builder-after.mjs src/world/map-forge/map-forge-builder.mjs
           cp /tmp/map-forge-core-after.mjs src/world/map-forge/map-forge-core.mjs
+          cp /tmp/map-forge-scene-prefabs-after.mjs src/world/map-forge/map-forge-scene-prefabs.mjs
           cp /tmp/map-forge-importer-after.mjs src/studio/adapters/map-forge-draft-importer.mjs
           npx playwright test tests/map-forge-visual-round.spec.js tests/map-forge-fountain-clearance.spec.js --project=chromium --output=playwright-results/after
       - name: Capture directional prop evidence

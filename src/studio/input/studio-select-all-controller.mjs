@@ -15,10 +15,18 @@ export function createStudioSelectAllController({root=globalThis,kernel}={}){
 
   const onKeyDown=event=>{
     if(destroyed||event.defaultPrevented||event.repeat)return;
-    if(!(event.metaKey||event.ctrlKey)||event.metaKey&&event.ctrlKey||event.altKey)return;
-    if(String(event.key||'').toLowerCase()!=='a')return;
     if(event.target?.closest?.(EDITABLE_SELECTOR))return;
     if(!document.getElementById?.('kelo-studio-live'))return;
+
+    if(event.key==='Escape'){
+      if(!kernel.selection.get?.().length)return;
+      event.preventDefault?.();
+      kernel.selection.set([]);
+      return;
+    }
+
+    if(!(event.metaKey||event.ctrlKey)||event.metaKey&&event.ctrlKey||event.altKey)return;
+    if(String(event.key||'').toLowerCase()!=='a')return;
 
     if(event.shiftKey){
       event.preventDefault?.();
@@ -41,6 +49,7 @@ export function createStudioSelectAllController({root=globalThis,kernel}={}){
 
   document.addEventListener?.('keydown',onKeyDown);
   return Object.freeze({
+    version:'studio-select-all-v1.2.0-escape-clear',
     destroy(){if(destroyed)return;destroyed=true;document.removeEventListener?.('keydown',onKeyDown);}
   });
 }
