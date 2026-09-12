@@ -16,16 +16,24 @@ try{
   await page.waitForFunction(()=>window.KELO_MAIN_HERO_SPRITE_AUDIT.readyCount===8,{timeout:120000});
   await page.waitForFunction(()=>window.KELO_MAIN_HERO_SPRITE_AUDIT.drawCount>0,{timeout:120000});
 
+  // LIVE opens on the auth gate. Enter through the same guest path a player uses,
+  // then prove the real movement loop rotates Base Zoo diagonally.
+  const guest=page.getByText('Jugar como invitado',{exact:true});
+  if(await guest.isVisible().catch(()=>false))await guest.click();
+  await page.waitForFunction(()=>!window.KeloInputLocks||!window.KeloInputLocks.isLocked(),{timeout:10000});
+  await page.waitForTimeout(300);
+
   const before=await page.evaluate(()=>({
     drawCount:window.KELO_MAIN_HERO_SPRITE_AUDIT.drawCount,
-    lastFace:window.KELO_MAIN_HERO_SPRITE_AUDIT.lastFace
+    lastFace:window.KELO_MAIN_HERO_SPRITE_AUDIT.lastFace,
+    inputLocks:window.KeloInputLocks&&window.KeloInputLocks.snapshot?window.KeloInputLocks.snapshot():null
   }));
 
-  // Drive the real game input instead of reaching into lexical actor state.
   await page.keyboard.down('ArrowDown');
   await page.keyboard.down('ArrowRight');
   await page.waitForFunction(()=>window.KELO_MAIN_HERO_SPRITE_AUDIT.lastFace==='down-right',{timeout:5000});
   await page.waitForFunction(previous=>window.KELO_MAIN_HERO_SPRITE_AUDIT.drawCount>previous,{timeout:5000},before.drawCount);
+  await page.waitForTimeout(200);
   await page.keyboard.up('ArrowRight');
   await page.keyboard.up('ArrowDown');
 
@@ -44,7 +52,8 @@ try{
       drawCount:audit.drawCount,
       lastFace:audit.lastFace,
       renderSource:renderAudit.mainHeroSpriteSource,
-      renderGrid:renderAudit.mainHeroSpriteGrid
+      renderGrid:renderAudit.mainHeroSpriteGrid,
+      inputLocks:window.KeloInputLocks&&window.KeloInputLocks.snapshot?window.KeloInputLocks.snapshot():null
     };
   });
 
@@ -58,6 +67,7 @@ try{
   if(result.readyCount!==8||!result.complete||result.failedCount!==0)failures.push('not all eight Base Zoo images loaded');
   if(result.drawCount<=before.drawCount)failures.push('Base Zoo did not continue rendering while the real player moved');
   if(result.lastFace!=='down-right')failures.push(`real diagonal movement rendered ${result.lastFace}`);
+  if(result.inputLocks&&result.inputLocks.locked)failures.push(`input remained locked by ${result.inputLocks.owners.join(',')}`);
 
   await page.screenshot({path:'artifacts/base-zoo-main-hero-live.png',fullPage:true});
   console.log(JSON.stringify({ok:failures.length===0,before,result,pageErrors:consoleErrors.slice(0,10),failures},null,2));
