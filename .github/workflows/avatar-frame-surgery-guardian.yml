@@ -5,7 +5,7 @@ on:
     paths:
       - 'src/creators/avatar/**'
       - 'src/creators/sprite-compiler/**'
-      - 'src/creators/ui/avatar-frame-surgery-workspace.mjs'
+      - 'src/creators/ui/avatar-frame-surgery-*.mjs'
       - 'src/creators/workspaces/avatar-workspace.mjs'
       - 'scripts/avatar-frame-surgery-supervisor-audit.mjs'
       - '.github/workflows/avatar-frame-surgery-guardian.yml'
@@ -28,8 +28,11 @@ jobs:
       - name: Syntax gate
         run: |
           node --check src/creators/ui/avatar-frame-surgery-workspace.mjs
+          node --check src/creators/ui/avatar-frame-surgery-editor.mjs
+          node --check src/creators/ui/avatar-frame-surgery-ui-kit.mjs
           node --check src/creators/sprite-compiler/sprite-frame-surgery-model.mjs
           node --check src/creators/sprite-compiler/sprite-frame-normalizer.mjs
+          node --check src/creators/avatar/avatar-quick-import-service.mjs
       - name: 25-of-25 Frame Surgery supervisor
         run: node scripts/avatar-frame-surgery-supervisor-audit.mjs
       - name: Existing adversarial ingestion corpus
