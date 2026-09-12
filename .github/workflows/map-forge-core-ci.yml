@@ -122,7 +122,7 @@ jobs:
           cp src/world/map-forge/map-forge-core.mjs /tmp/map-forge-core-after.mjs
           cp src/world/map-forge/map-forge-scene-prefabs.mjs /tmp/map-forge-scene-prefabs-after.mjs
           cp src/studio/adapters/map-forge-draft-importer.mjs /tmp/map-forge-importer-after.mjs
-          SOURCE_CHANGE_COMMIT="$(git log -1 --format=%H -- src/world/map-forge/map-forge-builder.mjs src/world/map-forge/map-forge-champion-overrides.mjs src/world/map-forge/map-forge-core.mjs src/world/map-forge/map-forge-scene-prefabs.mjs src/studio/adapters/map-forge-draft-importer.mjs)"
+          SOURCE_CHANGE_COMMIT="$(git log -1 --format=%H -- src/world/map-forge/map-forge-core.mjs)"
           BASE_COMMIT="${SOURCE_CHANGE_COMMIT}^"
           git show "$BASE_COMMIT:src/world/map-forge/map-forge-champion-overrides.mjs" > /tmp/map-forge-champion-before.mjs
           git show "$BASE_COMMIT:src/world/map-forge/map-forge-builder.mjs" > /tmp/map-forge-builder-before.mjs
