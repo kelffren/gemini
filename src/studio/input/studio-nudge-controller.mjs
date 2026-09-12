@@ -28,8 +28,9 @@ export function resolveSelectedStudioEntities(entities=[],selection=[]){
   if(!selection?.length||!entities?.length)return [];
   const byId=new Map();
   for(const entity of entities){
-    if(entity?.id==null)continue;
-    const id=String(entity.id);
+    const rawId=entity?.id;
+    if(rawId==null)continue;
+    const id=String(rawId);
     if(!byId.has(id))byId.set(id,entity);
   }
   const rows=[];
