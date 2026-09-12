@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: CREATORS / AVATAR UI
  * owner: Avatar Quick Import presentation
- * keys: UNIVERSAL SPRITE INGESTION UPLOAD PROGRESS HYPOTHESIS METRICS FRAME DOCTOR 1D 4D 8D
+ * keys: UNIVERSAL SPRITE INGESTION UPLOAD PROGRESS HYPOTHESIS METRICS FRAME DOCTOR TACTILE 1D 4D 8D
  * owns: zero-adjustment upload path, real animated runtime preview, explicit ambiguity choice and advanced review controls
  * does-not-own: pixel detection, normalization, persistence, renderer or auth rules
  */
@@ -19,8 +19,8 @@ const css = `
 .kaq-metrics{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;margin:10px 0}.kaq-metric{border:1px solid #2b2f37;border-radius:13px;background:#101218;padding:9px;text-align:center}.kaq-metric b{display:block;color:#8ce0ad;font-size:17px}.kaq-metric span{display:block;color:#90949c;font-size:9px;font-weight:850;margin-top:3px;letter-spacing:.04em}.kaq-metric.warn b{color:#efcf7b}
 .kaq-chips{display:flex;flex-wrap:wrap;gap:6px;margin:9px 0}.kaq-chip{border:1px solid #30343d;border-radius:999px;background:#11141a;color:#c6c9d0;padding:6px 9px;font-size:10px;font-weight:850}.kaq-chip.good{border-color:#28553b;color:#8ce0ad}.kaq-chip.warn{border-color:#66552a;color:#efcf7b}
 .kaq-hypotheses{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;margin:10px 0}.kaq-hypothesis{border:1px solid #30343d;border-radius:13px;background:#101218;color:#d7d9dd;padding:10px;text-align:left}.kaq-hypothesis b,.kaq-hypothesis span{display:block}.kaq-hypothesis span{font-size:10px;color:#92969e;margin-top:4px}.kaq-hypothesis.on{border-color:#d1ae58;background:#1c1911}
-.kaq-doctor{border:1px solid #282c33;background:#101218;border-radius:15px;padding:12px;margin:10px 0}.kaq-doctor h3{font-size:13px;margin:0 0 8px}.kaq-frame{border-top:1px solid #252932;padding:8px 0;font-size:11px;color:#c5c8ce}.kaq-frame b{color:#efcf7b}.kaq-frame.art b{color:#ff9696}
-.kaq-repair{border-top:1px solid #252932;margin-top:10px;padding-top:10px}.kaq-repair button{border:1px solid #806c38;background:#211d13;color:#efcf7b;border-radius:10px;padding:8px;font-weight:850}.kaq-repair input{width:70px;margin:4px;border:1px solid #373b44;border-radius:8px;background:#090b0f;color:#fff;padding:7px}
+.kaq-doctor{border:1px solid #282c33;background:#101218;border-radius:15px;padding:12px;margin:10px 0}.kaq-doctor h3{font-size:13px;margin:0 0 8px}.kaq-frame{border-top:1px solid #252932;padding:8px 0;font-size:11px;color:#c5c8ce}.kaq-frame b{color:#efcf7b}.kaq-frame.art b{color:#ff9696}.kaq-frame.recoverable b{color:#8ce0ad}
+.kaq-repair{border-top:1px solid #252932;margin-top:10px;padding-top:10px}.kaq-repair button{border:1px solid #806c38;background:#211d13;color:#efcf7b;border-radius:10px;padding:8px;font-weight:850;margin:3px}.kaq-repair button.tactile{border-color:#3a7250;background:#102419;color:#91e2af}.kaq-repair input{width:70px;margin:4px;border:1px solid #373b44;border-radius:8px;background:#090b0f;color:#fff;padding:7px}
 .kaq-use{width:100%;border:0;border-radius:16px;background:#d1ae58;color:#111;padding:16px;font-size:17px;font-weight:950;margin-top:12px}.kaq-use:disabled{opacity:.38}.kaq-advanced{margin-top:12px;border:1px solid #262a31;border-radius:15px;background:#101218;padding:12px}.kaq-advanced summary{font-weight:850;cursor:pointer}.kaq-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}.kaq-grid label{font-size:10px;color:#9da0a7}.kaq-grid input,.kaq-grid select{width:100%;box-sizing:border-box;margin-top:5px;border:1px solid #373b44;border-radius:10px;background:#090b0f;color:#fff;padding:10px}.kaq-check{display:flex;gap:8px;align-items:flex-start;margin-top:12px;color:#c9cbd0;font-size:12px;line-height:1.35}.kaq-note{color:#858991;font-size:10px;line-height:1.4;margin-top:9px}
 @media(max-width:600px){.kaq-metrics{grid-template-columns:repeat(2,1fr)}.kaq-preview{min-height:300px}.kaq-grid{grid-template-columns:1fr}.kaq-wrap{padding-inline:10px}}
 `;
@@ -189,6 +189,7 @@ export async function openAvatarQuickImport({root = globalThis, avatarQuick} = {
       [analysis.backgroundKind === 'transparent' ? 'TRANSPARENTE' : 'FONDO LIMPIADO', true]
     ];
     if (compiled?.selfHealed) values.push(['AUTO-REPARADO', true]);
+    if (compiled?.validation?.sourceCropDiagnostics?.some(item => item.classification === 'RECOVERABLE_SOURCE_CROP')) values.push(['CROP RECUPERABLE', false]);
     if (compiled) values.push([compiled.status, !compiled.reviewRequired]);
     for (const [text, good] of values) chips.append(node(document, 'span', {class: `kaq-chip ${good ? 'good' : 'warn'}`, text}));
   }
@@ -238,9 +239,21 @@ export async function openAvatarQuickImport({root = globalThis, avatarQuick} = {
       row.append(edit);
       doctor.append(row);
     }
+    for (const item of compiled.validation?.sourceCropDiagnostics || []) {
+      if (item.classification !== 'RECOVERABLE_SOURCE_CROP') continue;
+      const frameIndex = Number(item.row) * Number(compiled.columns || 1) + Number(item.column);
+      const row = node(document, 'div', {class: 'kaq-frame recoverable'}, [
+        node(document, 'b', {text: `${item.direction} / FRAME ${Number(item.column) + 1}`}),
+        node(document, 'div', {text: 'RECOVERABLE SOURCE CROP · los píxeles pueden existir en el original'})
+      ]);
+      const recover = node(document, 'button', {text: 'RECUPERAR EN EDITOR TÁCTIL'});
+      recover.onclick = () => openRepair(frameIndex, `${item.direction} · frame ${Number(item.column) + 1}`);
+      row.append(recover);
+      doctor.append(row);
+    }
     for (const defect of compiled.validation?.artDefects || []) doctor.append(node(document, 'div', {class: 'kaq-frame art'}, [
       node(document, 'b', {text: `${defect.direction} / FRAME ${defect.column + 1}`}),
-      node(document, 'div', {text: 'ART DEFECT — REGENERATION REQUIRED'})
+      node(document, 'div', {text: 'SOURCE ART MISSING — REGENERATION OR EXTERNAL PATCH REQUIRED'})
     ]));
   }
 
@@ -249,16 +262,37 @@ export async function openAvatarQuickImport({root = globalThis, avatarQuick} = {
     const patch = framePatches[index] || {};
     repair.replaceChildren(
       node(document, 'b', {text: `REPARAR · ${label}`}),
-      node(document, 'div', {text: 'Ajuste mecánico local; los demás frames no se recompilan visualmente.'}),
+      node(document, 'div', {text: 'Editor táctil recomendado; ajuste numérico se mantiene como fallback.'})
     );
     const scale = node(document, 'input', {type: 'number', step: '.01', value: patch.scale || 1});
     const x = node(document, 'input', {type: 'number', step: '1', value: patch.x || 0});
     const y = node(document, 'input', {type: 'number', step: '1', value: patch.y || 0});
-    const apply = node(document, 'button', {text: 'APLICAR PATCH'});
+    const tactile = node(document, 'button', {class: 'tactile', text: 'ABRIR EDITOR TÁCTIL'});
+    const apply = node(document, 'button', {text: 'APLICAR PATCH NUMÉRICO'});
     const copy = node(document, 'button', {text: 'COPIAR FRAME ANTERIOR'});
-    apply.onclick = () => { framePatches[index] = {scale: Number(scale.value) || 1, x: Number(x.value) || 0, y: Number(y.value) || 0}; void refreshPreview(); };
+    tactile.disabled = !(file && compiled?.columns === 4 && compiled?.rows === 4 && compiled?.directions === 4 && index < 16);
+    tactile.onclick = () => {
+      if (tactile.disabled) return;
+      const EventCtor = root.CustomEvent || globalThis.CustomEvent;
+      shell.dispatchEvent(new EventCtor('kelo:avatar:tactile-frame', {detail: {
+        index,
+        label,
+        file,
+        analysis,
+        compiled,
+        framePatches,
+        apply(nextPatch) {
+          framePatches[index] = {...nextPatch};
+          void refreshPreview();
+        },
+        fallback() {
+          repair.hidden = false;
+        }
+      }}));
+    };
+    apply.onclick = () => { framePatches[index] = {...patch, scale: Number(scale.value) || 1, x: Number(x.value) || 0, y: Number(y.value) || 0}; void refreshPreview(); };
     copy.onclick = () => { if (index > 0) { framePatches[index] = {copyFrom: index - 1, scale: 1, x: 0, y: 0}; void refreshPreview(); } };
-    repair.append(node(document, 'label', {text: 'ESCALA'}, [scale]), node(document, 'label', {text: 'X'}, [x]), node(document, 'label', {text: 'Y'}, [y]), apply, copy);
+    repair.append(tactile, node(document, 'label', {text: 'ESCALA'}, [scale]), node(document, 'label', {text: 'X'}, [x]), node(document, 'label', {text: 'Y'}, [y]), apply, copy);
     repair.hidden = false;
   }
 
@@ -297,7 +331,8 @@ export async function openAvatarQuickImport({root = globalThis, avatarQuick} = {
     root.__KELO_AVATAR_COMPILER_TEST__ = {
       ready: !!compiled,
       analysis: analysis ? {frames: analysis.detectedFrames, hypotheses: analysis.hypotheses, directions: analysis.directions, reviewRequired: analysis.reviewRequired} : null,
-      compiled: compiled ? {columns: compiled.columns, rows: compiled.rows, frameCounts: compiled.frameCounts, directionKeys: compiled.directionKeys, status: compiled.status, scores: compiled.validation?.scores, doctor: {healthy: compiled.frameDoctor?.healthyCount, suspicious: compiled.frameDoctor?.defectiveCount}} : null
+      compiled: compiled ? {columns: compiled.columns, rows: compiled.rows, frameCounts: compiled.frameCounts, directionKeys: compiled.directionKeys, status: compiled.status, scores: compiled.validation?.scores, sourceCropDiagnostics: compiled.validation?.sourceCropDiagnostics, doctor: {healthy: compiled.frameDoctor?.healthyCount, suspicious: compiled.frameDoctor?.defectiveCount}} : null,
+      framePatches: Object.fromEntries(Object.entries(framePatches).map(([key,value]) => [key, {...value}]))
     };
   }
 
@@ -324,7 +359,7 @@ export async function openAvatarQuickImport({root = globalThis, avatarQuick} = {
       const artDefect = !!compiled.validation?.artDefects?.length;
       const acceptedReview = confirm.checked || config().userConfirmedInterpretation;
       use.disabled = artDefect || (compiled.reviewRequired && !acceptedReview);
-      if (artDefect) setStage('ART DEFECT — REGENERATION REQUIRED · revisa el Frame Doctor', 'bad');
+      if (artDefect) setStage('SOURCE ART MISSING · regeneración o patch externo requerido', 'bad');
       else if (compiled.reviewRequired && !acceptedReview) {
         setStage(`REVIEW REQUIRED · ${compiled.reviewReasons.join(' · ')}`, 'warn');
         advanced.open = true;
@@ -414,6 +449,6 @@ export async function openAvatarQuickImport({root = globalThis, avatarQuick} = {
   }
   close.onclick = destroy;
   raf = root.requestAnimationFrame(tick);
-  active = F({version: 'kelo-avatar-quick-ui-v6.0.0-universal-ingestion', shell, close: destroy});
+  active = F({version: 'kelo-avatar-quick-ui-v6.1.0-tactile-frame-doctor', shell, close: destroy});
   return active;
 }
