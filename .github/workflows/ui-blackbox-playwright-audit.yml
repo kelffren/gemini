@@ -1,0 +1,38 @@
+name: UI Black-box Playwright Audit
+
+on:
+  push:
+    branches:
+      - audit/ui-blackbox-playwright-20260912
+
+jobs:
+  blackbox-ui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install Playwright
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Audit published game as a user
+        id: audit
+        continue-on-error: true
+        env:
+          TARGET_URL: https://kelffren.github.io/gemini/
+          MAX_ACTIONS: '90'
+        run: node scripts/blackbox-ui-playwright-audit.mjs
+      - name: Upload audit evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-blackbox-playwright-report
+          path: ui-blackbox-artifacts/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Surface audit exit status
+        if: steps.audit.outcome == 'failure'
+        run: echo 'Audit completed with critical findings; see artifact.'
