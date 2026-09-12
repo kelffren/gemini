@@ -12,7 +12,7 @@
 import {clamp,freezeDeep,stableStringify,hashString,seed32,createRng} from './map-forge-prng.mjs';
 import {createMapIntent,buildCandidateParts} from './map-forge-builder.mjs';
 import {validateMapDefinition,scoreMapDefinition} from './map-forge-quality.mjs';
-export const MAP_FORGE_GENERATOR_VERSION='1.1.9';
+export const MAP_FORGE_GENERATOR_VERSION='1.1.10';
 export {createMapIntent} from './map-forge-builder.mjs';
 export {createRng,stableStringify} from './map-forge-prng.mjs';
 export {validateMapDefinition,scoreMapDefinition} from './map-forge-quality.mjs';
@@ -20,7 +20,8 @@ export {validateMapDefinition,scoreMapDefinition} from './map-forge-quality.mjs'
 const DIRECTIONAL_DECORATION_FAMILIES=new Set(['bench','market_prop']);
 const DECORATION_DECLUSTER_RADIUS=240;
 const DECORATION_DECLUSTER_GAIN=23;
-const STREET_LAMP_ROAD_GAIN=36;
+const STREET_LAMP_ROAD_GAIN=30;
+const STREET_LAMP_SWAPS_PER_DISTRICT=2;
 const STREET_BENCH_ROAD_GAIN=36;
 const STREET_BENCH_SWAPS_PER_DISTRICT=2;
 const decorationDistance=(a,b)=>Math.hypot(Number(a?.x||0)-Number(b?.x||0),Number(a?.y||0)-Number(b?.y||0));
@@ -52,7 +53,7 @@ function findRoadAffinitySwap(rows,roads,district,targetFamily,donorFamily,minGa
 function organizeStreetFurnitureFamilies(parts){
   const rows=(parts.decorations||[]).map(row=>({...row})),districts=[...new Set(rows.map(row=>row.district))].sort();let lampSwaps=0,lampRoadGain=0,benchSwaps=0,benchRoadGain=0;
   for(const district of districts){
-    const lampBest=findRoadAffinitySwap(rows,parts.roads,district,'lamp','flower',STREET_LAMP_ROAD_GAIN);if(lampBest){swapDecorationIdentity(rows[lampBest.i],rows[lampBest.j]);lampSwaps++;lampRoadGain+=lampBest.gain;}
+    for(let pass=0;pass<STREET_LAMP_SWAPS_PER_DISTRICT;pass++){const lampBest=findRoadAffinitySwap(rows,parts.roads,district,'lamp','flower',STREET_LAMP_ROAD_GAIN);if(!lampBest)break;swapDecorationIdentity(rows[lampBest.i],rows[lampBest.j]);lampSwaps++;lampRoadGain+=lampBest.gain;}
     for(let pass=0;pass<STREET_BENCH_SWAPS_PER_DISTRICT;pass++){const benchBest=findRoadAffinitySwap(rows,parts.roads,district,'bench','flower',STREET_BENCH_ROAD_GAIN);if(!benchBest)break;swapDecorationIdentity(rows[benchBest.i],rows[benchBest.j]);benchSwaps++;benchRoadGain+=benchBest.gain;}
   }
   const swaps=lampSwaps+benchSwaps,totalRoadGain=lampRoadGain+benchRoadGain;
