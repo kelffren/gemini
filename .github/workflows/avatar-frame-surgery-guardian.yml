@@ -8,6 +8,7 @@ on:
       - 'src/creators/ui/avatar-frame-surgery-*.mjs'
       - 'src/creators/workspaces/avatar-workspace.mjs'
       - 'scripts/avatar-frame-surgery-supervisor-audit.mjs'
+      - 'scripts/avatar-frame-surgery-research-audit.mjs'
       - '.github/workflows/avatar-frame-surgery-guardian.yml'
   workflow_dispatch:
 
@@ -31,10 +32,15 @@ jobs:
           node --check src/creators/ui/avatar-frame-surgery-editor.mjs
           node --check src/creators/ui/avatar-frame-surgery-ui-kit.mjs
           node --check src/creators/sprite-compiler/sprite-frame-surgery-model.mjs
+          node --check src/creators/sprite-compiler/sprite-frame-surgery-selection.mjs
           node --check src/creators/sprite-compiler/sprite-frame-normalizer.mjs
+          node --check src/creators/avatar/kelo-universal-asset-compiler.mjs
           node --check src/creators/avatar/avatar-quick-import-service.mjs
+          node --check scripts/avatar-frame-surgery-research-audit.mjs
       - name: 35-of-35 research-hardened Frame Surgery supervisor
         run: node scripts/avatar-frame-surgery-supervisor-audit.mjs
+      - name: Advanced research adversary
+        run: node scripts/avatar-frame-surgery-research-audit.mjs
       - name: Existing adversarial ingestion corpus
         run: npm run audit:sprite-ingestion
       - name: Existing Frame Doctor audit
