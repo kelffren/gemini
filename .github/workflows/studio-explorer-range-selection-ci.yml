@@ -6,12 +6,14 @@ on:
     paths:
       - 'src/studio/input/studio-explorer-range-selection-controller.mjs'
       - 'src/studio/input/studio-explorer-reveal-controller.mjs'
+      - 'src/studio/input/studio-nudge-controller.mjs'
       - 'scripts/studio-explorer-range-selection-audit.mjs'
       - '.github/workflows/studio-explorer-range-selection-ci.yml'
   pull_request:
     paths:
       - 'src/studio/input/studio-explorer-range-selection-controller.mjs'
       - 'src/studio/input/studio-explorer-reveal-controller.mjs'
+      - 'src/studio/input/studio-nudge-controller.mjs'
       - 'scripts/studio-explorer-range-selection-audit.mjs'
       - '.github/workflows/studio-explorer-range-selection-ci.yml'
 
@@ -30,6 +32,7 @@ jobs:
         run: |
           node --check src/studio/input/studio-explorer-range-selection-controller.mjs
           node --check src/studio/input/studio-explorer-reveal-controller.mjs
+          node --check src/studio/input/studio-nudge-controller.mjs
           node --check scripts/studio-explorer-range-selection-audit.mjs
-      - name: Explorer range selection audit
+      - name: Explorer range and keyboard selection audit
         run: node scripts/studio-explorer-range-selection-audit.mjs
