@@ -65,7 +65,7 @@ export function createStudioExplorerRangeSelectionController({root=globalThis,ke
 
   function onkeydown(event){
     if(destroyed||event.defaultPrevented||event.ctrlKey||event.metaKey||event.altKey||event.shiftKey)return;
-    if(event.key!=='ArrowUp'&&event.key!=='ArrowDown')return;
+    if(!['ArrowUp','ArrowDown','Home','End'].includes(event.key))return;
     const row=event.target?.closest?.(ENTITY_SELECTOR);
     if(!row)return;
     const rows=explorerRows();
@@ -76,7 +76,7 @@ export function createStudioExplorerRangeSelectionController({root=globalThis,ke
       index=rows.findIndex(candidate=>String(candidate.dataset?.entity||'')===id);
     }
     if(index<0)return;
-    const nextIndex=Math.max(0,Math.min(rows.length-1,index+(event.key==='ArrowDown'?1:-1)));
+    const nextIndex=event.key==='Home'?0:event.key==='End'?rows.length-1:Math.max(0,Math.min(rows.length-1,index+(event.key==='ArrowDown'?1:-1)));
     event.preventDefault?.();
     event.stopImmediatePropagation?.();
     if(nextIndex===index)return;
@@ -90,7 +90,7 @@ export function createStudioExplorerRangeSelectionController({root=globalThis,ke
   document.addEventListener('click',onclick,true);
   document.addEventListener('keydown',onkeydown,true);
   return Object.freeze({
-    version:'studio-explorer-range-selection-v1.1.0-keyboard-nav',
+    version:'studio-explorer-range-selection-v1.2.0-home-end',
     get anchor(){return anchorId;},
     destroy(){
       if(destroyed)return;
