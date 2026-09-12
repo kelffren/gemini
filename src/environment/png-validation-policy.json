@@ -12,6 +12,51 @@
       "reason": "Main player character spritesheet is owned by KeloAvatar actor presentation, not the environment world-art contract."
     },
     {
+      "path": "assets/base-zoo/Idle/rotations/south.png",
+      "scope": "non-world-ui",
+      "reason": "Base Zoo south-facing player frame is owned by KeloAvatar actor presentation, not environment world art."
+    },
+    {
+      "path": "assets/base-zoo/Idle/rotations/south-east.png",
+      "scope": "non-world-ui",
+      "reason": "Base Zoo south-east player frame is owned by KeloAvatar actor presentation, not environment world art."
+    },
+    {
+      "path": "assets/base-zoo/Idle/rotations/east.png",
+      "scope": "non-world-ui",
+      "reason": "Base Zoo east-facing player frame is owned by KeloAvatar actor presentation, not environment world art."
+    },
+    {
+      "path": "assets/base-zoo/Idle/rotations/north-east.png",
+      "scope": "non-world-ui",
+      "reason": "Base Zoo north-east player frame is owned by KeloAvatar actor presentation, not environment world art."
+    },
+    {
+      "path": "assets/base-zoo/Idle/rotations/north.png",
+      "scope": "non-world-ui",
+      "reason": "Base Zoo north-facing player frame is owned by KeloAvatar actor presentation, not environment world art."
+    },
+    {
+      "path": "assets/base-zoo/Idle/rotations/north-west.png",
+      "scope": "non-world-ui",
+      "reason": "Base Zoo north-west player frame is owned by KeloAvatar actor presentation, not environment world art."
+    },
+    {
+      "path": "assets/base-zoo/Idle/rotations/west.png",
+      "scope": "non-world-ui",
+      "reason": "Base Zoo west-facing player frame is owned by KeloAvatar actor presentation, not environment world art."
+    },
+    {
+      "path": "assets/base-zoo/Idle/rotations/south-west.png",
+      "scope": "non-world-ui",
+      "reason": "Base Zoo south-west player frame is owned by KeloAvatar actor presentation, not environment world art."
+    },
+    {
+      "path": "assets/kelo-hero-body-base-8dir.png",
+      "scope": "source-sheet",
+      "reason": "Eight-direction hero body source is retained for avatar authoring and is outside the environment world-art runtime contract."
+    },
+    {
       "path": "assets/fx/sword-swap/activation-eye.PNG",
       "scope": "non-world-ui",
       "reason": "Sword Swap activation eye is an actor presentation VFX asset owned by the modular Visual System, not the environment art contract."
