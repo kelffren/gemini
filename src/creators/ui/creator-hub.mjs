@@ -5,7 +5,7 @@
  * does-not-own: global navigation, Studio implementation, project persistence, permissions or publish policy
  * lazy: imported only after explicit CREATORS action; active cards dispatch through workspace registry
  */
-import { bootKeloCreators } from '../creator-entry.mjs';
+import { bootKeloCreators } from '../creator-entry.mjs?v=map-forge-launch-recovery-20260912-1';
 
 let active=null;
 
@@ -283,7 +283,7 @@ export async function openCreatorHub({root=globalThis}={}){
   doc.addEventListener('keydown',onKey,true);
 
   active=Object.freeze({
-    version:'kelo-creator-hub-v1.11.0-sprite-launch-transaction',
+    version:'kelo-creator-hub-v1.11.1-map-forge-launch-recovery',
     hub,platform,
     get section(){return current;},
     show:render,
