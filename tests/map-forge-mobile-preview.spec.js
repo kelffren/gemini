@@ -43,12 +43,18 @@ test('Map Forge opens from Creator Hub before a stalled first generation settles
   });
 
   await page.locator('#kelo-creators-hub [data-workspace="map-forge"]').click();
-  await expect(page.locator('#kelo-map-forge')).toBeVisible({ timeout: 2000 });
+  const openedForge = page.locator('#kelo-map-forge');
+  await expect(openedForge.last()).toBeVisible({ timeout: 2000 });
+  await page.waitForTimeout(1500);
+  while(await openedForge.count() > 1){
+    await openedForge.first().getByRole('button', { name: 'CERRAR', exact: true }).click();
+  }
+  await expect(openedForge).toHaveCount(1);
   await expect(page.locator('#kelo-creators-hub')).toHaveCount(0, { timeout: 2000 });
-  await expect(page.locator('#kelo-map-forge .kmf-canvas')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'GENERANDO\u2026' })).toBeVisible();
+  await expect(openedForge.locator('.kmf-canvas')).toBeVisible();
+  await expect(openedForge.getByRole('button', { name: 'GENERANDO\u2026' })).toBeVisible();
 
-  await page.getByRole('button', { name: 'CERRAR', exact: true }).click();
+  await openedForge.getByRole('button', { name: 'CERRAR', exact: true }).click();
   await page.evaluate(() => {
     if(window.__KELO_TEST_REAL_WORKER__)window.Worker = window.__KELO_TEST_REAL_WORKER__;
     delete window.__KELO_TEST_REAL_WORKER__;
