@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: WORLD / MAP FORGE / ARRIVAL SCENE
  * owner: KeloMapForge deterministic generator core
- * purpose: turn the player's first visible area into an authored spawn scene using already-generated decorations
+ * purpose: turn spawn and world-edge exits into authored gateway scenes using already-generated decorations
  * public-api: materializeArrivalScene()
  * consumes: generated Map Forge candidate parts + world bounds
  * state-owned: none
@@ -14,6 +14,7 @@ const MAX_SOURCE_DISTANCE=760;
 const MIN_SPACING=64;
 const BLOCK_PAD=20;
 const LANDMARK_PAD=20;
+const EXIT_GATE_DEPTH=184;
 
 const PAIRS=Object.freeze({
   plaza:Object.freeze([{family:'lamp',roles:['arrival-light-left','arrival-light-right'],forward:72,lateral:112},{family:'bench',roles:['arrival-rest-left','arrival-rest-right'],forward:-50,lateral:156}]),
@@ -37,6 +38,21 @@ function safePoint(parts,rows,index,p,worldBounds){const source=rows[index];if(!
 function chooseSource(rows,district,family,target,used){let best=null;for(let i=0;i<rows.length;i++){const row=rows[i];if(used.has(i)||row.scenePrefabId||row.district!==district||row.family!==family)continue;const distance=pointDistance(row,target);if(distance>MAX_SOURCE_DISTANCE)continue;if(!best||distance<best.distance-1e-6||Math.abs(distance-best.distance)<=1e-6&&i<best.index)best={index:i,distance};}return best;}
 function acceptedPoint(parts,rows,index,target,worldBounds){const source=rows[index];for(const t of[1,.84,.68,.52]){const p={x:ROUND(source.x+(target.x-source.x)*t),y:ROUND(source.y+(target.y-source.y)*t)};if(safePoint(parts,rows,index,p,worldBounds))return p;}return null;}
 function rotationFromFrame(frame){const degrees=Math.atan2(-frame.fx,frame.fy)*180/Math.PI;return((Math.round(degrees/90)*90)%360+360)%360;}
+function exitRoadFrame(parts,exit){const road=(parts.roads||[]).find(row=>row.id===`road:exit:${exit.id}`||row.to===`exit:${exit.id}`),points=road?.polyline||[];if(points.length<2)return null;const first=points[0],last=points.at(-1),lastIsExit=pointDistance(last,exit)<=pointDistance(first,exit),edge=lastIsExit?last:first,inside=lastIsExit?points.at(-2):points[1],dx=inside.x-edge.x,dy=inside.y-edge.y,len=Math.hypot(dx,dy)||1,fx=dx/len,fy=dy/len;return{roadId:road.id,fx,fy,lx:-fy,ly:fx,x:edge.x,y:edge.y,distance:pointDistance(edge,exit)};}
+function exitAnchor(exit,frame){return{x:ROUND(exit.x+frame.fx*EXIT_GATE_DEPTH),y:ROUND(exit.y+frame.fy*EXIT_GATE_DEPTH)};}
+function materializeExitGateways(parts,{worldBounds}={}){
+  if(!worldBounds)return parts;
+  const rows=(parts.decorations||[]).map(row=>({...row})),scenes=[...(parts.scenePrefabs||[]).filter(row=>row.sceneType!=='exit')];let resolved=0,members=0,moved=0,totalMovement=0;
+  for(const exit of parts.exits||[]){
+    const district=(parts.districts||[]).find(row=>row.id===exit.district),frame=exitRoadFrame(parts,exit);if(!district||!frame)continue;
+    const pair=(PAIRS[district.kind]||PAIRS.default)[0],anchor=exitAnchor(exit,frame),lateral=Math.max(pair.lateral,112),leftTarget=targetPoint(anchor,frame,0,-lateral),rightTarget=targetPoint(anchor,frame,0,lateral),used=new Set(),left=chooseSource(rows,exit.district,pair.family,leftTarget,used);if(!left)continue;used.add(left.index);const right=chooseSource(rows,exit.district,pair.family,rightTarget,used);if(!right)continue;
+    const originalLeft={...rows[left.index]},originalRight={...rows[right.index]},leftAccepted=acceptedPoint(parts,rows,left.index,leftTarget,worldBounds);if(!leftAccepted)continue;rows[left.index].x=leftAccepted.x;rows[left.index].y=leftAccepted.y;const rightAccepted=acceptedPoint(parts,rows,right.index,rightTarget,worldBounds);if(!rightAccepted){rows[left.index]=originalLeft;rows[right.index]=originalRight;continue;}rows[right.index].x=rightAccepted.x;rows[right.index].y=rightAccepted.y;
+    const sceneId=`scene-prefab:exit:${exit.id}:edge-gateway-v1`,sceneMembers=[];
+    for(const [sourceIndex,role,target,before] of[[left.index,'exit-marker-left',leftTarget,originalLeft],[right.index,'exit-marker-right',rightTarget,originalRight]]){const row=rows[sourceIndex],movement=pointDistance(before,row);row.scenePrefabId=sceneId;row.sceneRole=role;row.sceneKit='arrival';row.sceneVariant='edge-gateway';sceneMembers.push({role,family:pair.family,decorationId:row.id,position:{x:ROUND(row.x),y:ROUND(row.y)},ideal:target,sourceDistance:ROUND(pointDistance(before,target)),finalDistance:ROUND(pointDistance(row,target)),movement:ROUND(movement)});if(movement>=1)moved++;totalMovement+=movement;}
+    scenes.push({id:sceneId,prefabId:'exit-edge-gateway-v1',sceneType:'exit',kit:'arrival',variant:'edge-gateway',landmarkId:null,exitId:exit.id,district:exit.district,anchor,rotation:rotationFromFrame(frame),connectors:[{id:'road-egress',kind:'road',required:true,roadId:frame.roadId,position:{x:ROUND(frame.x),y:ROUND(frame.y)},distance:ROUND(frame.distance),facing:'boundary'}],members:sceneMembers,memberCount:2,movedCount:sceneMembers.filter(row=>row.movement>=1).length,distanceImprovement:0,movementDistance:ROUND(sceneMembers.reduce((sum,row)=>sum+row.movement,0))});resolved++;members+=2;
+  }
+  return{...parts,decorations:rows,scenePrefabs:scenes,generationStats:{...parts.generationStats,exitSceneResolvedCount:resolved,exitSceneMemberCount:members,exitSceneMovedCount:moved,exitSceneMovementDistance:ROUND(totalMovement)}};
+}
 
 export function materializeArrivalScene(parts,{worldBounds}={}){
   const spawn=(parts.spawnPoints||[])[0];if(!spawn||!worldBounds)return parts;
@@ -49,8 +65,7 @@ export function materializeArrivalScene(parts,{worldBounds}={}){
     rows[right.index].x=rightAccepted.x;rows[right.index].y=rightAccepted.y;
     for(const [sourceIndex,role,target] of[[left.index,pair.roles[0],leftTarget],[right.index,pair.roles[1],rightTarget]]){const before=sourceIndex===left.index?originalLeft:originalRight,row=rows[sourceIndex],movement=pointDistance(before,row);row.scenePrefabId=sceneId;row.sceneRole=role;row.sceneKit='arrival';row.sceneVariant='gateway';members.push({role,family:pair.family,decorationId:row.id,position:{x:ROUND(row.x),y:ROUND(row.y)},ideal:target,sourceDistance:ROUND(pointDistance(before,target)),finalDistance:ROUND(pointDistance(row,target)),movement:ROUND(movement)});if(movement>=1)moved++;totalMovement+=movement;}
   }
-  if(members.length<2)return{...parts,generationStats:{...parts.generationStats,arrivalSceneResolvedCount:0,arrivalSceneMemberCount:0,arrivalSceneMovedCount:0,arrivalSceneMovementDistance:0}};
-  const rotation=rotationFromFrame(frame),scene={id:sceneId,prefabId:'spawn-arrival-gateway-v1',sceneType:'arrival',kit:'arrival',variant:'gateway',landmarkId:null,district:spawn.district,anchor:{x:ROUND(spawn.x),y:ROUND(spawn.y)},rotation,connectors:[{id:'road-entry',kind:'road',required:true,roadId:frame.roadId,position:{x:ROUND(frame.x),y:ROUND(frame.y)},distance:ROUND(frame.distance),facing:'road'}],members,memberCount:members.length,movedCount:moved,distanceImprovement:0,movementDistance:ROUND(totalMovement)};
-  const scenes=[...(parts.scenePrefabs||[]).filter(row=>row.id!==sceneId),scene];
-  return{...parts,decorations:rows,scenePrefabs:scenes,generationStats:{...parts.generationStats,arrivalSceneResolvedCount:1,arrivalSceneMemberCount:members.length,arrivalSceneMovedCount:moved,arrivalSceneMovementDistance:ROUND(totalMovement)}};
+  const scenes=[...(parts.scenePrefabs||[]).filter(row=>row.id!==sceneId)];
+  if(members.length>=2){const rotation=rotationFromFrame(frame),scene={id:sceneId,prefabId:'spawn-arrival-gateway-v1',sceneType:'arrival',kit:'arrival',variant:'gateway',landmarkId:null,district:spawn.district,anchor:{x:ROUND(spawn.x),y:ROUND(spawn.y)},rotation,connectors:[{id:'road-entry',kind:'road',required:true,roadId:frame.roadId,position:{x:ROUND(frame.x),y:ROUND(frame.y)},distance:ROUND(frame.distance),facing:'road'}],members,memberCount:members.length,movedCount:moved,distanceImprovement:0,movementDistance:ROUND(totalMovement)};scenes.push(scene);}
+  return materializeExitGateways({...parts,decorations:rows,scenePrefabs:scenes,generationStats:{...parts.generationStats,arrivalSceneResolvedCount:members.length>=2?1:0,arrivalSceneMemberCount:members.length>=2?members.length:0,arrivalSceneMovedCount:members.length>=2?moved:0,arrivalSceneMovementDistance:members.length>=2?ROUND(totalMovement):0}},{worldBounds});
 }

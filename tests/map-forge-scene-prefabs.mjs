@@ -30,7 +30,7 @@ function pairBalance(scene){
 for(const seed of SEEDS){
   const map=generateMapCandidate(recipe,{seed,assetCatalogVersion:'ci-catalog'});
   assert.equal(map.validation.valid,true,`${seed}: map must remain valid after authored scene materialization`);
-  assert.equal(map.metadata.generatorVersion,'1.7.0',`${seed}: layered authored grove guard targets generator 1.7.0`);
+  assert.equal(map.metadata.generatorVersion,'1.8.0',`${seed}: authored edge gateway guard targets generator 1.8.0`);
 
   const stats=map.generationStats||{};
   const evaluated=Number(stats.scenePrefabEvaluatedCount||0);
@@ -41,13 +41,17 @@ for(const seed of SEEDS){
   const improvement=Number(stats.scenePrefabDistanceImprovement||0);
   const movement=Number(stats.scenePrefabMovementDistance||0);
   const pairRollbacks=Number(stats.scenePrefabPairRollbackCount||0);
-  const prefabs=map.scenePrefabs||[],landmarkPrefabs=prefabs.filter(scene=>scene.sceneType!=='arrival'),arrival=prefabs.find(scene=>scene.sceneType==='arrival');
+  const prefabs=map.scenePrefabs||[],landmarkPrefabs=prefabs.filter(scene=>scene.sceneType!=='arrival'&&scene.sceneType!=='exit'),arrival=prefabs.find(scene=>scene.sceneType==='arrival');
 
   assert.ok(evaluated>=4,`${seed}: Royal Capital must evaluate multiple authored landmark prefab patterns`);
   assert.equal(landmarkPrefabs.length,scenes,`${seed}: landmark scenePrefabSceneCount must match landmark scene payload`);
   assert.ok(scenes>=1,`${seed}: at least one authored landmark scene prefab must resolve`);
   assert.ok(members>=2,`${seed}: resolved authored landmark scenes must contain multiple semantic members`);
   assert.equal(connectors,scenes,`${seed}: every resolved landmark scene must expose its road-entry connector`);
+  const exits=map.scenePrefabs.filter(scene=>scene.sceneType==='exit');
+  assert.ok(exits.length>=1,`${seed}: at least one authored world-edge gateway must resolve`);
+  assert.ok(exits.every(scene=>scene.memberCount===2),`${seed}: every resolved world-edge gateway must remain a balanced pair`);
+  assert.ok(exits.every(scene=>(scene.connectors||[]).some(connector=>connector.kind==='road'&&connector.required&&connector.roadId)),`${seed}: every world-edge gateway must retain its egress road connector`);
   const royalGrove=landmarkPrefabs.find(scene=>scene.landmarkId==='ancient_tree');
   const royalCanopy=(royalGrove?.members||[]).filter(member=>member.family==='tree');
   assert.equal(royalCanopy.length,2,`${seed}: Royal Capital ancient grove must retain its authored tree canopy`);
@@ -62,8 +66,8 @@ for(const seed of SEEDS){
   assert.ok((arrival.members||[]).length>=2,`${seed}: arrival scene must visibly contain at least one balanced prop pair`);
   assert.equal(pairBalance(arrival).orphan,0,`${seed}: arrival scene must never expose a one-sided pair`);
   assert.equal((arrival.connectors||[]).filter(row=>row.kind==='road'&&row.required===true&&row.roadId).length,1,`${seed}: arrival scene must expose a required road connector`);
-  const landmarkMemberIds=new Set(landmarkPrefabs.flatMap(scene=>(scene.members||[]).map(member=>member.decorationId)));
-  for(const member of arrival.members||[])assert.ok(!landmarkMemberIds.has(member.decorationId),`${seed}: arrival scene cannot steal ${member.decorationId} from an authored landmark scene`);
+  const otherSceneMemberIds=new Set(prefabs.filter(scene=>scene.sceneType!=='arrival').flatMap(scene=>(scene.members||[]).map(member=>member.decorationId)));
+  for(const member of arrival.members||[])assert.ok(!otherSceneMemberIds.has(member.decorationId),`${seed}: arrival scene cannot steal ${member.decorationId} from another authored scene`);
 
   const manifest=map.spriteManifest;
   assert.ok(manifest&&manifest.version==='map-forge-sprite-manifest-v1',`${seed}: map must return the sprite manifest it needs`);
