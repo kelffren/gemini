@@ -115,11 +115,13 @@ jobs:
         run: |
           cp src/world/map-forge/map-forge-champion-overrides.mjs /tmp/map-forge-champion-after.mjs
           cp src/world/map-forge/map-forge-core.mjs /tmp/map-forge-core-after.mjs
+          cp src/world/map-forge/map-forge-scene-prefabs.mjs /tmp/map-forge-scene-prefabs-after.mjs
           cp src/studio/adapters/map-forge-draft-importer.mjs /tmp/map-forge-importer-after.mjs
-          SOURCE_CHANGE_COMMIT="$(git log -1 --format=%H -- src/world/map-forge/map-forge-champion-overrides.mjs src/world/map-forge/map-forge-core.mjs src/studio/adapters/map-forge-draft-importer.mjs)"
+          SOURCE_CHANGE_COMMIT="$(git log -1 --format=%H -- src/world/map-forge/map-forge-champion-overrides.mjs src/world/map-forge/map-forge-core.mjs src/world/map-forge/map-forge-scene-prefabs.mjs src/studio/adapters/map-forge-draft-importer.mjs)"
           BASE_COMMIT="${SOURCE_CHANGE_COMMIT}^"
           git show "$BASE_COMMIT:src/world/map-forge/map-forge-champion-overrides.mjs" > /tmp/map-forge-champion-before.mjs
           git show "$BASE_COMMIT:src/world/map-forge/map-forge-core.mjs" > /tmp/map-forge-core-before.mjs
+          git show "$BASE_COMMIT:src/world/map-forge/map-forge-scene-prefabs.mjs" > /tmp/map-forge-scene-prefabs-before.mjs
           git show "$BASE_COMMIT:src/studio/adapters/map-forge-draft-importer.mjs" > /tmp/map-forge-importer-before.mjs
           echo "Comparing complete visual pipeline around source change: $BASE_COMMIT -> $SOURCE_CHANGE_COMMIT (current $(git rev-parse HEAD))"
       - name: Capture fixed-seed BEFORE preview and runtime evidence
@@ -129,6 +131,7 @@ jobs:
         run: |
           cp /tmp/map-forge-champion-before.mjs src/world/map-forge/map-forge-champion-overrides.mjs
           cp /tmp/map-forge-core-before.mjs src/world/map-forge/map-forge-core.mjs
+          cp /tmp/map-forge-scene-prefabs-before.mjs src/world/map-forge/map-forge-scene-prefabs.mjs
           cp /tmp/map-forge-importer-before.mjs src/studio/adapters/map-forge-draft-importer.mjs
           npx playwright test tests/map-forge-visual-round.spec.js --project=chromium --output=playwright-results/before
       - name: Capture fixed-seed AFTER preview and runtime evidence
@@ -138,6 +141,7 @@ jobs:
         run: |
           cp /tmp/map-forge-champion-after.mjs src/world/map-forge/map-forge-champion-overrides.mjs
           cp /tmp/map-forge-core-after.mjs src/world/map-forge/map-forge-core.mjs
+          cp /tmp/map-forge-scene-prefabs-after.mjs src/world/map-forge/map-forge-scene-prefabs.mjs
           cp /tmp/map-forge-importer-after.mjs src/studio/adapters/map-forge-draft-importer.mjs
           npx playwright test tests/map-forge-visual-round.spec.js tests/map-forge-fountain-clearance.spec.js --project=chromium --output=playwright-results/after
       - name: Capture directional prop evidence
