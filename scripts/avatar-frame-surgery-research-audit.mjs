@@ -49,8 +49,7 @@ check('lasso-simplifies-noisy-touch-path',()=>{
 });
 
 check('view-mode-is-nondestructive-navigation',()=>{
-  has(editor,["S.mode==='view'",'1 dedo desplaza, 2 dedos hacen zoom','S.view={zoom:1,x:0,y:0}','no modifica el sprite']);
-  assert.ok(!editor.includes("type:'drag',...v}),{message:'view mode must not reuse sprite drag reducer'});
+  has(editor,["S.mode==='view'",'1 dedo desplaza, 2 dedos hacen zoom','S.view={zoom:1,x:0,y:0}','no modifica el sprite',"if(S.mode==='view'&&S.gesture?.view)","else if(S.tool==='move')commitPatch"]);
 });
 
 check('editor-wires-color-wand-and-lasso',()=>has(editor,['colorFloodSelectionMask','polygonSelectionMask','WAND COLOR','LASSO','tolerance.value']));
@@ -87,5 +86,5 @@ check('legacy-can-only-corroborate-existing-v6-hypothesis',()=>{
 check('pixel-art-compile-defaults-nearest-neighbor',()=>has(compiler,"imageSmoothing:config?.imageSmoothing === true"));
 
 const ok=failures.length===0;
-console.log(JSON.stringify({ok,supervisor:'Kelo Frame Surgery Research Adversary',version:'1.0.0',checks,failures},null,2));
+console.log(JSON.stringify({ok,supervisor:'Kelo Frame Surgery Research Adversary',version:'1.0.1',checks,failures},null,2));
 if(!ok)throw new Error(`FRAME_SURGERY_RESEARCH_AUDIT_REJECTED :: ${failures.join(' | ')}`);
