@@ -64,7 +64,7 @@ export function createStudioExplorerRangeSelectionController({root=globalThis,ke
   }
 
   function onkeydown(event){
-    if(destroyed||event.defaultPrevented||event.ctrlKey||event.metaKey||event.altKey||event.shiftKey)return;
+    if(destroyed||event.defaultPrevented||event.ctrlKey||event.metaKey||event.altKey)return;
     if(!['ArrowUp','ArrowDown','Home','End'].includes(event.key))return;
     const row=event.target?.closest?.(ENTITY_SELECTOR);
     if(!row)return;
@@ -82,6 +82,20 @@ export function createStudioExplorerRangeSelectionController({root=globalThis,ke
     if(nextIndex===index)return;
     const next=rows[nextIndex],id=String(next.dataset?.entity||'');
     if(!id)return;
+
+    if(event.shiftKey){
+      const visibleIds=rows.map(candidate=>String(candidate.dataset?.entity||'')).filter(Boolean);
+      const current=kernel.selection.get?.()||[];
+      const currentId=String(row.dataset?.entity||'');
+      if(!anchorId||!visibleIds.includes(String(anchorId)))anchorId=visibleIds.includes(currentId)?currentId:id;
+      const result=resolveExplorerRange({ids:visibleIds,anchorId,targetId:id,current,append:false});
+      if(!result)return;
+      anchorId=result.anchor;
+      kernel.selection.set(result.selection);
+      focusRow(next,{scroll:true});
+      return;
+    }
+
     anchorId=id;
     kernel.selection.set([id]);
     focusRow(next,{scroll:true});
@@ -90,7 +104,7 @@ export function createStudioExplorerRangeSelectionController({root=globalThis,ke
   document.addEventListener('click',onclick,true);
   document.addEventListener('keydown',onkeydown,true);
   return Object.freeze({
-    version:'studio-explorer-range-selection-v1.2.0-home-end',
+    version:'studio-explorer-range-selection-v1.3.0-keyboard-range',
     get anchor(){return anchorId;},
     destroy(){
       if(destroyed)return;
