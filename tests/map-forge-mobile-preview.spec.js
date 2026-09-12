@@ -12,15 +12,19 @@ test('Map Forge opens from Creator Hub before a stalled first generation settles
   const pageErrors = [];
   page.on('pageerror', error => pageErrors.push(String(error)));
 
-  const response = await page.goto('/?offline=1', { waitUntil: 'domcontentloaded', timeout: 30000 });
+  const response = await page.goto('/?mapEditor=1', { waitUntil: 'domcontentloaded', timeout: 30000 });
   expect(response.status()).toBeLessThan(400);
-  await page.waitForFunction(() => !!window.KeloInputLocks?.acquire, null, { timeout: 15000 });
+  await page.waitForFunction(() => !!(
+    window.KeloInputLocks?.acquire &&
+    window.KELO_ADMIN_KEYS?.can?.('world.edit')
+  ), null, { timeout: 15000 });
 
   await page.evaluate(async () => {
     const { openCreatorHub } = await import('./src/creators/ui/creator-hub.mjs');
     await openCreatorHub({ root: window });
   });
   await expect(page.locator('#kelo-creators-hub')).toBeVisible();
+  await expect(page.locator('#kelo-creators-hub [data-workspace="map-forge"]')).toBeEnabled();
 
   await page.evaluate(() => {
     window.__KELO_TEST_REAL_WORKER__ = window.Worker;
