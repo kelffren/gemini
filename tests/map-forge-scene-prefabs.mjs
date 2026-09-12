@@ -30,7 +30,7 @@ function pairBalance(scene){
 for(const seed of SEEDS){
   const map=generateMapCandidate(recipe,{seed,assetCatalogVersion:'ci-catalog'});
   assert.equal(map.validation.valid,true,`${seed}: map must remain valid after authored scene materialization`);
-  assert.equal(map.metadata.generatorVersion,'1.6.0',`${seed}: adaptive authored scene guard targets generator 1.6.0`);
+  assert.equal(map.metadata.generatorVersion,'1.7.0',`${seed}: layered authored grove guard targets generator 1.7.0`);
 
   const stats=map.generationStats||{};
   const evaluated=Number(stats.scenePrefabEvaluatedCount||0);
@@ -48,6 +48,10 @@ for(const seed of SEEDS){
   assert.ok(scenes>=1,`${seed}: at least one authored landmark scene prefab must resolve`);
   assert.ok(members>=2,`${seed}: resolved authored landmark scenes must contain multiple semantic members`);
   assert.equal(connectors,scenes,`${seed}: every resolved landmark scene must expose its road-entry connector`);
+  const royalGrove=landmarkPrefabs.find(scene=>scene.landmarkId==='ancient_tree');
+  const royalCanopy=(royalGrove?.members||[]).filter(member=>member.family==='tree');
+  assert.equal(royalCanopy.length,2,`${seed}: Royal Capital ancient grove must retain its authored tree canopy`);
+  assert.deepEqual(royalCanopy.map(member=>member.role).sort(),['canopy-tree-left','canopy-tree-right'],`${seed}: Royal Capital grove canopy must frame both sides of the approach`);
   assert.ok(improvement>=0,`${seed}: authored scene distance improvement cannot be negative`);
   assert.ok(movement>=0,`${seed}: authored scene movement cannot be negative`);
 
@@ -120,6 +124,9 @@ for(const seed of SEEDS){
   assert.ok(ancient,`${seed}: Forest must resolve a recognizable ancient-tree grove`);
   assert.equal(ancient.prefabId,'ancient-grove-v1',`${seed}: Forest grove must use the existing authored scene owner`);
   assert.ok(ancient.memberCount>=2&&ancient.movedCount>=1,`${seed}: Forest grove must physically compose at least two existing decorations`);
+  const canopy=ancient.members.filter(member=>member.family==='tree');
+  assert.equal(canopy.length,2,`${seed}: Forest grove must include a balanced authored tree canopy`);
+  assert.deepEqual(canopy.map(member=>member.role).sort(),['canopy-tree-left','canopy-tree-right'],`${seed}: Forest grove canopy must frame both sides of the approach`);
   assert.equal(pairBalance(ancient).orphan,0,`${seed}: Forest grove must retain balanced left/right pairs`);
   assert.equal((ancient.connectors||[]).filter(row=>row.kind==='road'&&row.required===true&&row.roadId).length,1,`${seed}: Forest grove must stay connected to a road`);
   forestAdaptiveBackoffs+=Number(map.generationStats.scenePrefabAdaptiveBackoffCount||0);

@@ -24,7 +24,7 @@ const VARIANTS=Object.freeze([
   Object.freeze({id:'deep',forwardScale:1.12,lateralScale:.92})
 ]);
 
-const slot=(role,family,forwardGap,lateral)=>Object.freeze({role,family,forwardGap,lateral});
+const slot=(role,family,forwardGap,lateral,alternates=[])=>Object.freeze({role,family,forwardGap,lateral,alternates:Object.freeze(alternates.map(Object.freeze))});
 export const SCENE_PREFAB_PATTERNS=Object.freeze({
   central_fountain:Object.freeze({id:'royal-fountain-court-v1',kit:'royal-civic',roadBand:[35,190],slots:Object.freeze([
     slot('approach-lamp-left','lamp',46,-124),slot('approach-lamp-right','lamp',46,124),
@@ -47,6 +47,7 @@ export const SCENE_PREFAB_PATTERNS=Object.freeze({
     slot('rest-bench','bench',150,0)
   ])}),
   ancient_tree:Object.freeze({id:'ancient-grove-v1',kit:'forest',roadBand:[24,320],slots:Object.freeze([
+    slot('canopy-tree-left','tree',168,-184,[{forwardGap:100,lateral:-260}]),slot('canopy-tree-right','tree',168,184,[{forwardGap:100,lateral:260}]),
     slot('shrub-left','bush',50,-112),slot('shrub-right','bush',50,112),
     slot('stone-left','rock',132,-154),slot('stone-right','rock',132,154)
   ])}),
@@ -76,6 +77,7 @@ function rotationAxes(rotation=0){const value=((Number(rotation)||0)%360+360)%36
 function landmarkRadius(landmark){return Math.max(80,Number(landmark?.clearance?.radius)||Math.max(Number(landmark?.bounds?.w)||0,Number(landmark?.bounds?.h)||0)*.7);}
 function variantFor(pattern,landmark){const p=landmark.position||landmark,index=seed32(`${pattern.id}|${landmark.id}|${ROUND(p.x)}|${ROUND(p.y)}`)%VARIANTS.length;return VARIANTS[index];}
 function authoredPoint(landmark,member,variant){const center=landmark.position||landmark,axes=rotationAxes(landmark.rotation),radius=landmarkRadius(landmark),forward=(radius+member.forwardGap)*variant.forwardScale,lateral=member.lateral*variant.lateralScale;return{x:ROUND(center.x+axes.forward.x*forward+axes.lateral.x*lateral),y:ROUND(center.y+axes.forward.y*forward+axes.lateral.y*lateral)};}
+function authoredPoints(landmark,member,variant){return [member,...(member.alternates||[]).map(alternate=>({...member,...alternate,alternates:[]}))].map(candidate=>authoredPoint(landmark,candidate,variant));}
 function nearestRoadFrame(point,roads){let best=null;for(const road of roads||[]){const pts=road.polyline||[];for(let i=1;i<pts.length;i++){const a=pts[i-1],b=pts[i],dx=b.x-a.x,dy=b.y-a.y,den=dx*dx+dy*dy,t=den?Math.max(0,Math.min(1,((point.x-a.x)*dx+(point.y-a.y)*dy)/den)):0,x=a.x+dx*t,y=a.y+dy*t,distance=Math.hypot(x-point.x,y-point.y);if(!best||distance<best.distance)best={roadId:road.id,x,y,distance};}}return best;}
 function districtOwnerAt(parts,p){let owner=null,best=Infinity;for(const d of parts.districts||[]){const dx=p.x-d.center.x,dy=p.y-d.center.y,cost=(dx*dx+dy*dy)/Math.max(.2,Number(d.weight)||1);if(cost<best){best=cost;owner=d.id;}}return owner;}
 function pointInsideRect(p,r,pad=0){return p.x>=r.x-pad&&p.x<=r.x+r.w+pad&&p.y>=r.y-pad&&p.y<=r.y+r.h+pad;}
@@ -110,14 +112,19 @@ export function materializeScenePrefabs(parts,{worldBounds}={}){
     const pattern=SCENE_PREFAB_PATTERNS[landmark.type];if(!pattern)continue;evaluated++;
     const variant=variantFor(pattern,landmark),used=new Set(),memberRows=[],originalRows=new Map(),connector=connectorFor(parts,landmark);let sceneMoved=0,sceneImprovement=0,sceneMovement=0;
     for(const member of pattern.slots){
-      const ideal=authoredPoint(landmark,member,variant),source=chooseMember(rows,landmark,member,ideal,used);if(!source)continue;
-      const row=rows[source.index],beforeDistance=pointDistance(row,ideal),beforeRhythm=localSameFamilyCount(rows);let accepted=null;
-      if(beforeDistance<MEMBER_MIN_IMPROVEMENT){accepted={x:row.x,y:row.y,t:0};}
-      else for(const candidate of candidatePoints(row,ideal)){
-        if(!pointSafe(parts,rows,source.index,landmark,pattern,candidate,worldBounds)){safetyRejected++;continue;}
-        const oldX=row.x,oldY=row.y;row.x=candidate.x;row.y=candidate.y;const afterRhythm=localSameFamilyCount(rows);row.x=oldX;row.y=oldY;if(afterRhythm>beforeRhythm){rhythmProtected++;continue;}accepted=candidate;break;
+      let ideal=null,source=null,accepted=null,beforeDistance=Infinity;
+      for(const authored of authoredPoints(landmark,member,variant)){
+        const candidateSource=chooseMember(rows,landmark,member,authored,used);if(!candidateSource)continue;
+        const candidateRow=rows[candidateSource.index],distance=pointDistance(candidateRow,authored),beforeRhythm=localSameFamilyCount(rows);let candidateAccepted=null;
+        if(distance<MEMBER_MIN_IMPROVEMENT){candidateAccepted={x:candidateRow.x,y:candidateRow.y,t:0};}
+        else for(const candidate of candidatePoints(candidateRow,authored)){
+          if(!pointSafe(parts,rows,candidateSource.index,landmark,pattern,candidate,worldBounds)){safetyRejected++;continue;}
+          const oldX=candidateRow.x,oldY=candidateRow.y;candidateRow.x=candidate.x;candidateRow.y=candidate.y;const afterRhythm=localSameFamilyCount(rows);candidateRow.x=oldX;candidateRow.y=oldY;if(afterRhythm>beforeRhythm){rhythmProtected++;continue;}candidateAccepted=candidate;break;
+        }
+        if(candidateAccepted){ideal=authored;source=candidateSource;accepted=candidateAccepted;beforeDistance=distance;break;}
       }
-      if(!accepted)continue;
+      if(!accepted||!source||!ideal)continue;
+      const row=rows[source.index];
       originalRows.set(source.index,{...row});
       const old={x:row.x,y:row.y},afterDistance=pointDistance(accepted,ideal),improvement=beforeDistance-afterDistance,movement=pointDistance(old,accepted);row.x=accepted.x;row.y=accepted.y;row.scenePrefabId=`scene-prefab:${landmark.id}:${pattern.id}`;row.sceneRole=member.role;row.sceneKit=pattern.kit;row.sceneVariant=variant.id;used.add(source.index);members++;if(movement>=1){moved++;sceneMoved++;totalMovement+=movement;sceneMovement+=movement;}if(improvement>0){totalImprovement+=improvement;sceneImprovement+=improvement;}memberRows.push({role:member.role,family:member.family,decorationId:row.id,position:{x:ROUND(row.x),y:ROUND(row.y)},ideal,sourceDistance:ROUND(beforeDistance),finalDistance:ROUND(afterDistance),movement:ROUND(movement),adaptiveBackoff:accepted.t>0&&accepted.t<.68,sourceIndex:source.index});
     }

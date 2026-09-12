@@ -173,6 +173,8 @@ La colocación natural reutiliza el Poisson owner existente con propuestas mixta
 
 Los prefabs semánticos se materializan sobre esas decoraciones existentes. Desde el generador `1.6.0`, el owner de escenas busca de forma adaptativa a lo largo del trayecto entre la posición válida original y el slot autorado, en vez de probar solo tres saltos gruesos. Cada paso vuelve a validar distrito, bounds, parcelas, landmarks, carretera, vistas, spacing y ritmo local; no existe un fallback que atraviese una restricción. Esto permite que el `ancient-grove-v1` se resuelva de forma determinista en las seeds representativas de Forest sin crear objetos nuevos ni cambiar densidad, conectividad o RNG base.
 
+Desde `1.7.0`, `ancient-grove-v1` reutiliza además una pareja de árboles existentes como dosel lateral, acompañada cuando hay espacio por arbustos y marcadores de piedra. Cada slot de dosel puede probar una segunda composición autorada segura para adaptarse a distritos estrechos sin improvisar coordenadas. El landmark deja así de ser una pieza aislada rodeada solo de props bajos: la escena conserva un acceso abierto hacia su conector vial y gana una silueta forestal legible. La pareja se acepta o revierte de forma atómica mediante el mismo guard de roles left/right; no aumenta el conteo de decoraciones ni introduce assets sintéticos.
+
 ## Online-first
 
 ```text
