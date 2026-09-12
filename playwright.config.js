@@ -14,5 +14,8 @@ module.exports = defineConfig({
     isMobile: true,
     hasTouch: true,
   },
-  projects: [{ name: 'chromium', use: { ...devices['Pixel 7'] } }],
+  projects: [
+    { name: 'chromium', use: { ...devices['Pixel 7'] } },
+    { name: 'webkit', use: { ...devices['iPhone 13'] } },
+  ],
 });
