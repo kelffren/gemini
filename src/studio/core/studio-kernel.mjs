@@ -21,10 +21,27 @@ import { normalizeWorldDocument } from '../document/world-document.mjs';
 const entityScale=e=>{const n=Number(e?.transform?.scale);return Math.max(.1,Math.min(8,Number.isFinite(n)?n:1));};
 const entityRect=e=>{const s=entityScale(e);return{x:Number(e.transform?.x)||0,y:Number(e.transform?.y)||0,w:Math.max(1,(Number(e.bounds?.w)||1)*s),h:Math.max(1,(Number(e.bounds?.h)||1)*s)};};
 function collectEntityIds(command,out=new Set()){if(!command||typeof command!=='object')return out;if(String(command.type||'').startsWith('entity.')){if(command.id)out.add(String(command.id));if(command.entity?.id)out.add(String(command.entity.id));}if(Array.isArray(command.commands))for(const child of command.commands)collectEntityIds(child,out);return out;}
+export function syncWorldSpatialCommand({command,document,spatial}){
+  const rows=document.entities||[],ids=collectEntityIds(command);
+  if(!ids.size)return;
+  if(ids.size===1){
+    const id=ids.values().next().value,order=rows.findIndex(row=>row.id===id),e=order>=0?rows[order]:null;
+    if(e)spatial.upsert({id:e.id,category:'entity',rect:entityRect(e),data:e,order});else spatial.remove(id);
+    return;
+  }
+  const pending=new Set(ids);
+  for(let order=0;order<rows.length&&pending.size;order++){
+    const e=rows[order],id=e?.id==null?'':String(e.id);
+    if(!id||!pending.has(id))continue;
+    spatial.upsert({id:e.id,category:'entity',rect:entityRect(e),data:e,order});
+    pending.delete(id);
+  }
+  for(const id of pending)spatial.remove(id);
+}
 const worldDocumentModel=Object.freeze({
   id:'world',normalize:normalizeWorldDocument,chunkSize:document=>Number(document?.settings?.chunkSize)||512,
   rebuildSpatial({document,spatial}){const rows=document.entities||[];spatial.clear();for(let order=0;order<rows.length;order++){const e=rows[order];if(e?.id)spatial.upsert({id:e.id,category:'entity',rect:entityRect(e),data:e,order});}},
-  syncCommand({command,document,spatial}){const rows=document.entities||[];for(const id of collectEntityIds(command)){const order=rows.findIndex(row=>row.id===id),e=order>=0?rows[order]:null;if(e)spatial.upsert({id:e.id,category:'entity',rect:entityRect(e),data:e,order});else spatial.remove(id);}}
+  syncCommand:syncWorldSpatialCommand
 });
 function resolveDocumentModel(model){if(!model)return worldDocumentModel;if(typeof model.normalize!=='function')throw new Error('STUDIO_DOCUMENT_MODEL_NORMALIZE_REQUIRED');return model;}
 
