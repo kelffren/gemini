@@ -18,12 +18,14 @@ on:
       - 'scripts/map-forge-paving-intent-audit.mjs'
       - 'scripts/map-forge-decoration-spacing-audit.mjs'
       - 'tests/map-forge-mobile-preview.spec.js'
+      - 'tests/map-forge-ios-entry.spec.js'
       - 'tests/map-forge-visual-round.spec.js'
       - 'tests/map-forge-fountain-clearance.spec.js'
       - 'tests/map-forge-orientation-visual.spec.js'
       - 'tests/map-forge-royal-capital-road-width.mjs'
       - 'tests/map-forge-scene-prefabs.mjs'
       - 'tests/map-forge-upright-decorations.mjs'
+      - 'playwright.config.js'
       - '.github/workflows/map-forge-core-ci.yml'
       - 'docs/systems/MAP_FORGE_SYSTEM.md'
       - 'docs/system-catalog.json'
@@ -41,12 +43,14 @@ on:
       - 'scripts/map-forge-paving-intent-audit.mjs'
       - 'scripts/map-forge-decoration-spacing-audit.mjs'
       - 'tests/map-forge-mobile-preview.spec.js'
+      - 'tests/map-forge-ios-entry.spec.js'
       - 'tests/map-forge-visual-round.spec.js'
       - 'tests/map-forge-fountain-clearance.spec.js'
       - 'tests/map-forge-orientation-visual.spec.js'
       - 'tests/map-forge-royal-capital-road-width.mjs'
       - 'tests/map-forge-scene-prefabs.mjs'
       - 'tests/map-forge-upright-decorations.mjs'
+      - 'playwright.config.js'
       - '.github/workflows/map-forge-core-ci.yml'
 
 jobs:
@@ -88,13 +92,21 @@ jobs:
       - name: Install Playwright
         run: |
           npm install --no-audit --no-fund
-          npx playwright install --with-deps chromium
+          npx playwright install --with-deps chromium webkit
       - name: Serve branch checkout
         run: python3 -m http.server 4173 --bind 127.0.0.1 > /tmp/kelo-map-forge-http.log 2>&1 &
       - name: Guard Creator Hub launch against stalled first generation
         env:
           KELO_PAGES: http://127.0.0.1:4173/
         run: npx playwright test tests/map-forge-mobile-preview.spec.js --project=chromium --grep "opens from Creator Hub"
+      - name: Guard Creator Hub launch on iPhone WebKit
+        env:
+          KELO_PAGES: http://127.0.0.1:4173/
+        run: npx playwright test tests/map-forge-mobile-preview.spec.js --project=webkit --grep "opens from Creator Hub"
+      - name: Guard exact MENÚ to CREATORS to Map Forge touch path on iPhone WebKit
+        env:
+          KELO_PAGES: http://127.0.0.1:4173/
+        run: npx playwright test tests/map-forge-ios-entry.spec.js --project=webkit
       - name: Wait for Map Forge launch fix on live Pages
         run: |
           set -euo pipefail
@@ -115,6 +127,14 @@ jobs:
         env:
           KELO_PAGES: https://kelffren.github.io/gemini/
         run: npx playwright test tests/map-forge-mobile-preview.spec.js --project=chromium --grep "opens from Creator Hub"
+      - name: Open Map Forge from Creator Hub on live Pages (iPhone WebKit)
+        env:
+          KELO_PAGES: https://kelffren.github.io/gemini/
+        run: npx playwright test tests/map-forge-mobile-preview.spec.js --project=webkit --grep "opens from Creator Hub"
+      - name: Tap MENÚ to CREATORS to Map Forge on live Pages (iPhone WebKit)
+        env:
+          KELO_PAGES: https://kelffren.github.io/gemini/
+        run: npx playwright test tests/map-forge-ios-entry.spec.js --project=webkit
       - name: Prepare paired visual pipeline states
         run: |
           cp src/world/map-forge/map-forge-champion-overrides.mjs /tmp/map-forge-champion-after.mjs
