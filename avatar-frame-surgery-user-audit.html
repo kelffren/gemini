@@ -1,4 +1,9 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><link rel="icon" href="data:,"><title>Kelo Frame Surgery User Audit</title></head><body><script type="module">
+<!doctype html><!-- KELO-INDEX
+area: QA / FRAME SURGERY / BROWSER USER
+owner: mobile browser acceptance harness
+keys: FRAME SURGERY MOBILE PLAYWRIGHT RAW EXACT CANVAS
+purpose: boot the production Frame Surgery workspace for end-to-end mobile acceptance without owning runtime behavior
+--><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><link rel="icon" href="data:,"><title>Kelo Frame Surgery User Audit</title></head><body><script type="module">
 import{openAvatarQuickImport}from'./src/creators/ui/avatar-frame-surgery-workspace.mjs';
 const audit={booted:false,imports:[],errors:[]};
 addEventListener('error',e=>audit.errors.push(String(e.error?.stack||e.message||e)));
