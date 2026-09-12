@@ -1,15 +1,15 @@
 /* KELO-INDEX
  * area: CREATORS / SPRITE COMPILER / FRAME NORMALIZATION
- * owner: lossless frame canvas, scale, center and foot-anchor normalization
- * keys: SPRITE NORMALIZE CANVAS SCALE CENTER FOOT ANCHOR VARIABLE FRAME COUNT
- * purpose: repack detected frames into a runtime atlas while changing geometry only
+ * owner: lossless frame canvas, scale, center, foot-anchor and Frame Surgery composition
+ * keys: SPRITE NORMALIZE CANVAS SCALE CENTER FOOT ANCHOR SURGERY ROTATE MASK OVERLAY CROP CLONE FILL PIXEL-PERFECT
+ * purpose: repack detected frames into runtime atlas and apply reversible per-frame surgery patches
  * public-api: planSpriteFrameNormalization, normalizeSpriteFrameGroups
- * consumes: sprite foreground pixels + resolved sprite rig groups
+ * consumes: sprite foreground pixels + resolved sprite rig groups + optional non-destructive frame patches
  * state-owned: none; deterministic pixels/layout -> runtime canvas and metrics
- * extension-points: safe scale policy and target atlas sizing
  * online: N/A
- * do-not: detect layouts, assign semantics, generate art or repair missing anatomy
+ * do-not: detect layouts, assign semantics, persist content or mutate source pixels
  */
+import {normalizeSurgeryPatch} from './sprite-frame-surgery-model.mjs';
 
 const F = Object.freeze;
 const clamp = (value, min = 0, max = 1) => Math.max(min, Math.min(max, Number(value) || 0));
@@ -33,238 +33,124 @@ function frameBounds(frame) {
   const h = Math.max(1, Number(bounds.h ?? bounds.height) || 1);
   return {x: Number(bounds.x) || 0, y: Number(bounds.y) || 0, w, h};
 }
-
 function sourceRect(frame, bounds, width, height) {
   const source = frame?.sourceRect || bounds;
-  const x = clamp(Math.floor(source.x), 0, width - 1);
-  const y = clamp(Math.floor(source.y), 0, height - 1);
+  const x = clamp(Math.floor(source.x), 0, width - 1), y = clamp(Math.floor(source.y), 0, height - 1);
   const right = clamp(Math.ceil(source.x + (source.w ?? source.width)), x + 1, width);
   const bottom = clamp(Math.ceil(source.y + (source.h ?? source.height)), y + 1, height);
   return {x, y, w: right - x, h: bottom - y};
 }
-
+function cropSourceRect(source, crop, width, height) {
+  const left = source.w * Number(crop?.left || 0), right = source.w * Number(crop?.right || 0);
+  const top = source.h * Number(crop?.top || 0), bottom = source.h * Number(crop?.bottom || 0);
+  const x0 = clamp(Math.floor(source.x + left), 0, width - 1), y0 = clamp(Math.floor(source.y + top), 0, height - 1);
+  const x1 = clamp(Math.ceil(source.x + source.w - right), x0 + 1, width), y1 = clamp(Math.ceil(source.y + source.h - bottom), y0 + 1, height);
+  return {x:x0, y:y0, w:x1-x0, h:y1-y0};
+}
 function percentile(values, q) {
   const sorted = values.filter(Number.isFinite).sort((a, b) => a - b);
   if (!sorted.length) return 0;
   return sorted[Math.round(clamp(q) * (sorted.length - 1))];
 }
-
-function spread(values) {
-  return values.length ? Math.max(...values) - Math.min(...values) : 0;
-}
-
+function spread(values) { return values.length ? Math.max(...values) - Math.min(...values) : 0; }
 function sourceMetrics(groups) {
   const frames = groups.flat().filter(frame => frameBounds(frame));
-  const heights = frames.map(frame => frameBounds(frame).h);
-  const widths = frames.map(frame => frameBounds(frame).w);
+  const heights = frames.map(frame => frameBounds(frame).h), widths = frames.map(frame => frameBounds(frame).w);
   const areas = frames.map(frame => Number(frame.area) || frameBounds(frame).w * frameBounds(frame).h);
   const feetOffsets = groups.flatMap(group => {
-    const feet = group.map(frame => {
-      const bounds = frameBounds(frame);
-      return bounds ? bounds.y + bounds.h : null;
-    }).filter(Number.isFinite);
-    const center = median(feet);
-    return feet.map(value => Math.abs(value - center));
+    const feet = group.map(frame => { const bounds = frameBounds(frame); return bounds ? bounds.y + bounds.h : null; }).filter(Number.isFinite);
+    const center = median(feet); return feet.map(value => Math.abs(value - center));
   });
   const centerOffsets = frames.map(frame => {
-    const bounds = frameBounds(frame);
-    const cell = frame.cell;
-    if (!cell) return 0;
+    const bounds = frameBounds(frame), cell = frame.cell; if (!cell) return 0;
     const cellWidth = Number(cell.w ?? cell.width) || 1;
     return Math.abs((bounds.x + bounds.w / 2) - (Number(cell.x) + cellWidth / 2)) / cellWidth;
   });
-  return {
-    heightVariation: cv(heights),
-    widthVariation: cv(widths),
-    visualScaleVariation: cv(areas.map(Math.sqrt)),
-    footAnchorDispersionPx: feetOffsets.length ? Math.max(...feetOffsets) : 0,
-    footAnchorDispersion: median(heights) ? mean(feetOffsets) / median(heights) : 0,
-    centerDrift: mean(centerOffsets),
-    clippingFrames: frames.filter(frame => frame.touchesCanvasEdge || frame.boundaryRatio > .012).length,
-    frames: frames.length
-  };
+  return {heightVariation:cv(heights),widthVariation:cv(widths),visualScaleVariation:cv(areas.map(Math.sqrt)),
+    footAnchorDispersionPx:feetOffsets.length?Math.max(...feetOffsets):0,footAnchorDispersion:median(heights)?mean(feetOffsets)/median(heights):0,
+    centerDrift:mean(centerOffsets),clippingFrames:frames.filter(frame=>frame.touchesCanvasEdge||frame.boundaryRatio>.012).length,frames:frames.length};
 }
 
 export function planSpriteFrameNormalization(rig, {
-  sourceWidth,
-  sourceHeight,
-  maxRuntimeDimension = 1024,
-  maxCellDimension = 256,
-  minCellDimension = 48,
-  safeScaleMin = .84,
-  safeScaleMax = 1.18,
-  scaleDeadZone = .035,
-  footAnchor = .92,
-  horizontalAnchor = .5,
-  framePatches = null
+  sourceWidth, sourceHeight, maxRuntimeDimension = 1024, maxCellDimension = 256, minCellDimension = 48,
+  safeScaleMin = .84, safeScaleMax = 1.18, scaleDeadZone = .035, footAnchor = .92, horizontalAnchor = .5, framePatches = null
 } = {}) {
   if (!rig?.groups?.length) throw new Error('SPRITE_NORMALIZER_RIG_REQUIRED');
-  const rows = rig.groups.length;
-  const columns = Math.max(1, ...rig.groups.map(group => group.length));
-  const usable = rig.groups.flat().filter(frame => frameBounds(frame));
-  if (!usable.length) throw new Error('SPRITE_NORMALIZER_FRAMES_REQUIRED');
-  const heights = usable.map(frame => frameBounds(frame).h);
-  const medianHeight = median(heights);
-  const framePlans = [];
-  const allFrames = rig.groups.flat();
+  const rows = rig.groups.length, columns = Math.max(1, ...rig.groups.map(group => group.length));
+  const usable = rig.groups.flat().filter(frame => frameBounds(frame)); if (!usable.length) throw new Error('SPRITE_NORMALIZER_FRAMES_REQUIRED');
+  const medianHeight = median(usable.map(frame => frameBounds(frame).h)), framePlans = [], allFrames = rig.groups.flat();
   for (let row = 0; row < rig.groups.length; row++) for (let column = 0; column < rig.groups[row].length; column++) {
-    const frame = rig.groups[row][column];
-    const patch = framePatches?.[row * columns + column] || {};
+    const frame = rig.groups[row][column], rawPatch = framePatches?.[row * columns + column] || {}, patch = normalizeSurgeryPatch(rawPatch);
     const sourceFrame = Number.isInteger(Number(patch.copyFrom)) ? (allFrames[Number(patch.copyFrom)] || frame) : frame;
-    const bounds = frameBounds(sourceFrame);
-    if (!bounds) continue;
-    const rawCorrection = medianHeight / Math.max(1, bounds.h);
-    const withinDeadZone = Math.abs(rawCorrection - 1) <= scaleDeadZone;
-    const correction = withinDeadZone ? 1 : clamp(rawCorrection, safeScaleMin, safeScaleMax);
-    const scaleOutlier = rawCorrection < safeScaleMin || rawCorrection > safeScaleMax;
-    framePlans.push({
-      row,
-      column,
-      direction: rig.directionKeys?.[row] || `row${row + 1}`,
-      frame,
-      sourceFrame,
-      patch,
-      bounds,
-      correction,
-      rawCorrection,
-      scaleOutlier,
-      correctedWidth: bounds.w * correction,
-      correctedHeight: bounds.h * correction
-    });
+    const bounds = frameBounds(sourceFrame); if (!bounds) continue;
+    const rawCorrection = medianHeight / Math.max(1, bounds.h), withinDeadZone = Math.abs(rawCorrection - 1) <= scaleDeadZone;
+    const correction = withinDeadZone ? 1 : clamp(rawCorrection, safeScaleMin, safeScaleMax), scaleOutlier = rawCorrection < safeScaleMin || rawCorrection > safeScaleMax;
+    framePlans.push({row,column,direction:rig.directionKeys?.[row]||`row${row+1}`,frame,sourceFrame,patch,bounds,correction,rawCorrection,scaleOutlier,
+      correctedWidth:bounds.w*correction,correctedHeight:bounds.h*correction});
   }
-  const desiredWidth = Math.max(minCellDimension, Math.ceil(percentile(framePlans.map(plan => plan.correctedWidth), .96) / .82));
-  const desiredHeight = Math.max(minCellDimension, Math.ceil(percentile(framePlans.map(plan => plan.correctedHeight), .96) / .84));
-  const atlasScale = Math.min(
-    1,
-    maxCellDimension / Math.max(desiredWidth, desiredHeight),
-    maxRuntimeDimension / Math.max(1, desiredWidth * columns),
-    maxRuntimeDimension / Math.max(1, desiredHeight * rows)
-  );
-  const frameWidth = Math.max(minCellDimension, Math.round(desiredWidth * atlasScale));
-  const frameHeight = Math.max(minCellDimension, Math.round(desiredHeight * atlasScale));
-  const baseline = frameHeight * clamp(footAnchor, .72, .98);
-  const centerX = frameWidth * clamp(horizontalAnchor, .2, .8);
-  const plans = framePlans.map(plan => {
-    const patch = plan.patch || {};
-    const patchScale = clamp(Number(patch.scale) || 1, .5, 1.5);
-    const scale = plan.correction * atlasScale * patchScale;
-    const boundsCenterInSource = plan.bounds.x + plan.bounds.w / 2;
-    const boundsBottomInSource = plan.bounds.y + plan.bounds.h;
-    const source = sourceRect(plan.sourceFrame || plan.frame, plan.bounds, sourceWidth, sourceHeight);
-    const dx = plan.column * frameWidth + centerX - (boundsCenterInSource - source.x) * scale;
-    const dy = plan.row * frameHeight + baseline - (boundsBottomInSource - source.y) * scale;
-    const offsetX = Number(patch.x) || 0;
-    const offsetY = Number(patch.y) || 0;
-    return F({...plan, source: F(source), patch: F({scale: patchScale, x: offsetX, y: offsetY, copyFrom: Number.isInteger(Number(patch.copyFrom)) ? Number(patch.copyFrom) : null}), scale, destination: F({x: dx + offsetX, y: dy + offsetY, w: source.w * scale, h: source.h * scale})});
+  const desiredWidth = Math.max(minCellDimension, Math.ceil(percentile(framePlans.map(plan=>plan.correctedWidth),.96)/.82));
+  const desiredHeight = Math.max(minCellDimension, Math.ceil(percentile(framePlans.map(plan=>plan.correctedHeight),.96)/.84));
+  const atlasScale = Math.min(1,maxCellDimension/Math.max(desiredWidth,desiredHeight),maxRuntimeDimension/Math.max(1,desiredWidth*columns),maxRuntimeDimension/Math.max(1,desiredHeight*rows));
+  const frameWidth=Math.max(minCellDimension,Math.round(desiredWidth*atlasScale)),frameHeight=Math.max(minCellDimension,Math.round(desiredHeight*atlasScale));
+  const baseline=frameHeight*clamp(footAnchor,.72,.98),centerX=frameWidth*clamp(horizontalAnchor,.2,.8);
+  const plans = framePlans.map(plan=>{
+    const patch=plan.patch, patchScale=patch.scale, scale=plan.correction*atlasScale*patchScale;
+    const boundsCenterInSource=plan.bounds.x+plan.bounds.w/2,boundsBottomInSource=plan.bounds.y+plan.bounds.h;
+    const uncropped=sourceRect(plan.sourceFrame||plan.frame,plan.bounds,sourceWidth,sourceHeight),source=cropSourceRect(uncropped,patch.crop,sourceWidth,sourceHeight);
+    let dx=plan.column*frameWidth+centerX-(boundsCenterInSource-source.x)*scale+patch.x;
+    let dy=plan.row*frameHeight+baseline-(boundsBottomInSource-source.y)*scale+patch.y;
+    if(patch.pixelSnap){dx=Math.round(dx);dy=Math.round(dy);}
+    return F({...plan,source:F(source),scale,destination:F({x:dx,y:dy,w:source.w*scale,h:source.h*scale}),
+      surgery:F({rotation:patch.rotation,erase:patch.erase,restore:patch.restore,clone:patch.clone,fill:patch.fill,overlays:patch.overlays,crop:patch.crop,layerVisibility:patch.layerVisibility})});
   });
-  const outputHeights = plans.map(plan => plan.bounds.h * plan.scale);
-  const outputWidths = plans.map(plan => plan.bounds.w * plan.scale);
-  const source = sourceMetrics(rig.groups);
-  const artDefects = plans.filter(plan => plan.frame.touchesCanvasEdge).map(plan => F({
-    row: plan.row,
-    column: plan.column,
-    direction: plan.direction,
-    code: 'ART_DEFECT_REGENERATION_REQUIRED',
-    reason: 'source pixels touch the outer canvas; missing artwork cannot be reconstructed deterministically'
-  }));
-  const suspicious = plans.filter(plan => plan.scaleOutlier || plan.frame.boundaryRatio > .012).map(plan => F({
-    row: plan.row,
-    column: plan.column,
-    direction: plan.direction,
-    scaleDelta: plan.rawCorrection - 1,
-    feetOffsetPx: (() => {
-      const peers = rig.groups[plan.row].map(frame => {
-        const bounds = frameBounds(frame);
-        return bounds ? bounds.y + bounds.h : null;
-      }).filter(Number.isFinite);
-      return (plan.bounds.y + plan.bounds.h) - median(peers);
-    })(),
-    reasons: F([
-      ...(plan.scaleOutlier ? ['SCALE_OUTLIER'] : []),
-      ...(plan.frame.boundaryRatio > .012 ? ['REGION_BOUNDARY_CONTACT'] : [])
-    ])
-  }));
-  return F({
-    version: 'sprite-frame-normalizer-v1.0.0',
-    rows,
-    columns,
-    frameCounts: F(rig.groups.map(group => group.length)),
-    directionKeys: F([...(rig.directionKeys || [])]),
-    rowMap: rig.rowMap,
-    frameWidth,
-    frameHeight,
-    width: frameWidth * columns,
-    height: frameHeight * rows,
-    baseline,
-    centerX,
-    atlasScale,
-    plans: F(plans),
-    sourceMetrics: F(source),
-    outputMetrics: F({
-      heightVariation: cv(outputHeights),
-      widthVariation: cv(outputWidths),
-      visualScaleVariation: cv(outputHeights),
-      footAnchorDispersionPx: 0,
-      footAnchorDispersion: 0,
-      centerDrift: 0,
-      clippingFrames: artDefects.length,
-      frames: plans.length,
-      minOccupancy: Math.min(...plans.map(plan => (plan.bounds.w * plan.scale) * (plan.bounds.h * plan.scale) / Math.max(1, frameWidth * frameHeight))),
-      maxOccupancy: Math.max(...plans.map(plan => (plan.bounds.w * plan.scale) * (plan.bounds.h * plan.scale) / Math.max(1, frameWidth * frameHeight)))
-    }),
-    suspicious: F(suspicious),
-    artDefects: F(artDefects),
-    safeScalePolicy: F({min: safeScaleMin, max: safeScaleMax, deadZone: scaleDeadZone}),
-    footAnchor,
-    horizontalAnchor
-  });
+  const outputHeights=plans.map(plan=>plan.bounds.h*plan.scale),outputWidths=plans.map(plan=>plan.bounds.w*plan.scale),source=sourceMetrics(rig.groups);
+  const artDefects=plans.filter(plan=>plan.frame.touchesCanvasEdge&&!(plan.patch.overlays?.some(x=>x.visible!==false))).map(plan=>F({row:plan.row,column:plan.column,direction:plan.direction,code:'ART_DEFECT_REGENERATION_REQUIRED',reason:'source pixels touch the outer canvas; add a real replacement/piece or regenerate the missing artwork'}));
+  const repairedEdgeFrames=plans.filter(plan=>plan.frame.touchesCanvasEdge&&plan.patch.overlays?.some(x=>x.visible!==false)).map(plan=>plan.row*columns+plan.column);
+  const suspicious=plans.filter(plan=>plan.scaleOutlier||plan.frame.boundaryRatio>.012).map(plan=>F({row:plan.row,column:plan.column,direction:plan.direction,scaleDelta:plan.rawCorrection-1,
+    feetOffsetPx:(()=>{const peers=rig.groups[plan.row].map(frame=>{const bounds=frameBounds(frame);return bounds?bounds.y+bounds.h:null}).filter(Number.isFinite);return(plan.bounds.y+plan.bounds.h)-median(peers)})(),
+    reasons:F([...(plan.scaleOutlier?['SCALE_OUTLIER']:[]),...(plan.frame.boundaryRatio>.012?['REGION_BOUNDARY_CONTACT']:[])])}));
+  return F({version:'sprite-frame-normalizer-v2.1.0-surgery-pixel-perfect',rows,columns,frameCounts:F(rig.groups.map(group=>group.length)),directionKeys:F([...(rig.directionKeys||[])]),rowMap:rig.rowMap,
+    frameWidth,frameHeight,width:frameWidth*columns,height:frameHeight*rows,baseline,centerX,atlasScale,plans:F(plans),sourceMetrics:F(source),
+    outputMetrics:F({heightVariation:cv(outputHeights),widthVariation:cv(outputWidths),visualScaleVariation:cv(outputHeights),footAnchorDispersionPx:0,footAnchorDispersion:0,centerDrift:0,
+      clippingFrames:artDefects.length,frames:plans.length,minOccupancy:Math.min(...plans.map(plan=>(plan.bounds.w*plan.scale)*(plan.bounds.h*plan.scale)/Math.max(1,frameWidth*frameHeight))),
+      maxOccupancy:Math.max(...plans.map(plan=>(plan.bounds.w*plan.scale)*(plan.bounds.h*plan.scale)/Math.max(1,frameWidth*frameHeight)))}),suspicious:F(suspicious),artDefects:F(artDefects),repairedEdgeFrames:F(repairedEdgeFrames),
+    safeScalePolicy:F({min:safeScaleMin,max:safeScaleMax,deadZone:scaleDeadZone}),footAnchor,horizontalAnchor});
 }
 
-function makeCanvas(root, width, height) {
-  const canvas = root.document?.createElement?.('canvas');
-  if (!canvas) throw new Error('SPRITE_NORMALIZER_CANVAS_REQUIRED');
-  canvas.width = width;
-  canvas.height = height;
-  return canvas;
+function makeCanvas(root,width,height){const canvas=root.document?.createElement?.('canvas');if(!canvas)throw new Error('SPRITE_NORMALIZER_CANVAS_REQUIRED');canvas.width=Math.max(1,Math.round(width));canvas.height=Math.max(1,Math.round(height));return canvas}
+function putPixels(root,canvas,data,width,height){const context=canvas.getContext('2d',{willReadFrequently:true}),image=context.createImageData(width,height);image.data.set(data);context.putImageData(image,0,0)}
+function linePoints(a,b){let x0=a.x|0,y0=a.y|0,x1=b.x|0,y1=b.y|0,dx=Math.abs(x1-x0),sx=x0<x1?1:-1,dy=-Math.abs(y1-y0),sy=y0<y1?1:-1,err=dx+dy,out=[];for(;;){out.push({x:x0,y:y0});if(x0===x1&&y0===y1)break;const e2=2*err;if(e2>=dy){err+=dy;x0+=sx}if(e2<=dx){err+=dx;y0+=sy}}return out}
+function rasterizeStrokePoints(stroke,width,height){const input=(stroke?.points||[]).map(p=>({x:clamp(Math.round(p.x*(width-1)),0,width-1),y:clamp(Math.round(p.y*(height-1)),0,height-1)}));if(!input.length)return[];const out=[],seen=new Set;for(let i=0;i<input.length;i++){const segment=i?linePoints(input[i-1],input[i]):[input[i]];for(const p of segment){const k=p.y*width+p.x;if(!seen.has(k)){seen.add(k);out.push(p)}}}return out}
+function brushOffsets(radius){const r=Math.max(1,Math.round(radius)),out=[];for(let y=-r;y<=r;y++)for(let x=-r;x<=r;x++)if(x*x+y*y<=r*r)out.push({x,y});return out}
+function paintStroke(context,stroke,width,height,operation='destination-out'){
+  if(!stroke?.points?.length||operation!=='destination-out')return;const image=context.getImageData(0,0,width,height),data=image.data;
+  const radius=Math.max(1,stroke.radius*Math.min(width,height)),offsets=brushOffsets(radius);
+  for(const p of rasterizeStrokePoints(stroke,width,height))for(const o of offsets){const x=p.x+o.x,y=p.y+o.y;if(x<0||y<0||x>=width||y>=height)continue;const i=(y*width+x)*4;data[i]=0;data[i+1]=0;data[i+2]=0;data[i+3]=0}
+  context.putImageData(image,0,0)
 }
+function restoreStroke(context,base,stroke,width,height){if(!stroke?.points?.length)return;const image=context.getImageData(0,0,width,height),data=image.data,src=base.getContext('2d',{willReadFrequently:true}).getImageData(0,0,width,height).data;
+  const radius=Math.max(1,stroke.radius*Math.min(width,height)),offsets=brushOffsets(radius);for(const p of rasterizeStrokePoints(stroke,width,height))for(const o of offsets){const x=p.x+o.x,y=p.y+o.y;if(x<0||y<0||x>=width||y>=height)continue;const i=(y*width+x)*4;data[i]=src[i];data[i+1]=src[i+1];data[i+2]=src[i+2];data[i+3]=src[i+3]}context.putImageData(image,0,0)}
+function cloneStroke(context,base,stroke,width,height){if(!stroke?.points?.length||!stroke.source)return;const image=context.getImageData(0,0,width,height),data=image.data,src=base.getContext('2d',{willReadFrequently:true}).getImageData(0,0,width,height).data;
+  const points=rasterizeStrokePoints(stroke,width,height);if(!points.length)return;const first=points[0],anchor={x:Math.round(stroke.source.x*(width-1)),y:Math.round(stroke.source.y*(height-1))};
+  const radius=Math.max(1,stroke.radius*Math.min(width,height)),offsets=brushOffsets(radius);for(const p of points){const sx0=anchor.x+(p.x-first.x),sy0=anchor.y+(p.y-first.y);for(const o of offsets){const tx=p.x+o.x,ty=p.y+o.y,sx=sx0+o.x,sy=sy0+o.y;if(tx<0||ty<0||tx>=width||ty>=height||sx<0||sy<0||sx>=width||sy>=height)continue;const ti=(ty*width+tx)*4,si=(sy*width+sx)*4;data[ti]=src[si];data[ti+1]=src[si+1];data[ti+2]=src[si+2];data[ti+3]=src[si+3]}}context.putImageData(image,0,0)}
+function findEnclosedTransparentComponent(data,width,height,sx,sy,maxArea=128){if(sx<0||sy<0||sx>=width||sy>=height||data[(sy*width+sx)*4+3]>24)return[];const seen=new Uint8Array(width*height),q=new Int32Array(Math.min(width*height,maxArea+2));let a=0,b=1,touchesEdge=false;q[0]=sy*width+sx;seen[q[0]]=1;const out=[];while(a<b){const n=q[a++],x=n%width,y=n/width|0;out.push(n);if(x===0||y===0||x===width-1||y===height-1)touchesEdge=true;if(out.length>maxArea)return[];for(const[ox,oy]of[[1,0],[-1,0],[0,1],[0,-1]]){const X=x+ox,Y=y+oy;if(X<0||Y<0||X>=width||Y>=height)continue;const j=Y*width+X;if(!seen[j]&&data[j*4+3]<=24){seen[j]=1;if(b>=q.length)return[];q[b++]=j}}}return touchesEdge?[]:out}
+function smartFillSmallGap(context,stroke,width,height){if(!stroke?.points?.length)return;const image=context.getImageData(0,0,width,height),data=image.data,snapshot=new Uint8ClampedArray(data);const radius=Math.max(1,Math.round(stroke.radius*Math.min(width,height))),maxArea=Math.max(4,Math.min(256,Math.round(Math.PI*radius*radius*1.5)));
+  for(const point of stroke.points){const cx=clamp(Math.round(point.x*(width-1)),0,width-1),cy=clamp(Math.round(point.y*(height-1)),0,height-1),component=findEnclosedTransparentComponent(snapshot,width,height,cx,cy,maxArea);if(!component.length)continue;for(const n of component){const x=n%width,y=n/width|0,i=n*4;let best=-1,bestD=Infinity;for(let r=1;r<=4&&best<0;r++)for(let oy=-r;oy<=r;oy++)for(let ox=-r;ox<=r;ox++){const X=x+ox,Y=y+oy;if(X<0||Y<0||X>=width||Y>=height)continue;const j=(Y*width+X)*4;if(snapshot[j+3]<=64)continue;const d=ox*ox+oy*oy;if(d<bestD){bestD=d;best=j}}if(best>=0){data[i]=snapshot[best];data[i+1]=snapshot[best+1];data[i+2]=snapshot[best+2];data[i+3]=snapshot[best+3]}}}context.putImageData(image,0,0)}
 
-function putPixels(root, canvas, data, width, height) {
-  const context = canvas.getContext('2d', {willReadFrequently: true});
-  const image = context.createImageData(width, height);
-  image.data.set(data);
-  context.putImageData(image, 0, 0);
-}
+function frameSourceForIndex(plan,rig,index,sourceWidth,sourceHeight){const flat=rig.groups.flat(),frame=flat[index],bounds=frameBounds(frame);if(!frame||!bounds)return null;return sourceRect(frame,bounds,sourceWidth,sourceHeight)}
+function drawOverlay(root,context,overlay,{sourceCanvas,rig,plan,sourceWidth,sourceHeight,frameWidth,frameHeight,imageSmoothing}){if(overlay.visible===false)return;let image=overlay.canvas||overlay.image||null,source=null;if(!image&&Number.isInteger(overlay.sourceFrame)){image=sourceCanvas;source=frameSourceForIndex(plan,rig,overlay.sourceFrame,sourceWidth,sourceHeight)}if(!image)return;
+  const imageWidth=image.naturalWidth||image.width||frameWidth,imageHeight=image.naturalHeight||image.height||frameHeight;let sx=0,sy=0,sw=imageWidth,sh=imageHeight;if(source){sx=source.x;sy=source.y;sw=source.w;sh=source.h}if(overlay.sourceRect){sx+=sw*overlay.sourceRect.x;sy+=sh*overlay.sourceRect.y;sw*=overlay.sourceRect.w;sh*=overlay.sourceRect.h}
+  const targetW=overlay.frameRect?overlay.frameRect.w*frameWidth*overlay.scale:sw*(frameWidth/Math.max(1,plan.source.w))*overlay.scale,targetH=overlay.frameRect?overlay.frameRect.h*frameHeight*overlay.scale:sh*(frameHeight/Math.max(1,plan.source.h))*overlay.scale;
+  const baseX=overlay.frameRect?(overlay.frameRect.x+overlay.frameRect.w/2)*frameWidth:frameWidth/2,baseY=overlay.frameRect?(overlay.frameRect.y+overlay.frameRect.h/2)*frameHeight:frameHeight*.92-targetH/2,cx=baseX+overlay.x,cy=baseY+overlay.y;
+  context.save();context.globalAlpha=overlay.opacity;context.imageSmoothingEnabled=!!imageSmoothing;context.translate(cx,cy);context.rotate(overlay.rotation);context.drawImage(image,sx,sy,sw,sh,-targetW/2,-targetH/2,targetW,targetH);context.restore()}
+function composeFrame(root,sourceCanvas,plan,rig,options){const{frameWidth,frameHeight,sourceWidth,sourceHeight}=options,cell=makeCanvas(root,frameWidth,frameHeight),context=cell.getContext('2d',{willReadFrequently:true});context.clearRect(0,0,frameWidth,frameHeight);context.imageSmoothingEnabled=!!options.imageSmoothing;
+  const destination=plan.destination,localX=destination.x-plan.column*frameWidth,localY=destination.y-plan.row*frameHeight,cx=localX+destination.w/2,cy=localY+destination.h/2;
+  if(plan.patch.layerVisibility?.character!==false){context.save();context.translate(cx,cy);context.rotate(plan.patch.rotation||0);context.drawImage(sourceCanvas,plan.source.x,plan.source.y,plan.source.w,plan.source.h,-destination.w/2,-destination.h/2,destination.w,destination.h);context.restore()}
+  if(plan.patch.layerVisibility?.pieces!==false){for(const overlay of plan.patch.overlays||[])if(overlay.visible!==false&&overlay.cutoutOriginal&&(overlay.canvas||overlay.image)&&overlay.frameRect){const image=overlay.canvas||overlay.image,x=overlay.frameRect.x*frameWidth,y=overlay.frameRect.y*frameHeight,w=overlay.frameRect.w*frameWidth,h=overlay.frameRect.h*frameHeight,iw=image.naturalWidth||image.width||w,ih=image.naturalHeight||image.height||h;context.save();context.globalCompositeOperation='destination-out';context.drawImage(image,0,0,iw,ih,x,y,w,h);context.restore()}for(const overlay of plan.patch.overlays||[])drawOverlay(root,context,overlay,{sourceCanvas,rig,plan,sourceWidth,sourceHeight,frameWidth,frameHeight,imageSmoothing:options.imageSmoothing})}
+  const base=makeCanvas(root,frameWidth,frameHeight);base.getContext('2d').drawImage(cell,0,0);if(plan.patch.layerVisibility?.mask!==false){for(const stroke of plan.patch.erase||[])paintStroke(context,stroke,frameWidth,frameHeight,'destination-out');for(const stroke of plan.patch.restore||[])restoreStroke(context,base,stroke,frameWidth,frameHeight)}if(plan.patch.layerVisibility?.patches!==false){for(const stroke of plan.patch.clone||[])cloneStroke(context,base,stroke,frameWidth,frameHeight);for(const stroke of plan.patch.fill||[])smartFillSmallGap(context,stroke,frameWidth,frameHeight)}return cell}
 
-export function normalizeSpriteFrameGroups(root, foreground, rig, options = {}) {
-  if (!foreground?.cleanedData) throw new Error('SPRITE_NORMALIZER_FOREGROUND_REQUIRED');
-  const plan = planSpriteFrameNormalization(rig, {
-    ...options,
-    sourceWidth: foreground.width,
-    sourceHeight: foreground.height
-  });
-  const source = makeCanvas(root, foreground.width, foreground.height);
-  putPixels(root, source, foreground.cleanedData, foreground.width, foreground.height);
-  const output = makeCanvas(root, plan.width, plan.height);
-  const context = output.getContext('2d', {willReadFrequently: true});
-  context.clearRect(0, 0, output.width, output.height);
-  context.imageSmoothingEnabled = options.imageSmoothing !== false;
-  context.imageSmoothingQuality = 'high';
-  for (const frame of plan.plans) {
-    const sourceRect = frame.source;
-    const destination = frame.destination;
-    context.drawImage(
-      source,
-      sourceRect.x,
-      sourceRect.y,
-      sourceRect.w,
-      sourceRect.h,
-      destination.x,
-      destination.y,
-      destination.w,
-      destination.h
-    );
-  }
-  return F({canvas: output, sourceCanvas: source, plan, ...plan});
-}
+export function normalizeSpriteFrameGroups(root,foreground,rig,options={}){if(!foreground?.cleanedData)throw new Error('SPRITE_NORMALIZER_FOREGROUND_REQUIRED');const plan=planSpriteFrameNormalization(rig,{...options,sourceWidth:foreground.width,sourceHeight:foreground.height}),source=makeCanvas(root,foreground.width,foreground.height);putPixels(root,source,foreground.cleanedData,foreground.width,foreground.height);
+  const output=makeCanvas(root,plan.width,plan.height),context=output.getContext('2d',{willReadFrequently:true}),imageSmoothing=options.imageSmoothing===true;context.clearRect(0,0,output.width,output.height);context.imageSmoothingEnabled=imageSmoothing;
+  for(const frame of plan.plans){const cell=composeFrame(root,source,frame,rig,{frameWidth:plan.frameWidth,frameHeight:plan.frameHeight,sourceWidth:foreground.width,sourceHeight:foreground.height,imageSmoothing});context.drawImage(cell,frame.column*plan.frameWidth,frame.row*plan.frameHeight)}return F({canvas:output,sourceCanvas:source,plan,...plan})}
 
-export const __spriteFrameNormalizerInternals = F({cv, frameBounds, percentile, sourceMetrics, spread});
+export const __spriteFrameNormalizerInternals=F({cv,frameBounds,percentile,sourceMetrics,spread,cropSourceRect,rasterizeStrokePoints,findEnclosedTransparentComponent,paintStroke,restoreStroke,cloneStroke,smartFillSmallGap,composeFrame});

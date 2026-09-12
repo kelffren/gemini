@@ -37,7 +37,7 @@ function addHint(stage){
   const p=overlay.ownerDocument.createElement('p');p.className='sr-help sr-touch-help';p.textContent='☝️ MOVER: arrastra · 🤏 MOVER: escala · ⌫ BORRAR: 1 dedo borra · 🤏 BORRAR: tamaño';card.append(p);
 }
 function createBrushRing(stage){
-  const wrap=stage.parentElement,doc=stage.ownerDocument,ring=doc.createElement('div');ring.className='sr-touch-brush-ring';ring.hidden=true;Object.assign(ring.style,{position:'absolute',zIndex:'8',border:'2px solid rgba(255,235,155,.95)',boxShadow:'0 0 0 1px rgba(0,0,0,.7),borderRadius:'50%',pointerEvents:'none',transform:'translate(-50%,-50%)',background:'rgba(255,255,255,.035)'});wrap?.append(ring);return ring;
+  const wrap=stage.parentElement,doc=stage.ownerDocument,ring=doc.createElement('div');ring.className='sr-touch-brush-ring';ring.hidden=true;Object.assign(ring.style,{position:'absolute',zIndex:'8',border:'2px solid rgba(255,235,155,.95)',boxShadow:'0 0 0 1px rgba(0,0,0,.7)',borderRadius:'50%',pointerEvents:'none',transform:'translate(-50%,-50%)',background:'rgba(255,255,255,.035)'});wrap?.append(ring);return ring;
 }
 
 function attachStage(stage,root){

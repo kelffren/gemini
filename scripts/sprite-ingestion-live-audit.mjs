@@ -16,6 +16,18 @@ fs.mkdirSync(outputDirectory, {recursive: true});
 const executablePath = process.env.CHROME_BIN || undefined;
 const browser = await chromium.launch({headless: true, ...(executablePath ? {executablePath} : {})});
 
+async function canvasData(page, selector) {
+  return page.locator(selector).evaluate(canvas => canvas.toDataURL());
+}
+
+async function waitForCanvasChange(page, selector, baseline, timeout = 2200) {
+  await page.waitForFunction(({selector, baseline}) => {
+    const canvas = document.querySelector(selector);
+    return !!canvas && typeof canvas.toDataURL === 'function' && canvas.toDataURL() !== baseline;
+  }, {selector, baseline}, {timeout, polling: 50});
+  return canvasData(page, selector);
+}
+
 try {
   const context = await browser.newContext({viewport: {width: 1440, height: 1050}, deviceScaleFactor: 1, serviceWorkers: 'block'});
   const page = await context.newPage();
@@ -33,20 +45,30 @@ try {
 
   const halo = page.locator('.case').filter({hasText: 'White background halos'});
   await halo.click();
-  await page.waitForTimeout(250);
-  const first = await page.locator('#after canvas').evaluate(canvas => canvas.toDataURL());
-  const runtimeFirst = await page.locator('#game-canvas').evaluate(canvas => canvas.toDataURL());
-  await page.waitForTimeout(340);
-  const second = await page.locator('#after canvas').evaluate(canvas => canvas.toDataURL());
-  const runtimeSecond = await page.locator('#game-canvas').evaluate(canvas => canvas.toDataURL());
-  if (first === second) throw new Error('SPRITE_COMPILED_PREVIEW_NOT_ANIMATING');
-  if (runtimeFirst === runtimeSecond) throw new Error('SPRITE_GAME_RUNTIME_NOT_ANIMATING');
+  await page.waitForTimeout(80);
+  const first = await canvasData(page, '#after canvas');
+  const runtimeFirst = await canvasData(page, '#game-canvas');
+  let second;
+  let runtimeSecond;
+  try {
+    second = await waitForCanvasChange(page, '#after canvas', first);
+  } catch {
+    throw new Error('SPRITE_COMPILED_PREVIEW_NOT_ANIMATING');
+  }
+  try {
+    runtimeSecond = await waitForCanvasChange(page, '#game-canvas', runtimeFirst);
+  } catch {
+    throw new Error('SPRITE_GAME_RUNTIME_NOT_ANIMATING');
+  }
   const directionButtons = page.locator('#directions button');
   if (await directionButtons.count() !== 4) throw new Error('SPRITE_4D_PREVIEW_DIRECTIONS_MISSING');
   await directionButtons.nth(1).click();
-  await page.waitForTimeout(180);
-  const directionFrame = await page.locator('#after canvas').evaluate(canvas => canvas.toDataURL());
-  if (directionFrame === second) throw new Error('SPRITE_DIRECTION_SWITCH_NO_VISUAL_CHANGE');
+  let directionFrame;
+  try {
+    directionFrame = await waitForCanvasChange(page, '#after canvas', second);
+  } catch {
+    throw new Error('SPRITE_DIRECTION_SWITCH_NO_VISUAL_CHANGE');
+  }
 
   await page.screenshot({path: path.join(outputDirectory, 'adversarial-lab-before-after-runtime.png'), fullPage: true});
   await page.locator('#before').screenshot({path: path.join(outputDirectory, 'before-irregular-halo.png')});
