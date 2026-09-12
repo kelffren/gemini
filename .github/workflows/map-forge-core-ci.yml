@@ -18,6 +18,7 @@ on:
       - 'scripts/map-forge-paving-intent-audit.mjs'
       - 'scripts/map-forge-decoration-spacing-audit.mjs'
       - 'tests/map-forge-mobile-preview.spec.js'
+      - 'tests/map-forge-ios-entry.spec.js'
       - 'tests/map-forge-visual-round.spec.js'
       - 'tests/map-forge-fountain-clearance.spec.js'
       - 'tests/map-forge-orientation-visual.spec.js'
@@ -42,6 +43,7 @@ on:
       - 'scripts/map-forge-paving-intent-audit.mjs'
       - 'scripts/map-forge-decoration-spacing-audit.mjs'
       - 'tests/map-forge-mobile-preview.spec.js'
+      - 'tests/map-forge-ios-entry.spec.js'
       - 'tests/map-forge-visual-round.spec.js'
       - 'tests/map-forge-fountain-clearance.spec.js'
       - 'tests/map-forge-orientation-visual.spec.js'
@@ -101,6 +103,10 @@ jobs:
         env:
           KELO_PAGES: http://127.0.0.1:4173/
         run: npx playwright test tests/map-forge-mobile-preview.spec.js --project=webkit --grep "opens from Creator Hub"
+      - name: Guard exact MENÚ to CREATORS to Map Forge touch path on iPhone WebKit
+        env:
+          KELO_PAGES: http://127.0.0.1:4173/
+        run: npx playwright test tests/map-forge-ios-entry.spec.js --project=webkit
       - name: Wait for Map Forge launch fix on live Pages
         run: |
           set -euo pipefail
@@ -125,6 +131,10 @@ jobs:
         env:
           KELO_PAGES: https://kelffren.github.io/gemini/
         run: npx playwright test tests/map-forge-mobile-preview.spec.js --project=webkit --grep "opens from Creator Hub"
+      - name: Tap MENÚ to CREATORS to Map Forge on live Pages (iPhone WebKit)
+        env:
+          KELO_PAGES: https://kelffren.github.io/gemini/
+        run: npx playwright test tests/map-forge-ios-entry.spec.js --project=webkit
       - name: Prepare paired visual pipeline states
         run: |
           cp src/world/map-forge/map-forge-champion-overrides.mjs /tmp/map-forge-champion-after.mjs
