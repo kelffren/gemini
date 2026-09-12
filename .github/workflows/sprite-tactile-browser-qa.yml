@@ -7,6 +7,7 @@ on:
       - 'src/creators/ui/avatar-frame-*.mjs'
       - 'tests/sprite-tactile-editor.spec.js'
       - 'tests/fixtures/sprite-tactile-editor.html'
+      - 'playwright.sprite.config.js'
       - '.github/workflows/sprite-tactile-browser-qa.yml'
   pull_request:
     paths:
@@ -14,12 +15,13 @@ on:
       - 'src/creators/ui/avatar-frame-*.mjs'
       - 'tests/sprite-tactile-editor.spec.js'
       - 'tests/fixtures/sprite-tactile-editor.html'
+      - 'playwright.sprite.config.js'
   workflow_dispatch:
 
 jobs:
   mobile-browser-agent:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -27,18 +29,18 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
-      - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+      - name: Install Chromium and iPhone-compatible WebKit
+        run: npx playwright install --with-deps chromium webkit
       - name: Start local static runtime
         run: |
           python3 -m http.server 4173 --bind 127.0.0.1 > /tmp/kelo-sprite-server.log 2>&1 &
           for i in {1..30}; do curl -fsS http://127.0.0.1:4173/tests/fixtures/sprite-tactile-editor.html >/dev/null && exit 0; sleep 1; done
           cat /tmp/kelo-sprite-server.log
           exit 1
-      - name: Mobile tactile browser verification
+      - name: Mobile tactile browser verification · Chromium + iPhone WebKit
         env:
           SPRITE_QA_URL: http://127.0.0.1:4173/tests/fixtures/sprite-tactile-editor.html
-        run: npx playwright test tests/sprite-tactile-editor.spec.js --project=chromium
+        run: npx playwright test --config=playwright.sprite.config.js
       - name: Upload screenshots and traces
         if: always()
         uses: actions/upload-artifact@v4
@@ -46,6 +48,6 @@ jobs:
           name: sprite-tactile-browser-qa
           path: |
             test-results/
-            playwright-report.json
+            playwright-sprite-report.json
           if-no-files-found: ignore
           retention-days: 7
