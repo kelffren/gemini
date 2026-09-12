@@ -95,10 +95,16 @@ export function applyPinchFromPointers(start,{a0,b0,a1,b1}){
 
 export function alphaBoundsMatchProposal(currentBounds,referenceBounds,currentPatch={}){
   if(!currentBounds||!referenceBounds||!currentBounds.height||!referenceBounds.height)throw new Error('FRAME_REFERENCE_BOUNDS_REQUIRED');
-  const patch=normalizeFramePatch(currentPatch),factor=referenceBounds.height/currentBounds.height;
+  const patch=normalizeFramePatch(currentPatch),heightFactor=referenceBounds.height/currentBounds.height;
+  const hasPixelMass=Number(referenceBounds.pixels)>0&&Number(currentBounds.pixels)>0;
+  const pixelFactor=hasPixelMass?Math.sqrt(Number(referenceBounds.pixels)/Number(currentBounds.pixels)):null;
+  const disagreement=hasPixelMass?Math.max(heightFactor,pixelFactor)/Math.max(1e-6,Math.min(heightFactor,pixelFactor)):1;
+  const strayAlphaSuspected=disagreement>1.18;
+  const factor=hasPixelMass?(strayAlphaSuspected?pixelFactor:Math.sqrt(heightFactor*pixelFactor)):heightFactor;
   const scale=clamp(patch.scale*factor,.2,4);
   const currentCenter=currentBounds.x+currentBounds.width/2,referenceCenter=referenceBounds.x+referenceBounds.width/2;
-  return F({...scaleAroundFootPivot(patch,scale),x:patch.x+(referenceCenter-currentCenter),y:patch.y,autoMatch:F({factor,referenceHeight:referenceBounds.height,currentHeight:currentBounds.height})});
+  const centerDelta=strayAlphaSuspected?0:referenceCenter-currentCenter;
+  return F({...scaleAroundFootPivot(patch,scale),x:patch.x+centerDelta,y:patch.y,autoMatch:F({factor,heightFactor,pixelFactor,referenceHeight:referenceBounds.height,currentHeight:currentBounds.height,strayAlphaSuspected})});
 }
 
 export function copyFrameTransform(patch={}){const p=normalizeFramePatch(patch);return F({scale:p.scale,x:p.x,y:p.y,pivot:clone(p.pivot)});}
