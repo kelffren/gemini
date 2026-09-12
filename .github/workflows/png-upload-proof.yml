@@ -1,0 +1,92 @@
+name: PNG upload proof
+
+on:
+  push:
+    branches:
+      - chatgpt/png-upload-proof
+    paths:
+      - .github/workflows/png-upload-proof.yml
+
+permissions:
+  contents: write
+
+jobs:
+  import-png:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install headless browser
+        run: |
+          npm install --no-save playwright
+          npx playwright install chromium
+
+      - name: Download exact PNG through Firestorage
+        env:
+          SHARE_URL: https://firestorage.ai/ja/f/1P1I0_CrIwP8
+          EXPECTED_SHA256: 579ad3028b510c60532cb72471ebec9e27e8ed185488b9cb864daf294047aa30
+          EXPECTED_SIZE: '2030009'
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const crypto = require('crypto');
+          const { chromium } = require('playwright');
+          const share = process.env.SHARE_URL;
+          const expectedSha = process.env.EXPECTED_SHA256;
+          const expectedSize = Number(process.env.EXPECTED_SIZE);
+          const out = 'assets/bot-crimson-v1.png';
+          function exact(buf) {
+            return buf.length === expectedSize &&
+              crypto.createHash('sha256').update(buf).digest('hex') === expectedSha &&
+              buf.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10]));
+          }
+          (async () => {
+            const browser = await chromium.launch({ headless: true });
+            const context = await browser.newContext({ acceptDownloads: true });
+            const page = await context.newPage();
+            await page.goto(share, { waitUntil: 'domcontentloaded', timeout: 60000 });
+            await page.waitForTimeout(10000);
+            const button = page.locator('button:has-text("ダウンロード")').first();
+            await button.waitFor({ state: 'visible', timeout: 20000 });
+            const downloadPromise = page.waitForEvent('download', { timeout: 30000 });
+            await button.click();
+            const download = await downloadPromise;
+            const tempPath = await download.path();
+            if (!tempPath) throw new Error('browser did not expose downloaded file');
+            const buf = fs.readFileSync(tempPath);
+            const sha = crypto.createHash('sha256').update(buf).digest('hex');
+            console.log('DOWNLOADED_BYTES', buf.length);
+            console.log('DOWNLOADED_SHA256', sha);
+            if (!exact(buf)) throw new Error('downloaded binary does not match source PNG');
+            fs.mkdirSync('assets', { recursive: true });
+            fs.writeFileSync(out, buf);
+            console.log('EXACT_PNG_FOUND');
+            await browser.close();
+          })().catch(err => { console.error(err); process.exit(1); });
+          NODE
+
+      - name: Confirm exact binary and PNG dimensions
+        run: |
+          test "$(sha256sum assets/bot-crimson-v1.png | awk '{print $1}')" = "579ad3028b510c60532cb72471ebec9e27e8ed185488b9cb864daf294047aa30"
+          test "$(stat -c%s assets/bot-crimson-v1.png)" = "2030009"
+          python - <<'PY'
+          import struct
+          p='assets/bot-crimson-v1.png'
+          with open(p,'rb') as f:
+              sig=f.read(8)
+              assert sig == b'\x89PNG\r\n\x1a\n'
+              length=struct.unpack('>I',f.read(4))[0]
+              kind=f.read(4)
+              assert kind == b'IHDR' and length >= 8
+              width,height=struct.unpack('>II',f.read(8))
+          print('PNG_DIMENSIONS',width,height)
+          assert (width,height)==(1024,1536)
+          PY
+
+      - name: Commit proof asset to test branch
+        run: |
+          git config user.name 'kelo-asset-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add assets/bot-crimson-v1.png
+          git commit -m 'test: import exact crimson bot PNG via bridge'
+          git push origin HEAD:chatgpt/png-upload-proof
