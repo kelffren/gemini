@@ -77,6 +77,7 @@ export function estimateSpriteBackground(sourceData, width, height, {
       transparentRatio,
       dominance: transparentRatio,
       borderNoise: 0,
+      variationRatio: 0,
       coreThreshold: 0,
       haloThreshold: 0
     });
@@ -93,6 +94,7 @@ export function estimateSpriteBackground(sourceData, width, height, {
   const rgb = [0, 1, 2].map(channel => Math.round(median(dominant.map(pixel => pixel[channel]))));
   const distances = opaque.map(pixel => colorDistance(pixel[0], pixel[1], pixel[2], rgb));
   const p90 = quantile(distances, 0.9);
+  const variationRatio = distances.filter(distance => distance > 7).length / Math.max(1, distances.length);
   const dominance = dominant.length / Math.max(1, opaque.length);
   const uniform = dominance >= 0.46 && p90 <= 58;
   const confidence = clamp(dominance * 0.68 + (1 - clamp(p90 / 92, 0, 1)) * 0.32, 0, 1);
@@ -107,6 +109,7 @@ export function estimateSpriteBackground(sourceData, width, height, {
     transparentRatio,
     dominance,
     borderNoise: p90,
+    variationRatio,
     coreThreshold,
     haloThreshold
   });
@@ -135,7 +138,7 @@ function floodConnectedBackground(data, width, height, background, alphaThreshol
   }
   for (let y = 1; y < height - 1; y++) {
     push(y * width);
-    push(y * width + width - 1);
+    if (width > 1) push(y * width + width - 1);
   }
 
   while (head < tail) {
@@ -319,7 +322,7 @@ export function analyzeSpriteForeground(sourceData, width, height, options = {})
   }) : null;
 
   return F({
-    version: 'sprite-foreground-v1.0.0',
+    version: 'sprite-foreground-v1.1.0',
     width,
     height,
     background,
