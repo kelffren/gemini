@@ -23,13 +23,17 @@ try{
 
   const before=await page.evaluate(()=>({
     drawCount:window.KELO_MAIN_HERO_SPRITE_AUDIT.drawCount,
-    lastFace:window.KELO_MAIN_HERO_SPRITE_AUDIT.lastFace
+    lastFace:window.KELO_MAIN_HERO_SPRITE_AUDIT.lastFace,
+    inputAvailable:typeof input!=='undefined'&&!!input
   }));
+  if(!before.inputAvailable)throw new Error('legacy input owner state unavailable');
 
-  // Real movement path. lastFace only changes inside Base Zoo's live renderer,
-  // so reaching down-right proves the game loop rendered the diagonal Base Zoo asset.
-  await page.keyboard.down('ArrowDown');
-  await page.keyboard.down('ArrowRight');
+  // Feed the real legacy input state consumed by KeloInput/processInput instead of
+  // relying on browser focus/keyboard delivery. The game loop remains the renderer driver.
+  await page.evaluate(()=>{
+    input.keys.ArrowDown=true;
+    input.keys.ArrowRight=true;
+  });
   await page.waitForFunction(()=>window.KELO_MAIN_HERO_SPRITE_AUDIT.lastFace==='down-right',null,{timeout:5000});
   await page.waitForTimeout(180);
 
@@ -49,13 +53,16 @@ try{
       lastFace:audit.lastFace,
       renderSource:renderAudit.mainHeroSpriteSource,
       renderGrid:renderAudit.mainHeroSpriteGrid,
-      inputLocks:window.KeloInputLocks&&window.KeloInputLocks.snapshot?window.KeloInputLocks.snapshot():null
+      inputLocks:window.KeloInputLocks&&window.KeloInputLocks.snapshot?window.KeloInputLocks.snapshot():null,
+      move:window.KeloInput&&window.KeloInput.snapshot?window.KeloInput.snapshot().combat.move:null
     };
   });
 
   await page.screenshot({path:'artifacts/base-zoo-main-hero-live.png',fullPage:true});
-  await page.keyboard.up('ArrowRight');
-  await page.keyboard.up('ArrowDown');
+  await page.evaluate(()=>{
+    input.keys.ArrowRight=false;
+    input.keys.ArrowDown=false;
+  });
 
   const expectedSource='assets/base-zoo/Idle/rotations/';
   const failures=[];
@@ -65,13 +72,14 @@ try{
   if(result.renderGrid!=='8-direction-files')failures.push('wrong directional mode in render audit');
   if(result.directionMode!==8)failures.push('directionMode is not 8');
   if(result.readyCount!==8||!result.complete||result.failedCount!==0)failures.push('not all eight Base Zoo images loaded');
-  if(before.drawCount<1||result.drawCount<1)failures.push('Base Zoo never rendered as the local player');
+  if(before.drawCount<1||result.drawCount<=before.drawCount)failures.push('Base Zoo did not keep rendering through the real game loop');
   if(result.lastFace!=='down-right')failures.push(`real diagonal movement rendered ${result.lastFace}`);
   if(result.inputLocks&&result.inputLocks.locked)failures.push(`input remained locked by ${result.inputLocks.owners.join(',')}`);
+  if(!result.move||result.move.x<=0||result.move.y<=0)failures.push('KeloInput did not observe positive diagonal movement');
 
   console.log(JSON.stringify({ok:failures.length===0,before,result,pageErrors:consoleErrors.slice(0,10),failures},null,2));
   if(failures.length)process.exitCode=1;
 }finally{
-  try{await page.keyboard.up('ArrowRight');await page.keyboard.up('ArrowDown');}catch{}
+  try{await page.evaluate(()=>{if(typeof input!=='undefined'&&input){input.keys.ArrowRight=false;input.keys.ArrowDown=false;}});}catch{}
   await browser.close();
 }
