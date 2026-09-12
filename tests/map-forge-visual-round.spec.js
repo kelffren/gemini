@@ -98,6 +98,8 @@ function mapMetrics(map){
     blockCount:(map.blocks||[]).length,
     decorationCount:decorations.length,
     declusterSwapCount:Number(map.generationStats?.decorationDeclusterSwapCount||0),
+    naturalClusterAttemptCount:Number(map.generationStats?.decorationNaturalClusterAttemptCount||0),
+    naturalClusterAcceptedCount:Number(map.generationStats?.decorationNaturalClusterAcceptedCount||0),
     landmarkRoadFacingCount:Number(map.generationStats?.landmarkRoadFacingCount||0),
     landmarkRoadFacingChangedCount:Number(map.generationStats?.landmarkRoadFacingChangedCount||0),
     uprightDecorationCount:upright.length,
@@ -161,6 +163,7 @@ test(`Map Forge ${STAGE} fixed-seed preview/runtime visual evidence`,async({page
     expect(mainMetrics.scenicVistas).toBeGreaterThanOrEqual(82);
     expect(mainMetrics.negativeSpace).toBeGreaterThanOrEqual(78);
     expect(mainMetrics.declusterSwapCount).toBeGreaterThan(0);
+    expect(mainMetrics.naturalClusterAcceptedCount).toBeGreaterThanOrEqual(8);
     expect(mainMetrics.localSameFamilyRatio).toBeLessThanOrEqual(LOCAL_SAME_FAMILY_MAX);
     expect(mainMetrics.landmarkRoadFacingCount).toBeGreaterThanOrEqual(3);
     expect(mainMetrics.landmarkRoadFacingChangedCount).toBeGreaterThan(0);
@@ -202,6 +205,7 @@ test(`Map Forge ${STAGE} fixed-seed preview/runtime visual evidence`,async({page
       expect(metrics.scenicVistas).toBeGreaterThanOrEqual(VALIDATION_VISTAS_MIN);
       expect(metrics.negativeSpace).toBeGreaterThanOrEqual(VALIDATION_SPACE_MIN);
       expect(metrics.declusterSwapCount).toBeGreaterThan(0);
+      expect(metrics.naturalClusterAcceptedCount).toBeGreaterThanOrEqual(8);
       expect(metrics.localSameFamilyRatio).toBeLessThanOrEqual(LOCAL_SAME_FAMILY_MAX);
       expect(metrics.landmarkRoadFacingCount).toBeGreaterThanOrEqual(3);
       expect(metrics.sceneOrphanPairCount).toBe(0);

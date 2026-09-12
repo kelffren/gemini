@@ -169,6 +169,8 @@ Map Forge reutiliza `KELO_WORLD_BUILDER.renderSnapshotPreview()`; no existe rend
 
 El importer resuelve assets semánticos mediante el catálogo real. Cuando una familia declara varias alternativas aprobadas, selecciona una variante de forma determinista a partir de la identidad y posición final del elemento. Esto evita que árboles, farolas, fuentes y jardineras repitan siempre el primer asset del catálogo sin introducir aleatoriedad, alterar el `MapDefinition` ni crear otro renderer.
 
+La colocación natural reutiliza el Poisson owner existente con propuestas mixtas: bosque y granja combinan muestras globales con microagrupaciones alrededor de puntos ya válidos. Cada propuesta agrupada vuelve a pasar exactamente las mismas fronteras, carreteras, bloques, clearance de landmarks y separación mínima. El resultado conserva densidad y seguridad, pero introduce grupos y claros reproducibles en vez de una dispersión uniformemente independiente.
+
 ## Online-first
 
 ```text
