@@ -1,12 +1,13 @@
 /* KELO-INDEX
  * area: STUDIO / INPUT / PROPERTY COMMIT
- * owns: keyboard commit/cancel ergonomics for canonical Studio property inputs
+ * owns: keyboard commit/cancel ergonomics and direct keyboard entry into canonical Studio property inputs
  * does-not-own: property mutation, CommandBus, authority or transform math
  * public-api: createStudioPropertyCommitController()
  * online: delegates persistence to the existing [data-prop] change handler
  */
 
 const PROPERTY_SELECTOR='#kelo-studio-live [data-prop]';
+const EDITABLE_SELECTOR='input,textarea,select,[contenteditable="true"],[contenteditable=""]';
 
 export function shouldHandleStudioPropertyCommitKey(event){
   if(!event||event.defaultPrevented||event.repeat||event.ctrlKey||event.metaKey||event.altKey)return false;
@@ -15,13 +16,33 @@ export function shouldHandleStudioPropertyCommitKey(event){
   return key==='Enter'||key==='Escape';
 }
 
+export function shouldHandleStudioPropertyFocusKey(event){
+  if(!event||event.defaultPrevented||event.repeat||event.ctrlKey||event.metaKey||event.altKey||event.shiftKey)return false;
+  if(String(event.key||'')!=='F2')return false;
+  return !event.target?.closest?.(EDITABLE_SELECTOR);
+}
+
 export function createStudioPropertyCommitController({root=globalThis}={}){
   const document=root?.document;
-  if(!document?.addEventListener)return Object.freeze({destroy(){}});
+  if(!document?.addEventListener)return Object.freeze({focusFirstProperty:()=>false,destroy(){}});
   let destroyed=false;
   const initialValues=new WeakMap();
   const enqueue=typeof root?.queueMicrotask==='function'?root.queueMicrotask.bind(root):
     typeof globalThis.queueMicrotask==='function'?globalThis.queueMicrotask.bind(globalThis):fn=>Promise.resolve().then(fn);
+
+  function enabledFields(){
+    return Array.from(document.querySelectorAll?.(PROPERTY_SELECTOR)||[])
+      .filter(field=>!field?.disabled&&field?.getAttribute?.('aria-disabled')!=='true');
+  }
+
+  function focusFirstProperty(){
+    if(destroyed)return false;
+    const first=enabledFields()[0];
+    if(!first)return false;
+    first.focus?.();
+    first.select?.();
+    return true;
+  }
 
   function focusin(event){
     const input=event.target;
@@ -30,6 +51,12 @@ export function createStudioPropertyCommitController({root=globalThis}={}){
   }
 
   function keydown(event){
+    if(shouldHandleStudioPropertyFocusKey(event)){
+      if(!focusFirstProperty())return;
+      event.preventDefault?.();
+      event.stopPropagation?.();
+      return;
+    }
     if(!shouldHandleStudioPropertyCommitKey(event))return;
     const input=event.target;
     event.preventDefault?.();
@@ -55,8 +82,7 @@ export function createStudioPropertyCommitController({root=globalThis}={}){
     // input list in a microtask, then continue spreadsheet-style editing.
     enqueue(()=>{
       if(destroyed)return;
-      const fields=Array.from(document.querySelectorAll?.(PROPERTY_SELECTOR)||[])
-        .filter(field=>!field?.disabled&&field?.getAttribute?.('aria-disabled')!=='true');
+      const fields=enabledFields();
       if(!fields.length)return;
       let index=fields.indexOf(input);
       if(index<0&&sourceProp){
@@ -73,7 +99,8 @@ export function createStudioPropertyCommitController({root=globalThis}={}){
   document.addEventListener('focusin',focusin,true);
   document.addEventListener('keydown',keydown,true);
   return Object.freeze({
-    version:'studio-property-commit-v1.1.0-enter-navigation',
+    version:'studio-property-commit-v1.2.0-f2-focus',
+    focusFirstProperty,
     destroy(){
       if(destroyed)return;
       destroyed=true;
