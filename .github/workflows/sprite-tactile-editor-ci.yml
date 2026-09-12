@@ -9,6 +9,7 @@ on:
       - 'src/creators/sprite-compiler/**'
       - 'src/creators/avatar/kelo-universal-asset-compiler.mjs'
       - 'scripts/sprite-tactile-editor-audit.mjs'
+      - 'scripts/sprite-source-crop-audit.mjs'
       - 'package.json'
       - '.github/workflows/sprite-tactile-editor-ci.yml'
   pull_request:
@@ -19,6 +20,7 @@ on:
       - 'src/creators/sprite-compiler/**'
       - 'src/creators/avatar/kelo-universal-asset-compiler.mjs'
       - 'scripts/sprite-tactile-editor-audit.mjs'
+      - 'scripts/sprite-source-crop-audit.mjs'
       - 'package.json'
   workflow_dispatch:
 
@@ -42,8 +44,13 @@ jobs:
           node --check src/creators/ui/avatar-frame-editor.mjs
           node --check src/creators/ui/avatar-frame-builder.mjs
           node --check src/creators/ui/avatar-frame-builder-hook.mjs
+          node --check src/creators/sprite-compiler/sprite-frame-normalizer.mjs
+          node --check src/creators/sprite-compiler/sprite-frame-doctor.mjs
+          node --check src/creators/sprite-compiler/sprite-ingestion-validator.mjs
       - name: Tactile editor audit
         run: npm run audit:sprite-tactile
+      - name: Smart source crop audit
+        run: node scripts/sprite-source-crop-audit.mjs
       - name: Existing Avatar Quick audit
         run: npm run audit:avatar-quick
       - name: Existing sprite compiler audit
