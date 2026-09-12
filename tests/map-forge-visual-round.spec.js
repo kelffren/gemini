@@ -139,10 +139,12 @@ async function generateSelected(page,forge,seed){
   await page.getByRole('button',{name:'GENERAR'}).click();
   await expect(forge.getByText(/4\/4 válidos/)).toBeVisible({timeout:15000});
   await forge.getByRole('button').filter({hasText:`Seed ${seed}`}).first().click();
-  const selectedHandle=await page.waitForFunction(async expected=>{const {getMapForgeWorkspace}=await import('./src/creators/ui/map-forge-workspace.mjs');const map=getMapForgeWorkspace()?.selected;return map?.metadata?.seed===expected?JSON.stringify(map):null;},seed,{timeout:5000});
-  const selectedJson=await selectedHandle.jsonValue();
-  await selectedHandle.dispose();
-  return JSON.parse(selectedJson);
+  for(let attempt=0;attempt<50;attempt++){
+    const map=await page.evaluate(async expected=>{const {getMapForgeWorkspace}=await import('./src/creators/ui/map-forge-workspace.mjs');const selected=getMapForgeWorkspace()?.selected;return selected?.metadata?.seed===expected?JSON.parse(JSON.stringify(selected)):null;},seed);
+    if(map)return map;
+    await page.waitForTimeout(100);
+  }
+  throw new Error(`Map Forge selected map ${seed} was not available for visual evidence`);
 }
 
 test(`Map Forge ${STAGE} fixed-seed preview/runtime visual evidence`,async({page})=>{
