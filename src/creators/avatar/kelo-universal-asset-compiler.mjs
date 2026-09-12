@@ -8,7 +8,7 @@
  * state-owned: none; pure file -> analysis/runtime derivative
  * extension-points: deterministic Sprite Compiler stages and explicit advanced user choices
  * online: N/A; persistence stays in Avatar Quick Import service
- * do-not: render gameplay, persist content, generate art, discard directions or bypass review gates
+ * do-not: render gameplay, persist content, generate art, discard directions or bypass art-defect gates
  */
 import {analyzeAvatarSpriteSheet,compileAvatarRuntime} from './avatar-spritesheet-analyzer.mjs';
 import {analyzeSpriteForeground} from '../sprite-compiler/sprite-foreground-analysis.mjs';
@@ -31,335 +31,36 @@ function canvasFor(root, width, height) {
   canvas.height = Math.max(1, Math.round(height));
   return canvas;
 }
-
 async function bitmapFor(file, root) {
   if (root.createImageBitmap) return root.createImageBitmap(file);
   if (!root.document || !root.URL?.createObjectURL) throw new Error('UNIVERSAL_IMAGE_DECODE_UNAVAILABLE');
   const url = root.URL.createObjectURL(file);
-  try {
-    return await new Promise((resolve, reject) => {
-      const image = new root.Image();
-      image.onload = () => resolve(image);
-      image.onerror = () => reject(new Error('UNIVERSAL_IMAGE_INVALID'));
-      image.src = url;
-    });
-  } finally {
-    root.URL.revokeObjectURL(url);
-  }
+  try { return await new Promise((resolve,reject)=>{const image=new root.Image();image.onload=()=>resolve(image);image.onerror=()=>reject(new Error('UNIVERSAL_IMAGE_INVALID'));image.src=url}); }
+  finally { root.URL.revokeObjectURL(url); }
 }
+function canvasBlob(canvas,type='image/png',quality=.94){return new Promise((resolve,reject)=>canvas.toBlob(blob=>blob?resolve(blob):reject(new Error('UNIVERSAL_RUNTIME_ENCODE_FAILED')),type,quality))}
+function assertFile(file){if(!file)throw new Error('UNIVERSAL_FILE_REQUIRED');if(Number(file.size)>MAX_SOURCE_BYTES)throw new Error('UNIVERSAL_FILE_TOO_LARGE');if(file.type&&!/^image\/(png|webp|jpeg)$/.test(file.type))throw new Error('UNIVERSAL_IMAGE_TYPE_UNSUPPORTED')}
+async function decodeSource(file,root){const bitmap=await bitmapFor(file,root),width=bitmap.width||bitmap.naturalWidth,height=bitmap.height||bitmap.naturalHeight;if(!width||!height)throw new Error('UNIVERSAL_IMAGE_INVALID');if(width>MAX_SOURCE_DIMENSION||height>MAX_SOURCE_DIMENSION){bitmap.close?.();throw new Error('UNIVERSAL_IMAGE_DIMENSIONS_TOO_LARGE')}const canvas=canvasFor(root,width,height),context=canvas.getContext('2d',{willReadFrequently:true});context.clearRect(0,0,width,height);context.drawImage(bitmap,0,0,width,height);bitmap.close?.();return F({width,height,data:context.getImageData(0,0,width,height).data})}
 
-function canvasBlob(canvas, type = 'image/png', quality = .94) {
-  return new Promise((resolve, reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('UNIVERSAL_RUNTIME_ENCODE_FAILED')), type, quality));
-}
+function summarizeLayout(layout,index){return F({index,signature:layout.signature,mode:layout.mode,columns:layout.columns,rows:layout.rows,frameCounts:layout.frameCounts,frames:layout.evidence.detectedFrames,score:layout.score,coverage:layout.evidence.coverage,clipping:layout.evidence.clipping,why:layout.why})}
+function summarizeRig(rig,index){return F({index,profile:rig.profile,directions:rig.directions,directionKeys:rig.directionKeys,frameCounts:rig.frameCounts,score:rig.score,why:rig.why,reviewOnly:!!rig.reviewOnly})}
 
-function assertFile(file) {
-  if (!file) throw new Error('UNIVERSAL_FILE_REQUIRED');
-  if (Number(file.size) > MAX_SOURCE_BYTES) throw new Error('UNIVERSAL_FILE_TOO_LARGE');
-  if (file.type && !/^image\/(png|webp|jpeg)$/.test(file.type)) throw new Error('UNIVERSAL_IMAGE_TYPE_UNSUPPORTED');
-}
+function strongInternalSeparators(evidence){if(!evidence)return false;return evidence.canvasClipping===0&&evidence.detectedFrames===evidence.frameCount&&evidence.coverage>=.985&&evidence.nonEmpty>=.99&&evidence.groupConsistency>=.94&&evidence.heightConsistency>=.78&&evidence.countAgreement>=.78&&evidence.separators>=.50}
+function layoutReasons(layout,{confidence=1,foreground=null,preserveAmbiguity=false,alternatives=[]}={}){const reasons=[];if(!layout)return['NO_LAYOUT'];if(layout.score<.66)reasons.push('LOW_LAYOUT_SCORE');if(confidence<.68)reasons.push('LOW_CONFIDENCE');if(preserveAmbiguity&&alternatives.length)reasons.push('AMBIGUOUS_INTERPRETATION');if(layout.evidence.clipping>.09&&!strongInternalSeparators(layout.evidence))reasons.push('CLIPPING_RISK');if(layout.evidence.emptyFrames||layout.evidence.internalEmptySlots)reasons.push('EMPTY_FRAMES');if(foreground?.background?.kind==='mixed')reasons.push('COMPLEX_BACKGROUND');return unique(reasons)}
+function stabilizeLayoutReport(report){if(!report?.best)return report;const preserved=(report.reviewReasons||[]).filter(reason=>reason!=='CLIPPING_RISK');if(report.best.evidence.clipping>.09&&!strongInternalSeparators(report.best.evidence))preserved.push('CLIPPING_RISK');const reasons=unique(preserved);return F({...report,reviewReasons:F(reasons),reviewRequired:reasons.length>0})}
+function legacyStructureCandidate(report,legacy){if(!report?.best||!legacy)return null;const columns=Math.max(1,Math.round(Number(legacy.columns)||0)),rows=Math.max(1,Math.round(Number(legacy.rows)||0)),legacyFrames=columns*rows,bestFrames=Number(report.best.evidence?.detectedFrames)||0;if(!columns||!rows||legacyFrames<=bestFrames)return null;const candidate=report.hypotheses?.find(layout=>layout.columns===columns&&layout.rows===rows&&layout.evidence?.detectedFrames>=legacyFrames*.88);if(!candidate)return null;const e=candidate.evidence,robust=e.coverage>=.94&&e.nonEmpty>=.94&&e.groupConsistency>=.86&&e.heightConsistency>=.72&&e.separators>=.34&&!e.emptyFrames&&!e.internalEmptySlots,scoreNearBest=candidate.score>=report.best.score-.18,meaningfulRecovery=e.detectedFrames>=Math.max(bestFrames+4,Math.round(bestFrames*1.7)),legacyConfidence=Number(legacy.confidenceScore??legacy.confidence)||0;return robust&&scoreNearBest&&meaningfulRecovery&&legacyConfidence>=.45?candidate:null}
+function refineLayoutWithLegacy(report,legacy){const stable=stabilizeLayoutReport(report),candidate=legacyStructureCandidate(stable,legacy);if(!candidate)return stable;const previous=stable.best,alternatives=F([previous,...(stable.alternatives||[]).filter(item=>item.signature!==previous.signature)].slice(0,2)),confidence=clamp(Math.max(stable.confidence,candidate.score*.94)),reasons=layoutReasons(candidate,{confidence,foreground:stable.foreground,preserveAmbiguity:false});return F({...stable,best:candidate,alternatives,confidence,margin:candidate.score-previous.score,reviewRequired:reasons.length>0,reviewReasons:F(reasons),legacyCorroborated:true,legacyPreviousBest:previous.signature})}
+function selectedLayoutReport(report,layout,confirmed){if(layout===report.best&&!confirmed)return stabilizeLayoutReport(report);const reasons=layoutReasons(layout,{confidence:layout.score,foreground:report.foreground});return F({...report,best:layout,confidence:layout.score,margin:1,alternatives:F([]),reviewRequired:reasons.length>0,reviewReasons:F(reasons),userConfirmed:!!confirmed})}
+function selectedRigReport(report,selected,confirmed){if(selected===report.best&&!confirmed)return report;const reasons=[];if(selected.reviewOnly||![1,4,8].includes(selected.directions))reasons.push('UNRESOLVED_DIRECTION_RIG');if(selected.score<.72)reasons.push('LOW_SEMANTIC_CONFIDENCE');return F({...report,best:selected,confidence:selected.score,margin:1,reviewRequired:reasons.length>0,reviewReasons:F(reasons),userConfirmed:!!confirmed})}
 
-async function decodeSource(file, root) {
-  const bitmap = await bitmapFor(file, root);
-  const width = bitmap.width || bitmap.naturalWidth;
-  const height = bitmap.height || bitmap.naturalHeight;
-  if (!width || !height) throw new Error('UNIVERSAL_IMAGE_INVALID');
-  if (width > MAX_SOURCE_DIMENSION || height > MAX_SOURCE_DIMENSION) {
-    bitmap.close?.();
-    throw new Error('UNIVERSAL_IMAGE_DIMENSIONS_TOO_LARGE');
-  }
-  const canvas = canvasFor(root, width, height);
-  const context = canvas.getContext('2d', {willReadFrequently: true});
-  context.clearRect(0, 0, width, height);
-  context.drawImage(bitmap, 0, 0, width, height);
-  bitmap.close?.();
-  return F({width, height, data: context.getImageData(0, 0, width, height).data});
-}
+function sourceRiskReasons(foreground,normalization){const reasons=[];if(normalization?.suspicious?.some(item=>item.reasons?.includes('SCALE_OUTLIER')))reasons.push('SOURCE_SCALE_OUTLIER');const background=foreground?.background,texturedBorder=background?.kind==='color'&&background.uniform&&Number(background.borderNoise)>=18&&Number(background.dominance)<.88;if(texturedBorder)reasons.push('COMPLEX_BACKGROUND_TEXTURE');return reasons}
+function preserveSourceRisks(validation,foreground,normalization,{confirmed=false}={}){const detected=sourceRiskReasons(foreground,normalization),reasons=unique([...(validation.reviewReasons||[]),...(confirmed?[]:detected)]);return F({...validation,status:reasons.length?'REVIEW_REQUIRED':'VALIDATED',reviewRequired:reasons.length>0,reviewReasons:F(reasons),sourceRiskReasons:F(detected),sourceRiskAcknowledged:!!confirmed&&detected.length>0})}
 
-function summarizeLayout(layout, index) {
-  return F({
-    index,
-    signature: layout.signature,
-    mode: layout.mode,
-    columns: layout.columns,
-    rows: layout.rows,
-    frameCounts: layout.frameCounts,
-    frames: layout.evidence.detectedFrames,
-    score: layout.score,
-    coverage: layout.evidence.coverage,
-    clipping: layout.evidence.clipping,
-    why: layout.why
-  });
-}
+function publicAnalysis({file,source,foreground,layoutReport,rigReport,legacy}){const layout=layoutReport.best,rig=rigReport.best,reviewReasons=unique([...layoutReport.reviewReasons,...rigReport.reviewReasons]);return F({version:'kelo-universal-sprite-ingestion-v6.1.0-cross-checked',compilerVersion:'6.1.0',width:source.width,height:source.height,columns:layout.columns,rows:layout.rows,sourceColumns:layout.columns,sourceRows:layout.rows,frameCounts:layout.frameCounts,detectedFrames:layout.evidence.detectedFrames,directionKeys:rig.directionKeys,directions:rig.directions,rigProfileId:rig.profile,rowMap:rig.rowMap,directionConfidence:rigReport.confidence,directionMode:rig.profile,detectionMode:`universal:${layout.mode}`,strategy:layout.mode,confidenceScore:clamp(layoutReport.confidence*.64+rigReport.confidence*.36),autoCrop:true,removeBackground:foreground.background.kind==='color'&&foreground.background.uniform,backgroundKind:foreground.background.kind,backgroundRgb:foreground.background.rgb,backgroundThreshold:foreground.background.coreThreshold,backgroundUniform:foreground.background.uniform,contentBounds:foreground.contentBounds,sourceRects:F(layout.frames.filter(frame=>!frame.empty).map(frame=>frame.sourceRect)),hypotheses:F(layoutReport.hypotheses.map(summarizeLayout)),rigHypotheses:F(rigReport.candidates.map(summarizeRig)),reviewRequired:reviewReasons.length>0,reviewReasons:F(reviewReasons),status:reviewReasons.length?'REVIEW_REQUIRED':'READY_TO_COMPILE',frameMs:140,universalAuto:true,canonicalRig:true,scaleLock:true,deterministicOnly:true,legacyV4:legacy?F({available:true,version:legacy.version,columns:legacy.columns,rows:legacy.rows,confidence:legacy.confidenceScore,rowMap:legacy.rowMap}):F({available:false}),legacyCorroborated:!!layoutReport.legacyCorroborated,_foreground:foreground,_layoutReport:layoutReport,_rigReport:rigReport,_fileName:String(file.name||'')})}
 
-function summarizeRig(rig, index) {
-  return F({
-    index,
-    profile: rig.profile,
-    directions: rig.directions,
-    directionKeys: rig.directionKeys,
-    frameCounts: rig.frameCounts,
-    score: rig.score,
-    why: rig.why,
-    reviewOnly: !!rig.reviewOnly
-  });
-}
+export async function analyzeUniversalAvatarAsset(file,{root=globalThis,onProgress=null,rigHint=null,sourceDirectionOrder=null}={}){assertFile(file);onProgress?.({stage:'analyze',message:'ANALIZANDO…'});const source=await decodeSource(file,root);onProgress?.({stage:'foreground',message:'LIMPIANDO FONDO Y HALOS…'});const foreground=analyzeSpriteForeground(source.data,source.width,source.height);onProgress?.({stage:'detect',message:'DETECTANDO FRAMES…'});let layoutReport=interpretSpriteLayout(source.data,source.width,source.height,{foreground});let legacy=null;try{legacy=await analyzeAvatarSpriteSheet(file,{root})}catch{}layoutReport=refineLayoutWithLegacy(layoutReport,legacy);onProgress?.({stage:'interpret',message:'INTERPRETANDO ESTRUCTURA Y DIRECCIONES…'});const rigReport=interpretSpriteRig(layoutReport.best,{fileName:file.name,rowMapHint:legacy?.rowMap,rigHint,sourceDirectionOrder});return publicAnalysis({file,source,foreground,layoutReport,rigReport,legacy})}
+async function legacyCompile(file,config,root){const compiled=await compileAvatarRuntime(file,config,{root});return F({...compiled,compilerVersion:'4.0.0-fallback',strategy:'legacy-v4-explicit',reviewRequired:true,status:'REVIEW_REQUIRED'})}
 
-function strongInternalSeparators(evidence) {
-  if (!evidence) return false;
-  return evidence.canvasClipping === 0 &&
-    evidence.detectedFrames === evidence.frameCount &&
-    evidence.coverage >= .985 &&
-    evidence.nonEmpty >= .99 &&
-    evidence.groupConsistency >= .94 &&
-    evidence.heightConsistency >= .78 &&
-    evidence.countAgreement >= .78 &&
-    evidence.separators >= .50;
-}
+export async function compileUniversalAvatarRuntime(file,config=null,{root=globalThis,onProgress=null,oracle=null}={}){assertFile(file);if(config?.forceLegacyV4)return legacyCompile(file,config,root);const analysis=config?._layoutReport&&config?._foreground?config:await analyzeUniversalAvatarAsset(file,{root,onProgress,rigHint:config?.rigHint,sourceDirectionOrder:config?.sourceDirectionOrder});let foreground=analysis._foreground;if(!foreground){const source=await decodeSource(file,root);foreground=analyzeSpriteForeground(source.data,source.width,source.height)}const automatic=config?.universalAuto!==false&&config?.detectionMode!=='manual';let layout=analysis._layoutReport.best;if(!automatic)layout=buildManualSpriteLayout(foreground,{columns:config?.columns,rows:config?.rows,sourceRects:config?.sourceRects});else if(config?.selectedLayoutSignature)layout=analysis._layoutReport.hypotheses.find(candidate=>candidate.signature===config.selectedLayoutSignature)||layout;const confirmed=!!config?.userConfirmedInterpretation,layoutReport=selectedLayoutReport(analysis._layoutReport,layout,confirmed);let rigReport=interpretSpriteRig(layout,{fileName:file.name,rowMapHint:config?.rowMap||analysis.legacyV4?.rowMap,rigHint:config?.rigHint||analysis.directions,sourceDirectionOrder:config?.sourceDirectionOrder});if(config?.selectedRigProfile){const selected=rigReport.candidates.find(candidate=>candidate.profile===config.selectedRigProfile);if(selected)rigReport=selectedRigReport(rigReport,selected,confirmed)}onProgress?.({stage:'normalize',message:'NORMALIZANDO ESCALA, CENTRO Y PIES…'});const normalized=normalizeSpriteFrameGroups(root,foreground,rigReport.best,{imageSmoothing:config?.imageSmoothing===true,framePatches:config?.framePatches||null});onProgress?.({stage:'validate',message:'VALIDANDO ANIMACIÓN REAL…'});const context=normalized.canvas.getContext('2d',{willReadFrequently:true}),outputData=context.getImageData(0,0,normalized.width,normalized.height).data;let validation=validateSpriteIngestion({outputData,width:normalized.width,height:normalized.height,columns:normalized.columns,rows:normalized.rows,frameCounts:normalized.frameCounts,directionKeys:normalized.directionKeys,foreground,layout:layoutReport,rig:rigReport,normalization:normalized.plan,oracle});validation=preserveSourceRisks(validation,foreground,normalized.plan,{confirmed});validation=F({...validation,health:validation.scores.finalHealth});let blob=await canvasBlob(normalized.canvas,'image/png'),type='image/png';if(blob.size>MAX_RUNTIME_BYTES){blob=await canvasBlob(normalized.canvas,'image/webp',.96);type='image/webp'}if(blob.size>MAX_RUNTIME_BYTES)throw new Error('UNIVERSAL_RUNTIME_TOO_LARGE');const correctedFrames=normalized.plan.plans.filter(frame=>Math.abs(frame.correction-1)>.01).length,selfHealed=foreground.removedPixels>0||foreground.softenedPixels>0||correctedFrames>0||normalized.plan.sourceMetrics.centerDrift>.01||normalized.plan.sourceMetrics.footAnchorDispersionPx>1,confidenceScore=clamp(layoutReport.confidence*.42+rigReport.confidence*.20+validation.scores.finalHealth*.38),audit=F({selected:F({layout:layout.mode,layoutSignature:layout.signature,rig:rigReport.best.profile,sourceFrameCounts:layout.frameCounts,legacyCorroborated:!!analysis.legacyCorroborated}),testedLayouts:F(analysis._layoutReport.hypotheses.map(summarizeLayout)),testedRigs:F(rigReport.candidates.map(summarizeRig)),legacyV4:analysis.legacyV4,foreground:F({background:foreground.background,components:foreground.components.length,removedPixels:foreground.removedPixels,softenedPixels:foreground.softenedPixels}),normalization:F({correctedFrames,source:normalized.plan.sourceMetrics,output:normalized.plan.outputMetrics,suspicious:normalized.plan.suspicious}),sourceRiskReasons:validation.sourceRiskReasons,sourceRiskAcknowledged:validation.sourceRiskAcknowledged,finalHealth:validation.scores.finalHealth,reviewRequired:validation.reviewRequired});return F({blob,type,canvas:normalized.canvas,width:normalized.width,height:normalized.height,columns:normalized.columns,rows:normalized.rows,frameWidth:normalized.frameWidth,frameHeight:normalized.frameHeight,frameCounts:normalized.frameCounts,directionKeys:normalized.directionKeys,directions:rigReport.best.directions,rowMap:rigReport.best.rowMap,rigProfileId:rigReport.best.profile,frameMs:Number(config?.frameMs)||140,normalized:true,canonicalRig:true,scaleLocked:true,footAnchor:'bottom-center',deterministicOnly:true,compilerVersion:'6.1.0',strategy:layout.mode,detectionMode:`universal:${layout.mode}`,confidenceScore,validation,frameDoctor:validation.frameDoctor,audit,selfHealed,reviewRequired:validation.reviewRequired,reviewReasons:validation.reviewReasons,status:validation.status})}
 
-function layoutReasons(layout, {confidence = 1, foreground = null, preserveAmbiguity = false, alternatives = []} = {}) {
-  const reasons = [];
-  if (!layout) return ['NO_LAYOUT'];
-  if (layout.score < .66) reasons.push('LOW_LAYOUT_SCORE');
-  if (confidence < .68) reasons.push('LOW_CONFIDENCE');
-  if (preserveAmbiguity && alternatives.length) reasons.push('AMBIGUOUS_INTERPRETATION');
-  if (layout.evidence.clipping > .09 && !strongInternalSeparators(layout.evidence)) reasons.push('CLIPPING_RISK');
-  if (layout.evidence.emptyFrames || layout.evidence.internalEmptySlots) reasons.push('EMPTY_FRAMES');
-  if (foreground?.background?.kind === 'mixed') reasons.push('COMPLEX_BACKGROUND');
-  return unique(reasons);
-}
-
-function stabilizeLayoutReport(report) {
-  if (!report?.best) return report;
-  const preserved = (report.reviewReasons || []).filter(reason => reason !== 'CLIPPING_RISK');
-  if (report.best.evidence.clipping > .09 && !strongInternalSeparators(report.best.evidence)) preserved.push('CLIPPING_RISK');
-  const reasons = unique(preserved);
-  return F({...report, reviewReasons:F(reasons), reviewRequired:reasons.length > 0});
-}
-
-function legacyStructureCandidate(report, legacy) {
-  if (!report?.best || !legacy) return null;
-  const columns = Math.max(1, Math.round(Number(legacy.columns) || 0));
-  const rows = Math.max(1, Math.round(Number(legacy.rows) || 0));
-  const legacyFrames = columns * rows;
-  const bestFrames = Number(report.best.evidence?.detectedFrames) || 0;
-  if (!columns || !rows || legacyFrames <= bestFrames) return null;
-  const candidate = report.hypotheses?.find(layout => layout.columns === columns && layout.rows === rows && layout.evidence?.detectedFrames >= legacyFrames * .88);
-  if (!candidate) return null;
-  const evidence = candidate.evidence;
-  const robust = evidence.coverage >= .94 && evidence.nonEmpty >= .94 && evidence.groupConsistency >= .86 &&
-    evidence.heightConsistency >= .72 && evidence.separators >= .34 && !evidence.emptyFrames && !evidence.internalEmptySlots;
-  const scoreNearBest = candidate.score >= report.best.score - .18;
-  const meaningfulRecovery = evidence.detectedFrames >= Math.max(bestFrames + 4, Math.round(bestFrames * 1.7));
-  const legacyConfidence = Number(legacy.confidenceScore ?? legacy.confidence) || 0;
-  return robust && scoreNearBest && meaningfulRecovery && legacyConfidence >= .45 ? candidate : null;
-}
-
-function refineLayoutWithLegacy(report, legacy) {
-  const stable = stabilizeLayoutReport(report);
-  const candidate = legacyStructureCandidate(stable, legacy);
-  if (!candidate) return stable;
-  const previous = stable.best;
-  const alternatives = F([previous, ...(stable.alternatives || []).filter(item => item.signature !== previous.signature)].slice(0, 2));
-  const confidence = clamp(Math.max(stable.confidence, candidate.score * .94));
-  const reasons = layoutReasons(candidate, {confidence, foreground:stable.foreground, preserveAmbiguity:false});
-  return F({...stable,
-    best:candidate,
-    alternatives,
-    confidence,
-    margin:candidate.score - previous.score,
-    reviewRequired:reasons.length > 0,
-    reviewReasons:F(reasons),
-    legacyCorroborated:true,
-    legacyPreviousBest:previous.signature
-  });
-}
-
-function selectedLayoutReport(report, layout, confirmed) {
-  if (layout === report.best && !confirmed) return stabilizeLayoutReport(report);
-  const reasons = layoutReasons(layout, {confidence:layout.score, foreground:report.foreground});
-  return F({...report, best:layout, confidence:layout.score, margin:1, alternatives:F([]), reviewRequired:reasons.length > 0, reviewReasons:F(reasons), userConfirmed:!!confirmed});
-}
-
-function selectedRigReport(report, selected, confirmed) {
-  if (selected === report.best && !confirmed) return report;
-  const reasons = [];
-  if (selected.reviewOnly || ![1, 4, 8].includes(selected.directions)) reasons.push('UNRESOLVED_DIRECTION_RIG');
-  if (selected.score < .72) reasons.push('LOW_SEMANTIC_CONFIDENCE');
-  return F({...report, best:selected, confidence:selected.score, margin:1, reviewRequired:reasons.length > 0, reviewReasons:F(reasons), userConfirmed:!!confirmed});
-}
-
-function sourceRiskReasons(foreground, normalization) {
-  const reasons = [];
-  if (normalization?.suspicious?.some(item => item.reasons?.includes('SCALE_OUTLIER'))) reasons.push('SOURCE_SCALE_OUTLIER');
-  const background = foreground?.background;
-  const texturedBorder = background?.kind === 'color' && background.uniform && Number(background.borderNoise) >= 18 && Number(background.dominance) < .88;
-  if (texturedBorder) reasons.push('COMPLEX_BACKGROUND_TEXTURE');
-  return reasons;
-}
-
-function preserveSourceRisks(validation, foreground, normalization) {
-  const reasons = unique([...(validation.reviewReasons || []), ...sourceRiskReasons(foreground, normalization)]);
-  return F({...validation,
-    status:reasons.length ? 'REVIEW_REQUIRED' : 'VALIDATED',
-    reviewRequired:reasons.length > 0,
-    reviewReasons:F(reasons),
-    sourceRiskReasons:F(sourceRiskReasons(foreground, normalization))
-  });
-}
-
-function publicAnalysis({file, source, foreground, layoutReport, rigReport, legacy}) {
-  const layout = layoutReport.best;
-  const rig = rigReport.best;
-  const reviewReasons = unique([...layoutReport.reviewReasons, ...rigReport.reviewReasons]);
-  return F({
-    version:'kelo-universal-sprite-ingestion-v6.1.0-cross-checked',
-    compilerVersion:'6.1.0',
-    width:source.width,
-    height:source.height,
-    columns:layout.columns,
-    rows:layout.rows,
-    sourceColumns:layout.columns,
-    sourceRows:layout.rows,
-    frameCounts:layout.frameCounts,
-    detectedFrames:layout.evidence.detectedFrames,
-    directionKeys:rig.directionKeys,
-    directions:rig.directions,
-    rigProfileId:rig.profile,
-    rowMap:rig.rowMap,
-    directionConfidence:rigReport.confidence,
-    directionMode:rig.profile,
-    detectionMode:`universal:${layout.mode}`,
-    strategy:layout.mode,
-    confidenceScore:clamp((layoutReport.confidence * .64) + (rigReport.confidence * .36)),
-    autoCrop:true,
-    removeBackground:foreground.background.kind === 'color' && foreground.background.uniform,
-    backgroundKind:foreground.background.kind,
-    backgroundRgb:foreground.background.rgb,
-    backgroundThreshold:foreground.background.coreThreshold,
-    backgroundUniform:foreground.background.uniform,
-    contentBounds:foreground.contentBounds,
-    sourceRects:F(layout.frames.filter(frame => !frame.empty).map(frame => frame.sourceRect)),
-    hypotheses:F(layoutReport.hypotheses.map(summarizeLayout)),
-    rigHypotheses:F(rigReport.candidates.map(summarizeRig)),
-    reviewRequired:reviewReasons.length > 0,
-    reviewReasons:F(reviewReasons),
-    status:reviewReasons.length ? 'REVIEW_REQUIRED' : 'READY_TO_COMPILE',
-    frameMs:140,
-    universalAuto:true,
-    canonicalRig:true,
-    scaleLock:true,
-    deterministicOnly:true,
-    legacyV4:legacy ? F({available:true,version:legacy.version,columns:legacy.columns,rows:legacy.rows,confidence:legacy.confidenceScore,rowMap:legacy.rowMap}) : F({available:false}),
-    legacyCorroborated:!!layoutReport.legacyCorroborated,
-    _foreground:foreground,
-    _layoutReport:layoutReport,
-    _rigReport:rigReport,
-    _fileName:String(file.name || '')
-  });
-}
-
-export async function analyzeUniversalAvatarAsset(file, {root = globalThis, onProgress = null, rigHint = null, sourceDirectionOrder = null} = {}) {
-  assertFile(file);
-  onProgress?.({stage:'analyze',message:'ANALIZANDO…'});
-  const source = await decodeSource(file, root);
-  onProgress?.({stage:'foreground',message:'LIMPIANDO FONDO Y HALOS…'});
-  const foreground = analyzeSpriteForeground(source.data, source.width, source.height);
-  onProgress?.({stage:'detect',message:'DETECTANDO FRAMES…'});
-  let layoutReport = interpretSpriteLayout(source.data, source.width, source.height, {foreground});
-  let legacy = null;
-  try {
-    legacy = await analyzeAvatarSpriteSheet(file, {root});
-  } catch {
-    // V4 is only an independent structural witness. Its narrower limits never become the V6 renderer.
-  }
-  layoutReport = refineLayoutWithLegacy(layoutReport, legacy);
-  onProgress?.({stage:'interpret',message:'INTERPRETANDO ESTRUCTURA Y DIRECCIONES…'});
-  const rigReport = interpretSpriteRig(layoutReport.best, {fileName:file.name,rowMapHint:legacy?.rowMap,rigHint,sourceDirectionOrder});
-  return publicAnalysis({file, source, foreground, layoutReport, rigReport, legacy});
-}
-
-async function legacyCompile(file, config, root) {
-  const compiled = await compileAvatarRuntime(file, config, {root});
-  return F({...compiled,compilerVersion:'4.0.0-fallback',strategy:'legacy-v4-explicit',reviewRequired:true,status:'REVIEW_REQUIRED'});
-}
-
-export async function compileUniversalAvatarRuntime(file, config = null, {root = globalThis, onProgress = null, oracle = null} = {}) {
-  assertFile(file);
-  if (config?.forceLegacyV4) return legacyCompile(file, config, root);
-  const analysis = config?._layoutReport && config?._foreground
-    ? config
-    : await analyzeUniversalAvatarAsset(file, {root,onProgress,rigHint:config?.rigHint,sourceDirectionOrder:config?.sourceDirectionOrder});
-  let foreground = analysis._foreground;
-  if (!foreground) {
-    const source = await decodeSource(file, root);
-    foreground = analyzeSpriteForeground(source.data, source.width, source.height);
-  }
-  const automatic = config?.universalAuto !== false && config?.detectionMode !== 'manual';
-  let layout = analysis._layoutReport.best;
-  if (!automatic) layout = buildManualSpriteLayout(foreground, {columns:config?.columns,rows:config?.rows,sourceRects:config?.sourceRects});
-  else if (config?.selectedLayoutSignature) layout = analysis._layoutReport.hypotheses.find(candidate => candidate.signature === config.selectedLayoutSignature) || layout;
-  const confirmed = !!config?.userConfirmedInterpretation;
-  const layoutReport = selectedLayoutReport(analysis._layoutReport, layout, confirmed);
-  let rigReport = interpretSpriteRig(layout, {
-    fileName:file.name,
-    rowMapHint:config?.rowMap || analysis.legacyV4?.rowMap,
-    rigHint:config?.rigHint || analysis.directions,
-    sourceDirectionOrder:config?.sourceDirectionOrder
-  });
-  if (config?.selectedRigProfile) {
-    const selected = rigReport.candidates.find(candidate => candidate.profile === config.selectedRigProfile);
-    if (selected) rigReport = selectedRigReport(rigReport, selected, confirmed);
-  }
-  onProgress?.({stage:'normalize',message:'NORMALIZANDO ESCALA, CENTRO Y PIES…'});
-  const normalized = normalizeSpriteFrameGroups(root, foreground, rigReport.best, {imageSmoothing:config?.imageSmoothing === true,framePatches:config?.framePatches || null});
-  onProgress?.({stage:'validate',message:'VALIDANDO ANIMACIÓN REAL…'});
-  const context = normalized.canvas.getContext('2d', {willReadFrequently:true});
-  const outputData = context.getImageData(0, 0, normalized.width, normalized.height).data;
-  let validation = validateSpriteIngestion({
-    outputData,
-    width:normalized.width,
-    height:normalized.height,
-    columns:normalized.columns,
-    rows:normalized.rows,
-    frameCounts:normalized.frameCounts,
-    directionKeys:normalized.directionKeys,
-    foreground,
-    layout:layoutReport,
-    rig:rigReport,
-    normalization:normalized.plan,
-    oracle
-  });
-  validation = preserveSourceRisks(validation, foreground, normalized.plan);
-  validation = F({...validation,health:validation.scores.finalHealth});
-  let blob = await canvasBlob(normalized.canvas, 'image/png');
-  let type = 'image/png';
-  if (blob.size > MAX_RUNTIME_BYTES) { blob = await canvasBlob(normalized.canvas, 'image/webp', .96); type = 'image/webp'; }
-  if (blob.size > MAX_RUNTIME_BYTES) throw new Error('UNIVERSAL_RUNTIME_TOO_LARGE');
-  const correctedFrames = normalized.plan.plans.filter(frame => Math.abs(frame.correction - 1) > .01).length;
-  const selfHealed = foreground.removedPixels > 0 || foreground.softenedPixels > 0 || correctedFrames > 0 || normalized.plan.sourceMetrics.centerDrift > .01 || normalized.plan.sourceMetrics.footAnchorDispersionPx > 1;
-  const confidenceScore = clamp((layoutReport.confidence * .42) + (rigReport.confidence * .20) + (validation.scores.finalHealth * .38));
-  const audit = F({
-    selected:F({layout:layout.mode,layoutSignature:layout.signature,rig:rigReport.best.profile,sourceFrameCounts:layout.frameCounts,legacyCorroborated:!!analysis.legacyCorroborated}),
-    testedLayouts:F(analysis._layoutReport.hypotheses.map(summarizeLayout)),
-    testedRigs:F(rigReport.candidates.map(summarizeRig)),
-    legacyV4:analysis.legacyV4,
-    foreground:F({background:foreground.background,components:foreground.components.length,removedPixels:foreground.removedPixels,softenedPixels:foreground.softenedPixels}),
-    normalization:F({correctedFrames,source:normalized.plan.sourceMetrics,output:normalized.plan.outputMetrics,suspicious:normalized.plan.suspicious}),
-    sourceRiskReasons:validation.sourceRiskReasons,
-    finalHealth:validation.scores.finalHealth,
-    reviewRequired:validation.reviewRequired
-  });
-  return F({
-    blob,type,canvas:normalized.canvas,width:normalized.width,height:normalized.height,columns:normalized.columns,rows:normalized.rows,
-    frameWidth:normalized.frameWidth,frameHeight:normalized.frameHeight,frameCounts:normalized.frameCounts,directionKeys:normalized.directionKeys,
-    directions:rigReport.best.directions,rowMap:rigReport.best.rowMap,rigProfileId:rigReport.best.profile,frameMs:Number(config?.frameMs)||140,
-    normalized:true,canonicalRig:true,scaleLocked:true,footAnchor:'bottom-center',deterministicOnly:true,compilerVersion:'6.1.0',strategy:layout.mode,
-    detectionMode:`universal:${layout.mode}`,confidenceScore,validation,frameDoctor:validation.frameDoctor,audit,selfHealed,
-    reviewRequired:validation.reviewRequired,reviewReasons:validation.reviewReasons,status:validation.status
-  });
-}
-
-export const __universalSpriteIngestionV6 = F({
-  canvasFor,decodeSource,selectedLayoutReport,selectedRigReport,summarizeLayout,summarizeRig,strongInternalSeparators,layoutReasons,
-  stabilizeLayoutReport,legacyStructureCandidate,refineLayoutWithLegacy,sourceRiskReasons,preserveSourceRisks
-});
+export const __universalSpriteIngestionV6=F({canvasFor,decodeSource,selectedLayoutReport,selectedRigReport,summarizeLayout,summarizeRig,strongInternalSeparators,layoutReasons,stabilizeLayoutReport,legacyStructureCandidate,refineLayoutWithLegacy,sourceRiskReasons,preserveSourceRisks});
