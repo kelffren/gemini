@@ -12,6 +12,7 @@ import { createCompositeCommand } from '../document/composite-command.mjs';
 const ARROWS=Object.freeze({
   ArrowLeft:{x:-1,y:0},ArrowRight:{x:1,y:0},ArrowUp:{x:0,y:-1},ArrowDown:{x:0,y:1}
 });
+const EXPLORER_ENTITY_SELECTOR='#kelo-studio-live [data-entity]';
 const COARSE_MULTIPLIER=4;
 const MOBILE_MODES=Object.freeze(['snap','fine','coarse']);
 
@@ -48,6 +49,7 @@ export function createStudioNudgeController({root=globalThis,kernel}={}){
   }
 
   function editableTarget(target){return !!target?.closest?.('input,textarea,select,[contenteditable="true"]');}
+  function explorerTarget(target){return !!target?.closest?.(EXPLORER_ENTITY_SELECTOR);}
   function shell(){return document.getElementById('kelo-studio-live');}
   function canTouchNudge(){const host=shell();if(!host||host.dataset.sheetOpen==='1'||host.dataset.creatorMinimized==='1')return false;if(!['select','move'].includes(String(host.dataset.activeTool||'select')))return false;return kernel.selection.get().length>0;}
   function mobileStep(){return resolveStudioNudgeStep({root,kernel,mode:mobileMode});}
@@ -60,7 +62,7 @@ export function createStudioNudgeController({root=globalThis,kernel}={}){
 `;document.head.appendChild(style);}if(!pad?.isConnected){pad=document.createElement('div');pad.className='ks-nudge-pad';pad.setAttribute('aria-label','Mover selección con precisión');pad.innerHTML='<button type="button" data-nudge-dir="up" aria-label="Mover arriba">↑</button><button type="button" data-nudge-dir="left" aria-label="Mover izquierda">←</button><button type="button" data-nudge-mode="" aria-label="Nudge snap">SNAP</button><button type="button" data-nudge-dir="right" aria-label="Mover derecha">→</button><button type="button" data-nudge-dir="down" aria-label="Mover abajo">↓</button>';pad.addEventListener('click',onPadClick);host.appendChild(pad);}syncPad();}
 
   function onKey(event){
-    const dir=ARROWS[event.key];if(!dir||event.metaKey||event.ctrlKey||editableTarget(event.target))return;
+    const dir=ARROWS[event.key];if(!dir||event.metaKey||event.ctrlKey||editableTarget(event.target)||explorerTarget(event.target))return;
     const host=shell();if(!host)return;
     if(host.dataset.sheetOpen==='1'||host.dataset.creatorMinimized==='1')return;
     if(!['select','move'].includes(String(host.dataset.activeTool||'select')))return;
