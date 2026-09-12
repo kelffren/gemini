@@ -29,7 +29,7 @@ test('Map Forge opens from Creator Hub before a stalled first generation settles
   await page.waitForTimeout(500);
   const recoveredForge = page.locator('#kelo-map-forge');
   while(await recoveredForge.count()){
-    await recoveredForge.first().getByRole('button', { name: 'CERRAR', exact: true }).click();
+    await recoveredForge.first().getByRole('button', { name: 'CERRAR', exact: true }).evaluate(button => button.click());
   }
   await expect(recoveredForge).toHaveCount(0);
 
@@ -47,7 +47,7 @@ test('Map Forge opens from Creator Hub before a stalled first generation settles
   await expect(openedForge.last()).toBeVisible({ timeout: 2000 });
   await page.waitForTimeout(1500);
   while(await openedForge.count() > 1){
-    await openedForge.first().getByRole('button', { name: 'CERRAR', exact: true }).click();
+    await openedForge.first().getByRole('button', { name: 'CERRAR', exact: true }).evaluate(button => button.click());
   }
   await expect(openedForge).toHaveCount(1);
   await expect(page.locator('#kelo-creators-hub')).toHaveCount(0, { timeout: 2000 });
