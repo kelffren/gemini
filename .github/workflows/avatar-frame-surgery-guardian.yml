@@ -36,6 +36,8 @@ jobs:
           node --check src/creators/sprite-compiler/sprite-exact-canvas.mjs
           node --check src/creators/sprite-compiler/sprite-frame-normalizer.mjs
           node --check src/creators/avatar/kelo-universal-asset-compiler.mjs
+          node --check src/creators/avatar/raw-single-frame-analysis.mjs
+          node --check src/creators/avatar/raw-image-intent-gate.mjs
           node --check src/creators/avatar/avatar-quick-import-service.mjs
           node --check scripts/avatar-frame-surgery-supervisor-audit.mjs
           node --check scripts/avatar-frame-surgery-research-audit.mjs
@@ -50,7 +52,7 @@ jobs:
         run: npm run audit:sprite-frame-doctor
       - name: Existing Avatar Quick Import audit
         run: npm run audit:avatar-quick
-      - name: Mobile user browser acceptance — upload, exact size, touch gestures, use
+      - name: Mobile user browser acceptance — upload, exact size, touch gestures, raw fallback, use
         run: |
           set -euo pipefail
           python3 -m http.server 4173 --bind 127.0.0.1 >/tmp/frame-surgery-http.log 2>&1 &
