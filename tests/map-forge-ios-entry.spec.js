@@ -5,26 +5,7 @@
  */
 const { test, expect } = require('@playwright/test');
 
-// This test is intentionally UI-only: no direct openCreatorHub/openWorkspace calls.
-test('iPhone exact MENÚ to CREATORS to Map Forge tap path', async ({ page }) => {
-  const pageErrors = [];
-  const consoleErrors = [];
-  page.on('pageerror', error => pageErrors.push(String(error?.stack || error)));
-  page.on('console', msg => {
-    if (msg.type() === 'error') consoleErrors.push(msg.text());
-  });
-
-  const response = await page.goto('./?mapEditor=1&iosMapForgeEntry=1', {
-    waitUntil: 'domcontentloaded',
-    timeout: 30000,
-  });
-  expect(response.status()).toBeLessThan(400);
-
-  await page.waitForFunction(() => !!(
-    window.KeloInputLocks?.acquire &&
-    window.KELO_ADMIN_KEYS?.can?.('world.edit', window.KELO_ADMIN_KEYS?.playerId?.())
-  ), null, { timeout: 15000 });
-
+async function tapExactPath(page, screenshotName) {
   const menu = page.locator('#lx-side-menu');
   await expect(menu).toBeVisible({ timeout: 10000 });
   await menu.tap();
@@ -67,9 +48,64 @@ test('iPhone exact MENÚ to CREATORS to Map Forge tap path', async ({ page }) =>
   await expect(hub).toHaveCount(0, { timeout: 5000 });
   await expect(page.locator('#kelo-map-forge .kmf-canvas')).toBeVisible({ timeout: 5000 });
 
-  await page.screenshot({ path: 'test-results/map-forge-ios-exact-entry.png', fullPage: true });
-  expect(pageErrors).toEqual([]);
+  await page.screenshot({ path: `test-results/${screenshotName}`, fullPage: true });
+}
 
-  // Console errors are retained as diagnostics but do not fail unrelated legacy noise.
+function collectErrors(page) {
+  const pageErrors = [];
+  const consoleErrors = [];
+  page.on('pageerror', error => pageErrors.push(String(error?.stack || error)));
+  page.on('console', msg => {
+    if (msg.type() === 'error') consoleErrors.push(msg.text());
+  });
+  return { pageErrors, consoleErrors };
+}
+
+// This test is intentionally UI-only: no direct openCreatorHub/openWorkspace calls.
+test('iPhone exact MENÚ to CREATORS to Map Forge tap path', async ({ page }) => {
+  const { pageErrors, consoleErrors } = collectErrors(page);
+
+  const response = await page.goto('./?mapEditor=1&iosMapForgeEntry=1', {
+    waitUntil: 'domcontentloaded',
+    timeout: 30000,
+  });
+  expect(response.status()).toBeLessThan(400);
+
+  await page.waitForFunction(() => !!(
+    window.KeloInputLocks?.acquire &&
+    window.KELO_ADMIN_KEYS?.can?.('world.edit', window.KELO_ADMIN_KEYS?.playerId?.())
+  ), null, { timeout: 15000 });
+
+  await tapExactPath(page, 'map-forge-ios-exact-entry.png');
+  expect(pageErrors).toEqual([]);
   if (consoleErrors.length) console.log('IOS_ENTRY_CONSOLE_ERRORS', JSON.stringify(consoleErrors));
+});
+
+// Reproduces the user's real URL: seed the same creator permission once, then reload the
+// game WITHOUT mapEditor=1 and perform only visible touch interactions.
+test('iPhone normal game URL opens Map Forge after creator permission persists', async ({ page }) => {
+  const { pageErrors, consoleErrors } = collectErrors(page);
+
+  let response = await page.goto('./?mapEditor=1&seedCreatorPermission=1', {
+    waitUntil: 'domcontentloaded',
+    timeout: 30000,
+  });
+  expect(response.status()).toBeLessThan(400);
+  await page.waitForFunction(() => !!window.KELO_ADMIN_KEYS?.can?.('world.edit', window.KELO_ADMIN_KEYS?.playerId?.()), null, { timeout: 15000 });
+
+  response = await page.goto('./?iosMapForgeNormalEntry=1', {
+    waitUntil: 'domcontentloaded',
+    timeout: 30000,
+  });
+  expect(response.status()).toBeLessThan(400);
+  expect(new URL(page.url()).searchParams.has('mapEditor')).toBe(false);
+
+  await page.waitForFunction(() => !!(
+    window.KeloInputLocks?.acquire &&
+    window.KELO_ADMIN_KEYS?.can?.('world.edit', window.KELO_ADMIN_KEYS?.playerId?.())
+  ), null, { timeout: 15000 });
+
+  await tapExactPath(page, 'map-forge-ios-normal-game-entry.png');
+  expect(pageErrors).toEqual([]);
+  if (consoleErrors.length) console.log('IOS_NORMAL_ENTRY_CONSOLE_ERRORS', JSON.stringify(consoleErrors));
 });
