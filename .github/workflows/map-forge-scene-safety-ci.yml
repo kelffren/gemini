@@ -1,0 +1,32 @@
+# KELO-INDEX
+# area: QA / MAP FORGE
+# owner: Map Forge CI
+# purpose: prevent authored scene members from bypassing prefab road-band safety
+name: Map Forge Scene Safety CI
+
+on:
+  pull_request:
+    paths:
+      - 'src/world/map-forge/map-forge-scene-prefabs.mjs'
+      - 'src/world/map-forge/map-forge-core.mjs'
+      - 'tests/map-forge-scene-safety.mjs'
+      - '.github/workflows/map-forge-scene-safety-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'src/world/map-forge/map-forge-scene-prefabs.mjs'
+      - 'src/world/map-forge/map-forge-core.mjs'
+      - 'tests/map-forge-scene-safety.mjs'
+      - '.github/workflows/map-forge-scene-safety-ci.yml'
+
+jobs:
+  scene-safety:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Guard authored scene road-band safety
+        run: node tests/map-forge-scene-safety.mjs
