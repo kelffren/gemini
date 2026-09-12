@@ -5,6 +5,7 @@ on:
     paths:
       - 'src/creators/avatar/avatar-frame-*.mjs'
       - 'src/creators/ui/avatar-frame-*.mjs'
+      - 'src/creators/ui/avatar-workspace.mjs'
       - 'tests/sprite-tactile-editor.spec.js'
       - 'tests/fixtures/sprite-tactile-editor.html'
       - 'playwright.sprite.config.js'
@@ -13,6 +14,7 @@ on:
     paths:
       - 'src/creators/avatar/avatar-frame-*.mjs'
       - 'src/creators/ui/avatar-frame-*.mjs'
+      - 'src/creators/ui/avatar-workspace.mjs'
       - 'tests/sprite-tactile-editor.spec.js'
       - 'tests/fixtures/sprite-tactile-editor.html'
       - 'playwright.sprite.config.js'
