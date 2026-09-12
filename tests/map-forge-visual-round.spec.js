@@ -61,6 +61,18 @@ function decorationRhythmMetrics(map){
     localSameFamilyRatio:localNeighborCount?Number((localSameFamilyCount/localNeighborCount).toFixed(4)):0
   };
 }
+function scenePairMetrics(map){
+  let completePairs=0,orphanPairs=0;
+  for(const scene of map.scenePrefabs||[]){
+    const groups=new Map();
+    for(const member of scene.members||[]){
+      const match=String(member.role||'').match(/^(.*)-(left|right)$/);if(!match)continue;
+      const sides=groups.get(match[1])||new Set();sides.add(match[2]);groups.set(match[1],sides);
+    }
+    for(const sides of groups.values()){if(sides.size===2)completePairs++;else orphanPairs++;}
+  }
+  return{scenePrefabCount:(map.scenePrefabs||[]).length,sceneCompletePairCount:completePairs,sceneOrphanPairCount:orphanPairs,scenePairRollbackCount:Number(map.generationStats?.scenePrefabPairRollbackCount||0)};
+}
 function mapMetrics(map){
   const districtById=new Map((map.districts||[]).map(d=>[d.id,d]));
   const urban=(map.decorations||[]).filter(d=>URBAN_KINDS.has(districtById.get(d.district)?.kind));
@@ -87,7 +99,8 @@ function mapMetrics(map){
     urbanStreetscapeCount:streetscape,
     urbanStreetscapeRatio:urban.length?Number((streetscape/urban.length).toFixed(4)):1,
     familyCounts,
-    ...decorationRhythmMetrics(map)
+    ...decorationRhythmMetrics(map),
+    ...scenePairMetrics(map)
   };
 }
 function landmarkFacingEvidence(map,runtime){
@@ -138,6 +151,9 @@ test(`Map Forge ${STAGE} fixed-seed preview/runtime visual evidence`,async({page
     expect(mainMetrics.localSameFamilyRatio).toBeLessThanOrEqual(LOCAL_SAME_FAMILY_MAX);
     expect(mainMetrics.landmarkRoadFacingCount).toBeGreaterThanOrEqual(3);
     expect(mainMetrics.landmarkRoadFacingChangedCount).toBeGreaterThan(0);
+    expect(mainMetrics.scenePrefabCount).toBeGreaterThan(0);
+    expect(mainMetrics.sceneCompletePairCount).toBeGreaterThan(0);
+    expect(mainMetrics.sceneOrphanPairCount).toBe(0);
   }
   await page.screenshot({path:`test-results/screenshot_preview_${STAGE}.png`,fullPage:true});
 
@@ -172,6 +188,7 @@ test(`Map Forge ${STAGE} fixed-seed preview/runtime visual evidence`,async({page
       expect(metrics.declusterSwapCount).toBeGreaterThan(0);
       expect(metrics.localSameFamilyRatio).toBeLessThanOrEqual(LOCAL_SAME_FAMILY_MAX);
       expect(metrics.landmarkRoadFacingCount).toBeGreaterThanOrEqual(3);
+      expect(metrics.sceneOrphanPairCount).toBe(0);
     }
     validation.push(metrics);
   }
