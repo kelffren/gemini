@@ -1,0 +1,45 @@
+name: BrowserStack Map Forge Real iPhone
+
+on:
+  workflow_dispatch:
+
+jobs:
+  real-ios-map-forge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      KELO_PAGES: https://kelffren.github.io/gemini/
+      BROWSERSTACK_USERNAME: ${{ secrets.BROWSERSTACK_USERNAME }}
+      BROWSERSTACK_ACCESS_KEY: ${{ secrets.BROWSERSTACK_ACCESS_KEY }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Verify BrowserStack credentials exist
+        shell: bash
+        run: |
+          test -n "$BROWSERSTACK_USERNAME" || (echo "Missing BROWSERSTACK_USERNAME secret" && exit 1)
+          test -n "$BROWSERSTACK_ACCESS_KEY" || (echo "Missing BROWSERSTACK_ACCESS_KEY secret" && exit 1)
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run Map Forge on real iPhone
+        run: npm run test:browserstack:map-forge
+
+      - name: Upload Playwright evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browserstack-map-forge-evidence
+          if-no-files-found: ignore
+          path: |
+            playwright-report.json
+            test-results/
+            playwright-report/
