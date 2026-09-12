@@ -4,7 +4,7 @@
  * keys: SPRITE LAB BROWSER CORPUS METRICS ANIMATION BEFORE AFTER
  * purpose: compile every labelled degraded real sprite and expose machine- and human-readable results
  * online: static GitHub Pages audit surface; no auth and no persistence
- * do-not: upload assets, mutate player state or substitute green tests for visual review
+ * do-not: mutate player state or substitute green tests for visual review
  */
 import {buildAdversarialSpriteCorpus} from '../tests/fixtures/sprite-ingestion-adversarial-corpus.mjs';
 import {analyzeUniversalAvatarAsset,compileUniversalAvatarRuntime} from '../src/creators/avatar/kelo-universal-asset-compiler.mjs';
@@ -22,6 +22,9 @@ const casesNode = byId('cases');
 const filters = byId('filters');
 const title = byId('case-title');
 const meta = byId('case-meta');
+const uploadZone = byId('upload-zone');
+const uploadInput = byId('sprite-file');
+const uploadResult = byId('upload-result');
 const pct = value => `${Math.round(Math.max(0, Math.min(1, Number(value) || 0)) * 100)}%`;
 const labels = {n:'N ↑',ne:'NE ↗',e:'E →',se:'SE ↘',s:'S ↓',sw:'SW ↙',w:'W ←',nw:'NW ↖'};
 let corpus = null;
@@ -105,6 +108,34 @@ function selectResult(result) {
   paintDirections(result);
   paintCases();
 }
+
+async function analyzeUploadedFile(file) {
+  if (!file || !/^image\/(png|webp|jpeg)$/.test(file.type)) throw new Error('FORMAT_NOT_SUPPORTED: usa PNG, WebP o JPG');
+  uploadResult.className = 'upload-result';
+  uploadResult.textContent = 'ANALIZANDO… detectando frames, interpretando layout y normalizando.';
+  try {
+    const analysis = await analyzeUniversalAvatarAsset(file, {root});
+    const compiled = await compileUniversalAvatarRuntime(file, analysis, {root});
+    const image = new Image();
+    await new Promise((resolve, reject) => { image.onload = resolve; image.onerror = reject; image.src = URL.createObjectURL(file); });
+    const canvas = document.createElement('canvas');
+    canvas.width = image.naturalWidth; canvas.height = image.naturalHeight;
+    canvas.getContext('2d').drawImage(image, 0, 0);
+    const result = Object.freeze({spec:{id:'user-upload',tier:'USER',label:file.name,canvas,expectedStatus:compiled.validation.status},analysis,compiled,validation:compiled.validation,statusMatches:true});
+    selectResult(result);
+    const v = compiled.validation;
+    uploadResult.className = `upload-result ${v.status === 'VALIDATED' ? 'good' : 'review'}`;
+    uploadResult.textContent = `${v.status}\n${compiled.directionKeys.length} direcciones · ${v.counts.detectedFrames} frames detectados · salud ${pct(v.scores.finalHealth)}\n${v.reviewReasons.length ? 'Revisión: ' + v.reviewReasons.join(', ') : 'Listo para usar en runtime.'}`;
+  } catch (error) {
+    uploadResult.className = 'upload-result bad';
+    uploadResult.textContent = String(error?.message || error);
+  }
+}
+
+uploadInput?.addEventListener('change', () => void analyzeUploadedFile(uploadInput.files?.[0]));
+for (const event of ['dragenter', 'dragover']) uploadZone?.addEventListener(event, event => { event.preventDefault(); uploadZone.classList.add('drag'); });
+for (const event of ['dragleave', 'drop']) uploadZone?.addEventListener(event, event => { event.preventDefault(); uploadZone.classList.remove('drag'); });
+uploadZone?.addEventListener('drop', event => void analyzeUploadedFile(event.dataTransfer?.files?.[0]));
 
 function drawRuntime(now) {
   if (selected) {
