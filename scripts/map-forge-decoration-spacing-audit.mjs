@@ -15,7 +15,7 @@ import {scoreMapDefinition,validateMapDefinition} from '../src/world/map-forge/m
 const recipe=MAP_FORGE_RECIPES.KELO_ROYAL_CAPITAL_V1;
 const seeds=[81746291,12345,424242,29011987];
 const clone=value=>JSON.parse(JSON.stringify(value));
-const familyHistogram=rows=>Object.fromEntries([...rows.reduce((m,row)=>m.set(row.family,(m.get(row.family)||0)+1,new Map()).entries()].sort(([a],[b])=>String(a).localeCompare(String(b))));
+const familyHistogram=rows=>Object.fromEntries([...rows.reduce((m,row)=>m.set(row.family,(m.get(row.family)||0)+1),new Map()).entries()].sort(([a],[b])=>String(a).localeCompare(String(b))));
 const results=[],normalScores=[];
 
 for(const seed of seeds){
@@ -37,7 +37,7 @@ for(const seed of seeds){
   assert.ok(stackedScore.breakdown.decorationSpacing<=65,`${seed}: stacked fixture must expose severe spacing defect, got ${stackedScore.breakdown.decorationSpacing}`);
   assert.ok(stackedScore.total<=89,`${seed}: visually stacked but structurally valid map must not score 90+, got ${stackedScore.total}`);
 
-  const crowded=clone(map),districts=new Map((crowded.districts||[]).map(d=>[d.id,d])),urbanKinds=new Set(['plaza','royal','commerce']);
+  const crowded=clone(map),urbanKinds=new Set(['plaza','royal','commerce']);
   for(const district of crowded.districts||[]){
     if(!urbanKinds.has(district.kind))continue;
     const rows=(crowded.decorations||[]).filter(row=>row.district===district.id);
