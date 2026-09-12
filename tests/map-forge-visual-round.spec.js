@@ -81,6 +81,8 @@ function mapMetrics(map){
     blockCount:(map.blocks||[]).length,
     decorationCount:(map.decorations||[]).length,
     declusterSwapCount:Number(map.generationStats?.decorationDeclusterSwapCount||0),
+    landmarkRoadFacingCount:Number(map.generationStats?.landmarkRoadFacingCount||0),
+    landmarkRoadFacingChangedCount:Number(map.generationStats?.landmarkRoadFacingChangedCount||0),
     urbanDecorationCount:urban.length,
     urbanStreetscapeCount:streetscape,
     urbanStreetscapeRatio:urban.length?Number((streetscape/urban.length).toFixed(4)):1,
@@ -89,7 +91,7 @@ function mapMetrics(map){
   };
 }
 function landmarkFacingEvidence(map,runtime){
-  const expected=(map.landmarks||[]).map(row=>({id:String(row.id||''),facing:String(row.frontage?.facing||row.facing||'south').toLowerCase(),rotation:FACING_ROTATIONS[String(row.frontage?.facing||row.facing||'south').toLowerCase()]??0}));
+  const expected=(map.landmarks||[]).map(row=>({id:String(row.id||''),facing:String(row.frontage?.facing||row.facing||'south').toLowerCase(),rotation:FACING_ROTATIONS[String(row.frontage?.facing||row.facing||'south').toLowerCase()]??0,source:String(row.frontage?.source||'recipe')}));
   const actual=new Map((runtime.landmarkPlacements||[]).map(row=>[String(row.placementId||'').replace(/^map-forge:landmark:/,''),Number(row.rotation)]));
   const resolved=expected.filter(row=>actual.has(row.id)).map(row=>({...row,actualRotation:actual.get(row.id),matches:actual.get(row.id)===row.rotation}));
   return{expected,resolved,resolvedCount:resolved.length,mismatchCount:resolved.filter(row=>!row.matches).length,mismatches:resolved.filter(row=>!row.matches)};
@@ -134,6 +136,8 @@ test(`Map Forge ${STAGE} fixed-seed preview/runtime visual evidence`,async({page
     expect(mainMetrics.negativeSpace).toBeGreaterThanOrEqual(78);
     expect(mainMetrics.declusterSwapCount).toBeGreaterThan(0);
     expect(mainMetrics.localSameFamilyRatio).toBeLessThanOrEqual(LOCAL_SAME_FAMILY_MAX);
+    expect(mainMetrics.landmarkRoadFacingCount).toBeGreaterThanOrEqual(3);
+    expect(mainMetrics.landmarkRoadFacingChangedCount).toBeGreaterThan(0);
   }
   await page.screenshot({path:`test-results/screenshot_preview_${STAGE}.png`,fullPage:true});
 
@@ -146,10 +150,9 @@ test(`Map Forge ${STAGE} fixed-seed preview/runtime visual evidence`,async({page
   if(STAGE==='after'){
     expect(landmarkFacing.resolvedCount).toBeGreaterThan(0);
     expect(landmarkFacing.mismatchCount).toBe(0);
-    const market=landmarkFacing.resolved.find(row=>row.id==='main_market');
-    expect(market).toBeTruthy();
-    expect(market.facing).toBe('west');
-    expect(market.actualRotation).toBe(1);
+    const roadFacingResolved=landmarkFacing.resolved.filter(row=>row.source==='nearest-road');
+    expect(roadFacingResolved.length).toBeGreaterThanOrEqual(3);
+    expect(roadFacingResolved.every(row=>row.matches)).toBe(true);
   }
   await page.screenshot({path:`test-results/screenshot_runtime_${STAGE}.png`,fullPage:true});
 
@@ -168,6 +171,7 @@ test(`Map Forge ${STAGE} fixed-seed preview/runtime visual evidence`,async({page
       expect(metrics.negativeSpace).toBeGreaterThanOrEqual(VALIDATION_SPACE_MIN);
       expect(metrics.declusterSwapCount).toBeGreaterThan(0);
       expect(metrics.localSameFamilyRatio).toBeLessThanOrEqual(LOCAL_SAME_FAMILY_MAX);
+      expect(metrics.landmarkRoadFacingCount).toBeGreaterThanOrEqual(3);
     }
     validation.push(metrics);
   }
