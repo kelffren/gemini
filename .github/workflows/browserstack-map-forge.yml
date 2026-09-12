@@ -2,6 +2,11 @@ name: BrowserStack Map Forge Real iPhone
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/browserstack-map-forge.yml'
 
 jobs:
   real-ios-map-forge:
