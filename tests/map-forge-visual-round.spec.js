@@ -139,8 +139,8 @@ async function generateSelected(page,forge,seed){
   await page.getByRole('button',{name:'GENERAR'}).click();
   await expect(forge.getByText(/4\/4 válidos/)).toBeVisible({timeout:15000});
   await forge.getByRole('button').filter({hasText:`Seed ${seed}`}).first().click();
-  await page.waitForFunction(async expected=>{const {getMapForgeWorkspace}=await import('./src/creators/ui/map-forge-workspace.mjs');return getMapForgeWorkspace()?.selected?.metadata?.seed===expected;},seed,{timeout:5000});
-  return page.evaluate(async()=>{const {getMapForgeWorkspace}=await import('./src/creators/ui/map-forge-workspace.mjs');const map=getMapForgeWorkspace().selected;return JSON.parse(JSON.stringify(map));});
+  await page.waitForFunction(async expected=>{const {getMapForgeWorkspace}=await import('./src/creators/ui/map-forge-workspace.mjs');const map=getMapForgeWorkspace()?.selected;if(map?.metadata?.seed!==expected)return false;window.__KELO_VISUAL_SELECTED_MAP=JSON.parse(JSON.stringify(map));return true;},seed,{timeout:5000});
+  return page.evaluate(()=>window.__KELO_VISUAL_SELECTED_MAP);
 }
 
 test(`Map Forge ${STAGE} fixed-seed preview/runtime visual evidence`,async({page})=>{
