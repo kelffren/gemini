@@ -2,7 +2,7 @@
  * area: STUDIO / NUDGE INPUT
  * owns: precise keyboard + mobile touch nudging for selected objects
  * does-not-own: selection, authority transport, rendering or document persistence
- * public-api: createStudioNudgeController(), resolveStudioNudgeStep()
+ * public-api: createStudioNudgeController(), resolveStudioNudgeStep(), resolveSelectedStudioEntities()
  * online: persistent moves flow through Kernel CommandBus as one reversible batch
  */
 
@@ -24,12 +24,29 @@ export function resolveStudioNudgeStep({root=globalThis,kernel,shiftKey=false,al
   return mode==='coarse'||altKey?base*COARSE_MULTIPLIER:base;
 }
 
+export function resolveSelectedStudioEntities(entities=[],selection=[]){
+  if(!selection?.length||!entities?.length)return [];
+  const byId=new Map();
+  for(const entity of entities){
+    const rawId=entity?.id;
+    if(rawId==null)continue;
+    const id=String(rawId);
+    if(!byId.has(id))byId.set(id,entity);
+  }
+  const rows=[];
+  for(const id of selection){
+    const entity=byId.get(String(id));
+    if(entity)rows.push(entity);
+  }
+  return rows;
+}
+
 export function createStudioNudgeController({root=globalThis,kernel}={}){
   const document=root?.document;
   if(!document||!kernel)return Object.freeze({destroy(){},nudge:async()=>[]});
   let destroyed=false,busy=false,pad=null,style=null,observer=null,mobileMode='snap';
 
-  const selectedEntities=()=>kernel.selection.get().map(id=>kernel.document.entities.find(row=>String(row.id)===String(id))).filter(Boolean);
+  const selectedEntities=()=>resolveSelectedStudioEntities(kernel.document.entities,kernel.selection.get());
 
   async function nudge(dx,dy,{step=1}={}){
     if(destroyed||busy)return [];
@@ -78,6 +95,7 @@ export function createStudioNudgeController({root=globalThis,kernel}={}){
   observer=new MutationObserver(()=>{mountPad();syncPad();});observer.observe(document.documentElement||document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['data-active-tool','data-sheet-open','data-creator-minimized']});
   mountPad();
   return Object.freeze({
+    version:'studio-nudge-v1.1.0-linear-selection',
     nudge,cycleMobileMode,syncPad,
     get mobileMode(){return mobileMode;},
     destroy(){destroyed=true;document.removeEventListener('keydown',onKey,true);root.removeEventListener?.('resize',syncPad);observer?.disconnect();pad?.remove();style?.remove();pad=style=null;},

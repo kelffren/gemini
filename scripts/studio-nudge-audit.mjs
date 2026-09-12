@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { resolveStudioNudgeStep } from '../src/studio/input/studio-nudge-controller.mjs';
+import { resolveStudioNudgeStep, resolveSelectedStudioEntities } from '../src/studio/input/studio-nudge-controller.mjs';
 
 const fakeRoot={document:{querySelector:()=>({value:'16'})}};
 const fakeKernel={document:{settings:{tileSize:32}}};
@@ -13,6 +13,21 @@ assert.equal(resolveStudioNudgeStep({root:fakeRoot,kernel:fakeKernel,mode:'snap'
 assert.equal(resolveStudioNudgeStep({root:fakeRoot,kernel:fakeKernel,shiftKey:true,altKey:true}),1,'Shift precision must win over coarse Alt mode');
 assert.equal(resolveStudioNudgeStep({root:{document:{querySelector:()=>null}},kernel:fakeKernel}),32,'nudge must fall back to world tile size');
 assert.equal(resolveStudioNudgeStep({root:{document:{querySelector:()=>null}},kernel:fakeKernel,mode:'coarse'}),128,'mobile Coarse must also scale tile fallback');
+
+{
+  const accesses=new Array(2000).fill(0);
+  const entities=accesses.map((_,index)=>({
+    get id(){accesses[index]++;return `entity-${index}`;},
+    transform:{x:index,y:index}
+  }));
+  const selection=Array.from({length:800},(_,index)=>`entity-${index*2}`);
+  const resolved=resolveSelectedStudioEntities(entities,selection);
+  assert.equal(resolved.length,800,'large nudge selections must resolve every selected entity');
+  assert.deepEqual(resolved.slice(0,3).map(row=>row.transform.x),[0,2,4],'selection order must be preserved by indexed lookup');
+  assert.equal(Math.max(...accesses),1,'entity ids must be indexed once per resolution instead of rescanned once per selected id');
+  assert.equal(accesses.reduce((sum,count)=>sum+count,0),entities.length,'large-selection lookup cost must stay linear in entity count');
+  assert.deepEqual(resolveSelectedStudioEntities([{id:'a'},{id:'b'}],['missing','b']),[{id:'b'}],'missing selection ids must remain harmless');
+}
 
 const source=fs.readFileSync(new URL('../src/studio/input/studio-nudge-controller.mjs',import.meta.url),'utf8');
 assert.match(source,/ArrowLeft:\{x:-1,y:0\}/,'left arrow must be wired');
@@ -38,6 +53,8 @@ assert.match(source,/event\.metaKey\|\|event\.ctrlKey\|\|editableTarget/,'Ctrl/M
 assert.doesNotMatch(source,/event\.altKey\|\|editableTarget/,'Alt must remain available for coarse arrow nudging');
 assert.match(source,/\['select','move'\]\.includes/,'nudge must only own movement in object editing modes');
 assert.match(source,/event\.repeat/,'held keys must not flood Undo history');
+assert.match(source,/resolveSelectedStudioEntities\(kernel\.document\.entities,kernel\.selection\.get\(\)\)/,'nudge must use the indexed selection resolver');
+assert.doesNotMatch(source,/entities\.find\(/,'nudge must not rescan the full entity array once per selected id');
 assert.match(source,/createCompositeCommand\(commands,\{type:'entity\.batch\.nudge'/,'multi-selection nudges must be one reversible batch');
 assert.match(source,/await kernel\.execute\(command\)/,'persistent nudges must flow through Kernel CommandBus');
 assert.match(source,/\[data-ext="snap"\]/,'nudge must read the creator Snap control instead of inventing a second grid setting');
@@ -50,4 +67,4 @@ assert.match(entry,/createStudioNudgeController/,'Studio entry must install nudg
 assert.match(entry,/nudgeController\.destroy\(\)/,'Studio close must release nudge input');
 assert.match(entry,/kelo-studio-foundation-v\d+\.\d+\.\d+/,'Studio must expose a current foundation version');
 
-console.log(JSON.stringify({ok:true,keyboardNudge:true,mobileTouchPad:true,modes:['snap','fine','coarse'],exactMobileStepLabel:true,minTouchTarget:46,liveSnap:true,multiSelectionBatch:true,commandBus:true,authorityDirectWrite:false,cleanup:true},null,2));
+console.log(JSON.stringify({ok:true,keyboardNudge:true,mobileTouchPad:true,modes:['snap','fine','coarse'],exactMobileStepLabel:true,minTouchTarget:46,liveSnap:true,linearSelectionLookup:true,largeSelectionFixture:{entities:2000,selected:800,idReads:2000},multiSelectionBatch:true,commandBus:true,authorityDirectWrite:false,cleanup:true},null,2));
