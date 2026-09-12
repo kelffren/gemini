@@ -52,6 +52,7 @@ No uses `/*` para apagar código. Los comentarios solo documentan.
 | MOUNT CREATOR | definitions/import/virtual list/undo | `src/creators/workspaces/mount-workspace.mjs` `src/creators/ui/mount-creator.mjs` |
 | APPEARANCE CREATOR | Character+Mount outfit authoring/drag anchors | `src/creators/workspaces/appearance-workspace.mjs` `src/creators/ui/appearance-creator.mjs` |
 | CREATOR TABULAR IMPORT | CSV + XLSX lazy authoring | `src/creators/importers/tabular-definition-importer.mjs` |
+| IMAGE TREATMENT | análisis RGBA, halo/alpha cleanup y denoise edge-aware por perfil | `src/creators/core/image-treatment-engine.mjs` |
 | NET WS POSE | online room | `engine-net.js` |
 | VISUAL ASSET REGISTRY | IDs / preload / lazy visual | `src/visuals/asset-registry.js` |
 | ANIMATION CLIP ANCHOR | clips, channels, foot-root sockets | `src/visuals/animation-system.js` |
@@ -169,3 +170,13 @@ Detalle: `docs/VISUAL_SYSTEM.md`.
 - `docs/WORLD_BUILDER_MEMORY.md`: contrato completo, snapshot y migración online.
 - Hoy = `BORRADOR LOCAL`; futuro = `ServerWorldBuilderAuthority → Draft → Review → Publish`.
 <!-- WORLD-BUILDER-V1:END -->
+
+<!-- IMAGE-TREATMENT-V1:START -->
+## IMAGE TREATMENT ENGINE V1
+- `src/creators/core/image-treatment-engine.mjs`: owner único compartido para análisis RGBA, saneo de RGB invisible, reparación conservadora de halos y denoise edge-aware.
+- Perfiles: `sprite`, `pixel-art`, `illustration`, `ui`, `auto`. Sprite/pixel/UI no suavizan por defecto.
+- `src/creators/ui/sprite-factory-online.mjs`: usa `profile: sprite` antes del Sprite Compiler sin modificar el master subido.
+- Diagnóstico LIVE: `__KELO_IMAGE_TREATMENT_LAST__` y `__KELO_SPRITE_COMPILER_LAST__.imageTreatment`.
+- Audit: `node scripts/image-treatment-engine-audit.mjs`.
+- Detalle: `docs/IMAGE_TREATMENT_ENGINE.md`.
+<!-- IMAGE-TREATMENT-V1:END -->
