@@ -72,6 +72,7 @@
     "audit:sprite-ingestion": "node scripts/sprite-ingestion-core-audit.mjs",
     "audit:asset-sheet": "node scripts/asset-sheet-compiler-audit.mjs",
     "audit:asset-sheet:live": "node scripts/asset-sheet-live-audit.mjs",
+    "audit:image-lab": "node scripts/image-lab-audit.mjs",
     "audit:creator-suite": "node scripts/creator-definition-suite-audit.mjs",
     "audit:evolution": "node scripts/kelo-evolution-audit.mjs",
     "audit:evolution:sandbox": "node scripts/kelo-evolution-sandbox-audit.mjs",
