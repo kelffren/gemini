@@ -16,6 +16,7 @@
   const TILE=R.worldTileSize||32;
   const layerGroups=Object.freeze({
     plazaNature:Object.freeze({id:'plaza-nature',ownership:'plaza-nature-props-v1',priority:10,renderMode:'layer-stack',back:Object.freeze({phase:'props_back'}),front:Object.freeze({phase:'props_front'})}),
+    plazaImperialNature:Object.freeze({id:'plaza-imperial-nature',ownership:'plaza-imperial-nature-v1',priority:12,renderMode:'layer-stack',visibleDuringReset:true,back:Object.freeze({phase:'props_back'}),front:Object.freeze({phase:'props_front'})}),
     plazaFountain:Object.freeze({id:'plaza-fountain',ownership:'plaza-fountain-kelo-v1',priority:20,renderMode:'layer-stack',visibleDuringReset:true,front:Object.freeze({phase:'props_front'})}),
     ruralBoundary:Object.freeze({id:'rural-boundary',ownership:'rural-farm-boundary-props-v1',priority:8,renderMode:'layer-stack',back:Object.freeze({phase:'props_back'})})
   });
@@ -24,9 +25,11 @@
   }
   const assets=Object.freeze({
     plazaNature:Object.freeze({id:'plazaNature',src:RESET?null:plazaNatureAtlas?.src,width:plazaNatureAtlas?.width,height:plazaNatureAtlas?.height,frameMode:plazaNatureAtlas?.frameMode,frames:plazaNatureAtlas?.frames,frameWidth:plazaNatureAtlas?.spriteWidth,frameHeight:plazaNatureAtlas?.spriteHeight,columns:plazaNatureAtlas?.columns}),
+    plazaRoundTree:Object.freeze({id:'plazaRoundTree',src:'assets/world/imperial-plaza/arbol-redondo.png?art=631',width:1254,height:1254,frameWidth:1254,frameHeight:1254,columns:1}),
     ruralProps:Object.freeze({id:'ruralProps',src:RESET?null:ruralPropsAtlas?.src,width:ruralPropsAtlas?.width,height:ruralPropsAtlas?.height,frameWidth:ruralPropsAtlas?.tileWidth||TILE,frameHeight:ruralPropsAtlas?.tileHeight||TILE,columns:ruralPropsAtlas?.columns}),
     plazaFountainKelo:Object.freeze({id:'plazaFountainKelo',src:'assets/justicia_fountain_v2.PNG?art=502',width:1254,height:1254,frameWidth:1254,frameHeight:1254,columns:1}),
   });
+  defs.push(Object.freeze({id:'plaza-round-tree-imperial',family:'nature_prop',asset:'plazaRoundTree',frame:0,layerGroup:'plazaImperialNature',layerRole:'back',position:Object.freeze({x:1260,y:1540}),size:Object.freeze({w:192,h:192}),anchor:Object.freeze({x:0.5,y:1}),visualBounds:Object.freeze({x:1260,y:1540,w:192,h:192}),footprint:Object.freeze({x:1292,y:1668,w:128,h:64}),collider:Object.freeze({mode:'rect',x:1292,y:1668,w:128,h:64,noDraw:true}),layers:Object.freeze({back:'props_back',front:'props_front'}),priority:12,district:'central',occlusion:Object.freeze({mode:'actor-base-y-clip-v1',baseY:1732,clipPadding:8}),visualOnly:false}));
   defs.push(Object.freeze({id:'plaza-fountain-kelo',family:'landmark_prop',asset:'plazaFountainKelo',frame:0,layerGroup:'plazaFountain',layerRole:'front',position:Object.freeze({x:1080,y:800}),size:Object.freeze({w:720,h:720}),anchor:Object.freeze({x:0.5,y:1}),visualBounds:Object.freeze({x:1080,y:800,w:720,h:720}),footprint:Object.freeze({x:1190,y:1430,w:500,h:90}),collider:Object.freeze({mode:'none'}),layers:Object.freeze({back:null,front:'props_front'}),priority:20,district:'central',occlusion:Object.freeze({mode:'actor-base-y-redraw-v1',baseY:1505,bounds:Object.freeze({x:1080,y:800,w:720,h:720})}),visualOnly:false}));
   function ruralTile(frame,x,y,id,family){return Object.freeze({id,family:family||'rural_boundary_prop',asset:'ruralProps',frame,layerGroup:'ruralBoundary',layerRole:'back',position:Object.freeze({x,y}),size:Object.freeze({w:TILE,h:TILE}),anchor:Object.freeze({x:0,y:0}),visualBounds:Object.freeze({x,y,w:TILE,h:TILE}),footprint:Object.freeze({x,y:y+Math.round(TILE*0.65),w:TILE,h:Math.max(1,Math.round(TILE*0.35))}),collider:Object.freeze({mode:'none'}),layers:Object.freeze({back:'props_back',front:null}),priority:8,district:'rural',occlusion:Object.freeze({mode:'none'}),visualOnly:true});}
   function buildRuralFarmBoundary(farm){
@@ -40,5 +43,5 @@
     return Object.freeze(out);
   }
   const sources=Object.freeze({ruralFarmBoundary:Object.freeze({id:'ruralFarmBoundary',layerGroup:'ruralBoundary',build:buildRuralFarmBoundary,instances:function(){if(typeof STATE==='undefined'||!STATE||!STATE.farm)return Object.freeze([]);return buildRuralFarmBoundary(STATE.farm);}})});
-  window.KELO_PROP_CONTRACT=Object.freeze({version:'1.7.0',mode:'generic-prop-contract-v7-justice-fountain-v2',assets,layerGroups,props:Object.freeze(defs),sources,getByDistrict(district){return defs.filter(p=>p.district===district);}});
+  window.KELO_PROP_CONTRACT=Object.freeze({version:'1.8.0',mode:'generic-prop-contract-v8-imperial-round-tree',assets,layerGroups,props:Object.freeze(defs),sources,getByDistrict(district){return defs.filter(p=>p.district===district);}});
 })();
