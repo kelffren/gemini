@@ -1,6 +1,6 @@
 /* KELO-INDEX
  * area: STUDIO / QUICK BUILD ROOM OPENINGS
- * owns: semantic WALL -> DOOR/WINDOW replacement for generated rooms
+ * owns: semantic WALL -> DOOR/WINDOW replacement and opening -> WALL restoration for generated rooms
  * does-not-own: document mutation internals, CommandBus, authority, room planning or rendering
  * public-api: createRoomOpeningTool(), resolveRoomOpeningPieces()
  * online: persistent mutation goes through kernel.execute(entity.patch) -> CommandBus -> authority
@@ -43,15 +43,25 @@ export function createRoomOpeningTool(kernel,{root=globalThis}={}){
   if(!kernel)throw new Error('STUDIO_ROOM_OPENING_KERNEL_REQUIRED');
   const document=root?.document;
   const pieces=resolveRoomOpeningPieces({prefabs:kernel.prefabs.list?.()||[],overrides:root?.KELO_QUICK_BUILD_CATALOG||{}});
-  let destroyed=false,observer=null,unsubSelection=null,buttons=[];
+  let destroyed=false,observer=null,unsubSelection=null,buttons=[],restoreButton=null;
 
-  function selectedWall(){
+  function selectedEntity(){
     const ids=kernel.selection.get();
     if(ids.length!==1)return null;
     const id=String(ids[0]);
-    const row=kernel.spatial.get?.(id)?.data||kernel.document.entities.find(entity=>String(entity.id)===id)||null;
-    const piece=row?.components?.buildingPiece;
+    return kernel.spatial.get?.(id)?.data||kernel.document.entities.find(entity=>String(entity.id)===id)||null;
+  }
+
+  function selectedWall(){
+    const row=selectedEntity(),piece=row?.components?.buildingPiece;
     if(!row||piece?.type!=='wall'||piece?.roomGenerated!==true||!piece?.roomId)return null;
+    return row;
+  }
+
+  function selectedOpening(){
+    const row=selectedEntity(),piece=row?.components?.buildingPiece;
+    if(!row||piece?.roomGenerated!==true||piece?.openingGenerated!==true||!piece?.roomId||!piece?.wallPrefabId)return null;
+    if(piece.type!=='door'&&piece.type!=='window')return null;
     return row;
   }
 
@@ -86,13 +96,43 @@ export function createRoomOpeningTool(kernel,{root=globalThis}={}){
     return result;
   }
 
+  async function restoreSelected(){
+    const source=selectedOpening();
+    if(!source)return null;
+    const original=copy(source.components?.buildingPiece||{});
+    const wallPrefabId=String(original.wallPrefabId||'');
+    if(!wallPrefabId)return null;
+    const nextBuildingPiece={...original,type:'wall',prefabId:wallPrefabId};
+    delete nextBuildingPiece.openingGenerated;
+    delete nextBuildingPiece.openingType;
+    delete nextBuildingPiece.replacesType;
+    delete nextBuildingPiece.wallPrefabId;
+    const patch={
+      prefabId:wallPrefabId,
+      bounds:copy(source.bounds),
+      components:{...(copy(source.components)||{}),buildingPiece:nextBuildingPiece}
+    };
+    const command=createPatchEntityCommand(source.id,patch);
+    command.label='Restore room wall';
+    const result=await kernel.execute(command);
+    kernel.selection.set(source.id);
+    syncUi();
+    return result;
+  }
+
   function syncUi(){
-    const wall=selectedWall();
+    const wall=selectedWall(),opening=selectedOpening();
     for(const button of buttons){
       const available=!!wall&&!!pieceFor(button.dataset.roomOpening);
       button.disabled=!available;
       button.setAttribute('aria-disabled',available?'false':'true');
       button.title=available?`Replace selected room wall with ${button.dataset.roomOpening}`:'Select one generated ROOM wall';
+    }
+    if(restoreButton){
+      const available=!!opening;
+      restoreButton.disabled=!available;
+      restoreButton.setAttribute('aria-disabled',available?'false':'true');
+      restoreButton.title=available?'Restore selected opening to its original ROOM wall':'Select one generated ROOM door/window';
     }
   }
 
@@ -100,8 +140,10 @@ export function createRoomOpeningTool(kernel,{root=globalThis}={}){
     if(destroyed||!document)return;
     const palette=document.querySelector?.('.ks-qb-palette');
     if(!palette)return;
-    if(buttons.some(button=>button?.isConnected)){syncUi();return;}
-    buttons=[];
+    if(buttons.some(button=>button?.isConnected)&&restoreButton?.isConnected){syncUi();return;}
+    for(const button of buttons)button?.remove?.();
+    restoreButton?.remove?.();
+    buttons=[];restoreButton=null;
     const cancel=palette.querySelector?.('[data-qb-cancel]');
     for(const piece of TYPES){
       const button=document.createElement('button');
@@ -113,6 +155,13 @@ export function createRoomOpeningTool(kernel,{root=globalThis}={}){
       palette.insertBefore(button,cancel||null);
       buttons.push(button);
     }
+    restoreButton=document.createElement('button');
+    restoreButton.type='button';
+    restoreButton.className='ks-qb-piece';
+    restoreButton.dataset.roomOpeningRestore='wall';
+    restoreButton.textContent='↶ WALL';
+    restoreButton.addEventListener('click',event=>{event.preventDefault?.();event.stopPropagation?.();void restoreSelected().catch(error=>console.warn('[Kelo Studio] Room opening restore failed',error));});
+    palette.insertBefore(restoreButton,cancel||null);
     syncUi();
   }
 
@@ -122,7 +171,8 @@ export function createRoomOpeningTool(kernel,{root=globalThis}={}){
     observer?.disconnect?.();
     unsubSelection?.();
     for(const button of buttons)button?.remove?.();
-    buttons=[];
+    restoreButton?.remove?.();
+    buttons=[];restoreButton=null;
   }
 
   unsubSelection=kernel.selection.onChange(()=>syncUi());
@@ -134,10 +184,12 @@ export function createRoomOpeningTool(kernel,{root=globalThis}={}){
 
   return Object.freeze({
     id:'roomOpening',
-    version:'studio-room-opening-v1.0.0',
+    version:'studio-room-opening-v1.1.0-restore-wall',
     pieces:pieces.map(copy),
     replaceSelected,
+    restoreSelected,
     canReplace:()=>!!selectedWall(),
+    canRestore:()=>!!selectedOpening(),
     destroy
   });
 }
