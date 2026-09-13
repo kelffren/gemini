@@ -8,12 +8,20 @@ on:
     paths:
       - 'index.html'
       - 'engine-a.js'
-      - 'src/core/input-system.js'
-      - 'src/auth/guest-play-bypass.js'
-      - 'src/ui/account-auth-ui.js'
-      - 'src/creators/workspaces/world-workspace.mjs'
-      - 'src/studio/storage/indexeddb-studio-store.mjs'
+      - 'engine-*.js'
+      - 'src/core/**'
+      - 'src/auth/**'
+      - 'src/ui/**'
+      - 'src/abilities/**'
+      - 'src/appearance/**'
+      - 'src/mounts/**'
+      - 'src/systems/**'
+      - 'src/property/**'
+      - 'src/instances/**'
+      - 'src/creators/**'
+      - 'src/studio/**'
       - 'tests/iphone-gameplay.spec.js'
+      - 'tests/iphone-full-gameplay.spec.js'
       - 'tests/world-editor-ios-reopen.spec.js'
       - 'playwright.config.js'
       - 'browserstack.yml'
@@ -74,8 +82,11 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Run guest gameplay on real iPhone
+      - name: Run basic guest movement on real iPhone
         run: npx browserstack-node-sdk playwright test tests/iphone-gameplay.spec.js --workers=1
+
+      - name: Run full gameplay contract on real iPhone
+        run: npx browserstack-node-sdk playwright test tests/iphone-full-gameplay.spec.js --workers=1
 
       - name: Run World reopen on real iPhone
         run: npx browserstack-node-sdk playwright test tests/world-editor-ios-reopen.spec.js --workers=1
