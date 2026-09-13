@@ -2,12 +2,14 @@
  * area: STUDIO / SELECT TOOL
  * owns: entity selection from spatial hit testing, semantic room expansion and one-shot armed grab handoff
  * does-not-own: pointer listeners, drawing or persistent document mutation
- * public-api: createSelectTool(), resolveSelectHitRadius(), screenRadiusToWorld()
+ * public-api: createSelectTool(), resolveSelectHitRadius(), screenRadiusToWorld(), resolveRepeatSelectRadius()
  * online: local transient state only
  */
 
 const MOBILE_MAX=760;
 const MOBILE_HIT_RADIUS_PX=18;
+const MOBILE_REPEAT_RADIUS_PX=20;
+const DESKTOP_REPEAT_RADIUS_WORLD=12;
 const MIN_EFFECTIVE_ZOOM=.25;
 
 export function screenRadiusToWorld(screenRadius,zoom=1){
@@ -25,13 +27,20 @@ export function resolveSelectHitRadius(radius,{root=globalThis}={}){
   return screenRadiusToWorld(MOBILE_HIT_RADIUS_PX,zoom);
 }
 
-export function createSelectTool(kernel) {
+export function resolveRepeatSelectRadius({root=globalThis}={}){
+  const coarse=!!root?.matchMedia?.('(pointer: coarse)')?.matches;
+  const mobile=Number(root?.innerWidth||9999)<=MOBILE_MAX;
+  if(!coarse||!mobile)return DESKTOP_REPEAT_RADIUS_WORLD;
+  const zoom=Number(root?.KeloCamera?.snapshot?.()?.effectiveZoom)||1;
+  return Math.max(DESKTOP_REPEAT_RADIUS_WORLD,screenRadiusToWorld(MOBILE_REPEAT_RADIUS_PX,zoom));
+}
+
+export function createSelectTool(kernel,{root=globalThis}={}) {
   if (!kernel) throw new Error('STUDIO_SELECT_KERNEL_REQUIRED');
 
   let lastPick = null;
   let armedGrab = null;
   const REPEAT_WINDOW_MS = 1200;
-  const REPEAT_RADIUS = 12;
   const ARMED_GRAB_TTL_MS = 6000;
 
   function armGrab(ids = kernel.selection.get(), { ttl = ARMED_GRAB_TTL_MS } = {}) {
@@ -61,7 +70,7 @@ export function createSelectTool(kernel) {
   }
 
   function pointHits(px,py,radius){
-    const r=resolveSelectHitRadius(radius);
+    const r=resolveSelectHitRadius(radius,{root});
     if(r<=0)return kernel.spatial.queryPoint(px,py,{category:'entity'}).slice().reverse();
     const hits=kernel.spatial.queryRect({x:px-r,y:py-r,w:r*2+1,h:r*2+1},{category:'entity'}).slice().reverse();
     return hits.map((hit,index)=>({hit,index,d:hitDistanceSquared(hit,px,py)}))
@@ -107,10 +116,11 @@ export function createSelectTool(kernel) {
       const now = Date.now();
       const stackKey = ordered.map(hit => String(hit.id)).join('\u0001');
       const currentIndex = ordered.findIndex(hit => kernel.selection.has(hit.id));
+      const repeatRadius=resolveRepeatSelectRadius({root});
       const repeated = !!lastPick
         && lastPick.key === stackKey
         && now - lastPick.at <= REPEAT_WINDOW_MS
-        && Math.hypot(px - lastPick.x, py - lastPick.y) <= REPEAT_RADIUS;
+        && Math.hypot(px - lastPick.x, py - lastPick.y) <= repeatRadius;
 
       let hit = ordered[0];
       if (cycle && repeated && ordered.length > 1 && currentIndex >= 0) {
