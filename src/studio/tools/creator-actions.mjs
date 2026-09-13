@@ -14,13 +14,16 @@ function newId() { const uuid = globalThis.crypto?.randomUUID?.(); return `entit
 function newRoomId() { const uuid = globalThis.crypto?.randomUUID?.(); return `room:${uuid || `${Date.now().toString(36)}:${Math.random().toString(36).slice(2,10)}`}`; }
 const scaleOf=value=>{const n=Number(value);return Math.max(.1,Math.min(8,Number.isFinite(n)?Math.round(n*100)/100:1));};
 const snapUp=(value,step)=>Math.max(step,Math.ceil(Math.max(1,Number(value)||1)/step)*step);
+const normalizedRotation=value=>((Number(value)||0)%360+360)%360;
 const entityRect=(row,tile)=>{
   const t=row?.transform||{},scale=scaleOf(t.scale),x=Number(t.x)||0,y=Number(t.y)||0;
   const w=Math.max(1,Number(row?.bounds?.w)||tile)*scale,h=Math.max(1,Number(row?.bounds?.h)||tile)*scale;
-  return{x,y,x2:x+w,y2:y+h};
+  const angle=normalizedRotation(t.rotation);if(!angle)return{x,y,x2:x+w,y2:y+h};
+  const radians=angle*Math.PI/180,cos=Math.abs(Math.cos(radians)),sin=Math.abs(Math.sin(radians));
+  const rotatedW=cleanCoord(w*cos+h*sin),rotatedH=cleanCoord(w*sin+h*cos),cx=x+w/2,cy=y+h/2;
+  return{x:cleanCoord(cx-rotatedW/2),y:cleanCoord(cy-rotatedH/2),x2:cleanCoord(cx+rotatedW/2),y2:cleanCoord(cy+rotatedH/2)};
 };
 const rectsOverlap=(a,b)=>a.x<b.x2&&a.x2>b.x&&a.y<b.y2&&a.y2>b.y;
-const normalizedRotation=value=>((Number(value)||0)%360+360)%360;
 const cleanCoord=value=>Math.abs(value)<1e-9?0:Math.round(value*1e6)/1e6;
 function rotatePointAround(x,y,cx,cy,delta){
   const angle=normalizedRotation(delta),dx=(Number(x)||0)-cx,dy=(Number(y)||0)-cy;
