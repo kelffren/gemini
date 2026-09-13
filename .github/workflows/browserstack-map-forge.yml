@@ -67,7 +67,7 @@ jobs:
           test -n "$BROWSERSTACK_ACCESS_KEY" || (echo "Missing BROWSERSTACK_ACCESS_KEY secret" && exit 1)
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
       - name: Serve PR candidate for real-device testing
         if: github.event_name == 'pull_request'
