@@ -10,15 +10,16 @@ async function afterReload(page){await page.reload();await page.waitForFunction(
 async function pointer(page,selector,type,id,rx,ry,{primary=id===1}={}){await page.evaluate(({selector,type,id,rx,ry,primary})=>{const el=document.querySelector(selector),r=el.getBoundingClientRect();el.dispatchEvent(new PointerEvent(type,{bubbles:true,cancelable:true,pointerId:id,pointerType:'touch',isPrimary:primary,buttons:type==='pointerup'||type==='pointercancel'?0:1,clientX:r.left+r.width*rx,clientY:r.top+r.height*ry}));},{selector,type,id,rx,ry,primary});}
 async function pinch(page,selector){await pointer(page,selector,'pointerdown',1,.38,.55);await pointer(page,selector,'pointerdown',2,.62,.55,{primary:false});await pointer(page,selector,'pointermove',1,.30,.55);await pointer(page,selector,'pointermove',2,.70,.55,{primary:false});await pointer(page,selector,'pointerup',1,.30,.55);await pointer(page,selector,'pointerup',2,.70,.55,{primary:false});}
 
-test('real Avatar workspace opens PR 159 Frame Surgery first and exposes PR 155 builder inside it',async({page})=>{
+test('real Avatar workspace keeps PR 159 primary, opens only one PR 155 builder and tears child down with parent',async({page})=>{
   await ready(page);
   const info=await page.evaluate(()=>window.__AVATAR_AUTHORING_QA__.openUnified());
   expect(info.surgery).toBe(true);expect(info.builderEntry).toBe(true);expect(info.version).toContain('frame-builder-v1');
   await expect(page.locator('#kelo-avatar-quick')).toBeVisible();
   const entry=page.locator('[data-kelo-frame-builder]');await expect(entry).toBeVisible();await expect(entry).toHaveText('CONSTRUIR 4×4 · FRAME A FRAME');
-  await entry.click();await expect(page.locator('.kfb')).toBeVisible();await expect(page.locator('.kfb-progress')).toContainText('FRAME 128×192');
-  await page.locator('.kfb-x').click();await expect(page.locator('.kfb')).toHaveCount(0);
-  await page.evaluate(()=>window.__AVATAR_AUTHORING_QA__.closeUnified());await expect(page.locator('#kelo-avatar-quick')).toHaveCount(0);
+  await page.evaluate(()=>{const button=document.querySelector('[data-kelo-frame-builder]');button.click();button.click();});
+  await expect(page.locator('.kfb')).toHaveCount(1);await expect(page.locator('.kfb-progress')).toContainText('FRAME 128×192');
+  await page.evaluate(()=>window.__AVATAR_AUTHORING_QA__.closeUnified());
+  await expect(page.locator('.kfb')).toHaveCount(0);await expect(page.locator('#kelo-avatar-quick')).toHaveCount(0);
 });
 
 test('persistent 4x4 project survives reload, keeps isolated slots and exact Kelo frame contract',async({page})=>{
