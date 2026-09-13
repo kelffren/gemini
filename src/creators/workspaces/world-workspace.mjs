@@ -76,7 +76,12 @@ export function createWorldWorkspaceManifest({loader=()=>import('../../studio/in
       markOpenPhase(root,'studio-module:ready');
       if(typeof mod.openKeloStudioLive!=='function')throw new Error('CREATOR_WORLD_STUDIO_ENTRY_MISSING');
       markOpenPhase(root,'studio-open:start');
-      const session=await openMountedStudio(mod,root);
+      // Studio imports the same authorized draft into its own document model. Re-projecting
+      // each draft read back through WorldBuilder + Property while the editor is mounting
+      // duplicates the heaviest world work on iOS and can block Safari's main thread.
+      const session=typeof edit.withoutProjection==='function'
+        ?await edit.withoutProjection(()=>openMountedStudio(mod,root))
+        :await openMountedStudio(mod,root);
       markOpenPhase(root,'studio-open:ready');
       if(prepared?.documentMetadata&&session?.studio?.kernel?.setDocument){
         const current=session.studio.kernel.document;
