@@ -39,9 +39,12 @@ assert.equal(kernel.document.entities.length,1,'first placement must persist thr
 assert.equal(first.components.buildingPiece.type,'wall','placed entity must remain semantically identifiable as a wall');
 assert.ok(placement.getPreview(),'Quick Build must immediately recreate the next preview after placement');
 assert.equal(quick.active.type,'wall','placing must keep the same build piece active');
+preview=placement.getPreview();
+assert.deepEqual([preview.transform.x,preview.transform.y],[160,64],'next wall preview must auto-advance one prefab module instead of overlapping the placed wall');
 
-const second=await quick.commitAt(160,65);
-assert.equal(kernel.document.entities.length,2,'second click must place another wall without reopening the catalog');
+const second=await quick.commitAt(preview.transform.x,preview.transform.y);
+assert.equal(kernel.document.entities.length,2,'second tap on the advanced preview must place another wall without reopening the catalog or repositioning');
+assert.deepEqual(kernel.document.entities.map(entity=>[entity.transform.x,entity.transform.y]),[[96,64],[160,64]],'chain placement must create adjacent non-overlapping wall modules');
 assert.equal(kernel.history.undoDepth,2,'each single-piece placement must remain independently undoable');
 await kernel.undo();
 assert.equal(kernel.document.entities.length,1,'Undo must remove the most recent Quick Build placement');
@@ -63,4 +66,4 @@ assert.match(source,/placement\.commit\(\)/,'persistent placement must delegate 
 quick.destroy();
 assert.equal(kernel.input.has('studio-quick-build'),false,'destroy must unregister the temporary input context');
 
-console.log(JSON.stringify({ok:true,phase:1,pieces:['wall','floor'],preview:true,semanticMetadata:true,continuousPlacement:true,desktopPointer:true,mobilePointer:true,undoRedo:true,rotate:true,cancel:true,authorityBypass:false},null,2));
+console.log(JSON.stringify({ok:true,phase:'1.1',pieces:['wall','floor'],preview:true,semanticMetadata:true,continuousPlacement:true,chainAdvance:true,desktopPointer:true,mobilePointer:true,undoRedo:true,rotate:true,cancel:true,authorityBypass:false},null,2));
