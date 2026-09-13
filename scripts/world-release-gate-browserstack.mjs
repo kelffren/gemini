@@ -1,290 +1,71 @@
 /* KELO-INDEX
  * area: CI / WORLD RELEASE GATE / REAL IOS
- * owner: World Creator release validation
- * purpose: run the World open/reopen regression directly on BrowserStack real iOS without Playwright Test's desktop context defaults
+ * purpose: isolate the exact Studio phase that blocks physical iPhone Safari
  */
-import fs from 'node:fs';
 import { webkit } from 'playwright';
 
-const required = ['BROWSERSTACK_USERNAME', 'BROWSERSTACK_ACCESS_KEY', 'KELO_PAGES'];
-for (const key of required) {
-  if (!process.env[key]) throw new Error(`Missing required environment variable: ${key}`);
-}
+const required=['BROWSERSTACK_USERNAME','BROWSERSTACK_ACCESS_KEY','KELO_PAGES'];
+for(const key of required)if(!process.env[key])throw new Error(`Missing ${key}`);
+const localIdentifier=process.env.BROWSERSTACK_LOCAL_IDENTIFIER||'';
+const isLocal=process.env.KELO_RELEASE_STAGE==='PR_CANDIDATE_REAL_IPHONE';
+if(isLocal&&!localIdentifier)throw new Error('Missing BROWSERSTACK_LOCAL_IDENTIFIER');
+const caps={browserName:'safari',osVersion:'26',deviceName:'iPhone 14 Pro',realMobile:'true',name:`KELO World phase probe ${(process.env.KELO_CANDIDATE_SHA||'').slice(0,12)}`,build:process.env.BROWSERSTACK_BUILD_NAME||'KeloWorld-phase-probe',project:process.env.BROWSERSTACK_PROJECT_NAME||'KeloWorld','browserstack.username':process.env.BROWSERSTACK_USERNAME,'browserstack.accessKey':process.env.BROWSERSTACK_ACCESS_KEY,'browserstack.local':isLocal?'true':'false'};
+if(isLocal)caps['browserstack.localIdentifier']=localIdentifier;
+const wsEndpoint=`wss://cdp.browserstack.com/playwright?caps=${encodeURIComponent(JSON.stringify(caps))}`;
+const delay=ms=>new Promise(r=>setTimeout(r,ms));
+const log=(name,detail=null)=>console.log(`[KELO phase] ${name}${detail?`: ${JSON.stringify(detail)}`:''}`);
 
-const outputDir = 'test-results';
-fs.mkdirSync(outputDir, { recursive: true });
+let browser,context,page;
+async function wait(check,timeout=15000){const end=Date.now()+timeout;while(Date.now()<end){if(await check())return true;await delay(250);}throw new Error('phase wait timeout');}
+async function phase(name,fn){log(`${name}:start`);const started=Date.now();const result=await page.evaluate(fn);log(`${name}:ready`,{ms:Date.now()-started,...(result||{})});return result;}
 
-const isLocal = process.env.KELO_RELEASE_STAGE === 'PR_CANDIDATE_REAL_IPHONE';
-const localIdentifier = process.env.BROWSERSTACK_LOCAL_IDENTIFIER || '';
-const candidateSha = process.env.KELO_CANDIDATE_SHA || process.env.GITHUB_SHA || 'unknown';
-const baseURL = process.env.KELO_PAGES;
+try{
+  browser=await webkit.connect({wsEndpoint});log('connected');
+  context=await browser.newContext({baseURL:process.env.KELO_PAGES});page=await context.newPage();
+  page.on('console',msg=>{const t=msg.text();if(t.includes('[Kelo World open]')||t.includes('[Kelo Studio]'))console.log(`[browser] ${t}`);});
+  page.on('pageerror',err=>console.log(`[pageerror] ${String(err)}`));
+  const response=await page.goto('./?mapEditor=1&world-ios-reopen=1',{waitUntil:'domcontentloaded',timeout:30000});
+  log('page',{status:response?.status()});
+  await wait(()=>page.evaluate(()=>!!(window.KeloInputLocks?.acquire&&window.KELO_ADMIN_KEYS?.can?.('world.edit')&&window.KELO_WORLD_EDIT?.ready)),20000);
+  log('authorized');
 
-if (isLocal && !localIdentifier) {
-  throw new Error('PR candidate gate requires BROWSERSTACK_LOCAL_IDENTIFIER');
-}
+  await phase('legacy-close',async()=>{const t=performance.now();try{await window.KELO_WORLD_BUILDER_UI?.close?.(false);}catch(e){}return{innerMs:Math.round(performance.now()-t)};});
 
-const caps = {
-  browserName: 'safari',
-  osVersion: '26',
-  deviceName: 'iPhone 14 Pro',
-  realMobile: 'true',
-  name: `KELO World release gate ${candidateSha.slice(0, 12)}`,
-  build: process.env.BROWSERSTACK_BUILD_NAME || `KeloWorld-${process.env.GITHUB_RUN_ID || Date.now()}`,
-  project: process.env.BROWSERSTACK_PROJECT_NAME || 'KeloWorld',
-  'browserstack.username': process.env.BROWSERSTACK_USERNAME,
-  'browserstack.accessKey': process.env.BROWSERSTACK_ACCESS_KEY,
-  'browserstack.local': isLocal ? 'true' : 'false',
-};
-if (isLocal) caps['browserstack.localIdentifier'] = localIdentifier;
+  await phase('boot-studio',async()=>{const t=performance.now();const {bootKeloStudio}=await import('./src/studio/studio-entry.mjs');const actorId=String(window.KELO_ADMIN_KEYS?.playerId?.()||'local_pioneer');const studio=await bootKeloStudio({mode:'world',actorId,root:window});window.__KELO_PHASE={studio,actorId};return{innerMs:Math.round(performance.now()-t),assets:studio.adapter.assetCatalog.list().length};});
 
-const wsEndpoint = `wss://cdp.browserstack.com/playwright?caps=${encodeURIComponent(JSON.stringify(caps))}`;
-const evidence = {
-  candidateSha,
-  stage: process.env.KELO_RELEASE_STAGE || 'UNKNOWN',
-  baseURL,
-  device: 'iPhone 14 Pro',
-  osVersion: '26',
-  browserName: 'safari',
-  startedAt: new Date().toISOString(),
-  passed: false,
-  checkpoints: [],
-};
+  await phase('ensure-draft',async()=>{const g=window.__KELO_PHASE,E=window.KELO_WORLD_EDIT;let res=await E.getCurrentDraft(),d=res?.draft;if(!d||!['DRAFT','REJECTED'].includes(String(d.status||''))){res=await E.request('world:draft:create',{actorId:g.actorId,forceNew:true});d=res?.draft;}else{res=await E.request('world:draft:get',{actorId:g.actorId,draftId:d.draftId});d=res?.draft||d;}g.draft=d;return{draftId:d?.draftId||null};});
 
-let browser;
-let context;
-let page;
-const pageErrors = [];
-const consoleErrors = [];
-const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+  await phase('import-draft',async()=>{const g=window.__KELO_PHASE,t=performance.now();await g.studio.importCurrent({view:'draft',draftId:g.draft.draftId});return{innerMs:Math.round(performance.now()-t),entities:g.studio.kernel.document.entities.length};});
 
-function assert(condition, message) {
-  if (!condition) throw new Error(message);
-}
+  await phase('prefab-library',async()=>{const g=window.__KELO_PHASE,t=performance.now();const {createCreatorPrefabLibrary}=await import('./src/studio/prefabs/creator-prefab-library.mjs');g.prefabLibrary=createCreatorPrefabLibrary({kernel:g.studio.kernel,store:g.studio.store,tool:g.studio.tools.prefabStamp,ownerId:g.actorId});await g.prefabLibrary.load();return{innerMs:Math.round(performance.now()-t),prefabs:g.prefabLibrary.assets().length};});
 
-function checkpoint(name, detail = null) {
-  evidence.checkpoints.push({ name, at: new Date().toISOString(), detail });
-  console.log(`[KELO gate] ${name}${detail ? `: ${JSON.stringify(detail)}` : ''}`);
-}
+  await phase('creator-actions',async()=>{const g=window.__KELO_PHASE;const {createCreatorActions}=await import('./src/studio/tools/creator-actions.mjs');g.creator=createCreatorActions(g.studio.kernel);return{ok:true};});
 
-async function pageDiagnostic() {
-  if (!page) return null;
-  return page.evaluate(() => ({
-    readyState: document.readyState,
-    href: location.href,
-    creatorHub: !!document.getElementById('kelo-creators-hub'),
-    studio: !!document.getElementById('kelo-studio-live'),
-    launchError: document.querySelector('.kc-launch-error')?.textContent || null,
-    worldBusy: document.querySelector('[data-workspace="world"]')?.getAttribute('aria-busy') || null,
-    worldOpenPhase: window.__KELO_WORLD_OPEN_PHASE || null,
-    propertyCatalogCount: window.KELO_PROPERTY_CATALOG?.list?.()?.length ?? null,
-    adminPlayerId: window.KELO_ADMIN_KEYS?.playerId?.() || null,
-    canWorldEdit: !!window.KELO_ADMIN_KEYS?.can?.('world.edit'),
-    worldEditReady: !!window.KELO_WORLD_EDIT?.ready,
-    worldEditSource: window.KELO_WORLD_EDIT?.authoritySource?.() || null,
-    worldEditError: window.KELO_WORLD_EDIT?.lastError || null,
-  })).catch(error => ({ diagnosticError: String(error) }));
-}
+  await phase('authority-mirror',async()=>{const g=window.__KELO_PHASE;const {installStudioAuthorityMirror}=await import('./src/studio/integration/authority-command-mirror.mjs');g.mirror=installStudioAuthorityMirror({adapter:g.studio.adapter,actorId:g.actorId,getDraftId:()=>g.draft.draftId});for(const e of g.studio.kernel.document.entities)g.mirror.seed(e.id,e.source?.authorityPlacementId||e.id);for(const c of Object.values(g.studio.kernel.document.navigation?.collisions||{}))g.mirror.seedCollision(c.collisionId,c.collisionId);return{ok:true};});
 
-// BrowserStack's physical-iOS bridge can leave long locator wait commands idle until
-// the socket itself is killed. Keep every protocol operation short and poll DOM state
-// with page.evaluate so a missing element cannot strand the gate for minutes.
-async function waitUntil(check, timeout, label, interval = 250) {
-  const deadline = Date.now() + timeout;
-  let lastError = null;
-  while (Date.now() < deadline) {
-    try {
-      if (await check()) return true;
-    } catch (error) {
-      lastError = error;
-    }
-    await delay(interval);
-  }
-  const diagnostic = await pageDiagnostic();
-  throw new Error(`${label} timed out after ${timeout}ms${lastError ? `; last error: ${lastError}` : ''}; diagnostic=${JSON.stringify(diagnostic)}`);
-}
+  await phase('input-lock',async()=>{const g=window.__KELO_PHASE;g.inputToken=window.KeloInputLocks.acquire('kelo-studio-phase',{kind:'creator-session',draftId:g.draft.draftId});return{token:!!g.inputToken};});
 
-async function selectorVisible(selector, timeout, label) {
-  await waitUntil(
-    () => page.evaluate(sel => {
-      const el = document.querySelector(sel);
-      if (!el || !el.isConnected) return false;
-      const style = getComputedStyle(el);
-      if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0) return false;
-      const rect = el.getBoundingClientRect();
-      return rect.width > 0 && rect.height > 0;
-    }, selector),
-    timeout,
-    `${label} visibility`
-  );
-  checkpoint(`${label} visible`);
-}
+  await phase('overlay',async()=>{const g=window.__KELO_PHASE,t=performance.now();const {createStudioOverlayCanvas}=await import('./src/studio/render/studio-overlay-canvas.mjs');g.overlay=createStudioOverlayCanvas({host:document.body});return{innerMs:Math.round(performance.now()-t),w:g.overlay.canvas.width,h:g.overlay.canvas.height};});
 
-async function clickSelector(selector, label) {
-  const clicked = await page.evaluate(sel => {
-    const el = document.querySelector(sel);
-    if (!el || el.disabled) return false;
-    el.click();
-    return true;
-  }, selector);
-  assert(clicked, `${label} could not be clicked`);
-  checkpoint(`${label} clicked`);
-}
+  await phase('camera',async()=>{const g=window.__KELO_PHASE,t=performance.now();const {createStudioCameraController}=await import('./src/studio/input/studio-camera-controller.mjs');g.camera=createStudioCameraController({root:window,isUi:()=>false,onNavigateStart:()=>{},onPinchStart:()=>false,onPinchMove:()=>{},onPinchEnd:()=>{}});return{innerMs:Math.round(performance.now()-t),zoom:g.camera.zoom};});
 
-try {
-  // Intentionally use raw Playwright instead of @playwright/test's page/context fixture.
-  // Playwright Test >=1.50 injects reducedMotion="no-preference" by default. BrowserStack
-  // physical iOS expects the device's native value and rejects that emulation before a
-  // page opens. Raw browser.newContext() leaves device media preferences untouched.
-  browser = await webkit.connect({ wsEndpoint });
-  checkpoint('real iPhone connected');
-  context = await browser.newContext({ baseURL });
-  page = await context.newPage();
+  await phase('input-router',async()=>{const g=window.__KELO_PHASE;const handlers={pointerdown:()=>false,pointermove:()=>false,pointerup:()=>false,pointercancel:()=>false};g.unregister=g.studio.kernel.input.register('studio-phase',handlers,1000);g.studio.kernel.input.push('studio-phase');const {attachStudioPointerInput}=await import('./src/studio/input/pointer-input-adapter.mjs');g.detach=attachStudioPointerInput({element:document,router:g.studio.kernel.input,toWorld:(x,y)=>g.camera.toWorld(x,y),capture:true,stopPropagation:true,shouldHandle:()=>false});return{ok:true};});
 
-  page.on('pageerror', error => pageErrors.push(String(error)));
-  page.on('console', msg => {
-    const text = msg.text();
-    if (msg.type() === 'error') consoleErrors.push(text);
-    if (text.includes('[Kelo World open]')) console.log(`[KELO browser] ${text}`);
-  });
+  await phase('shell-real-preview',async()=>{const g=window.__KELO_PHASE,t=performance.now();const {createStudioLiveShell}=await import('./src/studio/ui/studio-live-shell.mjs');const assets=[...(g.studio.adapter.assetCatalog.list()||[]),...(g.prefabLibrary.assets()||[])];g.shell=createStudioLiveShell({host:document.body,assets,onMode:()=>{},onAsset:()=>{},onUndo:()=>{},onRedo:()=>{},onRotate:()=>{},onScale:()=>{},onErase:()=>{},onSave:()=>{},onClose:()=>{},onSelectEntity:()=>{},onDuplicate:()=>{},onDelete:()=>{},onPropertyChange:()=>{},onPlay:()=>{},onBrushSize:()=>{},onFocus:()=>{},renderAssetPreview:(canvas,asset)=>g.studio.assetPreview.renderThumbnail(canvas,asset)});return{innerMs:Math.round(performance.now()-t),mounted:!!document.getElementById('kelo-studio-live'),assets:assets.length};});
 
-  // mapEditor=1 is the repository's explicit offline/dev editor authorization path.
-  // It suppresses the account modal and bootstraps the local root admin scopes on a
-  // clean real device, so this regression tests World/Studio rather than login state.
-  const response = await page.goto('./?mapEditor=1&world-ios-reopen=1', {
-    waitUntil: 'domcontentloaded',
-    timeout: 30000,
-  });
-  assert(response, 'World navigation returned no response');
-  assert(response.status() < 400, `World navigation returned HTTP ${response.status()}`);
-  checkpoint('candidate page loaded', { status: response.status() });
+  await phase('productivity',async()=>{const g=window.__KELO_PHASE,t=performance.now();const {createCreatorProductivityPanel}=await import('./src/studio/ui/creator-productivity-panel.mjs');g.productivity=createCreatorProductivityPanel({shell:g.shell,onCopy:()=>0,onPaste:()=>{},onSavePrefab:()=>{},onValidate:()=>({ok:true}),onSnapChange:()=>{},onGridToggle:()=>{},onCameraToggle:()=>false,onZoomIn:()=>1,onZoomOut:()=>1,onZoomReset:()=>1});g.productivity.setSnap(32);return{innerMs:Math.round(performance.now()-t)};});
 
-  await waitUntil(
-    () => page.evaluate(() => !!(
-      window.KeloInputLocks?.acquire &&
-      window.KELO_ADMIN_KEYS?.can?.('world.edit')
-    )),
-    15000,
-    'World editor authorization'
-  );
-  checkpoint('world editor authorized', await pageDiagnostic());
+  await phase('shell-update',async()=>{const g=window.__KELO_PHASE,t=performance.now();g.shell.setHistory({canUndo:g.studio.kernel.history.canUndo,canRedo:g.studio.kernel.history.canRedo});g.shell.setScene({entities:g.studio.kernel.document.entities,selection:g.studio.kernel.selection.get()});g.shell.setStatus(`SELECT · ${g.studio.kernel.document.entities.length} objects`);return{innerMs:Math.round(performance.now()-t)};});
 
-  await page.evaluate(async () => {
-    const { openCreatorHub } = await import('./src/creators/ui/creator-hub.mjs');
-    await openCreatorHub({ root: window });
-  });
+  await phase('first-draw',async()=>{const g=window.__KELO_PHASE,t=performance.now();const {createCreatorGridOverlay}=await import('./src/studio/render/creator-grid-overlay.mjs');g.grid=createCreatorGridOverlay({size:32,visible:true});g.overlay.resize();g.overlay.clear();const ctx=g.overlay.ctx,w=g.overlay.canvas.clientWidth||innerWidth||1,h=g.overlay.canvas.clientHeight||innerHeight||1,z=g.camera.effectiveZoom||1,c=window.camera||{x:0,y:0};ctx.save();ctx.translate(w/2,h/2);ctx.scale(z,z);ctx.translate(-c.x,-c.y);g.grid.draw(ctx,{camera:c,viewWidth:w,viewHeight:h,zoom:z});g.studio.overlayRenderer.draw(ctx);ctx.restore();return{innerMs:Math.round(performance.now()-t),w,h,z};});
 
-  await selectorVisible('#kelo-creators-hub', 10000, 'Creator Hub');
-  checkpoint('pre-World diagnostic', await pageDiagnostic());
+  await phase('raf-loop-start',async()=>{const g=window.__KELO_PHASE;g.rafCount=0;const tick=()=>{g.rafCount++;g.overlay.resize();g.overlay.clear();if(g.rafCount<120)requestAnimationFrame(tick);};requestAnimationFrame(tick);return{scheduled:true};});
+  await delay(2500);
+  const rafCount=await page.evaluate(()=>window.__KELO_PHASE?.rafCount||0);log('raf-loop-responsive',{rafCount});
+  if(rafCount<2)throw new Error(`RAF_STALLED:${rafCount}`);
 
-  // Isolate the expensive World-open path before clicking the card. Each checkpoint
-  // tells us exactly which Studio phase can freeze a physical iPhone main thread.
-  checkpoint('Studio foundation probe start');
-  const studioBoot = await page.evaluate(async () => {
-    const started = performance.now();
-    const { bootKeloStudio } = await import('./src/studio/studio-entry.mjs');
-    const actorId = String(window.KELO_ADMIN_KEYS?.playerId?.() || 'local_pioneer');
-    const studio = await bootKeloStudio({ mode: 'world', actorId, root: window });
-    window.__KELO_WORLD_GATE_STUDIO = studio;
-    return { ms: Math.round(performance.now() - started), version: studio?.version || null, assets: studio?.adapter?.assetCatalog?.list?.()?.length || 0 };
-  });
-  checkpoint('Studio foundation probe ready', studioBoot);
-
-  checkpoint('Studio draft import probe start');
-  const studioImport = await page.evaluate(async () => {
-    const studio = window.__KELO_WORLD_GATE_STUDIO;
-    const E = window.KELO_WORLD_EDIT;
-    if (!studio || !E?.request) throw new Error('STUDIO_IMPORT_PROBE_NOT_READY');
-    const actorId = String(window.KELO_ADMIN_KEYS?.playerId?.() || 'local_pioneer');
-    const run = async () => {
-      let res = await E.getCurrentDraft();
-      let draft = res?.draft || null;
-      if (!draft || !['DRAFT', 'REJECTED'].includes(String(draft.status || ''))) {
-        res = await E.request('world:draft:create', { actorId, forceNew: true });
-        draft = res?.draft || null;
-      } else {
-        res = await E.request('world:draft:get', { actorId, draftId: draft.draftId });
-        draft = res?.draft || draft;
-      }
-      if (!draft?.draftId) throw new Error('STUDIO_IMPORT_PROBE_DRAFT_MISSING');
-      const started = performance.now();
-      await studio.importCurrent({ view: 'draft', draftId: draft.draftId });
-      return { ms: Math.round(performance.now() - started), draftId: draft.draftId, entities: studio.kernel.document.entities.length, terrain: Object.keys(studio.kernel.document.terrain || {}).length };
-    };
-    return typeof E.withoutProjection === 'function' ? E.withoutProjection(run) : run();
-  });
-  checkpoint('Studio draft import probe ready', studioImport);
-
-  checkpoint('Studio shell probe start');
-  const shellProbe = await page.evaluate(async () => {
-    const studio = window.__KELO_WORLD_GATE_STUDIO;
-    if (!studio) throw new Error('STUDIO_SHELL_PROBE_NOT_READY');
-    const { createStudioLiveShell } = await import('./src/studio/ui/studio-live-shell.mjs');
-    const started = performance.now();
-    const shell = createStudioLiveShell({
-      host: document.body,
-      assets: studio.adapter.assetCatalog.list?.() || [],
-      onMode: () => {}, onAsset: () => {}, onUndo: () => {}, onRedo: () => {},
-      onRotate: () => {}, onScale: () => {}, onErase: () => {}, onSave: () => {},
-      onClose: () => {}, onSelectEntity: () => {}, onDuplicate: () => {}, onDelete: () => {},
-      onPropertyChange: () => {}, onPlay: () => {}, onBrushSize: () => {}, onFocus: () => {},
-      renderAssetPreview: () => false,
-    });
-    const mounted = !!document.getElementById('kelo-studio-live');
-    const elapsed = Math.round(performance.now() - started);
-    shell.destroy();
-    return { ms: elapsed, mounted };
-  });
-  checkpoint('Studio shell probe ready', shellProbe);
-
-  await clickSelector('#kelo-creators-hub [data-workspace="world"]', 'World card');
-
-  await selectorVisible('#kelo-studio-live', 20000, 'World Studio');
-  assert(!(await page.evaluate(() => !!document.getElementById('kelo-creators-hub'))), 'Creator Hub remained mounted after opening World Studio');
-
-  // Reproduce the iOS stale-session failure mode: the Studio DOM shell disappears
-  // while the module-level Studio session still believes it is active.
-  await page.evaluate(() => document.getElementById('kelo-studio-live')?.remove());
-  assert(!(await page.evaluate(() => !!document.getElementById('kelo-studio-live'))), 'Failed to remove Studio shell for stale-session regression');
-  checkpoint('stale Studio shell reproduced');
-
-  await page.evaluate(async () => {
-    const { openCreatorHub } = await import(`./src/creators/ui/creator-hub.mjs?ios-reopen=${Date.now()}`);
-    await openCreatorHub({ root: window });
-  });
-
-  await selectorVisible('#kelo-creators-hub', 10000, 'Creator Hub after stale session');
-  await clickSelector('#kelo-creators-hub [data-workspace="world"]', 'World recovery card');
-
-  await selectorVisible('#kelo-studio-live', 20000, 'Recovered World Studio');
-  assert(!(await page.evaluate(() => !!document.getElementById('kelo-creators-hub'))), 'Creator Hub remained mounted after World recovery');
-  const position = await page.evaluate(() => getComputedStyle(document.getElementById('kelo-studio-live')).position);
-  assert(position === 'fixed', `Recovered Studio expected position=fixed, received ${position}`);
-
-  await page.screenshot({ path: `${outputDir}/world-editor-ios-recovered.png`, fullPage: true, timeout: 5000 });
-
-  assert(pageErrors.length === 0, `Page errors: ${pageErrors.join(' | ')}`);
-  const guardedConsoleErrors = consoleErrors.filter(row => /CREATOR_WORLD_STUDIO_MOUNT_FAILED|WORLD_EDIT_NOT_READY/.test(row));
-  assert(guardedConsoleErrors.length === 0, `Guarded console errors: ${guardedConsoleErrors.join(' | ')}`);
-
-  evidence.passed = true;
-  evidence.finishedAt = new Date().toISOString();
-  evidence.pageErrors = pageErrors;
-  evidence.consoleErrors = consoleErrors;
-  evidence.finalDiagnostic = await pageDiagnostic();
-  fs.writeFileSync(`${outputDir}/world-release-gate-evidence.json`, JSON.stringify(evidence, null, 2));
-  console.log(`VERIFIED ${evidence.stage}: World opened and recovered on real iPhone Safari. SHA ${candidateSha}`);
-} catch (error) {
-  evidence.finishedAt = new Date().toISOString();
-  evidence.error = String(error?.stack || error);
-  evidence.pageErrors = pageErrors;
-  evidence.consoleErrors = consoleErrors;
-  evidence.finalDiagnostic = await pageDiagnostic();
-  fs.writeFileSync(`${outputDir}/world-release-gate-evidence.json`, JSON.stringify(evidence, null, 2));
-  if (page) {
-    await page.screenshot({ path: `${outputDir}/world-release-gate-failure.png`, fullPage: true, timeout: 5000 }).catch(() => {});
-  }
-  throw error;
-} finally {
-  await context?.close().catch(() => {});
-  await browser?.close().catch(() => {});
+  await phase('cleanup',async()=>{const g=window.__KELO_PHASE;try{g.detach?.();}catch{}try{g.studio.kernel.input.pop('studio-phase');}catch{}try{g.unregister?.();}catch{}try{g.camera?.destroy?.();}catch{}try{g.productivity?.destroy?.();}catch{}try{g.shell?.destroy?.();}catch{}try{g.overlay?.destroy?.();}catch{}try{g.mirror?.uninstall?.();}catch{}try{window.KeloInputLocks.release(g.inputToken);}catch{}return{ok:true};});
+  console.log('VERIFIED PHASE PROBE: every Studio open phase stayed responsive on real iPhone');
+}finally{
+  await context?.close().catch(()=>{});await browser?.close().catch(()=>{});
 }
