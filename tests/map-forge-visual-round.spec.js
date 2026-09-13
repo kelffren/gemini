@@ -136,6 +136,10 @@ async function bootForge(page){
   return{forge,pageErrors};
 }
 
+async function waitForPreviewAssets(forge){
+  await expect.poll(async()=>forge.locator('[data-preview-assets-expected]').evaluate(node=>Number(node.dataset.previewAssetsExpected)>0&&Number(node.dataset.previewAssets)>=Number(node.dataset.previewAssetsExpected)),{timeout:20000,message:'all projected Map Forge sprites must render before visual evidence is captured'}).toBe(true);
+}
+
 async function generateSelected(page,forge,seed){
   await page.getByRole('spinbutton',{name:/Seed/}).fill(String(seed));
   await page.getByRole('combobox',{name:'Candidatos'}).selectOption({label:'Best of 4'});
@@ -154,6 +158,7 @@ test(`Map Forge ${STAGE} fixed-seed preview/runtime visual evidence`,async({page
   fs.mkdirSync('test-results',{recursive:true});
   const {forge,pageErrors}=await bootForge(page);
   const mainMap=await generateSelected(page,forge,MAIN_SEED);
+  await waitForPreviewAssets(forge);
   const mainMetrics=mapMetrics(mainMap);
   expect(mainMetrics.valid).toBe(true);expect(mainMetrics.errors).toEqual([]);
   if(STAGE==='after'){

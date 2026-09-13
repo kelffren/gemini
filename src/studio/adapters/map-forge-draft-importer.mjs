@@ -19,7 +19,10 @@ const SEMANTIC_ASSET_RULES=Object.freeze([
   {test:/\b(fountain|fuente)\b/,ids:['imperial:fuente-justicia','imperial:fuente-astral','imperial:fuente-leones']},
   {test:/\bmarket prop\b/,ids:['imperial:carrito-mercado']},
   {test:/\b(market|mercado|commerce|shop)\b/,ids:['imperial:kiosco']},
-  {test:/\b(ancient tree|tree|arbol|grove)\b/,ids:['imperial:arbol-florido-blanco','imperial:arbol-florido-azul']},
+  {test:/\b(ancient tree|tree|arbol|grove)\b/,ids:['imperial:arbol-florido-blanco','imperial:arbol-florido-azul'],contexts:Object.freeze([
+    {test:/^(dark_forest|woods|grove|deepwood)$/,ids:Object.freeze(['tree:oak-dense-dark','tree:pine-tall-evergreen','tree:willow-weeping','tree:oak-broad-green'])},
+    {test:/^(farms|fields)$/,ids:Object.freeze(['tree:apple-red','tree:birch-green','tree:canopy-light-green'])}
+  ])},
   {test:/\b(lamp|farola|light)\b/,ids:['imperial:farola','imperial:farola-monumental']},
   {test:/\b(bench|banco)\b/,ids:['imperial:banco']},
   {test:/\b(flower|floral|garden|jardin)\b/,ids:['imperial:jardinera-floral','imperial:jardinera-curva']},
@@ -39,7 +42,7 @@ function semanticText(row){return normalize([row?.kind,row?.type,row?.family,row
 function semanticRuleText(row){return normalize([row?.kind,row?.type,row?.family,row?.name,row?.label,row?.role].filter(Boolean).join(' '));}
 function semanticTokens(row){return [...new Set(semanticText(row).split(' ').filter(x=>x.length>=4&&!['landmark','district','anchor','primary','hero','destination'].includes(x)))];}
 function stableVariantIndex(row,count){let hash=2166136261;const pos=row?.position||row||{},key=`${semanticText(row)||String(row?.id||'map-forge')}|${Math.round(num(pos.x))},${Math.round(num(pos.y))}`;for(let i=0;i<key.length;i++){hash^=key.charCodeAt(i);hash=Math.imul(hash,16777619);}return count?(hash>>>0)%count:0;}
-function resolveRuleVariant(row,rule,catalog,rows){const available=rule.ids.map(id=>catalogGet(catalog,id,rows)).filter(Boolean);return available.length?available[stableVariantIndex(row,available.length)]:null;}
+function resolveRuleVariant(row,rule,catalog,rows){const context=row?.family==='tree'?(rule.contexts||[]).find(item=>item.test.test(String(row?.district||''))):null,contextual=(context?.ids||[]).map(id=>catalogGet(catalog,id,rows)).filter(Boolean),available=contextual.length?contextual:rule.ids.map(id=>catalogGet(catalog,id,rows)).filter(Boolean);return available.length?available[stableVariantIndex(row,available.length)]:null;}
 function resolveSemanticTemplate(row,catalog,rows){const explicit=String(row?.assetId||row?.prefabId||'');if(explicit){const t=catalogGet(catalog,explicit,rows);if(t)return t;}const text=semanticRuleText(row);for(const rule of SEMANTIC_ASSET_RULES)if(rule.test.test(text)){const t=resolveRuleVariant(row,rule,catalog,rows);if(t)return t;}const tokens=semanticTokens(row);let best=null,bestScore=0;for(const t of rows){const hay=normalize([t.id,t.label,t.family,t.category,t.sourceId].join(' '));let score=0;for(const token of tokens)if(hay.includes(token))score+=token.length>=7?3:2;if(score>bestScore){best=t;bestScore=score;}}return bestScore>=2?best:null;}
 function semanticFacingDegrees(row){const explicit=row?.rotation??row?.transform?.rotation;if(explicit!=null&&Number.isFinite(Number(explicit)))return Number(explicit);const facing=String(row?.frontage?.facing||row?.facing||'').toLowerCase();return FACING_DEGREES[facing]??0;}
 function rotatedTemplateSize(template,rotation){const w=Math.max(1,num(template?.width)||32),h=Math.max(1,num(template?.height)||32),q=((Math.floor(num(rotation))%4)+4)%4;return q%2?{w:h,h:w}:{w,h};}
