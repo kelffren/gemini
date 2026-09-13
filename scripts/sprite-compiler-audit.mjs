@@ -1,5 +1,14 @@
+/* KELO-INDEX
+ * area: CREATORS / SPRITE COMPILER / AUDIT
+ * keys: SPRITE COMPILER WORLD ASSET PIVOT FOOTPRINT PORTAL VARIANT SCALE ALPHA AUDIT
+ * purpose: deterministic regression coverage for spritesheet repair and single world-asset metadata
+ * online: N/A; authoring-only audit
+ */
 import assert from 'node:assert/strict';
 import {estimateCornerBackground,cleanBackgroundPixels,analyzeGridCells,planFrameNormalization,buildRepairReport} from '../src/creators/sprite-compiler/sprite-compiler-core.mjs';
+import {snapAlphaPixels,findOpaqueBounds,inferPortalOpening} from '../src/creators/sprite-compiler/sprite-world-asset-profile.mjs';
+import {compileWorldAssetPixels} from '../src/creators/sprite-compiler/sprite-world-asset-compiler.mjs';
+
 const W=40,H=40,COLS=2,ROWS=2,data=new Uint8ClampedArray(W*H*4);for(let i=0;i<data.length;i+=4){data[i]=248;data[i+1]=248;data[i+2]=248;data[i+3]=255;}
 const rect=(x0,y0,x1,y1,r=30,g=40,b=50)=>{for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){const i=(y*W+x)*4;data[i]=r;data[i+1]=g;data[i+2]=b;data[i+3]=255;}};rect(3,4,12,17);rect(24,2,35,18);rect(1,24,13,38);rect(25,23,37,37);
 const bg=estimateCornerBackground(data,W,H,{patch:0});assert.ok(bg&&bg.r>240);const cleaned=cleanBackgroundPixels(data,W,H,{background:'auto',colorThreshold:20,softEdge:0});assert.equal(cleaned.mode,'solid-corner');assert.ok(cleaned.removed>800);
@@ -7,4 +16,12 @@ const frames=analyzeGridCells(cleaned.data,W,H,{columns:COLS,rows:ROWS});assert.
 const plan=planFrameNormalization(frames,{targetWidth:32,targetHeight:32,padding:3,maxUpscale:4});assert.equal(plan.frames.length,4);const feet=new Set(plan.frames.map(f=>f.destination.feetY));assert.equal(feet.size,1);
 const fakeOutput=plan.frames.map(f=>Object.freeze({...f,clipped:false}));const report=buildRepairReport({sourceFrames:frames,outputFrames:fakeOutput,plan,backgroundCleanup:cleaned});assert.equal(report.pass,true);assert.equal(report.feetSpread,0);assert.equal(report.clippedAfter,0);
 const alpha=new Uint8ClampedArray(8*8*4);for(let y=2;y<7;y++)for(let x=2;x<6;x++){const i=(y*8+x)*4;alpha[i]=255;alpha[i+3]=255;}assert.equal(estimateCornerBackground(alpha,8,8,{patch:0}),null);const alphaClean=cleanBackgroundPixels(alpha,8,8);assert.equal(alphaClean.mode,'alpha');assert.equal(alphaClean.removed,0);
-console.log(JSON.stringify({ok:true,frames:report.frameCount,clippedBefore:report.clippedBefore,clippedAfter:report.clippedAfter,feetSpread:report.feetSpread,backgroundPixelsRemoved:report.backgroundPixelsRemoved,commonScale:Number(report.commonScale.toFixed(3))}));
+
+// Single world asset regression: imperial gate with an open center, broad base and AI-like alpha fringe.
+const AW=80,AH=80,asset=new Uint8ClampedArray(AW*AH*4);const fill=(x0,y0,x1,y1,a=255)=>{for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){const i=(y*AW+x)*4;asset[i]=235;asset[i+1]=195;asset[i+2]=55;asset[i+3]=a;}};
+fill(8,8,28,70);fill(52,8,72,70);fill(28,8,52,22);fill(8,70,72,75);for(let y=23;y<70;y++)for(let x=29;x<52;x++)asset[(y*AW+x)*4+3]=0;asset[(10*AW+10)*4+3]=252;asset[(2*AW+2)*4+3]=5;
+const snapped=snapAlphaPixels(asset,AW,AH);assert.equal(snapped.data[(10*AW+10)*4+3],255);assert.equal(snapped.data[(2*AW+2)*4+3],0);const assetBounds=findOpaqueBounds(snapped.data,AW,AH);assert.deepEqual({x:assetBounds.x,y:assetBounds.y,right:assetBounds.right,bottom:assetBounds.bottom},{x:8,y:8,right:72,bottom:75});const opening=inferPortalOpening(snapped.data,AW,AH,{bounds:assetBounds});assert.equal(opening.enabled,true);assert.ok(opening.confidence>.8);
+const compiled=compileWorldAssetPixels(asset,AW,AH,{assetId:'imperial_gate_A',category:'landmark_gate',nominalWidthTiles:3,variants:[{id:'A',spawnWeight:1},{id:'B',spawnWeight:.7,widthScale:.86}],placementRules:{minSpacing:10}}),worldAsset=compiled.profile;assert.equal(worldAsset.status,'USABLE');assert.ok(worldAsset.pivot.x>.45&&worldAsset.pivot.x<.55);assert.ok(worldAsset.pivot.y>.9);assert.ok(worldAsset.footprint.rect.width>45);assert.equal(worldAsset.collision.mode,'footprint-with-portal-cutout');assert.equal(worldAsset.collision.passThrough,true);assert.equal(worldAsset.collision.solidSegments.length,2);assert.equal(worldAsset.portal.walkThrough,true);assert.equal(worldAsset.scale.sizeClass,'large');assert.equal(worldAsset.scale.widthClass,'wide');assert.equal(worldAsset.variant.variantGroup,'imperial_gate');assert.equal(worldAsset.variant.variants[1].widthScale,.86);assert.equal(worldAsset.placementRules.nearPath,true);assert.equal(worldAsset.placementRules.minSpacing,10);assert.equal(compiled.metadata.cleanedPixels,undefined);
+const manual=compileWorldAssetPixels(asset,AW,AH,{assetId:'imperial_gate_C',category:'landmark_gate',portal:false,pivot:{x:.47,y:.99},footprint:{shape:'rect',rect:{x:14,y:71,width:52,height:5},confidence:1}}).profile;assert.equal(manual.portal.enabled,false);assert.equal(manual.pivot.reason,'manual-override');assert.equal(manual.footprint.source,'manual-override');assert.equal(manual.collision.passThrough,false);assert.ok(manual.styleValidation.warnings.includes('PORTAL_REVIEW_REQUIRED'));
+
+console.log(JSON.stringify({ok:true,frames:report.frameCount,clippedBefore:report.clippedBefore,clippedAfter:report.clippedAfter,feetSpread:report.feetSpread,backgroundPixelsRemoved:report.backgroundPixelsRemoved,commonScale:Number(report.commonScale.toFixed(3)),worldAsset:{status:worldAsset.status,pivot:worldAsset.pivot,footprint:worldAsset.footprint.rect,collisionMode:worldAsset.collision.mode,portal:{enabled:worldAsset.portal.enabled,confidence:worldAsset.portal.confidence},sizeClass:worldAsset.scale.sizeClass,variantGroup:worldAsset.variant.variantGroup}}));
