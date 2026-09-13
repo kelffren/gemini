@@ -40,7 +40,7 @@ export function createQuickBuildTool(kernel,{placement=null,root=globalThis}={})
   placement=placement||kernel.tools?.get?.('placement');
   if(!placement?.start||!placement?.move||!placement?.commit||!placement?.cancel)throw new Error('STUDIO_QUICK_BUILD_PLACEMENT_REQUIRED');
   const document=root?.document;
-  let destroyed=false,active=null,busy=false,launcher=null,palette=null,style=null,observer=null,previewUnsub=null;
+  let destroyed=false,active=null,busy=false,launcher=null,palette=null,style=null,observer=null,previewUnsub=null,seenShell=false;
   const pieces=resolveQuickBuildPieces({prefabs:kernel.prefabs.list?.()||[],overrides:root?.KELO_QUICK_BUILD_CATALOG||{}});
 
   const semanticComponents=piece=>({buildingPiece:{type:piece.type,system:'quick-build',version:1}});
@@ -79,6 +79,7 @@ export function createQuickBuildTool(kernel,{placement=null,root=globalThis}={})
   function ensureUi(){
     if(destroyed||!document)return null;
     const shell=document.getElementById?.('kelo-studio-live');if(!shell)return null;
+    seenShell=true;
     if(!style){style=document.createElement('style');style.dataset.keloQuickBuild='1';style.textContent=`
       #kelo-studio-live .ks-qb-launch{min-height:36px;border:1px solid rgba(140,240,180,.34);border-radius:10px;background:#123026;color:#bff7d4;font-size:7px;font-weight:950;padding:0 10px;letter-spacing:.06em}
       #kelo-studio-live .ks-qb-launch.on{border-color:#8cf0b4;background:#1a4938;color:#fff}
@@ -101,14 +102,12 @@ export function createQuickBuildTool(kernel,{placement=null,root=globalThis}={})
   }
   function syncUi(){if(launcher){launcher.classList.toggle('on',!!active);launcher.textContent=active?`⚒ ${active.label}`:'⚒ BUILD';}if(palette){palette.hidden=!active;palette.querySelectorAll?.('[data-qb-piece]')?.forEach(button=>button.classList.toggle('on',button.dataset.qbPiece===active?.type));}}
 
+  function destroy(){if(destroyed)return;destroyed=true;active=null;kernel.input.pop(CONTEXT);unregisterInput?.();previewUnsub?.();observer?.disconnect?.();document?.removeEventListener?.('keydown',keydown,true);launcher?.remove();palette?.remove();style?.remove();launcher=palette=style=observer=null;}
   function keydown(event){if(!active||event.defaultPrevented||event.repeat||event.target?.closest?.(EDITABLE))return;const key=norm(event.key);if(key==='escape'){event.preventDefault?.();event.stopImmediatePropagation?.();deactivate();}else if(key==='r'){event.preventDefault?.();event.stopImmediatePropagation?.();rotate();}}
   document?.addEventListener?.('keydown',keydown,true);
-  if(document?.documentElement&&root?.MutationObserver){observer=new root.MutationObserver(()=>ensureUi());observer.observe(document.documentElement,{childList:true,subtree:true});}
+  if(document?.documentElement&&root?.MutationObserver){observer=new root.MutationObserver(()=>{const shell=document.getElementById?.('kelo-studio-live');if(!shell&&seenShell){destroy();return;}ensureUi();});observer.observe(document.documentElement,{childList:true,subtree:true});}
   ensureUi();
   if(placement.onPreview){previewUnsub=placement.onPreview(next=>{if(!active||next)return;root.setTimeout?.(()=>{if(active&&!placement.getPreview?.()&&!busy)deactivate({cancel:false});},0);});}
 
-  return Object.freeze({
-    id:'quickBuild',version:'studio-quick-build-v1.0.0-phase1',pieces:pieces.map(copy),activate,deactivate,rotate,commitAt,get active(){return active?{...active}:null;},
-    destroy(){if(destroyed)return;destroyed=true;active=null;kernel.input.pop(CONTEXT);unregisterInput?.();previewUnsub?.();observer?.disconnect?.();document?.removeEventListener?.('keydown',keydown,true);launcher?.remove();palette?.remove();style?.remove();launcher=palette=style=observer=null;}
-  });
+  return Object.freeze({id:'quickBuild',version:'studio-quick-build-v1.0.0-phase1',pieces:pieces.map(copy),activate,deactivate,rotate,commitAt,get active(){return active?{...active}:null;},destroy});
 }
