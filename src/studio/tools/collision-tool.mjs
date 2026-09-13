@@ -9,6 +9,7 @@
 import { createCreateWorldCollisionCommand, createMoveWorldCollisionCommand, createRemoveWorldCollisionCommand } from '../document/world-surface-commands.mjs';
 
 const snap = (value, size) => Math.floor(Math.max(0, Number(value) || 0) / size) * size;
+const snapNearest = (value, size) => Math.round(Math.max(0, Number(value) || 0) / size) * size;
 const clone = value => value == null ? value : JSON.parse(JSON.stringify(value));
 const newId = () => `studio-collision:${globalThis.crypto?.randomUUID?.() || `${Date.now().toString(36)}:${Math.random().toString(36).slice(2,9)}`}`;
 
@@ -40,8 +41,9 @@ export function createCollisionTool(kernel) {
   function move(x, y) {
     if (!preview) return null;
     const t = tileSize(), ox = action === 'move' ? grabOffset.x : 0, oy = action === 'move' ? grabOffset.y : 0;
-    preview.x = snap((Number(x) || 0) - ox, t);
-    preview.y = snap((Number(y) || 0) - oy, t);
+    const snapMove = action === 'move' ? snapNearest : snap;
+    preview.x = snapMove((Number(x) || 0) - ox, t);
+    preview.y = snapMove((Number(y) || 0) - oy, t);
     return clone(preview);
   }
   async function commit() {
