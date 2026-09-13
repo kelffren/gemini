@@ -1,6 +1,6 @@
 /* KELO-INDEX
  * area: STUDIO / SELECT TOOL
- * owns: entity selection from spatial hit testing, semantic room expansion and one-shot armed grab handoff
+ * owns: entity selection from spatial hit testing, semantic room expansion/collapse and one-shot armed grab handoff
  * does-not-own: pointer listeners, drawing or persistent document mutation
  * public-api: createSelectTool(), resolveSelectHitRadius(), screenRadiusToWorld(), resolveRepeatSelectRadius()
  * online: local transient state only
@@ -95,6 +95,14 @@ export function createSelectTool(kernel,{root=globalThis}={}) {
       .map(row=>String(row.id));
   }
 
+  function isFullSemanticRoomSelected(roomIds){
+    if(roomIds.length<2)return false;
+    const selected=kernel.selection.get().map(String);
+    if(selected.length!==roomIds.length)return false;
+    const selectedSet=new Set(selected);
+    return roomIds.every(id=>selectedSet.has(String(id)));
+  }
+
   return Object.freeze({
     id: 'select',
     selectPoint(x, y, { append = false, preserveExisting = true, cycle = true, radius = null } = {}) {
@@ -136,8 +144,10 @@ export function createSelectTool(kernel,{root=globalThis}={}) {
       } else if (preserveExisting && currentIndex >= 0) hit = ordered[currentIndex];
 
       const roomIds = repeatedSelected ? semanticRoomIds(hit) : [];
-      if(roomIds.length>1) kernel.selection.set(roomIds);
-      else kernel.selection.set(hit.id);
+      if(roomIds.length>1){
+        if(isFullSemanticRoomSelected(roomIds))kernel.selection.set(hit.id);
+        else kernel.selection.set(roomIds);
+      }else kernel.selection.set(hit.id);
       lastPick = { x: px, y: py, key: stackKey, at: now };
       return hit.data || hit;
     },
