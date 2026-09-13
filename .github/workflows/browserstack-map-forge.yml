@@ -52,10 +52,21 @@ jobs:
     env:
       BROWSERSTACK_USERNAME: ${{ secrets.BROWSERSTACK_USERNAME }}
       BROWSERSTACK_ACCESS_KEY: ${{ secrets.BROWSERSTACK_ACCESS_KEY }}
+      KELO_CANDIDATE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
     steps:
       - name: Checkout exact candidate
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$KELO_CANDIDATE_SHA" || (echo "Checkout mismatch: expected $KELO_CANDIDATE_SHA, got $actual" && exit 1)
+          echo "Testing exact candidate: $actual"
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -131,7 +142,7 @@ jobs:
               test -f "$path" || continue
               local_hash="$(sha256sum "$path" | awk '{print $1}')"
               tmp="$(mktemp)"
-              if ! curl -fsSL "${KELO_PAGES}${path}?sha=${GITHUB_SHA}&attempt=${attempt}" -o "$tmp"; then
+              if ! curl -fsSL "${KELO_PAGES}${path}?sha=${KELO_CANDIDATE_SHA}&attempt=${attempt}" -o "$tmp"; then
                 all_live=0
                 rm -f "$tmp"
                 break
@@ -167,7 +178,7 @@ jobs:
         shell: bash
         run: |
           echo "VERIFIED ${KELO_RELEASE_STAGE}: World opened and reopened on a real iPhone with no guarded runtime errors."
-          echo "Candidate SHA: ${GITHUB_SHA}"
+          echo "Candidate SHA: ${KELO_CANDIDATE_SHA}"
 
       - name: Upload real-device evidence
         if: always()
