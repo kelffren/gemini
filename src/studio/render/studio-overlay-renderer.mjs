@@ -75,6 +75,7 @@ export function createStudioOverlayRenderer({ kernel, tools, assetPreview } = {}
     for (const id of kernel.selection.get()) { const row = kernel.spatial.get(id); if (row?.rect) drawRect(ctx, row.rect); }
     const marquee=tools?.marquee?.getPreview?.();if(marquee){ctx.save();ctx.fillStyle='rgba(231,197,106,.10)';ctx.fillRect(marquee.x,marquee.y,marquee.w,marquee.h);ctx.strokeStyle='rgba(231,197,106,.85)';drawRect(ctx,marquee,{dashed:true});ctx.restore();}
     drawBuildDrag(ctx,tools?.quickBuild?.getDragPreviews?.()||[]);
+    drawBuildDrag(ctx,tools?.roomBuild?.getPreviews?.()||[]);
     const placement = tools?.placement?.getPreview?.();if (placement) drawPlacement(ctx,placement);
     const prefab = tools?.prefabStamp?.getPreview?.();if(prefab)drawCreatorPrefab(ctx,prefab);
     drawPaintCopies(ctx,tools?.paintCopies?.getPreviews?.()||[]);
