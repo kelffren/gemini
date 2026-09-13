@@ -16,6 +16,12 @@ const studioShellMounted=root=>{
   const shell=doc.getElementById('kelo-studio-live');
   return !!(shell&&shell.isConnected!==false);
 };
+function markOpenPhase(root,phase){
+  const record=Object.freeze({phase:String(phase),at:Date.now()});
+  try{root.__KELO_WORLD_OPEN_PHASE=record;}catch{}
+  try{console.info(`[Kelo World open] ${record.phase}`);}catch{}
+  return record;
+}
 async function openMountedStudio(mod,root){
   let session=await mod.openKeloStudioLive({root});
   if(studioShellMounted(root))return session;
@@ -42,12 +48,16 @@ export function createWorldWorkspaceManifest({loader=()=>import('../../studio/in
     capability:'world.edit',
     availability:'active',
     async open({root=globalThis,mapDefinition=null,previewOnly=false}={}){
+      markOpenPhase(root,'authority:start');
       const edit=await waitForWorldEditAuthority(root);
+      markOpenPhase(root,'authority:ready');
       let prepared=null;
       if(mapDefinition){
+        markOpenPhase(root,'map-import:start');
         const bridge=await mapForgeImporter();
         if(typeof bridge.importMapForgeIntoWorldDraft!=='function')throw new Error('MAP_FORGE_STUDIO_IMPORTER_MISSING');
         prepared=await bridge.importMapForgeIntoWorldDraft({root,mapDefinition});
+        markOpenPhase(root,'map-import:ready');
       }
       if(previewOnly){
         if(!prepared?.draftId)throw new Error('MAP_FORGE_PREVIEW_DRAFT_MISSING');
@@ -58,15 +68,21 @@ export function createWorldWorkspaceManifest({loader=()=>import('../../studio/in
         if(typeof root.KeloCamera?.focus!=='function')throw new Error('MAP_FORGE_CAMERA_OWNER_NOT_READY');
         const focus=mapFocusPoint(mapDefinition);root.KeloCamera.focus(focus,{snap:true,source:'map-forge-exterior-preview'});
         root.showToast?.('Mapa generado cargado en el exterior como vista previa del borrador');
+        markOpenPhase(root,'preview:ready');
         return Object.freeze({mode:'map-forge-exterior-preview',draftId:prepared.draftId,prepared,focus,viewSnapshot:entered.viewSnapshot});
       }
+      markOpenPhase(root,'studio-module:start');
       const mod=await loader();
+      markOpenPhase(root,'studio-module:ready');
       if(typeof mod.openKeloStudioLive!=='function')throw new Error('CREATOR_WORLD_STUDIO_ENTRY_MISSING');
+      markOpenPhase(root,'studio-open:start');
       const session=await openMountedStudio(mod,root);
+      markOpenPhase(root,'studio-open:ready');
       if(prepared?.documentMetadata&&session?.studio?.kernel?.setDocument){
         const current=session.studio.kernel.document;
         session.studio.kernel.setDocument({...current,metadata:prepared.documentMetadata});
       }
+      markOpenPhase(root,'done');
       return session;
     }
   });
