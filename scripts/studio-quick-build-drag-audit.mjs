@@ -1,0 +1,41 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import {createStudioKernel} from '../src/studio/core/studio-kernel.mjs';
+import {createWorldDocument} from '../src/studio/document/world-document.mjs';
+import {createPlacementTool} from '../src/studio/tools/placement-tool.mjs';
+import {createQuickBuildTool} from '../src/studio/tools/quick-build-tool.mjs';
+
+const kernel=createStudioKernel({document:createWorldDocument({worldId:'audit:quick-build-drag',settings:{tileSize:32,chunkSize:256}})});
+kernel.prefabs.register({id:'wall',label:'Wall',category:'building',bounds:{w:64,h:16},components:{}});
+kernel.prefabs.register({id:'floor',label:'Floor',category:'building',bounds:{w:32,h:32},components:{}});
+const placement=createPlacementTool(kernel);kernel.tools.register(placement);
+const quick=createQuickBuildTool(kernel,{placement,root:{KELO_QUICK_BUILD_CATALOG:{wall:'wall',floor:'floor'}}});kernel.tools.register(quick);
+let executed=null;const off=kernel.commands.on(event=>{if(event.type==='execute')executed=event.command;});
+assert.equal(quick.activate('wall'),true);
+const down=kernel.input.route('pointerdown',{worldX:32,worldY:64,pointerType:'mouse'});assert.equal(down.handled,true);
+const move=kernel.input.route('pointermove',{worldX:250,worldY:64,pointerType:'mouse'});assert.equal(move.handled,true);
+const previews=quick.getDragPreviews();
+assert.equal(previews.length,4,'218px drag with 64px modules should preview four walls');
+assert.deepEqual(previews.map(row=>row.transform.x),[32,96,160,224],'drag preview must tile modules without gaps');
+assert.ok(previews.every(row=>row.transform.rotation===0),'horizontal drag must orient walls horizontally');
+const rows=await quick.commitDrag();
+assert.equal(rows.length,4,'drag commit must place all planned modules');
+assert.equal(kernel.document.entities.length,4,'all drag modules must persist');
+assert.equal(kernel.history.undoDepth,1,'entire drag must occupy exactly one history entry');
+assert.equal(executed?.type,'entity.place.batch','drag persistence must serialize as one batch command');
+assert.equal(executed?.commands?.length,4,'batch serialization must retain four child place commands');
+assert.ok(kernel.document.entities.every(row=>row.components?.buildingPiece?.type==='wall'),'batch pieces must retain semantic metadata');
+await kernel.undo();assert.equal(kernel.document.entities.length,0,'one Undo must remove the entire drag');
+await kernel.redo();assert.equal(kernel.document.entities.length,4,'one Redo must restore the entire drag');
+assert.equal(kernel.history.undoDepth,1,'Redo must restore a single history entry');
+
+quick.deactivate();quick.activate('floor');kernel.input.route('pointerdown',{worldX:0,worldY:0,pointerType:'touch'});kernel.input.route('pointermove',{worldX:0,worldY:100,pointerType:'touch'});
+const vertical=quick.getDragPreviews();assert.equal(vertical.length,4,'touch vertical drag must plan repeated floor modules');assert.ok(vertical.every(row=>row.transform.rotation===90),'vertical drag must orient modules vertically');
+
+const quickSource=fs.readFileSync(new URL('../src/studio/tools/quick-build-tool.mjs',import.meta.url),'utf8');
+const placementSource=fs.readFileSync(new URL('../src/studio/tools/placement-tool.mjs',import.meta.url),'utf8');
+assert.doesNotMatch(quickSource,/kernel\.execute\s*\(|KELO_WORLD_EDIT/,'Quick Build must not bypass placement/authority');
+assert.match(quickSource,/placement\.commitBatch\(/,'drag must delegate persistence to placement');
+assert.match(placementSource,/createCompositeCommand/,'batch placement must use the reusable composite command');
+off();quick.destroy();
+console.log(JSON.stringify({ok:true,phase:4,dragPreview:true,mouseDrag:true,touchDrag:true,batchEntities:4,historyEntries:1,oneUndo:true,oneRedo:true,semanticMetadata:true,authorityBypass:false},null,2));

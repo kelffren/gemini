@@ -1,6 +1,6 @@
 /* KELO-INDEX
  * area: STUDIO / OVERLAY RENDERER
- * owns: transient editor-only selection/ghost/gizmo/surface/collision/prefab/smart-guide/spacing/paint-copy primitives
+ * owns: transient editor-only selection/ghost/gizmo/surface/collision/prefab/smart-guide/spacing/paint-copy/build primitives
  * does-not-own: world rendering, terrain textures, gameplay sprites or physics
  * public-api: createStudioOverlayRenderer()
  * online: local-only
@@ -20,6 +20,17 @@ export function createStudioOverlayRenderer({ kernel, tools, assetPreview } = {}
     ctx.save();ctx.strokeStyle=stroke;ctx.lineWidth=state==='snapped'?3:2;drawRect(ctx,rect,{dashed:state!=='snapped'});
     const target=snap?.connection?.target;
     if(state==='snapped'&&target){ctx.fillStyle='rgba(140,240,180,.98)';ctx.beginPath();ctx.arc(Number(target.x)||0,Number(target.y)||0,5,0,Math.PI*2);ctx.fill();}
+    ctx.restore();
+  }
+  function drawBuildDrag(ctx,rows){
+    if(!rows?.length)return;
+    ctx.save();ctx.strokeStyle='rgba(140,240,180,.98)';
+    for(const row of rows){
+      const rect={x:Number(row.transform?.x)||0,y:Number(row.transform?.y)||0,w:Math.max(1,Number(row.bounds?.w)||1),h:Math.max(1,Number(row.bounds?.h)||1)};
+      const drew=assetPreview?.drawAsset?.(ctx,row.prefabId,rect.x,rect.y,{rotation:Number(row.transform?.rotation)||0,alpha:.52,placeholder:false});
+      if(!drew){ctx.save();ctx.globalAlpha=.14;ctx.fillRect(rect.x,rect.y,rect.w,rect.h);ctx.restore();}
+      drawRect(ctx,rect,{dashed:true,alpha:.9});
+    }
     ctx.restore();
   }
   function drawCreatorPrefab(ctx,preview){
@@ -63,6 +74,7 @@ export function createStudioOverlayRenderer({ kernel, tools, assetPreview } = {}
     if (!ctx) return;ctx.save();ctx.lineWidth = 2;
     for (const id of kernel.selection.get()) { const row = kernel.spatial.get(id); if (row?.rect) drawRect(ctx, row.rect); }
     const marquee=tools?.marquee?.getPreview?.();if(marquee){ctx.save();ctx.fillStyle='rgba(231,197,106,.10)';ctx.fillRect(marquee.x,marquee.y,marquee.w,marquee.h);ctx.strokeStyle='rgba(231,197,106,.85)';drawRect(ctx,marquee,{dashed:true});ctx.restore();}
+    drawBuildDrag(ctx,tools?.quickBuild?.getDragPreviews?.()||[]);
     const placement = tools?.placement?.getPreview?.();if (placement) drawPlacement(ctx,placement);
     const prefab = tools?.prefabStamp?.getPreview?.();if(prefab)drawCreatorPrefab(ctx,prefab);
     drawPaintCopies(ctx,tools?.paintCopies?.getPreviews?.()||[]);
