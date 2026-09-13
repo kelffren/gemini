@@ -52,7 +52,8 @@ for(const seed of SEEDS){
   assert.ok(exits.length>=1,`${seed}: at least one authored world-edge gateway must resolve`);
   assert.ok(exits.every(scene=>scene.memberCount===2),`${seed}: every resolved world-edge gateway must remain a balanced pair`);
   assert.ok(exits.every(scene=>(scene.connectors||[]).some(connector=>connector.kind==='road'&&connector.required&&connector.roadId)),`${seed}: every world-edge gateway must retain its egress road connector`);
-  if(seed===PRIMARY_SEED){assert.ok(exits.length>=2,`${seed}: fallback semantic pairs must frame at least two world exits`);assert.ok(exits.some(scene=>scene.exitId==='exit_northwest'&&scene.members.every(member=>member.family==='rock')),`${seed}: northwest forest exit must fall back from unavailable shrubs to authored stone markers`);}
+  assert.ok(exits.every(scene=>{const plan=map.sceneBuildPlan.find(row=>row.sceneId===scene.id);return plan&&Array.isArray(plan.needsGeneration)&&plan.needsGeneration.length===0;}),`${seed}: every resolved world-edge gateway must be drawable with approved sprite art now, not future generation`);
+  if(seed===PRIMARY_SEED){assert.ok(exits.length>=2,`${seed}: fallback semantic pairs must frame at least two world exits`);assert.ok(exits.some(scene=>scene.exitId==='exit_northwest'&&scene.members.every(member=>member.family==='tree')),`${seed}: northwest forest exit must fall back from unavailable shrubs to approved tree markers`);}
   const royalGrove=landmarkPrefabs.find(scene=>scene.landmarkId==='ancient_tree');
   const royalCanopy=(royalGrove?.members||[]).filter(member=>member.family==='tree');
   assert.equal(royalCanopy.length,2,`${seed}: Royal Capital ancient grove must retain its authored tree canopy`);
