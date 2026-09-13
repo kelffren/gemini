@@ -91,7 +91,7 @@ try{
   const loops=report.diagnostics?.observerStats?.filter?.(row=>row.tripped)||[];
   if(loops.length)throw new Error(`STUDIO_OBSERVER_LOOP:${JSON.stringify(loops)}`);
 
-  await page.locator('#kelo-studio-live [data-act="close"]').click();
+  await page.getByRole('button',{name:'Cerrar Kelo Studio'}).click();
   await page.locator('#kelo-studio-live').waitFor({state:'detached',timeout:8000});report.closed=true;
   if(errors.length)throw new Error(`PAGE_ERRORS:${JSON.stringify(errors)}`);
   report.ok=true;console.log(JSON.stringify(report,null,2));
