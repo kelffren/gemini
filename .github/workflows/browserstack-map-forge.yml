@@ -6,6 +6,8 @@ on:
     branches:
       - main
     paths:
+      - 'src/creators/workspaces/world-workspace.mjs'
+      - 'tests/world-editor-ios-reopen.spec.js'
       - '.github/workflows/browserstack-map-forge.yml'
 
 jobs:
@@ -32,11 +34,25 @@ jobs:
           test -n "$BROWSERSTACK_USERNAME" || (echo "Missing BROWSERSTACK_USERNAME secret" && exit 1)
           test -n "$BROWSERSTACK_ACCESS_KEY" || (echo "Missing BROWSERSTACK_ACCESS_KEY secret" && exit 1)
 
+      - name: Wait for matching Pages deployment
+        shell: bash
+        run: |
+          for i in {1..36}; do
+            if curl -fsSL "${KELO_PAGES}src/creators/workspaces/world-workspace.mjs?sha=${GITHUB_SHA}&attempt=${i}" | grep -q 'CREATOR_WORLD_STUDIO_MOUNT_FAILED'; then
+              echo "Matching World launch recovery is live on Pages"
+              exit 0
+            fi
+            echo "Waiting for Pages deployment (${i}/36)"
+            sleep 10
+          done
+          echo "Timed out waiting for the fixed World workspace on Pages"
+          exit 1
+
       - name: Install dependencies
         run: npm install
 
-      - name: Run Map Forge on real iPhone
-        run: npm run test:browserstack:map-forge
+      - name: Run Map Forge and World reopen on real iPhone
+        run: npm run test:browserstack:map-forge -- tests/world-editor-ios-reopen.spec.js
 
       - name: Upload Playwright evidence
         if: always()
