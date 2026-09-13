@@ -14,13 +14,6 @@ platforms:
     deviceName: iPhone 14 Pro
     playwrightConfigOptions:
       name: ios-real-iphone-14-pro
-      use:
-        # Real iOS owns the device media preferences. Playwright >=1.50 defaults
-        # reducedMotion to "no-preference", but BrowserStack real iOS requires
-        # the system/default value (reported as "none") when creating context.
-        # Explicit null prevents the SDK-generated config from sending desktop
-        # media emulation to the physical iPhone session.
-        reducedMotion: null
 
 parallelsPerPlatform: 1
 
