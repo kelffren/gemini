@@ -1,6 +1,6 @@
 /* KELO-INDEX
  * area: STUDIO / QUICK BUILD ROOM
- * owns: rectangular room planning, semantic room identity, intentional drag gating, live quantized measurement, desktop square lock and batch commit through placement
+ * owns: rectangular room planning, semantic room identity, intentional drag gating, live quantized measurement, desktop square/center modifiers and batch commit through placement
  * does-not-own: document mutation, CommandBus, authority, asset rendering
  * public-api: createRoomBuildTool(), resolveRoomDragThreshold()
  * online: persistent mutation delegates to placement.commitBatch() -> CommandBus -> authority
@@ -38,26 +38,29 @@ export function createRoomBuildTool(kernel,{placement=null,quickBuild=null,root=
   const wallLength=()=>{const g=grid(),w=wallBounds().w;return Math.max(g,Math.round(w/g)*g);};
   function clearTransient({keepDrag=false}={}){previews=[];plannedRoomId=null;measurement=null;planSignature=null;if(!keepDrag)drag=null;syncButton();}
   function wallRowFromSegmentStart(x,y,rotation,roomId,edge,index){const piece=wallPiece(),bounds=wallBounds();let tx=x,ty=y-bounds.h/2;if(rotation===90){tx=x-bounds.w/2;ty=y-bounds.h/2+bounds.w/2;}return{prefabId:piece.prefabId,transform:{x:tx,y:ty,rotation},bounds:{...bounds},components:semantic(roomId,edge,index)};}
-  function planRect(ax,ay,bx,by,{square=false}={}){
+  function planRect(ax,ay,bx,by,{square=false,centered=false}={}){
     plannerStats.requests++;
     const g=grid(),length=wallLength(),roomId=plannedRoomId||(plannedRoomId=newRoomId());
     const startX=snap(ax,g),startY=snap(ay,g),pointerX=snap(bx,g),pointerY=snap(by,g);
-    const requestedWidth=Math.abs(pointerX-startX),requestedHeight=Math.abs(pointerY-startY);
-    let countX,countY,endX,endY;
+    const rawWidth=Math.abs(pointerX-startX),rawHeight=Math.abs(pointerY-startY);
+    const requestedWidth=centered?rawWidth*2:rawWidth,requestedHeight=centered?rawHeight*2:rawHeight;
+    let countX,countY,x0,x1,y0,y1;
     if(square){
       const requestedSpan=Math.max(requestedWidth,requestedHeight),count=Math.max(1,Math.round(Math.max(length,requestedSpan)/length));
       countX=countY=count;
-      endX=startX+(pointerX<startX?-1:1)*count*length;
-      endY=startY+(pointerY<startY?-1:1)*count*length;
     }else{
       countX=Math.max(1,Math.round(Math.max(length,requestedWidth)/length));
       countY=Math.max(1,Math.round(Math.max(length,requestedHeight)/length));
-      endX=startX+(pointerX<startX?-1:1)*countX*length;
-      endY=startY+(pointerY<startY?-1:1)*countY*length;
     }
-    const x0=Math.min(startX,endX),x1=Math.max(startX,endX),y0=Math.min(startY,endY),y1=Math.max(startY,endY);
-    const signature=`${roomId}|${x0}|${y0}|${x1}|${y1}|${countX}|${countY}|${square?1:0}|${length}`;
-    const nextMeasurement={x:x0,y:y0,width:x1-x0,height:y1-y0,requestedWidth,requestedHeight,deltaWidth:(x1-x0)-requestedWidth,deltaHeight:(y1-y0)-requestedHeight,modulesX:countX,modulesY:countY,wallLength:length,totalWalls:2*(countX+countY),squareLocked:!!square};
+    if(centered){
+      const halfW=countX*length/2,halfH=countY*length/2;
+      x0=startX-halfW;x1=startX+halfW;y0=startY-halfH;y1=startY+halfH;
+    }else{
+      const endX=startX+(pointerX<startX?-1:1)*countX*length,endY=startY+(pointerY<startY?-1:1)*countY*length;
+      x0=Math.min(startX,endX);x1=Math.max(startX,endX);y0=Math.min(startY,endY);y1=Math.max(startY,endY);
+    }
+    const signature=`${roomId}|${x0}|${y0}|${x1}|${y1}|${countX}|${countY}|${square?1:0}|${centered?1:0}|${length}`;
+    const nextMeasurement={x:x0,y:y0,width:x1-x0,height:y1-y0,requestedWidth,requestedHeight,deltaWidth:(x1-x0)-requestedWidth,deltaHeight:(y1-y0)-requestedHeight,modulesX:countX,modulesY:countY,wallLength:length,totalWalls:2*(countX+countY),squareLocked:!!square,centered:!!centered,centerX:centered?startX:null,centerY:centered?startY:null};
     if(signature===planSignature&&previews.length){plannerStats.reuses++;measurement=nextMeasurement;syncButton();return copy(previews);}
     plannerStats.rebuilds++;
     const rows=[];
@@ -70,7 +73,7 @@ export function createRoomBuildTool(kernel,{placement=null,quickBuild=null,root=
   function deactivate(){if(!active)return false;active=false;clearTransient();kernel.input.pop(CONTEXT);syncButton();return true;}
   async function commitRoom(){if(!active||busy||previews.length<4)return null;busy=true;try{const rows=previews.map(copy),roomId=plannedRoomId;const committed=await placement.commitBatch(rows,{label:`Build room (${rows.length} walls)`});clearTransient();return Object.assign(committed,{roomId});}finally{busy=false;}}
   function dragDistance(e){return drag?Math.hypot((Number(e.worldX)||0)-drag.rawX,(Number(e.worldY)||0)-drag.rawY):0;}
-  function maybePlanDrag(e){if(!drag)return false;if(!drag.started){if(dragDistance(e)<drag.threshold)return false;drag.started=true;plannedRoomId=newRoomId();}planRect(drag.x,drag.y,e.worldX,e.worldY,{square:!!e.shiftKey});return true;}
+  function maybePlanDrag(e){if(!drag)return false;if(!drag.started){if(dragDistance(e)<drag.threshold)return false;drag.started=true;plannedRoomId=newRoomId();}planRect(drag.x,drag.y,e.worldX,e.worldY,{square:!!e.shiftKey,centered:!!e.altKey});return true;}
   const handlers={
     pointerdown:e=>{if(!active)return false;const g=grid(),pointerType=e.pointerType||'mouse';clearTransient();drag={x:snap(e.worldX,g),y:snap(e.worldY,g),rawX:Number(e.worldX)||0,rawY:Number(e.worldY)||0,pointerType,threshold:resolveRoomDragThreshold(pointerType,{root}),started:false};return true;},
     pointermove:e=>{if(!active||!drag)return!!active;maybePlanDrag(e);return true;},
@@ -79,9 +82,9 @@ export function createRoomBuildTool(kernel,{placement=null,quickBuild=null,root=
   };
   const unregister=kernel.input.register(CONTEXT,handlers,2300);
   function ensureButton(){if(destroyed||!document)return;const palette=document.querySelector?.('.ks-qb-palette');if(!palette)return;if(button?.isConnected)return;button=document.createElement('button');button.type='button';button.className='ks-qb-piece';button.dataset.qbRoom='1';button.setAttribute('aria-pressed','false');button.addEventListener('click',event=>{event.preventDefault?.();event.stopPropagation?.();active?deactivate():activate();});const cancel=palette.querySelector?.('[data-qb-cancel]');palette.insertBefore(button,cancel||null);syncButton();}
-  function syncButton(){if(!button)return;button.classList.toggle('on',active);button.setAttribute('aria-pressed',active?'true':'false');button.textContent=active?(measurement?`▣ ${measurement.squareLocked?'□ ':''}${Math.round(measurement.width)}×${Math.round(measurement.height)}`:'▣ ROOM ON'):'▣ ROOM';}
+  function syncButton(){if(!button)return;button.classList.toggle('on',active);button.setAttribute('aria-pressed',active?'true':'false');button.textContent=active?(measurement?`▣ ${measurement.centered?'⊙ ':''}${measurement.squareLocked?'□ ':''}${Math.round(measurement.width)}×${Math.round(measurement.height)}`:'▣ ROOM ON'):'▣ ROOM';}
   function destroy(){if(destroyed)return;destroyed=true;active=false;clearTransient();kernel.input.pop(CONTEXT);unregister?.();observer?.disconnect?.();button?.remove();button=null;}
   if(document?.documentElement&&root?.MutationObserver){observer=new root.MutationObserver(()=>{ensureButton();syncButton();});observer.observe(document.documentElement,{childList:true,subtree:true});}
   ensureButton();
-  return Object.freeze({id:'roomBuild',version:'studio-room-build-v1.5.0-plan-cache',activate,deactivate,planRect,commitRoom,getPreviews:()=>copy(previews),getMeasurement:()=>copy(measurement),getPlannerStats:()=>({...plannerStats}),get active(){return active;},destroy});
+  return Object.freeze({id:'roomBuild',version:'studio-room-build-v1.6.0-centered-drag',activate,deactivate,planRect,commitRoom,getPreviews:()=>copy(previews),getMeasurement:()=>copy(measurement),getPlannerStats:()=>({...plannerStats}),get active(){return active;},destroy});
 }

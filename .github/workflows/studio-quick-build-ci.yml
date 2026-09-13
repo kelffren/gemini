@@ -16,6 +16,7 @@ on:
       - 'scripts/studio-room-drag-threshold-audit.mjs'
       - 'scripts/studio-room-square-lock-audit.mjs'
       - 'scripts/studio-room-plan-cache-audit.mjs'
+      - 'scripts/studio-room-centered-drag-audit.mjs'
       - '.github/workflows/studio-quick-build-ci.yml'
   push:
     branches: [main]
@@ -33,6 +34,7 @@ on:
       - 'scripts/studio-room-drag-threshold-audit.mjs'
       - 'scripts/studio-room-square-lock-audit.mjs'
       - 'scripts/studio-room-plan-cache-audit.mjs'
+      - 'scripts/studio-room-centered-drag-audit.mjs'
 
 jobs:
   audit:
@@ -57,6 +59,7 @@ jobs:
           node --check scripts/studio-room-drag-threshold-audit.mjs
           node --check scripts/studio-room-square-lock-audit.mjs
           node --check scripts/studio-room-plan-cache-audit.mjs
+          node --check scripts/studio-room-centered-drag-audit.mjs
       - name: Quick Build phase 1-3 contract
         run: node scripts/studio-quick-build-audit.mjs
       - name: Quick Build phase 4 drag contract
@@ -69,3 +72,5 @@ jobs:
         run: node scripts/studio-room-square-lock-audit.mjs
       - name: Quick Build phase 5.6 ROOM quantized plan cache contract
         run: node scripts/studio-room-plan-cache-audit.mjs
+      - name: Quick Build phase 5.7 ROOM centered drag contract
+        run: node scripts/studio-room-centered-drag-audit.mjs
