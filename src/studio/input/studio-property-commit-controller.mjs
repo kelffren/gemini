@@ -13,7 +13,7 @@ export function shouldHandleStudioPropertyCommitKey(event){
   if(!event||event.defaultPrevented||event.repeat||event.ctrlKey||event.metaKey||event.altKey)return false;
   if(!event.target?.matches?.(PROPERTY_SELECTOR))return false;
   const key=String(event.key||'');
-  return key==='Enter'||key==='Escape';
+  return key==='Enter'||key==='Escape'||key==='Tab';
 }
 
 export function shouldHandleStudioPropertyFocusKey(event){
@@ -59,10 +59,10 @@ export function createStudioPropertyCommitController({root=globalThis}={}){
     }
     if(!shouldHandleStudioPropertyCommitKey(event))return;
     const input=event.target;
-    event.preventDefault?.();
-    event.stopPropagation?.();
 
     if(event.key==='Escape'){
+      event.preventDefault?.();
+      event.stopPropagation?.();
       const initial=initialValues.get(input);
       if(initial!==undefined)input.value=initial;
       input.blur?.();
@@ -70,9 +70,19 @@ export function createStudioPropertyCommitController({root=globalThis}={}){
     }
 
     const before=Array.from(document.querySelectorAll?.(PROPERTY_SELECTOR)||[]);
+    const enabledBefore=before.filter(field=>!field?.disabled&&field?.getAttribute?.('aria-disabled')!=='true');
     const sourceIndex=before.indexOf(input);
+    const enabledSourceIndex=enabledBefore.indexOf(input);
     const direction=event.shiftKey?-1:1;
     const sourceProp=String(input.dataset?.prop??input.getAttribute?.('data-prop')??'');
+    const isTab=event.key==='Tab';
+
+    // Keep native Tab behavior at the panel edges so keyboard users can leave the
+    // Inspector naturally. Internal Tab navigation is stabilized across rerenders.
+    if(isTab&&(enabledSourceIndex<0||enabledSourceIndex+direction<0||enabledSourceIndex+direction>=enabledBefore.length))return;
+
+    event.preventDefault?.();
+    event.stopPropagation?.();
 
     // Blur is intentionally canonical: the shell's existing `change` listener
     // owns conversion/clamping and forwards through its established CommandBus path.
@@ -90,7 +100,8 @@ export function createStudioPropertyCommitController({root=globalThis}={}){
       }
       if(index<0&&sourceIndex>=0)index=Math.min(sourceIndex,fields.length-1);
       if(index<0)return;
-      const nextIndex=(index+direction+fields.length)%fields.length;
+      const nextIndex=isTab?index+direction:(index+direction+fields.length)%fields.length;
+      if(nextIndex<0||nextIndex>=fields.length)return;
       const next=fields[nextIndex];
       if(!next||next===input&&fields.length===1)return;
       next.focus?.();
@@ -101,7 +112,7 @@ export function createStudioPropertyCommitController({root=globalThis}={}){
   document.addEventListener('focusin',focusin,true);
   document.addEventListener('keydown',keydown,true);
   return Object.freeze({
-    version:'studio-property-commit-v1.3.0-cyclic-navigation',
+    version:'studio-property-commit-v1.4.0-stable-tab-navigation',
     focusFirstProperty,
     destroy(){
       if(destroyed)return;
