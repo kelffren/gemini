@@ -51,9 +51,7 @@ const LANDMARK_SPECS=Object.freeze({
   mine_entrance:Object.freeze({label:'Entrada de mina',assetCandidates:Object.freeze([]),promptHint:'entrada de mina 2D pixel art, boca frontal legible y conectable a camino, fondo transparente'})
 });
 
-function spriteRecord(key,{kind,semantic,label,orientation='upright',assetCandidates=[],promptHint='sprite 2D pixel art, fondo transparente'}={}){
-  return{key,kind,semantic,label:label||semantic,orientation,assetCandidates:[...assetCandidates],usageCount:0,districts:[],sceneIds:[],roles:[],instanceIds:[],generation:{format:'png',background:'transparent',promptHint}};
-}
+function spriteRecord(key,{kind,semantic,label,orientation='upright',assetCandidates=[],promptHint='sprite 2D pixel art, fondo transparente'}={}){return{key,kind,semantic,label:label||semantic,orientation,assetCandidates:[...assetCandidates],usageCount:0,districts:[],sceneIds:[],roles:[],instanceIds:[],generation:{format:'png',background:'transparent',promptHint}};}
 function ensure(records,key,spec){let row=records.get(key);if(!row){row=spriteRecord(key,spec);records.set(key,row);}return row;}
 function addUsage(row,{district=null,sceneId=null,role=null,instanceId=null}={}){row.usageCount++;if(district)row.districts.push(district);if(sceneId)row.sceneIds.push(sceneId);if(role)row.roles.push(role);if(instanceId)row.instanceIds.push(instanceId);}
 function finalize(row){return{...row,districts:uniq(row.districts),sceneIds:uniq(row.sceneIds),roles:uniq(row.roles),instanceIds:uniq(row.instanceIds),needsGeneration:row.assetCandidates.length===0};}
@@ -61,9 +59,10 @@ function sceneMembership(parts){const byDecoration=new Map(),byLandmark=new Map(
 function landmarkSpec(type){const spec=LANDMARK_SPECS[type]||{};return{kind:'landmark',semantic:type,label:spec.label||String(type||'Landmark'),orientation:'directional',assetCandidates:spec.assetCandidates||[],promptHint:spec.promptHint||`${String(type||'landmark').replaceAll('_',' ')} 2D pixel art top-down/3-quarter, fachada o frente claramente definido, fondo transparente`};}
 function decorationSpec(family){const spec=DECORATION_SPECS[family]||{};return{kind:'decoration',semantic:family,label:spec.label||String(family||'Decoración'),orientation:spec.orientation||'upright',assetCandidates:spec.assetCandidates||[],promptHint:spec.promptHint||`${String(family||'prop').replaceAll('_',' ')} 2D pixel art, fondo transparente`};}
 function districtKind(parts,id){return String((parts.districts||[]).find(row=>row.id===id)?.kind||'default').toLowerCase();}
+function districtHasSnow(parts,id){const cells=(parts.terrain?.cells||[]).filter(row=>!id||row.district===id);return cells.some(row=>String(row.material||'').toLowerCase()==='snow');}
 function treePoolFor(decoration,parts,context){
   const biome=String(context?.biome||'').toLowerCase(),kind=districtKind(parts,decoration?.district);
-  if(biome.includes('snow')||biome.includes('tundra')||biome.includes('winter'))return KELO_TREE_ASSET_POOLS.snow;
+  if(biome.includes('snow')||biome.includes('tundra')||biome.includes('winter')||districtHasSnow(parts,decoration?.district))return KELO_TREE_ASSET_POOLS.snow;
   if(kind==='ruins'||kind==='mine')return KELO_TREE_ASSET_POOLS.ruins;
   if(kind==='farm')return KELO_TREE_ASSET_POOLS.farm;
   if(kind==='forest')return KELO_TREE_ASSET_POOLS.forest;
@@ -73,13 +72,11 @@ function treePoolFor(decoration,parts,context){
 function candidatesForDecoration(decoration,parts,context){return decoration?.family==='tree'?treePoolFor(decoration,parts,context):decorationSpec(decoration?.family).assetCandidates;}
 function chooseAsset(candidates,decoration,context){
   if(!candidates?.length)return null;
-  const key=`${context?.seed??0}|${decoration?.id||'dec'}|${decoration?.district||'none'}|${decoration?.family||'unknown'}`;
+  const key=`${context?.seed??0}|${decoration?.id||'dec'}|${decoration?.district||'none'}|${decoration?.family||'unknown'}|${Number(decoration?.x)||0}|${Number(decoration?.y)||0}`;
   return candidates[seed32(key)%candidates.length];
 }
 
-export function hasApprovedDecorationSprite(family){
-  return (DECORATION_SPECS[String(family||'')]?.assetCandidates?.length||0)>0;
-}
+export function hasApprovedDecorationSprite(family){return (DECORATION_SPECS[String(family||'')]?.assetCandidates?.length||0)>0;}
 
 export function buildSpriteManifest(parts,context={}){
   const records=new Map(),membership=sceneMembership(parts),instanceBindings=[];
