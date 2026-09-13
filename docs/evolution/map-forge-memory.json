@@ -1,6 +1,383 @@
 {
-  "schema": "kelo-evolution-memory-v1",
+  "schema": "kelo-evolution-memory-v2",
   "systemId": "map-forge",
-  "champion": null,
-  "entries": []
+  "champion": {
+    "candidateId": "KELO_FOREST_V1:mf-4199bdca4164:7b9e7099",
+    "score": 88.975,
+    "fingerprint": "mf-4199bdca4164",
+    "metadata": {
+      "recipeId": "KELO_FOREST_V1",
+      "holdoutScore": 89.466,
+      "paired": {
+        "cases": 4,
+        "wins": 4,
+        "losses": 0,
+        "ties": 0,
+        "winRate": 100,
+        "meanDelta": 0.6761,
+        "medianDelta": 0.6016,
+        "worstDelta": 0.4692
+      },
+      "evidence": {
+        "evaluatorVersion": "map-forge-evolution-v3",
+        "recipeId": "KELO_FOREST_V1",
+        "searchSeedFingerprint": "0c96137c42837b83",
+        "holdoutSeedFingerprint": "3927ac7eb909e4a4",
+        "baselineFingerprint": "mf-6c9f0f47bfeb",
+        "championFingerprint": "mf-4199bdca4164",
+        "baselineScore": 88.428,
+        "championScore": 88.975,
+        "holdoutBaselineScore": 88.834,
+        "holdoutChampionScore": 89.466,
+        "fingerprint": "mf-evidence-871a80302370"
+      },
+      "mutations": [
+        {
+          "geneId": "style.monumentality",
+          "scope": "style",
+          "before": 0.34,
+          "after": 0.237,
+          "delta": -0.103
+        },
+        {
+          "geneId": "style.decoration",
+          "scope": "style",
+          "before": 0.82,
+          "after": 0.6895,
+          "delta": -0.1305
+        },
+        {
+          "geneId": "style.vegetation",
+          "scope": "style",
+          "before": 0.96,
+          "after": 0.8714,
+          "delta": -0.0886
+        }
+      ],
+      "minimization": {
+        "genome": {
+          "schema": "kelo-map-forge-genome-v3",
+          "recipeId": "KELO_FOREST_V1",
+          "genes": {
+            "style.monumentality": 0.34,
+            "style.organicRoads": 0.92,
+            "style.density": 0.54,
+            "style.vegetation": 0.8714,
+            "style.exploration": 0.94,
+            "style.decoration": 0.6895,
+            "road.loopRatio": 0.38,
+            "road.curvature": 0.9,
+            "district.central.weight": 0.88,
+            "district.grove.weight": 1.18,
+            "district.ruins.weight": 0.8,
+            "district.stream.weight": 0.72,
+            "district.deepwood.weight": 1.25,
+            "landmark.ancient_tree.keepClearRadius": 145,
+            "landmark.ruin_tower.keepClearRadius": 120
+          }
+        },
+        "originalMutationCount": 3,
+        "finalMutationCount": 2,
+        "prunedCount": 1,
+        "checks": [
+          {
+            "geneId": "style.monumentality",
+            "pruned": true,
+            "searchDelta": 0.547,
+            "holdoutDelta": 0.632,
+            "paired": {
+              "cases": 4,
+              "wins": 4,
+              "losses": 0,
+              "ties": 0,
+              "winRate": 100,
+              "meanDelta": 0.6761,
+              "medianDelta": 0.6016,
+              "worstDelta": 0.4692
+            }
+          },
+          {
+            "geneId": "style.vegetation",
+            "pruned": false,
+            "searchDelta": -0.267,
+            "holdoutDelta": 0.184,
+            "paired": {
+              "cases": 4,
+              "wins": 2,
+              "losses": 1,
+              "ties": 1,
+              "winRate": 62.5,
+              "meanDelta": 0.1359,
+              "medianDelta": 0.1277,
+              "worstDelta": -0.0523
+            }
+          },
+          {
+            "geneId": "style.decoration",
+            "pruned": false,
+            "searchDelta": -0.267,
+            "holdoutDelta": 0.184,
+            "paired": {
+              "cases": 4,
+              "wins": 2,
+              "losses": 1,
+              "ties": 1,
+              "winRate": 62.5,
+              "meanDelta": 0.1359,
+              "medianDelta": 0.1277,
+              "worstDelta": -0.0523
+            }
+          }
+        ]
+      }
+    }
+  },
+  "entries": [
+    {
+      "id": "KELO_ROYAL_CAPITAL_V1:7b9e7099371d7ba8ec3b5580a2aeb9a70d45a5f5",
+      "at": null,
+      "sourceSha": "7b9e7099371d7ba8ec3b5580a2aeb9a70d45a5f5",
+      "candidateId": "KELO_ROYAL_CAPITAL_V1:mf-be7c9e64fa56:7b9e7099",
+      "candidateFingerprint": "mf-be7c9e64fa56",
+      "accepted": true,
+      "rejectedStage": null,
+      "baselineScore": 94.637,
+      "candidateScore": 95.002,
+      "delta": 0.365,
+      "holdout": {
+        "baselineScore": 95.541,
+        "candidateScore": 96.128,
+        "delta": 0.587,
+        "paired": {
+          "cases": 4,
+          "wins": 3,
+          "losses": 1,
+          "ties": 0,
+          "winRate": 75,
+          "meanDelta": 0.0799,
+          "medianDelta": 0.1655,
+          "worstDelta": -0.3727
+        }
+      },
+      "mutations": [
+        {
+          "geneId": "style.exploration",
+          "scope": "style",
+          "before": 0.74,
+          "after": 0.645,
+          "delta": -0.095
+        },
+        {
+          "geneId": "district.mining.weight",
+          "scope": "districts",
+          "before": 0.96,
+          "after": 0.87,
+          "delta": -0.09
+        },
+        {
+          "geneId": "district.harbor.weight",
+          "scope": "districts",
+          "before": 0.92,
+          "after": 0.7981,
+          "delta": -0.1219
+        },
+        {
+          "geneId": "landmark.main_market.keepClearRadius",
+          "scope": "landmarks",
+          "before": 130,
+          "after": 121.5778,
+          "delta": -8.4222
+        },
+        {
+          "geneId": "style.monumentality",
+          "scope": "style",
+          "before": 0.94,
+          "after": 0.8562,
+          "delta": -0.0838
+        },
+        {
+          "geneId": "district.central.weight",
+          "scope": "districts",
+          "before": 1.22,
+          "after": 1.2837,
+          "delta": 0.0637
+        },
+        {
+          "geneId": "style.density",
+          "scope": "style",
+          "before": 0.62,
+          "after": 0.7367,
+          "delta": 0.1167
+        },
+        {
+          "geneId": "style.exploration",
+          "scope": "style",
+          "before": 0.74,
+          "after": 0.6309,
+          "delta": -0.1091
+        },
+        {
+          "geneId": "style.vegetation",
+          "scope": "style",
+          "before": 0.68,
+          "after": 0.6112,
+          "delta": -0.0688
+        }
+      ],
+      "metrics": {
+        "meanQuality": 95.544,
+        "worstQuality": 94.37,
+        "meanVisual": 92.389,
+        "worstVisual": 90.996,
+        "navigationFloor": 89.76,
+        "complexitySafety": 100,
+        "stability": 97.509,
+        "validRate": 100
+      },
+      "failures": [],
+      "artifacts": [
+        {
+          "kind": "evolution-evidence",
+          "fingerprint": "mf-evidence-25e7f2fe2984",
+          "evaluatorVersion": "map-forge-evolution-v3"
+        }
+      ]
+    },
+    {
+      "id": "KELO_VILLAGE_V1:7b9e7099371d7ba8ec3b5580a2aeb9a70d45a5f5",
+      "at": null,
+      "sourceSha": "7b9e7099371d7ba8ec3b5580a2aeb9a70d45a5f5",
+      "candidateId": "KELO_VILLAGE_V1:mf-21c37805d216:7b9e7099",
+      "candidateFingerprint": "mf-21c37805d216",
+      "accepted": true,
+      "rejectedStage": null,
+      "baselineScore": 94.619,
+      "candidateScore": 94.957,
+      "delta": 0.338,
+      "holdout": {
+        "baselineScore": 94.362,
+        "candidateScore": 94.847,
+        "delta": 0.485,
+        "paired": {
+          "cases": 4,
+          "wins": 3,
+          "losses": 0,
+          "ties": 1,
+          "winRate": 87.5,
+          "meanDelta": 0.3593,
+          "medianDelta": 0.1855,
+          "worstDelta": 0.0035
+        }
+      },
+      "mutations": [
+        {
+          "geneId": "district.central.weight",
+          "scope": "districts",
+          "before": 1.1,
+          "after": 1.1726,
+          "delta": 0.0726
+        },
+        {
+          "geneId": "landmark.village_tree.keepClearRadius",
+          "scope": "landmarks",
+          "before": 130,
+          "after": 150.2149,
+          "delta": 20.2149
+        }
+      ],
+      "metrics": {
+        "meanQuality": 94.716,
+        "worstQuality": 93.3,
+        "meanVisual": 90.276,
+        "worstVisual": 87.601,
+        "navigationFloor": 100,
+        "complexitySafety": 100,
+        "stability": 95.93,
+        "validRate": 100
+      },
+      "failures": [],
+      "artifacts": [
+        {
+          "kind": "evolution-evidence",
+          "fingerprint": "mf-evidence-71ff0615c7cd",
+          "evaluatorVersion": "map-forge-evolution-v3"
+        }
+      ]
+    },
+    {
+      "id": "KELO_FOREST_V1:7b9e7099371d7ba8ec3b5580a2aeb9a70d45a5f5",
+      "at": null,
+      "sourceSha": "7b9e7099371d7ba8ec3b5580a2aeb9a70d45a5f5",
+      "candidateId": "KELO_FOREST_V1:mf-4199bdca4164:7b9e7099",
+      "candidateFingerprint": "mf-4199bdca4164",
+      "accepted": true,
+      "rejectedStage": null,
+      "baselineScore": 88.428,
+      "candidateScore": 88.975,
+      "delta": 0.547,
+      "holdout": {
+        "baselineScore": 88.834,
+        "candidateScore": 89.466,
+        "delta": 0.632,
+        "paired": {
+          "cases": 4,
+          "wins": 4,
+          "losses": 0,
+          "ties": 0,
+          "winRate": 100,
+          "meanDelta": 0.6761,
+          "medianDelta": 0.6016,
+          "worstDelta": 0.4692
+        }
+      },
+      "mutations": [
+        {
+          "geneId": "district.central.weight",
+          "scope": "districts",
+          "before": 0.88,
+          "after": 0.9693,
+          "delta": 0.0893
+        },
+        {
+          "geneId": "style.monumentality",
+          "scope": "style",
+          "before": 0.34,
+          "after": 0.237,
+          "delta": -0.103
+        },
+        {
+          "geneId": "style.decoration",
+          "scope": "style",
+          "before": 0.82,
+          "after": 0.6895,
+          "delta": -0.1305
+        },
+        {
+          "geneId": "style.vegetation",
+          "scope": "style",
+          "before": 0.96,
+          "after": 0.8714,
+          "delta": -0.0886
+        }
+      ],
+      "metrics": {
+        "meanQuality": 89.705,
+        "worstQuality": 89,
+        "meanVisual": 84.859,
+        "worstVisual": 83.661,
+        "navigationFloor": 68.67,
+        "complexitySafety": 100,
+        "stability": 98.242,
+        "validRate": 100
+      },
+      "failures": [],
+      "artifacts": [
+        {
+          "kind": "evolution-evidence",
+          "fingerprint": "mf-evidence-871a80302370",
+          "evaluatorVersion": "map-forge-evolution-v3"
+        }
+      ]
+    }
+  ]
 }
