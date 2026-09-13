@@ -37,6 +37,7 @@ export function createStudioSelectionHistoryController({root=globalThis,kernel,m
   let nav=null;
   let backButton=null;
   let forwardButton=null;
+  let sheetObserver=null;
 
   const same=(a,b)=>a.length===b.length&&a.every((value,i)=>value===b[i]);
   const existing=snapshot=>{
@@ -46,7 +47,10 @@ export function createStudioSelectionHistoryController({root=globalThis,kernel,m
   const refreshNav=()=>{
     if(!nav)return;
     const state=selectionHistoryNavState(history,index);
-    nav.hidden=!state.visible;
+    const shell=document.getElementById?.('kelo-studio-live');
+    const sheetOpen=shell?.dataset?.sheetOpen==='1';
+    nav.hidden=sheetOpen||!state.visible;
+    nav.style.pointerEvents=sheetOpen?'none':'auto';
     backButton.disabled=!state.canBack;
     forwardButton.disabled=!state.canForward;
     backButton.setAttribute?.('aria-disabled',String(!state.canBack));
@@ -99,6 +103,10 @@ export function createStudioSelectionHistoryController({root=globalThis,kernel,m
     nav.appendChild(backButton);
     nav.appendChild(forwardButton);
     shell.appendChild(nav);
+    if(root.MutationObserver){
+      sheetObserver=new root.MutationObserver(refreshNav);
+      sheetObserver.observe(shell,{attributes:true,attributeFilter:['data-sheet-open']});
+    }
     refreshNav();
     return true;
   };
@@ -133,8 +141,9 @@ export function createStudioSelectionHistoryController({root=globalThis,kernel,m
       root.removeEventListener?.('keydown',onKeyDown,{capture:true});
       try{unsubscribe?.();}catch{}
       try{observer?.disconnect?.();}catch{}
+      try{sheetObserver?.disconnect?.();}catch{}
       nav?.remove?.();
-      nav=null;backButton=null;forwardButton=null;
+      nav=null;backButton=null;forwardButton=null;sheetObserver=null;
       history=[];index=-1;
     },
     get size(){return history.length;},
