@@ -47,6 +47,7 @@ const evidence = {
   browserName: 'safari',
   startedAt: new Date().toISOString(),
   passed: false,
+  checkpoints: [],
 };
 
 let browser;
@@ -54,14 +55,54 @@ let context;
 let page;
 const pageErrors = [];
 const consoleErrors = [];
+const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
+function checkpoint(name, detail = null) {
+  evidence.checkpoints.push({ name, at: new Date().toISOString(), detail });
+  console.log(`[KELO gate] ${name}${detail ? `: ${JSON.stringify(detail)}` : ''}`);
+}
+
+async function pageDiagnostic() {
+  if (!page) return null;
+  return page.evaluate(() => ({
+    readyState: document.readyState,
+    href: location.href,
+    creatorHub: !!document.getElementById('kelo-creators-hub'),
+    studio: !!document.getElementById('kelo-studio-live'),
+    launchError: document.querySelector('.kc-launch-error')?.textContent || null,
+    adminPlayerId: window.KELO_ADMIN_KEYS?.playerId?.() || null,
+    canWorldEdit: !!window.KELO_ADMIN_KEYS?.can?.('world.edit'),
+    worldEditReady: !!window.KELO_WORLD_EDIT?.ready,
+    worldEditSource: window.KELO_WORLD_EDIT?.authoritySource?.() || null,
+    worldEditError: window.KELO_WORLD_EDIT?.lastError || null,
+  })).catch(error => ({ diagnosticError: String(error) }));
+}
+
+// BrowserStack's raw real-iOS Playwright bridge can kill a socket that sits inside
+// one long locator.waitFor()/waitForFunction command. Poll with short protocol calls
+// instead: this both honours our timeout and keeps the physical-device session alive.
+async function waitUntil(check, timeout, label, interval = 250) {
+  const deadline = Date.now() + timeout;
+  let lastError = null;
+  while (Date.now() < deadline) {
+    try {
+      if (await check()) return true;
+    } catch (error) {
+      lastError = error;
+    }
+    await delay(interval);
+  }
+  const diagnostic = await pageDiagnostic();
+  throw new Error(`${label} timed out after ${timeout}ms${lastError ? `; last error: ${lastError}` : ''}; diagnostic=${JSON.stringify(diagnostic)}`);
+}
+
 async function visible(locator, timeout, label) {
-  await locator.waitFor({ state: 'visible', timeout });
-  assert(await locator.isVisible(), `${label} is not visible`);
+  await waitUntil(() => locator.isVisible(), timeout, `${label} visibility`);
+  checkpoint(`${label} visible`);
 }
 
 try {
@@ -70,6 +111,7 @@ try {
   // physical iOS expects the device's native value and rejects that emulation before a
   // page opens. Raw browser.newContext() leaves device media preferences untouched.
   browser = await webkit.connect({ wsEndpoint });
+  checkpoint('real iPhone connected');
   context = await browser.newContext({ baseURL });
   page = await context.newPage();
 
@@ -87,11 +129,17 @@ try {
   });
   assert(response, 'World navigation returned no response');
   assert(response.status() < 400, `World navigation returned HTTP ${response.status()}`);
+  checkpoint('candidate page loaded', { status: response.status() });
 
-  await page.waitForFunction(() => !!(
-    window.KeloInputLocks?.acquire &&
-    window.KELO_ADMIN_KEYS?.can?.('world.edit')
-  ), null, { timeout: 15000 });
+  await waitUntil(
+    () => page.evaluate(() => !!(
+      window.KeloInputLocks?.acquire &&
+      window.KELO_ADMIN_KEYS?.can?.('world.edit')
+    )),
+    15000,
+    'World editor authorization'
+  );
+  checkpoint('world editor authorized', await pageDiagnostic());
 
   await page.evaluate(async () => {
     const { openCreatorHub } = await import('./src/creators/ui/creator-hub.mjs');
@@ -101,15 +149,17 @@ try {
   let hub = page.locator('#kelo-creators-hub');
   await visible(hub, 10000, 'Creator Hub');
   await hub.locator('[data-workspace="world"]').click();
+  checkpoint('World card clicked');
 
   const studio = page.locator('#kelo-studio-live');
-  await visible(studio, 15000, 'World Studio');
+  await visible(studio, 20000, 'World Studio');
   assert(await hub.count() === 0, 'Creator Hub remained mounted after opening World Studio');
 
   // Reproduce the iOS stale-session failure mode: the Studio DOM shell disappears
   // while the module-level Studio session still believes it is active.
   await page.evaluate(() => document.getElementById('kelo-studio-live')?.remove());
   assert(await studio.count() === 0, 'Failed to remove Studio shell for stale-session regression');
+  checkpoint('stale Studio shell reproduced');
 
   await page.evaluate(async () => {
     const { openCreatorHub } = await import(`./src/creators/ui/creator-hub.mjs?ios-reopen=${Date.now()}`);
@@ -119,9 +169,10 @@ try {
   hub = page.locator('#kelo-creators-hub');
   await visible(hub, 10000, 'Creator Hub after stale session');
   await hub.locator('[data-workspace="world"]').click();
+  checkpoint('World recovery card clicked');
 
   const recovered = page.locator('#kelo-studio-live');
-  await visible(recovered, 15000, 'Recovered World Studio');
+  await visible(recovered, 20000, 'Recovered World Studio');
   assert(await page.locator('#kelo-creators-hub').count() === 0, 'Creator Hub remained mounted after World recovery');
   const position = await recovered.evaluate(el => getComputedStyle(el).position);
   assert(position === 'fixed', `Recovered Studio expected position=fixed, received ${position}`);
@@ -136,6 +187,7 @@ try {
   evidence.finishedAt = new Date().toISOString();
   evidence.pageErrors = pageErrors;
   evidence.consoleErrors = consoleErrors;
+  evidence.finalDiagnostic = await pageDiagnostic();
   fs.writeFileSync(`${outputDir}/world-release-gate-evidence.json`, JSON.stringify(evidence, null, 2));
   console.log(`VERIFIED ${evidence.stage}: World opened and recovered on real iPhone Safari. SHA ${candidateSha}`);
 } catch (error) {
@@ -143,9 +195,10 @@ try {
   evidence.error = String(error?.stack || error);
   evidence.pageErrors = pageErrors;
   evidence.consoleErrors = consoleErrors;
+  evidence.finalDiagnostic = await pageDiagnostic();
   fs.writeFileSync(`${outputDir}/world-release-gate-evidence.json`, JSON.stringify(evidence, null, 2));
   if (page) {
-    await page.screenshot({ path: `${outputDir}/world-release-gate-failure.png`, fullPage: true }).catch(() => {});
+    await page.screenshot({ path: `${outputDir}/world-release-gate-failure.png`, fullPage: true, timeout: 5000 }).catch(() => {});
   }
   throw error;
 } finally {
