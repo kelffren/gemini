@@ -6,6 +6,14 @@
 const { test, expect } = require('@playwright/test');
 const fs = require('fs');
 
+const isBrowserStack = Boolean(
+  process.env.BROWSERSTACK_USERNAME ||
+  process.env.BROWSERSTACK_ACCESS_KEY ||
+  process.env.BROWSERSTACK_BUILD_NAME
+);
+
+test.skip(!isBrowserStack, 'Real iPhone gameplay proof only runs through BrowserStack');
+
 function playerPosition(page) {
   return page.evaluate(() => ({
     x: localPlayer.x,
@@ -91,7 +99,7 @@ test('real iPhone Safari can enter guest game and move with touch joystick', asy
   page.on('console', msg => { if (msg.type() === 'error') consoleErrors.push(msg.text()); });
   page.on('requestfailed', req => failedRequests.push(`${req.url()} :: ${req.failure()?.errorText || 'failed'}`));
 
-  const response = await page.goto('/?guest=1&iphoneGameplay=1', {
+  const response = await page.goto('./?guest=1&iphoneGameplay=1', {
     waitUntil: 'domcontentloaded',
     timeout: 45_000,
   });
@@ -115,6 +123,7 @@ test('real iPhone Safari can enter guest game and move with touch joystick', asy
     const gateStyle = gate ? getComputedStyle(gate) : null;
     return {
       url: location.href,
+      pathname: location.pathname,
       userAgent: navigator.userAgent,
       maxTouchPoints: navigator.maxTouchPoints,
       innerWidth: window.innerWidth,
@@ -128,7 +137,8 @@ test('real iPhone Safari can enter guest game and move with touch joystick', asy
     };
   });
 
-  // These assertions prevent a desktop/local Chromium run from masquerading as the iPhone proof.
+  // These assertions prevent a desktop/local Chromium run or wrong Pages root from masquerading as the iPhone proof.
+  expect(device.pathname).toMatch(/\/gemini\/?$/);
   expect(device.userAgent).toMatch(/iPhone|iPod/i);
   expect(device.maxTouchPoints).toBeGreaterThan(0);
   expect(device.innerWidth).toBeGreaterThan(250);
