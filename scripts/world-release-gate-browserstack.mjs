@@ -175,6 +175,67 @@ try {
 
   await selectorVisible('#kelo-creators-hub', 10000, 'Creator Hub');
   checkpoint('pre-World diagnostic', await pageDiagnostic());
+
+  // Isolate the expensive World-open path before clicking the card. Each checkpoint
+  // tells us exactly which Studio phase can freeze a physical iPhone main thread.
+  checkpoint('Studio foundation probe start');
+  const studioBoot = await page.evaluate(async () => {
+    const started = performance.now();
+    const { bootKeloStudio } = await import('./src/studio/studio-entry.mjs');
+    const actorId = String(window.KELO_ADMIN_KEYS?.playerId?.() || 'local_pioneer');
+    const studio = await bootKeloStudio({ mode: 'world', actorId, root: window });
+    window.__KELO_WORLD_GATE_STUDIO = studio;
+    return { ms: Math.round(performance.now() - started), version: studio?.version || null, assets: studio?.adapter?.assetCatalog?.list?.()?.length || 0 };
+  });
+  checkpoint('Studio foundation probe ready', studioBoot);
+
+  checkpoint('Studio draft import probe start');
+  const studioImport = await page.evaluate(async () => {
+    const studio = window.__KELO_WORLD_GATE_STUDIO;
+    const E = window.KELO_WORLD_EDIT;
+    if (!studio || !E?.request) throw new Error('STUDIO_IMPORT_PROBE_NOT_READY');
+    const actorId = String(window.KELO_ADMIN_KEYS?.playerId?.() || 'local_pioneer');
+    const run = async () => {
+      let res = await E.getCurrentDraft();
+      let draft = res?.draft || null;
+      if (!draft || !['DRAFT', 'REJECTED'].includes(String(draft.status || ''))) {
+        res = await E.request('world:draft:create', { actorId, forceNew: true });
+        draft = res?.draft || null;
+      } else {
+        res = await E.request('world:draft:get', { actorId, draftId: draft.draftId });
+        draft = res?.draft || draft;
+      }
+      if (!draft?.draftId) throw new Error('STUDIO_IMPORT_PROBE_DRAFT_MISSING');
+      const started = performance.now();
+      await studio.importCurrent({ view: 'draft', draftId: draft.draftId });
+      return { ms: Math.round(performance.now() - started), draftId: draft.draftId, entities: studio.kernel.document.entities.length, terrain: Object.keys(studio.kernel.document.terrain || {}).length };
+    };
+    return typeof E.withoutProjection === 'function' ? E.withoutProjection(run) : run();
+  });
+  checkpoint('Studio draft import probe ready', studioImport);
+
+  checkpoint('Studio shell probe start');
+  const shellProbe = await page.evaluate(async () => {
+    const studio = window.__KELO_WORLD_GATE_STUDIO;
+    if (!studio) throw new Error('STUDIO_SHELL_PROBE_NOT_READY');
+    const { createStudioLiveShell } = await import('./src/studio/ui/studio-live-shell.mjs');
+    const started = performance.now();
+    const shell = createStudioLiveShell({
+      host: document.body,
+      assets: studio.adapter.assetCatalog.list?.() || [],
+      onMode: () => {}, onAsset: () => {}, onUndo: () => {}, onRedo: () => {},
+      onRotate: () => {}, onScale: () => {}, onErase: () => {}, onSave: () => {},
+      onClose: () => {}, onSelectEntity: () => {}, onDuplicate: () => {}, onDelete: () => {},
+      onPropertyChange: () => {}, onPlay: () => {}, onBrushSize: () => {}, onFocus: () => {},
+      renderAssetPreview: () => false,
+    });
+    const mounted = !!document.getElementById('kelo-studio-live');
+    const elapsed = Math.round(performance.now() - started);
+    shell.destroy();
+    return { ms: elapsed, mounted };
+  });
+  checkpoint('Studio shell probe ready', shellProbe);
+
   await clickSelector('#kelo-creators-hub [data-workspace="world"]', 'World card');
 
   await selectorVisible('#kelo-studio-live', 20000, 'World Studio');
