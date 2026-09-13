@@ -33,7 +33,8 @@ export function createRoomBuildTool(kernel,{placement=null,quickBuild=null,root=
   const plannerStats={requests:0,rebuilds:0,reuses:0};
   const document=root?.document;
   const wallPiece=()=>quickBuild.pieces?.find?.(row=>row.type==='wall')||null;
-  const floorPiece=()=>quickBuild.pieces?.find?.(row=>row.type==='floor')||null;
+  const rawFloorPiece=()=>quickBuild.pieces?.find?.(row=>row.type==='floor')||null;
+  const floorPiece=()=>{const piece=rawFloorPiece(),wall=wallPiece();if(!piece)return null;if(piece.source!=='override'&&wall&&String(piece.prefabId)===String(wall.prefabId))return null;return piece;};
   const grid=()=>Math.max(1,Number(document?.getElementById?.('kelo-studio-live')?.querySelector?.('[data-ext="snap"]')?.value)||Number(kernel.document?.settings?.tileSize)||32);
   const prefabFor=piece=>piece?kernel.prefabs.resolve?.(piece.prefabId)||kernel.prefabs.get?.(piece.prefabId):null;
   const wallPrefab=()=>prefabFor(wallPiece());
@@ -96,5 +97,5 @@ export function createRoomBuildTool(kernel,{placement=null,quickBuild=null,root=
   function destroy(){if(destroyed)return;destroyed=true;active=false;clearTransient();kernel.input.pop(CONTEXT);unregister?.();observer?.disconnect?.();button?.remove();button=null;}
   if(document?.documentElement&&root?.MutationObserver){observer=new root.MutationObserver(()=>{ensureButton();syncButton();});observer.observe(document.documentElement,{childList:true,subtree:true});}
   ensureButton();
-  return Object.freeze({id:'roomBuild',version:'studio-room-build-v2.0.0-floor-fill',activate,deactivate,planRect,commitRoom,getPreviews:()=>copy(previews),getMeasurement:()=>copy(measurement),getPlannerStats:()=>({...plannerStats}),get active(){return active;},destroy});
+  return Object.freeze({id:'roomBuild',version:'studio-room-build-v2.0.1-floor-fill',activate,deactivate,planRect,commitRoom,getPreviews:()=>copy(previews),getMeasurement:()=>copy(measurement),getPlannerStats:()=>({...plannerStats}),get active(){return active;},destroy});
 }
