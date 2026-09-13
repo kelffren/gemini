@@ -1,11 +1,11 @@
-# Kelo World real-device test profile.
+# Kelo World real-device release-gate profile.
 # Credentials are intentionally not committed. Set BROWSERSTACK_USERNAME and
 # BROWSERSTACK_ACCESS_KEY in the environment or GitHub Actions secrets.
 userName: YOUR_USERNAME
 accessKey: YOUR_ACCESS_KEY
 
 projectName: KeloWorld
-buildName: MapForgeRealIOS
+buildName: WorldReleaseGateRealIOS
 buildIdentifier: '#${BUILD_NUMBER}'
 
 platforms:
@@ -17,11 +17,12 @@ platforms:
 
 parallelsPerPlatform: 1
 
-# Kelo World is tested against the public GitHub Pages deployment, so no tunnel is needed.
-browserstackLocal: false
+# PR candidates are served from the GitHub Actions runner and reached through
+# BrowserStack Local. The same tunnel remains enabled for post-deploy LIVE checks.
+browserstackLocal: true
 
 framework: playwright
-source: kelo-world-map-forge
+source: kelo-world-release-gate
 
 debug: true
 networkLogs: true

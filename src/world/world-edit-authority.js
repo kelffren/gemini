@@ -8,13 +8,14 @@
 'use strict';
 if(window.KELO_WORLD_EDIT)return;
 
-const VERSION='world-edit-authority-v1.1.0';
+const VERSION='world-edit-authority-v1.2.0';
 const WORLD_PARCEL_ID='parcel:world:editor';
 const listeners=new Set();
 const readyWaiters=new Set();
 const clone=v=>v==null?v:JSON.parse(JSON.stringify(v));
 let authority=null;
 let readyState=false;
+let projectionSuppression=0;
 let currentView={kind:'boot',id:null,worldId:'world:kelo-main',revisionVersion:0,publishedRevisionId:null};
 let lastError=null;
 
@@ -33,6 +34,9 @@ async function ensureWorldParcel(){
   const existing=S.parcel?.(WORLD_PARCEL_ID);if(existing)return existing;
   return S.request('ensureWorldEditorParcel',{ownerId:'developer'});
 }
+function rememberView(meta={}){
+  currentView=Object.assign({},currentView,clone(meta||{}));
+}
 async function projectView(snapshot,meta={},forcePlacements=false){
   if(!snapshot)return;
   const WB=worldBuilder();
@@ -46,9 +50,10 @@ async function projectView(snapshot,meta={},forcePlacements=false){
       await S.request('replaceLayout',{parcelId:WORLD_PARCEL_ID,placements:target,developer:true});
     }
   }
-  currentView=Object.assign({},currentView,clone(meta||{}));
+  rememberView(meta);
 }
 function emit(event){
+  if(!listeners.size)return;
   for(const fn of listeners){try{fn(clone(event));}catch(e){}}
 }
 function normalizeAuthority(adapter){
@@ -60,7 +65,7 @@ function markReady(){
   readyState=true;
   for(const waiter of readyWaiters){clearTimeout(waiter.timer);try{waiter.resolve(window.KELO_WORLD_EDIT);}catch(e){}}
   readyWaiters.clear();
-  emit({type:'ready',source:authoritySource(),view:clone(currentView)});
+  emit({type:'ready',source:authoritySource(),view:currentView});
 }
 function whenReady({timeoutMs=10000}={}){
   if(readyState&&authority)return Promise.resolve(window.KELO_WORLD_EDIT);
@@ -71,17 +76,25 @@ function whenReady({timeoutMs=10000}={}){
     readyWaiters.add(waiter);
   });
 }
+async function withoutProjection(task){
+  if(typeof task!=='function')throw new Error('WORLD_EDIT_PROJECTION_TASK_REQUIRED');
+  projectionSuppression++;
+  try{return await task();}
+  finally{projectionSuppression=Math.max(0,projectionSuppression-1);}
+}
 async function request(op,payload={}){
   if(!authority)throw new Error('WORLD_EDIT_AUTHORITY_NOT_READY');
   try{
     const result=await authority.request(String(op),payload||{});
     if(result?.viewSnapshot){
-      await projectView(result.viewSnapshot,result.viewMeta||{},result.projectPlacements===true);
+      if(projectionSuppression===0)await projectView(result.viewSnapshot,result.viewMeta||{},result.projectPlacements===true);
+      else rememberView(result.viewMeta||{});
     }
-    lastError=null;emit({type:'request',op:String(op),result:clone(result),view:clone(currentView)});
+    lastError=null;
+    emit({type:'request',op:String(op),result,view:currentView});
     return result;
   }catch(err){
-    lastError=String(err?.message||err);emit({type:'error',op:String(op),error:lastError,view:clone(currentView)});throw err;
+    lastError=String(err?.message||err);emit({type:'error',op:String(op),error:lastError,view:currentView});throw err;
   }
 }
 async function installAuthority(adapter){
@@ -90,7 +103,7 @@ async function installAuthority(adapter){
   try{
     const result=await request('world:published:get',{});
     markReady();
-    emit({type:'authority',source:authoritySource(),view:clone(currentView)});
+    emit({type:'authority',source:authoritySource(),view:currentView});
     return result;
   }catch(err){
     markNotReady();
@@ -118,6 +131,7 @@ window.KELO_WORLD_EDIT=Object.freeze({
   installAuthority,
   authoritySource,
   whenReady,
+  withoutProjection,
   getCurrentDraft:async()=>request('world:draft:current',{}),
   getPublishedRevision:async()=>request('world:published:meta',{}),
   listRevisions:async()=>request('world:revision:list',{}),
@@ -134,6 +148,8 @@ window.KELO_WORLD_EDIT_AUDIT=Object.freeze({
   uiStorageFree:true,
   uiTransportFree:true,
   publishedProjectionOnBoot:true,
+  scopedProjectionSuppression:true,
+  lazyListenerClone:true,
   propertySourceOfTruth:true,
   readinessContract:true
 });

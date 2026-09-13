@@ -13,6 +13,7 @@ export function createStudioAssetPreviewService({assetCatalog,atlasContract,devi
   if(!assetCatalog)throw new Error('STUDIO_ASSET_PREVIEW_CATALOG_REQUIRED');
   const images=new Map(),ownedKeys=new Set();
   const resolveAsset=value=>typeof value==='string'?assetCatalog.get(value):(value?.parts?value:assetCatalog.get(value?.id));
+  const mobileViewport=()=>Number(globalThis.innerWidth||0)>0&&Number(globalThis.innerWidth)<=760;
 
   function requestImage(key){
     key=String(key||'');if(!key||!atlasContract?.acquire)return Promise.resolve(null);
@@ -36,11 +37,24 @@ export function createStudioAssetPreviewService({assetCatalog,atlasContract,devi
   async function warmCreatorPrefab(asset){const {children}=creatorBounds(asset);await Promise.all(children.map(child=>warmAsset(child.prefabId)));}
   function drawCreatorPrefab(ctx,asset,x,y,{alpha=.72}={}){const {children}=creatorBounds(asset);let drew=false;for(const child of children)drew=drawAsset(ctx,child.prefabId,(Number(x)||0)+(Number(child.dx)||0),(Number(y)||0)+(Number(child.dy)||0),{rotation:Number(child.rotation)||0,alpha,placeholder:true})||drew;return drew;}
 
-  async function renderThumbnail(canvas,asset,{cssSize=54,padding=5}={}){
-    if(!canvas?.getContext)return false;const dpr=clamp(Number(devicePixelRatio)||1,1,3),size=Math.max(32,Number(cssSize)||54);canvas.width=Math.round(size*dpr);canvas.height=Math.round(size*dpr);canvas.style.width=`${size}px`;canvas.style.height=`${size}px`;const ctx=canvas.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,size,size);
-    const creator=!!asset?.creatorPrefab;if(creator)await warmCreatorPrefab(asset);else await warmAsset(asset);
-    const w=Math.max(1,Number(asset?.width||asset?.bounds?.w)||32),h=Math.max(1,Number(asset?.height||asset?.bounds?.h)||32),scale=Math.min((size-padding*2)/w,(size-padding*2)/h),ox=(size-w*scale)/2,oy=(size-h*scale)/2;
+  function paintThumbnail(canvas,asset,{size,padding,dpr}={}){
+    if(!canvas?.getContext)return false;
+    const ctx=canvas.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,size,size);
+    const creator=!!asset?.creatorPrefab,w=Math.max(1,Number(asset?.width||asset?.bounds?.w)||32),h=Math.max(1,Number(asset?.height||asset?.bounds?.h)||32),scale=Math.min((size-padding*2)/w,(size-padding*2)/h),ox=(size-w*scale)/2,oy=(size-h*scale)/2;
     ctx.save();ctx.translate(ox,oy);ctx.scale(scale,scale);if(creator)drawCreatorPrefab(ctx,asset,0,0,{alpha:1});else drawAsset(ctx,asset,0,0,{alpha:1});ctx.restore();return true;
+  }
+
+  async function renderThumbnail(canvas,asset,{cssSize=54,padding=5}={}){
+    // iPhone Safari can lock its renderer while a newly-mounted World shell creates
+    // many tiny preview canvas backing stores. Do zero canvas/atlas work on the mobile
+    // launch path; the asset row remains usable by label and placement still renders
+    // normally in the world canvas.
+    if(mobileViewport())return false;
+    if(!canvas?.getContext)return false;
+    const dpr=clamp(Number(devicePixelRatio)||1,1,3),size=Math.max(32,Number(cssSize)||54),config={size,padding,dpr};
+    canvas.width=Math.round(size*dpr);canvas.height=Math.round(size*dpr);canvas.style.width=`${size}px`;canvas.style.height=`${size}px`;
+    const creator=!!asset?.creatorPrefab;if(creator)await warmCreatorPrefab(asset);else await warmAsset(asset);
+    return paintThumbnail(canvas,asset,config);
   }
 
   function describeAsset(id){const row=assetCatalog.get(String(id));return row?copy(row):null;}
