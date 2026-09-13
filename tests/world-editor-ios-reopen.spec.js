@@ -23,7 +23,9 @@ test('World recovers a stale Studio session instead of leaving iOS on a black pa
   page.on('console', msg => { if(msg.type()==='error')consoleErrors.push(msg.text()); });
   fs.mkdirSync('test-results', { recursive: true });
 
-  const response = await page.goto('./?world-ios-reopen=1', { waitUntil: 'domcontentloaded', timeout: 30000 });
+  // mapEditor=1 is the explicit developer bootstrap recognized by
+  // admin-key-system.js. guest=1 keeps the auth wall out of the mobile QA path.
+  const response = await page.goto('./?guest=1&mapEditor=1&world-ios-reopen=1', { waitUntil: 'domcontentloaded', timeout: 30000 });
   expect(response && response.status()).toBeLessThan(400);
   await page.waitForFunction(() => !!(
     window.KeloInputLocks?.acquire &&
