@@ -101,10 +101,18 @@ test('Map Forge real preview exposes scene and sprite requirements, hides before
   const forge = page.locator('#kelo-map-forge');
   await expect(forge).toBeVisible();
 
-  // Keep this real preview smoke deterministic. The workspace intentionally boots with a random
-  // seed for users, but CI must judge the same representative capital on every run.
+  // The product intentionally boots with a random seed and a best-of selector. CI instead uses
+  // one exact candidate so visual evidence and arrival-scene expectations are reproducible.
   const fixedSeed = 81746291;
   const seedInput = forge.locator('input[type="number"]').first();
+  const selects = forge.locator('select.kmf-select');
+  await selects.nth(1).evaluate(select => {
+    const option = document.createElement('option');
+    option.value = '1';
+    option.textContent = 'Best of 1';
+    select.append(option);
+    select.value = '1';
+  });
   await seedInput.fill(String(fixedSeed));
   await forge.getByRole('button', { name: 'GENERAR', exact: true }).click();
   await page.waitForFunction(seed => window.__KELO_TEST_MAP_FORGE_WORKSPACE__?.selected?.metadata?.seed === seed, fixedSeed, { timeout: 30000 });
