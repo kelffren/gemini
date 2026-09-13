@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'src/creators/avatar/avatar-frame-*.mjs'
+      - 'src/creators/avatar/kelo-universal-asset-compiler.mjs'
       - 'src/creators/ui/avatar-authoring-workspace.mjs'
       - 'src/creators/ui/avatar-frame-*.mjs'
       - 'src/creators/workspaces/avatar-workspace.mjs'
@@ -32,6 +33,7 @@ jobs:
           node --check src/creators/avatar/avatar-frame-project-store.mjs
           node --check src/creators/avatar/avatar-frame-pixels.mjs
           node --check src/creators/avatar/avatar-frame-compositor.mjs
+          node --check src/creators/avatar/kelo-universal-asset-compiler.mjs
           node --check src/creators/ui/avatar-frame-editor.mjs
           node --check src/creators/ui/avatar-frame-builder.mjs
           node --check src/creators/ui/avatar-authoring-workspace.mjs
@@ -61,7 +63,7 @@ jobs:
           done
           cat /tmp/avatar-authoring-http.log
           exit 1
-      - name: Native mobile gestures · Chromium + iPhone WebKit
+      - name: Native mobile gestures + authored atlas · Chromium + iPhone WebKit
         env:
           AVATAR_AUTHORING_QA_URL: http://127.0.0.1:4173/tests/fixtures/avatar-authoring-159-155.html
         run: npx playwright test --config=playwright.avatar-authoring.config.js
