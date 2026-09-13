@@ -13,6 +13,7 @@
 const F = Object.freeze;
 const clamp = (n, a, b) => Math.max(a, Math.min(b, Number(n) || 0));
 const finite = (n, fallback = 0) => Number.isFinite(Number(n)) ? Number(n) : fallback;
+const nullableInteger = value => value !== null && value !== undefined && value !== '' && Number.isInteger(Number(value)) ? Number(value) : null;
 const clone = value => {
   if (value == null || typeof value !== 'object') return value;
   if (Array.isArray(value)) return value.map(clone);
@@ -35,7 +36,7 @@ export const SURGERY_LAYERS = F(['original', 'character', 'patches', 'pieces', '
 export const SURGERY_SELECTION_OPS = F(['replace', 'add', 'subtract', 'intersect']);
 
 export const surgeryFeatureContract = F({
-  version: 'kelo-frame-surgery-v2.0.0-research-hardened',
+  version: 'kelo-frame-surgery-v2.0.1-null-copy-safe',
   required: F([
     'one-finger-move', 'two-finger-scale', 'two-finger-rotate', 'ghost-reference',
     'align-feet', 'center-body', 'match-scale', 'finger-eraser', 'finger-restore',
@@ -86,7 +87,7 @@ function normalizeOverlay(overlay = {}) {
     id: String(overlay.id || `piece-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`),
     name: String(overlay.name || 'PIEZA').slice(0, 48),
     kind: ['frame', 'selection', 'external'].includes(overlay.kind) ? overlay.kind : 'external',
-    sourceFrame: Number.isInteger(Number(overlay.sourceFrame)) ? Number(overlay.sourceFrame) : null,
+    sourceFrame: nullableInteger(overlay.sourceFrame),
     sourceRect: overlay.sourceRect ? F({
       x: clamp(overlay.sourceRect.x, 0, 1), y: clamp(overlay.sourceRect.y, 0, 1),
       w: clamp(finite(overlay.sourceRect.w, 1), .001, 1), h: clamp(finite(overlay.sourceRect.h, 1), .001, 1)
@@ -190,7 +191,7 @@ export function normalizeSurgeryPatch(patch = {}) {
     x: clamp(finite(patch.x), -512, 512), y: clamp(finite(patch.y), -512, 512),
     rotation: clamp(finite(patch.rotation), -Math.PI * 4, Math.PI * 4),
     pixelSnap: patch.pixelSnap !== false,
-    copyFrom: Number.isInteger(Number(patch.copyFrom)) ? Number(patch.copyFrom) : null,
+    copyFrom: nullableInteger(patch.copyFrom),
     crop: normalizeCrop(patch.crop),
     erase: F((patch.erase || []).map(normalizeStroke)),
     restore: F((patch.restore || []).map(normalizeStroke)),
@@ -293,4 +294,4 @@ export function createSurgeryHistory(initialPatch = createSurgeryPatch(), {limit
   });
 }
 
-export const __frameSurgeryInternals = F({clamp, clone, pointerGeometry, normalizeCrop, normalizeStroke, normalizeOverlay, normalizeSelection, normalizeRuns});
+export const __frameSurgeryInternals = F({clamp, finite, nullableInteger, clone, pointerGeometry, normalizeCrop, normalizeStroke, normalizeOverlay, normalizeSelection, normalizeRuns});
