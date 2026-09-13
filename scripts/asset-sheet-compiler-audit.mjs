@@ -129,6 +129,8 @@ rect(alphaFixture, 24, 16, 8, 2, 8, [0, 0, 0, 255]);
 const alphaAnalysis = analyzeAssetSheetPixels(alphaFixture, 24, 24, {minComponentArea:2, cropPadding:1});
 assert(alphaAnalysis.background.mode === 'native-alpha', 'native alpha mode');
 assert(alphaAnalysis.assets.length === 1, `native alpha component count=${alphaAnalysis.assets.length}`);
+assert(alphaAnalysis.contentRegion.y === 0 && alphaAnalysis.contentRegion.h === 24, 'native alpha keeps every atlas row');
+assert(alphaAnalysis.stats.interfaceNoiseDetected === false, 'native alpha never treated as screenshot chrome');
 
 const workspace = createAssetSheetWorkspaceManifest({loader:async()=>({openAssetSheetWorkspace:context=>context})});
 assert(workspace.id === 'asset-sheet' && workspace.availability === 'active', 'creator workspace manifest');

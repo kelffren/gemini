@@ -274,7 +274,13 @@ export function analyzeAssetSheetPixels(rgba, width, height, inputOptions = {}) 
   const foreground = analyzeSpriteForeground(rgba, dimensions.width, dimensions.height, {alphaThreshold:options.alphaThreshold});
   const provisionalAlpha = alphaFromCleanedData(foreground.cleanedData, dimensions.width, dimensions.height);
   const provisionalComponents = normalizeComponents(foreground.components, options);
-  const contentRegion = componentRows(provisionalComponents, dimensions.width, dimensions.height, options);
+  // Native-alpha sheets already carry an explicit artwork/background boundary.
+  // Row-density cropping is reserved for opaque screenshots, where it removes
+  // browser/phone chrome. Applying it to a transparent atlas can mistake the
+  // largest first row for the whole content region and discard later rows.
+  const contentRegion = foreground.background.kind === 'transparent'
+    ? {x:0, y:0, w:dimensions.width, h:dimensions.height, confidence:1}
+    : componentRows(provisionalComponents, dimensions.width, dimensions.height, options);
   const alphaMask = maskToRegion(provisionalAlpha, dimensions.width, dimensions.height, contentRegion);
   const components = normalizeComponents(connectedSpriteComponents(coreFromAlpha(alphaMask, options.coreAlpha), dimensions.width, dimensions.height, {minArea:options.minComponentArea}), options);
   const groups = groupComponents(components, options);
