@@ -1,4 +1,4 @@
-name: BrowserStack Map Forge Real iPhone
+name: BrowserStack Real iPhone Gameplay + World
 
 on:
   workflow_dispatch:
@@ -6,8 +6,14 @@ on:
     branches:
       - main
     paths:
+      - 'index.html'
+      - 'engine-a.js'
+      - 'src/core/input-system.js'
+      - 'src/auth/guest-play-bypass.js'
+      - 'src/ui/account-auth-ui.js'
       - 'src/creators/workspaces/world-workspace.mjs'
       - 'src/studio/storage/indexeddb-studio-store.mjs'
+      - 'tests/iphone-gameplay.spec.js'
       - 'tests/world-editor-ios-reopen.spec.js'
       - 'playwright.config.js'
       - 'browserstack.yml'
@@ -16,11 +22,14 @@ on:
       - '.github/workflows/browserstack-map-forge.yml'
 
 jobs:
-  real-ios-map-forge:
+  real-ios-gameplay-and-world:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
       KELO_PAGES: https://kelffren.github.io/gemini/
+      PW_LIVE: '1'
+      BUILD_NUMBER: ${{ github.run_number }}
+      BROWSERSTACK_BUILD_NAME: KELO WORLD real iPhone ${{ github.sha }}
       BROWSERSTACK_USERNAME: ${{ secrets.BROWSERSTACK_USERNAME }}
       BROWSERSTACK_ACCESS_KEY: ${{ secrets.BROWSERSTACK_ACCESS_KEY }}
 
@@ -39,33 +48,43 @@ jobs:
           test -n "$BROWSERSTACK_USERNAME" || (echo "Missing BROWSERSTACK_USERNAME secret" && exit 1)
           test -n "$BROWSERSTACK_ACCESS_KEY" || (echo "Missing BROWSERSTACK_ACCESS_KEY secret" && exit 1)
 
-      - name: Wait for matching Pages deployment
+      - name: Wait for LIVE Pages game and World editor
         shell: bash
         run: |
           for i in {1..36}; do
+            index="$(curl -fsSL "${KELO_PAGES}?sha=${GITHUB_SHA}&attempt=${i}" || true)"
+            guest="$(curl -fsSL "${KELO_PAGES}src/auth/guest-play-bypass.js?sha=${GITHUB_SHA}&attempt=${i}" || true)"
+            engine="$(curl -fsSL "${KELO_PAGES}engine-a.js?sha=${GITHUB_SHA}&attempt=${i}" || true)"
             workspace="$(curl -fsSL "${KELO_PAGES}src/creators/workspaces/world-workspace.mjs?sha=${GITHUB_SHA}&attempt=${i}" || true)"
             store="$(curl -fsSL "${KELO_PAGES}src/studio/storage/indexeddb-studio-store.mjs?sha=${GITHUB_SHA}&attempt=${i}" || true)"
-            if printf '%s' "$workspace" | grep -Fq 'CREATOR_WORLD_STUDIO_MOUNT_FAILED' && printf '%s' "$store" | grep -Fq 'request.onblocked = failOpen'; then
-              echo "Matching World launch and non-blocking Studio store are live on Pages"
+            if printf '%s' "$index" | grep -Fq 'game-canvas' \
+              && printf '%s' "$guest" | grep -Fq 'kelo-guest-play-bypass-v2' \
+              && printf '%s' "$engine" | grep -Fq "window.addEventListener('pointerdown'" \
+              && printf '%s' "$workspace" | grep -Fq 'CREATOR_WORLD_STUDIO_MOUNT_FAILED' \
+              && printf '%s' "$store" | grep -Fq 'request.onblocked = failOpen'; then
+              echo "LIVE Pages exposes guest gameplay, touch input, and World editor fixes"
               exit 0
             fi
             echo "Waiting for Pages deployment (${i}/36)"
             sleep 10
           done
-          echo "Timed out waiting for the fixed World workspace and Studio store on Pages"
+          echo "Timed out waiting for LIVE Pages readiness"
           exit 1
 
       - name: Install dependencies
         run: npm install
 
+      - name: Run guest gameplay on real iPhone
+        run: npx browserstack-node-sdk playwright test tests/iphone-gameplay.spec.js --workers=1
+
       - name: Run World reopen on real iPhone
-        run: npx browserstack-node-sdk playwright test tests/world-editor-ios-reopen.spec.js
+        run: npx browserstack-node-sdk playwright test tests/world-editor-ios-reopen.spec.js --workers=1
 
       - name: Upload Playwright evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: browserstack-world-ios-evidence
+          name: browserstack-real-iphone-evidence
           if-no-files-found: ignore
           path: |
             playwright-report.json
