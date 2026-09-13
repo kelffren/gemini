@@ -45,18 +45,14 @@ export function createStudioAssetPreviewService({assetCatalog,atlasContract,devi
   }
 
   async function renderThumbnail(canvas,asset,{cssSize=54,padding=5}={}){
+    // iPhone Safari can lock its renderer while a newly-mounted World shell creates
+    // many tiny preview canvas backing stores. Do zero canvas/atlas work on the mobile
+    // launch path; the asset row remains usable by label and placement still renders
+    // normally in the world canvas.
+    if(mobileViewport())return false;
     if(!canvas?.getContext)return false;
     const dpr=clamp(Number(devicePixelRatio)||1,1,3),size=Math.max(32,Number(cssSize)||54),config={size,padding,dpr};
     canvas.width=Math.round(size*dpr);canvas.height=Math.round(size*dpr);canvas.style.width=`${size}px`;canvas.style.height=`${size}px`;
-    const ctx=canvas.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,size,size);
-    // Physical iPhone Safari can block its main thread for >90s when atlas acquisition/
-    // image decode starts while the World shell is still mounting. Keep launch responsive;
-    // mobile thumbnails stay as light placeholders until the atlas path is made explicitly
-    // user/idle driven instead of being started by createStudioLiveShell().
-    if(mobileViewport()){
-      ctx.save();ctx.globalAlpha=.10;ctx.fillRect(padding,padding,Math.max(1,size-padding*2),Math.max(1,size-padding*2));ctx.restore();
-      return true;
-    }
     const creator=!!asset?.creatorPrefab;if(creator)await warmCreatorPrefab(asset);else await warmAsset(asset);
     return paintThumbnail(canvas,asset,config);
   }
