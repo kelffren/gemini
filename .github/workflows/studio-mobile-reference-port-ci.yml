@@ -14,7 +14,7 @@ on:
 jobs:
   phone-reference:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -39,7 +39,8 @@ jobs:
         env:
           AUDIT_URL: http://127.0.0.1:8000/
           CHROME_BIN: /usr/bin/google-chrome
-        run: node scripts/studio-mobile-reference-live-audit.mjs
+          DEBUG: pw:api
+        run: timeout --signal=TERM 360s node scripts/studio-mobile-reference-live-audit.mjs
       - name: Upload evidence
         if: always()
         uses: actions/upload-artifact@v4
