@@ -143,7 +143,7 @@ async function waitForPreviewAssets(forge){
     await expect.poll(async()=>contract.evaluate(node=>Number(node.dataset.previewAssetsExpected)>0&&Number(node.dataset.previewAssets)>=Number(node.dataset.previewAssetsExpected)),{timeout:20000,message:'all projected Map Forge sprites must render before visual evidence is captured'}).toBe(true);
     return;
   }
-  await forge.page().waitForTimeout(2000);
+  await forge.evaluate(()=>new Promise(resolve=>setTimeout(resolve,2000)));
 }
 
 async function generateSelected(page,forge,seed){
