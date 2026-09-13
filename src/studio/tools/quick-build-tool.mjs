@@ -49,6 +49,21 @@ export function createQuickBuildTool(kernel,{placement=null,root=globalThis}={})
 
   function currentPosition(){const preview=placement.getPreview?.();return{x:Number(preview?.transform?.x)||0,y:Number(preview?.transform?.y)||0,rotation:Number(preview?.transform?.rotation)||0};}
   function startPreview(piece,{x=0,y=0,rotation=0}={}){placement.cancel();placement.start(piece.prefabId,{rotation,overrides:activeOverrides(piece)});placement.move(x,y,{snap:1});return placement.getPreview?.();}
+  function advancePosition(piece,preview){
+    const grid=snap();
+    const prefab=kernel.prefabs.get?.(piece.prefabId)||{};
+    const width=Math.max(grid,Number(prefab?.bounds?.w)||grid);
+    const height=Math.max(grid,Number(prefab?.bounds?.h)||grid);
+    const rotation=((Number(preview?.transform?.rotation)||0)%360+360)%360;
+    const vertical=rotation===90||rotation===270;
+    const distance=Math.max(grid,Math.round((vertical?width:width)/grid)*grid);
+    const direction=rotation===180||rotation===270?-1:1;
+    return {
+      x:(Number(preview?.transform?.x)||0)+(vertical?0:distance*direction),
+      y:(Number(preview?.transform?.y)||0)+(vertical?distance*direction:0),
+      rotation:Number(preview?.transform?.rotation)||0
+    };
+  }
   function activate(type){
     const piece=pieces.find(row=>row.type===String(type));if(!piece)return false;
     const previous=currentPosition();active=piece;kernel.input.push(CONTEXT);startPreview(piece,previous);syncUi();return true;
@@ -63,7 +78,7 @@ export function createQuickBuildTool(kernel,{placement=null,root=globalThis}={})
       placement.move(x,y,{snap:snap()});
       const before=placement.getPreview?.()||preview;
       const row=await placement.commit();
-      if(active===piece&&!destroyed){startPreview(piece,{x:Number(before?.transform?.x)||0,y:Number(before?.transform?.y)||0,rotation:Number(before?.transform?.rotation)||0});}
+      if(active===piece&&!destroyed){startPreview(piece,advancePosition(piece,before));}
       return row;
     }finally{busy=false;}
   }
@@ -109,5 +124,5 @@ export function createQuickBuildTool(kernel,{placement=null,root=globalThis}={})
   ensureUi();
   if(placement.onPreview){previewUnsub=placement.onPreview(next=>{if(!active||next)return;root.setTimeout?.(()=>{if(active&&!placement.getPreview?.()&&!busy)deactivate({cancel:false});},0);});}
 
-  return Object.freeze({id:'quickBuild',version:'studio-quick-build-v1.0.0-phase1',pieces:pieces.map(copy),activate,deactivate,rotate,commitAt,get active(){return active?{...active}:null;},destroy});
+  return Object.freeze({id:'quickBuild',version:'studio-quick-build-v1.1.0-chain-advance',pieces:pieces.map(copy),activate,deactivate,rotate,commitAt,get active(){return active?{...active}:null;},destroy});
 }
