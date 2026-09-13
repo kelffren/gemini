@@ -38,7 +38,9 @@ function normalizeOperation(operation={}){
   return F({operationId:clean(operation.operationId)||id('op'),type,enabled:operation.enabled!==false,params:F(params),createdAt:clean(operation.createdAt)||now()});
 }
 function normalizeRevision(revision={}){
-  return F({revisionId:clean(revision.revisionId)||id('rev'),label:clean(revision.label)||'Revision',createdAt:clean(revision.createdAt)||now(),operationIds:F([...(revision.operationIds||[])].map(clean).filter(Boolean))});
+  const operations=F([...(revision.operations||[])].map(normalizeOperation));
+  const operationIds=F(operations.length?operations.map(op=>op.operationId):[...(revision.operationIds||[])].map(clean).filter(Boolean));
+  return F({revisionId:clean(revision.revisionId)||id('rev'),label:clean(revision.label)||'Revision',createdAt:clean(revision.createdAt)||now(),operationIds,operations});
 }
 function freezeProject(project){
   return F({...project,source:F({...project.source}),working:F({...project.working,operations:F(project.working.operations.map(op=>F({...op,params:F(copy(op.params))}))}),revisions:F(project.revisions.map(normalizeRevision)),export:F({...project.export})});
@@ -75,10 +77,10 @@ export function resetImageLabWorkingCopy(project){
   assertProject(project);return freezeProject({...project,updatedAt:now(),working:{...project.working,baseSourceId:project.source.sourceId,operations:[]}});
 }
 export function createImageLabRevision(project,{label='Revision'}={}){
-  assertProject(project);const revision=normalizeRevision({label,operationIds:project.working.operations.map(op=>op.operationId)});return freezeProject({...project,updatedAt:now(),revisions:[...project.revisions,revision]});
+  assertProject(project);const revision=normalizeRevision({label,operations:project.working.operations.map(op=>copy(op))});return freezeProject({...project,updatedAt:now(),revisions:[...project.revisions,revision]});
 }
 export function resolveImageLabOperations(project,{revisionId=null}={}){
-  assertProject(project);if(!revisionId)return F(project.working.operations.filter(op=>op.enabled!==false));const revision=project.revisions.find(item=>item.revisionId===revisionId);if(!revision)throw new Error(`IMAGE_LAB_REVISION_NOT_FOUND:${revisionId}`);const wanted=new Set(revision.operationIds);return F(project.working.operations.filter(op=>wanted.has(op.operationId)&&op.enabled!==false));
+  assertProject(project);if(!revisionId)return F(project.working.operations.filter(op=>op.enabled!==false));const revision=project.revisions.find(item=>item.revisionId===revisionId);if(!revision)throw new Error(`IMAGE_LAB_REVISION_NOT_FOUND:${revisionId}`);if(Array.isArray(revision.operations)&&revision.operations.length)return F(revision.operations.filter(op=>op.enabled!==false).map(normalizeOperation));const wanted=new Set(revision.operationIds);return F(project.working.operations.filter(op=>wanted.has(op.operationId)&&op.enabled!==false));
 }
 export function withImageLabExport(project,{format=project?.export?.format||'png',quality=project?.export?.quality??.92}={}){
   assertProject(project);return freezeProject({...project,updatedAt:now(),export:{format:clean(format).toLowerCase(),quality:Math.max(0,Math.min(1,finite(quality,.92)))}});
