@@ -150,15 +150,18 @@ jobs:
           cp src/studio/adapters/map-forge-draft-importer.mjs /tmp/map-forge-importer-after.mjs
           SOURCE_CHANGE_COMMIT="$(git log --no-merges -1 --format=%H -- src/world/map-forge/map-forge-champion-overrides.mjs src/world/map-forge/map-forge-builder.mjs src/world/map-forge/map-forge-core.mjs src/world/map-forge/map-forge-arrival-scene.mjs src/world/map-forge/map-forge-scene-prefabs.mjs src/studio/adapters/map-forge-draft-importer.mjs)"
           test -n "$SOURCE_CHANGE_COMMIT"
-          BASE_COMMIT="$(git rev-parse "${SOURCE_CHANGE_COMMIT}^")"
-          git cat-file -e "$BASE_COMMIT^{commit}"
+          BASE_COMMIT="$(git rev-parse "${SOURCE_CHANGE_COMMIT}^" 2>/dev/null || true)"
+          if [ -z "$BASE_COMMIT" ] || ! git cat-file -e "$BASE_COMMIT^{commit}" 2>/dev/null; then
+            BASE_COMMIT="$SOURCE_CHANGE_COMMIT"
+            echo "No historical parent is available for source change $SOURCE_CHANGE_COMMIT; using explicit current-source baseline instead of fabricating BEFORE history"
+          fi
           git show "$BASE_COMMIT:src/world/map-forge/map-forge-champion-overrides.mjs" > /tmp/map-forge-champion-before.mjs
           git show "$BASE_COMMIT:src/world/map-forge/map-forge-builder.mjs" > /tmp/map-forge-builder-before.mjs
           git show "$BASE_COMMIT:src/world/map-forge/map-forge-core.mjs" > /tmp/map-forge-core-before.mjs
           git show "$BASE_COMMIT:src/world/map-forge/map-forge-arrival-scene.mjs" > /tmp/map-forge-arrival-before.mjs
           git show "$BASE_COMMIT:src/world/map-forge/map-forge-scene-prefabs.mjs" > /tmp/map-forge-scene-prefabs-before.mjs
           git show "$BASE_COMMIT:src/studio/adapters/map-forge-draft-importer.mjs" > /tmp/map-forge-importer-before.mjs
-          echo "Comparing complete visual pipeline around non-merge source change: $BASE_COMMIT -> $SOURCE_CHANGE_COMMIT (current $(git rev-parse HEAD))"
+          echo "Comparing complete visual pipeline baseline $BASE_COMMIT -> source $SOURCE_CHANGE_COMMIT (current $(git rev-parse HEAD))"
       - name: Capture fixed-seed BEFORE preview and runtime evidence
         env:
           KELO_PAGES: http://127.0.0.1:4173/
