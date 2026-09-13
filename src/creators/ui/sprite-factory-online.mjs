@@ -6,6 +6,7 @@
  * do-not: NO provider secret in browser, NO second auth system, NO gameplay authority
  */
 import {openSpriteFactory} from './sprite-factory-workspace.mjs';
+import {requestCreatorJson} from '../adapters/creator-http-adapter.mjs';
 import {repairSpritesheetImage,analyzeGridCells} from '../sprite-compiler/sprite-compiler-core.mjs';
 import {detectSpriteCompilerGrid,selectSpriteCompilerGrid} from '../sprite-compiler/sprite-compiler-grid.mjs';
 import {diagnoseSpriteFrames,buildSelectiveRepairTargets} from '../sprite-compiler/sprite-frame-doctor.mjs';
@@ -30,7 +31,7 @@ function qaRetryHint(qa){
 }
 function setBadge(panel,text,ready){const badge=panel?.querySelector('.ksf-pill');if(!badge)return;badge.textContent=text;badge.classList.toggle('warn',!ready);}
 async function fetchStatus(root,url,panel){
-  try{const res=await root.fetch(url+'/status',{headers:{Accept:'application/json'}}),data=await res.json();if(!res.ok)throw new Error(data?.error||`HTTP_${res.status}`);setBadge(panel,data.configured?'AI BACKEND · READY':'AI BACKEND · KEY REQUIRED',!!data.configured);return data;}catch(error){setBadge(panel,'AI BACKEND · DEPLOYING/OFFLINE',false);return{configured:false,error:String(error?.message||error)};}
+  try{const {ok,status,data}=await requestCreatorJson(root,url+'/status',{headers:{Accept:'application/json'}});if(!ok)throw new Error(data?.error||`HTTP_${status}`);setBadge(panel,data?.configured?'AI BACKEND · READY':'AI BACKEND · KEY REQUIRED',!!data?.configured);return data||{configured:false};}catch(error){setBadge(panel,'AI BACKEND · DEPLOYING/OFFLINE',false);return{configured:false,error:String(error?.message||error)};}
 }
 async function credentials(root){const auth=await root.KeloOnlineAuth?.credentials?.();if(!auth?.accessToken)throw new Error('INICIA_SESION_PARA_USAR_SPRITE_AI');if(auth.isAnonymous)throw new Error('SPRITE_AI_REQUIERE_CUENTA');return auth;}
 function publishTreatmentState(root,kind,report,extra={}){try{root.__KELO_IMAGE_TREATMENT_LAST__={version:'image-treatment-v1.0.0',kind,report,...extra};}catch{}}
@@ -61,8 +62,8 @@ export async function openSpriteFactoryOnline({root=globalThis}={}){
     return qa;
   }
   async function generateOnce(token,retryHint=''){
-    const res=await root.fetch(endpoint,{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({kind:'character-spritesheet',action:'walk',directions:DIRECTIONS,framesPerDirection:4,spriteSize:64,styleHint:'Kelo World premium dark-fantasy MMORPG sprite, clean silhouette, restrained gold accents, transparent background',sourceImageDataUrl,retryHint})});
-    const data=await res.json().catch(()=>null);if(!res.ok)throw new Error(data?.error||data?.detail||`SPRITE_AI_HTTP_${res.status}`);if(!data?.imageDataUrl)throw new Error('SPRITE_AI_NO_IMAGE_DATA_URL');return data;
+    const {ok,status,data}=await requestCreatorJson(root,endpoint,{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({kind:'character-spritesheet',action:'walk',directions:DIRECTIONS,framesPerDirection:4,spriteSize:64,styleHint:'Kelo World premium dark-fantasy MMORPG sprite, clean silhouette, restrained gold accents, transparent background',sourceImageDataUrl,retryHint})});
+    if(!ok)throw new Error(data?.error||data?.detail||`SPRITE_AI_HTTP_${status}`);if(!data?.imageDataUrl)throw new Error('SPRITE_AI_NO_IMAGE_DATA_URL');return data;
   }
   aiBtn.onclick=async()=>{
     if(busy)return;busy=true;aiBtn.disabled=true;aiBtn.textContent='GENERATING…';
