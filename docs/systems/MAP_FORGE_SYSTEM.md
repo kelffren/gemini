@@ -179,8 +179,6 @@ Desde `1.8.0`, el mismo owner de llegada compone también puertas de salida en l
 
 Desde `1.9.0`, una salida que no puede resolver la primera pareja semántica de su distrito prueba las alternativas ya declaradas por el mismo kit —por ejemplo, piedras después de arbustos en bosque o cajas después de barriles en mina—. Cada intento sigue siendo atómico y una alternativa fallida restaura ambas decoraciones antes de probar la siguiente. Esto amplía la cobertura de gateways sin robar miembros de otras escenas, inventar familias impropias ni relajar ninguna protección espacial.
 
-Desde `1.10.0`, si el distrito declarado de una salida no puede aportar una pareja, el owner prueba el distrito que realmente ocupa el ancla interior del borde. Esto corrige carreteras nacidas en el centro que alcanzan el mundo a través de granjas o minería: la escena usa utilería del distrito visible en ese borde, conserva el conector de la salida y mantiene la colocación atómica, spacing, carreteras y clearance.
-
 ## Online-first
 
 ```text
