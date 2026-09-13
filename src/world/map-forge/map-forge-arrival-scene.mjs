@@ -8,6 +8,7 @@
  * do-not: no DOM, renderer, catalog mutation, gameplay state or Math.random
  */
 import {insideBounds} from './map-forge-geometry.mjs';
+import {hasApprovedDecorationSprite} from './map-forge-sprite-manifest.mjs';
 
 const ROUND=value=>Math.round(Number(value||0)*10)/10;
 const MAX_SOURCE_DISTANCE=760;
@@ -21,7 +22,7 @@ const PAIRS=Object.freeze({
   royal:Object.freeze([{family:'lamp',roles:['arrival-light-left','arrival-light-right'],forward:72,lateral:112},{family:'bench',roles:['arrival-rest-left','arrival-rest-right'],forward:-50,lateral:156}]),
   commerce:Object.freeze([{family:'lamp',roles:['arrival-light-left','arrival-light-right'],forward:66,lateral:104},{family:'bench',roles:['arrival-rest-left','arrival-rest-right'],forward:-46,lateral:148}]),
   farm:Object.freeze([{family:'flower',roles:['arrival-flower-left','arrival-flower-right'],forward:58,lateral:108},{family:'crate',roles:['arrival-crate-left','arrival-crate-right'],forward:-52,lateral:148}]),
-  forest:Object.freeze([{family:'bush',roles:['arrival-shrub-left','arrival-shrub-right'],forward:56,lateral:108},{family:'rock',roles:['arrival-stone-left','arrival-stone-right'],forward:-54,lateral:146}]),
+  forest:Object.freeze([{family:'bush',roles:['arrival-shrub-left','arrival-shrub-right'],forward:56,lateral:108},{family:'tree',roles:['arrival-tree-left','arrival-tree-right'],forward:-54,lateral:146}]),
   mine:Object.freeze([{family:'barrel',roles:['arrival-barrel-left','arrival-barrel-right'],forward:54,lateral:100},{family:'crate',roles:['arrival-crate-left','arrival-crate-right'],forward:-48,lateral:142}]),
   default:Object.freeze([{family:'tree',roles:['arrival-tree-left','arrival-tree-right'],forward:62,lateral:118},{family:'rock',roles:['arrival-stone-left','arrival-stone-right'],forward:-56,lateral:150}])
 });
@@ -47,6 +48,7 @@ function materializeExitGateways(parts,{worldBounds}={}){
     const district=(parts.districts||[]).find(row=>row.id===exit.district),frame=exitRoadFrame(parts,exit);if(!district||!frame)continue;
     const anchor=exitAnchor(exit,frame);let placement=null;
     for(const pair of PAIRS[district.kind]||PAIRS.default){
+      if(!hasApprovedDecorationSprite(pair.family))continue;
       const lateral=Math.max(pair.lateral,112),leftTarget=targetPoint(anchor,frame,0,-lateral),rightTarget=targetPoint(anchor,frame,0,lateral),used=new Set(),left=chooseSource(rows,exit.district,pair.family,leftTarget,used);if(!left)continue;used.add(left.index);const right=chooseSource(rows,exit.district,pair.family,rightTarget,used);if(!right)continue;
       const originalLeft={...rows[left.index]},originalRight={...rows[right.index]},leftAccepted=acceptedPoint(parts,rows,left.index,leftTarget,worldBounds);if(!leftAccepted)continue;rows[left.index].x=leftAccepted.x;rows[left.index].y=leftAccepted.y;const rightAccepted=acceptedPoint(parts,rows,right.index,rightTarget,worldBounds);if(!rightAccepted){rows[left.index]=originalLeft;rows[right.index]=originalRight;continue;}rows[right.index].x=rightAccepted.x;rows[right.index].y=rightAccepted.y;placement={pair,left,right,leftTarget,rightTarget,originalLeft,originalRight};break;
     }
@@ -65,6 +67,7 @@ export function materializeArrivalScene(parts,{worldBounds}={}){
   const rows=(parts.decorations||[]).map(row=>({...row})),sceneId='scene-prefab:spawn:arrival-gateway-v1',used=new Set(),members=[];let moved=0,totalMovement=0;
   const pairs=PAIRS[district.kind]||PAIRS.default;
   for(const pair of pairs){
+    if(!hasApprovedDecorationSprite(pair.family))continue;
     const leftTarget=targetPoint(spawn,frame,pair.forward,-pair.lateral),rightTarget=targetPoint(spawn,frame,pair.forward,pair.lateral),left=chooseSource(rows,spawn.district,pair.family,leftTarget,used);if(!left)continue;used.add(left.index);const right=chooseSource(rows,spawn.district,pair.family,rightTarget,used);if(!right){used.delete(left.index);continue;}used.add(right.index);
     const originalLeft={...rows[left.index]},originalRight={...rows[right.index]},leftAccepted=acceptedPoint(parts,rows,left.index,leftTarget,worldBounds);if(!leftAccepted){used.delete(left.index);used.delete(right.index);continue;}rows[left.index].x=leftAccepted.x;rows[left.index].y=leftAccepted.y;const rightAccepted=acceptedPoint(parts,rows,right.index,rightTarget,worldBounds);if(!rightAccepted){rows[left.index]=originalLeft;rows[right.index]=originalRight;used.delete(left.index);used.delete(right.index);continue;}
     rows[right.index].x=rightAccepted.x;rows[right.index].y=rightAccepted.y;
