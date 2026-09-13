@@ -1,6 +1,6 @@
 /* KELO-INDEX
  * area: STUDIO / QUICK BUILD
- * owns: semantic piece selection, continuous placement input context, snap orchestration and compact Quick Build chrome
+ * owns: semantic piece selection, continuous placement input context, snap/orientation orchestration and compact Quick Build chrome
  * does-not-own: document mutation, CommandBus, authority, world rendering or camera transforms
  * public-api: createQuickBuildTool(), resolveQuickBuildPieces()
  * online: commits delegate to placement.commit() -> Kernel CommandBus -> authority mirror
@@ -16,6 +16,7 @@ const PIECES=Object.freeze([
 ]);
 const norm=value=>String(value||'').trim().toLowerCase();
 const copy=value=>value==null?value:(typeof structuredClone==='function'?structuredClone(value):JSON.parse(JSON.stringify(value)));
+const rotationDelta=(from,to)=>{const a=((Number(from)||0)%360+360)%360,b=((Number(to)||0)%360+360)%360;return b-a;};
 
 function scorePrefab(prefab,piece){
   const id=norm(prefab?.id),label=norm(prefab?.label),category=norm(prefab?.category),text=`${id} ${label} ${category}`;
@@ -42,7 +43,7 @@ export function createQuickBuildTool(kernel,{placement=null,root=globalThis}={})
   placement=placement||kernel.tools?.get?.('placement');
   if(!placement?.start||!placement?.move||!placement?.commit||!placement?.cancel)throw new Error('STUDIO_QUICK_BUILD_PLACEMENT_REQUIRED');
   const document=root?.document;
-  let destroyed=false,active=null,busy=false,launcher=null,palette=null,style=null,observer=null,previewUnsub=null,seenShell=false;
+  let destroyed=false,active=null,busy=false,manualRotationOverride=false,launcher=null,palette=null,style=null,observer=null,previewUnsub=null,seenShell=false;
   let snapState=Object.freeze({state:'none',candidateCount:0,checkedPairs:0,connection:null});
   const pieces=resolveQuickBuildPieces({prefabs:kernel.prefabs.list?.()||[],overrides:root?.KELO_QUICK_BUILD_CATALOG||{}});
   const snapResolver=createSnapResolver({spatial:kernel.spatial,radius:Math.max(32,Number(kernel.document?.settings?.tileSize)||32)*1.35});
@@ -69,18 +70,24 @@ export function createQuickBuildTool(kernel,{placement=null,root=globalThis}={})
   function resolveMove(x,y){
     if(!active)return null;
     placement.move(x,y,{snap:gridSnap()});
-    const preview=placement.getPreview?.();
+    let preview=placement.getPreview?.();
     if(!preview){setSnapState({state:'invalid',reason:'preview-missing',candidateCount:0,checkedPairs:0,connection:null});return null;}
-    const result=snapResolver.resolve(preview,{radius:snapRadius()});
-    if(result.state==='snapped')placement.move(result.x,result.y,{snap:1});
-    setSnapState(result);return placement.getPreview?.();
+    const rotations=manualRotationOverride?[preview.transform.rotation]:null;
+    const result=snapResolver.resolve(preview,{radius:snapRadius(),rotations});
+    if(result.state==='snapped'){
+      const delta=rotationDelta(preview.transform.rotation,result.rotation);
+      if(delta)placement.rotate?.(delta);
+      placement.move(result.x,result.y,{snap:1});
+      preview=placement.getPreview?.();
+    }
+    setSnapState({...result,manualRotationOverride});return preview;
   }
   function activate(type){
     const piece=pieces.find(row=>row.type===String(type));if(!piece)return false;
-    const previous=currentPosition();active=piece;kernel.input.push(CONTEXT);startPreview(piece,previous);syncUi();return true;
+    const previous=currentPosition();active=piece;manualRotationOverride=false;kernel.input.push(CONTEXT);startPreview(piece,previous);syncUi();return true;
   }
-  function deactivate({cancel=true}={}){if(!active)return false;active=null;kernel.input.pop(CONTEXT);if(cancel)placement.cancel();setSnapState({state:'none',candidateCount:0,checkedPairs:0,connection:null});syncUi();return true;}
-  function rotate(){if(!active)return false;placement.rotate?.(90);const preview=placement.getPreview?.();if(preview)resolveMove(preview.transform.x,preview.transform.y);return true;}
+  function deactivate({cancel=true}={}){if(!active)return false;active=null;manualRotationOverride=false;kernel.input.pop(CONTEXT);if(cancel)placement.cancel();setSnapState({state:'none',candidateCount:0,checkedPairs:0,connection:null});syncUi();return true;}
+  function rotate(){if(!active)return false;manualRotationOverride=true;placement.rotate?.(90);const preview=placement.getPreview?.();if(preview)resolveMove(preview.transform.x,preview.transform.y);return true;}
 
   async function commitAt(x,y){
     if(!active||busy)return null;busy=true;
@@ -90,7 +97,7 @@ export function createQuickBuildTool(kernel,{placement=null,root=globalThis}={})
       const before=placement.getPreview?.();
       if(!before){setSnapState({state:'invalid',reason:'preview-missing',candidateCount:0,checkedPairs:0,connection:null});return null;}
       const row=await placement.commit();
-      if(active===piece&&!destroyed){const next=advancePosition(piece,before);startPreview(piece,next);resolveMove(next.x,next.y);}
+      if(active===piece&&!destroyed){const next=advancePosition(piece,before);manualRotationOverride=false;startPreview(piece,next);resolveMove(next.x,next.y);}
       return row;
     }finally{busy=false;}
   }
@@ -130,15 +137,15 @@ export function createQuickBuildTool(kernel,{placement=null,root=globalThis}={})
   }
   function syncUi(){
     if(launcher){launcher.classList.toggle('on',!!active);launcher.textContent=active?`⚒ ${active.label}`:'⚒ BUILD';}
-    if(palette){palette.hidden=!active;palette.querySelectorAll?.('[data-qb-piece]')?.forEach(button=>button.classList.toggle('on',button.dataset.qbPiece===active?.type));const status=palette.querySelector?.('[data-qb-snap]');if(status){const state=snapState?.state||'valid';status.dataset.state=state;status.textContent=state==='snapped'?'SNAPPED':state==='invalid'?'INVALID':'FREE';}}
+    if(palette){palette.hidden=!active;palette.querySelectorAll?.('[data-qb-piece]')?.forEach(button=>button.classList.toggle('on',button.dataset.qbPiece===active?.type));const status=palette.querySelector?.('[data-qb-snap]');if(status){const state=snapState?.state||'valid';status.dataset.state=state;status.textContent=state==='snapped'?(snapState.autoRotated?`SNAP ${Math.round(Number(snapState.rotation)||0)}°`:'SNAPPED'):state==='invalid'?'INVALID':'FREE';}}
   }
 
-  function destroy(){if(destroyed)return;destroyed=true;active=null;kernel.input.pop(CONTEXT);unregisterInput?.();previewUnsub?.();observer?.disconnect?.();document?.removeEventListener?.('keydown',keydown,true);launcher?.remove();palette?.remove();style?.remove();launcher=palette=style=observer=null;}
+  function destroy(){if(destroyed)return;destroyed=true;active=null;manualRotationOverride=false;kernel.input.pop(CONTEXT);unregisterInput?.();previewUnsub?.();observer?.disconnect?.();document?.removeEventListener?.('keydown',keydown,true);launcher?.remove();palette?.remove();style?.remove();launcher=palette=style=observer=null;}
   function keydown(event){if(!active||event.defaultPrevented||event.repeat||event.target?.closest?.(EDITABLE))return;const key=norm(event.key);if(key==='escape'){event.preventDefault?.();event.stopImmediatePropagation?.();deactivate();}else if(key==='r'){event.preventDefault?.();event.stopImmediatePropagation?.();rotate();}}
   document?.addEventListener?.('keydown',keydown,true);
   if(document?.documentElement&&root?.MutationObserver){observer=new root.MutationObserver(()=>{const shell=document.getElementById?.('kelo-studio-live');if(!shell&&seenShell){destroy();return;}ensureUi();});observer.observe(document.documentElement,{childList:true,subtree:true});}
   ensureUi();
   if(placement.onPreview){previewUnsub=placement.onPreview(next=>{if(!active||next)return;root.setTimeout?.(()=>{if(active&&!placement.getPreview?.()&&!busy)deactivate({cancel:false});},0);});}
 
-  return Object.freeze({id:'quickBuild',version:'studio-quick-build-v1.2.0-phase2-snap',pieces:pieces.map(copy),activate,deactivate,rotate,commitAt,resolveMove,getSnapState:()=>copy(snapState),get active(){return active?{...active}:null;},destroy});
+  return Object.freeze({id:'quickBuild',version:'studio-quick-build-v1.3.0-phase3-auto-rotate',pieces:pieces.map(copy),activate,deactivate,rotate,commitAt,resolveMove,getSnapState:()=>copy(snapState),get active(){return active?{...active}:null;},destroy});
 }
