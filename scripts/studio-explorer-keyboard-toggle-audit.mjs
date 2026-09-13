@@ -53,8 +53,30 @@ keyHandler(shifted);
 assert.deepEqual(selection,['a','c'],'Ctrl/Cmd+Shift+Space must stay reserved');
 assert.equal(writes,2,'reserved modified Space must not mutate selection');
 
+const escape=key(rows[0],{key:'Escape',code:'Escape',ctrlKey:false,metaKey:false,shiftKey:false});
+keyHandler(escape);
+assert.deepEqual(selection,[],'Escape must clear the current Explorer selection');
+assert.equal(writes,3,'Escape must clear selection with exactly one local selection write');
+assert.equal(escape.prevented,1,'handled Escape must suppress competing browser/global handling');
+assert.equal(escape.stopped,1,'handled Escape must stay isolated from competing Studio handlers');
+assert.equal(controller.anchor,null,'Escape must reset the range anchor so the next Shift range starts fresh');
+
+const emptyEscape=key(rows[0],{key:'Escape',code:'Escape',ctrlKey:false,metaKey:false,shiftKey:false});
+keyHandler(emptyEscape);
+assert.equal(writes,3,'Escape on an already-empty selection must be a no-op');
+assert.equal(emptyEscape.prevented,0,'empty Escape must remain available to higher-level UI such as panel dismissal');
+assert.equal(emptyEscape.stopped,0,'empty Escape must not block higher-level UI');
+
+selection=['a'];
+const modifiedEscape=key(rows[0],{key:'Escape',code:'Escape',ctrlKey:false,metaKey:false,shiftKey:true});
+keyHandler(modifiedEscape);
+assert.deepEqual(selection,['a'],'modified Escape must remain reserved');
+assert.equal(writes,3,'modified Escape must not write selection state');
+assert.equal(modifiedEscape.prevented,0,'modified Escape must not be captured');
+
 const source=fs.readFileSync(new URL('../src/studio/input/studio-explorer-range-selection-controller.mjs',import.meta.url),'utf8');
 assert.match(source,/command&&\(event\.key===' '\|\|event\.code==='Space'\)&&!event\.shiftKey/,'controller must keep the keyboard toggle scoped to command+Space');
-assert.doesNotMatch(source,/kernel\.execute|KELO_WORLD_EDIT/,'Explorer keyboard toggle must remain selection-only and never bypass CommandBus/authority');
+assert.match(source,/event\.key==='Escape'&&!command&&!event\.shiftKey/,'Explorer deselection must stay scoped to plain Escape');
+assert.doesNotMatch(source,/kernel\.execute|KELO_WORLD_EDIT/,'Explorer keyboard selection controls must remain selection-only and never bypass CommandBus/authority');
 
-console.log(JSON.stringify({ok:true,keyboardToggle:true,nonContiguousSelection:true,writes,authorityBypass:false},null,2));
+console.log(JSON.stringify({ok:true,keyboardToggle:true,escapeClear:true,emptyEscapePassThrough:true,nonContiguousSelection:true,writes,authorityBypass:false},null,2));
