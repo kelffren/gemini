@@ -89,6 +89,8 @@ jobs:
           node --check src/creators/sprite-compiler/sprite-pixel-grammar.mjs
           node --check src/creators/sprite-compiler/sprite-silhouette-consistency.mjs
           node --check src/creators/sprite-compiler/sprite-donor-repair.mjs
+          node --check src/creators/sprite-compiler/sprite-atlas-finalizer.mjs
+          node --check src/creators/sprite-compiler/sprite-exact-canvas.mjs
           node --check src/creators/sprite-compiler/sprite-world-asset-compiler.mjs
           node --check src/creators/sprite-compiler/sprite-ingestion-validator.mjs
           node --check src/creators/workspaces/avatar-workspace.mjs
