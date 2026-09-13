@@ -11,6 +11,7 @@ import { createCompositeCommand } from '../document/composite-command.mjs';
 
 const copy = value => value == null ? value : (typeof structuredClone === 'function' ? structuredClone(value) : JSON.parse(JSON.stringify(value)));
 function newId() { const uuid = globalThis.crypto?.randomUUID?.(); return `entity:${uuid || `${Date.now().toString(36)}:${Math.random().toString(36).slice(2,10)}`}`; }
+function newRoomId() { const uuid = globalThis.crypto?.randomUUID?.(); return `room:${uuid || `${Date.now().toString(36)}:${Math.random().toString(36).slice(2,10)}`}`; }
 const scaleOf=value=>{const n=Number(value);return Math.max(.1,Math.min(8,Number.isFinite(n)?Math.round(n*100)/100:1));};
 const snapUp=(value,step)=>Math.max(step,Math.ceil(Math.max(1,Number(value)||1)/step)*step);
 const entityRect=(row,tile)=>{
@@ -31,6 +32,17 @@ function rotatePointAround(x,y,cx,cy,delta){
 }
 function scalePointAround(x,y,cx,cy,factor){
   return{x:cleanCoord(cx+((Number(x)||0)-cx)*factor),y:cleanCoord(cy+((Number(y)||0)-cy)*factor)};
+}
+function isolateSemanticRooms(rows=[]){
+  const roomMap=new Map();
+  return rows.map(row=>{
+    const piece=row?.components?.buildingPiece,sourceRoomId=piece?.roomId;
+    if(!sourceRoomId)return row;
+    let roomId=roomMap.get(String(sourceRoomId));
+    if(!roomId){roomId=newRoomId();roomMap.set(String(sourceRoomId),roomId);}
+    row.components={...(row.components||{}),buildingPiece:{...piece,roomId}};
+    return row;
+  });
 }
 
 export function smartDuplicateOffset(rows=[],tileSize=32){
@@ -80,7 +92,7 @@ export function createCreatorActions(kernel) {
     const rows = selectedEntities(); if (!rows.length) return [];
     const tile = Math.max(1, Number(kernel.document.settings?.tileSize) || 32),smart=findClearDuplicateOffset(rows,kernel.document.entities,tile);
     const dx = Number.isFinite(Number(offsetX)) ? Number(offsetX) : smart.dx, dy = Number.isFinite(Number(offsetY)) ? Number(offsetY) : smart.dy;
-    const clones = rows.map(row => { const clone=sanitizeClone(row); clone.transform={...(clone.transform||{}),x:(Number(clone.transform?.x)||0)+dx,y:(Number(clone.transform?.y)||0)+dy}; return clone; });
+    const clones = isolateSemanticRooms(rows.map(row => { const clone=sanitizeClone(row); clone.transform={...(clone.transform||{}),x:(Number(clone.transform?.x)||0)+dx,y:(Number(clone.transform?.y)||0)+dy}; return clone; }));
     await kernel.execute(createCompositeCommand(clones.map(row => createPlaceEntityCommand(row)), { type: 'entity.batch.duplicate', label: `Duplicate ${clones.length} object${clones.length === 1 ? '' : 's'}` }));
     const ids=clones.map(row => row.id);kernel.selection.set(ids);
     if(armGrab)kernel.tools.get?.('select')?.armGrab?.(ids);
@@ -95,7 +107,7 @@ export function createCreatorActions(kernel) {
     if(!clipboard.length)return [];
     const tile=Math.max(1,Number(kernel.document.settings?.tileSize)||32);pasteCount++;
     const dx=Number.isFinite(Number(offsetX))?Number(offsetX):tile*pasteCount,dy=Number.isFinite(Number(offsetY))?Number(offsetY):tile*pasteCount;
-    const clones=clipboard.map(row=>{const clone=sanitizeClone(row);clone.transform={...(clone.transform||{}),x:(Number(clone.transform?.x)||0)+dx,y:(Number(clone.transform?.y)||0)+dy};return clone;});
+    const clones=isolateSemanticRooms(clipboard.map(row=>{const clone=sanitizeClone(row);clone.transform={...(clone.transform||{}),x:(Number(clone.transform?.x)||0)+dx,y:(Number(clone.transform?.y)||0)+dy};return clone;}));
     await kernel.execute(createCompositeCommand(clones.map(row=>createPlaceEntityCommand(row)),{type:'entity.batch.paste',label:`Paste ${clones.length} object${clones.length===1?'':'s'}`}));
     kernel.selection.set(clones.map(row=>row.id));return clones;
   }
