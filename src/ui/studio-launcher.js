@@ -6,6 +6,7 @@
  * public-api: KELO_STUDIO_LAUNCHER + KELO_CREATORS_LAUNCHER alias
  * consumes: KELO_ADMIN_KEYS, KeloAccountPermissions, KELO_LUXE, menú Luxe existente
  * state-owned: solo estado efímero de carga
+ * lazy-contract: NO polling; sync happens on boot, explicit actions and permission changes
  * extension-points: Creator Hub / Sprite Factory / WorkspaceRegistry / Account Admin
  */
 (function(){
