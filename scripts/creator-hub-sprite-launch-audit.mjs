@@ -23,6 +23,6 @@ assert.ok(source.includes("throw new Error('SPRITE_ABILITY_WORKSPACE_MOUNT_FAILE
 assert.ok(source.includes("showLaunchError(id,error);"), 'Visible/recoverable launch failure path missing');
 assert.ok(source.includes("if(hub.isConnected)setOpeningUi(id,false);"), 'Busy UI must reset while Hub survives');
 assert.ok(source.includes("card.dataset.workspace=wid;"), 'Workspace cards must be addressable for busy state');
-assert.ok(source.includes("version:'kelo-creator-hub-v1.11.0-sprite-launch-transaction'"), 'Expected transactional launcher version missing');
+assert.ok(source.includes("version:'kelo-creator-hub-v1.12.0-asset-sheet-bridge'"), 'Expected transactional launcher version missing');
 
 console.log('CREATOR_HUB_SPRITE_LAUNCH_AUDIT: PASS');

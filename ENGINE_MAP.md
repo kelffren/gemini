@@ -174,6 +174,7 @@ El orden importa: `KeloCamera`, `KeloAvatar`, `KeloRender` y `KeloSimulation` se
 | `src/core/input-gate.js` | compatibilidad antigua | RETIRED COMPAT | Ya no es segundo wrapper LIVE; su función quedó absorbida por `KeloInput` |
 | `src/ui/modal-input-lock.js` | compatibilidad antigua | RETIRED COMPAT | No envuelve `processInput`; conservar solo mientras exista consumidor histórico |
 | `force-unlock-move.js` | ninguno | RETIRED HOTFIX / NOT LOADED | 0 timers, 0 wrappers |
+| Creator raw asset sheet bridge | `src/creators/assets/asset-sheet-compiler.mjs` / `Kelo Creator Asset Bridge` | DYNAMIC CREATOR / LOCAL DRAFT | Reutiliza Sprite Foreground + World Asset Compiler; revisión por JSON sin API; registra preview mediante Atlas Contract + Property Catalog y delega placement a World/Map Forge |
 | Runtime bootstrap tardío | `src/core/kelo-runtime-bootstrap.js` + Character Creator desde `profile-panel-close.js` | DYNAMIC LIVE / NEEDS_AUDIT | Boot ownership sigue disparado desde UI; moverlo solo cuando exista contrato claro, sin duplicar boot |
 
 ---

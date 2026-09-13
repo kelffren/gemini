@@ -234,3 +234,22 @@ El flujo deseado es siempre el más corto posible:
 → verificar
 → confirmar
 ```
+
+<!-- CREATOR-ASSET-SHEET-BRIDGE-V1:START -->
+## Asset Sheet Studio V1 — puente natural de clasificación
+
+Cuando ChatGPT entregue una sola imagen con varios árboles, edificios, plantas u objetos:
+
+1. abre **CREATORS → Asset Sheet Studio**;
+2. carga la imagen cruda y pulsa **ANALYZE SHEET**;
+3. revisa la vista numerada;
+4. descarga **REVIEW JSON** y copia **CHATGPT PROMPT**;
+5. adjunta la imagen + JSON en la conversación;
+6. importa el JSON devuelto para aplicar nombres/categorías;
+7. usa **OPEN IN WORLD** para probar la galería como borrador de sesión;
+8. exporta el atlas limpio + manifest y usa este puente Dropbox/GitHub para persistir los bytes.
+
+Este flujo no llama una API de ChatGPT. El modelo solo revisa un archivo que el usuario adjunta explícitamente. ChatGPT puede corregir semántica; no puede mover los recuadros, pivotes ni colisiones calculados por Kelo.
+
+Contrato técnico: `docs/systems/CREATOR_ASSET_BRIDGE.md`.
+<!-- CREATOR-ASSET-SHEET-BRIDGE-V1:END -->

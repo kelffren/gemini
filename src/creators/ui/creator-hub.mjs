@@ -5,14 +5,14 @@
  * does-not-own: global navigation, Studio implementation, project persistence, permissions or publish policy
  * lazy: imported only after explicit CREATORS action; active cards dispatch through workspace registry
  */
-import { bootKeloCreators } from '../creator-entry.mjs?v=map-forge-launch-recovery-20260912-1';
+import { bootKeloCreators } from '../creator-entry.mjs?v=asset-sheet-bridge-20260913-1';
 
 let active=null;
 
 const CATALOG=Object.freeze([
   {category:'BUILD',items:[['world','World','active'],['map-forge','Map Forge','active'],['parcel','Parcel','active'],['dungeon','Dungeon','active'],['game-mode','Game Mode','active']]},
   {category:'GAMEPLAY',items:[['mount','Mount','active'],['ability','Ability','active'],['sprite-ability','Sprite Ability','active'],['npc','NPC','active'],['quest','Quest / Dialogue','active'],['item','Item','active'],['crafting','Crafting','active']]},
-  {category:'VISUAL',items:[['avatar','Avatar','active'],['appearance','Appearance','active'],['animation','Animation','active'],['vfx','VFX','active'],['cinematic','Cinematic','active']]},
+  {category:'VISUAL',items:[['avatar','Avatar','active'],['asset-sheet','Asset Sheet Studio','active'],['appearance','Appearance','active'],['animation','Animation','active'],['vfx','VFX','active'],['cinematic','Cinematic','active']]},
   {category:'CONTENT',items:[['content-studio','Content Studio','active'],['prefab','Prefab','active'],['environment','Environment','active'],['audio','Audio','active']]}
 ]);
 
@@ -176,6 +176,7 @@ export async function openCreatorHub({root=globalThis}={}){
         let detail='Shared Studio core · private/local draft';
         if(wid==='avatar')detail='Subir → preview → usar';
         if(wid==='content-studio')detail='Spreadsheet · phone · Supabase · instant runtime';
+        if(wid==='asset-sheet')detail='Detect · classify · gallery · OPEN IN WORLD';
         if(wid==='sprite-ability')detail='SUBIR → VER → PROBAR → AJUSTAR → GUARDAR';
         const card=make('button',{
           class:`kc-card ${permitted?'active':''}`,
@@ -225,16 +226,23 @@ export async function openCreatorHub({root=globalThis}={}){
   async function renderAssets(){
     main.replaceChildren(
       make('h1',{text:'My Assets'}),
-      make('p',{class:'kc-lead',text:'Upload spreadsheets and files into the universal online content pipeline.'})
+      make('p',{class:'kc-lead',text:'Treat raw sprite sheets locally, test galleries in World, then use the existing online content pipeline for durable publication.'})
     );
-    const card=make('button',{class:'kc-card active','aria-label':'Abrir Content Studio'},[
+    const sheetCard=make('button',{class:'kc-card active','aria-label':'Abrir Asset Sheet Studio'},[
+      make('span',{class:'kc-pill',text:'LOCAL + BRIDGE'}),
+      make('strong',{text:'ASSET SHEET STUDIO'}),
+      make('small',{text:'Raw image → detect → classify → gallery → World'})
+    ]);
+    sheetCard.dataset.workspace='asset-sheet';
+    sheetCard.onclick=()=>void openWorkspace('asset-sheet');
+    const contentCard=make('button',{class:'kc-card active','aria-label':'Abrir Content Studio'},[
       make('span',{class:'kc-pill',text:'ONLINE'}),
       make('strong',{text:'CONTENT STUDIO'}),
       make('small',{text:'CSV/XLSX + images → Supabase → runtime'})
     ]);
-    card.dataset.workspace='content-studio';
-    card.onclick=()=>void openWorkspace('content-studio');
-    main.append(make('div',{class:'kc-grid'},[card]));
+    contentCard.dataset.workspace='content-studio';
+    contentCard.onclick=()=>void openWorkspace('content-studio');
+    main.append(make('div',{class:'kc-grid'},[sheetCard,contentCard]));
   }
 
   function renderEmpty(label,detail){
@@ -283,7 +291,7 @@ export async function openCreatorHub({root=globalThis}={}){
   doc.addEventListener('keydown',onKey,true);
 
   active=Object.freeze({
-    version:'kelo-creator-hub-v1.11.1-map-forge-launch-recovery',
+    version:'kelo-creator-hub-v1.12.0-asset-sheet-bridge',
     hub,platform,
     get section(){return current;},
     show:render,
