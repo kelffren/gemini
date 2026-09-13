@@ -109,3 +109,5 @@ async function enterAsGuest(page) {
   console.log(JSON.stringify({ compileAudit, liveAudit, treeResponses, failedCount: failed.length }, null, 2));
   await browser.close();
 })().catch(error => { console.error(error); process.exit(1); });
+
+// Trigger marker: 2026-09-13 visual audit
