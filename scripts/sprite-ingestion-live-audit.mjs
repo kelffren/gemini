@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: QA / UNIVERSAL SPRITE INGESTION / BROWSER
  * owner: Playwright visual and runtime acceptance audit
- * keys: SPRITE PLAYWRIGHT BEFORE AFTER ANIMATION RUNTIME SCREENSHOT CORPUS
+ * keys: SPRITE PLAYWRIGHT BEFORE AFTER ANIMATION RUNTIME SCREENSHOT CORPUS DIAGNOSTICS
  * purpose: run the complete adversarial lab, verify real animation and capture durable evidence
  * online: local static server or deployed GitHub Pages; no auth/persistence
  */
@@ -26,6 +26,16 @@ async function waitForCanvasChange(page, selector, baseline, timeout = 2200) {
     return !!canvas && typeof canvas.toDataURL === 'function' && canvas.toDataURL() !== baseline;
   }, {selector, baseline}, {timeout, polling: 50});
   return canvasData(page, selector);
+}
+
+async function selectionDiagnostics(page) {
+  return page.evaluate(() => {
+    try {
+      return globalThis.__KELO_SPRITE_INGESTION_DIAGNOSTICS__?.() || null;
+    } catch (error) {
+      return {diagnosticError:String(error?.stack || error)};
+    }
+  });
 }
 
 try {
@@ -53,21 +63,21 @@ try {
   try {
     second = await waitForCanvasChange(page, '#after canvas', first);
   } catch {
-    throw new Error('SPRITE_COMPILED_PREVIEW_NOT_ANIMATING');
+    throw new Error(`SPRITE_COMPILED_PREVIEW_NOT_ANIMATING:${JSON.stringify(await selectionDiagnostics(page))}`);
   }
   try {
     runtimeSecond = await waitForCanvasChange(page, '#game-canvas', runtimeFirst);
   } catch {
-    throw new Error('SPRITE_GAME_RUNTIME_NOT_ANIMATING');
+    throw new Error(`SPRITE_GAME_RUNTIME_NOT_ANIMATING:${JSON.stringify(await selectionDiagnostics(page))}`);
   }
   const directionButtons = page.locator('#directions button');
-  if (await directionButtons.count() !== 4) throw new Error('SPRITE_4D_PREVIEW_DIRECTIONS_MISSING');
+  if (await directionButtons.count() !== 4) throw new Error(`SPRITE_4D_PREVIEW_DIRECTIONS_MISSING:${JSON.stringify(await selectionDiagnostics(page))}`);
   await directionButtons.nth(1).click();
   let directionFrame;
   try {
     directionFrame = await waitForCanvasChange(page, '#after canvas', second);
   } catch {
-    throw new Error('SPRITE_DIRECTION_SWITCH_NO_VISUAL_CHANGE');
+    throw new Error(`SPRITE_DIRECTION_SWITCH_NO_VISUAL_CHANGE:${JSON.stringify(await selectionDiagnostics(page))}`);
   }
 
   await page.screenshot({path: path.join(outputDirectory, 'adversarial-lab-before-after-runtime.png'), fullPage: true});
@@ -75,7 +85,7 @@ try {
   await page.locator('#after').screenshot({path: path.join(outputDirectory, 'after-normalized-animation.png')});
   await page.locator('#game-canvas').screenshot({path: path.join(outputDirectory, 'runtime-kelo-avatar.png')});
   if (pageErrors.length) throw new Error(`SPRITE_LAB_PAGE_ERRORS:${pageErrors.join(' | ')}`);
-  console.log(JSON.stringify({ok: true, url, report, visual: {animationChanged: first !== second, runtimeChanged: runtimeFirst !== runtimeSecond, directionChanged: directionFrame !== second}, screenshots: fs.readdirSync(outputDirectory).sort()}, null, 2));
+  console.log(JSON.stringify({ok: true, url, report, selection: await selectionDiagnostics(page), visual: {animationChanged: first !== second, runtimeChanged: runtimeFirst !== runtimeSecond, directionChanged: directionFrame !== second}, screenshots: fs.readdirSync(outputDirectory).sort()}, null, 2));
 } finally {
   await browser.close();
 }

@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: QA / UNIVERSAL SPRITE INGESTION / VISUAL LAB
  * owner: browser adversarial corpus runner and before/after runtime evidence
- * keys: SPRITE LAB BROWSER CORPUS METRICS ANIMATION BEFORE AFTER
+ * keys: SPRITE LAB BROWSER CORPUS METRICS ANIMATION BEFORE AFTER DIAGNOSTICS
  * purpose: compile every labelled degraded real sprite and expose machine- and human-readable results
  * online: static GitHub Pages audit surface; no auth and no persistence
  * do-not: mutate player state or substitute green tests for visual review
@@ -46,6 +46,59 @@ function cloneCanvas(source) {
   return canvas;
 }
 
+function framePixelSignature(source, x, y, width, height) {
+  const context = source.getContext('2d', {willReadFrequently: true});
+  const data = context.getImageData(Math.round(x), Math.round(y), Math.round(width), Math.round(height)).data;
+  let hash = 2166136261;
+  let active = 0;
+  let alpha = 0;
+  for (let index = 0; index < data.length; index += 4) {
+    if (data[index + 3] > 18) active++;
+    alpha += data[index + 3];
+    hash ^= data[index]; hash = Math.imul(hash, 16777619);
+    hash ^= data[index + 1]; hash = Math.imul(hash, 16777619);
+    hash ^= data[index + 2]; hash = Math.imul(hash, 16777619);
+    hash ^= data[index + 3]; hash = Math.imul(hash, 16777619);
+  }
+  return `${(hash >>> 0).toString(16)}:${active}:${alpha}`;
+}
+
+function selectedDiagnostics() {
+  if (!selected?.compiled?.canvas) return null;
+  const compiled = selected.compiled;
+  const source = compiled.canvas;
+  const columns = Math.max(1, Number(compiled.columns) || 1);
+  const rows = Math.max(1, Number(compiled.rows) || 1);
+  const row = Math.max(0, Math.min(rows - 1, Number(compiled.rowMap?.[direction]) || 0));
+  const count = Math.max(1, Math.min(columns, Number(compiled.frameCounts?.[row]) || columns));
+  const frameWidth = source.width / columns;
+  const frameHeight = source.height / rows;
+  const signatures = [];
+  for (let column = 0; column < count; column++) {
+    signatures.push(framePixelSignature(source, column * frameWidth, row * frameHeight, frameWidth, frameHeight));
+  }
+  return Object.freeze({
+    id: selected.spec.id,
+    label: selected.spec.label,
+    direction,
+    row,
+    count,
+    frame,
+    frameMs: compiled.frameMs,
+    columns,
+    rows,
+    frameCounts: [...compiled.frameCounts],
+    rowMap: {...compiled.rowMap},
+    directionKeys: [...compiled.directionKeys],
+    signatures,
+    uniqueCompiledFrames: new Set(signatures).size,
+    strategy: compiled.strategy,
+    status: compiled.validation?.status,
+    health: compiled.validation?.scores?.finalHealth
+  });
+}
+root.__KELO_SPRITE_INGESTION_DIAGNOSTICS__ = selectedDiagnostics;
+
 function scoreNode(label, value) {
   const node = document.createElement('div');
   node.className = 'score';
@@ -84,7 +137,7 @@ function paintDirections(result) {
     const button = document.createElement('button');
     button.textContent = labels[key] || key.toUpperCase();
     button.className = key === direction ? 'on' : '';
-    button.onclick = () => { direction = key; frame = 0; paintDirections(result); };
+    button.onclick = () => { direction = key; frame = 0; lastFrame = 0; paintDirections(result); };
     directionRow.append(button);
   }
 }
@@ -92,6 +145,7 @@ function paintDirections(result) {
 function selectResult(result) {
   selected = result;
   frame = 0;
+  lastFrame = 0;
   before.replaceChildren(cloneCanvas(result.spec.canvas));
   const output = document.createElement('canvas');
   output.width = 380;

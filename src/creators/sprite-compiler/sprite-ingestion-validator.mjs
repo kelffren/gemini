@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: CREATORS / SPRITE COMPILER / VALIDATION
  * owner: compiled sprite health metrics and release gate
- * keys: SPRITE VALIDATION HEALTH DETECTION ALIGNMENT BACKGROUND CONSISTENCY REVIEW REQUIRED
+ * keys: SPRITE VALIDATION HEALTH DETECTION ALIGNMENT BACKGROUND CONSISTENCY REVIEW REQUIRED BOUNDARY REPAIR
  * purpose: verify the real runtime atlas and explain whether it is safe to use
  * public-api: validateSpriteIngestion
  * consumes: compiled RGBA atlas + layout/rig/normalization evidence + Sprite Frame Doctor
@@ -92,6 +92,37 @@ function localFrameMetrics(frames, frameWidth, frameHeight) {
   });
 }
 
+function boundaryRepairCandidates(normalization, columns) {
+  const candidates = new Set();
+  for (const plan of normalization?.plans || []) {
+    const frame = plan?.frame;
+    const patch = plan?.patch || {};
+    const crop = patch.crop || {};
+    const explicitSurgery = Math.abs(Number(patch.x) || 0) > .001 ||
+      Math.abs(Number(patch.y) || 0) > .001 ||
+      Math.abs((Number(patch.scale) || 1) - 1) > .001 ||
+      Math.abs(Number(patch.rotation) || 0) > .001 ||
+      ['left','right','top','bottom'].some(key => Math.abs(Number(crop[key]) || 0) > .001) ||
+      (patch.erase?.length || 0) > 0 ||
+      (patch.restore?.length || 0) > 0 ||
+      (patch.clone?.length || 0) > 0 ||
+      (patch.fill?.length || 0) > 0 ||
+      patch.overlays?.some(item => item?.visible !== false);
+    if (!frame || explicitSurgery || frame.touchesCanvasEdge || plan.scaleOutlier) continue;
+    if (!(Number(frame.boundaryPixels) > 0 || Number(frame.boundaryRatio) > .012)) continue;
+    const row = Math.max(0, Math.round(Number(plan.row) || 0));
+    const column = Math.max(0, Math.round(Number(plan.column) || 0));
+    candidates.add(row * columns + column);
+  }
+  for (const item of normalization?.suspicious || []) {
+    if (!item?.reasons?.includes('REGION_BOUNDARY_CONTACT') || item.reasons.includes('SCALE_OUTLIER')) continue;
+    const row = Math.max(0, Math.round(Number(item.row) || 0));
+    const column = Math.max(0, Math.round(Number(item.column) || 0));
+    candidates.add(row * columns + column);
+  }
+  return candidates;
+}
+
 export function validateSpriteIngestion({
   outputData,
   width,
@@ -165,19 +196,41 @@ export function validateSpriteIngestion({
     clippingScore * .07 +
     transparencyScore * .03
   );
+
+  const repairCandidates = boundaryRepairCandidates(normalization, columns);
+  const bridgeRepairEvidenceClean = repairCandidates.size > 0 &&
+    exactDetection >= .999 &&
+    output.clippingFrames === 0 &&
+    background >= .95 &&
+    alignment >= .90 &&
+    frameConsistency >= .94 &&
+    finalHealth >= .95 &&
+    !(normalization?.artDefects?.length) &&
+    !layout?.reviewRequired &&
+    !rig?.reviewRequired;
+  const doctorSuppressed = bridgeRepairEvidenceClean ? doctor.defective.filter(item => {
+    const key = item.row * columns + item.column;
+    const unsafe = item.reasons.includes('clipped') || item.reasons.includes('empty') || item.severity > .82;
+    return repairCandidates.has(key) && !unsafe;
+  }) : [];
+  const suppressedKeys = new Set(doctorSuppressed.map(item => `${item.row}:${item.column}`));
+  const doctorUnexplained = doctor.defective.filter(item => !suppressedKeys.has(`${item.row}:${item.column}`));
+  const doctorGate = doctorUnexplained.length > 0;
+
   const reasons = [];
   if (layout?.reviewRequired) reasons.push(...layout.reviewReasons);
   if (rig?.reviewRequired) reasons.push(...rig.reviewReasons);
   if (exactDetection < .90) reasons.push('FRAME_DETECTION_INCOMPLETE');
   if (output.clippingFrames) reasons.push('OUTPUT_CLIPPING');
   if (normalization?.artDefects?.length) reasons.push('ART_DEFECT_REGENERATION_REQUIRED');
-  if (doctor.defectiveCount) reasons.push('SUSPICIOUS_FRAMES');
+  if (doctorGate) reasons.push('SUSPICIOUS_FRAMES');
   if (background < .88) reasons.push('BACKGROUND_RESIDUAL');
   if (alignment < .90) reasons.push('ANCHOR_DRIFT');
   if (finalHealth < .84) reasons.push('HEALTH_BELOW_RELEASE_GATE');
   const uniqueReasons = [...new Set(reasons)];
+  const gateDiagnosis = F({...doctor, defective:F(doctorUnexplained)});
   return F({
-    version: 'sprite-ingestion-validator-v1.0.0',
+    version: 'sprite-ingestion-validator-v1.0.2-boundary-repair-aware',
     status: uniqueReasons.length ? 'REVIEW_REQUIRED' : 'VALIDATED',
     reviewRequired: uniqueReasons.length > 0,
     reviewReasons: F(uniqueReasons),
@@ -204,9 +257,15 @@ export function validateSpriteIngestion({
       sourceCenterDrift: normalization?.sourceMetrics?.centerDrift ?? null
     }),
     frameDoctor: doctor,
-    selectiveRepairTargets: buildSelectiveRepairTargets(doctor, {maxTargets: 12}),
+    doctorGate: F({
+      originalDefectiveCount: doctor.defectiveCount,
+      unexplainedDefectiveCount: doctorUnexplained.length,
+      suppressedBoundaryRepairCount: doctorSuppressed.length,
+      suppressed: F(doctorSuppressed.map(item => F({index:item.index,row:item.row,column:item.column,reasons:item.reasons,severity:item.severity})))
+    }),
+    selectiveRepairTargets: buildSelectiveRepairTargets(gateDiagnosis, {maxTargets: 12}),
     artDefects: F([...(normalization?.artDefects || [])])
   });
 }
 
-export const __spriteValidationInternals = F({borderResidual, liveFrameIndexes, localFrameMetrics, transparencyRatio});
+export const __spriteValidationInternals = F({borderResidual, liveFrameIndexes, localFrameMetrics, transparencyRatio, boundaryRepairCandidates});
