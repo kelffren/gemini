@@ -1,0 +1,31 @@
+name: Studio Quick Build CI
+
+on:
+  pull_request:
+    paths:
+      - 'src/studio/tools/quick-build-tool.mjs'
+      - 'src/studio/tools/register-basic-tools.mjs'
+      - 'scripts/studio-quick-build-audit.mjs'
+      - '.github/workflows/studio-quick-build-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'src/studio/tools/quick-build-tool.mjs'
+      - 'src/studio/tools/register-basic-tools.mjs'
+      - 'scripts/studio-quick-build-audit.mjs'
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Syntax
+        run: |
+          node --check src/studio/tools/quick-build-tool.mjs
+          node --check src/studio/tools/register-basic-tools.mjs
+          node --check scripts/studio-quick-build-audit.mjs
+      - name: Quick Build phase 1 contract
+        run: node scripts/studio-quick-build-audit.mjs
