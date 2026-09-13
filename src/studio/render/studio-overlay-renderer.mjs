@@ -33,6 +33,16 @@ export function createStudioOverlayRenderer({ kernel, tools, assetPreview } = {}
     }
     ctx.restore();
   }
+  function drawRoomMeasurement(ctx,measurement){
+    if(!measurement)return;
+    const x=Number(measurement.x)||0,y=Number(measurement.y)||0,w=Math.max(1,Number(measurement.width)||1),h=Math.max(1,Number(measurement.height)||1);
+    const label=`${Math.round(w)} × ${Math.round(h)}  •  ${Number(measurement.modulesX)||0}×${Number(measurement.modulesY)||0} modules`;
+    ctx.save();ctx.font='700 11px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+    const cx=x+w/2,cy=y+h/2,pad=5,textW=Math.max(72,ctx.measureText?.(label)?.width||72);
+    ctx.fillStyle='rgba(5,14,16,.86)';ctx.fillRect(cx-textW/2-pad,cy-10,textW+pad*2,20);
+    ctx.fillStyle='rgba(191,247,212,.98)';ctx.fillText(label,cx,cy);
+    ctx.restore();
+  }
   function drawCreatorPrefab(ctx,preview){
     const def=tools?.prefabStamp?.get?.(preview.prefabId);let drew=false;
     if(def?.children?.length){for(const child of def.children)drew=assetPreview?.drawAsset?.(ctx,child.prefabId,preview.x+(Number(child.dx)||0),preview.y+(Number(child.dy)||0),{rotation:Number(child.rotation)||0,alpha:.68,placeholder:false})||drew;}
@@ -76,6 +86,7 @@ export function createStudioOverlayRenderer({ kernel, tools, assetPreview } = {}
     const marquee=tools?.marquee?.getPreview?.();if(marquee){ctx.save();ctx.fillStyle='rgba(231,197,106,.10)';ctx.fillRect(marquee.x,marquee.y,marquee.w,marquee.h);ctx.strokeStyle='rgba(231,197,106,.85)';drawRect(ctx,marquee,{dashed:true});ctx.restore();}
     drawBuildDrag(ctx,tools?.quickBuild?.getDragPreviews?.()||[]);
     drawBuildDrag(ctx,tools?.roomBuild?.getPreviews?.()||[]);
+    drawRoomMeasurement(ctx,tools?.roomBuild?.getMeasurement?.());
     const placement = tools?.placement?.getPreview?.();if (placement) drawPlacement(ctx,placement);
     const prefab = tools?.prefabStamp?.getPreview?.();if(prefab)drawCreatorPrefab(ctx,prefab);
     drawPaintCopies(ctx,tools?.paintCopies?.getPreviews?.()||[]);
