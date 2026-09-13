@@ -78,7 +78,7 @@
     "evolution:map-forge": "node scripts/map-forge-evolution-autopilot.mjs"
   },
   "devDependencies": {
-    "@playwright/test": "^1.55.0",
+    "@playwright/test": "1.62.0",
     "browserstack-node-sdk": "^1.69.0"
   }
 }
