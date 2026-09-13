@@ -7,6 +7,7 @@ Antes de modificar Kelo World, son obligatorios estos documentos:
 3. [`docs/ONLINE_FIRST.md`](docs/ONLINE_FIRST.md) — **cómo preservar el camino a autoridad online/server**.
 4. [`docs/CODE_INDEX.md`](docs/CODE_INDEX.md) — **convención de navegación y KELO-INDEX**.
 5. [`docs/SYSTEM_DOCUMENTATION_STANDARD.md`](docs/SYSTEM_DOCUMENTATION_STANDARD.md) — **cómo documentar cada sistema para humanos/IA y jugadores**.
+6. [`docs/RELEASE_VALIDATION_GATE.md`](docs/RELEASE_VALIDATION_GATE.md) — **cuándo está permitido decir FIXED/DONE/VALIDATED y qué evidencia LIVE es obligatoria**.
 
 Si estos documentos contradicen el código LIVE cargado por `index.html`, gana el runtime y la documentación debe corregirse en el mismo pass.
 
@@ -94,6 +95,29 @@ Do not reimplement or destructively refactor a validated subsystem merely to mak
 
 A green unit/CI test alone is not sufficient for user-facing systems. When the feature is exposed in the deployed game, validate the relevant LIVE flow, inspect runtime errors, and visually inspect mobile UI when applicable before recording the feature as validated.
 
+## RULE 3A — NO FALSE COMPLETION / RELEASE GATE (MANDATORY)
+
+**MERGED ≠ VERIFIED. DEPLOYED ≠ VERIFIED.**
+
+For any deployed user-facing change, especially World / Studio / Creator mobile flows, never say or record `fixed`, `done`, `validated`, `working`, `ready`, or equivalent unless the exact deployed candidate has passed its required LIVE verification.
+
+Mandatory status vocabulary:
+
+- `CODE COMPLETE` — implementation exists but runtime behavior is not proven.
+- `PR CANDIDATE` — waiting for required candidate gates.
+- `PR VERIFIED` — required pre-merge gate passed on the exact candidate SHA.
+- `MERGED / LIVE UNVERIFIED` — merged/deployed but post-deploy verification is not green yet.
+- `LIVE VERIFIED` — exact deployed candidate passed the required LIVE flow.
+- `LIVE BROKEN` — deployment or required LIVE flow failed.
+
+For World / Studio / Creator mobile changes, `.github/workflows/browserstack-map-forge.yml` is the release gate and must prove the World open/reopen flow on real iPhone Safari. A red, skipped, cancelled, timed-out, missing, or unavailable gate is a hard failure, not success.
+
+Only `LIVE VERIFIED` may be reported to the user as fixed or complete for a deployed user-facing bug. Include the tested SHA and gate evidence in the completion report. If evidence is unavailable, report `UNVERIFIED`.
+
+Never weaken or delete a failing assertion merely to get a green check unless the product contract intentionally changed and that change is separately justified.
+
+Full policy: `docs/RELEASE_VALIDATION_GATE.md`.
+
 ## RULE 4 — MEMORY
 
 System-specific memory documents record validated implementation details. They do not override this file. Plans must never be recorded as implemented behavior.
@@ -167,7 +191,7 @@ La documentación pública no expone secretos, claves, rutas admin ni detalles e
 
 ## Required startup protocol for every development pass
 
-1. Read `docs/KELO_FOUNDATION.md`, `ENGINE_MAP.md`, `docs/ONLINE_FIRST.md`, `docs/SYSTEM_DOCUMENTATION_STANDARD.md` and this `AGENTS.md` completely.
+1. Read `docs/KELO_FOUNDATION.md`, `ENGINE_MAP.md`, `docs/ONLINE_FIRST.md`, `docs/SYSTEM_DOCUMENTATION_STANDARD.md`, `docs/RELEASE_VALIDATION_GATE.md` and this `AGENTS.md` completely.
 2. Re-scan current `main` and record HEAD before assuming ownership or LIVE status.
 3. Read the memory document(s) and `docs/systems/*` document for the subsystem being changed.
 4. Inspect `index.html` and current code/deployed state before modifying it.
@@ -175,7 +199,7 @@ La documentación pública no expone secretos, claves, rutas admin ni detalles e
 6. Preserve validated invariants and apply online-first rules.
 7. Prefer an existing contract/hook/primitive over a new system/global/wrapper.
 8. Test deterministically.
-9. Validate LIVE when the changed feature is user-facing/deployed.
+9. Validate LIVE when the changed feature is user-facing/deployed; never convert merge/deploy status into a success claim without the required release gate.
 10. Update subsystem memory only with behavior actually validated.
 11. Stamp or refresh `KELO-INDEX` on files you touch.
 12. Update `ENGINE_MAP.md`/`docs/KELO_FOUNDATION.md` when ownership, API or architecture changes.
