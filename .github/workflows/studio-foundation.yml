@@ -9,6 +9,7 @@ on:
       - 'scripts/studio-creator-v1-audit.mjs'
       - 'scripts/studio-overlap-cycle-audit.mjs'
       - 'scripts/studio-nudge-audit.mjs'
+      - 'scripts/studio-indexeddb-nonblocking-audit.mjs'
       - 'index.html'
       - 'package.json'
       - '.github/workflows/studio-foundation.yml'
@@ -31,6 +32,9 @@ jobs:
           node --check scripts/studio-creator-v1-audit.mjs
           node --check scripts/studio-overlap-cycle-audit.mjs
           node --check scripts/studio-nudge-audit.mjs
+          node --check scripts/studio-indexeddb-nonblocking-audit.mjs
+      - name: IndexedDB non-blocking recovery audit
+        run: node scripts/studio-indexeddb-nonblocking-audit.mjs
       - name: Overlap selection focused audit
         run: node scripts/studio-overlap-cycle-audit.mjs
       - name: Studio nudge focused audit
