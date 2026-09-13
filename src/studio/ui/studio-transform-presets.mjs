@@ -2,7 +2,7 @@
  * area: STUDIO / UI / TRANSFORM PRESETS
  * owns: ten exact multi-selection transform accelerators and their compact UI
  * does-not-own: authority transport, selection semantics, drag previews or document storage
- * public-api: createStudioTransformPresets()
+ * public-api: createStudioTransformPresets(), resolveSelectedRows()
  * online: every persistent edit flows through Kernel CommandBus as one reversible CompositeCommand
  */
 
@@ -12,12 +12,20 @@ import { createCompositeCommand } from '../document/composite-command.mjs';
 const clampScale=value=>Math.max(.1,Math.min(8,Math.round((Number(value)||1)*100)/100));
 const normalizeRotation=value=>((Math.round(Number(value)||0)%360)+360)%360;
 
+export function resolveSelectedRows(selectionIds=[],entities=[]){
+  const ids=Array.isArray(selectionIds)?selectionIds:[];
+  if(!ids.length)return [];
+  const byId=new Map();
+  for(const row of Array.isArray(entities)?entities:[]){if(row)byId.set(String(row.id),row);}
+  return ids.map(id=>byId.get(String(id))).filter(Boolean);
+}
+
 export function createStudioTransformPresets({root=globalThis,kernel}={}){
   if(!root?.document||!kernel?.selection||typeof kernel.execute!=='function')return Object.freeze({destroy(){}});
   const document=root.document;
   let destroyed=false,observer=null,trigger=null,panel=null,style=null,unsubscribeSelection=()=>{};
 
-  const selectedRows=()=>kernel.selection.get().map(id=>kernel.document.entities.find(row=>String(row.id)===String(id))).filter(Boolean);
+  const selectedRows=()=>resolveSelectedRows(kernel.selection.get(),kernel.document.entities);
   async function executeCommands(commands,{type,label}){
     if(!commands.length)return false;
     await kernel.execute(createCompositeCommand(commands,{type,label}));
