@@ -2,13 +2,13 @@
  * area: STUDIO / DOCUMENT COMMANDS
  * owns: generic entity authoring mutations with reversible deltas
  * does-not-own: gameplay-specific object behavior
- * public-api: createPlaceEntityCommand(), createMoveEntityCommand(), createRemoveEntityCommand(), createPatchEntityCommand()
+ * public-api: createPlaceEntityCommand(), createMoveEntityCommand(), createRemoveEntityCommand(), createPatchEntityCommand(), createCompositeCommand()
  * online: serialize() includes enough before/after state for authority undo/redo
  */
 
 const copy = value => value == null ? value : (typeof structuredClone === 'function' ? structuredClone(value) : JSON.parse(JSON.stringify(value)));
 const scaleOf = value => { const n=Number(value); return Math.max(.1,Math.min(8,Number.isFinite(n)?Math.round(n*100)/100:1)); };
-const rectFor = entity => { const s=scaleOf(entity?.transform?.scale); return { x: Number(entity?.transform?.x) || 0, y: Number(entity?.transform?.y) || 0, w: Math.max(1, (Number(entity?.bounds?.w) || 1)*s), h: Math.max(1, (Number(entity?.bounds?.h) || 1)*s) }; }; 
+const rectFor = entity => { const s=scaleOf(entity?.transform?.scale); return { x: Number(entity?.transform?.x) || 0, y: Number(entity?.transform?.y) || 0, w: Math.max(1, (Number(entity?.bounds?.w) || 1)*s), h: Math.max(1, (Number(entity?.bounds?.h) || 1)*s) }; };
 const findIndex = (document, id) => document.entities.findIndex(e => e.id === id);
 const normalizePatch = patch => {
   const next = copy(patch || {});
@@ -16,6 +16,18 @@ const normalizePatch = patch => {
   if (next?.transform && next.transform.scale != null) next.transform.scale = scaleOf(next.transform.scale);
   return next;
 };
+
+export function createCompositeCommand(commands,{label='Composite edit',type='composite'}={}){
+  const children=(commands||[]).filter(Boolean);
+  if(!children.length)throw new Error('STUDIO_COMPOSITE_EMPTY');
+  return {type,label,
+    async execute(context){let done=0;try{for(const command of children){await command.execute(context);done++;}}catch(error){for(let i=done-1;i>=0;i--){try{await children[i].undo(context);}catch{}}throw error;}},
+    async undo(context){for(let i=children.length-1;i>=0;i--)await children[i].undo(context);},
+    async redo(context){for(const command of children){if(typeof command.redo==='function')await command.redo(context);else await command.execute(context);}},
+    serialize:()=>({type,commands:children.map(command=>typeof command.serialize==='function'?command.serialize():{type:command.type||'anonymous'})}),
+    affectedRects:context=>children.flatMap(command=>typeof command.affectedRects==='function'?(command.affectedRects(context)||[]):[])
+  };
+}
 
 export function createPlaceEntityCommand(entity) {
   const row = copy(entity);
