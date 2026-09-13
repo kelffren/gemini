@@ -29,6 +29,9 @@ function rotatePointAround(x,y,cx,cy,delta){
   const radians=angle*Math.PI/180,cos=Math.cos(radians),sin=Math.sin(radians);
   return{x:cleanCoord(cx+dx*cos-dy*sin),y:cleanCoord(cy+dx*sin+dy*cos)};
 }
+function scalePointAround(x,y,cx,cy,factor){
+  return{x:cleanCoord(cx+((Number(x)||0)-cx)*factor),y:cleanCoord(cy+((Number(y)||0)-cy)*factor)};
+}
 
 export function smartDuplicateOffset(rows=[],tileSize=32){
   const tile=Math.max(1,Number(tileSize)||32),items=(Array.isArray(rows)?rows:[]).filter(Boolean);
@@ -116,9 +119,19 @@ export function createCreatorActions(kernel) {
 
   async function scaleSelection({delta=0,value=null}={}) {
     const rows=selectedEntities(); if(!rows.length)return [];
-    const commands=[];
-    for(const row of rows){const current=scaleOf(row.transform?.scale),next=scaleOf(value==null?current+(Number(delta)||0):value);if(next===current)continue;commands.push(createPatchEntityCommand(row.id,{transform:{...(row.transform||{}),scale:next}}));}
-    if(!commands.length)return rows;
+    const plans=rows.map(row=>{const current=scaleOf(row.transform?.scale),next=scaleOf(value==null?current+(Number(delta)||0):value);return{row,current,next};});
+    const changed=plans.filter(plan=>plan.next!==plan.current);if(!changed.length)return rows;
+    let cx=0,cy=0,factor=1;
+    if(rows.length>1){
+      const xs=rows.map(row=>Number(row.transform?.x)||0),ys=rows.map(row=>Number(row.transform?.y)||0);
+      cx=(Math.min(...xs)+Math.max(...xs))/2;cy=(Math.min(...ys)+Math.max(...ys))/2;
+      factor=changed.reduce((sum,plan)=>sum+(plan.next/plan.current),0)/changed.length;
+    }
+    const commands=plans.map(({row,next})=>{
+      const transform={...(row.transform||{}),scale:next};
+      if(rows.length>1){const point=scalePointAround(transform.x,transform.y,cx,cy,factor);transform.x=point.x;transform.y=point.y;}
+      return createPatchEntityCommand(row.id,{transform});
+    });
     await kernel.execute(createCompositeCommand(commands,{type:'entity.batch.scale',label:`Scale ${rows.length} object${rows.length===1?'':'s'}`}));
     return selectedEntities();
   }
