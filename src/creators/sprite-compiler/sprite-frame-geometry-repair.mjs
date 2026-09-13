@@ -24,12 +24,12 @@ export function planLocalFrameGeometryRepairs(frames,diagnosis,{maxRepairs=8}={}
   return Object.freeze({operations:Object.freeze(operations),skipped:Object.freeze(skipped)});
 }
 
-export function applyFrameGeometryRepairs(root,canvas,operations,{imageSmoothing=true}={}){
+export function applyFrameGeometryRepairs(root,canvas,operations,{imageSmoothing=false,profile='pixel-art'}={}){
   if(!root?.document||!canvas?.getContext)throw new Error('SPRITE_FRAME_GEOMETRY_CANVAS_REQUIRED');
-  const ctx=canvas.getContext('2d',{willReadFrequently:true}),applied=[];
+  const ctx=canvas.getContext('2d',{willReadFrequently:true}),applied=[],smoothing=profile==='pixel-art'?false:!!imageSmoothing;
   for(const op of operations||[]){
-    const temp=root.document.createElement('canvas');temp.width=op.source.width;temp.height=op.source.height;const tctx=temp.getContext('2d');tctx.clearRect(0,0,temp.width,temp.height);tctx.drawImage(canvas,op.source.x,op.source.y,op.source.width,op.source.height,0,0,temp.width,temp.height);
-    ctx.clearRect(op.cell.x,op.cell.y,op.cell.width,op.cell.height);ctx.imageSmoothingEnabled=!!imageSmoothing;ctx.drawImage(temp,0,0,temp.width,temp.height,op.destination.x,op.destination.y,op.destination.width,op.destination.height);applied.push(op.index);
+    const temp=root.document.createElement('canvas');temp.width=op.source.width;temp.height=op.source.height;const tctx=temp.getContext('2d');tctx.clearRect(0,0,temp.width,temp.height);tctx.imageSmoothingEnabled=false;tctx.drawImage(canvas,op.source.x,op.source.y,op.source.width,op.source.height,0,0,temp.width,temp.height);
+    ctx.clearRect(op.cell.x,op.cell.y,op.cell.width,op.cell.height);ctx.imageSmoothingEnabled=smoothing;ctx.drawImage(temp,0,0,temp.width,temp.height,op.destination.x,op.destination.y,op.destination.width,op.destination.height);applied.push(op.index);
   }
-  return Object.freeze({canvas,applied:Object.freeze(applied)});
+  return Object.freeze({canvas,applied:Object.freeze(applied),imageSmoothing:smoothing,profile});
 }
