@@ -1,16 +1,17 @@
 /* KELO-INDEX
  * area: AUTH / GUEST PLAY
  * owner-adjacent: KeloAccountAuthUI
- * keys: GUEST AI TEST PLAYWRIGHT AUTH BYPASS ANONYMOUS MOBILE SAFARI
- * purpose: make guest play one-step after anonymous auth and expose an explicit ?guest=1 test route that never blocks automated gameplay behind the auth modal
- * online: explicit test guest does not mint credentials or bypass server authorization; authenticated anonymous sessions keep using KeloOnlineAuth/Supabase normally
+ * keys: GUEST AI TEST PLAYWRIGHT AUTH BYPASS ANONYMOUS MOBILE SAFARI VISUALLAB LOCAL
+ * purpose: make guest play one-step after anonymous auth; if Supabase anonymous is disabled, keep an explicit local-play fallback that never mints a JWT
+ * online: explicit test/local guest does not mint credentials or bypass server authorization; authenticated anonymous sessions keep using KeloOnlineAuth/Supabase normally
  * do-not: NO fake JWT, NO server privilege bypass, NO service_role/secret, NO gameplay authority
  */
 (function(){
 'use strict';
-const VERSION='kelo-guest-play-bypass-v2';
+const VERSION='kelo-guest-play-bypass-v2.1';
+const LOCAL_KEY='kelo_local_guest_play_v1';
 const params=new URLSearchParams(location.search||'');
-const explicitGuest=params.get('guest')==='1'||params.get('aiGuest')==='1';
+const explicitGuest=params.get('guest')==='1'||params.get('aiGuest')==='1'||params.get('visualLab')==='1'||params.get('mapEditor')==='1';
 let lastReason='boot';
 let observer=null;
 
@@ -18,6 +19,12 @@ function authState(){
   try{return window.KeloOnlineAuth&&typeof window.KeloOnlineAuth.state==='function'?window.KeloOnlineAuth.state():null}catch(_){return null}
 }
 function isAnonymousSession(state){return !!(state?.authenticated&&state?.isAnonymous)}
+function localGuest(){
+  try{return sessionStorage.getItem(LOCAL_KEY)==='1'||localStorage.getItem(LOCAL_KEY)==='1'}catch(_){return false}
+}
+function markLocalGuest(){
+  try{sessionStorage.setItem(LOCAL_KEY,'1');localStorage.setItem(LOCAL_KEY,'1')}catch(_){}
+}
 function ensureStyle(){
   if(document.getElementById('kelo-guest-play-style'))return;
   const el=document.createElement('style');
@@ -28,20 +35,24 @@ function ensureStyle(){
 function closeGate(reason){
   const state=authState();
   const anonymous=isAnonymousSession(state);
-  if(!explicitGuest&&!anonymous)return false;
-  lastReason=reason||(explicitGuest?'explicit-guest':'anonymous-session');
+  if(!explicitGuest&&!anonymous&&!localGuest())return false;
+  lastReason=reason||(explicitGuest?'explicit-guest':anonymous?'anonymous-session':'local-guest');
   ensureStyle();
   document.documentElement.dataset.keloGuestPlay='1';
   if(explicitGuest)document.documentElement.dataset.keloAuthGate='off';
   try{window.KeloAccountAuthUI?.close?.()}catch(_){}
   const gate=document.getElementById('kelo-account-auth');
   if(gate&&!gate.hidden)gate.hidden=true;
-  try{window.dispatchEvent(new CustomEvent('kelo:guest-play-ready',{detail:{version:VERSION,explicitGuest,anonymous,reason:lastReason}}))}catch(_){}
+  try{window.dispatchEvent(new CustomEvent('kelo:guest-play-ready',{detail:{version:VERSION,explicitGuest,anonymous,local:localGuest(),reason:lastReason}}))}catch(_){}
   return true;
+}
+function enterLocal(reason){
+  markLocalGuest();
+  return closeGate(reason||'local-guest-enter');
 }
 function syncGate(reason){
   const state=authState();
-  const active=explicitGuest||isAnonymousSession(state);
+  const active=explicitGuest||isAnonymousSession(state)||localGuest();
   if(active)return closeGate(reason);
   delete document.documentElement.dataset.keloGuestPlay;
   if(!explicitGuest)delete document.documentElement.dataset.keloAuthGate;
@@ -70,9 +81,10 @@ schedule('boot');
 window.KeloGuestPlay=Object.freeze({
   version:VERSION,
   isExplicit:()=>explicitGuest,
-  active:()=>explicitGuest||isAnonymousSession(authState()),
-  state:()=>Object.freeze({version:VERSION,explicitGuest,anonymous:isAnonymousSession(authState()),lastReason}),
+  active:()=>explicitGuest||isAnonymousSession(authState())||localGuest(),
+  state:()=>Object.freeze({version:VERSION,explicitGuest,anonymous:isAnonymousSession(authState()),local:localGuest(),lastReason}),
   closeGate:()=>closeGate('api'),
+  enterLocal:()=>enterLocal('api'),
   sync:()=>syncGate('api-sync')
 });
 })();
