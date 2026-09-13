@@ -143,10 +143,15 @@ if (fs.existsSync('assets/Arboleskelo1.PNG')) {
   const decoded = decodePng(fs.readFileSync('assets/Arboleskelo1.PNG'));
   const real = analyzeAssetSheetPixels(decoded.rgba, decoded.width, decoded.height);
   const treeCount = real.assets.filter(asset => asset.family === 'tree').length;
-  assert(real.assets.length >= 15 && real.assets.length <= 24, `real atlas asset count=${real.assets.length}`);
-  assert(treeCount >= 5, `real atlas tree count=${treeCount}`);
-  assert(real.stats.rowCount >= 2 && real.stats.rowCount <= 5, `real atlas row count=${real.stats.rowCount}`);
-  realAsset = {dimensions:[decoded.width,decoded.height], assets:real.assets.length, rows:real.stats.rowCount, trees:treeCount};
+  const rowShape = Array.from({length:real.stats.rowCount}, (_, rowIndex) => real.assets.filter(asset => asset.rowIndex === rowIndex).length);
+  const familyCounts = Object.fromEntries([...new Set(real.assets.map(asset => asset.family))].sort().map(family => [family, real.assets.filter(asset => asset.family === family).length]));
+  const loosePetals = real.assets.at(-1);
+  assert(real.assets.length === 18, `real atlas asset count=${real.assets.length}`);
+  assert(treeCount === 5, `real atlas tree count=${treeCount}`);
+  assert(real.stats.rowCount === 3, `real atlas row count=${real.stats.rowCount}`);
+  assert(JSON.stringify(rowShape) === '[5,6,7]', `real atlas row shape=${JSON.stringify(rowShape)}`);
+  assert(loosePetals?.sourceComponentIds?.length === 13, `loose petals component count=${loosePetals?.sourceComponentIds?.length}`);
+  realAsset = {dimensions:[decoded.width,decoded.height], assets:real.assets.length, rows:real.stats.rowCount, rowShape, trees:treeCount, families:familyCounts, loosePetals:loosePetals.sourceComponentIds.length};
 }
 
 console.log(JSON.stringify({

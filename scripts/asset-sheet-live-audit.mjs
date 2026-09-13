@@ -37,9 +37,9 @@ const ui = await page.evaluate(() => ({
   families:[...document.querySelectorAll('.kas-row select:first-of-type')].map(select => select.value),
   mobileGrid:getComputedStyle(document.querySelector('.kas-grid')).gridTemplateColumns
 }));
-assert.ok(ui.assets >= 15 && ui.assets <= 24, `real atlas assets=${ui.assets}`);
+assert.equal(ui.assets, 18, `real atlas assets=${ui.assets}`);
 assert.equal(ui.boxes, ui.assets, 'preview box parity');
-assert.ok(ui.families.filter(value => value === 'tree').length >= 5, 'five real tree candidates');
+assert.equal(ui.families.filter(value => value === 'tree').length, 5, 'five real tree candidates');
 assert.ok(ui.mobileGrid.split(' ').length <= 1 || page.viewportSize().width > 820, `mobile layout=${ui.mobileGrid}`);
 
 const downloadPromise = page.waitForEvent('download');
@@ -53,7 +53,10 @@ const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
 assert.equal(manifest.kind, 'kelo-asset-sheet-manifest');
 assert.equal(manifest.atlas.kind, 'prop-atlas-irregular');
 assert.equal(manifest.assets.length, ui.assets);
-assert.ok(manifest.galleries.length >= 3, `galleries=${manifest.galleries.length}`);
+assert.equal(manifest.galleries.length, 4, `galleries=${manifest.galleries.length}`);
+const rowShape = Array.from({length:3}, (_, rowIndex) => manifest.assets.filter(asset => asset.rowIndex === rowIndex).length);
+assert.deepEqual(rowShape, [5, 6, 7], `row shape=${JSON.stringify(rowShape)}`);
+assert.equal(manifest.assets.at(-1)?.sourceComponentIds?.length, 13, 'loose petals stay one asset');
 assert.ok(manifest.assets.every(asset => asset.anchor?.kind === 'ground-pivot'), 'world-asset pivot reuse');
 assert.ok(manifest.assets.every(asset => asset.collider?.authority === 'review-required'), 'collision remains review-only');
 
@@ -67,4 +70,4 @@ assert.equal(worldPreview.workspace, 'world', 'existing World workspace route');
 assert.equal(worldPreview.draftAssets, ui.assets, 'World draft handoff');
 await browser.close();
 assert.deepEqual(errors, [], `browser errors: ${errors.join(' | ')}`);
-console.log(JSON.stringify({status:'ASSET_SHEET_LIVE_AUDIT_OK', viewport:'390x844', assets:ui.assets, trees:ui.families.filter(value => value === 'tree').length, galleries:manifest.galleries.length, worldPreview, screenshot:'artifacts/asset-sheet-compiler/asset-sheet-mobile.png'}));
+console.log(JSON.stringify({status:'ASSET_SHEET_LIVE_AUDIT_OK', viewport:'390x844', assets:ui.assets, trees:ui.families.filter(value => value === 'tree').length, rowShape, galleries:manifest.galleries.length, loosePetals:manifest.assets.at(-1)?.sourceComponentIds?.length, worldPreview, screenshot:'artifacts/asset-sheet-compiler/asset-sheet-mobile.png'}));

@@ -9,7 +9,7 @@
 import {analyzeSpriteForeground, connectedSpriteComponents} from '../sprite-compiler/sprite-foreground-analysis.mjs';
 import {compileWorldAssetPixels} from '../sprite-compiler/sprite-world-asset-compiler.mjs';
 
-export const ASSET_SHEET_COMPILER_VERSION = 'kelo-asset-sheet-compiler-v1';
+export const ASSET_SHEET_COMPILER_VERSION = 'kelo-asset-sheet-compiler-v1.1.0';
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const integer = value => Math.max(0, Math.round(Number(value) || 0));
@@ -132,7 +132,11 @@ function groupComponents(components, options) {
     for (const group of groups) {
       const seed = group.seed;
       const ratio = component.area / Math.max(1, seed.area);
-      const gap = bboxGap(component, seed);
+      // Compare against the growing group rather than only its first seed.
+      // Scattered leaves and petals form visual chains: each fragment can be
+      // close to the previous fragment while the last one is far from the
+      // original seed.
+      const gap = Math.min(...group.components.map(part => bboxGap(component, part)));
       const bothSmall = component.area < primaryArea && seed.area < primaryArea;
       const maxGap = bothSmall ? Math.max(12, satelliteDistance * 1.25) : Math.max(satelliteDistance, Math.min(72, Math.max(seed.w, seed.h) * 0.16));
       if ((ratio <= satelliteRatio || bothSmall) && gap <= maxGap && (!best || gap < best.gap)) best = {group, gap};
@@ -181,12 +185,15 @@ function roundConfidence(value) {
   return Math.round(clamp(value, 0, 1) * 100) / 100;
 }
 
-function classifyGroup(group, width, height) {
+function classifyGroup(group, width, height, artworkHeight = height) {
   const aspect = group.h / Math.max(1, group.w);
   const density = group.area / Math.max(1, group.w * group.h);
   const heightRatio = group.h / Math.max(1, height);
   const widthRatio = group.w / Math.max(1, width);
-  if (group.h >= Math.max(48, height * 0.07) && aspect >= 0.82 && density >= 0.025) {
+  // A tree label should be conservative. Small vertical props (flower pots,
+  // topiary bases and rock clusters) share the same bounding-box aspect, so a
+  // candidate must also be prominent relative to the detected artwork area.
+  if (group.h >= Math.max(48, artworkHeight * 0.23) && aspect >= 0.82 && density >= 0.025) {
     return {family:'tree', category:'nature/tree', confidence:roundConfidence(0.78 + Math.min(0.14, heightRatio * 0.45) + Math.min(0.06, density * 0.08)), layer:'props_back', rationale:'alto y con copa o silueta vertical; revisar especie y nombre'};
   }
   if (group.w >= 48 && group.w / Math.max(1, group.h) >= 1.45 && heightRatio <= 0.22 && group.componentIds.length <= 2) {
@@ -289,7 +296,7 @@ export function analyzeAssetSheetPixels(rgba, width, height, inputOptions = {}) 
   for (let index = 0; index < alphaMask.length; index += 1) cleanedPixels[index * 4 + 3] = alphaMask[index];
   const familyCounts = new Map();
   const assets = rowData.sorted.map((group, index) => {
-    const classification = classifyGroup(group, dimensions.width, dimensions.height);
+    const classification = classifyGroup(group, dimensions.width, dimensions.height, contentRegion.h);
     const familyIndex = (familyCounts.get(classification.family) || 0) + 1;
     familyCounts.set(classification.family, familyIndex);
     return makeFrame(group, classification, index, familyIndex, dimensions.width, dimensions.height, options, rowData.rowByGroup.get(group.id) || 0, cleanedPixels);

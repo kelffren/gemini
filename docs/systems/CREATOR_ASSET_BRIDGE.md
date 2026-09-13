@@ -1,4 +1,4 @@
-# Creator Asset Bridge V1 — Raw Sheet to Gallery
+# Creator Asset Bridge V1.1 — Raw Sheet to Gallery
 
 ## Status
 
@@ -9,7 +9,7 @@
 - creator UI: `src/creators/ui/asset-sheet-workspace.mjs`
 - existing byte transport: `CHATGPT_ASSET_UPLOAD_BRIDGE.md`
 - playerVisible: false
-- status: creator-local-file-bridge-v1
+- status: creator-local-file-bridge-v1.1
 
 ## Product contract
 
@@ -54,10 +54,10 @@ This is the same natural handoff philosophy as the existing Dropbox/GitHub byte 
 2. Detect native transparency or a dominant border background.
 3. Identify connected components and discard configured noise.
 4. Detect a dense content band so phone screenshot controls outside the asset sheet can be ignored.
-5. Keep large components as candidate assets and attach small nearby decorations to the nearest primary component.
+5. Keep large components as candidate assets and attach small nearby decorations to the nearest member of a growing group. This transitive chain keeps scattered petals/leaves together without swallowing the neighboring asset.
 6. Sort candidates into visual rows.
 7. Generate deterministic IDs (`asset-001`, `asset-002`, ...).
-8. Suggest `tree`, `hedge`, `plant`, `planter`, `flower`, `rock`, `ground-cluster`, `structure` or `unknown` from geometry.
+8. Conservatively suggest the broad geometry families `tree`, `hedge`, `plant`, `ground-cluster` or `unknown`; the natural review bridge can refine them to planter, flower, rock, structure, species and human-readable names.
 9. Reuse the existing single-world-asset compiler to infer a lower-support ground pivot, visual bounds, scale, variants, placement rules and conservative footprint/collider suggestions for every detected frame.
 10. Mark low-confidence semantics for review instead of silently declaring them correct.
 
@@ -110,6 +110,7 @@ The next online adapter may ingest the clean atlas and manifest into immutable C
 - `Asset Sheet Compiler CI`
 - deterministic opaque-background fixture verifies multiple assets, tree/hedge/detail suggestions, bounded rectangles, gallery/prefab generation and immutable rectangle review merge;
 - native-alpha fixture verifies transparent-source handling;
+- `assets/Arboleskelo1.PNG` is the fixed real-sheet regression: exactly 18 assets, row shape `5/6/7`, exactly 5 tree suggestions and one 13-fragment loose-petal group;
 - Creator Hub integration audit verifies the workspace is registered and visible.
 
 ## Extension rule
