@@ -1,6 +1,7 @@
 /* KELO-INDEX
  * area: CREATORS / SPRITE COMPILER / DONOR SURGERY AUDIT
  * purpose: regression coverage for donor suggestion, ghost-safe policy and selected-region-only overlays
+ * gate: whole-frame donor replacement is forbidden; donor copy requires an explicit selected region
  */
 import assert from 'node:assert/strict';
 import {buildDonorSurgeryPlanFromPixels,donorCandidateFor,donorOverlaySpec} from '../src/creators/sprite-compiler/sprite-donor-surgery-bridge.mjs';
