@@ -1,48 +1,78 @@
 /* KELO-INDEX
  * area: AUTH / GUEST PLAY
  * owner-adjacent: KeloAccountAuthUI
- * keys: GUEST AI TEST PLAYWRIGHT AUTH BYPASS ANONYMOUS
+ * keys: GUEST AI TEST PLAYWRIGHT AUTH BYPASS ANONYMOUS MOBILE SAFARI
  * purpose: make guest play one-step after anonymous auth and expose an explicit ?guest=1 test route that never blocks automated gameplay behind the auth modal
  * online: explicit test guest does not mint credentials or bypass server authorization; authenticated anonymous sessions keep using KeloOnlineAuth/Supabase normally
  * do-not: NO fake JWT, NO server privilege bypass, NO service_role/secret, NO gameplay authority
  */
 (function(){
 'use strict';
-const VERSION='kelo-guest-play-bypass-v1';
+const VERSION='kelo-guest-play-bypass-v2';
 const params=new URLSearchParams(location.search||'');
 const explicitGuest=params.get('guest')==='1'||params.get('aiGuest')==='1';
 let lastReason='boot';
+let observer=null;
 
 function authState(){
   try{return window.KeloOnlineAuth&&typeof window.KeloOnlineAuth.state==='function'?window.KeloOnlineAuth.state():null}catch(_){return null}
 }
+function isAnonymousSession(state){return !!(state?.authenticated&&state?.isAnonymous)}
+function ensureStyle(){
+  if(document.getElementById('kelo-guest-play-style'))return;
+  const el=document.createElement('style');
+  el.id='kelo-guest-play-style';
+  el.textContent='html[data-kelo-guest-play="1"] #kelo-account-auth{display:none!important;visibility:hidden!important;pointer-events:none!important}';
+  (document.head||document.documentElement).appendChild(el);
+}
 function closeGate(reason){
   const state=authState();
-  const anonymous=!!state?.isAnonymous;
+  const anonymous=isAnonymousSession(state);
   if(!explicitGuest&&!anonymous)return false;
-  lastReason=reason|| (explicitGuest?'explicit-guest':'anonymous-session');
+  lastReason=reason||(explicitGuest?'explicit-guest':'anonymous-session');
+  ensureStyle();
+  document.documentElement.dataset.keloGuestPlay='1';
   if(explicitGuest)document.documentElement.dataset.keloAuthGate='off';
   try{window.KeloAccountAuthUI?.close?.()}catch(_){}
   const gate=document.getElementById('kelo-account-auth');
-  if(gate)gate.hidden=true;
+  if(gate&&!gate.hidden)gate.hidden=true;
   try{window.dispatchEvent(new CustomEvent('kelo:guest-play-ready',{detail:{version:VERSION,explicitGuest,anonymous,reason:lastReason}}))}catch(_){}
   return true;
 }
-function schedule(reason){setTimeout(()=>closeGate(reason),0)}
+function syncGate(reason){
+  const state=authState();
+  const active=explicitGuest||isAnonymousSession(state);
+  if(active)return closeGate(reason);
+  delete document.documentElement.dataset.keloGuestPlay;
+  if(!explicitGuest)delete document.documentElement.dataset.keloAuthGate;
+  return false;
+}
+function schedule(reason){
+  [0,50,250,750,1500].forEach((delay,index)=>setTimeout(()=>syncGate(`${reason||'sync'}-${index}`),delay));
+}
+function observeGate(){
+  if(observer||typeof MutationObserver!=='function')return;
+  observer=new MutationObserver(()=>{
+    const gate=document.getElementById('kelo-account-auth');
+    if(gate&&!gate.hidden)schedule('gate-reopened');
+  });
+  observer.observe(document.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:['hidden','style','class']});
+}
 
-window.addEventListener('kelo:online-auth-state',()=>schedule('auth-state'),true);
-window.addEventListener('kelo:online-auth-ready',()=>schedule('auth-ready'),true);
-window.addEventListener('kelo:guest-created',()=>schedule('guest-created'),true);
-window.addEventListener('kelo:online-auth-required',()=>schedule('auth-required'),true);
-window.addEventListener('DOMContentLoaded',()=>schedule('dom-ready'),{once:true});
-setTimeout(()=>closeGate('boot'),0);
-setTimeout(()=>closeGate('boot-late'),250);
+['kelo:online-auth-state','kelo:online-auth-ready','kelo:guest-created','kelo:online-auth-required','kelo:account-signed-in','kelo:account-signed-out'].forEach(name=>window.addEventListener(name,()=>schedule(name),true));
+window.addEventListener('DOMContentLoaded',()=>{observeGate();schedule('dom-ready')},{once:true});
+window.addEventListener('load',()=>schedule('load'),{once:true});
+window.addEventListener('pageshow',()=>schedule('pageshow'));
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)schedule('visible')});
+observeGate();
+schedule('boot');
 
 window.KeloGuestPlay=Object.freeze({
   version:VERSION,
   isExplicit:()=>explicitGuest,
-  active:()=>explicitGuest||!!authState()?.isAnonymous,
-  state:()=>Object.freeze({version:VERSION,explicitGuest,anonymous:!!authState()?.isAnonymous,lastReason}),
-  closeGate:()=>closeGate('api')
+  active:()=>explicitGuest||isAnonymousSession(authState()),
+  state:()=>Object.freeze({version:VERSION,explicitGuest,anonymous:isAnonymousSession(authState()),lastReason}),
+  closeGate:()=>closeGate('api'),
+  sync:()=>syncGate('api-sync')
 });
 })();
