@@ -1,6 +1,6 @@
 /* KELO-INDEX
  * area: STUDIO / SELECT TOOL
- * owns: entity selection from spatial hit testing and one-shot armed grab handoff
+ * owns: entity selection from spatial hit testing, semantic room expansion and one-shot armed grab handoff
  * does-not-own: pointer listeners, drawing or persistent document mutation
  * public-api: createSelectTool(), resolveSelectHitRadius(), screenRadiusToWorld()
  * online: local transient state only
@@ -40,9 +40,7 @@ export function createSelectTool(kernel) {
     return armedGrab ? armedGrab.ids.slice() : [];
   }
 
-  function cancelGrab() {
-    armedGrab = null;
-  }
+  function cancelGrab() { armedGrab = null; }
 
   function consumeArmedGrab() {
     if (!armedGrab) return null;
@@ -72,6 +70,15 @@ export function createSelectTool(kernel) {
       .map(row=>row.hit);
   }
 
+  function semanticRoomIds(hit){
+    const entity=hit?.data||hit;
+    const roomId=entity?.components?.buildingPiece?.roomId;
+    if(!roomId)return [];
+    return (kernel.document?.entities||[])
+      .filter(row=>row?.components?.buildingPiece?.roomId===roomId)
+      .map(row=>String(row.id));
+  }
+
   return Object.freeze({
     id: 'select',
     selectPoint(x, y, { append = false, preserveExisting = true, cycle = true, radius = null } = {}) {
@@ -81,12 +88,9 @@ export function createSelectTool(kernel) {
       if (!append) {
         const armed = consumeArmedGrab();
         if (armed) { lastPick = null; return armed; }
-      } else {
-        cancelGrab();
-      }
+      } else cancelGrab();
 
       const ordered = pointHits(px,py,radius);
-
       if (!ordered.length) {
         lastPick = null;
         if (!append) kernel.selection.clear();
@@ -111,11 +115,11 @@ export function createSelectTool(kernel) {
       let hit = ordered[0];
       if (cycle && repeated && ordered.length > 1 && currentIndex >= 0) {
         hit = ordered[(currentIndex + 1) % ordered.length];
-      } else if (preserveExisting && currentIndex >= 0) {
-        hit = ordered[currentIndex];
-      }
+      } else if (preserveExisting && currentIndex >= 0) hit = ordered[currentIndex];
 
-      kernel.selection.set(hit.id);
+      const roomIds = repeated && ordered.length===1 && currentIndex>=0 ? semanticRoomIds(hit) : [];
+      if(roomIds.length>1) kernel.selection.set(roomIds);
+      else kernel.selection.set(hit.id);
       lastPick = { x: px, y: py, key: stackKey, at: now };
       return hit.data || hit;
     },
