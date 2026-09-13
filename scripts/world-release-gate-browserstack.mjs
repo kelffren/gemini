@@ -16,7 +16,7 @@ fs.mkdirSync(outputDir, { recursive: true });
 
 const isLocal = process.env.KELO_RELEASE_STAGE === 'PR_CANDIDATE_REAL_IPHONE';
 const localIdentifier = process.env.BROWSERSTACK_LOCAL_IDENTIFIER || '';
-const candidateSha = process.env.GITHUB_SHA || 'unknown';
+const candidateSha = process.env.KELO_CANDIDATE_SHA || process.env.GITHUB_SHA || 'unknown';
 const baseURL = process.env.KELO_PAGES;
 
 if (isLocal && !localIdentifier) {
@@ -78,7 +78,10 @@ try {
     if (msg.type() === 'error') consoleErrors.push(msg.text());
   });
 
-  const response = await page.goto('./?world-ios-reopen=1', {
+  // mapEditor=1 is the repository's explicit offline/dev editor authorization path.
+  // It suppresses the account modal and bootstraps the local root admin scopes on a
+  // clean real device, so this regression tests World/Studio rather than login state.
+  const response = await page.goto('./?mapEditor=1&world-ios-reopen=1', {
     waitUntil: 'domcontentloaded',
     timeout: 30000,
   });
