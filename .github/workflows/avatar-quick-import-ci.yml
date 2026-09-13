@@ -21,6 +21,7 @@ on:
       - 'supabase/migrations/*avatar*'
       - 'scripts/avatar-quick-import-audit.mjs'
       - 'scripts/avatar-quick-import-live-audit.mjs'
+      - 'scripts/sprite-compiler-audit.mjs'
       - 'scripts/sprite-ingestion-*.mjs'
       - 'src/creators/sprite-compiler/**'
       - 'tests/fixtures/**'
@@ -50,6 +51,7 @@ on:
       - 'supabase/migrations/*avatar*'
       - 'scripts/avatar-quick-import-audit.mjs'
       - 'scripts/avatar-quick-import-live-audit.mjs'
+      - 'scripts/sprite-compiler-audit.mjs'
       - 'scripts/sprite-ingestion-*.mjs'
       - 'src/creators/sprite-compiler/**'
       - 'tests/fixtures/**'
@@ -83,6 +85,9 @@ jobs:
           node --check src/creators/sprite-compiler/sprite-layout-interpreter.mjs
           node --check src/creators/sprite-compiler/sprite-rig-interpreter.mjs
           node --check src/creators/sprite-compiler/sprite-frame-normalizer.mjs
+          node --check src/creators/sprite-compiler/sprite-frame-geometry-repair.mjs
+          node --check src/creators/sprite-compiler/sprite-pixel-grammar.mjs
+          node --check src/creators/sprite-compiler/sprite-world-asset-compiler.mjs
           node --check src/creators/sprite-compiler/sprite-ingestion-validator.mjs
           node --check src/creators/workspaces/avatar-workspace.mjs
           node --check src/creators/creator-entry.mjs
@@ -91,11 +96,14 @@ jobs:
           node --check src/ui/studio-launcher.js
           node --check scripts/avatar-quick-import-audit.mjs
           node --check scripts/avatar-quick-import-live-audit.mjs
+          node --check scripts/sprite-compiler-audit.mjs
           node --check scripts/sprite-ingestion-adversarial-lab.mjs
           node --check scripts/sprite-ingestion-live-audit.mjs
           node --check scripts/sprite-ingestion-core-audit.mjs
       - name: Avatar architecture
         run: npm run audit:avatar-quick
+      - name: Pixel grammar and world-asset compiler
+        run: npm run audit:sprite-compiler
       - name: Universal sprite ingestion adversarial corpus
         run: npm run audit:sprite-ingestion
       - name: Universal content compatibility
