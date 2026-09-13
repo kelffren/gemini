@@ -19,7 +19,7 @@ import { createQuickBuildTool } from './quick-build-tool.mjs';
 export function registerBasicTools(kernel) {
   const select=createSelectTool(kernel),marquee=createMarqueeSelectTool(kernel),placement=createPlacementTool(kernel),transform=createTransformTool(kernel),terrain=createTerrainTool(kernel),collision=createCollisionTool(kernel),prefabStamp=createPrefabStampTool(kernel),paintCopies=createPaintCopiesTool(kernel);
   for(const tool of [select,marquee,placement,transform,terrain,collision,prefabStamp,paintCopies])if(!kernel.tools.get(tool.id))kernel.tools.register(tool);
-  const quickBuild=createQuickBuildTool(kernel,{placement});
-  if(!kernel.tools.get(quickBuild.id))kernel.tools.register(quickBuild);
+  let quickBuild=kernel.tools.get('quickBuild');
+  if(!quickBuild){quickBuild=createQuickBuildTool(kernel,{placement});kernel.tools.register(quickBuild);}
   return Object.freeze({select,marquee,placement,transform,terrain,collision,prefabStamp,paintCopies,quickBuild});
 }
