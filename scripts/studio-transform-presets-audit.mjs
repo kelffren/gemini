@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { resolveSelectedRows } from '../src/studio/ui/studio-transform-presets.mjs';
 
 const source=fs.readFileSync(new URL('../src/studio/ui/studio-transform-presets.mjs',import.meta.url),'utf8');
 const entry=fs.readFileSync(new URL('../src/studio/studio-entry.mjs',import.meta.url),'utf8');
@@ -26,9 +27,26 @@ assert.match(source,/min-height:48px/,'mobile preset touch targets must be at le
 assert.match(source,/env\(safe-area-inset-bottom\)/,'mobile preset panel must respect iPhone safe area');
 assert.doesNotMatch(source,/KELO_WORLD_EDIT/,'transform preset UI must not write authority directly');
 
+let idReads=0;
+const entityCount=5000,selectionCount=2000;
+const entities=Array.from({length:entityCount},(_,index)=>{
+  const row={transform:{x:index,y:index}};
+  Object.defineProperty(row,'id',{enumerable:true,get(){idReads++;return `entity-${index}`;}});
+  return row;
+});
+const selectedIds=Array.from({length:selectionCount},(_,index)=>`entity-${selectionCount-1-index}`);
+const selectedRows=resolveSelectedRows(selectedIds,entities);
+assert.equal(selectedRows.length,selectionCount,'selection resolver must retain all valid selected entities');
+assert.equal(selectedRows[0].transform.x,selectionCount-1,'selection resolver must preserve selection order');
+assert.equal(selectedRows.at(-1).transform.x,0,'selection resolver must preserve selection order through the final entity');
+assert.ok(idReads<=entityCount+2,`selection resolution must index document entities once, got ${idReads} id reads for ${entityCount} entities`);
+assert.match(source,/const byId=new Map\(\)/,'transform selection lookup must build one id index');
+assert.match(source,/byId\.get\(String\(id\)\)/,'transform selection lookup must use constant-time id resolution');
+assert.doesNotMatch(source,/entities\.find\(/,'transform selection lookup must not regress to one document scan per selected id');
+
 assert.match(entry,/createStudioTransformPresets/,'Studio entry must import transform presets');
 assert.match(entry,/transformPresets=createStudioTransformPresets\(\{root,kernel\}\)/,'Studio entry must instantiate transform presets with Kernel');
 assert.match(entry,/transformPresets\.destroy\(\)/,'Studio close must clean transform preset UI');
 assert.match(entry,/kelo-studio-foundation-v1\.22\.0-transform-presets/,'foundation version must expose transform preset integration');
 
-console.log(JSON.stringify({ok:true,presets:ids.length,rotations:3,scales:6,groupSnap:1,singleUndo:true,commandBus:true,authorityBypass:false,mobileTargetPx:48},null,2));
+console.log(JSON.stringify({ok:true,presets:ids.length,rotations:3,scales:6,groupSnap:1,singleUndo:true,commandBus:true,authorityBypass:false,mobileTargetPx:48,linearSelectionLookup:true,documentEntities:entityCount,selectedEntities:selectionCount,idReads},null,2));
