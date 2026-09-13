@@ -90,6 +90,10 @@ assert.equal(kernel.selection.get().length,1,'first mobile tap on a room wall mu
 select.selectPoint(secondX,py,{preserveExisting:true,cycle:true,radius:0});
 assert.equal(kernel.selection.get().length,24,'second mobile tap within tolerance must expand selection to walls and floors sharing the semantic roomId');
 assert.equal(kernel.selection.get().every(id=>kernel.document.entities.find(row=>row.id===id)?.components?.buildingPiece?.roomId===persistedRoomId),true,'semantic expansion must never select pieces from another room');
+select.selectPoint(secondX,py,{preserveExisting:true,cycle:true,radius:0});
+assert.deepEqual(kernel.selection.get(),[String(target.id)],'third repeat tap on the same room wall must collapse the semantic room back to the targeted piece');
+select.selectPoint(secondX,py,{preserveExisting:true,cycle:true,radius:0});
+assert.equal(kernel.selection.get().length,24,'fourth repeat tap must re-expand the same room so single/group editing stays reversible without clearing selection');
 
 const desktopSelect=createSelectTool(kernel,{root:desktopRoot});
 desktopSelect.clear();
@@ -104,12 +108,14 @@ assert.equal(kernel.document.entities.length,24,'one Redo must restore the entir
 assert.equal(kernel.document.entities.every(row=>row.components?.buildingPiece?.roomId===persistedRoomId),true,'Undo/Redo must preserve semantic room identity');
 
 const roomSource=fs.readFileSync(new URL('../src/studio/tools/room-build-tool.mjs',import.meta.url),'utf8');
+const selectSource=fs.readFileSync(new URL('../src/studio/tools/select-tool.mjs',import.meta.url),'utf8');
 assert.doesNotMatch(roomSource,/KELO_WORLD_EDIT|kernel\.execute\s*\(/,'ROOM must not bypass placement/CommandBus authority');
 assert.match(roomSource,/placement\.commitBatch\(/,'ROOM persistent mutation must delegate to placement.commitBatch');
 assert.match(roomSource,/getMeasurement/,'ROOM must expose transient measurement feedback without persisting it to the document');
+assert.doesNotMatch(selectSource,/kernel\.execute\s*\(|KELO_WORLD_EDIT/,'semantic selection toggling must remain transient and must not bypass CommandBus/authority');
 assert.equal(room.deactivate(),true,'ROOM must be cancellable back to normal Quick Build');
 assert.equal(kernel.input.active().includes('studio-quick-build-room'),false,'ROOM cancel must release its input context');
 room.destroy();quick.destroy();
 assert.equal(kernel.input.has('studio-quick-build-room'),false,'ROOM destroy must unregister listeners/context');
 
-console.log(JSON.stringify({ok:true,phase:'5.8',tool:'ROOM',wallModules:8,floorModules:16,roomEntities:24,liveMeasurement:true,requestedSize:[128,96],quantizedSize:[128,128],quantizationDelta:[0,32],moduleGrid:[2,2],exactCornerConnections:true,semanticRoomId:true,edgeRoles:true,singleWallFirstTap:true,zoomAwareMobileRoomSecondTap:true,mobileRepeatScreenPx:20,mobileRepeatWorldAtQuarterZoom:80,desktopRepeatWorld:12,historyEntries:1,oneUndo:true,oneRedo:true,desktopPointer:true,mobilePointer:true,authorityBypass:false},null,2));
+console.log(JSON.stringify({ok:true,phase:'5.10',tool:'ROOM',wallModules:8,floorModules:16,roomEntities:24,liveMeasurement:true,requestedSize:[128,96],quantizedSize:[128,128],quantizationDelta:[0,32],moduleGrid:[2,2],exactCornerConnections:true,semanticRoomId:true,edgeRoles:true,singleWallFirstTap:true,zoomAwareMobileRoomSecondTap:true,roomThirdTapCollapse:true,roomFourthTapReexpand:true,mobileRepeatScreenPx:20,mobileRepeatWorldAtQuarterZoom:80,desktopRepeatWorld:12,historyEntries:1,oneUndo:true,oneRedo:true,desktopPointer:true,mobilePointer:true,authorityBypass:false},null,2));
