@@ -109,7 +109,9 @@ export function createCreatorActions(kernel) {
   async function pasteClipboard({ offsetX, offsetY } = {}) {
     if(!clipboard.length)return [];
     const tile=Math.max(1,Number(kernel.document.settings?.tileSize)||32);pasteCount++;
-    const dx=Number.isFinite(Number(offsetX))?Number(offsetX):tile*pasteCount,dy=Number.isFinite(Number(offsetY))?Number(offsetY):tile*pasteCount;
+    const hasX=Number.isFinite(Number(offsetX)),hasY=Number.isFinite(Number(offsetY));
+    const smart=!hasX&&!hasY?findClearDuplicateOffset(clipboard,kernel.document.entities,tile):null;
+    const dx=hasX?Number(offsetX):(smart?.dx??tile*pasteCount),dy=hasY?Number(offsetY):(smart?.dy??tile*pasteCount);
     const clones=isolateSemanticRooms(clipboard.map(row=>{const clone=sanitizeClone(row);clone.transform={...(clone.transform||{}),x:(Number(clone.transform?.x)||0)+dx,y:(Number(clone.transform?.y)||0)+dy};return clone;}));
     await kernel.execute(createCompositeCommand(clones.map(row=>createPlaceEntityCommand(row)),{type:'entity.batch.paste',label:`Paste ${clones.length} object${clones.length===1?'':'s'}`}));
     kernel.selection.set(clones.map(row=>row.id));return clones;
