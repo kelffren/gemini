@@ -56,9 +56,9 @@ test('mobile editor rolls back pointercancel then accepts native two-pointer pin
   const atlas=await page.evaluate(()=>window.__AVATAR_AUTHORING_QA__.atlas());expect(atlas.width).toBe(512);expect(atlas.height).toBe(768);
 });
 
-test('precomposed 4x4 atlas survives the real compiler byte-for-byte instead of being normalized again',async({page})=>{
+test('precomposed 4x4 PNG survives the real compiler byte-for-byte after browser decoding',async({page})=>{
   await ready(page);await page.evaluate(()=>window.__AVATAR_AUTHORING_QA__.seed(Array.from({length:16},(_,i)=>i)));
   const result=await page.evaluate(()=>window.__AVATAR_AUTHORING_QA__.authoredRoundTrip());
   expect(result.width).toBe(512);expect(result.height).toBe(768);expect(result.frameWidth).toBe(128);expect(result.frameHeight).toBe(192);
-  expect(result.preserved).toBe(true);expect(result.auditPreserved).toBe(true);expect(result.mismatches).toBe(0);expect(result.samePixels).toBe(true);
+  expect(result.preserved).toBe(true);expect(result.auditPreserved).toBe(true);expect(result.compilerMismatches).toBe(0);expect(result.sameCompilerPixels).toBe(true);
 });
