@@ -19,6 +19,7 @@ on:
       - 'scripts/studio-room-plan-cache-audit.mjs'
       - 'scripts/studio-room-centered-drag-audit.mjs'
       - 'scripts/studio-room-floor-fill-audit.mjs'
+      - 'scripts/studio-room-preview-cleanup-audit.mjs'
       - '.github/workflows/studio-quick-build-ci.yml'
   push:
     branches: [main]
@@ -39,6 +40,7 @@ on:
       - 'scripts/studio-room-plan-cache-audit.mjs'
       - 'scripts/studio-room-centered-drag-audit.mjs'
       - 'scripts/studio-room-floor-fill-audit.mjs'
+      - 'scripts/studio-room-preview-cleanup-audit.mjs'
 
 jobs:
   audit:
@@ -66,6 +68,7 @@ jobs:
           node --check scripts/studio-room-plan-cache-audit.mjs
           node --check scripts/studio-room-centered-drag-audit.mjs
           node --check scripts/studio-room-floor-fill-audit.mjs
+          node --check scripts/studio-room-preview-cleanup-audit.mjs
       - name: Quick Build phase 1-3 contract
         run: node scripts/studio-quick-build-audit.mjs
       - name: Quick Build phase 4 drag contract
@@ -82,3 +85,5 @@ jobs:
         run: node scripts/studio-room-centered-drag-audit.mjs
       - name: Quick Build phase 5.8 ROOM floor fill contract
         run: node scripts/studio-room-floor-fill-audit.mjs
+      - name: Quick Build phase 5.9 ROOM preview cleanup contract
+        run: node scripts/studio-room-preview-cleanup-audit.mjs
