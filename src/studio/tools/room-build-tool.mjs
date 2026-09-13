@@ -27,7 +27,8 @@ export function createRoomBuildTool(kernel,{placement=null,quickBuild=null,root=
   placement=placement||kernel.tools?.get?.('placement');
   quickBuild=quickBuild||kernel.tools?.get?.('quickBuild');
   if(!placement?.commitBatch||!quickBuild)throw new Error('STUDIO_ROOM_BUILD_DEPENDENCIES_REQUIRED');
-  let active=false,drag=null,previews=[],destroyed=false,button=null,observer=null,busy=false,plannedRoomId=null,measurement=null;
+  let active=false,drag=null,previews=[],destroyed=false,button=null,observer=null,busy=false,plannedRoomId=null,measurement=null,planSignature=null;
+  const plannerStats={requests:0,rebuilds:0,reuses:0};
   const document=root?.document;
   const wallPiece=()=>quickBuild.pieces?.find?.(row=>row.type==='wall')||null;
   const grid=()=>Math.max(1,Number(document?.getElementById?.('kelo-studio-live')?.querySelector?.('[data-ext="snap"]')?.value)||Number(kernel.document?.settings?.tileSize)||32);
@@ -35,9 +36,10 @@ export function createRoomBuildTool(kernel,{placement=null,quickBuild=null,root=
   const wallBounds=()=>{const g=grid(),b=wallPrefab()?.bounds||{w:g,h:g};return{w:Math.max(1,Number(b.w)||g),h:Math.max(1,Number(b.h)||g)};};
   const semantic=(roomId,edge,index)=>{const piece=wallPiece(),bounds=wallBounds();return{buildingPiece:{type:'wall',system:'quick-build',version:3,snapPoints:[{id:'start',type:'wall',x:0,y:bounds.h/2,direction:'start'},{id:'end',type:'wall',x:bounds.w,y:bounds.h/2,direction:'end'}],roomGenerated:true,roomId,roomEdge:edge,roomIndex:index,prefabId:piece?.prefabId||null}};};
   const wallLength=()=>{const g=grid(),w=wallBounds().w;return Math.max(g,Math.round(w/g)*g);};
-  function clearTransient({keepDrag=false}={}){previews=[];plannedRoomId=null;measurement=null;if(!keepDrag)drag=null;syncButton();}
+  function clearTransient({keepDrag=false}={}){previews=[];plannedRoomId=null;measurement=null;planSignature=null;if(!keepDrag)drag=null;syncButton();}
   function wallRowFromSegmentStart(x,y,rotation,roomId,edge,index){const piece=wallPiece(),bounds=wallBounds();let tx=x,ty=y-bounds.h/2;if(rotation===90){tx=x-bounds.w/2;ty=y-bounds.h/2+bounds.w/2;}return{prefabId:piece.prefabId,transform:{x:tx,y:ty,rotation},bounds:{...bounds},components:semantic(roomId,edge,index)};}
   function planRect(ax,ay,bx,by,{square=false}={}){
+    plannerStats.requests++;
     const g=grid(),length=wallLength(),roomId=plannedRoomId||(plannedRoomId=newRoomId());
     const startX=snap(ax,g),startY=snap(ay,g),pointerX=snap(bx,g),pointerY=snap(by,g);
     const requestedWidth=Math.abs(pointerX-startX),requestedHeight=Math.abs(pointerY-startY);
@@ -53,11 +55,15 @@ export function createRoomBuildTool(kernel,{placement=null,quickBuild=null,root=
       endX=startX+(pointerX<startX?-1:1)*countX*length;
       endY=startY+(pointerY<startY?-1:1)*countY*length;
     }
-    const x0=Math.min(startX,endX),x1=Math.max(startX,endX),y0=Math.min(startY,endY),y1=Math.max(startY,endY),rows=[];
+    const x0=Math.min(startX,endX),x1=Math.max(startX,endX),y0=Math.min(startY,endY),y1=Math.max(startY,endY);
+    const signature=`${roomId}|${x0}|${y0}|${x1}|${y1}|${countX}|${countY}|${square?1:0}|${length}`;
+    const nextMeasurement={x:x0,y:y0,width:x1-x0,height:y1-y0,requestedWidth,requestedHeight,deltaWidth:(x1-x0)-requestedWidth,deltaHeight:(y1-y0)-requestedHeight,modulesX:countX,modulesY:countY,wallLength:length,totalWalls:2*(countX+countY),squareLocked:!!square};
+    if(signature===planSignature&&previews.length){plannerStats.reuses++;measurement=nextMeasurement;syncButton();return copy(previews);}
+    plannerStats.rebuilds++;
+    const rows=[];
     for(let i=0;i<countX;i++){const x=x0+i*length;rows.push(wallRowFromSegmentStart(x,y0,0,roomId,'top',i),wallRowFromSegmentStart(x,y1,0,roomId,'bottom',i));}
     for(let i=0;i<countY;i++){const y=y0+i*length;rows.push(wallRowFromSegmentStart(x0,y,90,roomId,'left',i),wallRowFromSegmentStart(x1,y,90,roomId,'right',i));}
-    previews=rows;
-    measurement={x:x0,y:y0,width:x1-x0,height:y1-y0,requestedWidth,requestedHeight,deltaWidth:(x1-x0)-requestedWidth,deltaHeight:(y1-y0)-requestedHeight,modulesX:countX,modulesY:countY,wallLength:length,totalWalls:rows.length,squareLocked:!!square};
+    previews=rows;planSignature=signature;measurement={...nextMeasurement,totalWalls:rows.length};
     syncButton();return copy(previews);
   }
   function activate(){if(active)return true;if(!wallPiece())return false;quickBuild.activate?.('wall');active=true;clearTransient();kernel.input.push(CONTEXT);syncButton();return true;}
@@ -77,5 +83,5 @@ export function createRoomBuildTool(kernel,{placement=null,quickBuild=null,root=
   function destroy(){if(destroyed)return;destroyed=true;active=false;clearTransient();kernel.input.pop(CONTEXT);unregister?.();observer?.disconnect?.();button?.remove();button=null;}
   if(document?.documentElement&&root?.MutationObserver){observer=new root.MutationObserver(()=>{ensureButton();syncButton();});observer.observe(document.documentElement,{childList:true,subtree:true});}
   ensureButton();
-  return Object.freeze({id:'roomBuild',version:'studio-room-build-v1.4.0-square-lock',activate,deactivate,planRect,commitRoom,getPreviews:()=>copy(previews),getMeasurement:()=>copy(measurement),get active(){return active;},destroy});
+  return Object.freeze({id:'roomBuild',version:'studio-room-build-v1.5.0-plan-cache',activate,deactivate,planRect,commitRoom,getPreviews:()=>copy(previews),getMeasurement:()=>copy(measurement),getPlannerStats:()=>({...plannerStats}),get active(){return active;},destroy});
 }
