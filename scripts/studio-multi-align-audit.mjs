@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { computeAlignedPositions,computeDistributedPositions } from '../src/studio/ui/studio-multi-align.mjs';
+import { computeAlignedPositions,computeDistributedPositions,createChangedMoveCommands } from '../src/studio/ui/studio-multi-align.mjs';
 
 const rows=[
   {id:'a',transform:{x:10,y:20,scale:1},bounds:{w:20,h:30}},
@@ -30,10 +30,34 @@ assert.deepEqual(vertical.map(r=>r.y),[5,51.67,23.33,80],'vertical distribution 
 assert.deepEqual(vertical.map(r=>r.x),[0,30,65,100],'vertical distribution must preserve x');
 assert.deepEqual(computeDistributedPositions(spread.slice(0,2),'horizontal'),[],'distribution requires at least three objects');
 
+const changed=createChangedMoveCommands(rows,[
+  {id:'a',x:10,y:20},
+  {id:'b',x:12,y:14},
+  {id:'missing',x:1,y:2}
+]);
+assert.equal(changed.length,1,'command builder must skip unchanged and missing entities');
+assert.deepEqual(changed[0].serialize(),{type:'entity.move',id:'b',from:null,to:{x:12,y:14}},'command builder must preserve canonical reversible move serialization');
+
+let idReads=0;
+const largeCount=2000;
+const largeEntities=Array.from({length:largeCount},(_,index)=>{
+  const entity={transform:{x:index,y:index}};
+  Object.defineProperty(entity,'id',{enumerable:true,get(){idReads++;return `entity-${index}`;}});
+  return entity;
+});
+const largeTargets=Array.from({length:largeCount},(_,index)=>({id:`entity-${index}`,x:index+1,y:index}));
+const largeCommands=createChangedMoveCommands(largeEntities,largeTargets);
+assert.equal(largeCommands.length,largeCount,'large multi-selection must produce one move command per changed entity');
+assert.ok(idReads<=largeCount+2,`entity ids must be read in one linear indexing pass, got ${idReads} reads for ${largeCount} entities`);
+assert.equal(largeCommands.at(-1).serialize().id,`entity-${largeCount-1}`,'linear lookup must preserve target identity/order');
+
 const source=fs.readFileSync(new URL('../src/studio/ui/studio-multi-align.mjs',import.meta.url),'utf8');
 assert.match(source,/createMoveEntityCommand/,'alignment must use reversible move commands');
 assert.match(source,/createCompositeCommand/,'group alignment must enter history as one composite action');
 assert.match(source,/kernel\.execute\(createCompositeCommand/,'persistent mutation must pass through Studio CommandBus');
+assert.match(source,/const byId=new Map\(\)/,'multi-align command build must index selected entities once');
+assert.match(source,/byId\.get\(id\)/,'target lookup must use constant-time id indexing');
+assert.doesNotMatch(source,/entities\.find\(/,'multi-align command construction must not regress to per-target linear scans');
 assert.match(source,/type:'selection\.align'/,'alignment authority serialization must have a deterministic group command type');
 assert.match(source,/type:'selection\.distribute'/,'distribution authority serialization must have a deterministic group command type');
 assert.match(source,/data-distribute="horizontal"/,'toolbar must expose horizontal distribution');
@@ -51,4 +75,4 @@ const entry=fs.readFileSync(new URL('../src/studio/studio-entry.mjs',import.meta
 assert.match(entry,/createStudioMultiAlign/,'Studio boot must install multi align');
 assert.match(entry,/multiAlign\.destroy\(\)/,'Studio close must cleanup multi align');
 
-console.log(JSON.stringify({ok:true,left:true,rightScaled:true,centers:true,top:true,bottom:true,distributeHorizontal:true,distributeVertical:true,scaledSpacing:true,commandBus:true,compositeUndo:true,mobileReachable:true,observerStable:true,cleanup:true},null,2));
+console.log(JSON.stringify({ok:true,left:true,rightScaled:true,centers:true,top:true,bottom:true,distributeHorizontal:true,distributeVertical:true,scaledSpacing:true,linearCommandBuild:true,largeSelection:largeCount,commandBus:true,compositeUndo:true,mobileReachable:true,observerStable:true,cleanup:true},null,2));

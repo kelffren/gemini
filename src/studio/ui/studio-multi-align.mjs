@@ -2,7 +2,7 @@
  * area: STUDIO / MULTI ALIGN
  * owns: compact multi-selection alignment UI and reversible group alignment commands
  * does-not-own: selection semantics, document persistence, authority transport or history storage
- * public-api: createStudioMultiAlign(), computeAlignedPositions(), computeDistributedPositions()
+ * public-api: createStudioMultiAlign(), computeAlignedPositions(), computeDistributedPositions(), createChangedMoveCommands()
  * online: mutations execute through Studio kernel CommandBus as one composite reversible action
  */
 
@@ -52,6 +52,23 @@ export function computeDistributedPositions(entities=[],axis='horizontal'){
   return rows.map(row=>targets.get(row.id));
 }
 
+export function createChangedMoveCommands(entities=[],targets=[]){
+  const byId=new Map();
+  for(const entity of Array.isArray(entities)?entities:[]){
+    if(entity)byId.set(String(entity.id),entity);
+  }
+  const commands=[];
+  for(const target of Array.isArray(targets)?targets:[]){
+    if(!target)continue;
+    const id=String(target.id),entity=byId.get(id);
+    if(!entity)continue;
+    const x=Number(entity.transform?.x)||0,y=Number(entity.transform?.y)||0;
+    if(x===target.x&&y===target.y)continue;
+    commands.push(createMoveEntityCommand(id,target));
+  }
+  return commands;
+}
+
 function ensureStyle(document){
   if(!document?.head||document.getElementById?.(STYLE_ID))return;
   const style=document.createElement('style');style.id=STYLE_ID;style.dataset.keloStudioUi='1';
@@ -75,10 +92,7 @@ export function createStudioMultiAlign({root=globalThis,kernel}={}){
   const selected=()=>{const ids=new Set((kernel.selection.get?.()||[]).map(String));return kernel.document.entities.filter(e=>ids.has(String(e.id)));};
 
   async function executeTargets(entities,targets,meta){
-    const commands=targets.filter(to=>{
-      const e=entities.find(row=>String(row.id)===to.id);if(!e)return false;
-      return (Number(e.transform?.x)||0)!==to.x||(Number(e.transform?.y)||0)!==to.y;
-    }).map(to=>createMoveEntityCommand(to.id,to));
+    const commands=createChangedMoveCommands(entities,targets);
     if(!commands.length)return false;
     await kernel.execute(createCompositeCommand(commands,meta(commands.length)));
     refresh();return true;
