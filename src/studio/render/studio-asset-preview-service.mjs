@@ -11,9 +11,7 @@ const copy=value=>value==null?value:(typeof structuredClone==='function'?structu
 
 export function createStudioAssetPreviewService({assetCatalog,atlasContract,devicePixelRatio=globalThis.devicePixelRatio||1}={}){
   if(!assetCatalog)throw new Error('STUDIO_ASSET_PREVIEW_CATALOG_REQUIRED');
-  const images=new Map(),ownedKeys=new Set(),thumbTokens=new WeakMap();
-  const thumbQueue=[];
-  let thumbRunning=0,closed=false;
+  const images=new Map(),ownedKeys=new Set();
   const resolveAsset=value=>typeof value==='string'?assetCatalog.get(value):(value?.parts?value:assetCatalog.get(value?.id));
   const mobileViewport=()=>Number(globalThis.innerWidth||0)>0&&Number(globalThis.innerWidth)<=760;
 
@@ -40,38 +38,30 @@ export function createStudioAssetPreviewService({assetCatalog,atlasContract,devi
   function drawCreatorPrefab(ctx,asset,x,y,{alpha=.72}={}){const {children}=creatorBounds(asset);let drew=false;for(const child of children)drew=drawAsset(ctx,child.prefabId,(Number(x)||0)+(Number(child.dx)||0),(Number(y)||0)+(Number(child.dy)||0),{rotation:Number(child.rotation)||0,alpha,placeholder:true})||drew;return drew;}
 
   function paintThumbnail(canvas,asset,{size,padding,dpr}={}){
-    if(closed||!canvas?.getContext)return false;
+    if(!canvas?.getContext)return false;
     const ctx=canvas.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,size,size);
     const creator=!!asset?.creatorPrefab,w=Math.max(1,Number(asset?.width||asset?.bounds?.w)||32),h=Math.max(1,Number(asset?.height||asset?.bounds?.h)||32),scale=Math.min((size-padding*2)/w,(size-padding*2)/h),ox=(size-w*scale)/2,oy=(size-h*scale)/2;
     ctx.save();ctx.translate(ox,oy);ctx.scale(scale,scale);if(creator)drawCreatorPrefab(ctx,asset,0,0,{alpha:1});else drawAsset(ctx,asset,0,0,{alpha:1});ctx.restore();return true;
   }
-  function pumpThumbnailQueue(){
-    if(closed||thumbRunning||!thumbQueue.length)return;
-    const task=thumbQueue.shift();thumbRunning=1;
-    Promise.resolve().then(task).catch(()=>{}).finally(()=>{thumbRunning=0;if(!closed){const schedule=globalThis.requestAnimationFrame||globalThis.setTimeout;try{schedule(()=>pumpThumbnailQueue(),16);}catch{setTimeout(()=>pumpThumbnailQueue(),16);}}});
-  }
-  function queueMobileThumbnail(canvas,asset,config){
-    const token={};thumbTokens.set(canvas,token);
-    thumbQueue.push(async()=>{
-      const creator=!!asset?.creatorPrefab;if(creator)await warmCreatorPrefab(asset);else await warmAsset(asset);
-      if(closed||thumbTokens.get(canvas)!==token||canvas.isConnected===false)return;
-      paintThumbnail(canvas,asset,config);
-    });
-    pumpThumbnailQueue();
-  }
 
   async function renderThumbnail(canvas,asset,{cssSize=54,padding=5}={}){
-    if(!canvas?.getContext)return false;const dpr=clamp(Number(devicePixelRatio)||1,1,3),size=Math.max(32,Number(cssSize)||54);canvas.width=Math.round(size*dpr);canvas.height=Math.round(size*dpr);canvas.style.width=`${size}px`;canvas.style.height=`${size}px`;const config={size,padding,dpr};
+    if(!canvas?.getContext)return false;
+    const dpr=clamp(Number(devicePixelRatio)||1,1,3),size=Math.max(32,Number(cssSize)||54),config={size,padding,dpr};
+    canvas.width=Math.round(size*dpr);canvas.height=Math.round(size*dpr);canvas.style.width=`${size}px`;canvas.style.height=`${size}px`;
     const ctx=canvas.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,size,size);
+    // Physical iPhone Safari can block its main thread for >90s when atlas acquisition/
+    // image decode starts while the World shell is still mounting. Keep launch responsive;
+    // mobile thumbnails stay as light placeholders until the atlas path is made explicitly
+    // user/idle driven instead of being started by createStudioLiveShell().
     if(mobileViewport()){
       ctx.save();ctx.globalAlpha=.10;ctx.fillRect(padding,padding,Math.max(1,size-padding*2),Math.max(1,size-padding*2));ctx.restore();
-      queueMobileThumbnail(canvas,asset,config);return true;
+      return true;
     }
     const creator=!!asset?.creatorPrefab;if(creator)await warmCreatorPrefab(asset);else await warmAsset(asset);
     return paintThumbnail(canvas,asset,config);
   }
 
   function describeAsset(id){const row=assetCatalog.get(String(id));return row?copy(row):null;}
-  function close(){closed=true;thumbQueue.length=0;for(const key of ownedKeys)try{atlasContract?.release?.(key);}catch{}ownedKeys.clear();images.clear();}
+  function close(){for(const key of ownedKeys)try{atlasContract?.release?.(key);}catch{}ownedKeys.clear();images.clear();}
   return Object.freeze({drawAsset,drawCreatorPrefab,renderThumbnail,warmAsset,warmCreatorPrefab,describeAsset,close});
 }
