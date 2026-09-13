@@ -94,6 +94,19 @@ export function createStudioExplorerRangeSelectionController({root=globalThis,ke
       return;
     }
 
+    if(command&&(event.key===' '||event.code==='Space')&&!event.shiftKey){
+      const id=String(row.dataset?.entity||'');
+      if(!id)return;
+      event.preventDefault?.();
+      event.stopImmediatePropagation?.();
+      anchorId=id;
+      const current=(kernel.selection.get?.()||[]).map(String);
+      const index=current.indexOf(id);
+      if(index>=0)kernel.selection.set(current.filter(candidate=>candidate!==id));
+      else kernel.selection.set([...current,id]);
+      return;
+    }
+
     if(command)return;
     if(!['ArrowUp','ArrowDown','Home','End','PageUp','PageDown'].includes(event.key))return;
     const rows=explorerRows();
@@ -132,7 +145,7 @@ export function createStudioExplorerRangeSelectionController({root=globalThis,ke
   document.addEventListener('click',onclick,true);
   document.addEventListener('keydown',onkeydown,true);
   return Object.freeze({
-    version:'studio-explorer-range-selection-v1.6.0-visible-context',
+    version:'studio-explorer-range-selection-v1.7.0-keyboard-toggle',
     get anchor(){return anchorId;},
     destroy(){
       if(destroyed)return;
