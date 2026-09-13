@@ -18,7 +18,7 @@ const event=(key,target=input,extra={})=>({key,target,defaultPrevented:false,rep
 
 assert.equal(shouldHandleStudioPropertyCommitKey(event('Enter')),true,'Enter should commit a Studio property');
 assert.equal(shouldHandleStudioPropertyCommitKey(event('Escape')),true,'Escape should cancel a Studio property');
-assert.equal(shouldHandleStudioPropertyCommitKey(event('Tab')),false,'unrelated keys must pass through');
+assert.equal(shouldHandleStudioPropertyCommitKey(event('Tab')),true,'Tab should be eligible for stable internal Inspector navigation');
 assert.equal(shouldHandleStudioPropertyCommitKey(event('Enter',input,{ctrlKey:true})),false,'modified Enter must pass through');
 assert.equal(shouldHandleStudioPropertyCommitKey(event('Enter',{matches:()=>false})),false,'non-property inputs must pass through');
 
@@ -43,6 +43,11 @@ assert.equal(blurCount,2,'Escape must exit the field once');
 assert.equal(input.value,'64','Escape must restore the value captured on focus');
 assert.equal(escape.prevented,1,'Escape must be consumed inside property editing');
 
+const boundaryTab=event('Tab');
+listeners.get('keydown').fn(boundaryTab);
+assert.equal(boundaryTab.prevented,0,'Tab must remain native when there is no internal enabled-field destination');
+assert.equal(blurCount,2,'boundary Tab must not force a parallel blur path');
+
 controller.destroy();
 assert.equal(listeners.has('focusin'),false,'destroy must remove focus listener');
 assert.equal(listeners.has('keydown'),false,'destroy must remove keyboard listener');
@@ -52,4 +57,4 @@ assert.ok(!source.includes('KELO_WORLD_EDIT'),'controller must not access author
 assert.ok(!source.includes('kernel.execute'),'controller must not create a parallel mutation path');
 assert.ok(source.includes('input.blur'), 'persistence must delegate through the shell canonical blur/change path');
 
-console.log('PASS studio property commit audit: Enter commits via canonical blur/change; Escape restores; shortcuts guarded; no authority bypass.');
+console.log('PASS studio property commit audit: Enter commits via canonical blur/change; Escape restores; internal Tab is stabilized with native boundary pass-through; no authority bypass.');
