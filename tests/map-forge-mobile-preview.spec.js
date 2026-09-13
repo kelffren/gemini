@@ -100,6 +100,15 @@ test('Map Forge real preview exposes scene and sprite requirements, hides before
 
   const forge = page.locator('#kelo-map-forge');
   await expect(forge).toBeVisible();
+
+  // Keep this real preview smoke deterministic. The workspace intentionally boots with a random
+  // seed for users, but CI must judge the same representative capital on every run.
+  const fixedSeed = 81746291;
+  const seedInput = forge.locator('input[type="number"]').first();
+  await seedInput.fill(String(fixedSeed));
+  await forge.getByRole('button', { name: 'GENERAR', exact: true }).click();
+  await page.waitForFunction(seed => window.__KELO_TEST_MAP_FORGE_WORKSPACE__?.selected?.metadata?.seed === seed, fixedSeed, { timeout: 30000 });
+
   await expect(page.getByRole('button', { name: 'VER EN MAPA EXTERIOR' })).toBeEnabled();
   await expect(page.getByRole('heading', { name: 'SPRITES NECESARIOS' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'PLAN DE ESCENAS' })).toBeVisible();
@@ -132,6 +141,7 @@ test('Map Forge real preview exposes scene and sprite requirements, hides before
     } : null;
   });
   expect(before).not.toBeNull();
+  expect(before.seed).toBe(fixedSeed);
   expect(before.propertyPreviewRenderer).toBe(true);
   expect(before.snapshotPreviewRenderer).toBe(true);
   expect(before.spriteManifestVersion).toBe('map-forge-sprite-manifest-v1');
