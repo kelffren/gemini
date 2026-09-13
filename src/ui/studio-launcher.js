@@ -33,13 +33,18 @@
     if(busy)button.setAttribute('aria-busy','true');else button.removeAttribute('aria-busy');
   }
   async function loadCreatorHub(){
-    // Safari keeps successful ES modules in its module map. Always give an explicit CREATORS
-    // launch a fresh URL so a previously-loaded Creator Hub cannot pin old workspace routing.
+    // Safari keeps successful ES modules in its module map. Prefer fresh URLs so an older
+    // Creator Hub cannot pin stale workspace routing, then retain the canonical lazy URL
+    // as a final recovery path if both cache-busted imports fail.
     const nonce=`${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;
     try{return await import(`./../creators/ui/creator-hub.mjs?v=${CREATOR_BUILD}-${nonce}`);}
     catch(firstError){
       console.warn('[Kelo Creators launcher] retrying fresh Creator Hub',firstError);
-      return import(`./../creators/ui/creator-hub.mjs?v=${CREATOR_BUILD}-${nonce}-retry-${Date.now()}`);
+      try{return await import(`./../creators/ui/creator-hub.mjs?v=${CREATOR_BUILD}-${nonce}-retry-${Date.now()}`);}
+      catch(retryError){
+        console.warn('[Kelo Creators launcher] falling back to canonical Creator Hub',retryError);
+        return import('./../creators/ui/creator-hub.mjs');
+      }
     }
   }
   async function open(){
@@ -94,7 +99,7 @@
   }
   function boot(){sync();void bootOnlineAuthorization();void import('./../characters/creator-avatar-runtime.mjs').then(m=>m.installCreatorAvatarRuntime({root:window})).catch(e=>console.warn('[Kelo Avatar runtime]',e));}
   window.KELO_ADMIN_KEYS?.onChange?.(sync);
-  const api=Object.freeze({version:'studio-launcher-v1.10.0-safari-touch-recovery',open,openSpriteFactory:openFactory,sync,get allowed(){return allowed();}});
+  const api=Object.freeze({version:'studio-launcher-v1.10.1-canonical-fallback',open,openSpriteFactory:openFactory,sync,get allowed(){return allowed();}});
   window.KELO_STUDIO_LAUNCHER=api;
   window.KELO_CREATORS_LAUNCHER=api;
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
