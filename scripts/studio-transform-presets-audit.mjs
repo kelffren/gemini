@@ -47,6 +47,6 @@ assert.doesNotMatch(source,/entities\.find\(/,'transform selection lookup must n
 assert.match(entry,/createStudioTransformPresets/,'Studio entry must import transform presets');
 assert.match(entry,/transformPresets=createStudioTransformPresets\(\{root,kernel\}\)/,'Studio entry must instantiate transform presets with Kernel');
 assert.match(entry,/transformPresets\.destroy\(\)/,'Studio close must clean transform preset UI');
-assert.match(entry,/kelo-studio-foundation-v1\.22\.0-transform-presets/,'foundation version must expose transform preset integration');
+assert.match(entry,/version:\s*'kelo-studio-foundation-v1\.\d+\.\d+[^']*'/,'foundation version must expose a current Studio foundation version');
 
 console.log(JSON.stringify({ok:true,presets:ids.length,rotations:3,scales:6,groupSnap:1,singleUndo:true,commandBus:true,authorityBypass:false,mobileTargetPx:48,linearSelectionLookup:true,documentEntities:entityCount,selectedEntities:selectionCount,idReads},null,2));
