@@ -19,6 +19,16 @@ const entityRect=(row,tile)=>{
   return{x,y,x2:x+w,y2:y+h};
 };
 const rectsOverlap=(a,b)=>a.x<b.x2&&a.x2>b.x&&a.y<b.y2&&a.y2>b.y;
+const normalizedRotation=value=>((Number(value)||0)%360+360)%360;
+const cleanCoord=value=>Math.abs(value)<1e-9?0:Math.round(value*1e6)/1e6;
+function rotatePointAround(x,y,cx,cy,delta){
+  const angle=normalizedRotation(delta),dx=(Number(x)||0)-cx,dy=(Number(y)||0)-cy;
+  if(angle===90)return{x:cleanCoord(cx-dy),y:cleanCoord(cy+dx)};
+  if(angle===180)return{x:cleanCoord(cx-dx),y:cleanCoord(cy-dy)};
+  if(angle===270)return{x:cleanCoord(cx+dy),y:cleanCoord(cy-dx)};
+  const radians=angle*Math.PI/180,cos=Math.cos(radians),sin=Math.sin(radians);
+  return{x:cleanCoord(cx+dx*cos-dy*sin),y:cleanCoord(cy+dx*sin+dy*cos)};
+}
 
 export function smartDuplicateOffset(rows=[],tileSize=32){
   const tile=Math.max(1,Number(tileSize)||32),items=(Array.isArray(rows)?rows:[]).filter(Boolean);
@@ -89,9 +99,16 @@ export function createCreatorActions(kernel) {
 
   async function rotateSelection(delta = 90) {
     const rows = selectedEntities(); if (!rows.length) return [];
+    const angle=Number(delta)||0;
+    let cx=0,cy=0;
+    if(rows.length>1){
+      const xs=rows.map(row=>Number(row.transform?.x)||0),ys=rows.map(row=>Number(row.transform?.y)||0);
+      cx=(Math.min(...xs)+Math.max(...xs))/2;cy=(Math.min(...ys)+Math.max(...ys))/2;
+    }
     const commands = rows.map(row => {
-      const rotation = ((Number(row.transform?.rotation) || 0) + Number(delta || 0)) % 360;
-      return createPatchEntityCommand(row.id, { transform: { ...(row.transform || {}), rotation } });
+      const transform={...(row.transform||{}),rotation:normalizedRotation((Number(row.transform?.rotation)||0)+angle)};
+      if(rows.length>1){const point=rotatePointAround(transform.x,transform.y,cx,cy,angle);transform.x=point.x;transform.y=point.y;}
+      return createPatchEntityCommand(row.id, { transform });
     });
     await kernel.execute(createCompositeCommand(commands, { type: 'entity.batch.rotate', label: `Rotate ${rows.length} object${rows.length === 1 ? '' : 's'}` }));
     return selectedEntities();
