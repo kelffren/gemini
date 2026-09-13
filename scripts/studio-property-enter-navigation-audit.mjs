@@ -60,13 +60,44 @@ microtasks.shift()();
 assert.deepEqual(calls,['blur:x','focus:rotation','select:rotation'],'Shift+Enter on the first enabled property must wrap to the last enabled property');
 
 calls.length=0;
+fields=[locked,x,y,rotation];
+const tab=key(x,'Tab');
+handlers.get('keydown')(tab);
+assert.equal(tab.defaultPrevented,true,'internal Tab must be stabilized by the controller');
+assert.deepEqual(calls,['blur:x'],'internal Tab must commit through the canonical blur path');
+const replacementX=field('x'),replacementY=field('y'),replacementRotation=field('rotation');
+fields=[locked,replacementX,replacementY,replacementRotation];
+microtasks.shift()();
+assert.deepEqual(calls,['blur:x','focus:y','select:y'],'Tab must recover the next property after a synchronous Inspector rerender');
+
+calls.length=0;
+const shiftTab=key(replacementRotation,'Tab',{shiftKey:true});
+handlers.get('keydown')(shiftTab);
+assert.equal(shiftTab.defaultPrevented,true,'internal Shift+Tab must be stabilized by the controller');
+microtasks.shift()();
+assert.deepEqual(calls,['blur:rotation','focus:y','select:y'],'Shift+Tab must move to the previous enabled property');
+
+calls.length=0;
+const firstBoundary=key(replacementX,'Tab',{shiftKey:true});
+handlers.get('keydown')(firstBoundary);
+assert.equal(firstBoundary.defaultPrevented,false,'Shift+Tab on the first enabled property must remain native so focus can leave the Inspector');
+assert.deepEqual(calls,[],'boundary Shift+Tab must not force a manual blur');
+assert.equal(microtasks.length,0,'boundary Shift+Tab must not schedule internal navigation');
+
+const lastBoundary=key(replacementRotation,'Tab');
+handlers.get('keydown')(lastBoundary);
+assert.equal(lastBoundary.defaultPrevented,false,'Tab on the last enabled property must remain native so focus can leave the Inspector');
+assert.deepEqual(calls,[],'boundary Tab must not force a manual blur');
+assert.equal(microtasks.length,0,'boundary Tab must not schedule internal navigation');
+
+calls.length=0;
 fields=[field('x'),field('y'),field('rotation')];
 handlers.get('keydown')(key(y));
-const replacementY=field('y');
-const replacementRotation=field('rotation');
-fields=[field('x'),replacementY,replacementRotation];
+const rerenderY=field('y');
+const rerenderRotation=field('rotation');
+fields=[field('x'),rerenderY,rerenderRotation];
 microtasks.shift()();
-assert.deepEqual(calls,['blur:y','focus:rotation','select:rotation'],'navigation must recover by data-prop after a synchronous property-panel rerender');
+assert.deepEqual(calls,['blur:y','focus:rotation','select:rotation'],'Enter navigation must recover by data-prop after a synchronous property-panel rerender');
 
 calls.length=0;
 const solo=field('solo');
@@ -96,8 +127,9 @@ assert.equal(handlers.has('focusin'),false,'destroy must detach focusin listener
 assert.equal(controller.focusFirstProperty(),false,'destroyed controller must not refocus properties');
 
 const source=fs.readFileSync(new URL('../src/studio/input/studio-property-commit-controller.mjs',import.meta.url),'utf8');
-assert.match(source,/input\.blur\?\.\(\)/,'Enter commit must remain delegated to canonical blur/change handling');
-assert.match(source,/\(index\+direction\+fields\.length\)%fields\.length/,'property navigation must use bounded cyclic indexing');
+assert.match(source,/input\.blur\?\.\(\)/,'keyboard commit must remain delegated to canonical blur/change handling');
+assert.match(source,/key==='Enter'\|\|key==='Escape'\|\|key==='Tab'/,'controller must explicitly support stable Tab navigation');
+assert.match(source,/isTab\?index\+direction:\(index\+direction\+fields\.length\)%fields\.length/,'Tab must stay bounded while Enter keeps cyclic navigation');
 assert.doesNotMatch(source,/kernel\.execute|KELO_WORLD_EDIT/,'property keyboard ergonomics must not bypass CommandBus or authority');
 
-console.log(JSON.stringify({ok:true,f2DirectFocus:true,f2SkipsDisabled:true,f2EditableGuard:true,f2EmptyNoop:true,enterAdvances:true,shiftEnterReverses:true,cyclicNavigation:true,singleFieldNoRefocus:true,skipsDisabled:true,rerenderRecovery:true,escapeCancelPreserved:true,commandBusBypass:false,authorityBypass:false},null,2));
+console.log(JSON.stringify({ok:true,f2DirectFocus:true,enterAdvances:true,shiftEnterReverses:true,cyclicNavigation:true,stableTabNavigation:true,stableShiftTabNavigation:true,tabBoundaryPassThrough:true,rerenderRecovery:true,escapeCancelPreserved:true,commandBusBypass:false,authorityBypass:false},null,2));
