@@ -2,13 +2,13 @@
  * area: AUTH / GUEST PLAY
  * owner-adjacent: KeloAccountAuthUI
  * keys: GUEST AI TEST PLAYWRIGHT AUTH BYPASS ANONYMOUS MOBILE SAFARI VISUALLAB LOCAL
- * purpose: make guest play one-step after anonymous auth; if Supabase anonymous is disabled, keep an explicit local-play fallback that never mints a JWT
+ * purpose: make guest play one-step after anonymous auth; if Supabase anonymous is disabled or rate-limited, keep a local-play fallback that never mints a JWT
  * online: explicit test/local guest does not mint credentials or bypass server authorization; authenticated anonymous sessions keep using KeloOnlineAuth/Supabase normally
  * do-not: NO fake JWT, NO server privilege bypass, NO service_role/secret, NO gameplay authority
  */
 (function(){
 'use strict';
-const VERSION='kelo-guest-play-bypass-v2.1';
+const VERSION='kelo-guest-play-bypass-v2.2';
 const LOCAL_KEY='kelo_local_guest_play_v1';
 const params=new URLSearchParams(location.search||'');
 const explicitGuest=params.get('guest')==='1'||params.get('aiGuest')==='1'||params.get('visualLab')==='1'||params.get('mapEditor')==='1';
@@ -50,6 +50,33 @@ function enterLocal(reason){
   markLocalGuest();
   return closeGate(reason||'local-guest-enter');
 }
+function authGuestFallbackError(error){
+  const code=String(error?.code||error?.name||'').toLowerCase();
+  const raw=String(error?.message||error||'').toLowerCase();
+  const status=Number(error?.status)||0;
+  if(code==='anonymous_provider_disabled'||code==='anonymous_sign_ins_disabled'||code==='signup_disabled')return true;
+  if(/anonymous/.test(code+' '+raw)&&/(disabled|not enabled|not allow|provider)/.test(code+' '+raw))return true;
+  if(status===429||/over_request_rate_limit|rate.?limit/.test(code+' '+raw))return true;
+  return false;
+}
+function installAuthGuestFallback(){
+  const auth=window.KeloOnlineAuth;
+  if(!auth||typeof auth.signInAsGuest!=='function'||auth.__keloGuestFallbackVersion===VERSION)return false;
+  const nativeGuest=auth.signInAsGuest.bind(auth);
+  const facade={...auth};
+  facade.signInAsGuest=async function(){
+    try{return await nativeGuest();}
+    catch(error){
+      if(!authGuestFallbackError(error))throw error;
+      enterLocal('supabase-anonymous-unavailable');
+      try{window.dispatchEvent(new CustomEvent('kelo:guest-local-fallback',{detail:{version:VERSION,code:String(error?.code||''),status:Number(error?.status)||0}}))}catch(_){}
+      return Object.freeze({state:'guest-local',authenticated:false,isAnonymous:false,localGuest:true,profileComplete:true,error:null});
+    }
+  };
+  facade.__keloGuestFallbackVersion=VERSION;
+  window.KeloOnlineAuth=Object.freeze(facade);
+  return true;
+}
 function syncGate(reason){
   const state=authState();
   const active=explicitGuest||isAnonymousSession(state)||localGuest();
@@ -71,11 +98,12 @@ function observeGate(){
 }
 
 ['kelo:online-auth-state','kelo:online-auth-ready','kelo:guest-created','kelo:online-auth-required','kelo:account-signed-in','kelo:account-signed-out'].forEach(name=>window.addEventListener(name,()=>schedule(name),true));
-window.addEventListener('DOMContentLoaded',()=>{observeGate();schedule('dom-ready')},{once:true});
-window.addEventListener('load',()=>schedule('load'),{once:true});
-window.addEventListener('pageshow',()=>schedule('pageshow'));
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)schedule('visible')});
+window.addEventListener('DOMContentLoaded',()=>{observeGate();installAuthGuestFallback();schedule('dom-ready')},{once:true});
+window.addEventListener('load',()=>{installAuthGuestFallback();schedule('load')},{once:true});
+window.addEventListener('pageshow',()=>{installAuthGuestFallback();schedule('pageshow')});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){installAuthGuestFallback();schedule('visible')}});
 observeGate();
+installAuthGuestFallback();
 schedule('boot');
 
 window.KeloGuestPlay=Object.freeze({
