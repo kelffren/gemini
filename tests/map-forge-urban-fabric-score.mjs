@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: QA / MAP FORGE
  * owner: Map Forge CI
- * purpose: fixed-seed regression guard preventing decoration-heavy sparse capitals from retaining 95+ elite scores
+ * purpose: fixed-seed regression guard preventing decoration-heavy sparse capitals from being scored as near-elite city layouts
  * public-api: CLI
  * consumes: Royal Capital recipe + generator/scorer
  * state-owned: none
@@ -20,7 +20,7 @@ for(const seed of seeds){
   const blocks=map.blocks?.length||0,decorations=map.decorations?.length||0,districts=map.districts?.length||1;
   const blocksPerDistrict=blocks/districts,decorationsPerBlock=decorations/Math.max(1,blocks);
   assert.ok(blocksPerDistrict<2.5&&decorationsPerBlock>9.5,`${seed}: regression seed no longer reproduces sparse/decor-heavy fabric; update the fixture only after visual review`);
-  assert.ok(map.quality.total<=94,`${seed}: sparse decoration-heavy capital must not retain 95+ elite score, got ${map.quality.total}`);
+  assert.ok(map.quality.total<=89,`${seed}: visually reviewed sparse decoration-heavy capital must cap below 90, got ${map.quality.total}`);
   results.push({seed,score:map.quality.total,blocks,decorations,blocksPerDistrict:Number(blocksPerDistrict.toFixed(3)),decorationsPerBlock:Number(decorationsPerBlock.toFixed(3))});
 }
 
