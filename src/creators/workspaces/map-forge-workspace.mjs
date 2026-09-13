@@ -6,15 +6,14 @@
  * public-api: createMapForgeWorkspaceManifest(), registerMapForgeWorkspace()
  * reuse: handoff returns through registered World workspace via openWorkspace()
  */
-const MAP_FORGE_UI_BUILD='safari-touch-recovery-20260912-1';
+const MAP_FORGE_UI_BUILD='safari-touch-recovery-20260913-2';
 
 function freshMapForgeUiLoader(){
-  // iOS Safari can keep a successfully-loaded ES module alive even after the file behind the
-  // same URL changed. A stale module is especially bad here because the card still receives the
-  // tap but routes through old launch code. Give every explicit Map Forge launch a fresh module
-  // URL so the editor entrypoint cannot be trapped behind Safari's module cache.
-  const nonce=`${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;
-  return import(`../ui/map-forge-workspace.mjs?v=${MAP_FORGE_UI_BUILD}-${nonce}`);
+  // Keep one module identity for the lifetime of the page so Map Forge's module-level `active`
+  // remains the single workspace owner. Cache bust between deployments by bumping BUILD, not on
+  // every tap: a per-tap nonce creates a fresh ES-module instance with its own `active` singleton
+  // and can mount duplicate #kelo-map-forge dialogs on iOS Safari.
+  return import(`../ui/map-forge-workspace.mjs?v=${MAP_FORGE_UI_BUILD}`);
 }
 
 export function createMapForgeWorkspaceManifest({loader=freshMapForgeUiLoader}={}){
