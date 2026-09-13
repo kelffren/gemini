@@ -124,17 +124,18 @@ export function createSelectTool(kernel,{root=globalThis}={}) {
       const stackKey = ordered.map(hit => String(hit.id)).join('\u0001');
       const currentIndex = ordered.findIndex(hit => kernel.selection.has(hit.id));
       const repeatRadius=resolveRepeatSelectRadius({root});
-      const repeated = !!lastPick
-        && lastPick.key === stackKey
+      const withinRepeat = !!lastPick
         && now - lastPick.at <= REPEAT_WINDOW_MS
         && Math.hypot(px - lastPick.x, py - lastPick.y) <= repeatRadius;
+      const repeatedStack = withinRepeat && lastPick.key === stackKey;
+      const repeatedSelected = withinRepeat && currentIndex >= 0;
 
       let hit = ordered[0];
-      if (cycle && repeated && ordered.length > 1 && currentIndex >= 0) {
+      if (cycle && repeatedStack && ordered.length > 1 && currentIndex >= 0) {
         hit = ordered[(currentIndex + 1) % ordered.length];
       } else if (preserveExisting && currentIndex >= 0) hit = ordered[currentIndex];
 
-      const roomIds = repeated && ordered.length===1 && currentIndex>=0 ? semanticRoomIds(hit) : [];
+      const roomIds = repeatedSelected ? semanticRoomIds(hit) : [];
       if(roomIds.length>1) kernel.selection.set(roomIds);
       else kernel.selection.set(hit.id);
       lastPick = { x: px, y: py, key: stackKey, at: now };
