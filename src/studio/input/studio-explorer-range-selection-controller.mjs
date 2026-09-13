@@ -82,6 +82,16 @@ export function createStudioExplorerRangeSelectionController({root=globalThis,ke
     if(!row)return;
 
     const command=!!(event.ctrlKey||event.metaKey);
+    if(event.key==='Escape'&&!command&&!event.shiftKey){
+      const current=kernel.selection.get?.()||[];
+      if(!current.length)return;
+      event.preventDefault?.();
+      event.stopImmediatePropagation?.();
+      anchorId=null;
+      kernel.selection.set([]);
+      return;
+    }
+
     if(command&&String(event.key||'').toLowerCase()==='a'&&!event.shiftKey){
       const ids=visibleEntityIds();
       if(!ids.length)return;
@@ -145,7 +155,7 @@ export function createStudioExplorerRangeSelectionController({root=globalThis,ke
   document.addEventListener('click',onclick,true);
   document.addEventListener('keydown',onkeydown,true);
   return Object.freeze({
-    version:'studio-explorer-range-selection-v1.7.0-keyboard-toggle',
+    version:'studio-explorer-range-selection-v1.8.0-escape-clear',
     get anchor(){return anchorId;},
     destroy(){
       if(destroyed)return;
