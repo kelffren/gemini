@@ -179,6 +179,8 @@ Desde `1.8.0`, el mismo owner de llegada compone también puertas de salida en l
 
 Desde `1.9.0`, una salida que no puede resolver la primera pareja semántica de su distrito prueba las alternativas ya declaradas por el mismo kit —por ejemplo, piedras después de arbustos en bosque o cajas después de barriles en mina—. Cada intento sigue siendo atómico y una alternativa fallida restaura ambas decoraciones antes de probar la siguiente. Esto amplía la cobertura de gateways sin robar miembros de otras escenas, inventar familias impropias ni relajar ninguna protección espacial.
 
+Desde `1.10.0`, las salidas mineras pueden recurrir a una pareja de marcadores de piedra cuando barriles y cajas ya pertenecen a la escena del landmark. La prioridad de composición no cambia: el fallback se prueba al final, conserva la pareja de forma atómica y mantiene todas las protecciones de distrito, carretera, spacing y clearance.
+
 ## Online-first
 
 ```text

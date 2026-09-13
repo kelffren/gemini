@@ -22,7 +22,7 @@ const PAIRS=Object.freeze({
   commerce:Object.freeze([{family:'lamp',roles:['arrival-light-left','arrival-light-right'],forward:66,lateral:104},{family:'bench',roles:['arrival-rest-left','arrival-rest-right'],forward:-46,lateral:148}]),
   farm:Object.freeze([{family:'flower',roles:['arrival-flower-left','arrival-flower-right'],forward:58,lateral:108},{family:'crate',roles:['arrival-crate-left','arrival-crate-right'],forward:-52,lateral:148}]),
   forest:Object.freeze([{family:'bush',roles:['arrival-shrub-left','arrival-shrub-right'],forward:56,lateral:108},{family:'rock',roles:['arrival-stone-left','arrival-stone-right'],forward:-54,lateral:146}]),
-  mine:Object.freeze([{family:'barrel',roles:['arrival-barrel-left','arrival-barrel-right'],forward:54,lateral:100},{family:'crate',roles:['arrival-crate-left','arrival-crate-right'],forward:-48,lateral:142}]),
+  mine:Object.freeze([{family:'barrel',roles:['arrival-barrel-left','arrival-barrel-right'],forward:54,lateral:100},{family:'crate',roles:['arrival-crate-left','arrival-crate-right'],forward:-48,lateral:142},{family:'rock',roles:['arrival-stone-left','arrival-stone-right'],forward:-56,lateral:150}]),
   default:Object.freeze([{family:'tree',roles:['arrival-tree-left','arrival-tree-right'],forward:62,lateral:118},{family:'rock',roles:['arrival-stone-left','arrival-stone-right'],forward:-56,lateral:150}])
 });
 
