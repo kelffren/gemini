@@ -81,10 +81,11 @@ export function createStudioNudgeController({root=globalThis,kernel}={}){
     if(pad.hidden!==hidden)pad.hidden=hidden;
     const modeButton=pad.querySelector('[data-nudge-mode]');
     if(modeButton){
-      const step=mobileStep(),stepText=String(step),label=`Nudge ${mobileMode}: ${step} pixels`,text=`${step} PX`;
+      const step=mobileStep();
       if(modeButton.dataset.mode!==mobileMode)modeButton.dataset.mode=mobileMode;
-      if(modeButton.dataset.step!==stepText)modeButton.dataset.step=stepText;
-      if(modeButton.textContent!==text)modeButton.textContent=text;
+      if(modeButton.dataset.step!==String(step))modeButton.dataset.step=String(step);
+      if(modeButton.textContent!==`${step} PX`)modeButton.textContent=`${step} PX`;
+      const label=`Nudge ${mobileMode}: ${step} pixels`;
       if(modeButton.getAttribute('aria-label')!==label)modeButton.setAttribute('aria-label',label);
     }
     const disabled=busy||!visible;
