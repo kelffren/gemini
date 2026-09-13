@@ -23,15 +23,17 @@ jobs:
       - name: Install Playwright
         run: npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund playwright@1.55.0
       - name: Syntax
-        run: node --check scripts/studio-observer-diagnostic.mjs
-      - name: Serve candidate branch
         run: |
-          python3 -m http.server 4173 --bind 127.0.0.1 >/tmp/studio-observer-http.log 2>&1 &
-          for i in $(seq 1 20); do curl -fsS http://127.0.0.1:4173/ >/dev/null && exit 0; sleep 1; done
+          node --check scripts/studio-observer-diagnostic.mjs
+          node --check src/studio/input/studio-nudge-controller.mjs
+      - name: Serve candidate branch at Pages-compatible /gemini/ path
+        run: |
+          python3 -m http.server 4173 --bind 127.0.0.1 --directory .. >/tmp/studio-observer-http.log 2>&1 &
+          for i in $(seq 1 20); do curl -fsS http://127.0.0.1:4173/gemini/ >/dev/null && exit 0; sleep 1; done
           cat /tmp/studio-observer-http.log
           exit 1
       - name: Diagnose observer traffic
         env:
-          AUDIT_URL: http://127.0.0.1:4173/
+          AUDIT_URL: http://127.0.0.1:4173/gemini/
           CHROME_BIN: /usr/bin/google-chrome
         run: node scripts/studio-observer-diagnostic.mjs
