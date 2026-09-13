@@ -12,9 +12,15 @@ export function createStudioOverlayRenderer({ kernel, tools, assetPreview } = {}
   function drawSurfaceCell(ctx,cell,{alpha=.24,dashed=false}={}){ctx.save();ctx.globalAlpha=alpha;ctx.fillStyle=cell.erase?'#ff7777':cell.role==='path'?'#e7c56a':'#70c46a';ctx.fillRect(cell.x,cell.y,cell.w,cell.h);ctx.restore();drawRect(ctx,cell,{dashed,alpha:.65});}
   function drawPlacement(ctx,placement){
     const rect={x:placement.transform.x,y:placement.transform.y,w:placement.bounds.w,h:placement.bounds.h};
-    const drew=assetPreview?.drawAsset?.(ctx,placement.prefabId,rect.x,rect.y,{rotation:placement.transform.rotation,alpha:.72,placeholder:false});
-    if(!drew){ctx.save();ctx.globalAlpha=.18;ctx.fillRect(rect.x,rect.y,rect.w,rect.h);ctx.restore();}
-    ctx.save();ctx.strokeStyle='rgba(131,235,175,.95)';drawRect(ctx,rect,{dashed:true});ctx.restore();
+    const snap=tools?.quickBuild?.active?tools.quickBuild.getSnapState?.():null;
+    const state=snap?.state||'valid';
+    const stroke=state==='snapped'?'rgba(140,240,180,.98)':state==='invalid'?'rgba(255,115,104,.98)':'rgba(131,235,175,.95)';
+    const drew=assetPreview?.drawAsset?.(ctx,placement.prefabId,rect.x,rect.y,{rotation:placement.transform.rotation,alpha:state==='invalid'?.42:.72,placeholder:false});
+    if(!drew){ctx.save();ctx.globalAlpha=state==='invalid'?.10:.18;ctx.fillRect(rect.x,rect.y,rect.w,rect.h);ctx.restore();}
+    ctx.save();ctx.strokeStyle=stroke;ctx.lineWidth=state==='snapped'?3:2;drawRect(ctx,rect,{dashed:state!=='snapped'});
+    const target=snap?.connection?.target;
+    if(state==='snapped'&&target){ctx.fillStyle='rgba(140,240,180,.98)';ctx.beginPath();ctx.arc(Number(target.x)||0,Number(target.y)||0,5,0,Math.PI*2);ctx.fill();}
+    ctx.restore();
   }
   function drawCreatorPrefab(ctx,preview){
     const def=tools?.prefabStamp?.get?.(preview.prefabId);let drew=false;
