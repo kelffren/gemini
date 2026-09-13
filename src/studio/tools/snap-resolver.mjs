@@ -1,6 +1,6 @@
 /* KELO-INDEX
  * area: STUDIO / QUICK BUILD SNAP
- * owns: semantic snap-point contracts, local candidate search and nearest compatible connection resolution
+ * owns: semantic snap-point contracts, local candidate search, nearest compatible connection and cardinal orientation resolution
  * does-not-own: input, rendering, document mutation, commands or authority
  * public-api: createSnapResolver(), defaultSnapPointsForPiece(), worldSnapPoints()
  * online: local-only resolver; callers still commit through placement/CommandBus
@@ -9,6 +9,7 @@
 const DIR=Object.freeze({north:{x:0,y:-1},south:{x:0,y:1},east:{x:1,y:0},west:{x:-1,y:0},start:{x:-1,y:0},end:{x:1,y:0}});
 const norm=value=>String(value||'').trim().toLowerCase();
 const clampRotation=value=>{const n=Number(value)||0;return((n%360)+360)%360;};
+const cardinalRotations=current=>{const base=clampRotation(current),out=[];for(const value of [base,base+90,base+180,base+270]){const rotation=clampRotation(value);if(!out.includes(rotation))out.push(rotation);}return out;};
 
 export function defaultSnapPointsForPiece(type,bounds={}){
   const w=Math.max(1,Number(bounds.w)||1),h=Math.max(1,Number(bounds.h)||1),piece=norm(type),mx=w/2,my=h/2;
@@ -66,35 +67,43 @@ function compatible(a,b){
 export function createSnapResolver({spatial,radius=48}={}){
   if(!spatial?.queryRect)throw new Error('STUDIO_SNAP_SPATIAL_REQUIRED');
   let searchRadius=Math.max(4,Number(radius)||48);
-  let last=Object.freeze({state:'none',candidateCount:0,checkedPairs:0,connection:null});
+  let last=Object.freeze({state:'none',candidateCount:0,checkedPairs:0,rotationChecks:0,connection:null});
 
-  function resolve(preview,{radius:nextRadius=searchRadius,excludeIds=[]}={}){
-    if(!preview){last=Object.freeze({state:'none',candidateCount:0,checkedPairs:0,connection:null});return last;}
+  function resolve(preview,{radius:nextRadius=searchRadius,excludeIds=[],rotations=null}={}){
+    if(!preview){last=Object.freeze({state:'none',candidateCount:0,checkedPairs:0,rotationChecks:0,connection:null});return last;}
     const r=Math.max(4,Number(nextRadius)||searchRadius),excluded=new Set((excludeIds||[]).map(String));
-    const sourcePoints=worldSnapPoints(preview);
-    if(!sourcePoints.length){last=Object.freeze({state:'none',candidateCount:0,checkedPairs:0,connection:null});return last;}
+    const currentRotation=clampRotation(preview.transform?.rotation),rotationOptions=Array.isArray(rotations)&&rotations.length?[...new Set(rotations.map(clampRotation))]:cardinalRotations(currentRotation);
+    const hasPoints=worldSnapPoints(preview).length>0;
+    if(!hasPoints){last=Object.freeze({state:'none',candidateCount:0,checkedPairs:0,rotationChecks:0,connection:null});return last;}
     const x=Number(preview.transform?.x)||0,y=Number(preview.transform?.y)||0,w=Math.max(1,Number(preview.bounds?.w)||1),h=Math.max(1,Number(preview.bounds?.h)||1);
-    const nearby=spatial.queryRect({x:x-r,y:y-r,w:w+r*2,h:h+r*2},{category:'entity'}).filter(row=>{
+    const reach=Math.max(w,h)+r;
+    const nearby=spatial.queryRect({x:x-reach,y:y-reach,w:w+reach*2,h:h+reach*2},{category:'entity'}).filter(row=>{
       const entity=row?.data;if(!entity||excluded.has(String(entity.id)))return false;
       return !!entity.components?.buildingPiece?.type;
     });
-    let best=null,checkedPairs=0;
-    for(const row of nearby){
-      const targetEntity=row.data;
-      for(const source of sourcePoints){
-        for(const target of worldSnapPoints(targetEntity)){
-          checkedPairs++;
-          if(!compatible(source,target))continue;
-          const dx=target.x-source.x,dy=target.y-source.y,distance=Math.hypot(dx,dy);
-          if(distance>r||(best&&distance>=best.distance))continue;
-          best={distance,dx,dy,source,target,targetEntityId:String(targetEntity.id)};
+    let best=null,checkedPairs=0,rotationChecks=0;
+    for(const rotation of rotationOptions){
+      rotationChecks++;
+      const candidatePreview={...preview,transform:{...(preview.transform||{}),rotation}};
+      const sourcePoints=worldSnapPoints(candidatePreview);
+      for(const row of nearby){
+        const targetEntity=row.data;
+        for(const source of sourcePoints){
+          for(const target of worldSnapPoints(targetEntity)){
+            checkedPairs++;
+            if(!compatible(source,target))continue;
+            const dx=target.x-source.x,dy=target.y-source.y,distance=Math.hypot(dx,dy);
+            const betterTie=best&&Math.abs(distance-best.distance)<1e-9&&rotation===currentRotation&&best.rotation!==currentRotation;
+            if(distance>r||(best&&distance>best.distance)||(!betterTie&&best&&Math.abs(distance-best.distance)<1e-9))continue;
+            best={distance,dx,dy,source,target,targetEntityId:String(targetEntity.id),rotation};
+          }
         }
       }
     }
-    if(!best){last=Object.freeze({state:'valid',candidateCount:nearby.length,checkedPairs,connection:null});return last;}
+    if(!best){last=Object.freeze({state:'valid',candidateCount:nearby.length,checkedPairs,rotationChecks,connection:null});return last;}
     const result={
-      state:'snapped',candidateCount:nearby.length,checkedPairs,
-      x:x+best.dx,y:y+best.dy,rotation:clampRotation(preview.transform?.rotation),
+      state:'snapped',candidateCount:nearby.length,checkedPairs,rotationChecks,
+      x:x+best.dx,y:y+best.dy,rotation:best.rotation,autoRotated:best.rotation!==currentRotation,
       connection:{distance:best.distance,source:{...best.source},target:{...best.target},targetEntityId:best.targetEntityId}
     };
     last=Object.freeze(result);return last;
