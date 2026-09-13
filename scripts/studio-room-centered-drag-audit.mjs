@@ -7,6 +7,8 @@ import { createQuickBuildTool } from '../src/studio/tools/quick-build-tool.mjs';
 import { createRoomBuildTool } from '../src/studio/tools/room-build-tool.mjs';
 import { worldSnapPoints } from '../src/studio/tools/snap-resolver.mjs';
 
+const walls=rows=>rows.filter(row=>row.components?.buildingPiece?.type==='wall');
+const floors=rows=>rows.filter(row=>row.components?.buildingPiece?.type==='floor');
 function fixture(){
   const kernel=createStudioKernel({document:createWorldDocument({worldId:'audit:room-centered-drag',settings:{tileSize:32,chunkSize:512}})});
   kernel.prefabs.register({id:'stone_wall_01',label:'Stone Wall',category:'building',bounds:{w:64,h:16},components:{visual:{source:'fixture'}}});
@@ -21,8 +23,9 @@ const {kernel,quick,room}=fixture();
 let rows=room.planRect(256,256,352,320,{centered:true});
 let measure=room.getMeasurement();
 assert.deepEqual([measure.x,measure.y,measure.width,measure.height,measure.modulesX,measure.modulesY,measure.totalWalls,measure.centered,measure.centerX,measure.centerY],[160,192,192,128,3,2,10,true,256,256],'Alt-style centered planning must expand equally around the anchor');
-assert.equal(rows.length,10,'centered 3x2 perimeter must contain ten walls');
-const points=rows.flatMap(worldSnapPoints);
+assert.equal(walls(rows).length,10,'centered 3x2 perimeter must contain ten walls');
+assert.equal(floors(rows).length,24,'centered 192x128 room must fill twenty-four floor tiles');
+const points=walls(rows).flatMap(worldSnapPoints);
 for(const corner of [[160,192],[352,192],[160,320],[352,320]]){
   assert.equal(points.filter(point=>Math.hypot(point.x-corner[0],point.y-corner[1])<0.001).length,2,`centered corner ${corner.join(',')} must remain endpoint-connected`);
 }
@@ -30,7 +33,8 @@ for(const corner of [[160,192],[352,192],[160,320],[352,320]]){
 rows=room.planRect(256,256,352,320,{centered:true,square:true});
 measure=room.getMeasurement();
 assert.deepEqual([measure.x,measure.y,measure.width,measure.height,measure.modulesX,measure.modulesY,measure.centered,measure.squareLocked],[160,160,192,192,3,3,true,true],'Alt+Shift must combine centered and square modifiers without changing the center');
-assert.equal(rows.length,12,'centered square must contain twelve wall modules');
+assert.equal(walls(rows).length,12,'centered square must contain twelve wall modules');
+assert.equal(floors(rows).length,36,'centered square must fill thirty-six floor tiles');
 
 kernel.input.route('pointerdown',{worldX:256,worldY:256,pointerType:'mouse'});
 kernel.input.route('pointermove',{worldX:352,worldY:320,pointerType:'mouse',altKey:true});
@@ -49,17 +53,17 @@ kernel.input.route('pointercancel',{worldX:352,worldY:320,pointerType:'mouse'});
 room.planRect(256,256,352,320,{centered:true});
 const before=kernel.history.undoDepth;
 const committed=await room.commitRoom();
-assert.equal(committed.length,10,'centered ROOM must commit the complete perimeter');
+assert.equal(committed.length,34,'centered ROOM must commit ten walls plus twenty-four floor tiles');
 assert.equal(kernel.history.undoDepth,before+1,'centered ROOM must remain one CommandBus history entry');
-assert.equal(kernel.document.entities.length,10,'all centered room walls must persist');
+assert.equal(kernel.document.entities.length,34,'all centered room pieces must persist');
 await kernel.undo();
 assert.equal(kernel.document.entities.length,0,'one Undo must remove the centered room');
 await kernel.redo();
-assert.equal(kernel.document.entities.length,10,'one Redo must restore the centered room');
+assert.equal(kernel.document.entities.length,34,'one Redo must restore the centered room');
 
 const source=fs.readFileSync(new URL('../src/studio/tools/room-build-tool.mjs',import.meta.url),'utf8');
 assert.doesNotMatch(source,/KELO_WORLD_EDIT|kernel\.execute\s*\(/,'centered ROOM must not bypass placement/CommandBus authority');
 assert.match(source,/placement\.commitBatch\(/,'centered ROOM persistence must remain delegated to placement.commitBatch');
 room.destroy();quick.destroy();
 
-console.log(JSON.stringify({ok:true,phase:'5.7',tool:'ROOM',improvement:'alt-centered-drag',anchor:[256,256],centeredSize:[192,128],centeredBounds:[160,192,352,320],centeredSquare:[192,192],liveToggle:true,modifierComposition:true,historyEntries:1,oneUndo:true,oneRedo:true,authorityBypass:false},null,2));
+console.log(JSON.stringify({ok:true,phase:'5.8',tool:'ROOM',improvement:'alt-centered-drag+floor-fill',anchor:[256,256],centeredSize:[192,128],centeredBounds:[160,192,352,320],centeredSquare:[192,192],centeredWalls:10,centeredFloors:24,liveToggle:true,modifierComposition:true,historyEntries:1,oneUndo:true,oneRedo:true,authorityBypass:false},null,2));
