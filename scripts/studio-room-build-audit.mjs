@@ -25,9 +25,12 @@ assert.equal(room.activate(),true,'ROOM must activate when a WALL prefab is avai
 assert.equal(room.active,true,'ROOM must expose active state');
 assert.equal(quick.active.type,'wall','ROOM must reuse the Quick Build WALL piece instead of creating a parallel catalog');
 assert.equal(kernel.input.active().includes('studio-quick-build-room'),true,'ROOM must own a temporary higher-priority input context');
+assert.equal(room.getMeasurement(),null,'ROOM measurement must be empty before a drag plan exists');
 
 let previews=room.planRect(0,0,128,96);
 assert.equal(previews.length,8,'drag dimensions must quantize to the wall module length and plan an eight-module closed perimeter');
+const measure=room.getMeasurement();
+assert.deepEqual({width:measure.width,height:measure.height,requestedWidth:measure.requestedWidth,requestedHeight:measure.requestedHeight,deltaWidth:measure.deltaWidth,deltaHeight:measure.deltaHeight,modulesX:measure.modulesX,modulesY:measure.modulesY,totalWalls:measure.totalWalls,wallLength:measure.wallLength},{width:128,height:128,requestedWidth:128,requestedHeight:96,deltaWidth:0,deltaHeight:32,modulesX:2,modulesY:2,totalWalls:8,wallLength:64},'ROOM must expose the exact modular result and the quantization delta before commit');
 assert.equal(previews.every(row=>row.prefabId==='stone_wall_01'),true,'ROOM must use the same resolved WALL prefab as Quick Build');
 assert.equal(previews.every(row=>row.components?.buildingPiece?.type==='wall'),true,'ROOM walls must preserve semantic wall metadata');
 assert.equal(previews.every(row=>row.components?.buildingPiece?.roomGenerated===true),true,'ROOM-generated walls must remain identifiable for later semantic editing');
@@ -49,19 +52,24 @@ let routed=kernel.input.route('pointerdown',{worldX:0,worldY:0,pointerType:'mous
 assert.equal(routed.handled,true,'desktop pointerdown must route through ROOM');
 routed=kernel.input.route('pointermove',{worldX:128,worldY:96,pointerType:'mouse'});
 assert.equal(routed.handled,true,'desktop pointermove must update ROOM preview');
+assert.equal(room.getMeasurement().height,128,'live desktop drag must expose the quantized room height before pointerup');
 routed=kernel.input.route('pointercancel',{worldX:128,worldY:96,pointerType:'mouse'});
 assert.equal(routed.handled,true,'pointercancel must cleanly terminate ROOM drag');
+assert.equal(room.getMeasurement(),null,'pointercancel must clear stale room measurements');
 routed=kernel.input.route('pointerdown',{worldX:0,worldY:0,pointerType:'touch'});
 assert.equal(routed.handled,true,'mobile touch pointerdown must route through ROOM');
 routed=kernel.input.route('pointermove',{worldX:128,worldY:96,pointerType:'touch'});
 assert.equal(routed.handled,true,'mobile touch pointermove must update ROOM preview');
+assert.equal(room.getMeasurement().deltaHeight,32,'mobile drag must expose the same quantization delta as desktop');
 routed=kernel.input.route('pointercancel',{worldX:128,worldY:96,pointerType:'touch'});
 assert.equal(routed.handled,true,'mobile pointercancel must cleanly terminate ROOM drag');
+assert.equal(room.getMeasurement(),null,'mobile cancel must clear measurement feedback');
 
 previews=room.planRect(0,0,128,96);
 const historyBefore=kernel.history.undoDepth;
 const committed=await room.commitRoom();
 assert.equal(committed.length,8,'ROOM must commit the entire planned perimeter');
+assert.equal(room.getMeasurement(),null,'committed ROOM must clear transient measurement state');
 assert.equal(kernel.document.entities.length,8,'all room walls must persist through placement batch');
 assert.equal(kernel.history.undoDepth,historyBefore+1,'one ROOM gesture must create exactly one history entry');
 const persistedRoomId=kernel.document.entities[0].components?.buildingPiece?.roomId;
@@ -93,9 +101,10 @@ assert.equal(kernel.document.entities.every(row=>row.components?.buildingPiece?.
 const roomSource=fs.readFileSync(new URL('../src/studio/tools/room-build-tool.mjs',import.meta.url),'utf8');
 assert.doesNotMatch(roomSource,/KELO_WORLD_EDIT|kernel\.execute\s*\(/,'ROOM must not bypass placement/CommandBus authority');
 assert.match(roomSource,/placement\.commitBatch\(/,'ROOM persistent mutation must delegate to placement.commitBatch');
+assert.match(roomSource,/getMeasurement/,'ROOM must expose transient measurement feedback without persisting it to the document');
 assert.equal(room.deactivate(),true,'ROOM must be cancellable back to normal Quick Build');
 assert.equal(kernel.input.active().includes('studio-quick-build-room'),false,'ROOM cancel must release its input context');
 room.destroy();quick.destroy();
 assert.equal(kernel.input.has('studio-quick-build-room'),false,'ROOM destroy must unregister listeners/context');
 
-console.log(JSON.stringify({ok:true,phase:'5.2',tool:'ROOM',previewModules:8,roomEntities:8,exactCornerConnections:true,semanticRoomId:true,edgeRoles:true,singleWallFirstTap:true,zoomAwareMobileRoomSecondTap:true,mobileRepeatScreenPx:20,mobileRepeatWorldAtQuarterZoom:80,desktopRepeatWorld:12,historyEntries:1,oneUndo:true,oneRedo:true,desktopPointer:true,mobilePointer:true,authorityBypass:false},null,2));
+console.log(JSON.stringify({ok:true,phase:'5.3',tool:'ROOM',previewModules:8,roomEntities:8,liveMeasurement:true,requestedSize:[128,96],quantizedSize:[128,128],quantizationDelta:[0,32],moduleGrid:[2,2],exactCornerConnections:true,semanticRoomId:true,edgeRoles:true,singleWallFirstTap:true,zoomAwareMobileRoomSecondTap:true,mobileRepeatScreenPx:20,mobileRepeatWorldAtQuarterZoom:80,desktopRepeatWorld:12,historyEntries:1,oneUndo:true,oneRedo:true,desktopPointer:true,mobilePointer:true,authorityBypass:false},null,2));
