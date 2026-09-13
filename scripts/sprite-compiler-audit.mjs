@@ -1,12 +1,14 @@
 /* KELO-INDEX
  * area: CREATORS / SPRITE COMPILER / AUDIT
- * keys: SPRITE COMPILER WORLD ASSET PIVOT FOOTPRINT PORTAL VARIANT SCALE ALPHA PIXEL GRAMMAR AUDIT
- * purpose: deterministic regression coverage for spritesheet repair, pixel-art hygiene and single world-asset metadata
+ * keys: SPRITE COMPILER WORLD ASSET PIVOT FOOTPRINT PORTAL VARIANT SCALE ALPHA PIXEL GRAMMAR SILHOUETTE DONOR AUDIT
+ * purpose: deterministic regression coverage for spritesheet repair, pixel-art hygiene, donor planning and single world-asset metadata
  * online: N/A; authoring-only audit
  */
 import assert from 'node:assert/strict';
 import {estimateCornerBackground,cleanBackgroundPixels,analyzeGridCells,planFrameNormalization,buildRepairReport} from '../src/creators/sprite-compiler/sprite-compiler-core.mjs';
 import {analyzePixelGrammar,decontaminateAlphaFringe,quantizePixelPalette,preparePixelArtPixels} from '../src/creators/sprite-compiler/sprite-pixel-grammar.mjs';
+import {auditSilhouetteConsistency} from '../src/creators/sprite-compiler/sprite-silhouette-consistency.mjs';
+import {planDonorRepairCandidates} from '../src/creators/sprite-compiler/sprite-donor-repair.mjs';
 import {snapAlphaPixels,findOpaqueBounds,inferPortalOpening} from '../src/creators/sprite-compiler/sprite-world-asset-profile.mjs';
 import {compileWorldAssetPixels} from '../src/creators/sprite-compiler/sprite-world-asset-compiler.mjs';
 
@@ -28,6 +30,10 @@ const fringe=decontaminateAlphaFringe(pixelArt,PW,PH,{radius:2});assert.ok(fring
 const prepared=preparePixelArtPixels(pixelArt,PW,PH);assert.equal(prepared.report.after.hiddenRgbPixels,0);assert.ok(prepared.report.after.paletteSize<=prepared.report.before.paletteSize);assert.ok(prepared.report.alpha.recoloredFringe>0);
 const quantized=quantizePixelPalette(prepared.data,PW,PH,{maxColors:2});assert.ok(quantized.palette.length<=2);
 
+// Silhouette QA regression: two compatible frames plus one implausibly flattened AI frame.
+const SW=60,SH=20,sheet=new Uint8ClampedArray(SW*SH*4),sfill=(x0,y0,x1,y1)=>{for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){const i=(y*SW+x)*4;sheet[i]=70;sheet[i+1]=120;sheet[i+2]=180;sheet[i+3]=255;}};
+sfill(4,3,15,18);sfill(24,4,35,18);sfill(42,11,58,15);const silhouetteFrames=analyzeGridCells(sheet,SW,SH,{columns:3,rows:1}),silhouette=auditSilhouetteConsistency(sheet,SW,SH,silhouetteFrames,{outlierThreshold:.35});assert.equal(silhouette.groups.length,1);assert.ok(silhouette.outlierCount>=1);assert.ok(silhouette.outliers.some(x=>x.index===2));const donorPlan=planDonorRepairCandidates(silhouetteFrames,silhouette,null);assert.ok(donorPlan.count>=1);const donor=donorPlan.candidates.find(x=>x.targetIndex===2);assert.ok(donor);assert.notEqual(donor.donorIndex,2);assert.equal(donor.autoApply,false);assert.equal(donor.mode,'piece-donor-reference');
+
 // Single world asset regression: imperial gate with an open center, broad base and AI-like alpha fringe.
 const AW=80,AH=80,asset=new Uint8ClampedArray(AW*AH*4);const fill=(x0,y0,x1,y1,a=255)=>{for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){const i=(y*AW+x)*4;asset[i]=235;asset[i+1]=195;asset[i+2]=55;asset[i+3]=a;}};
 fill(8,8,28,70);fill(52,8,72,70);fill(28,8,52,22);fill(8,70,72,75);for(let y=23;y<70;y++)for(let x=29;x<52;x++)asset[(y*AW+x)*4+3]=0;asset[(10*AW+10)*4+3]=252;asset[(2*AW+2)*4+3]=5;
@@ -35,4 +41,4 @@ const snapped=snapAlphaPixels(asset,AW,AH);assert.equal(snapped.data[(10*AW+10)*
 const compiled=compileWorldAssetPixels(asset,AW,AH,{assetId:'imperial_gate_A',category:'landmark_gate',nominalWidthTiles:3,variants:[{id:'A',spawnWeight:1},{id:'B',spawnWeight:.7,widthScale:.86}],placementRules:{minSpacing:10}}),worldAsset=compiled.profile;assert.equal(worldAsset.status,'USABLE');assert.ok(worldAsset.pivot.x>.45&&worldAsset.pivot.x<.55);assert.ok(worldAsset.pivot.y>.9);assert.ok(worldAsset.footprint.rect.width>45);assert.equal(worldAsset.collision.mode,'footprint-with-portal-cutout');assert.equal(worldAsset.collision.passThrough,true);assert.equal(worldAsset.collision.solidSegments.length,2);assert.equal(worldAsset.portal.walkThrough,true);assert.equal(worldAsset.scale.sizeClass,'large');assert.equal(worldAsset.scale.widthClass,'wide');assert.equal(worldAsset.variant.variantGroup,'imperial_gate');assert.equal(worldAsset.variant.variants[1].widthScale,.86);assert.equal(worldAsset.placementRules.nearPath,true);assert.equal(worldAsset.placementRules.minSpacing,10);assert.equal(compiled.metadata.cleanedPixels,undefined);assert.equal(worldAsset.pixelPreparation.schema,'kelo-pixel-grammar-v1');
 const manual=compileWorldAssetPixels(asset,AW,AH,{assetId:'imperial_gate_C',category:'landmark_gate',portal:false,pivot:{x:.47,y:.99},footprint:{shape:'rect',rect:{x:14,y:71,width:52,height:5},confidence:1}}).profile;assert.equal(manual.portal.enabled,false);assert.equal(manual.pivot.reason,'manual-override');assert.equal(manual.footprint.source,'manual-override');assert.equal(manual.collision.passThrough,false);assert.ok(manual.styleValidation.warnings.includes('PORTAL_REVIEW_REQUIRED'));
 
-console.log(JSON.stringify({ok:true,frames:report.frameCount,clippedBefore:report.clippedBefore,clippedAfter:report.clippedAfter,feetSpread:report.feetSpread,backgroundPixelsRemoved:report.backgroundPixelsRemoved,commonScale:Number(report.commonScale.toFixed(3)),pixelGrammar:{before:grammarBefore.status,after:prepared.report.after.status,recoloredFringe:prepared.report.alpha.recoloredFringe,hiddenRgbAfter:prepared.report.after.hiddenRgbPixels},worldAsset:{status:worldAsset.status,pivot:worldAsset.pivot,footprint:worldAsset.footprint.rect,collisionMode:worldAsset.collision.mode,portal:{enabled:worldAsset.portal.enabled,confidence:worldAsset.portal.confidence},sizeClass:worldAsset.scale.sizeClass,variantGroup:worldAsset.variant.variantGroup}}));
+console.log(JSON.stringify({ok:true,frames:report.frameCount,clippedBefore:report.clippedBefore,clippedAfter:report.clippedAfter,feetSpread:report.feetSpread,backgroundPixelsRemoved:report.backgroundPixelsRemoved,commonScale:Number(report.commonScale.toFixed(3)),pixelGrammar:{before:grammarBefore.status,after:prepared.report.after.status,recoloredFringe:prepared.report.alpha.recoloredFringe,hiddenRgbAfter:prepared.report.after.hiddenRgbPixels},silhouette:{outliers:silhouette.outlierCount,donorCandidates:donorPlan.count},worldAsset:{status:worldAsset.status,pivot:worldAsset.pivot,footprint:worldAsset.footprint.rect,collisionMode:worldAsset.collision.mode,portal:{enabled:worldAsset.portal.enabled,confidence:worldAsset.portal.confidence},sizeClass:worldAsset.scale.sizeClass,variantGroup:worldAsset.variant.variantGroup}}));
