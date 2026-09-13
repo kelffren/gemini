@@ -2,7 +2,7 @@
  * area: WORLD / MAP FORGE / SPRITE MANIFEST
  * owner: KeloMapForge deterministic generator core
  * purpose: derive the exact semantic sprite requirements and scene assembly plan for a generated MapDefinition
- * public-api: buildSpriteManifest()
+ * public-api: buildSpriteManifest(), hasApprovedDecorationSprite()
  * consumes: generated Map Forge candidate parts
  * state-owned: none
  * do-not: no DOM, renderer, catalog mutation, network or Math.random
@@ -45,6 +45,10 @@ function finalize(row){return{...row,districts:uniq(row.districts),sceneIds:uniq
 function sceneMembership(parts){const byDecoration=new Map(),byLandmark=new Map();for(const scene of parts.scenePrefabs||[]){if(scene.landmarkId)byLandmark.set(scene.landmarkId,scene.id);for(const member of scene.members||[])if(member.decorationId)byDecoration.set(member.decorationId,{sceneId:scene.id,role:member.role});}return{byDecoration,byLandmark};}
 function landmarkSpec(type){const spec=LANDMARK_SPECS[type]||{};return{kind:'landmark',semantic:type,label:spec.label||String(type||'Landmark'),orientation:'directional',assetCandidates:spec.assetCandidates||[],promptHint:spec.promptHint||`${String(type||'landmark').replaceAll('_',' ')} 2D pixel art top-down/3-quarter, fachada o frente claramente definido, fondo transparente`};}
 function decorationSpec(family){const spec=DECORATION_SPECS[family]||{};return{kind:'decoration',semantic:family,label:spec.label||String(family||'Decoración'),orientation:spec.orientation||'upright',assetCandidates:spec.assetCandidates||[],promptHint:spec.promptHint||`${String(family||'prop').replaceAll('_',' ')} 2D pixel art, fondo transparente`};}
+
+export function hasApprovedDecorationSprite(family){
+  return (DECORATION_SPECS[String(family||'')]?.assetCandidates?.length||0)>0;
+}
 
 export function buildSpriteManifest(parts){
   const records=new Map(),membership=sceneMembership(parts);
