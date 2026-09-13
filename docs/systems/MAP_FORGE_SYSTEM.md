@@ -177,6 +177,8 @@ Desde `1.7.0`, `ancient-grove-v1` reutiliza además una pareja de árboles exist
 
 Desde `1.8.0`, el mismo owner de llegada compone también puertas de salida en los bordes del mundo. Cada salida intenta reutilizar una pareja semántica propia de su distrito —luces, vegetación o utilería— a ambos lados del último tramo vial, dentro del mapa y orientada hacia el borde. La pareja es atómica, mantiene un conector explícito al `road:exit:*` existente y vuelve a pasar bounds, ownership de distrito, spacing, carreteras, bloques y clearance de landmarks. No genera props nuevos ni modifica navegación: hace legible el destino de una carretera que antes terminaba como un corte de pavimento sin señal visual.
 
+Desde `1.9.0`, una salida que no puede resolver la primera pareja semántica de su distrito prueba las alternativas ya declaradas por el mismo kit —por ejemplo, piedras después de arbustos en bosque o cajas después de barriles en mina—. Cada intento sigue siendo atómico y una alternativa fallida restaura ambas decoraciones antes de probar la siguiente. Esto amplía la cobertura de gateways sin robar miembros de otras escenas, inventar familias impropias ni relajar ninguna protección espacial.
+
 ## Online-first
 
 ```text

@@ -171,8 +171,8 @@ test(`Map Forge ${STAGE} fixed-seed preview/runtime visual evidence`,async({page
     expect(mainMetrics.scenePrefabCount).toBeGreaterThan(0);
     expect(mainMetrics.sceneCompletePairCount).toBeGreaterThan(0);
     expect(mainMetrics.sceneOrphanPairCount).toBe(0);
-    expect(mainMetrics.exitSceneCount).toBeGreaterThan(0);
-    expect(mainMetrics.exitSceneMovedCount).toBeGreaterThanOrEqual(2);
+    expect(mainMetrics.exitSceneCount).toBeGreaterThanOrEqual(2);
+    expect(mainMetrics.exitSceneMovedCount).toBeGreaterThanOrEqual(4);
     expect(mainMetrics.exitSceneMovementDistance).toBeGreaterThan(0);
     expect(mainMetrics.uprightDecorationCount).toBeGreaterThan(0);
     expect(mainMetrics.uprightRotatedCount).toBe(0);

@@ -15,7 +15,7 @@ import {validateMapDefinition,scoreMapDefinition} from './map-forge-quality.mjs'
 import {materializeScenePrefabs,scenePrefabTieScore} from './map-forge-scene-prefabs.mjs';
 import {materializeArrivalScene} from './map-forge-arrival-scene.mjs';
 import {buildSpriteManifest} from './map-forge-sprite-manifest.mjs';
-export const MAP_FORGE_GENERATOR_VERSION='1.8.0';
+export const MAP_FORGE_GENERATOR_VERSION='1.9.0';
 export {createMapIntent} from './map-forge-builder.mjs';
 export {createRng,stableStringify} from './map-forge-prng.mjs';
 export {validateMapDefinition,scoreMapDefinition} from './map-forge-quality.mjs';
