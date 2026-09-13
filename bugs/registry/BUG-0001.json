@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "id": "BUG-0001",
+  "title": "BrowserStack real iPhone test fails before page launch on reducedMotion capability mismatch",
+  "status": "OPEN",
+  "severity": "high",
+  "area": ["qa", "browserstack", "playwright", "ios"],
+  "source": "test",
+  "discovered_at": "2026-09-13",
+  "reported_by": ["GitHub Actions", "BrowserStack Map Forge Real iPhone"],
+  "reports": [],
+  "environment": {
+    "game_build": null,
+    "device": "iPhone 14 Pro",
+    "os": "iOS 26",
+    "browser": "Safari",
+    "surface": "BrowserStack real-device Playwright workflow"
+  },
+  "reproduction": [
+    "Run the BrowserStack Map Forge Real iPhone workflow on main.",
+    "Allow credentials, Pages deployment wait and dependency install to complete.",
+    "Start the real iPhone Playwright test through browserstack-node-sdk.",
+    "Observe browser context creation fail before page.goto can validate the game."
+  ],
+  "expected": "BrowserStack creates the real iPhone Safari context and the test reaches the deployed KELO WORLD page.",
+  "actual": "browser.newContext fails because BrowserStack expects reducedMotion 'none' while the provided value is 'no-preference'.",
+  "evidence": [
+    "GitHub Actions run 34764846903",
+    "GitHub Actions run 34764978999",
+    "Error: expectedValue of reducedMotion: 'none' does not match providedValue: 'no-preference'"
+  ],
+  "suspected_files": [
+    "playwright.config.js",
+    "browserstack.yml",
+    "tests/world-editor-ios-reopen.spec.js",
+    ".github/workflows/browserstack-map-forge.yml",
+    "package.json",
+    "package-lock.json"
+  ],
+  "owner_hint": "Real iOS QA / BrowserStack integration",
+  "claimed_by": null,
+  "claim_started_at": null,
+  "fix": {
+    "status": "none",
+    "commits": [],
+    "files": [],
+    "summary": "A previous attempt to let BrowserStack own mobile capabilities did not remove the mismatch; root source of reducedMotion injection is still unresolved."
+  },
+  "verification": {
+    "status": "PENDING",
+    "method": "Workflow must create Safari context on the configured real iPhone and reach page.goto.",
+    "evidence": [],
+    "verified_by": null,
+    "verified_at": null
+  },
+  "blocked_by": [],
+  "duplicate_of": null,
+  "related_bugs": ["BUG-0002", "BUG-0003"],
+  "notes": [
+    "This is a test-harness/integration defect, not evidence that Guest or World itself fails on the device.",
+    "Do not mark downstream iPhone bugs verified while this gate prevents the real-device flow from executing."
+  ],
+  "updated_at": "2026-09-13"
+}
