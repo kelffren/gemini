@@ -25,7 +25,10 @@ test('World recovers a stale Studio session instead of leaving iOS on a black pa
   page.on('console', msg => { if(msg.type()==='error')consoleErrors.push(msg.text()); });
   fs.mkdirSync('test-results', { recursive: true });
 
-  const response = await page.goto('./?world-ios-reopen=1', { waitUntil: 'domcontentloaded', timeout: 30000 });
+  // mapEditor=1 is the explicit local editor authorization mode. A clean browser
+  // has no account session or stored admin key, so the regression must enter through
+  // this sanctioned path rather than accidentally testing the login modal.
+  const response = await page.goto('./?mapEditor=1&world-ios-reopen=1', { waitUntil: 'domcontentloaded', timeout: 30000 });
   expect(response && response.status()).toBeLessThan(400);
   await page.waitForFunction(() => !!(
     window.KeloInputLocks?.acquire &&
