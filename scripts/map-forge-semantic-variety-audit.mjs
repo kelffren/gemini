@@ -3,6 +3,7 @@
  * owner: Map Forge Studio handoff contract audit
  * purpose: prove district labels cannot override intrinsic semantic kind while unsafe decoration footprints may be culled
  */
+// KELO-INDEX MAP-FORGE/TREE-PALETTE keeps forest, farm and ceremonial sprite families deterministic.
 import assert from 'node:assert/strict';
 import {generateBestOf} from '../src/world/map-forge/map-forge-core.mjs';
 import {getMapForgeRecipe} from '../src/world/map-forge/map-forge-recipes.mjs';
