@@ -1,10 +1,12 @@
 /* KELO-INDEX
  * area: CREATORS / SPRITE COMPILER / CORE
  * owner: deterministic sprite repair planning and browser canvas adapter
- * owns: background cleanup, pixel grammar, cell bounds, common scale, feet anchoring, repair QA
+ * owns: background cleanup, pixel grammar, silhouette QA, donor planning, cell bounds, common scale, feet anchoring, repair QA
  * does-not-own: generative AI inference, animation semantics, publishing authority
  */
 import {preparePixelArtPixels} from './sprite-pixel-grammar.mjs';
+import {auditSilhouetteConsistency} from './sprite-silhouette-consistency.mjs';
+import {planDonorRepairCandidates} from './sprite-donor-repair.mjs';
 const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
 const finite=(v,f=0)=>Number.isFinite(Number(v))?Number(v):f;
 const dist=(r,g,b,c)=>Math.hypot(r-c.r,g-c.g,b-c.b);
@@ -50,20 +52,20 @@ export function planFrameNormalization(frames,{targetWidth=64,targetHeight=64,pa
   const planned=frames.map(frame=>{if(!frame.bounds)return Object.freeze({...frame,destination:null});const width=Math.max(1,Math.round(frame.bounds.width*scale)),height=Math.max(1,Math.round(frame.bounds.height*scale)),x=Math.round((targetWidth-width)/2),y=anchor==='center'?Math.round((targetHeight-height)/2):baseline-height;return Object.freeze({...frame,destination:Object.freeze({x,y,width,height,feetY:y+height,centerX:x+width/2})});});
   return Object.freeze({frames:Object.freeze(planned),scale,targetWidth,targetHeight,padding,anchor,baseline,maxSourceWidth:maxW,maxSourceHeight:maxH,empty:false});
 }
-export function buildRepairReport({sourceFrames=[],outputFrames=[],plan=null,backgroundCleanup=null,pixelGrammar=null}={}){
+export function buildRepairReport({sourceFrames=[],outputFrames=[],plan=null,backgroundCleanup=null,pixelGrammar=null,silhouette=null,donorPlan=null}={}){
   const sourceNonEmpty=sourceFrames.filter(f=>f.bounds).length,outputNonEmpty=outputFrames.filter(f=>f.bounds).length,clippedBefore=sourceFrames.filter(f=>f.clipped).length,clippedAfter=outputFrames.filter(f=>f.clipped).length;
   const feet=(plan?.frames||[]).map(f=>f.destination?.feetY).filter(Number.isFinite),feetSpread=feet.length?Math.max(...feet)-Math.min(...feet):0;
   const occupancy=(plan?.frames||[]).map(f=>f.destination?f.destination.width*f.destination.height/(plan.targetWidth*plan.targetHeight):0).filter(v=>v>0),minOccupancy=occupancy.length?Math.min(...occupancy):0,maxOccupancy=occupancy.length?Math.max(...occupancy):0,frameCount=sourceFrames.length;
   const geometryPass=frameCount>0&&sourceNonEmpty===frameCount&&outputNonEmpty===frameCount&&clippedAfter===0&&feetSpread<=1,pixelPass=pixelGrammar?.pass!==false;
-  return Object.freeze({pass:geometryPass&&pixelPass,geometryPass,pixelPass,frameCount,sourceNonEmpty,outputNonEmpty,clippedBefore,clippedAfter,feetSpread,commonScale:plan?.scale??1,minOccupancy,maxOccupancy,backgroundMode:backgroundCleanup?.mode||'unknown',backgroundPixelsRemoved:backgroundCleanup?.removed||0,pixelGrammar:pixelGrammar||null});
+  return Object.freeze({pass:geometryPass&&pixelPass,geometryPass,pixelPass,frameCount,sourceNonEmpty,outputNonEmpty,clippedBefore,clippedAfter,feetSpread,commonScale:plan?.scale??1,minOccupancy,maxOccupancy,backgroundMode:backgroundCleanup?.mode||'unknown',backgroundPixelsRemoved:backgroundCleanup?.removed||0,pixelGrammar:pixelGrammar||null,silhouette:silhouette||null,donorPlan:donorPlan||null});
 }
-export function repairSpritesheetImage(root,image,{columns=4,rows=8,targetWidth=64,targetHeight=64,padding=4,removeBackground=true,colorThreshold=34,softEdge=14,imageSmoothing=false,profile='pixel-art',pixelGrammar=true,paletteMaxColors=null}={}){
+export function repairSpritesheetImage(root,image,{columns=4,rows=8,targetWidth=64,targetHeight=64,padding=4,removeBackground=true,colorThreshold=34,softEdge=14,imageSmoothing=false,profile='pixel-art',pixelGrammar=true,paletteMaxColors=null,silhouetteQA=true,silhouetteThreshold=.48}={}){
   if(!root?.document)throw new Error('SPRITE_COMPILER_DOM_REQUIRED');const width=Math.max(1,Math.round(image.naturalWidth||image.width||0)),height=Math.max(1,Math.round(image.naturalHeight||image.height||0));if(!width||!height)throw new Error('SPRITE_COMPILER_IMAGE_DIMENSIONS_REQUIRED');
   const makeCanvas=(w,h)=>{const c=root.document.createElement('canvas');c.width=w;c.height=h;return c;};const source=makeCanvas(width,height),sctx=source.getContext('2d',{willReadFrequently:true});sctx.clearRect(0,0,width,height);sctx.drawImage(image,0,0,width,height);const raw=sctx.getImageData(0,0,width,height);
   const cleanup=removeBackground?cleanBackgroundPixels(raw.data,width,height,{background:'auto',colorThreshold,softEdge}):Object.freeze({data:new Uint8ClampedArray(raw.data),background:null,removed:0,mode:'preserve'});
   const prepared=pixelGrammar&&profile==='pixel-art'?preparePixelArtPixels(cleanup.data,width,height,{paletteMaxColors}):Object.freeze({data:cleanup.data,report:null}),cleaned=sctx.createImageData(width,height);cleaned.data.set(prepared.data);sctx.putImageData(cleaned,0,0);
-  const sourceFrames=analyzeGridCells(prepared.data,width,height,{columns,rows}),plan=planFrameNormalization(sourceFrames,{targetWidth,targetHeight,padding}),output=makeCanvas(columns*targetWidth,rows*targetHeight),ctx=output.getContext('2d',{willReadFrequently:true});ctx.clearRect(0,0,output.width,output.height);ctx.imageSmoothingEnabled=profile==='pixel-art'?false:!!imageSmoothing;
+  const sourceFrames=analyzeGridCells(prepared.data,width,height,{columns,rows}),silhouette=silhouetteQA?auditSilhouetteConsistency(prepared.data,width,height,sourceFrames,{outlierThreshold:silhouetteThreshold}):null,donorPlan=silhouette?planDonorRepairCandidates(sourceFrames,silhouette,null):null,plan=planFrameNormalization(sourceFrames,{targetWidth,targetHeight,padding}),output=makeCanvas(columns*targetWidth,rows*targetHeight),ctx=output.getContext('2d',{willReadFrequently:true});ctx.clearRect(0,0,output.width,output.height);ctx.imageSmoothingEnabled=profile==='pixel-art'?false:!!imageSmoothing;
   for(const frame of plan.frames){if(!frame.bounds||!frame.destination)continue;const dest=frame.destination,dx=frame.column*targetWidth+dest.x,dy=frame.row*targetHeight+dest.y;ctx.drawImage(source,frame.bounds.x,frame.bounds.y,frame.bounds.width,frame.bounds.height,dx,dy,dest.width,dest.height);}
-  const outPixels=ctx.getImageData(0,0,output.width,output.height),outputFrames=analyzeGridCells(outPixels.data,output.width,output.height,{columns,rows}),report=buildRepairReport({sourceFrames,outputFrames,plan,backgroundCleanup:cleanup,pixelGrammar:prepared.report});
-  return Object.freeze({canvas:output,report,plan,sourceFrames,outputFrames,pixelGrammar:prepared.report,columns,rows,frameWidth:targetWidth,frameHeight:targetHeight,sourceWidth:width,sourceHeight:height});
+  const outPixels=ctx.getImageData(0,0,output.width,output.height),outputFrames=analyzeGridCells(outPixels.data,output.width,output.height,{columns,rows}),report=buildRepairReport({sourceFrames,outputFrames,plan,backgroundCleanup:cleanup,pixelGrammar:prepared.report,silhouette,donorPlan});
+  return Object.freeze({canvas:output,report,plan,sourceFrames,outputFrames,pixelGrammar:prepared.report,silhouette,donorPlan,columns,rows,frameWidth:targetWidth,frameHeight:targetHeight,sourceWidth:width,sourceHeight:height});
 }
