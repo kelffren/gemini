@@ -69,14 +69,21 @@ export function createSelectTool(kernel,{root=globalThis}={}) {
     return dx*dx+dy*dy;
   }
 
+  function suppressRoomInteriorUnderEdges(hits){
+    if(hits.length<2)return hits;
+    const edgeRooms=new Set(hits.map(hit=>hit?.data||hit).filter(entity=>entity?.components?.buildingPiece?.roomEdge).map(entity=>entity.components.buildingPiece.roomId).filter(Boolean));
+    if(!edgeRooms.size)return hits;
+    return hits.filter(hit=>{const piece=(hit?.data||hit)?.components?.buildingPiece;return !(piece?.roomInterior===true&&edgeRooms.has(piece.roomId));});
+  }
+
   function pointHits(px,py,radius){
     const r=resolveSelectHitRadius(radius,{root});
-    if(r<=0)return kernel.spatial.queryPoint(px,py,{category:'entity'}).slice().reverse();
+    if(r<=0)return suppressRoomInteriorUnderEdges(kernel.spatial.queryPoint(px,py,{category:'entity'}).slice().reverse());
     const hits=kernel.spatial.queryRect({x:px-r,y:py-r,w:r*2+1,h:r*2+1},{category:'entity'}).slice().reverse();
-    return hits.map((hit,index)=>({hit,index,d:hitDistanceSquared(hit,px,py)}))
+    return suppressRoomInteriorUnderEdges(hits.map((hit,index)=>({hit,index,d:hitDistanceSquared(hit,px,py)}))
       .filter(row=>row.d<=r*r)
       .sort((a,b)=>a.d-b.d||a.index-b.index)
-      .map(row=>row.hit);
+      .map(row=>row.hit));
   }
 
   function semanticRoomIds(hit){
