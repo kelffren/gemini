@@ -15,7 +15,8 @@ const snap=(v,g)=>Math.round((Number(v)||0)/g)*g;
 const newRoomId=()=>`room:${globalThis.crypto?.randomUUID?.()||`${Date.now().toString(36)}:${Math.random().toString(36).slice(2,9)}`}`;
 
 export function resolveRoomDragThreshold(pointerType='mouse',{root=globalThis}={}){
-  const coarse=pointerType==='touch'||pointerType==='pen'||!!root?.matchMedia?.('(pointer: coarse)')?.matches;
+  const type=String(pointerType||'mouse').toLowerCase();
+  const coarse=type==='touch'||type==='pen'||(type!=='mouse'&&!!root?.matchMedia?.('(pointer: coarse)')?.matches);
   const px=coarse?TOUCH_DRAG_PX:MOUSE_DRAG_PX;
   const zoom=Math.max(MIN_EFFECTIVE_ZOOM,Number(root?.KeloCamera?.snapshot?.()?.effectiveZoom)||1);
   return px/zoom;
