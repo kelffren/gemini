@@ -10,6 +10,23 @@ import { waitForWorldEditAuthority } from '../adapters/world-creator-adapter.mjs
 const actor=root=>String(root.KELO_ADMIN_KEYS?.playerId?.()||root.keloNet?.playerKey||root.localPlayer?.id||'local_pioneer');
 const finite=v=>Number.isFinite(Number(v));
 const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
+const studioShellMounted=root=>{
+  const doc=root?.document;
+  if(!doc?.getElementById)return true;
+  const shell=doc.getElementById('kelo-studio-live');
+  return !!(shell&&shell.isConnected!==false);
+};
+async function openMountedStudio(mod,root){
+  let session=await mod.openKeloStudioLive({root});
+  if(studioShellMounted(root))return session;
+  try{await mod.closeKeloStudioLive?.({root});}catch{}
+  session=await mod.openKeloStudioLive({root});
+  if(!studioShellMounted(root)){
+    try{await mod.closeKeloStudioLive?.({root});}catch{}
+    throw new Error('CREATOR_WORLD_STUDIO_MOUNT_FAILED');
+  }
+  return session;
+}
 function mapFocusPoint(map){
   const b=map?.worldBounds||{},bx=finite(b.x)?Number(b.x):0,by=finite(b.y)?Number(b.y):0,bw=Math.max(1,finite(b.w)?Number(b.w):1),bh=Math.max(1,finite(b.h)?Number(b.h):1),spawn=(map?.spawnPoints||[]).find(p=>finite(p?.x)&&finite(p?.y));
   const x=spawn?Number(spawn.x):bx+bw/2,y=spawn?Number(spawn.y):by+bh/2;
@@ -45,7 +62,7 @@ export function createWorldWorkspaceManifest({loader=()=>import('../../studio/in
       }
       const mod=await loader();
       if(typeof mod.openKeloStudioLive!=='function')throw new Error('CREATOR_WORLD_STUDIO_ENTRY_MISSING');
-      const session=await mod.openKeloStudioLive({root});
+      const session=await openMountedStudio(mod,root);
       if(prepared?.documentMetadata&&session?.studio?.kernel?.setDocument){
         const current=session.studio.kernel.document;
         session.studio.kernel.setDocument({...current,metadata:prepared.documentMetadata});
