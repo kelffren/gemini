@@ -6,7 +6,17 @@
 const { test, expect } = require('@playwright/test');
 const fs = require('fs');
 
-test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+// Local runs emulate a phone. BrowserStack real iOS must own viewport/touch/mobile
+// capabilities; forcing Playwright emulation onto a physical iPhone causes its
+// context validation to reject media/device defaults before the page even opens.
+const isBrowserStack = Boolean(
+  process.env.BROWSERSTACK_USERNAME ||
+  process.env.BROWSERSTACK_ACCESS_KEY ||
+  process.env.BROWSERSTACK_BUILD_NAME
+);
+if (!isBrowserStack) {
+  test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+}
 
 test('World recovers a stale Studio session instead of leaving iOS on a black page', async ({ page }) => {
   const pageErrors = [];
