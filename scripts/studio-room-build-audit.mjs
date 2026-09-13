@@ -28,21 +28,26 @@ assert.equal(kernel.input.active().includes('studio-quick-build-room'),true,'ROO
 assert.equal(room.getMeasurement(),null,'ROOM measurement must be empty before a drag plan exists');
 
 let previews=room.planRect(0,0,128,96);
-assert.equal(previews.length,8,'drag dimensions must quantize to the wall module length and plan an eight-module closed perimeter');
+let wallPreviews=previews.filter(row=>row.components?.buildingPiece?.type==='wall');
+let floorPreviews=previews.filter(row=>row.components?.buildingPiece?.type==='floor');
+assert.equal(wallPreviews.length,8,'drag dimensions must quantize to the wall module length and keep an eight-module closed perimeter');
+assert.equal(floorPreviews.length,16,'ROOM V2 must auto-fill the quantized 128x128 interior with sixteen 32px FLOOR modules');
+assert.equal(previews.length,24,'ROOM preview must compose perimeter and floor fill');
 const measure=room.getMeasurement();
-assert.deepEqual({width:measure.width,height:measure.height,requestedWidth:measure.requestedWidth,requestedHeight:measure.requestedHeight,deltaWidth:measure.deltaWidth,deltaHeight:measure.deltaHeight,modulesX:measure.modulesX,modulesY:measure.modulesY,totalWalls:measure.totalWalls,wallLength:measure.wallLength},{width:128,height:128,requestedWidth:128,requestedHeight:96,deltaWidth:0,deltaHeight:32,modulesX:2,modulesY:2,totalWalls:8,wallLength:64},'ROOM must expose the exact modular result and the quantization delta before commit');
-assert.equal(previews.every(row=>row.prefabId==='stone_wall_01'),true,'ROOM must use the same resolved WALL prefab as Quick Build');
-assert.equal(previews.every(row=>row.components?.buildingPiece?.type==='wall'),true,'ROOM walls must preserve semantic wall metadata');
-assert.equal(previews.every(row=>row.components?.buildingPiece?.roomGenerated===true),true,'ROOM-generated walls must remain identifiable for later semantic editing');
+assert.deepEqual({width:measure.width,height:measure.height,requestedWidth:measure.requestedWidth,requestedHeight:measure.requestedHeight,deltaWidth:measure.deltaWidth,deltaHeight:measure.deltaHeight,modulesX:measure.modulesX,modulesY:measure.modulesY,totalWalls:measure.totalWalls,totalFloors:measure.totalFloors,totalPieces:measure.totalPieces,wallLength:measure.wallLength},{width:128,height:128,requestedWidth:128,requestedHeight:96,deltaWidth:0,deltaHeight:32,modulesX:2,modulesY:2,totalWalls:8,totalFloors:16,totalPieces:24,wallLength:64},'ROOM must expose modular perimeter, floor fill and quantization delta before commit');
+assert.equal(wallPreviews.every(row=>row.prefabId==='stone_wall_01'),true,'ROOM perimeter must use the same resolved WALL prefab as Quick Build');
+assert.equal(floorPreviews.every(row=>row.prefabId==='marble_floor_01'),true,'ROOM interior must use the same resolved FLOOR prefab as Quick Build');
+assert.equal(wallPreviews.every(row=>row.components?.buildingPiece?.roomGenerated===true),true,'ROOM-generated walls must remain identifiable for later semantic editing');
+assert.equal(floorPreviews.every(row=>row.components?.buildingPiece?.roomInterior===true),true,'ROOM-generated floors must remain identifiable as room interior');
 const roomIds=new Set(previews.map(row=>row.components?.buildingPiece?.roomId));
-assert.equal(roomIds.size,1,'every wall preview in one ROOM gesture must share one semantic roomId');
+assert.equal(roomIds.size,1,'every preview in one ROOM gesture must share one semantic roomId');
 assert.ok([...roomIds][0]?.startsWith('room:'),'ROOM semantic identity must use a stable room namespace');
-assert.deepEqual([...new Set(previews.map(row=>row.components?.buildingPiece?.roomEdge))].sort(),['bottom','left','right','top'],'ROOM walls must carry explicit edge roles');
-assert.equal(previews.filter(row=>row.transform.rotation===0).length,4,'ROOM must produce two horizontal edges with two modules each');
-assert.equal(previews.filter(row=>row.transform.rotation===90).length,4,'ROOM must produce two vertical edges with two modules each');
-const unique=new Set(previews.map(row=>`${row.transform.x}:${row.transform.y}:${row.transform.rotation}`));
-assert.equal(unique.size,previews.length,'ROOM planner must not emit duplicate wall modules');
-const points=previews.flatMap(worldSnapPoints);
+assert.deepEqual([...new Set(wallPreviews.map(row=>row.components?.buildingPiece?.roomEdge))].sort(),['bottom','left','right','top'],'ROOM walls must carry explicit edge roles');
+assert.equal(wallPreviews.filter(row=>row.transform.rotation===0).length,4,'ROOM must produce two horizontal edges with two modules each');
+assert.equal(wallPreviews.filter(row=>row.transform.rotation===90).length,4,'ROOM must produce two vertical edges with two modules each');
+const unique=new Set(wallPreviews.map(row=>`${row.transform.x}:${row.transform.y}:${row.transform.rotation}`));
+assert.equal(unique.size,wallPreviews.length,'ROOM planner must not emit duplicate wall modules');
+const points=wallPreviews.flatMap(worldSnapPoints);
 for(const corner of [[0,0],[128,0],[0,128],[128,128]]){
   const matches=points.filter(point=>Math.hypot(point.x-corner[0],point.y-corner[1])<0.001);
   assert.equal(matches.length,2,`room corner ${corner.join(',')} must join exactly two wall endpoints`);
@@ -68,23 +73,23 @@ assert.equal(room.getMeasurement(),null,'mobile cancel must clear measurement fe
 previews=room.planRect(0,0,128,96);
 const historyBefore=kernel.history.undoDepth;
 const committed=await room.commitRoom();
-assert.equal(committed.length,8,'ROOM must commit the entire planned perimeter');
+assert.equal(committed.length,24,'ROOM V2 must commit perimeter and floor fill together');
 assert.equal(room.getMeasurement(),null,'committed ROOM must clear transient measurement state');
-assert.equal(kernel.document.entities.length,8,'all room walls must persist through placement batch');
+assert.equal(kernel.document.entities.length,24,'all ROOM pieces must persist through one placement batch');
 assert.equal(kernel.history.undoDepth,historyBefore+1,'one ROOM gesture must create exactly one history entry');
 const persistedRoomId=kernel.document.entities[0].components?.buildingPiece?.roomId;
-assert.equal(kernel.document.entities.every(row=>row.components?.buildingPiece?.roomId===persistedRoomId),true,'persisted ROOM walls must retain one shared roomId');
-assert.deepEqual(kernel.selection.get().length,8,'fresh room placement must leave the whole room selected');
+assert.equal(kernel.document.entities.every(row=>row.components?.buildingPiece?.roomId===persistedRoomId),true,'persisted ROOM pieces must retain one shared roomId');
+assert.deepEqual(kernel.selection.get().length,24,'fresh room placement must leave the whole semantic room selected');
 
 select.clear();
 const target=kernel.document.entities.find(row=>row.components?.buildingPiece?.roomEdge==='top'&&row.components?.buildingPiece?.roomIndex===1);
 assert.ok(target,'audit must have a non-corner top wall target');
 const firstX=(Number(target.transform?.x)||0)+10,secondX=(Number(target.transform?.x)||0)+50,py=(Number(target.transform?.y)||0)+8;
 select.selectPoint(firstX,py,{preserveExisting:false,cycle:true,radius:0});
-assert.equal(kernel.selection.get().length,1,'first mobile tap on a room wall must preserve fine-grained single-wall editing');
+assert.equal(kernel.selection.get().length,1,'first mobile tap on a room wall must preserve fine-grained single-piece editing');
 select.selectPoint(secondX,py,{preserveExisting:true,cycle:true,radius:0});
-assert.equal(kernel.selection.get().length,8,'second mobile tap within 20 screen px at 0.25x zoom must expand selection to the semantic room');
-assert.equal(kernel.selection.get().every(id=>kernel.document.entities.find(row=>row.id===id)?.components?.buildingPiece?.roomId===persistedRoomId),true,'semantic expansion must never select walls from another room');
+assert.equal(kernel.selection.get().length,24,'second mobile tap within tolerance must expand selection to walls and floors sharing the semantic roomId');
+assert.equal(kernel.selection.get().every(id=>kernel.document.entities.find(row=>row.id===id)?.components?.buildingPiece?.roomId===persistedRoomId),true,'semantic expansion must never select pieces from another room');
 
 const desktopSelect=createSelectTool(kernel,{root:desktopRoot});
 desktopSelect.clear();
@@ -93,9 +98,9 @@ desktopSelect.selectPoint(secondX,py,{preserveExisting:true,cycle:true,radius:0}
 assert.equal(kernel.selection.get().length,1,'desktop must keep its precise 12-world-unit repeat radius instead of inheriting the larger mobile tolerance');
 
 await kernel.undo();
-assert.equal(kernel.document.entities.length,0,'one Undo must remove the entire room');
+assert.equal(kernel.document.entities.length,0,'one Undo must remove the entire room including floor fill');
 await kernel.redo();
-assert.equal(kernel.document.entities.length,8,'one Redo must restore the entire room');
+assert.equal(kernel.document.entities.length,24,'one Redo must restore the entire room including floor fill');
 assert.equal(kernel.document.entities.every(row=>row.components?.buildingPiece?.roomId===persistedRoomId),true,'Undo/Redo must preserve semantic room identity');
 
 const roomSource=fs.readFileSync(new URL('../src/studio/tools/room-build-tool.mjs',import.meta.url),'utf8');
@@ -107,4 +112,4 @@ assert.equal(kernel.input.active().includes('studio-quick-build-room'),false,'RO
 room.destroy();quick.destroy();
 assert.equal(kernel.input.has('studio-quick-build-room'),false,'ROOM destroy must unregister listeners/context');
 
-console.log(JSON.stringify({ok:true,phase:'5.3',tool:'ROOM',previewModules:8,roomEntities:8,liveMeasurement:true,requestedSize:[128,96],quantizedSize:[128,128],quantizationDelta:[0,32],moduleGrid:[2,2],exactCornerConnections:true,semanticRoomId:true,edgeRoles:true,singleWallFirstTap:true,zoomAwareMobileRoomSecondTap:true,mobileRepeatScreenPx:20,mobileRepeatWorldAtQuarterZoom:80,desktopRepeatWorld:12,historyEntries:1,oneUndo:true,oneRedo:true,desktopPointer:true,mobilePointer:true,authorityBypass:false},null,2));
+console.log(JSON.stringify({ok:true,phase:'5.8',tool:'ROOM',wallModules:8,floorModules:16,roomEntities:24,liveMeasurement:true,requestedSize:[128,96],quantizedSize:[128,128],quantizationDelta:[0,32],moduleGrid:[2,2],exactCornerConnections:true,semanticRoomId:true,edgeRoles:true,singleWallFirstTap:true,zoomAwareMobileRoomSecondTap:true,mobileRepeatScreenPx:20,mobileRepeatWorldAtQuarterZoom:80,desktopRepeatWorld:12,historyEntries:1,oneUndo:true,oneRedo:true,desktopPointer:true,mobilePointer:true,authorityBypass:false},null,2));
