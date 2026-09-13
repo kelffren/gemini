@@ -6,7 +6,15 @@
 const { test, expect } = require('@playwright/test');
 const fs = require('fs');
 
-test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+// BrowserStack supplies the physical iPhone/Safari capabilities. Re-applying
+// Playwright mobile emulation on top of a real device can inject media defaults
+// (notably reducedMotion=no-preference) that BrowserStack rejects before launch.
+const isBrowserStack = Boolean(
+  process.env.BROWSERSTACK_USERNAME ||
+  process.env.BROWSERSTACK_ACCESS_KEY ||
+  process.env.BROWSERSTACK_BUILD_NAME
+);
+if (!isBrowserStack) test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 
 test('World recovers a stale Studio session instead of leaving iOS on a black page', async ({ page }) => {
   const pageErrors = [];
