@@ -1,0 +1,37 @@
+name: Studio Observer Diagnostic
+
+on:
+  push:
+    branches: [debug/studio-observer-storm-v1]
+    paths:
+      - 'src/studio/**'
+      - 'src/creators/**'
+      - 'src/ui/**'
+      - 'scripts/studio-observer-diagnostic.mjs'
+      - '.github/workflows/studio-observer-diagnostic.yml'
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install Playwright
+        run: npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund playwright@1.55.0
+      - name: Syntax
+        run: node --check scripts/studio-observer-diagnostic.mjs
+      - name: Serve candidate branch
+        run: |
+          python3 -m http.server 4173 --bind 127.0.0.1 >/tmp/studio-observer-http.log 2>&1 &
+          for i in $(seq 1 20); do curl -fsS http://127.0.0.1:4173/ >/dev/null && exit 0; sleep 1; done
+          cat /tmp/studio-observer-http.log
+          exit 1
+      - name: Diagnose observer traffic
+        env:
+          AUDIT_URL: http://127.0.0.1:4173/
+          CHROME_BIN: /usr/bin/google-chrome
+        run: node scripts/studio-observer-diagnostic.mjs
