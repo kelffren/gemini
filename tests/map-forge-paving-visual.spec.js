@@ -25,10 +25,12 @@ async function openSeed68(page){
   await expect(forge.getByText(/4\/4 válidos/)).toBeVisible({timeout:15000});
   await forge.getByRole('button').filter({hasText:'Seed 68'}).click();
   await page.waitForFunction(()=>window.__KELO_TEST_MAP_FORGE_WORKSPACE__?.selected?.metadata?.seed===68,null,{timeout:5000});
-  const selected=await page.evaluate(()=>{const map=window.__KELO_TEST_MAP_FORGE_WORKSPACE__.selected,paving=map.validation.paving;return{seed:map.metadata.seed,layoutHash:map.metadata.layoutHash,generatorVersion:map.metadata.generatorVersion,valid:map.validation.valid,errors:map.validation.errors,largestComponentRatio:paving.largestComponentRatio,largestComponentCells:paving.largestComponentCells,stoneWithoutIntent:map.terrain.cells.filter(c=>c.material==='stone'&&!c.pavingIntent?.planId).length};});
+  const selected=await page.evaluate(()=>{const map=window.__KELO_TEST_MAP_FORGE_WORKSPACE__.selected,paving=map.validation.paving;return{seed:map.metadata.seed,layoutHash:map.metadata.layoutHash,generatorVersion:map.metadata.generatorVersion,valid:map.validation.valid,errors:map.validation.errors,score:map.score?.total??null,blockCount:map.blocks?.length||0,districtCount:map.districts?.length||0,largestComponentRatio:paving.largestComponentRatio,largestComponentCells:paving.largestComponentCells,stoneWithoutIntent:map.terrain.cells.filter(c=>c.material==='stone'&&!c.pavingIntent?.planId).length};});
   expect(selected).toMatchObject({seed:68,valid:true,errors:[],stoneWithoutIntent:0});
   expect(versionAtLeast(selected.generatorVersion,'1.1.0')).toBe(true);
   expect(selected.largestComponentRatio).toBeLessThanOrEqual(.10);
+  expect(selected.score).not.toBeNull();
+  expect(selected.score).toBeLessThanOrEqual(94);
   expect(pageErrors).toEqual([]);
   return{forge,selected,pageErrors};
 }
