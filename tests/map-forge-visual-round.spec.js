@@ -136,7 +136,7 @@ async function bootForge(page){
   return{forge,pageErrors};
 }
 
-async function waitForPreviewAssets(forge){
+// KELO-INDEX QA/ASSET-READY blocks screenshots until every projected sprite has rendered.\nasync function waitForPreviewAssets(forge){
   await expect.poll(async()=>forge.locator('[data-preview-assets-expected]').evaluate(node=>Number(node.dataset.previewAssetsExpected)>0&&Number(node.dataset.previewAssets)>=Number(node.dataset.previewAssetsExpected)),{timeout:20000,message:'all projected Map Forge sprites must render before visual evidence is captured'}).toBe(true);
 }
 
