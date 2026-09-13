@@ -30,7 +30,7 @@ function pairBalance(scene){
 for(const seed of SEEDS){
   const map=generateMapCandidate(recipe,{seed,assetCatalogVersion:'ci-catalog'});
   assert.equal(map.validation.valid,true,`${seed}: map must remain valid after authored scene materialization`);
-  assert.equal(map.metadata.generatorVersion,'1.9.0',`${seed}: fallback edge gateway guard targets generator 1.9.0`);
+  assert.equal(map.metadata.generatorVersion,'1.10.0',`${seed}: district tree palette guard targets generator 1.10.0`);
 
   const stats=map.generationStats||{};
   const evaluated=Number(stats.scenePrefabEvaluatedCount||0);
