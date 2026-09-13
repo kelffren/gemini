@@ -2,9 +2,25 @@
  * area: STUDIO / OVERLAY RENDERER
  * owns: transient editor-only selection/ghost/gizmo/surface/collision/prefab/smart-guide/spacing/paint-copy/build primitives
  * does-not-own: world rendering, terrain textures, gameplay sprites or physics
- * public-api: createStudioOverlayRenderer()
+ * public-api: createStudioOverlayRenderer(), resolveRoomPreviewGroups()
  * online: local-only
  */
+
+export function resolveRoomPreviewGroups(rows=[]){
+  const walls=[],floors=[],other=[];
+  let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  for(const row of rows||[]){
+    const piece=row?.components?.buildingPiece||{},type=piece.type;
+    if(type==='floor'&&piece.roomGenerated===true){
+      floors.push(row);
+      const x=Number(row.transform?.x)||0,y=Number(row.transform?.y)||0,w=Math.max(1,Number(row.bounds?.w)||1),h=Math.max(1,Number(row.bounds?.h)||1);
+      minX=Math.min(minX,x);minY=Math.min(minY,y);maxX=Math.max(maxX,x+w);maxY=Math.max(maxY,y+h);
+    }else if(type==='wall'&&piece.roomGenerated===true)walls.push(row);
+    else other.push(row);
+  }
+  const floorBounds=floors.length?{x:minX,y:minY,w:Math.max(1,maxX-minX),h:Math.max(1,maxY-minY)}:null;
+  return{walls,floors,other,floorBounds};
+}
 
 export function createStudioOverlayRenderer({ kernel, tools, assetPreview } = {}) {
   if (!kernel) throw new Error('STUDIO_OVERLAY_KERNEL_REQUIRED');
@@ -22,15 +38,26 @@ export function createStudioOverlayRenderer({ kernel, tools, assetPreview } = {}
     if(state==='snapped'&&target){ctx.fillStyle='rgba(140,240,180,.98)';ctx.beginPath();ctx.arc(Number(target.x)||0,Number(target.y)||0,5,0,Math.PI*2);ctx.fill();}
     ctx.restore();
   }
+  function drawBuildRow(ctx,row,{outline=true,alpha=.52,outlineAlpha=.9}={}){
+    const rect={x:Number(row.transform?.x)||0,y:Number(row.transform?.y)||0,w:Math.max(1,Number(row.bounds?.w)||1),h:Math.max(1,Number(row.bounds?.h)||1)};
+    const drew=assetPreview?.drawAsset?.(ctx,row.prefabId,rect.x,rect.y,{rotation:Number(row.transform?.rotation)||0,alpha,placeholder:false});
+    if(!drew){ctx.save();ctx.globalAlpha=outline?.14:.09;ctx.fillRect(rect.x,rect.y,rect.w,rect.h);ctx.restore();}
+    if(outline)drawRect(ctx,rect,{dashed:true,alpha:outlineAlpha});
+  }
   function drawBuildDrag(ctx,rows){
     if(!rows?.length)return;
     ctx.save();ctx.strokeStyle='rgba(140,240,180,.98)';
-    for(const row of rows){
-      const rect={x:Number(row.transform?.x)||0,y:Number(row.transform?.y)||0,w:Math.max(1,Number(row.bounds?.w)||1),h:Math.max(1,Number(row.bounds?.h)||1)};
-      const drew=assetPreview?.drawAsset?.(ctx,row.prefabId,rect.x,rect.y,{rotation:Number(row.transform?.rotation)||0,alpha:.52,placeholder:false});
-      if(!drew){ctx.save();ctx.globalAlpha=.14;ctx.fillRect(rect.x,rect.y,rect.w,rect.h);ctx.restore();}
-      drawRect(ctx,rect,{dashed:true,alpha:.9});
-    }
+    for(const row of rows)drawBuildRow(ctx,row);
+    ctx.restore();
+  }
+  function drawRoomBuildDrag(ctx,rows){
+    if(!rows?.length)return;
+    const {walls,floors,other,floorBounds}=resolveRoomPreviewGroups(rows);
+    ctx.save();
+    for(const row of floors)drawBuildRow(ctx,row,{outline:false,alpha:.44});
+    if(floorBounds){ctx.strokeStyle='rgba(120,210,180,.72)';drawRect(ctx,floorBounds,{dashed:true,alpha:.62});}
+    ctx.strokeStyle='rgba(140,240,180,.98)';
+    for(const row of [...walls,...other])drawBuildRow(ctx,row);
     ctx.restore();
   }
   function drawRoomMeasurement(ctx,measurement){
@@ -85,7 +112,7 @@ export function createStudioOverlayRenderer({ kernel, tools, assetPreview } = {}
     for (const id of kernel.selection.get()) { const row = kernel.spatial.get(id); if (row?.rect) drawRect(ctx, row.rect); }
     const marquee=tools?.marquee?.getPreview?.();if(marquee){ctx.save();ctx.fillStyle='rgba(231,197,106,.10)';ctx.fillRect(marquee.x,marquee.y,marquee.w,marquee.h);ctx.strokeStyle='rgba(231,197,106,.85)';drawRect(ctx,marquee,{dashed:true});ctx.restore();}
     drawBuildDrag(ctx,tools?.quickBuild?.getDragPreviews?.()||[]);
-    drawBuildDrag(ctx,tools?.roomBuild?.getPreviews?.()||[]);
+    drawRoomBuildDrag(ctx,tools?.roomBuild?.getPreviews?.()||[]);
     drawRoomMeasurement(ctx,tools?.roomBuild?.getMeasurement?.());
     const placement = tools?.placement?.getPreview?.();if (placement) drawPlacement(ctx,placement);
     const prefab = tools?.prefabStamp?.getPreview?.();if(prefab)drawCreatorPrefab(ctx,prefab);
