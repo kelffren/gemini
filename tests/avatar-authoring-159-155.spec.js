@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: QA / AVATAR AUTHORING 159+155
  * owner: browser acceptance for Frame Surgery + persistent 4x4 builder convergence
- * keys: AVATAR FRAME-SURGERY 4X4 INDEXEDDB PINCH POINTER-CANCEL LIFECYCLE WEBKIT CHROMIUM
+ * keys: AVATAR FRAME-SURGERY 4X4 INDEXEDDB PINCH POINTER-CANCEL LIFECYCLE AUTHORED-ATLAS WEBKIT CHROMIUM
  */
 const {test,expect}=require('@playwright/test');
 const QA=process.env.AVATAR_AUTHORING_QA_URL||'http://127.0.0.1:4173/tests/fixtures/avatar-authoring-159-155.html';
@@ -54,4 +54,11 @@ test('mobile editor rolls back pointercancel then accepts native two-pointer pin
   await page.locator('.kfb-slot').nth(0).click();await page.getByRole('button',{name:/GHOST/}).click();await expect(page.getByRole('button',{name:/GHOST/})).toHaveClass(/on/);await page.locator('.kfe-close').click();
   await page.getByRole('button',{name:'PREVIEW ATLAS',exact:true}).click();
   const atlas=await page.evaluate(()=>window.__AVATAR_AUTHORING_QA__.atlas());expect(atlas.width).toBe(512);expect(atlas.height).toBe(768);
+});
+
+test('precomposed 4x4 atlas survives the real compiler byte-for-byte instead of being normalized again',async({page})=>{
+  await ready(page);await page.evaluate(()=>window.__AVATAR_AUTHORING_QA__.seed(Array.from({length:16},(_,i)=>i)));
+  const result=await page.evaluate(()=>window.__AVATAR_AUTHORING_QA__.authoredRoundTrip());
+  expect(result.width).toBe(512);expect(result.height).toBe(768);expect(result.frameWidth).toBe(128);expect(result.frameHeight).toBe(192);
+  expect(result.preserved).toBe(true);expect(result.auditPreserved).toBe(true);expect(result.mismatches).toBe(0);expect(result.samePixels).toBe(true);
 });
