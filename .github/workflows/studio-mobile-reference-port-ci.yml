@@ -1,0 +1,57 @@
+# KELO-INDEX
+# area: QA / STUDIO / MOBILE REFERENCE
+# owner: Studio mobile reference port gate
+# purpose: validate the phone-first Studio UI against the exact PR candidate checkout
+name: Studio Mobile Reference Port CI
+
+on:
+  pull_request:
+    paths:
+      - 'src/studio/ui/creator-productivity-panel.mjs'
+      - 'scripts/studio-mobile-reference-live-audit.mjs'
+      - 'scripts/live-studio-open-smoke.mjs'
+      - '.github/workflows/studio-mobile-reference-port-ci.yml'
+
+jobs:
+  phone-reference:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax
+        run: |
+          node --check src/studio/ui/creator-productivity-panel.mjs
+          node --check scripts/live-studio-open-smoke.mjs
+          node --check scripts/studio-mobile-reference-live-audit.mjs
+      - name: Install Playwright
+        run: npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund playwright@1.55.0
+      - name: Serve candidate
+        run: |
+          python3 -m http.server 8000 --bind 127.0.0.1 >/tmp/studio-mobile-reference-http.log 2>&1 &
+          for i in {1..20}; do
+            curl -fsS http://127.0.0.1:8000/index.html >/dev/null && exit 0
+            sleep 1
+          done
+          cat /tmp/studio-mobile-reference-http.log
+          exit 1
+      - name: Diagnose World Studio observer boot
+        env:
+          AUDIT_URL: http://127.0.0.1:8000/
+          CHROME_BIN: /usr/bin/google-chrome
+        run: timeout --signal=TERM 120s node scripts/live-studio-open-smoke.mjs
+      - name: Exercise phone-first Studio flow
+        env:
+          AUDIT_URL: http://127.0.0.1:8000/
+          CHROME_BIN: /usr/bin/google-chrome
+          DEBUG: pw:api
+        run: timeout --signal=TERM 360s node scripts/studio-mobile-reference-live-audit.mjs
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: studio-mobile-reference-port
+          path: artifacts/**
+          if-no-files-found: ignore
