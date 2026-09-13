@@ -16,6 +16,7 @@ import { createPrefabStampTool } from './prefab-stamp-tool.mjs';
 import { createPaintCopiesTool } from './paint-copies-tool.mjs';
 import { createQuickBuildTool } from './quick-build-tool.mjs';
 import { createRoomBuildTool } from './room-build-tool.mjs';
+import { createRoomOpeningTool } from './room-opening-tool.mjs';
 
 export function registerBasicTools(kernel) {
   const select=createSelectTool(kernel),marquee=createMarqueeSelectTool(kernel),placement=createPlacementTool(kernel),transform=createTransformTool(kernel),terrain=createTerrainTool(kernel),collision=createCollisionTool(kernel),prefabStamp=createPrefabStampTool(kernel),paintCopies=createPaintCopiesTool(kernel);
@@ -24,5 +25,7 @@ export function registerBasicTools(kernel) {
   if(!quickBuild){quickBuild=createQuickBuildTool(kernel,{placement});kernel.tools.register(quickBuild);}
   let roomBuild=kernel.tools.get('roomBuild');
   if(!roomBuild){roomBuild=createRoomBuildTool(kernel,{placement,quickBuild});kernel.tools.register(roomBuild);}
-  return Object.freeze({select,marquee,placement,transform,terrain,collision,prefabStamp,paintCopies,quickBuild,roomBuild});
+  let roomOpening=kernel.tools.get('roomOpening');
+  if(!roomOpening){roomOpening=createRoomOpeningTool(kernel);kernel.tools.register(roomOpening);}
+  return Object.freeze({select,marquee,placement,transform,terrain,collision,prefabStamp,paintCopies,quickBuild,roomBuild,roomOpening});
 }
