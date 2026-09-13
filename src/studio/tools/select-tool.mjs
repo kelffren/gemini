@@ -1,6 +1,6 @@
 /* KELO-INDEX
  * area: STUDIO / SELECT TOOL
- * owns: entity selection from spatial hit testing, semantic room expansion/collapse and one-shot armed grab handoff
+ * owns: entity selection from spatial hit testing, semantic room expansion/collapse, append-toggle multi-selection and one-shot armed grab handoff
  * does-not-own: pointer listeners, drawing or persistent document mutation
  * public-api: createSelectTool(), resolveSelectHitRadius(), screenRadiusToWorld(), resolveRepeatSelectRadius()
  * online: local transient state only
@@ -123,7 +123,8 @@ export function createSelectTool(kernel,{root=globalThis}={}) {
 
       if (append) {
         const hit = ordered[0];
-        kernel.selection.add(hit.id);
+        if(kernel.selection.has(hit.id))kernel.selection.remove(hit.id);
+        else kernel.selection.add(hit.id);
         lastPick = null;
         return hit.data || hit;
       }
