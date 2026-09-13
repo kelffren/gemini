@@ -7,6 +7,7 @@ on:
       - main
     paths:
       - 'src/creators/workspaces/world-workspace.mjs'
+      - 'src/studio/storage/indexeddb-studio-store.mjs'
       - 'tests/world-editor-ios-reopen.spec.js'
       - 'playwright.config.js'
       - 'browserstack.yml'
@@ -42,14 +43,16 @@ jobs:
         shell: bash
         run: |
           for i in {1..36}; do
-            if curl -fsSL "${KELO_PAGES}src/creators/workspaces/world-workspace.mjs?sha=${GITHUB_SHA}&attempt=${i}" | grep -q 'CREATOR_WORLD_STUDIO_MOUNT_FAILED'; then
-              echo "Matching World launch recovery is live on Pages"
+            workspace="$(curl -fsSL "${KELO_PAGES}src/creators/workspaces/world-workspace.mjs?sha=${GITHUB_SHA}&attempt=${i}" || true)"
+            store="$(curl -fsSL "${KELO_PAGES}src/studio/storage/indexeddb-studio-store.mjs?sha=${GITHUB_SHA}&attempt=${i}" || true)"
+            if printf '%s' "$workspace" | grep -Fq 'CREATOR_WORLD_STUDIO_MOUNT_FAILED' && printf '%s' "$store" | grep -Fq 'request.onblocked = failOpen'; then
+              echo "Matching World launch and non-blocking Studio store are live on Pages"
               exit 0
             fi
             echo "Waiting for Pages deployment (${i}/36)"
             sleep 10
           done
-          echo "Timed out waiting for the fixed World workspace on Pages"
+          echo "Timed out waiting for the fixed World workspace and Studio store on Pages"
           exit 1
 
       - name: Install dependencies
