@@ -74,6 +74,7 @@ async function pageDiagnostic() {
     creatorHub: !!document.getElementById('kelo-creators-hub'),
     studio: !!document.getElementById('kelo-studio-live'),
     launchError: document.querySelector('.kc-launch-error')?.textContent || null,
+    worldBusy: document.querySelector('[data-workspace="world"]')?.getAttribute('aria-busy') || null,
     adminPlayerId: window.KELO_ADMIN_KEYS?.playerId?.() || null,
     canWorldEdit: !!window.KELO_ADMIN_KEYS?.can?.('world.edit'),
     worldEditReady: !!window.KELO_WORLD_EDIT?.ready,
@@ -82,9 +83,9 @@ async function pageDiagnostic() {
   })).catch(error => ({ diagnosticError: String(error) }));
 }
 
-// BrowserStack's raw real-iOS Playwright bridge can kill a socket that sits inside
-// one long locator.waitFor()/waitForFunction command. Poll with short protocol calls
-// instead: this both honours our timeout and keeps the physical-device session alive.
+// BrowserStack's physical-iOS bridge can leave long locator wait commands idle until
+// the socket itself is killed. Keep every protocol operation short and poll DOM state
+// with page.evaluate so a missing element cannot strand the gate for minutes.
 async function waitUntil(check, timeout, label, interval = 250) {
   const deadline = Date.now() + timeout;
   let lastError = null;
@@ -100,9 +101,31 @@ async function waitUntil(check, timeout, label, interval = 250) {
   throw new Error(`${label} timed out after ${timeout}ms${lastError ? `; last error: ${lastError}` : ''}; diagnostic=${JSON.stringify(diagnostic)}`);
 }
 
-async function visible(locator, timeout, label) {
-  await waitUntil(() => locator.isVisible(), timeout, `${label} visibility`);
+async function selectorVisible(selector, timeout, label) {
+  await waitUntil(
+    () => page.evaluate(sel => {
+      const el = document.querySelector(sel);
+      if (!el || !el.isConnected) return false;
+      const style = getComputedStyle(el);
+      if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0) return false;
+      const rect = el.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0;
+    }, selector),
+    timeout,
+    `${label} visibility`
+  );
   checkpoint(`${label} visible`);
+}
+
+async function clickSelector(selector, label) {
+  const clicked = await page.evaluate(sel => {
+    const el = document.querySelector(sel);
+    if (!el || el.disabled) return false;
+    el.click();
+    return true;
+  }, selector);
+  assert(clicked, `${label} could not be clicked`);
+  checkpoint(`${label} clicked`);
 }
 
 try {
@@ -146,19 +169,16 @@ try {
     await openCreatorHub({ root: window });
   });
 
-  let hub = page.locator('#kelo-creators-hub');
-  await visible(hub, 10000, 'Creator Hub');
-  await hub.locator('[data-workspace="world"]').click();
-  checkpoint('World card clicked');
+  await selectorVisible('#kelo-creators-hub', 10000, 'Creator Hub');
+  await clickSelector('#kelo-creators-hub [data-workspace="world"]', 'World card');
 
-  const studio = page.locator('#kelo-studio-live');
-  await visible(studio, 20000, 'World Studio');
-  assert(await hub.count() === 0, 'Creator Hub remained mounted after opening World Studio');
+  await selectorVisible('#kelo-studio-live', 20000, 'World Studio');
+  assert(!(await page.evaluate(() => !!document.getElementById('kelo-creators-hub'))), 'Creator Hub remained mounted after opening World Studio');
 
   // Reproduce the iOS stale-session failure mode: the Studio DOM shell disappears
   // while the module-level Studio session still believes it is active.
   await page.evaluate(() => document.getElementById('kelo-studio-live')?.remove());
-  assert(await studio.count() === 0, 'Failed to remove Studio shell for stale-session regression');
+  assert(!(await page.evaluate(() => !!document.getElementById('kelo-studio-live'))), 'Failed to remove Studio shell for stale-session regression');
   checkpoint('stale Studio shell reproduced');
 
   await page.evaluate(async () => {
@@ -166,18 +186,15 @@ try {
     await openCreatorHub({ root: window });
   });
 
-  hub = page.locator('#kelo-creators-hub');
-  await visible(hub, 10000, 'Creator Hub after stale session');
-  await hub.locator('[data-workspace="world"]').click();
-  checkpoint('World recovery card clicked');
+  await selectorVisible('#kelo-creators-hub', 10000, 'Creator Hub after stale session');
+  await clickSelector('#kelo-creators-hub [data-workspace="world"]', 'World recovery card');
 
-  const recovered = page.locator('#kelo-studio-live');
-  await visible(recovered, 20000, 'Recovered World Studio');
-  assert(await page.locator('#kelo-creators-hub').count() === 0, 'Creator Hub remained mounted after World recovery');
-  const position = await recovered.evaluate(el => getComputedStyle(el).position);
+  await selectorVisible('#kelo-studio-live', 20000, 'Recovered World Studio');
+  assert(!(await page.evaluate(() => !!document.getElementById('kelo-creators-hub'))), 'Creator Hub remained mounted after World recovery');
+  const position = await page.evaluate(() => getComputedStyle(document.getElementById('kelo-studio-live')).position);
   assert(position === 'fixed', `Recovered Studio expected position=fixed, received ${position}`);
 
-  await page.screenshot({ path: `${outputDir}/world-editor-ios-recovered.png`, fullPage: true });
+  await page.screenshot({ path: `${outputDir}/world-editor-ios-recovered.png`, fullPage: true, timeout: 5000 });
 
   assert(pageErrors.length === 0, `Page errors: ${pageErrors.join(' | ')}`);
   const guardedConsoleErrors = consoleErrors.filter(row => /CREATOR_WORLD_STUDIO_MOUNT_FAILED|WORLD_EDIT_NOT_READY/.test(row));
