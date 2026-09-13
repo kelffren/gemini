@@ -13,6 +13,7 @@ on:
       - 'src/studio/**'
       - 'src/ui/studio-launcher.js'
       - 'tests/world-editor-ios-reopen.spec.js'
+      - 'scripts/world-release-gate-browserstack.mjs'
       - 'playwright.config.js'
       - 'browserstack.yml'
       - 'package.json'
@@ -29,6 +30,7 @@ on:
       - 'src/studio/**'
       - 'src/ui/studio-launcher.js'
       - 'tests/world-editor-ios-reopen.spec.js'
+      - 'scripts/world-release-gate-browserstack.mjs'
       - 'playwright.config.js'
       - 'browserstack.yml'
       - 'package.json'
@@ -66,6 +68,14 @@ jobs:
           test -n "$BROWSERSTACK_USERNAME" || (echo "Missing BROWSERSTACK_USERNAME secret" && exit 1)
           test -n "$BROWSERSTACK_ACCESS_KEY" || (echo "Missing BROWSERSTACK_ACCESS_KEY secret" && exit 1)
 
+      - name: BrowserStack environment
+        uses: browserstack/github-actions/setup-env@master
+        with:
+          username: ${{ secrets.BROWSERSTACK_USERNAME }}
+          access-key: ${{ secrets.BROWSERSTACK_ACCESS_KEY }}
+          build-name: KeloWorld-${{ github.run_id }}-${{ github.run_attempt }}
+          project-name: KeloWorld
+
       - name: Install dependencies
         run: npm install
 
@@ -86,6 +96,14 @@ jobs:
           cat /tmp/kelo-world-release-gate-http.log || true
           echo "PR candidate server did not become reachable"
           exit 1
+
+      - name: Start BrowserStack Local tunnel
+        if: github.event_name == 'pull_request'
+        uses: browserstack/github-actions/setup-local@master
+        with:
+          local-testing: start
+          local-identifier: random
+          local-logging-level: all-logs
 
       - name: Point gate at deployed LIVE
         if: github.event_name != 'pull_request'
@@ -136,7 +154,13 @@ jobs:
           exit 1
 
       - name: Run World open/reopen on real iPhone
-        run: npx browserstack-node-sdk playwright test tests/world-editor-ios-reopen.spec.js
+        run: node scripts/world-release-gate-browserstack.mjs
+
+      - name: Stop BrowserStack Local tunnel
+        if: always() && github.event_name == 'pull_request'
+        uses: browserstack/github-actions/setup-local@master
+        with:
+          local-testing: stop
 
       - name: Record release-gate verdict
         if: success()
@@ -152,7 +176,5 @@ jobs:
           name: world-release-gate-${{ github.run_id }}-${{ github.run_attempt }}
           if-no-files-found: ignore
           path: |
-            playwright-report.json
             test-results/
-            playwright-report/
             /tmp/kelo-world-release-gate-http.log
