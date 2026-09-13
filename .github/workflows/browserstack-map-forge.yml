@@ -22,6 +22,8 @@ on:
       - 'src/studio/**'
       - 'tests/iphone-gameplay.spec.js'
       - 'tests/iphone-full-gameplay.spec.js'
+      - 'tests/iphone-major-gameplay.spec.js'
+      - 'tests/iphone-acceptance.spec.js'
       - 'tests/world-editor-ios-reopen.spec.js'
       - 'playwright.config.js'
       - 'browserstack.yml'
@@ -85,10 +87,11 @@ jobs:
       - name: Run basic guest movement on real iPhone
         run: npx browserstack-node-sdk playwright test tests/iphone-gameplay.spec.js --workers=1
 
-      - name: Run full gameplay contract on real iPhone
-        run: npx browserstack-node-sdk playwright test tests/iphone-full-gameplay.spec.js --workers=1
+      - name: Run major gameplay acceptance on real iPhone
+        run: npx browserstack-node-sdk playwright test tests/iphone-acceptance.spec.js --workers=1
 
       - name: Run World reopen on real iPhone
+        if: always()
         run: npx browserstack-node-sdk playwright test tests/world-editor-ios-reopen.spec.js --workers=1
 
       - name: Upload Playwright evidence
