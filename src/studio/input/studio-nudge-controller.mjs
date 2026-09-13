@@ -75,7 +75,21 @@ export function createStudioNudgeController({root=globalThis,kernel}={}){
   function canTouchNudge(){const host=shell();if(!host||host.dataset.sheetOpen==='1'||host.dataset.creatorMinimized==='1')return false;if(!['select','move'].includes(String(host.dataset.activeTool||'select')))return false;return kernel.selection.get().length>0;}
   function mobileStep(){return resolveStudioNudgeStep({root,kernel,mode:mobileMode});}
   function cycleMobileMode(){mobileMode=MOBILE_MODES[(MOBILE_MODES.indexOf(mobileMode)+1)%MOBILE_MODES.length];syncPad();return mobileMode;}
-  function syncPad(){if(!pad)return;const visible=(root.innerWidth||9999)<=760&&canTouchNudge();pad.hidden=!visible;const modeButton=pad.querySelector('[data-nudge-mode]');if(modeButton){const step=mobileStep();modeButton.dataset.mode=mobileMode;modeButton.dataset.step=String(step);modeButton.textContent=`${step} PX`;modeButton.setAttribute('aria-label',`Nudge ${mobileMode}: ${step} pixels`);}pad.querySelectorAll('[data-nudge-dir]').forEach(button=>button.disabled=busy||!visible);}
+  function syncPad(){
+    if(!pad)return;
+    const visible=(root.innerWidth||9999)<=760&&canTouchNudge(),hidden=!visible;
+    if(pad.hidden!==hidden)pad.hidden=hidden;
+    const modeButton=pad.querySelector('[data-nudge-mode]');
+    if(modeButton){
+      const step=mobileStep(),stepText=String(step),label=`Nudge ${mobileMode}: ${step} pixels`,text=`${step} PX`;
+      if(modeButton.dataset.mode!==mobileMode)modeButton.dataset.mode=mobileMode;
+      if(modeButton.dataset.step!==stepText)modeButton.dataset.step=stepText;
+      if(modeButton.textContent!==text)modeButton.textContent=text;
+      if(modeButton.getAttribute('aria-label')!==label)modeButton.setAttribute('aria-label',label);
+    }
+    const disabled=busy||!visible;
+    pad.querySelectorAll('[data-nudge-dir]').forEach(button=>{if(button.disabled!==disabled)button.disabled=disabled;});
+  }
   function onPadClick(event){const button=event.target?.closest?.('button');if(!button)return;if(button.dataset.nudgeMode!==undefined){cycleMobileMode();try{root.navigator?.vibrate?.(8);}catch{}return;}const dir=button.dataset.nudgeDir;const vector=MOBILE_VECTORS[dir];if(!vector||!canTouchNudge())return;try{root.navigator?.vibrate?.(6);}catch{}void nudge(vector[0],vector[1],{step:mobileStep()}).catch(error=>console.warn('[Kelo Studio] mobile nudge failed',error));}
   function mountPad(){if(destroyed)return;const host=shell();if(!host)return;if(!style){style=document.createElement('style');style.dataset.keloStudioNudgePad='1';style.textContent=`
 #kelo-studio-live .ks-nudge-pad{display:none}
@@ -99,7 +113,7 @@ export function createStudioNudgeController({root=globalThis,kernel}={}){
   observer=new MutationObserver(()=>{mountPad();syncPad();});observer.observe(document.documentElement||document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['data-active-tool','data-sheet-open','data-creator-minimized']});
   mountPad();
   return Object.freeze({
-    version:'studio-nudge-v1.2.0-diagonal-mobile',
+    version:'studio-nudge-v1.2.1-idempotent-mobile-sync',
     nudge,cycleMobileMode,syncPad,
     get mobileMode(){return mobileMode;},
     destroy(){destroyed=true;document.removeEventListener('keydown',onKey,true);root.removeEventListener?.('resize',syncPad);observer?.disconnect();pad?.remove();style?.remove();pad=style=null;},
