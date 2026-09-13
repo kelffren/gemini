@@ -75,6 +75,8 @@ async function pageDiagnostic() {
     studio: !!document.getElementById('kelo-studio-live'),
     launchError: document.querySelector('.kc-launch-error')?.textContent || null,
     worldBusy: document.querySelector('[data-workspace="world"]')?.getAttribute('aria-busy') || null,
+    worldOpenPhase: window.__KELO_WORLD_OPEN_PHASE || null,
+    propertyCatalogCount: window.KELO_PROPERTY_CATALOG?.list?.()?.length ?? null,
     adminPlayerId: window.KELO_ADMIN_KEYS?.playerId?.() || null,
     canWorldEdit: !!window.KELO_ADMIN_KEYS?.can?.('world.edit'),
     worldEditReady: !!window.KELO_WORLD_EDIT?.ready,
@@ -140,7 +142,9 @@ try {
 
   page.on('pageerror', error => pageErrors.push(String(error)));
   page.on('console', msg => {
-    if (msg.type() === 'error') consoleErrors.push(msg.text());
+    const text = msg.text();
+    if (msg.type() === 'error') consoleErrors.push(text);
+    if (text.includes('[Kelo World open]')) console.log(`[KELO browser] ${text}`);
   });
 
   // mapEditor=1 is the repository's explicit offline/dev editor authorization path.
@@ -170,6 +174,7 @@ try {
   });
 
   await selectorVisible('#kelo-creators-hub', 10000, 'Creator Hub');
+  checkpoint('pre-World diagnostic', await pageDiagnostic());
   await clickSelector('#kelo-creators-hub [data-workspace="world"]', 'World card');
 
   await selectorVisible('#kelo-studio-live', 20000, 'World Studio');
