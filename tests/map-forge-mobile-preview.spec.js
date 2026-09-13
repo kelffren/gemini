@@ -100,6 +100,23 @@ test('Map Forge real preview exposes scene and sprite requirements, hides before
 
   const forge = page.locator('#kelo-map-forge');
   await expect(forge).toBeVisible();
+
+  // The product intentionally boots with a random seed and a best-of selector. CI instead uses
+  // one exact candidate so visual evidence and arrival-scene expectations are reproducible.
+  const fixedSeed = 81746291;
+  const seedInput = forge.locator('input[type="number"]').first();
+  const selects = forge.locator('select.kmf-select');
+  await selects.nth(1).evaluate(select => {
+    const option = document.createElement('option');
+    option.value = '1';
+    option.textContent = 'Best of 1';
+    select.append(option);
+    select.value = '1';
+  });
+  await seedInput.fill(String(fixedSeed));
+  await forge.getByRole('button', { name: 'GENERAR', exact: true }).click();
+  await page.waitForFunction(seed => window.__KELO_TEST_MAP_FORGE_WORKSPACE__?.selected?.metadata?.seed === seed, fixedSeed, { timeout: 30000 });
+
   await expect(page.getByRole('button', { name: 'VER EN MAPA EXTERIOR' })).toBeEnabled();
   await expect(page.getByRole('heading', { name: 'SPRITES NECESARIOS' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'PLAN DE ESCENAS' })).toBeVisible();
@@ -132,6 +149,7 @@ test('Map Forge real preview exposes scene and sprite requirements, hides before
     } : null;
   });
   expect(before).not.toBeNull();
+  expect(before.seed).toBe(fixedSeed);
   expect(before.propertyPreviewRenderer).toBe(true);
   expect(before.snapshotPreviewRenderer).toBe(true);
   expect(before.spriteManifestVersion).toBe('map-forge-sprite-manifest-v1');
