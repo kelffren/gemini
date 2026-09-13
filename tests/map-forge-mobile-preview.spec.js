@@ -152,7 +152,7 @@ test('Map Forge real preview exposes scene and sprite requirements, hides before
   expect(before.seed).toBe(fixedSeed);
   expect(before.propertyPreviewRenderer).toBe(true);
   expect(before.snapshotPreviewRenderer).toBe(true);
-  expect(before.spriteManifestVersion).toBe('map-forge-sprite-manifest-v1');
+  expect(before.spriteManifestVersion).toBe('map-forge-sprite-manifest-v2');
   expect(before.uniqueSprites).toBeGreaterThan(0);
   expect(before.spriteInstances).toBeGreaterThan(0);
   expect(before.sceneBuildPlanCount).toBeGreaterThan(0);
