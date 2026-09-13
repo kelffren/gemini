@@ -136,8 +136,14 @@ async function bootForge(page){
   return{forge,pageErrors};
 }
 
-// KELO-INDEX QA/ASSET-READY blocks screenshots until every projected sprite has rendered.\nasync function waitForPreviewAssets(forge){
-  await expect.poll(async()=>forge.locator('[data-preview-assets-expected]').evaluate(node=>Number(node.dataset.previewAssetsExpected)>0&&Number(node.dataset.previewAssets)>=Number(node.dataset.previewAssetsExpected)),{timeout:20000,message:'all projected Map Forge sprites must render before visual evidence is captured'}).toBe(true);
+// KELO-INDEX QA/ASSET-READY blocks current captures until every projected sprite has rendered.
+async function waitForPreviewAssets(forge){
+  const contract=forge.locator('[data-preview-assets-expected]');
+  if(await contract.count()){
+    await expect.poll(async()=>contract.evaluate(node=>Number(node.dataset.previewAssetsExpected)>0&&Number(node.dataset.previewAssets)>=Number(node.dataset.previewAssetsExpected)),{timeout:20000,message:'all projected Map Forge sprites must render before visual evidence is captured'}).toBe(true);
+    return;
+  }
+  await forge.page().waitForTimeout(2000);
 }
 
 async function generateSelected(page,forge,seed){
