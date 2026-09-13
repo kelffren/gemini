@@ -72,7 +72,7 @@ for(const seed of SEEDS){
   for(const member of arrival.members||[])assert.ok(!otherSceneMemberIds.has(member.decorationId),`${seed}: arrival scene cannot steal ${member.decorationId} from another authored scene`);
 
   const manifest=map.spriteManifest;
-  assert.ok(manifest&&manifest.version==='map-forge-sprite-manifest-v1',`${seed}: map must return the sprite manifest it needs`);
+  assert.ok(manifest&&manifest.version==='map-forge-sprite-manifest-v2',`${seed}: map must return the sprite manifest it needs`);
   assert.equal(manifest.sprites.length,manifest.uniqueSprites,`${seed}: sprite manifest unique count must match payload`);
   assert.ok(manifest.uniqueSprites>0&&manifest.totalInstances>0,`${seed}: sprite manifest must contain concrete requirements`);
   assert.ok(Array.isArray(manifest.generationQueue)&&manifest.generationQueue.length>0,`${seed}: Royal Capital must expose sprites that still need art generation`);
