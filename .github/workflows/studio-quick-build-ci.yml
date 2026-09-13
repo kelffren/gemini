@@ -5,6 +5,7 @@ on:
     paths:
       - 'src/studio/tools/quick-build-tool.mjs'
       - 'src/studio/tools/room-build-tool.mjs'
+      - 'src/studio/tools/select-tool.mjs'
       - 'src/studio/tools/register-basic-tools.mjs'
       - 'src/studio/tools/placement-tool.mjs'
       - 'src/studio/document/document-commands.mjs'
@@ -18,6 +19,7 @@ on:
     paths:
       - 'src/studio/tools/quick-build-tool.mjs'
       - 'src/studio/tools/room-build-tool.mjs'
+      - 'src/studio/tools/select-tool.mjs'
       - 'src/studio/tools/register-basic-tools.mjs'
       - 'src/studio/tools/placement-tool.mjs'
       - 'src/studio/document/document-commands.mjs'
@@ -38,6 +40,7 @@ jobs:
         run: |
           node --check src/studio/tools/quick-build-tool.mjs
           node --check src/studio/tools/room-build-tool.mjs
+          node --check src/studio/tools/select-tool.mjs
           node --check src/studio/tools/register-basic-tools.mjs
           node --check src/studio/tools/placement-tool.mjs
           node --check src/studio/document/document-commands.mjs
