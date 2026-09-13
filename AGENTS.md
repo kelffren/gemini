@@ -180,3 +180,31 @@ La documentación pública no expone secretos, claves, rutas admin ni detalles e
 11. Stamp or refresh `KELO-INDEX` on files you touch.
 12. Update `ENGINE_MAP.md`/`docs/KELO_FOUNDATION.md` when ownership, API or architecture changes.
 13. Update technical docs, system catalog and `guide.html` when the system contract or player-visible behavior changes.
+
+## RULE 7 — BUG REGISTRY + AI BRIDGE (OBLIGATORIO)
+
+KELO WORLD tiene una memoria canónica de defectos en `/bugs`.
+
+Cuando una tarea involucre un fallo existente, descubra un fallo reproducible o pretenda declarar que un bug fue corregido, el agente debe leer:
+
+1. `bugs/README.md`
+2. `bugs/SCHEMA.md`
+3. `bugs/AI_BRIDGE.md`
+4. los registros relevantes de `bugs/registry/`
+
+Reglas duras:
+
+- Antes de crear un bug, buscar duplicados.
+- Un defecto reproducible que pueda requerir trabajo posterior debe registrarse o enlazarse a un bug existente.
+- Al comenzar una corrección, usar `CLAIMED` solo mientras exista trabajo activo.
+- Una IA que escribe el fix puede dejar el bug en `FIXED_PENDING_VERIFY`, con commit(s), archivos y evidencia.
+- **Está prohibido saltar de `CLAIMED`/`OPEN` directamente a `CLOSED`.**
+- Bugs críticos o visibles para jugadores solo pueden pasar a `VERIFIED` con una validación independiente que reproduzca el flujo original en el entorno pertinente.
+- Si la verificación falla o el defecto reaparece, usar `REOPENED` y conservar el historial.
+- Reportes de jugadores entran como `REPORT-*`; triage decide si crean un bug nuevo o se enlazan a uno existente.
+- Screenshots/videos pesados viven fuera de Git; el registro guarda referencias.
+- Nunca almacenar tokens, cookies, passwords, JWT completos o claves privadas dentro de reportes/bugs.
+
+Regla mental obligatoria:
+
+`DETECTAR != ARREGLAR != VERIFICAR != CERRAR`
