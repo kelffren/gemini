@@ -1,31 +1,72 @@
-name: BrowserStack Map Forge Real iPhone
+name: KELO World Release Gate
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'index.html'
+      - 'src/creators/ui/creator-hub.mjs'
+      - 'src/creators/workspaces/world-workspace.mjs'
+      - 'src/creators/adapters/world-creator-adapter.mjs'
+      - 'src/studio/**'
+      - 'src/ui/studio-launcher.js'
+      - 'tests/world-editor-ios-reopen.spec.js'
+      - 'scripts/world-release-gate-browserstack.mjs'
+      - 'playwright.config.js'
+      - 'browserstack.yml'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/browserstack-map-forge.yml'
   push:
     branches:
       - main
     paths:
+      - 'index.html'
+      - 'src/creators/ui/creator-hub.mjs'
       - 'src/creators/workspaces/world-workspace.mjs'
+      - 'src/creators/adapters/world-creator-adapter.mjs'
+      - 'src/studio/**'
+      - 'src/ui/studio-launcher.js'
       - 'tests/world-editor-ios-reopen.spec.js'
+      - 'scripts/world-release-gate-browserstack.mjs'
       - 'playwright.config.js'
       - 'browserstack.yml'
       - 'package.json'
       - 'package-lock.json'
       - '.github/workflows/browserstack-map-forge.yml'
 
+permissions:
+  contents: read
+
+concurrency:
+  group: kelo-world-release-gate-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  real-ios-map-forge:
+  world-release-gate:
+    name: KELO RELEASE GATE / World real iPhone
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      KELO_PAGES: https://kelffren.github.io/gemini/
       BROWSERSTACK_USERNAME: ${{ secrets.BROWSERSTACK_USERNAME }}
       BROWSERSTACK_ACCESS_KEY: ${{ secrets.BROWSERSTACK_ACCESS_KEY }}
+      KELO_CANDIDATE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
     steps:
-      - name: Checkout
+      - name: Checkout exact candidate
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$KELO_CANDIDATE_SHA" || (echo "Checkout mismatch: expected $KELO_CANDIDATE_SHA, got $actual" && exit 1)
+          echo "Testing exact candidate: $actual"
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -38,33 +79,113 @@ jobs:
           test -n "$BROWSERSTACK_USERNAME" || (echo "Missing BROWSERSTACK_USERNAME secret" && exit 1)
           test -n "$BROWSERSTACK_ACCESS_KEY" || (echo "Missing BROWSERSTACK_ACCESS_KEY secret" && exit 1)
 
-      - name: Wait for matching Pages deployment
-        shell: bash
-        run: |
-          for i in {1..36}; do
-            if curl -fsSL "${KELO_PAGES}src/creators/workspaces/world-workspace.mjs?sha=${GITHUB_SHA}&attempt=${i}" | grep -q 'CREATOR_WORLD_STUDIO_MOUNT_FAILED'; then
-              echo "Matching World launch recovery is live on Pages"
-              exit 0
-            fi
-            echo "Waiting for Pages deployment (${i}/36)"
-            sleep 10
-          done
-          echo "Timed out waiting for the fixed World workspace on Pages"
-          exit 1
+      - name: BrowserStack environment
+        uses: browserstack/github-actions/setup-env@master
+        with:
+          username: ${{ secrets.BROWSERSTACK_USERNAME }}
+          access-key: ${{ secrets.BROWSERSTACK_ACCESS_KEY }}
+          build-name: KeloWorld-${{ github.run_id }}-${{ github.run_attempt }}
+          project-name: KeloWorld
 
       - name: Install dependencies
         run: npm install
 
-      - name: Run World reopen on real iPhone
-        run: npx browserstack-node-sdk playwright test tests/world-editor-ios-reopen.spec.js
+      - name: Serve PR candidate for real-device testing
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          nohup python3 -m http.server 4173 --bind 0.0.0.0 > /tmp/kelo-world-release-gate-http.log 2>&1 &
+          echo $! > /tmp/kelo-world-release-gate-http.pid
+          for i in {1..20}; do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then
+              echo "KELO_PAGES=http://bs-local.com:4173/" >> "$GITHUB_ENV"
+              echo "KELO_RELEASE_STAGE=PR_CANDIDATE_REAL_IPHONE" >> "$GITHUB_ENV"
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/kelo-world-release-gate-http.log || true
+          echo "PR candidate server did not become reachable"
+          exit 1
 
-      - name: Upload Playwright evidence
+      - name: Start BrowserStack Local tunnel
+        if: github.event_name == 'pull_request'
+        uses: browserstack/github-actions/setup-local@master
+        with:
+          local-testing: start
+          local-identifier: random
+          local-logging-level: all-logs
+
+      - name: Point gate at deployed LIVE
+        if: github.event_name != 'pull_request'
+        shell: bash
+        run: |
+          echo "KELO_PAGES=https://kelffren.github.io/gemini/" >> "$GITHUB_ENV"
+          echo "KELO_RELEASE_STAGE=DEPLOYED_LIVE_REAL_IPHONE" >> "$GITHUB_ENV"
+
+      - name: Wait until exact main code is LIVE on Pages
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=(
+            "index.html"
+            "src/creators/ui/creator-hub.mjs"
+            "src/creators/workspaces/world-workspace.mjs"
+            "src/creators/adapters/world-creator-adapter.mjs"
+            "src/studio/integration/live-studio-controller.mjs"
+            "src/ui/studio-launcher.js"
+          )
+          for attempt in {1..60}; do
+            all_live=1
+            for path in "${files[@]}"; do
+              test -f "$path" || continue
+              local_hash="$(sha256sum "$path" | awk '{print $1}')"
+              tmp="$(mktemp)"
+              if ! curl -fsSL "${KELO_PAGES}${path}?sha=${KELO_CANDIDATE_SHA}&attempt=${attempt}" -o "$tmp"; then
+                all_live=0
+                rm -f "$tmp"
+                break
+              fi
+              live_hash="$(sha256sum "$tmp" | awk '{print $1}')"
+              rm -f "$tmp"
+              if [ "$local_hash" != "$live_hash" ]; then
+                all_live=0
+                break
+              fi
+            done
+            if [ "$all_live" -eq 1 ]; then
+              echo "Exact World/Studio candidate is LIVE on GitHub Pages"
+              exit 0
+            fi
+            echo "Waiting for exact Pages deployment (${attempt}/60)"
+            sleep 10
+          done
+          echo "LIVE deployment never matched the tested main candidate"
+          exit 1
+
+      - name: Run World open/reopen on real iPhone
+        run: node scripts/world-release-gate-browserstack.mjs
+
+      - name: Stop BrowserStack Local tunnel
+        if: always() && github.event_name == 'pull_request'
+        uses: browserstack/github-actions/setup-local@master
+        with:
+          local-testing: stop
+
+      - name: Record release-gate verdict
+        if: success()
+        shell: bash
+        run: |
+          echo "VERIFIED ${KELO_RELEASE_STAGE}: World opened and reopened on a real iPhone with no guarded runtime errors."
+          echo "Candidate SHA: ${KELO_CANDIDATE_SHA}"
+
+      - name: Upload real-device evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: browserstack-world-ios-evidence
+          name: world-release-gate-${{ github.run_id }}-${{ github.run_attempt }}
           if-no-files-found: ignore
           path: |
-            playwright-report.json
             test-results/
-            playwright-report/
+            /tmp/kelo-world-release-gate-http.log
