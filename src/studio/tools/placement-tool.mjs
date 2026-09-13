@@ -1,12 +1,12 @@
 /* KELO-INDEX
  * area: STUDIO / PLACEMENT TOOL
- * owns: local ghost preview and one-shot placement commit
+ * owns: local ghost preview and placement commits
  * does-not-own: pointer listeners, authority, asset rendering
  * public-api: createPlacementTool()
- * online: preview is local; commit becomes one Command
+ * online: previews are local; commits become CommandBus commands
  */
 
-import { createPlaceEntityCommand } from '../document/document-commands.mjs';
+import { createPlaceEntityCommand, createCompositeCommand } from '../document/document-commands.mjs';
 
 function id() {
   const uuid = globalThis.crypto?.randomUUID?.();
@@ -46,6 +46,14 @@ export function createPlacementTool(kernel) {
     kernel.selection.set(row.id);
     preview = null; emit(); return row;
   }
+  async function commitBatch(rows,{label='Place build segment'}={}){
+    const list=(rows||[]).map(row=>({ ...row, id:String(row?.id||id()), transform:{...(row?.transform||{})}, bounds:{...(row?.bounds||{})}, components:{...(row?.components||{})} }));
+    if(!list.length)return [];
+    const commands=list.map(createPlaceEntityCommand);
+    await kernel.execute(createCompositeCommand(commands,{type:'entity.place.batch',label}));
+    kernel.selection.set(list.map(row=>row.id));
+    preview=null;emit();return list;
+  }
 
-  return Object.freeze({ id: 'placement', start, move, rotate, cancel, commit, getPreview: () => preview ? { ...preview, transform: { ...preview.transform }, bounds: { ...preview.bounds } } : null, onPreview(fn) { if (typeof fn !== 'function') return () => {}; listeners.add(fn); return () => listeners.delete(fn); } });
+  return Object.freeze({ id: 'placement', start, move, rotate, cancel, commit, commitBatch, getPreview: () => preview ? { ...preview, transform: { ...preview.transform }, bounds: { ...preview.bounds } } : null, onPreview(fn) { if (typeof fn !== 'function') return () => {}; listeners.add(fn); return () => listeners.delete(fn); } });
 }
