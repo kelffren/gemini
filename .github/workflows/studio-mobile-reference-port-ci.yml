@@ -8,6 +8,7 @@ on:
   pull_request:
     paths:
       - 'src/studio/ui/creator-productivity-panel.mjs'
+      - 'src/studio/integration/live-studio-controller.mjs'
       - 'src/studio/tools/quick-build-tool.mjs'
       - 'src/studio/tools/room-build-tool.mjs'
       - 'src/studio/tools/room-material-tool.mjs'
@@ -30,6 +31,7 @@ jobs:
       - name: Syntax
         run: |
           node --check src/studio/ui/creator-productivity-panel.mjs
+          node --check src/studio/integration/live-studio-controller.mjs
           node --check src/studio/tools/quick-build-tool.mjs
           node --check src/studio/tools/room-build-tool.mjs
           node --check src/studio/tools/room-material-tool.mjs
