@@ -9,6 +9,7 @@ on:
     paths:
       - 'src/studio/ui/creator-productivity-panel.mjs'
       - 'scripts/studio-mobile-reference-live-audit.mjs'
+      - 'scripts/live-studio-open-smoke.mjs'
       - '.github/workflows/studio-mobile-reference-port-ci.yml'
 
 jobs:
@@ -23,6 +24,7 @@ jobs:
       - name: Syntax
         run: |
           node --check src/studio/ui/creator-productivity-panel.mjs
+          node --check scripts/live-studio-open-smoke.mjs
           node --check scripts/studio-mobile-reference-live-audit.mjs
       - name: Install Playwright
         run: npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund playwright@1.55.0
@@ -35,6 +37,11 @@ jobs:
           done
           cat /tmp/studio-mobile-reference-http.log
           exit 1
+      - name: Diagnose World Studio observer boot
+        env:
+          AUDIT_URL: http://127.0.0.1:8000/
+          CHROME_BIN: /usr/bin/google-chrome
+        run: timeout --signal=TERM 120s node scripts/live-studio-open-smoke.mjs
       - name: Exercise phone-first Studio flow
         env:
           AUDIT_URL: http://127.0.0.1:8000/
