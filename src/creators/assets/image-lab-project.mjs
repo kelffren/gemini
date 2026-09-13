@@ -43,7 +43,14 @@ function normalizeRevision(revision={}){
   return F({revisionId:clean(revision.revisionId)||id('rev'),label:clean(revision.label)||'Revision',createdAt:clean(revision.createdAt)||now(),operationIds,operations});
 }
 function freezeProject(project){
-  return F({...project,source:F({...project.source}),working:F({...project.working,operations:F(project.working.operations.map(op=>F({...op,params:F(copy(op.params))}))}),revisions:F(project.revisions.map(normalizeRevision)),export:F({...project.export})});
+  const operations=F(project.working.operations.map(op=>F({...op,params:F(copy(op.params))})));
+  return F({
+    ...project,
+    source:F({...project.source}),
+    working:F({...project.working,operations}),
+    revisions:F(project.revisions.map(normalizeRevision)),
+    export:F({...project.export})
+  });
 }
 function assertProject(project){if(!project||project.schema!=='kelo-image-lab-project-v1'||!project.source?.immutable||!Array.isArray(project.working?.operations))throw new Error('IMAGE_LAB_PROJECT_INVALID');}
 
