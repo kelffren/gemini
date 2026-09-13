@@ -100,8 +100,7 @@
     {key:'imperialObelisk',id:'imperial:obelisco',label:'Obelisco Imperial',src:'assets/world/imperial-plaza/obelisco-imperial.png?art=609',imageW:1024,imageH:1536,width:96,height:128,category:'architecture',collision:{x:0,y:80,w:96,h:48}},
     {key:'imperialStaircase',id:'imperial:escalinata',label:'Escalinata Imperial',src:'assets/world/imperial-plaza/escalinata-imperial.png?art=610',imageW:1448,imageH:1086,width:128,height:96,category:'architecture',collision:null},
     {key:'imperialLamp',id:'imperial:farola',label:'Farola Imperial',src:'assets/world/imperial-plaza/farola-imperial.png?art=611',imageW:1024,imageH:1536,width:64,height:96,category:'decor',collision:{x:16,y:64,w:32,h:32}},
-    {key:'imperialTopiary',id:'imperial:topiario',label:'Topiario Imperial',src:'assets/world/imperial-plaza/topiario-imperial.png?art=612',imageW:1254,imageH:1254,width:96,height:96,category:'decor',collision:{x:16,y:64,w:64,h:32}}
-,
+    {key:'imperialTopiary',id:'imperial:topiario',label:'Topiario Imperial',src:'assets/world/imperial-plaza/topiario-imperial.png?art=612',imageW:1254,imageH:1254,width:96,height:96,category:'decor',collision:{x:16,y:64,w:64,h:32}},
     {key:'imperialMonumentalLamp',id:'imperial:farola-monumental',label:'Farola Monumental Imperial',src:'assets/world/imperial-plaza/farola-monumental.png?art=613',imageW:1122,imageH:1402,width:64,height:96,category:'decor',collision:{x:16,y:64,w:32,h:32}},
     {key:'imperialAstralFountain',id:'imperial:fuente-astral',label:'Fuente Astral Imperial',src:'assets/world/imperial-plaza/fuente-astral.png?art=614',imageW:1254,imageH:1254,width:128,height:128,category:'architecture',collision:{x:0,y:64,w:128,h:64}},
     {key:'imperialBench',id:'imperial:banco',label:'Banco Imperial',src:'assets/world/imperial-plaza/banco-imperial.png?art=615',imageW:1448,imageH:1086,width:128,height:96,category:'decor',collision:{x:0,y:64,w:128,h:32}},
@@ -152,6 +151,40 @@
     }
   }
 
+  const KELO_TREE_PACK_01=Object.freeze([
+    {key:'treeOakRoundGreen',id:'tree:oak-round-green',label:'Roble Redondo Verde',src:'assets/world/trees/kelo-tree-pack-01/tree-oak-round-green.png?art=701',imageW:364,imageH:361,width:128,height:128,collision:{x:48,y:104,w:32,h:24}},
+    {key:'treePineTallEvergreen',id:'tree:pine-tall-evergreen',label:'Pino Alto Verde',src:'assets/world/trees/kelo-tree-pack-01/tree-pine-tall-evergreen.png?art=702',imageW:234,imageH:372,width:88,height:144,collision:{x:32,y:120,w:24,h:24}},
+    {key:'treeOakBroadGreen',id:'tree:oak-broad-green',label:'Roble Ancho Verde',src:'assets/world/trees/kelo-tree-pack-01/tree-oak-broad-green.png?art=703',imageW:351,imageH:366,width:120,height:128,collision:{x:44,y:104,w:32,h:24}},
+    {key:'treeCherryBlossomPink',id:'tree:cherry-blossom-pink',label:'Cerezo Rosa',src:'assets/world/trees/kelo-tree-pack-01/tree-cherry-blossom-pink.png?art=704',imageW:347,imageH:362,width:120,height:128,collision:{x:44,y:104,w:32,h:24}},
+    {key:'treeOakAutumnOrange',id:'tree:oak-autumn-orange',label:'Roble de Otoño Naranja',src:'assets/world/trees/kelo-tree-pack-01/tree-oak-autumn-orange.png?art=705',imageW:349,imageH:362,width:120,height:128,collision:{x:44,y:104,w:32,h:24}},
+    {key:'treeBirchGreen',id:'tree:birch-green',label:'Abedul Verde',src:'assets/world/trees/kelo-tree-pack-01/tree-birch-green.png?art=706',imageW:290,imageH:356,width:104,height:128,collision:{x:36,y:104,w:32,h:24}},
+    {key:'treeWillowWeeping',id:'tree:willow-weeping',label:'Sauce Llorón',src:'assets/world/trees/kelo-tree-pack-01/tree-willow-weeping.png?art=707',imageW:365,imageH:353,width:128,height:128,collision:{x:48,y:104,w:32,h:24}},
+    {key:'treeAppleRed',id:'tree:apple-red',label:'Manzano Rojo',src:'assets/world/trees/kelo-tree-pack-01/tree-apple-red.png?art=708',imageW:335,imageH:360,width:120,height:128,collision:{x:44,y:104,w:32,h:24}},
+    {key:'treeOakDenseDark',id:'tree:oak-dense-dark',label:'Roble Denso Oscuro',src:'assets/world/trees/kelo-tree-pack-01/tree-oak-dense-dark.png?art=709',imageW:367,imageH:363,width:128,height:128,collision:{x:48,y:104,w:32,h:24}},
+    {key:'treePineSnow',id:'tree:pine-snow',label:'Pino Nevado',src:'assets/world/trees/kelo-tree-pack-01/tree-pine-snow.png?art=710',imageW:275,imageH:364,width:96,height:128,collision:{x:36,y:104,w:24,h:24}},
+    {key:'treeDeadGnarled',id:'tree:dead-gnarled',label:'Árbol Seco Retorcido',src:'assets/world/trees/kelo-tree-pack-01/tree-dead-gnarled.png?art=711',imageW:339,imageH:356,width:120,height:128,collision:{x:44,y:104,w:32,h:24}},
+    {key:'treeCanopyLightGreen',id:'tree:canopy-light-green',label:'Árbol Verde Claro',src:'assets/world/trees/kelo-tree-pack-01/tree-canopy-light-green.png?art=712',imageW:346,imageH:367,width:120,height:128,collision:{x:44,y:104,w:32,h:24}}
+  ]);
+
+  function registerKeloTreePack01(){
+    for(const item of KELO_TREE_PACK_01){
+      const atlas={
+        id:item.key,src:item.src,width:item.imageW,height:item.imageH,
+        tileWidth:item.imageW,tileHeight:item.imageH,frameWidth:item.imageW,frameHeight:item.imageH,columns:1,
+        meta:{family:'kelo-tree-pack-01',standalone:true,anchor:'bottom-center'}
+      };
+      try{A?.register?.(item.key,atlas,{role:'optional'});}catch(e){
+        console.warn('[Kelo catalog] tree atlas registration skipped',item.key,e?.message||e);
+      }
+      register({
+        id:item.id,label:item.label,category:'nature',family:'kelo-tree-pack-01',districts:['*'],
+        width:item.width,height:item.height,snap:TILE,collision:item.collision,
+        source:'kelo-tree-pack-01',sourceId:item.key,
+        parts:[{assetKey:item.key,source:{x:0,y:0,w:item.imageW,h:item.imageH},offset:{x:0,y:0},size:{w:item.width,h:item.height},phase:'props_back'}]
+      });
+    }
+  }
+
   // Only expose runtime-approved sheets here. Source sheets and superseded
   // archive rasters stay available for authoring/history but are not fetched by LIVE.
   const EXTRA_SHEETS=Object.freeze([
@@ -174,9 +207,9 @@
     });
   }
 
-  registerPropTemplates(); registerPrefabTemplates(); registerRegistryTilesets(); registerImperialPlazaAssets(); registerExtraSheets();
+  registerPropTemplates(); registerPrefabTemplates(); registerRegistryTilesets(); registerImperialPlazaAssets(); registerKeloTreePack01(); registerExtraSheets();
   window.KELO_PROPERTY_CATALOG=Object.freeze({
-    version:'property-asset-catalog-v1.3.0',tileSize:TILE,registerTemplate:register,get(id){return templates.get(String(id))||null;},list(filter){let out=Array.from(templates.values()).filter(x=>x.placeable);if(filter?.category)out=out.filter(x=>x.category===filter.category);if(filter?.district)out=out.filter(x=>x.districts.includes('*')||x.districts.includes(filter.district));return out;},categories(){return Array.from(new Set(Array.from(templates.values()).map(x=>x.category))).sort();},onRegister(fn){if(typeof fn!=='function')return()=>{};listeners.add(fn);return()=>listeners.delete(fn);}
+    version:'property-asset-catalog-v1.4.0',tileSize:TILE,registerTemplate:register,get(id){return templates.get(String(id))||null;},list(filter){let out=Array.from(templates.values()).filter(x=>x.placeable);if(filter?.category)out=out.filter(x=>x.category===filter.category);if(filter?.district)out=out.filter(x=>x.districts.includes('*')||x.districts.includes(filter.district));return out;},categories(){return Array.from(new Set(Array.from(templates.values()).map(x=>x.category))).sort();},onRegister(fn){if(typeof fn!=='function')return()=>{};listeners.add(fn);return()=>listeners.delete(fn);}
   });
-  window.KELO_PROPERTY_CATALOG_AUDIT=Object.freeze({version:'property-asset-catalog-v1.3.0',templateCount:templates.size,propSource:!!P,prefabSource:!!F,tileSize:TILE,imperialPlazaAssets:IMPERIAL_PLAZA_ASSETS.map(s=>s.key),extraSheets:EXTRA_SHEETS.map(s=>s.key)});
+  window.KELO_PROPERTY_CATALOG_AUDIT=Object.freeze({version:'property-asset-catalog-v1.4.0',templateCount:templates.size,propSource:!!P,prefabSource:!!F,tileSize:TILE,imperialPlazaAssets:IMPERIAL_PLAZA_ASSETS.map(s=>s.key),keloTreePack01:KELO_TREE_PACK_01.map(s=>s.key),extraSheets:EXTRA_SHEETS.map(s=>s.key)});
 })();
