@@ -3,16 +3,25 @@ import fs from 'node:fs';
 import {createStudioKernel} from '../src/studio/core/studio-kernel.mjs';
 import {createWorldDocument} from '../src/studio/document/world-document.mjs';
 import {createPlacementTool} from '../src/studio/tools/placement-tool.mjs';
-import {createQuickBuildTool} from '../src/studio/tools/quick-build-tool.mjs';
+import {createQuickBuildTool,resolveQuickBuildDragThreshold} from '../src/studio/tools/quick-build-tool.mjs';
 
+const zoomRoot=zoom=>({KeloCamera:{snapshot:()=>({effectiveZoom:zoom})}});
+assert.equal(resolveQuickBuildDragThreshold('mouse',{root:zoomRoot(.25)}),24,'mouse drag threshold must remain 6 screen px at 0.25x');
+assert.equal(resolveQuickBuildDragThreshold('touch',{root:zoomRoot(.25)}),64,'touch drag threshold must remain 16 screen px at 0.25x');
+assert.equal(resolveQuickBuildDragThreshold('mouse',{root:zoomRoot(2)}),3,'mouse drag threshold must remain 6 screen px at 2x');
+assert.equal(resolveQuickBuildDragThreshold('touch',{root:zoomRoot(2)}),8,'touch drag threshold must remain 16 screen px at 2x');
+
+const root={KELO_QUICK_BUILD_CATALOG:{wall:'wall',floor:'floor'},KeloCamera:{snapshot:()=>({effectiveZoom:.25})}};
 const kernel=createStudioKernel({document:createWorldDocument({worldId:'audit:quick-build-drag',settings:{tileSize:32,chunkSize:256}})});
 kernel.prefabs.register({id:'wall',label:'Wall',category:'building',bounds:{w:64,h:16},components:{}});
 kernel.prefabs.register({id:'floor',label:'Floor',category:'building',bounds:{w:32,h:32},components:{}});
 const placement=createPlacementTool(kernel);kernel.tools.register(placement);
-const quick=createQuickBuildTool(kernel,{placement,root:{KELO_QUICK_BUILD_CATALOG:{wall:'wall',floor:'floor'}}});kernel.tools.register(quick);
+const quick=createQuickBuildTool(kernel,{placement,root});kernel.tools.register(quick);
 let executed=null;const off=kernel.commands.on(event=>{if(event.type==='execute')executed=event.command;});
 assert.equal(quick.activate('wall'),true);
 const down=kernel.input.route('pointerdown',{worldX:32,worldY:64,pointerType:'mouse'});assert.equal(down.handled,true);
+kernel.input.route('pointermove',{worldX:50,worldY:64,pointerType:'mouse'});
+assert.equal(quick.getDragPreviews().length,0,'18 world units at 0.25x are only 4.5 screen px and must stay a click');
 const move=kernel.input.route('pointermove',{worldX:250,worldY:64,pointerType:'mouse'});assert.equal(move.handled,true);
 const previews=quick.getDragPreviews();
 assert.equal(previews.length,4,'218px drag with 64px modules should preview four walls');
@@ -29,7 +38,10 @@ await kernel.undo();assert.equal(kernel.document.entities.length,0,'one Undo mus
 await kernel.redo();assert.equal(kernel.document.entities.length,4,'one Redo must restore the entire drag');
 assert.equal(kernel.history.undoDepth,1,'Redo must restore a single history entry');
 
-quick.deactivate();quick.activate('floor');kernel.input.route('pointerdown',{worldX:0,worldY:0,pointerType:'touch'});kernel.input.route('pointermove',{worldX:0,worldY:100,pointerType:'touch'});
+quick.deactivate();quick.activate('floor');kernel.input.route('pointerdown',{worldX:0,worldY:0,pointerType:'touch'});
+kernel.input.route('pointermove',{worldX:0,worldY:60,pointerType:'touch'});
+assert.equal(quick.getDragPreviews().length,0,'60 world units at 0.25x are 15 screen px and must not trigger touch drag');
+kernel.input.route('pointermove',{worldX:0,worldY:100,pointerType:'touch'});
 const vertical=quick.getDragPreviews();assert.equal(vertical.length,4,'touch vertical drag must plan repeated floor modules');assert.ok(vertical.every(row=>row.transform.rotation===90),'vertical drag must orient modules vertically');
 
 const quickSource=fs.readFileSync(new URL('../src/studio/tools/quick-build-tool.mjs',import.meta.url),'utf8');
@@ -38,4 +50,4 @@ assert.doesNotMatch(quickSource,/kernel\.execute\s*\(|KELO_WORLD_EDIT/,'Quick Bu
 assert.match(quickSource,/placement\.commitBatch\(/,'drag must delegate persistence to placement');
 assert.match(placementSource,/createCompositeCommand/,'batch placement must use the reusable composite command');
 off();quick.destroy();
-console.log(JSON.stringify({ok:true,phase:4,dragPreview:true,mouseDrag:true,touchDrag:true,batchEntities:4,historyEntries:1,oneUndo:true,oneRedo:true,semanticMetadata:true,authorityBypass:false},null,2));
+console.log(JSON.stringify({ok:true,phase:5,zoomAwareDrag:true,mouseScreenThresholdPx:6,touchScreenThresholdPx:16,zoomCases:[.25,2],batchEntities:4,historyEntries:1,oneUndo:true,oneRedo:true,semanticMetadata:true,authorityBypass:false},null,2));
