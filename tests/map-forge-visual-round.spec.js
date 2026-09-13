@@ -72,7 +72,8 @@ function scenePairMetrics(map){
     }
     for(const sides of groups.values()){if(sides.size===2)completePairs++;else orphanPairs++;}
   }
-  return{scenePrefabCount:(map.scenePrefabs||[]).length,sceneCompletePairCount:completePairs,sceneOrphanPairCount:orphanPairs,scenePairRollbackCount:Number(map.generationStats?.scenePrefabPairRollbackCount||0)};
+  const exitScenes=(map.scenePrefabs||[]).filter(scene=>scene.sceneType==='exit');
+  return{scenePrefabCount:(map.scenePrefabs||[]).length,sceneCompletePairCount:completePairs,sceneOrphanPairCount:orphanPairs,scenePairRollbackCount:Number(map.generationStats?.scenePrefabPairRollbackCount||0),exitSceneCount:exitScenes.length,exitSceneMovedCount:Number(map.generationStats?.exitSceneMovedCount||0),exitSceneMovementDistance:Number(map.generationStats?.exitSceneMovementDistance||0)};
 }
 function mapMetrics(map){
   const districtById=new Map((map.districts||[]).map(d=>[d.id,d]));
@@ -170,6 +171,9 @@ test(`Map Forge ${STAGE} fixed-seed preview/runtime visual evidence`,async({page
     expect(mainMetrics.scenePrefabCount).toBeGreaterThan(0);
     expect(mainMetrics.sceneCompletePairCount).toBeGreaterThan(0);
     expect(mainMetrics.sceneOrphanPairCount).toBe(0);
+    expect(mainMetrics.exitSceneCount).toBeGreaterThan(0);
+    expect(mainMetrics.exitSceneMovedCount).toBeGreaterThanOrEqual(2);
+    expect(mainMetrics.exitSceneMovementDistance).toBeGreaterThan(0);
     expect(mainMetrics.uprightDecorationCount).toBeGreaterThan(0);
     expect(mainMetrics.uprightRotatedCount).toBe(0);
     expect(mainMetrics.uprightNormalizedCount).toBeGreaterThan(0);
