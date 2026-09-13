@@ -1,12 +1,13 @@
 /* KELO-INDEX
  * area: CREATORS / SPRITE COMPILER / EXACT CANVAS
  * owner: exact runtime frame sizing after canonical sprite compilation
- * keys: SPRITE EXACT CANVAS FRAME SIZE CONTAIN COVER STRETCH PIXEL ART
+ * keys: SPRITE EXACT CANVAS FRAME SIZE CONTAIN COVER STRETCH PIXEL ART ATLAS EXTRUDE
  * purpose: guarantee every runtime frame is exactly the requested pixel dimensions without mutating source art
  * public-api: normalizeExactCanvasConfig, exactCanvasPlacement, reframeCompiledRuntimeExact, verifyExactRuntime
  * online: N/A
  * do-not: detect sprites, infer rigs, mutate source PNG or silently crop/distort artwork
  */
+import {finalizeRuntimeAtlasPixels} from './sprite-atlas-finalizer.mjs';
 const F=Object.freeze;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,Number(v)||0));
 const MODES=F(['contain','cover','stretch']);
@@ -16,7 +17,7 @@ export function normalizeExactCanvasConfig(input={}){
   const width=Math.max(8,Math.min(1024,Math.round(Number(input?.width)||64)));
   const height=Math.max(8,Math.min(1024,Math.round(Number(input?.height)||64)));
   const mode=MODES.includes(String(input?.mode||'').toLowerCase())?String(input.mode).toLowerCase():'contain';
-  return F({enabled,width,height,mode,anchorX:clamp(input?.anchorX??.5,0,1),anchorY:clamp(input?.anchorY??1,0,1),pixelArt:input?.pixelArt!==false,allowCrop:!!input?.allowCrop,allowDistort:!!input?.allowDistort});
+  return F({enabled,width,height,mode,anchorX:clamp(input?.anchorX??.5,0,1),anchorY:clamp(input?.anchorY??1,0,1),pixelArt:input?.pixelArt!==false,allowCrop:!!input?.allowCrop,allowDistort:!!input?.allowDistort,edgeExtrude:input?.edgeExtrude!==false,edgeExtrudeRadius:Math.max(1,Math.min(4,Math.round(Number(input?.edgeExtrudeRadius)||2)))});
 }
 
 export function exactCanvasPlacement(sourceWidth,sourceHeight,targetWidth,targetHeight,{mode='contain',anchorX=.5,anchorY=1}={}){
@@ -48,9 +49,11 @@ export async function reframeCompiledRuntimeExact(root,compiled,input={}){
       ctx.drawImage(compiled.canvas,col*compiled.frameWidth,row*compiled.frameHeight,compiled.frameWidth,compiled.frameHeight,col*config.width+placement.x,row*config.height+placement.y,placement.width,placement.height);
     }
   }
+  let atlasFinalization=null;
+  if(config.pixelArt&&config.edgeExtrude){const image=ctx.getImageData(0,0,output.width,output.height),finalized=finalizeRuntimeAtlasPixels(image.data,output.width,output.height,{columns,rows,frameWidth:config.width,frameHeight:config.height,frameCounts:compiled.frameCounts,radius:config.edgeExtrudeRadius});image.data.set(finalized.data);ctx.putImageData(image,0,0);atlasFinalization=finalized.report;}
   const blob=await canvasBlob(output,'image/png');
-  const exact=F({...config,sourceFrameWidth:compiled.frameWidth,sourceFrameHeight:compiled.frameHeight,placement,atlasWidth:output.width,atlasHeight:output.height,guarantee:`${config.width}x${config.height}`});
-  const next={...compiled,canvas:output,blob,type:'image/png',width:output.width,height:output.height,frameWidth:config.width,frameHeight:config.height,exactCanvas:exact,audit:F({...compiled.audit,exactCanvas:exact})};
+  const exact=F({...config,sourceFrameWidth:compiled.frameWidth,sourceFrameHeight:compiled.frameHeight,placement,atlasWidth:output.width,atlasHeight:output.height,guarantee:`${config.width}x${config.height}`,atlasFinalization});
+  const next={...compiled,canvas:output,blob,type:'image/png',width:output.width,height:output.height,frameWidth:config.width,frameHeight:config.height,exactCanvas:exact,atlasFinalization,audit:F({...compiled.audit,exactCanvas:exact,atlasFinalization})};
   const verification=verifyExactRuntime(next,config);if(!verification.ok)throw new Error(`EXACT_CANVAS_VERIFICATION_FAILED:${JSON.stringify(verification)}`);
   return F({...next,exactCanvasVerification:verification});
 }
