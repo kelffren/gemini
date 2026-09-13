@@ -38,8 +38,8 @@ export function createStudioExplorerRangeSelectionController({root=globalThis,ke
   const document=root?.document;
   if(!document?.addEventListener||!kernel?.selection)return Object.freeze({destroy(){}});
   let destroyed=false,anchorId=null;
-  const entityIds=()=>kernel.document?.entities?.map?.(row=>String(row.id))||[];
   const explorerRows=()=>Array.from(document.querySelectorAll?.(ENTITY_SELECTOR)||[]).filter(row=>String(row?.dataset?.entity||''));
+  const visibleEntityIds=()=>explorerRows().map(row=>String(row.dataset?.entity||'')).filter(Boolean);
 
   function focusRow(row,{scroll=false}={}){
     if(!row)return;
@@ -62,7 +62,7 @@ export function createStudioExplorerRangeSelectionController({root=globalThis,ke
     }
 
     const result=resolveExplorerRange({
-      ids:entityIds(),
+      ids:visibleEntityIds(),
       anchorId,
       targetId:id,
       current:kernel.selection.get?.()||[],
@@ -83,7 +83,7 @@ export function createStudioExplorerRangeSelectionController({root=globalThis,ke
 
     const command=!!(event.ctrlKey||event.metaKey);
     if(command&&String(event.key||'').toLowerCase()==='a'&&!event.shiftKey){
-      const ids=explorerRows().map(candidate=>String(candidate.dataset?.entity||'')).filter(Boolean);
+      const ids=visibleEntityIds();
       if(!ids.length)return;
       event.preventDefault?.();
       event.stopImmediatePropagation?.();
@@ -132,7 +132,7 @@ export function createStudioExplorerRangeSelectionController({root=globalThis,ke
   document.addEventListener('click',onclick,true);
   document.addEventListener('keydown',onkeydown,true);
   return Object.freeze({
-    version:'studio-explorer-range-selection-v1.5.0-context-select-all',
+    version:'studio-explorer-range-selection-v1.6.0-visible-context',
     get anchor(){return anchorId;},
     destroy(){
       if(destroyed)return;
