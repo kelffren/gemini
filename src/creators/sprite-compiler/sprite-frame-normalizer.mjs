@@ -81,7 +81,7 @@ export function planSpriteFrameNormalization(rig, {
   const medianHeight = median(usable.map(frame => frameBounds(frame).h)), framePlans = [], allFrames = rig.groups.flat();
   for (let row = 0; row < rig.groups.length; row++) for (let column = 0; column < rig.groups[row].length; column++) {
     const frame = rig.groups[row][column], rawPatch = framePatches?.[row * columns + column] || {}, patch = normalizeSurgeryPatch(rawPatch);
-    const sourceFrame = Number.isInteger(Number(patch.copyFrom)) ? (allFrames[Number(patch.copyFrom)] || frame) : frame;
+    const sourceFrame = patch.copyFrom !== null && Number.isInteger(Number(patch.copyFrom)) ? (allFrames[Number(patch.copyFrom)] || frame) : frame;
     const bounds = frameBounds(sourceFrame); if (!bounds) continue;
     const rawCorrection = medianHeight / Math.max(1, bounds.h), withinDeadZone = Math.abs(rawCorrection - 1) <= scaleDeadZone;
     const correction = withinDeadZone ? 1 : clamp(rawCorrection, safeScaleMin, safeScaleMax), scaleOutlier = rawCorrection < safeScaleMin || rawCorrection > safeScaleMax;
@@ -109,7 +109,7 @@ export function planSpriteFrameNormalization(rig, {
   const suspicious=plans.filter(plan=>plan.scaleOutlier||plan.frame.boundaryRatio>.012).map(plan=>F({row:plan.row,column:plan.column,direction:plan.direction,scaleDelta:plan.rawCorrection-1,
     feetOffsetPx:(()=>{const peers=rig.groups[plan.row].map(frame=>{const bounds=frameBounds(frame);return bounds?bounds.y+bounds.h:null}).filter(Number.isFinite);return(plan.bounds.y+plan.bounds.h)-median(peers)})(),
     reasons:F([...(plan.scaleOutlier?['SCALE_OUTLIER']:[]),...(plan.frame.boundaryRatio>.012?['REGION_BOUNDARY_CONTACT']:[])])}));
-  return F({version:'sprite-frame-normalizer-v2.1.1-surgery-bridge-repair',rows,columns,frameCounts:F(rig.groups.map(group=>group.length)),directionKeys:F([...(rig.directionKeys||[])]),rowMap:rig.rowMap,
+  return F({version:'sprite-frame-normalizer-v2.1.2-null-copy-safe',rows,columns,frameCounts:F(rig.groups.map(group=>group.length)),directionKeys:F([...(rig.directionKeys||[])]),rowMap:rig.rowMap,
     frameWidth,frameHeight,width:frameWidth*columns,height:frameHeight*rows,baseline,centerX,atlasScale,plans:F(plans),sourceMetrics:F(source),
     outputMetrics:F({heightVariation:cv(outputHeights),widthVariation:cv(outputWidths),visualScaleVariation:cv(outputHeights),footAnchorDispersionPx:0,footAnchorDispersion:0,centerDrift:0,
       clippingFrames:artDefects.length,frames:plans.length,minOccupancy:Math.min(...plans.map(plan=>(plan.bounds.w*plan.scale)*(plan.bounds.h*plan.scale)/Math.max(1,frameWidth*frameHeight))),
