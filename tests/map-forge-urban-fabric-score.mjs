@@ -32,4 +32,12 @@ assert.equal(structural.valid,true,'severe fabric fixture must remain structural
 const severeScore=scoreMapDefinition(severe,recipe,structural);
 assert.ok(severeScore.total<=89,`severely sparse decoration-heavy capital must cap below 90, got ${severeScore.total}`);
 
-console.log(JSON.stringify({ok:true,seeds:results,severeScore:severeScore.total},null,2));
+const zeroBlock=JSON.parse(JSON.stringify(source));
+zeroBlock.blocks=[];
+zeroBlock.parcels=[];
+const zeroBlockStructural=validateMapDefinition(zeroBlock,recipe);
+assert.equal(zeroBlockStructural.valid,true,'zero-block capital fixture must remain structurally valid so the scorer gate is isolated');
+const zeroBlockScore=scoreMapDefinition(zeroBlock,recipe,zeroBlockStructural);
+assert.ok(zeroBlockScore.total<=89,`capital with no urban blocks must cap below 90, got ${zeroBlockScore.total}`);
+
+console.log(JSON.stringify({ok:true,seeds:results,severeScore:severeScore.total,zeroBlockScore:zeroBlockScore.total},null,2));
