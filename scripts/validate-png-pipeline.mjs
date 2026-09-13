@@ -11,6 +11,8 @@ import {inspectPng, walkFiles} from './png-validation-core.mjs';
 const root = process.cwd();
 const assetsRoot = path.join(root, 'assets');
 const manifest = JSON.parse(fs.readFileSync(path.join(root, 'src/environment/art-asset-manifest.json'), 'utf8'));
+const treePackManifestPath = 'src/environment/kelo-tree-pack-01-manifest.json';
+const treePackManifest = JSON.parse(fs.readFileSync(path.join(root, treePackManifestPath), 'utf8'));
 const policy = JSON.parse(fs.readFileSync(path.join(root, 'src/environment/png-validation-policy.json'), 'utf8'));
 
 const failures = [];
@@ -22,11 +24,38 @@ const samePngPathAllowingExtensionCase = (left, right) => normalizePngExtensionC
 
 if (policy.version !== 'kelo-png-validation-policy-v1') fail(`unexpected policy version=${policy.version}`);
 if (!Array.isArray(policy.excludedFromWorldContract)) fail('excludedFromWorldContract must be an array');
+if (treePackManifest.version !== 'kelo-tree-pack-01-v1') fail(`unexpected tree pack manifest version=${treePackManifest.version}`);
+if (!Array.isArray(treePackManifest.items)) fail('tree pack manifest items must be an array');
 
 const manifestByPath = new Map();
-for (const asset of manifest.assets || []) {
+const registerAsset = asset => {
+  if (!asset || typeof asset.path !== 'string') {
+    fail(`invalid manifest asset path=${JSON.stringify(asset?.path)}`);
+    return;
+  }
   if (manifestByPath.has(asset.path)) fail(`duplicate manifest path=${asset.path}`);
   manifestByPath.set(asset.path, asset);
+};
+for (const asset of manifest.assets || []) registerAsset(asset);
+for (const item of treePackManifest.items || []) {
+  if (!item || typeof item.file !== 'string' || !/\.png$/i.test(item.file) || !Array.isArray(item.native) || item.native.length !== 2) {
+    fail(`invalid tree pack item=${JSON.stringify(item?.id || item?.file || null)}`);
+    continue;
+  }
+  const [width,height]=item.native.map(Number);
+  if (!Number.isInteger(width) || width <= 0 || !Number.isInteger(height) || height <= 0) {
+    fail(`invalid tree pack native dimensions id=${item.id}`);
+    continue;
+  }
+  registerAsset({
+    id:item.id,
+    path:`assets/world/trees/kelo-tree-pack-01/${item.file}`,
+    width,
+    height,
+    requireAlpha:true,
+    ownership:'property-catalog',
+    packageManifest:treePackManifestPath
+  });
 }
 
 const exclusions = new Map();
@@ -80,7 +109,7 @@ for (const item of runtimeRoots) {
   if (stat.isFile()) textFiles.push(item);
   else textFiles.push(...walkFiles(item, file => /\.(?:js|mjs|html|css|json)$/i.test(file)));
 }
-const excludedScanFiles = new Set(['src/environment/art-asset-manifest.json','src/environment/png-validation-policy.json']);
+const excludedScanFiles = new Set(['src/environment/art-asset-manifest.json','src/environment/png-validation-policy.json',treePackManifestPath]);
 const runtimeRefs = new Map();
 const refPattern = /assets\/[A-Za-z0-9_./-]+\.png/gi;
 for (const file of textFiles) {
