@@ -5,14 +5,19 @@ import { createWorldDocument } from '../src/studio/document/world-document.mjs';
 import { createPlacementTool } from '../src/studio/tools/placement-tool.mjs';
 import { createQuickBuildTool } from '../src/studio/tools/quick-build-tool.mjs';
 import { createRoomBuildTool } from '../src/studio/tools/room-build-tool.mjs';
-import { createSelectTool } from '../src/studio/tools/select-tool.mjs';
+import { createSelectTool, resolveRepeatSelectRadius } from '../src/studio/tools/select-tool.mjs';
 import { worldSnapPoints } from '../src/studio/tools/snap-resolver.mjs';
+
+const mobileRoot={innerWidth:390,matchMedia:()=>({matches:true}),KeloCamera:{snapshot:()=>({effectiveZoom:.25})}};
+const desktopRoot={innerWidth:1440,matchMedia:()=>({matches:false}),KeloCamera:{snapshot:()=>({effectiveZoom:.25})}};
+assert.equal(resolveRepeatSelectRadius({root:mobileRoot}),80,'20px repeat tolerance at 0.25x zoom must map to 80 world units on coarse mobile input');
+assert.equal(resolveRepeatSelectRadius({root:desktopRoot}),12,'desktop repeat tolerance must remain the precise 12-world-unit contract');
 
 const kernel=createStudioKernel({document:createWorldDocument({worldId:'audit:room-build',settings:{tileSize:32,chunkSize:512}})});
 kernel.prefabs.register({id:'stone_wall_01',label:'Stone Wall',category:'building',bounds:{w:64,h:16},components:{visual:{source:'fixture'}}});
 kernel.prefabs.register({id:'marble_floor_01',label:'Marble Floor',category:'building',bounds:{w:32,h:32},components:{visual:{source:'fixture'}}});
 const placement=createPlacementTool(kernel);kernel.tools.register(placement);
-const select=createSelectTool(kernel);kernel.tools.register(select);
+const select=createSelectTool(kernel,{root:mobileRoot});kernel.tools.register(select);
 const quick=createQuickBuildTool(kernel,{placement,root:{KELO_QUICK_BUILD_CATALOG:{wall:'stone_wall_01',floor:'marble_floor_01'}}});kernel.tools.register(quick);
 const room=createRoomBuildTool(kernel,{placement,quickBuild:quick,root:{}});kernel.tools.register(room);
 
@@ -66,12 +71,18 @@ assert.deepEqual(kernel.selection.get().length,8,'fresh room placement must leav
 select.clear();
 const target=kernel.document.entities.find(row=>row.components?.buildingPiece?.roomEdge==='top'&&row.components?.buildingPiece?.roomIndex===1);
 assert.ok(target,'audit must have a non-corner top wall target');
-const px=(Number(target.transform?.x)||0)+32,py=(Number(target.transform?.y)||0)+8;
-select.selectPoint(px,py,{preserveExisting:false,cycle:true,radius:0});
-assert.equal(kernel.selection.get().length,1,'first click/tap on a room wall must preserve fine-grained single-wall editing');
-select.selectPoint(px,py,{preserveExisting:true,cycle:true,radius:0});
-assert.equal(kernel.selection.get().length,8,'second click/tap on the same room wall must expand selection to the semantic room');
+const firstX=(Number(target.transform?.x)||0)+10,secondX=(Number(target.transform?.x)||0)+50,py=(Number(target.transform?.y)||0)+8;
+select.selectPoint(firstX,py,{preserveExisting:false,cycle:true,radius:0});
+assert.equal(kernel.selection.get().length,1,'first mobile tap on a room wall must preserve fine-grained single-wall editing');
+select.selectPoint(secondX,py,{preserveExisting:true,cycle:true,radius:0});
+assert.equal(kernel.selection.get().length,8,'second mobile tap within 20 screen px at 0.25x zoom must expand selection to the semantic room');
 assert.equal(kernel.selection.get().every(id=>kernel.document.entities.find(row=>row.id===id)?.components?.buildingPiece?.roomId===persistedRoomId),true,'semantic expansion must never select walls from another room');
+
+const desktopSelect=createSelectTool(kernel,{root:desktopRoot});
+desktopSelect.clear();
+desktopSelect.selectPoint(firstX,py,{preserveExisting:false,cycle:true,radius:0});
+desktopSelect.selectPoint(secondX,py,{preserveExisting:true,cycle:true,radius:0});
+assert.equal(kernel.selection.get().length,1,'desktop must keep its precise 12-world-unit repeat radius instead of inheriting the larger mobile tolerance');
 
 await kernel.undo();
 assert.equal(kernel.document.entities.length,0,'one Undo must remove the entire room');
@@ -87,4 +98,4 @@ assert.equal(kernel.input.active().includes('studio-quick-build-room'),false,'RO
 room.destroy();quick.destroy();
 assert.equal(kernel.input.has('studio-quick-build-room'),false,'ROOM destroy must unregister listeners/context');
 
-console.log(JSON.stringify({ok:true,phase:'5.1',tool:'ROOM',previewModules:8,roomEntities:8,exactCornerConnections:true,semanticRoomId:true,edgeRoles:true,singleWallFirstTap:true,roomSecondTap:true,historyEntries:1,oneUndo:true,oneRedo:true,desktopPointer:true,mobilePointer:true,authorityBypass:false},null,2));
+console.log(JSON.stringify({ok:true,phase:'5.2',tool:'ROOM',previewModules:8,roomEntities:8,exactCornerConnections:true,semanticRoomId:true,edgeRoles:true,singleWallFirstTap:true,zoomAwareMobileRoomSecondTap:true,mobileRepeatScreenPx:20,mobileRepeatWorldAtQuarterZoom:80,desktopRepeatWorld:12,historyEntries:1,oneUndo:true,oneRedo:true,desktopPointer:true,mobilePointer:true,authorityBypass:false},null,2));
