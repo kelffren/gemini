@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 
 const src=fs.readFileSync('src/studio/integration/world-studio-bridge.mjs','utf8');
-const roots=[
+const runtimeRoots=[
   '../render/studio-overlay-canvas.mjs',
   '../render/creator-grid-overlay.mjs',
   '../input/pointer-input-adapter.mjs',
@@ -13,21 +13,19 @@ const roots=[
   '../validation/creator-world-analyzer.mjs',
   '../document/document-commands.mjs'
 ];
-for(const mod of roots)if(!src.includes(`'${mod}'`))throw new Error(`missing iPhone prewarm module ${mod}`);
-if(!src.includes('for(let i=0;i<roots.length;i++)'))throw new Error('iPhone Studio prewarm must stay serialized');
-if(!src.includes('await import(roots[i])'))throw new Error('serialized dynamic import missing');
-if(!src.includes("if(i<roots.length-1)await yieldStudioBoot(root)"))throw new Error('main-thread yield must happen between iPhone imports, not after the final root');
-if(!src.includes('await prewarmIphoneStudioRuntime(root)'))throw new Error('prewarm must run before controller hydrate');
-const prewarmStart=src.indexOf('await prewarmIphoneStudioRuntime(root)');
-const controllerStart=src.indexOf('controllerMod=await import(CONTROLLER)');
-if(prewarmStart<0||controllerStart<0||prewarmStart>controllerStart)throw new Error('controller imports before iPhone prewarm');
 
-const fnStart=src.indexOf('async function prewarmIphoneStudioRuntime(root)');
-const loopStart=src.indexOf('for(let i=0;i<roots.length;i++)',fnStart);
-const warmFlag=src.indexOf('iphonePrewarmed=true;',fnStart);
-if(fnStart<0||loopStart<0||warmFlag<0)throw new Error('prewarm completion state missing');
-if(warmFlag<loopStart)throw new Error('iPhone prewarm is marked complete before all roots finish');
-const abortCheck=src.indexOf("if(root?.KELO_WORLD_LAUNCH_ABORTED)throw new Error('WORLD_EDITOR_OPEN_TIMEOUT')",loopStart);
-if(abortCheck<0||abortCheck>warmFlag)throw new Error('prewarm abort must leave completion state false');
+if(src.includes('prewarmIphoneStudioRuntime'))throw new Error('World bridge must not gate controller mount behind an eager iPhone runtime prewarm');
+if(src.includes('iphonePrewarmed'))throw new Error('obsolete iPhone prewarm state must not return');
+for(const mod of runtimeRoots){
+  if(src.includes(`'${mod}'`))throw new Error(`runtime root leaked back into World bridge critical path: ${mod}`);
+}
+const status=src.indexOf("setWorldLaunchStatus(root,'Cargando editor…')");
+const firstYield=src.indexOf('await yieldStudioBoot(root)',status);
+const controllerStart=src.indexOf('controllerMod=await import(CONTROLLER)',firstYield);
+if(status<0||firstYield<0||controllerStart<0)throw new Error('paced direct controller handoff missing');
+if(!(status<firstYield&&firstYield<controllerStart))throw new Error('controller handoff order must be status -> paint yield -> controller import');
+const beforeController=src.slice(firstYield,controllerStart);
+if((beforeController.match(/await import\(/g)||[]).length!==0)throw new Error('no Studio runtime import may block between the paint yield and controller import');
+if(!src.includes("if(root?.KELO_WORLD_LAUNCH_ABORTED)throw new Error('WORLD_EDITOR_OPEN_TIMEOUT')"))throw new Error('abort guard missing from direct controller handoff');
 
-console.log('world-editor-iphone-prewarm-audit: PASS');
+console.log('world-editor-iphone-prewarm-audit: PASS (controller-first, no eager runtime gate)');
