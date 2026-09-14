@@ -9,6 +9,7 @@ on:
       - sw.js
       - version.json
       - manifest.webmanifest
+      - netlify.toml
       - src/core/update-system.js
       - src/core/update-delta-core.js
       - src/core/update-watch.js
@@ -27,6 +28,7 @@ on:
       - scripts/turbo-delta-test.mjs
       - scripts/turbo-host-server.mjs
       - scripts/turbo-host-integration-test.mjs
+      - scripts/turbo-live-host-audit.mjs
       - vite.config.js
       - vite.config.mjs
       - vite.config.ts
@@ -43,6 +45,7 @@ on:
       - sw.js
       - version.json
       - manifest.webmanifest
+      - netlify.toml
       - src/core/update-system.js
       - src/core/update-delta-core.js
       - src/core/update-watch.js
@@ -61,6 +64,7 @@ on:
       - scripts/turbo-delta-test.mjs
       - scripts/turbo-host-server.mjs
       - scripts/turbo-host-integration-test.mjs
+      - scripts/turbo-live-host-audit.mjs
       - vite.config.js
       - vite.config.mjs
       - vite.config.ts
@@ -78,7 +82,9 @@ permissions:
 jobs:
   turbo-contract:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 12
+    env:
+      TURBO_PRODUCTION_HOST: https://kelo-world.netlify.app
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -96,6 +102,7 @@ jobs:
           node --check scripts/generate-turbo-manifest.mjs
           node --check scripts/turbo-host-server.mjs
           node --check scripts/turbo-host-integration-test.mjs
+          node --check scripts/turbo-live-host-audit.mjs
           node --check scripts/turbo-update-guardian.mjs
       - name: Install exact production compiler
         run: npm install --no-save --ignore-scripts esbuild@0.25.9
@@ -103,7 +110,7 @@ jobs:
         run: node scripts/turbo-build.mjs
       - name: Prove minification tree-shaking hashed code splitting
         run: node scripts/turbo-build-audit.mjs
-      - name: Prove host revalidation immutable caching Brotli and gzip
+      - name: Prove host implementation revalidation immutable caching Brotli and gzip
         run: node scripts/turbo-host-integration-test.mjs
       - name: Prove creator tools stay out of critical boot
         run: node scripts/turbo-boot-isolation-test.mjs
@@ -113,5 +120,21 @@ jobs:
         run: node scripts/generate-turbo-manifest.mjs
       - name: Prove one-file delta and identical-build zero asset bytes
         run: node tests/updater-delta.test.cjs
+      - name: Prove live production headers compression CDN and HTTP2
+        run: |
+          for attempt in $(seq 1 36); do
+            if node scripts/turbo-live-host-audit.mjs; then
+              exit 0
+            fi
+            echo "Netlify production not ready for this build yet; retry $attempt/36"
+            sleep 5
+          done
+          exit 1
+      - name: Promote verified live evidence for this CI workspace only
+        run: |
+          test -f dist/turbo-live-host-evidence.json
+          sed -i 's/^HOSTING_HEADERS_VERIFIED: false$/HOSTING_HEADERS_VERIFIED: true/' docs/evidence/TURBO_UPDATE_HOSTING_EVIDENCE.md
+          sed -i 's/^COMPRESSION_VERIFIED: false$/COMPRESSION_VERIFIED: true/' docs/evidence/TURBO_UPDATE_HOSTING_EVIDENCE.md
+          sed -i 's/^TRANSPORT_VERIFIED: false$/TRANSPORT_VERIFIED: true/' docs/evidence/TURBO_UPDATE_HOSTING_EVIDENCE.md
       - name: Enforce all 15 Turbo Update guarantees
         run: npm run audit:turbo
