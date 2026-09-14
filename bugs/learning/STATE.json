@@ -238,9 +238,20 @@
       "files": [
         "scripts/turbo-live-host-audit.mjs"
       ]
+    },
+    {
+      "id": "prevention:d71df2c0ad5aa627616858d3c65ef4131eb0f19d",
+      "at": "2026-09-14T13:55:51.000Z",
+      "source": "bug-prevention-ci",
+      "head_sha": "d71df2c0ad5aa627616858d3c65ef4131eb0f19d",
+      "base_sha": "52f31972fa259525862e15c47e670b6cf3de00fb",
+      "conclusion": "failure",
+      "files": [
+        "src/studio/studio-entry.mjs"
+      ]
     }
   ],
-  "feedback_updated_at": "2026-09-14T13:18:01.155Z",
+  "feedback_updated_at": "2026-09-14T13:56:10.682Z",
   "training": {
     "examples": 28,
     "search_examples": 21,
