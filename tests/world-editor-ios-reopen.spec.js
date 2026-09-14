@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: TEST / WORLD EDITOR / REAL IOS REOPEN
  * owner: World Creator mobile launch regression
- * purpose: reproduce the stale Studio-session black screen, prove World remounts on real iPhone Safari, preserve BUG-0003 black-box milestones as evidence, and emulate an iPhone UA locally instead of inheriting the global Pixel profile
+ * purpose: reproduce the stale Studio-session black screen, prove World remounts on real iPhone Safari, preserve BUG-0003 black-box milestones as evidence, and emulate iPhone identity locally without inheriting the global Pixel profile or forcing the WebKit binary
  */
 const { test, expect, devices } = require('@playwright/test');
 const fs = require('fs');
@@ -15,10 +15,14 @@ const isBrowserStack = Boolean(
   process.env.BROWSERSTACK_BUILD_NAME
 );
 if (!isBrowserStack) {
+  const iphone = devices['iPhone 13'];
+  // Do not spread the full descriptor here: it contains defaultBrowserType=webkit,
+  // which can silently make a Chromium smoke require an uninstalled WebKit binary.
   test.use({
-    ...devices['iPhone 13'],
+    userAgent: iphone.userAgent,
     viewport: { width: 390, height: 844 },
     screen: { width: 390, height: 844 },
+    deviceScaleFactor: iphone.deviceScaleFactor,
     isMobile: true,
     hasTouch: true,
   });
