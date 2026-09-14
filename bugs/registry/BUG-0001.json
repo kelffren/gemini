@@ -46,7 +46,7 @@
   "claimed_by": null,
   "claim_started_at": null,
   "research": {
-    "status": "blocked_external",
+    "status": "blocked",
     "summary": "The two reproducible configuration defects have been removed. reducedMotion is explicitly reset to null for BrowserStack and Playwright uses webkit while browserstack.yml selects the real Safari/iPhone platform. The latest workflow advances through SDK initialization and fails only when BrowserStack attempts to allocate Automate capacity, returning 'Automate testing time expired.' No game code or additional capability rewrite is justified until real-device Automate access is available again.",
     "known_facts": [
       {
@@ -75,7 +75,7 @@
         "id": "H1",
         "theory": "The original reducedMotion mismatch came from Playwright's default no-preference value entering the BrowserStack remote context.",
         "confidence": "high",
-        "status": "supported_by_fix",
+        "status": "supported",
         "why": "The mismatch disappears after reducedMotion:null and the workflow progresses to the remote-connect phase.",
         "evidence_for": ["F1", "F3"],
         "evidence_against": [],
@@ -152,7 +152,7 @@
       "validation": {
         "environment": "GitHub Actions run 34804862366 + BrowserStack SDK",
         "method": "Execute gameplay and World real-device specs after LIVE Pages readiness.",
-        "result": "BLOCKED_EXTERNAL",
+        "result": "BLOCKED",
         "evidence": ["Both specs reach browserType.connect and receive 'Automate testing time expired.'"]
       },
       "conclusion": "Configuration validation now progresses to remote session allocation; BrowserStack Automate availability is the remaining gate.",
