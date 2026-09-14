@@ -45,7 +45,7 @@ expect(core.includes('evaluateNetwork'), 'falta evaluador de red/ping');
 expect(core.includes('setGameplayBusy'), 'falta API de prioridad gameplay');
 expect(core.includes('KELO_COMBAT_ENABLED'), 'el updater no detecta combate crítico');
 expect(core.includes('KeloArena.isActive'), 'el updater no detecta Arena/PVP activo');
-expect(core.includes("status: 'paused'"), 'falta pausa del staging');
+expect(core.includes("state.stage.status = 'paused'"), 'falta pausa del staging');
 expect(core.includes('STAGE_CACHE_PREFIX'), 'falta cache aislado de staging por build');
 expect(core.includes('cache.put('), 'el updater no precarga bytes');
 expect(core.includes('for (const entry of plan)'), 'el staging no garantiza cola secuencial');
