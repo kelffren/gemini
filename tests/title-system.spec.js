@@ -1,13 +1,16 @@
 /* KELO-INDEX
  * area: QA / TITLES
- * keys: PLAYWRIGHT TITLES NOBILITY NAMEPLATE MOBILE DEV TITLE BOOK
- * hace: prueba 199→200, equip/unequip, Libro de títulos, panel integrado, nameplate y gate DEV en viewport móvil
- * online: usa fallback local únicamente; autoridad server se cubre en scripts/title-system-audit.js
+ * keys: PLAYWRIGHT TITLES NOBILITY NAMEPLATE MOBILE DEV TITLE BOOK GUEST RUNTIME
+ * hace: prueba 199→200, equip/unequip, Libro de títulos, panel integrado, nameplate y gate DEV en viewport móvil usando el fallback local explícito
+ * online: usa fallback local únicamente mediante guest=1; autoridad server se cubre en scripts/title-system-audit.js
  */
 const { test, expect } = require('@playwright/test');
 
 const BASE = process.env.KELO_TITLE_PAGE || 'http://127.0.0.1:4173/';
-function url(dev) { return BASE + (BASE.includes('?') ? '&' : '?') + (dev ? 'titleDev=1' : 'titleDev=0'); }
+function url(dev) {
+  const separator = BASE.includes('?') ? '&' : '?';
+  return BASE + separator + 'guest=1&' + (dev ? 'titleDev=1' : 'titleDev=0');
+}
 
 async function waitFoundation(page) {
   await page.waitForFunction(() => !!(window.KeloTitles && window.KeloPlayerStats && window.KeloNobility && window.KeloActorNameplate && window.KELO_LUXE), null, { timeout: 10000 });
