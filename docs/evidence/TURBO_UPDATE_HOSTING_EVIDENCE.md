@@ -1,65 +1,63 @@
 # Turbo Update — Hosting Evidence
 
-Status: **BLOCKED_BY_EXTERNAL_HOSTING**
+Status: **LIVE_NETLIFY_VERIFICATION_REQUIRED_EACH_CI**
 
 This file is evidence, not a waiver. Turbo Update MUST NOT be declared complete from configuration, comments, provider promises, or unverified code alone.
 
-## Current production host
+## Production candidate
 
-Current deployment path is GitHub Pages (`pages build and deployment`). GitHub Pages owns edge response headers and transport negotiation. This repository cannot force arbitrary `Cache-Control` rules per path, cannot force Brotli/Gzip selection, and cannot force HTTP/3/CDN behavior from application code.
+Netlify project `kelo-world` is connected to `kelffren/gemini` `main` and production deploys are automatic. GitHub remains the source of truth and GitHub Pages remains a fallback deployment.
+
+The repository intentionally keeps these persistent flags false:
 
 HOSTING_HEADERS_VERIFIED: false
 COMPRESSION_VERIFIED: false
 TRANSPORT_VERIFIED: false
 
-HOSTING_LIMITATION: GitHub Pages does not expose repository-controlled per-path response header rules required to prove immutable hashed assets plus explicit HTML/version/manifest revalidation, and protocol/compression behavior is platform-controlled.
-MIGRATION_PLAN: Deploy the tested Turbo host to a header-controllable public host (Netlify/Render/Cloudflare-class edge host), validate live responses for HTML/version/manifests and hashed assets, validate Content-Encoding br/gzip, record negotiated HTTP/2 or HTTP/3, then change the three VERIFIED flags above only from captured live evidence.
+They are promoted to `true` only inside a Turbo Guardian CI workspace after `scripts/turbo-live-host-audit.mjs` has successfully probed the public production host during that exact CI run. This prevents stale evidence from surviving a hosting regression.
 
-## 2026-09-14 execution evidence
+HOSTING_LIMITATION: Live production transport and compression cannot be proven from repository configuration alone; the public host must be reachable and probed on every acceptance run.
+MIGRATION_PLAN: Keep the host-agnostic build and GitHub source of truth. If Netlify fails the live gate or becomes unavailable, retain GitHub Pages as fallback and promote another header-controllable CDN only after it passes the same live audit.
 
-The repository now contains `scripts/turbo-host-server.mjs`, which implements the required server-side policy and derives `/version.json` from the deployed commit (`RENDER_GIT_COMMIT`/`GITHUB_SHA`) instead of trusting a hand-written build identity.
+## Netlify deployment evidence
 
-The repository also contains `scripts/turbo-host-integration-test.mjs`. Turbo Update Guardian builds the real hashed production output, launches this host, and makes HTTP requests against it. The test fails unless all of these are observed from the running server:
+The connected Netlify deployment reports:
 
-- `index.html` => `Cache-Control: no-cache, max-age=0, must-revalidate`;
-- `version.json` => the same revalidation policy;
-- a real content-hashed production JS output => `Cache-Control: public, max-age=31536000, immutable`;
-- `Accept-Encoding: br,gzip` => Brotli response;
-- `Accept-Encoding: gzip` => gzip response;
-- server/internal source paths are not publicly served.
+- project: `kelo-world`;
+- branch: `main`;
+- context: `production`;
+- deployment mode: Git-connected / non-manual;
+- six configured response-header rules processed without errors;
+- public production alias: `https://kelo-world.netlify.app`.
 
-This proves the host implementation behavior but is intentionally **not** treated as live-production hosting evidence.
+`netlify.toml` carries the host adapter policy while the game/runtime remains provider-independent.
 
-### External deployment attempt
+## Live CI acceptance gate
 
-A Render web service was requested from the connected workspace using the live `kelffren/gemini` `main` repository, with production build and `scripts/turbo-host-server.mjs` as the start command. Render returned an HTTP 500 and no new service was created. Inspection of the connected workspace showed the existing Render web services, including `kelo-world-server`, suspended by `billing`. Therefore publication to Render is currently an external account/hosting blocker rather than a repository-code blocker.
+`scripts/turbo-live-host-audit.mjs` runs against `TURBO_PRODUCTION_HOST` and fails unless the public host proves all of the following:
 
-A Netlify connector has been surfaced as an alternate deploy path. Connecting it requires explicit account authorization by the user; until a public host is successfully deployed and probed, the VERIFIED flags above remain false.
+- `index.html` returns `Cache-Control: no-cache, max-age=0, must-revalidate`;
+- `version.json` returns the same revalidation policy;
+- a real content-hashed production JavaScript object returns `Cache-Control: public, max-age=31536000, immutable`;
+- `Accept-Encoding: br,gzip` returns Brotli for a compressible production asset;
+- `Accept-Encoding: gzip` returns gzip fallback;
+- the response contains Netlify/CDN evidence headers;
+- a real HTTP/2 connection to the production host succeeds.
 
-## Required live acceptance evidence
+The audit writes `dist/turbo-live-host-evidence.json`. Only after that file exists from a passing live probe does the workflow temporarily promote the three VERIFIED flags in its disposable CI checkout and execute the final 15-point Guardian.
 
-TU-09 is accepted only when live responses prove:
+If the host regresses, the live audit fails before the flags are promoted and Turbo returns to FAIL-CLOSED automatically.
 
-- content-hashed JS/CSS/assets: `Cache-Control: public, max-age=31536000, immutable`;
-- `index.html`, `version.json`, update manifests and service-worker control files: `Cache-Control: no-cache, max-age=0, must-revalidate` or stricter equivalent;
-- the tested URLs are the actual production URLs.
+## Local host implementation evidence
 
-TU-10 is accepted only when live responses prove at least one supported compression encoding (`br` preferred, `gzip` fallback) for compressible production assets using `Accept-Encoding` negotiation.
+The repository also contains `scripts/turbo-host-server.mjs` and `scripts/turbo-host-integration-test.mjs`. The integration test builds the real hashed production output, launches the local reference host and verifies revalidation, immutable caching, Brotli, gzip and source denylisting. This proves implementation behavior but does not substitute for the live public-host gate.
 
-TU-11 is accepted only when live production evidence records HTTP/2 or HTTP/3 and the serving CDN/edge. A limitation + migration plan keeps the contract honest but does **not** convert TU-09/TU-10 into PASS.
+## Acceptance policy
 
-## Migration configuration staged in repository
+TU-09 passes only from same-run public response evidence for immutable hashed assets and revalidated control-plane documents.
 
-`public/_headers` is the target edge-host policy. It is intentionally **not evidence of current GitHub Pages behavior**. The guardian must require the VERIFIED flags plus live evidence before marking hosting guarantees complete.
+TU-10 passes only from same-run public `Content-Encoding` negotiation evidence.
 
-## Verification commands after migration
+TU-11 passes only from same-run HTTP/2 or HTTP/3 plus CDN/edge evidence, or remains explicitly blocked with a documented executable migration path.
 
-```bash
-curl -sSI https://PRODUCTION_HOST/index.html
-curl -sSI https://PRODUCTION_HOST/version.json
-curl -sSI https://PRODUCTION_HOST/PATH_TO_HASHED_ASSET.js
-curl -sSI -H 'Accept-Encoding: br,gzip' https://PRODUCTION_HOST/PATH_TO_HASHED_ASSET.js
-curl -sS -o /dev/null -w '%{http_version}\n' https://PRODUCTION_HOST/
-```
-
-Record the exact production host, tested URLs, timestamp, response headers, content encoding and negotiated HTTP version in this file before changing any VERIFIED flag.
+Provider configuration alone is never sufficient.
