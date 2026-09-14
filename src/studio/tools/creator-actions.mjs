@@ -124,15 +124,15 @@ export function createCreatorActions(kernel) {
 
   async function rotateSelection(delta = 90) {
     const rows = selectedEntities(); if (!rows.length) return [];
-    const angle=Number(delta)||0;
-    let cx=0,cy=0;
-    if(rows.length>1){
-      const xs=rows.map(row=>Number(row.transform?.x)||0),ys=rows.map(row=>Number(row.transform?.y)||0);
-      cx=(Math.min(...xs)+Math.max(...xs))/2;cy=(Math.min(...ys)+Math.max(...ys))/2;
-    }
+    const angle=Number(delta)||0,tile=Math.max(1,Number(kernel.document.settings?.tileSize)||32);
+    const pivot=rows.length>1?selectionVisualPivot(rows,tile):null;
     const commands = rows.map(row => {
       const transform={...(row.transform||{}),rotation:normalizedRotation((Number(row.transform?.rotation)||0)+angle)};
-      if(rows.length>1){const point=rotatePointAround(transform.x,transform.y,cx,cy,angle);transform.x=point.x;transform.y=point.y;}
+      if(pivot){
+        const center=entityCenter(row,tile),point=rotatePointAround(center.x,center.y,pivot.x,pivot.y,angle),scale=scaleOf(row.transform?.scale);
+        const width=Math.max(1,Number(row?.bounds?.w)||tile)*scale,height=Math.max(1,Number(row?.bounds?.h)||tile)*scale;
+        transform.x=cleanCoord(point.x-width/2);transform.y=cleanCoord(point.y-height/2);
+      }
       return createPatchEntityCommand(row.id, { transform });
     });
     await kernel.execute(createCompositeCommand(commands, { type: 'entity.batch.rotate', label: `Rotate ${rows.length} object${rows.length === 1 ? '' : 's'}` }));
