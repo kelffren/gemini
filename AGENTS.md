@@ -180,21 +180,42 @@ La documentación pública no expone secretos, claves, rutas admin ni detalles e
 11. Stamp or refresh `KELO-INDEX` on files you touch.
 12. Update `ENGINE_MAP.md`/`docs/KELO_FOUNDATION.md` when ownership, API or architecture changes.
 13. Update technical docs, system catalog and `guide.html` when the system contract or player-visible behavior changes.
+14. For defect work or risky changes, run the applicable Bug Intelligence preflight/gates from RULE 7 before claiming completion.
 
-## RULE 7 — BUG REGISTRY + AI BRIDGE (OBLIGATORIO)
+## RULE 7 — BUG REGISTRY + BUG INTELLIGENCE + AI BRIDGE (OBLIGATORIO)
 
-KELO WORLD tiene una memoria canónica de defectos en `/bugs`.
+KELO WORLD tiene una memoria canónica de defectos y regresiones en `/bugs`.
 
-Cuando una tarea involucre un fallo existente, descubra un fallo reproducible o pretenda declarar que un bug fue corregido, el agente debe leer:
+Cuando una tarea involucre un fallo existente, descubra un fallo reproducible, toque una superficie con historial de bugs o pretenda declarar que un defecto fue corregido, el agente debe leer:
 
 1. `bugs/README.md`
 2. `bugs/SCHEMA.md`
-3. `bugs/AI_BRIDGE.md`
-4. los registros relevantes de `bugs/registry/`
+3. `bugs/RESEARCH_PROTOCOL.md`
+4. `bugs/BUG_INTELLIGENCE.md`
+5. `bugs/AI_BRIDGE.md`
+6. los registros relevantes de `bugs/registry/`
 
-Reglas duras:
+### Preflight obligatorio para cambios materiales
 
+- Consultar `npm run bug:brief -- BUG-NNNN` para bugs relacionados.
+- Ejecutar `npm run bug:risk -- <base> <head>` cuando haya diff aplicable.
+- Ejecutar `npm run bug:impact -- --diff <base> <head> --depth=2` cuando el cambio pueda afectar consumidores/dependencias.
+- Ejecutar las verificaciones dirigidas que risk/impact recomienden.
+
+Un score alto no demuestra un bug, pero **sí invalida afirmar “seguro” sin evidencia proporcional**.
+
+### Cuando aparece un fallo
+
+- `npm run bug:scan -- <log>` para fingerprint/dedupe.
+- `npm run bug:candidate -- <log> --source=<origen>` si la evidencia debe persistirse.
+- `npm run audit:bug-reports` para validar integridad/privacidad de REPORTs.
+- `npm run bug:triage` para detectar clusters/reincidencias.
+- `npm run bug:culprit -- BUG-NNNN --limit=30` si parece regresión reciente; es correlación, no prueba de causalidad.
 - Antes de crear un bug, buscar duplicados.
+- Si el bug canónico estaba `VERIFIED/CLOSED` y aparece evidencia posterior compatible, revisar `REOPENED`; no esconder la regresión creando otro ID.
+
+### Estados y evidencia
+
 - Un defecto reproducible que pueda requerir trabajo posterior debe registrarse o enlazarse a un bug existente.
 - Al comenzar una corrección, usar `CLAIMED` solo mientras exista trabajo activo.
 - Una IA que escribe el fix puede dejar el bug en `FIXED_PENDING_VERIFY`, con commit(s), archivos y evidencia.
@@ -205,6 +226,32 @@ Reglas duras:
 - Screenshots/videos pesados viven fuera de Git; el registro guarda referencias.
 - Nunca almacenar tokens, cookies, passwords, JWT completos o claves privadas dentro de reportes/bugs.
 
+### Gates obligatorios antes de afirmar cierre
+
+Cuando aplique, ejecutar:
+
+- `npm run audit:bugs`
+- `npm run audit:bug-reports`
+- `npm run audit:bug-regressions`
+- `npm run audit:bug-close`
+- `npm run audit:bug-recurrence`
+
+`VERIFIED/CLOSED` no es válido si el close gate carece de evidencia o si existe una reincidencia posterior sin revisar.
+
+### CI no sustituye la disciplina del agente
+
+La rama `main` puede no estar protegida por GitHub. Por tanto:
+
+- un push directo puede existir antes de que Actions termine;
+- `queued` significa **NO VERIFICADO**, no PASS;
+- un workflow rojo no puede ignorarse solo porque el commit ya esté en `main`;
+- ningún agente debe presentar una tarea como “validada/segura” si los gates aplicables están fallando o todavía no fueron ejecutados;
+- si el entorno impide ejecutar una prueba requerida, registrar el bloqueo de forma explícita y no falsificar PASS.
+
 Regla mental obligatoria:
 
 `DETECTAR != ARREGLAR != VERIFICAR != CERRAR`
+
+Y para regresiones:
+
+`REPORTAR DE NUEVO -> REVISAR CANÓNICO -> REOPENED SI APLICA; NO DUPLICAR PARA ESCONDER HISTORIAL`
