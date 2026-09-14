@@ -189,7 +189,11 @@ const shellSource=await readFile(resolve(here,'../src/studio/ui/studio-live-shel
 assert.match(shellSource,/backdrop-filter:none!important/,'Studio chrome must kill backdrop-filter on coarse/narrow iPhone');
 
 const entrySource=await readFile(resolve(here,'../src/studio/studio-entry.mjs'),'utf8');
-assert.match(entrySource,/isPhoneStudioBoot\(root\)\?1800:0/,'iPhone must delay productivity extras until after chrome survives');
+assert.match(entrySource,/PHONE_OPTIONAL_BOOT_DELAY_MS=1800/,'iPhone optional build tools and asset palette must wait until after the live shell mounts');
+assert.match(entrySource,/PHONE_PRODUCTIVITY_BOOT_DELAY_MS=2800/,'iPhone productivity extras must wait beyond the optional post-mount imports');
+assert.match(entrySource,/optionalToolsTimer=deferStudioOptional/,'basic build tools must be deferred on iPhone instead of joining the critical Studio graph');
+assert.match(entrySource,/optionalPaletteTimer=deferStudioOptional/,'asset palette must be deferred on iPhone instead of joining the critical Studio graph');
+assert.match(entrySource,/for\(const timer of \[optionalToolsTimer,optionalPaletteTimer,extrasTimer\]\)/,'closing Studio must cancel deferred optional module imports');
 
 console.log(JSON.stringify({
   ok:true,
@@ -203,5 +207,6 @@ console.log(JSON.stringify({
   launchChromeBeforeImport:chromeBeforeLoader,
   openWatchdog:true,
   importWatchdog:true,
-  dynamicStudioGraph:true
+  dynamicStudioGraph:true,
+  optionalModulesDeferredPastMount:true
 }));
