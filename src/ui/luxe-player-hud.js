@@ -1,13 +1,13 @@
 /* KELO-INDEX
  * area: UI / HUD
  * owner: Kelo Luxe Shell presentation
- * keys: COMBAT HUD PVP HP MANA GUIDE MOBILE RAIL QUICK ACTIONS COLLAPSIBLE BOUTIQUE MENU FULLSCREEN
- * purpose: prioriza el paisaje: en social no hay player HUD; el rail lateral conserva los accesos reales dentro de un launcher retráctil mobile-first
+ * keys: COMBAT HUD PVP HP MANA GUIDE MOBILE RAIL QUICK ACTIONS COLLAPSIBLE BOUTIQUE MENU FULLSCREEN MINIMAP
+ * purpose: prioriza el paisaje: en social no hay player HUD; el rail lateral conserva los accesos reales dentro de un launcher retráctil mobile-first; el minimapa LIVE queda sobre la tarjeta de cuenta Kelo
  * public-api: KELO_LUXE_PLAYER_HUD.refresh/snapshot
- * consumes: localPlayer, STATE, KeloPvPWorld, KeloEvents, Luxe Shell, KELO_ORIENTATION
- * state-owned: cache visual del último snapshot + estado efímero abierto/cerrado del quick-actions rail
+ * consumes: localPlayer, STATE, KeloPvPWorld, KeloEvents, KeloRender, Luxe Shell, KELO_ORIENTATION
+ * state-owned: cache visual del último snapshot + estado efímero abierto/cerrado del quick-actions rail + presentación del minimapa
  * reuse: reutiliza los botones/handlers reales de Boutique, Menú, PvP y Pantalla Completa; GUÍA sigue siendo el único acceso añadido al mismo rail
- * do-not: NO gameplay state, NO polling/setInterval, NO player profile duplicado, NO handlers duplicados de Boutique/Menú/PvP/Fullscreen
+ * do-not: NO gameplay state, NO segundo render loop, NO setInterval, NO player profile duplicado, NO handlers duplicados de Boutique/Menú/PvP/Fullscreen
  * online: presentación solamente; la autoridad de combate/recursos permanece en sus owners
  */
 (function(root){
@@ -116,5 +116,63 @@ function snapshot(){const p=typeof localPlayer!=='undefined'?localPlayer:null,st
 function setBar(rowId,barId,textId,value,max){const row=byId(rowId),bar=byId(barId),text=byId(textId),fill=bar?.querySelector('i'),available=value!=null&&max!=null&&max>0;row?.classList.toggle('unavailable',!available);if(text)text.textContent=available?`${Math.round(value)} / ${Math.round(max)}`:'— / —';const pct=available?clamp((value/max)*100,0,100):0;if(fill)fill.style.width=pct+'%';if(bar){bar.setAttribute('aria-valuemin','0');bar.setAttribute('aria-valuemax',available?String(max):'0');bar.setAttribute('aria-valuenow',available?String(value):'0');bar.setAttribute('aria-valuetext',available?`${Math.round(value)} de ${Math.round(max)}`:'No disponible');}}
 function refresh(){last=snapshot();setBar('kw-hud-hp-row','kw-hud-hp-bar','kw-hud-hp-text',last.hp,last.maxHp);setBar('kw-hud-mana-row','kw-hud-mana-bar','kw-hud-mana-text',last.mana,last.maxMana);return last;}
 const eventNames=['player:stat_changed','player:state_changed','combat:entity_damaged','combat:damage_applied','ability:cast','ability:resource_changed'];if(root.KeloEvents?.on)eventNames.forEach(name=>root.KeloEvents.on(name,refresh));['pageshow','focus','online'].forEach(name=>root.addEventListener?.(name,refresh));document.addEventListener('pointerup',()=>queueMicrotask(refresh),{capture:true,passive:true});document.addEventListener('keyup',()=>queueMicrotask(refresh),{capture:true,passive:true});refresh();requestAnimationFrame(refresh);
-root.KELO_LUXE_PLAYER_HUD=Object.freeze({version:'luxe-player-hud-v1.2.0',layout:'pvp-only-combat-v1',visibility:'pvp-only',rail:'collapsible-five',refresh,snapshot,owner:'Kelo Luxe Shell presentation',polling:false});
+root.KELO_LUXE_PLAYER_HUD=Object.freeze({version:'luxe-player-hud-v1.3.0-minimap',layout:'pvp-only-combat-v1',visibility:'pvp-only',rail:'collapsible-five',refresh,snapshot,owner:'Kelo Luxe Shell presentation',polling:false});
+})(typeof globalThis!=='undefined'?globalThis:window);
+
+/* KELO-INDEX UI/MINIMAP: usa el owner KeloRender; no crea un segundo loop. Queda arriba del chip de cuenta Kelo. */
+(function(root){
+'use strict';
+if(typeof document==='undefined'||document.getElementById('kw-live-minimap'))return;
+const renderOwner=root.KeloRender;
+if(!renderOwner?.afterFrame)return;
+const host=document.createElement('div');
+host.id='kw-live-minimap';
+host.setAttribute('aria-label','Minimapa de Kelo World');
+host.innerHTML='<canvas width="96" height="96" aria-hidden="true"></canvas><span class="kw-minimap-north" aria-hidden="true">N</span>';
+document.body.appendChild(host);
+const canvas=host.querySelector('canvas'),mini=canvas.getContext('2d',{alpha:true});
+const base=document.createElement('canvas');base.width=192;base.height=192;const baseCtx=base.getContext('2d',{alpha:false});
+const miniStyle=document.createElement('style');miniStyle.id='kw-live-minimap-style';miniStyle.textContent=`
+#kw-live-minimap{position:fixed;top:max(10px,env(safe-area-inset-top));left:max(10px,env(safe-area-inset-left));width:88px;height:88px;z-index:2147480050;border:1px solid rgba(229,189,98,.48);border-radius:50%;overflow:hidden;background:rgba(7,13,14,.94);box-shadow:0 10px 28px rgba(0,0,0,.38),inset 0 0 0 2px rgba(255,255,255,.035);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);pointer-events:none;isolation:isolate}
+#kw-live-minimap:after{content:"";position:absolute;inset:4px;border:1px solid rgba(231,197,106,.18);border-radius:50%;pointer-events:none}
+#kw-live-minimap canvas{display:block;width:100%;height:100%;border-radius:50%;image-rendering:auto}
+#kw-live-minimap .kw-minimap-north{position:absolute;top:5px;left:50%;transform:translateX(-50%);z-index:2;color:#ffe19a;font:900 7px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;text-shadow:0 1px 4px #000}
+.ka-account-chip{top:calc(max(10px,env(safe-area-inset-top)) + 96px)!important;left:max(10px,env(safe-area-inset-left))!important;right:auto!important;z-index:2147480000!important}
+@media(max-width:360px){#kw-live-minimap{width:80px;height:80px}.ka-account-chip{top:calc(max(10px,env(safe-area-inset-top)) + 88px)!important}}
+@media(max-height:430px) and (orientation:landscape){#kw-live-minimap{width:64px;height:64px;top:max(5px,env(safe-area-inset-top));left:max(6px,env(safe-area-inset-left))}.ka-account-chip{top:calc(max(5px,env(safe-area-inset-top)) + 70px)!important;left:max(6px,env(safe-area-inset-left))!important}}
+`;document.head.appendChild(miniStyle);
+let baseReady=false,lastBaseAttempt=0,lastPaint=0;
+function worldConfig(frame){
+  const c=frame?.config||(typeof CONFIG!=='undefined'?CONFIG:null)||{};
+  return {w:Math.max(1,Number(c.worldWidth)||3600),h:Math.max(1,Number(c.worldHeight)||3200)};
+}
+function paintFallback(w,h){
+  baseCtx.setTransform(1,0,0,1,0,0);baseCtx.fillStyle='#163528';baseCtx.fillRect(0,0,base.width,base.height);
+  baseCtx.strokeStyle='rgba(235,207,128,.25)';baseCtx.lineWidth=3;baseCtx.beginPath();baseCtx.moveTo(base.width*.08,base.height*.5);baseCtx.lineTo(base.width*.92,base.height*.5);baseCtx.moveTo(base.width*.5,base.height*.08);baseCtx.lineTo(base.width*.5,base.height*.92);baseCtx.stroke();
+  baseCtx.strokeStyle='rgba(255,255,255,.10)';baseCtx.lineWidth=1;baseCtx.strokeRect(1,1,base.width-2,base.height-2);
+}
+function rebuildBase(frame,now){
+  if(baseReady||now-lastBaseAttempt<1800)return;
+  lastBaseAttempt=now;
+  const size=worldConfig(frame);paintFallback(size.w,size.h);
+  const renderer=root.KELO_WORLD_RENDERER;
+  if(!renderer?.draw)return;
+  try{
+    baseCtx.save();baseCtx.setTransform(base.width/size.w,0,0,base.height/size.h,0,0);
+    const drawn=renderer.draw(baseCtx)===true;baseCtx.restore();
+    if(drawn)baseReady=true;
+  }catch(error){try{baseCtx.restore();}catch(_){} }
+}
+function actorPoint(actor,size){if(!actor)return null;const x=Number(actor.x),y=Number(actor.y);if(!Number.isFinite(x)||!Number.isFinite(y))return null;return{x:(x/size.w)*canvas.width,y:(y/size.h)*canvas.height};}
+function drawDot(point,r,fill,stroke){if(!point)return;mini.beginPath();mini.arc(point.x,point.y,r,0,Math.PI*2);mini.fillStyle=fill;mini.fill();if(stroke){mini.strokeStyle=stroke;mini.lineWidth=1;mini.stroke();}}
+function paint(frame,now){
+  if(now-lastPaint<90)return;lastPaint=now;rebuildBase(frame,now);
+  const size=worldConfig(frame);mini.setTransform(1,0,0,1,0,0);mini.clearRect(0,0,canvas.width,canvas.height);mini.drawImage(base,0,0,canvas.width,canvas.height);
+  const cam=frame?.camera||(typeof camera!=='undefined'?camera:null),sw=Number(frame?.screenW)||0,sh=Number(frame?.screenH)||0,zoom=Math.max(.01,Number(frame?.config?.zoom)||(typeof CONFIG!=='undefined'?Number(CONFIG.zoom):1)||1);
+  if(cam&&sw&&sh){const vw=(sw/zoom)/size.w*canvas.width,vh=(sh/zoom)/size.h*canvas.height,cx=(Number(cam.x)||0)/size.w*canvas.width,cy=(Number(cam.y)||0)/size.h*canvas.height;mini.strokeStyle='rgba(255,255,255,.46)';mini.lineWidth=.8;mini.strokeRect(cx-vw/2,cy-vh/2,vw,vh);}
+  const others=typeof simulatedPlayers!=='undefined'&&Array.isArray(simulatedPlayers)?simulatedPlayers:[];others.forEach(actor=>drawDot(actorPoint(actor,size),1.7,'rgba(246,247,247,.82)','rgba(0,0,0,.55)'));
+  const me=typeof localPlayer!=='undefined'?localPlayer:null;drawDot(actorPoint(me,size),3.3,'#58bfff','#fff3bf');
+}
+const hookId=renderOwner.afterFrame('KeloLuxeMinimap',frame=>paint(frame,performance.now()),900);
+root.KELO_LUXE_MINIMAP=Object.freeze({version:'luxe-minimap-v1.0.0',owner:'Kelo Luxe Shell presentation',renderHook:hookId,position:'above-account-chip',timers:0});
 })(typeof globalThis!=='undefined'?globalThis:window);
