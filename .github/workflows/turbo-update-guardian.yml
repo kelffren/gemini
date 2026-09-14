@@ -79,6 +79,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: turbo-update-guardian-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   turbo-contract:
     runs-on: ubuntu-latest
