@@ -20,6 +20,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+      - name: Prove guardian trigger is fail-closed for every change
+        run: |
+          if grep -Eq '^[[:space:]]+paths(-ignore)?:' .github/workflows/turbo-update-guardian.yml; then
+            echo 'Turbo Update Guardian must not use path filters; they can hide contract regressions.' >&2
+            exit 1
+          fi
       - name: Syntax check Turbo runtime, compiler, host and guardian
         run: |
           node --check src/core/update-delta-core.js
