@@ -26,8 +26,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-          cache: npm
-      - run: npm ci
+      - name: Install project dependencies without lockfile
+        run: npm install --no-package-lock
       - run: npx playwright install --with-deps chromium
       - name: Process with Kelo Asset Sheet Compiler
         run: node scripts/compile-forest-plaza-tileset.mjs assets/world/plaza/forest-plaza-tileset-v2.png src/environment/generated/forest-plaza-tileset-v2-manifest.json src/environment/generated/forest-plaza-tileset-v2-manifest.js
