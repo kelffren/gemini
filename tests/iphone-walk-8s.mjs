@@ -72,10 +72,28 @@ try{
 }
 await pointer('pointerup', sx+80, sy);
 const moved=Math.abs(samples.at(-1).x - samples[0].x);
-log('movedX='+moved.toFixed(1)+' maxStall='+maxStall+' slow='+slow);
-await page.screenshot({path:'/workspace/screenshots/v665-walk8s.png', timeout:5000}).catch(()=>{});
+log('movedX='+moved.toFixed(1)+' maxStall='+maxStall+' slow='+slow+' waiting 10s');
+await page.waitForTimeout(10000);
+const mid=await evalSnap();
+log('afterWait evalMs='+mid.ms+' x='+mid.snap.x.toFixed(1));
+if(mid.ms>400){ console.log('FAIL hitch after wait'); process.exit(4); }
+await pointer('pointerdown', sx, sy);
+const later=[];
+for(let i=1;i<=20;i++){
+  const px=sx + 90*(0.5+0.5*Math.sin(i/5));
+  await pointer('pointermove', px, sy);
+  const {snap, ms}=await evalSnap();
+  later.push({x:snap.x, ms});
+  if(ms>400){ log('SLOW2 '+ms); slow++; }
+  await page.waitForTimeout(200);
+}
+await pointer('pointerup', sx+80, sy);
+const moved2=Math.abs(later.at(-1).x - later[0].x);
+log('moved2='+moved2.toFixed(1)+' slowTotal='+slow);
+await page.screenshot({path:'/workspace/screenshots/v666-walk-later.png', timeout:5000}).catch(()=>{});
 await browser.close();
 if(moved<40){ console.log('FAIL little movement'); process.exit(2); }
+if(moved2<20){ console.log('FAIL freeze after wait'); process.exit(4); }
 if(maxStall>=10 || slow>=6){ console.log('FAIL freeze'); process.exit(4); }
-console.log('PASS 8s walk');
+console.log('PASS 8s + 10s wait + 4s walk');
 process.exit(0);
