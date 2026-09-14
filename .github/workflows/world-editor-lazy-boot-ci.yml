@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
     paths:
+      - 'src/creators/creator-entry.mjs'
       - 'src/creators/adapters/world-creator-adapter.mjs'
       - 'src/creators/workspaces/world-workspace.mjs'
       - 'src/studio/adapters/current-world-importer.mjs'
@@ -18,11 +19,13 @@ on:
       - 'scripts/world-editor-iphone-import-audit.mjs'
       - 'scripts/world-editor-iphone-prewarm-audit.mjs'
       - 'scripts/world-editor-single-prewarm-owner-audit.mjs'
+      - 'scripts/world-editor-creator-boot-isolation-audit.mjs'
       - 'scripts/world-iphone-viewport-reveal-audit.mjs'
       - 'scripts/world-studio-provisional-shell-audit.mjs'
       - '.github/workflows/world-editor-lazy-boot-ci.yml'
   pull_request:
     paths:
+      - 'src/creators/creator-entry.mjs'
       - 'src/creators/adapters/world-creator-adapter.mjs'
       - 'src/creators/workspaces/world-workspace.mjs'
       - 'src/studio/adapters/current-world-importer.mjs'
@@ -37,6 +40,7 @@ on:
       - 'scripts/world-editor-iphone-import-audit.mjs'
       - 'scripts/world-editor-iphone-prewarm-audit.mjs'
       - 'scripts/world-editor-single-prewarm-owner-audit.mjs'
+      - 'scripts/world-editor-creator-boot-isolation-audit.mjs'
       - 'scripts/world-iphone-viewport-reveal-audit.mjs'
       - 'scripts/world-studio-provisional-shell-audit.mjs'
       - '.github/workflows/world-editor-lazy-boot-ci.yml'
@@ -61,6 +65,8 @@ jobs:
         run: node scripts/world-editor-iphone-prewarm-audit.mjs
       - name: Verify World open has one iPhone Studio prewarm owner
         run: node scripts/world-editor-single-prewarm-owner-audit.mjs
+      - name: Verify Creator boot keeps Sprite Ability graph off World path
+        run: node scripts/world-editor-creator-boot-isolation-audit.mjs
       - name: Verify hydrated Studio reveals game world viewport
         run: node scripts/world-iphone-viewport-reveal-audit.mjs
       - name: Verify provisional Studio shell listeners are stripped before hydrate
