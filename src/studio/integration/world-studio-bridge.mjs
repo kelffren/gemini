@@ -9,7 +9,7 @@
  */
 import { yieldStudioBoot, setWorldLaunchStatus } from './studio-boot-pace.mjs';
 
-export const WORLD_STUDIO_BRIDGE_BUILD='world-bridge-20260914-7';
+export const WORLD_STUDIO_BRIDGE_BUILD='world-bridge-20260914-8';
 const CONTROLLER=`./live-studio-controller.mjs?v=${WORLD_STUDIO_BRIDGE_BUILD}`;
 let controllerMod=null;
 
@@ -25,9 +25,22 @@ async function loadController(root){
   return controllerMod;
 }
 
+function stripProvisionalShellListeners(root,shell){
+  if(shell?.dataset?.keloWorldLoading!=='1')return shell;
+  if(typeof shell.cloneNode!=='function'||typeof shell.replaceWith!=='function')return shell;
+  try{
+    const clean=shell.cloneNode(true);
+    shell.replaceWith(clean);
+    return clean;
+  }catch{
+    return shell;
+  }
+}
+
 export function releaseWorldStudioViewport(root=globalThis){
-  const shell=root?.document?.getElementById?.('kelo-studio-live');
+  let shell=root?.document?.getElementById?.('kelo-studio-live');
   if(!shell?.dataset?.shellVersion||!shell?.querySelector?.('.ks-top'))return false;
+  shell=stripProvisionalShellListeners(root,shell);
   try{shell.removeAttribute?.('style');}catch{return false;}
   return true;
 }
