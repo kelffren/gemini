@@ -1,14 +1,14 @@
 {
   "schema_version": 1,
   "id": "BUG-0003",
-  "title": "World editor reopen fix is not yet verified on a real iPhone",
+  "title": "World editor button freezes on tap and never opens on iPhone",
   "status": "FIXED_PENDING_VERIFY",
   "severity": "critical",
   "area": ["creators", "world", "studio", "indexeddb", "ios"],
   "source": "mixed",
   "discovered_at": "2026-09-13",
-  "reported_by": ["human QA", "AI inspection", "regression test"],
-  "reports": [],
+  "reported_by": ["human QA", "AI inspection", "regression test", "player"],
+  "reports": ["REPORT-000001"],
   "environment": {
     "game_build": null,
     "device": "iPhone real device target",
@@ -25,33 +25,38 @@
     "Open Create -> World again and confirm Studio remounts instead of black-screening."
   ],
   "expected": "World opens, remains interactive, and can be reopened even after a stale Studio shell/session condition.",
-  "actual": "Fixes for stale Studio state and blocking IndexedDB exist in main, but real-iPhone acceptance remains unproven because BrowserStack fails before the page can be exercised.",
+  "actual": "Player report 2026-09-14: tapping World froze the card and Kelo Studio never appeared. Hub z-index 2147482100 covered Studio z-index 320, Hub backdrop-filter sat on the live canvas, and a hung Studio import left opening[] stuck so retries were swallowed.",
   "evidence": [
     "Commit 829ac7fbd5fc629b05ecf92489bab16b0292bce9: fix(studio): keep World editor responsive when IndexedDB hangs (#222)",
-    "tests/world-editor-ios-reopen.spec.js covers stale Studio shell recovery",
-    "BrowserStack real-iPhone runs currently fail during browser context creation before validating World"
+    "REPORT-000001: player, iPhone 393x852, World card stays frozen after tap",
+    "Local Chromium: openKeloStudioLive mounts in ~240ms; Creator Hub click path opened Studio then hid it under the Hub"
   ],
   "suspected_files": [
     "src/creators/workspaces/world-workspace.mjs",
-    "src/studio/storage/indexeddb-studio-store.mjs",
     "src/creators/ui/creator-hub.mjs",
+    "src/studio/ui/studio-live-shell.mjs",
+    "src/studio/storage/indexeddb-studio-store.mjs",
     "tests/world-editor-ios-reopen.spec.js"
   ],
-  "owner_hint": "Kelo Creators / World workspace + Kelo Studio storage/session lifecycle",
+  "owner_hint": "Kelo Creators / World workspace + Kelo Studio live shell stacking",
   "claimed_by": null,
   "claim_started_at": null,
   "fix": {
     "status": "candidate",
-    "commits": ["829ac7fbd5fc629b05ecf92489bab16b0292bce9"],
+    "commits": [],
     "files": [
       "src/creators/workspaces/world-workspace.mjs",
-      "src/studio/storage/indexeddb-studio-store.mjs"
+      "src/creators/ui/creator-hub.mjs",
+      "src/creators/creator-entry.mjs",
+      "src/ui/studio-launcher.js",
+      "src/studio/ui/studio-live-shell.mjs",
+      "index.html"
     ],
-    "summary": "World launch/studio storage now attempts bounded IndexedDB waits, fail-open behavior and stale Studio-session recovery instead of leaving the UI blocked indefinitely."
+    "summary": "World launch paints a curtain, yields with timers not rAF, times out the Studio import at 12s, parks/hides the Hub so Studio is not covered, raises #kelo-studio-live above the Hub, and removes Hub backdrop-filter over the live canvas."
   },
   "verification": {
     "status": "PENDING",
-    "method": "Real iPhone Safari E2E: enter game -> Create -> World -> interact/place -> close -> reopen -> no black screen.",
+    "method": "Real iPhone Safari E2E: enter game -> Create -> World -> Studio chrome visible and tappable. Do not mark PASS from headless_shell alone.",
     "evidence": [],
     "verified_by": null,
     "verified_at": null
@@ -61,7 +66,9 @@
   "related_bugs": ["BUG-0002"],
   "notes": [
     "Visibility of #kelo-studio-live alone is not sufficient acceptance; the editor must respond to touch/placement and reopen successfully.",
-    "Do not mark VERIFIED until the deployed flow passes on the target device class."
+    "Do not mark VERIFIED until the deployed flow passes on the target device class.",
+    "Studio graph must stay lazy until World is tapped (live-studio-click-audit).",
+    "headless_shell can freeze after Studio mounts because of the overlay canvas loop; that is not the player-facing Hub-cover bug."
   ],
-  "updated_at": "2026-09-13"
+  "updated_at": "2026-09-14T01:20:00Z"
 }

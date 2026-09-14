@@ -23,6 +23,15 @@ assert.ok(source.includes("throw new Error('SPRITE_ABILITY_WORKSPACE_MOUNT_FAILE
 assert.ok(source.includes("showLaunchError(id,error);"), 'Visible/recoverable launch failure path missing');
 assert.ok(source.includes("if(hub.isConnected)setOpeningUi(id,false);"), 'Busy UI must reset while Hub survives');
 assert.ok(source.includes("card.dataset.workspace=wid;"), 'Workspace cards must be addressable for busy state');
-assert.ok(source.includes("version:'kelo-creator-hub-v1.12.0-asset-sheet-bridge'"), 'Expected transactional launcher version missing');
+assert.ok(source.includes("version:'kelo-creator-hub-v1.15.0-world-unfreeze'"), 'Expected transactional launcher version missing');
+assert.ok(source.includes("await nextPaint();\n    await nextPaint();"), 'World/Hub launch must yield so busy UI can paint before Studio import');
+assert.ok(source.includes("pill.textContent='ABRIENDO'"), 'Busy World card must show ABRIENDO instead of looking frozen');
+assert.ok(source.includes("if(id==='world')await requireWorldStudioMount(session);"), 'World launch must confirm Studio shell before destroying Hub');
+assert.ok(source.includes("throw new Error('WORLD_EDITOR_MOUNT_FAILED')"), 'World mount failure must be explicit and recoverable');
+assert.ok(source.includes("World Editor no abrió. Toca World de nuevo para reintentar."), 'World launch error must tell the player they can retry');
+assert.ok(source.includes('function parkHub()'), 'World launch must detach the Hub so iPhone is not frozen under backdrop-filter');
+assert.ok(source.includes("if(id==='world')parkHub();"), 'World launch must park the Hub before importing Studio');
+assert.ok(source.includes("hub.style.display='none'"), 'World launch must hide the Hub without synchronously tearing it out of a live canvas');
+assert.ok(!source.includes('backdrop-filter:blur'), 'Creator Hub must not blur the live canvas; that freezes World open on iPhone');
 
 console.log('CREATOR_HUB_SPRITE_LAUNCH_AUDIT: PASS');

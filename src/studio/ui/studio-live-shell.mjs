@@ -37,7 +37,7 @@ export function createStudioLiveShell({
   style.dataset.keloStudioUi='1';
   style.textContent=`
   #kelo-studio-live{
-    position:fixed;inset:0;z-index:320;pointer-events:none;color:#edf4ef;
+    position:fixed;inset:0;z-index:2147482200;pointer-events:none;color:#edf4ef;
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
     --ks-gold:#e7c56a;--ks-gold-2:#f4dd8d;--ks-bg:rgba(5,12,14,.965);
     --ks-panel:rgba(10,24,25,.94);--ks-panel-soft:rgba(15,31,31,.88);

@@ -68,6 +68,87 @@ assert.equal(openCalls,2,'World workspace should retry Studio exactly once after
 assert.equal(closeCalls,1,'World workspace should close the stale Studio session before retrying');
 assert.equal(iosRoot.document.getElementById('kelo-studio-live')?.isConnected,true,'recovered World session must leave a connected Studio shell');
 
+let loaderStarted=0,curtainBeforeLoader=false;
+const nodes=new Map();
+const paintRoot={
+  KELO_WORLD_EDIT:{ready:true},
+  document:{
+    body:{
+      append(el){if(el?.id)nodes.set(el.id,el);}
+    },
+    createElement(tag){
+      const el={
+        tagName:String(tag).toUpperCase(),
+        id:'',
+        textContent:'',
+        style:{cssText:''},
+        isConnected:true,
+        setAttribute(){},
+        remove(){if(this.id)nodes.delete(this.id);}
+      };
+      return el;
+    },
+    getElementById(id){
+      if(id==='kelo-studio-live')return {isConnected:true};
+      return nodes.get(id)||null;
+    }
+  },
+  requestAnimationFrame:cb=>setTimeout(cb,0),
+  setTimeout,
+  clearTimeout
+};
+const paintManifest=createWorldWorkspaceManifest({
+  loader:async()=>{
+    loaderStarted++;
+    curtainBeforeLoader=!!paintRoot.document.getElementById('kelo-world-launch-curtain');
+    return {openKeloStudioLive:async()=>({id:'fresh'}),closeKeloStudioLive:async()=>{}};
+  }
+});
+const painted=await paintManifest.open({root:paintRoot});
+assert.equal(painted.id,'fresh','World launch with a curtain must still open Studio');
+assert.equal(loaderStarted,1,'Studio loader must run after the launch curtain paints');
+assert.equal(curtainBeforeLoader,true,'World curtain must be visible before the heavy Studio import starts');
+assert.equal(paintRoot.document.getElementById('kelo-world-launch-curtain'),null,'World curtain must be removed after Studio mounts');
+
+let timeoutCalls=0;
+const hangRoot={
+  KELO_WORLD_EDIT:{ready:true},
+  KELO_WORLD_OPEN_TIMEOUT_MS:40,
+  document:{getElementById:()=>null},
+  setTimeout,
+  clearTimeout
+};
+const hangManifest=createWorldWorkspaceManifest({
+  loader:async()=>({
+    openKeloStudioLive:()=>new Promise(()=>{timeoutCalls++;}),
+    closeKeloStudioLive:async()=>{}
+  })
+});
+const started=Date.now();
+await assert.rejects(()=>hangManifest.open({root:hangRoot}),/WORLD_EDITOR_OPEN_TIMEOUT|CREATOR_WORLD_STUDIO_MOUNT_FAILED/);
+assert.ok(Date.now()-started<20000,'World open watchdog must fail closed instead of leaving the Hub frozen');
+assert.ok(timeoutCalls>=1,'timeout path must have attempted a Studio open');
+
+const hangImportRoot={
+  KELO_WORLD_EDIT:{ready:true},
+  KELO_WORLD_OPEN_TIMEOUT_MS:40,
+  document:{getElementById:()=>null},
+  setTimeout,
+  clearTimeout
+};
+const hangImportManifest=createWorldWorkspaceManifest({
+  loader:()=>new Promise(()=>{})
+});
+const importStarted=Date.now();
+await assert.rejects(()=>hangImportManifest.open({root:hangImportRoot}),/WORLD_EDITOR_OPEN_TIMEOUT/);
+assert.ok(Date.now()-importStarted<20000,'Studio import hang must fail closed so the World button can be tapped again');
+
+const worldSource=await readFile(resolve(here,'../src/creators/workspaces/world-workspace.mjs'),'utf8');
+assert.match(worldSource,/kelo-world-launch-curtain/,'World workspace must paint a launch curtain before importing Studio');
+assert.match(worldSource,/WORLD_EDITOR_OPEN_TIMEOUT/,'World workspace must time out instead of freezing the editor button');
+assert.match(worldSource,/yieldFrames/,'World workspace must yield frames so iPhone can paint ABRIENDO');
+assert.match(worldSource,/withTimeout\(root,boot\(\)/,'World open watchdog must cover the Studio import, not only openKeloStudioLive');
+
 console.log(JSON.stringify({
   ok:true,
   lazyAuthorityBootstrap:true,
@@ -76,5 +157,8 @@ console.log(JSON.stringify({
   bootstrapCalls,
   iosWorldStaleShellRecovery:true,
   studioOpenCalls:openCalls,
-  studioCloseCalls:closeCalls
+  studioCloseCalls:closeCalls,
+  launchCurtainBeforeImport:curtainBeforeLoader,
+  openWatchdog:true,
+  importWatchdog:true
 }));

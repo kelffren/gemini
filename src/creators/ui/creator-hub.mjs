@@ -4,8 +4,9 @@
  * owns: creator project navigation shell only
  * does-not-own: global navigation, Studio implementation, project persistence, permissions or publish policy
  * lazy: imported only after explicit CREATORS action; active cards dispatch through workspace registry
+ * mobile: World launch detaches this shell so Hub + canvas cannot freeze iPhone before Studio mounts
  */
-import { bootKeloCreators } from '../creator-entry.mjs?v=asset-sheet-bridge-20260913-1';
+import { bootKeloCreators } from '../creator-entry.mjs?v=world-unfreeze-20260913-2';
 
 let active=null;
 
@@ -36,12 +37,13 @@ const PROJECT_WORKSPACES=Object.freeze({
 
 function css(){return `
 [data-kelo-creators-ui]{box-sizing:border-box;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#f5f3ea}
-#kelo-creators-hub{position:fixed;inset:0;z-index:2147482100;background:radial-gradient(circle at 50% -10%,rgba(198,164,92,.16),transparent 34%),rgba(7,8,10,.96);backdrop-filter:blur(16px);display:grid;grid-template-rows:auto 1fr;overflow:hidden}
+#kelo-creators-hub{position:fixed;inset:0;z-index:2147482100;background:radial-gradient(circle at 50% -10%,rgba(198,164,92,.16),transparent 34%),rgba(7,8,10,.96);display:grid;grid-template-rows:auto 1fr;overflow:hidden}
+body.kelo-studio-active #kelo-creators-hub{display:none!important;pointer-events:none}
 .kc-head{display:flex;align-items:center;gap:14px;padding:18px 22px;border-bottom:1px solid rgba(255,255,255,.08);background:rgba(10,11,14,.9)}
 .kc-mark{width:34px;height:34px;border:1px solid rgba(215,183,111,.65);display:grid;place-items:center;transform:rotate(45deg);border-radius:8px}.kc-mark span{transform:rotate(-45deg);font-size:11px;font-weight:900;letter-spacing:.08em}
 .kc-title{min-width:0}.kc-title strong{display:block;font-size:17px;letter-spacing:.08em}.kc-title small{display:block;color:#9d9d9d;margin-top:2px}.kc-close{margin-left:auto;border:1px solid rgba(255,255,255,.13);background:#14161b;color:#fff;border-radius:12px;padding:9px 12px;font-weight:800;cursor:pointer}
 .kc-layout{display:grid;grid-template-columns:220px minmax(0,1fr);min-height:0}.kc-nav{padding:16px 12px;border-right:1px solid rgba(255,255,255,.08);overflow:auto}.kc-nav button{display:block;width:100%;text-align:left;border:0;background:transparent;color:#a7a7aa;border-radius:10px;padding:11px 12px;margin:2px 0;font-weight:750;cursor:pointer}.kc-nav button[aria-selected="true"]{color:#fff;background:rgba(255,255,255,.07)}.kc-nav button[hidden]{display:none}
-.kc-main{overflow:auto;padding:24px clamp(16px,4vw,42px) 50px}.kc-main h1{font-size:clamp(26px,4vw,44px);margin:0 0 6px}.kc-lead{color:#a8a8ab;margin:0 0 28px}.kc-section{margin:28px 0}.kc-section h2{font-size:12px;letter-spacing:.18em;color:#cbb477;margin:0 0 12px}.kc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px}.kc-card{min-height:118px;border:1px solid rgba(255,255,255,.09);background:linear-gradient(145deg,rgba(255,255,255,.065),rgba(255,255,255,.025));border-radius:16px;padding:16px;text-align:left;color:#fff;display:flex;flex-direction:column;justify-content:space-between;transition:transform .16s ease,border-color .16s ease,opacity .16s ease}.kc-card.active{cursor:pointer;border-color:rgba(214,179,99,.42)}.kc-card.active:active{transform:scale(.985)}.kc-card:disabled{opacity:.58}.kc-card[aria-busy="true"]{opacity:.72;cursor:wait;transform:none}.kc-card strong{font-size:17px}.kc-card small{color:#8f9095}.kc-pill{align-self:flex-start;font-size:10px;letter-spacing:.12em;border-radius:999px;padding:5px 8px;background:rgba(210,179,107,.12);color:#d5b976}.kc-empty{border:1px dashed rgba(255,255,255,.12);border-radius:16px;padding:28px;color:#9fa0a4}.kc-launch-error{margin:0 0 14px;border:1px solid rgba(255,133,104,.34);border-radius:12px;padding:11px 13px;background:rgba(126,45,31,.15);color:#ffd5c9;font-size:12px;font-weight:750}.kc-project{display:flex;align-items:center;gap:12px;border:1px solid rgba(255,255,255,.09);border-radius:14px;padding:14px;margin:9px 0}.kc-project>div{min-width:0}.kc-project .kc-lead{margin:3px 0 0;font-size:11px}.kc-project button{margin-left:auto;border:1px solid rgba(214,179,99,.4);background:rgba(214,179,99,.1);color:#f7e2ad;border-radius:10px;padding:8px 11px;font-weight:800;cursor:pointer}
+.kc-main{overflow:auto;padding:24px clamp(16px,4vw,42px) 50px}.kc-main h1{font-size:clamp(26px,4vw,44px);margin:0 0 6px}.kc-lead{color:#a8a8ab;margin:0 0 28px}.kc-section{margin:28px 0}.kc-section h2{font-size:12px;letter-spacing:.18em;color:#cbb477;margin:0 0 12px}.kc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px}.kc-card{min-height:118px;border:1px solid rgba(255,255,255,.09);background:linear-gradient(145deg,rgba(255,255,255,.065),rgba(255,255,255,.025));border-radius:16px;padding:16px;text-align:left;color:#fff;display:flex;flex-direction:column;justify-content:space-between;transition:transform .16s ease,border-color .16s ease,opacity .16s ease}.kc-card.active{cursor:pointer;border-color:rgba(214,179,99,.42)}.kc-card.active:active{transform:scale(.985)}.kc-card:disabled{opacity:.58}.kc-card[aria-busy="true"]{opacity:.88;cursor:progress;transform:none}.kc-card strong{font-size:17px}.kc-card small{color:#8f9095}.kc-pill{align-self:flex-start;font-size:10px;letter-spacing:.12em;border-radius:999px;padding:5px 8px;background:rgba(210,179,107,.12);color:#d5b976}.kc-empty{border:1px dashed rgba(255,255,255,.12);border-radius:16px;padding:28px;color:#9fa0a4}.kc-launch-error{margin:0 0 14px;border:1px solid rgba(255,133,104,.34);border-radius:12px;padding:11px 13px;background:rgba(126,45,31,.15);color:#ffd5c9;font-size:12px;font-weight:750}.kc-project{display:flex;align-items:center;gap:12px;border:1px solid rgba(255,255,255,.09);border-radius:14px;padding:14px;margin:9px 0}.kc-project>div{min-width:0}.kc-project .kc-lead{margin:3px 0 0;font-size:11px}.kc-project button{margin-left:auto;border:1px solid rgba(214,179,99,.4);background:rgba(214,179,99,.1);color:#f7e2ad;border-radius:10px;padding:8px 11px;font-weight:800;cursor:pointer}
 @media(max-width:700px){#kelo-creators-hub{grid-template-rows:auto auto minmax(0,1fr)}.kc-head{padding:12px 14px}.kc-layout{display:contents}.kc-nav{display:flex;gap:5px;overflow-x:auto;border-right:0;border-bottom:1px solid rgba(255,255,255,.08);padding:8px 10px}.kc-nav button{width:auto;white-space:nowrap;padding:9px 10px}.kc-main{padding:18px 14px 34px}.kc-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.kc-card{min-height:106px;padding:13px}.kc-title small{display:none}}
 @media(max-width:380px){.kc-grid{grid-template-columns:1fr}}
 `;}
@@ -91,8 +93,8 @@ export async function openCreatorHub({root=globalThis}={}){
   let current='create';
 
   const nextPaint=()=>new Promise(resolve=>{
-    if(typeof root.requestAnimationFrame==='function')root.requestAnimationFrame(()=>resolve());
-    else root.setTimeout(resolve,16);
+    const wait=typeof root.setTimeout==='function'?root.setTimeout.bind(root):setTimeout;
+    wait(resolve,0);
   });
 
   async function requireSpriteAbilityMount(session){
@@ -108,27 +110,77 @@ export async function openCreatorHub({root=globalThis}={}){
   function setOpeningUi(id,busy){
     for(const control of hub.querySelectorAll('[data-workspace]')){
       const isTarget=control.dataset.workspace===id;
-      if(isTarget)control.setAttribute('aria-busy',String(busy));
+      if(isTarget){
+        control.setAttribute('aria-busy',String(busy));
+        const pill=control.querySelector('.kc-pill');
+        const detail=control.querySelector('small');
+        if(busy){
+          if(!control.dataset.keloIdlePill){
+            control.dataset.keloIdlePill=pill?.textContent||'';
+            control.dataset.keloIdleDetail=detail?.textContent||'';
+          }
+          if(pill)pill.textContent='ABRIENDO';
+          if(detail)detail.textContent=id==='world'?'Cargando el editor…':'Cargando herramientas…';
+        }else{
+          if(pill&&control.dataset.keloIdlePill)pill.textContent=control.dataset.keloIdlePill;
+          if(detail&&control.dataset.keloIdleDetail)detail.textContent=control.dataset.keloIdleDetail;
+        }
+      }
       if(opening.size)control.setAttribute('aria-disabled','true');
       else control.removeAttribute('aria-disabled');
     }
   }
 
+  function friendlyLaunchError(id,error){
+    const code=String(error?.message||error||'');
+    if(id==='world'||/WORLD_EDITOR|CREATOR_WORLD_STUDIO/.test(code))return 'World Editor no abrió. Toca World de nuevo para reintentar.';
+    if(typeof root.showToast==='function'||!code)return error?.message||`No se pudo abrir ${id}`;
+    return code;
+  }
+
   function showLaunchError(id,error){
     console.error(`[Kelo Creators → ${id}]`,error);
+    const message=friendlyLaunchError(id,error);
     if(typeof root.showToast==='function'){
-      root.showToast(error?.message||`No se pudo abrir ${id}`);
+      root.showToast(message);
       return;
     }
     main.querySelector('.kc-launch-error')?.remove();
-    const label=id==='sprite-ability'?'Sprite Ability':id;
+    const label=id==='sprite-ability'?'Sprite Ability':id==='world'?'World Editor':id;
     main.prepend(make('div',{class:'kc-launch-error',text:`${label} no terminó de abrir. El Hub sigue activo; toca de nuevo para reintentar.`}));
+  }
+
+  async function requireWorldStudioMount(){
+    for(let attempt=0;attempt<8;attempt++){
+      const candidate=doc.getElementById('kelo-studio-live');
+      if(candidate?.isConnected)return candidate;
+      await nextPaint();
+    }
+    throw new Error('WORLD_EDITOR_MOUNT_FAILED');
+  }
+
+  function parkHub(){
+    hub.dataset.keloWorldLaunch='1';
+    hub.style.zIndex='1';
+    hub.style.pointerEvents='none';
+    hub.style.backdropFilter='none';
+    hub.style.webkitBackdropFilter='none';
+  }
+
+  function restoreHub(){
+    delete hub.dataset.keloWorldLaunch;
+    hub.style.zIndex='';
+    hub.style.pointerEvents='';
+    hub.style.backdropFilter='';
+    hub.style.webkitBackdropFilter='';
   }
 
   async function openWorkspace(id,{projectId=null}={}){
     if(opening.size)return;
     opening.add(id);
     setOpeningUi(id,true);
+    await nextPaint();
+    await nextPaint();
     try{
       // Sprite Ability owns project bootstrap. Keep the Hub alive until its real Studio shell
       // is confirmed in the DOM; a rejected/partial launch must never strand mobile users.
@@ -148,10 +200,22 @@ export async function openCreatorHub({root=globalThis}={}){
         const project=await platform.projects.create({type:projectType,name:`${label} ${existing.length+1}`,ownerId});
         resolvedProjectId=project.projectId;
       }
+      if(id==='world')parkHub();
       const session=await platform.openWorkspace(id,resolvedProjectId?{projectId:resolvedProjectId}:{});
+      if(id==='world')await requireWorldStudioMount(session);
+      if(id==='world'){
+        hub.style.display='none';
+        setTimeout(()=>{try{destroy();}catch{}},250);
+        return session;
+      }
       destroy();
       return session;
     }catch(error){
+      if(id==='world'&&doc.getElementById('kelo-studio-live')?.isConnected){
+        destroy();
+        return null;
+      }
+      restoreHub();
       showLaunchError(id,error);
       return null;
     }finally{
@@ -188,7 +252,7 @@ export async function openCreatorHub({root=globalThis}={}){
           make('small',{text:implemented?(permitted?detail:'Your key does not grant this workspace'):'Workspace not implemented yet'})
         ]);
         card.dataset.workspace=wid;
-        if(permitted)card.onclick=()=>void openWorkspace(wid);
+        if(permitted)card.onclick=()=>wid==='world'?void setTimeout(()=>void openWorkspace(wid),50):void openWorkspace(wid);
         grid.append(card);
       }
       sec.append(grid);
@@ -291,7 +355,7 @@ export async function openCreatorHub({root=globalThis}={}){
   doc.addEventListener('keydown',onKey,true);
 
   active=Object.freeze({
-    version:'kelo-creator-hub-v1.12.0-asset-sheet-bridge',
+    version:'kelo-creator-hub-v1.15.0-world-unfreeze',
     hub,platform,
     get section(){return current;},
     show:render,
