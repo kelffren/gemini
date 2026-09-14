@@ -122,7 +122,7 @@ root.KELO_LUXE_PLAYER_HUD=Object.freeze({version:'luxe-player-hud-v1.3.0-minimap
 /* KELO-INDEX UI/MINIMAP: usa el owner KeloRender; no crea un segundo loop. Queda arriba del chip de cuenta Kelo. */
 (function(root){
 'use strict';
-if(typeof document==='undefined'||document.getElementById('kw-live-minimap'))return;
+if(typeof document==='undefined'||root.KELO_HIDE_MINIMAP===true||document.getElementById('kw-live-minimap'))return;
 const renderOwner=root.KeloRender;
 if(!renderOwner?.afterFrame)return;
 const host=document.createElement('div');

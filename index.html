@@ -13,7 +13,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="KELO WORLD">
-  <title>Kelo World — V6.61</title>
+  <title>Kelo World — V6.62</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="src/ui/backpack-fantasy-v1.css?v=1">
   <style>
@@ -23,14 +23,21 @@
     #ui-layer{position:absolute;inset:0;pointer-events:none;z-index:10}
     body.social-mode #action-bar-container,body.social-mode #equipment-action-bar-container,body.social-mode #mount-action-bar-container{display:none!important}
     html[data-kelo-auth-gate="off"] #kelo-account-auth,html[data-kelo-guest-play="1"] #kelo-account-auth{display:none!important}
+    #kw-live-minimap,#kelo-minimap,#minimap,.lx-mark{display:none!important;visibility:hidden!important;pointer-events:none!important}
+    #kelo-module-loader{position:fixed;left:50%;bottom:max(14px,calc(env(safe-area-inset-bottom) + 8px));transform:translateX(-50%);z-index:2147483600;pointer-events:none;min-width:168px;max-width:78vw;padding:8px 12px 9px;border-radius:16px;background:rgba(7,10,12,.88);border:1px solid rgba(229,189,98,.38);box-shadow:0 10px 28px rgba(0,0,0,.4);color:#e7c56a;font:700 11px/1.25 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;letter-spacing:.04em;text-align:center}
+    #kelo-module-loader[hidden]{display:none!important}
+    #kelo-module-loader .kelo-ml-track{margin-top:6px;height:3px;border-radius:99px;background:rgba(255,255,255,.08);overflow:hidden}
+    #kelo-module-loader .kelo-ml-bar{display:block;height:100%;width:0;background:linear-gradient(90deg,#c9a227,#f0d48a);transition:width .25s linear}
   </style>
 </head>
 <body class="social-mode">
 <canvas id="game-canvas"></canvas>
 <div id="ui-layer"><div class="action-bar" id="action-bar-container" aria-label="Barra de habilidades"></div></div>
+<div id="kelo-module-loader" hidden><span id="kelo-ml-text">Cargando módulos…</span><div class="kelo-ml-track"><i class="kelo-ml-bar" id="kelo-ml-bar"></i></div></div>
 <script>
 (function(){
   window.KELO_WORLD_DECORATION_RESET=true;
+  window.KELO_HIDE_MINIMAP=true;
   try{
     var q=new URLSearchParams(location.search);
     if(q.get('guest')==='1'||q.get('aiGuest')==='1'){
@@ -109,25 +116,44 @@
 <script>window.__keloReleaseRAF&&window.__keloReleaseRAF();</script>
 <script>
 (function(){
-  var mobile=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent||'') || (window.matchMedia&&matchMedia('(pointer: coarse)').matches);
-  if(mobile) return;
-  var urls=['src/core/update-system.js?v=3-network-stage','src/core/update-watch.js?v=1','src/ui/update-ui.js?v=2-network-stage','engine-m.js?v=94','engine-n.js?v=230','engine-o.js?v=96','engine-p.js?v=96','engine-q.js?v=94','engine-r.js?v=94','engine-s.js?v=96','engine-t.js?v=94','engine-u.js?v=94','engine-v.js?v=94','engine-w.js?v=94','engine-x.js?v=94','engine-y.js?v=98','engine-z.js?v=94','engine-aa.js?v=96','engine-ab.js?v=240','src/characters/character-appearance.js?v=4-base-zoo-authority','engine-ac.js?v=224','engine-ae.js?v=94','engine-af.js?v=94','engine-ag.js?v=94','engine-ah.js?v=95','engine-ai.js?v=95','engine-aj.js?v=94','src/ui/kelo-chat-drawer.js?v=5-premium-waze','src/ui/kelo-chat-integration-bridge.js?v=2','src/environment/plaza-depth.js?v=219','src/systems/nobility.js?v=4','src/ui/player-nameplate.js?v=1','src/ui/profile-panel-close.js?v=2','src/ui/self-interaction-ui.js?v=1'];
-  var i=0;
+  var packs=[
+    {src:'src/ui/player-nameplate.js?v=1', name:'placas'},
+    {src:'src/systems/nobility.js?v=4', name:'títulos'},
+    {src:'src/ui/kelo-chat-drawer.js?v=5-premium-waze', name:'chat'},
+    {src:'src/ui/kelo-chat-integration-bridge.js?v=2', name:'chat'},
+    {src:'src/environment/plaza-depth.js?v=219', name:'plaza'},
+    {src:'src/ui/profile-panel-close.js?v=2', name:'perfil'},
+    {src:'src/ui/self-interaction-ui.js?v=1', name:'perfil'}
+  ];
+  var i=0, box=document.getElementById('kelo-module-loader');
+  var text=document.getElementById('kelo-ml-text');
+  var bar=document.getElementById('kelo-ml-bar');
   function busy(){
-    try{
-      if(typeof input!=='undefined'&&input&&(input.normX||input.normY||input.active)) return true;
-    }catch(e){}
+    try{ if(typeof input!=='undefined'&&input&&(Math.abs(input.normX)>0.02||Math.abs(input.normY)>0.02||input.active)) return true; }catch(e){}
     return false;
   }
+  function show(msg, pct){
+    if(!box)return;
+    box.hidden=false;
+    if(text) text.textContent=msg;
+    if(bar) bar.style.width=Math.max(0,Math.min(100,pct))+'%';
+  }
+  function hide(){
+    if(!box)return;
+    show('Listo',100);
+    setTimeout(function(){ box.hidden=true; }, 900);
+  }
   function next(){
-    if(i>=urls.length)return;
-    if(busy()){ setTimeout(next, 400); return; }
+    if(i>=packs.length){ hide(); return; }
+    if(busy()){ show('En pausa · caminando', (i/packs.length)*100); setTimeout(next, 400); return; }
+    var item=packs[i];
+    show('Descargando '+item.name+'  '+(i+1)+'/'+packs.length, (i/packs.length)*100);
     var s=document.createElement('script');
-    s.src=urls[i++];
-    s.onload=s.onerror=function(){ setTimeout(next, 250); };
+    s.src=item.src;
+    s.onload=s.onerror=function(){ i+=1; setTimeout(next, 320); };
     document.head.appendChild(s);
   }
-  setTimeout(next, 8000);
+  setTimeout(next, 1600);
 })();
-</script></script>
+</script>
 </body></html>
