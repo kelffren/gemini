@@ -361,9 +361,20 @@
       "files": [
         "src/studio/integration/world-studio-bridge.mjs"
       ]
+    },
+    {
+      "id": "prevention:d78bef260a764c71396fb77f7fab027fc9708fc8",
+      "at": "2026-09-14T15:38:50.000Z",
+      "source": "bug-prevention-ci",
+      "head_sha": "d78bef260a764c71396fb77f7fab027fc9708fc8",
+      "base_sha": "33ab57893302db38a1c25c65f7acf6d78282e7f7",
+      "conclusion": "success",
+      "files": [
+        "scripts/world-editor-iphone-prewarm-audit.mjs"
+      ]
     }
   ],
-  "feedback_updated_at": "2026-09-14T15:38:51.546Z",
+  "feedback_updated_at": "2026-09-14T15:39:08.551Z",
   "training": {
     "examples": 33,
     "search_examples": 24,
