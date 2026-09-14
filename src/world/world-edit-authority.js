@@ -8,7 +8,7 @@
 'use strict';
 if(window.KELO_WORLD_EDIT)return;
 
-const VERSION='world-edit-authority-v1.1.1';
+const VERSION='world-edit-authority-v1.1.2';
 const WORLD_PARCEL_ID='parcel:world:editor';
 const listeners=new Set();
 const readyWaiters=new Set();
@@ -42,7 +42,8 @@ async function projectView(snapshot,meta={},forcePlacements=false){
     await ensureWorldParcel();
     const target=Array.isArray(snapshot.placements)?snapshot.placements:[];
     const current=S.getPlacements?.(WORLD_PARCEL_ID)||[];
-    if(forcePlacements||!layoutsEqual(current,target)){
+    const sameView=String(currentView.kind||'')===String(meta?.kind||'')&&String(currentView.id||'')===String(meta?.id||'');
+    if((forcePlacements&&!sameView)||!layoutsEqual(current,target)){
       await S.request('replaceLayout',{parcelId:WORLD_PARCEL_ID,placements:target,developer:true});
     }
   }
