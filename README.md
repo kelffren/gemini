@@ -1,19 +1,41 @@
-# kelffren/gemini
+# KELO WORLD
 
-# LEY — ONLINE FIRST
+Kelo World es un MMORPG/social RPG 2D top-down, mobile-first, construido sobre un runtime web modular con Foundation owners, sistemas online-ready y herramientas internas de creación.
 
-**Todo lo que se cree o se cambie aquí debe poder enchufarse al online después, sin rehacer el sistema.**
+**Runtime LIVE declarado:** `Kelo World — V6.54.2` en `index.html`.
 
-Empieza por: [ONLINE_FIRST.md](ONLINE_FIRST.md) · [docs/ONLINE_FIRST.md](docs/ONLINE_FIRST.md) · [AGENTS.md](AGENTS.md)
+## Ley principal
 
-## ChatGPT → assets (PNG automático)
+**ONLINE FIRST:** todo sistema nuevo debe poder conectarse a autoridad online sin rehacer su arquitectura. Lee primero `ONLINE_FIRST.md`, `docs/ONLINE_FIRST.md` y `AGENTS.md`.
 
-Si necesitas subir un PNG generado o recibido por ChatGPT directamente a `assets/`, **lee primero** [CHATGPT_ASSET_UPLOAD_BRIDGE.md](CHATGPT_ASSET_UPLOAD_BRIDGE.md). Ahí está documentado el flujo probado ChatGPT → Dropbox temporal → `asset-import-requests/*.json` → GitHub Action → `assets/...png` → verificación final.
+## Documentación actual
 
----
+- `docs/GAME_STATE_CURRENT.md` — estado real del juego ahora.
+- `ENGINE_MAP.md` — mapa de engine, boot order, owners y fronteras.
+- `docs/ARCHITECTURE_CURRENT.md` — arquitectura por capas.
+- `docs/CODE_INDEX.md` — índice de archivos y owners.
+- `docs/FEATURE_MATRIX.md` — matriz de sistemas activos/pending.
+- `docs/KELO_STUDIO_ARCHITECTURE.md` — World/Studio/Creators.
+- `docs/ASSET_CONTRACT.md` — contrato de assets, atlas y placement.
+- `docs/DOCUMENTATION_INDEX.md` — qué documentos son canónicos vs históricos.
 
-Kelo World Master Engine V2.1
+## Pipeline de assets actual
+
+ChatGPT/archivo → puente explícito → `assets/` → Asset Sheet Compiler → manifest irregular → Atlas Contract → Property Catalog → Studio/World → placement.
+
+El caso Forest Plaza ya está integrado con `forest-plaza-tileset-v2.png`, 146 piezas semánticamente clasificadas y carpetas visuales en Studio.
+
+## Entradas importantes
+
+- Runtime: `index.html`
+- Engine legacy core: `engine-a.js`, `engine-c.js`
+- Foundation core: `src/core/`
+- Mundo: `src/environment/`
+- Studio/Creators: `src/studio/`, `src/creators/`
+- Sistemas gameplay: `src/systems/`
+- Propiedad/catalog: `src/property/`
+- Documentación de sistemas: `docs/systems/`
 
 Repo: https://github.com/kelffren/gemini
 
-Si GitHub Pages está activo: https://kelffren.github.io/gemini/
+LIVE Pages: https://kelffren.github.io/gemini/
