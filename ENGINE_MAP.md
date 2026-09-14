@@ -2,8 +2,8 @@
 
 > Documento canónico del engine. Si contradice `index.html` o un owner Foundation LIVE, gana el runtime y este archivo debe actualizarse.
 
-**Sincronizado:** 2026-09-14  
-**Runtime declarado:** Kelo World V6.54.2  
+**Sincronizado:** 2026-09-15
+**Runtime declarado:** Kelo World V6.69
 **Modelo:** web 2D top-down, Canvas, mobile-first, login/guest gate antes del boot pesado.
 
 ## 1. Regla de engine
@@ -16,7 +16,7 @@ Estados usados aquí: `OWNER LIVE`, `SUPPORT LIVE`, `LEGACY CORE`, `DYNAMIC LIVE
 
 Safari iOS tiene **un solo hilo**. Si `engine-b` arranca `gameLoop` mientras el HTML sigue compilando 100+ scripts, el canvas se congela o se pone negro.
 
-Contrato LIVE (`index.html` V6.68):
+Contrato LIVE (`index.html` V6.69):
 
 1. Flag `__keloHoldGameLoop=true` **antes** de `engine-b`.
 2. Plaza only (~44 scripts): events → input → `engine-a/b/c` → cámara/avatar → `engine-d..l` → world-map/props → luxe HUD → governor.
@@ -26,6 +26,12 @@ Contrato LIVE (`index.html` V6.68):
 6. Prohibido inyectar `<script>` desde nameplates u otros owners (eso montaba el chat Waze y mataba Safari).
 
 El listado histórico de 16 pasos **no es el boot móvil**. Restaurar esos tags en `index.html` es un bug.
+
+### First-use: corrección candidata, pendiente de certificar
+
+`BUG-0004` registra omisiones del grafo de carga: Monturas requiere Stats/catálogos; Mochila requiere Equipment/Containers; Market requiere Backpack/Containers. Apariencia delega al `KELO_PROFILE_LAUNCHER.ensureCustomizer()` existente para preservar schema, contenido, preview y CSS en orden. Los errores de descarga deben rechazar `ensure`, limpiar la promesa fallida y permitir reintento. Un tag descargado no demuestra que su owner se inicializó.
+
+`playwright.freeze.config.js` y `tests/freeze-stability.spec.js` prueban desktop Chromium y perfiles móviles Chromium/WebKit: caminar 8s, parar 10s y volver a caminar 4s, con errores fatales y owners reales. Las pruebas están en investigación; no certifican iPhone físico ni cierran BUG-0003.
 
 ## 3. Owners de Foundation
 

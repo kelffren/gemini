@@ -1,0 +1,41 @@
+{
+  "schema_version": 2,
+  "id": "BUG-0004",
+  "title": "Menu features report ready while required runtime owners are missing",
+  "status": "CLAIMED",
+  "severity": "high",
+  "area": ["boot", "menu", "inventory", "mounts", "appearance", "market"],
+  "source": "mixed",
+  "discovered_at": "2026-09-15",
+  "reported_by": ["player", "Codex runtime QA"],
+  "reports": [],
+  "environment": {"game_build": "V6.69 / 307850e1", "device": "desktop with mobile iframe 390x844", "os": "Windows", "browser": "Codex in-app Chromium", "surface": "Luxe menu first use"},
+  "reproduction": ["Start a fresh guest session", "Open Mounts, Market or Appearance from the Luxe menu", "Observe load completion and inspect the actual UI and runtime errors"],
+  "expected": "A feature becomes ready only after its ordered dependencies and real owner initialize; failed downloads reject and remain retryable.",
+  "actual": "Original Mounts logs missing catalog/stats dependency; Market shows only Mercado cargando without close control; Appearance throws CHARACTER_SLOT_SCHEMA_NOT_LOADED. Bag ensure succeeds without Equipment or Containers. Script network errors also resolve successfully.",
+  "evidence": ["bugs/investigacion/BUG-0004/2026-09-15-v669-menu-first-use.md", "tests/module-loader-failure.mjs", "tests/freeze-stability.spec.js"],
+  "suspected_files": ["src/core/module-loader.js", "index.html"],
+  "owner_hint": "KeloModuleLoader coordinating existing feature launchers",
+  "claimed_by": "Codex freeze investigation",
+  "claim_started_at": "2026-09-15",
+  "research": {
+    "status": "in_progress",
+    "summary": "Dependency omissions and false-positive load success are reproduced. Candidate patches restore several features; full menu, WebKit and real iPhone verification remain pending.",
+    "known_facts": [
+      {"id": "F1", "statement": "Network error resolves and marks a pack loaded in the original loader; regression fails before the patch and passes after rejection/retry handling.", "evidence": ["tests/module-loader-failure.mjs"]},
+      {"id": "F2", "statement": "Original first-use graphs omit dependencies required at evaluation time.", "evidence": ["bugs/investigacion/BUG-0004/2026-09-15-v669-menu-first-use.md"]}
+    ],
+    "hypotheses": [], "ruled_out": [],
+    "unknowns": [{"id": "U1", "question": "Do all menu routes and gameplay systems initialize and remain responsive on WebKit and physical iPhone?", "why_it_matters": "Chromium movement alone does not verify Safari or feature operation.", "quickest_test": "Run the new stability workflow and physical iPhone menu/move/wait/resume QA."}],
+    "external_references": [], "last_researched_at": "2026-09-15"
+  },
+  "attempt_history": [
+    {"id": "A1", "at": "2026-09-15", "actor": "Codex", "goal": "Reproduce first-use failures and candidate dependency fixes", "hypothesis_ids": [], "change": {"commits": [], "files": ["src/core/module-loader.js", "index.html"], "summary": "Restore Mounts/Bag/Market dependencies, delegate Appearance to its existing launcher, reject failed script loads."}, "validation": {"environment": "local Chromium / mobile iframe", "method": "Actual menu opening plus movement 8s, rest 10s, resume 4s and runtime owner checks", "result": "PARTIAL", "evidence": ["bugs/investigacion/BUG-0004/2026-09-15-v669-menu-first-use.md"]}, "conclusion": "Mounts, Market and Bag candidate cycles passed. Appearance and remaining routes require further validation. This does not demonstrate a fix for the player's original persistent freeze.", "do_not_repeat_without": null}
+  ],
+  "next_best_actions": [{"priority": 1, "action": "Run Chromium/WebKit first-use feature matrix and open/close each real panel before move/rest/resume", "reason": "Detect initialization omissions and leaked input locks", "expected_signal": "Real owners and panels exist, errors remain empty and movement resumes", "stop_condition": "Any route failure requires a targeted dependency/owner fix before certification"}],
+  "fix": {"status": "candidate", "commits": [], "files": ["src/core/module-loader.js", "index.html"], "summary": "Partial first-use corrections under investigation."},
+  "verification": {"status": "PENDING", "method": null, "evidence": [], "verified_by": null, "verified_at": null},
+  "blocked_by": [], "duplicate_of": null, "related_bugs": ["BUG-0003"],
+  "notes": ["Do not mark VERIFIED or use this issue to close BUG-0003; the physical iPhone freeze has not been reproduced/fixed by these patches."],
+  "updated_at": "2026-09-15"
+}
