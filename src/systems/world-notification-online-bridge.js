@@ -8,17 +8,23 @@
 (function(){
 'use strict';
 if(window.KELO_WORLD_NOTIFICATION_ONLINE_BRIDGE)return;
-const VERSION='kelo-world-notification-online-bridge-v1.0.0';
+const VERSION='kelo-world-notification-online-bridge-v1.0.1';
 let installed=false;
 function net(){return window.KeloNetAuthority||null;}
 function notifications(){return window.KeloNotifications||null;}
+function outboundNotification(item){
+  let copy;try{copy=JSON.parse(JSON.stringify(item||{}));}catch(_){copy={};}
+  const action=copy.action,payload=action&&action.payload;
+  if(action&&action.event==='world:focus-location'&&(!payload||payload.x==null||payload.y==null||!Number.isFinite(Number(payload.x))||!Number.isFinite(Number(payload.y))))copy.action=null;
+  return copy;
+}
 function installTransport(){
   const center=notifications(),authority=net();
   if(installed||!center||!authority||typeof center.installTransport!=='function'||typeof authority.requestCommerce!=='function')return false;
   center.installTransport({
     broadcast(item){
       if(typeof authority.isOnline==='function'&&!authority.isOnline())return Promise.reject(new Error('KELO_NOTIFICATION_NETWORK_OFFLINE'));
-      return authority.requestCommerce('world_notification',{notification:item}).then(result=>{
+      return authority.requestCommerce('world_notification',{notification:outboundNotification(item)}).then(result=>{
         if(result&&result.ok===false)throw new Error(result.code||'KELO_NOTIFICATION_BROADCAST_REJECTED');
         return result;
       });
@@ -37,8 +43,8 @@ function installTransport(){
   return true;
 }
 function focusLocation(payload){
-  const p=payload||{},x=Number(p.x),y=Number(p.y),camera=window.KeloCamera;
-  if(!camera||!Number.isFinite(x)||!Number.isFinite(y)){
+  const p=payload||{},hasPoint=p.x!=null&&p.y!=null&&Number.isFinite(Number(p.x))&&Number.isFinite(Number(p.y)),x=hasPoint?Number(p.x):NaN,y=hasPoint?Number(p.y):NaN,camera=window.KeloCamera;
+  if(!camera||!hasPoint){
     try{window.dispatchEvent(new CustomEvent('kelo:world-location-unresolved',{detail:p}));}catch(_){}
     return false;
   }
@@ -62,5 +68,5 @@ function boot(){installTransport();installFocus();}
 boot();
 if(!installed){window.addEventListener('load',installTransport,{once:true});setTimeout(installTransport,250);setTimeout(installTransport,1200);}
 window.KELO_WORLD_NOTIFICATION_ONLINE_BRIDGE=Object.freeze({version:VERSION,installTransport,focusLocation,getState:()=>Object.freeze({installed,online:!!(net()&&net().isOnline&&net().isOnline())})});
-window.KELO_WORLD_NOTIFICATION_ONLINE_AUDIT=Object.freeze({version:VERSION,singleWebSocket:true,serverAuthorizationRequired:true,commerceEnvelopeBridge:true,cameraOwner:'KeloCamera',directCameraMutation:false});
+window.KELO_WORLD_NOTIFICATION_ONLINE_AUDIT=Object.freeze({version:VERSION,singleWebSocket:true,serverAuthorizationRequired:true,commerceEnvelopeBridge:true,cameraOwner:'KeloCamera',directCameraMutation:false,requiresRealCoordinates:true});
 })();
