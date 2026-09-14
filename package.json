@@ -20,6 +20,7 @@
     "audit:bugs": "node scripts/bug-registry-audit.mjs",
     "audit:bug-regressions": "node scripts/bug-regression-audit.mjs",
     "audit:bug-close": "node scripts/bug-close-gate.mjs",
+    "audit:bug-recurrence": "node scripts/bug-recurrence-gate.mjs",
     "audit:stones": "node scripts/audit-stones.js",
     "audit:property": "node scripts/property-editor-audit.js",
     "audit:character": "node scripts/character-customization-audit.js",
