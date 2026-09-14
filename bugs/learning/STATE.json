@@ -512,9 +512,20 @@
       "files": [
         "src/studio/integration/live-studio-controller.mjs"
       ]
+    },
+    {
+      "id": "prevention:ad130f147528adec1609c64b12b8de3eb53c54e6",
+      "at": "2026-09-14T19:40:44.000Z",
+      "source": "bug-prevention-ci",
+      "head_sha": "ad130f147528adec1609c64b12b8de3eb53c54e6",
+      "base_sha": "a80d26378e75529777d7914fd1652453a7b2c50c",
+      "conclusion": "success",
+      "files": [
+        "scripts/world-editor-iphone-prewarm-audit.mjs"
+      ]
     }
   ],
-  "feedback_updated_at": "2026-09-14T19:40:39.757Z",
+  "feedback_updated_at": "2026-09-14T19:41:01.293Z",
   "training": {
     "examples": 44,
     "search_examples": 33,
