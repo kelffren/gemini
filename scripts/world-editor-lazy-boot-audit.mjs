@@ -175,6 +175,19 @@ assert.doesNotMatch(controllerSource,/^import \{ createStudioOverlayCanvas \}/m,
 assert.doesNotMatch(controllerSource,/^import \{ createStudioLiveShell \}/m,'Live controller must not statically import the Studio shell');
 assert.match(controllerSource,/loadLiveStudioChrome/,'Live controller must load chrome before the rest of the Studio graph');
 assert.match(controllerSource,/loadLiveStudioRuntime/,'Live controller must dynamically import remaining Studio modules after chrome');
+assert.match(controllerSource,/startStudioOverlayDraw/,'Live controller must start the overlay after chrome returns on iPhone');
+assert.match(controllerSource,/overlayDrawMs=phoneOverlay\?90:16/,'iPhone overlay draw must be throttled instead of every rAF');
+
+const overlaySource=await readFile(resolve(here,'../src/studio/render/studio-overlay-canvas.mjs'),'utf8');
+assert.match(overlaySource,/isOverlayPhone\(\) \? 1 : 2/,'iPhone overlay backing store must stay at dpr 1');
+assert.match(overlaySource,/visualViewport/,'overlay must size to the visual viewport, not the body');
+assert.match(overlaySource,/position:'fixed'/,'overlay must be viewport-fixed so body height cannot allocate a giant canvas');
+
+const shellSource=await readFile(resolve(here,'../src/studio/ui/studio-live-shell.mjs'),'utf8');
+assert.match(shellSource,/backdrop-filter:none!important/,'Studio chrome must kill backdrop-filter on coarse/narrow iPhone');
+
+const entrySource=await readFile(resolve(here,'../src/studio/studio-entry.mjs'),'utf8');
+assert.match(entrySource,/isPhoneStudioBoot\(root\)\?1800:0/,'iPhone must delay productivity extras until after chrome survives');
 
 console.log(JSON.stringify({
   ok:true,

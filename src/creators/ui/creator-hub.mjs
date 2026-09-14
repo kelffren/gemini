@@ -6,7 +6,7 @@
  * lazy: imported only after explicit CREATORS action; active cards dispatch through workspace registry
  * mobile: World launch paints Studio chrome immediately; Hub stays parked until .ks-status exists without a loading flag and is restored if the editor never mounts
  */
-import { bootKeloCreators } from '../creator-entry.mjs?v=world-bridge-20260914-1';
+import { bootKeloCreators } from '../creator-entry.mjs?v=world-bridge-20260914-2';
 
 let active=null;
 

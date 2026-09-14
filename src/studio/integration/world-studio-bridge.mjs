@@ -4,12 +4,12 @@
  * does-not-own: Studio kernel, live shell internals, Hub, world authority
  * public-api: openKeloStudioLive(), closeKeloStudioLive(), getKeloStudioLive()
  * reuse: live-studio-controller remains the session owner; this file is the only first hop from World workspace
- * mobile: import Studio in waves with main-thread yields so iPhone keeps the launch chrome instead of a black tab
+ * mobile: import Studio in waves with main-thread yields; overlay survival is owned by the live controller, not this hop
  * online: no; authority stays in KELO_WORLD_EDIT
  */
 import { yieldStudioBoot, setWorldLaunchStatus } from './studio-boot-pace.mjs';
 
-export const WORLD_STUDIO_BRIDGE_BUILD='world-bridge-20260914-1';
+export const WORLD_STUDIO_BRIDGE_BUILD='world-bridge-20260914-2';
 const CONTROLLER=`./live-studio-controller.mjs?v=${WORLD_STUDIO_BRIDGE_BUILD}`;
 let controllerMod=null;
 

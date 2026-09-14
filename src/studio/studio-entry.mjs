@@ -4,7 +4,7 @@
  * does-not-own: automatic game startup or legacy builder replacement
  * public-api: bootKeloStudio()
  * online: authority remains KELO_WORLD_EDIT
- * mobile: World-open core graph stays small; build tools and keyboard extras load after the live shell
+ * mobile: World-open core graph stays small; iPhone delays productivity extras ~1.8s so blur pads cannot kill Safari after chrome
  */
 
 import { createStudioKernel } from './core/studio-kernel.mjs';
@@ -29,6 +29,12 @@ const NOOP_ASSET_PALETTE=Object.freeze({
 });
 const NOOP_ASSET_FAVORITES=Object.freeze({refresh:()=>{},destroy:()=>{},toggle:()=>false,get ids(){return [];}});
 const NOOP_CTRL=Object.freeze({destroy(){},refresh(){}});
+
+function isPhoneStudioBoot(root){
+  const ua=String(root?.navigator?.userAgent||'');
+  const short=Math.min(Number(root?.innerWidth)||999,Number(root?.innerHeight)||999);
+  return /iPhone|iPad|iPod|Android/i.test(ua)||short<=500;
+}
 
 let session = null;
 
@@ -159,6 +165,7 @@ export async function bootKeloStudio({ mode = 'world', actorId = null, document 
   const worker = createStudioWorkerClient({ resolvePrefab, prefabSnapshot: () => Object.fromEntries(kernel.prefabs.list().map(p => [p.id, kernel.prefabs.resolve(p.id)])) });
   const store = createStudioStore(), profiler = createStudioProfiler();
   const unsubscribeJournal = kernel.commands.on(event => { store.appendCommand(kernel.document.worldId, { action: event.type, command: event.command }).catch(() => {}); });
+  let extrasTimer=0;
   session = Object.freeze({ version: 'kelo-studio-foundation-v1.35.0-world-bridge-boot', mode, actorId, kernel, tools, overlayRenderer, assetPreview,
     get assetPalette(){return assetPalette;},
     get assetFavorites(){return assetFavorites;},
@@ -190,9 +197,13 @@ export async function bootKeloStudio({ mode = 'world', actorId = null, document 
     compile: options => profiler.measure('compile.sync', () => compiler.compile(kernel.document, options)), compileAsync: options => profiler.measure('compile.worker', () => worker.compile(kernel.document, options)),
     async importCurrent(options={}) { const next=await profiler.measure('import.current',()=>importCurrentKeloWorld({adapter,mode,actorId,...options})); kernel.setDocument(next); seedCatalogPrefabs({prefabRegistry:kernel.prefabs,assetCatalog:adapter.assetCatalog}); try{assetPalette.refresh();assetFavorites.refresh();multiAlign.refresh();historyHints.refresh();}catch{} return next; },
     checkpoint: () => store.saveCheckpoint(kernel.document.worldId,kernel.document), recover: () => store.loadRecovery(kernel.document.worldId),
-    close(){unsubscribeJournal();snapCycleController.destroy();propertyCommitController.destroy();explorerRangeSelectionController.destroy();explorerRevealController.destroy();selectAllController.destroy();keyboardClipboardController.destroy();keyboardHistoryController.destroy();keyboardDuplicateController.destroy();keyboardDeleteController.destroy();quickActionsController.destroy();focusShortcutController.destroy();selectionHistoryController.destroy();precisionSnapController.destroy();overlapCycleController.destroy();placementTouchController.destroy();nudgeController.destroy();transformPresets.destroy();historyHints.destroy();multiAlign.destroy();contextSnapChip.destroy();contextInspector.destroy();cleanWorkspace.destroy();menuMinimizer.destroy();assetKeyboardController.destroy();try{assetFavorites.destroy();}catch{}try{assetPalette.destroy();}catch{}worker.close();profiler.close();assetPreview.close();store.close().catch(()=>{});session=null;}
+    close(){if(extrasTimer){(root.clearTimeout||clearTimeout)(extrasTimer);extrasTimer=0;}unsubscribeJournal();snapCycleController.destroy();propertyCommitController.destroy();explorerRangeSelectionController.destroy();explorerRevealController.destroy();selectAllController.destroy();keyboardClipboardController.destroy();keyboardHistoryController.destroy();keyboardDuplicateController.destroy();keyboardDeleteController.destroy();quickActionsController.destroy();focusShortcutController.destroy();selectionHistoryController.destroy();precisionSnapController.destroy();overlapCycleController.destroy();placementTouchController.destroy();nudgeController.destroy();transformPresets.destroy();historyHints.destroy();multiAlign.destroy();contextSnapChip.destroy();contextInspector.destroy();cleanWorkspace.destroy();menuMinimizer.destroy();assetKeyboardController.destroy();try{assetFavorites.destroy();}catch{}try{assetPalette.destroy();}catch{}worker.close();profiler.close();assetPreview.close();store.close().catch(()=>{});session=null;}
   });
-  void installStudioProductivityExtras({root,kernel,tools,assetPalette,getAssets:paletteAssets}).then(next=>{
+  const applyStudioExtras=next=>{
+    if(!session){
+      for(const extra of Object.values(next||{}))try{extra?.destroy?.();}catch{}
+      return;
+    }
     assetFavorites=next.assetFavorites;
     assetKeyboardController=next.assetKeyboardController;
     menuMinimizer=next.menuMinimizer;
@@ -217,9 +228,13 @@ export async function bootKeloStudio({ mode = 'world', actorId = null, document 
     propertyCommitController=next.propertyCommitController;
     snapCycleController=next.snapCycleController;
     try{assetPalette.refresh();assetFavorites.refresh();multiAlign.refresh();historyHints.refresh();}catch{}
-  }).catch(error=>{
-    console.warn('[Kelo Studio] optional productivity extras unavailable; World editor stays usable',error);
-  });
+  };
+  extrasTimer=(root.setTimeout||setTimeout)(()=>{
+    extrasTimer=0;
+    void installStudioProductivityExtras({root,kernel,tools,assetPalette,getAssets:paletteAssets}).then(applyStudioExtras).catch(error=>{
+      console.warn('[Kelo Studio] optional productivity extras unavailable; World editor stays usable',error);
+    });
+  }, isPhoneStudioBoot(root)?1800:0);
   return session;
 }
 export function getKeloStudioSession(){return session;}

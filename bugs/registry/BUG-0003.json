@@ -23,7 +23,7 @@
     "REPORT-000001"
   ],
   "environment": {
-    "game_build": "world-bridge-20260914-1",
+    "game_build": "world-bridge-20260914-2",
     "device": "iPhone real device target",
     "os": "iOS",
     "browser": "Safari",
@@ -39,7 +39,7 @@
     "Open Create -> World again and confirm Studio remounts instead of black-screening."
   ],
   "expected": "World opens, remains interactive, and can be reopened even after a stale Studio shell/session condition.",
-  "actual": "Player iPhone 2026-09-14 22:03–22:04 still showed KELO STUDIO / Abriendo World Editor… then a fully black Safari tab (A3 / 5a52c6d). A4 / d6ff092 world-light still statically imported the Studio graph before chrome. A5 / world-chrome paints studio-live-shell first and chunks the controller graph. A6 / world-bridge is the current candidate: World first-hops a tiny paced bridge, iPhone prewarms runtime roots one-by-one with visible Cargando editor… n/N, core tools open first, rooms/paint/quick load after chrome.",
+  "actual": "Player iPhone 2026-09-14 ~01:01 (IMG_8305) reached KELO STUDIO chrome with PLAY/SAVE and tools (SELECT active, EDIT, MOVE, GROUND, ROAD, COLLISION) then the Safari tab went fully black. A6/world-bridge-20260914-1 therefore succeeded at chrome-first and failed after chrome. A7/world-bridge-20260914-2 is the current candidate: overlay dpr=1, viewport-fixed, delayed+throttled draw; Studio kills backdrop-filter on coarse/narrow; productivity extras wait ~1.8s on phone.",
   "evidence": [
     "Commit 829ac7fbd5fc629b05ecf92489bab16b0292bce9: IndexedDB fail-open candidate — insufficient.",
     "Commit 824a932f5e3e41c888116ab1453d64500e66255d: curtain + Hub stacking candidate — failed live Pages World tap QA on 2026-09-14.",
@@ -48,7 +48,9 @@
     "Player screenshots 2026-09-14 22:03–22:04: IMG_8293 KELO STUDIO / MODO CREADOR + Abriendo World Editor…; IMG_8294 fully black Safari tab with spinner",
     "Live Pages QA 2026-09-14: CREATOR_BUILD world-unfreeze-20260913-2 deployed; curtain visible; 80 /src/studio/ requests; #kelo-studio-live never attached in 15s",
     "Code inspection 2026-09-14 23:10 EDT: d6ff092 live-studio-controller.mjs still statically imported overlay, grid, pointer, camera, mirror, live-shell, productivity, actions, prefabs, analyzer and document-commands. World-workspace imported that module before createStudioLiveShell ran.",
-    "Player screenshots IMG_8293/IMG_8294 re-reported 2026-09-14 23:08 EDT asking if the World button was still broken."
+    "Player screenshots IMG_8293/IMG_8294 re-reported 2026-09-14 23:08 EDT asking if the World button was still broken.",
+    "Player screenshot IMG_8305 2026-09-14 01:01: Studio tools/chrome painted, viewport hole black, then the Safari tab died.",
+    "Code inspection 2026-09-14 01:02 EDT: after chrome, live-studio-controller awaited importCurrent, allocated a body-sized overlay at dpr<=1.5, and started an every-rAF resize/clear/draw loop while extras injected backdrop-filter:blur."
   ],
   "suspected_files": [
     "src/creators/workspaces/world-workspace.mjs",
@@ -69,7 +71,7 @@
   "claim_started_at": null,
   "research": {
     "status": "in_progress",
-    "summary": "Four candidate directions exist. IndexedDB fail-open (A1) was insufficient. Curtain/stacking while awaiting ~80 modules (A2) failed LIVE. Early Hub destruction (A3) painted loading chrome then black-tabbed Safari. world-light (A4) delayed extras/overlay and dynamically imported studio-entry, but the live controller itself still statically imported the Studio graph, so iPhone still paid the 80-module cost before tools existed. world-chrome (A5) is the first candidate that actually paints .ks-status/tools from studio-live-shell.mjs before loading the controller graph. Target iPhone verification is still required. world-bridge (A6) adds a tiny first hop plus sequential iPhone prewarm and core-vs-build tool split. Target iPhone verification is still required.",
+    "summary": "A6 world-bridge got past the Hub freeze: the iPhone now paints Studio tools, then dies. A7 keeps chrome-first and only changes post-chrome survival (overlay dpr/size/draw + extras delay + blur kill). Do not mark VERIFIED from headless_shell.",
     "known_facts": [
       {
         "id": "F1",
@@ -115,6 +117,23 @@
           "src/studio/integration/live-studio-controller.mjs at d6ff092",
           "F2",
           "F3"
+        ]
+      },
+      {
+        "id": "F7",
+        "statement": "On world-bridge-20260914-1 the real iPhone painted interactive Studio tools (SELECT/EDIT/MOVE/GROUND/ROAD/COLLISION, PLAY/SAVE) and then the Safari tab went black.",
+        "evidence": [
+          "Player screenshot IMG_8305",
+          "Player report: ahora llega hasta ahí y después se pone la pantalla negra"
+        ]
+      },
+      {
+        "id": "F8",
+        "statement": "After chrome, HEAD allocated a position:absolute body overlay at dpr<=1.5 and started an unthrottled rAF resize/clear/draw loop, then loaded productivity extras that inject backdrop-filter:blur inside #kelo-studio-live.",
+        "evidence": [
+          "src/studio/render/studio-overlay-canvas.mjs before world-bridge-20260914-2",
+          "src/studio/integration/live-studio-controller.mjs overlay+rAF after importCurrent",
+          "src/studio/studio-entry.mjs immediate installStudioProductivityExtras"
         ]
       }
     ],
@@ -162,15 +181,17 @@
       {
         "id": "H4",
         "theory": "Early overlay allocation at high devicePixelRatio contributes materially to Safari tab memory/resource failure after the loading shell paints.",
-        "confidence": "medium",
+        "confidence": "high",
         "status": "supported",
-        "why": "The failed handoff reached loading chrome before the tab blacked out, and the previous registry specifically associated that path with the dpr=3 overlay plus the static graph.",
+        "why": "IMG_8305 shows tools/chrome already painted, then a black tab. That is the post-chrome resource-kill window (overlay backing store + rAF + extras blur), not the earlier Hub-cover freeze.",
         "evidence_for": [
           "F3",
-          "F5"
+          "F5",
+          "F7",
+          "F8"
         ],
         "evidence_against": [],
-        "test_next": "On the current candidate, confirm the overlay is allocated only after chrome and capped at dpr<=1.5 on iPhone; if black-tab failure persists, compare a run with overlay creation disabled to isolate its contribution."
+        "test_next": "Verify world-bridge-20260914-2 on the real iPhone: tools must remain after chrome instead of a black tab."
       },
       {
         "id": "H5",
@@ -189,15 +210,32 @@
       {
         "id": "H6",
         "theory": "Painting studio-live-shell chrome first, then dynamically importing the live controller graph in chunks, is sufficient for the player iPhone to reach interactive World tools without a black tab.",
-        "confidence": "medium",
-        "status": "unverified",
-        "why": "This is the first candidate that actually stages the graph after visible .ks-status/tools, which is the missing condition from A2/A3/A4.",
+        "confidence": "low",
+        "status": "weakened",
+        "why": "world-bridge-20260914-1 did paint .ks-top/tools before the remaining graph, which A2/A3/A4 never did, but IMG_8305 still black-tabbed after those tools appeared.",
         "evidence_for": [
           "F6",
           "H3"
         ],
+        "evidence_against": [
+          "F7"
+        ],
+        "test_next": "Do not rewrite chrome-first. Attack only the post-chrome overlay/extras kill (A7)."
+      },
+      {
+        "id": "H7",
+        "theory": "After chrome paints, the body-sized overlay canvas plus every-rAF draw plus extras backdrop-filter:blur terminates iPhone WebContent.",
+        "confidence": "high",
+        "status": "supported",
+        "why": "Chrome and tools were already on screen (F7). The next owners are importCurrent, overlay allocation/rAF, and extras blur (F8). The same blur pattern previously froze Hub.",
+        "evidence_for": [
+          "F5",
+          "F7",
+          "F8",
+          "H4"
+        ],
         "evidence_against": [],
-        "test_next": "Real iPhone Safari: Create -> World -> tools/.ks-status visible, then interactive, then close/reopen World."
+        "test_next": "Real iPhone on world-bridge-20260914-2: overlay dpr=1, viewport-fixed, delayed/throttled draw, no Studio blur on coarse. Tools must stay up."
       }
     ],
     "ruled_out": [
@@ -220,13 +258,13 @@
       },
       {
         "id": "U3",
-        "question": "If world-chrome still black-tabs, does it die before .ks-top paints, after chrome but during studio-entry, or during importCurrent/overlay?",
-        "why_it_matters": "Separates remaining graph vs world-import vs overlay hypotheses.",
-        "quickest_test": "Record ordered milestones: placeholder -> .ks-top -> kernel boot -> importCurrent -> overlay."
+        "question": "Does A7 keep Studio tools alive on the real iPhone after chrome, or does WebContent still die later (importCurrent vs overlay vs extras)?",
+        "why_it_matters": "F7 already placed the fail after .ks-top/tools. The next fail, if any, is the remaining post-chrome owner.",
+        "quickest_test": "Real iPhone Safari: Create -> World -> wait 10s after tools appear; note whether the tab stays or blacks."
       }
     ],
     "external_references": [],
-    "last_researched_at": "2026-09-13T23:20:00-04:00"
+    "last_researched_at": "2026-09-14T01:10:00-04:00"
   },
   "attempt_history": [
     {
@@ -393,22 +431,94 @@
       },
       "conclusion": "This is the current candidate. It is the first change that actually satisfies A2 do_not_repeat_without (materially smaller graph before chrome). Device verification is still required.",
       "do_not_repeat_without": null
+    },
+    {
+      "id": "A6",
+      "at": "2026-09-14",
+      "actor": "development agent + player iPhone QA",
+      "goal": "Pace Studio through a World boot bridge so iPhone paints tools before the 80-module graph.",
+      "hypothesis_ids": [
+        "H3",
+        "H6"
+      ],
+      "change": {
+        "commits": [
+          "ab6b19c7b93ec81308ea0c4490bcbba1010df606",
+          "9f52de80b572a9a3657b106f61451871d592452e",
+          "535c5ba13002e9188bc762c450e280b8834995c5"
+        ],
+        "files": [
+          "src/studio/integration/world-studio-bridge.mjs",
+          "src/studio/integration/studio-boot-pace.mjs",
+          "src/studio/tools/register-core-tools.mjs",
+          "src/creators/workspaces/world-workspace.mjs"
+        ],
+        "summary": "Tiny first hop, sequential iPhone prewarm, core tools before rooms/paint, chrome-first kept."
+      },
+      "validation": {
+        "environment": "Player real iPhone Safari",
+        "method": "Create -> World and observe whether Studio stays interactive.",
+        "result": "FAIL",
+        "evidence": [
+          "IMG_8305: KELO STUDIO tools painted (SELECT/EDIT/MOVE/GROUND/ROAD/COLLISION, PLAY/SAVE)",
+          "Player: ahora llega hasta ahí y después se pone la pantalla negra"
+        ]
+      },
+      "conclusion": "Chrome-first worked. Post-chrome overlay/rAF/extras still kill the iPhone tab. Do not unwind the bridge.",
+      "do_not_repeat_without": "Evidence that chrome-first itself is the remaining fail. Next pass must keep the bridge and only change overlay/extras survival."
+    },
+    {
+      "id": "A7",
+      "at": "2026-09-14",
+      "actor": "development agent",
+      "goal": "Keep A6 chrome-first, then stop the post-chrome iPhone black tab.",
+      "hypothesis_ids": [
+        "H4",
+        "H7"
+      ],
+      "change": {
+        "commits": [
+          "f9dbfe52b338ad960b2332fb544aa536c64f05e8"
+        ],
+        "files": [
+          "src/studio/render/studio-overlay-canvas.mjs",
+          "src/studio/integration/live-studio-controller.mjs",
+          "src/studio/ui/studio-live-shell.mjs",
+          "src/studio/studio-entry.mjs",
+          "src/studio/integration/world-studio-bridge.mjs",
+          "src/creators/workspaces/world-workspace.mjs",
+          "src/creators/creator-entry.mjs",
+          "src/creators/ui/creator-hub.mjs",
+          "src/ui/studio-launcher.js",
+          "index.html",
+          "bugs/registry/BUG-0003.json"
+        ],
+        "summary": "Overlay dpr=1 on phone, position:fixed to visualViewport, delayed 160ms then ~90ms throttled draw after chrome returns; live-shell kills backdrop-filter on coarse/narrow; extras wait 1.8s on phone; cache-bust world-bridge-20260914-2."
+      },
+      "validation": {
+        "environment": "Target real iPhone Safari pending",
+        "method": "Exact Create -> World -> tools stay visible for 10s, then close/reopen World.",
+        "result": "NOT_RUN",
+        "evidence": []
+      },
+      "conclusion": "Current candidate. Do not mark VERIFIED from headless_shell.",
+      "do_not_repeat_without": null
     }
   ],
   "next_best_actions": [
     {
       "priority": 1,
-      "action": "Verify world-chrome on a real iPhone Safari using Create -> World. Require .ks-top/tools visible, then interactive .ks-status, then close/reopen World once.",
-      "reason": "A5 is the first candidate that paints tools before the Studio graph. More architecture rewrites before this test would repeat A2/A3/A4.",
-      "expected_signal": "PASS if tools appear and a second World open succeeds without a black tab; otherwise record the first missing milestone.",
-      "stop_condition": "If it passes, move toward VERIFIED with independent evidence. If it fails, inspect only the first missing milestone (chrome paint vs studio-entry vs importCurrent vs overlay)."
+      "action": "Verify world-bridge-20260914-2 on a real iPhone Safari: Create -> World -> tools stay on screen (not a black tab) for at least 10 seconds, then close/reopen World once.",
+      "reason": "A6 already proved chrome-first. A7 is only the post-chrome survival patch. Independent device evidence is the gate.",
+      "expected_signal": "PASS if tools remain and a second World open succeeds without a black tab; FAIL if the tab still dies after chrome.",
+      "stop_condition": "If it passes, move toward VERIFIED with independent evidence. If it fails after tools, inspect only overlay vs extras, not the bridge."
     },
     {
       "priority": 2,
-      "action": "If the target run fails, capture ordered boot milestones: placeholder -> .ks-top -> kernel boot -> importCurrent -> overlay allocation.",
-      "reason": "Converts freeze/black-tab into a precise failing boundary.",
-      "expected_signal": "Exactly one earliest missing milestone becomes the next investigation boundary.",
-      "stop_condition": "Once the earliest missing milestone is identified, inspect only its owner/dependencies."
+      "action": "If A7 still black-tabs, run one A/B with overlay creation disabled entirely.",
+      "reason": "H7 still needs a discriminator between overlay canvas and extras blur.",
+      "expected_signal": "Tools survive without overlay => overlay was the remaining kill; still dies => extras/importCurrent.",
+      "stop_condition": "Do not rewrite kernel/tools/authority on this bug."
     }
   ],
   "fix": {
@@ -417,32 +527,31 @@
       "ab6b19c7b93ec81308ea0c4490bcbba1010df606",
       "9f52de80b572a9a3657b106f61451871d592452e",
       "535c5ba13002e9188bc762c450e280b8834995c5",
-      "a54ff27ad4264aa31f4b65b21d939f4014cb0502"
+      "a54ff27ad4264aa31f4b65b21d939f4014cb0502",
+      "f9dbfe52b338ad960b2332fb544aa536c64f05e8"
     ],
     "files": [
-      "src/studio/integration/world-studio-bridge.mjs",
-      "src/studio/integration/studio-boot-pace.mjs",
+      "src/studio/render/studio-overlay-canvas.mjs",
       "src/studio/integration/live-studio-controller.mjs",
+      "src/studio/ui/studio-live-shell.mjs",
       "src/studio/studio-entry.mjs",
-      "src/studio/tools/register-core-tools.mjs",
-      "src/studio/tools/register-build-tools.mjs",
-      "src/studio/tools/register-basic-tools.mjs",
+      "src/studio/integration/world-studio-bridge.mjs",
       "src/creators/workspaces/world-workspace.mjs",
-      "src/creators/ui/creator-hub.mjs",
       "src/creators/creator-entry.mjs",
+      "src/creators/ui/creator-hub.mjs",
       "src/ui/studio-launcher.js",
       "index.html",
-      "scripts/world-editor-lazy-boot-audit.mjs",
       "bugs/registry/BUG-0003.json"
     ],
-    "summary": "A6 world-bridge: World no longer imports the 50-module Studio graph in one parse. A tiny first hop yields to Safari between waves (chrome → sequential iPhone prewarm → bridge → chunked controller). studio-entry registers core tools first and defers room/paint/quick-build. A5 world-chrome chrome-first + 40ms phone pause is kept. 5a52c6d and world-light still failed or pending; do not mark VERIFIED from headless_shell."
+    "summary": "A7 world-bridge-20260914-2: keep A6 chrome-first, then survive after tools paint. iPhone overlay is dpr=1, viewport-fixed, delayed 160ms and throttled ~90ms; Studio kills backdrop-filter on coarse; extras wait 1.8s. A6 failed player QA (IMG_8305 chrome then black). Do not mark VERIFIED from headless_shell."
   },
   "verification": {
     "status": "PENDING",
-    "method": "Real iPhone Safari E2E: enter game -> Create -> World -> Studio tools/.ks-status visible immediately, progress Cargando editor… n/N, then interactive, not a black Safari tab. Do not mark PASS from headless_shell. 824a932, 5a52c6d, unverified d6ff092 and world-chrome all failed or could not satisfy H3.",
+    "method": "Real iPhone Safari E2E: enter game -> Create -> World -> Studio tools stay visible, not a black Safari tab, then close/reopen World. Do not mark PASS from headless_shell.",
     "evidence": [
       "FAILED: 5a52c6d world-handoff — player iPhone screenshots 2026-09-14 22:03 loading chrome, 22:04 black Safari spinner",
-      "NOT DEVICE-VERIFIED: d6ff092 world-light — code inspection 2026-09-14 showed static controller graph still loaded before chrome"
+      "NOT DEVICE-VERIFIED: d6ff092 world-light — code inspection 2026-09-14 showed static controller graph still loaded before chrome",
+      "FAILED: world-bridge-20260914-1 — IMG_8305 tools painted then black tab"
     ],
     "verified_by": null,
     "verified_at": null
@@ -462,7 +571,10 @@
     "Do not mark CLOSED from this candidate. Player must enter the editor, not a black tab.",
     "824a932 failed verification: Hub awaited the Studio graph, so the World card stayed ABRIENDO while 80 modules loaded.",
     "5a52c6d failed verification: Hub destroyed at 250ms while the 80-module static graph + dpr=3 overlay killed the iPhone tab after loading chrome. REOPENED then replaced by world-light-20260914-1.",
-    "world-bridge-20260914-1 paces Studio imports in waves with main-thread yields and paints live chrome before the kernel graph. Still FIXED_PENDING_VERIFY until a real iPhone enters the editor."
+    "world-bridge-20260914-1 paces Studio imports in waves with main-thread yields and paints live chrome before the kernel graph. Still FIXED_PENDING_VERIFY until a real iPhone enters the editor.",
+    "IMG_8305 (2026-09-14 01:01) is post-chrome black-tab evidence. Chrome-first is no longer the missing milestone.",
+    "headless_shell overlay rAF freeze is now player-facing after chrome; still do not mark CLOSED/VERIFIED from this sandbox.",
+    "world-bridge-20260914-2 is FIXED_PENDING_VERIFY until a real iPhone keeps the tools instead of a black tab."
   ],
-  "updated_at": "2026-09-13T23:49:00-04:00"
+  "updated_at": "2026-09-14T01:10:00-04:00"
 }

@@ -45,6 +45,11 @@ export function createStudioLiveShell({
     --ks-muted:#88a096;--ks-text:#eef4ef;--ks-green:#264b3c;--ks-danger:#ff7a70;
   }
   #kelo-studio-live *{box-sizing:border-box}
+  @media (pointer:coarse),(max-width:900px){
+    #kelo-studio-live,#kelo-studio-live *{
+      backdrop-filter:none!important;-webkit-backdrop-filter:none!important;
+    }
+  }
   #kelo-studio-live button,#kelo-studio-live select,#kelo-studio-live input{font:inherit}
   #kelo-studio-live button{cursor:pointer;-webkit-tap-highlight-color:transparent}
   #kelo-studio-live button:disabled{opacity:.35;cursor:not-allowed;filter:saturate(.55)}
