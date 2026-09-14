@@ -12,7 +12,7 @@
 (function (root) {
   'use strict';
 
-  const VERSION = '1.2.0';
+  const VERSION = '1.2.1';
   const TARGET_FPS = 60;
   const TARGET_FRAME_MS = 1000 / TARGET_FPS;
   const SAMPLE_ALPHA = 0.08;
@@ -45,7 +45,8 @@
   let loafCount = 0;
   let worstLoafMs = 0;
   let recentLoafs = Object.freeze([]);
-  let profileIndex = 1;
+  const isPhone = Math.min(root.innerWidth || 9999, root.innerHeight || 9999) <= 844;
+  let profileIndex = isPhone ? 3 : 1;
   let manualProfile = null;
   let lastFrameAt = performance.now();
   let emaFrameMs = TARGET_FRAME_MS;

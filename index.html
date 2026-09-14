@@ -15,7 +15,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="KELO WORLD">
-  <title>Kelo World — V6.54.4</title>
+  <title>Kelo World — V6.54.5</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="src/ui/backpack-fantasy-v1.css?v=1">
   <style>
@@ -87,7 +87,7 @@
     try{local=(sessionStorage.getItem('kelo_local_guest_play_v1')==='1')||(localStorage.getItem('kelo_local_guest_play_v1')==='1')}catch(e){}
     var returning=false;
     try{returning=!!(localStorage.getItem('kelo.supabase.session.v1')||localStorage.getItem('kelo_character_id_v1')||localStorage.getItem('kelo.active.character.v1'))}catch(e){}
-    if(guest||local||returning){document.documentElement.setAttribute('data-kelo-auth-gate','off')}
+    if(guest||local||returning){document.documentElement.setAttribute('data-kelo-should-boot','1')}
   }catch(e){}
 })();
 </script>
@@ -95,11 +95,11 @@
 <script id="kelo-engine-boot" type="application/json">{"version":"kelo-engine-boot-v1-login-gate","scripts":["src/core/update-system.js?v=3-network-stage","src/core/update-watch.js?v=1","src/ui/update-ui.js?v=2-network-stage","src/core/events/event-bus.js?v=1","src/core/input-lock-system.js?v=1","src/core/movement-profile.js?v=1","src/core/kelo-runtime-bootstrap.js?v=2","src/physics/collision-utils.js?v=2","engine-a.js?v=151","src/core/attach-legacy-obstacles.js?v=1","src/core/input-system.js?v=1","src/core/movement-system.js?v=2","engine-b.js?v=94","engine-c.js?v=229","src/core/camera-system.js?v=1","src/core/avatar-render-system.js?v=2-base-zoo-authority","src/core/render-extension-system.js?v=3","src/core/simulation-extension-system.js?v=3","engine-d.js?v=95","engine-e.js?v=94","engine-f.js?v=95","engine-g.js?v=96","src/environment/mobile-performance-contract.js?v=1","engine-h.js?v=151","engine-i.js?v=94","engine-j.js?v=94","engine-k.js?v=94","src/environment/flag-world-decoration-reset.js?v=1","src/environment/rural-nature-atlas.js?v=200","src/environment/gardens-atlas.js?v=2","src/environment/gardens-joins.js?v=3","src/environment/terrain-contract.js?v=1","src/environment/generated/arboleskelo1-atlas.js?v=1","src/environment/tile-registry.js?v=237","src/environment/atlas-contract.js?v=4","src/environment/generated/forest-plaza-tileset-v2-manifest.js?v=1","src/environment/gardens-t-junction-registry.js?v=1","src/environment/district-decals-registry.js?v=3","src/environment/gardens-compositions.js?v=10","src/environment/world-map.js?v=terrain-191","src/environment/environment-layer-stack.js?v=4","src/environment/surface-ground.js?v=1","src/environment/prop-contract.js?v=6","src/environment/generic-props.js?v=9","src/environment/prefab-contract.js?v=1","engine-l.js?v=223","engine-m.js?v=94","engine-n.js?v=230","engine-o.js?v=96","engine-p.js?v=96","engine-q.js?v=94","engine-r.js?v=94","engine-s.js?v=96","engine-t.js?v=94","engine-u.js?v=94","engine-v.js?v=94","engine-w.js?v=94","engine-x.js?v=94","engine-y.js?v=98","engine-z.js?v=94","engine-aa.js?v=96","engine-ab.js?v=240","src/characters/character-appearance.js?v=4-base-zoo-authority","engine-ac.js?v=224","engine-ae.js?v=94","engine-af.js?v=94","engine-ag.js?v=94","engine-ah.js?v=95","engine-ai.js?v=95","engine-aj.js?v=94","src/systems/master-bot-pipelines.js?v=1","src/systems/pvp-world.js?v=6","src/systems/pvp-combat-runtime-loader.js?v=2","src/systems/arena-system.js?v=1","src/systems/arena-lane-pressure.js?v=1","src/systems/arena-telemetry.js?v=1","src/systems/arena-highlights.js?v=1","src/systems/arena-progression.js?v=1","src/visuals/visual-system.js?v=3","src/visuals/visual-manifests.js?v=2","src/visuals/asset-registry.js?v=1","src/visuals/animation-system.js?v=1","src/visuals/fx-system.js?v=3","src/visuals/sequence-system.js?v=2","src/visuals/melee-visual-manifest.js?v=2","src/visuals/melee-combat-visuals.js?v=1","src/abilities/abilityData.js?v=154","src/abilities/stone-system.js?v=154","src/mounts/mount-ability-data.js?v=1","src/abilities/equipment-ability-data.js?v=1","src/abilities/stone-backpack-bridge.js?v=2","src/abilities/kelo-ability-boot.js?v=160","src/abilities/ability-source-cast.js?v=1","src/visuals/ability-visuals.js?v=4","src/abilities/sword-swap-runtime.js?v=2","src/visuals/sword-swap-pvp-visuals.js?v=4","src/systems/title-catalog.js?v=1","src/systems/player-stats.js?v=1","src/systems/title-system.js?v=1","src/config/online-runtime-config.js?v=6","src/auth/online-auth-lifecycle-bridge.js?v=1","src/ui/google-auth-button.js?v=1&boot=7","src/ui/account-profile-18-ui.js?v=1&boot=8","engine-net.js?v=102","src/ui/luxe-shell.js?v=230","src/ui/kelo-chat-drawer.js?v=5-premium-waze","src/ui/kelo-chat-integration-bridge.js?v=2","src/ui/arena-ui.js?v=1","src/ui/arena-highlights-ui.js?v=1","src/ui/mobile-orientation.js?v=6","src/ui/luxe-boutique.js?v=206","src/environment/plaza-depth.js?v=219","src/systems/nobility.js?v=4","src/systems/nobility-authority.js?v=2","src/ui/luxe-player-hud.js?v=4-minimap-live-20260914","src/ui/player-nameplate.js?v=1","src/systems/nobility-combat.js?v=1","src/stats/stat-modifier-system.js?v=1","src/appearance/appearance-system.js?v=1","src/mounts/mount-appearance-content.js?v=1","src/mounts/mount-catalog.js?v=2","src/mounts/mount-equipment-catalog.js?v=2","src/systems/equipment-item-catalog.js?v=1","src/systems/equipment-system.js?v=6","src/mounts/mount-system.js?v=2","src/abilities/equipment-ability-channel.js?v=1","src/mounts/mount-ability-channel.js?v=2","src/ui/equipment-action-bar.js?v=1","src/ui/mount-action-bar.js?v=2","src/ui/mount-panel.js?v=2","src/systems/backpack-system.js?v=2","src/systems/container-system.js?v=4","src/systems/emote-system.js?v=1","src/systems/market-escrow-system.js?v=1","src/systems/commerce-authority.js?v=2","src/systems/regional-economy-math.js?v=1","src/systems/faction-clan-system.js?v=1","src/systems/caravan-system.js?v=1","src/systems/regional-economy-system.js?v=1","src/systems/logistics-devtools.js?v=1","src/property/property-asset-catalog.js?v=2","src/property/forest-plaza-asset-catalog.js?v=1","src/property/property-system.js?v=4","src/systems/admin-key-system.js?v=3-online","src/systems/guardian-authority.js?v=1","src/systems/guardian-system.js?v=1","src/ui/guardian-ui.js?v=1","src/systems/game-tuning-authority.js?v=1","src/systems/game-tuning-system.js?v=1","src/ui/game-tuning-admin-ui.js?v=1","src/ui/logistics-admin-ui.js?v=1","src/instances/instance-system.js?v=1","src/instances/instance-runtime-bridge.js?v=1","src/instances/house-instance.js?v=1","src/instances/property-house-bridge.js?v=1","src/instances/market-instance.js?v=1","src/environment/world-builder-system.js?v=4","src/ui/house-instance-ui.js?v=1","src/ui/backpack-ui.js?v=4","src/ui/warehouse-ui.js?v=3","src/ui/market-ui.js?v=2","src/ui/commerce-ui.js?v=1","src/systems/forge-system.js?v=1","src/systems/armor-aura.js?v=1","src/systems/illumination.js?v=2","src/systems/performance-governor.js?v=3","src/ui/profile-panel-close.js?v=2","src/appearance/character-appearance-adapter.js?v=1","src/ui/self-interaction-ui.js?v=1","src/ui/pvp-social-touch-guard.js?v=3","src/visuals/visual-lab-loader.js?v=1","src/ui/studio-launcher.js?v=9-world-bridge-20260914-3","src/ui/map-forge-launch-recovery-v1.js?v=1"]}</script>
 <script>
 (function(){
-  var started=false;
+  var started=false, pending=null;
   var AUTH=[
     'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0',
-    'src/auth/supabase-auth-runtime.js?v=6&boot=12',
-    'src/ui/account-auth-ui.js?v=2&boot=12',
+    'src/auth/supabase-auth-runtime.js?v=6&boot=13',
+    'src/ui/account-auth-ui.js?v=2&boot=13',
     'src/auth/guest-play-bypass.js?v=3'
   ];
   function list(){
@@ -116,40 +116,55 @@
     s.onload=s.onerror=function(){loadChain(urls,i+1,done)};
     document.body.appendChild(s);
   }
-  function start(){
-    if(started)return;
-    started=true;
-    var urls=list(), texts=new Array(urls.length), next=0;
-    function pump(){
-      if(next>=urls.length)return;
-      if(texts[next]==null)return;
-      var url=urls[next], code=texts[next];
-      next+=1;
-      try{
-        var s=document.createElement('script');
-        s.text=code+'\n//# sourceURL='+String(url).split('?')[0];
-        document.body.appendChild(s);
-      }catch(e){}
-      if(next<urls.length)setTimeout(pump,0);
+  function reveal(){
+    try{
+      document.documentElement.setAttribute('data-kelo-auth-gate','off');
+      var root=document.getElementById('kelo-account-auth');
+      if(root)root.hidden=true;
+    }catch(e){}
+  }
+  function evalAll(urls,texts){
+    // engine-b starts requestAnimationFrame(gameLoop). Every later owner
+    // MUST run in this same turn or the loop paints a half-booted world.
+    for(var i=0;i<texts.length;i++){
+      var s=document.createElement('script');
+      s.text=texts[i]+'\n//# sourceURL='+String(urls[i]).split('?')[0];
+      document.head.appendChild(s);
     }
-    urls.forEach(function(url,i){
-      fetch(url,{credentials:'same-origin',cache:'force-cache'}).then(function(r){
-        if(!r.ok)throw new Error(String(r.status));
+  }
+  function start(){
+    if(pending)return pending;
+    if(started){reveal();return Promise.resolve()}
+    started=true;
+    var urls=list();
+    pending=Promise.all(urls.map(function(url){
+      return fetch(url,{credentials:'same-origin'}).then(function(r){
+        if(!r.ok)throw new Error(String(r.status)+' '+url);
         return r.text();
-      }).then(function(t){texts[i]=t;if(i===next)pump()}).catch(function(){
-        texts[i]='';if(i===next)pump();
       });
+    })).then(function(texts){
+      evalAll(urls,texts);
+      reveal();
+    }).catch(function(){
+      for(var i=0;i<urls.length;i++){
+        var s=document.createElement('script');
+        s.src=urls[i];
+        s.async=false;
+        document.body.appendChild(s);
+      }
+      setTimeout(reveal,1200);
     });
+    return pending;
   }
   function afterPaint(fn){
     var kick=function(){var run=function(){setTimeout(fn,0)};if(window.requestAnimationFrame)requestAnimationFrame(run);else run()};
     if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',kick,{once:true});
     else kick();
   }
-  window.KeloEngineBoot=Object.freeze({version:'kelo-engine-boot-v1.2-load-complete',start:start,started:function(){return started}});
+  window.KeloEngineBoot=Object.freeze({version:'kelo-engine-boot-v1.3-sync-world',start:start,started:function(){return started}});
   afterPaint(function(){
     loadChain(AUTH,0);
-    try{if(document.documentElement.getAttribute('data-kelo-auth-gate')==='off')start()}catch(e){}
+    try{if(document.documentElement.getAttribute('data-kelo-should-boot')==='1')start()}catch(e){}
   });
 })();
 </script>
