@@ -4,7 +4,7 @@ Este sistema convierte `/bugs` de un registro reactivo en una defensa progresiva
 
 ## Ciclo
 
-`CAMBIO -> RIESGO -> BLAST RADIUS -> PRUEBAS DIRIGIDAS -> TELEMETRIA/MILESTONES -> DETECCION -> FINGERPRINT -> CANDIDATO -> CLUSTER/DEDUPE -> CULPRIT CORRELATION -> BUG -> HIPOTESIS -> EXPERIMENTO -> FIX -> VERIFICACION -> REGRESSION TEST -> CLOSE GATE`
+`CAMBIO -> RIESGO -> BLAST RADIUS -> PRUEBAS DIRIGIDAS -> TELEMETRIA/MILESTONES -> DETECCION -> FINGERPRINT -> CANDIDATO -> CLUSTER/DEDUPE -> CULPRIT CORRELATION -> BUG -> HIPOTESIS -> EXPERIMENTO -> FIX -> VERIFICACION -> REGRESSION TEST -> CLOSE GATE -> RECURRENCE GATE`
 
 ## Comandos
 
@@ -101,6 +101,16 @@ Bloquea `VERIFIED/CLOSED` cuando falta cualquiera de estas piezas aplicables:
 
 `npm run audit:bug-close -- --strict-pending` también convierte en fallo la ausencia de protección de regresión para high/critical que estén en `FIXED_PENDING_VERIFY`.
 
+### Gate de reincidencia
+
+`npm run audit:bug-recurrence`
+
+Cruza los `REPORT-*` sanitizados y enlazados con bugs canónicos. Si un reporte `MATCH_CANDIDATE` con confianza suficiente aparece **después** de que el bug quedó `VERIFIED` o `CLOSED`, la auditoría falla y obliga a revisar reapertura.
+
+No reabre automáticamente ni inventa causa raíz. Su función es impedir que un síntoma compatible con un bug cerrado vuelva silenciosamente sin revisión.
+
+`npm run audit:bug-recurrence -- --strict-pending` también trata como fallo una coincidencia posterior al fix mientras el bug sigue `FIXED_PENDING_VERIFY`.
+
 ## Runtime milestones
 
 `src/core/bug-observability.mjs` permite registrar checkpoints ligeros por flujo sin depender de servicios externos.
@@ -135,7 +145,8 @@ Para llegar a `VERIFIED/CLOSED` debe existir:
 3. verificación independiente en el entorno aplicable;
 4. protección de regresión permanente cuando sea automatizable;
 5. si no es automatizable, contrato explícito de smoke/manual verification con razón documentada;
-6. `audit:bug-close` en PASS.
+6. `audit:bug-close` en PASS;
+7. `audit:bug-recurrence` sin evidencia posterior incompatible.
 
 ## Regla para agentes
 
@@ -153,7 +164,8 @@ Cuando aparezca un fallo:
 2. `bug:candidate` para guardar una observación sanitizada si corresponde;
 3. `bug:triage` para revisar reincidencias;
 4. `bug:culprit` si se sospecha regresión reciente;
-5. actualizar/reabrir antes de crear otro bug cuando el fingerprint/síntoma coincida.
+5. `audit:bug-recurrence` si el bug enlazado estaba verificado/cerrado;
+6. actualizar/reabrir antes de crear otro bug cuando el fingerprint/síntoma coincida.
 
 Después de un fix:
 
@@ -162,4 +174,5 @@ Después de un fix:
 3. `npm run audit:bugs`;
 4. `npm run audit:bug-regressions`;
 5. `npm run audit:bug-close`;
-6. verificar el flujo original.
+6. `npm run audit:bug-recurrence`;
+7. verificar el flujo original.
