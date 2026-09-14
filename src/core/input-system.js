@@ -9,12 +9,25 @@
  * extension-points: before/after + combat.push/setAxes/configure
  * reuse: PvP, habilidades, mounts y futuros control schemes consumen el mismo contrato semántico
  * legacy: bridge temporal mientras parser físico base siga en engine-a.js
- * do-not: NO meter hit detection, abilities, UI, colisión, cámara ni render aquí
+ * do-not: NO meter hit detection, abilities, UI, cámara ni render aquí; la única excepción temporal es enlazar la vista legacy de obstáculos antes de instalar KeloInput
  */
 (function(root){
   'use strict';
   if(root.KeloInput)return;
-  const VERSION='kelo-input-v2.0.0-combat-intents';
+  const VERSION='kelo-input-v2.0.1-collision-boot-bridge';
+
+  // BOOT BRIDGE: all owner scripts are deferred now. engine-a has already created
+  // the legacy lexical `obstacles` array when this script executes, so attach it
+  // before KeloInput wraps processInput. The DOMContentLoaded attach remains
+  // idempotent, but this is the ordering-critical attachment used by gameplay.
+  try{
+    if(root.KELO_COLLISION&&typeof root.KELO_COLLISION.attachLegacyObstacleArray==='function'&&typeof obstacles!=='undefined'&&Array.isArray(obstacles)){
+      root.KELO_COLLISION.attachLegacyObstacleArray(obstacles,{adoptExistingOwner:'core-static'});
+    }
+  }catch(error){
+    root.KELO_INPUT_COLLISION_BOOT_ERROR=String(error?.message||error);
+  }
+
   if(typeof processInput!=='function'){
     root.KELO_INPUT_SYSTEM_AUDIT=Object.freeze({version:VERSION,installed:false,reason:'processInput-missing'});
     return;
@@ -163,6 +176,6 @@
     unregister:unregister,isLocked:isLocked,snapshot:snapshot,
     radialAxis:radialAxis,pollGamepad:pollGamepad,combat:combatApi
   });
-  root.KELO_INPUT_SYSTEM_AUDIT=Object.freeze({version:VERSION,installed:true,owner:true,singleLegacyWrapper:true,usesKeloInputLocks:true,beforeAfterHooks:true,combatIntentContract:true,inputBuffer:true,radialDeadzone:true,gamepadReady:true,timers:0,uiRules:false});
+  root.KELO_INPUT_SYSTEM_AUDIT=Object.freeze({version:VERSION,installed:true,owner:true,singleLegacyWrapper:true,usesKeloInputLocks:true,beforeAfterHooks:true,combatIntentContract:true,inputBuffer:true,radialDeadzone:true,gamepadReady:true,timers:0,uiRules:false,collisionLegacyAttached:!!root.KELO_COLLISION?.ownerSnapshot?.().legacyAttached});
   root.KELO_INPUT_GATE_AUDIT=Object.freeze({version:VERSION,installed:true,retiredInto:'KeloInput',owner:'KeloInput',lockOwner:'KeloInputLocks',bridge:true,processInputWrapperOwner:'KeloInput',timers:0});
 })(typeof globalThis!=='undefined'?globalThis:window);
