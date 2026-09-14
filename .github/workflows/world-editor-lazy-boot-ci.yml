@@ -15,6 +15,7 @@ on:
       - 'scripts/world-editor-lazy-boot-audit.mjs'
       - 'scripts/world-editor-iphone-import-audit.mjs'
       - 'scripts/world-editor-iphone-prewarm-audit.mjs'
+      - 'scripts/world-editor-single-prewarm-owner-audit.mjs'
       - 'scripts/world-iphone-viewport-reveal-audit.mjs'
       - 'scripts/world-studio-provisional-shell-audit.mjs'
       - '.github/workflows/world-editor-lazy-boot-ci.yml'
@@ -31,6 +32,7 @@ on:
       - 'scripts/world-editor-lazy-boot-audit.mjs'
       - 'scripts/world-editor-iphone-import-audit.mjs'
       - 'scripts/world-editor-iphone-prewarm-audit.mjs'
+      - 'scripts/world-editor-single-prewarm-owner-audit.mjs'
       - 'scripts/world-iphone-viewport-reveal-audit.mjs'
       - 'scripts/world-studio-provisional-shell-audit.mjs'
       - '.github/workflows/world-editor-lazy-boot-ci.yml'
@@ -53,6 +55,8 @@ jobs:
         run: node scripts/world-editor-iphone-import-audit.mjs
       - name: Verify iPhone Studio runtime prewarms serially
         run: node scripts/world-editor-iphone-prewarm-audit.mjs
+      - name: Verify World open has one iPhone Studio prewarm owner
+        run: node scripts/world-editor-single-prewarm-owner-audit.mjs
       - name: Verify hydrated Studio reveals game world viewport
         run: node scripts/world-iphone-viewport-reveal-audit.mjs
       - name: Verify provisional Studio shell listeners are stripped before hydrate
