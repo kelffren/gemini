@@ -72,7 +72,7 @@ export function createWorldCreatorAdapter({root=globalThis,permission=null}={}){
     async get(projectId){return allowed()&&String(projectId)===WORLD_PROJECT_ID?project():null;},
     async create(){if(!allowed())throw new Error('CREATOR_PERMISSION_DENIED:world.edit');return project();},
     async saveDraft(projectId,_document,{draftId=null}={}){if(String(projectId)!==WORLD_PROJECT_ID)throw new Error('CREATOR_WORLD_PROJECT_INVALID');permission?.require?.('world.edit',actor(),WORLD_PROJECT_ID);const E=await waitForWorldEditAuthority(root);return E.request('world:draft:save',{actorId:actor(),draftId:draftId||undefined});},
-    async loadDraft(projectId){if(String(projectId)!==WORLD_PROJECT_ID)throw new Error('CREATOR_WORLD_PROJECT_INVALID');const E=await waitForWorldEditAuthority(root),d=await current();if(!d)return null;return E.request('world:draft:get',{actorId:actor(),draftId:d.draftId});},
+    async loadDraft(projectId,{draftId=null}={}){if(String(projectId)!==WORLD_PROJECT_ID)throw new Error('CREATOR_WORLD_PROJECT_INVALID');const E=await waitForWorldEditAuthority(root);let id=draftId;if(!id){const d=await current();id=d?.draftId||null;}if(!id)return null;return E.request('world:draft:get',{actorId:actor(),draftId:id});},
     async archive(){throw new Error('CREATOR_WORLD_ARCHIVE_UNSUPPORTED');}
   });
 }
