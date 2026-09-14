@@ -8,10 +8,23 @@
  */
 const DEFAULT_RAF_FALLBACK_MS=48;
 
+function liveShellAlreadyInteractive(root){
+  try{
+    const shell=root?.document?.getElementById?.('kelo-studio-live');
+    if(!shell?.querySelector?.('.ks-top'))return false;
+    const status=String(shell.querySelector?.('.ks-status')?.textContent||'').trim();
+    return !!status&&!/^Cargando\b|^Abriendo\b|^Montando\b|^Reintentando\b/i.test(status);
+  }catch{return false;}
+}
+
 export function yieldStudioBoot(root=globalThis){
   return new Promise(resolve=>{
     const wait=typeof root?.setTimeout==='function'?root.setTimeout.bind(root):setTimeout;
     const cancel=typeof root?.clearTimeout==='function'?root.clearTimeout.bind(root):clearTimeout;
+    // Once the real shell has its controls and non-loading status, do not wait on
+    // Safari rAF again. This is the final live-controller mount yield: the UI is
+    // already interactive and another rAF/fallback only delays open() completion.
+    if(liveShellAlreadyInteractive(root)){wait(resolve,0);return;}
     const configured=Number(root?.KELO_STUDIO_BOOT_RAF_FALLBACK_MS);
     const fallbackMs=Number.isFinite(configured)?Math.max(0,configured):DEFAULT_RAF_FALLBACK_MS;
     let settled=false,timer=null;
