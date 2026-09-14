@@ -545,9 +545,20 @@
       "files": [
         "index.html"
       ]
+    },
+    {
+      "id": "prevention:18d14985d0d40bf53dbc8aa3fdf9328d5e7b3874",
+      "at": "2026-09-14T20:47:19.000Z",
+      "source": "bug-prevention-ci",
+      "head_sha": "18d14985d0d40bf53dbc8aa3fdf9328d5e7b3874",
+      "base_sha": "6b8f32dc249910de15d03408c45e57452015c2e5",
+      "conclusion": "failure",
+      "files": [
+        "src/studio/integration/world-studio-bridge.mjs"
+      ]
     }
   ],
-  "feedback_updated_at": "2026-09-14T20:42:15.662Z",
+  "feedback_updated_at": "2026-09-14T20:47:33.818Z",
   "training": {
     "examples": 44,
     "search_examples": 33,
