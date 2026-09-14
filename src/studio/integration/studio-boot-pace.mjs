@@ -3,18 +3,31 @@
  * owns: main-thread yields and World launch status text only
  * does-not-own: Studio kernel, Hub, tools, authority
  * public-api: yieldStudioBoot(), setWorldLaunchStatus()
- * mobile: lets iPhone Safari paint and run timers between Studio import waves
+ * mobile: lets iPhone Safari paint and run timers between Studio import waves without trusting requestAnimationFrame to fire forever
  * online: no
  */
+const DEFAULT_RAF_FALLBACK_MS=120;
+
 export function yieldStudioBoot(root=globalThis){
   return new Promise(resolve=>{
-    const raf=root.requestAnimationFrame;
+    const wait=typeof root?.setTimeout==='function'?root.setTimeout.bind(root):setTimeout;
+    const cancel=typeof root?.clearTimeout==='function'?root.clearTimeout.bind(root):clearTimeout;
+    const configured=Number(root?.KELO_STUDIO_BOOT_RAF_FALLBACK_MS);
+    const fallbackMs=Number.isFinite(configured)?Math.max(0,configured):DEFAULT_RAF_FALLBACK_MS;
+    let settled=false,timer=null;
+    const finish=()=>{
+      if(settled)return;
+      settled=true;
+      if(timer!=null)cancel(timer);
+      resolve();
+    };
+    const raf=root?.requestAnimationFrame;
     if(typeof raf==='function'){
-      raf.call(root,()=>resolve());
-      return;
+      timer=wait(finish,fallbackMs);
+      try{raf.call(root,finish);return;}catch{}
+      if(timer!=null){cancel(timer);timer=null;}
     }
-    const wait=typeof root.setTimeout==='function'?root.setTimeout.bind(root):setTimeout;
-    wait(()=>resolve(),0);
+    wait(finish,0);
   });
 }
 export function setWorldLaunchStatus(root,message){
