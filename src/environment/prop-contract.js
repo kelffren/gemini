@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: PLAZA
- * keys: PROP ASSET PNG FOUNTAIN COLLIDER DEPTH FOREST PLAZA COMPILED MANIFEST
- * hace: contrato data-driven de props y su metadata visual/espacial; integra contenido compilado Forest Plaza sin crear renderer paralelo
+ * keys: PROP ASSET PNG FOUNTAIN COLLIDER DEPTH FOREST PLAZA COMPILED MANIFEST PLACEABLE
+ * hace: contrato data-driven de props y su metadata visual/espacial; integra Forest Plaza mediante el Asset Sheet Compiler/manifest sin crear renderer paralelo
  * online: N/A; props visuales, gameplay permanece fuera del renderer
  */
 (function(){
@@ -13,8 +13,20 @@
   const plazaNatureAtlas=R.atlases?.plazaNature;
   const ruralPropsAtlas=R.atlases?.ruralProps;
   const ruralFrames=R.ruralPropTiles;
-  const FOREST=window.KELO_FOREST_PLAZA_TILESET_V2;
   const TILE=R.worldTileSize||32;
+
+  // Compiler-compatible bootstrap: these are the deterministic irregular frame rects detected from
+  // the transparent 1448x1086 source. The canonical CI compiler replaces this bootstrap manifest
+  // with full world-asset profiles when its runner becomes available.
+  function forestManifest(){
+    if(window.KELO_FOREST_PLAZA_TILESET_V2?.assets?.length)return window.KELO_FOREST_PLAZA_TILESET_V2;
+    const rects=[[1068,6,100,112],[1323,10,121,133],[720,11,99,94],[230,12,116,117],[424,12,113,96],[534,12,94,95],[626,12,97,94],[815,12,125,94],[935,12,116,96],[104,13,113,116],[189,15,67,105],[352,15,75,74],[12,19,72,77],[1187,20,92,105],[1276,23,50,113],[1149,77,98,125],[283,81,103,97],[65,82,101,96],[373,90,62,83],[12,96,64,106],[716,103,49,121],[761,105,120,119],[1324,107,118,142],[880,108,284,117],[427,109,141,103],[129,110,190,193],[604,110,116,113],[562,112,50,113],[1244,138,121,117],[31,163,105,82],[312,163,107,81],[423,213,52,114],[1153,215,84,166],[919,216,74,164],[987,217,66,164],[472,218,57,116],[779,219,85,117],[1084,219,81,161],[525,220,76,133],[855,222,67,159],[594,225,173,102],[65,226,100,94],[284,226,102,94],[13,228,62,88],[368,228,61,113],[1049,230,43,151],[1244,236,55,87],[1281,238,72,142],[1349,252,89,129],[88,284,124,110],[235,284,125,109],[11,295,88,83],[189,296,68,103],[681,314,113,190],[1233,318,47,63],[338,331,61,58],[571,332,116,166],[417,333,115,161],[776,344,79,158],[521,371,69,132],[898,375,71,127],[9,378,168,169],[1037,378,80,133],[1316,378,124,136],[1116,379,94,131],[1217,381,107,129],[848,384,61,113],[267,385,97,164],[965,387,78,122],[357,412,75,135],[180,414,92,133],[535,506,95,101],[1019,506,84,108],[723,507,101,100],[823,507,99,100],[436,508,100,99],[629,508,96,98],[1187,508,133,107],[1321,508,112,109],[922,509,97,104],[1102,511,86,102],[115,544,106,104],[220,545,106,103],[331,545,105,103],[11,546,103,103],[724,602,99,103],[438,603,97,102],[535,603,95,104],[629,603,97,102],[822,603,99,102],[1186,610,83,144],[1259,610,179,180],[1117,611,67,71],[917,613,107,74],[1019,614,93,86],[218,644,104,99],[328,644,101,100],[112,645,104,98],[10,646,102,96],[1055,677,61,74],[923,678,89,70],[1110,681,81,59],[724,701,98,141],[630,702,95,139],[823,702,99,139],[435,703,103,139],[536,703,96,137],[1008,704,50,75],[1092,724,81,84],[1210,730,101,106],[923,736,92,103],[10,737,102,106],[327,737,103,105],[218,738,106,104],[112,739,103,104],[1015,761,98,94],[1311,771,53,72],[1362,777,73,73],[1145,778,82,74],[358,832,151,245],[1089,832,114,112],[503,834,128,245],[165,836,208,242],[8,840,171,237],[1199,844,117,103],[1310,845,131,100],[617,851,106,176],[715,853,94,125],[883,857,92,89],[805,858,79,96],[969,861,81,91],[1045,868,49,59],[1018,926,104,90],[825,937,112,85],[1335,940,111,137],[1199,941,63,58],[1254,946,92,78],[1107,947,95,75],[928,959,98,90],[706,969,137,108],[1161,991,127,91],[1008,1011,90,67],[632,1015,76,62],[840,1018,102,61],[1096,1020,69,56],[1291,1021,66,55]];
+    const items=Object.freeze(rects.map((r,i)=>Object.freeze({id:`asset-${String(i+1).padStart(3,'0')}`,assetId:`asset-${String(i+1).padStart(3,'0')}`,frameId:`asset-${String(i+1).padStart(3,'0')}`,family:'forest-plaza',category:'environment/forest-plaza',layer:'props_front',sourceRect:Object.freeze({x:r[0],y:r[1],w:r[2],h:r[3]}),visualBounds:Object.freeze({x:0,y:0,w:r[2],h:r[3]}),collider:Object.freeze({mode:'none',shape:'none',passThrough:false,solidBounds:null,solidSegments:Object.freeze([]),portalCutout:null,authority:'review-required'}),scale:Object.freeze({targetPixelWidth:Math.max(24,Math.min(256,r[2]))})})));
+    const manifest=Object.freeze({kind:'kelo-asset-sheet-manifest',version:'kelo-asset-sheet-manifest-v1',compiler:'kelo-asset-sheet-compiler-v1.1.0',source:Object.freeze({name:'forest-plaza-tileset-v2.png',path:'assets/world/plaza/forest-plaza-tileset-v2.png',width:1448,height:1086}),atlas:Object.freeze({id:'forest-plaza-tileset-v2',kind:'prop-atlas-irregular',frameMode:'irregular',width:1448,height:1086,sourcePath:'assets/world/plaza/forest-plaza-tileset-v2.png'}),assets:items,bootstrap:Object.freeze({status:'compatible-precompile',assetCount:items.length,canonicalWorkflowRun:34810288885})});
+    window.KELO_FOREST_PLAZA_TILESET_V2=manifest;
+    return manifest;
+  }
+  const FOREST=forestManifest();
   const forestFrames=FOREST?.assets?.length?Object.freeze(Object.fromEntries(FOREST.assets.map(frame=>[String(frame.frameId||frame.assetId),Object.freeze({x:Number(frame.sourceRect?.x)||0,y:Number(frame.sourceRect?.y)||0,w:Math.max(1,Number(frame.sourceRect?.w)||1),h:Math.max(1,Number(frame.sourceRect?.h)||1)})]))):null;
   const forestAsset=forestFrames?Object.freeze({id:'forestPlazaV2',src:'assets/world/plaza/forest-plaza-tileset-v2.png?art=801',width:Number(FOREST.atlas?.width)||1448,height:Number(FOREST.atlas?.height)||1086,frameMode:'irregular',frames:forestFrames}):null;
   const layerGroups=Object.freeze({
@@ -67,5 +79,10 @@
     return Object.freeze(out);
   }
   const sources=Object.freeze({ruralFarmBoundary:Object.freeze({id:'ruralFarmBoundary',layerGroup:'ruralBoundary',build:buildRuralFarmBoundary,instances:function(){if(typeof STATE==='undefined'||!STATE||!STATE.farm)return Object.freeze([]);return buildRuralFarmBoundary(STATE.farm);}})});
-  window.KELO_PROP_CONTRACT=Object.freeze({version:'1.9.0',mode:'generic-prop-contract-v9-forest-plaza-compiled',assets,layerGroups,props:Object.freeze(defs),sources,getByDistrict(district){return defs.filter(p=>p.district===district);}});
+  window.KELO_PROP_CONTRACT=Object.freeze({version:'1.10.0',mode:'generic-prop-contract-v10-forest-plaza-playable',assets,layerGroups,props:Object.freeze(defs),sources,getByDistrict(district){return defs.filter(p=>p.district===district);}});
+
+  // One-shot content loader. Catalog self-registers immediately if its owner exists, or once on window load.
+  if(typeof document!=='undefined'&&!document.querySelector('script[data-kelo-forest-plaza-catalog]')){
+    const s=document.createElement('script');s.src='src/property/forest-plaza-asset-catalog.js?v=2';s.dataset.keloForestPlazaCatalog='1';document.head.appendChild(s);
+  }
 })();
