@@ -170,7 +170,7 @@ async function sampleTargetWindow(origin, durationMs = 220, stepMs = 8) {
 try {
   const sep = base.includes('?') ? '&' : '?';
   const url = `${base}${sep}offline=1&strict-pvp-quality=${Date.now()}`;
-  const response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 });
+  const response = await page.goto(url, { waitUntil: 'commit', timeout: 45000 });
   if (!response || response.status() >= 400) throw new Error(`STRICT_JUDGE_HTTP_${response?.status() || 'NO_RESPONSE'}`);
   await page.waitForFunction(() => /^Kelo World — V/i.test(document.title), null, { timeout: 30000 });
   await page.waitForFunction(() => !!window.KeloRuntimeBootstrap?.ensure, null, { timeout: 15000 });

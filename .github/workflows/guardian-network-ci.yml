@@ -1,0 +1,51 @@
+name: Guardian Network CI
+
+on:
+  pull_request:
+    paths:
+      - 'engine-net.js'
+      - 'server/guardian-coordinator.js'
+      - 'server/pvp-authority.js'
+      - 'src/online/guardian-pvp-worker.js'
+      - 'src/online/pvp-authority-core.js'
+      - 'src/systems/guardian-simulation-host.js'
+      - 'src/systems/guardian-system.js'
+      - 'src/ui/guardian-ui.js'
+      - 'scripts/guardian-system-audit.mjs'
+      - 'scripts/guardian-portable-pvp-audit.mjs'
+      - 'docs/systems/GUARDIAN_PORTABLE_PVP_AUTHORITY.md'
+      - '.github/workflows/guardian-network-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'engine-net.js'
+      - 'server/guardian-coordinator.js'
+      - 'server/pvp-authority.js'
+      - 'src/online/guardian-pvp-worker.js'
+      - 'src/online/pvp-authority-core.js'
+      - 'src/systems/guardian-simulation-host.js'
+      - 'src/systems/guardian-system.js'
+      - 'src/ui/guardian-ui.js'
+      - 'scripts/guardian-system-audit.mjs'
+      - 'scripts/guardian-portable-pvp-audit.mjs'
+      - 'docs/systems/GUARDIAN_PORTABLE_PVP_AUTHORITY.md'
+      - '.github/workflows/guardian-network-ci.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: guardian-network-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  guardian-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Run Guardian network and portable PvP audit
+        run: npm run audit:guardian

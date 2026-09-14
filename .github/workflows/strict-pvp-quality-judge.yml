@@ -31,8 +31,8 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: strict-pvp-quality-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: strict-pvp-quality-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
 
 jobs:
   syntax-contract:
@@ -82,7 +82,9 @@ jobs:
           PY
       - name: Judge actual mobile PvP from PR checkout
         env:
-          AUDIT_URL: http://127.0.0.1:4173/
+          # The production boot is login-gated. The judge must enter through the
+          # supported guest/QA path so KeloRuntimeBootstrap is actually mounted.
+          AUDIT_URL: http://127.0.0.1:4173/?guest=1
           PVP_QUALITY_THRESHOLD: '96'
           PVP_QUALITY_OUT: artifacts/pvp-quality-judge-local
         run: node scripts/live-pvp-quality-judge.mjs
@@ -147,7 +149,9 @@ jobs:
           PY
       - name: Judge deployed mobile PvP
         env:
-          AUDIT_URL: https://kelffren.github.io/gemini/
+          # Pages uses the same login-gated boot contract as local. Enter via the
+          # supported guest route so the deployed runtime can be judged headlessly.
+          AUDIT_URL: https://kelffren.github.io/gemini/?guest=1
           PVP_QUALITY_THRESHOLD: '96'
           PVP_QUALITY_OUT: artifacts/pvp-quality-judge-live
         run: node scripts/live-pvp-quality-judge.mjs

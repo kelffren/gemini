@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: CORE
  * owner: KeloRuntimeBootstrap
- * keys: BOOTSTRAP MODULE ORDER COMBAT EFFECTS STATUS MELEE ABILITY TIMELINE PVP PREDICTION LAZY FIRST-USE PERFORMANCE
+ * keys: BOOTSTRAP MODULE ORDER COMBAT EFFECTS STATUS MELEE ABILITY TIMELINE PVP PREDICTION LAZY FIRST-USE PERFORMANCE WATCHDOG
  * purpose: expone un único loader idempotente para foundations Combat/Effects/Status/Melee y soporte compartido de prediction; los módulos pesados cargan solo bajo `ensure()`
  * public-api: KeloRuntimeBootstrap.ensure/isReady/modules
  * state-owned: progreso/promesa efímera del late boot
@@ -11,7 +11,8 @@
  */
 (function(root){
   'use strict';
-  const VERSION='kelo-runtime-bootstrap-v1.5.0-pvp-visual-competitive';
+  const VERSION='kelo-runtime-bootstrap-v1.6.0-load-watchdog';
+  const LOAD_TIMEOUT_MS=12000;
   const MODULES=Object.freeze([
     'src/core/events/event-bus.js?v=1',
     'src/abilities/ability-action-timeline.js?v=1',
@@ -29,7 +30,7 @@
     'src/systems/pvp-ability-movement-prediction.js?v=1',
     'src/systems/pvp-visual-competitive-pass.js?v=1'
   ]);
-  const audit=root.KELO_RUNTIME_BOOTSTRAP_AUDIT={version:VERSION,ready:false,loading:false,loaded:0,total:MODULES.length,failed:[],requestedAt:0,readyAt:0};
+  const audit=root.KELO_RUNTIME_BOOTSTRAP_AUDIT={version:VERSION,ready:false,loading:false,loaded:0,total:MODULES.length,failed:[],requestedAt:0,readyAt:0,loadTimeoutMs:LOAD_TIMEOUT_MS};
   let promise=null;
   function exists(src){const base=src.split('?')[0];return Array.from(document.scripts).some(function(s){return(s.getAttribute('src')||'').split('?')[0]===base;});}
   function load(index,resolve,reject){
@@ -43,8 +44,25 @@
     const src=MODULES[index];
     if(exists(src)){audit.loaded+=1;load(index+1,resolve,reject);return;}
     const script=document.createElement('script');script.src=src;script.async=false;script.dataset.keloRuntimeFoundation='1';
-    script.onload=function(){audit.loaded+=1;load(index+1,resolve,reject);};
-    script.onerror=function(){audit.failed.push(src);console.error('[Kelo runtime bootstrap] failed',src);load(index+1,resolve,reject);};
+    let settled=false;
+    const finish=function(ok,reason){
+      if(settled)return;
+      settled=true;
+      clearTimeout(timer);
+      if(ok){audit.loaded+=1;}
+      else{
+        const failure=reason==='timeout'?src+':timeout':src;
+        audit.failed.push(failure);
+        console.error(reason==='timeout'?'[Kelo runtime bootstrap] timeout':'[Kelo runtime bootstrap] failed',src);
+      }
+      load(index+1,resolve,reject);
+    };
+    const timer=setTimeout(function(){
+      try{script.remove();}catch(_){}
+      finish(false,'timeout');
+    },LOAD_TIMEOUT_MS);
+    script.onload=function(){finish(true,'load');};
+    script.onerror=function(){finish(false,'error');};
     document.body.appendChild(script);
   }
   function ensure(){
