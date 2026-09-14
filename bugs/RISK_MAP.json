@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "description": "Risk rules used by bug:risk. Scores are additive and capped at 100.",
   "rules": [
     {
@@ -7,7 +7,14 @@
       "patterns": ["src/creators/workspaces/world-", "src/studio/", "src/ui/studio-launcher.js"],
       "score": 24,
       "reason": "World/Studio has critical mobile boot history and a large lazy module graph.",
-      "tests": ["npm run bug:brief -- BUG-0003", "npm run audit:studio", "real iPhone Create -> World -> interactive -> close/reopen"]
+      "tests": ["npm run bug:brief -- BUG-0003", "npm run audit:studio", "npm run bug:impact -- src/creators/workspaces/world-workspace.mjs --depth=3", "real iPhone Create -> World -> interactive -> close/reopen"]
+    },
+    {
+      "id": "esm-loader-mobile",
+      "patterns": ["src/ui/studio-launcher.js", "src/creators/ui/creator-hub.mjs", "src/creators/workspaces/world-workspace.mjs", "src/studio/integration/live-studio-controller.mjs", "src/studio/studio-entry.mjs"],
+      "score": 18,
+      "reason": "These files orchestrate dynamic ESM loading in the mobile World path; regressions can appear as hangs, duplicate module state or Safari-only boot failures.",
+      "tests": ["npm run bug:brief -- BUG-0003", "npm run bug:impact -- src/studio/integration/live-studio-controller.mjs --depth=3", "real iPhone World open twice without reload"]
     },
     {
       "id": "auth-session",
@@ -32,10 +39,17 @@
     },
     {
       "id": "render-loop",
-      "patterns": ["src/render/", "src/visuals/", "canvas", "renderer"],
+      "patterns": ["src/render/", "src/visuals/", "canvas", "renderer", "src/studio/render/"],
       "score": 15,
       "reason": "Render/canvas changes can create device-specific crashes, memory pressure or frame stalls.",
       "tests": ["npm run audit:performance", "mobile visual smoke"]
+    },
+    {
+      "id": "asset-memory-pressure",
+      "patterns": ["assets/", "spritesheet", "atlas", "tileset", "src/assets/", "src/studio/assets/"],
+      "score": 10,
+      "reason": "Large or duplicated assets can increase decode/GPU/WebContent memory and trigger mobile-only instability.",
+      "tests": ["npm run audit:performance", "cold mobile load", "repeat open/close smoke while watching memory symptoms"]
     },
     {
       "id": "pvp-combat",
