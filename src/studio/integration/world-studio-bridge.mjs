@@ -4,12 +4,12 @@
  * does-not-own: Studio kernel, live shell internals, Hub, world authority
  * public-api: openKeloStudioLive(), closeKeloStudioLive(), getKeloStudioLive()
  * reuse: live-studio-controller remains the session owner; this file is the only first hop from World workspace
- * mobile: import Studio in waves with main-thread yields; release the loading viewport as soon as real chrome hydrates, before draft import finishes
+ * mobile: import Studio in waves with main-thread yields; strip provisional listeners before controller hydrate, then release the loading viewport as soon as real chrome hydrates
  * online: no; authority stays in KELO_WORLD_EDIT
  */
 import { yieldStudioBoot, setWorldLaunchStatus } from './studio-boot-pace.mjs';
 
-export const WORLD_STUDIO_BRIDGE_BUILD='world-bridge-20260914-8';
+export const WORLD_STUDIO_BRIDGE_BUILD='world-bridge-20260914-9';
 const CONTROLLER=`./live-studio-controller.mjs?v=${WORLD_STUDIO_BRIDGE_BUILD}`;
 let controllerMod=null;
 
@@ -25,8 +25,9 @@ async function loadController(root){
   return controllerMod;
 }
 
-function stripProvisionalShellListeners(root,shell){
-  if(shell?.dataset?.keloWorldLoading!=='1')return shell;
+export function sanitizeWorldStudioProvisionalShell(root=globalThis){
+  const shell=root?.document?.getElementById?.('kelo-studio-live');
+  if(shell?.dataset?.keloWorldLoading!=='1')return shell||null;
   if(typeof shell.cloneNode!=='function'||typeof shell.replaceWith!=='function')return shell;
   try{
     const clean=shell.cloneNode(true);
@@ -38,9 +39,8 @@ function stripProvisionalShellListeners(root,shell){
 }
 
 export function releaseWorldStudioViewport(root=globalThis){
-  let shell=root?.document?.getElementById?.('kelo-studio-live');
+  const shell=root?.document?.getElementById?.('kelo-studio-live');
   if(!shell?.dataset?.shellVersion||!shell?.querySelector?.('.ks-top'))return false;
-  shell=stripProvisionalShellListeners(root,shell);
   try{shell.removeAttribute?.('style');}catch{return false;}
   return true;
 }
@@ -64,6 +64,9 @@ function releaseViewportDuringOpen(root,pending){
 export async function openKeloStudioLive(opts={}){
   const root=opts.root||globalThis;
   const ctrl=await loadController(root);
+  // Drop handlers belonging to the temporary chrome before the real controller
+  // can capture/reference that node. Never replace the DOM node once hydrate starts.
+  sanitizeWorldStudioProvisionalShell(root);
   const session=await releaseViewportDuringOpen(root,ctrl.openKeloStudioLive(opts));
   releaseWorldStudioViewport(root);
   return session;
