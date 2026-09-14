@@ -25,6 +25,8 @@ on:
       - scripts/turbo-build-audit.mjs
       - scripts/generate-turbo-manifest.mjs
       - scripts/turbo-delta-test.mjs
+      - scripts/turbo-host-server.mjs
+      - scripts/turbo-host-integration-test.mjs
       - vite.config.js
       - vite.config.mjs
       - vite.config.ts
@@ -57,6 +59,8 @@ on:
       - scripts/turbo-build-audit.mjs
       - scripts/generate-turbo-manifest.mjs
       - scripts/turbo-delta-test.mjs
+      - scripts/turbo-host-server.mjs
+      - scripts/turbo-host-integration-test.mjs
       - vite.config.js
       - vite.config.mjs
       - vite.config.ts
@@ -80,7 +84,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Syntax check Turbo runtime, compiler and guardian
+      - name: Syntax check Turbo runtime, compiler, host and guardian
         run: |
           node --check src/core/update-delta-core.js
           node --check src/core/update-system.js
@@ -90,6 +94,8 @@ jobs:
           node --check scripts/turbo-build.mjs
           node --check scripts/turbo-build-audit.mjs
           node --check scripts/generate-turbo-manifest.mjs
+          node --check scripts/turbo-host-server.mjs
+          node --check scripts/turbo-host-integration-test.mjs
           node --check scripts/turbo-update-guardian.mjs
       - name: Install exact production compiler
         run: npm install --no-save --ignore-scripts esbuild@0.25.9
@@ -97,6 +103,8 @@ jobs:
         run: node scripts/turbo-build.mjs
       - name: Prove minification tree-shaking hashed code splitting
         run: node scripts/turbo-build-audit.mjs
+      - name: Prove host revalidation immutable caching Brotli and gzip
+        run: node scripts/turbo-host-integration-test.mjs
       - name: Prove creator tools stay out of critical boot
         run: node scripts/turbo-boot-isolation-test.mjs
       - name: Prove PVP combat is an absolute updater hard stop
