@@ -1,10 +1,19 @@
 #!/usr/bin/env node
 
+/* KELO-INDEX
+ * area: BUGS / AGENT BRIEF
+ * owner: Bug Registry tooling
+ * purpose: resume el expediente canónico y las investigaciones versionadas de apoyo para que un agente continúe sin repetir trabajo
+ * public-api: npm run bug:brief -- BUG-NNNN
+ * online: N/A
+ */
+
 import fs from 'node:fs';
 import path from 'node:path';
 
 const root = process.cwd();
 const registryDir = path.join(root, 'bugs', 'registry');
+const investigationRoot = path.join(root, 'bugs', 'investigacion');
 const arg = process.argv[2];
 
 function listBugs() {
@@ -45,6 +54,37 @@ function envSummary(env = {}) {
     .join(' | ');
 }
 
+function parseInvestigationMeta(text, relativePath) {
+  const read = (label) => {
+    const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const match = text.match(new RegExp(`^${escaped}:\\s*\\`?([^\\n\\`]+)\\`?\\s*$`, 'mi'));
+    return match?.[1]?.trim() || null;
+  };
+  return {
+    file: relativePath,
+    bug: read('BUG'),
+    date: read('FECHA'),
+    version: read('VERSION / BUILD'),
+    commit: read('COMMIT BASE'),
+    environment: read('ENTORNO'),
+    status: read('ESTADO')
+  };
+}
+
+function listInvestigations(id) {
+  const dir = path.join(investigationRoot, id);
+  if (!fs.existsSync(dir)) return [];
+  return fs.readdirSync(dir)
+    .filter((name) => name.toLowerCase().endsWith('.md'))
+    .sort()
+    .reverse()
+    .map((name) => {
+      const file = path.join(dir, name);
+      const text = fs.readFileSync(file, 'utf8');
+      return parseInvestigationMeta(text, path.relative(root, file));
+    });
+}
+
 if (!arg) {
   console.error('Usage: npm run bug:brief -- BUG-0003');
   const bugs = listBugs();
@@ -70,6 +110,20 @@ if (!arg) {
     line('UPDATED', bug.updated_at);
     line('RESEARCH', research.status || 'legacy/unstructured');
 
+    section('INVESTIGACIONES DE APOYO');
+    const investigations = listInvestigations(id);
+    bullets(investigations, (item) => {
+      const parts = [item.file];
+      if (item.date) parts.push(`FECHA=${item.date}`);
+      if (item.version) parts.push(`VERSION=${item.version}`);
+      if (item.status) parts.push(`ESTADO=${item.status}`);
+      if (item.environment) parts.push(`ENTORNO=${item.environment}`);
+      return parts.join(' | ');
+    });
+    if (investigations.length) {
+      console.log('READ FIRST: open the newest investigation whose VERSION / BUILD still applies to current HEAD/runtime.');
+    }
+
     section('CURRENT OBSERVATION');
     console.log(bug.actual || '(not recorded)');
 
@@ -77,7 +131,7 @@ if (!arg) {
     console.log(bug.expected || '(not recorded)');
 
     section('REPRODUCTION');
-    bullets(bug.reproduction, (item, index) => item);
+    bullets(bug.reproduction, (item) => item);
 
     section('KNOWN FACTS');
     bullets(research.known_facts, (f) => `${f.id || '?'}: ${f.statement || f} ${f.evidence?.length ? `[evidence: ${f.evidence.join('; ')}]` : ''}`.trim());
