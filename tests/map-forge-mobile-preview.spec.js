@@ -8,12 +8,20 @@ const fs = require('fs');
 
 test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 
+async function navigateToMapEditor(page){
+  // World boot intentionally yields/defer-loads optional modules on mobile. DOMContentLoaded is
+  // therefore not the product readiness contract and can lag behind an already usable shell.
+  // Match the real Map Forge visual harness: commit navigation, then prove the exact APIs needed.
+  const response = await page.goto('./?mapEditor=1', { waitUntil: 'commit', timeout: 15000 });
+  expect(response.status()).toBeLessThan(400);
+  await page.waitForSelector('body', { timeout: 10000 });
+}
+
 test('Map Forge opens from Creator Hub before a stalled first generation settles', async ({ page }) => {
   const pageErrors = [];
   page.on('pageerror', error => pageErrors.push(String(error)));
 
-  const response = await page.goto('./?mapEditor=1', { waitUntil: 'domcontentloaded', timeout: 30000 });
-  expect(response.status()).toBeLessThan(400);
+  await navigateToMapEditor(page);
   await page.waitForFunction(() => !!(
     window.KeloInputLocks?.acquire &&
     window.KELO_ADMIN_KEYS?.can?.('world.edit')
@@ -74,8 +82,7 @@ test('Map Forge real preview exposes scene and sprite requirements, hides before
   page.on('pageerror', error => pageErrors.push(String(error)));
   fs.mkdirSync('test-results', { recursive: true });
 
-  const response = await page.goto('./?mapEditor=1', { waitUntil: 'domcontentloaded', timeout: 30000 });
-  expect(response.status()).toBeLessThan(400);
+  await navigateToMapEditor(page);
 
   await page.waitForFunction(() => !!(
     window.KELO_WORLD_BUILDER?.renderSnapshotPreview &&
