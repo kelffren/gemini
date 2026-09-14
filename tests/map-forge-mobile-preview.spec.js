@@ -17,6 +17,20 @@ async function navigateToMapEditor(page){
   await page.waitForSelector('body', { timeout: 10000 });
 }
 
+async function closeRecoveredForge(page, label){
+  const forge = page.locator('#kelo-map-forge');
+  const initial = await forge.count();
+  if(initial > 1)throw new Error(`${label}: expected at most one recovered Map Forge, found ${initial}`);
+  if(initial === 1){
+    await forge.first().getByRole('button', { name: 'CERRAR', exact: true }).evaluate(button => button.click());
+    await expect(forge, `${label}: recovered Map Forge did not close`).toHaveCount(0, { timeout: 2000 });
+  }
+  // A close that immediately remounts is a product lifecycle regression, not something the smoke
+  // should hide with an unbounded while(count()) cleanup loop.
+  await page.waitForTimeout(350);
+  await expect(forge, `${label}: Map Forge reopened after close`).toHaveCount(0);
+}
+
 test('Map Forge opens from Creator Hub before a stalled first generation settles', async ({ page }) => {
   const pageErrors = [];
   page.on('pageerror', error => pageErrors.push(String(error)));
@@ -28,11 +42,7 @@ test('Map Forge opens from Creator Hub before a stalled first generation settles
   ), null, { timeout: 15000 });
 
   await page.waitForTimeout(1000);
-  const recoveredPreview = page.locator('#kelo-map-forge');
-  while(await recoveredPreview.count()){
-    await recoveredPreview.first().getByRole('button', { name: 'CERRAR', exact: true }).evaluate(button => button.click());
-  }
-  await expect(recoveredPreview).toHaveCount(0);
+  await closeRecoveredForge(page, 'initial boot');
 
   await page.evaluate(async () => {
     const { openCreatorHub } = await import('./src/creators/ui/creator-hub.mjs');
@@ -42,11 +52,7 @@ test('Map Forge opens from Creator Hub before a stalled first generation settles
   await expect(page.locator('#kelo-creators-hub [data-workspace="map-forge"]')).toBeEnabled();
 
   await page.waitForTimeout(500);
-  const recoveredForge = page.locator('#kelo-map-forge');
-  while(await recoveredForge.count()){
-    await recoveredForge.first().getByRole('button', { name: 'CERRAR', exact: true }).evaluate(button => button.click());
-  }
-  await expect(recoveredForge).toHaveCount(0);
+  await closeRecoveredForge(page, 'creator hub recovery');
 
   await page.evaluate(() => {
     window.__KELO_TEST_REAL_WORKER__ = window.Worker;
@@ -59,12 +65,10 @@ test('Map Forge opens from Creator Hub before a stalled first generation settles
 
   await page.locator('#kelo-creators-hub [data-workspace="map-forge"]').click();
   const openedForge = page.locator('#kelo-map-forge');
-  await expect(openedForge.last()).toBeVisible({ timeout: 2000 });
+  await expect(openedForge).toHaveCount(1, { timeout: 2000 });
+  await expect(openedForge).toBeVisible({ timeout: 2000 });
   await page.waitForTimeout(1500);
-  while(await openedForge.count() > 1){
-    await openedForge.first().getByRole('button', { name: 'CERRAR', exact: true }).evaluate(button => button.click());
-  }
-  await expect(openedForge).toHaveCount(1);
+  await expect(openedForge, 'stalled generation must not duplicate Map Forge').toHaveCount(1);
   await expect(page.locator('#kelo-creators-hub')).toHaveCount(0, { timeout: 2000 });
   await expect(openedForge.locator('.kmf-canvas')).toBeVisible();
   await expect(openedForge.getByRole('button', { name: 'GENERANDO\u2026' })).toBeVisible();
@@ -93,11 +97,7 @@ test('Map Forge real preview exposes scene and sprite requirements, hides before
   ), null, { timeout: 15000 });
 
   await page.waitForTimeout(1000);
-  const recoveredPreview = page.locator('#kelo-map-forge');
-  while(await recoveredPreview.count()){
-    await recoveredPreview.first().getByRole('button', { name: 'CERRAR', exact: true }).evaluate(button => button.click());
-  }
-  await expect(recoveredPreview).toHaveCount(0);
+  await closeRecoveredForge(page, 'real preview boot');
 
   await page.evaluate(async () => {
     const { bootKeloCreators } = await import('./src/creators/creator-entry.mjs');
