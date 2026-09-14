@@ -25,6 +25,29 @@ async function waitReady() {
 }
 function assert(cond,msg){ if(!cond) throw new Error('TURBO HOST INTEGRATION FAIL: '+msg); }
 
+function findHashedProductionJs(baseDir) {
+  if (!fs.existsSync(baseDir)) return null;
+  const stack = [baseDir];
+  const matches = [];
+  while (stack.length) {
+    const dir = stack.pop();
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const absolute = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        stack.push(absolute);
+        continue;
+      }
+      if (entry.isFile() && /-[A-Z0-9]{6,}\.js$/i.test(entry.name)) {
+        matches.push(absolute);
+      }
+    }
+  }
+  if (!matches.length) return null;
+  // Prefer a non-trivial asset so compression negotiation is actually exercised.
+  matches.sort((a,b) => fs.statSync(b).size - fs.statSync(a).size);
+  return matches[0];
+}
+
 try {
   await waitReady();
   const index = await request('/index.html','br,gzip');
@@ -39,15 +62,17 @@ try {
   // proven below against a production asset large enough to exercise negotiation.
 
   const dist = path.join(root,'dist','turbo');
-  const hashed = fs.existsSync(dist) ? fs.readdirSync(dist).find((n)=>/-[A-Z0-9]{6,}\.js$/i.test(n)) : null;
-  assert(hashed,'no hashed production JS asset found; run npm run build first');
+  const hashedAbsolute = findHashedProductionJs(dist);
+  assert(hashedAbsolute,'no hashed production JS asset found recursively under dist/turbo; run npm run build first');
+  const hashedRelative = path.relative(dist, hashedAbsolute).split(path.sep).join('/');
+  const hashedUrl = '/dist/turbo/' + hashedRelative;
 
-  const assetBr = await request('/dist/turbo/'+hashed,'br,gzip');
+  const assetBr = await request(hashedUrl,'br,gzip');
   assert(assetBr.status===200,'hashed asset not served');
   assert(assetBr.headers['cache-control']==='public, max-age=31536000, immutable','hashed asset is not immutable');
   assert(assetBr.headers['content-encoding']==='br','hashed asset did not negotiate Brotli');
 
-  const assetGzip = await request('/dist/turbo/'+hashed,'gzip');
+  const assetGzip = await request(hashedUrl,'gzip');
   assert(assetGzip.status===200,'hashed asset not served for gzip negotiation');
   assert(assetGzip.headers['cache-control']==='public, max-age=31536000, immutable','gzip hashed asset is not immutable');
   assert(assetGzip.headers['content-encoding']==='gzip','hashed asset did not negotiate gzip fallback');
@@ -55,7 +80,7 @@ try {
   const denied = await request('/scripts/turbo-host-server.mjs');
   assert(denied.status===404,'server source is publicly exposed');
 
-  console.log(`TURBO HOST INTEGRATION PASS — revalidation, immutable hashed assets, Brotli, gzip and source denylist proven; asset=${hashed}`);
+  console.log(`TURBO HOST INTEGRATION PASS — revalidation, immutable hashed assets, Brotli, gzip and source denylist proven; asset=${hashedRelative}`);
 } finally {
   child.kill('SIGTERM');
 }
