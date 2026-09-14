@@ -15,9 +15,8 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="KELO WORLD">
-  <title>Kelo World — V6.55</title>
+  <title>Kelo World — V6.56</title>
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="preload" as="image" href="assets/hero.PNG?hero=deeab966" fetchpriority="high">
   <link rel="stylesheet" href="src/ui/backpack-fantasy-v1.css?v=1">
   <style>
     *{box-sizing:border-box;margin:0;padding:0;user-select:none;-webkit-user-select:none}
@@ -34,6 +33,30 @@
 <body class="social-mode">
 <canvas id="game-canvas"></canvas>
 <div id="ui-layer"><div class="action-bar" id="action-bar-container" aria-label="Barra de habilidades"></div></div>
+<script>
+(function(){
+  var native=window.requestAnimationFrame.bind(window);
+  var cancel=window.cancelAnimationFrame.bind(window);
+  var q=[],held=true,id=0;
+  window.requestAnimationFrame=function(cb){
+    if(!held)return native(cb);
+    var n=++id; q.push({n:n,cb:cb}); return n;
+  };
+  window.cancelAnimationFrame=function(n){
+    if(!held)return cancel(n);
+    q=q.filter(function(x){return x.n!==n});
+  };
+  window.__keloReleaseRAF=function(){
+    if(!held)return;
+    held=false;
+    window.requestAnimationFrame=native;
+    window.cancelAnimationFrame=cancel;
+    var run=q.slice(); q=[];
+    for(var i=0;i<run.length;i++){ try{ native(run[i].cb); }catch(e){} }
+  };
+  setTimeout(function(){ window.__keloReleaseRAF&&window.__keloReleaseRAF(); },15000);
+})();
+</script>
 
 <!-- KELO-INDEX UPDATE: owner KeloUpdater; registra SW, detecta deploys durante sesiones largas y monta aviso táctil. -->
 <script src="src/core/update-system.js?v=3-network-stage"></script>
@@ -136,4 +159,5 @@
 <!-- KELO-INDEX STUDIO: launcher mínimo; World/Mount/Appearance/VFX creators se importan solo tras acción CREATE. -->
 <script src="src/ui/studio-launcher.js?v=9-world-bridge-20260914-3"></script>
 <script src="src/ui/map-forge-launch-recovery-v1.js?v=1"></script>
+<script>window.__keloReleaseRAF&&window.__keloReleaseRAF();</script>
 </body></html>
