@@ -144,15 +144,12 @@ export function createCreatorActions(kernel) {
     const plans=rows.map(row=>{const current=scaleOf(row.transform?.scale),next=scaleOf(value==null?current+(Number(delta)||0):value);return{row,current,next};});
     const changed=plans.filter(plan=>plan.next!==plan.current);if(!changed.length)return rows;
     const tile=Math.max(1,Number(kernel.document.settings?.tileSize)||32);
-    let cx=0,cy=0,factor=1;
-    if(rows.length>1){
-      const pivot=selectionVisualPivot(rows,tile);cx=pivot.x;cy=pivot.y;
-      factor=changed.reduce((sum,plan)=>sum+(plan.next/plan.current),0)/changed.length;
-    }
-    const commands=plans.map(({row,next})=>{
+    let cx=0,cy=0;
+    if(rows.length>1){const pivot=selectionVisualPivot(rows,tile);cx=pivot.x;cy=pivot.y;}
+    const commands=changed.map(({row,current,next})=>{
       const transform={...(row.transform||{}),scale:next};
       if(rows.length>1){
-        const center=entityCenter(row,tile),point=scalePointAround(center.x,center.y,cx,cy,factor);
+        const factor=next/current,center=entityCenter(row,tile),point=scalePointAround(center.x,center.y,cx,cy,factor);
         const width=Math.max(1,Number(row?.bounds?.w)||tile)*next,height=Math.max(1,Number(row?.bounds?.h)||tile)*next;
         transform.x=cleanCoord(point.x-width/2);transform.y=cleanCoord(point.y-height/2);
       }
