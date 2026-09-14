@@ -6,7 +6,7 @@
  * mobile: lets iPhone Safari paint and run timers between Studio import waves without trusting requestAnimationFrame to fire forever
  * online: no
  */
-const DEFAULT_RAF_FALLBACK_MS=120;
+const DEFAULT_RAF_FALLBACK_MS=48;
 
 export function yieldStudioBoot(root=globalThis){
   return new Promise(resolve=>{
@@ -23,6 +23,9 @@ export function yieldStudioBoot(root=globalThis){
     };
     const raf=root?.requestAnimationFrame;
     if(typeof raf==='function'){
+      // iOS Safari can temporarily stop servicing rAF while parsing/evaluating a
+      // large ESM graph. Keep the paint opportunity, but never let a missed rAF
+      // hold every phased Studio import behind the old 120ms barrier.
       timer=wait(finish,fallbackMs);
       try{raf.call(root,finish);return;}catch{}
       if(timer!=null){cancel(timer);timer=null;}
