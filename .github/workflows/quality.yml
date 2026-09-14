@@ -28,3 +28,6 @@ jobs:
 
       - name: Foundation architecture guard
         run: node scripts/foundation-architecture-audit.js
+
+      - name: Runtime boot order contract
+        run: node scripts/runtime-boot-order-audit.mjs
