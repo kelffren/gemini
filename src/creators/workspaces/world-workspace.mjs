@@ -4,7 +4,7 @@
  * owns: descriptor and lazy routing into existing live Studio controller
  * does-not-own: World editor, commands, drafts, authority, terrain, collisions, PropertySystem or camera
  * reuse: existing openKeloStudioLive() remains implementation; Map Forge handoff imports through Studio adapter + KELO_WORLD_EDIT and focuses through KeloCamera
- * mobile: paint a launch curtain and yield a real frame before importing Studio so the World card cannot freeze the Hub on iPhone
+ * mobile: paint Studio chrome immediately and yield 420ms like Map Forge so the World card cannot freeze the Hub on iPhone while the Studio graph loads
  */
 import { waitForWorldEditAuthority } from '../adapters/world-creator-adapter.mjs';
 
@@ -12,13 +12,15 @@ const actor=root=>String(root.KELO_ADMIN_KEYS?.playerId?.()||root.keloNet?.playe
 const finite=v=>Number.isFinite(Number(v));
 const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
 const LAUNCH_CURTAIN_ID='kelo-world-launch-curtain';
-const STUDIO_OPEN_MS=12000;
+const STUDIO_OPEN_MS=20000;
+const DEFAULT_LAUNCH_YIELD_MS=420;
 const studioOpenBudget=root=>Math.max(250,Number(root?.KELO_WORLD_OPEN_TIMEOUT_MS)||STUDIO_OPEN_MS);
 const studioShellMounted=root=>{
   const doc=root?.document;
   if(!doc?.getElementById)return true;
   const shell=doc.getElementById('kelo-studio-live');
-  return !!(shell&&shell.isConnected!==false);
+  if(!shell||shell.isConnected===false)return false;
+  return shell.dataset?.keloWorldLoading!=='1';
 };
 function paintLaunchCurtain(root,message='Abriendo World Editor…'){
   const doc=root?.document;
@@ -32,7 +34,7 @@ function paintLaunchCurtain(root,message='Abriendo World Editor…'){
       el.setAttribute('role','status');
       el.setAttribute('aria-live','polite');
     }
-    if(el.style)el.style.cssText='position:fixed;inset:0;z-index:2147482200;display:grid;place-items:center;padding:24px;background:rgba(7,8,10,.94);color:#f7e7b4;font:800 15px/1.45 Inter,system-ui,-apple-system,sans-serif;letter-spacing:.12em;text-align:center;pointer-events:auto';
+    if(el.style)el.style.cssText='position:fixed;inset:0;z-index:2147482300;display:grid;place-items:center;padding:24px;background:rgba(5,12,14,.92);color:#f7e7b4;font:800 15px/1.45 Inter,system-ui,-apple-system,sans-serif;letter-spacing:.12em;text-align:center;pointer-events:auto';
     doc.body.append?.(el);
   }
   el.textContent=message;
@@ -41,11 +43,61 @@ function paintLaunchCurtain(root,message='Abriendo World Editor…'){
 function clearLaunchCurtain(root){
   try{root?.document?.getElementById?.(LAUNCH_CURTAIN_ID)?.remove?.();}catch{}
 }
+export function paintWorldEditorLaunchShell(root=globalThis,message='Abriendo World Editor…'){
+  const doc=root?.document;
+  if(!doc?.body||typeof doc.createElement!=='function')return null;
+  try{doc.body.classList.add('kelo-studio-active');}catch{}
+  let shell=typeof doc.getElementById==='function'?doc.getElementById('kelo-studio-live'):null;
+  if(!shell){
+    shell=doc.createElement('section');
+    shell.id='kelo-studio-live';
+    if(typeof shell.setAttribute==='function'){
+      shell.setAttribute('data-kelo-studio-ui','1');
+      shell.setAttribute('data-kelo-world-loading','1');
+      shell.setAttribute('role','dialog');
+      shell.setAttribute('aria-modal','true');
+      shell.setAttribute('aria-label','Kelo Studio');
+    }else if(shell.dataset)shell.dataset.keloWorldLoading='1';
+    if(shell.style)shell.style.cssText='position:fixed;inset:0;z-index:2147482200;display:grid;grid-template-rows:auto 1fr;background:#050e10;color:#f7e7b4;font:800 13px/1.4 Inter,system-ui,-apple-system,sans-serif;pointer-events:auto';
+    shell.innerHTML='<div style="display:flex;align-items:center;gap:10px;min-height:58px;padding:12px 16px;border-bottom:1px solid rgba(231,197,106,.42)"><div style="width:36px;height:36px;border:1px solid rgba(231,197,106,.5);border-radius:11px;display:grid;place-items:center">♛</div><div><div style="letter-spacing:.14em">KELO STUDIO</div><div style="margin-top:4px;font-size:9px;letter-spacing:.18em;color:#9bb7ad">MODO CREADOR</div></div></div><div data-kelo-world-launch-status="1" style="display:grid;place-items:center;letter-spacing:.12em">'+message+'</div>';
+    doc.body.append?.(shell);
+  }else if(shell.dataset){
+    shell.dataset.keloWorldLoading='1';
+    const status=typeof shell.querySelector==='function'?shell.querySelector('[data-kelo-world-launch-status]'):null;
+    if(status)status.textContent=message;
+  }
+  paintLaunchCurtain(root,message);
+  return shell;
+}
+function discardLoadingShell(root){
+  const shell=root?.document?.getElementById?.('kelo-studio-live');
+  if(shell?.dataset?.keloWorldLoading==='1'){
+    try{shell.remove();}catch{}
+    try{root.document.body.classList.remove('kelo-studio-active');}catch{}
+  }
+  clearLaunchCurtain(root);
+}
+function pauseGameplayRender(root){
+  const kr=root?.KeloRender;
+  if(typeof kr?.intercept!=='function'||typeof kr?.unregister!=='function')return ()=>{};
+  let id=null;
+  try{id=kr.intercept('world-editor-launch',()=>true,-1000);}catch{return ()=>{};}
+  let done=false;
+  return ()=>{
+    if(done)return;
+    done=true;
+    try{if(id)kr.unregister(id);}catch{}
+  };
+}
 async function yieldFrames(root,count=2){
   const wait=typeof root.setTimeout==='function'?root.setTimeout.bind(root):setTimeout;
-  for(let i=0;i<Math.max(1,count);i++){
-    await new Promise(resolve=>wait(()=>resolve(),0));
+  const configured=Number(root?.KELO_WORLD_LAUNCH_YIELD_MS);
+  const ms=Number.isFinite(configured)?Math.max(0,configured):DEFAULT_LAUNCH_YIELD_MS;
+  if(ms<=0){
+    for(let i=0;i<Math.max(1,count);i++)await new Promise(resolve=>wait(()=>resolve(),0));
+    return;
   }
+  await new Promise(resolve=>wait(()=>resolve(),ms));
 }
 async function withTimeout(root,promise,ms,code){
   let timer=null;
@@ -90,9 +142,11 @@ export function createWorldWorkspaceManifest({loader=()=>import('../../studio/in
     projectTypes:['WORLD'],
     capability:'world.edit',
     availability:'active',
+    paintLaunch(root=globalThis,message){return paintWorldEditorLaunchShell(root,message);},
     async open({root=globalThis,mapDefinition=null,previewOnly=false}={}){
-      paintLaunchCurtain(root,previewOnly?'Cargando vista previa…':'Abriendo World Editor…');
+      paintWorldEditorLaunchShell(root,previewOnly?'Cargando vista previa…':'Abriendo World Editor…');
       await yieldFrames(root,2);
+      const resumeRender=pauseGameplayRender(root);
       try{
         const boot=async()=>{
           const edit=await waitForWorldEditAuthority(root);
@@ -114,6 +168,7 @@ export function createWorldWorkspaceManifest({loader=()=>import('../../studio/in
             return Object.freeze({mode:'map-forge-exterior-preview',draftId:prepared.draftId,prepared,focus,viewSnapshot:entered.viewSnapshot});
           }
           let mod=await loadStudioModule(loader,root);
+          resumeRender();
           if(typeof mod.openKeloStudioLive!=='function')throw new Error('CREATOR_WORLD_STUDIO_ENTRY_MISSING');
           let session;
           try{
@@ -122,7 +177,7 @@ export function createWorldWorkspaceManifest({loader=()=>import('../../studio/in
             const code=String(first?.message||first||'');
             if(code==='WORLD_EDITOR_OPEN_TIMEOUT')throw first;
             try{await mod.closeKeloStudioLive?.({root});}catch{}
-            paintLaunchCurtain(root,'Reintentando World Editor…');
+            paintWorldEditorLaunchShell(root,'Reintentando World Editor…');
             await yieldFrames(root,1);
             mod=await loadStudioModule(loader,root,{fresh:true});
             if(typeof mod.openKeloStudioLive!=='function')throw first;
@@ -136,7 +191,9 @@ export function createWorldWorkspaceManifest({loader=()=>import('../../studio/in
         };
         return await withTimeout(root,boot(),studioOpenBudget(root),'WORLD_EDITOR_OPEN_TIMEOUT');
       }finally{
-        clearLaunchCurtain(root);
+        resumeRender();
+        if(studioShellMounted(root))clearLaunchCurtain(root);
+        else discardLoadingShell(root);
       }
     }
   });

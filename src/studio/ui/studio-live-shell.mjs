@@ -55,7 +55,7 @@ export function createStudioLiveShell({
     border:1px solid rgba(231,197,106,.48);border-radius:18px;
     background:linear-gradient(180deg,rgba(8,18,20,.985),rgba(5,12,14,.965));
     box-shadow:0 16px 46px rgba(0,0,0,.48),inset 0 1px 0 rgba(255,255,255,.035);
-    pointer-events:auto;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)
+    pointer-events:auto
   }
   .ks-brand{display:flex;align-items:center;gap:9px;min-width:0}
   .ks-brand-mark{
@@ -89,7 +89,7 @@ export function createStudioLiveShell({
   .ks-left,.ks-right{
     position:absolute;top:78px;bottom:92px;width:290px;border:1px solid rgba(231,197,106,.28);
     border-radius:17px;background:var(--ks-bg);box-shadow:0 18px 48px rgba(0,0,0,.42);
-    overflow:hidden;pointer-events:auto;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)
+    overflow:hidden;pointer-events:auto
   }
   .ks-left{left:12px}.ks-right{right:12px;width:300px}
   .ks-panel-head{
@@ -134,7 +134,7 @@ export function createStudioLiveShell({
     padding:9px;border:1px solid rgba(231,197,106,.45);border-radius:18px;
     background:linear-gradient(180deg,rgba(5,14,16,.975),rgba(6,17,18,.965));
     box-shadow:0 20px 58px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.035);
-    pointer-events:auto;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)
+    pointer-events:auto
   }
   .ks-deck{display:block}
   .ks-deck-head{
@@ -202,7 +202,7 @@ export function createStudioLiveShell({
   .ks-compact-copy{min-width:0}
   .ks-compact-copy small{display:block;color:#789085;font-size:6px;font-weight:900;letter-spacing:.08em}
   .ks-compact-copy strong{display:block;color:#fff1b8;font-size:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
-  .ks-scale-hud{position:absolute;left:50%;bottom:max(76px,calc(env(safe-area-inset-bottom) + 70px));transform:translateX(-50%);display:none;align-items:center;gap:5px;padding:5px 6px;border:1px solid rgba(231,197,106,.58);border-radius:14px;background:rgba(5,14,16,.97);box-shadow:0 12px 34px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.05);pointer-events:auto;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);z-index:3}
+  .ks-scale-hud{position:absolute;left:50%;bottom:max(76px,calc(env(safe-area-inset-bottom) + 70px));transform:translateX(-50%);display:none;align-items:center;gap:5px;padding:5px 6px;border:1px solid rgba(231,197,106,.58);border-radius:14px;background:rgba(5,14,16,.97);box-shadow:0 12px 34px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.05);pointer-events:auto;z-index:3}
   .ks-scale-hud.on{display:flex}.ks-scale-hud.gesture{border-color:#f4dd8d;box-shadow:0 0 0 2px rgba(231,197,106,.12),0 12px 34px rgba(0,0,0,.55)}
   .ks-scale-hud small{font-size:5.5px;line-height:1.15;font-weight:950;letter-spacing:.1em;color:#8fa89f;text-align:center}.ks-scale-hud small span{color:#e7c56a}
   .ks-scale-hud button{width:42px;height:40px;padding:0;border:1px solid rgba(231,197,106,.3);border-radius:11px;background:#102022;color:#fff0b2;font-size:21px;font-weight:850;line-height:1}
@@ -279,8 +279,11 @@ export function createStudioLiveShell({
   `;
   document.head.appendChild(style);
 
-  const root=document.createElement('section');
+  let root=document.getElementById('kelo-studio-live');
+  if(root?.isConnected===false)root=null;
+  if(!root)root=document.createElement('section');
   root.id='kelo-studio-live';
+  if(root.dataset)delete root.dataset.keloWorldLoading;
   root.dataset.keloStudioUi='1';
   root.dataset.shellVersion=SHELL_VERSION;
   root.dataset.compact='full';

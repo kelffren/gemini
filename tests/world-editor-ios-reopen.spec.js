@@ -41,6 +41,7 @@ test('World recovers a stale Studio session instead of leaving iOS on a black pa
   await hub.locator('[data-workspace="world"]').click();
   const studio = page.locator('#kelo-studio-live');
   await expect(studio).toBeVisible({ timeout: 15000 });
+  await expect(studio).not.toHaveAttribute('data-kelo-world-loading', '1', { timeout: 25000 });
   await expect(hub).toHaveCount(0);
 
   // Reproduce the Safari failure mode: DOM shell disappears while the module-level
@@ -57,6 +58,7 @@ test('World recovers a stale Studio session instead of leaving iOS on a black pa
 
   const recovered = page.locator('#kelo-studio-live');
   await expect(recovered).toBeVisible({ timeout: 15000 });
+  await expect(recovered).not.toHaveAttribute('data-kelo-world-loading', '1', { timeout: 25000 });
   await expect(page.locator('#kelo-creators-hub')).toHaveCount(0);
   await expect(recovered).toHaveCSS('position', 'fixed');
   await page.screenshot({ path: 'test-results/world-editor-ios-recovered.png', fullPage: true });

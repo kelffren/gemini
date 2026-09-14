@@ -145,9 +145,13 @@ assert.ok(Date.now()-importStarted<20000,'Studio import hang must fail closed so
 
 const worldSource=await readFile(resolve(here,'../src/creators/workspaces/world-workspace.mjs'),'utf8');
 assert.match(worldSource,/kelo-world-launch-curtain/,'World workspace must paint a launch curtain before importing Studio');
+assert.match(worldSource,/paintWorldEditorLaunchShell|paintLaunch/,'World must expose an immediate Studio loading shell for Hub handoff');
 assert.match(worldSource,/WORLD_EDITOR_OPEN_TIMEOUT/,'World workspace must time out instead of freezing the editor button');
 assert.match(worldSource,/yieldFrames/,'World workspace must yield frames so iPhone can paint ABRIENDO');
+assert.match(worldSource,/420/,'World launch must yield ~420ms so iPhone can composite Studio chrome before the graph loads');
+assert.match(worldSource,/KeloRender/,'World launch must pause gameplay render during the Studio import');
 assert.match(worldSource,/withTimeout\(root,boot\(\)/,'World open watchdog must cover the Studio import, not only openKeloStudioLive');
+assert.match(worldSource,/keloWorldLoading/,'Loading placeholder must not count as a mounted Studio shell');
 
 console.log(JSON.stringify({
   ok:true,

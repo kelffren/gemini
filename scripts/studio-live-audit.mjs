@@ -76,7 +76,10 @@ const resourcesAtHub=await page.evaluate(()=>performance.getEntriesByType('resou
 if(!resourcesAtHub.some(x=>/\/src\/creators\//.test(x)))throw new Error('CREATOR_HUB_DYNAMIC_IMPORT_NOT_OBSERVED');
 if(resourcesAtHub.some(x=>/\/src\/studio\//.test(x)))throw new Error('STUDIO_LOADED_BEFORE_WORLD_WORKSPACE');
 await page.getByRole('button',{name:'Abrir World'}).click();
-await page.waitForFunction(()=>document.body.classList.contains('kelo-studio-active')&&!!document.getElementById('kelo-studio-live'),null,{timeout:15000});
+await page.waitForFunction(()=>{
+  const el=document.getElementById('kelo-studio-live');
+  return !!(document.body.classList.contains('kelo-studio-active')&&el&&el.dataset.keloWorldLoading!=='1'&&el.querySelector('[data-mode="terrain"]'));
+},null,{timeout:25000});
 const opened=await page.evaluate(()=>({
   shell:!!document.getElementById('kelo-studio-live'),
   hub:!!document.getElementById('kelo-creators-hub'),

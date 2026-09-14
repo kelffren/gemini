@@ -4,9 +4,9 @@
  * owns: creator project navigation shell only
  * does-not-own: global navigation, Studio implementation, project persistence, permissions or publish policy
  * lazy: imported only after explicit CREATORS action; active cards dispatch through workspace registry
- * mobile: World launch detaches this shell so Hub + canvas cannot freeze iPhone before Studio mounts
+ * mobile: World launch paints Studio chrome and hides this Hub immediately, like Map Forge, so iPhone is not stuck on ABRIENDO while the Studio graph loads
  */
-import { bootKeloCreators } from '../creator-entry.mjs?v=world-unfreeze-20260913-2';
+import { bootKeloCreators } from '../creator-entry.mjs?v=world-handoff-20260914-1';
 
 let active=null;
 
@@ -150,15 +150,6 @@ export async function openCreatorHub({root=globalThis}={}){
     main.prepend(make('div',{class:'kc-launch-error',text:`${label} no terminó de abrir. El Hub sigue activo; toca de nuevo para reintentar.`}));
   }
 
-  async function requireWorldStudioMount(){
-    for(let attempt=0;attempt<8;attempt++){
-      const candidate=doc.getElementById('kelo-studio-live');
-      if(candidate?.isConnected)return candidate;
-      await nextPaint();
-    }
-    throw new Error('WORLD_EDITOR_MOUNT_FAILED');
-  }
-
   function parkHub(){
     hub.dataset.keloWorldLaunch='1';
     hub.style.zIndex='1';
@@ -179,8 +170,10 @@ export async function openCreatorHub({root=globalThis}={}){
     if(opening.size)return;
     opening.add(id);
     setOpeningUi(id,true);
-    await nextPaint();
-    await nextPaint();
+    if(id!=='world'){
+      await nextPaint();
+      await nextPaint();
+    }
     try{
       // Sprite Ability owns project bootstrap. Keep the Hub alive until its real Studio shell
       // is confirmed in the DOM; a rejected/partial launch must never strand mobile users.
@@ -200,14 +193,29 @@ export async function openCreatorHub({root=globalThis}={}){
         const project=await platform.projects.create({type:projectType,name:`${label} ${existing.length+1}`,ownerId});
         resolvedProjectId=project.projectId;
       }
-      if(id==='world')parkHub();
-      const session=await platform.openWorkspace(id,resolvedProjectId?{projectId:resolvedProjectId}:{});
-      if(id==='world')await requireWorldStudioMount(session);
       if(id==='world'){
+        parkHub();
+        const paint=platform.workspaces.resolve('world')?.paintLaunch;
+        if(typeof paint==='function')paint(root);
+        if(!doc.getElementById('kelo-studio-live'))throw new Error('WORLD_EDITOR_MOUNT_FAILED');
         hub.style.display='none';
+        // Map Forge pattern: hand the Hub off as soon as World chrome is up.
+        // Waiting for the 80-module Studio graph here is what froze the World card on iPhone.
+        const pending=platform.openWorkspace(id,resolvedProjectId?{projectId:resolvedProjectId}:{});
+        pending.catch(error=>{
+          const live=doc.getElementById('kelo-studio-live');
+          const loading=live?.dataset?.keloWorldLoading==='1';
+          if(loading||!live?.isConnected){
+            try{live?.remove();}catch{}
+            try{doc.getElementById('kelo-world-launch-curtain')?.remove();}catch{}
+            try{doc.body.classList.remove('kelo-studio-active');}catch{}
+          }
+          showLaunchError(id,error);
+        });
         setTimeout(()=>{try{destroy();}catch{}},250);
-        return session;
+        return null;
       }
+      const session=await platform.openWorkspace(id,resolvedProjectId?{projectId:resolvedProjectId}:{});
       destroy();
       return session;
     }catch(error){
@@ -252,7 +260,16 @@ export async function openCreatorHub({root=globalThis}={}){
           make('small',{text:implemented?(permitted?detail:'Your key does not grant this workspace'):'Workspace not implemented yet'})
         ]);
         card.dataset.workspace=wid;
-        if(permitted)card.onclick=()=>wid==='world'?void setTimeout(()=>void openWorkspace(wid),50):void openWorkspace(wid);
+        if(permitted){
+          if(wid==='world'){
+            card.addEventListener('pointerup',event=>{
+              if(event.button!=null&&event.button!==0)return;
+              event.preventDefault();
+              event.stopPropagation();
+              void openWorkspace(wid);
+            });
+          }else card.onclick=()=>void openWorkspace(wid);
+        }
         grid.append(card);
       }
       sec.append(grid);
@@ -355,7 +372,7 @@ export async function openCreatorHub({root=globalThis}={}){
   doc.addEventListener('keydown',onKey,true);
 
   active=Object.freeze({
-    version:'kelo-creator-hub-v1.15.0-world-unfreeze',
+    version:'kelo-creator-hub-v1.16.0-world-handoff',
     hub,platform,
     get section(){return current;},
     show:render,

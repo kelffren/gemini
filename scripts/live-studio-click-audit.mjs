@@ -68,6 +68,10 @@ try{
   for(const label of ['CREATE','MY PROJECTS','MY ASSETS','SHARED WITH ME','TEST INVITES','PUBLISHED'])if(!navLabels.includes(label))throw new Error(`CREATOR_HUB_NAV_MISSING:${label}`);
   await page.getByRole('button',{name:'Abrir World'}).click();
   await page.waitForSelector('#kelo-studio-live',{state:'visible',timeout:15000});
+  await page.waitForFunction(()=>{
+    const el=document.getElementById('kelo-studio-live');
+    return !!(el&&el.dataset.keloWorldLoading!=='1'&&el.querySelector('.ks-status'));
+  },null,{timeout:25000});
   report.studioVisible=true;
   report.studioRequestsAfterWorld=requested.filter(u=>/\/src\/studio\//.test(u)).length;
   if(report.studioRequestsAfterWorld<1)throw new Error('STUDIO_NOT_LAZY_LOADED_AFTER_WORLD');

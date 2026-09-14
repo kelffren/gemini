@@ -12,7 +12,7 @@
   'use strict';
   if(window.KELO_STUDIO_LAUNCHER)return;
   let loading=false,factoryLoading=false,directOpenStarted=false;
-  const CREATOR_BUILD='world-unfreeze-20260913-2';
+  const CREATOR_BUILD='world-handoff-20260914-1';
   const params=()=>new URLSearchParams(window.location.search);
   const directRequested=()=>params().get('creators')==='1'||params().get('creator')==='1';
   const actor=()=>String(window.KELO_ADMIN_KEYS?.playerId?.()||window.keloNet?.playerKey||window.localPlayer?.id||'local_pioneer');
@@ -122,7 +122,7 @@
   }
   function boot(){sync();maybeOpenDirect();void bootOnlineAuthorization();void import('./../characters/creator-avatar-runtime.mjs').then(m=>m.installCreatorAvatarRuntime({root:window})).catch(e=>console.warn('[Kelo Avatar runtime]',e));}
   window.KELO_ADMIN_KEYS?.onChange?.(()=>{sync();maybeOpenDirect();});
-  const api=Object.freeze({version:'studio-launcher-v1.12.0-world-unfreeze',open,openSpriteFactory:openFactory,sync,get allowed(){return allowed();},get directRequested(){return directRequested();}});
+  const api=Object.freeze({version:'studio-launcher-v1.13.0-world-handoff',open,openSpriteFactory:openFactory,sync,get allowed(){return allowed();},get directRequested(){return directRequested();}});
   window.KELO_STUDIO_LAUNCHER=api;
   window.KELO_CREATORS_LAUNCHER=api;
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
