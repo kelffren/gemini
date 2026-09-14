@@ -20,7 +20,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: bug-self-learning-main
+  group: bug-learning-state-writes
   cancel-in-progress: false
 
 jobs:
