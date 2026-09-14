@@ -1,7 +1,7 @@
 <!-- KELO-INDEX
   area: RUNTIME / UI BOOT
   owner: index.html load order
-  keys: HUD LUXE PLAYER GUIDE NOBILITY TITLES MOBILE MOUNTS APPEARANCE ARENA RANKED EQUIPMENT WEAPON Q W E PERFORMANCE LAZY
+  keys: HUD LUXE PLAYER GUIDE NOBILITY TITLES MOBILE MOUNTS APPEARANCE ARENA RANKED EQUIPMENT WEAPON Q W E PERFORMANCE LAZY UPDATE PWA
   purpose: carga el runtime LIVE y monta un único HUD superior izquierdo mediante Kelo Luxe
   online: la UI solo consume estado; autoridad permanece en los owners de dominio
 -->
@@ -10,7 +10,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#05070a">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="KELO WORLD">
   <title>Kelo World — V6.54</title>
+  <link rel="manifest" href="manifest.webmanifest">
   <link rel="preload" as="image" href="assets/hero.PNG?hero=deeab966" fetchpriority="high">
   <link rel="stylesheet" href="src/ui/backpack-fantasy-v1.css?v=1">
   <style>
@@ -28,6 +34,10 @@
 <body class="social-mode">
 <canvas id="game-canvas"></canvas>
 <div id="ui-layer"><div class="action-bar" id="action-bar-container" aria-label="Barra de habilidades"></div></div>
+
+<!-- KELO-INDEX UPDATE: owner KeloUpdater; registra el Service Worker y monta el aviso táctil antes del runtime gameplay. -->
+<script src="src/core/update-system.js?v=1"></script>
+<script src="src/ui/update-ui.js?v=1"></script>
 
 <!-- KELO-INDEX CORE: primitives compartidos + bootstrap ligero. KeloRuntimeBootstrap NO carga Combat/Effects/Status/Melee hasta ensure(). -->
 <script src="src/core/events/event-bus.js?v=1"></script>
