@@ -19,6 +19,7 @@ on:
       - 'scripts/map-forge-decoration-spacing-audit.mjs'
       - 'tests/map-forge-mobile-preview.spec.js'
       - 'tests/map-forge-ios-entry.spec.js'
+      - 'tests/map-forge-workspace-open-lock.mjs'
       - 'tests/map-forge-visual-round.spec.js'
       - 'tests/map-forge-fountain-clearance.spec.js'
       - 'tests/map-forge-orientation-visual.spec.js'
@@ -45,6 +46,7 @@ on:
       - 'scripts/map-forge-decoration-spacing-audit.mjs'
       - 'tests/map-forge-mobile-preview.spec.js'
       - 'tests/map-forge-ios-entry.spec.js'
+      - 'tests/map-forge-workspace-open-lock.mjs'
       - 'tests/map-forge-visual-round.spec.js'
       - 'tests/map-forge-fountain-clearance.spec.js'
       - 'tests/map-forge-orientation-visual.spec.js'
@@ -64,6 +66,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Guard canonical Map Forge workspace open lock
+        run: node tests/map-forge-workspace-open-lock.mjs
       - name: Run Map Forge deterministic + 300-seed audit
         run: node scripts/map-forge-core-audit.mjs
       - name: Guard Royal Capital arterial width
