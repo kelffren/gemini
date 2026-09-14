@@ -6,7 +6,7 @@
  * public-api: createMapForgeWorkspaceManifest(), registerMapForgeWorkspace()
  * reuse: handoff returns through registered World workspace via openWorkspace()
  */
-const MAP_FORGE_UI_BUILD='safari-touch-recovery-20260914-3';
+const MAP_FORGE_UI_BUILD='safari-touch-recovery-20260914-4';
 const MAP_FORGE_OPENING_KEY='__KELO_MAP_FORGE_WORKSPACE_OPENING__';
 
 function freshMapForgeUiLoader(){
@@ -17,10 +17,21 @@ function freshMapForgeUiLoader(){
   return import(`../ui/map-forge-workspace.mjs?v=${MAP_FORGE_UI_BUILD}`);
 }
 
+function canonicalMapForgeHost(root){
+  // Workspace callers may pass lightweight root wrappers. Those wrappers are not a safe
+  // cross-module lock owner even when they all target the same browsing context. Coordinate on the
+  // document's canonical window so every Creator module identity shares one in-flight open.
+  return root?.document?.defaultView||root?.window||root||globalThis;
+}
+
+function mapForgeDocument(root){
+  return root?.document||canonicalMapForgeHost(root)?.document||null;
+}
+
 function existingMapForgeSession(root,mod){
   const mounted=typeof mod?.getMapForgeWorkspace==='function'?mod.getMapForgeWorkspace():null;
   if(mounted?.shell?.isConnected)return mounted;
-  const shell=root?.document?.getElementById?.('kelo-map-forge');
+  const shell=mapForgeDocument(root)?.getElementById?.('kelo-map-forge');
   if(!shell?.isConnected)return null;
   // A shell can belong to a previously cached module identity on Pages. Treat that DOM owner as
   // authoritative instead of mounting a second dialog from the current module identity.
@@ -42,9 +53,10 @@ export function createMapForgeWorkspaceManifest({loader=freshMapForgeUiLoader}={
     availability:'active',
     async open({root=globalThis,openWorkspace=null}={}){
       // The normal game URL can transiently execute more than one cached Creator module identity
-      // on iOS Safari / Pages. Module-local `active` state cannot coordinate those identities, so
-      // coalesce launches on the shared window before the first dynamic import can yield.
-      const sharedOpening=root?.[MAP_FORGE_OPENING_KEY];
+      // on iOS Safari / Pages. Module-local `active` state cannot coordinate those identities, and
+      // callers may provide different root wrappers, so coalesce on the canonical browsing window.
+      const host=canonicalMapForgeHost(root);
+      const sharedOpening=host?.[MAP_FORGE_OPENING_KEY];
       if(sharedOpening&&typeof sharedOpening.then==='function')return sharedOpening;
 
       const launch=(async()=>{
@@ -76,10 +88,10 @@ export function createMapForgeWorkspaceManifest({loader=freshMapForgeUiLoader}={
         return pending;
       })();
 
-      try{root[MAP_FORGE_OPENING_KEY]=launch;}catch{}
+      try{host[MAP_FORGE_OPENING_KEY]=launch;}catch{}
       try{return await launch;}
       finally{
-        try{if(root?.[MAP_FORGE_OPENING_KEY]===launch)delete root[MAP_FORGE_OPENING_KEY];}catch{}
+        try{if(host?.[MAP_FORGE_OPENING_KEY]===launch)delete host[MAP_FORGE_OPENING_KEY];}catch{}
       }
     }
   });
