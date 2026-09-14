@@ -29,13 +29,13 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - name: Process with Kelo Asset Sheet Compiler
         run: node scripts/compile-forest-plaza-tileset.mjs assets/world/plaza/forest-plaza-tileset-v2.png src/environment/generated/forest-plaza-tileset-v2-manifest.json src/environment/generated/forest-plaza-tileset-v2-manifest.js
-      - name: Commit compiled manifest
+      - name: Commit compiled manifest and runtime wiring
         shell: bash
         run: |
           set -euo pipefail
           git config user.name 'kelo-asset-compiler-bot'
           git config user.email '68343904+kelffren@users.noreply.github.com'
-          git add src/environment/generated/forest-plaza-tileset-v2-manifest.json src/environment/generated/forest-plaza-tileset-v2-manifest.js
+          git add src/environment/generated/forest-plaza-tileset-v2-manifest.json src/environment/generated/forest-plaza-tileset-v2-manifest.js index.html
           if git diff --cached --quiet; then
             echo 'Compiler output already current.'
             exit 0
