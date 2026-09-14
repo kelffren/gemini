@@ -10,7 +10,7 @@
   "reported_by": ["human QA", "AI inspection", "regression test", "player"],
   "reports": ["REPORT-000001"],
   "environment": {
-    "game_build": null,
+    "game_build": "world-handoff-20260914-1",
     "device": "iPhone real device target",
     "os": "iOS",
     "browser": "Safari",
@@ -20,21 +20,24 @@
     "Enter KELO WORLD on mobile.",
     "Open Create/Creators.",
     "Tap World.",
-    "Confirm Kelo Studio appears and is interactive.",
+    "Confirm Kelo Studio chrome appears immediately instead of a frozen World card.",
+    "Confirm the editor becomes interactive (tools/status, not only the loading shell).",
     "Close/remove the Studio shell or reproduce the stale-session condition.",
     "Open Create -> World again and confirm Studio remounts instead of black-screening."
   ],
   "expected": "World opens, remains interactive, and can be reopened even after a stale Studio shell/session condition.",
-  "actual": "Player report 2026-09-14: tapping World froze the card and Kelo Studio never appeared. Hub z-index 2147482100 covered Studio z-index 320, Hub backdrop-filter sat on the live canvas, and a hung Studio import left opening[] stuck so retries were swallowed.",
+  "actual": "Player report 2026-09-14 (repeat): tapping World still froze the card. Live Pages with 824a932 painted the launch curtain and requested 80 Studio modules, but #kelo-studio-live never attached within 15s and the Hub stayed on ABRIENDO because it awaited the Studio graph.",
   "evidence": [
-    "Commit 829ac7fbd5fc629b05ecf92489bab16b0292bce9: fix(studio): keep World editor responsive when IndexedDB hangs (#222)",
+    "Commit 829ac7fbd5fc629b05ecf92489bab16b0292bce9: IndexedDB fail-open candidate — insufficient.",
+    "Commit 824a932f5e3e41c888116ab1453d64500e66255d: curtain + Hub stacking candidate — failed live Pages World tap QA on 2026-09-14.",
     "REPORT-000001: player, iPhone 393x852, World card stays frozen after tap",
-    "Local Chromium: openKeloStudioLive mounts in ~240ms; Creator Hub click path opened Studio then hid it under the Hub"
+    "Live Pages QA 2026-09-14: CREATOR_BUILD world-unfreeze-20260913-2 deployed; curtain visible; 80 /src/studio/ requests; #kelo-studio-live never attached in 15s"
   ],
   "suspected_files": [
     "src/creators/workspaces/world-workspace.mjs",
     "src/creators/ui/creator-hub.mjs",
     "src/studio/ui/studio-live-shell.mjs",
+    "src/studio/integration/live-studio-controller.mjs",
     "src/studio/storage/indexeddb-studio-store.mjs",
     "tests/world-editor-ios-reopen.spec.js"
   ],
@@ -43,20 +46,21 @@
   "claim_started_at": null,
   "fix": {
     "status": "candidate",
-    "commits": ["824a932f5e3e41c888116ab1453d64500e66255d"],
+    "commits": ["1455ab8c0beee2361becf067501c0accd53eb6e8", "824a932f5e3e41c888116ab1453d64500e66255d"],
     "files": [
       "src/creators/workspaces/world-workspace.mjs",
       "src/creators/ui/creator-hub.mjs",
       "src/creators/creator-entry.mjs",
       "src/ui/studio-launcher.js",
       "src/studio/ui/studio-live-shell.mjs",
+      "src/studio/integration/live-studio-controller.mjs",
       "index.html"
     ],
-    "summary": "World launch paints a curtain, yields with timers not rAF, times out the Studio import at 12s, parks/hides the Hub so Studio is not covered, raises #kelo-studio-live above the Hub, and removes Hub backdrop-filter over the live canvas."
+    "summary": "World now follows the Map Forge handoff: pointerup paints #kelo-studio-live chrome immediately, hides/destroys the Hub, yields 420ms, pauses gameplay render during the Studio import, and only then loads the 80-module graph. Loading placeholder is not treated as a mounted editor. Studio chrome no longer uses backdrop-filter over the live canvas."
   },
   "verification": {
     "status": "PENDING",
-    "method": "Real iPhone Safari E2E: enter game -> Create -> World -> Studio chrome visible and tappable. Do not mark PASS from headless_shell alone.",
+    "method": "Real iPhone Safari E2E: enter game -> Create -> World -> Studio chrome visible immediately, then interactive. Do not mark PASS from headless_shell alone. Previous 824a932 candidate failed this method on live Pages.",
     "evidence": [],
     "verified_by": null,
     "verified_at": null
@@ -65,10 +69,11 @@
   "duplicate_of": null,
   "related_bugs": ["BUG-0002"],
   "notes": [
-    "Visibility of #kelo-studio-live alone is not sufficient acceptance; the editor must respond to touch/placement and reopen successfully.",
+    "Visibility of a loading #kelo-studio-live is not sufficient acceptance; .ks-status / tools must appear and respond to touch.",
     "Do not mark VERIFIED until the deployed flow passes on the target device class.",
     "Studio graph must stay lazy until World is tapped (live-studio-click-audit).",
-    "headless_shell can freeze after Studio mounts because of the overlay canvas loop; that is not the player-facing Hub-cover bug."
+    "headless_shell can freeze after Studio mounts because of the overlay canvas loop; that is not the player-facing Hub-cover bug.",
+    "824a932 failed verification: Hub awaited the Studio graph, so the World card stayed ABRIENDO while 80 modules loaded."
   ],
-  "updated_at": "2026-09-14T01:20:00Z"
+  "updated_at": "2026-09-14T01:52:00Z"
 }
