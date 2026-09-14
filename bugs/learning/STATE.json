@@ -438,9 +438,20 @@
       "files": [
         "index.html"
       ]
+    },
+    {
+      "id": "prevention:15c7fde0f48736e97563376cac9fbc55d243c809",
+      "at": "2026-09-14T17:37:24.000Z",
+      "source": "bug-prevention-ci",
+      "head_sha": "15c7fde0f48736e97563376cac9fbc55d243c809",
+      "base_sha": "1dc2bafbd474b4f201fceddd2515a98d212e4623",
+      "conclusion": "failure",
+      "files": [
+        "src/studio/integration/studio-boot-pace.mjs"
+      ]
     }
   ],
-  "feedback_updated_at": "2026-09-14T17:22:32.085Z",
+  "feedback_updated_at": "2026-09-14T17:37:44.942Z",
   "training": {
     "examples": 33,
     "search_examples": 24,
