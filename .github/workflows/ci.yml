@@ -96,9 +96,9 @@ jobs:
 
       - name: Authored world visual contract
         run: |
-          grep -q "window.KELO_WORLD_DECORATION_RESET=false" index.html
-          if grep -q "window.KELO_WORLD_DECORATION_RESET=true" index.html; then
-            echo 'index.html re-enables retired decoration reset before world boot'
+          grep -q "window.KELO_WORLD_DECORATION_RESET=true" index.html
+          if grep -q "window.KELO_WORLD_DECORATION_RESET=false" index.html; then
+            echo 'index.html bypasses the iPhone-safe staged world bootstrap before world-map loads'
             exit 1
           fi
           if grep -q "assets/fuentekelo-runtime.PNG" index.html; then
@@ -170,5 +170,5 @@ jobs:
 
       - name: Authored world CI scope guard
         run: |
-          grep -q "window.KELO_WORLD_DECORATION_RESET=false" index.html
+          grep -q "window.KELO_WORLD_DECORATION_RESET=true" index.html
           grep -q "const DECORATION_RESET=false" src/environment/environment-layer-stack.js
