@@ -1,13 +1,24 @@
 #!/usr/bin/env node
 
+/* KELO-INDEX
+ * area: BUGS / REGISTRY AUDIT
+ * owner: Bug Registry tooling
+ * purpose: valida expedientes canónicos e investigaciones de apoyo, incluyendo BUG + FECHA + VERSION obligatorios
+ * public-api: npm run audit:bugs
+ * online: N/A
+ */
+
 import fs from 'node:fs';
 import path from 'node:path';
 
-const registryDir = path.join(process.cwd(), 'bugs', 'registry');
+const root = process.cwd();
+const registryDir = path.join(root, 'bugs', 'registry');
+const investigationRoot = path.join(root, 'bugs', 'investigacion');
 const allowedStatuses = new Set(['OPEN','TRIAGED','CLAIMED','FIXED_PENDING_VERIFY','VERIFIED','CLOSED','BLOCKED','REOPENED','WONT_FIX']);
 const hypothesisStatuses = new Set(['unverified','supported','weakened','ruled_out','confirmed']);
 const attemptResults = new Set(['PASS','FAIL','PARTIAL','NOT_RUN','BLOCKED']);
 const researchStatuses = new Set(['not_started','in_progress','sufficient','blocked']);
+const investigationStatuses = new Set(['vigente','parcialmente_superada','superada','historica']);
 const errors = [];
 const warnings = [];
 
@@ -17,6 +28,21 @@ function uniqueIds(items = []) {
   const ids = items.map((x) => x?.id).filter(Boolean);
   return ids.length === new Set(ids).size;
 }
+function readMeta(text, label) {
+  const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const match = text.match(new RegExp(`^${escaped}:\\s*\\`?([^\\n\\`]+)\\`?\\s*$`, 'mi'));
+  return match?.[1]?.trim() || null;
+}
+function walkMarkdown(dir) {
+  if (!fs.existsSync(dir)) return [];
+  const out = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) out.push(...walkMarkdown(full));
+    else if (entry.isFile() && entry.name.toLowerCase().endsWith('.md') && entry.name !== 'README.md') out.push(full);
+  }
+  return out;
+}
 
 if (!fs.existsSync(registryDir)) {
   console.error('bugs/registry not found');
@@ -24,6 +50,7 @@ if (!fs.existsSync(registryDir)) {
 }
 
 const files = fs.readdirSync(registryDir).filter((name) => /^BUG-\d{4}\.json$/.test(name)).sort();
+const knownBugIds = new Set(files.map((name) => name.replace('.json', '')));
 for (const file of files) {
   const fullPath = path.join(registryDir, file);
   let bug;
@@ -84,6 +111,29 @@ for (const file of files) {
   }
 }
 
+const investigationFiles = walkMarkdown(investigationRoot);
+for (const fullPath of investigationFiles) {
+  const rel = path.relative(root, fullPath);
+  const text = fs.readFileSync(fullPath, 'utf8');
+  const bugId = readMeta(text, 'BUG');
+  const date = readMeta(text, 'FECHA');
+  const version = readMeta(text, 'VERSION / BUILD');
+  const status = readMeta(text, 'ESTADO');
+  const parentBug = path.basename(path.dirname(fullPath)).toUpperCase();
+
+  if (!bugId) pushError(rel, 'missing required BUG metadata');
+  else {
+    if (!/^BUG-\d{4}$/.test(bugId)) pushError(rel, `invalid BUG metadata ${bugId}`);
+    if (!knownBugIds.has(bugId)) pushError(rel, `references unknown bug ${bugId}`);
+    if (/^BUG-\d{4}$/.test(parentBug) && parentBug !== bugId) pushError(rel, `BUG metadata ${bugId} does not match parent folder ${parentBug}`);
+  }
+  if (!date) pushError(rel, 'missing required FECHA metadata');
+  else if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) pushError(rel, `FECHA must use YYYY-MM-DD, got ${date}`);
+  if (!version) pushError(rel, 'missing required VERSION / BUILD metadata');
+  if (!status) pushError(rel, 'missing required ESTADO metadata');
+  else if (!investigationStatuses.has(status)) pushError(rel, `invalid ESTADO ${status}`);
+}
+
 if (warnings.length) {
   console.log('BUG REGISTRY WARNINGS');
   for (const warning of warnings) console.log(`- ${warning}`);
@@ -95,4 +145,4 @@ if (errors.length) {
   process.exit(1);
 }
 
-console.log(`BUG REGISTRY AUDIT PASS — ${files.length} bug(s) checked${warnings.length ? `, ${warnings.length} warning(s)` : ''}.`);
+console.log(`BUG REGISTRY AUDIT PASS — ${files.length} bug(s), ${investigationFiles.length} investigation(s) checked${warnings.length ? `, ${warnings.length} warning(s)` : ''}.`);
