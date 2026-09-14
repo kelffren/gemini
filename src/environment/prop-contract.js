@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: PLAZA
- * keys: PROP ASSET PNG FOUNTAIN COLLIDER DEPTH
- * hace: contrato data-driven de props y su metadata visual/espacial
+ * keys: PROP ASSET PNG FOUNTAIN COLLIDER DEPTH FOREST PLAZA COMPILED MANIFEST
+ * hace: contrato data-driven de props y su metadata visual/espacial; integra contenido compilado Forest Plaza sin crear renderer paralelo
  * online: N/A; props visuales, gameplay permanece fuera del renderer
  */
 (function(){
@@ -13,10 +13,14 @@
   const plazaNatureAtlas=R.atlases?.plazaNature;
   const ruralPropsAtlas=R.atlases?.ruralProps;
   const ruralFrames=R.ruralPropTiles;
+  const FOREST=window.KELO_FOREST_PLAZA_TILESET_V2;
   const TILE=R.worldTileSize||32;
+  const forestFrames=FOREST?.assets?.length?Object.freeze(Object.fromEntries(FOREST.assets.map(frame=>[String(frame.frameId||frame.assetId),Object.freeze({x:Number(frame.sourceRect?.x)||0,y:Number(frame.sourceRect?.y)||0,w:Math.max(1,Number(frame.sourceRect?.w)||1),h:Math.max(1,Number(frame.sourceRect?.h)||1)})]))):null;
+  const forestAsset=forestFrames?Object.freeze({id:'forestPlazaV2',src:'assets/world/plaza/forest-plaza-tileset-v2.png?art=801',width:Number(FOREST.atlas?.width)||1448,height:Number(FOREST.atlas?.height)||1086,frameMode:'irregular',frames:forestFrames}):null;
   const layerGroups=Object.freeze({
     plazaNature:Object.freeze({id:'plaza-nature',ownership:'plaza-nature-props-v1',priority:10,renderMode:'layer-stack',back:Object.freeze({phase:'props_back'}),front:Object.freeze({phase:'props_front'})}),
     plazaImperialNature:Object.freeze({id:'plaza-imperial-nature',ownership:'plaza-imperial-nature-v1',priority:12,renderMode:'layer-stack',visibleDuringReset:true,back:Object.freeze({phase:'props_back'}),front:Object.freeze({phase:'props_front'})}),
+    plazaForestCompiled:Object.freeze({id:'plaza-forest-compiled',ownership:'kelo-creator-asset-bridge:forest-plaza-v2',priority:14,renderMode:'layer-stack',visibleDuringReset:true,back:Object.freeze({phase:'props_back'}),front:Object.freeze({phase:'props_front'})}),
     plazaFountain:Object.freeze({id:'plaza-fountain',ownership:'plaza-fountain-kelo-v1',priority:20,renderMode:'layer-stack',visibleDuringReset:true,front:Object.freeze({phase:'props_front'})}),
     ruralBoundary:Object.freeze({id:'rural-boundary',ownership:'rural-farm-boundary-props-v1',priority:8,renderMode:'layer-stack',back:Object.freeze({phase:'props_back'})})
   });
@@ -26,11 +30,31 @@
   const assets=Object.freeze({
     plazaNature:Object.freeze({id:'plazaNature',src:RESET?null:plazaNatureAtlas?.src,width:plazaNatureAtlas?.width,height:plazaNatureAtlas?.height,frameMode:plazaNatureAtlas?.frameMode,frames:plazaNatureAtlas?.frames,frameWidth:plazaNatureAtlas?.spriteWidth,frameHeight:plazaNatureAtlas?.spriteHeight,columns:plazaNatureAtlas?.columns}),
     plazaRoundTree:Object.freeze({id:'plazaRoundTree',src:'assets/world/imperial-plaza/arbol-redondo.png?art=631',width:1254,height:1254,frameWidth:1254,frameHeight:1254,columns:1}),
+    ...(forestAsset?{forestPlazaV2:forestAsset}:{}),
     ruralProps:Object.freeze({id:'ruralProps',src:RESET?null:ruralPropsAtlas?.src,width:ruralPropsAtlas?.width,height:ruralPropsAtlas?.height,frameWidth:ruralPropsAtlas?.tileWidth||TILE,frameHeight:ruralPropsAtlas?.tileHeight||TILE,columns:ruralPropsAtlas?.columns}),
     plazaFountainKelo:Object.freeze({id:'plazaFountainKelo',src:'assets/justicia_fountain_v2.PNG?art=502',width:1254,height:1254,frameWidth:1254,frameHeight:1254,columns:1}),
   });
   defs.push(Object.freeze({id:'plaza-round-tree-imperial',family:'nature_prop',asset:'plazaRoundTree',frame:0,layerGroup:'plazaImperialNature',layerRole:'back',position:Object.freeze({x:1260,y:1540}),size:Object.freeze({w:192,h:192}),anchor:Object.freeze({x:0.5,y:1}),visualBounds:Object.freeze({x:1260,y:1540,w:192,h:192}),footprint:Object.freeze({x:1292,y:1668,w:128,h:64}),collider:Object.freeze({mode:'rect',x:1292,y:1668,w:128,h:64,noDraw:true}),layers:Object.freeze({back:'props_back',front:'props_front'}),priority:12,district:'central',occlusion:Object.freeze({mode:'actor-base-y-clip-v1',baseY:1732,clipPadding:8}),visualOnly:false}));
   defs.push(Object.freeze({id:'plaza-fountain-kelo',family:'landmark_prop',asset:'plazaFountainKelo',frame:0,layerGroup:'plazaFountain',layerRole:'front',position:Object.freeze({x:1080,y:800}),size:Object.freeze({w:720,h:720}),anchor:Object.freeze({x:0.5,y:1}),visualBounds:Object.freeze({x:1080,y:800,w:720,h:720}),footprint:Object.freeze({x:1190,y:1430,w:500,h:90}),collider:Object.freeze({mode:'none'}),layers:Object.freeze({back:null,front:'props_front'}),priority:20,district:'central',occlusion:Object.freeze({mode:'actor-base-y-redraw-v1',baseY:1505,bounds:Object.freeze({x:1080,y:800,w:720,h:720})}),visualOnly:false}));
+
+  function forestCandidates(predicate){return Array.isArray(FOREST?.assets)?FOREST.assets.filter(frame=>frame?.sourceRect&&predicate(frame.sourceRect,frame)):[];}
+  function addForestProp(id,frame,x,y,w,h,role='back'){
+    if(!forestAsset||!frame)return;
+    const frameId=String(frame.frameId||frame.assetId),baseY=y+h;
+    defs.push(Object.freeze({id,family:'forest_plaza_compiled',asset:'forestPlazaV2',frame:frameId,layerGroup:'plazaForestCompiled',layerRole:role,position:Object.freeze({x,y}),size:Object.freeze({w,h}),anchor:Object.freeze({x:0.5,y:1}),visualBounds:Object.freeze({x,y,w,h}),footprint:Object.freeze({x:x+Math.round(w*.3),y:baseY-Math.max(8,Math.round(h*.08)),w:Math.max(12,Math.round(w*.4)),h:Math.max(8,Math.round(h*.08))}),collider:Object.freeze({mode:'none'}),layers:Object.freeze({back:'props_back',front:'props_front'}),priority:14,district:'central',occlusion:Object.freeze({mode:'none'}),visualOnly:true}));
+  }
+  if(forestAsset){
+    const trees=forestCandidates((r)=>r.y>=790&&r.h>=120&&r.w>=70).slice(0,4);
+    const banners=forestCandidates((r)=>r.y>=185&&r.y<390&&r.h>=105&&r.w<=100).slice(0,2);
+    const planters=forestCandidates((r)=>r.y>=300&&r.y<515&&r.h>=90&&r.w>=55&&r.w<=150).slice(0,2);
+    const treeSlots=[[770,1120],[1980,1120],[790,1710],[1960,1710]];
+    trees.forEach((frame,i)=>addForestProp(`forest-plaza-tree-${i+1}`,frame,treeSlots[i][0],treeSlots[i][1],150,190));
+    if(banners[0])addForestProp('forest-plaza-banner-west',banners[0],1000,1360,64,112,'front');
+    if(banners[1])addForestProp('forest-plaza-banner-east',banners[1],1820,1360,64,112,'front');
+    if(planters[0])addForestProp('forest-plaza-planter-west',planters[0],970,1570,100,116,'front');
+    if(planters[1])addForestProp('forest-plaza-planter-east',planters[1],1810,1570,100,116,'front');
+  }
+
   function ruralTile(frame,x,y,id,family){return Object.freeze({id,family:family||'rural_boundary_prop',asset:'ruralProps',frame,layerGroup:'ruralBoundary',layerRole:'back',position:Object.freeze({x,y}),size:Object.freeze({w:TILE,h:TILE}),anchor:Object.freeze({x:0,y:0}),visualBounds:Object.freeze({x,y,w:TILE,h:TILE}),footprint:Object.freeze({x,y:y+Math.round(TILE*0.65),w:TILE,h:Math.max(1,Math.round(TILE*0.35))}),collider:Object.freeze({mode:'none'}),layers:Object.freeze({back:'props_back',front:null}),priority:8,district:'rural',occlusion:Object.freeze({mode:'none'}),visualOnly:true});}
   function buildRuralFarmBoundary(farm){
     if(!farm||!ruralPropsAtlas||!ruralFrames)return Object.freeze([]);
@@ -43,5 +67,5 @@
     return Object.freeze(out);
   }
   const sources=Object.freeze({ruralFarmBoundary:Object.freeze({id:'ruralFarmBoundary',layerGroup:'ruralBoundary',build:buildRuralFarmBoundary,instances:function(){if(typeof STATE==='undefined'||!STATE||!STATE.farm)return Object.freeze([]);return buildRuralFarmBoundary(STATE.farm);}})});
-  window.KELO_PROP_CONTRACT=Object.freeze({version:'1.8.0',mode:'generic-prop-contract-v8-imperial-round-tree',assets,layerGroups,props:Object.freeze(defs),sources,getByDistrict(district){return defs.filter(p=>p.district===district);}});
+  window.KELO_PROP_CONTRACT=Object.freeze({version:'1.9.0',mode:'generic-prop-contract-v9-forest-plaza-compiled',assets,layerGroups,props:Object.freeze(defs),sources,getByDistrict(district){return defs.filter(p=>p.district===district);}});
 })();
