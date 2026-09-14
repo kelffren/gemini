@@ -9,6 +9,7 @@ on:
       - 'src/systems/title-system.js'
       - 'scripts/luxe-menu-audit.mjs'
       - 'scripts/live-luxe-menu-audit.mjs'
+      - 'scripts/pvp-quick-action-diagnostic.mjs'
       - 'docs/systems/MAIN_MENU_SYSTEM.md'
       - 'guide.html'
       - '.github/workflows/player-hud-ci.yml'
@@ -20,8 +21,10 @@ on:
       - 'src/ui/luxe-player-hud.js'
       - 'scripts/luxe-menu-audit.mjs'
       - 'scripts/live-luxe-menu-audit.mjs'
+      - 'scripts/pvp-quick-action-diagnostic.mjs'
       - 'docs/systems/MAIN_MENU_SYSTEM.md'
       - 'guide.html'
+      - '.github/workflows/player-hud-ci.yml'
   workflow_dispatch:
 
 jobs:
@@ -40,6 +43,7 @@ jobs:
           node --check src/ui/luxe-player-hud.js
           node --check scripts/luxe-menu-audit.mjs
           node --check scripts/live-luxe-menu-audit.mjs
+          node --check scripts/pvp-quick-action-diagnostic.mjs
           node scripts/luxe-menu-audit.mjs
           node scripts/system-documentation-audit.js
       - name: Install Chromium
@@ -53,6 +57,7 @@ jobs:
             if curl -fsS http://127.0.0.1:4173/ >/dev/null; then break; fi
             sleep 1
           done
+          AUDIT_URL=http://127.0.0.1:4173/ node scripts/pvp-quick-action-diagnostic.mjs
           AUDIT_URL=http://127.0.0.1:4173/ AUDIT_OUT=artifacts/player-hud node scripts/live-luxe-menu-audit.mjs
       - name: Upload HUD audit evidence
         if: always()
