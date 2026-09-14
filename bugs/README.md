@@ -14,6 +14,8 @@ Flujo oficial:
 
 La IA que modifica código **no obtiene permiso automático para cerrar el bug**. `FIXED_PENDING_VERIFY` significa exactamente: existe una corrección candidata, pero todavía falta una verificación independiente.
 
+**Cortafuegos iPhone:** `bugs/FIREWALL.md`. Si no se prueba en iPhone real, la mejora no es válida. Mientras un bug iPhone/World high/critical no esté `VERIFIED`, no se avanza. `npm run firewall:iphone`.
+
 ## Fast path para agentes
 
 Para un bug existente:

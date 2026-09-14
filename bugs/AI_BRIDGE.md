@@ -211,10 +211,14 @@ Si falla, el expediente está incompleto o rompe invariantes del registro.
 
 **DETECTAR no es ARREGLAR. ARREGLAR no es VERIFICAR. VERIFICAR no es CERRAR.**
 
+**IPHONE REAL != HEADLESS.** Viewport, Chromium o Pixel no verifican un bug de iPhone.
+
+**BUG ABIERTO EN IPHONE => NO SE AVANZA.** Evolution, autopilot y mejoras ajenas quedan congeladas hasta `VERIFIED` con iPhone Safari real. Contrato: `bugs/FIREWALL.md`. Comando: `npm run firewall:iphone`.
+
 Y además:
 
 **UN INTENTO FALLIDO ES CONOCIMIENTO. NO SE REPITE SIN NUEVA EVIDENCIA.**
 
 ## 13. Prompt corto para cualquier IA
 
-> Lee `AGENTS.md`, `bugs/README.md`, `bugs/SCHEMA.md`, `bugs/RESEARCH_PROTOCOL.md` y el bug relevante. Ejecuta `npm run bug:brief -- BUG-NNNN` si puedes. Antes de tocar código identifica hechos, hipótesis activas, hipótesis descartadas, todos los intentos previos y la siguiente acción de mayor valor. No repitas un intento `FAIL` sin nueva evidencia. Cada experimento debe quedar en `attempt_history`. Si corriges un bug, déjalo `FIXED_PENDING_VERIFY`; solo una verificación independiente del flujo original puede moverlo a `VERIFIED`.
+> Lee `AGENTS.md`, `bugs/README.md`, `bugs/SCHEMA.md`, `bugs/RESEARCH_PROTOCOL.md`, `bugs/FIREWALL.md` y el bug relevante. Ejecuta `npm run bug:brief -- BUG-NNNN` si puedes. Antes de tocar código identifica hechos, hipótesis activas, hipótesis descartadas, todos los intentos previos y la siguiente acción de mayor valor. No repitas un intento `FAIL` sin nueva evidencia. Cada experimento debe quedar en `attempt_history`. Si corriges un bug, déjalo `FIXED_PENDING_VERIFY`; solo una verificación independiente del flujo original en iPhone Safari real puede moverlo a `VERIFIED`. Si hay un bug iPhone/World high/critical abierto, no avances con otras mejoras.

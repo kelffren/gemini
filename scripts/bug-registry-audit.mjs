@@ -110,6 +110,15 @@ for (const file of files) {
   if (['VERIFIED','CLOSED'].includes(bug.status) && bug.verification?.status !== 'PASS') {
     pushError(file, `${bug.status} requires verification.status PASS`);
   }
+  const areas = (bug.area || []).map((a) => String(a).toLowerCase());
+  const iphoneRelevant = areas.some((a) => /ios|iphone|mobile|safari|browserstack|world|studio|creators|guest/.test(a));
+  const proof = [bug.verification?.method, ...(bug.verification?.evidence || [])].filter(Boolean).join('\n');
+  if (iphoneRelevant && String(bug.verification?.status || '').toUpperCase() === 'PASS' && !/real iphone|iphone safari|browserstack|ios-real-iphone|player iphone/i.test(proof)) {
+    pushError(file, 'iPhone/World PASS requires real iPhone Safari or BrowserStack evidence');
+  }
+  if (iphoneRelevant && ['VERIFIED','CLOSED'].includes(bug.status) && !/real iphone|iphone safari|browserstack|ios-real-iphone|player iphone/i.test(proof)) {
+    pushError(file, `${bug.status} on iPhone/World bug is invalid without real-device proof`);
+  }
 }
 
 const investigationFiles = walkMarkdown(investigationRoot);

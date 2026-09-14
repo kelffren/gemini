@@ -10,7 +10,10 @@ on:
       - 'docs/systems/BUG_COORDINATION_SYSTEM.md'
       - 'docs/system-catalog.json'
       - 'AGENTS.md'
+      - 'scripts/iphone-real-device-firewall.mjs'
+      - 'tests/iphone-real-device-firewall.test.mjs'
       - '.github/workflows/bug-reporting-ci.yml'
+      - '.github/workflows/iphone-improvement-firewall.yml'
   pull_request:
     paths:
       - 'bugs/**'
@@ -19,7 +22,10 @@ on:
       - 'docs/systems/BUG_COORDINATION_SYSTEM.md'
       - 'docs/system-catalog.json'
       - 'AGENTS.md'
+      - 'scripts/iphone-real-device-firewall.mjs'
+      - 'tests/iphone-real-device-firewall.test.mjs'
       - '.github/workflows/bug-reporting-ci.yml'
+      - '.github/workflows/iphone-improvement-firewall.yml'
   workflow_dispatch:
 
 jobs:
@@ -58,4 +64,12 @@ jobs:
         run: |
           grep -q 'FIXED_PENDING_VERIFY' bugs/AI_BRIDGE.md
           grep -q 'DETECTAR != ARREGLAR != VERIFICAR != CERRAR' AGENTS.md
+          grep -q 'IPHONE REAL != HEADLESS' AGENTS.md
           grep -q 'bug-coordination' docs/system-catalog.json
+          test -f bugs/FIREWALL.md
+          test -f scripts/iphone-real-device-firewall.mjs
+
+      - name: iPhone real-device firewall contract
+        run: |
+          node tests/iphone-real-device-firewall.test.mjs
+          node scripts/iphone-real-device-firewall.mjs --mode=registry
