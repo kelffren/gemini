@@ -35,15 +35,22 @@ try {
   const version = await request('/version.json','gzip');
   assert(version.status===200,'version not served');
   assert(version.headers['cache-control']==='no-cache, max-age=0, must-revalidate','version revalidation header wrong');
-  assert(version.headers['content-encoding']==='gzip','version did not negotiate gzip');
+  // version.json is intentionally tiny and may stay uncompressed. Compression is
+  // proven below against a production asset large enough to exercise negotiation.
 
   const dist = path.join(root,'dist','turbo');
   const hashed = fs.existsSync(dist) ? fs.readdirSync(dist).find((n)=>/-[A-Z0-9]{6,}\.js$/i.test(n)) : null;
   assert(hashed,'no hashed production JS asset found; run npm run build first');
-  const asset = await request('/dist/turbo/'+hashed,'br,gzip');
-  assert(asset.status===200,'hashed asset not served');
-  assert(asset.headers['cache-control']==='public, max-age=31536000, immutable','hashed asset is not immutable');
-  assert(asset.headers['content-encoding']==='br','hashed asset did not negotiate Brotli');
+
+  const assetBr = await request('/dist/turbo/'+hashed,'br,gzip');
+  assert(assetBr.status===200,'hashed asset not served');
+  assert(assetBr.headers['cache-control']==='public, max-age=31536000, immutable','hashed asset is not immutable');
+  assert(assetBr.headers['content-encoding']==='br','hashed asset did not negotiate Brotli');
+
+  const assetGzip = await request('/dist/turbo/'+hashed,'gzip');
+  assert(assetGzip.status===200,'hashed asset not served for gzip negotiation');
+  assert(assetGzip.headers['cache-control']==='public, max-age=31536000, immutable','gzip hashed asset is not immutable');
+  assert(assetGzip.headers['content-encoding']==='gzip','hashed asset did not negotiate gzip fallback');
 
   const denied = await request('/scripts/turbo-host-server.mjs');
   assert(denied.status===404,'server source is publicly exposed');
