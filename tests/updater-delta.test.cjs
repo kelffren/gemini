@@ -21,5 +21,5 @@ assert.equal(delta.chooseConcurrency({ gameplayBusy: false, status: 'constrained
 assert.equal(delta.chooseConcurrency({ gameplayBusy: false, status: 'fair', pingMs: 120 }), 2);
 assert.equal(delta.chooseConcurrency({ gameplayBusy: false, status: 'good', pingMs: 80, downlinkMbps: 20 }), 4);
 assert.equal(delta.chooseConcurrency({ gameplayBusy: false, status: 'good', pingMs: 40, downlinkMbps: 20 }), 6);
-assert.equal(delta.chooseConcurrency({ gameplayBusy: true, foreground: true, status: 'good', pingMs: 40, downlinkMbps: 20 }), 6);
-console.log('UPDATER DELTA TEST PASS — identical build = 0 asset bytes; one changed file = one asset delta');
+assert.equal(delta.chooseConcurrency({ gameplayBusy: true, foreground: true, status: 'good', pingMs: 40, downlinkMbps: 20 }), 0);
+console.log('UPDATER DELTA TEST PASS — identical build = 0 asset bytes; one changed file = one asset delta; combat = zero concurrency');
