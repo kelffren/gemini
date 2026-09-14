@@ -1,0 +1,47 @@
+name: App Updater CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - index.html
+      - manifest.webmanifest
+      - version.json
+      - sw.js
+      - src/core/update-system.js
+      - src/ui/update-ui.js
+      - scripts/updater-audit.mjs
+      - docs/systems/APP_UPDATE_SYSTEM.md
+      - docs/system-catalog.json
+      - package.json
+      - .github/workflows/app-updater-ci.yml
+  pull_request:
+    paths:
+      - index.html
+      - manifest.webmanifest
+      - version.json
+      - sw.js
+      - src/core/update-system.js
+      - src/ui/update-ui.js
+      - scripts/updater-audit.mjs
+      - docs/systems/APP_UPDATE_SYSTEM.md
+      - docs/system-catalog.json
+      - package.json
+      - .github/workflows/app-updater-ci.yml
+
+permissions:
+  contents: read
+
+jobs:
+  updater-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Audit updater contract
+        run: npm run audit:updater
+      - name: Audit system documentation
+        run: npm run audit:docs
