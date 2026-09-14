@@ -52,6 +52,8 @@ expect(core.includes('for (const entry of plan)'), 'el staging no garantiza cola
 expect(core.includes('stageMetaUrl'), 'falta marcador de build completamente descargada');
 expect(core.includes('isBuildStaged'), 'applyUpdate no puede verificar staging completo');
 expect(core.includes('kelo_update'), 'falta handoff de build a la recarga');
+expect(core.includes("parsed.querySelectorAll('script[src]')"), 'el plan no incluye scripts declarados por el HTML nuevo');
+expect(!core.includes('(?:api|auth)'), 'no excluir src/auth: los scripts estáticos de auth también son parte del boot shell');
 expect(!core.includes('setInterval('), 'KeloUpdater no puede usar setInterval/watchdog');
 
 expect(ui.includes('Actualización en segundo plano'), 'la UI no presenta precarga silenciosa');
@@ -82,6 +84,4 @@ expect(doc.includes('200 ms'), 'documentación no declara el umbral superior de 
 expect(doc.includes('setGameplayBusy'), 'documentación no explica prioridad gameplay');
 expect(doc.includes('Ahorro de Datos'), 'documentación no explica Save Data');
 
-if (!process.exitCode) {
-  console.log('UPDATER AUDIT PASS');
-}
+if (!process.exitCode) console.log('UPDATER AUDIT PASS');
