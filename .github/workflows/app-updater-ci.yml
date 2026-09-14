@@ -9,6 +9,7 @@ on:
       - version.json
       - sw.js
       - src/core/update-system.js
+      - src/core/update-watch.js
       - src/ui/update-ui.js
       - scripts/updater-audit.mjs
       - docs/systems/APP_UPDATE_SYSTEM.md
@@ -22,6 +23,7 @@ on:
       - version.json
       - sw.js
       - src/core/update-system.js
+      - src/core/update-watch.js
       - src/ui/update-ui.js
       - scripts/updater-audit.mjs
       - docs/systems/APP_UPDATE_SYSTEM.md
@@ -44,6 +46,7 @@ jobs:
       - name: Syntax check updater runtime
         run: |
           node --check src/core/update-system.js
+          node --check src/core/update-watch.js
           node --check src/ui/update-ui.js
           node --check sw.js
       - name: Audit updater contract
