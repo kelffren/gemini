@@ -15,9 +15,8 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="KELO WORLD">
-  <title>Kelo World — V6.54.3</title>
+  <title>Kelo World — V6.54.4</title>
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="preload" as="image" href="assets/hero.PNG?hero=deeab966">
   <link rel="stylesheet" href="src/ui/backpack-fantasy-v1.css?v=1">
   <style>
     *{box-sizing:border-box;margin:0;padding:0;user-select:none;-webkit-user-select:none}
@@ -97,6 +96,12 @@
 <script>
 (function(){
   var started=false;
+  var AUTH=[
+    'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0',
+    'src/auth/supabase-auth-runtime.js?v=6&boot=12',
+    'src/ui/account-auth-ui.js?v=2&boot=12',
+    'src/auth/guest-play-bypass.js?v=3'
+  ];
   function list(){
     try{
       var node=document.getElementById('kelo-engine-boot');
@@ -104,19 +109,48 @@
       return data.scripts||[];
     }catch(e){return []}
   }
+  function loadChain(urls,i,done){
+    if(i>=urls.length){if(done)done();return;}
+    var s=document.createElement('script');
+    s.src=urls[i];
+    s.onload=s.onerror=function(){loadChain(urls,i+1,done)};
+    document.body.appendChild(s);
+  }
   function start(){
     if(started)return;
     started=true;
-    var urls=list();
-    for(var i=0;i<urls.length;i++){
-      var s=document.createElement('script');
-      s.src=urls[i];
-      s.async=false;
-      document.body.appendChild(s);
+    var urls=list(), texts=new Array(urls.length), next=0;
+    function pump(){
+      if(next>=urls.length)return;
+      if(texts[next]==null)return;
+      var url=urls[next], code=texts[next];
+      next+=1;
+      try{
+        var s=document.createElement('script');
+        s.text=code+'\n//# sourceURL='+String(url).split('?')[0];
+        document.body.appendChild(s);
+      }catch(e){}
+      if(next<urls.length)setTimeout(pump,0);
     }
+    urls.forEach(function(url,i){
+      fetch(url,{credentials:'same-origin',cache:'force-cache'}).then(function(r){
+        if(!r.ok)throw new Error(String(r.status));
+        return r.text();
+      }).then(function(t){texts[i]=t;if(i===next)pump()}).catch(function(){
+        texts[i]='';if(i===next)pump();
+      });
+    });
   }
-  window.KeloEngineBoot=Object.freeze({version:'kelo-engine-boot-v1.1-ordered',start:start,started:function(){return started}});
-  try{if(document.documentElement.getAttribute('data-kelo-auth-gate')==='off')start()}catch(e){}
+  function afterPaint(fn){
+    var kick=function(){var run=function(){setTimeout(fn,0)};if(window.requestAnimationFrame)requestAnimationFrame(run);else run()};
+    if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',kick,{once:true});
+    else kick();
+  }
+  window.KeloEngineBoot=Object.freeze({version:'kelo-engine-boot-v1.2-load-complete',start:start,started:function(){return started}});
+  afterPaint(function(){
+    loadChain(AUTH,0);
+    try{if(document.documentElement.getAttribute('data-kelo-auth-gate')==='off')start()}catch(e){}
+  });
 })();
 </script>
 <script>
@@ -135,10 +169,5 @@
 })();
 </script>
 
-<!-- KELO-INDEX AUTH: deferred so iPhone paints login even if the CDN is slow. -->
-<script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0"></script>
-<script defer src="src/auth/supabase-auth-runtime.js?v=6&boot=11"></script>
-<script defer src="src/ui/account-auth-ui.js?v=2&boot=11"></script>
-<script defer src="src/auth/guest-play-bypass.js?v=3"></script>
 
 </body></html>
