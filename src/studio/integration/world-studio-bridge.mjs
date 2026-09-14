@@ -4,7 +4,7 @@
  * does-not-own: Studio kernel, live shell internals, Hub, world authority
  * public-api: openKeloStudioLive(), closeKeloStudioLive(), getKeloStudioLive()
  * reuse: live-studio-controller remains the session owner; this file is the only first hop from World workspace
- * mobile: import Studio in waves with main-thread yields; strip provisional listeners before controller hydrate, release the loading viewport as soon as real chrome hydrates, and keep one Studio stylesheet after provisional→live handoff
+ * mobile: import the zero-static-import controller immediately after one paint yield; controller owns phased runtime loading after chrome exists. Strip provisional listeners before controller hydrate, release the loading viewport as soon as real chrome hydrates, and keep one Studio stylesheet after provisional→live handoff.
  * online: no; authority stays in KELO_WORLD_EDIT
  */
 import { yieldStudioBoot, setWorldLaunchStatus } from './studio-boot-pace.mjs';
@@ -12,43 +12,16 @@ import { yieldStudioBoot, setWorldLaunchStatus } from './studio-boot-pace.mjs';
 export const WORLD_STUDIO_BRIDGE_BUILD='world-bridge-20260914-13';
 const CONTROLLER=`./live-studio-controller.mjs?v=${WORLD_STUDIO_BRIDGE_BUILD}`;
 let controllerMod=null;
-let iphonePrewarmed=false;
-
-function isPhone(root){
-  const ua=String(root?.navigator?.userAgent||'');
-  const short=Math.min(Number(root?.innerWidth)||999,Number(root?.innerHeight)||999);
-  return /iPhone|iPad|iPod/i.test(ua)||short<=500;
-}
-
-async function prewarmIphoneStudioRuntime(root){
-  if(iphonePrewarmed||!isPhone(root))return;
-  const roots=[
-    '../render/studio-overlay-canvas.mjs',
-    '../render/creator-grid-overlay.mjs',
-    '../input/pointer-input-adapter.mjs',
-    '../input/studio-camera-controller.mjs',
-    './authority-command-mirror.mjs',
-    '../ui/creator-productivity-panel.mjs',
-    '../tools/creator-actions.mjs',
-    '../prefabs/creator-prefab-library.mjs',
-    '../validation/creator-world-analyzer.mjs',
-    '../document/document-commands.mjs'
-  ];
-  for(let i=0;i<roots.length;i++){
-    if(root?.KELO_WORLD_LAUNCH_ABORTED)throw new Error('WORLD_EDITOR_OPEN_TIMEOUT');
-    setWorldLaunchStatus(root,`Preparando Studio ${i+1}/${roots.length}…`);
-    await import(roots[i]);
-    if(i<roots.length-1)await yieldStudioBoot(root);
-  }
-  iphonePrewarmed=true;
-}
 
 async function loadController(root){
   if(controllerMod)return controllerMod;
   if(root?.KELO_WORLD_LAUNCH_ABORTED)throw new Error('WORLD_EDITOR_OPEN_TIMEOUT');
   setWorldLaunchStatus(root,'Cargando editor…');
+  // Critical iPhone rule: do not gate the controller behind eager imports of its
+  // runtime graph. The controller has zero static Studio imports and paints chrome
+  // before its phased 4+6 runtime batches, so starting it first gives Safari an
+  // interactive mount sooner and removes a 10-module serial await chain.
   await yieldStudioBoot(root);
-  await prewarmIphoneStudioRuntime(root);
   if(root?.KELO_WORLD_LAUNCH_ABORTED)throw new Error('WORLD_EDITOR_OPEN_TIMEOUT');
   controllerMod=await import(CONTROLLER);
   await yieldStudioBoot(root);
