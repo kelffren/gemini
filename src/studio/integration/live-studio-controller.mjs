@@ -10,7 +10,8 @@
  */
 
 let active=null;
-const BUILD='world-bridge-20260914-3';
+const controllerUrl=new URL(import.meta.url);
+const BUILD=controllerUrl.searchParams.get('v')||'world-bridge-20260914-15';
 const mutable=status=>['DRAFT','REJECTED'].includes(String(status||''));
 const DIRECT_DRAG_THRESHOLD=5;
 function actor(root){return String(root.KELO_ADMIN_KEYS?.playerId?.()||root.keloNet?.playerKey||root.localPlayer?.id||'local_pioneer');}
