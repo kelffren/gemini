@@ -14,6 +14,7 @@ const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
 const LAUNCH_CURTAIN_ID='kelo-world-launch-curtain';
 const STUDIO_OPEN_MS=20000;
 const DEFAULT_LAUNCH_YIELD_MS=420;
+const DEFAULT_RUNTIME_YIELD_FALLBACK_MS=120;
 const WORLD_BUILD='world-bridge-20260914-1';
 const PHONE_RUNTIME_ROOTS=Object.freeze([
   '../../studio/render/studio-overlay-canvas.mjs',
@@ -68,9 +69,24 @@ export function isPhoneWorldBootstrap(root=globalThis){
 }
 function yieldRuntimeTurn(root){
   return new Promise(resolve=>{
+    const wait=typeof root?.setTimeout==='function'?root.setTimeout.bind(root):setTimeout;
+    const cancel=typeof root?.clearTimeout==='function'?root.clearTimeout.bind(root):clearTimeout;
+    const configured=Number(root?.KELO_WORLD_RUNTIME_YIELD_FALLBACK_MS);
+    const fallbackMs=Number.isFinite(configured)?Math.max(0,configured):DEFAULT_RUNTIME_YIELD_FALLBACK_MS;
+    let settled=false,timer=null;
+    const finish=()=>{
+      if(settled)return;
+      settled=true;
+      if(timer!=null)cancel(timer);
+      resolve();
+    };
     const raf=root?.requestAnimationFrame;
-    if(typeof raf==='function')raf.call(root,()=>resolve());
-    else (root?.setTimeout||setTimeout)(resolve,0);
+    if(typeof raf==='function'){
+      timer=wait(finish,fallbackMs);
+      try{raf.call(root,finish);return;}catch{}
+      if(timer!=null){cancel(timer);timer=null;}
+    }
+    wait(finish,0);
   });
 }
 function paintBootProgress(root,loaded,total){
