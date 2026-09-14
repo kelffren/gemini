@@ -49,6 +49,9 @@ jobs:
       - name: Enforce bug closure evidence gate
         run: npm run audit:bug-close
 
+      - name: Fail on verified or closed bug recurrence
+        run: npm run audit:bug-recurrence
+
       - name: Print incoming recurrence clusters
         run: npm run bug:triage
 
