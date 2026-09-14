@@ -22,6 +22,7 @@ Para un bug existente:
 
 Ese briefing muestra en orden:
 
+- investigaciones de apoyo disponibles para ese BUG, con fecha, versión/build y vigencia;
 - observación actual;
 - hechos confirmados;
 - hipótesis activas;
@@ -40,10 +41,38 @@ Regla central:
 
 - `incoming/` — reportes crudos antes de deduplicar/triage. Futuro destino de reportes de jugadores y automatizaciones.
 - `registry/` — un JSON por bug canónico (`BUG-0001.json`).
-- `templates/` — contratos de bug y reporte.
+- `investigacion/` — biblioteca de apoyo por bug con investigaciones técnicas versionadas y fechadas.
+- `templates/` — contratos de bug, reporte e investigación.
 - `SCHEMA.md` — campos, estados, investigación e invariantes.
 - `RESEARCH_PROTOCOL.md` — cómo separar hechos, hipótesis, intentos, descartes, unknowns y siguientes acciones.
 - `AI_BRIDGE.md` — protocolo obligatorio para cualquier IA que lea o modifique bugs.
+
+## Sección `investigacion/`
+
+Una investigación externa o técnica ampliada vive en:
+
+`bugs/investigacion/BUG-NNNN/`
+
+Cada archivo debe declarar obligatoriamente al principio:
+
+- `BUG: BUG-NNNN`
+- `FECHA: YYYY-MM-DD`
+- `VERSION / BUILD: versión exacta investigada`
+- `ESTADO: vigente | parcialmente_superada | superada | historica`
+
+También debe indicar el entorno cuando aplique. El nombre recomendado es:
+
+`YYYY-MM-DD-<version>-<tema>.md`
+
+Ejemplo real:
+
+`bugs/investigacion/BUG-0003/2026-09-13-world-light-20260914-1-safari-freeze.md`
+
+La investigación apoya al agente, pero no sustituye el JSON canónico. Si descubre un hecho, hipótesis, descarte o intento nuevo, el agente debe reflejarlo también en `bugs/registry/BUG-NNNN.json`.
+
+Antes de tocar código, el agente debe abrir primero la investigación más reciente cuya `VERSION / BUILD` siga aplicando al HEAD/runtime actual. No aplicar conclusiones de una versión vieja sin comprobar vigencia.
+
+`npm run audit:bugs` valida automáticamente que toda investigación tenga BUG + FECHA + VERSION/BUILD + ESTADO válidos y que el BUG coincida con su carpeta.
 
 ## Schema v2 — expediente vivo
 
@@ -96,7 +125,7 @@ Un reporte puede convertirse en bug nuevo o enlazarse a un bug existente. Muchos
 
 ## Auditoría
 
-Después de modificar registros:
+Después de modificar registros o investigaciones:
 
 `npm run audit:bugs`
 
@@ -108,7 +137,8 @@ El auditor comprueba, entre otras cosas:
 - resultados válidos de intentos;
 - que todo `FAIL` tenga `do_not_repeat_without`;
 - que `FIXED_PENDING_VERIFY` tenga un fix identificable;
-- que `VERIFIED/CLOSED` requieran verificación `PASS`.
+- que `VERIFIED/CLOSED` requieran verificación `PASS`;
+- que cada archivo de `bugs/investigacion/` tenga BUG, FECHA, VERSION / BUILD y ESTADO válidos.
 
 ## Seguridad
 
@@ -126,4 +156,4 @@ Aplicar sanitización antes de persistir diagnósticos, logs o screenshots.
 
 ## Lectura obligatoria para agentes
 
-Antes de registrar, reclamar, arreglar, verificar o cerrar un bug, leer [`AI_BRIDGE.md`](AI_BRIDGE.md), [`SCHEMA.md`](SCHEMA.md) y [`RESEARCH_PROTOCOL.md`](RESEARCH_PROTOCOL.md).
+Antes de registrar, reclamar, arreglar, verificar o cerrar un bug, leer [`AI_BRIDGE.md`](AI_BRIDGE.md), [`SCHEMA.md`](SCHEMA.md), [`RESEARCH_PROTOCOL.md`](RESEARCH_PROTOCOL.md) y las investigaciones aplicables en `bugs/investigacion/BUG-NNNN/`.
