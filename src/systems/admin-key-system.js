@@ -92,5 +92,13 @@ window.addEventListener('load',syncWhenReady,{once:true});
   script.id='kelo-world-notification-script';
   script.src='src/systems/world-notification-system.js?v=1';
   script.async=false;
+  script.onload=function(){
+    if(document.getElementById('kelo-world-notification-online-bridge'))return;
+    const bridge=document.createElement('script');
+    bridge.id='kelo-world-notification-online-bridge';
+    bridge.src='src/systems/world-notification-online-bridge.js?v=1';
+    bridge.async=false;
+    document.head.appendChild(bridge);
+  };
   document.head.appendChild(script);
 })();
