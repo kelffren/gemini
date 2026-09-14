@@ -8,12 +8,12 @@ projectName: KeloWorld
 buildName: MapForgeRealIOS
 buildIdentifier: '#${BUILD_NUMBER}'
 
+# Keep real-iOS capabilities minimal and device-owned. Do not add Playwright
+# emulation descriptors here; the physical iPhone/Safari session supplies them.
 platforms:
   - browserName: safari
     osVersion: 26
     deviceName: iPhone 14 Pro
-    playwrightConfigOptions:
-      name: ios-real-iphone-14-pro
 
 parallelsPerPlatform: 1
 
@@ -25,5 +25,4 @@ source: kelo-world-map-forge
 
 debug: true
 networkLogs: true
-consoleLogs: errors
 testObservability: true
