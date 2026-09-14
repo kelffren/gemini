@@ -6,6 +6,24 @@ on:
     branches:
       - main
     paths:
+      - 'index.html'
+      - 'src/auth/**'
+      - 'src/ui/account-auth-ui.js'
+      - 'src/ui/luxe-shell.js'
+      - 'src/ui/studio-launcher.js'
+      - 'src/creators/**'
+      - 'src/studio/**'
+      - 'src/world/**'
+      - 'tests/world-placement-functional.spec.js'
+      - 'playwright.config.js'
+      - '.github/workflows/world-placement-functional.yml'
+  pull_request:
+    paths:
+      - 'index.html'
+      - 'src/auth/**'
+      - 'src/ui/account-auth-ui.js'
+      - 'src/ui/luxe-shell.js'
+      - 'src/ui/studio-launcher.js'
       - 'src/creators/**'
       - 'src/studio/**'
       - 'src/world/**'
