@@ -8,7 +8,7 @@
  */
 (function(){
 'use strict';
-const VERSION='kelo-account-auth-ui-v1.0.4-engine-gate';
+const VERSION='kelo-account-auth-ui-v1.0.5-safari-order';
 const UPGRADE_PENDING='kelo_guest_upgrade_pending_email_v1';
 const LOCAL_GUEST_KEY='kelo_local_guest_play_v1';
 let root=null,card=null,message=null,busy=false,mode='login',lastState=null;
