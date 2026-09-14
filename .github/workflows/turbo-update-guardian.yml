@@ -19,6 +19,7 @@ on:
       - src/visuals/visual-integration.js
       - tests/updater-delta.test.cjs
       - scripts/turbo-update-guardian.mjs
+      - scripts/turbo-combat-hard-stop-test.mjs
       - scripts/turbo-boot-isolation-test.mjs
       - scripts/turbo-build.mjs
       - scripts/turbo-build-audit.mjs
@@ -50,6 +51,7 @@ on:
       - src/visuals/visual-integration.js
       - tests/updater-delta.test.cjs
       - scripts/turbo-update-guardian.mjs
+      - scripts/turbo-combat-hard-stop-test.mjs
       - scripts/turbo-boot-isolation-test.mjs
       - scripts/turbo-build.mjs
       - scripts/turbo-build-audit.mjs
@@ -83,6 +85,7 @@ jobs:
           node --check src/core/update-delta-core.js
           node --check src/core/update-system.js
           node --check src/visuals/visual-lab-loader.js
+          node --check scripts/turbo-combat-hard-stop-test.mjs
           node --check scripts/turbo-boot-isolation-test.mjs
           node --check scripts/turbo-build.mjs
           node --check scripts/turbo-build-audit.mjs
@@ -96,6 +99,8 @@ jobs:
         run: node scripts/turbo-build-audit.mjs
       - name: Prove creator tools stay out of critical boot
         run: node scripts/turbo-boot-isolation-test.mjs
+      - name: Prove PVP combat is an absolute updater hard stop
+        run: node scripts/turbo-combat-hard-stop-test.mjs
       - name: Generate SHA-256 Turbo manifest from actual boot bytes
         run: node scripts/generate-turbo-manifest.mjs
       - name: Prove one-file delta and identical-build zero asset bytes
