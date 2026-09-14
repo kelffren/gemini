@@ -8,10 +8,26 @@ Este es el puente obligatorio para cualquier IA/agente que inspeccione o modifiq
 2. Leer `bugs/README.md`.
 3. Leer `bugs/SCHEMA.md`.
 4. Leer `bugs/RESEARCH_PROTOCOL.md`.
-5. Leer todos los bugs relevantes en `bugs/registry/`.
-6. Para un bug existente, ejecutar `npm run bug:brief -- BUG-NNNN` cuando el entorno lo permita.
-7. Buscar duplicados antes de crear uno nuevo.
-8. Inspeccionar el `main` actual; no asumir que un chat, commit viejo o memoria describe el runtime actual.
+5. Leer `bugs/BUG_INTELLIGENCE.md`.
+6. Leer todos los bugs relevantes en `bugs/registry/`.
+7. Revisar las investigaciones aplicables en `bugs/investigacion/BUG-NNNN/`.
+8. Para un bug existente, ejecutar `npm run bug:brief -- BUG-NNNN` cuando el entorno lo permita.
+9. Buscar duplicados antes de crear uno nuevo.
+10. Inspeccionar el `main` actual; no asumir que un chat, commit viejo o memoria describe el runtime actual.
+
+### Preflight de riesgo
+
+Cuando exista un diff o cambio propuesto con alcance material, ejecutar:
+
+`npm run bug:risk -- <base> <head>`
+
+El score no demuestra que haya un bug. Sirve para decidir cuánta verificación dirigida hace falta. Si aparece un bug histórico relacionado, leer su briefing antes de declarar el cambio seguro.
+
+Si existe un log/error reproducible, ejecutar cuando sea práctico:
+
+`npm run bug:scan -- <log-file>`
+
+El fingerprint ayuda a detectar reincidencias/duplicados, pero nunca sustituye el triage humano/IA ni demuestra causa raíz.
 
 ### Regla anti-pérdida de tiempo
 
@@ -23,7 +39,8 @@ Antes de escribir código, el agente debe poder responder:
 - qué intentos ya se hicieron y cómo terminaron;
 - qué intento NO debe repetirse sin nueva evidencia;
 - cuál es la `next_best_action` actual;
-- cuál es la prueba exacta que demostraría éxito.
+- cuál es la prueba exacta que demostraría éxito;
+- qué bugs históricos y zonas de riesgo toca el cambio.
 
 Si no puede responder eso, primero completa la investigación del bug.
 
@@ -35,7 +52,7 @@ NO crees un bug nuevo si ya existe uno con el mismo síntoma/flujo. En ese caso 
 
 Proceso:
 
-`DESCUBRIR -> BUSCAR DUPLICADO -> REGISTRAR/ENLAZAR -> TRIAGE -> INVESTIGAR`
+`DESCUBRIR -> FINGERPRINT/DEDUPE -> REGISTRAR/ENLAZAR -> TRIAGE -> INVESTIGAR`
 
 Al crear un bug:
 
@@ -80,7 +97,7 @@ Nunca borrar un intento fallido para limpiar el registro.
 
 ### Investigación externa
 
-Cuando el bug depende de navegador, iOS, BrowserStack, Playwright, SDK, API o servicio externo, consultar documentación oficial/changelog aplicable y registrar solo la conclusión útil en `research.external_references`.
+Cuando el bug depende de navegador, iOS, BrowserStack, Playwright, SDK, API o servicio externo, consultar documentación oficial/changelog aplicable y registrar solo la conclusión útil en `research.external_references` y, cuando haga falta ampliar el razonamiento, en `bugs/investigacion/BUG-NNNN/` con BUG + FECHA + VERSION/BUILD.
 
 ## 3. Si quieres trabajar en un bug
 
@@ -88,7 +105,9 @@ Antes de editar código:
 
 - comprobar que no está `CLOSED`, `WONT_FIX` o reclamado activamente por otro agente;
 - leer el briefing completo;
+- revisar investigaciones vigentes para la versión/build actual;
 - comprobar que la solución propuesta no repite un `attempt_history` fallido;
+- revisar el riesgo/historial de los archivos que se van a tocar;
 - si repite un intento, documentar primero la nueva evidencia que invalida el resultado anterior;
 - si está libre y entendido, mover a `CLAIMED`;
 - rellenar `claimed_by` y `claim_started_at`;
@@ -123,10 +142,12 @@ Cuando exista una corrección candidata:
 3. Registra el cambio también en `attempt_history`.
 4. Resume qué cambió sin exagerar.
 5. Actualiza las hipótesis según la evidencia obtenida.
-6. Cambia estado a `FIXED_PENDING_VERIFY`.
-7. Libera `claimed_by` si ya no estás trabajando activamente.
-8. Deja `verification.status = PENDING`.
-9. Asegura que `next_best_actions` incluya la verificación real pendiente.
+6. Añade una prueba de regresión permanente cuando el fallo sea automatizable; si no lo es, documenta el contrato de smoke/manual verification y la razón.
+7. Ejecuta `npm run audit:bug-regressions`.
+8. Cambia estado a `FIXED_PENDING_VERIFY`.
+9. Libera `claimed_by` si ya no estás trabajando activamente.
+10. Deja `verification.status = PENDING`.
+11. Asegura que `next_best_actions` incluya la verificación real pendiente.
 
 `FIXED_PENDING_VERIFY` NO significa que el bug esté resuelto para el jugador. Significa que hay una corrección lista para ser atacada por el verificador.
 
@@ -138,13 +159,15 @@ Preferiblemente un agente/prueba diferente al que hizo el fix:
 2. Reproducir el mismo flujo y entorno que fallaba.
 3. Ejecutar prueba negativa/edge cuando aplique.
 4. Comprobar regresiones relacionadas.
-5. Guardar evidencia.
+5. Ejecutar/confirmar la protección de regresión permanente.
+6. Guardar evidencia.
 
 Si pasa:
 
 - añadir un intento con `validation.result = PASS`;
 - `verification.status = PASS`;
 - registrar método, evidencia, agente y fecha;
+- ejecutar `npm run audit:bug-regressions`;
 - mover a `VERIFIED`.
 
 Después puede pasar a `CLOSED` cuando el cierre administrativo sea apropiado.
@@ -173,7 +196,7 @@ Los reportes de jugador entran primero como `REPORT-*`.
 
 Triage:
 
-`REPORT -> sanitizar -> buscar duplicado -> enlazar BUG existente o crear BUG nuevo`
+`REPORT -> sanitizar -> fingerprint/dedupe -> enlazar BUG existente o crear BUG nuevo`
 
 Nunca confiar ciegamente en la causa sugerida por el jugador. Su descripción sí es evidencia del síntoma.
 
@@ -205,7 +228,13 @@ Antes de terminar un pass que cambió bugs:
 
 `npm run audit:bugs`
 
-Si falla, el expediente está incompleto o rompe invariantes del registro.
+`npm run audit:bug-regressions`
+
+Para una vista global:
+
+`npm run bug:health`
+
+Si una auditoría falla, el expediente o la defensa contra regresión está incompleta.
 
 ## 12. Regla de oro
 
@@ -215,6 +244,8 @@ Y además:
 
 **UN INTENTO FALLIDO ES CONOCIMIENTO. NO SE REPITE SIN NUEVA EVIDENCIA.**
 
+**UN BUG SERIO ARREGLADO DEBE DEJAR UNA DEFENSA PARA NO VOLVER SILENCIOSAMENTE.**
+
 ## 13. Prompt corto para cualquier IA
 
-> Lee `AGENTS.md`, `bugs/README.md`, `bugs/SCHEMA.md`, `bugs/RESEARCH_PROTOCOL.md` y el bug relevante. Ejecuta `npm run bug:brief -- BUG-NNNN` si puedes. Antes de tocar código identifica hechos, hipótesis activas, hipótesis descartadas, todos los intentos previos y la siguiente acción de mayor valor. No repitas un intento `FAIL` sin nueva evidencia. Cada experimento debe quedar en `attempt_history`. Si corriges un bug, déjalo `FIXED_PENDING_VERIFY`; solo una verificación independiente del flujo original puede moverlo a `VERIFIED`.
+> Lee `AGENTS.md`, `bugs/README.md`, `bugs/SCHEMA.md`, `bugs/RESEARCH_PROTOCOL.md`, `bugs/BUG_INTELLIGENCE.md`, las investigaciones aplicables y el bug relevante. Ejecuta `npm run bug:brief -- BUG-NNNN` y evalúa riesgo/historial de los archivos que tocarás cuando sea posible. No repitas un intento `FAIL` sin nueva evidencia. Cada experimento debe quedar en `attempt_history`. Si corriges un bug, añade defensa de regresión, ejecuta `npm run audit:bug-regressions` y déjalo `FIXED_PENDING_VERIFY`; solo una verificación independiente del flujo original puede moverlo a `VERIFIED`.
