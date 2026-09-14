@@ -9,7 +9,7 @@
 (function(root){
 'use strict';
 if(root.KELO_MODULE_LOADER)return;
-const VERSION='kelo-module-loader-v4';
+const VERSION='kelo-module-loader-v5';
 const FEATURES={
   social:[
     {src:'src/ui/player-nameplate.js?v=2',name:'placas'},
@@ -150,25 +150,8 @@ function isPhone(){
 }
 function start(opts){
   if(opts&&opts.build) build=String(opts.build);
-  if(isPhone()){
-    const el=box(); if(el) el.hidden=true;
-    return;
-  }
-  const queue=IDLE.slice();
-  let n=0;
-  function idleNext(){
-    if(n>=queue.length){ hideChip(shown?'Listo':''); return; }
-    if(busy()){ setTimeout(idleNext, 800); return; }
-    loadFeature(queue[n],{interactive:false}).then(function(){ n+=1; idleNext(); });
-  }
-  setTimeout(idleNext, 1200);
-  setInterval(function ping(){
-    if(busy()) return;
-    fetch('index.html?ping='+Date.now(),{cache:'no-store'}).then(function(r){return r.text();}).then(function(html){
-      const m=html.match(/Kelo World — (V[\d.]+)/);
-      if(m&&m[1]&&m[1]!==build){ show('Nueva versión '+m[1]+' · cierra y abre',100); const el=box(); if(el) el.hidden=false; }
-    }).catch(function(){});
-  },45000);
+  const el=box(); if(el) el.hidden=true;
+  // First-use only. Compiling extra JS while gameLoop runs freezes Safari.
 }
 root.KELO_MODULE_LOADER=Object.freeze({version:VERSION,start,ensure,needs,isReady:function(n){return !!loaded[n];},features:Object.keys(FEATURES)});
 })(typeof globalThis!=='undefined'?globalThis:window);

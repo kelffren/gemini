@@ -12,26 +12,20 @@ Kelo World NO debe crear un segundo engine. El runtime histórico `engine-*.js` 
 
 Estados usados aquí: `OWNER LIVE`, `SUPPORT LIVE`, `LEGACY CORE`, `DYNAMIC LIVE`, `PREPARED`, `PENDING VERIFY`, `SERVER AUTHORITY`.
 
-## 2. Boot real
+## 2. Boot real (plaza-first)
 
-`index.html` pinta primero Auth/Guest y luego arranca el JSON `#kelo-engine-boot`. El orden conceptual actual es:
+Safari iOS tiene **un solo hilo**. Si `engine-b` arranca `gameLoop` mientras el HTML sigue compilando 100+ scripts, el canvas se congela o se pone negro.
 
-1. Update foundation + events + input locks + runtime bootstrap.
-2. Collision + `engine-a` + adopción de obstacles legacy.
-3. Input/Movement Foundation + `engine-b` + `engine-c`.
-4. Camera, Avatar, Render extensions, Simulation extensions.
-5. `engine-d..k` + performance contract móvil.
-6. Terrain/atlases/world-map/layer stack/surface/props/prefabs + `engine-l`.
-7. Resto de engine legacy `m..aj` + appearance + PvP world.
-8. Visual System + manifests + registry + animation/FX/sequence.
-9. Ability/Stone/Equipment/Mount channels + títulos/stats.
-10. Online config/auth lifecycle + `engine-net`.
-11. Luxe UI/HUD/chat/arena/mobile/plaza depth.
-12. Equipment/backpack/container/market/economy/factions/caravans.
-13. Property Catalog + Forest Plaza Catalog + PropertySystem.
-14. Admin/Guardian/Tuning/Instances/World Builder.
-15. Forge/aura/illumination/performance + profile/self interaction.
-16. Studio launcher + Map Forge recovery; Studio grande se carga bajo acción.
+Contrato LIVE (`index.html` V6.68):
+
+1. Flag `__keloHoldGameLoop=true` **antes** de `engine-b`.
+2. Plaza only (~44 scripts): events → input → `engine-a/b/c` → cámara/avatar → `engine-d..l` → world-map/props → luxe HUD → governor.
+3. `engine-b` y `KELO_PERF` **no** piden rAF hasta `kelo:boot-ready`.
+4. Tras el último script de plaza: `__keloBootReady=true` + evento `kelo:boot-ready`. El player ya puede caminar.
+5. **Nada más se descarga solo.** Chat premium, tileset 556KB, PvP, studio, backpack, engines `m..aj` = `KELO_MODULE_LOADER.ensure(feature)` al tocar el menú.
+6. Prohibido inyectar `<script>` desde nameplates u otros owners (eso montaba el chat Waze y mataba Safari).
+
+El listado histórico de 16 pasos **no es el boot móvil**. Restaurar esos tags en `index.html` es un bug.
 
 ## 3. Owners de Foundation
 

@@ -295,5 +295,10 @@
 
   document.addEventListener('visibilitychange', publishVisibility, { passive: true });
   setupLoafObserver();
-  root.requestAnimationFrame(frame);
+  function armPerfLoop(){ root.requestAnimationFrame(frame); }
+  if(root.__keloHoldGameLoop && !root.__keloBootReady){
+    root.addEventListener('kelo:boot-ready', armPerfLoop, {once:true});
+  }else{
+    armPerfLoop();
+  }
 })(typeof globalThis !== 'undefined' ? globalThis : window);

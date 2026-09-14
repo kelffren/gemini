@@ -327,4 +327,15 @@ function gameLoop(currentTime) {
   processInput(); updateMovement(dt); updateCamera(dt); updateSimulation(dt); render();
   requestAnimationFrame(gameLoop);
 }
-loadState(); renderActionBar(); updateHud(); requestAnimationFrame(gameLoop);
+loadState(); renderActionBar(); updateHud();
+function armKeloGameLoop(){
+  if(window.__keloGameLoopStarted)return;
+  window.__keloGameLoopStarted=true;
+  lastTime=performance.now();
+  requestAnimationFrame(gameLoop);
+}
+if(window.__keloHoldGameLoop && !window.__keloBootReady){
+  window.addEventListener('kelo:boot-ready', armKeloGameLoop, {once:true});
+}else{
+  armKeloGameLoop();
+}

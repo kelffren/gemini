@@ -13,7 +13,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="KELO WORLD">
-  <title>Kelo World — V6.67</title>
+  <title>Kelo World — V6.68</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="src/ui/backpack-fantasy-v1.css?v=1">
   <style>
@@ -39,6 +39,7 @@
 (function(){
   window.KELO_WORLD_DECORATION_RESET=true;
   window.KELO_HIDE_MINIMAP=true;
+  window.__keloHoldGameLoop=true;
   try{
     var q=new URLSearchParams(location.search);
     if(q.get('guest')==='1'||q.get('aiGuest')==='1'){
@@ -48,25 +49,6 @@
       localStorage.setItem('kelo_local_guest_play_v1','1');
     }
   }catch(e){}
-  var native=window.requestAnimationFrame.bind(window);
-  var cancel=window.cancelAnimationFrame.bind(window);
-  var q=[],held=true,id=0;
-  window.requestAnimationFrame=function(cb){
-    if(!held)return native(cb);
-    var n=++id; q.push({n:n,cb:cb}); return n;
-  };
-  window.cancelAnimationFrame=function(n){
-    if(!held)return cancel(n);
-    q=q.filter(function(x){return x.n!==n});
-  };
-  window.__keloReleaseRAF=function(){
-    if(!held)return;
-    held=false;
-    window.requestAnimationFrame=native;
-    window.cancelAnimationFrame=cancel;
-    var run=q.slice(); q=[];
-    for(var i=0;i<run.length;i++){ try{ native(run[i].cb); }catch(e){} }
-  };
 })();
 </script>
 <script src="src/core/events/event-bus.js?v=1"></script>
@@ -78,7 +60,7 @@
 <script>window.KELO_COLLISION.attachLegacyObstacleArray(obstacles,{adoptExistingOwner:'core-static'});</script>
 <script src="src/core/input-system.js?v=1"></script>
 <script src="src/core/movement-system.js?v=2"></script>
-<script src="engine-b.js?v=94"></script>
+<script src="engine-b.js?v=95-boot-ready"></script>
 <script src="engine-c.js?v=229"></script>
 <script src="src/core/camera-system.js?v=1"></script>
 <script src="src/core/avatar-render-system.js?v=2-base-zoo-authority"></script>
@@ -113,8 +95,8 @@
 <script src="src/ui/luxe-shell.js?v=231"></script>
 <script src="src/ui/mobile-orientation.js?v=6"></script>
 <script src="src/ui/luxe-player-hud.js?v=4-minimap-live-20260914"></script>
-<script src="src/systems/performance-governor.js?v=3"></script>
-<script>window.__keloReleaseRAF&&window.__keloReleaseRAF();</script>
-<script src="src/core/module-loader.js?v=4"></script>
-<script>window.KELO_MODULE_LOADER&&window.KELO_MODULE_LOADER.start({build:'V6.67'});</script>
+<script src="src/systems/performance-governor.js?v=4-boot-ready"></script>
+<script>window.__keloBootReady=true;window.dispatchEvent(new Event("kelo:boot-ready"));</script>
+<script src="src/core/module-loader.js?v=5"></script>
+<script>window.KELO_MODULE_LOADER&&window.KELO_MODULE_LOADER.start({build:'V6.68'});</script>
 </body></html>
