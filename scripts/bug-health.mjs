@@ -9,7 +9,7 @@ const bugs=fs.existsSync(dir)?fs.readdirSync(dir).filter(n=>/^BUG-\d{4}\.json$/.
 const reports=[];
 if(fs.existsSync(incomingDir)){
   for(const name of fs.readdirSync(incomingDir).filter(n=>/^REPORT-.*\.json$/.test(n))){
-    try{reports.push({name,...JSON.parse(fs.readFileSync(path.join(incomingDir,n),'utf8'))});}catch{}
+    try{reports.push({name,...JSON.parse(fs.readFileSync(path.join(incomingDir,name),'utf8'))});}catch{}
   }
 }
 const severityWeight={critical:40,high:25,medium:12,low:5};
