@@ -11,6 +11,7 @@
     "audit:character": "node scripts/character-customization-audit.js",
     "audit:foundation": "node scripts/foundation-architecture-audit.js",
     "audit:docs": "node scripts/system-documentation-audit.js",
+    "audit:updater": "node scripts/updater-audit.mjs",
     "audit:titles": "node scripts/title-system-audit.js",
     "audit:containers": "node scripts/container-system-audit.js",
     "audit:commerce": "node scripts/commerce-system-audit.js",
