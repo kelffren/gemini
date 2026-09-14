@@ -9,7 +9,7 @@
  */
 import { yieldStudioBoot, setWorldLaunchStatus } from './studio-boot-pace.mjs';
 
-export const WORLD_STUDIO_BRIDGE_BUILD='world-bridge-20260914-10';
+export const WORLD_STUDIO_BRIDGE_BUILD='world-bridge-20260914-11';
 const CONTROLLER=`./live-studio-controller.mjs?v=${WORLD_STUDIO_BRIDGE_BUILD}`;
 let controllerMod=null;
 let iphonePrewarmed=false;
@@ -22,7 +22,6 @@ function isPhone(root){
 
 async function prewarmIphoneStudioRuntime(root){
   if(iphonePrewarmed||!isPhone(root))return;
-  iphonePrewarmed=true;
   const roots=[
     '../render/studio-overlay-canvas.mjs',
     '../render/creator-grid-overlay.mjs',
@@ -39,8 +38,9 @@ async function prewarmIphoneStudioRuntime(root){
     if(root?.KELO_WORLD_LAUNCH_ABORTED)throw new Error('WORLD_EDITOR_OPEN_TIMEOUT');
     setWorldLaunchStatus(root,`Preparando Studio ${i+1}/${roots.length}…`);
     await import(roots[i]);
-    await yieldStudioBoot(root);
+    if(i<roots.length-1)await yieldStudioBoot(root);
   }
+  iphonePrewarmed=true;
 }
 
 async function loadController(root){
