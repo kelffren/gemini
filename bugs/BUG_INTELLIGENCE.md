@@ -4,7 +4,7 @@ Este sistema convierte `/bugs` de un registro reactivo en una defensa progresiva
 
 ## Ciclo
 
-`CAMBIO -> RIESGO -> BLAST RADIUS -> PRUEBAS DIRIGIDAS -> TELEMETRIA/MILESTONES -> DETECCION -> FINGERPRINT -> CANDIDATO -> CLUSTER/DEDUPE -> BUG -> HIPOTESIS -> EXPERIMENTO -> FIX -> VERIFICACION -> REGRESSION TEST -> CLOSE GATE`
+`CAMBIO -> RIESGO -> BLAST RADIUS -> PRUEBAS DIRIGIDAS -> TELEMETRIA/MILESTONES -> DETECCION -> FINGERPRINT -> CANDIDATO -> CLUSTER/DEDUPE -> CULPRIT CORRELATION -> BUG -> HIPOTESIS -> EXPERIMENTO -> FIX -> VERIFICACION -> REGRESSION TEST -> CLOSE GATE`
 
 ## Comandos
 
@@ -22,6 +22,7 @@ La normalización está centralizada en `scripts/lib/bug-fingerprint.mjs`. Antes
 
 Convierte una observación/log en `bugs/incoming/REPORT-*.json` sin convertirla automáticamente en bug canónico. El reporte contiene:
 - fingerprint estable;
+- `git_head` observado cuando está disponible;
 - excerpt sanitizado;
 - clasificación aproximada;
 - bugs conocidos más cercanos;
@@ -34,6 +35,14 @@ Si ya existe un incoming report con el mismo fingerprint, no crea otro: devuelve
 `npm run bug:triage`
 
 Agrupa `bugs/incoming` por fingerprint y muestra `SINGLE`, `REPEATED` o `RECURRENT`. Un fingerprint repetido debe actualizar/reabrir primero el bug canónico relacionado; no se debe crear otro ID por costumbre.
+
+### Correlacionar commits sospechosos
+
+`npm run bug:culprit -- BUG-0003 --limit=30`
+
+Busca commits recientes que tocaron archivos históricamente relacionados con el bug (`suspected_files`, archivos de intentos y archivos del fix), muestra qué superficie tocaron y rebaja commits ya registrados como fixes conocidos.
+
+Es una herramienta para priorizar investigación, no para declarar causa raíz. El propio comando recuerda la regla: correlación no implica causalidad; reproducir o bisectar antes de acusar un commit.
 
 ### Predecir riesgo antes de declarar seguro un cambio
 
@@ -143,7 +152,8 @@ Cuando aparezca un fallo:
 1. `bug:scan` para comparar;
 2. `bug:candidate` para guardar una observación sanitizada si corresponde;
 3. `bug:triage` para revisar reincidencias;
-4. actualizar/reabrir antes de crear otro bug cuando el fingerprint/síntoma coincida.
+4. `bug:culprit` si se sospecha regresión reciente;
+5. actualizar/reabrir antes de crear otro bug cuando el fingerprint/síntoma coincida.
 
 Después de un fix:
 
