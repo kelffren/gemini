@@ -10,6 +10,7 @@ on:
       - 'src/studio/adapters/current-world-importer.mjs'
       - 'src/studio/integration/live-studio-controller.mjs'
       - 'src/studio/integration/world-studio-bridge.mjs'
+      - 'src/studio/integration/studio-boot-pace.mjs'
       - 'src/studio/studio-entry.mjs'
       - 'src/world/world-draft-store.js'
       - 'src/world/world-revision-system.js'
@@ -22,6 +23,7 @@ on:
       - 'scripts/world-editor-creator-boot-isolation-audit.mjs'
       - 'scripts/world-iphone-viewport-reveal-audit.mjs'
       - 'scripts/world-studio-provisional-shell-audit.mjs'
+      - 'scripts/world-studio-ready-yield-audit.mjs'
       - '.github/workflows/world-editor-lazy-boot-ci.yml'
   pull_request:
     paths:
@@ -31,6 +33,7 @@ on:
       - 'src/studio/adapters/current-world-importer.mjs'
       - 'src/studio/integration/live-studio-controller.mjs'
       - 'src/studio/integration/world-studio-bridge.mjs'
+      - 'src/studio/integration/studio-boot-pace.mjs'
       - 'src/studio/studio-entry.mjs'
       - 'src/world/world-draft-store.js'
       - 'src/world/world-revision-system.js'
@@ -43,6 +46,7 @@ on:
       - 'scripts/world-editor-creator-boot-isolation-audit.mjs'
       - 'scripts/world-iphone-viewport-reveal-audit.mjs'
       - 'scripts/world-studio-provisional-shell-audit.mjs'
+      - 'scripts/world-studio-ready-yield-audit.mjs'
       - '.github/workflows/world-editor-lazy-boot-ci.yml'
 
 permissions:
@@ -71,3 +75,5 @@ jobs:
         run: node scripts/world-iphone-viewport-reveal-audit.mjs
       - name: Verify provisional Studio shell listeners are stripped before hydrate
         run: node scripts/world-studio-provisional-shell-audit.mjs
+      - name: Verify ready Studio shell bypasses Safari mount rAF wait
+        run: node scripts/world-studio-ready-yield-audit.mjs
