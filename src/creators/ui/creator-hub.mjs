@@ -4,9 +4,9 @@
  * owns: creator project navigation shell only
  * does-not-own: global navigation, Studio implementation, project persistence, permissions or publish policy
  * lazy: imported only after explicit CREATORS action; active cards dispatch through workspace registry
- * mobile: World launch paints Studio chrome and hides this Hub immediately, like Map Forge, so iPhone is not stuck on ABRIENDO while the Studio graph loads
+ * mobile: World launch paints Studio chrome immediately; Hub stays parked until .ks-status exists and is restored if the editor never mounts
  */
-import { bootKeloCreators } from '../creator-entry.mjs?v=world-handoff-20260914-1';
+import { bootKeloCreators } from '../creator-entry.mjs?v=world-light-20260914-1';
 
 let active=null;
 
@@ -199,31 +199,44 @@ export async function openCreatorHub({root=globalThis}={}){
         if(typeof paint==='function')paint(root);
         if(!doc.getElementById('kelo-studio-live'))throw new Error('WORLD_EDITOR_MOUNT_FAILED');
         hub.style.display='none';
-        // Map Forge pattern: hand the Hub off as soon as World chrome is up.
-        // Waiting for the 80-module Studio graph here is what froze the World card on iPhone.
         const pending=platform.openWorkspace(id,resolvedProjectId?{projectId:resolvedProjectId}:{});
-        pending.catch(error=>{
+        const abortWorldLaunch=()=>{
           const live=doc.getElementById('kelo-studio-live');
-          const loading=live?.dataset?.keloWorldLoading==='1';
-          if(loading||!live?.isConnected){
+          const ready=live?.isConnected&&live.dataset?.keloWorldLoading!=='1'&&live.querySelector?.('.ks-status');
+          if(!ready){
             try{live?.remove();}catch{}
             try{doc.getElementById('kelo-world-launch-curtain')?.remove();}catch{}
+            try{doc.querySelector('canvas.kelo-studio-overlay')?.remove();}catch{}
             try{doc.body.classList.remove('kelo-studio-active');}catch{}
           }
+          restoreHub();
+          hub.style.display='';
+        };
+        pending.then(()=>{
+          const live=doc.getElementById('kelo-studio-live');
+          const ready=live?.isConnected&&live.dataset?.keloWorldLoading!=='1'&&live.querySelector?.('.ks-status');
+          if(ready){
+            setTimeout(()=>{try{destroy();}catch{}},250);
+            return;
+          }
+          abortWorldLaunch();
+          showLaunchError(id,new Error('WORLD_EDITOR_OPEN_TIMEOUT'));
+        }).catch(error=>{
+          abortWorldLaunch();
           showLaunchError(id,error);
         });
-        setTimeout(()=>{try{destroy();}catch{}},250);
         return null;
       }
       const session=await platform.openWorkspace(id,resolvedProjectId?{projectId:resolvedProjectId}:{});
       destroy();
       return session;
     }catch(error){
-      if(id==='world'&&doc.getElementById('kelo-studio-live')?.isConnected){
+      if(id==='world'&&doc.getElementById('kelo-studio-live')?.querySelector?.('.ks-status')){
         destroy();
         return null;
       }
       restoreHub();
+      hub.style.display='';
       showLaunchError(id,error);
       return null;
     }finally{
@@ -372,7 +385,7 @@ export async function openCreatorHub({root=globalThis}={}){
   doc.addEventListener('keydown',onKey,true);
 
   active=Object.freeze({
-    version:'kelo-creator-hub-v1.16.0-world-handoff',
+    version:'kelo-creator-hub-v1.18.0-world-light',
     hub,platform,
     get section(){return current;},
     show:render,

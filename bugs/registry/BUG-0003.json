@@ -10,7 +10,7 @@
   "reported_by": ["human QA", "AI inspection", "regression test", "player"],
   "reports": ["REPORT-000001"],
   "environment": {
-    "game_build": "world-handoff-20260914-1",
+    "game_build": "world-light-20260914-1",
     "device": "iPhone real device target",
     "os": "iOS",
     "browser": "Safari",
@@ -26,11 +26,13 @@
     "Open Create -> World again and confirm Studio remounts instead of black-screening."
   ],
   "expected": "World opens, remains interactive, and can be reopened even after a stale Studio shell/session condition.",
-  "actual": "Player report 2026-09-14 (repeat): tapping World still froze the card. Live Pages with 824a932 painted the launch curtain and requested 80 Studio modules, but #kelo-studio-live never attached within 15s and the Hub stayed on ABRIENDO because it awaited the Studio graph.",
+  "actual": "Player report 2026-09-14 (repeat): tapping World still froze the card. Live Pages with 824a932 painted the launch curtain and requested 80 Studio modules, but #kelo-studio-live never attached within 15s and the Hub stayed on ABRIENDO because it awaited the Studio graph. Player report 2026-09-14 (handoff fail): world-handoff 5a52c6d painted KELO STUDIO / Abriendo World Editor… then the Safari tab went fully black with a loading spinner.",
   "evidence": [
     "Commit 829ac7fbd5fc629b05ecf92489bab16b0292bce9: IndexedDB fail-open candidate — insufficient.",
     "Commit 824a932f5e3e41c888116ab1453d64500e66255d: curtain + Hub stacking candidate — failed live Pages World tap QA on 2026-09-14.",
-    "REPORT-000001: player, iPhone 393x852, World card stays frozen after tap",
+    "Commit 5a52c6d7404e09019c9ec96cc2ecea43af1bb6a7: Map Forge Hub-handoff candidate — failed player iPhone QA; loading chrome then black Safari tab.",
+    "REPORT-000001: player, iPhone 393x852, World card stays frozen after tap, then loading chrome then black tab",
+    "Player screenshots 2026-09-14 22:03–22:04: IMG_8293 KELO STUDIO / MODO CREADOR + Abriendo World Editor…; IMG_8294 fully black Safari tab with spinner",
     "Live Pages QA 2026-09-14: CREATOR_BUILD world-unfreeze-20260913-2 deployed; curtain visible; 80 /src/studio/ requests; #kelo-studio-live never attached in 15s"
   ],
   "suspected_files": [
@@ -38,6 +40,9 @@
     "src/creators/ui/creator-hub.mjs",
     "src/studio/ui/studio-live-shell.mjs",
     "src/studio/integration/live-studio-controller.mjs",
+    "src/studio/studio-entry.mjs",
+    "src/studio/studio-boot-extras.mjs",
+    "src/studio/render/studio-overlay-canvas.mjs",
     "src/studio/storage/indexeddb-studio-store.mjs",
     "tests/world-editor-ios-reopen.spec.js"
   ],
@@ -52,16 +57,20 @@
       "src/creators/ui/creator-hub.mjs",
       "src/creators/creator-entry.mjs",
       "src/ui/studio-launcher.js",
-      "src/studio/ui/studio-live-shell.mjs",
+      "src/studio/studio-entry.mjs",
+      "src/studio/studio-boot-extras.mjs",
       "src/studio/integration/live-studio-controller.mjs",
+      "src/studio/render/studio-overlay-canvas.mjs",
       "index.html"
     ],
-    "summary": "World now follows the Map Forge handoff: pointerup paints #kelo-studio-live chrome immediately, hides/destroys the Hub, yields 420ms, pauses gameplay render during the Studio import, and only then loads the 80-module graph. Loading placeholder is not treated as a mounted editor. Studio chrome no longer uses backdrop-filter over the live canvas."
+    "summary": "5a52c6d handoff failed player QA (loading chrome then black Safari tab). New world-light candidate: keep Hub until .ks-status and restore it if the editor never mounts; Studio extras/palette load after core; live controller dynamically imports studio-entry; shell paints before world import; overlay dpr capped at 1.5 on iPhone and allocated after chrome."
   },
   "verification": {
     "status": "PENDING",
-    "method": "Real iPhone Safari E2E: enter game -> Create -> World -> Studio chrome visible immediately, then interactive. Do not mark PASS from headless_shell alone. Previous 824a932 candidate failed this method on live Pages.",
-    "evidence": [],
+    "method": "Real iPhone Safari E2E: enter game -> Create -> World -> Studio chrome visible immediately, then interactive tools/status, not a black Safari tab. Do not mark PASS from headless_shell. 824a932 and 5a52c6d both failed this method.",
+    "evidence": [
+      "FAILED: 5a52c6d world-handoff — player iPhone screenshots 2026-09-14 22:03 loading chrome, 22:04 black Safari spinner"
+    ],
     "verified_by": null,
     "verified_at": null
   },
@@ -73,7 +82,9 @@
     "Do not mark VERIFIED until the deployed flow passes on the target device class.",
     "Studio graph must stay lazy until World is tapped (live-studio-click-audit).",
     "headless_shell can freeze after Studio mounts because of the overlay canvas loop; that is not the player-facing Hub-cover bug.",
-    "824a932 failed verification: Hub awaited the Studio graph, so the World card stayed ABRIENDO while 80 modules loaded."
+    "824a932 failed verification: Hub awaited the Studio graph, so the World card stayed ABRIENDO while 80 modules loaded.",
+    "5a52c6d failed verification: Hub destroyed at 250ms while the 80-module static graph + dpr=3 overlay killed the iPhone tab after loading chrome. REOPENED then replaced by world-light-20260914-1.",
+    "Do not mark CLOSED from this candidate. Player must enter the editor, not a black tab."
   ],
-  "updated_at": "2026-09-14T01:52:00Z"
+  "updated_at": "2026-09-14T02:40:00Z"
 }

@@ -4,7 +4,7 @@
  * owns: descriptor and lazy routing into existing live Studio controller
  * does-not-own: World editor, commands, drafts, authority, terrain, collisions, PropertySystem or camera
  * reuse: existing openKeloStudioLive() remains implementation; Map Forge handoff imports through Studio adapter + KELO_WORLD_EDIT and focuses through KeloCamera
- * mobile: paint Studio chrome immediately and yield 420ms like Map Forge so the World card cannot freeze the Hub on iPhone while the Studio graph loads
+ * mobile: paint Studio chrome immediately, yield, then load a light Studio graph; resume gameplay render after 800ms so a hung import cannot leave a black tab
  */
 import { waitForWorldEditAuthority } from '../adapters/world-creator-adapter.mjs';
 
@@ -71,10 +71,11 @@ export function paintWorldEditorLaunchShell(root=globalThis,message='Abriendo Wo
 }
 function discardLoadingShell(root){
   const shell=root?.document?.getElementById?.('kelo-studio-live');
-  if(shell?.dataset?.keloWorldLoading==='1'){
-    try{shell.remove();}catch{}
+  if(shell?.dataset?.keloWorldLoading==='1'||!shell?.querySelector?.('.ks-status')){
+    try{shell?.remove();}catch{}
     try{root.document.body.classList.remove('kelo-studio-active');}catch{}
   }
+  try{root?.document?.querySelector?.('canvas.kelo-studio-overlay')?.remove?.();}catch{}
   clearLaunchCurtain(root);
 }
 function pauseGameplayRender(root){
@@ -134,7 +135,7 @@ function mapFocusPoint(map){
   return Object.freeze({x:clamp(x,bx,bx+bw),y:clamp(y,by,by+bh)});
 }
 
-export function createWorldWorkspaceManifest({loader=()=>import('../../studio/integration/live-studio-controller.mjs'),mapForgeImporter=()=>import('../../studio/adapters/map-forge-draft-importer.mjs')}={}){
+export function createWorldWorkspaceManifest({loader=()=>import('../../studio/integration/live-studio-controller.mjs?v=world-light-20260914-1'),mapForgeImporter=()=>import('../../studio/adapters/map-forge-draft-importer.mjs')}={}){
   return Object.freeze({
     id:'world',
     label:'World',
@@ -147,8 +148,13 @@ export function createWorldWorkspaceManifest({loader=()=>import('../../studio/in
       paintWorldEditorLaunchShell(root,previewOnly?'Cargando vista previa…':'Abriendo World Editor…');
       await yieldFrames(root,2);
       const resumeRender=pauseGameplayRender(root);
+      const failsafeWait=typeof root.setTimeout==='function'?root.setTimeout.bind(root):setTimeout;
+      const failsafeCancel=typeof root.clearTimeout==='function'?root.clearTimeout.bind(root):clearTimeout;
+      const failsafe=failsafeWait(()=>resumeRender(),800);
       try{
+        try{root.KELO_WORLD_LAUNCH_ABORTED=false;}catch{}
         const boot=async()=>{
+          if(root.KELO_WORLD_LAUNCH_ABORTED)throw new Error('WORLD_EDITOR_OPEN_TIMEOUT');
           const edit=await waitForWorldEditAuthority(root);
           let prepared=null;
           if(mapDefinition){
@@ -169,6 +175,7 @@ export function createWorldWorkspaceManifest({loader=()=>import('../../studio/in
           }
           let mod=await loadStudioModule(loader,root);
           resumeRender();
+          if(root.KELO_WORLD_LAUNCH_ABORTED)throw new Error('WORLD_EDITOR_OPEN_TIMEOUT');
           if(typeof mod.openKeloStudioLive!=='function')throw new Error('CREATOR_WORLD_STUDIO_ENTRY_MISSING');
           let session;
           try{
@@ -190,7 +197,11 @@ export function createWorldWorkspaceManifest({loader=()=>import('../../studio/in
           return session;
         };
         return await withTimeout(root,boot(),studioOpenBudget(root),'WORLD_EDITOR_OPEN_TIMEOUT');
+      }catch(error){
+        try{root.KELO_WORLD_LAUNCH_ABORTED=true;}catch{}
+        throw error;
       }finally{
+        failsafeCancel(failsafe);
         resumeRender();
         if(studioShellMounted(root))clearLaunchCurtain(root);
         else discardLoadingShell(root);
