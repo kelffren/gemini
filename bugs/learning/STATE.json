@@ -383,9 +383,20 @@
       "files": [
         "index.html"
       ]
+    },
+    {
+      "id": "prevention:f3b7afc695f5e0a51486303f4092e5f3dcfd2ab7",
+      "at": "2026-09-14T16:36:47.000Z",
+      "source": "bug-prevention-ci",
+      "head_sha": "f3b7afc695f5e0a51486303f4092e5f3dcfd2ab7",
+      "base_sha": "8eeeb4e744bbb98902d0cb727b647db496a2e097",
+      "conclusion": "failure",
+      "files": [
+        "src/studio/integration/world-studio-bridge.mjs"
+      ]
     }
   ],
-  "feedback_updated_at": "2026-09-14T15:40:31.385Z",
+  "feedback_updated_at": "2026-09-14T16:37:05.081Z",
   "training": {
     "examples": 33,
     "search_examples": 24,
