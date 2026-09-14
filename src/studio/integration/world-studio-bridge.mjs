@@ -4,55 +4,30 @@
  * does-not-own: Studio kernel, live shell internals, Hub, world authority
  * public-api: openKeloStudioLive(), closeKeloStudioLive(), getKeloStudioLive()
  * reuse: live-studio-controller remains the session owner; this file is the only first hop from World workspace
- * mobile: import Studio in waves with main-thread yields; strip provisional listeners before controller hydrate, then release the loading viewport as soon as real chrome hydrates
+ * mobile: import the zero-static-import controller after one paint yield, then hand off to controller immediately; controller owns phased runtime loading after chrome exists. Strip provisional listeners before controller hydrate, release the loading viewport as soon as real chrome hydrates, and keep one Studio stylesheet after provisional→live handoff.
  * online: no; authority stays in KELO_WORLD_EDIT
  */
 import { yieldStudioBoot, setWorldLaunchStatus } from './studio-boot-pace.mjs';
 
-export const WORLD_STUDIO_BRIDGE_BUILD='world-bridge-20260914-11';
-const CONTROLLER=`./live-studio-controller.mjs?v=${WORLD_STUDIO_BRIDGE_BUILD}`;
+export const WORLD_STUDIO_BRIDGE_BUILD='world-bridge-20260914-15';
+const bridgeUrl=new URL(import.meta.url);
+const controllerBuild=bridgeUrl.searchParams.get('v')||WORLD_STUDIO_BRIDGE_BUILD;
+const CONTROLLER=`./live-studio-controller.mjs?v=${encodeURIComponent(controllerBuild)}`;
 let controllerMod=null;
-let iphonePrewarmed=false;
-
-function isPhone(root){
-  const ua=String(root?.navigator?.userAgent||'');
-  const short=Math.min(Number(root?.innerWidth)||999,Number(root?.innerHeight)||999);
-  return /iPhone|iPad|iPod/i.test(ua)||short<=500;
-}
-
-async function prewarmIphoneStudioRuntime(root){
-  if(iphonePrewarmed||!isPhone(root))return;
-  const roots=[
-    '../render/studio-overlay-canvas.mjs',
-    '../render/creator-grid-overlay.mjs',
-    '../input/pointer-input-adapter.mjs',
-    '../input/studio-camera-controller.mjs',
-    './authority-command-mirror.mjs',
-    '../ui/creator-productivity-panel.mjs',
-    '../tools/creator-actions.mjs',
-    '../prefabs/creator-prefab-library.mjs',
-    '../validation/creator-world-analyzer.mjs',
-    '../document/document-commands.mjs'
-  ];
-  for(let i=0;i<roots.length;i++){
-    if(root?.KELO_WORLD_LAUNCH_ABORTED)throw new Error('WORLD_EDITOR_OPEN_TIMEOUT');
-    setWorldLaunchStatus(root,`Preparando Studio ${i+1}/${roots.length}…`);
-    await import(roots[i]);
-    if(i<roots.length-1)await yieldStudioBoot(root);
-  }
-  iphonePrewarmed=true;
-}
 
 async function loadController(root){
   if(controllerMod)return controllerMod;
   if(root?.KELO_WORLD_LAUNCH_ABORTED)throw new Error('WORLD_EDITOR_OPEN_TIMEOUT');
   setWorldLaunchStatus(root,'Cargando editor…');
+  // Give Safari one paint before parsing the controller, but once the controller
+  // has evaluated do not insert another frame/timer barrier before mount. The
+  // controller's first responsibility is painting #kelo-studio-live; delaying the
+  // handoff here only widens the imports-finished -> mount gap observed on iPhone.
   await yieldStudioBoot(root);
-  await prewarmIphoneStudioRuntime(root);
   if(root?.KELO_WORLD_LAUNCH_ABORTED)throw new Error('WORLD_EDITOR_OPEN_TIMEOUT');
   controllerMod=await import(CONTROLLER);
-  await yieldStudioBoot(root);
   if(root?.KELO_WORLD_LAUNCH_ABORTED)throw new Error('WORLD_EDITOR_OPEN_TIMEOUT');
+  setWorldLaunchStatus(root,'Montando editor…');
   return controllerMod;
 }
 
@@ -67,6 +42,18 @@ export function sanitizeWorldStudioProvisionalShell(root=globalThis){
   }catch{
     return shell;
   }
+}
+
+export function pruneWorldStudioStyles(root=globalThis){
+  const doc=root?.document;
+  const styles=Array.from(doc?.querySelectorAll?.('style[data-kelo-studio-ui="1"]')||[]);
+  if(styles.length<=1)return styles.length;
+  const keep=styles[styles.length-1];
+  for(const style of styles){
+    if(style===keep)continue;
+    try{style.remove?.();}catch{}
+  }
+  return 1;
 }
 
 export function releaseWorldStudioViewport(root=globalThis){
@@ -98,6 +85,7 @@ export async function openKeloStudioLive(opts={}){
   sanitizeWorldStudioProvisionalShell(root);
   const session=await releaseViewportDuringOpen(root,ctrl.openKeloStudioLive(opts));
   releaseWorldStudioViewport(root);
+  pruneWorldStudioStyles(root);
   return session;
 }
 export async function closeKeloStudioLive(opts={}){

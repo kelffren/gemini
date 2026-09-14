@@ -58,8 +58,18 @@ function proveHttp2(pathname = '/') {
   });
 }
 
+function cacheDirectives(value) {
+  return String(value || '')
+    .split(',')
+    .map((part) => part.trim().toLowerCase())
+    .filter(Boolean)
+    .sort();
+}
+
 function exactCache(headers, expected) {
-  return String(headers['cache-control'] || '').trim().toLowerCase() === expected.toLowerCase();
+  const actual = cacheDirectives(headers['cache-control']);
+  const wanted = cacheDirectives(expected);
+  return actual.length === wanted.length && actual.every((directive, index) => directive === wanted[index]);
 }
 
 async function findLiveHashedAsset() {
@@ -71,15 +81,20 @@ async function findLiveHashedAsset() {
   } catch (error) {
     fail(`live meta.json is invalid JSON: ${error.message}`);
   }
-  const candidates = Object.keys(meta.outputs || {})
-    .map((p) => p.replaceAll('\\', '/'))
-    .filter((p) => /-[A-Z0-9]{6,}\.js$/i.test(p));
+  const candidates = Object.entries(meta.outputs || {})
+    .map(([p, info]) => ({
+      path: p.replaceAll('\\', '/'),
+      bytes: Number(info?.bytes || 0)
+    }))
+    .filter((item) => /-[A-Z0-9]{6,}\.js$/i.test(item.path))
+    .sort((a, b) => b.bytes - a.bytes);
   if (!candidates.length) fail('live deploy exposes no hashed production JS asset in meta.json');
-  const chosen = candidates[0].replace(/^\.?\//, '');
-  return '/' + chosen;
+  const chosen = candidates[0].path.replace(/^\.?\//, '');
+  return { path: '/' + chosen, bytes: candidates[0].bytes };
 }
 
-const hashedPath = await findLiveHashedAsset();
+const hashedAsset = await findLiveHashedAsset();
+const hashedPath = hashedAsset.path;
 const index = await request('/index.html', 'br,gzip');
 if (index.status !== 200) fail(`index status ${index.status}`);
 if (!exactCache(index.headers, 'no-cache, max-age=0, must-revalidate')) fail(`index Cache-Control=${index.headers['cache-control'] || '<missing>'}`);
@@ -92,11 +107,11 @@ const assetBr = await request(hashedPath, 'br,gzip');
 if (assetBr.status !== 200) fail(`hashed asset status ${assetBr.status} path=${hashedPath}`);
 if (!exactCache(assetBr.headers, 'public, max-age=31536000, immutable')) fail(`hashed asset Cache-Control=${assetBr.headers['cache-control'] || '<missing>'}`);
 const brEncoding = String(assetBr.headers['content-encoding'] || '').toLowerCase();
-if (brEncoding !== 'br') fail(`expected Brotli on hashed asset, got ${brEncoding || '<none>'}`);
+if (brEncoding !== 'br') fail(`expected Brotli on hashed asset (${hashedAsset.bytes} bytes), got ${brEncoding || '<none>'}`);
 
 const assetGzip = await request(hashedPath, 'gzip');
 const gzipEncoding = String(assetGzip.headers['content-encoding'] || '').toLowerCase();
-if (gzipEncoding !== 'gzip') fail(`expected gzip fallback on hashed asset, got ${gzipEncoding || '<none>'}`);
+if (gzipEncoding !== 'gzip') fail(`expected gzip fallback on hashed asset (${hashedAsset.bytes} bytes), got ${gzipEncoding || '<none>'}`);
 
 const cdnHeader = String(assetBr.headers.server || assetBr.headers['x-nf-request-id'] || '').toLowerCase();
 const netlifyEvidence = Boolean(assetBr.headers['x-nf-request-id']) || cdnHeader.includes('netlify');
@@ -109,6 +124,7 @@ const evidence = {
   generatedAt: new Date().toISOString(),
   origin,
   hashedAsset: hashedPath,
+  hashedAssetBytes: hashedAsset.bytes,
   hostingHeadersVerified: true,
   compressionVerified: true,
   transportVerified: true,
@@ -126,4 +142,4 @@ const evidence = {
 
 fs.mkdirSync(path.join(root, 'dist'), { recursive: true });
 fs.writeFileSync(path.join(root, 'dist', 'turbo-live-host-evidence.json'), JSON.stringify(evidence, null, 2) + '\n');
-console.log(`TURBO LIVE HOST AUDIT PASS — ${origin}; liveAsset=${hashedPath}; br=${brEncoding}; gzip=${gzipEncoding}; http2=${h2.alpn}`);
+console.log(`TURBO LIVE HOST AUDIT PASS — ${origin}; liveAsset=${hashedPath}; bytes=${hashedAsset.bytes}; br=${brEncoding}; gzip=${gzipEncoding}; http2=${h2.alpn}`);

@@ -34,7 +34,7 @@ jobs:
           node-version: '20'
 
       - name: Record sanitized prevention outcome
-        run: node scripts/bug-learning-observe.mjs --head="$OBSERVED_HEAD" --conclusion="$OBSERVED_CONCLUSION" --at="$OBSERVED_AT"
+        run: node scripts/bug-learning-observe.mjs --head="$OBSERVED_HEAD" --conclusion="$OBSERVED_CONCLUSION" --at="$OBSERVED_AT" --success-minutes=60
 
       - name: Audit feedback state
         run: node scripts/bug-learning-audit.mjs
@@ -54,12 +54,12 @@ jobs:
 
           if [ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]; then
             git reset --hard origin/main
-            node scripts/bug-learning-observe.mjs --head="$OBSERVED_HEAD" --conclusion="$OBSERVED_CONCLUSION" --at="$OBSERVED_AT"
+            node scripts/bug-learning-observe.mjs --head="$OBSERVED_HEAD" --conclusion="$OBSERVED_CONCLUSION" --at="$OBSERVED_AT" --success-minutes=60
             node scripts/bug-learning-audit.mjs
           fi
 
           if git diff --quiet -- bugs/learning/STATE.json; then
-            echo 'Latest main already contains equivalent feedback.'
+            echo 'Latest main already contains equivalent or recently sampled success feedback.'
             exit 0
           fi
 
