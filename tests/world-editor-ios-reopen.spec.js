@@ -42,6 +42,7 @@ function writeWorldTrace(name, rows) {
 }
 
 test('World recovers a stale Studio session instead of leaving iOS on a black page', async ({ page }) => {
+  test.setTimeout(90000);
   const pageErrors = [];
   const consoleErrors = [];
   page.on('pageerror', error => pageErrors.push(String(error)));
@@ -53,6 +54,17 @@ test('World recovers a stale Studio session instead of leaving iOS on a black pa
   // admin-key-system.js. guest=1 keeps the auth wall out of the mobile QA path.
   const response = await page.goto('./?guest=1&mapEditor=1&world-ios-reopen=1', { waitUntil: 'domcontentloaded', timeout: 30000 });
   expect(response && response.status()).toBeLessThan(400);
+  const mobileIdentity = await page.evaluate(() => ({
+    ua: navigator.userAgent,
+    touchPoints: navigator.maxTouchPoints,
+    width: innerWidth,
+    height: innerHeight,
+    dpr: devicePixelRatio,
+  }));
+  expect(mobileIdentity.ua).toContain('iPhone');
+  expect(mobileIdentity.touchPoints).toBeGreaterThan(0);
+  expect(mobileIdentity.width).toBeLessThanOrEqual(430);
+
   await page.waitForFunction(() => !!(
     window.KeloInputLocks?.acquire &&
     window.KELO_ADMIN_KEYS?.can?.('world.edit')
@@ -70,15 +82,19 @@ test('World recovers a stale Studio session instead of leaving iOS on a black pa
   await expect(studio).not.toHaveAttribute('data-kelo-world-loading', '1', { timeout: 25000 });
   await expect(hub).toHaveCount(0);
 
-  // The bridge black box must prove that visible chrome progressed to a real
-  // interactive session. A shell alone is not acceptance for BUG-0003.
-  await page.waitForTimeout(1100);
+  // Player evidence showed a post-chrome death. Holding the live shell for 10 s
+  // makes that failure class part of the regression gate rather than accepting
+  // a one-frame/editor-chrome success.
+  await page.waitForTimeout(10100);
   const firstTrace = await readWorldTrace(page);
   writeWorldTrace('world-editor-black-box-first-open', firstTrace);
   const firstMilestones = firstTrace.map(row => row.milestone);
   expect(firstMilestones).toContain('CONTROLLER_OPEN_RESOLVED');
   expect(firstMilestones).toContain('EDITOR_READY');
   expect(firstMilestones).toContain('SURVIVED_1000MS');
+  expect(firstMilestones).toContain('SURVIVED_5000MS');
+  expect(firstMilestones).toContain('SURVIVED_10000MS');
+  await expect(studio).toBeVisible();
 
   // Reproduce the Safari failure mode: DOM shell disappears while the module-level
   // Studio session is still cached as active.
