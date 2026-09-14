@@ -1,175 +1,85 @@
-# ÍNDICE DE CÓDIGO — palabras clave
+# Kelo World — Code Index
 
-Busca en el repo: `KELO-INDEX` o la clave (`NET`, `CAST`, `POSE`, …).
+**Actualizado:** 2026-09-14
 
-Formato obligatorio en JS (el motor **no lo ejecuta**):
+## Runtime
 
-```js
-/* KELO-INDEX
- * area: NET
- * keys: POSE CAST AUTHORITY PLAYERKEY WS
- * hace: puente WebSocket; el cliente pide, el server decide si hay ws
- * online: request() misma boca local/server
- */
-```
+- `index.html` — orden LIVE, auth-first y engine boot.
+- `engine-a.js` — legacy state/movement physics core.
+- `engine-c.js` — legacy render/simulation orchestration.
+- `engine-net.js` — networking runtime.
 
-Encima de una función:
+## Foundation Core
 
-```js
-// KELO-INDEX NET/POSE envia x y face gait zone al room
-function sendPose() { ... }
-```
+- `src/core/events/event-bus.js` — `KeloEvents`.
+- `src/core/input-lock-system.js` — `KeloInputLocks`.
+- `src/core/input-system.js` — `KeloInput`.
+- `src/core/movement-system.js` — `KeloMovement`.
+- `src/core/camera-system.js` — `KeloCamera`.
+- `src/core/avatar-render-system.js` — `KeloAvatar`.
+- `src/core/render-extension-system.js` — `KeloRender`.
+- `src/core/simulation-extension-system.js` — `KeloSimulation`.
+- `src/core/update-system.js` — `KeloUpdater`.
 
-No uses `/*` para apagar código. Los comentarios solo documentan.
+## World / Environment
 
----
+- `src/environment/world-map.js` — definición principal.
+- `src/environment/terrain-contract.js` — terrain.
+- `src/environment/tile-registry.js` — tile/atlas registry.
+- `src/environment/atlas-contract.js` — atlas authority.
+- `src/environment/environment-layer-stack.js` — draw phases.
+- `src/environment/surface-ground.js` — suelo.
+- `src/environment/prop-contract.js` — props data-driven.
+- `src/environment/prefab-contract.js` — prefab rendering contract.
+- `src/environment/world-builder-system.js` — builder integration.
+- `src/environment/generated/forest-plaza-tileset-v2-manifest.js` — manifest irregular Forest Plaza.
 
-## Claves → archivo dueño LIVE
+## Forest Plaza / Assets
 
-| Clave | Qué es | Dónde |
-|---|---|---|
-| CORE | estado, input, física, loop | `engine-a.js` |
-| LOOP | requestAnimationFrame | `engine-b.js` |
-| MOVE JOY GAIT | joystick, walk/run | `engine-ac.js` |
-| HERO SPRITE | hoja del personaje | `engine-ab.js` |
-| MELEE TAP | ataque por toque (APAGADO) | `engine-n.js` |
-| PLAZA GROUND | suelo authored | `engine-l.js` |
-| HOUSES | casas legacy | `engine-y.js` |
-| TILES REGISTRY | atlas + prefabs | `src/environment/tile-registry.js` |
-| WORLD CHUNKS | renderer 512 | `src/environment/world-map.js` |
-| LUXE BOUTIQUE | tienda | `src/environment/luxe-kiosk-atlas.js` `src/ui/luxe-boutique.js` |
-| HUD LUXE | shell menú | `src/ui/luxe-shell.js` |
-| MOBILE ORIENTATION | vertical/horizontal, viewport y botón GIRAR | `src/ui/mobile-orientation.js` |
-| STONES RECIPE | piedras data-driven; 5 slots | `src/abilities/stone-system.js` `abilityData.js` |
-| CAST ABILITY | delivery/effects compartidos + `castSource/predictSource` para weapon/mount sin tocar Stone hotbar | `src/abilities/kelo-ability-boot.js` |
-| MOUNT CATALOG PROFILE | MountDefinition + MovementProfile + EquipmentSlotProfile | `src/mounts/mount-catalog.js` |
-| MOUNT RUNTIME EQUIP | equipar/montar/equipo/outfit + authority boundary | `src/mounts/mount-system.js` |
-| MOUNT ABILITY M1 M2 M3 | canal exclusivo de 3 slots reutilizando KeloAbilities | `src/mounts/mount-ability-channel.js` `mount-ability-data.js` |
-| MOUNT UI | panel + barra M1–M3 | `src/ui/mount-panel.js` `src/ui/mount-action-bar.js` |
-| STATS MODIFIER AGGREGATOR | math compartida player/mount y scopes | `src/stats/stat-modifier-system.js` |
-| APPEARANCE OUTFIT PROFILE | profiles/slots/anchors/outfits Character+Mount | `src/appearance/appearance-system.js` |
-| CHARACTER APPEARANCE ADAPTER | KeloCharacterSlotSchema → shared Appearance profile | `src/appearance/character-appearance-adapter.js` |
-| MOUNT CREATOR | definitions/import/virtual list/undo | `src/creators/workspaces/mount-workspace.mjs` `src/creators/ui/mount-creator.mjs` |
-| APPEARANCE CREATOR | Character+Mount outfit authoring/drag anchors | `src/creators/workspaces/appearance-workspace.mjs` `src/creators/ui/appearance-creator.mjs` |
-| CREATOR TABULAR IMPORT | CSV + XLSX lazy authoring | `src/creators/importers/tabular-definition-importer.mjs` |
-| NET WS POSE | online room | `engine-net.js` |
-| VISUAL ASSET REGISTRY | IDs / preload / lazy visual | `src/visuals/asset-registry.js` |
-| ANIMATION CLIP ANCHOR | clips, channels, foot-root sockets | `src/visuals/animation-system.js` |
-| VFX PROJECTILE SFX SCREEN | FX reutilizable / projectile visual / sonido | `src/visuals/fx-system.js` |
-| VISUAL SEQUENCE | timelines/composición opcional | `src/visuals/sequence-system.js` |
-| ABILITY VISUAL PROFILE | Ability event → presentation | `src/visuals/ability-visuals.js` |
-| VISUAL EVENT AUDIT | bus/context/layers/audit | `src/visuals/visual-system.js` |
-| VISUAL LAB | galería dev `?visualLab=1` | `src/visuals/visual-lab.js` |
-| VISUAL ACTOR BRIDGE | actorBackFX/actorFrontFX final | `src/visuals/visual-integration.js` |
-| NET VISUAL EVENT | relay semántico presentation-only | `engine-net.js` + `server/index.js` |
-| AUTHORITY | boca única client→server | `engine-net.js` `KeloNetAuthority` |
-| ONLINE IDENTITY | Supabase account → personaje; verificación server-side | `server/online-identity-store.js` + `profiles` `characters` `account_roles` |
-| SUPABASE FOUNDATION | persistencia, RLS, Storage, versionado, idempotencia y outbox | `supabase/migrations/*` `docs/systems/ONLINE_FOUNDATION.md` |
-| CREATOR ASSET BACKEND | familia estable → revisiones inmutables → review/publicación | `asset_families` `asset_revisions` `asset_review_requests` `asset_publications` + `creator-private`/`creator-global` |
-| MAP PERSISTENCE | mapa estable → versiones/chunks/dependencias exactas de assets | `maps` `map_versions` `map_version_chunks` `map_asset_refs` `map_publications` |
-| ECONOMY PERSISTENCE | wallets materializados + ledger append-only + item instances | `character_wallets` `wallet_ledger` `item_instances` `character_equipment` |
-| PROPERTY CATALOG | templates placeables desde props/prefabs | `src/property/property-asset-catalog.js` |
-| PROPERTY PARCEL UNITS | balances, placements, autoridad reemplazable | `src/property/property-system.js` |
-| MAP EDITOR | editor mundo/parcela, export/import | `src/ui/property-editor.js` |
-| NOBLEZA | rangos donación | `src/systems/nobility.js` `nobility-authority.js` |
-| LOGISTICS ADMIN UI | QA móvil/desktop de economía, rutas, carretas, facciones y clanes | `src/ui/logistics-admin-ui.js` + `KeloLogisticsDevtools` |
-| FORGE EQUIP | forja / gear | `src/systems/forge-system.js` `equipment-system.js` |
-| SERVER ROOM | autoridad Node | `server/index.js` |
-| GUARDIAN DONATION HOST | control plane de donación, capacidades, heartbeat y lease máster | `src/systems/guardian-system.js` `src/systems/guardian-authority.js` `server/guardian-coordinator.js` |
-| UNIVERSAL SPRITE INGESTION | detección foreground, hipótesis de layout, rigs 1/4/8D, normalización, Frame Doctor y validación | `src/creators/sprite-compiler/` + `src/creators/avatar/kelo-universal-asset-compiler.mjs` |
-| CREATOR ASSET SHEET BRIDGE | hoja cruda multi-asset → detección irregular → revisión JSON natural → galerías/prefabs → preview en World | `src/creators/assets/asset-sheet-compiler.mjs` + `kelo-creator-asset-bridge.mjs` + `asset-sheet-catalog-preview-adapter.mjs` |
+- `assets/world/plaza/forest-plaza-tileset-v2.png` — atlas fuente LIVE.
+- `src/property/forest-plaza-asset-catalog.js` — 146 templates, nombres/categorías.
+- `src/property/property-asset-catalog.js` — catálogo general.
+- `src/creators/assets/asset-sheet-compiler.mjs` — compiler heterogéneo.
+- `src/creators/sprite-compiler/sprite-foreground-analysis.mjs` — foreground/components.
+- `src/creators/sprite-compiler/sprite-world-asset-compiler.mjs` — perfil world asset.
 
----
+## Studio / Creator
 
-## Áreas (primera palabra después de KELO-INDEX)
+- `src/ui/studio-launcher.js` — launcher.
+- `src/creators/workspaces/world-workspace.mjs` — route/prewarm móvil.
+- `src/studio/integration/world-studio-bridge.mjs` — bridge de carga.
+- `src/studio/integration/live-studio-controller.mjs` — sesión LIVE.
+- `src/studio/studio-entry.mjs` — composición Studio.
+- `src/studio/core/studio-kernel.mjs` — document/commands.
+- `src/studio/ui/studio-live-shell.mjs` — shell.
+- `src/studio/ui/studio-asset-palette.mjs` — búsqueda/categorías/carpetas.
+- `src/world/map-forge/` — generación/composición Map Forge.
 
-`CORE` `NET` `AUTH` `CAST` `STONES` `MOUNTS` `STATS` `APPEARANCE` `CREATORS` `MOVE` `HERO` `PLAZA` `LUXE` `HUD` `ECON` `COMBAT` `SERVER` `UI` `PROPERTY` `DB` `SUPABASE` `GUARDIAN`
+## Gameplay
 
-Grep rápido:
+- `src/abilities/` — abilities/Stone/equipment channels.
+- `src/systems/pvp-world.js` — PvP world.
+- `src/systems/arena-*` — Arena.
+- `src/systems/equipment-system.js` — equipo.
+- `src/mounts/` — monturas.
+- `src/systems/backpack-system.js` — mochila.
+- `src/systems/container-system.js` — contenedores.
+- `src/systems/title-system.js` + `player-stats.js` — títulos/stats.
+- `src/systems/nobility.js` — nobleza.
+- `src/systems/commerce-authority.js` — commerce.
+- `src/systems/regional-economy-system.js` — economía regional.
+- `src/systems/caravan-system.js` — caravanas.
+- `src/property/property-system.js` — placements/property.
+- `src/instances/` — instancias.
 
-```text
-KELO-INDEX NET
-KELO-INDEX CAST
-KELO-INDEX MOUNTS
-KELO-INDEX STATS
-KELO-INDEX APPEARANCE
-KELO-INDEX CREATORS
-KELO-INDEX MOVE
-KELO-INDEX PROPERTY
-KELO-INDEX UI
-KELO-INDEX SERVER
-KELO-INDEX GUARDIAN
-```
+## Admin / Reliability
 
-## ONLINE FOUNDATION V1
-- `server/*` sigue siendo el único owner de autoridad gameplay online; Supabase no simula PvP ni movimiento por frame.
-- `server/online-identity-store.js`: verifica access token de Supabase y resuelve `accountId → characterId` sin confiar IDs declarados por cliente.
-- `auth.users.id` identifica cuenta; `characters.id` identifica personaje. `legacy_player_key` es solo puente de migración.
-- `supabase/migrations/*`: fuente versionada de schema/RLS/Storage; las versiones de migración son únicas.
-- Assets: `asset_families` conserva identidad editable; `asset_revisions` conserva bytes/versiones inmutables; mapas referencian `asset_id`, nunca URL.
-- Mapas: `maps → map_versions → map_version_chunks`; `map_asset_refs` fija dependencias reproducibles.
-- Economía: `character_wallets` es saldo materializado; `wallet_ledger` es historial append-only e idempotente por correlation ID.
-- Confiabilidad: `server_idempotency`, `server_outbox`, `server_audit_events` son service-only.
-- Storage: `creator-private`, `creator-global`, `avatars`, `map-previews`; las escrituras de usuario se limitan por carpeta `auth.uid()`.
-- Realtime Broadcast se reserva para publicación pública de assets/mapas; PvP y datos privados siguen por server WebSocket.
-- Browser: publishable key. Server: secret/service-role; una key secreta nunca entra en Pages, localStorage ni GitHub.
-- Audit: `npm run audit:online-foundation`.
+- `src/systems/admin-key-system.js`
+- `src/systems/guardian-system.js`
+- `src/systems/game-tuning-system.js`
+- `src/bug-reporting/`
+- `bugs/` — registry/evidence canónico.
 
-## MOUNT / STATS / APPEARANCE FOUNDATION V1
-- `src/mounts/mount-catalog.js`: definiciones ligeras; una montura nueva es data, no clase.
-- `src/mounts/mount-system.js`: único owner de `STATE.mounts`; equip/mount/dismount, equipo y outfit.
-- `src/mounts/mount-ability-channel.js`: tres slots adicionales; no modifica los 5 Stone slots ni crea delivery handlers paralelos.
-- `src/stats/stat-modifier-system.js`: resolver determinista común; `KeloEquipment` publica su equipo legacy como source adapter.
-- `src/appearance/appearance-system.js`: contrato visual compartido Character/Mount, completamente separado de stats.
-- `src/appearance/character-appearance-adapter.js`: deriva slots/orden del owner `KeloCharacterSlotSchema`; Character Creator sigue siendo su owner actual.
-- `src/creators/workspaces/mount-workspace.mjs` + `appearance-workspace.mjs`: workspaces lazy registrados en Kelo Creators.
-- `src/creators/core/definition-workspace-session.mjs`: reutiliza History + Studio Store para authoring de definitions.
-- `src/creators/importers/tabular-definition-importer.mjs`: CSV local y SheetJS XLSX cargado solo al importar.
-- Audits: `audit:mounts`, `audit:stats`, `audit:appearance`, `audit:mount-creator`.
-- Arte real de monturas todavía pendiente: no confundir Foundation/data/editor con aprobación visual pixel-perfect.
+## Documentación
 
-## INSTANCE SYSTEM V1
-- `src/instances/instance-system.js`: manager/lifecycle/contexto genérico.
-- `src/instances/instance-runtime-bridge.js`: transición world/house y bounds visuales.
-- `src/instances/house-instance.js`: autoridad, persistencia, snapshot y permisos House.
-- `src/instances/property-house-bridge.js`: contrato Property ↔ House.
-- `src/ui/house-instance-ui.js`: entrada/salida y acceso al mismo Property Editor.
-
-## ADMIN KEY / WORLD CREATOR V1
-- `src/systems/admin-key-system.js`: objeto/entitlement Llave Admin, scopes y autoridad reemplazable.
-- `src/ui/property-editor.js`: modo MUNDO visible únicamente con `world.edit`.
-- Parcela de jugador conserva unidades/ownership; Llave Admin no altera esa economía.
-
-## MOBILE ORIENTATION V1
-- `src/ui/mobile-orientation.js`: detecta portrait/landscape, sincroniza `innerWidth/innerHeight` con canvas/UI y expone `KELO_ORIENTATION`.
-- Botón `↻ GIRAR` vive en el rail móvil de Luxe; intenta `ScreenOrientation.lock()` cuando el navegador lo permite.
-- iOS/WebKit u otros navegadores sin lock conservan fallback seguro: giro físico + reajuste automático.
-- `scripts/mobile-orientation-audit.mjs`: certifica 390×844 y 844×390, cambio dinámico y ausencia de errores.
-
-<!-- CODE-INDEX-VISUAL-V1:START -->
-## VISUAL SYSTEM V1
-
-Regla: visuales son piezas reutilizables; StoneSystem no conoce Animation/VFX/Sequence. El gameplay emite eventos y la presentación los consume.
-
-Orden de carga relevante:
-`visual core/manifests/registries → abilityData → stone-system → mount ability data → ability boot → ability-visuals → engine-net → sistemas tardíos → visual-lab → visual-integration final`.
-
-Render: `groundFX → belowActor → actorBackFX → actor → actorFrontFX → worldFX → foregroundFX → screenFX → UI`.
-
-APIs clave: `KeloAnimation.play`, `KeloAnchors.get`, `KeloFX.spawn`, `KeloProjectileVisuals.preview/attach`, `KeloSFX.play`, `KeloSequence.play`, `KeloAbilityVisuals.playCue`, `KeloVisualEventBus.emit`.
-
-QA: `scripts/visual-system-contract-audit.js` + `scripts/live-visual-system-audit.mjs`; workflows `visual-system-ci.yml` y `visual-system-live.yml`.
-
-Detalle: `docs/VISUAL_SYSTEM.md`.
-<!-- CODE-INDEX-VISUAL-V1:END -->
-
-<!-- WORLD-BUILDER-V1:START -->
-## WORLD BUILDER / ADMIN AUTHORING V1
-- `src/environment/world-builder-system.js`: autoridad local reemplazable para overrides de SUELO/CAMINOS y colisiones del mundo principal.
-- `src/environment/world-builder-property-renderer.js`: fallback visual de placements Property cuando Decoration Reset suprime las capas normales; no posee estado.
-- `src/ui/world-builder-ui.js`: UI táctil/desktop `🗝 WORLD BUILDER`; capas SUELO, CAMINOS, OBJETOS y COLISIÓN.
-- `src/property/property-system.js`: continúa siendo la única fuente de verdad para OBJETOS/placements del mundo y parcelas.
-- `src/systems/admin-key-system.js`: única puerta de permisos/scopes de autor.
-- `docs/WORLD_BUILDER_MEMORY.md`: contrato completo, snapshot y migración online.
-- Hoy = `BORRADOR LOCAL`; futuro = `ServerWorldBuilderAuthority → Draft → Review → Publish`.
-<!-- WORLD-BUILDER-V1:END -->
+Empieza por `docs/DOCUMENTATION_INDEX.md`. Los documentos `*_MEMORY.md` son contexto acumulado, no autoridad superior al runtime.
