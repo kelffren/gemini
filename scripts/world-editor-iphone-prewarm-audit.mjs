@@ -33,4 +33,9 @@ if(afterControllerImport.includes('await yieldStudioBoot(root)'))throw new Error
 if(!afterControllerImport.includes("setWorldLaunchStatus(root,'Montando editor…')"))throw new Error('post-import mount status missing');
 if(!src.includes("if(root?.KELO_WORLD_LAUNCH_ABORTED)throw new Error('WORLD_EDITOR_OPEN_TIMEOUT')"))throw new Error('abort guard missing from direct controller handoff');
 
-console.log('world-editor-iphone-prewarm-audit: PASS (controller-first, immediate mount handoff)');
+if(!src.includes('const bridgeUrl=new URL(import.meta.url)'))throw new Error('bridge must inspect its own versioned URL');
+if(!src.includes("bridgeUrl.searchParams.get('v')||WORLD_STUDIO_BRIDGE_BUILD"))throw new Error('controller build must inherit the bridge v token');
+if(!src.includes('encodeURIComponent(controllerBuild)'))throw new Error('controller URL must carry the inherited bridge/retry token');
+if(/const CONTROLLER=`\.\/live-studio-controller\.mjs\?v=\$\{WORLD_STUDIO_BRIDGE_BUILD\}`/.test(src))throw new Error('fixed controller URL makes fresh World retry reuse the previous Safari module instance');
+
+console.log('world-editor-iphone-prewarm-audit: PASS (controller-first, immediate mount handoff, fresh retry cascades to controller)');
