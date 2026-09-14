@@ -38,9 +38,20 @@
       "files": [
         "src/creators/workspaces/world-workspace.mjs"
       ]
+    },
+    {
+      "id": "prevention:fe6688314b9a4e26fdb655da22d953e4cd62e4a8",
+      "at": "2026-09-14T11:35:01.000Z",
+      "source": "bug-prevention-ci",
+      "head_sha": "fe6688314b9a4e26fdb655da22d953e4cd62e4a8",
+      "base_sha": "79e579dccb6782c79a81663a54b2782a3a864a21",
+      "conclusion": "success",
+      "files": [
+        "scripts/world-editor-single-prewarm-owner-audit.mjs"
+      ]
     }
   ],
-  "feedback_updated_at": "2026-09-14T11:35:03.708Z",
+  "feedback_updated_at": "2026-09-14T11:35:24.058Z",
   "training": {
     "examples": 0,
     "search_examples": 0,
