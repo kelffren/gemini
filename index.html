@@ -15,7 +15,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="KELO WORLD">
-  <title>Kelo World — V6.57</title>
+  <title>Kelo World — V6.58</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="src/ui/backpack-fantasy-v1.css?v=1">
 <link rel="stylesheet" href="src/ui/kelo-interface-system.css?v=1">
@@ -37,6 +37,16 @@
 <div id="ui-layer"><div class="action-bar" id="action-bar-container" aria-label="Barra de habilidades"></div></div>
 <script>
 (function(){
+  window.KELO_WORLD_DECORATION_RESET=true;
+  try{
+    var q=new URLSearchParams(location.search);
+    if(q.get('guest')==='1'||q.get('aiGuest')==='1'){
+      document.documentElement.setAttribute('data-kelo-auth-gate','off');
+      document.documentElement.setAttribute('data-kelo-guest-play','1');
+      sessionStorage.setItem('kelo_local_guest_play_v1','1');
+      localStorage.setItem('kelo_local_guest_play_v1','1');
+    }
+  }catch(e){}
   var native=window.requestAnimationFrame.bind(window);
   var cancel=window.cancelAnimationFrame.bind(window);
   var q=[],held=true,id=0;
@@ -60,110 +70,111 @@
 </script>
 
 <!-- KELO-INDEX UPDATE: owner KeloUpdater; registra SW, detecta deploys durante sesiones largas y monta aviso táctil. -->
-<script src="src/core/update-system.js?v=3-network-stage"></script>
-<script src="src/core/update-watch.js?v=1"></script>
-<script src="src/ui/update-ui.js?v=2-network-stage"></script>
+<script defer src="src/core/update-system.js?v=3-network-stage"></script>
+<script defer src="src/core/update-watch.js?v=1"></script>
+<script defer src="src/ui/update-ui.js?v=2-network-stage"></script>
 
 <!-- KELO-INDEX CORE: primitives compartidos + bootstrap ligero. KeloRuntimeBootstrap NO carga Combat/Effects/Status/Melee hasta ensure(). -->
-<script src="src/core/events/event-bus.js?v=1"></script>
-<script src="src/core/input-lock-system.js?v=1"></script>
-<script src="src/core/movement-profile.js?v=1"></script>
-<script src="src/core/kelo-runtime-bootstrap.js?v=2"></script>
+<script defer src="src/core/events/event-bus.js?v=1"></script>
+<script defer src="src/core/input-lock-system.js?v=1"></script>
+<script defer src="src/core/movement-profile.js?v=1"></script>
+<script defer src="src/core/kelo-runtime-bootstrap.js?v=2"></script>
 
 <!-- KELO-INDEX CORE/LEGACY: engine-a define parsers/física base; KELO_COLLISION adopta obstacles; KeloInput/KeloMovement/KeloCamera/KeloAvatar y bridges Render/Simulation son los puntos de extensión core. -->
-<script src="src/physics/collision-utils.js?v=2"></script><script src="engine-a.js?v=151"></script><script>window.KELO_COLLISION.attachLegacyObstacleArray(obstacles,{adoptExistingOwner:'core-static'});</script><script src="src/core/input-system.js?v=1"></script><script src="src/core/movement-system.js?v=2"></script><script src="engine-b.js?v=94"></script><script src="engine-c.js?v=229"></script><script src="src/core/camera-system.js?v=1"></script><script src="src/core/avatar-render-system.js?v=2-base-zoo-authority"></script><script src="src/core/render-extension-system.js?v=3"></script><script src="src/core/simulation-extension-system.js?v=3"></script><script src="engine-d.js?v=95"></script><script src="engine-e.js?v=94"></script><script src="engine-f.js?v=95"></script><script src="engine-g.js?v=96"></script><script src="src/environment/mobile-performance-contract.js?v=1"></script><script src="engine-h.js?v=151"></script><script src="engine-i.js?v=94"></script><script src="engine-j.js?v=94"></script><script src="engine-k.js?v=94"></script>
+<script defer src="src/physics/collision-utils.js?v=2"></script><script defer src="engine-a.js?v=151"></script><script defer src="src/core/input-system.js?v=1"></script><script defer src="src/core/movement-system.js?v=2"></script><script defer src="engine-b.js?v=94"></script><script defer src="engine-c.js?v=229"></script><script defer src="src/core/camera-system.js?v=1"></script><script defer src="src/core/avatar-render-system.js?v=2-base-zoo-authority"></script><script defer src="src/core/render-extension-system.js?v=3"></script><script defer src="src/core/simulation-extension-system.js?v=3"></script><script defer src="engine-d.js?v=95"></script><script defer src="engine-e.js?v=94"></script><script defer src="engine-f.js?v=95"></script><script defer src="engine-g.js?v=96"></script><script defer src="src/environment/mobile-performance-contract.js?v=1"></script><script defer src="engine-h.js?v=151"></script><script defer src="engine-i.js?v=94"></script><script defer src="engine-j.js?v=94"></script><script defer src="engine-k.js?v=94"></script>
 
 <!-- KELO-INDEX WORLD: contracts, atlases y renderer del mundo. -->
-<script>window.KELO_WORLD_DECORATION_RESET=true;</script><script src="src/environment/rural-nature-atlas.js?v=200"></script><script src="src/environment/gardens-atlas.js?v=2"></script><script src="src/environment/gardens-joins.js?v=3"></script><script src="src/environment/terrain-contract.js?v=1"></script><script src="src/environment/generated/arboleskelo1-atlas.js?v=1"></script><script src="src/environment/tile-registry.js?v=237"></script><script src="src/environment/atlas-contract.js?v=4"></script><script src="src/environment/generated/forest-plaza-tileset-v2-manifest.js?v=1"></script><script src="src/environment/gardens-t-junction-registry.js?v=1"></script><script src="src/environment/district-decals-registry.js?v=3"></script><script src="src/environment/gardens-compositions.js?v=10"></script><script src="src/environment/world-map.js?v=terrain-191"></script><script src="src/environment/environment-layer-stack.js?v=4"></script><script src="src/environment/surface-ground.js?v=1"></script><script src="src/environment/prop-contract.js?v=7-map-probe"></script><script src="src/environment/generic-props.js?v=9"></script><script src="src/environment/prefab-contract.js?v=1"></script><script src="engine-l.js?v=223"></script>
+<script defer src="src/environment/rural-nature-atlas.js?v=200"></script><script defer src="src/environment/gardens-atlas.js?v=2"></script><script defer src="src/environment/gardens-joins.js?v=3"></script><script defer src="src/environment/terrain-contract.js?v=1"></script><script defer src="src/environment/generated/arboleskelo1-atlas.js?v=1"></script><script defer src="src/environment/tile-registry.js?v=237"></script><script defer src="src/environment/atlas-contract.js?v=4"></script><script defer src="src/environment/generated/forest-plaza-tileset-v2-manifest.js?v=1"></script><script defer src="src/environment/gardens-t-junction-registry.js?v=1"></script><script defer src="src/environment/district-decals-registry.js?v=3"></script><script defer src="src/environment/gardens-compositions.js?v=10"></script><script defer src="src/environment/world-map.js?v=terrain-191"></script><script defer src="src/environment/environment-layer-stack.js?v=4"></script><script defer src="src/environment/surface-ground.js?v=1"></script><script defer src="src/environment/prop-contract.js?v=7-map-probe"></script><script defer src="src/environment/generic-props.js?v=9"></script><script defer src="src/environment/prefab-contract.js?v=1"></script><script defer src="engine-l.js?v=223"></script>
 
 <!-- KELO-INDEX LEGACY/SUPPORT: wrappers históricos y puentes todavía LIVE. PvP solicita foundations al primer enter mediante el owner KeloRuntimeBootstrap. -->
-<script src="engine-m.js?v=94"></script><script src="engine-n.js?v=230"></script><script src="engine-o.js?v=96"></script><script src="engine-p.js?v=96"></script><script src="engine-q.js?v=94"></script><script src="engine-r.js?v=94"></script><script src="engine-s.js?v=96"></script><script src="engine-t.js?v=94"></script><script src="engine-u.js?v=94"></script><script src="engine-v.js?v=94"></script><script src="engine-w.js?v=94"></script><script src="engine-x.js?v=94"></script><script src="engine-y.js?v=98"></script><script src="engine-z.js?v=94"></script><script src="engine-aa.js?v=96"></script><script src="engine-ab.js?v=240"></script><script src="src/characters/character-appearance.js?v=4-base-zoo-authority"></script><script src="engine-ac.js?v=224"></script><script src="engine-ae.js?v=94"></script><script src="engine-af.js?v=94"></script><script src="engine-ag.js?v=94"></script><script src="engine-ah.js?v=95"></script><script src="engine-ai.js?v=95"></script><script src="engine-aj.js?v=94"></script><script src="src/systems/master-bot-pipelines.js?v=1"></script><script src="src/systems/pvp-world.js?v=6"></script><script src="src/systems/pvp-combat-runtime-loader.js?v=2"></script><script src="src/systems/arena-system.js?v=1"></script><script src="src/systems/arena-lane-pressure.js?v=1"></script><script src="src/systems/arena-telemetry.js?v=1"></script><script src="src/systems/arena-highlights.js?v=1"></script><script src="src/systems/arena-progression.js?v=1"></script>
+<script defer src="engine-m.js?v=94"></script><script defer src="engine-n.js?v=230"></script><script defer src="engine-o.js?v=96"></script><script defer src="engine-p.js?v=96"></script><script defer src="engine-q.js?v=94"></script><script defer src="engine-r.js?v=94"></script><script defer src="engine-s.js?v=96"></script><script defer src="engine-t.js?v=94"></script><script defer src="engine-u.js?v=94"></script><script defer src="engine-v.js?v=94"></script><script defer src="engine-w.js?v=94"></script><script defer src="engine-x.js?v=94"></script><script defer src="engine-y.js?v=98"></script><script defer src="engine-z.js?v=94"></script><script defer src="engine-aa.js?v=96"></script><script defer src="engine-ab.js?v=240"></script><script defer src="src/characters/character-appearance.js?v=4-base-zoo-authority"></script><script defer src="engine-ac.js?v=224"></script><script defer src="engine-ae.js?v=94"></script><script defer src="engine-af.js?v=94"></script><script defer src="engine-ag.js?v=94"></script><script defer src="engine-ah.js?v=95"></script><script defer src="engine-ai.js?v=95"></script><script defer src="engine-aj.js?v=94"></script><script defer src="src/systems/master-bot-pipelines.js?v=1"></script><script defer src="src/systems/pvp-world.js?v=6"></script><script defer src="src/systems/pvp-combat-runtime-loader.js?v=2"></script><script defer src="src/systems/arena-system.js?v=1"></script><script defer src="src/systems/arena-lane-pressure.js?v=1"></script><script defer src="src/systems/arena-telemetry.js?v=1"></script><script defer src="src/systems/arena-highlights.js?v=1"></script><script defer src="src/systems/arena-progression.js?v=1"></script>
 
 <!-- KELO-INDEX VISUALS: presentación modular; no autoridad gameplay. -->
-<script src="src/visuals/visual-system.js?v=3"></script><script src="src/visuals/visual-manifests.js?v=2"></script><script src="src/visuals/asset-registry.js?v=1"></script><script src="src/visuals/animation-system.js?v=1"></script><script src="src/visuals/fx-system.js?v=3"></script><script src="src/visuals/sequence-system.js?v=2"></script><script src="src/visuals/melee-visual-manifest.js?v=2"></script><script src="src/visuals/melee-combat-visuals.js?v=1"></script>
+<script defer src="src/visuals/visual-system.js?v=3"></script><script defer src="src/visuals/visual-manifests.js?v=2"></script><script defer src="src/visuals/asset-registry.js?v=1"></script><script defer src="src/visuals/animation-system.js?v=1"></script><script defer src="src/visuals/fx-system.js?v=3"></script><script defer src="src/visuals/sequence-system.js?v=2"></script><script defer src="src/visuals/melee-visual-manifest.js?v=2"></script><script defer src="src/visuals/melee-combat-visuals.js?v=1"></script>
 
 <!-- KELO-INDEX ABILITIES/PROGRESSION/NET: Stones conserva 5 slots; a pie Weapon aporta Q/W/E; Mount sustituye Q/W/E por M1-M3; todos reutilizan KeloAbilities y cargan foundations bajo first-use. -->
-<script src="src/abilities/abilityData.js?v=154"></script><script src="src/abilities/stone-system.js?v=154"></script><script src="src/mounts/mount-ability-data.js?v=1"></script><script src="src/abilities/equipment-ability-data.js?v=1"></script><script src="src/abilities/stone-backpack-bridge.js?v=2"></script><script src="src/abilities/kelo-ability-boot.js?v=160"></script><script src="src/abilities/ability-source-cast.js?v=1"></script><script src="src/visuals/ability-visuals.js?v=4"></script><script src="src/abilities/sword-swap-runtime.js?v=2"></script><script src="src/visuals/sword-swap-pvp-visuals.js?v=4"></script><script src="src/systems/title-catalog.js?v=1"></script><script src="src/systems/player-stats.js?v=1"></script><script src="src/systems/title-system.js?v=1"></script><script src="src/config/online-runtime-config.js?v=6"></script><script src="src/ui/google-auth-button.js?v=1&boot=7"></script><script src="src/ui/account-profile-18-ui.js?v=1&boot=8"></script><script src="engine-net.js?v=102"></script>
+<script defer src="src/abilities/abilityData.js?v=154"></script><script defer src="src/abilities/stone-system.js?v=154"></script><script defer src="src/mounts/mount-ability-data.js?v=1"></script><script defer src="src/abilities/equipment-ability-data.js?v=1"></script><script defer src="src/abilities/stone-backpack-bridge.js?v=2"></script><script defer src="src/abilities/kelo-ability-boot.js?v=160"></script><script defer src="src/abilities/ability-source-cast.js?v=1"></script><script defer src="src/visuals/ability-visuals.js?v=4"></script><script defer src="src/abilities/sword-swap-runtime.js?v=2"></script><script defer src="src/visuals/sword-swap-pvp-visuals.js?v=4"></script><script defer src="src/systems/title-catalog.js?v=1"></script><script defer src="src/systems/player-stats.js?v=1"></script><script defer src="src/systems/title-system.js?v=1"></script><script defer src="src/config/online-runtime-config.js?v=6"></script><script defer src="src/ui/google-auth-button.js?v=1&boot=7"></script><script defer src="src/ui/account-profile-18-ui.js?v=1&boot=8"></script><script defer src="engine-net.js?v=102"></script>
 
 <!-- KELO-INDEX UI/SYSTEMS: UI consume APIs; shared stats/appearance cargan antes de Equipment/Mount runtime. -->
-<script src="src/ui/luxe-shell.js?v=230"></script>
-<script src="src/ui/kelo-interface-runtime.js?v=1"></script>
-<script src="src/ui/kelo-chat-drawer.js?v=5-premium-waze"></script>
-<script src="src/ui/kelo-chat-integration-bridge.js?v=2"></script>
-<script src="src/ui/arena-ui.js?v=1"></script>
-<script src="src/ui/arena-highlights-ui.js?v=1"></script>
-<script src="src/ui/mobile-orientation.js?v=6"></script>
-<script src="src/ui/luxe-boutique.js?v=206"></script>
-<script src="src/environment/plaza-depth.js?v=219"></script>
-<script src="src/systems/nobility.js?v=4"></script>
-<script src="src/systems/nobility-authority.js?v=2"></script>
-<script src="src/ui/luxe-player-hud.js?v=4-minimap-live-20260914"></script>
-<script src="src/ui/player-nameplate.js?v=1"></script>
-<script src="src/systems/nobility-combat.js?v=1"></script>
-<script src="src/stats/stat-modifier-system.js?v=1"></script>
-<script src="src/appearance/appearance-system.js?v=1"></script>
-<script src="src/mounts/mount-appearance-content.js?v=1"></script>
-<script src="src/mounts/mount-catalog.js?v=2"></script>
-<script src="src/mounts/mount-equipment-catalog.js?v=2"></script>
-<script src="src/systems/equipment-item-catalog.js?v=1"></script>
-<script src="src/systems/equipment-system.js?v=6"></script>
-<script src="src/mounts/mount-system.js?v=2"></script>
-<script src="src/abilities/equipment-ability-channel.js?v=1"></script>
-<script src="src/mounts/mount-ability-channel.js?v=2"></script>
-<script src="src/ui/equipment-action-bar.js?v=1"></script>
-<script src="src/ui/mount-action-bar.js?v=2"></script>
-<script src="src/ui/mount-panel.js?v=2"></script>
-<script src="src/systems/backpack-system.js?v=2"></script>
-<script src="src/systems/container-system.js?v=4"></script>
-<script src="src/systems/emote-system.js?v=1"></script>
-<script src="src/systems/market-escrow-system.js?v=1"></script>
-<script src="src/systems/commerce-authority.js?v=2"></script>
-<script src="src/systems/regional-economy-math.js?v=1"></script>
-<script src="src/systems/faction-clan-system.js?v=1"></script>
-<script src="src/systems/caravan-system.js?v=1"></script>
-<script src="src/systems/regional-economy-system.js?v=1"></script>
-<script src="src/systems/logistics-devtools.js?v=1"></script>
-<script src="src/property/property-asset-catalog.js?v=2"></script>
-<script src="src/property/forest-plaza-asset-catalog.js?v=1"></script>
-<script src="src/property/property-system.js?v=4"></script>
-<script src="src/systems/admin-key-system.js?v=3-online"></script>
+<script defer src="src/ui/luxe-shell.js?v=230"></script>
+<script defer src="src/ui/kelo-interface-runtime.js?v=1"></script>
+<script defer src="src/ui/kelo-chat-drawer.js?v=5-premium-waze"></script>
+<script defer src="src/ui/kelo-chat-integration-bridge.js?v=2"></script>
+<script defer src="src/ui/arena-ui.js?v=1"></script>
+<script defer src="src/ui/arena-highlights-ui.js?v=1"></script>
+<script defer src="src/ui/mobile-orientation.js?v=6"></script>
+<script defer src="src/ui/luxe-boutique.js?v=206"></script>
+<script defer src="src/environment/plaza-depth.js?v=219"></script>
+<script defer src="src/systems/nobility.js?v=4"></script>
+<script defer src="src/systems/nobility-authority.js?v=2"></script>
+<script defer src="src/ui/luxe-player-hud.js?v=4-minimap-live-20260914"></script>
+<script defer src="src/ui/player-nameplate.js?v=1"></script>
+<script defer src="src/systems/nobility-combat.js?v=1"></script>
+<script defer src="src/stats/stat-modifier-system.js?v=1"></script>
+<script defer src="src/appearance/appearance-system.js?v=1"></script>
+<script defer src="src/mounts/mount-appearance-content.js?v=1"></script>
+<script defer src="src/mounts/mount-catalog.js?v=2"></script>
+<script defer src="src/mounts/mount-equipment-catalog.js?v=2"></script>
+<script defer src="src/systems/equipment-item-catalog.js?v=1"></script>
+<script defer src="src/systems/equipment-system.js?v=6"></script>
+<script defer src="src/mounts/mount-system.js?v=2"></script>
+<script defer src="src/abilities/equipment-ability-channel.js?v=1"></script>
+<script defer src="src/mounts/mount-ability-channel.js?v=2"></script>
+<script defer src="src/ui/equipment-action-bar.js?v=1"></script>
+<script defer src="src/ui/mount-action-bar.js?v=2"></script>
+<script defer src="src/ui/mount-panel.js?v=2"></script>
+<script defer src="src/systems/backpack-system.js?v=2"></script>
+<script defer src="src/systems/container-system.js?v=4"></script>
+<script defer src="src/systems/emote-system.js?v=1"></script>
+<script defer src="src/systems/market-escrow-system.js?v=1"></script>
+<script defer src="src/systems/commerce-authority.js?v=2"></script>
+<script defer src="src/systems/regional-economy-math.js?v=1"></script>
+<script defer src="src/systems/faction-clan-system.js?v=1"></script>
+<script defer src="src/systems/caravan-system.js?v=1"></script>
+<script defer src="src/systems/regional-economy-system.js?v=1"></script>
+<script defer src="src/systems/logistics-devtools.js?v=1"></script>
+<script defer src="src/property/property-asset-catalog.js?v=2"></script>
+<script defer src="src/property/forest-plaza-asset-catalog.js?v=1"></script>
+<script defer src="src/property/property-system.js?v=4"></script>
+<script defer src="src/systems/admin-key-system.js?v=3-online"></script>
 <!-- KELO-INDEX GUARDIAN: control plane autenticado; reutiliza el servidor existente y no crea un segundo WebSocket. -->
-<script src="src/systems/guardian-authority.js?v=1"></script>
-<script src="src/systems/guardian-system.js?v=1"></script>
-<script src="src/ui/guardian-ui.js?v=1"></script>
+<script defer src="src/systems/guardian-authority.js?v=1"></script>
+<script defer src="src/systems/guardian-system.js?v=1"></script>
+<script defer src="src/ui/guardian-ui.js?v=1"></script>
 <!-- KELO-INDEX ADMIN/TUNING: preview local, publicación server-side y actualización global vía KeloUpdater. -->
-<script src="src/systems/game-tuning-authority.js?v=1"></script>
-<script src="src/systems/game-tuning-system.js?v=1"></script>
-<script src="src/ui/game-tuning-admin-ui.js?v=1"></script>
-<script src="src/ui/logistics-admin-ui.js?v=1"></script>
-<script src="src/instances/instance-system.js?v=1"></script>
-<script src="src/instances/instance-runtime-bridge.js?v=1"></script>
-<script src="src/instances/house-instance.js?v=1"></script>
-<script src="src/instances/property-house-bridge.js?v=1"></script>
-<script src="src/instances/market-instance.js?v=1"></script>
-<script src="src/environment/world-builder-system.js?v=4"></script>
-<script src="src/ui/house-instance-ui.js?v=1"></script>
-<script src="src/ui/backpack-ui.js?v=4"></script>
-<script src="src/ui/warehouse-ui.js?v=3"></script>
-<script src="src/ui/market-ui.js?v=2"></script>
-<script src="src/ui/commerce-ui.js?v=1"></script>
-<script src="src/systems/forge-system.js?v=1"></script>
-<script src="src/systems/armor-aura.js?v=1"></script>
-<script src="src/systems/illumination.js?v=2"></script>
-<script src="src/systems/performance-governor.js?v=3"></script>
+<script defer src="src/systems/game-tuning-authority.js?v=1"></script>
+<script defer src="src/systems/game-tuning-system.js?v=1"></script>
+<script defer src="src/ui/game-tuning-admin-ui.js?v=1"></script>
+<script defer src="src/ui/logistics-admin-ui.js?v=1"></script>
+<script defer src="src/instances/instance-system.js?v=1"></script>
+<script defer src="src/instances/instance-runtime-bridge.js?v=1"></script>
+<script defer src="src/instances/house-instance.js?v=1"></script>
+<script defer src="src/instances/property-house-bridge.js?v=1"></script>
+<script defer src="src/instances/market-instance.js?v=1"></script>
+<script defer src="src/environment/world-builder-system.js?v=4"></script>
+<script defer src="src/ui/house-instance-ui.js?v=1"></script>
+<script defer src="src/ui/backpack-ui.js?v=4"></script>
+<script defer src="src/ui/warehouse-ui.js?v=3"></script>
+<script defer src="src/ui/market-ui.js?v=2"></script>
+<script defer src="src/ui/commerce-ui.js?v=1"></script>
+<script defer src="src/systems/forge-system.js?v=1"></script>
+<script defer src="src/systems/armor-aura.js?v=1"></script>
+<script defer src="src/systems/illumination.js?v=2"></script>
+<script defer src="src/systems/performance-governor.js?v=3"></script>
 
 <!-- KELO-INDEX LATE BOOT: Profile conserva cierre/inspección y lanza Character Customizer solo bajo acción explícita; ya no arranca combat/effects/melee. -->
-<script src="src/ui/profile-panel-close.js?v=2"></script>
-<script src="src/appearance/character-appearance-adapter.js?v=1"></script>
-<script src="src/ui/self-interaction-ui.js?v=1"></script>
-<script src="src/ui/pvp-social-touch-guard.js?v=3"></script>
-<script src="src/visuals/visual-lab-loader.js?v=1"></script>
+<script defer src="src/ui/profile-panel-close.js?v=2"></script>
+<script defer src="src/appearance/character-appearance-adapter.js?v=1"></script>
+<script defer src="src/ui/self-interaction-ui.js?v=1"></script>
+<script defer src="src/ui/pvp-social-touch-guard.js?v=3"></script>
+<script defer src="src/visuals/visual-lab-loader.js?v=1"></script>
 <!-- KELO-INDEX STUDIO: launcher mínimo; World/Mount/Appearance/VFX creators se importan solo tras acción CREATE. -->
-<script src="src/ui/studio-launcher.js?v=9-world-bridge-20260914-3"></script>
-<script src="src/ui/map-forge-launch-recovery-v1.js?v=1"></script>
-<script>window.__keloReleaseRAF&&window.__keloReleaseRAF();</script>
+<script defer src="src/ui/studio-launcher.js?v=9-world-bridge-20260914-3"></script>
+<script defer src="src/ui/map-forge-launch-recovery-v1.js?v=1"></script>
 <script>
-(function(){
+document.addEventListener('DOMContentLoaded',function(){
+  try{window.KELO_COLLISION&&window.KELO_COLLISION.attachLegacyObstacleArray(obstacles,{adoptExistingOwner:'core-static'});}catch(e){}
+  if(window.__keloReleaseRAF)window.__keloReleaseRAF();
   var urls=[
     'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0',
     'src/auth/supabase-auth-runtime.js?v=6&boot=8',
@@ -179,6 +190,6 @@
     document.head.appendChild(s);
   }
   next(0);
-})();
+});
 </script>
 </body></html>
