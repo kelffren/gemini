@@ -46,7 +46,7 @@
   "claim_started_at": null,
   "fix": {
     "status": "candidate",
-    "commits": ["1455ab8c0beee2361becf067501c0accd53eb6e8", "824a932f5e3e41c888116ab1453d64500e66255d"],
+    "commits": ["5a52c6d7404e09019c9ec96cc2ecea43af1bb6a7", "824a932f5e3e41c888116ab1453d64500e66255d"],
     "files": [
       "src/creators/workspaces/world-workspace.mjs",
       "src/creators/ui/creator-hub.mjs",
