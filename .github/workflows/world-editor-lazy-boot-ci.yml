@@ -7,24 +7,28 @@ on:
       - 'src/creators/adapters/world-creator-adapter.mjs'
       - 'src/creators/workspaces/world-workspace.mjs'
       - 'src/studio/adapters/current-world-importer.mjs'
+      - 'src/studio/integration/world-studio-bridge.mjs'
       - 'src/world/world-draft-store.js'
       - 'src/world/world-revision-system.js'
       - 'src/world/world-edit-authority.js'
       - 'src/world/authorities/local-world-edit-authority.js'
       - 'scripts/world-editor-lazy-boot-audit.mjs'
       - 'scripts/world-editor-iphone-import-audit.mjs'
+      - 'scripts/world-iphone-viewport-reveal-audit.mjs'
       - '.github/workflows/world-editor-lazy-boot-ci.yml'
   pull_request:
     paths:
       - 'src/creators/adapters/world-creator-adapter.mjs'
       - 'src/creators/workspaces/world-workspace.mjs'
       - 'src/studio/adapters/current-world-importer.mjs'
+      - 'src/studio/integration/world-studio-bridge.mjs'
       - 'src/world/world-draft-store.js'
       - 'src/world/world-revision-system.js'
       - 'src/world/world-edit-authority.js'
       - 'src/world/authorities/local-world-edit-authority.js'
       - 'scripts/world-editor-lazy-boot-audit.mjs'
       - 'scripts/world-editor-iphone-import-audit.mjs'
+      - 'scripts/world-iphone-viewport-reveal-audit.mjs'
       - '.github/workflows/world-editor-lazy-boot-ci.yml'
 
 permissions:
@@ -43,3 +47,5 @@ jobs:
         run: node scripts/world-editor-lazy-boot-audit.mjs
       - name: Verify iPhone draft import avoids persistent read
         run: node scripts/world-editor-iphone-import-audit.mjs
+      - name: Verify hydrated Studio reveals game world viewport
+        run: node scripts/world-iphone-viewport-reveal-audit.mjs
