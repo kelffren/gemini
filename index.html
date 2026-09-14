@@ -13,7 +13,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="KELO WORLD">
-  <title>Kelo World — V6.66</title>
+  <title>Kelo World — V6.67</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="src/ui/backpack-fantasy-v1.css?v=1">
   <style>
@@ -24,6 +24,7 @@
     body.social-mode #action-bar-container,body.social-mode #equipment-action-bar-container,body.social-mode #mount-action-bar-container{display:none!important}
     html[data-kelo-auth-gate="off"] #kelo-account-auth,html[data-kelo-guest-play="1"] #kelo-account-auth{display:none!important}
     #kw-live-minimap,#kelo-minimap,#minimap,.lx-mark{display:none!important;visibility:hidden!important;pointer-events:none!important}
+    #lx-chat-drawer.kc-premium,#lx-chat-tab.kc-chat-tab{display:none!important;transform:translate3d(0,110%,0)!important;pointer-events:none!important}
     #kelo-module-loader{position:fixed;left:50%;bottom:max(14px,calc(env(safe-area-inset-bottom) + 8px));transform:translateX(-50%);z-index:2147483600;pointer-events:none;min-width:168px;max-width:78vw;padding:8px 12px 9px;border-radius:16px;background:rgba(7,10,12,.88);border:1px solid rgba(229,189,98,.38);box-shadow:0 10px 28px rgba(0,0,0,.4);color:#e7c56a;font:700 11px/1.25 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;letter-spacing:.04em;text-align:center}
     #kelo-module-loader[hidden]{display:none!important}
     #kelo-module-loader .kelo-ml-track{margin-top:6px;height:3px;border-radius:99px;background:rgba(255,255,255,.08);overflow:hidden}
@@ -114,6 +115,6 @@
 <script src="src/ui/luxe-player-hud.js?v=4-minimap-live-20260914"></script>
 <script src="src/systems/performance-governor.js?v=3"></script>
 <script>window.__keloReleaseRAF&&window.__keloReleaseRAF();</script>
-<script src="src/core/module-loader.js?v=3"></script>
-<script>window.KELO_MODULE_LOADER&&window.KELO_MODULE_LOADER.start({build:'V6.66'});</script>
+<script src="src/core/module-loader.js?v=4"></script>
+<script>window.KELO_MODULE_LOADER&&window.KELO_MODULE_LOADER.start({build:'V6.67'});</script>
 </body></html>

@@ -76,6 +76,14 @@ log('movedX='+moved.toFixed(1)+' maxStall='+maxStall+' slow='+slow+' waiting 10s
 await page.waitForTimeout(10000);
 const mid=await evalSnap();
 log('afterWait evalMs='+mid.ms+' x='+mid.snap.x.toFixed(1));
+const chat=await page.evaluate(()=>({
+  premium:!!document.querySelector('#lx-chat-drawer.kc-premium, #lx-chat-tab.kc-chat-tab'),
+  loader:!!document.getElementById('kelo-chat-drawer-loader'),
+  keloChat:!!window.KeloChatUI
+}));
+log('chat '+JSON.stringify(chat));
+if(chat.premium||chat.loader||chat.keloChat){ console.log('FAIL chat auto-mounted'); process.exit(4); }
+
 if(mid.ms>400){ console.log('FAIL hitch after wait'); process.exit(4); }
 await pointer('pointerdown', sx, sy);
 const later=[];

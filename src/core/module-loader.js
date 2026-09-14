@@ -9,13 +9,11 @@
 (function(root){
 'use strict';
 if(root.KELO_MODULE_LOADER)return;
-const VERSION='kelo-module-loader-v3';
+const VERSION='kelo-module-loader-v4';
 const FEATURES={
   social:[
-    {src:'src/ui/player-nameplate.js?v=1',name:'placas'},
+    {src:'src/ui/player-nameplate.js?v=2',name:'placas'},
     {src:'src/systems/nobility.js?v=4',name:'títulos'},
-    {src:'src/ui/kelo-chat-drawer.js?v=5-premium-waze',name:'chat'},
-    {src:'src/ui/kelo-chat-integration-bridge.js?v=2',name:'chat'},
     {src:'src/environment/plaza-depth.js?v=219',name:'plaza'},
     {src:'src/ui/profile-panel-close.js?v=2',name:'perfil'},
     {src:'src/ui/self-interaction-ui.js?v=1',name:'perfil'}
