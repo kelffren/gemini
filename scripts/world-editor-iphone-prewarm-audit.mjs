@@ -36,8 +36,10 @@ if(!afterControllerImport.includes("setWorldLaunchStatus(root,'Montando editorâ€
 if(!src.includes("if(root?.KELO_WORLD_LAUNCH_ABORTED)throw new Error('WORLD_EDITOR_OPEN_TIMEOUT')"))throw new Error('abort guard missing from direct controller handoff');
 
 if(!src.includes('const bridgeUrl=new URL(import.meta.url)'))throw new Error('bridge must inspect its own versioned URL');
-if(!src.includes("bridgeUrl.searchParams.get('v')||WORLD_STUDIO_BRIDGE_BUILD"))throw new Error('controller build must inherit the bridge v token');
-if(!src.includes('encodeURIComponent(controllerBuild)'))throw new Error('controller URL must carry the inherited bridge/retry token');
+if(!src.includes("const incomingBuild=bridgeUrl.searchParams.get('v')||''"))throw new Error('bridge must separate incoming workspace token from its current build');
+if(!src.includes("incomingBuild.startsWith('world-ios-')?incomingBuild:WORLD_STUDIO_BRIDGE_BUILD"))throw new Error('only a fresh world-ios retry nonce may override the current bridge build');
+if(!src.includes('encodeURIComponent(controllerBuild)'))throw new Error('controller URL must carry the selected current/retry token');
+if(src.includes("const controllerBuild=bridgeUrl.searchParams.get('v')||WORLD_STUDIO_BRIDGE_BUILD"))throw new Error('stale static Workspace build must not downgrade controller/shell/studio-entry');
 if(/const CONTROLLER=`\.\/live-studio-controller\.mjs\?v=\$\{WORLD_STUDIO_BRIDGE_BUILD\}`/.test(src))throw new Error('fixed controller URL makes fresh World retry reuse the previous Safari module instance');
 
 if(!controller.includes('const controllerUrl=new URL(import.meta.url)'))throw new Error('live controller must inspect its versioned module URL');
@@ -51,4 +53,4 @@ if(!fallback)throw new Error('Studio boot rAF fallback missing');
 if(Number(fallback[1])>50)throw new Error(`Studio boot rAF fallback ${fallback[1]}ms is too long for phased iPhone World boot`);
 if(!pace.includes('timer=wait(finish,fallbackMs)'))throw new Error('Studio boot yield must retain a timer escape hatch when Safari rAF stalls');
 
-console.log('world-editor-iphone-prewarm-audit: PASS (controller-first, fresh retry cascades through controller shell and studio-entry, bounded Safari paint fallback)');
+console.log('world-editor-iphone-prewarm-audit: PASS (controller-first, stale static build rejected, fresh retry cascades, bounded Safari paint fallback)');
