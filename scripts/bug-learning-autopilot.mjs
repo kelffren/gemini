@@ -29,14 +29,10 @@ const unique=list=>[...new Set((list||[]).filter(Boolean))];
 const severityBase={critical:78,high:62,medium:43,low:25};
 const resultAdjust={FAIL:16,PARTIAL:9,BLOCKED:6,NOT_RUN:2,PASS:-16};
 
-function readJson(file,fallback){
-  try{return JSON.parse(fs.readFileSync(file,'utf8'));}catch{return fallback;}
-}
+function readJson(file,fallback){try{return JSON.parse(fs.readFileSync(file,'utf8'));}catch{return fallback;}}
 function listJson(dir,re){
   if(!fs.existsSync(dir))return [];
-  return fs.readdirSync(dir).filter(name=>re.test(name)).map(name=>{
-    try{return JSON.parse(fs.readFileSync(path.join(dir,name),'utf8'));}catch{return null;}
-  }).filter(Boolean);
+  return fs.readdirSync(dir).filter(name=>re.test(name)).map(name=>{try{return JSON.parse(fs.readFileSync(path.join(dir,name),'utf8'));}catch{return null;}}).filter(Boolean);
 }
 function historicalFiles(bug){
   const files=new Set([...(bug?.suspected_files||[]),...(bug?.fix?.files||[])]);
@@ -47,7 +43,7 @@ function regressionProtected(bug){
   const refs=[...(bug?.fix?.files||[]),...(bug?.verification?.evidence||[])];
   return refs.some(value=>typeof value==='string'&&(/(^|\/)(tests?|scripts)\//i.test(value)||/\.(spec|test)\.[cm]?[jt]s$/i.test(value)))||Boolean(bug?.regression?.test||bug?.regression?.command);
 }
-function parseTime(value){const t=Date.parse(value||'');return Number.isFinite(t)?t:0;}
+function parseTime(value){const time=Date.parse(value||'');return Number.isFinite(time)?time:0;}
 function gitHead(){try{return execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();}catch{return null;}}
 function matchedRules(files,riskMap){
   const rows=[];
@@ -69,13 +65,11 @@ function compactBugForFingerprint(bug){
     fix:{status:bug.fix?.status,commits:bug.fix?.commits,files:bug.fix?.files},
     verification:{status:bug.verification?.status,verified_at:bug.verification?.verified_at,evidence:bug.verification?.evidence},
     regression:bug.regression||null,
-    attempts:(bug.attempt_history||[]).map(a=>({id:a.id,at:a.at,result:a.validation?.result,files:a.change?.files,commits:a.change?.commits})),
+    attempts:(bug.attempt_history||[]).map(attempt=>({id:attempt.id,at:attempt.at,result:attempt.validation?.result,files:attempt.change?.files,commits:attempt.change?.commits})),
     updated_at:bug.updated_at
   };
 }
-function compactReportForFingerprint(report){
-  return {id:report.id,created_at:report.created_at,category:report.category,fingerprint:report.diagnostics?.fingerprint||null,triage:report.triage||null};
-}
+function compactReportForFingerprint(report){return {id:report.id,created_at:report.created_at,category:report.category,fingerprint:report.diagnostics?.fingerprint||null,triage:report.triage||null};}
 
 const riskMap=readJson(riskPath,{version:0,rules:[]});
 const bugs=listJson(registryDir,/^BUG-\d{4}\.json$/);
@@ -92,28 +86,26 @@ if(previous?.source_fingerprint===sourceFingerprint){
 
 const reportsByBug=new Map();
 for(const report of reports){
-  const id=report?.triage?.bug_id;if(!id)continue;
-  const list=reportsByBug.get(id)||[];list.push(report);reportsByBug.set(id,list);
+  const bugId=report?.triage?.bug_id;if(!bugId)continue;
+  const list=reportsByBug.get(bugId)||[];list.push(report);reportsByBug.set(bugId,list);
 }
+
 const examples=[];
 for(const bug of bugs){
   const files=historicalFiles(bug);if(!files.length)continue;
   const base=severityBase[String(bug.severity||'low').toLowerCase()]||25;
   const linked=reportsByBug.get(bug.id)||[];
   const recurrenceBonus=Math.min(12,linked.length*3)+(bug.status==='REOPENED'?10:0);
-  const bugTarget=clamp(base+recurrenceBonus,8,100);
-  examples.push({id:`${bug.id}:summary`,bugId:bug.id,kind:'bug',at:bug.discovered_at||bug.updated_at||null,files,target:bugTarget,result:null});
+  examples.push({id:`${bug.id}:summary`,bugId:bug.id,kind:'bug',at:bug.discovered_at||bug.updated_at||null,files,target:clamp(base+recurrenceBonus,8,100),result:null});
   for(const attempt of bug.attempt_history||[]){
-    const attemptFiles=(attempt?.change?.files||[]).filter(Boolean);const eventFiles=attemptFiles.length?attemptFiles:files;
+    const attemptFiles=(attempt?.change?.files||[]).filter(Boolean);
     const result=String(attempt?.validation?.result||'NOT_RUN').toUpperCase();
-    const target=clamp(base+(resultAdjust[result]??2)+recurrenceBonus,8,100);
-    examples.push({id:`${bug.id}:${attempt.id||examples.length}`,bugId:bug.id,kind:'attempt',at:attempt.at||bug.updated_at||null,files:eventFiles,target,result});
+    examples.push({id:`${bug.id}:${attempt.id||examples.length}`,bugId:bug.id,kind:'attempt',at:attempt.at||bug.updated_at||null,files:attemptFiles.length?attemptFiles:files,target:clamp(base+(resultAdjust[result]??2)+recurrenceBonus,8,100),result});
   }
   for(const report of linked){
     if(!report?.created_at)continue;
     const confidence=finite(report?.triage?.confidence)?Number(report.triage.confidence):.7;
-    const target=clamp(base+8+Math.round(confidence*8)+(bug.status==='REOPENED'?8:0),8,100);
-    examples.push({id:`${bug.id}:${report.id}`,bugId:bug.id,kind:'report',at:report.created_at,files,target,result:'REPORT'});
+    examples.push({id:`${bug.id}:${report.id}`,bugId:bug.id,kind:'report',at:report.created_at,files,target:clamp(base+8+Math.round(confidence*8)+(bug.status==='REOPENED'?8:0),8,100),result:'REPORT'});
   }
 }
 examples.sort((a,b)=>parseTime(a.at)-parseTime(b.at)||a.id.localeCompare(b.id));
@@ -138,10 +130,10 @@ function evaluatePolicy(policy,dataset){
   if(!dataset.length)return {valid:true,score:0,metrics:{calibration:0,severeRecall:0,mediumRecall:0,falseAlarmSafety:100,simplicity:100,examples:0}};
   let totalWeight=0,absError=0,severeWeight=0,severeHit=0,mediumWeight=0,mediumHit=0,lowWeight=0,lowSafe=0;
   for(const row of dataset){
-    const w=Number(row.weight||1),predicted=predict(policy,row);totalWeight+=w;absError+=Math.abs(predicted-row.target)*w;
-    if(row.target>=65){severeWeight+=w;if(predicted>=50)severeHit+=w;}
-    if(row.target>=45){mediumWeight+=w;if(predicted>=35)mediumHit+=w;}
-    if(row.target<45){lowWeight+=w;if(predicted<50)lowSafe+=w;}
+    const weight=Number(row.weight||1),predicted=predict(policy,row);totalWeight+=weight;absError+=Math.abs(predicted-row.target)*weight;
+    if(row.target>=65){severeWeight+=weight;if(predicted>=50)severeHit+=weight;}
+    if(row.target>=45){mediumWeight+=weight;if(predicted>=35)mediumHit+=weight;}
+    if(row.target<45){lowWeight+=weight;if(predicted<50)lowSafe+=weight;}
   }
   const calibration=clamp(100-(absError/Math.max(.0001,totalWeight)),0,100);
   const severeRecall=severeWeight?severeHit/severeWeight*100:100;
@@ -158,7 +150,11 @@ function derivePolicy(id,{blend=.5,recurrenceBoost=0,failBoost=0,conservative=fa
     const matched=searchExamples.filter(example=>matchedRules(example.files,{rules:[rule]}).length);
     if(!matched.length){multipliers[rule.id]=1;continue;}
     let weight=0,target=0,reportsWeight=0,failWeight=0;
-    for(const row of matched){const w=Number(row.weight||1);weight+=w;target+=row.target*w;if(row.kind==='report')reportsWeight+=w;if(row.result==='FAIL'||row.result==='PARTIAL')failWeight+=w;}
+    for(const row of matched){
+      const rowWeight=Number(row.weight||1);weight+=rowWeight;target+=row.target*rowWeight;
+      if(row.kind==='report')reportsWeight+=rowWeight;
+      if(row.result==='FAIL'||row.result==='PARTIAL')failWeight+=rowWeight;
+    }
     const avgTarget=target/Math.max(.0001,weight),reportRatio=reportsWeight/Math.max(.0001,weight),failRatio=failWeight/Math.max(.0001,weight);
     const evidenceIdeal=clamp(.78+(avgTarget/100)*.62+reportRatio*recurrenceBoost+failRatio*failBoost,.75,1.75);
     let value=1+(evidenceIdeal-1)*blend;if(conservative)value=Math.max(1,value);
@@ -192,34 +188,38 @@ const championHoldout=holdoutExamples.length?evaluatePolicy(champion,holdoutExam
 const statsByFile=new Map();
 for(const example of examples){
   for(const file of example.files){
-    const row=statsByFile.get(file)||{file,evidence:0,weightedTarget:0,weight:0,severe:0,failures:0,reports:0,bugIds:new Set()};
-    const w=Number(example.weight||1);row.evidence++;row.weight+=w;row.weightedTarget+=example.target*w;if(example.target>=65)row.severe++;if(example.result==='FAIL'||example.result==='PARTIAL')row.failures++;if(example.kind==='report')row.reports++;row.bugIds.add(example.bugId);statsByFile.set(file,row);
+    const stat=statsByFile.get(file)||{file,evidence:0,weightedTarget:0,weight:0,severe:0,failures:0,reports:0,bugIds:new Set()};
+    const weight=Number(example.weight||1);stat.evidence++;stat.weight+=weight;stat.weightedTarget+=example.target*weight;
+    if(example.target>=65)stat.severe++;if(example.result==='FAIL'||example.result==='PARTIAL')stat.failures++;if(example.kind==='report')stat.reports++;stat.bugIds.add(example.bugId);statsByFile.set(file,stat);
   }
 }
-const hotspots=[...statsByFile.values()].map(row=>{
-  const avgTarget=row.weightedTarget/Math.max(.0001,row.weight);
-  const bonus=clamp(Math.round(Math.max(0,avgTarget-38)/4+Math.log2(row.evidence+1)*2+row.reports),0,20);
-  const confidence=row.evidence>=6||row.severe>=4?'high':row.evidence>=3||row.severe>=2?'medium':'low';
-  const rules=matchedRules([row.file],riskMap).map(item=>item.rule);
-  const tests=unique([...rules.flatMap(rule=>rule.tests||[]),...[...row.bugIds].map(id=>`npm run bug:brief -- ${id}`)]);
-  return {file:row.file,risk_bonus:bonus,confidence,evidence_count:row.evidence,average_target:round(avgTarget,2),severe_events:row.severe,failed_events:row.failures,report_events:row.reports,bug_ids:[...row.bugIds].sort(),matched_rules:rules.map(rule=>rule.id),recommended_tests:tests};
+const hotspots=[...statsByFile.values()].map(stat=>{
+  const avgTarget=stat.weightedTarget/Math.max(.0001,stat.weight);
+  const bonus=clamp(Math.round(Math.max(0,avgTarget-38)/4+Math.log2(stat.evidence+1)*2+stat.reports),0,20);
+  const confidence=stat.evidence>=6||stat.severe>=4?'high':stat.evidence>=3||stat.severe>=2?'medium':'low';
+  const rules=matchedRules([stat.file],riskMap).map(item=>item.rule);
+  const tests=unique([...rules.flatMap(rule=>rule.tests||[]),...[...stat.bugIds].map(id=>`npm run bug:brief -- ${id}`)]);
+  return {file:stat.file,risk_bonus:bonus,confidence,evidence_count:stat.evidence,average_target:round(avgTarget,2),severe_events:stat.severe,failed_events:stat.failures,report_events:stat.reports,bug_ids:[...stat.bugIds].sort(),matched_rules:rules.map(rule=>rule.id),recommended_tests:tests};
 }).filter(row=>row.risk_bonus>0).sort((a,b)=>b.risk_bonus-a.risk_bonus||b.evidence_count-a.evidence_count||a.file.localeCompare(b.file)).slice(0,60);
 
 const preventionGaps=[];
-for(const hotspot of hotspots){
-  if(['high','medium'].includes(hotspot.confidence)&&hotspot.matched_rules.length===0)preventionGaps.push({type:'uncovered_hotspot',priority:hotspot.confidence==='high'?'high':'medium',file:hotspot.file,reason:`${hotspot.evidence_count} historical signals but no RISK_MAP rule matches this file.`});
-}
-for(const bug of bugs){
-  if(['critical','high'].includes(String(bug.severity).toLowerCase())&&!regressionProtected(bug))preventionGaps.push({type:'missing_regression_defense',priority:'high',bug_id:bug.id,reason:'High-impact bug has no durable regression test/contract detected.'});
-}
+for(const hotspot of hotspots)if(['high','medium'].includes(hotspot.confidence)&&hotspot.matched_rules.length===0)preventionGaps.push({type:'uncovered_hotspot',priority:hotspot.confidence==='high'?'high':'medium',file:hotspot.file,reason:`${hotspot.evidence_count} historical signals but no RISK_MAP rule matches this file.`});
+for(const bug of bugs)if(['critical','high'].includes(String(bug.severity).toLowerCase())&&!regressionProtected(bug))preventionGaps.push({type:'missing_regression_defense',priority:'high',bug_id:bug.id,reason:'High-impact bug has no durable regression test/contract detected.'});
 const fingerprintClusters=new Map();
-for(const report of reports){const fp=report?.diagnostics?.fingerprint;if(!fp)continue;const row=fingerprintClusters.get(fp)||{count:0,bugIds:new Set()};row.count++;if(report?.triage?.bug_id)row.bugIds.add(report.triage.bug_id);fingerprintClusters.set(fp,row);}
+for(const report of reports){
+  const fingerprint=report?.diagnostics?.fingerprint;if(!fingerprint)continue;
+  const row=fingerprintClusters.get(fingerprint)||{count:0,bugIds:new Set()};row.count++;if(report?.triage?.bug_id)row.bugIds.add(report.triage.bug_id);fingerprintClusters.set(fingerprint,row);
+}
 for(const [fingerprint,row] of fingerprintClusters)if(row.count>=2)preventionGaps.push({type:'recurring_fingerprint',priority:row.count>=3?'high':'medium',fingerprint,count:row.count,bug_ids:[...row.bugIds].sort(),reason:'Same failure shape has appeared repeatedly and deserves a durable regression defense.'});
 
 let memory=createEvolutionMemory(previous?.memory||{systemId:'bug-intelligence-risk-policy'});
 const mutations=[];
-for(const rule of riskMap.rules||[]){const before=baseline.multipliers[rule.id]??1,after=champion.multipliers[rule.id]??1;if(Math.abs(after-before)>.0001)mutations.push({geneId:`risk:${rule.id}`,before,after});}
+for(const rule of riskMap.rules||[]){
+  const before=baseline.multipliers[rule.id]??1,after=champion.multipliers[rule.id]??1;
+  if(Math.abs(after-before)>.0001)mutations.push({geneId:`risk:${rule.id}`,before,after});
+}
 const evidenceAt=latestTime?new Date(latestTime).toISOString():null;
+const cycleFailures=accepted?[]:[...(holdoutExamples.length<2?['insufficient_holdout_evidence']:[]),...(cycle.selected?.comparison?.failures||[])];
 memory=recordEvolutionExperiment(memory,{
   id:`bug-learn-${sourceFingerprint}`,
   at:evidenceAt,
@@ -234,7 +234,7 @@ memory=recordEvolutionExperiment(memory,{
   holdout:championHoldout?{baseline:baselineHoldout?.score??null,candidate:championHoldout.score,delta:round(championHoldout.score-(baselineHoldout?.score??0),4)}:null,
   mutations,
   metrics:championSearch.metrics,
-  failures:accepted?[]:[holdoutExamples.length<2?'insufficient_holdout_evidence':...(cycle.selected?.comparison?.failures||[])].filter(Boolean),
+  failures:cycleFailures,
   artifacts:['bugs/learning/STATE.json']
 });
 if(accepted)memory=promoteEvolutionChampion(memory,{candidateId:champion.id,score:championSearch.score,fingerprint:evolutionFingerprint(champion),metadata:{sourceFingerprint,riskMapFingerprint,holdoutScore:championHoldout?.score??null}});
