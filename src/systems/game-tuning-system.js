@@ -3,9 +3,9 @@
  * owner: KeloGameTuning
  * keys: ADMIN TUNING CAMERA SPRITE SCALE PREVIEW DRAFT PUBLISH UPDATE AUTHORITY
  * purpose: mantiene configuración visual global versionada, aplica preview por APIs owner y solicita publicación autoritativa sin escribir gameplay desde UI
- * public-api: KeloGameTuning.loadPublished/preview/saveDraft/discard/publish/getState/schema
- * consumes: KeloCamera, KeloAvatar, KeloNetAuthority, KeloUpdater y game-tuning.json
- * state-owned: configuración publicada/draft/preview de presentación; no posee cámara/avatar internals ni gameplay
+ * public-api: KeloGameTuning.loadPublished/ingestPublished/preview/saveDraft/discard/publish/getState/schema
+ * consumes: KeloCamera, KeloAvatar middleware, KeloNetAuthority, KeloUpdater y game-tuning.json
+ * state-owned: configuración publicada/draft/preview y escala visual; no posee cámara/avatar internals ni gameplay
  * extension-points: schema declarativo + authority publish; nuevos campos deben mapear a APIs públicas de sus owners
  * reuse: panel admin y futuros presets de presentación
  * legacy: N/A
@@ -15,11 +15,13 @@
   'use strict';
   if(root.KeloGameTuning)return;
 
-  const VERSION='kelo-game-tuning-v1.0.0';
+  const VERSION='kelo-game-tuning-v1.0.1';
   const SCHEMA_VERSION=1;
   const DRAFT_KEY='kelo.game.tuning.draft.v1';
   const CONFIG_URL=new URL('game-tuning.json',document.baseURI);
   const listeners=new Set();
+  let avatarMiddlewareId=null;
+  let spriteScale={local:1,remote:1};
 
   const FIELD_SCHEMA=Object.freeze({
     camera:Object.freeze({
@@ -38,12 +40,7 @@
     })
   });
 
-  let published=null;
-  let draft=null;
-  let previewActive=false;
-  let status='booting';
-  let lastError=null;
-
+  let published=null,draft=null,previewActive=false,status='booting',lastError=null;
   function clone(value){return JSON.parse(JSON.stringify(value));}
   function finite(value){const n=Number(value);return Number.isFinite(n)?n:null;}
   function clamp(value,min,max){return Math.max(min,Math.min(max,value));}
@@ -51,173 +48,86 @@
   function safeWriteDraft(value){try{if(value)localStorage.setItem(DRAFT_KEY,JSON.stringify(value));else localStorage.removeItem(DRAFT_KEY);}catch(_){}}
   function emit(reason,extra){const detail=Object.assign({reason,state:getState()},extra||{});listeners.forEach(fn=>{try{fn(detail);}catch(_){}});try{root.dispatchEvent(new CustomEvent('kelo:game-tuning:'+reason,{detail}));}catch(_){}}
 
+  function ensureAvatarMiddleware(){
+    if(avatarMiddlewareId||!root.KeloAvatar?.use)return;
+    avatarMiddlewareId=root.KeloAvatar.use('game-tuning:sprite-scale',function(actor,isSelf,next){
+      const scale=isSelf?spriteScale.local:spriteScale.remote;
+      if(!actor||typeof ctx==='undefined'||!ctx||Math.abs(scale-1)<.0001||!Number.isFinite(Number(actor.x))||!Number.isFinite(Number(actor.y)))return next();
+      ctx.save();
+      ctx.translate(Number(actor.x),Number(actor.y));
+      ctx.scale(scale,scale);
+      ctx.translate(-Number(actor.x),-Number(actor.y));
+      try{return next();}finally{ctx.restore();}
+    },10000);
+  }
+
   function ownerDefaults(){
     const camera=root.KeloCamera?.snapshot?.()||{};
     const follow=root.KeloCamera?.getFollowTuning?.()||camera.follow||{};
-    const avatar=root.KeloAvatar?.getPresentationTuning?.()||{};
-    return {
-      schema:SCHEMA_VERSION,
-      revision:0,
-      publishedAt:null,
-      publishedBy:'runtime-defaults',
-      camera:{
-        baseZoom:finite(camera.baseZoom)??.82,
-        dampX:finite(follow.dampX),
-        dampY:finite(follow.dampY),
-        deadXRatio:finite(follow.deadXRatio),
-        deadYRatio:finite(follow.deadYRatio),
-        lookAheadDist:finite(follow.lookAheadDist),
-        lookAheadDecay:finite(follow.lookAheadDecay),
-        dprCap:finite(camera.dprCap)??3
-      },
-      sprites:{
-        localPlayerScale:finite(avatar.localScale)??1,
-        remotePlayerScale:finite(avatar.remoteScale)??1
-      }
-    };
+    return {schema:SCHEMA_VERSION,revision:0,publishedAt:null,publishedBy:'runtime-defaults',camera:{
+      baseZoom:finite(camera.baseZoom)??.82,dampX:finite(follow.dampX),dampY:finite(follow.dampY),deadXRatio:finite(follow.deadXRatio),deadYRatio:finite(follow.deadYRatio),lookAheadDist:finite(follow.lookAheadDist),lookAheadDecay:finite(follow.lookAheadDecay),dprCap:finite(camera.dprCap)??3
+    },sprites:{localPlayerScale:spriteScale.local,remotePlayerScale:spriteScale.remote}};
   }
 
   function sanitize(raw,base){
     const source=raw&&typeof raw==='object'?raw:{};
     const fallback=base&&typeof base==='object'?base:ownerDefaults();
-    const out={
-      schema:SCHEMA_VERSION,
-      revision:Math.max(0,Math.floor(finite(source.revision)??finite(fallback.revision)??0)),
-      publishedAt:source.publishedAt==null?(fallback.publishedAt||null):String(source.publishedAt).slice(0,80),
-      publishedBy:source.publishedBy==null?(fallback.publishedBy||null):String(source.publishedBy).slice(0,120),
-      camera:{},sprites:{}
-    };
-    for(const group of ['camera','sprites']){
-      for(const [key,def] of Object.entries(FIELD_SCHEMA[group])){
-        const candidate=finite(source[group]?.[key]);
-        const inherited=finite(fallback[group]?.[key]);
-        out[group][key]=candidate==null?(inherited==null?null:clamp(inherited,def.min,def.max)):clamp(candidate,def.min,def.max);
-      }
+    const out={schema:SCHEMA_VERSION,revision:Math.max(0,Math.floor(finite(source.revision)??finite(fallback.revision)??0)),publishedAt:source.publishedAt==null?(fallback.publishedAt||null):String(source.publishedAt).slice(0,80),publishedBy:source.publishedBy==null?(fallback.publishedBy||null):String(source.publishedBy).slice(0,120),camera:{},sprites:{}};
+    for(const group of ['camera','sprites'])for(const [key,def] of Object.entries(FIELD_SCHEMA[group])){
+      const candidate=finite(source[group]?.[key]),inherited=finite(fallback[group]?.[key]);
+      out[group][key]=candidate==null?(inherited==null?null:clamp(inherited,def.min,def.max)):clamp(candidate,def.min,def.max);
     }
     return out;
   }
 
   function apply(config,source){
-    const value=sanitize(config,published||ownerDefaults());
-    const camera=value.camera;
+    const value=sanitize(config,published||ownerDefaults()),camera=value.camera;
     if(root.KeloCamera){
       if(finite(camera.baseZoom)!=null)root.KeloCamera.setBaseZoom(camera.baseZoom,source||'game-tuning');
-      const follow={};
-      ['dampX','dampY','deadXRatio','deadYRatio','lookAheadDist','lookAheadDecay'].forEach(key=>{if(finite(camera[key])!=null)follow[key]=camera[key];});
+      const follow={};['dampX','dampY','deadXRatio','deadYRatio','lookAheadDist','lookAheadDecay'].forEach(key=>{if(finite(camera[key])!=null)follow[key]=camera[key];});
       if(Object.keys(follow).length)root.KeloCamera.setFollowTuning(follow);
       if(finite(camera.dprCap)!=null){root.KeloCamera.configureViewport({dprCap:camera.dprCap});root.KeloCamera.scheduleViewportSync(source||'game-tuning');}
     }
-    if(root.KeloAvatar?.setPresentationTuning)root.KeloAvatar.setPresentationTuning({localScale:value.sprites.localPlayerScale,remoteScale:value.sprites.remotePlayerScale},source||'game-tuning');
+    ensureAvatarMiddleware();
+    spriteScale={local:finite(value.sprites.localPlayerScale)??1,remote:finite(value.sprites.remotePlayerScale)??1};
     return value;
   }
 
-  function getState(){
-    return Object.freeze({
-      version:VERSION,
-      status,
-      previewActive,
-      published:published?clone(published):null,
-      draft:draft?clone(draft):null,
-      effective:clone(previewActive&&draft?draft:(published||ownerDefaults())),
-      lastError
-    });
-  }
+  function getState(){return Object.freeze({version:VERSION,status,previewActive,published:published?clone(published):null,draft:draft?clone(draft):null,effective:clone(previewActive&&draft?draft:(published||ownerDefaults())),spriteScale:Object.freeze({...spriteScale}),lastError});}
+  function setDraft(next,options){const opts=options||{};draft=sanitize(next,published||ownerDefaults());if(opts.persist)safeWriteDraft(draft);return draft;}
+  function preview(next){const nextDraft=setDraft(next||draft||published||ownerDefaults(),{persist:false});previewActive=true;status='preview';apply(nextDraft,'game-tuning-preview');emit('preview');return getState();}
+  function saveDraft(next){if(next)setDraft(next,{persist:false});if(!draft)draft=sanitize(published||ownerDefaults(),published||ownerDefaults());safeWriteDraft(draft);emit('draft-saved');return getState();}
+  function discard(){previewActive=false;draft=null;safeWriteDraft(null);apply(published||ownerDefaults(),'game-tuning-discard');status=published?'ready':'local-defaults';emit('discarded');return getState();}
 
-  function setDraft(next,options){
-    const opts=options||{};
-    draft=sanitize(next,published||ownerDefaults());
-    if(opts.persist)safeWriteDraft(draft);
-    return draft;
-  }
-
-  function preview(next){
-    const nextDraft=setDraft(next||draft||published||ownerDefaults(),{persist:false});
-    previewActive=true;
-    status='preview';
-    apply(nextDraft,'game-tuning-preview');
-    emit('preview');
-    return getState();
-  }
-
-  function saveDraft(next){
-    if(next)setDraft(next,{persist:false});
-    if(!draft)draft=sanitize(published||ownerDefaults(),published||ownerDefaults());
-    safeWriteDraft(draft);
-    emit('draft-saved');
-    return getState();
-  }
-
-  function discard(){
-    previewActive=false;
-    draft=null;
-    safeWriteDraft(null);
-    apply(published||ownerDefaults(),'game-tuning-discard');
-    status=published?'ready':'local-defaults';
-    emit('discarded');
-    return getState();
+  function ingestPublished(value,source){
+    published=sanitize(value,published||ownerDefaults());
+    if(!previewActive){draft=clone(published);apply(published,source||'game-tuning-ingest');}
+    status=previewActive?'preview':'ready';lastError=null;emit('ingested',{source:source||'authority'});return getState();
   }
 
   async function loadPublished(options){
-    const opts=options||{};
-    status='loading';lastError=null;emit('loading');
+    const opts=options||{};status='loading';lastError=null;emit('loading');
     try{
       let value=null;
-      if(opts.authority!==false&&root.KeloNetAuthority?.isOnline?.()&&root.KeloNetAuthority.getGameTuning){
-        try{value=await root.KeloNetAuthority.getGameTuning();}catch(_){value=null;}
-      }
-      if(!value){
-        const url=new URL(CONFIG_URL.href);url.searchParams.set('_kelo_tuning',Date.now().toString(36));
-        const res=await fetch(url.href,{cache:'no-store',credentials:'same-origin'});
-        if(!res.ok)throw new Error('GAME_TUNING_HTTP_'+res.status);
-        value=await res.json();
-      }
-      published=sanitize(value,ownerDefaults());
-      const saved=safeReadDraft();
-      draft=saved?sanitize(saved,published):clone(published);
-      previewActive=false;
-      apply(published,'game-tuning-published');
-      status='ready';
-      emit('loaded');
-    }catch(error){
-      published=sanitize(ownerDefaults(),ownerDefaults());
-      draft=sanitize(safeReadDraft()||published,published);
-      previewActive=false;
-      apply(published,'game-tuning-fallback');
-      status='local-defaults';lastError=String(error&&error.message||error);emit('error');
-    }
+      if(opts.authority!==false&&root.KeloNetAuthority?.isOnline?.()&&root.KeloNetAuthority.getGameTuning){try{value=await root.KeloNetAuthority.getGameTuning();}catch(_){value=null;}}
+      if(value?.config)value=value.config;
+      if(!value){const url=new URL(CONFIG_URL.href);url.searchParams.set('_kelo_tuning',Date.now().toString(36));const res=await fetch(url.href,{cache:'no-store',credentials:'same-origin'});if(!res.ok)throw new Error('GAME_TUNING_HTTP_'+res.status);value=await res.json();}
+      published=sanitize(value,ownerDefaults());const saved=safeReadDraft();draft=saved?sanitize(saved,published):clone(published);previewActive=false;apply(published,'game-tuning-published');status='ready';emit('loaded');
+    }catch(error){published=sanitize(ownerDefaults(),ownerDefaults());draft=sanitize(safeReadDraft()||published,published);previewActive=false;apply(published,'game-tuning-fallback');status='local-defaults';lastError=String(error&&error.message||error);emit('error');}
     return getState();
   }
 
   async function publish(next){
-    if(next)setDraft(next,{persist:false});
-    if(!draft)draft=sanitize(published||ownerDefaults(),published||ownerDefaults());
+    if(next)setDraft(next,{persist:false});if(!draft)draft=sanitize(published||ownerDefaults(),published||ownerDefaults());
     if(!root.KeloNetAuthority?.publishGameTuning)throw new Error('GAME_TUNING_AUTHORITY_UNAVAILABLE');
     status='publishing';lastError=null;emit('publishing');
-    try{
-      const result=await root.KeloNetAuthority.publishGameTuning(draft);
-      published=sanitize(result?.config||draft,published||ownerDefaults());
-      draft=clone(published);previewActive=false;safeWriteDraft(null);
-      apply(published,'game-tuning-publish-confirmed');
-      status='published';emit('published',{result});
-      try{root.KeloUpdater?.check?.({force:true});}catch(_){ }
-      return Object.freeze({state:getState(),result});
-    }catch(error){
-      status='preview';previewActive=true;lastError=String(error&&error.message||error);emit('publish-error');throw error;
-    }
+    try{const result=await root.KeloNetAuthority.publishGameTuning(draft);published=sanitize(result?.config||draft,published||ownerDefaults());draft=clone(published);previewActive=false;safeWriteDraft(null);apply(published,'game-tuning-publish-confirmed');status='published';emit('published',{result});try{root.KeloUpdater?.check?.({force:true});}catch(_){ }return Object.freeze({state:getState(),result});}
+    catch(error){status='preview';previewActive=true;lastError=String(error&&error.message||error);emit('publish-error');throw error;}
   }
 
-  root.KeloGameTuning=Object.freeze({
-    version:VERSION,
-    schema:FIELD_SCHEMA,
-    loadPublished,
-    preview,
-    saveDraft,
-    discard,
-    publish,
-    getState,
-    onChange(fn){if(typeof fn!=='function')return()=>{};listeners.add(fn);return()=>listeners.delete(fn);}
-  });
-  root.KELO_GAME_TUNING_AUDIT=Object.freeze({version:VERSION,owner:'KeloGameTuning',ownerApisOnly:true,preview:true,draft:true,serverPublishBoundary:true,clientSecrets:false,updateBridge:true});
-
-  loadPublished({authority:false}).catch(()=>{});
+  root.KeloGameTuning=Object.freeze({version:VERSION,schema:FIELD_SCHEMA,loadPublished,ingestPublished,preview,saveDraft,discard,publish,getState,onChange(fn){if(typeof fn!=='function')return()=>{};listeners.add(fn);return()=>listeners.delete(fn);}});
+  root.KELO_GAME_TUNING_AUDIT=Object.freeze({version:VERSION,owner:'KeloGameTuning',cameraOwnerApis:true,avatarMiddleware:true,preview:true,draft:true,serverPublishBoundary:true,clientSecrets:false,updateBridge:true});
+  ensureAvatarMiddleware();
+  const pending=root.KELO_PENDING_GAME_TUNING;delete root.KELO_PENDING_GAME_TUNING;
+  if(pending?.config)ingestPublished(pending.config,pending.source||'network-pending');else loadPublished({authority:false}).catch(()=>{});
 })(typeof globalThis!=='undefined'?globalThis:window);
