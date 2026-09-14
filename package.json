@@ -8,6 +8,7 @@
     "test:live": "playwright test",
     "test:browserstack": "browserstack-node-sdk playwright test",
     "test:browserstack:map-forge": "browserstack-node-sdk playwright test tests/map-forge-mobile-preview.spec.js tests/map-forge-evolution-visual.spec.js tests/map-forge-orientation-visual.spec.js",
+    "test:bug-intelligence": "node scripts/bug-intelligence-selftest.mjs",
     "bug:brief": "node scripts/bug-brief.mjs",
     "bug:scan": "node scripts/bug-scan.mjs",
     "bug:risk": "node scripts/bug-risk.mjs",
