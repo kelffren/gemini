@@ -1,6 +1,6 @@
 /* KELO-INDEX
  * area: AUDIT / WORLD IPHONE BOOT
- * purpose: verify the iPhone World bootstrap serializes runtime-root loading and desktop does not pay the preload cost
+ * purpose: verify the iPhone World bootstrap serializes runtime-root loading, cannot hang on a missing RAF callback, and desktop does not pay the preload cost
  */
 import assert from 'node:assert/strict';
 import {isPhoneWorldBootstrap,preloadPhoneStudioRuntime} from '../src/creators/workspaces/world-workspace.mjs';
@@ -43,6 +43,30 @@ assert.deepEqual(finished,modules,'each runtime root must finish before the next
 assert.equal(maxActive,1,'iPhone runtime-root preload must cap direct import concurrency at one');
 assert.deepEqual(result,{enabled:true,loaded:4,total:4});
 
+const stalledRafRoot={
+  ...iphoneRoot,
+  KELO_WORLD_RUNTIME_YIELD_FALLBACK_MS:5,
+  requestAnimationFrame:()=>1
+};
+const stalledStarted=Date.now();
+const stalledResult=await preloadPhoneStudioRuntime(stalledRafRoot,{
+  modules:['one.mjs','two.mjs'],
+  load:async specifier=>({specifier})
+});
+const stalledElapsed=Date.now()-stalledStarted;
+assert.deepEqual(stalledResult,{enabled:true,loaded:2,total:2},'a missing Safari RAF callback must not strand the preload between modules');
+assert.ok(stalledElapsed<100,'runtime fallback must release the next module without waiting for the global World timeout');
+
+const throwingRafRoot={
+  ...iphoneRoot,
+  requestAnimationFrame:()=>{throw new Error('RAF_UNAVAILABLE');}
+};
+const throwingResult=await preloadPhoneStudioRuntime(throwingRafRoot,{
+  modules:['one.mjs','two.mjs'],
+  load:async specifier=>({specifier})
+});
+assert.deepEqual(throwingResult,{enabled:true,loaded:2,total:2},'RAF exceptions must fall back to a timer instead of aborting World boot');
+
 let desktopLoads=0;
 const desktopResult=await preloadPhoneStudioRuntime(desktopRoot,{
   modules,
@@ -58,4 +82,4 @@ await assert.rejects(
   'preloader must respect the existing World launch abort contract'
 );
 
-console.log('PASS world iPhone runtime preload audit: serial on phone, lazy on desktop, abort-safe');
+console.log('PASS world iPhone runtime preload audit: serial on phone, bounded RAF yield, timer fallback, lazy on desktop, abort-safe');
