@@ -13,23 +13,16 @@ if (delta.chooseConcurrency({ gameplayBusy: true, foreground: true, status: 'goo
   fail('foreground/explicit combat concurrency is not zero');
 }
 
-// TU-06 says combat/PVP is absolute: foreground must never bypass the gate,
-// active tracked updater transfers must be aborted when gameplay becomes busy,
-// and AbortError handling must pause/retry regardless of foreground mode.
-if (/isGameplayBusy\(\)\s*&&\s*!o\.foreground/.test(runtime)) {
-  fail('runtime network/concurrency gate still exempts foreground updates from combat pause');
-}
-if (/manualGameplayBusy\s*&&\s*!foregroundStage/.test(runtime)) {
-  fail('active foreground transfers are not aborted when combat starts');
-}
-if (/isGameplayBusy\(\)\s*&&\s*!\(options\s*&&\s*options\.foreground\)/.test(runtime)) {
-  fail('AbortError combat retry still exempts foreground updates');
-}
-if (!/if\s*\(isGameplayBusy\(\)\)\s*return\s*\{allow:false/.test(runtime)) {
-  fail('network gate does not contain an unconditional combat hard stop');
-}
-if (!/if\s*\(state\.manualGameplayBusy\)\s*abortBackgroundDownloads\(\)/.test(runtime)) {
-  fail('setGameplayBusy does not abort all tracked updater downloads');
-}
+if (/isGameplayBusy\(\)\s*&&\s*!o\.foreground/.test(runtime)) fail('runtime gate still exempts foreground from combat');
+if (/manualGameplayBusy\s*&&\s*!foregroundStage/.test(runtime)) fail('foreground stage is still exempt from abort');
+if (/isGameplayBusy\(\)\s*&&\s*!\(options\s*&&\s*options\.foreground\)/.test(runtime)) fail('retry still exempts foreground');
+if (!/function networkGateFromState[\s\S]*?if\(isGameplayBusy\(\)\)return \{allow:false/.test(runtime)) fail('network gate lacks unconditional combat stop');
+if (!/function chooseConcurrency[\s\S]*?if\(isGameplayBusy\(\)\)return 0/.test(runtime)) fail('runtime fallback concurrency lacks unconditional zero');
+if (!/function setGameplayBusy[\s\S]*?if\(state\.manualGameplayBusy\)\{[\s\S]*?abortBackgroundDownloads\(\)/.test(runtime)) fail('setGameplayBusy does not abort all tracked updater transfers');
+if (!/async function applyUpdate\(\)\{if\(isGameplayBusy\(\)\)throw new Error\('update_blocked_combat'\)/.test(runtime)) fail('applyUpdate can start during combat');
+if (!/async function prepareUpdate\(build,options\)\{\s*if\(isGameplayBusy\(\)\)throw new Error\('update_blocked_combat'\)/.test(runtime)) fail('prepareUpdate can start during combat');
+if (!/timedFetch\(GITHUB_TREE_API[\s\S]*?,MANIFEST_TIMEOUT_MS,true\)/.test(runtime)) fail('manifest request is not abort-tracked');
+if (!/timedFetch\(fresh\.href[\s\S]*?,FETCH_TIMEOUT_MS,true\)/.test(runtime)) fail('index staging request is not abort-tracked');
+if (!/timedFetch\(probe\.href[\s\S]*?,PING_TIMEOUT_MS,true\)/.test(runtime)) fail('network probe is not abort-tracked');
 
-console.log('TURBO COMBAT HARD-STOP PASS — PVP/combat forces zero concurrency and aborts active updater transfers');
+console.log('TURBO COMBAT HARD-STOP PASS — PVP/combat blocks apply/prepare, forces zero concurrency, and aborts active updater network work');
