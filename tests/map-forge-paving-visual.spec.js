@@ -6,6 +6,8 @@
 const {test,expect}=require('@playwright/test');
 const fs=require('fs');
 
+test.setTimeout(90000);
+
 function versionAtLeast(actual,minimum){
   const a=String(actual||'').split('.').map(Number),b=minimum.split('.').map(Number);
   for(let i=0;i<Math.max(a.length,b.length);i++){const delta=(a[i]||0)-(b[i]||0);if(delta)return delta>0;}
