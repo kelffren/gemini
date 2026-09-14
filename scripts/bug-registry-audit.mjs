@@ -29,9 +29,10 @@ function uniqueIds(items = []) {
   return ids.length === new Set(ids).size;
 }
 function readMeta(text, label) {
-  const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const match = text.match(new RegExp(`^${escaped}:\\s*\\`?([^\\n\\`]+)\\`?\\s*$`, 'mi'));
-  return match?.[1]?.trim() || null;
+  const prefix = `${label}:`;
+  const row = String(text).split(/\r?\n/).find((line) => line.trimStart().startsWith(prefix));
+  if (!row) return null;
+  return row.slice(row.indexOf(prefix) + prefix.length).trim().replace(/^`|`$/g, '').trim() || null;
 }
 function walkMarkdown(dir) {
   if (!fs.existsSync(dir)) return [];
