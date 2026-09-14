@@ -579,9 +579,23 @@
         "index.html",
         "src/ui/luxe-player-hud.js"
       ]
+    },
+    {
+      "id": "prevention:810db25c6b5077800f56db543d359775648266ba",
+      "at": "2026-09-14T22:06:50.000Z",
+      "source": "bug-prevention-ci",
+      "head_sha": "810db25c6b5077800f56db543d359775648266ba",
+      "base_sha": "777487e5c4f10eb68ea1ab82d1d5ad5a7f419a0c",
+      "conclusion": "success",
+      "files": [
+        "index.html",
+        "src/core/module-loader.js",
+        "src/ui/player-nameplate.js",
+        "tests/iphone-walk-8s.mjs"
+      ]
     }
   ],
-  "feedback_updated_at": "2026-09-14T20:54:50.524Z",
+  "feedback_updated_at": "2026-09-14T22:07:41.467Z",
   "training": {
     "examples": 44,
     "search_examples": 33,
