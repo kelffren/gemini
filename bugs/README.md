@@ -33,6 +33,8 @@ Ese briefing muestra en orden:
 - fix candidate;
 - gate de verificación y blockers.
 
+Antes de cambiar una superficie con historial de fallos, revisar también la memoria aprendida en `bugs/learning/STATE.json` o ejecutar `node scripts/bug-risk.mjs <base> <head>`; el predictor usa esa memoria solo cuando sigue siendo compatible con el `RISK_MAP` actual.
+
 Regla central:
 
 **un intento `FAIL` no se repite sin nueva evidencia que invalide la conclusión anterior.**
@@ -42,10 +44,45 @@ Regla central:
 - `incoming/` — reportes crudos antes de deduplicar/triage. Futuro destino de reportes de jugadores y automatizaciones.
 - `registry/` — un JSON por bug canónico (`BUG-0001.json`).
 - `investigacion/` — biblioteca de apoyo por bug con investigaciones técnicas versionadas y fechadas.
+- `learning/` — memoria autónoma aprendida por KeloEvolution: policy champion, hotspots y gaps de prevención.
 - `templates/` — contratos de bug, reporte e investigación.
 - `SCHEMA.md` — campos, estados, investigación e invariantes.
 - `RESEARCH_PROTOCOL.md` — cómo separar hechos, hipótesis, intentos, descartes, unknowns y siguientes acciones.
 - `AI_BRIDGE.md` — protocolo obligatorio para cualquier IA que lea o modifique bugs.
+- `BUG_INTELLIGENCE.md` — risk, impact, dedupe, cierre y defensa contra regresiones.
+
+## Aprendizaje automático y prevención
+
+El adapter `scripts/bug-learning-autopilot.mjs` reutiliza **KeloEvolution**. Aprende de:
+
+- severidad de bugs;
+- intentos `PASS/FAIL/PARTIAL/BLOCKED`;
+- reincidencias y reportes;
+- archivos históricamente implicados;
+- regresiones reabiertas.
+
+El ciclo es:
+
+`EVIDENCIA → CHALLENGERS → SEARCH → HOLDOUT → CHAMPION → HOTSPOTS → PREVENCIÓN → NUEVA EVIDENCIA`
+
+Reglas duras:
+
+1. el único auto-write permitido es `bugs/learning/STATE.json`;
+2. no puede cambiar lifecycle de un bug;
+3. no puede auto-cerrar;
+4. no puede escribir source code arbitrario;
+5. los multiplicadores aprendidos están acotados;
+6. una nueva policy necesita holdout suficiente;
+7. si el estado está stale, `bug-risk` lo ignora;
+8. `bug-prevention` solo ejecuta comandos `npm run audit:*` allowlisted y existentes;
+9. una verificación manual nunca se presenta como ejecutada automáticamente.
+
+Workflows:
+
+- `.github/workflows/bug-self-learning.yml` — aprende cada hora y cuando cambia evidencia; no commitea si no hay evidencia nueva.
+- `.github/workflows/bug-prevention.yml` — usa memoria aprendida para elegir auditorías preventivas en cambios de código relevantes.
+
+Contrato completo: [`learning/README.md`](learning/README.md) y [`../docs/systems/BUG_INTELLIGENCE_LEARNING.md`](../docs/systems/BUG_INTELLIGENCE_LEARNING.md).
 
 ## Sección `investigacion/`
 
@@ -129,6 +166,10 @@ Después de modificar registros o investigaciones:
 
 `npm run audit:bugs`
 
+Para memoria aprendida:
+
+`node scripts/bug-learning-audit.mjs --strict`
+
 El auditor comprueba, entre otras cosas:
 
 - schema v2;
@@ -138,7 +179,8 @@ El auditor comprueba, entre otras cosas:
 - que todo `FAIL` tenga `do_not_repeat_without`;
 - que `FIXED_PENDING_VERIFY` tenga un fix identificable;
 - que `VERIFIED/CLOSED` requieran verificación `PASS`;
-- que cada archivo de `bugs/investigacion/` tenga BUG, FECHA, VERSION / BUILD y ESTADO válidos.
+- que cada archivo de `bugs/investigacion/` tenga BUG, FECHA, VERSION / BUILD y ESTADO válidos;
+- que la memoria autónoma no amplíe su auto-write scope ni obtenga autoridad para cerrar bugs/source-write.
 
 ## Seguridad
 
@@ -156,4 +198,4 @@ Aplicar sanitización antes de persistir diagnósticos, logs o screenshots.
 
 ## Lectura obligatoria para agentes
 
-Antes de registrar, reclamar, arreglar, verificar o cerrar un bug, leer [`AI_BRIDGE.md`](AI_BRIDGE.md), [`SCHEMA.md`](SCHEMA.md), [`RESEARCH_PROTOCOL.md`](RESEARCH_PROTOCOL.md) y las investigaciones aplicables en `bugs/investigacion/BUG-NNNN/`.
+Antes de registrar, reclamar, arreglar, verificar o cerrar un bug, leer [`AI_BRIDGE.md`](AI_BRIDGE.md), [`SCHEMA.md`](SCHEMA.md), [`RESEARCH_PROTOCOL.md`](RESEARCH_PROTOCOL.md), [`BUG_INTELLIGENCE.md`](BUG_INTELLIGENCE.md), la memoria aplicable en `bugs/learning/` y las investigaciones aplicables en `bugs/investigacion/BUG-NNNN/`.
