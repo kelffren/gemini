@@ -25,6 +25,11 @@ const entityRect=(row,tile)=>{
 };
 const rectsOverlap=(a,b)=>a.x<b.x2&&a.x2>b.x&&a.y<b.y2&&a.y2>b.y;
 const cleanCoord=value=>Math.abs(value)<1e-9?0:Math.round(value*1e6)/1e6;
+const entityCenter=(row,tile)=>{const rect=entityRect(row,tile);return{x:cleanCoord((rect.x+rect.x2)/2),y:cleanCoord((rect.y+rect.y2)/2)};};
+const selectionVisualPivot=(rows,tile)=>{
+  const rects=rows.map(row=>entityRect(row,tile));
+  return{x:cleanCoord((Math.min(...rects.map(r=>r.x))+Math.max(...rects.map(r=>r.x2)))/2),y:cleanCoord((Math.min(...rects.map(r=>r.y))+Math.max(...rects.map(r=>r.y2)))/2)};
+};
 function rotatePointAround(x,y,cx,cy,delta){
   const angle=normalizedRotation(delta),dx=(Number(x)||0)-cx,dy=(Number(y)||0)-cy;
   if(angle===90)return{x:cleanCoord(cx-dy),y:cleanCoord(cy+dx)};
@@ -138,15 +143,19 @@ export function createCreatorActions(kernel) {
     const rows=selectedEntities(); if(!rows.length)return [];
     const plans=rows.map(row=>{const current=scaleOf(row.transform?.scale),next=scaleOf(value==null?current+(Number(delta)||0):value);return{row,current,next};});
     const changed=plans.filter(plan=>plan.next!==plan.current);if(!changed.length)return rows;
+    const tile=Math.max(1,Number(kernel.document.settings?.tileSize)||32);
     let cx=0,cy=0,factor=1;
     if(rows.length>1){
-      const xs=rows.map(row=>Number(row.transform?.x)||0),ys=rows.map(row=>Number(row.transform?.y)||0);
-      cx=(Math.min(...xs)+Math.max(...xs))/2;cy=(Math.min(...ys)+Math.max(...ys))/2;
+      const pivot=selectionVisualPivot(rows,tile);cx=pivot.x;cy=pivot.y;
       factor=changed.reduce((sum,plan)=>sum+(plan.next/plan.current),0)/changed.length;
     }
     const commands=plans.map(({row,next})=>{
       const transform={...(row.transform||{}),scale:next};
-      if(rows.length>1){const point=scalePointAround(transform.x,transform.y,cx,cy,factor);transform.x=point.x;transform.y=point.y;}
+      if(rows.length>1){
+        const center=entityCenter(row,tile),point=scalePointAround(center.x,center.y,cx,cy,factor);
+        const width=Math.max(1,Number(row?.bounds?.w)||tile)*next,height=Math.max(1,Number(row?.bounds?.h)||tile)*next;
+        transform.x=cleanCoord(point.x-width/2);transform.y=cleanCoord(point.y-height/2);
+      }
       return createPatchEntityCommand(row.id,{transform});
     });
     await kernel.execute(createCompositeCommand(commands,{type:'entity.batch.scale',label:`Scale ${rows.length} object${rows.length===1?'':'s'}`}));
