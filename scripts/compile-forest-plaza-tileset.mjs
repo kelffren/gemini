@@ -19,6 +19,11 @@ if(!fs.existsSync(path.join(root,input)))throw new Error(`FOREST_PLAZA_SOURCE_MI
 const types={'.js':'text/javascript','.mjs':'text/javascript','.json':'application/json','.png':'image/png','.html':'text/html'};
 const server=http.createServer((req,res)=>{
   const rel=decodeURIComponent(String(req.url||'/').split('?')[0]).replace(/^\/+/, '');
+  if(rel==='__kelo_compile.html'){
+    res.writeHead(200,{'Content-Type':'text/html','Cache-Control':'no-store'});
+    res.end('<!doctype html><meta charset="utf-8"><title>Kelo compiler</title><body></body>');
+    return;
+  }
   const file=path.join(root,rel||'index.html');
   if(!file.startsWith(root)||!fs.existsSync(file)||fs.statSync(file).isDirectory()){res.writeHead(404);res.end('not found');return;}
   res.writeHead(200,{'Content-Type':types[path.extname(file).toLowerCase()]||'application/octet-stream','Cache-Control':'no-store'});
@@ -30,12 +35,12 @@ const base=`http://127.0.0.1:${port}`;
 const browser=await chromium.launch({headless:true});
 try{
   const page=await browser.newPage();
-  await page.goto(`${base}/index.html`,{waitUntil:'domcontentloaded',timeout:30000}).catch(()=>{});
+  await page.goto(`${base}/__kelo_compile.html`,{waitUntil:'domcontentloaded',timeout:30000});
   const manifest=await page.evaluate(async ({base,input})=>{
-    const compiler=await import(`${base}/src/creators/assets/asset-sheet-compiler.mjs?forest-plaza-v2=1`);
+    const compiler=await import(`${base}/src/creators/assets/asset-sheet-compiler.mjs?forest-plaza-v2=2`);
     const img=new Image();
     img.crossOrigin='anonymous';
-    img.src=`${base}/${input}?compile=1`;
+    img.src=`${base}/${input}?compile=2`;
     await img.decode();
     const canvas=document.createElement('canvas');canvas.width=img.naturalWidth;canvas.height=img.naturalHeight;
     const g=canvas.getContext('2d',{willReadFrequently:true});g.clearRect(0,0,canvas.width,canvas.height);g.drawImage(img,0,0);
