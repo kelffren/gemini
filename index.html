@@ -1,7 +1,7 @@
 <!-- KELO-INDEX
   area: RUNTIME / UI BOOT
   owner: index.html load order
-  keys: HUD LUXE PLAYER GUIDE NOBILITY TITLES MOBILE MOUNTS APPEARANCE ARENA RANKED EQUIPMENT WEAPON Q W E PERFORMANCE LAZY UPDATE PWA ADMIN TUNING
+  keys: HUD LUXE PLAYER GUIDE NOBILITY TITLES MOBILE MOUNTS APPEARANCE ARENA RANKED EQUIPMENT WEAPON Q W E PERFORMANCE LAZY UPDATE PWA ADMIN TUNING GUARDIAN
   purpose: carga el runtime LIVE y monta un único HUD superior izquierdo mediante Kelo Luxe
   online: la UI solo consume estado; autoridad permanece en los owners de dominio
 -->
@@ -99,6 +99,10 @@
 <script src="src/property/property-asset-catalog.js?v=2"></script>
 <script src="src/property/property-system.js?v=4"></script>
 <script src="src/systems/admin-key-system.js?v=3-online"></script>
+<!-- KELO-INDEX GUARDIAN: control plane autenticado; reutiliza el servidor existente y no crea un segundo WebSocket. -->
+<script src="src/systems/guardian-authority.js?v=1"></script>
+<script src="src/systems/guardian-system.js?v=1"></script>
+<script src="src/ui/guardian-ui.js?v=1"></script>
 <!-- KELO-INDEX ADMIN/TUNING: preview local, publicación server-side y actualización global vía KeloUpdater. -->
 <script src="src/systems/game-tuning-authority.js?v=1"></script>
 <script src="src/systems/game-tuning-system.js?v=1"></script>

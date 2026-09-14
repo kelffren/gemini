@@ -75,6 +75,7 @@ No uses `/*` para apagar código. Los comentarios solo documentan.
 | LOGISTICS ADMIN UI | QA móvil/desktop de economía, rutas, carretas, facciones y clanes | `src/ui/logistics-admin-ui.js` + `KeloLogisticsDevtools` |
 | FORGE EQUIP | forja / gear | `src/systems/forge-system.js` `equipment-system.js` |
 | SERVER ROOM | autoridad Node | `server/index.js` |
+| GUARDIAN DONATION HOST | control plane de donación, capacidades, heartbeat y lease máster | `src/systems/guardian-system.js` `src/systems/guardian-authority.js` `server/guardian-coordinator.js` |
 | UNIVERSAL SPRITE INGESTION | detección foreground, hipótesis de layout, rigs 1/4/8D, normalización, Frame Doctor y validación | `src/creators/sprite-compiler/` + `src/creators/avatar/kelo-universal-asset-compiler.mjs` |
 | CREATOR ASSET SHEET BRIDGE | hoja cruda multi-asset → detección irregular → revisión JSON natural → galerías/prefabs → preview en World | `src/creators/assets/asset-sheet-compiler.mjs` + `kelo-creator-asset-bridge.mjs` + `asset-sheet-catalog-preview-adapter.mjs` |
 
@@ -82,7 +83,7 @@ No uses `/*` para apagar código. Los comentarios solo documentan.
 
 ## Áreas (primera palabra después de KELO-INDEX)
 
-`CORE` `NET` `AUTH` `CAST` `STONES` `MOUNTS` `STATS` `APPEARANCE` `CREATORS` `MOVE` `HERO` `PLAZA` `LUXE` `HUD` `ECON` `COMBAT` `SERVER` `UI` `PROPERTY` `DB` `SUPABASE`
+`CORE` `NET` `AUTH` `CAST` `STONES` `MOUNTS` `STATS` `APPEARANCE` `CREATORS` `MOVE` `HERO` `PLAZA` `LUXE` `HUD` `ECON` `COMBAT` `SERVER` `UI` `PROPERTY` `DB` `SUPABASE` `GUARDIAN`
 
 Grep rápido:
 
@@ -97,6 +98,7 @@ KELO-INDEX MOVE
 KELO-INDEX PROPERTY
 KELO-INDEX UI
 KELO-INDEX SERVER
+KELO-INDEX GUARDIAN
 ```
 
 ## ONLINE FOUNDATION V1
