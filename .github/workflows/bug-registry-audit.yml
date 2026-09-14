@@ -1,0 +1,40 @@
+name: Bug Registry Audit
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'bugs/**'
+      - 'scripts/bug-brief.mjs'
+      - 'scripts/bug-registry-audit.mjs'
+      - 'package.json'
+      - '.github/workflows/bug-registry-audit.yml'
+  pull_request:
+    paths:
+      - 'bugs/**'
+      - 'scripts/bug-brief.mjs'
+      - 'scripts/bug-registry-audit.mjs'
+      - 'package.json'
+      - '.github/workflows/bug-registry-audit.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  audit-bug-registry:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Audit bug registry schema and research history
+        run: npm run audit:bugs
+
+      - name: Smoke-test agent briefing on critical World bug
+        run: npm run bug:brief -- BUG-0003
