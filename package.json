@@ -71,7 +71,7 @@
     "audit:appearance": "node scripts/appearance-foundation-audit.mjs",
     "audit:mount-creator": "node scripts/mount-creator-audit.mjs",
     "audit:logistics": "node scripts/regional-logistics-audit.js",
-    "audit:logistics-ui": "node scripts/regional-logistics-admin-ui-audit.js",
+    "audit:logistics-ui": "node scripts/logistics-admin-ui-audit.js",
     "audit:performance": "node scripts/performance-foundation-audit.js",
     "audit:online-foundation": "node scripts/online-foundation-audit.mjs",
     "audit:universal-content": "node scripts/universal-content-studio-audit.mjs",
