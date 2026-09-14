@@ -9,7 +9,7 @@
 (function(root){
 'use strict';
 if(root.KELO_MODULE_LOADER)return;
-const VERSION='kelo-module-loader-v5';
+const VERSION='kelo-module-loader-v6';
 const FEATURES={
   social:[
     {src:'src/ui/player-nameplate.js?v=2',name:'placas'},
@@ -126,7 +126,8 @@ function loadFeature(name,opts){
   return inflight[name];
 }
 function ensure(name){
-  if(name==='chat'||name==='profile'||name==='nobility'||name==='emotes') name='social';
+  if(name==='chat'||name==='profile') return Promise.resolve(true);
+  if(name==='nobility'||name==='emotes') name='social';
   if(name==='pvp'){
     if(root.KeloRuntimeBootstrap&&typeof root.KeloRuntimeBootstrap.ensure==='function') return root.KeloRuntimeBootstrap.ensure();
     return Promise.resolve(false);
@@ -139,7 +140,8 @@ function ensure(name){
   });
 }
 function needs(name){
-  if(name==='chat'||name==='profile'||name==='nobility'||name==='emotes') name='social';
+  if(name==='chat'||name==='profile') return false;
+  if(name==='nobility'||name==='emotes') name='social';
   if(name==='pvp') return !(root.KeloMeleeEngine&&root.KeloCombatEngine);
   if(!FEATURES[name]) return false;
   return !loaded[name];
