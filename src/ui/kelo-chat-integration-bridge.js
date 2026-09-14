@@ -6,8 +6,8 @@
 */
 (function(root){
 'use strict';
-if(root.__KELO_CHAT_INTEGRATION_BRIDGE_V1__)return;
-root.__KELO_CHAT_INTEGRATION_BRIDGE_V1__=true;
+if(root.__KELO_CHAT_INTEGRATION_BRIDGE_V2__)return;
+root.__KELO_CHAT_INTEGRATION_BRIDGE_V2__=true;
 
 var drawer=null;
 var observer=null;
@@ -26,6 +26,10 @@ function release(){
   var api=locks();
   if(token&&api&&typeof api.release==='function')api.release(token);
 }
+function releaseExistingLuxeChatLock(){
+  var luxe=root.KELO_LUXE;
+  if(luxe&&typeof luxe.closeChat==='function')luxe.closeChat();
+}
 function syncFromDrawer(){
   if(syncing||!drawer||!root.KeloChatUI)return;
   var domOpen=drawer.classList.contains('open');
@@ -38,6 +42,9 @@ function syncFromDrawer(){
     }else{
       release();
       if(apiOpen&&typeof root.KeloChatUI.close==='function')root.KeloChatUI.close();
+      // If Luxe opened the same real drawer, its original input-lock token must
+      // also be released when the player collapses the sheet by drag/tap.
+      releaseExistingLuxeChatLock();
     }
   }finally{syncing=false;}
 }
@@ -48,8 +55,8 @@ function mount(){
   observer=new MutationObserver(syncFromDrawer);
   observer.observe(drawer,{attributes:true,attributeFilter:['class']});
   syncFromDrawer();
-  root.addEventListener('pagehide',function(){if(observer)observer.disconnect();release();},{once:true});
-  root.KeloChatIntegrationBridge=Object.freeze({sync:syncFromDrawer,version:'1.0.0'});
+  root.addEventListener('pagehide',function(){if(observer)observer.disconnect();release();releaseExistingLuxeChatLock();},{once:true});
+  root.KeloChatIntegrationBridge=Object.freeze({sync:syncFromDrawer,version:'2.0.0'});
   return true;
 }
 function boot(){
