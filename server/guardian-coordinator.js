@@ -1,10 +1,10 @@
 /* KELO-INDEX
  * area: SERVER / GUARDIAN
  * owner: Kelo Guardian Coordinator
- * keys: GUARDIAN DONATION HOST LEASE MASTER REGION SCHEDULER RELAY ASSET COMPUTE MIRROR REWARD PROOF HEARTBEAT AUTH
- * purpose: coordina nodos Guardian autenticados, capacidad regional, asignaciones verificables y unidades de servicio sin ceder autoridad económica al cliente
- * online: el servidor central conserva autoridad; Guardian solo ejecuta workloads con lease explícita y las recompensas nacen de pruebas/observaciones server-side
- * do-not: NO confiar métricas/recompensas declaradas por cliente; NO mover economía/PvP al nodo sin protocolo de verificación; NO acuñar KC aquí
+ * keys: GUARDIAN DONATION CLIENT-ONLY HOST LEASE MASTER REGION SCHEDULER RELAY ASSET COMPUTE MIRROR REWARD PROOF HEARTBEAT AUTH
+ * purpose: coordina nodos Guardian autenticados y separa participación P2P de donación útil/recompensable
+ * online: clientes pueden registrarse para P2P sin donar; solo donadores reciben roles/workloads/proof; economía sigue server-authoritative
+ * do-not: NO confiar métricas/recompensas declaradas por cliente; NO usar client-only como donor/witness; NO acuñar KC aquí
  */
 'use strict';
 
@@ -53,6 +53,7 @@ function sanitizeCapabilities(raw={}){
 }
 function sanitizePreferences(raw={}){
   return Object.freeze({
+    clientOnly:bool(raw.clientOnly),
     idleDonation:raw.idleDonation!==false,wifiOnly:raw.wifiOnly!==false,chargingOnly:bool(raw.chargingOnly),
     allowAssets:raw.allowAssets!==false,allowRelay:raw.allowRelay!==false,allowCompute:bool(raw.allowCompute),
     maxUploadMbps:clamp(raw.maxUploadMbps,1,200,10),storageMb:Math.round(clamp(raw.storageMb,64,102400,512))
@@ -77,6 +78,7 @@ function sanitizeObservation(raw={},at=Date.now()){
   });
 }
 function recommendedRoles(capabilities,preferences){
+  if(preferences&&preferences.clientOnly)return Object.freeze([]);
   const out=['witness-ready'];
   if(preferences.allowAssets)out.push('asset-seeder-ready');
   if(preferences.allowRelay&&capabilities.webrtc)out.push('relay-ready');
@@ -84,7 +86,7 @@ function recommendedRoles(capabilities,preferences){
   if(capabilities.webrtc&&capabilities.cores>=4&&capabilities.visibility==='visible'&&!capabilities.saveData)out.push('host-ready');
   return Object.freeze(out);
 }
-function errorCode(error){const raw=String(error&&error.message||error);const known=['AUTH_TOKEN_REQUIRED','ACCOUNT_BANNED','ACCOUNT_SUSPENDED','GUARDIAN_NODE_ID_INVALID','GUARDIAN_NODE_NOT_ENABLED','GUARDIAN_MASTER_PERMISSION_DENIED','GUARDIAN_FOREGROUND_REQUIRED','GUARDIAN_MASTER_BUSY','GUARDIAN_BODY_TOO_LARGE','GUARDIAN_INVALID_JSON'];return known.find(code=>raw.includes(code))||'GUARDIAN_SERVER_ERROR';}
+function errorCode(error){const raw=String(error&&error.message||error);const known=['AUTH_TOKEN_REQUIRED','ACCOUNT_BANNED','ACCOUNT_SUSPENDED','GUARDIAN_NODE_ID_INVALID','GUARDIAN_NODE_NOT_ENABLED','GUARDIAN_MASTER_PERMISSION_DENIED','GUARDIAN_DONATION_REQUIRED','GUARDIAN_CLIENT_ONLY_NO_REWARD','GUARDIAN_FOREGROUND_REQUIRED','GUARDIAN_MASTER_BUSY','GUARDIAN_BODY_TOO_LARGE','GUARDIAN_INVALID_JSON'];return known.find(code=>raw.includes(code))||'GUARDIAN_SERVER_ERROR';}
 function json(res,status,payload){res.statusCode=status;res.setHeader('Content-Type','application/json; charset=utf-8');res.setHeader('Cache-Control','no-store');res.end(JSON.stringify(payload));}
 function cors(req,res){
   res.setHeader('Access-Control-Allow-Origin','*');
@@ -125,16 +127,19 @@ function createGuardianCoordinator(options={}){
     const rank=rankFor(node.service.verifiedUnits);
     return Object.freeze({...node.service,rank:Object.freeze({...rank}),currencySettlementReady:false});
   }
-  function sweepLeaseOnly(at){if(masterLease&&masterLease.expiresAt<=at){const prior=nodes.get(masterLease.nodeKey);if(prior&&prior.role==='master-host')prior.role='donor-ready';masterLease=null;}}
+  function donorRole(node){return node&&node.preferences&&node.preferences.clientOnly?'client-only':'donor-ready';}
+  function sweepLeaseOnly(at){if(masterLease&&masterLease.expiresAt<=at){const prior=nodes.get(masterLease.nodeKey);if(prior&&prior.role==='master-host')prior.role=donorRole(prior);masterLease=null;}}
   function sweepWorkloads(at){
     for(const [id,workload] of workloads){if(workload.expiresAt>at)continue;const node=nodes.get(workload.nodeKey);if(node&&Array.isArray(node.assignments))node.assignments=node.assignments.filter(row=>row.id!==id);workloads.delete(id);}
   }
   function networkSummary(at=now()){
     sweepLeaseOnly(at);sweepWorkloads(at);
-    let active=0,ios=0,relayReady=0,assetReady=0,computeReady=0,hostReady=0,assigned=0;
+    let active=0,clientNodes=0,ios=0,relayReady=0,assetReady=0,computeReady=0,hostReady=0,assigned=0;
     const assignedByType={};
     for(const node of nodes.values()){
-      if(!fresh(node,at))continue;active++;
+      if(!fresh(node,at))continue;
+      if(node.preferences&&node.preferences.clientOnly){clientNodes++;continue;}
+      active++;
       if(node.capabilities.platform==='ios')ios++;
       if(node.recommendedRoles.includes('relay-ready'))relayReady++;
       if(node.recommendedRoles.includes('asset-seeder-ready'))assetReady++;
@@ -143,7 +148,7 @@ function createGuardianCoordinator(options={}){
       for(const row of node.assignments||[]){assigned++;assignedByType[row.type]=(assignedByType[row.type]||0)+1;}
     }
     const demand={};for(const [region,pressure] of regionalDemand)demand[region]=pressure;
-    return Object.freeze({activeNodes:active,iosNodes:ios,relayReady,assetReady,computeReady,hostReady,assignedWorkloads:assigned,assignedByType:Object.freeze(assignedByType),regionalDemand:Object.freeze(demand),masterActive:!!masterLease,masterEpoch:masterLease?.epoch||0});
+    return Object.freeze({activeNodes:active,clientNodes,p2pNodes:active+clientNodes,iosNodes:ios,relayReady,assetReady,computeReady,hostReady,assignedWorkloads:assigned,assignedByType:Object.freeze(assignedByType),regionalDemand:Object.freeze(demand),masterActive:!!masterLease,masterEpoch:masterLease?.epoch||0});
   }
   function sweep(at=now()){
     for(const [key,node] of nodes){if(!fresh(node,at)){for(const row of node.assignments||[])workloads.delete(row.id);nodes.delete(key);}}
@@ -151,18 +156,19 @@ function createGuardianCoordinator(options={}){
   }
   function publicAssignment(row){return Object.freeze({id:row.id,type:row.type,region:row.region,purpose:row.purpose,expiresAt:row.expiresAt,epoch:row.epoch});}
   function publicObservation(obs){if(!obs)return null;return Object.freeze({region:obs.region,rttMs:obs.rttMs,packetLossPct:obs.packetLossPct,uploadMbps:obs.uploadMbps,cpuLoad:obs.cpuLoad,tickHz:obs.tickHz,connections:obs.connections,observedAt:obs.observedAt,source:obs.source});}
-  function publicNode(node){if(!node)return null;return Object.freeze({nodeId:node.nodeId,enabled:true,role:node.role,recommendedRoles:node.recommendedRoles,capabilities:node.capabilities,preferences:node.preferences,lastHeartbeatAt:node.lastHeartbeatAt,region:node.observation?.region||'unknown',quality:publicObservation(node.observation),assignments:Object.freeze((node.assignments||[]).map(publicAssignment)),service:serviceState(node),masterLeaseExpiresAt:masterLease?.nodeKey===node.key?masterLease.expiresAt:null,masterEpoch:masterLease?.nodeKey===node.key?masterLease.epoch:null});}
-  function payload(actor,node,at=now()){sweep(at);return Object.freeze({ok:true,source:'guardian-coordinator-v2',serverTime:at,masterEligible:masterEligible(actor),node:publicNode(node),network:networkSummary(at),rewardPolicy:Object.freeze({proofRequired:true,clientMayMint:false,ranks:GUARDIAN_RANKS})});}
+  function publicNode(node){if(!node)return null;const clientOnly=!!node.preferences?.clientOnly;return Object.freeze({nodeId:node.nodeId,enabled:true,clientOnly,donationEnabled:!clientOnly,role:node.role,recommendedRoles:node.recommendedRoles,capabilities:node.capabilities,preferences:node.preferences,lastHeartbeatAt:node.lastHeartbeatAt,region:node.observation?.region||'unknown',quality:publicObservation(node.observation),assignments:Object.freeze((node.assignments||[]).map(publicAssignment)),service:serviceState(node),masterLeaseExpiresAt:masterLease?.nodeKey===node.key?masterLease.expiresAt:null,masterEpoch:masterLease?.nodeKey===node.key?masterLease.epoch:null});}
+  function payload(actor,node,at=now()){sweep(at);return Object.freeze({ok:true,source:'guardian-coordinator-v3-client-separation',serverTime:at,masterEligible:masterEligible(actor),node:publicNode(node),network:networkSummary(at),rewardPolicy:Object.freeze({proofRequired:true,clientMayMint:false,ranks:GUARDIAN_RANKS})});}
   function ensureNodeState(node){if(!Array.isArray(node.assignments))node.assignments=[];serviceState(node);return node;}
   function enable(actor,input={}){
     const at=now(),nodeId=normalizeNodeId(input.nodeId),key=nodeKey(actor.accountId,nodeId),capabilities=sanitizeCapabilities(input.capabilities),preferences=sanitizePreferences(input.preferences),existing=nodes.get(key);
     const node=ensureNodeState(existing||{key,nodeId,accountId:actor.accountId,createdAt:at});
-    node.capabilities=capabilities;node.preferences=preferences;node.recommendedRoles=recommendedRoles(capabilities,preferences);node.lastHeartbeatAt=at;node.role=masterLease?.nodeKey===key?'master-host':'donor-ready';nodes.set(key,node);return payload(actor,node,at);
+    node.capabilities=capabilities;node.preferences=preferences;node.recommendedRoles=recommendedRoles(capabilities,preferences);node.lastHeartbeatAt=at;node.role=masterLease?.nodeKey===key?'master-host':donorRole(node);nodes.set(key,node);return payload(actor,node,at);
   }
   function heartbeat(actor,input={}){
     const at=now(),nodeId=normalizeNodeId(input.nodeId),key=nodeKey(actor.accountId,nodeId),node=nodes.get(key);if(!node)throw new Error('GUARDIAN_NODE_NOT_ENABLED');
     if(input.capabilities)node.capabilities=sanitizeCapabilities(input.capabilities);if(input.preferences)node.preferences=sanitizePreferences(input.preferences);node.recommendedRoles=recommendedRoles(node.capabilities,node.preferences);node.lastHeartbeatAt=at;
-    if(masterLease?.nodeKey===key){if(node.capabilities.visibility==='visible'){masterLease.expiresAt=at+MASTER_LEASE_MS;node.role='master-host';}else{masterLease=null;node.role='donor-ready';}}
+    if(masterLease?.nodeKey===key){if(node.preferences.clientOnly){masterLease=null;node.role='client-only';}else if(node.capabilities.visibility==='visible'){masterLease.expiresAt=at+MASTER_LEASE_MS;node.role='master-host';}else{masterLease=null;node.role='donor-ready';}}
+    else node.role=donorRole(node);
     return payload(actor,node,at);
   }
   function disable(actor,input={}){
@@ -172,14 +178,14 @@ function createGuardianCoordinator(options={}){
   function startMaster(actor,input={}){
     if(!masterEligible(actor))throw new Error('GUARDIAN_MASTER_PERMISSION_DENIED');
     const at=now(),nodeId=normalizeNodeId(input.nodeId),key=nodeKey(actor.accountId,nodeId);let node=nodes.get(key);if(!node){enable(actor,input);node=nodes.get(key);}
-    if(!node)throw new Error('GUARDIAN_NODE_NOT_ENABLED');if(node.capabilities.visibility!=='visible')throw new Error('GUARDIAN_FOREGROUND_REQUIRED');
+    if(!node)throw new Error('GUARDIAN_NODE_NOT_ENABLED');if(node.preferences.clientOnly)throw new Error('GUARDIAN_DONATION_REQUIRED');if(node.capabilities.visibility!=='visible')throw new Error('GUARDIAN_FOREGROUND_REQUIRED');
     sweep(at);if(masterLease&&masterLease.nodeKey!==key&&masterLease.accountId!==actor.accountId)throw new Error('GUARDIAN_MASTER_BUSY');
-    if(masterLease&&masterLease.nodeKey!==key){const previous=nodes.get(masterLease.nodeKey);if(previous)previous.role='donor-ready';}
+    if(masterLease&&masterLease.nodeKey!==key){const previous=nodes.get(masterLease.nodeKey);if(previous)previous.role=donorRole(previous);}
     masterLease={nodeKey:key,accountId:actor.accountId,nodeId,epoch:++epoch,startedAt:at,expiresAt:at+MASTER_LEASE_MS};node.role='master-host';node.lastHeartbeatAt=at;return payload(actor,node,at);
   }
   function stopMaster(actor,input={}){
     if(!masterEligible(actor))throw new Error('GUARDIAN_MASTER_PERMISSION_DENIED');
-    const at=now(),nodeId=normalizeNodeId(input.nodeId),key=nodeKey(actor.accountId,nodeId),node=nodes.get(key);if(masterLease?.nodeKey===key)masterLease=null;if(node)node.role='donor-ready';return payload(actor,node,at);
+    const at=now(),nodeId=normalizeNodeId(input.nodeId),key=nodeKey(actor.accountId,nodeId),node=nodes.get(key);if(masterLease?.nodeKey===key)masterLease=null;if(node)node.role=donorRole(node);return payload(actor,node,at);
   }
 
   // KELO-INDEX GUARDIAN/OBSERVATION: solo procesos confiables del server deben alimentar mediciones que influyen scheduling/recompensas.
@@ -187,6 +193,7 @@ function createGuardianCoordinator(options={}){
   function setRegionalDemand(region,pressure){region=normalizeRegion(region);pressure=clamp(pressure,0,1,0);if(pressure<=0)regionalDemand.delete(region);else regionalDemand.set(region,pressure);return Object.freeze({region,pressure,multiplier:Number((1+pressure*.75).toFixed(4))});}
   function demandMultiplier(region){const pressure=regionalDemand.get(normalizeRegion(region))||0;return 1+pressure*.75;}
   function workloadCapability(type,node){
+    if(node.preferences&&node.preferences.clientOnly)return false;
     if(type==='relay')return node.recommendedRoles.includes('relay-ready');
     if(type==='asset-seeder')return node.recommendedRoles.includes('asset-seeder-ready');
     if(type==='compute-worker')return node.recommendedRoles.includes('compute-candidate');
@@ -230,7 +237,7 @@ function createGuardianCoordinator(options={}){
 
   // KELO-INDEX GUARDIAN/PROOF: solo código server-side llama esta API; no existe endpoint cliente para autoadjudicarse unidades/KC.
   function recordVerifiedContribution(ref,proof={}){
-    const node=resolveNode(ref);if(!node||!fresh(node,now()))throw new Error('GUARDIAN_NODE_NOT_ENABLED');const type=String(proof.type||''),rate=PROOF_RATES[type];if(!rate)throw new Error('GUARDIAN_PROOF_TYPE_INVALID');
+    const node=resolveNode(ref);if(!node||!fresh(node,now()))throw new Error('GUARDIAN_NODE_NOT_ENABLED');if(node.preferences&&node.preferences.clientOnly)throw new Error('GUARDIAN_CLIENT_ONLY_NO_REWARD');const type=String(proof.type||''),rate=PROOF_RATES[type];if(!rate)throw new Error('GUARDIAN_PROOF_TYPE_INVALID');
     let quantity=0;if(type.endsWith('_seconds'))quantity=clamp(proof.seconds,0,3600,0);else quantity=clamp(proof.megabytes,0,10240,0);if(quantity<=0)throw new Error('GUARDIAN_PROOF_EMPTY');
     const rawUnits=quantity*rate,region=normalizeRegion(proof.region||node.observation?.region),demand=type==='availability_seconds'?1:demandMultiplier(region),service=serviceState(node),rank=rankFor(service.verifiedUnits+rawUnits),rewarded=rawUnits*demand*rank.multiplier;
     node.service.verifiedUnits=Number((service.verifiedUnits+rawUnits).toFixed(6));node.service.rewardedUnits=Number((service.rewardedUnits+rewarded).toFixed(6));node.service.proofCount++;
@@ -257,8 +264,8 @@ function createGuardianCoordinator(options={}){
       json(res,200,result);return true;
     }catch(error){const code=errorCode(error),status=code==='AUTH_TOKEN_REQUIRED'?401:code==='GUARDIAN_MASTER_PERMISSION_DENIED'?403:code==='GUARDIAN_MASTER_BUSY'?409:code==='GUARDIAN_SERVER_ERROR'?500:400;json(res,status,{ok:false,error:code});return true;}
   }
-  function audit(){const at=now();sweep(at);const summary=networkSummary(at);return Object.freeze({version:'guardian-coordinator-v2',activeNodes:summary.activeNodes,masterActive:!!masterLease,masterEpoch:masterLease?.epoch||0,activeWorkloads:workloads.size,regionsWithDemand:regionalDemand.size,masterLeaseMs:MASTER_LEASE_MS,workloadLeaseMs:WORKLOAD_LEASE_MS,staleMs:STALE_MS,serverAuthorityPreserved:true,rewardMetricsClientTrusted:false,kcMintAuthority:false,regionalScheduling:true,usefulServiceProof:true});}
-  return Object.freeze({version:'guardian-coordinator-v2',enable,heartbeat,disable,status,startMaster,stopMaster,sweep,handleHttp,audit,observe,setRegionalDemand,planWorkload,assignWorkload,acknowledgeWorkload,releaseWorkload,planSupport,recordVerifiedContribution});
+  function audit(){const at=now();sweep(at);const summary=networkSummary(at);return Object.freeze({version:'guardian-coordinator-v3-client-separation',activeNodes:summary.activeNodes,clientNodes:summary.clientNodes,p2pNodes:summary.p2pNodes,masterActive:!!masterLease,masterEpoch:masterLease?.epoch||0,activeWorkloads:workloads.size,regionsWithDemand:regionalDemand.size,masterLeaseMs:MASTER_LEASE_MS,workloadLeaseMs:WORKLOAD_LEASE_MS,staleMs:STALE_MS,serverAuthorityPreserved:true,rewardMetricsClientTrusted:false,kcMintAuthority:false,regionalScheduling:true,usefulServiceProof:true,clientParticipationSeparate:true,clientOnlyWorkloadEligible:false,clientOnlyRewardEligible:false});}
+  return Object.freeze({version:'guardian-coordinator-v3-client-separation',enable,heartbeat,disable,status,startMaster,stopMaster,sweep,handleHttp,audit,observe,setRegionalDemand,planWorkload,assignWorkload,acknowledgeWorkload,releaseWorkload,planSupport,recordVerifiedContribution});
 }
 
 module.exports={createGuardianCoordinator,sanitizeCapabilities,sanitizePreferences,sanitizeObservation,recommendedRoles,rankFor,GUARDIAN_RANKS,PROOF_RATES};
