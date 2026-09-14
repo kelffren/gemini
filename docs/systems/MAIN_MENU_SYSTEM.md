@@ -2,190 +2,254 @@
 
 ## Status
 
-**Foundation active UI shell + Player HUD V1.** `src/ui/luxe-shell.js` remains the single visible main-menu/HUD presentation owner used by the current runtime. `src/ui/luxe-player-hud.js` is a presentation subcomponent of that same owner: it replaces the old compact top-left gold/presence surface with the player profile HUD without creating a second gameplay, profile, wallet, nobility or title system.
+**Foundation active UI shell + collapsible quick-actions rail.** `src/ui/luxe-shell.js` remains the single visible main-menu/HUD presentation owner used by the current runtime. `src/ui/luxe-player-hud.js` is a presentation subcomponent of that same owner and now groups the existing right-side controls behind one retractable launcher without creating a second menu, route, gameplay owner or duplicated handler.
 
-## Owner and responsibility
+## Purpose and problem solved
+
+Luxe gives the player one main navigation surface while keeping the world readable on a phone. The quick-actions rail specifically solves permanent right-edge HUD obstruction: when collapsed, only one touch target remains; when expanded, the same existing Boutique, Menú, PvP, Guía and Pantalla Completa controls become available.
+
+The change is presentation-only. It does not alter the destination or authority behind any action.
+
+## Owner and files
 
 - **Presentation owner:** `KELO_LUXE` / `src/ui/luxe-shell.js`
-- **Player HUD presentation subcomponent:** `src/ui/luxe-player-hud.js` / `KELO_LUXE_PLAYER_HUD`
+- **Player HUD + quick-actions presentation subcomponent:** `src/ui/luxe-player-hud.js` / `KELO_LUXE_PLAYER_HUD`
+- **Fullscreen/orientation owner:** `KELO_ORIENTATION` / `src/ui/mobile-orientation.js`
+- **Boutique owner:** `KELO_BOUTIQUE` / `src/ui/luxe-boutique.js`
 - **Input-lock owner:** `KeloInputLocks`
 - **Domain owners:** each destination and player datum keeps its own state and operations.
 
-The Luxe shell owns only:
+Luxe owns only UI presentation state and route dispatch. It does **not** own inventory, abilities, character appearance, market data, properties, nobility, titles, HP, gold, clan membership, emotes, PvP authority, fullscreen authority or creator permissions.
 
-- the visible top HUD shell;
-- the right-side Menu / PvP launch controls;
-- open/closed presentation state for its main menu and chat drawer;
-- temporary input-lock claims for those Luxe surfaces;
-- dispatching a tap to an existing public owner API.
+## State owned / not owned
 
-It does **not** own inventory, abilities, character appearance, market data, properties, nobility, titles, HP, gold, clan membership, emotes, profile authority, PvP authority or creator permissions.
+Owned presentation state:
 
-## Player HUD V1
+- main-menu open/closed;
+- chat drawer open/closed;
+- Luxe input-lock tokens;
+- quick-actions rail expanded/collapsed;
+- last rendered combat HUD snapshot cache.
 
-The top-left HUD is one cohesive player card. It is rendered as real DOM/CSS, not as a flat reference image, and consumes state already owned by the runtime.
+Not owned:
 
-Visible hierarchy:
+- Boutique state or purchase rules;
+- PvP state/authority;
+- fullscreen/orientation state;
+- profile or economy values;
+- gameplay movement/combat;
+- destination panel state.
 
-1. **Nobleza** — intentionally the strongest prestige treatment, with crown, gold frame and larger typography.
-2. Player name + stable player ID.
-3. Equipped personal title.
-4. Vida / Maná resource rows.
-5. Clan + Oro.
-6. A styled **GUÍA** button sits immediately below the card.
+The quick-actions expanded flag is ephemeral. It is not persisted, networked or written to gameplay state.
 
-The card contains:
+## Quick-actions rail contract
 
-- avatar/portrait;
-- player name;
-- player ID and copy affordance;
-- clan plaque under the avatar;
-- current Nobleza rank;
-- currently equipped personal title;
-- HP / max HP with a dynamic bar;
-- Maná / max Maná when a real resource source exists;
-- current Oro amount;
-- the player-guide link below the card.
+Default state is **collapsed**.
 
-### Data sources and ownership
+Collapsed:
 
-| HUD datum | Source / owner consumed | Fallback policy |
-|---|---|---|
-| Name / ID | `localPlayer` | stable local prototype identity if no profile bridge exists |
-| Avatar | player/profile avatar when exposed | existing `assets/hero.PNG` visual fallback only |
-| Clan | player/profile clan fields if exposed | `Sin clan`; no clan persistence is invented |
-| Nobleza | `KeloNobility.getRank()` | actor nobility field / `Sin nobleza` |
-| Personal title | `KeloTitles.getEquipped()` + `getTitle()` | `Ninguno` |
-| Vida | `localPlayer.hp` / `maxHp` | unavailable indicator if absent |
-| Maná | player/profile `mana` / `maxMana` only | `— / —`; the HUD does not invent mana gameplay state |
-| Oro | existing `STATE.gold` / profile bridge | `0` only when no value is exposed |
+```text
+☰
+```
 
-The HUD never mutates those values. It renders snapshots and subscribes to semantic changes when owners emit them. It also refreshes after player UI interactions so existing legacy flows that still call `saveState()` remain visible without a timer. There is no `setInterval`, watchdog or continuous render-loop polling.
+Expanded:
 
-### Duplicate HUD root cause and retirement
+```text
+×
+Boutique
+Menú
+PvP
+Guía
+Pantalla completa
+```
 
-The duplicated `Oro 1500` was **not** a double execution of `luxe-shell.js`. Two different surfaces were live at the same time:
+Implementation rules:
 
-1. `index.html` mounted the legacy `#telemetry-bar` containing `Oro: 1500 | KC: 200` in the top-left corner.
-2. `src/ui/luxe-shell.js` independently mounted its Luxe `.lx-gold` pill in the same area.
+1. `src/ui/luxe-player-hud.js` obtains the existing nodes `#lx-shop`, `#lx-side-menu`, `#lx-side-pvp` and `#kelo-orientation-btn`.
+2. It creates only the `GUÍA` link if that existing Luxe presentation has not already created it.
+3. Those exact nodes are moved into `#kw-quick-actions-options`; their existing listeners/owners are preserved.
+4. `#kw-quick-actions-toggle` owns only expanded/collapsed presentation state.
+5. Boutique, Menú, PvP and Guía auto-collapse the rail after activation. Fullscreen remains visible while toggling so the same existing control can immediately expose its updated SALIR/PANTALLA state.
+6. Collapsed options use `visibility:hidden` plus `pointer-events:none`; the rail root is pointer-transparent and only the launcher keeps `pointer-events:auto`. The old right-side area therefore does not remain as an invisible touch blocker.
+7. Open/close motion uses only `opacity` and `transform` for the visible transition, about 210 ms, and respects `prefers-reduced-motion`.
+8. The toggle exposes `aria-expanded`, `aria-controls` and a changing accessible label.
 
-The old guide link was also mounted independently by `index.html`.
+No destination handler is copied into `luxe-player-hud.js`.
 
-Player HUD V1 removes the cause rather than covering it:
+## Mobile layout contract
 
-- the legacy `#telemetry-bar` markup and its `.hud-badge` CSS are removed from `index.html`;
-- the legacy standalone `#kelo-guide-link` markup/CSS are removed from `index.html`;
-- the Player HUD subcomponent replaces the old Luxe gold/presence nodes in DOM and owns the single integrated visual surface;
-- the integrated Oro display still reads the same `STATE.gold` value; there is no second wallet variable.
+The quick-actions launcher is mobile-first:
 
-No hidden duplicate telemetry element is retained.
+- anchored with `safe-area-inset-top` and `safe-area-inset-right`;
+- minimum interactive size is 44×44 px, including compact landscape;
+- 390×844, 393×852 and 430×932 are explicit target viewports;
+- low-height landscape compacts action height and spacing;
+- the expanded list has an internal `max-height` and `overflow-y:auto`, so it cannot force document scrolling;
+- `100dvh` is used when supported, with `100vh` fallback;
+- no horizontal document overflow;
+- the main world remains touchable wherever the collapsed list used to occupy space.
 
-## Current player-facing menu routes
+The Luxe shell keeps its existing z-index hierarchy. The quick rail stays inside `#kelo-luxe`; it does not use an arbitrary global maximum z-index and does not supersede critical modal/help overlays.
+
+## Player combat HUD
+
+The persistent profile-heavy HUD was retired from normal social exploration. In social mode the compact combat HUD is hidden. When the runtime enters PvP/combat mode, the top-left combat card exposes only real Vida and Maná resources already owned by gameplay/runtime state.
+
+- Vida reads `localPlayer.hp / maxHp`.
+- Maná reads a real player/profile mana source when available and otherwise renders `— / —`.
+- The HUD does not mutate either resource.
+- It does not poll with `setInterval`.
+- Semantic events plus lightweight refresh hooks keep the presentation current.
+
+## Current player-facing main-menu routes
 
 | Entry | Destination owner / route | Status |
 |---|---|---|
 | Mochila | `KeloBackpackUI.open()` | LIVE |
 | Habilidades | `KeloAbilities.openStonePanel()` | LIVE |
 | Apariencia | `KeloCharacterCustomizer.open()` | DYNAMIC LIVE |
+| Monturas | `KeloMountPanel.open()` | LIVE when owner ready |
 | Perfil | legacy LIVE `inspectPlayer(localPlayer, true)` adapter | LIVE / LEGACY UI |
 | Mercado | `KeloMarketUI.open()` | LIVE |
 | Chat | Luxe chat drawer | LIVE presentation |
-| Propiedades | `KELO_HOUSE_UI.show()` with current property/house owner flow | LIVE |
-| Nobleza | `KeloNobility.open()` | LIVE, authority-aware |
+| Propiedades | `KELO_HOUSE_UI.show()` | LIVE |
+| Nobleza | `KeloNobility.open()` | LIVE |
+| Libro de títulos | `KeloTitles.openBook()` | LIVE |
 | Burlas | `KeloSelfInteractionUI.openEmotes()` | LIVE |
-| Creators | `KELO_CREATORS_LAUNCHER` / admin-authorized lazy launcher | LIVE when authorized |
+| Creators | authorized lazy launcher | LIVE when authorized |
 
-## Recovered discoverability
-
-Three valid features existed in the runtime but were not exposed in the visible Luxe menu:
-
-1. **Apariencia** — the Character Creator was already Foundation-active but primarily reachable through self-interaction/profile routing.
-2. **Nobleza** — the nobility owner still had a stale injection selector for an older `#menu-sheet .menu-grid`; the real current shell is `#lx-menu-panel .lx-menu-grid`. Luxe routes directly to the existing owner rather than duplicating the Nobility UI.
-3. **Burlas** — the emote panel was reachable from the self-interaction popup but not from the main menu.
-
-## Intentionally not exposed as fake buttons
-
-### Misiones
-
-The current legacy `openSocialTool('missions')` path is only a placeholder message. `engine-q.js` contains a legacy Maestro trial prototype and explicitly is not the owner for new missions. The premium menu only renders Misiones if a future `KeloMissionsUI.open()` owner exists.
-
-### Ajustes
-
-The current legacy `openSocialTool('settings')` path is only a placeholder. The premium menu only renders Ajustes if a future `KeloSettingsUI.open()` owner exists.
-
-This keeps the rule: **visible button = real destination**.
-
-## Nobility / donations
-
-`KeloNobility` remains the owner. Its existing flow includes accumulated donations and ranks from Caballero through Rey. When online authority is available, `nobility-authority.js` routes donation decisions through `KeloNetAuthority`; neither the menu nor the Player HUD calculates or mutates donation balances.
-
-`KeloTitles` remains a separate owner for achievement titles. The Player HUD may therefore display, for example, Nobleza `Duque` and personal title `Asesino` simultaneously without merging the two concepts.
+Misiones and Ajustes remain owner-gated and do not render until a real public UI owner exists.
 
 ## Input-lock contract
 
-Opening the Luxe main menu claims one token:
+Opening the main Luxe menu claims:
 
 ```text
 owner: luxe-main-menu
 ```
 
-Closing it releases that exact token.
-
-The chat drawer uses its own token:
+The chat drawer uses:
 
 ```text
 owner: luxe-chat
 ```
 
-A menu tap must not leak through to world movement. Luxe UI surfaces stop pointer propagation, while the actual lock lifecycle remains owned by `KeloInputLocks`.
+The quick-actions launcher itself does not acquire a gameplay input lock because it is a small non-modal HUD affordance. Pointer isolation is local to the controls: pointer events from the Luxe rail are prevented from leaking to the world by the existing Luxe shell listener, while collapsed options cannot intercept taps at all.
 
-The Player HUD itself is pointer-transparent except for intentional controls such as avatar/profile, copy-ID and GUÍA. No direct `KELO_MODAL_INPUT_LOCK` writes, watchdogs or `setInterval` polling are allowed.
+## Fullscreen / orientation integration
 
-## Mobile layout contract
+`src/ui/mobile-orientation.js` remains the sole owner of `#kelo-orientation-btn` behavior. The quick-actions layer only relocates that DOM node after the orientation module has mounted it. `KELO_ORIENTATION` continues to update:
 
-Player HUD:
+- `aria-pressed`;
+- `aria-label`;
+- fullscreen mode dataset;
+- PANTALLA/COMPLETA versus SALIR/PANTALLA copy;
+- iOS immersive fallback/help.
 
-- anchored to `safe-area-inset-top` and `safe-area-inset-left`;
-- width scales with `clamp()` and has a compact <=360 px layout;
-- Nobleza remains readable and visually dominant without consuming half the viewport;
-- low-height landscape reduces avatar/resources further;
-- interactive targets such as GUÍA remain at least 44 px high;
-- the card does not occupy the right-side Menu / PvP rail.
+No fullscreen logic is reimplemented in Luxe HUD.
 
-Main menu:
+## Boutique integration
 
-- portrait-first;
-- two-column card grid;
-- iOS safe-area aware;
-- menu content scrolls inside the panel instead of growing outside the viewport;
-- low-height landscape receives a compact layout;
-- primary close target is at least 44 × 44 px;
-- cards are substantially larger than the minimum touch target;
-- no horizontal document overflow.
+`src/ui/luxe-boutique.js` continues to attach the existing `#lx-shop` handler. Moving the same node preserves that handler. The quick-actions layer never writes `shop.onclick`.
 
-## Creators
+## Main menu integration
 
-`src/ui/studio-launcher.js` remains a separate launcher because it owns authorization and lazy loading for creator tools. It **reuses the existing Luxe grid** and does not create another menu. If the active user lacks the required admin permission, the Creators card is absent.
+`#lx-side-menu` keeps the `KELO_LUXE.toggleMenu` handler created by `luxe-shell.js`. Expanding/collapsing quick actions is independent of opening/closing the main menu.
 
-## Adding a future main-menu destination
+## PvP integration
 
-Do not add a decorative button first. The sequence is:
+`#lx-side-pvp` keeps the existing Luxe PvP handler and delegates to the existing `enterPvPWorld()` path. The rail does not own combat state.
 
-1. identify the domain owner;
-2. confirm a stable public `open()`/navigation operation exists;
-3. add one declarative menu entry in Luxe;
-4. route the tap to that owner API;
-5. add browser coverage;
-6. update this document and player guide if the entry is player-visible.
+## Online-first model
 
-If there is no real owner yet, do not expose the entry as if it worked.
+The feature is client-only presentation and requires no server authority or persistence. All valuable/gameplay operations still flow through their existing owners. Connecting or changing online authority later does not require changing quick-actions IDs, handler ownership or flow.
 
-## Extending the Player HUD
+## Extension points
 
-Do not add a second HUD or profile store. Expose the missing datum from its real domain owner or a minimal profile read adapter, then teach `luxe-player-hud.js` to consume it. The HUD is intentionally tolerant of absent optional fields so future clan/mana/online-profile owners can plug into the same presentation contract.
+To add a future quick action:
 
-## Validation
+1. identify an existing owner and real control/route;
+2. reuse that control or create it in the owner that owns the behavior;
+3. add only presentation placement to the quick-actions list;
+4. preserve stable IDs/handlers;
+5. add static and browser coverage;
+6. update this document and the player guide when the visible flow changes.
 
-Static contract audit: `node scripts/luxe-menu-audit.mjs`.
+Do not place fake destinations in the quick rail.
 
-Browser audit: `node scripts/live-luxe-menu-audit.mjs` with `AUDIT_URL` pointing at a local server or the deployed Pages URL. It validates portrait/landscape containment, recovered routes, token release, movement after closing, PvP enter/leave, console errors and screenshot evidence. Player HUD V1 additionally requires checking one top-left HUD instance, absence of legacy telemetry/guide elements, safe-area containment, Nobleza/title separation, resource values and pointer isolation.
+## Invariants
+
+- one Luxe navigation owner;
+- one right-edge quick-actions launcher;
+- no duplicated Boutique/Menu/PvP/Fullscreen handlers;
+- closed options cannot capture pointer/touch;
+- minimum touch target remains 44 px;
+- world/gameplay state is never mutated by the rail;
+- no timer/watchdog/polling for rail state;
+- same control IDs remain available to existing code/tests;
+- fullscreen owner remains `KELO_ORIENTATION`;
+- Guide remains `guide.html`.
+
+## Anti-patterns
+
+Do not:
+
+- create a second main menu;
+- clone the five action buttons;
+- copy destination `onclick` handlers into the HUD;
+- hide the list only with opacity while leaving it touchable;
+- add a giant z-index;
+- add a framework/library for this interaction;
+- use a timer to keep the rail synchronized;
+- store expanded/collapsed state in gameplay/profile persistence.
+
+## Tests and CI
+
+Static contract audit:
+
+```text
+node scripts/luxe-menu-audit.mjs
+```
+
+Live/browser audit:
+
+```text
+node scripts/live-luxe-menu-audit.mjs
+```
+
+The browser audit verifies:
+
+- closed-by-default launcher;
+- pointer isolation while collapsed;
+- expanded five-control order;
+- Boutique and main-menu routing;
+- fullscreen enter/exit label/state through the existing owner;
+- PvP first-use route and combat HUD;
+- portrait targets including 390×844, 393×852 and 430×932;
+- compact 844×390 landscape;
+- no horizontal overflow;
+- screenshot evidence for closed/open states;
+- console/page errors.
+
+## Observability
+
+`KELO_LUXE_PLAYER_HUD` advertises its version, layout, visibility mode, rail mode, owner and polling policy for deterministic browser inspection. `KELO_LUXE_AUDIT` and `KELO_ORIENTATION_AUDIT` remain the corresponding owner-level metadata surfaces.
+
+## Known debt
+
+- Some main-menu destinations still use explicitly documented legacy adapters while their final owner UIs are migrated.
+- Guide copy may lag older HUD wording and must remain synchronized whenever the public menu flow changes.
+- The combat HUD is deliberately minimal; additional player data must come from real domain owners rather than a new HUD state store.
+
+## Checklist for future changes
+
+- [ ] Reuse `KELO_LUXE` rather than create another navigation surface.
+- [ ] Reuse action nodes/owner APIs instead of cloning handlers.
+- [ ] Preserve collapsed pointer isolation.
+- [ ] Check safe areas and 44 px minimum targets.
+- [ ] Check portrait and low-height landscape.
+- [ ] Keep fullscreen/orientation in `KELO_ORIENTATION`.
+- [ ] Keep domain authority outside UI.
+- [ ] Run static audit.
+- [ ] Run browser/live audit.
+- [ ] Update docs/guide for player-visible flow changes.

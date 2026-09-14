@@ -1,8 +1,8 @@
 /* KELO-INDEX
  * area: TEST / UI
  * owner: Premium main menu + player HUD contract audit
- * keys: MENU LUXE HUD PVP HP MANA GUIDE INPUT LOCK FOUNDATION COMMERCE MOUNTS
- * purpose: prueba estáticamente que Luxe reutiliza owners reales, oculta el HUD en social y presenta solo Vida/Maná en PvP con rail lateral único
+ * keys: MENU LUXE HUD PVP HP MANA GUIDE INPUT LOCK FOUNDATION COMMERCE MOUNTS QUICK ACTIONS COLLAPSIBLE
+ * purpose: prueba estáticamente que Luxe reutiliza owners reales, oculta el HUD en social y agrupa el rail lateral real detrás de un launcher retráctil sin duplicar handlers
  * online: N/A; valida fronteras UI/owner, no autoridad gameplay
  */
 import fs from 'node:fs';
@@ -41,24 +41,29 @@ assert(market.includes('window.KeloMarketUI=Object.freeze'),'Market UI owner mis
 assert(house.includes('window.KELO_HOUSE_UI=Object.freeze'),'Property UI owner missing');
 assert(studio.includes("document.querySelector('#lx-menu-panel .lx-menu-grid')"),'Creators launcher must reuse Luxe grid');
 assert(playerHud.includes('KELO-INDEX')&&playerHud.includes('owner: Kelo Luxe Shell presentation'),'Combat HUD owner missing');
-for(const id of ['kw-player-hud-wrap','kw-hud-hp-row','kw-hud-hp-bar','kw-hud-hp-text','kw-hud-mana-row','kw-hud-mana-bar','kw-hud-mana-text','kw-player-guide'])assert(playerHud.includes(id),'Combat HUD missing required element: '+id);
+for(const id of ['kw-player-hud-wrap','kw-hud-hp-row','kw-hud-hp-bar','kw-hud-hp-text','kw-hud-mana-row','kw-hud-mana-bar','kw-hud-mana-text','kw-player-guide','kw-quick-actions-toggle','kw-quick-actions-options'])assert(playerHud.includes(id),'Combat HUD/quick rail missing required element: '+id);
 for(const removed of ['kw-hud-avatar','kw-hud-name','kw-hud-id','kw-hud-clan','kw-hud-nobility','kw-hud-title','kw-hud-gold'])assert(!playerHud.includes(removed),'Permanent profile metadata returned: '+removed);
 assert(playerHud.includes('body:not(.social-mode) #kw-player-hud-wrap{display:block}'),'Combat HUD must reveal only outside social mode');
 assert(playerHud.includes('#kw-player-hud-wrap')&&playerHud.includes('display:none'),'Combat HUD must hide by default');
 assert(playerHud.includes("finite(p?.hp)")&&playerHud.includes("finite(p?.maxHp)"),'Combat HUD must consume real HP');
 assert(playerHud.includes("p?.mana??state?.playerProfile?.mana")&&playerHud.includes("'— / —'"),'Mana unavailable contract missing');
 assert(playerHud.includes("root.KeloPvPWorld?.state")&&playerHud.includes('KELO_COMBAT_ENABLED'),'PvP owner compatibility read missing');
-assert(playerHud.includes('env(safe-area-inset-top)')&&playerHud.includes('env(safe-area-inset-left)'),'iOS safe area support missing');
-assert(playerHud.includes('flex-direction:column!important')&&playerHud.includes('[shop,menu,pvp,guide,fullscreen]'),'Right rail must be one ordered vertical stack');
+assert(playerHud.includes('env(safe-area-inset-top,0px)')&&playerHud.includes('env(safe-area-inset-right,0px)'),'iOS quick-actions safe area support missing');
+assert(playerHud.includes('[shop,menu,pvp,guide,fullscreen]')&&playerHud.includes('quickOptions.appendChild(node)'),'Right rail must reuse the five existing controls instead of duplicating them');
 assert(playerHud.includes("shop.textContent='Boutique'")&&playerHud.includes("guide.href='guide.html'"),'Boutique/Guide rail reuse contract missing');
-assert(playerHud.includes('#kelo-orientation-btn')&&playerHud.includes('#lx-shop')&&playerHud.includes('.lx-side-guide'),'Five lateral controls styling contract missing');
+assert(playerHud.includes("quickToggle.setAttribute('aria-expanded','false')")&&playerHud.includes("quickToggle.setAttribute('aria-controls','kw-quick-actions-options')"),'Quick-actions toggle accessibility contract missing');
+assert(playerHud.includes("quickOptions.setAttribute('aria-hidden','true')")&&playerHud.includes("pointer-events:none!important")&&playerHud.includes(".kw-quick-actions-open .kw-quick-actions-options"),'Collapsed quick-actions pointer isolation missing');
+assert(playerHud.includes('opacity .21s ease')&&playerHud.includes('translateY(-6px) scale(.97)'),'Quick-actions lightweight transition missing');
+assert(playerHud.includes("const autoCloseActions=new Set([shop,menu,pvp,guide].filter(Boolean))"),'Owner-backed quick actions must auto-close without replacing their handlers');
+assert(!playerHud.includes('shop.onclick=')&&!playerHud.includes('menu.onclick=')&&!playerHud.includes('pvp.onclick=')&&!playerHud.includes('fullscreen.onclick='),'Player HUD must not replace existing action handlers');
+assert(playerHud.includes("rail:'collapsible-five'")&&playerHud.includes("version:'luxe-player-hud-v1.2.0'"),'Collapsible rail audit metadata missing');
 assert(!playerHud.includes('grid-template-columns:repeat(2,44px)'),'Deprecated 2x2 rail returned');
 assert(!playerHud.includes('setInterval('),'Combat HUD must not poll');
 assert((playerHud.match(/requestAnimationFrame\(/g)||[]).length===1,'Combat HUD may use one initial RAF only');
 assert(!/STATE\s*\.\s*gold\s*[+\-*/]?=/.test(playerHud),'Combat HUD must not mutate gold');
 assert(!/\.hp\s*[+\-*/]?=/.test(playerHud),'Combat HUD must not mutate HP');
-assert(index.includes('src/ui/luxe-player-hud.js?v=3'),'Combat HUD cache-bust missing');
+assert(index.includes('src/ui/luxe-player-hud.js?v=3'),'Combat HUD runtime include missing');
 assert(!index.includes('id="telemetry-bar"'),'Legacy telemetry returned');
 assert(!index.includes('id="kelo-guide-link"'),'Legacy guide returned');
 assert(index.includes('<div id="ui-layer"><div class="action-bar"'),'UI layer owner surface drifted');
-console.log(JSON.stringify({status:'PASS',owner:'Kelo Luxe Shell presentation',layout:'pvp-only-combat-v1',socialHudHidden:true,pvpResources:['hp','mana'],rightRail:['Boutique','Menu','PvP','Guía','Pantalla completa'],noProfileMetadataInPersistentHud:true,noPolling:true,tokenInputLocks:true},null,2));
+console.log(JSON.stringify({status:'PASS',owner:'Kelo Luxe Shell presentation',layout:'pvp-only-combat-v1',socialHudHidden:true,pvpResources:['hp','mana'],rightRail:{launcher:'collapsible',default:'closed',actions:['Boutique','Menu','PvP','Guía','Pantalla completa']},noProfileMetadataInPersistentHud:true,noPolling:true,tokenInputLocks:true},null,2));
