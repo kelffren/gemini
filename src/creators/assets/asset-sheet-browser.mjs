@@ -6,7 +6,7 @@
  * public-api: analyzeAssetSheetFile(), renderAssetSheetPreview(), exportAssetFramePng(), exportCleanAtlasPng(), exportCleanAtlasDataUrl()
  * online: no; reads a local File and returns local Blobs
  */
-import { analyzeAssetSheetPixels } from './asset-sheet-compiler.mjs';
+import { analyzeAssetSheetPixels } from './asset-sheet-compiler-v2.mjs';
 
 const MAX_BYTES = 20 * 1024 * 1024;
 const MAX_PIXELS = 12_000_000;
