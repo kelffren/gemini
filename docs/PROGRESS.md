@@ -1,7 +1,11 @@
-# PROGRESS
+# Kelo World — Progress
 
-## 2026-08-31 Plaza Slice V0.1
-HECHO: engine-s.js — avatares pixel 4 dir, edificios de plaza, colisiones, bots extra, chat + burbuja, tap-to-walk, HUD chat/mochila.
-PROBLEMAS: plaza.jpg sigue de fondo; no es atlas HD aún.
-SIGUIENTE: mejorar pixel del hero y puertas.
-DECISIONES: canvas 2D, no Phaser (el repo no tenía Phaser). No se borró combate.
+**2026-09-14**
+
+- Runtime declarado: V6.54.2.
+- Forest Plaza V2 atlas importado al repo y boot.
+- 146 frames irregulares integrados mediante compiler/manifest/Atlas Contract/Property Catalog.
+- 146 assets clasificados y nombrados semánticamente manteniendo IDs legacy.
+- Studio Asset Palette expone 7 carpetas Forest Plaza.
+- Documentación canónica sincronizada con engine/runtime actual.
+- World/iPhone permanece sujeto a verificación real de estabilidad antes de declarar cierre definitivo.
