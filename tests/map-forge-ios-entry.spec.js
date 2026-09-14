@@ -49,6 +49,7 @@ async function tapExactPath(page, screenshotName) {
 
   await mapForge.tap();
   const forge = page.locator('#kelo-map-forge');
+  await expect(forge).toHaveCount(1, { timeout: 10000 });
   await expect(forge).toBeVisible({ timeout: 10000 });
   await expect(hub).toHaveCount(0, { timeout: 5000 });
   await expect(forge.locator('.kmf-canvas')).toBeVisible({ timeout: 5000 });
