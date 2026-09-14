@@ -4,9 +4,9 @@
  * owns: creator project navigation shell only
  * does-not-own: global navigation, Studio implementation, project persistence, permissions or publish policy
  * lazy: imported only after explicit CREATORS action; active cards dispatch through workspace registry
- * mobile: World launch paints Studio chrome immediately; Hub stays parked until .ks-status exists and is restored if the editor never mounts
+ * mobile: World launch paints Studio chrome immediately; Hub stays parked until .ks-status exists without a loading flag and is restored if the editor never mounts
  */
-import { bootKeloCreators } from '../creator-entry.mjs?v=world-light-20260914-1';
+import { bootKeloCreators } from '../creator-entry.mjs?v=world-chrome-20260914-1';
 
 let active=null;
 
@@ -231,7 +231,7 @@ export async function openCreatorHub({root=globalThis}={}){
       destroy();
       return session;
     }catch(error){
-      if(id==='world'&&doc.getElementById('kelo-studio-live')?.querySelector?.('.ks-status')){
+      if(id==='world'&&doc.getElementById('kelo-studio-live')?.querySelector?.('.ks-status')&&doc.getElementById('kelo-studio-live')?.dataset?.keloWorldLoading!=='1'){
         destroy();
         return null;
       }
@@ -385,7 +385,7 @@ export async function openCreatorHub({root=globalThis}={}){
   doc.addEventListener('keydown',onKey,true);
 
   active=Object.freeze({
-    version:'kelo-creator-hub-v1.18.0-world-light',
+    version:'kelo-creator-hub-v1.19.0-world-chrome',
     hub,platform,
     get section(){return current;},
     show:render,

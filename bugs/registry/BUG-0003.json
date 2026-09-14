@@ -4,13 +4,26 @@
   "title": "World editor button freezes on tap and never opens on iPhone",
   "status": "FIXED_PENDING_VERIFY",
   "severity": "critical",
-  "area": ["creators", "world", "studio", "indexeddb", "ios"],
+  "area": [
+    "creators",
+    "world",
+    "studio",
+    "indexeddb",
+    "ios"
+  ],
   "source": "mixed",
   "discovered_at": "2026-09-13",
-  "reported_by": ["human QA", "AI inspection", "regression test", "player"],
-  "reports": ["REPORT-000001"],
+  "reported_by": [
+    "human QA",
+    "AI inspection",
+    "regression test",
+    "player"
+  ],
+  "reports": [
+    "REPORT-000001"
+  ],
   "environment": {
-    "game_build": "world-light-20260914-1",
+    "game_build": "world-chrome-20260914-1",
     "device": "iPhone real device target",
     "os": "iOS",
     "browser": "Safari",
@@ -26,14 +39,16 @@
     "Open Create -> World again and confirm Studio remounts instead of black-screening."
   ],
   "expected": "World opens, remains interactive, and can be reopened even after a stale Studio shell/session condition.",
-  "actual": "Player report 2026-09-14 (repeat): tapping World still froze the card. Live Pages with 824a932 painted the launch curtain and requested 80 Studio modules, but #kelo-studio-live never attached within 15s and the Hub stayed on ABRIENDO because it awaited the Studio graph. Player report 2026-09-14 (handoff fail): world-handoff 5a52c6d painted KELO STUDIO / Abriendo World Editor… then the Safari tab went fully black with a loading spinner.",
+  "actual": "Player iPhone 2026-09-14 22:03–22:04 still showed KELO STUDIO / Abriendo World Editor… then a fully black Safari tab (A3 / 5a52c6d). A4 / d6ff092 world-light was deployed later but live-studio-controller.mjs still had 11 static Studio imports, so importing the controller still pulled the large graph before .ks-status/tools existed. A5 / world-chrome paints studio-live-shell first and only then dynamically imports the rest of the Studio graph.",
   "evidence": [
     "Commit 829ac7fbd5fc629b05ecf92489bab16b0292bce9: IndexedDB fail-open candidate — insufficient.",
     "Commit 824a932f5e3e41c888116ab1453d64500e66255d: curtain + Hub stacking candidate — failed live Pages World tap QA on 2026-09-14.",
     "Commit 5a52c6d7404e09019c9ec96cc2ecea43af1bb6a7: Map Forge Hub-handoff candidate — failed player iPhone QA; loading chrome then black Safari tab.",
     "REPORT-000001: player, iPhone 393x852, World card stays frozen after tap, then loading chrome then black tab",
     "Player screenshots 2026-09-14 22:03–22:04: IMG_8293 KELO STUDIO / MODO CREADOR + Abriendo World Editor…; IMG_8294 fully black Safari tab with spinner",
-    "Live Pages QA 2026-09-14: CREATOR_BUILD world-unfreeze-20260913-2 deployed; curtain visible; 80 /src/studio/ requests; #kelo-studio-live never attached in 15s"
+    "Live Pages QA 2026-09-14: CREATOR_BUILD world-unfreeze-20260913-2 deployed; curtain visible; 80 /src/studio/ requests; #kelo-studio-live never attached in 15s",
+    "Code inspection 2026-09-14 23:10 EDT: d6ff092 live-studio-controller.mjs still statically imported overlay, grid, pointer, camera, mirror, live-shell, productivity, actions, prefabs, analyzer and document-commands. World-workspace imported that module before createStudioLiveShell ran.",
+    "Player screenshots IMG_8293/IMG_8294 re-reported 2026-09-14 23:08 EDT asking if the World button was still broken."
   ],
   "suspected_files": [
     "src/creators/workspaces/world-workspace.mjs",
@@ -51,32 +66,53 @@
   "claim_started_at": null,
   "research": {
     "status": "in_progress",
-    "summary": "Three distinct candidate directions have already been exercised. IndexedDB fail-open alone was insufficient. Keeping the Hub/curtain visible while awaiting the full Studio graph still left World stuck while roughly 80 Studio modules loaded. Destroying the Hub early allowed Studio chrome to paint but was followed by a black Safari tab on the player's iPhone. The current world-light candidate deliberately stages boot work, delays extras/palette, dynamically imports the Studio entry, keeps the Hub until .ks-status appears, and reduces early overlay pressure. It is not yet verified on the real target flow.",
+    "summary": "Four candidate directions exist. IndexedDB fail-open (A1) was insufficient. Curtain/stacking while awaiting ~80 modules (A2) failed LIVE. Early Hub destruction (A3) painted loading chrome then black-tabbed Safari. world-light (A4) delayed extras/overlay and dynamically imported studio-entry, but the live controller itself still statically imported the Studio graph, so iPhone still paid the 80-module cost before tools existed. world-chrome (A5) is the first candidate that actually paints .ks-status/tools from studio-live-shell.mjs before loading the controller graph. Target iPhone verification is still required.",
     "known_facts": [
       {
         "id": "F1",
         "statement": "The IndexedDB fail-open candidate did not by itself eliminate the player-facing World-open failure.",
-        "evidence": ["829ac7fbd5fc629b05ecf92489bab16b0292bce9 marked insufficient in the pre-v2 registry"]
+        "evidence": [
+          "829ac7fbd5fc629b05ecf92489bab16b0292bce9 marked insufficient in the pre-v2 registry"
+        ]
       },
       {
         "id": "F2",
         "statement": "With 824a932 deployed, the launch curtain painted and about 80 /src/studio/ requests occurred, but #kelo-studio-live did not attach within 15 seconds and the Hub remained on ABRIENDO.",
-        "evidence": ["Live Pages QA 2026-09-14", "824a932f5e3e41c888116ab1453d64500e66255d"]
+        "evidence": [
+          "Live Pages QA 2026-09-14",
+          "824a932f5e3e41c888116ab1453d64500e66255d"
+        ]
       },
       {
         "id": "F3",
         "statement": "With 5a52c6d, the player's iPhone showed KELO STUDIO / Abriendo World Editor… and then the Safari tab became fully black with a loading spinner.",
-        "evidence": ["Player screenshots IMG_8293 and IMG_8294", "5a52c6d7404e09019c9ec96cc2ecea43af1bb6a7"]
+        "evidence": [
+          "Player screenshots IMG_8293 and IMG_8294",
+          "5a52c6d7404e09019c9ec96cc2ecea43af1bb6a7"
+        ]
       },
       {
         "id": "F4",
         "statement": "A visible loading shell is not acceptance; .ks-status/tools must mount and respond to touch.",
-        "evidence": ["Player-facing acceptance rule recorded in the pre-v2 BUG-0003 notes"]
+        "evidence": [
+          "Player-facing acceptance rule recorded in the pre-v2 BUG-0003 notes"
+        ]
       },
       {
         "id": "F5",
         "statement": "headless_shell can freeze after Studio mounts because of the overlay canvas loop, but that observation is not the same as the original Hub-cover symptom.",
-        "evidence": ["Pre-v2 BUG-0003 note distinguishing headless_shell from player-facing failure"]
+        "evidence": [
+          "Pre-v2 BUG-0003 note distinguishing headless_shell from player-facing failure"
+        ]
+      },
+      {
+        "id": "F6",
+        "statement": "A4/d6ff092 did not shrink the Studio import graph before chrome: live-studio-controller.mjs still had 11 static imports, so World-workspace import of that module loaded the graph before createStudioLiveShell.",
+        "evidence": [
+          "src/studio/integration/live-studio-controller.mjs at d6ff092",
+          "F2",
+          "F3"
+        ]
       }
     ],
     "hypotheses": [
@@ -86,8 +122,12 @@
         "confidence": "low",
         "status": "weakened",
         "why": "A fail-open candidate targeted IndexedDB, but the player-facing failure persisted.",
-        "evidence_for": ["IndexedDB is in the boot path and was previously suspected"],
-        "evidence_against": ["F1"],
+        "evidence_for": [
+          "IndexedDB is in the boot path and was previously suspected"
+        ],
+        "evidence_against": [
+          "F1"
+        ],
         "test_next": "Do not spend another pass on IndexedDB alone unless a trace shows the current world-light boot waiting there before .ks-status."
       },
       {
@@ -97,7 +137,9 @@
         "status": "ruled_out",
         "why": "The 824a932 curtain/stacking candidate painted correctly but still failed while the Studio graph loaded.",
         "evidence_for": [],
-        "evidence_against": ["F2"],
+        "evidence_against": [
+          "F2"
+        ],
         "test_next": null
       },
       {
@@ -106,9 +148,13 @@
         "confidence": "high",
         "status": "supported",
         "why": "The failed 824a932 path requested about 80 Studio modules while the Hub stayed ABRIENDO and the interactive shell never attached within the observed window.",
-        "evidence_for": ["F2", "F3"],
+        "evidence_for": [
+          "F2",
+          "F3",
+          "F6"
+        ],
         "evidence_against": [],
-        "test_next": "Verify the world-light staged/dynamic import candidate on real iPhone and record whether .ks-status appears before extras/palette and the broader Studio graph finish loading."
+        "test_next": "Verify world-chrome: .ks-top/.ks-status must exist before live-studio-controller starts fetching the remaining Studio graph on iPhone."
       },
       {
         "id": "H4",
@@ -116,19 +162,39 @@
         "confidence": "medium",
         "status": "supported",
         "why": "The failed handoff reached loading chrome before the tab blacked out, and the previous registry specifically associated that path with the dpr=3 overlay plus the static graph.",
-        "evidence_for": ["F3", "F5"],
+        "evidence_for": [
+          "F3",
+          "F5"
+        ],
         "evidence_against": [],
         "test_next": "On the current candidate, confirm the overlay is allocated only after chrome and capped at dpr<=1.5 on iPhone; if black-tab failure persists, compare a run with overlay creation disabled to isolate its contribution."
       },
       {
         "id": "H5",
         "theory": "The current world-light staged boot is sufficient to open an interactive Studio on the player's iPhone without black-screening.",
+        "confidence": "low",
+        "status": "weakened",
+        "why": "Code inspection showed world-light still statically imported the Studio graph from the live controller before .ks-status existed, so it could not satisfy H3 even if extras/overlay were delayed.",
+        "evidence_for": [
+          "Design of d6ff09277a6eecd244d89710f1043278edde1076"
+        ],
+        "evidence_against": [
+          "F6"
+        ],
+        "test_next": "Do not spend a real-iPhone pass on d6ff092 as-is; verify A5/world-chrome instead."
+      },
+      {
+        "id": "H6",
+        "theory": "Painting studio-live-shell chrome first, then dynamically importing the live controller graph in chunks, is sufficient for the player iPhone to reach interactive World tools without a black tab.",
         "confidence": "medium",
         "status": "unverified",
-        "why": "It directly addresses the two strongest remaining signals: eager graph cost and early overlay pressure while preserving the Hub until interactive status exists.",
-        "evidence_for": ["Design of d6ff09277a6eecd244d89710f1043278edde1076"],
+        "why": "This is the first candidate that actually stages the graph after visible .ks-status/tools, which is the missing condition from A2/A3/A4.",
+        "evidence_for": [
+          "F6",
+          "H3"
+        ],
         "evidence_against": [],
-        "test_next": "Execute the exact real-iPhone Create -> World acceptance flow and require interactive .ks-status/tools, then reopen World once more."
+        "test_next": "Real iPhone Safari: Create -> World -> tools/.ks-status visible, then interactive, then close/reopen World."
       }
     ],
     "ruled_out": [
@@ -136,25 +202,28 @@
         "hypothesis_id": "H2",
         "theory": "Hub stacking/visibility alone is the root cause.",
         "reason": "824a932 fixed curtain/stacking behavior but still failed LIVE while the Studio graph loaded and the interactive shell did not attach.",
-        "evidence": ["824a932f5e3e41c888116ab1453d64500e66255d", "F2"]
+        "evidence": [
+          "824a932f5e3e41c888116ab1453d64500e66255d",
+          "F2"
+        ]
       }
     ],
     "unknowns": [
       {
         "id": "U1",
-        "question": "Does d6ff092 world-light reach an interactive .ks-status/tools state on the real player's iPhone and survive a second World open?",
-        "why_it_matters": "This is the actual acceptance gate for the current candidate.",
-        "quickest_test": "Real iPhone Safari: game -> Create -> World -> wait for interactive status/tools -> close/reopen World."
+        "question": "Does world-chrome reach interactive .ks-status/tools on the real player iPhone and survive a second World open without a black Safari tab?",
+        "why_it_matters": "This is the acceptance gate for A5.",
+        "quickest_test": "Real iPhone Safari: game -> Create -> World -> wait for tools/status -> close/reopen World."
       },
       {
-        "id": "U2",
-        "question": "If world-light still fails, is the last successful milestone before failure shell paint, .ks-status mount, core editor interactivity, extras load, or overlay allocation?",
-        "why_it_matters": "That boundary determines whether to pursue import-graph, controller, extras, or overlay work instead of another broad rewrite.",
-        "quickest_test": "Record milestone markers in order during one target-device run and stop at the first missing marker."
+        "id": "U3",
+        "question": "If world-chrome still black-tabs, does it die before .ks-top paints, after chrome but during studio-entry, or during importCurrent/overlay?",
+        "why_it_matters": "Separates remaining graph vs world-import vs overlay hypotheses.",
+        "quickest_test": "Record ordered milestones: placeholder -> .ks-top -> kernel boot -> importCurrent -> overlay."
       }
     ],
     "external_references": [],
-    "last_researched_at": "2026-09-13T22:51:00-04:00"
+    "last_researched_at": "2026-09-13T23:20:00-04:00"
   },
   "attempt_history": [
     {
@@ -162,17 +231,25 @@
       "at": "2026-09-14",
       "actor": "development agent",
       "goal": "Prevent IndexedDB startup from indefinitely blocking World boot.",
-      "hypothesis_ids": ["H1"],
+      "hypothesis_ids": [
+        "H1"
+      ],
       "change": {
-        "commits": ["829ac7fbd5fc629b05ecf92489bab16b0292bce9"],
-        "files": ["src/studio/storage/indexeddb-studio-store.mjs"],
+        "commits": [
+          "829ac7fbd5fc629b05ecf92489bab16b0292bce9"
+        ],
+        "files": [
+          "src/studio/storage/indexeddb-studio-store.mjs"
+        ],
         "summary": "Added an IndexedDB fail-open candidate."
       },
       "validation": {
         "environment": "Subsequent player/LIVE World-open behavior",
         "method": "Observe whether the user-facing World path stops freezing after the candidate.",
         "result": "PARTIAL",
-        "evidence": ["Candidate recorded as insufficient; later World-open failures remained."]
+        "evidence": [
+          "Candidate recorded as insufficient; later World-open failures remained."
+        ]
       },
       "conclusion": "IndexedDB may be contributory but is not sufficient as the sole explanation/fix for the player-facing freeze.",
       "do_not_repeat_without": "A current boot trace showing the staged world-light path specifically waiting on IndexedDB before interactive shell mount."
@@ -182,17 +259,30 @@
       "at": "2026-09-14",
       "actor": "development agent + LIVE QA",
       "goal": "Keep a launch curtain/Hub stacking state while Studio loads so the World tap does not appear frozen.",
-      "hypothesis_ids": ["H2", "H3"],
+      "hypothesis_ids": [
+        "H2",
+        "H3"
+      ],
       "change": {
-        "commits": ["824a932f5e3e41c888116ab1453d64500e66255d"],
-        "files": ["src/creators/workspaces/world-workspace.mjs", "src/creators/ui/creator-hub.mjs"],
+        "commits": [
+          "824a932f5e3e41c888116ab1453d64500e66255d"
+        ],
+        "files": [
+          "src/creators/workspaces/world-workspace.mjs",
+          "src/creators/ui/creator-hub.mjs"
+        ],
         "summary": "Added curtain/Hub stacking behavior while awaiting Studio."
       },
       "validation": {
         "environment": "LIVE Pages mobile World tap QA",
         "method": "Tap World and observe shell attachment and module loading for 15 seconds.",
         "result": "FAIL",
-        "evidence": ["Curtain visible", "about 80 Studio module requests", "#kelo-studio-live did not attach within 15s", "Hub stayed ABRIENDO"]
+        "evidence": [
+          "Curtain visible",
+          "about 80 Studio module requests",
+          "#kelo-studio-live did not attach within 15s",
+          "Hub stayed ABRIENDO"
+        ]
       },
       "conclusion": "Presentation/stacking alone does not solve the bug; waiting on the large Studio graph still blocks the interactive handoff.",
       "do_not_repeat_without": "A materially smaller/staged Studio boot graph or evidence that the original 80-module wait no longer occurs."
@@ -202,17 +292,29 @@
       "at": "2026-09-14",
       "actor": "development agent + player iPhone QA",
       "goal": "Hand World off to Studio early, similar to Map Forge, so the Hub no longer blocks the editor.",
-      "hypothesis_ids": ["H3", "H4"],
+      "hypothesis_ids": [
+        "H3",
+        "H4"
+      ],
       "change": {
-        "commits": ["5a52c6d7404e09019c9ec96cc2ecea43af1bb6a7"],
-        "files": ["src/creators/workspaces/world-workspace.mjs", "src/creators/ui/creator-hub.mjs", "src/studio/studio-entry.mjs"],
+        "commits": [
+          "5a52c6d7404e09019c9ec96cc2ecea43af1bb6a7"
+        ],
+        "files": [
+          "src/creators/workspaces/world-workspace.mjs",
+          "src/creators/ui/creator-hub.mjs",
+          "src/studio/studio-entry.mjs"
+        ],
         "summary": "Destroyed/handed off the Hub early so Studio loading chrome could take over."
       },
       "validation": {
         "environment": "Player real iPhone Safari",
         "method": "Open Create -> World and observe whether Studio becomes interactive.",
         "result": "FAIL",
-        "evidence": ["IMG_8293 showed KELO STUDIO / Abriendo World Editor…", "IMG_8294 showed a fully black Safari tab with spinner"]
+        "evidence": [
+          "IMG_8293 showed KELO STUDIO / Abriendo World Editor…",
+          "IMG_8294 showed a fully black Safari tab with spinner"
+        ]
       },
       "conclusion": "Early Hub destruction exposes a different failure mode: loading chrome can paint, but the iPhone tab can die before interactive Studio is established. The handoff must preserve recovery while reducing boot/resource pressure.",
       "do_not_repeat_without": "A staged/lighter Studio graph and reduced early rendering allocation, plus a recovery path that keeps/restores the Hub if interactive mount fails."
@@ -222,10 +324,26 @@
       "at": "2026-09-14",
       "actor": "development agent",
       "goal": "Stage World boot so interactive shell/status appears before extras and heavy rendering work, while preserving Hub recovery.",
-      "hypothesis_ids": ["H3", "H4", "H5"],
+      "hypothesis_ids": [
+        "H3",
+        "H4",
+        "H5"
+      ],
       "change": {
-        "commits": ["d6ff09277a6eecd244d89710f1043278edde1076"],
-        "files": ["src/creators/workspaces/world-workspace.mjs", "src/creators/ui/creator-hub.mjs", "src/creators/creator-entry.mjs", "src/ui/studio-launcher.js", "src/studio/studio-entry.mjs", "src/studio/studio-boot-extras.mjs", "src/studio/integration/live-studio-controller.mjs", "src/studio/render/studio-overlay-canvas.mjs", "index.html"],
+        "commits": [
+          "d6ff09277a6eecd244d89710f1043278edde1076"
+        ],
+        "files": [
+          "src/creators/workspaces/world-workspace.mjs",
+          "src/creators/ui/creator-hub.mjs",
+          "src/creators/creator-entry.mjs",
+          "src/ui/studio-launcher.js",
+          "src/studio/studio-entry.mjs",
+          "src/studio/studio-boot-extras.mjs",
+          "src/studio/integration/live-studio-controller.mjs",
+          "src/studio/render/studio-overlay-canvas.mjs",
+          "index.html"
+        ],
         "summary": "Keep Hub until .ks-status; restore it if mount fails; load extras/palette after core; dynamically import studio-entry; paint shell before world import; cap iPhone overlay DPR at 1.5 and allocate after chrome."
       },
       "validation": {
@@ -236,59 +354,94 @@
       },
       "conclusion": "This is the current candidate and must be attacked by target-device verification before another architecture rewrite is justified.",
       "do_not_repeat_without": null
+    },
+    {
+      "id": "A5",
+      "at": "2026-09-14",
+      "actor": "development agent",
+      "goal": "Paint real Studio tools/status before importing the live controller graph, which A4 still loaded statically.",
+      "hypothesis_ids": [
+        "H3",
+        "H4",
+        "H6"
+      ],
+      "change": {
+        "commits": [
+          "5106c29644583ede46a13e488096c423341d5cbe"
+        ],
+        "files": [
+          "src/studio/integration/live-studio-controller.mjs",
+          "src/creators/workspaces/world-workspace.mjs",
+          "src/creators/ui/creator-hub.mjs",
+          "src/creators/creator-entry.mjs",
+          "src/ui/studio-launcher.js",
+          "index.html",
+          "scripts/world-editor-lazy-boot-audit.mjs"
+        ],
+        "summary": "Remove static Studio imports from the live controller. World paints studio-live-shell (.ks-top/.ks-status/tools) first, then dynamically loads the remaining graph in chunks. Pause updater during launch. Keep Hub recovery if hydrate fails."
+      },
+      "validation": {
+        "environment": "Unit/source audits in repo; target real iPhone Safari pending",
+        "method": "world-editor-lazy-boot-audit, creator-hub-sprite-launch-audit, studio-foundation-audit, then exact Create -> World flow on iPhone.",
+        "result": "NOT_RUN",
+        "evidence": [
+          "lazy-boot audit PASS for chrome-before-import and no static controller imports"
+        ]
+      },
+      "conclusion": "This is the current candidate. It is the first change that actually satisfies A2 do_not_repeat_without (materially smaller graph before chrome). Device verification is still required.",
+      "do_not_repeat_without": null
     }
   ],
   "next_best_actions": [
     {
       "priority": 1,
-      "action": "Verify d6ff092 world-light on a real iPhone Safari using the exact player flow and require .ks-status/tools to become touch-interactive, then close/reopen World once.",
-      "reason": "The current candidate directly addresses the strongest surviving hypotheses; more code before this test risks repeating broad speculative fixes.",
-      "expected_signal": "PASS if interactive status/tools appear and a second World open succeeds without black tab; otherwise record the last successful boot milestone.",
-      "stop_condition": "If the test passes, stop debugging and move toward VERIFIED with independent evidence. If it fails, do not rewrite broadly; continue only from the first missing milestone."
+      "action": "Verify world-chrome on a real iPhone Safari using Create -> World. Require .ks-top/tools visible, then interactive .ks-status, then close/reopen World once.",
+      "reason": "A5 is the first candidate that paints tools before the Studio graph. More architecture rewrites before this test would repeat A2/A3/A4.",
+      "expected_signal": "PASS if tools appear and a second World open succeeds without a black tab; otherwise record the first missing milestone.",
+      "stop_condition": "If it passes, move toward VERIFIED with independent evidence. If it fails, inspect only the first missing milestone (chrome paint vs studio-entry vs importCurrent vs overlay)."
     },
     {
       "priority": 2,
-      "action": "If the target run fails, capture ordered boot milestones: Hub handoff -> shell paint -> .ks-status -> core interactivity -> extras/palette -> overlay allocation.",
-      "reason": "This converts a generic freeze/black-tab symptom into a precise failing boundary and separates import-graph, controller, extras and rendering hypotheses.",
+      "action": "If the target run fails, capture ordered boot milestones: placeholder -> .ks-top -> kernel boot -> importCurrent -> overlay allocation.",
+      "reason": "Converts freeze/black-tab into a precise failing boundary.",
       "expected_signal": "Exactly one earliest missing milestone becomes the next investigation boundary.",
-      "stop_condition": "Once the earliest missing milestone is identified, inspect only its owner/dependencies before touching unrelated Studio systems."
-    },
-    {
-      "priority": 3,
-      "action": "Only if failure occurs after shell/status but near overlay allocation, compare one target-device run with overlay creation disabled against the capped-DPR path.",
-      "reason": "This is the cheapest discriminating test for H4 and avoids blaming the overlay when the import/controller path is actually failing earlier.",
-      "expected_signal": "If disabling overlay prevents the black-tab failure, H4 strengthens materially; if not, deprioritize overlay work.",
-      "stop_condition": "Do not run this experiment unless milestones show the failure occurs after interactive shell/status."
+      "stop_condition": "Once the earliest missing milestone is identified, inspect only its owner/dependencies."
     }
   ],
   "fix": {
     "status": "candidate",
-    "commits": ["d6ff09277a6eecd244d89710f1043278edde1076", "5a52c6d7404e09019c9ec96cc2ecea43af1bb6a7", "824a932f5e3e41c888116ab1453d64500e66255d"],
+    "commits": [
+      "5106c29644583ede46a13e488096c423341d5cbe"
+    ],
     "files": [
+      "src/studio/integration/live-studio-controller.mjs",
       "src/creators/workspaces/world-workspace.mjs",
       "src/creators/ui/creator-hub.mjs",
       "src/creators/creator-entry.mjs",
       "src/ui/studio-launcher.js",
-      "src/studio/studio-entry.mjs",
-      "src/studio/studio-boot-extras.mjs",
-      "src/studio/integration/live-studio-controller.mjs",
-      "src/studio/render/studio-overlay-canvas.mjs",
-      "index.html"
+      "index.html",
+      "scripts/world-editor-lazy-boot-audit.mjs",
+      "bugs/registry/BUG-0003.json"
     ],
-    "summary": "5a52c6d handoff failed player QA (loading chrome then black Safari tab). New world-light candidate: keep Hub until .ks-status and restore it if the editor never mounts; Studio extras/palette load after core; live controller dynamically imports studio-entry; shell paints before world import; overlay dpr capped at 1.5 on iPhone and allocated after chrome."
+    "summary": "A4 world-light still statically imported the Studio graph from the live controller before chrome. A5 world-chrome: paint studio-live-shell tools first; live controller has zero static Studio imports and loads the graph in chunks after .ks-status exists; updater marked busy during launch."
   },
   "verification": {
     "status": "PENDING",
-    "method": "Real iPhone Safari E2E: enter game -> Create -> World -> Studio chrome visible immediately, then interactive tools/status, not a black Safari tab. Do not mark PASS from headless_shell. 824a932 and 5a52c6d both failed this method.",
+    "method": "Real iPhone Safari E2E: enter game -> Create -> World -> Studio tools/.ks-status visible immediately, then interactive, not a black Safari tab. Do not mark PASS from headless_shell. 824a932, 5a52c6d and unverified d6ff092 all failed or could not satisfy H3.",
     "evidence": [
-      "FAILED: 5a52c6d world-handoff — player iPhone screenshots 2026-09-14 22:03 loading chrome, 22:04 black Safari spinner"
+      "FAILED: 5a52c6d world-handoff — player iPhone screenshots 2026-09-14 22:03 loading chrome, 22:04 black Safari spinner",
+      "NOT DEVICE-VERIFIED: d6ff092 world-light — code inspection 2026-09-14 showed static controller graph still loaded before chrome"
     ],
     "verified_by": null,
     "verified_at": null
   },
-  "blocked_by": ["BUG-0001"],
+  "blocked_by": [
+    "BUG-0001"
+  ],
   "duplicate_of": null,
-  "related_bugs": ["BUG-0002"],
+  "related_bugs": [
+    "BUG-0002"
+  ],
   "notes": [
     "Visibility of a loading #kelo-studio-live is not sufficient acceptance; .ks-status / tools must appear and respond to touch.",
     "Do not mark VERIFIED until the deployed flow passes on the target device class.",
@@ -296,5 +449,5 @@
     "headless_shell can freeze after Studio mounts because of the overlay canvas loop; that is not the player-facing Hub-cover bug.",
     "Do not mark CLOSED from this candidate. Player must enter the editor, not a black tab."
   ],
-  "updated_at": "2026-09-13T22:51:00-04:00"
+  "updated_at": "2026-09-13T23:20:00-04:00"
 }
