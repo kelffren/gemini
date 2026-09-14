@@ -372,9 +372,20 @@
       "files": [
         "scripts/world-editor-iphone-prewarm-audit.mjs"
       ]
+    },
+    {
+      "id": "prevention:557f89979d24b1e747b494ab32d1d755ab10e337",
+      "at": "2026-09-14T15:39:56.000Z",
+      "source": "bug-prevention-ci",
+      "head_sha": "557f89979d24b1e747b494ab32d1d755ab10e337",
+      "base_sha": "50f1eb5ac43693f9203015b46ed9aa99ab56a58d",
+      "conclusion": "cancelled",
+      "files": [
+        "index.html"
+      ]
     }
   ],
-  "feedback_updated_at": "2026-09-14T15:39:08.551Z",
+  "feedback_updated_at": "2026-09-14T15:40:31.385Z",
   "training": {
     "examples": 33,
     "search_examples": 24,
