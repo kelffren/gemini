@@ -227,9 +227,20 @@
       "files": [
         "src/studio/integration/world-studio-bridge.mjs"
       ]
+    },
+    {
+      "id": "prevention:26604d054ccde885ca6f1e1c0f3f4f6a3c4bac28",
+      "at": "2026-09-14T13:17:42.000Z",
+      "source": "bug-prevention-ci",
+      "head_sha": "26604d054ccde885ca6f1e1c0f3f4f6a3c4bac28",
+      "base_sha": "27c0f5cec576e40842f0d3c5d43d0c0a40dfa58d",
+      "conclusion": "failure",
+      "files": [
+        "scripts/turbo-live-host-audit.mjs"
+      ]
     }
   ],
-  "feedback_updated_at": "2026-09-14T12:46:51.138Z",
+  "feedback_updated_at": "2026-09-14T13:18:01.155Z",
   "training": {
     "examples": 28,
     "search_examples": 21,
