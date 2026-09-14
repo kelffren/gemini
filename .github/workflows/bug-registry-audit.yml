@@ -6,6 +6,7 @@ on:
     paths:
       - 'bugs/**'
       - 'scripts/bug-*.mjs'
+      - 'scripts/lib/bug-*.mjs'
       - 'src/core/bug-observability.mjs'
       - 'package.json'
       - '.github/workflows/bug-registry-audit.yml'
@@ -13,6 +14,7 @@ on:
     paths:
       - 'bugs/**'
       - 'scripts/bug-*.mjs'
+      - 'scripts/lib/bug-*.mjs'
       - 'src/core/bug-observability.mjs'
       - 'package.json'
       - '.github/workflows/bug-registry-audit.yml'
@@ -44,11 +46,20 @@ jobs:
       - name: Audit permanent regression protection
         run: npm run audit:bug-regressions
 
+      - name: Enforce bug closure evidence gate
+        run: npm run audit:bug-close
+
+      - name: Print incoming recurrence clusters
+        run: npm run bug:triage
+
       - name: Print bug health dashboard
         run: npm run bug:health
 
       - name: Score regression risk for this commit
         run: npm run bug:risk -- HEAD~1 HEAD
+
+      - name: Analyze reverse dependency blast radius
+        run: npm run bug:impact -- --diff HEAD~1 HEAD --depth=2
 
       - name: Smoke-test agent briefing on critical World bug
         run: npm run bug:brief -- BUG-0003
