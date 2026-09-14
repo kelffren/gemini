@@ -1,170 +1,78 @@
-# Kelo World Asset Contract v2
+# Kelo World — Asset Contract
 
-Purpose: make final authored PNGs replaceable through data instead of renderer-specific code.
+**Actualizado:** 2026-09-14
 
-The production path is:
+## Objetivo
 
-`PNG → validate → manifest → TileRegistry / profile metadata → generic render layers → LIVE`
+Un asset debe poder viajar desde una imagen fuente hasta un objeto placeable sin crear renderers, catálogos o persistence paralelos.
 
-## Global invariants
+## Pipeline oficial
 
-- Logical world tile: `32x32`.
-- Pixel sampling: `nearest`.
-- Every production PNG has a stable `id`, `family`, semantic `version`, file `path`, `kind`, dimensions and alpha policy.
-- Every asset explicitly declares padding/spacing and frame mode, even when both are zero or the PNG is a single frame.
-- Asset semantics and instance placement are separate. The manifest declares what an asset can do; TileRegistry/profile/prefab data owns concrete world coordinates and per-instance values.
-- Visual bounds, gameplay footprint, collider and interaction are independent concepts.
-- Runtime layer names are contract data and must exactly match the formal environment layer stack.
-- District compatibility is declared as data. `*` means reusable in every district.
-- Cache metadata is executable: for TileRegistry-owned PNGs, CI verifies the manifest cache key/value against the query string used by TileRegistry.
-- Fallback behavior is explicit. Silent renderer-specific fallbacks are not part of the production contract.
-- PNG extension casing is not semantic: `.png`, `.PNG` and mixed-case variants are valid. Runtime path matching ignores casing only for the final `.png` extension; directory and basename casing remain exact, and case-colliding files are still rejected.
+`SOURCE FILE → BYTE BRIDGE/LOCAL FILE → FOREGROUND ANALYSIS → ASSET SHEET COMPILER → MANIFEST → ATLAS CONTRACT → PROPERTY CATALOG → STUDIO → WORLD PLACEMENT`
 
-## Required per-asset metadata
+## Owners
 
-Every entry in `src/environment/art-asset-manifest.json` must declare:
+- bytes externos hacia repo: `CHATGPT_ASSET_UPLOAD_BRIDGE.md` / workflows existentes;
+- foreground/components: `sprite-foreground-analysis.mjs`;
+- sheet grouping/manifest: `asset-sheet-compiler.mjs`;
+- world profile: `sprite-world-asset-compiler.mjs`;
+- atlas runtime: `KELO_ATLAS_CONTRACT`;
+- placeable templates: `KELO_PROPERTY_CATALOG`;
+- world mutation: Studio/`KELO_WORLD_EDIT`;
+- render: environment/render owners existentes.
 
-- `id`
-- `family`
-- `version`
-- `path`
-- `kind`
-- `width`, `height`
-- `requireAlpha`
-- `sampling`
-- `padding`, `spacing`
-- `frames`
-- `anchor`
-- `visualBounds`
-- `footprint`
-- `collider`
-- `ownership`
-- `layers`
-- `priority`
-- `occlusion`
-- `districtCompatibility`
-- `cache`
-- `fallback`
+## Manifest irregular
 
-Grid atlases additionally declare `cellWidth`, `cellHeight`, `columns` and `rows`.
+Cada frame debe tener al menos:
 
-## Placement modes
+- `assetId`/`frameId` estable;
+- `sourceRect {x,y,w,h}`;
+- familia/categoría;
+- visual bounds;
+- escala objetivo;
+- layer sugerido;
+- collider/footprint con authority explícita.
 
-The contract deliberately does not duplicate world coordinates into the asset manifest.
+Los sourceRects son geometría fuente y no se cambian durante una revisión semántica casual.
 
-`anchor`, `visualBounds`, `footprint`, `collider` and `occlusion` declare whether their values come from:
+## Identidad
 
-- the tile/cell itself;
-- the whole asset;
-- a registry frame;
-- a registry instance;
-- or `none`.
+No renombrar IDs persistentes de forma que rompa placements. Para Forest Plaza se conservaron `asset-001..asset-146` como identidad legacy estable y se añadieron nombres semánticos `fp_*` como metadata/catalog sourceId.
 
-This keeps one asset reusable across many placements while making ownership explicit and machine-checkable.
+## Forest Plaza reference implementation
 
-## Formal layers
+Atlas: `assets/world/plaza/forest-plaza-tileset-v2.png`
 
-`layerPhases` in the manifest is checked against `src/environment/environment-layer-stack.js`.
+Clasificación actual:
 
-Current phases:
+- `plaza_core`
+- `architecture`
+- `garden_decor`
+- `water_features`
+- `terrain_paths`
+- `market_props`
+- `nature_trees_rocks`
 
-1. `ground`
-2. `ground_variation`
-3. `transitions`
-4. `paths_floors`
-5. `decals_details`
-6. `props_back`
-7. `props_front`
-8. `vfx_weather_lighting`
+El catálogo convierte cada frame en template placeable y Studio expone esas categorías como carpetas visuales.
 
-Actors remain between the pre-actor and post-actor passes; they are not an environment asset phase.
+## Colisión
 
-## Frames, padding and spacing
+Un frame detectado NO se vuelve automáticamente sólido. La geometría de compiler puede ser `review-required`. Props decorativos pueden ser visual-only; arquitectura gameplay debe pasar revisión explícita antes de publicar collider sólido.
 
-Grid coverage is validated with:
+## Rendering
 
-`2*padding + columns*cellWidth + (columns-1)*spacing = PNG width`
+El catálogo describe `parts` con `assetKey`, source rect, offset, size y phase. No se permiten draw paths especiales por asset salvo que el render contract lo requiera de forma generalizable.
 
-and the equivalent height formula.
+## Publicación
 
-This preserves the current zero-padding Canvas 2D atlases while allowing future atlases to add spacing/extrusion without changing validator ownership.
+Preview local/Studio no equivale a publicación durable. La publicación debe cruzar el boundary online/repo ya existente y quedar versionable.
 
-`frames.count` must equal the grid cell count for grid atlases. Single-image prefabs must declare exactly one frame.
+## Anti-patrones
 
-## Cache contract
-
-TileRegistry PNGs use:
-
-```json
-"cache": {
-  "strategy": "query",
-  "key": "art",
-  "value": "191"
-}
-```
-
-CI reads TileRegistry and verifies that the runtime source contains the same query key/value. A PNG replacement therefore cannot accidentally ship with stale registry cache metadata.
-
-Assets loaded by another formal owner may use `runtime-owner` with an explicit version until that owner is migrated to a shared asset loader.
-
-## Fallback contract
-
-Fallback is always explicit:
-
-```json
-{"mode":"none"}
-```
-
-or:
-
-```json
-{"mode":"asset","assetId":"tileset-vclean"}
-```
-
-The referenced fallback asset must exist in the manifest.
-
-## Validation gate
-
-`scripts/validate-art-assets.mjs` validates:
-
-- contract version;
-- world tile and sampling invariants;
-- formal layer-stack parity;
-- known district compatibility;
-- required production metadata;
-- duplicate ids and paths;
-- PNG signature;
-- actual vs declared dimensions;
-- alpha / `tRNS` support;
-- frame count;
-- padding / spacing / grid coverage;
-- placement mode validity;
-- ownership, layers and priority;
-- cache metadata;
-- fallback references;
-- TileRegistry PNG parity;
-- TileRegistry ↔ manifest cache-key parity.
-
-Phase 9 adds `scripts/validate-png-pipeline.mjs` and `scripts/png-validation-core.mjs` as the binary/inventory gate. For every registered production PNG, CI now validates the full chunk stream rather than only IHDR: chunk bounds/order, CRCs, IHDR/PLTE/IDAT/IEND rules, non-interlaced runtime policy, zlib decode, decoded scanline length and filter bytes. It also inventories every PNG under `assets/`, rejects unregistered world PNGs, requires explicit policy entries for retained non-world/archive PNGs, detects path case collisions and verifies runtime PNG references resolve to a registered production asset or an explicitly allowed non-world UI asset. Extension casing is deliberately excluded from runtime path-case mismatch failures; only the basename/directory portion must retain exact casing.
-
-`scripts/test-png-validation.mjs` mutates a known-good PNG and proves the validator fails closed for bad signatures, truncation, CRC corruption, invalid IHDR interlace metadata and trailing bytes. These are CI gates, not documentation-only guidance.
-
-## Integration rule
-
-A future final asset such as `oak-tree-v1.png` should require:
-
-1. add the PNG;
-2. add one manifest entry;
-3. pass the validator;
-4. register frame/instance metadata;
-5. assign it to a district/profile or prefab definition;
-6. render through the existing generic layer path;
-7. certify LIVE mobile.
-
-If a new authored PNG requires an asset-name or district-specific branch in the renderer, the pipeline is still incomplete and the next contract layer must be generalized instead of adding that branch.
-
-## Phase status
-
-Asset Contract v2 closes the asset-level metadata portion of Phase 1. The complete PNG integrity/inventory gate is owned by Phase 9 and builds on this same manifest instead of creating a second source of truth.
-
-It does **not** claim the entire art factory is finished. The final A→B substitution test must still prove that authored art can be replaced through PNG + metadata without renderer/gameplay edits.
+- segundo atlas registry;
+- segundo property catalog;
+- base64 gigante embebido como solución permanente;
+- sourceRects recalculados sin revision;
+- collider inventado por heurística y marcado como production;
+- nombres `asset-###` mostrados al creador cuando existe metadata semántica;
+- un PNG completo usado como “mapa” cuando en realidad se necesitan piezas reutilizables.
