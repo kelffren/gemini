@@ -4,12 +4,12 @@
  * does-not-own: Studio kernel, live shell internals, Hub, world authority
  * public-api: openKeloStudioLive(), closeKeloStudioLive(), getKeloStudioLive()
  * reuse: live-studio-controller remains the session owner; this file is the only first hop from World workspace
- * mobile: import Studio in waves with main-thread yields; strip provisional listeners before controller hydrate, then release the loading viewport as soon as real chrome hydrates
+ * mobile: import Studio in waves with main-thread yields; strip provisional listeners before controller hydrate, release the loading viewport as soon as real chrome hydrates, and keep one Studio stylesheet after provisional→live handoff
  * online: no; authority stays in KELO_WORLD_EDIT
  */
 import { yieldStudioBoot, setWorldLaunchStatus } from './studio-boot-pace.mjs';
 
-export const WORLD_STUDIO_BRIDGE_BUILD='world-bridge-20260914-11';
+export const WORLD_STUDIO_BRIDGE_BUILD='world-bridge-20260914-13';
 const CONTROLLER=`./live-studio-controller.mjs?v=${WORLD_STUDIO_BRIDGE_BUILD}`;
 let controllerMod=null;
 let iphonePrewarmed=false;
@@ -69,6 +69,18 @@ export function sanitizeWorldStudioProvisionalShell(root=globalThis){
   }
 }
 
+export function pruneWorldStudioStyles(root=globalThis){
+  const doc=root?.document;
+  const styles=Array.from(doc?.querySelectorAll?.('style[data-kelo-studio-ui="1"]')||[]);
+  if(styles.length<=1)return styles.length;
+  const keep=styles[styles.length-1];
+  for(const style of styles){
+    if(style===keep)continue;
+    try{style.remove?.();}catch{}
+  }
+  return 1;
+}
+
 export function releaseWorldStudioViewport(root=globalThis){
   const shell=root?.document?.getElementById?.('kelo-studio-live');
   if(!shell?.dataset?.shellVersion||!shell?.querySelector?.('.ks-top'))return false;
@@ -98,6 +110,7 @@ export async function openKeloStudioLive(opts={}){
   sanitizeWorldStudioProvisionalShell(root);
   const session=await releaseViewportDuringOpen(root,ctrl.openKeloStudioLive(opts));
   releaseWorldStudioViewport(root);
+  pruneWorldStudioStyles(root);
   return session;
 }
 export async function closeKeloStudioLive(opts={}){
