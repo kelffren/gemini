@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
-import { releaseWorldStudioViewport } from '../src/studio/integration/world-studio-bridge.mjs';
+import {
+  releaseWorldStudioViewport,
+  sanitizeWorldStudioProvisionalShell,
+} from '../src/studio/integration/world-studio-bridge.mjs';
 
 function makeShell({ loading = true } = {}) {
   const shell = {
@@ -24,17 +27,25 @@ function makeShell({ loading = true } = {}) {
   let current = provisional;
   provisional.replaceWith = next => { provisional.replacedWith = next; current = next; };
   const root = { document: { getElementById: id => id === 'kelo-studio-live' ? current : null } };
+
+  const clean = sanitizeWorldStudioProvisionalShell(root);
+  assert.equal(provisional.cloneCount, 1, 'loading shell must be cloned exactly once before controller hydrate');
+  assert.notEqual(clean, provisional, 'controller must receive a listener-free provisional node');
+  assert.equal(current, clean, 'clean shell must be installed before hydrate starts');
+
   assert.equal(releaseWorldStudioViewport(root), true);
-  assert.equal(provisional.cloneCount, 1, 'loading shell must be cloned exactly once to drop provisional listeners');
-  assert.notEqual(current, provisional, 'loading shell must be replaced');
-  assert.equal(current.stylePresent, false, 'replacement must expose the game viewport');
+  assert.equal(clean.cloneCount, 0, 'viewport polling must never replace a shell after hydrate can start');
+  assert.equal(current, clean, 'viewport release must preserve the controller-owned DOM node');
+  assert.equal(clean.stylePresent, false, 'hydrated shell must expose the game viewport');
 }
 
 {
   const finalShell = makeShell({ loading: false });
   const root = { document: { getElementById: id => id === 'kelo-studio-live' ? finalShell : null } };
-  assert.equal(releaseWorldStudioViewport(root), true);
+  assert.equal(sanitizeWorldStudioProvisionalShell(root), finalShell);
   assert.equal(finalShell.cloneCount, 0, 'interactive shell must keep its real event listeners');
+  assert.equal(releaseWorldStudioViewport(root), true);
+  assert.equal(finalShell.cloneCount, 0, 'interactive shell must never be replaced during viewport release');
   assert.equal(finalShell.stylePresent, false, 'interactive shell must not retain the opaque launch style');
 }
 
