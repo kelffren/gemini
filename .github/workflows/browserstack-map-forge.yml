@@ -20,6 +20,7 @@ on:
       - 'src/instances/**'
       - 'src/creators/**'
       - 'src/studio/**'
+      - 'src/world/**'
       - 'tests/iphone-gameplay.spec.js'
       - 'tests/iphone-visible-guest.spec.js'
       - 'tests/iphone-world-visible-flow.spec.js'
