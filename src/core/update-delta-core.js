@@ -44,7 +44,8 @@
 
   function chooseConcurrency(input) {
     const state = input || {};
-    if (state.gameplayBusy && !state.foreground) return 0;
+    // Turbo contract TU-06: combat/PVP is an absolute hard stop, including explicit/foreground updates.
+    if (state.gameplayBusy) return 0;
     const status = String(state.status || '').toLowerCase();
     const ping = Number(state.pingMs);
     const downlink = Number(state.downlinkMbps);
