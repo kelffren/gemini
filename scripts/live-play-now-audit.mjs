@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import { chromium } from 'playwright';
 
-const AUDIT_REVISION = 'live-play-now-v1-world-visible-real-touch';
+const AUDIT_REVISION = 'live-play-now-v2-domcontentloaded-world-visible-real-touch';
 const base = process.env.AUDIT_URL || 'https://kelffren.github.io/gemini/?offline=1&qa-live-audit=1';
 const executablePath = process.env.CHROME_BIN || '/usr/bin/google-chrome';
 
@@ -70,7 +70,7 @@ async function snapshot() {
 const deployment = await waitForCurrentDeployment();
 
 try {
-  await page.goto(withBust(base), { waitUntil: 'networkidle', timeout: 60_000 });
+  await page.goto(withBust(base), { waitUntil: 'domcontentloaded', timeout: 60_000 });
   await page.waitForFunction(() => (
     typeof localPlayer !== 'undefined' &&
     typeof input !== 'undefined' &&
