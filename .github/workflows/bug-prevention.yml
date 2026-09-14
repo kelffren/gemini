@@ -41,6 +41,16 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Syntax-check self-learning scripts
+        run: |
+          node --check scripts/bug-learning-autopilot.mjs
+          node --check scripts/bug-learning-audit.mjs
+          node --check scripts/bug-prevention.mjs
+          node --check scripts/bug-risk.mjs
+
+      - name: Dry-run learner against canonical evidence
+        run: node scripts/bug-learning-autopilot.mjs --json
+
       - name: Audit learned memory bounds
         run: node scripts/bug-learning-audit.mjs
 
