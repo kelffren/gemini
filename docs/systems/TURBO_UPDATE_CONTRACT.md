@@ -18,7 +18,7 @@ This document is the acceptance source of truth for Turbo Update. Code comments,
 10. **Compression.** JS/CSS/JSON/static text payloads use Brotli and/or Gzip where hosting supports it.
 11. **Transport/CDN.** HTTP/2, HTTP/3 and/or CDN delivery must have live evidence; if the current host blocks a capability, record the limitation and an executable migration plan.
 12. **Metrics.** Runtime/audit exposes **Update Delta Bytes** and **Time To Update Ready**.
-13. **Fail-closed CI guardian.** Push/PR CI must fail whenever any contract guarantee loses evidence.
+13. **Fail-closed CI guardian.** Push/PR CI must fail whenever any contract guarantee loses evidence. The Turbo Guardian must run on every push to `main` and every pull request; `paths:` and `paths-ignore:` trigger filters are forbidden because they can hide regressions outside an allowlist.
 14. **Documentation.** This contract and hosting/build evidence stay synchronized with implementation.
 15. **Deterministic delta tests.** A build with exactly one changed object must transfer only that object's delta bytes. An identical build must transfer **0 bytes of update assets**.
 
@@ -37,7 +37,11 @@ The command `npm run audit:turbo` is intentionally fail-closed. A red result mea
 
 ### Current baseline
 
-The pre-Turbo updater is a useful staging foundation, but it is not sufficient evidence for this contract. It currently uses build-scoped staging (`kelo-update-stage-v2-<build>`), sequential transfer logic, network/gameplay gating, and explicit update activation. Those properties do not prove a global content-addressed cache, content-hashed production chunks, adaptive parallel transfer, production compilation, compression, or byte-perfect delta behavior.
+The current Turbo updater stages deploys from a per-file manifest and reuses unchanged content through the stable `kelo-assets-v3` Cache Storage cache, with content-addressed object URLs under `__kelo_asset_v3__/`. Runtime state exposes delta/reuse byte counts and time-to-ready, requests persistent storage when the browser supports it, uses low/high fetch priority for background versus explicit work, adapts concurrency from network conditions, and hard-stops updater work while gameplay/PVP is busy.
+
+The modern Turbo/lazy build surface is compiled by esbuild in production mode with minification, tree-shaking, code splitting and content-hashed output names. Studio/World Editor/Map Forge/Visual Lab remain outside critical boot through lazy/dynamic imports verified by CI. Hosting-dependent guarantees are never inferred from this repository: the current Netlify production host must pass the same-run live audit for cache headers, Brotli, gzip, CDN evidence and HTTP/2 before final acceptance.
+
+This baseline is implementation context only. It does not override the completion rule: every acceptance run must still execute and pass all 15 checks, including deterministic delta tests and the live host gate.
 
 ### Legacy compiler note
 
@@ -45,11 +49,13 @@ No `LEGACY_COMPILER_EXCEPTION` is granted by this document at present. A future 
 
 ### Storage persistence fallback
 
-No `STORAGE_PERSIST_FALLBACK` acceptance marker is granted until runtime behavior and documentation are implemented and tested.
+The runtime calls `navigator.storage.persisted()`/`navigator.storage.persist()` when available and records the result in updater state. If the API is absent or persistence is denied, Turbo continues on best-effort Cache Storage and exposes the non-persisted/unknown state rather than claiming durable storage. No `STORAGE_PERSIST_FALLBACK` acceptance marker is needed while the primary persistence path remains implemented; a future fallback-only implementation must document and test its behavior before receiving such a marker.
 
 ## REGRESSION POLICY
 
 A previously passing guarantee that loses its evidence immediately returns the contract to INCOMPLETE. The guardian must not infer success from filenames, comments, or an unused implementation. Tests must measure behavior or emitted build artifacts whenever feasible.
+
+The dedicated Turbo Guardian runs for every pull request and every push to `main`; path-filtered triggers are prohibited and checked explicitly inside CI. A green unrelated workflow such as Kelo CI is not substitute evidence for the Turbo contract.
 
 Firewall/safety rules that currently exist in `main` must be respected. Rules intentionally removed from the repository are not resurrected by this contract.
 
