@@ -4,7 +4,7 @@ Este sistema convierte `/bugs` de un registro reactivo en una defensa progresiva
 
 ## Ciclo
 
-`CAMBIO -> RIESGO -> PRUEBAS DIRIGIDAS -> TELEMETRIA/MILESTONES -> DETECCION -> FINGERPRINT -> BUG/REPORT -> HIPOTESIS -> EXPERIMENTO -> FIX -> VERIFICACION -> REGRESSION TEST`
+`CAMBIO -> RIESGO -> BLAST RADIUS -> PRUEBAS DIRIGIDAS -> TELEMETRIA/MILESTONES -> DETECCION -> FINGERPRINT -> CANDIDATO -> CLUSTER/DEDUPE -> BUG -> HIPOTESIS -> EXPERIMENTO -> FIX -> VERIFICACION -> REGRESSION TEST -> CLOSE GATE`
 
 ## Comandos
 
@@ -13,6 +13,27 @@ Este sistema convierte `/bugs` de un registro reactivo en una defensa progresiva
 `npm run bug:scan -- path/al/log.txt`
 
 Normaliza ruido variable, crea un fingerprint estable y compara el fallo contra bugs conocidos. Su resultado es una ayuda de triage: nunca crea ni cierra bugs automáticamente.
+
+La normalización está centralizada en `scripts/lib/bug-fingerprint.mjs`. Antes de fingerprinting se redactan ejemplos comunes de secretos/PII como bearer tokens, cookies, JWT, emails e IPs.
+
+### Crear un candidato sanitizado
+
+`npm run bug:candidate -- path/al/log.txt --source=monitoring`
+
+Convierte una observación/log en `bugs/incoming/REPORT-*.json` sin convertirla automáticamente en bug canónico. El reporte contiene:
+- fingerprint estable;
+- excerpt sanitizado;
+- clasificación aproximada;
+- bugs conocidos más cercanos;
+- estado `MATCH_CANDIDATE` o `NEW_CANDIDATE`.
+
+Si ya existe un incoming report con el mismo fingerprint, no crea otro: devuelve el reporte existente. Usar `--dry-run` para CI/tests.
+
+### Detectar reincidencias
+
+`npm run bug:triage`
+
+Agrupa `bugs/incoming` por fingerprint y muestra `SINGLE`, `REPEATED` o `RECURRENT`. Un fingerprint repetido debe actualizar/reabrir primero el bug canónico relacionado; no se debe crear otro ID por costumbre.
 
 ### Predecir riesgo antes de declarar seguro un cambio
 
@@ -28,6 +49,21 @@ Niveles: `LOW`, `MEDIUM`, `HIGH`, `CRITICAL`.
 
 HIGH/CRITICAL obliga conceptualmente a ejecutar verificaciones dirigidas antes de afirmar que el cambio es seguro. El score no significa que exista un bug; significa que el coste/probabilidad de regresión merece más evidencia.
 
+### Calcular blast radius
+
+`npm run bug:impact -- src/algo.mjs --depth=3`
+
+O sobre un commit:
+
+`npm run bug:impact -- --diff HEAD~1 HEAD --depth=2`
+
+Construye el grafo de imports relativos de `src/`, recorre dependencias inversas y muestra qué módulos consumidores pueden verse afectados. Además cruza el radio con:
+- bugs históricos;
+- reglas del risk map;
+- verificaciones recomendadas.
+
+Esto evita revisar solo el archivo editado cuando una regresión puede aparecer varios módulos arriba.
+
 ### Salud del sistema de bugs
 
 `npm run bug:health`
@@ -41,6 +77,20 @@ Muestra estados, severidades, bugs con más intentos fallidos, hotspots históri
 Un bug `VERIFIED` o `CLOSED` debe dejar evidencia de protección permanente: test/spec/script o un contrato `regression.test` / `regression.command` en el bug.
 
 `FIXED_PENDING_VERIFY` sin protección permanente genera warning para que el test se cree antes del cierre.
+
+### Gate de cierre
+
+`npm run audit:bug-close`
+
+Bloquea `VERIFIED/CLOSED` cuando falta cualquiera de estas piezas aplicables:
+- fix identificable;
+- `verification.status = PASS`;
+- método y evidencia reproducible;
+- protección permanente contra regresión;
+- `verified_by` y `verified_at` en bugs high/critical;
+- blockers abiertos en un bug marcado CLOSED.
+
+`npm run audit:bug-close -- --strict-pending` también convierte en fallo la ausencia de protección de regresión para high/critical que estén en `FIXED_PENDING_VERIFY`.
 
 ## Runtime milestones
 
@@ -75,16 +125,25 @@ Para llegar a `VERIFIED/CLOSED` debe existir:
 2. fix identificable;
 3. verificación independiente en el entorno aplicable;
 4. protección de regresión permanente cuando sea automatizable;
-5. si no es automatizable, contrato explícito de smoke/manual verification con razón documentada.
+5. si no es automatizable, contrato explícito de smoke/manual verification con razón documentada;
+6. `audit:bug-close` en PASS.
 
 ## Regla para agentes
 
 Antes de cambios de alto riesgo:
 
 1. `npm run bug:risk -- <base> <head>` cuando exista un diff aplicable;
-2. leer briefs de los bugs relacionados;
-3. ejecutar los tests sugeridos por el risk report;
-4. no declarar seguro un HIGH/CRITICAL basándose solo en lint/unit tests si el fallo histórico era móvil/LIVE.
+2. `npm run bug:impact -- --diff <base> <head> --depth=2` para cambios con dependencias relevantes;
+3. leer briefs de los bugs relacionados;
+4. ejecutar los tests sugeridos por risk/impact;
+5. no declarar seguro un HIGH/CRITICAL basándose solo en lint/unit tests si el fallo histórico era móvil/LIVE.
+
+Cuando aparezca un fallo:
+
+1. `bug:scan` para comparar;
+2. `bug:candidate` para guardar una observación sanitizada si corresponde;
+3. `bug:triage` para revisar reincidencias;
+4. actualizar/reabrir antes de crear otro bug cuando el fingerprint/síntoma coincida.
 
 Después de un fix:
 
@@ -92,4 +151,5 @@ Después de un fix:
 2. añadir/regenerar el regression test;
 3. `npm run audit:bugs`;
 4. `npm run audit:bug-regressions`;
-5. verificar el flujo original.
+5. `npm run audit:bug-close`;
+6. verificar el flujo original.
