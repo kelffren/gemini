@@ -21,7 +21,7 @@ const rail=luxe.querySelector('.lx-rail');
 const shop=document.getElementById('lx-shop');
 const menu=document.getElementById('lx-side-menu');
 const pvp=document.getElementById('lx-side-pvp');
-const fullscreen=document.getElementById('kelo-orientation-btn');
+let fullscreen=document.getElementById('kelo-orientation-btn');
 let guide=document.getElementById('kw-player-guide');
 if(shop){shop.classList.add('lx-side-shop');shop.textContent='Boutique';shop.setAttribute('aria-label','Abrir Boutique');shop.setAttribute('title','Boutique');}
 if(!guide){guide=document.createElement('a');guide.id='kw-player-guide';guide.className='lx-side-guide';guide.href='guide.html';guide.setAttribute('aria-label','Abrir guía');guide.innerHTML='<b aria-hidden="true">▤</b><span>GUÍA</span>';}
@@ -43,6 +43,17 @@ if(rail){
   rail.appendChild(quickToggle);
   rail.appendChild(quickOptions);
   [shop,menu,pvp,guide,fullscreen].filter(Boolean).forEach(node=>quickOptions.appendChild(node));
+}
+function adoptFullscreenControl(){
+  const control=document.getElementById('kelo-orientation-btn');
+  if(!control||!quickOptions)return false;
+  fullscreen=control;
+  if(control.parentElement!==quickOptions)quickOptions.appendChild(control);
+  return true;
+}
+if(!adoptFullscreenControl()){
+  root.addEventListener?.('kelo:orientationchange',adoptFullscreenControl,{once:true});
+  root.addEventListener?.('kelo:fullscreenchange',adoptFullscreenControl,{once:true});
 }
 function setQuickActionsExpanded(force){
   if(!rail||!quickToggle||!quickOptions)return false;
