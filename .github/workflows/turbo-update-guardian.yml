@@ -10,8 +10,10 @@ on:
       - version.json
       - manifest.webmanifest
       - src/core/update-system.js
+      - src/core/update-delta-core.js
       - src/core/update-watch.js
       - src/ui/update-ui.js
+      - tests/updater-delta.test.cjs
       - scripts/turbo-update-guardian.mjs
       - scripts/turbo-build.mjs
       - scripts/generate-turbo-manifest.mjs
@@ -33,8 +35,10 @@ on:
       - version.json
       - manifest.webmanifest
       - src/core/update-system.js
+      - src/core/update-delta-core.js
       - src/core/update-watch.js
       - src/ui/update-ui.js
+      - tests/updater-delta.test.cjs
       - scripts/turbo-update-guardian.mjs
       - scripts/turbo-build.mjs
       - scripts/generate-turbo-manifest.mjs
@@ -62,10 +66,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Syntax check Turbo guardian
-        run: node --check scripts/turbo-update-guardian.mjs
+      - name: Syntax check Turbo runtime and guardian
+        run: |
+          node --check src/core/update-delta-core.js
+          node --check src/core/update-system.js
+          node --check scripts/generate-turbo-manifest.mjs
+          node --check scripts/turbo-update-guardian.mjs
+      - name: Generate SHA-256 Turbo manifest from actual boot bytes
+        run: node scripts/generate-turbo-manifest.mjs
+      - name: Prove one-file delta and identical-build zero asset bytes
+        run: node tests/updater-delta.test.cjs
       - name: Enforce all 15 Turbo Update guarantees
         run: npm run audit:turbo
-      - name: Prove one-file delta and identical-build zero asset bytes
-        if: always()
-        run: npm run test:turbo-delta
