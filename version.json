@@ -1,1 +1,4 @@
-{"sha":"f1a5b014c0ffee2026091406b0000000c0ffee14","builtAt":"2026-09-14T06:50:00Z","source":"github-pages"}
+---
+layout: null
+---
+{"sha":"{{ site.github.build_revision }}","builtAt":"{{ site.time | date_to_xmlschema }}","source":"github-pages"}
