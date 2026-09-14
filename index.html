@@ -35,8 +35,9 @@
 <canvas id="game-canvas"></canvas>
 <div id="ui-layer"><div class="action-bar" id="action-bar-container" aria-label="Barra de habilidades"></div></div>
 
-<!-- KELO-INDEX UPDATE: owner KeloUpdater; registra el Service Worker y monta el aviso táctil antes del runtime gameplay. -->
-<script src="src/core/update-system.js?v=2-network-stage"></script>
+<!-- KELO-INDEX UPDATE: owner KeloUpdater; registra SW, detecta deploys durante sesiones largas y monta aviso táctil. -->
+<script src="src/core/update-system.js?v=3-network-stage"></script>
+<script src="src/core/update-watch.js?v=1"></script>
 <script src="src/ui/update-ui.js?v=2-network-stage"></script>
 
 <!-- KELO-INDEX CORE: primitives compartidos + bootstrap ligero. KeloRuntimeBootstrap NO carga Combat/Effects/Status/Melee hasta ensure(). -->
