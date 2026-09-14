@@ -9,6 +9,7 @@
  * do-not: NO setInterval, NO sockets, NO economía, NO persistencia durable, NO confiar HP enviado por cliente
  */
 'use strict';
+self.window=self;
 importScripts(
   '../core/events/event-bus.js',
   '../systems/combat/combat-schema.js',
