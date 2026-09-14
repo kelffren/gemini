@@ -1,10 +1,21 @@
 #!/usr/bin/env node
+/* KELO-INDEX
+ * area: QA / BUGS / HEALTH
+ * owner: Bug Intelligence health dashboard
+ * purpose: summarize canonical defect debt, recurrence, historical hotspots and self-learning prevention health
+ * public-api: CLI
+ * consumes: bugs/registry, bugs/incoming, bugs/learning/STATE.json
+ * state-owned: none
+ * online: N/A
+ * do-not: health/attention scores are triage signals, never proof of root cause or verification
+ */
 import fs from 'node:fs';
 import path from 'node:path';
 
 const root=process.cwd();
 const dir=path.join(root,'bugs','registry');
 const incomingDir=path.join(root,'bugs','incoming');
+const learningPath=path.join(root,'bugs','learning','STATE.json');
 const bugs=fs.existsSync(dir)?fs.readdirSync(dir).filter(n=>/^BUG-\d{4}\.json$/.test(n)).map(n=>JSON.parse(fs.readFileSync(path.join(dir,n),'utf8'))):[];
 const reports=[];
 if(fs.existsSync(incomingDir)){
@@ -12,6 +23,8 @@ if(fs.existsSync(incomingDir)){
     try{reports.push({name,...JSON.parse(fs.readFileSync(path.join(incomingDir,name),'utf8'))});}catch{}
   }
 }
+let learning=null;
+try{if(fs.existsSync(learningPath))learning=JSON.parse(fs.readFileSync(learningPath,'utf8'));}catch{}
 const severityWeight={critical:40,high:25,medium:12,low:5};
 const terminal=new Set(['CLOSED','WONT_FIX']);
 const byStatus={},bySeverity={},hotspots=new Map(),reportStatus={},fingerprints=new Map();
@@ -68,6 +81,19 @@ console.log('Status:',JSON.stringify(byStatus));
 console.log('Severity:',JSON.stringify(bySeverity));
 console.log('Report triage:',JSON.stringify(reportStatus));
 
+console.log('\nSelf-learning prevention:');
+if(!learning)console.log('- state unavailable');
+else{
+  const training=learning.training||{},champion=learning.champion||{},memory=learning.memory_summary||{};
+  console.log(`- champion=${champion.id||'none'} search=${champion.search_score??'-'} holdout=${champion.holdout_score??'-'} last_promoted=${champion.accepted_from_last_cycle===true?'yes':'no'}`);
+  console.log(`- examples=${training.examples||0} search=${training.search_examples||0} holdout=${training.holdout_examples||0} experiments=${memory.experiments||0}`);
+  console.log(`- learned_hotspots=${learning.hotspots?.length||0} prevention_gaps=${learning.prevention_gaps?.length||0} updated=${learning.updated_at||'never'}`);
+  const topLearned=(learning.hotspots||[]).slice(0,5);
+  for(const row of topLearned)console.log(`  - ${row.confidence} +${row.risk_bonus} ${row.file} evidence=${row.evidence_count} bugs=${(row.bug_ids||[]).join(',')||'-'}`);
+  const highGaps=(learning.prevention_gaps||[]).filter(row=>row.priority==='high').slice(0,5);
+  if(highGaps.length){console.log('  high-priority prevention gaps:');for(const gap of highGaps)console.log(`  - ${gap.type}: ${gap.bug_id||gap.file||gap.fingerprint||'unknown'} — ${gap.reason}`);}
+}
+
 console.log('\nHighest attention debt:');
 for(const x of attention.slice(0,10))console.log(`- score=${x.score} ${x.id} fails=${x.fails} [${x.status}/${x.severity}] ${x.title}`);
 
@@ -84,4 +110,4 @@ const pending=bugs.filter(b=>b.status==='FIXED_PENDING_VERIFY');
 if(!pending.length)console.log('- none');
 for(const b of pending)console.log(`- ${b.id}: ${b.verification?.method||'verification method missing'} | regression=${regressionProtected(b)?'yes':'missing'}`);
 
-console.log('\nInterpretation: attention score is a triage heuristic, not proof of product impact or root cause.');
+console.log('\nInterpretation: attention and learned-risk scores are triage heuristics, not proof of product impact, causality or verification.');
