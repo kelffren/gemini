@@ -15,7 +15,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="KELO WORLD">
-  <title>Kelo World — V6.56</title>
+  <title>Kelo World — V6.57</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="src/ui/backpack-fantasy-v1.css?v=1">
 <link rel="stylesheet" href="src/ui/kelo-interface-system.css?v=1">
@@ -56,7 +56,6 @@
     var run=q.slice(); q=[];
     for(var i=0;i<run.length;i++){ try{ native(run[i].cb); }catch(e){} }
   };
-  setTimeout(function(){ window.__keloReleaseRAF&&window.__keloReleaseRAF(); },15000);
 })();
 </script>
 
@@ -84,7 +83,7 @@
 <script src="src/visuals/visual-system.js?v=3"></script><script src="src/visuals/visual-manifests.js?v=2"></script><script src="src/visuals/asset-registry.js?v=1"></script><script src="src/visuals/animation-system.js?v=1"></script><script src="src/visuals/fx-system.js?v=3"></script><script src="src/visuals/sequence-system.js?v=2"></script><script src="src/visuals/melee-visual-manifest.js?v=2"></script><script src="src/visuals/melee-combat-visuals.js?v=1"></script>
 
 <!-- KELO-INDEX ABILITIES/PROGRESSION/NET: Stones conserva 5 slots; a pie Weapon aporta Q/W/E; Mount sustituye Q/W/E por M1-M3; todos reutilizan KeloAbilities y cargan foundations bajo first-use. -->
-<script src="src/abilities/abilityData.js?v=154"></script><script src="src/abilities/stone-system.js?v=154"></script><script src="src/mounts/mount-ability-data.js?v=1"></script><script src="src/abilities/equipment-ability-data.js?v=1"></script><script src="src/abilities/stone-backpack-bridge.js?v=2"></script><script src="src/abilities/kelo-ability-boot.js?v=160"></script><script src="src/abilities/ability-source-cast.js?v=1"></script><script src="src/visuals/ability-visuals.js?v=4"></script><script src="src/abilities/sword-swap-runtime.js?v=2"></script><script src="src/visuals/sword-swap-pvp-visuals.js?v=4"></script><script src="src/systems/title-catalog.js?v=1"></script><script src="src/systems/player-stats.js?v=1"></script><script src="src/systems/title-system.js?v=1"></script><script src="src/config/online-runtime-config.js?v=6"></script><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0"></script><script src="src/auth/supabase-auth-runtime.js?v=6&boot=8"></script><script src="src/auth/online-auth-lifecycle-bridge.js?v=1"></script><script src="src/ui/account-auth-ui.js?v=2&boot=8"></script><script src="src/auth/guest-play-bypass.js?v=2"></script><script src="src/ui/google-auth-button.js?v=1&boot=7"></script><script src="src/ui/account-profile-18-ui.js?v=1&boot=8"></script><script src="engine-net.js?v=102"></script>
+<script src="src/abilities/abilityData.js?v=154"></script><script src="src/abilities/stone-system.js?v=154"></script><script src="src/mounts/mount-ability-data.js?v=1"></script><script src="src/abilities/equipment-ability-data.js?v=1"></script><script src="src/abilities/stone-backpack-bridge.js?v=2"></script><script src="src/abilities/kelo-ability-boot.js?v=160"></script><script src="src/abilities/ability-source-cast.js?v=1"></script><script src="src/visuals/ability-visuals.js?v=4"></script><script src="src/abilities/sword-swap-runtime.js?v=2"></script><script src="src/visuals/sword-swap-pvp-visuals.js?v=4"></script><script src="src/systems/title-catalog.js?v=1"></script><script src="src/systems/player-stats.js?v=1"></script><script src="src/systems/title-system.js?v=1"></script><script src="src/config/online-runtime-config.js?v=6"></script><script src="src/ui/google-auth-button.js?v=1&boot=7"></script><script src="src/ui/account-profile-18-ui.js?v=1&boot=8"></script><script src="engine-net.js?v=102"></script>
 
 <!-- KELO-INDEX UI/SYSTEMS: UI consume APIs; shared stats/appearance cargan antes de Equipment/Mount runtime. -->
 <script src="src/ui/luxe-shell.js?v=230"></script>
@@ -163,4 +162,23 @@
 <script src="src/ui/studio-launcher.js?v=9-world-bridge-20260914-3"></script>
 <script src="src/ui/map-forge-launch-recovery-v1.js?v=1"></script>
 <script>window.__keloReleaseRAF&&window.__keloReleaseRAF();</script>
+<script>
+(function(){
+  var urls=[
+    'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0',
+    'src/auth/supabase-auth-runtime.js?v=6&boot=8',
+    'src/auth/online-auth-lifecycle-bridge.js?v=1',
+    'src/ui/account-auth-ui.js?v=2&boot=8',
+    'src/auth/guest-play-bypass.js?v=2'
+  ];
+  function next(i){
+    if(i>=urls.length)return;
+    var s=document.createElement('script');
+    s.src=urls[i];
+    s.onload=s.onerror=function(){next(i+1)};
+    document.head.appendChild(s);
+  }
+  next(0);
+})();
+</script>
 </body></html>
