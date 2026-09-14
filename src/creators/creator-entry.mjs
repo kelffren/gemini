@@ -18,7 +18,7 @@ import { createAvatarQuickImportService } from './avatar/avatar-quick-import-ser
 import { installCreatorAvatarRuntime } from '../characters/creator-avatar-runtime.mjs';
 import { createKeloSupabaseBrowserSession } from '../online/kelo-supabase-browser-session.mjs';
 import { KELO_SUPABASE_PUBLIC_CONFIG } from '../online/kelo-supabase-public-config.mjs';
-import { registerWorldWorkspace } from './workspaces/world-workspace.mjs?v=world-bridge-20260914-2';
+import { registerWorldWorkspace } from './workspaces/world-workspace.mjs?v=world-bridge-20260914-3';
 import { registerMapForgeWorkspace } from './workspaces/map-forge-workspace.mjs?v=map-forge-launch-recovery-20260912-1';
 import { registerMountWorkspace } from './workspaces/mount-workspace.mjs';
 import { registerAppearanceWorkspace } from './workspaces/appearance-workspace.mjs';

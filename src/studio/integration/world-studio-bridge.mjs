@@ -9,7 +9,7 @@
  */
 import { yieldStudioBoot, setWorldLaunchStatus } from './studio-boot-pace.mjs';
 
-export const WORLD_STUDIO_BRIDGE_BUILD='world-bridge-20260914-2';
+export const WORLD_STUDIO_BRIDGE_BUILD='world-bridge-20260914-3';
 const CONTROLLER=`./live-studio-controller.mjs?v=${WORLD_STUDIO_BRIDGE_BUILD}`;
 let controllerMod=null;
 

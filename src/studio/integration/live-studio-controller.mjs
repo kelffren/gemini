@@ -6,11 +6,11 @@
  * public-api: openKeloStudioLive(), closeKeloStudioLive()
  * consumes: KeloInputLocks, KELO_WORLD_EDIT, Studio Kernel/Tools
  * online: confirmed Commands mirror through KELO_WORLD_EDIT; previews/camera/productivity stay local
- * mobile: ZERO static Studio imports — chrome first; World bridge yields; overlay starts after chrome on iPhone (dpr=1, throttled) so Safari does not black-tab the tools
+ * mobile: ZERO static Studio imports — chrome first; World bridge yields; iPhone never allocates the overlay canvas and hydrates the draft after tools are already on screen
  */
 
 let active=null;
-const BUILD='world-bridge-20260914-2';
+const BUILD='world-bridge-20260914-3';
 const mutable=status=>['DRAFT','REJECTED'].includes(String(status||''));
 const DIRECT_DRAG_THRESHOLD=5;
 function actor(root){return String(root.KELO_ADMIN_KEYS?.playerId?.()||root.keloNet?.playerKey||root.localPlayer?.id||'local_pioneer');}
@@ -174,11 +174,6 @@ export async function openKeloStudioLive({root=globalThis}={}){
     if(root.KELO_WORLD_LAUNCH_ABORTED)throw new Error('WORLD_EDITOR_OPEN_TIMEOUT');
     await yieldLiveMount(root);
     if(root.KELO_WORLD_LAUNCH_ABORTED)throw new Error('WORLD_EDITOR_OPEN_TIMEOUT');
-    await studio.importCurrent({view:'draft',draftId});
-    if(root.KELO_WORLD_LAUNCH_ABORTED)throw new Error('WORLD_EDITOR_OPEN_TIMEOUT');
-    if(isPhone(root))await pause(root,80);
-    if(root.KELO_WORLD_LAUNCH_ABORTED)throw new Error('WORLD_EDITOR_OPEN_TIMEOUT');
-    for(const e of studio.kernel.document.entities)mirror.seed(e.id,e.source?.authorityPlacementId||e.id);for(const c of Object.values(studio.kernel.document.navigation?.collisions||{}))mirror.seedCollision(c.collisionId,c.collisionId);
     updateShell();
     const phoneOverlay=isPhone(root);
     const overlayDrawMs=phoneOverlay?90:16;
@@ -206,14 +201,29 @@ export async function openKeloStudioLive({root=globalThis}={}){
     function startStudioOverlayDraw(){
       overlayStart=0;
       if(!running||overlay)return;
+      if(phoneOverlay)return;
       try{overlay=createStudioOverlayCanvas({host:root.document.body});}catch(error){console.warn('[Kelo Studio] overlay canvas unavailable; chrome stays up',error);return;}
       draw();
+    }
+    async function hydrateAfterChrome(){
+      overlayStart=0;
+      if(!running||root.KELO_WORLD_LAUNCH_ABORTED)return;
+      try{
+        await studio.importCurrent({view:'draft',draftId});
+        if(!running||root.KELO_WORLD_LAUNCH_ABORTED)return;
+        for(const e of studio.kernel.document.entities)mirror.seed(e.id,e.source?.authorityPlacementId||e.id);for(const c of Object.values(studio.kernel.document.navigation?.collisions||{}))mirror.seedCollision(c.collisionId,c.collisionId);
+        updateShell();
+        if(!phoneOverlay)startStudioOverlayDraw();
+      }catch(error){
+        console.warn('[Kelo Studio] draft import deferred; chrome stays up',error);
+        try{shell?.setStatus?.('Editor listo');}catch{}
+      }
     }
     onKey=e=>{if(isStudioUi(e))return;const key=e.key.toLowerCase();if(playing){if(key==='escape'){e.preventDefault();void guarded(togglePlaytest);}return;}if((e.metaKey||e.ctrlKey)&&key==='z'){e.preventDefault();void guarded(()=>e.shiftKey?studio.kernel.redo():studio.kernel.undo());return;}if((e.metaKey||e.ctrlKey)&&key==='d'){e.preventDefault();void guarded(()=>creator.duplicateSelection());return;}if((e.metaKey||e.ctrlKey)&&key==='c'){e.preventDefault();const count=creator.copySelection();productivity?.setClipboard(count);toast(root,count?`${count} objeto${count===1?'':'s'} copiado${count===1?'':'s'}`:'Selecciona algo para copiar');return;}if((e.metaKey||e.ctrlKey)&&key==='v'){e.preventDefault();void guarded(()=>creator.pasteClipboard());return;}if((e.metaKey||e.ctrlKey)&&key==='s'){e.preventDefault();void guarded(async()=>{await saveDraft();toast(root,'Studio guardado');});return;}if(key==='f'){e.preventDefault();focusSelection();return;}if(key==='+'||key==='='){e.preventDefault();cameraController.setZoom(cameraController.zoom*1.2);updateShell();return;}if(key==='-'){e.preventDefault();cameraController.setZoom(cameraController.zoom/1.2);updateShell();return;}if(key==='0'){e.preventDefault();cameraController.setZoom(1);updateShell();return;}if(key==='escape'){e.preventDefault();if(['camera','placement','prefab','terrain','path','collision'].includes(mode)){cancelTransient();setMode('select');}else void closeKeloStudioLive({root});return;}if(key==='r'){e.preventDefault();void guarded(()=>mode==='placement'?Promise.resolve(studio.tools.placement.rotate(90)):mode==='prefab'?Promise.resolve(null):creator.rotateSelection(90));return;}if(key==='e'&&(mode==='terrain'||mode==='path')){e.preventDefault();const next=!studio.tools.terrain.state().erase;studio.tools.terrain.configure({erase:next});shell?.setErase(next);updateShell();return;}if(key==='delete'||key==='backspace'){e.preventDefault();if(mode==='collision'&&studio.tools.collision.selectedId)void guarded(()=>studio.tools.collision.removeSelected());else void guarded(()=>creator.removeSelection());return;}if(key==='q')setMode('select');else if(key==='v')setMode('move');else if(key==='h')setMode(mode==='camera'?'select':'camera');else if(key==='g')setMode('terrain');else if(key==='p')setMode('path');else if(key==='c')setMode('collision');};root.document.addEventListener('keydown',onKey,true);
     const liveSession={version:'kelo-studio-creator-v1.7.0-world-bridge',studio,prefabLibrary,cameraController,get draftId(){return draftId;},get mode(){return mode;},get playing(){return playing;},get snapSize(){return snapSize;},setMode,beginPlacement,focusSelection,validate:validateMap,togglePlaytest:()=>guarded(togglePlaytest),close:()=>closeKeloStudioLive({root})};
     Object.defineProperty(liveSession,'__cleanup',{value:async()=>{running=false;cancelDirectGesture();if(pinchScale){try{await endPinchScale({cancelled:true});}catch{}}cancelPinchPreviewFrame();stopOverlayDraw();if(onKey)root.document.removeEventListener('keydown',onKey,true);selectionUnsub?.();detachPointer?.();cameraController?.destroy();studio.kernel.input.pop('studio-live');unregisterInput?.();mirror.uninstall();productivity?.destroy();shell?.destroy();overlay?.destroy();studio.tools.collision.setVisible(false);if(inputLockToken){root.KeloInputLocks.release(inputLockToken);inputLockToken=null;}try{await studio.checkpoint();}catch{}try{studio.close();}catch{}try{await root.KELO_WORLD_EDIT?.request?.('world:view:published',{actorId});}catch{}},enumerable:false});
     if(shell?.root?.dataset)delete shell.root.dataset.keloWorldLoading;active=Object.freeze(liveSession);root.document.body.classList.add('kelo-studio-active');toast(root,'Kelo Studio Creator V1.7 activo');
-    overlayStart=(root.setTimeout||setTimeout)(startStudioOverlayDraw,phoneOverlay?160:0);
+    overlayStart=(root.setTimeout||setTimeout)(hydrateAfterChrome,phoneOverlay?200:0);
     return active;
   }catch(error){running=false;try{if(overlayStart){(root.clearTimeout||clearTimeout)(overlayStart);overlayStart=0;}}catch{}try{if(typeof root.cancelAnimationFrame==='function')root.cancelAnimationFrame(frame);}catch{}try{(root.clearTimeout||clearTimeout)(frame);}catch{}try{cancelDirectGesture();detachPointer?.();cameraController?.destroy();}catch{}try{studio.kernel.input.pop('studio-live');unregisterInput?.();}catch{}try{mirror.uninstall();}catch{}try{productivity?.destroy();shell?.destroy();overlay?.destroy();studio.tools.collision.setVisible(false);}catch{}if(inputLockToken){try{root.KeloInputLocks.release(inputLockToken);}catch{}inputLockToken=null;}try{studio.close();}catch{}throw error;}
 }

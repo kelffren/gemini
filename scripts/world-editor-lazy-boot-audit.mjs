@@ -175,7 +175,9 @@ assert.doesNotMatch(controllerSource,/^import \{ createStudioOverlayCanvas \}/m,
 assert.doesNotMatch(controllerSource,/^import \{ createStudioLiveShell \}/m,'Live controller must not statically import the Studio shell');
 assert.match(controllerSource,/loadLiveStudioChrome/,'Live controller must load chrome before the rest of the Studio graph');
 assert.match(controllerSource,/loadLiveStudioRuntime/,'Live controller must dynamically import remaining Studio modules after chrome');
-assert.match(controllerSource,/startStudioOverlayDraw/,'Live controller must start the overlay after chrome returns on iPhone');
+assert.match(controllerSource,/startStudioOverlayDraw/,'Live controller must keep a deferred overlay start after chrome');
+assert.match(controllerSource,/if\(phoneOverlay\)return/,'iPhone must not allocate the overlay canvas after chrome paints');
+assert.match(controllerSource,/hydrateAfterChrome/,'World draft import must run after chrome returns so tools stay on iPhone');
 assert.match(controllerSource,/overlayDrawMs=phoneOverlay\?90:16/,'iPhone overlay draw must be throttled instead of every rAF');
 
 const overlaySource=await readFile(resolve(here,'../src/studio/render/studio-overlay-canvas.mjs'),'utf8');
