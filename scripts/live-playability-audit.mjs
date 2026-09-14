@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import { chromium } from 'playwright';
 
-const AUDIT_REVISION = 'live-playability-v1-real-touch';
+const AUDIT_REVISION = 'live-playability-v2-pre-dcl-real-touch';
 const base = process.env.AUDIT_URL || 'https://kelffren.github.io/gemini/?offline=1&qa-live-audit=1';
 const executablePath = process.env.CHROME_BIN || '/usr/bin/google-chrome';
 
@@ -30,10 +30,11 @@ function withBust(value) {
 }
 
 async function waitForCurrentDeployment() {
-  const markerUrl = new URL('scripts/live-playability-audit.mjs', new URL(base).origin + new URL(base).pathname).href;
+  const root = new URL(base);
+  const markerUrl = new URL('scripts/live-playability-audit.mjs', `${root.origin}${root.pathname}`).href;
   let lastStatus = 0;
   let lastBody = '';
-  for (let attempt = 1; attempt <= 20; attempt += 1) {
+  for (let attempt = 1; attempt <= 24; attempt += 1) {
     try {
       const response = await context.request.get(`${markerUrl}?deploy-check=${Date.now()}-${attempt}`, {
         headers: { 'cache-control': 'no-cache', pragma: 'no-cache' },
@@ -53,13 +54,15 @@ async function waitForCurrentDeployment() {
 const deployment = await waitForCurrentDeployment();
 
 try {
-  await page.goto(withBust(base), { waitUntil: 'networkidle', timeout: 60_000 });
+  // V6.59 deliberately releases gameplay before DOMContentLoaded. Waiting for
+  // networkidle/DCL here would call a playable Safari boot "broken".
+  await page.goto(withBust(base), { waitUntil: 'commit', timeout: 60_000 });
   await page.waitForFunction(() => (
     typeof localPlayer !== 'undefined' &&
     typeof input !== 'undefined' &&
     typeof processInput === 'function' &&
     document.getElementById('game-canvas')
-  ), null, { timeout: 35_000 });
+  ), null, { timeout: 45_000 });
   await page.waitForTimeout(1_000);
 
   const boot = await page.evaluate(() => {
@@ -73,6 +76,8 @@ try {
     }));
     return {
       title: document.title,
+      readyState: document.readyState,
+      rafReleased: window.__keloRAFReleased === true,
       bodyClass: document.body.className,
       canvas: rect ? {
         x: Number(rect.x.toFixed(1)),
@@ -175,7 +180,7 @@ try {
   if (stopped.touchActive) throw new Error('LIVE touchEnd did not release touch state');
   if (pageErrors.length) throw new Error(`LIVE page errors:\n${pageErrors.join('\n')}`);
 
-  console.log(`LIVE_PLAYABILITY_PASS moved=${moved.toFixed(2)}px target=${JSON.stringify(touchEvents[0]?.target || null)}`);
+  console.log(`LIVE_PLAYABILITY_PASS moved=${moved.toFixed(2)}px readyState=${boot.readyState} target=${JSON.stringify(touchEvents[0]?.target || null)}`);
 } catch (error) {
   await page.screenshot({ path: 'artifacts/live-playable-failure.png', fullPage: false }).catch(() => {});
   throw error;
