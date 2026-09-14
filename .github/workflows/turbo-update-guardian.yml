@@ -21,6 +21,7 @@ on:
       - scripts/turbo-update-guardian.mjs
       - scripts/turbo-boot-isolation-test.mjs
       - scripts/turbo-build.mjs
+      - scripts/turbo-build-audit.mjs
       - scripts/generate-turbo-manifest.mjs
       - scripts/turbo-delta-test.mjs
       - vite.config.js
@@ -51,6 +52,7 @@ on:
       - scripts/turbo-update-guardian.mjs
       - scripts/turbo-boot-isolation-test.mjs
       - scripts/turbo-build.mjs
+      - scripts/turbo-build-audit.mjs
       - scripts/generate-turbo-manifest.mjs
       - scripts/turbo-delta-test.mjs
       - vite.config.js
@@ -76,14 +78,22 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Syntax check Turbo runtime and guardian
+      - name: Syntax check Turbo runtime, compiler and guardian
         run: |
           node --check src/core/update-delta-core.js
           node --check src/core/update-system.js
           node --check src/visuals/visual-lab-loader.js
           node --check scripts/turbo-boot-isolation-test.mjs
+          node --check scripts/turbo-build.mjs
+          node --check scripts/turbo-build-audit.mjs
           node --check scripts/generate-turbo-manifest.mjs
           node --check scripts/turbo-update-guardian.mjs
+      - name: Install exact production compiler
+        run: npm install --no-save --ignore-scripts esbuild@0.25.9
+      - name: Build production Turbo/lazy surface
+        run: node scripts/turbo-build.mjs
+      - name: Prove minification tree-shaking hashed code splitting
+        run: node scripts/turbo-build-audit.mjs
       - name: Prove creator tools stay out of critical boot
         run: node scripts/turbo-boot-isolation-test.mjs
       - name: Generate SHA-256 Turbo manifest from actual boot bytes
