@@ -1,0 +1,50 @@
+{
+  "schema": "kelo-bug-learning-v1",
+  "system_id": "bug-intelligence",
+  "source_fingerprint": null,
+  "risk_map_fingerprint": null,
+  "source_head": null,
+  "champion": {
+    "id": "baseline-v1",
+    "multipliers": {},
+    "search_score": null,
+    "holdout_score": null,
+    "accepted_from_last_cycle": false
+  },
+  "memory": {
+    "schema": "kelo-evolution-memory-v2",
+    "systemId": "bug-intelligence-risk-policy",
+    "champion": null,
+    "entries": []
+  },
+  "memory_summary": {
+    "systemId": "bug-intelligence-risk-policy",
+    "experiments": 0,
+    "accepted": 0,
+    "rejected": 0,
+    "acceptanceRate": 0,
+    "meanAcceptedDelta": 0,
+    "repeatedCandidates": 0,
+    "champion": null
+  },
+  "training": {
+    "examples": 0,
+    "search_examples": 0,
+    "holdout_examples": 0,
+    "latest_evidence_at": null
+  },
+  "metrics": {},
+  "hotspots": [],
+  "prevention_gaps": [],
+  "safety": {
+    "auto_write_scope": ["bugs/learning/STATE.json"],
+    "arbitrary_source_code_writes": false,
+    "bug_state_mutation": false,
+    "auto_close": false,
+    "requires_holdout_for_policy_promotion": true,
+    "max_rule_multiplier": 1.75,
+    "min_rule_multiplier": 0.75,
+    "max_hotspot_bonus": 20
+  },
+  "updated_at": null
+}
