@@ -8,7 +8,7 @@ import { sanitizeBugText } from './lib/bug-fingerprint.mjs';
 
 const root=process.cwd();
 const pkg=JSON.parse(fs.readFileSync(path.join(root,'package.json'),'utf8'));
-for(const name of ['bug:scan','bug:candidate','bug:triage','bug:impact','bug:culprit','bug:risk','bug:health','audit:bugs','audit:bug-regressions','audit:bug-close']){
+for(const name of ['bug:scan','bug:candidate','bug:triage','bug:impact','bug:culprit','bug:risk','bug:health','audit:bugs','audit:bug-regressions','audit:bug-close','audit:bug-recurrence']){
   if(!pkg.scripts?.[name])throw new Error(`missing package script ${name}`);
 }
 const risk=JSON.parse(fs.readFileSync(path.join(root,'bugs','RISK_MAP.json'),'utf8'));
@@ -19,6 +19,7 @@ for(const rule of risk.rules){
 execFileSync(process.execPath,['scripts/bug-health.mjs'],{cwd:root,stdio:'pipe'});
 execFileSync(process.execPath,['scripts/bug-regression-audit.mjs'],{cwd:root,stdio:'pipe'});
 execFileSync(process.execPath,['scripts/bug-close-gate.mjs'],{cwd:root,stdio:'pipe'});
+execFileSync(process.execPath,['scripts/bug-recurrence-gate.mjs'],{cwd:root,stdio:'pipe'});
 execFileSync(process.execPath,['scripts/bug-triage.mjs'],{cwd:root,stdio:'pipe'});
 const impact=execFileSync(process.execPath,['scripts/bug-impact.mjs','src/studio/integration/live-studio-controller.mjs','--depth=2'],{cwd:root,encoding:'utf8'});
 if(!/BUG IMPACT/.test(impact)||!/world-studio-ios/.test(impact))throw new Error('bug:impact did not expose World/Studio blast radius risk');
@@ -43,4 +44,4 @@ obs.mark('START');
 obs.fail(new Error('synthetic'),'SELFTEST');
 const events=obs.read();
 if(events.length!==2||events[0].milestone!=='START'||events[1].milestone!=='FAIL')throw new Error('runtime observability timeline failed');
-console.log(`BUG INTELLIGENCE SELFTEST PASS — ${risk.rules.length} risk rules, sanitized fingerprinting/candidates, triage, blast radius, culprit correlation, close/regression gates and runtime milestones validated.`);
+console.log(`BUG INTELLIGENCE SELFTEST PASS — ${risk.rules.length} risk rules, sanitized fingerprinting/candidates, triage, blast radius, culprit correlation, recurrence/close/regression gates and runtime milestones validated.`);
