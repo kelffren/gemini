@@ -1,0 +1,54 @@
+name: Bug Prevention
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'scripts/**'
+      - 'assets/**'
+      - 'index.html'
+      - 'sw.js'
+      - 'package.json'
+      - 'bugs/RISK_MAP.json'
+      - '.github/workflows/bug-prevention.yml'
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'scripts/**'
+      - 'assets/**'
+      - 'index.html'
+      - 'sw.js'
+      - 'package.json'
+      - 'bugs/RISK_MAP.json'
+      - '.github/workflows/bug-prevention.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  prevent:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 3
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Audit learned memory bounds
+        run: node scripts/bug-learning-audit.mjs
+
+      - name: Score static plus learned regression risk
+        run: node scripts/bug-risk.mjs HEAD~1 HEAD
+
+      - name: Execute bounded preventive audits
+        run: node scripts/bug-prevention.mjs HEAD~1 HEAD
+
+      - name: Inspect reverse-dependency blast radius
+        run: node scripts/bug-impact.mjs --diff HEAD~1 HEAD --depth=2
