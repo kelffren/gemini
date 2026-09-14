@@ -40,7 +40,8 @@
     {"id": "factions-clans","owner":"KeloFactions","source":"src/systems/faction-clan-system.js","technicalDoc":"docs/systems/REGIONAL_ECONOMY_LOGISTICS_SYSTEM.md","playerVisible":false,"status":"foundation-api-live-offline-online-ready"},
     {"id": "logistics-devtools","owner":"KeloLogisticsDevtools","source":"src/systems/logistics-devtools.js","technicalDoc":"docs/systems/REGIONAL_ECONOMY_LOGISTICS_SYSTEM.md","playerVisible":false,"status":"development-observability"},
     {"id": "logistics-admin-ui","owner":"KeloLogisticsAdminUI","source":"src/ui/logistics-admin-ui.js","technicalDoc":"docs/systems/LOGISTICS_ADMIN_UI.md","playerVisible":false,"status":"internal-admin-qa-live"},
-    {"id":"guardian-network","owner":"KeloGuardian + Kelo Guardian Coordinator","source":"src/systems/guardian-system.js","technicalDoc":"docs/systems/GUARDIAN_SYSTEM.md","playerVisible":true,"playerGuideAnchor":"menu-principal","status":"guardian-foundation-v2-regional-scheduler-proof-webrtc-data-plane"},
+    {"id":"guardian-network","owner":"KeloGuardian + Kelo Guardian Coordinator","source":"src/systems/guardian-system.js","technicalDoc":"docs/systems/GUARDIAN_SYSTEM.md","playerVisible":true,"playerGuideAnchor":"menu-principal","status":"guardian-foundation-v3-webrtc-regional-proof-hot-mirror"},
+    {"id":"guardian-hot-mirror","owner":"KeloGuardianMirror","source":"src/systems/guardian-hot-mirror.js","technicalDoc":"docs/systems/GUARDIAN_HOT_MIRROR.md","playerVisible":false,"status":"guardian-support-v1-hot-mirror-failover-foundation"},
     {"id":"bug-coordination","owner":"KeloBugReporter + /bugs canonical registry","source":"src/bug-reporting/bug-reporter.mjs","technicalDoc":"docs/systems/BUG_COORDINATION_SYSTEM.md","playerVisible":false,"status":"internal-dormant-v1"}
   ]
 }
