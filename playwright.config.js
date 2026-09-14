@@ -1,7 +1,10 @@
 const { defineConfig, devices } = require('@playwright/test');
 
-// BrowserStack real iOS receives device/browser capabilities from browserstack.yml.
-// Keep the BrowserStack project deliberately free of desktop/mobile emulation.
+// BrowserStack real iOS receives the physical Safari/device capabilities from
+// browserstack.yml. Playwright itself only accepts chromium/firefox/webkit as
+// browserName values, so the runner uses webkit while BrowserStack maps that
+// session onto Safari on the requested real iPhone.
+//
 // Playwright defaults reducedMotion to "no-preference"; BrowserStack real iOS
 // expects the device/system default instead, so explicitly reset it with null.
 const isBrowserStack = Boolean(
@@ -15,8 +18,7 @@ const localMobileUse = {
 };
 
 const browserStackIOSUse = {
-  browserName: 'safari',
-  channel: 'safari',
+  browserName: 'webkit',
   reducedMotion: null,
 };
 
@@ -34,9 +36,9 @@ module.exports = defineConfig({
   },
   projects: [
     {
-      // BrowserStack documents this naming form for real iOS Playwright projects.
+      // Physical Safari/iPhone selection remains exclusively in browserstack.yml.
       name: isBrowserStack
-        ? 'safari@iPhone 14 Pro:26@browserstack-mobile'
+        ? 'webkit-real-ios-browserstack'
         : 'chromium',
       use: isBrowserStack ? browserStackIOSUse : localMobileUse,
     },
