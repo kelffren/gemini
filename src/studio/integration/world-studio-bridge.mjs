@@ -9,8 +9,10 @@
  */
 import { yieldStudioBoot, setWorldLaunchStatus } from './studio-boot-pace.mjs';
 
-export const WORLD_STUDIO_BRIDGE_BUILD='world-bridge-20260914-14';
-const CONTROLLER=`./live-studio-controller.mjs?v=${WORLD_STUDIO_BRIDGE_BUILD}`;
+export const WORLD_STUDIO_BRIDGE_BUILD='world-bridge-20260914-15';
+const bridgeUrl=new URL(import.meta.url);
+const controllerBuild=bridgeUrl.searchParams.get('v')||WORLD_STUDIO_BRIDGE_BUILD;
+const CONTROLLER=`./live-studio-controller.mjs?v=${encodeURIComponent(controllerBuild)}`;
 let controllerMod=null;
 
 async function loadController(root){
