@@ -26,6 +26,11 @@ if(status<0||firstYield<0||controllerStart<0)throw new Error('paced direct contr
 if(!(status<firstYield&&firstYield<controllerStart))throw new Error('controller handoff order must be status -> paint yield -> controller import');
 const beforeController=src.slice(firstYield,controllerStart);
 if((beforeController.match(/await import\(/g)||[]).length!==0)throw new Error('no Studio runtime import may block between the paint yield and controller import');
+const controllerReturn=src.indexOf('return controllerMod;',controllerStart);
+if(controllerReturn<0)throw new Error('controller return missing');
+const afterControllerImport=src.slice(controllerStart,controllerReturn);
+if(afterControllerImport.includes('await yieldStudioBoot(root)'))throw new Error('do not insert a second paint/timer barrier between controller evaluation and World mount');
+if(!afterControllerImport.includes("setWorldLaunchStatus(root,'Montando editor…')"))throw new Error('post-import mount status missing');
 if(!src.includes("if(root?.KELO_WORLD_LAUNCH_ABORTED)throw new Error('WORLD_EDITOR_OPEN_TIMEOUT')"))throw new Error('abort guard missing from direct controller handoff');
 
-console.log('world-editor-iphone-prewarm-audit: PASS (controller-first, no eager runtime gate)');
+console.log('world-editor-iphone-prewarm-audit: PASS (controller-first, immediate mount handoff)');
