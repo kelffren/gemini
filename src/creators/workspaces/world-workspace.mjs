@@ -4,7 +4,7 @@
  * owns: descriptor and lazy routing into existing live Studio controller
  * does-not-own: World editor, commands, drafts, authority, terrain, collisions, PropertySystem or camera
  * reuse: existing openKeloStudioLive() remains implementation; Map Forge handoff imports through Studio adapter + KELO_WORLD_EDIT and focuses through KeloCamera
- * mobile: paint Studio chrome first; iPhone prewarms runtime roots one-by-one, then hops through world-studio-bridge so Safari never parses the full editor graph in one tap
+ * mobile: paint Studio chrome first; the world-studio-bridge is the single owner of the serialized critical iPhone prewarm so Safari does not parse the full editor graph before controller hydrate
  */
 import { waitForWorldEditAuthority } from '../adapters/world-creator-adapter.mjs';
 
@@ -15,7 +15,7 @@ const LAUNCH_CURTAIN_ID='kelo-world-launch-curtain';
 const STUDIO_OPEN_MS=20000;
 const DEFAULT_LAUNCH_YIELD_MS=420;
 const DEFAULT_RUNTIME_YIELD_FALLBACK_MS=120;
-const WORLD_BUILD='world-bridge-20260914-6';
+const WORLD_BUILD='world-bridge-20260914-12';
 const PHONE_RUNTIME_ROOTS=Object.freeze([
   '../../studio/render/studio-overlay-canvas.mjs',
   '../../studio/render/creator-grid-overlay.mjs',
@@ -275,7 +275,6 @@ export function createWorldWorkspaceManifest({loader=()=>import(`../../studio/in
           if(!previewOnly){
             await paintInteractiveChrome(root,previewOnly?'Cargando vista previa…':'Cargando editor…');
             await yieldFrames(root,1);
-            await preloadPhoneStudioRuntime(root);
           }
           const edit=await waitForWorldEditAuthority(root);
           let prepared=null;
