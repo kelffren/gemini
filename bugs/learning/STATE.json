@@ -249,9 +249,20 @@
       "files": [
         "src/studio/studio-entry.mjs"
       ]
+    },
+    {
+      "id": "prevention:995f936076b501a477b8e88aaa774553b8db87b1",
+      "at": "2026-09-14T13:56:37.000Z",
+      "source": "bug-prevention-ci",
+      "head_sha": "995f936076b501a477b8e88aaa774553b8db87b1",
+      "base_sha": "8804868f66326b3b19d6b8adb5083cfccb831a2e",
+      "conclusion": "success",
+      "files": [
+        "scripts/world-editor-lazy-boot-audit.mjs"
+      ]
     }
   ],
-  "feedback_updated_at": "2026-09-14T13:56:10.682Z",
+  "feedback_updated_at": "2026-09-14T13:56:53.023Z",
   "training": {
     "examples": 28,
     "search_examples": 21,
