@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "id": "BUG-0001",
   "title": "BrowserStack real iPhone test fails before page launch on reducedMotion capability mismatch",
   "status": "OPEN",
@@ -40,6 +40,98 @@
   "owner_hint": "Real iOS QA / BrowserStack integration",
   "claimed_by": null,
   "claim_started_at": null,
+  "research": {
+    "status": "in_progress",
+    "summary": "The BrowserStack real-device gate fails before navigation because the resolved Playwright/SDK context contains a reducedMotion value BrowserStack rejects. A previous capability simplification did not remove the injected value, so the unresolved question is where the final context value is introduced.",
+    "known_facts": [
+      {
+        "id": "F1",
+        "statement": "The failure occurs during browser.newContext before page.goto reaches KELO WORLD.",
+        "evidence": ["GitHub Actions run 34764846903", "GitHub Actions run 34764978999"]
+      },
+      {
+        "id": "F2",
+        "statement": "BrowserStack reports expected reducedMotion 'none' but receives 'no-preference'.",
+        "evidence": ["Error: expectedValue of reducedMotion: 'none' does not match providedValue: 'no-preference'"]
+      },
+      {
+        "id": "F3",
+        "statement": "Removing some explicit mobile capabilities previously did not eliminate the mismatch.",
+        "evidence": ["Existing fix.summary in BUG-0001 before schema v2 migration"]
+      }
+    ],
+    "hypotheses": [
+      {
+        "id": "H1",
+        "theory": "The resolved Playwright device/project configuration injects reducedMotion='no-preference' after BrowserStack configuration is applied.",
+        "confidence": "medium",
+        "status": "supported",
+        "why": "The rejected value appears at browser context creation even after a prior attempt to let BrowserStack own mobile capabilities.",
+        "evidence_for": ["F2", "F3"],
+        "evidence_against": [],
+        "test_next": "Print or otherwise inspect the final Playwright project/use/context options passed through the BrowserStack SDK and compare them with a minimal project that does not spread a Playwright device descriptor."
+      },
+      {
+        "id": "H2",
+        "theory": "browserstack.yml or BrowserStack SDK capability normalization conflicts with a Playwright default even when the project does not explicitly set reducedMotion.",
+        "confidence": "low",
+        "status": "unverified",
+        "why": "The SDK transforms Playwright configuration before real-device session creation, so the mismatch may be introduced during that transform rather than by the test file.",
+        "evidence_for": ["F1", "F2"],
+        "evidence_against": [],
+        "test_next": "Run one minimal real-device smoke spec with a stripped Playwright project and compare the session creation result before changing game tests."
+      }
+    ],
+    "ruled_out": [],
+    "unknowns": [
+      {
+        "id": "U1",
+        "question": "Which exact configuration layer supplies reducedMotion='no-preference' to the final BrowserStack context?",
+        "why_it_matters": "Fixing the wrong config file will repeat the failed capability-cleanup attempt.",
+        "quickest_test": "Inspect/log the resolved Playwright project and SDK-transformed capabilities in the minimal failing workflow."
+      }
+    ],
+    "external_references": [],
+    "last_researched_at": "2026-09-14T02:55:00Z"
+  },
+  "attempt_history": [
+    {
+      "id": "A1",
+      "at": null,
+      "actor": "previous agent",
+      "goal": "Remove the reducedMotion mismatch by allowing BrowserStack to own mobile capabilities.",
+      "hypothesis_ids": ["H1", "H2"],
+      "change": {
+        "commits": [],
+        "files": ["playwright.config.js", "browserstack.yml"],
+        "summary": "Simplified ownership of mobile capabilities so BrowserStack would supply device capabilities."
+      },
+      "validation": {
+        "environment": "GitHub Actions + BrowserStack real iPhone",
+        "method": "Run the real-device workflow through browserstack-node-sdk.",
+        "result": "FAIL",
+        "evidence": ["Mismatch remained after the capability-ownership attempt."]
+      },
+      "conclusion": "Simply removing/ceding explicit mobile capabilities is insufficient; the final injected reducedMotion value must be located before another config edit.",
+      "do_not_repeat_without": "Evidence identifying a different resolved capability set or configuration layer than the one used by the failed attempt."
+    }
+  ],
+  "next_best_actions": [
+    {
+      "priority": 1,
+      "action": "Capture the final resolved Playwright project/use options and BrowserStack SDK capability payload for the failing session, specifically the origin of reducedMotion.",
+      "reason": "This directly identifies the layer injecting the rejected value and prevents another blind config edit.",
+      "expected_signal": "A single config/device descriptor/default can be named as the source of 'no-preference'.",
+      "stop_condition": "If the resolved Playwright config contains no reducedMotion but the SDK payload does, move investigation to BrowserStack SDK normalization instead of game/test config."
+    },
+    {
+      "priority": 2,
+      "action": "Create/run a minimal one-page real-iPhone smoke project without Playwright device spreading and compare session creation.",
+      "reason": "A differential test separates Playwright project injection from BrowserStack SDK/service behavior.",
+      "expected_signal": "Minimal project either opens a session or reproduces the same mismatch.",
+      "stop_condition": "Once the responsible layer is isolated, stop modifying unrelated World/Guest tests and fix only that layer."
+    }
+  ],
   "fix": {
     "status": "none",
     "commits": [],
@@ -60,5 +152,5 @@
     "This is a test-harness/integration defect, not evidence that Guest or World itself fails on the device.",
     "Do not mark downstream iPhone bugs verified while this gate prevents the real-device flow from executing."
   ],
-  "updated_at": "2026-09-13"
+  "updated_at": "2026-09-14T02:55:00Z"
 }
