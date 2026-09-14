@@ -14,6 +14,7 @@
     "bug:candidate": "node scripts/bug-candidate.mjs",
     "bug:triage": "node scripts/bug-triage.mjs",
     "bug:impact": "node scripts/bug-impact.mjs",
+    "bug:culprit": "node scripts/bug-culprit.mjs",
     "bug:risk": "node scripts/bug-risk.mjs",
     "bug:health": "node scripts/bug-health.mjs",
     "audit:bugs": "node scripts/bug-registry-audit.mjs",
