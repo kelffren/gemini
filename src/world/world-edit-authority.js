@@ -8,7 +8,7 @@
 'use strict';
 if(window.KELO_WORLD_EDIT)return;
 
-const VERSION='world-edit-authority-v1.1.0';
+const VERSION='world-edit-authority-v1.1.1';
 const WORLD_PARCEL_ID='parcel:world:editor';
 const listeners=new Set();
 const readyWaiters=new Set();
@@ -78,10 +78,13 @@ async function request(op,payload={}){
     if(result?.viewSnapshot){
       await projectView(result.viewSnapshot,result.viewMeta||{},result.projectPlacements===true);
     }
-    lastError=null;emit({type:'request',op:String(op),result:clone(result),view:clone(currentView)});
+    lastError=null;
+    if(listeners.size)emit({type:'request',op:String(op),result:clone(result),view:clone(currentView)});
     return result;
   }catch(err){
-    lastError=String(err?.message||err);emit({type:'error',op:String(op),error:lastError,view:clone(currentView)});throw err;
+    lastError=String(err?.message||err);
+    if(listeners.size)emit({type:'error',op:String(op),error:lastError,view:clone(currentView)});
+    throw err;
   }
 }
 async function installAuthority(adapter){
