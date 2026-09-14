@@ -2,7 +2,9 @@
 
 ## Propósito
 
-`KeloUpdater` mantiene actualizada la web instalada de KELO WORLD sin pedir al jugador que elimine ni vuelva a añadir el icono de la pantalla de inicio. Detecta la revisión que ya fue publicada por GitHub Pages y, cuando hay una build distinta, ofrece una acción táctil para recargar el cliente con archivos frescos.
+`KeloUpdater` mantiene actualizada la web instalada de KELO WORLD sin pedir al jugador que elimine ni vuelva a añadir el icono de la pantalla de inicio. Detecta la revisión que ya fue publicada por GitHub Pages, descarga por adelantado los bytes estáticos de la nueva build mientras el jugador sigue usando la versión actual y solo habilita `ACTUALIZAR` cuando la build necesaria para arrancar está preparada.
+
+La descarga es deliberadamente oportunista: gameplay, PVP y una conexión estable tienen prioridad sobre el updater.
 
 ## OWNER y archivos
 
@@ -13,136 +15,200 @@
 - Revisión desplegada: `version.json`, renderizado por GitHub Pages/Jekyll mediante `site.github.build_revision`.
 - Install metadata: `manifest.webmanifest`.
 - Boot LIVE: `index.html`.
+- Auditoría: `scripts/updater-audit.mjs`.
 
-No existe un segundo owner de versiones. La UI no decide qué build es actual ni escribe estado del updater.
+No existe un segundo owner de versiones. La UI no decide qué build es actual, no mide la red y no escribe estado del updater.
 
 ## Estado que posee
 
-`KeloUpdater` posee únicamente metadata de cliente:
+`KeloUpdater` posee únicamente metadata del cliente y del staging:
 
 - `installedBuild`: última build que este cliente confirmó como cargada;
 - `deployedBuild`: revisión actualmente publicada por Pages;
-- `availableBuild`: revisión pendiente de aplicar;
-- estado de ciclo: `booting`, `checking`, `current`, `available`, `applying`, `error`;
+- `availableBuild`: revisión pendiente;
+- `stage.build/status/total/completed/percent`: estado de la precarga;
+- `network.status/pingMs/failures/saveData/effectiveType/downlinkMbps`: diagnóstico efímero de red;
 - disponibilidad del Service Worker.
 
-La única persistencia local es `kelo.world.updater.installedBuild.v1`. No contiene inventario, auth, economía, posición, HP ni ningún dato de gameplay.
+La única persistencia de versión sigue siendo `kelo.world.updater.installedBuild.v1`. Los bytes precargados viven en Cache Storage bajo un namespace exclusivo `kelo-update-stage-v2-<sha>`.
 
-## Estado que NO posee
-
-El updater no posee ni puede modificar:
-
-- autoridad online o WebSocket;
-- sesiones Supabase;
-- personaje, inventario, mercado, KC/oro, propiedades o progreso;
-- mapas o assets como contenido autoritativo;
-- lógica de PvP.
-
-Actualizar el cliente solo cambia los bytes estáticos que el navegador usa para ejecutar la build publicada.
+No contiene inventario, auth, economía, posición, HP ni ningún dato gameplay.
 
 ## API pública
 
 ```js
 KeloUpdater.check({ force?: boolean })
+KeloUpdater.prepareUpdate(build?)
 KeloUpdater.applyUpdate()
+KeloUpdater.evaluateNetwork()
+KeloUpdater.setGameplayBusy(boolean, source?)
+KeloUpdater.setNetworkPriority('critical' | 'normal', source?)
 KeloUpdater.getState()
 ```
 
-Eventos de ventana:
+Para cualquier subsistema que necesite prioridad absoluta de red:
+
+```js
+KeloUpdater.setGameplayBusy(true, 'pvp')
+// ...
+KeloUpdater.setGameplayBusy(false, 'pvp')
+```
+
+También existe el puente desacoplado `kelo:network-priority`. Además, el updater detecta automáticamente `window.KELO_COMBAT_ENABLED === true` y Arena activa mediante `KeloArena.isActive()`.
+
+## Eventos
 
 ```text
 kelo:update:checking
 kelo:update:available
 kelo:update:current
+kelo:update:network
+kelo:update:network-priority
+kelo:update:staging
+kelo:update:staging-progress
+kelo:update:staging-paused
+kelo:update:staging-resumed
+kelo:update:staged
+kelo:update:staging-error
+kelo:update:staging-unsupported
 kelo:update:applying
 kelo:update:error
 kelo:update:service-worker-error
 ```
 
-La UI escucha estos eventos y delega `applyUpdate()` al owner.
+## Flujo completo
 
-## Flujo
+1. `index.html` carga `KeloUpdater` antes del runtime gameplay.
+2. El owner registra `sw.js` con `updateViaCache: none`.
+3. Consulta `version.json` con `cache: no-store`.
+4. Pages expone el SHA real que ya está desplegado.
+5. Si ese SHA difiere de `installedBuild`, pasa a `available`.
+6. Antes de descargar el nuevo `index.html`, el evaluador hace un probe pequeño same-origin.
+7. Si la red es apta, `prepareUpdate()` obtiene el HTML nuevo y extrae scripts, CSS, manifest, preload e iconos same-origin.
+8. Descarga **un solo recurso a la vez** y lo guarda en `kelo-update-stage-v2-<sha>`.
+9. Si el ping sube, hay errores, Ahorro de Datos, PVP/combat o la app queda oculta, la cola se pausa sin perder lo ya descargado.
+10. Cuando la red vuelve a ser sana, se recupera automáticamente.
+11. Solo después de completar todos los recursos requeridos se escribe el marcador de staging completo y se emite `kelo:update:staged`.
+12. La UI cambia a `Nueva versión lista` y habilita `ACTUALIZAR`.
+13. Al pulsar el botón, el navegador navega con `kelo_update=<sha>`.
+14. `sw.js` sirve primero los bytes ya precargados de esa build. Si falta un recurso, usa `cache: reload` como fallback.
+15. La página nueva confirma el SHA, actualiza `installedBuild`, limpia parámetros efímeros y elimina staging viejo después de completar la carga.
 
-1. `index.html` carga `src/core/update-system.js` antes del runtime gameplay.
-2. El owner registra `sw.js` con scope de la instalación actual y `updateViaCache: none`.
-3. `KeloUpdater` solicita `version.json` con `cache: no-store`.
-4. GitHub Pages publica en ese archivo el SHA real de la revisión ya desplegada.
-5. En el primer arranque con updater, ese SHA se establece como baseline local.
-6. En aperturas posteriores, si el SHA desplegado difiere del baseline, el estado pasa a `available` y la UI muestra `ACTUALIZAR`.
-7. Al pulsar `ACTUALIZAR`, el owner asegura que el Service Worker está listo y navega a la misma URL con `kelo_update=<sha>`.
-8. El Service Worker reconoce esa navegación y, durante una ventana corta, fuerza `cache: reload` para requests same-origin. Así JS/CSS/assets de la build nueva no quedan pegados a una respuesta HTTP vieja.
-9. La nueva página confirma que `kelo_update` coincide con `version.json`, persiste el nuevo baseline y limpia los parámetros de la URL con `history.replaceState`.
+## Evaluador de red / ping
 
-## Política de caché
+La política inicial es conservadora:
 
-El Service Worker NO implementa un cache offline general y NO intercepta APIs externas. Fuera de la ventana explícita de actualización deja que el navegador siga su comportamiento normal. Esto evita convertir cada apertura en una descarga completa y evita almacenar respuestas gameplay/auth.
+| Condición | Acción |
+|---|---|
+| `0–100 ms` | descarga secuencial normal |
+| `101–150 ms` | descarga secuencial con mayor separación |
+| `151–200 ms` | descarga muy limitada si no hay gameplay crítico |
+| `>200 ms` | pausa |
+| offline / timeout / errores | pausa |
+| `slow-2g` / `2g` | pausa |
+| Ahorro de Datos (`saveData`) | pausa automática |
+| PVP, combate o Arena activa | pausa; gameplay tiene prioridad |
+| app oculta | pausa |
 
-Durante una actualización explícita, solo requests `GET` del mismo origen entran en la ventana de refresh fuerte. La ventana es efímera y vive únicamente en memoria del worker.
+El ping se mide contra `version.json` del mismo origen con una petición pequeña, `cache: no-store`, timeout y una mediana de las últimas muestras para no reaccionar de forma exagerada a un pico aislado.
 
-## iPhone / instalación
+Si `navigator.connection` existe, sus pistas (`rtt`, `downlink`, `effectiveType`, `saveData`) son señal adicional. iOS puede no exponer esa API; el sistema no depende de ella.
 
-La instalación usa `manifest.webmanifest` y metadatos `apple-mobile-web-app-*` en `index.html`. El icono instalado sigue apuntando al mismo scope `./`; una build nueva no requiere una nueva instalación.
+No se usa `setInterval`. Las reevaluaciones solo existen mientras hay una actualización pendiente y la cola necesita avanzar o recuperarse.
 
-En iOS/WebKit el soporte concreto del navegador puede variar, por eso el flujo no depende de Background Sync ni Push. La comprobación ocurre al abrir el juego, al volver a primer plano, al recuperar una página desde BFCache o al recuperar conexión.
+## Prioridad absoluta del juego
 
-No se usa `setInterval` ni un watchdog permanente.
+El updater tiene concurrencia de descarga **1**. Antes de cada recurso vuelve a comprobar si debe ceder la red. Si combate o Arena están activos, no inicia un recurso nuevo y entra en `gameplay-priority`.
 
-## Online-first
+Una descarga que ya estaba en vuelo puede terminar, pero nunca se lanza una batería paralela de descargas. Esto evita que el updater compita deliberadamente con movimiento, reconciliación, combate o chat.
 
-Este sistema es deliberadamente cliente-only porque decide qué bytes estáticos ejecutar, no decisiones gameplay. El servidor autoritativo permanece en `server/*` y Supabase según sus owners actuales. Ninguna migración futura de autoridad gameplay requiere cambiar el contrato del updater.
+## Qué se precarga
 
-Si en el futuro el servidor necesita imponer una versión mínima compatible, esa política debe añadirse como una frontera explícita de compatibilidad (por ejemplo `minimumClientBuild`) y nunca mezclarse con estado gameplay local.
+La precarga prepara el **boot shell de la nueva build**, no todo el universo de assets:
+
+- `index.html`;
+- scripts declarados por el HTML nuevo;
+- CSS;
+- manifest;
+- preload e iconos same-origin;
+- recursos estáticos usados por la sesión como extensión opcional.
+
+Los recursos dinámicos que no forman parte del arranque se descargan bajo demanda después de la activación. Esto mantiene ligero el juego.
+
+## Política de Cache Storage
+
+`kelo-update-stage-v2-<sha>` es exclusivamente staging temporal de bytes estáticos. No se almacenan API, Supabase, auth, WebSocket, economía, inventario ni payloads gameplay.
+
+`sw.js` solo consulta ese cache durante la ventana explícita de aplicación de una build. Fuera de esa ventana no convierte KELO WORLD en una app cache-first ni en un modo offline general.
+
+## UI
+
+Durante la precarga:
+
+```text
+Actualización en segundo plano
+Preparando 43% (38/88) · 74 ms
+```
+
+Si se pausa:
+
+```text
+Actualización pausada
+priorizando PVP y gameplay
+```
+
+O por red:
+
+```text
+Actualización pausada
+ping alto · 224 ms
+```
+
+Solo al finalizar:
+
+```text
+Nueva versión lista
+Descargada sin interrumpir el juego · Build abc1234
+[ ACTUALIZAR ]
+```
+
+No hay recarga automática a mitad de una partida.
+
+## iPhone / PWA
+
+El icono instalado sigue apuntando al mismo scope `./`. Una build nueva no requiere reinstalar la PWA.
+
+Mientras KELO WORLD está abierto, WebKit puede descargar y llenar Cache Storage. iOS **no garantiza** que una PWA suspendida o cerrada continúe ejecutando JavaScript o descargas en segundo plano; el staging reanuda cuando el jugador vuelve.
+
+No depende de Background Sync ni Push.
 
 ## Invariantes
 
 - Una revisión se considera disponible solo cuando `version.json` de Pages la expone como desplegada.
-- Un commit todavía no desplegado no debe forzar al cliente a recargar.
-- La primera ejecución del updater establece baseline y no debe producir un falso update.
-- La UI nunca escribe `installedBuild` directamente.
-- El updater no guarda respuestas API ni gameplay en Cache Storage.
-- El update debe conservar la URL/ruta actual salvo parámetros efímeros del updater.
-- El sistema debe funcionar desde un subpath como `/gemini/`; no asume scope `/`.
-
-## Extension points
-
-Capacidades compatibles sin crear un segundo updater:
-
-- changelog asociado a un SHA;
-- `required: true` / versión mínima cuando exista autoridad que lo publique;
-- precache selectivo de assets inmutables con hash;
-- progreso de descarga cuando exista un manifiesto real de assets;
-- telemetría de `available/applied/error` sin incluir datos sensibles.
-
-## Anti-patrones
-
-No hacer:
-
-- `setInterval` para consultar versiones cada pocos segundos;
-- recargar automáticamente mientras el jugador está en una acción crítica;
-- cache-first para `version.json`;
-- cachear respuestas Supabase/WebSocket/API desde `sw.js`;
-- usar el SHA de `main` como verdad si Pages todavía no terminó de desplegarlo;
-- crear otro service worker para un subsistema del juego;
-- borrar/reinstalar el icono como mecanismo normal de actualización.
+- Un commit todavía no desplegado no debe activar el updater.
+- Gameplay siempre gana frente a staging.
+- La cola de staging tiene concurrencia 1.
+- `>200 ms`, red inestable o Save Data detienen nuevas descargas.
+- El botón normal de actualización aparece cuando el staging requerido está completo.
+- Si Cache Storage no está disponible, se conserva el fallback clásico de actualización directa.
+- La UI nunca escribe `installedBuild`.
+- El updater no almacena respuestas API ni gameplay.
+- El update conserva ruta y scope del repo `/gemini/`.
+- No se usa un segundo Service Worker.
 
 ## QA / auditoría
 
-- `node scripts/updater-audit.mjs`
-- `npm run audit:updater`
-- Workflow: `.github/workflows/app-updater-ci.yml`
+```bash
+npm run audit:updater
+```
 
-La auditoría estática exige boot LIVE, manifest, Service Worker, build marker, documentación y ausencia de `setInterval` en el owner.
+Workflow: `.github/workflows/app-updater-ci.yml`.
 
-Para validación LIVE se debe comprobar en Pages:
-
-1. `version.json` devuelve JSON renderizado con SHA hexadecimal;
-2. `sw.js` responde bajo el mismo scope;
-3. `index.html` carga ambos módulos del updater;
-4. una build posterior provoca `available` en un cliente con baseline anterior;
-5. `ACTUALIZAR` recarga y el baseline pasa a la nueva build sin reinstalar el icono.
+La auditoría exige boot LIVE, manifest, build marker real, umbrales 100/150/200 ms, Ahorro de Datos, detector PVP/Combat/Arena, staging por build, cola secuencial, marcador de staging completo, consumo desde `sw.js`, UI preparando/pausado/listo y ausencia de `setInterval`.
 
 ## Deuda conocida
 
-- El primer rollout necesita que el dispositivo cargue una vez el nuevo `index.html`; un cliente que jamás haya recibido este código todavía no puede ser controlado retroactivamente por el Service Worker.
+- El primer rollout necesita que el dispositivo reciba una vez el nuevo `index.html`.
 - No existe todavía changelog por build.
-- No existe todavía modo offline completo; se evita introducirlo accidentalmente dentro del updater.
+- No existe modo offline completo y no debe mezclarse accidentalmente con este updater.
+- iOS puede suspender JavaScript cuando la PWA deja de estar activa; el staging reanuda al volver.
