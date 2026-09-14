@@ -94,15 +94,19 @@ jobs:
       - name: Authoritative nobility mechanics
         run: node scripts/server-nobility-audit.js
 
-      - name: Intentional visual reset contract
+      - name: Authored world visual contract
         run: |
-          grep -q "window.KELO_WORLD_DECORATION_RESET=true" index.html
+          grep -q "window.KELO_WORLD_DECORATION_RESET=false" index.html
+          if grep -q "window.KELO_WORLD_DECORATION_RESET=true" index.html; then
+            echo 'index.html re-enables retired decoration reset before world boot'
+            exit 1
+          fi
           if grep -q "assets/fuentekelo-runtime.PNG" index.html; then
             echo 'superseded fountain runtime is still bootstrapped by index.html'
             exit 1
           fi
-          grep -q "version:'1.7.0'" src/environment/prop-contract.js
-          grep -q "generic-prop-contract-v7-justice-fountain-v2" src/environment/prop-contract.js
+          grep -q "version:'1.10.0'" src/environment/prop-contract.js
+          grep -q "generic-prop-contract-v10-forest-plaza-playable" src/environment/prop-contract.js
           test "$(grep -c "plazaFountainKelo:Object.freeze" src/environment/prop-contract.js)" -eq 1
           grep -q "src:'assets/justicia_fountain_v2.PNG?art=502'" src/environment/prop-contract.js
           grep -q "id:'plaza-fountain-kelo'" src/environment/prop-contract.js
@@ -113,9 +117,10 @@ jobs:
           grep -q "actor-base-y-redraw-v1" src/environment/prop-contract.js
           grep -q "generic-props-v2.0" src/environment/generic-props.js
           grep -q "data-driven-props-v6-reset-visible" src/environment/generic-props.js
+          grep -q "const DECORATION_RESET=false" src/environment/environment-layer-stack.js
           grep -q "environment-layer-stack-v2.5" src/environment/environment-layer-stack.js
-          grep -q "blank-world-reset-visible-landmarks-v2" src/environment/environment-layer-stack.js
-          grep -q "resetBootstrap=true" src/environment/world-map.js
+          grep -q "formal-base-back-actor-front-order-v1" src/environment/environment-layer-stack.js
+          grep -q "else acquireManagedAtlases()" src/environment/world-map.js
           grep -q "window.KELO_WORLD_DECORATION_RESET!==true" engine-l.js
           grep -q "if (resetActive())" engine-o.js
           grep -q "if (resetActive())" engine-p.js
@@ -163,6 +168,7 @@ jobs:
           print('PASS current Justicia fountain + historical fountain source/archive contract')
           PY
 
-      - name: Reset CI scope guard
+      - name: Authored world CI scope guard
         run: |
-          grep -q "window.KELO_WORLD_DECORATION_RESET=true" index.html
+          grep -q "window.KELO_WORLD_DECORATION_RESET=false" index.html
+          grep -q "const DECORATION_RESET=false" src/environment/environment-layer-stack.js
