@@ -27,10 +27,13 @@
     "repeatedCandidates": 0,
     "champion": null
   },
+  "observations": [],
+  "feedback_updated_at": null,
   "training": {
     "examples": 0,
     "search_examples": 0,
     "holdout_examples": 0,
+    "feedback_examples": 0,
     "latest_evidence_at": null
   },
   "metrics": {},
@@ -44,7 +47,8 @@
     "requires_holdout_for_policy_promotion": true,
     "max_rule_multiplier": 1.75,
     "min_rule_multiplier": 0.75,
-    "max_hotspot_bonus": 20
+    "max_hotspot_bonus": 20,
+    "max_feedback_observations": 200
   },
   "updated_at": null
 }
