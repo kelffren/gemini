@@ -9,9 +9,11 @@ on:
       - version.json
       - sw.js
       - src/core/update-system.js
+      - src/core/update-delta-core.js
       - src/core/update-watch.js
       - src/ui/update-ui.js
       - scripts/updater-audit.mjs
+      - tests/updater-delta.test.cjs
       - docs/systems/APP_UPDATE_SYSTEM.md
       - docs/system-catalog.json
       - package.json
@@ -23,9 +25,11 @@ on:
       - version.json
       - sw.js
       - src/core/update-system.js
+      - src/core/update-delta-core.js
       - src/core/update-watch.js
       - src/ui/update-ui.js
       - scripts/updater-audit.mjs
+      - tests/updater-delta.test.cjs
       - docs/systems/APP_UPDATE_SYSTEM.md
       - docs/system-catalog.json
       - package.json
@@ -43,12 +47,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Syntax check updater runtime
+      - name: Syntax check Turbo V3 runtime
         run: |
+          node --check src/core/update-delta-core.js
           node --check src/core/update-system.js
           node --check src/core/update-watch.js
           node --check src/ui/update-ui.js
           node --check sw.js
+      - name: Prove zero-byte and one-file delta invariants
+        run: node tests/updater-delta.test.cjs
       - name: Audit updater contract
         run: npm run audit:updater
       - name: Audit system documentation
