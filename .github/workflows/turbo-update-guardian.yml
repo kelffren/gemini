@@ -1,0 +1,71 @@
+name: Turbo Update Guardian
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - package.json
+      - index.html
+      - sw.js
+      - version.json
+      - manifest.webmanifest
+      - src/core/update-system.js
+      - src/core/update-watch.js
+      - src/ui/update-ui.js
+      - scripts/turbo-update-guardian.mjs
+      - scripts/turbo-build.mjs
+      - scripts/generate-turbo-manifest.mjs
+      - scripts/turbo-delta-test.mjs
+      - vite.config.js
+      - vite.config.mjs
+      - vite.config.ts
+      - esbuild.config.js
+      - _headers
+      - public/_headers
+      - docs/systems/TURBO_UPDATE_CONTRACT.md
+      - docs/evidence/TURBO_UPDATE_HOSTING_EVIDENCE.md
+      - .github/workflows/turbo-update-guardian.yml
+  pull_request:
+    paths:
+      - package.json
+      - index.html
+      - sw.js
+      - version.json
+      - manifest.webmanifest
+      - src/core/update-system.js
+      - src/core/update-watch.js
+      - src/ui/update-ui.js
+      - scripts/turbo-update-guardian.mjs
+      - scripts/turbo-build.mjs
+      - scripts/generate-turbo-manifest.mjs
+      - scripts/turbo-delta-test.mjs
+      - vite.config.js
+      - vite.config.mjs
+      - vite.config.ts
+      - esbuild.config.js
+      - _headers
+      - public/_headers
+      - docs/systems/TURBO_UPDATE_CONTRACT.md
+      - docs/evidence/TURBO_UPDATE_HOSTING_EVIDENCE.md
+      - .github/workflows/turbo-update-guardian.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  turbo-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Syntax check Turbo guardian
+        run: node --check scripts/turbo-update-guardian.mjs
+      - name: Enforce all 15 Turbo Update guarantees
+        run: npm run audit:turbo
+      - name: Prove one-file delta and identical-build zero asset bytes
+        if: always()
+        run: npm run test:turbo-delta
