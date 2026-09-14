@@ -4,12 +4,12 @@
  * does-not-own: Studio kernel, live shell internals, Hub, world authority
  * public-api: openKeloStudioLive(), closeKeloStudioLive(), getKeloStudioLive()
  * reuse: live-studio-controller remains the session owner; this file is the only first hop from World workspace
- * mobile: import Studio in waves with main-thread yields; overlay survival is owned by the live controller, not this hop
+ * mobile: import Studio in waves with main-thread yields; release the loading viewport as soon as real chrome hydrates, before draft import finishes
  * online: no; authority stays in KELO_WORLD_EDIT
  */
 import { yieldStudioBoot, setWorldLaunchStatus } from './studio-boot-pace.mjs';
 
-export const WORLD_STUDIO_BRIDGE_BUILD='world-bridge-20260914-5';
+export const WORLD_STUDIO_BRIDGE_BUILD='world-bridge-20260914-7';
 const CONTROLLER=`./live-studio-controller.mjs?v=${WORLD_STUDIO_BRIDGE_BUILD}`;
 let controllerMod=null;
 
@@ -32,10 +32,26 @@ export function releaseWorldStudioViewport(root=globalThis){
   return true;
 }
 
+function releaseViewportDuringOpen(root,pending){
+  const wait=typeof root?.setTimeout==='function'?root.setTimeout.bind(root):setTimeout;
+  const cancel=typeof root?.clearTimeout==='function'?root.clearTimeout.bind(root):clearTimeout;
+  let stopped=false,timer=null;
+  const probe=()=>{
+    if(stopped)return;
+    if(releaseWorldStudioViewport(root)){stopped=true;return;}
+    timer=wait(probe,32);
+  };
+  probe();
+  return Promise.resolve(pending).finally(()=>{
+    stopped=true;
+    if(timer!=null)cancel(timer);
+  });
+}
+
 export async function openKeloStudioLive(opts={}){
   const root=opts.root||globalThis;
   const ctrl=await loadController(root);
-  const session=await ctrl.openKeloStudioLive(opts);
+  const session=await releaseViewportDuringOpen(root,ctrl.openKeloStudioLive(opts));
   releaseWorldStudioViewport(root);
   return session;
 }
