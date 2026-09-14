@@ -17,6 +17,15 @@ function placementToEntity(placement, catalog) {
   if (template?.collision) components.collider = { rect: copy(template.collision), blocksMovement: true };
   return { id: String(placement.placementId), prefabId: String(placement.assetId), transform: { x: Number(placement.x) || 0, y: Number(placement.y) || 0, rotation: quarter * 90, scale: scaleOf(placement.scale) }, bounds: rotatedBounds(template, quarter), components, source: { kind: 'kelo-placement', authorityPlacementId: String(placement.placementId), updatedAt: Number(placement.updatedAt) || 0 } };
 }
+async function readDraftSnapshot(adapter,payload){
+  try{
+    return await adapter.worldEditRequest('world:preview:enter',payload);
+  }catch(error){
+    const message=String(error?.message||error||'');
+    if(!/UNKNOWN_WORLD_EDIT_OPERATION|UNSUPPORTED|NOT_IMPLEMENTED/i.test(message))throw error;
+    return adapter.worldEditRequest('world:draft:get',payload);
+  }
+}
 export async function importCurrentKeloWorld({ adapter, mode = 'world', actorId = null, parcelId = null, view = 'published', draftId = null } = {}) {
   if (!adapter) throw new Error('STUDIO_IMPORT_ADAPTER_REQUIRED');
   let snapshot = null, viewMeta = null, targetParcelId = parcelId;
@@ -24,9 +33,9 @@ export async function importCurrentKeloWorld({ adapter, mode = 'world', actorId 
     if (!targetParcelId) { const parcel = await adapter.propertyRequest('ensureLegacyParcel', { ownerId: actorId || undefined }); targetParcelId = parcel?.parcelId || null; }
     const property = await adapter.propertyRequest('snapshot', {}); snapshot = { placements: (property?.placements || []).filter(row => !targetParcelId || row.parcelId === targetParcelId), cells: {}, collisions: {} };
   } else {
-    const op = view === 'draft' ? 'world:draft:get' : 'world:published:get';
-    const payload = view === 'draft' ? { actorId: actorId || undefined, draftId: draftId || undefined } : { actorId: actorId || undefined };
-    const result = await adapter.worldEditRequest(op, payload); snapshot = result?.viewSnapshot || result?.snapshot || result?.revision?.snapshot || { placements: [], cells: {}, collisions: {} }; viewMeta = result?.viewMeta || result?.revision || result?.draft || null;
+    const payload = { actorId: actorId || undefined, ...(view === 'draft' ? { draftId: draftId || undefined } : {}) };
+    const result = view === 'draft' ? await readDraftSnapshot(adapter,payload) : await adapter.worldEditRequest('world:published:get',payload);
+    snapshot = result?.viewSnapshot || result?.snapshot || result?.revision?.snapshot || { placements: [], cells: {}, collisions: {} }; viewMeta = result?.viewMeta || result?.revision || result?.draft || null;
   }
   const entities = (snapshot?.placements || []).map(row => placementToEntity(row, adapter.assetCatalog));
   return createWorldDocument({ worldId: mode === 'parcel' ? String(targetParcelId || `parcel:${actorId || 'local'}`) : String(snapshot?.worldId || 'world:kelo-main'), metadata: { name: mode === 'parcel' ? 'My Parcel' : 'Kelo World', description: '', tags: [mode, 'imported', view], source: 'kelo-runtime-import-v2' }, settings: { tileSize: adapter.tileRegistry?.worldTileSize || 32, chunkSize: adapter.worldRenderer?.chunkSize || 512 }, terrain: copy(snapshot?.cells || {}), entities, navigation: { collisions: copy(snapshot?.collisions || {}) }, revision: { id: viewMeta?.revisionId || viewMeta?.id || viewMeta?.draftId || null, number: Number(viewMeta?.number || viewMeta?.revisionVersion) || 0 } });
