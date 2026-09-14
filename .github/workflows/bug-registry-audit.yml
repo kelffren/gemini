@@ -40,6 +40,9 @@ jobs:
       - name: Self-test bug intelligence tooling
         run: npm run test:bug-intelligence
 
+      - name: Audit incoming report integrity and privacy
+        run: npm run audit:bug-reports
+
       - name: Audit bug registry schema and research history
         run: npm run audit:bugs
 
