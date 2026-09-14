@@ -57,6 +57,24 @@ Si es NO, no está listo.
 
 # Kelo World — Mandatory Development Rules
 
+
+## RULE 0 — PLAYWRIGHT iPhone GATE (OBLIGATORIA PARA EL AGENTE)
+
+El agente **no puede** decir listo / arreglado / VERIFICADO / push-and-done
+sin correr Playwright contra el build local (iPhone UA, 390×844).
+
+Mínimo obligatorio, cada cambio de boot/UI/runtime:
+
+1. Nace `localPlayer` y el canvas no es negro.
+2. **Caminar 8 segundos seguidos** con el joystick virtual. La posición tiene que avanzar. `page.evaluate` no puede tardar >400 ms. Si el evaluate supera 2 s → FREEZE → el trabajo NO está hecho.
+3. No `page crash`. No pantalla negra al soltar.
+
+Prohibido como única prueba: “boot + 200 px en el primer frame”.
+Eso ya mintió. La prueba que cuenta es el walk sostenido de 8 s.
+
+Si Playwright no pasa, se sigue debuggeando. No se cierra el turno.
+
+
 This file is mandatory reading before any implementation, refactor, integration, or new gameplay/system pass in Kelo World.
 
 ## RULE 1 — ONLINE-FIRST ARCHITECTURE (MANDATORY)

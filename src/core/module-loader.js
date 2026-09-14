@@ -9,7 +9,7 @@
 (function(root){
 'use strict';
 if(root.KELO_MODULE_LOADER)return;
-const VERSION='kelo-module-loader-v1';
+const VERSION='kelo-module-loader-v2';
 const FEATURES={
   social:[
     {src:'src/ui/player-nameplate.js?v=1',name:'placas'},
@@ -146,16 +146,21 @@ function needs(name){
   if(!FEATURES[name]) return false;
   return !loaded[name];
 }
+function isPhone(){
+  try{ return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent||'') || (root.matchMedia&&root.matchMedia('(pointer: coarse)').matches); }
+  catch(_){ return false; }
+}
 function start(opts){
   if(opts&&opts.build) build=String(opts.build);
+  const queue=isPhone()?['social']:IDLE.slice();
   let n=0;
   function idleNext(){
-    if(n>=IDLE.length){ hideChip(shown?'Listo':''); return; }
-    loadFeature(IDLE[n],{interactive:false}).then(function(){ n+=1; idleNext(); });
+    if(n>=queue.length){ hideChip(shown?'Listo':''); return; }
+    if(busy()){ setTimeout(idleNext, 800); return; }
+    loadFeature(queue[n],{interactive:false}).then(function(){ n+=1; idleNext(); });
   }
-  let warm=false;
-  try{ warm=localStorage.getItem('kelo_modpack_social')===build; }catch(_){}
-  setTimeout(idleNext, warm?400:1200);
+  const delay=isPhone()?8000:1200;
+  setTimeout(idleNext, delay);
   setInterval(function ping(){
     if(busy()) return;
     fetch('index.html?ping='+Date.now(),{cache:'no-store'}).then(function(r){return r.text();}).then(function(html){
