@@ -1,6 +1,9 @@
 # KELO WORLD — host-agnostic Netlify adapter
 # GitHub remains the source of truth. Netlify is the primary static CDN target;
 # GitHub Pages remains a fallback until another compatible edge target is enabled.
+# Compression policy: Netlify CDN negotiates Brotli/Gzip automatically; this is
+# NEVER accepted from configuration/comment alone and is live-tested by
+# scripts/turbo-live-host-audit.mjs before the Turbo Guardian may pass.
 
 [build]
   command = "npm install --no-save --ignore-scripts esbuild@0.25.9 && npm run build"
