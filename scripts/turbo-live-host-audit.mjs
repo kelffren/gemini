@@ -62,19 +62,24 @@ function exactCache(headers, expected) {
   return String(headers['cache-control'] || '').trim().toLowerCase() === expected.toLowerCase();
 }
 
-function findHashedAsset() {
-  const metaPath = path.join(root, 'dist', 'turbo', 'meta.json');
-  if (!fs.existsSync(metaPath)) fail('dist/turbo/meta.json missing; run production build first');
-  const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+async function findLiveHashedAsset() {
+  const metaResponse = await request('/dist/turbo/meta.json');
+  if (metaResponse.status !== 200) fail(`live meta.json status ${metaResponse.status}`);
+  let meta;
+  try {
+    meta = JSON.parse(metaResponse.body.toString('utf8'));
+  } catch (error) {
+    fail(`live meta.json is invalid JSON: ${error.message}`);
+  }
   const candidates = Object.keys(meta.outputs || {})
     .map((p) => p.replaceAll('\\', '/'))
     .filter((p) => /-[A-Z0-9]{6,}\.js$/i.test(p));
-  if (!candidates.length) fail('no hashed production JS asset found in build metadata');
+  if (!candidates.length) fail('live deploy exposes no hashed production JS asset in meta.json');
   const chosen = candidates[0].replace(/^\.?\//, '');
   return '/' + chosen;
 }
 
-const hashedPath = findHashedAsset();
+const hashedPath = await findLiveHashedAsset();
 const index = await request('/index.html', 'br,gzip');
 if (index.status !== 200) fail(`index status ${index.status}`);
 if (!exactCache(index.headers, 'no-cache, max-age=0, must-revalidate')) fail(`index Cache-Control=${index.headers['cache-control'] || '<missing>'}`);
@@ -121,4 +126,4 @@ const evidence = {
 
 fs.mkdirSync(path.join(root, 'dist'), { recursive: true });
 fs.writeFileSync(path.join(root, 'dist', 'turbo-live-host-evidence.json'), JSON.stringify(evidence, null, 2) + '\n');
-console.log(`TURBO LIVE HOST AUDIT PASS — ${origin}; asset=${hashedPath}; br=${brEncoding}; gzip=${gzipEncoding}; http2=${h2.alpn}`);
+console.log(`TURBO LIVE HOST AUDIT PASS — ${origin}; liveAsset=${hashedPath}; br=${brEncoding}; gzip=${gzipEncoding}; http2=${h2.alpn}`);
