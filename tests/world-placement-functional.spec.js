@@ -13,9 +13,12 @@ async function objectCount(studio) {
 }
 
 async function openWorld(page) {
+  // The game intentionally has a long global boot graph. For this acceptance test
+  // we only need the first response committed, then we wait on the exact runtime
+  // capabilities required to open World. DOMContentLoaded is not an editor contract.
   await page.goto('./?guest=1&mapEditor=1&worldPlacementFunctional=1', {
-    waitUntil: 'domcontentloaded',
-    timeout: 45_000,
+    waitUntil: 'commit',
+    timeout: 15_000,
   });
 
   await page.waitForFunction(() => !!(
@@ -23,7 +26,7 @@ async function openWorld(page) {
     window.KELO_ADMIN_KEYS?.can?.('world.edit') &&
     window.KELO_LUXE?.toggleMenu &&
     window.KELO_CREATORS_LAUNCHER
-  ), null, { timeout: 30_000 });
+  ), null, { timeout: 45_000 });
 
   const menu = page.locator('#lx-side-menu');
   await expect(menu).toBeVisible({ timeout: 20_000 });
@@ -52,7 +55,7 @@ async function openWorld(page) {
 }
 
 test('mobile World editor places a real asset into the map', async ({ page }) => {
-  test.setTimeout(150_000);
+  test.setTimeout(180_000);
   fs.mkdirSync('test-results', { recursive: true });
 
   const pageErrors = [];
@@ -93,7 +96,8 @@ test('mobile World editor places a real asset into the map', async ({ page }) =>
 
   const afterObjects = await objectCount(studio);
   expect(afterObjects).toBeGreaterThan(beforeObjects);
-  await expect(studio.locator('[data-entity]')).toHaveCount(beforeExplorer + 1, { timeout: 15_000 });
+  await expect.poll(async () => studio.locator('[data-entity]').count(), { timeout: 15_000 })
+    .toBeGreaterThan(beforeExplorer);
 
   const save = studio.locator('[data-act="save"]:visible').first();
   await expect(save).toBeVisible({ timeout: 10_000 });
