@@ -205,9 +205,20 @@
       "files": [
         "scripts/turbo-host-integration-test.mjs"
       ]
+    },
+    {
+      "id": "prevention:a2f3968a2cbb02fc53bd03952904edcd6b9fba2f",
+      "at": "2026-09-14T12:44:25.000Z",
+      "source": "bug-prevention-ci",
+      "head_sha": "a2f3968a2cbb02fc53bd03952904edcd6b9fba2f",
+      "base_sha": "6f5db74c707ea89ed34f025e019578b10d8afb4a",
+      "conclusion": "failure",
+      "files": [
+        "scripts/turbo-live-host-audit.mjs"
+      ]
     }
   ],
-  "feedback_updated_at": "2026-09-14T12:29:56.614Z",
+  "feedback_updated_at": "2026-09-14T12:45:24.611Z",
   "training": {
     "examples": 28,
     "search_examples": 21,
