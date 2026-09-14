@@ -44,18 +44,21 @@ const activationReuse = globalCache && (anyHas(sourceFiles, 'sha256') || anyHas(
 const minifyEvidence = regexAny(buildConfigs, /minify|terser|esbuild/) || ['vite','rollup','webpack','esbuild'].some((d) => dependencies[d]);
 const treeShakeEvidence = regexAny(buildConfigs, /tree.?shak|treeshake/) || ['vite','rollup','esbuild'].some((d) => dependencies[d]);
 const codeSplitEvidence = regexAny(buildConfigs, /manualChunks|splitChunks|codeSplitting|splitting\s*:\s*true/);
-const legacyCompilerException = has(contractDoc, 'LEGACY_COMPILER_EXCEPTION', 'scope:', 'migration:');
-const lazyEvidence = anyHas(['index.html', ...sourceFiles], 'import(') && ['studio','world','map-forge','visual'].every((term) => anyHas(['index.html', ...sourceFiles, contractDoc], term));
+const legacyCompilerException = regexAny([contractDoc], /^LEGACY_COMPILER_EXCEPTION_ACCEPTED:\s*true\s*$/mi)
+  && regexAny([contractDoc], /^scope:\s*\S.+$/mi)
+  && regexAny([contractDoc], /^migration:\s*\S.+$/mi);
+const lazyEvidence = anyHas(['index.html', ...sourceFiles], 'import(')
+  && ['studio','world','map-forge','visual'].every((term) => anyHas(['index.html', ...sourceFiles], term));
 const adaptiveParallel = anyHas(sourceFiles, 'effectiveType') && anyHas(sourceFiles, 'saveData') && (anyHas(sourceFiles, 'concurrency') || anyHas(sourceFiles, 'parallel'));
 const pvpAbsolutePause = regexAny(sourceFiles, /(combat|pvp|arena)[\s\S]{0,240}(concurrency\s*[:=]\s*0|return\s+0|allow\s*:\s*false)/i);
 const fetchPriority = (anyHas(sourceFiles, "priority: 'high'") || anyHas(sourceFiles, 'priority: "high"')) && (anyHas(sourceFiles, "priority: 'low'") || anyHas(sourceFiles, 'priority: "low"'));
 const persistentStorage = anyHas(sourceFiles, 'navigator.storage.persist') || anyHas(sourceFiles, 'storage.persist(');
-const persistenceFallback = has(contractDoc, 'STORAGE_PERSIST_FALLBACK');
+const persistenceFallback = regexAny([contractDoc], /^STORAGE_PERSIST_FALLBACK_ACCEPTED:\s*true\s*$/mi);
 const immutableHeaders = regexAny(headerConfigs, /immutable/i);
 const revalidateHeaders = regexAny(headerConfigs, /no-cache|max-age=0|must-revalidate/i);
 const compressionEvidence = regexAny(headerConfigs, /brotli|gzip|content-encoding|\.br\b|\.gz\b/i) || regexAny(buildConfigs, /brotli|gzip/i);
-const transportEvidence = regexAny(headerConfigs, /http\/2|http2|http\/3|http3|cdn/i) || has(hostingDoc, 'TRANSPORT_VERIFIED');
-const transportLimitationPlan = has(hostingDoc, 'HOSTING_LIMITATION', 'MIGRATION_PLAN');
+const transportEvidence = regexAny(headerConfigs, /http\/2|http2|http\/3|http3|cdn/i) || regexAny([hostingDoc], /^TRANSPORT_VERIFIED:\s*true\s*$/mi);
+const transportLimitationPlan = regexAny([hostingDoc], /^HOSTING_LIMITATION:\s*\S.+$/mi) && regexAny([hostingDoc], /^MIGRATION_PLAN:\s*\S.+$/mi);
 const metricsEvidence = anyHas(sourceFiles, 'Update Delta Bytes') && anyHas(sourceFiles, 'Time To Update Ready');
 const guardianWorkflow = exists('.github/workflows/turbo-update-guardian.yml') && has('.github/workflows/turbo-update-guardian.yml', 'npm run audit:turbo');
 const guardianScript = scripts['audit:turbo'] === 'node scripts/turbo-update-guardian.mjs';
