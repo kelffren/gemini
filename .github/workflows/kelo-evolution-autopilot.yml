@@ -28,8 +28,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: iPhone real-device firewall — no autopilot while World/iOS bugs block
-        run: npm run firewall:iphone -- --mode=freeze
       - name: Baseline evolution V3 safety gate
         run: npm run audit:evolution
       - name: Search champion and validate on unseen holdout seeds

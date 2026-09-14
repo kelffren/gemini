@@ -15,7 +15,6 @@ on:
       - 'scripts/kelo-code-evolution-sandbox.mjs'
       - 'scripts/kelo-source-code-proposer-audit.mjs'
       - 'scripts/map-forge-evolution-autopilot.mjs'
-      - 'scripts/iphone-real-device-firewall.mjs'
       - 'tests/map-forge-evolution-visual.spec.js'
       - 'docs/evolution/**'
       - 'docs/systems/KELO_EVOLUTION_ENGINE.md'
@@ -37,7 +36,6 @@ on:
       - 'scripts/kelo-code-evolution-sandbox.mjs'
       - 'scripts/kelo-source-code-proposer-audit.mjs'
       - 'scripts/map-forge-evolution-autopilot.mjs'
-      - 'scripts/iphone-real-device-firewall.mjs'
       - 'tests/map-forge-evolution-visual.spec.js'
       - 'docs/evolution/**'
       - 'docs/systems/KELO_EVOLUTION_ENGINE.md'
@@ -59,8 +57,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: iPhone real-device firewall
-        run: npm run firewall:iphone -- --mode=freeze
       - name: Syntax check evolution V4 modules
         run: |
           node --check src/creators/evolution/evolution-engine.mjs

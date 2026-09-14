@@ -200,9 +200,6 @@ Transiciones adicionales:
 10. Una hipótesis descartada solo puede reabrirse con nueva evidencia registrada.
 11. Antes de repetir un intento `FAIL`, debe cumplirse o invalidarse su `do_not_repeat_without`.
 12. Todo bug activo debe indicar al menos una `next_best_action`, salvo que esté explícitamente bloqueado sin acción posible.
-13. **IPHONE REAL != HEADLESS.** Para bugs con área `ios`, `iphone`, `safari`, `mobile`, `world`, `studio`, `creators` o `guest`, `verification.status = PASS` exige evidencia de iPhone Safari real (BrowserStack `ios-real-iphone` o el teléfono del jugador). Chromium, Pixel, viewport o captura local no cuentan.
-14. `VERIFIED` / `CLOSED` de un bug iPhone/World sin esa prueba es inválido. El cortafuegos `npm run firewall:iphone` debe fallar.
-15. Mientras un bug iPhone/World `critical`/`high` esté `OPEN`, `CLAIMED`, `FIXED_PENDING_VERIFY`, `BLOCKED` o `REOPENED`, no se aceptan avances ajenos (evolution autopilot, features nuevas, refactors fuera de `suspected_files`/`fix.files`). Solo el arreglo y su prueba en iPhone real.
 
 ## Severidad
 

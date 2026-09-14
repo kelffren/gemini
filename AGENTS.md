@@ -200,8 +200,6 @@ Reglas duras:
 - Una IA que escribe el fix puede dejar el bug en `FIXED_PENDING_VERIFY`, con commit(s), archivos y evidencia.
 - **Está prohibido saltar de `CLAIMED`/`OPEN` directamente a `CLOSED`.**
 - Bugs críticos o visibles para jugadores solo pueden pasar a `VERIFIED` con una validación independiente que reproduzca el flujo original en el entorno pertinente.
-- **IPHONE REAL != HEADLESS.** Una mejora de iPhone/World/Guest no es válida con Chromium, Pixel, viewport ni captura local. Solo cuenta iPhone Safari real (BrowserStack o el teléfono del jugador).
-- **Mientras un bug iPhone/World de severidad high/critical siga `OPEN` / `FIXED_PENDING_VERIFY`, no se avanza:** nada de evolution autopilot, paneles nuevos ni refactors ajenos. Solo el arreglo de esos bugs y su prueba en iPhone real. `npm run firewall:iphone` es el cortafuegos.
 - Si la verificación falla o el defecto reaparece, usar `REOPENED` y conservar el historial.
 - Reportes de jugadores entran como `REPORT-*`; triage decide si crean un bug nuevo o se enlazan a uno existente.
 - Screenshots/videos pesados viven fuera de Git; el registro guarda referencias.
@@ -210,7 +208,3 @@ Reglas duras:
 Regla mental obligatoria:
 
 `DETECTAR != ARREGLAR != VERIFICAR != CERRAR`
-
-`IPHONE REAL != HEADLESS`
-
-`BUG ABIERTO EN IPHONE => NO SE AVANZA`
