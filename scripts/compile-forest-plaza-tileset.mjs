@@ -1,8 +1,8 @@
 /* KELO-INDEX
  * area: CREATORS / ASSET SHEET / FOREST PLAZA
  * owner: Kelo Creator Asset Bridge
- * keys: ASSET SHEET COMPILER FOREST PLAZA MANIFEST PLAYWRIGHT
- * purpose: ejecuta el Asset Sheet Compiler real del repo sobre el atlas Forest Plaza y emite metadata durable
+ * keys: ASSET SHEET COMPILER FOREST PLAZA MANIFEST PLAYWRIGHT RUNTIME LOAD ORDER
+ * purpose: ejecuta el Asset Sheet Compiler real del repo sobre el atlas Forest Plaza, emite metadata durable y conecta el contenido al runtime existente
  * online: N/A; authoring determinista, no autoridad gameplay
  */
 import fs from 'node:fs';
@@ -48,7 +48,20 @@ try{
   fs.writeFileSync(path.join(root,outJson),JSON.stringify(manifest,null,2)+'\n');
   const js=`/* KELO-INDEX\n * area: ENVIRONMENT / GENERATED ASSET MANIFEST\n * owner: Kelo Creator Asset Bridge\n * keys: FOREST PLAZA ASSET SHEET MANIFEST IRREGULAR FRAMES\n * purpose: metadata compilada para registrar el atlas Forest Plaza en runtime/editor\n * online: N/A; contenido visual inmutable\n */\nwindow.KELO_FOREST_PLAZA_TILESET_V2=${JSON.stringify(manifest)};\n`;
   fs.writeFileSync(path.join(root,outJs),js);
-  console.log(JSON.stringify({compiler:manifest.compiler,assetCount:manifest.assets.length,galleries:manifest.galleries.length,atlas:manifest.atlas.id,width:manifest.atlas.width,height:manifest.atlas.height}));
+
+  // KELO-INDEX WORLD/ASSET conecta solo contenido/data a los owners ya existentes.
+  const indexPath=path.join(root,'index.html');
+  let html=fs.readFileSync(indexPath,'utf8');
+  const manifestTag='<script src="src/environment/generated/forest-plaza-tileset-v2-manifest.js?v=1"></script>';
+  const catalogTag='<script src="src/property/forest-plaza-asset-catalog.js?v=1"></script>';
+  if(!html.includes('forest-plaza-tileset-v2-manifest.js')){
+    html=html.replace(/(<script src="src\/environment\/atlas-contract\.js[^\"]*"><\/script>)/,'$1'+manifestTag);
+  }
+  if(!html.includes('forest-plaza-asset-catalog.js')){
+    html=html.replace(/(<script src="src\/property\/property-asset-catalog\.js[^\"]*"><\/script>)/,'$1\n'+catalogTag);
+  }
+  fs.writeFileSync(indexPath,html);
+  console.log(JSON.stringify({compiler:manifest.compiler,assetCount:manifest.assets.length,galleries:manifest.galleries.length,atlas:manifest.atlas.id,width:manifest.atlas.width,height:manifest.atlas.height,runtimeWired:true}));
 }finally{
   await browser.close();server.close();
 }
