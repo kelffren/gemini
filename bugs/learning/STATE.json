@@ -1,27 +1,58 @@
 {
   "schema": "kelo-bug-learning-v1",
   "system_id": "bug-intelligence",
-  "source_fingerprint": null,
-  "risk_map_fingerprint": null,
-  "source_head": null,
+  "source_fingerprint": "evo-2ddd02c5",
+  "risk_map_fingerprint": "evo-5a643574",
+  "source_head": "94d2a69be497299c4dac0484f776ac944f933cd5",
   "champion": {
     "id": "baseline-v1",
     "multipliers": {},
-    "search_score": null,
-    "holdout_score": null,
+    "search_score": 61.973,
+    "holdout_score": 45.911,
     "accepted_from_last_cycle": false
   },
   "memory": {
     "schema": "kelo-evolution-memory-v2",
     "systemId": "bug-intelligence-risk-policy",
     "champion": null,
-    "entries": []
+    "entries": [
+      {
+        "id": "bug-learn-evo-2ddd02c5",
+        "at": "2026-09-14T12:29:42.000Z",
+        "sourceSha": "94d2a69be497299c4dac0484f776ac944f933cd5",
+        "candidateId": "baseline-v1",
+        "candidateFingerprint": "evo-682f7207",
+        "accepted": false,
+        "rejectedStage": "holdout",
+        "baselineScore": 61.973,
+        "candidateScore": 61.973,
+        "delta": 0,
+        "holdout": {
+          "baseline": 45.911,
+          "candidate": 45.911,
+          "delta": 0
+        },
+        "mutations": [],
+        "metrics": {
+          "calibration": 63.196,
+          "severeRecall": 46.669,
+          "mediumRecall": 57.905,
+          "falseAlarmSafety": 100,
+          "simplicity": 100,
+          "examples": 21
+        },
+        "failures": [],
+        "artifacts": [
+          "bugs/learning/STATE.json"
+        ]
+      }
+    ]
   },
   "memory_summary": {
     "systemId": "bug-intelligence-risk-policy",
-    "experiments": 0,
+    "experiments": 1,
     "accepted": 0,
-    "rejected": 0,
+    "rejected": 1,
     "acceptanceRate": 0,
     "meanAcceptedDelta": 0,
     "repeatedCandidates": 0,
@@ -178,15 +209,824 @@
   ],
   "feedback_updated_at": "2026-09-14T12:29:56.614Z",
   "training": {
-    "examples": 0,
-    "search_examples": 0,
-    "holdout_examples": 0,
-    "feedback_examples": 0,
-    "latest_evidence_at": null
+    "examples": 28,
+    "search_examples": 21,
+    "holdout_examples": 7,
+    "feedback_examples": 13,
+    "latest_evidence_at": "2026-09-14T12:29:42.000Z"
   },
-  "metrics": {},
-  "hotspots": [],
-  "prevention_gaps": [],
+  "metrics": {
+    "baseline_search": {
+      "valid": true,
+      "score": 61.973,
+      "metrics": {
+        "calibration": 63.196,
+        "severeRecall": 46.669,
+        "mediumRecall": 57.905,
+        "falseAlarmSafety": 100,
+        "simplicity": 100,
+        "examples": 21
+      }
+    },
+    "champion_search": {
+      "valid": true,
+      "score": 61.973,
+      "metrics": {
+        "calibration": 63.196,
+        "severeRecall": 46.669,
+        "mediumRecall": 57.905,
+        "falseAlarmSafety": 100,
+        "simplicity": 100,
+        "examples": 21
+      }
+    },
+    "baseline_holdout": {
+      "valid": true,
+      "score": 45.911,
+      "metrics": {
+        "calibration": 68.857,
+        "severeRecall": 0,
+        "mediumRecall": 50,
+        "falseAlarmSafety": 100,
+        "simplicity": 100,
+        "examples": 7
+      }
+    },
+    "champion_holdout": {
+      "valid": true,
+      "score": 45.911,
+      "metrics": {
+        "calibration": 68.857,
+        "severeRecall": 0,
+        "mediumRecall": 50,
+        "falseAlarmSafety": 100,
+        "simplicity": 100,
+        "examples": 7
+      }
+    },
+    "last_cycle": {
+      "accepted": false,
+      "rejected_stage": "holdout",
+      "selected_id": "failure-sensitive"
+    }
+  },
+  "hotspots": [
+    {
+      "file": "src/creators/workspaces/world-workspace.mjs",
+      "risk_bonus": 20,
+      "confidence": "high",
+      "evidence_count": 10,
+      "average_target": 87.4,
+      "severe_events": 10,
+      "failed_events": 4,
+      "report_events": 1,
+      "feedback_events": 1,
+      "bug_ids": [
+        "BUG-0003"
+      ],
+      "matched_rules": [
+        "world-studio-ios",
+        "esm-loader-mobile"
+      ],
+      "recommended_tests": [
+        "npm run bug:brief -- BUG-0003",
+        "npm run audit:studio",
+        "npm run bug:impact -- src/creators/workspaces/world-workspace.mjs --depth=3",
+        "real iPhone Create -> World -> interactive -> close/reopen",
+        "npm run bug:impact -- src/studio/integration/live-studio-controller.mjs --depth=3",
+        "real iPhone World open twice without reload"
+      ]
+    },
+    {
+      "file": "src/creators/ui/creator-hub.mjs",
+      "risk_bonus": 20,
+      "confidence": "high",
+      "evidence_count": 8,
+      "average_target": 87.38,
+      "severe_events": 8,
+      "failed_events": 2,
+      "report_events": 1,
+      "feedback_events": 0,
+      "bug_ids": [
+        "BUG-0003"
+      ],
+      "matched_rules": [
+        "esm-loader-mobile"
+      ],
+      "recommended_tests": [
+        "npm run bug:brief -- BUG-0003",
+        "npm run bug:impact -- src/studio/integration/live-studio-controller.mjs --depth=3",
+        "real iPhone World open twice without reload"
+      ]
+    },
+    {
+      "file": "index.html",
+      "risk_bonus": 19,
+      "confidence": "high",
+      "evidence_count": 12,
+      "average_target": 66.73,
+      "severe_events": 6,
+      "failed_events": 0,
+      "report_events": 1,
+      "feedback_events": 6,
+      "bug_ids": [
+        "BUG-0003"
+      ],
+      "matched_rules": [
+        "critical-shell"
+      ],
+      "recommended_tests": [
+        "npm test",
+        "npm run build",
+        "npm run bug:brief -- BUG-0003"
+      ]
+    },
+    {
+      "file": "src/creators/creator-entry.mjs",
+      "risk_bonus": 18,
+      "confidence": "high",
+      "evidence_count": 6,
+      "average_target": 84.17,
+      "severe_events": 6,
+      "failed_events": 0,
+      "report_events": 1,
+      "feedback_events": 0,
+      "bug_ids": [
+        "BUG-0003"
+      ],
+      "matched_rules": [],
+      "recommended_tests": [
+        "npm run bug:brief -- BUG-0003"
+      ]
+    },
+    {
+      "file": "src/studio/integration/live-studio-controller.mjs",
+      "risk_bonus": 18,
+      "confidence": "high",
+      "evidence_count": 6,
+      "average_target": 84.17,
+      "severe_events": 6,
+      "failed_events": 0,
+      "report_events": 1,
+      "feedback_events": 0,
+      "bug_ids": [
+        "BUG-0003"
+      ],
+      "matched_rules": [
+        "world-studio-ios",
+        "esm-loader-mobile"
+      ],
+      "recommended_tests": [
+        "npm run bug:brief -- BUG-0003",
+        "npm run audit:studio",
+        "npm run bug:impact -- src/creators/workspaces/world-workspace.mjs --depth=3",
+        "real iPhone Create -> World -> interactive -> close/reopen",
+        "npm run bug:impact -- src/studio/integration/live-studio-controller.mjs --depth=3",
+        "real iPhone World open twice without reload"
+      ]
+    },
+    {
+      "file": "src/ui/studio-launcher.js",
+      "risk_bonus": 18,
+      "confidence": "high",
+      "evidence_count": 6,
+      "average_target": 84.17,
+      "severe_events": 6,
+      "failed_events": 0,
+      "report_events": 1,
+      "feedback_events": 0,
+      "bug_ids": [
+        "BUG-0003"
+      ],
+      "matched_rules": [
+        "world-studio-ios",
+        "esm-loader-mobile"
+      ],
+      "recommended_tests": [
+        "npm run bug:brief -- BUG-0003",
+        "npm run audit:studio",
+        "npm run bug:impact -- src/creators/workspaces/world-workspace.mjs --depth=3",
+        "real iPhone Create -> World -> interactive -> close/reopen",
+        "npm run bug:impact -- src/studio/integration/live-studio-controller.mjs --depth=3",
+        "real iPhone World open twice without reload"
+      ]
+    },
+    {
+      "file": "src/studio/integration/world-studio-bridge.mjs",
+      "risk_bonus": 18,
+      "confidence": "high",
+      "evidence_count": 5,
+      "average_target": 87.2,
+      "severe_events": 5,
+      "failed_events": 1,
+      "report_events": 1,
+      "feedback_events": 0,
+      "bug_ids": [
+        "BUG-0003"
+      ],
+      "matched_rules": [
+        "world-studio-ios"
+      ],
+      "recommended_tests": [
+        "npm run bug:brief -- BUG-0003",
+        "npm run audit:studio",
+        "npm run bug:impact -- src/creators/workspaces/world-workspace.mjs --depth=3",
+        "real iPhone Create -> World -> interactive -> close/reopen"
+      ]
+    },
+    {
+      "file": "src/studio/studio-entry.mjs",
+      "risk_bonus": 18,
+      "confidence": "high",
+      "evidence_count": 5,
+      "average_target": 87.2,
+      "severe_events": 5,
+      "failed_events": 1,
+      "report_events": 1,
+      "feedback_events": 0,
+      "bug_ids": [
+        "BUG-0003"
+      ],
+      "matched_rules": [
+        "world-studio-ios",
+        "esm-loader-mobile"
+      ],
+      "recommended_tests": [
+        "npm run bug:brief -- BUG-0003",
+        "npm run audit:studio",
+        "npm run bug:impact -- src/creators/workspaces/world-workspace.mjs --depth=3",
+        "real iPhone Create -> World -> interactive -> close/reopen",
+        "npm run bug:impact -- src/studio/integration/live-studio-controller.mjs --depth=3",
+        "real iPhone World open twice without reload"
+      ]
+    },
+    {
+      "file": "src/studio/integration/studio-boot-pace.mjs",
+      "risk_bonus": 18,
+      "confidence": "medium",
+      "evidence_count": 3,
+      "average_target": 90.01,
+      "severe_events": 3,
+      "failed_events": 1,
+      "report_events": 1,
+      "feedback_events": 0,
+      "bug_ids": [
+        "BUG-0003"
+      ],
+      "matched_rules": [
+        "world-studio-ios"
+      ],
+      "recommended_tests": [
+        "npm run bug:brief -- BUG-0003",
+        "npm run audit:studio",
+        "npm run bug:impact -- src/creators/workspaces/world-workspace.mjs --depth=3",
+        "real iPhone Create -> World -> interactive -> close/reopen"
+      ]
+    },
+    {
+      "file": "src/studio/tools/register-core-tools.mjs",
+      "risk_bonus": 18,
+      "confidence": "medium",
+      "evidence_count": 3,
+      "average_target": 90.01,
+      "severe_events": 3,
+      "failed_events": 1,
+      "report_events": 1,
+      "feedback_events": 0,
+      "bug_ids": [
+        "BUG-0003"
+      ],
+      "matched_rules": [
+        "world-studio-ios"
+      ],
+      "recommended_tests": [
+        "npm run bug:brief -- BUG-0003",
+        "npm run audit:studio",
+        "npm run bug:impact -- src/creators/workspaces/world-workspace.mjs --depth=3",
+        "real iPhone Create -> World -> interactive -> close/reopen"
+      ]
+    },
+    {
+      "file": "bugs/registry/BUG-0003.json",
+      "risk_bonus": 17,
+      "confidence": "high",
+      "evidence_count": 4,
+      "average_target": 84.75,
+      "severe_events": 4,
+      "failed_events": 0,
+      "report_events": 1,
+      "feedback_events": 0,
+      "bug_ids": [
+        "BUG-0003"
+      ],
+      "matched_rules": [],
+      "recommended_tests": [
+        "npm run bug:brief -- BUG-0003"
+      ]
+    },
+    {
+      "file": "src/studio/render/studio-overlay-canvas.mjs",
+      "risk_bonus": 17,
+      "confidence": "high",
+      "evidence_count": 4,
+      "average_target": 84.75,
+      "severe_events": 4,
+      "failed_events": 0,
+      "report_events": 1,
+      "feedback_events": 0,
+      "bug_ids": [
+        "BUG-0003"
+      ],
+      "matched_rules": [
+        "world-studio-ios",
+        "render-loop"
+      ],
+      "recommended_tests": [
+        "npm run bug:brief -- BUG-0003",
+        "npm run audit:studio",
+        "npm run bug:impact -- src/creators/workspaces/world-workspace.mjs --depth=3",
+        "real iPhone Create -> World -> interactive -> close/reopen",
+        "npm run audit:performance",
+        "mobile visual smoke"
+      ]
+    },
+    {
+      "file": ".nojekyll",
+      "risk_bonus": 17,
+      "confidence": "medium",
+      "evidence_count": 3,
+      "average_target": 85.34,
+      "severe_events": 3,
+      "failed_events": 0,
+      "report_events": 1,
+      "feedback_events": 0,
+      "bug_ids": [
+        "BUG-0003"
+      ],
+      "matched_rules": [],
+      "recommended_tests": [
+        "npm run bug:brief -- BUG-0003"
+      ]
+    },
+    {
+      "file": "scripts/world-editor-lazy-boot-audit.mjs",
+      "risk_bonus": 17,
+      "confidence": "medium",
+      "evidence_count": 3,
+      "average_target": 85.34,
+      "severe_events": 3,
+      "failed_events": 0,
+      "report_events": 1,
+      "feedback_events": 0,
+      "bug_ids": [
+        "BUG-0003"
+      ],
+      "matched_rules": [],
+      "recommended_tests": [
+        "npm run bug:brief -- BUG-0003"
+      ]
+    },
+    {
+      "file": "src/studio/storage/indexeddb-studio-store.mjs",
+      "risk_bonus": 17,
+      "confidence": "medium",
+      "evidence_count": 3,
+      "average_target": 87.67,
+      "severe_events": 3,
+      "failed_events": 1,
+      "report_events": 1,
+      "feedback_events": 0,
+      "bug_ids": [
+        "BUG-0003"
+      ],
+      "matched_rules": [
+        "world-studio-ios",
+        "persistence"
+      ],
+      "recommended_tests": [
+        "npm run bug:brief -- BUG-0003",
+        "npm run audit:studio",
+        "npm run bug:impact -- src/creators/workspaces/world-workspace.mjs --depth=3",
+        "real iPhone Create -> World -> interactive -> close/reopen",
+        "save/reload/reopen smoke"
+      ]
+    },
+    {
+      "file": "src/studio/studio-boot-extras.mjs",
+      "risk_bonus": 17,
+      "confidence": "medium",
+      "evidence_count": 3,
+      "average_target": 85.34,
+      "severe_events": 3,
+      "failed_events": 0,
+      "report_events": 1,
+      "feedback_events": 0,
+      "bug_ids": [
+        "BUG-0003"
+      ],
+      "matched_rules": [
+        "world-studio-ios"
+      ],
+      "recommended_tests": [
+        "npm run bug:brief -- BUG-0003",
+        "npm run audit:studio",
+        "npm run bug:impact -- src/creators/workspaces/world-workspace.mjs --depth=3",
+        "real iPhone Create -> World -> interactive -> close/reopen"
+      ]
+    },
+    {
+      "file": "src/studio/ui/studio-live-shell.mjs",
+      "risk_bonus": 17,
+      "confidence": "medium",
+      "evidence_count": 3,
+      "average_target": 85.34,
+      "severe_events": 3,
+      "failed_events": 0,
+      "report_events": 1,
+      "feedback_events": 0,
+      "bug_ids": [
+        "BUG-0003"
+      ],
+      "matched_rules": [
+        "world-studio-ios"
+      ],
+      "recommended_tests": [
+        "npm run bug:brief -- BUG-0003",
+        "npm run audit:studio",
+        "npm run bug:impact -- src/creators/workspaces/world-workspace.mjs --depth=3",
+        "real iPhone Create -> World -> interactive -> close/reopen"
+      ]
+    },
+    {
+      "file": "tests/world-editor-ios-reopen.spec.js",
+      "risk_bonus": 15,
+      "confidence": "medium",
+      "evidence_count": 3,
+      "average_target": 78.35,
+      "severe_events": 2,
+      "failed_events": 0,
+      "report_events": 1,
+      "feedback_events": 0,
+      "bug_ids": [
+        "BUG-0001",
+        "BUG-0003"
+      ],
+      "matched_rules": [],
+      "recommended_tests": [
+        "npm run bug:brief -- BUG-0001",
+        "npm run bug:brief -- BUG-0003"
+      ]
+    },
+    {
+      "file": "src/auth/guest-play-bypass.js",
+      "risk_bonus": 14,
+      "confidence": "medium",
+      "evidence_count": 2,
+      "average_target": 81,
+      "severe_events": 2,
+      "failed_events": 0,
+      "report_events": 0,
+      "feedback_events": 0,
+      "bug_ids": [
+        "BUG-0002"
+      ],
+      "matched_rules": [
+        "auth-session"
+      ],
+      "recommended_tests": [
+        "guest login smoke",
+        "returning-session smoke",
+        "npm run bug:brief -- BUG-0002"
+      ]
+    },
+    {
+      "file": "scripts/turbo-host-integration-test.mjs",
+      "risk_bonus": 13,
+      "confidence": "low",
+      "evidence_count": 1,
+      "average_target": 78,
+      "severe_events": 1,
+      "failed_events": 1,
+      "report_events": 0,
+      "feedback_events": 1,
+      "bug_ids": [],
+      "matched_rules": [
+        "update-system"
+      ],
+      "recommended_tests": [
+        "npm run audit:updater",
+        "npm run audit:turbo",
+        "npm run build",
+        "npm run audit:turbo-build"
+      ]
+    },
+    {
+      "file": "playwright.config.js",
+      "risk_bonus": 11,
+      "confidence": "medium",
+      "evidence_count": 3,
+      "average_target": 67.01,
+      "severe_events": 2,
+      "failed_events": 1,
+      "report_events": 0,
+      "feedback_events": 0,
+      "bug_ids": [
+        "BUG-0001"
+      ],
+      "matched_rules": [],
+      "recommended_tests": [
+        "npm run bug:brief -- BUG-0001"
+      ]
+    },
+    {
+      "file": "browserstack.yml",
+      "risk_bonus": 10,
+      "confidence": "low",
+      "evidence_count": 2,
+      "average_target": 66.51,
+      "severe_events": 1,
+      "failed_events": 1,
+      "report_events": 0,
+      "feedback_events": 0,
+      "bug_ids": [
+        "BUG-0001"
+      ],
+      "matched_rules": [],
+      "recommended_tests": [
+        "npm run bug:brief -- BUG-0001"
+      ]
+    },
+    {
+      "file": ".github/workflows/browserstack-map-forge.yml",
+      "risk_bonus": 8,
+      "confidence": "low",
+      "evidence_count": 1,
+      "average_target": 62,
+      "severe_events": 0,
+      "failed_events": 0,
+      "report_events": 0,
+      "feedback_events": 0,
+      "bug_ids": [
+        "BUG-0001"
+      ],
+      "matched_rules": [],
+      "recommended_tests": [
+        "npm run bug:brief -- BUG-0001"
+      ]
+    },
+    {
+      "file": "src/core/update-system.js",
+      "risk_bonus": 8,
+      "confidence": "low",
+      "evidence_count": 1,
+      "average_target": 58,
+      "severe_events": 0,
+      "failed_events": 0,
+      "report_events": 0,
+      "feedback_events": 1,
+      "bug_ids": [],
+      "matched_rules": [
+        "update-system"
+      ],
+      "recommended_tests": [
+        "npm run audit:updater",
+        "npm run audit:turbo",
+        "npm run build",
+        "npm run audit:turbo-build"
+      ]
+    },
+    {
+      "file": "src/ui/account-auth-ui.js",
+      "risk_bonus": 8,
+      "confidence": "low",
+      "evidence_count": 1,
+      "average_target": 58,
+      "severe_events": 0,
+      "failed_events": 0,
+      "report_events": 0,
+      "feedback_events": 1,
+      "bug_ids": [],
+      "matched_rules": [],
+      "recommended_tests": []
+    },
+    {
+      "file": "sw.js",
+      "risk_bonus": 8,
+      "confidence": "low",
+      "evidence_count": 1,
+      "average_target": 58,
+      "severe_events": 0,
+      "failed_events": 0,
+      "report_events": 0,
+      "feedback_events": 1,
+      "bug_ids": [],
+      "matched_rules": [
+        "update-system",
+        "critical-shell"
+      ],
+      "recommended_tests": [
+        "npm run audit:updater",
+        "npm run audit:turbo",
+        "npm run build",
+        "npm run audit:turbo-build",
+        "npm test"
+      ]
+    },
+    {
+      "file": "tests/iphone-gameplay.spec.js",
+      "risk_bonus": 8,
+      "confidence": "low",
+      "evidence_count": 1,
+      "average_target": 62,
+      "severe_events": 0,
+      "failed_events": 0,
+      "report_events": 0,
+      "feedback_events": 0,
+      "bug_ids": [
+        "BUG-0001"
+      ],
+      "matched_rules": [],
+      "recommended_tests": [
+        "npm run bug:brief -- BUG-0001"
+      ]
+    },
+    {
+      "file": "tests/iphone-visible-guest.spec.js",
+      "risk_bonus": 8,
+      "confidence": "low",
+      "evidence_count": 1,
+      "average_target": 62,
+      "severe_events": 0,
+      "failed_events": 0,
+      "report_events": 0,
+      "feedback_events": 0,
+      "bug_ids": [
+        "BUG-0001"
+      ],
+      "matched_rules": [],
+      "recommended_tests": [
+        "npm run bug:brief -- BUG-0001"
+      ]
+    },
+    {
+      "file": "tests/iphone-world-visible-flow.spec.js",
+      "risk_bonus": 8,
+      "confidence": "low",
+      "evidence_count": 1,
+      "average_target": 62,
+      "severe_events": 0,
+      "failed_events": 0,
+      "report_events": 0,
+      "feedback_events": 0,
+      "bug_ids": [
+        "BUG-0001"
+      ],
+      "matched_rules": [],
+      "recommended_tests": [
+        "npm run bug:brief -- BUG-0001"
+      ]
+    },
+    {
+      "file": "scripts/validate-art-assets.mjs",
+      "risk_bonus": 3,
+      "confidence": "low",
+      "evidence_count": 1,
+      "average_target": 32,
+      "severe_events": 0,
+      "failed_events": 0,
+      "report_events": 0,
+      "feedback_events": 1,
+      "bug_ids": [],
+      "matched_rules": [],
+      "recommended_tests": []
+    },
+    {
+      "file": "scripts/validate-performance-telemetry.mjs",
+      "risk_bonus": 3,
+      "confidence": "low",
+      "evidence_count": 1,
+      "average_target": 32,
+      "severe_events": 0,
+      "failed_events": 0,
+      "report_events": 0,
+      "feedback_events": 1,
+      "bug_ids": [],
+      "matched_rules": [],
+      "recommended_tests": []
+    },
+    {
+      "file": "scripts/validate-png-pipeline.mjs",
+      "risk_bonus": 3,
+      "confidence": "low",
+      "evidence_count": 1,
+      "average_target": 32,
+      "severe_events": 0,
+      "failed_events": 0,
+      "report_events": 0,
+      "feedback_events": 1,
+      "bug_ids": [],
+      "matched_rules": [],
+      "recommended_tests": []
+    },
+    {
+      "file": "scripts/world-editor-single-prewarm-owner-audit.mjs",
+      "risk_bonus": 3,
+      "confidence": "low",
+      "evidence_count": 1,
+      "average_target": 32,
+      "severe_events": 0,
+      "failed_events": 0,
+      "report_events": 0,
+      "feedback_events": 1,
+      "bug_ids": [],
+      "matched_rules": [],
+      "recommended_tests": []
+    },
+    {
+      "file": "src/environment/png-validation-policy.json",
+      "risk_bonus": 3,
+      "confidence": "low",
+      "evidence_count": 1,
+      "average_target": 32,
+      "severe_events": 0,
+      "failed_events": 0,
+      "report_events": 0,
+      "feedback_events": 1,
+      "bug_ids": [],
+      "matched_rules": [],
+      "recommended_tests": []
+    },
+    {
+      "file": "src/environment/prop-contract.js",
+      "risk_bonus": 3,
+      "confidence": "low",
+      "evidence_count": 1,
+      "average_target": 32,
+      "severe_events": 0,
+      "failed_events": 0,
+      "report_events": 0,
+      "feedback_events": 1,
+      "bug_ids": [],
+      "matched_rules": [],
+      "recommended_tests": []
+    }
+  ],
+  "prevention_gaps": [
+    {
+      "type": "uncovered_hotspot",
+      "priority": "high",
+      "file": "src/creators/creator-entry.mjs",
+      "reason": "6 historical/feedback signals but no RISK_MAP rule matches this file."
+    },
+    {
+      "type": "uncovered_hotspot",
+      "priority": "high",
+      "file": "bugs/registry/BUG-0003.json",
+      "reason": "4 historical/feedback signals but no RISK_MAP rule matches this file."
+    },
+    {
+      "type": "uncovered_hotspot",
+      "priority": "medium",
+      "file": ".nojekyll",
+      "reason": "3 historical/feedback signals but no RISK_MAP rule matches this file."
+    },
+    {
+      "type": "uncovered_hotspot",
+      "priority": "medium",
+      "file": "scripts/world-editor-lazy-boot-audit.mjs",
+      "reason": "3 historical/feedback signals but no RISK_MAP rule matches this file."
+    },
+    {
+      "type": "uncovered_hotspot",
+      "priority": "medium",
+      "file": "tests/world-editor-ios-reopen.spec.js",
+      "reason": "3 historical/feedback signals but no RISK_MAP rule matches this file."
+    },
+    {
+      "type": "uncovered_hotspot",
+      "priority": "medium",
+      "file": "playwright.config.js",
+      "reason": "3 historical/feedback signals but no RISK_MAP rule matches this file."
+    },
+    {
+      "type": "missing_regression_defense",
+      "priority": "high",
+      "bug_id": "BUG-0001",
+      "reason": "High-impact bug has no durable regression test/contract detected."
+    },
+    {
+      "type": "missing_regression_defense",
+      "priority": "high",
+      "bug_id": "BUG-0002",
+      "reason": "High-impact bug has no durable regression test/contract detected."
+    },
+    {
+      "type": "missing_regression_defense",
+      "priority": "high",
+      "bug_id": "BUG-0003",
+      "reason": "High-impact bug has no durable regression test/contract detected."
+    }
+  ],
   "safety": {
     "auto_write_scope": [
       "bugs/learning/STATE.json"
@@ -200,5 +1040,5 @@
     "max_hotspot_bonus": 20,
     "max_feedback_observations": 200
   },
-  "updated_at": null
+  "updated_at": "2026-09-14T12:31:53.806Z"
 }
