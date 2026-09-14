@@ -593,9 +593,20 @@
         "src/ui/player-nameplate.js",
         "tests/iphone-walk-8s.mjs"
       ]
+    },
+    {
+      "id": "prevention:f47c8b50b07c75b8f47b606de2b8ecaf8c804452",
+      "at": "2026-09-14T22:15:21.000Z",
+      "source": "bug-prevention-ci",
+      "head_sha": "f47c8b50b07c75b8f47b606de2b8ecaf8c804452",
+      "base_sha": "5c04272e6ea8dcb7cd0c23b43aa2769b773efa20",
+      "conclusion": "failure",
+      "files": [
+        "src/studio/integration/world-studio-bridge.mjs"
+      ]
     }
   ],
-  "feedback_updated_at": "2026-09-14T22:07:41.467Z",
+  "feedback_updated_at": "2026-09-14T22:15:35.330Z",
   "training": {
     "examples": 44,
     "search_examples": 33,
