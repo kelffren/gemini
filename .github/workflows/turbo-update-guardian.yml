@@ -13,8 +13,13 @@ on:
       - src/core/update-delta-core.js
       - src/core/update-watch.js
       - src/ui/update-ui.js
+      - src/ui/studio-launcher.js
+      - src/visuals/visual-lab-loader.js
+      - src/visuals/visual-lab.js
+      - src/visuals/visual-integration.js
       - tests/updater-delta.test.cjs
       - scripts/turbo-update-guardian.mjs
+      - scripts/turbo-boot-isolation-test.mjs
       - scripts/turbo-build.mjs
       - scripts/generate-turbo-manifest.mjs
       - scripts/turbo-delta-test.mjs
@@ -38,8 +43,13 @@ on:
       - src/core/update-delta-core.js
       - src/core/update-watch.js
       - src/ui/update-ui.js
+      - src/ui/studio-launcher.js
+      - src/visuals/visual-lab-loader.js
+      - src/visuals/visual-lab.js
+      - src/visuals/visual-integration.js
       - tests/updater-delta.test.cjs
       - scripts/turbo-update-guardian.mjs
+      - scripts/turbo-boot-isolation-test.mjs
       - scripts/turbo-build.mjs
       - scripts/generate-turbo-manifest.mjs
       - scripts/turbo-delta-test.mjs
@@ -70,8 +80,12 @@ jobs:
         run: |
           node --check src/core/update-delta-core.js
           node --check src/core/update-system.js
+          node --check src/visuals/visual-lab-loader.js
+          node --check scripts/turbo-boot-isolation-test.mjs
           node --check scripts/generate-turbo-manifest.mjs
           node --check scripts/turbo-update-guardian.mjs
+      - name: Prove creator tools stay out of critical boot
+        run: node scripts/turbo-boot-isolation-test.mjs
       - name: Generate SHA-256 Turbo manifest from actual boot bytes
         run: node scripts/generate-turbo-manifest.mjs
       - name: Prove one-file delta and identical-build zero asset bytes
