@@ -54,76 +54,101 @@ test('World recovers a stale Studio session instead of leaving iOS on a black pa
   fs.mkdirSync('test-results', { recursive: true });
   await page.addInitScript(key => { try { sessionStorage.removeItem(key); } catch {} }, BLACK_BOX_KEY);
 
-  // mapEditor=1 is the explicit developer bootstrap recognized by
-  // admin-key-system.js. guest=1 keeps the auth wall out of the mobile QA path.
-  const response = await page.goto('./?guest=1&mapEditor=1&world-ios-reopen=1', { waitUntil: 'domcontentloaded', timeout: 30000 });
-  expect(response && response.status()).toBeLessThan(400);
-  const mobileIdentity = await page.evaluate(() => ({
-    ua: navigator.userAgent,
-    touchPoints: navigator.maxTouchPoints,
-    width: innerWidth,
-    height: innerHeight,
-    dpr: devicePixelRatio,
-  }));
-  expect(mobileIdentity.ua).toContain('iPhone');
-  expect(mobileIdentity.touchPoints).toBeGreaterThan(0);
-  expect(mobileIdentity.width).toBeLessThanOrEqual(430);
+  try {
+    // mapEditor=1 is the explicit developer bootstrap recognized by the game.
+    // guest=1 keeps the auth wall out of the mobile QA path.
+    const response = await page.goto('./?guest=1&mapEditor=1&world-ios-reopen=1', { waitUntil: 'domcontentloaded', timeout: 30000 });
+    expect(response && response.status()).toBeLessThan(400);
+    const mobileIdentity = await page.evaluate(() => ({
+      ua: navigator.userAgent,
+      touchPoints: navigator.maxTouchPoints,
+      width: innerWidth,
+      height: innerHeight,
+      dpr: devicePixelRatio,
+    }));
+    expect(mobileIdentity.ua).toContain('iPhone');
+    expect(mobileIdentity.touchPoints).toBeGreaterThan(0);
+    expect(mobileIdentity.width).toBeLessThanOrEqual(430);
 
-  await page.waitForFunction(() => !!(
-    window.KeloInputLocks?.acquire &&
-    window.KELO_ADMIN_KEYS?.can?.('world.edit')
-  ), null, { timeout: 15000 });
+    // KeloInputLocks is intentionally created by bootKeloCreators(). Do not wait
+    // for a lazy Creator-owned contract before giving its owner a chance to boot.
+    await page.evaluate(async () => {
+      const { openCreatorHub } = await import('./src/creators/ui/creator-hub.mjs');
+      await openCreatorHub({ root: window });
+    });
+    const hub = page.locator('#kelo-creators-hub');
+    await expect(hub).toBeVisible({ timeout: 10000 });
 
-  await page.evaluate(async () => {
-    const { openCreatorHub } = await import('./src/creators/ui/creator-hub.mjs');
-    await openCreatorHub({ root: window });
-  });
-  const hub = page.locator('#kelo-creators-hub');
-  await expect(hub).toBeVisible({ timeout: 10000 });
-  await hub.locator('[data-workspace="world"]').click();
-  const studio = page.locator('#kelo-studio-live');
-  await expect(studio).toBeVisible({ timeout: 15000 });
-  await expect(studio).not.toHaveAttribute('data-kelo-world-loading', '1', { timeout: 25000 });
-  await expect(hub).toHaveCount(0);
+    await page.waitForFunction(() => !!(
+      window.KeloInputLocks?.acquire &&
+      window.KELO_ADMIN_KEYS?.can?.('world.edit')
+    ), null, { timeout: 10000 });
+    const creatorContracts = await page.evaluate(async () => {
+      const { getKeloCreatorsPlatform } = await import('./src/creators/creator-entry.mjs');
+      const platform = getKeloCreatorsPlatform();
+      const actorId = platform?.permission?.actorId?.();
+      return {
+        inputLocks: !!window.KeloInputLocks?.acquire,
+        platform: !!platform,
+        actorId: actorId || null,
+        worldEdit: !!platform?.permission?.can?.('world.edit', actorId),
+      };
+    });
+    expect(creatorContracts.inputLocks).toBeTruthy();
+    expect(creatorContracts.platform).toBeTruthy();
+    expect(creatorContracts.worldEdit).toBeTruthy();
 
-  // Player evidence showed a post-chrome death. Holding the live shell for 10 s
-  // makes that failure class part of the regression gate rather than accepting
-  // a one-frame/editor-chrome success.
-  await page.waitForTimeout(10100);
-  const firstTrace = await readWorldTrace(page);
-  writeWorldTrace('world-editor-black-box-first-open', firstTrace);
-  const firstMilestones = firstTrace.map(row => row.milestone);
-  expect(firstMilestones).toContain('CONTROLLER_OPEN_RESOLVED');
-  expect(firstMilestones).toContain('EDITOR_READY');
-  expect(firstMilestones).toContain('SURVIVED_1000MS');
-  expect(firstMilestones).toContain('SURVIVED_5000MS');
-  expect(firstMilestones).toContain('SURVIVED_10000MS');
-  await expect(studio).toBeVisible();
+    await hub.locator('[data-workspace="world"]').click();
+    const studio = page.locator('#kelo-studio-live');
+    await expect(studio).toBeVisible({ timeout: 15000 });
+    await expect(studio).not.toHaveAttribute('data-kelo-world-loading', '1', { timeout: 25000 });
+    await expect(hub).toHaveCount(0);
 
-  // Reproduce the Safari failure mode: DOM shell disappears while the module-level
-  // Studio session is still cached as active.
-  await page.evaluate(() => document.getElementById('kelo-studio-live')?.remove());
-  await expect(studio).toHaveCount(0);
+    // Player evidence showed a post-chrome death. Holding the live shell for 10 s
+    // makes that failure class part of the regression gate rather than accepting
+    // a one-frame/editor-chrome success.
+    await page.waitForTimeout(10100);
+    const firstTrace = await readWorldTrace(page);
+    writeWorldTrace('world-editor-black-box-first-open', firstTrace);
+    const firstMilestones = firstTrace.map(row => row.milestone);
+    expect(firstMilestones).toContain('CONTROLLER_OPEN_RESOLVED');
+    expect(firstMilestones).toContain('EDITOR_READY');
+    expect(firstMilestones).toContain('SURVIVED_1000MS');
+    expect(firstMilestones).toContain('SURVIVED_5000MS');
+    expect(firstMilestones).toContain('SURVIVED_10000MS');
+    await expect(studio).toBeVisible();
 
-  await page.evaluate(async () => {
-    const { openCreatorHub } = await import(`./src/creators/ui/creator-hub.mjs?ios-reopen=${Date.now()}`);
-    await openCreatorHub({ root: window });
-  });
-  await expect(page.locator('#kelo-creators-hub')).toBeVisible({ timeout: 10000 });
-  await page.locator('#kelo-creators-hub [data-workspace="world"]').click();
+    // Reproduce the Safari failure mode: DOM shell disappears while the module-level
+    // Studio session is still cached as active.
+    await page.evaluate(() => document.getElementById('kelo-studio-live')?.remove());
+    await expect(studio).toHaveCount(0);
 
-  const recovered = page.locator('#kelo-studio-live');
-  await expect(recovered).toBeVisible({ timeout: 15000 });
-  await expect(recovered).not.toHaveAttribute('data-kelo-world-loading', '1', { timeout: 25000 });
-  await expect(page.locator('#kelo-creators-hub')).toHaveCount(0);
-  await expect(recovered).toHaveCSS('position', 'fixed');
-  await page.screenshot({ path: 'test-results/world-editor-ios-recovered.png', fullPage: true });
+    await page.evaluate(async () => {
+      const { openCreatorHub } = await import(`./src/creators/ui/creator-hub.mjs?ios-reopen=${Date.now()}`);
+      await openCreatorHub({ root: window });
+    });
+    await expect(page.locator('#kelo-creators-hub')).toBeVisible({ timeout: 10000 });
+    await page.locator('#kelo-creators-hub [data-workspace="world"]').click();
 
-  const recoveredTrace = await readWorldTrace(page);
-  writeWorldTrace('world-editor-black-box-reopen', recoveredTrace);
-  expect(recoveredTrace.filter(row => row.milestone === 'EDITOR_READY').length).toBeGreaterThanOrEqual(2);
-  expect(recoveredTrace.some(row => row.milestone === 'FAIL')).toBeFalsy();
+    const recovered = page.locator('#kelo-studio-live');
+    await expect(recovered).toBeVisible({ timeout: 15000 });
+    await expect(recovered).not.toHaveAttribute('data-kelo-world-loading', '1', { timeout: 25000 });
+    await expect(page.locator('#kelo-creators-hub')).toHaveCount(0);
+    await expect(recovered).toHaveCSS('position', 'fixed');
+    await page.screenshot({ path: 'test-results/world-editor-ios-recovered.png', fullPage: true });
 
-  expect(pageErrors).toEqual([]);
-  expect(consoleErrors.filter(row => /CREATOR_WORLD_STUDIO_MOUNT_FAILED|WORLD_EDIT_NOT_READY/.test(row))).toEqual([]);
+    const recoveredTrace = await readWorldTrace(page);
+    writeWorldTrace('world-editor-black-box-reopen', recoveredTrace);
+    expect(recoveredTrace.filter(row => row.milestone === 'EDITOR_READY').length).toBeGreaterThanOrEqual(2);
+    expect(recoveredTrace.some(row => row.milestone === 'FAIL')).toBeFalsy();
+
+    expect(pageErrors).toEqual([]);
+    expect(consoleErrors.filter(row => /CREATOR_WORLD_STUDIO_MOUNT_FAILED|WORLD_EDIT_NOT_READY/.test(row))).toEqual([]);
+  } finally {
+    // Always persist the last completed World phase. If opening dies before the
+    // normal assertions, the CI artifact still tells us how far the bridge got.
+    let finalTrace = [];
+    try { finalTrace = await readWorldTrace(page); } catch {}
+    writeWorldTrace('world-editor-black-box-final', finalTrace);
+  }
 });
