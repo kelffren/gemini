@@ -1,6 +1,6 @@
 (function(root){
   'use strict';
-  const VERSION='1.0.0';
+  const VERSION='1.0.1';
   const POLICY_ID='kelo-mobile-art-performance-v1';
   const isMobile=()=>Math.min(root.innerWidth||9999,root.innerHeight||9999)<=844&&(root.innerWidth||9999)<=600;
   const deviceMemory=Math.max(0,Number(root.navigator?.deviceMemory)||0);
@@ -8,8 +8,12 @@
   const mobile=isMobile();
   const BUDGETS=Object.freeze(mobile?{
     dprCap:lowMemory?1.5:2,
-    chunkCacheCap:lowMemory?8:12,
-    chunkCullMarginChunks:1,
+    // The world renderer uses 512px chunks. With a one-chunk cull margin an iPhone
+    // viewport can require ~20 chunks at once while the old cache only retained 12.
+    // That creates an endless build -> evict -> rebuild loop on Safari's main thread.
+    // Keep the mobile working set resident and do not pre-render an off-screen margin.
+    chunkCacheCap:24,
+    chunkCullMarginChunks:0,
     decodedTextureMB:lowMemory?24:40,
     residentDistrictAtlases:lowMemory?4:6,
     canvasMegapixels:lowMemory?0.9:1.5
