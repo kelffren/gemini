@@ -23,7 +23,7 @@
     "REPORT-000001"
   ],
   "environment": {
-    "game_build": "world-chrome-20260914-1",
+    "game_build": "world-bridge-20260914-1",
     "device": "iPhone real device target",
     "os": "iOS",
     "browser": "Safari",
@@ -39,7 +39,7 @@
     "Open Create -> World again and confirm Studio remounts instead of black-screening."
   ],
   "expected": "World opens, remains interactive, and can be reopened even after a stale Studio shell/session condition.",
-  "actual": "Player iPhone 2026-09-14 22:03–22:04 still showed KELO STUDIO / Abriendo World Editor… then a fully black Safari tab (A3 / 5a52c6d). A4 / d6ff092 world-light was deployed later but live-studio-controller.mjs still had 11 static Studio imports, so importing the controller still pulled the large graph before .ks-status/tools existed. A5 / world-chrome paints studio-live-shell first and only then dynamically imports the rest of the Studio graph.",
+  "actual": "Player iPhone 2026-09-14 22:03–22:04 still showed KELO STUDIO / Abriendo World Editor… then a fully black Safari tab (A3 / 5a52c6d). A4 / d6ff092 world-light still statically imported the Studio graph before chrome. A5 / world-chrome paints studio-live-shell first and chunks the controller graph. A6 / world-bridge is the current candidate: World first-hops a tiny paced bridge, iPhone prewarms runtime roots one-by-one with visible Cargando editor… n/N, core tools open first, rooms/paint/quick load after chrome.",
   "evidence": [
     "Commit 829ac7fbd5fc629b05ecf92489bab16b0292bce9: IndexedDB fail-open candidate — insufficient.",
     "Commit 824a932f5e3e41c888116ab1453d64500e66255d: curtain + Hub stacking candidate — failed live Pages World tap QA on 2026-09-14.",
@@ -59,14 +59,17 @@
     "src/studio/studio-boot-extras.mjs",
     "src/studio/render/studio-overlay-canvas.mjs",
     "src/studio/storage/indexeddb-studio-store.mjs",
-    "tests/world-editor-ios-reopen.spec.js"
+    "tests/world-editor-ios-reopen.spec.js",
+    "src/studio/integration/world-studio-bridge.mjs",
+    "src/studio/integration/studio-boot-pace.mjs",
+    "src/studio/tools/register-core-tools.mjs"
   ],
   "owner_hint": "Kelo Creators / World workspace + Kelo Studio live shell stacking",
   "claimed_by": null,
   "claim_started_at": null,
   "research": {
     "status": "in_progress",
-    "summary": "Four candidate directions exist. IndexedDB fail-open (A1) was insufficient. Curtain/stacking while awaiting ~80 modules (A2) failed LIVE. Early Hub destruction (A3) painted loading chrome then black-tabbed Safari. world-light (A4) delayed extras/overlay and dynamically imported studio-entry, but the live controller itself still statically imported the Studio graph, so iPhone still paid the 80-module cost before tools existed. world-chrome (A5) is the first candidate that actually paints .ks-status/tools from studio-live-shell.mjs before loading the controller graph. Target iPhone verification is still required.",
+    "summary": "Four candidate directions exist. IndexedDB fail-open (A1) was insufficient. Curtain/stacking while awaiting ~80 modules (A2) failed LIVE. Early Hub destruction (A3) painted loading chrome then black-tabbed Safari. world-light (A4) delayed extras/overlay and dynamically imported studio-entry, but the live controller itself still statically imported the Studio graph, so iPhone still paid the 80-module cost before tools existed. world-chrome (A5) is the first candidate that actually paints .ks-status/tools from studio-live-shell.mjs before loading the controller graph. Target iPhone verification is still required. world-bridge (A6) adds a tiny first hop plus sequential iPhone prewarm and core-vs-build tool split. Target iPhone verification is still required.",
     "known_facts": [
       {
         "id": "F1",
@@ -411,10 +414,18 @@
   "fix": {
     "status": "candidate",
     "commits": [
+      "9f52de80b572a9a3657b106f61451871d592452e",
+      "535c5ba13002e9188bc762c450e280b8834995c5",
       "a54ff27ad4264aa31f4b65b21d939f4014cb0502"
     ],
     "files": [
+      "src/studio/integration/world-studio-bridge.mjs",
+      "src/studio/integration/studio-boot-pace.mjs",
       "src/studio/integration/live-studio-controller.mjs",
+      "src/studio/studio-entry.mjs",
+      "src/studio/tools/register-core-tools.mjs",
+      "src/studio/tools/register-build-tools.mjs",
+      "src/studio/tools/register-basic-tools.mjs",
       "src/creators/workspaces/world-workspace.mjs",
       "src/creators/ui/creator-hub.mjs",
       "src/creators/creator-entry.mjs",
@@ -423,11 +434,11 @@
       "scripts/world-editor-lazy-boot-audit.mjs",
       "bugs/registry/BUG-0003.json"
     ],
-    "summary": "A4 world-light still statically imported the Studio graph from the live controller before chrome. A5 world-chrome: paint studio-live-shell tools first; live controller has zero static Studio imports and loads the graph in chunks after .ks-status exists; updater marked busy during launch."
+    "summary": "A6 world-bridge: World no longer imports the 50-module Studio graph in one parse. A tiny first hop yields to Safari between waves (chrome → sequential iPhone prewarm → bridge → chunked controller). studio-entry registers core tools first and defers room/paint/quick-build. A5 world-chrome chrome-first + 40ms phone pause is kept. 5a52c6d and world-light still failed or pending; do not mark VERIFIED from headless_shell."
   },
   "verification": {
     "status": "PENDING",
-    "method": "Real iPhone Safari E2E: enter game -> Create -> World -> Studio tools/.ks-status visible immediately, then interactive, not a black Safari tab. Do not mark PASS from headless_shell. 824a932, 5a52c6d and unverified d6ff092 all failed or could not satisfy H3.",
+    "method": "Real iPhone Safari E2E: enter game -> Create -> World -> Studio tools/.ks-status visible immediately, progress Cargando editor… n/N, then interactive, not a black Safari tab. Do not mark PASS from headless_shell. 824a932, 5a52c6d, unverified d6ff092 and world-chrome all failed or could not satisfy H3.",
     "evidence": [
       "FAILED: 5a52c6d world-handoff — player iPhone screenshots 2026-09-14 22:03 loading chrome, 22:04 black Safari spinner",
       "NOT DEVICE-VERIFIED: d6ff092 world-light — code inspection 2026-09-14 showed static controller graph still loaded before chrome"
@@ -447,7 +458,10 @@
     "Do not mark VERIFIED until the deployed flow passes on the target device class.",
     "Studio graph must stay lazy until World is tapped (live-studio-click-audit).",
     "headless_shell can freeze after Studio mounts because of the overlay canvas loop; that is not the player-facing Hub-cover bug.",
-    "Do not mark CLOSED from this candidate. Player must enter the editor, not a black tab."
+    "Do not mark CLOSED from this candidate. Player must enter the editor, not a black tab.",
+    "824a932 failed verification: Hub awaited the Studio graph, so the World card stayed ABRIENDO while 80 modules loaded.",
+    "5a52c6d failed verification: Hub destroyed at 250ms while the 80-module static graph + dpr=3 overlay killed the iPhone tab after loading chrome. REOPENED then replaced by world-light-20260914-1.",
+    "world-bridge-20260914-1 paces Studio imports in waves with main-thread yields and paints live chrome before the kernel graph. Still FIXED_PENDING_VERIFY until a real iPhone enters the editor."
   ],
-  "updated_at": "2026-09-13T23:20:00-04:00"
+  "updated_at": "2026-09-13T23:46:00-04:00"
 }

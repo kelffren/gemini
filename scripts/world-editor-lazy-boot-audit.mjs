@@ -157,6 +157,8 @@ await assert.rejects(()=>hangImportManifest.open({root:hangImportRoot}),/WORLD_E
 assert.ok(Date.now()-importStarted<20000,'Studio import hang must fail closed so the World button can be tapped again');
 
 const worldSource=await readFile(resolve(here,'../src/creators/workspaces/world-workspace.mjs'),'utf8');
+assert.match(worldSource,/world-studio-bridge/,'World must pace Studio through the boot bridge');
+assert.match(worldSource,/kelo-world-launch-curtain/,'World workspace must paint a launch curtain before importing Studio');
 assert.match(worldSource,/paintWorldEditorLaunchShell|paintLaunch/,'World must expose an immediate Studio loading shell for Hub handoff');
 assert.match(worldSource,/paintInteractiveChrome/,'World must upgrade to live Studio chrome before importing the controller graph');
 assert.match(worldSource,/studio-live-shell\.mjs/,'World must load studio-live-shell before the live controller');

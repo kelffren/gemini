@@ -4,7 +4,7 @@
  * owns: descriptor and lazy routing into existing live Studio controller
  * does-not-own: World editor, commands, drafts, authority, terrain, collisions, PropertySystem or camera
  * reuse: existing openKeloStudioLive() remains implementation; Map Forge handoff imports through Studio adapter + KELO_WORLD_EDIT and focuses through KeloCamera
- * mobile: paint real Studio chrome (.ks-status/tools) before importing the live controller graph; iPhone prewarms runtime roots sequentially to avoid a Safari ESM burst
+ * mobile: paint Studio chrome first; iPhone prewarms runtime roots one-by-one, then hops through world-studio-bridge so Safari never parses the full editor graph in one tap
  */
 import { waitForWorldEditAuthority } from '../adapters/world-creator-adapter.mjs';
 
@@ -14,7 +14,7 @@ const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
 const LAUNCH_CURTAIN_ID='kelo-world-launch-curtain';
 const STUDIO_OPEN_MS=20000;
 const DEFAULT_LAUNCH_YIELD_MS=420;
-const WORLD_BUILD='world-chrome-20260914-2';
+const WORLD_BUILD='world-bridge-20260914-1';
 const PHONE_RUNTIME_ROOTS=Object.freeze([
   '../../studio/render/studio-overlay-canvas.mjs',
   '../../studio/render/creator-grid-overlay.mjs',
@@ -36,11 +36,19 @@ const PHONE_RUNTIME_ROOTS=Object.freeze([
   '../../studio/components/kelo-components.mjs',
   '../../studio/storage/indexeddb-studio-store.mjs',
   '../../studio/performance/studio-profiler.mjs',
-  '../../studio/tools/register-basic-tools.mjs',
+  '../../studio/tools/select-tool.mjs',
+  '../../studio/tools/marquee-select-tool.mjs',
+  '../../studio/tools/placement-tool.mjs',
+  '../../studio/tools/transform-tool.mjs',
+  '../../studio/tools/terrain-tool.mjs',
+  '../../studio/tools/collision-tool.mjs',
+  '../../studio/tools/prefab-stamp-tool.mjs',
+  '../../studio/tools/register-core-tools.mjs',
   '../../studio/render/studio-overlay-renderer.mjs',
   '../../studio/render/studio-asset-preview-service.mjs',
   '../../studio/input/studio-placement-touch-controller.mjs',
-  '../../studio/input/studio-explorer-range-selection-controller.mjs'
+  '../../studio/input/studio-explorer-range-selection-controller.mjs',
+  `../../studio/studio-entry.mjs?v=${WORLD_BUILD}`
 ]);
 const studioOpenBudget=root=>Math.max(250,Number(root?.KELO_WORLD_OPEN_TIMEOUT_MS)||STUDIO_OPEN_MS);
 const studioShellMounted=root=>{
@@ -65,6 +73,16 @@ function yieldRuntimeTurn(root){
     else (root?.setTimeout||setTimeout)(resolve,0);
   });
 }
+function paintBootProgress(root,loaded,total){
+  const msg=`Cargando editor… ${loaded}/${total}`;
+  try{
+    const doc=root?.document;
+    const status=typeof doc?.querySelector==='function'?doc.querySelector('[data-kelo-world-launch-status], #kelo-studio-live .ks-status'):null;
+    if(status)status.textContent=msg;
+    const curtain=typeof doc?.getElementById==='function'?doc.getElementById(LAUNCH_CURTAIN_ID):null;
+    if(curtain)curtain.textContent=msg;
+  }catch{}
+}
 export async function preloadPhoneStudioRuntime(root=globalThis,{load=null,yieldControl=null,modules=PHONE_RUNTIME_ROOTS}={}){
   if(!isPhoneWorldBootstrap(root))return Object.freeze({enabled:false,loaded:0,total:modules.length});
   const importer=typeof load==='function'?load:(specifier=>import(specifier));
@@ -74,6 +92,7 @@ export async function preloadPhoneStudioRuntime(root=globalThis,{load=null,yield
     if(root?.KELO_WORLD_LAUNCH_ABORTED)throw new Error('WORLD_EDITOR_OPEN_TIMEOUT');
     await importer(specifier);
     loaded++;
+    paintBootProgress(root,loaded,modules.length);
     if(loaded<modules.length)await release();
   }
   return Object.freeze({enabled:true,loaded,total:modules.length});
@@ -202,9 +221,9 @@ async function openMountedStudio(mod,root){
 async function loadStudioModule(loader,root,{fresh=false}={}){
   if(fresh){
     const src=Function.prototype.toString.call(loader);
-    if(src.includes('live-studio-controller.mjs')){
+    if(src.includes('live-studio-controller.mjs')||src.includes('world-studio-bridge.mjs')){
       const nonce=`${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;
-      return import(`../../studio/integration/live-studio-controller.mjs?v=world-ios-${nonce}`);
+      return import(`../../studio/integration/world-studio-bridge.mjs?v=world-ios-${nonce}`);
     }
   }
   return loader(root);
@@ -215,7 +234,8 @@ function mapFocusPoint(map){
   return Object.freeze({x:clamp(x,bx,bx+bw),y:clamp(y,by,by+bh)});
 }
 
-export function createWorldWorkspaceManifest({loader=()=>import(`../../studio/integration/live-studio-controller.mjs?v=${WORLD_BUILD}`),mapForgeImporter=()=>import('../../studio/adapters/map-forge-draft-importer.mjs')}={}){
+// second hop after the paced bridge: import('../../studio/integration/live-studio-controller.mjs')
+export function createWorldWorkspaceManifest({loader=()=>import(`../../studio/integration/world-studio-bridge.mjs?v=${WORLD_BUILD}`),mapForgeImporter=()=>import('../../studio/adapters/map-forge-draft-importer.mjs')}={}){
   return Object.freeze({
     id:'world',
     label:'World',

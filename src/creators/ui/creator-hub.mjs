@@ -6,7 +6,7 @@
  * lazy: imported only after explicit CREATORS action; active cards dispatch through workspace registry
  * mobile: World launch paints Studio chrome immediately; Hub stays parked until .ks-status exists without a loading flag and is restored if the editor never mounts
  */
-import { bootKeloCreators } from '../creator-entry.mjs?v=world-chrome-20260914-1';
+import { bootKeloCreators } from '../creator-entry.mjs?v=world-bridge-20260914-1';
 
 let active=null;
 
@@ -385,7 +385,7 @@ export async function openCreatorHub({root=globalThis}={}){
   doc.addEventListener('keydown',onKey,true);
 
   active=Object.freeze({
-    version:'kelo-creator-hub-v1.19.0-world-chrome',
+    version:'kelo-creator-hub-v1.19.0-world-bridge',
     hub,platform,
     get section(){return current;},
     show:render,

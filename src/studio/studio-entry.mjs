@@ -4,7 +4,7 @@
  * does-not-own: automatic game startup or legacy builder replacement
  * public-api: bootKeloStudio()
  * online: authority remains KELO_WORLD_EDIT
- * mobile: World-open core graph stays small; keyboard/productivity extras load after the live shell
+ * mobile: World-open core graph stays small; build tools and keyboard extras load after the live shell
  */
 
 import { createStudioKernel } from './core/studio-kernel.mjs';
@@ -17,7 +17,7 @@ import { seedCatalogPrefabs } from './adapters/catalog-prefab-seeder.mjs';
 import { registerKeloComponents } from './components/kelo-components.mjs';
 import { createStudioStore } from './storage/indexeddb-studio-store.mjs';
 import { createStudioProfiler } from './performance/studio-profiler.mjs';
-import { registerBasicTools } from './tools/register-basic-tools.mjs';
+import { registerCoreTools } from './tools/register-core-tools.mjs';
 import { createStudioOverlayRenderer } from './render/studio-overlay-renderer.mjs';
 import { createStudioAssetPreviewService } from './render/studio-asset-preview-service.mjs';
 import { createStudioPlacementTouchController } from './input/studio-placement-touch-controller.mjs';
@@ -100,7 +100,15 @@ export async function bootKeloStudio({ mode = 'world', actorId = null, document 
   const initial = document || createWorldDocument({ worldId: mode === 'parcel' ? `parcel:${actorId || 'local'}` : 'world:kelo-main', metadata: { name: mode === 'parcel' ? 'My Parcel' : 'Kelo World', description: '', tags: [mode] }, settings: { tileSize: root.KELO_TILE_REGISTRY?.worldTileSize || 32, chunkSize: root.KELO_WORLD_RENDERER?.chunkSize || 512 } });
   const kernel = createStudioKernel({ document: initial, adapter });
   registerKeloComponents(kernel.components); seedCatalogPrefabs({ prefabRegistry: kernel.prefabs, assetCatalog: adapter.assetCatalog });
-  const tools = registerBasicTools(kernel);
+  const tools = registerCoreTools(kernel);
+  void import('./tools/register-basic-tools.mjs').then(mod=>{
+    if(typeof mod.registerBasicTools!=='function')return;
+    try{Object.assign(tools,mod.registerBasicTools(kernel));}catch(error){
+      console.warn('[Kelo Studio] optional build tools unavailable; World editor stays usable',error);
+    }
+  }).catch(error=>{
+    console.warn('[Kelo Studio] optional build tools unavailable; World editor stays usable',error);
+  });
   const assetPreview=createStudioAssetPreviewService({assetCatalog:adapter.assetCatalog,atlasContract:root.KELO_ATLAS_CONTRACT});
   const overlayRenderer = createStudioOverlayRenderer({ kernel, tools, assetPreview });
   const paletteAssets=()=>{
@@ -151,7 +159,7 @@ export async function bootKeloStudio({ mode = 'world', actorId = null, document 
   const worker = createStudioWorkerClient({ resolvePrefab, prefabSnapshot: () => Object.fromEntries(kernel.prefabs.list().map(p => [p.id, kernel.prefabs.resolve(p.id)])) });
   const store = createStudioStore(), profiler = createStudioProfiler();
   const unsubscribeJournal = kernel.commands.on(event => { store.appendCommand(kernel.document.worldId, { action: event.type, command: event.command }).catch(() => {}); });
-  session = Object.freeze({ version: 'kelo-studio-foundation-v1.34.0-mobile-light-boot', mode, actorId, kernel, tools, overlayRenderer, assetPreview,
+  session = Object.freeze({ version: 'kelo-studio-foundation-v1.35.0-world-bridge-boot', mode, actorId, kernel, tools, overlayRenderer, assetPreview,
     get assetPalette(){return assetPalette;},
     get assetFavorites(){return assetFavorites;},
     get assetKeyboardController(){return assetKeyboardController;},
