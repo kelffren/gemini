@@ -31,7 +31,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: strict-pvp-quality-${{ github.event.pull_request.number || github.ref }}
+  group: strict-pvp-quality-${{ github.event.pull_request.head.sha || github.sha }}
   cancel-in-progress: false
 
 jobs:
