@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 
 const src=fs.readFileSync('src/studio/integration/world-studio-bridge.mjs','utf8');
+const controller=fs.readFileSync('src/studio/integration/live-studio-controller.mjs','utf8');
 const pace=fs.readFileSync('src/studio/integration/studio-boot-pace.mjs','utf8');
 const runtimeRoots=[
   '../render/studio-overlay-canvas.mjs',
@@ -39,9 +40,15 @@ if(!src.includes("bridgeUrl.searchParams.get('v')||WORLD_STUDIO_BRIDGE_BUILD"))t
 if(!src.includes('encodeURIComponent(controllerBuild)'))throw new Error('controller URL must carry the inherited bridge/retry token');
 if(/const CONTROLLER=`\.\/live-studio-controller\.mjs\?v=\$\{WORLD_STUDIO_BRIDGE_BUILD\}`/.test(src))throw new Error('fixed controller URL makes fresh World retry reuse the previous Safari module instance');
 
+if(!controller.includes('const controllerUrl=new URL(import.meta.url)'))throw new Error('live controller must inspect its versioned module URL');
+if(!controller.includes("controllerUrl.searchParams.get('v')||'world-bridge-20260914-15'"))throw new Error('live controller must inherit the bridge/retry token instead of pinning a stale build');
+if(/const BUILD='world-bridge-20260914-\d+'/.test(controller))throw new Error('fixed controller BUILD breaks fresh Safari retries for shell/studio-entry');
+if(!controller.includes('studio-live-shell.mjs?v=${BUILD}'))throw new Error('live shell import must receive inherited World retry token');
+if(!controller.includes('studio-entry.mjs?v=${BUILD}'))throw new Error('studio-entry import must receive inherited World retry token');
+
 const fallback=pace.match(/const DEFAULT_RAF_FALLBACK_MS=(\d+);/);
 if(!fallback)throw new Error('Studio boot rAF fallback missing');
 if(Number(fallback[1])>50)throw new Error(`Studio boot rAF fallback ${fallback[1]}ms is too long for phased iPhone World boot`);
 if(!pace.includes('timer=wait(finish,fallbackMs)'))throw new Error('Studio boot yield must retain a timer escape hatch when Safari rAF stalls');
 
-console.log('world-editor-iphone-prewarm-audit: PASS (controller-first, immediate mount handoff, fresh retry cascades to controller, bounded Safari paint fallback)');
+console.log('world-editor-iphone-prewarm-audit: PASS (controller-first, fresh retry cascades through controller shell and studio-entry, bounded Safari paint fallback)');
