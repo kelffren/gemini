@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: UI / AVATAR / IDENTITY
  * owner: KeloActorNameplate (presentation consumer); composition owner remains KeloAvatar
- * keys: NAMEPLATE NOBILITY TITLE NAME AVATAR MIDDLEWARE ANCHOR BOUNDS COLLIDER SCALE
+ * keys: NAMEPLATE NOBILITY TITLE NAME AVATAR MIDDLEWARE ANCHOR BOUNDS COLLIDER SCALE CHAT SOCIAL UI BOOT
  * purpose: dibuja rango de Nobleza + nombre + título equipado usando el anchor visual semántico del avatar, sin acoplar identidad al collider
  * public-api: KeloActorNameplate.resolve/draw
  * consumes: KeloAvatar, KELO_AVATAR_PRESENTATION, KeloNobility rank catalog, KeloTitleCatalog, actor replicated state
@@ -102,3 +102,13 @@
   root.KeloActorNameplate = Object.freeze({ version: VERSION, resolve: resolve, draw: draw, anchorFor: anchorFor, middlewareId: middlewareId });
   root.KELO_ACTOR_NAMEPLATE_AUDIT = Object.freeze({ version: VERSION, ready: true, middleware: true, priority: 500, localAndRemote: true, gameplayAuthority: false, semanticAvatarAnchor: true, colliderFallbackOnly: true });
 })(typeof globalThis !== 'undefined' ? globalThis : window);
+
+/* Social UI extension boot: keep chat isolated in its own owner file without changing avatar/nameplate behavior. */
+(function loadKeloChatDrawer(){
+  if(typeof document==='undefined'||window.KeloChat||document.getElementById('kelo-chat-drawer-loader'))return;
+  const script=document.createElement('script');
+  script.id='kelo-chat-drawer-loader';
+  script.src='src/ui/kelo-chat-drawer.js?v=1';
+  script.async=false;
+  document.body.appendChild(script);
+})();
