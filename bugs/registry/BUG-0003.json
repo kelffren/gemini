@@ -367,7 +367,7 @@
       ],
       "change": {
         "commits": [
-          "5106c29644583ede46a13e488096c423341d5cbe"
+          "a54ff27ad4264aa31f4b65b21d939f4014cb0502"
         ],
         "files": [
           "src/studio/integration/live-studio-controller.mjs",
@@ -411,7 +411,7 @@
   "fix": {
     "status": "candidate",
     "commits": [
-      "5106c29644583ede46a13e488096c423341d5cbe"
+      "a54ff27ad4264aa31f4b65b21d939f4014cb0502"
     ],
     "files": [
       "src/studio/integration/live-studio-controller.mjs",
