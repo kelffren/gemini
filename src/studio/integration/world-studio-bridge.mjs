@@ -9,9 +9,14 @@
  */
 import { yieldStudioBoot, setWorldLaunchStatus } from './studio-boot-pace.mjs';
 
-export const WORLD_STUDIO_BRIDGE_BUILD='world-bridge-20260914-15';
+export const WORLD_STUDIO_BRIDGE_BUILD='world-bridge-20260914-16';
 const bridgeUrl=new URL(import.meta.url);
-const controllerBuild=bridgeUrl.searchParams.get('v')||WORLD_STUDIO_BRIDGE_BUILD;
+const incomingBuild=bridgeUrl.searchParams.get('v')||'';
+// Workspace can lag one or more static build tags behind this bridge. Do not let
+// that stale tag downgrade the controller/shell/studio-entry chain. The only
+// external token we intentionally preserve is the world-ios-* nonce used by the
+// recovery path to force a genuinely fresh Safari module graph.
+const controllerBuild=incomingBuild.startsWith('world-ios-')?incomingBuild:WORLD_STUDIO_BRIDGE_BUILD;
 const CONTROLLER=`./live-studio-controller.mjs?v=${encodeURIComponent(controllerBuild)}`;
 let controllerMod=null;
 
