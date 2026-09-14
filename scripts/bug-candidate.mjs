@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { fingerprintBugText, bugSimilarity, sanitizeBugText } from './lib/bug-fingerprint.mjs';
 
 const args=process.argv.slice(2);
@@ -19,6 +20,8 @@ const incomingDir=path.join(root,'bugs','incoming');
 const bugs=fs.existsSync(registryDir)?fs.readdirSync(registryDir).filter(n=>/^BUG-\d{4}\.json$/.test(n)).map(n=>JSON.parse(fs.readFileSync(path.join(registryDir,n),'utf8'))):[];
 const ranked=bugs.map(b=>({id:b.id,title:b.title,status:b.status,severity:b.severity,score:bugSimilarity(tokens,b)})).sort((a,b)=>b.score-a.score);
 const best=ranked[0]||null;
+let gitHead=null;
+try{gitHead=execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim()||null;}catch{}
 
 if(fs.existsSync(incomingDir)){
   for(const name of fs.readdirSync(incomingDir).filter(n=>/^REPORT-.*\.json$/.test(n))){
@@ -46,9 +49,10 @@ const report={
   category:likelyClass,
   screenshot_ref:null,
   environment:{raw:'unknown'},
-  game_context:{},
+  game_context:{git_head:gitHead},
   diagnostics:{
     fingerprint,
+    git_head:gitHead,
     excerpt:sanitized.slice(0,1600),
     closest_known_bugs:ranked.slice(0,5)
   },
@@ -63,6 +67,7 @@ const report={
 
 console.log(`# BUG CANDIDATE fingerprint=${fingerprint}`);
 console.log(`Class: ${likelyClass}`);
+console.log(`Git HEAD: ${gitHead||'unknown'}`);
 console.log(`Closest: ${best?`${best.id} score=${best.score.toFixed(3)} [${best.status}/${best.severity}]`:'none'}`);
 console.log(`Decision: ${report.triage.status}${report.triage.bug_id?` -> ${report.triage.bug_id}`:''}`);
 if(dryRun){console.log('Dry run: report not written.');process.exit(0);}
