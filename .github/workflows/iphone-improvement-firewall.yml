@@ -1,0 +1,46 @@
+# KELO-INDEX
+# area: QA / IPHONE / FIREWALL
+# owner: Real-iPhone improvement gate
+# purpose: reject fake iPhone verification and freeze unrelated advances while World/iOS bugs stay unverified
+name: iPhone Real-Device Firewall
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: iphone-real-device-firewall-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  firewall:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Fetch base for pull requests
+        if: github.event_name == 'pull_request'
+        run: git fetch origin ${{ github.base_ref }} --depth=50
+      - name: Prove firewall contract
+        run: node tests/iphone-real-device-firewall.test.mjs
+      - name: Block fake iPhone verification and unrelated advances
+        env:
+          GITHUB_EVENT_BEFORE: ${{ github.event.before }}
+        run: node scripts/iphone-real-device-firewall.mjs --mode=all
+      - name: Autopilot must stay frozen while iPhone bugs block
+        run: |
+          if node scripts/iphone-real-device-firewall.mjs --mode=freeze; then
+            echo "No blocking iPhone bugs; autopilot may run after real-device PASS"
+          else
+            echo "Autopilot correctly frozen until real iPhone verification"
+          fi

@@ -12,6 +12,8 @@ Este índice es una vista rápida. La fuente canónica de cada bug es su JSON en
 
 `BUG-0001` bloquea la verificación real de `BUG-0002` y `BUG-0003`.
 
+**Cortafuegos:** mientras esos tres sigan sin iPhone Safari real, no se avanza. Ver `bugs/FIREWALL.md`. Viewport/headless no cuenta.
+
 ## Cómo mantener este índice
 
 - Actualizarlo cuando cambie el estado/resumen de un bug canónico.
