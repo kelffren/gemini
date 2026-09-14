@@ -1,8 +1,8 @@
 /* KELO-INDEX
  * area: CORE
  * owner: KeloUpdater audit
- * keys: UPDATE PWA SERVICEWORKER AUDIT CI STAGING PING NETWORK
- * purpose: valida por contrato boot, staging secuencial, gate de red, prioridad gameplay, activación y documentación
+ * keys: UPDATE PWA SERVICEWORKER AUDIT CI STAGING PING NETWORK WATCH
+ * purpose: valida boot, staging secuencial, gate de red, prioridad gameplay, detección en sesiones largas, activación y documentación
  * online: N/A; auditoría estática del cliente
  */
 import fs from 'node:fs';
@@ -20,14 +20,16 @@ const expect = (condition, message) => {
 
 const index = read('index.html');
 const core = read('src/core/update-system.js');
+const watch = read('src/core/update-watch.js');
 const ui = read('src/ui/update-ui.js');
 const sw = read('sw.js');
 const manifest = JSON.parse(read('manifest.webmanifest'));
 const version = read('version.json');
 const doc = read('docs/systems/APP_UPDATE_SYSTEM.md');
 
-expect(index.includes('src/core/update-system.js?v=2-network-stage'), 'index.html no carga la revisión network-stage de update-system.js');
-expect(index.includes('src/ui/update-ui.js?v=2-network-stage'), 'index.html no carga la revisión network-stage de update-ui.js');
+expect(index.includes('src/core/update-system.js?v=3-network-stage'), 'index.html no carga la revisión fresca network-stage de update-system.js');
+expect(index.includes('src/core/update-watch.js?v=1'), 'index.html no carga el detector de deploys durante sesiones largas');
+expect(index.includes('src/ui/update-ui.js?v=2-network-stage'), 'index.html no carga update-ui.js');
 expect(index.includes('rel="manifest" href="manifest.webmanifest"'), 'index.html no declara manifest.webmanifest');
 expect(index.includes('apple-mobile-web-app-capable'), 'faltan metadatos de instalación iOS');
 
@@ -56,6 +58,13 @@ expect(core.includes("parsed.querySelectorAll('script[src]')"), 'el plan no incl
 expect(!core.includes('(?:api|auth)'), 'no excluir src/auth: los scripts estáticos de auth también son parte del boot shell');
 expect(!core.includes('setInterval('), 'KeloUpdater no puede usar setInterval/watchdog');
 
+expect(watch.includes('CHECK_EVERY_MS = 120000'), 'el watch debe comprobar deploys con cadencia ligera de 2 minutos');
+expect(watch.includes('updater.check()'), 'el watch no delega la detección a KeloUpdater');
+expect(watch.includes('snapshot.gameplayBusy'), 'el watch no cede el chequeo ante gameplay crítico');
+expect(watch.includes("document.visibilityState === 'visible'"), 'el watch debe evitar comprobaciones periódicas con la app oculta');
+expect(watch.includes('setTimeout('), 'el watch debe programarse sin loop de frame');
+expect(!watch.includes('setInterval('), 'el watch no puede usar setInterval agresivo');
+
 expect(ui.includes('Actualización en segundo plano'), 'la UI no presenta precarga silenciosa');
 expect(ui.includes('Actualización pausada'), 'la UI no presenta pausa por red/gameplay');
 expect(ui.includes('Nueva versión lista'), 'la UI no distingue build completamente preparada');
@@ -83,5 +92,6 @@ expect(doc.includes('precarga'), 'documentación no describe staging en segundo 
 expect(doc.includes('200 ms'), 'documentación no declara el umbral superior de ping');
 expect(doc.includes('setGameplayBusy'), 'documentación no explica prioridad gameplay');
 expect(doc.includes('Ahorro de Datos'), 'documentación no explica Save Data');
+expect(doc.includes('2 minutos'), 'documentación no explica detección durante sesiones largas');
 
 if (!process.exitCode) console.log('UPDATER AUDIT PASS');
