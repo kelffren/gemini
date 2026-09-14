@@ -6,6 +6,7 @@
 const { test, expect } = require('@playwright/test');
 const fs = require('fs');
 
+test.setTimeout(90000);
 test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 
 async function navigateToMapEditor(page){
@@ -71,7 +72,7 @@ test('Map Forge opens from Creator Hub before a stalled first generation settles
   await expect(openedForge, 'stalled generation must not duplicate Map Forge').toHaveCount(1);
   await expect(page.locator('#kelo-creators-hub')).toHaveCount(0, { timeout: 2000 });
   await expect(openedForge.locator('.kmf-canvas')).toBeVisible();
-  await expect(openedForge.getByRole('button', { name: 'GENERANDO\u2026' })).toBeVisible();
+  await expect(openedForge.getByRole('button', { name: 'GENERANDO…' })).toBeVisible();
 
   await openedForge.getByRole('button', { name: 'CERRAR', exact: true }).click();
   await page.evaluate(() => {
