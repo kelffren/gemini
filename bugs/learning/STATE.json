@@ -49,9 +49,21 @@
       "files": [
         "scripts/world-editor-single-prewarm-owner-audit.mjs"
       ]
+    },
+    {
+      "id": "prevention:5b12ebc68a49a07128d4a6904dc54c0a3b4e7a95",
+      "at": "2026-09-14T11:37:54.000Z",
+      "source": "bug-prevention-ci",
+      "head_sha": "5b12ebc68a49a07128d4a6904dc54c0a3b4e7a95",
+      "base_sha": "9ed701db01bfccbf15695e2feddff530b96308b7",
+      "conclusion": "cancelled",
+      "files": [
+        "index.html",
+        "src/ui/account-auth-ui.js"
+      ]
     }
   ],
-  "feedback_updated_at": "2026-09-14T11:35:24.058Z",
+  "feedback_updated_at": "2026-09-14T11:38:10.553Z",
   "training": {
     "examples": 0,
     "search_examples": 0,
