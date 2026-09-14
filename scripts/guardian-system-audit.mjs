@@ -1,12 +1,16 @@
 /* KELO-INDEX
  * area: QA / GUARDIAN
- * keys: GUARDIAN AUDIT HOST LEASE AUTH IOS REGION SCHEDULER REWARD PROOF
- * hace: valida control plane V2, selección regional, apoyo por presión y unidades de servicio verificadas
- * online: N/A; audit local determinista
+ * keys: GUARDIAN AUDIT HOST LEASE AUTH IOS REGION SCHEDULER REWARD PROOF SUPABASE WEBRTC SIGNAL DATACHANNEL
+ * hace: valida control plane V2, selección regional, apoyo por presión, unidades verificadas y el data plane WebRTC sin segundo loop ni autoridad gameplay cliente
+ * online: audit local determinista + contrato estático de migración Supabase/WebRTC
  */
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import {fileURLToPath} from 'node:url';
 import {createRequire} from 'node:module';
 const require=createRequire(import.meta.url);
+const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const {createGuardianCoordinator,rankFor}=require('../server/guardian-coordinator.js');
 let now=1_000_000;
 const identity={
@@ -44,4 +48,11 @@ const availability=guardian.recordVerifiedContribution({accountId:eu.accountId,n
 const host=guardian.recordVerifiedContribution({accountId:eu.accountId,nodeId:euNode.nodeId},{type:'host_seconds',seconds:3600,region:'eu-west'});assert.equal(host.demandMultiplier,1.75);assert.ok(host.weightedUnits>host.rawUnits);assert.equal(host.kcMinted,0);
 assert.equal(rankFor(50000).multiplier,2);assert.equal(rankFor(250000).multiplier,3);
 assert.equal(guardian.audit().serverAuthorityPreserved,true);assert.equal(guardian.audit().rewardMetricsClientTrusted,false);assert.equal(guardian.audit().kcMintAuthority,false);
-console.log('GUARDIAN_AUDIT_OK',guardian.audit());
+
+const authority=fs.readFileSync(path.join(root,'src/systems/guardian-authority.js'),'utf8');
+const client=fs.readFileSync(path.join(root,'src/systems/guardian-system.js'),'utf8');
+const migration=fs.readFileSync(path.join(root,'supabase/migrations/20260914052544_guardian_webrtc_control_plane_v2.sql'),'utf8');
+assert.match(authority,/guardian_signal_send/);assert.match(authority,/guardian_signal_poll/);assert.match(authority,/primarySupabaseRpc:true/);assert.match(authority,/httpFallback:true/);
+assert.match(client,/RTCPeerConnection/);assert.match(client,/createDataChannel\('kelo-guardian'/);assert.match(client,/KeloSimulation\.after\('guardian:runtime'/);assert.doesNotMatch(client,/setInterval\s*\(/);assert.match(client,/clientGameplayAuthority:false/);assert.match(client,/sendToMaster/);assert.match(client,/broadcast/);
+assert.match(migration,/create table if not exists public\.guardian_signals/);assert.match(migration,/create or replace function public\.guardian_signal_send/);assert.match(migration,/create or replace function public\.guardian_signal_poll/);assert.match(migration,/GUARDIAN_SIGNAL_PAIR_DENIED/);assert.match(migration,/enable row level security/);assert.match(migration,/security definer/);
+console.log('GUARDIAN_AUDIT_OK',{...guardian.audit(),supabaseControlPlane:true,webrtcDataPlane:true,secondLoop:false,clientGameplayAuthority:false});
