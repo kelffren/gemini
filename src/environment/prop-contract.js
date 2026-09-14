@@ -65,6 +65,8 @@
     if(banners[1])addForestProp('forest-plaza-banner-east',banners[1],1820,1360,64,112,'front');
     if(planters[0])addForestProp('forest-plaza-planter-west',planters[0],970,1570,100,116,'front');
     if(planters[1])addForestProp('forest-plaza-planter-east',planters[1],1810,1570,100,116,'front');
+    const probe=trees[0]||banners[0]||planters[0]||FOREST.assets[0];
+    if(probe)addForestProp('map-editor-probe-20260914',probe,1488,1496,140,168,'front');
   }
 
   function ruralTile(frame,x,y,id,family){return Object.freeze({id,family:family||'rural_boundary_prop',asset:'ruralProps',frame,layerGroup:'ruralBoundary',layerRole:'back',position:Object.freeze({x,y}),size:Object.freeze({w:TILE,h:TILE}),anchor:Object.freeze({x:0,y:0}),visualBounds:Object.freeze({x,y,w:TILE,h:TILE}),footprint:Object.freeze({x,y:y+Math.round(TILE*0.65),w:TILE,h:Math.max(1,Math.round(TILE*0.35))}),collider:Object.freeze({mode:'none'}),layers:Object.freeze({back:'props_back',front:null}),priority:8,district:'rural',occlusion:Object.freeze({mode:'none'}),visualOnly:true});}
