@@ -567,9 +567,21 @@
       "files": [
         "scripts/world-studio-provisional-shell-audit.mjs"
       ]
+    },
+    {
+      "id": "prevention:cd3fd566ea154168f4ddc643655abc7139100313",
+      "at": "2026-09-14T20:54:29.000Z",
+      "source": "bug-prevention-ci",
+      "head_sha": "cd3fd566ea154168f4ddc643655abc7139100313",
+      "base_sha": "89133d2a7a2202db9a09c5e20fef36080a72372a",
+      "conclusion": "cancelled",
+      "files": [
+        "index.html",
+        "src/ui/luxe-player-hud.js"
+      ]
     }
   ],
-  "feedback_updated_at": "2026-09-14T20:47:55.451Z",
+  "feedback_updated_at": "2026-09-14T20:54:50.524Z",
   "training": {
     "examples": 44,
     "search_examples": 33,
