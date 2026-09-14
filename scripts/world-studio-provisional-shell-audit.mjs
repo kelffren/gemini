@@ -6,12 +6,26 @@ import {
 } from '../src/studio/integration/world-studio-bridge.mjs';
 
 function makeShell({ loading = true } = {}) {
+  const controls=[
+    {disabled:false,attrs:{},setAttribute(k,v){this.attrs[k]=v;}},
+    {disabled:false,attrs:{},setAttribute(k,v){this.attrs[k]=v;}},
+  ];
+  const status={textContent:'Cargando editor…'};
   const shell = {
     dataset: { shellVersion: 'studio-live-shell-v1.7.0', ...(loading ? { keloWorldLoading: '1' } : {}) },
     stylePresent: true,
     replacedWith: null,
     cloneCount: 0,
-    querySelector(selector) { return selector === '.ks-top' ? {} : null; },
+    attrs:{},
+    controls,
+    status,
+    setAttribute(k,v){this.attrs[k]=v;},
+    querySelector(selector) {
+      if(selector === '.ks-top')return {};
+      if(selector === '.ks-status')return status;
+      return null;
+    },
+    querySelectorAll(selector){return selector==='button,select,input'?controls:[];},
     removeAttribute(name) { if (name === 'style') this.stylePresent = false; },
     cloneNode(deep) {
       assert.equal(deep, true);
@@ -41,10 +55,14 @@ function makeStyle() {
   assert.notEqual(clean, provisional, 'controller must receive a listener-free provisional node');
   assert.equal(current, clean, 'clean shell must be installed before hydrate starts');
 
-  assert.equal(releaseWorldStudioViewport(root), true);
+  assert.equal(releaseWorldStudioViewport(root), false, 'visual provisional chrome must not be reported as interactive');
   assert.equal(clean.cloneCount, 0, 'viewport polling must never replace a shell after hydrate can start');
   assert.equal(current, clean, 'viewport release must preserve the controller-owned DOM node');
-  assert.equal(clean.stylePresent, false, 'hydrated shell must expose the game viewport');
+  assert.equal(clean.stylePresent, false, 'provisional chrome may reveal the game viewport');
+  assert.equal(clean.dataset.keloStudioInteractive,'0','provisional shell must explicitly report non-interactive state');
+  assert.equal(clean.attrs['aria-busy'],'true','provisional shell must expose busy state');
+  assert.equal(clean.status.textContent,'Terminando de cargar editor…');
+  assert.ok(clean.controls.every(control=>control.disabled),'all provisional controls must be disabled instead of silently no-op');
 }
 
 {
@@ -55,6 +73,9 @@ function makeStyle() {
   assert.equal(releaseWorldStudioViewport(root), true);
   assert.equal(finalShell.cloneCount, 0, 'interactive shell must never be replaced during viewport release');
   assert.equal(finalShell.stylePresent, false, 'interactive shell must not retain the opaque launch style');
+  assert.equal(finalShell.dataset.keloStudioInteractive,'1','live shell must report interactive state');
+  assert.equal(finalShell.attrs['aria-busy'],'false','live shell must clear busy state');
+  assert.ok(finalShell.controls.every(control=>!control.disabled),'live controls must remain enabled');
 }
 
 {
