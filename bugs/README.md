@@ -6,19 +6,58 @@
 
 Un bug no debe vivir solamente en un chat, un commit o la memoria de un agente. Todo defecto reproducible que pueda requerir trabajo posterior debe quedar registrado aquí con un ID estable.
 
+El registro también funciona como **memoria de investigación entre agentes**. Un agente nuevo debe poder descubrir qué ocurre, qué se sabe, qué se sospecha, qué ya se intentó, qué falló y cuál es la siguiente prueba de mayor valor sin reconstruir conversaciones antiguas.
+
 Flujo oficial:
 
-`DETECTAR → REGISTRAR → TRIAGE → CLAIM → FIXED_PENDING_VERIFY → VERIFIED → CLOSED`
+`DETECTAR → REGISTRAR → TRIAGE → INVESTIGAR → CLAIM → FIXED_PENDING_VERIFY → VERIFIED → CLOSED`
 
 La IA que modifica código **no obtiene permiso automático para cerrar el bug**. `FIXED_PENDING_VERIFY` significa exactamente: existe una corrección candidata, pero todavía falta una verificación independiente.
+
+## Fast path para agentes
+
+Para un bug existente:
+
+`npm run bug:brief -- BUG-0003`
+
+Ese briefing muestra en orden:
+
+- observación actual;
+- hechos confirmados;
+- hipótesis activas;
+- hipótesis descartadas;
+- intentos anteriores y resultado;
+- unknowns;
+- próximas acciones priorizadas;
+- fix candidate;
+- gate de verificación y blockers.
+
+Regla central:
+
+**un intento `FAIL` no se repite sin nueva evidencia que invalide la conclusión anterior.**
 
 ## Estructura
 
 - `incoming/` — reportes crudos antes de deduplicar/triage. Futuro destino de reportes de jugadores y automatizaciones.
 - `registry/` — un JSON por bug canónico (`BUG-0001.json`).
 - `templates/` — contratos de bug y reporte.
-- `SCHEMA.md` — campos, estados e invariantes.
+- `SCHEMA.md` — campos, estados, investigación e invariantes.
+- `RESEARCH_PROTOCOL.md` — cómo separar hechos, hipótesis, intentos, descartes, unknowns y siguientes acciones.
 - `AI_BRIDGE.md` — protocolo obligatorio para cualquier IA que lea o modifique bugs.
+
+## Schema v2 — expediente vivo
+
+Los bugs activos registran además:
+
+- `research.known_facts` (`F1`, `F2`, ...);
+- `research.hypotheses` (`H1`, `H2`, ...);
+- `research.ruled_out`;
+- `research.unknowns`;
+- `research.external_references` cuando dependen de SDK/API/browser/servicio externo;
+- `attempt_history` (`A1`, `A2`, ...), incluyendo intentos fallidos;
+- `next_best_actions`, priorizadas por valor informativo.
+
+Esto evita que varios agentes ataquen la misma teoría fallida con nombres distintos.
 
 ## Estados
 
@@ -36,11 +75,17 @@ La IA que modifica código **no obtiene permiso automático para cerrar el bug**
 
 No basta con `tests pass` si el bug es visible para el jugador. La verificación debe corresponder al entorno donde falla: LIVE, móvil real, BrowserStack, server real u otro target aplicable.
 
+Una hipótesis solo pasa a `confirmed` con evidencia que demuestre la causa. Un commit solo es un intento hasta que su validación diga qué ocurrió realmente.
+
 ## IDs
 
 - Bug canónico: `BUG-NNNN`.
 - Reporte individual: `REPORT-NNNNNN`.
-- Nunca reutilizar IDs cerrados.
+- Hecho dentro del bug: `F1`, `F2`, ...
+- Hipótesis: `H1`, `H2`, ...
+- Intento: `A1`, `A2`, ...
+- Unknown: `U1`, `U2`, ...
+- Nunca reutilizar IDs cerrados dentro de su ámbito.
 - Antes de crear un bug, buscar duplicados por título, área, síntomas, archivos y reproducción.
 
 ## Reportes de jugadores — plug-and-play
@@ -48,6 +93,22 @@ No basta con `tests pass` si el bug es visible para el jugador. La verificación
 El contrato ya reserva `incoming/` y `REPORT_TEMPLATE.json` para que más adelante el cliente del juego pueda enviar descripción + captura + contexto técnico. Las imágenes pesadas NO deben versionarse dentro de Git: deben vivir en storage y el reporte solo guarda una referencia segura.
 
 Un reporte puede convertirse en bug nuevo o enlazarse a un bug existente. Muchos reportes pueden apuntar al mismo bug.
+
+## Auditoría
+
+Después de modificar registros:
+
+`npm run audit:bugs`
+
+El auditor comprueba, entre otras cosas:
+
+- schema v2;
+- estados válidos;
+- IDs únicos de hechos/hipótesis/intentos;
+- resultados válidos de intentos;
+- que todo `FAIL` tenga `do_not_repeat_without`;
+- que `FIXED_PENDING_VERIFY` tenga un fix identificable;
+- que `VERIFIED/CLOSED` requieran verificación `PASS`.
 
 ## Seguridad
 
@@ -65,4 +126,4 @@ Aplicar sanitización antes de persistir diagnósticos, logs o screenshots.
 
 ## Lectura obligatoria para agentes
 
-Antes de registrar, reclamar, arreglar, verificar o cerrar un bug, leer [`AI_BRIDGE.md`](AI_BRIDGE.md) y [`SCHEMA.md`](SCHEMA.md).
+Antes de registrar, reclamar, arreglar, verificar o cerrar un bug, leer [`AI_BRIDGE.md`](AI_BRIDGE.md), [`SCHEMA.md`](SCHEMA.md) y [`RESEARCH_PROTOCOL.md`](RESEARCH_PROTOCOL.md).
