@@ -75,6 +75,7 @@
     "audit:logistics-ui": "node scripts/logistics-admin-ui-audit.js",
     "audit:performance": "node scripts/performance-foundation-audit.js",
     "audit:online-foundation": "node scripts/online-foundation-audit.mjs",
+    "audit:guardian": "node scripts/guardian-system-audit.mjs",
     "audit:universal-content": "node scripts/universal-content-studio-audit.mjs",
     "audit:avatar-quick": "node scripts/avatar-quick-import-audit.mjs",
     "audit:sprite-compiler": "node scripts/sprite-compiler-audit.mjs",
