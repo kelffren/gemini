@@ -41,6 +41,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+      - name: Syntax check updater runtime
+        run: |
+          node --check src/core/update-system.js
+          node --check src/ui/update-ui.js
+          node --check sw.js
       - name: Audit updater contract
         run: npm run audit:updater
       - name: Audit system documentation
