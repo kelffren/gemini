@@ -15,7 +15,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="KELO WORLD">
-  <title>Kelo World — V6.54.9</title>
+  <title>Kelo World — V6.55</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="preload" as="image" href="assets/hero.PNG?hero=deeab966" fetchpriority="high">
   <link rel="stylesheet" href="src/ui/backpack-fantasy-v1.css?v=1">
@@ -34,18 +34,6 @@
 <body class="social-mode">
 <canvas id="game-canvas"></canvas>
 <div id="ui-layer"><div class="action-bar" id="action-bar-container" aria-label="Barra de habilidades"></div></div>
-<script>
-(function(){
-  var KEY='kelo_sw_wipe_v6549';
-  try{if(sessionStorage.getItem(KEY)==='1')return;sessionStorage.setItem(KEY,'1')}catch(e){return}
-  if(!('serviceWorker'in navigator))return;
-  navigator.serviceWorker.getRegistrations().then(function(rs){
-    return Promise.all((rs||[]).map(function(r){return r.unregister()}));
-  }).then(function(){return caches.keys()}).then(function(keys){
-    return Promise.all((keys||[]).map(function(k){return caches.delete(k)}));
-  }).then(function(){location.reload()}).catch(function(){});
-})();
-</script>
 
 <!-- KELO-INDEX UPDATE: owner KeloUpdater; registra SW, detecta deploys durante sesiones largas y monta aviso táctil. -->
 <script src="src/core/update-system.js?v=3-network-stage"></script>
@@ -62,7 +50,7 @@
 <script src="src/physics/collision-utils.js?v=2"></script><script src="engine-a.js?v=151"></script><script>window.KELO_COLLISION.attachLegacyObstacleArray(obstacles,{adoptExistingOwner:'core-static'});</script><script src="src/core/input-system.js?v=1"></script><script src="src/core/movement-system.js?v=2"></script><script src="engine-b.js?v=94"></script><script src="engine-c.js?v=229"></script><script src="src/core/camera-system.js?v=1"></script><script src="src/core/avatar-render-system.js?v=2-base-zoo-authority"></script><script src="src/core/render-extension-system.js?v=3"></script><script src="src/core/simulation-extension-system.js?v=3"></script><script src="engine-d.js?v=95"></script><script src="engine-e.js?v=94"></script><script src="engine-f.js?v=95"></script><script src="engine-g.js?v=96"></script><script src="src/environment/mobile-performance-contract.js?v=1"></script><script src="engine-h.js?v=151"></script><script src="engine-i.js?v=94"></script><script src="engine-j.js?v=94"></script><script src="engine-k.js?v=94"></script>
 
 <!-- KELO-INDEX WORLD: contracts, atlases y renderer del mundo. -->
-<script>window.KELO_WORLD_DECORATION_RESET=false;</script><script src="src/environment/rural-nature-atlas.js?v=200"></script><script src="src/environment/gardens-atlas.js?v=2"></script><script src="src/environment/gardens-joins.js?v=3"></script><script src="src/environment/terrain-contract.js?v=1"></script><script src="src/environment/generated/arboleskelo1-atlas.js?v=1"></script><script src="src/environment/tile-registry.js?v=237"></script><script src="src/environment/atlas-contract.js?v=4"></script><script src="src/environment/generated/forest-plaza-tileset-v2-manifest.js?v=1"></script><script src="src/environment/gardens-t-junction-registry.js?v=1"></script><script src="src/environment/district-decals-registry.js?v=3"></script><script src="src/environment/gardens-compositions.js?v=10"></script><script src="src/environment/world-map.js?v=terrain-191"></script><script src="src/environment/environment-layer-stack.js?v=4"></script><script src="src/environment/surface-ground.js?v=1"></script><script src="src/environment/prop-contract.js?v=7-map-probe"></script><script src="src/environment/generic-props.js?v=9"></script><script src="src/environment/prefab-contract.js?v=1"></script><script src="engine-l.js?v=223"></script>
+<script>window.KELO_WORLD_DECORATION_RESET=true;</script><script src="src/environment/rural-nature-atlas.js?v=200"></script><script src="src/environment/gardens-atlas.js?v=2"></script><script src="src/environment/gardens-joins.js?v=3"></script><script src="src/environment/terrain-contract.js?v=1"></script><script src="src/environment/generated/arboleskelo1-atlas.js?v=1"></script><script src="src/environment/tile-registry.js?v=237"></script><script src="src/environment/atlas-contract.js?v=4"></script><script src="src/environment/generated/forest-plaza-tileset-v2-manifest.js?v=1"></script><script src="src/environment/gardens-t-junction-registry.js?v=1"></script><script src="src/environment/district-decals-registry.js?v=3"></script><script src="src/environment/gardens-compositions.js?v=10"></script><script src="src/environment/world-map.js?v=terrain-191"></script><script src="src/environment/environment-layer-stack.js?v=4"></script><script src="src/environment/surface-ground.js?v=1"></script><script src="src/environment/prop-contract.js?v=7-map-probe"></script><script src="src/environment/generic-props.js?v=9"></script><script src="src/environment/prefab-contract.js?v=1"></script><script src="engine-l.js?v=223"></script>
 
 <!-- KELO-INDEX LEGACY/SUPPORT: wrappers históricos y puentes todavía LIVE. PvP solicita foundations al primer enter mediante el owner KeloRuntimeBootstrap. -->
 <script src="engine-m.js?v=94"></script><script src="engine-n.js?v=230"></script><script src="engine-o.js?v=96"></script><script src="engine-p.js?v=96"></script><script src="engine-q.js?v=94"></script><script src="engine-r.js?v=94"></script><script src="engine-s.js?v=96"></script><script src="engine-t.js?v=94"></script><script src="engine-u.js?v=94"></script><script src="engine-v.js?v=94"></script><script src="engine-w.js?v=94"></script><script src="engine-x.js?v=94"></script><script src="engine-y.js?v=98"></script><script src="engine-z.js?v=94"></script><script src="engine-aa.js?v=96"></script><script src="engine-ab.js?v=240"></script><script src="src/characters/character-appearance.js?v=4-base-zoo-authority"></script><script src="engine-ac.js?v=224"></script><script src="engine-ae.js?v=94"></script><script src="engine-af.js?v=94"></script><script src="engine-ag.js?v=94"></script><script src="engine-ah.js?v=95"></script><script src="engine-ai.js?v=95"></script><script src="engine-aj.js?v=94"></script><script src="src/systems/master-bot-pipelines.js?v=1"></script><script src="src/systems/pvp-world.js?v=6"></script><script src="src/systems/pvp-combat-runtime-loader.js?v=2"></script><script src="src/systems/arena-system.js?v=1"></script><script src="src/systems/arena-lane-pressure.js?v=1"></script><script src="src/systems/arena-telemetry.js?v=1"></script><script src="src/systems/arena-highlights.js?v=1"></script><script src="src/systems/arena-progression.js?v=1"></script>
@@ -71,7 +59,7 @@
 <script src="src/visuals/visual-system.js?v=3"></script><script src="src/visuals/visual-manifests.js?v=2"></script><script src="src/visuals/asset-registry.js?v=1"></script><script src="src/visuals/animation-system.js?v=1"></script><script src="src/visuals/fx-system.js?v=3"></script><script src="src/visuals/sequence-system.js?v=2"></script><script src="src/visuals/melee-visual-manifest.js?v=2"></script><script src="src/visuals/melee-combat-visuals.js?v=1"></script>
 
 <!-- KELO-INDEX ABILITIES/PROGRESSION/NET: Stones conserva 5 slots; a pie Weapon aporta Q/W/E; Mount sustituye Q/W/E por M1-M3; todos reutilizan KeloAbilities y cargan foundations bajo first-use. -->
-<script src="src/abilities/abilityData.js?v=154"></script><script src="src/abilities/stone-system.js?v=154"></script><script src="src/mounts/mount-ability-data.js?v=1"></script><script src="src/abilities/equipment-ability-data.js?v=1"></script><script src="src/abilities/stone-backpack-bridge.js?v=2"></script><script src="src/abilities/kelo-ability-boot.js?v=160"></script><script src="src/abilities/ability-source-cast.js?v=1"></script><script src="src/visuals/ability-visuals.js?v=4"></script><script src="src/abilities/sword-swap-runtime.js?v=2"></script><script src="src/visuals/sword-swap-pvp-visuals.js?v=4"></script><script src="src/systems/title-catalog.js?v=1"></script><script src="src/systems/player-stats.js?v=1"></script><script src="src/systems/title-system.js?v=1"></script><script src="src/config/online-runtime-config.js?v=6"></script><script src="src/ui/google-auth-button.js?v=1&boot=7"></script><script src="src/ui/account-profile-18-ui.js?v=1&boot=8"></script><script src="engine-net.js?v=102"></script>
+<script src="src/abilities/abilityData.js?v=154"></script><script src="src/abilities/stone-system.js?v=154"></script><script src="src/mounts/mount-ability-data.js?v=1"></script><script src="src/abilities/equipment-ability-data.js?v=1"></script><script src="src/abilities/stone-backpack-bridge.js?v=2"></script><script src="src/abilities/kelo-ability-boot.js?v=160"></script><script src="src/abilities/ability-source-cast.js?v=1"></script><script src="src/visuals/ability-visuals.js?v=4"></script><script src="src/abilities/sword-swap-runtime.js?v=2"></script><script src="src/visuals/sword-swap-pvp-visuals.js?v=4"></script><script src="src/systems/title-catalog.js?v=1"></script><script src="src/systems/player-stats.js?v=1"></script><script src="src/systems/title-system.js?v=1"></script><script src="src/config/online-runtime-config.js?v=6"></script><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0"></script><script src="src/auth/supabase-auth-runtime.js?v=6&boot=8"></script><script src="src/auth/online-auth-lifecycle-bridge.js?v=1"></script><script src="src/ui/account-auth-ui.js?v=2&boot=8"></script><script src="src/auth/guest-play-bypass.js?v=2"></script><script src="src/ui/google-auth-button.js?v=1&boot=7"></script><script src="src/ui/account-profile-18-ui.js?v=1&boot=8"></script><script src="engine-net.js?v=102"></script>
 
 <!-- KELO-INDEX UI/SYSTEMS: UI consume APIs; shared stats/appearance cargan antes de Equipment/Mount runtime. -->
 <script src="src/ui/luxe-shell.js?v=230"></script>
@@ -137,7 +125,7 @@
 <script src="src/systems/forge-system.js?v=1"></script>
 <script src="src/systems/armor-aura.js?v=1"></script>
 <script src="src/systems/illumination.js?v=2"></script>
-<script src="src/systems/performance-governor.js?v=4-phone"></script>
+<script src="src/systems/performance-governor.js?v=3"></script>
 
 <!-- KELO-INDEX LATE BOOT: Profile conserva cierre/inspección y lanza Character Customizer solo bajo acción explícita; ya no arranca combat/effects/melee. -->
 <script src="src/ui/profile-panel-close.js?v=2"></script>
@@ -148,5 +136,4 @@
 <!-- KELO-INDEX STUDIO: launcher mínimo; World/Mount/Appearance/VFX creators se importan solo tras acción CREATE. -->
 <script src="src/ui/studio-launcher.js?v=9-world-bridge-20260914-3"></script>
 <script src="src/ui/map-forge-launch-recovery-v1.js?v=1"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0"></script><script src="src/auth/supabase-auth-runtime.js?v=6&boot=8"></script><script src="src/auth/online-auth-lifecycle-bridge.js?v=1"></script><script src="src/ui/account-auth-ui.js?v=2&boot=8"></script><script src="src/auth/guest-play-bypass.js?v=2"></script>
 </body></html>
