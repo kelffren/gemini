@@ -84,3 +84,13 @@ const params=new URLSearchParams(location.search);
 if(params.get('mapEditor')==='1')request('admin-key:bootstrap-local-root',{actorId:playerId(),ownerId:playerId(),developer:true}).then(syncWhenReady).catch(console.error);else syncWhenReady();
 window.addEventListener('load',syncWhenReady,{once:true});
 })();
+
+/* World notifications depend on Admin authority for publishing, so they boot here after KELO_ADMIN_KEYS exists. */
+(function bootWorldNotifications(){
+  if(window.KeloNotifications||document.getElementById('kelo-world-notification-script'))return;
+  const script=document.createElement('script');
+  script.id='kelo-world-notification-script';
+  script.src='src/systems/world-notification-system.js?v=1';
+  script.async=false;
+  document.head.appendChild(script);
+})();
