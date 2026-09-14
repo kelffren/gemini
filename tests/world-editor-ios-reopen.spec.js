@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: TEST / WORLD EDITOR / REAL IOS REOPEN
  * owner: World Creator mobile launch regression
- * purpose: reproduce the stale Studio-session black screen and prove World remounts on real iPhone Safari
+ * purpose: reproduce the stale Studio-session black screen, prove World remounts on real iPhone Safari, and preserve BUG-0003 black-box milestones as evidence
  */
 const { test, expect } = require('@playwright/test');
 const fs = require('fs');
@@ -16,12 +16,30 @@ const isBrowserStack = Boolean(
 );
 if (!isBrowserStack) test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 
+const BLACK_BOX_KEY = 'kelo:bug-observability:v1';
+
+async function readWorldTrace(page) {
+  return page.evaluate(key => {
+    try {
+      const rows = JSON.parse(sessionStorage.getItem(key) || '[]');
+      return Array.isArray(rows) ? rows.filter(row => row?.flow === 'world-open' && row?.bugId === 'BUG-0003') : [];
+    } catch {
+      return [];
+    }
+  }, BLACK_BOX_KEY);
+}
+
+function writeWorldTrace(name, rows) {
+  fs.writeFileSync(`test-results/${name}.json`, JSON.stringify(rows, null, 2));
+}
+
 test('World recovers a stale Studio session instead of leaving iOS on a black page', async ({ page }) => {
   const pageErrors = [];
   const consoleErrors = [];
   page.on('pageerror', error => pageErrors.push(String(error)));
   page.on('console', msg => { if(msg.type()==='error')consoleErrors.push(msg.text()); });
   fs.mkdirSync('test-results', { recursive: true });
+  await page.addInitScript(key => { try { sessionStorage.removeItem(key); } catch {} }, BLACK_BOX_KEY);
 
   // mapEditor=1 is the explicit developer bootstrap recognized by
   // admin-key-system.js. guest=1 keeps the auth wall out of the mobile QA path.
@@ -44,6 +62,16 @@ test('World recovers a stale Studio session instead of leaving iOS on a black pa
   await expect(studio).not.toHaveAttribute('data-kelo-world-loading', '1', { timeout: 25000 });
   await expect(hub).toHaveCount(0);
 
+  // The bridge black box must prove that visible chrome progressed to a real
+  // interactive session. A shell alone is not acceptance for BUG-0003.
+  await page.waitForTimeout(1100);
+  const firstTrace = await readWorldTrace(page);
+  writeWorldTrace('world-editor-black-box-first-open', firstTrace);
+  const firstMilestones = firstTrace.map(row => row.milestone);
+  expect(firstMilestones).toContain('CONTROLLER_OPEN_RESOLVED');
+  expect(firstMilestones).toContain('EDITOR_READY');
+  expect(firstMilestones).toContain('SURVIVED_1000MS');
+
   // Reproduce the Safari failure mode: DOM shell disappears while the module-level
   // Studio session is still cached as active.
   await page.evaluate(() => document.getElementById('kelo-studio-live')?.remove());
@@ -62,6 +90,11 @@ test('World recovers a stale Studio session instead of leaving iOS on a black pa
   await expect(page.locator('#kelo-creators-hub')).toHaveCount(0);
   await expect(recovered).toHaveCSS('position', 'fixed');
   await page.screenshot({ path: 'test-results/world-editor-ios-recovered.png', fullPage: true });
+
+  const recoveredTrace = await readWorldTrace(page);
+  writeWorldTrace('world-editor-black-box-reopen', recoveredTrace);
+  expect(recoveredTrace.filter(row => row.milestone === 'EDITOR_READY').length).toBeGreaterThanOrEqual(2);
+  expect(recoveredTrace.some(row => row.milestone === 'FAIL')).toBeFalsy();
 
   expect(pageErrors).toEqual([]);
   expect(consoleErrors.filter(row => /CREATOR_WORLD_STUDIO_MOUNT_FAILED|WORLD_EDIT_NOT_READY/.test(row))).toEqual([]);
