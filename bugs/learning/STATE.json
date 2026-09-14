@@ -556,9 +556,20 @@
       "files": [
         "src/studio/integration/world-studio-bridge.mjs"
       ]
+    },
+    {
+      "id": "prevention:be9576ae3b83ef2dbd099f0eaaf983617bc93c7e",
+      "at": "2026-09-14T20:47:38.000Z",
+      "source": "bug-prevention-ci",
+      "head_sha": "be9576ae3b83ef2dbd099f0eaaf983617bc93c7e",
+      "base_sha": "18d14985d0d40bf53dbc8aa3fdf9328d5e7b3874",
+      "conclusion": "success",
+      "files": [
+        "scripts/world-studio-provisional-shell-audit.mjs"
+      ]
     }
   ],
-  "feedback_updated_at": "2026-09-14T20:47:33.818Z",
+  "feedback_updated_at": "2026-09-14T20:47:55.451Z",
   "training": {
     "examples": 44,
     "search_examples": 33,
