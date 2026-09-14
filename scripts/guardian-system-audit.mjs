@@ -1,8 +1,8 @@
 /* KELO-INDEX
  * area: QA / GUARDIAN
- * keys: GUARDIAN AUDIT HOST LEASE AUTH IOS REGION SCHEDULER REWARD PROOF SUPABASE WEBRTC SIGNAL DATACHANNEL
- * hace: valida control plane V2, selección regional, apoyo por presión, unidades verificadas y el data plane WebRTC sin segundo loop ni autoridad gameplay cliente
- * online: audit local determinista + contrato estático de migración Supabase/WebRTC
+ * keys: GUARDIAN AUDIT HOST LEASE AUTH IOS REGION SCHEDULER REWARD PROOF SUPABASE WEBRTC SIGNAL DATACHANNEL HOT MIRROR FAILOVER CHECKPOINT
+ * hace: valida control plane V2, selección regional, servicio verificado y V3 Hot Mirror sin segundo loop ni autoridad gameplay cliente
+ * online: audit local determinista + contratos estáticos Supabase/WebRTC/Hot Mirror
  */
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -51,8 +51,12 @@ assert.equal(guardian.audit().serverAuthorityPreserved,true);assert.equal(guardi
 
 const authority=fs.readFileSync(path.join(root,'src/systems/guardian-authority.js'),'utf8');
 const client=fs.readFileSync(path.join(root,'src/systems/guardian-system.js'),'utf8');
+const mirror=fs.readFileSync(path.join(root,'src/systems/guardian-hot-mirror.js'),'utf8');
+const ui=fs.readFileSync(path.join(root,'src/ui/guardian-ui.js'),'utf8');
 const migration=fs.readFileSync(path.join(root,'supabase/migrations/20260914052544_guardian_webrtc_control_plane_v2.sql'),'utf8');
 assert.match(authority,/guardian_signal_send/);assert.match(authority,/guardian_signal_poll/);assert.match(authority,/primarySupabaseRpc:true/);assert.match(authority,/httpFallback:true/);
 assert.match(client,/RTCPeerConnection/);assert.match(client,/createDataChannel\('kelo-guardian'/);assert.match(client,/KeloSimulation\.after\('guardian:runtime'/);assert.doesNotMatch(client,/setInterval\s*\(/);assert.match(client,/clientGameplayAuthority:false/);assert.match(client,/sendToMaster/);assert.match(client,/broadcast/);
+assert.match(mirror,/guardian:mirror_checkpoint/);assert.match(mirror,/guardian:mirror_ack/);assert.match(mirror,/guardian:mirror_takeover/);assert.match(mirror,/KeloSimulation\.after\('guardian:hot-mirror'/);assert.match(mirror,/startMasterHost\(\)/);assert.match(mirror,/authoritativeGameplay:false/);assert.match(mirror,/clientGameplayAuthority:false/);assert.doesNotMatch(mirror,/setInterval\s*\(/);assert.doesNotMatch(mirror,/STATE\.gold\s*=/);assert.doesNotMatch(mirror,/\.hp\s*=\s*msg/);
+assert.match(ui,/guardian-hot-mirror\.js/);assert.match(ui,/KeloGuardianMirror/);assert.match(ui,/mirrorReadOnly:true/);assert.match(ui,/gameplayAuthority:false/);
 assert.match(migration,/create table if not exists public\.guardian_signals/);assert.match(migration,/create or replace function public\.guardian_signal_send/);assert.match(migration,/create or replace function public\.guardian_signal_poll/);assert.match(migration,/GUARDIAN_SIGNAL_PAIR_DENIED/);assert.match(migration,/enable row level security/);assert.match(migration,/security definer/);
-console.log('GUARDIAN_AUDIT_OK',{...guardian.audit(),supabaseControlPlane:true,webrtcDataPlane:true,secondLoop:false,clientGameplayAuthority:false});
+console.log('GUARDIAN_AUDIT_OK',{...guardian.audit(),supabaseControlPlane:true,webrtcDataPlane:true,hotMirror:true,automaticMasterClaim:true,secondLoop:false,clientGameplayAuthority:false});
