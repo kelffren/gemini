@@ -27,8 +27,20 @@
     "repeatedCandidates": 0,
     "champion": null
   },
-  "observations": [],
-  "feedback_updated_at": null,
+  "observations": [
+    {
+      "id": "prevention:79e579dccb6782c79a81663a54b2782a3a864a21",
+      "at": "2026-09-14T11:34:47.000Z",
+      "source": "bug-prevention-ci",
+      "head_sha": "79e579dccb6782c79a81663a54b2782a3a864a21",
+      "base_sha": "8c4a20dccfafa905b0b0ccbf22ac91eb9dfa46f3",
+      "conclusion": "failure",
+      "files": [
+        "src/creators/workspaces/world-workspace.mjs"
+      ]
+    }
+  ],
+  "feedback_updated_at": "2026-09-14T11:35:03.708Z",
   "training": {
     "examples": 0,
     "search_examples": 0,
@@ -40,7 +52,9 @@
   "hotspots": [],
   "prevention_gaps": [],
   "safety": {
-    "auto_write_scope": ["bugs/learning/STATE.json"],
+    "auto_write_scope": [
+      "bugs/learning/STATE.json"
+    ],
     "arbitrary_source_code_writes": false,
     "bug_state_mutation": false,
     "auto_close": false,
