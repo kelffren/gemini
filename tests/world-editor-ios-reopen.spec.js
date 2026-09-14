@@ -1,9 +1,9 @@
 /* KELO-INDEX
  * area: TEST / WORLD EDITOR / REAL IOS REOPEN
  * owner: World Creator mobile launch regression
- * purpose: reproduce the stale Studio-session black screen, prove World remounts on real iPhone Safari, and preserve BUG-0003 black-box milestones as evidence
+ * purpose: reproduce the stale Studio-session black screen, prove World remounts on real iPhone Safari, preserve BUG-0003 black-box milestones as evidence, and emulate an iPhone UA locally instead of inheriting the global Pixel profile
  */
-const { test, expect } = require('@playwright/test');
+const { test, expect, devices } = require('@playwright/test');
 const fs = require('fs');
 
 // BrowserStack supplies the physical iPhone/Safari capabilities. Re-applying
@@ -14,7 +14,15 @@ const isBrowserStack = Boolean(
   process.env.BROWSERSTACK_ACCESS_KEY ||
   process.env.BROWSERSTACK_BUILD_NAME
 );
-if (!isBrowserStack) test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+if (!isBrowserStack) {
+  test.use({
+    ...devices['iPhone 13'],
+    viewport: { width: 390, height: 844 },
+    screen: { width: 390, height: 844 },
+    isMobile: true,
+    hasTouch: true,
+  });
+}
 
 const BLACK_BOX_KEY = 'kelo:bug-observability:v1';
 
