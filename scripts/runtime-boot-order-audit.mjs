@@ -77,9 +77,7 @@ if(!fs.existsSync(INDEX)){
     ['src/environment/prop-contract.js','src/environment/generic-props.js','generic renderer consumes prop contract'],
     ['src/environment/generic-props.js','engine-l.js','legacy world renderer follows managed props'],
     ['src/core/kelo-runtime-bootstrap.js','src/systems/pvp-combat-runtime-loader.js','PvP must reuse shared lazy foundations'],
-    ['src/config/online-runtime-config.js','src/auth/supabase-auth-runtime.js','auth consumes runtime config'],
-    ['src/auth/supabase-auth-runtime.js','src/auth/online-auth-lifecycle-bridge.js','lifecycle consumes auth runtime'],
-    ['src/auth/online-auth-lifecycle-bridge.js','engine-net.js','network engine follows auth lifecycle'],
+    ['src/config/online-runtime-config.js','engine-net.js','network reads online runtime config before transport boot'],
     ['src/systems/player-stats.js','src/systems/title-system.js','titles consume canonical player stats'],
     ['src/stats/stat-modifier-system.js','src/systems/equipment-system.js','equipment publishes through stat modifier owner'],
     ['src/appearance/appearance-system.js','src/mounts/mount-system.js','mounts consume canonical appearance'],
@@ -91,6 +89,37 @@ if(!fs.existsSync(INDEX)){
     ['src/systems/game-tuning-system.js','src/ui/game-tuning-admin-ui.js','tuning UI consumes system API']
   ];
   for(const edge of edges) before(...edge);
+
+  // Auth intentionally starts after DOMContentLoaded so a slow third-party Supabase CDN
+  // can never hold the game's first frame. Validate that post-DCL chain separately
+  // instead of pretending those files are parser-time boot scripts.
+  const loaderMatch=html.match(/\bvar\s+urls\s*=\s*\[([\s\S]*?)\]\s*;/);
+  if(!loaderMatch){
+    fail('post-DCL auth loader missing');
+  } else {
+    const dynamic=[];
+    const stringRe=/['"]([^'"]+)['"]/g;
+    let item;
+    while((item=stringRe.exec(loaderMatch[1]))) dynamic.push(item[1].split('?')[0].split('#')[0]);
+    const dynamicPos=new Map(dynamic.map((src,index)=>[src,index]));
+    const requireDynamic=src=>{
+      const index=dynamicPos.get(src);
+      if(index==null){fail('required post-DCL auth script missing: '+src);return null;}
+      return index;
+    };
+    const dynamicBefore=(a,b,reason)=>{
+      const ai=requireDynamic(a),bi=requireDynamic(b);
+      if(ai==null||bi==null)return;
+      if(ai>=bi)fail(`${a} must load before ${b} in post-DCL auth chain${reason?` (${reason})`:''}`);
+    };
+    const sdk=dynamic.find(src=>/^https:\/\/cdn\.jsdelivr\.net\/npm\/@supabase\/supabase-js@/i.test(src));
+    if(!sdk)fail('Supabase SDK missing from post-DCL auth chain');
+    else dynamicBefore(sdk,'src/auth/supabase-auth-runtime.js','auth runtime consumes Supabase SDK');
+    dynamicBefore('src/auth/supabase-auth-runtime.js','src/auth/online-auth-lifecycle-bridge.js','lifecycle consumes auth runtime');
+    dynamicBefore('src/auth/online-auth-lifecycle-bridge.js','src/ui/account-auth-ui.js','account UI follows lifecycle owner');
+    dynamicBefore('src/ui/account-auth-ui.js','src/auth/guest-play-bypass.js','guest bypass applies after canonical account UI');
+    ok(`validated ${dynamic.length} post-DCL auth loader entries`);
+  }
 
   const inlineMutations=[...html.matchAll(/<script>([^<]*(?:window|globalThis)\.[A-Z0-9_]+\s*=.*?)[<]\/script>/gsi)];
   if(inlineMutations.length) warn(`${inlineMutations.length} inline global boot mutation(s) remain; migrate them into explicit config owners gradually`);
