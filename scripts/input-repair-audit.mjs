@@ -19,7 +19,7 @@ const pageErrors = [];
 page.on('pageerror', (error) => pageErrors.push(String(error?.stack || error?.message || error)));
 
 try {
-  await page.goto(url, { waitUntil: 'networkidle', timeout: 60_000 });
+  await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60_000 });
   await page.waitForFunction(() => (
     typeof localPlayer !== 'undefined' &&
     typeof input !== 'undefined' &&
