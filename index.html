@@ -13,7 +13,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="KELO WORLD">
-  <title>Kelo World — V6.62</title>
+  <title>Kelo World — V6.63</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="src/ui/backpack-fantasy-v1.css?v=1">
   <style>
@@ -116,6 +116,7 @@
 <script>window.__keloReleaseRAF&&window.__keloReleaseRAF();</script>
 <script>
 (function(){
+  var BUILD='V6.63';
   var packs=[
     {src:'src/ui/player-nameplate.js?v=1', name:'placas'},
     {src:'src/systems/nobility.js?v=4', name:'títulos'},
@@ -123,9 +124,19 @@
     {src:'src/ui/kelo-chat-integration-bridge.js?v=2', name:'chat'},
     {src:'src/environment/plaza-depth.js?v=219', name:'plaza'},
     {src:'src/ui/profile-panel-close.js?v=2', name:'perfil'},
-    {src:'src/ui/self-interaction-ui.js?v=1', name:'perfil'}
+    {src:'src/ui/self-interaction-ui.js?v=1', name:'perfil'},
+    {src:'engine-m.js?v=94', name:'mundo'},
+    {src:'engine-n.js?v=230', name:'mundo'},
+    {src:'engine-o.js?v=96', name:'mundo'},
+    {src:'engine-p.js?v=96', name:'mundo'},
+    {src:'engine-q.js?v=94', name:'mundo'},
+    {src:'engine-s.js?v=96', name:'mundo'},
+    {src:'engine-ah.js?v=95', name:'mundo'},
+    {src:'engine-ai.js?v=95', name:'mundo'},
+    {src:'src/systems/illumination.js?v=2', name:'luz'}
   ];
-  var i=0, box=document.getElementById('kelo-module-loader');
+  var i=0, shown=false, cacheHits=0;
+  var box=document.getElementById('kelo-module-loader');
   var text=document.getElementById('kelo-ml-text');
   var bar=document.getElementById('kelo-ml-bar');
   function busy(){
@@ -134,26 +145,45 @@
   }
   function show(msg, pct){
     if(!box)return;
-    box.hidden=false;
+    box.hidden=false; shown=true;
     if(text) text.textContent=msg;
     if(bar) bar.style.width=Math.max(0,Math.min(100,pct))+'%';
   }
-  function hide(){
+  function hide(msg){
     if(!box)return;
-    show('Listo',100);
-    setTimeout(function(){ box.hidden=true; }, 900);
+    if(shown){ show(msg||'Listo',100); setTimeout(function(){ box.hidden=true; }, 800); }
+    else box.hidden=true;
+    try{ localStorage.setItem('kelo_modpack', BUILD); }catch(e){}
   }
   function next(){
-    if(i>=packs.length){ hide(); return; }
-    if(busy()){ show('En pausa · caminando', (i/packs.length)*100); setTimeout(next, 400); return; }
-    var item=packs[i];
-    show('Descargando '+item.name+'  '+(i+1)+'/'+packs.length, (i/packs.length)*100);
+    if(i>=packs.length){ hide(cacheHits>=packs.length-1?'':'Listo'); return; }
+    if(busy()){ if(shown) show('En pausa · caminando', (i/packs.length)*100); setTimeout(next, 450); return; }
+    var item=packs[i], t0=performance.now();
     var s=document.createElement('script');
     s.src=item.src;
-    s.onload=s.onerror=function(){ i+=1; setTimeout(next, 320); };
+    s.onload=s.onerror=function(){
+      var dt=performance.now()-t0;
+      if(dt<50) cacheHits++;
+      else show('Descargando '+item.name+'  '+(i+1)+'/'+packs.length, ((i+1)/packs.length)*100);
+      i+=1;
+      setTimeout(next, dt<50?80:380);
+    };
     document.head.appendChild(s);
   }
-  setTimeout(next, 1600);
+  function ping(){
+    if(busy())return;
+    fetch('index.html?ping='+Date.now(),{cache:'no-store'}).then(function(r){return r.text()}).then(function(html){
+      var m=html.match(/Kelo World — (V[\d.]+)/);
+      if(m&&m[1]&&m[1]!==BUILD){
+        show('Nueva versión '+m[1]+' · cierra y abre',100);
+        box.hidden=false;
+      }
+    }).catch(function(){});
+  }
+  var warm=false;
+  try{ warm=localStorage.getItem('kelo_modpack')===BUILD; }catch(e){}
+  setTimeout(next, warm?400:1400);
+  setInterval(ping, 45000);
 })();
 </script>
 </body></html>
