@@ -414,7 +414,7 @@
   "fix": {
     "status": "candidate",
     "commits": [
-      "0c3a97a51c0986a8ba89f55914659ecc6aeccf97",
+      "ab6b19c7b93ec81308ea0c4490bcbba1010df606",
       "9f52de80b572a9a3657b106f61451871d592452e",
       "535c5ba13002e9188bc762c450e280b8834995c5",
       "a54ff27ad4264aa31f4b65b21d939f4014cb0502"
@@ -464,5 +464,5 @@
     "5a52c6d failed verification: Hub destroyed at 250ms while the 80-module static graph + dpr=3 overlay killed the iPhone tab after loading chrome. REOPENED then replaced by world-light-20260914-1.",
     "world-bridge-20260914-1 paces Studio imports in waves with main-thread yields and paints live chrome before the kernel graph. Still FIXED_PENDING_VERIFY until a real iPhone enters the editor."
   ],
-  "updated_at": "2026-09-13T23:48:00-04:00"
+  "updated_at": "2026-09-13T23:49:00-04:00"
 }
