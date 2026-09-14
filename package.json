@@ -2,6 +2,8 @@
   "name": "kelo-world",
   "private": true,
   "scripts": {
+    "build": "node scripts/turbo-build.mjs",
+    "audit:turbo-build": "node scripts/turbo-build-audit.mjs",
     "test": "playwright test",
     "test:live": "playwright test",
     "test:browserstack": "browserstack-node-sdk playwright test",
@@ -84,6 +86,7 @@
   },
   "devDependencies": {
     "@playwright/test": "1.62.0",
-    "browserstack-node-sdk": "^1.69.0"
+    "browserstack-node-sdk": "^1.69.0",
+    "esbuild": "0.25.9"
   }
 }
