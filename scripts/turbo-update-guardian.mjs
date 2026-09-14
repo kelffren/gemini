@@ -25,33 +25,63 @@ const scripts = packageJson.scripts || {};
 const dependencies = { ...(packageJson.dependencies || {}), ...(packageJson.devDependencies || {}) };
 
 const sourceFiles = ['src/core/update-system.js','src/core/update-delta-core.js','src/core/update-watch.js','src/ui/update-ui.js','sw.js'];
+const lazyFiles = ['src/ui/studio-launcher.js','src/visuals/visual-lab-loader.js'];
 const buildConfigs = ['vite.config.js','vite.config.mjs','vite.config.ts','rollup.config.js','rollup.config.mjs','webpack.config.js','webpack.config.cjs','esbuild.config.js','scripts/turbo-build.mjs'];
 const headerConfigs = ['_headers','public/_headers','netlify.toml','vercel.json','firebase.json','nginx.conf','.github/workflows/pages.yml','.github/workflows/deploy-pages.yml'];
 const contractDoc = 'docs/systems/TURBO_UPDATE_CONTRACT.md';
 const hostingDoc = 'docs/evidence/TURBO_UPDATE_HOSTING_EVIDENCE.md';
+const workflowPath = '.github/workflows/turbo-update-guardian.yml';
 
 function check(id, title, pass, evidence, blocker) {
   return { id, title, pass: !!pass, evidence, blocker: blocker || null };
 }
 
 const buildConfigPresent = buildConfigs.some(exists);
-const productionBuildScript = typeof scripts.build === 'string' && scripts.build.trim().length > 0;
+const productionBuildScript = scripts.build === 'node scripts/turbo-build.mjs';
 const manifestGenerator = exists('scripts/generate-turbo-manifest.mjs') || exists('scripts/turbo-build.mjs');
-// Turbo V3 currently consumes GitHub's recursive tree as a per-file manifest: path -> Git blob identity + byte size.
 const deltaManifestRuntime = (anyHas(sourceFiles, 'GITHUB_TREE_API') && anyHas(sourceFiles, 'fetchBuildTree') && anyHas(sourceFiles, 'blob')) || anyHas(sourceFiles, 'turbo-update-manifest') || anyHas(sourceFiles, 'delta-manifest');
 const globalCache = (anyHas(sourceFiles, "ASSET_CACHE_NAME = 'kelo-assets-v3'") || anyHas(sourceFiles, 'kelo-turbo-assets-v1') || anyHas(sourceFiles, 'TURBO_ASSET_CACHE'))
   && (anyHas(sourceFiles, '__kelo_asset_v3__/') || anyHas(sourceFiles, 'assetObjectUrl'));
-const contentHashConfig = regexAny(buildConfigs, /\[(?:content)?hash(?::\d+)?\]|entryFileNames[^\n]*hash|chunkFileNames[^\n]*hash|assetFileNames[^\n]*hash/)
+const contentHashConfig = regexAny(buildConfigs, /\[(?:content)?hash(?::\d+)?\]|entryFileNames[^\n]*hash|chunkFileNames[^\n]*hash|assetFileNames[^\n]*hash/i)
   || (anyHas(sourceFiles, 'assetObjectUrl(blob)') && anyHas(sourceFiles, '__kelo_asset_v3__/'));
 const activationReuse = globalCache && (anyHas(sourceFiles, 'sha256') || anyHas(sourceFiles, 'contentHash') || anyHas(sourceFiles, 'normalizeBlob') || anyHas(sourceFiles, 'blob'));
-const minifyEvidence = regexAny(buildConfigs, /minify|terser|esbuild/) || ['vite','rollup','webpack','esbuild'].some((d) => dependencies[d]);
-const treeShakeEvidence = regexAny(buildConfigs, /tree.?shak|treeshake/) || ['vite','rollup','esbuild'].some((d) => dependencies[d]);
-const codeSplitEvidence = regexAny(buildConfigs, /manualChunks|splitChunks|codeSplitting|splitting\s*:\s*true/);
+const minifyEvidence = regexAny(buildConfigs, /minify|terser|esbuild/i) || ['vite','rollup','webpack','esbuild'].some((d) => dependencies[d]);
+const treeShakeEvidence = regexAny(buildConfigs, /tree.?shak|treeshake/i) || ['vite','rollup','esbuild'].some((d) => dependencies[d]);
+const codeSplitEvidence = regexAny(buildConfigs, /manualChunks|splitChunks|codeSplitting|splitting\s*:\s*true/i);
+
+let buildOutputEvidence = false;
+let buildOutputSummary = 'dist/turbo/build-report.json missing; production compiler has not been executed in this workspace.';
+if (exists('dist/turbo/build-report.json') && exists('dist/turbo/meta.json')) {
+  try {
+    const report = JSON.parse(read('dist/turbo/build-report.json'));
+    const meta = JSON.parse(read('dist/turbo/meta.json'));
+    const outputs = Object.entries(meta.outputs || {});
+    const jsOutputs = outputs.filter(([file]) => file.endsWith('.js'));
+    const hashed = jsOutputs.length > 0 && jsOutputs.every(([file]) => /-[A-Z0-9]{6,}\.js$/i.test(file.replaceAll('\\','/')));
+    const lazyEdges = outputs.flatMap(([, info]) => info.imports || []).filter((item) => item.kind === 'dynamic-import').length;
+    buildOutputEvidence = report.compiler === 'esbuild'
+      && report.mode === 'production'
+      && report.minify === true
+      && report.treeShaking === true
+      && report.codeSplitting === true
+      && report.contentHashedNames === true
+      && outputs.length >= 3
+      && hashed
+      && lazyEdges >= 1;
+    buildOutputSummary = `compiler=${report.compiler}; outputs=${outputs.length}; hashedJS=${hashed}; lazyEdges=${lazyEdges}; minify=${report.minify}; treeShake=${report.treeShaking}; split=${report.codeSplitting}`;
+  } catch (error) {
+    buildOutputSummary = `production build report invalid: ${error.message}`;
+  }
+}
+
 const legacyCompilerException = regexAny([contractDoc], /^LEGACY_COMPILER_EXCEPTION_ACCEPTED:\s*true\s*$/mi)
   && regexAny([contractDoc], /^scope:\s*\S.+$/mi)
   && regexAny([contractDoc], /^migration:\s*\S.+$/mi);
-const lazyEvidence = anyHas(['index.html', ...sourceFiles], 'import(')
-  && ['studio','world','map-forge','visual'].every((term) => anyHas(['index.html', ...sourceFiles], term));
+const bootIsolationTest = exists('scripts/turbo-boot-isolation-test.mjs')
+  && has(workflowPath, 'node scripts/turbo-boot-isolation-test.mjs');
+const lazyEvidence = anyHas(lazyFiles, 'import(')
+  && ['studio','world','map-forge','visual'].every((term) => anyHas(['index.html', ...lazyFiles], term))
+  && bootIsolationTest;
 const adaptiveParallel = anyHas(sourceFiles, 'chooseConcurrency') && anyHas(sourceFiles, 'effectiveType') && anyHas(sourceFiles, 'saveData');
 const pvpAbsolutePause = (anyHas(sourceFiles, 'gameplayBusy') && regexAny(sourceFiles, /gameplayBusy\s*&&\s*!state\.foreground\)\s*return\s+0/))
   || regexAny(sourceFiles, /(combat|pvp|arena)[\s\S]{0,240}(concurrency\s*[:=]\s*0|return\s+0|allow\s*:\s*false)/i);
@@ -65,14 +95,14 @@ const compressionEvidence = regexAny(headerConfigs, /brotli|gzip|content-encodin
 const transportEvidence = regexAny(headerConfigs, /http\/2|http2|http\/3|http3|cdn/i) || regexAny([hostingDoc], /^TRANSPORT_VERIFIED:\s*true\s*$/mi);
 const transportLimitationPlan = regexAny([hostingDoc], /^HOSTING_LIMITATION:\s*\S.+$/mi) && regexAny([hostingDoc], /^MIGRATION_PLAN:\s*\S.+$/mi);
 const metricsEvidence = (anyHas(sourceFiles, 'deltaBytes') && anyHas(sourceFiles, 'timeToReadyMs')) || (anyHas(sourceFiles, 'Update Delta Bytes') && anyHas(sourceFiles, 'Time To Update Ready'));
-const guardianWorkflow = exists('.github/workflows/turbo-update-guardian.yml') && has('.github/workflows/turbo-update-guardian.yml', 'npm run audit:turbo');
+const guardianWorkflow = exists(workflowPath) && has(workflowPath, 'npm run audit:turbo');
 const guardianScript = scripts['audit:turbo'] === 'node scripts/turbo-update-guardian.mjs';
 const documentation = exists(contractDoc) && has(contractDoc, 'ACCEPTANCE CRITERIA', 'EVIDENCE', 'REGRESSION POLICY');
 const deltaTestPaths = ['scripts/turbo-delta-test.mjs','tests/turbo-update-delta.spec.js','tests/turbo-update-delta.spec.mjs','tests/updater-delta.test.cjs'];
 const deltaTestFile = deltaTestPaths.some(exists);
 const deltaTestScript = (typeof scripts['test:turbo-delta'] === 'string' && scripts['test:turbo-delta'].length > 0)
-  || (exists('.github/workflows/turbo-update-guardian.yml') && has('.github/workflows/turbo-update-guardian.yml', 'node tests/updater-delta.test.cjs'));
-const deltaTestWired = exists('.github/workflows/turbo-update-guardian.yml') && (has('.github/workflows/turbo-update-guardian.yml', 'npm run test:turbo-delta') || has('.github/workflows/turbo-update-guardian.yml', 'node tests/updater-delta.test.cjs'));
+  || (exists(workflowPath) && has(workflowPath, 'node tests/updater-delta.test.cjs'));
+const deltaTestWired = exists(workflowPath) && (has(workflowPath, 'npm run test:turbo-delta') || has(workflowPath, 'node tests/updater-delta.test.cjs'));
 const deltaTestAssertions = deltaTestFile
   && regexAny(deltaTestPaths, /0\s*asset bytes|0\s*bytes|zero\s*bytes|deltaBytes\s*,\s*0|deltaBytes\s*===\s*0|strictEqual\([^,]+,\s*0\)/i)
   && regexAny(deltaTestPaths, /one changed file|one-file|single|1 file|deltaFiles\s*,\s*1|changed.*1|delta.*1/i);
@@ -104,8 +134,8 @@ const checks = [
   check('TU-01','Delta manifest por archivo con identidad/hash de contenido', manifestGenerator && deltaManifestRuntime && manifestIntegrity, `${manifestGenerator ? 'generator present' : 'generator missing'}; ${deltaManifestRuntime ? 'runtime per-file manifest present' : 'runtime does not consume a per-file manifest'}; ${manifestEvidence}`, 'Generate the manifest in CI and verify identities against actual bytes.'),
   check('TU-02','Cache global content-addressed reutilizable entre builds', globalCache, globalCache ? 'Stable kelo-assets-v3 content-addressed cache and object keys found.' : 'Only build-scoped staging cache is proven.', 'Use a stable content-addressed cache; unchanged objects must survive build changes and cost 0 network bytes.'),
   check('TU-03','Chunks/objetos hashados + activación reutilizable', contentHashConfig && activationReuse, `hashed object naming=${contentHashConfig}; activation reuse=${activationReuse}`, 'Hash object URLs/names and make activation resolve/reuse those exact cached objects.'),
-  check('TU-04','Compiler prod: minify + tree-shake + code split (or explicit legacy exception)', (productionBuildScript && buildConfigPresent && minifyEvidence && treeShakeEvidence && codeSplitEvidence) || legacyCompilerException, `build=${productionBuildScript}; config=${buildConfigPresent}; minify=${minifyEvidence}; treeShake=${treeShakeEvidence}; split=${codeSplitEvidence}; legacyException=${legacyCompilerException}`, 'Add a real production compiler, or document a narrowly scoped legacy exception with migration evidence.'),
-  check('TU-05','Boot crítico separado de Studio/World Editor/Map Forge/Visual Lab lazy', lazyEvidence && codeSplitEvidence, `lazyEvidence=${lazyEvidence}; split=${codeSplitEvidence}`, 'Prove creator tools are absent from critical boot and loaded only on demand.'),
+  check('TU-04','Compiler prod: minify + tree-shake + code split (or explicit legacy exception)', (productionBuildScript && buildConfigPresent && minifyEvidence && treeShakeEvidence && codeSplitEvidence && buildOutputEvidence) || legacyCompilerException, `build=${productionBuildScript}; config=${buildConfigPresent}; minify=${minifyEvidence}; treeShake=${treeShakeEvidence}; split=${codeSplitEvidence}; executedOutput=${buildOutputEvidence}; ${buildOutputSummary}; legacyException=${legacyCompilerException}`, 'Run the production compiler and prove emitted minified, hashed, split output; config alone is insufficient.'),
+  check('TU-05','Boot crítico separado de Studio/World Editor/Map Forge/Visual Lab lazy', lazyEvidence && codeSplitEvidence && buildOutputEvidence, `lazyEvidence=${lazyEvidence}; isolationTest=${bootIsolationTest}; split=${codeSplitEvidence}; executedOutput=${buildOutputEvidence}`, 'Prove creator tools are absent from critical boot and lazy split edges survive the production build.'),
   check('TU-06','Paralelismo adaptativo + pausa absoluta en PVP/combate', adaptiveParallel && pvpAbsolutePause, `adaptive=${adaptiveParallel}; pvpPause=${pvpAbsolutePause}`, 'Implement a tested concurrency governor; PVP/combat must force zero updater transfers.'),
   check('TU-07','Fetch Priority low background / high explicit apply', fetchPriority, fetchPriority ? 'Both priority modes found.' : 'Queue ordering alone is insufficient.', 'Use RequestInit priority with graceful unsupported-browser fallback.'),
   check('TU-08','navigator.storage.persist() o fallback documentado', persistentStorage || persistenceFallback, `persist=${persistentStorage}; fallback=${persistenceFallback}`, 'Request persistence where supported and document behavior when denied/unavailable.'),
