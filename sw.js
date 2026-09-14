@@ -8,7 +8,8 @@
  * do-not: never cache API/session/gameplay responses
  */
 'use strict';
-let forceFreshUntil = 0;
+let forceFreshUntil = 0; // kelo-sw-v6548 wipe-on-activate
+
 let activeStagedBuild = null;
 let activeInstalledBuild = null;
 const FORCE_FRESH_MS = 180000;
@@ -64,7 +65,12 @@ async function stagedResponse(request, url, build) {
   try { const cache = await caches.open(stageCacheName(build)); return await cache.match(request, { ignoreSearch: false }) || await cache.match(url.href); } catch (_) { return null; }
 }
 self.addEventListener('install', () => { self.skipWaiting(); });
-self.addEventListener('activate', (event) => { event.waitUntil(self.clients.claim()); });
+self.addEventListener('activate', (event) => {
+  event.waitUntil((async () => {
+    try { const keys = await caches.keys(); await Promise.all(keys.map((k) => caches.delete(k))); } catch (_) {}
+    await self.clients.claim();
+  })());
+});
 self.addEventListener('message', (event) => {
   const data = event.data || {};
   if (data.type === 'KELO_SKIP_WAITING') { self.skipWaiting(); return; }
@@ -77,7 +83,7 @@ self.addEventListener('fetch', (event) => {
   event.respondWith((async () => {
     if (Date.now() < forceFreshUntil && activeStagedBuild) {
       const staged = await stagedResponse(request, url, activeStagedBuild); if (staged) return staged;
-      try { return await fetch(request, { cache: 'reload' }); } catch (_) { return fetch(request); }
+      try { return await fetch(request, { cache: 'reload' }); } catch (_) { return fetch(request, { cache: 'reload' }); }
     }
     if (request.mode !== 'navigate') {
       const build = await resolveActiveBuild();

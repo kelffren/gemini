@@ -13,6 +13,13 @@ const assetsRoot = path.join(root, 'assets');
 const manifest = JSON.parse(fs.readFileSync(path.join(root, 'src/environment/art-asset-manifest.json'), 'utf8'));
 const treePackManifestPath = 'src/environment/kelo-tree-pack-01-manifest.json';
 const treePackManifest = JSON.parse(fs.readFileSync(path.join(root, treePackManifestPath), 'utf8'));
+const worldPackageManifestPaths = [
+  'src/environment/generated/forest-plaza-tileset-v2-manifest.json'
+];
+const worldPackageManifests = worldPackageManifestPaths.map(packageManifestPath => ({
+  packageManifestPath,
+  manifest: JSON.parse(fs.readFileSync(path.join(root, packageManifestPath), 'utf8'))
+}));
 const policy = JSON.parse(fs.readFileSync(path.join(root, 'src/environment/png-validation-policy.json'), 'utf8'));
 
 const failures = [];
@@ -55,6 +62,29 @@ for (const item of treePackManifest.items || []) {
     requireAlpha:true,
     ownership:'property-catalog',
     packageManifest:treePackManifestPath
+  });
+}
+for (const {packageManifestPath, manifest: packageManifest} of worldPackageManifests) {
+  const source = packageManifest?.source;
+  const atlas = packageManifest?.atlas;
+  const width = Number(source?.width);
+  const height = Number(source?.height);
+  if (packageManifest?.kind !== 'kelo-asset-sheet-manifest' || typeof source?.path !== 'string' || !/\.png$/i.test(source.path)) {
+    fail(`invalid generated world package=${packageManifestPath}`);
+    continue;
+  }
+  if (!Number.isInteger(width) || width <= 0 || !Number.isInteger(height) || height <= 0) {
+    fail(`invalid generated world package dimensions=${packageManifestPath}`);
+    continue;
+  }
+  registerAsset({
+    id: atlas?.id || path.basename(source.path, path.extname(source.path)),
+    path: source.path,
+    width,
+    height,
+    requireAlpha: source?.background?.kind === 'transparent',
+    ownership: 'generated-world-package',
+    packageManifest: packageManifestPath
   });
 }
 
@@ -109,7 +139,12 @@ for (const item of runtimeRoots) {
   if (stat.isFile()) textFiles.push(item);
   else textFiles.push(...walkFiles(item, file => /\.(?:js|mjs|html|css|json)$/i.test(file)));
 }
-const excludedScanFiles = new Set(['src/environment/art-asset-manifest.json','src/environment/png-validation-policy.json',treePackManifestPath]);
+const excludedScanFiles = new Set([
+  'src/environment/art-asset-manifest.json',
+  'src/environment/png-validation-policy.json',
+  treePackManifestPath,
+  ...worldPackageManifestPaths
+]);
 const runtimeRefs = new Map();
 const refPattern = /assets\/[A-Za-z0-9_./-]+\.png/gi;
 for (const file of textFiles) {

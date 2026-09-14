@@ -125,6 +125,16 @@
       "path": "assets/cespedsindivisiones.PNG",
       "scope": "source-sheet",
       "reason": "Kelo-uploaded PNG retained as importer input only; it is not a runtime asset until explicitly processed and integrated."
+    },
+    {
+      "path": "assets/world/plaza/forest-plaza-tileset.png",
+      "scope": "superseded-archive",
+      "reason": "Forest Plaza V1 atlas is retained for history; the LIVE compiled plaza package uses the V2 atlas and generated manifest."
+    },
+    {
+      "path": "assets/world/roads/kelo-organic-roads-atlas.png",
+      "scope": "source-sheet",
+      "reason": "Organic roads atlas is retained as an authoring source until a generated runtime package formally registers it in the world asset contract."
     }
   ]
 }

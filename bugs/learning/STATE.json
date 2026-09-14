@@ -72,9 +72,100 @@
       "files": [
         "index.html"
       ]
+    },
+    {
+      "id": "prevention:3c9d678ef7b51f6964a8f59f144e3dff883897cf",
+      "at": "2026-09-14T12:06:03.000Z",
+      "source": "bug-prevention-ci",
+      "head_sha": "3c9d678ef7b51f6964a8f59f144e3dff883897cf",
+      "base_sha": "6e5e4f6fe5adaae52c242945354a681ad55b8001",
+      "conclusion": "success",
+      "files": [
+        "index.html",
+        "src/environment/prop-contract.js"
+      ]
+    },
+    {
+      "id": "prevention:d7e791f2eb3a053edc60c675b46456365f94e666",
+      "at": "2026-09-14T12:13:02.000Z",
+      "source": "bug-prevention-ci",
+      "head_sha": "d7e791f2eb3a053edc60c675b46456365f94e666",
+      "base_sha": "210a048657af3252bd20de8dfe1280033e4a9572",
+      "conclusion": "cancelled",
+      "files": [
+        "index.html"
+      ]
+    },
+    {
+      "id": "prevention:64c7c38c281f6812613adb184ea639fd03dadb19",
+      "at": "2026-09-14T12:14:31.000Z",
+      "source": "bug-prevention-ci",
+      "head_sha": "64c7c38c281f6812613adb184ea639fd03dadb19",
+      "base_sha": "b844d95f67b91a12d0b8c3d39a3715194f973cb0",
+      "conclusion": "success",
+      "files": [
+        "src/environment/png-validation-policy.json"
+      ]
+    },
+    {
+      "id": "prevention:074dfef306969d08c96e2f2af4fa90feffd2c91e",
+      "at": "2026-09-14T12:15:25.000Z",
+      "source": "bug-prevention-ci",
+      "head_sha": "074dfef306969d08c96e2f2af4fa90feffd2c91e",
+      "base_sha": "b32aa05fb2f3cc1b6dae6464a61724f7f894fe6b",
+      "conclusion": "success",
+      "files": [
+        "scripts/validate-png-pipeline.mjs"
+      ]
+    },
+    {
+      "id": "prevention:1cfb35799b65c183c97da7608e5ee8fb5b03137b",
+      "at": "2026-09-14T12:17:06.000Z",
+      "source": "bug-prevention-ci",
+      "head_sha": "1cfb35799b65c183c97da7608e5ee8fb5b03137b",
+      "base_sha": "8203e63c8328e1f85e02910655420b6704f1b7e1",
+      "conclusion": "success",
+      "files": [
+        "scripts/validate-art-assets.mjs"
+      ]
+    },
+    {
+      "id": "prevention:993b9ecbf168e6e9cd552ed21dc8128d4e7e0a46",
+      "at": "2026-09-14T12:18:47.000Z",
+      "source": "bug-prevention-ci",
+      "head_sha": "993b9ecbf168e6e9cd552ed21dc8128d4e7e0a46",
+      "base_sha": "780ba95c496ec2f48b5baf2a4c918c3e5742fb93",
+      "conclusion": "success",
+      "files": [
+        "scripts/validate-performance-telemetry.mjs"
+      ]
+    },
+    {
+      "id": "prevention:b18c873cb650b9b925750b433e0a28774217fec1",
+      "at": "2026-09-14T12:20:54.000Z",
+      "source": "bug-prevention-ci",
+      "head_sha": "b18c873cb650b9b925750b433e0a28774217fec1",
+      "base_sha": "62d25f798050e7835ddfe5d9ab3b70fbf99725d6",
+      "conclusion": "cancelled",
+      "files": [
+        "index.html",
+        "src/core/update-system.js",
+        "sw.js"
+      ]
+    },
+    {
+      "id": "prevention:5d31f045d49d69866af41a522711e1af78ff6790",
+      "at": "2026-09-14T12:24:43.000Z",
+      "source": "bug-prevention-ci",
+      "head_sha": "5d31f045d49d69866af41a522711e1af78ff6790",
+      "base_sha": "8c228f59982119bf7789de2a0c60e8de1770ef91",
+      "conclusion": "success",
+      "files": [
+        "index.html"
+      ]
     }
   ],
-  "feedback_updated_at": "2026-09-14T11:47:26.928Z",
+  "feedback_updated_at": "2026-09-14T12:25:41.601Z",
   "training": {
     "examples": 0,
     "search_examples": 0,
