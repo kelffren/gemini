@@ -18,6 +18,7 @@
     "bug:risk": "node scripts/bug-risk.mjs",
     "bug:health": "node scripts/bug-health.mjs",
     "audit:bugs": "node scripts/bug-registry-audit.mjs",
+    "audit:bug-reports": "node scripts/bug-report-audit.mjs",
     "audit:bug-regressions": "node scripts/bug-regression-audit.mjs",
     "audit:bug-close": "node scripts/bug-close-gate.mjs",
     "audit:bug-recurrence": "node scripts/bug-recurrence-gate.mjs",
