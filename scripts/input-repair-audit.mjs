@@ -18,8 +18,46 @@ const page = await context.newPage();
 const pageErrors = [];
 page.on('pageerror', (error) => pageErrors.push(String(error?.stack || error?.message || error)));
 
+const cdp = await context.newCDPSession(page);
+await cdp.send('Page.enable');
+await cdp.send('Debugger.enable');
+let resolveDomReady;
+const domReadyPromise = new Promise((resolve) => { resolveDomReady = resolve; });
+cdp.on('Page.domContentEventFired', () => resolveDomReady(true));
+const parsedScripts = new Map();
+cdp.on('Debugger.scriptParsed', (event) => parsedScripts.set(event.scriptId, event.url || '<inline>'));
+
+async function captureBootBlocker() {
+  let resolvePaused;
+  const pausedPromise = new Promise((resolve) => { resolvePaused = resolve; });
+  cdp.once('Debugger.paused', resolvePaused);
+  await cdp.send('Debugger.pause').catch(() => {});
+  const paused = await Promise.race([
+    pausedPromise,
+    new Promise((resolve) => setTimeout(() => resolve(null), 4_000))
+  ]);
+  if (!paused) return [];
+  const stack = (paused.callFrames || []).slice(0, 12).map((frame) => ({
+    functionName: frame.functionName || '<anonymous>',
+    url: frame.url || parsedScripts.get(frame.location?.scriptId) || '<inline>',
+    line: Number(frame.location?.lineNumber || 0) + 1,
+    column: Number(frame.location?.columnNumber || 0) + 1
+  }));
+  console.error('BOOT_BLOCKER_STACK ' + JSON.stringify(stack));
+  await cdp.send('Debugger.resume').catch(() => {});
+  return stack;
+}
+
 try {
-  await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+  await page.goto(url, { waitUntil: 'commit', timeout: 60_000 });
+  const domReady = await Promise.race([
+    domReadyPromise,
+    new Promise((resolve) => setTimeout(() => resolve(false), 12_000))
+  ]);
+  if (!domReady) {
+    const blocker = await captureBootBlocker();
+    throw new Error(`DOMContentLoaded stalled before gameplay boot. blocker=${JSON.stringify(blocker)}`);
+  }
   await page.waitForFunction(() => (
     typeof localPlayer !== 'undefined' &&
     typeof input !== 'undefined' &&
@@ -158,7 +196,6 @@ try {
   const hitStack = await inspectPoint(start.x, start.y);
   const before = await snapshot();
 
-  const cdp = await context.newCDPSession(page);
   await cdp.send('Input.dispatchTouchEvent', {
     type: 'touchStart',
     touchPoints: [{ x: start.x, y: start.y, radiusX: 2, radiusY: 2, force: 1, id: 77 }]
