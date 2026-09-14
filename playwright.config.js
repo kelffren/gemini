@@ -1,9 +1,9 @@
 const { defineConfig, devices } = require('@playwright/test');
 
 // BrowserStack real iOS receives device/browser capabilities from browserstack.yml.
-// Do not inject Playwright's Chromium/Pixel device descriptor into that context:
-// BrowserStack's real Safari driver validates those emulation values differently
-// (notably reducedMotion), which can abort before the first page is opened.
+// Keep the BrowserStack project deliberately free of desktop/mobile emulation.
+// Playwright defaults reducedMotion to "no-preference"; BrowserStack real iOS
+// expects the device/system default instead, so explicitly reset it with null.
 const isBrowserStack = Boolean(
   process.env.BROWSERSTACK_USERNAME ||
   process.env.BROWSERSTACK_ACCESS_KEY ||
@@ -12,6 +12,12 @@ const isBrowserStack = Boolean(
 
 const localMobileUse = {
   ...devices['Pixel 7'],
+};
+
+const browserStackIOSUse = {
+  browserName: 'safari',
+  channel: 'safari',
+  reducedMotion: null,
 };
 
 module.exports = defineConfig({
@@ -24,13 +30,15 @@ module.exports = defineConfig({
     trace: 'retain-on-failure',
     screenshot: 'on',
     video: 'off',
-    // Real-device BrowserStack must own viewport/touch/mobile/media capabilities.
-    ...(isBrowserStack ? {} : localMobileUse),
+    ...(isBrowserStack ? browserStackIOSUse : localMobileUse),
   },
   projects: [
     {
-      name: isBrowserStack ? 'browserstack-real-ios' : 'chromium',
-      use: isBrowserStack ? {} : localMobileUse,
+      // BrowserStack documents this naming form for real iOS Playwright projects.
+      name: isBrowserStack
+        ? 'safari@iPhone 14 Pro:26@browserstack-mobile'
+        : 'chromium',
+      use: isBrowserStack ? browserStackIOSUse : localMobileUse,
     },
   ],
 });
