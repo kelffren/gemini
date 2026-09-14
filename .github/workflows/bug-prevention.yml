@@ -12,6 +12,8 @@ on:
       - 'package.json'
       - 'bugs/RISK_MAP.json'
       - '.github/workflows/bug-prevention.yml'
+      - '.github/workflows/bug-self-learning.yml'
+      - '.github/workflows/bug-learning-feedback.yml'
   pull_request:
     paths:
       - 'src/**'
@@ -22,6 +24,8 @@ on:
       - 'package.json'
       - 'bugs/RISK_MAP.json'
       - '.github/workflows/bug-prevention.yml'
+      - '.github/workflows/bug-self-learning.yml'
+      - '.github/workflows/bug-learning-feedback.yml'
 
 permissions:
   contents: read
@@ -47,6 +51,7 @@ jobs:
       - name: Syntax-check self-learning scripts
         run: |
           node --check scripts/bug-learning-autopilot.mjs
+          node --check scripts/bug-learning-observe.mjs
           node --check scripts/bug-learning-audit.mjs
           node --check scripts/bug-prevention.mjs
           node --check scripts/bug-risk.mjs
