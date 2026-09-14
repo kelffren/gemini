@@ -58,8 +58,18 @@ function proveHttp2(pathname = '/') {
   });
 }
 
+function cacheDirectives(value) {
+  return String(value || '')
+    .split(',')
+    .map((part) => part.trim().toLowerCase())
+    .filter(Boolean)
+    .sort();
+}
+
 function exactCache(headers, expected) {
-  return String(headers['cache-control'] || '').trim().toLowerCase() === expected.toLowerCase();
+  const actual = cacheDirectives(headers['cache-control']);
+  const wanted = cacheDirectives(expected);
+  return actual.length === wanted.length && actual.every((directive, index) => directive === wanted[index]);
 }
 
 async function findLiveHashedAsset() {
