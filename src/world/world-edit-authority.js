@@ -8,7 +8,7 @@
 'use strict';
 if(window.KELO_WORLD_EDIT)return;
 
-const VERSION='world-edit-authority-v1.1.2';
+const VERSION='world-edit-authority-v1.1.3';
 const WORLD_PARCEL_ID='parcel:world:editor';
 const listeners=new Set();
 const readyWaiters=new Set();
@@ -17,6 +17,7 @@ let authority=null;
 let readyState=false;
 let currentView={kind:'boot',id:null,worldId:'world:kelo-main',revisionVersion:0,publishedRevisionId:null};
 let lastError=null;
+let adjacentDraftRead=null;
 
 function propertySystem(){return window.KELO_PROPERTY_SYSTEM||null;}
 function worldBuilder(){return window.KELO_WORLD_BUILDER||null;}
@@ -56,7 +57,7 @@ function normalizeAuthority(adapter){
   if(!adapter||typeof adapter.request!=='function')throw new Error('INVALID_WORLD_EDIT_AUTHORITY');
   return adapter;
 }
-function markNotReady(){readyState=false;}
+function markNotReady(){readyState=false;adjacentDraftRead=null;}
 function markReady(){
   readyState=true;
   for(const waiter of readyWaiters){clearTimeout(waiter.timer);try{waiter.resolve(window.KELO_WORLD_EDIT);}catch(e){}}
@@ -74,17 +75,34 @@ function whenReady({timeoutMs=10000}={}){
 }
 async function request(op,payload={}){
   if(!authority)throw new Error('WORLD_EDIT_AUTHORITY_NOT_READY');
+  const operation=String(op);
   try{
-    const result=await authority.request(String(op),payload||{});
+    if(operation==='world:draft:get'&&adjacentDraftRead){
+      const draftId=String(payload?.draftId||'');
+      if(draftId&&draftId===adjacentDraftRead.draftId){
+        const result=clone(adjacentDraftRead.result);
+        adjacentDraftRead=null;
+        lastError=null;
+        if(listeners.size)emit({type:'request',op:operation,result:clone(result),view:clone(currentView)});
+        return result;
+      }
+    }
+    const result=await authority.request(operation,payload||{});
+    if(operation==='world:draft:current'&&result?.draft?.draftId){
+      adjacentDraftRead={draftId:String(result.draft.draftId),result:clone(result)};
+    }else{
+      adjacentDraftRead=null;
+    }
     if(result?.viewSnapshot){
       await projectView(result.viewSnapshot,result.viewMeta||{},result.projectPlacements===true);
     }
     lastError=null;
-    if(listeners.size)emit({type:'request',op:String(op),result:clone(result),view:clone(currentView)});
+    if(listeners.size)emit({type:'request',op:operation,result:clone(result),view:clone(currentView)});
     return result;
   }catch(err){
+    adjacentDraftRead=null;
     lastError=String(err?.message||err);
-    if(listeners.size)emit({type:'error',op:String(op),error:lastError,view:clone(currentView)});
+    if(listeners.size)emit({type:'error',op:operation,error:lastError,view:clone(currentView)});
     throw err;
   }
 }
@@ -139,7 +157,8 @@ window.KELO_WORLD_EDIT_AUDIT=Object.freeze({
   uiTransportFree:true,
   publishedProjectionOnBoot:true,
   propertySourceOfTruth:true,
-  readinessContract:true
+  readinessContract:true,
+  adjacentDraftReadReuse:true
 });
 
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(boot,0),{once:true});else setTimeout(boot,0);
