@@ -37,12 +37,17 @@ assert(!obstacles.some(x=>x.id==='wall-1'),'dynamic collider remove failed');
 C.clearOwner('property:placements');
 assert(obstacles.length===1&&obstacles[0].id==='legacy-wall','clearOwner affected foreign collider');
 
-// Boot contract: collision owner attaches immediately after engine-a creates the legacy array.
+// Boot contract: all classic runtime scripts are deferred. engine-a must execute before
+// KeloInput, and KeloInput's boot preamble must attach engine-a's lexical obstacle view
+// before KeloInput installs its processInput wrapper.
 const index=fs.readFileSync('index.html','utf8');
 const engineAt=index.indexOf('engine-a.js?');
-const attachAt=index.indexOf('attachLegacyObstacleArray(obstacles');
 const inputAt=index.indexOf('src/core/input-system.js?');
-assert(engineAt>=0&&attachAt>engineAt&&inputAt>attachAt,'legacy obstacle view is not attached between engine-a and KeloInput');
+assert(engineAt>=0&&inputAt>engineAt,'engine-a is not ordered before KeloInput');
+const inputBoot=fs.readFileSync('src/core/input-system.js','utf8');
+const attachAt=inputBoot.indexOf('attachLegacyObstacleArray(obstacles');
+const wrapperAt=inputBoot.indexOf('processInput=function');
+assert(attachAt>=0&&wrapperAt>attachAt,'legacy obstacle view is not attached in the KeloInput boot preamble before the wrapper installs');
 
 // Migrated LIVE producers must publish through KELO_COLLISION, never splice/push the shared view.
 for(const file of [
@@ -68,5 +73,6 @@ console.log(JSON.stringify({
   ownership:true,
   foreignOwnerIsolation:true,
   legacyView:true,
+  deferredBootBridge:'KeloInput preamble',
   migratedProducers:['generic-props','property','world-builder','ability-walls']
 },null,2));
