@@ -118,7 +118,9 @@ function changedInventory(parent,firstBad){
     const [add,del,...rest]=line.split('\t');return [rest.join('\t'),{additions:add,deletions:del}];
   }));
   return names.map(line=>{
-    const [status,...rest]=line.split('\t');const file=rest[rest.length-1];return {status,file,...(nums.get(file)||{})};
+    const [status,...rest]=line.split('\t');
+    const file=rest[rest.length-1];
+    return {status,file,...(nums.get(file)||{})};
   });
 }
 
@@ -137,88 +139,159 @@ const RISK_PATTERNS=[
   ['cloneNode',2,/cloneNode\s*\(/],
   ['unbounded loop',8,/while\s*\(\s*true\s*\)|for\s*\(\s*;\s*;\s*\)/]
 ];
+
 function scanDiff(parent,firstBad){
   const diff=git(['diff','--unified=0','--no-color',parent,firstBad]);
-  let file='';const findings=[];
+  let file='';
+  const findings=[];
   for(const raw of diff.split('\n')){
     if(raw.startsWith('+++ b/')){file=raw.slice(6);continue;}
     if(!raw.startsWith('+')||raw.startsWith('+++'))continue;
     const line=raw.slice(1);
-    for(const [kind,score,re] of RISK_PATTERNS)if(re.test(line))findings.push({file,kind,score,line:line.trim().slice(0,500)});
+    for(const [kind,score,re] of RISK_PATTERNS){
+      if(re.test(line))findings.push({file,kind,score,line:line.trim().slice(0,500)});
+    }
   }
   return findings.sort((a,b)=>b.score-a.score);
 }
+
 function findProbableFixes(firstBad,head,files){
   const keyword=/\b(fix|freeze|frozen|hang|storm|observer|loop|boot|mount|safari|iphone|performance|regression|deadlock|stuck)\b/i;
   const seen=new Set(),rows=[];
   for(const file of files){
-    let text='';try{text=git(['log','--format=%H%x09%s','--reverse',`${firstBad}..${head}`,'--',file]);}catch{}
+    let text='';
+    try{text=git(['log','--format=%H%x09%s','--reverse',`${firstBad}..${head}`,'--',file]);}catch{}
     for(const line of text.split('\n').filter(Boolean)){
-      const tab=line.indexOf('\t');if(tab<0)continue;
-      const sha=line.slice(0,tab),subject=line.slice(tab+1);if(!keyword.test(subject))continue;
-      const key=`${sha}:${file}`;if(seen.has(key))continue;seen.add(key);rows.push({sha,subject,file});
+      const tab=line.indexOf('\t');
+      if(tab<0)continue;
+      const sha=line.slice(0,tab),subject=line.slice(tab+1);
+      if(!keyword.test(subject))continue;
+      const key=`${sha}:${file}`;
+      if(seen.has(key))continue;
+      seen.add(key);
+      rows.push({sha,subject,file});
     }
   }
   return rows.slice(0,80);
 }
+
 function markdown(r){
   const b=r.boundary||{};
   const risks=r.riskFindings.slice(0,30).map(x=>`| ${x.score} | \`${x.file}\` | ${x.kind} | \`${x.line.replaceAll('|','\\|')}\` |`).join('\n')||'| — | — | — | — |';
   const files=r.changedFiles.map(x=>`- ${x.status} \`${x.file}\` (+${x.additions??'?'} / -${x.deletions??'?'})`).join('\n')||'- none';
   const fixes=r.probableFixes.slice(0,30).map(x=>`- \`${x.sha.slice(0,12)}\` ${x.subject} — \`${x.file}\``).join('\n')||'- none found';
   const checks=r.revalidation.map(x=>`- ${x.result} \`${x.sha.slice(0,12)}\` ${x.label} (${x.durationMs} ms)`).join('\n')||'- none';
-  return `# World Forensic Autopsy Report\n\nGenerated: ${r.endedAt||new Date().toISOString()}\n\nOwner: **${r.owner}**\n\n## Inputs\n\n- GOOD: \`${r.inputs.good}\`\n- BAD: \`${r.inputs.bad}\`\n- Mode: **${r.inputs.mode}** / recovery profile **${r.inputs.profile}**\n\n## Recovery bisect\n\n- Result: **${r.recoveryBisect?.result||'—'}**\n- First bad candidate: \`${r.recoveryBisect?.firstBad||'—'}\`\n\n## Boundary revalidation\n\n- Status: **${b.confirmed?'CONFIRMED':'UNCONFIRMED'}**\n- Parent / last GOOD: \`${b.parent||'—'}\`\n- First BAD: \`${b.firstBad||'—'}\`\n- Commit: ${b.subject||'—'}\n- Parent repeats: ${(b.parentResults||[]).join(', ')||'—'}\n- Bad repeats: ${(b.badResults||[]).join(', ')||'—'}\n\n${checks}\n\n## Files changed at boundary\n\n${files}\n\n## Side-effect risk scanner\n\nScores prioritize code review; they are not causal proof.\n\n| Score | File | Side effect | Added line |\n| ---: | --- | --- | --- |\n${risks}\n\n## Probable later fixes touching the same files\n\n${fixes}\n\n## Rules\n\n- `recovery:bisect` is the single owner of historical binary search.\n- FIRST BAD is confirmed only when parent repeatedly PASSes and candidate repeatedly FAILs.\n- Use the smallest probe matching the symptom; richer UI tests can expose secondary boundaries.\n- Chromium/mobile emulation is not REAL IPHONE evidence.\n- Risk findings and fix-message matches are leads, not causal verdicts.\n`;
+  return [
+    '# World Forensic Autopsy Report',
+    '',
+    `Generated: ${r.endedAt||new Date().toISOString()}`,
+    '',
+    `Owner: **${r.owner}**`,
+    '',
+    '## Inputs','',
+    `- GOOD: \`${r.inputs.good}\``,
+    `- BAD: \`${r.inputs.bad}\``,
+    `- Mode: **${r.inputs.mode}** / recovery profile **${r.inputs.profile}**`,
+    '',
+    '## Recovery bisect','',
+    `- Result: **${r.recoveryBisect?.result||'—'}**`,
+    `- First bad candidate: \`${r.recoveryBisect?.firstBad||'—'}\``,
+    '',
+    '## Boundary revalidation','',
+    `- Status: **${b.confirmed?'CONFIRMED':'UNCONFIRMED'}**`,
+    `- Parent / last GOOD: \`${b.parent||'—'}\``,
+    `- First BAD: \`${b.firstBad||'—'}\``,
+    `- Commit: ${b.subject||'—'}`,
+    `- Parent repeats: ${(b.parentResults||[]).join(', ')||'—'}`,
+    `- Bad repeats: ${(b.badResults||[]).join(', ')||'—'}`,
+    '',checks,'',
+    '## Files changed at boundary','',files,'',
+    '## Side-effect risk scanner','',
+    'Scores prioritize code review; they are not causal proof.','',
+    '| Score | File | Side effect | Added line |',
+    '| ---: | --- | --- | --- |',
+    risks,'',
+    '## Probable later fixes touching the same files','',fixes,'',
+    '## Rules','',
+    '- recovery:bisect is the single owner of historical binary search.',
+    '- FIRST BAD is confirmed only when parent repeatedly PASSes and candidate repeatedly FAILs.',
+    '- Use the smallest probe matching the symptom; richer UI tests can expose secondary boundaries.',
+    '- Chromium/mobile emulation is not REAL IPHONE evidence.',
+    '- Risk findings and fix-message matches are leads, not causal verdicts.',
+    ''
+  ].join('\n');
 }
 
 let exitCode=0;
 try{
   const goodSha=resolveRef(good),badSha=resolveRef(bad);
-  report.inputs.goodResolved=goodSha;report.inputs.badResolved=badSha;
+  report.inputs.goodResolved=goodSha;
+  report.inputs.badResolved=badSha;
   if(!isAncestor(goodSha,badSha))throw new Error('FORENSIC_GOOD_IS_NOT_ANCESTOR_OF_BAD');
 
-  // Devil's Advocate: validate the assumptions before asking git bisect to trust them.
+  // Devil's Advocate: validate endpoint assumptions before trusting bisect.
   let server=await startServer(4183);
   const goodEndpoint=runProfileAt(goodSha,'ENDPOINT_GOOD',server.base);
   const badEndpoint=runProfileAt(badSha,'ENDPOINT_BAD',server.base);
-  stopServer(server);restore();
+  stopServer(server);
+  restore();
   report.endpointValidation={good:goodEndpoint.result,bad:badEndpoint.result};
+
   if(goodEndpoint.result!=='PASS'||badEndpoint.result!=='FAIL'){
     report.notes.push('INVALID_ENDPOINTS: GOOD must PASS and BAD must FAIL with the same stable recovery profile');
     exitCode=3;
   }else{
-    // Cartographer: delegate binary search to the existing Bug Intelligence owner.
-    const bisectProc=spawnSync(process.execPath,[path.join(root,'scripts','recovery-bisect.mjs'),`--good=${goodSha}`,`--bad=${badSha}`,`--profile=${profile}`,`--artifacts=${tempRecovery}`],{
-      cwd:root,encoding:'utf8',timeout:60*60*1000,env:{...process.env,KELO_RECOVERY_ARTIFACTS:tempRecovery}
+    // Cartographer: binary search belongs to the existing Bug Intelligence Recovery owner.
+    const bisectProc=spawnSync(process.execPath,[
+      path.join(root,'scripts','recovery-bisect.mjs'),
+      `--good=${goodSha}`,
+      `--bad=${badSha}`,
+      `--profile=${profile}`,
+      `--artifacts=${tempRecovery}`
+    ],{
+      cwd:root,
+      encoding:'utf8',
+      timeout:60*60*1000,
+      env:{...process.env,KELO_RECOVERY_ARTIFACTS:tempRecovery}
     });
     const bisectReportPath=path.join(tempRecovery,'bisect-report.json');
-    if(!fs.existsSync(bisectReportPath))throw new Error(`FORENSIC_RECOVERY_BISECT_REPORT_MISSING:${String(bisectProc.stderr||'').slice(-3000)}`);
+    if(!fs.existsSync(bisectReportPath)){
+      throw new Error(`FORENSIC_RECOVERY_BISECT_REPORT_MISSING:${String(bisectProc.stderr||'').slice(-3000)}`);
+    }
     report.recoveryBisect=JSON.parse(fs.readFileSync(bisectReportPath,'utf8'));
     report.recoveryBisect.stdout=String(bisectProc.stdout||'').slice(-12000);
     report.recoveryBisect.stderr=String(bisectProc.stderr||'').slice(-12000);
     const firstBad=report.recoveryBisect.firstBad;
     if(!firstBad)throw new Error('FORENSIC_RECOVERY_BISECT_INCONCLUSIVE');
 
-    // Interpreter + Devil's Advocate: prove the boundary again with the same frozen runner.
+    // Interpreter + Devil's Advocate: prove the returned parent/child boundary again.
     const parent=git(['rev-parse',`${firstBad}^`]);
     server=await startServer(4184);
     const parentRows=[],badRows=[];
     for(let i=0;i<repeat;i++)parentRows.push(runProfileAt(parent,`REVALIDATE_PARENT_GOOD#${i+1}`,server.base));
     for(let i=0;i<repeat;i++)badRows.push(runProfileAt(firstBad,`REVALIDATE_FIRST_BAD#${i+1}`,server.base));
-    stopServer(server);restore();
-    const parentResults=parentRows.map(x=>x.result),badResults=badRows.map(x=>x.result);
+    stopServer(server);
+    restore();
+
+    const parentResults=parentRows.map(x=>x.result);
+    const badResults=badRows.map(x=>x.result);
     const confirmed=parentResults.every(x=>x==='PASS')&&badResults.every(x=>x==='FAIL');
     const subject=git(['show','-s','--format=%s',firstBad]);
     const date=git(['show','-s','--format=%cI',firstBad]);
     report.boundary={firstBad,parent,subject,date,parentResults,badResults,confirmed};
 
-    // Reporter: reduce the suspect surface to exactly the boundary diff.
+    // Reporter: reduce review to exactly parent -> first bad.
     report.changedFiles=changedInventory(parent,firstBad);
     report.riskFindings=scanDiff(parent,firstBad);
     report.probableFixes=findProbableFixes(firstBad,originalSha,report.changedFiles.map(x=>x.file));
-    if(!confirmed){report.notes.push('BOUNDARY_FLAKY_OR_UNCONFIRMED');exitCode=4;}
+    if(!confirmed){
+      report.notes.push('BOUNDARY_FLAKY_OR_UNCONFIRMED');
+      exitCode=4;
+    }
   }
 }catch(error){
-  report.fatal=String(error?.stack||error?.message||error);exitCode=5;
+  report.fatal=String(error?.stack||error?.message||error);
+  exitCode=5;
 }finally{
   restore();
   report.endedAt=new Date().toISOString();
@@ -228,6 +301,8 @@ try{
   if(fs.existsSync(tempRecovery))fs.cpSync(tempRecovery,path.join(outputDir,'recovery-bisect'),{recursive:true});
   if(fs.existsSync(tempEvidence))fs.cpSync(tempEvidence,path.join(outputDir,'revalidation-evidence'),{recursive:true});
   console.log(`[FORENSIC] report: ${path.relative(root,outputDir)}`);
-  if(report.boundary)console.log(`[FORENSIC] ${report.boundary.confirmed?'CONFIRMED':'UNCONFIRMED'} first bad: ${report.boundary.firstBad} ${report.boundary.subject}`);
+  if(report.boundary){
+    console.log(`[FORENSIC] ${report.boundary.confirmed?'CONFIRMED':'UNCONFIRMED'} first bad: ${report.boundary.firstBad} ${report.boundary.subject}`);
+  }
 }
 process.exit(exitCode);
