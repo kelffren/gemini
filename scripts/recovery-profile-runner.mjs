@@ -99,6 +99,14 @@ async function ping(label='PING'){
   if(ms>2000)throw new Error(`EVENT_LOOP_FREEZE_${ms}MS`);
   return ms;
 }
+async function readPlayer(){
+  return page.evaluate(()=>{
+    try{
+      const p=window.eval('localPlayer');
+      return p?{x:Number(p.x),y:Number(p.y),vx:Number(p.vx)||0,vy:Number(p.vy)||0}:null;
+    }catch{return null;}
+  });
+}
 async function captureRecovery(){
   try{report.recovery=await page.evaluate(()=>window.KELO_RECOVERY_MESH?.report?.()||window.KELO_FREEZE_LOCATOR?.report?.()||null);}catch{}
 }
@@ -109,26 +117,31 @@ async function bootCheck({navigate=true}={}){
   }
   await page.waitForSelector('#game-canvas',{state:'attached',timeout:12000});
   await page.waitForFunction(()=>{
-    const p=globalThis.localPlayer;
-    return !!p&&Number.isFinite(Number(p.x))&&Number.isFinite(Number(p.y));
+    try{
+      const p=window.eval('localPlayer');
+      return !!p&&Number.isFinite(Number(p.x))&&Number.isFinite(Number(p.y));
+    }catch{return false;}
   },null,{timeout:15000});
+  const player=await readPlayer();
   const state=await page.evaluate(()=>({
-    x:Number(globalThis.localPlayer?.x),y:Number(globalThis.localPlayer?.y),
     canvasW:document.getElementById('game-canvas')?.width||0,canvasH:document.getElementById('game-canvas')?.height||0,
     bootReady:!!globalThis.__keloBootReady
   }));
+  Object.assign(state,player||{});
   step('BOOT_READY',state);
-  if(!state.bootReady||!state.canvasW||!state.canvasH)throw new Error('BOOT_NOT_READY');
+  if(!player||!state.bootReady||!state.canvasW||!state.canvasH)throw new Error('BOOT_NOT_READY');
   await ping('BOOT_EVENT_LOOP_PING');
 }
 async function movementCheck(){
-  const before=await page.evaluate(()=>({x:Number(globalThis.localPlayer?.x),y:Number(globalThis.localPlayer?.y)}));
+  const before=await readPlayer();
+  if(!before)throw new Error('MOVEMENT_PLAYER_UNAVAILABLE');
   step('MOVEMENT_START',before);
   await page.keyboard.down('d');
   const deadline=Date.now()+8000;
   while(Date.now()<deadline){await new Promise(r=>setTimeout(r,500));await ping('MOVEMENT_PING');}
   await page.keyboard.up('d');
-  const after=await page.evaluate(()=>({x:Number(globalThis.localPlayer?.x),y:Number(globalThis.localPlayer?.y)}));
+  const after=await readPlayer();
+  if(!after)throw new Error('MOVEMENT_PLAYER_LOST');
   const distance=Math.hypot(after.x-before.x,after.y-before.y);
   step('MOVEMENT_END',{...after,distance});
   if(!(distance>2))throw new Error(`MOVEMENT_STALLED_${distance.toFixed(2)}`);
