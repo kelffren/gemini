@@ -20,6 +20,7 @@ function ok(condition,message){if(condition){passed++;console.log('✓',message)
 function has(text,token){return text.includes(token);}
 
 const index=read('index.html');
+const moduleLoader=read('src/core/module-loader.js');
 const bootstrap=read('src/core/kelo-runtime-bootstrap.js');
 const profile=read('src/ui/profile-panel-close.js');
 const pvpLoader=read('src/systems/pvp-combat-runtime-loader.js');
@@ -48,7 +49,8 @@ ok(has(pvpLoader,'KeloRuntimeBootstrap.ensure()')&&has(pvpLoader,'ensureCombatRe
 ok(!has(pvpLoader,"document.createElement('script')")&&!has(pvpLoader,'existingBootstrapScript'),'PvP no implementa un segundo loader de scripts');
 ok(has(pvpLoader,'enterPromise')&&has(pvpLoader,'if(enterPromise)return enterPromise'),'PvP deduplica entradas mientras foundations están cargando');
 ok(has(pvpLoader,'Object.getOwnPropertyDescriptors(original)')&&has(pvpLoader,'descriptors.enter=')&&has(pvpLoader,'descriptors.ensureCombatReady='),'PvP conserva API/getters del owner al instalar la fachada lazy');
-ok(has(index,'src/systems/pvp-combat-runtime-loader.js?v=2'),'Runtime monta el bridge PvP lazy inmediatamente después de KeloPvPWorld');
+ok(has(moduleLoader,"{src:'src/systems/pvp-world.js")&&has(moduleLoader,"{src:'src/systems/pvp-combat-runtime-loader.js")&&has(moduleLoader,"if(name==='pvp') task=ensurePvp()"),'KeloModuleLoader posee el pack PvP first-use completo');
+ok(!has(index,'src/systems/pvp-world.js')&&!has(index,'src/systems/pvp-combat-runtime-loader.js'),'PvP pesado permanece fuera del critical path de index.html');
 
 ok(!has(abilities,'retryTimer')&&!has(abilities,'scheduleBoot()'),'KeloAbilities no hace polling de boot mientras foundations están unloaded');
 ok(has(abilities,'KeloAbilitiesLoader')&&has(abilities,'ensureRuntime()')&&has(abilities,'KeloRuntimeBootstrap.ensure()'),'KeloAbilities tiene first-use loader ligero sobre el owner RuntimeBootstrap');
