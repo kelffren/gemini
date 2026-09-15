@@ -1,0 +1,82 @@
+name: Asset PNG Space Compiler
+
+on:
+  push:
+    branches:
+      - main
+      - feat/adaptive-png-space-compiler
+    paths:
+      - 'src/creators/assets/png-*.mjs'
+      - 'scripts/asset-space-compiler*.mjs'
+      - 'assets/**/*.png'
+      - '.github/workflows/asset-space-compiler.yml'
+  pull_request:
+    paths:
+      - 'src/creators/assets/png-*.mjs'
+      - 'scripts/asset-space-compiler*.mjs'
+      - 'assets/**/*.png'
+      - '.github/workflows/asset-space-compiler.yml'
+  workflow_dispatch:
+    inputs:
+      input_path:
+        description: PNG file or folder to inspect
+        required: true
+        default: assets
+        type: string
+      mode:
+        description: Compression policy
+        required: true
+        default: strict
+        type: choice
+        options:
+          - strict
+          - adaptive
+
+permissions:
+  contents: read
+
+jobs:
+  strict-quality-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Deterministic compiler self-test
+        run: node scripts/asset-space-compiler-audit.mjs
+      - name: Dry-run real PNG assets
+        run: node scripts/asset-space-compiler.mjs --input="${{ github.event.inputs.input_path || 'assets' }}" --mode=strict --max-files=80 --report=test-results/asset-space-report
+      - name: Publish summary
+        if: always()
+        run: |
+          if [ -f test-results/asset-space-report/report.json ]; then
+            node -e "const r=require('./test-results/asset-space-report/report.json'); require('fs').appendFileSync(process.env.GITHUB_STEP_SUMMARY, '# PNG Space Compiler\n\nFiles: '+r.fileCount+'\n\nBefore: '+r.beforeBytes+' bytes\n\nAfter: '+r.afterBytes+' bytes\n\nPotential strict saving: '+r.savedPercent.toFixed(2)+'%\n')"
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: png-space-strict-report
+          path: test-results/asset-space-report
+          if-no-files-found: ignore
+
+  adaptive-lab:
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'adaptive'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install adaptive image codec
+        run: npm install --no-save sharp@0.35.4
+      - name: Adaptive dry-run with captures
+        run: node scripts/asset-space-compiler.mjs --input="${{ github.event.inputs.input_path }}" --mode=adaptive --capture --max-files=20 --report=test-results/asset-space-adaptive
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: png-space-adaptive-report
+          path: test-results/asset-space-adaptive
+          if-no-files-found: ignore
