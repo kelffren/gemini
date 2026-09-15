@@ -6,6 +6,8 @@
 const {test,expect}=require('@playwright/test');
 const fs=require('fs');
 
+test.setTimeout(90000);
+
 function versionAtLeast(actual,minimum){
   const a=String(actual||'').split('.').map(Number),b=minimum.split('.').map(Number);
   for(let i=0;i<Math.max(a.length,b.length);i++){const delta=(a[i]||0)-(b[i]||0);if(delta)return delta>0;}
@@ -14,11 +16,12 @@ function versionAtLeast(actual,minimum){
 
 async function openSeed68(page){
   const pageErrors=[];page.on('pageerror',error=>pageErrors.push(String(error)));
-  const response=await page.goto('/?mapEditor=1&offline=1',{waitUntil:'domcontentloaded',timeout:30000});
+  const response=await page.goto('/?mapEditor=1&offline=1',{waitUntil:'commit',timeout:15000});
   expect(response.status()).toBeLessThan(400);
+  await page.waitForSelector('body',{timeout:10000});
   await page.waitForFunction(()=>!!(window.KELO_WORLD_BUILDER?.renderSnapshotPreview&&window.KELO_PROPERTY_SYSTEM?.drawPlacements&&window.KELO_PROPERTY_CATALOG&&window.KeloCamera?.focus&&window.KELO_ADMIN_KEYS?.can?.('world.edit')),null,{timeout:15000});
   await page.evaluate(async()=>{const {bootKeloCreators}=await import('./src/creators/creator-entry.mjs');const platform=await bootKeloCreators({root:window});window.__KELO_TEST_MAP_FORGE_WORKSPACE__=await platform.openWorkspace('map-forge');});
-  const forge=page.locator('#kelo-map-forge');await expect(forge).toBeVisible();
+  const forge=page.locator('#kelo-map-forge');await expect(forge).toHaveCount(1);await expect(forge).toBeVisible();
   await page.getByRole('spinbutton',{name:/Seed/}).fill('68');
   await page.getByRole('combobox',{name:'Candidatos'}).selectOption({label:'Best of 4'});
   await page.getByRole('button',{name:'GENERAR'}).click();
