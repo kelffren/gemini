@@ -773,9 +773,26 @@
       "files": [
         "src/core/bug-observability.mjs"
       ]
+    },
+    {
+      "id": "prevention:0875d6a8f762abdf076b59a36171f3350d3d69c0",
+      "at": "2026-09-15T05:29:29.000Z",
+      "source": "bug-prevention-ci",
+      "head_sha": "0875d6a8f762abdf076b59a36171f3350d3d69c0",
+      "base_sha": "9a2805738e53bf5cdf8cda05dfdf3b3bb52c642c",
+      "conclusion": "success",
+      "files": [
+        ".github/workflows/legacy-observatory.yml",
+        "config/legacy-migration-manifest.json",
+        "docs/LEGACY_EXIT_PROGRAM.md",
+        "docs/LEGACY_MIGRATION_CHECKLIST.md",
+        "scripts/legacy-migration-gate.mjs",
+        "scripts/legacy-observatory.mjs",
+        "src/core/migration-switchboard.js"
+      ]
     }
   ],
-  "feedback_updated_at": "2026-09-15T03:37:30.370Z",
+  "feedback_updated_at": "2026-09-15T05:29:55.118Z",
   "training": {
     "examples": 58,
     "search_examples": 43,
