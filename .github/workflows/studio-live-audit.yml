@@ -1,7 +1,7 @@
 name: Kelo Studio LIVE audit
 on:
   push:
-    branches: [main]
+    branches: [main, 'experiment/world-editor-72604f28']
     paths:
       - 'src/studio/**'
       - 'src/creators/**'
@@ -38,21 +38,21 @@ jobs:
         run: node --check scripts/studio-live-audit.mjs
       - name: Install Playwright
         run: npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund playwright@1.55.0
-      - name: Serve PR candidate
-        if: github.event_name == 'pull_request'
+      - name: Serve local candidate
+        if: github.event_name == 'pull_request' || github.ref_name == 'experiment/world-editor-72604f28'
         run: |
           python3 -m http.server 8000 --bind 127.0.0.1 >/tmp/studio-live-http.log 2>&1 &
           for i in {1..20}; do curl -fsS http://127.0.0.1:8000/index.html >/dev/null && exit 0; sleep 1; done
           cat /tmp/studio-live-http.log
           exit 1
-      - name: Audit PR candidate Kelo Studio vertical slice
-        if: github.event_name == 'pull_request'
+      - name: Audit local Kelo Studio vertical slice
+        if: github.event_name == 'pull_request' || github.ref_name == 'experiment/world-editor-72604f28'
         env:
           AUDIT_URL: http://127.0.0.1:8000/
           CHROME_BIN: /usr/bin/google-chrome
         run: node scripts/studio-live-audit.mjs
       - name: Audit deployed Kelo Studio vertical slice
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' && github.ref_name != 'experiment/world-editor-72604f28'
         env:
           AUDIT_URL: https://kelffren.github.io/gemini/
           CHROME_BIN: /usr/bin/google-chrome
