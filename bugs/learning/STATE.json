@@ -645,9 +645,20 @@
       "files": [
         "src/studio/integration/live-studio-controller.mjs"
       ]
+    },
+    {
+      "id": "prevention:bc11cdb0019455e34b406e5bdf76f71fb253d04c",
+      "at": "2026-09-15T00:29:44.000Z",
+      "source": "bug-prevention-ci",
+      "head_sha": "bc11cdb0019455e34b406e5bdf76f71fb253d04c",
+      "base_sha": "918d2e90ae1d4ecffde77958e2d8b983d0f5fb74",
+      "conclusion": "failure",
+      "files": [
+        "src/studio/integration/world-studio-bridge.mjs"
+      ]
     }
   ],
-  "feedback_updated_at": "2026-09-15T00:29:49.306Z",
+  "feedback_updated_at": "2026-09-15T00:30:17.283Z",
   "training": {
     "examples": 53,
     "search_examples": 39,
