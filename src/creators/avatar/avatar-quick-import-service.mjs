@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: CREATORS / AVATAR
  * owner: Avatar Quick Import orchestration
- * keys: AVATAR UNIVERSAL-SPRITE-INGESTION FRAME-SURGERY RAW-IMAGE EXACT-CANVAS REVIEW-GATE CONTENT SUPABASE SELECTION REALTIME WORKER ISOLATION
+ * keys: AVATAR UNIVERSAL-SPRITE-INGESTION FRAME-SURGERY RAW-IMAGE EXACT-CANVAS REVIEW-GATE CONTENT SUPABASE SELECTION REALTIME WORKER ISOLATION TRUST PREFLIGHT
  * owns: file -> validated canonical runtime derivative -> optional raw-intent review -> exact-sized runtime -> universal character revision -> active character selection
  * does-not-own: renderer, auth transport, base content persistence or avatar approval
  */
@@ -10,6 +10,8 @@ import { acceptConfirmedRawImageRuntime } from './raw-image-intent-gate.mjs';
 import { serializeSurgeryPatches } from '../sprite-compiler/sprite-frame-surgery-model.mjs';
 import { reframeCompiledRuntimeExact } from '../sprite-compiler/sprite-exact-canvas.mjs';
 import { createIsolatedAssetWorkerClient } from '../sprite-compiler/asset-isolated-worker-client.mjs';
+import { assertSafeAssetInput } from '../sprite-compiler/asset-safe-decode.mjs';
+import { verifyAssetRelease } from '../sprite-compiler/asset-release-verifier.mjs';
 const F=Object.freeze,ACTIVE_CHARACTER_KEY='kelo.active.character.v1',ISOLATED_WORKER_URL=new URL('../sprite-compiler/asset-universal-compiler-worker.mjs',import.meta.url);
 const clean=v=>String(v||'').toLowerCase().replace(/[^a-z0-9_-]+/g,'-').replace(/^-+|-+$/g,'').slice(0,55)||'avatar';
 async function sha256(value,root){const bytes=value?.arrayBuffer?await value.arrayBuffer():new TextEncoder().encode(String(value)).buffer;if(root.crypto?.subtle){const d=await root.crypto.subtle.digest('SHA-256',bytes);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,'0')).join('');}let h=2166136261;for(const b of new Uint8Array(bytes)){h^=b;h=Math.imul(h,16777619);}return (h>>>0).toString(16).padStart(8,'0').repeat(4);}
@@ -18,19 +20,27 @@ function rememberCharacter(root,character){try{if(character?.id)root.localStorag
 async function createOnce(fn){try{return await fn();}catch(error){if(Number(error?.status)===409||/duplicate|already exists|resource exists|conflict/i.test(String(error?.message||'')))return null;throw error;}}
 async function syncNetwork(root,contentSession,character){if(!root.KeloNetAuthority?.refreshAvatar||!contentSession.accessToken||!character?.id)return null;try{return await root.KeloNetAuthority.refreshAvatar({accessToken:contentSession.accessToken,characterId:character.id,name:character.name||null});}catch(error){if(/NETWORK_OFFLINE|NETWORK_CLOSED|NETWORK_TIMEOUT/.test(String(error?.message||'')))return null;throw error;}}
 function isolationCapability(root){const reasons=[];if(typeof root?.Worker!=='function')reasons.push('WORKER_UNAVAILABLE');if(typeof root?.OffscreenCanvas!=='function')reasons.push('OFFSCREEN_CANVAS_UNAVAILABLE');if(typeof root?.createImageBitmap!=='function')reasons.push('IMAGE_BITMAP_UNAVAILABLE');return F({ready:reasons.length===0,reasons:F(reasons)});}
+function hardRelease(input,compiled){const decision=verifyAssetRelease({input,compiled,requiredDomains:['security','runtime']});if(decision.decision==='REJECTED'){const error=new Error(`AVATAR_RELEASE_GATE_REJECTED:${decision.rejected.join('|')}`);error.releaseDecision=decision;throw error;}return decision;}
 function createCompileBridge(root){
   const capability=isolationCapability(root),timeoutMs=Math.max(5000,Math.min(120000,Number(root?.__KELO_ASSET_WORKER_TIMEOUT_MS__)||25000));
   const client=capability.ready?createIsolatedAssetWorkerClient({workerFactory:()=>new root.Worker(ISOLATED_WORKER_URL,{type:'module',name:'kelo-avatar-compiler-v7'}),defaultTimeoutMs:timeoutMs}):null;
   async function compile(file,analysis,{onProgress=null,signal=null}={}){
+    onProgress?.({stage:'preflight',message:'Verificando archivo, dimensiones y memoria antes de decodificar…'});
+    const input=await assertSafeAssetInput(file,{maxBytes:12*1024*1024,maxDimension:3072,maxPixels:9_437_184,maxDecodedBytes:48*1024*1024,allowAnimation:false});
+    if(signal?.aborted)throw new Error(`ASSET_WORKER_ABORTED:${String(signal.reason||'external')}`);
+    let compiled;
     if(client){
       onProgress?.({stage:'isolation',message:'Compilando avatar fuera del hilo de la interfaz…'});
-      const compiled=await client.run({task:'compile-avatar',file,config:analysis||null,options:{}},{timeoutMs,signal,onProgress});
+      compiled=await client.run({task:'compile-avatar',file,config:analysis||null,options:{}},{timeoutMs,signal,onProgress});
       if(!compiled?.blob||!compiled?.width||!compiled?.height)throw new Error('ASSET_WORKER_RUNTIME_INVALID');
-      return F({...compiled,isolationMode:'dedicated-worker',isolationFallbackReason:null});
+      compiled=F({...compiled,isolationMode:'dedicated-worker',isolationFallbackReason:null,assetPreflight:input});
+    }else{
+      onProgress?.({stage:'isolation-fallback',message:'Este navegador no soporta aislamiento completo; usando compatibilidad controlada.'});
+      const direct=await compileUniversalAvatarRuntime(file,analysis,{root,onProgress});
+      compiled=F({...direct,isolatedWorker:false,isolationMode:'main-thread-compatibility',isolationFallbackReason:capability.reasons.join(',')||'UNKNOWN',assetPreflight:input});
     }
-    onProgress?.({stage:'isolation-fallback',message:'Este navegador no soporta aislamiento completo; usando compatibilidad controlada.'});
-    const compiled=await compileUniversalAvatarRuntime(file,analysis,{root,onProgress});
-    return F({...compiled,isolatedWorker:false,isolationMode:'main-thread-compatibility',isolationFallbackReason:capability.reasons.join(',')||'UNKNOWN'});
+    const releaseDecision=hardRelease(input,compiled);
+    return F({...compiled,releaseDecision});
   }
   return F({compile,capability,terminateAll:reason=>client?.terminateAll(reason)||F({terminated:false,reason:'NO_WORKER_CLIENT'})});
 }
@@ -42,6 +52,7 @@ export function createAvatarQuickImportService({contentSession,contentRepository
     const character=await ensureIdentity(),uid=contentRepository.userId();onProgress?.({stage:'compile',message:'Detectando, reparando y normalizando avatar…'});let compiled=await compileBridge.compile(file,analysis,{onProgress,signal});
     compiled=acceptConfirmedRawImageRuntime(compiled,analysis);
     if(analysis?.exactCanvas?.enabled&&!compiled.exactCanvas){onProgress?.({stage:'exact-canvas',message:`Ajustando runtime exacto ${analysis.exactCanvas.width}×${analysis.exactCanvas.height}px…`});compiled=await reframeCompiledRuntimeExact(root,compiled,analysis.exactCanvas);}
+    const releaseDecision=hardRelease(compiled.assetPreflight,compiled);compiled=F({...compiled,releaseDecision});
     if(compiled.validation?.artDefects?.length){const error=new Error('AVATAR_ART_DEFECT_REGENERATION_REQUIRED');error.validation=compiled.validation;throw error;}
     if(compiled.reviewRequired&&!analysis?.userConfirmedInterpretation){const error=new Error('AVATAR_REVIEW_REQUIRED');error.validation=compiled.validation;throw error;}
     if(compiled.reviewRequired){const error=new Error('AVATAR_REVIEW_STILL_REQUIRED');error.validation=compiled.validation;throw error;}
@@ -49,14 +60,15 @@ export function createAvatarQuickImportService({contentSession,contentRepository
     onProgress?.({stage:'upload-runtime',message:'Subiendo runtime validado…'});await createOnce(()=>contentRepository.upload('avatars',runtimePath,compiled.blob,{upsert:false}));
     const surgeryPatches=serializeSurgeryPatches(analysis?.framePatches||{}),surgeryCount=Object.keys(surgeryPatches).length;
     const isolation=F({mode:String(compiled.isolationMode||'unknown'),worker:compiled.isolatedWorker===true,fallbackReason:compiled.isolationFallbackReason||null,capability:compileBridge.capability});
-    const autoDetect={version:String(analysis?.version||'kelo-universal-sprite-ingestion-v6'),compilerVersion:String(compiled.compilerVersion||analysis?.compilerVersion||'6.0.0'),mode:String(compiled.detectionMode||analysis?.detectionMode||'universal'),strategy:String(compiled.strategy||analysis?.strategy||'spatial-clusters'),confidenceScore:Number(compiled.confidenceScore||analysis?.confidenceScore)||0,directionConfidence:Number(analysis?.directionConfidence)||0,autoCrop:!!analysis?.autoCrop,normalized:!!compiled.normalized,canonicalRig:!!compiled.canonicalRig,selfHealed:!!compiled.selfHealed,deterministicOnly:compiled.deterministicOnly!==false,status:compiled.status,reviewRequired:!!compiled.reviewRequired,validation:compiled.validation||null,audit:compiled.audit||null,isolation,sourceSize:{width:Number(analysis?.width)||0,height:Number(analysis?.height)||0},contentBounds:analysis?.contentBounds||null,exactCanvas:compiled.exactCanvas||null,rawIntent:compiled.rawIntent||null,surgery:surgeryCount?{version:'kelo-frame-surgery-v2.1.0',nonDestructive:true,patchCount:surgeryCount,patches:surgeryPatches}:null};
-    const payload={rigProfileId:compiled.rigProfileId||'sprite-rig-1d',directions:compiled.directions||compiled.rows,animationSetId:'creator-auto-walk-v3',slots:[],rarity:'custom',metadata:{source:'kelo-universal-sprite-ingestion-v6',characterId:character.id,autoDetect},avatarRuntime:{bucket:'avatars',path:runtimePath,publicUrl,columns:compiled.columns,rows:compiled.rows,frameWidth:compiled.frameWidth,frameHeight:compiled.frameHeight,frameCounts:compiled.frameCounts,directionKeys:compiled.directionKeys,rowMap:compiled.rowMap,frameMs:compiled.frameMs,renderHeight:82,runtimeHash,normalized:!!compiled.normalized,canonicalRig:!!compiled.canonicalRig,detectionMode:compiled.detectionMode,strategy:compiled.strategy,confidenceScore:compiled.confidenceScore,validation:compiled.validation||null,exactCanvas:compiled.exactCanvas||null,rawIntent:compiled.rawIntent||null,isolation}};
+    const trust=F({preflight:F({format:compiled.assetPreflight?.format||null,width:compiled.assetPreflight?.width||null,height:compiled.assetPreflight?.height||null,pixels:compiled.assetPreflight?.pixels||null,decodedBytes:compiled.assetPreflight?.decodedBytes||null}),releaseDecision:F({decision:releaseDecision.decision,rejected:releaseDecision.rejected,reviewRequired:releaseDecision.reviewRequired,warnings:releaseDecision.warnings,policyVersion:releaseDecision.policyVersion})});
+    const autoDetect={version:String(analysis?.version||'kelo-universal-sprite-ingestion-v6'),compilerVersion:String(compiled.compilerVersion||analysis?.compilerVersion||'6.0.0'),mode:String(compiled.detectionMode||analysis?.detectionMode||'universal'),strategy:String(compiled.strategy||analysis?.strategy||'spatial-clusters'),confidenceScore:Number(compiled.confidenceScore||analysis?.confidenceScore)||0,directionConfidence:Number(analysis?.directionConfidence)||0,autoCrop:!!analysis?.autoCrop,normalized:!!compiled.normalized,canonicalRig:!!compiled.canonicalRig,selfHealed:!!compiled.selfHealed,deterministicOnly:compiled.deterministicOnly!==false,status:compiled.status,reviewRequired:!!compiled.reviewRequired,validation:compiled.validation||null,audit:compiled.audit||null,isolation,trust,sourceSize:{width:Number(analysis?.width)||0,height:Number(analysis?.height)||0},contentBounds:analysis?.contentBounds||null,exactCanvas:compiled.exactCanvas||null,rawIntent:compiled.rawIntent||null,surgery:surgeryCount?{version:'kelo-frame-surgery-v2.1.0',nonDestructive:true,patchCount:surgeryCount,patches:surgeryPatches}:null};
+    const payload={rigProfileId:compiled.rigProfileId||'sprite-rig-1d',directions:compiled.directions||compiled.rows,animationSetId:'creator-auto-walk-v3',slots:[],rarity:'custom',metadata:{source:'kelo-universal-sprite-ingestion-v6',characterId:character.id,autoDetect},avatarRuntime:{bucket:'avatars',path:runtimePath,publicUrl,columns:compiled.columns,rows:compiled.rows,frameWidth:compiled.frameWidth,frameHeight:compiled.frameHeight,frameCounts:compiled.frameCounts,directionKeys:compiled.directionKeys,rowMap:compiled.rowMap,frameMs:compiled.frameMs,renderHeight:82,runtimeHash,normalized:!!compiled.normalized,canonicalRig:!!compiled.canonicalRig,detectionMode:compiled.detectionMode,strategy:compiled.strategy,confidenceScore:compiled.confidenceScore,validation:compiled.validation||null,exactCanvas:compiled.exactCanvas||null,rawIntent:compiled.rawIntent||null,isolation,trust}};
     const draft=F({schemaVersion:1,sourceRow:1,contentType:'character',schema:F({label:'Character',owner:'KeloCreatorAvatars',required:F(['primary'])}),slug,displayName:String(displayName||'Mi Avatar').slice(0,100),tags:F(['avatar','quick-import','universal-sprite-ingestion-v6','frame-surgery','exact-canvas',...(compiled.rawIntent?['raw-image']:[]),...(compiled.isolatedWorker?['isolated-worker']:['compatibility-fallback'])]),publish:false,visibility:'global',assetRefs:F([{role:'primary',file:file.name}]),payload:F(payload)}),job=F({ok:true,draft,resolvedAssets:F([{role:'primary',file,sourceName:file.name}]),errors:F([]),warnings:F([])});
     onProgress?.({stage:'register',message:'Registrando personaje…'});const result=await contentService.importJob(job,{onProgress:e=>{if(e.stage==='assets')onProgress?.({stage:'source',message:`Guardando fuente ${e.done}/${e.total}…`});}});await contentRepository.setActiveCharacterAvatar(character.id,result.revision.content_id);
-    const manifest={contentId:result.revision.content_id,displayName:draft.displayName,payload};root.KeloCreatorAvatars?.register?.(manifest);root.KeloCreatorAvatars?.select?.(result.revision.content_id,{manifest,persistLocal:true});onProgress?.({stage:'network',message:'Sincronizando con jugadores…'});await syncNetwork(root,contentSession,character);onProgress?.({stage:'active',message:'Avatar activo'});return F({character,manifest,result,compilerAudit:compiled.audit||null,isolation});
+    const manifest={contentId:result.revision.content_id,displayName:draft.displayName,payload};root.KeloCreatorAvatars?.register?.(manifest);root.KeloCreatorAvatars?.select?.(result.revision.content_id,{manifest,persistLocal:true});onProgress?.({stage:'network',message:'Sincronizando con jugadores…'});await syncNetwork(root,contentSession,character);onProgress?.({stage:'active',message:'Avatar activo'});return F({character,manifest,result,compilerAudit:compiled.audit||null,isolation,trust});
   }
   async function hydrateActive(){if(!contentSession.accessToken)return root.KeloCreatorAvatars?.current?.()||null;await contentSession.ensureFresh();const chars=await contentRepository.listMyCharacters(),character=pickCharacter(chars,root);if(!character?.active_avatar_content_id)return null;rememberCharacter(root,character);const manifest=await contentRepository.getAvatarManifest(character.active_avatar_content_id);if(!manifest)return null;const rt=manifest.payload?.avatarRuntime;if(rt?.bucket&&rt?.path&&!rt.publicUrl)rt.publicUrl=contentRepository.publicUrl(rt.bucket,rt.path);root.KeloCreatorAvatars?.register?.(manifest);root.KeloCreatorAvatars?.select?.(manifest.contentId,{manifest,persistLocal:true});await syncNetwork(root,contentSession,character);return manifest;}
-  return F({version:'avatar-quick-import-service-v7.0.0-isolated',importAndUse,hydrateActive,isolationCapability:compileBridge.capability,terminateCompiler:compileBridge.terminateAll});
+  return F({version:'avatar-quick-import-service-v7.1.0-trust-isolated',importAndUse,hydrateActive,isolationCapability:compileBridge.capability,terminateCompiler:compileBridge.terminateAll});
 }
 
-export const __avatarQuickImportIsolation=F({isolationCapability,createCompileBridge});
+export const __avatarQuickImportIsolation=F({isolationCapability,hardRelease,createCompileBridge});
