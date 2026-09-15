@@ -1,13 +1,13 @@
 /* KELO-INDEX
  * area: CREATORS / ASSET BYTES
  * owner: Kelo Creator Asset Bridge
- * keys: PNG ADAPTIVE PALETTE QUALITY AGENT SHARP PIXEL ART
+ * keys: PNG ADAPTIVE PALETTE QUALITY AGENT SHARP PIXEL ART ICC METADATA
  * purpose: search near-lossless PNG palette candidates and keep only candidates approved by the deterministic quality agent
  * public-api: optimizePngAdaptive()
  * state-owned: none
  * online: N/A; creator/build-time capability only
  * consumes: png-space-optimizer.mjs, png-quality-agent.mjs, optional sharp dependency
- * do-not: resize, resample, change dimensions, silently alter alpha, or bypass quality gates
+ * do-not: resize, resample, change dimensions, silently alter alpha/color metadata, or bypass quality gates
  */
 
 import {decodePngRgba, optimizePngLossless} from './png-space-optimizer.mjs';
@@ -49,8 +49,9 @@ async function decodeWithSharp(sharp, buffer) {
 
 export async function optimizePngAdaptive(buffer, options = {}) {
   const strict = optimizePngLossless(buffer, options.losslessOptions);
-  const original = decodePngRgba(buffer);
+  const sourcePng = decodePngRgba(buffer);
   const sharp = await loadSharp();
+  const originalVisual = await decodeWithSharp(sharp, buffer);
   const profiles = options.profiles || defaultProfiles();
   const qualityPolicy = options.qualityPolicy || 'pixel-art';
   const qualityLimits = options.qualityLimits || {};
@@ -60,6 +61,7 @@ export async function optimizePngAdaptive(buffer, options = {}) {
     let generated;
     try {
       generated = await sharp(buffer, {animated:false})
+        .keepMetadata()
         .png({
           palette:true,
           colours:profile.colours,
@@ -85,7 +87,7 @@ export async function optimizePngAdaptive(buffer, options = {}) {
     const tightened = optimizePngLossless(generated, options.losslessOptions);
     const candidateBuffer = tightened.buffer;
     const decoded = await decodeWithSharp(sharp, candidateBuffer);
-    if (decoded.width !== original.ihdr.width || decoded.height !== original.ihdr.height) {
+    if (decoded.width !== sourcePng.ihdr.width || decoded.height !== sourcePng.ihdr.height) {
       candidates.push({
         label:`sharp-palette:${profile.colours}:dither-${profile.dither}`,
         bytes:candidateBuffer.length,
@@ -96,7 +98,7 @@ export async function optimizePngAdaptive(buffer, options = {}) {
       continue;
     }
 
-    const metrics = evaluatePixelFidelity(original.rgba, decoded.rgba, decoded.width, decoded.height);
+    const metrics = evaluatePixelFidelity(originalVisual.rgba, decoded.rgba, decoded.width, decoded.height);
     const verdict = judgePixelFidelity(metrics, qualityPolicy, qualityLimits);
     candidates.push({
       label:`sharp-palette:${profile.colours}:dither-${profile.dither}`,
