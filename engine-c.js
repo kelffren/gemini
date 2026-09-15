@@ -1,11 +1,11 @@
 /* KELO-INDEX
  * area: CORE
  * owner: legacy render/social core; camera commands after boot owned by KeloCamera
- * keys: RENDER LAYERS VISUAL VFX SCREEN UPDATE SOCIAL CAMERA FOUNDATION PVP LEGACY BOT GUARD
- * hace: orquesta render del mundo/actores/UI y ofrece puntos explícitos para sistemas Foundation; congela solo el wandering legacy de simulatedPlayers mientras el PvP moderno controla su fallback
+ * keys: RENDER LAYERS VISUAL VFX SCREEN UPDATE SOCIAL CAMERA FOUNDATION PVP LEGACY BOT GUARD SIMULATION BRIDGE
+ * hace: orquesta render del mundo/actores/UI y aporta augmentación legacy de simulación mediante KELO_LEGACY_SIMULATION_BRIDGE sin poseer updateSimulation
  * online: visuales consumen eventos; este archivo no decide autoridad compartida
- * legacy: CONFIG.zoom/cycleZoom/screenToWorld son bootstrap pre-KeloCamera y quedan reemplazados por el owner tras carga; title Caballero wrapper RETIRED
- * do-not: no añadir nuevos writers camera.* ni wrappers renderAvatar; usar KeloCamera/KeloAvatar
+ * legacy: CONFIG.zoom/cycleZoom/screenToWorld son bootstrap pre-KeloCamera y quedan reemplazados por el owner tras carga; simulación base permanece en engine-a
+ * do-not: no añadir nuevos writers camera.* ni wrappers renderAvatar/updateSimulation; usar KeloCamera/KeloAvatar/KeloSimulation
  */
 CONFIG.zoom = 0.82;
 const ZOOM_STEPS = [0.7, 0.82, 1];
@@ -175,37 +175,45 @@ render = function() {
     ctx.arc(input.originX + Math.cos(angle) * clamped, input.originY + Math.sin(angle) * clamped, 18, 0, Math.PI * 2); ctx.fill(); ctx.restore();
   }
 };
-const _updateSimulation = updateSimulation;
-updateSimulation = function(dt) {
-  const modernPvp = window.KELO_COMBAT_ENABLED === true;
-  const legacyBotState = modernPvp && Array.isArray(simulatedPlayers) ? simulatedPlayers.map(function(bot){
-    return { bot:bot, x:bot.x, y:bot.y, targetX:bot.targetX, targetY:bot.targetY };
-  }) : null;
-  _updateSimulation(dt);
-  if (legacyBotState) legacyBotState.forEach(function(entry){
-    entry.bot.x=entry.x; entry.bot.y=entry.y; entry.bot.targetX=entry.targetX; entry.bot.targetY=entry.targetY;
-  });
-  const now = Date.now();
-  if (STATE.farm.coop && STATE.farm.coop.fedAt && (now - STATE.farm.coop.fedAt) / 1000 >= STATE.farm.coop.duration) {
-    if (!STATE.farm.coop.ready) { STATE.farm.coop.ready = true; STATE.silo.eggs = (STATE.silo.eggs || 0) + 2; STATE.farm.coop.fedAt = 0; saveState(); showToast('+2 huevos'); }
+const _legacySimulationFrames=[];
+window.KELO_LEGACY_SIMULATION_BRIDGE=Object.freeze({
+  version:'engine-c-simulation-bridge-v1',
+  before:function(){
+    const modernPvp=window.KELO_COMBAT_ENABLED===true;
+    const legacyBotState=modernPvp&&Array.isArray(simulatedPlayers)?simulatedPlayers.map(function(bot){
+      return {bot:bot,x:bot.x,y:bot.y,targetX:bot.targetX,targetY:bot.targetY};
+    }):null;
+    _legacySimulationFrames.push(legacyBotState);
+  },
+  after:function(ctx){
+    const legacyBotState=_legacySimulationFrames.pop()||null;
+    if(legacyBotState)legacyBotState.forEach(function(entry){
+      entry.bot.x=entry.x;entry.bot.y=entry.y;entry.bot.targetX=entry.targetX;entry.bot.targetY=entry.targetY;
+    });
+    const now=Date.now();
+    if(STATE.farm.coop&&STATE.farm.coop.fedAt&&(now-STATE.farm.coop.fedAt)/1000>=STATE.farm.coop.duration){
+      if(!STATE.farm.coop.ready){STATE.farm.coop.ready=true;STATE.silo.eggs=(STATE.silo.eggs||0)+2;STATE.farm.coop.fedAt=0;saveState();showToast('+2 huevos');}
+    }
+    if(STATE.farm.pen&&STATE.farm.pen.fedAt&&STATE.farm.pen.fedAt>0&&(now-STATE.farm.pen.fedAt)/1000>=STATE.farm.pen.duration){
+      if(!STATE.farm.pen.ready){STATE.farm.pen.ready=true;STATE.silo.pork=(STATE.silo.pork||0)+1;STATE.farm.pen.fedAt=0;saveState();showToast('+1 cerdo');}
+    }
+    if(window.KeloVisualSystem&&typeof window.KeloVisualSystem.update==='function')window.KeloVisualSystem.update(ctx&&Number(ctx.dt)||0);
   }
-  if (STATE.farm.pen && STATE.farm.pen.fedAt && STATE.farm.pen.fedAt > 0 && (now - STATE.farm.pen.fedAt) / 1000 >= STATE.farm.pen.duration) {
-    if (!STATE.farm.pen.ready) { STATE.farm.pen.ready = true; STATE.silo.pork = (STATE.silo.pork || 0) + 1; STATE.farm.pen.fedAt = 0; saveState(); showToast('+1 cerdo'); }
-  }
-  if (window.KeloVisualSystem && typeof window.KeloVisualSystem.update === 'function') window.KeloVisualSystem.update(dt);
-};
+});
 window.addEventListener('keydown', function(e) {
   if (e.key === 'Escape') { closeMenu(); closeSocialOverlays(); document.querySelectorAll('.app-panel').forEach(function(p){ p.style.display = 'none'; }); }
 });
 const _feedAnimals = feedAnimals;
 feedAnimals = function(type) { _feedAnimals(type); if (type === 'chickens' && STATE.farm.coop) STATE.farm.coop.ready = false; if (type === 'pigs' && STATE.farm.pen) STATE.farm.pen.ready = false; };
 window.KELO_LEGACY_WORLD_DRAW_AUDIT = Object.freeze({
-  version:'legacy-world-reset-guard-v2-pvp-bot-freeze',
+  version:'legacy-world-reset-guard-v3-simulation-bridge',
   get decorationReset(){ return decorationResetActive(); },
   farmSuppressed:true,
   plotSuppressed:true,
   arenaFrameSuppressed:true,
   simulatedPlayersSuppressed:true,
   pvpLegacyBotWanderingSuppressed:true,
-  baseObstaclesSuppressed:true
+  baseObstaclesSuppressed:true,
+  simulationWrapperRetired:true,
+  simulationBridge:'KELO_LEGACY_SIMULATION_BRIDGE'
 });
