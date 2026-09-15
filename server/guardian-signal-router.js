@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: SERVER / GUARDIAN SIGNALING
  * owner: Kelo Guardian Signal Router
- * keys: GUARDIAN WEBRTC SIGNAL OFFER ANSWER ICE SESSION TTL RATE LIMIT SINGLE SOCKET RELAY
+ * keys: GUARDIAN WEBRTC SIGNAL OFFER ANSWER ICE KEEPALIVE SESSION TTL RATE LIMIT SINGLE SOCKET RELAY
  * purpose: enruta signaling WebRTC entre nodos Guardian autenticados usando el WebSocket existente del juego
  * authority: signaling solamente; no transporta ni acepta autoridad de gameplay/economia/PvP
  * do-not: NO segundo WebSocket, NO credenciales TURN en cliente, NO broadcast SDP/ICE, NO confiar nodeId sin binding autenticado
@@ -25,6 +25,7 @@ function actorFor(me){return{accountId:me.accountId,roles:Array.isArray(me.roles
 function makeSessionId(seq){return 'gs_'+Date.now().toString(36)+'_'+Number(seq).toString(36)+'_'+Math.random().toString(36).slice(2,8);}
 function sanitizeSignal(raw){
   const kind=String(raw?.kind||'');
+  if(kind==='keepalive')return Object.freeze({kind});
   if(kind==='offer'||kind==='answer'){
     const sdp=String(raw?.sdp||'');
     if(!sdp||sdp.length>SDP_MAX)throw new Error('GUARDIAN_SIGNAL_SDP_INVALID');
@@ -102,6 +103,7 @@ function createGuardianSignalRouter({guardian,now=Date.now}={}){
     if(row.a!==source.key&&row.b!==source.key)throw new Error('GUARDIAN_SIGNAL_SESSION_FORBIDDEN');
     const targetKey=row.a===source.key?row.b:row.a,target=bindings.get(targetKey);if(!target||target.me.ws?.readyState!==1||!nodeIsEnabled(target)){if(target)unbind(target.me,'node-disabled');else closeSession(id,'peer-offline',false);throw new Error('GUARDIAN_SIGNAL_CAPACITY');}
     const signal=sanitizeSignal(input.signal);row.expiresAt=now()+SESSION_TTL_MS;
+    if(signal.kind==='keepalive')return Object.freeze({ok:true,sessionId:id,keptAlive:true,expiresAt:row.expiresAt});
     const out={t:'guardian:peer:signal',sessionId:id,peerNodeId:source.nodeId,signal,expiresAt:row.expiresAt,source:'guardian-signal-router-v1'};send(target.me,out);return Object.freeze({ok:true,sessionId:id});
   }
   function closeFrom(me,input={}){requireAuth(me);rate(me);const source=bindingFor(me),id=String(input.sessionId||''),row=sessions.get(id);if(!row)return{ok:true,closed:false};if(row.a!==source.key&&row.b!==source.key)throw new Error('GUARDIAN_SIGNAL_SESSION_FORBIDDEN');return{ok:true,closed:closeSession(id,input.reason||'peer-closed',true)};}
@@ -117,8 +119,8 @@ function createGuardianSignalRouter({guardian,now=Date.now}={}){
       return true;
     }catch(error){send(me,{t:'guardian:error',requestId:msg?.requestId||null,code:errorCode(error),source:'guardian-signal-router-v1'});return true;}
   }
-  function audit(){sweep();return Object.freeze({version:'guardian-signal-router-v1.1',bindings:bindings.size,sessions:sessions.size,sessionTtlMs:SESSION_TTL_MS,maxSessionsPerNode:MAX_SESSIONS_PER_NODE,singleSocket:true,liveDonorRequired:true,gameplayAuthority:false,economyAuthority:false,pvpAuthority:false});}
-  return Object.freeze({version:'guardian-signal-router-v1.1',handle,bind,unbind,requestPeer,routeSignal,closeFrom,sweep,audit});
+  function audit(){sweep();return Object.freeze({version:'guardian-signal-router-v1.2',bindings:bindings.size,sessions:sessions.size,sessionTtlMs:SESSION_TTL_MS,maxSessionsPerNode:MAX_SESSIONS_PER_NODE,singleSocket:true,heartbeatKeepalive:true,liveDonorRequired:true,gameplayAuthority:false,economyAuthority:false,pvpAuthority:false});}
+  return Object.freeze({version:'guardian-signal-router-v1.2',handle,bind,unbind,requestPeer,routeSignal,closeFrom,sweep,audit});
 }
 
 module.exports={createGuardianSignalRouter,sanitizeSignal};
