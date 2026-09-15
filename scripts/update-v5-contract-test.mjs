@@ -34,12 +34,16 @@ forbidText('updater', files.updater, '/git/trees/', 'a repo-wide Git tree walk d
 forbidText('updater', files.updater, 'serviceWorker.register', 'iPhone updater must never depend on Service Worker registration');
 forbidText('updater', files.updater, 'setInterval(', 'update engine must not add a permanent polling loop');
 
-// Gate: tiny, event/time-out based, learning, no heavy updater on current builds.
-requireText('gate', files.gate, 'kelo-update-gate-v5-learning-hint', 'the active lightweight gate contract must stay versioned');
+// Gate: cheap compare seed, safe zero-byte fast-forward, learning and lazy heavy updater.
+requireText('gate', files.gate, 'kelo-update-gate-v6-live-fast-forward', 'the active lightweight gate contract must stay versioned');
 requireText('gate', files.gate, '__KELO_UPDATE_HINT__', 'gate should pass deployment knowledge to V5.1');
 requireText('gate', files.gate, 'kelo.world.updater.hotset.v1', 'normal sessions must train the predictive cache');
+requireText('gate', files.gate, 'kelo.world.updater.compare.v5.', 'gate compare must seed the cache V5.1 already consumes');
+requireText('gate', files.gate, "emit('fast-forward'", 'non-runtime-only deployments should advance with zero asset download and no reload');
+requireText('gate', files.gate, "p.startsWith('.github/')", 'fast-forward must be allowlisted to clearly non-runtime repository paths');
 requireText('gate', files.gate, 'src/core/update-system-v5.js?v=5.1-health-hint', 'heavy updater must remain lazy and current');
 forbidText('gate', files.gate, 'setInterval(', 'gate must use a single rescheduled timeout, never a permanent interval');
+forbidText('gate', files.gate, '/git/trees/', 'gate must never regress to repository tree walking');
 forbidText('gate', files.gate, 'update-system-v4.js', 'V4 must not be reactivated accidentally');
 
 // Worker: verification is isolated from game/render/network.
@@ -51,7 +55,7 @@ forbidText('worker', files.worker, 'document.', 'verification worker must never 
 // Boot: only pending-update boots arm the early error recorder.
 requireText('index', files.index, "sessionStorage.getItem('kelo.world.updater.pendingBuild.v5')", 'normal boots must not pay the early-health listener cost');
 requireText('index', files.index, '__KELO_UPDATE_EARLY_HEALTH__', 'pending-update boots must expose early health evidence');
-requireText('index', files.index, 'src/core/update-gate.js?v=5-learning-hint', 'Safari must not reuse an older gate');
+requireText('index', files.index, 'src/core/update-gate.js?v=6-live-fast-forward', 'Safari must not reuse an older gate');
 
 // Settings observability must remain first-use only and event-driven.
 requireText('settings', files.settings, 'update-intelligence-ui.js?v=1', 'update diagnostics belong behind Settings first-use gate');
@@ -65,7 +69,8 @@ if (failures.length) {
 }
 
 console.log('KELO UPDATE OS V5 CONTRACT: OK');
-console.log('✓ exact commit delta');
+console.log('✓ exact commit delta + shared compare seed');
+console.log('✓ zero-download non-runtime fast-forward');
 console.log('✓ predictive hotset');
 console.log('✓ off-main-thread integrity verification');
 console.log('✓ CDN consistency barrier');
