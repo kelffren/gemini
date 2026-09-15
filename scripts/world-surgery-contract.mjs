@@ -53,7 +53,12 @@ assert.equal(api.getFlight().lastCompleted?.module,'paintCopies');
 api.moduleDisabled('assetPalette','CONTRACT');
 assert.equal(api.status('assetPalette').status,'DISABLED');
 
-const live=readFileSync(new URL('../src/studio/integration/live-studio-controller.mjs',import.meta.url),'utf8');
+// The LIVE controller is intentionally split into a thin Surgery wrapper plus the
+// preserved proven implementation. Audit the effective runtime surface, not one
+// physical file, so the contract does not create false failures after extraction.
+const liveWrapper=readFileSync(new URL('../src/studio/integration/live-studio-controller.mjs',import.meta.url),'utf8');
+const liveBase=readFileSync(new URL('../src/studio/integration/live-studio-controller-base.mjs',import.meta.url),'utf8');
+const live=`${liveWrapper}\n${liveBase}`;
 assert.match(live,/createNoopAuthorityMirror/,'authority mirror fallback missing');
 assert.match(live,/createNoopCameraController/,'camera fallback missing');
 assert.match(live,/enabled\?\.\('authorityMirror'\)/,'authority mirror switch is not wired');
