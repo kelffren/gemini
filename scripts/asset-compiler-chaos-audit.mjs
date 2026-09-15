@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {webcrypto} from 'node:crypto';
 import {inspectAssetContainer,assertSafeAssetInput} from '../src/creators/sprite-compiler/asset-safe-decode.mjs';
+import {fingerprintAssetBuild} from '../src/creators/sprite-compiler/asset-build-fingerprint.mjs';
 import {createAssetJobRunner} from '../src/creators/sprite-compiler/asset-job-runner.mjs';
 import {createAssetTransaction} from '../src/creators/sprite-compiler/asset-transaction.mjs';
 import {createAssetVerificationLedger,verifyAssetVerificationLedger} from '../src/creators/sprite-compiler/asset-verification-ledger.mjs';
@@ -24,6 +25,9 @@ const huge=new Blob([makePng(0xffffffff,0xffffffff)],{type:'image/png'});Object.
 
 // Declared WebP container size mismatch must fail closed.
 const webp=new Uint8Array(30);webp.set([...Buffer.from('RIFF'),99,0,0,0,...Buffer.from('WEBPVP8X'),10,0,0,0],0);webp[24]=31;webp[27]=15;const badWebp=new Blob([webp],{type:'image/webp'});Object.defineProperty(badWebp,'name',{value:'bad.webp'});await assert.rejects(()=>assertSafeAssetInput(badWebp),/ASSET_CONTAINER_SIZE_MISMATCH/);
+
+// Content addressing ignores filename and private analysis state, but rejects non-private binary config.
+const sourceBytes=makePng(32,16),fileA=new Blob([sourceBytes],{type:'image/png'}),fileB=new Blob([sourceBytes],{type:'image/png'});Object.defineProperty(fileA,'name',{value:'one.png'});Object.defineProperty(fileB,'name',{value:'renamed.png'});const cryptoRoot={crypto:webcrypto};const fpA=await fingerprintAssetBuild(fileA,{config:{b:2,a:1,_foreground:new Uint8Array([1,2,3])},compilerVersion:'7.0.0',root:cryptoRoot}),fpB=await fingerprintAssetBuild(fileB,{config:{a:1,b:2},compilerVersion:'7.0.0',root:cryptoRoot});assert.equal(fpA.hash,fpB.hash);assert.equal(fpA.sourceHash,fpB.sourceHash);await assert.rejects(()=>fingerprintAssetBuild(fileA,{config:{pixels:new Uint8Array([1])},compilerVersion:'7.0.0',root:cryptoRoot}),/BINARY_CONFIG_UNSUPPORTED/);
 
 // Timeout and supersession: late async results cannot become successful jobs.
 const runner=createAssetJobRunner({defaultTimeoutMs:120});const started=Date.now();await assert.rejects(()=>runner.run([{name:'hang',run:()=>sleep(500)}]),/ASSET_JOB_ABORTED:timeout/);assert.ok(Date.now()-started<450);
@@ -58,4 +62,4 @@ assert.throws(()=>assertPinnedAssetOracle({id:'seg',model:'sam',version:'latest'
 // Visual AI cannot prove usage rights; external source without an explicit declaration/license remains review-required.
 const sourceDecision=evaluateAssetSourceAttestation({sourceType:'external',sourceUri:'example',declaration:false});assert.equal(sourceDecision.pass,false);assert.ok(sourceDecision.reasons.includes('SOURCE_LICENSE_EVIDENCE_REQUIRED'));
 
-console.log(JSON.stringify({ok:true,randomCases:5000,randomRejected,timeoutFailClosed:true,staleProtected:true,hardWorkerKill:true,transactionRollback:true,ledgerTamperDetected:true,aiSecurityAuthorityDenied:true,humanHardOverrideDenied:true,realDeviceCanary:true,modelDriftGoverned:true,sourceRightsNotGuessed:true}));
+console.log(JSON.stringify({ok:true,randomCases:5000,randomRejected,contentAddressed:true,timeoutFailClosed:true,staleProtected:true,hardWorkerKill:true,transactionRollback:true,ledgerTamperDetected:true,aiSecurityAuthorityDenied:true,humanHardOverrideDenied:true,realDeviceCanary:true,modelDriftGoverned:true,sourceRightsNotGuessed:true}));
