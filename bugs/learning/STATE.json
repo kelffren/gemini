@@ -762,9 +762,20 @@
         "src/ui/studio-launcher.js",
         "sw.js"
       ]
+    },
+    {
+      "id": "prevention:39c8507326faa6a5dbe75b9dd0d5c5f0b5b94f74",
+      "at": "2026-09-15T03:32:08.000Z",
+      "source": "bug-prevention-ci",
+      "head_sha": "39c8507326faa6a5dbe75b9dd0d5c5f0b5b94f74",
+      "base_sha": "7514195859d3a277b953a87ab18cca2b7b47c08e",
+      "conclusion": "success",
+      "files": [
+        "src/core/bug-observability.mjs"
+      ]
     }
   ],
-  "feedback_updated_at": "2026-09-15T03:32:30.142Z",
+  "feedback_updated_at": "2026-09-15T03:37:30.370Z",
   "training": {
     "examples": 58,
     "search_examples": 43,
