@@ -54,6 +54,14 @@ async function assertNoViewportOverflow(label) {
 
 try {
   await page.goto(url + (url.includes('?') ? '&' : '?') + 'character-creator-v2-audit=' + Date.now(), { waitUntil:'domcontentloaded', timeout:60000 });
+  await page.waitForFunction(() => !!window.KELO_MODULE_LOADER && !!window.KeloInputLocks, null, {timeout:20000});
+  const cold=await page.evaluate(() => ({creator:!!window.KeloCharacterCustomization,launcher:!!window.KeloCharacterCustomizer,needs:window.KELO_MODULE_LOADER?.needs?.('appearance')}));
+  if(cold.creator||cold.launcher||cold.needs!==true) throw new Error('CHARACTER_CREATOR_MUST_STAY_DEFERRED_'+JSON.stringify(cold));
+  await page.evaluate(async () => {
+    await window.KELO_MODULE_LOADER.ensure('appearance');
+    if(!window.KeloCharacterCustomizer?.open) throw new Error('CHARACTER_LAUNCHER_MISSING_AFTER_FIRST_USE');
+    await window.KeloCharacterCustomizer.open();
+  });
   await waitForCreator();
 
   const baseline = await page.evaluate(async expected => {
@@ -111,10 +119,6 @@ try {
     };
   }, EXPECTED);
 
-  await page.evaluate(() => {
-    window.confirm=()=>true;
-    return window.KeloCharacterCustomizer.open();
-  });
   const modal=page.locator('#kelo-character-customizer');
   await modal.waitFor({state:'visible',timeout:10000});
   await page.waitForFunction(() => window.KeloInputLocks?.has?.('character-customizer') === true);
@@ -198,7 +202,6 @@ try {
   await modal.locator('[data-kc-load="1"]').click();
   const loaded=await page.evaluate(() => window.KeloCharacterCustomization.getState());
   if(loaded.slots.hair!==afterRedo && loaded.slots.hair!==hairBeforeRandom) {
-    // Hair may be the same across the saved edited state; validate the explicit palette instead.
     if(loaded.palettes.hair!=='hair_silver') throw new Error('LOAD_SLOT_UI_FAILED');
   }
 
@@ -233,14 +236,14 @@ try {
       lockSnapshot,
       backpack,
       menuCallable:typeof window.toggleMenu==='function',
-      pvpCallable:typeof window.enterPvPWorld==='function'&&typeof window.leavePvPWorld==='function',
+      pvpFirstUseRoute:typeof window.KELO_MODULE_LOADER?.ensure==='function'&&window.KELO_MODULE_LOADER?.needs?.('pvp')===true,
       movementOwner:!!window.KeloMovement,
       inputOwner:!!window.KeloInput
     };
   });
   if(!postClose.customizerReleased) throw new Error('CUSTOMIZER_INPUT_LOCK_LEAKED');
   if(postClose.backpack.available&&(!postClose.backpack.opened||!postClose.backpack.closed)) throw new Error('BACKPACK_BROKEN_AFTER_CUSTOMIZER');
-  if(!postClose.menuCallable||!postClose.pvpCallable||!postClose.movementOwner||!postClose.inputOwner) throw new Error('CORE_FLOW_MISSING_AFTER_CUSTOMIZER_'+JSON.stringify(postClose));
+  if(!postClose.menuCallable||!postClose.pvpFirstUseRoute||!postClose.movementOwner||!postClose.inputOwner) throw new Error('CORE_FLOW_MISSING_AFTER_CUSTOMIZER_'+JSON.stringify(postClose));
 
   const finalAudit=await page.evaluate(() => ({
     customization:window.KELO_CHARACTER_CUSTOMIZATION_AUDIT,
@@ -253,7 +256,7 @@ try {
   if(pageErrors.length) throw new Error('PAGE_ERRORS_'+pageErrors.join(' | '));
 
   const report={
-    ok:true,url,expected:EXPECTED,
+    ok:true,url,expected:EXPECTED,cold,
     baseline,
     editedState,
     hairLock:{before:hairBeforeRandom,after:hairAfterRandom},
