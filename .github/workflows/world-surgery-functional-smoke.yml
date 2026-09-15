@@ -17,6 +17,18 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Patch visual harness to tap visible asset row
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('scripts/world-surgery-functional-smoke.mjs')
+          s=p.read_text()
+          old='await page.locator(`#kelo-studio-live [data-asset="${tree.id.replaceAll(\'"\',\'\\\\"\')}"]`).first().tap();'
+          new='await page.locator(`#kelo-studio-live [data-asset="${tree.id.replaceAll(\'"\',\'\\\\"\')}"]:visible`).first().tap();'
+          if old not in s:
+              raise SystemExit('VISIBLE_ASSET_PATCH_TARGET_MISSING')
+          p.write_text(s.replace(old,new,1))
+          PY
       - name: Syntax check
         run: |
           node --check scripts/world-surgery-functional-smoke.mjs
