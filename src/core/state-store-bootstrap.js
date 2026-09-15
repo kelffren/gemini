@@ -1,15 +1,15 @@
 /* KELO-INDEX
  * area: CORE / PERSISTENCE
  * owner: KeloStateStore
- * keys: STATE SAVE MIGRATION SCHEMA BACKUP LEGACY COMPATIBILITY
- * purpose: normaliza el save legacy antes de que engine-a lo consuma, preservando campos desconocidos y creando backup antes de cualquier migración
+ * keys: STATE SAVE MIGRATION SCHEMA BACKUP LEGACY COMPATIBILITY DEFAULTS
+ * purpose: normaliza el save legacy antes de que engine-a lo consuma, preservando campos desconocidos, defaults actuales y backup previo
  * public-api: KeloStateStore.normalizeState/migrateStorage/snapshot
- * consumes: localStorage key kelo_world_state_v2_1
+ * consumes: localStorage key kelo_world_state_v2_1 + defaults legacy de engine-a V6.69
  * state-owned: solo metadata de migración; gameplay STATE sigue legacy durante esta fase
  * extension-points: añadir migraciones versionadas y deterministas sin cambiar gameplay
- * reuse: cualquier futura migración de save debe entrar aquí, no en engine-a
+ * reuse: cualquier futura migración de save debe entrar aquí, no repartirse por features
  * legacy: compatibility boundary; no reemplaza STATE todavía
- * do-not: NO gameplay rules, NO timers, NO listeners, NO borrar saves corruptos, NO inventar contenido
+ * do-not: NO gameplay rules, NO timers, NO listeners, NO borrar saves corruptos, NO defaults inventados fuera del baseline legacy
  */
 (function(root,factory){
   'use strict';
@@ -22,26 +22,63 @@
 })(typeof globalThis!=='undefined'?globalThis:this,function(){
   'use strict';
 
-  const VERSION='kelo-state-store-bootstrap-v1.0.0';
+  const VERSION='kelo-state-store-bootstrap-v1.1.0';
   const STORAGE_KEY='kelo_world_state_v2_1';
   const BACKUP_KEY=STORAGE_KEY+'.backup.pre-schema-v3';
   const SCHEMA_VERSION=3;
+  const BOOT_NOW=Date.now();
   let last={status:'idle',changed:false,fromVersion:null,toVersion:SCHEMA_VERSION,backupCreated:false,error:null};
 
+  // Mirrored from the V6.69 legacy STATE baseline. These values are compatibility
+  // defaults only: an existing user value always wins, including intentionally empty arrays.
   const BASE=Object.freeze({
     gold:1500,kc:200,fusionMastery:1,fusionXp:0,farmLevel:1,farmXp:0,investorXp:0,investorRank:1,
     silo:Object.freeze({wheat:10,carrot:4,eggs:0,pork:0}),
-    equipped:Object.freeze([]),inventory:Object.freeze([]),marketListings:Object.freeze([]),auctions:Object.freeze([]),markets:Object.freeze([]),
-    plot:Object.freeze({x:2000,y:1500,w:400,h:300,lastMaintenance:0,furniture:Object.freeze([])}),
+    equipped:Object.freeze([]),
+    inventory:Object.freeze([]),
+    marketListings:Object.freeze([
+      Object.freeze({
+        id:'lst_1',seller:'Merchant_Zack',type:'stone',price:450,
+        item:Object.freeze({uid:'st_migrated_default_meteor_epic',typeId:'meteor',name:'Meteoro',icon:'\u2604\uFE0F',tier:'Epic',isUlt:true,color:'#ff9f1c',baseCd:10,dmg:60,currentCd:0,positiveMod:'+15% Dano',negativeMod:'-5% Velocidad post-uso'})
+      }),
+      Object.freeze({id:'lst_2',seller:'Farmer_Bob',type:'resource',name:'Lote de 20 Trigo',icon:'\uD83C\uDF3E',price:180})
+    ]),
+    auctions:Object.freeze([
+      Object.freeze({id:'auc_1',seller:'System_Vault',name:'Piedra Divina: Colapso Estelar',icon:'\u2728',tier:'Divine',currentBid:1200,topBidder:'Duelist_V',timeLeft:120})
+    ]),
+    markets:Object.freeze([
+      Object.freeze({id:'m1',title:'Volumen diario de Oro > 500k?',payout:1.85,poolYes:1200,poolNo:800,myBet:null}),
+      Object.freeze({id:'m2',title:'Mas de 100 combates PvP hoy?',payout:2.20,poolYes:450,poolNo:950,myBet:null})
+    ]),
+    plot:Object.freeze({
+      x:2000,y:1500,w:400,h:300,lastMaintenance:BOOT_NOW,
+      furniture:Object.freeze([
+        Object.freeze({type:'floor',gx:0,gy:0,gw:10,gh:8}),
+        Object.freeze({type:'wall',gx:0,gy:0,gw:10,gh:1}),
+        Object.freeze({type:'mannequin',gx:3,gy:3,gw:1,gh:1}),
+        Object.freeze({type:'showcase',gx:6,gy:3,gw:1,gh:1})
+      ])
+    }),
     farm:Object.freeze({
-      x:600,y:1500,w:480,h:320,crops:Object.freeze([]),
-      coop:Object.freeze({type:'chickens',fedAt:0,duration:20,ready:false}),
+      x:600,y:1500,w:480,h:320,
+      crops:Object.freeze([
+        Object.freeze({id:0,type:'wheat',plantedAt:BOOT_NOW-12000,harvested:false}),
+        Object.freeze({id:1,type:'carrot',plantedAt:BOOT_NOW-5000,harvested:false}),
+        Object.freeze({id:2,type:'wheat',plantedAt:BOOT_NOW,harvested:false}),
+        Object.freeze({id:3,type:null,plantedAt:0,harvested:false})
+      ]),
+      coop:Object.freeze({type:'chickens',fedAt:BOOT_NOW-15000,duration:20,ready:false}),
       pen:Object.freeze({type:'pigs',fedAt:0,duration:45,ready:false})
     })
   });
 
   function object(value){return value&&typeof value==='object'&&!Array.isArray(value)?value:{};}
-  function array(value){return Array.isArray(value)?value:[];}
+  function clone(value){
+    if(Array.isArray(value))return value.map(clone);
+    if(value&&typeof value==='object'){const out={};for(const key of Object.keys(value))out[key]=clone(value[key]);return out;}
+    return value;
+  }
+  function array(value,fallback){return Array.isArray(value)?value:clone(Array.isArray(fallback)?fallback:[]);}
   function finite(value,fallback){const n=Number(value);return Number.isFinite(n)?n:fallback;}
   function integer(value,fallback){return Math.trunc(finite(value,fallback));}
   function bool(value,fallback){return typeof value==='boolean'?value:fallback;}
@@ -50,7 +87,7 @@
 
   function normalizeAnimal(raw,defaults){
     const src=object(raw);
-    return Object.assign({},src,{
+    return Object.assign({},clone(defaults),src,{
       type:text(src.type,defaults.type),
       fedAt:nonNegative(src.fedAt,defaults.fedAt),
       duration:Math.max(1,finite(src.duration,defaults.duration)),
@@ -58,19 +95,20 @@
     });
   }
 
-  function normalizeCrop(raw,index){
-    const src=object(raw);
-    return Object.assign({},src,{
-      id:src.id==null?index:src.id,
-      type:src.type==null?null:String(src.type),
-      plantedAt:nonNegative(src.plantedAt,0),
-      harvested:bool(src.harvested,false)
+  function normalizeCrop(raw,index,defaults){
+    const src=object(raw),fallback=object(defaults);
+    return Object.assign({},clone(fallback),src,{
+      id:src.id==null?(fallback.id==null?index:fallback.id):src.id,
+      type:src.type==null?(fallback.type==null?null:String(fallback.type)):String(src.type),
+      plantedAt:nonNegative(src.plantedAt,nonNegative(fallback.plantedAt,0)),
+      harvested:bool(src.harvested,bool(fallback.harvested,false))
     });
   }
 
   function normalizeState(input){
     const src=object(input);
     const silo=object(src.silo),plot=object(src.plot),farm=object(src.farm);
+    const cropSource=array(farm.crops,BASE.farm.crops);
     const normalized=Object.assign({},src,{
       schemaVersion:SCHEMA_VERSION,
       gold:nonNegative(src.gold,BASE.gold),
@@ -81,27 +119,27 @@
       farmXp:nonNegative(src.farmXp,BASE.farmXp),
       investorXp:nonNegative(src.investorXp,BASE.investorXp),
       investorRank:Math.max(1,integer(src.investorRank,BASE.investorRank)),
-      silo:Object.assign({},silo,{
+      silo:Object.assign({},clone(BASE.silo),silo,{
         wheat:nonNegative(silo.wheat,BASE.silo.wheat),
         carrot:nonNegative(silo.carrot,BASE.silo.carrot),
         eggs:nonNegative(silo.eggs,BASE.silo.eggs),
         pork:nonNegative(silo.pork,BASE.silo.pork)
       }),
-      equipped:array(src.equipped),
-      inventory:array(src.inventory),
-      marketListings:array(src.marketListings),
-      auctions:array(src.auctions),
-      markets:array(src.markets),
-      plot:Object.assign({},plot,{
+      equipped:array(src.equipped,BASE.equipped),
+      inventory:array(src.inventory,BASE.inventory),
+      marketListings:array(src.marketListings,BASE.marketListings),
+      auctions:array(src.auctions,BASE.auctions),
+      markets:array(src.markets,BASE.markets),
+      plot:Object.assign({},clone(BASE.plot),plot,{
         x:finite(plot.x,BASE.plot.x),y:finite(plot.y,BASE.plot.y),
         w:Math.max(1,finite(plot.w,BASE.plot.w)),h:Math.max(1,finite(plot.h,BASE.plot.h)),
-        lastMaintenance:nonNegative(plot.lastMaintenance,Date.now()),
-        furniture:array(plot.furniture)
+        lastMaintenance:nonNegative(plot.lastMaintenance,BASE.plot.lastMaintenance),
+        furniture:array(plot.furniture,BASE.plot.furniture)
       }),
-      farm:Object.assign({},farm,{
+      farm:Object.assign({},clone(BASE.farm),farm,{
         x:finite(farm.x,BASE.farm.x),y:finite(farm.y,BASE.farm.y),
         w:Math.max(1,finite(farm.w,BASE.farm.w)),h:Math.max(1,finite(farm.h,BASE.farm.h)),
-        crops:array(farm.crops).map(normalizeCrop),
+        crops:cropSource.map(function(crop,index){return normalizeCrop(crop,index,BASE.farm.crops[index]);}),
         coop:normalizeAnimal(farm.coop,BASE.farm.coop),
         pen:normalizeAnimal(farm.pen,BASE.farm.pen)
       })
