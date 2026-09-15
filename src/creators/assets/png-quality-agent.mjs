@@ -1,12 +1,12 @@
 /* KELO-INDEX
  * area: CREATORS / ASSET QUALITY
  * owner: Kelo Creator Asset Bridge
- * keys: PNG QUALITY AGENT FIDELITY PSNR EDGE ALPHA PIXEL ART
- * purpose: deterministic before/after judge for image optimization candidates
+ * keys: PNG QUALITY AGENT FIDELITY PSNR EDGE ALPHA BORDER SEAM PIXEL ART
+ * purpose: deterministic before/after judge for image optimization candidates with asset-class-specific hard gates
  * public-api: evaluatePixelFidelity(), judgePixelFidelity()
  * state-owned: none
  * online: N/A; creator/build-time quality gate
- * reuse: lossless optimizer now, adaptive palette search later
+ * reuse: lossless optimizer, adaptive palette search, codec tournament
  * do-not: approve by file size alone or let a visual/LLM opinion override failed hard metrics
  */
 
@@ -14,6 +14,35 @@ const clamp01 = value => Math.max(0, Math.min(1, Number(value) || 0));
 
 function luminance(r, g, b) {
   return (77 * r + 150 * g + 29 * b) / 256;
+}
+
+function exactByteEquality(a, b) {
+  if (Buffer.isBuffer(a) && Buffer.isBuffer(b)) return a.equals(b);
+  if (!a || !b || a.length !== b.length) return false;
+  for (let index = 0; index < a.length; index += 1) if (a[index] !== b[index]) return false;
+  return true;
+}
+
+function exactMetrics() {
+  return {
+    comparable:true,
+    exactPixels:true,
+    changedPixels:0,
+    changedPixelRatio:0,
+    meanAbsRgb:0,
+    rmseRgb:0,
+    psnrRgb:Infinity,
+    maxRgbDelta:0,
+    alphaChangedPixels:0,
+    alphaChangedRatio:0,
+    alphaMaxDelta:0,
+    edgeMae:0,
+    largeDeltaRatio:0,
+    borderChangedPixels:0,
+    borderChangedRatio:0,
+    borderMeanAbsRgb:0,
+    borderMaxRgbDelta:0
+  };
 }
 
 export function evaluatePixelFidelity(originalRgba, candidateRgba, width, height) {
@@ -31,28 +60,16 @@ export function evaluatePixelFidelity(originalRgba, candidateRgba, width, height
       alphaChangedRatio:1,
       alphaMaxDelta:255,
       edgeMae:Infinity,
-      largeDeltaRatio:1
+      largeDeltaRatio:1,
+      borderChangedPixels:null,
+      borderChangedRatio:1,
+      borderMeanAbsRgb:Infinity,
+      borderMaxRgbDelta:255
     };
   }
 
   const pixelCount = width * height;
-  if (Buffer.isBuffer(originalRgba) && Buffer.isBuffer(candidateRgba) && originalRgba.equals(candidateRgba)) {
-    return {
-      comparable:true,
-      exactPixels:true,
-      changedPixels:0,
-      changedPixelRatio:0,
-      meanAbsRgb:0,
-      rmseRgb:0,
-      psnrRgb:Infinity,
-      maxRgbDelta:0,
-      alphaChangedPixels:0,
-      alphaChangedRatio:0,
-      alphaMaxDelta:0,
-      edgeMae:0,
-      largeDeltaRatio:0
-    };
-  }
+  if (exactByteEquality(originalRgba, candidateRgba)) return exactMetrics();
 
   let changedPixels = 0;
   let alphaChangedPixels = 0;
@@ -61,27 +78,43 @@ export function evaluatePixelFidelity(originalRgba, candidateRgba, width, height
   let absRgb = 0;
   let squaredRgb = 0;
   let largeDeltaPixels = 0;
+  let borderPixels = 0;
+  let borderChangedPixels = 0;
+  let borderAbsRgb = 0;
+  let borderMaxRgbDelta = 0;
 
-  for (let pixel = 0; pixel < pixelCount; pixel += 1) {
-    const offset = pixel * 4;
-    let changed = false;
-    let pixelRgbMax = 0;
-    for (let channel = 0; channel < 3; channel += 1) {
-      const delta = Math.abs(originalRgba[offset + channel] - candidateRgba[offset + channel]);
-      absRgb += delta;
-      squaredRgb += delta * delta;
-      if (delta > maxRgbDelta) maxRgbDelta = delta;
-      if (delta > pixelRgbMax) pixelRgbMax = delta;
-      if (delta) changed = true;
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const pixel = y * width + x;
+      const offset = pixel * 4;
+      const onBorder = x === 0 || y === 0 || x === width - 1 || y === height - 1;
+      let changed = false;
+      let pixelRgbMax = 0;
+      let pixelRgbAbs = 0;
+      for (let channel = 0; channel < 3; channel += 1) {
+        const delta = Math.abs(originalRgba[offset + channel] - candidateRgba[offset + channel]);
+        absRgb += delta;
+        squaredRgb += delta * delta;
+        pixelRgbAbs += delta;
+        if (delta > maxRgbDelta) maxRgbDelta = delta;
+        if (delta > pixelRgbMax) pixelRgbMax = delta;
+        if (delta) changed = true;
+      }
+      const alphaDelta = Math.abs(originalRgba[offset + 3] - candidateRgba[offset + 3]);
+      if (alphaDelta) {
+        alphaChangedPixels += 1;
+        changed = true;
+        if (alphaDelta > alphaMaxDelta) alphaMaxDelta = alphaDelta;
+      }
+      if (pixelRgbMax > 12) largeDeltaPixels += 1;
+      if (changed) changedPixels += 1;
+      if (onBorder) {
+        borderPixels += 1;
+        borderAbsRgb += pixelRgbAbs;
+        if (changed) borderChangedPixels += 1;
+        if (pixelRgbMax > borderMaxRgbDelta) borderMaxRgbDelta = pixelRgbMax;
+      }
     }
-    const alphaDelta = Math.abs(originalRgba[offset + 3] - candidateRgba[offset + 3]);
-    if (alphaDelta) {
-      alphaChangedPixels += 1;
-      changed = true;
-      if (alphaDelta > alphaMaxDelta) alphaMaxDelta = alphaDelta;
-    }
-    if (pixelRgbMax > 12) largeDeltaPixels += 1;
-    if (changed) changedPixels += 1;
   }
 
   let edgeError = 0;
@@ -126,9 +159,21 @@ export function evaluatePixelFidelity(originalRgba, candidateRgba, width, height
     alphaChangedRatio:alphaChangedPixels / Math.max(1, pixelCount),
     alphaMaxDelta,
     edgeMae:edgeError / Math.max(1, edgeCount),
-    largeDeltaRatio:largeDeltaPixels / Math.max(1, pixelCount)
+    largeDeltaRatio:largeDeltaPixels / Math.max(1, pixelCount),
+    borderChangedPixels,
+    borderChangedRatio:borderChangedPixels / Math.max(1, borderPixels),
+    borderMeanAbsRgb:borderAbsRgb / Math.max(1, borderPixels * 3),
+    borderMaxRgbDelta
   };
 }
+
+const POLICY_LIMITS = {
+  balanced:{minPsnrRgb:50, maxMeanAbsRgb:0.75, maxAlphaDelta:0, maxEdgeMae:0.55, maxLargeDeltaRatio:0.001, maxBorderMeanAbsRgb:0.9, maxBorderRgbDelta:18},
+  'pixel-art':{minPsnrRgb:58, maxMeanAbsRgb:0.28, maxAlphaDelta:0, maxEdgeMae:0.22, maxLargeDeltaRatio:0.00025, maxBorderMeanAbsRgb:0.35, maxBorderRgbDelta:8},
+  'ui-crisp':{minPsnrRgb:56, maxMeanAbsRgb:0.35, maxAlphaDelta:0, maxEdgeMae:0.25, maxLargeDeltaRatio:0.0003, maxBorderMeanAbsRgb:0.4, maxBorderRgbDelta:8},
+  'fx-alpha':{minPsnrRgb:49, maxMeanAbsRgb:0.9, maxAlphaDelta:0, maxEdgeMae:0.75, maxLargeDeltaRatio:0.0015, maxBorderMeanAbsRgb:1.2, maxBorderRgbDelta:24},
+  'seam-safe':{minPsnrRgb:60, maxMeanAbsRgb:0.20, maxAlphaDelta:0, maxEdgeMae:0.18, maxLargeDeltaRatio:0.0001, maxBorderMeanAbsRgb:0, maxBorderRgbDelta:0}
+};
 
 export function judgePixelFidelity(metrics, policy = 'strict', overrides = {}) {
   if (!metrics?.comparable) return {pass:false, score:0, policy, reasons:['not-comparable']};
@@ -142,28 +187,26 @@ export function judgePixelFidelity(metrics, policy = 'strict', overrides = {}) {
     };
   }
 
-  const limits = {
-    minPsnrRgb:50,
-    maxMeanAbsRgb:0.75,
-    maxAlphaDelta:0,
-    maxEdgeMae:0.55,
-    maxLargeDeltaRatio:0.001,
-    ...overrides
-  };
+  const limits = {...(POLICY_LIMITS[policy] || POLICY_LIMITS.balanced), ...overrides};
   const checks = [
     ['psnr', metrics.psnrRgb >= limits.minPsnrRgb],
     ['mean-rgb', metrics.meanAbsRgb <= limits.maxMeanAbsRgb],
     ['alpha', metrics.alphaMaxDelta <= limits.maxAlphaDelta],
     ['edges', metrics.edgeMae <= limits.maxEdgeMae],
-    ['large-delta', metrics.largeDeltaRatio <= limits.maxLargeDeltaRatio]
+    ['large-delta', metrics.largeDeltaRatio <= limits.maxLargeDeltaRatio],
+    ['border-mean', metrics.borderMeanAbsRgb <= limits.maxBorderMeanAbsRgb],
+    ['border-max', metrics.borderMaxRgbDelta <= limits.maxBorderRgbDelta]
   ];
   const reasons = checks.filter(([, pass]) => !pass).map(([name]) => name);
-  const psnrScore = metrics.psnrRgb === Infinity ? 1 : clamp01((metrics.psnrRgb - 35) / 20);
+  const psnrScore = metrics.psnrRgb === Infinity ? 1 : clamp01((metrics.psnrRgb - 35) / 25);
   const meanScore = clamp01(1 - metrics.meanAbsRgb / Math.max(0.0001, limits.maxMeanAbsRgb * 2));
   const edgeScore = clamp01(1 - metrics.edgeMae / Math.max(0.0001, limits.maxEdgeMae * 2));
   const alphaScore = metrics.alphaMaxDelta <= limits.maxAlphaDelta ? 1 : 0;
   const largeDeltaScore = clamp01(1 - metrics.largeDeltaRatio / Math.max(0.000001, limits.maxLargeDeltaRatio * 2));
-  const score = 0.30 * psnrScore + 0.25 * meanScore + 0.20 * edgeScore + 0.15 * alphaScore + 0.10 * largeDeltaScore;
+  const borderScore = limits.maxBorderRgbDelta === 0
+    ? (metrics.borderMaxRgbDelta === 0 ? 1 : 0)
+    : clamp01(1 - metrics.borderMeanAbsRgb / Math.max(0.0001, limits.maxBorderMeanAbsRgb * 2));
+  const score = 0.25 * psnrScore + 0.20 * meanScore + 0.18 * edgeScore + 0.14 * alphaScore + 0.08 * largeDeltaScore + 0.15 * borderScore;
 
   return {pass:reasons.length === 0, score:Number(score.toFixed(6)), policy, reasons, limits};
 }
