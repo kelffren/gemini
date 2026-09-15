@@ -9,7 +9,7 @@
 (function(root){
 'use strict';
 if(root.KELO_MODULE_LOADER)return;
-const VERSION='kelo-module-loader-v6';
+const VERSION='kelo-module-loader-v14';
 const FEATURES={
   social:[
     {src:'src/ui/player-nameplate.js?v=2',name:'placas'},
@@ -30,15 +30,29 @@ const FEATURES={
     {src:'src/systems/illumination.js?v=2',name:'luz'}
   ],
   bag:[
+    {src:'src/stats/stat-modifier-system.js?v=1',name:'estadísticas'},
+    {src:'src/abilities/equipment-ability-data.js?v=1',name:'habilidades del equipo'},
+    {src:'src/systems/equipment-item-catalog.js?v=1',name:'equipo'},
+    {src:'src/systems/equipment-system.js?v=1',name:'equipo'},
     {src:'src/systems/backpack-system.js?v=2',name:'mochila'},
+    {src:'src/systems/container-system.js?v=1',name:'contenedores'},
+    {src:'src/ui/warehouse-ui.js?v=1',name:'almacén'},
     {src:'src/ui/backpack-ui.js?v=4',name:'mochila'}
   ],
   mounts:[
+    {src:'src/stats/stat-modifier-system.js?v=1',name:'estadísticas'},
+    {src:'src/appearance/appearance-system.js?v=1',name:'apariencia'},
+    {src:'src/mounts/mount-ability-data.js?v=1',name:'habilidades de montura'},
     {src:'src/mounts/mount-catalog.js?v=2',name:'monturas'},
+    {src:'src/mounts/mount-equipment-catalog.js?v=1',name:'equipo de montura'},
     {src:'src/mounts/mount-system.js?v=2',name:'monturas'},
+    {src:'src/mounts/mount-ability-channel.js?v=1',name:'habilidades de montura'},
+    {src:'src/ui/mount-action-bar.js?v=1',name:'controles de montura'},
     {src:'src/ui/mount-panel.js?v=2',name:'monturas'}
   ],
   market:[
+    {src:'src/systems/backpack-system.js?v=2',name:'mochila'},
+    {src:'src/systems/container-system.js?v=1',name:'contenedores'},
     {src:'src/systems/market-escrow-system.js?v=1',name:'mercado'},
     {src:'src/ui/market-ui.js?v=2',name:'mercado'}
   ],
@@ -47,18 +61,36 @@ const FEATURES={
     {src:'src/systems/player-stats.js?v=1',name:'títulos'},
     {src:'src/systems/title-system.js?v=1',name:'títulos'}
   ],
+  abilities:[
+    {src:'src/abilities/abilityData.js?v=154',name:'habilidades'},
+    {src:'src/abilities/stone-system.js?v=154',name:'piedras'},
+    {src:'src/abilities/stone-backpack-bridge.js?v=2',name:'inventario de piedras'},
+    {src:'src/abilities/kelo-ability-boot.js?v=160',name:'habilidades'},
+    {src:'src/abilities/ability-source-cast.js?v=1',name:'habilidades'}
+  ],
+  pvp:[
+    {src:'src/systems/pvp-world.js?v=11',name:'mundo PvP'},
+    {src:'src/systems/pvp-combat-runtime-loader.js?v=2',name:'combate PvP'}
+  ],
   appearance:[
-    {src:'src/characters/character-customization.js?v=1',name:'apariencia'},
-    {src:'src/ui/character-customizer-ui.js?v=1',name:'apariencia'}
+    {src:'src/ui/profile-panel-close.js?v=2',name:'apariencia'}
   ],
   properties:[
+    {src:'src/environment/generated/forest-plaza-tileset-v2-manifest.js?v=1',name:'catálogo de plaza'},
+    {src:'src/property/property-asset-catalog.js?v=2',name:'catálogo de propiedades'},
+    {src:'src/property/forest-plaza-asset-catalog.js?v=1',name:'catálogo de plaza'},
     {src:'src/property/property-system.js?v=4',name:'propiedades'},
+    {src:'src/instances/instance-system.js?v=1',name:'instancias'},
+    {src:'src/instances/instance-runtime-bridge.js?v=1',name:'instancias'},
+    {src:'src/instances/house-instance.js?v=1',name:'casas'},
+    {src:'src/instances/property-house-bridge.js?v=1',name:'casas'},
     {src:'src/ui/house-instance-ui.js?v=1',name:'propiedades'}
   ]
 };
 const IDLE=['social','world'];
 const loaded=Object.create(null);
 const inflight=Object.create(null);
+const fileLoads=new Map();
 let build='V6.64';
 let shown=false;
 function busy(){
@@ -86,14 +118,20 @@ function hasScript(src){
   return Array.from(document.scripts).some(function(s){return (s.getAttribute('src')||'').split('?')[0]===base;});
 }
 function loadOne(item){
-  return new Promise(function(resolve){
+  const key=item.src.split('?')[0];
+  if(fileLoads.has(key))return fileLoads.get(key);
+  const promise=new Promise(function(resolve,reject){
     if(hasScript(item.src)){ resolve(0); return; }
     const t0=performance.now();
     const s=document.createElement('script');
     s.src=item.src;
-    s.onload=s.onerror=function(){ resolve(performance.now()-t0); };
+    s.onload=function(){ resolve(performance.now()-t0); };
+    s.onerror=function(){ s.remove();reject(new Error('KELO_MODULE_LOAD_FAILED:'+item.src)); };
     document.head.appendChild(s);
   });
+  fileLoads.set(key,promise);
+  promise.catch(function(){fileLoads.delete(key);});
+  return promise;
 }
 function loadFeature(name,opts){
   const files=FEATURES[name];
@@ -101,13 +139,22 @@ function loadFeature(name,opts){
   if(loaded[name]) return Promise.resolve(true);
   if(inflight[name]) return inflight[name];
   const interactive=!!(opts&&opts.interactive);
-  inflight[name]=new Promise(function(resolve){
+  inflight[name]=new Promise(function(resolve,reject){
     let i=0, hits=0;
     function step(){
       if(i>=files.length){
-        loaded[name]=true; delete inflight[name];
-        try{ localStorage.setItem('kelo_modpack_'+name, build); }catch(_){}
-        resolve(true); return;
+        // Character owns its ordered, lazy content graph; do not bypass its launcher.
+        Promise.resolve().then(function(){
+          if(name==='appearance')return root.KELO_PROFILE_LAUNCHER.ensureCustomizer();
+          if(name==='abilities')return root.KeloAbilitiesLoader.ensure();
+          if(name==='pvp')return root.KeloPvPWorld.ensureCombatReady();
+          return true;
+        }).then(function(){
+          loaded[name]=true; delete inflight[name];
+          try{ localStorage.setItem('kelo_modpack_'+name, build); }catch(_){}
+          resolve(true);
+        }).catch(function(error){delete inflight[name];reject(error);});
+        return;
       }
       if(!interactive&&busy()){
         if(shown) show('En pausa · caminando', (i/files.length)*100);
@@ -119,7 +166,7 @@ function loadFeature(name,opts){
         else show('Descargando '+item.name+'  '+(i+1)+'/'+files.length, ((i+1)/files.length)*100);
         i+=1;
         setTimeout(step, dt<50?80:360);
-      });
+      }).catch(function(error){delete inflight[name];reject(error);});
     }
     step();
   });
@@ -128,21 +175,20 @@ function loadFeature(name,opts){
 function ensure(name){
   if(name==='chat'||name==='profile') return Promise.resolve(true);
   if(name==='nobility'||name==='emotes') name='social';
-  if(name==='pvp'){
-    if(root.KeloRuntimeBootstrap&&typeof root.KeloRuntimeBootstrap.ensure==='function') return root.KeloRuntimeBootstrap.ensure();
-    return Promise.resolve(false);
-  }
   if(!FEATURES[name]) return Promise.resolve(true);
   show('Cargando '+name+'…', 8);
-  return loadFeature(name,{interactive:true}).then(function(ok){
+  const dependencies=name==='pvp'?ensure('abilities'):Promise.resolve(true);
+  return dependencies.then(function(){return loadFeature(name,{interactive:true});}).then(function(ok){
     hideChip('Listo');
     return ok;
+  }).catch(function(error){
+    show('No se pudo cargar · vuelve a intentarlo',0);
+    throw error;
   });
 }
 function needs(name){
   if(name==='chat'||name==='profile') return false;
   if(name==='nobility'||name==='emotes') name='social';
-  if(name==='pvp') return !(root.KeloMeleeEngine&&root.KeloCombatEngine);
   if(!FEATURES[name]) return false;
   return !loaded[name];
 }

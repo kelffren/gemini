@@ -1,6 +1,7 @@
 {
   "schema": 1,
   "systems": [
+    {"id":"chat-drawer","owner":"KeloChatUI + KeloChatIntegrationBridge","source":"src/ui/kelo-chat-drawer.js","technicalDoc":"docs/systems/CHAT_DRAWER.md","playerVisible":true,"playerGuideAnchor":"chat-inferior","status":"candidate-validation"},
     {"id": "input-locks","owner":"KeloInputLocks","source":"src/core/input-lock-system.js","technicalDoc":"docs/systems/INPUT_LOCK_SYSTEM.md","playerVisible":true,"playerGuideAnchor":"controles-y-bloqueos-de-interfaz","status":"foundation-active"},
     {"id": "input","owner":"KeloInput","source":"src/core/input-system.js","technicalDoc":"docs/systems/INPUT_SYSTEM.md","playerVisible":true,"playerGuideAnchor":"controles-y-bloqueos-de-interfaz","status":"foundation-transitional"},
     {"id": "input-gate-retired","owner":"none","source":"src/core/input-gate.js","technicalDoc":"docs/systems/INPUT_GATE.md","playerVisible":false,"status":"retired-compat"},

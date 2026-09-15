@@ -1,0 +1,148 @@
+{
+  "schema_version": 2,
+  "id": "BUG-0005",
+  "title": "Stationary desktop terrain continuously rebuilds and evicts visible chunks",
+  "status": "CLAIMED",
+  "severity": "high",
+  "area": [
+    "world",
+    "render",
+    "performance",
+    "cache"
+  ],
+  "source": "mixed",
+  "discovered_at": "2026-09-15",
+  "reported_by": [
+    "player",
+    "Codex runtime QA"
+  ],
+  "reports": [],
+  "environment": {
+    "game_build": "V6.69 / 307850e1",
+    "device": "desktop 1440x900 and iPhone 390x844 emulation",
+    "os": "Windows",
+    "browser": "Playwright Chromium / WebKit",
+    "surface": "plaza ground, default and .7 zoom"
+  },
+  "reproduction": [
+    "Open a fresh guest session at 1440x900",
+    "Leave the camera stationary and sample world cache counters five seconds apart",
+    "Inspect surface-ground tiles drawn per frame; repeat at base zoom .7"
+  ],
+  "expected": "Visible ground is reused from a bounded cache; stationary frames do not rebuild/evict the same chunks.",
+  "actual": "Legacy world rebuilt/evicted 972 chunks in five seconds at default desktop zoom; surface ground rebuilt 7680 tiles per frame with a full 16-slot cache.",
+  "evidence": [
+    "bugs/investigacion/BUG-0005/2026-09-15-terrain-cache-thrash.md",
+    "tests/freeze-stability.spec.js"
+  ],
+  "suspected_files": [
+    "src/environment/world-map.js",
+    "src/environment/surface-ground.js",
+    "src/environment/mobile-performance-contract.js",
+    "index.html"
+  ],
+  "owner_hint": "KELO_WORLD_RENDERER, surface-ground and KELO_MOBILE_PERFORMANCE_CONTRACT",
+  "claimed_by": "Codex freeze investigation",
+  "claim_started_at": "2026-09-15",
+  "research": {
+    "status": "in_progress",
+    "summary": "Reproduced terrain cache thrashing. Candidate eliminates measured idle rebuilds; broader validation is pending.",
+    "known_facts": [
+      {
+        "id": "F1",
+        "statement": "Default desktop working set exceeds the old cache capacities and triggers continuous rebuilds while stationary.",
+        "evidence": [
+          "bugs/investigacion/BUG-0005/2026-09-15-terrain-cache-thrash.md",
+          "tests/freeze-stability.spec.js"
+        ]
+      },
+      {
+        "id": "F2",
+        "statement": "After the candidate, idle builds/evictions are zero at default and .7 zoom on desktop and iPhone Chromium.",
+        "evidence": [
+          "bugs/investigacion/BUG-0005/2026-09-15-terrain-cache-thrash.md",
+          "tests/freeze-stability.spec.js"
+        ]
+      }
+    ],
+    "hypotheses": [],
+    "ruled_out": [],
+    "unknowns": [
+      {
+        "id": "U1",
+        "question": "Does the correction eliminate the originally reported freeze on physical iPhone?",
+        "why_it_matters": "Desktop cache thrashing alone does not reproduce every iOS crash.",
+        "quickest_test": "Deploy verified candidate and repeat real iPhone play and World Editor reopening."
+      }
+    ],
+    "external_references": [],
+    "last_researched_at": "2026-09-15"
+  },
+  "attempt_history": [
+    {
+      "id": "A1",
+      "at": "2026-09-15",
+      "actor": "Codex",
+      "goal": "Stop continuous terrain cache rebuilds",
+      "hypothesis_ids": [],
+      "change": {
+        "commits": [],
+        "files": [
+          "src/environment/world-map.js",
+          "src/environment/surface-ground.js",
+          "src/environment/mobile-performance-contract.js",
+          "index.html"
+        ],
+        "summary": "Skip uninitialized legacy terrain; use actual camera view and bounded device budgets for surface LRU."
+      },
+      "validation": {
+        "environment": "local Playwright Chromium / WebKit",
+        "method": "Five-second idle metrics at two zooms; boot move8s/rest10s/resume4s across three browser projects",
+        "result": "PARTIAL",
+        "evidence": [
+          "bugs/investigacion/BUG-0005/2026-09-15-terrain-cache-thrash.md",
+          "tests/freeze-stability.spec.js"
+        ]
+      },
+      "conclusion": "Idle rebuild loop eliminated in measured local cases and three boot cycles passed. Full matrix and physical iPhone remain pending.",
+      "do_not_repeat_without": null
+    }
+  ],
+  "next_best_actions": [
+    {
+      "priority": 1,
+      "action": "Complete feature/zoom matrix, inspect visuals and resources, then verify deployed and physical iPhone behavior",
+      "reason": "Prevent accepting one isolated local result as a global fix",
+      "expected_signal": "No continuous terrain rebuilding, no crashes, movement resumes after rest",
+      "stop_condition": "Any regression requires owner-level diagnosis before certification"
+    }
+  ],
+  "fix": {
+    "status": "candidate",
+    "commits": [],
+    "files": [
+      "src/environment/world-map.js",
+      "src/environment/surface-ground.js",
+      "src/environment/mobile-performance-contract.js",
+      "index.html"
+    ],
+    "summary": "Bounded working-set cache and suppression of uninitialized legacy terrain."
+  },
+  "verification": {
+    "status": "PENDING",
+    "method": null,
+    "evidence": [],
+    "verified_by": null,
+    "verified_at": null
+  },
+  "blocked_by": [],
+  "duplicate_of": null,
+  "related_bugs": [
+    "BUG-0003",
+    "BUG-0004"
+  ],
+  "notes": [
+    "Local evidence does not close the physical iPhone World Editor report."
+  ],
+  "updated_at": "2026-09-15"
+}

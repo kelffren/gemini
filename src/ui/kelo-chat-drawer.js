@@ -22,7 +22,6 @@
     var style = document.createElement('style');
     style.id = STYLE_ID;
     style.textContent = `
-#kelo-luxe #${SHEET_ID}.kc-premium,
 #${SHEET_ID}.kc-premium{
   --kc-gold:#f4c85f;
   --kc-gold-soft:rgba(244,200,95,.48);
@@ -229,6 +228,10 @@
   #${KEYBOARD_ID}.kc-keyboard{padding-top:3px!important;padding-bottom:calc(4px + env(safe-area-inset-bottom,0px))!important}
 }
 @media (prefers-reduced-motion:reduce){#${SHEET_ID}.kc-premium{transition:none!important}}
+/* KELO-INDEX SHORT VIEWPORT: keep every keyboard row reachable in landscape. */
+@media (max-height:680px){
+  #${SHEET_ID}.kc-premium.open.kc-keyboard-open{height:calc(100dvh - 24px)!important;max-height:calc(100dvh - 24px)!important;min-height:0!important}
+}
 `;
     document.head.appendChild(style);
   }
@@ -642,15 +645,7 @@
     return true;
   }
 
-  function boot() {
-    if (mount()) return;
-    var tries = 0;
-    var timer = setInterval(function () {
-      tries += 1;
-      if (mount() || tries >= 80) clearInterval(timer);
-    }, 100);
-  }
-
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true });
-  else boot();
+  // KELO-INDEX BOOT: Luxe owns the DOM and precedes this presentation module.
+  // Mount before boot-ready; a deferred DOM event is sufficient for other hosts.
+  if (!mount() && document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mount, { once: true });
 })(window);

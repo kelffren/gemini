@@ -83,8 +83,6 @@
   const sources=Object.freeze({ruralFarmBoundary:Object.freeze({id:'ruralFarmBoundary',layerGroup:'ruralBoundary',build:buildRuralFarmBoundary,instances:function(){if(typeof STATE==='undefined'||!STATE||!STATE.farm)return Object.freeze([]);return buildRuralFarmBoundary(STATE.farm);}})});
   window.KELO_PROP_CONTRACT=Object.freeze({version:'1.10.0',mode:'generic-prop-contract-v10-forest-plaza-playable',assets,layerGroups,props:Object.freeze(defs),sources,getByDistrict(district){return defs.filter(p=>p.district===district);}});
 
-  // One-shot content loader. Catalog self-registers immediately if its owner exists, or once on window load.
-  if(typeof document!=='undefined'&&!document.querySelector('script[data-kelo-forest-plaza-catalog]')){
-    const s=document.createElement('script');s.src='src/property/forest-plaza-asset-catalog.js?v=2';s.dataset.keloForestPlazaCatalog='1';document.head.appendChild(s);
-  }
+  // KELO-INDEX BOOT: Property/Creators load catalog content after its owner exists;
+  // the plaza prop contract never downloads editor modules during boot.
 })();

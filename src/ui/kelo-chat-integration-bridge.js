@@ -13,6 +13,7 @@ var drawer=null;
 var observer=null;
 var bridgeLock=null;
 var syncing=false;
+var lastDomOpen=null;
 
 function locks(){return root.KeloInputLocks||null;}
 function acquire(){
@@ -34,6 +35,10 @@ function syncFromDrawer(){
   if(syncing||!drawer||!root.KeloChatUI)return;
   var domOpen=drawer.classList.contains('open');
   var apiOpen=typeof root.KeloChatUI.isOpen==='function'?root.KeloChatUI.isOpen():domOpen;
+  // KELO-INDEX MUTATION LOOP: classList.remove/toggle can notify observers even
+  // when the class is unchanged. Only reconcile an actual open-state change.
+  if(lastDomOpen===domOpen&&apiOpen===domOpen)return;
+  lastDomOpen=domOpen;
   syncing=true;
   try{
     if(domOpen){
@@ -49,21 +54,18 @@ function syncFromDrawer(){
   }finally{syncing=false;}
 }
 function mount(){
-  drawer=document.getElementById('lx-chat-drawer');
+  var target=document.getElementById('lx-chat-drawer');
+  if(target===drawer&&observer)return true;
+  drawer=target;
   if(!drawer||!root.KeloChatUI)return false;
   if(observer)observer.disconnect();
   observer=new MutationObserver(syncFromDrawer);
   observer.observe(drawer,{attributes:true,attributeFilter:['class']});
   syncFromDrawer();
   root.addEventListener('pagehide',function(){if(observer)observer.disconnect();release();releaseExistingLuxeChatLock();},{once:true});
-  root.KeloChatIntegrationBridge=Object.freeze({sync:syncFromDrawer,version:'2.0.0'});
+  root.KeloChatIntegrationBridge=Object.freeze({sync:syncFromDrawer,version:'2.1.0'});
   return true;
 }
-function boot(){
-  if(mount())return;
-  var tries=0;
-  var timer=setInterval(function(){tries+=1;if(mount()||tries>=80)clearInterval(timer);},100);
-}
 root.addEventListener('kelo:chat-ui-ready',function(){mount();},{once:true});
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
+if(!mount()&&document.readyState==='loading')document.addEventListener('DOMContentLoaded',mount,{once:true});
 })(window);

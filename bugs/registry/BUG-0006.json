@@ -1,0 +1,150 @@
+{
+  "schema_version": 2,
+  "id": "BUG-0006",
+  "title": "Bottom chat drawer does not load or expand and its close observer can loop",
+  "status": "CLAIMED",
+  "severity": "high",
+  "area": [
+    "chat",
+    "ui",
+    "input",
+    "boot"
+  ],
+  "source": "mixed",
+  "discovered_at": "2026-09-15",
+  "reported_by": [
+    "player",
+    "Codex runtime QA"
+  ],
+  "reports": [],
+  "environment": {
+    "game_build": "V6.69",
+    "device": "desktop and iPhone emulation",
+    "os": "Windows",
+    "browser": "Chromium / WebKit",
+    "surface": "bottom chat drawer"
+  },
+  "reproduction": [
+    "Open a fresh guest session",
+    "Try to expand the bottom chat",
+    "Open chat from menu, type and close it"
+  ],
+  "expected": "Bottom drawer is visible, expands within viewport and releases input locks on close.",
+  "actual": "Drawer scripts are absent and CSS hides them; restored legacy CSS blocks expansion and close reconciliation repeats unchanged class writes.",
+  "evidence": [
+    "bugs/investigacion/BUG-0006/2026-09-15-chat-drawer.md",
+    "tests/chat-lock-regression.mjs",
+    "tests/freeze-stability.spec.js"
+  ],
+  "suspected_files": [
+    "src/ui/kelo-chat-drawer.js",
+    "src/ui/kelo-chat-integration-bridge.js",
+    "index.html"
+  ],
+  "owner_hint": "KeloChatUI / KeloChatIntegrationBridge / Luxe",
+  "claimed_by": "Codex freeze investigation",
+  "claim_started_at": "2026-09-15",
+  "research": {
+    "status": "in_progress",
+    "summary": "Missing boot integration, CSS specificity and close mutation loop reproduced; candidate passes portrait chat cycles.",
+    "known_facts": [
+      {
+        "id": "F1",
+        "statement": "Original bottom chat is not loaded and is explicitly hidden.",
+        "evidence": [
+          "bugs/investigacion/BUG-0006/2026-09-15-chat-drawer.md",
+          "tests/chat-lock-regression.mjs",
+          "tests/freeze-stability.spec.js"
+        ]
+      },
+      {
+        "id": "F2",
+        "statement": "CSS expansion failed in Playwright; candidate passed desktop Chromium and iPhone Chromium/WebKit typing and move/rest/resume.",
+        "evidence": [
+          "bugs/investigacion/BUG-0006/2026-09-15-chat-drawer.md",
+          "tests/chat-lock-regression.mjs",
+          "tests/freeze-stability.spec.js"
+        ]
+      }
+    ],
+    "hypotheses": [],
+    "ruled_out": [],
+    "unknowns": [
+      {
+        "id": "U1",
+        "question": "Does the restored chat behave correctly on physical iPhone and the deployed build?",
+        "why_it_matters": "Local emulation does not cover the physical device or production delivery.",
+        "quickest_test": "Repeat bottom tab, keyboard, collapse and movement workflow on deployed build."
+      }
+    ],
+    "external_references": [],
+    "last_researched_at": "2026-09-15"
+  },
+  "attempt_history": [
+    {
+      "id": "A1",
+      "at": "2026-09-15",
+      "actor": "Codex",
+      "goal": "Restore bottom chat without freeze or leaked input lock",
+      "hypothesis_ids": [],
+      "change": {
+        "commits": [],
+        "files": [
+          "src/ui/kelo-chat-drawer.js",
+          "src/ui/kelo-chat-integration-bridge.js",
+          "index.html"
+        ],
+        "summary": "Restore ordered boot, settle observer state changes and repair expansion CSS."
+      },
+      "validation": {
+        "environment": "local Playwright Chromium / WebKit",
+        "method": "Keyboard, menu, collapse, move8s/rest10s/resume4s plus bounded mutation-queue regression",
+        "result": "PARTIAL",
+        "evidence": [
+          "bugs/investigacion/BUG-0006/2026-09-15-chat-drawer.md",
+          "tests/chat-lock-regression.mjs",
+          "tests/freeze-stability.spec.js"
+        ]
+      },
+      "conclusion": "Portrait workflows pass; short viewport keyboard clipping is fixed in a further candidate under test.",
+      "do_not_repeat_without": null
+    }
+  ],
+  "next_best_actions": [
+    {
+      "priority": 1,
+      "action": "Complete horizontal chat workflow and deployed verification",
+      "reason": "Avoid clipped controls and ensure the served build contains the fix",
+      "expected_signal": "All keyboard rows accessible, input locks release and movement resumes",
+      "stop_condition": "Any failure requires further correction"
+    }
+  ],
+  "fix": {
+    "status": "candidate",
+    "commits": [],
+    "files": [
+      "src/ui/kelo-chat-drawer.js",
+      "src/ui/kelo-chat-integration-bridge.js",
+      "index.html"
+    ],
+    "summary": "Ordered visible chat UI with stable close synchronization and responsive keyboard."
+  },
+  "verification": {
+    "status": "PENDING",
+    "method": null,
+    "evidence": [],
+    "verified_by": null,
+    "verified_at": null
+  },
+  "blocked_by": [],
+  "duplicate_of": null,
+  "related_bugs": [
+    "BUG-0003",
+    "BUG-0004",
+    "BUG-0005"
+  ],
+  "notes": [
+    "UI validation does not certify remote message delivery."
+  ],
+  "updated_at": "2026-09-15"
+}

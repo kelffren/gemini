@@ -2,8 +2,8 @@
 
 > Documento canónico del engine. Si contradice `index.html` o un owner Foundation LIVE, gana el runtime y este archivo debe actualizarse.
 
-**Sincronizado:** 2026-09-14  
-**Runtime declarado:** Kelo World V6.54.2  
+**Sincronizado:** 2026-09-15
+**Runtime declarado:** Kelo World V6.69
 **Modelo:** web 2D top-down, Canvas, mobile-first, login/guest gate antes del boot pesado.
 
 ## 1. Regla de engine
@@ -16,16 +16,25 @@ Estados usados aquí: `OWNER LIVE`, `SUPPORT LIVE`, `LEGACY CORE`, `DYNAMIC LIVE
 
 Safari iOS tiene **un solo hilo**. Si `engine-b` arranca `gameLoop` mientras el HTML sigue compilando 100+ scripts, el canvas se congela o se pone negro.
 
-Contrato LIVE (`index.html` V6.68):
+Contrato LIVE (`index.html` V6.69):
 
 1. Flag `__keloHoldGameLoop=true` **antes** de `engine-b`.
 2. Plaza only (~44 scripts): events → input → `engine-a/b/c` → cámara/avatar → `engine-d..l` → world-map/props → luxe HUD → governor.
 3. `engine-b` y `KELO_PERF` **no** piden rAF hasta `kelo:boot-ready`.
 4. Tras el último script de plaza: `__keloBootReady=true` + evento `kelo:boot-ready`. El player ya puede caminar.
-5. **Nada más se descarga solo.** Chat premium, tileset 556KB, PvP, studio, backpack, engines `m..aj` = `KELO_MODULE_LOADER.ensure(feature)` al tocar el menú.
+   El chat inferior visible forma parte de la UI de plaza: Luxe → KeloChatUI → KeloChatIntegrationBridge, sin polling ni carga de módulos gameplay. El bridge solo reconcilia cambios reales para evitar bucles de MutationObserver al cerrar.
+5. **Nada más de gameplay se descarga solo.** PvP, backpack y features opcionales = `KELO_MODULE_LOADER.ensure(feature)` al tocar el menú. El chat inferior reutiliza la UI de Luxe del boot; no activa transporte, Studio ni engines `m..aj`.
 6. Prohibido inyectar `<script>` desde nameplates u otros owners (eso montaba el chat Waze y mataba Safari).
 
 El listado histórico de 16 pasos **no es el boot móvil**. Restaurar esos tags en `index.html` es un bug.
+
+### First-use: corrección candidata, pendiente de certificar
+
+`BUG-0004` registra omisiones del grafo de carga: Monturas requiere Stats/catálogos; Mochila requiere Equipment/Containers; Market requiere Backpack/Containers. Apariencia delega al `KELO_PROFILE_LAUNCHER.ensureCustomizer()` existente para preservar schema, contenido, preview y CSS en orden. Los errores de descarga deben rechazar `ensure`, limpiar la promesa fallida y permitir reintento. Un tag descargado no demuestra que su owner se inicializó.
+
+`playwright.freeze.config.js` y `tests/freeze-stability.spec.js` prueban desktop Chromium y perfiles móviles Chromium/WebKit: caminar 8s, parar 10s y volver a caminar 4s, con errores fatales y owners reales. Las pruebas están en investigación; no certifican iPhone físico ni cierran BUG-0003.
+
+`BUG-0005` registra cache thrashing reproducido en escritorio: cachés menores que la vista y trabajo de terreno legacy sin atlas. La corrección candidata deja el suelo actual en `surface-ground.js`, que consume el viewport de `KeloCamera` y el presupuesto móvil/escritorio; `world-map.js` no reconstruye terreno transparente cuando su bootstrap omitió los atlas. Se comprueba que los contadores de reconstrucción/evicción no crezcan con cámara quieta.
 
 ## 3. Owners de Foundation
 
