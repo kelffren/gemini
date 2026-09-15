@@ -29,7 +29,7 @@ export const CREATOR_CONTENT_TYPES=freezeList([
   type('furniture','Furniture','WORLD','asset-forge',{icon:'▤',description:'Placeable interior/exterior furniture prepared as reusable art.',kind:'asset',runtimeOwner:'KELO_PROPERTY_CATALOG + PropertySystem',tools:['image-lab','asset-sheet'],defaults:{category:'decoration'}}),
   type('environment','Environment','WORLD','environment',{icon:'☼',description:'Biome mood, weather, time and ambient direction.',projectTypes:['ENVIRONMENT'],kind:'definition',runtimeOwner:'environment owners',tools:['image-lab','asset-forge']}),
   type('prefab','Prefab','WORLD','prefab',{icon:'▦',description:'Reusable compositions that reference existing assets.',projectTypes:['PREFAB'],kind:'definition',runtimeOwner:'KELO_WORLD_RENDERER + property/world contracts',tools:['asset-forge','world']}),
-  type('world','World / Scene','WORLD','world',{icon:'⌘',description:'Compose and place approved assets inside the world editor.',kind:'world',runtimeOwner:'Studio Kernel + KELO_WORLD_EDIT',tools:['map-forge']} ,marketable:false),
+  type('world','World / Scene','WORLD','world',{icon:'⌘',description:'Compose and place approved assets inside the world editor.',kind:'world',runtimeOwner:'Studio Kernel + KELO_WORLD_EDIT',tools:['map-forge'],marketable:false}),
   type('map','Map Forge','WORLD','map-forge',{icon:'⌗',description:'Generate and compose map layouts without creating a second runtime.',kind:'world',runtimeOwner:'KeloMapForge',tools:['world'],marketable:false}),
   type('vfx','VFX','VISUAL','vfx',{icon:'✦',description:'Visual effects routed through the existing visual system.',projectTypes:['VFX'],kind:'visual',runtimeOwner:'KeloVisualSystem',tools:['image-lab','animation']}),
   type('animation','Animation','VISUAL','animation',{icon:'▶',description:'Sprite/frame motion authored against reusable animation contracts.',projectTypes:['ANIMATION'],kind:'visual',runtimeOwner:'animation/avatar consumers',tools:['asset-sheet','image-lab']}),
@@ -44,11 +44,10 @@ export const CREATOR_CONTENT_TYPES=freezeList([
 ]);
 
 const byId=new Map(CREATOR_CONTENT_TYPES.map(row=>[row.id,row]));
-const byProjectType=new Map();
-for(const row of CREATOR_CONTENT_TYPES)for(const projectType of row.projectTypes)if(!byProjectType.has(projectType))byProjectType.set(projectType,row);
+const preferredProjectType=Object.freeze({ITEM:'item',APPEARANCE:'skin',MOUNT:'mount',NPC:'npc',ABILITY:'ability',SPRITE_ABILITY:'sprite-ability',VFX:'vfx',ANIMATION:'animation',ENVIRONMENT:'environment',PREFAB:'prefab',AUDIO:'audio',CINEMATIC:'cinematic'});
 
 export function getCreatorContentType(id){return byId.get(String(id||'').toLowerCase())||null;}
-export function creatorTypeForProjectType(projectType){return byProjectType.get(String(projectType||'').toUpperCase())||null;}
+export function creatorTypeForProjectType(projectType){const id=preferredProjectType[String(projectType||'').toUpperCase()];return id?getCreatorContentType(id):null;}
 export function listCreatorContentTypes({group=null,query=''}={}){
   const needle=String(query||'').trim().toLowerCase();
   return CREATOR_CONTENT_TYPES.filter(row=>(!group||row.group===String(group).toUpperCase())&&(!needle||`${row.id} ${row.label} ${row.description} ${row.runtimeOwner}`.toLowerCase().includes(needle)));
