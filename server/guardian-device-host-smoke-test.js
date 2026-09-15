@@ -33,7 +33,7 @@ assert.ok(hosted.node.masterLeaseExpiresAt>clock);
 
 clock+=26_000;
 const swept=guardian.sweep(clock);
-assert.equal(swept.master,null);
+assert.equal(swept.masterActive,false);
 const afterExpiry=guardian.status(admin,{nodeId:'guardian_admin_test'});
 assert.notEqual(afterExpiry.node?.role,'master-host');
 
