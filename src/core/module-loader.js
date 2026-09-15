@@ -1,15 +1,16 @@
 /* KELO-INDEX
  * area: CORE / BOOT
  * owner: KeloModuleLoader
- * keys: DYNAMIC LOAD IDLE FIRST-USE CACHE VERSION PING MOBILE SAFARI
- * purpose: un solo hilo de descarga. Plaza ya está viva; el resto entra en idle o al tocar un tool del menú. Pausa si el player camina.
- * public-api: KELO_MODULE_LOADER.start/ensure/needs/isReady
- * do-not: NO tileset 556KB, NO studio, NO supabase, NO segundo gameLoop, NO SW
+ * keys: DYNAMIC LOAD IDLE FIRST-USE CACHE VERSION PING MOBILE SAFARI RECOVERY QUARANTINE TRACE
+ * purpose: un solo hilo de descarga. Plaza ya está viva; el resto entra en idle o al tocar un tool del menú. Pausa si el player camina. Expone eventos diagnósticos sin cambiar ownership.
+ * public-api: KELO_MODULE_LOADER.start/ensure/needs/isReady/diagnostics
+ * consumes: optional KELO_RECOVERY_MESH diagnostics when recoveryLab=1
+ * do-not: NO tileset 556KB, NO studio, NO supabase, NO segundo gameLoop, NO SW, NO quarantine fuera de recoveryLab
  */
 (function(root){
 'use strict';
 if(root.KELO_MODULE_LOADER)return;
-const VERSION='kelo-module-loader-v6';
+const VERSION='kelo-module-loader-v7-recovery';
 const FEATURES={
   social:[
     {src:'src/ui/player-nameplate.js?v=2',name:'placas'},
@@ -59,8 +60,27 @@ const FEATURES={
 const IDLE=['social','world'];
 const loaded=Object.create(null);
 const inflight=Object.create(null);
+const failures=Object.create(null);
 let build='V6.64';
 let shown=false;
+
+function emit(type,detail){
+  try{root.dispatchEvent(new CustomEvent(type,{detail:Object.freeze({...detail})}));}catch(_){}
+  try{root.KELO_RECOVERY_MESH?.mark?.(String(type).replace(/^kelo:/,'').replace(/-/g,'_').toUpperCase(),detail);}catch(_){}
+}
+function recoveryQuery(){
+  try{return new URLSearchParams(root.location?.search||'');}catch(_){return null;}
+}
+function recoveryEnabled(){
+  const q=recoveryQuery();
+  return !!q&&(q.get('recoveryLab')==='1'||q.get('debugRecovery')==='1'||q.get('freezeLab')==='1');
+}
+function quarantined(name){
+  if(!recoveryEnabled())return false;
+  try{if(root.KELO_RECOVERY_MESH?.shouldSkip?.(name))return true;}catch(_){}
+  const q=recoveryQuery();
+  return String(q?.get('recoverySkip')||'').split(',').map(v=>v.trim()).filter(Boolean).includes(String(name));
+}
 function busy(){
   try{
     if(typeof input!=='undefined'&&input&&(Math.abs(input.normX)>0.02||Math.abs(input.normY)>0.02||input.active)) return true;
@@ -85,40 +105,61 @@ function hasScript(src){
   const base=src.split('?')[0];
   return Array.from(document.scripts).some(function(s){return (s.getAttribute('src')||'').split('?')[0]===base;});
 }
-function loadOne(item){
+function loadOne(item,feature){
   return new Promise(function(resolve){
-    if(hasScript(item.src)){ resolve(0); return; }
+    if(hasScript(item.src)){
+      emit('kelo:module-load-end',{feature,src:item.src,ok:true,ms:0,cached:true});
+      resolve({ms:0,ok:true,cached:true});return;
+    }
     const t0=performance.now();
+    emit('kelo:module-load-start',{feature,src:item.src,name:item.name});
     const s=document.createElement('script');
     s.src=item.src;
-    s.onload=s.onerror=function(){ resolve(performance.now()-t0); };
+    s.onload=function(){
+      const ms=performance.now()-t0;
+      emit('kelo:module-load-end',{feature,src:item.src,ok:true,ms:Math.round(ms),cached:false});
+      resolve({ms,ok:true,cached:false});
+    };
+    s.onerror=function(){
+      const ms=performance.now()-t0;
+      failures[item.src]=(failures[item.src]||0)+1;
+      emit('kelo:module-load-error',{feature,src:item.src,ok:false,ms:Math.round(ms),error:'SCRIPT_LOAD_ERROR',count:failures[item.src]});
+      resolve({ms,ok:false,cached:false});
+    };
     document.head.appendChild(s);
   });
 }
 function loadFeature(name,opts){
   const files=FEATURES[name];
   if(!files) return Promise.resolve(true);
+  if(quarantined(name)){
+    emit('kelo:module-quarantined',{feature:name,src:'',ok:false,error:'RECOVERY_QUARANTINE'});
+    return Promise.resolve(false);
+  }
   if(loaded[name]) return Promise.resolve(true);
   if(inflight[name]) return inflight[name];
   const interactive=!!(opts&&opts.interactive);
   inflight[name]=new Promise(function(resolve){
-    let i=0, hits=0;
+    let i=0,hits=0,errors=0;
     function step(){
       if(i>=files.length){
-        loaded[name]=true; delete inflight[name];
-        try{ localStorage.setItem('kelo_modpack_'+name, build); }catch(_){}
-        resolve(true); return;
+        loaded[name]=errors===0; delete inflight[name];
+        try{ if(errors===0)localStorage.setItem('kelo_modpack_'+name,build); }catch(_){}
+        emit('kelo:module-feature-complete',{feature:name,ok:errors===0,files:files.length,errors});
+        resolve(errors===0); return;
       }
       if(!interactive&&busy()){
-        if(shown) show('En pausa · caminando', (i/files.length)*100);
+        if(shown) show('En pausa · caminando',(i/files.length)*100);
         setTimeout(step,450); return;
       }
       const item=files[i];
-      loadOne(item).then(function(dt){
+      loadOne(item,name).then(function(result){
+        const dt=Number(result?.ms)||0;
+        if(!result?.ok)errors++;
         if(dt<50) hits++;
-        else show('Descargando '+item.name+'  '+(i+1)+'/'+files.length, ((i+1)/files.length)*100);
+        else show('Descargando '+item.name+'  '+(i+1)+'/'+files.length,((i+1)/files.length)*100);
         i+=1;
-        setTimeout(step, dt<50?80:360);
+        setTimeout(step,dt<50?80:360);
       });
     }
     step();
@@ -133,11 +174,12 @@ function ensure(name){
     return Promise.resolve(false);
   }
   if(!FEATURES[name]) return Promise.resolve(true);
-  show('Cargando '+name+'…', 8);
-  return loadFeature(name,{interactive:true}).then(function(ok){
-    hideChip('Listo');
-    return ok;
-  });
+  if(quarantined(name)){
+    emit('kelo:module-quarantined',{feature:name,src:'',ok:false,error:'RECOVERY_QUARANTINE'});
+    return Promise.resolve(false);
+  }
+  show('Cargando '+name+'…',8);
+  return loadFeature(name,{interactive:true}).then(function(ok){hideChip(ok?'Listo':'Fallo al cargar');return ok;});
 }
 function needs(name){
   if(name==='chat'||name==='profile') return false;
@@ -146,14 +188,20 @@ function needs(name){
   if(!FEATURES[name]) return false;
   return !loaded[name];
 }
-function isPhone(){
-  try{ return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent||'') || (root.matchMedia&&root.matchMedia('(pointer: coarse)').matches); }
-  catch(_){ return false; }
-}
 function start(opts){
   if(opts&&opts.build) build=String(opts.build);
   const el=box(); if(el) el.hidden=true;
+  emit('kelo:module-loader-start',{build,version:VERSION});
   // First-use only. Compiling extra JS while gameLoop runs freezes Safari.
 }
-root.KELO_MODULE_LOADER=Object.freeze({version:VERSION,start,ensure,needs,isReady:function(n){return !!loaded[n];},features:Object.keys(FEATURES)});
+function diagnostics(){
+  return Object.freeze({
+    version:VERSION,build,features:Object.keys(FEATURES),
+    loaded:Object.keys(loaded).filter(k=>loaded[k]),
+    inflight:Object.keys(inflight),
+    failures:{...failures},
+    quarantined:Object.keys(FEATURES).filter(quarantined)
+  });
+}
+root.KELO_MODULE_LOADER=Object.freeze({version:VERSION,start,ensure,needs,isReady:function(n){return !!loaded[n];},features:Object.keys(FEATURES),diagnostics});
 })(typeof globalThis!=='undefined'?globalThis:window);
