@@ -1,12 +1,12 @@
 /* KELO-INDEX
  * area: ONLINE / GUARDIAN PEER MESH
  * owner: Kelo Guardian P2P client
- * keys: WEBRTC SIGNAL SINGLE SOCKET RELAY ASSET CHUNKS SHA256 LATENCY TURN FALLBACK SAFARI UI
+ * keys: WEBRTC SIGNAL SINGLE SOCKET RELAY ASSET CHUNKS SHA256 LATENCY TURN FALLBACK SAFARI UI KEEPALIVE
  * purpose: establece DataChannels entre nodos Guardian usando KeloNetAuthority como signaling único
  * authority: canal P2P solo transporta probes/assets verificados; nunca gameplay/economia/PvP/autenticacion
- * do-not: NO segundo WebSocket, NO token en peer channel, NO eval, NO asset cross-origin, NO archivo > 512KB
+ * do-not: NO segundo WebSocket, NO token en peer channel, NO eval, NO asset cross-origin, NO archivo > 512KB, NO timer propio de keepalive
  */
-const VERSION='guardian-peer-mesh-v1.1.0';
+const VERSION='guardian-peer-mesh-v1.2.0';
 const root=globalThis;
 const sessions=new Map(),transfers=new Map();
 const listeners=new Set();
@@ -75,8 +75,9 @@ async function handlePeerMessage(row,data){
 }
 function handleNetwork(event){const msg=event?.detail||event;if(!msg?.t)return;Promise.resolve().then(async()=>{if(msg.t==='guardian:peer:session')await startOffer(msg);else if(msg.t==='guardian:peer:invite')createSession(msg.sessionId,'answerer',msg.peerNodeId,msg.expiresAt);else if(msg.t==='guardian:peer:signal')await receiveSignal(msg);else if(msg.t==='guardian:peer:closed')closeSession(msg.sessionId,msg.reason||'server-closed',false);}).catch(error=>{lastError=String(error?.message||error);emit();});}
 async function ensureBound(){const state=host?.getState?.(),n=net();if(!state?.donorEnabled||!state?.node||!n?.isOnline?.())return false;if(boundNodeId===state.nodeId)return true;await n.guardianBind(state.nodeId);boundNodeId=state.nodeId;lastError=null;emit();return true;}
-function syncHostState(){const state=host?.getState?.();if(!state?.donorEnabled||!state?.node){boundNodeId=null;closeAll('donor-disabled',true);emit();return;}ensureBound().catch(error=>{lastError=String(error?.message||error);emit();});}
-function onNetworkOpen(){boundNodeId=null;ensureBound().catch(error=>{lastError=String(error?.message||error);emit();});}
+function keepSessionsAlive(){if(!boundNodeId||!net()?.isOnline?.())return;for(const row of sessions.values()){if(row.state==='closed'||row.state==='failed')continue;try{networkSignal(row.sessionId,{kind:'keepalive'});row.expiresAt=Date.now()+60000;}catch{}}}
+function syncHostState(){const state=host?.getState?.();if(!state?.donorEnabled||!state?.node){boundNodeId=null;closeAll('donor-disabled',true);emit();return;}ensureBound().then(()=>keepSessionsAlive()).catch(error=>{lastError=String(error?.message||error);emit();});}
+function onNetworkOpen(){boundNodeId=null;ensureBound().then(()=>keepSessionsAlive()).catch(error=>{lastError=String(error?.message||error);emit();});}
 function onNetworkClose(){boundNodeId=null;closeAll('network-closed',false);emit();}
 async function requestPeer(region='global'){if(!await ensureBound())throw new Error('GUARDIAN_P2P_NOT_BOUND');return networkRequest('guardian:peer:request',{region:String(region||'global').slice(0,48)},8000);}
 function openChannels(){return [...sessions.values()].filter(x=>x.channel?.readyState==='open');}
@@ -86,7 +87,7 @@ function ensureUi(){if(panel&&panel.isConnected)return panel;const sheet=documen
 function renderUi(){const el=ensureUi();if(!el)return;const s=getState(),hs=host?.getState?.()||{},eligible=!!(hs.donorEnabled&&hs.preferences?.allowRelay);const peer=s.sessions[0];el.innerHTML='<b>Guardian P2P</b><div style="opacity:.72;margin:4px 0">'+(s.connected?'Conectado · '+s.connected+' peer'+(s.connected>1?'s':'')+(peer?.rttMs!=null?' · '+peer.rttMs+' ms':''):(s.boundNodeId?'Nodo enlazado · esperando peer':'Sin enlace de signaling'))+'</div>'+(eligible&&!s.connected?'<button data-guardian-peer="connect" style="min-height:40px;border-radius:11px;border:1px solid rgba(120,180,255,.35);background:#10263a;color:#dcecff;font-weight:800;padding:0 12px">Probar enlace P2P</button>':'')+'<div style="opacity:.55;margin-top:5px;font-size:9px">Assets ≤512 KB con SHA-256 · mismo WebSocket para signaling · '+(s.turnConfigured?'TURN configurado':'STUN directo')+'</div>'+(s.lastError?'<div style="color:#ffaaa0;margin-top:5px">'+String(s.lastError).replace(/[<>]/g,'')+'</div>':'');}
 function attach(deviceHost=root.KeloGuardianDeviceHost){if(host)return true;host=deviceHost;if(!host)return false;window.addEventListener('kelo:guardian-network',handleNetwork);window.addEventListener('kelo:network-open',onNetworkOpen);window.addEventListener('kelo:network-close',onNetworkClose);detachHost=host.onChange?.(syncHostState);ensureUi();syncHostState();emit();return true;}
 function stop(){try{detachHost?.();}catch{}detachHost=null;window.removeEventListener('kelo:guardian-network',handleNetwork);window.removeEventListener('kelo:network-open',onNetworkOpen);window.removeEventListener('kelo:network-close',onNetworkClose);closeAll('mesh-stop',true);boundNodeId=null;host=null;emit();}
-function getState(){return Object.freeze({version:VERSION,boundNodeId,sessions:Object.freeze([...sessions.values()].map(x=>Object.freeze({sessionId:x.sessionId,role:x.role,peerNodeId:x.peerNodeId,state:x.state,rttMs:x.rttMs,expiresAt:x.expiresAt}))),connected:openChannels().length,bytesSent,bytesReceived,probes,lastError,maxAssetBytes:MAX_ASSET_BYTES,singleSocketSignaling:true,gameplayAuthority:false,economyAuthority:false,pvpAuthority:false,turnConfigured:Array.isArray(root.KELO_GUARDIAN_ICE_SERVERS)&&root.KELO_GUARDIAN_ICE_SERVERS.some(x=>String(x?.urls||'').startsWith('turn'))});}
+function getState(){return Object.freeze({version:VERSION,boundNodeId,sessions:Object.freeze([...sessions.values()].map(x=>Object.freeze({sessionId:x.sessionId,role:x.role,peerNodeId:x.peerNodeId,state:x.state,rttMs:x.rttMs,expiresAt:x.expiresAt}))),connected:openChannels().length,bytesSent,bytesReceived,probes,lastError,maxAssetBytes:MAX_ASSET_BYTES,singleSocketSignaling:true,heartbeatKeepalive:true,gameplayAuthority:false,economyAuthority:false,pvpAuthority:false,turnConfigured:Array.isArray(root.KELO_GUARDIAN_ICE_SERVERS)&&root.KELO_GUARDIAN_ICE_SERVERS.some(x=>String(x?.urls||'').startsWith('turn'))});}
 function onChange(fn){if(typeof fn!=='function')return()=>{};listeners.add(fn);return()=>listeners.delete(fn);}
 
 export const GuardianPeerMesh=Object.freeze({version:VERSION,attach,stop,ensureBound,requestPeer,requestAsset,getState,onChange});
