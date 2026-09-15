@@ -2,7 +2,7 @@
 
 > Documento canónico del engine. Si contradice `index.html` o un owner Foundation LIVE, gana el runtime y este archivo debe actualizarse.
 
-**Sincronizado:** 2026-09-14  
+**Sincronizado:** 2026-09-15  
 **Runtime declarado:** Kelo World V6.54.2  
 **Modelo:** web 2D top-down, Canvas, mobile-first, login/guest gate antes del boot pesado.
 
@@ -96,6 +96,19 @@ El shell es UI; no posee mutations del mundo. Las mutations pasan por Studio Ker
 `asset-sheet-compiler.mjs` reutiliza `sprite-foreground-analysis.mjs` y `sprite-world-asset-compiler.mjs`. Produce frames irregulares, metadata y manifest; no redibuja el arte ni se convierte en un renderer.
 
 El Asset Compiler puede sugerir semántica, pero nombres/categorías revisados deben conservar geometría sourceRect estable para no romper placements.
+
+### PNG Space Gate — PREPARED / build-time
+
+Antes del análisis geométrico puede existir una etapa independiente de bytes bajo el mismo owner `Kelo Creator Asset Bridge`:
+
+`RAW PNG → png-space-optimizer / png-quality-agent → asset-sheet-compiler → manifest`
+
+- `png-space-optimizer.mjs`: explora filtros/DEFLATE y paleta exacta cuando aplica; strict exige RGBA idéntico.
+- `png-quality-agent.mjs`: hard gate before/after; alpha, PSNR, RGB y bordes para candidatos adaptativos.
+- `png-adaptive-optimizer.mjs`: cuantización opt-in; si no supera el gate, vuelve a strict.
+- `scripts/asset-space-compiler.mjs`: CLI recursiva, reportes y capturas; no forma parte del boot del juego.
+
+Esta etapa **no cambia sourceRects, dimensiones, catalog IDs ni runtime ownership**. No se considera LIVE hasta medir assets reales y pasar CI; el runtime continúa consumiendo las rutas actuales.
 
 ## 8. Gameplay
 
