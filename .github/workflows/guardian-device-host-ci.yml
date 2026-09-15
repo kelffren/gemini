@@ -1,0 +1,30 @@
+name: Guardian Device Host CI
+
+on:
+  pull_request:
+    paths:
+      - 'server/guardian-coordinator.js'
+      - 'server/guardian-device-host-smoke-test.js'
+      - 'src/online/guardian-device-host.mjs'
+      - 'src/core/settings-lazy-gate.js'
+      - '.github/workflows/guardian-device-host-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  guardian-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.20.0'
+      - name: Syntax check browser modules
+        run: |
+          node --check src/online/guardian-device-host.mjs
+          node --check src/core/settings-lazy-gate.js
+      - name: Guardian donor/master lease contract
+        run: node server/guardian-device-host-smoke-test.js
