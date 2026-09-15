@@ -1,16 +1,16 @@
 /* KELO-INDEX
  * area: CORE / BOOT
  * owner: KeloModuleLoader
- * keys: DYNAMIC LOAD IDLE FIRST-USE CACHE VERSION PING MOBILE SAFARI RECOVERY QUARANTINE TRACE STYLE
- * purpose: un solo hilo de descarga. Plaza ya está viva; el resto entra al tocar un tool del menú. JS y CSS opcionales se cargan secuencialmente. Pausa si el player camina.
+ * keys: DYNAMIC LOAD IDLE FIRST-USE CACHE VERSION PING MOBILE SAFARI RECOVERY QUARANTINE TRACE STYLE ASSET-LIBRARY
+ * purpose: un solo hilo de descarga. Plaza ya está viva; el resto entra al tocar un tool del menú. JS y CSS opcionales se cargan secuencialmente. Pausa si el player camina. La biblioteca puede bloquear paquetes opcionales.
  * public-api: KELO_MODULE_LOADER.start/ensure/needs/isReady/diagnostics
- * consumes: optional KELO_RECOVERY_MESH diagnostics when recoveryLab=1
+ * consumes: optional KELO_ASSET_REGISTRY allow-list + optional KELO_RECOVERY_MESH diagnostics when recoveryLab=1
  * do-not: NO tileset 556KB, NO studio, NO supabase, NO segundo gameLoop, NO SW, NO quarantine fuera de recoveryLab
  */
 (function(root){
 'use strict';
 if(root.KELO_MODULE_LOADER)return;
-const VERSION='kelo-module-loader-v8-style-first-use';
+const VERSION='kelo-module-loader-v9-asset-gate';
 const FEATURES={
   social:[
     {src:'src/ui/player-nameplate.js?v=2',name:'placas'},
@@ -81,6 +81,12 @@ function quarantined(name){
   const q=recoveryQuery();
   return String(q?.get('recoverySkip')||'').split(',').map(v=>v.trim()).filter(Boolean).includes(String(name));
 }
+function assetAllowed(name){
+  try{
+    if(!root.KELO_ASSET_REGISTRY||typeof root.KELO_ASSET_REGISTRY.isEnabled!=='function')return true;
+    return root.KELO_ASSET_REGISTRY.isEnabled(name)!==false;
+  }catch(_){return true;}
+}
 function busy(){
   try{
     if(typeof input!=='undefined'&&input&&(Math.abs(input.normX)>0.02||Math.abs(input.normY)>0.02||input.active)) return true;
@@ -137,6 +143,10 @@ function loadOne(item,feature){
 function loadFeature(name,opts){
   const files=FEATURES[name];
   if(!files)return Promise.resolve(true);
+  if(!assetAllowed(name)){
+    emit('kelo:module-blocked',{feature:name,src:'',ok:false,error:'ASSET_LIBRARY_DISABLED'});
+    return Promise.resolve(false);
+  }
   if(quarantined(name)){
     emit('kelo:module-quarantined',{feature:name,src:'',ok:false,error:'RECOVERY_QUARANTINE'});
     return Promise.resolve(false);
@@ -147,6 +157,11 @@ function loadFeature(name,opts){
   inflight[name]=new Promise(function(resolve){
     let i=0,errors=0;
     function step(){
+      if(!assetAllowed(name)){
+        delete inflight[name];
+        emit('kelo:module-blocked',{feature:name,src:'',ok:false,error:'ASSET_LIBRARY_DISABLED_DURING_LOAD'});
+        resolve(false);return;
+      }
       if(i>=files.length){
         loaded[name]=errors===0;delete inflight[name];
         try{if(errors===0)localStorage.setItem('kelo_modpack_'+name,build);}catch(_){}
@@ -178,6 +193,11 @@ function ensure(name){
     return Promise.resolve(false);
   }
   if(!FEATURES[name])return Promise.resolve(true);
+  if(!assetAllowed(name)){
+    emit('kelo:module-blocked',{feature:name,src:'',ok:false,error:'ASSET_LIBRARY_DISABLED'});
+    hideChip('Desactivado en Assets');
+    return Promise.resolve(false);
+  }
   if(quarantined(name)){
     emit('kelo:module-quarantined',{feature:name,src:'',ok:false,error:'RECOVERY_QUARANTINE'});
     return Promise.resolve(false);
@@ -190,22 +210,25 @@ function needs(name){
   if(name==='nobility'||name==='emotes')name='social';
   if(name==='pvp')return !(root.KeloMeleeEngine&&root.KeloCombatEngine);
   if(!FEATURES[name])return false;
+  if(!assetAllowed(name))return true;
   return !loaded[name];
 }
 function start(opts){
   if(opts&&opts.build)build=String(opts.build);
   const el=box();if(el)el.hidden=true;
-  emit('kelo:module-loader-start',{build,version:VERSION});
+  emit('kelo:module-loader-start',{build,version:VERSION,assetSelection:root.KELO_ASSET_REGISTRY?.getState?.().features||null});
   // First-use only. Executing extra JS while gameLoop runs freezes Safari.
 }
 function diagnostics(){
   return Object.freeze({
     version:VERSION,build,features:Object.keys(FEATURES),
+    enabled:Object.keys(FEATURES).filter(assetAllowed),
+    disabled:Object.keys(FEATURES).filter(function(k){return !assetAllowed(k);}),
     loaded:Object.keys(loaded).filter(function(k){return loaded[k];}),
     inflight:Object.keys(inflight),
     failures:{...failures},
     quarantined:Object.keys(FEATURES).filter(quarantined)
   });
 }
-root.KELO_MODULE_LOADER=Object.freeze({version:VERSION,start,ensure,needs,isReady:function(n){return !!loaded[n];},features:Object.keys(FEATURES),diagnostics});
+root.KELO_MODULE_LOADER=Object.freeze({version:VERSION,start,ensure,needs,isReady:function(n){return !!loaded[n];},canLoad:assetAllowed,features:Object.keys(FEATURES),diagnostics});
 })(typeof globalThis!=='undefined'?globalThis:window);
