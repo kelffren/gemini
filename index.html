@@ -1,7 +1,7 @@
 <!-- KELO-INDEX
   area: RUNTIME / UI BOOT
   owner: index.html load order
-  purpose: plaza first. heavy owners after first frame.
+  purpose: plaza first. heavy owners after first frame. recovery diagnostics load only by explicit query flag.
 -->
 <!DOCTYPE html>
 <html lang="es">
@@ -48,10 +48,18 @@
       sessionStorage.setItem('kelo_local_guest_play_v1','1');
       localStorage.setItem('kelo_local_guest_play_v1','1');
     }
-    if(q.get('freezeLab')==='1'||q.get('freeze')==='1'||q.get('debugFreeze')==='1'){
-      window.__keloFreezeLocatorPromise=import('./src/core/bug-observability.mjs?v=freeze-locator-1').then(function(mod){
-        return mod.installFreezeLocator({root:window,flow:'world-open',bugId:'BUG-0003',version:'V6.69-freeze-locator'});
-      }).catch(function(error){console.error('[Kelo Freeze Locator boot]',error);return null;});
+    var freeze=q.get('freezeLab')==='1'||q.get('freeze')==='1'||q.get('debugFreeze')==='1';
+    var recovery=q.get('recoveryLab')==='1'||q.get('debugRecovery')==='1'||freeze;
+    if(recovery){
+      window.__keloRecoveryMeshPromise=import('./src/core/bug-observability.mjs?v=recovery-mesh-1').then(function(mod){
+        var flow=q.get('recoveryFlow')||(freeze?'world-open':'runtime');
+        var bug=q.get('bug')||(freeze?'BUG-0003':null);
+        var mesh=mod.installRecoveryMesh({root:window,flow:flow,bugId:bug,force:true,version:'V6.69-recovery-mesh'});
+        if(freeze){
+          window.__keloFreezeLocatorPromise=Promise.resolve(mod.installFreezeLocator({root:window,flow:'world-open',bugId:bug||'BUG-0003',force:true,version:'V6.69-freeze-locator'}));
+        }
+        return mesh;
+      }).catch(function(error){console.error('[Kelo Recovery Mesh boot]',error);return null;});
     }
   }catch(e){}
 })();
@@ -102,7 +110,7 @@
 <script src="src/ui/luxe-player-hud.js?v=4-minimap-live-20260914"></script>
 <script src="src/systems/performance-governor.js?v=4-boot-ready"></script>
 <script>window.__keloBootReady=true;window.dispatchEvent(new Event("kelo:boot-ready"));</script>
-<script src="src/core/module-loader.js?v=6"></script>
+<script src="src/core/module-loader.js?v=7-recovery"></script>
 <script>window.KELO_MODULE_LOADER&&window.KELO_MODULE_LOADER.start({build:'V6.69'});</script>
 <script src="src/systems/admin-key-system.js?v=1"></script>
 <script src="src/ui/studio-launcher.js?v=world-bridge-20260915-20"></script>
