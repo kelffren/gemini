@@ -10,16 +10,24 @@ page.on('pageerror',error=>pageErrors.push(String(error?.stack||error?.message||
 
 const fail=async message=>{await browser.close();throw new Error(message);};
 
-try{
-  await page.goto(`${BASE}?mapEditor=1&world-surgery-smoke=${Date.now()}`,{waitUntil:'domcontentloaded',timeout:30000});
-  await page.waitForFunction(()=>{
-    const actor=window.KELO_ADMIN_KEYS?.playerId?.();
-    const launcher=window.KELO_CREATORS_LAUNCHER||window.KELO_STUDIO_LAUNCHER;
-    return typeof launcher?.open==='function'&&launcher.allowed===true&&!!actor&&window.KELO_ADMIN_KEYS?.can?.('world.edit',actor)===true&&!!window.KeloInputLocks&&!!window.KELO_WORLD_EDIT?.ready;
-  },{timeout:30000});
-
-  await page.evaluate(()=>window.KELO_CREATORS_LAUNCHER.open());
+async function openCreators(){
+  await page.evaluate(async()=>{
+    const {openCreatorHub}=await import('./src/creators/ui/creator-hub.mjs');
+    await openCreatorHub({root:window});
+  });
   await page.waitForSelector('#kelo-creators-hub',{state:'visible',timeout:15000});
+  await page.waitForFunction(()=>!!(
+    window.KeloInputLocks?.acquire&&
+    window.KELO_ADMIN_KEYS?.can?.('world.edit')
+  ),{timeout:15000});
+}
+
+try{
+  // Match the repository's official World mobile QA bootstrap: guest mode keeps
+  // the auth wall out of this diagnostic path, and Creators owns KeloInputLocks.
+  await page.goto(`${BASE}?guest=1&mapEditor=1&world-surgery-smoke=${Date.now()}`,{waitUntil:'domcontentloaded',timeout:30000});
+  await openCreators();
+
   const surgeryButton=page.locator('[data-world-surgery="1"]');
   await surgeryButton.waitFor({state:'visible',timeout:10000});
   await surgeryButton.click();
@@ -45,12 +53,9 @@ try{
   const persisted=await page.evaluate(()=>({preset:window.KELO_WORLD_SURGERY.getConfig().preset,paintCopies:window.KELO_WORLD_SURGERY.enabled('paintCopies')}));
   if(persisted.paintCopies!==false)await fail(`SURGERY_PERSISTENCE_FAILED:${JSON.stringify(persisted)}`);
 
-  await page.waitForFunction(()=>{
-    const launcher=window.KELO_CREATORS_LAUNCHER||window.KELO_STUDIO_LAUNCHER;
-    return typeof launcher?.open==='function'&&launcher.allowed===true&&window.KELO_WORLD_EDIT?.ready;
-  },{timeout:30000});
-  await page.evaluate(()=>window.KELO_CREATORS_LAUNCHER.open());
-  await page.waitForSelector('#kelo-creators-hub',{state:'visible',timeout:15000});
+  // Recreate the Creator-owned input/permission contracts after reload before
+  // asking World to mount. This mirrors tests/world-editor-ios-reopen.spec.js.
+  await openCreators();
   await page.locator('[data-workspace="world"]').first().click();
   await page.waitForFunction(()=>{
     const live=document.getElementById('kelo-studio-live');
