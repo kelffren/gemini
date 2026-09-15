@@ -4,7 +4,7 @@
  * does-not-own: gameplay rules, editor state, rendering implementation
  * public-api: createKeloRuntimeAdapter()
  * online: persistent mutations delegate to KELO_WORLD_EDIT / system authorities
- * world-surgery: assetCatalog gates Studio access to KELO_PROPERTY_CATALOG; treeCatalog filters tree-like entries only. These switches do NOT unregister the game's global catalog.
+ * world-surgery: asset catalog is resolved live on every read so a cold phone boot cannot freeze an empty/partial catalog reference.
  */
 
 export function createKeloRuntimeAdapter(root = globalThis) {
@@ -16,7 +16,6 @@ export function createKeloRuntimeAdapter(root = globalThis) {
   let commandMirror = null;
 
   function assetCatalog() {
-    const catalog = get('KELO_PROPERTY_CATALOG');
     if (!enabled('assetCatalog')) {
       mark('assetCatalog','DISABLED',{reason:'kill-switch'});
       mark('treeCatalog','DISABLED',{reason:'assetCatalog-off'});
@@ -25,17 +24,18 @@ export function createKeloRuntimeAdapter(root = globalThis) {
 
     mark('assetCatalog','ACTIVE');
     mark('treeCatalog',enabled('treeCatalog')?'ACTIVE':'DISABLED',{scope:'studio-filter'});
+    const liveCatalog = () => get('KELO_PROPERTY_CATALOG');
     const allow = item => enabled('treeCatalog') || !treeLike(item);
     return Object.freeze({
       get(id) {
-        const item = catalog?.get?.(id) || null;
+        const item = liveCatalog()?.get?.(id) || null;
         return item && allow(item) ? item : null;
       },
       list(filter) {
-        const rows = catalog?.list?.(filter) || [];
+        const rows = liveCatalog()?.list?.(filter) || [];
         return enabled('treeCatalog') ? rows : rows.filter(allow);
       },
-      categories() { return catalog?.categories?.() || []; }
+      categories() { return liveCatalog()?.categories?.() || []; }
     });
   }
 
