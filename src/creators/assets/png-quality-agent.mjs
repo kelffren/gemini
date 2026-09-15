@@ -36,6 +36,24 @@ export function evaluatePixelFidelity(originalRgba, candidateRgba, width, height
   }
 
   const pixelCount = width * height;
+  if (Buffer.isBuffer(originalRgba) && Buffer.isBuffer(candidateRgba) && originalRgba.equals(candidateRgba)) {
+    return {
+      comparable:true,
+      exactPixels:true,
+      changedPixels:0,
+      changedPixelRatio:0,
+      meanAbsRgb:0,
+      rmseRgb:0,
+      psnrRgb:Infinity,
+      maxRgbDelta:0,
+      alphaChangedPixels:0,
+      alphaChangedRatio:0,
+      alphaMaxDelta:0,
+      edgeMae:0,
+      largeDeltaRatio:0
+    };
+  }
+
   let changedPixels = 0;
   let alphaChangedPixels = 0;
   let alphaMaxDelta = 0;
