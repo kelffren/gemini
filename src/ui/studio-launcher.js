@@ -1,18 +1,18 @@
 /* KELO-INDEX
  * area: UI / CREATORS LAUNCHER
  * owner: Kelo Studio Launcher (compat name retained)
- * keys: CREATORS MENU PREMIUM LAZY ADMIN ANIMATION CAPABILITY AVATAR SPRITE FACTORY ONLINE PERMISSIONS DIRECT URL
+ * keys: CREATORS MENU PREMIUM LAZY ADMIN ANIMATION CAPABILITY AVATAR SPRITE FACTORY ONLINE PERMISSIONS DIRECT URL GM LIVE
  * purpose: añade CREATORS y Sprite Factory al menú Luxe, carga permisos online y permite abrir Creators directamente con ?creators=1
  * public-api: KELO_STUDIO_LAUNCHER + KELO_CREATORS_LAUNCHER alias
  * consumes: KELO_ADMIN_KEYS, KeloAccountPermissions, KELO_LUXE, menú Luxe existente
  * state-owned: solo estado efímero de carga
- * extension-points: Creator Hub / Sprite Factory / WorkspaceRegistry / Account Admin
+ * extension-points: Creator Hub / Sprite Factory / WorkspaceRegistry / Account Admin / Account Live Control
  */
 (function(){
   'use strict';
   if(window.KELO_STUDIO_LAUNCHER)return;
   let loading=false,factoryLoading=false,directOpenStarted=false;
-  const CREATOR_BUILD='world-bridge-20260915-22';
+  const CREATOR_BUILD='world-bridge-20260915-23';
   const params=()=>new URLSearchParams(window.location.search);
   const directRequested=()=>params().get('creators')==='1'||params().get('creator')==='1';
   const actor=()=>String(window.KELO_ADMIN_KEYS?.playerId?.()||window.keloNet?.playerKey||window.localPlayer?.id||'local_pioneer');
@@ -111,9 +111,15 @@
       const permissionsModule=await import('./../auth/account-permissions-runtime.mjs?v=1');
       await permissionsModule.installAccountPermissions({root:window});
       sync();maybeOpenDirect();
-      const adminModule=await import('./account-admin-panel.mjs?v=1');
+    }catch(error){console.warn('[Kelo online permissions boot]',error);}
+    try{
+      const adminModule=await import('./account-admin-panel.mjs?v=2');
       await adminModule.installAccountAdminPanel({root:window});
-    }catch(error){console.warn('[Kelo online authorization boot]',error);}
+    }catch(error){console.warn('[Kelo admin panel boot]',error);}
+    try{
+      const liveModule=await import('./../auth/account-live-control-runtime.mjs?v=1');
+      await liveModule.installAccountLiveControl({root:window});
+    }catch(error){console.warn('[Kelo account live control boot]',error);}
   }
   function bootSurgery(){
     void import('./../studio/diagnostics/world-surgery-runtime.mjs?v=1')
@@ -122,7 +128,7 @@
   }
   function boot(){bootSurgery();sync();maybeOpenDirect();void bootOnlineAuthorization();void import('./../characters/creator-avatar-runtime.mjs').then(m=>m.installCreatorAvatarRuntime({root:window})).catch(e=>console.warn('[Kelo Avatar runtime]',e));}
   window.KELO_ADMIN_KEYS?.onChange?.(()=>{sync();maybeOpenDirect();});
-  const api=Object.freeze({version:'studio-launcher-v1.18.0-world-surgery',open,openSpriteFactory:openFactory,sync,get allowed(){return allowed();},get directRequested(){return directRequested();}});
+  const api=Object.freeze({version:'studio-launcher-v1.19.0-gm-live-control',open,openSpriteFactory:openFactory,sync,get allowed(){return allowed();},get directRequested(){return directRequested();}});
   window.KELO_STUDIO_LAUNCHER=api;
   window.KELO_CREATORS_LAUNCHER=api;
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
