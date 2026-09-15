@@ -7,17 +7,18 @@ Este archivo define qué documentación debe leerse como estado actual y qué ar
 ## Canónicos actuales
 
 1. `../README.md` — entrada del repo.
-2. `../ENGINE_MAP.md` — engine/boot/owners.
-3. `GAME_STATE_CURRENT.md` — snapshot funcional actual.
-4. `ARCHITECTURE_CURRENT.md` — arquitectura por capas.
-5. `CODE_INDEX.md` — mapa de código.
-6. `FEATURE_MATRIX.md` — estado por feature.
-7. `IMPLEMENTATION_ROADMAP.md` — próximos pasos.
-8. `KELO_FOUNDATION.md` — leyes Foundation.
-9. `KELO_STUDIO_ARCHITECTURE.md` — World/Studio/Creators.
-10. `ASSET_CONTRACT.md` — assets/atlases/placement.
-11. `VISUAL_SYSTEM.md` — pipeline visual.
-12. `SYSTEM_DOCUMENTATION_STANDARD.md` + `system-catalog.json` — contrato documental.
+2. `../AI_MOBILE_EXECUTION_BRIDGE.md` — protocolo operativo móvil para IAs, GitHub, LIVE y QA cloud.
+3. `../ENGINE_MAP.md` — engine/boot/owners.
+4. `GAME_STATE_CURRENT.md` — snapshot funcional actual.
+5. `ARCHITECTURE_CURRENT.md` — arquitectura por capas.
+6. `CODE_INDEX.md` — mapa de código.
+7. `FEATURE_MATRIX.md` — estado por feature.
+8. `IMPLEMENTATION_ROADMAP.md` — próximos pasos.
+9. `KELO_FOUNDATION.md` — leyes Foundation.
+10. `KELO_STUDIO_ARCHITECTURE.md` — World/Studio/Creators.
+11. `ASSET_CONTRACT.md` — assets/atlases/placement.
+12. `VISUAL_SYSTEM.md` — pipeline visual.
+13. `SYSTEM_DOCUMENTATION_STANDARD.md` + `system-catalog.json` — contrato documental.
 
 ## Documentación por sistema
 
