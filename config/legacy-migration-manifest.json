@@ -1,5 +1,5 @@
 {
-  "version": 7,
+  "version": 8,
   "defaultMode": "LEGACY",
   "allowedModes": ["LEGACY", "SHADOW", "NEW"],
   "domains": {
@@ -67,11 +67,14 @@
       "authority": "collision-owner-registry"
     },
     "render": {
-      "mode": "LEGACY",
+      "mode": "NEW",
       "owner": "KeloRender",
-      "legacy": ["engine-a.js", "engine-c.js"],
-      "contracts": ["render", "renderAvatar"],
-      "activationGate": "visual-parity"
+      "legacy": ["engine-c.js", "src/environment/gardens-landmark.js"],
+      "contracts": ["render"],
+      "activationGate": "single-writer-render-audit",
+      "authority": "single-global-wrapper",
+      "scope": "frame-orchestration-only",
+      "compatibility": "engine-c exposes KELO_LEGACY_RENDER_BRIDGE; visual extensions register through KeloRender hooks"
     },
     "simulation": {
       "mode": "LEGACY",

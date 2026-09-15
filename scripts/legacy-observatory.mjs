@@ -43,6 +43,18 @@ function scopeFor(file){ return /^(?:scripts|tests|\.github)\//.test(rel(file))?
 function count(re,text){ return [...text.matchAll(re)].length; }
 function uniq(values){ return [...new Set(values)].sort(); }
 function esc(s){ return s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'); }
+function countAuthorityWrites(key,text){
+  const tail=key.includes('.') ? key.split('.').map(esc).join('\\.') : esc(key);
+  if(key.includes('.')){
+    return count(new RegExp('(?:\\b'+tail+'\\s*=(?!=)|\\b'+tail+'\\s*(?:\\+\\+|--|\\+=|-=|\\*=|/=))','g'),text);
+  }
+  // Simple identifiers are global contracts only when assigned as a statement or explicitly through a global object.
+  // This intentionally ignores local declarations (`const render =`), destructuring/default params (`{render=true}`),
+  // object fields and other lexical variables that merely share the authority contract name.
+  const statement=new RegExp('^[\\t ]*'+tail+'\\s*(?:=(?!=)|\\+\\+|--|\\+=|-=|\\*=|/=)','gm');
+  const explicitGlobal=new RegExp('\\b(?:window|globalThis|root)\\.'+tail+'\\s*(?:=(?!=)|\\+\\+|--|\\+=|-=|\\*=|/=)','g');
+  return count(statement,text)+count(explicitGlobal,text);
+}
 function detect(file){
   const text=fs.readFileSync(file,'utf8');
   const fileName=rel(file);
@@ -54,9 +66,7 @@ function detect(file){
   const globalWrites=uniq([...text.matchAll(/\b(?:window|globalThis|root)\.([A-Za-z_$][\w$]*)\s*=(?!=)/g)].map(m=>m[1]));
   const writers=[];
   for(const key of CRITICAL_KEYS){
-    const tail=key.includes('.') ? key.split('.').map(esc).join('\\.') : esc(key);
-    const re=new RegExp('(?:\\b'+tail+'\\s*=(?!=)|\\b'+tail+'\\s*(?:\\+\\+|--|\\+=|-=|\\*=|/=))','g');
-    let n=count(re,text);
+    let n=countAuthorityWrites(key,text);
     if(key==='obstacles'){
       n+=count(new RegExp('\\bobstacles\\s*\\.\\s*(?:'+MUTATING_COLLECTION_METHODS+')\\s*\\(','g'),text);
       n+=count(/\bobstacles\s*\[[^\]]+\]\s*=(?!=)/g,text);
@@ -126,7 +136,7 @@ const routedKeys=new Set(Object.entries(routedAuthority).filter(([,v])=>v.instal
 const qaOnly=conflicts.filter(c=>!runtimeKeys.has(c.key)&&!routedKeys.has(c.key));
 if(!qaOnly.length) md.push('- None.');
 for(const c of qaOnly) md.push(`- **${c.key}**: ${c.writers.map(w=>`${w.file} (${w.count}, ${w.scope})`).join(', ')}`);
-md.push('','## Rule','A migration must not activate NEW authority while unresolved duplicate runtime writers remain for the same state key. QA/test writers are reported but do not count as runtime authority. Accessor-routed keys are removed from runtime conflict counts only when their boundary source exists; dedicated behavioral CI must certify boot order and routing semantics.');
+md.push('','## Rule','A migration must not activate NEW authority while unresolved duplicate runtime writers remain for the same state key. QA/test writers are reported but do not count as runtime authority. Accessor-routed keys are removed from runtime conflict counts only when their boundary source exists; dedicated behavioral CI must certify boot order and routing semantics. Simple identifier contracts count only statement/global-object assignments, not lexical variables with the same name.');
 fs.writeFileSync(path.join(OUT_DIR,'report.md'),md.join('\n')+'\n');
 
 console.log(JSON.stringify(summary,null,2));
