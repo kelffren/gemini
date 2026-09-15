@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "defaultMode": "LEGACY",
+  "allowedModes": ["LEGACY", "SHADOW", "NEW"],
+  "domains": {
+    "input": {
+      "mode": "LEGACY",
+      "owner": "InputSystem",
+      "legacy": ["engine-a.js", "engine-c.js"],
+      "contracts": ["processInput"],
+      "activationGate": "characterization-pass"
+    },
+    "movement": {
+      "mode": "LEGACY",
+      "owner": "MovementSystem",
+      "legacy": ["engine-a.js", "engine-c.js"],
+      "contracts": ["localPlayer.x", "localPlayer.y", "updateMovement"],
+      "activationGate": "shadow-parity"
+    },
+    "camera": {
+      "mode": "LEGACY",
+      "owner": "KeloCamera",
+      "legacy": ["engine-a.js", "engine-c.js"],
+      "contracts": ["cameraX", "cameraY"],
+      "activationGate": "shadow-parity"
+    },
+    "playerState": {
+      "mode": "LEGACY",
+      "owner": "PlayerState",
+      "legacy": ["engine-a.js", "engine-c.js"],
+      "contracts": ["localPlayer.hp", "localPlayer.maxHp"],
+      "activationGate": "single-writer"
+    },
+    "collision": {
+      "mode": "LEGACY",
+      "owner": "KELO_COLLISION",
+      "legacy": ["engine-a.js", "engine-c.js"],
+      "contracts": ["obstacles"],
+      "activationGate": "single-writer"
+    },
+    "render": {
+      "mode": "LEGACY",
+      "owner": "KeloRender",
+      "legacy": ["engine-a.js", "engine-c.js"],
+      "contracts": ["render", "renderAvatar"],
+      "activationGate": "visual-parity"
+    },
+    "simulation": {
+      "mode": "LEGACY",
+      "owner": "SimulationSystem",
+      "legacy": ["engine-a.js", "engine-c.js"],
+      "contracts": ["updateSimulation"],
+      "activationGate": "shadow-parity"
+    },
+    "world": {
+      "mode": "LEGACY",
+      "owner": "WorldSystem",
+      "legacy": ["engine-a.js", "engine-c.js"],
+      "contracts": ["worldMap"],
+      "activationGate": "world-load-baseline"
+    }
+  }
+}
