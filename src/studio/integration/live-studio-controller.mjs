@@ -9,19 +9,22 @@ import {openKeloStudioLive as openBase,closeKeloStudioLive as closeBase,getKeloS
 import {createStudioMobilePlacementGhost} from '../render/studio-mobile-placement-ghost.mjs';
 
 let ghost=null,commandUnsub=null;
+const MIN_REAL_CATALOG=5;
 const isPhone=root=>/iPhone|iPad|iPod|Android/i.test(String(root?.navigator?.userAgent||''))||Math.min(Number(root?.innerWidth)||999,Number(root?.innerHeight)||999)<=500;
 const sleep=(root,ms)=>new Promise(resolve=>(root.setTimeout||setTimeout)(resolve,ms));
 
 async function waitForRealCatalog(root){
   if(!isPhone(root)||root.KELO_WORLD_SURGERY?.enabled?.('assetCatalog')===false)return 0;
   const started=Date.now();let last=-1,stableSince=0,best=0;
-  while(Date.now()-started<8000){
+  while(Date.now()-started<10000){
     let count=0;
     try{count=Number(root.KELO_PROPERTY_CATALOG?.list?.()?.length||0);}catch{}
     best=Math.max(best,count);
-    if(count>0){
+    if(count>=MIN_REAL_CATALOG){
       if(count!==last){last=count;stableSince=Date.now();}
       else if(Date.now()-stableSince>=1800)return count;
+    }else{
+      last=count;stableSince=0;
     }
     await sleep(root,120);
   }
@@ -34,7 +37,7 @@ function syncDiagnostics(root,session){
   let catalog=0;try{catalog=Number(root.KELO_PROPERTY_CATALOG?.list?.()?.length||0);}catch{}
   el.dataset.keloEntityCount=String(entities);
   el.dataset.keloCatalogCount=String(catalog);
-  el.dataset.keloCatalogReady=catalog>0?'1':'0';
+  el.dataset.keloCatalogReady=catalog>=MIN_REAL_CATALOG?'1':'0';
 }
 
 function installDiagnostics(root,session){
@@ -61,7 +64,9 @@ function installGhost(root,session){
 
 export async function openKeloStudioLive({root=globalThis}={}){
   const catalogCount=await waitForRealCatalog(root);
-  try{root.KELO_WORLD_SURGERY?.markStatus?.('assetCatalog',catalogCount>0?'ACTIVE':'FAILED',{phase:'pre-live',count:catalogCount});}catch{}
+  const catalogReady=!isPhone(root)||root.KELO_WORLD_SURGERY?.enabled?.('assetCatalog')===false||catalogCount>=MIN_REAL_CATALOG;
+  try{root.KELO_WORLD_SURGERY?.markStatus?.('assetCatalog',catalogReady?'ACTIVE':'FAILED',{phase:'pre-live',count:catalogCount,min:MIN_REAL_CATALOG});}catch{}
+  if(!catalogReady)throw new Error(`WORLD_ASSET_CATALOG_NOT_READY:${catalogCount}`);
   const session=await openBase({root});
   installDiagnostics(root,session);
   installGhost(root,session);
