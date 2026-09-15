@@ -56,7 +56,8 @@ function createGuardianSignalRouter({guardian,now=Date.now}={}){
     prev.count++;rates.set(me,prev);if(prev.count>RATE_MAX)throw new Error('GUARDIAN_SIGNAL_RATE_LIMIT');
   }
   function requireAuth(me){if(!me?.accountId)throw new Error('GUARDIAN_SIGNAL_AUTH_REQUIRED');return actorFor(me);}
-  function bindingFor(me){const key=me?._guardianNodeKey,row=key&&bindings.get(key);if(!row||row.me!==me)throw new Error('GUARDIAN_SIGNAL_NODE_NOT_BOUND');return row;}
+  function nodeIsEnabled(row){if(!row?.me?.accountId)return false;try{return !!guardian.status(actorFor(row.me),{nodeId:row.nodeId})?.node?.enabled;}catch{return false;}}
+  function bindingFor(me){const key=me?._guardianNodeKey,row=key&&bindings.get(key);if(!row||row.me!==me)throw new Error('GUARDIAN_SIGNAL_NODE_NOT_BOUND');if(!nodeIsEnabled(row)){unbind(me,'node-disabled');throw new Error('GUARDIAN_SIGNAL_NODE_NOT_ENABLED');}return row;}
   function sessionCount(key){let n=0;for(const row of sessions.values())if(row.a===key||row.b===key)n++;return n;}
   function closeSession(id,reason='closed',notify=true){
     const row=sessions.get(id);if(!row)return false;sessions.delete(id);
@@ -87,7 +88,7 @@ function createGuardianSignalRouter({guardian,now=Date.now}={}){
     if(sessionCount(source.key)>=MAX_SESSIONS_PER_NODE)throw new Error('GUARDIAN_SIGNAL_SESSION_LIMIT');
     const region=clean(input.region||'global',48)||'global';
     const plan=guardian.planWorkload({type:'relay',region,limit:8,excludeNodeKeys:[source.key]});
-    const candidate=(plan.candidates||[]).find(row=>{const b=bindings.get(row.nodeKey);return b&&b.me!==me&&b.me.ws?.readyState===1&&sessionCount(row.nodeKey)<MAX_SESSIONS_PER_NODE;});
+    const candidate=(plan.candidates||[]).find(row=>{const b=bindings.get(row.nodeKey);return b&&b.me!==me&&b.me.ws?.readyState===1&&nodeIsEnabled(b)&&sessionCount(row.nodeKey)<MAX_SESSIONS_PER_NODE;});
     if(!candidate)throw new Error('GUARDIAN_SIGNAL_CAPACITY');
     const id=makeSessionId(++seq),at=now(),row={id,a:source.key,b:candidate.nodeKey,createdAt:at,expiresAt:at+SESSION_TTL_MS,region};sessions.set(id,row);
     const peer=bindings.get(candidate.nodeKey);
@@ -99,7 +100,7 @@ function createGuardianSignalRouter({guardian,now=Date.now}={}){
     requireAuth(me);rate(me);sweep();const source=bindingFor(me),id=String(input.sessionId||'');
     if(!SESSION_RE.test(id))throw new Error('GUARDIAN_SIGNAL_SESSION_INVALID');const row=sessions.get(id);if(!row)throw new Error('GUARDIAN_SIGNAL_SESSION_INVALID');
     if(row.a!==source.key&&row.b!==source.key)throw new Error('GUARDIAN_SIGNAL_SESSION_FORBIDDEN');
-    const targetKey=row.a===source.key?row.b:row.a,target=bindings.get(targetKey);if(!target||target.me.ws?.readyState!==1){closeSession(id,'peer-offline',false);throw new Error('GUARDIAN_SIGNAL_CAPACITY');}
+    const targetKey=row.a===source.key?row.b:row.a,target=bindings.get(targetKey);if(!target||target.me.ws?.readyState!==1||!nodeIsEnabled(target)){if(target)unbind(target.me,'node-disabled');else closeSession(id,'peer-offline',false);throw new Error('GUARDIAN_SIGNAL_CAPACITY');}
     const signal=sanitizeSignal(input.signal);row.expiresAt=now()+SESSION_TTL_MS;
     const out={t:'guardian:peer:signal',sessionId:id,peerNodeId:source.nodeId,signal,expiresAt:row.expiresAt,source:'guardian-signal-router-v1'};send(target.me,out);return Object.freeze({ok:true,sessionId:id});
   }
@@ -116,8 +117,8 @@ function createGuardianSignalRouter({guardian,now=Date.now}={}){
       return true;
     }catch(error){send(me,{t:'guardian:error',requestId:msg?.requestId||null,code:errorCode(error),source:'guardian-signal-router-v1'});return true;}
   }
-  function audit(){sweep();return Object.freeze({version:'guardian-signal-router-v1',bindings:bindings.size,sessions:sessions.size,sessionTtlMs:SESSION_TTL_MS,maxSessionsPerNode:MAX_SESSIONS_PER_NODE,singleSocket:true,gameplayAuthority:false,economyAuthority:false,pvpAuthority:false});}
-  return Object.freeze({version:'guardian-signal-router-v1',handle,bind,unbind,requestPeer,routeSignal,closeFrom,sweep,audit});
+  function audit(){sweep();return Object.freeze({version:'guardian-signal-router-v1.1',bindings:bindings.size,sessions:sessions.size,sessionTtlMs:SESSION_TTL_MS,maxSessionsPerNode:MAX_SESSIONS_PER_NODE,singleSocket:true,liveDonorRequired:true,gameplayAuthority:false,economyAuthority:false,pvpAuthority:false});}
+  return Object.freeze({version:'guardian-signal-router-v1.1',handle,bind,unbind,requestPeer,routeSignal,closeFrom,sweep,audit});
 }
 
 module.exports={createGuardianSignalRouter,sanitizeSignal};
