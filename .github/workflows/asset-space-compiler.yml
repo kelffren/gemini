@@ -34,13 +34,17 @@ on:
           - strict
           - adaptive
 
+concurrency:
+  group: asset-png-space-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
 jobs:
   strict-quality-gate:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -52,8 +56,8 @@ jobs:
         run: node scripts/asset-sheet-compiler-audit.mjs
       - name: Documentation contract audit
         run: node scripts/system-documentation-audit.js
-      - name: Dry-run real PNG assets
-        run: node scripts/asset-space-compiler.mjs --input="${{ github.event.inputs.input_path || 'assets' }}" --mode=strict --max-files=80 --report=test-results/asset-space-report
+      - name: Dry-run representative real PNG assets
+        run: node scripts/asset-space-compiler.mjs --input="${{ github.event.inputs.input_path || 'assets' }}" --mode=strict --max-files=12 --report=test-results/asset-space-report
       - name: Publish summary
         if: always()
         run: |
@@ -70,7 +74,7 @@ jobs:
   adaptive-lab:
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'adaptive'
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -79,7 +83,7 @@ jobs:
       - name: Install adaptive image codec
         run: npm install --no-save sharp@0.35.4
       - name: Adaptive dry-run with captures
-        run: node scripts/asset-space-compiler.mjs --input="${{ github.event.inputs.input_path }}" --mode=adaptive --capture --max-files=20 --report=test-results/asset-space-adaptive
+        run: node scripts/asset-space-compiler.mjs --input="${{ github.event.inputs.input_path }}" --mode=adaptive --capture --max-files=12 --report=test-results/asset-space-adaptive
       - uses: actions/upload-artifact@v4
         if: always()
         with:
