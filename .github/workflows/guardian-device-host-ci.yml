@@ -6,6 +6,7 @@ on:
       - 'server/guardian-coordinator.js'
       - 'server/guardian-device-host-smoke-test.js'
       - 'src/online/guardian-device-host.mjs'
+      - 'src/online/guardian-workload-runtime.mjs'
       - 'src/core/settings-lazy-gate.js'
       - '.github/workflows/guardian-device-host-ci.yml'
   workflow_dispatch:
@@ -25,6 +26,8 @@ jobs:
       - name: Syntax check browser modules
         run: |
           node --check src/online/guardian-device-host.mjs
+          node --check src/online/guardian-workload-runtime.mjs
           node --check src/core/settings-lazy-gate.js
-      - name: Guardian donor/master lease contract
+          node --check server/guardian-coordinator.js
+      - name: Guardian donor master workload failover contract
         run: node server/guardian-device-host-smoke-test.js
