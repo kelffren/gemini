@@ -39,6 +39,10 @@ const isolated=createIsolatedAssetWorkerClient({workerFactory:()=>new SilentWork
 let echoTerminated=false;class EchoWorker{postMessage(message){queueMicrotask(()=>this.onmessage?.({data:{id:message.id,ok:true,value:message.payload}}));}terminate(){echoTerminated=true;}}
 const echo=createIsolatedAssetWorkerClient({workerFactory:()=>new EchoWorker()});assert.deepEqual(await echo.run({hello:'world'}),{hello:'world'});assert.equal(echoTerminated,true);
 
+// Progress is advisory and must never resolve the worker job before the final ok:true envelope.
+let progressTerminated=false;class ProgressWorker{postMessage(message){queueMicrotask(()=>this.onmessage?.({data:{id:message.id,type:'progress',progress:{stage:'analyze'}}}));setTimeout(()=>this.onmessage?.({data:{id:message.id,ok:true,value:{done:true}}}),5);}terminate(){progressTerminated=true;}}
+let progressEvents=0;const progressClient=createIsolatedAssetWorkerClient({workerFactory:()=>new ProgressWorker(),defaultTimeoutMs:200});const progressResult=await progressClient.run({task:'compile-avatar'},{onProgress:event=>{assert.equal(event.stage,'analyze');progressEvents++;}});assert.deepEqual(progressResult,{done:true});assert.equal(progressEvents,1);assert.equal(progressTerminated,true);
+
 // Failed gates can never expose staged output.
 const tx=createAssetTransaction({id:'chaos'});tx.stage('asset',{secret:'not-published'});tx.gate('security',false);assert.throws(()=>tx.commit(),/ASSET_TRANSACTION_GATE_FAILED/);assert.equal(tx.state,'ROLLED_BACK');assert.deepEqual(tx.snapshot().keys,[]);
 
@@ -62,4 +66,4 @@ assert.throws(()=>assertPinnedAssetOracle({id:'seg',model:'sam',version:'latest'
 // Visual AI cannot prove usage rights; external source without an explicit declaration/license remains review-required.
 const sourceDecision=evaluateAssetSourceAttestation({sourceType:'external',sourceUri:'example',declaration:false});assert.equal(sourceDecision.pass,false);assert.ok(sourceDecision.reasons.includes('SOURCE_LICENSE_EVIDENCE_REQUIRED'));
 
-console.log(JSON.stringify({ok:true,randomCases:5000,randomRejected,contentAddressed:true,timeoutFailClosed:true,staleProtected:true,hardWorkerKill:true,transactionRollback:true,ledgerTamperDetected:true,aiSecurityAuthorityDenied:true,humanHardOverrideDenied:true,realDeviceCanary:true,modelDriftGoverned:true,sourceRightsNotGuessed:true}));
+console.log(JSON.stringify({ok:true,randomCases:5000,randomRejected,contentAddressed:true,timeoutFailClosed:true,staleProtected:true,hardWorkerKill:true,workerProgressProtocol:true,transactionRollback:true,ledgerTamperDetected:true,aiSecurityAuthorityDenied:true,humanHardOverrideDenied:true,realDeviceCanary:true,modelDriftGoverned:true,sourceRightsNotGuessed:true}));
