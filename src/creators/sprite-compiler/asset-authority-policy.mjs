@@ -4,13 +4,14 @@
  * public-api: evaluateAssetAuthority(), sanitizeAiAssetSuggestions(), ASSET_AUTHORITY_POLICY
  */
 const F=Object.freeze;
-const LOCKED_DOMAINS=F(new Set(['security','integrity','runtime','resource-budget','reproducibility','collision','portal','pivot','footprint','geometry-critical']));
-const AI_ADVISORY_DOMAINS=F(new Set(['semantics','taxonomy','tags','description','style','layers','depth','anchor-suggestion','repair-suggestion']));
-const AI_ALLOWED_KEYS=F(new Set(['categorySuggestion','tags','description','styleSuggestion','layers','depth','anchorSuggestions','repairSuggestions','rationale','confidence']));
+const LOCKED_DOMAIN_VALUES=F(['security','integrity','runtime','resource-budget','reproducibility','collision','portal','pivot','footprint','geometry-critical']);
+const AI_ADVISORY_DOMAIN_VALUES=F(['semantics','taxonomy','tags','description','style','layers','depth','anchor-suggestion','repair-suggestion']);
+const AI_ALLOWED_KEY_VALUES=F(['categorySuggestion','tags','description','styleSuggestion','layers','depth','anchorSuggestions','repairSuggestions','rationale','confidence']);
+const LOCKED_DOMAINS=new Set(LOCKED_DOMAIN_VALUES),AI_ADVISORY_DOMAINS=new Set(AI_ADVISORY_DOMAIN_VALUES),AI_ALLOWED_KEYS=new Set(AI_ALLOWED_KEY_VALUES);
 const clamp=v=>Math.max(0,Math.min(1,Number(v)||0));
 const unique=a=>[...new Set(a.filter(Boolean))];
 
-export const ASSET_AUTHORITY_POLICY=F({version:'kelo-asset-authority-v1',lockedDomains:LOCKED_DOMAINS,aiAdvisoryDomains:AI_ADVISORY_DOMAINS,principle:'AI may propose; deterministic evidence or explicit human review decides.'});
+export const ASSET_AUTHORITY_POLICY=F({version:'kelo-asset-authority-v1',lockedDomains:LOCKED_DOMAIN_VALUES,aiAdvisoryDomains:AI_ADVISORY_DOMAIN_VALUES,principle:'AI may propose; deterministic evidence or explicit human review decides.'});
 
 export function sanitizeAiAssetSuggestions(input={}){
  const output={};for(const [key,value] of Object.entries(input||{}))if(AI_ALLOWED_KEYS.has(key))output[key]=value;
