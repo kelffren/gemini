@@ -115,9 +115,14 @@
       await adminModule.installAccountAdminPanel({root:window});
     }catch(error){console.warn('[Kelo online authorization boot]',error);}
   }
-  function boot(){sync();maybeOpenDirect();void bootOnlineAuthorization();void import('./../characters/creator-avatar-runtime.mjs').then(m=>m.installCreatorAvatarRuntime({root:window})).catch(e=>console.warn('[Kelo Avatar runtime]',e));}
+  function bootSurgery(){
+    void import('./../studio/diagnostics/world-surgery-runtime.mjs?v=1')
+      .then(m=>m.installWorldSurgery({root:window}))
+      .catch(error=>console.warn('[Kelo World Surgery boot]',error));
+  }
+  function boot(){bootSurgery();sync();maybeOpenDirect();void bootOnlineAuthorization();void import('./../characters/creator-avatar-runtime.mjs').then(m=>m.installCreatorAvatarRuntime({root:window})).catch(e=>console.warn('[Kelo Avatar runtime]',e));}
   window.KELO_ADMIN_KEYS?.onChange?.(()=>{sync();maybeOpenDirect();});
-  const api=Object.freeze({version:'studio-launcher-v1.17.0-world-bridge-a10',open,openSpriteFactory:openFactory,sync,get allowed(){return allowed();},get directRequested(){return directRequested();}});
+  const api=Object.freeze({version:'studio-launcher-v1.18.0-world-surgery',open,openSpriteFactory:openFactory,sync,get allowed(){return allowed();},get directRequested(){return directRequested();}});
   window.KELO_STUDIO_LAUNCHER=api;
   window.KELO_CREATORS_LAUNCHER=api;
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
