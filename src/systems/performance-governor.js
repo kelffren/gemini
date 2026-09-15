@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: PERFORMANCE
  * owner: KELO_PERF / KELO_PERFORMANCE_GOVERNOR
- * keys: FPS FRAME P50 P95 P99 STALL LOAF VISIBILITY LIFECYCLE QUALITY GOVERNOR HOOKS NETWORK MEMORY
+ * keys: FPS FRAME P50 P95 P99 STALL LOAF VISIBILITY LIFECYCLE QUALITY GOVERNOR HOOKS NETWORK MEMORY SAMPLED-SNAPSHOT
  * purpose: mide frame-time/carga real, gobierna calidad local y publica CLIENT_HIDDEN/CLIENT_VISIBLE sin crear otro lifecycle manager
  * public-api: KELO_PERF report/culling/quality/telemetry + visibility state
  * consumes: KeloEvents, KeloSimulation, KeloRender, mobile/atlas/world/network audits
@@ -12,13 +12,14 @@
 (function (root) {
   'use strict';
 
-  const VERSION = '1.2.1';
+  const VERSION = '1.3.0-sampled-snapshots';
   const TARGET_FPS = 60;
   const TARGET_FRAME_MS = 1000 / TARGET_FPS;
   const SAMPLE_ALPHA = 0.08;
   const REPORT_TTL_MS = 750;
   const FRAME_WINDOW = 600;
   const TELEMETRY_REFRESH_MS = 500;
+  const SNAPSHOT_REFRESH_MS = 200;
 
   const WEIGHTS = Object.freeze({
     chunk: 2, staticProp: 1, animatedProp: 3, npc: 4, player: 5, mountRider: 7,
@@ -52,10 +53,14 @@
   let emaFrameMs = TARGET_FRAME_MS;
   let badMs = 0;
   let goodMs = 0;
+  let tuneElapsedMs = 0;
   let lastHudAt = 0;
   let hud = null;
   let hudEnabled = false;
   let lastSnapshot = null;
+  let lastSnapshotAt = -Infinity;
+  let snapshotBuilds = 0;
+  let snapshotSkips = 0;
 
   const loafSupported = !!(
     root.PerformanceObserver && Array.isArray(root.PerformanceObserver.supportedEntryTypes) &&
@@ -190,8 +195,18 @@
       particleCap: p.particleCap, fxCap: p.fxCap, actorCutoff: p.actorCutoff, textureMB: textureMB(), counts: Object.freeze(counts),
       simulation:sim, render:render, mobile:mobile, network:net,
       assets:atlas ? Object.freeze({loaded:Array.isArray(atlas.loaded)?atlas.loaded.length:0,decodedTextureMB:Number(atlas.decodedTextureMB)||0,residentDistrictAtlasCount:Number(atlas.residentDistrictAtlasCount)||0}) : null,
-      world:world ? Object.freeze({chunkCacheSize:Number(world.chunkCacheSize)||0,activeDistrictLabel:world.activeDistrictLabel||null}) : null
+      world:world ? Object.freeze({chunkCacheSize:Number(world.chunkCacheSize)||0,activeDistrictLabel:world.activeDistrictLabel||null}) : null,
+      snapshotRefreshMs:SNAPSHOT_REFRESH_MS,snapshotBuilds,snapshotSkips
     });
+  }
+
+  function refreshSnapshot(now,force){
+    now=Number(now)||performance.now();
+    if(!force&&lastSnapshot&&now-lastSnapshotAt<SNAPSHOT_REFRESH_MS){snapshotSkips+=1;return lastSnapshot;}
+    lastSnapshotAt=now;
+    snapshotBuilds+=1;
+    lastSnapshot=buildSnapshot(now);
+    return lastSnapshot;
   }
 
   function dispatchQualityChange(previous, next) {
@@ -233,16 +248,20 @@
   function frame(now) {
     const rawDt = now - lastFrameAt; lastFrameAt = now;
     if (!document.hidden && rawDt > 0) {
-      recordFrame(rawDt); if (rawDt < 120) emaFrameMs += (rawDt - emaFrameMs) * SAMPLE_ALPHA;
-      const snapshot = buildSnapshot(now); lastSnapshot = snapshot;
-      if (rawDt < 120) autoTune(rawDt, snapshot); updateHud(now, snapshot);
+      recordFrame(rawDt);
+      if (rawDt < 120) { emaFrameMs += (rawDt - emaFrameMs) * SAMPLE_ALPHA; tuneElapsedMs += rawDt; }
+      if (!lastSnapshot || now - lastSnapshotAt >= SNAPSHOT_REFRESH_MS) {
+        const snapshot = refreshSnapshot(now,true);
+        if (tuneElapsedMs > 0) { autoTune(tuneElapsedMs, snapshot); tuneElapsedMs = 0; }
+        updateHud(now, snapshot);
+      } else snapshotSkips += 1;
     }
     root.requestAnimationFrame(frame);
   }
 
   function reportVisible(kind, count) { if (!kind) return; reported.set(String(kind), { count: Math.max(0, Number(count) || 0), at: performance.now() }); }
   function canSpawn(kind, count) {
-    const p = profile(), n = Math.max(1, Number(count) || 1), snapshot = lastSnapshot || buildSnapshot(performance.now());
+    const p = profile(), n = Math.max(1, Number(count) || 1), snapshot = refreshSnapshot(performance.now(),false);
     if (kind === 'particle' && (snapshot.counts.particle || 0) + n > p.particleCap) return false;
     if ((kind === 'simpleFx' || kind === 'complexFx') && ((snapshot.counts.simpleFx || 0) + (snapshot.counts.complexFx || 0) + n > p.fxCap)) return false;
     return snapshot.weightedCost + (WEIGHTS[kind] || 1) * n <= p.weightedBudget;
@@ -264,11 +283,11 @@
     const previous = profile(); manualProfile = found.id; dispatchQualityChange(previous, found); return found.id;
   }
   function toggleHUD(force) { hudEnabled = typeof force === 'boolean' ? force : !hudEnabled; ensureHud(); if (hud) hud.style.display = hudEnabled ? 'block' : 'none'; try { localStorage.setItem('kelo_perf_hud', hudEnabled ? '1' : '0'); } catch (e) {} return hudEnabled; }
-  function getSnapshot() { return lastSnapshot || buildSnapshot(performance.now()); }
+  function getSnapshot() { return refreshSnapshot(performance.now(),false); }
   function getFrameTelemetry() { const stats = refreshFrameStats(performance.now(), true); return Object.freeze({ ...stats, visibilityResets, visibilityChanges, loafSupported, loafCount, worstLoafMs, recentLoafs }); }
 
   function publishVisibility() {
-    visibilityChanges += 1; lastFrameAt = performance.now();
+    visibilityChanges += 1; lastFrameAt = performance.now(); tuneElapsedMs = 0;
     if (!document.hidden) visibilityResets += 1;
     const name = document.hidden ? 'CLIENT_HIDDEN' : 'CLIENT_VISIBLE';
     const payload = Object.freeze({hidden:document.hidden===true,at:Date.now(),source:'KELO_PERF'});
@@ -277,7 +296,7 @@
   }
 
   const api = Object.freeze({
-    version: VERSION, targetFps: TARGET_FPS, targetFrameMs: TARGET_FRAME_MS, frameWindow: FRAME_WINDOW, weights: WEIGHTS, profiles: PROFILES,
+    version: VERSION, targetFps: TARGET_FPS, targetFrameMs: TARGET_FRAME_MS, frameWindow: FRAME_WINDOW, snapshotRefreshMs:SNAPSHOT_REFRESH_MS, weights: WEIGHTS, profiles: PROFILES,
     reportVisible, canSpawn, getAnimationHz, shouldUpdate, forgetUpdateKey, shouldRenderActor,
     registerTexture, unregisterTexture, setManualQuality, toggleHUD, getSnapshot, getFrameTelemetry,
     get visible(){return document.hidden!==true;}, get profile() { return profile(); }
