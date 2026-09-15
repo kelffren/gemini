@@ -113,11 +113,11 @@
       sync();maybeOpenDirect();
     }catch(error){console.warn('[Kelo online permissions boot]',error);}
     try{
-      const adminModule=await import('./account-admin-panel.mjs?v=2');
+      const adminModule=await import('./account-admin-panel.mjs?v=3');
       await adminModule.installAccountAdminPanel({root:window});
     }catch(error){console.warn('[Kelo admin panel boot]',error);}
     try{
-      const liveModule=await import('./../auth/account-live-control-runtime.mjs?v=1');
+      const liveModule=await import('./../auth/account-live-control-runtime.mjs?v=2');
       await liveModule.installAccountLiveControl({root:window});
     }catch(error){console.warn('[Kelo account live control boot]',error);}
   }
@@ -128,7 +128,7 @@
   }
   function boot(){bootSurgery();sync();maybeOpenDirect();void bootOnlineAuthorization();void import('./../characters/creator-avatar-runtime.mjs').then(m=>m.installCreatorAvatarRuntime({root:window})).catch(e=>console.warn('[Kelo Avatar runtime]',e));}
   window.KELO_ADMIN_KEYS?.onChange?.(()=>{sync();maybeOpenDirect();});
-  const api=Object.freeze({version:'studio-launcher-v1.19.0-gm-live-control',open,openSpriteFactory:openFactory,sync,get allowed(){return allowed();},get directRequested(){return directRequested();}});
+  const api=Object.freeze({version:'studio-launcher-v1.19.1-gm-live-control',open,openSpriteFactory:openFactory,sync,get allowed(){return allowed();},get directRequested(){return directRequested();}});
   window.KELO_STUDIO_LAUNCHER=api;
   window.KELO_CREATORS_LAUNCHER=api;
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
