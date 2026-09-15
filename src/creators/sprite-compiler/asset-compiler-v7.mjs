@@ -15,3 +15,6 @@ export {auditTemporalConsistency,detectAiAssetDefects,attachAssetProvenance,fuzz
 export {ASSET_AUTHORITY_POLICY,evaluateAssetAuthority,sanitizeAiAssetSuggestions} from './asset-authority-policy.mjs';
 export {buildAssetReleaseEvidence,verifyAssetRelease,verifyReproducibleAssetOutputs} from './asset-release-verifier.mjs';
 export {createAssetVerificationLedger,verifyAssetVerificationLedger} from './asset-verification-ledger.mjs';
+export {ASSET_BACKEND_TRUST,normalizeAssetBackend,createAssetBackendRegistry,chooseAssetBackend} from './asset-backend-contract.mjs';
+export {createAssetReviewPacket,resolveAssetReviewPacket} from './asset-human-review.mjs';
+export {normalizeRuntimeSample,evaluateRuntimeCanary} from './asset-runtime-canary.mjs';
