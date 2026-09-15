@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "defaultMode": "LEGACY",
   "allowedModes": ["LEGACY", "SHADOW", "NEW"],
   "domains": {
@@ -51,6 +51,15 @@
       "legacy": ["engine-a.js", "engine-c.js"],
       "contracts": ["updateSimulation"],
       "activationGate": "shadow-parity"
+    },
+    "simulationFarmTick": {
+      "mode": "SHADOW",
+      "owner": "SimulationFarmShadow",
+      "legacy": ["engine-c.js"],
+      "contracts": ["STATE.farm.coop.ready", "STATE.silo.eggs", "STATE.farm.pen.ready", "STATE.silo.pork"],
+      "activationGate": "shadow-parity",
+      "authority": "legacy-only",
+      "shadowEvidence": "KELO_SIMULATION_FARM_SHADOW_AUDIT"
     },
     "world": {
       "mode": "LEGACY",
