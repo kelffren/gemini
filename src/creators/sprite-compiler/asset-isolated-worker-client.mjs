@@ -10,15 +10,17 @@ export function createIsolatedAssetWorkerClient({workerFactory,defaultTimeoutMs=
  async function run(payload,{timeoutMs=defaultTimeoutMs,signal=null,transfer=[],onProgress=null}={}){
    const id=++sequence,worker=workerFactory(),deadline=Math.max(100,Number(timeoutMs)||defaultTimeoutMs);if(!worker||typeof worker.postMessage!=='function'||typeof worker.terminate!=='function')throw new Error('ASSET_WORKER_INVALID');
    return new Promise((resolve,reject)=>{
-     let settled=false;const finish=(fn,value)=>{if(settled)return;settled=true;clearTimeout(timer);signal?.removeEventListener?.('abort',abort);active.delete(id);try{worker.terminate();}catch{}fn(value);};
+     let settled=false,timer=null;
+     const finish=(fn,value)=>{if(settled)return;settled=true;if(timer)clearTimeout(timer);signal?.removeEventListener?.('abort',abort);active.delete(id);try{worker.terminate();}catch{}fn(value);};
      const abort=()=>finish(reject,new Error(`ASSET_WORKER_ABORTED:${String(signal?.reason||'external')}`));
-     const timer=setTimeout(()=>finish(reject,new Error('ASSET_WORKER_HARD_TIMEOUT')),deadline);active.set(id,worker);
+     const cancel=reason=>finish(reject,new Error(`ASSET_WORKER_TERMINATED:${String(reason||'manual')}`));
+     timer=setTimeout(()=>finish(reject,new Error('ASSET_WORKER_HARD_TIMEOUT')),deadline);active.set(id,F({worker,cancel}));
      worker.onmessage=event=>{const message=event?.data||{};if(message.id!==id)return;if(message.type==='progress'){try{onProgress?.(message.progress);}catch{}return;}if(message.ok===false)return finish(reject,errorFrom(message.error?.code||message.error?.message||'ASSET_WORKER_TASK_FAILED'));if(message.ok!==true)return;finish(resolve,message.value);};
      worker.onerror=event=>finish(reject,errorFrom(event?.message||'ASSET_WORKER_RUNTIME_ERROR'));
      if(signal?.aborted)return abort();signal?.addEventListener?.('abort',abort,{once:true});
      try{worker.postMessage({id,payload},transfer);}catch(error){finish(reject,error);}
    });
  }
- function terminateAll(reason='manual'){for(const [id,worker] of active){try{worker.terminate();}catch{}active.delete(id);}return F({terminated:true,reason:String(reason)});}
+ function terminateAll(reason='manual'){const entries=[...active.values()];for(const entry of entries)entry.cancel(reason);return F({terminated:entries.length,reason:String(reason)});}
  return F({run,terminateAll,get activeCount(){return active.size;}});
 }
