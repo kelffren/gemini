@@ -39,9 +39,9 @@ const artifactDir=path.resolve(args.artifacts||process.env.KELO_RECOVERY_ARTIFAC
 fs.mkdirSync(artifactDir,{recursive:true});
 
 const report={
-  schema:4,profile,base,startedAt:new Date().toISOString(),gitHead:null,result:'RUNNING',reason:null,
+  schema:5,profile,base,startedAt:new Date().toISOString(),gitHead:null,result:'RUNNING',reason:null,
   steps:[],console:[],pageErrors:[],requestFailures:[],httpErrors:[],crashed:false,recovery:null,trace:null,
-  compatibility:{worldProbe:null,authBridge:null,creatorHub:null}
+  compatibility:{worldProbe:null,authBridge:null,creatorHub:null,aclBridge:null}
 };
 try{report.gitHead=(await import('node:child_process')).execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();}catch{}
 const shortHead=()=>String(report.gitHead||'unknown').slice(0,12);
@@ -182,6 +182,52 @@ async function bridgeHistoricalAccess(){
   step('CREATOR_HUB_READY',{mode:report.compatibility.creatorHub});
 }
 
+async function installForensicWorldAclBridge(){
+  const state=await page.evaluate(()=>{
+    const keys=window.KELO_ADMIN_KEYS;
+    const result={keys:!!keys,can:typeof keys?.can==='function',method:null,worldEditReady:!!window.KELO_WORLD_EDIT?.ready,inputLocks:!!window.KeloInputLocks?.acquire&&!!window.KeloInputLocks?.release};
+    if(!keys||typeof keys.can!=='function')return result;
+    const original=keys.can.bind(keys);
+    const forensicCan=(capability,...rest)=>String(capability)==='world.edit'?true:original(capability,...rest);
+    try{
+      keys.can=forensicCan;
+      if(keys.can('world.edit','forensic_probe')){result.method='method-override';return result;}
+    }catch(error){result.methodError=String(error?.message||error);}
+    try{
+      const proxy=new Proxy(keys,{get(target,prop,receiver){if(prop==='can')return forensicCan;return Reflect.get(target,prop,receiver);}});
+      window.KELO_ADMIN_KEYS=proxy;
+      if(window.KELO_ADMIN_KEYS?.can?.('world.edit','forensic_probe')){result.method='global-proxy';return result;}
+    }catch(error){result.proxyError=String(error?.message||error);}
+    return result;
+  });
+  report.compatibility.aclBridge=state.method||'failed';
+  step('FORENSIC_ACL_BRIDGE',state);
+  if(!state.method)throw new Error(`FORENSIC_WORLD_EDIT_PERMISSION_SHIM_FAILED:${JSON.stringify(state)}`);
+  return state;
+}
+
+async function openWorldDirectForensic(){
+  const preflight=await installForensicWorldAclBridge();
+  report.compatibility.worldProbe='forensic-direct-entrypoint';
+  step('WORLD_FORENSIC_DIRECT_START',preflight);
+  await page.evaluate(()=>{
+    window.__KELO_FORENSIC_WORLD_OPEN__={startedAt:performance.now(),phase:'import',done:false,error:null};
+    Promise.resolve()
+      .then(()=>import('./src/creators/ui/creator-hub.mjs'))
+      .then(mod=>{try{mod.closeCreatorHub?.();}catch{}return import('./src/studio/integration/live-studio-controller.mjs');})
+      .then(mod=>{
+        const marker=window.__KELO_FORENSIC_WORLD_OPEN__;
+        marker.phase='open';
+        if(typeof mod.openKeloStudioLive!=='function')throw new Error('OPEN_KELO_STUDIO_LIVE_MISSING');
+        return mod.openKeloStudioLive({root:window});
+      })
+      .then(()=>{const marker=window.__KELO_FORENSIC_WORLD_OPEN__;marker.phase='done';marker.done=true;})
+      .catch(error=>{const marker=window.__KELO_FORENSIC_WORLD_OPEN__;marker.phase='error';marker.done=true;marker.error=String(error?.stack||error?.message||error);});
+    return true;
+  });
+  step('WORLD_FORENSIC_DIRECT_DISPATCHED');
+}
+
 async function worldCheck({navigate=true}={}){
   if(navigate){
     const url=targetUrl({creators:'1',recoveryFlow:'world-open',bug:'BUG-0003',freezeLab:'1'});
@@ -191,20 +237,33 @@ async function worldCheck({navigate=true}={}){
 
   await bridgeHistoricalAccess();
 
-  // Compatibility is explicit, not permissive: modern World uses data-workspace,
-  // historical Creator Hub (including the Paint Copies boundary) used aria-label="Abrir World".
+  // Prefer the real user path when the current/historical ACL exposes it. When the
+  // historical card is NO ACCESS, bypass only world.edit inside this isolated probe
+  // and call the exact Studio entrypoint. That keeps ACL out of the regression variable.
   const world=page.locator('[data-workspace="world"], [aria-label="Abrir World"]').first();
-  await world.waitFor({state:'visible',timeout:18000});
-  const variant=await world.evaluate(el=>el.matches('[data-workspace="world"]')?'modern':'legacy-aria');
-  report.compatibility.worldProbe=variant;
-  step('WORLD_CARD_FOUND',{variant});
+  const actionable=await world.isVisible({timeout:2200}).catch(()=>false);
+  let variant='';
+  if(actionable){
+    variant=await world.evaluate(el=>el.matches('[data-workspace="world"]')?'modern':'legacy-aria');
+    report.compatibility.worldProbe=variant;
+    step('WORLD_CARD_FOUND',{variant});
+    await world.click({timeout:5000,force:true,noWaitAfter:true});
+    step('WORLD_TAP',{variant});
+  }else{
+    variant='legacy-direct';
+    step('WORLD_CARD_NOT_ACTIONABLE',{reason:'historical-acl-or-no-button'});
+    await openWorldDirectForensic();
+  }
 
-  // Locator click is bounded from the Node/Playwright side. Do not page.evaluate(click)
-  // here: the historical regression can monopolize the page main thread during the click path.
-  await world.click({timeout:5000,force:true,noWaitAfter:true});
-  step('WORLD_TAP',{variant});
-
-  await page.waitForSelector('#kelo-studio-live',{state:'attached',timeout:8000});
+  try{
+    await page.waitForSelector('#kelo-studio-live',{state:'attached',timeout:10000});
+  }catch(error){
+    let marker=null;
+    try{marker=await page.evaluate(()=>window.__KELO_FORENSIC_WORLD_OPEN__||null);}catch{}
+    step('WORLD_SHELL_MOUNT_FAILED',{variant,marker});
+    if(marker?.error)throw new Error(`WORLD_DIRECT_OPEN_ERROR:${marker.error}`);
+    throw error;
+  }
   step('WORLD_SHELL_MOUNTED',{variant});
 
   // Preserve the modern readiness contract. For legacy commits, use the status text
@@ -227,7 +286,8 @@ async function worldCheck({navigate=true}={}){
       variant:probeVariant,
       loading:live?.dataset?.keloWorldLoading||null,
       status:String(live?.querySelector('.ks-status')?.textContent||'').trim(),
-      buttons:live?.querySelectorAll('button')?.length||0
+      buttons:live?.querySelectorAll('button')?.length||0,
+      direct:window.__KELO_FORENSIC_WORLD_OPEN__||null
     };
   },{probeVariant:variant});
   step('WORLD_READY',ready);
