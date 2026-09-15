@@ -1,25 +1,26 @@
 /* KELO-INDEX
  * area: CORE / SIMULATION
  * owner: KeloSimulation
- * keys: SIMULATION UPDATE HOOK BEFORE AFTER EXTENSION FOUNDATION SLEEP WAKE LIFECYCLE
- * purpose: único bridge de extensión alrededor de updateSimulation tras engine-c mientras el core legacy siga global
+ * keys: SIMULATION UPDATE HOOK BEFORE AFTER EXTENSION FOUNDATION SLEEP WAKE LIFECYCLE OWNER
+ * purpose: único owner global de updateSimulation; ejecuta la simulación base legacy y extensiones ordenadas sin wrappers paralelos
  * public-api: KeloSimulation.before/after/setEnabled/unregister/snapshot
- * consumes: updateSimulation legacy final de engine-c
+ * consumes: updateSimulation base de engine-a + KELO_LEGACY_SIMULATION_BRIDGE de engine-c
  * state-owned: registro ordenado + estado enabled/sleeping de extensiones simulation
  * extension-points: before/after con prioridad explícita y suspensión idempotente
  * reuse: timers gameplay existentes, interpolación net y updates de sistemas sin envolver updateSimulation
- * legacy: bridge temporal; la simulación base sigue viviendo en engine-a/engine-c
- * do-not: NO crear otro game loop, NO renderizar, NO meter UI
+ * legacy: la simulación base sigue en engine-a; engine-c aporta augmentación mediante bridge sin reasignar el global
+ * do-not: NO crear otro game loop, NO envolver updateSimulation fuera de este owner, NO renderizar, NO meter UI
  */
 (function(root){
   'use strict';
   if(root.KeloSimulation)return;
-  const VERSION='kelo-simulation-extensions-v1.2.0';
+  const VERSION='kelo-simulation-extensions-v1.3.0';
   if(typeof updateSimulation!=='function'){
     root.KELO_SIMULATION_EXTENSION_AUDIT=Object.freeze({version:VERSION,installed:false,reason:'updateSimulation-missing'});
     return;
   }
   const originalUpdateSimulation=updateSimulation;
+  const legacyBridge=root.KELO_LEGACY_SIMULATION_BRIDGE||null;
   const hooks={before:[],after:[]};
   const active={before:[],after:[]};
   let sequence=1;
@@ -70,14 +71,16 @@
   function snapshot(){
     const before=publicList('before'),after=publicList('after');
     const all=before.concat(after),enabled=all.filter(function(h){return h.enabled;}).length;
-    return Object.freeze({version:VERSION,before:before,after:after,registered:all.length,enabled:enabled,sleeping:all.length-enabled});
+    return Object.freeze({version:VERSION,before:before,after:after,registered:all.length,enabled:enabled,sleeping:all.length-enabled,legacyBridge:!!legacyBridge});
   }
 
-  // FOUNDATION-ALLOW: único bridge autorizado alrededor de updateSimulation tras engine-c.
+  // FOUNDATION-ALLOW: única asignación runtime autorizada de updateSimulation después del bootstrap base de engine-a.
   updateSimulation=function(dt){
     const context={dt:Number(dt)||0,player:typeof localPlayer!=='undefined'?localPlayer:null,state:typeof STATE!=='undefined'?STATE:null};
     runPhase('before',context);
+    if(legacyBridge&&typeof legacyBridge.before==='function')legacyBridge.before(context);
     const out=originalUpdateSimulation.apply(this,arguments);
+    if(legacyBridge&&typeof legacyBridge.after==='function')legacyBridge.after(context);
     runPhase('after',context);
     return out;
   };
@@ -90,5 +93,5 @@
     unregister:unregister,
     snapshot:snapshot
   });
-  root.KELO_SIMULATION_EXTENSION_AUDIT=Object.freeze({version:VERSION,installed:true,singleLegacyWrapper:true,beforeAfter:true,sleepWake:true,activeListCached:true,timers:0,renderAuthority:false,legacyTarget:'updateSimulation'});
+  root.KELO_SIMULATION_EXTENSION_AUDIT=Object.freeze({version:VERSION,installed:true,singleGlobalWriter:true,legacyAugmentBridge:!!legacyBridge,beforeAfter:true,sleepWake:true,activeListCached:true,timers:0,renderAuthority:false,baseTarget:'engine-a:updateSimulation'});
 })(typeof globalThis!=='undefined'?globalThis:window);

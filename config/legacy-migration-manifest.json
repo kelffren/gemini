@@ -1,5 +1,5 @@
 {
-  "version": 5,
+  "version": 6,
   "defaultMode": "LEGACY",
   "allowedModes": ["LEGACY", "SHADOW", "NEW"],
   "domains": {
@@ -73,9 +73,17 @@
     "simulation": {
       "mode": "LEGACY",
       "owner": "SimulationSystem",
-      "legacy": ["engine-a.js", "engine-c.js"],
+      "legacy": ["engine-a.js"],
+      "contracts": ["simulationBase.legacy"],
+      "activationGate": "slice-migration"
+    },
+    "simulationLoopOwner": {
+      "mode": "NEW",
+      "owner": "SimulationSystem",
+      "legacy": ["engine-c.js"],
       "contracts": ["updateSimulation"],
-      "activationGate": "shadow-parity"
+      "activationGate": "single-writer-audit",
+      "authority": "single-global-wrapper"
     },
     "simulationFarmTick": {
       "mode": "SHADOW",
