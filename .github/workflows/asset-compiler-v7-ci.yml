@@ -7,7 +7,9 @@ on:
       - 'src/creators/sprite-compiler/sprite-exact-canvas.mjs'
       - 'src/creators/avatar/avatar-quick-import-service.mjs'
       - 'src/creators/avatar/raw-image-intent-gate.mjs'
+      - 'src/creators/avatar/raw-single-frame-analysis.mjs'
       - 'src/creators/avatar/kelo-universal-asset-compiler.mjs'
+      - 'src/creators/ui/avatar-frame-surgery-workspace.mjs'
       - 'scripts/asset-compiler-v7-audit.mjs'
       - 'scripts/asset-compiler-chaos-audit.mjs'
       - '.github/workflows/asset-compiler-v7-ci.yml'
@@ -18,7 +20,9 @@ on:
       - 'src/creators/sprite-compiler/sprite-exact-canvas.mjs'
       - 'src/creators/avatar/avatar-quick-import-service.mjs'
       - 'src/creators/avatar/raw-image-intent-gate.mjs'
+      - 'src/creators/avatar/raw-single-frame-analysis.mjs'
       - 'src/creators/avatar/kelo-universal-asset-compiler.mjs'
+      - 'src/creators/ui/avatar-frame-surgery-workspace.mjs'
       - 'scripts/asset-compiler-v7-audit.mjs'
       - 'scripts/asset-compiler-chaos-audit.mjs'
       - '.github/workflows/asset-compiler-v7-ci.yml'
@@ -38,9 +42,11 @@ jobs:
       - name: Syntax-check production isolation path
         run: |
           node --check src/creators/avatar/avatar-quick-import-service.mjs
+          node --check src/creators/ui/avatar-frame-surgery-workspace.mjs
           node --check src/creators/sprite-compiler/asset-universal-compiler-worker.mjs
           node --check src/creators/sprite-compiler/asset-worker-canvas-root.mjs
           node --check src/creators/sprite-compiler/asset-isolated-worker-client.mjs
+          node --check src/creators/sprite-compiler/asset-release-verifier.mjs
       - name: Deterministic V7 audit
         run: node scripts/asset-compiler-v7-audit.mjs
       - name: Adversarial chaos audit
