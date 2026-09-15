@@ -1,5 +1,5 @@
 {
-  "version": 4,
+  "version": 5,
   "defaultMode": "LEGACY",
   "allowedModes": ["LEGACY", "SHADOW", "NEW"],
   "domains": {
@@ -53,6 +53,14 @@
       "legacy": ["src/environment/generic-prefabs.js", "src/environment/luxe-kiosk-atlas.js"],
       "contracts": ["collisionOwner.environment:generic-prefabs"],
       "activationGate": "owner-registry-audit",
+      "authority": "collision-owner-registry"
+    },
+    "collisionLegacyMutators": {
+      "mode": "NEW",
+      "owner": "KELO_COLLISION",
+      "legacy": ["engine-ae.js", "engine-aj.js", "engine-l.js"],
+      "contracts": ["collisionMutation.registry-only"],
+      "activationGate": "single-bootstrap-writer-audit",
       "authority": "collision-owner-registry"
     },
     "render": {
