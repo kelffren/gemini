@@ -35,6 +35,9 @@ jobs:
       - name: Legacy transition bridge
         run: node scripts/legacy-transition-bridge-audit.mjs
 
+      - name: Reproducible builds
+        run: node scripts/reproducible-build-audit.mjs
+
       - name: Foundation architecture audit
         run: node scripts/foundation-architecture-audit.js
 
