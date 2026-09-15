@@ -7,13 +7,6 @@ const page=await context.newPage();
 const pageErrors=[];
 page.on('pageerror',e=>pageErrors.push(String(e?.stack||e?.message||e)));
 
-const visible=el=>{
-  if(!el)return false;
-  const r=el.getBoundingClientRect();
-  const s=getComputedStyle(el);
-  return r.width>1&&r.height>1&&s.display!=='none'&&s.visibility!=='hidden'&&s.opacity!=='0';
-};
-
 try{
   await page.goto(`${BASE}?guest=1&offline=1&mapEditor=1&convergence=${Date.now()}`,{waitUntil:'domcontentloaded',timeout:30000});
   await page.waitForTimeout(1000);
@@ -51,10 +44,8 @@ try{
   await page.evaluate(()=>{
     const root=document.querySelector('#kelo-studio-live');
     if(!root)return;
-    const hasVisibleAsset=[...root.querySelectorAll('[data-asset]')].some(el=>{
-      const r=el.getBoundingClientRect(),s=getComputedStyle(el);return r.width>1&&r.height>1&&s.display!=='none'&&s.visibility!=='hidden';
-    });
-    if(hasVisibleAsset)return;
+    const isVisible=el=>{const r=el.getBoundingClientRect(),s=getComputedStyle(el);return r.width>1&&r.height>1&&s.display!=='none'&&s.visibility!=='hidden';};
+    if([...root.querySelectorAll('[data-asset]')].some(isVisible))return;
     const controls=[...root.querySelectorAll('button,[role="button"]')];
     const target=root.querySelector('[data-act="edit-assets"]')||root.querySelector('[data-pane="assets"]')||controls.find(el=>/asset/i.test(el.textContent||''));
     target?.click?.();
@@ -85,10 +76,7 @@ try{
   });
   if(!assetInfo?.id)throw new Error('CONVERGENCE_ASSET_ROW_MISSING');
 
-  // Give async thumbnail acquisition a short chance before requiring real pixels.
-  if(!assetInfo.painted){
-    await page.waitForTimeout(1200);
-  }
+  if(!assetInfo.painted)await page.waitForTimeout(1200);
   const previewPainted=await page.evaluate(()=>{
     const root=document.querySelector('#kelo-studio-live');
     const row=[...root.querySelectorAll('[data-asset]')].find(el=>{const r=el.getBoundingClientRect(),s=getComputedStyle(el);return r.width>1&&r.height>1&&s.display!=='none'&&s.visibility!=='hidden';});
@@ -104,8 +92,13 @@ try{
     status:document.querySelector('#kelo-studio-live .ks-status')?.textContent||''
   }));
 
-  const row=page.locator('#kelo-studio-live [data-asset]').filter({visible:true}).first();
-  await row.click();
+  const assetClicked=await page.evaluate(()=>{
+    const root=document.querySelector('#kelo-studio-live');
+    const row=[...root.querySelectorAll('[data-asset]')].find(el=>{const r=el.getBoundingClientRect(),s=getComputedStyle(el);return r.width>1&&r.height>1&&s.display!=='none'&&s.visibility!=='hidden';});
+    row?.click?.();return !!row;
+  });
+  if(!assetClicked)throw new Error('CONVERGENCE_ASSET_CLICK_FAILED');
+
   const canvas=page.locator('#game-canvas');
   const box=await canvas.boundingBox();
   if(!box)throw new Error('CONVERGENCE_GAME_CANVAS_MISSING');
