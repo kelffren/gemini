@@ -1,17 +1,18 @@
 /* KELO-INDEX
  * area: CREATORS / ASSET BYTES
  * owner: Kelo Creator Asset Bridge
- * keys: PNG ADAPTIVE PALETTE QUALITY AGENT SHARP PIXEL ART ICC METADATA
- * purpose: search near-lossless PNG palette candidates and keep only candidates approved by the deterministic quality agent
+ * keys: PNG ADAPTIVE PALETTE QUALITY AGENT SHARP PIXEL ART ICC METADATA PROFILE
+ * purpose: search near-lossless PNG palette candidates using an asset-specific quality policy and retain only approved candidates
  * public-api: optimizePngAdaptive()
  * state-owned: none
  * online: N/A; creator/build-time capability only
- * consumes: png-space-optimizer.mjs, png-quality-agent.mjs, optional sharp dependency
+ * consumes: png-space-optimizer.mjs, png-quality-agent.mjs, asset-image-profiler.mjs, optional sharp dependency
  * do-not: resize, resample, change dimensions, silently alter alpha/color metadata, or bypass quality gates
  */
 
 import {decodePngRgba, optimizePngLossless} from './png-space-optimizer.mjs';
 import {evaluatePixelFidelity, judgePixelFidelity} from './png-quality-agent.mjs';
+import {profileAssetImage} from './asset-image-profiler.mjs';
 
 async function loadSharp() {
   try {
@@ -23,20 +24,16 @@ async function loadSharp() {
   }
 }
 
-function defaultProfiles() {
-  return [
-    {colours:256, dither:0},
-    {colours:224, dither:0},
-    {colours:192, dither:0},
-    {colours:160, dither:0},
-    {colours:128, dither:0},
-    {colours:112, dither:0},
-    {colours:96, dither:0},
-    {colours:80, dither:0},
-    {colours:64, dither:0},
-    {colours:48, dither:0},
-    {colours:32, dither:0}
-  ];
+function searchProfiles(assetProfile) {
+  const unique = assetProfile?.metrics?.uniqueColors || 4097;
+  const targets = unique <= 32
+    ? [32, 24, 16]
+    : unique <= 64
+      ? [64, 48, 40, 32]
+      : unique <= 128
+        ? [128, 112, 96, 80, 64]
+        : [256, 224, 192, 160, 128, 112, 96, 80, 64, 48, 32];
+  return targets.map(colours => ({colours, dither:0}));
 }
 
 async function decodeWithSharp(sharp, buffer) {
@@ -52,8 +49,14 @@ export async function optimizePngAdaptive(buffer, options = {}) {
   const sourcePng = decodePngRgba(buffer);
   const sharp = await loadSharp();
   const originalVisual = await decodeWithSharp(sharp, buffer);
-  const profiles = options.profiles || defaultProfiles();
-  const qualityPolicy = options.qualityPolicy || 'pixel-art';
+  const assetProfile = options.assetProfile || profileAssetImage(
+    originalVisual.rgba,
+    originalVisual.width,
+    originalVisual.height,
+    {sourceName:options.sourceName || ''}
+  );
+  const profiles = options.profiles || searchProfiles(assetProfile);
+  const qualityPolicy = options.qualityPolicy || assetProfile.adaptivePolicy || 'balanced';
   const qualityLimits = options.qualityLimits || {};
   const candidates = [];
 
@@ -83,7 +86,6 @@ export async function optimizePngAdaptive(buffer, options = {}) {
       continue;
     }
 
-    // Tighten every adaptive candidate losslessly after quantization.
     const tightened = optimizePngLossless(generated, options.losslessOptions);
     const candidateBuffer = tightened.buffer;
     const decoded = await decodeWithSharp(sharp, candidateBuffer);
@@ -135,7 +137,11 @@ export async function optimizePngAdaptive(buffer, options = {}) {
       alphaChangedRatio:0,
       alphaMaxDelta:0,
       edgeMae:0,
-      largeDeltaRatio:0
+      largeDeltaRatio:0,
+      borderChangedPixels:0,
+      borderChangedRatio:0,
+      borderMeanAbsRgb:0,
+      borderMaxRgbDelta:0
     }
   };
 
@@ -153,6 +159,8 @@ export async function optimizePngAdaptive(buffer, options = {}) {
       optimizedBytes:winner.bytes,
       savedBytes,
       savedPercent:Number(savedPercent.toFixed(3)),
+      assetProfile,
+      qualityPolicy,
       winner:{
         label:winner.label,
         bytes:winner.bytes,
