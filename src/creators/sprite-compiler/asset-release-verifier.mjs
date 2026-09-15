@@ -15,7 +15,7 @@ export function buildAssetReleaseEvidence({input=null,compiled=null,budget=null,
  if(regression)evidence.push(F({id:'visual-regression',domain:'integrity',source:'deterministic',authoritative:true,pass:regression.pass===true,reason:'VISUAL_REGRESSION_FAILED',details:regression}));
  if(temporal)evidence.push(F({id:'temporal-consistency',domain:'geometry-critical',source:'deterministic',authoritative:true,pass:temporal.pass===true&&temporal.status!=='REVIEW_REQUIRED',reason:'TEMPORAL_CONSISTENCY_FAILED',details:temporal}));
  if(canary)evidence.push(F({id:'runtime-canary',domain:'runtime',source:'deterministic',authoritative:true,pass:canary.pass===true&&canary.status==='PASSED',reason:'CANARY_RUNTIME_GATE_FAILED',details:canary}));
- if(defects){const blocking=(defects.defects||[]).filter(x=>x.severity==='blocking'||Number(x.score)>=.9);evidence.push(F({id:'ai-defect-scan',domain:'integrity',source:'deterministic',authoritative:true,pass:blocking.length===0,reason:'BLOCKING_ASSET_DEFECT',details:{blocking}}));}
+ if(defects){const flagged=(defects.defects||[]).filter(x=>x.severity==='blocking'||Number(x.score)>=.9),confidence=flagged.reduce((max,x)=>Math.max(max,Number(x.score)||0),0);evidence.push(F({id:'ai-defect-scan',domain:'integrity',source:'ai',authoritative:false,pass:flagged.length?false:null,confidence,reason:'AI_ASSET_DEFECT_WARNING',details:{flagged,authority:'ADVISORY_ONLY'}}));}
  if(aiSuggestions){const advice=sanitizeAiAssetSuggestions(aiSuggestions);evidence.push(F({id:'ai-advice',domain:'semantics',source:'ai',authoritative:false,pass:null,confidence:Number(aiSuggestions.confidence)||0,details:advice}));}
  return F(evidence);
 }
