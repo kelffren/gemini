@@ -1,6 +1,6 @@
 # Kelo World — Code Index
 
-**Actualizado:** 2026-09-14
+**Actualizado:** 2026-09-15
 
 ## Runtime
 
@@ -20,6 +20,7 @@
 - `src/core/render-extension-system.js` — `KeloRender`.
 - `src/core/simulation-extension-system.js` — `KeloSimulation`.
 - `src/core/update-system.js` — `KeloUpdater`.
+- `src/core/creators-lazy-gate.js` — entrada lazy a Creator Library/Creators; no carga editores pesados en boot normal.
 
 ## World / Environment
 
@@ -45,7 +46,14 @@
 
 ## Studio / Creator
 
-- `src/ui/studio-launcher.js` — launcher.
+- `src/creators/creator-entry.mjs` — composition root lazy de todos los workspaces Creator.
+- `src/creators/library/creator-content-types.mjs` — Creator Library: tipos universales y routing a owners/workspaces existentes.
+- `src/creators/ui/creator-library-workspace.mjs` — biblioteca móvil CREATE / MY LIBRARY / TOOLS / PIPELINE.
+- `src/creators/workspaces/creator-library-workspace.mjs` — manifest lazy de Creator Library.
+- `src/creators/workspaces/image-lab-workspace.mjs` — manifest que integra Image Lab al registry Creator.
+- `src/creators/ui/image-lab-workspace.mjs` — preparación de fuentes tipo Photoshop ligero/no destructivo.
+- `src/creators/ui/asset-forge-workspace.mjs` — pixel drawing + QA/repair + asset authoring local.
+- `src/ui/studio-launcher.js` — launcher del Creator Hub/Studio avanzado.
 - `src/creators/workspaces/world-workspace.mjs` — route/prewarm móvil.
 - `src/studio/integration/world-studio-bridge.mjs` — bridge de carga.
 - `src/studio/integration/live-studio-controller.mjs` — sesión LIVE.
@@ -82,4 +90,4 @@
 
 ## Documentación
 
-Empieza por `docs/DOCUMENTATION_INDEX.md`. Los documentos `*_MEMORY.md` son contexto acumulado, no autoridad superior al runtime.
+Empieza por `docs/DOCUMENTATION_INDEX.md`. Para passes materiales multiagente, lee también la entrada `ACTIVE` correspondiente en `docs/IMPLEMENTATION_LEDGER.md`. Los documentos `*_MEMORY.md` son contexto acumulado, no autoridad superior al runtime.
