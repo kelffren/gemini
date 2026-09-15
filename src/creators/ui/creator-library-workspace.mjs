@@ -55,51 +55,45 @@ export async function openCreatorLibraryWorkspace({root=globalThis,projects=null
   for(const [id,label] of tabRows){const b=el(doc,'button',{class:'kcl-tab',text:label,'aria-selected':'false'});b.onclick=()=>void render(id);buttons.set(id,b);tabs.append(b);}
   function actor(){return String(permission?.actorId?.()||root.KELO_ADMIN_KEYS?.playerId?.()||root.keloNet?.playerKey||root.localPlayer?.id||'local_pioneer');}
   function toast(message){if(typeof root.showToast==='function')root.showToast(message);else console.info('[Creator Library]',message);}
-  function workspaceAvailable(id){const row=workspaces?.resolve?.(id);return workspaces?!!row&&row.availability==='active':true;}
+  function workspaceAllowed(id){const row=workspaces?.resolve?.(id);if(!workspaces)return true;if(!row||row.availability!=='active')return false;if(!row.capability)return true;return !!permission?.can?.(row.capability,actor());}
   function projectWorkspace(type){const routed=creatorTypeForProjectType(type);return routed?.workspaceId||String(type||'').toLowerCase().replaceAll('_','-');}
   async function launch(workspaceId,context={}){
     if(busy)return null;busy=true;shell.setAttribute('aria-busy','true');shell.style.pointerEvents='none';
-    try{
-      if(!workspaceAvailable(workspaceId))throw new Error(`CREATOR_WORKSPACE_NOT_AVAILABLE:${workspaceId}`);
-      const result=await openWorkspace(workspaceId,context);destroy();return result;
-    }catch(error){shell.style.pointerEvents='';shell.removeAttribute('aria-busy');toast(`No se pudo abrir ${workspaceId}`);console.error('[Creator Library launch]',error);return null;}
+    try{if(!workspaceAllowed(workspaceId))throw new Error(`CREATOR_WORKSPACE_NOT_AVAILABLE:${workspaceId}`);const result=await openWorkspace(workspaceId,context);destroy();return result;}
+    catch(error){shell.style.pointerEvents='';shell.removeAttribute('aria-busy');toast(`No se pudo abrir ${workspaceId}`);console.error('[Creator Library launch]',error);return null;}
     finally{busy=false;}
   }
-  function hero(title,copy,{search=false,onInput=null}={}){
-    const left=el(doc,'div',{},[el(doc,'h1',{text:title}),el(doc,'p',{text:copy})]),children=[left];
-    if(search){const input=el(doc,'input',{class:'kcl-search',type:'search',placeholder:'Buscar character, weapon, tree, VFX…','aria-label':'Buscar tipos de contenido'});input.oninput=()=>onInput?.(input.value);children.push(input);}
-    return el(doc,'div',{class:'kcl-hero'},children);
-  }
+  function hero(title,copy){return el(doc,'div',{class:'kcl-hero'},el(doc,'div',{},[el(doc,'h1',{text:title}),el(doc,'p',{text:copy})]));}
   function typeCard(row){
-    const enabled=workspaceAvailable(row.workspaceId),card=el(doc,'button',{class:'kcl-card',disabled:!enabled,'aria-label':enabled?`Crear ${row.label}`:`${row.label} no disponible`});
+    const enabled=workspaceAllowed(row.workspaceId),card=el(doc,'button',{class:'kcl-card',disabled:!enabled,'aria-label':enabled?`Crear ${row.label}`:`${row.label} no disponible`});
     card.append(el(doc,'span',{class:'kcl-card-icon',text:row.icon}),el(doc,'strong',{text:row.label}),el(doc,'small',{text:row.description}));
     const foot=el(doc,'footer');foot.append(el(doc,'span',{class:'kcl-chip',text:row.kind.toUpperCase()}),el(doc,'span',{class:'kcl-chip',text:row.workspaceId.toUpperCase()}));for(const tool of row.tools.slice(0,2))foot.append(el(doc,'span',{class:'kcl-chip',text:tool.toUpperCase()}));card.append(foot);
     if(enabled)card.onclick=()=>void launch(row.workspaceId,{creatorIntent:{typeId:row.id,label:row.label,kind:row.kind,defaults:row.defaults}});return card;
   }
-  function renderCreate(query=''){
-    const wrap=el(doc,'div',{class:'kcl-shell'});wrap.append(hero('Create anything','Una sola biblioteca; cada tipo abre el editor especializado que ya posee esa responsabilidad.',{search:true,onInput:value=>renderCreate(value)}));
-    const rows=listCreatorContentTypes({query});if(!rows.length){wrap.append(el(doc,'div',{class:'kcl-empty',text:'No encontré ese tipo. Añadir un tipo nuevo significa enrutarlo a un owner existente, no crear un engine paralelo.'}));main.replaceChildren(wrap);return;}
-    for(const group of GROUP_ORDER){const groupRows=rows.filter(row=>row.group===group);if(!groupRows.length)continue;const section=el(doc,'section',{class:'kcl-section'},[el(doc,'h2',{text:group})]),grid=el(doc,'div',{class:'kcl-grid'});for(const row of groupRows)grid.append(typeCard(row));section.append(grid);wrap.append(section);}main.replaceChildren(wrap);
+  function renderCreate(){
+    const wrap=el(doc,'div',{class:'kcl-shell'}),groups=el(doc,'div'),search=el(doc,'input',{class:'kcl-search',type:'search',placeholder:'Buscar character, weapon, tree, VFX…','aria-label':'Buscar tipos de contenido'}),top=hero('Create anything','Una sola biblioteca; cada tipo abre el editor especializado que ya posee esa responsabilidad.');top.append(search);wrap.append(top,groups);
+    function paintGroups(query=''){groups.replaceChildren();const rows=listCreatorContentTypes({query});if(!rows.length){groups.append(el(doc,'div',{class:'kcl-empty',text:'No encontré ese tipo. Añadir un tipo nuevo significa enrutarlo a un owner existente, no crear un engine paralelo.'}));return;}for(const group of GROUP_ORDER){const groupRows=rows.filter(row=>row.group===group);if(!groupRows.length)continue;const section=el(doc,'section',{class:'kcl-section'},[el(doc,'h2',{text:group})]),grid=el(doc,'div',{class:'kcl-grid'});for(const row of groupRows)grid.append(typeCard(row));section.append(grid);groups.append(section);}}
+    search.oninput=()=>paintGroups(search.value);paintGroups();main.replaceChildren(wrap);
   }
   async function renderLibrary(){
     const wrap=el(doc,'div',{class:'kcl-shell'});wrap.append(hero('My Library','Proyectos de Creator guardados por los repositorios existentes. La Library no duplica su persistencia.'));
     if(!projects?.list){wrap.append(el(doc,'div',{class:'kcl-empty',text:'Project repository unavailable in this session.'}));main.replaceChildren(wrap);return;}
     const rows=(await projects.list({ownerId:actor()})).slice(0,120);if(!rows.length){wrap.append(el(doc,'div',{class:'kcl-empty',text:'Todavía no hay proyectos. Empieza en CREATE.'}));main.replaceChildren(wrap);return;}
-    for(const project of rows){const workspaceId=projectWorkspace(project.type),open=el(doc,'button',{class:'kcl-btn',text:'OPEN'});open.disabled=!workspaceAvailable(workspaceId);open.onclick=()=>void launch(workspaceId,{projectId:project.projectId});wrap.append(el(doc,'article',{class:'kcl-project'},[el(doc,'div',{},[el(doc,'strong',{text:project.name||project.projectId}),el(doc,'small',{text:`${project.type} · ${project.status||'draft'} · ${String(project.projectId).slice(-10)}`})]),open]));}main.replaceChildren(wrap);
+    for(const project of rows){const workspaceId=projectWorkspace(project.type),open=el(doc,'button',{class:'kcl-btn',text:'OPEN'});open.disabled=!workspaceAllowed(workspaceId);open.onclick=()=>void launch(workspaceId,{projectId:project.projectId});wrap.append(el(doc,'article',{class:'kcl-project'},[el(doc,'div',{},[el(doc,'strong',{text:project.name||project.projectId}),el(doc,'small',{text:`${project.type} · ${project.status||'draft'} · ${String(project.projectId).slice(-10)}`})]),open]));}main.replaceChildren(wrap);
   }
   function renderTools(){
     const wrap=el(doc,'div',{class:'kcl-shell'});wrap.append(hero('Creator Tools','El “Photoshop” de Kelo es modular: prepara la imagen en Image Lab, dibuja pixel art en Pixel Forge y usa los editores especializados para el contenido final.'));
-    const grid=el(doc,'div',{class:'kcl-grid'});for(const row of TOOL_ROWS){const card=el(doc,'button',{class:'kcl-card',disabled:!workspaceAvailable(row.id)});card.append(el(doc,'span',{class:'kcl-card-icon',text:row.icon}),el(doc,'strong',{text:row.label}),el(doc,'small',{text:row.detail}),el(doc,'footer',{},el(doc,'span',{class:'kcl-chip',text:'LAZY TOOL'})));card.onclick=()=>void launch(row.id);grid.append(card);}wrap.append(grid);main.replaceChildren(wrap);
+    const grid=el(doc,'div',{class:'kcl-grid'});for(const row of TOOL_ROWS){const enabled=workspaceAllowed(row.id),card=el(doc,'button',{class:'kcl-card',disabled:!enabled});card.append(el(doc,'span',{class:'kcl-card-icon',text:row.icon}),el(doc,'strong',{text:row.label}),el(doc,'small',{text:row.detail}),el(doc,'footer',{},el(doc,'span',{class:'kcl-chip',text:'LAZY TOOL'})));if(enabled)card.onclick=()=>void launch(row.id);grid.append(card);}wrap.append(grid);main.replaceChildren(wrap);
   }
   function renderPipeline(){
     const wrap=el(doc,'div',{class:'kcl-shell'});wrap.append(hero('Creator pipeline','La misma ruta sirve para un personaje, una skin, un arma o un árbol; cambia el editor especializado, no la arquitectura.'));
-    const steps=[['1 · IDEA','Elige el tipo de contenido y conserva la intención del creador.'],['2 · PREP','Image Lab / Pixel Forge preparan fuentes y arte sin mutar el runtime.'],['3 · BUILD','El workspace especializado crea definition/asset/animation usando su owner.'],['4 · TEST','Preview o test draft valida antes de tocar contenido compartido.'],['5 · REVIEW / PUBLISH','La autoridad online futura aprueba, versiona y publica; el cliente no decide economía real.']];const row=el(doc,'div',{class:'kcl-pipeline'});for(const [title,copy] of steps)row.append(el(doc,'div',{class:'kcl-step'},[el(doc,'b',{text:title}),el(doc,'span',{text:copy})]));wrap.append(row,el(doc,'div',{class:'kcl-note',text:`Registrados ${CREATOR_CONTENT_TYPES.length} tipos de entrada. Regla: CONTENT EXISTS ≠ CONTENT IS ACTIVE. Catálogos grandes cargan metadata/preview bajo demanda y los assets completos solo cuando se usan.`}));main.replaceChildren(wrap);
+    const steps=[['1 · IDEA','Elige el tipo de contenido y conserva la intención del creador.'],['2 · PREP','Image Lab / Pixel Forge preparan fuentes y arte sin mutar el runtime.'],['3 · BUILD','El workspace especializado crea definition/asset/animation usando su owner.'],['4 · TEST','Preview o test draft valida antes de tocar contenido compartido.'],['5 · REVIEW / PUBLISH','La autoridad online futura aprueba, versiona y publica; el cliente no decide economía real.']],row=el(doc,'div',{class:'kcl-pipeline'});for(const [title,copy] of steps)row.append(el(doc,'div',{class:'kcl-step'},[el(doc,'b',{text:title}),el(doc,'span',{text:copy})]));wrap.append(row,el(doc,'div',{class:'kcl-note',text:`Registrados ${CREATOR_CONTENT_TYPES.length} tipos de entrada. Regla: CONTENT EXISTS ≠ CONTENT IS ACTIVE. Catálogos grandes deben permanecer metadata/preview-first y cargar contenido completo solo bajo demanda.`}));main.replaceChildren(wrap);
   }
   async function render(id){current=id;for(const [key,b] of buttons)b.setAttribute('aria-selected',String(key===id));if(id==='create')renderCreate();else if(id==='library')await renderLibrary();else if(id==='tools')renderTools();else renderPipeline();}
   function keys(event){if(event.key==='Escape'){event.preventDefault();destroy();}}
   function destroy(){if(active?.shell!==shell)return;active=null;doc.removeEventListener('keydown',keys,true);try{if(lock)root.KeloInputLocks?.release?.(lock);}catch{}shell.remove();style.remove();}
   close.onclick=destroy;doc.addEventListener('keydown',keys,true);
-  active=Object.freeze({version:'kelo-creator-library-v1',shell,openType:typeId=>{const row=CREATOR_CONTENT_TYPES.find(x=>x.id===typeId);return row?launch(row.workspaceId,{creatorIntent:{typeId:row.id,defaults:row.defaults}}):null;},show:render,close:destroy,get tab(){return current;}});
+  active=Object.freeze({version:'kelo-creator-library-v1.1',shell,openType:typeId=>{const row=CREATOR_CONTENT_TYPES.find(x=>x.id===typeId);return row?launch(row.workspaceId,{creatorIntent:{typeId:row.id,defaults:row.defaults}}):null;},show:render,close:destroy,get tab(){return current;}});
   await render('create');return active;
 }
 export function getCreatorLibraryWorkspace(){return active;}
