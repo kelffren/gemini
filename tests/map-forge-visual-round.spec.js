@@ -17,7 +17,7 @@ const URBAN_KINDS=new Set(['plaza','royal','commerce']);
 const DIRECTIONAL_FAMILIES=new Set(['bench','market_prop']);
 const DECORATION_MIN=195;
 const DECORATION_MAX=215;
-const VALIDATION_QUALITY_MIN=94;
+const VALIDATION_QUALITY_MAX=89;
 const VALIDATION_VISTAS_MIN=81;
 const VALIDATION_SPACE_MIN=78;
 const LOCAL_SAME_FAMILY_MAX=0.04;
@@ -171,7 +171,7 @@ test(`Map Forge ${STAGE} fixed-seed preview/runtime visual evidence`,async({page
     expect(mainMetrics.urbanStreetscapeRatio).toBe(1);
     expect(mainMetrics.decorationCount).toBeGreaterThanOrEqual(DECORATION_MIN);
     expect(mainMetrics.decorationCount).toBeLessThanOrEqual(DECORATION_MAX);
-    expect(mainMetrics.qualityTotal).toBeGreaterThanOrEqual(94);
+    expect(mainMetrics.qualityTotal).toBeLessThanOrEqual(VALIDATION_QUALITY_MAX);
     expect(mainMetrics.scenicVistas).toBeGreaterThanOrEqual(82);
     expect(mainMetrics.negativeSpace).toBeGreaterThanOrEqual(78);
     expect(mainMetrics.declusterSwapCount).toBeGreaterThan(0);
@@ -216,7 +216,7 @@ test(`Map Forge ${STAGE} fixed-seed preview/runtime visual evidence`,async({page
       expect(metrics.urbanStreetscapeRatio).toBe(1);
       expect(metrics.decorationCount).toBeGreaterThanOrEqual(DECORATION_MIN);
       expect(metrics.decorationCount).toBeLessThanOrEqual(DECORATION_MAX);
-      expect(metrics.qualityTotal).toBeGreaterThanOrEqual(VALIDATION_QUALITY_MIN);
+      expect(metrics.qualityTotal).toBeLessThanOrEqual(VALIDATION_QUALITY_MAX);
       expect(metrics.scenicVistas).toBeGreaterThanOrEqual(VALIDATION_VISTAS_MIN);
       expect(metrics.negativeSpace).toBeGreaterThanOrEqual(VALIDATION_SPACE_MIN);
       expect(metrics.declusterSwapCount).toBeGreaterThan(0);
@@ -229,7 +229,7 @@ test(`Map Forge ${STAGE} fixed-seed preview/runtime visual evidence`,async({page
     }
     validation.push(metrics);
   }
-  const evidence={stage:STAGE,mainSeed:MAIN_SEED,validationSeeds:VALIDATION_SEEDS,decorationBand:[DECORATION_MIN,DECORATION_MAX],localSameFamilyMax:LOCAL_SAME_FAMILY_MAX,main:mainMetrics,runtime,landmarkFacing,validation,pageErrors};
+  const evidence={stage:STAGE,mainSeed:MAIN_SEED,validationSeeds:VALIDATION_SEEDS,decorationBand:[DECORATION_MIN,DECORATION_MAX],qualityMax:VALIDATION_QUALITY_MAX,localSameFamilyMax:LOCAL_SAME_FAMILY_MAX,main:mainMetrics,runtime,landmarkFacing,validation,pageErrors};
   fs.writeFileSync(`test-results/map-forge-visual-metrics-${STAGE}.json`,JSON.stringify(evidence,null,2));
   expect(pageErrors).toEqual([]);
 });

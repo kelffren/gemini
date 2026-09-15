@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: QA / MAP FORGE
  * owner: Map Forge CI
- * purpose: fixed-seed regression guard preventing decoration-heavy sparse capitals from retaining 95+ elite scores
+ * purpose: fixed-seed regression guard preventing sparse capitals from being scored as near-elite city layouts
  * public-api: CLI
  * consumes: Royal Capital recipe + generator/scorer
  * state-owned: none
@@ -20,7 +20,7 @@ for(const seed of seeds){
   const blocks=map.blocks?.length||0,decorations=map.decorations?.length||0,districts=map.districts?.length||1;
   const blocksPerDistrict=blocks/districts,decorationsPerBlock=decorations/Math.max(1,blocks);
   assert.ok(blocksPerDistrict<2.5&&decorationsPerBlock>9.5,`${seed}: regression seed no longer reproduces sparse/decor-heavy fabric; update the fixture only after visual review`);
-  assert.ok(map.quality.total<=94,`${seed}: sparse decoration-heavy capital must not retain 95+ elite score, got ${map.quality.total}`);
+  assert.ok(map.quality.total<=89,`${seed}: visually reviewed sparse decoration-heavy capital must cap below 90, got ${map.quality.total}`);
   results.push({seed,score:map.quality.total,blocks,decorations,blocksPerDistrict:Number(blocksPerDistrict.toFixed(3)),decorationsPerBlock:Number(decorationsPerBlock.toFixed(3))});
 }
 
@@ -32,6 +32,15 @@ assert.equal(structural.valid,true,'severe fabric fixture must remain structural
 const severeScore=scoreMapDefinition(severe,recipe,structural);
 assert.ok(severeScore.total<=89,`severely sparse decoration-heavy capital must cap below 90, got ${severeScore.total}`);
 
+const underbuiltLowDecor=JSON.parse(JSON.stringify(source));
+underbuiltLowDecor.blocks=underbuiltLowDecor.blocks.slice(0,Math.max(1,Math.floor(underbuiltLowDecor.blocks.length*.5)));
+underbuiltLowDecor.parcels=underbuiltLowDecor.parcels.filter(parcel=>underbuiltLowDecor.blocks.some(block=>block.id===parcel.blockId));
+underbuiltLowDecor.decorations=[];
+const underbuiltLowDecorStructural=validateMapDefinition(underbuiltLowDecor,recipe);
+assert.equal(underbuiltLowDecorStructural.valid,true,'low-decoration underbuilt fixture must remain structurally valid so density-based fabric scoring is isolated');
+const underbuiltLowDecorScore=scoreMapDefinition(underbuiltLowDecor,recipe,underbuiltLowDecorStructural);
+assert.ok(underbuiltLowDecorScore.total<=89,`underbuilt capital must cap below 90 even when low decoration count would evade decorations-per-block detection, got ${underbuiltLowDecorScore.total}`);
+
 const zeroBlock=JSON.parse(JSON.stringify(source));
 zeroBlock.blocks=[];
 zeroBlock.parcels=[];
@@ -40,4 +49,4 @@ assert.equal(zeroBlockStructural.valid,true,'zero-block capital fixture must rem
 const zeroBlockScore=scoreMapDefinition(zeroBlock,recipe,zeroBlockStructural);
 assert.ok(zeroBlockScore.total<=89,`capital with no urban blocks must cap below 90, got ${zeroBlockScore.total}`);
 
-console.log(JSON.stringify({ok:true,seeds:results,severeScore:severeScore.total,zeroBlockScore:zeroBlockScore.total},null,2));
+console.log(JSON.stringify({ok:true,seeds:results,severeScore:severeScore.total,underbuiltLowDecorScore:underbuiltLowDecorScore.total,zeroBlockScore:zeroBlockScore.total},null,2));
