@@ -1,0 +1,8 @@
+/* KELO-INDEX
+ * area: CREATORS / SPRITE COMPILER / SOURCE TRUST
+ * purpose: require explicit human/source declarations for origin and usage rights because visual AI cannot prove legal permission
+ * public-api: normalizeAssetSourceAttestation(), evaluateAssetSourceAttestation()
+ */
+const F=Object.freeze;const text=v=>String(v??'').trim();
+export function normalizeAssetSourceAttestation(raw={}){return F({schema:'kelo-asset-source-attestation-v1',sourceType:text(raw.sourceType||'unknown'),sourceUri:text(raw.sourceUri)||null,creatorOrProvider:text(raw.creatorOrProvider)||null,licenseId:text(raw.licenseId)||null,usageScope:text(raw.usageScope)||null,declarant:text(raw.declarant)||null,declaration:raw.declaration===true,aiGenerated:raw.aiGenerated===true,model:text(raw.model)||null,notes:text(raw.notes)||null});}
+export function evaluateAssetSourceAttestation(raw,{requireDeclaration=true,requireLicenseForExternal=true}={}){const item=normalizeAssetSourceAttestation(raw),reasons=[];if(requireDeclaration&&!item.declaration)reasons.push('SOURCE_DECLARATION_REQUIRED');if(requireDeclaration&&!item.declarant)reasons.push('SOURCE_DECLARANT_REQUIRED');const external=!['user-created','ai-generated-by-user','internal'].includes(item.sourceType);if(requireLicenseForExternal&&external&&!item.licenseId)reasons.push('SOURCE_LICENSE_EVIDENCE_REQUIRED');if(item.sourceType==='unknown')reasons.push('SOURCE_ORIGIN_UNKNOWN');return F({schema:'kelo-asset-source-attestation-decision-v1',status:reasons.length?'REVIEW_REQUIRED':'ATTESTED',pass:reasons.length===0,reasons:F(reasons),attestation:item,note:'This records evidence and workflow requirements; it does not itself determine legal ownership or license validity.'});}
