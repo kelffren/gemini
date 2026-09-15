@@ -738,9 +738,33 @@
       "files": [
         "index.html"
       ]
+    },
+    {
+      "id": "prevention:9ccb88a6b66f8b4285a02a801cc806fff9f4b6c8",
+      "at": "2026-09-15T03:30:47.000Z",
+      "source": "bug-prevention-ci",
+      "head_sha": "9ccb88a6b66f8b4285a02a801cc806fff9f4b6c8",
+      "base_sha": "84d0df5a0a28db4ed1b01c3d0cd4cf0c09a77e2a",
+      "conclusion": "failure",
+      "files": [
+        "bugs/investigacion/BUG-0003/2026-09-15-world-bridge-20260915-20-a9.md",
+        "bugs/registry/BUG-0003.json",
+        "index.html",
+        "scripts/world-editor-creator-boot-isolation-audit.mjs",
+        "scripts/world-editor-single-prewarm-owner-audit.mjs",
+        "src/creators/creator-entry.mjs",
+        "src/creators/ui/creator-hub.mjs",
+        "src/creators/workspaces/world-workspace.mjs",
+        "src/studio/integration/live-studio-controller.mjs",
+        "src/studio/integration/world-studio-bridge.mjs",
+        "src/studio/studio-entry.mjs",
+        "src/studio/ui/studio-live-shell.mjs",
+        "src/ui/studio-launcher.js",
+        "sw.js"
+      ]
     }
   ],
-  "feedback_updated_at": "2026-09-15T02:25:00.834Z",
+  "feedback_updated_at": "2026-09-15T03:32:30.142Z",
   "training": {
     "examples": 58,
     "search_examples": 43,
