@@ -52,9 +52,13 @@ jobs:
       - name: Verify player position shadow safety
         run: node scripts/player-position-shadow-audit.mjs
 
+      - name: Verify player position transition owner
+        run: node scripts/player-position-transition-audit.mjs
+
       - name: Syntax-check migration runtimes
         run: |
           node --check src/core/player-state-system.js
+          node --check src/core/player-position-system.js
           node --check src/systems/combat/damage-resolver.js
           node --check src/core/render-extension-system.js
           node --check src/environment/gardens-landmark.js
@@ -62,6 +66,9 @@ jobs:
           node --check src/core/simulation-farm-shadow.js
           node --check src/core/camera-follow-shadow.js
           node --check src/core/player-position-shadow.js
+          node --check src/instances/instance-runtime-bridge.js
+          node --check src/instances/market-instance.js
+          node --check src/ui/builder-parcel-meta.js
           node --check src/environment/generic-prefabs.js
           node --check src/environment/luxe-kiosk-atlas.js
           node --check engine-c.js

@@ -1,8 +1,10 @@
 /* KELO-INDEX
  * area: PROPERTY
- * keys: PARCEL NAME DOOR SPAWN META ONLINE
- * hace: nombre + tile puerta de la parcela; al entrar te deja en la puerta
+ * owner: parcel metadata; player transition owned by KeloPlayerPosition; camera owned by KeloCamera
+ * keys: PARCEL NAME DOOR SPAWN META ONLINE POSITION CAMERA
+ * hace: nombre + tile puerta de la parcela; al entrar delega posición/cámara a Foundation owners
  * online: metadata local lista para copiar al record del server
+ * do-not: NO escribir localPlayer.x/y ni camera.* directamente
  */
 (function(){
   'use strict';
@@ -30,9 +32,11 @@
     const btn=document.getElementById('kelo-door-pick');if(btn)btn.classList.remove('on');
   }
   function warpToDoor(){
-    const m=rec();if(!m.door||typeof localPlayer==='undefined')return;
-    localPlayer.x=m.door.x+TILE/2;localPlayer.y=m.door.y+TILE+8;
-    if(typeof camera!=='undefined'){camera.x=localPlayer.x;camera.y=localPlayer.y;camera.targetX=localPlayer.x;camera.targetY=localPlayer.y;}
+    const m=rec();if(!m.door)return;
+    if(!window.KeloPlayerPosition?.teleport){console.error('[Kelo parcel meta] KeloPlayerPosition unavailable');return;}
+    const x=m.door.x+TILE/2,y=m.door.y+TILE+8;
+    window.KeloPlayerPosition.teleport(x,y,{source:'parcel-meta:door',stopMotion:true});
+    if(window.KeloCamera?.setTarget)window.KeloCamera.setTarget(x,y,{snap:true,source:'parcel-meta:door'});
   }
   function inject(){
     const host=document.getElementById('kelo-world-builder');if(!host||document.getElementById('kelo-parcel-meta'))return;
@@ -86,5 +90,5 @@
   document.addEventListener('click',e=>{
     if(e.target&&e.target.id==='kelo-scope-parcel')setTimeout(warpToDoor,120);
   },true);
-  window.KELO_PARCEL_META=Object.freeze({version:'parcel-meta-v1.0.0',setName,setDoor,warpToDoor,get meta(){return rec();}});
+  window.KELO_PARCEL_META=Object.freeze({version:'parcel-meta-v1.1.0-position-owner',setName,setDoor,warpToDoor,get meta(){return rec();}});
 })();

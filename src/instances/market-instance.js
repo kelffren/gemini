@@ -1,22 +1,24 @@
 /* KELO-INDEX
  * area: INSTANCES / COMMERCE
- * owner: KeloMarketWorld
- * keys: MARKET INSTANCE STALL CARPET SELLING CAMERA RENDER INPUT OFFLINE ONLINE
+ * owner: KeloMarketWorld; transition position owned by KeloPlayerPosition
+ * keys: MARKET INSTANCE STALL CARPET SELLING CAMERA POSITION RENDER INPUT OFFLINE ONLINE
  * purpose: zona de mercado separada, caminable y reutilizable; dibuja puestos y expone interacción sin poseer economía
  * public-api: KeloMarketWorld.enter/leave/getStalls/getStall/startSelling/stopSelling
- * consumes: KELO_INSTANCES, KELO_SCENE_CONTEXT, KeloCamera, KeloRender, KeloSimulation, KeloCommerceAuthority, KeloInputLocks
+ * consumes: KELO_INSTANCES, KELO_SCENE_CONTEXT, KeloPlayerPosition, KeloCamera, KeloRender, KeloSimulation, KeloCommerceAuthority, KeloInputLocks
  * state-owned: snapshot temporal de posición/cámara y modo vendedor local; NO posee listings, oro ni trades
  * online: la instancia y puestos consumen snapshots de KeloCommerceAuthority; el servidor puede sustituir autoridad sin cambiar este renderer
- * do-not: no mover items/oro, no crear otro render loop, no escribir camera.* directamente
+ * legacy: clampPlayer conserva writers x/y continuos hasta su propia migración
+ * do-not: no mover items/oro, no crear otro render loop, no escribir camera.* directamente, no usar x/y directos fuera del clamp legacy
  */
 (function(root){
 'use strict';
-const VERSION='market-instance-v1.0.1';
+const VERSION='market-instance-v1.1.0-position-owner';
 const I=root.KELO_INSTANCES;
 const cameraOwner=root.KeloCamera;
+const positionOwner=root.KeloPlayerPosition;
 const renderOwner=root.KeloRender;
 const simulationOwner=root.KeloSimulation;
-if(!I||!cameraOwner||!renderOwner||!simulationOwner){console.error('[Kelo market world] Foundation owners missing');return;}
+if(!I||!cameraOwner||!positionOwner||!renderOwner||!simulationOwner){console.error('[Kelo market world] Foundation owners missing');return;}
 const RESOURCE_ID='central-market';
 const BOUNDS=Object.freeze({x:0,y:0,w:1280,h:820});
 const SPAWN=Object.freeze({x:640,y:690});
@@ -42,10 +44,10 @@ function claimFor(stallId){return (commerceSnapshot()?.stalls||[]).find(x=>x&&x.
 function stallById(stallId){return STALLS.find(s=>s.stallId===String(stallId||''))||null;}
 function stallCarpetRect(stall){return{x:stall.x-70,y:stall.y+(stall.facing==='down'?52:-104),w:140,h:70};}
 function hitStall(wx,wy){for(const stall of STALLS){const r=stallCarpetRect(stall);if(wx>=r.x&&wx<=r.x+r.w&&wy>=r.y&&wy<=r.y+r.h)return stall;}return null;}
-function captureWorld(){if(worldState)return;worldState={player:(typeof localPlayer!=='undefined'&&localPlayer)?{x:localPlayer.x,y:localPlayer.y}:null,camera:cameraOwner.snapshot()};}
+function captureWorld(){if(worldState)return;worldState={player:positionOwner.capture(),camera:cameraOwner.snapshot()};}
 function clearMotion(){if(typeof localPlayer!=='undefined'&&localPlayer){localPlayer.vx=0;localPlayer.vy=0;}if(typeof input!=='undefined'&&input){input.normX=0;input.normY=0;input.touchActive=false;input.touchId=null;}}
-function centerOn(x,y){if(typeof localPlayer!=='undefined'&&localPlayer){localPlayer.x=x;localPlayer.y=y;}cameraOwner.setTarget(x,y,{snap:true,source:'market-instance:center'});clearMotion();}
-function restoreWorld(){stopSelling();if(worldState){if(worldState.player&&typeof localPlayer!=='undefined'&&localPlayer){localPlayer.x=worldState.player.x;localPlayer.y=worldState.player.y;localPlayer.vx=0;localPlayer.vy=0;}if(worldState.camera)cameraOwner.restoreState(worldState.camera,{source:'market-instance:leave'});}worldState=null;document.body.classList.remove('kelo-market-instance');}
+function centerOn(x,y){positionOwner.teleport(x,y,{source:'market-instance:center',stopMotion:true});cameraOwner.setTarget(x,y,{snap:true,source:'market-instance:center'});clearMotion();}
+function restoreWorld(){stopSelling();if(worldState){if(worldState.player)positionOwner.restore(worldState.player,{source:'market-instance:leave',stopMotion:true});clearMotion();if(worldState.camera)cameraOwner.restoreState(worldState.camera,{source:'market-instance:leave'});}worldState=null;document.body.classList.remove('kelo-market-instance');}
 function sellerPosition(stall){return{x:stall.x,y:stall.y+(stall.facing==='down'?-28:28)};}
 function startSelling(stallId){
   const stall=stallById(stallId);if(!stall)return{ok:false,error:'STALL_NOT_FOUND'};
@@ -88,5 +90,5 @@ renderOwner.intercept('market-instance:exclusive-render',drawMarket,260);
 simulationOwner.after('market-instance:bounds',clampPlayer,860);
 installPointer();
 root.KeloMarketWorld=Object.freeze({version:VERSION,resourceId:RESOURCE_ID,bounds:clone(BOUNDS),spawn:clone(SPAWN),enter,leave,isActive:active,getStalls:()=>STALLS.map(clone),getStall:stallId=>clone(stallById(stallId)),getClaim:stallId=>clone(claimFor(stallId)),startSelling,stopSelling,getSellingStall:()=>sellingStallId,hitTest:(x,y)=>clone(hitStall(x,y))});
-root.KELO_MARKET_WORLD_AUDIT=Object.freeze({version:VERSION,instanceType:'market',offline:true,serverReplaceable:true,exclusiveRenderOwner:'KeloRender',simulationOwner:'KeloSimulation',cameraOwner:'KeloCamera',economyOwner:'KeloCommerceAuthority',stallCarpets:true,freeStallClaimInteraction:true,sellingMovementLock:true,dprSafeCanvasTransform:true,directInventoryMutation:false,directGoldMutation:false});
+root.KELO_MARKET_WORLD_AUDIT=Object.freeze({version:VERSION,instanceType:'market',offline:true,serverReplaceable:true,exclusiveRenderOwner:'KeloRender',simulationOwner:'KeloSimulation',positionTransitionOwner:'KeloPlayerPosition',cameraOwner:'KeloCamera',economyOwner:'KeloCommerceAuthority',stallCarpets:true,freeStallClaimInteraction:true,sellingMovementLock:true,dprSafeCanvasTransform:true,directInventoryMutation:false,directGoldMutation:false});
 })(typeof globalThis!=='undefined'?globalThis:window);
