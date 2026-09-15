@@ -24,7 +24,7 @@ export function createHardenedAssetCompiler({compiler,compilerVersion='unknown',
    const log=async(type,payload,meta={})=>ledger?ledger.append(type,payload,meta):null;
    const stages=[
     {name:'safe-input',run:async()=>{const input=tx.stage('input',await assertSafeAssetInput(file,{...limits,...(options.limits||{})}));await log('safe-input',{format:input.format,width:input.width,height:input.height,pixels:input.pixels,decodedBytes:input.decodedBytes});return input;}},
-    {name:'fingerprint',run:async()=>{const fingerprint=tx.stage('fingerprint',await fingerprintAssetBuild(file,{config,compilerVersion,root}));await log('fingerprint',{id:fingerprint.id,algorithm:fingerprint.algorithm||null,compilerVersion});return fingerprint;}},
+    {name:'fingerprint',run:async()=>{const fingerprint=tx.stage('fingerprint',await fingerprintAssetBuild(file,{config,compilerVersion,root}));await log('fingerprint',{id:fingerprint.id,sourceHash:fingerprint.sourceHash,buildHash:fingerprint.buildHash,algorithm:fingerprint.algorithm||null,compilerVersion});return fingerprint;}},
     {name:'compile',run:async({signal})=>{if(signal.aborted)throw new Error('ASSET_COMPILE_ABORTED');const compiled=tx.stage('compiled',await compiler(file,config,{...options,root,signal}));await log('compiled',summary(compiled));return compiled;}},
     {name:'release-gates',run:async()=>{
       const input=tx.read('input'),compiled=tx.read('compiled'),fingerprint=tx.read('fingerprint');
@@ -35,8 +35,8 @@ export function createHardenedAssetCompiler({compiler,compilerVersion='unknown',
     }}
    ];
    try{
-    const run=await jobs.run(stages,{signal:options.signal,timeoutMs:options.timeoutMs||timeoutMs,label:'hardened-asset-compile'}),compiled=tx.read('compiled'),fingerprint=tx.read('fingerprint'),metadata=tx.read('metadata'),releaseDecision=tx.read('releaseDecision'),committed=tx.commit();await log('commit',{assetId:fingerprint.id,gates:committed.gates.map(g=>({name:g.name,pass:g.pass}))});const ledgerVerification=ledger?await ledger.verify():F({valid:null,reason:'LEDGER_DISABLED'});
-    return F({status:'COMMITTED',assetId:fingerprint.id,fingerprint,metadata,compiled,releaseDecision,transaction:F({id:committed.id,gates:committed.gates}),verificationLedger:ledger?F({verification:ledgerVerification,entries:ledger.entries()}):null,job:F({id:run.id,elapsedMs:run.elapsedMs,timeline:run.timeline})});
+    const run=await jobs.run(stages,{signal:options.signal,timeoutMs:options.timeoutMs||timeoutMs,label:'hardened-asset-compile'}),compiled=tx.read('compiled'),fingerprint=tx.read('fingerprint'),metadata=tx.read('metadata'),releaseDecision=tx.read('releaseDecision'),committed=tx.commit();await log('commit',{assetId:fingerprint.id,gates:committed.gates.map(g=>({name:g.name,pass:g.pass}))});const ledgerVerification=ledger?await ledger.verify():F({valid:null,reason:'LEDGER_DISABLED'}),ledgerSeal=ledger?ledger.seal():null;
+    return F({status:'COMMITTED',assetId:fingerprint.id,fingerprint,metadata,compiled,releaseDecision,transaction:F({id:committed.id,gates:committed.gates}),verificationLedger:ledger?F({verification:ledgerVerification,seal:ledgerSeal,entries:ledger.entries()}):null,job:F({id:run.id,elapsedMs:run.elapsedMs,timeline:run.timeline})});
    }catch(error){if(tx.state==='OPEN')tx.rollback(error?.message||'compile-failed');try{await log('rollback',{reason:String(error?.message||error)})}catch{}throw error;}
  }
  return F({compile,cancel:jobs.cancel,get active(){return jobs.active;}});
