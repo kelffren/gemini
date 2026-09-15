@@ -1,0 +1,106 @@
+name: Convergence World Preview PvP Pinch
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - experiment/convergence-world-preview-pvp-pinch
+    paths:
+      - '.github/workflows/convergence-world-preview-pvp-pinch.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  certify:
+    name: ${{ matrix.label }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        include:
+          - label: pvp-winner-44be
+            sha: 44be3cba72ee35b3f4a426a8044477d39bdae4bd
+          - label: studio-0138-3eb5
+            sha: 3eb556373c54ffad1e236490f0614f65642a7395
+          - label: studio-0736-c1ab
+            sha: c1ab6db74afff897062ea8b61ac281dad3f3e1d2
+          - label: studio-1935-6d52
+            sha: 6d522d9613893d71be72aa3427a2f9d67a40161b
+          - label: studio-0045-7acf
+            sha: 7acf59dffb22aa83f2ec7c8de2ed571b0bdda8a8
+          - label: studio-1540-66f5
+            sha: 66f5a6f993ff6c4629fc5e42db2b814f595e292e
+    steps:
+      - name: Checkout repository history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Checkout candidate snapshot
+        shell: bash
+        run: |
+          git checkout --detach '${{ matrix.sha }}'
+          echo "candidate=$(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+          echo "message=$(git log -1 --pretty=%s)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+          npx playwright install --with-deps chromium
+
+      - name: Start exact snapshot server
+        shell: bash
+        run: |
+          python3 -m http.server 4173 --bind 127.0.0.1 > /tmp/kelo-convergence-http.log 2>&1 &
+          echo $! > /tmp/kelo-convergence-http.pid
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/kelo-convergence-http.log || true
+          exit 1
+
+      - name: Gate A - World editor functional placement
+        env:
+          AUDIT_URL: http://127.0.0.1:4173/
+        run: node scripts/studio-live-audit.mjs
+
+      - name: Gate B - Visual asset preview and two-finger pinch scale
+        run: node scripts/studio-creator-v1-audit.mjs
+
+      - name: Gate C - Strict PvP live action camera
+        env:
+          AUDIT_URL: http://127.0.0.1:4173/
+          PVP_CAMERA_STRICT: '1'
+          PVP_CAMERA_OUT: artifacts/pvp-live-action-camera
+        run: node scripts/live-pvp-live-action-camera-judge.mjs
+
+      - name: Summary
+        if: success()
+        shell: bash
+        run: |
+          echo '✅ WORLD + ASSET PREVIEW + TWO-FINGER PINCH + PVP all passed on this exact SHA.' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload convergence evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: convergence-${{ matrix.label }}
+          path: |
+            artifacts/**
+            /tmp/kelo-convergence-http.log
+          if-no-files-found: ignore
+          retention-days: 7
