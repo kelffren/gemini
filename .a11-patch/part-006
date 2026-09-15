@@ -1,0 +1,91 @@
+     get assetPalette(){return assetPalette;},
+     get assetFavorites(){return assetFavorites;},
+     get assetKeyboardController(){return assetKeyboardController;},
+@@ -313,9 +426,20 @@ export async function bootKeloStudio({ mode = 'world', actorId = null, document
+   extrasTimer=deferStudioOptional(root,()=>{
+     extrasTimer=0;
+     if(closed)return;
+-    void installStudioProductivityExtras({root,kernel,tools,assetPalette,getAssets:paletteAssets}).then(applyStudioExtras).catch(error=>{
+-      console.warn('[Kelo Studio] optional productivity extras unavailable; World editor stays usable',error);
+-    });
++    void (async()=>{
++      try{
++        if(phoneBoot){
++          const {whenStudioIdle,pauseStudioBoot}=await import('./integration/studio-boot-pace.mjs');
++          await whenStudioIdle(root,{timeoutMs:700});
++          await pauseStudioBoot(root,48);
++          if(closed)return;
++        }
++        const next=await installStudioProductivityExtras({root,kernel,tools,assetPalette,getAssets:paletteAssets,phone:phoneBoot});
++        applyStudioExtras(next);
++      }catch(error){
++        console.warn('[Kelo Studio] optional productivity extras unavailable; World editor stays usable',error);
++      }
++    })();
+   }, phoneBoot?PHONE_PRODUCTIVITY_BOOT_DELAY_MS:0);
+   return session;
+ }
+diff --git a/src/studio/tools/register-build-tools-serial.mjs b/src/studio/tools/register-build-tools-serial.mjs
+new file mode 100644
+index 0000000..48ea563
+--- /dev/null
++++ b/src/studio/tools/register-build-tools-serial.mjs
+@@ -0,0 +1,29 @@
++/* KELO-INDEX
++ * area: STUDIO / BUILD TOOLS SERIAL
++ * owns: phone-safe registration of paint/quick/room tools without a static barrel spike
++ * does-not-own: core tools, live shell, UI
++ * public-api: registerBuildToolsSerial()
++ * mobile: imported only after chrome; each tool module loads between yields
++ * online: no
++ */
++export async function registerBuildToolsSerial(kernel,core={},{wait=async()=>{}}={}){
++  const placement=core.placement||kernel.tools.get('placement');
++  const out={};
++  const ensure=async(id,path,factory)=>{
++    let tool=kernel.tools.get(id);
++    if(tool){out[id]=tool;return tool;}
++    const mod=await import(path);
++    await wait();
++    tool=factory(mod);
++    kernel.tools.register(tool);
++    out[id]=tool;
++    await wait();
++    return tool;
++  };
++  const paintCopies=await ensure('paintCopies','./paint-copies-tool.mjs',m=>m.createPaintCopiesTool(kernel));
++  const quickBuild=await ensure('quickBuild','./quick-build-tool.mjs',m=>m.createQuickBuildTool(kernel,{placement}));
++  const roomBuild=await ensure('roomBuild','./room-build-tool.mjs',m=>m.createRoomBuildTool(kernel,{placement,quickBuild}));
++  await ensure('roomOpening','./room-opening-tool.mjs',m=>m.createRoomOpeningTool(kernel));
++  await ensure('roomMaterial','./room-material-tool.mjs',m=>m.createRoomMaterialTool(kernel));
++  return Object.freeze({paintCopies,quickBuild,roomBuild,roomOpening:out.roomOpening,roomMaterial:out.roomMaterial});
++}
+diff --git a/src/ui/studio-launcher.js b/src/ui/studio-launcher.js
+index 9d5a258..560bc82 100644
+--- a/src/ui/studio-launcher.js
++++ b/src/ui/studio-launcher.js
+@@ -12,7 +12,7 @@
+   'use strict';
+   if(window.KELO_STUDIO_LAUNCHER)return;
+   let loading=false,factoryLoading=false,directOpenStarted=false;
+-  const CREATOR_BUILD='world-bridge-20260915-21';
++  const CREATOR_BUILD='world-bridge-20260915-22';
+   const params=()=>new URLSearchParams(window.location.search);
+   const directRequested=()=>params().get('creators')==='1'||params().get('creator')==='1';
+   const actor=()=>String(window.KELO_ADMIN_KEYS?.playerId?.()||window.keloNet?.playerKey||window.localPlayer?.id||'local_pioneer');
+diff --git a/sw.js b/sw.js
+index 8f10d4b..3b050ac 100644
+--- a/sw.js
++++ b/sw.js
+@@ -8,7 +8,7 @@
+  * do-not: never cache API/session/gameplay responses
+  */
+ 'use strict';
+-let forceFreshUntil = 0; // kelo-sw-v6550 world-a10 wipe-on-activate
++let forceFreshUntil = 0; // kelo-sw-v6551 world-a11 wipe-on-activate
+ 
+ let activeStagedBuild = null;
+ let activeInstalledBuild = null;
+-- 
+2.47.3
+
