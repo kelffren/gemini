@@ -34,8 +34,13 @@ jobs:
       - name: Verify farm shadow safety
         run: node scripts/simulation-farm-shadow-audit.mjs
 
-      - name: Syntax-check shadow runtime
-        run: node --check src/core/simulation-farm-shadow.js
+      - name: Verify camera follow shadow safety
+        run: node scripts/camera-follow-shadow-audit.mjs
+
+      - name: Syntax-check shadow runtimes
+        run: |
+          node --check src/core/simulation-farm-shadow.js
+          node --check src/core/camera-follow-shadow.js
 
       - name: Upload observatory report
         if: always()

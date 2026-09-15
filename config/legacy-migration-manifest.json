@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "defaultMode": "LEGACY",
   "allowedModes": ["LEGACY", "SHADOW", "NEW"],
   "domains": {
@@ -23,6 +23,15 @@
       "legacy": ["engine-a.js", "engine-c.js"],
       "contracts": ["cameraX", "cameraY"],
       "activationGate": "shadow-parity"
+    },
+    "cameraFollow": {
+      "mode": "SHADOW",
+      "owner": "KeloCameraFollowShadow",
+      "legacy": ["engine-a.js"],
+      "contracts": ["camera.lookOffsetX", "camera.lookOffsetY", "camera.targetX", "camera.targetY", "camera.x", "camera.y"],
+      "activationGate": "runtime-shadow-parity",
+      "authority": "legacy-only",
+      "shadowEvidence": "KELO_CAMERA_FOLLOW_SHADOW_AUDIT"
     },
     "playerState": {
       "mode": "LEGACY",
