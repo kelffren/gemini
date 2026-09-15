@@ -25,5 +25,7 @@ jobs:
           node --check src/studio/tools/register-build-tools.mjs
           node --check src/studio/tools/paint-copies-tool.mjs
           node --check src/creators/ui/creator-hub.mjs
+          node --check scripts/world-forensic-probe.mjs
+          node --check scripts/world-forensic-autopsy.mjs
       - name: Unified control-plane contract
         run: node scripts/world-surgery-contract.mjs
