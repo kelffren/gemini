@@ -1,4 +1,4 @@
-name: Critical World Editor d71 LIVE certification
+name: Critical World Editor d71 Real iPhone certification
 
 on:
   push:
@@ -9,16 +9,23 @@ on:
   workflow_dispatch:
 
 jobs:
-  certify:
+  real-iphone:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
+    env:
+      BROWSERSTACK_USERNAME: ${{ secrets.BROWSERSTACK_USERNAME }}
+      BROWSERSTACK_ACCESS_KEY: ${{ secrets.BROWSERSTACK_ACCESS_KEY }}
+      BROWSERSTACK_BUILD_NAME: KELO d71 critical real iPhone ${{ github.sha }}
+      BUILD_NUMBER: ${{ github.run_number }}
+      KELO_PAGES: http://localhost:8000/gemini/
+      PW_LIVE: '1'
     steps:
       - name: Checkout critical experiment
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Prove code snapshot is d71 plus this workflow only
+      - name: Prove runtime is exact d71 snapshot
         shell: bash
         run: |
           set -euo pipefail
@@ -29,87 +36,61 @@ jobs:
           test "${#changed[@]}" -eq 1
           test "${changed[0]}" = '.github/workflows/critical-world-editor-d71-live.yml'
 
+      - name: Verify BrowserStack credentials
+        shell: bash
+        run: |
+          test -n "$BROWSERSTACK_USERNAME" || (echo 'Missing BROWSERSTACK_USERNAME' && exit 1)
+          test -n "$BROWSERSTACK_ACCESS_KEY" || (echo 'Missing BROWSERSTACK_ACCESS_KEY' && exit 1)
+
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
 
-      - name: Adapt historical harness in runner only
+      - name: Install exact snapshot dependencies
+        run: npm install
+
+      - name: Enable BrowserStack Local only in runner
         shell: bash
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          p=Path('scripts/studio-live-audit.mjs')
+          p=Path('browserstack.yml')
           s=p.read_text()
-          replacements=[
-            ("'KELO_CREATORS_LAUNCHER','NO polling'", "'KELO_CREATORS_LAUNCHER'"),
-            ("?mapEditor=1&studio-live-audit=${Date.now()}", "?guest=1&mapEditor=1&studio-live-audit=${Date.now()}"),
-            ("let deployReady=false;", "let deployReady=true;"),
-            ("for(let attempt=0;attempt<60;attempt++){", "for(let attempt=0;attempt<0;attempt++){")
-          ]
-          for old,new in replacements:
-              if old not in s:
-                  raise SystemExit(f'historical harness pattern not found: {old}')
-              s=s.replace(old,new,1)
-          p.write_text(s)
+          old='browserstackLocal: false'
+          if old not in s:
+              raise SystemExit('browserstackLocal marker not found')
+          p.write_text(s.replace(old,'browserstackLocal: true',1))
           PY
-          node --check scripts/studio-live-audit.mjs
-          echo 'Historical harness adapted only inside runner; editor/runtime files untouched.'
+          grep -F 'browserstackLocal: true' browserstack.yml
+          echo 'Only runner copy changed; repository snapshot remains d71.'
 
-      - name: Install Playwright client
-        run: npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund playwright@1.55.0
-
-      - name: Serve exact critical snapshot
+      - name: Serve exact d71 snapshot under /gemini/
         shell: bash
         run: |
-          python3 -m http.server 8000 --bind 127.0.0.1 >/tmp/critical-world-editor-http.log 2>&1 &
+          set -euo pipefail
+          mkdir -p /tmp/kelo-d71-live
+          ln -s "$GITHUB_WORKSPACE" /tmp/kelo-d71-live/gemini
+          python3 -m http.server 8000 --bind 0.0.0.0 --directory /tmp/kelo-d71-live >/tmp/kelo-d71-http.log 2>&1 &
           for i in {1..30}; do
-            if curl -fsS http://127.0.0.1:8000/index.html >/dev/null; then exit 0; fi
+            if curl -fsS http://127.0.0.1:8000/gemini/index.html >/dev/null; then
+              echo 'd71 local LIVE endpoint ready'
+              exit 0
+            fi
             sleep 1
           done
-          cat /tmp/critical-world-editor-http.log
+          cat /tmp/kelo-d71-http.log
           exit 1
 
-      - name: Bounded World open probe
-        shell: bash
-        run: |
-          node --input-type=module <<'NODE'
-          import { chromium } from 'playwright';
-          const browser=await chromium.launch({headless:true,executablePath:'/usr/bin/google-chrome',args:['--no-sandbox','--disable-dev-shm-usage']});
-          const context=await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true});
-          const page=await context.newPage();
-          const errors=[];
-          page.on('pageerror',e=>errors.push(String(e)));
-          const stage=s=>console.log(`[D71-PROBE] ${s}`);
-          try{
-            stage('BOOT');
-            const response=await page.goto('http://127.0.0.1:8000/?guest=1&mapEditor=1&critical-d71=1',{waitUntil:'domcontentloaded',timeout:20000});
-            if(!response||response.status()>=400)throw new Error(`BOOT_HTTP_${response?.status()}`);
-            stage('ADMIN_READY');
-            await page.waitForFunction(()=>!!(window.KeloInputLocks?.acquire&&window.KELO_ADMIN_KEYS?.can?.('world.edit')),null,{timeout:15000});
-            stage('CREATORS');
-            await page.evaluate(async()=>{const m=await import('./src/creators/ui/creator-hub.mjs');await m.openCreatorHub({root:window});});
-            await page.waitForSelector('#kelo-creators-hub',{state:'visible',timeout:10000});
-            stage('WORLD_CLICK');
-            await page.locator('#kelo-creators-hub [data-workspace="world"]').click({timeout:10000});
-            stage('WORLD_MOUNT');
-            await page.waitForSelector('#kelo-studio-live',{state:'visible',timeout:15000});
-            await page.waitForFunction(()=>{const el=document.getElementById('kelo-studio-live');return !!(el&&el.dataset.keloWorldLoading!=='1'&&el.querySelector('.ks-status'));},null,{timeout:30000});
-            const result=await page.evaluate(()=>({status:document.querySelector('#kelo-studio-live .ks-status')?.textContent||'',modes:['terrain','path','collision'].map(x=>!!document.querySelector(`#kelo-studio-live [data-mode="${x}"]`)),bodyActive:document.body.classList.contains('kelo-studio-active')}));
-            stage(`PASS ${JSON.stringify(result)}`);
-            if(errors.length)throw new Error(`PAGE_ERRORS:${errors.join(' | ')}`);
-          } finally { await browser.close(); }
-          NODE
+      - name: Real iPhone visible World + placement + reopen
+        run: npx browserstack-node-sdk playwright test tests/iphone-world-visible-flow.spec.js --workers=1
 
-      - name: Run full Studio LIVE placement audit
-        env:
-          AUDIT_URL: http://127.0.0.1:8000/
-          CHROME_BIN: /usr/bin/google-chrome
-        run: node scripts/studio-live-audit.mjs
-
-      - name: Upload certification evidence
+      - name: Upload real-iPhone evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: critical-world-editor-d71-live-evidence
-          path: artifacts/
+          name: critical-d71-real-iphone-evidence
           if-no-files-found: warn
+          path: |
+            playwright-report.json
+            test-results/
+            playwright-report/
