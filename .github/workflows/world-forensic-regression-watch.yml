@@ -1,0 +1,85 @@
+name: World Forensic Regression Watch
+
+on:
+  workflow_run:
+    workflows:
+      - World Editor Mobile Smoke
+      - World Editor Lazy Boot CI
+      - Kelo Studio LIVE audit
+      - World Surgery Functional Smoke
+    types: [completed]
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  detect-regression:
+    if: >-
+      github.event.workflow_run.conclusion == 'failure' &&
+      github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Find previous successful SHA and dispatch autopsy
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          WORKFLOW_ID: ${{ github.event.workflow_run.workflow_id }}
+          FAILED_SHA: ${{ github.event.workflow_run.head_sha }}
+          FAILED_AT: ${{ github.event.workflow_run.created_at }}
+          BRANCH: ${{ github.event.workflow_run.head_branch }}
+          WORKFLOW_NAME: ${{ github.event.workflow_run.name }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Failed workflow: $WORKFLOW_NAME"
+          echo "BAD: $FAILED_SHA"
+          echo "Branch: $BRANCH"
+
+          RUNS="$(gh api -X GET "repos/$REPO/actions/workflows/$WORKFLOW_ID/runs" \
+            -f branch="$BRANCH" \
+            -f status=success \
+            -f per_page=50)"
+
+          GOOD_SHA="$(printf '%s' "$RUNS" | jq -r --arg failed_at "$FAILED_AT" --arg bad "$FAILED_SHA" '
+            .workflow_runs
+            | map(select(.created_at < $failed_at and .head_sha != $bad))
+            | sort_by(.created_at)
+            | reverse
+            | .[0].head_sha // empty
+          ')"
+
+          if [ -z "$GOOD_SHA" ]; then
+            {
+              echo '## World Forensic Regression Watch'
+              echo
+              echo "Failure detected at \`$FAILED_SHA\`, but no earlier successful SHA was found for this workflow/branch."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          case "$WORKFLOW_NAME" in
+            *Lazy*Boot*) MODE='BOOT' ;;
+            *) MODE='WORLD_MOUNT' ;;
+          esac
+
+          {
+            echo '## World regression detected'
+            echo
+            echo "- Workflow: **$WORKFLOW_NAME**"
+            echo "- GOOD: \`$GOOD_SHA\`"
+            echo "- BAD: \`$FAILED_SHA\`"
+            echo "- Probe: **$MODE**"
+            echo
+            echo 'Dispatching World Forensic Autopsy automatically.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          gh workflow run world-forensic-autopsy.yml \
+            --repo "$REPO" \
+            --ref "$DEFAULT_BRANCH" \
+            -f good_sha="$GOOD_SHA" \
+            -f bad_sha="$FAILED_SHA" \
+            -f mode="$MODE" \
+            -f repeat='2'
