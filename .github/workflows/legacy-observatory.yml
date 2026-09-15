@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [legacy-observatory]
+    branches: [legacy-observatory, legacy-shadow-*]
   workflow_dispatch:
 
 permissions:
@@ -30,6 +30,12 @@ jobs:
 
       - name: Enforce migration activation gate
         run: node scripts/legacy-migration-gate.mjs
+
+      - name: Verify farm shadow safety
+        run: node scripts/simulation-farm-shadow-audit.mjs
+
+      - name: Syntax-check shadow runtime
+        run: node --check src/core/simulation-farm-shadow.js
 
       - name: Upload observatory report
         if: always()
