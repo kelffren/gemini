@@ -1,19 +1,20 @@
 /* KELO-INDEX
  * area: CORE / OPTIONAL UI
  * owner: KeloCreatorsLazyGate
- * keys: CREATORS LAZY FIRST-USE ADMIN MOBILE SAFARI NO-FREEZE ASSET CATALOG
- * purpose: mantiene la entrada Creators disponible sin evaluar Studio hasta que el usuario la abre; carga el catálogo de assets solo en Creator
- * public-api: KeloCreatorsLazyGate.open/sync
+ * keys: CREATORS ASSET FORGE LAZY FIRST-USE ADMIN MOBILE SAFARI NO-FREEZE ASSET CATALOG
+ * purpose: mantiene Creators y Asset Forge disponibles sin evaluar Studio hasta que el usuario los abre; Asset Forge no carga el catálogo grande
+ * public-api: KeloCreatorsLazyGate.open/openAssetForge/sync
  * consumes: KELO_ADMIN_KEYS + Luxe menu
  * do-not: NO creator imports on normal boot, NO polling, NO second loop
  */
 (function(root){
 'use strict';
 if(root.KeloCreatorsLazyGate)return;
-const VERSION='kelo-creators-lazy-gate-v4-assets';
-const LAUNCHER_SRC='src/ui/studio-launcher.js?v=world-bridge-20260915-25';
+const VERSION='kelo-creators-lazy-gate-v6-direct-asset-forge';
+const LAUNCHER_SRC='src/ui/studio-launcher.js?v=asset-forge-20260915-1';
 const ASSET_CATALOG_SRC='src/property/property-asset-catalog.js?v=creator-assets-20260915-1';
-let loading=null,catalogLoading=null;
+const assetForgeModuleUrl=()=>new URL('src/creators/creator-entry.mjs?v=asset-forge-20260915-1',root.document?.baseURI||root.location.href).href;
+let loading=null,catalogLoading=null,forgeLoading=null;
 const query=()=>{try{return new URLSearchParams(root.location.search);}catch(_){return new URLSearchParams();}};
 const directRequested=()=>query().get('creators')==='1'||query().get('creator')==='1'||query().get('mapEditor')==='1';
 const actor=()=>String(root.KELO_ADMIN_KEYS?.playerId?.()||root.keloNet?.playerKey||root.localPlayer?.id||'local_pioneer');
@@ -28,16 +29,28 @@ function paint(btn,busy){
   btn.disabled=!!busy;
   if(busy)btn.setAttribute('aria-busy','true');else btn.removeAttribute('aria-busy');
 }
+function paintForge(btn,busy){
+  if(!btn)return;
+  btn.innerHTML='<span class="lx-menu-icon" aria-hidden="true">✎</span><span class="lx-menu-copy"><b>'+(busy?'Abriendo…':'Asset Forge')+'</b><small>'+(busy?'Cargando editor ligero':'Dibujar · reparar · mercado')+'</small></span>';
+  btn.disabled=!!busy;
+  if(busy)btn.setAttribute('aria-busy','true');else btn.removeAttribute('aria-busy');
+}
 function sync(){
   const grid=document.querySelector('#lx-menu-panel .lx-menu-grid');
   if(!grid)return false;
-  let btn=document.getElementById('lx-create-studio');
-  if(!allowed()&&!directRequested()){btn?.remove();return true;}
+  let btn=document.getElementById('lx-create-studio'),forgeBtn=document.getElementById('lx-create-asset-forge');
+  if(!allowed()&&!directRequested()){btn?.remove();forgeBtn?.remove();return true;}
   if(!btn){
     btn=document.createElement('button');btn.id='lx-create-studio';btn.type='button';btn.className='lx-menu-item';
     btn.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();void open();});grid.appendChild(btn);
   }
-  btn.setAttribute('aria-label','Abrir Kelo Creators');paint(btn,!!loading);return true;
+  if(!forgeBtn){
+    forgeBtn=document.createElement('button');forgeBtn.id='lx-create-asset-forge';forgeBtn.type='button';forgeBtn.className='lx-menu-item';
+    forgeBtn.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();void openAssetForge();});grid.appendChild(forgeBtn);
+  }
+  btn.setAttribute('aria-label','Abrir Kelo Creators');paint(btn,!!loading);
+  forgeBtn.setAttribute('aria-label','Abrir Kelo Asset Forge');paintForge(forgeBtn,!!forgeLoading);
+  return true;
 }
 function loadAssetCatalog(){
   if(root.KELO_PROPERTY_CATALOG?.list)return Promise.resolve(root.KELO_PROPERTY_CATALOG);
@@ -64,6 +77,21 @@ function loadStudio(){
   })().finally(function(){loading=null;sync();});
   return loading;
 }
+async function openAssetForge(){
+  if(forgeLoading)return forgeLoading;
+  if(!allowed()){toast('Necesitas acceso a Kelo Creators');return false;}
+  const btn=document.getElementById('lx-create-asset-forge');paintForge(btn,true);
+  forgeLoading=(async function(){
+    try{
+      root.KELO_LUXE?.closeMenu?.();
+      const mod=await import(assetForgeModuleUrl());
+      const platform=await mod.bootKeloCreators({root});
+      await platform.openWorkspace('asset-forge');
+      return true;
+    }catch(error){console.error('[Kelo Asset Forge lazy gate]',error);toast('No se pudo abrir Asset Forge');return false;}
+  })().finally(function(){forgeLoading=null;paintForge(document.getElementById('lx-create-asset-forge'),false);sync();});
+  return forgeLoading;
+}
 async function open(){
   if(!allowed()){
     if(directRequested()&&query().get('mapEditor')==='1'&&root.KELO_ADMIN_KEYS?.request){
@@ -76,7 +104,7 @@ async function open(){
   catch(error){console.error('[Kelo Creators lazy gate]',error);toast('No se pudo abrir Kelo Creators');return false;}
   finally{paint(document.getElementById('lx-create-studio'),false);}
 }
-const api=Object.freeze({version:VERSION,open,sync,get allowed(){return allowed();},get directRequested(){return directRequested();}});
+const api=Object.freeze({version:VERSION,open,openAssetForge,sync,get allowed(){return allowed();},get directRequested(){return directRequested();}});
 root.KeloCreatorsLazyGate=api;
 root.KELO_CREATORS_LAZY_GATE=api;
 try{root.KELO_ADMIN_KEYS?.onChange?.(sync);}catch(_){}
