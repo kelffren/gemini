@@ -1,23 +1,24 @@
 /* KELO-INDEX
  * area: CORE / OPTIONAL UI
  * owner: KeloSettingsLazyGate
- * keys: SETTINGS DOWNLOAD CENTER GUARDIAN LAZY FIRST-USE MOBILE SAFARI WORKLOAD P2P WEBRTC
- * purpose: mantiene Ajustes visible con una puerta mínima; Download Center y Guardian/Workload/P2P no se evalúan hasta el primer toque
+ * keys: SETTINGS DOWNLOAD CENTER UPDATE INTELLIGENCE GUARDIAN WORKLOAD P2P WEBRTC LAZY FIRST-USE MOBILE SAFARI
+ * purpose: mantiene Ajustes visible con una puerta mínima; Update Intelligence y Guardian solo se evalúan tras el primer toque
  * public-api: KeloSettingsUI.open/close + KeloSettingsLazyGate.load
- * do-not: NO download center/Guardian import on normal boot, NO polling, NO segundo socket/loop
+ * do-not: NO settings/Guardian payload on normal boot, NO polling, NO segundo socket/loop
  */
 (function(root){
 'use strict';
 if(root.KeloSettingsLazyGate)return;
-const VERSION='kelo-settings-lazy-gate-v1.3-guardian-p2p';
+const VERSION='kelo-settings-lazy-gate-v2.1-update-intelligence-guardian';
 let loading=null,guardianLoading=null,workloadLoading=null,peerLoading=null;
+function loadScript(src,marker){return new Promise(function(resolve,reject){const base=src.split('?')[0],existing=Array.from(document.scripts).find(function(s){return String(s.getAttribute('src')||'').split('?')[0]===base;});if(existing){resolve();return;}const s=document.createElement('script');s.src=src;s.async=false;s.dataset.keloSettingsFirstUse=marker||'1';s.onload=resolve;s.onerror=function(){reject(new Error('SETTINGS_SCRIPT_LOAD_FAILED:'+src));};document.head.appendChild(s);});}
 function load(){
-  if(root.KeloDownloadCenter)return Promise.resolve(root.KeloDownloadCenter);
+  if(root.KeloDownloadCenter&&root.KeloUpdateIntelligenceUI)return Promise.resolve(root.KeloDownloadCenter);
   if(loading)return loading;
-  loading=new Promise(function(resolve,reject){
-    const s=document.createElement('script');s.src='src/core/download-center.js?v=2-safe';s.async=false;s.dataset.keloSettingsFirstUse='1';
-    s.onload=function(){resolve(root.KeloDownloadCenter||null);};s.onerror=function(){reject(new Error('DOWNLOAD_CENTER_LOAD_FAILED'));};document.head.appendChild(s);
-  }).finally(function(){loading=null;});
+  loading=loadScript('src/core/download-center.js?v=2-safe','download-center')
+    .then(function(){return loadScript('src/core/update-intelligence-ui.js?v=1','update-intelligence');})
+    .then(function(){return root.KeloDownloadCenter||null;})
+    .finally(function(){loading=null;});
   return loading;
 }
 function loadGuardian(){
@@ -41,14 +42,14 @@ function loadGuardianPeers(guardian){
 async function open(){
   try{
     const center=await load();if(!center||typeof center.open!=='function')throw new Error('DOWNLOAD_CENTER_UNAVAILABLE');
-    center.open();
+    center.open();try{root.KeloUpdateIntelligenceUI?.render?.();}catch(_){}
     loadGuardian().then(function(guardian){try{guardian?.mountInSettings?.();}catch(error){console.error('[Kelo Guardian mount]',error);}if(guardian){loadGuardianWorkloads(guardian);loadGuardianPeers(guardian);}});
     return true;
   }
   catch(error){console.error('[Kelo Settings lazy gate]',error);if(typeof root.showToast==='function')root.showToast('No se pudo abrir Ajustes');return false;}
 }
 function close(){try{root.KeloDownloadCenter?.close?.();}catch(_){} }
-const api=Object.freeze({version:VERSION,load,loadGuardian,loadGuardianWorkloads,loadGuardianPeers,open,close,get loaded(){return !!root.KeloDownloadCenter;},get guardianLoaded(){return !!root.KeloGuardianDeviceHost;},get workloadRuntimeLoaded(){return !!root.KeloGuardianWorkloadRuntime;},get peerMeshLoaded(){return !!root.KeloGuardianPeerMesh;}});
+const api=Object.freeze({version:VERSION,load,loadGuardian,loadGuardianWorkloads,loadGuardianPeers,open,close,get loaded(){return !!(root.KeloDownloadCenter&&root.KeloUpdateIntelligenceUI);},get guardianLoaded(){return !!root.KeloGuardianDeviceHost;},get workloadRuntimeLoaded(){return !!root.KeloGuardianWorkloadRuntime;},get peerMeshLoaded(){return !!root.KeloGuardianPeerMesh;}});
 root.KeloSettingsLazyGate=api;
 root.KeloSettingsUI=Object.freeze({open,close});
 try{root.KELO_LUXE?.renderMenu?.();}catch(_){}
