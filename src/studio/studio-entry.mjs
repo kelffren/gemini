@@ -32,7 +32,18 @@ async function loadStudioCore(root,phoneBoot){
   const previewMod=await import('./render/studio-asset-preview-service.mjs');await wait();abort();
   const storeMod=await import('./storage/indexeddb-studio-store.mjs');await wait();abort();
   const profilerMod=await import('./performance/studio-profiler.mjs');await wait();abort();
-  const compilerMod=await import('./compiler/world-compiler.mjs');await wait();abort();
+  const surgery=root.KELO_WORLD_SURGERY;
+  let compilerMod=null;
+  if(surgery?.enabled?.('compiler')===false){
+    compilerMod={createWorldCompiler:null};
+    surgery?.markStatus?.('compiler','DISABLED',{phase:'module-import'});
+  }else{
+    const compilerToken=surgery?.start?.('compiler','module-import');
+    try{
+      compilerMod=await import('./compiler/world-compiler.mjs');await wait();abort();
+      surgery?.done?.(compilerToken);
+    }catch(error){surgery?.fail?.(compilerToken,error);throw error;}
+  }
   let overlayMod=null,workerMod=null,touchMod=null,rangeMod=null;
   if(!phoneBoot){
     overlayMod=await import('./render/studio-overlay-renderer.mjs');await wait();abort();
@@ -54,7 +65,7 @@ async function loadStudioCore(root,phoneBoot){
     createStudioAssetPreviewService:previewMod.createStudioAssetPreviewService,
     createStudioStore:storeMod.createStudioStore,
     createStudioProfiler:profilerMod.createStudioProfiler,
-    createWorldCompiler:compilerMod.createWorldCompiler,
+    createWorldCompiler:compilerMod?.createWorldCompiler||null,
     createStudioOverlayRenderer:overlayMod?.createStudioOverlayRenderer||null,
     createStudioWorkerClient:workerMod?.createStudioWorkerClient||null,
     createStudioPlacementTouchController:touchMod.createStudioPlacementTouchController,
@@ -70,6 +81,7 @@ const NOOP_ASSET_FAVORITES=Object.freeze({refresh:()=>{},destroy:()=>{},toggle:(
 const NOOP_CTRL=Object.freeze({destroy(){},refresh(){}});
 const NOOP_STORE=Object.freeze({appendCommand:async()=>false,saveCheckpoint:async()=>false,loadRecovery:async()=>null,close:async()=>{}});
 const NOOP_ASSET_PREVIEW=Object.freeze({renderThumbnail:async()=>false,warmAsset:async()=>false,close(){}});
+const DISABLED_COMPILER=Object.freeze({compile(){throw new Error('WORLD_SURGERY_COMPILER_DISABLED');}});
 // A11: preview/catalog UI early; heavy optional tools + extras later and idle-sliced.
 const PHONE_PREVIEW_BOOT_DELAY_MS=1200;
 const PHONE_OPTIONAL_BOOT_DELAY_MS=45000;
@@ -373,7 +385,8 @@ export async function bootKeloStudio({ mode = 'world', actorId = null, document 
   let propertyCommitController=NOOP_CTRL;
   let snapCycleController=NOOP_CTRL;
   const resolvePrefab = id => kernel.prefabs.resolve(id) || adapter.assetCatalog.get(id) || { id };
-  const compiler = createWorldCompiler({ resolvePrefab });
+  const compiler=surgery.enabled('compiler')&&typeof createWorldCompiler==='function'?createWorldCompiler({resolvePrefab}):DISABLED_COMPILER;
+  surgery.markStatus('compiler',surgery.enabled('compiler')&&typeof createWorldCompiler==='function'?'ACTIVE':'DISABLED',{phase:'boot'});
   const worker = createStudioWorkerClient&&surgery.enabled('worker')?createStudioWorkerClient({ resolvePrefab, prefabSnapshot: () => Object.fromEntries(kernel.prefabs.list().map(p => [p.id, kernel.prefabs.resolve(p.id)])) }):{compile:(doc,options)=>Promise.resolve(compiler.compile(doc,options)),close(){},get active(){return false;}};
   surgery.markStatus('worker',createStudioWorkerClient&&surgery.enabled('worker')?'ACTIVE':'DISABLED',{phase:'boot'});
   const store = surgery.enabled('storage')?createStudioStore():NOOP_STORE, profiler = createStudioProfiler();
