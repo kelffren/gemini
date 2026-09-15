@@ -11,10 +11,20 @@ on:
       - server/package-lock.json
       - .nvmrc
       - .github/workflows/dependency-lock.yml
+  pull_request:
+    branches:
+      - main
+    paths:
+      - package.json
+      - package-lock.json
+      - server/package.json
+      - server/package-lock.json
+      - .nvmrc
+      - .github/workflows/dependency-lock.yml
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: dependency-lock-${{ github.ref }}
@@ -27,41 +37,30 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Setup client Node
         uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
 
-      - name: Generate client lockfile
-        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+      - name: Verify client lockfile is reproducible
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f package-lock.json
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          git diff --exit-code -- package-lock.json
 
       - name: Setup server Node
         uses: actions/setup-node@v4
         with:
           node-version: 24.20.0
 
-      - name: Generate server lockfile
+      - name: Verify server lockfile is reproducible
         working-directory: server
-        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
-
-      - name: Commit lockfiles when changed
         shell: bash
         run: |
           set -euo pipefail
-          root_tracked=0
-          server_tracked=0
-          git ls-files --error-unmatch package-lock.json >/dev/null 2>&1 && root_tracked=1 || true
-          git ls-files --error-unmatch server/package-lock.json >/dev/null 2>&1 && server_tracked=1 || true
-          if git diff --quiet -- package-lock.json server/package-lock.json && [ "$root_tracked" -eq 1 ] && [ "$server_tracked" -eq 1 ]; then
-            echo "lockfiles already current"
-            exit 0
-          fi
-          git config user.name "kelo-evergreen-bot"
-          git config user.email "68343904+kelffren@users.noreply.github.com"
-          git add package-lock.json server/package-lock.json
-          git commit -m "build: refresh dependency lockfiles"
-          git pull --rebase origin "$GITHUB_REF_NAME"
-          git push origin "HEAD:$GITHUB_REF_NAME"
+          test -f package-lock.json
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          git diff --exit-code -- package-lock.json
