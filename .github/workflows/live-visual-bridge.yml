@@ -1,0 +1,55 @@
+name: Kelo Live Visual Bridge
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'work/**'
+      - 'feature/**'
+      - 'codex/**'
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: kelo-live-visual-bridge-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  live-visual-bridge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install project dependencies
+        run: npm ci
+
+      - name: Run live visual bridge
+        run: node scripts/live-visual-bridge.mjs
+
+      - name: Publish bridge summary
+        if: always()
+        shell: bash
+        run: |
+          if [ -f artifacts/live-visual-bridge/summary.txt ]; then
+            cat artifacts/live-visual-bridge/summary.txt >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'Bridge did not produce a summary.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload live preview evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kelo-live-visual-bridge-${{ github.run_id }}
+          path: artifacts/live-visual-bridge/
+          if-no-files-found: warn
+          retention-days: 7
