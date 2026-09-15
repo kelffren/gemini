@@ -1,8 +1,9 @@
 /* KELO-INDEX
  * area: UI
- * keys: BUILDER UX SCOPE PICKUP ROTATE DOCK BRUSH UNDO ONLINE
- * hace: Plaza|Parcela + recoger/rotar + barra abajo; el pointer lo posee builder-input
+ * keys: BUILDER UX SCOPE PICKUP ROTATE DOCK BRUSH UNDO ONLINE POSITION CAMERA
+ * hace: Plaza|Parcela + recoger/rotar + barra abajo; el pointer lo posee builder-input; transiciones de jugador/cámara se delegan a Foundation owners
  * online: envuelve request()
+ * do-not: NO escribir localPlayer.x/y ni camera.* directamente
  */
 (function(){
   'use strict';
@@ -49,7 +50,7 @@
   }
   async function rotateHeldOrSelected(){
     if(held){held.rotation=((held.rotation||0)+1)%4;toast('Rotado '+held.rotation);return;}
-    if(!selectedId){toast('Selecciona o recoge un objeto');return;}
+    if(!selectedId){toast('Selecciona o recoge un objeto primero');return;}
     try{await editReq('world:placement:rotate',{actorId:actor(),placementId:selectedId,delta:1});toast('Rotado');}catch(e){toast(e.message);}
   }
   async function pickUnderGhost(){
@@ -130,9 +131,11 @@
     scope=next==='parcel'?'parcel':'world';
     ensureParcel().then(p=>{
       toast(scope==='world'?'Editando PLAZA':'Editando MI PARCELA');
-      if(scope==='parcel'&&p?.bounds&&typeof localPlayer!=='undefined'){
-        localPlayer.x=p.bounds.x+p.bounds.w/2;localPlayer.y=p.bounds.y+p.bounds.h+40;
-        if(typeof camera!=='undefined'){camera.x=localPlayer.x;camera.y=localPlayer.y;camera.targetX=localPlayer.x;camera.targetY=localPlayer.y;}
+      if(scope==='parcel'&&p?.bounds){
+        const x=p.bounds.x+p.bounds.w/2,y=p.bounds.y+p.bounds.h+40;
+        if(!window.KeloPlayerPosition?.teleport)throw new Error('KeloPlayerPosition unavailable in builder scope');
+        window.KeloPlayerPosition.teleport(x,y,{source:'builder-ux:parcel-scope',stopMotion:true});
+        if(window.KeloCamera?.setTarget)window.KeloCamera.setTarget(x,y,{snap:true,source:'builder-ux:parcel-scope'});
       }
       document.getElementById('kelo-scope-world')?.classList.toggle('on',scope==='world');
       document.getElementById('kelo-scope-parcel')?.classList.toggle('on',scope==='parcel');
@@ -203,7 +206,7 @@
   const t=setInterval(()=>{wrapWorld();wrapProperty();wrapEdit();injectChrome();},200);
   setTimeout(()=>clearInterval(t),25000);
   window.KELO_BUILDER_UX=Object.freeze({
-    version:'builder-ux-v1.3.0',undoLast,setScope,pickUnderGhost,rotateHeldOrSelected,dock,
+    version:'builder-ux-v1.4.0-position-owner',undoLast,setScope,pickUnderGhost,rotateHeldOrSelected,dock,
     drop:dropHeld,pickUp,
     get scope(){return scope;},get parcelId(){return parcel?.parcelId||null;},get holding(){return !!held;},get undoCount(){return undo.length;}
   });

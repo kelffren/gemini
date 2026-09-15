@@ -69,6 +69,7 @@ jobs:
           node --check src/instances/instance-runtime-bridge.js
           node --check src/instances/market-instance.js
           node --check src/ui/builder-parcel-meta.js
+          node --check src/ui/builder-ux-v2.js
           node --check src/environment/generic-prefabs.js
           node --check src/environment/luxe-kiosk-atlas.js
           node --check engine-c.js
