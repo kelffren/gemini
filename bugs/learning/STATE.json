@@ -842,9 +842,25 @@
         "src/environment/generic-prefabs.js",
         "src/environment/luxe-kiosk-atlas.js"
       ]
+    },
+    {
+      "id": "prevention:4d1ccf949fb4b2517de2c8e7ed56d8e8c14031a1",
+      "at": "2026-09-15T06:42:35.000Z",
+      "source": "bug-prevention-ci",
+      "head_sha": "4d1ccf949fb4b2517de2c8e7ed56d8e8c14031a1",
+      "base_sha": "cb90474b1b109f2924fbff39801f48d350c2523c",
+      "conclusion": "success",
+      "files": [
+        ".github/workflows/legacy-observatory.yml",
+        "config/legacy-migration-manifest.json",
+        "engine-c.js",
+        "index.html",
+        "scripts/simulation-owner-migration-audit.mjs",
+        "src/core/simulation-extension-system.js"
+      ]
     }
   ],
-  "feedback_updated_at": "2026-09-15T06:32:22.455Z",
+  "feedback_updated_at": "2026-09-15T06:45:23.674Z",
   "training": {
     "examples": 58,
     "search_examples": 43,
