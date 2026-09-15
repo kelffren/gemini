@@ -1,11 +1,15 @@
 {
   "name": "kelo-world",
   "private": true,
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "build": "node scripts/turbo-build.mjs",
     "audit:turbo-build": "node scripts/turbo-build-audit.mjs",
     "test": "playwright test",
     "test:live": "playwright test",
+    "test:state-migrations": "node tests/state-store-migration.test.cjs",
     "test:browserstack": "browserstack-node-sdk playwright test",
     "test:browserstack:map-forge": "browserstack-node-sdk playwright test tests/map-forge-mobile-preview.spec.js tests/map-forge-evolution-visual.spec.js tests/map-forge-orientation-visual.spec.js",
     "test:bug-intelligence": "node scripts/bug-intelligence-selftest.mjs",
@@ -31,6 +35,7 @@
     "audit:foundation": "node scripts/foundation-architecture-audit.js",
     "audit:docs": "node scripts/system-documentation-audit.js",
     "audit:updater": "node scripts/updater-audit.mjs",
+    "audit:sw-cache": "node scripts/service-worker-cache-audit.mjs",
     "audit:turbo": "node scripts/turbo-update-guardian.mjs",
     "audit:titles": "node scripts/title-system-audit.js",
     "audit:containers": "node scripts/container-system-audit.js",
@@ -102,7 +107,7 @@
   },
   "devDependencies": {
     "@playwright/test": "1.62.0",
-    "browserstack-node-sdk": "^1.69.0",
+    "browserstack-node-sdk": "1.69.0",
     "esbuild": "0.25.9"
   }
 }
