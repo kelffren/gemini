@@ -1,15 +1,15 @@
 /* KELO-INDEX
  * area: QA / MOVEMENT
  * owner: FOUNDATION CI
- * keys: MOVEMENT HOOK BEFORE INTERCEPT AFTER ORDER WRAPPER CONTRACT
- * purpose: valida el owner único de extensiones de movimiento sin ejecutar el juego completo
+ * keys: MOVEMENT HOOK BEFORE INTERCEPT AFTER ORDER WRAPPER CONTRACT PLAZA FIRST LAZY
+ * purpose: valida owner único y orden real de movimiento sin exigir extensiones legacy pesadas en parser boot
  * public-api: CLI
  * consumes: src/core/movement-system.js, engine-g/ac/ah/ai.js, index.html
  * state-owned: ninguno
  * extension-points: invariantes del contrato KeloMovement
  * reuse: Foundation CI
- * legacy: simula updateMovement de engine-a
- * do-not: no sustituir smoke browser de movimiento real
+ * legacy: simula updateMovement de engine-a; extensiones legacy pueden estar deferred/inactivas
+ * do-not: no sustituir smoke browser de movimiento real ni reinsertar engines pesados en index.html
  */
 'use strict';
 const fs=require('fs');
@@ -52,6 +52,19 @@ ok(g.includes("KeloMovement.intercept('engine-g:legacy-dash'"),'ENGINE_G_INTERCE
 ok(ac.includes("KeloMovement.before('engine-ac:gait-speed'")&&ac.includes("KeloMovement.after('engine-ac:visual-motion'"),'ENGINE_AC_HOOKS');
 ok(ah.includes("KeloMovement.after('engine-ah:release-brake'"),'ENGINE_AH_HOOK');
 ok(ai.includes("KeloMovement.after('engine-ai:cafe-room-clamp'"),'ENGINE_AI_HOOK');
-const iA=html.indexOf('engine-a.js'),iM=html.indexOf('src/core/movement-system.js'),iG=html.indexOf('engine-g.js'),iAc=html.indexOf('engine-ac.js');
-ok(iA>=0&&iM>iA&&iG>iM&&iAc>iM,'LOAD_ORDER');
-console.log('MOVEMENT_SYSTEM_OK: single wrapper + hooks + exclusive interceptors + legacy movement migration passed');
+
+// Plaza-first boot deliberately keeps heavy legacy engines out of parser-time HTML.
+// The owner must be installed before the active static consumer engine-g. If optional
+// legacy extensions ever return to parser boot, they must still come after KeloMovement.
+const iA=html.indexOf('engine-a.js');
+const iM=html.indexOf('src/core/movement-system.js');
+const iG=html.indexOf('engine-g.js');
+const optional=['engine-ac.js','engine-ah.js','engine-ai.js'];
+ok(iA>=0&&iM>iA&&iG>iM,'LOAD_ORDER_STATIC');
+for(const src of optional){
+  const pos=html.indexOf(src);
+  ok(pos<0||pos>iM,'OPTIONAL_EXTENSION_BEFORE_MOVEMENT:'+src);
+}
+ok(html.indexOf('engine-ac.js')<0,'ENGINE_AC_MUST_REMAIN_OUT_OF_PARSER_BOOT');
+
+console.log('MOVEMENT_SYSTEM_OK: single wrapper + hooks + interceptors + plaza-first owner order passed');

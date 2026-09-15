@@ -8,7 +8,7 @@
 import fs from 'node:fs';
 const read=(path)=>fs.readFileSync(path,'utf8');
 const assert=(condition,message)=>{if(!condition)throw new Error(message);};
-const luxe=read('src/ui/luxe-shell.js'),playerHud=read('src/ui/luxe-player-hud.js'),index=read('index.html'),character=read('src/ui/character-customizer-ui.js'),selfUi=read('src/ui/self-interaction-ui.js'),backpack=read('src/ui/backpack-ui.js'),market=read('src/ui/market-ui.js'),commerce=read('src/ui/commerce-ui.js'),house=read('src/ui/house-instance-ui.js'),studio=read('src/ui/studio-launcher.js'),engineC=read('engine-c.js'),engineQ=read('engine-q.js');
+const luxe=read('src/ui/luxe-shell.js'),playerHud=read('src/ui/luxe-player-hud.js'),index=read('index.html'),character=read('src/ui/character-customizer-ui.js'),selfUi=read('src/ui/self-interaction-ui.js'),backpack=read('src/ui/backpack-ui.js'),market=read('src/ui/market-ui.js'),commerce=read('src/ui/commerce-ui.js'),house=read('src/ui/house-instance-ui.js'),studio=read('src/ui/studio-launcher.js'),engineC=read('engine-c.js'),engineQ=read('engine-q.js'),loader=read('src/core/module-loader.js');
 assert(luxe.includes('KELO-INDEX'),'Luxe shell must carry KELO-INDEX');
 assert(luxe.includes("luxe-shell-v4.0.4-mount-menu"),'Premium Luxe version missing');
 assert(luxe.includes("grid-template-columns:repeat(2,minmax(0,1fr))"),'Premium menu must use a two-column grid');
@@ -56,14 +56,16 @@ assert(playerHud.includes("quickOptions.setAttribute('aria-hidden','true')")&&pl
 assert(playerHud.includes('opacity .21s ease')&&playerHud.includes('translateY(-6px) scale(.97)'),'Quick-actions lightweight transition missing');
 assert(playerHud.includes("const autoCloseActions=new Set([shop,menu,pvp,guide].filter(Boolean))"),'Owner-backed quick actions must auto-close without replacing their handlers');
 assert(!playerHud.includes('shop.onclick=')&&!playerHud.includes('menu.onclick=')&&!playerHud.includes('pvp.onclick=')&&!playerHud.includes('fullscreen.onclick='),'Player HUD must not replace existing action handlers');
-assert(playerHud.includes("rail:'collapsible-five'")&&playerHud.includes("version:'luxe-player-hud-v1.2.0'"),'Collapsible rail audit metadata missing');
+assert(playerHud.includes("rail:'collapsible-five'")&&playerHud.includes("version:'luxe-player-hud-v1.3.0-minimap'"),'Collapsible rail audit metadata missing');
 assert(!playerHud.includes('grid-template-columns:repeat(2,44px)'),'Deprecated 2x2 rail returned');
 assert(!playerHud.includes('setInterval('),'Combat HUD must not poll');
 assert((playerHud.match(/requestAnimationFrame\(/g)||[]).length===1,'Combat HUD may use one initial RAF only');
 assert(!/STATE\s*\.\s*gold\s*[+\-*/]?=/.test(playerHud),'Combat HUD must not mutate gold');
 assert(!/\.hp\s*[+\-*/]?=/.test(playerHud),'Combat HUD must not mutate HP');
-assert(index.includes('src/ui/luxe-player-hud.js?v=3'),'Combat HUD runtime include missing');
+assert(index.includes('src/ui/luxe-player-hud.js?v=4-minimap-live-20260914'),'Combat HUD runtime include missing');
+assert(loader.includes("{src:'src/systems/pvp-world.js")&&loader.includes("{src:'src/systems/pvp-combat-runtime-loader.js"),'PvP must remain first-use through KeloModuleLoader');
+assert(!index.includes('src/systems/pvp-world.js'),'PvP world must not return to cold boot');
 assert(!index.includes('id="telemetry-bar"'),'Legacy telemetry returned');
 assert(!index.includes('id="kelo-guide-link"'),'Legacy guide returned');
 assert(index.includes('<div id="ui-layer"><div class="action-bar"'),'UI layer owner surface drifted');
-console.log(JSON.stringify({status:'PASS',owner:'Kelo Luxe Shell presentation',layout:'pvp-only-combat-v1',socialHudHidden:true,pvpResources:['hp','mana'],rightRail:{launcher:'collapsible',default:'closed',actions:['Boutique','Menu','PvP','Guía','Pantalla completa']},noProfileMetadataInPersistentHud:true,noPolling:true,tokenInputLocks:true},null,2));
+console.log(JSON.stringify({status:'PASS',owner:'Kelo Luxe Shell presentation',layout:'pvp-only-combat-v1',socialHudHidden:true,pvpResources:['hp','mana'],rightRail:{launcher:'collapsible',default:'closed',actions:['Boutique','Menu','PvP','Guía','Pantalla completa']},noProfileMetadataInPersistentHud:true,noPolling:true,tokenInputLocks:true,pvpFirstUse:true},null,2));

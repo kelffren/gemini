@@ -1,0 +1,80 @@
+name: Kelo Live Visual Bridge
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'work/**'
+      - 'feature/**'
+      - 'codex/**'
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: kelo-live-visual-bridge-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  live-visual-bridge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install project dependencies
+        run: npm install --no-save --ignore-scripts
+
+      - name: Run live visual bridge
+        run: node scripts/live-visual-bridge.mjs
+
+      - name: Prove detector rejects broken movement
+        shell: bash
+        run: |
+          cp -a artifacts/live-visual-bridge artifacts/live-visual-bridge-pass
+          set +e
+          KELO_BRIDGE_MOVE_MS=0 node scripts/live-visual-bridge.mjs
+          code=$?
+          set -e
+
+          if [ "$code" -eq 0 ]; then
+            echo 'Detector self-check FAILED: zero-movement session was accepted.'
+            exit 1
+          fi
+
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const result = JSON.parse(fs.readFileSync('artifacts/live-visual-bridge/result.json', 'utf8'));
+          if (result.pass !== false || result.checks?.playerMoved !== false) {
+            throw new Error(`Detector self-check produced unexpected result: ${JSON.stringify(result.checks)}`);
+          }
+          console.log('DETECTOR_SELF_CHECK=PASS');
+          NODE
+
+          rm -rf artifacts/live-visual-bridge
+          mv artifacts/live-visual-bridge-pass artifacts/live-visual-bridge
+
+      - name: Publish bridge summary
+        if: always()
+        shell: bash
+        run: |
+          if [ -f artifacts/live-visual-bridge/summary.txt ]; then
+            cat artifacts/live-visual-bridge/summary.txt >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'Bridge did not produce a summary.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload live preview evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kelo-live-visual-bridge-${{ github.run_id }}
+          path: artifacts/live-visual-bridge/
+          if-no-files-found: warn
+          retention-days: 7

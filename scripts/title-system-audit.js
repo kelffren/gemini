@@ -82,6 +82,7 @@ const validContext = (overrides = {}) => ({
   const net = read('engine-net.js');
   const server = read('server/index.js');
   const index = read('index.html');
+  const loader = read('src/core/module-loader.js');
   assert.strictEqual(engineC.includes("localPlayer.title = 'Caballero'"), false, 'legacy Caballero debe retirarse');
   assert.strictEqual(/renderAvatar\s*=\s*function/.test(nameplate), false, 'nameplate no envuelve renderAvatar');
   assert.strictEqual(nameplate.includes("KeloAvatar.use('actor-nameplate'"), true, 'nameplate usa KeloAvatar');
@@ -96,9 +97,15 @@ const validContext = (overrides = {}) => ({
   assert.strictEqual(server.includes("msg.t === 'titles:unlock'"), false, 'server no expone titles:unlock');
   assert.strictEqual(server.includes('recordConfirmedKill'), true, 'server tiene hook interno de kill confirmada');
   assert.strictEqual(/msg\.t\s*===\s*['"]visual:event['"]/.test(server), true, 'visual relay existe pero separado');
-  assert.ok(index.indexOf('src/systems/player-stats.js') < index.indexOf('src/systems/title-system.js'), 'Stats carga antes de Titles');
-  assert.ok(index.indexOf('src/systems/title-system.js') < index.indexOf('src/systems/nobility.js'), 'Titles carga antes de panel Nobleza');
-  assert.ok(index.indexOf('src/ui/player-nameplate.js') > index.indexOf('src/systems/nobility-authority.js'), 'nameplate resuelve catálogo/rangos tras owners');
 
-  console.log('✅ Kelo Titles audit: catalog/data/placeholders, Title Book, 199→200 unlock, invalid kills, equip/unequip, persistence, net + Foundation guards OK');
+  const titleCatalogPos=loader.indexOf("src/systems/title-catalog.js");
+  const statsPos=loader.indexOf("src/systems/player-stats.js");
+  const titleSystemPos=loader.indexOf("src/systems/title-system.js");
+  assert.ok(titleCatalogPos>=0&&titleCatalogPos<statsPos&&statsPos<titleSystemPos,'Deferred Titles pack must load catalog → stats → system');
+  assert.strictEqual(index.includes('src/systems/title-system.js'),false,'Titles owner must stay out of cold boot');
+  assert.strictEqual(index.includes('src/systems/player-stats.js'),false,'Title stats must stay out of cold boot');
+  assert.ok(loader.includes("if(name==='nobility'||name==='emotes') name='social'"),'Social first-use alias contract missing');
+  assert.ok(nameplate.includes('root.KeloNobility')&&nameplate.includes('root.KeloTitleCatalog'),'nameplate must consume owners defensively when deferred owners become available');
+
+  console.log('✅ Kelo Titles audit: catalog/data/placeholders, Title Book, 199→200 unlock, invalid kills, equip/unequip, persistence, net + deferred Foundation guards OK');
 })().catch((err) => { console.error('❌ Kelo Titles audit failed:', err); process.exitCode = 1; });
