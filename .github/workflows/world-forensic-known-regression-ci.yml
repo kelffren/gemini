@@ -1,0 +1,70 @@
+name: World Forensic Known Regression CI
+
+on:
+  push:
+    branches: [world-surgery]
+    paths:
+      - 'scripts/world-forensic-autopsy.mjs'
+      - 'scripts/recovery-bisect.mjs'
+      - 'scripts/recovery-profile-runner.mjs'
+      - '.github/workflows/world-forensic-autopsy.yml'
+      - '.github/workflows/world-forensic-known-regression-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: world-forensic-known-regression-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  paint-copies-known-boundary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install Recovery Mesh browser dependencies
+        run: |
+          npm install --no-package-lock --no-audit --no-fund
+          npx playwright install --with-deps chromium
+
+      - name: Reproduce known Paint Copies first-bad boundary
+        env:
+          FORENSIC_GOOD: ea14e48426ac20aff44da009f0d615d8562cf7cd
+          FORENSIC_BAD: c13cceafecd4edc9144a99a108eb2851f88a7541
+          FORENSIC_MODE: WORLD_MOUNT
+          FORENSIC_REPEAT: '1'
+        run: node scripts/world-forensic-autopsy.mjs
+
+      - name: Assert historical answer
+        run: |
+          REPORT="$(find forensics -type f -name report.json | sort | tail -1)"
+          node - <<'NODE' "$REPORT"
+          const fs=require('fs');
+          const file=process.argv[2];
+          const r=JSON.parse(fs.readFileSync(file,'utf8'));
+          const expected='c13cceafecd4edc9144a99a108eb2851f88a7541';
+          if(r.boundary?.firstBad!==expected||r.boundary?.confirmed!==true){
+            console.error('FORENSIC_KNOWN_REGRESSION_MISMATCH',r.boundary,r.endpointValidation,r.fatal);
+            process.exit(1);
+          }
+          console.log('WORLD_FORENSIC_KNOWN_REGRESSION_PASS',r.boundary.firstBad,r.boundary.subject);
+          NODE
+
+      - name: Upload known-regression evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: world-forensic-known-regression-${{ github.run_id }}
+          if-no-files-found: warn
+          retention-days: 14
+          path: |
+            forensics/world-autopsy-*/**
