@@ -1,20 +1,20 @@
 /* KELO-INDEX
  * area: ONLINE / GUARDIAN PEER MESH
  * owner: Kelo Guardian P2P client
- * keys: WEBRTC SIGNAL SINGLE SOCKET RELAY ASSET CHUNKS SHA256 LATENCY TURN FALLBACK SAFARI
+ * keys: WEBRTC SIGNAL SINGLE SOCKET RELAY ASSET CHUNKS SHA256 LATENCY TURN FALLBACK SAFARI UI
  * purpose: establece DataChannels entre nodos Guardian usando KeloNetAuthority como signaling único
  * authority: canal P2P solo transporta probes/assets verificados; nunca gameplay/economia/PvP/autenticacion
  * do-not: NO segundo WebSocket, NO token en peer channel, NO eval, NO asset cross-origin, NO archivo > 512KB
  */
-const VERSION='guardian-peer-mesh-v1.0.0';
+const VERSION='guardian-peer-mesh-v1.1.0';
 const root=globalThis;
 const sessions=new Map(),transfers=new Map();
 const listeners=new Set();
 const MAX_ASSET_BYTES=512*1024,CHUNK_BYTES=18*1024,MAX_SESSIONS=2;
 const CACHE_NAME='kelo-guardian-verified-assets-v1';
-let host=null,detachHost=null,boundNodeId=null,lastError=null,bytesSent=0,bytesReceived=0,probes=0;
+let host=null,detachHost=null,boundNodeId=null,lastError=null,bytesSent=0,bytesReceived=0,probes=0,panel=null;
 
-function emit(){const state=getState();listeners.forEach(fn=>{try{fn(state);}catch{}});}
+function emit(){const state=getState();listeners.forEach(fn=>{try{fn(state);}catch{}});renderUi();}
 function net(){return root.KeloNetAuthority||null;}
 function safePath(value){const path=String(value||'');if(!/^\/assets\/[A-Za-z0-9_./-]{1,480}$/.test(path)||path.includes('..'))throw new Error('GUARDIAN_P2P_ASSET_PATH_INVALID');return path;}
 function validSha(value){const sha=String(value||'').toLowerCase();if(!/^[a-f0-9]{64}$/.test(sha))throw new Error('GUARDIAN_P2P_SHA_INVALID');return sha;}
@@ -28,6 +28,7 @@ function networkRequest(type,payload,timeout){const n=net();if(!n||typeof n.guar
 function networkSignal(sessionId,signal){const n=net();if(!n||typeof n.guardianSignal!=='function')throw new Error('GUARDIAN_SIGNAL_TRANSPORT_UNAVAILABLE');return n.guardianSignal(sessionId,signal);}
 function closePc(row){try{row.channel?.close?.();}catch{}try{row.pc?.close?.();}catch{}row.channel=null;row.pc=null;}
 function closeSession(id,reason='local-close',notify=true){const row=sessions.get(id);if(!row)return false;closePc(row);sessions.delete(id);if(notify){try{net()?.guardianClosePeer?.(id,reason);}catch{}}emit();return true;}
+function closeAll(reason,notify){for(const id of [...sessions.keys()])closeSession(id,reason,notify);transfers.clear();}
 function setupChannel(row,channel){
   row.channel=channel;channel.binaryType='arraybuffer';
   channel.onopen=()=>{row.connectedAt=Date.now();row.state='connected';emit();try{channelSend(channel,{kind:'probe',id:randomId('probe'),sentAt:Date.now()});}catch{}};
@@ -73,14 +74,21 @@ async function handlePeerMessage(row,data){
   if(msg.kind==='asset-end'){const t=transfers.get(String(msg.id));if(t)await finishTransfer(row,t);return;}
 }
 function handleNetwork(event){const msg=event?.detail||event;if(!msg?.t)return;Promise.resolve().then(async()=>{if(msg.t==='guardian:peer:session')await startOffer(msg);else if(msg.t==='guardian:peer:invite')createSession(msg.sessionId,'answerer',msg.peerNodeId,msg.expiresAt);else if(msg.t==='guardian:peer:signal')await receiveSignal(msg);else if(msg.t==='guardian:peer:closed')closeSession(msg.sessionId,msg.reason||'server-closed',false);}).catch(error=>{lastError=String(error?.message||error);emit();});}
-async function ensureBound(){const state=host?.getState?.();const n=net();if(!state?.donorEnabled||!state?.node||!n?.isOnline?.())return false;if(boundNodeId===state.nodeId)return true;await n.guardianBind(state.nodeId);boundNodeId=state.nodeId;emit();return true;}
-async function requestPeer(region='global'){await ensureBound();return networkRequest('guardian:peer:request',{region:String(region||'global').slice(0,48)},8000);}
+async function ensureBound(){const state=host?.getState?.(),n=net();if(!state?.donorEnabled||!state?.node||!n?.isOnline?.())return false;if(boundNodeId===state.nodeId)return true;await n.guardianBind(state.nodeId);boundNodeId=state.nodeId;lastError=null;emit();return true;}
+function syncHostState(){const state=host?.getState?.();if(!state?.donorEnabled||!state?.node){boundNodeId=null;closeAll('donor-disabled',true);emit();return;}ensureBound().catch(error=>{lastError=String(error?.message||error);emit();});}
+function onNetworkOpen(){boundNodeId=null;ensureBound().catch(error=>{lastError=String(error?.message||error);emit();});}
+function onNetworkClose(){boundNodeId=null;closeAll('network-closed',false);emit();}
+async function requestPeer(region='global'){if(!await ensureBound())throw new Error('GUARDIAN_P2P_NOT_BOUND');return networkRequest('guardian:peer:request',{region:String(region||'global').slice(0,48)},8000);}
 function openChannels(){return [...sessions.values()].filter(x=>x.channel?.readyState==='open');}
-async function requestAsset(path,sha){path=safePath(path);sha=validSha(sha);let rows=openChannels();if(!rows.length){await requestPeer();await new Promise(resolve=>setTimeout(resolve,500));rows=openChannels();}if(!rows.length)throw new Error('GUARDIAN_P2P_NO_CONNECTED_PEER');const id=randomId('asset');channelSend(rows[0].channel,{kind:'asset-request',id,path,sha256:sha});return{id,peerNodeId:rows[0].peerNodeId};}
-function attach(deviceHost=root.KeloGuardianDeviceHost){if(host)return true;host=deviceHost;if(!host)return false;window.addEventListener('kelo:guardian-network',handleNetwork);detachHost=host.onChange?.(()=>{ensureBound().catch(error=>{lastError=String(error?.message||error);emit();});});ensureBound().catch(()=>{});emit();return true;}
-function stop(){try{detachHost?.();}catch{}detachHost=null;window.removeEventListener('kelo:guardian-network',handleNetwork);for(const id of [...sessions.keys()])closeSession(id,'mesh-stop',true);boundNodeId=null;host=null;emit();}
+function waitForChannel(timeoutMs=8000){const ready=openChannels()[0];if(ready)return Promise.resolve(ready);return new Promise((resolve,reject)=>{let off=null;const timer=setTimeout(()=>{off?.();reject(new Error('GUARDIAN_P2P_CONNECT_TIMEOUT'));},timeoutMs);off=onChange(state=>{if(state.connected>0){clearTimeout(timer);off?.();resolve(openChannels()[0]);}});});}
+async function requestAsset(path,sha){path=safePath(path);sha=validSha(sha);let row=openChannels()[0];if(!row){await requestPeer();row=await waitForChannel(8000);}const id=randomId('asset');channelSend(row.channel,{kind:'asset-request',id,path,sha256:sha});return{id,peerNodeId:row.peerNodeId};}
+function ensureUi(){if(panel&&panel.isConnected)return panel;const sheet=document.querySelector('#kelo-download-center .kdc-sheet');if(!sheet)return null;panel=document.getElementById('kelo-guardian-peer-panel')||document.createElement('section');panel.id='kelo-guardian-peer-panel';panel.style.cssText='margin:8px 0;padding:10px;border-radius:14px;background:#0b171a;border:1px solid rgba(120,180,255,.22);color:#dcecff;font:600 11px/1.35 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';if(!panel.isConnected)sheet.appendChild(panel);panel.onclick=async e=>{if(e.target?.dataset?.guardianPeer!=='connect')return;e.target.disabled=true;try{await requestPeer();root.showToast?.('Guardian P2P: negociando enlace');}catch(error){lastError=String(error?.message||error);root.showToast?.(lastError);}finally{e.target.disabled=false;renderUi();}};return panel;}
+function renderUi(){const el=ensureUi();if(!el)return;const s=getState(),hs=host?.getState?.()||{},eligible=!!(hs.donorEnabled&&hs.preferences?.allowRelay);const peer=s.sessions[0];el.innerHTML='<b>Guardian P2P</b><div style="opacity:.72;margin:4px 0">'+(s.connected?'Conectado · '+s.connected+' peer'+(s.connected>1?'s':'')+(peer?.rttMs!=null?' · '+peer.rttMs+' ms':''):(s.boundNodeId?'Nodo enlazado · esperando peer':'Sin enlace de signaling'))+'</div>'+(eligible&&!s.connected?'<button data-guardian-peer="connect" style="min-height:40px;border-radius:11px;border:1px solid rgba(120,180,255,.35);background:#10263a;color:#dcecff;font-weight:800;padding:0 12px">Probar enlace P2P</button>':'')+'<div style="opacity:.55;margin-top:5px;font-size:9px">Assets ≤512 KB con SHA-256 · mismo WebSocket para signaling · '+(s.turnConfigured?'TURN configurado':'STUN directo')+'</div>'+(s.lastError?'<div style="color:#ffaaa0;margin-top:5px">'+String(s.lastError).replace(/[<>]/g,'')+'</div>':'');}
+function attach(deviceHost=root.KeloGuardianDeviceHost){if(host)return true;host=deviceHost;if(!host)return false;window.addEventListener('kelo:guardian-network',handleNetwork);window.addEventListener('kelo:network-open',onNetworkOpen);window.addEventListener('kelo:network-close',onNetworkClose);detachHost=host.onChange?.(syncHostState);ensureUi();syncHostState();emit();return true;}
+function stop(){try{detachHost?.();}catch{}detachHost=null;window.removeEventListener('kelo:guardian-network',handleNetwork);window.removeEventListener('kelo:network-open',onNetworkOpen);window.removeEventListener('kelo:network-close',onNetworkClose);closeAll('mesh-stop',true);boundNodeId=null;host=null;emit();}
 function getState(){return Object.freeze({version:VERSION,boundNodeId,sessions:Object.freeze([...sessions.values()].map(x=>Object.freeze({sessionId:x.sessionId,role:x.role,peerNodeId:x.peerNodeId,state:x.state,rttMs:x.rttMs,expiresAt:x.expiresAt}))),connected:openChannels().length,bytesSent,bytesReceived,probes,lastError,maxAssetBytes:MAX_ASSET_BYTES,singleSocketSignaling:true,gameplayAuthority:false,economyAuthority:false,pvpAuthority:false,turnConfigured:Array.isArray(root.KELO_GUARDIAN_ICE_SERVERS)&&root.KELO_GUARDIAN_ICE_SERVERS.some(x=>String(x?.urls||'').startsWith('turn'))});}
+function onChange(fn){if(typeof fn!=='function')return()=>{};listeners.add(fn);return()=>listeners.delete(fn);}
 
-export const GuardianPeerMesh=Object.freeze({version:VERSION,attach,stop,ensureBound,requestPeer,requestAsset,getState,onChange(fn){if(typeof fn==='function')listeners.add(fn);return()=>listeners.delete(fn);}});
+export const GuardianPeerMesh=Object.freeze({version:VERSION,attach,stop,ensureBound,requestPeer,requestAsset,getState,onChange});
 root.KeloGuardianPeerMesh=GuardianPeerMesh;
 if(root.KeloGuardianDeviceHost)attach(root.KeloGuardianDeviceHost);
