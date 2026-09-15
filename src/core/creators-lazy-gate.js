@@ -13,7 +13,7 @@ if(root.KeloCreatorsLazyGate)return;
 const VERSION='kelo-creators-lazy-gate-v6-direct-asset-forge';
 const LAUNCHER_SRC='src/ui/studio-launcher.js?v=asset-forge-20260915-1';
 const ASSET_CATALOG_SRC='src/property/property-asset-catalog.js?v=creator-assets-20260915-1';
-const ASSET_FORGE_MODULE='./src/creators/creator-entry.mjs?v=asset-forge-20260915-1';
+const assetForgeModuleUrl=()=>new URL('src/creators/creator-entry.mjs?v=asset-forge-20260915-1',root.document?.baseURI||root.location.href).href;
 let loading=null,catalogLoading=null,forgeLoading=null;
 const query=()=>{try{return new URLSearchParams(root.location.search);}catch(_){return new URLSearchParams();}};
 const directRequested=()=>query().get('creators')==='1'||query().get('creator')==='1'||query().get('mapEditor')==='1';
@@ -84,7 +84,7 @@ async function openAssetForge(){
   forgeLoading=(async function(){
     try{
       root.KELO_LUXE?.closeMenu?.();
-      const mod=await import(ASSET_FORGE_MODULE);
+      const mod=await import(assetForgeModuleUrl());
       const platform=await mod.bootKeloCreators({root});
       await platform.openWorkspace('asset-forge');
       return true;
