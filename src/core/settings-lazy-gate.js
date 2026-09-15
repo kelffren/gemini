@@ -9,14 +9,14 @@
 (function(root){
 'use strict';
 if(root.KeloSettingsLazyGate)return;
-const VERSION='kelo-settings-lazy-gate-v2-update-intelligence';
+const VERSION='kelo-settings-lazy-gate-v3-update-intelligence';
 let loading=null;
 function loadScript(src,marker){return new Promise(function(resolve,reject){const base=src.split('?')[0],existing=Array.from(document.scripts).find(function(s){return String(s.getAttribute('src')||'').split('?')[0]===base;});if(existing){resolve();return;}const s=document.createElement('script');s.src=src;s.async=false;s.dataset.keloSettingsFirstUse=marker||'1';s.onload=resolve;s.onerror=function(){reject(new Error('SETTINGS_SCRIPT_LOAD_FAILED:'+src));};document.head.appendChild(s);});}
 function load(){
   if(root.KeloDownloadCenter&&root.KeloUpdateIntelligenceUI)return Promise.resolve(root.KeloDownloadCenter);
   if(loading)return loading;
   loading=loadScript('src/core/download-center.js?v=2-safe','download-center')
-    .then(function(){return loadScript('src/core/update-intelligence-ui.js?v=1','update-intelligence');})
+    .then(function(){return loadScript('src/core/update-intelligence-ui.js?v=2-fast-forward-health','update-intelligence');})
     .then(function(){return root.KeloDownloadCenter||null;})
     .finally(function(){loading=null;});
   return loading;
