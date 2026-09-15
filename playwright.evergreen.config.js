@@ -1,3 +1,9 @@
+/* KELO-INDEX
+ * area: QA / MOBILE WEBKIT CONFIG
+ * owner: Evergreen branch smoke
+ * purpose: ejecuta el commit de la rama en WebKit con viewport/device profile iPhone sin confundirlo con real-device QA
+ * legacy: N/A
+ */
 const { defineConfig, devices } = require('@playwright/test');
 
 module.exports = defineConfig({
