@@ -1,9 +1,9 @@
 /* KELO-INDEX
  * area: QA / LEGACY MODERNIZATION / COLLISION
  * owner: Collision Owner Migration Audit
- * owns: certification that environment colliders mutate through KELO_COLLISION and legacy obstacles stays a projection
+ * owns: certification that migrated colliders mutate through KELO_COLLISION and legacy obstacles stays a projection
  * does-not-own: gameplay collision semantics or world geometry
- * purpose: prevent direct obstacles writes from returning after the environment-prefab migration
+ * purpose: prevent direct obstacles writes from returning after collision-owner migration
  * public-api: CLI `node scripts/collision-owner-migration-audit.mjs`
  * reuse: Legacy Observatory CI
  */
@@ -19,24 +19,46 @@ function fail(message){console.error('COLLISION_OWNER_AUDIT_FAIL:',message);fail
 function ok(message){console.log('COLLISION_OWNER_AUDIT_OK:',message);}
 function read(rel){return fs.readFileSync(path.join(ROOT,rel),'utf8');}
 function expect(condition,message){if(!condition)fail(message);else ok(message);}
+const directObstacleMutation=/\bobstacles\s*\.\s*(?:push|pop|shift|unshift|splice|sort|reverse|copyWithin|fill)\s*\(/;
 
 const generic=read('src/environment/generic-prefabs.js');
 const luxe=read('src/environment/luxe-kiosk-atlas.js');
+const engineAe=read('engine-ae.js');
+const engineAj=read('engine-aj.js');
+const engineL=read('engine-l.js');
 const observatory=read('scripts/legacy-observatory.mjs');
 
 expect(generic.includes("COLLISION_OWNER='environment:generic-prefabs'"),'generic prefabs declares a stable collision owner');
 expect(generic.includes('collision.replaceOwner(COLLISION_OWNER,colliders)'),'generic prefabs publishes colliders through replaceOwner');
 expect(generic.includes('collision.clearOwner(COLLISION_OWNER)'),'generic prefabs clears its own bucket on decoration reset');
-expect(!/\bobstacles\s*\.\s*(?:push|pop|shift|unshift|splice|sort|reverse|copyWithin|fill)\s*\(/.test(generic),'generic prefabs has no direct obstacles collection mutation');
+expect(!directObstacleMutation.test(generic),'generic prefabs has no direct obstacles collection mutation');
 expect(!/\bset(?:Timeout|Interval)\s*\(/.test(generic),'generic prefabs has no timer-based collision repair');
 
 expect(luxe.includes('collision.remove(item.owner,item.id)'),'Luxe removes adopted legacy placeholders through KELO_COLLISION');
-expect(!/\bobstacles\s*\.\s*(?:push|pop|shift|unshift|splice|sort|reverse|copyWithin|fill)\s*\(/.test(luxe),'Luxe has no direct obstacles collection mutation');
+expect(!directObstacleMutation.test(luxe),'Luxe has no direct obstacles collection mutation');
 expect(!/\bset(?:Timeout|Interval)\s*\(/.test(luxe),'Luxe has no timer-based placeholder repair');
+
+expect(engineAe.includes("BUILDING_OWNER='legacy:engine-ae-buildings'"),'engine-ae publishes plaza buildings under a stable collision owner');
+expect(engineAe.includes('collision.replaceOwner(BUILDING_OWNER,buildings)'),'engine-ae routes building publication through replaceOwner');
+expect(!directObstacleMutation.test(engineAe),'engine-ae no longer mutates obstacles directly');
+
+expect(engineAj.includes('collision.remove(item.owner,item.id)'),'engine-aj dedupe removes records through KELO_COLLISION');
+expect(!directObstacleMutation.test(engineAj),'engine-aj no longer mutates obstacles directly');
+
+expect(engineL.includes('collision.remove(item.owner,item.id)'),'engine-l plaza cleanup removes records through KELO_COLLISION');
+expect(!directObstacleMutation.test(engineL),'engine-l no longer mutates obstacles directly');
 
 expect(observatory.includes('=(?!=)'),'Observatory excludes equality checks from assignment detection');
 expect(observatory.includes("MUTATING_COLLECTION_METHODS='push|pop|shift|unshift|splice|sort|reverse|copyWithin|fill'"),'Observatory detects direct collection mutations');
 expect(observatory.includes("'obstacles','render'"),'obstacles is a critical authority key');
+
+const reportPath=path.join(ROOT,'artifacts','legacy-observatory','report.json');
+if(fs.existsSync(reportPath)){
+  const report=JSON.parse(fs.readFileSync(reportPath,'utf8'));
+  const runtimeObstacleWriters=(report.authority?.obstacles||[]).filter(x=>x.scope==='runtime');
+  expect(runtimeObstacleWriters.length===1&&runtimeObstacleWriters[0].file==='engine-a.js',`only engine-a bootstrap may directly seed obstacles; got ${runtimeObstacleWriters.map(x=>x.file).join(', ')||'none'}`);
+  expect(!(report.runtimeConflicts||[]).some(x=>x.key==='obstacles'),'obstacles is no longer a duplicate runtime authority conflict');
+}else fail('legacy observatory report missing before collision audit');
 
 const collisionPath=path.join(ROOT,'src','physics','collision-utils.js');
 delete require.cache[require.resolve(collisionPath)];
