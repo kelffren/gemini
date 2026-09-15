@@ -7,6 +7,7 @@
  * public-api: createStudioLiveShell()
  * online: no; callbacks delegate all persistent work to Studio Kernel
  * mobile-flow: choose asset -> compact placement strip -> EDIT reopens workspace without clearing the active asset
+ * mobile: reuse an already-painted #kelo-studio-live instead of wiping innerHTML; abort previous listeners so hydrate does not clone the tree
  */
 
 import { virtualRange } from './virtual-list.mjs';
@@ -25,15 +26,24 @@ const TOOL_LABELS=Object.freeze({
   play:'Playtest'
 });
 
+let liveShellAbort=null;
 export function createStudioLiveShell({
-  host=globalThis.document?.body,assets=[],onMode,onAsset,onUndo,onRedo,onRotate,onScale,onErase,onSave,onClose,
+  host=globalThis.document?.body,assets=[],reuse=false,onMode,onAsset,onUndo,onRedo,onRotate,onScale,onErase,onSave,onClose,
   onSelectEntity,onDuplicate,onDelete,onPropertyChange,onPlay,onBrushSize,onFocus,renderAssetPreview
 }={}){
+  try{liveShellAbort?.abort();}catch{}
+  liveShellAbort=new AbortController();
+  const signal=liveShellAbort.signal;
   const document=host?.ownerDocument||globalThis.document;
   if(!document||!host)throw new Error('STUDIO_LIVE_SHELL_HOST_REQUIRED');
   const view=document.defaultView||globalThis;
 
-  const style=document.createElement('style');
+  let root=document.getElementById('kelo-studio-live');
+  if(root?.isConnected===false)root=null;
+  const canReuse=!!reuse&&!!root?.querySelector?.('.ks-top')&&root.dataset?.shellVersion===SHELL_VERSION;
+  let style=canReuse?document.querySelector('style[data-kelo-studio-ui="1"]'):null;
+  if(!style){
+  style=document.createElement('style');
   style.dataset.keloStudioUi='1';
   style.textContent=`
   #kelo-studio-live{
@@ -283,9 +293,8 @@ export function createStudioLiveShell({
   }
   `;
   document.head.appendChild(style);
+  }
 
-  let root=document.getElementById('kelo-studio-live');
-  if(root?.isConnected===false)root=null;
   if(!root)root=document.createElement('section');
   root.id='kelo-studio-live';
   if(root.dataset)delete root.dataset.keloWorldLoading;
@@ -294,7 +303,7 @@ export function createStudioLiveShell({
   root.dataset.compact='full';
   root.dataset.sheetOpen='0';
   root.dataset.selectionCount='0';
-  root.innerHTML=`
+  if(!canReuse) root.innerHTML=`
     <div class="ks-top">
       <div class="ks-brand">
         <div class="ks-brand-mark" aria-hidden="true">♛</div>
@@ -436,7 +445,7 @@ export function createStudioLiveShell({
       </div>
     </div>
   `;
-  host.appendChild(root);
+  if(!root.isConnected)host.appendChild(root);
 
   const bottom=root.querySelector('.ks-bottom');
   const desktopAssetViewport=root.querySelector('.ks-left .ks-assets');
@@ -658,11 +667,11 @@ export function createStudioLiveShell({
     desktopAssetViewport.scrollTop=0;
     mobileAssetViewport.scrollTop=0;
     renderAssets();
-  });
-  desktopAssetViewport.addEventListener('scroll',renderAssets,{passive:true});
-  mobileAssetViewport.addEventListener('scroll',renderAssets,{passive:true});
-  desktopExplorer.addEventListener('scroll',renderExplorer,{passive:true});
-  mobileExplorer.addEventListener('scroll',renderExplorer,{passive:true});
+  },{signal});
+  desktopAssetViewport.addEventListener('scroll',renderAssets,{passive:true,signal});
+  mobileAssetViewport.addEventListener('scroll',renderAssets,{passive:true,signal});
+  desktopExplorer.addEventListener('scroll',renderExplorer,{passive:true,signal});
+  mobileExplorer.addEventListener('scroll',renderExplorer,{passive:true,signal});
 
   root.addEventListener('change',e=>{
     if(e.target.matches('[data-act="brush-size"]')){
@@ -671,7 +680,7 @@ export function createStudioLiveShell({
       return;
     }
     if(e.target.matches('[data-prop]')){const prop=e.target.dataset.prop,value=Number(e.target.value)||0;if(prop==='scalePercent')onPropertyChange?.('scale',Math.max(10,Math.min(800,value))/100);else onPropertyChange?.(prop,value);}
-  });
+  },{signal});
 
   root.addEventListener('click',e=>{
     const asset=e.target.closest('[data-asset]');
@@ -727,12 +736,11 @@ export function createStudioLiveShell({
     else if(a==='save')onSave?.();
     else if(a==='play')onPlay?.();
     else if(a==='close')onClose?.();
-  });
+  },{signal});
 
   syncErase();
   syncCompactAsset();
-  renderAssets();
-  renderScene();
+  if(!canReuse){renderAssets();renderScene();}
   syncContextActions();
 
   return Object.freeze({
@@ -779,6 +787,6 @@ export function createStudioLiveShell({
     get erase(){return erase;},
     get selectedAsset(){return selectedAsset;},
     get compact(){return root.dataset.compact==='asset';},
-    destroy(){root.remove();style.remove();}
+    destroy(){try{liveShellAbort?.abort();}catch{}root.remove();style?.remove?.();}
   });
 }

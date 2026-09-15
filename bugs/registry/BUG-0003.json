@@ -23,7 +23,7 @@
     "REPORT-000001"
   ],
   "environment": {
-    "game_build": "world-bridge-20260914-3",
+    "game_build": "world-bridge-20260915-20",
     "device": "iPhone real device target",
     "os": "iOS",
     "browser": "Safari",
@@ -39,7 +39,7 @@
     "Open Create -> World again and confirm Studio remounts instead of black-screening."
   ],
   "expected": "World opens, remains interactive, and can be reopened even after a stale Studio shell/session condition.",
-  "actual": "Player 2026-09-14 still reports the editor breaking after tools paint. LIVE Pages at 05:44 EDT still served world-bridge-20260914-1 (index last-modified 04:53:11 GMT, overlay dpr 1.5, overlay allocated before chrome return). A7 never reached the iPhone because pages-build-deployment kept getting cancelled. A8 keeps chrome-first, skips the iPhone overlay canvas entirely, hydrates the draft after tools return, and adds .nojekyll so Pages can actually publish. Do not rewrite Studio. Chrome already exists.",
+  "actual": "Player 2026-09-15 still reports World freezing after tools paint on LIVE world-bridge-20260915-19. A8 skipped overlay and hydrates at 200ms; chrome-first already works. Remaining post-chrome killers on iPhone: studio-entry 15 static imports evaluated as one graph, createStudioLiveShell innerHTML rebuilt after tools exist, cloneNode of the whole shell, importCurrent structuredClone at 200ms, extras barrel at 2.8s, and unique nonce module URLs (H6). A9/world-bridge-20260915-20 attacks those without rewriting Studio.",
   "evidence": [
     "Commit 829ac7fbd5fc629b05ecf92489bab16b0292bce9: IndexedDB fail-open candidate — insufficient.",
     "Commit 824a932f5e3e41c888116ab1453d64500e66255d: curtain + Hub stacking candidate — failed live Pages World tap QA on 2026-09-14.",
@@ -52,7 +52,8 @@
     "Player screenshot IMG_8305 2026-09-14 01:01: Studio tools/chrome painted, viewport hole black, then the Safari tab died.",
     "Code inspection 2026-09-14 01:02 EDT: after chrome, live-studio-controller awaited importCurrent, allocated a body-sized overlay at dpr<=1.5, and started an every-rAF resize/clear/draw loop while extras injected backdrop-filter:blur.",
     "Player 2026-09-14: hey se sigue rompiendo crees que tendremos que rehacerlo?",
-    "LIVE curl 2026-09-14 05:44 EDT: index last-modified 04:53:11 GMT; studio-launcher.js?v=9-world-bridge-20260914; overlay cap still mobile 1.5; BUILD world-bridge-20260914-1"
+    "LIVE curl 2026-09-14 05:44 EDT: index last-modified 04:53:11 GMT; studio-launcher.js?v=9-world-bridge-20260914; overlay cap still mobile 1.5; BUILD world-bridge-20260914-1",
+    "Player 2026-09-15: \"mi editor world sigue quedándose frisado y nadie encuentra la solución\". LIVE Pages last-modified 2026-09-15 02:26:38 GMT serving world-bridge-20260915-19. Overlay already skipped. Freeze persists after A8."
   ],
   "suspected_files": [
     "src/creators/workspaces/world-workspace.mjs",
@@ -73,7 +74,7 @@
   "claim_started_at": null,
   "research": {
     "status": "in_progress",
-    "summary": "Player still sees the black tab because LIVE is stuck on A6. A7 never deployed. A8 skips iPhone overlay and hydrates the draft after chrome. Do not rewrite. Do not mark VERIFIED from headless.",
+    "summary": "A9 world-bridge-20260915-20: do not rewrite. Chrome already exists. Serialize studio-entry graph, reuse painted shell, skip cloneNode, delay importCurrent to 8s, delay extras to 15s, kill launcher nonces. FIXED_PENDING_VERIFY until real iPhone keeps tools 10s and can reopen.",
     "known_facts": [
       {
         "id": "F1",
@@ -569,21 +570,57 @@
       },
       "conclusion": "Current candidate. Rewrite is ruled out.",
       "do_not_repeat_without": null
+    },
+    {
+      "id": "A9",
+      "at": "2026-09-15",
+      "actor": "development agent + player report",
+      "goal": "Stop post-chrome Safari/WebContent death after tools already painted, without rewriting Studio.",
+      "hypothesis_ids": [
+        "H3",
+        "H4",
+        "H6",
+        "H7"
+      ],
+      "change": {
+        "commits": [],
+        "files": [
+          "src/studio/studio-entry.mjs",
+          "src/studio/integration/live-studio-controller.mjs",
+          "src/studio/ui/studio-live-shell.mjs",
+          "src/studio/integration/world-studio-bridge.mjs",
+          "src/creators/workspaces/world-workspace.mjs",
+          "src/ui/studio-launcher.js",
+          "src/creators/ui/creator-hub.mjs",
+          "src/creators/creator-entry.mjs",
+          "index.html",
+          "sw.js"
+        ],
+        "summary": "Serialize studio-entry imports; reuse painted shell; skip cloneNode; importCurrent at 8s on iPhone; extras at 15s; no nonce launcher URLs; cache-bust world-bridge-20260915-20."
+      },
+      "validation": {
+        "environment": "Target real iPhone Safari after LIVE Pages publishes world-bridge-20260915-20",
+        "method": "Create -> World -> tools stay 10s without a black tab, then close/reopen.",
+        "result": "NOT_RUN",
+        "evidence": []
+      },
+      "conclusion": "Candidate. A8 reached the phone and still froze; A9 attacks the remaining post-chrome graph.",
+      "do_not_repeat_without": "Do not rewrite Studio. Do not restore overlay/cloneNode/nonce imports as a first retry."
     }
   ],
   "next_best_actions": [
     {
       "priority": 1,
-      "action": "Wait until LIVE index.html serves studio-launcher.js?v=9-world-bridge-20260914-3, then player Create -> World on iPhone.",
-      "reason": "F9 showed the previous candidate never reached the phone.",
-      "expected_signal": "LIVE overlay/controller files contain hydrateAfterChrome and if(phoneOverlay)return. Tools stay up 10s.",
-      "stop_condition": "If LIVE still serves 20260914-1, do not treat player black-tab as A8 failure."
+      "action": "Wait until LIVE index.html serves studio-launcher.js?v=world-bridge-20260915-20, then player Create -> World on iPhone.",
+      "reason": "F9 showed previous candidates often never reached the phone. A8 did reach LIVE as 20260915-19 and still froze.",
+      "expected_signal": "LIVE world-workspace WORLD_BUILD is world-bridge-20260915-20. Tools stay up 10s.",
+      "stop_condition": "If LIVE still serves 20260915-19, do not treat player black-tab as A9 failure."
     },
     {
       "priority": 2,
-      "action": "If A8 is live and the tab still dies after tools, skip importCurrent on first paint (empty document) as the next A/B. Do not rewrite Studio.",
-      "reason": "Discriminates overlay vs draft import as the remaining kill.",
-      "expected_signal": "Tools survive with empty world => importCurrent is the remaining kill.",
+      "action": "If A9 is live and the tab still dies in the first 2s (before importCurrent/extras), reduce kernel/tool graph further. Do not rewrite Studio.",
+      "reason": "Discriminates remaining parse/eval of register-core-tools vs deferred work.",
+      "expected_signal": "Last BUG-0003 milestone in sessionStorage.",
       "stop_condition": "Do not rewrite kernel/tools/authority."
     }
   ],
@@ -597,17 +634,18 @@
       "f9dbfe52b338ad960b2332fb544aa536c64f05e8"
     ],
     "files": [
+      "src/studio/studio-entry.mjs",
       "src/studio/integration/live-studio-controller.mjs",
+      "src/studio/ui/studio-live-shell.mjs",
       "src/studio/integration/world-studio-bridge.mjs",
       "src/creators/workspaces/world-workspace.mjs",
-      "src/creators/creator-entry.mjs",
-      "src/creators/ui/creator-hub.mjs",
       "src/ui/studio-launcher.js",
+      "src/creators/ui/creator-hub.mjs",
+      "src/creators/creator-entry.mjs",
       "index.html",
-      ".nojekyll",
-      "bugs/registry/BUG-0003.json"
+      "sw.js"
     ],
-    "summary": "A8 world-bridge-20260914-3: do not rewrite. Skip iPhone overlay. Hydrate draft after chrome. .nojekyll for Pages. A7 never published (F9). Player still on A6. FIXED_PENDING_VERIFY."
+    "summary": "A9 world-bridge-20260915-20: do not rewrite. Serialize studio-entry. Reuse shell. Skip cloneNode. Delay importCurrent/extras. Kill nonce URLs. FIXED_PENDING_VERIFY."
   },
   "verification": {
     "status": "PENDING",
@@ -617,7 +655,8 @@
       "NOT DEVICE-VERIFIED: d6ff092 world-light — code inspection 2026-09-14 showed static controller graph still loaded before chrome",
       "FAILED: world-bridge-20260914-1 — IMG_8305 tools painted then black tab",
       "NOT PUBLISHED: world-bridge-20260914-2 — LIVE 05:44 EDT still world-bridge-20260914-1 / last-modified 04:53:11 GMT",
-      "PLAYER: 2026-09-14 se sigue rompiendo — against unpublished A7 / live A6"
+      "PLAYER: 2026-09-14 se sigue rompiendo — against unpublished A7 / live A6",
+      "PLAYER: 2026-09-15 se sigue rompiendo — against LIVE world-bridge-20260915-19 / A8"
     ],
     "verified_by": null,
     "verified_at": null
@@ -642,7 +681,8 @@
     "headless_shell overlay rAF freeze is now player-facing after chrome; still do not mark CLOSED/VERIFIED from this sandbox.",
     "world-bridge-20260914-2 is FIXED_PENDING_VERIFY until a real iPhone keeps the tools instead of a black tab.",
     "Player asked if Studio must be rewritten. No. Tools already paint. Rewrite is H8 ruled_out.",
-    "Do not treat a player fail as A7/A8 failure until LIVE index serves the matching cache-bust."
+    "Do not treat a player fail as A7/A8 failure until LIVE index serves the matching cache-bust.",
+    "A9 implemented 2026-09-15 after player report that A8/world-bridge-20260915-19 still froze."
   ],
-  "updated_at": "2026-09-14T01:48:00-04:00"
+  "updated_at": "2026-09-15T03:26:00Z"
 }

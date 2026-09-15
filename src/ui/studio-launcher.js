@@ -12,7 +12,7 @@
   'use strict';
   if(window.KELO_STUDIO_LAUNCHER)return;
   let loading=false,factoryLoading=false,directOpenStarted=false;
-  const CREATOR_BUILD='world-bridge-20260914-3';
+  const CREATOR_BUILD='world-bridge-20260915-20';
   const params=()=>new URLSearchParams(window.location.search);
   const directRequested=()=>params().get('creators')==='1'||params().get('creator')==='1';
   const actor=()=>String(window.KELO_ADMIN_KEYS?.playerId?.()||window.keloNet?.playerKey||window.localPlayer?.id||'local_pioneer');
@@ -35,17 +35,12 @@
     if(busy)button.setAttribute('aria-busy','true');else button.removeAttribute('aria-busy');
   }
   async function loadCreatorHub(){
-    // iOS Safari retains successful ES modules in its module map. Use fresh URLs first,
-    // then fall back to the canonical module so a cache-busted route can never strand Creators.
-    const nonce=`${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;
-    try{return await import(`./../creators/ui/creator-hub.mjs?v=${CREATOR_BUILD}-${nonce}`);}
+    // BUG-0003 H6: unique nonce specifiers leak module identities in Safari.
+    // One stable build URL per launch; retry the same specifier, never a new graph.
+    try{return await import(`./../creators/ui/creator-hub.mjs?v=${CREATOR_BUILD}`);}
     catch(firstError){
-      console.warn('[Kelo Creators launcher] retrying fresh Creator Hub',firstError);
-      try{return await import(`./../creators/ui/creator-hub.mjs?v=${CREATOR_BUILD}-${nonce}-retry-${Date.now()}`);}
-      catch(retryError){
-        console.warn('[Kelo Creators launcher] falling back to canonical Creator Hub',retryError);
-        return import('./../creators/ui/creator-hub.mjs');
-      }
+      console.warn('[Kelo Creators launcher] retrying Creator Hub',firstError);
+      return import(`./../creators/ui/creator-hub.mjs?v=${CREATOR_BUILD}`);
     }
   }
   async function open(){
@@ -122,7 +117,7 @@
   }
   function boot(){sync();maybeOpenDirect();void bootOnlineAuthorization();void import('./../characters/creator-avatar-runtime.mjs').then(m=>m.installCreatorAvatarRuntime({root:window})).catch(e=>console.warn('[Kelo Avatar runtime]',e));}
   window.KELO_ADMIN_KEYS?.onChange?.(()=>{sync();maybeOpenDirect();});
-  const api=Object.freeze({version:'studio-launcher-v1.15.0-world-bridge',open,openSpriteFactory:openFactory,sync,get allowed(){return allowed();},get directRequested(){return directRequested();}});
+  const api=Object.freeze({version:'studio-launcher-v1.16.0-world-bridge-a9',open,openSpriteFactory:openFactory,sync,get allowed(){return allowed();},get directRequested(){return directRequested();}});
   window.KELO_STUDIO_LAUNCHER=api;
   window.KELO_CREATORS_LAUNCHER=api;
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();

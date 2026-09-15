@@ -8,7 +8,7 @@
  * do-not: never cache API/session/gameplay responses
  */
 'use strict';
-let forceFreshUntil = 0; // kelo-sw-v6548 wipe-on-activate
+let forceFreshUntil = 0; // kelo-sw-v6549 world-a9 wipe-on-activate
 
 let activeStagedBuild = null;
 let activeInstalledBuild = null;

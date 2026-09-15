@@ -4,14 +4,14 @@
  * does-not-own: Studio kernel, live shell internals, Hub, world authority
  * public-api: openKeloStudioLive(), closeKeloStudioLive(), getKeloStudioLive()
  * reuse: live-studio-controller remains the session owner; this file is the only first hop from World workspace
- * mobile: import the zero-static-import controller after one paint yield, then hand off to controller immediately; controller owns phased runtime loading after chrome exists. Strip provisional listeners before controller hydrate, reveal the game viewport during hydrate without treating provisional chrome as interactive, keep one Studio stylesheet after provisional→live handoff, and persist BUG-0003 milestones so a Safari/WebContent death leaves the last completed phase in sessionStorage.
+ * mobile: import the zero-static-import controller after one paint yield, then hand off to controller immediately; controller owns phased runtime loading after chrome exists. Do not cloneNode the provisional chrome. Reveal the game viewport during hydrate without treating provisional chrome as interactive, keep one Studio stylesheet after provisional→live handoff, and persist BUG-0003 milestones so a Safari/WebContent death leaves the last completed phase in sessionStorage.
  * observability: reuses src/core/bug-observability.mjs; records bridge/controller/shell readiness plus lightweight canvas/resource/viewport snapshots and 1s/5s/10s survival marks.
  * online: no; authority stays in KELO_WORLD_EDIT
  */
 import { createBugObserver } from '../../core/bug-observability.mjs';
 import { yieldStudioBoot, setWorldLaunchStatus } from './studio-boot-pace.mjs';
 
-export const WORLD_STUDIO_BRIDGE_BUILD='world-bridge-20260915-19';
+export const WORLD_STUDIO_BRIDGE_BUILD='world-bridge-20260915-20';
 const bridgeUrl=new URL(import.meta.url);
 const incomingBuild=bridgeUrl.searchParams.get('v')||'';
 // Workspace can lag one or more static build tags behind this bridge. Do not let
@@ -90,16 +90,10 @@ async function loadController(root,observer=null){
 }
 
 export function sanitizeWorldStudioProvisionalShell(root=globalThis){
-  const shell=root?.document?.getElementById?.('kelo-studio-live');
-  if(shell?.dataset?.keloWorldLoading!=='1')return shell||null;
-  if(typeof shell.cloneNode!=='function'||typeof shell.replaceWith!=='function')return shell;
-  try{
-    const clean=shell.cloneNode(true);
-    shell.replaceWith(clean);
-    return clean;
-  }catch{
-    return shell;
-  }
+  // A9: cloning the painted Studio tree duplicated the whole chrome in Safari
+  // memory right before controller hydrate. Listener swap is owned by the live
+  // shell AbortController; this function only reports the existing node.
+  return root?.document?.getElementById?.('kelo-studio-live')||null;
 }
 
 export function pruneWorldStudioStyles(root=globalThis){
