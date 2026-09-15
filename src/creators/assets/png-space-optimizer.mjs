@@ -324,16 +324,28 @@ function palettePng(decoded, representation, filterStrategy, zlibOptions) {
   });
 }
 
-function candidateRecord(kind, label, buffer, original) {
+function candidateRecord(kind, label, buffer) {
+  return {
+    kind,
+    label,
+    buffer,
+    bytes:buffer.length,
+    tested:false,
+    accepted:null,
+    quality:null,
+    qualityScore:null,
+    error:null
+  };
+}
+
+function validateCandidate(candidate, original) {
   try {
-    const decoded = decodePngRgba(buffer);
+    const decoded = decodePngRgba(candidate.buffer);
     const quality = evaluatePixelFidelity(original.rgba, decoded.rgba, original.ihdr.width, original.ihdr.height);
     const verdict = judgePixelFidelity(quality, 'strict');
     return {
-      kind,
-      label,
-      buffer,
-      bytes:buffer.length,
+      ...candidate,
+      tested:true,
       quality,
       verdict,
       accepted:verdict.pass,
@@ -341,10 +353,8 @@ function candidateRecord(kind, label, buffer, original) {
     };
   } catch (error) {
     return {
-      kind,
-      label,
-      buffer,
-      bytes:buffer.length,
+      ...candidate,
+      tested:true,
       quality:{comparable:false, exactPixels:false, changedPixels:null, maxRgbDelta:null},
       accepted:false,
       qualityScore:0,
@@ -377,15 +387,15 @@ export function optimizePngLossless(buffer, options = {}) {
         optimizedBytes:originalBytes,
         savedBytes:0,
         savedPercent:0,
-        exactPixels:true,
-        qualityScore:1,
+        exactPixels:null,
+        qualityScore:null,
         candidates:[]
       }
     };
   }
 
   const filterStrategies = options.filterStrategies || ['adaptive', 0, 1, 2, 3, 4];
-  const candidates = [candidateRecord('original', 'original', buffer, decoded)];
+  const candidates = [candidateRecord('original', 'original', buffer)];
   const profiles = zlibProfiles();
 
   for (const filterStrategy of filterStrategies) {
@@ -396,8 +406,7 @@ export function optimizePngLossless(buffer, options = {}) {
       candidates.push(candidateRecord(
         'refilter',
         `refilter:${filterStrategy}:${profile.name}`,
-        candidate,
-        decoded
+        candidate
       ));
     }
   }
@@ -410,16 +419,25 @@ export function optimizePngLossless(buffer, options = {}) {
         candidates.push(candidateRecord(
           'exact-palette',
           `palette:${palette.colorCount}:${filterStrategy}:${profile.name}`,
-          candidate,
-          decoded
+          candidate
         ));
       }
     }
   }
 
-  const accepted = candidates.filter(candidate => candidate.accepted);
-  accepted.sort((a, b) => a.bytes - b.bytes || a.label.localeCompare(b.label));
-  const winner = accepted[0] || candidates[0];
+  const ordered = candidates.slice().sort((a, b) => a.bytes - b.bytes || a.label.localeCompare(b.label));
+  let winner = null;
+  const validatedByLabel = new Map();
+  for (const candidate of ordered) {
+    const validated = validateCandidate(candidate, decoded);
+    validatedByLabel.set(candidate.label, validated);
+    if (validated.accepted) {
+      winner = validated;
+      break;
+    }
+  }
+  if (!winner) winner = validateCandidate(candidates[0], decoded);
+
   const savedBytes = Math.max(0, originalBytes - winner.bytes);
   const savedPercent = originalBytes ? (savedBytes / originalBytes) * 100 : 0;
 
@@ -436,16 +454,20 @@ export function optimizePngLossless(buffer, options = {}) {
       winner:{kind:winner.kind, label:winner.label, bytes:winner.bytes},
       source:{width:decoded.ihdr.width, height:decoded.ihdr.height, colorType:decoded.ihdr.colorType, bitDepth:decoded.ihdr.bitDepth},
       paletteCandidate:palette ? {exactColors:palette.colorCount} : null,
-      candidates:candidates.map(candidate => ({
-        kind:candidate.kind,
-        label:candidate.label,
-        bytes:candidate.bytes,
-        accepted:candidate.accepted,
-        exactPixels:candidate.quality.exactPixels,
-        changedPixels:candidate.quality.changedPixels,
-        maxRgbDelta:candidate.quality.maxRgbDelta,
-        error:candidate.error || null
-      }))
+      candidates:candidates.map(candidate => {
+        const validated = validatedByLabel.get(candidate.label);
+        return {
+          kind:candidate.kind,
+          label:candidate.label,
+          bytes:candidate.bytes,
+          tested:Boolean(validated),
+          accepted:validated?.accepted ?? null,
+          exactPixels:validated?.quality?.exactPixels ?? null,
+          changedPixels:validated?.quality?.changedPixels ?? null,
+          maxRgbDelta:validated?.quality?.maxRgbDelta ?? null,
+          error:validated?.error || null
+        };
+      })
     }
   };
 }
