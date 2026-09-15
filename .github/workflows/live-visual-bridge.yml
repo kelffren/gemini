@@ -27,10 +27,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: npm
 
       - name: Install project dependencies
-        run: npm ci
+        run: npm install --no-save --ignore-scripts
 
       - name: Run live visual bridge
         run: node scripts/live-visual-bridge.mjs
