@@ -1,12 +1,12 @@
 /* KELO-INDEX
  * area: CORE / INPUT
  * owner: KeloInput
- * keys: INPUT PIPELINE LOCK HOOK COMBAT INTENT BUFFER GAMEPAD DEADZONE AIM FOUNDATION
+ * keys: INPUT PIPELINE LOCK HOOK COMBAT INTENT BUFFER GAMEPAD DEADZONE AIM FOUNDATION ZERO-GARBAGE
  * purpose: único pipeline alrededor del processInput legacy; normaliza intención de movimiento/combate sin crear otro input manager
  * public-api: KeloInput.before/after/unregister/snapshot/isLocked + combat.* + radialAxis/pollGamepad
  * consumes: processInput legacy, KeloInputLocks, input, localPlayer, Gamepad API opcional
  * state-owned: hooks + estado normalizado/cola efímera de input; NO posee gameplay/cooldowns/HP
- * extension-points: before/after + combat.push/setAxes/configure
+ * extension-points: before/after + combat.push/setAxes/configure/read
  * reuse: PvP, habilidades, mounts y futuros control schemes consumen el mismo contrato semántico
  * legacy: bridge temporal mientras parser físico base siga en engine-a.js
  * do-not: NO meter hit detection, abilities, UI, cámara ni render aquí; la única excepción temporal es enlazar la vista legacy de obstáculos antes de instalar KeloInput
@@ -14,12 +14,8 @@
 (function(root){
   'use strict';
   if(root.KeloInput)return;
-  const VERSION='kelo-input-v2.0.1-collision-boot-bridge';
+  const VERSION='kelo-input-v2.1.0-zero-copy-read';
 
-  // BOOT BRIDGE: all owner scripts are deferred now. engine-a has already created
-  // the legacy lexical `obstacles` array when this script executes, so attach it
-  // before KeloInput wraps processInput. The DOMContentLoaded attach remains
-  // idempotent, but this is the ordering-critical attachment used by gameplay.
   try{
     if(root.KELO_COLLISION&&typeof root.KELO_COLLISION.attachLegacyObstacleArray==='function'&&typeof obstacles!=='undefined'&&Array.isArray(obstacles)){
       root.KELO_COLLISION.attachLegacyObstacleArray(obstacles,{adoptExistingOwner:'core-static'});
@@ -34,14 +30,8 @@
   }
   const originalProcessInput=processInput;
   const hooks={before:[],after:[]};
-  const DEFAULTS=Object.freeze({
-    bufferMs:125,
-    moveDeadzone:.14,
-    aimDeadzone:.18,
-    gamepadMoveCurve:1.2,
-    gamepadAimCurve:1.12,
-    maxBuffered:32
-  });
+  const active={before:[],after:[]};
+  const DEFAULTS=Object.freeze({bufferMs:125,moveDeadzone:.14,aimDeadzone:.18,gamepadMoveCurve:1.2,gamepadAimCurve:1.12,maxBuffered:32});
   const tuning=Object.assign({},DEFAULTS);
   const queue=[];
   const combat={
@@ -54,6 +44,19 @@
     lastSource:'legacy',
     gamepadIndex:-1
   };
+  const combatReadView={};
+  Object.defineProperties(combatReadView,{
+    move:{enumerable:true,get:()=>combat.move},
+    aim:{enumerable:true,get:()=>combat.aim},
+    rawAim:{enumerable:true,get:()=>combat.rawAim},
+    basic:{enumerable:true,get:()=>combat.basic},
+    special:{enumerable:true,get:()=>combat.special},
+    buffered:{enumerable:true,get:()=>queue},
+    lastSource:{enumerable:true,get:()=>combat.lastSource},
+    gamepadIndex:{enumerable:true,get:()=>combat.gamepadIndex},
+    tuning:{enumerable:true,get:()=>tuning}
+  });
+  Object.freeze(combatReadView);
   let sequence=1;
 
   function perfNow(){return root.performance&&typeof root.performance.now==='function'?root.performance.now():Date.now();}
@@ -126,13 +129,14 @@
     return Object.freeze({index:pad.index,move,aim,buttons:pad.buttons||[]});
   }
 
+  function rebuild(phase){active[phase]=hooks[phase].slice();}
   function add(phase,owner,fn,priority){
     if(typeof fn!=='function')throw new TypeError('input hook must be a function');
     const entry={id:'input-hook-'+sequence++,owner:String(owner||'anonymous'),fn:fn,priority:Number(priority)||0};
-    hooks[phase].push(entry);hooks[phase].sort(function(a,b){return a.priority-b.priority||a.id.localeCompare(b.id);});return entry.id;
+    hooks[phase].push(entry);hooks[phase].sort(function(a,b){return a.priority-b.priority||a.id.localeCompare(b.id);});rebuild(phase);return entry.id;
   }
-  function unregister(id){let removed=false;['before','after'].forEach(function(phase){const i=hooks[phase].findIndex(function(h){return h.id===id;});if(i>=0){hooks[phase].splice(i,1);removed=true;}});return removed;}
-  function run(phase,ctx){const list=hooks[phase].slice();for(let i=0;i<list.length;i++)list[i].fn(ctx);}
+  function unregister(id){let removed=false;['before','after'].forEach(function(phase){const i=hooks[phase].findIndex(function(h){return h.id===id;});if(i>=0){hooks[phase].splice(i,1);rebuild(phase);removed=true;}});return removed;}
+  function run(phase,ctx){const list=active[phase];for(let i=0;i<list.length;i++)list[i].fn(ctx);}
   function isLocked(){const locks=root.KeloInputLocks;return !!(locks&&typeof locks.isLocked==='function'&&locks.isLocked());}
   function clearIntent(){
     if(typeof input!=='undefined'&&input){input.normX=0;input.normY=0;input.touchActive=false;input.touchId=null;const keys=input.keys||{};Object.keys(keys).forEach(function(key){keys[key]=false;});}
@@ -141,9 +145,9 @@
   }
   function publicList(phase){return Object.freeze(hooks[phase].map(function(h){return Object.freeze({id:h.id,owner:h.owner,priority:h.priority});}));}
   function combatSnapshot(){return Object.freeze({tuning:Object.freeze(Object.assign({},tuning)),move:Object.freeze(Object.assign({},combat.move)),aim:Object.freeze(Object.assign({},combat.aim)),rawAim:Object.freeze(Object.assign({},combat.rawAim)),basic:Object.freeze(Object.assign({},combat.basic)),special:Object.freeze(Object.assign({},combat.special)),buffered:Object.freeze(queue.slice()),lastSource:combat.lastSource,gamepadIndex:combat.gamepadIndex});}
+  function combatRead(){return combatReadView;}
   function snapshot(){return Object.freeze({version:VERSION,locked:isLocked(),before:publicList('before'),after:publicList('after'),combat:combatSnapshot()});}
 
-  // FOUNDATION-ALLOW: único bridge autorizado alrededor del processInput legacy.
   processInput=function(){
     if(isLocked()){clearIntent();return;}
     const ctx={input:typeof input!=='undefined'?input:null,player:typeof localPlayer!=='undefined'?localPlayer:null,combat:combat};
@@ -159,14 +163,8 @@
   };
 
   const combatApi=Object.freeze({
-    configure:configureCombat,
-    setAxes:setAxes,
-    push:pushCombatIntent,
-    peek:peekCombatIntent,
-    consume:consumeCombatIntent,
-    expire:expireCombatIntents,
-    clear:clearCombatIntents,
-    snapshot:combatSnapshot,
+    configure:configureCombat,setAxes:setAxes,push:pushCombatIntent,peek:peekCombatIntent,consume:consumeCombatIntent,expire:expireCombatIntents,clear:clearCombatIntents,
+    snapshot:combatSnapshot,read:combatRead,
     get bufferMs(){return tuning.bufferMs;}
   });
   root.KeloInput=Object.freeze({
@@ -176,6 +174,6 @@
     unregister:unregister,isLocked:isLocked,snapshot:snapshot,
     radialAxis:radialAxis,pollGamepad:pollGamepad,combat:combatApi
   });
-  root.KELO_INPUT_SYSTEM_AUDIT=Object.freeze({version:VERSION,installed:true,owner:true,singleLegacyWrapper:true,usesKeloInputLocks:true,beforeAfterHooks:true,combatIntentContract:true,inputBuffer:true,radialDeadzone:true,gamepadReady:true,timers:0,uiRules:false,collisionLegacyAttached:!!root.KELO_COLLISION?.ownerSnapshot?.().legacyAttached});
+  root.KELO_INPUT_SYSTEM_AUDIT=Object.freeze({version:VERSION,installed:true,owner:true,singleLegacyWrapper:true,usesKeloInputLocks:true,beforeAfterHooks:true,activeListCached:true,perFrameHookCopies:false,zeroCopyCombatRead:true,combatIntentContract:true,inputBuffer:true,radialDeadzone:true,gamepadReady:true,timers:0,uiRules:false,collisionLegacyAttached:!!root.KELO_COLLISION?.ownerSnapshot?.().legacyAttached});
   root.KELO_INPUT_GATE_AUDIT=Object.freeze({version:VERSION,installed:true,retiredInto:'KeloInput',owner:'KeloInput',lockOwner:'KeloInputLocks',bridge:true,processInputWrapperOwner:'KeloInput',timers:0});
 })(typeof globalThis!=='undefined'?globalThis:window);
