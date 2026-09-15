@@ -46,13 +46,22 @@ jobs:
       - name: Verify player vitals owner migration
         run: node scripts/player-state-owner-migration-audit.mjs
 
+      - name: Verify render owner migration
+        run: node scripts/render-owner-migration-audit.mjs
+
+      - name: Verify player position shadow safety
+        run: node scripts/player-position-shadow-audit.mjs
+
       - name: Syntax-check migration runtimes
         run: |
           node --check src/core/player-state-system.js
           node --check src/systems/combat/damage-resolver.js
+          node --check src/core/render-extension-system.js
+          node --check src/environment/gardens-landmark.js
           node --check src/core/simulation-extension-system.js
           node --check src/core/simulation-farm-shadow.js
           node --check src/core/camera-follow-shadow.js
+          node --check src/core/player-position-shadow.js
           node --check src/environment/generic-prefabs.js
           node --check src/environment/luxe-kiosk-atlas.js
           node --check engine-c.js
