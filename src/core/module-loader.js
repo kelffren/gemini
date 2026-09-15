@@ -1,8 +1,8 @@
 /* KELO-INDEX
  * area: CORE / BOOT
  * owner: KeloModuleLoader
- * keys: DYNAMIC LOAD IDLE FIRST-USE CACHE VERSION PING MOBILE SAFARI RECOVERY QUARANTINE TRACE
- * purpose: un solo hilo de descarga. Plaza ya está viva; el resto entra en idle o al tocar un tool del menú. Pausa si el player camina. Expone eventos diagnósticos sin cambiar ownership.
+ * keys: DYNAMIC LOAD IDLE FIRST-USE CACHE VERSION PING MOBILE SAFARI RECOVERY QUARANTINE TRACE STYLE
+ * purpose: un solo hilo de descarga. Plaza ya está viva; el resto entra al tocar un tool del menú. JS y CSS opcionales se cargan secuencialmente. Pausa si el player camina.
  * public-api: KELO_MODULE_LOADER.start/ensure/needs/isReady/diagnostics
  * consumes: optional KELO_RECOVERY_MESH diagnostics when recoveryLab=1
  * do-not: NO tileset 556KB, NO studio, NO supabase, NO segundo gameLoop, NO SW, NO quarantine fuera de recoveryLab
@@ -10,7 +10,7 @@
 (function(root){
 'use strict';
 if(root.KELO_MODULE_LOADER)return;
-const VERSION='kelo-module-loader-v7-recovery';
+const VERSION='kelo-module-loader-v8-style-first-use';
 const FEATURES={
   social:[
     {src:'src/ui/player-nameplate.js?v=2',name:'placas'},
@@ -31,6 +31,7 @@ const FEATURES={
     {src:'src/systems/illumination.js?v=2',name:'luz'}
   ],
   bag:[
+    {src:'src/ui/backpack-fantasy-v1.css?v=1',name:'estilo mochila',type:'style'},
     {src:'src/systems/backpack-system.js?v=2',name:'mochila'},
     {src:'src/ui/backpack-ui.js?v=4',name:'mochila'}
   ],
@@ -57,7 +58,6 @@ const FEATURES={
     {src:'src/ui/house-instance-ui.js?v=1',name:'propiedades'}
   ]
 };
-const IDLE=['social','world'];
 const loaded=Object.create(null);
 const inflight=Object.create(null);
 const failures=Object.create(null);
@@ -93,71 +93,75 @@ function barEl(){return document.getElementById('kelo-ml-bar');}
 function show(msg,pct){
   const el=box(); if(!el)return;
   el.hidden=false; shown=true;
-  const t=textEl(); if(t) t.textContent=msg;
-  const b=barEl(); if(b) b.style.width=Math.max(0,Math.min(100,pct||0))+'%';
+  const t=textEl(); if(t)t.textContent=msg;
+  const b=barEl(); if(b)b.style.width=Math.max(0,Math.min(100,pct||0))+'%';
 }
 function hideChip(msg){
   const el=box(); if(!el)return;
-  if(shown){ show(msg||'Listo',100); setTimeout(function(){ el.hidden=true; },800); }
-  else el.hidden=true;
+  if(shown){show(msg||'Listo',100);setTimeout(function(){el.hidden=true;},800);}else el.hidden=true;
 }
-function hasScript(src){
-  const base=src.split('?')[0];
-  return Array.from(document.scripts).some(function(s){return (s.getAttribute('src')||'').split('?')[0]===base;});
+function base(src){return String(src||'').split('?')[0];}
+function hasAsset(item){
+  const target=base(item.src);
+  if(item.type==='style'){
+    return Array.from(document.querySelectorAll('link[rel="stylesheet"]')).some(function(link){return base(link.getAttribute('href'))===target;});
+  }
+  return Array.from(document.scripts).some(function(script){return base(script.getAttribute('src'))===target;});
 }
 function loadOne(item,feature){
   return new Promise(function(resolve){
-    if(hasScript(item.src)){
-      emit('kelo:module-load-end',{feature,src:item.src,ok:true,ms:0,cached:true});
+    if(hasAsset(item)){
+      emit('kelo:module-load-end',{feature,src:item.src,type:item.type||'script',ok:true,ms:0,cached:true});
       resolve({ms:0,ok:true,cached:true});return;
     }
     const t0=performance.now();
-    emit('kelo:module-load-start',{feature,src:item.src,name:item.name});
-    const s=document.createElement('script');
-    s.src=item.src;
-    s.onload=function(){
+    const type=item.type==='style'?'style':'script';
+    emit('kelo:module-load-start',{feature,src:item.src,name:item.name,type});
+    const node=type==='style'?document.createElement('link'):document.createElement('script');
+    if(type==='style'){node.rel='stylesheet';node.href=item.src;}
+    else{node.src=item.src;node.async=false;}
+    node.onload=function(){
       const ms=performance.now()-t0;
-      emit('kelo:module-load-end',{feature,src:item.src,ok:true,ms:Math.round(ms),cached:false});
+      emit('kelo:module-load-end',{feature,src:item.src,type,ok:true,ms:Math.round(ms),cached:false});
       resolve({ms,ok:true,cached:false});
     };
-    s.onerror=function(){
+    node.onerror=function(){
       const ms=performance.now()-t0;
       failures[item.src]=(failures[item.src]||0)+1;
-      emit('kelo:module-load-error',{feature,src:item.src,ok:false,ms:Math.round(ms),error:'SCRIPT_LOAD_ERROR',count:failures[item.src]});
+      emit('kelo:module-load-error',{feature,src:item.src,type,ok:false,ms:Math.round(ms),error:type==='style'?'STYLE_LOAD_ERROR':'SCRIPT_LOAD_ERROR',count:failures[item.src]});
       resolve({ms,ok:false,cached:false});
     };
-    document.head.appendChild(s);
+    document.head.appendChild(node);
   });
 }
 function loadFeature(name,opts){
   const files=FEATURES[name];
-  if(!files) return Promise.resolve(true);
+  if(!files)return Promise.resolve(true);
   if(quarantined(name)){
     emit('kelo:module-quarantined',{feature:name,src:'',ok:false,error:'RECOVERY_QUARANTINE'});
     return Promise.resolve(false);
   }
-  if(loaded[name]) return Promise.resolve(true);
-  if(inflight[name]) return inflight[name];
+  if(loaded[name])return Promise.resolve(true);
+  if(inflight[name])return inflight[name];
   const interactive=!!(opts&&opts.interactive);
   inflight[name]=new Promise(function(resolve){
-    let i=0,hits=0,errors=0;
+    let i=0,errors=0;
     function step(){
       if(i>=files.length){
-        loaded[name]=errors===0; delete inflight[name];
-        try{ if(errors===0)localStorage.setItem('kelo_modpack_'+name,build); }catch(_){}
+        loaded[name]=errors===0;delete inflight[name];
+        try{if(errors===0)localStorage.setItem('kelo_modpack_'+name,build);}catch(_){}
         emit('kelo:module-feature-complete',{feature:name,ok:errors===0,files:files.length,errors});
-        resolve(errors===0); return;
+        resolve(errors===0);return;
       }
       if(!interactive&&busy()){
-        if(shown) show('En pausa · caminando',(i/files.length)*100);
-        setTimeout(step,450); return;
+        if(shown)show('En pausa · caminando',(i/files.length)*100);
+        setTimeout(step,450);return;
       }
       const item=files[i];
       loadOne(item,name).then(function(result){
-        const dt=Number(result?.ms)||0;
-        if(!result?.ok)errors++;
-        if(dt<50) hits++;
-        else show('Descargando '+item.name+'  '+(i+1)+'/'+files.length,((i+1)/files.length)*100);
+        const dt=Number(result&&result.ms)||0;
+        if(!result||!result.ok)errors++;
+        if(dt>=50)show('Descargando '+item.name+'  '+(i+1)+'/'+files.length,((i+1)/files.length)*100);
         i+=1;
         setTimeout(step,dt<50?80:360);
       });
@@ -167,13 +171,13 @@ function loadFeature(name,opts){
   return inflight[name];
 }
 function ensure(name){
-  if(name==='chat'||name==='profile') return Promise.resolve(true);
-  if(name==='nobility'||name==='emotes') name='social';
+  if(name==='chat'||name==='profile')return Promise.resolve(true);
+  if(name==='nobility'||name==='emotes')name='social';
   if(name==='pvp'){
-    if(root.KeloRuntimeBootstrap&&typeof root.KeloRuntimeBootstrap.ensure==='function') return root.KeloRuntimeBootstrap.ensure();
+    if(root.KeloRuntimeBootstrap&&typeof root.KeloRuntimeBootstrap.ensure==='function')return root.KeloRuntimeBootstrap.ensure();
     return Promise.resolve(false);
   }
-  if(!FEATURES[name]) return Promise.resolve(true);
+  if(!FEATURES[name])return Promise.resolve(true);
   if(quarantined(name)){
     emit('kelo:module-quarantined',{feature:name,src:'',ok:false,error:'RECOVERY_QUARANTINE'});
     return Promise.resolve(false);
@@ -182,22 +186,22 @@ function ensure(name){
   return loadFeature(name,{interactive:true}).then(function(ok){hideChip(ok?'Listo':'Fallo al cargar');return ok;});
 }
 function needs(name){
-  if(name==='chat'||name==='profile') return false;
-  if(name==='nobility'||name==='emotes') name='social';
-  if(name==='pvp') return !(root.KeloMeleeEngine&&root.KeloCombatEngine);
-  if(!FEATURES[name]) return false;
+  if(name==='chat'||name==='profile')return false;
+  if(name==='nobility'||name==='emotes')name='social';
+  if(name==='pvp')return !(root.KeloMeleeEngine&&root.KeloCombatEngine);
+  if(!FEATURES[name])return false;
   return !loaded[name];
 }
 function start(opts){
-  if(opts&&opts.build) build=String(opts.build);
-  const el=box(); if(el) el.hidden=true;
+  if(opts&&opts.build)build=String(opts.build);
+  const el=box();if(el)el.hidden=true;
   emit('kelo:module-loader-start',{build,version:VERSION});
-  // First-use only. Compiling extra JS while gameLoop runs freezes Safari.
+  // First-use only. Executing extra JS while gameLoop runs freezes Safari.
 }
 function diagnostics(){
   return Object.freeze({
     version:VERSION,build,features:Object.keys(FEATURES),
-    loaded:Object.keys(loaded).filter(k=>loaded[k]),
+    loaded:Object.keys(loaded).filter(function(k){return loaded[k];}),
     inflight:Object.keys(inflight),
     failures:{...failures},
     quarantined:Object.keys(FEATURES).filter(quarantined)
