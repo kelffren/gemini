@@ -1,0 +1,136 @@
+name: Apply BUG-0003 A10 patch
+
+on:
+  push:
+    branches:
+      - automation/apply-bug-0003-a10
+    paths:
+      - .github/workflows/apply-bug-0003-a10.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply-patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout current main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Download exact uploaded patch
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import hashlib, html, re, sys
+          from urllib.parse import urljoin
+          from urllib.request import Request, urlopen
+
+          SHARE = 'https://firestorage.ai/ja/f/lpZ7jZ03goHI'
+          EXPECTED = '558ab93258f2d182df82109aaaecd071cd10dacbb78cdbcfe82b885e43048339'
+          FILE_ID = '01a0a352f734761c96417fa8e32bfb7c'
+          PUBLIC_ID = 'WtzK8Yjhb5sqv0HL'
+          SLUG = 'lpZ7jZ03goHI'
+
+          def fetch(url, limit=2_000_000):
+              req = Request(url, headers={'User-Agent':'Mozilla/5.0 GitHub-Actions KeloWorldPatch/1.0'})
+              with urlopen(req, timeout=25) as r:
+                  data = r.read(limit + 1)
+                  return r.geturl(), r.headers.get('Content-Type',''), data
+
+          def exact(data):
+              return hashlib.sha256(data).hexdigest() == EXPECTED
+
+          candidates = []
+          def add(u):
+              if not u: return
+              u = html.unescape(u).replace('\\u0026','&').replace('\\/','/')
+              full = urljoin(SHARE, u)
+              if full not in candidates:
+                  candidates.append(full)
+
+          try:
+              final_url, ctype, page = fetch(SHARE)
+          except Exception as e:
+              print('share fetch failed:', repr(e))
+              sys.exit(2)
+
+          if exact(page):
+              open('/tmp/bug0003.patch','wb').write(page)
+              print('Patch downloaded directly from share URL')
+              sys.exit(0)
+
+          text = page.decode('utf-8','replace')
+          print('share:', final_url, ctype, 'bytes=', len(page))
+          print('contains file id:', FILE_ID in text, 'public id:', PUBLIC_ID in text)
+
+          # Links and JSON/string URLs embedded in server-rendered HTML.
+          for pat in [r'''(?:href|src|action|data-url|data-download)=["']([^"']+)["']''',
+                      r'''["'](https?://[^"'<> ]+)["']''',
+                      r'''["'](/[^"'<> ]*(?:download|file|blob|storage)[^"'<> ]*)["']''']:
+              for m in re.finditer(pat, text, re.I):
+                  add(m.group(1))
+
+          # Common direct-download shapes; exact SHA check prevents accepting the wrong body.
+          bases = ['https://firestorage.ai']
+          ids = [FILE_ID, PUBLIC_ID, SLUG]
+          paths = []
+          for x in ids:
+              paths += [
+                  f'/api/files/{x}', f'/api/files/{x}/download', f'/api/file/{x}', f'/api/file/{x}/download',
+                  f'/api/download/{x}', f'/download/{x}', f'/files/{x}/download', f'/f/{x}/download',
+                  f'/api/f/{x}', f'/api/f/{x}/download', f'/api/share/{x}', f'/api/share/{x}/download',
+                  f'/api/shares/{x}', f'/api/shares/{x}/download'
+              ]
+          paths += [
+              f'/ja/f/{SLUG}?download=1', f'/ja/f/{SLUG}/download', f'/en/f/{SLUG}/download',
+              f'/f/{SLUG}?download=1', f'/f/{SLUG}/download'
+          ]
+          for b in bases:
+              for p in paths: add(b+p)
+
+          # Prioritize likely file/download targets from HTML.
+          candidates.sort(key=lambda u: (0 if any(k in u.lower() for k in ('download','.patch','file','blob','storage')) else 1, len(u)))
+          print('candidate count:', len(candidates))
+          for i, u in enumerate(candidates[:80]):
+              try:
+                  fu, ct, body = fetch(u)
+                  h = hashlib.sha256(body).hexdigest()
+                  print(f'[{i}]', u, '->', fu, ct, len(body), h[:12])
+                  if h == EXPECTED:
+                      open('/tmp/bug0003.patch','wb').write(body)
+                      print('FOUND exact patch:', fu)
+                      sys.exit(0)
+              except Exception as e:
+                  print(f'[{i}] fail', u, type(e).__name__, str(e)[:180])
+
+          print('No exact patch body found. HTML prefix follows:')
+          print(text[:12000])
+          sys.exit(3)
+          PY
+
+      - name: Verify and apply patch
+        shell: bash
+        run: |
+          test "$(sha256sum /tmp/bug0003.patch | awk '{print $1}')" = "558ab93258f2d182df82109aaaecd071cd10dacbb78cdbcfe82b885e43048339"
+          git apply --check /tmp/bug0003.patch
+          git apply /tmp/bug0003.patch
+          git diff --check
+
+      - name: Run A10 static audits
+        shell: bash
+        run: |
+          node scripts/world-editor-lazy-boot-audit.mjs
+          node scripts/world-editor-single-prewarm-owner-audit.mjs
+          node scripts/world-editor-creator-boot-isolation-audit.mjs
+
+      - name: Commit A10 to main
+        shell: bash
+        run: |
+          git config user.name "kelo-world-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -m "fix(world): A10 iPhone post-chrome survival + TREE place (BUG-0003)"
+          git push origin HEAD:main
