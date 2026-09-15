@@ -1,4 +1,4 @@
-name: Critical World Editor d71 Real iPhone certification
+name: World Editor first-regression bisect
 
 on:
   push:
@@ -9,88 +9,226 @@ on:
   workflow_dispatch:
 
 jobs:
-  real-iphone:
+  bisect:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    env:
-      BROWSERSTACK_USERNAME: ${{ secrets.BROWSERSTACK_USERNAME }}
-      BROWSERSTACK_ACCESS_KEY: ${{ secrets.BROWSERSTACK_ACCESS_KEY }}
-      BROWSERSTACK_BUILD_NAME: KELO d71 critical real iPhone ${{ github.sha }}
-      BUILD_NUMBER: ${{ github.run_number }}
-      KELO_PAGES: http://localhost:8000/gemini/
-      PW_LIVE: '1'
     steps:
-      - name: Checkout critical experiment
+      - name: Checkout full history
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Prove runtime is exact d71 snapshot
-        shell: bash
-        run: |
-          set -euo pipefail
-          BASE=d71df2c0ad5aa627616858d3c65ef4131eb0f19d
-          git cat-file -e "$BASE^{commit}"
-          mapfile -t changed < <(git diff --name-only "$BASE" HEAD)
-          printf 'Changed from d71:\n%s\n' "${changed[@]}"
-          test "${#changed[@]}" -eq 1
-          test "${changed[0]}" = '.github/workflows/critical-world-editor-d71-live.yml'
-
-      - name: Verify BrowserStack credentials
-        shell: bash
-        run: |
-          test -n "$BROWSERSTACK_USERNAME" || (echo 'Missing BROWSERSTACK_USERNAME' && exit 1)
-          test -n "$BROWSERSTACK_ACCESS_KEY" || (echo 'Missing BROWSERSTACK_ACCESS_KEY' && exit 1)
 
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
 
-      - name: Install exact snapshot dependencies
-        run: npm install
-
-      - name: Enable BrowserStack Local only in runner
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          p=Path('browserstack.yml')
-          s=p.read_text()
-          old='browserstackLocal: false'
-          if old not in s:
-              raise SystemExit('browserstackLocal marker not found')
-          p.write_text(s.replace(old,'browserstackLocal: true',1))
-          PY
-          grep -F 'browserstackLocal: true' browserstack.yml
-          echo 'Only runner copy changed; repository snapshot remains d71.'
-
-      - name: Serve exact d71 snapshot under /gemini/
+      - name: Install isolated Playwright harness
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p /tmp/kelo-d71-live
-          ln -s "$GITHUB_WORKSPACE" /tmp/kelo-d71-live/gemini
-          python3 -m http.server 8000 --bind 0.0.0.0 --directory /tmp/kelo-d71-live >/tmp/kelo-d71-http.log 2>&1 &
+          mkdir -p /tmp/kelo-bisect-harness
+          cd /tmp/kelo-bisect-harness
+          npm init -y >/dev/null 2>&1
+          npm install --no-audit --no-fund playwright@1.55.0
+
+      - name: Create functional World placement probe
+        shell: bash
+        run: |
+          cat > /tmp/kelo-bisect-harness/probe.mjs <<'NODE'
+          import { createRequire } from 'node:module';
+          import fs from 'node:fs';
+          const require=createRequire(import.meta.url);
+          const { chromium }=require('/tmp/kelo-bisect-harness/node_modules/playwright');
+          const sha=process.argv[2]||'unknown';
+          const resultFile='/tmp/kelo-bisect-results.tsv';
+          const log=(status,stage,msg='')=>{
+            const clean=String(msg).replace(/[\r\n\t]+/g,' ').slice(0,500);
+            fs.appendFileSync(resultFile,`${sha}\t${status}\t${stage}\t${clean}\n`);
+            console.log(`[BISECT ${sha.slice(0,8)}] ${status} ${stage} ${clean}`);
+          };
+          let browser;
+          try{
+            browser=await chromium.launch({headless:true,executablePath:'/usr/bin/google-chrome',args:['--no-sandbox','--disable-dev-shm-usage']});
+            const context=await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true});
+            const page=await context.newPage();
+            const pageErrors=[];
+            page.on('pageerror',e=>pageErrors.push(String(e)));
+
+            let stage='BOOT';
+            const response=await page.goto(`http://127.0.0.1:8000/gemini/?guest=1&mapEditor=1&bisect=${sha}`,{waitUntil:'domcontentloaded',timeout:25000});
+            if(!response||response.status()>=400)throw new Error(`HTTP_${response?.status()}`);
+
+            stage='ADMIN_READY';
+            await page.waitForFunction(()=>!!(window.KELO_ADMIN_KEYS?.can?.('world.edit')&&window.KeloInputLocks?.acquire),null,{timeout:20000});
+
+            stage='CREATORS';
+            await page.evaluate(async()=>{
+              const m=await import('./src/creators/ui/creator-hub.mjs');
+              await m.openCreatorHub({root:window});
+            });
+            await page.waitForSelector('#kelo-creators-hub',{state:'visible',timeout:12000});
+
+            stage='WORLD_OPEN';
+            await page.locator('#kelo-creators-hub [data-workspace="world"]').click({timeout:12000});
+            await page.waitForSelector('#kelo-studio-live',{state:'visible',timeout:15000});
+            await page.waitForFunction(()=>{
+              const el=document.getElementById('kelo-studio-live');
+              return !!(el&&el.dataset.keloWorldLoading!=='1'&&el.querySelector('.ks-status'));
+            },null,{timeout:30000});
+
+            stage='ASSET_SELECT';
+            const studio=page.locator('#kelo-studio-live');
+            const edit=studio.locator('[data-act="edit-assets"]:visible').first();
+            if(await edit.count()){
+              try{ await edit.click({timeout:4000}); }catch{}
+            }
+            let asset=studio.locator('[data-pane="assets"] [data-asset]:visible').first();
+            if(!(await asset.count())) asset=studio.locator('[data-asset]:visible').first();
+            await asset.waitFor({state:'visible',timeout:15000});
+
+            const readCount=async()=>page.evaluate(()=>{
+              const placements=window.KELO_PROPERTY_SYSTEM?.getPlacements?.('parcel:world:editor');
+              if(Array.isArray(placements))return placements.length;
+              const text=document.querySelector('#kelo-studio-live .ks-status')?.textContent||'';
+              const m=text.match(/(\d+)\s+objects?/i);
+              return m?Number(m[1]):0;
+            });
+            const before=await readCount();
+            await asset.click({timeout:10000});
+
+            stage='PLACEMENT';
+            const canvas=page.locator('#game-canvas');
+            const box=await canvas.boundingBox();
+            if(!box)throw new Error('NO_GAME_CANVAS_BOX');
+            await canvas.click({position:{x:Math.max(40,Math.min(box.width-40,box.width*0.52)),y:Math.max(120,Math.min(box.height-180,box.height*0.44))},timeout:10000});
+            await page.waitForFunction(previous=>{
+              const placements=window.KELO_PROPERTY_SYSTEM?.getPlacements?.('parcel:world:editor');
+              if(Array.isArray(placements)&&placements.length>previous)return true;
+              const text=document.querySelector('#kelo-studio-live .ks-status')?.textContent||'';
+              const m=text.match(/(\d+)\s+objects?/i);
+              return !!(m&&Number(m[1])>previous);
+            },before,{timeout:15000});
+            const after=await readCount();
+            if(after<=before)throw new Error(`PLACEMENT_DID_NOT_INCREMENT:${before}->${after}`);
+            if(pageErrors.length)throw new Error(`PAGE_ERRORS:${pageErrors.join(' | ')}`);
+
+            log('GOOD','PLACEMENT',`${before}->${after}`);
+            await browser.close();
+            process.exit(0);
+          }catch(error){
+            const text=String(error?.stack||error);
+            let stage='UNKNOWN';
+            if(/goto|DOMContentLoaded|domcontentloaded|Timeout 25000/.test(text))stage='BOOT';
+            else if(/KELO_ADMIN_KEYS|waitForFunction/.test(text))stage='ADMIN_OR_WORLD';
+            else if(/creator-hub|kelo-creators-hub/.test(text))stage='CREATORS';
+            else if(/kelo-studio-live|data-workspace/.test(text))stage='WORLD_OPEN';
+            else if(/data-asset|ASSET/.test(text))stage='ASSET_SELECT';
+            else if(/PLACEMENT|game-canvas/.test(text))stage='PLACEMENT';
+            log('BAD',stage,text);
+            try{await browser?.close();}catch{}
+            process.exit(1);
+          }
+          NODE
+
+          cat > /tmp/kelo-bisect-harness/probe.sh <<'SH'
+          #!/usr/bin/env bash
+          set +e
+          sha="$(git rev-parse HEAD)"
+          cd /tmp/kelo-bisect-harness
+          node probe.mjs "$sha"
+          rc=$?
+          cd "$GITHUB_WORKSPACE"
+          exit $rc
+          SH
+          chmod +x /tmp/kelo-bisect-harness/probe.sh
+
+      - name: Serve whichever commit is checked out
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/kelo-bisect-root
+          ln -s "$GITHUB_WORKSPACE" /tmp/kelo-bisect-root/gemini
+          python3 -m http.server 8000 --bind 127.0.0.1 --directory /tmp/kelo-bisect-root >/tmp/kelo-bisect-http.log 2>&1 &
           for i in {1..30}; do
-            if curl -fsS http://127.0.0.1:8000/gemini/index.html >/dev/null; then
-              echo 'd71 local LIVE endpoint ready'
-              exit 0
-            fi
+            if curl -fsS http://127.0.0.1:8000/gemini/index.html >/dev/null; then exit 0; fi
             sleep 1
           done
-          cat /tmp/kelo-d71-http.log
+          cat /tmp/kelo-bisect-http.log
           exit 1
 
-      - name: Real iPhone visible World + placement + reopen
-        run: npx browserstack-node-sdk playwright test tests/iphone-world-visible-flow.spec.js --workers=1
+      - name: Validate known-good and known-bad anchors
+        shell: bash
+        run: |
+          set -euo pipefail
+          GOOD=72604f28d4023c0543bfd2c36b1bf6823704a3db
+          BAD=d71df2c0ad5aa627616858d3c65ef4131eb0f19d
+          ORIGINAL=$(git rev-parse HEAD)
+          git checkout -q -f "$GOOD"
+          echo "Testing known GOOD $GOOD"
+          /tmp/kelo-bisect-harness/probe.sh
+          git checkout -q -f "$BAD"
+          echo "Testing known BAD $BAD"
+          if /tmp/kelo-bisect-harness/probe.sh; then
+            echo 'ERROR: d71 unexpectedly passed; refusing invalid bisect.'
+            exit 1
+          fi
+          git checkout -q -f "$ORIGINAL"
 
-      - name: Upload real-iPhone evidence
+      - name: Bisect 2,233 commits to first regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          GOOD=72604f28d4023c0543bfd2c36b1bf6823704a3db
+          BAD=d71df2c0ad5aa627616858d3c65ef4131eb0f19d
+          ORIGINAL=$(git rev-parse HEAD)
+          : > /tmp/kelo-bisect-results.tsv
+          git bisect start "$BAD" "$GOOD"
+          set +e
+          git bisect run /tmp/kelo-bisect-harness/probe.sh
+          BISECT_RC=$?
+          set -e
+          CULPRIT=$(git rev-parse HEAD)
+          echo "$CULPRIT" > /tmp/kelo-first-bad-sha.txt
+          git show --no-ext-diff --stat --oneline "$CULPRIT" > /tmp/kelo-first-bad-show.txt
+          git bisect log > /tmp/kelo-bisect-log.txt
+          echo "BISECT_RC=$BISECT_RC"
+          echo "FIRST_BAD=$CULPRIT"
+          cat /tmp/kelo-first-bad-show.txt
+
+          PARENT=$(git rev-parse "$CULPRIT^1")
+          echo "PARENT=$PARENT" | tee /tmp/kelo-boundary.txt
+          git checkout -q -f "$PARENT"
+          if /tmp/kelo-bisect-harness/probe.sh; then
+            echo 'PARENT_RESULT=GOOD' | tee -a /tmp/kelo-boundary.txt
+          else
+            echo 'PARENT_RESULT=BAD' | tee -a /tmp/kelo-boundary.txt
+          fi
+          git checkout -q -f "$CULPRIT"
+          if /tmp/kelo-bisect-harness/probe.sh; then
+            echo 'CULPRIT_RESULT=GOOD' | tee -a /tmp/kelo-boundary.txt
+          else
+            echo 'CULPRIT_RESULT=BAD' | tee -a /tmp/kelo-boundary.txt
+          fi
+          git bisect reset "$ORIGINAL" || true
+
+          grep -q '^PARENT_RESULT=GOOD$' /tmp/kelo-boundary.txt
+          grep -q '^CULPRIT_RESULT=BAD$' /tmp/kelo-boundary.txt
+
+      - name: Publish bisect evidence
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p artifacts/world-bisect
+          cp /tmp/kelo-bisect-results.tsv artifacts/world-bisect/results.tsv 2>/dev/null || true
+          cp /tmp/kelo-first-bad-sha.txt artifacts/world-bisect/first-bad-sha.txt 2>/dev/null || true
+          cp /tmp/kelo-first-bad-show.txt artifacts/world-bisect/first-bad-show.txt 2>/dev/null || true
+          cp /tmp/kelo-bisect-log.txt artifacts/world-bisect/bisect-log.txt 2>/dev/null || true
+          cp /tmp/kelo-boundary.txt artifacts/world-bisect/boundary.txt 2>/dev/null || true
+
+      - name: Upload bisect evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: critical-d71-real-iphone-evidence
+          name: world-editor-first-regression-bisect
+          path: artifacts/world-bisect/
           if-no-files-found: warn
-          path: |
-            playwright-report.json
-            test-results/
-            playwright-report/
