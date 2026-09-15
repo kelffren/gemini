@@ -43,8 +43,13 @@ jobs:
       - name: Verify simulation owner migration
         run: node scripts/simulation-owner-migration-audit.mjs
 
+      - name: Verify player vitals owner migration
+        run: node scripts/player-state-owner-migration-audit.mjs
+
       - name: Syntax-check migration runtimes
         run: |
+          node --check src/core/player-state-system.js
+          node --check src/systems/combat/damage-resolver.js
           node --check src/core/simulation-extension-system.js
           node --check src/core/simulation-farm-shadow.js
           node --check src/core/camera-follow-shadow.js

@@ -11,13 +11,13 @@
  */
 (function(root){
   'use strict';
-  const VERSION='kelo-runtime-bootstrap-v1.5.0-pvp-visual-competitive';
+  const VERSION='kelo-runtime-bootstrap-v1.5.1-player-vitals-owner';
   const MODULES=Object.freeze([
     'src/core/events/event-bus.js?v=1',
     'src/abilities/ability-action-timeline.js?v=1',
     'src/systems/combat/combat-schema.js?v=2',
     'src/systems/combat/hit-resolver.js?v=2',
-    'src/systems/combat/damage-resolver.js?v=1',
+    'src/systems/combat/damage-resolver.js?v=3-player-vitals',
     'src/systems/effects/effect-schema.js?v=2',
     'src/systems/effects/status-engine.js?v=1',
     'src/systems/effects/effect-engine.js?v=2',

@@ -1,5 +1,5 @@
 {
-  "version": 6,
+  "version": 7,
   "defaultMode": "LEGACY",
   "allowedModes": ["LEGACY", "SHADOW", "NEW"],
   "domains": {
@@ -34,11 +34,14 @@
       "shadowEvidence": "KELO_CAMERA_FOLLOW_SHADOW_AUDIT"
     },
     "playerState": {
-      "mode": "LEGACY",
-      "owner": "PlayerState",
-      "legacy": ["engine-a.js", "engine-c.js"],
+      "mode": "NEW",
+      "owner": "KeloPlayerState",
+      "legacy": ["engine-b.js", "engine-net.js", "src/systems/arena-system.js", "src/systems/pvp-world.js", "src/systems/combat/damage-resolver.js"],
       "contracts": ["localPlayer.hp", "localPlayer.maxHp"],
-      "activationGate": "single-writer"
+      "activationGate": "accessor-boundary-runtime-audit",
+      "authority": "single-accessor-boundary",
+      "scope": "local-player-vitals-only",
+      "compatibility": "legacy direct and aliased writes are routed through KeloPlayerState accessors"
     },
     "collision": {
       "mode": "LEGACY",
