@@ -6,7 +6,7 @@
  * public-api: openKeloStudioLive(), closeKeloStudioLive()
  * consumes: KeloInputLocks, KELO_WORLD_EDIT, Studio Kernel/Tools
  * online: confirmed Commands mirror through KELO_WORLD_EDIT; previews/camera/productivity stay local
- * mobile: ZERO static Studio imports — chrome first; World bridge yields; iPhone never allocates the overlay canvas and hydrates the draft after tools are already on screen
+ * mobile: ZERO static Studio imports — chrome first; World bridge yields; iPhone serializes runtime module parse/eval between paints, never allocates the overlay canvas, and hydrates the draft after tools are already on screen
  */
 
 let active=null;
@@ -34,25 +34,45 @@ async function loadLiveStudioRuntime(root){
   const phone=isPhone(root);
   const {yieldStudioBoot,setWorldLaunchStatus}=await import('./studio-boot-pace.mjs');
   const wait=async()=>{await yieldStudioBoot(root);if(phone)await pause(root,40);};
+  const abortIfNeeded=()=>{if(root.KELO_WORLD_LAUNCH_ABORTED)throw new Error('WORLD_EDITOR_OPEN_TIMEOUT');};
   setWorldLaunchStatus(root,'Cargando herramientas…');
-  const [overlayMod,gridMod,pointerMod,cameraMod]=await Promise.all([
-    import('../render/studio-overlay-canvas.mjs'),
-    import('../render/creator-grid-overlay.mjs'),
-    import('../input/pointer-input-adapter.mjs'),
-    import('../input/studio-camera-controller.mjs')
-  ]);
-  await wait();
-  if(root.KELO_WORLD_LAUNCH_ABORTED)throw new Error('WORLD_EDITOR_OPEN_TIMEOUT');
+  let overlayMod,gridMod,pointerMod,cameraMod;
+  if(phone){
+    overlayMod=await import('../render/studio-overlay-canvas.mjs');await wait();abortIfNeeded();
+    gridMod=await import('../render/creator-grid-overlay.mjs');await wait();abortIfNeeded();
+    pointerMod=await import('../input/pointer-input-adapter.mjs');await wait();abortIfNeeded();
+    cameraMod=await import('../input/studio-camera-controller.mjs');await wait();abortIfNeeded();
+  }else{
+    [overlayMod,gridMod,pointerMod,cameraMod]=await Promise.all([
+      import('../render/studio-overlay-canvas.mjs'),
+      import('../render/creator-grid-overlay.mjs'),
+      import('../input/pointer-input-adapter.mjs'),
+      import('../input/studio-camera-controller.mjs')
+    ]);
+    await wait();
+    abortIfNeeded();
+  }
   setWorldLaunchStatus(root,'Cargando núcleo…');
-  const [mirrorMod,prodMod,actionsMod,prefabMod,analyzerMod,commandsMod]=await Promise.all([
-    import('./authority-command-mirror.mjs'),
-    import('../ui/creator-productivity-panel.mjs'),
-    import('../tools/creator-actions.mjs'),
-    import('../prefabs/creator-prefab-library.mjs'),
-    import('../validation/creator-world-analyzer.mjs'),
-    import('../document/document-commands.mjs')
-  ]);
-  await wait();
+  let mirrorMod,prodMod,actionsMod,prefabMod,analyzerMod,commandsMod;
+  if(phone){
+    mirrorMod=await import('./authority-command-mirror.mjs');await wait();abortIfNeeded();
+    prodMod=await import('../ui/creator-productivity-panel.mjs');await wait();abortIfNeeded();
+    actionsMod=await import('../tools/creator-actions.mjs');await wait();abortIfNeeded();
+    prefabMod=await import('../prefabs/creator-prefab-library.mjs');await wait();abortIfNeeded();
+    analyzerMod=await import('../validation/creator-world-analyzer.mjs');await wait();abortIfNeeded();
+    commandsMod=await import('../document/document-commands.mjs');await wait();abortIfNeeded();
+  }else{
+    [mirrorMod,prodMod,actionsMod,prefabMod,analyzerMod,commandsMod]=await Promise.all([
+      import('./authority-command-mirror.mjs'),
+      import('../ui/creator-productivity-panel.mjs'),
+      import('../tools/creator-actions.mjs'),
+      import('../prefabs/creator-prefab-library.mjs'),
+      import('../validation/creator-world-analyzer.mjs'),
+      import('../document/document-commands.mjs')
+    ]);
+    await wait();
+    abortIfNeeded();
+  }
   return {
     createStudioOverlayCanvas:overlayMod.createStudioOverlayCanvas,
     createCreatorGridOverlay:gridMod.createCreatorGridOverlay,
