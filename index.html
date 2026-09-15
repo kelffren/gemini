@@ -48,6 +48,11 @@
       sessionStorage.setItem('kelo_local_guest_play_v1','1');
       localStorage.setItem('kelo_local_guest_play_v1','1');
     }
+    if(q.get('freezeLab')==='1'||q.get('freeze')==='1'||q.get('debugFreeze')==='1'){
+      window.__keloFreezeLocatorPromise=import('./src/core/bug-observability.mjs?v=freeze-locator-1').then(function(mod){
+        return mod.installFreezeLocator({root:window,flow:'world-open',bugId:'BUG-0003',version:'V6.69-freeze-locator'});
+      }).catch(function(error){console.error('[Kelo Freeze Locator boot]',error);return null;});
+    }
   }catch(e){}
 })();
 </script>
