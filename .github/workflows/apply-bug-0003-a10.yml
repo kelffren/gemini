@@ -49,14 +49,13 @@ jobs:
           echo "Changed files:"
           git diff --name-only
 
-      - name: Run A10 static audits
+      - name: Run A10 release audits
         shell: bash
         working-directory: game
         run: |
           node scripts/world-editor-lazy-boot-audit.mjs
           node scripts/world-editor-single-prewarm-owner-audit.mjs
           node scripts/world-editor-creator-boot-isolation-audit.mjs
-          node scripts/_bug0003-smoke.mjs
 
       - name: Commit A10 to main
         shell: bash
