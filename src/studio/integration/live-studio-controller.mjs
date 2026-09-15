@@ -8,7 +8,7 @@
 import {openKeloStudioLive as openBase,closeKeloStudioLive as closeBase,getKeloStudioLive as getBase} from './live-studio-controller-base.mjs';
 import {createStudioMobilePlacementGhost} from '../render/studio-mobile-placement-ghost.mjs';
 
-let ghost=null,commandUnsub=null;
+let ghost=null,commandUnsub=null,lifeTimer=0;
 const MIN_REAL_CATALOG=5;
 const isPhone=root=>/iPhone|iPad|iPod|Android/i.test(String(root?.navigator?.userAgent||''))||Math.min(Number(root?.innerWidth)||999,Number(root?.innerHeight)||999)<=500;
 const sleep=(root,ms)=>new Promise(resolve=>(root.setTimeout||setTimeout)(resolve,ms));
@@ -40,10 +40,21 @@ function syncDiagnostics(root,session){
   el.dataset.keloCatalogReady=catalog>=MIN_REAL_CATALOG?'1':'0';
 }
 
+function clearWrapperRuntime(root=globalThis){
+  ghost?.destroy?.();ghost=null;
+  commandUnsub?.();commandUnsub=null;
+  if(lifeTimer){try{(root.clearInterval||clearInterval)(lifeTimer);}catch{}lifeTimer=0;}
+}
+
 function installDiagnostics(root,session){
   commandUnsub?.();commandUnsub=null;
+  if(lifeTimer){try{(root.clearInterval||clearInterval)(lifeTimer);}catch{}lifeTimer=0;}
   syncDiagnostics(root,session);
   try{commandUnsub=session?.studio?.kernel?.commands?.on?.(()=>syncDiagnostics(root,session))||null;}catch{}
+  lifeTimer=(root.setInterval||setInterval)(()=>{
+    if(!root.document?.getElementById('kelo-studio-live')||getBase()!==session)clearWrapperRuntime(root);
+    else syncDiagnostics(root,session);
+  },1000);
 }
 
 function installGhost(root,session){
@@ -74,7 +85,7 @@ export async function openKeloStudioLive({root=globalThis}={}){
 }
 
 export async function closeKeloStudioLive({root=globalThis}={}){
-  ghost?.destroy?.();ghost=null;commandUnsub?.();commandUnsub=null;
+  clearWrapperRuntime(root);
   return closeBase({root});
 }
 
