@@ -97,6 +97,12 @@ export async function openCreatorHub({root=globalThis}={}){
     wait(resolve,0);
   });
 
+  // WORLD SURGERY: this control opens before World and must not depend on Studio mounting.
+  async function openWorldSurgery(){
+    const mod=await import('../../studio/diagnostics/world-surgery-control.mjs?v=world-surgery-v1');
+    return mod.openWorldSurgeryControl({root});
+  }
+
   async function requireSpriteAbilityMount(session){
     for(let attempt=0;attempt<4;attempt++){
       const candidate=session?.root?.isConnected?session.root:doc.getElementById('kelo-studio-workspace');
@@ -284,6 +290,19 @@ export async function openCreatorHub({root=globalThis}={}){
           }else card.onclick=()=>void openWorkspace(wid);
         }
         grid.append(card);
+        if(wid==='world'&&permitted){
+          const surgeryCard=make('button',{
+            class:'kc-card active',
+            'aria-label':'Abrir World Surgery Control'
+          },[
+            make('span',{class:'kc-pill',text:'DIAGNÓSTICO'}),
+            make('strong',{text:'🩺 CIRUGÍA'}),
+            make('small',{text:'Kill switches · Flight Recorder · Auto Bisect'})
+          ]);
+          surgeryCard.dataset.worldSurgery='1';
+          surgeryCard.onclick=()=>void openWorldSurgery().catch(error=>showLaunchError('world-surgery',error));
+          grid.append(surgeryCard);
+        }
       }
       sec.append(grid);
       main.append(sec);

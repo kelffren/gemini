@@ -68,6 +68,8 @@ const NOOP_ASSET_PALETTE=Object.freeze({
 });
 const NOOP_ASSET_FAVORITES=Object.freeze({refresh:()=>{},destroy:()=>{},toggle:()=>false,get ids(){return [];}});
 const NOOP_CTRL=Object.freeze({destroy(){},refresh(){}});
+const NOOP_STORE=Object.freeze({appendCommand:async()=>false,saveCheckpoint:async()=>false,loadRecovery:async()=>null,close:async()=>{}});
+const NOOP_ASSET_PREVIEW=Object.freeze({renderThumbnail:async()=>false,warmAsset:async()=>false,close(){}});
 // A11: preview/catalog UI early; heavy optional tools + extras later and idle-sliced.
 const PHONE_PREVIEW_BOOT_DELAY_MS=1200;
 const PHONE_OPTIONAL_BOOT_DELAY_MS=45000;
@@ -240,6 +242,14 @@ export async function bootKeloStudio({ mode = 'world', actorId = null, document 
     });
     return session;
   }
+  // WORLD SURGERY: install the tiny control plane before optional Studio modules execute.
+  const {getWorldSurgery}=await import('./diagnostics/world-surgery-control.mjs');
+  const surgery=getWorldSurgery({root});
+  surgery.beginBoot(()=>({
+    entities:session?.kernel?.document?.entities?.length||0,
+    prefabs:session?.kernel?.prefabs?.list?.().length||0,
+    assets:session?.adapter?.assetCatalog?.list?.().length||0
+  }));
   const phoneBoot=isPhoneStudioBoot(root);
   let optionalToolsTimer=0,optionalPaletteTimer=0,extrasTimer=0,closed=false;
   const core=await loadStudioCore(root,phoneBoot);
@@ -252,13 +262,20 @@ export async function bootKeloStudio({ mode = 'world', actorId = null, document 
   const adapter = createKeloRuntimeAdapter(root);
   const initial = document || createWorldDocument({ worldId: mode === 'parcel' ? `parcel:${actorId || 'local'}` : 'world:kelo-main', metadata: { name: mode === 'parcel' ? 'My Parcel' : 'Kelo World', description: '', tags: [mode] }, settings: { tileSize: root.KELO_TILE_REGISTRY?.worldTileSize || 32, chunkSize: root.KELO_WORLD_RENDERER?.chunkSize || 512 } });
   const kernel = createStudioKernel({ document: initial, adapter });
-  registerKeloComponents(kernel.components); seedCatalogPrefabs({ prefabRegistry: kernel.prefabs, assetCatalog: adapter.assetCatalog });
+  registerKeloComponents(kernel.components);
+  if(surgery.enabled('prefabSeeder')){
+    const token=surgery.start('prefabSeeder','boot');
+    seedCatalogPrefabs({ prefabRegistry: kernel.prefabs, assetCatalog: adapter.assetCatalog });
+    surgery.done(token,{prefabs:kernel.prefabs.list?.().length||0});
+  }else surgery.markStatus('prefabSeeder','DISABLED',{phase:'boot'});
   const {yieldStudioBoot}=await import('./integration/studio-boot-pace.mjs');
   const tools = phoneBoot && typeof registerCoreToolsSerial==='function'
     ? await registerCoreToolsSerial(kernel,{wait:async()=>{await yieldStudioBoot(root);await new Promise(r=>(root.setTimeout||setTimeout)(r,24));}})
     : registerCoreTools(kernel);
   const loadBasicTools=()=>{
     if(closed)return;
+    if(!surgery.enabled('basicTools')){surgery.markStatus('basicTools','DISABLED',{phase:'deferred-import'});return;}
+    const surgeryToken=surgery.start('basicTools','deferred-import');
     // A11 phone: never import register-basic-tools / register-build-tools barrels (static spikes).
     void (async()=>{
       try{
@@ -276,14 +293,20 @@ export async function bootKeloStudio({ mode = 'world', actorId = null, document 
           if(closed||typeof mod.registerBasicTools!=='function')return;
           Object.assign(tools,mod.registerBasicTools(kernel));
         }
+        surgery.done(surgeryToken);
       }catch(error){
+        surgery.fail(surgeryToken,error);
         console.warn('[Kelo Studio] optional build tools unavailable; World editor stays usable',error);
       }
     })();
   };
   optionalToolsTimer=deferStudioOptional(root,()=>{optionalToolsTimer=0;loadBasicTools();},phoneBoot?PHONE_OPTIONAL_BOOT_DELAY_MS:0);
-  const assetPreview=createStudioAssetPreviewService({assetCatalog:adapter.assetCatalog,atlasContract:root.KELO_ATLAS_CONTRACT,devicePixelRatio:phoneBoot?1:(globalThis.devicePixelRatio||1)});
-  const overlayRenderer = createStudioOverlayRenderer?createStudioOverlayRenderer({ kernel, tools, assetPreview }):{draw(){}};
+  const assetPreview=surgery.enabled('assetPreview')
+    ? createStudioAssetPreviewService({assetCatalog:adapter.assetCatalog,atlasContract:root.KELO_ATLAS_CONTRACT,devicePixelRatio:phoneBoot?1:(globalThis.devicePixelRatio||1)})
+    : NOOP_ASSET_PREVIEW;
+  surgery.markStatus('assetPreview',surgery.enabled('assetPreview')?'ACTIVE':'DISABLED',{phase:'boot'});
+  const overlayRenderer = createStudioOverlayRenderer&&surgery.enabled('overlay')?createStudioOverlayRenderer({ kernel, tools, assetPreview }):{draw(){}};
+  surgery.markStatus('overlay',createStudioOverlayRenderer&&surgery.enabled('overlay')?'ACTIVE':'DISABLED',{phase:'boot'});
   const paletteAssets=()=>{
     const personal=(tools.prefabStamp?.list?.()||[]).map(def=>({
       id:String(def.id),label:String(def.label||def.id),category:'My Prefabs',
@@ -297,21 +320,27 @@ export async function bootKeloStudio({ mode = 'world', actorId = null, document 
   let assetPalette=NOOP_ASSET_PALETTE;
   const loadAssetPalette=()=>{
     if(closed)return;
+    if(!surgery.enabled('assetPalette')){surgery.markStatus('assetPalette','DISABLED',{phase:'deferred-import'});return;}
+    const paletteToken=surgery.start('assetPalette','deferred-import');
     void import('./ui/studio-asset-palette.mjs').then(paletteUi=>{
       if(closed||typeof paletteUi.createStudioAssetPalette!=='function')return;
       assetPalette=paletteUi.createStudioAssetPalette({root,getAssets:paletteAssets,renderAssetPreview:(canvas,asset)=>assetPreview.renderThumbnail(canvas,asset)});
       try{assetPalette.refresh();}catch{}
+      surgery.done(paletteToken);
     }).catch(error=>{
+      surgery.fail(paletteToken,error);
       console.warn('[Kelo Studio] optional asset palette unavailable; continuing without it',error);
     });
   };
   optionalPaletteTimer=deferStudioOptional(root,()=>{optionalPaletteTimer=0;loadAssetPalette();},phoneBoot?PHONE_PREVIEW_BOOT_DELAY_MS:0);
-  const placementTouchController=createStudioPlacementTouchController({root,placement:tools.placement});
+  const placementTouchController=surgery.enabled('placementTouch')?createStudioPlacementTouchController({root,placement:tools.placement}):NOOP_CTRL;
+  surgery.markStatus('placementTouch',surgery.enabled('placementTouch')?'ACTIVE':'DISABLED',{phase:'boot'});
   // Explorer range is keyboard/desktop-heavy; keep a noop on phone until extras wave.
-  let explorerRangeSelectionController=phoneBoot
+  let explorerRangeSelectionController=phoneBoot||!surgery.enabled('explorerRange')
     ? {destroy(){},refresh(){}}
     : createStudioExplorerRangeSelectionController({root,kernel});
-  if(phoneBoot){
+  if(!surgery.enabled('explorerRange'))surgery.markStatus('explorerRange','DISABLED',{phase:'boot'});
+  if(phoneBoot&&surgery.enabled('explorerRange')){
     deferStudioOptional(root,()=>{
       if(closed)return;
       void (async()=>{
@@ -352,8 +381,10 @@ export async function bootKeloStudio({ mode = 'world', actorId = null, document 
   let snapCycleController=NOOP_CTRL;
   const resolvePrefab = id => kernel.prefabs.resolve(id) || adapter.assetCatalog.get(id) || { id };
   const compiler = createWorldCompiler({ resolvePrefab });
-  const worker = createStudioWorkerClient?createStudioWorkerClient({ resolvePrefab, prefabSnapshot: () => Object.fromEntries(kernel.prefabs.list().map(p => [p.id, kernel.prefabs.resolve(p.id)])) }):{compile:(doc,options)=>Promise.resolve(compiler.compile(doc,options)),close(){},get active(){return false;}};
-  const store = createStudioStore(), profiler = createStudioProfiler();
+  const worker = createStudioWorkerClient&&surgery.enabled('worker')?createStudioWorkerClient({ resolvePrefab, prefabSnapshot: () => Object.fromEntries(kernel.prefabs.list().map(p => [p.id, kernel.prefabs.resolve(p.id)])) }):{compile:(doc,options)=>Promise.resolve(compiler.compile(doc,options)),close(){},get active(){return false;}};
+  surgery.markStatus('worker',createStudioWorkerClient&&surgery.enabled('worker')?'ACTIVE':'DISABLED',{phase:'boot'});
+  const store = surgery.enabled('storage')?createStudioStore():NOOP_STORE, profiler = createStudioProfiler();
+  surgery.markStatus('storage',surgery.enabled('storage')?'ACTIVE':'DISABLED',{phase:'boot'});
   const unsubscribeJournal = kernel.commands.on(event => { store.appendCommand(kernel.document.worldId, { action: event.type, command: event.command }).catch(() => {}); });
   session = Object.freeze({ version: 'kelo-studio-foundation-v1.36.0-world-bridge-a11', mode, actorId, kernel, tools, overlayRenderer, assetPreview,
     get assetPalette(){return assetPalette;},
@@ -384,7 +415,18 @@ export async function bootKeloStudio({ mode = 'world', actorId = null, document 
     get snapCycleController(){return snapCycleController;},
     compiler, worker, store, profiler, adapter,
     compile: options => profiler.measure('compile.sync', () => compiler.compile(kernel.document, options)), compileAsync: options => profiler.measure('compile.worker', () => worker.compile(kernel.document, options)),
-    async importCurrent(options={}) { const next=await profiler.measure('import.current',()=>importCurrentKeloWorld({adapter,mode,actorId,...options})); kernel.setDocument(next); seedCatalogPrefabs({prefabRegistry:kernel.prefabs,assetCatalog:adapter.assetCatalog}); try{assetPalette.refresh();assetFavorites.refresh();multiAlign.refresh();historyHints.refresh();}catch{} return next; },
+    async importCurrent(options={}) {
+      if(!surgery.enabled('currentWorldImporter')){surgery.markStatus('currentWorldImporter','DISABLED',{phase:'import.current'});return kernel.document;}
+      const token=surgery.start('currentWorldImporter','import.current');
+      try{
+        const next=await profiler.measure('import.current',()=>importCurrentKeloWorld({adapter,mode,actorId,...options}));
+        kernel.setDocument(next);
+        if(surgery.enabled('prefabSeeder'))seedCatalogPrefabs({prefabRegistry:kernel.prefabs,assetCatalog:adapter.assetCatalog});
+        try{assetPalette.refresh();assetFavorites.refresh();multiAlign.refresh();historyHints.refresh();}catch{}
+        surgery.done(token,{entities:next?.entities?.length||0});
+        return next;
+      }catch(error){surgery.fail(token,error);throw error;}
+    },
     checkpoint: () => store.saveCheckpoint(kernel.document.worldId,kernel.document), recover: () => store.loadRecovery(kernel.document.worldId),
     close(){
       closed=true;
@@ -426,6 +468,8 @@ export async function bootKeloStudio({ mode = 'world', actorId = null, document 
   extrasTimer=deferStudioOptional(root,()=>{
     extrasTimer=0;
     if(closed)return;
+    if(!surgery.enabled('productivityExtras')){surgery.markStatus('productivityExtras','DISABLED',{phase:'deferred-import'});return;}
+    const extrasToken=surgery.start('productivityExtras','deferred-import');
     void (async()=>{
       try{
         if(phoneBoot){
@@ -436,7 +480,9 @@ export async function bootKeloStudio({ mode = 'world', actorId = null, document 
         }
         const next=await installStudioProductivityExtras({root,kernel,tools,assetPalette,getAssets:paletteAssets,phone:phoneBoot});
         applyStudioExtras(next);
+        surgery.done(extrasToken);
       }catch(error){
+        surgery.fail(extrasToken,error);
         console.warn('[Kelo Studio] optional productivity extras unavailable; World editor stays usable',error);
       }
     })();

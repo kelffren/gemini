@@ -21,6 +21,20 @@ const num = value => Number(value) || 0;
 export function createPaintCopiesTool(kernel) {
   if (!kernel) throw new Error('STUDIO_PAINT_COPIES_KERNEL_REQUIRED');
 
+  /* WORLD SURGERY MODULE: PAINT_COPIES
+   * PURPOSE: interactive drag-copy tool.
+   * SIDE EFFECTS: input context, keydown listener, MutationObserver, Studio DOM button.
+   * HISTORICAL RISK: c13cceaf introduced the first mount regression; 51bd045 later stopped its DOM mutation storm.
+   * KILL SWITCH: worldSurgery.paintCopies
+   */
+  const surgery=globalThis.KELO_WORLD_SURGERY;
+  if(surgery?.enabled?.('paintCopies')===false){
+    surgery.markStatus?.('paintCopies','DISABLED',{phase:'constructor'});
+    const off=()=>false;
+    return Object.freeze({id:'paintCopies',start:off,activate:off,deactivate:off,toggle:off,beginAt:off,strokeTo:off,commit:async()=>({rows:[],stamps:0,capped:false}),cancelStroke(){},cancel(){},state:()=>({ready:false,enabled:false,active:false,disabled:true}),getPreviews:()=>[]});
+  }
+  const surgeryToken=surgery?.start?.('paintCopies','constructor');
+
   let template = null;
   let stroke = null;
   let enabled = false;
@@ -344,6 +358,7 @@ export function createPaintCopiesTool(kernel) {
   }
 
   installDomBridge();
+  surgery?.done?.(surgeryToken,{observer:!!domObserver,input:!!unregisterInput});
 
   return Object.freeze({
     id: 'paintCopies',
