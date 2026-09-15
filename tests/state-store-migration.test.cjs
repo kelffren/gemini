@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: QA / PERSISTENCE
  * owner: KeloStateStore migration characterization
- * purpose: garantiza migración idempotente, backup, preservación de campos y tolerancia a JSON corrupto
+ * purpose: garantiza migración idempotente, backup, preservación de campos/defaults y tolerancia a JSON corrupto
  */
 'use strict';
 const assert=require('node:assert/strict');
@@ -29,12 +29,35 @@ function storage(seed){
   assert.ok(Array.isArray(next.inventory));
   assert.ok(Array.isArray(next.equipped));
   assert.ok(Array.isArray(next.marketListings));
+  assert.ok(next.marketListings.length>=2,'missing market defaults should inherit current baseline');
+  assert.ok(Array.isArray(next.auctions)&&next.auctions.length>=1,'missing auction defaults should inherit current baseline');
+  assert.ok(Array.isArray(next.markets)&&next.markets.length>=2,'missing market-event defaults should inherit current baseline');
   assert.ok(next.silo&&typeof next.silo==='object');
   assert.ok(next.plot&&Array.isArray(next.plot.furniture));
+  assert.equal(next.plot.furniture.length,4,'missing plot furniture should inherit current baseline');
   assert.ok(next.farm&&Array.isArray(next.farm.crops));
-  assert.equal(next.farm.crops[0].id,9);
+  assert.equal(next.farm.crops[0].id,9,'existing crop must win over baseline');
   assert.equal(next.schemaVersion,store.schemaVersion);
   assert.equal(mem.getItem(store.backupKey),JSON.stringify(legacy));
+})();
+
+(function missingFarmAndPlotUseLegacyBaselineRatherThanEmptyContainers(){
+  const next=store.normalizeState({gold:5});
+  assert.equal(next.plot.furniture.length,4);
+  assert.equal(next.farm.crops.length,4);
+  assert.equal(next.farm.crops[0].type,'wheat');
+  assert.equal(next.farm.crops[1].type,'carrot');
+  assert.equal(next.farm.coop.type,'chickens');
+  assert.equal(next.farm.pen.type,'pigs');
+})();
+
+(function intentionalEmptyArraysStayEmpty(){
+  const next=store.normalizeState({marketListings:[],auctions:[],markets:[],plot:{furniture:[]},farm:{crops:[]}});
+  assert.deepEqual(next.marketListings,[]);
+  assert.deepEqual(next.auctions,[]);
+  assert.deepEqual(next.markets,[]);
+  assert.deepEqual(next.plot.furniture,[]);
+  assert.deepEqual(next.farm.crops,[]);
 })();
 
 (function migrationIsIdempotentAndDoesNotReplaceFirstBackup(){
