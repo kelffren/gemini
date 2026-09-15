@@ -1,0 +1,33 @@
+name: Asset Compiler V7 Trust Boundary
+
+on:
+  pull_request:
+    paths:
+      - 'src/creators/sprite-compiler/asset-*.mjs'
+      - 'scripts/asset-compiler-v7-audit.mjs'
+      - 'scripts/asset-compiler-chaos-audit.mjs'
+      - '.github/workflows/asset-compiler-v7-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'src/creators/sprite-compiler/asset-*.mjs'
+      - 'scripts/asset-compiler-v7-audit.mjs'
+      - 'scripts/asset-compiler-chaos-audit.mjs'
+      - '.github/workflows/asset-compiler-v7-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  trust-boundary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Deterministic V7 audit
+        run: node scripts/asset-compiler-v7-audit.mjs
+      - name: Adversarial chaos audit
+        run: node scripts/asset-compiler-chaos-audit.mjs
