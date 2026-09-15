@@ -115,38 +115,7 @@
 <script src="src/core/module-loader.js?v=8-style-first-use"></script>
 <script>window.KELO_MODULE_LOADER&&window.KELO_MODULE_LOADER.start({build:'V6.69'});</script>
 <script src="src/core/settings-lazy-gate.js?v=1"></script>
-<script>
-(function reconnectKeloUpdater(){
-  'use strict';
-  if(window.__KELO_UPDATER_BOOTSTRAP__)return;
-  window.__KELO_UPDATER_BOOTSTRAP__=true;
-  function load(src){
-    return new Promise(function(resolve,reject){
-      var existing=Array.from(document.scripts).find(function(s){return (s.getAttribute('src')||'').split('?')[0]===src.split('?')[0];});
-      if(existing){resolve();return;}
-      var script=document.createElement('script');
-      script.src=src;
-      script.async=false;
-      script.onload=resolve;
-      script.onerror=function(){reject(new Error('updater_script_load_failed:'+src));};
-      document.head.appendChild(script);
-    });
-  }
-  function connect(){
-    load('src/core/update-delta-core.js?v=3')
-      .then(function(){return load('src/core/update-system.js?v=3');})
-      .then(function(){return load('src/core/update-watch.js?v=3');})
-      .then(function(){window.dispatchEvent(new CustomEvent('kelo:update:connected',{detail:{version:'turbo-v3',mode:'post-boot'}}));})
-      .catch(function(error){console.error('[Kelo post-boot services]',error);});
-  }
-  function schedule(){
-    if('requestIdleCallback' in window){window.requestIdleCallback(connect,{timeout:2000});}
-    else{window.setTimeout(connect,800);}
-  }
-  if(document.readyState==='complete')schedule();
-  else window.addEventListener('load',schedule,{once:true});
-})();
-</script>
+<script src="src/core/update-gate.js?v=1"></script>
 <script src="src/systems/admin-key-system.js?v=1"></script>
 <script src="src/core/creators-lazy-gate.js?v=1"></script>
 </body></html>
