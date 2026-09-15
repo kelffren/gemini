@@ -1,0 +1,161 @@
+name: World Surgery Wire V2
+
+on:
+  push:
+    branches: [world-surgery]
+
+permissions:
+  contents: write
+
+jobs:
+  wire:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: world-surgery
+          fetch-depth: 1
+
+      - name: Wire individual extras and heartbeat lifecycle
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def must(text, old, label):
+              if old not in text:
+                  raise SystemExit(f'missing expected block: {label}')
+              return text
+
+          p=Path('src/studio/studio-entry.mjs')
+          text=p.read_text()
+          marker='const surgeryApi=root.KELO_WORLD_SURGERY;'
+          if marker not in text:
+              old="""async function installStudioProductivityExtras({root,kernel,tools,assetPalette,getAssets,phone=false}){\n  // Desktop: one barrel. Phone: avoid the barrel eval spike — import small batches with yields.\n"""
+              new="""async function installStudioProductivityExtras({root,kernel,tools,assetPalette,getAssets,phone=false}){\n  const surgeryApi=root.KELO_WORLD_SURGERY;\n  const extraEnabled=id=>surgeryApi?.enabled?.(id)!==false;\n  const trackedCreate=(id,fn,args,fallback=NOOP_CTRL)=>{\n    if(!extraEnabled(id)){surgeryApi?.markStatus?.(id,'DISABLED',{phase:'constructor'});return fallback;}\n    if(typeof fn!=='function')return fallback;\n    const token=surgeryApi?.start?.(id,'constructor');\n    try{const value=fn(args);surgeryApi?.done?.(token);return value;}catch(error){surgeryApi?.fail?.(token,error);console.warn(`[Kelo Studio] optional ${id} failed; continuing`,error);return fallback;}\n  };\n  // Desktop: one barrel. Phone: avoid the barrel eval spike — import small batches with yields.\n"""
+              must(text,old,'install extras header')
+              text=text.replace(old,new,1)
+
+          if "trackedCreate('assetFavorites'" not in text:
+              old="""    let assetFavorites=NOOP_ASSET_FAVORITES;\n    try{\n      assetFavorites=createStudioAssetFavorites({root,paletteApi:assetPalette,getAssets});\n    }catch(error){\n      console.warn('[Kelo Studio] optional asset favorites unavailable; continuing without it',error);\n    }\n"""
+              new="""    const assetFavorites=trackedCreate('assetFavorites',createStudioAssetFavorites,{root,paletteApi:assetPalette,getAssets},NOOP_ASSET_FAVORITES);\n"""
+              must(text,old,'desktop asset favorites')
+              text=text.replace(old,new,1)
+
+          desktop_map={
+            "assetKeyboardController:createStudioAssetKeyboardController({root,assetPalette}),":"assetKeyboardController:trackedCreate('assetKeyboard',createStudioAssetKeyboardController,{root,assetPalette}),",
+            "menuMinimizer:createStudioMenuMinimizer({root}),":"menuMinimizer:trackedCreate('menuMinimizer',createStudioMenuMinimizer,{root}),",
+            "cleanWorkspace:createStudioCleanWorkspace({root,kernel}),":"cleanWorkspace:trackedCreate('cleanWorkspace',createStudioCleanWorkspace,{root,kernel}),",
+            "contextInspector:createStudioContextInspector({root,kernel,tools}),":"contextInspector:trackedCreate('contextInspector',createStudioContextInspector,{root,kernel,tools}),",
+            "contextSnapChip:createStudioContextSnapChip({root}),":"contextSnapChip:trackedCreate('contextSnapChip',createStudioContextSnapChip,{root}),",
+            "multiAlign:createStudioMultiAlign({root,kernel}),":"multiAlign:trackedCreate('multiAlign',createStudioMultiAlign,{root,kernel}),",
+            "historyHints:createStudioHistoryHints({root,kernel}),":"historyHints:trackedCreate('historyHints',createStudioHistoryHints,{root,kernel}),",
+            "transformPresets:createStudioTransformPresets({root,kernel}),":"transformPresets:trackedCreate('transformPresets',createStudioTransformPresets,{root,kernel}),",
+            "nudgeController:createStudioNudgeController({root,kernel}),":"nudgeController:trackedCreate('nudge',createStudioNudgeController,{root,kernel}),",
+            "overlapCycleController:createStudioOverlapCycleController({root,kernel}),":"overlapCycleController:trackedCreate('overlapCycle',createStudioOverlapCycleController,{root,kernel}),",
+            "precisionSnapController:createStudioPrecisionSnapController({root}),":"precisionSnapController:trackedCreate('precisionSnap',createStudioPrecisionSnapController,{root}),",
+            "selectionHistoryController:createStudioSelectionHistoryController({root,kernel}),":"selectionHistoryController:trackedCreate('selectionHistory',createStudioSelectionHistoryController,{root,kernel}),",
+            "focusShortcutController:createStudioFocusShortcutController({root}),":"focusShortcutController:trackedCreate('focusShortcut',createStudioFocusShortcutController,{root}),",
+            "quickActionsController:createStudioQuickActionsController({root,kernel,assetPalette}),":"quickActionsController:trackedCreate('quickActions',createStudioQuickActionsController,{root,kernel,assetPalette}),",
+            "keyboardDeleteController:createStudioKeyboardDeleteController({root,kernel}),":"keyboardDeleteController:trackedCreate('keyboardDelete',createStudioKeyboardDeleteController,{root,kernel}),",
+            "keyboardDuplicateController:createStudioKeyboardDuplicateController({root,kernel}),":"keyboardDuplicateController:trackedCreate('keyboardDuplicate',createStudioKeyboardDuplicateController,{root,kernel}),",
+            "keyboardHistoryController:createStudioKeyboardHistoryController({root}),":"keyboardHistoryController:trackedCreate('keyboardHistory',createStudioKeyboardHistoryController,{root}),",
+            "keyboardClipboardController:createStudioKeyboardClipboardController({root}),":"keyboardClipboardController:trackedCreate('keyboardClipboard',createStudioKeyboardClipboardController,{root}),",
+            "selectAllController:createStudioSelectAllController({root,kernel}),":"selectAllController:trackedCreate('selectAll',createStudioSelectAllController,{root,kernel}),",
+            "explorerRevealController:createStudioExplorerRevealController({root,kernel}),":"explorerRevealController:trackedCreate('explorerReveal',createStudioExplorerRevealController,{root,kernel}),",
+            "propertyCommitController:createStudioPropertyCommitController({root}),":"propertyCommitController:trackedCreate('propertyCommit',createStudioPropertyCommitController,{root}),",
+            "snapCycleController:createStudioSnapCycleController({root})":"snapCycleController:trackedCreate('snapCycle',createStudioSnapCycleController,{root})"
+          }
+          for old,new in desktop_map.items():
+              if old in text:text=text.replace(old,new,1)
+
+          if "'assetFavorites']," not in text:
+              start=text.index('  const specs=[\n')
+              end=text.index('  ];\n',start)+5
+              specs="""  const specs=[\n    ['./ui/studio-asset-favorites.mjs','createStudioAssetFavorites','assetFavorites'],\n    ['./input/studio-asset-keyboard-controller.mjs','createStudioAssetKeyboardController','assetKeyboard'],\n    ['./ui/studio-menu-minimizer.mjs','createStudioMenuMinimizer','menuMinimizer'],\n    ['./ui/studio-clean-workspace.mjs','createStudioCleanWorkspace','cleanWorkspace'],\n    ['./ui/studio-context-inspector.mjs','createStudioContextInspector','contextInspector'],\n    ['./ui/studio-context-snap-chip.mjs','createStudioContextSnapChip','contextSnapChip'],\n    ['./ui/studio-multi-align.mjs','createStudioMultiAlign','multiAlign'],\n    ['./ui/studio-history-hints.mjs','createStudioHistoryHints','historyHints'],\n    ['./ui/studio-transform-presets.mjs','createStudioTransformPresets','transformPresets'],\n    ['./input/studio-nudge-controller.mjs','createStudioNudgeController','nudge'],\n    ['./input/studio-overlap-cycle-controller.mjs','createStudioOverlapCycleController','overlapCycle'],\n    ['./input/studio-precision-snap-controller.mjs','createStudioPrecisionSnapController','precisionSnap'],\n    ['./input/studio-selection-history-controller.mjs','createStudioSelectionHistoryController','selectionHistory'],\n    ['./input/studio-focus-shortcut-controller.mjs','createStudioFocusShortcutController','focusShortcut'],\n    ['./input/studio-quick-actions-controller.mjs','createStudioQuickActionsController','quickActions'],\n    ['./input/studio-keyboard-delete-controller.mjs','createStudioKeyboardDeleteController','keyboardDelete'],\n    ['./input/studio-keyboard-duplicate-controller.mjs','createStudioKeyboardDuplicateController','keyboardDuplicate'],\n    ['./input/studio-keyboard-history-controller.mjs','createStudioKeyboardHistoryController','keyboardHistory'],\n    ['./input/studio-keyboard-clipboard-controller.mjs','createStudioKeyboardClipboardController','keyboardClipboard'],\n    ['./input/studio-select-all-controller.mjs','createStudioSelectAllController','selectAll'],\n    ['./input/studio-explorer-reveal-controller.mjs','createStudioExplorerRevealController','explorerReveal'],\n    ['./input/studio-property-commit-controller.mjs','createStudioPropertyCommitController','propertyCommit'],\n    ['./input/studio-snap-cycle-controller.mjs','createStudioSnapCycleController','snapCycle']\n  ];\n"""
+              text=text[:start]+specs+text[end:]
+
+          old_loop="""  const creators={};\n  for(const [modPath,name] of specs){\n    try{\n      const mod=await import(modPath);\n      creators[name]=mod[name];\n    }catch(error){\n      console.warn(`[Kelo Studio] optional ${name} unavailable; continuing`,error);\n      creators[name]=null;\n    }\n    await wait();\n  }\n"""
+          new_loop="""  const creators={};\n  for(const [modPath,name,flag] of specs){\n    if(!extraEnabled(flag)){surgeryApi?.markStatus?.(flag,'DISABLED',{phase:'module-import'});creators[name]=null;await wait();continue;}\n    const token=surgeryApi?.start?.(flag,'module-import');\n    try{\n      const mod=await import(modPath);\n      creators[name]=mod[name];\n      surgeryApi?.done?.(token);\n    }catch(error){\n      surgeryApi?.fail?.(token,error);\n      console.warn(`[Kelo Studio] optional ${name} unavailable; continuing`,error);\n      creators[name]=null;\n    }\n    await wait();\n  }\n"""
+          if old_loop in text:text=text.replace(old_loop,new_loop,1)
+
+          old_fav="""  let assetFavorites=NOOP_ASSET_FAVORITES;\n  try{\n    if(typeof creators.createStudioAssetFavorites==='function'){\n      assetFavorites=creators.createStudioAssetFavorites({root,paletteApi:assetPalette,getAssets});\n    }\n  }catch(error){\n    console.warn('[Kelo Studio] optional asset favorites unavailable; continuing without it',error);\n  }\n  await wait();\n  const mk=(name,args)=>{\n    const fn=creators[name];\n    if(typeof fn!=='function')return NOOP_CTRL;\n    try{return fn(args);}catch(error){\n      console.warn(`[Kelo Studio] optional ${name} failed; continuing`,error);\n      return NOOP_CTRL;\n    }\n  };\n"""
+          new_fav="""  const assetFavorites=trackedCreate('assetFavorites',creators.createStudioAssetFavorites,{root,paletteApi:assetPalette,getAssets},NOOP_ASSET_FAVORITES);\n  await wait();\n  const mk=(name,args,flag)=>trackedCreate(flag,creators[name],args,NOOP_CTRL);\n"""
+          if old_fav in text:text=text.replace(old_fav,new_fav,1)
+
+          phone_map={
+            "mk('createStudioAssetKeyboardController',{root,assetPalette})":"mk('createStudioAssetKeyboardController',{root,assetPalette},'assetKeyboard')",
+            "mk('createStudioMenuMinimizer',{root})":"mk('createStudioMenuMinimizer',{root},'menuMinimizer')",
+            "mk('createStudioCleanWorkspace',{root,kernel})":"mk('createStudioCleanWorkspace',{root,kernel},'cleanWorkspace')",
+            "mk('createStudioContextInspector',{root,kernel,tools})":"mk('createStudioContextInspector',{root,kernel,tools},'contextInspector')",
+            "mk('createStudioContextSnapChip',{root})":"mk('createStudioContextSnapChip',{root},'contextSnapChip')",
+            "mk('createStudioMultiAlign',{root,kernel})":"mk('createStudioMultiAlign',{root,kernel},'multiAlign')",
+            "mk('createStudioHistoryHints',{root,kernel})":"mk('createStudioHistoryHints',{root,kernel},'historyHints')",
+            "mk('createStudioTransformPresets',{root,kernel})":"mk('createStudioTransformPresets',{root,kernel},'transformPresets')",
+            "mk('createStudioNudgeController',{root,kernel})":"mk('createStudioNudgeController',{root,kernel},'nudge')",
+            "mk('createStudioOverlapCycleController',{root,kernel})":"mk('createStudioOverlapCycleController',{root,kernel},'overlapCycle')",
+            "mk('createStudioPrecisionSnapController',{root})":"mk('createStudioPrecisionSnapController',{root},'precisionSnap')",
+            "mk('createStudioSelectionHistoryController',{root,kernel})":"mk('createStudioSelectionHistoryController',{root,kernel},'selectionHistory')",
+            "mk('createStudioFocusShortcutController',{root})":"mk('createStudioFocusShortcutController',{root},'focusShortcut')",
+            "mk('createStudioQuickActionsController',{root,kernel,assetPalette})":"mk('createStudioQuickActionsController',{root,kernel,assetPalette},'quickActions')",
+            "mk('createStudioKeyboardDeleteController',{root,kernel})":"mk('createStudioKeyboardDeleteController',{root,kernel},'keyboardDelete')",
+            "mk('createStudioKeyboardDuplicateController',{root,kernel})":"mk('createStudioKeyboardDuplicateController',{root,kernel},'keyboardDuplicate')",
+            "mk('createStudioKeyboardHistoryController',{root})":"mk('createStudioKeyboardHistoryController',{root},'keyboardHistory')",
+            "mk('createStudioKeyboardClipboardController',{root})":"mk('createStudioKeyboardClipboardController',{root},'keyboardClipboard')",
+            "mk('createStudioSelectAllController',{root,kernel})":"mk('createStudioSelectAllController',{root,kernel},'selectAll')",
+            "mk('createStudioExplorerRevealController',{root,kernel})":"mk('createStudioExplorerRevealController',{root,kernel},'explorerReveal')",
+            "mk('createStudioPropertyCommitController',{root})":"mk('createStudioPropertyCommitController',{root},'propertyCommit')",
+            "mk('createStudioSnapCycleController',{root})":"mk('createStudioSnapCycleController',{root},'snapCycle')"
+          }
+          for old,new in phone_map.items():
+              if old in text:text=text.replace(old,new,1)
+
+          p.write_text(text)
+
+          live=Path('src/studio/integration/live-studio-controller.mjs')
+          text=live.read_text()
+          if "const surgery=root.KELO_WORLD_SURGERY;" not in text:
+              old="""  const studio=await bootKeloStudio({mode:'world',actorId,root});if(root.KELO_WORLD_LAUNCH_ABORTED){try{studio.close();}catch{}throw new Error('WORLD_EDITOR_OPEN_TIMEOUT');}\n"""
+              new=old+"  const surgery=root.KELO_WORLD_SURGERY;\n"
+              must(text,old,'live surgery handle')
+              text=text.replace(old,new,1)
+          if "surgery?.enabled?.('grid')" not in text:
+              old="""    let snapSize=Math.max(1,Number(studio.kernel.document.settings?.tileSize)||32);const gridOverlay=createCreatorGridOverlay({size:snapSize,visible:true});\n"""
+              new="""    let snapSize=Math.max(1,Number(studio.kernel.document.settings?.tileSize)||32);const gridOverlay=surgery?.enabled?.('grid')===false?{draw(){},configure(){}}:createCreatorGridOverlay({size:snapSize,visible:true});\n    surgery?.markStatus?.('grid',surgery?.enabled?.('grid')===false?'DISABLED':'ACTIVE',{phase:'live-mount'});\n"""
+              must(text,old,'grid switch')
+              text=text.replace(old,new,1)
+          if "WORLD SURGERY: draft hydration gate" not in text:
+              old="""    async function hydrateAfterChrome(){\n      overlayStart=0;\n      if(!running||root.KELO_WORLD_LAUNCH_ABORTED)return;\n"""
+              new="""    async function hydrateAfterChrome(){\n      overlayStart=0;\n      if(!running||root.KELO_WORLD_LAUNCH_ABORTED)return;\n      // WORLD SURGERY: draft hydration gate isolates snapshot/import work after chrome is already alive.\n      if(surgery?.enabled?.('draftHydration')===false||surgery?.enabled?.('snapshotLoading')===false){\n        if(surgery?.enabled?.('draftHydration')===false)surgery?.markStatus?.('draftHydration','DISABLED',{phase:'hydrate'});\n        if(surgery?.enabled?.('snapshotLoading')===false)surgery?.markStatus?.('snapshotLoading','DISABLED',{phase:'hydrate'});\n        try{shell?.setStatus?.(`${mode.toUpperCase()} · diagnóstico sin hydrate`);}catch{}\n        updateShell();\n        return;\n      }\n"""
+              must(text,old,'hydrate gate')
+              text=text.replace(old,new,1)
+          if "surgery?.endBoot?.(true);" not in text:
+              old="""    active=Object.freeze(liveSession);root.document.body.classList.add('kelo-studio-active');toast(root,'Kelo Studio Creator V1.8 activo');\n"""
+              new=old+"    surgery?.endBoot?.(true);\n"
+              must(text,old,'boot success end')
+              text=text.replace(old,new,1)
+          if "surgery?.endBoot?.(false);throw error;" not in text:
+              old="""try{studio.close();}catch{}throw error;}\n}\n\nexport async function closeKeloStudioLive"""
+              new="""try{studio.close();}catch{}surgery?.endBoot?.(false);throw error;}\n}\n\nexport async function closeKeloStudioLive"""
+              must(text,old,'boot failure end')
+              text=text.replace(old,new,1)
+          live.write_text(text)
+          PY
+
+      - name: Syntax check
+        run: |
+          node --check src/studio/studio-entry.mjs
+          node --check src/studio/integration/live-studio-controller.mjs
+          node --check src/studio/diagnostics/world-surgery-control.mjs
+          node --check src/creators/ui/creator-hub.mjs
+          node --check src/studio/tools/paint-copies-tool.mjs
+
+      - name: Commit and self-remove
+        shell: bash
+        run: |
+          git config user.name "kelo-world-surgery"
+          git config user.email "kelo-world-surgery@users.noreply.github.com"
+          git rm .github/workflows/world-surgery-wire-v2.yml
+          git add src/studio/studio-entry.mjs src/studio/integration/live-studio-controller.mjs
+          git commit -m "feat(world-surgery): wire individual extras and boot lifecycle"
+          git push origin HEAD:world-surgery
