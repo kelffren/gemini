@@ -801,9 +801,20 @@
       "files": [
         "src/studio/diagnostics/world-surgery-runtime.mjs"
       ]
+    },
+    {
+      "id": "prevention:159f0d9817cb3cb7f9f207e25c02dbb0820ed831",
+      "at": "2026-09-15T06:00:35.000Z",
+      "source": "bug-prevention-ci",
+      "head_sha": "159f0d9817cb3cb7f9f207e25c02dbb0820ed831",
+      "base_sha": "e7d99e78789e43ed8fa4f0ce8bbfae2ad3395825",
+      "conclusion": "failure",
+      "files": [
+        "src/studio/tools/register-build-tools.mjs"
+      ]
     }
   ],
-  "feedback_updated_at": "2026-09-15T06:00:16.966Z",
+  "feedback_updated_at": "2026-09-15T06:00:52.013Z",
   "training": {
     "examples": 58,
     "search_examples": 43,
