@@ -8,11 +8,11 @@
 (function(root){
 'use strict';
 if(root.KeloAccountLiveControlGate)return;
-const VERSION='kelo-account-live-control-gate-v1';
+const VERSION='kelo-account-live-control-gate-v2';
 let loading=null,installed=false;
 async function arm(){
   if(installed||loading||!root.KeloOnlineAuth)return installed;
-  loading=import('./../auth/account-live-control-runtime.mjs?v=1')
+  loading=import('./../auth/account-live-control-runtime.mjs?v=2')
     .then(m=>m.installAccountLiveControl({root}))
     .then(api=>{installed=!!api;return installed;})
     .catch(error=>{console.warn('[Kelo account live-control gate]',error);return false;})
