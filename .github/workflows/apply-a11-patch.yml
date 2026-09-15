@@ -1,0 +1,58 @@
+name: Apply A11 BUG-0003 patch
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/apply-a11-patch.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-a11-bug-0003
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout triggering main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Rebuild and verify uploaded patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .a11-patch/part-* > /tmp/gemini-bug-0003-a11.patch
+          echo 'cb819165ebe5019c17a9a55e6518efc91695a1a18e65050ef7de79ec3635a01a  /tmp/gemini-bug-0003-a11.patch' | sha256sum -c -
+          git apply --check /tmp/gemini-bug-0003-a11.patch
+
+      - name: Apply A11
+        shell: bash
+        run: |
+          set -euo pipefail
+          git apply /tmp/gemini-bug-0003-a11.patch
+
+      - name: Run BUG-0003 structural audits
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/world-editor-lazy-boot-audit.mjs
+          node scripts/world-editor-single-prewarm-owner-audit.mjs
+          node scripts/world-editor-creator-boot-isolation-audit.mjs
+
+      - name: Commit A11 and remove temporary applicator
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .a11-patch
+          rm -f .github/workflows/apply-a11-patch.yml
+          git config user.name 'kelo-world-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add -A
+          git commit -m 'fix(world): A11 early asset preview + defer heavy iPhone waves (BUG-0003)'
+          git push origin HEAD:main
