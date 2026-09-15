@@ -23,7 +23,7 @@
     "REPORT-000001"
   ],
   "environment": {
-    "game_build": "world-bridge-20260915-20",
+    "game_build": "world-bridge-20260915-21",
     "device": "iPhone real device target",
     "os": "iOS",
     "browser": "Safari",
@@ -74,7 +74,7 @@
   "claim_started_at": null,
   "research": {
     "status": "in_progress",
-    "summary": "A9 world-bridge-20260915-20: do not rewrite. Chrome already exists. Serialize studio-entry graph, reuse painted shell, skip cloneNode, delay importCurrent to 8s, delay extras to 15s, kill launcher nonces. FIXED_PENDING_VERIFY until real iPhone keeps tools 10s and can reopen.",
+    "summary": "A10 world-bridge-20260915-21 hardens A9 without rewrite: serial core-tool modules (no static 7-tool barrel on phone), lite draft hydrate at 2.5s, light TREE asset seed without thumbnails, extras at 10s, stable -retry tag instead of nonce. FIXED_PENDING_VERIFY until real iPhone keeps tools 10s, places TREE, and reopens.",
     "known_facts": [
       {
         "id": "F1",
@@ -298,7 +298,7 @@
       }
     ],
     "external_references": [],
-    "last_researched_at": "2026-09-14T01:10:00-04:00"
+    "last_researched_at": "2026-09-15T04:20:00Z"
   },
   "attempt_history": [
     {
@@ -606,22 +606,65 @@
       },
       "conclusion": "Candidate. A8 reached the phone and still froze; A9 attacks the remaining post-chrome graph.",
       "do_not_repeat_without": "Do not rewrite Studio. Do not restore overlay/cloneNode/nonce imports as a first retry."
+    },
+    {
+      "id": "A10",
+      "at": "2026-09-15",
+      "actor": "local free-path agent",
+      "goal": "Harden A9 so World survives post-chrome and TREE placement works without an 8s freeze window.",
+      "hypothesis_ids": [
+        "H3",
+        "H4",
+        "H6",
+        "H7"
+      ],
+      "change": {
+        "commits": [],
+        "files": [
+          "src/studio/tools/register-core-tools-serial.mjs",
+          "src/studio/tools/register-core-tools.mjs",
+          "src/studio/studio-entry.mjs",
+          "src/studio/integration/live-studio-controller.mjs",
+          "src/studio/adapters/current-world-importer.mjs",
+          "src/studio/integration/world-studio-bridge.mjs",
+          "src/creators/workspaces/world-workspace.mjs",
+          "src/ui/studio-launcher.js",
+          "src/creators/creator-entry.mjs",
+          "src/creators/ui/creator-hub.mjs",
+          "index.html",
+          "sw.js"
+        ],
+        "summary": "A10 world-bridge-20260915-21: serial tools; skip phone importCurrent; TREE seed+prefabs; re-enable provisional controls; delay optional/extras; stable -retry."
+      },
+      "validation": {
+        "environment": "Local box Chrome headless iPhone UA @ /workspace/gemini (NOT real Safari)",
+        "method": "scripts/_bug0003-smoke.mjs + world-editor-* audits",
+        "result": "PARTIAL",
+        "evidence": [
+          "open ok world-bridge-a10; tools SELECT/MOVE/GROUND/ROAD/COLLISION + PLAY/SAVE at 1s/3s/6s",
+          "TREE place tree:oak-broad-green -> placement preview true",
+          "reopen ok",
+          "audits PASS: lazy-boot, single-prewarm-owner, creator-boot-isolation"
+        ]
+      },
+      "conclusion": "Local box smoke passes. Still FIXED_PENDING_VERIFY until real iPhone Safari.",
+      "do_not_repeat_without": "Do not restore overlay/cloneNode/nonce/static tool barrel as a first retry."
     }
   ],
   "next_best_actions": [
     {
       "priority": 1,
-      "action": "Wait until LIVE index.html serves studio-launcher.js?v=world-bridge-20260915-20, then player Create -> World on iPhone.",
-      "reason": "F9 showed previous candidates often never reached the phone. A8 did reach LIVE as 20260915-19 and still froze.",
-      "expected_signal": "LIVE world-workspace WORLD_BUILD is world-bridge-20260915-20. Tools stay up 10s.",
-      "stop_condition": "If LIVE still serves 20260915-19, do not treat player black-tab as A9 failure."
+      "action": "Publish/serve world-bridge-20260915-21 then player Create → World on iPhone.",
+      "reason": "A9 is already LIVE; A10 must reach the phone before judging.",
+      "expected_signal": "Tools stay 10s; TREE placeable from asset strip; reopen works.",
+      "stop_condition": "If LIVE still serves 20260915-20, do not treat player fail as A10 failure."
     },
     {
       "priority": 2,
-      "action": "If A9 is live and the tab still dies in the first 2s (before importCurrent/extras), reduce kernel/tool graph further. Do not rewrite Studio.",
-      "reason": "Discriminates remaining parse/eval of register-core-tools vs deferred work.",
+      "action": "If tab dies before 1s, freezeLab=1 and inspect last milestone; shrink remaining kernel graph only.",
+      "reason": "Discriminates parse/eval vs deferred hydrate.",
       "expected_signal": "Last BUG-0003 milestone in sessionStorage.",
-      "stop_condition": "Do not rewrite kernel/tools/authority."
+      "stop_condition": "Do not rewrite Studio."
     }
   ],
   "fix": {
@@ -634,18 +677,20 @@
       "f9dbfe52b338ad960b2332fb544aa536c64f05e8"
     ],
     "files": [
+      "src/studio/tools/register-core-tools-serial.mjs",
+      "src/studio/tools/register-core-tools.mjs",
       "src/studio/studio-entry.mjs",
       "src/studio/integration/live-studio-controller.mjs",
-      "src/studio/ui/studio-live-shell.mjs",
+      "src/studio/adapters/current-world-importer.mjs",
       "src/studio/integration/world-studio-bridge.mjs",
       "src/creators/workspaces/world-workspace.mjs",
       "src/ui/studio-launcher.js",
-      "src/creators/ui/creator-hub.mjs",
       "src/creators/creator-entry.mjs",
+      "src/creators/ui/creator-hub.mjs",
       "index.html",
       "sw.js"
     ],
-    "summary": "A9 world-bridge-20260915-20: do not rewrite. Serialize studio-entry. Reuse shell. Skip cloneNode. Delay importCurrent/extras. Kill nonce URLs. FIXED_PENDING_VERIFY."
+    "summary": "A10 world-bridge-20260915-21 hardens A9: serial tools, lite hydrate, TREE seed, no nonce. FIXED_PENDING_VERIFY."
   },
   "verification": {
     "status": "PENDING",
@@ -656,7 +701,8 @@
       "FAILED: world-bridge-20260914-1 — IMG_8305 tools painted then black tab",
       "NOT PUBLISHED: world-bridge-20260914-2 — LIVE 05:44 EDT still world-bridge-20260914-1 / last-modified 04:53:11 GMT",
       "PLAYER: 2026-09-14 se sigue rompiendo — against unpublished A7 / live A6",
-      "PLAYER: 2026-09-15 se sigue rompiendo — against LIVE world-bridge-20260915-19 / A8"
+      "PLAYER: 2026-09-15 se sigue rompiendo — against LIVE world-bridge-20260915-19 / A8",
+      "A10 candidate on local branch fix/bug-0003-world-edit-freeze; not yet device-verified."
     ],
     "verified_by": null,
     "verified_at": null
@@ -682,7 +728,9 @@
     "world-bridge-20260914-2 is FIXED_PENDING_VERIFY until a real iPhone keeps the tools instead of a black tab.",
     "Player asked if Studio must be rewritten. No. Tools already paint. Rewrite is H8 ruled_out.",
     "Do not treat a player fail as A7/A8 failure until LIVE index serves the matching cache-bust.",
-    "A9 implemented 2026-09-15 after player report that A8/world-bridge-20260915-19 still froze."
+    "A9 implemented 2026-09-15 after player report that A8/world-bridge-20260915-19 still froze.",
+    "A10 2026-09-15: A9 already LIVE as world-bridge-20260915-20. A10 reduces first-2s tool barrel and restores usable TREE placement timing.",
+    "A10 local smoke 2026-09-15: Chromium iPhone-emulation survived 6s, placed TREE, reopened. Not iPhone Safari."
   ],
-  "updated_at": "2026-09-15T03:26:00Z"
+  "updated_at": "2026-09-15T04:30:00Z"
 }

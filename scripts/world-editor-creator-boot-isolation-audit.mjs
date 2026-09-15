@@ -34,6 +34,6 @@ if(/sprite-ability-(visual-ui|manual-cutter|repair-studio|repair-touch|irregular
   fail('World/Creator boot still imports Sprite Ability extensions before the lazy gate');
 }
 
-if(!source.includes("world-workspace.mjs?v=world-bridge-20260915-20"))fail('World workspace cache-bust is behind the live bridge build');
+if(!source.includes("world-workspace.mjs?v=world-bridge-20260915-21"))fail('World workspace cache-bust is behind the live bridge build');
 
-console.log(JSON.stringify({ok:true,file,lazySpriteAbilityImports:spriteImports.length,worldBootExcluded:true,workspaceBuild:'world-bridge-20260915-20'}));
+console.log(JSON.stringify({ok:true,file,lazySpriteAbilityImports:spriteImports.length,worldBootExcluded:true,workspaceBuild:'world-bridge-20260915-21'}));

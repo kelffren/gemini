@@ -6,12 +6,12 @@
  * public-api: openKeloStudioLive(), closeKeloStudioLive()
  * consumes: KeloInputLocks, KELO_WORLD_EDIT, Studio Kernel/Tools
  * online: confirmed Commands mirror through KELO_WORLD_EDIT; previews/camera/productivity stay local
- * mobile: ZERO static Studio imports — chrome first; iPhone reuses the painted shell, skips overlay/grid/importCurrent on first paint, and hydrates the draft only after the tools have survived
+ * mobile: ZERO static Studio imports — chrome first; iPhone reuses the painted shell, skips overlay/grid/importCurrent on first paint, seeds a light TREE-capable asset strip without thumbnails, and never runs a blocking draft import on the first phone paint
  */
 
 let active=null;
 const controllerUrl=new URL(import.meta.url);
-const BUILD=controllerUrl.searchParams.get('v')||'world-bridge-20260914-15';
+const BUILD=controllerUrl.searchParams.get('v')||'world-bridge-20260915-21';
 const mutable=status=>['DRAFT','REJECTED'].includes(String(status||''));
 const DIRECT_DRAG_THRESHOLD=5;
 function actor(root){return String(root.KELO_ADMIN_KEYS?.playerId?.()||root.keloNet?.playerKey||root.localPlayer?.id||'local_pioneer');}
@@ -113,6 +113,44 @@ function paintStubChrome(root,createStudioLiveShell){
   return shell;
 }
 
+
+function phoneSeedAssets(all){
+  const list=Array.isArray(all)?all:[];
+  const prefer=/tree|arbol|oak|pine|willow|birch|nature|vegetation|bush|plant|rock|hedge|flor/i;
+  const matched=list.filter(a=>prefer.test(`${a?.id||''} ${a?.label||''} ${a?.category||''}`));
+  const seed=(matched.length?matched:list).slice(0,24);
+  if(seed.length)return seed;
+  // Catalog may still be empty on cold phone boot; keep a tiny placeable TREE strip.
+  return [
+    {id:'tree:oak-broad-green',label:'Roble',category:'nature/tree',width:64,height:96},
+    {id:'tree:pine-tall-evergreen',label:'Pino',category:'nature/tree',width:48,height:112},
+    {id:'imperial:arbol-florido-blanco',label:'Árbol florido',category:'nature/tree',width:64,height:96},
+    {id:'tree:birch-green',label:'Abedul',category:'nature/tree',width:48,height:96}
+  ];
+}
+function ensurePhonePlacementPrefabs(studio,assets){
+  const registry=studio?.kernel?.prefabs;
+  if(!registry?.register)return 0;
+  let added=0;
+  for(const asset of assets||[]){
+    const id=String(asset?.id||'');
+    if(!id||registry.has?.(id)||registry.resolve?.(id))continue;
+    try{
+      registry.register({
+        id,
+        version:1,
+        label:String(asset.label||id),
+        category:String(asset.category||'nature/tree'),
+        bounds:{w:Math.max(1,Number(asset.width)||64),h:Math.max(1,Number(asset.height)||96)},
+        components:{visual:{source:'phone-seed',parts:[]}},
+        dependencies:[]
+      });
+      added++;
+    }catch{}
+  }
+  return added;
+}
+
 export async function openKeloStudioLive({root=globalThis}={}){
   if(active)return active;if(!root.document)throw new Error('STUDIO_DOM_REQUIRED');
   const actorId=actor(root);if(!root.KELO_ADMIN_KEYS?.can?.('world.edit',actorId))throw new Error('ADMIN_KEY_PERMISSION_DENIED');if(root.KELO_WORLD_BUILDER?.isMainWorld&&!root.KELO_WORLD_BUILDER.isMainWorld())throw new Error('STUDIO_MAIN_WORLD_ONLY');if(!root.KeloInputLocks?.acquire||!root.KeloInputLocks?.release)throw new Error('STUDIO_INPUT_LOCKS_NOT_READY');
@@ -189,13 +227,23 @@ export async function openKeloStudioLive({root=globalThis}={}){
     unregisterInput=studio.kernel.input.register('studio-live',handlers,1000);studio.kernel.input.push('studio-live');
     detachPointer=attachStudioPointerInput({element:root.document,router:studio.kernel.input,toWorld:(x,y)=>cameraController.toWorld(x,y),capture:true,stopPropagation:true,shouldHandle:e=>running&&!playing&&!isStudioUi(e)});
     const phoneShell=isPhone(root);
-    shell=createStudioLiveShell({host:root.document.body,reuse:phoneShell&&!!root.document.getElementById('kelo-studio-live')?.querySelector?.('.ks-top'),assets:phoneShell?[]:allAssets(),onMode:setMode,onAsset:beginPlacement,onUndo:()=>guarded(()=>studio.kernel.undo()),onRedo:()=>guarded(()=>studio.kernel.redo()),onRotate:()=>guarded(()=>mode==='placement'?Promise.resolve(studio.tools.placement.rotate(90)):mode==='prefab'?(toast(root,'Coloca el prefab y luego rota sus piezas.'),Promise.resolve(null)):creator.rotateSelection(90)),onDuplicate:()=>guarded(()=>creator.duplicateSelection()),onScale:action=>guarded(()=>creator.scaleSelection(action==='reset'?{value:1}:{delta:action==='down'?-.1:.1})),onDelete:()=>guarded(()=>creator.removeSelection()),onSelectEntity:(id,{append=false}={})=>{if(append)studio.kernel.selection.add(id);else studio.kernel.selection.set(id);updateShell();},onPropertyChange:(prop,value)=>guarded(()=>changeProperty(prop,value)),onBrushSize:size=>{studio.tools.terrain.configure({brushSize:size});updateShell();},onErase:erase=>{if(mode==='terrain'||mode==='path'){studio.tools.terrain.configure({erase});updateShell();}},onPlay:()=>guarded(togglePlaytest),onSave:()=>guarded(async()=>{await saveDraft();toast(root,'Studio guardado');}),onFocus:focusSelection,renderAssetPreview:(canvas,asset)=>studio.assetPreview.renderThumbnail(canvas,asset),onClose:()=>{void closeKeloStudioLive({root});}});
+    shell=createStudioLiveShell({host:root.document.body,reuse:phoneShell&&!!root.document.getElementById('kelo-studio-live')?.querySelector?.('.ks-top'),assets:phoneShell?[]:allAssets(),onMode:setMode,onAsset:beginPlacement,onUndo:()=>guarded(()=>studio.kernel.undo()),onRedo:()=>guarded(()=>studio.kernel.redo()),onRotate:()=>guarded(()=>mode==='placement'?Promise.resolve(studio.tools.placement.rotate(90)):mode==='prefab'?(toast(root,'Coloca el prefab y luego rota sus piezas.'),Promise.resolve(null)):creator.rotateSelection(90)),onDuplicate:()=>guarded(()=>creator.duplicateSelection()),onScale:action=>guarded(()=>creator.scaleSelection(action==='reset'?{value:1}:{delta:action==='down'?-.1:.1})),onDelete:()=>guarded(()=>creator.removeSelection()),onSelectEntity:(id,{append=false}={})=>{if(append)studio.kernel.selection.add(id);else studio.kernel.selection.set(id);updateShell();},onPropertyChange:(prop,value)=>guarded(()=>changeProperty(prop,value)),onBrushSize:size=>{studio.tools.terrain.configure({brushSize:size});updateShell();},onErase:erase=>{if(mode==='terrain'||mode==='path'){studio.tools.terrain.configure({erase});updateShell();}},onPlay:()=>guarded(togglePlaytest),onSave:()=>guarded(async()=>{await saveDraft();toast(root,'Studio guardado');}),onFocus:focusSelection,renderAssetPreview:phoneShell?(()=>{}):(canvas,asset)=>studio.assetPreview.renderThumbnail(canvas,asset),onClose:()=>{void closeKeloStudioLive({root});}});
     try{root.document.getElementById('kelo-world-launch-curtain')?.remove();}catch{}
-    if(phoneShell){(root.setTimeout||setTimeout)(async()=>{if(!running||productivity)return;const prodUi=await import('../ui/creator-productivity-panel.mjs');if(!running||productivity)return;productivity=prodUi.createCreatorProductivityPanel({shell,onCameraToggle:on=>{setMode(on?'camera':'select');return mode==='camera';},onZoomIn:()=>{const z=cameraController.setZoom(cameraController.zoom*1.2);updateShell();return z;},onZoomOut:()=>{const z=cameraController.setZoom(cameraController.zoom/1.2);updateShell();return z;},onZoomReset:()=>{const z=cameraController.setZoom(1);updateShell();return z;},onCopy:()=>{const count=creator.copySelection();productivity?.setClipboard(count);toast(root,count?`${count} objeto${count===1?'':'s'} copiado${count===1?'':'s'}`:'Selecciona algo para copiar');return count;},onPaste:()=>guarded(()=>creator.pasteClipboard()),onSavePrefab:async label=>{try{const def=await prefabLibrary.captureSelection({label});shell.setAssets(allAssets());toast(root,`${def.label} guardado en My Prefabs`);return def;}catch(e){toast(root,e.message||String(e));return false;}},onValidate:async()=>validateMap(),onSnapChange:size=>{snapSize=Math.max(1,Number(size)||1);gridOverlay.configure({size:snapSize});toast(root,snapSize===1?'Snap libre':`Snap ${snapSize}px`);},onGridToggle:visible=>gridOverlay.configure({visible})});productivity.setSnap(snapSize);},8000);}else {productivity=createCreatorProductivityPanel({shell,onCameraToggle:on=>{setMode(on?'camera':'select');return mode==='camera';},onZoomIn:()=>{const z=cameraController.setZoom(cameraController.zoom*1.2);updateShell();return z;},onZoomOut:()=>{const z=cameraController.setZoom(cameraController.zoom/1.2);updateShell();return z;},onZoomReset:()=>{const z=cameraController.setZoom(1);updateShell();return z;},onCopy:()=>{const count=creator.copySelection();productivity?.setClipboard(count);toast(root,count?`${count} objeto${count===1?'':'s'} copiado${count===1?'':'s'}`:'Selecciona algo para copiar');return count;},onPaste:()=>guarded(()=>creator.pasteClipboard()),onSavePrefab:async label=>{try{const def=await prefabLibrary.captureSelection({label});shell.setAssets(allAssets());toast(root,`${def.label} guardado en My Prefabs`);return def;}catch(e){toast(root,e.message||String(e));return false;}},onValidate:async()=>validateMap(),onSnapChange:size=>{snapSize=Math.max(1,Number(size)||1);gridOverlay.configure({size:snapSize});toast(root,snapSize===1?'Snap libre':`Snap ${snapSize}px`);},onGridToggle:visible=>gridOverlay.configure({visible})});productivity.setSnap(snapSize);}selectionUnsub=studio.kernel.selection.onChange(updateShell);updateShell();
+    if(phoneShell){(root.setTimeout||setTimeout)(async()=>{if(!running||productivity)return;const prodUi=await import('../ui/creator-productivity-panel.mjs');if(!running||productivity)return;productivity=prodUi.createCreatorProductivityPanel({shell,onCameraToggle:on=>{setMode(on?'camera':'select');return mode==='camera';},onZoomIn:()=>{const z=cameraController.setZoom(cameraController.zoom*1.2);updateShell();return z;},onZoomOut:()=>{const z=cameraController.setZoom(cameraController.zoom/1.2);updateShell();return z;},onZoomReset:()=>{const z=cameraController.setZoom(1);updateShell();return z;},onCopy:()=>{const count=creator.copySelection();productivity?.setClipboard(count);toast(root,count?`${count} objeto${count===1?'':'s'} copiado${count===1?'':'s'}`:'Selecciona algo para copiar');return count;},onPaste:()=>guarded(()=>creator.pasteClipboard()),onSavePrefab:async label=>{try{const def=await prefabLibrary.captureSelection({label});shell.setAssets(allAssets());toast(root,`${def.label} guardado en My Prefabs`);return def;}catch(e){toast(root,e.message||String(e));return false;}},onValidate:async()=>validateMap(),onSnapChange:size=>{snapSize=Math.max(1,Number(size)||1);gridOverlay.configure({size:snapSize});toast(root,snapSize===1?'Snap libre':`Snap ${snapSize}px`);},onGridToggle:visible=>gridOverlay.configure({visible})});productivity.setSnap(snapSize);},14000);}else {productivity=createCreatorProductivityPanel({shell,onCameraToggle:on=>{setMode(on?'camera':'select');return mode==='camera';},onZoomIn:()=>{const z=cameraController.setZoom(cameraController.zoom*1.2);updateShell();return z;},onZoomOut:()=>{const z=cameraController.setZoom(cameraController.zoom/1.2);updateShell();return z;},onZoomReset:()=>{const z=cameraController.setZoom(1);updateShell();return z;},onCopy:()=>{const count=creator.copySelection();productivity?.setClipboard(count);toast(root,count?`${count} objeto${count===1?'':'s'} copiado${count===1?'':'s'}`:'Selecciona algo para copiar');return count;},onPaste:()=>guarded(()=>creator.pasteClipboard()),onSavePrefab:async label=>{try{const def=await prefabLibrary.captureSelection({label});shell.setAssets(allAssets());toast(root,`${def.label} guardado en My Prefabs`);return def;}catch(e){toast(root,e.message||String(e));return false;}},onValidate:async()=>validateMap(),onSnapChange:size=>{snapSize=Math.max(1,Number(size)||1);gridOverlay.configure({size:snapSize});toast(root,snapSize===1?'Snap libre':`Snap ${snapSize}px`);},onGridToggle:visible=>gridOverlay.configure({visible})});productivity.setSnap(snapSize);}selectionUnsub=studio.kernel.selection.onChange(updateShell);updateShell();
     void prefabLibrary.load().then(()=>{if(isPhone(root))return;try{shell?.setAssets?.(allAssets());updateShell();}catch{}}).catch(e=>console.warn('[Kelo Studio] creator prefab cache unavailable',e));
     if(isPhone(root)&&shell?.root){
-      const loadAssetsOnce=()=>{if(!running||shell.root.dataset.keloAssetsReady==='1')return;shell.root.dataset.keloAssetsReady='1';try{shell.setAssets(allAssets());}catch{}};
-      shell.root.addEventListener('click',e=>{if(e.target?.closest?.('[data-act="edit-assets"]'))loadAssetsOnce();},{capture:true});
+      const loadFullAssets=()=>{if(!running||shell.root.dataset.keloAssetsReady==='1')return;shell.root.dataset.keloAssetsReady='1';try{shell.setAssets(allAssets());}catch{}};
+      // A10: seed a light TREE-capable strip soon so placement works without waiting for EDIT or 8s hydrate.
+      (root.setTimeout||setTimeout)(()=>{
+        if(!running||!shell?.setAssets)return;
+        try{
+          const seed=phoneSeedAssets(allAssets());
+          ensurePhonePlacementPrefabs(studio,seed);
+          shell.setAssets(seed);
+          updateShell();
+        }catch{}
+      },900);
+      shell.root.addEventListener('click',e=>{if(e.target?.closest?.('[data-act="edit-assets"]'))loadFullAssets();},{capture:true});
     }
     if(root.KELO_WORLD_LAUNCH_ABORTED)throw new Error('WORLD_EDITOR_OPEN_TIMEOUT');
     await yieldLiveMount(root);
@@ -234,24 +282,42 @@ export async function openKeloStudioLive({root=globalThis}={}){
     async function hydrateAfterChrome(){
       overlayStart=0;
       if(!running||root.KELO_WORLD_LAUNCH_ABORTED)return;
+      // A10 phone: auto importCurrent (structuredClone + draft snapshot) freezes WebContent
+      // even when delayed. Keep an empty editable document + TREE seed; draft can load later
+      // from desktop or an explicit reload path without blocking first paint survival.
+      if(phoneOverlay){
+        try{shell?.setStatus?.(`${mode.toUpperCase()} · listo · coloca assets`);}catch{}
+        updateShell();
+        return;
+      }
       try{
         await studio.importCurrent({view:'draft',draftId});
         if(!running||root.KELO_WORLD_LAUNCH_ABORTED)return;
         for(const e of studio.kernel.document.entities)mirror.seed(e.id,e.source?.authorityPlacementId||e.id);for(const c of Object.values(studio.kernel.document.navigation?.collisions||{}))mirror.seedCollision(c.collisionId,c.collisionId);
         updateShell();
-        if(!phoneOverlay)startStudioOverlayDraw();
+        startStudioOverlayDraw();
       }catch(error){
         console.warn('[Kelo Studio] draft import deferred; chrome stays up',error);
         try{shell?.setStatus?.('Editor listo');}catch{}
       }
     }
     onKey=e=>{if(isStudioUi(e))return;const key=e.key.toLowerCase();if(playing){if(key==='escape'){e.preventDefault();void guarded(togglePlaytest);}return;}if((e.metaKey||e.ctrlKey)&&key==='z'){e.preventDefault();void guarded(()=>e.shiftKey?studio.kernel.redo():studio.kernel.undo());return;}if((e.metaKey||e.ctrlKey)&&key==='d'){e.preventDefault();void guarded(()=>creator.duplicateSelection());return;}if((e.metaKey||e.ctrlKey)&&key==='c'){e.preventDefault();const count=creator.copySelection();productivity?.setClipboard(count);toast(root,count?`${count} objeto${count===1?'':'s'} copiado${count===1?'':'s'}`:'Selecciona algo para copiar');return;}if((e.metaKey||e.ctrlKey)&&key==='v'){e.preventDefault();void guarded(()=>creator.pasteClipboard());return;}if((e.metaKey||e.ctrlKey)&&key==='s'){e.preventDefault();void guarded(async()=>{await saveDraft();toast(root,'Studio guardado');});return;}if(key==='f'){e.preventDefault();focusSelection();return;}if(key==='+'||key==='='){e.preventDefault();cameraController.setZoom(cameraController.zoom*1.2);updateShell();return;}if(key==='-'){e.preventDefault();cameraController.setZoom(cameraController.zoom/1.2);updateShell();return;}if(key==='0'){e.preventDefault();cameraController.setZoom(1);updateShell();return;}if(key==='escape'){e.preventDefault();if(['camera','placement','prefab','terrain','path','collision'].includes(mode)){cancelTransient();setMode('select');}else void closeKeloStudioLive({root});return;}if(key==='r'){e.preventDefault();void guarded(()=>mode==='placement'?Promise.resolve(studio.tools.placement.rotate(90)):mode==='prefab'?Promise.resolve(null):creator.rotateSelection(90));return;}if(key==='e'&&(mode==='terrain'||mode==='path')){e.preventDefault();const next=!studio.tools.terrain.state().erase;studio.tools.terrain.configure({erase:next});shell?.setErase(next);updateShell();return;}if(key==='delete'||key==='backspace'){e.preventDefault();if(mode==='collision'&&studio.tools.collision.selectedId)void guarded(()=>studio.tools.collision.removeSelected());else void guarded(()=>creator.removeSelection());return;}if(key==='q')setMode('select');else if(key==='v')setMode('move');else if(key==='h')setMode(mode==='camera'?'select':'camera');else if(key==='g')setMode('terrain');else if(key==='p')setMode('path');else if(key==='c')setMode('collision');};root.document.addEventListener('keydown',onKey,true);
-    const liveSession={version:'kelo-studio-creator-v1.7.0-world-bridge',studio,prefabLibrary,cameraController,get draftId(){return draftId;},get mode(){return mode;},get playing(){return playing;},get snapSize(){return snapSize;},setMode,beginPlacement,focusSelection,validate:validateMap,togglePlaytest:()=>guarded(togglePlaytest),close:()=>closeKeloStudioLive({root})};
+    const liveSession={version:'kelo-studio-creator-v1.8.0-world-bridge-a10',studio,prefabLibrary,cameraController,get draftId(){return draftId;},get mode(){return mode;},get playing(){return playing;},get snapSize(){return snapSize;},setMode,beginPlacement,focusSelection,validate:validateMap,togglePlaytest:()=>guarded(togglePlaytest),close:()=>closeKeloStudioLive({root})};
     Object.defineProperty(liveSession,'__cleanup',{value:async()=>{running=false;cancelDirectGesture();if(pinchScale){try{await endPinchScale({cancelled:true});}catch{}}cancelPinchPreviewFrame();stopOverlayDraw();if(onKey)root.document.removeEventListener('keydown',onKey,true);selectionUnsub?.();detachPointer?.();cameraController?.destroy();studio.kernel.input.pop('studio-live');unregisterInput?.();mirror.uninstall();productivity?.destroy();shell?.destroy();overlay?.destroy();studio.tools.collision.setVisible(false);if(inputLockToken){root.KeloInputLocks.release(inputLockToken);inputLockToken=null;}try{await studio.checkpoint();}catch{}try{studio.close();}catch{}try{await root.KELO_WORLD_EDIT?.request?.('world:view:published',{actorId});}catch{}},enumerable:false});
-    if(shell?.root?.dataset)delete shell.root.dataset.keloWorldLoading;active=Object.freeze(liveSession);root.document.body.classList.add('kelo-studio-active');toast(root,'Kelo Studio Creator V1.7 activo');
+    if(shell?.root?.dataset)delete shell.root.dataset.keloWorldLoading;
+    try{
+      shell?.root?.querySelectorAll?.('button,select,input')?.forEach?.(control=>{
+        if(control.dataset?.keloProvisionalDisabled==='1'){
+          control.disabled=false;control.removeAttribute?.('aria-disabled');delete control.dataset.keloProvisionalDisabled;
+        }
+      });
+      if(shell?.root?.dataset)shell.root.dataset.keloStudioInteractive='1';
+    }catch{}
+    active=Object.freeze(liveSession);root.document.body.classList.add('kelo-studio-active');toast(root,'Kelo Studio Creator V1.8 activo');
     if(phoneOverlay){
       try{shell?.setStatus?.(`${mode.toUpperCase()} · listo`);}catch{}
-      overlayStart=(root.setTimeout||setTimeout)(hydrateAfterChrome,8000);
+      // A10: phone hydrate is status-only (no importCurrent). Run soon so UI says listo.
+      overlayStart=(root.setTimeout||setTimeout)(hydrateAfterChrome,400);
     }else overlayStart=(root.setTimeout||setTimeout)(hydrateAfterChrome,0);
     return active;
   }catch(error){running=false;try{if(overlayStart){(root.clearTimeout||clearTimeout)(overlayStart);overlayStart=0;}}catch{}try{if(typeof root.cancelAnimationFrame==='function')root.cancelAnimationFrame(frame);}catch{}try{(root.clearTimeout||clearTimeout)(frame);}catch{}try{cancelDirectGesture();detachPointer?.();cameraController?.destroy();}catch{}try{studio.kernel.input.pop('studio-live');unregisterInput?.();}catch{}try{mirror.uninstall();}catch{}try{productivity?.destroy();shell?.destroy();overlay?.destroy();studio.tools.collision.setVisible(false);}catch{}if(inputLockToken){try{root.KeloInputLocks.release(inputLockToken);}catch{}inputLockToken=null;}try{studio.close();}catch{}throw error;}

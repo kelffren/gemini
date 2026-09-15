@@ -4,7 +4,7 @@
  * does-not-own: automatic game startup or legacy builder replacement
  * public-api: bootKeloStudio()
  * online: authority remains KELO_WORLD_EDIT
- * mobile: ZERO static Studio imports; iPhone serializes kernel/tools/services between paints, skips overlay renderer + worker, and waits 8s/15s for palette/extras
+ * mobile: ZERO static Studio imports; iPhone serializes kernel/tools/services between paints, skips overlay renderer + worker, registers core tools serially, seeds placement early, and waits 3s/10s for draft hydrate / extras
  */
 
 async function loadStudioCore(root,phoneBoot){
@@ -16,7 +16,15 @@ async function loadStudioCore(root,phoneBoot){
   const documentMod=await import('./document/world-document.mjs');await wait();abort();
   const adapterMod=await import('./adapters/kelo-runtime-adapter.mjs');await wait();abort();
   setWorldLaunchStatus(root,'Cargando herramientas…');
-  const toolsMod=await import('./tools/register-core-tools.mjs');await wait();abort();
+  let toolsMod=null;
+  if(phoneBoot){
+    // A10: never import the static 7-tool barrel on iPhone; serial file has zero static deps.
+    const serialMod=await import('./tools/register-core-tools-serial.mjs');
+    toolsMod={registerCoreTools:null,registerCoreToolsSerial:serialMod.registerCoreToolsSerial};
+  }else{
+    toolsMod=await import('./tools/register-core-tools.mjs');
+  }
+  await wait();abort();
   const seederMod=await import('./adapters/catalog-prefab-seeder.mjs');await wait();abort();
   const componentsMod=await import('./components/kelo-components.mjs');await wait();abort();
   const importerMod=await import('./adapters/current-world-importer.mjs');await wait();abort();
@@ -31,12 +39,15 @@ async function loadStudioCore(root,phoneBoot){
     workerMod=await import('./compiler/worker-client.mjs');await wait();abort();
   }
   touchMod=await import('./input/studio-placement-touch-controller.mjs');await wait();abort();
-  rangeMod=await import('./input/studio-explorer-range-selection-controller.mjs');await wait();abort();
+  if(!phoneBoot){
+    rangeMod=await import('./input/studio-explorer-range-selection-controller.mjs');await wait();abort();
+  }
   return {
     createStudioKernel:kernelMod.createStudioKernel,
     createWorldDocument:documentMod.createWorldDocument,
     createKeloRuntimeAdapter:adapterMod.createKeloRuntimeAdapter,
     registerCoreTools:toolsMod.registerCoreTools,
+    registerCoreToolsSerial:toolsMod.registerCoreToolsSerial||null,
     seedCatalogPrefabs:seederMod.seedCatalogPrefabs,
     registerKeloComponents:componentsMod.registerKeloComponents,
     importCurrentKeloWorld:importerMod.importCurrentKeloWorld,
@@ -47,7 +58,7 @@ async function loadStudioCore(root,phoneBoot){
     createStudioOverlayRenderer:overlayMod?.createStudioOverlayRenderer||null,
     createStudioWorkerClient:workerMod?.createStudioWorkerClient||null,
     createStudioPlacementTouchController:touchMod.createStudioPlacementTouchController,
-    createStudioExplorerRangeSelectionController:rangeMod.createStudioExplorerRangeSelectionController
+    createStudioExplorerRangeSelectionController:rangeMod?.createStudioExplorerRangeSelectionController||null
   };
 }
 
@@ -57,8 +68,8 @@ const NOOP_ASSET_PALETTE=Object.freeze({
 });
 const NOOP_ASSET_FAVORITES=Object.freeze({refresh:()=>{},destroy:()=>{},toggle:()=>false,get ids(){return [];}});
 const NOOP_CTRL=Object.freeze({destroy(){},refresh(){}});
-const PHONE_OPTIONAL_BOOT_DELAY_MS=8000;
-const PHONE_PRODUCTIVITY_BOOT_DELAY_MS=15000;
+const PHONE_OPTIONAL_BOOT_DELAY_MS=12000;
+const PHONE_PRODUCTIVITY_BOOT_DELAY_MS=18000;
 
 function isPhoneStudioBoot(root){
   const ua=String(root?.navigator?.userAgent||'');
@@ -141,7 +152,7 @@ export async function bootKeloStudio({ mode = 'world', actorId = null, document 
   const core=await loadStudioCore(root,phoneBoot);
   const {
     createStudioKernel,createWorldDocument,createKeloRuntimeAdapter,registerCoreTools,
-    seedCatalogPrefabs,registerKeloComponents,importCurrentKeloWorld,createStudioAssetPreviewService,
+    registerCoreToolsSerial,seedCatalogPrefabs,registerKeloComponents,importCurrentKeloWorld,createStudioAssetPreviewService,
     createStudioStore,createStudioProfiler,createWorldCompiler,createStudioOverlayRenderer,
     createStudioWorkerClient,createStudioPlacementTouchController,createStudioExplorerRangeSelectionController
   }=core;
@@ -149,7 +160,10 @@ export async function bootKeloStudio({ mode = 'world', actorId = null, document 
   const initial = document || createWorldDocument({ worldId: mode === 'parcel' ? `parcel:${actorId || 'local'}` : 'world:kelo-main', metadata: { name: mode === 'parcel' ? 'My Parcel' : 'Kelo World', description: '', tags: [mode] }, settings: { tileSize: root.KELO_TILE_REGISTRY?.worldTileSize || 32, chunkSize: root.KELO_WORLD_RENDERER?.chunkSize || 512 } });
   const kernel = createStudioKernel({ document: initial, adapter });
   registerKeloComponents(kernel.components); seedCatalogPrefabs({ prefabRegistry: kernel.prefabs, assetCatalog: adapter.assetCatalog });
-  const tools = registerCoreTools(kernel);
+  const {yieldStudioBoot}=await import('./integration/studio-boot-pace.mjs');
+  const tools = phoneBoot && typeof registerCoreToolsSerial==='function'
+    ? await registerCoreToolsSerial(kernel,{wait:async()=>{await yieldStudioBoot(root);await new Promise(r=>(root.setTimeout||setTimeout)(r,24));}})
+    : registerCoreTools(kernel);
   const loadBasicTools=()=>{
     if(closed)return;
     void import('./tools/register-basic-tools.mjs').then(mod=>{
@@ -187,7 +201,19 @@ export async function bootKeloStudio({ mode = 'world', actorId = null, document 
   };
   optionalPaletteTimer=deferStudioOptional(root,()=>{optionalPaletteTimer=0;loadAssetPalette();},phoneBoot?PHONE_OPTIONAL_BOOT_DELAY_MS:0);
   const placementTouchController=createStudioPlacementTouchController({root,placement:tools.placement});
-  const explorerRangeSelectionController=createStudioExplorerRangeSelectionController({root,kernel});
+  // Explorer range is keyboard/desktop-heavy; keep a noop on phone until extras wave.
+  let explorerRangeSelectionController=phoneBoot
+    ? {destroy(){},refresh(){}}
+    : createStudioExplorerRangeSelectionController({root,kernel});
+  if(phoneBoot){
+    deferStudioOptional(root,()=>{
+      if(closed)return;
+      void import('./input/studio-explorer-range-selection-controller.mjs').then(mod=>{
+        if(closed||typeof mod.createStudioExplorerRangeSelectionController!=='function')return;
+        try{explorerRangeSelectionController=mod.createStudioExplorerRangeSelectionController({root,kernel});}catch{}
+      }).catch(()=>{});
+    },PHONE_OPTIONAL_BOOT_DELAY_MS);
+  }
   let assetFavorites=NOOP_ASSET_FAVORITES;
   let assetKeyboardController=NOOP_CTRL;
   let menuMinimizer=NOOP_CTRL;
@@ -216,7 +242,7 @@ export async function bootKeloStudio({ mode = 'world', actorId = null, document 
   const worker = createStudioWorkerClient?createStudioWorkerClient({ resolvePrefab, prefabSnapshot: () => Object.fromEntries(kernel.prefabs.list().map(p => [p.id, kernel.prefabs.resolve(p.id)])) }):{compile:(doc,options)=>Promise.resolve(compiler.compile(doc,options)),close(){},get active(){return false;}};
   const store = createStudioStore(), profiler = createStudioProfiler();
   const unsubscribeJournal = kernel.commands.on(event => { store.appendCommand(kernel.document.worldId, { action: event.type, command: event.command }).catch(() => {}); });
-  session = Object.freeze({ version: 'kelo-studio-foundation-v1.35.0-world-bridge-boot', mode, actorId, kernel, tools, overlayRenderer, assetPreview,
+  session = Object.freeze({ version: 'kelo-studio-foundation-v1.36.0-world-bridge-a10', mode, actorId, kernel, tools, overlayRenderer, assetPreview,
     get assetPalette(){return assetPalette;},
     get assetFavorites(){return assetFavorites;},
     get assetKeyboardController(){return assetKeyboardController;},

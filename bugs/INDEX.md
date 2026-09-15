@@ -6,7 +6,7 @@ Este índice es una vista rápida. La fuente canónica de cada bug es su JSON en
 |---|---|---:|---|
 | `BUG-0001` | `OPEN` | high | BrowserStack real iPhone falla antes de abrir la página por mismatch `reducedMotion`. |
 | `BUG-0002` | `FIXED_PENDING_VERIFY` | critical | Guest tiene fixes candidatos, pero falta prueba E2E real de `Jugar como invitado` en iPhone. |
-| `BUG-0003` | `FIXED_PENDING_VERIFY` | critical | World se congelaba en ABRIENDO; candidato world-chrome (tools antes del grafo). Falta iPhone real. |
+| `BUG-0003` | `FIXED_PENDING_VERIFY` | critical | World post-chrome freeze; candidato A10 world-bridge-20260915-21. Falta iPhone real. |
 
 ## Dependencias actuales
 

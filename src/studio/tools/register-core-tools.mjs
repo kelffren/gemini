@@ -4,7 +4,7 @@
  * does-not-own: room builder, paint copies, quick-build, UI
  * public-api: registerCoreTools()
  * reuse: registerBasicTools() still registers the full set for audits and desktop
- * mobile: kept as the first World-open tool wave; heavy build tools load after the live shell
+ * mobile: phone World-open uses register-core-tools-serial.mjs instead of this static barrel
  * online: no
  */
 import { createSelectTool } from './select-tool.mjs';

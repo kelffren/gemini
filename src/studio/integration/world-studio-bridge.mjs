@@ -11,14 +11,13 @@
 import { createBugObserver } from '../../core/bug-observability.mjs';
 import { yieldStudioBoot, setWorldLaunchStatus } from './studio-boot-pace.mjs';
 
-export const WORLD_STUDIO_BRIDGE_BUILD='world-bridge-20260915-20';
+export const WORLD_STUDIO_BRIDGE_BUILD='world-bridge-20260915-21';
 const bridgeUrl=new URL(import.meta.url);
 const incomingBuild=bridgeUrl.searchParams.get('v')||'';
 // Workspace can lag one or more static build tags behind this bridge. Do not let
-// that stale tag downgrade the controller/shell/studio-entry chain. The only
-// external token we intentionally preserve is the world-ios-* nonce used by the
-// recovery path to force a genuinely fresh iOS module graph.
-const controllerBuild=incomingBuild.startsWith('world-ios-')?incomingBuild:WORLD_STUDIO_BRIDGE_BUILD;
+// that stale tag downgrade the controller/shell/studio-entry chain. Preserve only
+// explicit recovery tags (stable *-retry or legacy world-ios-*); never invent new nonces.
+const controllerBuild=(incomingBuild.endsWith('-retry')||incomingBuild.startsWith('world-ios-'))?incomingBuild:WORLD_STUDIO_BRIDGE_BUILD;
 const CONTROLLER=`./live-studio-controller.mjs?v=${encodeURIComponent(controllerBuild)}`;
 const BUG_ID='BUG-0003';
 let controllerMod=null;
@@ -112,13 +111,22 @@ function markProvisionalControls(shell){
   const loading=shell?.dataset?.keloWorldLoading==='1';
   if(shell?.dataset)shell.dataset.keloStudioInteractive=loading?'0':'1';
   try{shell?.setAttribute?.('aria-busy',loading?'true':'false');}catch{}
-  if(!loading)return;
   try{
     shell?.querySelectorAll?.('button,select,input')?.forEach?.(control=>{
-      control.disabled=true;
-      control.setAttribute?.('aria-disabled','true');
+      if(loading){
+        control.disabled=true;
+        control.setAttribute?.('aria-disabled','true');
+        control.dataset.keloProvisionalDisabled='1';
+      }else if(control.dataset?.keloProvisionalDisabled==='1'){
+        // A10: re-enable only controls we disabled during provisional chrome.
+        // Leave Studio's own selection-gated disabled state alone.
+        control.disabled=false;
+        control.removeAttribute?.('aria-disabled');
+        delete control.dataset.keloProvisionalDisabled;
+      }
     });
   }catch{}
+  if(!loading)return;
   try{
     const status=shell?.querySelector?.('.ks-status');
     if(status)status.textContent='Terminando de cargar editor…';

@@ -189,11 +189,22 @@ const shellSource=await readFile(resolve(here,'../src/studio/ui/studio-live-shel
 assert.match(shellSource,/backdrop-filter:none!important/,'Studio chrome must kill backdrop-filter on coarse/narrow iPhone');
 
 const entrySource=await readFile(resolve(here,'../src/studio/studio-entry.mjs'),'utf8');
-assert.match(entrySource,/PHONE_OPTIONAL_BOOT_DELAY_MS=1800/,'iPhone optional build tools and asset palette must wait until after the live shell mounts');
-assert.match(entrySource,/PHONE_PRODUCTIVITY_BOOT_DELAY_MS=2800/,'iPhone productivity extras must wait beyond the optional post-mount imports');
+assert.match(entrySource,/PHONE_OPTIONAL_BOOT_DELAY_MS=12000/,'iPhone optional build tools and asset palette must wait well past first-paint survival');
+assert.match(entrySource,/PHONE_PRODUCTIVITY_BOOT_DELAY_MS=18000/,'iPhone productivity extras must wait beyond the optional post-mount imports');
 assert.match(entrySource,/optionalToolsTimer=deferStudioOptional/,'basic build tools must be deferred on iPhone instead of joining the critical Studio graph');
 assert.match(entrySource,/optionalPaletteTimer=deferStudioOptional/,'asset palette must be deferred on iPhone instead of joining the critical Studio graph');
 assert.match(entrySource,/for\(const timer of \[optionalToolsTimer,optionalPaletteTimer,extrasTimer\]\)/,'closing Studio must cancel deferred optional module imports');
+assert.match(entrySource,/register-core-tools-serial\.mjs/,'iPhone must load core tools through the serial module, not the static barrel');
+assert.match(entrySource,/registerCoreToolsSerial/,'iPhone World boot must register core tools serially between paints');
+
+assert.match(controllerSource,/hydrateAfterChrome,400/,'iPhone post-chrome hydrate is status-only and must not wait on importCurrent');
+assert.match(controllerSource,/A10 phone: auto importCurrent/,'iPhone must document why importCurrent is skipped');
+assert.match(controllerSource,/phoneSeedAssets/,'iPhone must seed a light TREE-capable asset strip');
+assert.match(controllerSource,/renderAssetPreview:phoneShell\?\(\(\)=>\{\}\)/,'iPhone first paint must skip asset thumbnail decode');
+
+const workspaceFresh=await readFile(resolve(here,'../src/creators/workspaces/world-workspace.mjs'),'utf8');
+assert.doesNotMatch(workspaceFresh,/world-ios-\\$\{nonce\}/,'World recovery must not mint unique nonce module graphs');
+assert.match(workspaceFresh,/WORLD_BUILD\}-retry/,'World recovery must use a stable -retry build tag');
 
 console.log(JSON.stringify({
   ok:true,

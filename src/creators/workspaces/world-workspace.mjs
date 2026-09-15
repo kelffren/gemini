@@ -4,7 +4,7 @@
  * owns: descriptor and lazy routing into existing live Studio controller
  * does-not-own: World editor, commands, drafts, authority, terrain, collisions, PropertySystem or camera
  * reuse: existing openKeloStudioLive() remains implementation; Map Forge handoff imports through Studio adapter + KELO_WORLD_EDIT and focuses through KeloCamera
- * mobile: paint Studio chrome first; the world-studio-bridge is the single owner of the serialized critical iPhone prewarm so Safari does not parse the full editor graph before controller hydrate
+ * mobile: paint Studio chrome first; the world-studio-bridge is the single owner of the serialized critical iPhone prewarm so Safari does not parse the full editor graph before controller hydrate; recovery retries use a stable build tag, never a nonce
  */
 import { waitForWorldEditAuthority } from '../adapters/world-creator-adapter.mjs';
 
@@ -15,40 +15,26 @@ const LAUNCH_CURTAIN_ID='kelo-world-launch-curtain';
 const STUDIO_OPEN_MS=20000;
 const DEFAULT_LAUNCH_YIELD_MS=420;
 const DEFAULT_RUNTIME_YIELD_FALLBACK_MS=120;
-const WORLD_BUILD='world-bridge-20260915-20';
+const WORLD_BUILD='world-bridge-20260915-21';
 const PHONE_RUNTIME_ROOTS=Object.freeze([
-  '../../studio/render/studio-overlay-canvas.mjs',
-  '../../studio/render/creator-grid-overlay.mjs',
   '../../studio/input/pointer-input-adapter.mjs',
   '../../studio/input/studio-camera-controller.mjs',
   '../../studio/integration/authority-command-mirror.mjs',
-  '../../studio/ui/creator-productivity-panel.mjs',
   '../../studio/tools/creator-actions.mjs',
   '../../studio/prefabs/creator-prefab-library.mjs',
-  '../../studio/validation/creator-world-analyzer.mjs',
   '../../studio/document/document-commands.mjs',
   '../../studio/core/studio-kernel.mjs',
   '../../studio/document/world-document.mjs',
   '../../studio/compiler/world-compiler.mjs',
-  '../../studio/compiler/worker-client.mjs',
   '../../studio/adapters/kelo-runtime-adapter.mjs',
   '../../studio/adapters/current-world-importer.mjs',
   '../../studio/adapters/catalog-prefab-seeder.mjs',
   '../../studio/components/kelo-components.mjs',
   '../../studio/storage/indexeddb-studio-store.mjs',
   '../../studio/performance/studio-profiler.mjs',
-  '../../studio/tools/select-tool.mjs',
-  '../../studio/tools/marquee-select-tool.mjs',
-  '../../studio/tools/placement-tool.mjs',
-  '../../studio/tools/transform-tool.mjs',
-  '../../studio/tools/terrain-tool.mjs',
-  '../../studio/tools/collision-tool.mjs',
-  '../../studio/tools/prefab-stamp-tool.mjs',
-  '../../studio/tools/register-core-tools.mjs',
-  '../../studio/render/studio-overlay-renderer.mjs',
+  '../../studio/tools/register-core-tools-serial.mjs',
   '../../studio/render/studio-asset-preview-service.mjs',
   '../../studio/input/studio-placement-touch-controller.mjs',
-  '../../studio/input/studio-explorer-range-selection-controller.mjs',
   `../../studio/studio-entry.mjs?v=${WORLD_BUILD}`
 ]);
 const studioOpenBudget=root=>Math.max(250,Number(root?.KELO_WORLD_OPEN_TIMEOUT_MS)||STUDIO_OPEN_MS);
@@ -238,8 +224,8 @@ async function loadStudioModule(loader,root,{fresh=false}={}){
   if(fresh){
     const src=Function.prototype.toString.call(loader);
     if(src.includes('live-studio-controller.mjs')||src.includes('world-studio-bridge.mjs')){
-      const nonce=`${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;
-      return import(`../../studio/integration/world-studio-bridge.mjs?v=world-ios-${nonce}`);
+      // A10: never mint a unique nonce graph (H6). Stable retry tag reuses identities.
+      return import(`../../studio/integration/world-studio-bridge.mjs?v=${WORLD_BUILD}-retry`);
     }
   }
   return loader(root);
