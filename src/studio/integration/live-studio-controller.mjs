@@ -243,6 +243,7 @@ export async function openKeloStudioLive({root=globalThis}={}){
   const {bootKeloStudio}=await import(`../studio-entry.mjs?v=${BUILD}`);
   if(root.KELO_WORLD_LAUNCH_ABORTED)throw new Error('WORLD_EDITOR_OPEN_TIMEOUT');
   const studio=await bootKeloStudio({mode:'world',actorId,root});if(root.KELO_WORLD_LAUNCH_ABORTED){try{studio.close();}catch{}throw new Error('WORLD_EDITOR_OPEN_TIMEOUT');}
+  const surgery=root.KELO_WORLD_SURGERY;
   const creator=createCreatorActions(studio.kernel),prefabLibrary=createCreatorPrefabLibrary({kernel:studio.kernel,store:studio.store,tool:studio.tools.prefabStamp,ownerId:actorId});
   const phonePreview=isPhone(root)?createPacedPhoneAssetPreview(studio.assetPreview,root):null;
   const renderPhoneAssetPreview=(canvas,asset)=>{
@@ -257,7 +258,8 @@ export async function openKeloStudioLive({root=globalThis}={}){
     inputLockToken=root.KeloInputLocks.acquire('kelo-studio',{kind:'creator-session',draftId});
     const baseAssets=studio.adapter.assetCatalog.list()||[],allAssets=()=>[...baseAssets,...prefabLibrary.assets()];
     const materials=Array.from(new Set([...(root.KELO_WORLD_BUILDER?.materials||[]),...Object.keys(root.KELO_TERRAIN_CONTRACT?.materials||{})])),groundMaterial=materials.includes('grass')?'grass':materials[0]||'grass',pathMaterial=materials.includes('marble')?'marble':materials[1]||materials[0]||'grass';
-    let snapSize=Math.max(1,Number(studio.kernel.document.settings?.tileSize)||32);const gridOverlay=createCreatorGridOverlay({size:snapSize,visible:true});
+    let snapSize=Math.max(1,Number(studio.kernel.document.settings?.tileSize)||32);const gridOverlay=surgery?.enabled?.('grid')===false?{draw(){},configure(){}}:createCreatorGridOverlay({size:snapSize,visible:true});
+    surgery?.markStatus?.('grid',surgery?.enabled?.('grid')===false?'DISABLED':'ACTIVE',{phase:'live-mount'});
     const surfaceCount=()=>Object.keys(studio.kernel.document.terrain||{}).length,collisionCount=()=>Object.keys(studio.kernel.document.navigation?.collisions||{}).length,scene=()=>({entities:studio.kernel.document.entities,selection:studio.kernel.selection.get()});
     const isStudioUi=e=>!!e?.target?.closest?.('[data-kelo-studio-ui]');
     function syncModeUi(){shell?.root?.querySelectorAll?.('[data-mode]')?.forEach?.(b=>b.classList.toggle('on',b.dataset.mode===mode));}
@@ -390,6 +392,14 @@ export async function openKeloStudioLive({root=globalThis}={}){
     async function hydrateAfterChrome(){
       overlayStart=0;
       if(!running||root.KELO_WORLD_LAUNCH_ABORTED)return;
+      // WORLD SURGERY: draft hydration gate isolates snapshot/import work after chrome is already alive.
+      if(surgery?.enabled?.('draftHydration')===false||surgery?.enabled?.('snapshotLoading')===false){
+        if(surgery?.enabled?.('draftHydration')===false)surgery?.markStatus?.('draftHydration','DISABLED',{phase:'hydrate'});
+        if(surgery?.enabled?.('snapshotLoading')===false)surgery?.markStatus?.('snapshotLoading','DISABLED',{phase:'hydrate'});
+        try{shell?.setStatus?.(`${mode.toUpperCase()} · diagnóstico sin hydrate`);}catch{}
+        updateShell();
+        return;
+      }
       // A10 phone: auto importCurrent (structuredClone + draft snapshot) freezes WebContent
       // even when delayed. Keep an empty editable document + TREE seed; draft can load later
       // from desktop or an explicit reload path without blocking first paint survival.
@@ -422,13 +432,14 @@ export async function openKeloStudioLive({root=globalThis}={}){
       if(shell?.root?.dataset)shell.root.dataset.keloStudioInteractive='1';
     }catch{}
     active=Object.freeze(liveSession);root.document.body.classList.add('kelo-studio-active');toast(root,'Kelo Studio Creator V1.8 activo');
+    surgery?.endBoot?.(true);
     if(phoneOverlay){
       try{shell?.setStatus?.(`${mode.toUpperCase()} · listo`);}catch{}
       // A10: phone hydrate is status-only (no importCurrent). Run soon so UI says listo.
       overlayStart=(root.setTimeout||setTimeout)(hydrateAfterChrome,400);
     }else overlayStart=(root.setTimeout||setTimeout)(hydrateAfterChrome,0);
     return active;
-  }catch(error){running=false;try{if(overlayStart){(root.clearTimeout||clearTimeout)(overlayStart);overlayStart=0;}}catch{}try{if(typeof root.cancelAnimationFrame==='function')root.cancelAnimationFrame(frame);}catch{}try{(root.clearTimeout||clearTimeout)(frame);}catch{}try{cancelDirectGesture();detachPointer?.();cameraController?.destroy();}catch{}try{studio.kernel.input.pop('studio-live');unregisterInput?.();}catch{}try{mirror.uninstall();}catch{}try{productivity?.destroy();shell?.destroy();overlay?.destroy();studio.tools.collision.setVisible(false);}catch{}if(inputLockToken){try{root.KeloInputLocks.release(inputLockToken);}catch{}inputLockToken=null;}try{studio.close();}catch{}throw error;}
+  }catch(error){running=false;try{if(overlayStart){(root.clearTimeout||clearTimeout)(overlayStart);overlayStart=0;}}catch{}try{if(typeof root.cancelAnimationFrame==='function')root.cancelAnimationFrame(frame);}catch{}try{(root.clearTimeout||clearTimeout)(frame);}catch{}try{cancelDirectGesture();detachPointer?.();cameraController?.destroy();}catch{}try{studio.kernel.input.pop('studio-live');unregisterInput?.();}catch{}try{mirror.uninstall();}catch{}try{productivity?.destroy();shell?.destroy();overlay?.destroy();studio.tools.collision.setVisible(false);}catch{}if(inputLockToken){try{root.KeloInputLocks.release(inputLockToken);}catch{}inputLockToken=null;}try{studio.close();}catch{}surgery?.endBoot?.(false);throw error;}
 }
 
 export async function closeKeloStudioLive({root=globalThis}={}){if(!active)return;const session=active;active=null;root.document?.body?.classList.remove('kelo-studio-active');await session.__cleanup?.();}

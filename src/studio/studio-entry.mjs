@@ -88,6 +88,14 @@ function deferStudioOptional(root,fn,delay){
 let session = null;
 
 async function installStudioProductivityExtras({root,kernel,tools,assetPalette,getAssets,phone=false}){
+  const surgeryApi=root.KELO_WORLD_SURGERY;
+  const extraEnabled=id=>surgeryApi?.enabled?.(id)!==false;
+  const trackedCreate=(id,fn,args,fallback=NOOP_CTRL)=>{
+    if(!extraEnabled(id)){surgeryApi?.markStatus?.(id,'DISABLED',{phase:'constructor'});return fallback;}
+    if(typeof fn!=='function')return fallback;
+    const token=surgeryApi?.start?.(id,'constructor');
+    try{const value=fn(args);surgeryApi?.done?.(token);return value;}catch(error){surgeryApi?.fail?.(token,error);console.warn(`[Kelo Studio] optional ${id} failed; continuing`,error);return fallback;}
+  };
   // Desktop: one barrel. Phone: avoid the barrel eval spike — import small batches with yields.
   if(!phone){
     const extras=await import('./studio-boot-extras.mjs');
@@ -100,123 +108,108 @@ async function installStudioProductivityExtras({root,kernel,tools,assetPalette,g
       createStudioMenuMinimizer,createStudioCleanWorkspace,createStudioContextInspector,createStudioContextSnapChip,
       createStudioAssetFavorites,createStudioMultiAlign,createStudioHistoryHints,createStudioTransformPresets
     }=extras;
-    let assetFavorites=NOOP_ASSET_FAVORITES;
-    try{
-      assetFavorites=createStudioAssetFavorites({root,paletteApi:assetPalette,getAssets});
-    }catch(error){
-      console.warn('[Kelo Studio] optional asset favorites unavailable; continuing without it',error);
-    }
+    const assetFavorites=trackedCreate('assetFavorites',createStudioAssetFavorites,{root,paletteApi:assetPalette,getAssets},NOOP_ASSET_FAVORITES);
     return {
       assetFavorites,
-      assetKeyboardController:createStudioAssetKeyboardController({root,assetPalette}),
-      menuMinimizer:createStudioMenuMinimizer({root}),
-      cleanWorkspace:createStudioCleanWorkspace({root,kernel}),
-      contextInspector:createStudioContextInspector({root,kernel,tools}),
-      contextSnapChip:createStudioContextSnapChip({root}),
-      multiAlign:createStudioMultiAlign({root,kernel}),
-      historyHints:createStudioHistoryHints({root,kernel}),
-      transformPresets:createStudioTransformPresets({root,kernel}),
-      nudgeController:createStudioNudgeController({root,kernel}),
-      overlapCycleController:createStudioOverlapCycleController({root,kernel}),
-      precisionSnapController:createStudioPrecisionSnapController({root}),
-      selectionHistoryController:createStudioSelectionHistoryController({root,kernel}),
-      focusShortcutController:createStudioFocusShortcutController({root}),
-      quickActionsController:createStudioQuickActionsController({root,kernel,assetPalette}),
-      keyboardDeleteController:createStudioKeyboardDeleteController({root,kernel}),
-      keyboardDuplicateController:createStudioKeyboardDuplicateController({root,kernel}),
-      keyboardHistoryController:createStudioKeyboardHistoryController({root}),
-      keyboardClipboardController:createStudioKeyboardClipboardController({root}),
-      selectAllController:createStudioSelectAllController({root,kernel}),
-      explorerRevealController:createStudioExplorerRevealController({root,kernel}),
-      propertyCommitController:createStudioPropertyCommitController({root}),
-      snapCycleController:createStudioSnapCycleController({root})
+      assetKeyboardController:trackedCreate('assetKeyboard',createStudioAssetKeyboardController,{root,assetPalette}),
+      menuMinimizer:trackedCreate('menuMinimizer',createStudioMenuMinimizer,{root}),
+      cleanWorkspace:trackedCreate('cleanWorkspace',createStudioCleanWorkspace,{root,kernel}),
+      contextInspector:trackedCreate('contextInspector',createStudioContextInspector,{root,kernel,tools}),
+      contextSnapChip:trackedCreate('contextSnapChip',createStudioContextSnapChip,{root}),
+      multiAlign:trackedCreate('multiAlign',createStudioMultiAlign,{root,kernel}),
+      historyHints:trackedCreate('historyHints',createStudioHistoryHints,{root,kernel}),
+      transformPresets:trackedCreate('transformPresets',createStudioTransformPresets,{root,kernel}),
+      nudgeController:trackedCreate('nudge',createStudioNudgeController,{root,kernel}),
+      overlapCycleController:trackedCreate('overlapCycle',createStudioOverlapCycleController,{root,kernel}),
+      precisionSnapController:trackedCreate('precisionSnap',createStudioPrecisionSnapController,{root}),
+      selectionHistoryController:trackedCreate('selectionHistory',createStudioSelectionHistoryController,{root,kernel}),
+      focusShortcutController:trackedCreate('focusShortcut',createStudioFocusShortcutController,{root}),
+      quickActionsController:trackedCreate('quickActions',createStudioQuickActionsController,{root,kernel,assetPalette}),
+      keyboardDeleteController:trackedCreate('keyboardDelete',createStudioKeyboardDeleteController,{root,kernel}),
+      keyboardDuplicateController:trackedCreate('keyboardDuplicate',createStudioKeyboardDuplicateController,{root,kernel}),
+      keyboardHistoryController:trackedCreate('keyboardHistory',createStudioKeyboardHistoryController,{root}),
+      keyboardClipboardController:trackedCreate('keyboardClipboard',createStudioKeyboardClipboardController,{root}),
+      selectAllController:trackedCreate('selectAll',createStudioSelectAllController,{root,kernel}),
+      explorerRevealController:trackedCreate('explorerReveal',createStudioExplorerRevealController,{root,kernel}),
+      propertyCommitController:trackedCreate('propertyCommit',createStudioPropertyCommitController,{root}),
+      snapCycleController:trackedCreate('snapCycle',createStudioSnapCycleController,{root})
     };
   }
   const {yieldStudioBoot,pauseStudioBoot,whenStudioIdle}=await import('./integration/studio-boot-pace.mjs');
   const wait=async()=>{await whenStudioIdle(root,{timeoutMs:900});await yieldStudioBoot(root);await pauseStudioBoot(root,72);};
   const specs=[
-    ['./ui/studio-asset-favorites.mjs','createStudioAssetFavorites'],
-    ['./input/studio-asset-keyboard-controller.mjs','createStudioAssetKeyboardController'],
-    ['./ui/studio-menu-minimizer.mjs','createStudioMenuMinimizer'],
-    ['./ui/studio-clean-workspace.mjs','createStudioCleanWorkspace'],
-    ['./ui/studio-context-inspector.mjs','createStudioContextInspector'],
-    ['./ui/studio-context-snap-chip.mjs','createStudioContextSnapChip'],
-    ['./ui/studio-multi-align.mjs','createStudioMultiAlign'],
-    ['./ui/studio-history-hints.mjs','createStudioHistoryHints'],
-    ['./ui/studio-transform-presets.mjs','createStudioTransformPresets'],
-    ['./input/studio-nudge-controller.mjs','createStudioNudgeController'],
-    ['./input/studio-overlap-cycle-controller.mjs','createStudioOverlapCycleController'],
-    ['./input/studio-precision-snap-controller.mjs','createStudioPrecisionSnapController'],
-    ['./input/studio-selection-history-controller.mjs','createStudioSelectionHistoryController'],
-    ['./input/studio-focus-shortcut-controller.mjs','createStudioFocusShortcutController'],
-    ['./input/studio-quick-actions-controller.mjs','createStudioQuickActionsController'],
-    ['./input/studio-keyboard-delete-controller.mjs','createStudioKeyboardDeleteController'],
-    ['./input/studio-keyboard-duplicate-controller.mjs','createStudioKeyboardDuplicateController'],
-    ['./input/studio-keyboard-history-controller.mjs','createStudioKeyboardHistoryController'],
-    ['./input/studio-keyboard-clipboard-controller.mjs','createStudioKeyboardClipboardController'],
-    ['./input/studio-select-all-controller.mjs','createStudioSelectAllController'],
-    ['./input/studio-explorer-reveal-controller.mjs','createStudioExplorerRevealController'],
-    ['./input/studio-property-commit-controller.mjs','createStudioPropertyCommitController'],
-    ['./input/studio-snap-cycle-controller.mjs','createStudioSnapCycleController']
+    ['./ui/studio-asset-favorites.mjs','createStudioAssetFavorites','assetFavorites'],
+    ['./input/studio-asset-keyboard-controller.mjs','createStudioAssetKeyboardController','assetKeyboard'],
+    ['./ui/studio-menu-minimizer.mjs','createStudioMenuMinimizer','menuMinimizer'],
+    ['./ui/studio-clean-workspace.mjs','createStudioCleanWorkspace','cleanWorkspace'],
+    ['./ui/studio-context-inspector.mjs','createStudioContextInspector','contextInspector'],
+    ['./ui/studio-context-snap-chip.mjs','createStudioContextSnapChip','contextSnapChip'],
+    ['./ui/studio-multi-align.mjs','createStudioMultiAlign','multiAlign'],
+    ['./ui/studio-history-hints.mjs','createStudioHistoryHints','historyHints'],
+    ['./ui/studio-transform-presets.mjs','createStudioTransformPresets','transformPresets'],
+    ['./input/studio-nudge-controller.mjs','createStudioNudgeController','nudge'],
+    ['./input/studio-overlap-cycle-controller.mjs','createStudioOverlapCycleController','overlapCycle'],
+    ['./input/studio-precision-snap-controller.mjs','createStudioPrecisionSnapController','precisionSnap'],
+    ['./input/studio-selection-history-controller.mjs','createStudioSelectionHistoryController','selectionHistory'],
+    ['./input/studio-focus-shortcut-controller.mjs','createStudioFocusShortcutController','focusShortcut'],
+    ['./input/studio-quick-actions-controller.mjs','createStudioQuickActionsController','quickActions'],
+    ['./input/studio-keyboard-delete-controller.mjs','createStudioKeyboardDeleteController','keyboardDelete'],
+    ['./input/studio-keyboard-duplicate-controller.mjs','createStudioKeyboardDuplicateController','keyboardDuplicate'],
+    ['./input/studio-keyboard-history-controller.mjs','createStudioKeyboardHistoryController','keyboardHistory'],
+    ['./input/studio-keyboard-clipboard-controller.mjs','createStudioKeyboardClipboardController','keyboardClipboard'],
+    ['./input/studio-select-all-controller.mjs','createStudioSelectAllController','selectAll'],
+    ['./input/studio-explorer-reveal-controller.mjs','createStudioExplorerRevealController','explorerReveal'],
+    ['./input/studio-property-commit-controller.mjs','createStudioPropertyCommitController','propertyCommit'],
+    ['./input/studio-snap-cycle-controller.mjs','createStudioSnapCycleController','snapCycle']
   ];
   const creators={};
-  for(const [modPath,name] of specs){
+  for(const [modPath,name,flag] of specs){
+    if(!extraEnabled(flag)){surgeryApi?.markStatus?.(flag,'DISABLED',{phase:'module-import'});creators[name]=null;await wait();continue;}
+    const token=surgeryApi?.start?.(flag,'module-import');
     try{
       const mod=await import(modPath);
       creators[name]=mod[name];
+      surgeryApi?.done?.(token);
     }catch(error){
+      surgeryApi?.fail?.(token,error);
       console.warn(`[Kelo Studio] optional ${name} unavailable; continuing`,error);
       creators[name]=null;
     }
     await wait();
   }
-  let assetFavorites=NOOP_ASSET_FAVORITES;
-  try{
-    if(typeof creators.createStudioAssetFavorites==='function'){
-      assetFavorites=creators.createStudioAssetFavorites({root,paletteApi:assetPalette,getAssets});
-    }
-  }catch(error){
-    console.warn('[Kelo Studio] optional asset favorites unavailable; continuing without it',error);
-  }
+  const assetFavorites=trackedCreate('assetFavorites',creators.createStudioAssetFavorites,{root,paletteApi:assetPalette,getAssets},NOOP_ASSET_FAVORITES);
   await wait();
-  const mk=(name,args)=>{
-    const fn=creators[name];
-    if(typeof fn!=='function')return NOOP_CTRL;
-    try{return fn(args);}catch(error){
-      console.warn(`[Kelo Studio] optional ${name} failed; continuing`,error);
-      return NOOP_CTRL;
-    }
-  };
-  const assetKeyboardController=mk('createStudioAssetKeyboardController',{root,assetPalette});
+  const mk=(name,args,flag)=>trackedCreate(flag,creators[name],args,NOOP_CTRL);
+  const assetKeyboardController=mk('createStudioAssetKeyboardController',{root,assetPalette},'assetKeyboard');
   await wait();
-  const menuMinimizer=mk('createStudioMenuMinimizer',{root});
-  const cleanWorkspace=mk('createStudioCleanWorkspace',{root,kernel});
+  const menuMinimizer=mk('createStudioMenuMinimizer',{root},'menuMinimizer');
+  const cleanWorkspace=mk('createStudioCleanWorkspace',{root,kernel},'cleanWorkspace');
   await wait();
-  const contextInspector=mk('createStudioContextInspector',{root,kernel,tools});
-  const contextSnapChip=mk('createStudioContextSnapChip',{root});
+  const contextInspector=mk('createStudioContextInspector',{root,kernel,tools},'contextInspector');
+  const contextSnapChip=mk('createStudioContextSnapChip',{root},'contextSnapChip');
   await wait();
-  const multiAlign=mk('createStudioMultiAlign',{root,kernel});
-  const historyHints=mk('createStudioHistoryHints',{root,kernel});
-  const transformPresets=mk('createStudioTransformPresets',{root,kernel});
+  const multiAlign=mk('createStudioMultiAlign',{root,kernel},'multiAlign');
+  const historyHints=mk('createStudioHistoryHints',{root,kernel},'historyHints');
+  const transformPresets=mk('createStudioTransformPresets',{root,kernel},'transformPresets');
   await wait();
-  const nudgeController=mk('createStudioNudgeController',{root,kernel});
-  const overlapCycleController=mk('createStudioOverlapCycleController',{root,kernel});
+  const nudgeController=mk('createStudioNudgeController',{root,kernel},'nudge');
+  const overlapCycleController=mk('createStudioOverlapCycleController',{root,kernel},'overlapCycle');
   await wait();
-  const precisionSnapController=mk('createStudioPrecisionSnapController',{root});
-  const selectionHistoryController=mk('createStudioSelectionHistoryController',{root,kernel});
-  const focusShortcutController=mk('createStudioFocusShortcutController',{root});
+  const precisionSnapController=mk('createStudioPrecisionSnapController',{root},'precisionSnap');
+  const selectionHistoryController=mk('createStudioSelectionHistoryController',{root,kernel},'selectionHistory');
+  const focusShortcutController=mk('createStudioFocusShortcutController',{root},'focusShortcut');
   await wait();
-  const quickActionsController=mk('createStudioQuickActionsController',{root,kernel,assetPalette});
-  const keyboardDeleteController=mk('createStudioKeyboardDeleteController',{root,kernel});
-  const keyboardDuplicateController=mk('createStudioKeyboardDuplicateController',{root,kernel});
+  const quickActionsController=mk('createStudioQuickActionsController',{root,kernel,assetPalette},'quickActions');
+  const keyboardDeleteController=mk('createStudioKeyboardDeleteController',{root,kernel},'keyboardDelete');
+  const keyboardDuplicateController=mk('createStudioKeyboardDuplicateController',{root,kernel},'keyboardDuplicate');
   await wait();
-  const keyboardHistoryController=mk('createStudioKeyboardHistoryController',{root});
-  const keyboardClipboardController=mk('createStudioKeyboardClipboardController',{root});
-  const selectAllController=mk('createStudioSelectAllController',{root,kernel});
+  const keyboardHistoryController=mk('createStudioKeyboardHistoryController',{root},'keyboardHistory');
+  const keyboardClipboardController=mk('createStudioKeyboardClipboardController',{root},'keyboardClipboard');
+  const selectAllController=mk('createStudioSelectAllController',{root,kernel},'selectAll');
   await wait();
-  const explorerRevealController=mk('createStudioExplorerRevealController',{root,kernel});
-  const propertyCommitController=mk('createStudioPropertyCommitController',{root});
-  const snapCycleController=mk('createStudioSnapCycleController',{root});
+  const explorerRevealController=mk('createStudioExplorerRevealController',{root,kernel},'explorerReveal');
+  const propertyCommitController=mk('createStudioPropertyCommitController',{root},'propertyCommit');
+  const snapCycleController=mk('createStudioSnapCycleController',{root},'snapCycle');
   return {
     assetFavorites,assetKeyboardController,menuMinimizer,cleanWorkspace,contextInspector,contextSnapChip,
     multiAlign,historyHints,transformPresets,nudgeController,overlapCycleController,precisionSnapController,
