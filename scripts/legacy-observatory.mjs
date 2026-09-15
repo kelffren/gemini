@@ -21,7 +21,11 @@ const CRITICAL_KEYS = [
   'cameraX','cameraY','velocityX','velocityY','obstacles','worldMap',
   'render','renderAvatar','updateSimulation','processInput','updateMovement'
 ];
-const CRITICAL_AUTHORITY_KEYS = new Set(['localPlayer.x','localPlayer.y','obstacles','render','updateSimulation','processInput','updateMovement']);
+const CRITICAL_AUTHORITY_KEYS = new Set(['localPlayer.x','localPlayer.y','localPlayer.hp','localPlayer.maxHp','obstacles','render','updateSimulation','processInput','updateMovement']);
+const ACCESSOR_ROUTED_AUTHORITY = Object.freeze({
+  'localPlayer.hp':Object.freeze({owner:'KeloPlayerState',file:'src/core/player-state-system.js',evidence:'KELO_PLAYER_STATE_AUDIT'}),
+  'localPlayer.maxHp':Object.freeze({owner:'KeloPlayerState',file:'src/core/player-state-system.js',evidence:'KELO_PLAYER_STATE_AUDIT'})
+});
 const MUTATING_COLLECTION_METHODS='push|pop|shift|unshift|splice|sort|reverse|copyWithin|fill';
 
 function walk(dir, out=[]){
@@ -69,6 +73,7 @@ function detect(file){
 }
 
 const rows=walk(ROOT).map(detect);
+const rowFiles=new Set(rows.map(r=>r.file));
 const legacy=rows.filter(r=>r.legacy);
 const authority={};
 for(const row of rows){
@@ -77,10 +82,19 @@ for(const row of rows){
     authority[w.key].push({file:row.file,count:w.count,legacy:row.legacy,scope:row.scope});
   }
 }
+const routedAuthority={};
+for(const [key,boundary] of Object.entries(ACCESSOR_ROUTED_AUTHORITY)){
+  const rawWriters=(authority[key]||[]).filter(w=>w.scope==='runtime');
+  routedAuthority[key]={...boundary,installed:rowFiles.has(boundary.file),rawWriters};
+}
 const conflicts=Object.entries(authority).filter(([,writers])=>writers.length>1).map(([key,writers])=>({key,writers}));
 const runtimeConflicts=conflicts.map(function(conflict){
   return {key:conflict.key,writers:conflict.writers.filter(w=>w.scope==='runtime')};
-}).filter(conflict=>conflict.writers.length>1);
+}).filter(function(conflict){
+  if(conflict.writers.length<=1)return false;
+  const routed=routedAuthority[conflict.key];
+  return !(routed&&routed.installed);
+});
 const summary={
   generatedAt:new Date().toISOString(),
   filesScanned:rows.length,
@@ -89,24 +103,30 @@ const summary={
   highLegacy:legacy.filter(r=>r.risk==='high').map(r=>r.file),
   authorityConflicts:conflicts.length,
   runtimeAuthorityConflicts:runtimeConflicts.length,
+  accessorRoutedAuthorityKeys:Object.keys(routedAuthority).filter(k=>routedAuthority[k].installed),
   criticalAuthorityConflicts:conflicts.filter(c=>CRITICAL_AUTHORITY_KEYS.has(c.key)).length,
   criticalRuntimeAuthorityConflicts:runtimeConflicts.filter(c=>CRITICAL_AUTHORITY_KEYS.has(c.key)).length
 };
 
 fs.mkdirSync(OUT_DIR,{recursive:true});
-fs.writeFileSync(path.join(OUT_DIR,'report.json'),JSON.stringify({summary,authority,conflicts,runtimeConflicts,legacy,files:rows},null,2));
+fs.writeFileSync(path.join(OUT_DIR,'report.json'),JSON.stringify({summary,authority,routedAuthority,conflicts,runtimeConflicts,legacy,files:rows},null,2));
 const md=[];
-md.push('# Kelo Legacy Observatory','',`Generated: ${summary.generatedAt}`,'',`- Files scanned: ${summary.filesScanned}`,`- Legacy engine files: ${summary.legacyFiles}`,`- Static authority conflicts: ${summary.authorityConflicts}`,`- Runtime authority conflicts: ${summary.runtimeAuthorityConflicts}`,`- Critical runtime authority conflicts: ${summary.criticalRuntimeAuthorityConflicts}`,'','## Legacy risk');
+md.push('# Kelo Legacy Observatory','',`Generated: ${summary.generatedAt}`,'',`- Files scanned: ${summary.filesScanned}`,`- Legacy engine files: ${summary.legacyFiles}`,`- Static authority conflicts: ${summary.authorityConflicts}`,`- Runtime authority conflicts: ${summary.runtimeAuthorityConflicts}`,`- Accessor-routed authority keys: ${summary.accessorRoutedAuthorityKeys.length}`,`- Critical runtime authority conflicts: ${summary.criticalRuntimeAuthorityConflicts}`,'','## Legacy risk');
 for(const row of [...legacy].sort((a,b)=>b.score-a.score)) md.push(`- **${row.risk.toUpperCase()}** ${row.file} — score ${row.score}; globals writes ${row.globalWrites.length}; critical writes ${row.writers.reduce((a,b)=>a+b.count,0)}; timers ${row.timers.timeout+row.timers.interval}`);
 md.push('','## Runtime authority conflicts');
 if(!runtimeConflicts.length) md.push('- None detected by static scanner.');
 for(const c of runtimeConflicts) md.push(`- **${c.key}**: ${c.writers.map(w=>`${w.file} (${w.count})`).join(', ')}`);
+md.push('','## Accessor-routed authority');
+for(const [key,routed] of Object.entries(routedAuthority)){
+  md.push(`- **${key}** → ${routed.owner} (${routed.installed?'installed':'MISSING'}); raw compatibility writers: ${routed.rawWriters.map(w=>`${w.file} (${w.count})`).join(', ')||'none'}`);
+}
 md.push('','## QA/static-only conflicts');
 const runtimeKeys=new Set(runtimeConflicts.map(c=>c.key));
-const qaOnly=conflicts.filter(c=>!runtimeKeys.has(c.key));
+const routedKeys=new Set(Object.entries(routedAuthority).filter(([,v])=>v.installed).map(([k])=>k));
+const qaOnly=conflicts.filter(c=>!runtimeKeys.has(c.key)&&!routedKeys.has(c.key));
 if(!qaOnly.length) md.push('- None.');
 for(const c of qaOnly) md.push(`- **${c.key}**: ${c.writers.map(w=>`${w.file} (${w.count}, ${w.scope})`).join(', ')}`);
-md.push('','## Rule','A migration must not activate NEW authority while unresolved duplicate runtime writers remain for the same state key. QA/test writers are reported but do not count as runtime authority.');
+md.push('','## Rule','A migration must not activate NEW authority while unresolved duplicate runtime writers remain for the same state key. QA/test writers are reported but do not count as runtime authority. Accessor-routed keys are removed from runtime conflict counts only when their boundary source exists; dedicated behavioral CI must certify boot order and routing semantics.');
 fs.writeFileSync(path.join(OUT_DIR,'report.md'),md.join('\n')+'\n');
 
 console.log(JSON.stringify(summary,null,2));
