@@ -114,6 +114,7 @@
 <script>window.__keloBootReady=true;window.dispatchEvent(new Event("kelo:boot-ready"));</script>
 <script src="src/core/module-loader.js?v=8-style-first-use"></script>
 <script>window.KELO_MODULE_LOADER&&window.KELO_MODULE_LOADER.start({build:'V6.69'});</script>
+<script src="src/core/settings-lazy-gate.js?v=1"></script>
 <script>
 (function reconnectKeloUpdater(){
   'use strict';
@@ -135,7 +136,7 @@
     load('src/core/update-delta-core.js?v=3')
       .then(function(){return load('src/core/update-system.js?v=3');})
       .then(function(){return load('src/core/update-watch.js?v=3');})
-      .then(function(){window.dispatchEvent(new CustomEvent('kelo:update:connected',{detail:{version:'turbo-v3',mode:'post-boot'}}));return load('src/core/download-center.js?v=2-safe');})
+      .then(function(){window.dispatchEvent(new CustomEvent('kelo:update:connected',{detail:{version:'turbo-v3',mode:'post-boot'}}));})
       .catch(function(error){console.error('[Kelo post-boot services]',error);});
   }
   function schedule(){
