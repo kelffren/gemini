@@ -33,34 +33,28 @@ jobs:
           const httpErrors=[];
           const requestFailures=[];
 
-          page.on('console',m=>{if(m.type()==='error')consoleErrors.push(m.text());});
-          page.on('pageerror',e=>consoleErrors.push('PAGEERROR: '+(e.stack||e.message)));
-          page.on('response',async response=>{
+          page.on('console',m=>{
+            if(m.type()==='error'){
+              consoleErrors.push({text:m.text(),location:m.location()});
+            }
+          });
+          page.on('pageerror',e=>consoleErrors.push({text:'PAGEERROR: '+(e.stack||e.message),location:null}));
+          page.on('response',response=>{
             const status=response.status();
             if(status>=400){
               const request=response.request();
-              httpErrors.push({
-                status,
-                statusText:response.statusText(),
-                url:response.url(),
-                resourceType:request.resourceType(),
-                method:request.method()
-              });
+              httpErrors.push({status,statusText:response.statusText(),url:response.url(),resourceType:request.resourceType(),method:request.method()});
             }
           });
           page.on('requestfailed',request=>{
-            requestFailures.push({
-              url:request.url(),
-              resourceType:request.resourceType(),
-              method:request.method(),
-              failure:request.failure()?.errorText||'unknown'
-            });
+            requestFailures.push({url:request.url(),resourceType:request.resourceType(),method:request.method(),failure:request.failure()?.errorText||'unknown'});
           });
 
           await page.goto(url,{waitUntil:'networkidle',timeout:60000});
           await page.waitForFunction(()=>typeof localPlayer!=='undefined'&&typeof camera!=='undefined'&&document.getElementById('game-canvas'),null,{timeout:45000});
           await page.waitForTimeout(2500);
 
+          const performanceResources=await page.evaluate(()=>performance.getEntriesByType('resource').map(r=>({name:r.name,initiatorType:r.initiatorType,duration:r.duration,transferSize:r.transferSize,encodedBodySize:r.encodedBodySize})).filter(r=>r.transferSize===0||r.encodedBodySize===0));
           const getState=()=>page.evaluate(()=>({
             player:{x:localPlayer.x,y:localPlayer.y,vx:localPlayer.vx,vy:localPlayer.vy},
             camera:{x:camera.x,y:camera.y,targetX:camera.targetX,targetY:camera.targetY},
@@ -79,7 +73,7 @@ jobs:
 
           const after=await getState();
           await page.screenshot({path:'artifacts/chatgpt-control/after.png'});
-          const result={url,before,after,delta:{x:after.player.x-before.player.x,y:after.player.y-before.player.y},consoleErrors,httpErrors,requestFailures};
+          const result={url,before,after,delta:{x:after.player.x-before.player.x,y:after.player.y-before.player.y},consoleErrors,httpErrors,requestFailures,performanceResources};
           fs.writeFileSync('artifacts/chatgpt-control/result.json',JSON.stringify(result,null,2));
           console.log('CHATGPT_CONTROL_RESULT='+JSON.stringify(result));
 
