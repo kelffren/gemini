@@ -858,9 +858,20 @@
         "scripts/simulation-owner-migration-audit.mjs",
         "src/core/simulation-extension-system.js"
       ]
+    },
+    {
+      "id": "prevention:e87607c8bbe18e96fcf38cc411da7990185ecdd3",
+      "at": "2026-09-15T07:44:17.000Z",
+      "source": "bug-prevention-ci",
+      "head_sha": "e87607c8bbe18e96fcf38cc411da7990185ecdd3",
+      "base_sha": "267fdaeeedfb5107287d705ed699f8a20221ab05",
+      "conclusion": "success",
+      "files": [
+        "index.html"
+      ]
     }
   ],
-  "feedback_updated_at": "2026-09-15T06:45:23.674Z",
+  "feedback_updated_at": "2026-09-15T07:59:45.824Z",
   "training": {
     "examples": 58,
     "search_examples": 43,
