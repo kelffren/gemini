@@ -2,8 +2,8 @@
 
 > Documento canónico del engine. Si contradice `index.html` o un owner Foundation LIVE, gana el runtime y este archivo debe actualizarse.
 
-**Sincronizado:** 2026-09-14  
-**Runtime declarado:** Kelo World V6.54.2  
+**Sincronizado:** 2026-09-15  
+**Runtime declarado:** Kelo World V6.69  
 **Modelo:** web 2D top-down, Canvas, mobile-first, login/guest gate antes del boot pesado.
 
 ## 1. Regla de engine
@@ -16,16 +16,18 @@ Estados usados aquí: `OWNER LIVE`, `SUPPORT LIVE`, `LEGACY CORE`, `DYNAMIC LIVE
 
 Safari iOS tiene **un solo hilo**. Si `engine-b` arranca `gameLoop` mientras el HTML sigue compilando 100+ scripts, el canvas se congela o se pone negro.
 
-Contrato LIVE (`index.html` V6.68):
+Contrato LIVE (`index.html` V6.69):
 
 1. Flag `__keloHoldGameLoop=true` **antes** de `engine-b`.
-2. Plaza only (~44 scripts): events → input → `engine-a/b/c` → cámara/avatar → `engine-d..l` → world-map/props → luxe HUD → governor.
+2. Plaza only: events → input → `engine-a/b/c` → cámara/avatar → `engine-d..l` → world-map/props → luxe HUD → governor.
 3. `engine-b` y `KELO_PERF` **no** piden rAF hasta `kelo:boot-ready`.
 4. Tras el último script de plaza: `__keloBootReady=true` + evento `kelo:boot-ready`. El player ya puede caminar.
-5. **Nada más se descarga solo.** Chat premium, tileset 556KB, PvP, studio, backpack, engines `m..aj` = `KELO_MODULE_LOADER.ensure(feature)` al tocar el menú.
-6. Prohibido inyectar `<script>` desde nameplates u otros owners (eso montaba el chat Waze y mataba Safari).
+5. **Nada más se descarga solo.** `KELO_MODULE_LOADER` es first-use y carga únicamente los packs declarados actualmente: `social`, `world`, `bag`, `mounts`, `market`, `titles`, `appearance` y `properties`.
+6. PvP/Combat foundations usan `KeloRuntimeBootstrap.ensure()` y tampoco se autodescargan durante el boot de plaza.
+7. Los `engine-*.js` legacy que no aparecen ni en `index.html` ni en un pack dinámico se consideran **inactivos**, no “faltantes”. No se deben reinsertar como scripts estáticos para satisfacer auditorías antiguas.
+8. Prohibido inyectar `<script>` desde nameplates u otros owners al abrir Chat; esa compilación mid-game fue una causa medida del freeze.
 
-El listado histórico de 16 pasos **no es el boot móvil**. Restaurar esos tags en `index.html` es un bug.
+El listado histórico de 16 pasos **no es el boot móvil**. Restaurar esos tags en `index.html` es un bug. Los guards de CI deben validar el boot por fases y no asumir que todo módulo existente en el repositorio está activo.
 
 ## 3. Owners de Foundation
 
@@ -107,7 +109,7 @@ El Asset Compiler puede sugerir semántica, pero nombres/categorías revisados d
 - Titles/stats: `KeloPlayerStats`, `KeloTitles`.
 - Nobility: `KeloNobility` separado de Titles.
 - Economy/logistics: `KeloRegionalEconomy`, `KeloCaravans`, `KeloFactions`.
-- Property/instances: `KELO_PROPERTY_CATALOG`, `PropertySystem`, InstanceSystem.
+- Property/instances: `KELO_PROPERTY_CATALOG`, PropertySystem, InstanceSystem.
 
 ## 9. Online boundary
 
@@ -122,6 +124,7 @@ El cliente puede predecir/presentar, pero progreso valioso, comercio, PvP compet
 - No sustituir World/Studio por un editor nuevo para corregir un bug de boot.
 - No publicar assets persistentes solo porque funcionan en preview local.
 - No declarar un fix móvil verificado sin QA real.
+- No reinsertar módulos legacy pesados en parser boot para “poner CI verde”.
 
 ## 11. Documentos relacionados
 
