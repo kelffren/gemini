@@ -1,0 +1,183 @@
++  const wait=async()=>{await whenStudioIdle(root,{timeoutMs:900});await yieldStudioBoot(root);await pauseStudioBoot(root,72);};
++  const specs=[
++    ['./ui/studio-asset-favorites.mjs','createStudioAssetFavorites'],
++    ['./input/studio-asset-keyboard-controller.mjs','createStudioAssetKeyboardController'],
++    ['./ui/studio-menu-minimizer.mjs','createStudioMenuMinimizer'],
++    ['./ui/studio-clean-workspace.mjs','createStudioCleanWorkspace'],
++    ['./ui/studio-context-inspector.mjs','createStudioContextInspector'],
++    ['./ui/studio-context-snap-chip.mjs','createStudioContextSnapChip'],
++    ['./ui/studio-multi-align.mjs','createStudioMultiAlign'],
++    ['./ui/studio-history-hints.mjs','createStudioHistoryHints'],
++    ['./ui/studio-transform-presets.mjs','createStudioTransformPresets'],
++    ['./input/studio-nudge-controller.mjs','createStudioNudgeController'],
++    ['./input/studio-overlap-cycle-controller.mjs','createStudioOverlapCycleController'],
++    ['./input/studio-precision-snap-controller.mjs','createStudioPrecisionSnapController'],
++    ['./input/studio-selection-history-controller.mjs','createStudioSelectionHistoryController'],
++    ['./input/studio-focus-shortcut-controller.mjs','createStudioFocusShortcutController'],
++    ['./input/studio-quick-actions-controller.mjs','createStudioQuickActionsController'],
++    ['./input/studio-keyboard-delete-controller.mjs','createStudioKeyboardDeleteController'],
++    ['./input/studio-keyboard-duplicate-controller.mjs','createStudioKeyboardDuplicateController'],
++    ['./input/studio-keyboard-history-controller.mjs','createStudioKeyboardHistoryController'],
++    ['./input/studio-keyboard-clipboard-controller.mjs','createStudioKeyboardClipboardController'],
++    ['./input/studio-select-all-controller.mjs','createStudioSelectAllController'],
++    ['./input/studio-explorer-reveal-controller.mjs','createStudioExplorerRevealController'],
++    ['./input/studio-property-commit-controller.mjs','createStudioPropertyCommitController'],
++    ['./input/studio-snap-cycle-controller.mjs','createStudioSnapCycleController']
++  ];
++  const creators={};
++  for(const [modPath,name] of specs){
++    try{
++      const mod=await import(modPath);
++      creators[name]=mod[name];
++    }catch(error){
++      console.warn(`[Kelo Studio] optional ${name} unavailable; continuing`,error);
++      creators[name]=null;
++    }
++    await wait();
++  }
+   let assetFavorites=NOOP_ASSET_FAVORITES;
+   try{
+-    assetFavorites=createStudioAssetFavorites({root,paletteApi:assetPalette,getAssets});
++    if(typeof creators.createStudioAssetFavorites==='function'){
++      assetFavorites=creators.createStudioAssetFavorites({root,paletteApi:assetPalette,getAssets});
++    }
+   }catch(error){
+     console.warn('[Kelo Studio] optional asset favorites unavailable; continuing without it',error);
+   }
+-  const assetKeyboardController=createStudioAssetKeyboardController({root,assetPalette});
+-  const menuMinimizer=createStudioMenuMinimizer({root});
+-  const cleanWorkspace=createStudioCleanWorkspace({root,kernel});
+-  const contextInspector=createStudioContextInspector({root,kernel,tools});
+-  const contextSnapChip=createStudioContextSnapChip({root});
+-  const multiAlign=createStudioMultiAlign({root,kernel});
+-  const historyHints=createStudioHistoryHints({root,kernel});
+-  const transformPresets=createStudioTransformPresets({root,kernel});
+-  const nudgeController=createStudioNudgeController({root,kernel});
+-  const overlapCycleController=createStudioOverlapCycleController({root,kernel});
+-  const precisionSnapController=createStudioPrecisionSnapController({root});
+-  const selectionHistoryController=createStudioSelectionHistoryController({root,kernel});
+-  const focusShortcutController=createStudioFocusShortcutController({root});
+-  const quickActionsController=createStudioQuickActionsController({root,kernel,assetPalette});
+-  const keyboardDeleteController=createStudioKeyboardDeleteController({root,kernel});
+-  const keyboardDuplicateController=createStudioKeyboardDuplicateController({root,kernel});
+-  const keyboardHistoryController=createStudioKeyboardHistoryController({root});
+-  const keyboardClipboardController=createStudioKeyboardClipboardController({root});
+-  const selectAllController=createStudioSelectAllController({root,kernel});
+-  const explorerRevealController=createStudioExplorerRevealController({root,kernel});
+-  const propertyCommitController=createStudioPropertyCommitController({root});
+-  const snapCycleController=createStudioSnapCycleController({root});
++  await wait();
++  const mk=(name,args)=>{
++    const fn=creators[name];
++    if(typeof fn!=='function')return NOOP_CTRL;
++    try{return fn(args);}catch(error){
++      console.warn(`[Kelo Studio] optional ${name} failed; continuing`,error);
++      return NOOP_CTRL;
++    }
++  };
++  const assetKeyboardController=mk('createStudioAssetKeyboardController',{root,assetPalette});
++  await wait();
++  const menuMinimizer=mk('createStudioMenuMinimizer',{root});
++  const cleanWorkspace=mk('createStudioCleanWorkspace',{root,kernel});
++  await wait();
++  const contextInspector=mk('createStudioContextInspector',{root,kernel,tools});
++  const contextSnapChip=mk('createStudioContextSnapChip',{root});
++  await wait();
++  const multiAlign=mk('createStudioMultiAlign',{root,kernel});
++  const historyHints=mk('createStudioHistoryHints',{root,kernel});
++  const transformPresets=mk('createStudioTransformPresets',{root,kernel});
++  await wait();
++  const nudgeController=mk('createStudioNudgeController',{root,kernel});
++  const overlapCycleController=mk('createStudioOverlapCycleController',{root,kernel});
++  await wait();
++  const precisionSnapController=mk('createStudioPrecisionSnapController',{root});
++  const selectionHistoryController=mk('createStudioSelectionHistoryController',{root,kernel});
++  const focusShortcutController=mk('createStudioFocusShortcutController',{root});
++  await wait();
++  const quickActionsController=mk('createStudioQuickActionsController',{root,kernel,assetPalette});
++  const keyboardDeleteController=mk('createStudioKeyboardDeleteController',{root,kernel});
++  const keyboardDuplicateController=mk('createStudioKeyboardDuplicateController',{root,kernel});
++  await wait();
++  const keyboardHistoryController=mk('createStudioKeyboardHistoryController',{root});
++  const keyboardClipboardController=mk('createStudioKeyboardClipboardController',{root});
++  const selectAllController=mk('createStudioSelectAllController',{root,kernel});
++  await wait();
++  const explorerRevealController=mk('createStudioExplorerRevealController',{root,kernel});
++  const propertyCommitController=mk('createStudioPropertyCommitController',{root});
++  const snapCycleController=mk('createStudioSnapCycleController',{root});
+   return {
+     assetFavorites,assetKeyboardController,menuMinimizer,cleanWorkspace,contextInspector,contextSnapChip,
+     multiAlign,historyHints,transformPresets,nudgeController,overlapCycleController,precisionSnapController,
+@@ -166,14 +259,27 @@ export async function bootKeloStudio({ mode = 'world', actorId = null, document
+     : registerCoreTools(kernel);
+   const loadBasicTools=()=>{
+     if(closed)return;
+-    void import('./tools/register-basic-tools.mjs').then(mod=>{
+-      if(closed||typeof mod.registerBasicTools!=='function')return;
+-      try{Object.assign(tools,mod.registerBasicTools(kernel));}catch(error){
++    // A11 phone: never import register-basic-tools / register-build-tools barrels (static spikes).
++    void (async()=>{
++      try{
++        if(phoneBoot){
++          const pace=await import('./integration/studio-boot-pace.mjs');
++          await pace.whenStudioIdle(root,{timeoutMs:800});
++          await pace.pauseStudioBoot(root,48);
++          if(closed)return;
++          const mod=await import('./tools/register-build-tools-serial.mjs');
++          if(closed||typeof mod.registerBuildToolsSerial!=='function')return;
++          const wait=async()=>{await pace.whenStudioIdle(root,{timeoutMs:400});await pace.pauseStudioBoot(root,36);};
++          Object.assign(tools,await mod.registerBuildToolsSerial(kernel,tools,{wait}));
++        }else{
++          const mod=await import('./tools/register-basic-tools.mjs');
++          if(closed||typeof mod.registerBasicTools!=='function')return;
++          Object.assign(tools,mod.registerBasicTools(kernel));
++        }
++      }catch(error){
+         console.warn('[Kelo Studio] optional build tools unavailable; World editor stays usable',error);
+       }
+-    }).catch(error=>{
+-      console.warn('[Kelo Studio] optional build tools unavailable; World editor stays usable',error);
+-    });
++    })();
+   };
+   optionalToolsTimer=deferStudioOptional(root,()=>{optionalToolsTimer=0;loadBasicTools();},phoneBoot?PHONE_OPTIONAL_BOOT_DELAY_MS:0);
+   const assetPreview=createStudioAssetPreviewService({assetCatalog:adapter.assetCatalog,atlasContract:root.KELO_ATLAS_CONTRACT,devicePixelRatio:phoneBoot?1:(globalThis.devicePixelRatio||1)});
+@@ -199,7 +305,7 @@ export async function bootKeloStudio({ mode = 'world', actorId = null, document
+       console.warn('[Kelo Studio] optional asset palette unavailable; continuing without it',error);
+     });
+   };
+-  optionalPaletteTimer=deferStudioOptional(root,()=>{optionalPaletteTimer=0;loadAssetPalette();},phoneBoot?PHONE_OPTIONAL_BOOT_DELAY_MS:0);
++  optionalPaletteTimer=deferStudioOptional(root,()=>{optionalPaletteTimer=0;loadAssetPalette();},phoneBoot?PHONE_PREVIEW_BOOT_DELAY_MS:0);
+   const placementTouchController=createStudioPlacementTouchController({root,placement:tools.placement});
+   // Explorer range is keyboard/desktop-heavy; keep a noop on phone until extras wave.
+   let explorerRangeSelectionController=phoneBoot
+@@ -208,11 +314,18 @@ export async function bootKeloStudio({ mode = 'world', actorId = null, document
+   if(phoneBoot){
+     deferStudioOptional(root,()=>{
+       if(closed)return;
+-      void import('./input/studio-explorer-range-selection-controller.mjs').then(mod=>{
+-        if(closed||typeof mod.createStudioExplorerRangeSelectionController!=='function')return;
+-        try{explorerRangeSelectionController=mod.createStudioExplorerRangeSelectionController({root,kernel});}catch{}
+-      }).catch(()=>{});
+-    },PHONE_OPTIONAL_BOOT_DELAY_MS);
++      void (async()=>{
++        try{
++          const pace=await import('./integration/studio-boot-pace.mjs');
++          await pace.whenStudioIdle(root,{timeoutMs:600});
++          await pace.pauseStudioBoot(root,40);
++          if(closed)return;
++          const mod=await import('./input/studio-explorer-range-selection-controller.mjs');
++          if(closed||typeof mod.createStudioExplorerRangeSelectionController!=='function')return;
++          explorerRangeSelectionController=mod.createStudioExplorerRangeSelectionController({root,kernel});
++        }catch{}
++      })();
++    },PHONE_PRODUCTIVITY_BOOT_DELAY_MS);
+   }
+   let assetFavorites=NOOP_ASSET_FAVORITES;
+   let assetKeyboardController=NOOP_CTRL;
+@@ -242,7 +355,7 @@ export async function bootKeloStudio({ mode = 'world', actorId = null, document
+   const worker = createStudioWorkerClient?createStudioWorkerClient({ resolvePrefab, prefabSnapshot: () => Object.fromEntries(kernel.prefabs.list().map(p => [p.id, kernel.prefabs.resolve(p.id)])) }):{compile:(doc,options)=>Promise.resolve(compiler.compile(doc,options)),close(){},get active(){return false;}};
+   const store = createStudioStore(), profiler = createStudioProfiler();
+   const unsubscribeJournal = kernel.commands.on(event => { store.appendCommand(kernel.document.worldId, { action: event.type, command: event.command }).catch(() => {}); });
+-  session = Object.freeze({ version: 'kelo-studio-foundation-v1.36.0-world-bridge-a10', mode, actorId, kernel, tools, overlayRenderer, assetPreview,
++  session = Object.freeze({ version: 'kelo-studio-foundation-v1.36.0-world-bridge-a11', mode, actorId, kernel, tools, overlayRenderer, assetPreview,
