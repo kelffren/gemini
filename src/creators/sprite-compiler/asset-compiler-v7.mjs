@@ -12,3 +12,6 @@ export {createHardenedAssetCompiler,compileAssetHardened} from './asset-compiler
 export {canonicalizeColorSpace,canonicalizeAlphaMode,segmentAssetSemantically,extractAssetLayers,inferDepthAndOcclusion,inferSemanticAnchors} from './asset-canonicalization.mjs';
 export {packAtlasDeterministically,generateMipChain,encodeGpuTextureVariants,estimateRuntimeTextureBudget} from './asset-runtime-optimization.mjs';
 export {auditTemporalConsistency,detectAiAssetDefects,attachAssetProvenance,fuzzAssetCompiler} from './asset-quality-v7.mjs';
+export {ASSET_AUTHORITY_POLICY,evaluateAssetAuthority,sanitizeAiAssetSuggestions} from './asset-authority-policy.mjs';
+export {buildAssetReleaseEvidence,verifyAssetRelease,verifyReproducibleAssetOutputs} from './asset-release-verifier.mjs';
+export {createAssetVerificationLedger,verifyAssetVerificationLedger} from './asset-verification-ledger.mjs';
