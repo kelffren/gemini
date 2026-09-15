@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: QA / BUG RECOVERY
  * owner: /bugs Bug Intelligence support tooling
- * keys: RECOVERY PROFILE PLAYWRIGHT TRACE NETWORK BOOT MOVEMENT WORLD FREEZE EVIDENCE EXIT-CODE
+ * keys: RECOVERY PROFILE PLAYWRIGHT TRACE NETWORK BOOT MOVEMENT WORLD FREEZE EVIDENCE EXIT-CODE LEGACY-HISTORY
  * purpose: clasifica un checkout como PASS/FAIL/SKIP con perfiles deterministas reutilizables por CI y git bisect y deja trace/network evidence
  * public-api: CLI --profile=boot|movement|world|full --base=<url>
  * consumes: @playwright/test chromium, KELO_PAGES, recoveryLab runtime diagnostics
@@ -39,8 +39,9 @@ const artifactDir=path.resolve(args.artifacts||process.env.KELO_RECOVERY_ARTIFAC
 fs.mkdirSync(artifactDir,{recursive:true});
 
 const report={
-  schema:2,profile,base,startedAt:new Date().toISOString(),gitHead:null,result:'RUNNING',reason:null,
-  steps:[],console:[],pageErrors:[],requestFailures:[],httpErrors:[],crashed:false,recovery:null,trace:null
+  schema:3,profile,base,startedAt:new Date().toISOString(),gitHead:null,result:'RUNNING',reason:null,
+  steps:[],console:[],pageErrors:[],requestFailures:[],httpErrors:[],crashed:false,recovery:null,trace:null,
+  compatibility:{worldProbe:null}
 };
 try{report.gitHead=(await import('node:child_process')).execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();}catch{}
 const shortHead=()=>String(report.gitHead||'unknown').slice(0,12);
@@ -79,6 +80,8 @@ async function makePage(){
   await context.tracing.start({screenshots:true,snapshots:true,sources:true});
   traceStarted=true;
   page=await context.newPage();
+  page.setDefaultTimeout(15000);
+  page.setDefaultNavigationTimeout(30000);
   page.on('console',msg=>{if(['error','warning'].includes(msg.type()))report.console.push({type:msg.type(),text:msg.text().slice(0,500)});});
   page.on('pageerror',error=>report.pageErrors.push(String(error?.message||error).slice(0,800)));
   page.on('requestfailed',request=>{
@@ -152,31 +155,57 @@ async function worldCheck({navigate=true}={}){
     step('WORLD_NAVIGATE',{url});
     await page.goto(url,{waitUntil:'domcontentloaded',timeout:30000});
   }
-  const world=page.locator('[data-workspace="world"]');
-  await world.waitFor({state:'attached',timeout:18000});
-  step('WORLD_CARD_FOUND');
-  await page.evaluate(()=>{
-    const el=document.querySelector('[data-workspace="world"]');
-    if(!el)throw new Error('WORLD_CARD_MISSING');
-    el.click();
-  });
-  step('WORLD_TAP');
-  await page.waitForSelector('#kelo-studio-live',{state:'attached',timeout:7000});
-  step('WORLD_SHELL_MOUNTED');
-  await page.waitForFunction(()=>{
+
+  // Compatibility is explicit, not permissive: modern World uses data-workspace,
+  // historical Creator Hub (including the Paint Copies boundary) used aria-label="Abrir World".
+  const world=page.locator('[data-workspace="world"], [aria-label="Abrir World"]').first();
+  await world.waitFor({state:'visible',timeout:18000});
+  const variant=await world.evaluate(el=>el.matches('[data-workspace="world"]')?'modern':'legacy-aria');
+  report.compatibility.worldProbe=variant;
+  step('WORLD_CARD_FOUND',{variant});
+
+  // Locator click is bounded from the Node/Playwright side. Do not page.evaluate(click)
+  // here: the historical regression can monopolize the page main thread during the click path.
+  await world.click({timeout:5000,force:true,noWaitAfter:true});
+  step('WORLD_TAP',{variant});
+
+  await page.waitForSelector('#kelo-studio-live',{state:'attached',timeout:8000});
+  step('WORLD_SHELL_MOUNTED',{variant});
+
+  // Preserve the modern readiness contract. For legacy commits, use the status text
+  // they actually exposed: initial "WORLD LIVE · loading" -> final stable WORLD LIVE state.
+  await page.waitForFunction(({probeVariant})=>{
     const live=document.getElementById('kelo-studio-live');
-    return !!live&&live.dataset?.keloWorldLoading!=='1'&&!!live.querySelector('.ks-status');
-  },null,{timeout:30000});
-  const ready=await page.evaluate(()=>{
+    if(!live)return false;
+    const status=String(live.querySelector('.ks-status')?.textContent||'').trim();
+    if(probeVariant==='modern'){
+      return live.dataset?.keloWorldLoading!=='1'&&Boolean(status);
+    }
+    if(!status)return false;
+    if(!/^WORLD LIVE\s*·/i.test(status))return false;
+    return !/(?:loading|booting world runtime|loading draft|catalog|canvas|controls|hud|start)/i.test(status);
+  },{probeVariant:variant},{timeout:30000});
+
+  const ready=await page.evaluate(({probeVariant})=>{
     const live=document.getElementById('kelo-studio-live');
-    return {loading:live?.dataset?.keloWorldLoading||null,status:String(live?.querySelector('.ks-status')?.textContent||'').trim(),buttons:live?.querySelectorAll('button')?.length||0};
-  });
+    return {
+      variant:probeVariant,
+      loading:live?.dataset?.keloWorldLoading||null,
+      status:String(live?.querySelector('.ks-status')?.textContent||'').trim(),
+      buttons:live?.querySelectorAll('button')?.length||0
+    };
+  },{probeVariant:variant});
   step('WORLD_READY',ready);
-  for(let i=0;i<3;i++){await new Promise(r=>setTimeout(r,500));await ping(`WORLD_PING_${i+1}`);}
+
+  for(let i=0;i<3;i++){
+    await new Promise(r=>setTimeout(r,500));
+    await ping(`WORLD_PING_${i+1}`);
+  }
+
   const select=page.locator('#kelo-studio-live button').filter({hasText:/SELECT/i}).first();
   if(await select.count()){
     await select.click({timeout:3000});
-    step('WORLD_SAFE_CONTROL_CLICK',{control:'SELECT'});
+    step('WORLD_SAFE_CONTROL_CLICK',{control:'SELECT',variant});
     await ping('WORLD_POST_CLICK_PING');
   }
 }
