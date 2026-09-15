@@ -9,12 +9,14 @@ on:
       - 'src/creators/assets/png-*.mjs'
       - 'scripts/asset-space-compiler*.mjs'
       - 'assets/**/*.png'
+      - 'C/**/*.png'
       - '.github/workflows/asset-space-compiler.yml'
   pull_request:
     paths:
       - 'src/creators/assets/png-*.mjs'
       - 'scripts/asset-space-compiler*.mjs'
       - 'assets/**/*.png'
+      - 'C/**/*.png'
       - '.github/workflows/asset-space-compiler.yml'
   workflow_dispatch:
     inputs:
@@ -44,8 +46,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - name: Deterministic compiler self-test
+      - name: Deterministic PNG compiler self-test
         run: node scripts/asset-space-compiler-audit.mjs
+      - name: Existing Asset Sheet compatibility audit
+        run: node scripts/asset-sheet-compiler-audit.mjs
+      - name: Documentation contract audit
+        run: node scripts/system-documentation-audit.js
       - name: Dry-run real PNG assets
         run: node scripts/asset-space-compiler.mjs --input="${{ github.event.inputs.input_path || 'assets' }}" --mode=strict --max-files=80 --report=test-results/asset-space-report
       - name: Publish summary
