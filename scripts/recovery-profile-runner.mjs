@@ -39,7 +39,7 @@ const artifactDir=path.resolve(args.artifacts||process.env.KELO_RECOVERY_ARTIFAC
 fs.mkdirSync(artifactDir,{recursive:true});
 
 const report={
-  schema:5,profile,base,startedAt:new Date().toISOString(),gitHead:null,result:'RUNNING',reason:null,
+  schema:6,profile,base,startedAt:new Date().toISOString(),gitHead:null,result:'RUNNING',reason:null,
   steps:[],console:[],pageErrors:[],requestFailures:[],httpErrors:[],crashed:false,recovery:null,trace:null,
   compatibility:{worldProbe:null,authBridge:null,creatorHub:null,aclBridge:null}
 };
@@ -185,19 +185,44 @@ async function bridgeHistoricalAccess(){
 async function installForensicWorldAclBridge(){
   const state=await page.evaluate(()=>{
     const keys=window.KELO_ADMIN_KEYS;
-    const result={keys:!!keys,can:typeof keys?.can==='function',method:null,worldEditReady:!!window.KELO_WORLD_EDIT?.ready,inputLocks:!!window.KeloInputLocks?.acquire&&!!window.KeloInputLocks?.release};
+    const globalDescriptor=Object.getOwnPropertyDescriptor(window,'KELO_ADMIN_KEYS');
+    const result={
+      keys:!!keys,
+      can:typeof keys?.can==='function',
+      method:null,
+      worldEditReady:!!window.KELO_WORLD_EDIT?.ready,
+      inputLocks:!!window.KeloInputLocks?.acquire&&!!window.KeloInputLocks?.release,
+      globalDescriptor:globalDescriptor?{writable:!!globalDescriptor.writable,configurable:!!globalDescriptor.configurable,setter:typeof globalDescriptor.set==='function'}:null
+    };
     if(!keys||typeof keys.can!=='function')return result;
     const original=keys.can.bind(keys);
     const forensicCan=(capability,...rest)=>String(capability)==='world.edit'?true:original(capability,...rest);
+
+    // Historical KELO_ADMIN_KEYS is frozen: `can` is read-only/non-configurable.
+    // Do not mutate it or proxy a non-configurable property. Build a separate facade
+    // preserving every other descriptor and replace only the global reference.
     try{
-      keys.can=forensicCan;
-      if(keys.can('world.edit','forensic_probe')){result.method='method-override';return result;}
-    }catch(error){result.methodError=String(error?.message||error);}
-    try{
-      const proxy=new Proxy(keys,{get(target,prop,receiver){if(prop==='can')return forensicCan;return Reflect.get(target,prop,receiver);}});
-      window.KELO_ADMIN_KEYS=proxy;
-      if(window.KELO_ADMIN_KEYS?.can?.('world.edit','forensic_probe')){result.method='global-proxy';return result;}
-    }catch(error){result.proxyError=String(error?.message||error);}
+      const facade=Object.create(Object.getPrototypeOf(keys));
+      for(const key of Reflect.ownKeys(keys)){
+        if(key==='can')continue;
+        const descriptor=Object.getOwnPropertyDescriptor(keys,key);
+        if(descriptor)Object.defineProperty(facade,key,descriptor);
+      }
+      Object.defineProperty(facade,'can',{value:forensicCan,enumerable:true,writable:false,configurable:false});
+      try{
+        window.KELO_ADMIN_KEYS=facade;
+      }catch{}
+      if(window.KELO_ADMIN_KEYS!==facade&&globalDescriptor?.configurable){
+        Object.defineProperty(window,'KELO_ADMIN_KEYS',{...globalDescriptor,value:facade});
+      }
+      result.replaced=window.KELO_ADMIN_KEYS===facade;
+      if(result.replaced&&window.KELO_ADMIN_KEYS?.can?.('world.edit','forensic_probe')){
+        result.method='facade-replacement';
+        return result;
+      }
+    }catch(error){
+      result.facadeError=String(error?.message||error);
+    }
     return result;
   });
   report.compatibility.aclBridge=state.method||'failed';
