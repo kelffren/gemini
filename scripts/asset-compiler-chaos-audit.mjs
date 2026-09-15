@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {webcrypto} from 'node:crypto';
+import {readFile} from 'node:fs/promises';
 import {inspectAssetContainer,assertSafeAssetInput} from '../src/creators/sprite-compiler/asset-safe-decode.mjs';
 import {fingerprintAssetBuild} from '../src/creators/sprite-compiler/asset-build-fingerprint.mjs';
 import {createAssetJobRunner} from '../src/creators/sprite-compiler/asset-job-runner.mjs';
@@ -11,16 +12,17 @@ import {evaluateRuntimeCanary} from '../src/creators/sprite-compiler/asset-runti
 import {createIsolatedAssetWorkerClient} from '../src/creators/sprite-compiler/asset-isolated-worker-client.mjs';
 import {assertPinnedAssetOracle,evaluateOracleShadow} from '../src/creators/sprite-compiler/asset-oracle-governance.mjs';
 import {evaluateAssetSourceAttestation} from '../src/creators/sprite-compiler/asset-source-attestation.mjs';
+import {buildAssetReleaseEvidence,verifyAssetRelease} from '../src/creators/sprite-compiler/asset-release-verifier.mjs';
 
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
-const makePng=(width,height)=>{const bytes=new Uint8Array(33);bytes.set([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a,0,0,0,13,0x49,0x48,0x44,0x52]);bytes[16]=(width>>>24)&255;bytes[17]=(width>>>16)&255;bytes[18]=(width>>>8)&255;bytes[19]=width&255;bytes[20]=(height>>>24)&255;bytes[21]=(height>>>16)&255;bytes[22]=(height>>>8)&255;bytes[23]=height&255;bytes[24]=8;bytes[25]=6;return bytes;};
+const makePng=(width,height)=>{const bytes=new Uint8Array(57);bytes.set([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a,0,0,0,13,0x49,0x48,0x44,0x52]);bytes[16]=(width>>>24)&255;bytes[17]=(width>>>16)&255;bytes[18]=(width>>>8)&255;bytes[19]=width&255;bytes[20]=(height>>>24)&255;bytes[21]=(height>>>16)&255;bytes[22]=(height>>>8)&255;bytes[23]=height&255;bytes[24]=8;bytes[25]=6;bytes.set([0,0,0,0,0x49,0x44,0x41,0x54],33);bytes.set([0,0,0,0,0x49,0x45,0x4e,0x44],45);return bytes;};
 
 // Parser totality: arbitrary bytes may be rejected but must not throw.
 let state=0x4b454c4f;const rand=()=>((state=(Math.imul(state,1664525)+1013904223)>>>0)>>>0);let randomRejected=0;
 for(let n=0;n<5000;n++){const length=1+(rand()%1024),bytes=new Uint8Array(length);for(let i=0;i<length;i++)bytes[i]=rand()&255;const result=inspectAssetContainer(bytes);assert.equal(typeof result.valid,'boolean');if(!result.valid)randomRejected++;}
 assert.ok(randomRejected>4900);
 
-// Decompression-bomb style dimensions must fail before decode.
+// Decompression-bomb style dimensions must fail before browser decode, using a structurally complete PNG fixture.
 const huge=new Blob([makePng(0xffffffff,0xffffffff)],{type:'image/png'});Object.defineProperty(huge,'name',{value:'huge.png'});await assert.rejects(()=>assertSafeAssetInput(huge),/ASSET_DIMENSION_LIMIT|ASSET_PIXEL_LIMIT|ASSET_DECODE_MEMORY_LIMIT/);
 
 // Declared WebP container size mismatch must fail closed.
@@ -43,6 +45,10 @@ const echo=createIsolatedAssetWorkerClient({workerFactory:()=>new EchoWorker()})
 let progressTerminated=false;class ProgressWorker{postMessage(message){queueMicrotask(()=>this.onmessage?.({data:{id:message.id,type:'progress',progress:{stage:'analyze'}}}));setTimeout(()=>this.onmessage?.({data:{id:message.id,ok:true,value:{done:true}}}),5);}terminate(){progressTerminated=true;}}
 let progressEvents=0;const progressClient=createIsolatedAssetWorkerClient({workerFactory:()=>new ProgressWorker(),defaultTimeoutMs:200});const progressResult=await progressClient.run({task:'compile-avatar'},{onProgress:event=>{assert.equal(event.stage,'analyze');progressEvents++;}});assert.deepEqual(progressResult,{done:true});assert.equal(progressEvents,1);assert.equal(progressTerminated,true);
 
+// Manual termination must reject pending promises immediately, not leave zombie jobs until timeout.
+class NeverWorker{postMessage(){}terminate(){this.terminated=true;}}
+const killClient=createIsolatedAssetWorkerClient({workerFactory:()=>new NeverWorker(),defaultTimeoutMs:1000});const pending=killClient.run({task:'analyze-avatar'});await sleep(5);const killed=killClient.terminateAll('new-source');assert.equal(killed.terminated,1);await assert.rejects(()=>pending,/ASSET_WORKER_TERMINATED:new-source/);assert.equal(killClient.activeCount,0);
+
 // Failed gates can never expose staged output.
 const tx=createAssetTransaction({id:'chaos'});tx.stage('asset',{secret:'not-published'});tx.gate('security',false);assert.throws(()=>tx.commit(),/ASSET_TRANSACTION_GATE_FAILED/);assert.equal(tx.state,'ROLLED_BACK');assert.deepEqual(tx.snapshot().keys,[]);
 
@@ -52,6 +58,9 @@ const ledger=createAssetVerificationLedger({assetId:'chaos',root:{crypto:webcryp
 // AI backend cannot satisfy a security-capability trust contract.
 const backend=chooseAssetBackend([{id:'ai-decoder',trust:'advisory',capabilities:['decode-untrusted'],isolation:'none',deterministic:false}],{capability:'decode-untrusted',minTrust:'advisory'});assert.notEqual(backend.status,'READY');
 const sandboxed=chooseAssetBackend([{id:'safe-wasm',trust:'sandboxed',capabilities:['decode-untrusted'],isolation:'wasm-component',deterministic:true}],{capability:'decode-untrusted',minTrust:'sandboxed',requireIsolation:true,requireDeterministic:true});assert.equal(sandboxed.status,'READY');
+
+// AI defect detection stays advisory even when it reports a severe-looking defect.
+const defectEvidence=buildAssetReleaseEvidence({input:{valid:true,width:1,height:1},compiled:{blob:{},width:1,height:1},defects:{defects:[{severity:'blocking',score:.99,code:'AI_ODDITY'}]}}),aiDefect=defectEvidence.find(item=>item.id==='ai-defect-scan');assert.equal(aiDefect.source,'ai');assert.equal(aiDefect.authoritative,false);const aiDefectRelease=verifyAssetRelease({input:{valid:true,width:1,height:1},compiled:{blob:{},width:1,height:1,reviewRequired:false},defects:{defects:[{severity:'blocking',score:.99}]}});assert.equal(aiDefectRelease.decision,'APPROVED');assert.ok(aiDefectRelease.warnings.includes('AI_ASSET_DEFECT_WARNING'));
 
 // Neither AI nor human review can override hard safety failures.
 const packet=createAssetReviewPacket({assetId:'x',releaseDecision:{rejected:['ASSET_DECODE_MEMORY_LIMIT'],reviewRequired:['STYLE_AMBIGUOUS']}});assert.equal(packet.status,'QUARANTINED');const resolution=resolveAssetReviewPacket(packet,{approvals:['STYLE_AMBIGUOUS'],reviewer:'human'});assert.equal(resolution.status,'QUARANTINED');assert.equal(resolution.resolved,false);
@@ -66,4 +75,7 @@ assert.throws(()=>assertPinnedAssetOracle({id:'seg',model:'sam',version:'latest'
 // Visual AI cannot prove usage rights; external source without an explicit declaration/license remains review-required.
 const sourceDecision=evaluateAssetSourceAttestation({sourceType:'external',sourceUri:'example',declaration:false});assert.equal(sourceDecision.pass,false);assert.ok(sourceDecision.reasons.includes('SOURCE_LICENSE_EVIDENCE_REQUIRED'));
 
-console.log(JSON.stringify({ok:true,randomCases:5000,randomRejected,contentAddressed:true,timeoutFailClosed:true,staleProtected:true,hardWorkerKill:true,workerProgressProtocol:true,transactionRollback:true,ledgerTamperDetected:true,aiSecurityAuthorityDenied:true,humanHardOverrideDenied:true,realDeviceCanary:true,modelDriftGoverned:true,sourceRightsNotGuessed:true}));
+// Production Frame Surgery UI must stay behind the isolated service and never regress to direct heavy compiler imports.
+const workspaceSource=await readFile(new URL('../src/creators/ui/avatar-frame-surgery-workspace.mjs',import.meta.url),'utf8');assert.ok(!workspaceSource.includes('kelo-universal-asset-compiler.mjs'));assert.ok(!workspaceSource.includes('analyzeRawSingleFrameAsset'));assert.ok(workspaceSource.includes('avatarQuick.analyzeAsset'));assert.ok(workspaceSource.includes('avatarQuick.analyzeRawAsset'));assert.ok(workspaceSource.includes('avatarQuick.compilePreview'));
+
+console.log(JSON.stringify({ok:true,randomCases:5000,randomRejected,contentAddressed:true,timeoutFailClosed:true,staleProtected:true,hardWorkerKill:true,workerProgressProtocol:true,workerTerminateRejects:true,transactionRollback:true,ledgerTamperDetected:true,aiSecurityAuthorityDenied:true,aiDefectsAdvisory:true,humanHardOverrideDenied:true,realDeviceCanary:true,modelDriftGoverned:true,sourceRightsNotGuessed:true,uiIsolationBoundary:true}));
