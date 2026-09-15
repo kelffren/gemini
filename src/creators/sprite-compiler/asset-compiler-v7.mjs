@@ -18,3 +18,6 @@ export {createAssetVerificationLedger,verifyAssetVerificationLedger} from './ass
 export {ASSET_BACKEND_TRUST,normalizeAssetBackend,createAssetBackendRegistry,chooseAssetBackend} from './asset-backend-contract.mjs';
 export {createAssetReviewPacket,resolveAssetReviewPacket} from './asset-human-review.mjs';
 export {normalizeRuntimeSample,evaluateRuntimeCanary} from './asset-runtime-canary.mjs';
+export {createIsolatedAssetWorkerClient} from './asset-isolated-worker-client.mjs';
+export {normalizeAssetOracle,assertPinnedAssetOracle,evaluateOracleShadow} from './asset-oracle-governance.mjs';
+export {normalizeAssetSourceAttestation,evaluateAssetSourceAttestation} from './asset-source-attestation.mjs';
