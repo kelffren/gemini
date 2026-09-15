@@ -10,7 +10,7 @@
 (function(root){
 'use strict';
 if(root.KeloCreatorsLazyGate)return;
-const VERSION='kelo-creators-lazy-gate-v2';
+const VERSION='kelo-creators-lazy-gate-v3';
 let loading=null;
 const query=()=>{try{return new URLSearchParams(root.location.search);}catch(_){return new URLSearchParams();}};
 const directRequested=()=>query().get('creators')==='1'||query().get('creator')==='1'||query().get('mapEditor')==='1';
@@ -41,7 +41,7 @@ function loadStudio(){
   if(root.KELO_STUDIO_LAUNCHER)return Promise.resolve(root.KELO_STUDIO_LAUNCHER);
   if(loading)return loading;
   loading=new Promise(function(resolve,reject){
-    const s=document.createElement('script');s.src='src/ui/studio-launcher.js?v=world-bridge-20260915-23';s.async=false;s.dataset.keloCreatorsFirstUse='1';
+    const s=document.createElement('script');s.src='src/ui/studio-launcher.js?v=world-bridge-20260915-24';s.async=false;s.dataset.keloCreatorsFirstUse='1';
     s.onload=function(){resolve(root.KELO_STUDIO_LAUNCHER||null);};s.onerror=function(){reject(new Error('CREATORS_LAUNCHER_LOAD_FAILED'));};document.head.appendChild(s);
   }).finally(function(){loading=null;sync();});
   return loading;
