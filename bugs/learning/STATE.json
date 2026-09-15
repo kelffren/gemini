@@ -812,9 +812,20 @@
       "files": [
         "src/studio/tools/register-build-tools.mjs"
       ]
+    },
+    {
+      "id": "prevention:f810e11771ac66c1bd50c779c3189e315809ee27",
+      "at": "2026-09-15T06:00:59.000Z",
+      "source": "bug-prevention-ci",
+      "head_sha": "f810e11771ac66c1bd50c779c3189e315809ee27",
+      "base_sha": "2379a5275375280449de4f05b692ddcb2e68e354",
+      "conclusion": "failure",
+      "files": [
+        "src/ui/studio-launcher.js"
+      ]
     }
   ],
-  "feedback_updated_at": "2026-09-15T06:00:52.013Z",
+  "feedback_updated_at": "2026-09-15T06:01:30.688Z",
   "training": {
     "examples": 58,
     "search_examples": 43,
