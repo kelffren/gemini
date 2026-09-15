@@ -9,7 +9,9 @@ const errors=[];
 page.on('pageerror',e=>errors.push('page:'+String(e?.message||e)));
 page.on('console',m=>{if(m.type()==='error')errors.push('console:'+m.text());});
 await page.goto(url.toString(),{waitUntil:'domcontentloaded',timeout:30000});
-await page.waitForFunction(()=>window.KELO_LUXE&&window.KELO_LUXE_PLAYER_HUD&&window.KeloPvPWorld&&window.KELO_PVP_COMBAT_LOADER_AUDIT&&document.getElementById('lx-side-pvp')&&document.getElementById('kw-quick-actions-toggle'),null,{timeout:20000});
+await page.waitForFunction(()=>window.KELO_LUXE&&window.KELO_LUXE_PLAYER_HUD&&window.KELO_MODULE_LOADER&&document.getElementById('lx-side-pvp')&&document.getElementById('kw-quick-actions-toggle'),null,{timeout:20000});
+const cold=await page.evaluate(()=>({pvpLoaded:!!window.KeloPvPWorld,pvpAudit:!!window.KELO_PVP_COMBAT_LOADER_AUDIT,needs:window.KELO_MODULE_LOADER?.needs?.('pvp')}));
+if(cold.pvpLoaded||cold.pvpAudit||cold.needs!==true)throw new Error('PVP_COLD_BOOT_CONTRACT_BROKEN:'+JSON.stringify(cold));
 const snap=()=>page.evaluate(()=>{
   const btn=document.getElementById('lx-side-pvp');
   const enter=window.enterPvPWorld;
@@ -27,16 +29,16 @@ const snap=()=>page.evaluate(()=>{
     quick:document.getElementById('kw-quick-actions-toggle')?.getAttribute('aria-expanded')||null
   };
 });
-const report={before:await snap(),afterTap:null,afterDirect:null,errors};
+const report={cold,before:await snap(),afterTap:null,errors};
 await page.locator('#kw-quick-actions-toggle').tap();
 await page.waitForFunction(()=>document.getElementById('kw-quick-actions-toggle')?.getAttribute('aria-expanded')==='true');
 await page.locator('#lx-side-pvp').tap();
-await page.waitForTimeout(250);
+await page.waitForFunction(()=>window.KeloPvPWorld&&typeof window.enterPvPWorld==='function'&&window.KELO_PVP_COMBAT_LOADER_AUDIT?.ready===true,null,{timeout:15000});
+await page.waitForFunction(()=>window.KeloPvPWorld?.state?.combatEnabled===true&&window.KeloPvPWorld?.state?.mode!=='social',null,{timeout:20000});
 report.afterTap=await snap();
-if(!(report.afterTap.loader.firstRequestedAt>0)||report.afterTap.state.mode==='social'){
-  await page.evaluate(()=>window.enterPvPWorld?.());
-  await page.waitForTimeout(250);
-  report.afterDirect=await snap();
-}
+if(!(report.afterTap.loader.firstRequestedAt>0))throw new Error('PVP_FIRST_USE_NOT_REQUESTED');
+if(!report.afterTap.loader.combatReady)throw new Error('PVP_COMBAT_NOT_READY_AFTER_FIRST_USE');
+if(report.afterTap.state.mode==='social'||!report.afterTap.state.combatEnabled)throw new Error('PVP_DID_NOT_ENTER_AFTER_QUICK_ACTION');
+if(errors.length)throw new Error('PVP_DIAGNOSTIC_ERRORS:'+errors.join(' | '));
 console.log('PVP_QUICK_DIAGNOSTIC='+JSON.stringify(report,null,2));
 await browser.close();
