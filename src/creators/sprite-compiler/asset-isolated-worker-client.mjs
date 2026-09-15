@@ -7,13 +7,13 @@ const F=Object.freeze;
 const errorFrom=value=>value instanceof Error?value:new Error(String(value||'ASSET_WORKER_FAILED'));
 export function createIsolatedAssetWorkerClient({workerFactory,defaultTimeoutMs=10000}={}){
  if(typeof workerFactory!=='function')throw new Error('ASSET_WORKER_FACTORY_REQUIRED');let sequence=0,active=new Map();
- async function run(payload,{timeoutMs=defaultTimeoutMs,signal=null,transfer=[]}={}){
+ async function run(payload,{timeoutMs=defaultTimeoutMs,signal=null,transfer=[],onProgress=null}={}){
    const id=++sequence,worker=workerFactory(),deadline=Math.max(100,Number(timeoutMs)||defaultTimeoutMs);if(!worker||typeof worker.postMessage!=='function'||typeof worker.terminate!=='function')throw new Error('ASSET_WORKER_INVALID');
    return new Promise((resolve,reject)=>{
      let settled=false;const finish=(fn,value)=>{if(settled)return;settled=true;clearTimeout(timer);signal?.removeEventListener?.('abort',abort);active.delete(id);try{worker.terminate();}catch{}fn(value);};
      const abort=()=>finish(reject,new Error(`ASSET_WORKER_ABORTED:${String(signal?.reason||'external')}`));
      const timer=setTimeout(()=>finish(reject,new Error('ASSET_WORKER_HARD_TIMEOUT')),deadline);active.set(id,worker);
-     worker.onmessage=event=>{const message=event?.data||{};if(message.id!==id)return;if(message.ok===false)return finish(reject,errorFrom(message.error?.code||message.error?.message||'ASSET_WORKER_TASK_FAILED'));finish(resolve,message.value);};
+     worker.onmessage=event=>{const message=event?.data||{};if(message.id!==id)return;if(message.type==='progress'){try{onProgress?.(message.progress);}catch{}return;}if(message.ok===false)return finish(reject,errorFrom(message.error?.code||message.error?.message||'ASSET_WORKER_TASK_FAILED'));if(message.ok!==true)return;finish(resolve,message.value);};
      worker.onerror=event=>finish(reject,errorFrom(event?.message||'ASSET_WORKER_RUNTIME_ERROR'));
      if(signal?.aborted)return abort();signal?.addEventListener?.('abort',abort,{once:true});
      try{worker.postMessage({id,payload},transfer);}catch(error){finish(reject,error);}
