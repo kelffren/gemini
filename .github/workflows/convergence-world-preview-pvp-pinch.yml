@@ -39,10 +39,15 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Preserve version-neutral probe
+        shell: bash
+        run: cp scripts/convergence-local-world-probe.mjs /tmp/convergence-local-world-probe.mjs
+
       - name: Checkout candidate snapshot
         shell: bash
         run: |
           git checkout --detach '${{ matrix.sha }}'
+          cp /tmp/convergence-local-world-probe.mjs scripts/convergence-local-world-probe.mjs
           echo "candidate=$(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
           echo "message=$(git log -1 --pretty=%s)" >> "$GITHUB_STEP_SUMMARY"
 
@@ -73,12 +78,12 @@ jobs:
           cat /tmp/kelo-convergence-http.log || true
           exit 1
 
-      - name: Gate A - World editor functional placement
+      - name: Gate A - World placement plus painted asset preview
         env:
           AUDIT_URL: http://127.0.0.1:4173/
-        run: node scripts/studio-live-audit.mjs
+        run: node scripts/convergence-local-world-probe.mjs
 
-      - name: Gate B - Visual asset preview and two-finger pinch scale
+      - name: Gate B - Two-finger pinch scale and visual asset contracts
         run: node scripts/studio-creator-v1-audit.mjs
 
       - name: Gate C - Strict PvP live action camera
@@ -91,8 +96,7 @@ jobs:
       - name: Summary
         if: success()
         shell: bash
-        run: |
-          echo '✅ WORLD + ASSET PREVIEW + TWO-FINGER PINCH + PVP all passed on this exact SHA.' >> "$GITHUB_STEP_SUMMARY"
+        run: echo '✅ WORLD + ASSET PREVIEW + TWO-FINGER PINCH + PVP all passed on this exact SHA.' >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload convergence evidence
         if: always()
