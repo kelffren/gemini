@@ -1,11 +1,11 @@
 /* KELO-INDEX
  * area: CORE
- * owner: legacy social/render bridge; frame authority owned by KeloRender; camera commands after boot owned by KeloCamera
- * keys: RENDER LAYERS VISUAL VFX SCREEN UPDATE SOCIAL CAMERA FOUNDATION PVP LEGACY BOT GUARD SIMULATION BRIDGE
- * hace: expone dibujo legacy mediante KELO_LEGACY_RENDER_BRIDGE y augmentación legacy de simulación mediante KELO_LEGACY_SIMULATION_BRIDGE sin poseer render/updateSimulation
+ * owner: legacy social/render bridge; frame authority owned by KeloRender; transition position commands owned by KeloPlayerPosition; camera commands after boot owned by KeloCamera
+ * keys: RENDER LAYERS VISUAL VFX SCREEN UPDATE SOCIAL CAMERA POSITION FOUNDATION PVP LEGACY BOT GUARD SIMULATION BRIDGE
+ * hace: expone dibujo legacy mediante KELO_LEGACY_RENDER_BRIDGE y augmentación legacy de simulación mediante KELO_LEGACY_SIMULATION_BRIDGE sin poseer render/updateSimulation/position transitions
  * online: visuales consumen eventos; este archivo no decide autoridad compartida
  * legacy: CONFIG.zoom/cycleZoom/screenToWorld son bootstrap pre-KeloCamera y quedan reemplazados por el owner tras carga; simulación base permanece en engine-a
- * do-not: no añadir nuevos writers camera.* ni wrappers render/renderAvatar/updateSimulation; usar KeloCamera/KeloRender/KeloAvatar/KeloSimulation
+ * do-not: no añadir nuevos writers camera.* ni localPlayer.x/y ni wrappers render/renderAvatar/updateSimulation; usar KeloCamera/KeloPlayerPosition/KeloRender/KeloAvatar/KeloSimulation
  */
 CONFIG.zoom = 0.82;
 const ZOOM_STEPS = [0.7, 0.82, 1];
@@ -83,13 +83,17 @@ function openSocialTool(tool) {
   if (tool === 'friends') { showToast('Amigos · acceso social preparado'); return; }
   if (tool === 'settings') { showToast('Ajustes · usa Zoom HD por ahora'); return; }
 }
+function transitionPlayer(x,y,source) {
+  if (!window.KeloPlayerPosition || typeof window.KeloPlayerPosition.teleport !== 'function') throw new Error('KeloPlayerPosition unavailable during quickTravel');
+  return window.KeloPlayerPosition.teleport(x,y,{source:source,stopMotion:true});
+}
 function quickTravel(dest) {
   closeMenu();
   if (!window.KeloCamera) throw new Error('KeloCamera unavailable during quickTravel');
-  if (dest === 'plaza') { localPlayer.x = 1400; localPlayer.y = 1600; window.KeloCamera.setTarget(1400, 1600, { source:'engine-c:quick-travel-plaza' }); showToast('Plaza Central'); }
+  if (dest === 'plaza') { transitionPlayer(1400,1600,'engine-c:quick-travel-plaza'); window.KeloCamera.setTarget(1400, 1600, { source:'engine-c:quick-travel-plaza' }); showToast('Plaza Central'); }
   else if (dest === 'farm') { teleportToFarm(); showToast('Distrito Rural'); }
   else if (dest === 'house') { teleportToPlot(); showToast('Tu parcela'); }
-  else if (dest === 'arena') { localPlayer.x = arenaPvP.x + 80; localPlayer.y = arenaPvP.y + arenaPvP.h / 2; window.KeloCamera.setTarget(arenaPvP.x + arenaPvP.w / 2, arenaPvP.y + arenaPvP.h / 2, { source:'engine-c:quick-travel-arena' }); showToast('Arena 1v1'); }
+  else if (dest === 'arena') { const x=arenaPvP.x+80,y=arenaPvP.y+arenaPvP.h/2; transitionPlayer(x,y,'engine-c:quick-travel-arena'); window.KeloCamera.setTarget(arenaPvP.x + arenaPvP.w / 2, arenaPvP.y + arenaPvP.h / 2, { source:'engine-c:quick-travel-arena' }); showToast('Arena 1v1'); }
 }
 checkFarmTouch = function(sx, sy) {
   if (decorationResetActive()) return false;
