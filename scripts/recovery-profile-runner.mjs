@@ -39,9 +39,9 @@ const artifactDir=path.resolve(args.artifacts||process.env.KELO_RECOVERY_ARTIFAC
 fs.mkdirSync(artifactDir,{recursive:true});
 
 const report={
-  schema:3,profile,base,startedAt:new Date().toISOString(),gitHead:null,result:'RUNNING',reason:null,
+  schema:4,profile,base,startedAt:new Date().toISOString(),gitHead:null,result:'RUNNING',reason:null,
   steps:[],console:[],pageErrors:[],requestFailures:[],httpErrors:[],crashed:false,recovery:null,trace:null,
-  compatibility:{worldProbe:null}
+  compatibility:{worldProbe:null,authBridge:null,creatorHub:null}
 };
 try{report.gitHead=(await import('node:child_process')).execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();}catch{}
 const shortHead=()=>String(report.gitHead||'unknown').slice(0,12);
@@ -59,7 +59,7 @@ const sanitizeUrl=raw=>{
 
 function targetUrl(extra={}){
   const url=new URL(base);
-  for(const [key,value] of Object.entries({aiGuest:'1',recoveryLab:'1',recoveryHud:'0',recoveryFlow:profile,...extra})){
+  for(const [key,value] of Object.entries({aiGuest:'1',guest:'1',recoveryLab:'1',recoveryHud:'0',recoveryFlow:profile,...extra})){
     if(value!=null)url.searchParams.set(key,String(value));
   }
   return url.href;
@@ -149,12 +149,47 @@ async function movementCheck(){
   step('MOVEMENT_END',{...after,distance});
   if(!(distance>2))throw new Error(`MOVEMENT_STALLED_${distance.toFixed(2)}`);
 }
+
+async function bridgeHistoricalAccess(){
+  const guest=page.getByRole('button',{name:/Jugar como invitado|Play as guest/i}).first();
+  const guestVisible=await guest.isVisible({timeout:1200}).catch(()=>false);
+  if(guestVisible){
+    report.compatibility.authBridge='legacy-guest-button';
+    step('AUTH_GUEST_GATE_FOUND');
+    await guest.click({timeout:5000});
+    await guest.waitFor({state:'hidden',timeout:8000}).catch(()=>{});
+    await page.waitForTimeout(350);
+    await ping('AUTH_GUEST_EVENT_LOOP_PING');
+    step('AUTH_GUEST_ENTERED');
+  }else{
+    report.compatibility.authBridge='query-or-session';
+  }
+
+  const hub=page.locator('#kelo-creators-hub');
+  const hubVisible=await hub.isVisible({timeout:1200}).catch(()=>false);
+  if(!hubVisible){
+    step('CREATOR_HUB_DIRECT_OPEN');
+    await page.evaluate(async()=>{
+      const mod=await import('./src/creators/ui/creator-hub.mjs');
+      if(typeof mod.openCreatorHub!=='function')throw new Error('OPEN_CREATOR_HUB_MISSING');
+      await mod.openCreatorHub({root:window});
+    });
+    report.compatibility.creatorHub='direct-module-open';
+  }else{
+    report.compatibility.creatorHub='already-open';
+  }
+  await hub.waitFor({state:'visible',timeout:10000});
+  step('CREATOR_HUB_READY',{mode:report.compatibility.creatorHub});
+}
+
 async function worldCheck({navigate=true}={}){
   if(navigate){
     const url=targetUrl({creators:'1',recoveryFlow:'world-open',bug:'BUG-0003',freezeLab:'1'});
     step('WORLD_NAVIGATE',{url});
     await page.goto(url,{waitUntil:'domcontentloaded',timeout:30000});
   }
+
+  await bridgeHistoricalAccess();
 
   // Compatibility is explicit, not permissive: modern World uses data-workspace,
   // historical Creator Hub (including the Paint Copies boundary) used aria-label="Abrir World".
