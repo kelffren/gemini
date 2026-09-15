@@ -1,6 +1,6 @@
 # Kelo World — Code Index
 
-**Actualizado:** 2026-09-14
+**Actualizado:** 2026-09-15
 
 ## Runtime
 
@@ -39,7 +39,11 @@
 - `assets/world/plaza/forest-plaza-tileset-v2.png` — atlas fuente LIVE.
 - `src/property/forest-plaza-asset-catalog.js` — 146 templates, nombres/categorías.
 - `src/property/property-asset-catalog.js` — catálogo general.
-- `src/creators/assets/asset-sheet-compiler.mjs` — compiler heterogéneo.
+- `src/creators/assets/png-space-optimizer.mjs` — compresión PNG lossless con gate RGBA exacto.
+- `src/creators/assets/png-adaptive-optimizer.mjs` — búsqueda opt-in near-lossless con fallback strict.
+- `src/creators/assets/png-quality-agent.mjs` — comparación before/after, alpha, PSNR y bordes.
+- `scripts/asset-space-compiler.mjs` — CLI recursiva, captura y reporte de ahorro/calidad.
+- `src/creators/assets/asset-sheet-compiler.mjs` — compiler heterogéneo de geometría/metadata.
 - `src/creators/sprite-compiler/sprite-foreground-analysis.mjs` — foreground/components.
 - `src/creators/sprite-compiler/sprite-world-asset-compiler.mjs` — perfil world asset.
 
