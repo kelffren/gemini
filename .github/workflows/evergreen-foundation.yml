@@ -48,3 +48,40 @@ jobs:
           test -f src/core/state-store-bootstrap.js
           grep -q 'state-store-bootstrap.js' index.html
           node -e "const fs=require('fs');const html=fs.readFileSync('index.html','utf8');const state=html.indexOf('state-store-bootstrap.js');const legacy=html.indexOf('engine-a.js');if(state<0||legacy<0||state>legacy)throw new Error('state migrator must load before engine-a');console.log('BOOT CONTRACT PASS')"
+
+  client-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install exact client dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Production build
+        run: npm run build
+      - name: Build contract audit
+        run: npm run audit:turbo-build
+
+  server-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup server Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.20.0
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - name: Install exact server dependencies
+        working-directory: server
+        run: npm ci --omit=dev --ignore-scripts --no-audit --no-fund
+      - name: Authoritative server smoke
+        working-directory: server
+        run: npm run test:smoke
