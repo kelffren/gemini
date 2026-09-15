@@ -2,7 +2,8 @@
   'use strict';
   // Migration marker for the previous CI contract: mode:'luxe-only-v1'. Rendering is now generic.
   const R=window.KELO_PREFAB_RENDERER;
-  if(!R||typeof R.getEntry!=='function'){console.error('[Kelo Luxe] generic prefab renderer unavailable');return;}
+  const collision=window.KELO_COLLISION;
+  if(!R||typeof R.getEntry!=='function'||!collision||typeof collision.remove!=='function'){console.error('[Kelo Luxe] generic prefab renderer/collision owner unavailable');return;}
   const luxe=R.getEntry('luxeBoutique');
   if(!luxe){console.error('[Kelo Luxe] prefab missing');return;}
   const p=luxe.prefab,a=luxe.asset;
@@ -14,7 +15,13 @@
   const sameRect=(x,r)=>x&&x.x===r.x&&x.y===r.y&&x.w===r.w&&x.h===r.h;
   function hideLegacyPlaceholders(){
     if(typeof obstacles==='undefined'||!Array.isArray(obstacles))return false;
-    for(let i=obstacles.length-1;i>=0;i--){const o=obstacles[i];if(o&&!o._genericPrefabCollision&&LEGACY_PLAZA_PLACEHOLDERS.some(r=>sameRect(o,r)))obstacles.splice(i,1);}
+    const removals=[];
+    for(const o of obstacles){
+      if(!o||o._genericPrefabCollision||!LEGACY_PLAZA_PLACEHOLDERS.some(r=>sameRect(o,r)))continue;
+      const owner=String(o._keloCollisionOwner||'');const id=String(o.id||'');
+      if(owner&&id)removals.push({owner,id});
+    }
+    for(const item of removals)collision.remove(item.owner,item.id);
     return true;
   }
 
@@ -33,9 +40,9 @@
     if(!window._keloLuxeBoutiqueKey){window._keloLuxeBoutiqueKey=true;window.addEventListener('keydown',e=>{if((e.key||'').toLowerCase()!=='e')return;const active=document.activeElement;if(active&&/INPUT|TEXTAREA/.test(active.tagName||''))return;if(nearShop())openBoutique();});}
   }
   function install(){hideLegacyPlaceholders();installInteraction();}
-  install();setTimeout(install,120);setTimeout(install,600);
+  install();
 
   window.KELO_ARCHITECTURE_RENDERER=Object.freeze({version:'architecture-prefab-adapter-v2',mode:'generic-prefab-contract-v1',prefabCount:window.KELO_PREFAB_CONTRACT?.prefabs?.length||0,depthMode:'building-base-y-occlusion-v1',renderMode:'generic-prefab-renderer-v1',spatialOwnership:'architecture-prefabs-v1',get ready(){return R.ready;},get rendererWrapped(){return false;},get depthWrapped(){return false;},get environmentLayerStack(){return !!window.KELO_ENVIRONMENT_LAYERS;},get backLayerRegistered(){return !!window.KELO_ENVIRONMENT_LAYERS?.layers?.some(x=>x.id==='architecture-prefabs-back');},get frontLayerRegistered(){return !!window.KELO_ENVIRONMENT_LAYERS?.layers?.some(x=>x.id==='architecture-prefabs-front');},get postActorContractPreserved(){return typeof window.KELO_WORLD_RENDERER?.drawPostActors==='function';},getEntry:R.getEntry});
-  window.KELO_LUXE_KIOSK=Object.freeze({disabled:false,version:'authored-raster-v2.0',asset:a.src,source:'generic-prefab-contract',prefabId:p.id,shop:SHOP,collision:COLLISION,interaction:p.interaction,depthMode:'building-base-y-occlusion-v1',depthOcclusion:true,renderMode:'generic-prefab-renderer-v1',backLayer:'props_back',frontLayer:'props_front',legacyBrownPlaceholdersRemoved:true,isOccluding:actor=>luxe.isOccluding(actor),get ready(){return luxe.ready;},get failed(){return luxe.failed;},get rendererWrapped(){return false;},get depthWrapped(){return false;},get environmentLayerStack(){return !!window.KELO_ENVIRONMENT_LAYERS;},open:openBoutique});
+  window.KELO_LUXE_KIOSK=Object.freeze({disabled:false,version:'authored-raster-v2.1',asset:a.src,source:'generic-prefab-contract',prefabId:p.id,shop:SHOP,collision:COLLISION,interaction:p.interaction,depthMode:'building-base-y-occlusion-v1',depthOcclusion:true,renderMode:'generic-prefab-renderer-v1',backLayer:'props_back',frontLayer:'props_front',legacyBrownPlaceholdersRemoved:true,collisionMutationMode:'owner-registry-v1',isOccluding:actor=>luxe.isOccluding(actor),get ready(){return luxe.ready;},get failed(){return luxe.failed;},get rendererWrapped(){return false;},get depthWrapped(){return false;},get environmentLayerStack(){return !!window.KELO_ENVIRONMENT_LAYERS;},open:openBoutique});
   window.KELO_MARKET_PAVILION=Object.freeze({disabled:true,reason:'removed-by-player'});
 })();
