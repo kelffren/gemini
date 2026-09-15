@@ -6,7 +6,7 @@
  * online: account_runtime_commands + RLS/RPC son autoridad de entrega; kick temporal queda además protegido por account_moderation en servidor
  * do-not: NO requestAnimationFrame, NO segundo socket de juego, NO writes directos a tablas admin
  */
-const VERSION='account-live-control-v1.0.0';
+const VERSION='account-live-control-v1.0.1';
 
 export async function installAccountLiveControl({root=window}={}){
   if(root.KeloAccountLiveControl)return root.KeloAccountLiveControl;
@@ -25,7 +25,11 @@ export async function installAccountLiveControl({root=window}={}){
   function overlay(title,message){
     let el=document.getElementById('kelo-admin-session-lock');
     if(!el){el=document.createElement('div');el.id='kelo-admin-session-lock';el.style.cssText='position:fixed;inset:0;z-index:2147483647;display:grid;place-items:center;padding:24px;background:rgba(3,6,10,.985);color:#eef4ff;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;text-align:center;pointer-events:auto';document.body.appendChild(el);}
-    el.innerHTML=`<div style="max-width:430px;border:1px solid rgba(230,190,90,.4);border-radius:22px;padding:24px;background:#0c1420;box-shadow:0 24px 80px rgba(0,0,0,.7)"><div style="font-size:13px;font-weight:950;letter-spacing:.08em;color:#f0d47f">${String(title||'SESIÓN CERRADA')}</div><div style="margin-top:10px;font-size:12px;line-height:1.5;color:#aebfd1">${String(message||'La sesión fue cerrada por un administrador.')}</div></div>`;
+    el.textContent='';
+    const card=document.createElement('div');card.style.cssText='max-width:430px;border:1px solid rgba(230,190,90,.4);border-radius:22px;padding:24px;background:#0c1420;box-shadow:0 24px 80px rgba(0,0,0,.7)';
+    const heading=document.createElement('div');heading.style.cssText='font-size:13px;font-weight:950;letter-spacing:.08em;color:#f0d47f';heading.textContent=String(title||'SESIÓN CERRADA');
+    const copy=document.createElement('div');copy.style.cssText='margin-top:10px;font-size:12px;line-height:1.5;color:#aebfd1';copy.textContent=String(message||'La sesión fue cerrada por un administrador.');
+    card.append(heading,copy);el.appendChild(card);
   }
   function closeGameConnection(){
     const candidates=[root.keloNet?.ws,root.keloNet?.socket,root.KeloNetAuthority?.socket,root.KeloNetAuthority?.ws];
