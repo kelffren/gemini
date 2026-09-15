@@ -14,8 +14,6 @@ jobs:
     timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -27,18 +25,16 @@ jobs:
           node --check src/studio/tools/register-build-tools.mjs
           node --check src/studio/tools/paint-copies-tool.mjs
           node --check src/creators/ui/creator-hub.mjs
-          node --check scripts/world-forensic-probe.mjs
+          node --check scripts/recovery-bisect.mjs
+          node --check scripts/recovery-profile-runner.mjs
           node --check scripts/world-forensic-autopsy.mjs
       - name: Unified control-plane contract
         run: node scripts/world-surgery-contract.mjs
-      - name: Forensic engine synthetic first-bad self-test
-        env:
-          FORENSIC_GOOD: 2e205aa67eacadfb4358624f87113bdee7f60a9e
-          FORENSIC_BAD: 707d848f15c9e6e9e5b28b15d54ccab4e3cb5b24
-          FORENSIC_MODE: CUSTOM
-          FORENSIC_PROBE_COMMAND: test ! -f scripts/world-forensic-probe.mjs
-          FORENSIC_REPEAT: '1'
+      - name: Forensic ownership contract
         run: |
-          node scripts/world-forensic-autopsy.mjs
-          REPORT="$(find forensics -type f -name report.json | sort | tail -1)"
-          node -e "const fs=require('fs');const r=JSON.parse(fs.readFileSync(process.argv[1]));if(r.boundary?.firstBad!=='707d848f15c9e6e9e5b28b15d54ccab4e3cb5b24'||!r.boundary?.confirmed){console.error(r.boundary);process.exit(1)};console.log('WORLD_FORENSIC_ENGINE_SELF_TEST_PASS',r.boundary.firstBad)" "$REPORT"
+          grep -q "scripts','recovery-bisect.mjs" scripts/world-forensic-autopsy.mjs
+          if grep -q 'FORENSIC_PROBE_COMMAND\|while(lo<hi)' scripts/world-forensic-autopsy.mjs; then
+            echo 'World forensic autopsy must delegate binary search to recovery:bisect; duplicate bisect/probe logic detected.'
+            exit 1
+          fi
+          echo WORLD_FORENSIC_OWNER_CONTRACT_PASS
