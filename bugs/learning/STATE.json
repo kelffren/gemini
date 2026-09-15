@@ -1,9 +1,9 @@
 {
   "schema": "kelo-bug-learning-v1",
   "system_id": "bug-intelligence",
-  "source_fingerprint": "evo-b7cdd422",
+  "source_fingerprint": "evo-75d64cf4",
   "risk_map_fingerprint": "evo-5a643574",
-  "source_head": "2aab618bfb28b35286ab5184b7587f1e1d5f8981",
+  "source_head": "9ccb88a6b66f8b4285a02a801cc806fff9f4b6c8",
   "champion": {
     "id": "failure-sensitive",
     "multipliers": {
@@ -18,8 +18,8 @@
       "persistence": 1.2496,
       "critical-shell": 1.1327
     },
-    "search_score": 58.59,
-    "holdout_score": 56.661,
+    "search_score": 58.729,
+    "holdout_score": 60.576,
     "accepted_from_last_cycle": false
   },
   "memory": {
@@ -216,17 +216,47 @@
         "artifacts": [
           "bugs/learning/STATE.json"
         ]
+      },
+      {
+        "id": "bug-learn-evo-75d64cf4",
+        "at": "2026-09-15T02:23:21.000Z",
+        "sourceSha": "9ccb88a6b66f8b4285a02a801cc806fff9f4b6c8",
+        "candidateId": "failure-sensitive",
+        "candidateFingerprint": "evo-a590ee4f",
+        "accepted": false,
+        "rejectedStage": "search",
+        "baselineScore": 58.729,
+        "candidateScore": 58.729,
+        "delta": 0,
+        "holdout": {
+          "baseline": 60.576,
+          "candidate": 60.576,
+          "delta": 0
+        },
+        "mutations": [],
+        "metrics": {
+          "calibration": 64.192,
+          "severeRecall": 45.815,
+          "mediumRecall": 40.605,
+          "falseAlarmSafety": 100,
+          "simplicity": 93.197,
+          "examples": 43
+        },
+        "failures": [],
+        "artifacts": [
+          "bugs/learning/STATE.json"
+        ]
       }
     ]
   },
   "memory_summary": {
     "systemId": "bug-intelligence-risk-policy",
-    "experiments": 5,
+    "experiments": 6,
     "accepted": 1,
-    "rejected": 4,
-    "acceptanceRate": 0.2,
+    "rejected": 5,
+    "acceptanceRate": 0.16666666666666666,
     "meanAcceptedDelta": 7.322,
-    "repeatedCandidates": 3,
+    "repeatedCandidates": 4,
     "champion": {
       "candidateId": "failure-sensitive",
       "score": 69.585,
@@ -712,59 +742,59 @@
   ],
   "feedback_updated_at": "2026-09-15T02:25:00.834Z",
   "training": {
-    "examples": 56,
-    "search_examples": 42,
-    "holdout_examples": 14,
-    "feedback_examples": 41,
-    "latest_evidence_at": "2026-09-15T00:30:21.000Z"
+    "examples": 58,
+    "search_examples": 43,
+    "holdout_examples": 15,
+    "feedback_examples": 42,
+    "latest_evidence_at": "2026-09-15T02:23:21.000Z"
   },
   "metrics": {
     "baseline_search": {
       "valid": true,
-      "score": 58.59,
+      "score": 58.729,
       "metrics": {
-        "calibration": 63.784,
-        "severeRecall": 45.814,
+        "calibration": 64.192,
+        "severeRecall": 45.815,
         "mediumRecall": 40.605,
         "falseAlarmSafety": 100,
         "simplicity": 93.197,
-        "examples": 42
+        "examples": 43
       }
     },
     "champion_search": {
       "valid": true,
-      "score": 58.59,
+      "score": 58.729,
       "metrics": {
-        "calibration": 63.784,
-        "severeRecall": 45.814,
+        "calibration": 64.192,
+        "severeRecall": 45.815,
         "mediumRecall": 40.605,
         "falseAlarmSafety": 100,
         "simplicity": 93.197,
-        "examples": 42
+        "examples": 43
       }
     },
     "baseline_holdout": {
       "valid": true,
-      "score": 56.661,
+      "score": 60.576,
       "metrics": {
-        "calibration": 65.916,
-        "severeRecall": 42.859,
-        "mediumRecall": 30.004,
+        "calibration": 67.057,
+        "severeRecall": 50.004,
+        "mediumRecall": 36.37,
         "falseAlarmSafety": 100,
         "simplicity": 93.197,
-        "examples": 14
+        "examples": 15
       }
     },
     "champion_holdout": {
       "valid": true,
-      "score": 56.661,
+      "score": 60.576,
       "metrics": {
-        "calibration": 65.916,
-        "severeRecall": 42.859,
-        "mediumRecall": 30.004,
+        "calibration": 67.057,
+        "severeRecall": 50.004,
+        "mediumRecall": 36.37,
         "falseAlarmSafety": 100,
         "simplicity": 93.197,
-        "examples": 14
+        "examples": 15
       }
     },
     "last_cycle": {
@@ -778,9 +808,9 @@
       "file": "src/studio/integration/world-studio-bridge.mjs",
       "risk_bonus": 20,
       "confidence": "high",
-      "evidence_count": 13,
-      "average_target": 81.53,
-      "severe_events": 13,
+      "evidence_count": 14,
+      "average_target": 81.64,
+      "severe_events": 14,
       "failed_events": 9,
       "report_events": 1,
       "feedback_events": 8,
@@ -801,9 +831,9 @@
       "file": "src/creators/workspaces/world-workspace.mjs",
       "risk_bonus": 20,
       "confidence": "high",
-      "evidence_count": 11,
-      "average_target": 86.54,
-      "severe_events": 11,
+      "evidence_count": 12,
+      "average_target": 86.25,
+      "severe_events": 12,
       "failed_events": 5,
       "report_events": 1,
       "feedback_events": 2,
@@ -827,9 +857,9 @@
       "file": "src/creators/ui/creator-hub.mjs",
       "risk_bonus": 20,
       "confidence": "high",
-      "evidence_count": 8,
-      "average_target": 87.38,
-      "severe_events": 8,
+      "evidence_count": 9,
+      "average_target": 86.89,
+      "severe_events": 9,
       "failed_events": 2,
       "report_events": 1,
       "feedback_events": 0,
@@ -849,9 +879,9 @@
       "file": "src/studio/integration/live-studio-controller.mjs",
       "risk_bonus": 20,
       "confidence": "high",
-      "evidence_count": 8,
-      "average_target": 82.62,
-      "severe_events": 8,
+      "evidence_count": 9,
+      "average_target": 82.66,
+      "severe_events": 9,
       "failed_events": 2,
       "report_events": 1,
       "feedback_events": 2,
@@ -875,12 +905,78 @@
       "file": "src/studio/studio-entry.mjs",
       "risk_bonus": 20,
       "confidence": "high",
-      "evidence_count": 6,
-      "average_target": 85.67,
-      "severe_events": 6,
+      "evidence_count": 7,
+      "average_target": 85.28,
+      "severe_events": 7,
       "failed_events": 2,
       "report_events": 1,
       "feedback_events": 1,
+      "bug_ids": [
+        "BUG-0003"
+      ],
+      "matched_rules": [
+        "world-studio-ios",
+        "esm-loader-mobile"
+      ],
+      "recommended_tests": [
+        "npm run bug:brief -- BUG-0003",
+        "npm run audit:studio",
+        "npm run bug:impact -- src/creators/workspaces/world-workspace.mjs --depth=3",
+        "real iPhone Create -> World -> interactive -> close/reopen",
+        "npm run bug:impact -- src/studio/integration/live-studio-controller.mjs --depth=3",
+        "real iPhone World open twice without reload"
+      ]
+    },
+    {
+      "file": "index.html",
+      "risk_bonus": 19,
+      "confidence": "high",
+      "evidence_count": 22,
+      "average_target": 60.35,
+      "severe_events": 7,
+      "failed_events": 0,
+      "report_events": 1,
+      "feedback_events": 15,
+      "bug_ids": [
+        "BUG-0003"
+      ],
+      "matched_rules": [
+        "critical-shell"
+      ],
+      "recommended_tests": [
+        "npm test",
+        "npm run build",
+        "npm run bug:brief -- BUG-0003"
+      ]
+    },
+    {
+      "file": "src/creators/creator-entry.mjs",
+      "risk_bonus": 19,
+      "confidence": "high",
+      "evidence_count": 7,
+      "average_target": 84,
+      "severe_events": 7,
+      "failed_events": 0,
+      "report_events": 1,
+      "feedback_events": 0,
+      "bug_ids": [
+        "BUG-0003"
+      ],
+      "matched_rules": [],
+      "recommended_tests": [
+        "npm run bug:brief -- BUG-0003"
+      ]
+    },
+    {
+      "file": "src/ui/studio-launcher.js",
+      "risk_bonus": 19,
+      "confidence": "high",
+      "evidence_count": 7,
+      "average_target": 84,
+      "severe_events": 7,
+      "failed_events": 0,
+      "report_events": 1,
+      "feedback_events": 0,
       "bug_ids": [
         "BUG-0003"
       ],
@@ -918,72 +1014,6 @@
         "npm run audit:studio",
         "npm run bug:impact -- src/creators/workspaces/world-workspace.mjs --depth=3",
         "real iPhone Create -> World -> interactive -> close/reopen"
-      ]
-    },
-    {
-      "file": "index.html",
-      "risk_bonus": 18,
-      "confidence": "high",
-      "evidence_count": 20,
-      "average_target": 60.63,
-      "severe_events": 6,
-      "failed_events": 0,
-      "report_events": 1,
-      "feedback_events": 14,
-      "bug_ids": [
-        "BUG-0003"
-      ],
-      "matched_rules": [
-        "critical-shell"
-      ],
-      "recommended_tests": [
-        "npm test",
-        "npm run build",
-        "npm run bug:brief -- BUG-0003"
-      ]
-    },
-    {
-      "file": "src/creators/creator-entry.mjs",
-      "risk_bonus": 18,
-      "confidence": "high",
-      "evidence_count": 6,
-      "average_target": 84.17,
-      "severe_events": 6,
-      "failed_events": 0,
-      "report_events": 1,
-      "feedback_events": 0,
-      "bug_ids": [
-        "BUG-0003"
-      ],
-      "matched_rules": [],
-      "recommended_tests": [
-        "npm run bug:brief -- BUG-0003"
-      ]
-    },
-    {
-      "file": "src/ui/studio-launcher.js",
-      "risk_bonus": 18,
-      "confidence": "high",
-      "evidence_count": 6,
-      "average_target": 84.17,
-      "severe_events": 6,
-      "failed_events": 0,
-      "report_events": 1,
-      "feedback_events": 0,
-      "bug_ids": [
-        "BUG-0003"
-      ],
-      "matched_rules": [
-        "world-studio-ios",
-        "esm-loader-mobile"
-      ],
-      "recommended_tests": [
-        "npm run bug:brief -- BUG-0003",
-        "npm run audit:studio",
-        "npm run bug:impact -- src/creators/workspaces/world-workspace.mjs --depth=3",
-        "real iPhone Create -> World -> interactive -> close/reopen",
-        "npm run bug:impact -- src/studio/integration/live-studio-controller.mjs --depth=3",
-        "real iPhone World open twice without reload"
       ]
     },
     {
@@ -1054,6 +1084,55 @@
       ]
     },
     {
+      "file": "src/studio/ui/studio-live-shell.mjs",
+      "risk_bonus": 17,
+      "confidence": "high",
+      "evidence_count": 4,
+      "average_target": 84.75,
+      "severe_events": 4,
+      "failed_events": 0,
+      "report_events": 1,
+      "feedback_events": 0,
+      "bug_ids": [
+        "BUG-0003"
+      ],
+      "matched_rules": [
+        "world-studio-ios"
+      ],
+      "recommended_tests": [
+        "npm run bug:brief -- BUG-0003",
+        "npm run audit:studio",
+        "npm run bug:impact -- src/creators/workspaces/world-workspace.mjs --depth=3",
+        "real iPhone Create -> World -> interactive -> close/reopen"
+      ]
+    },
+    {
+      "file": "sw.js",
+      "risk_bonus": 17,
+      "confidence": "medium",
+      "evidence_count": 4,
+      "average_target": 78.49,
+      "severe_events": 3,
+      "failed_events": 0,
+      "report_events": 1,
+      "feedback_events": 1,
+      "bug_ids": [
+        "BUG-0003"
+      ],
+      "matched_rules": [
+        "update-system",
+        "critical-shell"
+      ],
+      "recommended_tests": [
+        "npm run audit:updater",
+        "npm run audit:turbo",
+        "npm run build",
+        "npm run audit:turbo-build",
+        "npm test",
+        "npm run bug:brief -- BUG-0003"
+      ]
+    },
+    {
       "file": ".nojekyll",
       "risk_bonus": 17,
       "confidence": "medium",
@@ -1098,29 +1177,6 @@
     },
     {
       "file": "src/studio/studio-boot-extras.mjs",
-      "risk_bonus": 17,
-      "confidence": "medium",
-      "evidence_count": 3,
-      "average_target": 85.34,
-      "severe_events": 3,
-      "failed_events": 0,
-      "report_events": 1,
-      "feedback_events": 0,
-      "bug_ids": [
-        "BUG-0003"
-      ],
-      "matched_rules": [
-        "world-studio-ios"
-      ],
-      "recommended_tests": [
-        "npm run bug:brief -- BUG-0003",
-        "npm run audit:studio",
-        "npm run bug:impact -- src/creators/workspaces/world-workspace.mjs --depth=3",
-        "real iPhone Create -> World -> interactive -> close/reopen"
-      ]
-    },
-    {
-      "file": "src/studio/ui/studio-live-shell.mjs",
       "risk_bonus": 17,
       "confidence": "medium",
       "evidence_count": 3,
@@ -1346,29 +1402,6 @@
       "bug_ids": [],
       "matched_rules": [],
       "recommended_tests": []
-    },
-    {
-      "file": "sw.js",
-      "risk_bonus": 8,
-      "confidence": "low",
-      "evidence_count": 1,
-      "average_target": 58,
-      "severe_events": 0,
-      "failed_events": 0,
-      "report_events": 0,
-      "feedback_events": 1,
-      "bug_ids": [],
-      "matched_rules": [
-        "update-system",
-        "critical-shell"
-      ],
-      "recommended_tests": [
-        "npm run audit:updater",
-        "npm run audit:turbo",
-        "npm run build",
-        "npm run audit:turbo-build",
-        "npm test"
-      ]
     },
     {
       "file": "tests/iphone-gameplay.spec.js",
@@ -1598,7 +1631,7 @@
       "type": "uncovered_hotspot",
       "priority": "high",
       "file": "src/creators/creator-entry.mjs",
-      "reason": "6 historical/feedback signals but no RISK_MAP rule matches this file."
+      "reason": "7 historical/feedback signals but no RISK_MAP rule matches this file."
     },
     {
       "type": "uncovered_hotspot",
@@ -1690,5 +1723,5 @@
     "max_hotspot_bonus": 20,
     "max_feedback_observations": 200
   },
-  "updated_at": "2026-09-15T01:36:12.800Z"
+  "updated_at": "2026-09-15T03:28:31.721Z"
 }
