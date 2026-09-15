@@ -9,7 +9,6 @@ const PRE_ACTOR_PHASES=new Set(['props_back']);
 const POST_ACTOR_PHASES=new Set(['props_front','vfx_weather_lighting']);
 const ORDERING_POLICY='phase-priority-id-v1';
 const SPATIAL_POLICY='same-phase-aabb-priority-resolution-v1';
-const AUDIT_MAX_STALE_MS=1000;
 const phaseRank=new Map(PHASES.map((name,i)=>[name,i]));
 const layers=[];
 let auditDirty=true;
@@ -51,8 +50,8 @@ function spatialOverlaps(){
 }
 function syncAudit(force){
   if(!window.KELO_ENVIRONMENT_LAYER_AUDIT)return false;
+  if(!force&&!auditDirty){window.KELO_ENVIRONMENT_LAYER_AUDIT.skippedSyncs++;return false;}
   const now=typeof performance!=='undefined'&&typeof performance.now==='function'?performance.now():Date.now();
-  if(!force&&!auditDirty&&now-lastAuditAt<AUDIT_MAX_STALE_MS){window.KELO_ENVIRONMENT_LAYER_AUDIT.skippedSyncs++;return false;}
   const ties=priorityTies(),spatial=spatialOverlaps(),ambiguous=spatial.filter(x=>x.ambiguous);
   window.KELO_ENVIRONMENT_LAYER_AUDIT.layerCount=layers.length;
   window.KELO_ENVIRONMENT_LAYER_AUDIT.baseLayerCount=layers.filter(l=>timingForPhase(l.phase)==='base').length;
@@ -88,8 +87,8 @@ function draw(g){
 }
 function drawPreActors(g){drawTiming(g,'pre_actor');syncAudit(false);return true;}
 function drawPostActors(g){drawTiming(g,'post_actor');syncAudit(false);return true;}
-window.KELO_ENVIRONMENT_LAYER_AUDIT={version:'environment-layer-stack-v2.5',ready:true,mode:DECORATION_RESET?'blank-world-reset-visible-landmarks-v2':'formal-base-back-actor-front-order-v1',decorationReset:DECORATION_RESET,orderingPolicy:ORDERING_POLICY,spatialPolicy:SPATIAL_POLICY,phases:PHASES,preActorPhases:Array.from(PRE_ACTOR_PHASES),postActorPhases:Array.from(POST_ACTOR_PHASES),layerCount:0,baseLayerCount:0,preActorLayerCount:0,postActorLayerCount:0,priorityTieCount:0,priorityTies:[],spatialOverlapCount:0,spatialOverlaps:[],spatialTieCount:0,spatialTies:[],layers:[],auditMode:'dirty-with-max-stale-v1',maxStaleMs:AUDIT_MAX_STALE_MS,rebuildCount:0,skippedSyncs:0,lastRebuildAt:0};
-window.KELO_ENVIRONMENT_LAYERS=Object.freeze({version:'environment-layer-stack-v2.5',decorationReset:DECORATION_RESET,orderingPolicy:ORDERING_POLICY,spatialPolicy:SPATIAL_POLICY,phases:PHASES,preActorPhases:Object.freeze(Array.from(PRE_ACTOR_PHASES)),postActorPhases:Object.freeze(Array.from(POST_ACTOR_PHASES)),register:registerLayer,drawPreActors,drawPostActors,get layers(){return layers.slice();}});
+window.KELO_ENVIRONMENT_LAYER_AUDIT={version:'environment-layer-stack-v2.5',ready:true,mode:DECORATION_RESET?'blank-world-reset-visible-landmarks-v2':'formal-base-back-actor-front-order-v1',decorationReset:DECORATION_RESET,orderingPolicy:ORDERING_POLICY,spatialPolicy:SPATIAL_POLICY,phases:PHASES,preActorPhases:Array.from(PRE_ACTOR_PHASES),postActorPhases:Array.from(POST_ACTOR_PHASES),layerCount:0,baseLayerCount:0,preActorLayerCount:0,postActorLayerCount:0,priorityTieCount:0,priorityTies:[],spatialOverlapCount:0,spatialOverlaps:[],spatialTieCount:0,spatialTies:[],layers:[],auditMode:'dirty-only-v2',maxStaleMs:null,rebuildCount:0,skippedSyncs:0,lastRebuildAt:0,lastPerfAt:()=>lastAuditAt};
+window.KELO_ENVIRONMENT_LAYERS=Object.freeze({version:'environment-layer-stack-v2.5',decorationReset:DECORATION_RESET,orderingPolicy:ORDERING_POLICY,spatialPolicy:SPATIAL_POLICY,phases:PHASES,preActorPhases:Object.freeze(Array.from(PRE_ACTOR_PHASES)),postActorPhases:Object.freeze(Array.from(POST_ACTOR_PHASES)),register:registerLayer,refreshAudit:()=>syncAudit(true),markAuditDirty,drawPreActors,drawPostActors,get layers(){return layers.slice();}});
 window.KELO_WORLD_RENDERER=Object.freeze({draw,drawPreActors,drawPostActors,districts:base.districts,chunkSize:base.chunkSize,get ready(){return DECORATION_RESET?true:(base.ready&&layers.every(l=>!l.required||l.ready()));},environmentLayerStack:true,preActorLayerStack:true,postActorLayerStack:true,decorationReset:DECORATION_RESET});
 syncAudit(true);
 })();

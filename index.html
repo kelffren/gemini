@@ -7,7 +7,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#05070a">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -15,6 +15,7 @@
   <meta name="apple-mobile-web-app-title" content="KELO WORLD">
   <title>Kelo World — V6.69</title>
   <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="src/ui/responsive-foundation.css?v=1">
   <style>
     *{box-sizing:border-box;margin:0;padding:0;user-select:none;-webkit-user-select:none}
     html,body{width:100%;height:100%;overflow:hidden;background:#05070a}
@@ -87,12 +88,13 @@
 <script src="src/core/player-state-system.js?v=1"></script>
 <script src="src/core/player-position-system.js?v=1-transition-owner"></script>
 <script>window.KELO_COLLISION.attachLegacyObstacleArray(obstacles,{adoptExistingOwner:'core-static'});</script>
-<script src="src/core/input-system.js?v=1"></script>
-<script src="src/core/movement-system.js?v=2"></script>
+<script src="src/core/input-system.js?v=2-zero-copy"></script>
+<script src="src/core/movement-system.js?v=3-zero-garbage"></script>
 <script src="engine-b.js?v=95-boot-ready"></script>
 <script src="engine-c.js?v=232-position-owner"></script>
 <script src="src/core/camera-follow-shadow.js?v=1"></script>
 <script src="src/core/camera-system.js?v=1"></script>
+<script src="src/core/viewport-system.js?v=1"></script>
 <script src="src/core/avatar-render-system.js?v=2-base-zoo-authority"></script>
 <script src="src/core/render-extension-system.js?v=4-render-owner"></script>
 <script src="src/core/simulation-extension-system.js?v=4-sim-owner"></script>
@@ -118,7 +120,7 @@
 <script src="src/environment/district-decals-registry.js?v=3"></script>
 <script src="src/environment/gardens-compositions.js?v=10"></script>
 <script src="src/environment/world-map.js?v=terrain-191"></script>
-<script src="src/environment/environment-layer-stack.js?v=4"></script>
+<script src="src/environment/environment-layer-stack.js?v=5-dirty-audit"></script>
 <script src="src/environment/surface-ground.js?v=1"></script>
 <script src="src/environment/prop-contract.js?v=7-map-probe"></script>
 <script src="src/environment/generic-props.js?v=9"></script>
@@ -127,10 +129,11 @@
 <script src="src/ui/luxe-shell.js?v=231"></script>
 <script src="src/ui/mobile-orientation.js?v=6"></script>
 <script src="src/ui/luxe-player-hud.js?v=4-minimap-live-20260914"></script>
-<script src="src/systems/performance-governor.js?v=4-boot-ready"></script>
+<script src="src/systems/performance-governor.js?v=5-sampled-snapshots"></script>
 <script>window.__keloBootReady=true;window.dispatchEvent(new Event("kelo:boot-ready"));</script>
-<script src="src/core/asset-registry.js?v=1"></script>
-<script src="src/core/module-loader.js?v=9-asset-gate"></script>
+<script src="src/core/feature-registry.js?v=2"></script>
+<script src="src/core/asset-registry.js?v=2-feature-registry"></script>
+<script src="src/core/module-loader.js?v=10-feature-registry"></script>
 <script>window.KELO_MODULE_LOADER&&window.KELO_MODULE_LOADER.start({build:'V6.69'});</script>
 <script src="src/ui/asset-library-launcher.js?v=1"></script>
 <script src="src/core/settings-lazy-gate.js?v=3-update-intel"></script>

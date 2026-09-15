@@ -11,6 +11,7 @@ import { createCompositeCommand } from '../document/composite-command.mjs';
 
 const MAX_PREVIEW_ENTITIES = 500;
 const INPUT_CONTEXT = 'studio-paint-copies';
+const EMPTY_PREVIEWS = Object.freeze([]);
 const copy = value => value == null ? value : (typeof structuredClone === 'function' ? structuredClone(value) : JSON.parse(JSON.stringify(value)));
 function newId() {
   const uuid = globalThis.crypto?.randomUUID?.();
@@ -151,14 +152,8 @@ export function createPaintCopiesTool(kernel) {
     return state();
   }
 
-  function cancelStroke() {
-    stroke = null;
-  }
-
-  function cancel() {
-    stroke = null;
-    template = null;
-  }
+  function cancelStroke() { stroke = null; }
+  function cancel() { stroke = null; template = null; }
 
   async function commit() {
     if (!stroke?.active) throw new Error('STUDIO_PAINT_COPIES_STROKE_NOT_ACTIVE');
@@ -183,10 +178,7 @@ export function createPaintCopiesTool(kernel) {
       pointerdown: event => {
         if (!enabled) return false;
         pointers.add(event.pointerId ?? 'mouse');
-        if (pointers.size > 1) {
-          cancelStroke();
-          return true;
-        }
+        if (pointers.size > 1) { cancelStroke(); return true; }
         if (committing) return true;
         beginAt(event.worldX, event.worldY, { snap: currentSnap() });
         return true;
@@ -220,9 +212,8 @@ export function createPaintCopiesTool(kernel) {
 
   function activate() {
     if (enabled) return true;
-    try {
-      start({ snap: currentSnap() });
-    } catch (error) {
+    try { start({ snap: currentSnap() }); }
+    catch (error) {
       notify('Selecciona un objeto o grupo antes de usar PAINT COPIES');
       syncButton();
       return false;
@@ -246,9 +237,7 @@ export function createPaintCopiesTool(kernel) {
     return false;
   }
 
-  function toggle() {
-    return enabled ? deactivate() : activate();
-  }
+  function toggle() { return enabled ? deactivate() : activate(); }
 
   function syncButton() {
     if (!button?.isConnected) return;
@@ -272,11 +261,7 @@ export function createPaintCopiesTool(kernel) {
     const editBar = shell.querySelector('.ks-ext-edit');
     if (!editBar) return false;
     const existing = editBar.querySelector('[data-ext-paint-copies]');
-    if (existing) {
-      button = existing;
-      syncButton();
-      return true;
-    }
+    if (existing) { button = existing; syncButton(); return true; }
     button = document.createElement('button');
     button.type = 'button';
     button.dataset.extPaintCopies = '1';
@@ -357,6 +342,9 @@ export function createPaintCopiesTool(kernel) {
     cancelStroke,
     cancel,
     state,
-    getPreviews: () => stroke?.previews.map(copy) || []
+    // Safe ownership boundary for external callers that may mutate returned rows.
+    getPreviews: () => stroke?.previews.map(copy) || [],
+    // Renderer-only read path: no structuredClone/JSON clone in the hot frame loop.
+    getPreviewRefs: () => stroke?.previews || EMPTY_PREVIEWS
   });
 }
