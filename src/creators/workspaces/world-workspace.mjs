@@ -15,7 +15,7 @@ const LAUNCH_CURTAIN_ID='kelo-world-launch-curtain';
 const STUDIO_OPEN_MS=20000;
 const DEFAULT_LAUNCH_YIELD_MS=420;
 const DEFAULT_RUNTIME_YIELD_FALLBACK_MS=120;
-const WORLD_BUILD='world-bridge-20260914-12';
+const WORLD_BUILD='world-bridge-20260915-19';
 const PHONE_RUNTIME_ROOTS=Object.freeze([
   '../../studio/render/studio-overlay-canvas.mjs',
   '../../studio/render/creator-grid-overlay.mjs',
