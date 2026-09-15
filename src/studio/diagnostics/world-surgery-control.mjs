@@ -38,6 +38,10 @@ export const WORLD_SURGERY_MODULES=Object.freeze([
   {id:'snapshotLoading',label:'Snapshot Loading',group:'ISOLATABLE'},
 
   {id:'paintCopies',label:'Paint Copies',group:'OPTIONAL',risk:'HISTORICAL REGRESSION · c13cceaf'},
+  {id:'quickBuild',label:'Quick Build',group:'OPTIONAL'},
+  {id:'roomBuild',label:'Room Build',group:'OPTIONAL'},
+  {id:'roomOpening',label:'Room Opening',group:'OPTIONAL'},
+  {id:'roomMaterial',label:'Room Material',group:'OPTIONAL'},
   {id:'assetPalette',label:'Asset Palette',group:'OPTIONAL'},
   {id:'assetFavorites',label:'Asset Favorites',group:'OPTIONAL'},
   {id:'assetKeyboard',label:'Asset Keyboard',group:'OPTIONAL'},

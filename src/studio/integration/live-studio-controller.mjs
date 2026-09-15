@@ -32,6 +32,7 @@ async function loadLiveStudioChrome(){
 
 async function loadLiveStudioRuntime(root){
   const phone=isPhone(root);
+  const surgery=root.KELO_WORLD_SURGERY; // WORLD SURGERY LIVE IMPORT GATES
   const {yieldStudioBoot,setWorldLaunchStatus}=await import('./studio-boot-pace.mjs');
   const wait=async()=>{await yieldStudioBoot(root);if(phone)await pause(root,40);};
   const abortIfNeeded=()=>{if(root.KELO_WORLD_LAUNCH_ABORTED)throw new Error('WORLD_EDITOR_OPEN_TIMEOUT');};
@@ -41,13 +42,14 @@ async function loadLiveStudioRuntime(root){
     overlayMod={createStudioOverlayCanvas:()=>({canvas:null,ctx:null,resize:()=>({}),clear(){},destroy(){},dpr:1})};
     gridMod={createCreatorGridOverlay:()=>({draw(){},configure(){}})};
     pointerMod=await import('../input/pointer-input-adapter.mjs');await wait();abortIfNeeded();
-    cameraMod=await import('../input/studio-camera-controller.mjs');await wait();abortIfNeeded();
+    if(surgery?.enabled?.('cameraController')===false){cameraMod={createStudioCameraController:null};surgery?.markStatus?.('cameraController','DISABLED',{phase:'module-import'});}
+    else{cameraMod=await import('../input/studio-camera-controller.mjs');await wait();abortIfNeeded();}
   }else{
     [overlayMod,gridMod,pointerMod,cameraMod]=await Promise.all([
-      import('../render/studio-overlay-canvas.mjs'),
-      import('../render/creator-grid-overlay.mjs'),
+      surgery?.enabled?.('overlay')===false?Promise.resolve({createStudioOverlayCanvas:null}):import('../render/studio-overlay-canvas.mjs'),
+      surgery?.enabled?.('grid')===false?Promise.resolve({createCreatorGridOverlay:null}):import('../render/creator-grid-overlay.mjs'),
       import('../input/pointer-input-adapter.mjs'),
-      import('../input/studio-camera-controller.mjs')
+      surgery?.enabled?.('cameraController')===false?Promise.resolve({createStudioCameraController:null}):import('../input/studio-camera-controller.mjs')
     ]);
     await wait();
     abortIfNeeded();
@@ -55,7 +57,8 @@ async function loadLiveStudioRuntime(root){
   setWorldLaunchStatus(root,'Cargando núcleo…');
   let mirrorMod,prodMod,actionsMod,prefabMod,analyzerMod,commandsMod;
   if(phone){
-    mirrorMod=await import('./authority-command-mirror.mjs');await wait();abortIfNeeded();
+    if(surgery?.enabled?.('authorityMirror')===false){mirrorMod={installStudioAuthorityMirror:null};surgery?.markStatus?.('authorityMirror','DISABLED',{phase:'module-import'});}
+    else{mirrorMod=await import('./authority-command-mirror.mjs');await wait();abortIfNeeded();}
     prodMod={createCreatorProductivityPanel:null};
     actionsMod=await import('../tools/creator-actions.mjs');await wait();abortIfNeeded();
     prefabMod=await import('../prefabs/creator-prefab-library.mjs');await wait();abortIfNeeded();
@@ -63,7 +66,7 @@ async function loadLiveStudioRuntime(root){
     commandsMod=await import('../document/document-commands.mjs');await wait();abortIfNeeded();
   }else{
     [mirrorMod,prodMod,actionsMod,prefabMod,analyzerMod,commandsMod]=await Promise.all([
-      import('./authority-command-mirror.mjs'),
+      surgery?.enabled?.('authorityMirror')===false?Promise.resolve({installStudioAuthorityMirror:null}):import('./authority-command-mirror.mjs'),
       import('../ui/creator-productivity-panel.mjs'),
       import('../tools/creator-actions.mjs'),
       import('../prefabs/creator-prefab-library.mjs'),
@@ -216,6 +219,21 @@ function createPacedPhoneAssetPreview(assetPreview,root){
   });
 }
 
+function createNoopAuthorityMirror(){
+  return Object.freeze({uninstall(){},previewScale:async()=>null,authorityIdFor:()=>null,collisionAuthorityIdFor:()=>null,seed(){},seedCollision(){},clear(){}});
+}
+function createNoopCameraController(root){
+  let zoom=1,panMode=false;
+  const snapshot=()=>root.KeloCamera?.snapshot?.()||{x:0,y:0,effectiveZoom:1,screenW:root.innerWidth||1,screenH:root.innerHeight||1};
+  return Object.freeze({
+    toWorld:(x,y)=>root.KeloCamera?.screenToWorld?.(Number(x)||0,Number(y)||0)||{x:Number(x)||0,y:Number(y)||0},
+    panScreen(){return null;},setCenter(){return null;},
+    setZoom(next){zoom=Math.max(.2,Math.min(5,Number(next)||1));return zoom;},
+    focusRect(){return null;},setPanMode(value){panMode=!!value;return panMode;},resume(){},suspend(){},destroy(){},snapshot,
+    minZoom:.2,maxZoom:5,get zoom(){return zoom;},get effectiveZoom(){return Number(snapshot().effectiveZoom)||1;},get enabled(){return false;},get panMode(){return panMode;}
+  });
+}
+
 export async function openKeloStudioLive({root=globalThis}={}){
   if(active)return active;if(!root.document)throw new Error('STUDIO_DOM_REQUIRED');
   const actorId=actor(root);if(!root.KELO_ADMIN_KEYS?.can?.('world.edit',actorId))throw new Error('ADMIN_KEY_PERMISSION_DENIED');if(root.KELO_WORLD_BUILDER?.isMainWorld&&!root.KELO_WORLD_BUILDER.isMainWorld())throw new Error('STUDIO_MAIN_WORLD_ONLY');if(!root.KeloInputLocks?.acquire||!root.KeloInputLocks?.release)throw new Error('STUDIO_INPUT_LOCKS_NOT_READY');
@@ -252,13 +270,17 @@ export async function openKeloStudioLive({root=globalThis}={}){
     if(canvas?.closest?.('.ks-compact-asset'))phonePreview?.renderPriority(canvas,asset);
     else phonePreview?.render(canvas,asset);
   };
-  let draftId=draft.draftId;const mirror=installStudioAuthorityMirror({adapter:studio.adapter,actorId,getDraftId:()=>draftId});
+  let draftId=draft.draftId;
+  const mirror=surgery?.enabled?.('authorityMirror')===false||typeof installStudioAuthorityMirror!=='function'
+    ? createNoopAuthorityMirror()
+    : installStudioAuthorityMirror({adapter:studio.adapter,actorId,getDraftId:()=>draftId});
+  surgery?.markStatus?.('authorityMirror',surgery?.enabled?.('authorityMirror')===false?'DISABLED':'ACTIVE',{phase:'live-mount'});
   let inputLockToken=null,overlay=null,overlayStart=0,shell=null,productivity=null,cameraController=null,unregisterInput=null,detachPointer=null,selectionUnsub=null,frame=0,running=true,playing=false,mode='select',dragEntity=null,directGesture=null,onKey=null,pinchScale=null,pinchPreviewFrame=0,pinchPreviewPending=null,pinchPreviewChain=Promise.resolve();
   try{
     inputLockToken=root.KeloInputLocks.acquire('kelo-studio',{kind:'creator-session',draftId});
     const baseAssets=studio.adapter.assetCatalog.list()||[],allAssets=()=>[...baseAssets,...prefabLibrary.assets()];
     const materials=Array.from(new Set([...(root.KELO_WORLD_BUILDER?.materials||[]),...Object.keys(root.KELO_TERRAIN_CONTRACT?.materials||{})])),groundMaterial=materials.includes('grass')?'grass':materials[0]||'grass',pathMaterial=materials.includes('marble')?'marble':materials[1]||materials[0]||'grass';
-    let snapSize=Math.max(1,Number(studio.kernel.document.settings?.tileSize)||32);const gridOverlay=surgery?.enabled?.('grid')===false?{draw(){},configure(){}}:createCreatorGridOverlay({size:snapSize,visible:true});
+    let snapSize=Math.max(1,Number(studio.kernel.document.settings?.tileSize)||32);const gridOverlay=surgery?.enabled?.('grid')===false||typeof createCreatorGridOverlay!=='function'?{draw(){},configure(){}}:createCreatorGridOverlay({size:snapSize,visible:true});
     surgery?.markStatus?.('grid',surgery?.enabled?.('grid')===false?'DISABLED':'ACTIVE',{phase:'live-mount'});
     const surfaceCount=()=>Object.keys(studio.kernel.document.terrain||{}).length,collisionCount=()=>Object.keys(studio.kernel.document.navigation?.collisions||{}).length,scene=()=>({entities:studio.kernel.document.entities,selection:studio.kernel.selection.get()});
     const isStudioUi=e=>!!e?.target?.closest?.('[data-kelo-studio-ui]');
@@ -290,7 +312,10 @@ export async function openKeloStudioLive({root=globalThis}={}){
     function setPlayChrome(on){const r=shell?.root;if(!r)return;for(const sel of ['.ks-left','.ks-right','.ks-bottom']){const el=r.querySelector(sel);if(el)el.style.display=on?'none':'';}const b=r.querySelector('[data-act="play"]');if(b)b.textContent=on?'■ EDIT':'▶ PLAY';if(overlay?.canvas)overlay.canvas.style.display=on?'none':'';}
     async function togglePlaytest(){if(!playing){await saveDraft();playing=true;cancelDirectGesture();cameraController?.suspend();if(inputLockToken){root.KeloInputLocks.release(inputLockToken);inputLockToken=null;}setPlayChrome(true);toast(root,'Playtest activo · toca EDIT para volver');}else{inputLockToken=root.KeloInputLocks.acquire('kelo-studio',{kind:'creator-session',draftId});playing=false;cameraController?.resume();cameraController?.setPanMode(mode==='camera');setPlayChrome(false);toast(root,'Modo edición');}updateShell();}
     function cancelForCamera(){dragEntity=null;cancelDirectGesture();studio.tools.transform.cancel();studio.tools.marquee.cancel();if(studio.tools.terrain.state().stroke)studio.tools.terrain.cancel();studio.tools.collision.cancel();}
-    cameraController=createStudioCameraController({root,isUi:isStudioUi,onNavigateStart:cancelForCamera,onPinchStart:payload=>mode==='select'?false:beginPinchScale(payload),onPinchMove:movePinchScale,onPinchEnd:payload=>{void guarded(()=>endPinchScale(payload));}});
+    cameraController=surgery?.enabled?.('cameraController')===false||typeof createStudioCameraController!=='function'
+      ? createNoopCameraController(root)
+      : createStudioCameraController({root,isUi:isStudioUi,onNavigateStart:cancelForCamera,onPinchStart:payload=>mode==='select'?false:beginPinchScale(payload),onPinchMove:movePinchScale,onPinchEnd:payload=>{void guarded(()=>endPinchScale(payload));}});
+    surgery?.markStatus?.('cameraController',surgery?.enabled?.('cameraController')===false?'DISABLED':'ACTIVE',{phase:'live-mount'});
 
     const handlers={
       pointerdown:e=>{if(playing)return false;if(mode==='camera')return true;if(mode==='placement'){studio.tools.placement.move(e.worldX,e.worldY,{snap:snapSize});return true;}if(mode==='prefab'){studio.tools.prefabStamp.move(e.worldX,e.worldY,{snap:snapSize});return true;}if(mode==='terrain'||mode==='path'){studio.tools.terrain.beginStroke(e.worldX,e.worldY);return true;}if(mode==='collision'){studio.tools.collision.beginAt(e.worldX,e.worldY);return true;}const append=mode==='select'&&!!(e.originalEvent?.shiftKey||e.originalEvent?.metaKey||e.originalEvent?.ctrlKey),hit=studio.tools.select.selectPoint(e.worldX,e.worldY,{append});if(mode==='move'&&hit){dragEntity=hit.id;studio.tools.transform.begin(hit.id);}else if(mode==='select'&&hit&&!append){beginDirectObjectDrag(e,hit);}else if(mode==='select'&&!hit&&e.pointerType==='touch'&&!append){beginDirectCameraPan(e);}else if(mode==='select'&&!hit&&e.pointerType!=='touch')studio.tools.marquee.begin(e.worldX,e.worldY,{append});updateShell();return true;},
@@ -385,7 +410,7 @@ export async function openKeloStudioLive({root=globalThis}={}){
     function startStudioOverlayDraw(){
       overlayStart=0;
       if(!running||overlay)return;
-      if(phoneOverlay)return;
+      if(phoneOverlay||surgery?.enabled?.('overlay')===false||typeof createStudioOverlayCanvas!=='function'){surgery?.markStatus?.('overlay','DISABLED',{phase:'live-overlay'});return;}
       try{overlay=createStudioOverlayCanvas({host:root.document.body});}catch(error){console.warn('[Kelo Studio] overlay canvas unavailable; chrome stays up',error);return;}
       draw();
     }
