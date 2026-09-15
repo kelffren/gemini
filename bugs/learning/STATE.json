@@ -790,9 +790,20 @@
         "scripts/legacy-observatory.mjs",
         "src/core/migration-switchboard.js"
       ]
+    },
+    {
+      "id": "prevention:e7d99e78789e43ed8fa4f0ce8bbfae2ad3395825",
+      "at": "2026-09-15T06:00:02.000Z",
+      "source": "bug-prevention-ci",
+      "head_sha": "e7d99e78789e43ed8fa4f0ce8bbfae2ad3395825",
+      "base_sha": "9072c2724ef1653dd14f3311e432da31b849a0fb",
+      "conclusion": "failure",
+      "files": [
+        "src/studio/diagnostics/world-surgery-runtime.mjs"
+      ]
     }
   ],
-  "feedback_updated_at": "2026-09-15T05:29:55.118Z",
+  "feedback_updated_at": "2026-09-15T06:00:16.966Z",
   "training": {
     "examples": 58,
     "search_examples": 43,
