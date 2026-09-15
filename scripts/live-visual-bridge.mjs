@@ -75,23 +75,6 @@ function startStaticServer() {
   });
 }
 
-function isBenignUrl(url = '') {
-  return /\/favicon\.ico(?:$|\?)/i.test(url);
-}
-
-function consoleLocationUrl(entry) {
-  return entry?.location?.url || '';
-}
-
-function hardConsoleErrors(entries) {
-  return entries.filter((entry) => {
-    const text = String(entry?.text || '');
-    const url = consoleLocationUrl(entry);
-    if (isBenignUrl(url) && /404/.test(text)) return false;
-    return true;
-  });
-}
-
 async function countFrames(page, durationMs = 900) {
   return page.evaluate((duration) => new Promise((resolve) => {
     const started = performance.now();
@@ -230,9 +213,9 @@ try {
   const dy = (result.after?.player?.y ?? 0) - (result.before?.player?.y ?? 0);
   result.movement = { dx, dy, distance: Math.hypot(dx, dy) };
 
-  const hardConsole = hardConsoleErrors(result.consoleErrors);
-  const hardHttp = result.httpErrors.filter((entry) => !isBenignUrl(entry.url));
-  const hardRequests = result.requestFailures.filter((entry) => !isBenignUrl(entry.url));
+  const hardConsole = [...result.consoleErrors];
+  const hardHttp = [...result.httpErrors];
+  const hardRequests = [...result.requestFailures];
 
   result.checks = {
     bootReady: result.after?.bootReady === true,
