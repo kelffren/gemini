@@ -1,0 +1,20 @@
+import assert from 'node:assert/strict';
+import {inspectAssetContainer} from '../src/creators/sprite-compiler/asset-safe-decode.mjs';
+import {validateAssetMetadata} from '../src/creators/sprite-compiler/asset-metadata-schema.mjs';
+import {createAssetTransaction} from '../src/creators/sprite-compiler/asset-transaction.mjs';
+import {scoreVisualRegression} from '../src/creators/sprite-compiler/asset-visual-regression.mjs';
+import {canonicalizeAlphaMode,inferSemanticAnchors} from '../src/creators/sprite-compiler/asset-canonicalization.mjs';
+import {packAtlasDeterministically,generateMipChain,estimateRuntimeTextureBudget} from '../src/creators/sprite-compiler/asset-runtime-optimization.mjs';
+import {auditTemporalConsistency,detectAiAssetDefects} from '../src/creators/sprite-compiler/asset-quality-v7.mjs';
+
+const png=new Uint8Array(24);png.set([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a],0);png.set([0,0,0,13],8);png.set([0x49,0x48,0x44,0x52],12);png.set([0,0,0,32,0,0,0,16],16);const header=inspectAssetContainer(png);assert.equal(header.valid,true);assert.equal(header.width,32);assert.equal(header.height,16);
+const rgba=new Uint8ClampedArray(16*16*4);for(let y=3;y<15;y++)for(let x=5;x<11;x++){const i=(y*16+x)*4;rgba[i]=120;rgba[i+1]=80;rgba[i+2]=40;rgba[i+3]=255;}rgba[0]=255;const alpha=canonicalizeAlphaMode(rgba,16,16);assert.equal(alpha.hiddenRgbCleared,1);const anchors=inferSemanticAnchors(alpha.data,16,16);assert.ok(anchors.anchors.feet.y>.8);
+const defects=detectAiAssetDefects(alpha.data,16,16);assert.ok(!defects.reasons.includes('EMPTY_ASSET'));
+const atlas=packAtlasDeterministically([{id:'b',width:20,height:10},{id:'a',width:10,height:20}],{maxWidth:64,padding:2});assert.equal(atlas.items[0].id,'a');
+const mips=generateMipChain(alpha.data,16,16);assert.ok(mips.levels.length>=4);assert.equal(mips.levels.at(-1).width,1);assert.equal(mips.levels.at(-1).height,1);
+const budget=estimateRuntimeTextureBudget({width:1024,height:1024,mipmaps:true});assert.ok(budget.rawMiB>5&&budget.rawMiB<6);
+const same=scoreVisualRegression(alpha.data,alpha.data);assert.equal(same.pass,true);assert.equal(same.changedPixels,0);
+const tx=createAssetTransaction({id:'audit'});tx.stage('blob',{ok:true});tx.gate('health',true);const committed=tx.commit();assert.equal(committed.state,'COMMITTED');
+assert.equal(validateAssetMetadata({schema:'kelo-asset-v2',assetId:'x',build:{fingerprint:'abc'},runtime:{width:1,height:1}}).valid,true);
+const temporal=auditTemporalConsistency([{bounds:{x:1,y:1,w:6,h:10},pixels:60},{bounds:{x:1.2,y:1,w:6,h:10},pixels:60},{bounds:{x:.9,y:1,w:6,h:10},pixels:60}]);assert.equal(temporal.status,'VALIDATED');
+console.log(JSON.stringify({ok:true,header,atlas:{width:atlas.width,height:atlas.height},mips:mips.levels.length,budgetMiB:Number(budget.rawMiB.toFixed(2)),temporal:temporal.status}));
