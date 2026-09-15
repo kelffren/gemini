@@ -1,0 +1,29 @@
+name: World Surgery Contract
+
+on:
+  push:
+    branches: [world-surgery]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Syntax check surgery surface
+        run: |
+          node --check src/studio/diagnostics/world-surgery-control.mjs
+          node --check src/studio/diagnostics/world-surgery-runtime.mjs
+          node --check src/studio/studio-entry.mjs
+          node --check src/studio/tools/register-build-tools.mjs
+          node --check src/studio/tools/paint-copies-tool.mjs
+          node --check src/creators/ui/creator-hub.mjs
+      - name: Unified control-plane contract
+        run: node scripts/world-surgery-contract.mjs

@@ -1,0 +1,50 @@
+name: World Surgery Functional Smoke
+
+on:
+  push:
+    branches: [world-surgery]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mobile-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax check
+        run: |
+          node --check scripts/world-surgery-asset-visual-smoke.mjs
+          node --check src/studio/adapters/kelo-runtime-adapter.mjs
+          node --check src/studio/render/studio-asset-preview-service.mjs
+          node --check src/studio/render/studio-mobile-placement-ghost.mjs
+          node --check src/studio/integration/live-studio-controller.mjs
+          node --check src/studio/integration/live-studio-controller-base.mjs
+      - name: Install Playwright package
+        run: npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund playwright@1.55.0
+      - name: Serve branch candidate
+        run: |
+          python3 -m http.server 8000 --bind 127.0.0.1 >/tmp/world-surgery-http.log 2>&1 &
+          for i in {1..20}; do curl -fsS http://127.0.0.1:8000/index.html >/dev/null && exit 0; sleep 1; done
+          cat /tmp/world-surgery-http.log
+          exit 1
+      - name: Run full mobile asset visual smoke
+        env:
+          AUDIT_URL: http://127.0.0.1:8000/
+          CHROME_BIN: /usr/bin/google-chrome
+        run: node scripts/world-surgery-asset-visual-smoke.mjs
+      - name: Upload World Surgery visual proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: world-surgery-asset-proof-${{ github.run_id }}
+          if-no-files-found: warn
+          retention-days: 7
+          path: |
+            test-results/world-surgery-asset-proof/**
+            /tmp/world-surgery-http.log
