@@ -2,231 +2,292 @@
 
 ## Purpose
 
-World Forensic Autopsy turns a vague regression such as **"World froze"** into a reproducible boundary:
+World Forensic Autopsy converts a vague regression such as **"World froze"** into a reproducible chain:
 
-`LAST GOOD -> FIRST BAD -> changed files -> risky side effects -> likely fix candidates`
+`LAST GOOD -> FIRST BAD -> changed files -> risky side effects -> probable later fix`
 
-It automates the forensic procedure used to isolate the historical World Editor regression where `ea14e48426ac20aff44da009f0d615d8562cf7cd` was GOOD and `c13cceafecd4edc9144a99a108eb2851f88a7541` was the first BAD boundary for `WORLD_MOUNT`.
+It automates the forensic procedure used to isolate the historical World Editor regression where:
 
-This system does **not** automatically modify production. It only checks out historical commits inside CI, runs probes, and uploads evidence.
+- `ea14e48426ac20aff44da009f0d615d8562cf7cd` was the last confirmed GOOD boundary.
+- `c13cceafecd4edc9144a99a108eb2851f88a7541` was the first BAD `WORLD_MOUNT` boundary.
+- the first BAD commit was `studio: make paint copies interactive`.
+- a later related fix was `51bd0453876296e1548b70e38f89338bfdb05f9a` — `fix(studio): stop Paint Copies DOM mutation storm`.
 
-## Mental model
+The forensic system does **not** automatically revert, patch, merge, force-push or change Pages.
 
-There are two complementary diagnostic layers.
+---
 
-### Layer A — Runtime Surgery
+## Ownership — one bisect engine only
 
-Runs inside the current build.
+Kelo World already has a canonical historical regression engine:
 
-- records `START module`
-- records `DONE module`
-- writes heartbeat every ~400 ms
-- persists last started/completed module
-- can disable modules with kill switches
-- can run module Auto Bisect
+```text
+Bug Intelligence / Recovery Mesh
+└── scripts/recovery-bisect.mjs
+    └── scripts/recovery-profile-runner.mjs
+```
 
-This answers:
+`recovery:bisect` is the **single owner** of commit binary search.
 
-> Which subsystem was executing when this build died?
+`World Forensic Autopsy` does not implement a second bisect. It wraps that owner and adds the forensic work that was previously manual:
 
-### Layer B — Git Forensic Autopsy
+1. validate GOOD/BAD assumptions;
+2. run the canonical recovery bisect;
+3. revalidate parent GOOD / child BAD repeatedly;
+4. inspect only the boundary diff;
+5. score newly added risky side effects;
+6. search later commits touching the same files for likely fixes;
+7. produce one evidence package.
 
-Runs against repository history.
+---
 
-- receives a known GOOD SHA and BAD SHA
-- validates both endpoints
-- walks the ancestry using binary search
-- executes the same deterministic probe at every candidate SHA
-- finds the first BAD commit
-- re-tests the parent and first BAD multiple times
-- diffs only that boundary
-- scores risky side effects added by that commit
-- searches later commits touching the same files for likely fixes
+## Mental map
 
-This answers:
+There are two complementary diagnostic dimensions.
 
-> Which historical code change introduced the regression?
+### A. Runtime Surgery — where did this build die?
 
-Together they create a two-dimensional diagnosis:
+Inside the current build:
 
-`runtime module suspect + historical first-bad commit`.
+```text
+START module
+↓
+heartbeat
+↓
+DONE module
+```
 
-## Historical procedure being automated
+If Safari dies after START and before DONE, World Surgery preserves the last started module as a runtime suspect.
 
-The original forensic investigation deliberately separated four roles:
+It can then disable modules or run module-level Auto Bisect.
 
-1. **Cartographer** — commit graph, SHAs, ancestry, diffs.
-2. **Interpreter** — execution path and boot/mount phases.
-3. **Devil's Advocate** — tries to disprove the current hypothesis.
-4. **Reporter** — records evidence and a reproducible experiment.
+### B. Historical Forensics — which code change introduced it?
 
-The automated implementation preserves those responsibilities as phases instead of pretending one test proves everything.
+Against Git history:
 
-## Phases
+```text
+KNOWN GOOD SHA
+      ↓
+recovery:bisect
+      ↓
+FIRST BAD candidate
+      ↓
+revalidate parent GOOD
+revalidate child BAD
+      ↓
+boundary diff
+      ↓
+side-effect scanner
+      ↓
+probable later fixes
+```
 
-### 0. Inputs
+Together:
 
-Required:
+```text
+runtime suspect
+      +
+historical first-bad commit
+      ↓
+small causal search space
+```
 
-- `GOOD_SHA`
-- `BAD_SHA`
-- probe mode
+---
 
-Probe modes:
+## The original forensic method now encoded
 
-- `BOOT` — page reaches a responsive boot state.
-- `WORLD_MOUNT` — Creator Hub opens and `#kelo-studio-live` mounts and remains responsive.
-- `CUSTOM` — caller supplies a shell command as the probe.
+The historical investigation effectively separated four jobs.
 
-### 1. Endpoint validation
+### 1. Cartographer
 
-Before bisecting:
+Owns:
 
-- GOOD must pass.
-- BAD must fail.
-- GOOD must be an ancestor of BAD.
+- commit graph;
+- GOOD/BAD refs;
+- ancestry;
+- first-bad search;
+- exact boundary diff.
 
-If those assumptions are false, the run stops. We do not manufacture a boundary from invalid endpoints.
+Automated owner: `scripts/recovery-bisect.mjs`.
 
-### 2. Binary search over hashes
+### 2. Interpreter
 
-The engine obtains the ordered ancestry path from GOOD to BAD and tests the midpoint.
+Owns the meaning of the failing phase.
 
-- PASS -> move toward BAD.
-- FAIL -> move toward GOOD.
+Available stable Recovery profiles:
 
-Continue until one candidate remains.
+- `BOOT` -> `boot`
+- `WORLD_MOUNT` -> `world`
+- `MOVEMENT` -> `movement`
+- `FULL` -> `full`
 
-This is equivalent to the manual hash-by-hash forensic process but requires approximately `log2(N)` probes rather than testing every commit.
+The same frozen profile runner is used while the checked-out game code changes underneath it.
 
-### 3. Boundary revalidation
+### 3. Devil's Advocate
 
-The alleged boundary is never accepted immediately.
+The system tries to disprove its own answer.
 
-The engine re-runs:
+Before accepting the boundary:
 
-- parent of FIRST_BAD: must repeatedly PASS.
-- FIRST_BAD: must repeatedly FAIL.
+- input GOOD must PASS;
+- input BAD must FAIL;
+- FIRST BAD parent must repeatedly PASS;
+- FIRST BAD must repeatedly FAIL.
 
-Default: 2 repetitions each.
+Default boundary repetitions: `2`.
 
-If the boundary is flaky, the report says **FLAKY / UNCONFIRMED**, not FIRST BAD CONFIRMED.
+If this does not reproduce, the report is **UNCONFIRMED / FLAKY**.
 
-### 4. Failure-layer separation
+### 4. Reporter
 
-A UI-level failure can be a secondary boundary rather than the original freeze.
+Produces evidence rather than a guess:
 
-When investigating boot regressions, prefer this sequence:
+- `report.json`
+- `REPORT.md`
+- canonical Recovery bisect report/log
+- revalidation evidence
+- changed-file inventory
+- side-effect findings
+- probable later fix candidates
 
-1. `BOOT`
-2. `WORLD_MOUNT`
-3. richer placement/functional probes
+---
 
-A commit that merely hides an Assets row is not automatically the first boot regression.
+## Why phase selection matters
 
-### 5. Diff autopsy
+The forensic investigation taught us that a richer UI test can reveal a **secondary boundary** rather than the original freeze.
 
-For `PARENT -> FIRST_BAD`, collect:
+Example mental rule:
 
-- commit message/date
-- changed files
-- additions/deletions
-- zero-context diff
-- added side effects
+```text
+UI behavior changed
+!=
+first boot/mount regression
+```
 
-Risk scanner highlights additions such as:
+Therefore use the smallest profile matching the observed symptom.
+
+For a World Editor freeze, prefer `WORLD_MOUNT` first.
+
+If needed, compare with `BOOT` or `FULL` afterwards to determine whether the regression is global boot, World-only, movement-related or a richer functional failure.
+
+Do not promote a secondary UI boundary to root cause without the narrower probe.
+
+---
+
+## Side-effect scanner
+
+Once FIRST BAD is confirmed, the autopsy only analyzes:
+
+`PARENT -> FIRST_BAD`
+
+Added lines receive diagnostic attention for patterns such as:
 
 - `MutationObserver`
-- global/subtree DOM observation
+- broad `subtree:true` observation
+- `document.body`
 - `innerHTML` / `outerHTML`
 - `replaceChildren`
-- `addEventListener`
-- intervals/timeouts
+- event listeners
+- intervals / timeouts
 - `requestAnimationFrame`
 - Workers
 - IndexedDB
 - `structuredClone`
 - dynamic imports
 - `cloneNode`
-- direct `document.body` mutation
 - unbounded loops
 
-A risk hit is a **lead**, not proof of causality.
+Scores prioritize review. They do **not** prove causality.
 
-### 6. Historical-fix search
+The Paint Copies case is the model example: the first-bad diff introduced a broad DOM observation path and DOM writes, while a later commit explicitly referenced stopping a Paint Copies DOM mutation storm.
 
-For every file changed by FIRST_BAD, inspect later commits touching the same file and prioritize commit messages containing terms such as:
+---
 
-`fix, freeze, frozen, hang, storm, observer, loop, boot, mount, safari, iphone, performance, regression`
+## Historical-fix search
 
-This is how a later fix such as `fix(studio): stop Paint Copies DOM mutation storm` becomes supporting evidence rather than coincidence.
+For every file touched by FIRST BAD, the autopsy scans later commits touching that same file and prioritizes messages containing terms such as:
 
-### 7. Evidence package
+`fix, freeze, frozen, hang, storm, observer, loop, boot, mount, safari, iphone, performance, regression, deadlock, stuck`
 
-Every run produces:
+A matching later fix is supporting evidence, not independent proof.
 
-- `report.json`
-- `REPORT.md`
-- tested SHA sequence
-- endpoint results
-- boundary revalidation results
-- changed-file inventory
-- risky-side-effect findings
-- probable later fix candidates
+---
 
-## Example: historical Paint Copies regression
+## Automatic Regression Watch
 
-Known historical evidence:
+`World Forensic Regression Watch` observes selected World workflows after this capability reaches the default branch.
 
-- GOOD: `ea14e48426ac20aff44da009f0d615d8562cf7cd`
-- FIRST BAD: `c13cceafecd4edc9144a99a108eb2851f88a7541`
-- first-bad message: `studio: make paint copies interactive`
-- changed runtime area: Paint Copies
-- high-risk side effect: broad `MutationObserver` plus DOM writes
-- later related fix: `51bd0453876296e1548b70e38f89338bfdb05f9a`
-- fix message: `fix(studio): stop Paint Copies DOM mutation storm`
+When a monitored push workflow changes to FAILURE:
 
-The purpose of this example is to test the forensic engine against a regression whose answer is already known.
+1. current failing SHA becomes BAD;
+2. the watch finds the most recent earlier SUCCESS on the same workflow/branch;
+3. that SHA becomes GOOD;
+4. it dispatches `World Forensic Autopsy`;
+5. the autopsy validates the endpoints before trusting them;
+6. the report is uploaded as a GitHub Actions artifact.
 
-## Automatic regression watch
+This means the future default workflow is intended to be:
 
-Once the workflows live on the default branch, `World Forensic Regression Watch` can observe selected World gates.
+```text
+CI green
+↓
+new commit
+↓
+World gate red
+↓
+Regression Watch
+↓
+last green SHA + current red SHA
+↓
+Recovery bisect
+↓
+confirmed first bad
+↓
+diff + side effects + later fix candidates
+```
 
-When a monitored workflow changes from a previous SUCCESS to a new FAILURE:
+No human has to manually try hundreds or thousands of hashes.
 
-1. failing run SHA becomes BAD.
-2. most recent earlier successful run on the same branch becomes GOOD.
-3. the watch dispatches `World Forensic Autopsy` automatically.
-4. the generated report is uploaded as a workflow artifact.
-
-No production code is reverted or modified.
-
-## Safety rules
-
-- Never force-push during forensic analysis.
-- Never mutate historical archive branches.
-- Never automatically merge a suspected fix.
-- Never call a commit FIRST BAD unless parent GOOD / child BAD is reproducible.
-- A Chromium result is not REAL IPHONE evidence.
-- Runtime `SUSPECT` and historical risk scores are diagnostic rankings, not certainty.
+---
 
 ## Commands
 
-Manual local/CI invocation:
+Direct autopsy:
 
 ```bash
 FORENSIC_GOOD=<good-sha> \
 FORENSIC_BAD=<bad-sha> \
 FORENSIC_MODE=WORLD_MOUNT \
+FORENSIC_REPEAT=2 \
 node scripts/world-forensic-autopsy.mjs
 ```
 
-Custom probe:
+Canonical lower-level bisect:
 
 ```bash
-FORENSIC_GOOD=<good-sha> \
-FORENSIC_BAD=<bad-sha> \
-FORENSIC_MODE=CUSTOM \
-FORENSIC_PROBE_COMMAND='npm test -- my-regression-test' \
-node scripts/world-forensic-autopsy.mjs
+npm run recovery:bisect -- --good=<good-sha> --bad=<bad-sha> --profile=world
 ```
+
+Supported autopsy modes:
+
+```text
+BOOT
+WORLD_MOUNT
+MOVEMENT
+FULL
+```
+
+Arbitrary shell probes are intentionally **not** exposed by World Forensic Autopsy. The Recovery Mesh uses allowlisted deterministic profiles so a workflow input cannot execute arbitrary repository commands.
+
+---
+
+## Safety / evidence rules
+
+- Never force-push during forensic analysis.
+- Never mutate archived historical branches.
+- Never auto-merge a suspected fix.
+- Never call a commit FIRST BAD unless the parent PASS / child FAIL boundary reproduces.
+- `SKIP` is infrastructure uncertainty, not PASS or FAIL.
+- Chromium/iPhone emulation is not REAL IPHONE evidence.
+- Runtime `SUSPECT`, risk scores and fix-message matches are diagnostic leads, not causal verdicts.
+- The final real-device gate remains Safari on a physical iPhone when the historical symptom was iPhone-specific.
