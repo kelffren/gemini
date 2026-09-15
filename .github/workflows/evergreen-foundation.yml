@@ -1,0 +1,41 @@
+name: Evergreen Foundation Guard
+
+on:
+  push:
+    branches:
+      - evergreen-migration-2026-09-15
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: evergreen-foundation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  foundation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: State migration characterization
+        run: node tests/state-store-migration.test.cjs
+
+      - name: Foundation architecture audit
+        run: node scripts/foundation-architecture-audit.js
+
+      - name: Static boot contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f src/core/state-store-bootstrap.js
+          grep -q 'state-store-bootstrap.js' index.html
+          node -e "const fs=require('fs');const html=fs.readFileSync('index.html','utf8');const state=html.indexOf('state-store-bootstrap.js');const legacy=html.indexOf('engine-a.js');if(state<0||legacy<0||state>legacy)throw new Error('state migrator must load before engine-a');console.log('BOOT CONTRACT PASS')"
