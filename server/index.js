@@ -1,10 +1,10 @@
 /* KELO-INDEX
  * area: SERVER / NETWORK
  * owner: Kelo server authority + server/pvp-authority.js for PvP simulation
- * keys: WEBSOCKET AUTHORITY INPUT INTENT FIXED TIMESTEP RECONCILIATION PVP TITLES COMMERCE FORGE AOI SPATIAL GRID HYSTERESIS PERFORMANCE IDENTITY SUPABASE AVATAR HEALTH READINESS HEARTBEAT SHUTDOWN GUARDIAN NOTIFICATION
- * purpose: autoridad server-side; PvP acepta inputs/intents y todas las salidas de estado/presentación se filtran por zone + AOI por viewer; notificaciones globales se autorizan con roles/permisos Supabase
- * online: pose sigue para mundo social; dentro de PvP la posición, dash, cooldown, mana, hits, HP, CC, muerte y kills nacen del fixed-step server; hello resuelve identidad Supabase y avatar persistido cuando existe
- * do-not: NO broadcast global periódico de actores, NO daño/posición PvP declarados por cliente, NO confiar accountId/characterId/avatar URL/permisos enviados por cliente, NO segundo servidor HTTP paralelo
+ * keys: WEBSOCKET AUTHORITY INPUT INTENT FIXED TIMESTEP RECONCILIATION PVP TITLES COMMERCE FORGE AOI SPATIAL GRID HYSTERESIS PERFORMANCE IDENTITY SUPABASE AVATAR HEALTH READINESS HEARTBEAT SHUTDOWN GUARDIAN NOTIFICATION SIGNAL WEBRTC
+ * purpose: autoridad server-side; PvP acepta inputs/intents y Guardian signaling reutiliza el WebSocket único sin ceder autoridad gameplay
+ * online: pose sigue para mundo social; dentro de PvP la posición, dash, cooldown, mana, hits, HP, CC, muerte y kills nacen del fixed-step server; hello resuelve identidad Supabase
+ * do-not: NO broadcast global periódico de actores, NO daño/posición PvP declarados por cliente, NO confiar accountId/characterId/avatar URL/permisos enviados por cliente, NO segundo servidor/socket paralelo
  */
 'use strict';
 const http = require('http');
@@ -18,6 +18,7 @@ const { createPvpAuthority, FIXED_DT, SNAPSHOT_HZ } = require('./pvp-authority')
 const { createOnlineIdentityStore } = require('./online-identity-store');
 const { createAvatarSyncStore } = require('./avatar-sync-store');
 const { createGuardianCoordinator } = require('./guardian-coordinator');
+const { createGuardianSignalRouter } = require('./guardian-signal-router');
 
 const PORT=Number(process.env.PORT||2567),MAX=32,WORLD={w:3600,h:3200};
 const AOI_CELL=512,AOI_RADIUS=1350,AOI_HYSTERESIS=180,MAX_WS_PAYLOAD=64*1024,HEARTBEAT_MS=30000;
@@ -30,6 +31,7 @@ const NOTIFICATION_ROLE_ALLOWLIST=new Set(['admin','owner','developer','superadm
 const players=new Map();let seq=1;
 const identity=createOnlineIdentityStore({supabaseUrl:process.env.SUPABASE_URL,supabaseServerKey:process.env.SUPABASE_SECRET_KEY||process.env.SUPABASE_SERVICE_ROLE_KEY,requireAuth:process.env.KELO_REQUIRE_AUTH==='1'});
 const guardian=createGuardianCoordinator({identity});
+const guardianSignals=createGuardianSignalRouter({guardian});
 const avatarSync=createAvatarSyncStore({supabaseUrl:process.env.SUPABASE_URL,supabaseApiKey:process.env.SUPABASE_PUBLISHABLE_KEY||process.env.SUPABASE_SECRET_KEY||process.env.SUPABASE_SERVICE_ROLE_KEY});
 const economy=createPlayerEconomyStore({supabaseUrl:process.env.SUPABASE_URL,supabaseServiceKey:process.env.SUPABASE_SERVICE_ROLE_KEY});
 const nobility=createNobilityService({supabaseUrl:process.env.SUPABASE_URL,supabaseServiceKey:process.env.SUPABASE_SERVICE_ROLE_KEY});
@@ -70,7 +72,7 @@ async function recordConfirmedKill(killerConnectionId,victimConnectionId,context
 const pvp=createPvpAuthority({onKill:(killer,victim,context)=>recordConfirmedKill(killer.id,victim.id,Object.assign({mode:'pvp',serverConfirmed:true},context||{}))});
 function pvpSnapshotFor(viewer,snapshot,events,index){const playersOut={},visible=new Set();candidatePlayers(viewer,index).forEach(target=>{const row=snapshot.players&&snapshot.players[target.id],was=viewer._aoiRelevant instanceof Set&&viewer._aoiRelevant.has(target.id);if(row&&relevantTo(viewer,target,was)){playersOut[target.id]=row;visible.add(target.id)}});if(snapshot.players&&snapshot.players[viewer.id]){playersOut[viewer.id]=snapshot.players[viewer.id];visible.add(viewer.id)}const projectiles=(snapshot.projectiles||[]).filter(projectile=>{const ownerId=projectile.ownerId||projectile.actorId||projectile.playerId;if(ownerId&&visible.has(ownerId))return true;const x=Number(projectile.x??projectile.position?.x),y=Number(projectile.y??projectile.position?.y);if(!Number.isFinite(x)||!Number.isFinite(y))return false;const dx=x-(Number(viewer.x)||0),dy=y-(Number(viewer.y)||0);return dx*dx+dy*dy<=AOI_RADIUS*AOI_RADIUS});const eventList=(events||[]).filter(ev=>!ev||(!ev.actorId&&!ev.targetId)||visible.has(ev.actorId)||visible.has(ev.targetId)||ev.targetId===viewer.id);return{...snapshot,players:playersOut,projectiles,events:eventList};}
 function sendPvpSnapshots(snapshot,events){const index=buildSpatialIndex();players.forEach(viewer=>{if(!(viewer.zone==='pvp'||viewer._pvpActive))return;send(viewer.ws,{t:'pvp:snapshot',...pvpSnapshotFor(viewer,snapshot,events,index),source:'server-authoritative-aoi'})});}
-function healthPayload(){return{ok:true,service:'kelo-world-server',version:'server-runtime-v3-world-notifications',uptimeMs:Date.now()-STARTED_AT,connections:players.size,shuttingDown,identity:identity.audit(),avatarSync:avatarSync.audit(),pvp:pvp.audit(),guardian:guardian.audit(),worldNotifications:{serverAuthorized:true,singleSocket:true},serverTime:Date.now()};}
+function healthPayload(){return{ok:true,service:'kelo-world-server',version:'server-runtime-v4-guardian-signal',uptimeMs:Date.now()-STARTED_AT,connections:players.size,shuttingDown,identity:identity.audit(),avatarSync:avatarSync.audit(),pvp:pvp.audit(),guardian:guardian.audit(),guardianSignals:guardianSignals.audit(),worldNotifications:{serverAuthorized:true,singleSocket:true},serverTime:Date.now()};}
 
 const httpServer=http.createServer(async(req,res)=>{
   if(await guardian.handleHttp(req,res))return;
@@ -85,15 +87,15 @@ const httpServer=http.createServer(async(req,res)=>{
   res.end(JSON.stringify({ok:false,error:'NOT_FOUND'}));
 });
 const wss=new WebSocketServer({server:httpServer,maxPayload:MAX_WS_PAYLOAD,perMessageDeflate:false});
-wss.keloServerHooks=Object.freeze({recordConfirmedOpenWorldKill:recordConfirmedKill,pvpAuthority:pvp,aoi:Object.freeze({cell:AOI_CELL,radius:AOI_RADIUS,hysteresis:AOI_HYSTERESIS}),identityAuthority:identity,avatarSyncAuthority:avatarSync,guardianCoordinator:guardian,health:healthPayload});
-httpServer.listen(PORT,'0.0.0.0',()=>console.log(`Kelo room ws://0.0.0.0:${PORT} · fixed PvP ${Math.round(1/FIXED_DT)}Hz · snapshots ${SNAPSHOT_HZ}Hz · AOI ${AOI_RADIUS}px · maxPayload ${MAX_WS_PAYLOAD} · Identity ${identity.source}${identity.requireAuth?' required':' transition'} · Avatar ${avatarSync.configured?'ready':'local'} · Guardian ${guardian.version} · Nobleza ${nobility.source} · Titles ${titles.source} · Forge ${forge.source} · Commerce ${commerce.version}`));
+wss.keloServerHooks=Object.freeze({recordConfirmedOpenWorldKill:recordConfirmedKill,pvpAuthority:pvp,aoi:Object.freeze({cell:AOI_CELL,radius:AOI_RADIUS,hysteresis:AOI_HYSTERESIS}),identityAuthority:identity,avatarSyncAuthority:avatarSync,guardianCoordinator:guardian,guardianSignalRouter:guardianSignals,health:healthPayload});
+httpServer.listen(PORT,'0.0.0.0',()=>console.log(`Kelo room ws://0.0.0.0:${PORT} · fixed PvP ${Math.round(1/FIXED_DT)}Hz · snapshots ${SNAPSHOT_HZ}Hz · AOI ${AOI_RADIUS}px · maxPayload ${MAX_WS_PAYLOAD} · Identity ${identity.source}${identity.requireAuth?' required':' transition'} · Avatar ${avatarSync.configured?'ready':'local'} · Guardian ${guardian.version}/${guardianSignals.version} · Nobleza ${nobility.source} · Titles ${titles.source} · Forge ${forge.source} · Commerce ${commerce.version}`));
 
 wss.on('connection',ws=>{
   if(shuttingDown){ws.close(1012,'server restarting');return;}
   if(players.size>=MAX){ws.close(1013,'room full');return;}
   ws.isAlive=true;ws.on('pong',()=>{ws.isAlive=true;});
-  const id='p'+seq++,me={id,ws,playerKey:null,accountId:null,characterId:null,authSource:'pending',roles:[],permissions:[],name:'Kelo',x:1400,y:1600,vx:0,vy:0,face:'down',gait:'idle',zone:'plaza',hp:100,maxHp:100,mana:100,maxMana:100,nobilityRank:'none',nobilityPower:0,equippedTitleId:null,armorScore:0,auraRank:0,averageQuality:0,averageGrade:0,equipmentSummary:[],avatarManifest:null,_avatarAccessToken:null,_aoiRelevant:new Set(),_lastWorldNotificationAt:0};
-  players.set(id,me);pvp.register(me);send(ws,{t:'welcome',id,players:publicStateFor(me),nobilitySource:nobility.source,titleSource:titles.source,forgeSource:forge.source,commerceSource:'server-authoritative',identityAuthority:identity.audit(),avatarSyncAuthority:avatarSync.audit(),pvpAuthority:pvp.audit(),serverTime:Date.now(),aoi:{cell:AOI_CELL,radius:AOI_RADIUS,hysteresis:AOI_HYSTERESIS}});sendRelevantJoin(me);
+  const id='p'+seq++,me={id,ws,playerKey:null,accountId:null,characterId:null,authSource:'pending',roles:[],permissions:[],name:'Kelo',x:1400,y:1600,vx:0,vy:0,face:'down',gait:'idle',zone:'plaza',hp:100,maxHp:100,mana:100,maxMana:100,nobilityRank:'none',nobilityPower:0,equippedTitleId:null,armorScore:0,auraRank:0,averageQuality:0,averageGrade:0,equipmentSummary:[],avatarManifest:null,_avatarAccessToken:null,_aoiRelevant:new Set(),_lastWorldNotificationAt:0,_guardianNodeKey:null,_guardianNodeId:null};
+  players.set(id,me);pvp.register(me);send(ws,{t:'welcome',id,players:publicStateFor(me),nobilitySource:nobility.source,titleSource:titles.source,forgeSource:forge.source,commerceSource:'server-authoritative',identityAuthority:identity.audit(),avatarSyncAuthority:avatarSync.audit(),pvpAuthority:pvp.audit(),guardianSignalAuthority:guardianSignals.audit(),serverTime:Date.now(),aoi:{cell:AOI_CELL,radius:AOI_RADIUS,hysteresis:AOI_HYSTERESIS}});sendRelevantJoin(me);
   ws.on('message',async buf=>{
     let msg;try{msg=JSON.parse(String(buf))}catch(_){return;}
     try{
@@ -114,6 +116,7 @@ wss.on('connection',ws=>{
         if(Number.isFinite(msg.x))me.x=clamp(msg.x,20,WORLD.w-20);if(Number.isFinite(msg.y))me.y=clamp(msg.y,20,WORLD.h-20);if(['up','down','left','right'].includes(msg.face))me.face=msg.face;if(['idle','walk','run'].includes(msg.gait))me.gait=msg.gait;if(['plaza','cafe','open-world','market'].includes(msg.zone))me.zone=msg.zone;return;
       }
       if(!me.playerKey){protocolError(ws,msg.requestId,'IDENTITY_REQUIRED','Envía hello antes de usar sistemas autoritativos.');return;}
+      if(String(msg.t||'').startsWith('guardian:')){if(guardianSignals.handle(me,msg))return;}
       if(msg.t==='avatar:refresh'){
         const resolved=await identity.resolve({accessToken:msg.accessToken,characterId:msg.characterId,name:me.name});
         if(!resolved.authenticated)throw new Error('AUTH_TOKEN_REQUIRED');
@@ -139,7 +142,7 @@ wss.on('connection',ws=>{
       if(msg.t==='forge:combine'){const snapshot=await forge.combine(me.playerKey,msg.materialId);me.armorScore=snapshot.armorScore;me.auraRank=snapshot.auraRank;me.averageQuality=snapshot.averageQuality;me.averageGrade=snapshot.averageGrade;me.equipmentSummary=snapshot.equipmentSummary;send(ws,{t:'forge:combined',requestId:msg.requestId||null,snapshot});return;}
     }catch(err){const raw=String(err&&err.message||err),known=['INSUFFICIENT_GOLD','INSUFFICIENT_KC','INVALID_AMOUNT','INVALID_CURRENCY','ITEM_NOT_OWNED','INVALID_FORGE_TYPE','INVALID_TIER','MAX_TIER','INVALID_MATERIAL_LEVEL','TOO_MANY_CRYSTALS','INVALID_CRYSTAL','MATERIAL_REQUIRED','CRYSTAL_REQUIRED','INVALID_MATERIAL','MAX_MATERIAL_LEVEL','NEED_SIX','INVALID_VISUAL_EVENT','UNKNOWN_TITLE','TITLE_LOCKED','INVALID_PLAYER_ID','UNKNOWN_COMMERCE_OPERATION','SUPABASE_NOT_CONFIGURED','AUTH_TOKEN_REQUIRED','INVALID_AUTH_USER','CHARACTER_REQUIRED','INVALID_CHARACTER_ID','CHARACTER_NOT_OWNED','WORLD_NOTIFICATION_FORBIDDEN','WORLD_NOTIFICATION_RATE_LIMIT','WORLD_NOTIFICATION_TARGET_NOT_ALLOWED','WORLD_NOTIFICATION_EMPTY'],code=known.find(k=>raw.includes(k))||'SERVER_ERROR';console.error('protocol error',msg&&msg.t,raw);protocolError(ws,msg&&msg.requestId,code,code);}
   });
-  ws.on('close',()=>{const playerKey=me.playerKey;pvp.unregister(me);sendRelevantLeave(me);players.delete(id);if(playerKey&&!connectionsForPlayerKey(playerKey).length){const result=commerce.disconnect(playerKey);notifyCommerce(result.notifyPlayerIds||[],'disconnect',playerKey);}});
+  ws.on('close',()=>{const playerKey=me.playerKey;guardianSignals.unbind(me,'socket-close');pvp.unregister(me);sendRelevantLeave(me);players.delete(id);if(playerKey&&!connectionsForPlayerKey(playerKey).length){const result=commerce.disconnect(playerKey);notifyCommerce(result.notifyPlayerIds||[],'disconnect',playerKey);}});
 });
 
 let fixedTick=0;
@@ -149,7 +152,7 @@ const simulationTimer=setInterval(()=>{
   if(fixedTick%6===0&&players.size)sendRelevantStates();
 },1000/60);
 const heartbeatTimer=setInterval(()=>{
-  guardian.sweep(Date.now());
+  const now=Date.now();guardian.sweep(now);guardianSignals.sweep(now);
   wss.clients.forEach(ws=>{
     if(ws.isAlive===false){ws.terminate();return;}
     ws.isAlive=false;try{ws.ping();}catch(_){ws.terminate();}

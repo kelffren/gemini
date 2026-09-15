@@ -1,0 +1,44 @@
+name: Guardian Device Host CI
+
+on:
+  pull_request:
+    paths:
+      - 'server/guardian-coordinator.js'
+      - 'server/guardian-device-host-smoke-test.js'
+      - 'server/guardian-signal-router.js'
+      - 'server/guardian-signal-router-smoke-test.js'
+      - 'server/index.js'
+      - 'engine-net.js'
+      - 'src/online/guardian-device-host.mjs'
+      - 'src/online/guardian-workload-runtime.mjs'
+      - 'src/online/guardian-peer-mesh.mjs'
+      - 'src/core/settings-lazy-gate.js'
+      - '.github/workflows/guardian-device-host-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  guardian-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.20.0'
+      - name: Syntax check Guardian and network integration
+        run: |
+          node --check src/online/guardian-device-host.mjs
+          node --check src/online/guardian-workload-runtime.mjs
+          node --check src/online/guardian-peer-mesh.mjs
+          node --check src/core/settings-lazy-gate.js
+          node --check server/guardian-coordinator.js
+          node --check server/guardian-signal-router.js
+          node --check server/index.js
+          node --check engine-net.js
+      - name: Guardian donor master workload failover contract
+        run: node server/guardian-device-host-smoke-test.js
+      - name: Guardian single-socket WebRTC signaling contract
+        run: node server/guardian-signal-router-smoke-test.js
