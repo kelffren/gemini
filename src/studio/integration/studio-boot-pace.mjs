@@ -55,3 +55,24 @@ export function setWorldLaunchStatus(root,message){
     if(curtain)curtain.textContent=message;
   }catch{}
 }
+
+export function pauseStudioBoot(root=globalThis,ms=32){
+  const wait=typeof root?.setTimeout==='function'?root.setTimeout.bind(root):setTimeout;
+  return new Promise(resolve=>wait(resolve,Math.max(0,Number(ms)||0)));
+}
+
+/** Prefer idle time for post-chrome phone work; always fall back so Safari never stalls forever. */
+export function whenStudioIdle(root=globalThis,{timeoutMs=900}={}){
+  return new Promise(resolve=>{
+    const wait=typeof root?.setTimeout==='function'?root.setTimeout.bind(root):setTimeout;
+    const cancel=typeof root?.clearTimeout==='function'?root.clearTimeout.bind(root):clearTimeout;
+    let settled=false,timer=null;
+    const finish=()=>{if(settled)return;settled=true;if(timer!=null)cancel(timer);resolve();};
+    timer=wait(finish,Math.max(120,Number(timeoutMs)||900));
+    const ric=root?.requestIdleCallback;
+    if(typeof ric==='function'){
+      try{ric.call(root,finish,{timeout:Math.max(120,Number(timeoutMs)||900)});return;}catch{}
+    }
+    wait(finish,0);
+  });
+}

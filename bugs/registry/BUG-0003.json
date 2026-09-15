@@ -23,7 +23,7 @@
     "REPORT-000001"
   ],
   "environment": {
-    "game_build": "world-bridge-20260915-21",
+    "game_build": "world-bridge-20260915-22",
     "device": "iPhone real device target",
     "os": "iOS",
     "browser": "Safari",
@@ -39,7 +39,7 @@
     "Open Create -> World again and confirm Studio remounts instead of black-screening."
   ],
   "expected": "World opens, remains interactive, and can be reopened even after a stale Studio shell/session condition.",
-  "actual": "Player 2026-09-15 still reports World freezing after tools paint on LIVE world-bridge-20260915-19. A8 skipped overlay and hydrates at 200ms; chrome-first already works. Remaining post-chrome killers on iPhone: studio-entry 15 static imports evaluated as one graph, createStudioLiveShell innerHTML rebuilt after tools exist, cloneNode of the whole shell, importCurrent structuredClone at 200ms, extras barrel at 2.8s, and unique nonce module URLs (H6). A9/world-bridge-20260915-20 attacks those without rewriting Studio.",
+  "actual": "Player 2026-09-15 after A10/world-bridge-20260915-21 on real device: editor OPENS, then FREEZES again after a while; assets do NOT load/preview. Requirement: preview assets BEFORE placing. A11 attacks delayed extras spike + early paced preview.",
   "evidence": [
     "Commit 829ac7fbd5fc629b05ecf92489bab16b0292bce9: IndexedDB fail-open candidate — insufficient.",
     "Commit 824a932f5e3e41c888116ab1453d64500e66255d: curtain + Hub stacking candidate — failed live Pages World tap QA on 2026-09-14.",
@@ -74,7 +74,7 @@
   "claim_started_at": null,
   "research": {
     "status": "in_progress",
-    "summary": "A10 world-bridge-20260915-21 hardens A9 without rewrite: serial core-tool modules (no static 7-tool barrel on phone), lite draft hydrate at 2.5s, light TREE asset seed without thumbnails, extras at 10s, stable -retry tag instead of nonce. FIXED_PENDING_VERIFY until real iPhone keeps tools 10s, places TREE, and reopens.",
+    "summary": "A11 world-bridge-20260915-22: early visible asset preview (<3s) + deferred idle-sliced heavy waves. FIXED_PENDING_VERIFY until real iPhone.",
     "known_facts": [
       {
         "id": "F1",
@@ -649,39 +649,72 @@
       },
       "conclusion": "Local box smoke passes. Still FIXED_PENDING_VERIFY until real iPhone Safari.",
       "do_not_repeat_without": "Do not restore overlay/cloneNode/nonce/static tool barrel as a first retry."
+    },
+    {
+      "id": "A11",
+      "at": "2026-09-15",
+      "actor": "local free-path agent",
+      "goal": "Keep editor open; stop delayed freeze; restore asset preview BEFORE placement.",
+      "hypothesis_ids": [
+        "H3",
+        "H4",
+        "H7"
+      ],
+      "change": {
+        "commits": [],
+        "files": [
+          "src/studio/studio-entry.mjs",
+          "src/studio/integration/live-studio-controller.mjs",
+          "src/studio/integration/studio-boot-pace.mjs",
+          "src/studio/integration/world-studio-bridge.mjs",
+          "src/creators/workspaces/world-workspace.mjs",
+          "src/ui/studio-launcher.js",
+          "index.html",
+          "sw.js",
+          "scripts/world-editor-lazy-boot-audit.mjs",
+          "scripts/_bug0003-smoke.mjs"
+        ],
+        "summary": "A11 world-bridge-20260915-22: immediate seed+openAssets+sync fallback preview; heavy waves 45s/55s idle-sliced; no phone basic-tools barrel."
+      },
+      "validation": {
+        "environment": "Local box Chrome headless iPhone UA @ /workspace/gemini (NOT real Safari)",
+        "method": "scripts/_bug0003-smoke.mjs + world-editor-* audits",
+        "result": "PARTIAL",
+        "evidence": [
+          "t1000: assets=8 sheetOpen=1 previewInk=8 status preview",
+          "survive t12000/t20000/t28000",
+          "TREE place tree:oak-broad-green placement preview true",
+          "reopen ok",
+          "audits PASS: lazy-boot, single-prewarm-owner, creator-boot-isolation"
+        ]
+      },
+      "conclusion": "Local smoke shows early asset preview before 20s and no freeze through 28s. Still FIXED_PENDING_VERIFY until real iPhone Safari.",
+      "do_not_repeat_without": "Do not restore overlay/cloneNode/nonce/static tool barrel. Do not permanently disable asset preview on phone."
     }
   ],
   "next_best_actions": [
     {
       "priority": 1,
-      "action": "Publish/serve world-bridge-20260915-21 then player Create → World on iPhone.",
-      "reason": "A9 is already LIVE; A10 must reach the phone before judging.",
-      "expected_signal": "Tools stay 10s; TREE placeable from asset strip; reopen works.",
-      "stop_condition": "If LIVE still serves 20260915-20, do not treat player fail as A10 failure."
+      "action": "Publish/serve world-bridge-20260915-22 then player Create → World on iPhone.",
+      "reason": "A10 opened but delayed-froze without asset preview; A11 must reach the phone.",
+      "expected_signal": "Survive 30–60s; asset strip/library shows preview before place; TREE place; walk; reopen.",
+      "stop_condition": "If LIVE still serves 20260915-21, do not treat player fail as A11 failure."
     },
     {
       "priority": 2,
-      "action": "If tab dies before 1s, freezeLab=1 and inspect last milestone; shrink remaining kernel graph only.",
-      "reason": "Discriminates parse/eval vs deferred hydrate.",
-      "expected_signal": "Last BUG-0003 milestone in sessionStorage.",
+      "action": "If delayed freeze persists near extras wave, further shrink phone extras batch size / raise idle gaps only.",
+      "reason": "Root is post-chrome heavy module eval, not Hub cover.",
+      "expected_signal": "Last BUG-0003 milestone + tools still responsive past 60s.",
       "stop_condition": "Do not rewrite Studio."
     }
   ],
   "fix": {
     "status": "candidate",
-    "commits": [
-      "ab6b19c7b93ec81308ea0c4490bcbba1010df606",
-      "9f52de80b572a9a3657b106f61451871d592452e",
-      "535c5ba13002e9188bc762c450e280b8834995c5",
-      "a54ff27ad4264aa31f4b65b21d939f4014cb0502",
-      "f9dbfe52b338ad960b2332fb544aa536c64f05e8"
-    ],
+    "commits": [],
     "files": [
-      "src/studio/tools/register-core-tools-serial.mjs",
-      "src/studio/tools/register-core-tools.mjs",
       "src/studio/studio-entry.mjs",
       "src/studio/integration/live-studio-controller.mjs",
-      "src/studio/adapters/current-world-importer.mjs",
+      "src/studio/integration/studio-boot-pace.mjs",
       "src/studio/integration/world-studio-bridge.mjs",
       "src/creators/workspaces/world-workspace.mjs",
       "src/ui/studio-launcher.js",
@@ -690,7 +723,7 @@
       "index.html",
       "sw.js"
     ],
-    "summary": "A10 world-bridge-20260915-21 hardens A9: serial tools, lite hydrate, TREE seed, no nonce. FIXED_PENDING_VERIFY."
+    "summary": "A11 world-bridge-20260915-22: early paced/visible preview + deferred extras. FIXED_PENDING_VERIFY."
   },
   "verification": {
     "status": "PENDING",
@@ -702,7 +735,8 @@
       "NOT PUBLISHED: world-bridge-20260914-2 — LIVE 05:44 EDT still world-bridge-20260914-1 / last-modified 04:53:11 GMT",
       "PLAYER: 2026-09-14 se sigue rompiendo — against unpublished A7 / live A6",
       "PLAYER: 2026-09-15 se sigue rompiendo — against LIVE world-bridge-20260915-19 / A8",
-      "A10 candidate on local branch fix/bug-0003-world-edit-freeze; not yet device-verified."
+      "A10 candidate on local branch fix/bug-0003-world-edit-freeze; not yet device-verified.",
+      "A11 candidate on local branch fix/bug-0003-world-edit-freeze; not yet device-verified."
     ],
     "verified_by": null,
     "verified_at": null
@@ -730,7 +764,8 @@
     "Do not treat a player fail as A7/A8 failure until LIVE index serves the matching cache-bust.",
     "A9 implemented 2026-09-15 after player report that A8/world-bridge-20260915-19 still froze.",
     "A10 2026-09-15: A9 already LIVE as world-bridge-20260915-20. A10 reduces first-2s tool barrel and restores usable TREE placement timing.",
-    "A10 local smoke 2026-09-15: Chromium iPhone-emulation survived 6s, placed TREE, reopened. Not iPhone Safari."
+    "A10 local smoke 2026-09-15: Chromium iPhone-emulation survived 6s, placed TREE, reopened. Not iPhone Safari.",
+    "A11 2026-09-15: after A10 real-device report (opens, delayed freeze, no asset preview). Early paced preview + idle-sliced extras. Not iPhone verified."
   ],
-  "updated_at": "2026-09-15T04:30:00Z"
+  "updated_at": "2026-09-15T05:25:00Z"
 }

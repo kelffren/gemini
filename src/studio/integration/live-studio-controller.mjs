@@ -6,12 +6,12 @@
  * public-api: openKeloStudioLive(), closeKeloStudioLive()
  * consumes: KeloInputLocks, KELO_WORLD_EDIT, Studio Kernel/Tools
  * online: confirmed Commands mirror through KELO_WORLD_EDIT; previews/camera/productivity stay local
- * mobile: ZERO static Studio imports — chrome first; iPhone reuses the painted shell, skips overlay/grid/importCurrent on first paint, seeds a light TREE-capable asset strip without thumbnails, and never runs a blocking draft import on the first phone paint
+ * mobile: ZERO static Studio imports — chrome first; iPhone reuses the painted shell, skips overlay/grid/importCurrent on first paint, seeds a TREE-capable asset strip with paced thumbnails early, idle-slices productivity/extras, and never runs a blocking draft import on the first phone paint
  */
 
 let active=null;
 const controllerUrl=new URL(import.meta.url);
-const BUILD=controllerUrl.searchParams.get('v')||'world-bridge-20260915-21';
+const BUILD=controllerUrl.searchParams.get('v')||'world-bridge-20260915-22';
 const mutable=status=>['DRAFT','REJECTED'].includes(String(status||''));
 const DIRECT_DRAG_THRESHOLD=5;
 function actor(root){return String(root.KELO_ADMIN_KEYS?.playerId?.()||root.keloNet?.playerKey||root.localPlayer?.id||'local_pioneer');}
@@ -151,6 +151,71 @@ function ensurePhonePlacementPrefabs(studio,assets){
   return added;
 }
 
+
+function createPacedPhoneAssetPreview(assetPreview,root){
+  // Serial thumbnail decode with yields — keeps strip/library preview without a main-thread spike.
+  let queue=[],busy=false,token=0;
+  const wait=ms=>new Promise(r=>(root.setTimeout||setTimeout)(r,ms));
+  function canvasHasInk(canvas){
+    try{
+      const ctx=canvas.getContext('2d');
+      if(!ctx||!canvas.width||!canvas.height)return false;
+      const {data}=ctx.getImageData(0,0,Math.min(canvas.width,12),Math.min(canvas.height,12));
+      for(let i=3;i<data.length;i+=4)if(data[i]>10)return true;
+    }catch{}
+    return false;
+  }
+  function drawFallback(canvas,asset,cssSize=48){
+    if(!canvas?.getContext)return;
+    const size=Math.max(32,Number(cssSize)||48);
+    const dpr=1;
+    canvas.width=Math.round(size*dpr);canvas.height=Math.round(size*dpr);
+    canvas.style.width=`${size}px`;canvas.style.height=`${size}px`;
+    const ctx=canvas.getContext('2d');
+    ctx.setTransform(1,0,0,1,0,0);
+    ctx.clearRect(0,0,size,size);
+    ctx.fillStyle='#173028';ctx.fillRect(0,0,size,size);
+    ctx.strokeStyle='rgba(231,197,106,.35)';ctx.strokeRect(1,1,size-2,size-2);
+    const label=String(asset?.label||asset?.id||'?');
+    const glyph=/tree|arbol|oak|pine|willow|birch|flor/i.test(label)?'Tr':(label.slice(0,2).toUpperCase()||'?');
+    ctx.fillStyle='#e7f5c8';ctx.font=`bold ${Math.max(11,Math.floor(size*0.34))}px system-ui,sans-serif`;
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(glyph,size/2,size/2+1);
+  }
+  async function pump(){
+    if(busy)return;
+    busy=true;
+    while(queue.length){
+      const job=queue.shift();
+      if(!job||job.token!==token)continue;
+      try{
+        await assetPreview.renderThumbnail(job.canvas,job.asset,{cssSize:job.cssSize||48});
+      }catch{}
+      if(!canvasHasInk(job.canvas))drawFallback(job.canvas,job.asset,job.cssSize||48);
+      await wait(job.priority?12:28);
+    }
+    busy=false;
+  }
+  function enqueue(canvas,asset,{priority=false,cssSize=48}={}){
+    if(!canvas||!asset)return;
+    // Paint a visible glyph immediately so preview exists before atlas/decode (well under 20s).
+    try{drawFallback(canvas,asset,cssSize);}catch{}
+    const job={canvas,asset,priority:!!priority,cssSize,token};
+    if(priority)queue.unshift(job);
+    else{
+      queue.push(job);
+      if(queue.length>48)queue.splice(0,queue.length-48);
+    }
+    void pump();
+  }
+  function reset(){token++;queue.length=0;}
+  return Object.freeze({
+    render:(canvas,asset)=>enqueue(canvas,asset,{priority:false}),
+    renderPriority:(canvas,asset)=>enqueue(canvas,asset,{priority:true,cssSize:54}),
+    reset
+  });
+}
+
 export async function openKeloStudioLive({root=globalThis}={}){
   if(active)return active;if(!root.document)throw new Error('STUDIO_DOM_REQUIRED');
   const actorId=actor(root);if(!root.KELO_ADMIN_KEYS?.can?.('world.edit',actorId))throw new Error('ADMIN_KEY_PERMISSION_DENIED');if(root.KELO_WORLD_BUILDER?.isMainWorld&&!root.KELO_WORLD_BUILDER.isMainWorld())throw new Error('STUDIO_MAIN_WORLD_ONLY');if(!root.KeloInputLocks?.acquire||!root.KeloInputLocks?.release)throw new Error('STUDIO_INPUT_LOCKS_NOT_READY');
@@ -179,6 +244,13 @@ export async function openKeloStudioLive({root=globalThis}={}){
   if(root.KELO_WORLD_LAUNCH_ABORTED)throw new Error('WORLD_EDITOR_OPEN_TIMEOUT');
   const studio=await bootKeloStudio({mode:'world',actorId,root});if(root.KELO_WORLD_LAUNCH_ABORTED){try{studio.close();}catch{}throw new Error('WORLD_EDITOR_OPEN_TIMEOUT');}
   const creator=createCreatorActions(studio.kernel),prefabLibrary=createCreatorPrefabLibrary({kernel:studio.kernel,store:studio.store,tool:studio.tools.prefabStamp,ownerId:actorId});
+  const phonePreview=isPhone(root)?createPacedPhoneAssetPreview(studio.assetPreview,root):null;
+  const renderPhoneAssetPreview=(canvas,asset)=>{
+    if(!asset)return;
+    // Compact/selected preview jumps the queue; library/strip rows stay paced.
+    if(canvas?.closest?.('.ks-compact-asset'))phonePreview?.renderPriority(canvas,asset);
+    else phonePreview?.render(canvas,asset);
+  };
   let draftId=draft.draftId;const mirror=installStudioAuthorityMirror({adapter:studio.adapter,actorId,getDraftId:()=>draftId});
   let inputLockToken=null,overlay=null,overlayStart=0,shell=null,productivity=null,cameraController=null,unregisterInput=null,detachPointer=null,selectionUnsub=null,frame=0,running=true,playing=false,mode='select',dragEntity=null,directGesture=null,onKey=null,pinchScale=null,pinchPreviewFrame=0,pinchPreviewPending=null,pinchPreviewChain=Promise.resolve();
   try{
@@ -227,23 +299,59 @@ export async function openKeloStudioLive({root=globalThis}={}){
     unregisterInput=studio.kernel.input.register('studio-live',handlers,1000);studio.kernel.input.push('studio-live');
     detachPointer=attachStudioPointerInput({element:root.document,router:studio.kernel.input,toWorld:(x,y)=>cameraController.toWorld(x,y),capture:true,stopPropagation:true,shouldHandle:e=>running&&!playing&&!isStudioUi(e)});
     const phoneShell=isPhone(root);
-    shell=createStudioLiveShell({host:root.document.body,reuse:phoneShell&&!!root.document.getElementById('kelo-studio-live')?.querySelector?.('.ks-top'),assets:phoneShell?[]:allAssets(),onMode:setMode,onAsset:beginPlacement,onUndo:()=>guarded(()=>studio.kernel.undo()),onRedo:()=>guarded(()=>studio.kernel.redo()),onRotate:()=>guarded(()=>mode==='placement'?Promise.resolve(studio.tools.placement.rotate(90)):mode==='prefab'?(toast(root,'Coloca el prefab y luego rota sus piezas.'),Promise.resolve(null)):creator.rotateSelection(90)),onDuplicate:()=>guarded(()=>creator.duplicateSelection()),onScale:action=>guarded(()=>creator.scaleSelection(action==='reset'?{value:1}:{delta:action==='down'?-.1:.1})),onDelete:()=>guarded(()=>creator.removeSelection()),onSelectEntity:(id,{append=false}={})=>{if(append)studio.kernel.selection.add(id);else studio.kernel.selection.set(id);updateShell();},onPropertyChange:(prop,value)=>guarded(()=>changeProperty(prop,value)),onBrushSize:size=>{studio.tools.terrain.configure({brushSize:size});updateShell();},onErase:erase=>{if(mode==='terrain'||mode==='path'){studio.tools.terrain.configure({erase});updateShell();}},onPlay:()=>guarded(togglePlaytest),onSave:()=>guarded(async()=>{await saveDraft();toast(root,'Studio guardado');}),onFocus:focusSelection,renderAssetPreview:phoneShell?(()=>{}):(canvas,asset)=>studio.assetPreview.renderThumbnail(canvas,asset),onClose:()=>{void closeKeloStudioLive({root});}});
+    shell=createStudioLiveShell({host:root.document.body,reuse:phoneShell&&!!root.document.getElementById('kelo-studio-live')?.querySelector?.('.ks-top'),assets:phoneShell?phoneSeedAssets(allAssets()):allAssets(),onMode:setMode,onAsset:beginPlacement,onUndo:()=>guarded(()=>studio.kernel.undo()),onRedo:()=>guarded(()=>studio.kernel.redo()),onRotate:()=>guarded(()=>mode==='placement'?Promise.resolve(studio.tools.placement.rotate(90)):mode==='prefab'?(toast(root,'Coloca el prefab y luego rota sus piezas.'),Promise.resolve(null)):creator.rotateSelection(90)),onDuplicate:()=>guarded(()=>creator.duplicateSelection()),onScale:action=>guarded(()=>creator.scaleSelection(action==='reset'?{value:1}:{delta:action==='down'?-.1:.1})),onDelete:()=>guarded(()=>creator.removeSelection()),onSelectEntity:(id,{append=false}={})=>{if(append)studio.kernel.selection.add(id);else studio.kernel.selection.set(id);updateShell();},onPropertyChange:(prop,value)=>guarded(()=>changeProperty(prop,value)),onBrushSize:size=>{studio.tools.terrain.configure({brushSize:size});updateShell();},onErase:erase=>{if(mode==='terrain'||mode==='path'){studio.tools.terrain.configure({erase});updateShell();}},onPlay:()=>guarded(togglePlaytest),onSave:()=>guarded(async()=>{await saveDraft();toast(root,'Studio guardado');}),onFocus:focusSelection,renderAssetPreview:phoneShell?renderPhoneAssetPreview:(canvas,asset)=>studio.assetPreview.renderThumbnail(canvas,asset),onClose:()=>{void closeKeloStudioLive({root});}});
     try{root.document.getElementById('kelo-world-launch-curtain')?.remove();}catch{}
-    if(phoneShell){(root.setTimeout||setTimeout)(async()=>{if(!running||productivity)return;const prodUi=await import('../ui/creator-productivity-panel.mjs');if(!running||productivity)return;productivity=prodUi.createCreatorProductivityPanel({shell,onCameraToggle:on=>{setMode(on?'camera':'select');return mode==='camera';},onZoomIn:()=>{const z=cameraController.setZoom(cameraController.zoom*1.2);updateShell();return z;},onZoomOut:()=>{const z=cameraController.setZoom(cameraController.zoom/1.2);updateShell();return z;},onZoomReset:()=>{const z=cameraController.setZoom(1);updateShell();return z;},onCopy:()=>{const count=creator.copySelection();productivity?.setClipboard(count);toast(root,count?`${count} objeto${count===1?'':'s'} copiado${count===1?'':'s'}`:'Selecciona algo para copiar');return count;},onPaste:()=>guarded(()=>creator.pasteClipboard()),onSavePrefab:async label=>{try{const def=await prefabLibrary.captureSelection({label});shell.setAssets(allAssets());toast(root,`${def.label} guardado en My Prefabs`);return def;}catch(e){toast(root,e.message||String(e));return false;}},onValidate:async()=>validateMap(),onSnapChange:size=>{snapSize=Math.max(1,Number(size)||1);gridOverlay.configure({size:snapSize});toast(root,snapSize===1?'Snap libre':`Snap ${snapSize}px`);},onGridToggle:visible=>gridOverlay.configure({visible})});productivity.setSnap(snapSize);},14000);}else {productivity=createCreatorProductivityPanel({shell,onCameraToggle:on=>{setMode(on?'camera':'select');return mode==='camera';},onZoomIn:()=>{const z=cameraController.setZoom(cameraController.zoom*1.2);updateShell();return z;},onZoomOut:()=>{const z=cameraController.setZoom(cameraController.zoom/1.2);updateShell();return z;},onZoomReset:()=>{const z=cameraController.setZoom(1);updateShell();return z;},onCopy:()=>{const count=creator.copySelection();productivity?.setClipboard(count);toast(root,count?`${count} objeto${count===1?'':'s'} copiado${count===1?'':'s'}`:'Selecciona algo para copiar');return count;},onPaste:()=>guarded(()=>creator.pasteClipboard()),onSavePrefab:async label=>{try{const def=await prefabLibrary.captureSelection({label});shell.setAssets(allAssets());toast(root,`${def.label} guardado en My Prefabs`);return def;}catch(e){toast(root,e.message||String(e));return false;}},onValidate:async()=>validateMap(),onSnapChange:size=>{snapSize=Math.max(1,Number(size)||1);gridOverlay.configure({size:snapSize});toast(root,snapSize===1?'Snap libre':`Snap ${snapSize}px`);},onGridToggle:visible=>gridOverlay.configure({visible})});productivity.setSnap(snapSize);}selectionUnsub=studio.kernel.selection.onChange(updateShell);updateShell();
+    if(phoneShell){(root.setTimeout||setTimeout)(async()=>{if(!running||productivity)return;try{const pace=await import('./studio-boot-pace.mjs');await pace.whenStudioIdle(root,{timeoutMs:600});await pace.pauseStudioBoot(root,40);}catch{}if(!running||productivity)return;const prodUi=await import('../ui/creator-productivity-panel.mjs');if(!running||productivity)return;try{const pace=await import('./studio-boot-pace.mjs');await pace.pauseStudioBoot(root,48);}catch{}if(!running||productivity)return;productivity=prodUi.createCreatorProductivityPanel({shell,onCameraToggle:on=>{setMode(on?'camera':'select');return mode==='camera';},onZoomIn:()=>{const z=cameraController.setZoom(cameraController.zoom*1.2);updateShell();return z;},onZoomOut:()=>{const z=cameraController.setZoom(cameraController.zoom/1.2);updateShell();return z;},onZoomReset:()=>{const z=cameraController.setZoom(1);updateShell();return z;},onCopy:()=>{const count=creator.copySelection();productivity?.setClipboard(count);toast(root,count?`${count} objeto${count===1?'':'s'} copiado${count===1?'':'s'}`:'Selecciona algo para copiar');return count;},onPaste:()=>guarded(()=>creator.pasteClipboard()),onSavePrefab:async label=>{try{const def=await prefabLibrary.captureSelection({label});shell.setAssets(allAssets());toast(root,`${def.label} guardado en My Prefabs`);return def;}catch(e){toast(root,e.message||String(e));return false;}},onValidate:async()=>validateMap(),onSnapChange:size=>{snapSize=Math.max(1,Number(size)||1);gridOverlay.configure({size:snapSize});toast(root,snapSize===1?'Snap libre':`Snap ${snapSize}px`);},onGridToggle:visible=>gridOverlay.configure({visible})});productivity.setSnap(snapSize);},22000);}else {productivity=createCreatorProductivityPanel({shell,onCameraToggle:on=>{setMode(on?'camera':'select');return mode==='camera';},onZoomIn:()=>{const z=cameraController.setZoom(cameraController.zoom*1.2);updateShell();return z;},onZoomOut:()=>{const z=cameraController.setZoom(cameraController.zoom/1.2);updateShell();return z;},onZoomReset:()=>{const z=cameraController.setZoom(1);updateShell();return z;},onCopy:()=>{const count=creator.copySelection();productivity?.setClipboard(count);toast(root,count?`${count} objeto${count===1?'':'s'} copiado${count===1?'':'s'}`:'Selecciona algo para copiar');return count;},onPaste:()=>guarded(()=>creator.pasteClipboard()),onSavePrefab:async label=>{try{const def=await prefabLibrary.captureSelection({label});shell.setAssets(allAssets());toast(root,`${def.label} guardado en My Prefabs`);return def;}catch(e){toast(root,e.message||String(e));return false;}},onValidate:async()=>validateMap(),onSnapChange:size=>{snapSize=Math.max(1,Number(size)||1);gridOverlay.configure({size:snapSize});toast(root,snapSize===1?'Snap libre':`Snap ${snapSize}px`);},onGridToggle:visible=>gridOverlay.configure({visible})});productivity.setSnap(snapSize);}selectionUnsub=studio.kernel.selection.onChange(updateShell);updateShell();
     void prefabLibrary.load().then(()=>{if(isPhone(root))return;try{shell?.setAssets?.(allAssets());updateShell();}catch{}}).catch(e=>console.warn('[Kelo Studio] creator prefab cache unavailable',e));
     if(isPhone(root)&&shell?.root){
-      const loadFullAssets=()=>{if(!running||shell.root.dataset.keloAssetsReady==='1')return;shell.root.dataset.keloAssetsReady='1';try{shell.setAssets(allAssets());}catch{}};
-      // A10: seed a light TREE-capable strip soon so placement works without waiting for EDIT or 8s hydrate.
-      (root.setTimeout||setTimeout)(()=>{
-        if(!running||!shell?.setAssets)return;
+      const loadFullAssets=()=>{
+        if(!running||shell.root.dataset.keloAssetsReady==='1')return;
+        shell.root.dataset.keloAssetsReady='1';
+        try{
+          phonePreview?.reset?.();
+          const list=allAssets();
+          ensurePhonePlacementPrefabs(studio,list.slice(0,80));
+          shell.setAssets(list);
+          try{shell.openAssets?.();}catch{}
+          updateShell();
+        }catch{}
+      };
+      const paintSeed=(why='',{openSheet=false}={})=>{
+        if(!running||!shell?.setAssets)return null;
         try{
           const seed=phoneSeedAssets(allAssets());
           ensurePhonePlacementPrefabs(studio,seed);
+          // Do not reset the preview queue on first paint — keep immediate glyphs.
+          if(why==='refresh')phonePreview?.reset?.();
           shell.setAssets(seed);
+          const first=seed[0];
+          if(first?.id){
+            try{shell.setSelectedAsset?.(first.id,{compact:false});}catch{}
+          }
+          if(openSheet){
+            try{shell.openAssets?.();}catch{}
+          }
           updateShell();
-        }catch{}
-      },900);
+          for(const asset of seed.slice(0,8)){
+            try{studio.assetPreview.warmAsset(asset.id||asset).catch(()=>{});}catch{}
+          }
+          try{shell?.setStatus?.(`${mode.toUpperCase()} · ${seed.length} assets · preview`);}catch{}
+          return seed;
+        }catch{return null;}
+      };
+      // A11: assets+preview in first seconds (not after 12–20s heavy waves).
+      const immediate=paintSeed('seed',{openSheet:true});
+      (root.setTimeout||setTimeout)(()=>{
+        if(!running)return;
+        paintSeed('reinforce',{openSheet:true});
+      },450);
+      (root.setTimeout||setTimeout)(()=>{
+        if(!running||shell.root.dataset.keloAssetsReady==='1')return;
+        const n=(allAssets()||[]).length;
+        if(n>4)paintSeed('refresh',{openSheet:true});
+      },2400);
       shell.root.addEventListener('click',e=>{if(e.target?.closest?.('[data-act="edit-assets"]'))loadFullAssets();},{capture:true});
+      void immediate;
     }
     if(root.KELO_WORLD_LAUNCH_ABORTED)throw new Error('WORLD_EDITOR_OPEN_TIMEOUT');
     await yieldLiveMount(root);
@@ -302,7 +410,7 @@ export async function openKeloStudioLive({root=globalThis}={}){
       }
     }
     onKey=e=>{if(isStudioUi(e))return;const key=e.key.toLowerCase();if(playing){if(key==='escape'){e.preventDefault();void guarded(togglePlaytest);}return;}if((e.metaKey||e.ctrlKey)&&key==='z'){e.preventDefault();void guarded(()=>e.shiftKey?studio.kernel.redo():studio.kernel.undo());return;}if((e.metaKey||e.ctrlKey)&&key==='d'){e.preventDefault();void guarded(()=>creator.duplicateSelection());return;}if((e.metaKey||e.ctrlKey)&&key==='c'){e.preventDefault();const count=creator.copySelection();productivity?.setClipboard(count);toast(root,count?`${count} objeto${count===1?'':'s'} copiado${count===1?'':'s'}`:'Selecciona algo para copiar');return;}if((e.metaKey||e.ctrlKey)&&key==='v'){e.preventDefault();void guarded(()=>creator.pasteClipboard());return;}if((e.metaKey||e.ctrlKey)&&key==='s'){e.preventDefault();void guarded(async()=>{await saveDraft();toast(root,'Studio guardado');});return;}if(key==='f'){e.preventDefault();focusSelection();return;}if(key==='+'||key==='='){e.preventDefault();cameraController.setZoom(cameraController.zoom*1.2);updateShell();return;}if(key==='-'){e.preventDefault();cameraController.setZoom(cameraController.zoom/1.2);updateShell();return;}if(key==='0'){e.preventDefault();cameraController.setZoom(1);updateShell();return;}if(key==='escape'){e.preventDefault();if(['camera','placement','prefab','terrain','path','collision'].includes(mode)){cancelTransient();setMode('select');}else void closeKeloStudioLive({root});return;}if(key==='r'){e.preventDefault();void guarded(()=>mode==='placement'?Promise.resolve(studio.tools.placement.rotate(90)):mode==='prefab'?Promise.resolve(null):creator.rotateSelection(90));return;}if(key==='e'&&(mode==='terrain'||mode==='path')){e.preventDefault();const next=!studio.tools.terrain.state().erase;studio.tools.terrain.configure({erase:next});shell?.setErase(next);updateShell();return;}if(key==='delete'||key==='backspace'){e.preventDefault();if(mode==='collision'&&studio.tools.collision.selectedId)void guarded(()=>studio.tools.collision.removeSelected());else void guarded(()=>creator.removeSelection());return;}if(key==='q')setMode('select');else if(key==='v')setMode('move');else if(key==='h')setMode(mode==='camera'?'select':'camera');else if(key==='g')setMode('terrain');else if(key==='p')setMode('path');else if(key==='c')setMode('collision');};root.document.addEventListener('keydown',onKey,true);
-    const liveSession={version:'kelo-studio-creator-v1.8.0-world-bridge-a10',studio,prefabLibrary,cameraController,get draftId(){return draftId;},get mode(){return mode;},get playing(){return playing;},get snapSize(){return snapSize;},setMode,beginPlacement,focusSelection,validate:validateMap,togglePlaytest:()=>guarded(togglePlaytest),close:()=>closeKeloStudioLive({root})};
+    const liveSession={version:'kelo-studio-creator-v1.8.0-world-bridge-a11',studio,prefabLibrary,cameraController,get draftId(){return draftId;},get mode(){return mode;},get playing(){return playing;},get snapSize(){return snapSize;},setMode,beginPlacement,focusSelection,validate:validateMap,togglePlaytest:()=>guarded(togglePlaytest),close:()=>closeKeloStudioLive({root})};
     Object.defineProperty(liveSession,'__cleanup',{value:async()=>{running=false;cancelDirectGesture();if(pinchScale){try{await endPinchScale({cancelled:true});}catch{}}cancelPinchPreviewFrame();stopOverlayDraw();if(onKey)root.document.removeEventListener('keydown',onKey,true);selectionUnsub?.();detachPointer?.();cameraController?.destroy();studio.kernel.input.pop('studio-live');unregisterInput?.();mirror.uninstall();productivity?.destroy();shell?.destroy();overlay?.destroy();studio.tools.collision.setVisible(false);if(inputLockToken){root.KeloInputLocks.release(inputLockToken);inputLockToken=null;}try{await studio.checkpoint();}catch{}try{studio.close();}catch{}try{await root.KELO_WORLD_EDIT?.request?.('world:view:published',{actorId});}catch{}},enumerable:false});
     if(shell?.root?.dataset)delete shell.root.dataset.keloWorldLoading;
     try{

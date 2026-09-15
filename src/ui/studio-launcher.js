@@ -12,7 +12,7 @@
   'use strict';
   if(window.KELO_STUDIO_LAUNCHER)return;
   let loading=false,factoryLoading=false,directOpenStarted=false;
-  const CREATOR_BUILD='world-bridge-20260915-21';
+  const CREATOR_BUILD='world-bridge-20260915-22';
   const params=()=>new URLSearchParams(window.location.search);
   const directRequested=()=>params().get('creators')==='1'||params().get('creator')==='1';
   const actor=()=>String(window.KELO_ADMIN_KEYS?.playerId?.()||window.keloNet?.playerKey||window.localPlayer?.id||'local_pioneer');

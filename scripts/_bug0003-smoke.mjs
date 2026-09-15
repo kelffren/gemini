@@ -3,7 +3,7 @@ const url='http://127.0.0.1:4173/?guest=1&mapEditor=1&creators=1&freezeLab=1';
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const browser=await puppeteer.launch({
   executablePath:'/usr/bin/google-chrome', headless:'new',
-  protocolTimeout:60000,
+  protocolTimeout:90000,
   args:['--no-sandbox','--disable-dev-shm-usage','--window-size=390,844']
 });
 const page=await browser.newPage();
@@ -31,22 +31,37 @@ try{
   });
   mark('open',worldOpen);
   let frozen=false;
-  const checkpoints=[1000,3000,6000];
+  const heavyAt=new Set([1000,3000,6000]);
+  const checkpoints=[1000,3000,6000,12000,20000,28000];
   let prev=0;
   for(const ms of checkpoints){
     await sleep(ms-prev); prev=ms;
+    const wantHeavy=heavyAt.has(ms);
     const snap=await Promise.race([
-      page.evaluate(()=>{
+      page.evaluate((heavy)=>{
         const el=document.getElementById('kelo-studio-live');
-        return {
+        const base={
           exists:!!el,hasTop:!!el?.querySelector?.('.ks-top'),
           status:String(el?.querySelector?.('.ks-status')?.textContent||'').slice(0,100),
           assets:el?.querySelectorAll?.('[data-asset]')?.length||0,
+          sheetOpen:el?.dataset?.sheetOpen||'',
           modes:[...(el?.querySelectorAll?.('[data-mode]')||[])].map(b=>b.dataset.mode),
           acts:[...(el?.querySelectorAll?.('[data-act="play"],[data-act="save"]')||[])].map(b=>b.dataset.act)
         };
-      }),
-      sleep(8000).then(()=>({timeout:true}))
+        if(!heavy)return base;
+        const canvases=[...(el?.querySelectorAll?.('[data-asset] canvas, .ks-compact-asset canvas')||[])];
+        let previewInk=0;
+        for(const c of canvases.slice(0,8)){
+          try{
+            const ctx=c.getContext('2d');
+            if(!ctx||!c.width||!c.height)continue;
+            const {data}=ctx.getImageData(0,0,Math.min(c.width,16),Math.min(c.height,16));
+            for(let i=3;i<data.length;i+=4){if(data[i]>8){previewInk++;break;}}
+          }catch{}
+        }
+        return {...base,previewCanvases:canvases.length,previewInk};
+      }, wantHeavy),
+      sleep(wantHeavy?8000:4000).then(()=>({timeout:true}))
     ]);
     mark('t'+ms,snap);
     if(snap.timeout){frozen=true;report.frozenAt=ms;break;}
@@ -58,7 +73,7 @@ try{
         || el?.querySelector?.('[data-asset]');
       if(!btn)return {ok:false,reason:'no-asset'};
       btn.click();
-      const bridge=await import('./src/studio/integration/world-studio-bridge.mjs?v=world-bridge-20260915-21');
+      const bridge=await import('./src/studio/integration/world-studio-bridge.mjs?v=world-bridge-20260915-22');
       const session=bridge.getKeloStudioLive?.();
       const preview=!!(session?.studio?.tools?.placement?.getPreview?.()||session?.studio?.tools?.prefabStamp?.getPreview?.());
       return {ok:!!(session&& (session.mode==='placement'||session.mode==='prefab'||preview)),asset:btn.dataset.asset,mode:session?.mode||null,preview,hasSession:!!session};
@@ -77,8 +92,12 @@ try{
       return {ok:!!session,hasTop:!!el?.querySelector?.('.ks-top'),status:String(el?.querySelector?.('.ks-status')?.textContent||'').slice(0,80)};
     });
     mark('reopen',reopen);
+    const early=report.stages.find(s=>s.s==='t1000');
     const mid=report.stages.find(s=>s.s==='t3000');
-    report.ok=!!(worldOpen.ok && mid?.exists && mid?.hasTop && reopen.ok);
+    const late=report.stages.find(s=>s.s==='t20000')||report.stages.find(s=>s.s==='t12000');
+    report.previewOk=!!((early?.assets||0)>0 && ((early?.previewInk||0)>0 || (mid?.previewInk||0)>0));
+    report.survivedLate=!!(late&&!late.timeout&&late.exists&&late.hasTop);
+    report.ok=!!(worldOpen.ok && mid?.exists && mid?.hasTop && report.previewOk && report.treeReady && reopen.ok && report.survivedLate);
   }else report.ok=false;
 }catch(e){report.fatal=String(e?.message||e);report.ok=false;}
 await browser.close();

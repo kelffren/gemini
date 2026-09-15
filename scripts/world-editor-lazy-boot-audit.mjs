@@ -189,18 +189,29 @@ const shellSource=await readFile(resolve(here,'../src/studio/ui/studio-live-shel
 assert.match(shellSource,/backdrop-filter:none!important/,'Studio chrome must kill backdrop-filter on coarse/narrow iPhone');
 
 const entrySource=await readFile(resolve(here,'../src/studio/studio-entry.mjs'),'utf8');
-assert.match(entrySource,/PHONE_OPTIONAL_BOOT_DELAY_MS=12000/,'iPhone optional build tools and asset palette must wait well past first-paint survival');
-assert.match(entrySource,/PHONE_PRODUCTIVITY_BOOT_DELAY_MS=18000/,'iPhone productivity extras must wait beyond the optional post-mount imports');
+assert.match(entrySource,/PHONE_PREVIEW_BOOT_DELAY_MS=1200/,'iPhone asset palette/preview path must load early before heavy extras');
+assert.match(entrySource,/PHONE_OPTIONAL_BOOT_DELAY_MS=45000/,'iPhone optional build tools must wait past first-paint survival');
+assert.match(entrySource,/PHONE_PRODUCTIVITY_BOOT_DELAY_MS=55000/,'iPhone productivity extras must wait beyond the early preview path');
 assert.match(entrySource,/optionalToolsTimer=deferStudioOptional/,'basic build tools must be deferred on iPhone instead of joining the critical Studio graph');
 assert.match(entrySource,/optionalPaletteTimer=deferStudioOptional/,'asset palette must be deferred on iPhone instead of joining the critical Studio graph');
+assert.match(entrySource,/phoneBoot\?PHONE_PREVIEW_BOOT_DELAY_MS/,'asset palette timer must use the early preview delay, not the heavy optional delay');
+assert.match(entrySource,/phone:phoneBoot/,'iPhone productivity extras must install through the paced phone path');
 assert.match(entrySource,/for\(const timer of \[optionalToolsTimer,optionalPaletteTimer,extrasTimer\]\)/,'closing Studio must cancel deferred optional module imports');
 assert.match(entrySource,/register-core-tools-serial\.mjs/,'iPhone must load core tools through the serial module, not the static barrel');
 assert.match(entrySource,/registerCoreToolsSerial/,'iPhone World boot must register core tools serially between paints');
+assert.match(entrySource,/register-build-tools-serial\.mjs/,'iPhone optional tools must load build tools serially without barrels');
+assert.match(entrySource,/never import register-basic-tools/,'iPhone must document skipping register-basic-tools delayed freeze');
 
 assert.match(controllerSource,/hydrateAfterChrome,400/,'iPhone post-chrome hydrate is status-only and must not wait on importCurrent');
 assert.match(controllerSource,/A10 phone: auto importCurrent/,'iPhone must document why importCurrent is skipped');
 assert.match(controllerSource,/phoneSeedAssets/,'iPhone must seed a light TREE-capable asset strip');
-assert.match(controllerSource,/renderAssetPreview:phoneShell\?\(\(\)=>\{\}\)/,'iPhone first paint must skip asset thumbnail decode');
+assert.match(controllerSource,/createPacedPhoneAssetPreview/,'iPhone must pace asset thumbnail decode instead of skipping preview forever');
+assert.match(controllerSource,/renderAssetPreview:phoneShell\?renderPhoneAssetPreview/,'iPhone must wire paced previews into the live shell');
+assert.match(controllerSource,/paintSeed/,'iPhone must seed TREE assets early for preview-before-place');
+assert.match(controllerSource,/openSheet:true/,'iPhone must open the assets sheet early so previews are visible before 20s');
+assert.match(controllerSource,/phoneSeedAssets\(allAssets\(\)\)/,'iPhone shell must mount with seeded assets, not an empty strip');
+assert.match(controllerSource,/drawFallback/,'iPhone paced preview must draw a visible fallback when atlas thumbs are empty');
+assert.doesNotMatch(controllerSource,/renderAssetPreview:phoneShell\?\(\(\)=>\{\}\)/,'iPhone must not permanently noop asset previews');
 
 const workspaceFresh=await readFile(resolve(here,'../src/creators/workspaces/world-workspace.mjs'),'utf8');
 assert.doesNotMatch(workspaceFresh,/world-ios-\\$\{nonce\}/,'World recovery must not mint unique nonce module graphs');
