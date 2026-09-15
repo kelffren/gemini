@@ -2,7 +2,7 @@
 
 > Documento canónico del engine. Si contradice `index.html` o un owner Foundation LIVE, gana el runtime y este archivo debe actualizarse.
 
-**Sincronizado:** 2026-09-14  
+**Sincronizado:** 2026-09-15  
 **Runtime declarado:** Kelo World V6.54.2  
 **Modelo:** web 2D top-down, Canvas, mobile-first, login/guest gate antes del boot pesado.
 
@@ -46,9 +46,14 @@ El listado histórico de 16 pasos **no es el boot móvil**. Restaurar esos tags 
 | Templates placeables | `KELO_PROPERTY_CATALOG` | OWNER LIVE |
 | Prop definitions | `KELO_PROP_CONTRACT` | OWNER LIVE |
 | World editing authority | `KELO_WORLD_EDIT` | OWNER LIVE |
+| Creator composition | `src/creators/creator-entry.mjs` | OWNER LIVE creator / lazy |
+| Creator type routing | `Kelo Creator Library` | PENDING VERIFY creator / lazy |
+| Image source preparation | `Kelo Creator Assets / Image Lab` | SUPPORT LIVE creator / lazy |
 | Studio document/commands | `Studio Kernel` | OWNER LIVE creator |
 | Map generation | `KeloMapForge` | OWNER LIVE creator |
 | Update/PWA | `KeloUpdater` | OWNER LIVE client |
+
+`Kelo Creator Library` es un owner de **authoring navigation/routing**, no de gameplay. Character, Appearance, Equipment, Abilities, World, VFX y demás conservan sus owners de runtime.
 
 ## 4. Mundo y render
 
@@ -75,10 +80,16 @@ Estado actual:
 - Studio muestra carpetas visuales para Plaza, Arquitectura, Jardines, Agua, Caminos, Mercado y Bosque.
 - props de demostración pueden aparecer en mapa central mediante `KELO_PROP_CONTRACT` sin crear renderer paralelo.
 
-## 6. Studio / World Editor
+## 6. Studio / World Editor / Creator OS
 
 Entradas principales:
 
+- `src/core/creators-lazy-gate.js`
+- `src/creators/creator-entry.mjs`
+- `src/creators/library/creator-content-types.mjs`
+- `src/creators/ui/creator-library-workspace.mjs`
+- `src/creators/ui/image-lab-workspace.mjs`
+- `src/creators/ui/asset-forge-workspace.mjs`
 - `src/ui/studio-launcher.js`
 - `src/creators/workspaces/world-workspace.mjs`
 - `src/studio/integration/world-studio-bridge.mjs`
@@ -87,9 +98,11 @@ Entradas principales:
 - `src/studio/ui/studio-live-shell.mjs`
 - `src/studio/ui/studio-asset-palette.mjs`
 
-El shell es UI; no posee mutations del mundo. Las mutations pasan por Studio Kernel/commands y la autoridad existente. En móvil, el boot se fragmenta y cede turns para evitar matar Safari al parsear/montar el grafo completo.
+Creator Library presenta tipos humanos como Character, Skin, Weapon, Prop o VFX y los enruta al workspace owner existente. No es otro editor/runtime. Image Lab prepara fuentes; Asset Forge dibuja/QA pixel art; los workspaces especializados conservan sus contratos.
 
-**Regla QA:** World en iPhone no se declara resuelto solo con headless. Requiere apertura, interacción, placement y reapertura en dispositivo real/LIVE.
+El shell de World/Studio es UI; no posee mutations del mundo. Las mutations pasan por Studio Kernel/commands y la autoridad existente. En móvil, el boot se fragmenta y cede turns para evitar matar Safari al parsear/montar el grafo completo.
+
+**Regla QA:** World y Creator OS en iPhone no se declaran resueltos solo con headless. Requieren apertura/interacción en dispositivo real/LIVE; World además requiere placement/reapertura según su gate.
 
 ## 7. Asset compiler
 
@@ -109,14 +122,18 @@ El Asset Compiler puede sugerir semántica, pero nombres/categorías revisados d
 - Economy/logistics: `KeloRegionalEconomy`, `KeloCaravans`, `KeloFactions`.
 - Property/instances: `KELO_PROPERTY_CATALOG`, `PropertySystem`, InstanceSystem.
 
+Creator authoring nunca reemplaza estos owners. Un draft Weapon puede enrutar al Item workspace, pero combate/equipment siguen perteneciendo a sus owners.
+
 ## 9. Online boundary
 
-El cliente puede predecir/presentar, pero progreso valioso, comercio, PvP competitivo, propiedad y cambios globales deben migrar/fallar hacia autoridad de servidor. `docs/ONLINE_FIRST.md` y los documentos de cada sistema mandan sobre implementaciones locales temporales.
+El cliente puede predecir/presentar y crear drafts privados, pero progreso valioso, comercio, PvP competitivo, propiedad, publicación global y economía de creadores deben migrar/fallar hacia autoridad de servidor. `docs/ONLINE_FIRST.md` y los documentos de cada sistema mandan sobre implementaciones locales temporales.
 
 ## 10. Qué NO hacer
 
 - No crear otro renderer de props o tiles.
 - No crear otro catálogo de assets en paralelo.
+- No convertir Creator Library en gameplay authority.
+- No duplicar Image Lab/Asset Forge para cada tipo de contenido.
 - No escribir directamente cámara/zoom/canvas desde features nuevas.
 - No mutar `obstacles` desde features nuevas.
 - No sustituir World/Studio por un editor nuevo para corregir un bug de boot.
@@ -132,3 +149,5 @@ El cliente puede predecir/presentar, pero progreso valioso, comercio, PvP compet
 - `docs/ASSET_CONTRACT.md`
 - `docs/CODE_INDEX.md`
 - `docs/SYSTEM_DOCUMENTATION_STANDARD.md`
+- `docs/IMPLEMENTATION_LEDGER.md`
+- `docs/systems/CREATOR_OS_LIBRARY.md`
