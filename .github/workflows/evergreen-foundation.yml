@@ -29,6 +29,9 @@ jobs:
       - name: State migration characterization
         run: node tests/state-store-migration.test.cjs
 
+      - name: Service worker cache ownership
+        run: node scripts/service-worker-cache-audit.mjs
+
       - name: Foundation architecture audit
         run: node scripts/foundation-architecture-audit.js
 
