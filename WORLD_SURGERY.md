@@ -15,6 +15,8 @@ The Surgery panel is intentionally independent from Studio mount. Its settings p
 - ISOLATABLE and OPTIONAL modules can be disabled without deleting their implementation.
 - On iPhone, individually disabled productivity modules are skipped before dynamic `import()`.
 - Paint Copies OFF returns a no-op tool before registering its input context, key listener, MutationObserver, or Studio DOM button.
+- Camera Controller and Authority Mirror can be isolated behind safe NOOP adapters.
+- Quick Build, Room Build, Room Opening and Room Material have independent optional switches.
 
 ## Evidence labels
 
