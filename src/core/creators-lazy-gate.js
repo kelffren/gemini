@@ -43,10 +43,10 @@ function loadAssetCatalog(){
   if(root.KELO_PROPERTY_CATALOG?.list)return Promise.resolve(root.KELO_PROPERTY_CATALOG);
   if(catalogLoading)return catalogLoading;
   catalogLoading=new Promise(function(resolve){
-    let s=document.querySelector('script[data-kelo-creator-assets="1"]');
+    const stale=document.querySelector('script[data-kelo-creator-assets="1"]');
+    if(stale)stale.remove();
+    const s=document.createElement('script');s.src=ASSET_CATALOG_SRC;s.async=false;s.dataset.keloCreatorAssets='1';
     const done=function(){resolve(root.KELO_PROPERTY_CATALOG||null);};
-    if(s){s.addEventListener('load',done,{once:true});s.addEventListener('error',done,{once:true});return;}
-    s=document.createElement('script');s.src=ASSET_CATALOG_SRC;s.async=false;s.dataset.keloCreatorAssets='1';
     s.onload=done;s.onerror=function(error){console.warn('[Kelo Creators gate] asset catalog unavailable; using fallback',error);done();};document.head.appendChild(s);
   }).finally(function(){catalogLoading=null;});
   return catalogLoading;
