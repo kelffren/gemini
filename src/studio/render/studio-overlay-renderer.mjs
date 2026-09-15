@@ -25,9 +25,8 @@ export function resolveRoomPreviewGroups(rows=[]){
 export function createStudioOverlayRenderer({ kernel, tools, assetPreview } = {}) {
   if (!kernel) throw new Error('STUDIO_OVERLAY_KERNEL_REQUIRED');
 
-  // BUG-0003 isolation switch. Paint Copies is OFF by default so the baseline never
-  // evaluates getPreviews() or draws its copies. Re-enable deliberately with
-  // ?paintCopies=1 (or window.KELO_PAINT_COPIES_ENABLED=true) for A/B testing.
+  // BUG-0003 isolation switch. Paint Copies remains OFF by default. The renderer now
+  // has a zero-copy preview path, but activation stays deliberate until mobile QA.
   let paintCopiesQueryEnabled=false;
   try{
     const q=new URLSearchParams(globalThis?.location?.search||'');
@@ -39,6 +38,8 @@ export function createStudioOverlayRenderer({ kernel, tools, assetPreview } = {}
   const paintCopiesDiagnostics={
     enabled:paintCopiesQueryEnabled,
     previewCalls:0,
+    zeroCopyReads:0,
+    fallbackCloneReads:0,
     drawCalls:0,
     skippedFrames:0,
     lastRows:0,
@@ -114,6 +115,15 @@ export function createStudioOverlayRenderer({ kernel, tools, assetPreview } = {}
     }
     ctx.restore();
   }
+  function readPaintRows(){
+    const tool=tools?.paintCopies;
+    if(typeof tool?.getPreviewRefs==='function'){
+      paintCopiesDiagnostics.zeroCopyReads++;
+      return tool.getPreviewRefs()||[];
+    }
+    paintCopiesDiagnostics.fallbackCloneReads++;
+    return tool?.getPreviews?.()||[];
+  }
   function drawSpacingGuide(ctx,guide){
     const from=Number(guide.from)||0,to=Number(guide.to)||0,cross=Number(guide.cross)||0,mid=(from+to)/2,label=`${Math.round(Number(guide.gap)||0)}px`,tick=4;
     ctx.save();ctx.strokeStyle='rgba(244,221,141,.98)';ctx.fillStyle='rgba(244,221,141,.98)';ctx.lineWidth=1.4;ctx.setLineDash([]);ctx.beginPath();
@@ -148,7 +158,7 @@ export function createStudioOverlayRenderer({ kernel, tools, assetPreview } = {}
       try{
         paintCopiesDiagnostics.enabled=true;
         paintCopiesDiagnostics.previewCalls++;
-        const paintRows=tools?.paintCopies?.getPreviews?.()||[];
+        const paintRows=readPaintRows();
         paintCopiesDiagnostics.lastRows=paintRows.length;
         drawPaintCopies(ctx,paintRows);
       }catch(error){
