@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [legacy-observatory, legacy-shadow-*]
+    branches: [legacy-observatory, 'legacy-shadow-*', 'legacy-phase*']
   workflow_dispatch:
 
 permissions:
@@ -37,10 +37,15 @@ jobs:
       - name: Verify camera follow shadow safety
         run: node scripts/camera-follow-shadow-audit.mjs
 
-      - name: Syntax-check shadow runtimes
+      - name: Verify collision owner migration
+        run: node scripts/collision-owner-migration-audit.mjs
+
+      - name: Syntax-check migration runtimes
         run: |
           node --check src/core/simulation-farm-shadow.js
           node --check src/core/camera-follow-shadow.js
+          node --check src/environment/generic-prefabs.js
+          node --check src/environment/luxe-kiosk-atlas.js
 
       - name: Upload observatory report
         if: always()
