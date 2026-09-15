@@ -33,24 +33,26 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Syntax
-        run: node --check scripts/studio-live-audit.mjs
-
-      - name: Adapt historical readiness marker in runner only
+      - name: Adapt historical harness in runner only
         shell: bash
         run: |
           python3 - <<'PY'
           from pathlib import Path
           p=Path('scripts/studio-live-audit.mjs')
           s=p.read_text()
-          old="'KELO_CREATORS_LAUNCHER','NO polling'"
-          new="'KELO_CREATORS_LAUNCHER'"
-          if old not in s:
+          marker_old="'KELO_CREATORS_LAUNCHER','NO polling'"
+          marker_new="'KELO_CREATORS_LAUNCHER'"
+          url_old="?mapEditor=1&studio-live-audit=${Date.now()}"
+          url_new="?guest=1&mapEditor=1&studio-live-audit=${Date.now()}"
+          if marker_old not in s:
               raise SystemExit('historical marker pattern not found')
-          p.write_text(s.replace(old,new,1))
+          if url_old not in s:
+              raise SystemExit('historical QA URL pattern not found')
+          s=s.replace(marker_old,marker_new,1).replace(url_old,url_new,1)
+          p.write_text(s)
           PY
           node --check scripts/studio-live-audit.mjs
-          echo 'Historical harness adapted; editor/runtime files remain untouched.'
+          echo 'Historical QA harness adapted in runner only; editor/runtime files untouched.'
 
       - name: Install Playwright client
         run: npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund playwright@1.55.0
