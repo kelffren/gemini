@@ -1,0 +1,65 @@
+name: Critical World Editor d71 LIVE certification
+
+on:
+  push:
+    branches:
+      - experiment/world-editor-pre-dynamic-imports-d71df2c0-live
+    paths:
+      - '.github/workflows/critical-world-editor-d71-live.yml'
+  workflow_dispatch:
+
+jobs:
+  certify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout critical experiment
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Prove code snapshot is d71 plus this workflow only
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE=d71df2c0ad5aa627616858d3c65ef4131eb0f19d
+          git cat-file -e "$BASE^{commit}"
+          mapfile -t changed < <(git diff --name-only "$BASE" HEAD)
+          printf 'Changed from d71:\n%s\n' "${changed[@]}"
+          test "${#changed[@]}" -eq 1
+          test "${changed[0]}" = '.github/workflows/critical-world-editor-d71-live.yml'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Syntax
+        run: node --check scripts/studio-live-audit.mjs
+
+      - name: Install Playwright client
+        run: npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund playwright@1.55.0
+
+      - name: Serve exact critical snapshot
+        shell: bash
+        run: |
+          python3 -m http.server 8000 --bind 127.0.0.1 >/tmp/critical-world-editor-http.log 2>&1 &
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:8000/index.html >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/critical-world-editor-http.log
+          exit 1
+
+      - name: Run full Studio LIVE placement audit
+        env:
+          AUDIT_URL: http://127.0.0.1:8000/
+          CHROME_BIN: /usr/bin/google-chrome
+        run: node scripts/studio-live-audit.mjs
+
+      - name: Upload certification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: critical-world-editor-d71-live-evidence
+          path: artifacts/
+          if-no-files-found: warn
