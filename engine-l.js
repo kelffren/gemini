@@ -15,8 +15,13 @@
   // LIVE owner: plaza tiles + aimed-skill landing marker. Viewport/HiDPI belongs to KeloCamera.
   const PLAZA = { x: 1040, y: 1240, w: 800, h: 560 };
   const REGISTRY = window.KELO_TILE_REGISTRY;
+  const collision=window.KELO_COLLISION;
   if (!REGISTRY?.atlases?.plaza || !REGISTRY?.atlases?.plazaGround || !REGISTRY?.atlases?.transitions || !REGISTRY?.tiles || !REGISTRY?.families || !REGISTRY?.transitionMasks) {
     console.error('[Kelo plaza] visual registry missing authored ground or transition metadata');
+    return;
+  }
+  if(!collision||typeof collision.remove!=='function'){
+    console.error('[Kelo plaza] collision owner registry missing');
     return;
   }
   const ATLAS = REGISTRY.atlases.plaza;
@@ -29,7 +34,7 @@
   const TRANSITION_MASKS = REGISTRY.transitionMasks;
 
   window.KELO_PLAZA_AUDIT = {
-    version: 'V5.93-authored-ground-foundation',
+    version: 'V5.94-collision-owner-registry',
     ready: false,
     assetLoaded: false,
     groundAssetLoaded: false,
@@ -54,16 +59,29 @@
     decorationResetSuppressed: window.KELO_WORLD_DECORATION_RESET === true,
     renderOwner:'KeloRender',
     viewportOwner:'KeloCamera',
-    directViewportWrites:false
+    directViewportWrites:false,
+    collisionMutationMode:'collision-owner-registry-v1',
+    collisionRemovals:0
   };
 
   function inPlaza(o) {
     const x=o.x||0, y=o.y||0, w=o.w||o.width||0, h=o.h||o.height||0;
     return x < PLAZA.x+PLAZA.w && x+w > PLAZA.x && y < PLAZA.y+PLAZA.h && y+h > PLAZA.y;
   }
-  if (Array.isArray(obstacles)) {
-    for (let i=obstacles.length-1;i>=0;i--) if (inPlaza(obstacles[i])) obstacles.splice(i,1);
+  function clearPlazaColliders(){
+    if(!Array.isArray(obstacles))return 0;
+    const removals=[];
+    for(const o of obstacles){
+      if(!o||!inPlaza(o))continue;
+      const owner=String(o._keloCollisionOwner||'');const id=String(o.id||'');
+      if(owner&&id)removals.push({owner,id});
+      else console.warn('[Kelo plaza] unowned collider in plaza left untouched',o);
+    }
+    for(const item of removals)collision.remove(item.owner,item.id);
+    window.KELO_PLAZA_AUDIT.collisionRemovals=removals.length;
+    return removals.length;
   }
+  clearPlazaColliders();
 
   let floorLayer=null, transitionLayer=null, propLayer=null;
   let baseLoaded=false, transitionsLoaded=false, groundLoaded=false;
