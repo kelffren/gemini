@@ -10,8 +10,8 @@
 (function(root){
 'use strict';
 if(root.KeloCreatorsLazyGate)return;
-const VERSION='kelo-creators-lazy-gate-v4-assets';
-const LAUNCHER_SRC='src/ui/studio-launcher.js?v=world-bridge-20260915-25';
+const VERSION='kelo-creators-lazy-gate-v5-asset-forge';
+const LAUNCHER_SRC='src/ui/studio-launcher.js?v=asset-forge-20260915-1';
 const ASSET_CATALOG_SRC='src/property/property-asset-catalog.js?v=creator-assets-20260915-1';
 let loading=null,catalogLoading=null;
 const query=()=>{try{return new URLSearchParams(root.location.search);}catch(_){return new URLSearchParams();}};
