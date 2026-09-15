@@ -36,6 +36,21 @@
 <div id="kelo-module-loader" hidden><span id="kelo-ml-text">Cargando módulos…</span><div class="kelo-ml-track"><i class="kelo-ml-bar" id="kelo-ml-bar"></i></div></div>
 <script>
 (function(){
+  try{
+    if(sessionStorage.getItem('kelo.world.updater.pendingBuild.v5')&&!window.__KELO_UPDATE_EARLY_HEALTH__){
+      var health={errors:[],startedAt:Date.now(),stop:null};
+      var record=function(type,message){
+        if(health.errors.length>=10)health.errors.shift();
+        health.errors.push({type:type,message:String(message||type),at:Date.now()});
+      };
+      var onEarlyError=function(event){record('error',event&&event.message||'early_error');};
+      var onEarlyReject=function(event){var reason=event&&event.reason;record('unhandledrejection',reason&&reason.message||reason||'early_rejection');};
+      health.stop=function(){window.removeEventListener('error',onEarlyError);window.removeEventListener('unhandledrejection',onEarlyReject);};
+      window.addEventListener('error',onEarlyError);
+      window.addEventListener('unhandledrejection',onEarlyReject);
+      window.__KELO_UPDATE_EARLY_HEALTH__=health;
+    }
+  }catch(e){}
   window.KELO_WORLD_DECORATION_RESET=true;
   window.KELO_HIDE_MINIMAP=true;
   window.__keloHoldGameLoop=true;
@@ -117,7 +132,7 @@
 <script src="src/core/module-loader.js?v=8-style-first-use"></script>
 <script>window.KELO_MODULE_LOADER&&window.KELO_MODULE_LOADER.start({build:'V6.69'});</script>
 <script src="src/core/settings-lazy-gate.js?v=2-update-intel"></script>
-<script src="src/core/update-gate.js?v=4-learning"></script>
+<script src="src/core/update-gate.js?v=5-learning-hint"></script>
 <script src="src/systems/admin-key-system.js?v=1"></script>
 <script src="src/core/creators-lazy-gate.js?v=1"></script>
 </body></html>
