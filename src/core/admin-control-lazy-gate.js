@@ -8,7 +8,7 @@
 (function(root){
 'use strict';
 if(root.KeloAdminControlLazyGate)return;
-const VERSION='kelo-admin-control-lazy-gate-v1';
+const VERSION='kelo-admin-control-lazy-gate-v2';
 let loading=null;
 const actor=()=>String(root.KELO_ADMIN_KEYS?.playerId?.()||root.keloNet?.playerKey||root.localPlayer?.id||'local_pioneer');
 function locallyEligible(){
@@ -31,7 +31,7 @@ async function load(){
     const permissionsModule=await import('./../auth/account-permissions-runtime.mjs?v=1');
     const permissions=await permissionsModule.installAccountPermissions({root});
     if(!(permissions?.hasRole?.('admin')||permissions?.can?.('admin.panel')))throw new Error('ADMIN_PERMISSION_DENIED');
-    const adminModule=await import('./../ui/account-admin-panel.mjs?v=2');
+    const adminModule=await import('./../ui/account-admin-panel.mjs?v=3');
     return adminModule.installAccountAdminPanel({root});
   })().finally(()=>{loading=null;sync();});
   return loading;
