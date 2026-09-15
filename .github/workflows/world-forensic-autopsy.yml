@@ -1,0 +1,97 @@
+name: World Forensic Autopsy
+
+on:
+  workflow_dispatch:
+    inputs:
+      good_sha:
+        description: 'Known GOOD commit/ref'
+        required: true
+        type: string
+      bad_sha:
+        description: 'Known BAD commit/ref'
+        required: true
+        type: string
+      mode:
+        description: 'Stable forensic probe'
+        required: true
+        default: WORLD_MOUNT
+        type: choice
+        options:
+          - BOOT
+          - WORLD_MOUNT
+          - CUSTOM
+      custom_probe_command:
+        description: 'Shell command used only when mode=CUSTOM'
+        required: false
+        type: string
+      repeat:
+        description: 'Boundary revalidation repetitions (1-5)'
+        required: false
+        default: '2'
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: world-forensic-${{ inputs.good_sha }}-${{ inputs.bad_sha }}-${{ inputs.mode }}
+  cancel-in-progress: false
+
+jobs:
+  autopsy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install stable forensic browser harness
+        if: inputs.mode != 'CUSTOM'
+        run: |
+          npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund playwright@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Run historical first-bad autopsy
+        id: autopsy
+        continue-on-error: true
+        env:
+          FORENSIC_GOOD: ${{ inputs.good_sha }}
+          FORENSIC_BAD: ${{ inputs.bad_sha }}
+          FORENSIC_MODE: ${{ inputs.mode }}
+          FORENSIC_PROBE_COMMAND: ${{ inputs.custom_probe_command }}
+          FORENSIC_REPEAT: ${{ inputs.repeat }}
+          FORENSIC_TIMEOUT_MS: '30000'
+        run: node scripts/world-forensic-autopsy.mjs
+
+      - name: Publish report in job summary
+        if: always()
+        shell: bash
+        run: |
+          REPORT="$(find forensics -type f -name REPORT.md -print 2>/dev/null | sort | tail -1 || true)"
+          if [ -n "$REPORT" ] && [ -f "$REPORT" ]; then
+            cat "$REPORT" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo '## World Forensic Autopsy' >> "$GITHUB_STEP_SUMMARY"
+            echo 'No report file was produced.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload forensic evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: world-forensic-autopsy-${{ github.run_id }}
+          if-no-files-found: warn
+          retention-days: 30
+          path: |
+            forensics/world-autopsy-*/**
+
+      - name: Enforce confirmed result
+        if: steps.autopsy.outcome != 'success'
+        run: |
+          echo 'Forensic autopsy did not produce a confirmed boundary. Read the uploaded report.'
+          exit 1
