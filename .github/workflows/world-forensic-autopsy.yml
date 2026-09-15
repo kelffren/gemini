@@ -12,20 +12,17 @@ on:
         required: true
         type: string
       mode:
-        description: 'Stable forensic probe'
+        description: 'Bug Intelligence / Recovery profile'
         required: true
         default: WORLD_MOUNT
         type: choice
         options:
           - BOOT
           - WORLD_MOUNT
-          - CUSTOM
-      custom_probe_command:
-        description: 'Shell command used only when mode=CUSTOM'
-        required: false
-        type: string
+          - MOVEMENT
+          - FULL
       repeat:
-        description: 'Boundary revalidation repetitions (1-5)'
+        description: 'Parent/first-bad revalidation repetitions (1-5)'
         required: false
         default: '2'
         type: string
@@ -50,22 +47,19 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Install stable forensic browser harness
-        if: inputs.mode != 'CUSTOM'
+      - name: Install Recovery Mesh browser dependencies
         run: |
-          npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund playwright@1.55.0
+          npm install --no-package-lock --no-audit --no-fund
           npx playwright install --with-deps chromium
 
-      - name: Run historical first-bad autopsy
+      - name: Run first-bad autopsy
         id: autopsy
         continue-on-error: true
         env:
           FORENSIC_GOOD: ${{ inputs.good_sha }}
           FORENSIC_BAD: ${{ inputs.bad_sha }}
           FORENSIC_MODE: ${{ inputs.mode }}
-          FORENSIC_PROBE_COMMAND: ${{ inputs.custom_probe_command }}
           FORENSIC_REPEAT: ${{ inputs.repeat }}
-          FORENSIC_TIMEOUT_MS: '30000'
         run: node scripts/world-forensic-autopsy.mjs
 
       - name: Publish report in job summary
@@ -90,8 +84,8 @@ jobs:
           path: |
             forensics/world-autopsy-*/**
 
-      - name: Enforce confirmed result
+      - name: Enforce confirmed boundary
         if: steps.autopsy.outcome != 'success'
         run: |
-          echo 'Forensic autopsy did not produce a confirmed boundary. Read the uploaded report.'
+          echo 'Forensic autopsy did not produce a confirmed parent-GOOD / child-BAD boundary. Read the uploaded report.'
           exit 1
