@@ -4,6 +4,10 @@ on:
   pull_request:
     paths:
       - 'src/creators/sprite-compiler/asset-*.mjs'
+      - 'src/creators/sprite-compiler/sprite-exact-canvas.mjs'
+      - 'src/creators/avatar/avatar-quick-import-service.mjs'
+      - 'src/creators/avatar/raw-image-intent-gate.mjs'
+      - 'src/creators/avatar/kelo-universal-asset-compiler.mjs'
       - 'scripts/asset-compiler-v7-audit.mjs'
       - 'scripts/asset-compiler-chaos-audit.mjs'
       - '.github/workflows/asset-compiler-v7-ci.yml'
@@ -11,6 +15,10 @@ on:
     branches: [main]
     paths:
       - 'src/creators/sprite-compiler/asset-*.mjs'
+      - 'src/creators/sprite-compiler/sprite-exact-canvas.mjs'
+      - 'src/creators/avatar/avatar-quick-import-service.mjs'
+      - 'src/creators/avatar/raw-image-intent-gate.mjs'
+      - 'src/creators/avatar/kelo-universal-asset-compiler.mjs'
       - 'scripts/asset-compiler-v7-audit.mjs'
       - 'scripts/asset-compiler-chaos-audit.mjs'
       - '.github/workflows/asset-compiler-v7-ci.yml'
@@ -27,6 +35,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Syntax-check production isolation path
+        run: |
+          node --check src/creators/avatar/avatar-quick-import-service.mjs
+          node --check src/creators/sprite-compiler/asset-universal-compiler-worker.mjs
+          node --check src/creators/sprite-compiler/asset-worker-canvas-root.mjs
+          node --check src/creators/sprite-compiler/asset-isolated-worker-client.mjs
       - name: Deterministic V7 audit
         run: node scripts/asset-compiler-v7-audit.mjs
       - name: Adversarial chaos audit
