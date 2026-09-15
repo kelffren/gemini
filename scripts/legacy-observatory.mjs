@@ -21,7 +21,8 @@ const CRITICAL_KEYS = [
   'cameraX','cameraY','velocityX','velocityY','obstacles','worldMap',
   'render','renderAvatar','updateSimulation','processInput','updateMovement'
 ];
-const CRITICAL_AUTHORITY_KEYS = new Set(['localPlayer.x','localPlayer.y','render','updateSimulation','processInput','updateMovement']);
+const CRITICAL_AUTHORITY_KEYS = new Set(['localPlayer.x','localPlayer.y','obstacles','render','updateSimulation','processInput','updateMovement']);
+const MUTATING_COLLECTION_METHODS='push|pop|shift|unshift|splice|sort|reverse|copyWithin|fill';
 
 function walk(dir, out=[]){
   if(!fs.existsSync(dir)) return out;
@@ -46,12 +47,18 @@ function detect(file){
     ...[...text.matchAll(/\bimport\s*\(\s*['\"]([^'\"]+)['\"]\s*\)/g)].map(m=>m[1])
   ]);
   const globalReads=uniq([...text.matchAll(/\b(?:window|globalThis|root)\.([A-Za-z_$][\w$]*)/g)].map(m=>m[1]));
-  const globalWrites=uniq([...text.matchAll(/\b(?:window|globalThis|root)\.([A-Za-z_$][\w$]*)\s*=/g)].map(m=>m[1]));
+  const globalWrites=uniq([...text.matchAll(/\b(?:window|globalThis|root)\.([A-Za-z_$][\w$]*)\s*=(?!=)/g)].map(m=>m[1]));
   const writers=[];
   for(const key of CRITICAL_KEYS){
     const tail=key.includes('.') ? key.split('.').map(esc).join('\\.') : esc(key);
-    const re=new RegExp('(?:\\b'+tail+'\\s*=|\\b'+tail+'\\s*(?:\\+\\+|--|\\+=|-=|\\*=|/=))','g');
-    const n=count(re,text); if(n) writers.push({key,count:n});
+    const re=new RegExp('(?:\\b'+tail+'\\s*=(?!=)|\\b'+tail+'\\s*(?:\\+\\+|--|\\+=|-=|\\*=|/=))','g');
+    let n=count(re,text);
+    if(key==='obstacles'){
+      n+=count(new RegExp('\\bobstacles\\s*\\.\\s*(?:'+MUTATING_COLLECTION_METHODS+')\\s*\\(','g'),text);
+      n+=count(/\bobstacles\s*\[[^\]]+\]\s*=(?!=)/g,text);
+      n+=count(/\bobstacles\s*\.\s*length\s*=(?!=)/g,text);
+    }
+    if(n) writers.push({key,count:n});
   }
   const listeners=uniq([...text.matchAll(/addEventListener\s*\(\s*['\"]([^'\"]+)['\"]/g)].map(m=>m[1]));
   const timers={timeout:count(/\bsetTimeout\s*\(/g,text), interval:count(/\bsetInterval\s*\(/g,text), raf:count(/\brequestAnimationFrame\s*\(/g,text)};

@@ -823,9 +823,28 @@
       "files": [
         "src/ui/studio-launcher.js"
       ]
+    },
+    {
+      "id": "prevention:c40bd96e5c8cd55c68db3eb72dbdb4ab340f4723",
+      "at": "2026-09-15T06:29:22.000Z",
+      "source": "bug-prevention-ci",
+      "head_sha": "c40bd96e5c8cd55c68db3eb72dbdb4ab340f4723",
+      "base_sha": "2e74d9db22a2e2d8e0909e23c58eb15711829f46",
+      "conclusion": "failure",
+      "files": [
+        ".github/workflows/legacy-observatory.yml",
+        "config/legacy-migration-manifest.json",
+        "engine-ae.js",
+        "engine-aj.js",
+        "engine-l.js",
+        "scripts/collision-owner-migration-audit.mjs",
+        "scripts/legacy-observatory.mjs",
+        "src/environment/generic-prefabs.js",
+        "src/environment/luxe-kiosk-atlas.js"
+      ]
     }
   ],
-  "feedback_updated_at": "2026-09-15T06:01:30.688Z",
+  "feedback_updated_at": "2026-09-15T06:32:22.455Z",
   "training": {
     "examples": 58,
     "search_examples": 43,
