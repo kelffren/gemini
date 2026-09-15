@@ -7,6 +7,9 @@ import {createAssetVerificationLedger,verifyAssetVerificationLedger} from '../sr
 import {chooseAssetBackend} from '../src/creators/sprite-compiler/asset-backend-contract.mjs';
 import {createAssetReviewPacket,resolveAssetReviewPacket} from '../src/creators/sprite-compiler/asset-human-review.mjs';
 import {evaluateRuntimeCanary} from '../src/creators/sprite-compiler/asset-runtime-canary.mjs';
+import {createIsolatedAssetWorkerClient} from '../src/creators/sprite-compiler/asset-isolated-worker-client.mjs';
+import {assertPinnedAssetOracle,evaluateOracleShadow} from '../src/creators/sprite-compiler/asset-oracle-governance.mjs';
+import {evaluateAssetSourceAttestation} from '../src/creators/sprite-compiler/asset-source-attestation.mjs';
 
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 const makePng=(width,height)=>{const bytes=new Uint8Array(33);bytes.set([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a,0,0,0,13,0x49,0x48,0x44,0x52]);bytes[16]=(width>>>24)&255;bytes[17]=(width>>>16)&255;bytes[18]=(width>>>8)&255;bytes[19]=width&255;bytes[20]=(height>>>24)&255;bytes[21]=(height>>>16)&255;bytes[22]=(height>>>8)&255;bytes[23]=height&255;bytes[24]=8;bytes[25]=6;return bytes;};
@@ -26,6 +29,12 @@ const webp=new Uint8Array(30);webp.set([...Buffer.from('RIFF'),99,0,0,0,...Buffe
 const runner=createAssetJobRunner({defaultTimeoutMs:120});const started=Date.now();await assert.rejects(()=>runner.run([{name:'hang',run:()=>sleep(500)}]),/ASSET_JOB_ABORTED:timeout/);assert.ok(Date.now()-started<450);
 const first=runner.run([{name:'slow',run:()=>sleep(250)}]);await sleep(10);const second=runner.run([{name:'fast',run:async()=>42}]);await assert.rejects(()=>first,/ASSET_JOB_ABORTED:superseded|ASSET_JOB_STALE/);assert.equal((await second).value,42);
 
+// Dedicated-worker isolation provides a true hard-timeout boundary for CPU-bound backend tasks.
+let hardWorker=null;class SilentWorker{constructor(){this.terminated=false;hardWorker=this;}postMessage(){}terminate(){this.terminated=true;}}
+const isolated=createIsolatedAssetWorkerClient({workerFactory:()=>new SilentWorker(),defaultTimeoutMs:110});await assert.rejects(()=>isolated.run({task:'hang'}),/ASSET_WORKER_HARD_TIMEOUT/);assert.equal(hardWorker.terminated,true);assert.equal(isolated.activeCount,0);
+let echoTerminated=false;class EchoWorker{postMessage(message){queueMicrotask(()=>this.onmessage?.({data:{id:message.id,ok:true,value:message.payload}}));}terminate(){echoTerminated=true;}}
+const echo=createIsolatedAssetWorkerClient({workerFactory:()=>new EchoWorker()});assert.deepEqual(await echo.run({hello:'world'}),{hello:'world'});assert.equal(echoTerminated,true);
+
 // Failed gates can never expose staged output.
 const tx=createAssetTransaction({id:'chaos'});tx.stage('asset',{secret:'not-published'});tx.gate('security',false);assert.throws(()=>tx.commit(),/ASSET_TRANSACTION_GATE_FAILED/);assert.equal(tx.state,'ROLLED_BACK');assert.deepEqual(tx.snapshot().keys,[]);
 
@@ -43,4 +52,10 @@ const packet=createAssetReviewPacket({assetId:'x',releaseDecision:{rejected:['AS
 const goodSamples=Array.from({length:5},(_,i)=>({deviceClass:'iphone',platform:'ios',api:'webgl2',decodeMs:20+i,uploadMs:12+i,firstRenderMs:40+i,peakMemoryMiB:20+i,textureUploadOk:true,renderOk:true,contextLost:false}));const canaryGood=evaluateRuntimeCanary(goodSamples,{minimumSamples:5,requiredDeviceClasses:['iphone'],budgets:{maxDecodeP95Ms:50,maxUploadP95Ms:50,maxFirstRenderP95Ms:100,maxPeakMemoryP95MiB:40}});assert.equal(canaryGood.pass,true);
 const canaryBad=evaluateRuntimeCanary([...goodSamples.slice(0,4),{...goodSamples[4],contextLost:true}],{minimumSamples:5,requiredDeviceClasses:['iphone']});assert.equal(canaryBad.pass,false);assert.ok(canaryBad.reasons.includes('CANARY_RUNTIME_FAILURE'));
 
-console.log(JSON.stringify({ok:true,randomCases:5000,randomRejected,timeoutFailClosed:true,staleProtected:true,transactionRollback:true,ledgerTamperDetected:true,aiSecurityAuthorityDenied:true,humanHardOverrideDenied:true,realDeviceCanary:true}));
+// AI oracle versions must be pinned; new versions are shadow-tested and never auto-promoted.
+assert.throws(()=>assertPinnedAssetOracle({id:'seg',model:'sam',version:'latest',promptPolicyHash:'x'}),/ASSET_ORACLE_UNPINNED/);const baseline={id:'seg-v1',provider:'test',model:'seg',version:'1.0.0',promptPolicyHash:'abc'},candidate={...baseline,id:'seg-v2',version:'2.0.0'};const shadowCases=Array.from({length:30},(_,i)=>({baseline:{label:i%2},candidate:{label:i%2},baselinePass:true,candidatePass:true,critical:i<4}));const shadow=evaluateOracleShadow({baseline,candidate,cases:shadowCases});assert.equal(shadow.status,'ELIGIBLE_FOR_HUMAN_PROMOTION');assert.equal(shadow.autoPromote,false);
+
+// Visual AI cannot prove usage rights; external source without an explicit declaration/license remains review-required.
+const sourceDecision=evaluateAssetSourceAttestation({sourceType:'external',sourceUri:'example',declaration:false});assert.equal(sourceDecision.pass,false);assert.ok(sourceDecision.reasons.includes('SOURCE_LICENSE_EVIDENCE_REQUIRED'));
+
+console.log(JSON.stringify({ok:true,randomCases:5000,randomRejected,timeoutFailClosed:true,staleProtected:true,hardWorkerKill:true,transactionRollback:true,ledgerTamperDetected:true,aiSecurityAuthorityDenied:true,humanHardOverrideDenied:true,realDeviceCanary:true,modelDriftGoverned:true,sourceRightsNotGuessed:true}));
