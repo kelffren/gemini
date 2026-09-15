@@ -34,6 +34,32 @@ jobs:
       - name: Run live visual bridge
         run: node scripts/live-visual-bridge.mjs
 
+      - name: Prove detector rejects broken movement
+        shell: bash
+        run: |
+          cp -a artifacts/live-visual-bridge artifacts/live-visual-bridge-pass
+          set +e
+          KELO_BRIDGE_MOVE_MS=0 node scripts/live-visual-bridge.mjs
+          code=$?
+          set -e
+
+          if [ "$code" -eq 0 ]; then
+            echo 'Detector self-check FAILED: zero-movement session was accepted.'
+            exit 1
+          fi
+
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const result = JSON.parse(fs.readFileSync('artifacts/live-visual-bridge/result.json', 'utf8'));
+          if (result.pass !== false || result.checks?.playerMoved !== false) {
+            throw new Error(`Detector self-check produced unexpected result: ${JSON.stringify(result.checks)}`);
+          }
+          console.log('DETECTOR_SELF_CHECK=PASS');
+          NODE
+
+          rm -rf artifacts/live-visual-bridge
+          mv artifacts/live-visual-bridge-pass artifacts/live-visual-bridge
+
       - name: Publish bridge summary
         if: always()
         shell: bash
