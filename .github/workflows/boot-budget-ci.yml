@@ -1,0 +1,40 @@
+name: Kelo Boot Budget CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'index.html'
+      - 'engine-*.js'
+      - 'src/core/**'
+      - 'src/environment/**'
+      - 'src/ui/**'
+      - 'src/systems/performance-governor.js'
+      - 'scripts/boot-budget-audit.mjs'
+      - '.github/workflows/boot-budget-ci.yml'
+  pull_request:
+    paths:
+      - 'index.html'
+      - 'engine-*.js'
+      - 'src/core/**'
+      - 'src/environment/**'
+      - 'src/ui/**'
+      - 'src/systems/performance-governor.js'
+      - 'scripts/boot-budget-audit.mjs'
+
+permissions:
+  contents: read
+
+jobs:
+  boot-budget:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax check zero-boot infrastructure
+        run: |
+          node --check src/core/module-loader.js
+          node --check src/core/boot-stage-loader.js
+          node --check scripts/boot-budget-audit.mjs
+      - name: Audit critical boot bytes
+        run: node scripts/boot-budget-audit.mjs
