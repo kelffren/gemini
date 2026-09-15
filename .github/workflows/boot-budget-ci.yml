@@ -35,6 +35,9 @@ jobs:
         run: |
           node --check src/core/module-loader.js
           node --check src/core/boot-stage-loader.js
+          node --check src/core/micro-core-runtime.js
+          node --check src/core/settings-lazy-gate.js
+          node --check src/core/creators-lazy-gate.js
           node --check scripts/boot-budget-audit.mjs
       - name: Audit critical boot bytes
         run: node scripts/boot-budget-audit.mjs
