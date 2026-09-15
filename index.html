@@ -135,8 +135,8 @@
     load('src/core/update-delta-core.js?v=3')
       .then(function(){return load('src/core/update-system.js?v=3');})
       .then(function(){return load('src/core/update-watch.js?v=3');})
-      .then(function(){window.dispatchEvent(new CustomEvent('kelo:update:connected',{detail:{version:'turbo-v3',mode:'post-boot'}}));})
-      .catch(function(error){console.error('[KeloUpdater reconnect]',error);});
+      .then(function(){window.dispatchEvent(new CustomEvent('kelo:update:connected',{detail:{version:'turbo-v3',mode:'post-boot'}}));return load('src/core/download-center.js?v=1-safe');})
+      .catch(function(error){console.error('[Kelo post-boot services]',error);});
   }
   function schedule(){
     if('requestIdleCallback' in window){window.requestIdleCallback(connect,{timeout:2000});}
