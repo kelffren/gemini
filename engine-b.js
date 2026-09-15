@@ -1,3 +1,10 @@
+/* KELO-INDEX
+ * area: LEGACY / SOCIAL
+ * owner: legacy farm, arena and social interaction helpers
+ * keys: SOCIAL MODAL CLOSE OPTIONAL DOM INPUT
+ * hace: conserva helpers legacy; cerrar una interfaz ausente sigue limpiando el target
+ * online: cierre de UI local; no cambia autoridad de gameplay
+ */
 function renderFarm(farm) {
   ctx.fillStyle = 'rgba(46, 117, 89, 0.15)';
   ctx.fillRect(farm.x, farm.y, farm.w, farm.h);
@@ -57,7 +64,11 @@ function openSocialModal(player, sx, sy) {
   modal.style.left = Math.min(sx, screenW - 180) + 'px';
   modal.style.top = Math.min(sy, screenH - 160) + 'px';
 }
-function closeSocialModal() { document.getElementById('social-modal').style.display = 'none'; activeSocialTarget = null; }
+function closeSocialModal() {
+  const modal = document.getElementById('social-modal');
+  if (modal) modal.style.display = 'none';
+  activeSocialTarget = null;
+}
 function socialAction(action) {
   if (action === 'Desafiar 1v1') startPvP(activeSocialTarget);
   else if (action === 'Visitar Casa') { camera.targetX = activeSocialTarget.plotX; camera.targetY = activeSocialTarget.plotY; localPlayer.x = activeSocialTarget.plotX - 60; localPlayer.y = activeSocialTarget.plotY; }

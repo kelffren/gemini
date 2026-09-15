@@ -1,6 +1,10 @@
+/* KELO-INDEX area: ENVIRONMENT / PERFORMANCE; owner: KELO_MOBILE_PERFORMANCE_CONTRACT;
+ * keys: CHUNK CACHE BUDGET VIEWPORT MOBILE DESKTOP; online: N/A;
+ * hace: limita caches visuales segun dispositivo y el working set del mundo actual.
+ */
 (function(root){
   'use strict';
-  const VERSION='1.0.1';
+  const VERSION='1.0.2';
   const POLICY_ID='kelo-mobile-art-performance-v1';
   const isMobile=()=>Math.min(root.innerWidth||9999,root.innerHeight||9999)<=844&&(root.innerWidth||9999)<=600;
   const deviceMemory=Math.max(0,Number(root.navigator?.deviceMemory)||0);
@@ -19,7 +23,9 @@
     canvasMegapixels:lowMemory?0.9:1.5
   }:{
     dprCap:3,
-    chunkCacheCap:24,
+    // The current 3600x3200 world has 8x7 chunks. Desktop zoom can show all
+    // 56; a bounded 64-slot budget avoids cycling visible chunks through LRU.
+    chunkCacheCap:64,
     chunkCullMarginChunks:1,
     decodedTextureMB:96,
     residentDistrictAtlases:10,

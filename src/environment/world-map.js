@@ -15,7 +15,7 @@
 'use strict';
 const R=window.KELO_TILE_REGISTRY,TERRAIN=window.KELO_TERRAIN_CONTRACT,G=window.KELO_GARDENS_ATLAS,J=window.KELO_GARDENS_JOINS,A=window.KELO_ATLAS_CONTRACT,P=window.KELO_MOBILE_PERFORMANCE_CONTRACT,CAM=window.KeloCamera;
 if(!R?.atlases||!R?.families||!TERRAIN?.materials||!TERRAIN?.transitions||!TERRAIN?.districts||!G||!J||!A?.acquire||!A?.release||!P?.budgets||!CAM?.worldView){console.error('[Kelo world] registry, terrain/district contract, gardens atlases, atlas contract, mobile performance contract or KeloCamera.worldView missing');return;}
-const TILE=R.worldTileSize||32,CHUNK=512,F=R.families,cache=new Map(),MAX=Math.max(4,Number(P.budgets.chunkCacheCap)||24),CULL_MARGIN=Math.max(0,Number(P.budgets.chunkCullMarginChunks)||1);
+const TILE=R.worldTileSize||32,CHUNK=512,F=R.families,cache=new Map(),MAX=Math.max(4,Number(P.budgets.chunkCacheCap)||24),CULL_MARGIN=Math.max(0,Number(P.budgets.chunkCullMarginChunks??1));
 let gardenImg=null,gardenJoinImg=null,terrainReady=false,gardenReady=false,gardenJoinReady=false,ready=false,gardenWanted=false,gardenHeld=false,gardenLoadPromise=null,gardenLoadGeneration=0,gardenAcquireCount=0,gardenReleaseCount=0,chunkBuildCount=0,chunkHitCount=0,chunkEvictionCount=0;
 const DISTRICTS=TERRAIN.districts,GARDEN_DISTRICT=DISTRICTS.find(d=>d.id==='gardens')||null;
 const ROADS=Object.freeze([{x:384,y:1408,w:800,h:64},{x:1088,y:1408,w:96,h:160},{x:1088,y:1488,w:1792,h:96},{x:1376,y:384,w:128,h:2500},{x:1376,y:736,w:1120,h:128},{x:1376,y:2304,w:640,h:128}]);
@@ -66,7 +66,16 @@ async function acquireGardenAssets(generation){try{const [base,joins]=await Prom
 function requestGardens(){gardenWanted=true;if(gardenHeld||gardenLoadPromise){updateGardenAudit();return;}const generation=++gardenLoadGeneration;gardenLoadPromise=acquireGardenAssets(generation);updateGardenAudit();}
 function releaseGardens(){gardenWanted=false;++gardenLoadGeneration;gardenLoadPromise=null;if(gardenHeld){A.release('gardensBase');A.release('gardensJoins');gardenReleaseCount+=1;}gardenHeld=false;gardenImg=null;gardenJoinImg=null;gardenReady=false;gardenJoinReady=false;invalidateDistrict(GARDEN_DISTRICT);updateGardenAudit();}
 function syncDistrictAssets(b){if(window.KELO_WORLD_DECORATION_RESET===true)return;const needGardens=!!GARDEN_DISTRICT&&intersects(boundsRect(b),{x:GARDEN_DISTRICT.x,y:GARDEN_DISTRICT.y,w:GARDEN_DISTRICT.w,h:GARDEN_DISTRICT.h});if(needGardens)requestGardens();else if(gardenWanted||gardenHeld||gardenLoadPromise)releaseGardens();}
-function draw(g){if(!ready)return false;const b=bounds();syncDistrictAssets(b);for(let y=b.minY;y<=b.maxY;y++)for(let x=b.minX;x<=b.maxX;x++)g.drawImage(build(x,y),x*CHUNK,y*CHUNK);updateDistrictAudit();return true;}
+function draw(g){
+  if(!ready)return false;
+  // KELO-INDEX RESET BOOT: no terrain atlases were acquired for the reset map.
+  // Its ground belongs to the environment layers; do not build transparent
+  // legacy chunks or acquire hidden district art underneath that ground.
+  if(!terrainReady)return true;
+  const b=bounds();syncDistrictAssets(b);
+  for(let y=b.minY;y<=b.maxY;y++)for(let x=b.minX;x<=b.maxX;x++)g.drawImage(build(x,y),x*CHUNK,y*CHUNK);
+  updateDistrictAudit();return true;
+}
 function syncReady(){terrainReady=TERRAIN_ATLAS_KEYS.every(key=>ATLAS_IMAGES[key]?.ready===true);ready=terrainReady;if(ready)Object.assign(window.KELO_WORLD_AUDIT,{ready:true,assetLoaded:true,transitionAssetLoaded:true,grassVariationAssetLoaded:true,marbleVariationAssetLoaded:true,terrainAtlasesReady:true,atlasConsumerMode:'atlas-contract-managed-v2-lazy-district',worldOwnsImageLoader:false,atlasContractVersion:A.policy.version});updateGardenAudit();}
 async function acquireManagedAtlases(){try{await Promise.all(TERRAIN_ATLAS_KEYS.map(async key=>{const image=await A.acquire(key);ATLAS_IMAGES[key].image=image;ATLAS_IMAGES[key].ready=true;}));syncReady();}catch(err){console.error('[Kelo world] managed core terrain atlas acquisition failed',err);}}
 function performanceSnapshot(){return Object.freeze({version:'world-v1.27-performance',ready,chunkCacheSize:cache.size,chunkCacheCap:MAX,chunkBuildCount,chunkHitCount,chunkEvictionCount,activeDistrictLabel:window.KELO_WORLD_AUDIT?.activeDistrictLabel||null,gardensResident:gardenHeld,gardensWanted:gardenWanted,gardensLoading:!!gardenLoadPromise,gardenAcquireCount,gardenReleaseCount});}

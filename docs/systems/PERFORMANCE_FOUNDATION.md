@@ -66,6 +66,10 @@ La hotbar usa una fingerprint visual por slot para evitar reescrituras DOM cuand
 
 `KELO_WORLD_RENDERER` construye/dibuja únicamente chunks dentro del viewport de `KeloCamera` más margen. La cache es LRU y limitada por `KELO_MOBILE_PERFORMANCE_CONTRACT`. Recursos district como Gardens se adquieren solo cuando el viewport expandido los necesita.
 
+En el boot V6.69, el flag inicial de reset evita adquirir los atlas del terreno legacy. Ese renderer no debe construir chunks transparentes ni adquirir Gardens después de que el layer stack cambie el flag: sin `terrainReady`, deja el suelo a las capas actuales. `surface-ground.js` conserva su contenido pero consulta `KeloCamera.worldView()` para el viewport real, sin margen adicional, y comparte el presupuesto de caché del contrato. Sus hits actualizan LRU; publica contadores acumulados de builds y evictions para detectar reconstrucción continua durante reposo.
+
+El contrato 1.0.2 limita cada caché a 24 chunks en móvil y 64 en escritorio. El mundo actual de 3600x3200 tiene 56 chunks de 512px como máximo; el zoom de escritorio puede mostrar más de 24. Las plazas se reservan solo al pedir chunks, no por adelantado. El margen móvil cero se conserva. Un mundo o viewport futuro que exceda este working set requiere revisar el presupuesto y la resolución de caché; no aumentar memoria sin medir. BUG-0005 registra la reproducción y la evidencia local; iPhone físico sigue pendiente.
+
 ### Actores remotos
 
 El cliente reutiliza `KELO_PERF.shouldUpdate()` y `KELO_PERF.shouldRenderActor()` para reducir interpolación y draw de peers lejanos. Es una optimización de presentación; nunca decide autoridad gameplay.

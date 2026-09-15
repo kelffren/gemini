@@ -9,7 +9,7 @@
 (function(root){
 'use strict';
 if(root.KELO_MODULE_LOADER)return;
-const VERSION='kelo-module-loader-v11';
+const VERSION='kelo-module-loader-v14';
 const FEATURES={
   social:[
     {src:'src/ui/player-nameplate.js?v=2',name:'placas'},
@@ -61,11 +61,29 @@ const FEATURES={
     {src:'src/systems/player-stats.js?v=1',name:'títulos'},
     {src:'src/systems/title-system.js?v=1',name:'títulos'}
   ],
+  abilities:[
+    {src:'src/abilities/abilityData.js?v=154',name:'habilidades'},
+    {src:'src/abilities/stone-system.js?v=154',name:'piedras'},
+    {src:'src/abilities/stone-backpack-bridge.js?v=2',name:'inventario de piedras'},
+    {src:'src/abilities/kelo-ability-boot.js?v=160',name:'habilidades'},
+    {src:'src/abilities/ability-source-cast.js?v=1',name:'habilidades'}
+  ],
+  pvp:[
+    {src:'src/systems/pvp-world.js?v=11',name:'mundo PvP'},
+    {src:'src/systems/pvp-combat-runtime-loader.js?v=2',name:'combate PvP'}
+  ],
   appearance:[
     {src:'src/ui/profile-panel-close.js?v=2',name:'apariencia'}
   ],
   properties:[
+    {src:'src/environment/generated/forest-plaza-tileset-v2-manifest.js?v=1',name:'catálogo de plaza'},
+    {src:'src/property/property-asset-catalog.js?v=2',name:'catálogo de propiedades'},
+    {src:'src/property/forest-plaza-asset-catalog.js?v=1',name:'catálogo de plaza'},
     {src:'src/property/property-system.js?v=4',name:'propiedades'},
+    {src:'src/instances/instance-system.js?v=1',name:'instancias'},
+    {src:'src/instances/instance-runtime-bridge.js?v=1',name:'instancias'},
+    {src:'src/instances/house-instance.js?v=1',name:'casas'},
+    {src:'src/instances/property-house-bridge.js?v=1',name:'casas'},
     {src:'src/ui/house-instance-ui.js?v=1',name:'propiedades'}
   ]
 };
@@ -126,8 +144,12 @@ function loadFeature(name,opts){
     function step(){
       if(i>=files.length){
         // Character owns its ordered, lazy content graph; do not bypass its launcher.
-        const ready=name==='appearance'?root.KELO_PROFILE_LAUNCHER.ensureCustomizer():Promise.resolve(true);
-        Promise.resolve(ready).then(function(){
+        Promise.resolve().then(function(){
+          if(name==='appearance')return root.KELO_PROFILE_LAUNCHER.ensureCustomizer();
+          if(name==='abilities')return root.KeloAbilitiesLoader.ensure();
+          if(name==='pvp')return root.KeloPvPWorld.ensureCombatReady();
+          return true;
+        }).then(function(){
           loaded[name]=true; delete inflight[name];
           try{ localStorage.setItem('kelo_modpack_'+name, build); }catch(_){}
           resolve(true);
@@ -153,13 +175,10 @@ function loadFeature(name,opts){
 function ensure(name){
   if(name==='chat'||name==='profile') return Promise.resolve(true);
   if(name==='nobility'||name==='emotes') name='social';
-  if(name==='pvp'){
-    if(root.KeloRuntimeBootstrap&&typeof root.KeloRuntimeBootstrap.ensure==='function') return root.KeloRuntimeBootstrap.ensure();
-    return Promise.resolve(false);
-  }
   if(!FEATURES[name]) return Promise.resolve(true);
   show('Cargando '+name+'…', 8);
-  return loadFeature(name,{interactive:true}).then(function(ok){
+  const dependencies=name==='pvp'?ensure('abilities'):Promise.resolve(true);
+  return dependencies.then(function(){return loadFeature(name,{interactive:true});}).then(function(ok){
     hideChip('Listo');
     return ok;
   }).catch(function(error){
@@ -170,7 +189,6 @@ function ensure(name){
 function needs(name){
   if(name==='chat'||name==='profile') return false;
   if(name==='nobility'||name==='emotes') name='social';
-  if(name==='pvp') return !(root.KeloMeleeEngine&&root.KeloCombatEngine);
   if(!FEATURES[name]) return false;
   return !loaded[name];
 }

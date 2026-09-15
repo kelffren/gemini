@@ -1,3 +1,4 @@
+/* KELO-INDEX area: QA; owner: live mobile performance audit; keys: CACHE DPR BUDGET LIVE; online: read-only QA */
 import fs from 'node:fs';
 import { chromium } from 'playwright';
 const url=process.env.AUDIT_URL||'https://kelffren.github.io/gemini/';
@@ -21,22 +22,24 @@ for(let attempt=0;attempt<18;attempt++){
       audit:window.KELO_MOBILE_PERFORMANCE_CONTRACT?.snapshot?.()||window.KELO_MOBILE_PERFORMANCE_AUDIT||null,
       hd:window.KELO_HD_RENDER||null,
       world:window.KELO_WORLD_AUDIT||null,
+      surface:window.KELO_SURFACE_GROUND_AUDIT||null,
       atlas:window.KELO_ATLAS_AUDIT||null,
       perf:window.KELO_PERF?.getSnapshot?.()||null,
       canvas:(()=>{const c=document.getElementById('game-canvas');return c?{width:c.width,height:c.height,cssWidth:c.clientWidth,cssHeight:c.clientHeight}:null})()
     }));
-    if(evidence.contract==='1.0.0'&&evidence.hd?.mobilePerformanceContractVersion==='1.0.0'&&evidence.world?.version==='world-v1.25')break;
+    if(evidence.contract==='1.0.2'&&evidence.hd?.mobilePerformanceContractVersion==='1.0.2'&&evidence.surface?.version==='surface-ground-v1.1.0')break;
     evidence=null;
   }catch(e){lastErr=e}
   await page.waitForTimeout(4000);
 }
-if(!evidence){await browser.close();throw new Error('LIVE did not converge to mobile performance contract 1.0.0 / world-v1.25: '+String(lastErr||''));}
+if(!evidence){await browser.close();throw new Error('LIVE did not converge to mobile performance contract 1.0.2 / surface-ground-v1.1.0: '+String(lastErr||''));}
 await page.waitForTimeout(2000);
 evidence=await page.evaluate(()=>({
   contract:window.KELO_MOBILE_PERFORMANCE_CONTRACT?.version||null,
   audit:window.KELO_MOBILE_PERFORMANCE_CONTRACT?.snapshot?.()||window.KELO_MOBILE_PERFORMANCE_AUDIT||null,
   hd:window.KELO_HD_RENDER||null,
   world:window.KELO_WORLD_AUDIT||null,
+  surface:window.KELO_SURFACE_GROUND_AUDIT||null,
   atlas:window.KELO_ATLAS_AUDIT||null,
   perf:window.KELO_PERF?.getSnapshot?.()||null,
   canvas:(()=>{const c=document.getElementById('game-canvas');return c?{width:c.width,height:c.height,cssWidth:c.clientWidth,cssHeight:c.clientHeight}:null})()
@@ -45,11 +48,15 @@ await page.screenshot({path:'artifacts/live-mobile-performance.png',fullPage:tru
 const report={url,viewport:{width:390,height:844,dpr:2},...evidence,consoleErrors,pageErrors,failedRequests,httpErrors};
 fs.writeFileSync('artifacts/live-mobile-performance.json',JSON.stringify(report,null,2));
 const errors=[];
-if(evidence.contract!=='1.0.0')errors.push('contract version');
+if(evidence.contract!=='1.0.2')errors.push('contract version');
 if(!evidence.audit?.mobile)errors.push('mobile detection');
 if((evidence.hd?.dprCap||99)>2)errors.push('DPR cap');
 if(evidence.canvas?.width!==780||evidence.canvas?.height!==1688)errors.push(`canvas ${evidence.canvas?.width}x${evidence.canvas?.height}`);
-if((evidence.world?.chunkCacheCap||99)>12)errors.push('chunk cache cap');
+if(evidence.audit?.budgets?.chunkCacheCap!==24)errors.push('mobile chunk budget');
+if(evidence.world?.chunkCullMarginChunks!==0)errors.push('mobile cull margin');
+if(evidence.world?.chunkCacheCap!==evidence.audit?.budgets?.chunkCacheCap)errors.push('world chunk cache cap');
+if(evidence.surface?.chunkCacheCap!==evidence.audit?.budgets?.chunkCacheCap)errors.push('surface chunk cache cap');
+if((evidence.surface?.chunkCacheSize||0)>(evidence.surface?.chunkCacheCap||0))errors.push('surface chunk cache overflow');
 if((evidence.world?.chunkCacheSize||0)>(evidence.world?.chunkCacheCap||0))errors.push('chunk cache overflow');
 if((evidence.atlas?.decodedTextureMB||0)>(evidence.audit?.budgets?.decodedTextureMB||40))errors.push('decoded texture budget');
 if((evidence.atlas?.residentDistrictAtlasCount||0)>(evidence.audit?.budgets?.residentDistrictAtlases||6))errors.push('district atlas residency budget');

@@ -21,3 +21,11 @@ The network regression test failed on original code with `Missing expected rejec
 Movement tests reverse direction every 2s along the same path to avoid mistaking a map boundary for a freeze. A naive initial right-only resume had zero displacement at the boundary; it was a test geometry error, not evidence of freeze.
 
 Pending: actual UI open/close and functional operations for all routes; WebKit matrix; cold-load timing; long-session soak; real iPhone QA; original player's persistent freeze reproduction. Existing static audits for equipment/performance still assume the removed eager index chain and fail; do not weaken their functional checks to hide this.
+
+## Continued investigation
+
+The first GitHub workflow (run 34907255285, commit 78bacac2bb91d23fc543196f84e1eea760c0a704, draft PR 247) finished with 19 failures / 8 passes. Real menu clicks exposed `closeSocialModal()` dereferencing an absent `social-modal`. The failure was reproduced locally with the complete Bag cycle, then corrected in the existing legacy close helper. Bag subsequently passed on desktop Chromium, iPhone Chromium and iPhone WebKit. This is distinct from terrain cache thrashing now tracked as BUG-0005.
+
+Further dependency candidates restore Properties (including its catalog before initialization), Abilities and PvP. Properties' old unsolicited catalog injection ran before its owner and poisoned first-use retries, so that injection was removed in favor of the explicit feature graph. Browser tests now open panels through their real first-use menu routes, rather than preloading those panels by API, and actually enter/exit PvP. The expanded matrix is still running; these routes are not globally certified.
+
+Trace recording now omits snapshots/screenshots for high-frequency position samples. The initial CI artifact grew to 4 GB; subsequent runs retain error screenshots and numerical evidence without that recording overhead. Performance Foundation's PvP load-order check now follows the first-use graph and still requires the readiness call; its 47 checks pass.
