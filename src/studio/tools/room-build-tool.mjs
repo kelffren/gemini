@@ -4,6 +4,7 @@
  * does-not-own: document mutation, CommandBus, authority, asset rendering
  * public-api: createRoomBuildTool(), resolveRoomDragThreshold()
  * online: persistent mutation delegates to placement.commitBatch() -> CommandBus -> authority
+ * mobile: button synchronization is idempotent so lifecycle observation cannot create a childList feedback loop
  */
 
 import { planRoomFloor } from './room-floor-planner.mjs';
@@ -14,6 +15,7 @@ const TOUCH_DRAG_PX=16;
 const MIN_EFFECTIVE_ZOOM=.25;
 const copy=v=>v==null?v:(typeof structuredClone==='function'?structuredClone(v):JSON.parse(JSON.stringify(v)));
 const snap=(v,g)=>Math.round((Number(v)||0)/g)*g;
+const setText=(node,value)=>{const next=String(value??'');if(node&&node.textContent!==next)node.textContent=next;};
 const newRoomId=()=>`room:${globalThis.crypto?.randomUUID?.()||`${Date.now().toString(36)}:${Math.random().toString(36).slice(2,9)}`}`;
 
 export function resolveRoomDragThreshold(pointerType='mouse',{root=globalThis}={}){
@@ -51,20 +53,10 @@ export function createRoomBuildTool(kernel,{placement=null,quickBuild=null,root=
     const rawWidth=Math.abs(pointerX-startX),rawHeight=Math.abs(pointerY-startY);
     const requestedWidth=centered?rawWidth*2:rawWidth,requestedHeight=centered?rawHeight*2:rawHeight;
     let countX,countY,x0,x1,y0,y1;
-    if(square){
-      const requestedSpan=Math.max(requestedWidth,requestedHeight),count=Math.max(1,Math.round(Math.max(length,requestedSpan)/length));
-      countX=countY=count;
-    }else{
-      countX=Math.max(1,Math.round(Math.max(length,requestedWidth)/length));
-      countY=Math.max(1,Math.round(Math.max(length,requestedHeight)/length));
-    }
-    if(centered){
-      const halfW=countX*length/2,halfH=countY*length/2;
-      x0=startX-halfW;x1=startX+halfW;y0=startY-halfH;y1=startY+halfH;
-    }else{
-      const endX=startX+(pointerX<startX?-1:1)*countX*length,endY=startY+(pointerY<startY?-1:1)*countY*length;
-      x0=Math.min(startX,endX);x1=Math.max(startX,endX);y0=Math.min(startY,endY);y1=Math.max(startY,endY);
-    }
+    if(square){const requestedSpan=Math.max(requestedWidth,requestedHeight),count=Math.max(1,Math.round(Math.max(length,requestedSpan)/length));countX=countY=count;}
+    else{countX=Math.max(1,Math.round(Math.max(length,requestedWidth)/length));countY=Math.max(1,Math.round(Math.max(length,requestedHeight)/length));}
+    if(centered){const halfW=countX*length/2,halfH=countY*length/2;x0=startX-halfW;x1=startX+halfW;y0=startY-halfH;y1=startY+halfH;}
+    else{const endX=startX+(pointerX<startX?-1:1)*countX*length,endY=startY+(pointerY<startY?-1:1)*countY*length;x0=Math.min(startX,endX);x1=Math.max(startX,endX);y0=Math.min(startY,endY);y1=Math.max(startY,endY);}
     const floor=floorPiece(),floorDef=floorPrefab();
     const floorKey=floor&&floorDef?`${floor.prefabId}:${Number(floorDef?.bounds?.w)||0}x${Number(floorDef?.bounds?.h)||0}`:'none';
     const signature=`${roomId}|${x0}|${y0}|${x1}|${y1}|${countX}|${countY}|${square?1:0}|${centered?1:0}|${length}|${floorKey}`;
@@ -93,9 +85,9 @@ export function createRoomBuildTool(kernel,{placement=null,quickBuild=null,root=
   };
   const unregister=kernel.input.register(CONTEXT,handlers,2300);
   function ensureButton(){if(destroyed||!document)return;const palette=document.querySelector?.('.ks-qb-palette');if(!palette)return;if(button?.isConnected)return;button=document.createElement('button');button.type='button';button.className='ks-qb-piece';button.dataset.qbRoom='1';button.setAttribute('aria-pressed','false');button.addEventListener('click',event=>{event.preventDefault?.();event.stopPropagation?.();active?deactivate():activate();});const cancel=palette.querySelector?.('[data-qb-cancel]');palette.insertBefore(button,cancel||null);syncButton();}
-  function syncButton(){if(!button)return;button.classList.toggle('on',active);button.setAttribute('aria-pressed',active?'true':'false');button.textContent=active?(measurement?`▣ ${measurement.centered?'⊙ ':''}${measurement.squareLocked?'□ ':''}${Math.round(measurement.width)}×${Math.round(measurement.height)} · ${measurement.totalFloors||0}F`:'▣ ROOM ON'):'▣ ROOM';}
+  function syncButton(){if(!button)return;button.classList.toggle('on',active);const pressed=active?'true':'false';if(button.getAttribute('aria-pressed')!==pressed)button.setAttribute('aria-pressed',pressed);const label=active?(measurement?`▣ ${measurement.centered?'⊙ ':''}${measurement.squareLocked?'□ ':''}${Math.round(measurement.width)}×${Math.round(measurement.height)} · ${measurement.totalFloors||0}F`:'▣ ROOM ON'):'▣ ROOM';setText(button,label);}
   function destroy(){if(destroyed)return;destroyed=true;active=false;clearTransient();kernel.input.pop(CONTEXT);unregister?.();observer?.disconnect?.();button?.remove();button=null;}
   if(document?.documentElement&&root?.MutationObserver){observer=new root.MutationObserver(()=>{ensureButton();syncButton();});observer.observe(document.documentElement,{childList:true,subtree:true});}
   ensureButton();
-  return Object.freeze({id:'roomBuild',version:'studio-room-build-v2.0.1-floor-fill',activate,deactivate,planRect,commitRoom,getPreviews:()=>copy(previews),getMeasurement:()=>copy(measurement),getPlannerStats:()=>({...plannerStats}),get active(){return active;},destroy});
+  return Object.freeze({id:'roomBuild',version:'studio-room-build-v2.0.2-idempotent-dom',activate,deactivate,planRect,commitRoom,getPreviews:()=>copy(previews),getMeasurement:()=>copy(measurement),getPlannerStats:()=>({...plannerStats}),get active(){return active;},destroy});
 }

@@ -1,0 +1,56 @@
+name: World Editor A10 CI
+
+on:
+  push:
+    branches:
+      - fix/world-a10-mobile-hydration
+  pull_request:
+    paths:
+      - 'src/creators/workspaces/world-workspace.mjs'
+      - 'src/studio/**'
+      - 'src/ui/studio-launcher.js'
+      - 'src/creators/ui/creator-hub.mjs'
+      - 'src/creators/creator-entry.mjs'
+      - 'tests/world-editor-*'
+      - 'tests/studio-build-tools-dom-loop.test.mjs'
+      - 'index.html'
+      - '.github/workflows/world-editor-a10-ci.yml'
+
+jobs:
+  a10-contract-and-mobile-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: A10 architecture contract
+        run: node --test tests/world-editor-a10-hydration.test.mjs tests/studio-build-tools-dom-loop.test.mjs
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Start local game server
+        run: |
+          python3 -m http.server 4173 --bind 127.0.0.1 > /tmp/kelo-a10-server.log 2>&1 &
+          echo $! > /tmp/kelo-a10-server.pid
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/kelo-a10-server.log
+          exit 1
+      - name: World open and iPhone reopen smoke
+        env:
+          KELO_PAGES: http://127.0.0.1:4173/
+        run: npx playwright test tests/world-editor-live-open.spec.js tests/world-editor-ios-reopen.spec.js --project=chromium --reporter=line
+      - name: Upload BUG-0003 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: world-editor-a10-evidence
+          path: |
+            test-results/
+            playwright-report.json
+          if-no-files-found: ignore

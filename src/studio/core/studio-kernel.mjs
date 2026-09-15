@@ -5,6 +5,7 @@
  * public-api: createStudioKernel()
  * online: adapter mirror is transactional; failed authority writes roll local state back
  * reuse: World is the default documentModel; other Creator workspaces inject only their document semantics
+ * mobile: A10 exposes setDocumentAsync() so large World spatial indexes rebuild cooperatively in bounded batches
  */
 
 import { createHistoryManager } from './history-manager.mjs';
@@ -50,6 +51,25 @@ export function createStudioKernel({document,adapter=null,historyBudgetBytes,doc
   let current=normalize(document||{}),spatial=createSpatialChunkIndex({chunkSize:chunkSizeOf(current)}),dirty=createDirtyChunkManager({chunkSize:chunkSizeOf(current)});
   const history=createHistoryManager({budgetBytes:historyBudgetBytes}),input=createInputRouter(),selection=createSelectionManager(),components=createComponentRegistry(),prefabs=createPrefabRegistry();let kernel=null;
   function rebuildSpatial(){spatial.clear();model.rebuildSpatial?.({document:current,spatial,kernel});}
+  async function rebuildSpatialAsync({batchSize=100,yieldControl=null,onBatch=null}={}){
+    if(model!==worldDocumentModel){rebuildSpatial();onBatch?.({start:0,end:current.entities?.length||0,total:current.entities?.length||0,done:true});return;}
+    const rows=current.entities||[],size=Math.max(1,Math.floor(Number(batchSize)||100));
+    spatial.clear();
+    if(!rows.length){onBatch?.({start:0,end:0,total:0,done:true});return;}
+    for(let start=0;start<rows.length;start+=size){
+      const end=Math.min(rows.length,start+size);
+      for(let order=start;order<end;order++){const e=rows[order];if(e?.id)spatial.upsert({id:e.id,category:'entity',rect:entityRect(e),data:e,order});}
+      onBatch?.({start,end,total:rows.length,done:end>=rows.length});
+      if(end<rows.length&&typeof yieldControl==='function')await yieldControl({start,end,total:rows.length});
+    }
+  }
+  function resetDocumentState(next){
+    current=normalize(next);
+    spatial=createSpatialChunkIndex({chunkSize:chunkSizeOf(current)});
+    dirty=createDirtyChunkManager({chunkSize:chunkSizeOf(current)});
+    history.clear();selection.clear();
+    return current;
+  }
   function syncCommand(command){model.syncCommand?.({command,document:current,spatial,kernel});}
   function markRects(rects,reason){for(const rect of rects||[])if(rect)dirty.markRect(rect,reason||'edit');}
   async function mirror(event){if(typeof adapter?.mirrorStudioEvent==='function')await adapter.mirrorStudioEvent(event,{document:current,kernel});}
@@ -57,7 +77,8 @@ export function createStudioKernel({document,adapter=null,historyBudgetBytes,doc
   const execute=command=>commandBus.execute(command,{document:current,kernel,adapter});
   async function undo(){const entry=await history.undo();if(!entry)return null;const event={type:'undo',command:entry.serialized,affectedRects:entry.affectedRects||[]};try{await mirror(event);}catch(error){await history.redo();rebuildSpatial();throw error;}rebuildSpatial();markRects(event.affectedRects,`undo:${entry.type||'command'}`);commandBus.emit(event);return entry;}
   async function redo(){const entry=await history.redo();if(!entry)return null;const event={type:'redo',command:entry.serialized,affectedRects:entry.affectedRects||[]};try{await mirror(event);}catch(error){await history.undo();rebuildSpatial();throw error;}rebuildSpatial();markRects(event.affectedRects,`redo:${entry.type||'command'}`);commandBus.emit(event);return entry;}
-  function setDocument(next){current=normalize(next);spatial=createSpatialChunkIndex({chunkSize:chunkSizeOf(current)});dirty=createDirtyChunkManager({chunkSize:chunkSizeOf(current)});history.clear();selection.clear();rebuildSpatial();return current;}
-  kernel={version:'studio-kernel-v1.6.0',domain:String(model.id||'custom'),execute,undo,redo,setDocument,get document(){return current;},get adapter(){return adapter;},get documentModel(){return model;},get history(){return history;},get commands(){return commandBus;},get input(){return input;},get selection(){return selection;},get components(){return components;},get prefabs(){return prefabs;},get spatial(){return spatial;},get dirty(){return dirty;}};
+  function setDocument(next){resetDocumentState(next);rebuildSpatial();return current;}
+  async function setDocumentAsync(next,options={}){resetDocumentState(next);await rebuildSpatialAsync(options);return current;}
+  kernel={version:'studio-kernel-v1.7.0-a10',domain:String(model.id||'custom'),execute,undo,redo,setDocument,setDocumentAsync,get document(){return current;},get adapter(){return adapter;},get documentModel(){return model;},get history(){return history;},get commands(){return commandBus;},get input(){return input;},get selection(){return selection;},get components(){return components;},get prefabs(){return prefabs;},get spatial(){return spatial;},get dirty(){return dirty;}};
   kernel.tools=createToolRegistry({kernel});rebuildSpatial();return Object.freeze(kernel);
 }
