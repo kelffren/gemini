@@ -17,7 +17,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Patch visual harness to tap visible asset row
+      - name: Patch visual harness to follow visible mobile placement UI
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -27,7 +27,13 @@ jobs:
           new='await page.locator(`#kelo-studio-live [data-asset="${tree.id.replaceAll(\'"\',\'\\\\"\')}"]:visible`).first().tap();'
           if old not in s:
               raise SystemExit('VISIBLE_ASSET_PATCH_TARGET_MISSING')
-          p.write_text(s.replace(old,new,1))
+          s=s.replace(old,new,1)
+          old2='await canvas.tap({position:point});'
+          new2="await page.getByRole('button',{name:/COLOCAR AQUÍ/i}).tap();"
+          if old2 not in s:
+              raise SystemExit('PLACE_HERE_PATCH_TARGET_MISSING')
+          s=s.replace(old2,new2,1)
+          p.write_text(s)
           PY
       - name: Syntax check
         run: |
