@@ -869,9 +869,20 @@
       "files": [
         "index.html"
       ]
+    },
+    {
+      "id": "prevention:5bbdf26cf91235327d1d23c0db0a475975be936b",
+      "at": "2026-09-15T08:24:18.000Z",
+      "source": "bug-prevention-ci",
+      "head_sha": "5bbdf26cf91235327d1d23c0db0a475975be936b",
+      "base_sha": "c653cafac14ec726ee9e57c92f0480c3eded4b75",
+      "conclusion": "failure",
+      "files": [
+        "src/core/update-verifier-worker.js"
+      ]
     }
   ],
-  "feedback_updated_at": "2026-09-15T07:59:45.824Z",
+  "feedback_updated_at": "2026-09-15T09:06:13.623Z",
   "training": {
     "examples": 58,
     "search_examples": 43,
