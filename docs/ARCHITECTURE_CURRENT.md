@@ -1,6 +1,6 @@
 # Kelo World — Architecture Current
 
-**Actualizado:** 2026-09-14 · Runtime V6.54.2
+**Actualizado:** 2026-09-15 · Runtime V6.54.2
 
 ## Capas
 
@@ -19,18 +19,29 @@
 ### 5. Asset Infrastructure
 `KELO_ATLAS_CONTRACT` resuelve atlas; `KELO_PROPERTY_CATALOG` expone templates placeables. Compilers producen metadata, no renderers.
 
-### 6. Studio / Creators
-`src/studio/` contiene document/kernel/tools/UI. `src/creators/` contiene workspaces, Map Forge, asset compiler y evolución. Todos delegan mutations a owners existentes.
+### 6. Studio / Creators / Creator OS
+`src/studio/` contiene document/kernel/tools/UI. `src/creators/creator-entry.mjs` es el composition root lazy de Creators. `src/creators/` contiene workspaces, Map Forge, compilers, Image Lab, Asset Forge y evolución. Todos delegan mutations a owners existentes.
+
+`Kelo Creator Library` añade una capa de **authoring routing**, no un engine: traduce intención humana (`Character`, `Skin`, `Weapon`, `Prop`, `VFX`, etc.) al workspace especializado existente. La lista de tipos vive en `src/creators/library/creator-content-types.mjs`.
+
+El “Photoshop” interno se construye por composición, no duplicación:
+
+- `Image Lab` prepara source images de forma no destructiva;
+- `Asset Forge` cubre pixel drawing/QA/repair;
+- `Asset Sheet Studio` detecta/corta/clasifica sheets;
+- Avatar/Appearance/Item/VFX/Animation/World/etc. conservan authoring especializado.
+
+Los módulos pesados de Creator siguen lazy. Creator Library puede abrirse sin precargar el catálogo completo del World Editor.
 
 ### 7. Gameplay Domains
-Abilities, equipment, mounts, backpack, PvP/Arena, identity/titles, nobility, economy, commerce, property, instances y guardian son owners separados.
+Abilities, equipment, mounts, backpack, PvP/Arena, identity/titles, nobility, economy, commerce, property, instances y guardian son owners separados. Creator OS no obtiene autoridad sobre ellos.
 
 ### 8. Online
-`engine-net.js`, auth lifecycle y módulos server/Supabase implementan o preparan autoridad online. La regla es server-authoritative para valor persistente/competitivo.
+`engine-net.js`, auth lifecycle y módulos server/Supabase implementan o preparan autoridad online. La regla es server-authoritative para valor persistente/competitivo. Publicación global, moderación, ownership de mercado, compras KC y revenue split de creadores pertenecen a esta frontera, no a IndexedDB/localStorage.
 
 ## Flujo de asset moderno
 
-`PNG/JPEG/WebP → foreground analysis → asset sheet compiler → sourceRects irregulares → manifest → atlas → semantic catalog → Studio palette → placement`
+`PNG/JPEG/WebP → Image Lab opcional → foreground analysis/Asset Forge → asset sheet compiler → sourceRects/manifest → atlas/semantic catalog → specialized Creator/Studio → preview/test → future review/publish authority → runtime on demand`
 
 Forest Plaza es el caso de referencia actual: 146 piezas, IDs legacy preservados, nombres semánticos y 7 carpetas visuales.
 
@@ -41,10 +52,12 @@ Forest Plaza es el caso de referencia actual: 146 piezas, IDs legacy preservados
 - render feature vía `KeloRender`/contratos de environment;
 - templates vía `KELO_PROPERTY_CATALOG`;
 - World changes vía Studio/`KELO_WORLD_EDIT`;
+- Creator Library enruta, no reimplementa runtimes;
+- Image Lab/Asset Forge no crean un segundo catálogo runtime;
 - assets importados no inventan un renderer;
 - UI no se convierte en autoridad gameplay;
 - cliente no se convierte en autoridad final online.
 
 ## Móvil
 
-El editor se abre con chrome-first y prewarm/boot por etapas. Evitar canvas/blur/import masivo simultáneo en iPhone. La verificación final de World móvil es dispositivo real + LIVE.
+El editor se abre con chrome-first y prewarm/boot por etapas. Creator Library/Image Lab/Asset Forge deben cargar solo por acción explícita. Evitar canvas/blur/import masivo simultáneo en iPhone. La verificación final de World móvil y nuevas superficies Creator exige dispositivo real/LIVE además de los gates automatizados aplicables.
