@@ -53,7 +53,7 @@ jobs:
           p.write_text(s)
           PY
           node --check scripts/studio-live-audit.mjs
-          echo 'Local exact-snapshot gate replaces obsolete Pages marker gate; editor/runtime files untouched.'
+          echo 'Historical harness adapted only inside runner; editor/runtime files untouched.'
 
       - name: Install Playwright client
         run: npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund playwright@1.55.0
@@ -68,6 +68,37 @@ jobs:
           done
           cat /tmp/critical-world-editor-http.log
           exit 1
+
+      - name: Bounded World open probe
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import { chromium } from 'playwright';
+          const browser=await chromium.launch({headless:true,executablePath:'/usr/bin/google-chrome',args:['--no-sandbox','--disable-dev-shm-usage']});
+          const context=await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true});
+          const page=await context.newPage();
+          const errors=[];
+          page.on('pageerror',e=>errors.push(String(e)));
+          const stage=s=>console.log(`[D71-PROBE] ${s}`);
+          try{
+            stage('BOOT');
+            const response=await page.goto('http://127.0.0.1:8000/?guest=1&mapEditor=1&critical-d71=1',{waitUntil:'domcontentloaded',timeout:20000});
+            if(!response||response.status()>=400)throw new Error(`BOOT_HTTP_${response?.status()}`);
+            stage('ADMIN_READY');
+            await page.waitForFunction(()=>!!(window.KeloInputLocks?.acquire&&window.KELO_ADMIN_KEYS?.can?.('world.edit')),null,{timeout:15000});
+            stage('CREATORS');
+            await page.evaluate(async()=>{const m=await import('./src/creators/ui/creator-hub.mjs');await m.openCreatorHub({root:window});});
+            await page.waitForSelector('#kelo-creators-hub',{state:'visible',timeout:10000});
+            stage('WORLD_CLICK');
+            await page.locator('#kelo-creators-hub [data-workspace="world"]').click({timeout:10000});
+            stage('WORLD_MOUNT');
+            await page.waitForSelector('#kelo-studio-live',{state:'visible',timeout:15000});
+            await page.waitForFunction(()=>{const el=document.getElementById('kelo-studio-live');return !!(el&&el.dataset.keloWorldLoading!=='1'&&el.querySelector('.ks-status'));},null,{timeout:30000});
+            const result=await page.evaluate(()=>({status:document.querySelector('#kelo-studio-live .ks-status')?.textContent||'',modes:['terrain','path','collision'].map(x=>!!document.querySelector(`#kelo-studio-live [data-mode="${x}"]`)),bodyActive:document.body.classList.contains('kelo-studio-active')}));
+            stage(`PASS ${JSON.stringify(result)}`);
+            if(errors.length)throw new Error(`PAGE_ERRORS:${errors.join(' | ')}`);
+          } finally { await browser.close(); }
+          NODE
 
       - name: Run full Studio LIVE placement audit
         env:
