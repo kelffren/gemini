@@ -10,6 +10,7 @@ on:
       - 'src/creators/creator-entry.mjs'
       - 'src/creators/ui/creator-hub.mjs'
       - 'scripts/asset-sheet-compiler-audit.mjs'
+      - 'scripts/asset-sheet-semantic-audit.mjs'
       - 'scripts/asset-sheet-live-audit.mjs'
       - 'docs/systems/CREATOR_ASSET_BRIDGE.md'
       - 'docs/system-catalog.json'
@@ -22,8 +23,10 @@ on:
       - 'src/creators/ui/asset-sheet-workspace.mjs'
       - 'src/creators/workspaces/asset-sheet-workspace.mjs'
       - 'scripts/asset-sheet-compiler-audit.mjs'
+      - 'scripts/asset-sheet-semantic-audit.mjs'
       - 'scripts/asset-sheet-live-audit.mjs'
       - 'docs/systems/CREATOR_ASSET_BRIDGE.md'
+      - '.github/workflows/asset-sheet-compiler-ci.yml'
   workflow_dispatch:
 
 permissions:
@@ -40,6 +43,8 @@ jobs:
       - name: Syntax
         run: |
           node --check src/creators/assets/asset-sheet-compiler.mjs
+          node --check src/creators/assets/asset-sheet-semantic-compiler.mjs
+          node --check src/creators/assets/asset-sheet-compiler-v2.mjs
           node --check src/creators/assets/asset-sheet-browser.mjs
           node --check src/creators/assets/kelo-creator-asset-bridge.mjs
           node --check src/creators/assets/asset-sheet-catalog-preview-adapter.mjs
@@ -47,6 +52,8 @@ jobs:
           node --check src/creators/workspaces/asset-sheet-workspace.mjs
       - name: Asset sheet contract
         run: npm run audit:asset-sheet
+      - name: Semantic road + terrain contract
+        run: node scripts/asset-sheet-semantic-audit.mjs
       - name: System documentation
         run: npm run audit:docs
 
