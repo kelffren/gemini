@@ -46,6 +46,9 @@ jobs:
           node --check src/core/camera-follow-shadow.js
           node --check src/environment/generic-prefabs.js
           node --check src/environment/luxe-kiosk-atlas.js
+          node --check engine-ae.js
+          node --check engine-aj.js
+          node --check engine-l.js
 
       - name: Upload observatory report
         if: always()
