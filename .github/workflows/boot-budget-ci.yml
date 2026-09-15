@@ -42,6 +42,7 @@ jobs:
           node --check src/core/update-system-v4.js
           node --check src/core/update-system-v5.js
           node --check src/core/update-verifier-worker.js
+          node --check src/core/update-intelligence-ui.js
           node --check src/ui/lite-shell-gate.js
           node --check scripts/boot-budget-audit.mjs
       - name: Audit critical boot bytes
