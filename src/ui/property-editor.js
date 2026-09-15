@@ -1,8 +1,9 @@
 /* KELO-INDEX
  * area: UI
- * keys: MAP EDITOR PARCEL PROPERTY ASSET PLACE MOVE DELETE TILESET EXPORT IMPORT MOBILE
- * hace: editor visual; lista de colocados para borrar sin acertar el sprite
+ * keys: MAP EDITOR PARCEL PROPERTY ASSET PLACE MOVE DELETE TILESET EXPORT IMPORT MOBILE POSITION CAMERA
+ * hace: editor visual; lista de colocados para borrar sin acertar el sprite; transiciones de jugador/cámara delegadas a Foundation owners
  * online: nunca muta balances directo; todo por KELO_PROPERTY_SYSTEM.request()
+ * do-not: NO escribir localPlayer.x/y ni camera.* directamente
  */
 (function(){
   'use strict';
@@ -63,7 +64,7 @@
   function refreshSelected(){const t=C.get(selectedAsset);const p=selectedPlacement&&S.getPlacements(parcelId).find(x=>x.placementId===selectedPlacement);el('pe-selected').textContent=movePlacementId?'Toca el nuevo lugar del objeto':(p?`Seleccionado: ${C.get(p.assetId)?.label||p.assetId}`:(t?`Para colocar: ${t.label}`:'Toca un colocado o el mapa'));el('pe-move').disabled=!p;el('pe-move').classList.toggle('on',!!movePlacementId);el('pe-move').textContent=movePlacementId?'TOCA DESTINO':'MOVER';el('pe-rotate').disabled=!p;el('pe-delete').disabled=!p&&!lastPlacementId;}
   function populateCategories(){const s=el('pe-cat');const cats=C.categories();if(cats.includes('tileset'))s.insertAdjacentHTML('beforeend','<option value="tileset">Tileset</option>');for(const c of cats){if(c==='tileset')continue;const o=document.createElement('option');o.value=c;o.textContent=c;s.appendChild(o);}C.onRegister(()=>{const have=new Set(Array.from(s.options).map(o=>o.value));for(const c of C.categories()){if(have.has(c))continue;const o=document.createElement('option');o.value=c;o.textContent=c;s.appendChild(o);have.add(c);}cards();});}
   async function setMode(next){if(next==='world'&&!developer)return;mode=next;selectedAsset=null;selectedPlacement=null;movePlacementId=null;ghost=null;await ensureParcel();refreshInfo();cards();refreshSelected();}
-  async function openEditor(next){open=true;root.style.display='flex';document.body.classList.add('kelo-property-editing');if(typeof closeMenu==='function')closeMenu();await setMode(next||mode);if(mode==='parcel'){const p=currentParcel();if(p&&typeof localPlayer!=='undefined'){localPlayer.x=p.bounds.x+p.bounds.w/2;localPlayer.y=p.bounds.y+p.bounds.h+90;camera.x=localPlayer.x;camera.y=localPlayer.y;camera.targetX=localPlayer.x;camera.targetY=localPlayer.y;}}}
+  async function openEditor(next){open=true;root.style.display='flex';document.body.classList.add('kelo-property-editing');if(typeof closeMenu==='function')closeMenu();await setMode(next||mode);if(mode==='parcel'){const p=currentParcel();if(p){const x=p.bounds.x+p.bounds.w/2,y=p.bounds.y+p.bounds.h+90;if(!window.KeloPlayerPosition?.teleport)throw new Error('KeloPlayerPosition unavailable in property editor');window.KeloPlayerPosition.teleport(x,y,{source:'property-editor:parcel-open',stopMotion:true});if(window.KeloCamera?.setTarget)window.KeloCamera.setTarget(x,y,{snap:true,source:'property-editor:parcel-open'});}}}
   function closeEditor(){open=false;root.style.display='none';document.body.classList.remove('kelo-property-editing');selectedAsset=null;selectedPlacement=null;movePlacementId=null;ghost=null;if(typeof input!=='undefined'){input.touchActive=false;input.touchId=null;}}
   function toggle(next){if(open)closeEditor();else openEditor(next);}
 
@@ -105,6 +106,6 @@
 
   const oldOpen=window.openSocialTool;if(typeof oldOpen==='function'){window.openSocialTool=function(tool){if(tool==='properties'){openEditor('parcel');return;}return oldOpen.apply(this,arguments);};}
   populateCategories();S.onChange(()=>{if(open){refreshInfo();cards();refreshSelected();}});C.onRegister(()=>{if(open)cards();});
-  window.KELO_PROPERTY_EDITOR=Object.freeze({version:'property-editor-v1.3.0',developer,open:(m)=>openEditor(m||'parcel'),close:closeEditor,toggle:()=>toggle(mode),get mode(){return mode;},get parcelId(){return parcelId;},get selectedPlacementId(){return selectedPlacement;},get movingPlacementId(){return movePlacementId;}});
-  window.KELO_PROPERTY_EDITOR_AUDIT=Object.freeze({version:'property-editor-v1.3.0',developerGate:'admin-key-world.edit',mobile:true,exportImport:true,unitAware:true,worldEditor:true,nativeMove:true,placedListDelete:true,undoLast:true,tilesetCategory:true});
+  window.KELO_PROPERTY_EDITOR=Object.freeze({version:'property-editor-v1.4.0-position-owner',developer,open:(m)=>openEditor(m||'parcel'),close:closeEditor,toggle:()=>toggle(mode),get mode(){return mode;},get parcelId(){return parcelId;},get selectedPlacementId(){return selectedPlacement;},get movingPlacementId(){return movePlacementId;}});
+  window.KELO_PROPERTY_EDITOR_AUDIT=Object.freeze({version:'property-editor-v1.4.0-position-owner',developerGate:'admin-key-world.edit',mobile:true,exportImport:true,unitAware:true,worldEditor:true,nativeMove:true,placedListDelete:true,undoLast:true,tilesetCategory:true,positionTransitionOwner:'KeloPlayerPosition',cameraOwner:'KeloCamera'});
 })();
