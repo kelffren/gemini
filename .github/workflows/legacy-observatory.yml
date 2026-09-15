@@ -1,0 +1,41 @@
+name: Kelo Legacy Observatory
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [legacy-observatory]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  legacy-observatory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run legacy census
+        run: node scripts/legacy-observatory.mjs
+
+      - name: Enforce migration activation gate
+        run: node scripts/legacy-migration-gate.mjs
+
+      - name: Upload observatory report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: legacy-observatory-report
+          path: artifacts/legacy-observatory/
+          if-no-files-found: warn
+          retention-days: 14
