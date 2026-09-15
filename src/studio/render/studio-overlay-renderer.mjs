@@ -24,6 +24,32 @@ export function resolveRoomPreviewGroups(rows=[]){
 
 export function createStudioOverlayRenderer({ kernel, tools, assetPreview } = {}) {
   if (!kernel) throw new Error('STUDIO_OVERLAY_KERNEL_REQUIRED');
+
+  // BUG-0003 isolation switch. Paint Copies is OFF by default so the baseline never
+  // evaluates getPreviews() or draws its copies. Re-enable deliberately with
+  // ?paintCopies=1 (or window.KELO_PAINT_COPIES_ENABLED=true) for A/B testing.
+  let paintCopiesQueryEnabled=false;
+  try{
+    const q=new URLSearchParams(globalThis?.location?.search||'');
+    paintCopiesQueryEnabled=q.get('paintCopies')==='1'||q.get('paintCopies')==='on';
+  }catch(_error){}
+  if(typeof globalThis!=='undefined'&&typeof globalThis.KELO_PAINT_COPIES_ENABLED!=='boolean'){
+    globalThis.KELO_PAINT_COPIES_ENABLED=paintCopiesQueryEnabled;
+  }
+  const paintCopiesDiagnostics={
+    enabled:paintCopiesQueryEnabled,
+    previewCalls:0,
+    drawCalls:0,
+    skippedFrames:0,
+    lastRows:0,
+    lastMs:0,
+    maxMs:0,
+    errors:0
+  };
+  if(typeof globalThis!=='undefined')globalThis.KELO_PAINT_COPIES_DIAGNOSTICS=paintCopiesDiagnostics;
+  function isPaintCopiesEnabled(){
+    return typeof globalThis!=='undefined'&&globalThis.KELO_PAINT_COPIES_ENABLED===true;
+  }
   function drawRect(ctx, rect, { dashed = false, alpha = 1 } = {}) { ctx.save(); ctx.globalAlpha *= alpha; if (dashed) ctx.setLineDash([6,4]); ctx.strokeRect(rect.x, rect.y, rect.w, rect.h); ctx.restore(); }
   function drawSurfaceCell(ctx,cell,{alpha=.24,dashed=false}={}){ctx.save();ctx.globalAlpha=alpha;ctx.fillStyle=cell.erase?'#ff7777':cell.role==='path'?'#e7c56a':'#70c46a';ctx.fillRect(cell.x,cell.y,cell.w,cell.h);ctx.restore();drawRect(ctx,cell,{dashed,alpha:.65});}
   function drawPlacement(ctx,placement){
@@ -78,6 +104,7 @@ export function createStudioOverlayRenderer({ kernel, tools, assetPreview } = {}
   }
   function drawPaintCopies(ctx,rows){
     if(!rows?.length)return;
+    paintCopiesDiagnostics.drawCalls++;
     ctx.save();ctx.strokeStyle='rgba(131,235,175,.88)';
     for(const row of rows){
       const scale=Math.max(.1,Number(row.transform?.scale)||1),rect={x:Number(row.transform?.x)||0,y:Number(row.transform?.y)||0,w:Math.max(1,(Number(row.bounds?.w)||1)*scale),h:Math.max(1,(Number(row.bounds?.h)||1)*scale)};
@@ -116,7 +143,28 @@ export function createStudioOverlayRenderer({ kernel, tools, assetPreview } = {}
     drawRoomMeasurement(ctx,tools?.roomBuild?.getMeasurement?.());
     const placement = tools?.placement?.getPreview?.();if (placement) drawPlacement(ctx,placement);
     const prefab = tools?.prefabStamp?.getPreview?.();if(prefab)drawCreatorPrefab(ctx,prefab);
-    drawPaintCopies(ctx,tools?.paintCopies?.getPreviews?.()||[]);
+    if(isPaintCopiesEnabled()){
+      const started=typeof performance!=='undefined'&&performance.now?performance.now():Date.now();
+      try{
+        paintCopiesDiagnostics.enabled=true;
+        paintCopiesDiagnostics.previewCalls++;
+        const paintRows=tools?.paintCopies?.getPreviews?.()||[];
+        paintCopiesDiagnostics.lastRows=paintRows.length;
+        drawPaintCopies(ctx,paintRows);
+      }catch(error){
+        paintCopiesDiagnostics.errors++;
+        console.error('[BUG-0003 Paint Copies]',error);
+      }finally{
+        const ended=typeof performance!=='undefined'&&performance.now?performance.now():Date.now();
+        paintCopiesDiagnostics.lastMs=Math.max(0,ended-started);
+        paintCopiesDiagnostics.maxMs=Math.max(paintCopiesDiagnostics.maxMs,paintCopiesDiagnostics.lastMs);
+      }
+    }else{
+      paintCopiesDiagnostics.enabled=false;
+      paintCopiesDiagnostics.skippedFrames++;
+      paintCopiesDiagnostics.lastRows=0;
+      paintCopiesDiagnostics.lastMs=0;
+    }
     const transforms=tools?.transform?.getPreviews?.()||[];if(transforms.length){for(const transform of transforms){const row=kernel.spatial.get(transform.entityId);if(row?.rect)drawRect(ctx,{...row.rect,x:transform.x??row.rect.x,y:transform.y??row.rect.y},{dashed:true,alpha:.7});}drawSmartGuides(ctx,tools?.transform?.getGuides?.()||[]);}
     const stroke=tools?.terrain?.getStrokePreview?.();if(stroke?.cells?.length){for(const cell of stroke.cells)drawSurfaceCell(ctx,cell,{alpha:.20});}
     const terrain=tools?.terrain?.getPreview?.();if(terrain){const cells=terrain.cells?.length?terrain.cells:[terrain];for(const cell of cells)drawSurfaceCell(ctx,cell,{alpha:.28,dashed:true});}
