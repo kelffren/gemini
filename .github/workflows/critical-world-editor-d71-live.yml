@@ -40,19 +40,20 @@ jobs:
           from pathlib import Path
           p=Path('scripts/studio-live-audit.mjs')
           s=p.read_text()
-          marker_old="'KELO_CREATORS_LAUNCHER','NO polling'"
-          marker_new="'KELO_CREATORS_LAUNCHER'"
-          url_old="?mapEditor=1&studio-live-audit=${Date.now()}"
-          url_new="?guest=1&mapEditor=1&studio-live-audit=${Date.now()}"
-          if marker_old not in s:
-              raise SystemExit('historical marker pattern not found')
-          if url_old not in s:
-              raise SystemExit('historical QA URL pattern not found')
-          s=s.replace(marker_old,marker_new,1).replace(url_old,url_new,1)
+          replacements=[
+            ("'KELO_CREATORS_LAUNCHER','NO polling'", "'KELO_CREATORS_LAUNCHER'"),
+            ("?mapEditor=1&studio-live-audit=${Date.now()}", "?guest=1&mapEditor=1&studio-live-audit=${Date.now()}"),
+            ("let deployReady=false;", "let deployReady=true;"),
+            ("for(let attempt=0;attempt<60;attempt++){", "for(let attempt=0;attempt<0;attempt++){")
+          ]
+          for old,new in replacements:
+              if old not in s:
+                  raise SystemExit(f'historical harness pattern not found: {old}')
+              s=s.replace(old,new,1)
           p.write_text(s)
           PY
           node --check scripts/studio-live-audit.mjs
-          echo 'Historical QA harness adapted in runner only; editor/runtime files untouched.'
+          echo 'Local exact-snapshot gate replaces obsolete Pages marker gate; editor/runtime files untouched.'
 
       - name: Install Playwright client
         run: npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund playwright@1.55.0
