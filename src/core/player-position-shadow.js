@@ -19,7 +19,7 @@
     return;
   }
   const EVENT_CAP=32,LARGE_MOVE_PX=96;
-  let lastX=Number(localPlayer.x)||0,lastY=Number(localPlayer.y)||0,lastContext='boot';
+  let lastX=Number(localPlayer.x)||0,lastY=Number(localPlayer.y)||0,lastContext=null;
   let frames=0,changedFrames=0,continuousMoves=0,largeMoves=0,contextTransitions=0,maxDelta=0,lastDelta=0,lastKind='stationary';
   const events=[];
   function finite(v,fallback){const n=Number(v);return Number.isFinite(n)?n:fallback;}
@@ -37,6 +37,7 @@
     }catch(_){ }
     return 'world';
   }
+  lastContext=context();
   function pushEvent(event){events.push(Object.freeze(event));if(events.length>EVENT_CAP)events.shift();}
   function sample(simContext){
     frames++;
