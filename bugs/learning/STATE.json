@@ -1,9 +1,9 @@
 {
   "schema": "kelo-bug-learning-v1",
   "system_id": "bug-intelligence",
-  "source_fingerprint": "evo-569526e7",
+  "source_fingerprint": "evo-b7cdd422",
   "risk_map_fingerprint": "evo-5a643574",
-  "source_head": "15f0642614b29610ac90bfdeaaf9cc0819ff284f",
+  "source_head": "2aab618bfb28b35286ab5184b7587f1e1d5f8981",
   "champion": {
     "id": "failure-sensitive",
     "multipliers": {
@@ -18,8 +18,8 @@
       "persistence": 1.2496,
       "critical-shell": 1.1327
     },
-    "search_score": 60.172,
-    "holdout_score": 44.399,
+    "search_score": 58.59,
+    "holdout_score": 56.661,
     "accepted_from_last_cycle": false
   },
   "memory": {
@@ -186,17 +186,47 @@
         "artifacts": [
           "bugs/learning/STATE.json"
         ]
+      },
+      {
+        "id": "bug-learn-evo-b7cdd422",
+        "at": "2026-09-15T00:30:21.000Z",
+        "sourceSha": "2aab618bfb28b35286ab5184b7587f1e1d5f8981",
+        "candidateId": "failure-sensitive",
+        "candidateFingerprint": "evo-a590ee4f",
+        "accepted": false,
+        "rejectedStage": "search",
+        "baselineScore": 58.59,
+        "candidateScore": 58.59,
+        "delta": 0,
+        "holdout": {
+          "baseline": 56.661,
+          "candidate": 56.661,
+          "delta": 0
+        },
+        "mutations": [],
+        "metrics": {
+          "calibration": 63.784,
+          "severeRecall": 45.814,
+          "mediumRecall": 40.605,
+          "falseAlarmSafety": 100,
+          "simplicity": 93.197,
+          "examples": 42
+        },
+        "failures": [],
+        "artifacts": [
+          "bugs/learning/STATE.json"
+        ]
       }
     ]
   },
   "memory_summary": {
     "systemId": "bug-intelligence-risk-policy",
-    "experiments": 4,
+    "experiments": 5,
     "accepted": 1,
-    "rejected": 3,
-    "acceptanceRate": 0.25,
+    "rejected": 4,
+    "acceptanceRate": 0.2,
     "meanAcceptedDelta": 7.322,
-    "repeatedCandidates": 2,
+    "repeatedCandidates": 3,
     "champion": {
       "candidateId": "failure-sensitive",
       "score": 69.585,
@@ -671,44 +701,44 @@
   ],
   "feedback_updated_at": "2026-09-15T00:30:39.995Z",
   "training": {
-    "examples": 53,
-    "search_examples": 39,
+    "examples": 56,
+    "search_examples": 42,
     "holdout_examples": 14,
-    "feedback_examples": 38,
-    "latest_evidence_at": "2026-09-14T22:15:21.000Z"
+    "feedback_examples": 41,
+    "latest_evidence_at": "2026-09-15T00:30:21.000Z"
   },
   "metrics": {
     "baseline_search": {
       "valid": true,
-      "score": 60.172,
+      "score": 58.59,
       "metrics": {
-        "calibration": 64.466,
-        "severeRecall": 47.81,
-        "mediumRecall": 44.813,
+        "calibration": 63.784,
+        "severeRecall": 45.814,
+        "mediumRecall": 40.605,
         "falseAlarmSafety": 100,
         "simplicity": 93.197,
-        "examples": 39
+        "examples": 42
       }
     },
     "champion_search": {
       "valid": true,
-      "score": 60.172,
+      "score": 58.59,
       "metrics": {
-        "calibration": 64.466,
-        "severeRecall": 47.81,
-        "mediumRecall": 44.813,
+        "calibration": 63.784,
+        "severeRecall": 45.814,
+        "mediumRecall": 40.605,
         "falseAlarmSafety": 100,
         "simplicity": 93.197,
-        "examples": 39
+        "examples": 42
       }
     },
     "baseline_holdout": {
       "valid": true,
-      "score": 44.399,
+      "score": 56.661,
       "metrics": {
-        "calibration": 62.882,
-        "severeRecall": 19.998,
-        "mediumRecall": 10,
+        "calibration": 65.916,
+        "severeRecall": 42.859,
+        "mediumRecall": 30.004,
         "falseAlarmSafety": 100,
         "simplicity": 93.197,
         "examples": 14
@@ -716,11 +746,11 @@
     },
     "champion_holdout": {
       "valid": true,
-      "score": 44.399,
+      "score": 56.661,
       "metrics": {
-        "calibration": 62.882,
-        "severeRecall": 19.998,
-        "mediumRecall": 10,
+        "calibration": 65.916,
+        "severeRecall": 42.859,
+        "mediumRecall": 30.004,
         "falseAlarmSafety": 100,
         "simplicity": 93.197,
         "examples": 14
@@ -737,12 +767,12 @@
       "file": "src/studio/integration/world-studio-bridge.mjs",
       "risk_bonus": 20,
       "confidence": "high",
-      "evidence_count": 12,
-      "average_target": 81.83,
-      "severe_events": 12,
-      "failed_events": 8,
+      "evidence_count": 13,
+      "average_target": 81.53,
+      "severe_events": 13,
+      "failed_events": 9,
       "report_events": 1,
-      "feedback_events": 7,
+      "feedback_events": 8,
       "bug_ids": [
         "BUG-0003"
       ],
@@ -760,12 +790,12 @@
       "file": "src/creators/workspaces/world-workspace.mjs",
       "risk_bonus": 20,
       "confidence": "high",
-      "evidence_count": 10,
-      "average_target": 87.4,
-      "severe_events": 10,
-      "failed_events": 4,
+      "evidence_count": 11,
+      "average_target": 86.54,
+      "severe_events": 11,
+      "failed_events": 5,
       "report_events": 1,
-      "feedback_events": 1,
+      "feedback_events": 2,
       "bug_ids": [
         "BUG-0003"
       ],
@@ -805,15 +835,15 @@
       ]
     },
     {
-      "file": "src/studio/studio-entry.mjs",
+      "file": "src/studio/integration/live-studio-controller.mjs",
       "risk_bonus": 20,
       "confidence": "high",
-      "evidence_count": 6,
-      "average_target": 85.67,
-      "severe_events": 6,
+      "evidence_count": 8,
+      "average_target": 82.62,
+      "severe_events": 8,
       "failed_events": 2,
       "report_events": 1,
-      "feedback_events": 1,
+      "feedback_events": 2,
       "bug_ids": [
         "BUG-0003"
       ],
@@ -831,13 +861,13 @@
       ]
     },
     {
-      "file": "src/studio/integration/live-studio-controller.mjs",
-      "risk_bonus": 19,
+      "file": "src/studio/studio-entry.mjs",
+      "risk_bonus": 20,
       "confidence": "high",
-      "evidence_count": 7,
-      "average_target": 83.28,
-      "severe_events": 7,
-      "failed_events": 1,
+      "evidence_count": 6,
+      "average_target": 85.67,
+      "severe_events": 6,
+      "failed_events": 2,
       "report_events": 1,
       "feedback_events": 1,
       "bug_ids": [
@@ -1611,7 +1641,21 @@
       "type": "repeated_prevention_failure",
       "priority": "high",
       "file": "src/studio/integration/world-studio-bridge.mjs",
-      "count": 7,
+      "count": 8,
+      "reason": "Preventive CI has repeatedly produced failure signals on changes touching this file."
+    },
+    {
+      "type": "repeated_prevention_failure",
+      "priority": "high",
+      "file": "src/creators/workspaces/world-workspace.mjs",
+      "count": 2,
+      "reason": "Preventive CI has repeatedly produced failure signals on changes touching this file."
+    },
+    {
+      "type": "repeated_prevention_failure",
+      "priority": "high",
+      "file": "src/studio/integration/live-studio-controller.mjs",
+      "count": 2,
       "reason": "Preventive CI has repeatedly produced failure signals on changes touching this file."
     },
     {
@@ -1635,5 +1679,5 @@
     "max_hotspot_bonus": 20,
     "max_feedback_observations": 200
   },
-  "updated_at": "2026-09-14T22:17:57.767Z"
+  "updated_at": "2026-09-15T01:36:12.800Z"
 }
