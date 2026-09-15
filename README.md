@@ -8,8 +8,11 @@ Kelo World es un MMORPG/social RPG 2D top-down, mobile-first, construido sobre u
 
 **ONLINE FIRST:** todo sistema nuevo debe poder conectarse a autoridad online sin rehacer su arquitectura. Lee primero `ONLINE_FIRST.md`, `docs/ONLINE_FIRST.md` y `AGENTS.md`.
 
+**AI MOBILE-FIRST:** Kelo dirige el proyecto desde iPhone. Toda IA/agente que trabaje en el repo debe leer `AI_MOBILE_EXECUTION_BRIDGE.md` para saber cómo usar GitHub + LIVE + TinyFish/AppDeploy sin depender de una computadora personal.
+
 ## Documentación actual
 
+- `AI_MOBILE_EXECUTION_BRIDGE.md` — puente operativo entre Kelo móvil, IAs, GitHub y QA cloud.
 - `docs/GAME_STATE_CURRENT.md` — estado real del juego ahora.
 - `ENGINE_MAP.md` — mapa de engine, boot order, owners y fronteras.
 - `docs/ARCHITECTURE_CURRENT.md` — arquitectura por capas.
