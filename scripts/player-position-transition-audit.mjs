@@ -20,6 +20,7 @@ function directWrites(text,key){return (text.match(new RegExp('\\blocalPlayer\\.
 const owner=read('src/core/player-position-system.js');
 const engineC=read('engine-c.js');
 const parcelMeta=read('src/ui/builder-parcel-meta.js');
+const builderUx=read('src/ui/builder-ux-v2.js');
 const house=read('src/instances/instance-runtime-bridge.js');
 const market=read('src/instances/market-instance.js');
 const index=read('index.html');
@@ -32,6 +33,8 @@ expect(directWrites(engineC,'x')===0&&directWrites(engineC,'y')===0,'engine-c qu
 expect(engineC.includes('KeloPlayerPosition.teleport'),'engine-c quick travel uses KeloPlayerPosition');
 expect(directWrites(parcelMeta,'x')===0&&directWrites(parcelMeta,'y')===0,'parcel door warp no longer writes localPlayer x/y directly');
 expect(parcelMeta.includes('KeloPlayerPosition.teleport'),'parcel door warp uses KeloPlayerPosition');
+expect(directWrites(builderUx,'x')===0&&directWrites(builderUx,'y')===0,'builder parcel scope no longer writes localPlayer x/y directly');
+expect(builderUx.includes("KeloPlayerPosition.teleport")&&builderUx.includes("KeloCamera.setTarget"),'builder parcel scope delegates position and camera transitions');
 expect(house.includes("KeloPlayerPosition.teleport")&&house.includes("KeloPlayerPosition.restore"),'house enter/leave transitions use KeloPlayerPosition');
 expect(directWrites(house,'x')===1&&directWrites(house,'y')===1,'house keeps only its continuous clamp writer pair for later migration');
 expect(market.includes("KeloPlayerPosition.teleport")&&market.includes("KeloPlayerPosition.restore"),'market transition paths use KeloPlayerPosition');
@@ -41,6 +44,7 @@ const engineCIndex=index.indexOf('engine-c.js');
 expect(ownerIndex>=0&&engineCIndex>ownerIndex,'position transition owner boots before engine-c consumers');
 expect(manifest.domains?.playerPositionTransitions?.mode==='NEW','manifest activates transition-only position slice as NEW');
 expect(manifest.domains?.playerPositionTransitions?.scope==='transition-only','manifest limits NEW claim to transition-only scope');
+expect(manifest.domains?.playerPositionTransitions?.migratedCallers?.includes('src/ui/builder-ux-v2.js'),'manifest records builder UX transition migration');
 expect(manifest.domains?.movement?.mode==='LEGACY','continuous movement remains LEGACY');
 expect(manifest.domains?.playerPositionShadow?.mode==='SHADOW','position observability remains SHADOW');
 
