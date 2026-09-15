@@ -56,19 +56,26 @@ forbidText('worker', files.worker, 'document.', 'verification worker must never 
 requireText('index', files.index, "sessionStorage.getItem('kelo.world.updater.pendingBuild.v5')", 'normal boots must not pay the early-health listener cost');
 requireText('index', files.index, '__KELO_UPDATE_EARLY_HEALTH__', 'pending-update boots must expose early health evidence');
 requireText('index', files.index, 'src/core/update-gate.js?v=6-live-fast-forward', 'Safari must not reuse an older gate');
+requireText('index', files.index, 'src/core/settings-lazy-gate.js?v=3-update-intel', 'Safari must not reuse the older Settings gate after Intelligence V2');
 
-// Settings observability must remain first-use only and event-driven.
-requireText('settings', files.settings, 'update-intelligence-ui.js?v=1', 'update diagnostics belong behind Settings first-use gate');
+// Settings observability must remain first-use only, truthful, and event-driven.
+requireText('settings', files.settings, 'kelo-settings-lazy-gate-v3-update-intelligence', 'Settings lazy gate must remain on the V3 first-use contract');
+requireText('settings', files.settings, 'update-intelligence-ui.js?v=2-fast-forward-health', 'Update Intelligence V2 must stay first-use only');
+requireText('intelligence', files.intelligence, 'kelo-update-intelligence-ui-v2', 'the visible diagnostics contract must stay versioned');
+requireText('intelligence', files.intelligence, "'fast-forward'", 'V6 zero-byte fast-forward must be observable in Settings');
+requireText('intelligence', files.intelligence, 'Hashes reales', 'UI must separate hash evidence from generic updater state');
+requireText('intelligence', files.intelligence, 'Early errors', 'early boot health evidence must be visible');
+requireText('intelligence', files.intelligence, 'Hint reused', 'duplicate version-request elimination must be observable');
 requireText('intelligence', files.intelligence, 'Copiar diagnóstico', 'mobile support must retain one-tap diagnostic export');
 forbidText('intelligence', files.intelligence, 'setInterval(', 'diagnostics UI must react to updater events instead of polling');
 
 if (failures.length) {
-  console.error('\nKELO UPDATE OS V5 CONTRACT FAILED\n');
+  console.error('\nKELO UPDATE OS V6 CONTRACT FAILED\n');
   failures.forEach((failure, index) => console.error(`${index + 1}. ${failure}`));
   process.exit(1);
 }
 
-console.log('KELO UPDATE OS V5 CONTRACT: OK');
+console.log('KELO UPDATE OS V6 CONTRACT: OK');
 console.log('✓ exact commit delta + shared compare seed');
 console.log('✓ zero-download non-runtime fast-forward');
 console.log('✓ predictive hotset');
@@ -76,4 +83,4 @@ console.log('✓ off-main-thread integrity verification');
 console.log('✓ CDN consistency barrier');
 console.log('✓ early + post-boot health shield');
 console.log('✓ iPhone path has no mandatory Service Worker');
-console.log('✓ lazy, event-driven observability');
+console.log('✓ lazy, truthful, event-driven observability');
