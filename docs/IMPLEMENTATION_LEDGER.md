@@ -46,7 +46,7 @@ Handoff prompt:
 
 ### IMP-2026-09-15-CREATOR-OS-001
 
-**Status:** ACTIVE  
+**Status:** IMPLEMENTED_PENDING_VERIFY  
 **Owner(s):** Kelo Creators composition root + Kelo Creator Library; specialized editors keep their existing owners.  
 **User intent / source prompt:** Convert Kelo's creator tooling into a universal in-game creation ecosystem: one library for characters, skins, weapons, armor, props, world objects, VFX, animations and future content; include an easy Photoshop-like preparation experience; preserve reuse/lazy loading so catalog growth does not make normal gameplay heavy; keep the creator-economy/market path open; and document every material improvement so any agent can continue the same implementation intent.
 
@@ -82,6 +82,10 @@ Handoff prompt:
 - Creator composition root registers Library + Image Lab and supplies the workspace registry to router UIs.
 - Lazy gate changed so `Creator Library` is the direct lightweight menu surface; `openAssetForge()` remains supported for compatibility.
 - Creator Library routes to existing workspaces rather than cloning their logic.
+- Search was corrected to repaint only result groups, preserving focus/keyboard on mobile.
+- Workspace cards now respect manifest availability and capability permissions.
+- Creator OS owner/boundary documentation synchronized.
+- Static contract audit script added for types/routes/lazy/docs checks.
 
 **Files/contracts touched:**
 
@@ -91,7 +95,15 @@ Handoff prompt:
 - `src/creators/workspaces/image-lab-workspace.mjs`
 - `src/creators/creator-entry.mjs`
 - `src/core/creators-lazy-gate.js`
-- documentation files listed below as this pass continues
+- `scripts/creator-os-library-audit.mjs`
+- `docs/systems/CREATOR_OS_LIBRARY.md`
+- `docs/IMPLEMENTATION_LEDGER.md`
+- `docs/SYSTEM_DOCUMENTATION_STANDARD.md`
+- `docs/DOCUMENTATION_INDEX.md`
+- `docs/system-catalog.json`
+- `docs/CODE_INDEX.md`
+- `ENGINE_MAP.md`
+- `docs/ARCHITECTURE_CURRENT.md`
 
 **Deferred deliberately:**
 
@@ -101,10 +113,12 @@ Handoff prompt:
 - Layer-based raster editor parity with full Photoshop; existing Image Lab + Asset Forge are the current safe base.
 - Automatic seasonal publishing without human/review authority.
 - Claiming that every specialized creator fully supports every asset type; Library routing does not invent missing domain capability.
+- Type-specific default seeding/presets inside every legacy specialized editor; current V1 routes to the correct owner first.
 
 **Acceptance / gates:**
 
 - Static module syntax/import graph must pass.
+- `node scripts/creator-os-library-audit.mjs` must pass from a runnable checkout.
 - Creator Library must open lazily without loading the large world asset catalog first.
 - On mobile, CREATE search/cards and TOOLS must be operable.
 - Character/Skin/Weapon/Prop/VFX routes must open the intended existing workspace.
@@ -113,10 +127,15 @@ Handoff prompt:
 - Creator UI must receive user-facing/LIVE mobile verification before claiming complete.
 - `npm run audit:docs` should pass once this pass is integrated into a runnable checkout.
 
-**Evidence:** code commits on branch; runtime/Playwright evidence not recorded yet.
+**Evidence:**
 
-**Next action:** finish documentation/catalog synchronization, static audit, PR review; run required mobile/Playwright gates from a runnable checkout/LIVE before merge/validation.
+- Branch: `creator-os-universal-library`.
+- Pull request: `#269` — `Creator OS V1 — universal library + cross-agent implementation ledger`.
+- GitHub compare: branch ahead of `main` with only intended Creator/documentation/QA files.
+- Local shell attempt could not clone GitHub because the execution environment could not resolve `github.com`; therefore Node/Playwright/LIVE evidence is **not** claimed.
+
+**Next action:** run the static audit + docs audit + mandatory mobile/Playwright/LIVE gates from a runnable checkout. Fix any observed failure in this same branch/PR. Only then change this status to `VALIDATED` and merge according to repository protocol.
 
 **Handoff prompt:**
 
-> Continue `IMP-2026-09-15-CREATOR-OS-001`. Read `AGENTS.md`, Foundation, Engine Map, System Documentation Standard, this ledger entry, and `docs/systems/CREATOR_OS_LIBRARY.md`. Preserve existing owners. Do not create a second asset catalog, image editor, runtime renderer, history store, or marketplace authority. Continue the smallest unimplemented item, update this same ledger entry with actual evidence, and never mark VALIDATED without the required mobile/Playwright/LIVE gates.
+> Continue `IMP-2026-09-15-CREATOR-OS-001` / PR #269. Read `AGENTS.md`, Foundation, Engine Map, System Documentation Standard, this ledger entry, and `docs/systems/CREATOR_OS_LIBRARY.md`. Preserve existing owners. Do not create a second asset catalog, image editor, runtime renderer, history store, or marketplace authority. First run `node scripts/creator-os-library-audit.mjs`, `npm run audit:docs`, the required iPhone Playwright gate, and LIVE Creator Library interaction. Fix failures in PR #269. Do not mark VALIDATED or merge as verified until those gates pass. After validation, the next product pass is the online Review/Publish/Discover authority adapter, not another local marketplace implementation.
