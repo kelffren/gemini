@@ -1,5 +1,5 @@
 {
-  "version": 8,
+  "version": 9,
   "defaultMode": "LEGACY",
   "allowedModes": ["LEGACY", "SHADOW", "NEW"],
   "domains": {
@@ -16,6 +16,16 @@
       "legacy": ["engine-a.js", "engine-c.js"],
       "contracts": ["localPlayer.x", "localPlayer.y", "updateMovement"],
       "activationGate": "shadow-parity"
+    },
+    "playerPositionShadow": {
+      "mode": "SHADOW",
+      "owner": "KeloPlayerPositionShadow",
+      "legacy": ["engine-a.js", "engine-ai.js", "engine-b.js", "engine-c.js", "engine-f.js", "engine-g.js", "engine-net.js", "src/abilities/kelo-ability-boot.js", "src/instances/instance-runtime-bridge.js", "src/instances/market-instance.js", "src/systems/pvp-world.js", "src/ui/builder-parcel-meta.js", "src/ui/builder-ux-v2.js", "src/ui/property-editor.js"],
+      "contracts": ["localPlayer.x", "localPlayer.y"],
+      "activationGate": "read-only-position-observability-audit",
+      "authority": "legacy-only",
+      "scope": "diagnostic-only",
+      "shadowEvidence": "KELO_PLAYER_POSITION_SHADOW_AUDIT"
     },
     "camera": {
       "mode": "LEGACY",
