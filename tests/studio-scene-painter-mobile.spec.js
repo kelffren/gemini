@@ -41,7 +41,7 @@ test('Scene Painter survives mobile lazy boot, Grid 3x2, one Undo and shell muta
     };
   },WORLD_BUILD);
   await hub.locator('[data-workspace="world"]').click();const shell=page.locator('#kelo-studio-live');await expect(shell).toBeVisible({timeout:20000});
-  await page.waitForFunction(async()=>{const s=await window.__scenePainterStudio?.();return !!(s?.tools?.paintCopies&&window.KELO_WORLD_SURGERY?.enabled?.('paintCopies'));},null,{timeout:60000,polling:250});
+  await expect.poll(async()=>page.evaluate(async()=>{const s=await window.__scenePainterStudio?.();return !!(s?.tools?.paintCopies&&window.KELO_WORLD_SURGERY?.enabled?.('paintCopies'));}),{timeout:60000,intervals:[250,250,500,500,1000]}).toBe(true);
 
   const source=await page.evaluate(async()=>{const {createPlaceEntityCommand}=await import('./src/studio/document/document-commands.mjs');const s=await window.__scenePainterStudio();if(!s){const diag=await window.__scenePainterDiag?.();throw new Error(`SCENE_PAINTER_SESSION_MISSING ${JSON.stringify(diag)}`);}const id='test:scene-painter-source';if(!s.kernel.document.entities.some(e=>String(e.id)===id))await s.kernel.execute(createPlaceEntityCommand({id,prefabId:'test-scene-source',transform:{x:128,y:128,rotation:0,scale:1},bounds:{w:32,h:32}}));s.kernel.selection.set(id);return{entities:s.kernel.document.entities.length,undoDepth:s.kernel.history.undoDepth};});
 
