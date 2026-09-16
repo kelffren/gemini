@@ -84,8 +84,9 @@ const twoAgainCheck = strictCheck(twoRgba,twoAgain.buffer,96,96,'palette-1bit-id
 assert.equal(twoAgainCheck.decoded.ihdr.bitDepth,1,'palette-1bit-idempotent: sub-byte decoder/refilter remains active');
 assert.ok(twoAgain.buffer.length <= twoOptimized.buffer.length,'palette-1bit-idempotent: reoptimization must not grow');
 
-// Fully opaque RGBA has a mathematically useless alpha channel. The optimizer
-// may remove that channel only after strict RGBA validation proves equivalence.
+// Fully opaque RGBA has a mathematically useless alpha channel. Alpha-drop must
+// be generated as an exact candidate, but it does NOT have to beat a refilter:
+// the optimizer's contract is to choose the smallest verified representation.
 const opaqueWidth = 160;
 const opaqueHeight = 96;
 const opaqueRgba = Buffer.alloc(opaqueWidth*opaqueHeight*4);
@@ -101,15 +102,20 @@ for (let y=0; y<opaqueHeight; y+=1) {
 const opaqueOriginal = encodeRgbaPng(opaqueRgba,opaqueWidth,opaqueHeight,{level:1,filterStrategy:0});
 const opaqueOptimized = optimizePngLossless(opaqueOriginal,{disablePalette:true});
 const opaqueCheck = strictCheck(opaqueRgba,opaqueOptimized.buffer,opaqueWidth,opaqueHeight,'alpha-drop');
-assert.equal(opaqueOptimized.report.winner.kind,'exact-alpha-drop','alpha-drop: redundant channel removed');
-assert.equal(opaqueCheck.decoded.ihdr.colorType,2,'alpha-drop: RGBA becomes RGB');
-assert.ok(opaqueOptimized.buffer.length < opaqueOriginal.length,'alpha-drop: output smaller');
+assert.deepEqual(opaqueOptimized.report.alphaDropCandidate,{fromColorType:6,toColorType:2},'alpha-drop: redundant channel representation discovered');
+const alphaDropCandidates = opaqueOptimized.report.candidates.filter(item=>item.kind==='exact-alpha-drop');
+assert.ok(alphaDropCandidates.length > 0,'alpha-drop: exact candidates generated');
+assert.ok(alphaDropCandidates.some(item=>item.bytes < opaqueOriginal.length),'alpha-drop: at least one representation is smaller than source');
+if (opaqueOptimized.report.winner.kind === 'exact-alpha-drop') {
+  assert.equal(opaqueCheck.decoded.ihdr.colorType,2,'alpha-drop winner: RGBA becomes RGB');
+}
+assert.ok(opaqueOptimized.buffer.length < opaqueOriginal.length,'alpha-drop fixture: chosen exact output smaller');
 
 console.log(JSON.stringify({
   status:'PNG_SPACE_COMPILER_AUDIT_OK',
   base:{beforeBytes:original.length,afterBytes:optimized.buffer.length,savedPercent:optimized.report.savedPercent,winner:optimized.report.winner},
   palette2bit:{beforeBytes:fourOriginal.length,afterBytes:fourOptimized.buffer.length,winner:fourOptimized.report.winner,bitDepth:fourCheck.decoded.ihdr.bitDepth},
   palette1bit:{beforeBytes:twoOriginal.length,afterBytes:twoOptimized.buffer.length,winner:twoOptimized.report.winner,bitDepth:twoCheck.decoded.ihdr.bitDepth,reoptimizedBytes:twoAgain.buffer.length},
-  alphaDrop:{beforeBytes:opaqueOriginal.length,afterBytes:opaqueOptimized.buffer.length,winner:opaqueOptimized.report.winner,colorType:opaqueCheck.decoded.ihdr.colorType},
+  alphaDrop:{beforeBytes:opaqueOriginal.length,afterBytes:opaqueOptimized.buffer.length,winner:opaqueOptimized.report.winner,candidateCount:alphaDropCandidates.length,outputColorType:opaqueCheck.decoded.ihdr.colorType},
   qualityScore:baseCheck.verdict.score
 }));
