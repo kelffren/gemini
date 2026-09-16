@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Kelo World · Publicar Asset</title>
+  <style>
+    :root{color-scheme:dark;--bg:#080b10;--card:#111722;--line:#283244;--text:#f5f7fb;--muted:#9aa7bb;--ok:#65d48a;--warn:#f3c969;--bad:#ff7b7b;--accent:#d8b463}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:16px/1.4 system-ui,-apple-system,sans-serif}main{max-width:760px;margin:auto;padding:24px 16px 60px}.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px;margin:14px 0}h1{font-size:26px;margin:8px 0}.muted{color:var(--muted)}label{display:block;margin:12px 0 6px}input,textarea,button{font:inherit}input[type=text],textarea,input[type=file]{width:100%;padding:13px;border:1px solid var(--line);border-radius:12px;background:#0b1018;color:var(--text)}button{min-height:48px;border:0;border-radius:12px;padding:0 18px;background:var(--accent);color:#15120b;font-weight:800}button[disabled]{opacity:.45}.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}.preview{display:grid;place-items:center;min-height:220px;background:#090d13;border:1px dashed var(--line);border-radius:14px;overflow:hidden}.preview img{max-width:100%;max-height:360px;image-rendering:auto}.status{font-weight:800}.ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}code{word-break:break-all;color:#d7e4ff}@media(max-width:520px){.row{grid-template-columns:1fr}}
+  </style>
+</head>
+<body><main>
+  <p class="muted">Kelo World Creator</p><h1>Publicar asset comunitario</h1>
+  <p class="muted">PNG, WebP y JPEG seguros pueden pasar directo por validación automática. Los formatos con más riesgo no se publican automáticamente.</p>
+
+  <section class="card">
+    <label for="file">Archivo</label><input id="file" type="file" accept="image/png,image/webp,image/jpeg,image/gif">
+    <div class="row"><div><label for="name">Nombre</label><input id="name" type="text" maxlength="80" placeholder="Abrigo dorado"></div><div><label for="type">Tipo</label><input id="type" type="text" maxlength="32" value="cosmetic"></div></div>
+    <label for="tags">Tags, separados por coma</label><input id="tags" type="text" placeholder="abrigo, oro, lujo">
+  </section>
+
+  <section class="card"><div id="preview" class="preview"><span class="muted">Selecciona un asset para previsualizarlo</span></div></section>
+  <section class="card"><div id="status" class="status muted">Sin validar</div><p id="details" class="muted"></p><code id="hash"></code></section>
+  <button id="publish" type="button" disabled>Publicar</button>
+  <p id="result" class="muted" aria-live="polite"></p>
+
+<script type="module">
+import { prepareCommunityAsset, publishCommunityAsset, getCommunityAssetTransport } from './src/creators/assets/community-asset-publisher.mjs';
+const $=id=>document.getElementById(id), file=$('file'), preview=$('preview'), status=$('status'), details=$('details'), hash=$('hash'), publish=$('publish'), result=$('result');
+let selected=null, objectUrl=null, prepared=null;
+const metadata=()=>({name:$('name').value||selected?.name||'Untitled asset',type:$('type').value||'cosmetic',tags:$('tags').value.split(',').map(x=>x.trim()).filter(Boolean)});
+async function validate(){
+  selected=file.files?.[0]||null; prepared=null; result.textContent=''; publish.disabled=true;
+  if(objectUrl) URL.revokeObjectURL(objectUrl);
+  preview.innerHTML='';
+  if(!selected){preview.innerHTML='<span class="muted">Selecciona un asset para previsualizarlo</span>';return;}
+  objectUrl=URL.createObjectURL(selected); const img=new Image(); img.src=objectUrl; img.alt='Vista previa del asset'; preview.append(img);
+  status.className='status muted'; status.textContent='Validando…'; details.textContent=''; hash.textContent='';
+  prepared=await prepareCommunityAsset(selected,metadata()); const v=prepared.validation;
+  status.textContent=v.status==='auto_publish'?'Listo para publicación automática':v.status==='manual_review'?'Necesita revisión':'Bloqueado';
+  status.className='status '+(v.status==='auto_publish'?'ok':v.status==='manual_review'?'warn':'bad');
+  details.textContent=`${v.mime||'sin MIME'} · ${(v.bytes/1024).toFixed(1)} KB · ${v.dimensions?.width||'?'}×${v.dimensions?.height||'?'} · ${v.reasons.map(r=>r.code).join(', ')||'sin incidencias'}`;
+  hash.textContent=v.sha256?`SHA-256 ${v.sha256}`:'';
+  publish.disabled=v.status!=='auto_publish';
+}
+file.addEventListener('change',validate); ['name','type','tags'].forEach(id=>$(id).addEventListener('change',()=>selected&&validate()));
+publish.addEventListener('click',async()=>{
+  if(!selected) return; publish.disabled=true; result.textContent='Publicando…';
+  try{
+    const response=await publishCommunityAsset({file:selected,metadata:metadata(),creatorId:globalThis.KELO_PLAYER_ID||'anonymous'});
+    if(response.ok&&response.status==='published'){result.textContent=`Publicado: ${response.manifest.id}`;result.className='ok';}
+    else if(response.status==='backend_not_configured'){result.textContent='Validación lista. Falta configurar el almacenamiento/API comunitaria para compartirlo entre teléfonos.';result.className='warn';}
+    else{result.textContent=`No publicado: ${response.status}`;result.className='warn';}
+  }catch(error){result.textContent=`Error: ${error.message||error}`;result.className='bad';}
+  finally{publish.disabled=prepared?.validation?.status!=='auto_publish';}
+});
+if(!getCommunityAssetTransport()){result.textContent='Modo local activo: la validación funciona; el backend comunitario todavía no está conectado.';}
+</script>
+</main></body></html>
