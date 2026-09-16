@@ -51,9 +51,11 @@ export function installAssetForgeDrawingControls({root=globalThis,session=null}=
   function setStatus(message){if(status)status.textContent=message;}
   function snapshot(){return ctx.getImageData(0,0,canvas.width,canvas.height);}
   function restore(image){ctx.putImageData(image,0,0);}
+  function cloneImageData(source){const image=ctx.createImageData(source.width,source.height);image.data.set(source.data);return image;}
   function pushUndo(){undoStack.push(snapshot());if(undoStack.length>HISTORY_LIMIT)undoStack.shift();redoStack=[];}
   function clearHistory(){undoStack=[];redoStack=[];}
   function refreshQa(){try{session?.selfCheck?.();}catch{}}
+  function releasePointer(pointerId){try{canvas.releasePointerCapture?.(pointerId);}catch{}}
   function updateToggles(){
     ppBtn.classList.toggle('active',pixelPerfect);mxBtn.classList.toggle('active',mirrorX);myBtn.classList.toggle('active',mirrorY);alphaBtn.classList.toggle('active',alphaLock);gridBtn.classList.toggle('active',gridVisible);
     lineBtn.classList.toggle('active',tool==='line');rectBtn.classList.toggle('active',tool==='rect');ellipseBtn.classList.toggle('active',tool==='ellipse');
@@ -73,16 +75,17 @@ export function installAssetForgeDrawingControls({root=globalThis,session=null}=
   }
   function mirroredCenters(points){return mirrorPixelPoints(points,canvas.width,canvas.height,{horizontal:mirrorX,vertical:mirrorY});}
   function paintPoint(image,center,erase=false){
+    const rgba=erase?null:hexToRgba(colorInput.value);
     for(const mirrored of mirroredCenters([center]))for(const p of brushStampPoints(mirrored,brushSize,canvas.width,canvas.height)){
       const i=(p.y*canvas.width+p.x)*4;
       if(alphaLock&&image.data[i+3]===0)continue;
       if(erase){image.data[i]=0;image.data[i+1]=0;image.data[i+2]=0;image.data[i+3]=0;}
-      else {const rgba=hexToRgba(colorInput.value);image.data[i]=rgba[0];image.data[i+1]=rgba[1];image.data[i+2]=rgba[2];image.data[i+3]=255;}
+      else {image.data[i]=rgba[0];image.data[i+1]=rgba[1];image.data[i+2]=rgba[2];image.data[i+3]=255;}
     }
   }
   function renderPoints(points,{erase=false}={}){
     if(!stroke)return;
-    const image=new ImageData(new Uint8ClampedArray(stroke.base.data),stroke.base.width,stroke.base.height);
+    const image=cloneImageData(stroke.base);
     for(const p of uniquePoints(points))paintPoint(image,p,erase);
     restore(image);
   }
@@ -127,9 +130,9 @@ export function installAssetForgeDrawingControls({root=globalThis,session=null}=
     if(activePointerId!==null)return;
     event.preventDefault();event.stopImmediatePropagation();activePointerId=event.pointerId;canvas.setPointerCapture?.(event.pointerId);
     const start=pointFromEvent(event);
-    if(tool==='picker'){sampleColor(start);activePointerId=null;return;}
+    if(tool==='picker'){sampleColor(start);releasePointer(event.pointerId);activePointerId=null;return;}
     pushUndo();
-    if(tool==='fill'){fillAt(start);activePointerId=null;refreshQa();return;}
+    if(tool==='fill'){fillAt(start);releasePointer(event.pointerId);activePointerId=null;refreshQa();return;}
     stroke={base:snapshot(),start,last:start,path:[start]};
     if(tool==='pencil'||tool==='eraser')renderFreehand();else renderShape(start);
   }
@@ -140,16 +143,17 @@ export function installAssetForgeDrawingControls({root=globalThis,session=null}=
   function onPointerUp(event){
     if(activePointerId===null||event.pointerId!==activePointerId)return;
     event.preventDefault();event.stopImmediatePropagation();if(stroke)extendStroke(event);
-    try{canvas.releasePointerCapture?.(event.pointerId);}catch{}finishStroke();
+    releasePointer(event.pointerId);finishStroke();
   }
   function onPointerCancel(event){
     if(activePointerId===null||event.pointerId!==activePointerId)return;
     event.preventDefault();event.stopImmediatePropagation();
-    if(stroke){restore(stroke.base);undoStack.pop();}stroke=null;activePointerId=null;
+    if(stroke){restore(stroke.base);undoStack.pop();}releasePointer(event.pointerId);stroke=null;activePointerId=null;
   }
   function onShellClickCapture(event){
     const button=event.target?.closest?.('button');if(!button||!shell.contains(button))return;
     const mapped=TOOL_LABELS.get(text(button));if(mapped){setBaseTool(mapped);updateToggles();}
+    if(text(button)==='EDIT')clearHistory();
   }
   function doUndo(event){
     if(!undoStack.length)return;
@@ -159,6 +163,7 @@ export function installAssetForgeDrawingControls({root=globalThis,session=null}=
     if(!redoStack.length)return;
     event?.preventDefault?.();event?.stopImmediatePropagation?.();undoStack.push(snapshot());restore(redoStack.pop());refreshQa();setStatus('Redo.');
   }
+  function onNew(){root.queueMicrotask?.(clearHistory);}
 
   ppBtn.onclick=()=>{pixelPerfect=!pixelPerfect;updateToggles();setStatus(pixelPerfect?'Pixel Perfect activo: limpia dobles de esquina.':'Pixel Perfect desactivado.');};
   mxBtn.onclick=()=>{mirrorX=!mirrorX;updateToggles();};myBtn.onclick=()=>{mirrorY=!mirrorY;updateToggles();};alphaBtn.onclick=()=>{alphaLock=!alphaLock;updateToggles();};
@@ -170,12 +175,12 @@ export function installAssetForgeDrawingControls({root=globalThis,session=null}=
   shell.addEventListener('click',onShellClickCapture,true);
   undoButton?.addEventListener('click',doUndo,true);redoButton?.addEventListener('click',doRedo,true);
   sizeSelect?.addEventListener('change',clearHistory,true);fileInput?.addEventListener('change',clearHistory,true);
-  newButton?.addEventListener('click',()=>root.queueMicrotask?.(clearHistory),true);
+  newButton?.addEventListener('click',onNew,true);
   updateToggles();setStatus('Drawing Engine V2 activo · trazo interpolado para dedo + Pixel Perfect.');
 
   return()=>{
     canvas.removeEventListener('pointerdown',onPointerDown,true);canvas.removeEventListener('pointermove',onPointerMove,true);canvas.removeEventListener('pointerup',onPointerUp,true);canvas.removeEventListener('pointercancel',onPointerCancel,true);
     shell.removeEventListener('click',onShellClickCapture,true);undoButton?.removeEventListener('click',doUndo,true);redoButton?.removeEventListener('click',doRedo,true);
-    sizeSelect?.removeEventListener('change',clearHistory,true);fileInput?.removeEventListener('change',clearHistory,true);controls.remove();
+    sizeSelect?.removeEventListener('change',clearHistory,true);fileInput?.removeEventListener('change',clearHistory,true);newButton?.removeEventListener('click',onNew,true);controls.remove();
   };
 }
