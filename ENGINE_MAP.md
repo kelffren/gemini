@@ -38,7 +38,7 @@ Contrato LIVE/candidato (`index.html` V6.69):
 18. La hotbar moderna usa lifecycle **local por botón**: un solo drag activo conserva `pointerId`, usa `setPointerCapture`, ignora eventos de otro pointer y `pointercancel` cancela sin castear. No instala listeners globales y no sustituye el strangler legacy `KeloAbilityAim`.
 19. El smoke WebKit verifica el handoff de abilities: no hay hotbar/`KeloAbilities` al boot; tras cargar `abilityRuntime` aparecen exactamente 5 slots modernos sin restaurar `action-slot-*` de `engine-g`.
 20. PvP solicita explícitamente `KeloRuntimeBootstrap.ensure() → KELO_MODULE_LOADER.ensure('abilityRuntime') → KeloAbilitiesLoader.ensure()` antes de despertar abilities y enlazar prediction. No depende de un global implícito.
-21. `legacy-ability-consumer-audit.mjs` inventaría referencias ejecutables y falla si vuelve a crecer el set de consumidores directos de `KeloAbilityAim`; el baseline actual es exactamente `engine-l.js`.
+21. `legacy-ability-consumer-audit.mjs` mantiene un inventario de referencias ejecutables y falla si vuelve a crecer el set de consumidores directos de `KeloAbilityAim`; el baseline actual es exactamente `engine-l.js`.
 22. Prohibido inyectar `<script>` desde features por fuera de `KeloModuleLoader`.
 
 El listado histórico de boot completo NO es el boot móvil. Restaurar tags pesados en `index.html` es un bug.
