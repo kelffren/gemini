@@ -1,0 +1,23 @@
+# Pixelorama Pro real-iPhone gate. Credentials come only from environment/secrets.
+userName: ${BROWSERSTACK_USERNAME}
+accessKey: ${BROWSERSTACK_ACCESS_KEY}
+
+projectName: KeloWorld
+buildName: PixeloramaRealIOS
+buildIdentifier: '#${BUILD_NUMBER}'
+
+# BrowserStack currently exposes this as a real Safari/iPhone combination.
+# Do not replace it with Playwright device emulation: this gate exists for physical iOS/WebKit behavior.
+platforms:
+  - browserName: safari
+    osVersion: 26
+    deviceName: iPhone 14 Pro
+
+parallelsPerPlatform: 1
+browserstackLocal: false
+framework: playwright
+source: kelo-world-pixelorama-real-ios
+
+debug: true
+networkLogs: true
+testObservability: true
