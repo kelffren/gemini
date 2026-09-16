@@ -1,0 +1,6 @@
+gradio
+diffusers>=0.40.0
+transformers
+accelerate
+safetensors
+Pillow
