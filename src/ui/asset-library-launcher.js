@@ -46,7 +46,9 @@ function openCreatorsWhenReady(){
 }
 
 function openLibrary(){
-  const opened=root.open('asset-vault.html','_blank','noopener=false');
+  // Same-origin opener is intentionally preserved so the vault can ask the running game
+  // to hydrate an integrated asset without adding that asset to global boot.
+  const opened=root.open('asset-vault.html','_blank');
   if(!opened)root.location.href='asset-vault.html';
   try{root.KELO_LUXE?.closeMenu?.();}catch{}
 }
