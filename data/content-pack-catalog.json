@@ -1,0 +1,100 @@
+{
+  "schema": "kelo-content-pack-catalog-v1",
+  "version": 1,
+  "policy": {
+    "binaryPreload": false,
+    "explicitInstall": true,
+    "lockAlgorithm": "SHA-256",
+    "licenseMode": "per-member",
+    "maxMembersPerPack": 64
+  },
+  "packs": [
+    {
+      "id": "kelo:combat-starter",
+      "name": "Combat Starter",
+      "version": "1.0.0",
+      "category": "abilities",
+      "description": "Tres habilidades data-driven listas para el motor oficial de Kelo.",
+      "icon": "⚡",
+      "author": "Kelo World",
+      "licensePolicy": "per-member",
+      "tags": ["ability", "combat", "fire", "ice", "wind"],
+      "dependencies": [],
+      "members": [
+        {"provider": "kelo-content", "assetId": "kelo-content:ember-lance"},
+        {"provider": "kelo-content", "assetId": "kelo-content:frost-ring"},
+        {"provider": "kelo-content", "assetId": "kelo-content:gale-step"}
+      ]
+    },
+    {
+      "id": "kelo:imperial-social-scenes",
+      "name": "Imperial Social Scenes",
+      "version": "1.0.0",
+      "category": "scenes",
+      "description": "Tres escenas preconstruidas para colocar como prefabs completos en Studio.",
+      "icon": "🏛️",
+      "author": "Kelo World",
+      "licensePolicy": "per-member",
+      "tags": ["scene", "social", "imperial", "plaza", "prefab"],
+      "dependencies": [],
+      "members": [
+        {"provider": "kelo-content", "assetId": "kelo-content:imperial-rest-corner"},
+        {"provider": "kelo-content", "assetId": "kelo-content:imperial-ceremony-stage"},
+        {"provider": "kelo-content", "assetId": "kelo-content:imperial-fountain-lounge"}
+      ]
+    },
+    {
+      "id": "oga:audio-starter",
+      "name": "OpenGameArt Audio Starter",
+      "version": "1.0.0",
+      "category": "audio",
+      "description": "SFX, música y ambientes CC0 verificados. Los binarios solo bajan al instalar.",
+      "icon": "🎧",
+      "author": "OpenGameArt creators",
+      "licensePolicy": "per-member",
+      "tags": ["sfx", "music", "ambience", "cc0"],
+      "dependencies": [],
+      "members": [
+        {"provider": "opengameart", "assetId": "opengameart:click-ui-sfx"},
+        {"provider": "opengameart", "assetId": "opengameart:forest-ambience"},
+        {"provider": "opengameart", "assetId": "opengameart:menu-music-loop"},
+        {"provider": "opengameart", "assetId": "opengameart:level-music-loop"}
+      ]
+    },
+    {
+      "id": "oga:pixel-starter",
+      "name": "OpenGameArt Pixel Starter",
+      "version": "1.0.0",
+      "category": "visual",
+      "description": "Animación de personaje, tiles y moneda CC0 para prototipos rápidos.",
+      "icon": "🧱",
+      "author": "OpenGameArt creators",
+      "licensePolicy": "per-member",
+      "tags": ["pixel-art", "animation", "tileset", "sprite", "cc0"],
+      "dependencies": [],
+      "members": [
+        {"provider": "opengameart", "assetId": "opengameart:simple-character-base-16x16"},
+        {"provider": "opengameart", "assetId": "opengameart:universal-8x8-tileset"},
+        {"provider": "opengameart", "assetId": "opengameart:gold-coin-token"}
+      ]
+    },
+    {
+      "id": "lpc:motion-starter",
+      "name": "LPC Motion Starter",
+      "version": "1.0.0",
+      "category": "animation",
+      "description": "Idle, walk, run y jump del set Shadow LPC CC0 fijado al commit verificado.",
+      "icon": "🎞️",
+      "author": "LPC contributors",
+      "licensePolicy": "per-member",
+      "tags": ["lpc", "animation", "character", "movement", "cc0"],
+      "dependencies": [],
+      "members": [
+        {"provider": "lpc", "assetId": "lpc:shadow:idle"},
+        {"provider": "lpc", "assetId": "lpc:shadow:walk"},
+        {"provider": "lpc", "assetId": "lpc:shadow:run"},
+        {"provider": "lpc", "assetId": "lpc:shadow:jump"}
+      ]
+    }
+  ]
+}
