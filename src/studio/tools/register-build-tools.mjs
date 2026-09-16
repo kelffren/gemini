@@ -1,6 +1,6 @@
 /* KELO-INDEX
  * area: STUDIO / BUILD TOOLS
- * owns: paint-copies, quick-build and room tools loaded after World chrome
+ * owns: paint-copies, quick-build, quick-edit and room tools loaded after World chrome
  * does-not-own: select/placement core, live shell, authority
  * public-api: registerBuildTools()
  * reuse: registerBasicTools() composes this after registerCoreTools()
@@ -10,6 +10,7 @@
  */
 import { createPaintCopiesTool } from './paint-copies-tool.mjs';
 import { createQuickBuildTool } from './quick-build-tool.mjs';
+import { createQuickEditTool } from './quick-edit-tool.mjs';
 import { createRoomBuildTool } from './room-build-tool.mjs';
 import { createRoomOpeningTool } from './room-opening-tool.mjs';
 import { createRoomMaterialTool } from './room-material-tool.mjs';
@@ -21,55 +22,41 @@ const disabled=(key,reason='switch-off')=>surgery()?.moduleDisabled?.(key,`BUILD
 function createTracked(key,create){
   if(!enabled(key)){disabled(key);return null;}
   const S=surgery(),started=S?.moduleStart?.(key,'BUILD_TOOLS');
-  try{
-    const value=create();
-    S?.moduleDone?.(key,started);
-    return value;
-  }catch(error){
-    S?.moduleFailed?.(key,error);
-    throw error;
-  }
+  try{const value=create();S?.moduleDone?.(key,started);return value;}
+  catch(error){S?.moduleFailed?.(key,error);throw error;}
 }
 
 export function registerBuildTools(kernel,core={}){
   const placement=core.placement||kernel.tools.get('placement');
+  const empty={paintCopies:null,quickBuild:null,quickEdit:null,roomBuild:null,roomOpening:null,roomMaterial:null};
   if(!enabled('basicTools')){
-    for(const key of ['paintCopies','quickBuild','roomBuild','roomOpening','roomMaterial'])disabled(key,'basicTools-master-off');
-    return {paintCopies:null,quickBuild:null,roomBuild:null,roomOpening:null,roomMaterial:null};
+    for(const key of Object.keys(empty))disabled(key,'basicTools-master-off');
+    return empty;
   }
 
   let paintCopies=kernel.tools.get('paintCopies');
-  if(!paintCopies){
-    paintCopies=createTracked('paintCopies',()=>createPaintCopiesTool(kernel));
-    if(paintCopies)kernel.tools.register(paintCopies);
-  }
+  if(!paintCopies){paintCopies=createTracked('paintCopies',()=>createPaintCopiesTool(kernel));if(paintCopies)kernel.tools.register(paintCopies);}
 
   let quickBuild=kernel.tools.get('quickBuild');
-  if(!quickBuild){
-    quickBuild=createTracked('quickBuild',()=>createQuickBuildTool(kernel,{placement}));
-    if(quickBuild)kernel.tools.register(quickBuild);
+  if(!quickBuild){quickBuild=createTracked('quickBuild',()=>createQuickBuildTool(kernel,{placement}));if(quickBuild)kernel.tools.register(quickBuild);}
+
+  let quickEdit=kernel.tools.get('quickEdit');
+  if(!quickEdit){
+    if(!quickBuild)disabled('quickEdit','dependency-quickBuild-off');
+    else{quickEdit=createTracked('quickEdit',()=>createQuickEditTool(kernel,{quickBuild}));if(quickEdit)kernel.tools.register(quickEdit);}
   }
 
   let roomBuild=kernel.tools.get('roomBuild');
   if(!roomBuild){
-    if(!quickBuild){disabled('roomBuild','dependency-quickBuild-off');}
-    else{
-      roomBuild=createTracked('roomBuild',()=>createRoomBuildTool(kernel,{placement,quickBuild}));
-      if(roomBuild)kernel.tools.register(roomBuild);
-    }
+    if(!quickBuild)disabled('roomBuild','dependency-quickBuild-off');
+    else{roomBuild=createTracked('roomBuild',()=>createRoomBuildTool(kernel,{placement,quickBuild}));if(roomBuild)kernel.tools.register(roomBuild);}
   }
 
   let roomOpening=kernel.tools.get('roomOpening');
-  if(!roomOpening){
-    roomOpening=createTracked('roomOpening',()=>createRoomOpeningTool(kernel));
-    if(roomOpening)kernel.tools.register(roomOpening);
-  }
+  if(!roomOpening){roomOpening=createTracked('roomOpening',()=>createRoomOpeningTool(kernel));if(roomOpening)kernel.tools.register(roomOpening);}
 
   let roomMaterial=kernel.tools.get('roomMaterial');
-  if(!roomMaterial){
-    roomMaterial=createTracked('roomMaterial',()=>createRoomMaterialTool(kernel));
-    if(roomMaterial)kernel.tools.register(roomMaterial);
-  }
+  if(!roomMaterial){roomMaterial=createTracked('roomMaterial',()=>createRoomMaterialTool(kernel));if(roomMaterial)kernel.tools.register(roomMaterial);}
 
-  return {paintCopies,quickBuild,roomBuild,roomOpening,roomMaterial};
+  return {paintCopies,quickBuild,quickEdit,roomBuild,roomOpening,roomMaterial};
 }
