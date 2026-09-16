@@ -1,0 +1,43 @@
+name: World Editor Lab Gate
+
+on:
+  push:
+    branches:
+      - lab/world-editor-fortnite-preview
+    paths:
+      - 'src/studio/**'
+      - 'scripts/studio-quick-build-audit.mjs'
+      - 'scripts/studio-quick-build-placement-guard-audit.mjs'
+      - 'scripts/studio-quick-edit-audit.mjs'
+      - '.github/workflows/world-editor-lab-gate.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: world-editor-lab-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  editor-contracts:
+    name: isolated-world-editor-contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout exact lab bytes
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+
+      - name: Quick Build semantic contract
+        run: node scripts/studio-quick-build-audit.mjs
+
+      - name: Quick Build overlap guard
+        run: node scripts/studio-quick-build-placement-guard-audit.mjs
+
+      - name: Quick Edit contract
+        run: node scripts/studio-quick-edit-audit.mjs
