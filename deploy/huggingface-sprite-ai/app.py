@@ -46,23 +46,30 @@ def _to_data_url(image: Image.Image) -> str:
     return "data:image/png;base64," + base64.b64encode(buffer.getvalue()).decode("ascii")
 
 
-def _row(sheet: Image.Image, index: int) -> Image.Image:
+def _walk_row(sheet: Image.Image, index: int) -> Image.Image:
+    """Turn the LoRA's trained 3-walk-frames + special-pose row into a clean 4-frame loop."""
     top = index * CELL
-    return sheet.crop((0, top, SHEET, top + CELL))
+    trained_walk = [sheet.crop((column * CELL, top, (column + 1) * CELL, top + CELL)) for column in range(3)]
+    loop = Image.new("RGB", (SHEET, CELL), (255, 255, 255))
+    for target_column, source_index in enumerate((0, 1, 2, 1)):
+        loop.paste(trained_walk[source_index], (target_column * CELL, 0))
+    return loop
 
 
 def _compose(cardinal: Image.Image, diagonal: Image.Image) -> Image.Image:
-    # LoRA training order for the cardinal pass is S, W, E, N.
+    # The public LoRA was trained with rows S, W, E, N. Kelo never copies the
+    # fourth special-pose cell; _walk_row converts the first 3 walk cells into
+    # a deterministic 0-1-2-1 loop that matches the runtime's four-frame contract.
     cardinal_rows = {"S": 0, "W": 1, "E": 2, "N": 3}
-    # The second pass is explicitly prompted in this order.
+    # The diagonal pass is experimental and explicitly prompted in this order.
     diagonal_rows = {"NE": 0, "SE": 1, "SW": 2, "NW": 3}
     order = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
     atlas = Image.new("RGB", (SHEET, SHEET * 2), (255, 255, 255))
     for target_row, direction in enumerate(order):
         if direction in cardinal_rows:
-            source = _row(cardinal, cardinal_rows[direction])
+            source = _walk_row(cardinal, cardinal_rows[direction])
         else:
-            source = _row(diagonal, diagonal_rows[direction])
+            source = _walk_row(diagonal, diagonal_rows[direction])
         atlas.paste(source, (0, target_row * CELL))
     return atlas
 
@@ -73,7 +80,7 @@ def _cardinal_prompt(subject: str, retry_hint: str) -> str:
         "Create pixel art on a plain solid background. Make exactly one 4 by 4 sprite grid, no labels, no borders and no scenery. "
         "All 16 cells show the exact same character with identical clothes, equipment, proportions and palette. "
         "Rows are exactly: facing down, facing left, facing right, facing up. "
-        "Every row contains four chronological looping walk phases with strong readable limb motion. "
+        "In every row the FIRST THREE cells are chronological walking frames with clear limb motion; the fourth cell may be a separate special pose. "
         "Keep the feet baseline, scale and framing constant and leave clear empty padding around the character in every cell. "
         f"{retry_hint}"
     )
@@ -84,7 +91,7 @@ def _diagonal_prompt(subject: str, retry_hint: str) -> str:
         f"{subject}\n"
         "Using the reference sheet only to preserve the exact same character identity and art style, create a new pixel-art 4 by 4 sprite grid on a plain solid background. "
         "No labels, borders or scenery. Rows are exactly: facing north-east, south-east, south-west, north-west. "
-        "Every row contains four chronological looping walk phases. Preserve clothing, equipment, silhouette, palette, scale, feet baseline and padding exactly. "
+        "In every row the FIRST THREE cells are chronological walking frames; the fourth is a spare special pose. Preserve clothing, equipment, silhouette, palette, scale, feet baseline and padding exactly. "
         f"{retry_hint}"
     )
 
