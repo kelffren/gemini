@@ -35,6 +35,7 @@ const maxRecent=numberConst(external,'MAX_RECENT_ASSETS');
 const maxPreviewConcurrency=numberConst(external,'MAX_THUMBNAIL_CONCURRENCY');
 const queryCache=numberConst(worker,'MAX_QUERY_CACHE');
 const externalConcurrency=numberConst(runtime,'MAX_CONCURRENCY');
+const externalQueue=numberConst(runtime,'MAX_QUEUE');
 const externalCacheEntries=numberConst(runtime,'MAX_CACHE_ENTRIES');
 const externalMaxBytes=numberConst(runtime,'DEFAULT_MAX_BYTES');
 
@@ -43,6 +44,7 @@ assert(Number.isFinite(maxRecent)&&maxRecent<=800,'recent metadata LRU must stay
 assert(Number.isFinite(maxPreviewConcurrency)&&maxPreviewConcurrency<=6,'preview network concurrency must stay <= 6');
 assert(Number.isFinite(queryCache)&&queryCache<=12,'worker query cache must stay <= 12 result sets');
 assert(Number.isFinite(externalConcurrency)&&externalConcurrency<=3,'external provider concurrency must stay <= 3 on mobile');
+assert(Number.isFinite(externalQueue)&&externalQueue<=24,'external provider queue must stay <= 24 pending requests');
 assert(Number.isFinite(externalCacheEntries)&&externalCacheEntries<=64,'external metadata cache must stay <= 64 entries');
 assert(Number.isFinite(externalMaxBytes)&&externalMaxBytes<=1_500_000,'default external response budget must stay <= 1.5 MB');
 assert(/new Worker\(new URL\('\.\/kenney-index-worker\.js/.test(kenney),'Kenney provider must keep full-index search in a Web Worker');
@@ -52,6 +54,7 @@ assert(/IntersectionObserver/.test(external),'visible previews must be viewport-
 assert(/fetchPriority='low'/.test(external),'thumbnail requests must remain low priority');
 assert(/includeLazy=!!wanted\|\|\(options\.includeLazy===true&&q\.length>0\)/.test(external),'giant lazy catalogs must stay asleep on blank federated browse');
 assert(/PROVIDER_CIRCUIT_OPEN/.test(runtime)&&/BREAKER_FAILURES/.test(runtime),'external provider runtime must retain circuit breaker isolation');
+assert(/PROVIDER_QUEUE_SATURATED/.test(runtime),'external provider runtime must apply queue backpressure');
 assert(/saveData/.test(runtime)&&/effectiveType/.test(runtime),'external provider runtime must adapt to mobile connection/data saver');
 assert(/catalogOnly:true/.test(ambientcg)&&/downloadUrl:null/.test(ambientcg),'ambientCG must remain catalog-only until explicit source resolution');
 assert(/catalogOnly:true/.test(polyhaven)&&/\/search\?/.test(polyhaven),'Poly Haven must use search-first catalog-only discovery');
@@ -71,4 +74,4 @@ const pages=[];for(let offset=0;offset<synthetic.length;offset+=maxFederated)pag
 assert(pages.length>=50,'synthetic 10k test did not create expected bounded pages');
 assert(Math.max(...pages.map(page=>page.length))<=maxFederated,'a synthetic page exceeded the DOM metadata budget');
 
-if(!process.exitCode){console.log(JSON.stringify({ok:true,syntheticAssets:synthetic.length,pages:pages.length,maxFederated,maxRecent,maxPreviewConcurrency,queryCache,externalConcurrency,externalCacheEntries,externalMaxBytes,providers:providerIds.size,architecture:'worker + lazy APIs + metadata paging + bounded network + viewport previews + hibernated pages'},null,2));}
+if(!process.exitCode){console.log(JSON.stringify({ok:true,syntheticAssets:synthetic.length,pages:pages.length,maxFederated,maxRecent,maxPreviewConcurrency,queryCache,externalConcurrency,externalQueue,externalCacheEntries,externalMaxBytes,providers:providerIds.size,architecture:'worker + lazy APIs + metadata paging + bounded network + backpressure + viewport previews + hibernated pages'},null,2));}
