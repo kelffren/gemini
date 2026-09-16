@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "globalMultiplier": 1,
+  "templates": {
+    "starter_weapon": { "price": 90 },
+    "arcane_staff": { "price": 135 },
+    "starter_bow": { "price": 120 },
+    "starter_daggers": { "price": 125 },
+    "starter_hammer": { "price": 130 },
+    "frost_staff": { "price": 145 }
+  }
+}
