@@ -1,0 +1,45 @@
+{
+  "schema": "kelo-content-descriptors-v1",
+  "algorithm": "sha256",
+  "source": "data/kelo-content-starter-catalog.json",
+  "sourceDigest": "sha256:93d1149b3222e4043a2e1f2cab229df21c92d5bb71a90176bfbd040947d5ff34",
+  "sourceVersion": 1,
+  "descriptors": [
+    {
+      "id": "ember-lance",
+      "mediaType": "application/json",
+      "size": 744,
+      "digest": "sha256:3d92d74fa564a86bfc6762cc5cc366a9ac1017042974bb16ad93bc831ddc139f"
+    },
+    {
+      "id": "frost-ring",
+      "mediaType": "application/json",
+      "size": 708,
+      "digest": "sha256:6a0898dd4a23478774cec1668edd3b1de5a26d3ed2589ad94038f1ff17969daf"
+    },
+    {
+      "id": "gale-step",
+      "mediaType": "application/json",
+      "size": 588,
+      "digest": "sha256:8e8cc5442721cb2cdf95e8488e6dd7330cb89a465528b5f6539f997478dfd7d1"
+    },
+    {
+      "id": "imperial-ceremony-stage",
+      "mediaType": "application/json",
+      "size": 637,
+      "digest": "sha256:14afc75604e3d0e781074d2125e0386c219d6e5e24aba8f8dc586c390c1e7567"
+    },
+    {
+      "id": "imperial-fountain-lounge",
+      "mediaType": "application/json",
+      "size": 570,
+      "digest": "sha256:f0e695463fed1843325573f85f6b37f0a71c28545ef2289324e0e15712cc2880"
+    },
+    {
+      "id": "imperial-rest-corner",
+      "mediaType": "application/json",
+      "size": 523,
+      "digest": "sha256:cec1cc289eff46f28ff21995f0f13f176b57d22db669919d7d010a9e502abad2"
+    }
+  ]
+}
