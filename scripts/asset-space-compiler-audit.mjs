@@ -1,8 +1,8 @@
 /* KELO-INDEX
  * area: QA / CREATOR ASSET INGEST
  * owner: Kelo Creator Asset Bridge
- * keys: PNG SPACE COMPILER AUDIT LOSSLESS PALETTE BIT DEPTH ALPHA DROP SUBBYTE QUALITY GATE
- * purpose: prove exact PNG reductions shrink representative fixtures without changing decoded RGBA pixels
+ * keys: PNG SPACE COMPILER AUDIT LOSSLESS PALETTE BIT DEPTH ALPHA DROP SUBBYTE CACHE QUALITY GATE
+ * purpose: prove exact PNG reductions and cache integrity without changing decoded RGBA pixels
  * online: N/A; deterministic build-time audit
  */
 
@@ -35,7 +35,6 @@ function makePattern(width, height, colors) {
   return rgba;
 }
 
-// General low-colour transparent pixel-art fixture.
 const width = 128;
 const height = 128;
 const rgba = makePattern(width,height,[
@@ -52,7 +51,6 @@ assert.ok(optimized.buffer.length < original.length,'base: optimized fixture is 
 assert.equal(optimized.report.winner.kind,'exact-palette','base: exact palette candidate wins');
 assert.equal(optimized.report.paletteCandidate.bitDepth,4,'base: 5-colour palette selects 4-bit indexes');
 
-// Four exact RGBA colours must fit into a 2-bit indexed PNG.
 const fourRgba = makePattern(96,96,[
   [0,0,0,0],
   [30,80,180,255],
@@ -66,7 +64,6 @@ assert.equal(fourOptimized.report.winner.kind,'exact-palette','palette-2bit: pal
 assert.equal(fourOptimized.report.paletteCandidate.bitDepth,2,'palette-2bit: minimum legal bit depth');
 assert.equal(fourCheck.decoded.ihdr.bitDepth,2,'palette-2bit: output IHDR uses 2 bits');
 
-// Two exact colours must fit into a 1-bit indexed PNG.
 const twoRgba = makePattern(96,96,[
   [15,20,28,255],
   [220,226,238,255]
@@ -78,15 +75,11 @@ assert.equal(twoOptimized.report.winner.kind,'exact-palette','palette-1bit: pale
 assert.equal(twoOptimized.report.paletteCandidate.bitDepth,1,'palette-1bit: minimum legal bit depth');
 assert.equal(twoCheck.decoded.ihdr.bitDepth,1,'palette-1bit: output IHDR uses 1 bit');
 
-// Re-optimizing sub-byte output must remain exact and supported.
 const twoAgain = optimizePngLossless(twoOptimized.buffer);
 const twoAgainCheck = strictCheck(twoRgba,twoAgain.buffer,96,96,'palette-1bit-idempotent');
 assert.equal(twoAgainCheck.decoded.ihdr.bitDepth,1,'palette-1bit-idempotent: sub-byte decoder/refilter remains active');
 assert.ok(twoAgain.buffer.length <= twoOptimized.buffer.length,'palette-1bit-idempotent: reoptimization must not grow');
 
-// Fully opaque RGBA has a mathematically useless alpha channel. Alpha-drop must
-// be generated as an exact candidate, but it does NOT have to beat a refilter:
-// the optimizer's contract is to choose the smallest verified representation.
 const opaqueWidth = 160;
 const opaqueHeight = 96;
 const opaqueRgba = Buffer.alloc(opaqueWidth*opaqueHeight*4);
@@ -119,3 +112,5 @@ console.log(JSON.stringify({
   alphaDrop:{beforeBytes:opaqueOriginal.length,afterBytes:opaqueOptimized.buffer.length,winner:opaqueOptimized.report.winner,candidateCount:alphaDropCandidates.length,outputColorType:opaqueCheck.decoded.ihdr.colorType},
   qualityScore:baseCheck.verdict.score
 }));
+
+await import('./asset-optimization-cache-audit.mjs');
