@@ -115,6 +115,8 @@ jobs:
         run: node scripts/asset-atlas-final-bytes-audit.mjs --manifest=src/environment/generated/forest-plaza-tileset-v2-manifest.js --padding=2 --report=test-results/asset-atlas-final-bytes
       - name: Smart Atlas DELIVERY candidate compiler
         run: node scripts/asset-atlas-delivery-candidate.mjs --manifest=src/environment/generated/forest-plaza-tileset-v2-manifest.js --padding=2 --report=test-results/asset-atlas-delivery-candidate
+      - name: Batch strict PNG DELIVERY candidates
+        run: node scripts/asset-batch-delivery-compiler.mjs --input=assets --max-files=80 --max-source-bytes=8388608 --min-saving-bytes=1024 --min-saving-percent=0.1 --report=test-results/asset-batch-delivery
       - name: Verified DELIVERY registry
         run: node scripts/asset-delivery-registry.mjs --input=test-results --report=test-results/asset-delivery-registry
       - name: Asset documentation contract
@@ -130,6 +132,10 @@ jobs:
             test-results/asset-atlas-overlap-diagnostics
             test-results/asset-atlas-topology-crop
             test-results/asset-atlas-final-bytes
-            test-results/asset-atlas-delivery-candidate
+            test-results/asset-atlas-delivery-candidate/delivery-manifest.json
+            test-results/asset-atlas-delivery-candidate/report.json
+            test-results/asset-batch-delivery/report.json
+            test-results/asset-batch-delivery/candidates/**/delivery-manifest.json
+            test-results/asset-batch-delivery/candidates/**/report.json
             test-results/asset-delivery-registry
           if-no-files-found: ignore
