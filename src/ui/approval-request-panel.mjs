@@ -1,21 +1,23 @@
 /* KELO-INDEX
  * area: UI / APPROVAL REQUEST
  * owner: KeloApprovalRequestPanel
- * keys: APPROVALREQUEST EDITOR ASSET MAP REVIEW ADMIN MOBILE
- * purpose: mobile-first universal inbox for editor work awaiting an authorized admin decision
- * authority: decisions use review_approval_request(); this UI never publishes game content directly
+ * keys: APPROVALREQUEST EDITOR ASSET MAP REVIEW ADMIN MOBILE PREVIEW INSPECT
+ * purpose: mobile-first universal inbox with inspect-before-decision visual review
+ * authority: decisions use review_approval_request(); previews use short-lived signed URLs; UI never publishes game content directly
  */
-import {installApprovalRequestRuntime} from './../core/approval-request-runtime.mjs?v=1';
+import {installApprovalRequestRuntime} from './../core/approval-request-runtime.mjs?v=2-visual-review';
 
-const VERSION='approval-request-panel-v1.0.0';
+const VERSION='approval-request-panel-v1.1.0-visual-review';
 const esc=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 const fmt=value=>{if(!value)return'—';const d=new Date(value);return Number.isNaN(d.getTime())?'—':d.toLocaleString();};
+const bytes=value=>{const n=Number(value)||0;if(n<1024)return`${n} B`;if(n<1048576)return`${(n/1024).toFixed(1)} KB`;return`${(n/1048576).toFixed(2)} MB`;};
 const labels={asset:'Asset',map:'Mapa',scene:'Escena',skin:'Skin',item:'Item',animation:'Animación',vfx:'VFX',ability:'Habilidad',world:'Mundo',other:'Otro'};
+const pretty=value=>{try{return JSON.stringify(value??{},null,2);}catch{return String(value??'');}};
 
 export async function installApprovalRequestPanel({root=window}={}){
   if(root.KeloApprovalRequestPanel)return root.KeloApprovalRequestPanel;
   const runtime=await installApprovalRequestRuntime({root});
-  let opened=false,busy=false,status='pending',rows=[];
+  let opened=false,busy=false,status='pending',rows=[],selected=null;
   const $=id=>document.getElementById(id);
   const permissions=()=>root.KeloAccountPermissions||root.KeloPermissions;
   const allowed=()=>!!(permissions()?.hasRole?.('admin')||permissions()?.can?.('approval.view')||permissions()?.can?.('approval.review'));
@@ -24,70 +26,44 @@ export async function installApprovalRequestPanel({root=window}={}){
 
   function ensureStyle(){
     if($('kelo-approval-request-style'))return;
-    const style=document.createElement('style');
-    style.id='kelo-approval-request-style';
-    style.textContent=`
-#kelo-approval-request{position:fixed;z-index:495;inset:max(8px,env(safe-area-inset-top)) max(8px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left));display:none;overflow:hidden;pointer-events:auto;border:1px solid rgba(219,183,88,.46);border-radius:24px;background:linear-gradient(180deg,rgba(8,13,22,.995),rgba(4,8,14,.995));color:#eef4ff;box-shadow:0 30px 110px rgba(0,0,0,.78);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}#kelo-approval-request *{box-sizing:border-box}.kar-shell{height:100%;display:grid;grid-template-rows:auto auto 1fr}.kar-head{display:flex;align-items:center;gap:10px;padding:13px 14px;border-bottom:1px solid rgba(255,255,255,.07);background:linear-gradient(90deg,rgba(44,65,99,.35),rgba(20,13,7,.22))}.kar-title{flex:1;font-weight:950;letter-spacing:.05em;color:#f0d47f}.kar-title small{display:block;margin-top:3px;font-size:9px;color:#8195ac;letter-spacing:.01em}.kar-close{width:38px;height:38px;border-radius:12px;border:1px solid rgba(219,183,88,.28);background:#111a28;color:#f0d47f;font-size:20px}.kar-tabs{display:flex;gap:7px;padding:9px 10px;overflow:auto;border-bottom:1px solid rgba(255,255,255,.06)}.kar-tab,.kar-btn{border:1px solid rgba(219,183,88,.22);border-radius:11px;background:#0d1724;color:#dce8f5;padding:9px 11px;font-size:11px;font-weight:850;white-space:nowrap}.kar-tab.on{background:#243b59;border-color:#d6b75c;color:#fff0ad}.kar-list{overflow:auto;padding:10px;-webkit-overflow-scrolling:touch}.kar-card{border:1px solid rgba(255,255,255,.08);border-radius:16px;background:rgba(15,25,39,.88);padding:12px;margin-bottom:9px}.kar-top{display:flex;gap:8px;align-items:flex-start}.kar-copy{flex:1;min-width:0}.kar-card h3{font-size:13px;margin:0;color:#eef4ff}.kar-meta{margin-top:4px;font-size:9px;line-height:1.5;color:#8195ac}.kar-summary{margin-top:8px;color:#bccbdd;font-size:11px;line-height:1.45;white-space:pre-wrap}.kar-pill{display:inline-flex;align-items:center;border:1px solid rgba(113,166,215,.2);border-radius:999px;padding:4px 7px;color:#a8cae8;background:#112438;font-size:8px;font-weight:900;text-transform:uppercase}.kar-pill.pending{color:#ffd28d;background:#382714;border-color:rgba(255,199,91,.28)}.kar-pill.approved{color:#9de0bd;background:#10291e;border-color:rgba(91,211,151,.28)}.kar-pill.rejected{color:#ffabab;background:#36161a;border-color:rgba(255,110,110,.25)}.kar-actions{display:flex;gap:7px;margin-top:10px;flex-wrap:wrap}.kar-btn.approve{border-color:rgba(91,211,151,.35);color:#9de0bd;background:#10291e}.kar-btn.reject{border-color:rgba(255,110,110,.38);color:#ffabab;background:#2b1216}.kar-note{width:100%;min-height:68px;resize:vertical;margin-top:9px;border:1px solid rgba(219,183,88,.18);border-radius:11px;background:#0b1522;color:#eef4ff;padding:9px;font-size:11px}.kar-empty{height:100%;display:grid;place-items:center;text-align:center;color:#6f8499;padding:28px}.kar-busy{opacity:.56;pointer-events:none}.kar-refresh{font-size:16px;padding-inline:12px}@media(max-width:620px){#kelo-approval-request{border-radius:18px}.kar-head{padding:10px}.kar-list{padding:8px}.kar-card{padding:10px}.kar-title{font-size:13px}.kar-tab,.kar-btn{min-height:38px}}
+    const style=document.createElement('style');style.id='kelo-approval-request-style';style.textContent=`
+#kelo-approval-request{position:fixed;z-index:495;inset:max(8px,env(safe-area-inset-top)) max(8px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left));display:none;overflow:hidden;pointer-events:auto;border:1px solid rgba(219,183,88,.46);border-radius:24px;background:linear-gradient(180deg,rgba(8,13,22,.995),rgba(4,8,14,.995));color:#eef4ff;box-shadow:0 30px 110px rgba(0,0,0,.78);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}#kelo-approval-request *{box-sizing:border-box}.kar-shell{height:100%;display:grid;grid-template-rows:auto auto 1fr;position:relative}.kar-head{display:flex;align-items:center;gap:10px;padding:13px 14px;border-bottom:1px solid rgba(255,255,255,.07);background:linear-gradient(90deg,rgba(44,65,99,.35),rgba(20,13,7,.22))}.kar-title{flex:1;font-weight:950;letter-spacing:.05em;color:#f0d47f}.kar-title small{display:block;margin-top:3px;font-size:9px;color:#8195ac;letter-spacing:.01em}.kar-close{width:38px;height:38px;border-radius:12px;border:1px solid rgba(219,183,88,.28);background:#111a28;color:#f0d47f;font-size:20px}.kar-tabs{display:flex;gap:7px;padding:9px 10px;overflow:auto;border-bottom:1px solid rgba(255,255,255,.06)}.kar-tab,.kar-btn{border:1px solid rgba(219,183,88,.22);border-radius:11px;background:#0d1724;color:#dce8f5;padding:9px 11px;font-size:11px;font-weight:850;white-space:nowrap}.kar-tab.on{background:#243b59;border-color:#d6b75c;color:#fff0ad}.kar-list{overflow:auto;padding:10px;-webkit-overflow-scrolling:touch}.kar-card{border:1px solid rgba(255,255,255,.08);border-radius:16px;background:rgba(15,25,39,.88);padding:12px;margin-bottom:9px}.kar-top{display:flex;gap:8px;align-items:flex-start}.kar-copy{flex:1;min-width:0}.kar-card h3,.kar-detail h3{font-size:13px;margin:0;color:#eef4ff}.kar-meta{margin-top:4px;font-size:9px;line-height:1.5;color:#8195ac}.kar-summary{margin-top:8px;color:#bccbdd;font-size:11px;line-height:1.45;white-space:pre-wrap}.kar-pill{display:inline-flex;align-items:center;border:1px solid rgba(113,166,215,.2);border-radius:999px;padding:4px 7px;color:#a8cae8;background:#112438;font-size:8px;font-weight:900;text-transform:uppercase}.kar-pill.pending{color:#ffd28d;background:#382714;border-color:rgba(255,199,91,.28)}.kar-pill.approved{color:#9de0bd;background:#10291e;border-color:rgba(91,211,151,.28)}.kar-pill.rejected{color:#ffabab;background:#36161a;border-color:rgba(255,110,110,.25)}.kar-actions{display:flex;gap:7px;margin-top:10px;flex-wrap:wrap}.kar-btn.inspect{border-color:rgba(113,166,215,.34);color:#b9dcff;background:#102338}.kar-btn.approve{border-color:rgba(91,211,151,.35);color:#9de0bd;background:#10291e}.kar-btn.reject{border-color:rgba(255,110,110,.38);color:#ffabab;background:#2b1216}.kar-note{width:100%;min-height:74px;resize:vertical;margin-top:9px;border:1px solid rgba(219,183,88,.18);border-radius:11px;background:#0b1522;color:#eef4ff;padding:9px;font-size:11px}.kar-empty{height:100%;display:grid;place-items:center;text-align:center;color:#6f8499;padding:28px}.kar-busy{opacity:.56;pointer-events:none}.kar-refresh{font-size:16px;padding-inline:12px}
+.kar-detail{position:absolute;z-index:4;inset:0;background:linear-gradient(180deg,#09111c,#05090f);display:grid;grid-template-rows:auto 1fr}.kar-detail[hidden]{display:none}.kar-detail-head{display:flex;align-items:center;gap:9px;padding:11px;border-bottom:1px solid rgba(255,255,255,.07)}.kar-back{width:42px;height:38px}.kar-detail-title{flex:1;min-width:0}.kar-detail-title b{display:block;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.kar-detail-title small{display:block;color:#8195ac;font-size:9px;margin-top:2px}.kar-detail-body{overflow:auto;padding:10px;-webkit-overflow-scrolling:touch}.kar-preview-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:10px}.kar-preview{min-height:160px;border:1px solid rgba(255,255,255,.08);border-radius:15px;background:radial-gradient(circle at 50% 45%,rgba(63,87,116,.28),rgba(8,13,20,.9));overflow:hidden;display:grid;place-items:center;position:relative}.kar-preview img{width:100%;height:100%;max-height:320px;object-fit:contain;image-rendering:auto}.kar-preview small{padding:14px;text-align:center;color:#748ba1}.kar-preview-tag{position:absolute;left:7px;bottom:7px;border-radius:999px;padding:4px 7px;background:rgba(4,8,14,.8);border:1px solid rgba(255,255,255,.12);font-size:8px;color:#d5e3ef}.kar-section{border:1px solid rgba(255,255,255,.07);border-radius:15px;background:rgba(15,25,39,.82);padding:11px;margin-bottom:9px}.kar-section h4{font-size:10px;color:#efd47d;margin:0 0 8px;letter-spacing:.06em}.kar-facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.kar-fact{padding:8px;border-radius:10px;background:#0b1522;border:1px solid rgba(255,255,255,.05)}.kar-fact small{display:block;color:#70859a;font-size:8px}.kar-fact b{display:block;margin-top:3px;font-size:10px;overflow-wrap:anywhere}.kar-json{margin:0;max-height:280px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;color:#a8bdd1;font:9px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace}.kar-decision-bar{position:sticky;bottom:-10px;margin:10px -10px -10px;padding:10px;background:linear-gradient(180deg,rgba(5,9,15,.1),rgba(5,9,15,.98) 28%)}
+@media(max-width:620px){#kelo-approval-request{border-radius:18px}.kar-head{padding:10px}.kar-list{padding:8px}.kar-card{padding:10px}.kar-title{font-size:13px}.kar-tab,.kar-btn{min-height:38px}.kar-preview-grid{grid-template-columns:1fr}.kar-preview{min-height:220px}.kar-facts{grid-template-columns:1fr 1fr}}
 `;
     document.head.appendChild(style);
   }
 
   function ensureDom(){
     if($('kelo-approval-request'))return;
-    ensureStyle();
-    const panel=document.createElement('section');
-    panel.id='kelo-approval-request';
-    panel.innerHTML=`<div class="kar-shell"><div class="kar-head"><div class="kar-title">✓ APPROVALREQUEST<small>trabajo de editores · assets · mapas · contenido</small></div><button class="kar-btn kar-refresh" id="kar-refresh" aria-label="Actualizar">↻</button><button class="kar-close" id="kar-close" aria-label="Cerrar">×</button></div><div class="kar-tabs" id="kar-tabs"><button class="kar-tab on" data-status="pending">PENDIENTES</button><button class="kar-tab" data-status="approved">APROBADAS</button><button class="kar-tab" data-status="rejected">RECHAZADAS</button><button class="kar-tab" data-status="all">TODAS</button></div><div class="kar-list" id="kar-list"></div></div>`;
-    panel.addEventListener('pointerdown',event=>event.stopPropagation());
-    document.body.appendChild(panel);
-    $('kar-close').onclick=close;
-    $('kar-refresh').onclick=()=>void refresh();
-    $('kar-tabs').onclick=event=>{const button=event.target.closest('[data-status]');if(!button)return;status=button.dataset.status||'pending';$('kar-tabs').querySelectorAll('[data-status]').forEach(node=>node.classList.toggle('on',node===button));void refresh();};
-    $('kar-list').onclick=event=>{const button=event.target.closest('[data-decision]');if(button)void decide(button.dataset.id,button.dataset.decision);};
+    ensureStyle();const panel=document.createElement('section');panel.id='kelo-approval-request';panel.innerHTML=`<div class="kar-shell"><div class="kar-head"><div class="kar-title">✓ APPROVALREQUEST<small>inspecciona antes de aprobar · assets · mapas · contenido</small></div><button class="kar-btn kar-refresh" id="kar-refresh" aria-label="Actualizar">↻</button><button class="kar-close" id="kar-close" aria-label="Cerrar">×</button></div><div class="kar-tabs" id="kar-tabs"><button class="kar-tab on" data-status="pending">PENDIENTES</button><button class="kar-tab" data-status="approved">APROBADAS</button><button class="kar-tab" data-status="rejected">RECHAZADAS</button><button class="kar-tab" data-status="all">TODAS</button></div><div class="kar-list" id="kar-list"></div><aside class="kar-detail" id="kar-detail" hidden><div class="kar-detail-head"><button class="kar-btn kar-back" id="kar-back">‹</button><div class="kar-detail-title" id="kar-detail-title"></div><span id="kar-detail-status"></span></div><div class="kar-detail-body" id="kar-detail-body"></div></aside></div>`;panel.addEventListener('pointerdown',event=>event.stopPropagation());document.body.appendChild(panel);
+    $('kar-close').onclick=close;$('kar-back').onclick=closeDetail;$('kar-refresh').onclick=()=>void refresh();
+    $('kar-tabs').onclick=event=>{const button=event.target.closest('[data-status]');if(!button)return;status=button.dataset.status||'pending';$('kar-tabs').querySelectorAll('[data-status]').forEach(node=>node.classList.toggle('on',node===button));closeDetail();void refresh();};
+    $('kar-list').onclick=event=>{const button=event.target.closest('[data-inspect]');if(button)void openDetail(button.dataset.inspect);};
+    $('kar-detail-body').onclick=event=>{const button=event.target.closest('[data-decision]');if(button)void decide(button.dataset.id,button.dataset.decision);};
   }
 
   function render(){
-    const host=$('kar-list');
-    if(!host)return;
-    if(!rows.length){host.innerHTML=`<div class="kar-empty">${status==='pending'?'No hay solicitudes pendientes.':'No hay solicitudes en esta vista.'}</div>`;return;}
-    host.innerHTML=rows.map(row=>{
-      const type=labels[row.request_type]||row.request_type||'Contenido';
-      const reviewer=canReview()&&row.status==='pending';
-      const metaBits=[type,row.submitted_by_name||'Editor',fmt(row.submitted_at)];
-      if(row.entity_type)metaBits.push(row.entity_type);
-      return `<article class="kar-card" data-request="${esc(row.id)}"><div class="kar-top"><div class="kar-copy"><h3>${esc(row.title)}</h3><div class="kar-meta">${metaBits.map(esc).join(' · ')}</div></div><span class="kar-pill ${esc(row.status)}">${esc(row.status)}</span></div>${row.summary?`<div class="kar-summary">${esc(row.summary)}</div>`:''}${row.decision_note?`<div class="kar-summary"><b>Nota:</b> ${esc(row.decision_note)}</div>`:''}${reviewer?`<textarea class="kar-note" data-note="${esc(row.id)}" placeholder="Nota opcional para el editor"></textarea><div class="kar-actions"><button class="kar-btn approve" data-id="${esc(row.id)}" data-decision="approved">✓ APROBAR</button><button class="kar-btn reject" data-id="${esc(row.id)}" data-decision="rejected">✕ RECHAZAR</button></div>`:''}</article>`;
-    }).join('');
+    const host=$('kar-list');if(!host)return;if(!rows.length){host.innerHTML=`<div class="kar-empty">${status==='pending'?'No hay solicitudes pendientes.':'No hay solicitudes en esta vista.'}</div>`;return;}
+    host.innerHTML=rows.map(row=>{const type=labels[row.request_type]||row.request_type||'Contenido',metaBits=[type,row.submitted_by_name||'Editor',fmt(row.submitted_at)];if(row.entity_type)metaBits.push(row.entity_type);return `<article class="kar-card" data-request="${esc(row.id)}"><div class="kar-top"><div class="kar-copy"><h3>${esc(row.title)}</h3><div class="kar-meta">${metaBits.map(esc).join(' · ')}</div></div><span class="kar-pill ${esc(row.status)}">${esc(row.status)}</span></div>${row.summary?`<div class="kar-summary">${esc(row.summary)}</div>`:''}${row.decision_note?`<div class="kar-summary"><b>Nota:</b> ${esc(row.decision_note)}</div>`:''}<div class="kar-actions"><button class="kar-btn inspect" data-inspect="${esc(row.id)}">👁 INSPECCIONAR</button></div></article>`;}).join('');
+  }
+
+  function fact(label,value){return `<div class="kar-fact"><small>${esc(label)}</small><b>${esc(value??'—')}</b></div>`;}
+  function renderDetail(){
+    const shell=$('kar-detail'),body=$('kar-detail-body'),title=$('kar-detail-title'),statusNode=$('kar-detail-status');if(!shell||!body||!selected)return;
+    const req=selected.request||{},detail=selected.detail||{},assets=selected.previewAssets||[];title.innerHTML=`<b>${esc(req.title||'Solicitud')}</b><small>${esc(labels[req.requestType]||req.requestType||'Contenido')} · ${esc(fmt(req.submittedAt))}</small>`;statusNode.innerHTML=`<span class="kar-pill ${esc(req.status)}">${esc(req.status)}</span>`;
+    const previews=assets.length?`<div class="kar-preview-grid">${assets.map(asset=>`<div class="kar-preview">${asset.signedUrl&&String(asset.mimeType||'').startsWith('image/')?`<img src="${esc(asset.signedUrl)}" alt="Preview ${esc(asset.role||'asset')}">`:`<small>${asset.previewError?'Preview no disponible':'Sin preview visual'}</small>`}<span class="kar-preview-tag">${esc(asset.role||'asset')} · ${esc(asset.pixelWidth||'?')}×${esc(asset.pixelHeight||'?')}</span></div>`).join('')}</div>`:'';
+    let facts='';if(detail.kind==='asset')facts=[['Asset ID',detail.assetId],['Revisión',detail.revision],['Tipo',detail.assetKind],['Categoría',detail.category],['Tamaño',`${detail.pixelWidth||'?'}×${detail.pixelHeight||'?'} · ${bytes(detail.byteSize)}`],['Colisión',detail.collisionMode],['Render',detail.renderPhase],['Familia',detail.semanticFamily]].map(([a,b])=>fact(a,b)).join('');else if(detail.kind==='content')facts=[['Content ID',detail.contentId],['Tipo',detail.contentType],['Revisión',detail.revision],['Schema',detail.schemaVersion],['Slug',detail.slug],['Stable key',detail.stableKey]].map(([a,b])=>fact(a,b)).join('');else facts=[['Entidad',req.entityType],['Entity ID',req.entityId],['Fuente',req.sourceType]].map(([a,b])=>fact(a,b)).join('');
+    const reviewer=canReview()&&req.status==='pending';body.innerHTML=`${previews}<section class="kar-section"><h4>RESUMEN</h4><h3>${esc(req.title||'')}</h3>${req.summary?`<div class="kar-summary">${esc(req.summary)}</div>`:''}</section><section class="kar-section"><h4>DATOS</h4><div class="kar-facts">${facts}</div></section>${detail.payload?`<section class="kar-section"><h4>PAYLOAD DEL CONTENIDO</h4><pre class="kar-json">${esc(pretty(detail.payload))}</pre></section>`:''}<section class="kar-section"><h4>METADATA / TRAZABILIDAD</h4><pre class="kar-json">${esc(pretty({request:req.metadata||{},detail:detail.revisionMetadata||detail.definitionMetadata||{},assets:assets.map(a=>({role:a.role,assetId:a.assetId,revisionId:a.revisionId,mimeType:a.mimeType,size:a.byteSize}))}))}</pre></section>${req.decisionNote?`<section class="kar-section"><h4>DECISIÓN</h4><div class="kar-summary">${esc(req.decisionNote)}</div></section>`:''}${reviewer?`<div class="kar-decision-bar"><textarea class="kar-note" id="kar-detail-note" placeholder="Nota opcional para el editor"></textarea><div class="kar-actions"><button class="kar-btn approve" data-id="${esc(req.id)}" data-decision="approved">✓ APROBAR</button><button class="kar-btn reject" data-id="${esc(req.id)}" data-decision="rejected">✕ RECHAZAR</button></div></div>`:''}`;shell.hidden=false;
   }
 
   function setBusy(value){busy=!!value;$('kelo-approval-request')?.classList.toggle('kar-busy',busy);}
+  async function refresh(){if(!allowed())throw new Error('APPROVAL_VIEW_DENIED');setBusy(true);try{rows=await runtime.list({status,limit:150})||[];render();return rows;}catch(error){console.warn('[ApprovalRequest refresh]',error);toast('No se pudo cargar ApprovalRequest');throw error;}finally{setBusy(false);}}
+  async function openDetail(id){if(busy)return;setBusy(true);try{selected=await runtime.detail(id);renderDetail();return selected;}catch(error){console.warn('[ApprovalRequest detail]',error);toast('No se pudo cargar la inspección');return null;}finally{setBusy(false);}}
+  function closeDetail(){selected=null;const shell=$('kar-detail');if(shell)shell.hidden=true;}
+  async function decide(id,decision){if(busy||!canReview())return false;const note=$('kar-detail-note')?.value||null;setBusy(true);try{await runtime.review(id,decision,note);toast(decision==='approved'?'Solicitud aprobada':'Solicitud rechazada');closeDetail();await refresh();return true;}catch(error){console.warn('[ApprovalRequest review]',error);toast(String(error?.message||error).includes('CANNOT_REVIEW_OWN_REQUEST')?'No puedes aprobar tu propia solicitud':'No se pudo guardar la decisión');return false;}finally{setBusy(false);}}
+  async function open(){if(!allowed())throw new Error('APPROVAL_VIEW_DENIED');ensureDom();opened=true;$('kelo-approval-request').style.display='block';await runtime.markRead();await refresh();return true;}
+  function close(){closeDetail();opened=false;const panel=$('kelo-approval-request');if(panel)panel.style.display='none';}
 
-  async function refresh(){
-    if(!allowed())throw new Error('APPROVAL_VIEW_DENIED');
-    setBusy(true);
-    try{rows=await runtime.list({status,limit:150})||[];render();return rows;}
-    catch(error){console.warn('[ApprovalRequest refresh]',error);toast('No se pudo cargar ApprovalRequest');throw error;}
-    finally{setBusy(false);}
-  }
-
-  async function decide(id,decision){
-    if(busy||!canReview())return false;
-    const note=$('kar-list')?.querySelector(`[data-note="${CSS.escape(String(id))}"]`)?.value||null;
-    setBusy(true);
-    try{await runtime.review(id,decision,note);toast(decision==='approved'?'Solicitud aprobada':'Solicitud rechazada');await refresh();return true;}
-    catch(error){console.warn('[ApprovalRequest review]',error);toast(String(error?.message||error).includes('CANNOT_REVIEW_OWN_REQUEST')?'No puedes aprobar tu propia solicitud':'No se pudo guardar la decisión');return false;}
-    finally{setBusy(false);}
-  }
-
-  async function open(){
-    if(!allowed())throw new Error('APPROVAL_VIEW_DENIED');
-    ensureDom();opened=true;$('kelo-approval-request').style.display='block';
-    await runtime.markRead();
-    await refresh();
-    return true;
-  }
-  function close(){opened=false;const panel=$('kelo-approval-request');if(panel)panel.style.display='none';}
-
-  const api=Object.freeze({version:VERSION,open,close,refresh,get opened(){return opened;}});
-  root.KeloApprovalRequestPanel=api;
-  return api;
+  const api=Object.freeze({version:VERSION,open,close,refresh,inspect:openDetail,get opened(){return opened;}});root.KeloApprovalRequestPanel=api;return api;
 }
