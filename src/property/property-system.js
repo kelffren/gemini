@@ -13,9 +13,7 @@
   const STORAGE='kelo_property_state_v1';
   const SCHEMA=1;
   const COLLISION_OWNER='property:placements';
-  const images=new Map();
-  const readyAssets=new Set();
-  const listeners=new Set();
+  const images=new Map(),readyAssets=new Set(),loadingAssets=new Set(),listeners=new Set();
   let remoteAdapter=null,seq=1;
   const playerId=()=>String(window.keloNet?.playerKey||window.localPlayer?.id||'local_pioneer');
   const clone=v=>JSON.parse(JSON.stringify(v));
@@ -121,7 +119,7 @@
 
   function drawTemplate(g,t,rec,phase){
     const q=((rec.rotation%4)+4)%4,s=normalizeScale(rec.scale),d=rotatedSize(t,q,s);let drew=false;g.save();g.translate(rec.x+d.w/2,rec.y+d.h/2);g.rotate(q*Math.PI/2);g.scale(s,s);g.translate(-t.width/2,-t.height/2);
-    for(const part of t.parts){if(part.phase!==phase)continue;const img=images.get(part.assetKey);if(!img||!readyAssets.has(part.assetKey))continue;const a=g.globalAlpha;g.globalAlpha=a*part.opacity;g.drawImage(img,part.source.x,part.source.y,part.source.w,part.source.h,part.offset.x,part.offset.y,part.size.w,part.size.h);g.globalAlpha=a;drew=true;}
+    for(const part of t.parts){if(part.phase!==phase)continue;const img=images.get(part.assetKey);if(!img||!readyAssets.has(part.assetKey)){acquire(part.assetKey);continue;}const a=g.globalAlpha;g.globalAlpha=a*part.opacity;g.drawImage(img,part.source.x,part.source.y,part.source.w,part.source.h,part.offset.x,part.offset.y,part.size.w,part.size.h);g.globalAlpha=a;drew=true;}
     g.restore();return drew;
   }
   function drawPlacements(g,rows,phase='props_back'){
@@ -132,10 +130,8 @@
   L.register({id:'property-placements-back',phase:'props_back',priority:35,required:false,ready:()=>true,draw:g=>drawPhase(g,'props_back'),ownership:'property-placement-system-v1',bounds});
   L.register({id:'property-placements-front',phase:'props_front',priority:35,required:false,ready:()=>true,draw:g=>drawPhase(g,'props_front'),ownership:'property-placement-system-v1',bounds});
 
-  const assetKeys=new Set();C.list().forEach(t=>t.parts.forEach(p=>assetKeys.add(p.assetKey)));
   function announceAssetReady(key){try{window.dispatchEvent(new CustomEvent('kelo:property-render-assets-ready',{detail:{key}}));}catch(e){}}
-  function acquire(key){if(readyAssets.has(key))return;A.acquire(key).then(img=>{images.set(key,img);readyAssets.add(key);announceAssetReady(key);}).catch(err=>console.warn('[Kelo property] asset unavailable',key,err));}
-  assetKeys.forEach(acquire);C.onRegister(t=>t.parts.forEach(p=>{assetKeys.add(p.assetKey);acquire(p.assetKey);}));
+  function acquire(key){if(readyAssets.has(key)||loadingAssets.has(key))return;loadingAssets.add(key);A.acquire(key).then(img=>{images.set(key,img);readyAssets.add(key);loadingAssets.delete(key);announceAssetReady(key);}).catch(err=>console.warn('[Kelo property] asset unavailable',key,err));}
   syncColliders();
 
   function exportLayout(pid){return{contract:'kelo-property-layout-v1',parcel:clone(parcel(pid)),placements:state.placements.filter(p=>p.parcelId===pid).map(clone)};}
