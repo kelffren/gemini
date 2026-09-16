@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: QA / FOUNDATION / LEGACY CONTAINMENT
  * owner: Kelo Legacy Containment
- * keys: SELFTEST NEGATIVE TEST FITNESS LEGACY
+ * keys: SELFTEST NEGATIVE TEST FITNESS LEGACY MUTATIONS
  * purpose: prove the containment fitness function allows comment-only/shrink changes and rejects executable/authority growth
  * public-api: CLI only
  * consumes: legacy-containment-audit.mjs pure inspection/comparison exports
@@ -44,6 +44,24 @@ const criticalResult=compare(base,criticalWriter);
 assert(hasType(criticalResult,'new-critical-writer'),'NEW_CRITICAL_WRITER_MUST_FAIL');
 assert(criticalResult.newCriticalKeys.includes('localPlayer.hp'),'CRITICAL_KEY_MUST_BE_REPORTED');
 
+const nestedState=base+`STATE.inventory=[];\n`;
+const nestedStateResult=compare(base,nestedState);
+assert(hasType(nestedStateResult,'new-critical-writer'),'NESTED_STATE_WRITER_MUST_FAIL');
+assert(nestedStateResult.newCriticalKeys.includes('STATE.inventory'),'NESTED_STATE_KEY_MUST_BE_REPORTED');
+
+const nestedConfig=base+`CONFIG.speed=400;\n`;
+assert(compare(base,nestedConfig).newCriticalKeys.includes('CONFIG.speed'),'NESTED_CONFIG_KEY_MUST_BE_REPORTED');
+
+const obstacleMutation=base+`obstacles.push({x:1,y:1});\n`;
+const obstacleResult=compare(base,obstacleMutation);
+assert(hasType(obstacleResult,'new-critical-writer'),'OBSTACLE_MUTATOR_MUST_FAIL');
+assert(obstacleResult.newCriticalKeys.includes('obstacles.push()'),'OBSTACLE_MUTATOR_KEY_MUST_BE_REPORTED');
+
+const stateArrayMutation=base+`STATE.inventory.push({id:'x'});\n`;
+const stateArrayResult=compare(base,stateArrayMutation);
+assert(hasType(stateArrayResult,'new-critical-writer'),'STATE_MUTATOR_MUST_FAIL');
+assert(stateArrayResult.newCriticalKeys.includes('STATE.inventory.push()'),'STATE_MUTATOR_KEY_MUST_BE_REPORTED');
+
 const timerGrowth=base+`setInterval(()=>{},1000);\n`;
 assert(hasMetric(compare(base,timerGrowth),'intervals'),'INTERVAL_GROWTH_MUST_FAIL');
 
@@ -59,6 +77,10 @@ assert(hasMetric(domResult,'domMutations'),'DOM_RESPONSIBILITY_GROWTH_MUST_FAIL'
 
 console.log(JSON.stringify({
   ok:true,
-  cases:['comment-only-pass','shrink-pass','executable-block','global-writer-block','critical-writer-block','timer-block','listener-block','storage-block','dom-block']
+  cases:[
+    'comment-only-pass','shrink-pass','executable-block','global-writer-block','critical-writer-block',
+    'nested-state-block','nested-config-block','obstacles-mutator-block','state-mutator-block',
+    'timer-block','listener-block','storage-block','dom-block'
+  ]
 },null,2));
 console.log('LEGACY_CONTAINMENT_SELFTEST_PASS');
