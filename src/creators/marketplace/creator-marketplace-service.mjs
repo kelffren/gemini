@@ -31,12 +31,16 @@ export function createCreatorMarketplaceService({contentSession,contentRepositor
   async function dashboard(){
     if(!authenticated())return F({authenticated:false,characters:F([]),wallets:F([]),listings:F([]),published:F([]),profile:null});
     await fresh();
-    const [characters,content,listings,profileRow]=await Promise.all([
-      contentRepository.listMyCharacters(),contentRepository.listMyContent(),contentRepository.listMyCreatorMarketListings(),contentRepository.getCreatorProfile(null)
+    const [characters,content,definitions,listings,profileRow]=await Promise.all([
+      contentRepository.listMyCharacters(),contentRepository.listMyContent(),contentRepository.listMyDefinitions(),contentRepository.listMyCreatorMarketListings(),contentRepository.getCreatorProfile(null)
     ]);
+    const definitionById=new Map(arr(definitions).map(row=>[text(row.id),row]));
     const revisions=arr(content).map(row=>row.id).filter(Boolean),publications=await contentRepository.listActivePublicationsForRevisions(revisions),publicationByRevision=new Map(arr(publications).map(row=>[text(row.revision_id),row]));
     const listingByRevision=new Map(arr(listings).filter(row=>row.status==='active').map(row=>[text(row.revision_id),row]));
-    const published=arr(content).map(row=>{const publication=publicationByRevision.get(text(row.id));if(!publication)return null;return F({revisionId:text(row.id),contentId:text(row.content_id),revision:Number(row.revision)||1,publication:F({...publication}),listing:listingByRevision.get(text(row.id))||null,payload:F({...row.payload})});}).filter(Boolean);
+    const published=arr(content).map(row=>{
+      const publication=publicationByRevision.get(text(row.id));if(!publication)return null;const definition=definitionById.get(text(row.definition_id))||{};
+      return F({revisionId:text(row.id),definitionId:text(row.definition_id),contentId:text(row.content_id),contentType:text(definition.content_type||'generic'),displayName:text(definition.display_name||row.content_id),tags:F(arr(definition.tags).map(String)),revision:Number(row.revision)||1,publication:F({...publication}),listing:listingByRevision.get(text(row.id))||null,payload:F({...row.payload})});
+    }).filter(Boolean);
     const wallets=[];for(const character of arr(characters)){const wallet=await contentRepository.getCharacterWallet(character.id,'kc');wallets.push(F({characterId:text(character.id),characterName:text(character.name),kc:Number(wallet?.amount)||0,revision:Number(wallet?.revision)||0}));}
     return F({authenticated:true,characters:F(arr(characters).map(x=>F({...x}))),wallets:F(wallets),listings:F(arr(listings).map(x=>F({...x}))),published:F(published),profile:profileRow||null});
   }
@@ -52,5 +56,5 @@ export function createCreatorMarketplaceService({contentSession,contentRepositor
     return F({correlationId,...result});
   }
   async function owned(){if(!authenticated())return F([]);await fresh();const rows=await contentRepository.listMyCreatorEntitlements();return F(arr(rows).map(row=>F({...row})));}
-  return F({version:'kelo-creator-marketplace-service-v1.0.0',authenticated,discover,profile,saveProfile,dashboard,createListing,cancelListing,purchase,owned});
+  return F({version:'kelo-creator-marketplace-service-v1.0.1',authenticated,discover,profile,saveProfile,dashboard,createListing,cancelListing,purchase,owned});
 }
