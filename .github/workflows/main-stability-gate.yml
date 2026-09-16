@@ -54,6 +54,9 @@ jobs:
       - name: Performance no-regression contract
         run: npm run audit:performance
 
+      - name: Biblioteca 10k catalog budget
+        run: node scripts/audit-asset-catalog-10k.mjs
+
       - name: Online foundation contract
         run: npm run audit:online-foundation
 
