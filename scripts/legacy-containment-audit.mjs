@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: QA / FOUNDATION / LEGACY CONTAINMENT
  * owner: Kelo Legacy Containment
- * keys: LEGACY ENGINE-A ENGINE-C FITNESS MONOTONIC GLOBALS WRITERS TIMERS
+ * keys: LEGACY ENGINE-A ENGINE-C FITNESS MONOTONIC GLOBALS WRITERS MUTATIONS TIMERS
  * purpose: prevent legacy engines from gaining executable surface, global authority or new side-effect responsibilities
  * public-api: CLI + inspectLegacySource/compareLegacyMetrics for deterministic self-tests
  * consumes: git history + engine-a.js + engine-c.js
@@ -20,11 +20,9 @@ const TARGETS=['engine-a.js','engine-c.js'];
 const ZERO_SHA=/^0+$/;
 const SHA=/^[0-9a-f]{7,40}$/i;
 const OUT_DIR=path.join(ROOT,'artifacts','legacy-containment');
-const CRITICAL_KEYS=[
-  'localPlayer.x','localPlayer.y','localPlayer.hp','localPlayer.maxHp',
-  'camera.x','camera.y','camera.targetX','camera.targetY',
-  'obstacles','STATE','CONFIG','render','renderAvatar','updateSimulation','processInput','updateMovement'
-];
+const CRITICAL_ROOTS=['localPlayer','camera','STATE','CONFIG'];
+const CORE_ASSIGNMENTS=['render','renderAvatar','updateSimulation','processInput','updateMovement'];
+const MUTATOR_METHODS=['push','splice','pop','shift','unshift','sort','reverse','copyWithin','fill','set','delete','clear','add'];
 export const LEGACY_MONOTONIC_METRICS=Object.freeze([
   'semanticBytes','topLevelDeclarations','explicitGlobalWrites','criticalWriteCount',
   'eventListeners','intervals','timeouts','rafCalls','localStorageWrites','domMutations'
@@ -54,6 +52,13 @@ function sourceAt(ref,file){
 function count(re,text){return [...text.matchAll(re)].length;}
 function uniq(values){return [...new Set(values)].sort();}
 function esc(value){return value.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');}
+function bump(target,key,n=1){target[key]=(target[key]||0)+n;}
+function firstPathKey(root,path=''){
+  const dot=path.match(/\.\s*([A-Za-z_$][\w$]*)/);
+  if(dot)return `${root}.${dot[1]}`;
+  if(path.trim().startsWith('['))return `${root}[]`;
+  return root;
+}
 
 // Removes comments and insignificant whitespace while preserving strings/template literals.
 // This lets documentation/comments grow without giving executable legacy code a larger budget.
@@ -88,15 +93,30 @@ function topLevelDeclarations(text){
   }
   return uniq(names);
 }
-function assignmentCount(text,key){
-  const dotted=key.split('.').map(esc).join('\\s*\\.\\s*');
-  const re=new RegExp(`\\b${dotted}\\s*(?:=|\\+=|-=|\\*=|/=|\\+\\+|--)`,'g');
-  return count(re,text);
+function detectCriticalWrites(text){
+  const writes={};
+  const op='(?:=|\\+=|-=|\\*=|/=|\\+\\+|--)';
+  const path='((?:\\s*\\.\\s*[A-Za-z_$][\\w$]*|\\s*\\[[^\\]]+\\])*)';
+  for(const root of CRITICAL_ROOTS){
+    const assignment=new RegExp(`\\b${esc(root)}${path}\\s*${op}`,'g');
+    for(const m of text.matchAll(assignment))bump(writes,firstPathKey(root,m[1]));
+    const mutation=new RegExp(`\\b${esc(root)}${path}\\s*\\.\\s*(${MUTATOR_METHODS.join('|')})\\s*\\(`,'g');
+    for(const m of text.matchAll(mutation))bump(writes,`${firstPathKey(root,m[1])}.${m[2]}()`);
+  }
+  const obstaclesMutator=new RegExp(`\\bobstacles\\s*\\.\\s*(${MUTATOR_METHODS.join('|')})\\s*\\(`,'g');
+  for(const m of text.matchAll(obstaclesMutator))bump(writes,`obstacles.${m[1]}()`);
+  const obstaclesIndex=new RegExp(`\\bobstacles\\s*\\[[^\\]]+\\]\\s*${op}`,'g');
+  for(const _ of text.matchAll(obstaclesIndex))bump(writes,'obstacles[]');
+  for(const key of CORE_ASSIGNMENTS){
+    const re=new RegExp(`\\b${esc(key)}\\s*${op}`,'g');
+    const n=count(re,text);if(n)bump(writes,key,n);
+  }
+  return Object.fromEntries(Object.entries(writes).sort(([a],[b])=>a.localeCompare(b)));
 }
 export function inspectLegacySource(text){
   const semantic=legacySemanticSource(text);
   const globalWriteNames=uniq([...text.matchAll(/\b(?:window|globalThis|root)\.([A-Za-z_$][\w$]*)\s*=/g)].map(m=>m[1]));
-  const criticalWrites=Object.fromEntries(CRITICAL_KEYS.map(key=>[key,assignmentCount(text,key)]).filter(([,n])=>n>0));
+  const criticalWrites=detectCriticalWrites(text);
   const criticalWriteCount=Object.values(criticalWrites).reduce((a,b)=>a+b,0);
   const declarations=topLevelDeclarations(text);
   return {
@@ -132,7 +152,7 @@ export function compareLegacyMetrics(before,after,file='synthetic.js'){
 export function runLegacyContainmentAudit(){
   const base=resolveBase();
   if(!base)throw new Error('LEGACY_CONTAINMENT_NO_BASE: provide KELO_LEGACY_BASE_SHA or --base=<sha>');
-  const report={version:1,base,head:git(['rev-parse','HEAD']).trim(),targets:{},violations:[]};
+  const report={version:2,base,head:git(['rev-parse','HEAD']).trim(),targets:{},violations:[]};
   for(const file of TARGETS){
     const currentPath=path.join(ROOT,file);
     if(!fs.existsSync(currentPath))throw new Error(`LEGACY_CONTAINMENT_TARGET_MISSING:${file}`);
