@@ -1,6 +1,6 @@
 # Community Asset Streaming — Kelo World
 
-**Estado:** CLIENT/RUNTIME LIVE PREPARED · REMOTE STORAGE PENDING
+**Estado:** CLIENT/RUNTIME LIVE PREPARED · REMOTE AUTO-PUBLISH PENDING DEPLOY
 **Owner:** Kelo Community Asset Pipeline
 **Fecha:** 2026-09-16
 
@@ -53,11 +53,11 @@ Bloqueados para auto-publicación:
 - JavaScript
 - cualquier MIME desconocido/no permitido
 
-Gates iniciales:
+Gates iniciales, alineados con `asset_revisions`/Storage existente:
 
-- máximo 8 MiB;
-- máximo 4096x4096;
-- máximo 16,777,216 píxeles;
+- máximo 5 MiB;
+- máximo 2048x2048;
+- máximo 4,194,304 píxeles;
 - decodificación de imagen obligatoria;
 - SHA-256 cuando Web Crypto está disponible;
 - metadata acotada y normalizada.
@@ -139,9 +139,18 @@ kelo:community-player-left
 
 Esto quita el pin de memoria; el GC puede liberar después el object URL.
 
-## Backend/Storage — pendiente real
+## Backend/Storage
 
-GitHub Pages no puede ser el storage de uploads comunitarios dinámicos.
+El repo ya contiene la foundation de Supabase para creators:
+
+- `public.asset_families`
+- `public.asset_revisions`
+- `public.asset_review_requests`
+- `public.asset_publications`
+- bucket privado `creator-private`
+- bucket público `creator-global`
+
+GitHub Pages nunca debe recibir uploads comunitarios dinámicos. El flujo nuevo debe reutilizar esa foundation y mover automáticamente los raster seguros desde cuarentena/privado a publicación pública mediante autoridad de servidor/Edge Function; no crear otro catálogo paralelo.
 
 `community-asset-publisher.mjs` usa un contrato de transporte explícito:
 
@@ -159,7 +168,7 @@ window.KELO_COMMUNITY_ASSET_TRANSPORT = {
 };
 ```
 
-Hasta que exista un storage/API configurado, `creator-publish.html` valida y previsualiza, pero informa claramente que el backend comunitario no está conectado. No debe fingir publicación multi-dispositivo.
+Hasta que la función remota esté desplegada/conectada, `creator-publish.html` valida y previsualiza, pero informa claramente que el backend comunitario no está conectado. No debe fingir publicación multi-dispositivo.
 
 ## Integración server AOI
 
@@ -187,4 +196,4 @@ Preferencia de red:
 
 ## Próximo gate para LIVE multiusuario
 
-Conectar almacenamiento remoto + catálogo persistente + autenticación/ownership. Después conectar IDs equipados al estado AOI del servidor y al owner de avatar/render existente.
+Desplegar/conectar el transporte Supabase de auto-publicación sobre la foundation existente y luego conectar IDs equipados al estado AOI del servidor y al owner de avatar/render existente.
