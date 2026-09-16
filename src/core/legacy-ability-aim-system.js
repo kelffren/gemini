@@ -1,23 +1,23 @@
 /* KELO-INDEX
  * area: CORE / LEGACY ABILITY COMPAT
  * owner: KeloAbilityAim
- * keys: ABILITY AIM DASH RANGE POINTER COMPATIBILITY LEGACY STRANGLER
+ * keys: ABILITY AIM DASH RANGE POINTER RENDER COMPATIBILITY LEGACY STRANGLER
  * purpose: concentra en un único owner la matemática final y los overrides de aim que antes se repartían entre engine-j/engine-k, sin cambiar rangos, cooldowns ni feel
  * public-api: KeloAbilityAim.maxRange/minRatio/measuredRange/powerFromButtonDistance/snapshot
- * consumes: legacy skillAim/aim/STATE/localPlayer/camera/dashTween + helpers definidos por engine-g
+ * consumes: legacy skillAim/aim/STATE/localPlayer/camera/dashTween + helpers definidos por engine-g + KeloRender
  * state-owned: ninguna autoridad gameplay nueva; adapta skillAim legacy y expone matemática pura reutilizable
  * extension-points: reemplazar consumidores legacy por la API pura hasta retirar el adapter
  * legacy: strangler temporal para engine-g; no añadir abilities nuevas aquí
- * do-not: NO segundo ability engine, NO segundo pointermove listener, NO nuevos números de balance
+ * do-not: NO segundo ability engine, NO segundo pointermove listener, NO nuevos números de balance, NO globals implícitos
  */
 (function(root,factory){
 'use strict';
 const api=factory();
 if(typeof module==='object'&&module.exports)module.exports=api;
 if(!root||!root.document)return;
-root.KeloAbilityAim=api;
 
 if(typeof skillAim==='undefined'||typeof aim==='undefined')throw new Error('legacy skill aim unavailable before KeloAbilityAim');
+if(!root.KeloRender||typeof root.KeloRender.afterFrame!=='function')throw new Error('KeloRender unavailable before KeloAbilityAim');
 
 skillAim.power=1;
 skillAim.castRange=160;
@@ -29,8 +29,9 @@ function slotCenter(el){
   return{x:r.left+r.width/2,y:r.top+r.height/2};
 }
 
-skillRange=function(typeId){return api.maxRange(typeId);};
-measuredRange=function(typeId,power){return api.measuredRange(typeId,power);};
+function skillRangeCompat(typeId){return api.maxRange(typeId);}
+root.skillRange=skillRangeCompat;
+root.measuredRange=api.measuredRange;
 
 function updateAimFromButton(x,y){
   const dx=x-skillAim.slotX;
@@ -49,13 +50,14 @@ function updateAimFromButton(x,y){
   skillAim.castRange=api.measuredRange(skillAim.typeId,Math.max(api.minimumPointerPower,p));
 }
 
-beginSkillAim=function(index,e){
+function beginSkillAimCompat(index,e){
   const stone=STATE.equipped[index];
   if(!stone||stone.currentCd>0)return;
   if(!isAimSkill(stone.typeId)){triggerStone(index);return;}
   e.preventDefault();
   e.stopPropagation();
   const el=e.currentTarget||document.getElementById('action-slot-'+index);
+  if(!el)return;
   const c=slotCenter(el);
   try{el.setPointerCapture(e.pointerId);}catch(_){}
   skillAim.active=true;
@@ -73,11 +75,13 @@ beginSkillAim=function(index,e){
   skillAim.power=api.initialPower;
   skillAim.castRange=api.measuredRange(stone.typeId,skillAim.power);
   updateAimFromButton(e.clientX,e.clientY);
-};
+}
+root.beginSkillAim=beginSkillAimCompat;
 
-updateAimFromPointer=function(x,y){updateAimFromButton(x,y);};
+function updateAimFromPointerCompat(x,y){updateAimFromButton(x,y);}
+root.updateAimFromPointer=updateAimFromPointerCompat;
 
-castAimedSkill=function(index,typeId,dirX,dirY){
+function castAimedSkillCompat(index,typeId,dirX,dirY){
   const stone=STATE.equipped[index];
   if(!stone||stone.currentCd>0)return;
   const range=skillAim.castRange||api.measuredRange(typeId,skillAim.power||1);
@@ -113,9 +117,10 @@ castAimedSkill=function(index,typeId,dirX,dirY){
     for(let i=0;i<24;i++)spawnParticle(tx+(Math.random()-0.5)*80,ty+(Math.random()-0.5)*80,stone.color,20,0.8);
     if(isPvPActive&&arenaPvP.rival&&Math.hypot(tx-arenaPvP.rival.x,ty-arenaPvP.rival.y)<90)applyPvPDamage(arenaPvP.rival,stone.dmg);
   }
-};
+}
+root.castAimedSkill=castAimedSkillCompat;
 
-drawSkillIndicator=function(){
+function drawSkillIndicatorCompat(){
   if(!skillAim.active)return;
   const z=CONFIG.zoom||1;
   const maxR=api.maxRange(skillAim.typeId)||170;
@@ -182,10 +187,16 @@ drawSkillIndicator=function(){
   ctx.textAlign='center';
   ctx.fillText('skill',skillAim.currentX,skillAim.currentY+4);
   ctx.restore();
-};
+}
+root.drawSkillIndicator=drawSkillIndicatorCompat;
+
+const renderSnapshot=root.KeloRender.snapshot();
+const staleHook=Array.isArray(renderSnapshot.afterFrame)?renderSnapshot.afterFrame.find(function(h){return h.owner==='engine-g:skill-indicator';}):null;
+if(staleHook)root.KeloRender.unregister(staleHook.id);
+const renderHookId=root.KeloRender.afterFrame('KeloAbilityAim:skill-indicator',drawSkillIndicatorCompat,20);
 
 root.KeloAbilityAim=Object.freeze(Object.assign({},api,{
-  snapshot:function(){return Object.freeze({version:api.version,active:!!skillAim.active,typeId:skillAim.typeId||'',power:Number(skillAim.power)||0,castRange:Number(skillAim.castRange)||0,pointerId:skillAim.pointerId??null});}
+  snapshot:function(){return Object.freeze({version:api.version,active:!!skillAim.active,typeId:skillAim.typeId||'',power:Number(skillAim.power)||0,castRange:Number(skillAim.castRange)||0,pointerId:skillAim.pointerId??null,renderHookId:renderHookId,legacyRenderHookRetired:!!staleHook});}
 }));
 })(typeof globalThis!=='undefined'?globalThis:this,function(){
 'use strict';
