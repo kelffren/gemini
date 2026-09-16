@@ -17,7 +17,7 @@ const spriteAi=createSpriteAiService();
 const gameTuning=createGameTuningPublisher();
 const handlers=[createSpriteAiHttpHandler({service:spriteAi,identity}),createGameTuningHttpHandler({publisher:gameTuning,identity})];
 const spriteAiStatus=spriteAi.status(),tuningStatus=gameTuning.audit();
-console.log(`[Sprite AI] HTTP ready · provider ${spriteAiStatus.provider} · model ${spriteAiStatus.model} · ${spriteAiStatus.configured?'configured':'key-missing'}`);
+console.log(`[Sprite AI] HTTP ready · provider ${spriteAiStatus.provider} · ${spriteAiStatus.model||spriteAiStatus.space||'unconfigured'} · ${spriteAiStatus.configured?'configured':'not-configured'} · paid-fallback ${spriteAiStatus.allowPaidFallback?'enabled':'disabled'}`);
 console.log(`[Game Tuning] HTTP ready · ${tuningStatus.repository}@${tuningStatus.branch} · ${tuningStatus.configured?'publish-ready':'publish-key-missing'}`);
 const nativeCreateServer=http.createServer;
 http.createServer=function patchedCreateServer(...args){
