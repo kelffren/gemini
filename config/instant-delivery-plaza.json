@@ -1,13 +1,19 @@
 {
   "schema": "kelo-instant-delivery-plan-v1",
   "id": "plaza-first-playable-v1",
-  "notes": "SOURCE remains canonical. Sparse PNG keeps logical dimensions/source coordinates and only removes pixels outside declared runtime coverage. Codec candidates are laboratory outputs until device proof permits promotion.",
+  "notes": "SOURCE remains canonical. Sparse PNG keeps logical dimensions/source coordinates and only removes pixels outside declared runtime coverage. Promoted DELIVERY entries are exact byte contracts consumed by Weightless ratchets; codec candidates remain laboratory outputs until device proof permits promotion.",
   "assets": [
     {
       "id": "plazaNature",
       "mode": "sparse-png",
       "source": "assets/Arboleskelo1.PNG",
       "outputBase": "plaza-nature-runtime-core",
+      "delivery": {
+        "path": "assets/pn-233db909.png",
+        "bytes": 1283924,
+        "sha256": "233db909c040229470a2aea2bb98d29f9a79c45b89f3996df0799dd92afee8a1",
+        "exact": true
+      },
       "allowedFrameIds": ["tree_large", "tree_pink", "tree_medium", "tree_cypress", "tree_small"],
       "keepRects": [
         {"id":"tree_large","x":7,"y":25,"w":438,"h":527},
