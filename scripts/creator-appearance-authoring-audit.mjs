@@ -2,18 +2,22 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import {createRequire} from 'node:module';
-import {fileURLToPath} from 'node:url';
+import {fileURLToPath,pathToFileURL} from 'node:url';
 
 const here=path.dirname(fileURLToPath(import.meta.url));
 const root=path.resolve(here,'..');
 const require=createRequire(import.meta.url);
 const contract=require(path.join(root,'src/characters/creator-character-visual-contract.js'));
+const chamberModule=await import(pathToFileURL(path.join(root,'src/creators/appearance/creator-character-test-chamber.mjs')).href);
+const {CHARACTER_TEST_STATES,resolveCharacterTestTrack}=chamberModule;
 
 assert.equal(contract.version,'creator-character-visual-contract-v2.0.0');
+assert.deepEqual(CHARACTER_TEST_STATES.map(row=>row.id),['idle','walk','run','attack','hit','death']);
 
 const canonicalRow={
   id:'appearance.character.test_sheet',displayName:'Test Sheet',targetType:'character',slotId:'torso',rarity:'rare',
   transforms:{default:{x:1,y:-2,scaleX:1,scaleY:1,rotation:3},left:{x:-7,y:4,scaleX:1.2,scaleY:1.2,rotation:-9}},
+  animationMapping:{attack:{frames:[0,2,3],frameMs:90,loop:false}},
   metadata:{characterVisual:{mode:'auto',layer:'front',columns:4,rows:4,heightScale:1,anchor:{x:.5,y:1}}}
 };
 const canonical=contract.compileRow({row:canonicalRow,source:'asset.png',asset:{pixelWidth:512,pixelHeight:768}});
@@ -54,11 +58,29 @@ const a=contract.presentationFingerprint(canonical),b=contract.presentationFinge
 assert.equal(a,b,'same authoring descriptor must keep stable presentation fingerprint');
 assert.notEqual(a,contract.presentationFingerprint(weapon),'different visual descriptors must not share fingerprint');
 
+const walkTrack=resolveCharacterTestTrack({row:{animationMapping:{}},state:'walk',columns:4});
+assert.deepEqual([...walkTrack.frames],[0,1,2,3]);
+assert.equal(walkTrack.loop,true);
+assert.equal(walkTrack.authored,false);
+assert.equal(walkTrack.source,'runtime-generic-stride');
+const attackTrack=resolveCharacterTestTrack({row:canonicalRow,state:'attack',columns:4});
+assert.deepEqual([...attackTrack.frames],[0,2,3]);
+assert.equal(attackTrack.frameMs,90);
+assert.equal(attackTrack.loop,false);
+assert.equal(attackTrack.authored,true);
+assert.equal(attackTrack.source,'animationMapping.attack');
+const deathFallback=resolveCharacterTestTrack({row:{animationMapping:{}},state:'death',columns:4});
+assert.deepEqual([...deathFallback.frames],[0]);
+assert.equal(deathFallback.loop,false);
+assert.equal(deathFallback.fallback,true);
+
 const files={
   feature:fs.readFileSync(path.join(root,'src/core/feature-registry.js'),'utf8'),
   bridge:fs.readFileSync(path.join(root,'src/characters/creator-character-state-bridge.js'),'utf8'),
+  runtime:fs.readFileSync(path.join(root,'src/characters/character-appearance.js'),'utf8'),
   creator:fs.readFileSync(path.join(root,'src/creators/ui/appearance-creator.mjs'),'utf8'),
-  preview:fs.readFileSync(path.join(root,'src/creators/appearance/creator-appearance-preview.mjs'),'utf8')
+  preview:fs.readFileSync(path.join(root,'src/creators/appearance/creator-appearance-preview.mjs'),'utf8'),
+  chamber:fs.readFileSync(path.join(root,'src/creators/appearance/creator-character-test-chamber.mjs'),'utf8')
 };
 const contractIndex=files.feature.indexOf('creator-character-visual-contract.js');
 const bridgeIndex=files.feature.indexOf('creator-character-state-bridge.js');
@@ -68,24 +90,37 @@ assert.match(files.bridge,/C\.buildDescriptor/);
 assert.doesNotMatch(files.bridge,/function\s+rawSheet\s*\(/);
 assert.doesNotMatch(files.bridge,/function\s+rawSocket\s*\(/);
 assert.doesNotMatch(files.bridge,/function\s+inferredSheet\s*\(/);
+assert.match(files.runtime,/motion\.frame != null/,'live Character renderer must honor explicit visual motion frame');
 assert.match(files.creator,/IMPORT PREVIEW IMAGE/);
 assert.match(files.creator,/COPY RUNTIME PAYLOAD/);
 assert.match(files.creator,/FACES=.*down.*left.*right.*up/);
+assert.match(files.creator,/CHARACTER TEST CHAMBER/);
+assert.match(files.creator,/createCreatorCharacterTestChamber/);
 assert.match(files.creator,/metadata\.characterVisual/);
 assert.doesNotMatch(files.creator,/setInterval\s*\(/);
 assert.doesNotMatch(files.creator,/requestAnimationFrame\s*\(/);
 assert.match(files.preview,/KeloCreatorCharacterVisualContract/);
+assert.match(files.preview,/actor\?\._visualMotion\?\.frame/);
 assert.match(files.preview,/imageSmoothingEnabled=false/);
 assert.doesNotMatch(files.preview,/setInterval\s*\(/);
 assert.doesNotMatch(files.preview,/requestAnimationFrame\s*\(/);
 assert.doesNotMatch(files.preview,/localStorage|indexedDB/);
+assert.match(files.chamber,/\['idle','walk','run','attack','hit','death'\]/);
+assert.match(files.chamber,/requestAnimationFrame/);
+assert.match(files.chamber,/cancelAnimationFrame/);
+assert.doesNotMatch(files.chamber,/setInterval\s*\(/);
+assert.doesNotMatch(files.chamber,/localStorage|indexedDB/);
+assert.doesNotMatch(files.chamber,/localPlayer|simulatedPlayers|KeloPvPWorld|KeloEquipment/);
 
 console.log('PASS creator appearance authoring audit',{
   contract:contract.version,
   canonicalMode:canonical.validation.mode,
   weaponMode:weapon.validation.mode,
   fingerprint:a,
+  testStates:CHARACTER_TEST_STATES.map(row=>row.id),
+  mappedAttack:[...attackTrack.frames],
+  walkFallback:[...walkTrack.frames],
   sameContractEditorRuntime:true,
-  polling:false,
+  singlePreviewMotionLoopOwner:'CreatorCharacterTestChamber',
   gameplayAuthority:false
 });
