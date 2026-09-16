@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: QA / LEGACY ABILITY POINTER LIFECYCLE
  * owner: Evergreen migration contract
- * purpose: impide que engine-g recupere aim/listeners/render y exige lifecycle desmontable propiedad de KeloAbilityAim
+ * purpose: impide que engine-g recupere aim/listeners/render y exige lifecycle/cast registry propiedad de KeloAbilityAim
  */
 const fs=require('node:fs');
 const assert=require('node:assert/strict');
@@ -24,10 +24,11 @@ assert.ok(legacy.includes("slot.addEventListener('pointerdown'"),'action slots m
 assert.ok(legacy.includes("typeof owner.begin === 'function'"),'action slots must delegate pointerdown to KeloAbilityAim.begin');
 assert.ok(owner.includes('setPointerCapture(e.pointerId)'),'aim owner must preserve pointer capture for touch drag continuity');
 assert.ok(owner.includes('root.endSkillAim=endSkillAimCompat'),'KeloAbilityAim must own endSkillAim compatibility');
-assert.ok(owner.includes('const cast=root.castAimedSkill;'),'end lifecycle must preserve the downstream engine-l cast decorator until its own migration');
+assert.ok(owner.includes('function registerCastMiddleware(owner,fn)'),'KeloAbilityAim must own the cast middleware registry');
+assert.ok(owner.includes('root.castAimedSkill=dispatchCast'),'legacy global cast compatibility must point to the single dispatcher');
 assert.ok(owner.includes("const lifecycleKey='__KELO_ABILITY_AIM_POINTER_LIFECYCLE__'"),'pointer lifecycle singleton key missing');
 assert.ok(owner.includes("version:'kelo-ability-pointer-lifecycle-v1.1.0'"),'pointer lifecycle version missing');
-assert.ok(owner.includes("const VERSION='kelo-ability-aim-v1.2.0-lifecycle-owner'"),'ability aim lifecycle-owner version missing');
+assert.ok(owner.includes("const VERSION='kelo-ability-aim-v1.3.0-cast-middleware-owner'"),'ability aim cast-middleware owner version missing');
 assert.ok(owner.includes('previousLifecycle.detach()'),'hot reload/re-evaluation must detach the previous lifecycle before attaching another');
 
 console.log('LEGACY ABILITY POINTER LIFECYCLE PASS');
