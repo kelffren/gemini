@@ -31,7 +31,7 @@ Per protected legacy file the audit measures:
 - semantic/executable bytes after removing comments and insignificant whitespace;
 - top-level declaration count;
 - explicit writes through `window.*`, `globalThis.*` or `root.*`;
-- writes to critical legacy authority keys such as player position/HP, camera, obstacles, STATE/CONFIG and core loop functions;
+- writes/mutations to critical legacy authority roots such as player state, camera, `STATE`, `CONFIG`, `obstacles` and core loop functions;
 - event listeners;
 - `setInterval` and `setTimeout` calls;
 - `requestAnimationFrame` calls;
@@ -40,22 +40,24 @@ Per protected legacy file the audit measures:
 
 Comments and formatting may grow without consuming executable legacy budget.
 
-In addition to numeric non-growth, introducing a new explicit global writer name or a new critical authority key is an immediate failure even if another writer is removed in the same change.
+In addition to numeric non-growth, introducing a new explicit global writer name or a new critical authority key/mutator is an immediate failure even if another writer is removed in the same change. Examples explicitly covered include nested `STATE.*`/`CONFIG.*` writes, `STATE.*.push(...)`, and direct `obstacles.push(...)` mutation.
 
 ## Base selection
 
-CI provides `KELO_LEGACY_BASE_SHA`:
+The comparison source is deliberately derived from the code GitHub actually tests:
 
-- pull request: exact PR base SHA;
-- push to `main`: previous `main` SHA from the push event;
-- manual/local fallback: parent commit (`HEAD^`).
+- pull request: `HEAD^1`, the first parent of GitHub's synthetic PR merge commit. This remains exact even when `main` advances after the PR event payload was created;
+- push to `main`: previous `main` SHA supplied through `KELO_LEGACY_BASE_SHA` from the push event;
+- explicit diagnostic/local run: `--base=<sha>` overrides automatic selection;
+- final local fallback: parent commit (`HEAD^`).
 
-The auditor reads the previous version directly from Git history using `git show`; it never needs to mutate the working tree.
+The auditor reads the previous version directly from Git history using `git show`; it never needs to mutate the working tree. The JSON evidence records both `base` and `baseSource`.
 
 ## Flow
 
 ```text
 branch candidate
+  -> resolve exact tested base
   -> inspect engine-a.js / engine-c.js
   -> inspect same files at exact base SHA
   -> compute deterministic metrics
@@ -91,7 +93,7 @@ Do not rewrite `engine-a.js` wholesale. The containment gate makes every success
 
 ## Evidence
 
-The Main Stability Gate uploads `artifacts/legacy-containment/report.json` with the rest of its evidence. The report includes base/head SHAs, before/after metrics, deltas, newly introduced authority names and all violations.
+The Main Stability Gate uploads `artifacts/legacy-containment/report.json` with the rest of its evidence. The report includes base/head SHAs, base-selection source, before/after metrics, deltas, newly introduced authority names and all violations.
 
 ## Online-first
 
@@ -106,7 +108,9 @@ A valid implementation must prove:
 - adding executable legacy code fails;
 - adding a new explicit global writer fails;
 - adding a new critical writer fails;
+- nested state/config and direct obstacle mutations fail;
 - comments/formatting alone do not consume executable budget;
+- PR comparison uses the actual synthetic merge commit's first parent;
 - the contract runs inside Main Stability Gate before user-visible browser smoke.
 
 ## Remaining debt
