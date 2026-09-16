@@ -1,0 +1,72 @@
+name: Environment Creator Playwright
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/creators/definition/creator-test-bridge.mjs'
+      - 'src/creators/definition/environment-live-preview.mjs'
+      - 'src/environment/environment-runtime.mjs'
+      - 'src/environment/environment-world-sync.mjs'
+      - 'tests/environment-creator-functions.spec.js'
+      - 'tests/fixtures/environment-creator-playwright.html'
+      - '.github/workflows/environment-creator-playwright.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: environment-creator-playwright-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  playwright:
+    name: creator-environment-playwright
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CI: true
+      KELO_PAGES: http://127.0.0.1:4173/
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Install Chromium
+        run: npx playwright install chromium --with-deps
+
+      - name: Start repository server
+        run: |
+          mkdir -p test-results
+          python3 -m http.server 4173 --bind 127.0.0.1 > test-results/environment-playwright-http.log 2>&1 &
+          echo $! > /tmp/kelo-environment-playwright-http.pid
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:4173/tests/fixtures/environment-creator-playwright.html >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat test-results/environment-playwright-http.log
+          exit 1
+
+      - name: Run Environment Creator Playwright
+        run: npx playwright test tests/environment-creator-functions.spec.js --project=chromium
+
+      - name: Upload Playwright evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: environment-creator-playwright-evidence
+          path: |
+            playwright-report.json
+            test-results/
+          retention-days: 14
+          if-no-files-found: ignore
