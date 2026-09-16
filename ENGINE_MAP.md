@@ -31,13 +31,14 @@ Contrato LIVE/candidato (`index.html` V6.69):
 11. El presupuesto CI actual es **48/48 scripts externos antes de boot-ready** y **3/3 scripts externos estáticos después**. También se limita el peso fuente determinista: **421,784 / 425,000 bytes críticos** y **21,669 / 22,000 bytes post-boot estáticos**. Subir esos límites requiere evidencia y cambio explícito del contrato, no crecimiento accidental.
 12. Hay **9 módulos internos diferidos after-paint**; no deben volver al parser-blocking boot.
 13. `engine-i.js`, `engine-j.js` y `engine-k.js` están **RETIRED** y el audit exige cero referencias runtime/test a esos archivos.
-14. `KeloAbilityAim` sustituyó la cadena J/K: posee matemática de aim/range, lifecycle de puntero, indicador de render y registry explícito de cast middleware. No crear un segundo ability input/aim owner.
+14. `KeloAbilityAim` sustituyó la cadena J/K y posee el **lifecycle global de puntero legacy**, matemática de aim/range, indicador de render y registry explícito de cast middleware. No crear un segundo lifecycle global para consumidores legacy.
 15. `engine-l.js` registra `engine-l:plaza-cast-presentation` en el boot crítico. `engine-m.js` **no** pertenece al primer frame: entra por first-use del pack `world` y entonces registra `engine-m:skill-shots`.
 16. El smoke WebKit del branch verifica ambas fases de `world`: `engine-m` ausente en boot y presente tras `KELO_MODULE_LOADER.ensure('world')`.
 17. `engine-g.js` **ya no posee ni construye la action bar**. Mantiene únicamente estado compatibility + dash tween legacy caracterizado. La hotbar moderna y el adapter `renderActionBar` pertenecen a `KeloAbilities` después del first-use de `abilityRuntime`.
-18. El smoke WebKit verifica el handoff de abilities: no hay hotbar/`KeloAbilities` al boot; tras cargar `abilityRuntime` aparecen exactamente 5 slots modernos sin restaurar `action-slot-*` de `engine-g`.
-19. PvP solicita explícitamente `KeloRuntimeBootstrap.ensure() → KELO_MODULE_LOADER.ensure('abilityRuntime') → KeloAbilitiesLoader.ensure()` antes de despertar abilities y enlazar prediction. No depende de un global implícito.
-20. Prohibido inyectar `<script>` desde features por fuera de `KeloModuleLoader`.
+18. La hotbar moderna usa lifecycle **local por botón**: un solo drag activo conserva `pointerId`, usa `setPointerCapture`, ignora eventos de otro pointer y `pointercancel` cancela sin castear. No instala listeners globales y no sustituye el strangler legacy `KeloAbilityAim`.
+19. El smoke WebKit verifica el handoff de abilities: no hay hotbar/`KeloAbilities` al boot; tras cargar `abilityRuntime` aparecen exactamente 5 slots modernos sin restaurar `action-slot-*` de `engine-g`.
+20. PvP solicita explícitamente `KeloRuntimeBootstrap.ensure() → KELO_MODULE_LOADER.ensure('abilityRuntime') → KeloAbilitiesLoader.ensure()` antes de despertar abilities y enlazar prediction. No depende de un global implícito.
+21. Prohibido inyectar `<script>` desde features por fuera de `KeloModuleLoader`.
 
 El listado histórico de boot completo NO es el boot móvil. Restaurar tags pesados en `index.html` es un bug.
 
@@ -51,13 +52,13 @@ El listado histórico de boot completo NO es el boot móvil. Restaurar tags pesa
 | Movement extensions | `KeloMovement` | OWNER LIVE / transitional |
 | Posición discontinua | `KeloPlayerPosition` | OWNER LIVE / transitional |
 | Viajes legacy plot/farm | `KeloLegacyTransitionBridge` | TEMPORAL STRANGLER |
-| Aim/range/pointer/cast middleware legacy | `KeloAbilityAim` | TEMPORAL STRANGLER |
+| Aim/range/pointer global/cast middleware legacy | `KeloAbilityAim` | TEMPORAL STRANGLER |
 | Dirección de abilities legacy | `KeloAbilityDirection` | TEMPORAL STRANGLER |
 | Trigger directo de stones legacy | `KeloLegacyAbilityTrigger` | TEMPORAL STRANGLER |
 | Feature lifecycle first-use/after-paint | `KeloModuleLoader` | OWNER LIVE |
 | Feature metadata/policies | `KELO_FEATURE_REGISTRY` | OWNER LIVE |
 | User-toggleable optional packs | `KELO_ASSET_REGISTRY` | OWNER LIVE |
-| Ability runtime/hotbar moderna | `KeloAbilities` + `KeloAbilitiesLoader` | OWNER LIVE / first-use |
+| Ability runtime/hotbar moderna + pointer local | `KeloAbilities` + `KeloAbilitiesLoader` | OWNER LIVE / first-use |
 | Física/movimiento continuo base | `engine-a.js` | LEGACY CORE |
 | UI/gameplay histórico base | `engine-b.js` | LEGACY CORE |
 | Social/render/simulation bridge histórico | `engine-c.js` | LEGACY CORE |
@@ -93,8 +94,8 @@ Ejemplos actuales:
 - Movimiento: `KeloMovement` posee un único wrapper autorizado con hooks.
 - Posición: `KeloPlayerPosition` posee teleport/restore; movimiento por frame aún legacy. **Dash no debe pasar por este owner**: se considera movimiento/ability y usa `KeloMovement` mientras se migra.
 - Plot/Farm travel: nombres legacy preservados, writes dirigidos a `KeloPlayerPosition`/`KeloCamera` por strangler temporal.
-- Abilities legacy: `KeloAbilityAim` posee un único pointer lifecycle y una cadena de middleware explícita; `engine-l/m` ya no monkey-patchean `castAimedSkill`.
-- Ability runtime moderno: `abilityRuntime` se carga bajo demanda por el ModuleLoader compartido; `KeloAbilities` posee hotbar + adapter `renderActionBar`. No se introduce otro loader.
+- Abilities legacy: `KeloAbilityAim` posee un único pointer lifecycle global y una cadena de middleware explícita; `engine-l/m` ya no monkey-patchean `castAimedSkill`.
+- Ability runtime moderno: `abilityRuntime` se carga bajo demanda por el ModuleLoader compartido; `KeloAbilities` posee hotbar + adapter `renderActionBar`. Sus cinco slots usan handlers Pointer Events locales; el VM test ejecuta el `bindSlot()` real y congela aislamiento por `pointerId`, cast único, cancel sin cast y self-cast inmediato.
 - `engine-f`: dirección/trigger directos están caracterizados por un test VM contra el archivo real; conserva thresholds `0.15/0.12/12`, dash directo 150, radio PvP 60 y proyectil 450/life 2.
 - `engine-g`: el dash tween está caracterizado contra el archivo real (quadratic ease-out, colisión, radio PvP `<52`, daño/fallback y finalización). El test exige que no recupere action bar, scheduler UI ni bindings de aim/pointer.
 - Observabilidad: shadows nunca son autoridad y ya no pertenecen al camino crítico del primer frame.
@@ -133,7 +134,7 @@ El shell es UI; no posee mutations del mundo. Las mutations pasan por Studio Ker
 
 ## 9. Gameplay
 
-- Abilities modernas: `KeloAbilities` + Stone/equipment/mount channels. `abilityRuntime` es first-use interno. Compatibilidad aim/input legacy: `KeloAbilityAim` hasta retirar consumidores.
+- Abilities modernas: `KeloAbilities` + Stone/equipment/mount channels. `abilityRuntime` es first-use interno; la hotbar moderna usa pointer lifecycle local por slot. Compatibilidad aim/input legacy: `KeloAbilityAim` hasta retirar consumidores.
 - PvP/Arena: `KeloArena`, PvP world + runtime loader; PvP garantiza el first-use del runtime de abilities antes de entrar.
 - Character: `KeloCharacterCustomization`, `KeloAppearance`, `KeloAvatar`.
 - Equipment: `KeloEquipment`.
@@ -151,9 +152,9 @@ El cliente puede predecir/presentar, pero progreso valioso, comercio, PvP compet
 
 Los workflows activos usan acciones externas fijadas por SHA exacto. `ci-supply-chain-audit.mjs` falla si reaparece una acción sin pin SHA o `permissions: write-all`.
 
-Foundation incluye characterization de state/save, SW, transition bridge, ability aim, ability direction, dash tween, **ability runtime first-use**, pointer lifecycle y cast middleware; además de reproducible-build, supply-chain, boot-surface, legacy-debt y architecture audits. Production build, authoritative server smoke y WebKit branch smoke completan el gate.
+Foundation incluye characterization de state/save, SW, transition bridge, ability aim, ability direction, dash tween, **ability runtime first-use**, **modern ability pointer lifecycle**, legacy pointer lifecycle y cast middleware; además de reproducible-build, supply-chain, boot-surface, legacy-debt y architecture audits. Production build, authoritative server smoke y WebKit branch smoke completan el gate.
 
-El head runtime `ad04037e4f28baabe3c03dd2883c0979b49ecc6a` pasó los cuatro gates (`foundation`, `client-build`, `server-smoke`, `webkit-mobile-smoke`). El WebKit smoke comprobó además el handoff de hotbar first-use. Esto sigue siendo evidencia branch-local y **no sustituye QA físico/LIVE**.
+El head runtime `c08d54c235be6b32cd6e75c6267995afca5ca3b1` pasó los cuatro gates (`foundation`, `client-build`, `server-smoke`, `webkit-mobile-smoke`). El WebKit smoke comprobó además el handoff de hotbar first-use. Esto sigue siendo evidencia branch-local y **no sustituye QA físico/LIVE**.
 
 ## 12. Qué NO hacer
 
@@ -162,6 +163,7 @@ El head runtime `ad04037e4f28baabe3c03dd2883c0979b49ecc6a` pasó los cuatro gate
 - No crear otro loader para trabajo after-paint/first-use; extender `KeloModuleLoader`.
 - No volver a poner control plane, updater, shadows, `engine-m` o abilities modernas como trabajo del primer frame.
 - No devolver action bar/hotbar a `engine-g`.
+- No crear listeners globales de pointer para la hotbar moderna; cada slot conserva su lifecycle local y el global legacy sigue en `KeloAbilityAim` hasta migrar sus consumidores.
 - No escribir directamente cámara/zoom/canvas desde features nuevas.
 - No mutar `obstacles` desde features nuevas.
 - No usar `KeloPlayerPosition` para dash/physics.
