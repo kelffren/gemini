@@ -10,7 +10,7 @@
 (function(root){
 'use strict';
 if(root.KELO_FEATURE_REGISTRY)return;
-const VERSION='kelo-feature-registry-v2.2.0-creator-character-bridge';
+const VERSION='kelo-feature-registry-v2.3.0-appearance-authoring-contract';
 const raw={
   social:{dependencies:[],policy:'first-use',files:[
     {src:'src/ui/player-nameplate.js?v=2',name:'placas'},
@@ -52,11 +52,12 @@ const raw={
   appearance:{dependencies:[],policy:'first-use',files:[
     {src:'src/appearance/appearance-system.js?v=3-creator-character-bridge',name:'appearance registry'},
     {src:'src/characters/character-slot-schema.js?v=2',name:'character slots'},
+    {src:'src/characters/creator-character-visual-contract.js?v=2',name:'creator visual authoring contract'},
     {src:'src/characters/character-visual-presets.js?v=2',name:'character visual contract'},
     {src:'src/characters/character-customization.js?v=2',name:'apariencia'},
     {src:'src/characters/character-visual-stack.js?v=2',name:'character visual stack'},
     {src:'src/appearance/character-appearance-adapter.js?v=2-creator-character-bridge',name:'character appearance adapter'},
-    {src:'src/characters/creator-character-state-bridge.js?v=1',name:'creator character bridge'},
+    {src:'src/characters/creator-character-state-bridge.js?v=2-authoring-contract',name:'creator character bridge'},
     {src:'src/ui/character-customizer-ui.js?v=1',name:'apariencia'}
   ]},
   properties:{dependencies:[],policy:'first-use',files:[
