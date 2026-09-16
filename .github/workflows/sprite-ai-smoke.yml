@@ -1,0 +1,47 @@
+name: Sprite AI Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'server/sprite-ai-*.js'
+      - 'src/creators/sprite-compiler/pose-templates.mjs'
+      - 'deploy/huggingface-sprite-ai/**'
+      - 'deploy/huggingface-sprite-pose/**'
+      - '.github/workflows/sprite-ai-smoke.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'server/sprite-ai-*.js'
+      - 'src/creators/sprite-compiler/pose-templates.mjs'
+      - 'deploy/huggingface-sprite-ai/**'
+      - 'deploy/huggingface-sprite-pose/**'
+      - '.github/workflows/sprite-ai-smoke.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Node syntax
+        run: |
+          node --check server/sprite-ai-service.js
+          node --check server/sprite-ai-provider-huggingface.js
+          node --check server/sprite-ai-provider-pose-huggingface.js
+          node --check server/sprite-ai-http.js
+          node --check server/sprite-ai-smoke-test.js
+      - name: Sprite AI deterministic smoke
+        run: node server/sprite-ai-smoke-test.js
+      - name: Hugging Face Space syntax
+        run: |
+          python -m py_compile deploy/huggingface-sprite-ai/app.py
+          python -m py_compile deploy/huggingface-sprite-pose/app.py
