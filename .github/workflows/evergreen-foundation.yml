@@ -56,6 +56,9 @@ jobs:
       - name: Legacy ability cast middleware
         run: node tests/legacy-ability-cast-middleware.test.cjs
 
+      - name: Legacy plaza cast presentation parity
+        run: node tests/legacy-plaza-cast-presentation-parity.test.cjs
+
       - name: Legacy ability consumer inventory
         run: node scripts/legacy-ability-consumer-audit.mjs
 
