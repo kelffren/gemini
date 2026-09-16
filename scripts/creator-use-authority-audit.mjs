@@ -19,6 +19,7 @@ check('direct use-state tables are not client writable',/revoke all on public\.c
 check('repository exposes all creator-use RPCs',/setCharacterCreatorContent/.test(repo)&&/setCharacterCreatorMount/.test(repo)&&/authorizeCreatorPropertyPlacement/.test(repo)&&/getMyCreatorUseState/.test(repo));
 check('use authority reuses delivery and exact revision identities',/activate\(revisionId\)/.test(use)&&/set_character_creator_content/.test(use)&&/set_character_creator_mount/.test(use)&&/authorize_creator_property_placement/.test(use));
 check('avatar use reuses existing server-authoritative avatar mutation',/selectCharacterAvatar/.test(use)&&/set_active_character_avatar/.test(use));
+check('authoritative use state carries current creator avatar revision',/'avatar',v_avatar/.test(migration)&&/raw\?\.avatar\?\.revisionId/.test(use)&&/state\.avatar/.test(use));
 check('use authority creates no auth client or ownership store',!/createClient\s*\(|localStorage\?\.setItem\([^)]*ownership|indexedDB/.test(use)&&/KeloOnlineAuth/.test(use));
 check('use cache is hydrated selection only',/const hydrated=new Map\(\)/.test(use)&&/get_my_creator_use_state/.test(use)&&!/listMyCreatorEntitlements|loadAllOwned|syncAllOwned/.test(use));
 check('creator entry shares one repository session with use authority',/getOrCreateCreatorUseAuthority/.test(entry)&&/useAuthority\.bindProvider/.test(entry)&&/contentRepository\.rpc/.test(entry)&&/contentSession\.onChange/.test(entry));
