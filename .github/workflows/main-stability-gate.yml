@@ -60,6 +60,9 @@ jobs:
       - name: Guardian distributed compute contract
         run: npm run audit:guardian
 
+      - name: Guardian community two-device quorum E2E
+        run: node scripts/guardian-community-two-device-e2e.mjs
+
       - name: Updater contract
         run: npm run audit:updater
 
