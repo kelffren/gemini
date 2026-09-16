@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: CREATORS / ASSET BUILD CACHE
  * owner: Kelo Creator Asset Bridge
- * keys: CONTENT ADDRESSED CACHE SHA256 OPTIMIZER FINGERPRINT DETERMINISTIC
+ * keys: CONTENT ADDRESSED CACHE SHA256 OPTIMIZER FINGERPRINT DETERMINISTIC INFINITY
  * purpose: reuse expensive deterministic asset optimization results only when source bytes, engine code and configuration are identical
  * public-api: buildOptimizationCacheKey(), readOptimizationCache(), writeOptimizationCache(), fingerprintFiles()
  * state-owned: local cache directory only; never canonical content
@@ -14,7 +14,17 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 
 const CACHE_SCHEMA='kelo-asset-optimization-cache-v1';
+const POS_INF='__KELO_NUMBER_POSITIVE_INFINITY__';
+const NEG_INF='__KELO_NUMBER_NEGATIVE_INFINITY__';
 const sha256=buffer=>crypto.createHash('sha256').update(buffer).digest('hex');
+
+function stringify(value) {
+  return JSON.stringify(value,(_key,item)=>item===Infinity?POS_INF:item===-Infinity?NEG_INF:item);
+}
+
+function parse(value) {
+  return JSON.parse(value,(_key,item)=>item===POS_INF?Infinity:item===NEG_INF?-Infinity:item);
+}
 
 export function fingerprintFiles(files=[]) {
   const hash=crypto.createHash('sha256');
@@ -37,7 +47,7 @@ export function buildOptimizationCacheKey(sourceBuffer,config={}) {
     qualityPolicy:String(config.qualityPolicy||''),
     extra:config.extra||null
   };
-  const configJson=JSON.stringify(normalized);
+  const configJson=stringify(normalized);
   const key=sha256(Buffer.from(`${sourceSha256}\n${configJson}`));
   return {key,sourceSha256,config:normalized};
 }
@@ -52,9 +62,9 @@ export function readOptimizationCache(cacheDir,descriptor) {
   const paths=entryPaths(cacheDir,descriptor.key);
   if(!fs.existsSync(paths.buffer)||!fs.existsSync(paths.meta)) return null;
   try {
-    const meta=JSON.parse(fs.readFileSync(paths.meta,'utf8'));
+    const meta=parse(fs.readFileSync(paths.meta,'utf8'));
     if(meta.schema!==CACHE_SCHEMA||meta.key!==descriptor.key||meta.sourceSha256!==descriptor.sourceSha256) return null;
-    if(JSON.stringify(meta.config)!==JSON.stringify(descriptor.config)) return null;
+    if(stringify(meta.config)!==stringify(descriptor.config)) return null;
     const buffer=fs.readFileSync(paths.buffer);
     if(buffer.length!==meta.outputBytes||sha256(buffer)!==meta.outputSha256) return null;
     return {buffer,report:meta.report,cache:{hit:true,key:descriptor.key,outputSha256:meta.outputSha256,createdAt:meta.createdAt}};
@@ -81,7 +91,7 @@ export function writeOptimizationCache(cacheDir,descriptor,result) {
   const tempBuffer=`${paths.buffer}.${process.pid}.tmp`;
   const tempMeta=`${paths.meta}.${process.pid}.tmp`;
   fs.writeFileSync(tempBuffer,result.buffer);
-  fs.writeFileSync(tempMeta,JSON.stringify(meta));
+  fs.writeFileSync(tempMeta,stringify(meta));
   fs.renameSync(tempBuffer,paths.buffer);
   fs.renameSync(tempMeta,paths.meta);
   return {hit:false,key:descriptor.key,outputSha256,createdAt:meta.createdAt};
