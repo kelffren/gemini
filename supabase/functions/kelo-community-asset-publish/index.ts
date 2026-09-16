@@ -2,10 +2,10 @@
  * area: SUPABASE / EDGE FUNCTIONS / COMMUNITY ASSETS
  * owner: Kelo Community Asset Pipeline
  * purpose: authenticated raster quarantine -> server validation -> creator-global publication
- * security: user JWT required; service key stays server-side; client metadata is never trusted for hash/dimensions
+ * security: user JWT required; service key stays server-side; client metadata is never trusted for hash/dimensions/Guardian proof
  */
 
-const VERSION='kelo-community-asset-publish-v1';
+const VERSION='kelo-community-asset-publish-v2-guardian-proof';
 const MAX_BYTES=5*1024*1024;
 const MAX_DIMENSION=2048;
 const MAX_PIXELS=4_194_304;
@@ -64,7 +64,16 @@ async function rpc(path:string,body:unknown,headersInit:HeadersInit){return resp
 async function rateLimit(userId:string){const since=new Date(Date.now()-60*60*1000).toISOString();const q=new URLSearchParams({owner_user_id:`eq.${userId}`,created_at:`gte.${since}`,select:'id',limit:String(HOURLY_LIMIT+1)});const rows=await responseJson(await fetch(`${base()}/rest/v1/asset_revisions?${q}`,{headers:adminHeaders()}));if(Array.isArray(rows)&&rows.length>=HOURLY_LIMIT)throw fail('COMMUNITY_ASSET_RATE_LIMIT',429);}
 async function upload(bucket:string,path:string,blob:Blob,authorizationHeaders:Record<string,string>,upsert=false){const h={...authorizationHeaders,'content-type':blob.type,'x-upsert':upsert?'true':'false'};const res=await fetch(`${base()}/storage/v1/object/${bucket}/${encodePath(path)}`,{method:'POST',headers:h,body:blob});if(res.ok)return responseJson(res);const text=await res.text();if(!upsert&&res.status===400&&/already exists|duplicate/i.test(text))return{duplicate:true};throw fail('STORAGE_UPLOAD_FAILED',res.status,text.slice(0,400));}
 async function findFamily(userId:string,slug:string,token:string){const q=new URLSearchParams({owner_user_id:`eq.${userId}`,slug:`eq.${slug}`,select:'id,stable_key',limit:'1'});const rows=await responseJson(await fetch(`${base()}/rest/v1/asset_families?${q}`,{headers:userHeaders(token)}));return Array.isArray(rows)?rows[0]||null:null;}
-async function createOrFindFamily(userId:string,token:string,slug:string,name:string,kind:string,tags:string[]){try{return await rpc('create_asset_family',{p_slug:slug,p_name:name,p_kind:kind,p_category:'community',p_semantic_family:'community',p_tags:tags,p_districts:[],p_metadata:{source:'community-auto-publish',policyVersion:2}},userHeaders(token));}catch(error){const found=await findFamily(userId,slug,token);if(found)return found;throw error;}}
+async function createOrFindFamily(userId:string,token:string,slug:string,name:string,kind:string,tags:string[]){try{return await rpc('create_asset_family',{p_slug:slug,p_name:name,p_kind:kind,p_category:'community',p_semantic_family:'community',p_tags:tags,p_districts:[],p_metadata:{source:'community-auto-publish',policyVersion:3}},userHeaders(token));}catch(error){const found=await findFamily(userId,slug,token);if(found)return found;throw error;}}
+async function guardianProof(revisionId:string,assetHash:string){
+  try{
+    const proof=await rpc('record_asset_guardian_provenance',{p_revision_id:revisionId,p_asset_hash:assetHash},adminHeaders());
+    if(proof?.verified===true&&proof?.assetHash===assetHash){
+      return{verified:true,provenance:{source:'guardian-community-supabase-v1',assetHash,communityBuilt:true,preset:String(proof.preset||''),contributorCount:Math.max(2,Number(proof.contributorCount)||2),verifiedAt:Number(proof.verifiedAt)||null}};
+    }
+  }catch(error){console.warn('[community asset publish] Guardian proof unavailable; publishing without Guardian badge',String((error as any)?.message||error));}
+  return{verified:false,provenance:null};
+}
 
 Deno.serve(async(req:Request)=>{
   const origin=corsOrigin(req);
@@ -94,11 +103,12 @@ Deno.serve(async(req:Request)=>{
     const revision=await rpc('register_asset_revision',{
       p_family_id:family.id,p_storage_path:privatePath,p_content_hash:hash,p_mime_type:file.type,p_byte_size:file.size,
       p_pixel_width:dimensions.width,p_pixel_height:dimensions.height,p_world_width:null,p_world_height:null,p_collision_mode:'none',
-      p_render_phase:'aboveActor',p_metadata:{source:'community-auto-publish',policyVersion:2,serverVerified:true}
+      p_render_phase:'aboveActor',p_metadata:{source:'community-auto-publish',policyVersion:3,serverStructuralVerified:true,guardianAuthority:'public.asset_guardian_provenance'}
     },userHeaders(token));
     await upload('creator-global',publicPath,new Blob([bytes],{type:file.type}),{apikey:serviceKey(),authorization:`Bearer ${serviceKey()}`},true);
     const publication=await rpc('publish_asset_revision',{p_revision_id:revision.id,p_public_storage_path:publicPath,p_visibility:'global',p_published_by:user.id},adminHeaders());
+    const guardian=await guardianProof(revision.id,hash);
     const publicUrl=`${base()}/storage/v1/object/public/creator-global/${encodePath(publicPath)}`;
-    return json({ok:true,status:'published',version:VERSION,assetId:revision.asset_id,revisionId:revision.id,publicationId:publication.id,url:publicUrl,sha256:hash,mime:file.type,bytes:file.size,width:dimensions.width,height:dimensions.height,creatorId:user.id,moderation:'automatic-structural'},200,origin);
+    return json({ok:true,status:'published',version:VERSION,assetId:revision.asset_id,revisionId:revision.id,publicationId:publication.id,url:publicUrl,sha256:hash,mime:file.type,bytes:file.size,width:dimensions.width,height:dimensions.height,creatorId:user.id,moderation:'automatic-structural',serverStructuralVerified:true,guardianVerified:guardian.verified,guardianProvenance:guardian.provenance},200,origin);
   }catch(error){const e:any=error;console.error('[community asset publish]',e?.code||e?.message||e,e?.detail||'');return json({ok:false,error:e?.code||'COMMUNITY_ASSET_PUBLISH_FAILED',detail:e?.detail||''},Number(e?.status)||500,origin);}
 });
