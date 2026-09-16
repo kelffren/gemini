@@ -3,7 +3,7 @@
  * owner: Kelo Legacy Containment
  * keys: LEGACY ENGINE-A ENGINE-C FITNESS MONOTONIC GLOBALS WRITERS TIMERS
  * purpose: prevent legacy engines from gaining executable surface, global authority or new side-effect responsibilities
- * public-api: CLI `node scripts/legacy-containment-audit.mjs`
+ * public-api: CLI + inspectLegacySource/compareLegacyMetrics for deterministic self-tests
  * consumes: git history + engine-a.js + engine-c.js
  * state-owned: none; emits deterministic audit evidence only
  * extension-points: add monotonic metrics only when they are stable enough to gate main
@@ -13,7 +13,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
-import {fileURLToPath} from 'node:url';
+import {fileURLToPath,pathToFileURL} from 'node:url';
 
 const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const TARGETS=['engine-a.js','engine-c.js'];
@@ -25,6 +25,10 @@ const CRITICAL_KEYS=[
   'camera.x','camera.y','camera.targetX','camera.targetY',
   'obstacles','STATE','CONFIG','render','renderAvatar','updateSimulation','processInput','updateMovement'
 ];
+export const LEGACY_MONOTONIC_METRICS=Object.freeze([
+  'semanticBytes','topLevelDeclarations','explicitGlobalWrites','criticalWriteCount',
+  'eventListeners','intervals','timeouts','rafCalls','localStorageWrites','domMutations'
+]);
 
 function git(args,{optional=false}={}){
   const out=spawnSync('git',args,{cwd:ROOT,encoding:'utf8'});
@@ -53,7 +57,7 @@ function esc(value){return value.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');}
 
 // Removes comments and insignificant whitespace while preserving strings/template literals.
 // This lets documentation/comments grow without giving executable legacy code a larger budget.
-function semanticSource(text){
+export function legacySemanticSource(text){
   let out='',state='code',quote='',escaped=false;
   for(let i=0;i<text.length;i++){
     const c=text[i],n=text[i+1];
@@ -89,8 +93,8 @@ function assignmentCount(text,key){
   const re=new RegExp(`\\b${dotted}\\s*(?:=|\\+=|-=|\\*=|/=|\\+\\+|--)`,'g');
   return count(re,text);
 }
-function inspect(text){
-  const semantic=semanticSource(text);
+export function inspectLegacySource(text){
+  const semantic=legacySemanticSource(text);
   const globalWriteNames=uniq([...text.matchAll(/\b(?:window|globalThis|root)\.([A-Za-z_$][\w$]*)\s*=/g)].map(m=>m[1]));
   const criticalWrites=Object.fromEntries(CRITICAL_KEYS.map(key=>[key,assignmentCount(text,key)]).filter(([,n])=>n>0));
   const criticalWriteCount=Object.values(criticalWrites).reduce((a,b)=>a+b,0);
@@ -112,38 +116,44 @@ function inspect(text){
     domMutations:count(/\b(?:appendChild|insertBefore|replaceChildren|replaceWith|removeChild|createElement)\s*\(/g,text)
   };
 }
-
-const MONOTONIC=[
-  'semanticBytes','topLevelDeclarations','explicitGlobalWrites','criticalWriteCount',
-  'eventListeners','intervals','timeouts','rafCalls','localStorageWrites','domMutations'
-];
-const base=resolveBase();
-if(!base)throw new Error('LEGACY_CONTAINMENT_NO_BASE: provide KELO_LEGACY_BASE_SHA or --base=<sha>');
-
-const report={version:1,base,head:git(['rev-parse','HEAD']).trim(),targets:{},violations:[]};
-for(const file of TARGETS){
-  const currentPath=path.join(ROOT,file);
-  if(!fs.existsSync(currentPath))throw new Error(`LEGACY_CONTAINMENT_TARGET_MISSING:${file}`);
-  const beforeText=sourceAt(base,file);
-  if(beforeText==null)throw new Error(`LEGACY_CONTAINMENT_BASE_TARGET_MISSING:${file}@${base}`);
-  const afterText=fs.readFileSync(currentPath,'utf8');
-  const before=inspect(beforeText),after=inspect(afterText);
-  const delta=Object.fromEntries(MONOTONIC.map(k=>[k,after[k]-before[k]]));
+export function compareLegacyMetrics(before,after,file='synthetic.js'){
+  const delta=Object.fromEntries(LEGACY_MONOTONIC_METRICS.map(k=>[k,after[k]-before[k]]));
   const newGlobals=after.explicitGlobalWriteNames.filter(name=>!before.explicitGlobalWriteNames.includes(name));
   const newCriticalKeys=Object.keys(after.criticalWrites).filter(key=>!(key in before.criticalWrites));
-  report.targets[file]={before,after,delta,newGlobals,newCriticalKeys};
-  for(const key of MONOTONIC){
-    if(after[key]>before[key])report.violations.push({file,type:'metric-growth',metric:key,before:before[key],after:after[key],delta:after[key]-before[key]});
+  const violations=[];
+  for(const key of LEGACY_MONOTONIC_METRICS){
+    if(after[key]>before[key])violations.push({file,type:'metric-growth',metric:key,before:before[key],after:after[key],delta:after[key]-before[key]});
   }
-  for(const name of newGlobals)report.violations.push({file,type:'new-global-writer',name});
-  for(const key of newCriticalKeys)report.violations.push({file,type:'new-critical-writer',key});
+  for(const name of newGlobals)violations.push({file,type:'new-global-writer',name});
+  for(const key of newCriticalKeys)violations.push({file,type:'new-critical-writer',key});
+  return {delta,newGlobals,newCriticalKeys,violations};
 }
 
-fs.mkdirSync(OUT_DIR,{recursive:true});
-fs.writeFileSync(path.join(OUT_DIR,'report.json'),JSON.stringify(report,null,2)+'\n');
-console.log('KELO_LEGACY_CONTAINMENT',JSON.stringify({base:report.base,head:report.head,targets:Object.fromEntries(Object.entries(report.targets).map(([file,row])=>[file,{delta:row.delta,newGlobals:row.newGlobals,newCriticalKeys:row.newCriticalKeys}])),violations:report.violations},null,2));
-if(report.violations.length){
-  console.error(`LEGACY_CONTAINMENT_FAIL:${report.violations.length}`);
-  process.exit(1);
+export function runLegacyContainmentAudit(){
+  const base=resolveBase();
+  if(!base)throw new Error('LEGACY_CONTAINMENT_NO_BASE: provide KELO_LEGACY_BASE_SHA or --base=<sha>');
+  const report={version:1,base,head:git(['rev-parse','HEAD']).trim(),targets:{},violations:[]};
+  for(const file of TARGETS){
+    const currentPath=path.join(ROOT,file);
+    if(!fs.existsSync(currentPath))throw new Error(`LEGACY_CONTAINMENT_TARGET_MISSING:${file}`);
+    const beforeText=sourceAt(base,file);
+    if(beforeText==null)throw new Error(`LEGACY_CONTAINMENT_BASE_TARGET_MISSING:${file}@${base}`);
+    const afterText=fs.readFileSync(currentPath,'utf8');
+    const before=inspectLegacySource(beforeText),after=inspectLegacySource(afterText);
+    const comparison=compareLegacyMetrics(before,after,file);
+    report.targets[file]={before,after,delta:comparison.delta,newGlobals:comparison.newGlobals,newCriticalKeys:comparison.newCriticalKeys};
+    report.violations.push(...comparison.violations);
+  }
+  fs.mkdirSync(OUT_DIR,{recursive:true});
+  fs.writeFileSync(path.join(OUT_DIR,'report.json'),JSON.stringify(report,null,2)+'\n');
+  console.log('KELO_LEGACY_CONTAINMENT',JSON.stringify({base:report.base,head:report.head,targets:Object.fromEntries(Object.entries(report.targets).map(([file,row])=>[file,{delta:row.delta,newGlobals:row.newGlobals,newCriticalKeys:row.newCriticalKeys}])),violations:report.violations},null,2));
+  if(report.violations.length){
+    console.error(`LEGACY_CONTAINMENT_FAIL:${report.violations.length}`);
+    return 1;
+  }
+  console.log('LEGACY_CONTAINMENT_PASS: legacy executable/authority surface did not grow.');
+  return 0;
 }
-console.log('LEGACY_CONTAINMENT_PASS: legacy executable/authority surface did not grow.');
+
+const invokedPath=process.argv[1]?pathToFileURL(path.resolve(process.argv[1])).href:null;
+if(invokedPath===import.meta.url)process.exitCode=runLegacyContainmentAudit();
