@@ -90,15 +90,20 @@
 
 ## Gameplay
 
-- Abilities: `KeloAbilities` + Stone/equipment/mount channels.
-- PvP/Arena: `KeloArena`, PvP world + runtime loader.
-- Character: `KeloCharacterCustomization`, `KeloAppearance`, `KeloAvatar`.
-- Equipment: `KeloEquipment`.
-- Backpack/containers: sistemas dedicados.
-- Titles/stats: `KeloPlayerStats`, `KeloTitles`.
-- Nobility: `KeloNobility` separado de Titles.
-- Economy/logistics: `KeloRegionalEconomy`, `KeloCaravans`, `KeloFactions`.
-- Property/instances: `KELO_PROPERTY_CATALOG`, `PropertySystem`, InstanceSystem.
+- `src/abilities/` — abilities/Stone/equipment channels.
+- `src/systems/pvp-world.js` — PvP world.
+- `src/systems/arena-*` — Arena.
+- `src/systems/equipment-system.js` — equipo.
+- `src/mounts/` — monturas.
+- `src/systems/backpack-system.js` — mochila.
+- `src/systems/container-system.js` — contenedores.
+- `src/systems/title-system.js` + `player-stats.js` — títulos/stats.
+- `src/systems/nobility.js` — nobleza.
+- `src/systems/commerce-authority.js` — commerce.
+- `src/systems/regional-economy-system.js` — economía regional.
+- `src/systems/caravan-system.js` — caravanas.
+- `src/property/property-system.js` — placements/property.
+- `src/instances/` — instancias.
 
 ## Admin / Reliability
 
