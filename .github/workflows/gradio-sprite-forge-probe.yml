@@ -1,4 +1,4 @@
-name: Probe Sprite Forge API
+name: Probe Self-Contained Sprite ZeroGPU
 
 on:
   push:
@@ -13,18 +13,24 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 6
     steps:
-      - name: Probe animation with real Kelo hero input
+      - name: Probe self-contained sprite generator
         shell: bash
         run: |
           mkdir -p probe
           set +e
-          HERO='https://raw.githubusercontent.com/kelffren/gemini/main/assets/hero.PNG'
-          cat > probe/request.json <<JSON
-          {"data":["Kelo World hero",{"path":"$HERO","url":"$HERO","orig_name":"hero.PNG","meta":{"_type":"gradio.FileData"}},"Chunky pixel-friendly","FLUX.2 Klein 4B — fast","Square · fast (544²)",["Walk"],2,4,1234,0.10,0.09,1.0,2,0.30,16,true,12,256]}
+          BASE='https://charlieamalet-tools3ox-pixelart-spritesheet-generatorart-api.hf.space'
+          curl -sS -D probe/info-headers.txt "$BASE/gradio_api/info" -o probe/info.json
+          cat > probe/request.json <<'JSON'
+          {"data":["pixel art full-body dark fantasy MMORPG hero, dark teal long coat with subtle gold trim, black pants and boots, clean silhouette, character sprite sheet, consistent character, walking animation frames, transparent simple background"]}
           JSON
-          curl -sS -D probe/submit-headers.txt -H 'Content-Type: application/json' -H 'Accept: application/json' -X POST --data-binary @probe/request.json https://multimodalart-sprite-forge.hf.space/gradio_api/call/forge -o probe/submit.json
+          curl -sS -D probe/submit-headers.txt -H 'Content-Type: application/json' -H 'Accept: application/json' -X POST --data-binary @probe/request.json "$BASE/gradio_api/call/generate_mesh" -o probe/submit.json
           python - <<'PY'
           import json, pathlib
+          try:
+              info=json.loads(pathlib.Path('probe/info.json').read_text())
+              print('=== INFO ===')
+              print(json.dumps(info,indent=2)[:20000])
+          except Exception as e: print('info parse error',e)
           try:
               data=json.loads(pathlib.Path('probe/submit.json').read_text())
               eid=data.get('event_id','')
@@ -35,7 +41,7 @@ jobs:
           PY
           EID="$(cat probe/event-id.txt 2>/dev/null)"
           if [ -n "$EID" ]; then
-            curl -sS --max-time 240 -D probe/sse-headers.txt -H 'Accept: text/event-stream' "https://multimodalart-sprite-forge.hf.space/gradio_api/call/forge/$EID" -o probe/sse.txt
+            curl -sS --max-time 240 -D probe/sse-headers.txt -H 'Accept: text/event-stream' "$BASE/gradio_api/call/generate_mesh/$EID" -o probe/sse.txt
             echo $? > probe/sse-exit.txt
           fi
           echo '=== SUBMIT ==='
@@ -47,6 +53,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: sprite-forge-api-probe
+          name: sprite-zero-api-probe
           path: probe/
           retention-days: 2
