@@ -38,6 +38,9 @@ jobs:
       - name: Legacy ability aim parity
         run: node tests/legacy-ability-aim-parity.test.cjs
 
+      - name: Legacy ability pointer lifecycle
+        run: node tests/legacy-ability-pointer-lifecycle.test.cjs
+
       - name: Reproducible builds
         run: node scripts/reproducible-build-audit.mjs
 
