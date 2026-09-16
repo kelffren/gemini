@@ -21,6 +21,7 @@ on:
       - 'src/core/feature-registry.js'
       - 'src/core/module-loader.js'
       - 'src/core/movement-profile.js'
+      - 'supabase/migrations/*guardian*.sql'
       - 'engine-net.js'
 
 concurrency:
@@ -29,6 +30,7 @@ concurrency:
 
 permissions:
   contents: read
+  pages: read
 
 jobs:
   community-live:
@@ -104,36 +106,74 @@ jobs:
           retention-days: 14
 
   pvp-takeover-live:
-    if: github.event_name == 'workflow_dispatch'
-    name: guardian-pvp-two-device-takeover-live
+    name: guardian-pvp-two-device-node-fenced-live
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
       KELO_PAGES_URL: https://kelffren.github.io/gemini/
-      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-      SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
       KELO_GUARDIAN_TEST_ADMIN_EMAIL: ${{ secrets.KELO_GUARDIAN_TEST_ADMIN_EMAIL }}
       KELO_GUARDIAN_TEST_ADMIN_PASSWORD: ${{ secrets.KELO_GUARDIAN_TEST_ADMIN_PASSWORD }}
-      KELO_GUARDIAN_TEST_DONOR_EMAIL: ${{ secrets.KELO_GUARDIAN_TEST_DONOR_EMAIL }}
-      KELO_GUARDIAN_TEST_DONOR_PASSWORD: ${{ secrets.KELO_GUARDIAN_TEST_DONOR_PASSWORD }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - name: Setup Node
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: '24'
-      - name: Validate Guardian failover secrets
+      - name: Check Guardian live credentials
+        id: credentials
         shell: bash
         run: |
           set -euo pipefail
-          required=(SUPABASE_URL SUPABASE_PUBLISHABLE_KEY KELO_GUARDIAN_TEST_ADMIN_EMAIL KELO_GUARDIAN_TEST_ADMIN_PASSWORD KELO_GUARDIAN_TEST_DONOR_EMAIL KELO_GUARDIAN_TEST_DONOR_PASSWORD)
-          for key in "${required[@]}"; do
-            if [ -z "${!key:-}" ]; then echo "Missing required GitHub Actions secret: $key" >&2; exit 1; fi
+          if [ -n "${KELO_GUARDIAN_TEST_ADMIN_EMAIL:-}" ] && [ -n "${KELO_GUARDIAN_TEST_ADMIN_PASSWORD:-}" ]; then
+            echo 'available=true' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo 'available=false' >> "$GITHUB_OUTPUT"
+          if [ "$GITHUB_EVENT_NAME" = 'workflow_dispatch' ]; then
+            echo 'Missing KELO_GUARDIAN_TEST_ADMIN_EMAIL/PASSWORD for requested live gate.' >&2
+            exit 1
+          fi
+          echo 'Guardian live credentials are not configured; push keeps deterministic gate only.'
+      - name: Checkout
+        if: steps.credentials.outputs.available == 'true'
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Setup Node
+        if: steps.credentials.outputs.available == 'true'
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - name: Wait until Pages serves this commit or a descendant
+        if: steps.credentials.outputs.available == 'true' && github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 90); do
+            latest="$(curl -fsSL -H 'Accept: application/vnd.github+json' -H "Authorization: Bearer $GH_TOKEN" -H 'X-GitHub-Api-Version: 2026-03-10' "https://api.github.com/repos/${GITHUB_REPOSITORY}/pages/builds/latest" || true)"
+            status="$(jq -r '.status // empty' <<<"$latest" 2>/dev/null || true)"
+            deployed="$(jq -r '.commit // empty' <<<"$latest" 2>/dev/null || true)"
+            echo "attempt=$attempt status=${status:-unknown} deployed=${deployed:-unknown}"
+            if [[ "$status" == 'built' && -n "$deployed" ]]; then
+              if [[ "$deployed" == "$TARGET_SHA" ]]; then exit 0; fi
+              compare="$(curl -fsSL -H 'Accept: application/vnd.github+json' -H "Authorization: Bearer $GH_TOKEN" -H 'X-GitHub-Api-Version: 2026-03-10' "https://api.github.com/repos/${GITHUB_REPOSITORY}/compare/${TARGET_SHA}...${deployed}" || true)"
+              relation="$(jq -r '.status // empty' <<<"$compare" 2>/dev/null || true)"
+              if [[ "$relation" == 'ahead' || "$relation" == 'identical' ]]; then exit 0; fi
+            fi
+            sleep 5
           done
+          echo 'Pages deployment barrier timed out.' >&2
+          exit 1
       - name: Install dependencies
+        if: steps.credentials.outputs.available == 'true'
         run: npm install --no-audit --no-fund
       - name: Install Chromium
+        if: steps.credentials.outputs.available == 'true'
         run: npx playwright install --with-deps chromium
-      - name: Live Guardian PvP failover gate
-        run: npx playwright test tests/guardian-pvp-failover-live.spec.js --project=chromium --retries=1
+      - name: Live same-account node-fenced Guardian PvP takeover gate
+        if: steps.credentials.outputs.available == 'true'
+        run: npx playwright test tests/guardian-pvp-takeover-live.spec.js --project=chromium --retries=1
+      - name: Upload live takeover metrics
+        if: always() && steps.credentials.outputs.available == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: guardian-pvp-node-fenced-live-${{ github.run_id }}
+          path: test-results/guardian-pvp-takeover-metrics.json
+          if-no-files-found: warn
+          retention-days: 14
