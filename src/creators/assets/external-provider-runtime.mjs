@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: CREATORS / EXTERNAL PROVIDER RUNTIME
  * owner: Kelo Universal Content Bridge
- * keys: NETWORK BUDGET CACHE LRU TIMEOUT CIRCUIT BREAKER SAVE DATA MOBILE QUEUE BACKPRESSURE
+ * keys: NETWORK BUDGET CACHE LRU TIMEOUT CIRCUIT BREAKER SAVE DATA MOBILE QUEUE BACKPRESSURE PAGING
  * purpose: let many remote catalogs coexist without allowing metadata search to saturate mobile bandwidth, RAM, or provider APIs
  */
 
@@ -43,6 +43,10 @@ export function mobilePageBudget(requested=24,{heavy=false}={}){
   if(saveData)cap=Math.min(cap,heavy?4:8);
   return Math.max(1,Math.min(Math.floor(Number(requested)||1),cap));
 }
+export function mobilePageWindow(requested=24,rawOffset=0,{heavy=false}={}){
+  const requestedLimit=Math.max(1,Math.floor(Number(requested)||1)),sourceOffset=Math.max(0,Math.floor(Number(rawOffset)||0)),limit=mobilePageBudget(requestedLimit,{heavy}),pageIndex=Math.floor(sourceOffset/requestedLimit),offset=pageIndex*limit;
+  return Object.freeze({requestedLimit,sourceOffset,limit,pageIndex,page:pageIndex+1,offset});
+}
 
 async function boundedText(response,maxBytes){
   const declared=Number(response.headers?.get?.('content-length')||0);
@@ -79,4 +83,4 @@ export function getExternalProviderRuntimeStats(){
   return Object.freeze({active,queued:waiters.length,cacheEntries:cache.size,inFlight:inFlight.size,maxConcurrency:MAX_CONCURRENCY,maxQueue:MAX_QUEUE,breakers:[...breakers.entries()].map(([providerId,row])=>({providerId,...row}))});
 }
 
-export const EXTERNAL_PROVIDER_RUNTIME=Object.freeze({version:'kelo-external-provider-runtime-v2-backpressure',fetchProviderJson,mobilePageBudget,clearExternalProviderRuntimeCache,getExternalProviderRuntimeStats});
+export const EXTERNAL_PROVIDER_RUNTIME=Object.freeze({version:'kelo-external-provider-runtime-v3-mobile-window',fetchProviderJson,mobilePageBudget,mobilePageWindow,clearExternalProviderRuntimeCache,getExternalProviderRuntimeStats});
