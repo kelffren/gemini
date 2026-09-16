@@ -1,9 +1,7 @@
 name: Sprite Factory Live Quality Smoke
 
 on:
-  push:
-    branches:
-      - qa/sprite-live-quality-smoke
+  workflow_dispatch:
 
 permissions:
   contents: read
