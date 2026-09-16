@@ -41,6 +41,9 @@ jobs:
       - name: Legacy ability direction parity
         run: node tests/legacy-ability-direction-parity.test.cjs
 
+      - name: Legacy dash tween parity
+        run: node tests/legacy-dash-tween-parity.test.cjs
+
       - name: Legacy ability pointer lifecycle
         run: node tests/legacy-ability-pointer-lifecycle.test.cjs
 
