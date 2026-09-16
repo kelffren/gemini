@@ -1,0 +1,56 @@
+name: Deploy Hugging Face ZeroGPU Spaces
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      HF_USER: kelffren
+      ATLAS_SPACE: kelo-sprite-ai
+      POSE_SPACE: kelo-sprite-pose
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Require Hugging Face write token
+        shell: bash
+        run: |
+          if [ -z "$HF_TOKEN" ]; then
+            echo "Missing GitHub Actions secret HF_TOKEN. Create a fine-grained Hugging Face token with write access, add it once as repo secret HF_TOKEN, then re-run this workflow."
+            exit 1
+          fi
+
+      - name: Install Hugging Face CLI
+        run: |
+          python -m pip install --upgrade "huggingface_hub>=1.4.0"
+          hf --version
+
+      - name: Create free ZeroGPU Spaces if missing
+        run: |
+          hf repos create "$HF_USER/$ATLAS_SPACE" --repo-type space --space-sdk gradio --flavor zero-a10g --public --exist-ok --token "$HF_TOKEN"
+          hf repos create "$HF_USER/$POSE_SPACE" --repo-type space --space-sdk gradio --flavor zero-a10g --public --exist-ok --token "$HF_TOKEN"
+
+      - name: Upload atlas Space
+        run: |
+          hf upload "$HF_USER/$ATLAS_SPACE" deploy/huggingface-sprite-ai . --repo-type space --token "$HF_TOKEN" --commit-message "Sync atlas Space from Kelo World ${GITHUB_SHA::7}"
+
+      - name: Upload pose Space
+        run: |
+          hf upload "$HF_USER/$POSE_SPACE" deploy/huggingface-sprite-pose . --repo-type space --token "$HF_TOKEN" --commit-message "Sync pose Space from Kelo World ${GITHUB_SHA::7}"
+
+      - name: Enforce ZeroGPU hardware
+        run: |
+          hf spaces settings "$HF_USER/$ATLAS_SPACE" --hardware zero-a10g --token "$HF_TOKEN"
+          hf spaces settings "$HF_USER/$POSE_SPACE" --hardware zero-a10g --token "$HF_TOKEN"
+
+      - name: Print endpoints
+        run: |
+          echo "Atlas: https://huggingface.co/spaces/$HF_USER/$ATLAS_SPACE"
+          echo "Pose:  https://huggingface.co/spaces/$HF_USER/$POSE_SPACE"
+          echo "Next: store these IDs in Supabase secrets KELO_SPRITE_AI_HF_SPACE and KELO_SPRITE_AI_HF_POSE_SPACE."
