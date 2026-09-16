@@ -13,15 +13,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Probe Gradio API and direct generation
+      - name: Probe Gradio Z-Image generation
         shell: bash
         run: |
           mkdir -p probe
           set +e
           curl -sS -D probe/info-headers.txt https://multimodalart-sprite-forge.hf.space/gradio_api/info -o probe/info.json
-          curl -sS -D probe/config-headers.txt https://multimodalart-sprite-forge.hf.space/config -o probe/config.json
           cat > probe/request.json <<'JSON'
-          {"data":["Original Kelo World fantasy MMORPG adventurer, dark teal long coat, restrained gold trim, clean readable silhouette, premium pixel-art game character, no text",null,"Chunky pixel-friendly","FLUX.2 Klein 4B — fast","Square · fast (544²)",["Walk"],2,4,1234,0.10,0.09,1.0,2,0.30,16,true,12,256]}
+          {"data":["Original Kelo World fantasy MMORPG adventurer, dark teal long coat, restrained gold trim, clean readable silhouette, premium pixel-art game character, no text",null,"Chunky pixel-friendly","Z-Image Turbo — fastest","Square · fast (544²)",["Walk"],2,4,1234,0.10,0.09,1.0,2,0.30,16,true,12,256]}
           JSON
           curl -sS -D probe/submit-headers.txt -H 'Content-Type: application/json' -H 'Accept: application/json' -X POST --data-binary @probe/request.json https://multimodalart-sprite-forge.hf.space/gradio_api/call/forge -o probe/submit.json
           python - <<'PY'
@@ -36,7 +35,7 @@ jobs:
           PY
           EID="$(cat probe/event-id.txt 2>/dev/null)"
           if [ -n "$EID" ]; then
-            curl -sS --max-time 150 -D probe/sse-headers.txt -H 'Accept: text/event-stream' "https://multimodalart-sprite-forge.hf.space/gradio_api/call/forge/$EID" -o probe/sse.txt
+            curl -sS --max-time 180 -D probe/sse-headers.txt -H 'Accept: text/event-stream' "https://multimodalart-sprite-forge.hf.space/gradio_api/call/forge/$EID" -o probe/sse.txt
             echo $? > probe/sse-exit.txt
           fi
           echo '=== SUBMIT ==='
