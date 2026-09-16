@@ -1,6 +1,6 @@
 # Kelo World — Code Index
 
-**Actualizado:** 2026-09-14
+**Actualizado:** 2026-09-15
 
 ## Runtime
 
@@ -39,7 +39,37 @@
 - `assets/world/plaza/forest-plaza-tileset-v2.png` — atlas fuente LIVE.
 - `src/property/forest-plaza-asset-catalog.js` — 146 templates, nombres/categorías.
 - `src/property/property-asset-catalog.js` — catálogo general.
-- `src/creators/assets/asset-sheet-compiler.mjs` — compiler heterogéneo.
+- `src/creators/assets/png-conformance-guard.mjs` — estructura PNG, APNG/Adam7/16-bit classification, safe-to-copy y límites anti-bomb.
+- `src/creators/assets/asset-image-profiler.mjs` — clasifica tile/pixel/UI/FX/sprite con confidence/sourceOfTruth y selecciona quality policy.
+- `src/creators/assets/png-space-optimizer.mjs` — compresión PNG lossless con gate RGBA exacto y reducciones exactas de representación.
+- `src/creators/assets/png-independent-validator.mjs` — consenso externo Sharp/libvips + pngcheck.
+- `src/creators/assets/png-codec-tournament.mjs` — torneo verificado Kelo/OxiPNG/ZopfliPNG/ECT.
+- `src/creators/assets/png-adaptive-optimizer.mjs` — búsqueda opt-in guiada por perfil con fallback strict.
+- `src/creators/assets/png-quality-agent.mjs` — RGBA/alpha/PSNR/bordes/seams/premultiplied/composited hard gates.
+- `src/creators/assets/asset-animation-consistency.mjs` — QA temporal de secuencias: silhouette, alpha, centroid, paleta y anchor drift.
+- `src/creators/assets/quality-boundary-search.mjs` — búsqueda medida multi-frontera/no-monotónica con probes exploratorios.
+- `src/creators/assets/quality-pareto.mjs` — fronteras no dominadas de tamaño/calidad/CPU/decode/memoria/compatibilidad.
+- `src/creators/assets/perceptual-quality-bridge.mjs` — advisory opcional SSIMULACRA2/Butteraugli/IQA; nunca sobreescribe hard gates.
+- `src/creators/assets/asset-effort-controller.mjs` — FAST→BALANCED→DEEP según valor marginal medido.
+- `src/creators/assets/asset-optimization-cache.mjs` — cache content-addressed invalidado por source/config/engine/toolchain.
+- `src/creators/assets/asset-provenance.mjs` — SHA-256 SOURCE/OUTPUT y evidencia reproducible.
+- `src/creators/assets/runtime-image-variants.mjs` — laboratorio DELIVERY PNG/WebP/AVIF en sRGB, con timings/memoria y bloqueo por device proof.
+- `src/creators/assets/delivery-device-proof.mjs` — contrato formal de benchmark real iOS Safari.
+- `src/creators/assets/asset-delivery-manifest.mjs` — variantes DELIVERY inmutables por hash + provenance.
+- `src/creators/assets/smart-atlas-planner.mjs` — trim alpha-safe, `orig/trim/anchor`, MaxRects y subframe dedup.
+- `src/creators/assets/asset-budget-policy.mjs` — límites declarativos por grupo/zona para bytes, RGBA, file count y asset máximo.
+- `docs/asset-space-budgets.json` — política inicial de budget de bibliotecas/zonas; no infiere loading runtime.
+- `scripts/asset-space-compiler.mjs` — CLI FAST/AUTO/BALANCED/DEEP, before/after/diff, perfil, provenance y reporte.
+- `scripts/asset-space-budget.mjs` — transferencia, RGBA baseline, transparencia y duplicados exactos.
+- `scripts/asset-route-budget-audit.mjs` — enforcement CI de grupos declarados en `docs/asset-space-budgets.json`.
+- `scripts/asset-animation-consistency-audit.mjs` — corpus adversarial de flicker/anchor/alpha temporal.
+- `scripts/asset-codec-tournament.mjs` — laboratorio profundo de codecs y variantes de entrega.
+- `scripts/asset-space-meta-audit.mjs` — gate de profiler/seams/search no-monotónico/tournament.
+- `scripts/asset-png-torture-audit.mjs` — parser/conformance mutation corpus.
+- `scripts/asset-png-independent-audit.mjs` — validación independiente sobre assets reales.
+- `scripts/asset-atlas-space-audit.mjs` — presupuesto geométrico/trim/dedup/MaxRects de atlas.
+- `scripts/asset-atlas-recomposition-audit.mjs` — prueba render-exact de trim/repack + anchors.
+- `src/creators/assets/asset-sheet-compiler.mjs` — compiler heterogéneo de geometría/metadata.
 - `src/creators/sprite-compiler/sprite-foreground-analysis.mjs` — foreground/components.
 - `src/creators/sprite-compiler/sprite-world-asset-compiler.mjs` — perfil world asset.
 

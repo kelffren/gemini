@@ -1,0 +1,90 @@
+name: Asset Space Hardening
+
+on:
+  push:
+    branches: [main, feat/adaptive-png-space-compiler]
+    paths:
+      - 'src/creators/assets/**'
+      - 'scripts/asset-*.mjs'
+      - 'docs/asset-space-budgets.json'
+      - 'assets/world/plaza/**'
+      - 'src/environment/generated/forest-plaza-tileset-v2-manifest.js'
+      - '.github/workflows/asset-space-hardening.yml'
+  pull_request:
+    paths:
+      - 'src/creators/assets/**'
+      - 'scripts/asset-*.mjs'
+      - 'docs/asset-space-budgets.json'
+      - 'assets/world/plaza/**'
+      - 'src/environment/generated/forest-plaza-tileset-v2-manifest.js'
+      - '.github/workflows/asset-space-hardening.yml'
+
+concurrency:
+  group: asset-space-hardening-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  hardening:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - name: Bug Intelligence risk preflight
+        run: |
+          BASE="$(git merge-base HEAD origin/main)"
+          echo "Asset-space risk base: $BASE"
+          node scripts/bug-risk.mjs "$BASE" HEAD
+      - name: Bug Intelligence dependency impact
+        run: |
+          BASE="$(git merge-base HEAD origin/main)"
+          node scripts/bug-impact.mjs --diff "$BASE" HEAD --depth=2
+      - name: Runtime performance no-regression contract
+        run: |
+          BASE="$(git merge-base HEAD origin/main)"
+          TMP="$(mktemp -d)"
+          git worktree add --detach "$TMP/base" "$BASE" >/dev/null
+          set +e
+          (cd "$TMP/base" && node scripts/performance-foundation-audit.js) >"$TMP/base.log" 2>&1
+          BASE_RC=$?
+          node scripts/performance-foundation-audit.js >"$TMP/head.log" 2>&1
+          HEAD_RC=$?
+          set -e
+          grep '^✗ ' "$TMP/base.log" | sort >"$TMP/base.fail" || true
+          grep '^✗ ' "$TMP/head.log" | sort >"$TMP/head.fail" || true
+          echo "Baseline performance audit exit: $BASE_RC"
+          cat "$TMP/base.fail" || true
+          echo "HEAD performance audit exit: $HEAD_RC"
+          cat "$TMP/head.fail" || true
+          comm -13 "$TMP/base.fail" "$TMP/head.fail" >"$TMP/new.fail"
+          if [ -s "$TMP/new.fail" ]; then
+            echo 'NEW PERFORMANCE CONTRACT FAILURES INTRODUCED:'
+            cat "$TMP/new.fail"
+            exit 1
+          fi
+          echo 'PERFORMANCE_NO_REGRESSION_OK'
+      - name: Quality Agent golden corpus
+        run: node scripts/asset-quality-golden-corpus-audit.mjs
+      - name: Animation temporal consistency gate
+        run: node scripts/asset-animation-consistency-audit.mjs
+      - name: Declarative asset-group budgets
+        run: node scripts/asset-route-budget-audit.mjs --config=docs/asset-space-budgets.json --report=test-results/asset-route-budget
+      - name: PNG cache integrity
+        run: node scripts/asset-optimization-cache-audit.mjs
+      - name: Smart Atlas recomposition proof
+        run: node scripts/asset-atlas-recomposition-audit.mjs --manifest=src/environment/generated/forest-plaza-tileset-v2-manifest.js
+      - name: Asset documentation contract
+        run: node scripts/system-documentation-audit.js
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: asset-space-hardening-report
+          path: test-results/asset-route-budget
+          if-no-files-found: ignore
