@@ -7,14 +7,20 @@ on:
       - feat/adaptive-png-space-compiler
     paths:
       - 'src/creators/assets/png-*.mjs'
-      - 'scripts/asset-space-compiler*.mjs'
+      - 'src/creators/assets/asset-image-profiler.mjs'
+      - 'src/creators/assets/runtime-image-variants.mjs'
+      - 'scripts/asset-space-*.mjs'
+      - 'scripts/asset-codec-tournament.mjs'
       - 'assets/**/*.png'
       - 'C/**/*.png'
       - '.github/workflows/asset-space-compiler.yml'
   pull_request:
     paths:
       - 'src/creators/assets/png-*.mjs'
-      - 'scripts/asset-space-compiler*.mjs'
+      - 'src/creators/assets/asset-image-profiler.mjs'
+      - 'src/creators/assets/runtime-image-variants.mjs'
+      - 'scripts/asset-space-*.mjs'
+      - 'scripts/asset-codec-tournament.mjs'
       - 'assets/**/*.png'
       - 'C/**/*.png'
       - '.github/workflows/asset-space-compiler.yml'
@@ -33,6 +39,7 @@ on:
         options:
           - strict
           - adaptive
+          - tournament
 
 concurrency:
   group: asset-png-space-${{ github.ref }}
@@ -52,6 +59,8 @@ jobs:
           node-version: '20'
       - name: Deterministic PNG compiler self-test
         run: node scripts/asset-space-compiler-audit.mjs
+      - name: Meta policy / seam / tournament audit
+        run: node scripts/asset-space-meta-audit.mjs
       - name: Existing Asset Sheet compatibility audit
         run: node scripts/asset-sheet-compiler-audit.mjs
       - name: Documentation contract audit
@@ -89,4 +98,34 @@ jobs:
         with:
           name: png-space-adaptive-report
           path: test-results/asset-space-adaptive
+          if-no-files-found: ignore
+
+  codec-tournament-lab:
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'tournament'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install runtime codecs
+        run: |
+          npm install --no-save sharp@0.35.4
+          sudo apt-get update
+          sudo apt-get install -y zopfli webp pngquant
+          cargo install oxipng --version 10.0.0 --locked
+      - name: Run deep codec tournament
+        run: node scripts/asset-codec-tournament.mjs --input="${{ github.event.inputs.input_path }}" --max-files=6 --emit-variants --report=test-results/asset-codec-tournament
+      - name: Publish tournament summary
+        if: always()
+        run: |
+          if [ -f test-results/asset-codec-tournament/report.json ]; then
+            node -e "const r=require('./test-results/asset-codec-tournament/report.json'); require('fs').appendFileSync(process.env.GITHUB_STEP_SUMMARY, '# Asset Codec Tournament\n\nFiles: '+r.fileCount+'\n\nAuthoring PNG saving: '+r.totals.authoringSavedPercent.toFixed(2)+'%\n\nRuntime candidate saving: '+r.totals.runtimeSavedPercent.toFixed(2)+'%\n')"
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: asset-codec-tournament
+          path: test-results/asset-codec-tournament
           if-no-files-found: ignore
