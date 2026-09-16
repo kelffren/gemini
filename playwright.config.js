@@ -7,6 +7,7 @@ const { defineConfig, devices } = require('@playwright/test');
 //
 // Playwright defaults reducedMotion to "no-preference"; BrowserStack real iOS
 // expects the device/system default instead, so explicitly reset it with null.
+const isCI = Boolean(process.env.CI);
 const isBrowserStack = Boolean(
   process.env.BROWSERSTACK_USERNAME ||
   process.env.BROWSERSTACK_ACCESS_KEY ||
@@ -25,12 +26,15 @@ const browserStackIOSUse = {
 module.exports = defineConfig({
   testDir: './tests',
   timeout: 45000,
-  retries: 0,
+  globalTimeout: isCI ? 25 * 60 * 1000 : undefined,
+  forbidOnly: isCI,
+  retries: isCI ? 1 : 0,
+  workers: isCI ? 1 : undefined,
   reporter: [['list'], ['json', { outputFile: 'playwright-report.json' }]],
   use: {
     baseURL: process.env.KELO_PAGES || 'https://kelffren.github.io/gemini/',
-    trace: 'retain-on-failure',
-    screenshot: 'on',
+    trace: isCI ? 'on-first-retry' : 'retain-on-failure',
+    screenshot: 'only-on-failure',
     video: 'off',
     ...(isBrowserStack ? browserStackIOSUse : localMobileUse),
   },
