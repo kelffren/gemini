@@ -138,7 +138,6 @@ def _frame_prompt(subject: str, direction: str, action: str, phase: str, style_h
 
 
 def _quality_profile(retry_hint: str):
-    # First pass is intentionally cheap because Kelo Frame Doctor will request a targeted retry only if needed.
     if (retry_hint or "").strip():
         return {"tier": "repair", "size": 448, "steps": 16, "guidance": 5.2, "duration": 105}
     return {"tier": "draft", "size": 384, "steps": 12, "guidance": 4.6, "duration": 75}
@@ -176,20 +175,25 @@ def generate_pose(subject_prompt: str, source_image_data_url: str, seed: int = 0
     reference = _decode_reference(source_image_data_url)
     frames = _pose_frames(pose_template_json)
     profile = _quality_profile(retry_hint)
+
+    # Walk draft uses three unique frames and reuses passing-a as frame 4 (0→1→2→1).
+    # A QA retry automatically switches to four unique frames at higher quality.
+    synthesize_fourth = action == "walk" and profile["tier"] == "draft"
+    source_frames = frames[:3] if synthesize_fourth else frames
     prompts, pose_images = [], []
-    for index, frame in enumerate(frames):
+    for index, frame in enumerate(source_frames):
         phase = str(frame.get("phase") or frame.get("name") or f"frame-{index+1}")
         prompts.append(_frame_prompt(subject_prompt or "Premium dark-fantasy MMORPG character", direction, action, phase, style_hint, retry_hint))
         pose_images.append(_render_pose(frame, profile["size"]))
 
-    # One batched diffusion call replaces four serial calls. This is the main ZeroGPU quota optimization.
     outputs = _batch_sample(prompts, reference, pose_images, seed, profile)
+    final_outputs = [outputs[0], outputs[1], outputs[2], outputs[1]] if synthesize_fourth else outputs[:4]
     row = Image.new("RGB", (CELL * 4, CELL), (255, 255, 255))
-    for index, output in enumerate(outputs):
+    for index, output in enumerate(final_outputs):
         row.paste(output, (index * CELL, 0))
 
     metadata = json.dumps({
-        "version": "kelo-real-skeleton-v2-batched",
+        "version": "kelo-real-skeleton-v3-free-max",
         "conditioning": "controlnet-openpose+ip-adapter",
         "baseModel": BASE_MODEL,
         "controlNet": CONTROLNET_MODEL,
@@ -198,7 +202,10 @@ def generate_pose(subject_prompt: str, source_image_data_url: str, seed: int = 0
         "direction": direction,
         "action": action,
         "frames": 4,
-        "batchSize": 4,
+        "uniqueGpuFrames": len(source_frames),
+        "synthesizedFourth": synthesize_fourth,
+        "loopPattern": "0-1-2-1" if synthesize_fourth else "0-1-2-3",
+        "batchSize": len(source_frames),
         "seed": seed,
         "qualityTier": profile["tier"],
         "workingResolution": profile["size"],
@@ -209,7 +216,7 @@ def generate_pose(subject_prompt: str, source_image_data_url: str, seed: int = 0
 
 
 with gr.Blocks(title="Kelo Sprite Pose · Real Skeleton") as demo:
-    gr.Markdown("# Kelo Sprite Pose · Real Skeleton\nBatched SDXL + OpenPose ControlNet + IP-Adapter. First pass is quota-efficient; targeted retries automatically use a higher quality tier.")
+    gr.Markdown("# Kelo Sprite Pose · Real Skeleton\nQuota-aware batched SDXL + OpenPose + IP-Adapter. Walk drafts use 3 unique GPU frames; Frame Doctor escalates only failing rows to 4-frame repair quality.")
     subject = gr.Textbox(label="Character description", value="Premium dark-fantasy MMORPG character")
     source = gr.Textbox(label="Master reference data URL", visible=False)
     seed = gr.Number(label="Seed", value=0, precision=0)
