@@ -9,12 +9,14 @@ import {searchLpcAssets} from './lpc-live-provider.mjs';
 import {searchOpenGameArtAssets,clearOpenGameArtCache} from './opengameart-live-provider.mjs';
 import {searchKeloContent,clearKeloContentCache} from './kelo-content-live-provider.mjs';
 
-const CONFIG_URL='../../../data/external-asset-providers.json?v=5';
+// Resolve repo-local data from the module itself, not from the HTML document URL.
+// This keeps GitHub Pages project paths such as /gemini/ intact.
+const CONFIG_URL=new URL('../../../data/external-asset-providers.json?v=6',import.meta.url).href;
 let configPromise=null;let liveCache=new Map();
 function clean(v){return String(v??'').trim();}function join(base,path){return new URL(path,base).href;}function normalizeCategory(v){const x=clean(v).toLowerCase();return x||'other';}
 function browserQA(){if(typeof location==='undefined')return{};try{const p=new URLSearchParams(location.search);return{provider:clean(p.get('qaProvider')),preview:p.get('qaPreview')==='1'};}catch{return{};}}
 function visualKind(category=''){const c=normalizeCategory(category);if(c.includes('tile'))return'tileset';if(c.includes('anim'))return'animation';if(c.includes('vfx')||c.includes('effect'))return'vfx';if(c.includes('character')||c.includes('sprite'))return'sprite';return'image';}
-export async function loadProviderConfig(){if(configPromise)return configPromise;configPromise=fetch(CONFIG_URL,{cache:'no-store'}).then(r=>{if(!r.ok)throw new Error('PROVIDER_CONFIG_'+r.status);return r.json();});return configPromise;}
+export async function loadProviderConfig(){if(configPromise)return configPromise;configPromise=fetch(CONFIG_URL,{cache:'no-store'}).then(r=>{if(!r.ok)throw new Error('PROVIDER_CONFIG_'+r.status);return r.json();}).catch(error=>{configPromise=null;throw error;});return configPromise;}
 function normalizeSpriteCook(example,provider){const preview=example.previewPath?join(provider.assetBaseUrl,example.previewPath):null,category=normalizeCategory(example.category);return{id:`spritecook:${example.slug}`,provider:'spritecook',externalId:clean(example.slug),name:clean(example.title||example.slug),category,contentKind:visualKind(category),previewKind:'image',tags:[category,'pixel-art'].filter(Boolean),previewUrl:preview,downloadUrl:preview,sourceUrl:example.sourceUrl||provider.sourceUrl,license:'CC0-1.0',author:'SpriteCook',attributionRequired:false,ownership:'discovered',description:clean(example.prompt),settings:Array.isArray(example.settings)?example.settings:[],downloadable:!!preview,integrationReady:!!preview};}
 async function loadSpriteCook(provider){if(liveCache.has(provider.id))return liveCache.get(provider.id);const data=await fetch(provider.indexUrl,{mode:'cors',cache:'force-cache'}).then(r=>{if(!r.ok)throw new Error('SPRITECOOK_INDEX_'+r.status);return r.json();});const list=Array.isArray(data?.examples)?data.examples:[],result=list.map(x=>normalizeSpriteCook(x,provider));liveCache.set(provider.id,result);return result;}
 function normalizeKenney(rows){return(rows||[]).map(a=>({...a,contentKind:a.contentKind||visualKind(a.category),previewKind:a.previewKind||'image'}));}
