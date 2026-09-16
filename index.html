@@ -140,6 +140,7 @@
 <script src="src/core/hot-data-registry.js?v=1-transactional"></script>
 <script src="src/abilities/ability-balance-hot-owner.js?v=1"></script>
 <script src="src/systems/equipment-market-hot-owner.js?v=1"></script>
+<script src="src/systems/arena-progression-hot-owner.js?v=1"></script>
 <script src="src/core/update-gate.js?v=8-hot-data"></script>
 <script src="src/core/session-continuity-system.js?v=2-update-classes"></script>
 <script src="src/core/session-continuity-retry.js?v=1-event-driven"></script>
@@ -150,36 +151,73 @@
 <script>
 (function(){
   'use strict';
-  const selector='[id*="minimap" i],[class*="minimap" i],[id*="mini-map" i],[class*="mini-map" i],[data-minimap]';
-  function moveVisibleMinimap(){
-    const nodes=Array.from(document.querySelectorAll(selector));
-    for(const el of nodes){
-      if(!(el instanceof HTMLElement))continue;
-      const cs=getComputedStyle(el),r=el.getBoundingClientRect();
-      if(cs.display==='none'||cs.visibility==='hidden'||Number(cs.opacity)===0)continue;
-      if(r.width<48||r.height<48)continue;
-      if(r.width>260||r.height>260)continue;
-      const ratio=r.width/r.height;if(ratio<.55||ratio>1.8)continue;
-      el.style.setProperty('position','fixed','important');
-      el.style.setProperty('left','max(12px, env(safe-area-inset-left))','important');
-      el.style.setProperty('top','calc(env(safe-area-inset-top, 0px) + 12px)','important');
-      el.style.setProperty('right','auto','important');
-      el.style.setProperty('bottom','auto','important');
-      el.style.setProperty('z-index','2147480050','important');
-      el.dataset.keloMinimapPosition='top-left';
-      return true;
+  const semanticSelector='[id*="minimap" i],[class*="minimap" i],[id*="mini-map" i],[class*="mini-map" i],[data-minimap]';
+  const isVisible=function(el){
+    if(!(el instanceof HTMLElement))return false;
+    const cs=getComputedStyle(el),r=el.getBoundingClientRect();
+    return cs.display!=='none'&&cs.visibility!=='hidden'&&Number(cs.opacity)!==0&&r.width>=48&&r.height>=48&&r.width<=260&&r.height<=260;
+  };
+  const looksLikeBottomLeftMinimap=function(el){
+    if(!isVisible(el))return false;
+    const r=el.getBoundingClientRect(),ratio=r.width/r.height;
+    if(ratio<.55||ratio>1.8)return false;
+    if(r.left>Math.max(64,innerWidth*.28))return false;
+    if(r.top<innerHeight*.48)return false;
+    const hasCanvas=el.tagName==='CANVAS'||!!el.querySelector?.('canvas');
+    const nearBottom=(innerHeight-r.bottom)<=Math.max(180,innerHeight*.22);
+    return hasCanvas&&nearBottom;
+  };
+  const promoteHost=function(el){
+    let host=el;
+    for(let i=0;i<3&&host.parentElement&&host.parentElement!==document.body;i++){
+      const parent=host.parentElement,pr=parent.getBoundingClientRect(),hr=host.getBoundingClientRect();
+      if(pr.width<48||pr.height<48||pr.width>280||pr.height>280)break;
+      if(Math.abs(pr.left-hr.left)>36||Math.abs(pr.top-hr.top)>36)break;
+      host=parent;
     }
-    return false;
+    return host;
+  };
+  function findVisibleMinimap(){
+    const semantic=Array.from(document.querySelectorAll(semanticSelector)).find(isVisible);
+    if(semantic)return promoteHost(semantic);
+    const candidates=Array.from(document.querySelectorAll('canvas,div,section,aside')).filter(looksLikeBottomLeftMinimap);
+    if(!candidates.length)return null;
+    candidates.sort((a,b)=>{
+      const ar=a.getBoundingClientRect(),br=b.getBoundingClientRect();
+      return (br.width*br.height)-(ar.width*ar.height);
+    });
+    return promoteHost(candidates[0]);
   }
-  const move=()=>requestAnimationFrame(moveVisibleMinimap);
+  function moveVisibleMinimap(){
+    const el=findVisibleMinimap();
+    if(!el)return false;
+    el.style.setProperty('position','fixed','important');
+    el.style.setProperty('left','max(12px, env(safe-area-inset-left))','important');
+    el.style.setProperty('top','calc(env(safe-area-inset-top, 0px) + 12px)','important');
+    el.style.setProperty('right','auto','important');
+    el.style.setProperty('bottom','auto','important');
+    el.style.setProperty('transform','none','important');
+    el.style.setProperty('margin','0','important');
+    el.style.setProperty('z-index','2147480050','important');
+    el.dataset.keloMinimapPosition='top-left';
+    return true;
+  }
+  let queued=false;
+  const move=function(){
+    if(queued)return;
+    queued=true;
+    requestAnimationFrame(function(){queued=false;moveVisibleMinimap();});
+  };
   move();
   window.addEventListener('pageshow',move,{passive:true});
+  window.addEventListener('load',move,{passive:true});
   window.addEventListener('resize',move,{passive:true});
   window.addEventListener('orientationchange',move,{passive:true});
   window.addEventListener('kelo:boot-ready',move,{once:true});
+  document.addEventListener('pointerup',move,{passive:true});
   const observer=new MutationObserver(move);
-  observer.observe(document.body,{childList:true,subtree:true});
-  window.KELO_MINIMAP_POSITION=Object.freeze({position:'top-left',owner:'index-layout-adapter',refresh:moveVisibleMinimap});
+  observer.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['style','class']});
+  window.KELO_MINIMAP_POSITION=Object.freeze({position:'top-left',owner:'index-layout-adapter-v2',refresh:moveVisibleMinimap});
 })();
 </script>
 </body></html>

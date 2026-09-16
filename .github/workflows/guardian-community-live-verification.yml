@@ -1,0 +1,54 @@
+name: Guardian Community Live Verification
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: guardian-community-live-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  verify-live:
+    name: guardian-community-live-verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+      KELO_GUARDIAN_TEST_ADMIN_EMAIL: ${{ secrets.KELO_GUARDIAN_TEST_ADMIN_EMAIL }}
+      KELO_GUARDIAN_TEST_ADMIN_PASSWORD: ${{ secrets.KELO_GUARDIAN_TEST_ADMIN_PASSWORD }}
+      KELO_GUARDIAN_TEST_DONOR_EMAIL: ${{ secrets.KELO_GUARDIAN_TEST_DONOR_EMAIL }}
+      KELO_GUARDIAN_TEST_DONOR_PASSWORD: ${{ secrets.KELO_GUARDIAN_TEST_DONOR_PASSWORD }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+
+      - name: Validate required secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          required=(
+            SUPABASE_URL
+            SUPABASE_PUBLISHABLE_KEY
+            KELO_GUARDIAN_TEST_ADMIN_EMAIL
+            KELO_GUARDIAN_TEST_ADMIN_PASSWORD
+            KELO_GUARDIAN_TEST_DONOR_EMAIL
+            KELO_GUARDIAN_TEST_DONOR_PASSWORD
+          )
+          for key in "${required[@]}"; do
+            if [ -z "${!key:-}" ]; then
+              echo "Missing required GitHub Actions secret: $key" >&2
+              exit 1
+            fi
+          done
+
+      - name: Live two-account Guardian quorum smoke
+        run: node scripts/guardian-community-live-smoke.mjs

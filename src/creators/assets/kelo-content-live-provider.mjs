@@ -1,10 +1,10 @@
 /* KELO-INDEX
  * area: CREATORS / UNIVERSAL CONTENT PROVIDERS
  * owner: Kelo Universal Content Bridge
- * keys: KELO CONTENT ABILITY SCENE PREFAB INLINE
+ * keys: KELO CONTENT ABILITY SCENE PREFAB INLINE PAGINATION
  * purpose: Expose tiny native declarative content packs through the same personal vault flow.
  */
-const INDEX_URL=new URL('../../../data/kelo-content-starter-catalog.json?v=2',import.meta.url).href;
+const INDEX_URL=new URL('../../../data/kelo-content-starter-catalog.json?v=3',import.meta.url).href;
 let indexPromise=null;
 const clean=v=>String(v??'').trim();
 const lower=v=>clean(v).toLowerCase();
@@ -19,10 +19,10 @@ function normalize(row){
   return {id:`kelo-content:${clean(row.id)}`,provider:'kelo-content',externalId:clean(row.id),name:clean(row.name||row.id),category:clean(row.category||kind),contentKind:kind,tags:Array.isArray(row.tags)?row.tags:[],description:`Kelo declarative ${kind} · no executable code`,previewUrl:null,previewKind:'manifest',downloadUrl:null,sourceUrl:'https://github.com/kelffren/gemini',license:clean(row.license||'KELO-NATIVE'),author:clean(row.author||'Kelo World'),attributionRequired:false,ownership:'discovered',downloadable:true,integrationReady:true,inlineManifest:row.inlineManifest||null};
 }
 export async function searchKeloContent(query='',options={}){
-  const data=await loadIndex(),q=lower(query),limit=Math.max(1,Math.min(Number(options.limit)||160,320));let rows=data.assets.map(normalize);
+  const data=await loadIndex(),q=lower(query),limit=Math.max(1,Math.min(Number(options.limit)||80,320)),offset=Math.max(0,Number(options.offset)||0);let rows=data.assets.map(normalize);
   if(q){const tokens=q.split(/\s+/).filter(Boolean);rows=rows.filter(a=>{const hay=lower(`${a.name} ${a.category} ${a.contentKind} ${(a.tags||[]).join(' ')}`);return tokens.every(t=>hay.includes(t));});}
   if(options.contentKind&&options.contentKind!=='all')rows=rows.filter(a=>a.contentKind===options.contentKind);
-  return rows.slice(0,limit);
+  return rows.slice(offset,offset+limit);
 }
 export function clearKeloContentCache(){indexPromise=null;}
 export const KELO_CONTENT_LIVE_PROVIDER=Object.freeze({search:searchKeloContent,clearCache:clearKeloContentCache,indexUrl:INDEX_URL});

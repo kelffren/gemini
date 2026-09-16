@@ -87,6 +87,7 @@
     "audit:online-foundation": "node scripts/online-foundation-audit.mjs",
     "audit:guardian": "node scripts/guardian-system-audit.mjs",
     "audit:guardian-room-host": "node scripts/guardian-room-host-audit.mjs",
+    "audit:guardian-pvp-host": "node scripts/guardian-pvp-host-audit.mjs",
     "audit:universal-content": "node scripts/universal-content-studio-audit.mjs",
     "audit:avatar-quick": "node scripts/avatar-quick-import-audit.mjs",
     "audit:sprite-compiler": "node scripts/sprite-compiler-audit.mjs",
