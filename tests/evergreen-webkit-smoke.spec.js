@@ -21,7 +21,9 @@ test('V6.69 evergreen branch boots plaza without uncaught errors', async ({ page
     transitionBridge:window.KeloLegacyTransitionBridge&&window.KeloLegacyTransitionBridge.snapshot&&window.KeloLegacyTransitionBridge.snapshot(),
     camera:!!window.KeloCamera,
     position:!!window.KeloPlayerPosition,
-    collision:!!window.KELO_COLLISION
+    collision:!!window.KELO_COLLISION,
+    moduleLoader:window.KELO_MODULE_LOADER&&window.KELO_MODULE_LOADER.diagnostics&&window.KELO_MODULE_LOADER.diagnostics(),
+    assetKnown:window.KELO_ASSET_REGISTRY&&window.KELO_ASSET_REGISTRY.known
   }));
 
   expect(snapshot.bootReady).toBe(true);
@@ -32,8 +34,26 @@ test('V6.69 evergreen branch boots plaza without uncaught errors', async ({ page
   expect(snapshot.camera).toBe(true);
   expect(snapshot.position).toBe(true);
   expect(snapshot.collision).toBe(true);
+  expect(snapshot.moduleLoader).toBeTruthy();
+  expect(snapshot.moduleLoader.afterPaint).toEqual(expect.arrayContaining(['controlPlane','observability']));
+  expect(snapshot.assetKnown).not.toContain('controlPlane');
+  expect(snapshot.assetKnown).not.toContain('observability');
 
-  await page.waitForTimeout(1200);
+  await page.waitForFunction(()=>window.KELO_MODULE_LOADER?.isReady?.('controlPlane')&&window.KELO_MODULE_LOADER?.isReady?.('observability'),{timeout:10000});
+  const afterPaint=await page.evaluate(()=>({
+    controlPlane:window.KELO_MODULE_LOADER.isReady('controlPlane'),
+    observability:window.KELO_MODULE_LOADER.isReady('observability'),
+    positionShadow:!!window.KeloPlayerPositionShadow,
+    farmShadow:!!window.KELO_SIMULATION_FARM_SHADOW,
+    failures:window.KELO_MODULE_LOADER.diagnostics().failures
+  }));
+  expect(afterPaint.controlPlane).toBe(true);
+  expect(afterPaint.observability).toBe(true);
+  expect(afterPaint.positionShadow).toBe(true);
+  expect(afterPaint.farmShadow).toBe(true);
+  expect(afterPaint.failures).toEqual({});
+
+  await page.waitForTimeout(250);
   expect(pageErrors).toEqual([]);
   expect(consoleErrors.filter(text=>!/favicon/i.test(text))).toEqual([]);
 });
