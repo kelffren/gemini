@@ -1,13 +1,27 @@
 {
-  "version": 4,
+  "version": 5,
   "policy": {
     "downloadOnBrowse": false,
     "requireExplicitDownload": true,
     "requireExplicitIntegration": true,
-    "allowedLicenses": ["CC0-1.0", "CC0", "CC-BY-3.0", "CC-BY-4.0", "OGA-BY-3.0"],
+    "neverExecuteExternalCode": true,
+    "allowedLicenses": ["CC0-1.0", "CC0", "CC-BY-3.0", "CC-BY-4.0", "OGA-BY-3.0", "KELO-NATIVE"],
     "reviewLicenses": ["CC-BY-SA-3.0", "CC-BY-SA-4.0", "GPL-2.0", "GPL-3.0", "UNKNOWN"]
   },
   "providers": [
+    {
+      "id": "kelo-content",
+      "name": "Kelo Content Packs",
+      "mode": "live-index",
+      "enabled": true,
+      "verified": true,
+      "license": "KELO-NATIVE",
+      "attributionRequired": false,
+      "sourceUrl": "https://github.com/kelffren/gemini",
+      "browseUrl": "https://kelffren.github.io/gemini/asset-vault.html",
+      "indexUrl": "../../../data/kelo-content-starter-catalog.json?v=1",
+      "notes": "Declarative abilities and prebuilt scenes. Tiny JSON is downloaded into the personal vault only after Download; no executable code is accepted."
+    },
     {
       "id": "spritecook",
       "name": "SpriteCook Free Assets",
@@ -18,7 +32,7 @@
       "indexUrl": "https://cdn.jsdelivr.net/gh/SpriteCook/spritecook-free-game-assets@master/index.json",
       "assetBaseUrl": "https://cdn.jsdelivr.net/gh/SpriteCook/spritecook-free-game-assets@master/",
       "sourceUrl": "https://github.com/SpriteCook/spritecook-free-game-assets",
-      "notes": "Machine-readable CC0 catalog. Binary assets are fetched only after an explicit Download action."
+      "notes": "Machine-readable CC0 sprite catalog. Binary assets are fetched only after an explicit Download action."
     },
     {
       "id": "kenney",
@@ -32,7 +46,7 @@
       "metadataMirror": "https://github.com/shorepine/kenney",
       "indexUrl": "https://raw.githubusercontent.com/shorepine/kenney/main/index.tsv",
       "assetBaseUrl": "https://raw.githubusercontent.com/shorepine/kenney/main/",
-      "notes": "CC0 catalog. The remote metadata index is fetched only after the user explicitly selects Kenney; individual image bytes are fetched only after Download."
+      "notes": "CC0 catalog. The remote metadata index is fetched only after the user explicitly selects Kenney; individual binary bytes are fetched only after Download."
     },
     {
       "id": "lpc",
@@ -45,7 +59,7 @@
       "sourceUrl": "https://github.com/LiberatedPixelCup/Universal-LPC-Spritesheet-Character-Generator",
       "browseUrl": "https://liberatedpixelcup.github.io/Universal-LPC-Spritesheet-Character-Generator/",
       "pinnedCommit": "553ba7562534cbf32e7d9a502660f569d6b26512",
-      "notes": "LIVE verified subset from the canonical LPC repository. Only items whose direct PNG path and per-item credit/license metadata were verified are exposed as downloadable. This first gate is CC0-only; mixed-license items remain excluded until their individual import contract is verified."
+      "notes": "LIVE verified animation subset from the canonical LPC repository. Only direct PNG paths with verified per-item credit/license metadata are downloadable."
     },
     {
       "id": "opengameart",
@@ -57,8 +71,8 @@
       "attributionRequired": false,
       "sourceUrl": "https://opengameart.org/",
       "browseUrl": "https://opengameart.org/",
-      "indexUrl": "../../../data/opengameart-cc0-curated.json?v=1",
-      "notes": "LIVE curated metadata feed. Kelo never bulk-scrapes OpenGameArt from player devices. Only individually verified CC0 entries with source page + direct file URL are exposed; binary bytes are requested only after Download."
+      "indexUrl": "../../../data/opengameart-cc0-curated.json?v=2",
+      "notes": "LIVE curated metadata for sprites, animations, tiles, SFX, music and ambience. Kelo never bulk-scrapes OpenGameArt from player devices; binary bytes are requested only after Download."
     }
   ]
 }
