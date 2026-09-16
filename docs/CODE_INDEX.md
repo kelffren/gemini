@@ -7,7 +7,9 @@
 - `index.html` — orden LIVE, auth-first y engine boot.
 - `engine-a.js` — legacy state/movement physics core.
 - `engine-c.js` — legacy render/simulation orchestration.
-- `engine-net.js` — networking runtime.
+- `engine-net.js` — transporte multiplayer único; `avatarManifest` funciona como presentation envelope server-authoritative dentro del AOI.
+- `server/index.js` — autoridad WebSocket/AOI; serializa presentation state ya resuelto por servidor.
+- `server/avatar-sync-store.js` — resuelve full-body Creator avatar + modular Creator appearance publicados usando la identidad autenticada del dueño; sanea el envelope antes de replicarlo.
 
 ## Foundation Core
 
@@ -20,8 +22,8 @@
 - `src/core/render-extension-system.js` — `KeloRender`.
 - `src/core/simulation-extension-system.js` — `KeloSimulation`.
 - `src/core/update-system.js` — `KeloUpdater`.
-- `src/core/creators-lazy-gate.js` — entrada lazy a Creator Library/Creators y facades `KeloCreatorDelivery` + `KeloCreatorUse`; además hace un probe metadata-only del loadout Creator y solo carga Appearance cuando el personaje tiene bindings visuales.
-- `src/core/feature-registry.js` — catálogo first-use de módulos; Appearance declara explícitamente slot schema, visual presets/stack, adapter y Creator Character Bridge.
+- `src/core/creators-lazy-gate.js` — entrada lazy Creator; probe metadata-only del loadout local, y tras equip/clear reutiliza `KeloNetAuthority.refreshAvatar()` para refrescar el presentation envelope existente sin segundo socket.
+- `src/core/feature-registry.js` — catálogo first-use; Appearance declara slot schema, visual presets/stack, adapter y Creator Character Bridge.
 
 ## World / Environment
 
@@ -41,45 +43,47 @@
 - `assets/world/plaza/forest-plaza-tileset-v2.png` — atlas fuente LIVE.
 - `src/property/forest-plaza-asset-catalog.js` — 146 templates, nombres/categorías.
 - `src/property/property-asset-catalog.js` — catálogo general.
-- `src/property/creator-property-entitlement-guard.mjs` — facade dinámico que impide reutilizar templates Creator cacheados cuando cambia/revoca el acceso.
-- `src/property/property-system.js` — owner de parcelas/placements; `useGuard()` permite precondiciones Creator sin reemplazar House/remote/local authority.
+- `src/property/creator-property-entitlement-guard.mjs` — impide reutilizar templates Creator cacheados tras cambio/revocación de acceso.
+- `src/property/property-system.js` — owner de parcelas/placements; `useGuard()` permite precondiciones Creator sin reemplazar domain authority.
 - `src/creators/assets/asset-sheet-compiler.mjs` — compiler heterogéneo.
 - `src/creators/sprite-compiler/sprite-foreground-analysis.mjs` — foreground/components.
 - `src/creators/sprite-compiler/sprite-world-asset-compiler.mjs` — perfil world asset.
 
 ## Studio / Creator
 
-- `src/creators/creator-entry.mjs` — composition root lazy de workspaces y servicios compartidos Creator; enlaza Entitlements + Delivery + Use Authority al mismo repository/sesión autenticada.
+- `src/creators/creator-entry.mjs` — composition root lazy de workspaces y servicios compartidos Creator.
 - `src/creators/library/creator-content-types.mjs` — Creator Library: tipos universales y routing a owners/workspaces existentes.
-- `src/creators/ui/creator-library-workspace.mjs` — biblioteca móvil CREATE / MY LIBRARY / MARKET / TOOLS / PIPELINE; MARKET se importa lazy.
+- `src/creators/ui/creator-library-workspace.mjs` — biblioteca móvil CREATE / MY LIBRARY / MARKET / TOOLS / PIPELINE.
 - `src/creators/workspaces/creator-library-workspace.mjs` — manifest lazy de Creator Library.
-- `src/creators/workspaces/image-lab-workspace.mjs` — manifest que integra Image Lab al registry Creator.
-- `src/creators/ui/image-lab-workspace.mjs` — preparación de fuentes tipo Photoshop ligero/no destructivo.
-- `src/creators/ui/asset-forge-workspace.mjs` — pixel drawing + QA/repair + asset authoring local.
+- `src/creators/workspaces/image-lab-workspace.mjs` — integra Image Lab al registry Creator.
+- `src/creators/ui/image-lab-workspace.mjs` — preparación de fuentes no destructiva.
+- `src/creators/ui/asset-forge-workspace.mjs` — pixel drawing + QA/repair + authoring local.
 - `src/creators/ui/content-studio-workspace.mjs` — ingest universal + runtime preview + Release Center móvil.
-- `src/creators/release/creator-release-service.mjs` — frontera de release: lee review/publicación server-side y solo permite submit/resubmit a review.
-- `src/creators/marketplace/creator-marketplace-service.mjs` — composición client-side del marketplace; una compra confirmada refresca el entitlement guard.
-- `src/creators/ui/creator-marketplace-surface.mjs` — UI móvil lazy: DISCOVER / MY LISTINGS / OWNED / CREATOR PROFILE.
-- `src/creators/content/creator-content-delivery.mjs` — Delivery exact-revision/on-demand: verifica acceso, obtiene manifest publicado, despierta owner requerido y registra runtime sin sincronizar toda la librería; arma Use Authority en el primer consumo Creator.
-- `src/creators/content/creator-use-authority.mjs` — puente de uso persistente: avatar, visual appearance/equipment, mount y preflight de property pasan por RPC exact-revision antes del owner de dominio.
-- `src/characters/creator-character-state-bridge.js` — proyecta bindings visuales Creator server-authoritative como overlay efímero del actor local; registra piezas hidden+locked y reutiliza `KeloCharacterVisualStack`/`KeloAvatar` sin persistir ownership local.
-- `src/creators/content/supabase-content-repository.mjs` — transporte autenticado/RLS/RPC para contenido, release, marketplace, access, delivery y use authority; no posee publish/wallet/domain authority.
-- `src/creators/content/universal-content-service.mjs` — ingest semántico; estampa `revisionId`/`ownerUserId` en records runtime Creator.
-- `src/creators/content/runtime-content-registry.mjs` — registry semántico; bloquea records Creator sin entitlement antes de adaptarlos y revalida acceso en `getForUse()`.
-- `src/systems/creator-entitlement-system.js` — `KeloCreatorEntitlements`: cache/gate de acceso por revisión; no persiste ownership local ni crea auth client.
-- `src/characters/creator-avatar-runtime.mjs` — runtime de Creator avatars; local use verifica entitlement exacto y remote rendering conserva manifests publicados.
-- `src/appearance/appearance-system.js` — defensa secundaria: omite layers Creator sin entitlement; no es owner de gameplay stats.
-- `src/mounts/mount-catalog.js` — defensa secundaria: oculta monturas Creator no autorizadas de APIs de uso.
-- `src/mounts/mount-system.js` — owner mount; `useGuard()` compone Creator-use preconditions antes de su authority adapter.
-- `supabase/migrations/20260916002500_creator_marketplace_v1.sql` — listings, transacciones KC, entitlements y Creator profile authority.
-- `supabase/migrations/20260916002600_creator_marketplace_discover_v2.sql` — Discover metadata-first/privacy-aware con flags relativos de ownership.
-- `supabase/migrations/20260916003000_creator_entitlement_access.sql` — RPCs canónicos de acceso exact-revision (`creator owner` o entitlement).
-- `supabase/migrations/20260916003500_creator_content_delivery_v1.sql` — manifest de delivery exact-revision + selección server-authoritative de avatars Creator comprados.
-- `supabase/migrations/20260916004000_creator_use_authority_v1.sql` — bindings server-authoritative de Creator appearance/equipment/mount y autorización previa de Creator property use.
-- `scripts/creator-content-delivery-audit.mjs` — audit estático de lazy delivery, publicación completa, identidad, no bulk sync y defensas runtime.
-- `scripts/creator-use-authority-audit.mjs` — audit estático de exact-revision use authority, guards componibles, no auth/ownership paralelo y preservación de domain owners.
-- `scripts/creator-character-state-bridge-audit.mjs` — audit del overlay efímero, exact-revision hydration, lazy Appearance, no persistencia/renderer paralelo y limpieza por identidad.
-- `src/ui/studio-launcher.js` — launcher del Creator Hub/Studio avanzado.
+- `src/creators/release/creator-release-service.mjs` — frontera de release server-side.
+- `src/creators/marketplace/creator-marketplace-service.mjs` — marketplace; compra confirmada refresca entitlement guard.
+- `src/creators/ui/creator-marketplace-surface.mjs` — DISCOVER / MY LISTINGS / OWNED / CREATOR PROFILE.
+- `src/creators/content/creator-content-delivery.mjs` — Delivery exact-revision/on-demand.
+- `src/creators/content/creator-use-authority.mjs` — persistencia autoritativa de avatar, visual appearance/equipment, mount y preflight property.
+- `src/characters/creator-character-state-bridge.js` — overlay efímero local + overlays remotos WeakMap; ambos reutilizan `KeloCharacterCustomization`/`KeloCharacterVisualStack`/`KeloAvatar`, con IDs visuales revision-scoped separados local/remote.
+- `src/characters/creator-avatar-runtime.mjs` — full-body Creator avatars; además detecta `creatorAppearance` remoto y despierta Appearance bajo demanda, sin crear otro renderer.
+- `src/creators/content/supabase-content-repository.mjs` — transporte autenticado/RLS/RPC Creator.
+- `src/creators/content/universal-content-service.mjs` — ingest semántico.
+- `src/creators/content/runtime-content-registry.mjs` — registry semántico entitlement-aware.
+- `src/systems/creator-entitlement-system.js` — `KeloCreatorEntitlements`: acceso exact-revision, sin ownership local persistido.
+- `src/appearance/appearance-system.js` — registry/resolver shared; no gameplay stats.
+- `src/mounts/mount-catalog.js` — catálogo mount con defensa Creator.
+- `src/mounts/mount-system.js` — owner mount + guards componibles.
+- `supabase/migrations/20260916002500_creator_marketplace_v1.sql` — marketplace/KC/entitlements.
+- `supabase/migrations/20260916002600_creator_marketplace_discover_v2.sql` — Discover metadata-first.
+- `supabase/migrations/20260916003000_creator_entitlement_access.sql` — acceso exact-revision canónico.
+- `supabase/migrations/20260916003500_creator_content_delivery_v1.sql` — delivery manifest + Creator avatar selection.
+- `supabase/migrations/20260916004000_creator_use_authority_v1.sql` — bindings server-authoritative Creator.
+- `supabase/migrations/20260916004500_creator_modular_replication_v1.sql` — snapshot presentation-only de appearance/equipment actual, publicado y todavía autorizado.
+- `scripts/creator-content-delivery-audit.mjs` — audit Delivery.
+- `scripts/creator-use-authority-audit.mjs` — audit use authority.
+- `scripts/creator-character-state-bridge-audit.mjs` — audit local Character bridge.
+- `scripts/creator-modular-replication-audit.mjs` — audit del envelope remoto, publicación/entitlement, AOI reutilizado, WeakMap overlays y ausencia de segundo transporte/renderer.
+- `src/ui/studio-launcher.js` — launcher Creator Hub/Studio.
 - `src/creators/workspaces/world-workspace.mjs` — route/prewarm móvil.
 - `src/studio/integration/world-studio-bridge.mjs` — bridge de carga.
 - `src/studio/integration/live-studio-controller.mjs` — sesión LIVE.
@@ -91,8 +95,8 @@
 
 ## Gameplay
 
-- `src/characters/character-customization.js` — owner del estado visual base, catálogo, historial, saves y middleware de capas; Creator bridge solo proyecta una lectura efímera encima del actor local.
-- `src/characters/character-visual-stack.js` — resolver ordenado usado por renderer/preview; consume dinámicamente `KeloCharacterCustomization.stateForActor()`.
+- `src/characters/character-customization.js` — owner del estado visual base, catálogo, historial, saves y middleware de capas; Creator bridge modifica solo la lectura `stateForActor()` con overlays efímeros.
+- `src/characters/character-visual-stack.js` — resolver ordenado compartido por actor local/remoto.
 - `src/abilities/` — abilities/Stone/equipment channels.
 - `src/systems/pvp-world.js` — PvP world.
 - `src/systems/arena-*` — Arena.
@@ -105,7 +109,7 @@
 - `src/systems/commerce-authority.js` — commerce.
 - `src/systems/regional-economy-system.js` — economía regional.
 - `src/systems/caravan-system.js` — caravanas.
-- `src/property/property-system.js` — placements/property; Creator use authorization es preflight, no reemplazo de autoridad de parcelas.
+- `src/property/property-system.js` — placements/property; Creator use authorization es preflight.
 - `src/instances/` — instancias.
 
 ## Admin / Reliability
@@ -118,4 +122,4 @@
 
 ## Documentación
 
-Empieza por `docs/DOCUMENTATION_INDEX.md`. Para passes materiales multiagente, lee también la entrada `ACTIVE` o `IMPLEMENTED_PENDING_VERIFY` correspondiente en `docs/IMPLEMENTATION_LEDGER.md`. Los documentos `*_MEMORY.md` son contexto acumulado, no autoridad superior al runtime.
+Empieza por `docs/DOCUMENTATION_INDEX.md`. Para trabajo Creator actual lee también `docs/implementation-passes/IMP-2026-09-16-CREATOR-MODULAR-REPLICATION-008.md` y el documento de sistema asociado. Los documentos `*_MEMORY.md` son contexto acumulado, no autoridad superior al runtime.
