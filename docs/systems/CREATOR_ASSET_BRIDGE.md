@@ -1,4 +1,4 @@
-# Creator Asset Bridge V2 — Asset Intelligence Compiler
+# Creator Asset Bridge V2.2 — Asset Intelligence Compiler
 
 ## Status
 
@@ -36,14 +36,36 @@ Atlas work is a separate planning branch under the same owner:
 
 ```text
 atlas + manifest
-  → frame trim metadata (`orig`, `trim`, adjusted anchor)
+  → alpha-derived safe frame trim (`orig`, `trim`, adjusted anchor)
+  → manifest visualBounds comparison
   → exact subframe duplicate detection
   → MaxRects planning
   → frame recomposition proof
   → measured promotion decision
 ```
 
-No Smart Atlas plan changes LIVE pixels, sourceRects or runtime manifests automatically.
+Animated assets can add a temporal evidence branch:
+
+```text
+frame sequence
+  → silhouette / alpha mass / centroid / palette metrics
+  → anchor drift measurement
+  → robust temporal-outlier detection
+  → manifest-specific limits
+  → animation consistency verdict
+```
+
+Repository asset groups can add declarative size guardrails:
+
+```text
+explicit paths/prefixes
+  → PNG conformance metadata
+  → stored bytes + RGBA dimensional baseline
+  → file-count / largest-file limits
+  → CI budget verdict
+```
+
+No Smart Atlas plan, animation analyzer or asset budget mutates LIVE pixels, sourceRects or runtime manifests automatically.
 
 ## Core modules
 
@@ -52,8 +74,9 @@ No Smart Atlas plan changes LIVE pixels, sourceRects or runtime manifests automa
 - `png-independent-validator.mjs` — Sharp/libvips + pngcheck independent consensus.
 - `png-quality-agent.mjs` — strict/render-exact gates plus RGB, alpha, edge, border, premultiplied and composited render metrics.
 - `asset-image-profiler.mjs` — explicit contract > path hints > pixel evidence; emits confidence/sourceOfTruth/reasons; low-confidence assets remain conservative.
+- `asset-animation-consistency.mjs` — temporal silhouette/alpha/centroid/palette/anchor analysis with explicit policy limits.
 - `png-adaptive-optimizer.mjs` — libimagequant/Sharp adaptive candidate generation with strict fallback.
-- `quality-boundary-search.mjs` — measured non-monotonic-aware quality search; no unmeasured point is inferred to pass.
+- `quality-boundary-search.mjs` — measured non-monotonic-aware quality search; explores failed plateaus for hidden pass islands and never infers an unmeasured pass.
 - `quality-pareto.mjs` — authoring and delivery Pareto frontiers.
 - `asset-effort-controller.mjs` — FAST first; BALANCED/DEEP only when measured marginal byte value justifies CPU.
 - `asset-optimization-cache.mjs` — content-addressed cache keyed by source, engine, toolchain and policy.
@@ -61,7 +84,8 @@ No Smart Atlas plan changes LIVE pixels, sourceRects or runtime manifests automa
 - `runtime-image-variants.mjs` — canonical-sRGB PNG/WebP/AVIF lab with encode/decode/memory measurements.
 - `delivery-device-proof.mjs` — formal iOS Safari real-device evidence schema.
 - `asset-delivery-manifest.mjs` — immutable hash-named DELIVERY variants and rollback-friendly manifest.
-- `smart-atlas-planner.mjs` — metadata-safe trim, MaxRects plan and subframe dedup evidence.
+- `smart-atlas-planner.mjs` — alpha-safe trim, MaxRects plan and subframe dedup evidence.
+- `asset-budget-policy.mjs` — explicit per-group transfer/decode/file-count/largest-file budgets.
 
 ## PNG conformance and failure policy
 
@@ -117,7 +141,7 @@ CI includes:
 - representative real-asset source/output equality;
 - parser torture/mutation corpus.
 
-If the independent decoder disagrees, publication fails.
+If the independent decoder disagrees, publication fails. A known Ubuntu `pngcheck` compile/runtime zlib-version warning may be classified as environmental only when it is the sole diagnostic; any additional structural error remains blocking.
 
 ## Quality Agent V2
 
@@ -136,6 +160,22 @@ Hard metrics include:
 
 The Golden Corpus pins expected behavior for exact pixels, hidden transparent RGB, visible RGB changes, alpha changes and seam-border mutations.
 
+## Animation Consistency Gate
+
+`asset-animation-consistency.mjs` is temporal QA, not an animation engine. It accepts already-decoded frames and measures adjacent-frame and sequence-level evidence:
+
+- alpha-mask intersection-over-union;
+- alpha coverage and alpha-mass deltas;
+- alpha-weighted centroid movement;
+- bounding-box area change;
+- visible palette Jaccard similarity;
+- anchor drift when anchors are supplied;
+- robust alpha coverage/mass outliers using median absolute deviation.
+
+There are deliberately no universal gameplay thresholds. `judgeAnimationConsistency()` only enforces limits supplied by a caller/manifest. This prevents a walk cycle, attack smear or VFX from being rejected merely because its silhouette legitimately changes.
+
+The CI corpus proves three invariants: stable synthetic motion passes its declared contract; a 5 px anchor jump fails; a one-frame full-alpha flash fails. A future sprite compiler can attach animation-specific limits without creating a second animation owner.
+
 ## Perceptual evidence
 
 `perceptual-quality-bridge.mjs` records tool versions and parses named SSIMULACRA2/Butteraugli metrics. Perceptual tools never override a failed deterministic gate.
@@ -153,6 +193,18 @@ Authority order:
 3. pixel evidence.
 
 The profile contains `confidence`, `sourceOfTruth`, and `reasons`. Low-confidence classifications cannot enable adaptive WebP/AVIF automatically.
+
+## Non-monotonic quality search
+
+Codec quality knobs are not treated as mathematical monotonic functions. The search:
+
+1. spreads coarse probes across the full requested range;
+2. refines every observed pass/fail transition using only real encodes;
+3. searches same-state FAIL plateaus before spending spare budget on redundant PASS plateaus, because a hidden low-quality pass island can unlock a materially smaller candidate;
+4. probes local neighbours and remaining largest gaps while budget remains;
+5. never labels an unmeasured quality as pass/fail.
+
+The regression corpus includes both a monotonic boundary and an intentionally non-monotonic pass island.
 
 ## FAST / AUTO / BALANCED / DEEP
 
@@ -199,15 +251,29 @@ The content-addressed design makes rollback natural: old variants can coexist an
 `smart-atlas-planner.mjs` does not repack production blindly. It calculates:
 
 - `orig` dimensions;
-- trim rectangle;
+- alpha-derived trim rectangle;
 - adjusted + original anchor;
+- whether manifest `visualBounds` would have clipped real alpha;
 - transparent area recovered per frame;
 - MaxRects placements across candidate widths;
 - exact RGBA subframe duplicate groups.
 
 `asset-atlas-recomposition-audit.mjs` packs the trimmed frames in memory and reconstructs every original frame. Promotion is impossible unless visible pixels/alpha are render-exact and anchors recompose to their original coordinates.
 
-For Forest Plaza specifically, historical measurement already showed the atlas is geometrically dense; a new MaxRects plan is evidence only and can still conclude `NO`.
+For Forest Plaza the proof found 129/146 manifest `visualBounds` too small to be trusted as trim authority. Alpha-derived trim reconstructed 146/146 frames render-exact with anchors preserved, but the measured MaxRects plan was 22.532% worse in area than the current atlas. Therefore the current evidence says `NO REPACK`.
+
+## Declarative asset-group budgets
+
+`asset-budget-policy.mjs` and `scripts/asset-route-budget-audit.mjs` prevent repository asset growth from bypassing individual-image quality gates. Membership is explicit (`paths` / `prefixes`); the tool never guesses gameplay loading from filenames.
+
+A group can cap:
+
+- file count;
+- total stored bytes;
+- total `width × height × 4` RGBA dimensional baseline;
+- largest individual stored asset.
+
+`docs/asset-space-budgets.json` contains the current policy. The first enforced group, `plaza-authoring-library`, allows at most 2 PNG files, 7,000,000 stored bytes total, 20,000,000 RGBA-baseline bytes, and 4,000,000 bytes for the largest individual file. These are build-time repository guardrails, not a claim about exact browser memory or exact network-route loading.
 
 ## Security / robustness audits
 
@@ -234,7 +300,9 @@ Current required creator gates include:
 - independent libvips/pngcheck consensus;
 - strict compiler self-test;
 - Golden Quality Corpus;
-- profile/seam/search regressions;
+- profile/seam/non-monotonic-search regressions;
+- animation temporal consistency regression corpus;
+- declarative asset-group byte/RGBA budgets;
 - cache integrity;
 - existing Asset Sheet compatibility;
 - technical documentation audit;
@@ -245,6 +313,8 @@ Current required creator gates include:
 ## Ownership invariants
 
 - byte optimization does not become a renderer;
+- animation QA does not become an animation engine or gameplay timing owner;
+- budget policy does not infer runtime route ownership;
 - SOURCE never becomes disposable;
 - no candidate wins solely because it is smaller;
 - no LLM/visual reviewer can override a failed hard metric;
