@@ -145,6 +145,21 @@ export function releaseWorldStudioViewport(root=globalThis){
   return shell.dataset?.keloWorldLoading!=='1';
 }
 
+function finalizeResolvedLiveSession(root,session){
+  const shell=root?.document?.getElementById?.('kelo-studio-live');
+  const live=!!session?.studio?.kernel;
+  const hydrated=!!shell?.isConnected&&!!shell?.querySelector?.('.ks-top')&&!!shell?.querySelector?.('.ks-bottom');
+  if(!live||!hydrated)return false;
+  // The controller is the session owner and only resolves after Studio has a live
+  // kernel. If another provisional-chrome probe re-latched the loading bit in the
+  // same turn, that stale DOM bit must not make World close a valid live session.
+  if(shell.dataset?.keloWorldLoading==='1')delete shell.dataset.keloWorldLoading;
+  markProvisionalControls(shell);
+  try{shell.removeAttribute?.('aria-busy');}catch{}
+  if(shell.dataset)shell.dataset.keloStudioInteractive='1';
+  return true;
+}
+
 function releaseViewportDuringOpen(root,pending,observer=null){
   const wait=typeof root?.setTimeout==='function'?root.setTimeout.bind(root):setTimeout;
   const cancel=typeof root?.clearTimeout==='function'?root.clearTimeout.bind(root):clearTimeout;
@@ -187,6 +202,7 @@ export async function openKeloStudioLive(opts={}){
     phase='CONTROLLER_OPEN';
     observer.mark('CONTROLLER_OPEN_START',runtimeSnapshot(root));
     const session=await releaseViewportDuringOpen(root,ctrl.openKeloStudioLive(opts),observer);
+    finalizeResolvedLiveSession(root,session);
     observer.mark('CONTROLLER_OPEN_RESOLVED',runtimeSnapshot(root));
     phase='FINAL_RELEASE';
     releaseWorldStudioViewport(root);
