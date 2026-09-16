@@ -25,7 +25,7 @@
 - `src/core/simulation-extension-system.js` — `KeloSimulation`.
 - `src/core/update-system.js` — `KeloUpdater`.
 - `src/core/creators-lazy-gate.js` — entrada lazy Creator; probe metadata-only del loadout local, y tras equip/clear reutiliza `KeloNetAuthority.refreshAvatar()` para refrescar el presentation envelope existente sin segundo socket.
-- `src/core/feature-registry.js` — catálogo first-use; Appearance declara slot schema, visual presets/stack, adapter y Creator Character Bridge.
+- `src/core/feature-registry.js` — catálogo first-use; Appearance carga el contrato Creator visual V2 antes de presets, Character runtime y Creator Character Bridge.
 
 ## World / Environment
 
@@ -66,7 +66,10 @@
 - `src/creators/ui/creator-marketplace-surface.mjs` — DISCOVER / MY LISTINGS / OWNED / CREATOR PROFILE.
 - `src/creators/content/creator-content-delivery.mjs` — Delivery exact-revision/on-demand.
 - `src/creators/content/creator-use-authority.mjs` — persistencia autoritativa de avatar, visual appearance/equipment, mount y preflight property.
-- `src/characters/creator-character-state-bridge.js` — overlay efímero local + overlays remotos WeakMap; ambos reutilizan `KeloCharacterCustomization`/`KeloCharacterVisualStack`/`KeloAvatar`, con IDs visuales revision-scoped separados local/remote.
+- `src/characters/creator-character-visual-contract.js` — compilador visual puro V2; una sola definición row/payload → sheet/socket descriptor para editor, social y PvP.
+- `src/creators/appearance/creator-appearance-preview.mjs` — preview Character event-driven con misma geometría declarativa del runtime; import local memory-only, cuatro caras, sin loop/persistencia.
+- `src/creators/ui/appearance-creator.mjs` — Appearance Creator V2: runtime-contract preview, sheet/socket/layer/anchors y transforms por cara; Mount conserva preview esquemático.
+- `src/characters/creator-character-state-bridge.js` — overlay efímero local + overlays remotos WeakMap; compila ambos mediante `KeloCreatorCharacterVisualContract` y reutiliza `KeloCharacterCustomization`/`KeloCharacterVisualStack`/`KeloAvatar`.
 - `src/characters/creator-avatar-runtime.mjs` — full-body Creator avatars; además detecta `creatorAppearance` remoto y despierta Appearance bajo demanda, sin crear otro renderer.
 - `src/creators/content/supabase-content-repository.mjs` — transporte autenticado/RLS/RPC Creator.
 - `src/creators/content/universal-content-service.mjs` — ingest semántico.
@@ -86,6 +89,7 @@
 - `scripts/creator-character-state-bridge-audit.mjs` — audit local Character bridge.
 - `scripts/creator-modular-replication-audit.mjs` — audit del envelope remoto, publicación/entitlement, AOI reutilizado, WeakMap overlays y ausencia de segundo transporte/renderer.
 - `scripts/pvp-visual-presentation-audit.mjs` — audit de delta presentation PvP, same-socket, preserve-on-omission y separación de autoridad competitiva.
+- `scripts/creator-appearance-authoring-audit.mjs` — audit V2 de contrato único editor/runtime, sheet/socket, transforms, fingerprint, loader order y ausencia de polling.
 - `server/pvp-presentation-wire-smoke-test.js` — smoke puro de key/delta/change/clear/visibility y stripping de manifests repetidos.
 - `src/ui/studio-launcher.js` — launcher Creator Hub/Studio.
 - `src/creators/workspaces/world-workspace.mjs` — route/prewarm móvil.
@@ -127,4 +131,4 @@
 
 ## Documentación
 
-Empieza por `docs/DOCUMENTATION_INDEX.md`. Para el stack visual Creator actual lee `docs/implementation-passes/IMP-2026-09-16-CREATOR-MODULAR-REPLICATION-008.md` y después `docs/implementation-passes/IMP-2026-09-16-PVP-VISUAL-PRESENTATION-009.md`. Los documentos `*_MEMORY.md` son contexto acumulado, no autoridad superior al runtime.
+Empieza por `docs/DOCUMENTATION_INDEX.md`. Para el stack visual Creator actual lee en orden `docs/implementation-passes/IMP-2026-09-16-CREATOR-MODULAR-REPLICATION-008.md`, `docs/implementation-passes/IMP-2026-09-16-PVP-VISUAL-PRESENTATION-009.md` y `docs/implementation-passes/IMP-2026-09-16-CREATOR-APPEARANCE-AUTHORING-010.md`. Los documentos `*_MEMORY.md` son contexto acumulado, no autoridad superior al runtime.
