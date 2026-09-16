@@ -1,10 +1,10 @@
 /* KELO-INDEX
  * area: CHARACTERS / CREATOR STATE BRIDGE
  * owner-adjacent: KeloCharacterCustomization + Kelo Creator Use Authority + server presentation snapshots
- * keys: CREATOR CHARACTER APPEARANCE LOADOUT BRIDGE AUTHORITY EXACT REVISION OVERLAY REMOTE REPLICATION LAZY
- * purpose: proyecta bindings Creator autoritativos sobre el estado visual local y snapshots publicados sobre peers sin persistir ownership ni crear otro renderer
+ * keys: CREATOR CHARACTER APPEARANCE LOADOUT BRIDGE AUTHORITY EXACT REVISION OVERLAY REMOTE REPLICATION LAZY AUTHORING CONTRACT
+ * purpose: proyecta bindings Creator autoritativos sobre el estado visual local y snapshots publicados sobre peers usando el mismo descriptor que el authoring preview
  * public-api: KeloCreatorCharacterBridge.sync/clear/ingestRemote/clearRemote/state/diagnostics
- * consumes: KeloCreatorUse, KeloCreatorDelivery, KeloCreatorEntitlements, server avatar presentation envelope, KeloCharacterCustomization, KeloCharacterVisualStack
+ * consumes: KeloCreatorUse, KeloCreatorDelivery, KeloCreatorEntitlements, KeloCreatorCharacterVisualContract, server avatar presentation envelope, KeloCharacterCustomization, KeloCharacterVisualStack
  * state-owned: overlays efímeros slot->runtime item; nunca ownership, inventario, stats ni estado base del personaje
  * online: local usa entitlement + Delivery exacta; remote usa únicamente el envelope publicado/sanitizado por el servidor
  * do-not: NO localStorage, NO IndexedDB, NO segundo renderer, NO stats, NO inventar entitlement remoto, NO polling
@@ -12,9 +12,8 @@
 (function(root){
 'use strict';
 if(root.KeloCreatorCharacterBridge)return;
-const VERSION='creator-character-state-bridge-v1.1.0-remote-replication';
+const VERSION='creator-character-state-bridge-v1.2.0-authoring-contract';
 const UUID_RE=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const FACE_KEYS=['down','left','right','up'];
 const text=v=>String(v==null?'':v).trim();
 const copy=v=>v==null?v:JSON.parse(JSON.stringify(v));
 const overlay=new Map();
@@ -52,17 +51,11 @@ function installFacade(){
 }
 function primaryAsset(row){return row?.assets?.find?.(a=>a?.role==='primary')||row?.assets?.[0]||null;}
 function versionedUrl(url,hash){const raw=text(url);if(!raw||raw.startsWith('data:')||raw.startsWith('blob:'))return raw;const token=text(hash||'1').slice(0,12);return raw.includes('?')?`${raw}&v=${encodeURIComponent(token)}`:`${raw}?v=${encodeURIComponent(token)}`;}
-function scaleOf(t){const sx=Number.isFinite(Number(t?.scaleX))?Number(t.scaleX):1,sy=Number.isFinite(Number(t?.scaleY))?Number(t.scaleY):1;if(Math.abs(sx-sy)<0.001)return sx;return Math.sqrt(Math.max(.0001,Math.abs(sx*sy)));}
-function directionalOffsets(payload){const src=payload?.transforms||{},fallback=src.default||{},out={};for(const face of FACE_KEYS){const t=src[face]||fallback;out[face]={x:Number(t?.x)||0,y:Number(t?.y)||0,rotation:Number(t?.rotation)||0,scale:scaleOf(t)};}return out;}
-function hasTransforms(payload){return !!payload?.transforms&&Object.keys(payload.transforms).length>0;}
-function inferredSheet(asset,visual){if(visual?.mode==='sheet')return true;if(visual?.mode==='socket')return false;const cols=Math.max(1,Number(visual?.columns)||4),rows=Math.max(1,Number(visual?.rows)||4),w=Number(asset?.pixelWidth)||0,h=Number(asset?.pixelHeight)||0;if(!w||!h||w%cols||h%rows)return false;const ratio=(w/cols)/(h/rows);return Math.abs(ratio-(2/3))<=0.08;}
-function rawSheet(source,payload,asset,visual){return{mode:'sheet',source,columns:Math.max(1,Number(visual.columns)||4),rows:Math.max(1,Number(visual.rows)||4),faceRows:{down:0,left:1,right:2,up:3,...copy(visual.faceRows||{})},anchor:{x:.5,y:1,...copy(visual.anchor||{})},heightScale:Number(visual.heightScale)||1,rotation:Number(visual.rotation)||0,offsets:directionalOffsets(payload),layer:text(visual.layer||'front'),preview:{kind:'actor-sheet'}};}
-function rawSocket(source,payload,asset,visual,slot){const weapon=slot==='weaponMain'||slot==='weaponSecondary',w=Math.max(8,Number(visual.width)||Math.min(weapon?72:96,Number(asset?.pixelWidth)||(weapon?58:28))),h=Math.max(8,Number(visual.height)||Math.min(weapon?72:96,Number(asset?.pixelHeight)||(weapon?58:28)));return{mode:'socket',source,socket:text(visual.socket||(weapon?'weapon':'center')),layer:text(visual.layer||(slot==='back'?'back':'front')),width:w,height:h,anchor:{x:.5,y:(weapon?0.88:1),...copy(visual.anchor||{})},rotation:Number(visual.rotation)||0,offsets:directionalOffsets(payload),preview:{kind:'socket'}};}
 function visualDescriptor(row,binding){
-  const payload=row?.payload||{},asset=primaryAsset(row),visual=payload.characterVisual&&typeof payload.characterVisual==='object'?payload.characterVisual:{};if(!asset?.runtimeUrl)throw new Error('CREATOR_CHARACTER_RUNTIME_URL_REQUIRED');
-  const source=versionedUrl(asset.runtimeUrl,asset.contentHash||row.contentHash),slot=text(binding.slotKey||payload.slotId),V=root.KeloCharacterVisualPresets;
-  if(inferredSheet(asset,visual)){const raw=rawSheet(source,payload,asset,visual);return V?.sheet?V.sheet(source,raw):raw;}
-  const raw=rawSocket(source,payload,asset,visual,slot),isWeapon=slot==='weaponMain'||slot==='weaponSecondary';if(V&&isWeapon&&typeof V.weapon==='function'){const opts={...raw};if(!hasTransforms(payload))delete opts.offsets;return V.weapon(source,opts);}if(V?.socket)return V.socket(source,raw.socket,raw);return raw;
+  const payload=row?.payload||{},asset=primaryAsset(row);if(!asset?.runtimeUrl)throw new Error('CREATOR_CHARACTER_RUNTIME_URL_REQUIRED');
+  const slot=text(binding.slotKey||payload.slotId),C=root.KeloCreatorCharacterVisualContract;if(!C?.buildDescriptor)throw new Error('CREATOR_CHARACTER_VISUAL_CONTRACT_REQUIRED');
+  const check=C.validate({payload,asset,slot});if(!check.ok)throw new Error('CREATOR_CHARACTER_VISUAL_INVALID:'+check.errors.join(','));
+  return C.buildDescriptor({source:versionedUrl(asset.runtimeUrl,asset.contentHash||row.contentHash),payload,asset,slot,presets:root.KeloCharacterVisualPresets});
 }
 function itemId(row,binding,scope){return `creator.visual.${scope==='remote'?'remote':'local'}.${text(row.revisionId).replace(/-/g,'_')}.${text(binding.slotKey)}`;}
 function registerBinding(binding,row,scope){
@@ -95,7 +88,7 @@ function clearRemote(actor,reason){if(!actor||isLocalActor(actor))return false;c
 function ensureRemoteOverlay(actor){if(!actor||isLocalActor(actor))return;const snapshot=remoteEnvelope(actor);if(!snapshot){if(remoteOverlays.has(actor))clearRemote(actor,'remote-envelope-removed');return;}const fingerprint=remoteFingerprint(snapshot);if(remoteFingerprints.get(actor)!==fingerprint)ingestRemote(actor,snapshot);}
 function clear(reason){const had=overlay.size||accountId||characterId;overlay.clear();for(const [key,row] of registered)if(row.scope==='local')registered.delete(key);accountId='';characterId='';lastSync=null;lastError=null;if(had)bump(reason||'clear');return state();}
 function state(){return Object.freeze({version:VERSION,accountId:accountId||null,characterId:characterId||null,revision,slots:Object.freeze(Object.fromEntries(overlay)),registered:Object.freeze([...registered.values()]),lastSync,lastError});}
-function diagnostics(){return Object.freeze({version:VERSION,installed:!!facade,baseVersion:baseCustomization?.version||null,overlaySlots:overlay.size,registeredItems:registered.size,syncing:!!syncPromise,accountId:accountId||null,characterId:characterId||null,lastSync,lastError,remoteIngests,remoteClears,remoteFailures,remoteWeakState:true,persistentStore:false,polling:false,exactManifest:true,remotePublishedEnvelope:true,secondRenderer:false});}
+function diagnostics(){return Object.freeze({version:VERSION,installed:!!facade,baseVersion:baseCustomization?.version||null,overlaySlots:overlay.size,registeredItems:registered.size,syncing:!!syncPromise,accountId:accountId||null,characterId:characterId||null,lastSync,lastError,remoteIngests,remoteClears,remoteFailures,remoteWeakState:true,persistentStore:false,polling:false,exactManifest:true,remotePublishedEnvelope:true,sharedVisualContract:root.KeloCreatorCharacterVisualContract?.version||null,secondRenderer:false});}
 function onAuth(event){const d=event?.detail||authState();if(!d?.authenticated){clear('auth-ended');return;}if(characterId&&text(d.characterId)!==characterId)clear('character-changed');}
 function onEntitlementsChanged(){if(characterId)void sync({force:true}).catch(()=>{});}
 
@@ -106,5 +99,5 @@ root.addEventListener?.('kelo:creator-entitlements-changed',onEntitlementsChange
 root.KeloCreatorCharacterBridge=Object.freeze({version:VERSION,sync,clear,ingestRemote,clearRemote,state,diagnostics,getResolvedState:actor=>resolveState(actor||localActor())});
 const boot=root.__KELO_CREATOR_CHARACTER_BOOT_STATE__;try{delete root.__KELO_CREATOR_CHARACTER_BOOT_STATE__;}catch{}
 if(boot&&Array.isArray(boot.loadout))void sync({state:boot,force:true}).catch(()=>{});
-root.KELO_CREATOR_CHARACTER_BRIDGE_AUDIT=Object.freeze({version:VERSION,ephemeralOverlay:true,remoteWeakOverlay:true,hiddenLockedItems:true,serverStateOnly:true,remoteServerPublishedOnly:true,noPersistence:true,noPolling:true,singleFlight:true,exactManifest:true,secondRenderer:false});
+root.KELO_CREATOR_CHARACTER_BRIDGE_AUDIT=Object.freeze({version:VERSION,ephemeralOverlay:true,remoteWeakOverlay:true,hiddenLockedItems:true,serverStateOnly:true,remoteServerPublishedOnly:true,noPersistence:true,noPolling:true,singleFlight:true,exactManifest:true,sharedVisualContract:true,secondRenderer:false});
 })(typeof globalThis!=='undefined'?globalThis:window);
