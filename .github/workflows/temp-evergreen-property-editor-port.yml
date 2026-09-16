@@ -1,0 +1,59 @@
+name: Temp Evergreen property editor port
+
+on:
+  push:
+    branches:
+      - fix/evergreen-property-editor-position-2026-09-16
+
+permissions:
+  contents: write
+
+jobs:
+  port-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Port exact Evergreen editor position fix
+        shell: python
+        run: |
+          from pathlib import Path
+          path = Path('src/ui/property-editor.js')
+          text = path.read_text()
+          old = "  async function openEditor(next){open=true;root.style.display='flex';document.body.classList.add('kelo-property-editing');if(typeof closeMenu==='function')closeMenu();await setMode(next||mode);if(mode==='parcel'){const p=currentParcel();if(p&&typeof localPlayer!=='undefined'){localPlayer.x=p.bounds.x+p.bounds.w/2;localPlayer.y=p.bounds.y+p.bounds.h+90;camera.x=localPlayer.x;camera.y=localPlayer.y;camera.targetX=localPlayer.x;camera.targetY=localPlayer.y;}}}"
+          new = "  async function openEditor(next){open=true;root.style.display='flex';document.body.classList.add('kelo-property-editing');if(typeof closeMenu==='function')closeMenu();await setMode(next||mode);if(mode==='parcel'){const p=currentParcel();if(p&&typeof localPlayer!=='undefined'){const x=p.bounds.x+p.bounds.w/2,y=p.bounds.y+p.bounds.h+90;if(!window.KeloPlayerPosition?.teleport)throw new Error('KeloPlayerPosition unavailable');window.KeloPlayerPosition.teleport(x,y,{source:'property-editor:open',stopMotion:true});camera.x=x;camera.y=y;camera.targetX=x;camera.targetY=y;}}}"
+          if old in text:
+              if text.count(old) != 1:
+                  raise SystemExit(f'Expected one legacy editor reposition block, found {text.count(old)}')
+              path.write_text(text.replace(old, new, 1))
+          elif new not in text:
+              raise SystemExit('Neither legacy nor expected Evergreen editor reposition block was found')
+
+      - name: Verify JavaScript syntax
+        run: node --check src/ui/property-editor.js
+
+      - name: Verify Evergreen invariants
+        shell: python
+        run: |
+          from pathlib import Path
+          text = Path('src/ui/property-editor.js').read_text()
+          assert "KeloPlayerPosition.teleport(x,y,{source:'property-editor:open',stopMotion:true})" in text
+          assert "localPlayer.x=p.bounds.x+p.bounds.w/2" not in text
+          ps = Path('src/property/property-system.js').read_text()
+          assert "if(op==='move')" in ps
+          assert "rec.x=x;rec.y=y;rec.updatedAt=Date.now();bump();return clone(rec);" in ps
+          print('Evergreen editor position + placement persistence invariants OK')
+
+      - name: Commit ported fix
+        run: |
+          if git diff --quiet -- src/ui/property-editor.js; then
+            echo 'No new patch commit required.'
+            exit 0
+          fi
+          git config user.name 'kelo-evergreen-port-bot'
+          git config user.email '68343904+kelffren@users.noreply.github.com'
+          git add src/ui/property-editor.js
+          git commit -m 'fix(property): route editor reposition through KeloPlayerPosition'
+          git push origin HEAD:fix/evergreen-property-editor-position-2026-09-16
