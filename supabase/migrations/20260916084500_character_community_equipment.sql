@@ -16,16 +16,84 @@ create index if not exists character_community_equipment_user_idx
 
 alter table public.character_community_equipment enable row level security;
 revoke all on public.character_community_equipment from public, anon, authenticated;
-grant select on public.character_community_equipment to authenticated;
+grant select, insert, update, delete on public.character_community_equipment to authenticated;
 
 drop policy if exists character_community_equipment_owner_read on public.character_community_equipment;
 create policy character_community_equipment_owner_read
 on public.character_community_equipment
 for select to authenticated
 using (
-  exists (
+  (select auth.uid()) is not null
+  and equipped_by = (select auth.uid())
+  and exists (
     select 1
     from public.characters c
+    where c.id = character_community_equipment.character_id
+      and c.account_id = (select auth.uid())
+      and c.status = 'active'
+  )
+);
+
+drop policy if exists character_community_equipment_owner_insert on public.character_community_equipment;
+create policy character_community_equipment_owner_insert
+on public.character_community_equipment
+for insert to authenticated
+with check (
+  (select auth.uid()) is not null
+  and equipped_by = (select auth.uid())
+  and exists (
+    select 1 from public.characters c
+    where c.id = character_community_equipment.character_id
+      and c.account_id = (select auth.uid())
+      and c.status = 'active'
+  )
+  and exists (
+    select 1 from public.asset_publications ap
+    where ap.id = character_community_equipment.publication_id
+      and ap.is_active = true
+      and ap.visibility in ('global','official')
+  )
+);
+
+drop policy if exists character_community_equipment_owner_update on public.character_community_equipment;
+create policy character_community_equipment_owner_update
+on public.character_community_equipment
+for update to authenticated
+using (
+  (select auth.uid()) is not null
+  and equipped_by = (select auth.uid())
+  and exists (
+    select 1 from public.characters c
+    where c.id = character_community_equipment.character_id
+      and c.account_id = (select auth.uid())
+      and c.status = 'active'
+  )
+)
+with check (
+  equipped_by = (select auth.uid())
+  and exists (
+    select 1 from public.characters c
+    where c.id = character_community_equipment.character_id
+      and c.account_id = (select auth.uid())
+      and c.status = 'active'
+  )
+  and exists (
+    select 1 from public.asset_publications ap
+    where ap.id = character_community_equipment.publication_id
+      and ap.is_active = true
+      and ap.visibility in ('global','official')
+  )
+);
+
+drop policy if exists character_community_equipment_owner_delete on public.character_community_equipment;
+create policy character_community_equipment_owner_delete
+on public.character_community_equipment
+for delete to authenticated
+using (
+  (select auth.uid()) is not null
+  and equipped_by = (select auth.uid())
+  and exists (
+    select 1 from public.characters c
     where c.id = character_community_equipment.character_id
       and c.account_id = (select auth.uid())
       and c.status = 'active'
@@ -38,7 +106,7 @@ create or replace function public.equip_character_community_asset(
   p_publication_id uuid
 )
 returns jsonb
-language plpgsql security definer set search_path = '' as $$
+language plpgsql security invoker set search_path = '' as $$
 declare
   v_uid uuid := (select auth.uid());
   v_slot text := lower(trim(coalesce(p_slot,'')));
@@ -95,14 +163,14 @@ begin
 end;
 $$;
 revoke all on function public.equip_character_community_asset(uuid,text,uuid) from public, anon;
-grant execute on function public.equip_character_community_asset(uuid,text,uuid) to authenticated, service_role;
+grant execute on function public.equip_character_community_asset(uuid,text,uuid) to authenticated;
 
 create or replace function public.unequip_character_community_asset(
   p_character_id uuid,
   p_slot text
 )
 returns jsonb
-language plpgsql security definer set search_path = '' as $$
+language plpgsql security invoker set search_path = '' as $$
 declare
   v_uid uuid := (select auth.uid());
   v_slot text := lower(trim(coalesce(p_slot,'')));
@@ -126,23 +194,24 @@ begin
 end;
 $$;
 revoke all on function public.unequip_character_community_asset(uuid,text) from public, anon;
-grant execute on function public.unequip_character_community_asset(uuid,text) to authenticated, service_role;
+grant execute on function public.unequip_character_community_asset(uuid,text) to authenticated;
 
 create or replace function public.get_character_avatar_manifest(p_character_id uuid)
 returns jsonb
-language plpgsql stable security definer set search_path = '' as $$
+language plpgsql stable security invoker set search_path = '' as $$
 declare
   v_uid uuid := (select auth.uid());
-  v_role text := coalesce((select auth.role()), 'anon');
   v_content_id text;
   v_assets jsonb := '[]'::jsonb;
   v_row jsonb;
 begin
+  if v_uid is null then return null; end if;
+
   select c.active_avatar_content_id into v_content_id
   from public.characters c
   where c.id = p_character_id
     and c.status = 'active'
-    and (v_role = 'service_role' or c.account_id = v_uid)
+    and c.account_id = v_uid
   limit 1;
 
   if v_content_id is null then return null; end if;
@@ -185,21 +254,17 @@ begin
   join public.content_definitions cd on cd.id = cr.definition_id
   where cr.content_id = v_content_id
     and cd.content_type = 'character'
-    and (
-      v_role = 'service_role'
-      or cr.owner_user_id = v_uid
-      or exists(select 1 from public.content_publications cp where cp.revision_id = cr.id and cp.is_active = true)
-    )
+    and cr.owner_user_id = v_uid
   limit 1;
 
   return v_row;
 end;
 $$;
 revoke all on function public.get_character_avatar_manifest(uuid) from public, anon;
-grant execute on function public.get_character_avatar_manifest(uuid) to authenticated, service_role;
+grant execute on function public.get_character_avatar_manifest(uuid) to authenticated;
 
 comment on table public.character_community_equipment is 'Per-character references to active immutable community asset publications. No binary or client URL is stored here.';
-comment on function public.equip_character_community_asset(uuid,text,uuid) is 'Owner-only cosmetic equip by active publication id; replaces one slot atomically.';
-comment on function public.get_character_avatar_manifest(uuid) is 'Server-trusted avatar manifest plus active community cosmetic references for one owned character.';
+comment on function public.equip_character_community_asset(uuid,text,uuid) is 'RLS-protected owner cosmetic equip by active publication id; replaces one slot atomically.';
+comment on function public.get_character_avatar_manifest(uuid) is 'RLS-protected avatar manifest plus active community cosmetic references for one owned character.';
 
 commit;
