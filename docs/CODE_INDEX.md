@@ -1,6 +1,6 @@
 # Kelo World — Code Index
 
-**Actualizado:** 2026-09-15
+**Actualizado:** 2026-09-16
 
 ## Runtime
 
@@ -20,8 +20,8 @@
 - `src/core/render-extension-system.js` — `KeloRender`.
 - `src/core/simulation-extension-system.js` — `KeloSimulation`.
 - `src/core/update-system.js` — `KeloUpdater`.
-- `src/core/creators-lazy-gate.js` — entrada lazy a Creator Library/Creators y facades `KeloCreatorDelivery` + `KeloCreatorUse`; no carga Delivery/Use/editores pesados hasta uso explícito.
-- `src/core/feature-registry.js` — catálogo first-use de módulos; Delivery despierta únicamente Appearance/Mounts/Properties cuando la revisión lo necesita.
+- `src/core/creators-lazy-gate.js` — entrada lazy a Creator Library/Creators y facades `KeloCreatorDelivery` + `KeloCreatorUse`; además hace un probe metadata-only del loadout Creator y solo carga Appearance cuando el personaje tiene bindings visuales.
+- `src/core/feature-registry.js` — catálogo first-use de módulos; Appearance declara explícitamente slot schema, visual presets/stack, adapter y Creator Character Bridge.
 
 ## World / Environment
 
@@ -62,6 +62,7 @@
 - `src/creators/ui/creator-marketplace-surface.mjs` — UI móvil lazy: DISCOVER / MY LISTINGS / OWNED / CREATOR PROFILE.
 - `src/creators/content/creator-content-delivery.mjs` — Delivery exact-revision/on-demand: verifica acceso, obtiene manifest publicado, despierta owner requerido y registra runtime sin sincronizar toda la librería; arma Use Authority en el primer consumo Creator.
 - `src/creators/content/creator-use-authority.mjs` — puente de uso persistente: avatar, visual appearance/equipment, mount y preflight de property pasan por RPC exact-revision antes del owner de dominio.
+- `src/characters/creator-character-state-bridge.js` — proyecta bindings visuales Creator server-authoritative como overlay efímero del actor local; registra piezas hidden+locked y reutiliza `KeloCharacterVisualStack`/`KeloAvatar` sin persistir ownership local.
 - `src/creators/content/supabase-content-repository.mjs` — transporte autenticado/RLS/RPC para contenido, release, marketplace, access, delivery y use authority; no posee publish/wallet/domain authority.
 - `src/creators/content/universal-content-service.mjs` — ingest semántico; estampa `revisionId`/`ownerUserId` en records runtime Creator.
 - `src/creators/content/runtime-content-registry.mjs` — registry semántico; bloquea records Creator sin entitlement antes de adaptarlos y revalida acceso en `getForUse()`.
@@ -77,6 +78,7 @@
 - `supabase/migrations/20260916004000_creator_use_authority_v1.sql` — bindings server-authoritative de Creator appearance/equipment/mount y autorización previa de Creator property use.
 - `scripts/creator-content-delivery-audit.mjs` — audit estático de lazy delivery, publicación completa, identidad, no bulk sync y defensas runtime.
 - `scripts/creator-use-authority-audit.mjs` — audit estático de exact-revision use authority, guards componibles, no auth/ownership paralelo y preservación de domain owners.
+- `scripts/creator-character-state-bridge-audit.mjs` — audit del overlay efímero, exact-revision hydration, lazy Appearance, no persistencia/renderer paralelo y limpieza por identidad.
 - `src/ui/studio-launcher.js` — launcher del Creator Hub/Studio avanzado.
 - `src/creators/workspaces/world-workspace.mjs` — route/prewarm móvil.
 - `src/studio/integration/world-studio-bridge.mjs` — bridge de carga.
@@ -89,6 +91,8 @@
 
 ## Gameplay
 
+- `src/characters/character-customization.js` — owner del estado visual base, catálogo, historial, saves y middleware de capas; Creator bridge solo proyecta una lectura efímera encima del actor local.
+- `src/characters/character-visual-stack.js` — resolver ordenado usado por renderer/preview; consume dinámicamente `KeloCharacterCustomization.stateForActor()`.
 - `src/abilities/` — abilities/Stone/equipment channels.
 - `src/systems/pvp-world.js` — PvP world.
 - `src/systems/arena-*` — Arena.
