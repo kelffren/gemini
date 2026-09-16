@@ -23,7 +23,7 @@
 </div>
 <div class="toast" id="toast"></div>
 <script type="module">
-import {searchExternalAssets,getProviderStatuses} from './src/creators/assets/external-asset-providers.mjs?v=3';
+import {searchExternalAssets,getProviderStatuses} from './src/creators/assets/external-asset-providers.mjs?v=4';
 import {downloadAsset,integrateAsset,listAssets,getVaultStats,removeLocal} from './src/creators/assets/personal-asset-vault.mjs?v=2';
 
 const $=id=>document.getElementById(id);
@@ -54,7 +54,7 @@ function renderExplore(){
 }
 function renderVault(){const rows=state.vault.filter(a=>['free','owned','purchased'].includes(a.ownership));$('vault-grid').innerHTML=rows.length?rows.map(a=>card(a,a,true)).join(''):'<div class="empty">Tu Baúl está vacío. Explora una biblioteca y toca Descargar; solo entonces se guardará el archivo en este dispositivo.</div>';}
 function renderSources(){
-  $('sources-list').innerHTML=state.providers.map(p=>`<article class="source"><div><b>${esc(p.name)}</b><p>${p.live?(p.lazy?'Catálogo LIVE perezoso: el índice remoto solo se consulta al elegir esta fuente.':'Catálogo machine-readable conectado a Kelo.'):'Fuente conectada para descubrimiento; importación automática bloqueada hasta verificar URL directa + licencia por asset.'}</p><span class="pill ${p.live?'':'review'}">${p.live?(p.lazy?'LIVE LAZY · BAJO DEMANDA':'LIVE · BAJO DEMANDA'):'CONECTADA · REVISIÓN POR ASSET'}</span></div><button class="btn" data-source-open="${esc(p.browseUrl||'')}">Abrir</button></article>`).join('');
+  $('sources-list').innerHTML=state.providers.map(p=>`<article class="source"><div><b>${esc(p.name)}</b><p>${p.live?(p.lazy?'Catálogo LIVE perezoso: el índice remoto solo se consulta al elegir esta fuente.':'Catálogo verificado conectado a Kelo; binarios solo bajo demanda.'):'Fuente conectada para descubrimiento; importación automática bloqueada hasta verificar URL directa + licencia por asset.'}</p><span class="pill ${p.live?'':'review'}">${p.live?(p.lazy?'LIVE LAZY · BAJO DEMANDA':'LIVE · BAJO DEMANDA'):'CONECTADA · REVISIÓN POR ASSET'}</span></div><button class="btn" data-source-open="${esc(p.browseUrl||'')}">Abrir</button></article>`).join('');
 }
 async function setTab(tab){state.tab=tab;document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('on',b.dataset.tab===tab));$('explore-view').hidden=tab!=='explore';$('vault-view').hidden=tab!=='vault';$('sources-view').hidden=tab!=='sources';if(tab==='vault')await refreshVault();}
 
