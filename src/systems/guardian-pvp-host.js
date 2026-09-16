@@ -4,14 +4,14 @@
  * keys: GUARDIAN PVP TEMPORARY AUTHORITY ROOM FIXED STEP INTENT SNAPSHOT LEASE EPOCH MOBILE
  * purpose: ejecuta el mismo core PvP del servidor dentro del Guardian Master para salas temporales de prueba
  * consumes: KeloGuardian + KeloSharedPvPAuthority + KeloSimulation
- * state-owned: salas PvP efímeras, binding node->actor, snapshots y diagnóstico
+ * state-owned: una sala PvP efímera, binding node->actor, snapshots y diagnóstico
  * online: autoridad gameplay SOLO dentro de la sala temporal mientras la lease Master/epoch sigan válidos
  * do-not: NO economía, NO inventario, NO persistencia, NO recompensas, NO segundo loop, NO autoproclamarse Master
  */
 (function(root){
 'use strict';
 if(root.KeloGuardianPvPHost||!root.KeloGuardian)return;
-const VERSION='kelo-guardian-pvp-host-v1',SCHEMA=1,MAX_ROOMS=2,MAX_PLAYERS=16,MAX_MESSAGE_BYTES=48*1024,MAX_CATCHUP_STEPS=5,SNAPSHOT_MS=50;
+const VERSION='kelo-guardian-pvp-host-v1.1',SCHEMA=1,MAX_ROOMS=1,MAX_PLAYERS=16,MAX_MESSAGE_BYTES=48*1024,MAX_CATCHUP_STEPS=5,SNAPSHOT_MS=50;
 let activeRoom=null,snapshotSeq=0,latest=null,lastSnapshotSeq=0,lastError=null,wasMaster=false,observedEpoch=0,accumulator=0,lastEmitKey='';
 const rooms=new Map();
 const stats={intentsAccepted:0,intentsRejected:0,snapshotsSent:0,snapshotsReceived:0,leaseResets:0,roomsCreated:0,maxCatchupHit:0};
@@ -97,13 +97,13 @@ function tick(context){
   if(steps===MAX_CATCHUP_STEPS&&accumulator>=root.KeloSharedPvPAuthority.FIXED_DT){accumulator=0;stats.maxCatchupHit++;}
   now=Date.now();for(const row of rooms.values())if(row.epoch===observedEpoch)broadcastSnapshot(row,now);emit();
 }
-function state(){const g=guardian();return Object.freeze({version:VERSION,active:isActive(),roomId:activeRoom,actorId:actorId(),masterActive:!!g.masterActive,masterNodeId:g.master?.nodeId||null,masterEpoch:epoch(),hostedRooms:Object.freeze([...rooms.values()].map(r=>Object.freeze({id:r.id,epoch:r.epoch,players:r.playersByNode.size,tick:r.authority.snapshot(Date.now()).serverTick}))),latestSnapshot:latest?Object.freeze({roomId:latest.roomId,seq:latest.seq,serverTick:latest.serverTick,ageMs:Math.max(0,Date.now()-latest.receivedAt),players:Object.keys(latest.players||{}).length}):null,stats:Object.freeze({...stats}),temporaryGameplayAuthority:true,persistentAuthority:false,economyAuthority:false,inventoryAuthority:false,rewardsAuthority:false,lastError});}
+function state(){const g=guardian();return Object.freeze({version:VERSION,enabled:!!g.enabled,active:isActive(),roomId:activeRoom,actorId:actorId(),masterActive:!!g.masterActive,masterNodeId:g.master?.nodeId||null,masterEpoch:epoch(),hostedRooms:Object.freeze([...rooms.values()].map(r=>Object.freeze({id:r.id,epoch:r.epoch,players:r.playersByNode.size,tick:r.authority.snapshot(Date.now()).serverTick}))),latestSnapshot:latest?Object.freeze({roomId:latest.roomId,seq:latest.seq,serverTick:latest.serverTick,ageMs:Math.max(0,Date.now()-latest.receivedAt),players:Object.keys(latest.players||{}).length}):null,stats:Object.freeze({...stats}),temporaryGameplayAuthority:true,persistentAuthority:false,economyAuthority:false,inventoryAuthority:false,rewardsAuthority:false,lastError});}
 function emit(force){const s=state(),key=[s.active,s.roomId,s.masterActive,s.masterEpoch,s.hostedRooms.length,s.latestSnapshot?.seq||0,s.stats.intentsAccepted,s.stats.intentsRejected,s.lastError||''].join('|');if(!force&&key===lastEmitKey)return s;lastEmitKey=key;try{root.dispatchEvent(new CustomEvent('kelo:guardian-pvp-state',{detail:s}));}catch(_){}return s;}
 root.addEventListener('kelo:guardian-data',onGuardianData,{passive:true});
 root.addEventListener('kelo:guardian-state',()=>{reconcileLease();emit(true);},{passive:true});
 if(!root.KeloSimulation||typeof root.KeloSimulation.after!=='function')throw new Error('GUARDIAN_PVP_SIMULATION_OWNER_UNAVAILABLE');
 root.KeloSimulation.after('guardian:pvp-host',tick,375);
 root.KeloGuardianPvPHost=Object.freeze({version:VERSION,state,start,stop,isActive,actorId,submitIntent,latestSnapshot:()=>latest});
-root.KELO_GUARDIAN_PVP_HOST_AUDIT=Object.freeze({version:VERSION,owner:'KeloGuardianPvPHost',sharedAuthorityCore:true,existingGuardianDataChannel:true,fixedStep:true,maxCatchupSteps:MAX_CATCHUP_STEPS,leaseFenced:true,epochFenced:true,temporaryGameplayAuthority:true,persistentAuthority:false,economyAuthority:false,inventoryAuthority:false,rewardsAuthority:false,secondLoop:false,localStorage:false});
+root.KELO_GUARDIAN_PVP_HOST_AUDIT=Object.freeze({version:VERSION,owner:'KeloGuardianPvPHost',sharedAuthorityCore:true,existingGuardianDataChannel:true,fixedStep:true,maxRooms:MAX_ROOMS,maxCatchupSteps:MAX_CATCHUP_STEPS,leaseFenced:true,epochFenced:true,temporaryGameplayAuthority:true,persistentAuthority:false,economyAuthority:false,inventoryAuthority:false,rewardsAuthority:false,secondLoop:false,localStorage:false});
 reconcileLease();emit(true);
 })(typeof globalThis!=='undefined'?globalThis:window);
