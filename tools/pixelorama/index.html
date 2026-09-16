@@ -41,11 +41,7 @@
   function loadScript(src){return new Promise((resolve,reject)=>{const script=document.createElement('script');script.src=src;script.onload=resolve;script.onerror=()=>reject(new Error(`PIXELORAMA_ENGINE_SCRIPT_FAILED:${src}`));document.head.append(script);});}
   function nativeCommand(command,value){try{if(typeof window.keloPixeloramaCommand==='function'){window.keloPixeloramaCommand(command,value);return true;}}catch(error){console.warn('[Kelo Pixelorama] native command',error);}return false;}
   function clearIdleTimers(){if(idleTimer)clearTimeout(idleTimer);if(deepIdleTimer)clearTimeout(deepIdleTimer);idleTimer=deepIdleTimer=0;}
-  function markActive(){
-    if(shuttingDown)return;clearIdleTimers();nativeCommand('set_fps',60);
-    idleTimer=setTimeout(()=>nativeCommand('set_fps',30),2200);
-    deepIdleTimer=setTimeout(()=>nativeCommand('set_fps',15),10000);
-  }
+  function markActive(){if(shuttingDown)return;clearIdleTimers();nativeCommand('set_fps',60);idleTimer=setTimeout(()=>nativeCommand('set_fps',30),2200);deepIdleTimer=setTimeout(()=>nativeCommand('set_fps',15),10000);}
 
   function installDownloadBridge(){
     if(nativeAnchorClick)return;nativeAnchorClick=HTMLAnchorElement.prototype.click;
@@ -61,10 +57,8 @@
   async function openThroughNativeBridge(asset){
     if(!asset||!engine?.copyToFS||typeof window.keloPixeloramaCommand!=='function')return false;
     const safe=String(asset.name||'kelo-asset.png').replace(/[^a-zA-Z0-9._-]/g,'_').slice(-120),path=`user://kelo-bridge-${Date.now()}-${safe}`;
-    try{
-      await Promise.resolve(engine.copyToFS(path,asset.buffer));
-      nativeCommand('open_path',path);pendingAsset=null;showNote(`${safe} opened directly from Kelo.`);return true;
-    }catch(error){tell('error',{code:'NATIVE_OPEN_FAILED',message:String(error?.message||error)});return false;}
+    try{engine.copyToFS(path,asset.buffer);nativeCommand('open_path',path);pendingAsset=null;showNote(`${safe} opened directly from Kelo.`);return true;}
+    catch(error){tell('error',{code:'NATIVE_OPEN_FAILED',message:String(error?.message||error)});return false;}
   }
 
   function feedPendingAsset(){
@@ -72,21 +66,18 @@
     try{window.fileData=pendingAsset.buffer;window.fileType=pendingAsset.mime||'image/png';window.fileName=pendingAsset.name||'kelo-asset.png';window.canceled=false;pendingAsset=null;setTimeout(()=>window.dispatchEvent(new Event('focus')),20);showNote('Kelo asset injected into Pixelorama.');return true;}
     catch(error){tell('error',{code:'ASSET_INJECT_FAILED',message:String(error?.message||error)});return false;}
   }
-  function installOpenBridge(){
-    if(openHookInstalled||typeof window.upload_image!=='function')return false;
-    const original=window.upload_image;window.upload_image=function(){if(pendingAsset&&feedPendingAsset())return;return original.apply(this,arguments);};openHookInstalled=true;return true;
-  }
+  function installOpenBridge(){if(openHookInstalled||typeof window.upload_image!=='function')return false;const original=window.upload_image;window.upload_image=function(){if(pendingAsset&&feedPendingAsset())return;return original.apply(this,arguments);};openHookInstalled=true;return true;}
   async function tryOpenPending(){
-    if(!pendingAsset)return;
-    if(await openThroughNativeBridge(pendingAsset))return;
+    if(!pendingAsset)return;if(await openThroughNativeBridge(pendingAsset))return;
     for(const target of [canvas,document]){try{target.dispatchEvent(new KeyboardEvent('keydown',{key:'o',code:'KeyO',ctrlKey:true,bubbles:true,cancelable:true}));target.dispatchEvent(new KeyboardEvent('keyup',{key:'o',code:'KeyO',ctrlKey:true,bubbles:true,cancelable:true}));}catch{}}
     setTimeout(()=>{if(pendingAsset)showNote('Asset ready · if stock Pixelorama did not auto-open it, tap File → Open once; Kelo supplies it without a file picker.',0);},500);
   }
 
   async function shutdown(reason='parent-request'){
     if(shuttingDown)return;shuttingDown=true;clearIdleTimers();setStatus('Releasing Pixelorama memory…');status.hidden=false;
-    try{if(engine?.requestQuit)await Promise.resolve(engine.requestQuit());}catch(error){console.warn('[Kelo Pixelorama] requestQuit',error);}
-    try{if(window.Engine?.unload)window.Engine.unload();}catch(error){console.warn('[Kelo Pixelorama] Engine.unload',error);}
+    try{engine?.requestQuit?.();}catch(error){console.warn('[Kelo Pixelorama] requestQuit',error);}
+    await new Promise(resolve=>setTimeout(resolve,80));
+    try{window.Engine?.unload?.();}catch(error){console.warn('[Kelo Pixelorama] Engine.unload',error);}
     try{if(nativeAnchorClick)HTMLAnchorElement.prototype.click=nativeAnchorClick;}catch{}
     pendingAsset=null;engine=null;tell('quit-ack',{reason});
   }
@@ -97,13 +88,12 @@
     else if(message.type==='quit')void shutdown('parent-request');else if(message.type==='ping')tell('pong',{at:Date.now(),ready:!!engine});
   });
   for(const type of ['pointerdown','pointermove','keydown','touchstart'])addEventListener(type,markActive,{passive:true});
-  addEventListener('pagehide',()=>{clearIdleTimers();pendingAsset=null;},{once:true});
-  installDownloadBridge();
+  addEventListener('pagehide',()=>{clearIdleTimers();pendingAsset=null;},{once:true});installDownloadBridge();
 
   (async()=>{
     try{
       await loadScript(`${BASE}/index.js`);if(typeof window.Engine!=='function')throw new Error('PIXELORAMA_ENGINE_API_MISSING');
-      const config={args:[],canvasResizePolicy:2,ensureCrossOriginIsolationHeaders:false,executable:`${BASE}/index`,experimentalVK:false,focusCanvas:true,gdextensionLibs:[],serviceWorker:null};
+      const config={args:[],canvasResizePolicy:2,ensureCrossOriginIsolationHeaders:false,executable:`${BASE}/index`,mainPack:`${BASE}/index.pck`,experimentalVK:false,focusCanvas:true,gdextensionLibs:[],serviceWorker:null};
       engine=new window.Engine(config);const missing=window.Engine.getMissingFeatures?.({threads:false})||[];if(missing.length)throw new Error(`Pixelorama Web missing browser features: ${missing.join(', ')}`);
       await engine.startGame({onProgress:(current,total)=>{if(current>0&&total>0)setStatus(`Loading Pixelorama ${Math.round(current/total*100)}%…`);}});
       installOpenBridge();status.hidden=true;canvas.focus();nativeCommand('set_undo_limit',64);markActive();
