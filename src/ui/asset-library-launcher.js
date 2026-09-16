@@ -28,7 +28,7 @@ const hydratePersonalAssets=hydratePersonalContent;
 function ensureCommunityRuntime(){
   if(root.__KELO_COMMUNITY_ASSET_RUNTIME__)return Promise.resolve(root.__KELO_COMMUNITY_ASSET_RUNTIME__);
   if(communityRuntimePromise)return communityRuntimePromise;
-  communityRuntimePromise=import('./../creators/assets/community-asset-runtime.mjs?v=1').catch(error=>{communityRuntimePromise=null;throw error;});
+  communityRuntimePromise=import('./../creators/assets/community-asset-runtime.mjs?v=2').catch(error=>{communityRuntimePromise=null;throw error;});
   return communityRuntimePromise;
 }
 function openCreatorsWhenReady(){let tries=0;const attempt=()=>{tries++;const launcher=root.KELO_STUDIO_LAUNCHER||root.KELO_CREATORS_LAUNCHER;if(launcher?.open){void hydratePersonalContent().finally(()=>launcher.open().catch?.(()=>{}));return;}if(tries<20)root.setTimeout(attempt,150);};attempt();}
@@ -57,7 +57,7 @@ root.addEventListener('kelo:community-player-assets',event=>{
 root.addEventListener('kelo:forest-plaza-catalog-ready',()=>void hydratePersonalContent().catch(()=>{}));
 document.addEventListener('click',event=>{if(event.target?.closest?.('#lx-create-studio,#lx-create-asset-forge'))void hydratePersonalContent().catch(()=>{});},true);
 root.addEventListener('kelo:asset-selection-changed',()=>refresh(document.getElementById(ID)));root.addEventListener('storage',()=>refresh(document.getElementById(ID)));
-const api=Object.freeze({version:'content-library-launcher-v5-community',open:openLibrary,openPacks,openCommunityCreator,hydratePersonalAssets,hydratePersonalContent,ensureCommunityRuntime,refresh:()=>refresh(document.getElementById(ID))});
+const api=Object.freeze({version:'content-library-launcher-v6-community-guardian',open:openLibrary,openPacks,openCommunityCreator,hydratePersonalAssets,hydratePersonalContent,ensureCommunityRuntime,refresh:()=>refresh(document.getElementById(ID))});
 root.KELO_ASSET_LIBRARY_LAUNCHER=api;root.KELO_CONTENT_LIBRARY_LAUNCHER=api;
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mount,{once:true});else mount();
 })(typeof globalThis!=='undefined'?globalThis:window);
