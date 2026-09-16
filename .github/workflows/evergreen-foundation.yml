@@ -35,6 +35,9 @@ jobs:
       - name: Legacy transition bridge
         run: node scripts/legacy-transition-bridge-audit.mjs
 
+      - name: Legacy ability aim parity
+        run: node tests/legacy-ability-aim-parity.test.cjs
+
       - name: Reproducible builds
         run: node scripts/reproducible-build-audit.mjs
 
