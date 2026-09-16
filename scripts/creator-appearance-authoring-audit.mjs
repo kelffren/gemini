@@ -105,7 +105,7 @@ assert.match(files.preview,/imageSmoothingEnabled=false/);
 assert.doesNotMatch(files.preview,/setInterval\s*\(/);
 assert.doesNotMatch(files.preview,/requestAnimationFrame\s*\(/);
 assert.doesNotMatch(files.preview,/localStorage|indexedDB/);
-assert.match(files.chamber,/\['idle','walk','run','attack','hit','death'\]/);
+assert.match(files.chamber,/id:'idle'[\s\S]*id:'walk'[\s\S]*id:'run'[\s\S]*id:'attack'[\s\S]*id:'hit'[\s\S]*id:'death'/);
 assert.match(files.chamber,/requestAnimationFrame/);
 assert.match(files.chamber,/cancelAnimationFrame/);
 assert.doesNotMatch(files.chamber,/setInterval\s*\(/);
