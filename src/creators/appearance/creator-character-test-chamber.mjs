@@ -5,7 +5,7 @@
  * purpose: reproduce visual motion/frame states against the authoring preview using KeloCreatorCharacterVisualContract normalization without mutating gameplay/runtime authority
  * consumes: Appearance row.animationMapping + KeloCreatorCharacterVisualContract.resolveMotionSample/frameColumns + creator appearance preview render(frame,motion)
  * state-owned: ephemeral preview state + one requestAnimationFrame while playing
- * do-not: NO live actor mutation, NO HP/inventory/collision/network/persistence, NO second renderer, NO private face/frame normalization
+ * do-not: NO live actor mutation, NO HP/inventory/collision/network/persistence, NO second renderer, NO private face/frame state machine
  */
 const STATE_DEFS=Object.freeze([
   Object.freeze({id:'idle',label:'IDLE',loop:true,frameMs:180}),
@@ -17,17 +17,17 @@ const STATE_DEFS=Object.freeze([
 ]);
 const STATE_BY_ID=new Map(STATE_DEFS.map(row=>[row.id,row]));
 const finite=(v,fallback=0)=>Number.isFinite(Number(v))?Number(v):fallback;
-function clampFrame(value,columns){const max=Math.max(1,Math.floor(finite(columns,1)));return Math.max(0,Math.min(max-1,Math.floor(finite(value,0))));}
+function trackFrame(value,columns){const count=Math.max(1,Math.floor(finite(columns,4)));return Math.abs(Math.floor(finite(value,0)))%count;}
 function frameList(value,columns){
   let raw=value;
   if(raw&&typeof raw==='object'&&!Array.isArray(raw))raw=raw.frames??raw.frame??[];
   if(typeof raw==='string')raw=raw.split(/[\s,|;]+/).filter(Boolean);
   if(!Array.isArray(raw))raw=raw==null?[]:[raw];
-  return raw.filter(value=>Number.isFinite(Number(value))).map(value=>clampFrame(value,columns));
+  return raw.filter(value=>Number.isFinite(Number(value))).map(value=>trackFrame(value,columns));
 }
 function mappedValue(row,state){const mapping=row?.animationMapping&&typeof row.animationMapping==='object'?row.animationMapping:{};if(Object.prototype.hasOwnProperty.call(mapping,state))return{value:mapping[state],source:'animationMapping.'+state};if(Object.prototype.hasOwnProperty.call(mapping,'default'))return{value:mapping.default,source:'animationMapping.default'};return null;}
-export function resolveCharacterTestTrack({row,state='idle',columns=1}={}){
-  const def=STATE_BY_ID.get(String(state))||STATE_BY_ID.get('idle'),cols=Math.max(1,Math.floor(finite(columns,1))),mapped=mappedValue(row,def.id);let frames=[],loop=def.loop,frameMs=def.frameMs,source=def.id+'-static-fallback',authored=false;
+export function resolveCharacterTestTrack({row,state='idle',columns=4}={}){
+  const def=STATE_BY_ID.get(String(state))||STATE_BY_ID.get('idle'),cols=Math.max(1,Math.floor(finite(columns,4))),mapped=mappedValue(row,def.id);let frames=[],loop=def.loop,frameMs=def.frameMs,source=def.id+'-static-fallback',authored=false;
   if(mapped){const raw=mapped.value,obj=raw&&typeof raw==='object'&&!Array.isArray(raw)?raw:null;frames=frameList(raw,cols);loop=obj?.loop==null?def.loop:obj.loop===true;frameMs=Math.max(70,Math.min(2000,finite(obj?.frameMs??obj?.speedMs??obj?.ms,def.frameMs)));if(frames.length){source=mapped.source;authored=true;}}
   if(!frames.length&&def.id==='walk'){frames=Array.from({length:cols},(_,index)=>index);source='runtime-generic-stride';}
   if(!frames.length&&def.id==='run'){frames=Array.from({length:cols},(_,index)=>index);source='runtime-generic-stride-fast';}
@@ -42,7 +42,7 @@ export function createCreatorCharacterTestChamber({root=globalThis,preview,onSna
   const rafFn=typeof root.requestAnimationFrame==='function'?root.requestAnimationFrame.bind(root):null;
   const cancelFn=typeof root.cancelAnimationFrame==='function'?root.cancelAnimationFrame.bind(root):null;
   function columns(){const C=visualContract();if(C?.frameColumns)return C.frameColumns(row);const visual=row?.metadata?.characterVisual||{};return Math.max(1,Math.floor(finite(visual.columns,4)));}
-  function sample(frame){const C=visualContract();const visual={face,frame,on:state==='walk'||state==='run',state};if(C?.resolveMotionSample)return C.resolveMotionSample({visual,columns:columns(),fallbackFace:'down',fallbackState:state});const cols=columns();return Object.freeze({face:['down','left','right','up'].includes(face)?face:'down',frame:Math.abs(Math.floor(finite(frame,0)))%cols,moving:!!visual.on,state,dx:0,dy:0});}
+  function sample(frame){const C=visualContract();const visual={face,frame,on:state==='walk'||state==='run',state};if(C?.resolveMotionSample)return C.resolveMotionSample({visual,columns:columns(),fallbackFace:'down',fallbackState:state});const cols=columns();return Object.freeze({face:['down','left','right','up'].includes(face)?face:'down',frame:trackFrame(frame,cols),moving:!!visual.on,state,dx:0,dy:0});}
   function track(){return resolveCharacterTestTrack({row,state,columns:columns()});}
   function emit(){const canonical=sample(lastFrame??0),snapshot=Object.freeze({version:'creator-character-test-chamber-v1.2',state:canonical.state,playing,face:canonical.face,frame:lastFrame==null?null:canonical.frame,track:lastTrack,preview:lastPreview,error:lastError,motionContract:visualContract()?.version||null});try{onSnapshot?.(snapshot);}catch{}return snapshot;}
   async function paint(frame,trackValue){if(disposed)return null;const canonical=sample(frame);lastFrame=canonical.frame??0;lastError=null;try{const rendered=await preview.render({row,source,asset,face:canonical.face,motion:canonical.state,frame:lastFrame});if(disposed)return null;lastPreview=rendered;lastTrack=trackValue;return emit();}catch(error){lastPreview=null;lastTrack=trackValue;lastError=String(error?.message||error);return emit();}}
