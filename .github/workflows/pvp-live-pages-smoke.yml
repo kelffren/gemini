@@ -26,7 +26,10 @@ permissions:
   pages: read
 
 concurrency:
-  group: pvp-live-pages-smoke-${{ github.event_name }}-${{ github.event.build.commit || github.sha }}
+  # All production page_build events share one group, so a newer Pages build
+  # cancels an older smoke that is still waiting for publication. PRs remain
+  # isolated by github.ref and therefore cannot cancel each other's validation.
+  group: pvp-live-pages-smoke-${{ github.event_name }}-${{ github.event_name == 'page_build' && 'main' || github.ref }}
   cancel-in-progress: true
 
 jobs:
