@@ -1,6 +1,6 @@
 # Kelo World — Documentation Index
 
-**Sincronizado:** 2026-09-15
+**Sincronizado:** 2026-09-16
 
 Este archivo define qué documentación debe leerse como estado actual, qué archivo conserva intención de implementación y qué archivos son memoria/histórico.
 
@@ -19,7 +19,8 @@ Este archivo define qué documentación debe leerse como estado actual, qué arc
 11. `ASSET_CONTRACT.md` — assets/atlases/placement.
 12. `VISUAL_SYSTEM.md` — pipeline visual.
 13. `SYSTEM_DOCUMENTATION_STANDARD.md` + `system-catalog.json` — contrato documental.
-14. `IMPLEMENTATION_LEDGER.md` — intención/estado de passes materiales que atraviesan turnos o agentes; leer entradas ACTIVE antes de continuar ese trabajo.
+14. `IMPLEMENTATION_LEDGER.md` — ledger agregado histórico de passes materiales que atraviesan turnos o agentes.
+15. `implementation-passes/*.md` — entradas materiales nuevas/stacked cuando el pass necesita un handoff autocontenido; tienen la misma semántica de estado/gates del ledger y deben leerse si el ID aparece en el sistema/PR activo.
 
 ## Documentación por sistema
 
@@ -27,9 +28,11 @@ Este archivo define qué documentación debe leerse como estado actual, qué arc
 
 ## Ledger de implementación
 
-`IMPLEMENTATION_LEDGER.md` conserva el objetivo original, alcance planificado, lo realmente implementado, evidencia, gates pendientes y handoff de cambios materiales multiagente.
+`IMPLEMENTATION_LEDGER.md` conserva el historial agregado de objetivo, alcance, implementación, evidencia, gates pendientes y handoff de cambios materiales multiagente.
 
-No es una fuente de verdad superior al runtime. Un ítem `ACTIVE` o `IMPLEMENTED_PENDING_VERIFY` significa precisamente que todavía hay trabajo o verificación pendiente. Si un agente continúa ese pass, debe actualizar la misma entrada en vez de abrir un roadmap incompatible.
+`docs/implementation-passes/*.md` permite que un pass stacked nuevo conserve ese mismo contrato de handoff sin reescribir el historial agregado completo. No reemplaza las entradas antiguas del ledger. Un agente que continúa un pass debe buscar primero su ID exacto en ambos lugares y actualizar el mismo archivo/entrada existente, nunca abrir un roadmap paralelo.
+
+No son fuentes de verdad superiores al runtime. Un ítem `ACTIVE` o `IMPLEMENTED_PENDING_VERIFY` significa precisamente que todavía hay trabajo o verificación pendiente.
 
 ## Memorias operativas
 
@@ -48,7 +51,7 @@ Ejemplos: `WORLD_BUILDER_MEMORY.md`, `BACKPACK_SYSTEM_MEMORY.md`, `PROPERTY_EDIT
 3. `index.html` y boot real;
 4. documentos canónicos de estado actual;
 5. documentos de sistema;
-6. implementation ledger (intención/continuidad, no autoridad runtime);
+6. implementation ledger + implementation-pass handoff (intención/continuidad, no autoridad runtime);
 7. memoria/histórico.
 
-Cuando exista contradicción, corrige la documentación de estado actual en el mismo cambio, actualiza la entrada del ledger afectada y deja el histórico intacto.
+Cuando exista contradicción, corrige la documentación de estado actual en el mismo cambio, actualiza la entrada/handoff del pass afectado y deja el histórico intacto.
