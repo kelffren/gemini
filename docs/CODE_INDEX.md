@@ -84,6 +84,9 @@
 - `src/studio/ui/studio-live-shell.mjs` — shell.
 - `src/studio/ui/studio-asset-palette.mjs` — búsqueda/categorías/carpetas.
 - `src/world/map-forge/` — generación/composición Map Forge.
+- `server/sprite-ai-service.js` — owner server de selección de proveedor de inferencia para Sprite Factory.
+- `server/sprite-ai-provider-huggingface.js` — adapter server-only a Gradio/ZeroGPU.
+- `deploy/huggingface-sprite-ai/` — Space de referencia FLUX.2 Klein + SpriteSheet LoRA; produce candidatos para el compilador, no assets aprobados.
 
 ## Gameplay
 
