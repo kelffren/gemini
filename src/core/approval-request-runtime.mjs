@@ -1,11 +1,11 @@
 /* KELO-INDEX
  * area: CORE / APPROVAL WORKFLOW
  * owner: KeloApprovalRequestRuntime
- * keys: APPROVAL REQUEST EDITOR ADMIN NOTIFICATION REALTIME SUPABASE
- * purpose: shared client for editor submissions, admin review inbox and realtime approval notifications
+ * keys: APPROVAL REQUEST EDITOR ADMIN NOTIFICATION REALTIME SUPABASE PREVIEW SIGNED URL
+ * purpose: shared client for editor submissions, admin review inbox, secure visual previews and realtime approval notifications
  * authority: RPC + RLS; browser never publishes approved content directly
  */
-const VERSION='approval-request-runtime-v1.0.0';
+const VERSION='approval-request-runtime-v1.1.0-visual-review';
 
 export async function installApprovalRequestRuntime({root=window}={}){
   if(root.KeloApprovalRequestRuntime)return root.KeloApprovalRequestRuntime;
@@ -59,6 +59,27 @@ export async function installApprovalRequestRuntime({root=window}={}){
     return rpc('list_approval_requests',{p_status:status,p_limit:limit});
   }
 
+  async function signPreview(asset){
+    const bucket=String(asset?.bucket||''),path=String(asset?.path||'');
+    if(!bucket||!path)return {...asset,signedUrl:null};
+    try{
+      const c=client();
+      if(!c?.storage)throw new Error('STORAGE_CLIENT_UNAVAILABLE');
+      const result=await c.storage.from(bucket).createSignedUrl(path,300);
+      if(result.error)throw result.error;
+      return {...asset,signedUrl:result.data?.signedUrl||result.data?.signedURL||null};
+    }catch(error){
+      console.warn('[ApprovalRequest preview]',error);
+      return {...asset,signedUrl:null,previewError:String(error?.message||error)};
+    }
+  }
+
+  async function detail(id){
+    const payload=await rpc('get_approval_request_detail',{p_request_id:id});
+    const previewAssets=await Promise.all((payload?.previewAssets||[]).map(signPreview));
+    return {...(payload||{}),previewAssets};
+  }
+
   async function review(id,decision,note=null){
     return rpc('review_approval_request',{p_request_id:id,p_decision:decision,p_note:note});
   }
@@ -98,7 +119,7 @@ export async function installApprovalRequestRuntime({root=window}={}){
     channel=null;
   }
 
-  const api=Object.freeze({version:VERSION,submit,list,review,refreshUnread,markRead,startNotifications,stopNotifications,get unread(){return unread;}});
+  const api=Object.freeze({version:VERSION,submit,list,detail,review,refreshUnread,markRead,startNotifications,stopNotifications,get unread(){return unread;}});
   root.KeloApprovalRequestRuntime=api;
   root.addEventListener('kelo:account-signed-out',()=>{void stopNotifications();emitUnread(0);});
   return api;

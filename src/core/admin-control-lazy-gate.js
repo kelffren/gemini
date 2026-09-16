@@ -8,7 +8,7 @@
 (function(root){
 'use strict';
 if(root.KeloAdminControlLazyGate)return;
-const VERSION='kelo-admin-control-lazy-gate-v3-approval-request';
+const VERSION='kelo-admin-control-lazy-gate-v4-approval-visual-review';
 let adminLoading=null,approvalLoading=null,notificationBoot=null,approvalUnread=0,approvalUnreadHooked=false;
 const actor=()=>String(root.KELO_ADMIN_KEYS?.playerId?.()||root.keloNet?.playerKey||root.localPlayer?.id||'local_pioneer');
 const online=()=>root.KeloAccountPermissions||root.KeloPermissions;
@@ -42,7 +42,7 @@ async function loadAdmin(){
 async function loadApproval(){
   if(root.KeloApprovalRequestPanel)return root.KeloApprovalRequestPanel;
   if(approvalLoading)return approvalLoading;
-  approvalLoading=(async()=>{const p=await loadPermissions();if(!(p?.hasRole?.('admin')||p?.can?.('approval.view')||p?.can?.('approval.review')))throw new Error('APPROVAL_VIEW_DENIED');const mod=await import('./../ui/approval-request-panel.mjs?v=1');return mod.installApprovalRequestPanel({root});})().finally(()=>{approvalLoading=null;sync();});
+  approvalLoading=(async()=>{const p=await loadPermissions();if(!(p?.hasRole?.('admin')||p?.can?.('approval.view')||p?.can?.('approval.review')))throw new Error('APPROVAL_VIEW_DENIED');const mod=await import('./../ui/approval-request-panel.mjs?v=2-visual-review');return mod.installApprovalRequestPanel({root});})().finally(()=>{approvalLoading=null;sync();});
   return approvalLoading;
 }
 async function openAdmin(){
@@ -62,7 +62,7 @@ async function bootApprovalNotifications(){
   notificationBoot=(async()=>{
     const p=await loadPermissions();
     if(!(p?.hasRole?.('admin')||p?.can?.('approval.notifications')))return false;
-    const mod=await import('./approval-request-runtime.mjs?v=1');
+    const mod=await import('./approval-request-runtime.mjs?v=2-visual-review');
     const runtime=await mod.installApprovalRequestRuntime({root});
     if(!approvalUnreadHooked){root.addEventListener('kelo:approval-unread',event=>{approvalUnread=Math.max(0,Number(event?.detail?.count)||0);sync();});approvalUnreadHooked=true;}
     await runtime.startNotifications();

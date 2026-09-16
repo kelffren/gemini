@@ -34,4 +34,20 @@ const idempotent=fs.readFileSync('supabase/migrations/20260910032354_universal_c
 for(const needle of ['on conflict (owner_user_id, slug) do update','metadata = public.asset_families.metadata || excluded.metadata','returning * into v_row'])assert.ok(idempotent.includes(needle),`idempotent reimport contract missing ${needle}`);
 const entry=fs.readFileSync('src/creators/creator-entry.mjs','utf8'),hub=fs.readFileSync('src/creators/ui/creator-hub.mjs','utf8'),ui=fs.readFileSync('src/creators/ui/content-studio-workspace.mjs','utf8'),config=fs.readFileSync('src/online/kelo-supabase-public-config.mjs','utf8');
 assert.ok(entry.includes('registerContentStudioWorkspace'));assert.ok(hub.includes("['content-studio','Content Studio','active']"));assert.ok(ui.includes('.xlsx'));assert.ok(ui.includes('multiple:true'));assert.ok(!/sb_secret_|SUPABASE_SERVICE_ROLE_KEY\s*=\s*[^\s]/.test(config));
+
+// GitHub Pages regression guard: repository-local catalogs must resolve from the
+// ES module URL. Document-relative ../../../data paths escape /gemini/ on Pages.
+const externalProviderSource=fs.readFileSync('src/creators/assets/external-asset-providers.mjs','utf8');
+const keloProviderSource=fs.readFileSync('src/creators/assets/kelo-content-live-provider.mjs','utf8');
+const moduleRelativeExternal=/new URL\(['"]\.\.\/\.\.\/\.\.\/data\/external-asset-providers\.json(?:\?v=\d+)?['"],\s*import\.meta\.url\)\.href/;
+const moduleRelativeKelo=/new URL\(['"]\.\.\/\.\.\/\.\.\/data\/kelo-content-starter-catalog\.json(?:\?v=\d+)?['"],\s*import\.meta\.url\)\.href/;
+assert.match(externalProviderSource,moduleRelativeExternal,'external provider config must resolve from import.meta.url');
+assert.match(keloProviderSource,moduleRelativeKelo,'Kelo starter catalog must resolve from import.meta.url');
+assert.doesNotMatch(externalProviderSource,/const\s+CONFIG_URL\s*=\s*['"]\.\.\/\.\.\/\.\.\/data\/external-asset-providers/,'external provider config regressed to a document-relative URL');
+assert.doesNotMatch(keloProviderSource,/const\s+INDEX_URL\s*=\s*['"]\.\.\/\.\.\/\.\.\/data\/kelo-content-starter-catalog/,'Kelo starter catalog regressed to a document-relative URL');
+const externalCatalog=JSON.parse(fs.readFileSync('data/external-asset-providers.json','utf8'));
+const starterCatalog=JSON.parse(fs.readFileSync('data/kelo-content-starter-catalog.json','utf8'));
+assert.ok(Array.isArray(externalCatalog.providers)&&externalCatalog.providers.length>0,'external provider catalog is empty or invalid');
+assert.ok(Array.isArray(starterCatalog.assets)&&starterCatalog.assets.length>0,'Kelo starter catalog is empty or invalid');
+
 console.log('Universal Content Studio audit: OK');
