@@ -117,11 +117,15 @@ export function createRoomMaterialTool(kernel,{root=globalThis}={}){
     for(const button of buttons){
       const kind=button.dataset.roomMaterial;
       const list=candidates[kind]||[],available=!!roomId&&list.length>1&&rows.some(row=>row?.components?.buildingPiece?.type===kind);
-      button.disabled=!available;
-      button.setAttribute('aria-disabled',available?'false':'true');
+      const nextDisabled=!available;
+      if(button.disabled!==nextDisabled)button.disabled=nextDisabled;
+      const nextAria=available?'false':'true';
+      if(button.getAttribute('aria-disabled')!==nextAria)button.setAttribute('aria-disabled',nextAria);
       const current=currentPrefab(kind,rows),currentRow=list.find(row=>row.id===current);
-      button.textContent=`${DEFINITIONS[kind].glyph} ${DEFINITIONS[kind].label}${currentRow?` · ${currentRow.label}`:''}`;
-      button.title=available?`Cycle ${kind} material for the selected ROOM`:`Select a ROOM with at least two ${kind} prefabs available`;
+      const nextText=`${DEFINITIONS[kind].glyph} ${DEFINITIONS[kind].label}${currentRow?` · ${currentRow.label}`:''}`;
+      if(button.textContent!==nextText)button.textContent=nextText;
+      const nextTitle=available?`Cycle ${kind} material for the selected ROOM`:`Select a ROOM with at least two ${kind} prefabs available`;
+      if(button.title!==nextTitle)button.title=nextTitle;
     }
   }
 
@@ -155,11 +159,18 @@ export function createRoomMaterialTool(kernel,{root=globalThis}={}){
   }
 
   unsubSelection=kernel.selection.onChange(()=>syncUi());
-  if(document?.documentElement&&root?.MutationObserver){observer=new root.MutationObserver(()=>ensureUi());observer.observe(document.documentElement,{childList:true,subtree:true});}
+  if(document?.documentElement&&root?.MutationObserver){
+    observer=new root.MutationObserver(()=>{
+      if(destroyed)return;
+      if(buttons.length===2&&buttons.every(button=>button?.isConnected))return;
+      ensureUi();
+    });
+    observer.observe(document.documentElement,{childList:true,subtree:true});
+  }
   ensureUi();
 
   return Object.freeze({
-    id:'roomMaterial',version:'studio-room-material-v1.0.0',
+    id:'roomMaterial',version:'studio-room-material-v1.0.1-observer-safe',
     candidates:{wall:candidates.wall.map(copy),floor:candidates.floor.map(copy)},
     applyRoomMaterial,cycleRoomMaterial,
     getSelectedRoomId:selectedRoomId,
