@@ -1,8 +1,8 @@
 /* KELO-INDEX
  * area: BUILD / BOOT QA
  * owner: Kelo Boot Footprint QA
- * keys: OBSERVED BOOT TRANSFER RATCHET AUDIT PAYLOAD REQUEST COUNT REGRESSION STABLE CORE BOUNDARY PROMOTION
- * purpose: deterministic pure-data regression test for repeated observed preboot transfer comparison
+ * keys: OBSERVED BOOT TRANSFER RATCHET AUDIT PAYLOAD REQUEST COUNT REGRESSION STABLE CORE BOUNDARY PROMOTION REPLACEMENT DELIVERY
+ * purpose: deterministic pure-data regression test for repeated observed preboot transfer comparison including exact delivery substitutions
  * public-api: CLI audit
  * state-owned: none
  * online: N/A
@@ -30,4 +30,10 @@ assert(compareObservedBootTransfers(base,boundary).pass,'boundary-only resource 
 const promote=compareObservedBootTransfers(boundary,promoted);assert(promote.pass,'base boundary promoted to stable with identical cost must pass');assert(promote.boundaryPromotions.length===1&&promote.boundaryPromotions[0].path==='/race.js','boundary promotion must be reported');assert(promote.summary.gateRequestDelta===0,'boundary promotion must not inflate aggregate request gate');
 const promoteGrow=compareObservedBootTransfers(boundary,promotedBigger);assert(!promoteGrow.pass&&promoteGrow.regressions.some(r=>r.type==='observed-boundary-promotion-bytes-grew'),'boundary promotion byte growth must fail');
 const promoteRepeat=compareObservedBootTransfers(boundary,promotedRepeated);assert(!promoteRepeat.pass&&promoteRepeat.regressions.some(r=>r.type==='observed-boundary-promotion-request-count-grew'),'boundary promotion request growth must fail');
+const source=report([{path:'/assets/source.png',bytes:100}]),delivery=report([{path:'/assets/delivery.png',bytes:40}]),rule={id:'asset',source:'assets/source.png',delivery:{path:'assets/delivery.png',bytes:40,exact:true}};
+const replaced=compareObservedBootTransfers(source,delivery,{replacements:[rule]});assert(replaced.pass&&replaced.replacementImprovements.length===1&&replaced.summary.savedBytes===60,'declared exact observed replacement must pass');
+const undeclared=compareObservedBootTransfers(source,delivery);assert(!undeclared.pass&&undeclared.regressions.some(r=>r.type==='observed-stable-preboot-resource-added'),'undeclared observed rename must fail');
+const wrongBytes=compareObservedBootTransfers(source,delivery,{replacements:[{...rule,delivery:{...rule.delivery,bytes:41}}]});assert(!wrongBytes.pass&&wrongBytes.regressions.some(r=>r.type==='observed-replacement-delivery-byte-contract-mismatch'),'observed delivery bytes must match declaration');
+const tooBig=compareObservedBootTransfers(source,report([{path:'/assets/delivery.png',bytes:120}]),{replacements:[{...rule,delivery:{...rule.delivery,bytes:120}}]});assert(!tooBig.pass&&tooBig.regressions.some(r=>r.type==='observed-replacement-delivery-larger-than-source'),'larger observed replacement must fail');
+const sourceStill=report([{path:'/assets/source.png',bytes:100},{path:'/assets/delivery.png',bytes:40}]);const duplicate=compareObservedBootTransfers(source,sourceStill,{replacements:[rule]});assert(!duplicate.pass&&duplicate.regressions.some(r=>r.type==='observed-replacement-source-still-preboot-in-head'),'SOURCE still preboot must fail replacement');
 console.log('OBSERVED_BOOT_TRANSFER_RATCHET_AUDIT_PASS');
