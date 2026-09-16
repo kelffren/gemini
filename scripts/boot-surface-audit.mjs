@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: QA / BOOT PERFORMANCE
  * owner: Evergreen boot surface contract
- * purpose: impide que módulos internos/no críticos vuelvan al parser-blocking boot y fija presupuestos de superficie crítica
+ * purpose: impide que módulos internos/no críticos vuelvan al parser-blocking boot y mide/fija la superficie crítica
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -22,6 +22,15 @@ const after=html.slice(markerAt);
 const scriptSrcs=(text)=>[...text.matchAll(/<script\s+src=["']([^"']+)["'][^>]*><\/script>/g)].map(m=>m[1]);
 const critical=scriptSrcs(before);
 const postBootStatic=scriptSrcs(after);
+const localFile=(src)=>String(src).split(/[?#]/)[0].replace(/^\.\//,'').replace(/^\//,'');
+const bytesFor=(items)=>items.reduce((total,src)=>{
+  const rel=localFile(src);
+  const full=path.join(root,rel);
+  assert.ok(fs.existsSync(full),`boot script missing on disk: ${rel}`);
+  return total+fs.statSync(full).size;
+},0);
+const criticalBytes=bytesFor(critical);
+const postBootStaticBytes=bytesFor(postBootStatic);
 
 assert.ok(critical.length<=48,`critical script budget exceeded: ${critical.length} > 48`);
 assert.ok(postBootStatic.length<=3,`post-boot static script budget exceeded: ${postBootStatic.length} > 3`);
@@ -76,4 +85,4 @@ for(const engine of retiredEngines){
   assert.deepEqual(retiredRefs[engine],[],`retired ${engine} still referenced by runtime/test code: ${retiredRefs[engine].join(', ')}`);
 }
 
-console.log(`BOOT SURFACE PASS critical=${critical.length} postBootStatic=${postBootStatic.length} deferredInternal=9 retiredRuntimeRefs=0`);
+console.log(`BOOT SURFACE PASS critical=${critical.length} criticalBytes=${criticalBytes} postBootStatic=${postBootStatic.length} postBootStaticBytes=${postBootStaticBytes} deferredInternal=9 retiredRuntimeRefs=0`);
