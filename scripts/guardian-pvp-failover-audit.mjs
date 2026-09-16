@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 const root=path.resolve(path.dirname(new URL(import.meta.url).pathname),'..');
 const read=rel=>fs.readFileSync(path.join(root,rel),'utf8');
+const executable=source=>String(source||'').replace(/\/\*[\s\S]*?\*\//g,'').replace(/^\s*\/\/.*$/gm,'');
 
 const testSource=read('tests/guardian-pvp-failover-live.spec.js');
 const workflow=read('.github/workflows/guardian-pvp-failover-live.yml');
@@ -15,6 +16,7 @@ const browserstack=read('browserstack.guardian-failover.yml');
 const guardian=read('src/systems/guardian-system.js');
 const host=read('src/systems/guardian-pvp-host.js');
 const worker=read('src/workers/guardian-pvp-authority-worker.js');
+const workerCode=executable(worker);
 const adapter=read('src/systems/guardian-pvp-net-adapter.js');
 const registry=read('src/core/feature-registry.js');
 
@@ -44,7 +46,7 @@ assert.match(worker,/pendingRestoredActors/);
 assert.match(worker,/pruneUnclaimedRestored/);
 assert.match(worker,/authority\.unregister\(actorId\)/);
 assert.match(worker,/restoredActorPrune:true/);
-assert.doesNotMatch(worker,/setInterval|setTimeout/);
+assert.doesNotMatch(workerCode,/setInterval|setTimeout/);
 assert.match(adapter,/takeoverSequenceResync:true/);
 
 assert.match(registry,/kelo-feature-registry-v2\.5\.1-guardian-pvp-worker-prune/);
