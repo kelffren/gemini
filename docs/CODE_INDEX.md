@@ -25,10 +25,14 @@
 ## Build / Weightless
 
 - `src/build/boot-footprint-ratchet.mjs` — mide y compara el peso estático anterior a `kelo:boot-ready`.
+- `src/build/observed-boot-transfer-ratchet.mjs` — compara el núcleo estable de transferencias realmente observadas antes de `boot-ready`.
 - `scripts/boot-footprint.mjs` — snapshot CLI del first-playable path.
-- `scripts/boot-footprint-ratchet.mjs` — gate monotónico de JS/CSS crítico.
-- `scripts/boot-footprint-ratchet-audit.mjs` — corpus determinista del boot ratchet.
-- `.github/workflows/asset-bit-ratchet.yml` — Kelo Weightless Stack: assets, dedup, reconstrucción exacta y first-playable footprint.
+- `scripts/boot-footprint-ratchet.mjs` — gate monotónico del cierre estático crítico.
+- `scripts/boot-footprint-ratchet-audit.mjs` — corpus determinista del boot ratchet estático.
+- `scripts/observed-boot-transfer.mjs` — 3 arranques móviles aislados por revisión y separación stable/boundary.
+- `scripts/observed-boot-transfer-ratchet.mjs` — gate monotónico de bytes/requests realmente preboot.
+- `scripts/observed-boot-transfer-ratchet-audit.mjs` — regresión determinista del stable-core V3.
+- `.github/workflows/asset-bit-ratchet.yml` — Kelo Weightless Stack: assets, dedup, reconstrucción exacta, cierre estático y transferencia observada.
 - `.github/workflows/weightless-evolution-lab.yml` — laboratorio periódico/manual de búsqueda de representaciones más pequeñas; solo evidencia, no muta producción.
 
 ## World / Environment
@@ -36,10 +40,11 @@
 - `src/environment/world-map.js` — definición principal.
 - `src/environment/terrain-contract.js` — terrain.
 - `src/environment/tile-registry.js` — tile/atlas registry.
-- `src/environment/atlas-contract.js` — atlas authority.
+- `src/environment/atlas-contract.js` — autoridad de creación/carga/refcount/warm eviction de atlas.
 - `src/environment/environment-layer-stack.js` — draw phases.
 - `src/environment/surface-ground.js` — suelo.
 - `src/environment/prop-contract.js` — props data-driven.
+- `src/environment/generic-props.js` — renderer de props + residencia de atlas limitada al viewport, delegada a Atlas Contract.
 - `src/environment/prefab-contract.js` — prefab rendering contract.
 - `src/environment/world-builder-system.js` — builder integration.
 - `src/environment/generated/forest-plaza-tileset-v2-manifest.js` — manifest irregular Forest Plaza.
