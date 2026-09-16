@@ -1,19 +1,54 @@
 /* KELO-INDEX
  * area: TEST / PVP
  * owner: Playwright validation only
- * keys: PVP DODGE DASH COLLISION MOBILE DESKTOP LIVE WINNER
- * purpose: bloquea el dodge PvP funcional: 112 px reales, arranque responsivo y runtime de abilities despierto
+ * keys: PVP BUTTON FIRST-USE DODGE DASH COLLISION MOBILE DESKTOP LIVE WINNER
+ * purpose: bloquea la ruta visible botón PvP -> lazy runtime -> mundo PvP y después valida dodge 112 px real
  * online: N/A; valida el runtime local exacto de main sin alterar autoridad
  * do-not: NO gameplay mutation fuera de setup reproducible de prueba
  */
 const {test,expect}=require('@playwright/test');
 
+async function enterThroughVisiblePvpButton(page,label){
+  await page.waitForFunction(()=>window.KELO_MODULE_LOADER&&document.getElementById('lx-side-pvp'),{timeout:20000});
+  const before=await page.evaluate(()=>({
+    pvpWorld:!!window.KeloPvPWorld,
+    enter:typeof window.enterPvPWorld==='function',
+    loaderNeeds:window.KELO_MODULE_LOADER.needs('pvp'),
+    loaderReady:window.KELO_MODULE_LOADER.isReady('pvp')
+  }));
+  expect(before.loaderNeeds).toBe(true);
+  expect(before.loaderReady).toBe(false);
+
+  const button=page.locator('#lx-side-pvp');
+  await expect(button).toBeVisible();
+  await button.click();
+  await page.waitForFunction(()=>window.KELO_MODULE_LOADER&&window.KELO_MODULE_LOADER.isReady('pvp')&&window.KeloPvPWorld&&typeof window.enterPvPWorld==='function'&&window.KELO_PVP_COMBAT_LOADER_AUDIT?.ready===true,{timeout:30000});
+  await page.waitForFunction(()=>window.KeloPvPWorld&&window.KeloAbilities&&window.KeloPvPWorld.state.mode==='pvp'&&window.KeloPvPWorld.state.combatEnabled,{timeout:20000});
+
+  const after=await page.evaluate(()=>({
+    mode:window.KeloPvPWorld.state.mode,
+    combatEnabled:window.KeloPvPWorld.state.combatEnabled,
+    loaderNeeds:window.KELO_MODULE_LOADER.needs('pvp'),
+    loaderReady:window.KELO_MODULE_LOADER.isReady('pvp'),
+    diagnostics:window.KELO_MODULE_LOADER.diagnostics(),
+    combatLoader:window.KELO_PVP_COMBAT_LOADER_AUDIT?{
+      ready:window.KELO_PVP_COMBAT_LOADER_AUDIT.ready,
+      combatReady:window.KELO_PVP_COMBAT_LOADER_AUDIT.combatReady,
+      predictionReady:window.KELO_PVP_COMBAT_LOADER_AUDIT.predictionReady
+    }:null
+  }));
+  console.log('PVP_BUTTON_FIRST_USE',JSON.stringify({label,before,after},null,2));
+  expect(after.mode).toBe('pvp');
+  expect(after.combatEnabled).toBe(true);
+  expect(after.loaderNeeds).toBe(false);
+  expect(after.loaderReady).toBe(true);
+  expect(after.combatLoader&&after.combatLoader.ready).toBe(true);
+}
+
 async function runDodge(page,label){
   const errors=[];page.on('pageerror',e=>errors.push(String(e)));
   await page.goto('http://127.0.0.1:4173/index.html',{waitUntil:'domcontentloaded'});
-  await page.waitForFunction(()=>window.KeloPvPWorld&&window.KeloInput&&typeof window.enterPvPWorld==='function',{timeout:20000});
-  await page.evaluate(async()=>{await window.enterPvPWorld();});
-  await page.waitForFunction(()=>window.KeloPvPWorld&&window.KeloAbilities&&window.KeloPvPWorld.state.mode==='pvp'&&window.KeloPvPWorld.state.combatEnabled,{timeout:15000});
+  await enterThroughVisiblePvpButton(page,label);
   const result=await page.evaluate(async()=>{
     localPlayer.x=2790;localPlayer.y=720;localPlayer.vx=localPlayer.vy=0;
     window.KeloPvPWorld.setAimWorld({x:2910,y:720},'audit',1);
@@ -53,5 +88,5 @@ async function runDodge(page,label){
   return result;
 }
 
-test('PvP dodge winner mobile',async({browser})=>{const p=await browser.newPage({viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true});await runDodge(p,'mobile');await p.close();});
-test('PvP dodge winner desktop',async({browser})=>{const p=await browser.newPage({viewport:{width:1440,height:900}});await runDodge(p,'desktop');await p.close();});
+test('PvP visible button first-use + dodge winner mobile',async({browser})=>{const p=await browser.newPage({viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true});await runDodge(p,'mobile');await p.close();});
+test('PvP visible button first-use + dodge winner desktop',async({browser})=>{const p=await browser.newPage({viewport:{width:1440,height:900}});await runDodge(p,'desktop');await p.close();});
