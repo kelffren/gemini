@@ -1,8 +1,8 @@
 /* KELO-INDEX
  * area: QA / GUARDIAN
- * keys: GUARDIAN AUDIT HOST LEASE AUTH IOS REGION SCHEDULER REWARD PROOF SUPABASE WEBRTC SIGNAL DATACHANNEL HOT MIRROR FAILOVER CHECKPOINT WEBGPU GPU ASSET QUORUM
- * hace: valida control plane V3, selección regional/GPU, servicio verificado, WebGPU asset workers y Hot Mirror sin segundo loop ni autoridad gameplay cliente
- * online: audit local determinista + contratos estáticos Supabase/WebRTC/WebGPU/Hot Mirror
+ * keys: GUARDIAN AUDIT HOST LEASE AUTH IOS REGION SCHEDULER REWARD PROOF SUPABASE WEBRTC SIGNAL DATACHANNEL HOT MIRROR FAILOVER CHECKPOINT WEBGPU GPU ASSET QUORUM COMMUNITY RECEIPT PROVENANCE
+ * hace: valida control plane V3, selección regional/GPU, servicio verificado, WebGPU asset workers, identidad comunitaria anónima y Hot Mirror sin segundo loop ni autoridad gameplay cliente
+ * online: audit local determinista + contratos estáticos Supabase/WebRTC/WebGPU/Community/Hot Mirror
  */
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -54,6 +54,8 @@ assert.equal(guardian.audit().serverAuthorityPreserved,true);assert.equal(guardi
 const authority=fs.readFileSync(path.join(root,'src/systems/guardian-authority.js'),'utf8');
 const client=fs.readFileSync(path.join(root,'src/systems/guardian-system.js'),'utf8');
 const gpuWorker=fs.readFileSync(path.join(root,'src/systems/guardian-asset-gpu-worker.mjs'),'utf8');
+const community=fs.readFileSync(path.join(root,'src/systems/guardian-community-identity.js'),'utf8');
+const registry=fs.readFileSync(path.join(root,'src/core/feature-registry.js'),'utf8');
 const mirror=fs.readFileSync(path.join(root,'src/systems/guardian-hot-mirror.js'),'utf8');
 const ui=fs.readFileSync(path.join(root,'src/ui/guardian-ui.js'),'utf8');
 const migration=fs.readFileSync(path.join(root,'supabase/migrations/20260914052544_guardian_webrtc_control_plane_v2.sql'),'utf8');
@@ -61,8 +63,10 @@ const gpuMigration=fs.readFileSync(path.join(root,'supabase/migrations/202609160
 assert.match(authority,/guardian_signal_send/);assert.match(authority,/guardian_signal_poll/);assert.match(authority,/primarySupabaseRpc:true/);assert.match(authority,/httpFallback:true/);
 assert.match(client,/RTCPeerConnection/);assert.match(client,/createDataChannel\('kelo-guardian'/);assert.match(client,/KeloSimulation\.after\('guardian:runtime'/);assert.doesNotMatch(client,/setInterval\s*\(/);assert.match(client,/clientGameplayAuthority:false/);assert.match(client,/sendToMaster/);assert.match(client,/broadcast/);assert.match(client,/allowGpuAssets/);assert.match(client,/gpuCapacityUnits/);assert.match(client,/requestAdapter/);assert.doesNotMatch(client,/adapter\.info/);assert.match(client,/gpuVendorExposed:false/);
 assert.match(gpuWorker,/guardian:asset_gpu_job/);assert.match(gpuWorker,/guardian:asset_gpu_result/);assert.match(gpuWorker,/createComputePipeline/);assert.match(gpuWorker,/crypto\.subtle\.digest\('SHA-256'/);assert.match(gpuWorker,/arbitraryShaderAllowed:false/);assert.match(gpuWorker,/requiresAssetForgeQA:true/);assert.doesNotMatch(gpuWorker,/eval\s*\(/);assert.doesNotMatch(gpuWorker,/new Function/);assert.doesNotMatch(gpuWorker,/setInterval\s*\(/);
+assert.match(community,/guardian:community_receipt/);assert.match(community,/kelo:guardian-asset-provenance/);assert.match(community,/anonymousContributorTokens/);assert.match(community,/crypto\.subtle\.digest\('SHA-256'/);assert.match(community,/nodeIdPublished:false/);assert.match(community,/economicAuthority:false/);assert.match(community,/gameplayAuthority:false/);assert.match(community,/leaderboardAuthority:false/);assert.doesNotMatch(community,/setInterval\s*\(/);assert.doesNotMatch(community,/eval\s*\(/);assert.doesNotMatch(community,/new Function/);
+assert.match(registry,/guardian-community-identity\.js/);
 assert.match(mirror,/guardian:mirror_checkpoint/);assert.match(mirror,/guardian:mirror_ack/);assert.match(mirror,/guardian:mirror_takeover/);assert.match(mirror,/KeloSimulation\.after\('guardian:hot-mirror'/);assert.match(mirror,/startMasterHost\(\)/);assert.match(mirror,/authoritativeGameplay:false/);assert.match(mirror,/clientGameplayAuthority:false/);assert.doesNotMatch(mirror,/setInterval\s*\(/);assert.doesNotMatch(mirror,/STATE\.gold\s*=/);assert.doesNotMatch(mirror,/\.hp\s*=\s*msg/);
 assert.match(ui,/guardian-hot-mirror\.js/);assert.match(ui,/KeloGuardianMirror/);assert.match(ui,/communityGpuMeter:true/);assert.match(ui,/DONAR GPU PARA CREAR ASSETS/);assert.match(ui,/GPUu/);assert.match(ui,/mirrorReadOnly:true/);assert.match(ui,/gameplayAuthority:false/);
 assert.match(migration,/create table if not exists public\.guardian_signals/);assert.match(migration,/create or replace function public\.guardian_signal_send/);assert.match(migration,/create or replace function public\.guardian_signal_poll/);assert.match(migration,/GUARDIAN_SIGNAL_PAIR_DENIED/);assert.match(migration,/enable row level security/);assert.match(migration,/security definer/);
 assert.match(gpuMigration,/asset-gpu-worker/);assert.match(gpuMigration,/gpuCapacityUnits/);assert.match(gpuMigration,/gpuSharePct/);assert.match(gpuMigration,/gpuCapacityVerified/);assert.match(gpuMigration,/security definer/);assert.doesNotMatch(gpuMigration,/grant\s+execute\s+on\s+function\s+kelo_private/i);
-console.log('GUARDIAN_AUDIT_OK',{...guardian.audit(),supabaseControlPlane:true,webrtcDataPlane:true,webgpuAssetCompute:true,hashValidation:true,communityGpuMeter:true,hotMirror:true,automaticMasterClaim:true,secondLoop:false,clientGameplayAuthority:false});
+console.log('GUARDIAN_AUDIT_OK',{...guardian.audit(),supabaseControlPlane:true,webrtcDataPlane:true,webgpuAssetCompute:true,hashValidation:true,communityGpuMeter:true,communityIdentity:true,anonymousAssetProvenance:true,hotMirror:true,automaticMasterClaim:true,secondLoop:false,clientGameplayAuthority:false});
