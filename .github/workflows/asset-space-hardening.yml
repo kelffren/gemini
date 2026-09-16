@@ -95,6 +95,8 @@ jobs:
         run: node scripts/asset-palette-order-audit.mjs
       - name: Real repository palette tournament evidence
         run: node scripts/asset-palette-order-real-audit.mjs --input=assets --max-files=200 --report=test-results/asset-palette-real
+      - name: Indexed PNG canonicalization opportunity evidence
+        run: node scripts/asset-indexed-png-opportunity-audit.mjs --input=assets --report=test-results/asset-indexed-png-opportunity
       - name: Quality Agent golden corpus
         run: node scripts/asset-quality-golden-corpus-audit.mjs
       - name: Animation temporal consistency gate
@@ -114,4 +116,5 @@ jobs:
           path: |
             test-results/asset-route-budget
             test-results/asset-palette-real
+            test-results/asset-indexed-png-opportunity
           if-no-files-found: ignore
