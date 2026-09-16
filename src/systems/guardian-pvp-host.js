@@ -25,7 +25,7 @@ function bytes(v){try{return new TextEncoder().encode(JSON.stringify(v)).byteLen
 function actorIdForNode(nodeId){const clean=short(nodeId,80).replace(/[^A-Za-z0-9_-]/g,'_');return clean?'gp_'+clean.slice(-72):null;}
 function actorId(){return actorIdForNode(guardian().nodeId);}
 function visible(){return typeof document==='undefined'||document.visibilityState==='visible';}
-function centralOnline(){try{return root.KeloGuardianPvPNetAdapter?.state?.().centralOnline===true;}catch(_){return false;}}
+function centralOnline(){try{const base=root.KeloGuardianPvPNetAdapter?.baseAuthority;return !!(base&&typeof base.isOnline==='function'&&base.isOnline());}catch(_){return false;}}
 function masterValid(messageEpoch){const g=guardian();return !!(g.enabled&&g.masterActive&&!centralOnline()&&visible()&&epoch()&&Number(messageEpoch)===epoch());}
 function rateAllowed(peerId,now){const key=short(peerId,96),row=inputRateByPeer.get(key)||{windowAt:now,count:0};if(now-row.windowAt>=1000){row.windowAt=now;row.count=0;}row.count++;inputRateByPeer.set(key,row);if(row.count>MAX_INPUTS_PER_SECOND){stats.rateLimited++;return false;}return true;}
 function sanitizeIntent(raw){
@@ -36,7 +36,7 @@ function sanitizeIntent(raw){
   return Object.freeze({sequence,moveX,moveY,aimX,aimY,action,phase,abilityKey:m.abilityKey==null?null:short(m.abilityKey,64),slot:Number.isInteger(Number(m.slot))?Number(m.slot):null,direction:m.direction&&typeof m.direction==='object'?{x:Number(m.direction.x)||0,y:Number(m.direction.y)||0}:null,position:m.position&&typeof m.position==='object'?{x:Number(m.position.x)||0,y:Number(m.position.y)||0}:null,targetId:m.targetId==null?null:short(m.targetId,80),attackId:m.attackId==null?null:short(m.attackId,96),swordEntityId:m.swordEntityId==null?null:short(m.swordEntityId,96),clientTime:Number(m.clientTime)||Date.now()});
 }
 function disposeRoom(row){if(!row)return;try{row.authority?.dispose?.();}catch(_){} }
-function clearHosted(reason){if(rooms.size)stats.leaseResets++;for(const row of rooms.values())disposeRoom(row);rooms.clear();inputRateByPeer.clear();accumulator=0;snapshotSeq=0;if(reason&&!['lease-lost','new-lease'].includes(reason))lastError=reason;}
+function clearHosted(reason){if(rooms.size)stats.leaseResets++;for(const row of rooms.values())disposeRoom(row);rooms.clear();inputRateByPeer.clear();accumulator=0;snapshotSeq=0;if(reason&&!['lease-lost','new-lease','stop'].includes(reason))lastError=reason;}
 function createRoom(id){
   if(!root.KeloSharedPvPAuthority?.createPvpAuthority){lastError='GUARDIAN_PVP_CORE_UNAVAILABLE';return null;}
   if(rooms.size>=MAX_ROOMS)return null;
