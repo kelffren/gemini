@@ -8,6 +8,7 @@
 - `engine-a.js` — legacy state/movement physics core.
 - `engine-c.js` — legacy render/simulation orchestration.
 - `engine-net.js` — networking runtime.
+- `tools/pixelorama/index.html` — shell same-origin lazy de Pixelorama Pro; Godot/WASM solo bajo demanda.
 
 ## Foundation Core
 
@@ -18,7 +19,7 @@
 - `src/core/camera-system.js` — `KeloCamera`.
 - `src/core/avatar-render-system.js` — `KeloAvatar`.
 - `src/core/render-extension-system.js` — `KeloRender`.
-- `src/core/simulation-extension-system.js` — `KeloSimulation`.
+- `src/core/simulation-extension-system.js` — `KeloSimulation`, incluidos suspension claims owner-native para lifecycle explícito.
 - `src/core/update-system.js` — `KeloUpdater`.
 
 ## World / Environment
@@ -84,6 +85,11 @@
 - `src/studio/ui/studio-live-shell.mjs` — shell.
 - `src/studio/ui/studio-asset-palette.mjs` — búsqueda/categorías/carpetas.
 - `src/world/map-forge/` — generación/composición Map Forge.
+- `src/creators/core/creator-exclusive-runtime.mjs` — lifecycle de creators pesados sobre Foundation: input/movement/render/simulation/atlas.
+- `src/creators/repository/pixelorama-project-store.mjs` — drafts `.pxo` en IndexedDB con revisiones acotadas.
+- `src/creators/ui/pixelorama-pro-bridge.mjs` — integración Pixelorama Pro in-game, lazy y binaria con Asset Forge.
+- `scripts/prepare-pixelorama-kelo.mjs` — patch reproducible del source upstream para Web móvil Kelo sin vendorear WASM/PCK.
+- `scripts/pixelorama-runtime-audit.mjs` — auditoría estática del contrato Pixelorama/Kelo.
 - `server/sprite-ai-service.js` — owner server de selección de proveedor de inferencia para Sprite Factory.
 - `server/sprite-ai-provider-huggingface.js` — adapter server-only a Gradio/ZeroGPU.
 - `deploy/huggingface-sprite-ai/` — Space de referencia FLUX.2 Klein + SpriteSheet LoRA; produce candidatos para el compilador, no assets aprobados.
