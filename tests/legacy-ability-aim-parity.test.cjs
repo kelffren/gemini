@@ -8,7 +8,7 @@ const assert=require('node:assert/strict');
 const aim=require('../src/core/legacy-ability-aim-system.js');
 const approx=(actual,expected,epsilon=1e-9)=>assert.ok(Math.abs(actual-expected)<=epsilon,`expected ${actual} ≈ ${expected}`);
 
-assert.equal(aim.version,'kelo-ability-aim-v1.0.0-legacy-parity');
+assert.equal(aim.version,'kelo-ability-aim-v1.1.0-pointer-owner');
 assert.deepEqual(aim.max,{dash:170,fireball:300,frostnova:230,meteor:260});
 assert.deepEqual(aim.min,{dash:0.32,fireball:0.45,frostnova:0.45,meteor:0.4});
 assert.equal(aim.stickRadius,72);
