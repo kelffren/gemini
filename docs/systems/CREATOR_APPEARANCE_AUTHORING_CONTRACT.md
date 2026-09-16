@@ -2,7 +2,7 @@
 
 ## Status
 
-**IMPLEMENTED_PENDING_VERIFY.** Character appearance authoring compiles the same declarative visual descriptor consumed by the live Creator character bridge. The same PR now also contains a visual-only **Character Test Chamber** for `idle / walk / run / attack / hit / death`. Mount authoring remains on the older schematic preview and is not claimed WYSIWYG.
+**IMPLEMENTED_PENDING_VERIFY.** Character appearance authoring compiles the same declarative visual descriptor consumed by the live Creator character bridge. The same PR contains a visual-only **Character Test Chamber** for `idle / walk / run / attack / hit / death`. Face/frame sampling is now normalized by the same pure Creator visual contract used by authoring. Mount authoring remains on the older schematic preview and is not claimed WYSIWYG.
 
 ## Problem closed
 
@@ -17,9 +17,11 @@ V2 removes the duplicate descriptor compiler for Character content.
 
 A second authoring problem remained after descriptor parity: a static pose cannot reveal how a sheet behaves while the visual motion frame changes. The Test Chamber closes that authoring gap without creating a second gameplay state machine.
 
+The continuation review also found a concrete parity bug: the Chamber treated an omitted `characterVisual.columns` as 1 while the sheet contract/runtime defaults to 4. It also sanitized authored out-of-range frames differently from the live renderer. Both now use the contract-compatible four-column default and modulo frame semantics.
+
 ## Single source of truth
 
-`src/characters/creator-character-visual-contract.js` owns the pure conversion:
+`src/characters/creator-character-visual-contract.js` owns the pure conversion and visual sample normalization:
 
 ```text
 Appearance row / published Creator payload
@@ -30,6 +32,7 @@ Appearance row / published Creator payload
 KeloCreatorCharacterVisualContract
         ↓
 validated sheet/socket descriptor
+  + canonical face/frame sample
         ↓
 ┌────────────────────────────┬────────────────────────────┐
 │ Appearance Creator preview │ CreatorCharacterBridge     │
@@ -43,7 +46,7 @@ preview geometry                    CharacterVisualStack
                                      social + PvP
 ```
 
-The contract never draws, persists, grants ownership or changes gameplay.
+The contract never draws, persists, grants ownership, owns animation loops or changes gameplay.
 
 ## Contract API
 
@@ -56,8 +59,12 @@ Global: `KeloCreatorCharacterVisualContract`.
 - `presentationFingerprint(input)`
 - `inferredSheet(asset,visual)`
 - `directionalOffsets(payload)`
+- `normalizeFace(value,fallback)`
+- `normalizeFrame(value,columns)`
+- `resolveMotionSample({actor,visual,columns,fallbackFace,fallbackState})`
+- `frameColumns(row)`
 
-The same `buildDescriptor()` call is used by `creator-character-state-bridge.js` for local and remote Creator visuals.
+The same `buildDescriptor()` call is used by `creator-character-state-bridge.js` for local and remote Creator visuals. The authoring Preview/Test Chamber use the motion helpers rather than maintaining a second face/frame policy.
 
 ## Descriptor families
 
@@ -75,7 +82,7 @@ Supported data:
 - base rotation;
 - per-face X/Y/rotation/scale.
 
-The canonical Kelo Character contract remains 512×768, 4×4, 128×192 frames, with down/left/right/up rows.
+The canonical Kelo Character contract remains 512×768, 4×4, 128×192 frames, with down/left/right/up rows. `frameColumns(row)` therefore defaults an omitted/invalid authoring column count to 4, matching descriptor construction instead of inventing a Chamber-specific default.
 
 ### Socket
 
@@ -92,6 +99,18 @@ Supported data:
 
 `weaponMain` and `weaponSecondary` retain the existing weapon defaults when no custom transforms are supplied.
 
+## Canonical visual motion sample
+
+`resolveMotionSample()` is intentionally small and pure. It normalizes only visual presentation inputs:
+
+- face to `down / left / right / up`;
+- explicit frame using absolute integer modulo column count;
+- `on` into a visual moving flag;
+- visual state label;
+- visual dx/dy values.
+
+It does **not** decide whether gameplay is moving, attacking, hit or dead. Those transitions still belong to runtime gameplay/movement/combat owners. The Test Chamber supplies a temporary visual state and the live renderer remains the compatibility target for explicit `_visualMotion.frame` behavior.
+
 ## Authoring preview
 
 `src/creators/appearance/creator-appearance-preview.mjs` is an authoring-only canvas. It does not install a game renderer or own a render loop.
@@ -104,9 +123,9 @@ It intentionally reproduces the live CharacterCustomization geometry formulas:
 - `imageSmoothingEnabled = false`;
 - the same sheet frame, anchor, heightScale and face offsets;
 - the same socket width/height, anchor, rotation and offsets;
-- explicit `_visualMotion.frame` selection using the same modulo rule used by the live Character appearance renderer.
+- explicit `_visualMotion.frame` selection using the shared `resolveMotionSample()` / modulo rule used by the live Character appearance renderer.
 
-`render()` accepts authoring-only `motion` and `frame` inputs. The isolated preview actor receives `_visualMotion.face/frame/on/state`; no live actor is touched.
+`render()` accepts authoring-only `motion` and `frame` inputs. The isolated preview actor receives `_visualMotion.face/frame/on/state`; no live actor is touched. The row's effective column count comes from `frameColumns(row)`.
 
 ## Character Test Chamber
 
@@ -125,13 +144,21 @@ Track resolution follows the existing Appearance contract: `row.animationMapping
 
 Fallback is deterministic:
 
-- `walk` uses the declared sheet columns as the same generic stride sequence the Character renderer uses when moving;
+- `walk` uses the effective sheet columns as the same generic stride sequence the Character renderer uses when moving;
 - `run` uses the same columns with a faster preview cadence;
 - missing `idle / attack / hit / death` mappings hold frame `0` rather than inventing gameplay animation data.
+
+Authored numeric frames are normalized with the live explicit-frame modulo rule. Example: frame `5` in a four-column sheet resolves to frame `1`, not a Chamber-only clamp to frame `3`.
 
 The UI labels each state as **MAPPED** or **FALLBACK** so a creator cannot mistake a fallback pose for an authored attack/hit/death animation.
 
 The Test Chamber owns one `requestAnimationFrame` only while its workspace preview is playing. It redraws only when the resolved frame changes. Closing/rebuilding the preview calls `dispose()` and `cancelAnimationFrame()`.
+
+## Current-draft behavior
+
+`appearance-creator.mjs` rebuilds the preview from `session.get(session.selectedId)` and passes that row directly to `chamber.configure(...)`. Definition-session change notifications call `renderAll()`, disposing the previous Chamber/Preview first. The Test Chamber therefore does not keep an old row snapshot after a successful edit.
+
+This behavior is now covered by static audit assertions, but still requires interactive verification before the pass is `VALIDATED`.
 
 ## Runtime boundary
 
@@ -222,12 +249,16 @@ The gate checks:
 - directional transform preservation;
 - invalid sheet divisibility rejection;
 - deterministic fingerprint;
+- canonical face/frame/state sample normalization;
+- default sheet frame columns = 4;
 - exact six-state Test Chamber whitelist;
 - mapped attack track preservation;
 - deterministic walk/death fallbacks;
-- live Character renderer explicit-frame support;
+- live Character renderer explicit-frame modulo support;
 - loader order contract-before-bridge;
 - bridge consumes the shared contract rather than rebuilding raw sheet/socket descriptors;
+- Preview/Test Chamber consume the shared motion helpers;
+- Chamber receives the current selected row and rebuilds on session changes;
 - editor exposes image import + runtime payload + four faces + Test Chamber;
 - base preview/editor contain no RAF or polling loop;
 - Test Chamber contains RAF + cancellation, no polling or browser persistence.
@@ -236,16 +267,20 @@ Before status becomes **VALIDATED**, also verify on LIVE iPhone:
 
 1. import a real 4×4 clothing sheet;
 2. adjust each face and compare editor versus social actor;
-3. exercise IDLE/WALK/RUN and confirm columns/foot anchoring do not jump;
-4. test an authored `attack` mapping and confirm one-shot/last-frame behavior;
-5. verify HIT/DEATH without mappings are clearly labeled FALLBACK and do not pretend to be gameplay-complete;
-6. rapidly switch all six states and faces, close the editor, and confirm no RAF/input-lock leak;
-7. publish/equip the same revision and compare another account's social view;
-8. enter PvP and confirm the same visual geometry through the presentation bridge;
-9. test a socket weapon and a back-layer cosmetic;
-10. rotate portrait/landscape and confirm no freeze;
-11. confirm closing the workspace releases imported preview object URLs.
+3. exercise IDLE/WALK/RUN and confirm columns/foot anchoring do not jump, including a row that omits `columns` and therefore resolves to 4;
+4. test authored out-of-range frame `5` on a four-column sheet and confirm it displays frame `1`;
+5. test an authored `attack` mapping and confirm one-shot/last-frame behavior;
+6. verify HIT/DEATH without mappings are clearly labeled FALLBACK and do not pretend to be gameplay-complete;
+7. edit/apply the selected row and confirm Test Chamber reflects the current draft immediately;
+8. rapidly switch all six states and faces, close the editor, and confirm no RAF/input-lock leak;
+9. publish/equip the same revision and compare another account's social view;
+10. enter PvP and confirm the same visual geometry through the presentation bridge;
+11. test a socket weapon and a back-layer cosmetic;
+12. rotate portrait/landscape and confirm no freeze;
+13. confirm closing the workspace releases imported preview object URLs.
+
+There is no `.github/workflows` directory on this branch, so absence of GitHub Actions failures is not validation evidence. The static audit and mobile/LIVE gates still need a runnable environment.
 
 ## Explicit limitations
 
-Character has runtime-contract geometry/frame preview parity in this pass. Test Chamber is visual-only and does not claim combat-state-machine parity. Mount stays on the existing definition/schematic preview until a future Mount runtime-contract preview reuses the same strategy with `KeloMounts`/mount anchors.
+Character has runtime-contract geometry/frame preview parity implemented in this pass. Test Chamber is visual-only and does not claim combat-state-machine parity. Current code remains `IMPLEMENTED_PENDING_VERIFY` until static audit plus iPhone/LIVE interaction are actually executed. Mount stays on the existing definition/schematic preview until a future Mount runtime-contract preview reuses the same strategy with `KeloMounts`/mount anchors.
