@@ -9,7 +9,7 @@ on:
       - 'src/creators/assets/png-*.mjs'
       - 'src/creators/assets/asset-image-profiler.mjs'
       - 'src/creators/assets/runtime-image-variants.mjs'
-      - 'src/creators/assets/quality-pareto.mjs'
+      - 'src/creators/assets/quality-*.mjs'
       - 'src/creators/assets/perceptual-quality-bridge.mjs'
       - 'scripts/asset-space-*.mjs'
       - 'scripts/asset-atlas-space-audit.mjs'
@@ -23,7 +23,7 @@ on:
       - 'src/creators/assets/png-*.mjs'
       - 'src/creators/assets/asset-image-profiler.mjs'
       - 'src/creators/assets/runtime-image-variants.mjs'
-      - 'src/creators/assets/quality-pareto.mjs'
+      - 'src/creators/assets/quality-*.mjs'
       - 'src/creators/assets/perceptual-quality-bridge.mjs'
       - 'scripts/asset-space-*.mjs'
       - 'scripts/asset-atlas-space-audit.mjs'
@@ -56,6 +56,11 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  ASSET_NODE_VERSION: '24'
+  OXIPNG_VERSION: '10.2.1'
+  ECT_VERSION: '0.9.5'
+
 jobs:
   strict-quality-gate:
     runs-on: ubuntu-latest
@@ -64,16 +69,16 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: ${{ env.ASSET_NODE_VERSION }}
       - name: Deterministic PNG compiler self-test
         run: node scripts/asset-space-compiler-audit.mjs
-      - name: Meta policy / seam / tournament audit
+      - name: Meta policy / seam / tournament / boundary audit
         run: node scripts/asset-space-meta-audit.mjs
       - name: Existing Asset Sheet compatibility audit
         run: node scripts/asset-sheet-compiler-audit.mjs
       - name: Documentation contract audit
         run: node scripts/system-documentation-audit.js
-      - name: Asset transfer / decode / transparency budget
+      - name: Asset transfer / decode / transparency / duplicate budget
         run: node scripts/asset-space-budget.mjs --input="${{ github.event.inputs.input_path || 'assets' }}" --max-files=80 --report=test-results/asset-space-budget
       - name: Forest Plaza atlas occupancy / trim / repack budget
         run: node scripts/asset-atlas-space-audit.mjs --manifest=src/environment/generated/forest-plaza-tileset-v2-manifest.js --report=test-results/asset-atlas-space
@@ -86,7 +91,7 @@ jobs:
             node -e "const r=require('./test-results/asset-space-report/report.json'); require('fs').appendFileSync(process.env.GITHUB_STEP_SUMMARY, '# PNG Space Compiler\n\nFiles: '+r.fileCount+'\n\nBefore: '+r.beforeBytes+' bytes\n\nAfter: '+r.afterBytes+' bytes\n\nPotential strict saving: '+r.savedPercent.toFixed(2)+'%\n')"
           fi
           if [ -f test-results/asset-space-budget/report.json ]; then
-            node -e "const r=require('./test-results/asset-space-budget/report.json'); require('fs').appendFileSync(process.env.GITHUB_STEP_SUMMARY, '\n## Asset memory budget\n\nStored: '+r.totals.storedBytes+' bytes\n\nDecoded RGBA baseline: '+r.totals.decodedRgbaBytes+' bytes ('+r.totals.decodedExpansion+'x)\n\nExact duplicate groups: '+r.totals.duplicateGroups+'\n')"
+            node -e "const r=require('./test-results/asset-space-budget/report.json'); require('fs').appendFileSync(process.env.GITHUB_STEP_SUMMARY, '\n## Asset memory + duplicate budget\n\nStored: '+r.totals.storedBytes+' bytes\n\nDecoded RGBA baseline: '+r.totals.decodedRgbaBytes+' bytes ('+r.totals.decodedExpansion+'x)\n\nByte duplicate groups: '+(r.totals.byteDuplicateGroups??r.totals.duplicateGroups??0)+'\n\nRGBA duplicate groups: '+(r.totals.pixelDuplicateGroups??0)+'\n\nRender duplicate groups: '+(r.totals.renderDuplicateGroups??0)+'\n')"
           fi
           if [ -f test-results/asset-atlas-space/report.json ]; then
             node -e "const r=require('./test-results/asset-atlas-space/report.json'); require('fs').appendFileSync(process.env.GITHUB_STEP_SUMMARY, '\n## Forest Plaza atlas geometry\n\nFrames: '+r.atlas.frameCount+'\n\nSourceRect union: '+(r.geometry.sourceRectUnionRatio*100).toFixed(2)+'%\n\nVisual bounds: '+(r.geometry.visualBoundsAreaRatio*100).toFixed(2)+'%\n\nConservative shelf-pack area saving: '+(r.conservativeShelfPack?.estimatedAreaSavingPercent||0).toFixed(2)+'%\n')"
@@ -109,7 +114,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: ${{ env.ASSET_NODE_VERSION }}
       - name: Install adaptive image codec
         run: npm install --no-save sharp@0.35.4
       - name: Adaptive dry-run with captures
@@ -129,13 +134,41 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-      - name: Install runtime codecs
+          node-version: ${{ env.ASSET_NODE_VERSION }}
+      - name: Restore compiled codec tools
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/oxipng
+            .cache/asset-tools/ect
+          key: asset-codecs-linux-x64-oxipng-${{ env.OXIPNG_VERSION }}-ect-${{ env.ECT_VERSION }}
+      - name: Install runtime codec dependencies
         run: |
           npm install --no-save sharp@0.35.4
           sudo apt-get update
-          sudo apt-get install -y zopfli webp pngquant
-          cargo install oxipng --version 10.0.0 --locked
+          sudo apt-get install -y zopfli webp pngquant cmake nasm
+      - name: Install pinned OxiPNG
+        run: |
+          if [ ! -x "$HOME/.cargo/bin/oxipng" ]; then
+            cargo install oxipng --version "${OXIPNG_VERSION}" --locked
+          fi
+          "$HOME/.cargo/bin/oxipng" --version
+      - name: Build pinned ECT when cache is cold
+        run: |
+          mkdir -p .cache/asset-tools
+          if [ ! -x .cache/asset-tools/ect ]; then
+            tmp="$(mktemp -d)"
+            git clone --depth 1 --branch "v${ECT_VERSION}" --recurse-submodules --shallow-submodules https://github.com/fhanau/Efficient-Compression-Tool.git "$tmp/ect-src"
+            cmake -S "$tmp/ect-src/src" -B "$tmp/ect-build" -DCMAKE_BUILD_TYPE=Release
+            cmake --build "$tmp/ect-build" --parallel 2
+            ect_bin="$(find "$tmp/ect-build" -type f -name ect -perm -111 -print -quit)"
+            test -n "$ect_bin"
+            cp "$ect_bin" .cache/asset-tools/ect
+            chmod +x .cache/asset-tools/ect
+            rm -rf "$tmp"
+          fi
+          sudo ln -sf "$PWD/.cache/asset-tools/ect" /usr/local/bin/ect
+          ect -help >/dev/null 2>&1 || ect --help >/dev/null 2>&1 || true
       - name: Run deep codec tournament
         run: node scripts/asset-codec-tournament.mjs --input="${{ github.event.inputs.input_path }}" --max-files=6 --emit-variants --report=test-results/asset-codec-tournament
       - name: Publish tournament summary
