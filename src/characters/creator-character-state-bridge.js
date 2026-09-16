@@ -66,7 +66,7 @@ function inferredSheet(asset,visual){
 function rawSheet(source,payload,asset,visual){return{mode:'sheet',source,columns:Math.max(1,Number(visual.columns)||4),rows:Math.max(1,Number(visual.rows)||4),faceRows:{down:0,left:1,right:2,up:3,...copy(visual.faceRows||{})},anchor:{x:.5,y:1,...copy(visual.anchor||{})},heightScale:Number(visual.heightScale)||1,rotation:Number(visual.rotation)||0,offsets:directionalOffsets(payload),layer:text(visual.layer||'front'),preview:{kind:'actor-sheet'}};}
 function rawSocket(source,payload,asset,visual,slot){
   const weapon=slot==='weaponMain'||slot==='weaponSecondary',w=Math.max(8,Number(visual.width)||Math.min(weapon?72:96,Number(asset?.pixelWidth)||(weapon?58:28))),h=Math.max(8,Number(visual.height)||Math.min(weapon?72:96,Number(asset?.pixelHeight)||(weapon?58:28)));
-  return{mode:'socket',source,socket:text(visual.socket||(weapon?'weapon':'center')),layer:text(visual.layer||(slot==='back'?'back':'front')),width:w,height:h,anchor:{x:.5,y:weapon?.88:1,...copy(visual.anchor||{})},rotation:Number(visual.rotation)||0,offsets:directionalOffsets(payload),preview:{kind:'socket'}};
+  return{mode:'socket',source,socket:text(visual.socket||(weapon?'weapon':'center')),layer:text(visual.layer||(slot==='back'?'back':'front')),width:w,height:h,anchor:{x:.5,y:(weapon?0.88:1),...copy(visual.anchor||{})},rotation:Number(visual.rotation)||0,offsets:directionalOffsets(payload),preview:{kind:'socket'}};
 }
 function visualDescriptor(row,binding){
   const payload=row?.payload||{},asset=primaryAsset(row),visual=payload.characterVisual&&typeof payload.characterVisual==='object'?payload.characterVisual:{};if(!asset?.runtimeUrl)throw new Error('CREATOR_CHARACTER_RUNTIME_URL_REQUIRED');
