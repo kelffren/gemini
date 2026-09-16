@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: CORE / FEATURE REGISTRY
  * owner: KELO_FEATURE_REGISTRY
- * keys: FEATURE MODULE DEPENDENCY LAZY ASSET LIFECYCLE SCALABILITY PVP FIRST-USE
+ * keys: FEATURE MODULE DEPENDENCY LAZY ASSET LIFECYCLE SCALABILITY PVP GUARDIAN FIRST-USE
  * purpose: fuente única de verdad para paquetes opcionales; Module Loader y Asset Registry consumen este catálogo
  * public-api: KELO_FEATURE_REGISTRY.ids/has/get/files/catalog/resolve
  * state-owned: definiciones inmutables de features; no carga scripts ni modifica gameplay
@@ -10,7 +10,7 @@
 (function(root){
 'use strict';
 if(root.KELO_FEATURE_REGISTRY)return;
-const VERSION='kelo-feature-registry-v2.1.0-pvp-first-use';
+const VERSION='kelo-feature-registry-v2.2.0-guardian-room-host';
 const raw={
   social:{dependencies:[],policy:'first-use',files:[
     {src:'src/ui/player-nameplate.js?v=2',name:'placas'},
@@ -30,7 +30,13 @@ const raw={
     {src:'engine-ai.js?v=95',name:'mundo'},
     {src:'src/systems/illumination.js?v=2',name:'luz'}
   ]},
-  pvp:{dependencies:[],policy:'first-use',files:[
+  guardian:{dependencies:[],policy:'first-use',files:[
+    {src:'src/systems/guardian-authority.js?v=2-supabase-webrtc',name:'Guardian authority'},
+    {src:'src/systems/guardian-system.js?v=2-webrtc',name:'Guardian P2P'},
+    {src:'src/systems/guardian-room-host.js?v=1',name:'Guardian room host'},
+    {src:'src/ui/guardian-ui.js?v=2-hot-mirror',name:'Guardian UI'}
+  ]},
+  pvp:{dependencies:['guardian'],policy:'first-use',files:[
     {src:'src/abilities/abilityData.js?v=20260916-pvp-first-use-1',name:'datos habilidades PvP'},
     {src:'src/abilities/stone-system.js?v=20260916-pvp-first-use-1',name:'piedras PvP'},
     {src:'src/abilities/kelo-ability-boot.js?v=20260916-pvp-first-use-1',name:'runtime habilidades PvP'},
