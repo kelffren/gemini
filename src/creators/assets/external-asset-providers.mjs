@@ -9,7 +9,7 @@ import {searchLpcAssets} from './lpc-live-provider.mjs?v=2';
 import {searchOpenGameArtAssets,clearOpenGameArtCache} from './opengameart-live-provider.mjs?v=3';
 import {searchKeloContent,clearKeloContentCache} from './kelo-content-live-provider.mjs?v=3';
 import {installUniversalPreviewInspector} from './universal-preview-inspector.mjs?v=1';
-import {installUniversalSpritePreview} from './universal-sprite-preview.mjs?v=2';
+import {installUniversalSpritePreview} from './universal-sprite-preview.mjs?v=3';
 
 // Resolve repo-local data from the module itself, not from the HTML document URL.
 // This keeps GitHub Pages project paths such as /gemini/ intact.
