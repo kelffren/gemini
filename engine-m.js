@@ -1,15 +1,15 @@
 /* KELO-INDEX
  * area: LEGACY ABILITY PRESENTATION
- * owner: legacy skill shots; extension owners KeloSimulation + KeloRender
- * keys: SKILL SHOTS SIMULATION RENDER FOUNDATION
- * purpose: conserva proyectiles visuales legacy sin envolver core
- * public-api: window.skillShots + castAimedSkill compatibility
- * consumes: KeloSimulation, KeloRender, STATE, localPlayer, simulatedPlayers
+ * owner: legacy skill shots; cast chain owned by KeloAbilityAim; extension owners KeloSimulation + KeloRender
+ * keys: SKILL SHOTS CAST MIDDLEWARE SIMULATION RENDER FOUNDATION
+ * purpose: conserva proyectiles visuales legacy sin monkey-patch de cast ni envolver core
+ * public-api: window.skillShots
+ * consumes: KeloAbilityAim, KeloSimulation, KeloRender, STATE, localPlayer, simulatedPlayers
  * state-owned: skillShots legacy
- * extension-points: KeloSimulation.after + KeloRender.afterFrame
+ * extension-points: KeloAbilityAim.registerCastMiddleware + KeloSimulation.after + KeloRender.afterFrame
  * reuse: no añadir abilities nuevas aquí
- * legacy: skill shot stack pendiente de retirada
- * do-not: NO envolver updateSimulation ni render
+ * legacy: skill shot stack pendiente de retirada; cast global retirado
+ * do-not: NO reasignar castAimedSkill, NO envolver updateSimulation ni render
  */
 (function () {
   window.skillShots = window.skillShots || [];
@@ -28,15 +28,14 @@
     }
   }
 
-  const _castAll = castAimedSkill;
-  castAimedSkill = function(index, typeId, dirX, dirY) {
+  const castOwner=window.KeloAbilityAim;
+  if(!castOwner||typeof castOwner.registerCastMiddleware!=='function')throw new Error('KeloAbilityAim cast middleware unavailable before engine-m');
+  castOwner.registerCastMiddleware('engine-m:skill-shots',function(context,next){
+    const index=context.index,typeId=context.typeId;
     const stone = STATE.equipped[index];
     if (!stone || stone.currentCd > 0) return;
     const p = land();
-    if (typeId === 'dash') {
-      _castAll(index, typeId, dirX, dirY);
-      return;
-    }
+    if (typeId === 'dash') return next();
     if (typeId === 'fireball' || typeId === 'frostnova') {
       stone.currentCd = stone.baseCd;
       skillShots.push({
@@ -70,8 +69,8 @@
       });
       return;
     }
-    _castAll(index, typeId, dirX, dirY);
-  };
+    return next();
+  });
 
   function updateSkillShots(context) {
     const dt=context.dt;
