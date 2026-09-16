@@ -6,7 +6,7 @@
 # scripts/turbo-live-host-audit.mjs before the Turbo Guardian may pass.
 
 [build]
-  command = "npm install --no-save --ignore-scripts esbuild@0.25.9 && npm run build"
+  command = "npm ci --ignore-scripts --no-audit --no-fund && npm run build"
   publish = "."
 
 # Never let control-plane documents become stale.

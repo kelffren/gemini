@@ -1,0 +1,108 @@
+name: Evergreen Foundation Guard
+
+on:
+  push:
+    branches:
+      - evergreen-migration-2026-09-15
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: evergreen-foundation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  foundation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: State migration characterization
+        run: node tests/state-store-migration.test.cjs
+
+      - name: Service worker cache ownership
+        run: node scripts/service-worker-cache-audit.mjs
+
+      - name: Legacy transition bridge
+        run: node scripts/legacy-transition-bridge-audit.mjs
+
+      - name: Reproducible builds
+        run: node scripts/reproducible-build-audit.mjs
+
+      - name: Lightweight boot surface
+        run: node scripts/boot-surface-audit.mjs
+
+      - name: Foundation architecture audit
+        run: node scripts/foundation-architecture-audit.js
+
+      - name: Static boot contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f src/core/state-store-bootstrap.js
+          grep -q 'state-store-bootstrap.js' index.html
+          node -e "const fs=require('fs');const html=fs.readFileSync('index.html','utf8');const state=html.indexOf('state-store-bootstrap.js');const legacy=html.indexOf('engine-a.js');if(state<0||legacy<0||state>legacy)throw new Error('state migrator must load before engine-a');console.log('BOOT CONTRACT PASS')"
+
+  client-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install exact client dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Production build
+        run: npm run build
+      - name: Build contract audit
+        run: npm run audit:turbo-build
+
+  webkit-mobile-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install exact client dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Install WebKit runtime
+        run: npx playwright install --with-deps webkit
+      - name: Mobile WebKit branch smoke
+        run: npx playwright test --config=playwright.evergreen.config.js
+
+  server-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup server Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.20.0
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - name: Install exact server dependencies
+        working-directory: server
+        run: npm ci --omit=dev --ignore-scripts --no-audit --no-fund
+      - name: Authoritative server smoke
+        working-directory: server
+        run: npm run test:smoke

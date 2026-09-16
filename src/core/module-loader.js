@@ -1,8 +1,8 @@
 /* KELO-INDEX
  * area: CORE / BOOT
  * owner: KeloModuleLoader
- * keys: DYNAMIC LOAD IDLE FIRST-USE CACHE VERSION PING MOBILE SAFARI RECOVERY QUARANTINE TRACE STYLE ASSET-LIBRARY FEATURE-REGISTRY
- * purpose: un solo hilo de descarga. Plaza ya está viva; el resto entra al tocar un tool del menú. JS y CSS opcionales se cargan secuencialmente. Pausa si el player camina. La biblioteca puede bloquear paquetes opcionales.
+ * keys: DYNAMIC LOAD IDLE FIRST-USE AFTER-PAINT CACHE VERSION PING MOBILE SAFARI RECOVERY QUARANTINE TRACE STYLE ASSET-LIBRARY FEATURE-REGISTRY
+ * purpose: un solo hilo de carga. Plaza crítica vive primero; paquetes first-use cargan al tocar su tool y paquetes internos after-paint cargan tras el primer paint, sin bloquear el primer frame.
  * public-api: KELO_MODULE_LOADER.start/ensure/needs/isReady/diagnostics
  * consumes: KELO_FEATURE_REGISTRY + optional KELO_ASSET_REGISTRY allow-list + optional KELO_RECOVERY_MESH diagnostics
  * do-not: NO tileset 556KB, NO studio, NO supabase, NO segundo gameLoop, NO SW, NO quarantine fuera de recoveryLab
@@ -10,7 +10,7 @@
 (function(root){
 'use strict';
 if(root.KELO_MODULE_LOADER)return;
-const VERSION='kelo-module-loader-v10-feature-registry';
+const VERSION='kelo-module-loader-v11-after-paint';
 const LEGACY_FALLBACK=Object.freeze({
   social:Object.freeze([
     {src:'src/ui/player-nameplate.js?v=2',name:'placas'},
@@ -36,6 +36,8 @@ const inflight=Object.create(null);
 const failures=Object.create(null);
 let build='V6.69';
 let shown=false;
+let autoScheduled=false;
+let autoPromise=null;
 
 function registry(){return root.KELO_FEATURE_REGISTRY||null;}
 function resolveName(name){
@@ -97,14 +99,23 @@ function loadFeature(name,opts){
   if(loaded[name])return Promise.resolve(true);
   if(inflight[name])return inflight[name];
   const interactive=!!(opts&&opts.interactive);
+  const background=!!(opts&&opts.background);
+  const silent=!!(opts&&opts.silent);
   inflight[name]=new Promise(function(resolve){
     let i=0,errors=0;
     function step(){
       if(!assetAllowed(name)){delete inflight[name];emit('kelo:module-blocked',{feature:name,src:'',ok:false,error:'ASSET_LIBRARY_DISABLED_DURING_LOAD'});resolve(false);return;}
-      if(i>=files.length){loaded[name]=errors===0;delete inflight[name];try{if(errors===0)localStorage.setItem('kelo_modpack_'+name,build);}catch(_){}emit('kelo:module-feature-complete',{feature:name,ok:errors===0,files:files.length,errors});resolve(errors===0);return;}
-      if(!interactive&&busy()){if(shown)show('En pausa · caminando',(i/files.length)*100);setTimeout(step,450);return;}
+      if(i>=files.length){loaded[name]=errors===0;delete inflight[name];try{if(errors===0)localStorage.setItem('kelo_modpack_'+name,build);}catch(_){}emit('kelo:module-feature-complete',{feature:name,ok:errors===0,files:files.length,errors,policy:featureSpec(name)?.policy||'legacy'});resolve(errors===0);return;}
+      if(!interactive&&busy()){if(shown&&!silent)show('En pausa · caminando',(i/files.length)*100);setTimeout(step,450);return;}
       const item=files[i];
-      loadOne(item,name).then(function(result){const dt=Number(result&&result.ms)||0;if(!result||!result.ok)errors++;if(dt>=50)show('Descargando '+item.name+'  '+(i+1)+'/'+files.length,((i+1)/files.length)*100);i+=1;setTimeout(step,dt<50?80:360);});
+      loadOne(item,name).then(function(result){
+        const dt=Number(result&&result.ms)||0;
+        if(!result||!result.ok)errors++;
+        if(dt>=50&&!silent)show('Descargando '+item.name+'  '+(i+1)+'/'+files.length,((i+1)/files.length)*100);
+        i+=1;
+        const delay=background?(dt<50?16:120):(dt<50?80:360);
+        setTimeout(step,delay);
+      });
     }
     step();
   });
@@ -137,14 +148,38 @@ function needs(name){
   if(!assetAllowed(name))return true;
   return !loaded[name];
 }
+function afterFirstPaint(fn){
+  let done=false;
+  const run=function(){if(done)return;done=true;fn();};
+  if(typeof root.requestAnimationFrame==='function'&&root.document?.visibilityState!=='hidden'){
+    root.requestAnimationFrame(function(){root.requestAnimationFrame(run);});
+  }else setTimeout(run,48);
+}
+function autoFeatures(){return featureIds().filter(function(id){return featureSpec(id)?.policy==='after-paint';});}
+function scheduleAutoFeatures(){
+  if(autoScheduled)return autoPromise||Promise.resolve(true);
+  autoScheduled=true;
+  const ids=autoFeatures();
+  if(!ids.length)return Promise.resolve(true);
+  autoPromise=new Promise(function(resolve){
+    afterFirstPaint(function(){
+      emit('kelo:module-after-paint-start',{features:ids.slice(),count:ids.length});
+      let chain=Promise.resolve(true),ok=true;
+      ids.forEach(function(id){chain=chain.then(function(){return loadFeature(id,{interactive:true,background:true,silent:true});}).then(function(result){if(result===false)ok=false;return true;});});
+      chain.then(function(){emit('kelo:module-after-paint-complete',{features:ids.slice(),ok});resolve(ok);});
+    });
+  });
+  return autoPromise;
+}
 function start(opts){
   if(opts&&opts.build)build=String(opts.build);
   const el=box();if(el)el.hidden=true;
-  emit('kelo:module-loader-start',{build,version:VERSION,registryVersion:registry()?.version||'legacy-fallback',assetSelection:root.KELO_ASSET_REGISTRY?.getState?.().features||null});
+  emit('kelo:module-loader-start',{build,version:VERSION,registryVersion:registry()?.version||'legacy-fallback',assetSelection:root.KELO_ASSET_REGISTRY?.getState?.().features||null,afterPaint:autoFeatures()});
+  scheduleAutoFeatures();
 }
 function diagnostics(){
   const ids=featureIds();
-  return Object.freeze({version:VERSION,registryVersion:registry()?.version||'legacy-fallback',build,features:ids,enabled:ids.filter(assetAllowed),disabled:ids.filter(function(k){return !assetAllowed(k);}),loaded:Object.keys(loaded).filter(function(k){return loaded[k];}),inflight:Object.keys(inflight),failures:{...failures},quarantined:ids.filter(quarantined)});
+  return Object.freeze({version:VERSION,registryVersion:registry()?.version||'legacy-fallback',build,features:ids,enabled:ids.filter(assetAllowed),disabled:ids.filter(function(k){return !assetAllowed(k);}),loaded:Object.keys(loaded).filter(function(k){return loaded[k];}),inflight:Object.keys(inflight),failures:{...failures},quarantined:ids.filter(quarantined),afterPaint:autoFeatures(),autoScheduled});
 }
 root.KELO_MODULE_LOADER=Object.freeze({version:VERSION,start,ensure,needs,isReady:function(n){return !!loaded[resolveName(n)];},canLoad:assetAllowed,features:featureIds(),diagnostics});
 })(typeof globalThis!=='undefined'?globalThis:window);
