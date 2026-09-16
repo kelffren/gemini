@@ -1,0 +1,93 @@
+name: Sprite Factory Live Quality Smoke
+
+on:
+  push:
+    branches:
+      - qa/sprite-live-quality-smoke
+
+permissions:
+  contents: read
+
+jobs:
+  live-quality-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run real in-game Sprite Factory smoke
+        env:
+          SMOKE_ENDPOINT: https://iapxdbitjdwvtbpjghct.supabase.co/functions/v1/kelo-sprite-live-smoke-6f3e2a
+        run: |
+          mkdir -p live-smoke-artifacts
+          node <<'NODE'
+          const fs = require('fs');
+          const { chromium } = require('@playwright/test');
+          (async()=>{
+            const logs=[];
+            const browser=await chromium.launch({headless:true});
+            const page=await browser.newPage({viewport:{width:1440,height:1000},deviceScaleFactor:1});
+            page.on('console',m=>logs.push(`[console:${m.type()}] ${m.text()}`));
+            page.on('pageerror',e=>logs.push(`[pageerror] ${e.stack||e.message}`));
+            page.on('requestfailed',r=>logs.push(`[requestfailed] ${r.method()} ${r.url()} ${r.failure()?.errorText||''}`));
+            let ok=false;
+            try{
+              await page.goto(`https://kelffren.github.io/gemini/asset-library.html?liveSpriteSmoke=${Date.now()}`,{waitUntil:'domcontentloaded',timeout:60000});
+              await page.evaluate((endpoint)=>{
+                window.KELO_SPRITE_AI_ENDPOINT=endpoint;
+                window.KeloOnlineAuth={credentials:async()=>({accessToken:'live-smoke',isAnonymous:false,user:{id:'live-smoke'}})};
+              },process.env.SMOKE_ENDPOINT);
+              await page.evaluate(async()=>{
+                const mod=await import(`/gemini/src/creators/ui/sprite-factory-online.mjs?liveSmoke=${Date.now()}`);
+                await mod.openSpriteFactoryOnline({root:window});
+              });
+              await page.waitForSelector('.ksf-endpoint button',{state:'visible',timeout:30000});
+              const before=await page.locator('.ksf-endpoint button').textContent();
+              logs.push(`[button-before] ${before}`);
+              await page.locator('.ksf-endpoint button').click();
+              await page.waitForFunction(()=>{
+                const s=window.__KELO_SPRITE_COMPILER_LAST__;
+                return s?.mode==='direction-row' && s?.publicFallback===true;
+              },null,{timeout:360000});
+              await page.waitForTimeout(1500);
+              const diag=await page.evaluate(()=>({
+                compiler:window.__KELO_SPRITE_COMPILER_LAST__||null,
+                factory:window.__KELO_SPRITE_FACTORY_ONLINE__||null,
+                treatment:window.__KELO_IMAGE_TREATMENT_LAST__||null,
+                badge:[...document.querySelectorAll('.ksf-pill')].map(x=>x.textContent?.trim()).filter(Boolean),
+                button:document.querySelector('.ksf-endpoint button')?.textContent?.trim()||null
+              }));
+              fs.writeFileSync('live-smoke-artifacts/sprite-live-diagnostics.json',JSON.stringify(diag,null,2));
+              await page.screenshot({path:'live-smoke-artifacts/sprite-live-quality.png',fullPage:true});
+              ok=true;
+            }catch(err){
+              logs.push(`[fatal] ${err.stack||err.message}`);
+              try{await page.screenshot({path:'live-smoke-artifacts/sprite-live-failure.png',fullPage:true});}catch{}
+              fs.writeFileSync('live-smoke-artifacts/sprite-live-error.txt',String(err.stack||err));
+            }finally{
+              fs.writeFileSync('live-smoke-artifacts/browser.log',logs.join('\n'));
+              await browser.close();
+            }
+            if(!ok)process.exit(1);
+          })();
+          NODE
+
+      - name: Upload live quality evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sprite-live-quality-evidence
+          path: live-smoke-artifacts/
+          if-no-files-found: error
+          retention-days: 7
