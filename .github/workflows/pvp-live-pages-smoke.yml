@@ -1,0 +1,48 @@
+name: PvP LIVE Pages Smoke
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'tests/pvp-pages-live-smoke.spec.js'
+      - '.github/workflows/pvp-live-pages-smoke.yml'
+      - 'src/core/feature-registry.js'
+      - 'src/core/module-loader.js'
+      - 'src/ui/luxe-shell.js'
+      - 'src/ui/luxe-player-hud.js'
+      - 'src/systems/pvp-world.js'
+      - 'src/systems/pvp-combat-runtime-loader.js'
+      - 'src/abilities/**'
+      - 'engine-net.js'
+  workflow_run:
+    workflows: ['pages build and deployment']
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pvp-live-pages-smoke-${{ github.event_name }}-${{ github.event.workflow_run.head_sha || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  live-pvp:
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Smoke deployed PvP through real iPhone UI
+        env:
+          KELO_PAGES_URL: https://kelffren.github.io/gemini/
+        run: npx playwright test tests/pvp-pages-live-smoke.spec.js --project=chromium --retries=1
