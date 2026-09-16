@@ -27,10 +27,9 @@ assert.ok(critical.length<=48,`critical script budget exceeded: ${critical.lengt
 assert.ok(postBootStatic.length<=3,`post-boot static script budget exceeded: ${postBootStatic.length} > 3`);
 assert.ok(critical.some(src=>src.includes('src/core/legacy-ability-aim-system.js')),'KeloAbilityAim compatibility owner missing from critical boot');
 
+const retiredEngines=Object.freeze(['engine-i.js','engine-j.js','engine-k.js']);
 const forbiddenInIndex=[
-  'engine-i.js',
-  'engine-j.js',
-  'engine-k.js',
+  ...retiredEngines,
   'src/core/simulation-farm-shadow.js',
   'src/core/player-position-shadow.js',
   'src/ui/asset-library-launcher.js',
@@ -59,17 +58,22 @@ function walk(dir,files=[]){
     if(['.git','node_modules','dist'].includes(entry.name))continue;
     const full=path.join(dir,entry.name);
     if(entry.isDirectory())walk(full,files);
-    else if(/\.(?:js|mjs|cjs|html|json)$/.test(entry.name))files.push(full);
+    else if(/\.(?:js|mjs|cjs|html|json|md)$/.test(entry.name))files.push(full);
   }
   return files;
 }
-const engineIRefs=[];
+
+const retiredRefs=Object.fromEntries(retiredEngines.map(name=>[name,[]]));
 for(const full of walk(root)){
   const rel=path.relative(root,full).replaceAll('\\','/');
-  if(rel==='scripts/boot-surface-audit.mjs'||rel==='engine-i.js')continue;
+  if(rel==='scripts/boot-surface-audit.mjs'||retiredEngines.includes(rel))continue;
   let text='';try{text=fs.readFileSync(full,'utf8');}catch{continue;}
-  if(text.includes('engine-i.js'))engineIRefs.push(rel);
+  for(const engine of retiredEngines){
+    if(text.includes(engine))retiredRefs[engine].push(rel);
+  }
 }
-assert.deepEqual(engineIRefs,[],`dead engine-i.js still referenced by: ${engineIRefs.join(', ')}`);
+for(const engine of retiredEngines){
+  assert.deepEqual(retiredRefs[engine],[],`retired ${engine} still referenced by: ${retiredRefs[engine].join(', ')}`);
+}
 
-console.log(`BOOT SURFACE PASS critical=${critical.length} postBootStatic=${postBootStatic.length} deferredInternal=9 deadEngineIRefs=0`);
+console.log(`BOOT SURFACE PASS critical=${critical.length} postBootStatic=${postBootStatic.length} deferredInternal=9 retiredRefs=0`);
