@@ -1,15 +1,14 @@
 /* KELO-INDEX
  * area: ENVIRONMENT / PROPS
- * owner: KELO_GENERIC_PROPS; image lifecycle=KELO_ATLAS_CONTRACT; camera=KeloCamera
+ * owner: KELO_GENERIC_PROPS + KELO_ATLAS_CONTRACT
  * keys: PROP RENDER ATLAS VIEWPORT RESIDENCY
- * purpose: render props; acquire only atlases near camera, zero prefetch before boot-ready
- * do-not: NO new Image, eager-all preload, parallel loader
+ * purpose: viewport props; editor probes excluded
  */
 (function(){
 'use strict';
 const C=window.KELO_PROP_CONTRACT,L=window.KELO_ENVIRONMENT_LAYERS,A=window.KELO_ATLAS_CONTRACT,K=window.KELO_COLLISION,CAM=window.KeloCamera;
 if(!C||!L?.register||!A?.acquire||!A?.register){console.error('[Kelo generic props] contract missing');return;}
-const images=new Map(),ready=new Set(),held=new Set(),loading=new Map(),wanted=new Set(),groups=Object.entries(C.layerGroups||{}),stacked=groups.filter(([,g])=>g.renderMode!=='immediate'),sources=Object.values(C.sources||{}),entries=Object.entries(C.assets||{}).filter(([,a])=>a?.src),entryMap=new Map(entries),OWNER='environment:generic-props';
+const live=p=>!p?.id?.startsWith('map-editor-probe-'),images=new Map(),ready=new Set(),held=new Set(),loading=new Map(),wanted=new Set(),groups=Object.entries(C.layerGroups||{}),stacked=groups.filter(([,g])=>g.renderMode!=='immediate'),sources=Object.values(C.sources||{}),entries=Object.entries(C.assets||{}).filter(([,a])=>a?.src),entryMap=new Map(entries),OWNER='environment:generic-props';
 let failed=false,lastKey='',acquires=0,releases=0;
 const audit=window.KELO_GENERIC_PROP_AUDIT={version:'generic-props-v2.1-weightless',ready:false,failed:false,propCount:C.props.length,assetCount:entries.length,rendererMode:'data-driven-props-v7',resourceMode:'atlas-contract-viewport-v2',collisionOwner:OWNER,dynamicPropCount:0,initialWantedAssetCount:0,wantedAssetCount:0,residentAssetCount:0,acquireCount:0,releaseCount:0,wantedAssets:[]};
 function frame(a,f){if(a?.frames&&typeof f==='string'&&a.frames[f]){const r=a.frames[f];return{x:+r.x||0,y:+r.y||0,w:+r.w||0,h:+r.h||0};}const i=+f||0,c=a.columns||1;return{x:i%c*a.frameWidth,y:Math.floor(i/c)*a.frameHeight,w:a.frameWidth,h:a.frameHeight};}
@@ -18,11 +17,11 @@ function drawInstances(g,props,track,reset=false){if(failed||!g||!Array.isArray(
 function actors(){const out=[],reset=window.KELO_WORLD_DECORATION_RESET===true,pvp=typeof isPvPActive!=='undefined'&&isPvPActive&&typeof arenaPvP!=='undefined'&&arenaPvP?.rival;if(pvp)out.push(arenaPvP.rival);else if(!reset&&typeof simulatedPlayers!=='undefined'&&Array.isArray(simulatedPlayers))out.push(...simulatedPlayers);if(typeof localPlayer!=='undefined'&&localPlayer)out.push(localPlayer);return out;}
 function overlaps(a,b){const r=a?.radius||20;return a&&b&&a.x+r>b.x&&a.x-r<b.x+b.w&&a.y+r>b.y&&a.y-r<b.y+b.h;}
 function sourceProps(key){const out=[];for(const s of sources){if(s?.layerGroup!==key||typeof s.instances!=='function')continue;const x=s.instances();if(Array.isArray(x))out.push(...x);}return out;}
-function props(key){return C.props.filter(p=>p.layerGroup===key).concat(sourceProps(key));}
+function props(key){return C.props.filter(p=>live(p)&&p.layerGroup===key).concat(sourceProps(key));}
 function role(key,r){const x=props(key);return r==='back'?x.filter(p=>p.layerRole!=='front'):r==='front'?x.filter(p=>p.layerRole==='front'||(p.occlusion?.mode&&p.occlusion.mode!=='none')):x;}
 function view(m=0){try{const v=CAM?.worldView?.();return v?.w>0&&v?.h>0?{x:v.left-m,y:v.top-m,w:v.w+2*m,h:v.h+2*m}:null;}catch{return null;}}
 function hit(a,b){return a&&b&&a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;}
-function allProps(){const out=[...C.props];for(const [key] of groups)out.push(...sourceProps(key));return out;}
+function allProps(){const out=C.props.filter(live);for(const [key] of groups)out.push(...sourceProps(key));return out;}
 function auditResidency(){audit.wantedAssetCount=wanted.size;audit.residentAssetCount=ready.size;audit.acquireCount=acquires;audit.releaseCount=releases;audit.wantedAssets=[...wanted];}
 function release(id){if(!held.has(id)||loading.has(id))return;images.delete(id);ready.delete(id);held.delete(id);A.release(id);releases++;}
 function acquire(id){if(ready.has(id)||loading.has(id))return loading.get(id)||Promise.resolve(images.get(id));const a=entryMap.get(id);if(!a)return Promise.resolve();held.add(id);acquires++;const p=A.acquire(id).then(img=>{loading.delete(id);if(!wanted.has(id)){held.delete(id);A.release(id);releases++;return img;}images.set(id,img);ready.add(id);auditResidency();return img;}).catch(e=>{loading.delete(id);held.delete(id);audit.failed=true;console.error('[Kelo generic props] asset',id,e);});loading.set(id,p);return p;}
