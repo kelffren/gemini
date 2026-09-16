@@ -77,6 +77,14 @@ export async function bootKeloCreators({root=globalThis,stateAdapter=null}={}){
   }
   const permission=createCreatorPermissionAdapter(root),world=createWorldCreatorAdapter({root,permission}),localState=stateAdapter||createIndexedDbCreatorStateAdapter({indexedDBFactory:root.indexedDB}),projects=createLocalCreatorProjectRepository({domainAdapters:[world],stateAdapter:localState}),workspaces=createCreatorWorkspaceRegistry(),dependencies=createCreatorDependencyGraph();
   const fetchImpl=root.fetch?.bind?.(root)||globalThis.fetch?.bind?.(globalThis),contentSession=createKeloSupabaseBrowserSession({root,fetchImpl,config:KELO_SUPABASE_PUBLIC_CONFIG}),avatarRuntime=installCreatorAvatarRuntime({root}),runtimeContent=createRuntimeContentRegistry({root}),contentRepository=createSupabaseCreatorContentRepository({url:KELO_SUPABASE_PUBLIC_CONFIG.url,publishableKey:KELO_SUPABASE_PUBLIC_CONFIG.publishableKey,getAccessToken:()=>contentSession.accessToken,fetchImpl}),contentService=createUniversalContentService({repository:contentRepository,runtimeRegistry:runtimeContent,root}),marketplace=createCreatorMarketplaceService({contentSession,contentRepository,root}),avatarQuick=createAvatarQuickImportService({contentSession,contentRepository,contentService,root});
+  try{
+    root.KeloCreatorEntitlements?.bindProvider?.({
+      name:'creator-content-repository',
+      accountId:()=>contentRepository.userId(),
+      listAccess:()=>contentRepository.listMyCreatorContentAccess(),
+      checkAccess:id=>contentRepository.checkCreatorContentAccess(id)
+    });
+  }catch(error){console.warn('[Creators] entitlement provider unavailable',error);}
   try{root.KELO_CREATOR_CONTENT_REGISTRY=runtimeContent;root.KELO_CREATOR_MARKETPLACE=marketplace;void root.KeloCreatorEntitlements?.refresh?.();}catch{}
   registerWorldWorkspace(workspaces);registerMapForgeWorkspace(workspaces);registerMountWorkspace(workspaces);registerAppearanceWorkspace(workspaces);registerAnimationWorkspace(workspaces);registerVfxWorkspace(workspaces);registerAbilityWorkspace(workspaces);registerSpriteAbilityWorkspace(workspaces);registerContentStudioWorkspace(workspaces);registerAssetSheetWorkspace(workspaces);registerAssetForgeWorkspace(workspaces);registerImageLabWorkspace(workspaces);registerAvatarWorkspace(workspaces);registerDefinitionWorkspaces(workspaces);registerCreatorLibraryWorkspace(workspaces);
   async function openWorkspace(id,context={}){
@@ -85,7 +93,7 @@ export async function bootKeloCreators({root=globalThis,stateAdapter=null}={}){
     if(id==='sprite-ability')await ensureSpriteAbilityExtensions();
     return workspaces.open(id,{root,projects,permission,workspaces,dependencies,contentSession,contentRepository,contentService,marketplace,runtimeContent,avatarRuntime,avatarQuick,openWorkspace,...context});
   }
-  platform=Object.freeze({version:'kelo-creators-core-v1.27.0-entitlements',permission,projects,workspaces,dependencies,contentSession,contentRepository,contentService,marketplace,entitlements:root.KeloCreatorEntitlements||null,runtimeContent,avatarRuntime,avatarQuick,openWorkspace,close(){try{looseImportDispose?.();}catch{}try{irregularImportDispose?.();}catch{}try{repairTouchDispose?.();}catch{}try{repairStudioDispose?.();}catch{}try{manualCutterDispose?.();}catch{}try{easyUiDispose?.();}catch{}try{eventLabDispose?.();}catch{}try{visualUiDispose?.();}catch{}try{localState.close?.();}catch{}try{inputLocksDispose?.();}catch{}try{if(root.KELO_CREATOR_MARKETPLACE===marketplace)delete root.KELO_CREATOR_MARKETPLACE;}catch{}platform=null;}});
+  platform=Object.freeze({version:'kelo-creators-core-v1.27.1-entitlements',permission,projects,workspaces,dependencies,contentSession,contentRepository,contentService,marketplace,entitlements:root.KeloCreatorEntitlements||null,runtimeContent,avatarRuntime,avatarQuick,openWorkspace,close(){try{looseImportDispose?.();}catch{}try{irregularImportDispose?.();}catch{}try{repairTouchDispose?.();}catch{}try{repairStudioDispose?.();}catch{}try{manualCutterDispose?.();}catch{}try{easyUiDispose?.();}catch{}try{eventLabDispose?.();}catch{}try{visualUiDispose?.();}catch{}try{localState.close?.();}catch{}try{inputLocksDispose?.();}catch{}try{if(root.KELO_CREATOR_MARKETPLACE===marketplace)delete root.KELO_CREATOR_MARKETPLACE;}catch{}platform=null;}});
   return platform;
 }
 export function getKeloCreatorsPlatform(){return platform;}
