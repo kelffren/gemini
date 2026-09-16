@@ -57,6 +57,9 @@ jobs:
       - name: Biblioteca 10k catalog budget
         run: node scripts/audit-asset-catalog-10k.mjs
 
+      - name: Kelo content descriptor publication contract
+        run: node scripts/publish-kelo-content-descriptors.mjs --check
+
       - name: Online foundation contract
         run: npm run audit:online-foundation
 
