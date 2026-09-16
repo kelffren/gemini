@@ -21,6 +21,7 @@ import { createKeloSupabaseBrowserSession } from '../online/kelo-supabase-browse
 import { KELO_SUPABASE_PUBLIC_CONFIG } from '../online/kelo-supabase-public-config.mjs';
 import { installStudioMobileUiPolish } from '../studio/ui/studio-mobile-ui-polish.mjs?v=mobile-ui-20260916-2';
 import { installStudioMobileToolsSheet } from '../studio/ui/studio-mobile-tools-sheet.mjs?v=mobile-tools-sheet-20260916-2';
+import { installStudioMobileActionFeedback } from '../studio/ui/studio-mobile-action-feedback.mjs?v=mobile-action-feedback-20260916-1';
 import { registerWorldWorkspace } from './workspaces/world-workspace.mjs?v=world-bridge-20260915-22';
 import { registerMapForgeWorkspace } from './workspaces/map-forge-workspace.mjs?v=map-forge-mobile-ui-20260916-1';
 import { registerMountWorkspace } from './workspaces/mount-workspace.mjs';
@@ -55,6 +56,7 @@ export async function bootKeloCreators({root=globalThis,stateAdapter=null}={}){
   const inputLocksDispose=ensureCreatorInputLocks(root);
   const studioMobileUiPolish=installStudioMobileUiPolish({root});
   const studioMobileToolsSheet=installStudioMobileToolsSheet({root});
+  const studioMobileActionFeedback=installStudioMobileActionFeedback({root});
   let visualUiDispose=()=>{},eventLabDispose=()=>{},easyUiDispose=()=>{},manualCutterDispose=()=>{},repairStudioDispose=()=>{},repairTouchDispose=()=>{},irregularImportDispose=()=>{},looseImportDispose=()=>{};
   let spriteAbilityExtensionsPromise=null;
   async function ensureSpriteAbilityExtensions(){
@@ -114,7 +116,7 @@ export async function bootKeloCreators({root=globalThis,stateAdapter=null}={}){
     }catch(error){console.warn(`[Creators] ApprovalRequest dock unavailable for ${id}`,error);}
     return session;
   }
-  platform=Object.freeze({version:'kelo-creators-core-v1.29.0-smart-mobile-tools',permission,projects,workspaces,dependencies,contentSession,contentRepository,contentService,runtimeContent,avatarRuntime,avatarQuick,openWorkspace,close(){try{for(const dock of root.KELO_CREATOR_APPROVAL_DOCKS?.values?.()||[])dock?.destroy?.();root.KELO_CREATOR_APPROVAL_DOCKS?.clear?.();}catch{}try{looseImportDispose?.();}catch{}try{irregularImportDispose?.();}catch{}try{repairTouchDispose?.();}catch{}try{repairStudioDispose?.();}catch{}try{manualCutterDispose?.();}catch{}try{easyUiDispose?.();}catch{}try{eventLabDispose?.();}catch{}try{visualUiDispose?.();}catch{}try{studioMobileToolsSheet?.destroy?.();}catch{}try{studioMobileUiPolish?.destroy?.();}catch{}try{localState.close?.();}catch{}try{inputLocksDispose?.();}catch{}platform=null;}});
+  platform=Object.freeze({version:'kelo-creators-core-v1.30.0-recoverable-mobile-edit',permission,projects,workspaces,dependencies,contentSession,contentRepository,contentService,runtimeContent,avatarRuntime,avatarQuick,openWorkspace,close(){try{for(const dock of root.KELO_CREATOR_APPROVAL_DOCKS?.values?.()||[])dock?.destroy?.();root.KELO_CREATOR_APPROVAL_DOCKS?.clear?.();}catch{}try{looseImportDispose?.();}catch{}try{irregularImportDispose?.();}catch{}try{repairTouchDispose?.();}catch{}try{repairStudioDispose?.();}catch{}try{manualCutterDispose?.();}catch{}try{easyUiDispose?.();}catch{}try{eventLabDispose?.();}catch{}try{visualUiDispose?.();}catch{}try{studioMobileActionFeedback?.destroy?.();}catch{}try{studioMobileToolsSheet?.destroy?.();}catch{}try{studioMobileUiPolish?.destroy?.();}catch{}try{localState.close?.();}catch{}try{inputLocksDispose?.();}catch{}platform=null;}});
   return platform;
 }
 export function getKeloCreatorsPlatform(){return platform;}
