@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "masteryThresholds": {
+    "rookie": 0,
+    "fighter": 100,
+    "duelist": 250,
+    "tactician": 500,
+    "master": 900,
+    "champion": 1500,
+    "legend": 2400
+  },
+  "xp": {
+    "globalMultiplier": 1,
+    "winMultiplier": 1,
+    "lossMultiplier": 1,
+    "minAward": 4
+  }
+}
