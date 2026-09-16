@@ -12,13 +12,15 @@ Asset Forge es el editor local/mobile-first para crear, revisar, reparar, empaqu
 - **Controles de plantilla:** `src/creators/ui/asset-forge-template-controls.mjs`.
 - **Drawing primitives:** `src/creators/assets/asset-forge-drawing-engine.mjs`.
 - **Drawing controls:** `src/creators/ui/asset-forge-drawing-controls.mjs`.
+- **Editor Pro:** `src/creators/ui/pixelorama-pro-bridge.mjs`.
+- **Lifecycle pesado:** `src/creators/core/creator-exclusive-runtime.mjs`.
 
 Asset Forge no posee gameplay rendering, equipamiento runtime, pagos, moderación global ni credenciales remotas.
 
 ## Estado actual
-Activo como workspace lazy de Kelo Creators. El editor posee canvas pixel-art, import, local QA, safe auto-repair, IndexedDB library, export de paquete y preview local de listing.
+Activo como workspace lazy de Kelo Creators. El editor base posee canvas pixel-art, import, local QA, safe auto-repair, IndexedDB library, export de paquete y preview local de listing.
 
-Sobre el canvas base se cargan enhancers fail-open. El enhancer de templates hace el editor consciente del tipo de asset. El Drawing Engine V2 mejora el trazo sin crear un editor paralelo.
+Sobre el canvas base se cargan enhancers fail-open. El enhancer de templates hace el editor consciente del tipo de asset. Drawing Engine V2 mejora el trazo sin crear un editor paralelo. **Pixelorama Pro** es la superficie profesional opcional para layers, timeline, onion skin, selection, palettes, tilemaps, efectos y demás capacidades completas de Pixelorama Web sin reconstruirlas dentro del editor ligero.
 
 ### Drawing Engine V2
 - interpolación Bresenham entre muestras del dedo para evitar huecos cuando iOS entrega movimientos espaciados;
@@ -33,7 +35,20 @@ Sobre el canvas base se cargan enhancers fail-open. El enhancer de templates hac
 - historial local de 60 pasos para las operaciones del enhancer;
 - nearest-neighbor/pixelated rendering preservado por el canvas base.
 
-El drawing engine no tiene timers, observers ni render loop. Sólo trabaja durante eventos de puntero y restaura/previsualiza un `ImageData` de máximo 64×64 en Asset Forge V1.
+El drawing engine no tiene render loop propio. Sólo trabaja durante eventos de puntero y restaura/previsualiza un `ImageData` de máximo 64×64 en Asset Forge V1/V2.
+
+### Pixelorama Pro V2
+- se abre únicamente tras una acción explícita `PIXELORAMA PRO`;
+- todo ocurre dentro de Kelo World; el flujo de producto no navega a una pestaña externa;
+- antes de arrancar Godot/WASM adquiere `Creator Exclusive Runtime`: input bloqueado, movement/render interceptados, simulation suspendida y atlases no-core sin referencias expulsables;
+- el runtime Web vive en `tools/pixelorama/index.html` dentro de un iframe aislado y destruible;
+- el build pesado no entra al boot normal ni se versiona como WASM/PCK dentro de `gemini`;
+- Canvas/PXO se transfieren como `ArrayBuffer` cuando el bridge aplicable lo permite;
+- exports de imagen vuelven al import/QA canónico de Asset Forge;
+- `.pxo` se conserva en IndexedDB como source project, con máximo 5 revisiones por asset;
+- al cerrar se solicita `requestQuit`, `Engine.unload`, se destruye el iframe y se liberan todos los claims del juego.
+
+Detalles y limitaciones: `docs/systems/PIXELORAMA_PRO_BRIDGE.md` y `docs/systems/CREATOR_EXCLUSIVE_RUNTIME.md`.
 
 ### Templates V1
 - `prop`: asset libre, preserva categorías como `nature`, `structure`, `floor`, etc.
@@ -70,60 +85,37 @@ Funciones puras reutilizables:
 `evaluateAsset()` reutiliza el QA existente y suma advertencias de zona segura, tamaño/categoría/template cuando corresponda.
 
 ## Flujo visible
-1. El creador abre el mismo Asset Forge.
-2. Los enhancers de templates y dibujo se cargan lazy; si uno falla, el editor base sigue abriendo.
-3. Selecciona un template o empieza libre.
-4. Dibuja con el dedo/lápiz; el motor interpola el trazo y opcionalmente aplica Pixel Perfect/symmetry/alpha lock.
-5. `SELF CHECK` combina QA de píxeles + QA del template.
-6. `AUTO REPAIR` mantiene sólo reparaciones locales conservadoras.
-7. `SAVE` persiste localmente; `EXPORT` produce el paquete existente.
+1. El creador abre Asset Forge.
+2. Templates/drawing/Pixelorama bridge se cargan lazy y fail-open; si un enhancer falla, Asset Forge base sigue disponible.
+3. Puede dibujar rápido en el canvas local o abrir `PIXELORAMA PRO` para authoring avanzado.
+4. Pixelorama Pro hiberna trabajo pesado del juego antes de levantar Godot/WASM.
+5. El arte que regresa pasa por `SELF CHECK`, QA/template rules y `AUTO REPAIR` conservador.
+6. `SAVE` persiste el asset local; `.pxo` profesional se guarda como source project separado.
+7. `EXPORT` produce el paquete existente.
 8. `LIST MARKET` sigue siendo un listing local; no implica pagos/moderación reales.
 
-## Por qué PixelLab funciona y qué reutilizamos
-Investigación actualizada 2026-09:
-
-PixelLab.ai separa dos responsabilidades. Su editor avanzado no intenta reemplazar todo el conocimiento acumulado de un editor: integra **Pixelorama**, un editor open source con licencia MIT, y añade encima sus herramientas propietarias de generación/edición asistida. PixelLab ofrece además un creador web ligero para móvil, mientras su integración Pixelorama completa se orienta a desktop.
-
-Las ideas transferibles al runtime local de Kelo son:
-- dibujo determinista instantáneo primero;
-- IA como capa opcional encima, no dentro de cada movimiento del pincel;
-- Pixel Perfect;
-- mirror/symmetry;
-- alpha lock;
-- selección/inpainting mediante máscara;
-- palette targeting;
-- referencia/init image;
-- 4/8 directional generation;
-- skeleton-guided animation;
-- iteración manual → generación → corrección → nueva generación.
-
-PixelLab documenta que su Rotate genera vistas direccionales y recomienda corregir manualmente resultados parciales y reutilizarlos como init images, congelando regiones con inpainting. Su animador por skeleton usa poses reutilizables y el mismo ciclo de corrección progresiva. Eso encaja con el roadmap de Kelo: el artista conserva control y la automatización reduce trabajo repetitivo.
-
-### Límite de copia
-No se copian modelos, pesos, prompts internos ni backend propietario de PixelLab. El comportamiento del drawing engine local se inspira en técnicas estándar de raster/pixel art y en Pixelorama, cuyo código se publica bajo MIT. La implementación JavaScript de Kelo es propia y está adaptada al canvas móvil del juego.
-
-## Referencias de dibujo
-- Pixelorama docs: Pencil/Eraser, Pixel Perfect, Bucket, shapes, picker, symmetry y selección.
-- Pixelorama `Drawers.gd`: referencia MIT para la lógica conceptual de eliminación de dobles de esquina y mirror-aware drawing.
-- PixelLab docs: Pixelorama integration, Rotate, Inpaint/Inpaint v3, 8-directional sprite, skeleton animation, target palette/init image.
-- Aseprite: timeline/tags/slices/indexed palettes/sprite-sheet export.
-- Pro Motion NG: pixel-perfect, multi-frame transforms, palette/dithering/tile tooling.
-
 ## Local vs online authority
-Todo el authoring de este pass es local. Ninguna herramienta de dibujo concede ownership económico ni publica a un marketplace remoto. El servidor/commerce deberá validar cualquier publicación real futura.
+Todo el authoring de este sistema es cliente/local. Ninguna herramienta de dibujo, Pixelorama, un `.pxo` ni un listing local concede ownership económico o autoridad gameplay. El servidor/commerce deberá validar cualquier publicación real futura.
 
 ## Persistencia
-No se crea una base adicional. Se reutilizan los stores IndexedDB existentes de Asset Forge. La metadata `authoring` viaja dentro del manifest guardado/exportado. El historial del Drawing Engine V2 vive sólo durante la sesión de edición.
+- Asset Forge reutiliza `kelo-asset-forge-v1` para assets/listings.
+- Pixelorama Pro usa `kelo-pixelorama-projects-v1` para source projects `.pxo` con historial acotado.
+- La metadata `authoring` viaja dentro del manifest guardado/exportado.
+- El historial del Drawing Engine V2 vive sólo durante la sesión de edición.
+- El runtime WASM de Pixelorama no se conserva residente al cerrar; cache HTTP/disco y RAM son contratos separados.
 
 ## Invariantes
-1. No crear otro pixel editor paralelo.
+1. No crear otro Kelo engine ni otro editor de mundo.
 2. Ninguna herramienta de dibujo puede alterar gameplay authority.
-3. El drawing enhancer debe ser lazy y fail-open.
+3. Enhancers y Pixelorama deben ser lazy y fail-open.
 4. El trazo básico debe funcionar offline y sin IA.
 5. No aplicar smoothing/bilinear al pixel art.
 6. `prop` debe preservar categorías no-wearable existentes.
 7. Las reglas de safe area son QA/authoring; no son hitboxes ni collision authority.
 8. No simular publicación remota ni pagos.
+9. Pixelorama pesado y gameplay pesado no deben competir activamente; usar Creator Exclusive Runtime.
+10. No eliminar capacidades authoring de Pixelorama para ahorrar RAM: optimizar lifecycle, buffers, history, FPS y residency.
+11. No declarar Pixelorama Pro `VERIFIED` en móvil sin prueba real iPhone/LIVE.
 
 ## Roadmap derivado de la investigación
 ### P0 — Dibujo móvil sólido
@@ -138,13 +130,12 @@ No se crea una base adicional. Se reutilizan los stores IndexedDB existentes de 
 - [ ] cursor/brush preview;
 - [ ] filled shapes + dithering patterns.
 
-### P1 — Pixel editor profesional mínimo
-- layers + groups + visibility/lock/opacity;
-- clipping mask;
-- marquee + lasso + select-by-color/magic wand;
-- move/flip/rotate/nearest-neighbor scale;
-- palette panel + replace color + shading ramp + dithering;
-- custom brushes.
+### P1 — Editor profesional
+- [x] integrar Pixelorama Pro como editor avanzado lazy dentro del juego;
+- [x] layers/timeline/onion skin/palettes/selection disponibles mediante Pixelorama Web;
+- [x] lifecycle de cierre destruye runtime Godot/WASM;
+- [ ] desplegar el build custom Kelo-patched cuando vuelva a ser seguro activar su pipeline;
+- [ ] validar auto-open/export bridge en Safari iPhone real.
 
 ### P2 — Kelo-aware automation
 - body/reference mask real por dirección y frame;
@@ -155,13 +146,12 @@ No se crea una base adicional. Se reutilizan los stores IndexedDB existentes de 
 - frame confidence + sólo pedir corrección humana donde falle;
 - skeleton/anchor-guided clothing propagation.
 
-### P3 — Animación y productividad
-- timeline de layers/frames;
-- onion skin;
-- tags `idle/walk/run/attack` y direction sets;
-- linked cels/reuse de partes;
-- multi-frame transform/selection;
-- sprite-sheet export por tags + metadata/pivots.
+### P3 — Integración profunda Pixelorama ↔ Kelo
+- metadata Kelo dentro de project/layer/cel user data;
+- template projects por slot/dirección/estado;
+- export preset directo a paquete Kelo;
+- virtualizar proyectos inactivos si una sesión multi-tab demuestra presión de RAM;
+- medición real de peak RAM y repeated open/close en Safari.
 
 ### P4 — Economía de creadores
 - versionado del asset/source;
@@ -171,39 +161,48 @@ No se crea una base adicional. Se reutilizan los stores IndexedDB existentes de 
 - moderation + server validation + commerce authority antes de venta real.
 
 ## Extension points
-Las nuevas primitivas de dibujo deben entrar en `asset-forge-drawing-engine.mjs` como funciones puras y ser consumidas por el enhancer. Un nuevo tipo de ropa debe añadirse al template registry, no como workspace nuevo. La futura IA debe entrar por adapters explícitos y nunca ser requisito para el pincel local.
+Las nuevas primitivas ligeras entran en `asset-forge-drawing-engine.mjs`. Un nuevo tipo de ropa entra al template registry. Herramientas profesionales genéricas deben aprovechar Pixelorama Pro antes de duplicarse en Asset Forge. La futura IA entra por adapters explícitos y nunca es requisito para el pincel local.
 
 ## Anti-patrones
-- Duplicar Photoshop entero antes de resolver compatibilidad con Kelo World.
+- Duplicar Photoshop/Pixelorama entero dentro del canvas ligero.
 - Hacer una llamada de IA por movimiento del dedo.
 - Aplicar bilinear filtering a pixel art.
 - Usar auto-repair agresivo que invente arte.
 - Hardcodear casco/pantalón dentro de gameplay.
 - Exportar sprites sin metadata de slot/dirección/estado.
 - Meter credenciales o secretos de proveedores en el cliente.
+- Precargar WASM/PCK de Pixelorama durante boot.
+- Mantener Pixelorama oculto en RAM después de cerrar.
 
 ## Tests / CI
-- `tests/asset-template-registry.test.mjs`: inferencia/manifest/QA de templates.
-- `tests/asset-forge-drawing-engine.test.mjs`: Bresenham, interpolación, Pixel Perfect, mirror, shapes, flood fill y alpha-lock.
+- `tests/asset-template-registry.test.mjs`.
+- `tests/asset-forge-drawing-engine.test.mjs`.
+- `tests/creator-exclusive-runtime.test.mjs`.
+- `scripts/pixelorama-runtime-audit.mjs`.
 
-El repositorio no tenía un workflow GitHub Actions de esta capacidad en el snapshot revisado; las pruebas se pueden ejecutar con Node en un checkout del branch.
+El build custom de Pixelorama tiene un workflow blueprint bajo `.github/workflows-paused-2026-09-15/`; permanece pausado deliberadamente por la política actual de recuperación de Pages.
 
 ## Observabilidad
-Los fallos de cada enhancer se registran como warning desde el workspace manifest y el editor base permanece disponible. `SELF CHECK` continúa siendo la verificación visible canónica del asset.
+- Los fallos de cada enhancer se registran como warning desde el workspace manifest y el editor base permanece disponible.
+- `SELF CHECK` continúa siendo la verificación visible canónica del asset.
+- `getCreatorExclusiveSnapshot()` expone claims/lifecycle mientras Pixelorama Pro está abierto.
+- `KeloSimulation.snapshot()` expone `suspended`, claims y frames suspendidos.
 
 ## Deuda conocida
-- El enhancer todavía se acopla a algunos selectores DOM del editor base; conviene exponer un API formal de drawing/session state desde `asset-forge-workspace.mjs`.
-- No existe aún pan/zoom multitouch dedicado.
-- No existen layers/timeline reales de authoring.
+- El enhancer de dibujo todavía se acopla a algunos selectores DOM del editor base; conviene exponer API formal de session state.
+- No existe aún pan/zoom multitouch dedicado en el editor ligero.
 - No existe body-mask raster real por frame/dirección.
 - No existe preview real `TEST IN GAME` desde Asset Forge todavía.
 - Los listings actuales son locales.
+- El fallback stock de Pixelorama requiere prueba Safari/iPhone para confirmar auto-open/export sin interacción adicional.
+- El custom build Kelo está preparado pero no desplegado mientras los workflows sigan pausados.
 
 ## Checklist al extender
 - [ ] Reutilizar Kelo Creators/Asset Forge.
-- [ ] Añadir primitiva al drawing engine o template al registry; no crear editor paralelo.
+- [ ] Evitar duplicar una capacidad profesional que Pixelorama ya proporciona.
 - [ ] Confirmar touch/iPhone.
 - [ ] Mantener editor lazy y fail-open.
-- [ ] Añadir test puro para toda nueva geometría de píxeles.
+- [ ] Añadir test puro/arquitectural para nueva geometría o lifecycle.
 - [ ] Mantener nearest-neighbor/pixelated rendering.
 - [ ] Separar authoring QA de gameplay authority.
+- [ ] Garantizar teardown completo de runtimes pesados.
