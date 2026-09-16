@@ -1,14 +1,14 @@
 /* KELO-INDEX
  * area: CORE / LEGACY ABILITY COMPAT
- * owner: KeloAbilityAim
+ * owners: KeloAbilityAim + KeloLegacyAbilityCast
  * keys: ABILITY AIM DASH RANGE POINTER RENDER BEGIN END CAST MIDDLEWARE COMPATIBILITY LEGACY STRANGLER
- * purpose: concentra matemática, lifecycle de puntero y cadena explícita de cast en un único owner sin cambiar rangos, cooldowns ni orden de decorators
- * public-api: KeloAbilityAim.begin/end/cast/registerCastMiddleware/maxRange/minRatio/measuredRange/powerFromButtonDistance/snapshot
+ * purpose: conserva aim/range/pointer legacy y separa la cadena de cast en un owner explícito sin cambiar rangos, cooldowns ni orden de decorators
+ * public-api: KeloAbilityAim.begin/end/cast/maxRange/minRatio/measuredRange/powerFromButtonDistance/snapshot + KeloLegacyAbilityCast.registerMiddleware/dispatch/snapshot
  * consumes: legacy skillAim/aim/STATE/localPlayer/camera/dashTween + KeloRender
- * state-owned: lifecycle de puntero, estado de aim y registry ordenado de middleware de cast
- * extension-points: registerCastMiddleware(owner,fn); el último registrado envuelve a los anteriores, igual que los wrappers legacy
- * legacy: strangler temporal para engine-g/l/m; no añadir abilities nuevas aquí
- * do-not: NO segundo ability engine, NO segundo pointer lifecycle, NO nuevos números de balance, NO monkey-patch de cast fuera de este owner
+ * state-owned: KeloAbilityAim posee lifecycle de puntero/estado aim; KeloLegacyAbilityCast posee registry ordenado de middleware
+ * extension-points: KeloLegacyAbilityCast.registerMiddleware(owner,fn); el último registrado envuelve a los anteriores, igual que los wrappers legacy
+ * legacy: strangler temporal; KeloAbilityAim.registerCastMiddleware queda solo como adapter de compatibilidad durante migración
+ * do-not: NO segundo ability engine, NO segundo pointer lifecycle, NO nuevos números de balance, NO monkey-patch de cast fuera del owner
  */
 (function(root,factory){
 'use strict';
@@ -82,6 +82,7 @@ root.beginSkillAim=beginSkillAimCompat;
 function updateAimFromPointerCompat(x,y){updateAimFromButton(x,y);}
 root.updateAimFromPointer=updateAimFromPointerCompat;
 
+const CAST_OWNER_VERSION='kelo-legacy-ability-cast-v1.0.0';
 const castMiddlewares=[];
 let castMiddlewareSeq=0;
 function registerCastMiddleware(owner,fn){
@@ -144,6 +145,13 @@ function dispatchCast(index,typeId,dirX,dirY){
   }
   return invoke(castMiddlewares.length-1);
 }
+root.KeloLegacyAbilityCast=Object.freeze({
+  version:CAST_OWNER_VERSION,
+  registerMiddleware:registerCastMiddleware,
+  dispatch:dispatchCast,
+  snapshot:function(){return Object.freeze({version:CAST_OWNER_VERSION,owner:'KeloLegacyAbilityCast',middlewareCount:castMiddlewares.length,middlewareOwners:castMiddlewareOwners(),sequence:castMiddlewareSeq});}
+});
+root.KELO_LEGACY_ABILITY_CAST_AUDIT=Object.freeze({version:CAST_OWNER_VERSION,owner:'KeloLegacyAbilityCast',sharedRegistry:true,aimAdapterTemporary:true});
 root.castAimedSkill=dispatchCast;
 
 function endSkillAimCompat(e){
@@ -274,11 +282,11 @@ root.KeloAbilityAim=Object.freeze(Object.assign({},api,{
   registerCastMiddleware,
   updatePointer:updateAimFromPointerCompat,
   isAimSkill:isAimSkillCompat,
-  snapshot:function(){return Object.freeze({version:api.version,active:!!skillAim.active,typeId:skillAim.typeId||'',power:Number(skillAim.power)||0,castRange:Number(skillAim.castRange)||0,pointerId:skillAim.pointerId??null,renderHookId:renderHookId,legacyRenderHookRetired:!!staleHook,pointerLifecycle:pointerLifecycle.snapshot(),castMiddlewareCount:castMiddlewares.length,castMiddlewareOwners:castMiddlewareOwners()});}
+  snapshot:function(){return Object.freeze({version:api.version,active:!!skillAim.active,typeId:skillAim.typeId||'',power:Number(skillAim.power)||0,castRange:Number(skillAim.castRange)||0,pointerId:skillAim.pointerId??null,renderHookId:renderHookId,legacyRenderHookRetired:!!staleHook,pointerLifecycle:pointerLifecycle.snapshot(),castOwner:'KeloLegacyAbilityCast',castMiddlewareCount:castMiddlewares.length,castMiddlewareOwners:castMiddlewareOwners()});}
 }));
 })(typeof globalThis!=='undefined'?globalThis:this,function(){
 'use strict';
-const VERSION='kelo-ability-aim-v1.3.0-cast-middleware-owner';
+const VERSION='kelo-ability-aim-v1.4.0-cast-owner-split';
 const MAX=Object.freeze({dash:170,fireball:300,frostnova:230,meteor:260});
 const MIN_RATIO=Object.freeze({dash:0.32,fireball:0.45,frostnova:0.45,meteor:0.4});
 const STICK_RADIUS=72;
