@@ -1,10 +1,10 @@
 /* KELO-INDEX
  * area: CREATORS / EXTERNAL CONTENT / 3DASSETS.DEV
  * owner: Kelo Universal Content Bridge
- * keys: 3DASSETS CC0 GLB SEARCH API MODEL LAZY MOBILE
+ * keys: 3DASSETS CC0 GLB SEARCH API MODEL LAZY MOBILE PAGING
  * purpose: search the public CC0 GLB catalog without mirroring models or preloading model bytes on player devices
  */
-import {fetchProviderJson,mobilePageBudget,clearExternalProviderRuntimeCache} from './external-provider-runtime.mjs?v=1';
+import {fetchProviderJson,mobilePageWindow,clearExternalProviderRuntimeCache} from './external-provider-runtime.mjs?v=3';
 
 const API='https://3dassets.dev/api/v1/assets';
 function clean(value){return String(value??'').trim();}
@@ -19,7 +19,7 @@ function normalize(item,index){
 
 export async function searchThreeDAssets(query='',options={}){
   const q=clean(query);if(!q)return{assets:[],offset:0,limit:0,total:0,hasMore:false,requiresQuery:true,engine:'3dassets-v1-bounded'};
-  const requested=Math.max(1,Number(options.limit)||16),limit=mobilePageBudget(requested,{heavy:true}),offset=Math.max(0,Number(options.offset)||0),page=Math.floor(offset/limit)+1,params=new URLSearchParams({q,sort:'relevance',page:String(page),limit:String(limit)}),data=await fetchProviderJson('3dassets',`${API}?${params.toString()}`,{ttlMs:12*60*1000,maxBytes:800_000,cacheKey:`3dassets:${params.toString()}`}),rows=rowsOf(data),assets=rows.map(normalize).filter(row=>row.externalId),total=Number(data?.total||data?.count||data?.pagination?.total||data?.meta?.total||0)||null,totalPages=Number(data?.pages||data?.pageCount||data?.pagination?.pages||data?.meta?.pageCount||0)||0;
-  return{assets,offset,limit,total,hasMore:totalPages?page<totalPages:total?offset+rows.length<total:rows.length>=limit,engine:'3dassets-v1-bounded'};
+  const requested=Math.max(1,Number(options.limit)||16),window=mobilePageWindow(requested,options.offset,{heavy:true}),limit=window.limit,page=window.page,params=new URLSearchParams({q,sort:'relevance',page:String(page),limit:String(limit)}),data=await fetchProviderJson('3dassets',`${API}?${params.toString()}`,{ttlMs:12*60*1000,maxBytes:800_000,cacheKey:`3dassets:${params.toString()}`}),rows=rowsOf(data),assets=rows.map(normalize).filter(row=>row.externalId),total=Number(data?.total||data?.count||data?.pagination?.total||data?.meta?.total||0)||null,totalPages=Number(data?.pages||data?.pageCount||data?.pagination?.pages||data?.meta?.pageCount||0)||0;
+  return{assets,offset:window.sourceOffset,limit,total,hasMore:totalPages?page<totalPages:total?window.offset+rows.length<total:rows.length>=limit,engine:'3dassets-v1-bounded'};
 }
 export function clearThreeDAssetsCache(){clearExternalProviderRuntimeCache('3dassets:');}
