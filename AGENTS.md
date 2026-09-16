@@ -273,3 +273,83 @@ Regla mental obligatoria:
 Y para regresiones:
 
 `REPORTAR DE NUEVO -> REVISAR CANÓNICO -> REOPENED SI APLICA; NO DUPLICAR PARA ESCONDER HISTORIAL`
+
+## RULE 8 — INVESTIGADOR + CONSTRUCTOR EN PARALELO (OBLIGATORIO)
+
+Toda tarea operativa material pedida por el usuario —por ejemplo `ejecuta`, `fixea`, `implementa`, `optimiza`, `investiga`, `busca`, `revisa`, `migra`, `integra` o `refactoriza`— debe trabajar con **dos roles coordinados en paralelo** siempre que el entorno lo permita.
+
+La intención es simple: el constructor no programa a ciegas y el investigador no bloquea la ejecución.
+
+### Rol A — INVESTIGADOR
+
+Su trabajo es buscar evidencia actual y útil **mientras el constructor ya está trabajando**.
+
+Debe:
+
+1. Investigar en Internet documentación oficial, buenas prácticas actuales, APIs/versiones vigentes, patrones recomendados, problemas conocidos y soluciones comparables.
+2. Priorizar fuentes primarias/oficiales y luego fuentes técnicas de alta señal. Foros/Reddit pueden aportar síntomas o experiencias, pero no sustituyen documentación oficial cuando exista.
+3. Investigar específicamente el stack y la versión que usa el repo; no copiar recetas incompatibles por versión.
+4. Para bugs, buscar el error/síntoma exacto, issues conocidos, regresiones, límites de plataforma y fixes documentados.
+5. Para arquitectura, rendimiento o migraciones, buscar tradeoffs, compatibilidad, seguridad, mobile-first, online-first y coste de mantenimiento.
+6. Contrastar cada recomendación con `AGENTS.md`, `KELO_FOUNDATION`, `ENGINE_MAP`, el runtime LIVE y los contratos existentes. Una práctica genérica de Internet **no puede romper una ley del repo**.
+7. Entregar al constructor hallazgos cortos y accionables con este contrato mental:
+   - `HALLAZGO`
+   - `FUENTE/FECHA`
+   - `IMPACTO EN ESTE REPO`
+   - `RECOMENDACIÓN`
+   - `CONFIANZA / RIESGO`
+8. Si descubre que el enfoque que se está construyendo es incorrecto, inseguro, obsoleto o innecesariamente costoso, avisar inmediatamente para corregir rumbo antes de endurecer el código.
+
+El Investigador **no debe editar los mismos archivos que el Constructor** durante el mismo tramo de trabajo salvo partición explícita y sin solapamiento.
+
+### Rol B — CONSTRUCTOR
+
+Es el único writer por defecto del cambio principal.
+
+Debe:
+
+1. Empezar el preflight local y la implementación sin esperar a que termine toda la investigación.
+2. Leer primero las leyes/memorias/owners obligatorios del repo y trabajar sobre el runtime real.
+3. Incorporar durante la construcción los hallazgos del Investigador que estén respaldados, sean compatibles y mejoren seguridad, simplicidad, rendimiento, mantenibilidad o evergreen-ness.
+4. No copiar código de Internet a ciegas; adaptar patrones al owner y contratos existentes.
+5. Si rechaza una recomendación importante del Investigador, dejar clara la razón técnica.
+6. Mantener un único owner y evitar crear arquitectura paralela solo porque una fuente externa use otro patrón.
+7. Ejecutar las pruebas y gates obligatorios del repo. Investigación externa **no sustituye verificación real**.
+
+### Coordinación obligatoria
+
+- El patrón preferido es `MANAGER/COORDINADOR -> INVESTIGADOR + CONSTRUCTOR`.
+- Investigación y construcción avanzan simultáneamente cuando son independientes.
+- No permitir escrituras concurrentes sobre el mismo archivo sin coordinación; evita carreras, conflictos y cambios perdidos.
+- Los hallazgos importantes deben llegar durante el trabajo, no únicamente al final.
+- El constructor puede ajustar el plan conforme entra nueva evidencia.
+- Si una investigación necesita benchmark o experimento local, convertirla en una prueba reproducible y comparar antes/después.
+- Para decisiones sensibles a versión o fecha, registrar la fecha/fuente consultada.
+
+### Cuando el entorno NO tenga subagentes reales
+
+No fingir que existen.
+
+La misma IA debe ejecutar el protocolo como **dos workstreams lógicos intercalados**:
+
+`INVESTIGAR -> HANDOFF CORTO -> CONSTRUIR -> INVESTIGAR -> AJUSTAR -> TESTEAR`
+
+Debe seguir existiendo separación entre evidencia externa y decisión de implementación.
+
+### Fallback sin Internet
+
+Si no existe acceso web, está prohibido inventar investigación o fuentes.
+
+Marcar internamente `RESEARCH BLOCKED`, continuar con documentación local + experiencia técnica disponible y no afirmar que se verificaron prácticas/versiones externas que no pudieron consultarse.
+
+### Criterio de cierre
+
+Antes de afirmar que una tarea material está terminada, debe poder responderse:
+
+1. ¿Qué encontró la investigación que cambió o confirmó la implementación?
+2. ¿Qué recomendaciones se incorporaron y cuáles se rechazaron, con motivo?
+3. ¿Se respetó el owner existente y la arquitectura online-first?
+4. ¿Se ejecutaron los tests/gates reales aplicables?
+5. ¿Se evitó que dos agentes pisaran los mismos archivos?
+
+**La investigación mejora la decisión; los tests demuestran el comportamiento. Ninguna sustituye a la otra.**
