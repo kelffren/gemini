@@ -1,15 +1,15 @@
 /* KELO-INDEX
  * area: LEGACY PLAZA GROUND / AIM PRESENTATION
- * owner: plaza ground legacy; frame extension owned by KeloRender; viewport owned by KeloCamera
- * keys: PLAZA ATLAS LANDING RENDER CAMERA FOUNDATION
- * purpose: conserva ground authored y landing marker sin envolver render ni poseer Canvas/viewport
+ * owner: plaza ground legacy; cast chain owned by KeloAbilityAim; frame extension owned by KeloRender; viewport owned by KeloCamera
+ * keys: PLAZA ATLAS LANDING CAST MIDDLEWARE RENDER CAMERA FOUNDATION
+ * purpose: conserva ground authored, landing marker y presentación de cast sin monkey-patch global
  * public-api: KELO_PLAZA_TILESET, KELO_PLAZA_AUDIT
- * consumes: KeloRender, KeloCamera viewport policy, tile registry, world renderer, skillAim
+ * consumes: KeloAbilityAim, KeloRender, KeloCamera viewport policy, tile registry, world renderer, skillAim
  * state-owned: atlas images + baked layers
- * extension-points: KeloRender.afterFrame
+ * extension-points: KeloAbilityAim.registerCastMiddleware + KeloRender.afterFrame
  * reuse: contenido de plaza debe ir al registry/world renderer; viewport y DPR se delegan a KeloCamera
- * legacy: castAimedSkill y world-renderer decorator pendientes de consolidación
- * do-not: NO envolver render; NO escribir canvas.width/height, resize o CONFIG.zoom
+ * legacy: cast global retirado; world-renderer decorator pendiente de consolidación
+ * do-not: NO reasignar castAimedSkill, NO envolver render, NO escribir canvas.width/height, resize o CONFIG.zoom
  */
 (function () {
   // LIVE owner: plaza tiles + aimed-skill landing marker. Viewport/HiDPI belongs to KeloCamera.
@@ -59,6 +59,7 @@
     decorationResetSuppressed: window.KELO_WORLD_DECORATION_RESET === true,
     renderOwner:'KeloRender',
     viewportOwner:'KeloCamera',
+    castOwner:'KeloAbilityAim',
     directViewportWrites:false,
     collisionMutationMode:'collision-owner-registry-v1',
     collisionRemovals:0
@@ -272,8 +273,10 @@
     for(let i=0;i<=10;i++){ const t=i/10; burst(x1+(x2-x1)*t,y1+(y2-y1)*t,color,2,12); }
     if(typeof spawnDashTrail==='function') spawnDashTrail(x1,y1,x2,y2,color);
   }
-  const _cast=castAimedSkill;
-  castAimedSkill=function(index,typeId,dirX,dirY){
+  const castOwner=window.KeloAbilityAim;
+  if(!castOwner||typeof castOwner.registerCastMiddleware!=='function')throw new Error('KeloAbilityAim cast middleware unavailable before engine-l');
+  castOwner.registerCastMiddleware('engine-l:plaza-cast-presentation',function(context,next){
+    const index=context.index,typeId=context.typeId,dirX=context.dirX,dirY=context.dirY;
     const stone=STATE.equipped[index]; if(!stone||stone.currentCd>0) return;
     const land=landingPoint(), color=stone.color||'#ffd166';
     if(typeId==='dash'){
@@ -282,8 +285,8 @@
       dashTween.toX=Math.max(24,Math.min(CONFIG.worldWidth-24,land.x)); dashTween.toY=Math.max(24,Math.min(CONFIG.worldHeight-24,land.y));
       aim.x=dirX; aim.y=dirY; trailLine(dashTween.fromX,dashTween.fromY,dashTween.toX,dashTween.toY,color); burst(dashTween.toX,dashTween.toY,color,14,18); return;
     }
-    _cast(index,typeId,dirX,dirY); trailLine(localPlayer.x,localPlayer.y,land.x,land.y,color); burst(land.x,land.y,color,typeId==='meteor'?22:12,typeId==='meteor'?22:14);
-  };
+    const result=next(); trailLine(localPlayer.x,localPlayer.y,land.x,land.y,color); burst(land.x,land.y,color,typeId==='meteor'?22:12,typeId==='meteor'?22:14); return result;
+  });
 
   function drawLanding(){
     if(!skillAim.active) return;
