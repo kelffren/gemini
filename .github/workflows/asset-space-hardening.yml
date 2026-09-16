@@ -37,6 +37,13 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '24'
+      - name: Restore batch DELIVERY optimizer cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: .cache/asset-batch-delivery
+          key: asset-batch-delivery-v1-${{ runner.os }}-${{ hashFiles('src/creators/assets/png-space-optimizer.mjs', 'src/creators/assets/png-palette-order.mjs', 'src/creators/assets/png-conformance-guard.mjs', 'src/creators/assets/asset-image-profiler.mjs', 'src/creators/assets/png-render-metadata.mjs', 'src/creators/assets/asset-optimization-cache.mjs', 'scripts/asset-batch-delivery-compiler.mjs') }}
+          restore-keys: |
+            asset-batch-delivery-v1-${{ runner.os }}-
       - name: Bug Intelligence risk preflight
         run: |
           BEFORE="${{ github.event.before }}"
@@ -116,7 +123,26 @@ jobs:
       - name: Smart Atlas DELIVERY candidate compiler
         run: node scripts/asset-atlas-delivery-candidate.mjs --manifest=src/environment/generated/forest-plaza-tileset-v2-manifest.js --padding=2 --report=test-results/asset-atlas-delivery-candidate
       - name: Batch strict PNG DELIVERY candidates
-        run: node scripts/asset-batch-delivery-compiler.mjs --input=assets --max-files=80 --max-source-bytes=8388608 --min-saving-bytes=1024 --min-saving-percent=0.1 --report=test-results/asset-batch-delivery
+        run: node scripts/asset-batch-delivery-compiler.mjs --input=assets --max-files=80 --max-source-bytes=8388608 --min-saving-bytes=1024 --min-saving-percent=0.1 --cache=.cache/asset-batch-delivery --report=test-results/asset-batch-delivery
+      - name: Batch optimizer cache warm replay
+        run: |
+          node scripts/asset-batch-delivery-compiler.mjs --input=assets --max-files=80 --max-source-bytes=8388608 --min-saving-bytes=1024 --min-saving-percent=0.1 --cache=.cache/asset-batch-delivery --report="$RUNNER_TEMP/asset-batch-delivery-cache-replay"
+          node - <<'NODE'
+          const fs=require('fs');
+          const path=require('path');
+          const first=JSON.parse(fs.readFileSync('test-results/asset-batch-delivery/report.json','utf8'));
+          const replayPath=path.join(process.env.RUNNER_TEMP,'asset-batch-delivery-cache-replay','report.json');
+          const replay=JSON.parse(fs.readFileSync(replayPath,'utf8'));
+          const equalKeys=['scannedFiles','decodedFiles','candidateCount','totalSourceBytes','totalProjectedBytes','savedBytes','allPositiveSavingBytes','discardedPositiveSavingsBytes','runtimeActiveCandidates'];
+          for(const key of equalKeys){if(first[key]!==replay[key])throw new Error(`BATCH_CACHE_REPLAY_MISMATCH ${key}: ${first[key]} != ${replay[key]}`);}
+          if(replay.rejectedSafety!==0)throw new Error(`BATCH_CACHE_REPLAY_SAFETY_REJECTS ${replay.rejectedSafety}`);
+          if(replay.cacheHits!==replay.decodedFiles)throw new Error(`BATCH_CACHE_REPLAY_EXPECTED_ALL_HITS ${replay.cacheHits}/${replay.decodedFiles}`);
+          if(replay.cacheMisses!==0)throw new Error(`BATCH_CACHE_REPLAY_UNEXPECTED_MISSES ${replay.cacheMisses}`);
+          const speedup=replay.elapsedMs>0?first.elapsedMs/replay.elapsedMs:null;
+          const evidence={status:'ASSET_BATCH_DELIVERY_CACHE_REPLAY_OK',firstElapsedMs:first.elapsedMs,replayElapsedMs:replay.elapsedMs,speedup,firstCacheHits:first.cacheHits,firstCacheMisses:first.cacheMisses,replayCacheHits:replay.cacheHits,replayCacheMisses:replay.cacheMisses,decodedFiles:replay.decodedFiles,savedBytes:replay.savedBytes,candidateCount:replay.candidateCount};
+          fs.writeFileSync('test-results/asset-batch-delivery-cache-replay.json',JSON.stringify(evidence,null,2));
+          console.log(JSON.stringify(evidence));
+          NODE
       - name: Verified DELIVERY registry
         run: node scripts/asset-delivery-registry.mjs --input=test-results --report=test-results/asset-delivery-registry
       - name: Asset documentation contract
@@ -137,5 +163,6 @@ jobs:
             test-results/asset-batch-delivery/report.json
             test-results/asset-batch-delivery/candidates/**/delivery-manifest.json
             test-results/asset-batch-delivery/candidates/**/report.json
+            test-results/asset-batch-delivery-cache-replay.json
             test-results/asset-delivery-registry
           if-no-files-found: ignore
