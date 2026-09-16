@@ -1,12 +1,12 @@
 /* KELO-INDEX
  * area: CREATORS / ASSET QUALITY
  * owner: Kelo Creator Asset Bridge
- * keys: PNG QUALITY AGENT FIDELITY PSNR EDGE ALPHA BORDER SEAM PIXEL ART
+ * keys: PNG QUALITY AGENT FIDELITY PSNR EDGE ALPHA BORDER SEAM PIXEL ART RENDER EXACT
  * purpose: deterministic before/after judge for image optimization candidates with asset-class-specific hard gates
  * public-api: evaluatePixelFidelity(), judgePixelFidelity()
  * state-owned: none
  * online: N/A; creator/build-time quality gate
- * reuse: lossless optimizer, adaptive palette search, codec tournament
+ * reuse: lossless optimizer, adaptive palette search, codec tournament, DELIVERY variants
  * do-not: approve by file size alone or let a visual/LLM opinion override failed hard metrics
  */
 
@@ -27,8 +27,13 @@ function exactMetrics() {
   return {
     comparable:true,
     exactPixels:true,
+    renderExactPixels:true,
     changedPixels:0,
     changedPixelRatio:0,
+    renderChangedPixels:0,
+    renderChangedPixelRatio:0,
+    hiddenTransparentRgbChangedPixels:0,
+    hiddenTransparentRgbChangedRatio:0,
     meanAbsRgb:0,
     rmseRgb:0,
     psnrRgb:Infinity,
@@ -50,8 +55,13 @@ export function evaluatePixelFidelity(originalRgba, candidateRgba, width, height
     return {
       comparable:false,
       exactPixels:false,
+      renderExactPixels:false,
       changedPixels:null,
       changedPixelRatio:1,
+      renderChangedPixels:null,
+      renderChangedPixelRatio:1,
+      hiddenTransparentRgbChangedPixels:null,
+      hiddenTransparentRgbChangedRatio:1,
       meanAbsRgb:Infinity,
       rmseRgb:Infinity,
       psnrRgb:0,
@@ -72,6 +82,8 @@ export function evaluatePixelFidelity(originalRgba, candidateRgba, width, height
   if (exactByteEquality(originalRgba, candidateRgba)) return exactMetrics();
 
   let changedPixels = 0;
+  let renderChangedPixels = 0;
+  let hiddenTransparentRgbChangedPixels = 0;
   let alphaChangedPixels = 0;
   let alphaMaxDelta = 0;
   let maxRgbDelta = 0;
@@ -100,12 +112,19 @@ export function evaluatePixelFidelity(originalRgba, candidateRgba, width, height
         if (delta > pixelRgbMax) pixelRgbMax = delta;
         if (delta) changed = true;
       }
-      const alphaDelta = Math.abs(originalRgba[offset + 3] - candidateRgba[offset + 3]);
+      const originalAlpha = originalRgba[offset + 3];
+      const candidateAlpha = candidateRgba[offset + 3];
+      const alphaDelta = Math.abs(originalAlpha - candidateAlpha);
       if (alphaDelta) {
         alphaChangedPixels += 1;
         changed = true;
         if (alphaDelta > alphaMaxDelta) alphaMaxDelta = alphaDelta;
       }
+      const bothFullyTransparent = originalAlpha === 0 && candidateAlpha === 0;
+      const renderChanged = alphaDelta > 0 || (!bothFullyTransparent && pixelRgbMax > 0);
+      if (renderChanged) renderChangedPixels += 1;
+      else if (bothFullyTransparent && pixelRgbMax > 0) hiddenTransparentRgbChangedPixels += 1;
+
       if (pixelRgbMax > 12) largeDeltaPixels += 1;
       if (changed) changedPixels += 1;
       if (onBorder) {
@@ -149,8 +168,13 @@ export function evaluatePixelFidelity(originalRgba, candidateRgba, width, height
   return {
     comparable:true,
     exactPixels:changedPixels === 0,
+    renderExactPixels:renderChangedPixels === 0,
     changedPixels,
     changedPixelRatio:changedPixels / Math.max(1, pixelCount),
+    renderChangedPixels,
+    renderChangedPixelRatio:renderChangedPixels / Math.max(1, pixelCount),
+    hiddenTransparentRgbChangedPixels,
+    hiddenTransparentRgbChangedRatio:hiddenTransparentRgbChangedPixels / Math.max(1, pixelCount),
     meanAbsRgb,
     rmseRgb,
     psnrRgb,
@@ -184,6 +208,20 @@ export function judgePixelFidelity(metrics, policy = 'strict', overrides = {}) {
       score:metrics.exactPixels ? 1 : 0,
       policy,
       reasons:metrics.exactPixels ? [] : ['pixel-difference']
+    };
+  }
+
+  if (policy === 'render-exact') {
+    const pass = metrics.renderExactPixels === true && metrics.alphaMaxDelta === 0;
+    return {
+      pass,
+      score:pass ? 1 : 0,
+      policy,
+      reasons:pass ? [] : [
+        ...(metrics.alphaMaxDelta === 0 ? [] : ['alpha']),
+        ...(metrics.renderExactPixels ? [] : ['visible-pixel-difference'])
+      ],
+      limits:{alphaExact:true, visibleRgbExact:true, hiddenTransparentRgbMayChange:true}
     };
   }
 
