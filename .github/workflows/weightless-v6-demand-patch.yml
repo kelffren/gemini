@@ -1,0 +1,53 @@
+name: Weightless V6 property demand patch
+
+on:
+  push:
+    branches:
+      - feature/weightless-v6-property-demand-load
+
+permissions:
+  contents: write
+
+concurrency:
+  group: weightless-v6-demand-patch
+  cancel-in-progress: true
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: feature/weightless-v6-property-demand-load
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - name: Convert property catalog assets to render-demand loading
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const file='src/property/property-system.js';
+          let text=fs.readFileSync(file,'utf8');
+          const before=Buffer.byteLength(text);
+          const exact=(from,to,label)=>{if(!text.includes(from))throw new Error(`V6_PATCH_ANCHOR_MISSING:${label}`);text=text.replace(from,to);};
+          exact("  const images=new Map();\n  const readyAssets=new Set();\n  const listeners=new Set();","  const images=new Map(),readyAssets=new Set(),loadingAssets=new Set(),listeners=new Set();",'sets');
+          exact("for(const part of t.parts){if(part.phase!==phase)continue;const img=images.get(part.assetKey);if(!img||!readyAssets.has(part.assetKey))continue;const a=g.globalAlpha;","for(const part of t.parts){if(part.phase!==phase)continue;const img=images.get(part.assetKey);if(!img||!readyAssets.has(part.assetKey)){acquire(part.assetKey);continue;}const a=g.globalAlpha;",'draw-demand');
+          exact("  const assetKeys=new Set();C.list().forEach(t=>t.parts.forEach(p=>assetKeys.add(p.assetKey)));\n  function announceAssetReady(key){try{window.dispatchEvent(new CustomEvent('kelo:property-render-assets-ready',{detail:{key}}));}catch(e){}}\n  function acquire(key){if(readyAssets.has(key))return;A.acquire(key).then(img=>{images.set(key,img);readyAssets.add(key);announceAssetReady(key);}).catch(err=>console.warn('[Kelo property] asset unavailable',key,err));}\n  assetKeys.forEach(acquire);C.onRegister(t=>t.parts.forEach(p=>{assetKeys.add(p.assetKey);acquire(p.assetKey);}));","  function announceAssetReady(key){try{window.dispatchEvent(new CustomEvent('kelo:property-render-assets-ready',{detail:{key}}));}catch(e){}}\n  function acquire(key){if(readyAssets.has(key)||loadingAssets.has(key))return;loadingAssets.add(key);A.acquire(key).then(img=>{images.set(key,img);readyAssets.add(key);loadingAssets.delete(key);announceAssetReady(key);}).catch(err=>console.warn('[Kelo property] asset unavailable',key,err));}",'eager-acquire');
+          if(text.includes('assetKeys.forEach(acquire)'))throw new Error('V6_EAGER_ACQUIRE_REMAINS');
+          if(!text.includes('{acquire(part.assetKey);continue;}'))throw new Error('V6_DRAW_DEMAND_MISSING');
+          if(!text.includes('loadingAssets.has(key)'))throw new Error('V6_INFLIGHT_DEDUPE_MISSING');
+          const after=Buffer.byteLength(text);
+          if(after>before)throw new Error(`V6_CRITICAL_JS_GREW:${before}->${after}`);
+          fs.writeFileSync(file,text);
+          console.log(`WEIGHTLESS_V6_PATCH_PASS bytes=${before}->${after} delta=${after-before}`);
+          NODE
+      - name: Self-delete patch workflow and commit runtime change
+        run: |
+          rm -f .github/workflows/weightless-v6-demand-patch.yml
+          git config user.name "kelo-weightless-bot"
+          git config user.email "68343904+kelffren@users.noreply.github.com"
+          git add src/property/property-system.js .github/workflows/weightless-v6-demand-patch.yml
+          git diff --cached --check
+          git commit -m "perf(weightless): demand-load property catalog assets"
+          git push origin HEAD:feature/weightless-v6-property-demand-load
