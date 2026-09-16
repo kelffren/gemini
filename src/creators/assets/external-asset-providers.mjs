@@ -6,8 +6,9 @@
  */
 import {searchKenneyAssets,clearKenneyCache} from './kenney-live-provider.mjs';
 import {searchLpcAssets} from './lpc-live-provider.mjs';
+import {searchOpenGameArtAssets,clearOpenGameArtCache} from './opengameart-live-provider.mjs';
 
-const CONFIG_URL='../../../data/external-asset-providers.json?v=3';
+const CONFIG_URL='../../../data/external-asset-providers.json?v=4';
 let configPromise=null;
 let liveCache=new Map();
 
@@ -61,6 +62,7 @@ export async function browseProvider(id,options={}){
     if(provider.id==='spritecook'&&provider.mode==='live-index')return {provider,assets:await loadSpriteCook(provider),error:null};
     if(provider.id==='kenney'&&provider.mode==='lazy-live-index')return {provider,assets:await searchKenneyAssets(options.query||'',{limit:options.limit||320}),error:null};
     if(provider.id==='lpc'&&provider.mode==='live-index')return {provider,assets:await searchLpcAssets(options.query||'',{limit:options.limit||160}),error:null};
+    if(provider.id==='opengameart'&&provider.mode==='live-index')return {provider,assets:await searchOpenGameArtAssets(options.query||'',{limit:options.limit||160}),error:null};
     return {provider,assets:[],error:null};
   }catch(error){return {provider,assets:[],error:String(error?.message||error)};}
 }
@@ -98,6 +100,6 @@ function installQAPreviewHook(){
   setTimeout(()=>{observer?.disconnect();observer=null;},12000);
 }
 
-export function clearProviderCache(){liveCache=new Map();configPromise=null;clearKenneyCache();}
+export function clearProviderCache(){liveCache=new Map();configPromise=null;clearKenneyCache();clearOpenGameArtCache();}
 export const EXTERNAL_ASSET_PROVIDERS=Object.freeze({loadProviderConfig,getProviderStatuses,browseProvider,searchExternalAssets,clearProviderCache});
 if(typeof window!=='undefined'){window.KELO_EXTERNAL_ASSET_PROVIDERS=EXTERNAL_ASSET_PROVIDERS;installQAPreviewHook();}
