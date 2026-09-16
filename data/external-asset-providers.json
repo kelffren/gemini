@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "policy": {
     "downloadOnBrowse": false,
     "requireExplicitDownload": true,
@@ -37,13 +37,15 @@
     {
       "id": "lpc",
       "name": "Universal LPC",
-      "mode": "external-catalog",
+      "mode": "live-index",
       "enabled": true,
-      "license": "MIXED",
-      "attributionRequired": true,
-      "sourceUrl": "https://github.com/BenCreating/LPC-Spritesheet-Generator",
+      "verified": true,
+      "license": "CC0 verified subset",
+      "attributionRequired": false,
+      "sourceUrl": "https://github.com/LiberatedPixelCup/Universal-LPC-Spritesheet-Character-Generator",
       "browseUrl": "https://liberatedpixelcup.github.io/Universal-LPC-Spritesheet-Character-Generator/",
-      "notes": "Connected as a mixed-license source. Automatic importing stays gated until per-item license and download metadata are resolved."
+      "pinnedCommit": "553ba7562534cbf32e7d9a502660f569d6b26512",
+      "notes": "LIVE verified subset from the canonical LPC repository. Only items whose direct PNG path and per-item credit/license metadata were verified are exposed as downloadable. This first gate is CC0-only; mixed-license items remain excluded until their individual import contract is verified."
     },
     {
       "id": "opengameart",
