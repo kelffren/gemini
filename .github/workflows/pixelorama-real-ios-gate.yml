@@ -1,4 +1,4 @@
-name: Pixelorama Real iOS Gate
+name: Pixelorama Mobile Gates
 
 on:
   workflow_dispatch:
@@ -7,6 +7,7 @@ on:
     paths:
       - 'tests/pixelorama-pro-real-ios.spec.js'
       - 'browserstack.pixelorama.yml'
+      - 'playwright.pixelorama-webkit.config.js'
       - 'tools/pixelorama/index.html'
       - 'src/creators/ui/pixelorama-pro-bridge.mjs'
       - 'src/creators/core/creator-exclusive-runtime.mjs'
@@ -17,11 +18,60 @@ permissions:
   contents: read
 
 concurrency:
-  group: pixelorama-real-ios
+  group: pixelorama-mobile-gates
   cancel-in-progress: true
 
 jobs:
+  webkit-mobile-preflight:
+    name: WebKit mobile preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      CI: 'true'
+      KELO_LOCAL: http://127.0.0.1:4173/
+    steps:
+      - name: Checkout Kelo World
+        uses: actions/checkout@v7
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install test dependencies
+        run: npm install --no-save
+
+      - name: Install Playwright WebKit
+        run: npx playwright install --with-deps webkit
+
+      - name: Start current-commit static host
+        shell: bash
+        run: |
+          python3 -m http.server 4173 --bind 127.0.0.1 > /tmp/kelo-pixelorama-http.log 2>&1 &
+          echo $! > /tmp/kelo-pixelorama-http.pid
+          for attempt in {1..30}; do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/kelo-pixelorama-http.log
+          exit 1
+
+      - name: Run hard Pixelorama bridge and lifecycle test on WebKit mobile
+        run: npx playwright test tests/pixelorama-pro-real-ios.spec.js --config=playwright.pixelorama-webkit.config.js
+
+      - name: Record WebKit preflight
+        if: success()
+        run: |
+          echo '### Pixelorama WebKit mobile preflight PASS' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Custom PCK + native KeloWebBridge required' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Asset handoff + heartbeat + creator hibernate/release verified' >> "$GITHUB_STEP_SUMMARY"
+          echo '- This is Playwright WebKit mobile emulation, not physical-iPhone certification.' >> "$GITHUB_STEP_SUMMARY"
+
   real-iphone-safari:
+    name: Physical iPhone Safari certification
+    needs: webkit-mobile-preflight
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -43,8 +93,8 @@ jobs:
             echo 'available=true' >> "$GITHUB_OUTPUT"
           else
             echo 'available=false' >> "$GITHUB_OUTPUT"
-            echo '### Pixelorama real-iOS gate not executed' >> "$GITHUB_STEP_SUMMARY"
-            echo 'BROWSERSTACK_USERNAME / BROWSERSTACK_ACCESS_KEY are not configured as Actions secrets.' >> "$GITHUB_STEP_SUMMARY"
+            echo '### Pixelorama real-iOS gate NOT_EXECUTED' >> "$GITHUB_STEP_SUMMARY"
+            echo 'BrowserStack credentials are not configured. WebKit preflight remains separate evidence only.' >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Setup Node
@@ -59,7 +109,16 @@ jobs:
 
       - name: Run Pixelorama on physical iPhone Safari
         if: steps.credentials.outputs.available == 'true'
-        run: npx browserstack-node-sdk playwright test tests/pixelorama-pro-real-ios.spec.js
+        shell: bash
+        run: |
+          set +e
+          npx browserstack-node-sdk playwright test tests/pixelorama-pro-real-ios.spec.js 2>&1 | tee browserstack-pixelorama.log
+          code=${PIPESTATUS[0]}
+          if [[ "$code" -ne 0 ]] && grep -q 'Automate testing time expired' browserstack-pixelorama.log; then
+            echo '### Pixelorama real-iOS gate BLOCKED_BY_BROWSERSTACK_QUOTA' >> "$GITHUB_STEP_SUMMARY"
+            echo 'BrowserStack authenticated, but Automate testing time is exhausted. No physical Safari session started, so this is not a Pixelorama product failure and not a certification PASS.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+          exit "$code"
 
       - name: Record verified device gate
         if: steps.credentials.outputs.available == 'true' && success()
