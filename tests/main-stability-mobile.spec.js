@@ -1,14 +1,16 @@
 /* KELO-INDEX
  * area: TEST / MAIN STABILITY / MOBILE
  * owner: Main Stability Gate
- * keys: MOBILE IPHONE-UA TOUCH BOOT GUEST MOVEMENT RUNTIME SMOKE PR-BYTES
- * purpose: unskippable CI smoke for the exact PR bytes using an iPhone-sized touch context; real-device BrowserStack remains a separate stronger layer
- * do-not: NO BrowserStack-only skip, NO LIVE hardcode, NO direct mutation that bypasses human input for movement
+ * keys: MOBILE IPHONE-UA TOUCH BOOT GUEST MOVEMENT RUNTIME SMOKE PR-BYTES FREEZE 8S EVALUATE-LATENCY
+ * purpose: unskippable CI smoke for the exact PR bytes using an iPhone-sized touch context and the mandatory sustained-walk freeze firewall
+ * do-not: NO BrowserStack-only skip, NO LIVE hardcode, NO direct mutation that bypasses human input for movement, NO short movement-only proof
  */
 const { test, expect } = require('@playwright/test');
 
 const IPHONE_UA='Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1';
 const BASE_URL=process.env.KELO_PAGES||'http://127.0.0.1:4173/';
+const SUSTAINED_WALK_MS=8000;
+const EVALUATE_BUDGET_MS=400;
 
 async function position(page){
   return page.evaluate(()=>({
@@ -20,7 +22,13 @@ async function position(page){
   }));
 }
 
-async function touchMoveRight(page){
+async function sampledPosition(page){
+  const started=Date.now();
+  const value=await position(page);
+  return {value,latencyMs:Date.now()-started};
+}
+
+async function touchMoveRightForEightSeconds(page){
   const canvas=page.locator('#game-canvas');
   const box=await canvas.boundingBox();
   expect(box).not.toBeNull();
@@ -33,14 +41,25 @@ async function touchMoveRight(page){
     await canvas.dispatchEvent('pointermove',{pointerId,pointerType:'touch',isPrimary:true,clientX:sx+(ex-sx)*i/6,clientY:sy,buttons:1,button:0,pressure:.5,bubbles:true,cancelable:true});
     await page.waitForTimeout(35);
   }
-  await page.waitForTimeout(700);
-  const held=await position(page);
+
+  const started=Date.now();
+  const samples=[];
+  while(Date.now()-started<SUSTAINED_WALK_MS){
+    await page.waitForTimeout(500);
+    await canvas.dispatchEvent('pointermove',{pointerId,pointerType:'touch',isPrimary:true,clientX:ex,clientY:sy,buttons:1,button:0,pressure:.5,bubbles:true,cancelable:true});
+    const sample=await sampledPosition(page);
+    samples.push(sample);
+    expect(sample.latencyMs).toBeLessThanOrEqual(EVALUATE_BUDGET_MS);
+    expect(sample.value.touchActive).toBe(true);
+  }
+
+  const held=samples.at(-1)?.value||await position(page);
   await canvas.dispatchEvent('pointerup',{pointerId,pointerType:'touch',isPrimary:true,clientX:ex,clientY:sy,buttons:0,button:0,pressure:0,bubbles:true,cancelable:true});
   await page.waitForTimeout(150);
-  return held;
+  return {held,samples,durationMs:Date.now()-started};
 }
 
-test('exact PR bytes boot and move in iPhone-sized touch context',async({browser})=>{
+test('exact PR bytes boot and sustain 8s movement in iPhone-sized touch context',async({browser})=>{
   const page=await browser.newPage({baseURL:BASE_URL,viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true,userAgent:IPHONE_UA});
   const pageErrors=[];
   page.on('pageerror',error=>pageErrors.push(String(error&&error.stack||error)));
@@ -63,13 +82,17 @@ test('exact PR bytes boot and move in iPhone-sized touch context',async({browser
   await expect(page.locator('#kelo-account-auth')).toBeHidden({timeout:10000});
 
   const before=await position(page);
-  const held=await touchMoveRight(page);
+  const walk=await touchMoveRightForEightSeconds(page);
   const after=await position(page);
-  const moved=Math.hypot(held.x-before.x,held.y-before.y);
+  const moved=Math.hypot(walk.held.x-before.x,walk.held.y-before.y);
+  const maxEvaluateLatency=Math.max(...walk.samples.map(sample=>sample.latencyMs));
 
+  expect(walk.durationMs).toBeGreaterThanOrEqual(SUSTAINED_WALK_MS);
+  expect(walk.samples.length).toBeGreaterThanOrEqual(8);
   expect(moved).toBeGreaterThan(8);
-  expect(held.touchActive).toBe(true);
+  expect(walk.held.touchActive).toBe(true);
   expect(after.touchActive).toBe(false);
+  expect(maxEvaluateLatency).toBeLessThanOrEqual(EVALUATE_BUDGET_MS);
   expect(pageErrors).toEqual([]);
 
   const runtime=await page.evaluate(()=>({
