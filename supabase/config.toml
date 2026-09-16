@@ -33,6 +33,12 @@ additional_redirect_urls = [
 ]
 enable_signup = true
 
+# Sprite AI keeps gateway JWT verification off so public status + CORS preflight work.
+# POST generation verifies the Supabase user token inside the function before any
+# Hugging Face request is submitted. Provider secrets never reach the browser.
+[functions.kelo-sprite-generate]
+verify_jwt = false
+
 # The GitHub integration currently has production deployment disabled while
 # this foundation PR is validated. This ref is not a secret.
 [remotes.production]
