@@ -47,11 +47,13 @@ A legacy-containment failure is not fixed by raising a numeric baseline. Move th
 
 A PASS is valid only for the exact merge candidate that was tested. If `main` advances after the latest successful run, the pull request must trigger and pass the gate again against the new `main` before merge. A previously green check against an older base is not sufficient evidence for production merge.
 
+For legacy containment specifically, PR runs compare against `HEAD^1`: the first parent of GitHub's synthetic merge commit. This is the exact base that produced the candidate under test and avoids relying on a potentially stale PR payload SHA when `main` is moving quickly. Push runs use the previous `main` SHA from the push event.
+
 ## CI reproducibility
 
 Playwright runs in CI with one worker, one retry, a bounded global timeout, `forbidOnly`, and trace capture on the first retry. This keeps resource use deterministic and preserves debugging evidence without recording traces for every successful run.
 
-The legacy-containment check receives the exact pull-request base SHA (or previous `main` SHA for push events) and reads the comparison version from Git history. It does not depend on a hand-maintained baseline file.
+The legacy-containment check reads the comparison version from Git history and records the selected SHA/source in its evidence. It does not depend on a hand-maintained baseline file.
 
 ## Five-year rule
 
