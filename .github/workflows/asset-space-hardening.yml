@@ -91,6 +91,10 @@ jobs:
           echo 'PERFORMANCE_NO_REGRESSION_OK'
       - name: AUTO effort escalation regression
         run: node scripts/asset-effort-controller-audit.mjs
+      - name: Exact palette ordering tournament regression
+        run: node scripts/asset-palette-order-audit.mjs
+      - name: Real repository palette tournament evidence
+        run: node scripts/asset-palette-order-real-audit.mjs --input=assets --max-files=200 --report=test-results/asset-palette-real
       - name: Quality Agent golden corpus
         run: node scripts/asset-quality-golden-corpus-audit.mjs
       - name: Animation temporal consistency gate
@@ -107,5 +111,7 @@ jobs:
         if: always()
         with:
           name: asset-space-hardening-report
-          path: test-results/asset-route-budget
+          path: |
+            test-results/asset-route-budget
+            test-results/asset-palette-real
           if-no-files-found: ignore

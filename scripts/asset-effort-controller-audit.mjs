@@ -31,7 +31,7 @@ function proveExact(fixture,result,label){
 const high=image(96,96,(x,y)=>[(x*17+y*3)&255,(x*5+y*19)&255,(x*11+y*7)&255,32+((x*13+y*29)%192)]);
 const highFast=optimizePngWithAdaptiveEffort(high.png,{profile:profile(4097),maxCheapProbeSourceBytes:0});
 proveExact(high,highFast,'high-fast');
-assert.equal(highFast.report.effortController.version,'kelo-asset-effort-controller-v2');
+assert.equal(highFast.report.effortController.version,'kelo-asset-effort-controller-v2.1');
 assert.deepEqual(highFast.report.effortController.stages.map(s=>s.effort),['fast'],'large/high-color route without structural evidence must stop at FAST');
 assert.equal(highFast.report.effortController.opportunity.balancedJustified,false);
 

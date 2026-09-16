@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: BUILD / CREATOR ASSET INGEST
  * owner: Kelo Creator Asset Bridge
- * keys: PNG SPACE COMPILER AUTO EFFORT PROVENANCE CACHE PERCEPTUAL PUBLISH ATOMIC WRITE
+ * keys: PNG SPACE COMPILER AUTO EFFORT PROVENANCE CACHE PERCEPTUAL PUBLISH ATOMIC WRITE PALETTE ORDER
  * purpose: optimize PNGs with evidence-driven effort, reproducible cache/provenance and fail-closed adaptive publishing
  * public-api: CLI only
  * state-owned: report/provenance files + disposable cache; source writes only after all requested gates pass
@@ -11,6 +11,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {decodePngRgba,encodeRgbaPng,optimizePngLossless} from '../src/creators/assets/png-space-optimizer.mjs';
+import {PALETTE_ORDER_FAST,PALETTE_ORDER_BALANCED,PALETTE_ORDER_DEEP} from '../src/creators/assets/png-palette-order.mjs';
 import {optimizePngAdaptive} from '../src/creators/assets/png-adaptive-optimizer.mjs';
 import {profileAssetImage} from '../src/creators/assets/asset-image-profiler.mjs';
 import {inspectPerceptualQuality} from '../src/creators/assets/perceptual-quality-bridge.mjs';
@@ -21,13 +22,13 @@ import {buildAssetProvenance,writeAssetProvenance} from '../src/creators/assets/
 const args=process.argv.slice(2),argument=(name,fallback=null)=>{const prefix=`--${name}=`,token=args.find(v=>v.startsWith(prefix));return token?token.slice(prefix.length):fallback;},has=name=>args.includes(`--${name}`);
 const inputPath=path.resolve(argument('input','assets')),mode=argument('mode','strict'),reportPath=path.resolve(argument('report','dist/asset-space-report')),write=has('write'),requirePerceptual=has('require-perceptual')||(write&&mode==='adaptive'),capture=has('capture')||requirePerceptual,perceptual=has('perceptual')||requirePerceptual,effort=argument('effort',write?'auto':'fast'),maxFiles=Math.max(1,Number(argument('max-files','10000'))||10000),cacheEnabled=!has('no-cache'),cachePath=path.resolve(argument('cache','.cache/asset-space')),minSsimulacra2=Number(argument('ssimulacra2-min','90'));
 if(!['strict','adaptive'].includes(mode)){console.error('PNG_SPACE_COMPILER_INVALID_MODE');process.exit(2);}if(!['auto','fast','balanced','deep'].includes(effort)){console.error('PNG_SPACE_COMPILER_INVALID_EFFORT');process.exit(2);}if(!fs.existsSync(inputPath)){console.error(`PNG_SPACE_COMPILER_INPUT_NOT_FOUND — ${inputPath}`);process.exit(2);}
-const engineFiles=['src/creators/assets/png-space-optimizer.mjs','src/creators/assets/png-conformance-guard.mjs','src/creators/assets/png-adaptive-optimizer.mjs','src/creators/assets/png-quality-agent.mjs','src/creators/assets/asset-image-profiler.mjs','src/creators/assets/asset-effort-controller.mjs','scripts/asset-space-compiler.mjs'];
+const engineFiles=['src/creators/assets/png-space-optimizer.mjs','src/creators/assets/png-palette-order.mjs','src/creators/assets/png-conformance-guard.mjs','src/creators/assets/png-adaptive-optimizer.mjs','src/creators/assets/png-quality-agent.mjs','src/creators/assets/asset-image-profiler.mjs','src/creators/assets/asset-effort-controller.mjs','scripts/asset-space-compiler.mjs'];
 // Never pass path.resolve directly to Array.map: map supplies (value,index,array),
 // which path.resolve interprets as additional path segments. Resolve each value explicitly.
 const engineFingerprint=fingerprintFiles(engineFiles.map(file=>path.resolve(file))),toolchain=buildToolchainFingerprint();
 function walkPngs(target){const stat=fs.statSync(target);if(stat.isFile())return/\.png$/i.test(target)?[target]:[];const found=[],stack=[target];while(stack.length&&found.length<maxFiles){const dir=stack.pop();for(const entry of fs.readdirSync(dir,{withFileTypes:true})){const full=path.join(dir,entry.name);if(entry.isDirectory()){if(!['node_modules','.git','dist','test-results','.cache'].includes(entry.name))stack.push(full);}else if(entry.isFile()&&/\.png$/i.test(entry.name)){found.push(full);if(found.length>=maxFiles)break;}}}return found.sort();}
 const safeRelative=file=>path.relative(process.cwd(),file).replaceAll('\\','/'),fileKey=file=>safeRelative(file).replace(/[^a-z0-9._-]+/gi,'__'),human=bytes=>bytes<1024?`${bytes} B`:bytes<1024**2?`${(bytes/1024).toFixed(1)} KB`:`${(bytes/1024**2).toFixed(2)} MB`;
-function losslessOptionsFor(profile){if(effort==='deep')return{};if(effort==='balanced'||effort==='auto')return{filterStrategies:['adaptive',0,4]};return{filterStrategies:['adaptive'],disablePalette:(profile?.metrics?.uniqueColors||4097)>64};}
+function losslessOptionsFor(profile){if(effort==='deep')return{paletteOrderStrategies:PALETTE_ORDER_DEEP};if(effort==='balanced')return{filterStrategies:['adaptive',0,4],paletteOrderStrategies:PALETTE_ORDER_BALANCED};if(effort==='auto')return{filterStrategies:['adaptive',0,4]};return{filterStrategies:['adaptive'],paletteOrderStrategies:PALETTE_ORDER_FAST,disablePalette:(profile?.metrics?.uniqueColors||4097)>64};}
 function atomicReplace(file,buffer){const temp=`${file}.kelo-png-space-${process.pid}.tmp`;fs.writeFileSync(temp,buffer);fs.renameSync(temp,file);}
 function makeDiffPng(beforeBuffer,afterBuffer){const before=decodePngRgba(beforeBuffer),after=decodePngRgba(afterBuffer);if(before.ihdr.width!==after.ihdr.width||before.ihdr.height!==after.ihdr.height)throw new Error('PNG_SPACE_DIFF_DIMENSION_CHANGE');const rgba=Buffer.alloc(before.rgba.length);let changedPixels=0,maxDelta=0;for(let p=0;p<before.ihdr.width*before.ihdr.height;p+=1){const o=p*4;let delta=0;for(let c=0;c<4;c+=1)delta=Math.max(delta,Math.abs(before.rgba[o+c]-after.rgba[o+c]));if(!delta)continue;changedPixels+=1;maxDelta=Math.max(maxDelta,delta);rgba[o]=255;rgba[o+1]=delta>24?44:170;rgba[o+2]=35;rgba[o+3]=Math.max(64,Math.min(255,48+delta*8));}return{buffer:encodeRgbaPng(rgba,before.ihdr.width,before.ihdr.height,{level:9,filterStrategy:'adaptive'}),changedPixels,maxDelta};}
 function perceptualVerdict(report){const score=report?.metrics?.ssimulacra2;if(!requirePerceptual)return{required:false,pass:true,reason:null,score:score??null};if(score==null)return{required:true,pass:false,reason:'ssimulacra2-missing',score:null};return{required:true,pass:score>=minSsimulacra2,reason:score>=minSsimulacra2?null:`ssimulacra2<${minSsimulacra2}`,score};}
