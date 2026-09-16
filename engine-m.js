@@ -1,12 +1,12 @@
 /* KELO-INDEX
  * area: LEGACY ABILITY PRESENTATION
- * owner: legacy skill shots; cast chain owned by KeloAbilityAim; extension owners KeloSimulation + KeloRender
+ * owner: legacy skill shots; cast chain owned by KeloLegacyAbilityCast; extension owners KeloSimulation + KeloRender
  * keys: SKILL SHOTS CAST MIDDLEWARE SIMULATION RENDER FOUNDATION
- * purpose: conserva proyectiles visuales legacy sin monkey-patch de cast ni envolver core
+ * purpose: conserva proyectiles visuales legacy sin depender directamente de KeloAbilityAim ni envolver core
  * public-api: window.skillShots
- * consumes: KeloAbilityAim, KeloSimulation, KeloRender, STATE, localPlayer, simulatedPlayers
+ * consumes: KeloLegacyAbilityCast, KeloSimulation, KeloRender, STATE, localPlayer, simulatedPlayers, legacy skillAim range state
  * state-owned: skillShots legacy
- * extension-points: KeloAbilityAim.registerCastMiddleware + KeloSimulation.after + KeloRender.afterFrame
+ * extension-points: KeloLegacyAbilityCast.registerMiddleware + KeloSimulation.after + KeloRender.afterFrame
  * reuse: no añadir abilities nuevas aquí
  * legacy: skill shot stack pendiente de retirada; cast global retirado
  * do-not: NO reasignar castAimedSkill, NO envolver updateSimulation ni render
@@ -28,9 +28,9 @@
     }
   }
 
-  const castOwner=window.KeloAbilityAim;
-  if(!castOwner||typeof castOwner.registerCastMiddleware!=='function')throw new Error('KeloAbilityAim cast middleware unavailable before engine-m');
-  castOwner.registerCastMiddleware('engine-m:skill-shots',function(context,next){
+  const castOwner=window.KeloLegacyAbilityCast;
+  if(!castOwner||typeof castOwner.registerMiddleware!=='function')throw new Error('KeloLegacyAbilityCast unavailable before engine-m');
+  castOwner.registerMiddleware('engine-m:skill-shots',function(context,next){
     const index=context.index,typeId=context.typeId;
     const stone = STATE.equipped[index];
     if (!stone || stone.currentCd > 0) return;
