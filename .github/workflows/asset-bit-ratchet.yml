@@ -4,8 +4,9 @@ on:
   pull_request:
     paths:
       - 'index.html'
-      - 'assets/**/*.png'
-      - 'C/**/*.png'
+      - 'assets/**'
+      - 'data/**'
+      - 'C/**'
       - 'engine-*.js'
       - 'src/**/*.js'
       - 'src/**/*.mjs'
@@ -47,7 +48,7 @@ jobs:
         run: node scripts/asset-global-dedup.mjs --input=test-results/asset-space-budget-head/report.json --report=test-results/asset-global-dedup/report.json
       - name: Search exact reversible structural representations
         run: node scripts/exact-reconstruction-lab.mjs --input=assets --max-files=80 --report=test-results/exact-reconstruction/report.json
-      - name: Measure head first-playable footprint
+      - name: Measure head first-playable footprint closure
         run: node scripts/boot-footprint.mjs --root=. --report=test-results/boot-footprint-head/report.json
       - name: Materialize base worktree and measure it with the same head tools
         env:
@@ -58,7 +59,7 @@ jobs:
           node scripts/boot-footprint.mjs --root=/tmp/kelo-world-base --report=/tmp/boot-footprint-base.json
       - name: Enforce monotonic bytes for unchanged RGBA information
         run: node scripts/asset-bit-ratchet.mjs --base=/tmp/asset-space-budget-base/report.json --head=test-results/asset-space-budget-head/report.json --report=test-results/asset-bit-ratchet/report.json
-      - name: Enforce first-playable boot weight ratchet
+      - name: Enforce first-playable direct + dependency weight ratchet
         run: node scripts/boot-footprint-ratchet.mjs --base=/tmp/boot-footprint-base.json --head=test-results/boot-footprint-head/report.json --html-tolerance=512 --report=test-results/boot-footprint-ratchet/report.json
       - name: Publish Weightless summary
         if: always()
@@ -73,7 +74,7 @@ jobs:
             node -e "const r=require('./test-results/exact-reconstruction/report.json'); require('fs').appendFileSync(process.env.GITHUB_STEP_SUMMARY, '\n## Exact reconstruction lab\nScanned files: '+r.fileCount+'\n\nStructural opportunities: '+r.opportunityCount+'\n\nRaw-RGBA structural saving opportunity: '+r.theoreticalRawSavingBytes+' bytes\n')"
           fi
           if [ -f test-results/boot-footprint-ratchet/report.json ]; then
-            node -e "const r=require('./test-results/boot-footprint-ratchet/report.json'); const s=r.summary; require('fs').appendFileSync(process.env.GITHUB_STEP_SUMMARY, '\n## First-playable footprint\nPass: '+r.pass+'\n\nExternal bytes: '+s.baseExternalBytes+' -> '+s.headExternalBytes+' ('+s.externalDeltaBytes+')\n\nCritical resources: '+s.baseResourceCount+' -> '+s.headResourceCount+'\n\nPer-resource bytes saved: '+s.savedBytes+'\n')"
+            node -e "const r=require('./test-results/boot-footprint-ratchet/report.json'); const s=r.summary; require('fs').appendFileSync(process.env.GITHUB_STEP_SUMMARY, '\n## First-playable static closure V2\nPass: '+r.pass+'\n\nDirect bytes: '+s.baseDirectBytes+' -> '+s.headDirectBytes+' ('+s.directDeltaBytes+')\n\nDependency bytes: '+s.baseDependencyBytes+' -> '+s.headDependencyBytes+' ('+s.dependencyDeltaBytes+')\n\nFull closure bytes: '+s.baseExternalBytes+' -> '+s.headExternalBytes+' ('+s.externalDeltaBytes+')\n\nDependency resources: '+s.baseDependencyCount+' -> '+s.headDependencyCount+'\n\nTotal resources: '+s.baseResourceCount+' -> '+s.headResourceCount+'\n\nPer-resource bytes saved: '+s.savedBytes+'\n')"
           fi
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
