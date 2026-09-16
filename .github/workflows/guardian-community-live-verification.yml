@@ -9,6 +9,7 @@ on:
       - 'tests/guardian-pvp-*.spec.js'
       - 'scripts/guardian-pvp-host-audit.mjs'
       - 'scripts/guardian-system-audit.mjs'
+      - 'scripts/guardian-standby-audit.mjs'
       - 'server/guardian-coordinator.js'
       - 'src/systems/guardian-system.js'
       - 'src/systems/guardian-authority.js'
@@ -80,6 +81,8 @@ jobs:
           node-version: '24'
       - name: Guardian coordinator + control-plane audit
         run: npm run audit:guardian
+      - name: Guardian standby assignment security audit
+        run: node scripts/guardian-standby-audit.mjs
       - name: Guardian PvP host audit
         run: npm run audit:guardian-pvp-host
       - name: Install dependencies
