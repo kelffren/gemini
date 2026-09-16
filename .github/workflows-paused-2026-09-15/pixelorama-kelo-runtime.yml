@@ -1,0 +1,54 @@
+# PAUSED BY DESIGN.
+# Move this file to .github/workflows/ only after Kelo Pages/workflow queue is verified healthy.
+name: Pixelorama Kelo Web Runtime
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  GODOT_VERSION: 4.7.2
+  PIXELORAMA_SOURCE_SHA: da7b68f97806c461abde615d1d847af91921c37b
+
+jobs:
+  build-runtime:
+    runs-on: ubuntu-latest
+    container:
+      image: docker://barichello/godot-ci:4.7.2
+    steps:
+      - name: Checkout Kelo tooling
+        uses: actions/checkout@v7
+      - name: Checkout pinned Pixelorama source
+        uses: actions/checkout@v7
+        with:
+          repository: Orama-Interactive/Pixelorama
+          ref: ${{ env.PIXELORAMA_SOURCE_SHA }}
+          submodules: recursive
+          path: .pixelorama-src
+      - name: Patch Pixelorama for Kelo mobile runtime
+        run: node scripts/prepare-pixelorama-kelo.mjs .pixelorama-src
+      - name: Prepare Godot export templates
+        run: |
+          mkdir -p .pixelorama-src/build/web ~/.local/share/godot/export_templates
+          mv /root/.local/share/godot/export_templates/${GODOT_VERSION}.stable ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable
+      - name: Import Pixelorama resources
+        working-directory: .pixelorama-src
+        continue-on-error: true
+        run: godot --headless -v --import
+      - name: Export full threadless Web build
+        working-directory: .pixelorama-src
+        run: godot --headless -v --export-release "Web" ./build/web/index.html
+      - name: Record immutable build metadata
+        run: |
+          cat > .pixelorama-src/build/web/kelo-runtime.json <<EOF
+          {"pixeloramaSource":"${PIXELORAMA_SOURCE_SHA}","godot":"${GODOT_VERSION}","profile":"kelo-mobile-full","threads":false,"undoDefault":64}
+          EOF
+      - name: Upload runtime artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pixelorama-kelo-${{ env.PIXELORAMA_SOURCE_SHA }}
+          path: .pixelorama-src/build/web
+          if-no-files-found: error
+          retention-days: 30
