@@ -47,6 +47,9 @@ jobs:
       - name: Ability runtime first-use contract
         run: node tests/ability-runtime-first-use-contract.test.cjs
 
+      - name: Modern ability pointer lifecycle
+        run: node tests/modern-ability-pointer-lifecycle.test.cjs
+
       - name: Legacy ability pointer lifecycle
         run: node tests/legacy-ability-pointer-lifecycle.test.cjs
 
