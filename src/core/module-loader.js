@@ -10,7 +10,7 @@
 (function(root){
 'use strict';
 if(root.KELO_MODULE_LOADER)return;
-const VERSION='kelo-module-loader-v11-after-paint';
+const VERSION='kelo-module-loader-v12-cast-middleware';
 const LEGACY_FALLBACK=Object.freeze({
   social:Object.freeze([
     {src:'src/ui/player-nameplate.js?v=2',name:'placas'},
@@ -20,7 +20,7 @@ const LEGACY_FALLBACK=Object.freeze({
     {src:'src/ui/self-interaction-ui.js?v=1',name:'perfil'}
   ]),
   world:Object.freeze([
-    {src:'engine-m.js?v=94',name:'mundo'},{src:'engine-n.js?v=230',name:'mundo'},{src:'engine-o.js?v=96',name:'mundo'},
+    {src:'engine-m.js?v=95-cast-middleware',name:'mundo'},{src:'engine-n.js?v=230',name:'mundo'},{src:'engine-o.js?v=96',name:'mundo'},
     {src:'engine-p.js?v=96',name:'mundo'},{src:'engine-q.js?v=94',name:'mundo'},{src:'engine-s.js?v=96',name:'mundo'},
     {src:'engine-ah.js?v=95',name:'mundo'},{src:'engine-ai.js?v=95',name:'mundo'},{src:'src/systems/illumination.js?v=2',name:'luz'}
   ]),
