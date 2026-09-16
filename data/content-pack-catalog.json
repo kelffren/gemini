@@ -1,12 +1,16 @@
 {
   "schema": "kelo-content-pack-catalog-v1",
-  "version": 1,
+  "version": 2,
+  "publishedAt": "2026-09-16T07:16:00Z",
+  "expiresAt": "2026-10-16T07:16:00Z",
   "policy": {
     "binaryPreload": false,
     "explicitInstall": true,
     "lockAlgorithm": "SHA-256",
     "licenseMode": "per-member",
-    "maxMembersPerPack": 64
+    "maxMembersPerPack": 64,
+    "catalogVersionMonotonic": true,
+    "sameVersionMustBeImmutable": true
   },
   "packs": [
     {
