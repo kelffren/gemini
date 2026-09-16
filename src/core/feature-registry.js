@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: CORE / FEATURE REGISTRY
  * owner: KELO_FEATURE_REGISTRY
- * keys: FEATURE MODULE DEPENDENCY LAZY ASSET LIFECYCLE SCALABILITY AFTER-PAINT INTERNAL
+ * keys: FEATURE MODULE DEPENDENCY LAZY ASSET LIFECYCLE SCALABILITY AFTER-PAINT INTERNAL ABILITY
  * purpose: fuente única de verdad para paquetes opcionales e internos; Module Loader y Asset Registry consumen este catálogo
  * public-api: KELO_FEATURE_REGISTRY.ids/toggleableIds/has/get/files/catalog/resolve
  * state-owned: definiciones inmutables de features; no carga scripts ni modifica gameplay
@@ -10,7 +10,7 @@
 (function(root){
 'use strict';
 if(root.KELO_FEATURE_REGISTRY)return;
-const VERSION='kelo-feature-registry-v4.0.0-cast-middleware';
+const VERSION='kelo-feature-registry-v4.1.0-ability-first-use';
 const raw={
   controlPlane:{dependencies:[],policy:'after-paint',userToggle:false,files:[
     {src:'src/ui/asset-library-launcher.js?v=1',name:'biblioteca de assets'},
@@ -24,6 +24,11 @@ const raw={
   observability:{dependencies:[],policy:'after-paint',userToggle:false,files:[
     {src:'src/core/simulation-farm-shadow.js?v=1',name:'farm shadow'},
     {src:'src/core/player-position-shadow.js?v=1',name:'position shadow'}
+  ]},
+  abilityRuntime:{dependencies:[],policy:'first-use',userToggle:false,files:[
+    {src:'src/abilities/abilityData.js?v=7',name:'datos de habilidades'},
+    {src:'src/abilities/stone-system.js?v=3',name:'piedras'},
+    {src:'src/abilities/kelo-ability-boot.js?v=2.1-source-native',name:'runtime de habilidades'}
   ]},
   social:{dependencies:[],policy:'first-use',files:[
     {src:'src/ui/player-nameplate.js?v=2',name:'placas'},
