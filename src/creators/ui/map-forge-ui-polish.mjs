@@ -80,7 +80,8 @@ const CSS=`
   font-size:10px;letter-spacing:.16em;color:#d8bf78;
 }
 #kelo-map-forge[data-kelo-ui-polish="2"] .kmf-section-toggle{
-  margin-left:auto;min-width:44px;min-height:32px;padding:0 9px;
+  display:none;align-items:center;justify-content:center;
+  margin-left:auto;min-width:44px;min-height:44px;padding:0 10px;
   border:1px solid rgba(255,255,255,.1);border-radius:999px;
   background:#111720;color:#aeb7c3;font:800 9px/1 system-ui,-apple-system,sans-serif;
   letter-spacing:.04em;touch-action:manipulation;
@@ -140,6 +141,7 @@ const CSS=`
   }
   #kelo-map-forge[data-kelo-ui-polish="2"] .kmf-head-actions{gap:6px}
   #kelo-map-forge[data-kelo-ui-polish="2"] .kmf-head-actions .kmf-btn{min-height:44px;padding:0 11px;font-size:10px}
+  #kelo-map-forge[data-kelo-ui-polish="2"] .kmf-section-toggle{display:inline-flex}
   #kelo-map-forge[data-kelo-ui-polish="2"] .kmf-layout{
     display:flex;flex-direction:column;min-height:0;overflow:auto;
     overscroll-behavior:contain;-webkit-overflow-scrolling:touch;
@@ -214,7 +216,11 @@ function ensureStyle(doc){
 
 function findSection(shell,title){
   const target=String(title||'').trim().toUpperCase();
-  return [...shell.querySelectorAll('.kmf-section')].find(section=>String(section.querySelector('h3')?.textContent||'').trim().toUpperCase()===target)||null;
+  return [...shell.querySelectorAll('.kmf-section')].find(section=>{
+    const heading=section.querySelector('h3');
+    const label=String(heading?.childNodes?.[0]?.textContent||heading?.textContent||'').trim().toUpperCase();
+    return label===target;
+  })||null;
 }
 
 function addCollapsible(section,{collapsed=true}={}){
@@ -281,19 +287,37 @@ export function installMapForgeUiPolish({root=globalThis}={}){
   if(existing?.refresh){existing.refresh();return existing;}
 
   const style=ensureStyle(doc);
-  let destroyed=false;
-  const refresh=()=>destroyed?null:enhanceShell(doc.getElementById('kelo-map-forge'));
+  let destroyed=false,observedShell=null,shellObserver=null;
+  const MutationObserverCtor=root.MutationObserver||globalThis.MutationObserver;
+
+  const watchShell=shell=>{
+    if(!MutationObserverCtor||!shell||shell===observedShell)return;
+    shellObserver?.disconnect?.();
+    observedShell=shell;
+    shellObserver=new MutationObserverCtor(()=>enhanceShell(shell));
+    shellObserver.observe(shell,{childList:true,subtree:true});
+  };
+  const refresh=()=>{
+    if(destroyed)return null;
+    const shell=enhanceShell(doc.getElementById('kelo-map-forge'));
+    if(shell)watchShell(shell);
+    return shell;
+  };
   refresh();
 
-  const observer=new root.MutationObserver(()=>refresh());
-  observer.observe(doc.body||doc.documentElement,{childList:true,subtree:true});
+  let bodyObserver=null;
+  if(MutationObserverCtor){
+    bodyObserver=new MutationObserverCtor(()=>refresh());
+    bodyObserver.observe(doc.body||doc.documentElement,{childList:true,subtree:false});
+  }
 
   const api=Object.freeze({
-    version:'map-forge-ui-polish-v2.0.0',
+    version:'map-forge-ui-polish-v2.1.0',
     refresh,
     destroy(){
       if(destroyed)return;destroyed=true;
-      observer.disconnect();
+      bodyObserver?.disconnect?.();shellObserver?.disconnect?.();
+      observedShell=null;
       style.remove();
       try{if(root[POLISH_KEY]===api)delete root[POLISH_KEY];}catch{}
     }
