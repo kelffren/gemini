@@ -1,6 +1,6 @@
 /* KELO-INDEX
  * area: STUDIO / OVERLAY RENDERER
- * owns: transient editor-only selection/ghost/gizmo/surface/collision/prefab/smart-guide/spacing/paint-copy/build primitives
+ * owns: transient editor-only selection/ghost/gizmo/surface/collision/prefab/smart-guide/spacing/paint-copy/build/edit-grid primitives
  * does-not-own: world rendering, terrain textures, gameplay sprites or physics
  * public-api: createStudioOverlayRenderer(), resolveRoomPreviewGroups()
  * online: local-only
@@ -97,6 +97,18 @@ export function createStudioOverlayRenderer({ kernel, tools, assetPreview } = {}
     ctx.fillStyle='rgba(191,247,212,.98)';ctx.fillText(label,cx,cy);
     ctx.restore();
   }
+  function drawBuildEditGrid(ctx,preview){
+    if(!preview?.bounds||!preview?.transform)return;
+    const x=Number(preview.transform.x)||0,y=Number(preview.transform.y)||0,w=Math.max(1,Number(preview.bounds.w)||1),h=Math.max(1,Number(preview.bounds.h)||1),rotation=Number(preview.transform.rotation)||0,mask=String(preview.mask||'111111111').padEnd(9,'1').slice(0,9),cw=w/3,ch=h/3;
+    ctx.save();
+    const cx=x+w/2,cy=y+h/2;ctx.translate(cx,cy);ctx.rotate(rotation*Math.PI/180);ctx.translate(-w/2,-h/2);
+    for(let i=0;i<9;i++){
+      const col=i%3,row=Math.floor(i/3),filled=mask[i]!=='0';
+      ctx.save();ctx.fillStyle=filled?'rgba(120,190,255,.20)':'rgba(255,105,120,.30)';ctx.fillRect(col*cw,row*ch,cw,ch);ctx.strokeStyle=filled?'rgba(160,210,255,.92)':'rgba(255,135,145,.98)';ctx.lineWidth=Math.max(.75,Math.min(2,Math.min(cw,ch)*.08));ctx.strokeRect(col*cw,row*ch,cw,ch);if(!filled){ctx.beginPath();ctx.moveTo(col*cw+cw*.25,row*ch+ch*.25);ctx.lineTo(col*cw+cw*.75,row*ch+ch*.75);ctx.moveTo(col*cw+cw*.75,row*ch+ch*.25);ctx.lineTo(col*cw+cw*.25,row*ch+ch*.75);ctx.stroke();}ctx.restore();
+    }
+    ctx.restore();
+    ctx.save();ctx.font='800 9px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';ctx.textAlign='center';ctx.textBaseline='bottom';ctx.fillStyle=preview.available===false?'rgba(255,160,170,.98)':'rgba(180,220,255,.98)';ctx.fillText(`EDIT · ${String(preview.label||preview.pattern||'GRID').toUpperCase()}${preview.available===false?' · ASSET NEEDED':''}`,cx,y-4);ctx.restore();
+  }
   function drawCreatorPrefab(ctx,preview){
     const def=tools?.prefabStamp?.get?.(preview.prefabId);let drew=false;
     if(def?.children?.length){for(const child of def.children)drew=assetPreview?.drawAsset?.(ctx,child.prefabId,preview.x+(Number(child.dx)||0),preview.y+(Number(child.dy)||0),{rotation:Number(child.rotation)||0,alpha:.68,placeholder:false})||drew;}
@@ -151,6 +163,7 @@ export function createStudioOverlayRenderer({ kernel, tools, assetPreview } = {}
     drawBuildDrag(ctx,tools?.quickBuild?.getDragPreviews?.()||[]);
     drawRoomBuildDrag(ctx,tools?.roomBuild?.getPreviews?.()||[]);
     drawRoomMeasurement(ctx,tools?.roomBuild?.getMeasurement?.());
+    drawBuildEditGrid(ctx,tools?.buildEditGrid?.getPreview?.());
     const placement = tools?.placement?.getPreview?.();if (placement) drawPlacement(ctx,placement);
     const prefab = tools?.prefabStamp?.getPreview?.();if(prefab)drawCreatorPrefab(ctx,prefab);
     if(isPaintCopiesEnabled()){
