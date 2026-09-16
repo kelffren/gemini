@@ -10,7 +10,7 @@
 (function(root){
 'use strict';
 if(root.KELO_FEATURE_REGISTRY)return;
-const VERSION='kelo-feature-registry-v2.2.0-guardian-room-host';
+const VERSION='kelo-feature-registry-v2.2.1-guardian-room-host';
 const raw={
   social:{dependencies:[],policy:'first-use',files:[
     {src:'src/ui/player-nameplate.js?v=2',name:'placas'},
@@ -37,6 +37,10 @@ const raw={
     {src:'src/ui/guardian-ui.js?v=2-hot-mirror',name:'Guardian UI'}
   ]},
   pvp:{dependencies:['guardian'],policy:'first-use',files:[
+    {src:'src/systems/guardian-authority.js?v=2-supabase-webrtc',name:'Guardian authority'},
+    {src:'src/systems/guardian-system.js?v=2-webrtc',name:'Guardian P2P'},
+    {src:'src/systems/guardian-room-host.js?v=1',name:'Guardian room host'},
+    {src:'src/ui/guardian-ui.js?v=2-hot-mirror',name:'Guardian UI'},
     {src:'src/abilities/abilityData.js?v=20260916-pvp-first-use-1',name:'datos habilidades PvP'},
     {src:'src/abilities/stone-system.js?v=20260916-pvp-first-use-1',name:'piedras PvP'},
     {src:'src/abilities/kelo-ability-boot.js?v=20260916-pvp-first-use-1',name:'runtime habilidades PvP'},
