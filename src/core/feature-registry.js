@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: CORE / FEATURE REGISTRY
  * owner: KELO_FEATURE_REGISTRY
- * keys: FEATURE MODULE DEPENDENCY LAZY ASSET LIFECYCLE SCALABILITY CREATOR DELIVERY
+ * keys: FEATURE MODULE DEPENDENCY LAZY ASSET LIFECYCLE SCALABILITY CREATOR DELIVERY CHARACTER BRIDGE
  * purpose: fuente única de verdad para paquetes opcionales; Module Loader y Asset Registry consumen este catálogo
  * public-api: KELO_FEATURE_REGISTRY.ids/has/get/files/catalog/resolve
  * state-owned: definiciones inmutables de features; no carga scripts ni modifica gameplay
@@ -10,7 +10,7 @@
 (function(root){
 'use strict';
 if(root.KELO_FEATURE_REGISTRY)return;
-const VERSION='kelo-feature-registry-v2.1.0-creator-delivery';
+const VERSION='kelo-feature-registry-v2.2.0-creator-character-bridge';
 const raw={
   social:{dependencies:[],policy:'first-use',files:[
     {src:'src/ui/player-nameplate.js?v=2',name:'placas'},
@@ -50,8 +50,13 @@ const raw={
     {src:'src/systems/title-system.js?v=1',name:'títulos'}
   ]},
   appearance:{dependencies:[],policy:'first-use',files:[
-    {src:'src/appearance/appearance-system.js?v=2-creator-entitlement',name:'appearance registry'},
-    {src:'src/characters/character-customization.js?v=1',name:'apariencia'},
+    {src:'src/appearance/appearance-system.js?v=3-creator-character-bridge',name:'appearance registry'},
+    {src:'src/characters/character-slot-schema.js?v=2',name:'character slots'},
+    {src:'src/characters/character-visual-presets.js?v=2',name:'character visual contract'},
+    {src:'src/characters/character-customization.js?v=2',name:'apariencia'},
+    {src:'src/characters/character-visual-stack.js?v=2',name:'character visual stack'},
+    {src:'src/appearance/character-appearance-adapter.js?v=2-creator-character-bridge',name:'character appearance adapter'},
+    {src:'src/characters/creator-character-state-bridge.js?v=1',name:'creator character bridge'},
     {src:'src/ui/character-customizer-ui.js?v=1',name:'apariencia'}
   ]},
   properties:{dependencies:[],policy:'first-use',files:[
