@@ -1,6 +1,6 @@
 # Kelo World — Code Index
 
-**Actualizado:** 2026-09-15
+**Actualizado:** 2026-09-16
 
 ## Runtime
 
@@ -114,7 +114,10 @@
 ## Admin / Reliability
 
 - `src/systems/admin-key-system.js`
-- `src/systems/guardian-system.js`
+- `src/systems/guardian-system.js` — owner cliente Guardian, P2P, preferencias y capability probe WebGPU.
+- `src/systems/guardian-asset-gpu-worker.mjs` — cómputo WebGPU opt-in para candidatos de assets con presets seguros, SHA-256 y quorum.
+- `server/guardian-coordinator.js` — scheduler/leases/proofs y agregado de capacidad Guardian, incluida GPU para assets.
+- `supabase/migrations/20260916053000_guardian_gpu_asset_capacity_v3.sql` — agregado GPU del control plane primario.
 - `src/systems/game-tuning-system.js`
 - `src/bug-reporting/`
 - `bugs/` — registry/evidence canónico.
