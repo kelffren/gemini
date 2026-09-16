@@ -1,18 +1,20 @@
 /* KELO-INDEX
  * area: ENVIRONMENT / ONLINE
  * owner: canonical world environment synchronization
- * owns: initial REST convergence, Supabase Realtime subscription, role-gated publish/rollback RPCs and revision ordering
+ * owns: initial REST convergence, server-verified Realtime invalidation, role-gated publish/rollback RPCs and revision ordering
  * does-not-own: rendering, Creator preview state, auth UI or service-role secrets
+ * security: Realtime broadcast payloads are hints only; canonical state is always re-read from the RLS-protected REST row before apply
  */
 import { KELO_SUPABASE_PUBLIC_CONFIG } from '../online/kelo-supabase-public-config.mjs';
 import { installEnvironmentRuntime, normalizeEnvironmentState } from './environment-runtime.mjs';
 
-const VERSION='kelo-world-environment-sync-v2';
+const VERSION='kelo-world-environment-sync-v3';
 const TOPIC='world:environment';
 const SOCKET_TOPIC=`realtime:${TOPIC}`;
 const BROADCAST_EVENT='environment_changed';
 const SELECT_PATH='world_environment_state?id=eq.global&select=id,revision,schema_version,biome,weather,time_of_day,ambient_density,music_mood,accent,updated_by,updated_at&limit=1';
 const RECONNECT_DELAYS=[1000,2000,4000,8000,15000];
+const REALTIME_VERIFY_DEBOUNCE_MS=500;
 
 const trimSlash=value=>String(value||'').replace(/\/+$/,'');
 const numberOr=(value,fallback)=>Number.isFinite(Number(value))?Number(value):fallback;
@@ -70,20 +72,22 @@ export function installWorldEnvironmentSync(root=globalThis,{config=KELO_SUPABAS
   const runtime=installEnvironmentRuntime(root),base=trimSlash(config?.url),publishableKey=String(config?.publishableKey||''),fetcher=fetchImpl||root?.fetch?.bind?.(root)||globalThis.fetch?.bind?.(globalThis);
   if(!base||!publishableKey||typeof fetcher!=='function')throw new Error('WORLD_ENVIRONMENT_SYNC_CONFIG_REQUIRED');
 
-  let envelope=null,socket=null,heartbeatTimer=0,reconnectTimer=0,reconnectAttempt=0,refSeq=0,joinRef=null,started=false,stopped=false;
+  let envelope=null,socket=null,heartbeatTimer=0,reconnectTimer=0,realtimeVerifyTimer=0,reconnectAttempt=0,refSeq=0,joinRef=null,started=false,stopped=false,pendingRealtimeHint=null;
   const listeners=[];
-  const audit={version:VERSION,ready:false,started:false,connected:false,lastRevision:0,lastRefreshAt:0,lastRealtimeAt:0,lastPublishAt:0,lastRollbackAt:0,reconnects:0,lastError:null};
+  const audit={version:VERSION,ready:false,started:false,connected:false,lastRevision:0,lastRefreshAt:0,lastRealtimeAt:0,lastRealtimeHintAt:0,lastPublishAt:0,lastRollbackAt:0,realtimeHints:0,realtimeVerifications:0,reconnects:0,lastError:null};
 
   const nextRef=()=>String(++refSeq);
   function dispatch(name,detail){try{root?.dispatchEvent?.(new root.CustomEvent(name,{detail}));}catch{}}
   function headers(extra={}){return Object.assign({'apikey':publishableKey,'Accept':'application/json'},extra);}
   function clearHeartbeat(){if(heartbeatTimer){root.clearInterval?.(heartbeatTimer);heartbeatTimer=0;}}
   function clearReconnect(){if(reconnectTimer){root.clearTimeout?.(reconnectTimer);reconnectTimer=0;}}
+  function clearRealtimeVerify(){if(realtimeVerifyTimer){root.clearTimeout?.(realtimeVerifyTimer);realtimeVerifyTimer=0;}}
 
   function accept(next,{source='sync'}={}){
     if(!next||next.id!=='global'||next.revision<=0)return false;
     if(envelope&&next.revision<envelope.revision)return false;
-    if(envelope&&next.revision===envelope.revision&&source!=='refresh'&&source!=='conflict-refresh')return false;
+    const verifiedRefresh=source==='refresh'||source==='conflict-refresh'||source==='realtime-refresh'||source==='initial'||source==='online'||source==='pageshow'||source==='visible';
+    if(envelope&&next.revision===envelope.revision&&!verifiedRefresh)return false;
     envelope=next;audit.lastRevision=next.revision;
     runtime.receivePublished?.(next.state,{source:`world-${source}`,revision:next.revision,updatedAt:next.updatedAt,updatedBy:next.updatedBy});
     dispatch('kelo:world-environment-synced',Object.freeze({source,envelope:next}));
@@ -144,6 +148,19 @@ export function installWorldEnvironmentSync(root=globalThis,{config=KELO_SUPABAS
     reconnectTimer=root.setTimeout?.(()=>{reconnectTimer=0;connect();},delay)||0;
   }
 
+  function scheduleRealtimeVerification(hint){
+    pendingRealtimeHint=hint;audit.realtimeHints+=1;audit.lastRealtimeHintAt=Date.now();
+    if(realtimeVerifyTimer||stopped)return;
+    realtimeVerifyTimer=root.setTimeout?.(async()=>{
+      realtimeVerifyTimer=0;const latestHint=pendingRealtimeHint;pendingRealtimeHint=null;
+      if(latestHint&&envelope&&latestHint.revision>0&&latestHint.revision<envelope.revision)return;
+      try{
+        const confirmed=await refresh({source:'realtime-refresh'});audit.realtimeVerifications+=1;audit.lastRealtimeAt=Date.now();
+        dispatch('kelo:world-environment-realtime-confirmed',Object.freeze({hint:latestHint,confirmed}));
+      }catch(error){dispatch('kelo:world-environment-sync-error',{stage:'realtime-verify',hint:latestHint,error});}
+    },REALTIME_VERIFY_DEBOUNCE_MS)||0;
+  }
+
   function handleSocketMessage(event){
     let message;try{message=JSON.parse(String(event?.data||''));}catch{return;}
     if(message?.event==='phx_reply'&&message?.ref===joinRef&&message?.payload?.status==='ok'){
@@ -153,8 +170,8 @@ export function installWorldEnvironmentSync(root=globalThis,{config=KELO_SUPABAS
     if(message?.event==='broadcast'){
       const wrapper=message.payload||{};
       if(wrapper.event!==BROADCAST_EVENT)return;
-      const next=normalizeBroadcastEnvelope(wrapper);if(!next)return;
-      if(accept(next,{source:'realtime'}))audit.lastRealtimeAt=Date.now();
+      const hint=normalizeBroadcastEnvelope(wrapper);if(!hint)return;
+      scheduleRealtimeVerification(hint);
     }
   }
 
@@ -185,7 +202,7 @@ export function installWorldEnvironmentSync(root=globalThis,{config=KELO_SUPABAS
     addListener(root.document,'visibilitychange',()=>{if(root.document?.visibilityState==='visible')void refresh({source:'visible'}).catch(()=>{});},{passive:true});
     return api;
   }
-  function stop(){stopped=true;started=false;audit.started=false;audit.connected=false;clearReconnect();clearHeartbeat();for(const [target,event,handler,options] of listeners.splice(0))try{target.removeEventListener(event,handler,options);}catch{}try{socket?.close?.();}catch{}socket=null;return true;}
+  function stop(){stopped=true;started=false;audit.started=false;audit.connected=false;clearReconnect();clearHeartbeat();clearRealtimeVerify();pendingRealtimeHint=null;for(const [target,event,handler,options] of listeners.splice(0))try{target.removeEventListener(event,handler,options);}catch{}try{socket?.close?.();}catch{}socket=null;return true;}
 
   const api=Object.freeze({
     version:VERSION,start,stop,refresh,publish,rollback,
