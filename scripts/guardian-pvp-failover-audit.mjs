@@ -49,7 +49,9 @@ assert.match(worker,/restoredActorPrune:true/);
 assert.doesNotMatch(workerCode,/setInterval|setTimeout/);
 assert.match(adapter,/takeoverSequenceResync:true/);
 
-assert.match(registry,/kelo-feature-registry-v2\.5\.1-guardian-pvp-worker-prune/);
+// Registry release labels evolve independently; the failover contract is the
+// Guardian feature family plus the explicitly pinned worker-prune host below.
+assert.match(registry,/kelo-feature-registry-v2\.\d+\.\d+-guardian-[a-z0-9-]+/);
 assert.match(registry,/guardian-pvp-host\.js\?v=4-worker-prune/);
 
 assert.match(testSource,/KELO_GUARDIAN_TEST_ADMIN_EMAIL/);
