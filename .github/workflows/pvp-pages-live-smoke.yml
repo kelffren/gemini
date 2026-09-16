@@ -1,0 +1,107 @@
+name: PvP Pages Live Smoke
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'tests/pvp-pages-live-smoke.spec.js'
+      - '.github/workflows/pvp-pages-live-smoke.yml'
+      - 'src/core/feature-registry.js'
+      - 'src/core/module-loader.js'
+      - 'src/systems/pvp-world.js'
+      - 'src/systems/pvp-combat-runtime-loader.js'
+      - 'src/ui/luxe-shell.js'
+      - 'src/ui/luxe-player-hud.js'
+      - 'src/abilities/**'
+      - 'engine-net.js'
+      - 'index.html'
+  push:
+    branches: [main]
+    paths:
+      - 'tests/pvp-pages-live-smoke.spec.js'
+      - '.github/workflows/pvp-pages-live-smoke.yml'
+      - 'src/core/feature-registry.js'
+      - 'src/core/module-loader.js'
+      - 'src/systems/pvp-world.js'
+      - 'src/systems/pvp-combat-runtime-loader.js'
+      - 'src/ui/luxe-shell.js'
+      - 'src/ui/luxe-player-hud.js'
+      - 'src/abilities/**'
+      - 'engine-net.js'
+      - 'index.html'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: pvp-pages-live-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pvp-pages-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Start local candidate for pull request
+        if: github.event_name == 'pull_request'
+        run: |
+          python3 -m http.server 4173 --bind 127.0.0.1 > /tmp/kelo-pages-smoke-http.log 2>&1 &
+          for i in {1..30}; do
+            curl -fsS http://127.0.0.1:4173/index.html >/dev/null && exit 0
+            sleep 1
+          done
+          cat /tmp/kelo-pages-smoke-http.log
+          exit 1
+
+      - name: Wait for this main commit to finish Pages deployment
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          echo 'KELO_RUN_LIVE=1' >> "$GITHUB_ENV"
+          for i in {1..72}; do
+            CURRENT_MAIN="$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' "https://api.github.com/repos/${GITHUB_REPOSITORY}/branches/main" | jq -r '.commit.sha')"
+            if [ "$CURRENT_MAIN" != "$GITHUB_SHA" ]; then
+              echo "Newer main detected ($CURRENT_MAIN); this run is superseded and the newer push owns live verification."
+              echo 'KELO_RUN_LIVE=0' >> "$GITHUB_ENV"
+              exit 0
+            fi
+
+            RUNS="$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs?branch=main&per_page=30")"
+            MATCH="$(printf '%s' "$RUNS" | jq -c --arg sha "$GITHUB_SHA" '[.workflow_runs[] | select(.name=="pages build and deployment" and .head_sha==$sha)][0] // empty')"
+            if [ -n "$MATCH" ]; then
+              STATUS="$(printf '%s' "$MATCH" | jq -r '.status')"
+              CONCLUSION="$(printf '%s' "$MATCH" | jq -r '.conclusion // ""')"
+              echo "Pages deployment status=$STATUS conclusion=$CONCLUSION"
+              if [ "$STATUS" = 'completed' ]; then
+                if [ "$CONCLUSION" = 'success' ]; then
+                  exit 0
+                fi
+                echo "Pages deployment did not succeed: $CONCLUSION"
+                exit 1
+              fi
+            fi
+            sleep 5
+          done
+          echo 'Timed out waiting for the matching Pages deployment.'
+          exit 1
+
+      - name: Point smoke at GitHub Pages
+        if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && env.KELO_RUN_LIVE == '1')
+        run: echo "KELO_PVP_TEST_URL=https://kelffren.github.io/gemini/?guest=1&pvpPagesSmoke=${GITHUB_SHA}" >> "$GITHUB_ENV"
+
+      - name: Visible Quick Actions -> PVP smoke
+        if: github.event_name != 'push' || env.KELO_RUN_LIVE == '1'
+        run: npx playwright test tests/pvp-pages-live-smoke.spec.js --project=chromium
