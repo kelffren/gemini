@@ -10,7 +10,7 @@
 (function(root){
 'use strict';
 if(root.KeloGuardianPvPNetAdapter||!root.KeloNetAuthority||!root.KeloGuardianPvPHost)return;
-const VERSION='kelo-guardian-pvp-net-adapter-v1',SEND_HZ=30,SEND_DT=1/SEND_HZ,MAX_EVENTS=256;
+const VERSION='kelo-guardian-pvp-net-adapter-v1.1',SEND_HZ=30,SEND_DT=1/SEND_HZ,MAX_EVENTS=256;
 const base=root.KeloNetAuthority,consumed=new Set();
 let sequence=1,sendAcc=0,lastAck=0,lastError=null,forcedStop=false;
 function host(){return root.KeloGuardianPvPHost;}
@@ -24,9 +24,14 @@ function makeIntent(raw){
  const source=raw&&typeof raw==='object'?raw:{},m=unit(source.moveX!=null?source.moveX:move().x,source.moveY!=null?source.moveY:move().y),a=unit(source.aimX!=null?source.aimX:aim().x,source.aimY!=null?source.aimY:aim().y);
  return {sequence:sequence++,moveX:m.x,moveY:m.y,aimX:a.x,aimY:a.y,action:String(source.action||'input'),phase:String(source.phase||'none'),abilityKey:source.abilityKey||null,slot:Number.isInteger(Number(source.slot))?Number(source.slot):null,direction:source.direction||null,position:source.position||null,targetId:source.targetId||null,attackId:source.attackId||null,swordEntityId:source.swordEntityId||null,clientTime:Number(source.clientTime)||Date.now()};
 }
+function stopForCentral(code){
+ if(!guardianActive())return;host().stop();forcedStop=true;lastError=code||'GUARDIAN_PVP_CENTRAL_SERVER_RETURNED';
+ try{if(root.KeloPvPWorld?.state?.mode==='pvp')root.KeloPvPWorld.leave?.();}catch(_){}
+ emit();
+}
 function sendCombatIntent(raw){
  if(!guardianActive())return base.sendCombatIntent?.(raw)||false;
- if(baseOnline()){lastError='GUARDIAN_PVP_DOUBLE_AUTHORITY_BLOCKED';host().stop();forcedStop=true;emit();return false;}
+ if(baseOnline()){stopForCentral('GUARDIAN_PVP_DOUBLE_AUTHORITY_BLOCKED');return false;}
  const intent=makeIntent(raw),sent=host().submitIntent(intent);return sent||false;
 }
 function peerBase(p){return{id:p.id,name:p.name||'Guardian',x:Number(p.x)||0,y:Number(p.y)||0,vx:0,vy:0,radius:20,hp:Number.isFinite(Number(p.hp))?Number(p.hp):100,maxHp:Number.isFinite(Number(p.maxHp))?Number(p.maxHp):100,mana:Number.isFinite(Number(p.mana))?Number(p.mana):100,maxMana:Number.isFinite(Number(p.maxMana))?Number(p.maxMana):100,_face:p.face||'down',_gait:p.gait||'idle',zone:p.zone||'pvp',_snapshots:[],__guardianPvp:true};}
@@ -56,7 +61,7 @@ function ingestSnapshot(event){
 }
 function tick(context){
  if(!guardianActive())return;
- if(baseOnline()){host().stop();lastError='GUARDIAN_PVP_CENTRAL_SERVER_RETURNED';forcedStop=true;emit();return;}
+ if(baseOnline()){stopForCentral('GUARDIAN_PVP_CENTRAL_SERVER_RETURNED');return;}
  let dt=Math.max(0,Math.min(.1,Number(context?.dt)||0));sendAcc+=dt;
  if(!root.KeloPvPWorld?.state?.combatEnabled){sendAcc=0;return;}
  while(sendAcc>=SEND_DT){sendAcc-=SEND_DT;sendCombatIntent({action:'input',phase:'held',clientTime:Date.now()});}
@@ -70,6 +75,6 @@ root.addEventListener('kelo:guardian-pvp-state',emit,{passive:true});
 if(!root.KeloSimulation||typeof root.KeloSimulation.after!=='function')throw new Error('GUARDIAN_PVP_NET_SIMULATION_OWNER_UNAVAILABLE');
 root.KeloSimulation.after('guardian:pvp-net-adapter',tick,380);
 root.KeloGuardianPvPNetAdapter=Object.freeze({version:VERSION,state,baseAuthority:base});
-root.KELO_GUARDIAN_PVP_NET_ADAPTER_AUDIT=Object.freeze({version:VERSION,owner:'KeloGuardianPvPNetAdapter',centralFallback:true,doubleAuthorityBlocked:true,secondLoop:false,persistentAuthority:false,economyAuthority:false});
+root.KELO_GUARDIAN_PVP_NET_ADAPTER_AUDIT=Object.freeze({version:VERSION,owner:'KeloGuardianPvPNetAdapter',centralFallback:true,doubleAuthorityBlocked:true,centralReturnExitsPvp:true,secondLoop:false,persistentAuthority:false,economyAuthority:false});
 emit();
 })(typeof globalThis!=='undefined'?globalThis:window);
