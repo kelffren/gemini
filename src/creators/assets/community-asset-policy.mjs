@@ -1,7 +1,8 @@
 const MiB = 1024 * 1024;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export const COMMUNITY_ASSET_POLICY = Object.freeze({
-  version: 2,
+  version: 3,
   autoPublishMimeTypes: new Set(['image/png', 'image/webp', 'image/jpeg']),
   manualReviewMimeTypes: new Set(['image/gif']),
   blockedMimeTypes: new Set(['image/svg+xml', 'text/html', 'application/javascript', 'text/javascript']),
@@ -146,16 +147,18 @@ export async function validateCommunityAsset(file, metadata = {}) {
   };
 }
 
-export function buildCommunityManifest({ file, validation, remoteUrl, creatorId, assetId, version = 1 }) {
+export function buildCommunityManifest({ file, validation, remoteUrl, creatorId, assetId, revisionId = null, version = 1 }) {
   if (!validation || validation.status !== 'auto_publish') {
     throw new Error('asset_not_approved_for_auto_publish');
   }
   if (!remoteUrl) throw new Error('remote_url_required');
 
   const id = assetId || `community-${validation.sha256.slice(0, 24)}`;
+  const immutableRevisionId = UUID_RE.test(String(revisionId || '')) ? String(revisionId).toLowerCase() : null;
   return Object.freeze({
     schema: 'kelo.community-asset.v1',
     id,
+    revisionId: immutableRevisionId,
     version,
     creatorId: String(creatorId || 'anonymous'),
     name: validation.metadata.name,
