@@ -1,6 +1,6 @@
 # Kelo World — Code Index
 
-**Actualizado:** 2026-09-14
+**Actualizado:** 2026-09-15
 
 ## Runtime
 
@@ -18,7 +18,7 @@
 - `src/core/camera-system.js` — `KeloCamera`.
 - `src/core/avatar-render-system.js` — `KeloAvatar`.
 - `src/core/render-extension-system.js` — `KeloRender`.
-- `src/core/simulation-extension-system.js` — `KeloSimulation`.
+- `src/core/simulation-extension-system.js` — `KeloSimulation`, hooks + suspension claims owner-native.
 - `src/core/update-system.js` — `KeloUpdater`.
 
 ## World / Environment
@@ -54,6 +54,14 @@
 - `src/studio/ui/studio-live-shell.mjs` — shell.
 - `src/studio/ui/studio-asset-palette.mjs` — búsqueda/categorías/carpetas.
 - `src/world/map-forge/` — generación/composición Map Forge.
+- `src/creators/ui/asset-forge-workspace.mjs` — Asset Forge móvil ligero.
+- `src/creators/ui/asset-forge-drawing-controls.mjs` — Drawing Engine V2 / Pixel Perfect.
+- `src/creators/ui/pixelorama-pro-bridge.mjs` — bridge full-screen Kelo ↔ Pixelorama.
+- `src/creators/core/creator-exclusive-runtime.mjs` — hibernación owner-native para creators pesados.
+- `src/creators/repository/pixelorama-project-store.mjs` — `.pxo` IndexedDB con revisiones acotadas.
+- `tools/pixelorama/index.html` — shell Web/Godot lazy dentro del origen Kelo.
+- `scripts/prepare-pixelorama-kelo.mjs` — patcher reproducible del build Pixelorama Kelo.
+- `vendor/pixelorama-kelo/README.md` — source pins, licencia y contrato de build.
 
 ## Gameplay
 
