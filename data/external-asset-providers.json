@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 4,
   "policy": {
     "downloadOnBrowse": false,
     "requireExplicitDownload": true,
@@ -50,13 +50,15 @@
     {
       "id": "opengameart",
       "name": "OpenGameArt",
-      "mode": "external-catalog",
+      "mode": "live-index",
       "enabled": true,
-      "license": "MIXED",
-      "attributionRequired": true,
+      "verified": true,
+      "license": "CC0 curated subset",
+      "attributionRequired": false,
       "sourceUrl": "https://opengameart.org/",
       "browseUrl": "https://opengameart.org/",
-      "notes": "Discovery-only until an item has a verified direct file URL and compatible license. Client-side bulk scraping is intentionally disabled."
+      "indexUrl": "../../../data/opengameart-cc0-curated.json?v=1",
+      "notes": "LIVE curated metadata feed. Kelo never bulk-scrapes OpenGameArt from player devices. Only individually verified CC0 entries with source page + direct file URL are exposed; binary bytes are requested only after Download."
     }
   ]
 }
