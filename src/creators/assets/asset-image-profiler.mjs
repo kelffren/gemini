@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: CREATORS / ASSET BYTES
  * owner: Kelo Creator Asset Bridge
- * keys: IMAGE PROFILE PIXEL ART TILE SPRITE ALPHA COLOR COMPLEXITY POLICY
+ * keys: IMAGE PROFILE PIXEL ART TILE SPRITE ALPHA COLOR COMPLEXITY POLICY DELIVERY
  * purpose: classify decoded assets so compression search uses the right quality policy instead of one global preset
  * public-api: profileAssetImage()
  * state-owned: none; pure analysis
@@ -140,10 +140,13 @@ export function profileAssetImage(rgba, width, height, options = {}) {
   else if (kind === 'fx') adaptivePolicy = 'fx-alpha';
 
   const runtimeCandidates = ['png', 'webp-lossless'];
+  // DELIVERY-only optimization: hidden RGB under alpha=0 may change while alpha
+  // and every visible pixel remain exact. Never expose this on seam-critical tiles.
+  if (transparentRatio > 0.01 && !seamCritical) runtimeCandidates.push('webp-render-exact');
   if (!pixelCritical && !seamCritical) runtimeCandidates.push('webp-adaptive', 'avif-adaptive');
 
   return {
-    version:'kelo-asset-image-profile-v1.2',
+    version:'kelo-asset-image-profile-v1.3',
     kind,
     adaptivePolicy,
     sourceName:String(options.sourceName || options.file || ''),
@@ -166,7 +169,8 @@ export function profileAssetImage(rgba, width, height, options = {}) {
       preserveDimensions:true,
       preserveAlpha:alphaCritical,
       preserveBorder:seamCritical,
-      preferExactPixels:pixelCritical || seamCritical
+      preferExactPixels:pixelCritical || seamCritical,
+      allowHiddenTransparentRgbChangeInDelivery:transparentRatio > 0.01 && !seamCritical
     },
     runtimeCandidates
   };
