@@ -33,7 +33,7 @@ export function createSupabaseCreatorContentRepository({url,publishableKey,getAc
     return Array.isArray(rows)&&rows[0]?rows[0]:{character_id:id,currency_key:key,amount:0,revision:0,updated_at:null};
   }
   return Object.freeze({
-    version:'supabase-creator-content-repository-v1.3.1-marketplace',userId,rpc,select,upload,remove,signedUrl,publicUrl,
+    version:'supabase-creator-content-repository-v1.3.2-marketplace',userId,rpc,select,upload,remove,signedUrl,publicUrl,
     createAssetFamily:p=>rpc('create_asset_family',p),registerAssetRevision:p=>rpc('register_asset_revision',p),submitAssetRevision:id=>rpc('submit_asset_revision',{p_revision_id:id}),
     createContentDefinition:p=>rpc('create_content_definition',p),registerContentRevision:p=>rpc('register_content_revision',p),submitContentRevision:id=>rpc('submit_content_revision',{p_revision_id:id}),
     listMyRoles:()=>select('account_roles?select=role_key&order=role_key.asc'),
@@ -46,7 +46,7 @@ export function createSupabaseCreatorContentRepository({url,publishableKey,getAc
     getAvatarManifest:contentId=>rpc('get_avatar_manifest',{p_content_id:contentId}),
     getCreatorProfile:userIdValue=>rpc('get_creator_profile',{p_user_id:userIdValue||null}),
     upsertCreatorProfile:({displayName=null,handle=null,tagline='',bio=''})=>rpc('upsert_creator_profile',{p_display_name:displayName,p_handle:handle,p_tagline:tagline,p_bio:bio}),
-    discoverCreatorMarket:({query='',contentType='',limit=40,offset=0}={})=>rpc('discover_creator_market',{p_query:query||null,p_content_type:contentType||null,p_limit:limit,p_offset:offset}),
+    discoverCreatorMarket:({query='',contentType='',limit=40,offset=0}={})=>rpc('discover_creator_market_v2',{p_query:query||null,p_content_type:contentType||null,p_limit:limit,p_offset:offset}),
     listMyCreatorMarketListings:()=>rpc('list_my_creator_market_listings',{}),
     createCreatorMarketListing:({revisionId,payoutCharacterId,priceKc,licenseKey='standard'})=>rpc('create_creator_market_listing',{p_revision_id:revisionId,p_payout_character_id:payoutCharacterId,p_price_kc:Math.max(0,Math.floor(Number(priceKc)||0)),p_license_key:licenseKey}),
     cancelCreatorMarketListing:listingId=>rpc('cancel_creator_market_listing',{p_listing_id:listingId}),
