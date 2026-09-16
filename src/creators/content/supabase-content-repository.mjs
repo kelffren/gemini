@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: CREATORS / CONTENT ONLINE
  * owner: Supabase Creator content repository adapter
- * keys: CONTENT REVIEW PUBLICATION RELEASE RPC RLS
+ * keys: CONTENT REVIEW PUBLICATION RELEASE RPC RLS OWNER FILTER
  * owns: authenticated REST/RPC/Storage transport for Creator content
  * does-not-own: auth UI, schemas, runtime owners, service-role secrets, review decisions or publish authority
  * security: publishable key is public; every write still requires user JWT + RLS/RPC validation; publish_content_revision remains service-role only
@@ -23,13 +23,14 @@ export function createSupabaseCreatorContentRepository({url,publishableKey,getAc
   async function signedUrl(bucket,path,expiresIn=3600){const r=await fetchImpl(`${base}/storage/v1/object/sign/${encodeURIComponent(bucket)}/${encPath(path)}`,{method:'POST',headers:headers({'Content-Type':'application/json'}),body:JSON.stringify({expiresIn:Math.max(60,Number(expiresIn)||3600)})});const data=await bodyJson(r),signed=data?.signedURL||data?.signedUrl;return signed?`${base}/storage/v1${signed.startsWith('/')?'':'/'}${signed}`:null;}
   const publicUrl=(bucket,path)=>`${base}/storage/v1/object/public/${encodeURIComponent(bucket)}/${encPath(path)}`;
   const userId=()=>decodeJwt(token()).sub||null;
+  function listMyContent(){const uid=userId();if(!uid)return Promise.resolve([]);return select(`content_definition_revisions?select=id,definition_id,revision,content_id,schema_version,content_hash,payload,created_at&owner_user_id=eq.${encodeURIComponent(uid)}&order=created_at.desc&limit=500`);}
   function listActivePublicationsForRevisions(ids){const clean=revisionIds(ids);if(!clean.length)return Promise.resolve([]);return select(`content_publications?select=id,revision_id,visibility,published_at,is_active&is_active=eq.true&revision_id=in.(${clean.join(',')})&order=published_at.desc&limit=500`);}
   return Object.freeze({
-    version:'supabase-creator-content-repository-v1.2.0',userId,rpc,select,upload,remove,signedUrl,publicUrl,
+    version:'supabase-creator-content-repository-v1.2.1',userId,rpc,select,upload,remove,signedUrl,publicUrl,
     createAssetFamily:p=>rpc('create_asset_family',p),registerAssetRevision:p=>rpc('register_asset_revision',p),submitAssetRevision:id=>rpc('submit_asset_revision',{p_revision_id:id}),
     createContentDefinition:p=>rpc('create_content_definition',p),registerContentRevision:p=>rpc('register_content_revision',p),submitContentRevision:id=>rpc('submit_content_revision',{p_revision_id:id}),
     listMyRoles:()=>select('account_roles?select=role_key&order=role_key.asc'),
-    listMyContent:()=>select('content_definition_revisions?select=id,definition_id,revision,content_id,schema_version,content_hash,payload,created_at&order=created_at.desc&limit=500'),
+    listMyContent,
     listMyReviews:()=>select('content_review_requests?select=id,revision_id,status,submitted_at,decided_at,note&order=submitted_at.desc&limit=500'),
     listActivePublicationsForRevisions,
     listMyCharacters:()=>select('characters?select=id,name,status,active_avatar_content_id,created_at&status=eq.active&order=created_at.asc&limit=3'),
