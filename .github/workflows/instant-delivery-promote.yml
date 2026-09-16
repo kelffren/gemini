@@ -22,7 +22,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
-      TARGET: assets/plaza-nature-runtime-core--233db909c0402294.png
+      TARGET: assets/pn-233db909.png
+      OLD_TARGET: assets/plaza-nature-runtime-core--233db909c0402294.png
       EXPECTED_SHA256: 233db909c040229470a2aea2bb98d29f9a79c45b89f3996df0799dd92afee8a1
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -45,29 +46,40 @@ jobs:
           if(!item)throw new Error('PLAZA_NATURE_SPARSE_PLAN_MISSING');
           const source=fs.readFileSync(item.source);
           const built=buildSparsePngAtlas(source,item.keepRects);
-          const expected=process.env.EXPECTED_SHA256;
           const actual=sha256Hex(built.buffer);
-          if(actual!==expected)throw new Error(`PLAZA_NATURE_SPARSE_SHA_MISMATCH:${actual}:${expected}`);
+          if(actual!==process.env.EXPECTED_SHA256)throw new Error(`PLAZA_NATURE_SPARSE_SHA_MISMATCH:${actual}`);
           fs.mkdirSync('/tmp/kelo-instant-delivery',{recursive:true});
           fs.writeFileSync(path.join('/tmp/kelo-instant-delivery',path.basename(process.env.TARGET)),built.buffer);
           console.log(`INSTANT_DELIVERY_PROMOTION_CANDIDATE bytes=${built.buffer.length} sha256=${actual} saved=${built.report.savedBytes}`);
           NODE
-      - name: Promote only when branch bytes differ
+      - name: Promote exact blob and keep SOURCE out of boot closure
         run: |
           CANDIDATE="/tmp/kelo-instant-delivery/$(basename "$TARGET")"
           echo "$EXPECTED_SHA256  $CANDIDATE" | sha256sum -c -
-          CURRENT_SHA="missing"
-          if [ -f "$TARGET" ]; then CURRENT_SHA="$(sha256sum "$TARGET" | awk '{print $1}')"; fi
-          if [ "$CURRENT_SHA" = "$EXPECTED_SHA256" ]; then
-            echo "INSTANT_DELIVERY_PROMOTION_NOOP sha256=$CURRENT_SHA"
-            exit 0
-          fi
           cp "$CANDIDATE" "$TARGET"
           echo "$EXPECTED_SHA256  $TARGET" | sha256sum -c -
           test "$(wc -c < "$TARGET")" -eq 1283924
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const registry='src/environment/tile-registry.js';
+          let text=fs.readFileSync(registry,'utf8');
+          text=text.replace('assets/plaza-nature-runtime-core--233db909c0402294.png?v=233db909','assets/pn-233db909.png');
+          if(!text.includes("src:'assets/pn-233db909.png'"))throw new Error('PLAZA_NATURE_RUNTIME_ROUTE_NOT_PATCHED');
+          fs.writeFileSync(registry,text);
+          const meta='src/environment/generated/arboleskelo1-atlas.js';
+          text=fs.readFileSync(meta,'utf8');
+          text=text.replace('"source":"assets/Arboleskelo1.PNG",','"sourceAssetId":"plazaNatureCanonical",');
+          if(text.includes('assets/Arboleskelo1.PNG'))throw new Error('PLAZA_NATURE_SOURCE_STILL_IN_BOOT_METADATA');
+          fs.writeFileSync(meta,text);
+          NODE
+          rm -f "$OLD_TARGET"
           git config user.name "kelo-weightless-bot"
           git config user.email "68343904+kelffren@users.noreply.github.com"
-          git add "$TARGET"
-          git commit -m "perf(weightless): promote verified plaza nature sparse blob"
+          git add "$TARGET" "$OLD_TARGET" src/environment/tile-registry.js src/environment/generated/arboleskelo1-atlas.js
+          if git diff --cached --quiet; then
+            echo "INSTANT_DELIVERY_PROMOTION_NOOP sha256=$EXPECTED_SHA256"
+            exit 0
+          fi
+          git commit -m "perf(weightless): route plaza nature through exact sparse delivery"
           git push origin "HEAD:${GITHUB_HEAD_REF}"
-          echo "INSTANT_DELIVERY_PROMOTION_PUSHED previous=$CURRENT_SHA current=$EXPECTED_SHA256"
+          echo "INSTANT_DELIVERY_PROMOTION_PUSHED sha256=$EXPECTED_SHA256"
