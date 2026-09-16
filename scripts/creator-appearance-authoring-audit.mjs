@@ -73,6 +73,10 @@ const deathFallback=resolveCharacterTestTrack({row:{animationMapping:{}},state:'
 assert.deepEqual([...deathFallback.frames],[0]);
 assert.equal(deathFallback.loop,false);
 assert.equal(deathFallback.fallback,true);
+const textualMappingFallback=resolveCharacterTestTrack({row:{animationMapping:{attack:'slash_combo'}},state:'attack',columns:4});
+assert.deepEqual([...textualMappingFallback.frames],[0]);
+assert.equal(textualMappingFallback.authored,false,'non-numeric animation IDs are not frame tracks');
+assert.equal(textualMappingFallback.source,'attack-static-fallback');
 
 const files={
   feature:fs.readFileSync(path.join(root,'src/core/feature-registry.js'),'utf8'),
@@ -120,6 +124,7 @@ console.log('PASS creator appearance authoring audit',{
   testStates:CHARACTER_TEST_STATES.map(row=>row.id),
   mappedAttack:[...attackTrack.frames],
   walkFallback:[...walkTrack.frames],
+  textualMappingFallback:[...textualMappingFallback.frames],
   sameContractEditorRuntime:true,
   singlePreviewMotionLoopOwner:'CreatorCharacterTestChamber',
   gameplayAuthority:false
