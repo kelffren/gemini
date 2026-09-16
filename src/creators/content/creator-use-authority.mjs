@@ -87,7 +87,13 @@ export function createCreatorUseAuthority({root=globalThis,delivery=null}={}){
   }
   async function getState({characterId=null,hydrateRuntime=false}={}){
     const cid=await resolveCharacterId(characterId),raw=await rpc('get_my_creator_use_state',{p_character_id:cid}),loadout=Array.isArray(raw?.loadout)?raw.loadout:[],state={characterId:cid,loadout:new Map(),mount:null,avatar:null};
-    if(hydrateRuntime){for(const binding of loadout){try{const active=await activate(binding.revisionId);state.loadout.set(String(binding.slotKey),F({...binding,runtimeId:active.row?.activation?.runtimeId||null}));}catch(error){state.loadout.set(String(binding.slotKey),F({...binding,runtimeId:null,error:String(error?.message||error)}));}}if(raw?.mount?.revisionId){try{const active=await activate(raw.mount.revisionId);state.mount=F({...raw.mount,runtimeId:active.row?.activation?.runtimeId||null});}catch(error){state.mount=F({...raw.mount,runtimeId:null,error:String(error?.message||error)});}}}else{for(const binding of loadout)state.loadout.set(String(binding.slotKey),F({...binding,runtimeId:null}));if(raw?.mount)state.mount=F({...raw.mount,runtimeId:null});}
+    if(hydrateRuntime){
+      for(const binding of loadout){try{const active=await activate(binding.revisionId);state.loadout.set(String(binding.slotKey),F({...binding,runtimeId:active.row?.activation?.runtimeId||null}));}catch(error){state.loadout.set(String(binding.slotKey),F({...binding,runtimeId:null,error:String(error?.message||error)}));}}
+      if(raw?.mount?.revisionId){try{const active=await activate(raw.mount.revisionId);state.mount=F({...raw.mount,runtimeId:active.row?.activation?.runtimeId||null});}catch(error){state.mount=F({...raw.mount,runtimeId:null,error:String(error?.message||error)});}}
+      if(raw?.avatar?.revisionId){try{const active=await activate(raw.avatar.revisionId);state.avatar=F({...raw.avatar,runtimeId:active.row?.activation?.runtimeId||raw.avatar.contentId||null});}catch(error){state.avatar=F({...raw.avatar,runtimeId:null,error:String(error?.message||error)});}}
+    }else{
+      for(const binding of loadout)state.loadout.set(String(binding.slotKey),F({...binding,runtimeId:null}));if(raw?.mount)state.mount=F({...raw.mount,runtimeId:null});if(raw?.avatar)state.avatar=F({...raw.avatar,runtimeId:null});
+    }
     hydrated.set(cid,state);return snapshot(cid);
   }
   function snapshot(characterId){const id=text(characterId),state=hydrated.get(id);if(!state)return null;return F({characterId:id,loadout:F([...state.loadout.values()].map(copy)),mount:state.mount?F(copy(state.mount)):null,avatar:state.avatar?F(copy(state.avatar)):null});}
@@ -98,9 +104,9 @@ export function createCreatorUseAuthority({root=globalThis,delivery=null}={}){
     return F({mount:!!mountGuardDispose,property:!!propertyGuardDispose});
   }
   function invalidateIdentity(){hydrated.clear();return diagnostics();}
-  function diagnostics(){return F({version:'creator-use-authority-v1.0.1-avatar',provider:provider?.name||'KeloOnlineAuth',accountId:accountId()||null,hydratedCharacters:hydrated.size,mountGuard:!!mountGuardDispose,propertyGuard:!!propertyGuardDispose});}
+  function diagnostics(){return F({version:'creator-use-authority-v1.0.2-hydrated-avatar',provider:provider?.name||'KeloOnlineAuth',accountId:accountId()||null,hydratedCharacters:hydrated.size,mountGuard:!!mountGuardDispose,propertyGuard:!!propertyGuardDispose});}
   function dispose(){try{mountGuardDispose?.();}catch{}try{propertyGuardDispose?.();}catch{}mountGuardDispose=propertyGuardDispose=null;hydrated.clear();}
-  const api=F({version:'creator-use-authority-v1.0.1-avatar',bindProvider,selectCharacterAvatar,equipRevision,clearSlot,selectMount,clearMount,authorizePropertyPlacement,getState,snapshot,resolveCharacterAppearance,attachRuntimeGuards,invalidateIdentity,diagnostics,dispose});return api;
+  const api=F({version:'creator-use-authority-v1.0.2-hydrated-avatar',bindProvider,selectCharacterAvatar,equipRevision,clearSlot,selectMount,clearMount,authorizePropertyPlacement,getState,snapshot,resolveCharacterAppearance,attachRuntimeGuards,invalidateIdentity,diagnostics,dispose});return api;
 }
 
 export function getOrCreateCreatorUseAuthority({root=globalThis,delivery=null}={}){if(root.KELO_CREATOR_USE_AUTHORITY)return root.KELO_CREATOR_USE_AUTHORITY;const api=createCreatorUseAuthority({root,delivery});try{root.KELO_CREATOR_USE_AUTHORITY=api;}catch{}return api;}
