@@ -47,7 +47,7 @@ assert.ok(invalid.validation.errors.includes('SHEET_NOT_DIVISIBLE'));
 
 const payload=contract.rowToPayload(canonicalRow);
 assert.equal(payload.slotId,'torso');
-assert.equal(payload.characterVisual.mode,'auto');
+assert.equal(Object.prototype.hasOwnProperty.call(payload.characterVisual,'mode'),false,'auto is authoring intent and must be inferred from real asset dimensions at runtime');
 assert.equal(payload.transforms.left.x,-7);
 assert.equal(payload.transforms.left.rotation,-9);
 const a=contract.presentationFingerprint(canonical),b=contract.presentationFingerprint(contract.compileRow({row:JSON.parse(JSON.stringify(canonicalRow)),source:'asset.png',asset:{pixelWidth:512,pixelHeight:768}}));
