@@ -135,7 +135,7 @@ export function paintWorldEditorLaunchShell(root=globalThis,message='Abriendo Wo
       shell.setAttribute('aria-modal','true');
       shell.setAttribute('aria-label','Kelo Studio');
     }else if(shell.dataset)shell.dataset.keloWorldLoading='1';
-    if(shell.style)shell.style.cssText='position:fixed;inset:0;z-index:2147482200;display:grid;grid-template-rows:auto 1fr;background:#050e10;color:#f7e7b4;font:800 13px/1.4 Inter,system-ui,-apple-system,sans-serif;pointer-events:auto';
+    if(shell.style)shell.style.cssText='position:fixed;inset:0;z-index:2147482200;display:grid;grid-template-rows:auto 1fr;background:#050e10;color:#f7e7b4;font:800 13px/1.4 Inter,system-ui,-apple-system,sans-serif;letter-spacing:.12em;text-align:center;pointer-events:auto';
     shell.innerHTML='<div style="display:flex;align-items:center;gap:10px;min-height:58px;padding:12px 16px;border-bottom:1px solid rgba(231,197,106,.42)"><div style="width:36px;height:36px;border:1px solid rgba(231,197,106,.5);border-radius:11px;display:grid;place-items:center">♛</div><div><div style="letter-spacing:.14em">KELO STUDIO</div><div style="margin-top:4px;font-size:9px;letter-spacing:.18em;color:#9bb7ad">MODO CREADOR</div></div></div><div class="ks-status" data-kelo-world-launch-status="1" style="display:grid;place-items:center;letter-spacing:.12em">'+message+'</div>';
     doc.body.append?.(shell);
   }else if(shell.dataset){
