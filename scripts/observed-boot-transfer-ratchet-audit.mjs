@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: BUILD / BOOT QA
  * owner: Kelo Boot Footprint QA
- * keys: OBSERVED BOOT TRANSFER RATCHET AUDIT PAYLOAD REQUEST COUNT REGRESSION STABLE CORE BOUNDARY
+ * keys: OBSERVED BOOT TRANSFER RATCHET AUDIT PAYLOAD REQUEST COUNT REGRESSION STABLE CORE BOUNDARY PROMOTION
  * purpose: deterministic pure-data regression test for repeated observed preboot transfer comparison
  * public-api: CLI audit
  * state-owned: none
@@ -16,11 +16,18 @@ const larger=report([{path:'/index.html',bytes:100},{path:'/core.js',bytes:240},
 const added=report([{path:'/index.html',bytes:100},{path:'/core.js',bytes:200},{path:'/grass.png',bytes:300},{path:'/new.png',bytes:10}]);
 const repeated=report([{path:'/index.html',bytes:100},{path:'/core.js',bytes:200,requestCount:2,totalPayloadBytes:400},{path:'/grass.png',bytes:300}],{requestCount:4,totalPayloadBytes:800,stableRequestCount:4,stablePayloadBytes:800});
 const unknown=report([{path:'/index.html',bytes:100},{path:'/core.js',bytes:200},{path:'/grass.png',bytes:300}],{unknownLocalByteResponses:1});
-const boundary={...base,resources:[...base.resources,{path:'/race.js',resourceType:'script',requestCount:1,bytesPerResponse:50,totalPayloadBytes:50,presenceCount:1,statuses:[200]}],resourceCount:4,totalPayloadBytes:650,unstableResourceCount:1};
+const race={path:'/race.js',resourceType:'script',requestCount:1,bytesPerResponse:50,totalPayloadBytes:50,presenceCount:1,statuses:[200]};
+const boundary={...base,resources:[...base.resources,race],resourceCount:4,totalPayloadBytes:650,unstableResourceCount:1};
+const promoted=report([{path:'/index.html',bytes:100},{path:'/core.js',bytes:200},{path:'/grass.png',bytes:300},{path:'/race.js',bytes:50}],{resources:[...base.resources,{...race,presenceCount:3}],requestCount:4,resourceCount:4,totalPayloadBytes:650,stableRequestCount:4,stableResourceCount:4,stablePayloadBytes:650});
+const promotedBigger=report([{path:'/index.html',bytes:100},{path:'/core.js',bytes:200},{path:'/grass.png',bytes:300},{path:'/race.js',bytes:60}],{resources:[...base.resources,{...race,presenceCount:3,totalPayloadBytes:60,bytesPerResponse:60}],requestCount:4,resourceCount:4,totalPayloadBytes:660,stableRequestCount:4,stableResourceCount:4,stablePayloadBytes:660});
+const promotedRepeated=report([{path:'/index.html',bytes:100},{path:'/core.js',bytes:200},{path:'/grass.png',bytes:300},{path:'/race.js',bytes:50,requestCount:2,totalPayloadBytes:100}],{resources:[...base.resources,{...race,presenceCount:3,requestCount:2,totalPayloadBytes:100}],requestCount:5,resourceCount:4,totalPayloadBytes:700,stableRequestCount:5,stableResourceCount:4,stablePayloadBytes:700});
 assert(compareObservedBootTransfers(base,smaller).pass,'smaller stable observed boot must pass');
 const grow=compareObservedBootTransfers(base,larger);assert(!grow.pass&&grow.regressions.some(r=>r.type==='observed-stable-preboot-resource-bytes-grew'&&r.path==='/core.js'),'stable resource byte growth must fail');
 const add=compareObservedBootTransfers(base,added);assert(!add.pass&&add.regressions.some(r=>r.type==='observed-stable-preboot-resource-added'&&r.path==='/new.png'),'new stable observed resource must fail');
 const repeat=compareObservedBootTransfers(base,repeated);assert(!repeat.pass&&repeat.regressions.some(r=>r.type==='observed-stable-preboot-resource-request-count-grew'),'stable duplicate request growth must fail');
 const missing=compareObservedBootTransfers(base,unknown);assert(!missing.pass&&missing.regressions.some(r=>r.type==='observed-preboot-unknown-local-byte-response'),'unknown local byte response must fail closed');
 assert(compareObservedBootTransfers(base,boundary).pass,'boundary-only resource must remain advisory and not hard-fail');
+const promote=compareObservedBootTransfers(boundary,promoted);assert(promote.pass,'base boundary promoted to stable with identical cost must pass');assert(promote.boundaryPromotions.length===1&&promote.boundaryPromotions[0].path==='/race.js','boundary promotion must be reported');assert(promote.summary.gateRequestDelta===0,'boundary promotion must not inflate aggregate request gate');
+const promoteGrow=compareObservedBootTransfers(boundary,promotedBigger);assert(!promoteGrow.pass&&promoteGrow.regressions.some(r=>r.type==='observed-boundary-promotion-bytes-grew'),'boundary promotion byte growth must fail');
+const promoteRepeat=compareObservedBootTransfers(boundary,promotedRepeated);assert(!promoteRepeat.pass&&promoteRepeat.regressions.some(r=>r.type==='observed-boundary-promotion-request-count-grew'),'boundary promotion request growth must fail');
 console.log('OBSERVED_BOOT_TRANSFER_RATCHET_AUDIT_PASS');
