@@ -1,0 +1,22 @@
+# Guardian PvP failover: Master A is a physical iPhone Safari session.
+# Candidate B is a local Chromium process launched by the same Playwright test so both nodes run concurrently.
+userName: ${BROWSERSTACK_USERNAME}
+accessKey: ${BROWSERSTACK_ACCESS_KEY}
+
+projectName: KeloWorld
+buildName: GuardianPvPFailoverRealIOS
+buildIdentifier: '#${BUILD_NUMBER}'
+
+platforms:
+  - browserName: safari
+    osVersion: 26
+    deviceName: iPhone 14 Pro
+
+parallelsPerPlatform: 1
+browserstackLocal: false
+framework: playwright
+source: kelo-world-guardian-pvp-failover
+
+debug: true
+networkLogs: true
+testObservability: true
