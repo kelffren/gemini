@@ -5,6 +5,8 @@
  * does-not-own: DOM, persistence, marketplace payments, moderation authority or remote AI credentials
  * performance: pure functions only; no timers, observers, loops outside direct calls
  */
+import {applyAssetTemplateMetadata,evaluateTemplateCompliance} from './asset-template-registry.mjs';
+
 export const KELO_ASSET_SCHEMA_VERSION = 'kelo.asset.v1';
 export const MAX_FORGE_EDGE = 64;
 
@@ -17,12 +19,13 @@ export function createAssetId(name='asset', now=Date.now()){
 }
 
 export function createKeloAssetManifest({
-  id=null,name='Untitled Asset',creatorId='local_pioneer',category='prop',tags=[],width=32,height=32,
-  anchor={x:.5,y:1},collision=null,dependencies=[],season=null,createdAt=new Date().toISOString(),updatedAt=createdAt,
+  id=null,name='Untitled Asset',creatorId='local_pioneer',category='prop',tags=[],templateId='',width=32,height=32,
+  anchor=null,collision=null,dependencies=[],season=null,createdAt=new Date().toISOString(),updatedAt=createdAt,
   source='asset-forge',license='creator-owned',priceKC=0,status='draft'
 }={}){
   const w=clamp(Math.round(width),1,MAX_FORGE_EDGE),h=clamp(Math.round(height),1,MAX_FORGE_EDGE);
   const normalizedTags=[...new Set((Array.isArray(tags)?tags:[]).map(v=>slug(v,'')).filter(Boolean))].slice(0,16);
+  const template=applyAssetTemplateMetadata({templateId,name,category,tags:normalizedTags,anchor});
   const safeId=slug(id||createAssetId(name));
   const safeCollision=collision&&typeof collision==='object'?{
     x:clamp(collision.x,0,w),y:clamp(collision.y,0,h),
@@ -30,8 +33,8 @@ export function createKeloAssetManifest({
   }:null;
   return Object.freeze({
     schema:KELO_ASSET_SCHEMA_VERSION,id:safeId,name:cleanText(name,'Untitled Asset').slice(0,80),
-    creatorId:cleanText(creatorId,'local_pioneer').slice(0,80),category:slug(category,'prop'),tags:Object.freeze(normalizedTags),
-    dimensions:Object.freeze({width:w,height:h}),anchor:Object.freeze({x:clamp(anchor?.x,0,1),y:clamp(anchor?.y,0,1)}),
+    creatorId:cleanText(creatorId,'local_pioneer').slice(0,80),category:template.category,tags:template.tags,
+    dimensions:Object.freeze({width:w,height:h}),anchor:template.anchor,authoring:template.authoring,
     collision:safeCollision?Object.freeze(safeCollision):null,dependencies:Object.freeze((Array.isArray(dependencies)?dependencies:[]).map(String).slice(0,32)),
     season:season?slug(season):null,source:cleanText(source,'asset-forge'),license:cleanText(license,'creator-owned'),
     commerce:Object.freeze({priceKC:Math.max(0,Math.round(Number(priceKC)||0)),status:cleanText(status,'draft')}),
@@ -73,6 +76,15 @@ export function evaluateAsset({width,height,data,manifest=null}={}){
     if(touches){issues.push({code:'TOUCHES_BORDER',severity:'info',message:'El dibujo toca el borde; añade margen si no es un tile seamless.'});score-=3;}
   }
   if(manifest&&manifest.schema!==KELO_ASSET_SCHEMA_VERSION){issues.push({code:'SCHEMA',severity:'error',message:'Metadata incompatible con el contrato actual.'});score-=20;}
+  if(manifest){
+    const compliance=evaluateTemplateCompliance({metrics,manifest});
+    for(const issue of compliance.issues){
+      issues.push(issue);
+      if(issue.severity==='error')score-=20;
+      else if(issue.severity==='warn')score-=6;
+      else score-=1;
+    }
+  }
   score=clamp(Math.round(score),0,100);
   const grade=score>=90?'A':score>=80?'B':score>=70?'C':score>=55?'D':'F';
   return Object.freeze({score,grade,issues:Object.freeze(issues),metrics});

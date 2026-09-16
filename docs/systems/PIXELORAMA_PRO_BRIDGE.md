@@ -1,87 +1,49 @@
 # Kelo World — Pixelorama Pro Bridge
 
 ## Propósito
-Pixelorama Pro Bridge es una extensión **opcional, lazy y fail-open** de Asset Forge que permite enviar el trabajo actual a una instancia externa de Pixelorama Web o a una integración compatible, sin convertir al runtime local en un fork ni en un editor duplicado.
+Pixelorama Pro es una capacidad opcional de Asset Forge para abrir el editor web oficial de Pixelorama cuando el creador necesita capas, timeline, onion skin, paletas, selección y herramientas avanzadas que no conviene duplicar dentro del editor móvil ligero.
 
-El objetivo es simple: **Kelo conserva su Asset Forge mobile-first como editor rápido**, y quien necesite un editor de pixel art más profundo puede saltar a Pixelorama sin que Kelo tenga que reconstruir de golpe capas, timeline, onion skin, selecciones complejas, indexed palettes y todos los demás subsistemas de un editor profesional.
+## Owner y frontera
+- Owner Kelo: `src/creators/ui/pixelorama-pro-bridge.mjs` dentro de Asset Forge.
+- Upstream: Orama Interactive / Pixelorama.
+- Pixelorama sigue siendo software de terceros; Kelo no posee su runtime, persistencia ni disponibilidad.
+- URL estable usada por el bridge: `https://orama-interactive.github.io/Pixelorama/`.
 
-## Owner
-- **Owner:** Kelo Asset Forge / Pixelorama bridge.
-- **Bridge:** `src/creators/ui/pixelorama-pro-bridge.mjs`.
-- **Host:** `src/creators/ui/asset-forge-workspace.mjs`.
+## Licencia
+Pixelorama se publica bajo licencia MIT, copyright Orama Interactive and contributors. La integración actual no redistribuye su build: carga el sitio web oficial bajo demanda. Si en el futuro Kelo aloja una copia del build, deberá incluir el copyright y aviso MIT exigidos por la licencia.
 
-Pixelorama sigue siendo un producto/proyecto externo. Kelo sólo posee el adapter y la configuración que decide cómo abrirlo.
+## Rendimiento
+No se empaqueta Pixelorama dentro del repositorio ni se precarga durante el boot. El build web oficial observado usa aproximadamente 6.4 MB de PCK y 39.5 MB de WASM, más recursos auxiliares. Por eso el bridge sólo crea el iframe después de una acción explícita `PIXELORAMA PRO`.
 
-## Estado
-Activo como **bridge opcional V1**. No es requisito para dibujar, guardar, auto-reparar ni exportar en Kelo.
+## Flujo actual
+1. Abrir Asset Forge.
+2. Pulsar `PIXELORAMA PRO`.
+3. Pixelorama abre en una superficie full-screen aislada dentro del workspace.
+4. El creador trabaja en Pixelorama.
+5. Exporta PNG o spritesheet desde Pixelorama.
+6. Pulsa `IMPORT BACK`.
+7. Kelo cierra la superficie Pro y abre el selector `IMPORT` existente de Asset Forge.
+8. El archivo vuelve a pasar por normalización, QA, manifest y packaging de Kelo.
 
-El bridge aparece en Asset Forge como `OPEN PRO EDITOR` cuando puede montarse. Si la configuración externa falta o el popup es bloqueado, el editor local continúa funcionando.
-
-## Contrato actual
-`pixelorama-pro-bridge.mjs` exporta helpers puros para:
-- normalizar la URL externa;
-- decidir si el bridge está configurado;
-- construir una URL segura con parámetros de retorno no sensibles;
-- construir la metadata de handoff;
-- montar/desmontar el botón lazy sobre Asset Forge.
-
-No existe envío automático de credenciales, tokens ni secretos.
-
-## Seguridad
-1. La URL externa debe ser `http:` o `https:`; esquemas arbitrarios se rechazan.
-2. El bridge abre una pestaña separada con `noopener,noreferrer`.
-3. Nunca inserta secrets del juego en query params.
-4. No se considera online authority ni marketplace authority.
-5. Si Pixelorama o el host remoto falla, Asset Forge local sigue disponible.
-
-## Configuración
-La URL puede venir de una configuración explícita suministrada al mount o de una variable pública compatible del cliente. Una URL de editor remoto no debe contener credenciales.
-
-Ejemplo conceptual de handoff:
-
-```text
-Asset Forge local
-  → OPEN PRO EDITOR
-  → Pixelorama Web externo
-  → edición profesional
-  → export PNG/sprite sheet
-  → reimportar a Asset Forge
-  → SELF CHECK / compile / metadata Kelo
-```
-
-## Lo que V1 NO hace
-- No sincroniza binarios en tiempo real.
-- No sube automáticamente el PNG a un servidor externo.
-- No implementa OAuth.
-- No reemplaza el manifest Kelo.
-- No permite que un editor remoto publique al marketplace sin volver a pasar QA/authority.
-
-## Evolución recomendada
-### V2 — Handoff con paquete
-- exportar PNG + manifest `kelo.asset.v1` como paquete descargable/compartible;
-- detectar reimport y restaurar metadata de slot/directions/anchor;
-- preservar hash de source para lineage.
-
-### V3 — Adapter cooperativo
-Sólo si el deployment de Pixelorama ofrece una API/postMessage estable:
-- handshake de capacidades;
-- transferencia explícita de raster/metadata;
-- respuesta con PNG + frame metadata;
-- validación de origen y versión;
-- timeout/fallback local.
-
-### V4 — Creator pipeline
-- abrir una selección/frame concreto en editor externo;
-- volver con el resultado;
-- ejecutar `SELF CHECK` y Asset Space Compiler;
-- versionar SOURCE/AUTHORING sin tocar runtime hasta promoción.
+`FULLSCREEN` abre el editor oficial en una pestaña separada como fallback para navegadores móviles donde un iframe WebAssembly/Godot tenga limitaciones.
 
 ## Invariantes
-- El pincel local de Asset Forge nunca depende del bridge.
-- El bridge no puede saltarse QA.
-- El bridge no puede cambiar gameplay authority.
-- Toda comunicación futura debe ser explícita, origin-checked y sin secretos en URL.
-- SOURCE importado de vuelta debe conservarse antes de cualquier optimización destructiva.
+- Pixelorama nunca entra al boot normal del juego.
+- Un fallo de Pixelorama o de la red no debe impedir abrir Asset Forge.
+- Kelo no debe fingir que existe sincronización automática de `.pxo` mientras no haya un bridge de datos explícito.
+- El archivo que vuelve a Kelo debe seguir pasando por el pipeline canónico de Asset Forge.
+- No duplicar el build de ~46 MB+ en el repo salvo decisión explícita y medición de coste.
 
-## Tests
-`tests/pixelorama-pro-bridge.test.mjs` cubre normalización/filtrado básico de URLs y construcción de configuración segura.
+## Siguiente evolución
+- intercambio automático de PNG/spritesheet sin paso manual de descarga/selección;
+- soporte `.pxo` como source project preservado junto al asset compilado;
+- metadata Kelo dentro de Pixelorama usando project/layer/cel user data;
+- templates Kelo para casco, pantalón, armas y avatar;
+- export preset de Pixelorama → `.keloasset`;
+- investigar una build Kelo-pinned/autohospedada sólo si necesitamos API same-origin o independencia del upstream.
+
+## Referencias
+- Pixelorama Web oficial y rama `gh-pages`.
+- Pixelorama README / features.
+- Pixelorama LICENSE (MIT).
+- Pixelorama save/export documentation.
