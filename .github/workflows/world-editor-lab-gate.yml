@@ -34,6 +34,11 @@ jobs:
         with:
           node-version: '24'
 
+      - name: Edit Grid and overlay syntax
+        run: |
+          node --check src/studio/tools/build-edit-grid-tool.mjs
+          node --check src/studio/render/studio-overlay-renderer.mjs
+
       - name: Quick Build semantic contract
         run: node scripts/studio-quick-build-audit.mjs
 
