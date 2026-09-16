@@ -64,7 +64,8 @@ jobs:
           await browser.close();
           EOF
           node .tmp-download-fix.mjs
-          tar -tzf /tmp/kelo-fix.tar.gz | head -20
+          tar -tzf /tmp/kelo-fix.tar.gz > /tmp/archive-list.txt
+          head -20 /tmp/archive-list.txt
 
       - name: Apply all 87 uploaded patches locally
         shell: bash
@@ -106,18 +107,15 @@ jobs:
               { timeout: 30000 }
             );
 
-            // Start clean so the scenario has one unambiguous placed object.
             await page.evaluate(() => localStorage.removeItem('kelo_property_state_v1'));
             await page.reload({ waitUntil: 'domcontentloaded' });
             await page.waitForFunction(() => window.KELO_PROPERTY_EDITOR && window.KELO_PROPERTY_SYSTEM && window.KeloPlayerPosition, null, { timeout: 30000 });
 
-            // Open the real parcel editor. The uploaded fix must route this focus teleport through KeloPlayerPosition.
             await page.evaluate(() => window.KELO_PROPERTY_EDITOR.open('parcel'));
             await expect(page.locator('#kelo-property-editor')).toBeVisible();
             const firstOpenAudit = await page.evaluate(() => window.KeloPlayerPosition.snapshot());
             expect(firstOpenAudit.events.some(e => e.source === 'property-editor:open')).toBeTruthy();
 
-            // Pick a real tree asset and grant exactly one local prototype unit.
             const tree = page.locator('#pe-list .pe-card').filter({ hasText: /árbol|arbol|tree/i }).first();
             await expect(tree).toBeVisible({ timeout: 15000 });
             const grant = tree.locator('.pe-test');
@@ -125,7 +123,6 @@ jobs:
             await tree.click();
             await expect(page.locator('#pe-selected')).toContainText(/Para colocar:/);
 
-            // Convert a safe point inside the parcel to screen coordinates and click the actual game canvas area.
             const placePoint = await page.evaluate(() => {
               const p = window.KELO_PROPERTY_SYSTEM.parcel(window.KELO_PROPERTY_EDITOR.parcelId);
               const wx = p.bounds.x + p.bounds.w * 0.42;
@@ -144,7 +141,6 @@ jobs:
             });
             expect(placed).toBeTruthy();
 
-            // Select that placed tree through the editor UI and move it through the editor's native move mode.
             const placedRow = page.locator('#pe-placed button').first();
             await expect(placedRow).toBeVisible();
             await placedRow.click();
@@ -167,7 +163,6 @@ jobs:
             }, { id: placed.placementId, x: placed.x, y: placed.y });
             const moved = await page.evaluate(id => window.KELO_PROPERTY_SYSTEM.getPlacements(window.KELO_PROPERTY_EDITOR.parcelId).find(x => x.placementId === id), placed.placementId);
 
-            // Close the editor with its real close control and walk with real keyboard input.
             await page.locator('#pe-close').click();
             await expect(page.locator('#kelo-property-editor')).toBeHidden();
             const playerBefore = await page.evaluate(() => window.KeloPlayerPosition.capture());
@@ -179,7 +174,6 @@ jobs:
             expect(playerAfter).toBeTruthy();
             expect(Math.hypot(playerAfter.x - playerBefore.x, playerAfter.y - playerBefore.y)).toBeGreaterThan(0.1);
 
-            // Reopen the real editor and prove the moved tree is still at the moved coordinates.
             await page.evaluate(() => window.KELO_PROPERTY_EDITOR.open('parcel'));
             await expect(page.locator('#kelo-property-editor')).toBeVisible();
             const reopened = await page.evaluate(id => window.KELO_PROPERTY_SYSTEM.getPlacements(window.KELO_PROPERTY_EDITOR.parcelId).find(x => x.placementId === id), placed.placementId);
