@@ -62,7 +62,7 @@ El atlas LIVE es:
 
 `assets/world/plaza/forest-plaza-tileset-v2.png`
 
-La ruta completa es:
+La ruta completa LIVE sigue siendo:
 
 `PNG → src/creators/assets/asset-sheet-compiler.mjs → manifest irregular → src/environment/generated/forest-plaza-tileset-v2-manifest.js → KELO_ATLAS_CONTRACT → src/property/forest-plaza-asset-catalog.js → KELO_PROPERTY_CATALOG → Studio/World placement`
 
@@ -91,24 +91,40 @@ El shell es UI; no posee mutations del mundo. Las mutations pasan por Studio Ker
 
 **Regla QA:** World en iPhone no se declara resuelto solo con headless. Requiere apertura, interacción, placement y reapertura en dispositivo real/LIVE.
 
-## 7. Asset compiler
+## 7. Asset compiler + Space Gate
 
 `asset-sheet-compiler.mjs` reutiliza `sprite-foreground-analysis.mjs` y `sprite-world-asset-compiler.mjs`. Produce frames irregulares, metadata y manifest; no redibuja el arte ni se convierte en un renderer.
 
 El Asset Compiler puede sugerir semántica, pero nombres/categorías revisados deben conservar geometría sourceRect estable para no romper placements.
 
-### PNG Space Gate — PREPARED / build-time
+### Space Gate — PREPARED / build-time
 
-Antes del análisis geométrico puede existir una etapa independiente de bytes bajo el mismo owner `Kelo Creator Asset Bridge`:
+La capacidad de bytes se mantiene bajo el mismo owner `Kelo Creator Asset Bridge` y se separa en tres niveles:
 
-`RAW PNG → png-space-optimizer / png-quality-agent → asset-sheet-compiler → manifest`
+`SOURCE PNG → PROFILE → LOSSLESS TOURNAMENT → QUALITY GATE → AUTHORING PNG → asset-sheet-compiler → manifest`
 
-- `png-space-optimizer.mjs`: explora filtros/DEFLATE y paleta exacta cuando aplica; strict exige RGBA idéntico.
-- `png-quality-agent.mjs`: hard gate before/after; alpha, PSNR, RGB y bordes para candidatos adaptativos.
-- `png-adaptive-optimizer.mjs`: cuantización opt-in; si no supera el gate, vuelve a strict.
-- `scripts/asset-space-compiler.mjs`: CLI recursiva, reportes y capturas; no forma parte del boot del juego.
+Más una pista opcional:
 
-Esta etapa **no cambia sourceRects, dimensiones, catalog IDs ni runtime ownership**. No se considera LIVE hasta medir assets reales y pasar CI; el runtime continúa consumiendo las rutas actuales.
+`SOURCE/AUTHORING → RUNTIME VARIANT LAB → QUALITY GATE → DELIVERY CANDIDATE`
+
+- `asset-image-profiler.mjs`: clasifica tile/pixel/UI/FX/sprite y selecciona policy.
+- `png-space-optimizer.mjs`: filtros/DEFLATE/paleta exacta; strict exige RGBA idéntico.
+- `png-codec-tournament.mjs`: hace competir Kelo/OxiPNG/ZopfliPNG/ECT y vuelve a verificar píxeles + metadata visual.
+- `png-quality-agent.mjs`: hard gates de RGBA, alpha, PSNR, bordes y borde exterior; `seam-safe` bloquea cambios en bordes de tiles.
+- `png-adaptive-optimizer.mjs`: cuantización opt-in guiada por perfil; fallback strict.
+- `runtime-image-variants.mjs`: genera candidatos PNG/WebP/AVIF para DELIVERY sin sustituir SOURCE ni modificar el runtime.
+- `scripts/asset-space-compiler.mjs`: CLI recursiva con before/after/diff y reportes; fuera del boot.
+- `scripts/asset-codec-tournament.mjs`: laboratorio profundo manual de authoring/runtime codecs.
+
+Invariantes:
+
+- SOURCE se conserva como evidencia/canónico;
+- AUTHORING puede ser un PNG más pequeño solo después de demostrar equivalencia;
+- DELIVERY es un candidato separado y no se promueve automáticamente al runtime;
+- no cambian dimensiones, sourceRects, IDs ni ownership;
+- KTX2/Basis queda como horizonte para una futura superficie WebGL/WebGPU capaz de consumir texturas GPU comprimidas; no entra en Canvas 2D solo por ahorrar disco.
+
+El runtime continúa consumiendo las rutas actuales hasta un pass separado de promoción/QA en iPhone.
 
 ## 8. Gameplay
 
@@ -134,6 +150,8 @@ El cliente puede predecir/presentar, pero progreso valioso, comercio, PvP compet
 - No mutar `obstacles` desde features nuevas.
 - No sustituir World/Studio por un editor nuevo para corregir un bug de boot.
 - No publicar assets persistentes solo porque funcionan en preview local.
+- No sustituir SOURCE por un codec DELIVERY sin evidencia + rollback.
+- No introducir KTX2/Basis en Canvas 2D sin un consumidor gráfico que justifique esa ruta.
 - No declarar un fix móvil verificado sin QA real.
 
 ## 11. Documentos relacionados
