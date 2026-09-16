@@ -24,7 +24,8 @@ PUBLISHED -> ENTITLED/CREATOR-OWNED -> DELIVERED -> SERVER-AUTHORIZED USE -> DOM
 - Server authority migration: `supabase/migrations/20260916004000_creator_use_authority_v1.sql`
 - Entitlement truth: `KeloCreatorEntitlements` + `creator_content_entitlements`
 - Delivery: `Kelo Creator Content Delivery`
-- Domain owners remain `KeloCreatorAvatars`, `KeloAppearance` / CharacterCustomization, `KeloMounts`, and `KELO_PROPERTY_SYSTEM`.
+- Local Character visual projection: `src/characters/creator-character-state-bridge.js`
+- Domain owners remain `KeloCreatorAvatars`, `KeloCharacterCustomization` / `KeloAppearance`, `KeloMounts`, and `KELO_PROPERTY_SYSTEM`.
 
 ## One server rule
 
@@ -49,15 +50,17 @@ Buying `r3` does not grant `r4`.
 
 ## Character appearance and weapons
 
-V1 server-persisted `appearance` / `equipment` bindings are **visual Creator content bindings**. `KeloAppearance` can resolve them through `resolveCharacterAppearance()` after hydration.
+V1 server-persisted `appearance` / `equipment` bindings are **visual Creator content bindings**. They do not move gameplay weapon stats, inventory or combat ability authority into Creator Use. `KeloEquipment` remains the gameplay equipment/stat owner. A Creator weapon/skin becoming visually selected does not grant attack stats or bypass inventory/equipment rules.
 
-This does **not** move gameplay weapon stats, inventory or combat ability authority into Creator Use. `KeloEquipment` remains the gameplay equipment/stat owner. A Creator weapon/skin becoming visually selectable does not grant attack stats or bypass inventory/equipment rules.
+`KeloCharacterCustomization` remains the local visual owner. `Creator Character State Bridge` now projects the authoritative slot bindings into an ephemeral local-only overlay consumed by the existing `KeloCharacterVisualStack` and `KeloAvatar` middleware. The bridge deliberately does not call CharacterCustomization `select()` or `applySnapshot()`, so an online license is never copied into local persisted visual state.
 
-Existing `KeloCharacterCustomization` is still the character visual state/render owner during migration. The authoritative Creator binding now exists, but final automatic Character V2 renderer convergence remains a separate integration pass.
+Delivered Creator items used by that overlay are registered `hidden + locked`: they can render through the existing catalog but do not appear as ordinary locally unlocked cosmetics after logout. See `docs/systems/CREATOR_CHARACTER_STATE_BRIDGE.md`.
+
+Remote-player modular Creator skin/equipment replication is still a separate multiplayer integration. Full-body Creator avatar selection/rendering continues through the existing Creator Avatar path.
 
 ## Mount integration
 
-`KeloMounts` now supports composable `useGuard(fn)` preconditions. Guards run before its existing replaceable `authority.request()` boundary.
+`KeloMounts` supports composable `useGuard(fn)` preconditions. Guards run before its existing replaceable `authority.request()` boundary.
 
 For Creator mounts:
 
@@ -70,7 +73,7 @@ Creator Use does not become the mount gameplay owner.
 
 ## Property integration
 
-`KELO_PROPERTY_SYSTEM` now supports composable `useGuard(fn)` preconditions. A Creator `world`/`tile` placement first obtains `authorize_creator_property_placement` server-side.
+`KELO_PROPERTY_SYSTEM` supports composable `useGuard(fn)` preconditions. A Creator `world`/`tile` placement first obtains `authorize_creator_property_placement` server-side.
 
 That RPC is intentionally **not** a full parcel authority. It proves only that the caller may use the paid Creator revision. The existing Property/House/remote authority still owns:
 
@@ -84,9 +87,14 @@ A later online Property authority may combine content authorization and parcel v
 
 ## Lazy/mobile behavior
 
-Normal boot exposes only the small `KeloCreatorUse` facade. The real module loads on first explicit use. Creator Delivery also arms Use Authority when Creator content is first activated so runtime owner mutations cannot accidentally skip the preflight in the normal product path.
+The normal boot still avoids Creator OS UI, Creator Library data, Appearance runtime and Creator asset bytes. To restore an already-authorized modular Creator outfit after reload, the already-loaded Creator lazy gate may now import the small Use Authority/Delivery metadata layer and perform **one metadata-only use-state probe** for the authenticated character.
 
-No Owned-library bulk sync, polling, timer or second render loop is introduced.
+- no visual bindings -> stop; Appearance stays unloaded;
+- visual bindings -> first-use load Appearance + Character bridge, then deliver only the exact bound revisions.
+
+This intentionally supersedes the earlier stronger rule that the Use Authority implementation never loads during normal session boot. The important scalability invariant is now: **no heavy Creator OS, no bulk Owned sync, no Appearance package and no Creator visual bytes unless the character actually has bound visual revisions**.
+
+No polling, timer or second render loop is introduced.
 
 ## Public client API
 
@@ -119,14 +127,15 @@ Direct table writes are revoked from authenticated clients. Use changes occur th
 7. built-in content paths remain supported;
 8. Creator visual equipment does not become gameplay-stat authority;
 9. Property authorization receipt does not claim parcel/geometry authority;
-10. no eager full Creator library load.
+10. no eager full Creator library load;
+11. Character render restoration uses an ephemeral overlay, not persisted local ownership.
 
 ## Required validation
 
 Before `VALIDATED`:
 
 - apply migration in test Supabase;
-- run `node scripts/creator-use-authority-audit.mjs` and all upstream Creator audits;
+- run `node scripts/creator-use-authority-audit.mjs`, `node scripts/creator-character-state-bridge-audit.mjs` and all upstream Creator audits;
 - owner can persist own published revision;
 - buyer cannot persist foreign revision pre-purchase;
 - buyer can persist exact revision post-purchase;
@@ -134,9 +143,11 @@ Before `VALIDATED`:
 - r3 entitlement does not authorize r4;
 - inactive/unpublished revision is denied;
 - account switch/sign-out cannot reuse previous selection authority;
+- bound Creator skin/visual equipment restores through the existing Character renderer after reload;
+- clearing a Creator visual binding reveals the underlying local Character slot again;
 - mount guard persists exact revision before mount-domain mutation;
 - property guard denies unauthorized Creator placement before Property mutation;
-- built-in mount/property behavior remains unchanged;
+- built-in Character/mount/property behavior remains unchanged;
 - purchased avatar selection continues to work and remote players can render published avatars;
-- iPhone/LIVE first-use has no freeze/eager sync;
-- final Character appearance renderer convergence must be tested separately when wired.
+- iPhone/LIVE first-use has no freeze/eager bulk sync;
+- remote modular Creator appearance replication is tested separately before being claimed complete.
