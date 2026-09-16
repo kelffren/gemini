@@ -1,13 +1,13 @@
 /* KELO-INDEX
  * area: CREATORS / ENTRY
  * owner: Kelo Creators composition root
- * keys: CREATOR LIBRARY IMAGE LAB MARKETPLACE ENTITLEMENT DELIVERY WORKSPACE REGISTRY LAZY ONLINE
+ * keys: CREATOR LIBRARY IMAGE LAB MARKETPLACE ENTITLEMENT DELIVERY USE AUTHORITY WORKSPACE REGISTRY LAZY ONLINE
  * owns: lazy composition of generic Creator infrastructure and workspace registration
  * does-not-own: Studio core, workspace implementations, gameplay, payment settlement or network transport
  * public-api: bootKeloCreators, getKeloCreatorsPlatform
  * extension-points: register one documented workspace manifest; Creator Library routes to owners but never replaces them
  * reuse: every Creator workspace registers one manifest; shared online services are composed here once per Creator session
- * do-not: no heavy Creator module in normal boot, no duplicate editor/runtime/market authority owners
+ * do-not: no heavy Creator module in normal boot, no duplicate editor/runtime/market/use authority owners
  */
 import '../systems/creator-entitlement-system.js';
 import { createCreatorWorkspaceRegistry } from './core/workspace-registry.mjs';
@@ -18,6 +18,7 @@ import { createLocalCreatorProjectRepository } from './repository/local-creator-
 import { createIndexedDbCreatorStateAdapter } from './repository/indexeddb-creator-state-adapter.mjs';
 import { createRuntimeContentRegistry } from './content/runtime-content-registry.mjs';
 import { getOrCreateCreatorContentDelivery } from './content/creator-content-delivery.mjs';
+import { getOrCreateCreatorUseAuthority } from './content/creator-use-authority.mjs';
 import { createSupabaseCreatorContentRepository } from './content/supabase-content-repository.mjs';
 import { createUniversalContentService } from './content/universal-content-service.mjs';
 import { createCreatorMarketplaceService } from './marketplace/creator-marketplace-service.mjs';
@@ -77,7 +78,7 @@ export async function bootKeloCreators({root=globalThis,stateAdapter=null}={}){
     return spriteAbilityExtensionsPromise;
   }
   const permission=createCreatorPermissionAdapter(root),world=createWorldCreatorAdapter({root,permission}),localState=stateAdapter||createIndexedDbCreatorStateAdapter({indexedDBFactory:root.indexedDB}),projects=createLocalCreatorProjectRepository({domainAdapters:[world],stateAdapter:localState}),workspaces=createCreatorWorkspaceRegistry(),dependencies=createCreatorDependencyGraph();
-  const fetchImpl=root.fetch?.bind?.(root)||globalThis.fetch?.bind?.(globalThis),contentSession=createKeloSupabaseBrowserSession({root,fetchImpl,config:KELO_SUPABASE_PUBLIC_CONFIG}),avatarRuntime=installCreatorAvatarRuntime({root}),runtimeContent=createRuntimeContentRegistry({root}),contentRepository=createSupabaseCreatorContentRepository({url:KELO_SUPABASE_PUBLIC_CONFIG.url,publishableKey:KELO_SUPABASE_PUBLIC_CONFIG.publishableKey,getAccessToken:()=>contentSession.accessToken,fetchImpl}),contentService=createUniversalContentService({repository:contentRepository,runtimeRegistry:runtimeContent,root}),marketplace=createCreatorMarketplaceService({contentSession,contentRepository,root}),delivery=getOrCreateCreatorContentDelivery({root,runtimeRegistry:runtimeContent}),avatarQuick=createAvatarQuickImportService({contentSession,contentRepository,contentService,root});
+  const fetchImpl=root.fetch?.bind?.(root)||globalThis.fetch?.bind?.(globalThis),contentSession=createKeloSupabaseBrowserSession({root,fetchImpl,config:KELO_SUPABASE_PUBLIC_CONFIG}),avatarRuntime=installCreatorAvatarRuntime({root}),runtimeContent=createRuntimeContentRegistry({root}),contentRepository=createSupabaseCreatorContentRepository({url:KELO_SUPABASE_PUBLIC_CONFIG.url,publishableKey:KELO_SUPABASE_PUBLIC_CONFIG.publishableKey,getAccessToken:()=>contentSession.accessToken,fetchImpl}),contentService=createUniversalContentService({repository:contentRepository,runtimeRegistry:runtimeContent,root}),marketplace=createCreatorMarketplaceService({contentSession,contentRepository,root}),delivery=getOrCreateCreatorContentDelivery({root,runtimeRegistry:runtimeContent}),useAuthority=getOrCreateCreatorUseAuthority({root,delivery}),avatarQuick=createAvatarQuickImportService({contentSession,contentRepository,contentService,root});
   try{
     root.KeloCreatorEntitlements?.bindProvider?.({
       name:'creator-content-repository',
@@ -86,17 +87,19 @@ export async function bootKeloCreators({root=globalThis,stateAdapter=null}={}){
       checkAccess:id=>contentRepository.checkCreatorContentAccess(id)
     });
     delivery.bindProvider({name:'creator-content-repository',accountId:()=>contentRepository.userId(),getManifest:id=>contentRepository.getCreatorContentDelivery(id)});
-    sessionDispose=contentSession.onChange?.(()=>delivery.invalidateIdentity())||(()=>{});
-  }catch(error){console.warn('[Creators] content access provider unavailable',error);}
-  try{root.KELO_CREATOR_CONTENT_REGISTRY=runtimeContent;root.KELO_CREATOR_MARKETPLACE=marketplace;root.KELO_CREATOR_CONTENT_DELIVERY=delivery;void root.KeloCreatorEntitlements?.refresh?.();}catch{}
+    useAuthority.bindProvider({name:'creator-content-repository',accountId:()=>contentRepository.userId(),rpc:(name,payload)=>contentRepository.rpc(name,payload),listCharacters:()=>contentRepository.listMyCharacters()});
+    useAuthority.attachRuntimeGuards();
+    sessionDispose=contentSession.onChange?.(()=>{delivery.invalidateIdentity();useAuthority.invalidateIdentity();useAuthority.attachRuntimeGuards();})||(()=>{});
+  }catch(error){console.warn('[Creators] content access/use provider unavailable',error);}
+  try{root.KELO_CREATOR_CONTENT_REGISTRY=runtimeContent;root.KELO_CREATOR_MARKETPLACE=marketplace;root.KELO_CREATOR_CONTENT_DELIVERY=delivery;root.KELO_CREATOR_USE_AUTHORITY=useAuthority;void root.KeloCreatorEntitlements?.refresh?.();}catch{}
   registerWorldWorkspace(workspaces);registerMapForgeWorkspace(workspaces);registerMountWorkspace(workspaces);registerAppearanceWorkspace(workspaces);registerAnimationWorkspace(workspaces);registerVfxWorkspace(workspaces);registerAbilityWorkspace(workspaces);registerSpriteAbilityWorkspace(workspaces);registerContentStudioWorkspace(workspaces);registerAssetSheetWorkspace(workspaces);registerAssetForgeWorkspace(workspaces);registerImageLabWorkspace(workspaces);registerAvatarWorkspace(workspaces);registerDefinitionWorkspaces(workspaces);registerCreatorLibraryWorkspace(workspaces);
   async function openWorkspace(id,context={}){
     const manifest=workspaces.resolve(id);if(!manifest)throw new Error(`CREATOR_WORKSPACE_NOT_FOUND:${id}`);
     if(manifest.capability)permission.require(manifest.capability,permission.actorId(),context.projectId||null);
     if(id==='sprite-ability')await ensureSpriteAbilityExtensions();
-    return workspaces.open(id,{root,projects,permission,workspaces,dependencies,contentSession,contentRepository,contentService,marketplace,delivery,runtimeContent,avatarRuntime,avatarQuick,openWorkspace,...context});
+    return workspaces.open(id,{root,projects,permission,workspaces,dependencies,contentSession,contentRepository,contentService,marketplace,delivery,useAuthority,runtimeContent,avatarRuntime,avatarQuick,openWorkspace,...context});
   }
-  platform=Object.freeze({version:'kelo-creators-core-v1.28.0-content-delivery',permission,projects,workspaces,dependencies,contentSession,contentRepository,contentService,marketplace,delivery,entitlements:root.KeloCreatorEntitlements||null,runtimeContent,avatarRuntime,avatarQuick,openWorkspace,close(){try{sessionDispose?.();}catch{}try{looseImportDispose?.();}catch{}try{irregularImportDispose?.();}catch{}try{repairTouchDispose?.();}catch{}try{repairStudioDispose?.();}catch{}try{manualCutterDispose?.();}catch{}try{easyUiDispose?.();}catch{}try{eventLabDispose?.();}catch{}try{visualUiDispose?.();}catch{}try{localState.close?.();}catch{}try{inputLocksDispose?.();}catch{}try{if(root.KELO_CREATOR_MARKETPLACE===marketplace)delete root.KELO_CREATOR_MARKETPLACE;}catch{}platform=null;}});
+  platform=Object.freeze({version:'kelo-creators-core-v1.29.0-use-authority',permission,projects,workspaces,dependencies,contentSession,contentRepository,contentService,marketplace,delivery,useAuthority,entitlements:root.KeloCreatorEntitlements||null,runtimeContent,avatarRuntime,avatarQuick,openWorkspace,close(){try{sessionDispose?.();}catch{}try{looseImportDispose?.();}catch{}try{irregularImportDispose?.();}catch{}try{repairTouchDispose?.();}catch{}try{repairStudioDispose?.();}catch{}try{manualCutterDispose?.();}catch{}try{easyUiDispose?.();}catch{}try{eventLabDispose?.();}catch{}try{visualUiDispose?.();}catch{}try{localState.close?.();}catch{}try{inputLocksDispose?.();}catch{}try{if(root.KELO_CREATOR_MARKETPLACE===marketplace)delete root.KELO_CREATOR_MARKETPLACE;}catch{}platform=null;}});
   return platform;
 }
 export function getKeloCreatorsPlatform(){return platform;}
