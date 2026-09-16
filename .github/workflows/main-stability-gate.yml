@@ -1,0 +1,102 @@
+name: Main Stability Gate
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: main-stability-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  stability:
+    name: main-stability-gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CI: true
+      KELO_PAGES: http://127.0.0.1:4173/
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+
+      # The repository does not yet contain a lockfile. Use npm install here so
+      # the stability gate reflects the current repository contract. Lockfile
+      # introduction is tracked as a separate dependency-governance hardening.
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Install Chromium for Playwright
+        run: npx playwright install chromium --with-deps
+
+      - name: Build
+        run: npm run build
+
+      - name: Architecture contract
+        run: npm run audit:foundation
+
+      - name: Documentation contract
+        run: npm run audit:docs
+
+      - name: Performance no-regression contract
+        run: npm run audit:performance
+
+      - name: Online foundation contract
+        run: npm run audit:online-foundation
+
+      - name: Updater contract
+        run: npm run audit:updater
+
+      - name: Studio foundation contract
+        run: npm run audit:studio
+
+      - name: Paint Copies regression contract
+        run: npm run audit:studio:paint-copies
+
+      - name: PvP facing contract
+        run: npm run audit:pvp-facing
+
+      - name: Start exact PR build server
+        run: |
+          mkdir -p test-results
+          python3 -m http.server 4173 --bind 127.0.0.1 > test-results/main-stability-http.log 2>&1 &
+          echo $! > /tmp/kelo-main-stability-http.pid
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:4173/index.html >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat test-results/main-stability-http.log
+          exit 1
+
+      - name: Critical mobile and PvP smoke on PR bytes
+        run: >-
+          npx playwright test
+          tests/main-stability-mobile.spec.js
+          tests/pvp-dodge-live.spec.js
+          --project=chromium
+
+      - name: Upload Playwright evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: main-stability-playwright-evidence
+          path: |
+            playwright-report.json
+            test-results/
+          retention-days: 14
+          if-no-files-found: ignore
