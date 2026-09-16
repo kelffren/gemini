@@ -19,6 +19,7 @@ Mounts are data-driven gameplay content. A mount can be equipped independently f
 - **Ability runtime owner consumed:** `KeloAbilities`
 - **Stats owner consumed:** `KeloStats`
 - **Appearance owner consumed:** `KeloAppearance`
+- **Optional Creator-use precondition:** `Kelo Creator Use Authority`
 - **UI consumers:** `src/ui/mount-panel.js`, `src/ui/mount-action-bar.js`
 
 ## State ownership
@@ -38,7 +39,7 @@ Mounts are data-driven gameplay content. A mount can be equipped independently f
 }
 ```
 
-It does **not** own `STATE.equipped` (Stone loadout), player equipment slots, KeloAbilities effects, base movement physics, character customization or rendering.
+It does **not** own `STATE.equipped` (Stone loadout), player equipment slots, KeloAbilities effects, base movement physics, character customization, Creator entitlements or rendering.
 
 ## Definition contract
 
@@ -60,11 +61,12 @@ A mount definition declares stable IDs:
   riderAnchorProfileId,
   unlockRuleId,
   tags,
-  baseStats
+  baseStats,
+  metadata
 }
 ```
 
-Exactly three mount ability IDs are required. Definitions are lightweight metadata. Registering a definition does not instantiate an actor or load an image.
+Exactly three mount ability IDs are required. Definitions are lightweight metadata. Registering a definition does not instantiate an actor or load an image. Creator mounts may carry immutable `creatorRevisionId` metadata, but that metadata is not itself entitlement evidence.
 
 ## Runtime flow
 
@@ -73,15 +75,18 @@ MountDefinition
    ↓
 KeloMountCatalog
    ↓
-KeloMounts equipMount()
-   ↓
-mount() / dismount()
-   ├─ KeloMovement before/after → temporary movement profile
-   ├─ KeloStats → mount/player stat modifiers
-   ├─ KeloMountAbilityChannel → M1/M2/M3
-   │      ↓
-   │   KeloAbilities existing delivery/effect runtime
-   └─ KeloAppearance → outfit layer descriptors
+KeloMounts request(op)
+   ├─ composable useGuard() preconditions
+   ├─ replaceable authority.request()
+   └─ local domain fallback
+          ↓
+       equipMount() / mount() / dismount()
+          ├─ KeloMovement before/after → temporary movement profile
+          ├─ KeloStats → mount/player stat modifiers
+          ├─ KeloMountAbilityChannel → M1/M2/M3
+          │      ↓
+          │   KeloAbilities existing delivery/effect runtime
+          └─ KeloAppearance → outfit layer descriptors
 ```
 
 The five Stone slots remain owned by `KeloStones`. They are never converted to eight slots and mount abilities are never stored as fake Stones.
@@ -100,8 +105,11 @@ The five Stone slots remain owned by `KeloStones`. They are never converted to e
 - `getAppearance(mountId,direction,motion)`
 - `snapshot()`, `migrateState()`
 - `setAuthority(adapter)`
+- `useGuard(fn)` → registers an async precondition that runs before the authority adapter; returns a dispose function.
 
-`KeloMountCatalog` exposes registration, lookup, query, validation, migration, MovementProfile and EquipmentSlotProfile registries.
+`useGuard()` is compositional. It must not be used to replace `setAuthority()` or Mount gameplay rules. Creator Use Authority uses it only to persist/validate an exact Creator mount revision before the existing mount mutation continues.
+
+`KeloMountCatalog` exposes registration, lookup, query, validation, migration, MovementProfile and EquipmentSlotProfile registries. `getRaw(id)` is tooling/diagnostic access and must not be mistaken for permission to use Creator content.
 
 ## Ability contract
 
@@ -123,11 +131,20 @@ Mount outfits use `KeloAppearance` profiles and items. Cosmetics do not carry ga
 
 ## Local vs online authority
 
-Every mutation goes through the replaceable `KeloMounts.setAuthority({request})` boundary. V1 uses a local fallback for prototype play. Production authority must validate ownership, equipped mount, mount equipment, cooldowns and accepted gameplay modifiers server-side. Network payloads should transmit stable IDs/state, not full definitions or images.
+Every mutation goes through two composable boundaries in order:
+
+1. zero or more `useGuard(fn)` preconditions;
+2. the replaceable `KeloMounts.setAuthority({request})` domain boundary.
+
+V1 uses a local authority fallback for prototype play. Creator mounts can additionally install a server-backed exact-revision use guard without replacing Mount authority. Production Mount authority must still validate gameplay ownership/state, equipped mount, mount equipment, cooldowns and accepted gameplay modifiers server-side. Network payloads should transmit stable IDs/state, not full definitions or images.
+
+A successful Creator-use guard means only that the account is allowed to select/use that Creator content revision. It does not grant mount gameplay stats, abilities or domain legality by itself.
 
 ## Persistence
 
-Prototype state persists through the existing `saveState()` owner. `schemaVersion` and `revision` are present so migrations can replace this storage without changing content IDs.
+Prototype Mount state persists through the existing `saveState()` owner. Creator-content ownership is never persisted into `STATE.mounts.owned` as a fake purchase; exact Creator entitlement/use binding remains server-owned.
+
+`schemaVersion` and `revision` are present so migrations can replace local storage without changing content IDs.
 
 ## Invariants
 
@@ -138,18 +155,23 @@ Prototype state persists through the existing `saveState()` owner. `schemaVersio
 5. No definition implies an active actor or loaded asset.
 6. Gameplay mutation does not originate in UI.
 7. Movement uses `KeloMovement`; abilities use `KeloAbilities`; stats use `KeloStats`.
+8. Use guards run before domain authority and never replace it.
+9. Creator entitlement metadata never becomes local Mount ownership truth.
 
 ## Extension points
 
-Add new content by registering definitions/profiles. New cross-cutting behavior belongs in the appropriate owner (new KeloAbilities delivery primitive, KeloStats scope, KeloAppearance capability), not in a mount-ID branch.
+Add new content by registering definitions/profiles. New cross-cutting behavior belongs in the appropriate owner (new KeloAbilities delivery primitive, KeloStats scope, KeloAppearance capability), not in a mount-ID branch. Cross-domain authorization preconditions may use `useGuard`; gameplay validation belongs to Mount authority.
 
 ## Correct use
 
 ```js
-KeloMountCatalog.register(definition);
+const dispose = KeloMounts.useGuard(async (op, payload) => {
+  // optional cross-domain precondition
+});
 await KeloMounts.equipMount(definition.id);
 await KeloMounts.mount();
 KeloMountAbilityChannel.cast({slotIndex:0,direction:{x:1,y:0}});
+dispose();
 ```
 
 ## Anti-patterns
@@ -160,22 +182,26 @@ KeloMountAbilityChannel.cast({slotIndex:0,direction:{x:1,y:0}});
 - adding a `MountAbilityEngine` or second movement loop.
 - loading every mount asset at startup.
 - changing player stats from UI/outfit code.
+- treating a Creator catalog row as proof that the account owns the mount.
+- replacing Mount authority with Creator-use authorization.
 
 ## Tests / CI
 
 - `npm run audit:mounts` — definitions, 20k scale, exact 3-slot channel, Stone restoration.
 - `npm run audit:stats`
 - `npm run audit:appearance`
+- `node scripts/creator-use-authority-audit.mjs` when Creator-use guards change.
 - existing Foundation/Stone/Studio audits remain required.
 
 ## Observability
 
-`KELO_MOUNT_AUDIT` and `KELO_MOUNT_ABILITY_AUDIT` expose foundation facts. Runtime domain changes emit `KELO_MOUNT_CHANGED`, `KELO_MOUNTED`, `KELO_DISMOUNTED` and semantic mount ability events.
+`KELO_MOUNT_AUDIT` and `KELO_MOUNT_ABILITY_AUDIT` expose foundation facts. `KELO_MOUNT_AUDIT.composableUseGuards` documents the new precondition boundary. Runtime domain changes emit `KELO_MOUNT_CHANGED`, `KELO_MOUNTED`, `KELO_DISMOUNTED` and semantic mount ability events.
 
 ## Known limitations
 
 - Real horse/wolf art bundles are not yet present, so visual mount rendering is not claimed complete.
-- Server authority adapter is a boundary, not a deployed production service.
+- Full production Mount server authority remains a replaceable boundary, not a deployed complete service.
+- Creator Use Authority persists exact Creator mount selection, but does not replace future server simulation/spawn validation.
 - Native generic AbilitySource inside `KeloAbilities` remains follow-up debt; V1 bridge is intentionally isolated and tested.
 
 ## Checklist for a new mount

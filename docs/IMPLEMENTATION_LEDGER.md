@@ -501,3 +501,101 @@ Handoff prompt:
 **Handoff prompt:**
 
 > Continue `IMP-2026-09-15-CREATOR-DELIVERY-005` on `creator-content-delivery-v1`. Read `docs/systems/CREATOR_CONTENT_DELIVERY.md`, Entitlement/Marketplace ledger entries and migrations `20260916003000_creator_entitlement_access.sql` + `20260916003500_creator_content_delivery_v1.sql`. Do not bulk-sync Owned content, create another asset store/auth client, or treat `creator-global` URLs as license evidence. First run `node scripts/creator-content-delivery-audit.mjs` plus all upstream audits, apply migrations to test Supabase, then test owner/pre-purchase/post-purchase/r3-vs-r4/publication-integrity/account-switch/avatar-selection and iPhone/LIVE first-use. The next implementation layer is server-authoritative equip/place/spawn/use, not another marketplace or renderer rewrite.
+
+---
+
+### IMP-2026-09-15-CREATOR-USE-AUTHORITY-006
+
+**Status:** IMPLEMENTED_PENDING_VERIFY  
+**Depends on:** `IMP-2026-09-15-CREATOR-DELIVERY-005` / PR #276 and all upstream Creator stack layers.  
+**Owner(s):** Kelo Creator Use Authority + Supabase exact-revision use bindings; Character/Appearance/Equipment/Mount/Property retain their domain responsibilities.  
+**User intent / source prompt:** Continue after on-demand Delivery so Creator characters, skins, visual weapons/equipment, mounts and props do not become persistently usable merely because the browser loaded them. Reuse one server-side exact-revision rule and keep every improvement documented so any agent can continue without inventing parallel ownership or gameplay systems.
+
+**Why:** Entitlement + Delivery protects discovery/runtime activation, but persistent selections still need a server mutation. The correct boundary is one common Creator-content authorization precondition composed in front of existing domain owners, not separate ownership stores inside Character, Mount and Property.
+
+**Invariants:**
+
+- Persistent Creator use requires exact revision + allowed type + active publication + creator ownership or exact entitlement.
+- `creator_content_entitlements` remains ownership truth; use bindings are selection/use state, not ownership.
+- One private server helper (`kelo_private.require_creator_revision_use`) backs the new use mutations.
+- No second Supabase/auth client, wallet, inventory, renderer, mount owner or property owner.
+- Normal boot exposes only the small `KeloCreatorUse` facade; implementation remains dynamic-import first-use.
+- Creator `equipment` in this pass is visual/appearance content. It does not grant gameplay weapon stats or bypass `KeloEquipment`.
+- Property use authorization is a Creator-content preflight only. Property/House/remote authority still validates parcel ownership, geometry, bounds, quantities and actual placement persistence.
+- Current `KeloCharacterCustomization` remains the live character visual state/render owner. Server Creator appearance bindings exist now, but automatic renderer convergence is not claimed complete.
+- Built-in content keeps existing local/domain paths.
+
+**Implemented now (stacked branch `creator-use-authority-v1`):**
+
+- Added `creator_character_content_bindings`, `creator_character_mount_bindings` and `creator_property_use_authorizations` with direct authenticated table writes revoked.
+- Added shared `kelo_private.require_creator_revision_use(user,revision,allowedTypes)` exact-revision server precondition.
+- Added `set_character_creator_content` for server-authoritative Creator appearance/equipment visual slot bindings, including server-derived slot match and character target validation.
+- Added `set_character_creator_mount` for exact Creator mount selection by owned active character.
+- Added `authorize_creator_property_placement` as a server receipt proving paid Creator world/tile access before the existing Property owner applies parcel/placement rules.
+- Added `get_my_creator_use_state`, including authoritative loadout, mount and active Creator avatar revision identity.
+- Reused existing server-authoritative `set_active_character_avatar` through `KeloCreatorUse.avatar()`.
+- Added `Kelo Creator Use Authority` client service with only hydrated non-authoritative selection cache; no ownership store.
+- Added normal-game lazy `KeloCreatorUse.avatar/equip/clearSlot/mount/clearMount/place/state` facade.
+- Creator composition root binds Use Authority to the same authenticated Creator repository/session as Entitlements and Delivery and clears hydrated state on identity change.
+- `KeloMounts` now supports composable `useGuard(fn)` preconditions before its existing authority adapter; Creator mounts count as usable only while the entitlement guard allows the exact revision.
+- `KELO_PROPERTY_SYSTEM` now supports composable `useGuard(fn)` preconditions before House/remote/local authority; built-in unit behavior remains intact.
+- Delivery arms Use Authority only after first Creator-content activation so lazy Mount/Property owners cannot accidentally skip the product-path preflight.
+- Added hydrated authoritative state resolver for Creator visual loadouts without claiming that CharacterCustomization already consumes it automatically.
+- Added static audit and system documentation.
+
+**Files/contracts touched:**
+
+- `supabase/migrations/20260916004000_creator_use_authority_v1.sql`
+- `src/creators/content/creator-use-authority.mjs`
+- `src/creators/content/supabase-content-repository.mjs`
+- `src/creators/content/creator-content-delivery.mjs`
+- `src/creators/creator-entry.mjs`
+- `src/core/creators-lazy-gate.js`
+- `src/mounts/mount-system.js`
+- `src/property/property-system.js`
+- `scripts/creator-use-authority-audit.mjs`
+- `docs/systems/CREATOR_USE_AUTHORITY.md`
+- `docs/system-catalog.json`
+- `docs/CODE_INDEX.md`
+- `docs/ARCHITECTURE_CURRENT.md`
+- `docs/IMPLEMENTATION_LEDGER.md`
+
+**Deferred deliberately:**
+
+- Final Character V2 visual renderer convergence: authoritative Creator appearance/equipment slot bindings exist, but current `KeloCharacterCustomization` still owns actual character state/render until a dedicated adapter migration is validated.
+- Gameplay weapon/equipment stats, inventory, combat and ability authority. Creator visual `equipment` does not modify `KeloEquipment` stats.
+- Full server Property parcel/geometry/placement transaction authority. Current Creator RPC authorizes content access before the replaceable Property domain authority; it does not claim the actual placement is globally persisted.
+- Server-authoritative mount simulation/spawn broadcasting beyond selected Creator mount binding; `KeloMounts` remains domain owner.
+- Refund/revocation/subscription/version-upgrade policy and rN→rN+1 upgrade rules.
+- Marketplace OWNED-page convenience buttons for every content type; authority APIs exist independently of that UI sugar.
+
+**Acceptance / gates:**
+
+- `node scripts/creator-use-authority-audit.mjs` passes from a runnable checkout and all upstream Creator audits remain green.
+- Migration applies cleanly to test Supabase after all upstream migrations.
+- Creator owner can persist their own **published** exact revision; unpublished author drafts remain preview-only and cannot become persistent live use.
+- Buyer before purchase cannot persist character visual, mount or property use.
+- Buyer after purchase can persist only the exact entitled revision.
+- r3 entitlement does not authorize r4.
+- A second/non-entitled account remains denied.
+- Account switch/sign-out cannot reuse hydrated prior-user use state.
+- Server rejects a forged slot that does not match the Creator revision payload.
+- Server rejects Creator appearance/equipment targeting something other than character/player.
+- Mount guard runs before mount-domain authority and built-in mounts remain unchanged.
+- Property guard rejects unauthorized Creator placement before House/remote/local placement mutation; built-in unit/bounds behavior remains unchanged.
+- Purchased Creator avatar remains selectable through server authority and remote published avatar rendering remains intact.
+- Normal boot does not import Use Authority until first explicit Creator use/activation.
+- iPhone/LIVE first-use does not freeze or bulk-sync Owned content.
+- Character renderer convergence must get its own visual/LIVE test before anyone claims Creator skin/equipment is fully rendered from server binding after reload.
+
+**Evidence:**
+
+- Branch: `creator-use-authority-v1`, stacked from `creator-content-delivery-v1`.
+- New migration/client/guards/docs/audit are present on the branch.
+- This environment has not executed the migration, Node audit, upstream audits, multi-account Supabase integration, Playwright or iPhone/LIVE flow. No such verification is claimed; status remains `IMPLEMENTED_PENDING_VERIFY`.
+
+**Next action:** run Use Authority + upstream audits and apply all stacked migrations to a test Supabase project. Execute owner/pre-purchase/post-purchase/r3-vs-r4/account-switch tests for avatar, visual appearance/equipment, mount and property preflight. Then do the separate **Character Appearance State Bridge** pass so the authoritative visual loadout is hydrated into the current CharacterCustomization renderer without creating a second character state owner. After that, Property can receive a full online parcel-placement authority pass.
+
+**Handoff prompt:**
+
+> Continue `IMP-2026-09-15-CREATOR-USE-AUTHORITY-006` on `creator-use-authority-v1`. Read `docs/systems/CREATOR_USE_AUTHORITY.md`, Delivery/Entitlement/Marketplace ledger entries and migration `20260916004000_creator_use_authority_v1.sql`. Preserve the distinction between ownership, delivery, use binding and domain gameplay authority. Do not turn Creator visual `equipment` into weapon stats, do not replace `KeloEquipment`, `KeloMounts`, `KELO_PROPERTY_SYSTEM` or `KeloCharacterCustomization`, and do not call Property authorization full parcel authority. First run `node scripts/creator-use-authority-audit.mjs` plus every upstream audit, apply migrations in test Supabase and execute multi-account exact-revision tests + iPhone/LIVE. The next focused implementation pass is Character Appearance State Bridge: consume the authoritative Creator visual bindings inside the existing CharacterCustomization/render path, not a second renderer/state store.

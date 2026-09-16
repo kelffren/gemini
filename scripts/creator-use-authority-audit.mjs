@@ -1,0 +1,34 @@
+#!/usr/bin/env node
+import fs from 'node:fs';
+import path from 'node:path';
+const root=process.cwd(),read=p=>fs.readFileSync(path.join(root,p),'utf8'),checks=[];
+function check(name,ok){checks.push({name,ok:!!ok});if(!ok)process.exitCode=1;}
+const migration=read('supabase/migrations/20260916004000_creator_use_authority_v1.sql');
+const use=read('src/creators/content/creator-use-authority.mjs');
+const repo=read('src/creators/content/supabase-content-repository.mjs');
+const entry=read('src/creators/creator-entry.mjs');
+const lazy=read('src/core/creators-lazy-gate.js');
+const delivery=read('src/creators/content/creator-content-delivery.mjs');
+const mounts=read('src/mounts/mount-system.js');
+const property=read('src/property/property-system.js');
+check('one exact-revision server rule backs use mutations',/require_creator_revision_use/.test(migration)&&/creator_content_entitlements/.test(migration)&&/content_publications/.test(migration)&&/CREATOR_CONTENT_ACCESS_REQUIRED/.test(migration));
+check('character cosmetic binding validates server slot and target',/set_character_creator_content/.test(migration)&&/CREATOR_CONTENT_SLOT_MISMATCH/.test(migration)&&/CREATOR_CONTENT_TARGET_NOT_CHARACTER/.test(migration));
+check('creator mount binding is server-authoritative',/set_character_creator_mount/.test(migration)&&/array\['mount'\]/.test(migration));
+check('property mutation is only a creator-content authorization preflight',/authorize_creator_property_placement/.test(migration)&&/not parcel geometry authority/i.test(migration)&&/array\['world','tile'\]/.test(migration));
+check('direct use-state tables are not client writable',/revoke all on public\.creator_character_content_bindings,public\.creator_character_mount_bindings,public\.creator_property_use_authorizations from anon,authenticated/.test(migration));
+check('repository exposes all creator-use RPCs',/setCharacterCreatorContent/.test(repo)&&/setCharacterCreatorMount/.test(repo)&&/authorizeCreatorPropertyPlacement/.test(repo)&&/getMyCreatorUseState/.test(repo));
+check('use authority reuses delivery and exact revision identities',/activate\(revisionId\)/.test(use)&&/set_character_creator_content/.test(use)&&/set_character_creator_mount/.test(use)&&/authorize_creator_property_placement/.test(use));
+check('avatar use reuses existing server-authoritative avatar mutation',/selectCharacterAvatar/.test(use)&&/set_active_character_avatar/.test(use));
+check('authoritative use state carries current creator avatar revision',/'avatar',v_avatar/.test(migration)&&/raw\?\.avatar\?\.revisionId/.test(use)&&/state\.avatar/.test(use));
+check('use authority creates no auth client or ownership store',!/createClient\s*\(|localStorage\?\.setItem\([^)]*ownership|indexedDB/.test(use)&&/KeloOnlineAuth/.test(use));
+check('use cache is hydrated selection only',/const hydrated=new Map\(\)/.test(use)&&/get_my_creator_use_state/.test(use)&&!/listMyCreatorEntitlements|loadAllOwned|syncAllOwned/.test(use));
+check('creator entry shares one repository session with use authority',/getOrCreateCreatorUseAuthority/.test(entry)&&/useAuthority\.bindProvider/.test(entry)&&/contentRepository\.rpc/.test(entry)&&/contentSession\.onChange/.test(entry));
+check('normal boot exposes only lazy use facade',/useAuthorityModuleUrl/.test(lazy)&&/KeloCreatorUse/.test(lazy)&&!/void loadUseAuthority\(\)/.test(lazy));
+check('delivery arms use guards only after creator content use',/KeloCreatorUse\?\.load/.test(delivery)&&/attachRuntimeGuards/.test(delivery));
+check('mount owner composes guard before domain authority',/function useGuard/.test(mounts)&&/await runGuards\(op,data\)/.test(mounts)&&/return authority\.request/.test(mounts));
+check('creator mount local owned shortcut requires entitlement',/function creatorAccess/.test(mounts)&&/return creatorAccess\(key\)\.ok===true/.test(mounts));
+check('property owner composes guard before house remote or local authority',/function useGuard/.test(property)&&/await runUseGuards\(op,data\)/.test(property)&&/KELO_HOUSE_AUTHORITY/.test(property)&&/remoteAdapter/.test(property)&&/localRequest/.test(property));
+check('built-in property units rule is preserved while entitled creator templates are recognized',/!creatorUsable\(t\)&&available\(owner,t\.id\)<1/.test(property)&&/NO_OWNED_UNITS/.test(property));
+check('no polling or second render loop',!/setInterval|requestAnimationFrame/.test(use)&&!/setInterval|requestAnimationFrame/.test(migration));
+for(const c of checks)console.log(`${c.ok?'PASS':'FAIL'}  ${c.name}`);
+if(process.exitCode)console.error(`\nCreator use authority audit failed: ${checks.filter(x=>!x.ok).length}/${checks.length}`);else console.log(`\nCreator use authority audit passed: ${checks.length}/${checks.length}`);

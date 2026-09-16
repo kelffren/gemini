@@ -77,6 +77,7 @@ export function createCreatorContentDelivery({root=globalThis,runtimeRegistry=nu
     const type=text(contentType),feature=FEATURE_BY_TYPE[type];
     if(feature&&root.KELO_MODULE_LOADER?.ensure)await root.KELO_MODULE_LOADER.ensure(feature);
     if(type==='character'&&!root.KeloCreatorAvatars)installCreatorAvatarRuntime({root});
+    try{if(!root.KELO_CREATOR_USE_AUTHORITY&&root.KeloCreatorUse?.load)await root.KeloCreatorUse.load();root.KELO_CREATOR_USE_AUTHORITY?.attachRuntimeGuards?.();}catch(error){console.warn('[Creator delivery] use authority arm failed',error);}
   }
   function ensureRegistry(){
     if(registry)return registry;if(root.KELO_CREATOR_CONTENT_REGISTRY){registry=root.KELO_CREATOR_CONTENT_REGISTRY;return registry;}
@@ -91,8 +92,8 @@ export function createCreatorContentDelivery({root=globalThis,runtimeRegistry=nu
     const row=target.register(runtimeRecord(manifest));return F({manifest,row,cached:false});
   }
   function invalidateIdentity(){cache.clear();inflight.clear();return diagnostics();}
-  function diagnostics(){return F({version:'creator-content-delivery-v1.0.0',provider:provider?.name||'KeloOnlineAuth',accountId:accountId()||null,cachedManifests:cache.size,inflight:inflight.size,registryVersion:registry?.version||root.KELO_CREATOR_CONTENT_REGISTRY?.version||null});}
-  const api=F({version:'creator-content-delivery-v1.0.0',bindProvider,getManifest,activateRevision,invalidateIdentity,diagnostics});return api;
+  function diagnostics(){return F({version:'creator-content-delivery-v1.0.2-use-authority-arm',provider:provider?.name||'KeloOnlineAuth',accountId:accountId()||null,cachedManifests:cache.size,inflight:inflight.size,registryVersion:registry?.version||root.KELO_CREATOR_CONTENT_REGISTRY?.version||null});}
+  const api=F({version:'creator-content-delivery-v1.0.2-use-authority-arm',bindProvider,getManifest,activateRevision,invalidateIdentity,diagnostics});return api;
 }
 
 export function getOrCreateCreatorContentDelivery({root=globalThis,runtimeRegistry=null}={}){

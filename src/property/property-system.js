@@ -1,10 +1,10 @@
 /* KELO-INDEX
  * area: PROPERTY
- * keys: PARCEL PLACEMENT OWNERSHIP UNITS AUTHORITY RENDER COLLISION PREVIEW
+ * keys: PARCEL PLACEMENT OWNERSHIP UNITS AUTHORITY RENDER COLLISION PREVIEW CREATOR USE GUARD
  * hace: autoridad local reemplazable, balances por unidad, colocaciones y render dinámico de parcelas
- * online: UI solo llama request(); installRemoteAdapter permite sustituir localStorage por servidor sin cambiar UI
+ * online: UI solo llama request(); guards de uso corren antes de house/remote/local authority; installRemoteAdapter sigue reemplazando persistencia sin cambiar UI
  * collision: publica el set property:placements mediante KELO_COLLISION; no muta obstacles
- * public-api: KELO_PROPERTY_SYSTEM.drawPlacements() reutiliza el mismo renderer para previews read-only sin mutar state
+ * public-api: request/useGuard/installRemoteAdapter/drawPlacements; previews read-only reutilizan renderer sin mutar state
  */
 (function(){
   'use strict';
@@ -16,6 +16,7 @@
   const images=new Map();
   const readyAssets=new Set();
   const listeners=new Set();
+  const useGuards=new Set();
   let remoteAdapter=null,seq=1;
   const playerId=()=>String(window.keloNet?.playerKey||window.localPlayer?.id||'local_pioneer');
   const clone=v=>JSON.parse(JSON.stringify(v));
@@ -30,6 +31,8 @@
   function owned(owner,assetId){return Math.max(0,Math.floor(Number(state.balances?.[owner]?.[assetId])||0));}
   function deployed(owner,assetId,ignorePlacementId){return state.placements.reduce((n,p)=>n+(p.ownerId===owner&&p.assetId===assetId&&p.placementId!==ignorePlacementId?1:0),0);}
   function available(owner,assetId,ignorePlacementId){return Math.max(0,owned(owner,assetId)-deployed(owner,assetId,ignorePlacementId));}
+  function creatorRevision(t){if(t?.source!=='creator-content')return'';return String(t.sourceId||t.metadata?.creatorRevisionId||'');}
+  function creatorUsable(t){const revisionId=creatorRevision(t);if(!revisionId)return false;const gate=window.KeloCreatorEntitlements;return !!gate?.checkRecord?.({source:'creator-content',revisionId})?.ok;}
   function normalizeScale(v){const n=Number(v);return Math.max(.1,Math.min(8,Number.isFinite(n)?Math.round(n*100)/100:1));}
   function rotatedSize(t,q,scale=1){q=((Math.floor(Number(q)||0)%4)+4)%4;const s=normalizeScale(scale),w=t.width*s,h=t.height*s;return(q%2)?{w:h,h:w}:{w,h};}
   function snap(v,s){return Math.round((Number(v)||0)/s)*s;}
@@ -75,7 +78,7 @@
       const p=parcel(data.parcelId),t=C.get(data.assetId);if(!p)throw new Error('PARCEL_NOT_FOUND');if(!t)throw new Error('ASSET_NOT_FOUND');if(!canEdit(p,owner))throw new Error('NOT_PARCEL_OWNER');
       const q=((Math.floor(Number(data.rotation)||0)%4)+4)%4,scale=normalizeScale(data.scale),d=rotatedSize(t,q,scale),s=Math.max(1,t.snap||C.tileSize),x=snap(data.x,s),y=snap(data.y,s);
       if(!within(p.bounds,x,y,d.w,d.h))throw new Error('OUTSIDE_PARCEL');
-      if(p.kind!=='world_editor'&&available(owner,t.id)<1)throw new Error('NO_OWNED_UNITS');
+      if(p.kind!=='world_editor'&&!creatorUsable(t)&&available(owner,t.id)<1)throw new Error('NO_OWNED_UNITS');
       const rec={placementId:id('placement'),parcelId:p.parcelId,ownerId:owner,assetId:t.id,x,y,rotation:q,scale,layer:'property',createdAt:Date.now(),updatedAt:Date.now()};state.placements.push(rec);bump();return clone(rec);
     }
     if(op==='move'){
@@ -103,7 +106,9 @@
     }
     throw new Error('UNKNOWN_PROPERTY_OPERATION');
   }
-  async function request(op,payload){const data=payload||{};if(isHouseMutation(op,data)&&window.KELO_HOUSE_AUTHORITY?.request)return window.KELO_HOUSE_AUTHORITY.request(op,data);if(remoteAdapter&&typeof remoteAdapter.request==='function')return remoteAdapter.request(op,data);return localRequest(op,data);}
+  function useGuard(fn){if(typeof fn!=='function')throw new Error('INVALID_PROPERTY_USE_GUARD');useGuards.add(fn);return()=>useGuards.delete(fn);}
+  async function runUseGuards(op,data){for(const guard of [...useGuards])await guard(op,clone(data||{}));}
+  async function request(op,payload){const data=payload||{};await runUseGuards(op,data);if(isHouseMutation(op,data)&&window.KELO_HOUSE_AUTHORITY?.request)return window.KELO_HOUSE_AUTHORITY.request(op,data);if(remoteAdapter&&typeof remoteAdapter.request==='function')return remoteAdapter.request(op,data);return localRequest(op,data);}
   function installRemoteAdapter(adapter){if(adapter&&typeof adapter.request!=='function')throw new Error('INVALID_PROPERTY_ADAPTER');remoteAdapter=adapter||null;window.KELO_PROPERTY_AUDIT.authority=remoteAdapter?'remote-adapter':'local-fallback';}
   function ingestAuthoritySnapshot(next){if(!next||next.schema!==SCHEMA||!next.parcels||!next.balances||!Array.isArray(next.placements))throw new Error('INVALID_PROPERTY_SNAPSHOT');state=clone(next);persist();return snapshot();}
 
@@ -142,7 +147,7 @@
   function suppressLegacyFurniture(plot){const p=state.parcels['parcel:legacy:104'];return !!p&&p.bounds.x===plot?.x&&p.bounds.y===plot?.y&&state.placements.some(x=>x.parcelId===p.parcelId);}
   if(typeof renderPlot==='function'){const legacyRenderPlot=renderPlot;renderPlot=function(plot,isOwn){if(suppressLegacyFurniture(plot))return legacyRenderPlot(Object.assign({},plot,{furniture:[]}),isOwn);return legacyRenderPlot(plot,isOwn);};}
   window.KELO_PROPERTY_SYSTEM=Object.freeze({
-    version:'property-system-v1.4.0',storageMode:'local-fallback-replaceable',collisionOwner:COLLISION_OWNER,request,authorityLocalRequest:localRequest,installRemoteAdapter,ingestAuthoritySnapshot,snapshot,playerId,parcel,getOwnedUnits:(assetId,owner)=>owned(String(owner||playerId()),assetId),getDeployedUnits:(assetId,owner)=>deployed(String(owner||playerId()),assetId),getAvailableUnits:(assetId,owner)=>available(String(owner||playerId()),assetId),getPlacements:(pid)=>state.placements.filter(p=>!pid||p.parcelId===pid).map(clone),placementBounds,placementForPoint,drawPlacements,exportLayout,suppressLegacyFurniture,refreshSceneColliders:syncColliders,onChange(fn){if(typeof fn!=='function')return()=>{};listeners.add(fn);return()=>listeners.delete(fn);},get ready(){return true;}
+    version:'property-system-v1.5.0-use-guards',storageMode:'local-fallback-replaceable',collisionOwner:COLLISION_OWNER,request,useGuard,authorityLocalRequest:localRequest,installRemoteAdapter,ingestAuthoritySnapshot,snapshot,playerId,parcel,getOwnedUnits:(assetId,owner)=>owned(String(owner||playerId()),assetId),getDeployedUnits:(assetId,owner)=>deployed(String(owner||playerId()),assetId),getAvailableUnits:(assetId,owner)=>available(String(owner||playerId()),assetId),getPlacements:(pid)=>state.placements.filter(p=>!pid||p.parcelId===pid).map(clone),placementBounds,placementForPoint,drawPlacements,exportLayout,suppressLegacyFurniture,refreshSceneColliders:syncColliders,onChange(fn){if(typeof fn!=='function')return()=>{};listeners.add(fn);return()=>listeners.delete(fn);},get ready(){return true;}
   });
-  window.KELO_PROPERTY_AUDIT={version:'property-system-v1.4.0',schema:SCHEMA,authority:'local-fallback',serverReplaceable:true,collisionMode:'kelo-collision-owner-v2',collisionOwner:COLLISION_OWNER,parcelCount:Object.keys(state.parcels).length,placementCount:state.placements.length,assetCount:C.list().length,readOnlyPreviewRenderer:true};
+  window.KELO_PROPERTY_AUDIT={version:'property-system-v1.5.0-use-guards',schema:SCHEMA,authority:'local-fallback',serverReplaceable:true,composableUseGuards:true,creatorEntitlementAware:true,collisionMode:'kelo-collision-owner-v2',collisionOwner:COLLISION_OWNER,parcelCount:Object.keys(state.parcels).length,placementCount:state.placements.length,assetCount:C.list().length,readOnlyPreviewRenderer:true};
 })();
