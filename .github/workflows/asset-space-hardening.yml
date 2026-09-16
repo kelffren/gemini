@@ -39,16 +39,35 @@ jobs:
           node-version: '24'
       - name: Bug Intelligence risk preflight
         run: |
-          BASE="$(git merge-base HEAD origin/main)"
+          BEFORE="${{ github.event.before }}"
+          if [ "$GITHUB_EVENT_NAME" = "push" ] && [ "$GITHUB_REF" = "refs/heads/main" ] && [ -n "$BEFORE" ] && [ "$BEFORE" != "0000000000000000000000000000000000000000" ]; then
+            BASE="$BEFORE"
+          else
+            BASE="$(git merge-base HEAD origin/main)"
+          fi
           echo "Asset-space risk base: $BASE"
           node scripts/bug-risk.mjs "$BASE" HEAD
       - name: Bug Intelligence dependency impact
         run: |
-          BASE="$(git merge-base HEAD origin/main)"
-          node scripts/bug-impact.mjs --diff "$BASE" HEAD --depth=2
+          BEFORE="${{ github.event.before }}"
+          if [ "$GITHUB_EVENT_NAME" = "push" ] && [ "$GITHUB_REF" = "refs/heads/main" ] && [ -n "$BEFORE" ] && [ "$BEFORE" != "0000000000000000000000000000000000000000" ]; then
+            BASE="$BEFORE"
+          else
+            BASE="$(git merge-base HEAD origin/main)"
+          fi
+          if [ "$BASE" = "$(git rev-parse HEAD)" ]; then
+            echo 'BUG_IMPACT_NO_DIFF — nothing changed relative to baseline'
+          else
+            node scripts/bug-impact.mjs --diff "$BASE" HEAD --depth=2
+          fi
       - name: Runtime performance no-regression contract
         run: |
-          BASE="$(git merge-base HEAD origin/main)"
+          BEFORE="${{ github.event.before }}"
+          if [ "$GITHUB_EVENT_NAME" = "push" ] && [ "$GITHUB_REF" = "refs/heads/main" ] && [ -n "$BEFORE" ] && [ "$BEFORE" != "0000000000000000000000000000000000000000" ]; then
+            BASE="$BEFORE"
+          else
+            BASE="$(git merge-base HEAD origin/main)"
+          fi
           TMP="$(mktemp -d)"
           git worktree add --detach "$TMP/base" "$BASE" >/dev/null
           set +e
