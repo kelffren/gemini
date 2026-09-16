@@ -1,8 +1,8 @@
 /* KELO-INDEX
  * area: BUILD / CREATOR ASSET INGEST
  * owner: Kelo Creator Asset Bridge
- * keys: ASSET SPACE META AUDIT PROFILE SEAM RENDER EXACT QUALITY TOURNAMENT PATH TOKENS
- * purpose: prove asset classification, path-token safety, compound terrain names, seam/render-exact hard-gates and verified codec tournament behavior
+ * keys: ASSET SPACE META AUDIT PROFILE SEAM RENDER EXACT QUALITY BOUNDARY TOURNAMENT PATH TOKENS
+ * purpose: prove asset classification, path-token safety, seam/render-exact hard-gates, bounded quality search and verified codec tournament behavior
  * public-api: CLI audit
  * state-owned: none
  * online: N/A
@@ -12,6 +12,7 @@ import {encodeRgbaPng} from '../src/creators/assets/png-space-optimizer.mjs';
 import {profileAssetImage} from '../src/creators/assets/asset-image-profiler.mjs';
 import {evaluatePixelFidelity, judgePixelFidelity} from '../src/creators/assets/png-quality-agent.mjs';
 import {optimizePngTournament} from '../src/creators/assets/png-codec-tournament.mjs';
+import {searchIntegerQualityBoundary} from '../src/creators/assets/quality-boundary-search.mjs';
 
 function assert(condition, message) {
   if (!condition) throw new Error(`ASSET_SPACE_META_AUDIT_FAILED:${message}`);
@@ -59,7 +60,6 @@ assert(judgePixelFidelity(borderMetrics, 'seam-safe').pass === false, 'seam-safe
 const sprite = Buffer.alloc(24 * 24 * 4);
 for (let pixel = 0; pixel < 24 * 24; pixel += 1) {
   const o = pixel * 4;
-  // Deliberately non-zero hidden RGB to model AI/exporter transparent padding.
   sprite[o] = 21; sprite[o + 1] = 44; sprite[o + 2] = 77; sprite[o + 3] = 0;
 }
 for (let y = 5; y < 20; y += 1) {
@@ -94,6 +94,26 @@ alphaChanged[3] = 1;
 const alphaMetrics = evaluatePixelFidelity(sprite, alphaChanged, 24, 24);
 assert(judgePixelFidelity(alphaMetrics, 'render-exact').pass === false, 'render-exact rejects alpha change');
 
+// Boundary search: a synthetic codec passes quality >=83. A linear integer scan
+// from 60..100 would require 41 encodes; the controller must locate 83 within six.
+const boundarySearch = await searchIntegerQualityBoundary({
+  min:60,
+  max:100,
+  coarseStep:10,
+  maxEvaluations:6,
+  neighborRadius:0,
+  evaluate:async quality=>({
+    pass:quality>=83,
+    bytes:2000+quality*10,
+    score:quality/100,
+    reasons:quality>=83?[]:['synthetic-quality-gate']
+  })
+});
+assert(boundarySearch.boundaryPass === 83, `boundary quality=${boundarySearch.boundaryPass}`);
+assert(boundarySearch.budget.used <= 6, `boundary evaluations=${boundarySearch.budget.used}`);
+assert(boundarySearch.order.every(q=>boundarySearch.evaluated.some(item=>item.quality===q)), 'boundary never invents unmeasured result');
+assert(boundarySearch.bestByBytes?.quality === 83, `boundary byte winner=${boundarySearch.bestByBytes?.quality}`);
+
 const png = encodeRgbaPng(source, width, height, {level:1, filterStrategy:0});
 const tournament = optimizePngTournament(png, {effort:'balanced'});
 assert(tournament.report.winner.pass === true, 'tournament winner gate');
@@ -111,6 +131,7 @@ console.log(JSON.stringify({
   spriteRuntimeCandidates:spriteProfile.runtimeCandidates,
   renderExactHiddenChanges:hiddenMetrics.hiddenTransparentRgbChangedPixels,
   renderExactGate:judgePixelFidelity(hiddenMetrics, 'render-exact').pass,
+  boundarySearch:{order:boundarySearch.order,boundaryPass:boundarySearch.boundaryPass,evaluations:boundarySearch.budget.used},
   borderGate:judgePixelFidelity(borderMetrics, 'seam-safe').reasons,
   sourceBytes:png.length,
   tournamentBytes:tournament.buffer.length,
