@@ -1,6 +1,6 @@
 /* KELO-INDEX
  * area: QA / GUARDIAN PVP FAILOVER
- * keys: GUARDIAN PVP FAILOVER LIVE IOS LEASE EPOCH SNAPSHOT DRIFT AUTH CLEANUP
+ * keys: GUARDIAN PVP FAILOVER LIVE IOS LEASE EPOCH SNAPSHOT DRIFT AUTH CLEANUP PRUNE
  * purpose: gate estático del laboratorio A->B y de los contratos de producción que necesita para medir failover real
  */
 import assert from 'node:assert/strict';
@@ -31,6 +31,12 @@ assert.match(host,/centralAuthorityPriority:true/);
 assert.match(worker,/takeoverRestore:true/);
 assert.match(worker,/projectilesReset:true/);
 assert.match(worker,/transientActionsReset:true/);
+assert.match(worker,/RESTORED_ACTOR_RECLAIM_MS=5000/);
+assert.match(worker,/pendingRestoredActors/);
+assert.match(worker,/pruneUnclaimedRestored/);
+assert.match(worker,/authority\.unregister\(actorId\)/);
+assert.match(worker,/restoredActorPrune:true/);
+assert.doesNotMatch(worker,/setInterval|setTimeout/);
 assert.match(adapter,/takeoverSequenceResync:true/);
 
 assert.match(testSource,/KELO_GUARDIAN_TEST_ADMIN_EMAIL/);
@@ -74,6 +80,8 @@ console.log('GUARDIAN_PVP_FAILOVER_AUDIT_OK',{
   snapshotGapMeasured:true,
   positionDriftMeasured:true,
   blockedInputsMeasured:true,
+  staleRestoredActorPrune:true,
+  restoredActorReclaimMs:5000,
   persistentAuthority:false,
   economyAuthority:false
 });
