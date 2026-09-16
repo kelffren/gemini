@@ -40,6 +40,8 @@ El listado histórico de 16 pasos **no es el boot móvil**. Restaurar esos tags 
 | Avatar composition | `KeloAvatar` | OWNER LIVE |
 | Render extensions | `KeloRender` | OWNER LIVE |
 | Simulation extensions | `KeloSimulation` | OWNER LIVE |
+| Creator exclusive lifecycle | `Kelo Creators + Foundation owners` | OWNER LIVE creator |
+| Pixelorama Pro authoring | `Kelo Asset Forge / Pixelorama bridge` | PENDING VERIFY mobile |
 | Eventos | `KeloEvents` | OWNER LIVE |
 | Menú principal | `KELO_LUXE` | OWNER LIVE |
 | Assets/atlas | `KELO_ATLAS_CONTRACT` | OWNER LIVE |
@@ -50,6 +52,8 @@ El listado histórico de 16 pasos **no es el boot móvil**. Restaurar esos tags 
 | Map generation | `KeloMapForge` | OWNER LIVE creator |
 | Sprite AI authoring inference | `Kelo Sprite AI service` | PREPARED server provider bridge |
 | Update/PWA | `KeloUpdater` | OWNER LIVE client |
+
+`KeloSimulation` posee suspensión por claims. Un creator pesado puede suspender simulación mediante ese owner; no envuelve `updateSimulation`, no crea otro scheduler y debe liberar el claim al cerrar.
 
 ## 4. Mundo y render
 
@@ -91,6 +95,12 @@ Entradas principales:
 El shell es UI; no posee mutations del mundo. Las mutations pasan por Studio Kernel/commands y la autoridad existente. En móvil, el boot se fragmenta y cede turns para evitar matar Safari al parsear/montar el grafo completo.
 
 **Regla QA:** World en iPhone no se declara resuelto solo con headless. Requiere apertura, interacción, placement y reapertura en dispositivo real/LIVE.
+
+### Asset Forge / Pixelorama Pro
+
+Asset Forge sigue siendo el owner del authoring de assets. Cuando el creador pide herramientas profesionales, `src/creators/ui/pixelorama-pro-bridge.mjs` abre `tools/pixelorama/index.html` de forma lazy dentro del juego. Antes de levantar Godot/WASM, `creator-exclusive-runtime.mjs` adquiere los locks/interceptores de Foundation, suspende simulación mediante `KeloSimulation` y puede expulsar atlases no-core sin referencias.
+
+Pixelorama no forma parte del boot normal. El cierre pide `requestQuit`, descarga el runtime Godot, destruye el iframe y libera los claims. PNG/spritesheet vuelve al pipeline canónico de Asset Forge; `.pxo` se conserva como draft local con historial acotado. La capacidad permanece `PENDING VERIFY` hasta completar QA real en Safari/iPhone.
 
 ## 7. Asset compiler + Space Gate
 
@@ -171,6 +181,8 @@ Para Sprite AI, Pages nunca recibe credenciales del proveedor: el browser autent
 - No introducir KTX2/Basis en Canvas 2D sin un consumidor gráfico que justifique esa ruta.
 - No declarar un fix móvil verificado sin QA real.
 - No llamar proveedores de Sprite AI directamente desde GitHub Pages ni saltarse Sprite Compiler/Frame Doctor.
+- No crear un segundo game loop para un creator pesado; usar owners Foundation y `creator-exclusive-runtime`.
+- No precargar Pixelorama/Godot/WASM durante el boot del juego ni mantenerlo residente después de cerrar.
 
 ## 11. Documentos relacionados
 
@@ -182,3 +194,5 @@ Para Sprite AI, Pages nunca recibe credenciales del proveedor: el browser autent
 - `docs/CODE_INDEX.md`
 - `docs/SYSTEM_DOCUMENTATION_STANDARD.md`
 - `docs/systems/SPRITE_AI_SERVICE.md`
+- `docs/systems/CREATOR_EXCLUSIVE_RUNTIME.md`
+- `docs/systems/PIXELORAMA_PRO_BRIDGE.md`
