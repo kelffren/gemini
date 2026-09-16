@@ -29,6 +29,7 @@
     "audit:property": "node scripts/property-editor-audit.js",
     "audit:character": "node scripts/character-customization-audit.js",
     "audit:foundation": "node scripts/foundation-architecture-audit.js",
+    "audit:legacy-containment": "node scripts/legacy-containment-selftest.mjs && node scripts/legacy-containment-audit.mjs",
     "audit:docs": "node scripts/system-documentation-audit.js",
     "audit:updater": "node scripts/updater-audit.mjs",
     "audit:turbo": "node scripts/turbo-update-guardian.mjs",
