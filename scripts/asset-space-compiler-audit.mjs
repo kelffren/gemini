@@ -1,14 +1,42 @@
 /* KELO-INDEX
  * area: QA / CREATOR ASSET INGEST
  * owner: Kelo Creator Asset Bridge
- * keys: PNG SPACE COMPILER AUDIT LOSSLESS PALETTE BIT DEPTH ALPHA DROP SUBBYTE CACHE QUALITY GATE
- * purpose: prove exact PNG reductions and cache integrity without changing decoded RGBA pixels
+ * keys: PNG SPACE COMPILER AUDIT LOSSLESS PALETTE BIT DEPTH ALPHA DROP TRNS SUBBYTE CACHE QUALITY GATE
+ * purpose: prove exact PNG reductions, tRNS decoding and cache integrity without changing delivered RGBA pixels
  * online: N/A; deterministic build-time audit
  */
 
 import assert from 'node:assert/strict';
+import zlib from 'node:zlib';
 import {decodePngRgba, encodeRgbaPng, optimizePngLossless} from '../src/creators/assets/png-space-optimizer.mjs';
 import {evaluatePixelFidelity, judgePixelFidelity} from '../src/creators/assets/png-quality-agent.mjs';
+
+const PNG_SIGNATURE=Buffer.from([137,80,78,71,13,10,26,10]);
+const CRC_TABLE=(()=>{
+  const table=new Uint32Array(256);
+  for(let n=0;n<256;n+=1){let c=n;for(let k=0;k<8;k+=1)c=(c&1)?(0xedb88320^(c>>>1)):(c>>>1);table[n]=c>>>0;}
+  return table;
+})();
+const crc32=buffer=>{let c=0xffffffff;for(const value of buffer)c=CRC_TABLE[(c^value)&255]^(c>>>8);return(c^0xffffffff)>>>0;};
+function chunk(type,data=Buffer.alloc(0)){
+  const t=Buffer.from(type,'ascii'),len=Buffer.alloc(4),crc=Buffer.alloc(4);
+  len.writeUInt32BE(data.length);crc.writeUInt32BE(crc32(Buffer.concat([t,data])));
+  return Buffer.concat([len,t,data,crc]);
+}
+function ihdr(width,height,bitDepth,colorType){
+  const data=Buffer.alloc(13);data.writeUInt32BE(width,0);data.writeUInt32BE(height,4);data[8]=bitDepth;data[9]=colorType;return data;
+}
+function makeTrnsRgbFixture(){
+  const row=Buffer.from([0,10,20,30,40,50,60]);
+  const trns=Buffer.alloc(6);trns.writeUInt16BE(10,0);trns.writeUInt16BE(20,2);trns.writeUInt16BE(30,4);
+  return Buffer.concat([PNG_SIGNATURE,chunk('IHDR',ihdr(2,1,8,2)),chunk('tRNS',trns),chunk('IDAT',zlib.deflateSync(row)),chunk('IEND')]);
+}
+function makeTrnsGray2Fixture(){
+  // Four 2-bit samples 0,1,2,3 packed MSB-first => 00 01 10 11.
+  const row=Buffer.from([0,0b00011011]);
+  const trns=Buffer.alloc(2);trns.writeUInt16BE(2,0);
+  return Buffer.concat([PNG_SIGNATURE,chunk('IHDR',ihdr(4,1,2,0)),chunk('tRNS',trns),chunk('IDAT',zlib.deflateSync(row)),chunk('IEND')]);
+}
 
 function strictCheck(originalRgba, optimizedBuffer, width, height, label) {
   const decoded = decodePngRgba(optimizedBuffer);
@@ -104,12 +132,23 @@ if (opaqueOptimized.report.winner.kind === 'exact-alpha-drop') {
 }
 assert.ok(opaqueOptimized.buffer.length < opaqueOriginal.length,'alpha-drop fixture: chosen exact output smaller');
 
+const trnsRgb=decodePngRgba(makeTrnsRgbFixture());
+assert.deepEqual([...trnsRgb.rgba],[10,20,30,0,40,50,60,255],'tRNS truecolor: transparent key applied exactly');
+const trnsRgbOptimized=optimizePngLossless(makeTrnsRgbFixture());
+strictCheck(trnsRgb.rgba,trnsRgbOptimized.buffer,2,1,'tRNS truecolor optimize');
+
+const trnsGray=decodePngRgba(makeTrnsGray2Fixture());
+assert.deepEqual([...trnsGray.rgba],[0,0,0,255,85,85,85,255,170,170,170,0,255,255,255,255],'tRNS gray2: raw key scales to delivered gray exactly');
+const trnsGrayOptimized=optimizePngLossless(makeTrnsGray2Fixture());
+strictCheck(trnsGray.rgba,trnsGrayOptimized.buffer,4,1,'tRNS gray2 optimize');
+
 console.log(JSON.stringify({
   status:'PNG_SPACE_COMPILER_AUDIT_OK',
   base:{beforeBytes:original.length,afterBytes:optimized.buffer.length,savedPercent:optimized.report.savedPercent,winner:optimized.report.winner},
   palette2bit:{beforeBytes:fourOriginal.length,afterBytes:fourOptimized.buffer.length,winner:fourOptimized.report.winner,bitDepth:fourCheck.decoded.ihdr.bitDepth},
   palette1bit:{beforeBytes:twoOriginal.length,afterBytes:twoOptimized.buffer.length,winner:twoOptimized.report.winner,bitDepth:twoCheck.decoded.ihdr.bitDepth,reoptimizedBytes:twoAgain.buffer.length},
   alphaDrop:{beforeBytes:opaqueOriginal.length,afterBytes:opaqueOptimized.buffer.length,winner:opaqueOptimized.report.winner,candidateCount:alphaDropCandidates.length,outputColorType:opaqueCheck.decoded.ihdr.colorType},
+  trns:{truecolorAlpha:[trnsRgb.rgba[3],trnsRgb.rgba[7]],gray2Alpha:[trnsGray.rgba[3],trnsGray.rgba[7],trnsGray.rgba[11],trnsGray.rgba[15]]},
   qualityScore:baseCheck.verdict.score
 }));
 
