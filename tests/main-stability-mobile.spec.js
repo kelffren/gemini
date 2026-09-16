@@ -8,6 +8,7 @@
 const { test, expect } = require('@playwright/test');
 
 const IPHONE_UA='Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1';
+const BASE_URL=process.env.KELO_PAGES||'http://127.0.0.1:4173/';
 
 async function position(page){
   return page.evaluate(()=>({
@@ -40,7 +41,7 @@ async function touchMoveRight(page){
 }
 
 test('exact PR bytes boot and move in iPhone-sized touch context',async({browser})=>{
-  const page=await browser.newPage({viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true,userAgent:IPHONE_UA});
+  const page=await browser.newPage({baseURL:BASE_URL,viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true,userAgent:IPHONE_UA});
   const pageErrors=[];
   page.on('pageerror',error=>pageErrors.push(String(error&&error.stack||error)));
 
