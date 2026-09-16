@@ -38,7 +38,7 @@ test('V6.69 evergreen branch boots plaza without uncaught errors', async ({ page
   expect(snapshot.abilityAim.version).toBe('kelo-ability-aim-v1.0.0-legacy-parity');
   expect(snapshot.abilityDashMax).toBe(170);
   expect(snapshot.scripts.some(src=>src.includes('legacy-ability-aim-system.js'))).toBe(true);
-  expect(snapshot.scripts.some(src=>src.includes('engine-j.js')||src.includes('engine-k.js'))).toBe(false);
+  expect(snapshot.scripts.some(src=>/engine-(?:j|k)\.js/.test(src))).toBe(false);
   expect(snapshot.camera).toBe(true);
   expect(snapshot.position).toBe(true);
   expect(snapshot.collision).toBe(true);
