@@ -51,6 +51,9 @@ test('TEST DRAFT is temporary and RESTORE returns to canonical environment',asyn
   await expect(page.locator('#kelo-environment-runtime-test-apply')).toBeVisible();
 
   let state=await snapshot(page);
+  expect(state.bridge.version).toContain('kelo-creator-test-bridge-v9');
+  expect(state.bridge.worldConnected).toBe(true);
+  expect(state.bridge.worldRevision).toBe(12);
   expect(state.runtime.temporary).toBe(true);
   expect(state.runtime.state.biome).toBe('forest');
   expect(state.runtime.approved.biome).toBe('coast');
