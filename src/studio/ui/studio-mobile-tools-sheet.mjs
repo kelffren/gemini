@@ -1,14 +1,17 @@
 /* KELO-INDEX
  * area: STUDIO / MOBILE TOOLS SHEET
  * owner: presentation layer only
- * owns: mobile advanced-tools bottom sheet, categories, focus return and command proxies
+ * owns: mobile advanced-tools bottom sheet, categories, context defaults, focus return, swipe dismissal and command proxies
  * does-not-own: editor commands, tool state, selection, camera, paint, assets or persistence
  * public-api: installStudioMobileToolsSheet()
  */
 
-const KEY='__KELO_STUDIO_MOBILE_TOOLS_SHEET_V1__';
-const STYLE_ID='kelo-studio-mobile-tools-sheet-v1';
+const KEY='__KELO_STUDIO_MOBILE_TOOLS_SHEET_V2__';
+const STYLE_ID='kelo-studio-mobile-tools-sheet-v2';
 const MOBILE_QUERY='(max-width:760px)';
+const STORAGE_KEY='kelo.studio.mobileTools.lastCategory';
+const SWIPE_DISMISS_PX=72;
+const SWIPE_DISMISS_VELOCITY=.65;
 
 const CATEGORIES=Object.freeze([
   Object.freeze({
@@ -46,6 +49,7 @@ const CATEGORIES=Object.freeze([
     ])
   }),
 ]);
+const CATEGORY_IDS=new Set(CATEGORIES.map(category=>category.id));
 
 const CSS=`
 #kelo-studio-live .ks-tools-sheet{display:none}
@@ -55,14 +59,19 @@ const CSS=`
     width:auto;max-width:none;max-height:min(72dvh,620px);margin:0;padding:0;
     overflow:hidden;border:1px solid rgba(231,197,106,.48);border-radius:24px;
     background:linear-gradient(180deg,rgba(8,20,21,.995),rgba(4,12,14,.995));
-    color:#edf4ef;pointer-events:auto;box-shadow:0 26px 80px rgba(0,0,0,.68),inset 0 1px 0 rgba(255,255,255,.05)
+    color:#edf4ef;pointer-events:auto;box-shadow:0 26px 80px rgba(0,0,0,.68),inset 0 1px 0 rgba(255,255,255,.05);
+    transform:translate3d(0,var(--ks-sheet-drag-y,0px),0);transition:transform 170ms cubic-bezier(.2,.8,.2,1)
   }
+  #kelo-studio-live .ks-tools-sheet[data-dragging="1"]{transition:none!important}
   #kelo-studio-live .ks-tools-sheet::backdrop{background:rgba(1,6,8,.58);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
-  #kelo-studio-live .ks-tools-sheet-handle{width:42px;height:5px;border-radius:999px;background:rgba(255,255,255,.25);margin:8px auto 3px}
-  #kelo-studio-live .ks-tools-sheet-head{display:flex;align-items:center;gap:10px;padding:7px 12px 9px;border-bottom:1px solid rgba(231,197,106,.13)}
+  #kelo-studio-live .ks-tools-sheet-handle-zone{touch-action:none;cursor:grab;padding:7px 0 1px}
+  #kelo-studio-live .ks-tools-sheet[data-dragging="1"] .ks-tools-sheet-handle-zone{cursor:grabbing}
+  #kelo-studio-live .ks-tools-sheet-handle{width:42px;height:5px;border-radius:999px;background:rgba(255,255,255,.25);margin:0 auto}
+  #kelo-studio-live .ks-tools-sheet-head{display:flex;align-items:center;gap:10px;padding:5px 12px 9px;border-bottom:1px solid rgba(231,197,106,.13)}
   #kelo-studio-live .ks-tools-sheet-title{min-width:0;flex:1}
   #kelo-studio-live .ks-tools-sheet-title small{display:block;font-size:7px;font-weight:900;letter-spacing:.18em;color:#8da59b}
   #kelo-studio-live .ks-tools-sheet-title strong{display:block;margin-top:3px;font:800 15px/1 Georgia,"Times New Roman",serif;color:#f2d982}
+  #kelo-studio-live .ks-tools-sheet-context{display:block;margin-top:4px;font-size:6px;font-weight:800;letter-spacing:.07em;color:#819990}
   #kelo-studio-live .ks-tools-sheet-close{width:44px;min-width:44px;height:44px;border-radius:13px!important;font-size:20px!important;padding:0!important}
   #kelo-studio-live .ks-tools-sheet-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;padding:8px 10px 5px}
   #kelo-studio-live .ks-tools-sheet-tabs button{min-width:0!important;min-height:46px!important;padding:0 3px!important;border-radius:12px!important;font-size:5.9px!important;white-space:nowrap!important}
@@ -81,7 +90,7 @@ const CSS=`
   #kelo-studio-live .ks-tools-sheet-tabs button{font-size:5.4px!important}
 }
 @media(prefers-reduced-motion:reduce){
-  #kelo-studio-live .ks-tools-sheet *{animation:none!important;transition:none!important}
+  #kelo-studio-live .ks-tools-sheet,#kelo-studio-live .ks-tools-sheet *{animation:none!important;transition:none!important}
 }
 `;
 
@@ -95,16 +104,42 @@ function ensureStyle(doc){
   if(style)return style;
   style=doc.createElement('style');
   style.id=STYLE_ID;
-  style.dataset.keloStudioMobileToolsSheet='1';
+  style.dataset.keloStudioMobileToolsSheet='2';
   style.textContent=CSS;
   doc.head.append(style);
   return style;
+}
+
+function storageGet(root){
+  try{
+    const value=root?.sessionStorage?.getItem?.(STORAGE_KEY);
+    return CATEGORY_IDS.has(value)?value:null;
+  }catch{return null;}
+}
+
+function storageSet(root,value){
+  if(!CATEGORY_IDS.has(value))return;
+  try{root?.sessionStorage?.setItem?.(STORAGE_KEY,value);}catch{}
 }
 
 function commandSource(shell,item){
   const attr=item.kind==='mode'?'data-mode':'data-act';
   const scope=item.scope==='shell'?shell:shell.querySelector('.ks-deck')||shell;
   return scope.querySelector(`[${attr}="${item.value}"]`);
+}
+
+function activeMode(shell){
+  return shell.querySelector('.ks-deck [data-mode].on')?.dataset?.mode||null;
+}
+
+function preferredCategory(shell,root,dialog){
+  const selected=Math.max(0,Number(shell.dataset.selectionCount||0));
+  if(selected>0)return {id:'transform',reason:'OBJETO SELECCIONADO'};
+  const mode=activeMode(shell);
+  if(['terrain','path','collision'].includes(mode))return {id:'terrain',reason:'MODO DE TERRENO'};
+  const remembered=storageGet(root)||dialog?.dataset?.category;
+  if(CATEGORY_IDS.has(remembered))return {id:remembered,reason:'ÚLTIMA CATEGORÍA'};
+  return {id:'build',reason:'HERRAMIENTAS PRINCIPALES'};
 }
 
 function makeProxy(doc,shell,item,closeSheet){
@@ -127,6 +162,53 @@ function makeProxy(doc,shell,item,closeSheet){
   return button;
 }
 
+function resetDrag(dialog){
+  dialog.dataset.dragging='0';
+  dialog.style.setProperty('--ks-sheet-drag-y','0px');
+}
+
+function installSwipeDismiss(dialog){
+  if(dialog.dataset.swipeBound==='1')return;
+  dialog.dataset.swipeBound='1';
+  const zone=dialog.querySelector('.ks-tools-sheet-handle-zone');
+  if(!zone)return;
+  let pointerId=null,startY=0,lastY=0,lastTime=0,velocity=0;
+
+  const finish=(event,cancel=false)=>{
+    if(pointerId===null||(!cancel&&event?.pointerId!==pointerId))return;
+    const delta=Math.max(0,lastY-startY);
+    const shouldClose=!cancel&&(delta>=SWIPE_DISMISS_PX||velocity>=SWIPE_DISMISS_VELOCITY);
+    try{zone.releasePointerCapture?.(pointerId);}catch{}
+    pointerId=null;
+    if(shouldClose){
+      dialog.style.setProperty('--ks-sheet-drag-y','110%');
+      dialog.dataset.dragging='0';
+      const close=()=>{if(dialog.open)dialog.close();resetDrag(dialog);};
+      const reduced=dialog.ownerDocument.defaultView?.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+      if(reduced)close();else setTimeout(close,150);
+    }else resetDrag(dialog);
+  };
+
+  zone.addEventListener('pointerdown',event=>{
+    if(pointerId!==null)return;
+    pointerId=event.pointerId;startY=lastY=event.clientY;lastTime=performance.now();velocity=0;
+    dialog.dataset.dragging='1';
+    try{zone.setPointerCapture?.(pointerId);}catch{}
+  });
+  zone.addEventListener('pointermove',event=>{
+    if(event.pointerId!==pointerId)return;
+    const now=performance.now();
+    const dy=event.clientY-lastY,dt=Math.max(1,now-lastTime);
+    velocity=Math.max(0,dy/dt);lastY=event.clientY;lastTime=now;
+    const delta=Math.max(0,lastY-startY);
+    dialog.style.setProperty('--ks-sheet-drag-y',`${Math.min(delta,220)}px`);
+    if(delta>0)event.preventDefault();
+  });
+  zone.addEventListener('pointerup',event=>finish(event,false));
+  zone.addEventListener('pointercancel',event=>finish(event,true));
+  zone.addEventListener('lostpointercapture',event=>finish(event,true));
+}
+
 function buildSheet(shell,root){
   const doc=shell.ownerDocument;
   let dialog=shell.querySelector(':scope > .ks-tools-sheet');
@@ -136,14 +218,19 @@ function buildSheet(shell,root){
   dialog.className='ks-tools-sheet';
   dialog.setAttribute('aria-labelledby','ks-tools-sheet-title');
   dialog.innerHTML=`
-    <div class="ks-tools-sheet-handle" aria-hidden="true"></div>
+    <div class="ks-tools-sheet-handle-zone" aria-label="Desliza hacia abajo para cerrar">
+      <div class="ks-tools-sheet-handle" aria-hidden="true"></div>
+    </div>
     <div class="ks-tools-sheet-head">
-      <div class="ks-tools-sheet-title" id="ks-tools-sheet-title" tabindex="-1"><small>HERRAMIENTAS DEL EDITOR</small><strong>MÁS</strong></div>
+      <div class="ks-tools-sheet-title" id="ks-tools-sheet-title" tabindex="-1">
+        <small>HERRAMIENTAS DEL EDITOR</small><strong>MÁS</strong><span class="ks-tools-sheet-context"></span>
+      </div>
       <button type="button" class="ks-tools-sheet-close" aria-label="Cerrar herramientas">×</button>
     </div>
     <div class="ks-tools-sheet-tabs" role="tablist" aria-label="Categorías de herramientas"></div>
     <div class="ks-tools-sheet-body"></div>`;
   shell.append(dialog);
+  installSwipeDismiss(dialog);
 
   const closeButton=dialog.querySelector('.ks-tools-sheet-close');
   closeButton.addEventListener('click',()=>dialog.close());
@@ -152,9 +239,9 @@ function buildSheet(shell,root){
     const r=dialog.getBoundingClientRect();
     if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)dialog.close();
   });
-  dialog.addEventListener('cancel',()=>{ shell.dataset.mobileAdvanced='0'; });
+  dialog.addEventListener('cancel',()=>{shell.dataset.mobileAdvanced='0';resetDrag(dialog);});
   dialog.addEventListener('close',()=>{
-    shell.dataset.mobileAdvanced='0';
+    shell.dataset.mobileAdvanced='0';resetDrag(dialog);
     const invoker=shell.querySelector('.ks-mobile-more');
     invoker?.setAttribute('aria-expanded','false');
     invoker?.focus?.({preventScroll:true});
@@ -162,7 +249,7 @@ function buildSheet(shell,root){
   return dialog;
 }
 
-function renderCategory(shell,dialog,categoryId){
+function renderCategory(shell,dialog,categoryId,{root=globalThis,reason=''}={}){
   const doc=shell.ownerDocument;
   const tabs=dialog.querySelector('.ks-tools-sheet-tabs');
   const body=dialog.querySelector('.ks-tools-sheet-body');
@@ -172,13 +259,16 @@ function renderCategory(shell,dialog,categoryId){
 
   const active=CATEGORIES.find(category=>category.id===categoryId)||CATEGORIES[0];
   dialog.dataset.category=active.id;
+  storageSet(root,active.id);
+  const context=dialog.querySelector('.ks-tools-sheet-context');
+  if(context)context.textContent=reason||`CATEGORÍA · ${active.label}`;
 
   for(const category of CATEGORIES){
     const tab=doc.createElement('button');
     tab.type='button';tab.textContent=category.label;tab.setAttribute('role','tab');
     tab.setAttribute('aria-selected',category.id===active.id?'true':'false');
     tab.dataset.category=category.id;
-    tab.addEventListener('click',()=>renderCategory(shell,dialog,category.id));
+    tab.addEventListener('click',()=>renderCategory(shell,dialog,category.id,{root,reason:`CATEGORÍA · ${category.label}`}));
     tabs.append(tab);
   }
 
@@ -232,7 +322,9 @@ function renderCategory(shell,dialog,categoryId){
 function openSheet(shell,root){
   if(!isMobile(root))return false;
   const dialog=buildSheet(shell,root);
-  renderCategory(shell,dialog,dialog.dataset.category||'build');
+  resetDrag(dialog);
+  const preferred=preferredCategory(shell,root,dialog);
+  renderCategory(shell,dialog,preferred.id,{root,reason:preferred.reason});
   shell.dataset.mobileAdvanced='0';
   shell.querySelector('.ks-mobile-more')?.setAttribute('aria-expanded','true');
   try{
@@ -244,8 +336,8 @@ function openSheet(shell,root){
 }
 
 function attach(shell,root){
-  if(!shell||shell.dataset.keloToolsSheetBound==='1')return shell;
-  shell.dataset.keloToolsSheetBound='1';
+  if(!shell||shell.dataset.keloToolsSheetBound==='2')return shell;
+  shell.dataset.keloToolsSheetBound='2';
   buildSheet(shell,root);
   shell.addEventListener('click',event=>{
     const more=event.target?.closest?.('.ks-mobile-more');
@@ -260,7 +352,7 @@ function attach(shell,root){
 
 export function installStudioMobileToolsSheet({root=globalThis}={}){
   const doc=root?.document;
-  if(!doc)return Object.freeze({version:'studio-mobile-tools-sheet-v1',refresh:()=>null,destroy:()=>{}});
+  if(!doc)return Object.freeze({version:'studio-mobile-tools-sheet-v2',refresh:()=>null,destroy:()=>{}});
   const existing=root[KEY];
   if(existing?.refresh){existing.refresh();return existing;}
 
@@ -278,7 +370,7 @@ export function installStudioMobileToolsSheet({root=globalThis}={}){
   }
 
   const api=Object.freeze({
-    version:'studio-mobile-tools-sheet-v1.0.0',
+    version:'studio-mobile-tools-sheet-v2.0.0',
     refresh,
     open(){const shell=refresh();return shell?openSheet(shell,root):false;},
     destroy(){
