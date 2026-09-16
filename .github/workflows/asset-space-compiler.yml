@@ -10,10 +10,8 @@ on:
       - 'src/creators/assets/asset-*.mjs'
       - 'src/creators/assets/runtime-image-variants.mjs'
       - 'src/creators/assets/quality-*.mjs'
-      - 'src/creators/assets/perceptual-quality-bridge.mjs'
-      - 'scripts/asset-space-*.mjs'
-      - 'scripts/asset-atlas-space-audit.mjs'
-      - 'scripts/asset-codec-tournament.mjs'
+      - 'src/creators/assets/smart-atlas-planner.mjs'
+      - 'scripts/asset-*.mjs'
       - 'src/environment/generated/*manifest*.js'
       - 'assets/**/*.png'
       - 'C/**/*.png'
@@ -24,10 +22,8 @@ on:
       - 'src/creators/assets/asset-*.mjs'
       - 'src/creators/assets/runtime-image-variants.mjs'
       - 'src/creators/assets/quality-*.mjs'
-      - 'src/creators/assets/perceptual-quality-bridge.mjs'
-      - 'scripts/asset-space-*.mjs'
-      - 'scripts/asset-atlas-space-audit.mjs'
-      - 'scripts/asset-codec-tournament.mjs'
+      - 'src/creators/assets/smart-atlas-planner.mjs'
+      - 'scripts/asset-*.mjs'
       - 'src/environment/generated/*manifest*.js'
       - 'assets/**/*.png'
       - 'C/**/*.png'
@@ -44,10 +40,7 @@ on:
         required: true
         default: strict
         type: choice
-        options:
-          - strict
-          - adaptive
-          - tournament
+        options: [strict, adaptive, tournament]
 
 concurrency:
   group: asset-png-space-${{ github.ref }}
@@ -64,19 +57,29 @@ env:
 jobs:
   strict-quality-gate:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 18
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ env.ASSET_NODE_VERSION }}
+      - name: Install independent PNG validators
+        run: |
+          npm install --no-save sharp@0.35.4
+          sudo apt-get update
+          sudo apt-get install -y pngcheck
+          pngcheck -V || true
       - name: Restore deterministic asset optimization cache
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: .cache/asset-space
-          key: asset-space-strict-v1-${{ runner.os }}-${{ hashFiles('src/creators/assets/png-*.mjs', 'src/creators/assets/asset-image-profiler.mjs', 'src/creators/assets/asset-optimization-cache.mjs', 'scripts/asset-space-compiler.mjs', 'assets/**/*.png', 'C/**/*.png') }}
+          key: asset-space-strict-v2-${{ runner.os }}-${{ hashFiles('src/creators/assets/*.mjs', 'scripts/asset-*.mjs', 'assets/**/*.png', 'C/**/*.png') }}
           restore-keys: |
-            asset-space-strict-v1-${{ runner.os }}-
+            asset-space-strict-v2-${{ runner.os }}-
+      - name: PNG conformance / bomb / mutation torture audit
+        run: node scripts/asset-png-torture-audit.mjs
+      - name: Independent libvips + pngcheck consensus audit
+        run: node scripts/asset-png-independent-audit.mjs
       - name: Deterministic PNG compiler self-test
         run: node scripts/asset-space-compiler-audit.mjs
       - name: Meta policy / seam / tournament / boundary audit
@@ -87,23 +90,23 @@ jobs:
         run: node scripts/system-documentation-audit.js
       - name: Asset transfer / decode / transparency / duplicate budget
         run: node scripts/asset-space-budget.mjs --input="${{ github.event.inputs.input_path || 'assets' }}" --max-files=80 --report=test-results/asset-space-budget
-      - name: Forest Plaza atlas occupancy / trim / repack budget
+      - name: Forest Plaza smart trim / MaxRects / frame-dedup audit
         run: node scripts/asset-atlas-space-audit.mjs --manifest=src/environment/generated/forest-plaza-tileset-v2-manifest.js --report=test-results/asset-atlas-space
       - name: Dry-run representative real PNG assets
-        run: node scripts/asset-space-compiler.mjs --input="${{ github.event.inputs.input_path || 'assets' }}" --mode=strict --effort=fast --max-files=12 --report=test-results/asset-space-report
+        run: node scripts/asset-space-compiler.mjs --input="${{ github.event.inputs.input_path || 'assets' }}" --mode=strict --effort=auto --max-files=12 --report=test-results/asset-space-report
       - name: Publish summary
         if: always()
         run: |
           if [ -f test-results/asset-space-report/report.json ]; then
-            node -e "const r=require('./test-results/asset-space-report/report.json'); require('fs').appendFileSync(process.env.GITHUB_STEP_SUMMARY, '# PNG Space Compiler\n\nFiles: '+r.fileCount+'\n\nBefore: '+r.beforeBytes+' bytes\n\nAfter: '+r.afterBytes+' bytes\n\nPotential strict saving: '+r.savedPercent.toFixed(2)+'%\n\nCache hits/misses: '+(r.cacheHits||0)+' / '+(r.cacheMisses||0)+'\n')"
+            node -e "const r=require('./test-results/asset-space-report/report.json'); require('fs').appendFileSync(process.env.GITHUB_STEP_SUMMARY, '# PNG Space Compiler V2\n\nFiles: '+r.fileCount+'\n\nBefore: '+r.beforeBytes+' bytes\n\nAfter: '+r.afterBytes+' bytes\n\nPotential strict saving: '+r.savedPercent.toFixed(2)+'%\n\nCache hits/misses: '+(r.cacheHits||0)+' / '+(r.cacheMisses||0)+'\n\nPublish blocked: '+(r.publishBlocked||0)+'\n')"
           fi
           if [ -f test-results/asset-space-budget/report.json ]; then
-            node -e "const r=require('./test-results/asset-space-budget/report.json'); require('fs').appendFileSync(process.env.GITHUB_STEP_SUMMARY, '\n## Asset memory + duplicate budget\n\nStored: '+r.totals.storedBytes+' bytes\n\nDecoded RGBA baseline: '+r.totals.decodedRgbaBytes+' bytes ('+r.totals.decodedExpansion+'x)\n\nByte duplicate groups: '+(r.totals.byteDuplicateGroups??r.totals.duplicateGroups??0)+'\n\nRGBA duplicate groups: '+(r.totals.pixelDuplicateGroups??0)+'\n\nRender duplicate groups: '+(r.totals.renderDuplicateGroups??0)+'\n')"
+            node -e "const r=require('./test-results/asset-space-budget/report.json'); require('fs').appendFileSync(process.env.GITHUB_STEP_SUMMARY, '\n## Asset memory + duplicate budget\n\nStored: '+r.totals.storedBytes+' bytes\n\nDecoded RGBA baseline: '+r.totals.decodedRgbaBytes+' bytes ('+r.totals.decodedExpansion+'x)\n\nByte duplicate groups: '+(r.totals.byteDuplicateGroups??0)+'\n\nRGBA duplicate groups: '+(r.totals.pixelDuplicateGroups??0)+'\n\nRender duplicate groups: '+(r.totals.renderDuplicateGroups??0)+'\n')"
           fi
           if [ -f test-results/asset-atlas-space/report.json ]; then
-            node -e "const r=require('./test-results/asset-atlas-space/report.json'); require('fs').appendFileSync(process.env.GITHUB_STEP_SUMMARY, '\n## Forest Plaza atlas geometry\n\nFrames: '+r.atlas.frameCount+'\n\nSourceRect union: '+(r.geometry.sourceRectUnionRatio*100).toFixed(2)+'%\n\nVisual bounds: '+(r.geometry.visualBoundsAreaRatio*100).toFixed(2)+'%\n\nConservative shelf-pack area saving: '+(r.conservativeShelfPack?.estimatedAreaSavingPercent||0).toFixed(2)+'%\n')"
+            node -e "const r=require('./test-results/asset-atlas-space/report.json'); require('fs').appendFileSync(process.env.GITHUB_STEP_SUMMARY, '\n## Forest Plaza smart atlas\n\nFrames: '+r.atlas.frameCount+'\n\nSourceRect union: '+(r.geometry.sourceRectUnionRatio*100).toFixed(2)+'%\n\nFrame trim opportunity: '+r.smartPlan.trim.withinFrameSavingPercent.toFixed(2)+'%\n\nMaxRects area saving: '+(r.smartPlan.maxRects?.estimatedAreaSavingPercent||0).toFixed(2)+'%\n\nDuplicate frame groups: '+r.duplicateFrames.groupCount+'\n\nRepack candidate: '+r.decision.repackRecommended+'\n')"
           fi
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: png-space-strict-report
@@ -116,24 +119,23 @@ jobs:
   adaptive-lab:
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'adaptive'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ env.ASSET_NODE_VERSION }}
-      - name: Restore adaptive optimization cache
-        uses: actions/cache@v4
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: .cache/asset-space
-          key: asset-space-adaptive-v1-${{ runner.os }}-${{ hashFiles('src/creators/assets/png-*.mjs', 'src/creators/assets/asset-image-profiler.mjs', 'src/creators/assets/asset-optimization-cache.mjs', 'scripts/asset-space-compiler.mjs', 'assets/**/*.png', 'C/**/*.png') }}
+          key: asset-space-adaptive-v2-${{ runner.os }}-${{ hashFiles('src/creators/assets/*.mjs', 'scripts/asset-*.mjs', 'assets/**/*.png', 'C/**/*.png') }}
           restore-keys: |
-            asset-space-adaptive-v1-${{ runner.os }}-
-      - name: Install adaptive image codec
+            asset-space-adaptive-v2-${{ runner.os }}-
+      - name: Install adaptive codec
         run: npm install --no-save sharp@0.35.4
-      - name: Adaptive dry-run with captures
-        run: node scripts/asset-space-compiler.mjs --input="${{ github.event.inputs.input_path }}" --mode=adaptive --effort=deep --capture --max-files=12 --report=test-results/asset-space-adaptive
-      - uses: actions/upload-artifact@v4
+      - name: Adaptive dry-run with evidence
+        run: node scripts/asset-space-compiler.mjs --input="${{ github.event.inputs.input_path }}" --mode=adaptive --effort=auto --capture --max-files=12 --report=test-results/asset-space-adaptive
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: png-space-adaptive-report
@@ -143,14 +145,14 @@ jobs:
   codec-tournament-lab:
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'tournament'
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 40
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ env.ASSET_NODE_VERSION }}
       - name: Restore compiled codec tools
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: |
             ~/.cargo/bin/oxipng
@@ -160,12 +162,10 @@ jobs:
         run: |
           npm install --no-save sharp@0.35.4
           sudo apt-get update
-          sudo apt-get install -y zopfli webp pngquant cmake nasm
+          sudo apt-get install -y zopfli webp pngquant cmake nasm pngcheck
       - name: Install pinned OxiPNG
         run: |
-          if [ ! -x "$HOME/.cargo/bin/oxipng" ]; then
-            cargo install oxipng --version "${OXIPNG_VERSION}" --locked
-          fi
+          if [ ! -x "$HOME/.cargo/bin/oxipng" ]; then cargo install oxipng --version "${OXIPNG_VERSION}" --locked; fi
           "$HOME/.cargo/bin/oxipng" --version
       - name: Build pinned ECT when cache is cold
         run: |
@@ -182,16 +182,15 @@ jobs:
             rm -rf "$tmp"
           fi
           sudo ln -sf "$PWD/.cache/asset-tools/ect" /usr/local/bin/ect
-          ect -help >/dev/null 2>&1 || ect --help >/dev/null 2>&1 || true
       - name: Run deep codec tournament
         run: node scripts/asset-codec-tournament.mjs --input="${{ github.event.inputs.input_path }}" --max-files=6 --emit-variants --report=test-results/asset-codec-tournament
       - name: Publish tournament summary
         if: always()
         run: |
           if [ -f test-results/asset-codec-tournament/report.json ]; then
-            node -e "const r=require('./test-results/asset-codec-tournament/report.json'); require('fs').appendFileSync(process.env.GITHUB_STEP_SUMMARY, '# Asset Codec Tournament\n\nFiles: '+r.fileCount+'\n\nAuthoring PNG saving: '+r.totals.authoringSavedPercent.toFixed(2)+'%\n\nRuntime candidate saving: '+r.totals.runtimeSavedPercent.toFixed(2)+'%\n')"
+            node -e "const r=require('./test-results/asset-codec-tournament/report.json'); require('fs').appendFileSync(process.env.GITHUB_STEP_SUMMARY, '# Asset Codec Tournament\n\nFiles: '+r.fileCount+'\n\nAuthoring PNG saving: '+r.totals.authoringSavedPercent.toFixed(2)+'%\n\nDelivery byte candidate saving: '+r.totals.runtimeSavedPercent.toFixed(2)+'%\n')"
           fi
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: asset-codec-tournament
