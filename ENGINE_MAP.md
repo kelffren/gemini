@@ -2,7 +2,7 @@
 
 > Documento canónico del engine. Si contradice `index.html` o un owner Foundation LIVE, gana el runtime y este archivo debe actualizarse.
 
-**Sincronizado:** 2026-09-15  
+**Sincronizado:** 2026-09-16  
 **Runtime declarado:** Kelo World V6.69  
 **Modelo:** web 2D top-down, Canvas, mobile-first, login/guest gate antes del boot pesado.
 
@@ -27,9 +27,13 @@ Contrato LIVE/candidato (`index.html` V6.69):
 7. `controlPlane` y `observability` usan policy `after-paint`: cruzan dos `requestAnimationFrame` antes de cargar para no retrasar el primer paint.
 8. `controlPlane` contiene asset library launcher, settings gate, updater, admin/account gates y creators gate. `observability` contiene farm/player-position shadows. Son internos (`userToggle:false`) y no aparecen como packs apagables en Asset Library.
 9. Features first-use (`social`, `world`, `bag`, `mounts`, `market`, `titles`, `appearance`, `properties`) siguen entrando únicamente por `KELO_MODULE_LOADER.ensure(feature)`.
-10. El presupuesto CI actual es **≤49 scripts externos antes de boot-ready** y **≤3 scripts externos estáticos después**. Subir esos números requiere evidencia y cambio explícito del contrato, no crecimiento accidental.
-11. `engine-i.js` fue retirado: estaba vacío y no tenía consumidores válidos.
-12. Prohibido inyectar `<script>` desde features por fuera de `KeloModuleLoader`.
+10. El presupuesto CI actual es **48/48 scripts externos antes de boot-ready** y **3/3 scripts externos estáticos después**. También se limita el peso fuente determinista: **422,634 / 425,000 bytes críticos** y **21,342 / 22,000 bytes post-boot estáticos**. Subir esos límites requiere evidencia y cambio explícito del contrato, no crecimiento accidental.
+11. Hay **9 módulos internos diferidos after-paint**; no deben volver al parser-blocking boot.
+12. `engine-i.js`, `engine-j.js` y `engine-k.js` están **RETIRED** y el audit exige cero referencias runtime/test a esos archivos.
+13. `KeloAbilityAim` sustituyó la cadena J/K: posee matemática de aim/range, lifecycle de puntero, indicador de render y registry explícito de cast middleware. No crear un segundo ability input/aim owner.
+14. `engine-l.js` registra `engine-l:plaza-cast-presentation` en el boot crítico. `engine-m.js` **no** pertenece al primer frame: entra por first-use del pack `world` y entonces registra `engine-m:skill-shots`.
+15. El smoke WebKit del branch verifica ambas fases: `engine-m` ausente en boot y presente tras `KELO_MODULE_LOADER.ensure('world')`.
+16. Prohibido inyectar `<script>` desde features por fuera de `KeloModuleLoader`.
 
 El listado histórico de boot completo NO es el boot móvil. Restaurar tags pesados en `index.html` es un bug.
 
@@ -43,6 +47,9 @@ El listado histórico de boot completo NO es el boot móvil. Restaurar tags pesa
 | Movement extensions | `KeloMovement` | OWNER LIVE / transitional |
 | Posición discontinua | `KeloPlayerPosition` | OWNER LIVE / transitional |
 | Viajes legacy plot/farm | `KeloLegacyTransitionBridge` | TEMPORAL STRANGLER |
+| Aim/range/pointer/cast middleware legacy | `KeloAbilityAim` | TEMPORAL STRANGLER |
+| Dirección de abilities legacy | `KeloAbilityDirection` | TEMPORAL STRANGLER |
+| Trigger directo de stones legacy | `KeloLegacyAbilityTrigger` | TEMPORAL STRANGLER |
 | Feature lifecycle first-use/after-paint | `KeloModuleLoader` | OWNER LIVE |
 | Feature metadata/policies | `KELO_FEATURE_REGISTRY` | OWNER LIVE |
 | User-toggleable optional packs | `KELO_ASSET_REGISTRY` | OWNER LIVE |
@@ -50,6 +57,8 @@ El listado histórico de boot completo NO es el boot móvil. Restaurar tags pesa
 | UI/gameplay histórico base | `engine-b.js` | LEGACY CORE |
 | Social/render/simulation bridge histórico | `engine-c.js` | LEGACY CORE |
 | `engine-i.js` | — | RETIRED |
+| `engine-j.js` | — | RETIRED |
+| `engine-k.js` | — | RETIRED |
 | Colisiones | `KELO_COLLISION` | OWNER LIVE |
 | Cámara/viewport/zoom | `KeloCamera` | OWNER LIVE |
 | Avatar composition | `KeloAvatar` | OWNER LIVE |
@@ -78,7 +87,10 @@ Ejemplos actuales:
 - Movimiento: `KeloMovement` posee un único wrapper autorizado con hooks.
 - Posición: `KeloPlayerPosition` posee teleport/restore; movimiento por frame aún legacy.
 - Plot/Farm travel: nombres legacy preservados, writes dirigidos a `KeloPlayerPosition`/`KeloCamera` por strangler temporal.
+- Abilities legacy: `KeloAbilityAim` posee un único pointer lifecycle y una cadena de middleware explícita; `engine-l/m` ya no monkey-patchean `castAimedSkill`.
 - Observabilidad: shadows nunca son autoridad y ya no pertenecen al camino crítico del primer frame.
+
+Snapshot del debt audit actual: **9 engines legacy críticos** (`a,b,c,d,e,f,g,h,l`), **28 writes directos de posición** y **12 writes directos de cámara** en el índice estático de producción. `engine-f/g` concentran 10 de esos writes de posición y son un objetivo de caracterización/migración, no de borrado ciego.
 
 No crear un nuevo wrapper genérico para “ordenar” legacy. Cada bridge temporal necesita owner, audit, métricas/contadores y ruta de retirada.
 
@@ -131,7 +143,7 @@ El Asset Compiler puede sugerir semántica, pero nombres/categorías revisados d
 
 ## 9. Gameplay
 
-- Abilities: `KeloAbilities` + Stone/equipment/mount channels.
+- Abilities modernas: `KeloAbilities` + Stone/equipment/mount channels. Compatibilidad aim/input legacy: `KeloAbilityAim` hasta retirar consumidores.
 - PvP/Arena: `KeloArena`, PvP world + runtime loader.
 - Character: `KeloCharacterCustomization`, `KeloAppearance`, `KeloAvatar`.
 - Equipment: `KeloEquipment`.
@@ -145,19 +157,25 @@ El Asset Compiler puede sugerir semántica, pero nombres/categorías revisados d
 
 El cliente puede predecir/presentar, pero progreso valioso, comercio, PvP competitivo, propiedad y cambios globales deben migrar/fallar hacia autoridad de servidor. `docs/ONLINE_FIRST.md` y los documentos de cada sistema mandan sobre implementaciones locales temporales.
 
-## 11. Qué NO hacer
+## 11. Build / CI supply chain
+
+Los workflows activos usan acciones externas fijadas por SHA exacto. `ci-supply-chain-audit.mjs` falla si reaparece una acción sin pin SHA o `permissions: write-all`. El guard observado mantiene `actions/checkout` y `actions/setup-node` fijados, junto al resto de acciones externas.
+
+La migración evergreen no se considera verde por un solo test: el head debe pasar Foundation, production client build, authoritative server smoke y WebKit mobile branch smoke. Esto sigue siendo un gate branch-local y **no sustituye QA físico/LIVE**.
+
+## 12. Qué NO hacer
 
 - No crear otro renderer de props o tiles.
 - No crear otro catálogo de assets en paralelo.
 - No crear otro loader para trabajo after-paint/first-use; extender `KeloModuleLoader`.
-- No volver a poner control plane, updater o shadows como tags estáticos en `index.html`.
+- No volver a poner control plane, updater, shadows o `engine-m` como tags estáticos del primer frame en `index.html`.
 - No escribir directamente cámara/zoom/canvas desde features nuevas.
 - No mutar `obstacles` desde features nuevas.
 - No sustituir World/Studio por un editor nuevo para corregir un bug de boot.
 - No publicar assets persistentes solo porque funcionan en preview local.
 - No declarar un fix móvil verificado sin QA real.
 
-## 12. Documentos relacionados
+## 13. Documentos relacionados
 
 - `docs/GAME_STATE_CURRENT.md`
 - `docs/ARCHITECTURE_CURRENT.md`
