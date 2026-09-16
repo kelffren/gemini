@@ -30,25 +30,35 @@ Delta actual sigue por miembro. FastCDC queda reservado para blobs grandes y bui
 6. Publisher determinista `scripts/publish-kelo-content-descriptors.mjs` genera `mediaType + size + digest`, sourceVersion/sourceDigest, fail-closed y escritura temp+rename.
 7. Main Stability Gate ejecuta `--check` contra drift.
 8. `data/kelo-content-descriptors.json` ya está materializado en main.
-9. **Ronda actual:** `kelo-content-live-provider.mjs` consume primero el descriptor publicado y propaga `size -> expectedBytes` y `digest -> expectedSha256`. Solo acepta el set cuando schema/algoritmo/descriptors son válidos, no hay IDs duplicados, `sourceVersion` coincide y la cardinalidad coincide con el catálogo. Si no puede usarlo, conserva el cálculo cliente como fallback compatible.
+9. `kelo-content-live-provider.mjs` consume primero el descriptor publicado y propaga `size -> expectedBytes` y `digest -> expectedSha256`, con fallback cliente compatible.
+10. **Ronda actual:** Quaternius queda explícitamente `catalogOnly` hasta disponer de un resolver de archivo directo verificado. Los enlaces de Drive/folder ya no se presentan como `downloadUrl`; se conservan como `externalDownloadUrl/sourceUrl`. Esto evita enviar HTML, carpetas o archivos no identificados al Vault/CAS.
 
 ## Decisión de esta ronda
 
-La identidad publicada debe ser preferida sobre una identidad recalculada por el mismo consumidor. El cliente sigue verificando bytes, pero el valor esperado ya proviene normalmente del borde publisher. Esto acerca Kelo al patrón OCI descriptor->content y prepara metadata firmada tipo TUF sin meter claves privadas en Pages.
+Una biblioteca externa puede participar en descubrimiento sin ser automáticamente una fuente de bytes confiable. Para entrar al Vault como descarga directa debe existir una identidad de archivo verificable y estable (`mediaType + size + digest`) o un resolver controlado que produzca esos datos antes de staging.
 
 ```text
-publisher -> descriptor publicado {size,digest}
-         -> provider (prefer published)
-         -> expectedBytes/expectedSha256
-         -> staging: size check -> SHA-256 check -> integrate
+external catalog
+ -> metadata/preview
+ -> catalogOnly=true
+ -> open source
+
+verified direct binary future
+ -> descriptor {size,digest,mediaType}
+ -> size check
+ -> SHA-256 check
+ -> CAS/staging
 ```
+
+Esta frontera permite conectar más bibliotecas sin rebajar la seguridad del Content Vault.
 
 ## Riesgos abiertos
 
-- descriptor set todavía no está firmado;
+- descriptor set Kelo todavía no está firmado;
 - Pack Manager aún debe persistir descriptor locks explícitos por generación;
 - `stale` sigue observacional;
 - providers externos pueden carecer de digest/size confiables;
+- Quaternius todavía no debe integrarse como binario directo hasta resolver archivos concretos y verificables;
 - delta sigue por archivo; chunking aún no existe;
 - OPFS no benchmarkeado en iPhone real;
 - solo una generación previa;
@@ -56,12 +66,13 @@ publisher -> descriptor publicado {size,digest}
 
 ## Próximos niveles
 
-1. persistir `digest+size` publicados en member locks/generaciones del Pack Manager;
-2. versionar/inmutabilizar descriptor set junto al catálogo;
-3. firma metadata estilo TUF y hardening stale;
-4. auditoría/rebuild reference graph;
-5. OPFS iPhone benchmark;
-6. FastCDC build-time para archivos grandes + chunk CAS/Range/resume.
+1. conectar Quaternius al router federado conservando `catalogOnly`;
+2. persistir `digest+size` publicados en member locks/generaciones del Pack Manager;
+3. versionar/inmutabilizar descriptor set junto al catálogo;
+4. firma metadata estilo TUF y hardening stale;
+5. auditoría/rebuild reference graph;
+6. OPFS iPhone benchmark;
+7. FastCDC build-time para archivos grandes + chunk CAS/Range/resume.
 
 ## Regla permanente
 
