@@ -1,7 +1,7 @@
 <!-- KELO-INDEX
   area: RUNTIME / UI BOOT
   owner: index.html load order
-  purpose: plaza first. heavy owners after first frame. recovery diagnostics load only by explicit query flag.
+  purpose: plaza first. only first-frame authorities stay parser-blocking; internal control/observability enters after first paint through KeloModuleLoader.
 -->
 <!DOCTYPE html>
 <html lang="es">
@@ -100,15 +100,12 @@
 <script src="src/core/avatar-render-system.js?v=2-base-zoo-authority"></script>
 <script src="src/core/render-extension-system.js?v=4-render-owner"></script>
 <script src="src/core/simulation-extension-system.js?v=4-sim-owner"></script>
-<script src="src/core/simulation-farm-shadow.js?v=1"></script>
-<script src="src/core/player-position-shadow.js?v=1"></script>
 <script src="engine-d.js?v=95"></script>
 <script src="engine-e.js?v=94"></script>
 <script src="engine-f.js?v=95"></script>
 <script src="engine-g.js?v=96"></script>
 <script src="src/environment/mobile-performance-contract.js?v=2-cache-working-set"></script>
 <script src="engine-h.js?v=151"></script>
-<script src="engine-i.js?v=94"></script>
 <script src="engine-j.js?v=94"></script>
 <script src="engine-k.js?v=94"></script>
 <script src="src/environment/rural-nature-atlas.js?v=200"></script>
@@ -133,15 +130,8 @@
 <script src="src/ui/luxe-player-hud.js?v=4-minimap-live-20260914"></script>
 <script src="src/systems/performance-governor.js?v=5-sampled-snapshots"></script>
 <script>window.__keloBootReady=true;window.dispatchEvent(new Event("kelo:boot-ready"));</script>
-<script src="src/core/feature-registry.js?v=2"></script>
-<script src="src/core/asset-registry.js?v=2-feature-registry"></script>
-<script src="src/core/module-loader.js?v=10-feature-registry"></script>
+<script src="src/core/feature-registry.js?v=3-after-paint"></script>
+<script src="src/core/asset-registry.js?v=3-toggleable"></script>
+<script src="src/core/module-loader.js?v=11-after-paint"></script>
 <script>window.KELO_MODULE_LOADER&&window.KELO_MODULE_LOADER.start({build:'V6.69'});</script>
-<script src="src/ui/asset-library-launcher.js?v=1"></script>
-<script src="src/core/settings-lazy-gate.js?v=3-update-intel"></script>
-<script src="src/core/update-gate.js?v=6-live-fast-forward"></script>
-<script src="src/systems/admin-key-system.js?v=1"></script>
-<script src="src/core/admin-control-lazy-gate.js?v=2"></script>
-<script src="src/core/account-live-control-gate.js?v=2"></script>
-<script src="src/core/creators-lazy-gate.js?v=3"></script>
 </body></html>
