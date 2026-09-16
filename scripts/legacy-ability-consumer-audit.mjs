@@ -4,8 +4,9 @@ import path from 'node:path';
 const ROOT=process.cwd();
 const SKIP_DIRS=new Set(['.git','node_modules','docs','tests','.github','coverage','dist','build']);
 const EXTENSIONS=new Set(['.js','.mjs','.cjs','.html']);
-const TOKENS=['KeloAbilityAim','beginSkillAim','endSkillAim','castAimedSkill','skillAim','triggerStone'];
-const EXPECTED_DIRECT_AIM_CONSUMERS=Object.freeze(['engine-l.js']);
+const TOKENS=['KeloAbilityAim','KeloLegacyAbilityCast','beginSkillAim','endSkillAim','castAimedSkill','skillAim','triggerStone'];
+const EXPECTED_DIRECT_AIM_CONSUMERS=Object.freeze([]);
+const EXPECTED_DIRECT_CAST_CONSUMERS=Object.freeze(['engine-l.js','engine-m.js']);
 
 function walk(dir,out=[]){
   for(const entry of fs.readdirSync(dir,{withFileTypes:true})){
@@ -54,6 +55,10 @@ const directAimConsumers=runtimeConsumers
   .filter(item=>item.file!=='src/core/legacy-ability-aim-system.js'&&item.codeRefs.KeloAbilityAim)
   .map(item=>item.file)
   .sort();
+const directCastConsumers=runtimeConsumers
+  .filter(item=>item.file!=='src/core/legacy-ability-aim-system.js'&&item.codeRefs.KeloLegacyAbilityCast)
+  .map(item=>item.file)
+  .sort();
 const aimStateConsumers=runtimeConsumers
   .filter(item=>item.file!=='src/core/legacy-ability-aim-system.js'&&item.codeRefs.skillAim)
   .map(item=>item.file)
@@ -63,16 +68,18 @@ const triggerConsumers=runtimeConsumers
   .map(item=>item.file)
   .sort();
 
-console.log(`LEGACY ABILITY CONSUMER AUDIT runtimeFiles=${runtimeConsumers.length} directAimFiles=${directAimConsumers.length} aimStateFiles=${aimStateConsumers.length} triggerFiles=${triggerConsumers.length}`);
+console.log(`LEGACY ABILITY CONSUMER AUDIT runtimeFiles=${runtimeConsumers.length} directAimFiles=${directAimConsumers.length} castOwnerFiles=${directCastConsumers.length} aimStateFiles=${aimStateConsumers.length} triggerFiles=${triggerConsumers.length}`);
 for(const item of runtimeConsumers){
   const summary=Object.entries(item.codeRefs).map(([token,lines])=>`${token}@${lines.join(',')}`).join(' ');
   console.log(`ABILITY_CONSUMER ${item.file}${summary?' '+summary:''}`);
 }
 
 if(JSON.stringify(directAimConsumers)!==JSON.stringify(EXPECTED_DIRECT_AIM_CONSUMERS)){
-  throw new Error(`direct KeloAbilityAim consumers changed: expected ${EXPECTED_DIRECT_AIM_CONSUMERS.join(',')} got ${directAimConsumers.join(',')||'none'}`);
+  throw new Error(`direct KeloAbilityAim consumers changed: expected ${EXPECTED_DIRECT_AIM_CONSUMERS.join(',')||'none'} got ${directAimConsumers.join(',')||'none'}`);
 }
-if(directAimConsumers.includes('engine-g.js'))throw new Error('engine-g.js must not reclaim KeloAbilityAim dependency');
+if(JSON.stringify(directCastConsumers)!==JSON.stringify(EXPECTED_DIRECT_CAST_CONSUMERS)){
+  throw new Error(`direct KeloLegacyAbilityCast consumers changed: expected ${EXPECTED_DIRECT_CAST_CONSUMERS.join(',')} got ${directCastConsumers.join(',')||'none'}`);
+}
 
-const json={schema:2,runtimeFiles:runtimeConsumers.length,directAimConsumers,aimStateConsumers,triggerConsumers,consumers:runtimeConsumers};
+const json={schema:3,runtimeFiles:runtimeConsumers.length,directAimConsumers,directCastConsumers,aimStateConsumers,triggerConsumers,consumers:runtimeConsumers};
 console.log('LEGACY_ABILITY_CONSUMER_JSON='+JSON.stringify(json));
