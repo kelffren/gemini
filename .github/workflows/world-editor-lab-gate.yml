@@ -9,6 +9,7 @@ on:
       - 'scripts/studio-quick-build-audit.mjs'
       - 'scripts/studio-quick-build-placement-guard-audit.mjs'
       - 'scripts/studio-quick-edit-audit.mjs'
+      - 'scripts/studio-build-edit-grid-audit.mjs'
       - '.github/workflows/world-editor-lab-gate.yml'
   workflow_dispatch:
 
@@ -41,3 +42,6 @@ jobs:
 
       - name: Quick Edit contract
         run: node scripts/studio-quick-edit-audit.mjs
+
+      - name: Build Edit Grid contract
+        run: node scripts/studio-build-edit-grid-audit.mjs
