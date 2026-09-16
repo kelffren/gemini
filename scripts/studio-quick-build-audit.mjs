@@ -10,14 +10,18 @@ const resolved=resolveQuickBuildPieces({
   prefabs:[
     {id:'decor_lamp',label:'Lamp',category:'decor'},
     {id:'stone_wall_01',label:'Stone Wall',category:'building'},
-    {id:'marble_floor_01',label:'Marble Floor',category:'building'}
+    {id:'marble_floor_01',label:'Marble Floor',category:'building'},
+    {id:'wood_ramp_01',label:'Wood Ramp',category:'building'},
+    {id:'metal_roof_01',label:'Metal Roof Cone',category:'building'}
   ]
 });
-assert.deepEqual(resolved.map(row=>[row.type,row.prefabId]),[['wall','stone_wall_01'],['floor','marble_floor_01']],'catalog resolver must pick semantic wall/floor prefabs');
+assert.deepEqual(resolved.map(row=>[row.slot,row.type,row.prefabId]),[[1,'wall','stone_wall_01'],[2,'floor','marble_floor_01'],[3,'ramp','wood_ramp_01'],[4,'roof','metal_roof_01']],'catalog resolver must expose the four fast-build slots when matching assets exist');
 assert.deepEqual(defaultSnapPointsForPiece('wall',{w:64,h:16}).map(point=>point.id),['start','end'],'wall contract must expose reusable start/end points');
 assert.deepEqual(defaultSnapPointsForPiece('floor',{w:32,h:32}).map(point=>point.id),['north','south','west','east'],'floor contract must expose four reusable edges');
+assert.deepEqual(defaultSnapPointsForPiece('ramp',{w:64,h:32}).map(point=>point.id),['north','south','west','east'],'ramp contract must expose four reusable edges');
+assert.deepEqual(defaultSnapPointsForPiece('roof',{w:32,h:32}).map(point=>point.id),['north','south','west','east'],'roof contract must expose four reusable edges');
 
-// Phase 3 orientation contract: infer a perpendicular wall from pointer position without scanning another candidate set per rotation.
+// Orientation contract: infer a perpendicular wall from pointer position without scanning another candidate set per rotation.
 const rotateKernel=createStudioKernel({document:createWorldDocument({worldId:'audit:auto-rotate',settings:{tileSize:32,chunkSize:256}})});
 const targetWall={id:'target:wall',prefabId:'stone_wall_01',transform:{x:0,y:0,rotation:0},bounds:{w:64,h:16},components:{buildingPiece:{type:'wall',snapPoints:defaultSnapPointsForPiece('wall',{w:64,h:16})}}};
 rotateKernel.spatial.upsert({id:targetWall.id,category:'entity',rect:{x:0,y:0,w:64,h:16},data:targetWall,order:0});
@@ -36,16 +40,20 @@ assert.equal(manualOnly.rotationChecks,1,'manual override must evaluate only the
 const kernel=createStudioKernel({document:createWorldDocument({worldId:'audit:quick-build',settings:{tileSize:32,chunkSize:512}})});
 kernel.prefabs.register({id:'stone_wall_01',label:'Stone Wall',category:'building',bounds:{w:64,h:16},components:{visual:{source:'fixture'}}});
 kernel.prefabs.register({id:'marble_floor_01',label:'Marble Floor',category:'building',bounds:{w:32,h:32},components:{visual:{source:'fixture'}}});
+kernel.prefabs.register({id:'wood_ramp_01',label:'Wood Ramp',category:'building',bounds:{w:64,h:32},components:{visual:{source:'fixture'}}});
+kernel.prefabs.register({id:'metal_roof_01',label:'Metal Roof Cone',category:'building',bounds:{w:32,h:32},components:{visual:{source:'fixture'}}});
 const placement=createPlacementTool(kernel);kernel.tools.register(placement);
-const quick=createQuickBuildTool(kernel,{placement,root:{KELO_QUICK_BUILD_CATALOG:{wall:'stone_wall_01',floor:'marble_floor_01'}}});kernel.tools.register(quick);
+const quick=createQuickBuildTool(kernel,{placement,root:{KELO_QUICK_BUILD_CATALOG:{wall:'stone_wall_01',floor:'marble_floor_01',ramp:'wood_ramp_01',roof:'metal_roof_01'}}});kernel.tools.register(quick);
 
-assert.equal(quick.pieces.length,2,'phase 3 must preserve WALL and FLOOR');
+assert.equal(quick.pieces.length,4,'Quick Build v2 must expose WALL/FLOOR/RAMP/ROOF when the catalog supports them');
+assert.deepEqual(quick.pieces.map(row=>row.slot),[1,2,3,4],'fast-build pieces must retain stable 1-4 slots');
 assert.equal(quick.activate('wall'),true,'WALL must be selectable');
 assert.equal(kernel.input.active().includes('studio-quick-build'),true,'Quick Build must own a temporary input context while active');
 let preview=placement.getPreview();
 assert.equal(preview.prefabId,'stone_wall_01','selecting WALL must create a placement preview immediately');
 assert.equal(preview.components.buildingPiece.type,'wall','preview must carry semantic building-piece type');
-assert.equal(preview.components.buildingPiece.version,2,'semantic metadata schema must remain compatible with phase 2');
+assert.equal(preview.components.buildingPiece.version,3,'four-piece kit must advance semantic metadata schema');
+assert.equal(preview.components.buildingPiece.slot,1,'semantic metadata must retain the fast-build slot');
 assert.equal(preview.components.buildingPiece.snapPoints.length,2,'preview metadata must persist local snap-point contract');
 
 let routed=kernel.input.route('pointermove',{worldX:70,worldY:35,pointerType:'mouse'});
@@ -94,9 +102,20 @@ assert.equal(placement.getPreview().transform.rotation,manualRotation,'manual R 
 assert.equal(quick.getSnapState().manualRotationOverride,true,'snap state must report the active manual orientation override');
 assert.equal(quick.getSnapState().rotationChecks,1,'manual override must constrain resolver work to one orientation');
 
-assert.equal(quick.activate('floor'),true,'creator must be able to switch directly from WALL to FLOOR');
-assert.equal(placement.getPreview().components.buildingPiece.type,'floor','switching piece must update semantic metadata');
+assert.equal(quick.selectSlot(2),true,'slot 2 must instantly switch to FLOOR');
+assert.equal(placement.getPreview().components.buildingPiece.type,'floor','slot 2 must update semantic metadata');
 assert.equal(placement.getPreview().components.buildingPiece.snapPoints.length,4,'floor preview must use floor edge snap points');
+assert.equal(quick.selectSlot(3),true,'slot 3 must instantly switch to RAMP');
+assert.equal(quick.active.type,'ramp');
+assert.equal(placement.getPreview().components.buildingPiece.slot,3,'RAMP preview must preserve slot 3 metadata');
+assert.equal(placement.getPreview().components.buildingPiece.snapPoints.length,4,'RAMP preview must expose reusable edge snaps');
+assert.equal(quick.selectSlot(4),true,'slot 4 must instantly switch to ROOF');
+assert.equal(quick.active.type,'roof');
+assert.equal(placement.getPreview().components.buildingPiece.snapPoints.length,4,'ROOF preview must expose reusable edge snaps');
+assert.equal(quick.cycle(-1),true,'Q-style previous-piece cycle must be available');
+assert.equal(quick.active.type,'ramp','cycling backward from ROOF must select RAMP');
+assert.equal(quick.cycle(1),true,'E-style next-piece cycle must be available');
+assert.equal(quick.active.type,'roof','cycling forward must return to ROOF');
 assert.equal(quick.deactivate(),true,'Quick Build must be cancellable');
 assert.equal(placement.getPreview(),null,'cancel must remove the local preview');
 assert.equal(kernel.input.active().includes('studio-quick-build'),false,'cancel must return world input to the normal Studio stack');
@@ -124,7 +143,8 @@ assert.equal(perfResult.rotationChecks,4,'auto rotation must reuse the local can
 const source=fs.readFileSync(new URL('../src/studio/tools/quick-build-tool.mjs',import.meta.url),'utf8');
 assert.doesNotMatch(source,/KELO_WORLD_EDIT|kernel\.execute\s*\(/,'Quick Build must never bypass placement/CommandBus authority');
 assert.match(source,/placement\.commit\(\)/,'persistent placement must delegate to the existing placement tool');
+assert.doesNotMatch(source,/observe\(document\.documentElement,\{childList:true,subtree:true\}\)/,'Quick Build must not restore a permanent whole-document subtree observer');
 quick.destroy();
 assert.equal(kernel.input.has('studio-quick-build'),false,'destroy must unregister the temporary input context');
 
-console.log(JSON.stringify({ok:true,phase:'3',pieces:['wall','floor'],preview:true,semanticMetadata:true,snapPoints:true,localSnap:true,autoRotation:true,manualRotationOverride:true,snapFeedback:true,continuousPlacement:true,desktopPointer:true,mobilePointer:true,undoRedo:true,cancel:true,authorityBypass:false,performance:{entries:perfStats.entries,uniqueCandidates:perfStats.lastQuery.uniqueCandidates,membershipChecks:perfStats.lastQuery.membershipChecks,rotationChecks:perfResult.rotationChecks}},null,2));
+console.log(JSON.stringify({ok:true,phase:'four-piece-turbo',pieces:['wall','floor','ramp','roof'],fastSlots:[1,2,3,4],pieceCycle:true,preview:true,semanticMetadata:true,snapPoints:true,localSnap:true,autoRotation:true,manualRotationOverride:true,snapFeedback:true,continuousPlacement:true,desktopPointer:true,mobilePointer:true,undoRedo:true,cancel:true,authorityBypass:false,performance:{entries:perfStats.entries,uniqueCandidates:perfStats.lastQuery.uniqueCandidates,membershipChecks:perfStats.lastQuery.membershipChecks,rotationChecks:perfResult.rotationChecks}},null,2));
