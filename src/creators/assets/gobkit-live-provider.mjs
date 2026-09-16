@@ -1,10 +1,10 @@
 /* KELO-INDEX
  * area: CREATORS / EXTERNAL CONTENT / GOBKIT
  * owner: Kelo Universal Content Bridge
- * keys: GOBKIT CC0 GLB RIGGED ANIMATION MANIFEST LAZY MOBILE
+ * keys: GOBKIT CC0 GLB RIGGED ANIMATION MANIFEST LAZY MOBILE PAGING
  * purpose: expose Gobkit free model metadata without loading GLB bytes until a future explicit 3D integration flow requests them
  */
-import {fetchProviderJson,mobilePageBudget,clearExternalProviderRuntimeCache} from './external-provider-runtime.mjs?v=1';
+import {fetchProviderJson,mobilePageWindow,clearExternalProviderRuntimeCache} from './external-provider-runtime.mjs?v=3';
 
 const API='https://gobkit.com/api/free';
 function clean(value){return String(value??'').trim();}
@@ -13,7 +13,7 @@ function normalize({pack,model}){const id=clean(model?.id||model?.name),animatio
 function matches(row,q){if(!q)return true;const hay=`${row.name} ${row.category} ${(row.tags||[]).join(' ')} ${row.description}`.toLowerCase();return q.split(/\s+/).filter(Boolean).every(token=>hay.includes(token));}
 
 export async function searchGobkitAssets(query='',options={}){
-  const requested=Math.max(1,Number(options.limit)||24),limit=mobilePageBudget(requested,{heavy:true}),offset=Math.max(0,Number(options.offset)||0),data=await fetchProviderJson('gobkit',API,{ttlMs:60*60*1000,maxBytes:650_000,cacheKey:'gobkit:free:v2'}),q=clean(query).toLowerCase(),all=flatten(data).map(normalize),filtered=q?all.filter(row=>matches(row,q)):all,assets=filtered.slice(offset,offset+limit);
-  return{assets,offset,limit,total:filtered.length,hasMore:offset+assets.length<filtered.length,engine:'gobkit-free-manifest-v2'};
+  const requested=Math.max(1,Number(options.limit)||24),window=mobilePageWindow(requested,options.offset,{heavy:true}),limit=window.limit,apiOffset=window.offset,data=await fetchProviderJson('gobkit',API,{ttlMs:60*60*1000,maxBytes:650_000,cacheKey:'gobkit:free:v2'}),q=clean(query).toLowerCase(),all=flatten(data).map(normalize),filtered=q?all.filter(row=>matches(row,q)):all,assets=filtered.slice(apiOffset,apiOffset+limit);
+  return{assets,offset:window.sourceOffset,limit,total:filtered.length,hasMore:apiOffset+assets.length<filtered.length,engine:'gobkit-free-manifest-v2'};
 }
 export function clearGobkitCache(){clearExternalProviderRuntimeCache('gobkit:');}
