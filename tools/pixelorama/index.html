@@ -2,8 +2,8 @@
 <!-- KELO-INDEX
  area: CREATORS / PIXELORAMA WEB RUNTIME
  owner: Kelo Creators
- keys: PIXELORAMA GODOT WASM LAZY SAME-ORIGIN BRIDGE ARRAYBUFFER QUIT UNLOAD MEMORY FPS
- purpose: shell Kelo same-origin que arranca el build Web completo de Pixelorama solo bajo demanda y lo destruye al salir
+ keys: PIXELORAMA GODOT WASM LAZY SAME-ORIGIN BRIDGE ARRAYBUFFER QUIT UNLOAD MEMORY FPS SESSION DOCTOR HEARTBEAT
+ purpose: shell Kelo same-origin que arranca Pixelorama bajo demanda, reporta salud del bridge y lo destruye al salir
  online: authoring local; no gameplay/economy authority
  do-not: NO service worker propio, NO boot eager, NO duplicar binarios en gemini
 -->
@@ -30,25 +30,38 @@
 (() => {
   'use strict';
   const PROTOCOL='kelo.pixelorama.v1';
+  const BRIDGE_VERSION='kelo.pixelorama.session-doctor.v1';
   const UPSTREAM_COMMIT='2af0e590b6f1dd8a9255686373c5831623bb03bd';
   const BASE=`https://cdn.jsdelivr.net/gh/Orama-Interactive/Pixelorama@${UPSTREAM_COMMIT}`;
   const status=document.getElementById('status'),statusCopy=document.getElementById('status-copy'),note=document.getElementById('bridge-note'),canvas=document.getElementById('canvas');
   let engine=null,pendingAsset=null,openHookInstalled=false,shuttingDown=false,nativeAnchorClick=null,idleTimer=0,deepIdleTimer=0;
+  let runtimeMode='booting',nativeBridge=false,readyAt=0,lastAssetStage='idle',lastAssetName='',lastExportAt=0;
 
   const tell=(type,payload={},transfer=[])=>{try{parent.postMessage({protocol:PROTOCOL,type,payload},location.origin,transfer);}catch(error){console.warn('[Kelo Pixelorama] postMessage failed',error);}};
+  function health(){return {bridgeVersion:BRIDGE_VERSION,upstreamCommit:UPSTREAM_COMMIT,ready:!!engine,readyAt,mode:runtimeMode,nativeBridge,openHookInstalled,hasPendingAsset:!!pendingAsset,lastAssetStage,lastAssetName,lastExportAt,threads:false,shuttingDown};}
   function showNote(text,ms=4200){note.textContent=text;note.classList.add('show');if(ms>0)setTimeout(()=>note.classList.remove('show'),ms);}
   function setStatus(text){statusCopy.textContent=text;}
   function loadScript(src){return new Promise((resolve,reject)=>{const script=document.createElement('script');script.src=src;script.onload=resolve;script.onerror=()=>reject(new Error(`PIXELORAMA_ENGINE_SCRIPT_FAILED:${src}`));document.head.append(script);});}
   function nativeCommand(command,value){try{if(typeof window.keloPixeloramaCommand==='function'){window.keloPixeloramaCommand(command,value);return true;}}catch(error){console.warn('[Kelo Pixelorama] native command',error);}return false;}
   function clearIdleTimers(){if(idleTimer)clearTimeout(idleTimer);if(deepIdleTimer)clearTimeout(deepIdleTimer);idleTimer=deepIdleTimer=0;}
   function markActive(){if(shuttingDown)return;clearIdleTimers();nativeCommand('set_fps',60);idleTimer=setTimeout(()=>nativeCommand('set_fps',30),2200);deepIdleTimer=setTimeout(()=>nativeCommand('set_fps',15),10000);}
+  function focusPulse(){
+    // Pixelorama Web's stock loader awaits a focus-in signal after upload_image().
+    // We supply bytes without opening the system picker, so emulate that bridge lifecycle locally.
+    try{window.dispatchEvent(new Event('blur'));}catch{}
+    setTimeout(()=>{try{window.dispatchEvent(new Event('focus'));canvas.focus();}catch{}},24);
+  }
 
   function installDownloadBridge(){
     if(nativeAnchorClick)return;nativeAnchorClick=HTMLAnchorElement.prototype.click;
     HTMLAnchorElement.prototype.click=function(){
       const anchor=this,href=String(anchor.href||''),filename=String(anchor.download||'');
       if(filename&&href.startsWith('blob:')){
-        void (async()=>{try{const blob=await fetch(href).then(r=>r.blob()),buffer=await blob.arrayBuffer();tell('export',{name:filename,mime:blob.type||'application/octet-stream',buffer},[buffer]);showNote(`${filename} sent directly to Kelo.`);}catch(error){tell('error',{code:'EXPORT_CAPTURE_FAILED',message:String(error?.message||error)});nativeAnchorClick.call(anchor);}})();return;
+        void (async()=>{try{
+          const blob=await fetch(href).then(r=>r.blob()),buffer=await blob.arrayBuffer();lastExportAt=Date.now();
+          tell('export-captured',{name:filename,mime:blob.type||'application/octet-stream',bytes:blob.size,at:lastExportAt});
+          tell('export',{name:filename,mime:blob.type||'application/octet-stream',buffer},[buffer]);showNote(`${filename} sent directly to Kelo.`);
+        }catch(error){tell('error',{code:'EXPORT_CAPTURE_FAILED',message:String(error?.message||error)});nativeAnchorClick.call(anchor);}})();return;
       }
       return nativeAnchorClick.call(anchor);
     };
@@ -57,35 +70,47 @@
   async function openThroughNativeBridge(asset){
     if(!asset||!engine?.copyToFS||typeof window.keloPixeloramaCommand!=='function')return false;
     const safe=String(asset.name||'kelo-asset.png').replace(/[^a-zA-Z0-9._-]/g,'_').slice(-120),path=`user://kelo-bridge-${Date.now()}-${safe}`;
-    try{engine.copyToFS(path,asset.buffer);nativeCommand('open_path',path);pendingAsset=null;showNote(`${safe} opened directly from Kelo.`);return true;}
-    catch(error){tell('error',{code:'NATIVE_OPEN_FAILED',message:String(error?.message||error)});return false;}
+    try{
+      engine.copyToFS(path,asset.buffer);nativeCommand('open_path',path);pendingAsset=null;lastAssetStage='opened';lastAssetName=safe;
+      tell('asset-opened',{name:safe,mode:'native',at:Date.now()});showNote(`${safe} opened directly from Kelo.`);return true;
+    }catch(error){tell('error',{code:'NATIVE_OPEN_FAILED',message:String(error?.message||error)});return false;}
   }
 
   function feedPendingAsset(){
     if(!pendingAsset)return false;
-    try{window.fileData=pendingAsset.buffer;window.fileType=pendingAsset.mime||'image/png';window.fileName=pendingAsset.name||'kelo-asset.png';window.canceled=false;pendingAsset=null;setTimeout(()=>window.dispatchEvent(new Event('focus')),20);showNote('Kelo asset injected into Pixelorama.');return true;}
-    catch(error){tell('error',{code:'ASSET_INJECT_FAILED',message:String(error?.message||error)});return false;}
+    try{
+      const asset=pendingAsset;window.fileData=asset.buffer;window.fileType=asset.mime||'image/png';window.fileName=asset.name||'kelo-asset.png';window.canceled=false;pendingAsset=null;
+      lastAssetStage='injected';lastAssetName=window.fileName;tell('asset-injected',{name:lastAssetName,mode:'stock',at:Date.now()});focusPulse();showNote('Kelo asset injected into Pixelorama.');return true;
+    }catch(error){tell('error',{code:'ASSET_INJECT_FAILED',message:String(error?.message||error)});return false;}
   }
-  function installOpenBridge(){if(openHookInstalled||typeof window.upload_image!=='function')return false;const original=window.upload_image;window.upload_image=function(){if(pendingAsset&&feedPendingAsset())return;return original.apply(this,arguments);};openHookInstalled=true;return true;}
+  function installOpenBridge(){
+    if(openHookInstalled||typeof window.upload_image!=='function')return false;
+    const original=window.upload_image;window.upload_image=function(){if(pendingAsset&&feedPendingAsset())return;return original.apply(this,arguments);};openHookInstalled=true;tell('open-hook-ready',{at:Date.now()});return true;
+  }
   async function tryOpenPending(){
-    if(!pendingAsset)return;if(await openThroughNativeBridge(pendingAsset))return;
+    if(!pendingAsset)return;if(await openThroughNativeBridge(pendingAsset))return;installOpenBridge();
     for(const target of [canvas,document]){try{target.dispatchEvent(new KeyboardEvent('keydown',{key:'o',code:'KeyO',ctrlKey:true,bubbles:true,cancelable:true}));target.dispatchEvent(new KeyboardEvent('keyup',{key:'o',code:'KeyO',ctrlKey:true,bubbles:true,cancelable:true}));}catch{}}
-    setTimeout(()=>{if(pendingAsset)showNote('Asset ready · if stock Pixelorama did not auto-open it, tap File → Open once; Kelo supplies it without a file picker.',0);},500);
+    setTimeout(()=>{if(pendingAsset)showNote('Asset received · tap File → Open once. Kelo will inject it without the Files picker.',0);},650);
   }
 
   async function shutdown(reason='parent-request'){
-    if(shuttingDown)return;shuttingDown=true;clearIdleTimers();setStatus('Releasing Pixelorama memory…');status.hidden=false;
+    if(shuttingDown)return;shuttingDown=true;clearIdleTimers();tell('shutdown-start',{reason,at:Date.now()});setStatus('Releasing Pixelorama memory…');status.hidden=false;
     try{engine?.requestQuit?.();}catch(error){console.warn('[Kelo Pixelorama] requestQuit',error);}
     await new Promise(resolve=>setTimeout(resolve,80));
     try{window.Engine?.unload?.();}catch(error){console.warn('[Kelo Pixelorama] Engine.unload',error);}
     try{if(nativeAnchorClick)HTMLAnchorElement.prototype.click=nativeAnchorClick;}catch{}
-    pendingAsset=null;engine=null;tell('quit-ack',{reason});
+    pendingAsset=null;engine=null;tell('quit-ack',{reason,at:Date.now()});
   }
 
   addEventListener('message',event=>{
     if(event.origin!==location.origin||event.source!==parent)return;const message=event.data||{};if(message.protocol!==PROTOCOL)return;
-    if(message.type==='asset'){const p=message.payload||{};pendingAsset={name:String(p.name||'kelo-asset.png'),mime:String(p.mime||'image/png'),buffer:p.buffer};if(engine)void tryOpenPending();}
-    else if(message.type==='quit')void shutdown('parent-request');else if(message.type==='ping')tell('pong',{at:Date.now(),ready:!!engine});
+    if(message.type==='asset'){
+      const p=message.payload||{};
+      if(!(p.buffer instanceof ArrayBuffer)){tell('error',{code:'ASSET_BUFFER_INVALID',message:'Expected transferable ArrayBuffer'});return;}
+      pendingAsset={name:String(p.name||'kelo-asset.png'),mime:String(p.mime||'image/png'),buffer:p.buffer};lastAssetStage='received';lastAssetName=pendingAsset.name;
+      tell('asset-received',{name:lastAssetName,bytes:p.buffer.byteLength,mime:pendingAsset.mime,at:Date.now()});if(engine)void tryOpenPending();
+    }else if(message.type==='quit')void shutdown('parent-request');
+    else if(message.type==='ping')tell('pong',{...health(),pongAt:Date.now(),pingAt:Number(message.payload?.at)||0});
   });
   for(const type of ['pointerdown','pointermove','keydown','touchstart'])addEventListener(type,markActive,{passive:true});
   addEventListener('pagehide',()=>{clearIdleTimers();pendingAsset=null;},{once:true});installDownloadBridge();
@@ -96,9 +121,9 @@
       const config={args:[],canvasResizePolicy:2,ensureCrossOriginIsolationHeaders:false,executable:`${BASE}/index`,mainPack:`${BASE}/index.pck`,experimentalVK:false,focusCanvas:true,gdextensionLibs:[],serviceWorker:null};
       engine=new window.Engine(config);const missing=window.Engine.getMissingFeatures?.({threads:false})||[];if(missing.length)throw new Error(`Pixelorama Web missing browser features: ${missing.join(', ')}`);
       await engine.startGame({onProgress:(current,total)=>{if(current>0&&total>0)setStatus(`Loading Pixelorama ${Math.round(current/total*100)}%…`);}});
-      installOpenBridge();status.hidden=true;canvas.focus();nativeCommand('set_undo_limit',64);markActive();
-      const nativeBridge=typeof window.keloPixeloramaCommand==='function';tell('ready',{upstreamCommit:UPSTREAM_COMMIT,mode:nativeBridge?'kelo-custom-web':'stock-full-web',threads:false,nativeBridge});if(pendingAsset)void tryOpenPending();
-    }catch(error){console.error('[Kelo Pixelorama]',error);setStatus(`Pixelorama could not start: ${String(error?.message||error)}`);tell('error',{code:'BOOT_FAILED',message:String(error?.message||error)});}
+      installOpenBridge();status.hidden=true;canvas.focus();nativeCommand('set_undo_limit',64);markActive();nativeBridge=typeof window.keloPixeloramaCommand==='function';runtimeMode=nativeBridge?'kelo-custom-web':'stock-full-web';readyAt=Date.now();
+      tell('ready',health());if(pendingAsset)void tryOpenPending();
+    }catch(error){console.error('[Kelo Pixelorama]',error);runtimeMode='boot-failed';setStatus(`Pixelorama could not start: ${String(error?.message||error)}`);tell('error',{code:'BOOT_FAILED',message:String(error?.message||error)});}
   })();
 })();
 </script>
