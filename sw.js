@@ -8,7 +8,7 @@
  * do-not: never cache API/session/gameplay responses
  */
 'use strict';
-let forceFreshUntil = 0; // kelo-sw-v6551 world-a11 wipe-on-activate
+let forceFreshUntil = 0;
 
 let activeStagedBuild = null;
 let activeInstalledBuild = null;
@@ -27,6 +27,7 @@ function stageCacheName(build) { const normalized = normalizeBuild(build); retur
 function manifestMetaUrl(build) { const url = scopeUrl(MANIFEST_META_PATH); url.searchParams.set('build', normalizeBuild(build) || 'invalid'); return url.href; }
 function activeBuildMetaUrl() { return scopeUrl(ACTIVE_BUILD_META_PATH).href; }
 function assetObjectUrl(blob) { const normalized = normalizeBlob(blob); return normalized ? scopeUrl('__kelo_asset_v3__/' + normalized).href : null; }
+function isKeloOwnedCache(name) { return name === ASSET_CACHE_NAME || name === META_CACHE_NAME || String(name || '').startsWith(STAGE_CACHE_PREFIX); }
 async function readJson(response) { if (!response) return null; try { return await response.json(); } catch (_) { return null; } }
 async function getManifest(build) {
   const normalized = normalizeBuild(build); if (!normalized) return null;
@@ -40,6 +41,18 @@ async function resolveActiveBuild() {
   if (activeInstalledBuild) return activeInstalledBuild;
   try { const cache = await caches.open(META_CACHE_NAME); const payload = await readJson(await cache.match(activeBuildMetaUrl())); activeInstalledBuild = normalizeBuild(payload && payload.build); } catch (_) {}
   return activeInstalledBuild;
+}
+async function cleanupOwnedCaches() {
+  try {
+    const installed = await resolveActiveBuild();
+    const keep = new Set([ASSET_CACHE_NAME, META_CACHE_NAME]);
+    const installedStage = stageCacheName(installed);
+    const staged = stageCacheName(activeStagedBuild);
+    if (installedStage) keep.add(installedStage);
+    if (staged) keep.add(staged);
+    const keys = await caches.keys();
+    await Promise.all(keys.map((name) => isKeloOwnedCache(name) && !keep.has(name) ? caches.delete(name) : Promise.resolve(false)));
+  } catch (_) {}
 }
 function findManifestEntry(manifest, url) {
   if (!manifest || !Array.isArray(manifest.files)) return null;
@@ -67,7 +80,7 @@ async function stagedResponse(request, url, build) {
 self.addEventListener('install', () => { self.skipWaiting(); });
 self.addEventListener('activate', (event) => {
   event.waitUntil((async () => {
-    try { const keys = await caches.keys(); await Promise.all(keys.map((k) => caches.delete(k))); } catch (_) {}
+    await cleanupOwnedCaches();
     await self.clients.claim();
   })());
 });

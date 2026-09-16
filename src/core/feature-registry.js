@@ -1,17 +1,30 @@
 /* KELO-INDEX
  * area: CORE / FEATURE REGISTRY
  * owner: KELO_FEATURE_REGISTRY
- * keys: FEATURE MODULE DEPENDENCY LAZY ASSET LIFECYCLE SCALABILITY
- * purpose: fuente única de verdad para paquetes opcionales; Module Loader y Asset Registry consumen este catálogo
- * public-api: KELO_FEATURE_REGISTRY.ids/has/get/files/catalog/resolve
+ * keys: FEATURE MODULE DEPENDENCY LAZY ASSET LIFECYCLE SCALABILITY AFTER-PAINT INTERNAL
+ * purpose: fuente única de verdad para paquetes opcionales e internos; Module Loader y Asset Registry consumen este catálogo
+ * public-api: KELO_FEATURE_REGISTRY.ids/toggleableIds/has/get/files/catalog/resolve
  * state-owned: definiciones inmutables de features; no carga scripts ni modifica gameplay
  * do-not: NO ejecutar features, NO crear segundo loader, NO meter estado runtime mutable
  */
 (function(root){
 'use strict';
 if(root.KELO_FEATURE_REGISTRY)return;
-const VERSION='kelo-feature-registry-v2.0.0';
+const VERSION='kelo-feature-registry-v3.0.0';
 const raw={
+  controlPlane:{dependencies:[],policy:'after-paint',userToggle:false,files:[
+    {src:'src/ui/asset-library-launcher.js?v=1',name:'biblioteca de assets'},
+    {src:'src/core/settings-lazy-gate.js?v=3-update-intel',name:'ajustes'},
+    {src:'src/core/update-gate.js?v=6-live-fast-forward',name:'actualizador'},
+    {src:'src/systems/admin-key-system.js?v=1',name:'admin key'},
+    {src:'src/core/admin-control-lazy-gate.js?v=2',name:'admin control'},
+    {src:'src/core/account-live-control-gate.js?v=2',name:'cuenta live'},
+    {src:'src/core/creators-lazy-gate.js?v=3',name:'creators'}
+  ]},
+  observability:{dependencies:[],policy:'after-paint',userToggle:false,files:[
+    {src:'src/core/simulation-farm-shadow.js?v=1',name:'farm shadow'},
+    {src:'src/core/player-position-shadow.js?v=1',name:'position shadow'}
+  ]},
   social:{dependencies:[],policy:'first-use',files:[
     {src:'src/ui/player-nameplate.js?v=2',name:'placas'},
     {src:'src/systems/nobility.js?v=4',name:'títulos'},
@@ -64,15 +77,17 @@ for(const [id,spec] of Object.entries(raw)){
   definitions[id]=Object.freeze({
     id,
     policy:String(spec.policy||'first-use'),
+    userToggle:spec.userToggle!==false,
     dependencies:Object.freeze((spec.dependencies||[]).map(String)),
     files:Object.freeze((spec.files||[]).map(item=>Object.freeze({...item})))
   });
 }
 const IDS=Object.freeze(Object.keys(definitions));
+const TOGGLEABLE_IDS=Object.freeze(IDS.filter(id=>definitions[id].userToggle));
 function resolve(id){const key=String(id||'');return ALIASES[key]||key;}
 function get(id){return definitions[resolve(id)]||null;}
 function has(id){return !!get(id);}
 function files(id){return get(id)?.files||null;}
 function catalog(){return Object.freeze(Object.fromEntries(IDS.map(id=>[id,definitions[id]])));}
-root.KELO_FEATURE_REGISTRY=Object.freeze({version:VERSION,ids:IDS,aliases:ALIASES,resolve,has,get,files,catalog});
+root.KELO_FEATURE_REGISTRY=Object.freeze({version:VERSION,ids:IDS,toggleableIds:TOGGLEABLE_IDS,aliases:ALIASES,resolve,has,get,files,catalog});
 })(typeof globalThis!=='undefined'?globalThis:window);

@@ -1,0 +1,68 @@
+name: Dependency Lock Guard
+
+on:
+  push:
+    branches:
+      - evergreen-migration-2026-09-15
+    paths:
+      - package.json
+      - package-lock.json
+      - server/package.json
+      - server/package-lock.json
+      - .nvmrc
+      - .github/workflows/dependency-lock.yml
+  pull_request:
+    branches:
+      - main
+    paths:
+      - package.json
+      - package-lock.json
+      - server/package.json
+      - server/package-lock.json
+      - .nvmrc
+      - .github/workflows/dependency-lock.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dependency-lock-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lock:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup client Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+
+      - name: Verify client lockfile is reproducible
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f package-lock.json
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          git diff --exit-code -- package-lock.json
+
+      - name: Setup server Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.20.0
+          package-manager-cache: false
+
+      - name: Verify server lockfile is reproducible
+        working-directory: server
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f package-lock.json
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          git diff --exit-code -- package-lock.json
