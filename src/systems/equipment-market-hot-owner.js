@@ -19,6 +19,7 @@ let active=deepFreeze({schemaVersion:1,globalMultiplier:1,templates:{}}),epoch=0
 function clone(value){return value==null?value:JSON.parse(JSON.stringify(value));}
 function deepFreeze(value){if(!value||typeof value!=='object'||Object.isFrozen(value))return value;Object.keys(value).forEach(k=>deepFreeze(value[k]));return Object.freeze(value);}
 function emit(type,detail){try{root.dispatchEvent(new CustomEvent('kelo:equipment-market-balance:'+type,{detail:Object.assign(getState(),detail||{})}));}catch(_){} }
+function worldState(){try{if(root.STATE&&typeof root.STATE==='object')return root.STATE;if(typeof STATE!=='undefined'&&STATE&&typeof STATE==='object')return STATE;}catch(_){}return null;}
 function normalize(raw){
   if(!raw||typeof raw!=='object'||Array.isArray(raw))throw new Error('equipment_market_object_required');
   if(Number(raw.schemaVersion)!==1)throw new Error('equipment_market_schema_unsupported');
@@ -56,9 +57,9 @@ function bindCatalog(){
   baseCatalog=current;wrappedCatalog=makeWrapper(current);root.KELO_EQUIPMENT_ITEM_CATALOG=wrappedCatalog;binds++;return true;
 }
 function patchOfflineFixtures(){
-  if(!wrappedCatalog||!root.STATE?.commerce||!Array.isArray(root.STATE.commerce.demoListings))return 0;
+  const state=worldState();if(!wrappedCatalog||!state?.commerce||!Array.isArray(state.commerce.demoListings))return 0;
   const prices=new Map((wrappedCatalog.marketOffers||[]).map(o=>['demo_listing_'+o.offerId,o.price]));let changed=0;
-  for(const listing of root.STATE.commerce.demoListings){if(!listing||listing.demo!==true||listing.ownerId!=='offline_vendor_ron')continue;const price=prices.get(String(listing.listingId||''));if(!Number.isFinite(price)||listing.price===price)continue;listing.price=price;changed++;}
+  for(const listing of state.commerce.demoListings){if(!listing||listing.demo!==true||listing.ownerId!=='offline_vendor_ron')continue;const price=prices.get(String(listing.listingId||''));if(!Number.isFinite(price)||listing.price===price)continue;listing.price=price;changed++;}
   fixturePatches+=changed;return changed;
 }
 function applyRuntime(reason){try{const ready=bindCatalog(),patched=ready?patchOfflineFixtures():0;emit('runtime-refresh',{reason:String(reason||'manual'),ready,patched});return ready;}catch(error){lastError=String(error&&error.message||error);emit('runtime-error',{error:lastError});return false;}}
