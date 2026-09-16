@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: CREATORS / ASSET BYTES
  * owner: Kelo Creator Asset Bridge
- * keys: PNG COMPRESS LOSSLESS PALETTE QUALITY GATE PIXEL EXACT
+ * keys: PNG COMPRESS LOSSLESS PALETTE BIT DEPTH COLOR TYPE ALPHA DROP QUALITY GATE PIXEL EXACT
  * purpose: reduce PNG byte size before asset-sheet compilation while proving decoded pixels remain identical
  * public-api: optimizePngLossless(), decodePngRgba(), encodeRgbaPng()
  * state-owned: none; pure byte transformation + audit metadata
@@ -16,6 +16,7 @@ import {evaluatePixelFidelity, judgePixelFidelity} from './png-quality-agent.mjs
 const PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
 const COLOR_CHANNELS = new Map([[0, 1], [2, 3], [3, 1], [4, 2], [6, 4]]);
 const PALETTE_BLOCKERS = new Set(['bKGD', 'hIST', 'sBIT']);
+const ALPHA_DROP_BLOCKERS = new Set(['PLTE', 'tRNS', 'sBIT']);
 
 const CRC_TABLE = (() => {
   const table = new Uint32Array(256);
@@ -89,16 +90,21 @@ function paeth(a, b, c) {
 }
 
 function assertSupported(ihdr) {
-  if (ihdr.bitDepth !== 8) throw new Error(`PNG_SPACE_UNSUPPORTED_BIT_DEPTH:${ihdr.bitDepth}`);
   if (ihdr.interlace !== 0) throw new Error('PNG_SPACE_UNSUPPORTED_INTERLACE');
   const channels = COLOR_CHANNELS.get(ihdr.colorType);
   if (!channels) throw new Error(`PNG_SPACE_UNSUPPORTED_COLOR_TYPE:${ihdr.colorType}`);
+  const allowedDepths = (ihdr.colorType === 0 || ihdr.colorType === 3) ? [1, 2, 4, 8] : [8];
+  if (!allowedDepths.includes(ihdr.bitDepth)) throw new Error(`PNG_SPACE_UNSUPPORTED_BIT_DEPTH:${ihdr.bitDepth}`);
   if (!ihdr.width || !ihdr.height) throw new Error('PNG_SPACE_INVALID_DIMENSIONS');
-  return channels;
+  const bitsPerPixel = channels * ihdr.bitDepth;
+  return {
+    channels,
+    rowBytes:Math.ceil((ihdr.width * bitsPerPixel) / 8),
+    filterBpp:Math.max(1, Math.ceil(bitsPerPixel / 8))
+  };
 }
 
-function unfilterScanlines(inflated, width, height, channels) {
-  const rowBytes = width * channels;
+function unfilterByteRows(inflated, rowBytes, height, filterBpp) {
   const expected = height * (rowBytes + 1);
   if (inflated.length !== expected) throw new Error(`PNG_SPACE_INFLATE_LENGTH:${inflated.length}:${expected}`);
   const raw = Buffer.alloc(rowBytes * height);
@@ -110,9 +116,9 @@ function unfilterScanlines(inflated, width, height, channels) {
     const prevStart = rowStart - rowBytes;
     for (let x = 0; x < rowBytes; x += 1) {
       const encoded = inflated[read++];
-      const left = x >= channels ? raw[rowStart + x - channels] : 0;
+      const left = x >= filterBpp ? raw[rowStart + x - filterBpp] : 0;
       const up = y ? raw[prevStart + x] : 0;
-      const upperLeft = y && x >= channels ? raw[prevStart + x - channels] : 0;
+      const upperLeft = y && x >= filterBpp ? raw[prevStart + x - filterBpp] : 0;
       const predictor = filter === 0 ? 0
         : filter === 1 ? left
         : filter === 2 ? up
@@ -122,6 +128,24 @@ function unfilterScanlines(inflated, width, height, channels) {
     }
   }
   return raw;
+}
+
+function unpackSubByteRows(packed, width, height, bitDepth, colorType) {
+  const rowBytes = Math.ceil((width * bitDepth) / 8);
+  const mask = (1 << bitDepth) - 1;
+  const samples = Buffer.alloc(width * height);
+  let write = 0;
+  for (let y = 0; y < height; y += 1) {
+    const rowStart = y * rowBytes;
+    for (let x = 0; x < width; x += 1) {
+      const bitOffset = x * bitDepth;
+      const byte = packed[rowStart + (bitOffset >> 3)];
+      const shift = 8 - bitDepth - (bitOffset & 7);
+      const value = (byte >> shift) & mask;
+      samples[write++] = colorType === 0 ? Math.round((value * 255) / mask) : value;
+    }
+  }
+  return samples;
 }
 
 function samplesToRgba(samples, ihdr, chunks) {
@@ -169,11 +193,23 @@ function samplesToRgba(samples, ihdr, chunks) {
 export function decodePngRgba(buffer) {
   const chunks = parseChunks(buffer);
   const ihdr = readIhdr(chunks);
-  const channels = assertSupported(ihdr);
+  const layout = assertSupported(ihdr);
   const compressed = Buffer.concat(chunks.filter(chunk => chunk.type === 'IDAT').map(chunk => chunk.data));
-  const samples = unfilterScanlines(zlib.inflateSync(compressed), ihdr.width, ihdr.height, channels);
+  const packedSamples = unfilterByteRows(zlib.inflateSync(compressed), layout.rowBytes, ihdr.height, layout.filterBpp);
+  const samples = ihdr.bitDepth < 8
+    ? unpackSubByteRows(packedSamples, ihdr.width, ihdr.height, ihdr.bitDepth, ihdr.colorType)
+    : packedSamples;
   const rgba = samplesToRgba(samples, ihdr, chunks);
-  return {chunks, ihdr, channels, samples, rgba};
+  return {
+    chunks,
+    ihdr,
+    channels:layout.channels,
+    rowBytes:layout.rowBytes,
+    filterBpp:layout.filterBpp,
+    samples,
+    packedSamples,
+    rgba
+  };
 }
 
 function predictorForFilter(filter, left, up, upperLeft) {
@@ -184,15 +220,15 @@ function predictorForFilter(filter, left, up, upperLeft) {
     : paeth(left, up, upperLeft);
 }
 
-function filteredRow(samples, rowStart, rowBytes, channels, y, filter) {
+function filteredRow(samples, rowStart, rowBytes, filterBpp, y, filter) {
   const output = Buffer.allocUnsafe(rowBytes);
   const prevStart = rowStart - rowBytes;
   let cost = 0;
   for (let x = 0; x < rowBytes; x += 1) {
     const raw = samples[rowStart + x];
-    const left = x >= channels ? samples[rowStart + x - channels] : 0;
+    const left = x >= filterBpp ? samples[rowStart + x - filterBpp] : 0;
     const up = y ? samples[prevStart + x] : 0;
-    const upperLeft = y && x >= channels ? samples[prevStart + x - channels] : 0;
+    const upperLeft = y && x >= filterBpp ? samples[prevStart + x - filterBpp] : 0;
     const value = (raw - predictorForFilter(filter, left, up, upperLeft) + 256) & 255;
     output[x] = value;
     cost += Math.min(value, 256 - value);
@@ -200,8 +236,7 @@ function filteredRow(samples, rowStart, rowBytes, channels, y, filter) {
   return {output, cost};
 }
 
-function filterScanlines(samples, width, height, channels, strategy = 'adaptive') {
-  const rowBytes = width * channels;
+function filterByteRows(samples, rowBytes, height, filterBpp, strategy = 'adaptive') {
   const result = Buffer.allocUnsafe(height * (rowBytes + 1));
   let write = 0;
   for (let y = 0; y < height; y += 1) {
@@ -209,18 +244,22 @@ function filterScanlines(samples, width, height, channels, strategy = 'adaptive'
     let selected;
     if (strategy === 'adaptive') {
       for (let filter = 0; filter <= 4; filter += 1) {
-        const candidate = filteredRow(samples, rowStart, rowBytes, channels, y, filter);
+        const candidate = filteredRow(samples, rowStart, rowBytes, filterBpp, y, filter);
         if (!selected || candidate.cost < selected.cost) selected = {...candidate, filter};
       }
     } else {
       const filter = Number(strategy);
-      selected = {...filteredRow(samples, rowStart, rowBytes, channels, y, filter), filter};
+      selected = {...filteredRow(samples, rowStart, rowBytes, filterBpp, y, filter), filter};
     }
     result[write++] = selected.filter;
     selected.output.copy(result, write);
     write += rowBytes;
   }
   return result;
+}
+
+function filterScanlines(samples, width, height, channels, strategy = 'adaptive') {
+  return filterByteRows(samples, width * channels, height, channels, strategy);
 }
 
 function rebuildWithIdat(chunks, compressed) {
@@ -262,9 +301,22 @@ function buildFreshPng({ihdr, preIdat = [], idat, postIdat = []}) {
   ]);
 }
 
+function chunkPartitions(decoded, excluded, blockers = null) {
+  if (blockers && decoded.chunks.some(chunk => blockers.has(chunk.type))) return null;
+  const firstIdat = decoded.chunks.findIndex(chunk => chunk.type === 'IDAT');
+  let lastIdat = firstIdat;
+  for (let index = firstIdat + 1; index < decoded.chunks.length; index += 1) {
+    if (decoded.chunks[index].type === 'IDAT') lastIdat = index;
+  }
+  const preIdat = decoded.chunks.slice(1, firstIdat).filter(chunk => !excluded.has(chunk.type));
+  const postIdat = decoded.chunks.slice(lastIdat + 1).filter(chunk => !excluded.has(chunk.type));
+  return {preIdat, postIdat};
+}
+
 function paletteRepresentation(decoded) {
   if (decoded.ihdr.colorType === 3) return null;
-  if (decoded.chunks.some(chunk => PALETTE_BLOCKERS.has(chunk.type))) return null;
+  const partitions = chunkPartitions(decoded, new Set(['IHDR', 'PLTE', 'tRNS', 'IDAT', 'IEND']), PALETTE_BLOCKERS);
+  if (!partitions) return null;
 
   const map = new Map();
   const colors = [];
@@ -293,32 +345,78 @@ function paletteRepresentation(decoded) {
     if (color[3] !== 255) lastTransparent = index;
   });
   const trns = lastTransparent >= 0 ? Buffer.from(colors.slice(0, lastTransparent + 1).map(color => color[3])) : null;
+  const bitDepth = colors.length <= 2 ? 1 : colors.length <= 4 ? 2 : colors.length <= 16 ? 4 : 8;
+  return {...partitions, indexes, plte, trns, colorCount:colors.length, bitDepth};
+}
 
-  const firstIdat = decoded.chunks.findIndex(chunk => chunk.type === 'IDAT');
-  let lastIdat = firstIdat;
-  for (let index = firstIdat + 1; index < decoded.chunks.length; index += 1) {
-    if (decoded.chunks[index].type === 'IDAT') lastIdat = index;
+function packIndexedRows(indexes, width, height, bitDepth) {
+  if (bitDepth === 8) return Buffer.from(indexes);
+  const rowBytes = Math.ceil((width * bitDepth) / 8);
+  const packed = Buffer.alloc(rowBytes * height);
+  const mask = (1 << bitDepth) - 1;
+  for (let y = 0; y < height; y += 1) {
+    const rowStart = y * rowBytes;
+    for (let x = 0; x < width; x += 1) {
+      const value = indexes[y * width + x] & mask;
+      const bitOffset = x * bitDepth;
+      const byteOffset = rowStart + (bitOffset >> 3);
+      const shift = 8 - bitDepth - (bitOffset & 7);
+      packed[byteOffset] |= value << shift;
+    }
   }
-  const excluded = new Set(['IHDR', 'PLTE', 'tRNS', 'IDAT', 'IEND']);
-  const preIdat = decoded.chunks.slice(1, firstIdat).filter(chunk => !excluded.has(chunk.type));
-  const postIdat = decoded.chunks.slice(lastIdat + 1).filter(chunk => !excluded.has(chunk.type));
-  return {indexes, plte, trns, preIdat, postIdat, colorCount:colors.length};
+  return packed;
 }
 
 function palettePng(decoded, representation, filterStrategy, zlibOptions) {
-  const filtered = filterScanlines(
-    representation.indexes,
-    decoded.ihdr.width,
-    decoded.ihdr.height,
-    1,
-    filterStrategy
-  );
+  const packed = packIndexedRows(representation.indexes, decoded.ihdr.width, decoded.ihdr.height, representation.bitDepth);
+  const rowBytes = Math.ceil((decoded.ihdr.width * representation.bitDepth) / 8);
+  const filtered = filterByteRows(packed, rowBytes, decoded.ihdr.height, 1, filterStrategy);
   const compressed = zlib.deflateSync(filtered, zlibOptions);
   const pre = [...representation.preIdat, {type:'PLTE', data:representation.plte}];
   if (representation.trns) pre.push({type:'tRNS', data:representation.trns});
   return buildFreshPng({
-    ihdr:{...decoded.ihdr, bitDepth:8, colorType:3},
+    ihdr:{...decoded.ihdr, bitDepth:representation.bitDepth, colorType:3},
     preIdat:pre,
+    idat:compressed,
+    postIdat:representation.postIdat
+  });
+}
+
+function alphaDropRepresentation(decoded) {
+  if (![4, 6].includes(decoded.ihdr.colorType) || decoded.ihdr.bitDepth !== 8) return null;
+  if (decoded.chunks.some(chunk => ALPHA_DROP_BLOCKERS.has(chunk.type))) return null;
+  const rgba = decoded.rgba;
+  for (let offset = 3; offset < rgba.length; offset += 4) if (rgba[offset] !== 255) return null;
+
+  const targetColorType = decoded.ihdr.colorType === 6 ? 2 : 0;
+  const targetChannels = targetColorType === 2 ? 3 : 1;
+  const samples = Buffer.alloc(decoded.ihdr.width * decoded.ihdr.height * targetChannels);
+  let write = 0;
+  for (let offset = 0; offset < rgba.length; offset += 4) {
+    if (targetColorType === 2) {
+      samples[write++] = rgba[offset];
+      samples[write++] = rgba[offset + 1];
+      samples[write++] = rgba[offset + 2];
+    } else {
+      samples[write++] = rgba[offset];
+    }
+  }
+  const partitions = chunkPartitions(decoded, new Set(['IHDR', 'PLTE', 'tRNS', 'IDAT', 'IEND']));
+  return partitions ? {...partitions, samples, targetColorType, targetChannels} : null;
+}
+
+function alphaDropPng(decoded, representation, filterStrategy, zlibOptions) {
+  const filtered = filterScanlines(
+    representation.samples,
+    decoded.ihdr.width,
+    decoded.ihdr.height,
+    representation.targetChannels,
+    filterStrategy
+  );
+  const compressed = zlib.deflateSync(filtered, zlibOptions);
+  return buildFreshPng({
+    ihdr:{...decoded.ihdr, bitDepth:8, colorType:representation.targetColorType},
+    preIdat:representation.preIdat,
     idat:compressed,
     postIdat:representation.postIdat
   });
@@ -399,7 +497,7 @@ export function optimizePngLossless(buffer, options = {}) {
   const profiles = zlibProfiles();
 
   for (const filterStrategy of filterStrategies) {
-    const filtered = filterScanlines(decoded.samples, decoded.ihdr.width, decoded.ihdr.height, decoded.channels, filterStrategy);
+    const filtered = filterByteRows(decoded.packedSamples, decoded.rowBytes, decoded.ihdr.height, decoded.filterBpp, filterStrategy);
     for (const profile of profiles) {
       const compressed = zlib.deflateSync(filtered, profile.options);
       const candidate = rebuildWithIdat(decoded.chunks, compressed);
@@ -411,14 +509,29 @@ export function optimizePngLossless(buffer, options = {}) {
     }
   }
 
+  const alphaDrop = options.disableColorReduction === true ? null : alphaDropRepresentation(decoded);
+  if (alphaDrop) {
+    for (const filterStrategy of filterStrategies) {
+      for (const profile of profiles) {
+        const candidate = alphaDropPng(decoded, alphaDrop, filterStrategy, profile.options);
+        candidates.push(candidateRecord(
+          'exact-alpha-drop',
+          `alpha-drop:${decoded.ihdr.colorType}->${alphaDrop.targetColorType}:${filterStrategy}:${profile.name}`,
+          candidate
+        ));
+      }
+    }
+  }
+
   const palette = options.disablePalette === true ? null : paletteRepresentation(decoded);
   if (palette) {
-    for (const filterStrategy of ['adaptive', 0, 1, 2, 3, 4]) {
+    const paletteFilters = options.paletteFilterStrategies || filterStrategies;
+    for (const filterStrategy of paletteFilters) {
       for (const profile of profiles) {
         const candidate = palettePng(decoded, palette, filterStrategy, profile.options);
         candidates.push(candidateRecord(
           'exact-palette',
-          `palette:${palette.colorCount}:${filterStrategy}:${profile.name}`,
+          `palette:${palette.colorCount}:${palette.bitDepth}b:${filterStrategy}:${profile.name}`,
           candidate
         ));
       }
@@ -453,7 +566,8 @@ export function optimizePngLossless(buffer, options = {}) {
       qualityScore:winner.qualityScore,
       winner:{kind:winner.kind, label:winner.label, bytes:winner.bytes},
       source:{width:decoded.ihdr.width, height:decoded.ihdr.height, colorType:decoded.ihdr.colorType, bitDepth:decoded.ihdr.bitDepth},
-      paletteCandidate:palette ? {exactColors:palette.colorCount} : null,
+      alphaDropCandidate:alphaDrop ? {fromColorType:decoded.ihdr.colorType,toColorType:alphaDrop.targetColorType} : null,
+      paletteCandidate:palette ? {exactColors:palette.colorCount,bitDepth:palette.bitDepth} : null,
       candidates:candidates.map(candidate => {
         const validated = validatedByLabel.get(candidate.label);
         return {
