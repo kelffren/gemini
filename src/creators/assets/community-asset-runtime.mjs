@@ -10,10 +10,14 @@ function emit(name, detail) {
   }
 }
 
+function localActor() {
+  try { if (typeof localPlayer !== 'undefined' && localPlayer) return localPlayer; } catch {}
+  return globalThis.localPlayer || null;
+}
 function playerRecord(playerId) {
   const id = String(playerId);
   const net = globalThis.keloNet;
-  if (net?.id === id && typeof globalThis.localPlayer === 'object') return globalThis.localPlayer;
+  if (net?.id === id) return localActor();
   return net?.peers?.[id] || null;
 }
 
