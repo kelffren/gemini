@@ -1,0 +1,70 @@
+name: Environment Creator LIVE Admin E2E
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'tests/environment-creator-live-admin.spec.js'
+      - '.github/workflows/environment-creator-live-admin.yml'
+      - 'src/creators/definition/creator-test-bridge.mjs'
+      - 'src/environment/environment-world-sync.mjs'
+      - 'src/environment/environment-runtime.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: environment-creator-live-admin
+  cancel-in-progress: false
+
+jobs:
+  live-admin-e2e:
+    name: live-admin-environment-e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CI: true
+      KELO_PAGES_URL: https://kelffren.github.io/gemini/
+      KELO_E2E_ADMIN_EMAIL: ${{ secrets.KELO_E2E_ADMIN_EMAIL }}
+      KELO_E2E_ADMIN_PASSWORD: ${{ secrets.KELO_E2E_ADMIN_PASSWORD }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Verify dedicated admin test credentials
+        shell: bash
+        run: |
+          if [ -z "${KELO_E2E_ADMIN_EMAIL:-}" ] || [ -z "${KELO_E2E_ADMIN_PASSWORD:-}" ]; then
+            echo "::error::Missing KELO_E2E_ADMIN_EMAIL / KELO_E2E_ADMIN_PASSWORD repository secrets. LIVE mutation test was NOT run."
+            exit 1
+          fi
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Install Chromium
+        run: npx playwright install chromium --with-deps
+
+      - name: Run real Supabase publish + convergence + rollback
+        run: >-
+          npx playwright test
+          tests/environment-creator-live-admin.spec.js
+          --project=chromium
+          --trace=off
+
+      - name: Upload sanitized Playwright evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: environment-creator-live-admin-evidence
+          path: |
+            playwright-report.json
+            test-results/
+          retention-days: 7
+          if-no-files-found: ignore
