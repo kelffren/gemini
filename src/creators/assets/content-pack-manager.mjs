@@ -1,14 +1,14 @@
 /* KELO-INDEX
  * area: CREATORS / UNIVERSAL CONTENT PACKS
  * owner: Kelo Universal Content Bridge
- * keys: PACK DELTA UPDATE SHA256 DESCRIPTOR LOCK DEPENDENCY GC STORAGE MOBILE
- * purpose: Install and differentially update groups of vault content without adding pack binaries to normal game boot.
+ * keys: PACK DELTA UPDATE SHA256 DESCRIPTOR LOCK DEPENDENCY GC STORAGE SECURITY ROLLBACK MOBILE
+ * purpose: Install and differentially update groups of vault content while enforcing monotonic immutable catalog metadata.
  */
 import {searchExternalAssets} from './external-asset-providers.mjs';
 import {downloadAsset,integrateContent,getAsset,getBlob,removeLocal} from './personal-asset-vault.mjs';
 
-const CATALOG_URL='../../../data/content-pack-catalog.json?v=1';
-const DB_NAME='kelo_content_pack_v1',DB_VERSION=1,STORE='packs';
+const CATALOG_URL='../../../data/content-pack-catalog.json?v=2';
+const DB_NAME='kelo_content_pack_v1',DB_VERSION=2,STORE='packs',SETTINGS_STORE='settings';
 const MAX_MEMBERS=64;
 let catalogPromise=null,dbPromise=null;
 const copy=v=>v==null?v:JSON.parse(JSON.stringify(v));
@@ -57,31 +57,44 @@ function validatePack(pack){
   return pack;
 }
 
-export async function loadPackCatalog(){
-  if(catalogPromise)return catalogPromise;
-  catalogPromise=fetch(CATALOG_URL,{cache:'no-store'}).then(async response=>{
-    if(!response.ok)throw new Error('PACK_CATALOG_'+response.status);
-    const json=await response.json();if(json?.schema!=='kelo-content-pack-catalog-v1'||!Array.isArray(json.packs))throw new Error('PACK_CATALOG_INVALID');
-    return {...json,packs:json.packs.map(row=>copy(validatePack(row)))};
-  }).catch(error=>{catalogPromise=null;throw error;});
-  return catalogPromise;
-}
-export async function listContentPacks(){return copy((await loadPackCatalog()).packs);}
-export async function getContentPack(id){return(await listContentPacks()).find(pack=>pack.id===String(id))||null;}
-export function clearPackCatalogCache(){catalogPromise=null;}
-
 function openDb(){
   if(dbPromise)return dbPromise;
   dbPromise=new Promise((resolve,reject)=>{
     if(!('indexedDB'in globalThis))return reject(new Error('INDEXEDDB_UNAVAILABLE'));
     const request=indexedDB.open(DB_NAME,DB_VERSION);
-    request.onupgradeneeded=()=>{const db=request.result;if(!db.objectStoreNames.contains(STORE))db.createObjectStore(STORE,{keyPath:'id'});};
+    request.onupgradeneeded=()=>{const db=request.result;if(!db.objectStoreNames.contains(STORE))db.createObjectStore(STORE,{keyPath:'id'});if(!db.objectStoreNames.contains(SETTINGS_STORE))db.createObjectStore(SETTINGS_STORE,{keyPath:'id'});};
     request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error||new Error('PACK_DB_OPEN_FAILED'));
   }).catch(error=>{dbPromise=null;throw error;});return dbPromise;
 }
 async function stateGet(id){const db=await openDb();return new Promise((resolve,reject)=>{const req=db.transaction(STORE,'readonly').objectStore(STORE).get(String(id));req.onsuccess=()=>resolve(req.result||null);req.onerror=()=>reject(req.error);});}
 async function stateAll(){const db=await openDb();return new Promise((resolve,reject)=>{const req=db.transaction(STORE,'readonly').objectStore(STORE).getAll();req.onsuccess=()=>resolve(req.result||[]);req.onerror=()=>reject(req.error);});}
 async function statePut(value){const db=await openDb();return new Promise((resolve,reject)=>{const tx=db.transaction(STORE,'readwrite');tx.objectStore(STORE).put(value);tx.oncomplete=()=>resolve(copy(value));tx.onerror=()=>reject(tx.error);});}
+async function settingsGet(id){const db=await openDb();return new Promise((resolve,reject)=>{const req=db.transaction(SETTINGS_STORE,'readonly').objectStore(SETTINGS_STORE).get(String(id));req.onsuccess=()=>resolve(req.result||null);req.onerror=()=>reject(req.error);});}
+async function settingsPut(value){const db=await openDb();return new Promise((resolve,reject)=>{const tx=db.transaction(SETTINGS_STORE,'readwrite');tx.objectStore(SETTINGS_STORE).put(value);tx.oncomplete=()=>resolve(copy(value));tx.onerror=()=>reject(tx.error);});}
+
+async function validateCatalogSecurity(json){
+  const version=Number(json?.version);if(!Number.isSafeInteger(version)||version<1)throw new Error('PACK_CATALOG_VERSION_INVALID');
+  const digest=await hashObject(json),previous=await settingsGet('catalog-security');
+  if(previous?.version>version)throw new Error(`PACK_CATALOG_ROLLBACK:${version}<${previous.version}`);
+  if(previous?.version===version&&previous?.digest&&digest&&previous.digest!==digest)throw new Error('PACK_CATALOG_MUTATED_WITHOUT_VERSION:'+version);
+  const expiresAt=clean(json?.expiresAt)||null,publishedAt=clean(json?.publishedAt)||null,expiresMs=expiresAt?Date.parse(expiresAt):NaN,stale=Number.isFinite(expiresMs)&&Date.now()>expiresMs,versionJump=previous?.version&&version>previous.version?version-previous.version:0;
+  const security={id:'catalog-security',version,digest:digest?`sha256:${digest}`:null,publishedAt,expiresAt,stale,versionJump,lastAcceptedAt:now()};
+  await settingsPut(security);try{globalThis.dispatchEvent?.(new CustomEvent('kelo:pack-catalog-security',{detail:copy(security)}));}catch{}return security;
+}
+
+export async function loadPackCatalog(){
+  if(catalogPromise)return catalogPromise;
+  catalogPromise=fetch(CATALOG_URL,{cache:'no-store'}).then(async response=>{
+    if(!response.ok)throw new Error('PACK_CATALOG_'+response.status);
+    const json=await response.json();if(json?.schema!=='kelo-content-pack-catalog-v1'||!Array.isArray(json.packs))throw new Error('PACK_CATALOG_INVALID');
+    const security=await validateCatalogSecurity(json);return {...json,security,packs:json.packs.map(row=>copy(validatePack(row)))};
+  }).catch(error=>{catalogPromise=null;throw error;});
+  return catalogPromise;
+}
+export async function listContentPacks(){return copy((await loadPackCatalog()).packs);}
+export async function getContentPack(id){return(await listContentPacks()).find(pack=>pack.id===String(id))||null;}
+export async function getCatalogSecurityState(){return copy(await settingsGet('catalog-security'));}
+export function clearPackCatalogCache(){catalogPromise=null;}
 export async function getPackState(id){return copy(await stateGet(id));}
 export async function listPackStates(){return(await stateAll()).map(copy).sort((a,b)=>String(b.updatedAt||'').localeCompare(String(a.updatedAt||'')));}
 
@@ -115,8 +128,7 @@ export async function planContentPackUpdate(id,{integrate=true}={}){
     if(action==='download')deltaBytes+=estimatedBytes;else reusedBytes+=estimatedBytes;
     actions.push({asset,action,reason,estimatedBytes,previousLock:copy(lock)});oldLocks.delete(asset.id);
   }
-  const removed=[...oldLocks.values()];
-  const hash=await manifestHash(pack);
+  const removed=[...oldLocks.values()],hash=await manifestHash(pack);
   return {pack,previous,resolved,actions,removed,totalMembers:resolved.length,totalBytes,deltaBytes,reusedBytes,savedBytes:Math.max(0,totalBytes-deltaBytes),catalogHash:hash,changedMembers:actions.filter(x=>x.action!=='reuse').length,reusedMembers:actions.filter(x=>x.action==='reuse').length,removedMembers:removed.length};
 }
 
@@ -142,13 +154,9 @@ export async function installContentPack(id,{integrate=true,onProgress=null,_sta
       const lock={id:asset.id,provider:asset.provider,contentKind:local?.contentKind||asset.contentKind||'image',bytes:blob.size,sha256:sha256?`sha256:${sha256}`:oldLock?.sha256||null,expectedSha256:expected?`sha256:${expected}`:null,descriptorHash:asset.descriptorHash,integrated:!!local?.integrated,preexistingDownloaded,version:asset.memberVersion||pack.version};
       state.members.push(lock);state.completedMembers=index+1;state.bytes+=Number(blob.size||0);if(item.action==='download')state.delta.downloadedBytes+=Number(blob.size||0);state.updatedAt=now();await statePut(state);await tick();
     }
-
     if(plan.removed.length){
       const states=await listPackStates();
-      for(const member of plan.removed){
-        const shared=memberUsedByOtherPack(member.id,pack.id,states),wasAlreadyLocal=member.preexistingDownloaded===true;
-        if(!shared&&!wasAlreadyLocal)await removeLocal(member.id);
-      }
+      for(const member of plan.removed){const shared=memberUsedByOtherPack(member.id,pack.id,states),wasAlreadyLocal=member.preexistingDownloaded===true;if(!shared&&!wasAlreadyLocal)await removeLocal(member.id);}
     }
     state={...state,status:'installed',downloaded:true,integrated:integrate&&state.members.every(row=>row.integrated),installedAt:state.installedAt||now(),updatedAt:now(),error:null};
     await statePut(state);await emitProgress(onProgress,{packId:pack.id,phase:'done',total:plan.totalMembers,bytes:state.bytes,delta:copy(state.delta)});return copy(state);
@@ -180,19 +188,19 @@ export async function removeContentPack(id,{removeLocalMembers=true,onProgress=n
 export async function getPackStorageHealth(){
   const storage=globalThis.navigator?.storage;if(!storage)return{supported:false,usage:null,quota:null,persisted:false};
   let estimate={},persisted=false;try{estimate=await storage.estimate?.()||{};}catch{}try{persisted=await storage.persisted?.()||false;}catch{}
-  return{supported:true,usage:Number(estimate.usage||0),quota:Number(estimate.quota||0),persisted,free:Math.max(0,Number(estimate.quota||0)-Number(estimate.usage||0))};
+  return{supported:true,usage:Number(estimate.usage||0),quota:Number(estimate.quota||0),persisted,free:Math.max(0,Number(estimate.quota||0)-Number(estimate.usage||0)),opfsSupported:typeof storage.getDirectory==='function'};
 }
 export async function requestPersistentPackStorage(){const storage=globalThis.navigator?.storage;if(!storage?.persist)return false;try{return!!(await storage.persist());}catch{return false;}}
 
 export async function inspectContentPacks(){
-  const packs=await listContentPacks(),states=await listPackStates(),byId=new Map(states.map(s=>[s.id,s])),rows=[];
+  const catalog=await loadPackCatalog(),packs=catalog.packs,states=await listPackStates(),byId=new Map(states.map(s=>[s.id,s])),rows=[];
   for(const pack of packs){
     const state=byId.get(pack.id)||null,hash=await manifestHash(pack),updateAvailable=!!state&&compareVersions(pack.version,state.version)>0,catalogChanged=!!state?.catalogHash&&!!hash&&state.catalogHash!==hash;
     let delta=null;if(state?.downloaded&&(updateAvailable||catalogChanged||state.status==='partial'))try{const plan=await planContentPackUpdate(pack.id,{integrate:true});delta={changedMembers:plan.changedMembers,reusedMembers:plan.reusedMembers,removedMembers:plan.removedMembers,estimatedDownloadBytes:plan.deltaBytes,estimatedSavedBytes:plan.savedBytes};}catch{}
-    rows.push({...pack,state:copy(state),installed:!!state?.downloaded&&state.status==='installed',integrated:!!state?.integrated,partial:state?.status==='partial',updateAvailable,catalogChanged,manifestHash:hash?`sha256:${hash}`:null,delta});
+    rows.push({...pack,state:copy(state),installed:!!state?.downloaded&&state.status==='installed',integrated:!!state?.integrated,partial:state?.status==='partial',updateAvailable,catalogChanged,manifestHash:hash?`sha256:${hash}`:null,delta,catalogSecurity:copy(catalog.security)});
   }
   return rows;
 }
 
-export const CONTENT_PACK_MANAGER=Object.freeze({loadPackCatalog,listContentPacks,getContentPack,getPackState,listPackStates,inspectContentPacks,planContentPackUpdate,installContentPack,auditContentPack,removeContentPack,getPackStorageHealth,requestPersistentPackStorage,clearPackCatalogCache});
+export const CONTENT_PACK_MANAGER=Object.freeze({loadPackCatalog,listContentPacks,getContentPack,getCatalogSecurityState,getPackState,listPackStates,inspectContentPacks,planContentPackUpdate,installContentPack,auditContentPack,removeContentPack,getPackStorageHealth,requestPersistentPackStorage,clearPackCatalogCache});
 if(typeof window!=='undefined')window.KELO_CONTENT_PACK_MANAGER=CONTENT_PACK_MANAGER;
