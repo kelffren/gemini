@@ -23,6 +23,8 @@ Vault/integración: `personal-asset-vault.mjs`, `content-integration-router.mjs`
 
 Packs: `content-pack-manager.mjs`, `content-pack-transaction.mjs`, `content-packs.html`.
 
+Publisher: `scripts/publish-kelo-content-descriptors.mjs`.
+
 ## Vault / CAS
 
 IndexedDB `kelo_personal_asset_vault_v1`, stores `assets`, `blobs`, `manifests`, `casBlobs`.
@@ -33,35 +35,42 @@ asset metadata -> blobs[id] pointer -> casBlobs[sha256] immutable Blob
 
 Pointers nuevos conservan `digest`, `previousDigest`, `bytes`, `mime`, `storage:'cas-v2'`. Filas legacy con Blob inline siguen legibles. Migración es progresiva y nunca masiva en boot.
 
-APIs importantes: `downloadAsset`, `getBlob`, `getBlobByDigest`, `getBlobPointer`, `rollbackAssetBlob`, `garbageCollectCas`, `integrateContent`.
-
 ## Descriptor nativo Kelo
 
-`kelo-content-live-provider.mjs` deriva descriptor para cada `inlineManifest` al cargar el pequeño índice nativo:
+Durante la transición, `kelo-content-live-provider.mjs` deriva `expectedBytes` y `expectedSha256` de cada pequeño `inlineManifest`. Esto conserva compatibilidad pero no constituye una frontera de confianza independiente.
+
+### Publisher determinista
+
+`scripts/publish-kelo-content-descriptors.mjs` mueve la creación del descriptor hacia publicación/build:
 
 ```text
-JSON.stringify(inlineManifest)
- -> TextEncoder
- -> expectedBytes
- -> WebCrypto SHA-256
- -> expectedSha256
+data/kelo-content-starter-catalog.json
+ -> validar id + inlineManifest
+ -> JSON.stringify(inlineManifest)
+ -> bytes UTF-8
+ -> size
+ -> SHA-256
+ -> mediaType application/json
+ -> ordenar por id
+ -> data/kelo-content-descriptors.json
 ```
 
-El objeto normalizado expone:
+Schema de salida:
 
-```text
-bytes
-expectedBytes
-expectedSha256
+```json
+{
+  "schema": "kelo-content-descriptors-v1",
+  "algorithm": "sha256",
+  "source": "data/kelo-content-starter-catalog.json",
+  "descriptors": [
+    {"id":"...","mediaType":"application/json","size":123,"digest":"sha256:..."}
+  ]
+}
 ```
 
-La serialización coincide con `content-pack-transaction.mjs`, que crea el Blob mediante `JSON.stringify(asset.inlineManifest)`.
-
-Si WebCrypto no está disponible, `expectedBytes` sigue presente y `expectedSha256` queda `null`; compatibilidad se conserva.
+El script falla si una entrada Kelo carece de `id` o `inlineManifest`. Es build-time: no añade trabajo al boot, no crea otro Vault y no descarga binarios.
 
 ## Descarga/staging e integridad
-
-Flujo:
 
 ```text
 metadata/descriptor
@@ -75,23 +84,11 @@ metadata/descriptor
  -> staging
 ```
 
-Errores relevantes:
-
-```text
-ASSET_SIZE_MISMATCH
-ASSET_INTEGRITY_MISMATCH
-PACK_STAGE_CAS_DIGEST_MISMATCH
-```
-
-OCI recomienda comprobar tamaño antes de hashing/procesamiento pesado y después verificar digest. El descriptor derivado en cliente mejora integridad transaccional, pero no sustituye metadata firmada por publisher.
+Errores: `ASSET_SIZE_MISMATCH`, `ASSET_INTEGRITY_MISMATCH`, `PACK_STAGE_CAS_DIGEST_MISMATCH`.
 
 ## Pack Catalog y seguridad
 
-`data/content-pack-catalog.json` mantiene `version`, `publishedAt`, `expiresAt`, `packs[]`.
-
-PackManager usa IndexedDB `kelo_content_pack_v1`, stores `packs`, `settings`, `transactions`.
-
-Reglas:
+`data/content-pack-catalog.json` mantiene `version`, `publishedAt`, `expiresAt`, `packs[]`. PackManager usa IndexedDB `kelo_content_pack_v1`, stores `packs`, `settings`, `transactions`.
 
 ```text
 incoming.version < accepted.version -> PACK_CATALOG_ROLLBACK
@@ -100,13 +97,9 @@ same version + different digest -> PACK_CATALOG_MUTATED_WITHOUT_VERSION
 
 `stale` sigue observacional hasta existir refresh firmado confiable.
 
-## Planner diferencial
+## Planner y transacción
 
-`planContentPackUpdate(packId,{integrate:true})` produce `reuse`, `integrate`, `download`, `removed` y métricas `totalBytes`, `deltaBytes`, `stagingBytes`, `savedBytes`, miembros cambiados/reutilizados/retirados y `catalogHash`.
-
-## Transacción atómica
-
-Staging vive en `kelo_content_pack_staging_v1/stages`.
+`planContentPackUpdate()` produce `reuse`, `integrate`, `download`, `removed` y métricas de bytes/delta. Staging vive en `kelo_content_pack_staging_v1/stages`.
 
 ```text
 ACTIVE GEN N
@@ -120,87 +113,66 @@ ACTIVE GEN N
  -> activate target state
 ```
 
-El commit del Vault usa una sola transacción sobre `assets`, `blobs`, `manifests`, `casBlobs`. Pointer drift se comprueba antes del commit; si la base cambió se lanza `PACK_TRANSACTION_POINTER_DRIFT`.
+El commit del Vault usa una sola transacción sobre `assets`, `blobs`, `manifests`, `casBlobs`. Pointer drift lanza `PACK_TRANSACTION_POINTER_DRIFT`.
 
-## Journal / crash recovery
+## Journal, rollback y GC
 
-Fases: `staging`, `prepared`, `committing`, `vault-committed`, `committed`; recovery/error: `recovered`, `failed`, `interrupted`, `needs-recovery`.
-
-Journal guarda operación install/rollback, previousState, targetState, miembros cambiados/retirados, progreso, storagePressure y delta. Crash pre-commit aborta staging; crash post-Vault puede hacer roll-forward verificando pointers/tombstones.
-
-## Generaciones y rollback
-
-```text
-Gen N active -> prepare N+1 -> commit -> N+1 active, N previous
-```
-
-`rollbackContentPack()` stagea la generación previa desde CAS, recompila/valida, añade tombstones necesarios y hace commit atómico. No usa red si los digests siguen en CAS. Solo se conserva una generación anterior.
-
-## Reference graph / GC
-
-`buildContentReferenceGraph({verify:true})` protege:
-
-```text
-active generation
-previousGeneration
-live transaction previousState
-targetState
-targetMembers
-asset current/previous pointers
-```
-
-`garbageCollectContentStorage()` debe ser la entrada normal de mantenimiento: construye el grafo y pasa sus digests como raíces extra al GC del Vault. GC usa período de gracia; uninstall no equivale a borrar bytes inmediatamente.
+Journal cubre staging/prepared/committing/vault-committed/committed y recovery. `rollbackContentPack()` reconstruye la generación previa desde CAS sin red cuando los blobs siguen disponibles. `buildContentReferenceGraph({verify:true})` protege active generation, previousGeneration, transacciones vivas y pointers current/previous. Mantenimiento normal usa `garbageCollectContentStorage()`.
 
 ## Storage pressure
 
-`assessPackStoragePressure()` usa `navigator.storage.estimate()` y política actual de reserva `max(8% quota, 24 MiB)`.
-
-```text
-estimatedPeakExtraBytes = stagingBytes + downloadBytes
-freeAfter = free - estimatedPeakExtraBytes
-safe = freeAfter >= reserveBytes
-```
-
-Si la cuota es desconocida, el riesgo queda unknown; no inventar valores. `requestPersistentPackStorage()` solo solicita persistencia, nunca asumir que fue concedida. OPFS se detecta como capability pero aún no es almacenamiento canónico.
+`assessPackStoragePressure()` usa `navigator.storage.estimate()` y reserva `max(8% quota, 24 MiB)`. OPFS solo se detecta; IndexedDB sigue canónico hasta benchmark real en iPhone/Safari.
 
 ## Integración por tipo
 
-Visual: Blob -> integration router -> asset-sheet compiler -> manifest -> runtime bridge.
-
+Visual: Blob -> integration router -> compiler -> manifest -> runtime bridge.
 Audio: Blob -> audio manifest -> runtime bridge -> `Audio()` bajo demanda, `preload=none`.
+Ability: JSON -> whitelist validator -> engine; nunca JS externo.
+Scene/prefab: JSON -> prefab validator -> Studio prefabStamp.
 
-Ability: JSON -> whitelist validator -> personal ability manifest -> engine. Nunca ejecutar JS externo.
+## Estado del contrato de publicación
 
-Scene/prefab: JSON -> prefab validator -> prefabDefinition -> Studio prefabStamp.
+Implementado ahora:
 
-## Auditoría
+```text
+publisher determinista disponible
+client descriptor derivation disponible como fallback
+transaction size+digest verification disponible
+```
 
-`auditContentPack(id,{rehash:true})` comprueba binaries/digests de generación activa. `buildContentReferenceGraph({verify:true})` detecta raíces CAS faltantes. UI expone auditoría, rollback y preflight de espacio.
+Pendiente para cerrar la cadena:
+
+```text
+CI ejecuta publisher
+ -> exige descriptor file sincronizado
+ -> Pack Manager lee descriptor publicado
+ -> member lock conserva digest+size
+ -> cliente verifica ambos
+```
+
+Después de cerrar esa cadena se puede añadir firma TUF-style sin cambiar el Vault.
 
 ## Limitaciones actuales
 
-- no existe ACID entre DB de PackManager y DB del Vault; journal + roll-forward mitigan;
-- descriptors Kelo nativos se derivan en cliente y aún no están materializados/firmados por publisher;
+- publisher creado, pero todavía no está conectado a CI ni al consumo del Pack Manager;
+- descriptors Kelo derivados en cliente siguen siendo fallback temporal;
+- catálogo no está firmado y `stale` no bloquea;
 - providers externos pueden carecer de digest/size confiables;
-- catálogo no está firmado;
-- `stale` no bloquea;
 - delta sigue por archivo, sin chunk CAS;
 - staging puede duplicar temporalmente bytes;
-- OPFS no está benchmarkeado en iPhone real;
+- OPFS no benchmarkeado en iPhone;
 - solo una generación previa;
-- reference graph se reconstruye bajo demanda.
+- no existe ACID entre DB PackManager y Vault; journal + roll-forward mitigan.
 
 ## Próximos pasos
 
-1. publisher Kelo que materialice y exija `sha256 + bytes`;
-2. propagar esos descriptors publicados desde el pack catalog al resolver miembros;
-3. auditoría/rebuild detallado del reference graph;
-4. telemetría local de update/rollback/recovery/GC;
-5. firma de metadata estilo TUF;
-6. benchmark OPFS en iPhone;
-7. FastCDC build-time para archivos grandes;
-8. chunk CAS + Range/resume;
-9. Asset Gateway/CDN y mirrors.
+1. CI: ejecutar `node scripts/publish-kelo-content-descriptors.mjs` y fallar si cambia `data/kelo-content-descriptors.json`;
+2. consumir descriptor publicado desde Pack Manager y propagar `size/digest`;
+3. versionar descriptor set con catálogo inmutable;
+4. firma metadata estilo TUF;
+5. auditoría/rebuild reference graph;
+6. OPFS iPhone benchmark;
+7. FastCDC build-time para archivos grandes y luego chunk CAS + Range/resume.
 
 ## Reglas permanentes
 
@@ -208,6 +180,6 @@ No secretos en Pages; no JS externo ejecutable; licencia antes de integración; 
 
 ## Definition of Done
 
-Según aplique: boot sin binarios externos; reinstalación sin cambios evita red; update diferencial descarga solo cambios; CAS deduplica; staging no altera active; removals son atómicos; rollback funciona sin red con CAS; GC preserva roots; storage pressure se comprueba; auditoría detecta corrupción; anti-rollback funciona; recovery no deja mezcla de generaciones; CI/Pages sin regresión relevante.
+Según aplique: boot sin binarios externos; reinstalación sin cambios evita red; update diferencial descarga solo cambios; CAS deduplica; staging no altera active; removals son atómicos; rollback funciona sin red con CAS; GC preserva roots; storage pressure se comprueba; auditoría detecta corrupción; anti-rollback funciona; recovery no deja mezcla de generaciones; descriptors publicados son reproducibles; CI/Pages sin regresión relevante.
 
 **El catálogo puede crecer casi sin límite; el dispositivo solo paga almacenamiento, red y runtime por contenido seleccionado, con integridad, rollback y deduplicación.**
