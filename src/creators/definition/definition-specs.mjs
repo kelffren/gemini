@@ -52,7 +52,7 @@ export const DEFINITION_SPECS=Object.freeze({
     fields:Object.freeze([
       field('role','Role','select',{default:'villager',options:[option('villager','Villager',['aldeano']),option('merchant','Merchant',['comerciante','vendedor']),option('guard','Guard',['guardia']),option('enemy','Enemy',['enemigo','hostile','hostil']),option('quest_giver','Quest giver',['mision','quest'])]}),
       field('faction','Faction','text',{default:'neutral',placeholder:'neutral / city / guild / enemy'}),
-      field('behavior','Behavior','select',{default:'idle',options:[option('idle','Idle',['quieto']),option('patrol','Patrol',['patrulla']),option('wander','Wander',['caminar','deambular']),option('follow','Follow',['seguir']),option('aggressive','Aggressive',['agresivo','attack','atacar'])]}),
+      field('behavior','Behavior','select',{default:'idle',options:[option('idle','Idle',['quieto']),option('patrol','Patrol',['patrulla','patrols']),option('wander','Wander',['caminar','deambular']),option('follow','Follow',['seguir']),option('aggressive','Aggressive',['agresivo','attack','atacar'])]}),
       field('interactionRadius','Interaction radius','number',{default:96,min:16,max:1024,step:8,unit:'px',patterns:['radius','radio','distancia']}),
       field('dialogue','Opening dialogue','textarea',{default:'Hello, traveler.',placeholder:'First line the NPC says'}),
       field('shopOrReward','Shop / reward','text',{default:'',placeholder:'Optional shop, loot or reward'})
