@@ -1,8 +1,8 @@
 /* KELO-INDEX
  * area: TEST / GUARDIAN / PVP FAILOVER LIVE
  * owner: Guardian PvP failover validation only
- * keys: GUARDIAN PVP FAILOVER MASTER A B EPOCH LEASE WEBRTC TAKEOVER SNAPSHOT POSITION IOS
- * purpose: valida A->B con dos nodos autenticados, caída abrupta del Master, nueva lease/epoch y continuidad segura del snapshot PvP
+ * keys: GUARDIAN PVP FAILOVER MASTER A B EPOCH LEASE WEBRTC TAKEOVER SNAPSHOT POSITION PRUNE IOS
+ * purpose: valida A->B con dos nodos autenticados, caída abrupta del Master, nueva lease/epoch, continuidad segura y poda del actor fantasma
  * do-not: NO cuentas reales, NO imprimir tokens, NO conceder economía/recompensas, NO bypass del lease backend
  */
 const {test,expect,chromium}=require('@playwright/test');
@@ -58,10 +58,11 @@ async function rpc(session,name,args={}){
 }
 function metricScript(){
   if(window.__KELO_GUARDIAN_FAILOVER_METRICS__)return;
-  const m=window.__KELO_GUARDIAN_FAILOVER_METRICS__={snapshots:[],takeovers:[],rejects:[],guardian:[],peerCloses:[],installedAt:Date.now()};
+  const m=window.__KELO_GUARDIAN_FAILOVER_METRICS__={snapshots:[],takeovers:[],prunes:[],rejects:[],guardian:[],peerCloses:[],installedAt:Date.now()};
   const slimPlayers=players=>Object.fromEntries(Object.entries(players||{}).map(([id,p])=>[id,{x:Number(p.x)||0,y:Number(p.y)||0,hp:Number(p.hp)||0,mana:Number(p.mana)||0,ackSequence:Number(p.ackSequence)||0}]));
-  window.addEventListener('kelo:guardian-pvp-snapshot',event=>{const s=event.detail?.snapshot||{};m.snapshots.push({at:Date.now(),epoch:Number(s.epoch)||0,seq:Number(s.seq)||0,serverTick:Number(s.serverTick)||0,players:slimPlayers(s.players)});if(m.snapshots.length>600)m.snapshots.shift();});
-  window.addEventListener('kelo:guardian-pvp-takeover',event=>{const d=event.detail||{};m.takeovers.push({at:Date.now(),previousEpoch:Number(d.previousEpoch)||0,newEpoch:Number(d.newEpoch)||0,playersRestored:Number(d.playersRestored)||0,sourceSnapshotSeq:Number(d.sourceSnapshotSeq)||0,transientActionsReset:d.transientActionsReset===true,projectilesReset:d.projectilesReset===true});});
+  window.addEventListener('kelo:guardian-pvp-snapshot',event=>{const s=event.detail?.snapshot||{};m.snapshots.push({at:Date.now(),epoch:Number(s.epoch)||0,seq:Number(s.seq)||0,serverTick:Number(s.serverTick)||0,staleRestoredPlayersPruned:Number(s.staleRestoredPlayersPruned)||0,players:slimPlayers(s.players)});if(m.snapshots.length>600)m.snapshots.shift();});
+  window.addEventListener('kelo:guardian-pvp-takeover',event=>{const d=event.detail||{};m.takeovers.push({at:Date.now(),previousEpoch:Number(d.previousEpoch)||0,newEpoch:Number(d.newEpoch)||0,playersRestored:Number(d.playersRestored)||0,sourceSnapshotSeq:Number(d.sourceSnapshotSeq)||0,restoredActorReclaimMs:Number(d.restoredActorReclaimMs)||0,transientActionsReset:d.transientActionsReset===true,projectilesReset:d.projectilesReset===true});});
+  window.addEventListener('kelo:guardian-pvp-pruned',event=>{const d=event.detail||{};m.prunes.push({at:Date.now(),epoch:Number(d.epoch)||0,count:Number(d.count)||0,total:Number(d.total)||0,actorIds:Array.isArray(d.actorIds)?d.actorIds.slice():[],reclaimMs:Number(d.reclaimMs)||0});});
   window.addEventListener('kelo:guardian-pvp-reject',event=>{const d=event.detail||{};m.rejects.push({at:Date.now(),epoch:Number(d.epoch)||0,sequence:Number(d.sequence)||0,ackSequence:Number(d.ackSequence)||0,code:String(d.code||'')});});
   window.addEventListener('kelo:guardian-state',event=>{const s=event.detail||{};m.guardian.push({at:Date.now(),masterActive:!!s.masterActive,masterNodeId:s.master?.nodeId||null,masterEpoch:Number(s.master?.epoch)||0,connectedToMaster:!!s.dataPlane?.connectedToMaster,openPeerCount:Number(s.dataPlane?.openPeerCount)||0});if(m.guardian.length>600)m.guardian.shift();});
   window.addEventListener('kelo:guardian-peer-close',event=>m.peerCloses.push({at:Date.now(),nodeId:event.detail?.nodeId||null,reason:event.detail?.reason||null}));
@@ -79,11 +80,11 @@ async function loadGuardianLab(page,role){
     await window.KELO_MODULE_LOADER.ensure('guardian');
     if(!window.KeloGuardianPvPHost){
       await new Promise((resolve,reject)=>{
-        const s=document.createElement('script');s.src='src/systems/guardian-pvp-host.js?v=3-worker';s.onload=resolve;s.onerror=()=>reject(new Error('GUARDIAN_PVP_HOST_LOAD_FAILED'));document.head.appendChild(s);
+        const s=document.createElement('script');s.src='src/systems/guardian-pvp-host.js?v=4-worker-prune';s.onload=resolve;s.onerror=()=>reject(new Error('GUARDIAN_PVP_HOST_LOAD_FAILED'));document.head.appendChild(s);
       });
     }
   });
-  await page.waitForFunction(()=>window.KeloGuardian&&window.KeloGuardianPvPHost&&window.KELO_GUARDIAN_PVP_HOST_AUDIT?.isolatedWorker===true,{timeout:20000});
+  await page.waitForFunction(()=>window.KeloGuardian&&window.KeloGuardianPvPHost&&window.KELO_GUARDIAN_PVP_HOST_AUDIT?.isolatedWorker===true&&window.KELO_GUARDIAN_PVP_HOST_AUDIT?.restoredActorPrune===true,{timeout:20000});
   await page.evaluate(metricScript);
   await page.evaluate(()=>window.KeloGuardian.activate());
   await page.waitForFunction(()=>window.KeloGuardian.state().enabled&&window.KeloGuardian.state().connected,{timeout:20000});
@@ -99,7 +100,7 @@ async function waitForDirectPeer(page,masterSide,timeout=25000){
 }
 async function startRoom(page,roomId){return page.evaluate(roomId=>window.KeloGuardianPvPHost.start(roomId),roomId);}
 async function submit(page,intent){return page.evaluate(intent=>window.KeloGuardianPvPHost.submitIntent(intent),intent);}
-async function latestMetric(page){return page.evaluate(()=>{const m=window.__KELO_GUARDIAN_FAILOVER_METRICS__;return{snapshots:m.snapshots.slice(),takeovers:m.takeovers.slice(),rejects:m.rejects.slice(),guardian:m.guardian.slice(),peerCloses:m.peerCloses.slice()};});}
+async function latestMetric(page){return page.evaluate(()=>{const m=window.__KELO_GUARDIAN_FAILOVER_METRICS__;return{snapshots:m.snapshots.slice(),takeovers:m.takeovers.slice(),prunes:m.prunes.slice(),rejects:m.rejects.slice(),guardian:m.guardian.slice(),peerCloses:m.peerCloses.slice()};});}
 function distance(a,b){return Math.hypot((Number(a?.x)||0)-(Number(b?.x)||0),(Number(a?.y)||0)-(Number(b?.y)||0));}
 
 const missing=missingSecrets();
@@ -147,8 +148,10 @@ test('Guardian PvP LIVE: Master A disappears and B resumes same room on a new ep
     await pageB.waitForFunction(epoch=>{
       const rows=window.__KELO_GUARDIAN_FAILOVER_METRICS__?.snapshots||[],last=[...rows].reverse().find(x=>x.epoch===epoch);return !!(last&&Object.keys(last.players||{}).length>=2&&Object.values(last.players||{}).some(p=>p.ackSequence>=2));
     },oldEpoch,{timeout:20000});
+    const aActorId=await pageA.evaluate(()=>window.KeloGuardianPvPHost.actorId());
     const bActorId=await pageB.evaluate(()=>window.KeloGuardianPvPHost.actorId());
-    const pre=await latestMetric(pageB),lastOld=[...pre.snapshots].reverse().find(s=>s.epoch===oldEpoch&&s.players?.[bActorId]);
+    expect(aActorId).toBeTruthy();expect(bActorId).toBeTruthy();expect(aActorId).not.toBe(bActorId);
+    const pre=await latestMetric(pageB),lastOld=[...pre.snapshots].reverse().find(s=>s.epoch===oldEpoch&&s.players?.[aActorId]&&s.players?.[bActorId]);
     expect(lastOld).toBeTruthy();
 
     const failureAt=Date.now();
@@ -191,10 +194,20 @@ test('Guardian PvP LIVE: Master A disappears and B resumes same room on a new ep
     expect(afterPlayer).toBeTruthy();
     const positionDriftPx=distance(beforePlayer,afterPlayer);
     const failoverMs=firstNew.at-failureAt,snapshotGapMs=firstNew.at-lastOld.at,leaseAcquireMs=masterAcquiredAt-failureAt;
+
+    // B has reclaimed its actor with sequence 3. A is gone, so its restored actor must disappear after the bounded reclaim window.
+    await pageB.waitForFunction(({epoch,aActorId,bActorId})=>{
+      const rows=window.__KELO_GUARDIAN_FAILOVER_METRICS__?.snapshots||[],last=[...rows].reverse().find(s=>s.epoch===epoch);
+      return !!(last&&last.players?.[bActorId]&&!last.players?.[aActorId]&&Number(last.staleRestoredPlayersPruned||0)>=1);
+    },{epoch:newEpoch,aActorId,bActorId},{timeout:10000});
+    const finalMetrics=await latestMetric(pageB),finalNew=[...finalMetrics.snapshots].reverse().find(s=>s.epoch===newEpoch),prune=finalMetrics.prunes.find(p=>p.epoch===newEpoch&&p.actorIds.includes(aActorId));
+    const staleMasterActorPruned=!!(finalNew&&finalNew.players?.[bActorId]&&!finalNew.players?.[aActorId]&&Number(finalNew.staleRestoredPlayersPruned||0)>=1);
+
     const result={
       mode:REAL_IOS?'real-ios-master-a-to-local-chromium-b':'two-context-live',roomId,oldEpoch,newEpoch,failoverMs,snapshotGapMs,leaseAcquireMs,positionDriftPx,
-      blockedInputsDuringOutage:blockedInputs,claimErrors,rejects:post.rejects.length,playersRestored:takeover.playersRestored,
-      transientActionsReset:takeover.transientActionsReset,projectilesReset:takeover.projectilesReset,peerCloseEvents:post.peerCloses.length,
+      blockedInputsDuringOutage:blockedInputs,claimErrors,rejects:finalMetrics.rejects.length,playersRestored:takeover.playersRestored,
+      restoredActorReclaimMs:takeover.restoredActorReclaimMs||prune?.reclaimMs||0,staleMasterActorPruned,staleRestoredPlayersPruned:Number(finalNew?.staleRestoredPlayersPruned)||0,
+      transientActionsReset:takeover.transientActionsReset,projectilesReset:takeover.projectilesReset,peerCloseEvents:finalMetrics.peerCloses.length,
       persistentAuthority:false,economyAuthority:false
     };
     console.log('GUARDIAN_PVP_FAILOVER_LIVE',JSON.stringify(result));
@@ -203,6 +216,7 @@ test('Guardian PvP LIVE: Master A disappears and B resumes same room on a new ep
     expect(takeover.playersRestored).toBeGreaterThanOrEqual(1);
     expect(takeover.transientActionsReset).toBe(true);
     expect(takeover.projectilesReset).toBe(true);
+    expect(staleMasterActorPruned).toBe(true);
     expect(blockedInputs).toBeGreaterThanOrEqual(1);
   }finally{
     if(pageB)try{await pageB.evaluate(()=>window.KeloGuardianPvPHost?.stop?.());}catch(_){}
