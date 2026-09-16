@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { createDefinitionDraft, DEFINITION_WORKSPACE_ROWS, getDefinitionSpec, interpretDefinitionPrompt, validateDefinitionDraft } from '../src/creators/definition/definition-specs.mjs';
+import { createEnvironmentPreviewModel } from '../src/creators/definition/environment-live-preview.mjs';
 import { createDefinitionWorkspaceManifest, registerDefinitionWorkspaces } from '../src/creators/workspaces/definition-workspaces.mjs';
 
 assert.equal(DEFINITION_WORKSPACE_ROWS.length,11,'definition suite should activate eleven workspaces');
@@ -21,15 +22,21 @@ assert.equal(d.fields.rarity,'legendary');assert.equal(d.fields.itemType,'weapon
 
 d=interpretDefinitionPrompt('ENVIRONMENT','night forest with fog, ambient density 70, magical music',{name:'Environment'});
 assert.equal(d.fields.biome,'forest');assert.equal(d.fields.weather,'fog');assert.equal(d.fields.timeOfDay,'night');assert.equal(d.fields.ambientDensity,70);assert.equal(d.fields.musicMood,'magical');
+let preview=createEnvironmentPreviewModel(d);assert.equal(preview.biome,'forest');assert.equal(preview.weather,'fog');assert.equal(preview.timeOfDay,'night');assert.equal(preview.ambientDensity,70);assert.equal(preview.particleCount,0);assert.ok(preview.featureCount>=4&&preview.featureCount<=16);
 
 d=interpretDefinitionPrompt('ENVIRONMENT','bosque nocturno con bruma muy densa, luz de luna azul, ambiente mágico',{name:'Environment'});
 assert.equal(d.fields.biome,'forest');assert.equal(d.fields.weather,'fog');assert.equal(d.fields.timeOfDay,'night');assert.equal(d.fields.ambientDensity,92);assert.equal(d.fields.musicMood,'magical');assert.match(d.fields.notes,/blue/i);assert.match(d.fields.notes,/moonlit/i);
+preview=createEnvironmentPreviewModel({...d,referenceImage:'data:image/png;base64,abc'});assert.equal(preview.intent.palette.includes('blue'),true);assert.equal(preview.intent.lighting,'moonlit');assert.equal(preview.referenceImage,'data:image/png;base64,abc');
 
 d=interpretDefinitionPrompt('ENVIRONMENT','forest at night without fog, density 30, calm',{name:'Environment'});
 assert.equal(d.fields.biome,'forest');assert.equal(d.fields.weather,'clear');assert.equal(d.fields.timeOfDay,'night');assert.equal(d.fields.ambientDensity,30);assert.equal(d.fields.musicMood,'calm');
+preview=createEnvironmentPreviewModel(d);assert.equal(preview.particleCount,0);assert.match(preview.label,/forest · clear · night/i);
 
 d=interpretDefinitionPrompt('ENVIRONMENT','playa al atardecer sin lluvia, hora dorada, rosa y dorado',{name:'Environment'});
 assert.equal(d.fields.biome,'coast');assert.equal(d.fields.weather,'clear');assert.equal(d.fields.timeOfDay,'sunset');assert.match(d.fields.notes,/pink/i);assert.match(d.fields.notes,/gold/i);assert.match(d.fields.notes,/golden/i);
+preview=createEnvironmentPreviewModel(d);assert.equal(preview.biome,'coast');assert.equal(preview.timeOfDay,'sunset');assert.equal(preview.intent.palette.includes('pink'),true);assert.equal(preview.intent.lighting,'golden');
+
+preview=createEnvironmentPreviewModel({fields:{biome:'invalid',weather:'storm',timeOfDay:'night',ambientDensity:500,musicMood:'tense'}});assert.equal(preview.biome,'plaza');assert.equal(preview.weather,'storm');assert.equal(preview.ambientDensity,100);assert.equal(preview.particleCount<=18,true);
 
 d=interpretDefinitionPrompt('AUDIO','ambient loop, volume 65, range 600, trigger enter_zone',{name:'Audio'});
 assert.equal(d.fields.audioType,'ambient');assert.equal(d.fields.loop,true);assert.equal(d.fields.volume,65);assert.equal(d.fields.range,600);
@@ -37,4 +44,4 @@ assert.equal(d.fields.audioType,'ambient');assert.equal(d.fields.loop,true);asse
 const registered=[];const registry={register(manifest){registered.push(manifest);return manifest;}};registerDefinitionWorkspaces(registry);assert.equal(registered.length,11);assert.equal(registered.every(x=>x.availability==='active'),true);assert.equal(registered.every(x=>x.projectTypes.length===1),true);
 let opened=null;const manifest=createDefinitionWorkspaceManifest({id:'npc',type:'NPC',loader:async()=>({openGenericDefinitionCreator:async context=>{opened=context;return{ok:true};}})});const result=await manifest.open({root:{document:{}},projects:{},projectId:'creator-project:test'});assert.deepEqual(result,{ok:true});assert.equal(opened.definitionType,'NPC');assert.equal(opened.projectId,'creator-project:test');
 
-console.log(JSON.stringify({ok:true,workspaces:registered.map(x=>x.id),promptInterpreter:true,promptInterpreterV2:true,negationAware:true,bilingualEnvironmentIntent:true,defaultsValidate:true,lazyWorkspaceRouting:true},null,2));
+console.log(JSON.stringify({ok:true,workspaces:registered.map(x=>x.id),promptInterpreter:true,promptInterpreterV2:true,environmentLivePreview:true,referenceImageOverlay:true,reducedMotionCss:true,negationAware:true,bilingualEnvironmentIntent:true,defaultsValidate:true,lazyWorkspaceRouting:true},null,2));
