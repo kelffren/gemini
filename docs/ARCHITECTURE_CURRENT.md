@@ -34,7 +34,7 @@ Los módulos pesados de Creator siguen lazy. Creator Library, MARKET y Appearanc
 
 `Creator Modular Appearance Replication V1` extiende esa misma proyección a peers remotos sin crear otro renderer ni transporte. El game server deriva un presentation envelope desde los bindings persistidos del personaje autenticado, revalida publicación + acceso exacto + assets publicados, sanea el descriptor y lo adjunta al `avatarManifest` ya distribuido por `server/index.js` dentro del AOI. El viewer no necesita poseer el cosmético para verlo; esa presentación pública no concede derecho a equiparlo.
 
-La ruta remota es:
+La ruta remota social es:
 
 ```text
 creator_character_content_bindings
@@ -49,24 +49,41 @@ creator_character_content_bindings
   → KeloAvatar
 ```
 
+`PvP Visual Presentation Bridge V1` reutiliza exactamente ese envelope server-authoritative, pero no lo copia dentro del snapshot competitivo de 20 Hz. `server/pvp-presentation-wire.js` deriva un `presentationKey` pequeño y envía el manifest completo por el **mismo WebSocket** solo cuando aparece/cambia/se limpia o el actor vuelve a ser visible. `server/pvp-authority.js` permanece presentation-agnostic y no recibe responsabilidad cosmética.
+
+La ruta PvP es:
+
+```text
+trusted player.avatarManifest
+  → pvp-presentation-wire
+      ├─ pvp:presentation on change only
+      └─ presentationKey in pvp:snapshot
+  → engine-net peer presentation cache
+  → KeloPvPWorld renderAvatar(peer,false)
+  → existing KeloAvatar / Character visual stack
+```
+
+El bridge además corrige una ambigüedad crítica del cliente: **campo `avatarManifest` ausente ≠ clear**. Un snapshot competitivo que no posee presentation preserva el último envelope confiable; solo un clear server-side explícito lo elimina. Durante PvP, el normal AOI state puede seguir transportando otros metadatos, pero el wire retira `avatarManifest` repetido y deja solo `presentationKey`, evitando duplicar el payload visual a alta frecuencia.
+
 El servidor solo reconstruye URLs para `creator-global` con publicación activa y visibilidad `global|official`; el cliente remoto nunca declara URLs ni revisiones a replicar.
 
-Los facades `window.KeloCreatorDelivery` y `window.KeloCreatorUse` viven en `creators-lazy-gate`. En login/reload puede ocurrir un probe metadata-only local. Con cero bindings visuales se detiene sin Appearance. Con bindings se cargan solo las revisiones exactas. Tras equip/clear, el gate reutiliza `KeloNetAuthority.refreshAvatar()` para regenerar el mismo presentation envelope server-side y redistribuirlo por el AOI existente.
+Los facades `window.KeloCreatorDelivery` y `window.KeloCreatorUse` viven en `creators-lazy-gate`. En login/reload puede ocurrir un probe metadata-only local. Con cero bindings visuales se detiene sin Appearance. Con bindings se cargan solo las revisiones exactas. Tras equip/clear, el gate reutiliza `KeloNetAuthority.refreshAvatar()` para regenerar el mismo presentation envelope server-side; social AOI y PvP delta presentation consumen esa misma verdad sin un segundo sistema de ownership.
 
-`KELO_CREATOR_CONTENT_REGISTRY` sigue siendo registry semántico genérico. Character local usa el manifest exacto de Delivery como autoridad de revisión; remote presentation usa el envelope exacto saneado por server. Ninguno trata una URL pública como ownership.
+`KELO_CREATOR_CONTENT_REGISTRY` sigue siendo registry semántico genérico. Character local usa el manifest exacto de Delivery como autoridad de revisión; remote presentation usa el envelope exacto saneado por server. Ninguno trata una URL pública ni `presentationKey` como ownership.
 
 ### 7. Gameplay Domains
-Abilities, equipment, mounts, backpack, PvP/Arena, identity/titles, nobility, economy, commerce, property, instances y guardian son owners separados. Creator OS/Delivery/Use/Character bridge/replication no sustituyen esos owners.
+Abilities, equipment, mounts, backpack, PvP/Arena, identity/titles, nobility, economy, commerce, property, instances y guardian son owners separados. Creator OS/Delivery/Use/Character bridge/replication/presentation wire no sustituyen esos owners.
 
 - `character` full-body reutiliza `set_active_character_avatar` y `KeloCreatorAvatars`;
 - `appearance` / Creator `equipment` persiste revisión visual por slot;
 - Character bridge proyecta local y remote presentation sobre el mismo Character stack;
 - `KeloCharacterCustomization` conserva estado visual base, catálogo/historial/saves;
 - `KeloEquipment` conserva stats, inventario, weapon gameplay y ability loadout;
+- `server/pvp-authority.js` conserva movimiento, HP, mana, hits, cooldowns, rewind, CC, muerte y kills PvP;
 - `KeloMounts` conserva mount gameplay/state;
 - `KELO_PROPERTY_SYSTEM` conserva parcel ownership, bounds, quantities, placement, collision y render.
 
-Creator visual equipment sigue siendo cosmético. Replicarlo nunca concede damage, cooldowns, inventario ni abilities.
+Creator visual equipment sigue siendo cosmético. Replicarlo en social o PvP nunca concede damage, cooldowns, inventario ni abilities.
 
 ### 8. Online
 `engine-net.js`, auth lifecycle y módulos server/Supabase implementan o preparan autoridad online. La regla es server-authoritative para valor persistente/competitivo.
@@ -88,13 +105,15 @@ Para Creator content:
 - selección/uso y ownership siguen siendo verdades distintas;
 - `creator-global` es transporte público de bytes aprobados, no evidencia de licencia;
 - comprar r3 no concede r4 automáticamente;
-- remote viewing de un appearance autorizado no concede al viewer el derecho de usarlo.
+- remote viewing de un appearance autorizado no concede al viewer el derecho de usarlo;
+- `pvp:presentation` es un mensaje server-only de cache/presentation; el cliente no lo usa para mutar autoridad competitiva;
+- `presentationKey` es identidad de cache, no licencia ni revisión solicitada por cliente.
 
 ## Flujo moderno
 
-`source → authoring → revision → review → publication → marketplace → KC purchase → exact entitlement → Delivery → server-authorized use binding → local Character overlay / domain owner → server presentation snapshot → AOI remote overlay`
+`source → authoring → revision → review → publication → marketplace → KC purchase → exact entitlement → Delivery → server-authorized use binding → local Character overlay / domain owner → trusted server presentation envelope → social AOI o PvP presentation delta → remote overlay/render`
 
-Para acciones persistentes o competitivas, la mutación final sigue perteneciendo al domain owner. Replication solo transporta presentación server-accepted.
+Para acciones persistentes o competitivas, la mutación final sigue perteneciendo al domain owner. Replication/presentation solo transporta presentación server-accepted.
 
 ## Fronteras obligatorias
 
@@ -110,11 +129,14 @@ Para acciones persistentes o competitivas, la mutación final sigue perteneciend
 - Character bridge no usa `select()`/`applySnapshot()` para copiar licencias online a localStorage;
 - remote replication no exige viewer entitlement y tampoco concede viewer use rights;
 - el cliente nunca declara sus URLs/revisiones visuales como autoridad multiplayer;
+- PvP presentation nunca entra en `pvp-authority` como input del cliente;
 - no segundo socket ni segundo renderer para Creator modular appearance;
+- snapshots competitivos no repiten full presentation manifests por tick;
+- ausencia de manifest en un snapshot no equivale a revocación;
 - Creator visual `equipment` no modifica `KeloEquipment` gameplay stats;
 - Property Creator authorization no sustituye parcel authority;
 - cliente no se convierte en autoridad final online.
 
 ## Móvil
 
-El editor y Creator surfaces siguen first-use. En login/reload puede ocurrir una consulta metadata-only local. Con cero bindings, Appearance no carga. Para peers, networking tampoco carga Appearance hasta que un peer relevante dentro del AOI trae un `creatorAppearance` no vacío. Los overlays remotos usan `WeakMap` y `revisionKey` para no reingerir el mismo loadout en cada snapshot. No hay polling, bulk library sync ni preload de assets Creator no visibles. La validación final exige dispositivo real/LIVE con múltiples peers.
+El editor y Creator surfaces siguen first-use. En login/reload puede ocurrir una consulta metadata-only local. Con cero bindings, Appearance no carga. Para peers, networking tampoco carga Appearance hasta que un peer relevante trae un `creatorAppearance` no vacío. Los overlays remotos usan `WeakMap` y `revisionKey` para no reingerir el mismo loadout en cada snapshot. En PvP, el manifest completo se vuelve event-like y el stream de alta frecuencia conserva solo `presentationKey`; actores sin cosmético no generan un clear inicial inútil. No hay polling, bulk library sync ni preload de assets Creator no visibles. La validación final exige dispositivo real/LIVE con múltiples peers social + PvP.
