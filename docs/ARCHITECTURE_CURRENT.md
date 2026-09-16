@@ -14,19 +14,21 @@ El boot crítico solo conserva autoridades necesarias para dibujar, caminar y ma
 Contrato CI medido:
 
 - **48/48** scripts externos críticos antes de `kelo:boot-ready`;
-- **421,784 / 425,000 bytes** fuente críticos;
+- **422,540 / 425,000 bytes** fuente críticos;
 - **3/3** scripts externos estáticos después de boot-ready;
 - **21,669 / 22,000 bytes** post-boot estáticos;
 - **9** módulos internos diferidos `after-paint`.
 
-Los límites son guardrails: crecer exige evidencia y cambio explícito del contrato. Frente al estado inmediatamente anterior, retirar el bootstrap de hotbar de `engine-g` redujo el camino crítico en **1,231 bytes** sin aumentar el número de scripts. El runtime moderno de abilities permanece fuera del primer frame.
+Los límites son guardrails: crecer exige evidencia y cambio explícito del contrato. La separación del registry de cast legacy añadió **756 bytes** al source crítico, sin añadir scripts ni trabajo de primer uso; el runtime moderno de abilities permanece fuera del primer frame.
 
 ### 2. Foundation Core
 `src/core/` posee eventos, input locks, input, movement extension, player transition position, camera, avatar composition, render/simulation extension, feature lifecycle, update boundaries y fronteras de migración legacy.
 
 Los comandos discontinuos de viaje legacy `teleportToPlot` / `teleportToFarm` están estrangulados temporalmente por `KeloLegacyTransitionBridge` y pasan por `KeloPlayerPosition` + `KeloCamera`. Movimiento continuo sigue legacy hasta completar paridad/QA. `KeloPlayerPosition` no es owner de dash/physics; esas transiciones de movimiento deben usar `KeloMovement`/ability authority.
 
-`KeloAbilityAim` es el strangler temporal de aim/input legacy. Posee el lifecycle **global legacy** de puntero, matemática/range, indicador de render y un registry explícito de cast middleware. `engine-l` registra la presentación de cast de Plaza en boot; `engine-m` no se carga en el primer frame y registra `engine-m:skill-shots` únicamente cuando el pack `world` entra por first-use.
+`KeloAbilityAim` es el strangler temporal de aim/input legacy. Posee el lifecycle **global legacy** de puntero, matemática/range e indicador de render. El registry/dispatcher de cast middleware legacy se separó en `KeloLegacyAbilityCast`, expuesto desde el mismo `legacy-ability-aim-system.js`; por tanto no se añadió un segundo engine ni un nuevo `<script>` al boot. `KeloAbilityAim.registerCastMiddleware` sigue existiendo únicamente como adapter de compatibilidad durante la migración del consumidor restante.
+
+`engine-l` sigue siendo el único consumidor directo de `KeloAbilityAim`: registra `engine-l:plaza-cast-presentation` por el adapter temporal y permanece crítico. `engine-m` ya no depende directamente de `KeloAbilityAim`; cuando `world` entra por first-use registra `engine-m:skill-shots` mediante `KeloLegacyAbilityCast.registerMiddleware`. Sus cooldowns, velocidades, tamaños, life, partículas y orden LIFO permanecen sin cambios. Tanto `engine-l` como `engine-m` todavía leen `skillAim` como estado legacy de rango/dirección.
 
 `KeloAbilityDirection` y `KeloLegacyAbilityTrigger` mantienen compatibilidad de `engine-f`. Su comportamiento ya está caracterizado contra el archivo real mediante un sandbox VM: thresholds de dirección, prioridad input→velocidad→aim, dash directo 150, radio PvP `<60`, proyectiles 450/life 2 y fallback legacy.
 
@@ -34,7 +36,7 @@ Los comandos discontinuos de viaje legacy `teleportToPlot` / `teleportToFarm` es
 
 La hotbar moderna pertenece a `KeloAbilities`. No se construye durante el boot de Plaza: el feature interno `abilityRuntime` usa policy `first-use`, `userToggle:false` y carga en orden `abilityData.js → stone-system.js → kelo-ability-boot.js` mediante el `KeloModuleLoader` existente. `kelo-ability-boot.js` expone `KeloAbilitiesLoader`, crea `KeloAbilities` y mantiene el adapter compatibility `renderActionBar` cuando el runtime se despierta.
 
-El lifecycle moderno de la hotbar es **local por slot**, no global. Cada drag activo conserva su `pointerId`, usa `setPointerCapture` para continuidad del gesto, ignora `pointermove`/`pointerup` de otros pointers y limpia el estado al completar o cancelar. `pointercancel` nunca dispara cast. El self-target mantiene su cast inmediato. Este owner moderno convive temporalmente con `KeloAbilityAim`: el primero solo sirve a los cinco slots modernos first-use; el segundo sigue atendiendo consumidores legacy globales hasta migrarlos.
+El lifecycle moderno de la hotbar es **local por slot**, no global. Cada drag activo conserva su `pointerId`, usa `setPointerCapture` para continuidad del gesto, ignora `pointermove`/`pointerup` de otros pointers y limpia el estado al completar o cancelar. `pointercancel` nunca dispara cast. El self-target mantiene su cast inmediato. Este owner moderno convive temporalmente con `KeloAbilityAim`: el primero solo sirve a los cinco slots modernos first-use; el segundo sigue atendiendo aim/pointer legacy hasta migrar su consumidor restante.
 
 PvP ya no depende de que `KeloAbilitiesLoader` exista por casualidad. `pvp-combat-runtime-loader.js` ejecuta explícitamente `KeloRuntimeBootstrap.ensure() → KELO_MODULE_LOADER.ensure('abilityRuntime') → KeloAbilitiesLoader.ensure()` antes de validar foundations, despertar abilities y enlazar prediction.
 
@@ -47,7 +49,9 @@ El índice de producción conserva actualmente **9 engines legacy críticos**: `
 
 El debt audit actual cuenta **28 writes directos de posición** y **12 writes directos de cámara** en el índice estático de producción. `engine-f/g` contienen 10 de los writes de posición. Ambos ya tienen characterization tests; el próximo paso correcto es migrar consumidores hacia autoridades modernas equivalentes, no mover deuda de carpeta ni borrar archivos sin paridad.
 
-La retirada de la action bar de `engine-g` es un ejemplo del proceso correcto: primero se identificó el owner moderno, se cerró el contrato de carga física first-use, se añadió characterization/CI, se retiró solo la responsabilidad redundante y después se validó WebKit. El dash quedó intacto porque todavía no hay equivalencia demostrada con el dash moderno.
+El nuevo `legacy-ability-consumer-audit.mjs` inventaría el runtime por referencias ejecutables, ignorando comentarios. El baseline validado es: **1 consumidor directo de `KeloAbilityAim`** (`engine-l`), **3 consumidores de `skillAim`** (`engine-g/l/m`) y **6 consumidores de `triggerStone`**. El audit falla si reaparece otro consumidor directo de `KeloAbilityAim`.
+
+La retirada de la action bar de `engine-g` y la migración de `engine-m` muestran el proceso correcto: identificar owner, congelar comportamiento, migrar un consumidor, ejecutar CI/WebKit y solo después documentar. El dash quedó intacto porque todavía no hay equivalencia demostrada con el dash moderno.
 
 Objetivo de retirada por responsabilidad:
 
@@ -58,7 +62,7 @@ Nunca `BORRAR → arreglar lo que rompa`.
 ### 4. World / Environment
 `src/environment/` posee terrain contract, atlases, world map, layer stack, surface ground, prop contract, prefab contract, district visuals y World Builder support.
 
-`world` es first-use. El smoke del branch comprueba explícitamente que `engine-m.js` y su middleware no están presentes en el boot inicial y que aparecen después de `KELO_MODULE_LOADER.ensure('world')`. Esto protege simultáneamente first paint y funcionalidad.
+`world` es first-use. El smoke del branch comprueba explícitamente que `engine-m.js` y su middleware no están presentes en el boot inicial y que aparecen después de `KELO_MODULE_LOADER.ensure('world')`. `engine-m` registra su middleware a través de `KeloLegacyAbilityCast`, no mediante `KeloAbilityAim`. Esto protege simultáneamente first paint y funcionalidad.
 
 ### 5. Asset Infrastructure
 `KELO_ATLAS_CONTRACT` resuelve atlas; `KELO_PROPERTY_CATALOG` expone templates placeables. Compilers producen metadata, no renderers.
@@ -67,7 +71,7 @@ Nunca `BORRAR → arreglar lo que rompa`.
 `src/studio/` contiene document/kernel/tools/UI. `src/creators/` contiene workspaces, Map Forge, asset compiler y evolución. Todos delegan mutations a owners existentes.
 
 ### 7. Gameplay Domains
-Abilities modernas, equipment, mounts, backpack, PvP/Arena, identity/titles, nobility, economy, commerce, property, instances y guardian son owners separados. La compatibilidad de aim/cast legacy vive temporalmente detrás de `KeloAbilityAim`; no se crea un segundo ability engine.
+Abilities modernas, equipment, mounts, backpack, PvP/Arena, identity/titles, nobility, economy, commerce, property, instances y guardian son owners separados. La compatibilidad de aim/pointer legacy vive temporalmente detrás de `KeloAbilityAim`; la compatibilidad de dispatch/middleware vive detrás de `KeloLegacyAbilityCast`. Ninguno es un segundo ability engine.
 
 `KeloAbilities` es el runtime moderno data-driven y ahora también es el owner de la hotbar moderna/adapter `renderActionBar` tras el first-use de `abilityRuntime`. El smoke WebKit comprueba que no existe al boot y que, al cargar el feature, aparecen **5 slots modernos** sin restaurar los IDs `action-slot-*` retirados de `engine-g`.
 
@@ -92,7 +96,8 @@ La migración evergreen está protegida por `.github/workflows/evergreen-foundat
 - contrato `abilityRuntime` first-use y su orden físico;
 - characterization ejecutable del pointer lifecycle moderno de los cinco slots;
 - ownership del pointer lifecycle legacy global en `KeloAbilityAim`;
-- contrato del cast middleware;
+- contrato y orden LIFO de `KeloLegacyAbilityCast`;
+- inventario automático de consumidores legacy de ability/aim/trigger;
 - reproducible build audit;
 - CI supply-chain audit;
 - lightweight boot surface audit con presupuestos de count + bytes;
@@ -101,13 +106,13 @@ La migración evergreen está protegida por `.github/workflows/evergreen-foundat
 - orden estático de boot;
 - build de producción del cliente + Turbo audit;
 - smoke del servidor real;
-- WebKit móvil sobre el commit del PR, incluyendo el handoff de hotbar first-use.
+- WebKit móvil sobre el commit del PR, incluyendo el handoff de hotbar first-use y la carga diferida de `engine-m`.
 
 `boot-surface-audit.mjs` impide que control plane, updater, shadows, `engine-m` o engines retirados vuelvan accidentalmente al parser-blocking boot. El runtime moderno de abilities permanece fuera del boot crítico por contrato de lifecycle. Una subida del presupuesto crítico debe ser deliberada y respaldada por evidencia.
 
 Los workflows activos fijan acciones externas por SHA exacto. `ci-supply-chain-audit.mjs` falla ante acciones externas sin pin SHA y ante `permissions: write-all`. Dependabot propone actualizaciones de npm y GitHub Actions por PR; una actualización nunca se considera segura solo porque sea nueva.
 
-El head runtime `c08d54c235be6b32cd6e75c6267995afca5ca3b1` pasó los cuatro gates del Evergreen Foundation Guard: `foundation`, `client-build`, `server-smoke` y `webkit-mobile-smoke`. Eso es evidencia branch-local, no QA físico.
+El head runtime `cc2e54b4d8fb3223d2bee650641ced485e987ef9` pasó los cuatro gates del Evergreen Foundation Guard: `foundation`, `client-build`, `server-smoke` y `webkit-mobile-smoke`. El mismo run confirmó `directAimConsumers=["engine-l.js"]`. Eso es evidencia branch-local, no QA físico.
 
 ## Flujo de asset moderno
 
@@ -123,7 +128,8 @@ Forest Plaza es el caso de referencia actual: 146 piezas, IDs legacy preservados
 - cámara solo vía `KeloCamera`;
 - colisiones solo vía `KELO_COLLISION`;
 - render feature vía `KeloRender`/contratos de environment;
-- aim/pointer/cast middleware legacy pasa temporalmente por `KeloAbilityAim`;
+- aim/range/pointer legacy pasa temporalmente por `KeloAbilityAim`;
+- middleware/dispatch de cast legacy pasa por `KeloLegacyAbilityCast`; no añadir consumidores nuevos al adapter `KeloAbilityAim.registerCastMiddleware`;
 - lifecycle lazy/after-paint solo vía `KeloModuleLoader` + `KELO_FEATURE_REGISTRY`;
 - `abilityRuntime` es first-use interno y no user-toggleable;
 - hotbar moderna pertenece a `KeloAbilities`; `engine-g` no puede recuperarla;
