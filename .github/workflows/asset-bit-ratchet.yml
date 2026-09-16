@@ -49,14 +49,12 @@ jobs:
         run: node scripts/exact-reconstruction-lab.mjs --input=assets --max-files=80 --report=test-results/exact-reconstruction/report.json
       - name: Measure head first-playable footprint
         run: node scripts/boot-footprint.mjs --root=. --report=test-results/boot-footprint-head/report.json
-      - name: Materialize base worktree and measurements
+      - name: Materialize base worktree and measure it with the same head tools
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           git worktree add --detach /tmp/kelo-world-base "$BASE_SHA"
-          cd /tmp/kelo-world-base
-          node scripts/asset-space-budget.mjs --input=assets --max-files=10000 --report=/tmp/asset-space-budget-base
-          cd "$GITHUB_WORKSPACE"
+          node scripts/asset-space-budget.mjs --input=/tmp/kelo-world-base/assets --max-files=10000 --report=/tmp/asset-space-budget-base
           node scripts/boot-footprint.mjs --root=/tmp/kelo-world-base --report=/tmp/boot-footprint-base.json
       - name: Enforce monotonic bytes for unchanged RGBA information
         run: node scripts/asset-bit-ratchet.mjs --base=/tmp/asset-space-budget-base/report.json --head=test-results/asset-space-budget-head/report.json --report=test-results/asset-bit-ratchet/report.json
