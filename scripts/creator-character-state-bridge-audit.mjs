@@ -17,9 +17,11 @@ check('bridge creates no renderer or loop',!/KeloAvatar\.use|renderAvatar|reques
 check('bridge projects through existing character owner stateForActor',/__creatorCharacterBase/.test(bridge)&&/stateForActor\(actor\)\{return resolveState\(actor\);\}/.test(bridge)&&/root\.KeloCharacterCustomization=facade/.test(bridge));
 check('base character state stays authoritative for local fallback and persistence',/baseCustomization\?\.stateForActor/.test(bridge)&&!/applySnapshot\(|\.select\(|networkSnapshot\s*=/.test(bridge));
 check('server-bound Creator items are hidden and locked',/locked:true,hidden:true/.test(bridge)&&/server-bound/.test(bridge));
-check('exact revisions are activated through Delivery before visual registration',/KeloCreatorDelivery\?\.useRevision/.test(bridge)&&/runtimeRecord\(revisionId\)/.test(bridge)&&/query\(\{usable:true\}\)/.test(bridge));
+check('exact Delivery manifest drives visual registration',/KeloCreatorDelivery\?\.useRevision/.test(bridge)&&/function manifestRecord/.test(bridge)&&/CREATOR_CHARACTER_DELIVERY_REVISION_MISMATCH/.test(bridge)&&/exactManifest:true/.test(bridge));
+check('bridge rechecks entitlement on exact manifest',/KeloCreatorEntitlements\?\.checkRecord/.test(bridge)&&/CREATOR_CHARACTER_ENTITLEMENT_REQUIRED/.test(bridge));
+check('visual item identity is exact-revision scoped',/creator\.visual\.\$\{text\(row\.revisionId\)/.test(bridge)&&!/activation\?\.runtimeId/.test(bridge));
 check('slot target and content type are revalidated client-side',/CREATOR_CHARACTER_SLOT_MISMATCH/.test(bridge)&&/CREATOR_CHARACTER_TARGET_INVALID/.test(bridge)&&/CREATOR_CHARACTER_TYPE_INVALID/.test(bridge));
-check('logout and identity changes clear overlay',/kelo:online-auth-state/.test(bridge)&&/kelo:online-auth-session-ended/.test(bridge)&&/clear\('auth-ended'\)/.test(bridge));
+check('logout and identity changes clear overlay metadata',/kelo:online-auth-state/.test(bridge)&&/kelo:online-auth-session-ended/.test(bridge)&&/registered\.clear\(\)/.test(bridge)&&/lastError=null/.test(bridge));
 check('bridge hydration is single-flight',/if\(syncPromise\)return syncPromise/.test(bridge)&&/singleFlight:true/.test(bridge));
 check('visual stack dynamically consumes CharacterCustomization owner',/return root\.KeloCharacterCustomization/.test(visualStack)&&/A\.stateForActor/.test(visualStack));
 check('existing CharacterCustomization remains renderer owner with shared stack',/KeloCharacterVisualStack/.test(customization)&&/KeloAvatar\.use/.test(customization));
