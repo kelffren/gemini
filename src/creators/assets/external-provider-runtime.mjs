@@ -1,11 +1,12 @@
 /* KELO-INDEX
  * area: CREATORS / EXTERNAL PROVIDER RUNTIME
  * owner: Kelo Universal Content Bridge
- * keys: NETWORK BUDGET CACHE LRU TIMEOUT CIRCUIT BREAKER SAVE DATA MOBILE
+ * keys: NETWORK BUDGET CACHE LRU TIMEOUT CIRCUIT BREAKER SAVE DATA MOBILE QUEUE BACKPRESSURE
  * purpose: let many remote catalogs coexist without allowing metadata search to saturate mobile bandwidth, RAM, or provider APIs
  */
 
 const MAX_CONCURRENCY=3;
+const MAX_QUEUE=18;
 const DEFAULT_TIMEOUT_MS=6500;
 const DEFAULT_MAX_BYTES=1_500_000;
 const DEFAULT_TTL_MS=5*60*1000;
@@ -23,7 +24,11 @@ function now(){return Date.now();}
 function connection(){try{return globalThis.navigator?.connection||globalThis.navigator?.mozConnection||globalThis.navigator?.webkitConnection||null;}catch{return null;}}
 function emit(type,detail){try{globalThis.dispatchEvent?.(new CustomEvent(type,{detail}));}catch{}}
 function touchCache(key,row){cache.delete(key);cache.set(key,row);while(cache.size>MAX_CACHE_ENTRIES)cache.delete(cache.keys().next().value);}
-function acquire(){if(active<MAX_CONCURRENCY){active++;return Promise.resolve();}return new Promise(resolve=>waiters.push(resolve)).then(()=>{active++;});}
+function acquire(){
+  if(active<MAX_CONCURRENCY){active++;return Promise.resolve();}
+  if(waiters.length>=MAX_QUEUE)return Promise.reject(new Error('PROVIDER_QUEUE_SATURATED'));
+  return new Promise(resolve=>waiters.push(resolve)).then(()=>{active++;});
+}
 function release(){active=Math.max(0,active-1);waiters.shift()?.();}
 function breaker(providerId){const id=String(providerId||'external');let row=breakers.get(id);if(!row){row={failures:0,openUntil:0,lastError:null};breakers.set(id,row);}return row;}
 function breakerAssert(providerId){const row=breaker(providerId);if(row.openUntil>now())throw new Error(`PROVIDER_CIRCUIT_OPEN:${providerId}`);if(row.openUntil&&row.openUntil<=now()){row.openUntil=0;row.failures=0;}}
@@ -71,7 +76,7 @@ export function clearExternalProviderRuntimeCache(prefix=''){
   const p=String(prefix||'');for(const key of [...cache.keys()])if(!p||key.includes(p))cache.delete(key);
 }
 export function getExternalProviderRuntimeStats(){
-  return Object.freeze({active,queued:waiters.length,cacheEntries:cache.size,inFlight:inFlight.size,maxConcurrency:MAX_CONCURRENCY,breakers:[...breakers.entries()].map(([providerId,row])=>({providerId,...row}))});
+  return Object.freeze({active,queued:waiters.length,cacheEntries:cache.size,inFlight:inFlight.size,maxConcurrency:MAX_CONCURRENCY,maxQueue:MAX_QUEUE,breakers:[...breakers.entries()].map(([providerId,row])=>({providerId,...row}))});
 }
 
-export const EXTERNAL_PROVIDER_RUNTIME=Object.freeze({version:'kelo-external-provider-runtime-v1',fetchProviderJson,mobilePageBudget,clearExternalProviderRuntimeCache,getExternalProviderRuntimeStats});
+export const EXTERNAL_PROVIDER_RUNTIME=Object.freeze({version:'kelo-external-provider-runtime-v2-backpressure',fetchProviderJson,mobilePageBudget,clearExternalProviderRuntimeCache,getExternalProviderRuntimeStats});
