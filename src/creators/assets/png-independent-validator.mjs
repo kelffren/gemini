@@ -2,7 +2,7 @@
  * area: CREATORS / ASSET QUALITY
  * owner: Kelo Creator Asset Bridge
  * keys: PNG INDEPENDENT VALIDATION SHARP LIBVIPS PNGCHECK DIFFERENTIAL
- * purpose: prevent Kelo's encoder and decoder from being the only authority by checking outputs with independent implementations
+ * purpose: prevent Kelo's encoder/decoder from being sole authority while distinguishing pngcheck's known zlib-build warning from image errors
  * public-api: comparePngsIndependent(), validatePngIndependent()
  * state-owned: temporary files only
  * online: N/A; build/publish-time capability
@@ -12,57 +12,11 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
-
-function commandAvailable(command){
-  const result=spawnSync(command,['-h'],{stdio:'ignore',timeout:3000});
-  return !(result.error?.code==='ENOENT');
-}
-function runPngcheck(file){
-  if(!commandAvailable('pngcheck')) return {available:false,pass:null,error:'pngcheck-not-installed'};
-  const result=spawnSync('pngcheck',['-q',file],{encoding:'utf8',timeout:30_000});
-  return {available:true,pass:!result.error&&result.status===0,status:result.status,error:result.error?String(result.error.message||result.error):null,stderr:String(result.stderr||'').trim().slice(-4000)};
-}
+function commandAvailable(command){const result=spawnSync(command,['-h'],{stdio:'ignore',timeout:3000});return result.error?.code!=='ENOENT';}
+function onlyBenignZlibWarning(text){const lines=String(text||'').split(/\r?\n/).map(v=>v.trim()).filter(Boolean);return lines.length>0&&lines.every(line=>/^zlib warning:\s+different version \(expected .+, using .+\)$/i.test(line));}
+function runPngcheck(file){if(!commandAvailable('pngcheck'))return{available:false,pass:null,error:'pngcheck-not-installed'};const result=spawnSync('pngcheck',['-q',file],{encoding:'utf8',timeout:30_000}),stderr=String(result.stderr||'').trim().slice(-4000),benignEnvironmentWarning=!result.error&&result.status===2&&onlyBenignZlibWarning(stderr),pass=!result.error&&(result.status===0||benignEnvironmentWarning);return{available:true,pass,status:result.status,benignEnvironmentWarning,error:result.error?String(result.error.message||result.error):null,stderr};}
 async function loadSharp(){try{return(await import('sharp')).default;}catch{return null;}}
-async function decodeSharp(sharp,buffer){
-  const {data,info}=await sharp(buffer,{animated:false,failOn:'error'}).toColourspace('srgb').ensureAlpha().raw().toBuffer({resolveWithObject:true});
-  return {rgba:data,width:info.width,height:info.height,channels:info.channels,space:'srgb'};
-}
-function sameBytes(a,b){return Buffer.isBuffer(a)&&Buffer.isBuffer(b)&&a.equals(b);}
-
-export async function validatePngIndependent(buffer,options={}){
-  const temp=fs.mkdtempSync(path.join(os.tmpdir(),'kelo-png-independent-'));
-  const file=path.join(temp,'candidate.png');
-  fs.writeFileSync(file,buffer);
-  try{
-    const pngcheck=runPngcheck(file),sharp=await loadSharp();
-    let sharpResult={available:Boolean(sharp),pass:null,error:sharp?'not-run':'sharp-not-installed'};
-    if(sharp){
-      try{const decoded=await decodeSharp(sharp,buffer);sharpResult={available:true,pass:true,error:null,decoded:{width:decoded.width,height:decoded.height,channels:decoded.channels,space:decoded.space}};}
-      catch(error){sharpResult={available:true,pass:false,error:String(error?.message||error)};}
-    }
-    const requiredMissing=(options.requirePngcheck&& !pngcheck.available)||(options.requireSharp&&!sharpResult.available);
-    const pass=!requiredMissing&&(pngcheck.pass!==false)&&(sharpResult.pass!==false);
-    return {version:'kelo-png-independent-validator-v1',pass,requiredMissing,pngcheck,sharp:sharpResult};
-  }finally{fs.rmSync(temp,{recursive:true,force:true});}
-}
-
-export async function comparePngsIndependent(sourceBuffer,candidateBuffer,options={}){
-  const temp=fs.mkdtempSync(path.join(os.tmpdir(),'kelo-png-differential-'));
-  const sourcePath=path.join(temp,'source.png'),candidatePath=path.join(temp,'candidate.png');
-  fs.writeFileSync(sourcePath,sourceBuffer);fs.writeFileSync(candidatePath,candidateBuffer);
-  try{
-    const sourcePngcheck=runPngcheck(sourcePath),candidatePngcheck=runPngcheck(candidatePath),sharp=await loadSharp();
-    let sharpResult={available:Boolean(sharp),pass:null,exactSrgb:null,error:sharp?'not-run':'sharp-not-installed'};
-    if(sharp){
-      try{
-        const source=await decodeSharp(sharp,sourceBuffer),candidate=await decodeSharp(sharp,candidateBuffer);
-        const dimensions=source.width===candidate.width&&source.height===candidate.height;
-        sharpResult={available:true,pass:dimensions,exactSrgb:dimensions&&sameBytes(source.rgba,candidate.rgba),error:null,source:{width:source.width,height:source.height},candidate:{width:candidate.width,height:candidate.height}};
-      }catch(error){sharpResult={available:true,pass:false,exactSrgb:false,error:String(error?.message||error)};}
-    }
-    const requiredMissing=(options.requirePngcheck&&(!sourcePngcheck.available||!candidatePngcheck.available))||(options.requireSharp&&!sharpResult.available);
-    const requireExact=options.requireExactSrgb!==false;
-    const pass=!requiredMissing&&sourcePngcheck.pass!==false&&candidatePngcheck.pass!==false&&sharpResult.pass!==false&&(!requireExact||sharpResult.exactSrgb===true);
-    return {version:'kelo-png-differential-validator-v1',pass,requiredMissing,requireExactSrgb:requireExact,pngcheck:{source:sourcePngcheck,candidate:candidatePngcheck},sharp:sharpResult};
-  }finally{fs.rmSync(temp,{recursive:true,force:true});}
-}
+async function decodeSharp(sharp,buffer){const{data,info}=await sharp(buffer,{animated:false,failOn:'error'}).toColourspace('srgb').ensureAlpha().raw().toBuffer({resolveWithObject:true});return{rgba:data,width:info.width,height:info.height,channels:info.channels,space:'srgb'};}
+const sameBytes=(a,b)=>Buffer.isBuffer(a)&&Buffer.isBuffer(b)&&a.equals(b);
+export async function validatePngIndependent(buffer,options={}){const temp=fs.mkdtempSync(path.join(os.tmpdir(),'kelo-png-independent-')),file=path.join(temp,'candidate.png');fs.writeFileSync(file,buffer);try{const pngcheck=runPngcheck(file),sharp=await loadSharp();let sharpResult={available:Boolean(sharp),pass:null,error:sharp?'not-run':'sharp-not-installed'};if(sharp)try{const decoded=await decodeSharp(sharp,buffer);sharpResult={available:true,pass:true,error:null,decoded:{width:decoded.width,height:decoded.height,channels:decoded.channels,space:decoded.space}};}catch(error){sharpResult={available:true,pass:false,error:String(error?.message||error)};}const requiredMissing=(options.requirePngcheck&&!pngcheck.available)||(options.requireSharp&&!sharpResult.available),pass=!requiredMissing&&pngcheck.pass!==false&&sharpResult.pass!==false;return{version:'kelo-png-independent-validator-v1.1',pass,requiredMissing,pngcheck,sharp:sharpResult};}finally{fs.rmSync(temp,{recursive:true,force:true});}}
+export async function comparePngsIndependent(sourceBuffer,candidateBuffer,options={}){const temp=fs.mkdtempSync(path.join(os.tmpdir(),'kelo-png-differential-')),sourcePath=path.join(temp,'source.png'),candidatePath=path.join(temp,'candidate.png');fs.writeFileSync(sourcePath,sourceBuffer);fs.writeFileSync(candidatePath,candidateBuffer);try{const sourcePngcheck=runPngcheck(sourcePath),candidatePngcheck=runPngcheck(candidatePath),sharp=await loadSharp();let sharpResult={available:Boolean(sharp),pass:null,exactSrgb:null,error:sharp?'not-run':'sharp-not-installed'};if(sharp)try{const source=await decodeSharp(sharp,sourceBuffer),candidate=await decodeSharp(sharp,candidateBuffer),dimensions=source.width===candidate.width&&source.height===candidate.height;sharpResult={available:true,pass:dimensions,exactSrgb:dimensions&&sameBytes(source.rgba,candidate.rgba),error:null,source:{width:source.width,height:source.height},candidate:{width:candidate.width,height:candidate.height}};}catch(error){sharpResult={available:true,pass:false,exactSrgb:false,error:String(error?.message||error)};}const requiredMissing=(options.requirePngcheck&&(!sourcePngcheck.available||!candidatePngcheck.available))||(options.requireSharp&&!sharpResult.available),requireExact=options.requireExactSrgb!==false,pass=!requiredMissing&&sourcePngcheck.pass!==false&&candidatePngcheck.pass!==false&&sharpResult.pass!==false&&(!requireExact||sharpResult.exactSrgb===true);return{version:'kelo-png-differential-validator-v1.1',pass,requiredMissing,requireExactSrgb:requireExact,pngcheck:{source:sourcePngcheck,candidate:candidatePngcheck},sharp:sharpResult};}finally{fs.rmSync(temp,{recursive:true,force:true});}}
