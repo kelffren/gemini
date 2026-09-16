@@ -1,0 +1,162 @@
+name: Evergreen editor tree fix v2
+
+on:
+  push:
+    branches:
+      - test/evergreen-editor-tree-fix-2026-09-16
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-test:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, 'bootstrap evergreen editor tree fix v2')
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install browser test runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+          npx playwright install --with-deps chromium
+
+      - name: Download uploaded fix through its browser share page
+        shell: bash
+        run: |
+          cat > /tmp/download-fix.mjs <<'EOF'
+          import { chromium } from 'playwright';
+          const browser = await chromium.launch({headless:true});
+          const page = await browser.newPage({acceptDownloads:true});
+          await page.goto('https://firestorage.ai/ja/f/W8QhEfaMX0NE', {waitUntil:'domcontentloaded', timeout:60000});
+          await page.waitForTimeout(6000);
+          const body = await page.locator('body').innerText();
+          console.log(body.slice(0,5000));
+          const candidates = [
+            page.getByRole('button', {name:/ダウンロード|download/i}),
+            page.getByRole('link', {name:/ダウンロード|download/i}),
+            page.locator('a[href*="download"]'),
+            page.locator('button').filter({hasText:/\.tar\.gz|kelo-debt/i}),
+            page.locator('a').filter({hasText:/\.tar\.gz|kelo-debt/i})
+          ];
+          let target=null;
+          for (const loc of candidates) { if (await loc.count()) { target=loc.first(); break; } }
+          if (!target) {
+            console.log('buttons', await page.locator('button').allTextContents());
+            console.log('links', await page.locator('a').evaluateAll(as => as.map(a => ({text:a.textContent, href:a.href}))));
+            throw new Error('No download control found');
+          }
+          const downloadPromise = page.waitForEvent('download', {timeout:60000});
+          await target.click();
+          const download = await downloadPromise;
+          await download.saveAs('/tmp/kelo-fix.tar.gz');
+          console.log('saved', download.suggestedFilename());
+          await browser.close();
+          EOF
+          node /tmp/download-fix.mjs
+          tar -tzf /tmp/kelo-fix.tar.gz | head -10
+
+      - name: Apply the complete Evergreen patch bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/kelo-debt && mkdir -p /tmp/kelo-debt
+          tar -xzf /tmp/kelo-fix.tar.gz -C /tmp/kelo-debt
+          test -d /tmp/kelo-debt/kelo-debt/patches
+          count=$(find /tmp/kelo-debt/kelo-debt/patches -maxdepth 1 -type f -name '*.patch' | wc -l)
+          test "$count" -eq 87
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          for patch in $(find /tmp/kelo-debt/kelo-debt/patches -maxdepth 1 -type f -name '*.patch' | sort); do
+            echo "Applying $(basename "$patch")"
+            git am --3way "$patch"
+          done
+          git rm -f .github/workflows/evergreen-editor-tree-fix.yml .github/workflows/evergreen-editor-tree-fix-v2.yml
+          git commit -m 'chore: remove temporary evergreen fix harness'
+          git push origin HEAD:test/evergreen-editor-tree-fix-2026-09-16
+
+      - name: Build exact editor regression
+        shell: bash
+        run: |
+          cat > tests/editor-tree-move-reopen.e2e.spec.js <<'EOF'
+          import { test, expect } from '@playwright/test';
+
+          test('tree survives move, close, walking, and editor reopen', async ({ page }) => {
+            const pageErrors=[];
+            page.on('pageerror', e => pageErrors.push(String(e)));
+            await page.goto('http://127.0.0.1:4173/?mapEditor=1', {waitUntil:'domcontentloaded'});
+            await page.waitForFunction(() => window.KELO_PROPERTY_EDITOR && window.KELO_PROPERTY_SYSTEM && window.KELO_PROPERTY_CATALOG, null, {timeout:20000});
+
+            await page.evaluate(() => window.KELO_PROPERTY_EDITOR.open('parcel'));
+            await expect(page.locator('#kelo-property-editor')).toBeVisible();
+
+            const tree = page.locator('#pe-list .pe-card').filter({hasText:/tree|árbol|arbol/i}).first();
+            await expect(tree).toBeVisible({timeout:10000});
+            const grant = tree.locator('.pe-test');
+            if (await grant.count()) await grant.click();
+            await tree.click();
+
+            const canvas = page.locator('canvas').first();
+            const box = await canvas.boundingBox();
+            if (!box) throw new Error('canvas missing');
+            const before = await page.evaluate(() => window.KELO_PROPERTY_SYSTEM.getPlacements(window.KELO_PROPERTY_EDITOR.parcelId).length);
+            await page.mouse.click(box.x+box.width*.56, box.y+box.height*.50);
+            await page.waitForFunction(n => window.KELO_PROPERTY_SYSTEM.getPlacements(window.KELO_PROPERTY_EDITOR.parcelId).length > n, before);
+            const placed = await page.evaluate(() => {
+              const rows=window.KELO_PROPERTY_SYSTEM.getPlacements(window.KELO_PROPERTY_EDITOR.parcelId);
+              return rows[rows.length-1];
+            });
+
+            await page.locator('#pe-placed button').first().click();
+            await page.locator('#pe-move').click();
+            await page.mouse.click(box.x+box.width*.66, box.y+box.height*.58);
+            await page.waitForFunction(p => {
+              const r=window.KELO_PROPERTY_SYSTEM.getPlacements(window.KELO_PROPERTY_EDITOR.parcelId).find(x=>x.placementId===p.id);
+              return r && (r.x!==p.x || r.y!==p.y);
+            }, {id:placed.placementId,x:placed.x,y:placed.y});
+            const moved = await page.evaluate(id => window.KELO_PROPERTY_SYSTEM.getPlacements(window.KELO_PROPERTY_EDITOR.parcelId).find(x=>x.placementId===id), placed.placementId);
+
+            await page.locator('#pe-close').click();
+            await expect(page.locator('#kelo-property-editor')).toBeHidden();
+            const playerBefore = await page.evaluate(() => ({x:window.localPlayer?.x,y:window.localPlayer?.y}));
+            await page.keyboard.down('KeyD');
+            await page.waitForTimeout(900);
+            await page.keyboard.up('KeyD');
+            const playerAfter = await page.evaluate(() => ({x:window.localPlayer?.x,y:window.localPlayer?.y}));
+            expect(Number.isFinite(playerBefore.x) && Number.isFinite(playerAfter.x)).toBeTruthy();
+            expect(Math.hypot(playerAfter.x-playerBefore.x, playerAfter.y-playerBefore.y)).toBeGreaterThan(.1);
+
+            await page.evaluate(() => window.KELO_PROPERTY_EDITOR.open('parcel'));
+            await expect(page.locator('#kelo-property-editor')).toBeVisible();
+            const reopened = await page.evaluate(id => window.KELO_PROPERTY_SYSTEM.getPlacements(window.KELO_PROPERTY_EDITOR.parcelId).find(x=>x.placementId===id), placed.placementId);
+            expect(reopened).toBeTruthy();
+            expect(reopened.x).toBe(moved.x);
+            expect(reopened.y).toBe(moved.y);
+            expect(pageErrors).toEqual([]);
+          });
+          EOF
+
+      - name: Run exact editor flow
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m http.server 4173 >/tmp/kelo-http.log 2>&1 &
+          server=$!
+          trap 'kill $server || true' EXIT
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:4173/ >/dev/null && break; sleep 1; done
+          KELO_PAGES=http://127.0.0.1:4173 npx playwright test tests/editor-tree-move-reopen.e2e.spec.js --project=chromium --reporter=line
+
+      - name: Run existing regression suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx playwright test --project=chromium --reporter=line
