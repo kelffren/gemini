@@ -1,6 +1,6 @@
 /* KELO-INDEX
  * area: QA / GUARDIAN PVP FAILOVER
- * keys: GUARDIAN PVP FAILOVER LIVE IOS LEASE EPOCH SNAPSHOT DRIFT AUTH CLEANUP PRUNE
+ * keys: GUARDIAN PVP FAILOVER LIVE IOS LEASE EPOCH SNAPSHOT DRIFT AUTH CLEANUP PRUNE CACHE
  * purpose: gate estático del laboratorio A->B y de los contratos de producción que necesita para medir failover real
  */
 import assert from 'node:assert/strict';
@@ -16,6 +16,7 @@ const guardian=read('src/systems/guardian-system.js');
 const host=read('src/systems/guardian-pvp-host.js');
 const worker=read('src/workers/guardian-pvp-authority-worker.js');
 const adapter=read('src/systems/guardian-pvp-net-adapter.js');
+const registry=read('src/core/feature-registry.js');
 
 assert.match(guardian,/startMasterHost/);
 assert.match(guardian,/stopMasterHost/);
@@ -26,8 +27,15 @@ assert.match(guardian,/masterLeaseExpiresAt/);
 assert.match(host,/lastSnapshotEpoch/);
 assert.match(host,/TAKEOVER_MAX_AGE_MS=7000/);
 assert.match(host,/MAX_INPUTS_PER_SECOND=90/);
+assert.match(host,/WORKER_URL='src\/workers\/guardian-pvp-authority-worker\.js\?v=3-takeover-prune'/);
+assert.match(host,/restoredActorPrune:true/);
+assert.match(host,/RESTORED_ACTOR_RECLAIM_MS=5000/);
+assert.match(host,/kelo:guardian-pvp-pruned/);
+assert.match(host,/staleRestoredPlayersPruned/);
 assert.match(host,/isolatedWorker:true/);
 assert.match(host,/centralAuthorityPriority:true/);
+
+assert.match(worker,/guardian-pvp-authority-worker-v3-takeover-prune/);
 assert.match(worker,/takeoverRestore:true/);
 assert.match(worker,/projectilesReset:true/);
 assert.match(worker,/transientActionsReset:true/);
@@ -39,14 +47,22 @@ assert.match(worker,/restoredActorPrune:true/);
 assert.doesNotMatch(worker,/setInterval|setTimeout/);
 assert.match(adapter,/takeoverSequenceResync:true/);
 
+assert.match(registry,/kelo-feature-registry-v2\.5\.1-guardian-pvp-worker-prune/);
+assert.match(registry,/guardian-pvp-host\.js\?v=4-worker-prune/);
+
 assert.match(testSource,/KELO_GUARDIAN_TEST_ADMIN_EMAIL/);
 assert.match(testSource,/KELO_GUARDIAN_TEST_DONOR_EMAIL/);
+assert.match(testSource,/guardian-pvp-host\.js\?v=4-worker-prune/);
 assert.match(testSource,/await contextA\.close\(\);contextA=null;pageA=null/);
 assert.match(testSource,/lease is deliberately NOT released through stopMasterHost/);
 assert.match(testSource,/newEpoch.*toBeGreaterThan\(oldEpoch\)/s);
 assert.match(testSource,/positionDriftPx/);
 assert.match(testSource,/blockedInputsDuringOutage/);
 assert.match(testSource,/playersRestored/);
+assert.match(testSource,/staleMasterActorPruned/);
+assert.match(testSource,/staleRestoredPlayersPruned/);
+assert.match(testSource,/kelo:guardian-pvp-pruned/);
+assert.match(testSource,/!last\.players\?\.\[aActorId\]/);
 assert.match(testSource,/transientActionsReset/);
 assert.match(testSource,/projectilesReset/);
 assert.match(testSource,/guardian_master_stop/);
@@ -82,6 +98,8 @@ console.log('GUARDIAN_PVP_FAILOVER_AUDIT_OK',{
   blockedInputsMeasured:true,
   staleRestoredActorPrune:true,
   restoredActorReclaimMs:5000,
+  workerCacheVersioned:true,
+  liveGhostCleanupAsserted:true,
   persistentAuthority:false,
   economyAuthority:false
 });
