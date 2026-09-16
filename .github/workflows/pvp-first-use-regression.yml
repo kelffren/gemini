@@ -1,0 +1,73 @@
+name: PvP First-Use Regression
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/core/feature-registry.js'
+      - 'src/core/module-loader.js'
+      - 'src/systems/pvp-world.js'
+      - 'src/systems/pvp-combat-runtime-loader.js'
+      - 'src/abilities/**'
+      - 'engine-net.js'
+      - 'src/ui/luxe-shell.js'
+      - 'tests/pvp-dodge-live.spec.js'
+      - 'tests/iphone-walk-8s.mjs'
+      - 'bugs/registry/BUG-0004.json'
+      - '.github/workflows/pvp-first-use-regression.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pvp-first-use:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium
+      - name: Start local game
+        run: |
+          python3 -m http.server 4173 --bind 127.0.0.1 > /tmp/kelo-http.log 2>&1 &
+          for i in {1..30}; do
+            curl -fsS http://127.0.0.1:4173/index.html >/dev/null && exit 0
+            sleep 1
+          done
+          cat /tmp/kelo-http.log
+          exit 1
+      - name: Visible PvP button + first-use runtime + dodge
+        run: npx playwright test tests/pvp-dodge-live.spec.js --project=chromium
+      - name: iPhone 8s sustained-walk firewall
+        env:
+          KELO_URL: http://127.0.0.1:4173/?guest=1&pvpRegressionWalk=1
+        run: node tests/iphone-walk-8s.mjs
+      - name: Bug brief
+        run: npm run bug:brief -- BUG-0004
+      - name: Bug risk
+        if: github.event_name == 'pull_request'
+        run: npm run bug:risk -- "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}"
+      - name: Bug impact
+        if: github.event_name == 'pull_request'
+        run: npm run bug:impact -- --diff "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}" --depth=2
+      - name: Foundation audit
+        run: npm run audit:foundation
+      - name: Docs audit
+        run: npm run audit:docs
+      - name: Bug registry audit
+        run: npm run audit:bugs
+      - name: Bug report audit
+        run: npm run audit:bug-reports
+      - name: Bug regression audit
+        run: npm run audit:bug-regressions
+      - name: Bug close gate
+        run: npm run audit:bug-close
+      - name: Bug recurrence gate
+        run: npm run audit:bug-recurrence

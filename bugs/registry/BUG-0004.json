@@ -1,0 +1,248 @@
+{
+  "schema_version": 2,
+  "id": "BUG-0004",
+  "title": "Visible PvP button does not load the PvP domain on first use",
+  "status": "FIXED_PENDING_VERIFY",
+  "severity": "high",
+  "area": ["pvp", "ui", "lazy-loading", "mobile"],
+  "source": "human",
+  "discovered_at": "2026-09-16",
+  "reported_by": ["player"],
+  "reports": [],
+  "environment": {
+    "game_build": "main@b9ab9fd14efd8797bb6d6d69676dc89359013559",
+    "device": "mobile-first runtime",
+    "os": "iOS target",
+    "browser": "Safari target; automated regression uses Playwright Chromium with iPhone UA and 390x844 touch viewport",
+    "surface": "Quick Actions launcher -> visible Luxe PvP button"
+  },
+  "reproduction": [
+    "Open KELO WORLD from a cold page load where the PvP domain has not been loaded yet.",
+    "Open the visible Quick Actions launcher.",
+    "Tap the visible PVP button #lx-side-pvp.",
+    "Observe that the button asks KELO_MODULE_LOADER.ensure('pvp').",
+    "On the broken build, ensure('pvp') resolves after loading only combat foundations, while enterPvPWorld is still absent.",
+    "The UI then falls through to the 'PvP todavía cargando' path instead of entering the PvP world."
+  ],
+  "expected": "The first visible PVP tap loads the complete PvP first-use domain, installs enterPvPWorld, enters mode=pvp and enables combat without putting the full PvP domain into initial boot.",
+  "actual": "The pre-fix module loader treated combat foundations as sufficient for the pvp feature and did not load pvp-world.js or pvp-combat-runtime-loader.js, so the visible button could finish loading without an enterPvPWorld function.",
+  "evidence": [
+    "src/ui/luxe-shell.js visible button handler calls KELO_MODULE_LOADER.ensure('pvp') then checks window.enterPvPWorld.",
+    "Pre-fix src/core/module-loader.js special-cased pvp by calling only KeloRuntimeBootstrap.ensure().",
+    "src/systems/pvp-combat-runtime-loader.js requires an existing KeloPvPWorld and installs the enterPvPWorld lazy facade.",
+    "Candidate commits c4ed65b765bc976a01b5cf39ddcee3c6ea5151af and 6b85c07bc5349c4b6d304a97ccf85c19f1ea7ea7 implement the first-use feature contract.",
+    "GitHub Actions run 35059145087: mobile iPhone-UA visible Quick Actions -> PVP flow and desktop flow both passed; mode became pvp, combatEnabled=true, loaderReady=true and pvpReady=true.",
+    "GitHub Actions run 35059145087: dodge completed exactly 112 px with no collision hits or page errors on both mobile and desktop.",
+    "GitHub Actions run 35059145087: strict iPhone 390x844 touch walk passed 8 s + 10 s idle + 4 s walk with every timed page.evaluate <=400 ms and no crash.",
+    "GitHub Actions run 35059145087: Foundation, Docs, bug registry, bug reports, bug regression, bug close and bug recurrence gates passed."
+  ],
+  "suspected_files": [
+    "src/core/module-loader.js",
+    "src/core/feature-registry.js",
+    "src/ui/luxe-shell.js",
+    "src/ui/luxe-player-hud.js",
+    "src/systems/pvp-world.js",
+    "src/systems/pvp-combat-runtime-loader.js",
+    "tests/pvp-dodge-live.spec.js",
+    "tests/iphone-walk-8s.mjs"
+  ],
+  "owner_hint": "KeloModuleLoader first-use lifecycle delegating gameplay ownership to KeloPvPWorld",
+  "claimed_by": null,
+  "claim_started_at": null,
+  "research": {
+    "status": "sufficient",
+    "summary": "The gameplay owner and visible button handler were already correct. The defect was the feature lifecycle contract: ensure('pvp') loaded only shared combat foundations, not the PvP domain that defines enterPvPWorld. The candidate registers PvP as a real first-use feature pack and keeps KeloPvPWorld as gameplay owner. Automated cold-load regression is green; real Safari hardware remains the stronger final external verification while BrowserStack capacity is unavailable.",
+    "known_facts": [
+      {
+        "id": "F1",
+        "statement": "The visible Luxe PVP button calls KELO_MODULE_LOADER.ensure('pvp') when loader.needs('pvp') is true, then calls enterPvPWorld only if that function exists.",
+        "evidence": ["src/ui/luxe-shell.js"]
+      },
+      {
+        "id": "F2",
+        "statement": "Before the candidate fix, KELO_MODULE_LOADER.ensure('pvp') returned KeloRuntimeBootstrap.ensure() and did not load the PvP domain scripts.",
+        "evidence": ["src/core/module-loader.js before 6b85c07bc5349c4b6d304a97ccf85c19f1ea7ea7"]
+      },
+      {
+        "id": "F3",
+        "statement": "pvp-combat-runtime-loader.js does not create KeloPvPWorld; it requires KeloPvPWorld to already exist and then publishes enterPvPWorld.",
+        "evidence": ["src/systems/pvp-combat-runtime-loader.js"]
+      },
+      {
+        "id": "F4",
+        "statement": "The PvP control is intentionally inside the collapsed Quick Actions menu; a valid visible regression must open #kw-quick-actions-toggle before clicking #lx-side-pvp.",
+        "evidence": ["src/ui/luxe-player-hud.js", "GitHub Actions harness investigation on PR #292"]
+      },
+      {
+        "id": "F5",
+        "statement": "The final automated regression passed the cold first-use transition from loaderReady=false to loaderReady=true with KeloPvPWorld mode=pvp and combatEnabled=true.",
+        "evidence": ["GitHub Actions run 35059145087"]
+      },
+      {
+        "id": "F6",
+        "statement": "The strict iPhone-UA 390x844 sustained-walk firewall passed with all timed page.evaluate calls at or below 400 ms and no crash.",
+        "evidence": ["GitHub Actions run 35059145087"]
+      }
+    ],
+    "hypotheses": [
+      {
+        "id": "H1",
+        "theory": "The first-use feature contract is incomplete: combat foundations are being mistaken for a fully loaded PvP domain.",
+        "confidence": "high",
+        "status": "confirmed",
+        "why": "The visible button waits on ensure('pvp'), while the pre-fix ensure implementation never loaded the files that define KeloPvPWorld/enterPvPWorld; after making PvP an explicit first-use pack, the same visible flow passes from a cold load.",
+        "evidence_for": ["F1", "F2", "F3", "F5"],
+        "evidence_against": [],
+        "test_next": "Real iPhone Safari smoke when BrowserStack Automate capacity is available or via direct player QA."
+      }
+    ],
+    "ruled_out": [
+      {
+        "hypothesis_id": "H_UI_HANDLER",
+        "theory": "The visible button has no PvP handler.",
+        "reason": "The handler exists and correctly requests the pvp feature before calling enterPvPWorld.",
+        "evidence": ["src/ui/luxe-shell.js"]
+      },
+      {
+        "hypothesis_id": "H_AUTH_ONLY",
+        "theory": "The PvP failure is caused only by the account/auth overlay.",
+        "reason": "The isolated guest regression still required opening the intentionally collapsed Quick Actions menu; once the real UI path was reproduced, the PvP lifecycle candidate passed.",
+        "evidence": ["F4", "GitHub Actions runs preceding 35059145087"]
+      }
+    ],
+    "unknowns": [
+      {
+        "id": "U1",
+        "question": "Does the same candidate pass on physical iPhone Safari with the exact player environment?",
+        "why_it_matters": "The automated iPhone-UA mobile gate proves the application contract and freeze firewall, but physical Safari remains the strongest final user-facing verification.",
+        "quickest_test": "Run the visible Quick Actions -> PVP flow on a real iPhone Safari session when BrowserStack Automate capacity is restored, or record direct player QA."
+      }
+    ],
+    "external_references": [
+      {
+        "title": "Playwright auto-waiting",
+        "url": "https://playwright.dev/docs/actionability",
+        "lesson": "Use real locator clicks on the visible Quick Actions and PvP controls so the regression validates visibility, stability, event reception and enabled state instead of bypassing UI with page.evaluate."
+      }
+    ],
+    "last_researched_at": "2026-09-16"
+  },
+  "attempt_history": [
+    {
+      "id": "A1",
+      "at": "2026-09-16",
+      "actor": "development agent",
+      "goal": "Reconnect the visible PvP first-use path without moving the full PvP domain into initial boot.",
+      "hypothesis_ids": ["H1"],
+      "change": {
+        "commits": [
+          "c4ed65b765bc976a01b5cf39ddcee3c6ea5151af",
+          "6b85c07bc5349c4b6d304a97ccf85c19f1ea7ea7"
+        ],
+        "files": ["src/core/feature-registry.js", "src/core/module-loader.js"],
+        "summary": "Register PvP as a first-use feature pack, make ensure('pvp') load foundations then the PvP domain, and require the domain-ready facade for isReady/needs."
+      },
+      "validation": {
+        "environment": "GitHub Actions PR merge ref, Playwright mobile iPhone UA + desktop",
+        "method": "Cold load, open Quick Actions, click visible PVP, require pvp domain readiness/mode/combat, then execute dodge regression.",
+        "result": "PASS",
+        "evidence": ["GitHub Actions run 35059145087: 2 Playwright PvP tests passed"]
+      },
+      "conclusion": "The lifecycle repair works in automated mobile and desktop acceptance without adding the full PvP domain to initial boot.",
+      "do_not_repeat_without": "Only revisit the lifecycle design if a future regression shows ensure('pvp') resolving while pvpDomainReady remains false."
+    },
+    {
+      "id": "A2",
+      "at": "2026-09-16",
+      "actor": "development agent + GitHub Actions",
+      "goal": "Make the regression exercise the actual player-facing control rather than call enterPvPWorld directly.",
+      "hypothesis_ids": [],
+      "change": {
+        "commits": ["371e3ced1019df96b6e47e67342b118eff5b659e", "39005b78fa5e4f8e11ed3819798c353ec6d2ec41", "93fab474fb83b2f35242a4fc66a4781576a26b7b", "5a7eac43dfe89f6ad9bc18c94b32c9b5ecc68a60"],
+        "files": ["tests/pvp-dodge-live.spec.js"],
+        "summary": "Evolved the harness from direct entry to the real UI path and discovered that PvP intentionally lives behind the Quick Actions launcher."
+      },
+      "validation": {
+        "environment": "GitHub Actions",
+        "method": "Iterative visible-control regression runs.",
+        "result": "PASS",
+        "evidence": ["Earlier runs identified auth/harness and collapsed Quick Actions states; run 35059145087 passes the correct visible path without force click."]
+      },
+      "conclusion": "The permanent regression now matches the human control path: Quick Actions -> PVP.",
+      "do_not_repeat_without": "Do not replace this with a direct page.evaluate call to enterPvPWorld; that would stop protecting the original defect."
+    },
+    {
+      "id": "A3",
+      "at": "2026-09-16",
+      "actor": "development agent + GitHub Actions",
+      "goal": "Satisfy the repository iPhone freeze firewall around the runtime change.",
+      "hypothesis_ids": [],
+      "change": {
+        "commits": ["57d3b8b1625996609c5eac0d3aec6d8effc725be", "b5872d3533eb61efa1df34401deafab944448bb4"],
+        "files": ["tests/iphone-walk-8s.mjs", ".github/workflows/pvp-first-use-regression.yml"],
+        "summary": "Tightened the existing iPhone walk test so any timed page.evaluate above 400 ms fails, and attached it plus risk/impact and bug audits to the PvP gate."
+      },
+      "validation": {
+        "environment": "GitHub Actions, 390x844 touch viewport with iPhone Safari UA",
+        "method": "8 s sustained touch walk, 10 s idle, 4 s second walk; every timed page.evaluate <=400 ms; no page crash.",
+        "result": "PASS",
+        "evidence": ["GitHub Actions run 35059145087: movedX=1611.1, maxStall=6, post-idle evaluate=4 ms, moved2=498.2, strict firewall PASS"]
+      },
+      "conclusion": "The candidate does not reproduce the historical mobile freeze signature under the repository's mandatory local iPhone firewall.",
+      "do_not_repeat_without": "If a future physical-iPhone report shows a freeze, preserve that evidence and investigate it separately rather than weakening the 400 ms gate."
+    }
+  ],
+  "next_best_actions": [
+    {
+      "priority": 1,
+      "action": "Verify Quick Actions -> PVP on physical iPhone Safari when real-device capacity is available.",
+      "reason": "All automated acceptance and repository gates pass; hardware Safari is the remaining stronger external verification for this user-facing bug.",
+      "expected_signal": "First tap loads PvP, transitions to the arena and remains responsive without the 'PvP todavía cargando' dead-end.",
+      "stop_condition": "If physical Safari reproduces the dead-end or freeze, move BUG-0004 to REOPENED and preserve the exact build/device evidence."
+    }
+  ],
+  "fix": {
+    "status": "candidate_complete_automated_gates_pass",
+    "commits": [
+      "c4ed65b765bc976a01b5cf39ddcee3c6ea5151af",
+      "6b85c07bc5349c4b6d304a97ccf85c19f1ea7ea7",
+      "5a7eac43dfe89f6ad9bc18c94b32c9b5ecc68a60",
+      "57d3b8b1625996609c5eac0d3aec6d8effc725be",
+      "b5872d3533eb61efa1df34401deafab944448bb4"
+    ],
+    "files": [
+      "src/core/feature-registry.js",
+      "src/core/module-loader.js",
+      "tests/pvp-dodge-live.spec.js",
+      "tests/iphone-walk-8s.mjs",
+      ".github/workflows/pvp-first-use-regression.yml"
+    ],
+    "summary": "PvP now has an explicit first-use pack and readiness means the PvP domain/facade is installed, not merely that shared combat foundations exist. Permanent UI-path and iPhone freeze regression gates are attached."
+  },
+  "verification": {
+    "status": "PENDING_REAL_DEVICE",
+    "method": "Automated PR acceptance has passed on mobile iPhone UA and desktop, including strict sustained-walk freeze firewall; final stronger verification is physical iPhone Safari Quick Actions -> PVP.",
+    "evidence": [
+      "GitHub Actions run 35059145087: PvP visible-button mobile iPhone-UA PASS",
+      "GitHub Actions run 35059145087: PvP desktop PASS",
+      "GitHub Actions run 35059145087: strict iPhone sustained-walk firewall PASS",
+      "GitHub Actions run 35059145087: Foundation/Docs/Bug gates PASS"
+    ],
+    "verified_by": null,
+    "verified_at": null
+  },
+  "blocked_by": ["BUG-0001"],
+  "duplicate_of": null,
+  "related_bugs": ["BUG-0001", "BUG-0003"],
+  "regression": {
+    "test": "tests/pvp-dodge-live.spec.js + tests/iphone-walk-8s.mjs",
+    "command": "GitHub Actions workflow: PvP First-Use Regression"
+  },
+  "notes": [
+    "Automated acceptance is green and sufficient for merge candidacy, but BUG-0004 remains FIXED_PENDING_VERIFY until physical Safari evidence is available.",
+    "BrowserStack real-device verification is currently blocked by BUG-0001 (Automate testing time expired).",
+    "The risk scorer reported CRITICAL 99/100 because the PR branch was created from an older main and the direct base/head diff also includes unrelated mainline movement; targeted PvP, iPhone walk, Foundation, Docs and bug gates all passed on the PR merge ref.",
+    "Do not mark VERIFIED solely from code inspection or a direct page.evaluate call to enterPvPWorld."
+  ],
+  "updated_at": "2026-09-16"
+}

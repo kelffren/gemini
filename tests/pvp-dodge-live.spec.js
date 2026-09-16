@@ -1,19 +1,77 @@
 /* KELO-INDEX
  * area: TEST / PVP
  * owner: Playwright validation only
- * keys: PVP DODGE DASH COLLISION MOBILE DESKTOP LIVE WINNER
- * purpose: bloquea el dodge PvP funcional: 112 px reales, arranque responsivo y runtime de abilities despierto
- * online: N/A; valida el runtime local exacto de main sin alterar autoridad
- * do-not: NO gameplay mutation fuera de setup reproducible de prueba
+ * keys: PVP BUTTON FIRST-USE QUICK-ACTIONS GUEST DODGE DASH COLLISION MOBILE IPHONE DESKTOP LIVE WINNER
+ * purpose: bloquea la ruta visible launcher rápido -> botón PvP -> lazy runtime -> mundo PvP y después valida dodge 112 px real; guest=1 solo elimina Auth de esta prueba PvP
+ * online: N/A; valida el runtime local exacto del candidato sin alterar autoridad
+ * do-not: NO gameplay mutation fuera de setup reproducible de prueba, NO force click, NO llamada directa a enterPvPWorld
  */
 const {test,expect}=require('@playwright/test');
 
+const IPHONE_UA='Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1';
+
+async function waitForVisibleGameplay(page){
+  await page.waitForFunction(()=>!!(
+    document.documentElement.dataset.keloGuestPlay==='1' &&
+    typeof localPlayer!=='undefined' &&
+    document.getElementById('game-canvas') &&
+    document.getElementById('kw-quick-actions-toggle') &&
+    document.getElementById('lx-side-pvp')
+  ),{timeout:20000});
+  await expect(page.locator('#kelo-account-auth')).toBeHidden({timeout:15000});
+  await expect(page.locator('#game-canvas')).toBeVisible({timeout:15000});
+  const quick=page.locator('#kw-quick-actions-toggle');
+  await expect(quick).toBeVisible({timeout:20000});
+  await quick.click();
+  await expect(quick).toHaveAttribute('aria-expanded','true',{timeout:5000});
+  await expect(page.locator('#lx-side-pvp')).toBeVisible({timeout:5000});
+}
+
+async function enterThroughVisiblePvpButton(page,label){
+  await page.waitForFunction(()=>window.KELO_MODULE_LOADER&&document.getElementById('lx-side-pvp'),{timeout:20000});
+  await waitForVisibleGameplay(page);
+  const before=await page.evaluate(()=>({
+    pvpWorld:!!window.KeloPvPWorld,
+    enter:typeof window.enterPvPWorld==='function',
+    loaderNeeds:window.KELO_MODULE_LOADER.needs('pvp'),
+    loaderReady:window.KELO_MODULE_LOADER.isReady('pvp'),
+    guest:document.documentElement.dataset.keloGuestPlay||null,
+    quickActionsOpen:document.getElementById('kw-quick-actions-toggle')?.getAttribute('aria-expanded')==='true'
+  }));
+  expect(before.loaderNeeds).toBe(true);
+  expect(before.loaderReady).toBe(false);
+  expect(before.guest).toBe('1');
+  expect(before.quickActionsOpen).toBe(true);
+
+  const button=page.locator('#lx-side-pvp');
+  await button.click();
+  await page.waitForFunction(()=>window.KELO_MODULE_LOADER&&window.KELO_MODULE_LOADER.isReady('pvp')&&window.KeloPvPWorld&&typeof window.enterPvPWorld==='function'&&window.KELO_PVP_COMBAT_LOADER_AUDIT?.ready===true,{timeout:30000});
+  await page.waitForFunction(()=>window.KeloPvPWorld&&window.KeloAbilities&&window.KeloPvPWorld.state.mode==='pvp'&&window.KeloPvPWorld.state.combatEnabled,{timeout:20000});
+
+  const after=await page.evaluate(()=>({
+    mode:window.KeloPvPWorld.state.mode,
+    combatEnabled:window.KeloPvPWorld.state.combatEnabled,
+    loaderNeeds:window.KELO_MODULE_LOADER.needs('pvp'),
+    loaderReady:window.KELO_MODULE_LOADER.isReady('pvp'),
+    diagnostics:window.KELO_MODULE_LOADER.diagnostics(),
+    combatLoader:window.KELO_PVP_COMBAT_LOADER_AUDIT?{
+      ready:window.KELO_PVP_COMBAT_LOADER_AUDIT.ready,
+      combatReady:window.KELO_PVP_COMBAT_LOADER_AUDIT.combatReady,
+      predictionReady:window.KELO_PVP_COMBAT_LOADER_AUDIT.predictionReady
+    }:null
+  }));
+  console.log('PVP_BUTTON_FIRST_USE',JSON.stringify({label,before,after},null,2));
+  expect(after.mode).toBe('pvp');
+  expect(after.combatEnabled).toBe(true);
+  expect(after.loaderNeeds).toBe(false);
+  expect(after.loaderReady).toBe(true);
+  expect(after.combatLoader&&after.combatLoader.ready).toBe(true);
+}
+
 async function runDodge(page,label){
   const errors=[];page.on('pageerror',e=>errors.push(String(e)));
-  await page.goto('http://127.0.0.1:4173/index.html',{waitUntil:'domcontentloaded'});
-  await page.waitForFunction(()=>window.KeloPvPWorld&&window.KeloInput&&typeof window.enterPvPWorld==='function',{timeout:20000});
-  await page.evaluate(async()=>{await window.enterPvPWorld();});
-  await page.waitForFunction(()=>window.KeloPvPWorld&&window.KeloAbilities&&window.KeloPvPWorld.state.mode==='pvp'&&window.KeloPvPWorld.state.combatEnabled,{timeout:15000});
+  await page.goto('http://127.0.0.1:4173/?guest=1&pvpRegression=1',{waitUntil:'domcontentloaded'});
+  await enterThroughVisiblePvpButton(page,label);
   const result=await page.evaluate(async()=>{
     localPlayer.x=2790;localPlayer.y=720;localPlayer.vx=localPlayer.vy=0;
     window.KeloPvPWorld.setAimWorld({x:2910,y:720},'audit',1);
@@ -53,5 +111,5 @@ async function runDodge(page,label){
   return result;
 }
 
-test('PvP dodge winner mobile',async({browser})=>{const p=await browser.newPage({viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true});await runDodge(p,'mobile');await p.close();});
-test('PvP dodge winner desktop',async({browser})=>{const p=await browser.newPage({viewport:{width:1440,height:900}});await runDodge(p,'desktop');await p.close();});
+test('PvP visible button first-use + dodge winner mobile iPhone UA',async({browser})=>{const p=await browser.newPage({viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true,userAgent:IPHONE_UA});await runDodge(p,'mobile-iphone');await p.close();});
+test('PvP visible button first-use + dodge winner desktop',async({browser})=>{const p=await browser.newPage({viewport:{width:1440,height:900}});await runDodge(p,'desktop');await p.close();});
