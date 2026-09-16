@@ -7,6 +7,7 @@ const checks=[];
 function check(name,ok,detail=''){checks.push({name,ok:!!ok,detail});if(!ok)process.exitCode=1;}
 const migration=read('supabase/migrations/20260916002500_creator_marketplace_v1.sql');
 const discover=read('supabase/migrations/20260916002600_creator_marketplace_discover_v2.sql');
+const hardening=read('supabase/migrations/20260916002700_creator_marketplace_idempotency_hardening.sql');
 const repo=read('src/creators/content/supabase-content-repository.mjs');
 const service=read('src/creators/marketplace/creator-marketplace-service.mjs');
 const surface=read('src/creators/ui/creator-marketplace-surface.mjs');
@@ -18,6 +19,9 @@ check('default split is creator 100%',/seller_share_bps integer not null default
 check('purchase ignores client price',/purchase_creator_market_listing\(\s*p_listing_id uuid,\s*p_buyer_character_id uuid,\s*p_correlation_id uuid/s.test(migration)&&!(/purchase_creator_market_listing[\s\S]{0,250}p_price/i.test(migration)));
 check('published content required',/PUBLISHED_CONTENT_REQUIRED/.test(migration)&&/content_publications/.test(migration));
 check('entitlement is account-level',/primary key\(buyer_user_id,revision_id\)/.test(migration));
+check('concurrent idempotency lock',/pg_advisory_xact_lock\(hashtextextended\(p_correlation_id::text,0\)\)/.test(hardening));
+check('idempotent retry returns transaction',/idempotent',true/.test(hardening)&&/CORRELATION_CONFLICT/.test(hardening));
+check('payout character revalidated',/PAYOUT_CHARACTER_UNAVAILABLE/.test(hardening));
 check('discover v2 hides raw account id',/discover_creator_market_v2/.test(discover)&&!/creator_user_id/.test(discover));
 check('discover ownership flags',/is_own boolean,is_owned boolean/.test(discover));
 check('repository uses discover v2',/discover_creator_market_v2/.test(repo));
