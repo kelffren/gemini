@@ -166,7 +166,7 @@ test('LIVE admin: history + temporary draft + real publish + second-client conve
     expect(b.runtimeState.ambientDensity).toBe(targetDensity);
 
     await pageA.locator('#kelo-environment-runtime-world-undo').click();
-    await pageA.waitForFunction(published=>window.KELO_WORLD_ENVIRONMENT_SYNC?.revision>published,published=checkpoint.publishedRevision,{timeout:20000});
+    await pageA.waitForFunction(published=>window.KELO_WORLD_ENVIRONMENT_SYNC?.revision>published,checkpoint.publishedRevision,{timeout:20000});
     a=await snapshot(pageA);
     expect(a.revision).toBeGreaterThan(checkpoint.publishedRevision);
     expect(normalizeState(a.runtimeState)).toEqual(checkpoint.initialState);
