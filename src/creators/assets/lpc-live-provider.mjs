@@ -1,0 +1,71 @@
+/* KELO-INDEX
+ * area: CREATORS / EXTERNAL ASSET PROVIDERS / UNIVERSAL LPC
+ * owner: Kelo Creator Asset Bridge
+ * keys: LPC CC0 VERIFIED PINNED REMOTE SPRITES ATTRIBUTION
+ * purpose: expose only individually verified LPC assets with pinned source bytes and preserved credit metadata.
+ */
+
+const REPO='LiberatedPixelCup/Universal-LPC-Spritesheet-Character-Generator';
+const PIN='553ba7562534cbf32e7d9a502660f569d6b26512';
+const CDN=`https://cdn.jsdelivr.net/gh/${REPO}@${PIN}/`;
+const GITHUB=`https://github.com/${REPO}/blob/${PIN}/`;
+
+const SHADOW_CREDIT=Object.freeze({
+  authors:['drjamgo@hotmail.com','JaidynReiman'],
+  licenses:['CC0'],
+  urls:['https://opengameart.org/content/shadow-for-lpc-sprite'],
+  notes:'Original by Dr. Jamgo; jump/sit/emote/run/revised combat by JaidynReiman.',
+  definition:'sheet_definitions/body/shadow.json'
+});
+const BOB_CREDIT=Object.freeze({
+  authors:['ElizaWy','bluecarrot16'],
+  licenses:['CC0'],
+  urls:['https://opengameart.org/content/lpc-hair','https://github.com/ElizaWy/LPC/blob/main/Characters/Hair','https://opengameart.org/content/lpc-expanded-sit-run-jump-more'],
+  notes:'Original by bluecarrot16. Edited and animated by ElizaWy.',
+  definition:'sheet_definitions/hair/bob/hair_bob.json'
+});
+
+const VERIFIED=[
+  {group:'Shadow',category:'character-effect',base:'spritesheets/shadow/adult/',credit:SHADOW_CREDIT,animations:['idle','walk','run','jump','slash','spellcast','shoot','thrust']},
+  {group:'Bob Hair',category:'hair',base:'spritesheets/hair/bob/adult/',credit:BOB_CREDIT,animations:['idle','walk','run','jump','slash','shoot']}
+];
+
+const text=v=>String(v??'').trim();
+const lower=v=>text(v).toLowerCase();
+const title=v=>text(v).replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+function makeId(group,animation){return `lpc:${lower(group).replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')}:${animation}`;}
+function makeAsset(set,animation){
+  const path=`${set.base}${animation}.png`;
+  const authors=set.credit.authors.slice();
+  return {
+    id:makeId(set.group,animation),provider:'lpc',externalId:path,
+    name:`${set.group} · ${title(animation)}`,category:set.category,
+    tags:['lpc','pixel-art','character',set.category,lower(set.group),animation,'cc0'],
+    description:`Universal LPC ${set.group} animation (${animation}). Verified against the canonical definition and pinned repository commit.`,
+    previewUrl:CDN+path,downloadUrl:CDN+path,
+    sourceUrl:set.credit.urls[0]||GITHUB+set.credit.definition,
+    definitionUrl:GITHUB+set.credit.definition,
+    repositoryUrl:`https://github.com/${REPO}`,
+    pinnedCommit:PIN,license:'CC0',licenses:set.credit.licenses.slice(),
+    author:authors.join(', '),authors,creditUrls:set.credit.urls.slice(),creditNotes:set.credit.notes,
+    attributionRequired:false,ownership:'discovered',downloadable:true,integrationReady:true,
+    animation,pack:set.group,verified:true
+  };
+}
+const ALL=Object.freeze(VERIFIED.flatMap(set=>set.animations.map(animation=>Object.freeze(makeAsset(set,animation)))));
+
+export async function searchLpcAssets(query='',options={}){
+  const q=lower(query),tokens=q.split(/\s+/).filter(Boolean),limit=Math.max(1,Math.min(Number(options.limit)||160,320));
+  let rows=ALL.slice();
+  if(tokens.length){
+    rows=rows.map(asset=>{
+      const hay=lower(`${asset.name} ${asset.category} ${asset.description} ${(asset.tags||[]).join(' ')} ${asset.author}`);
+      const hits=tokens.reduce((n,t)=>n+(hay.includes(t)?1:0),0);
+      const exact=hay.includes(q);return{asset,hits,score:(exact?100:0)+hits*20};
+    }).filter(row=>row.hits===tokens.length).sort((a,b)=>b.score-a.score||a.asset.name.localeCompare(b.asset.name)).map(row=>row.asset);
+  }
+  return rows.slice(0,limit).map(asset=>({...asset,authors:asset.authors.slice(),licenses:asset.licenses.slice(),creditUrls:asset.creditUrls.slice(),tags:asset.tags.slice()}));
+}
+
+export function getLpcProviderMeta(){return{repository:REPO,pinnedCommit:PIN,verifiedCount:ALL.length,licenseScope:'CC0-only-v1'};}
+export const LPC_LIVE_PROVIDER=Object.freeze({search:searchLpcAssets,meta:getLpcProviderMeta});
