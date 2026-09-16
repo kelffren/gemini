@@ -26,15 +26,18 @@ Contrato LIVE/candidato (`index.html` V6.69):
 6. `KELO_FEATURE_REGISTRY` + `KELO_ASSET_REGISTRY` + `KELO_MODULE_LOADER` son los únicos tres scripts estáticos permitidos después de boot-ready.
 7. `controlPlane` y `observability` usan policy `after-paint`: cruzan dos `requestAnimationFrame` antes de cargar para no retrasar el primer paint.
 8. `controlPlane` contiene asset library launcher, settings gate, updater, admin/account gates y creators gate. `observability` contiene farm/player-position shadows. Son internos (`userToggle:false`) y no aparecen como packs apagables en Asset Library.
-9. Features first-use (`social`, `world`, `bag`, `mounts`, `market`, `titles`, `appearance`, `properties`) siguen entrando únicamente por `KELO_MODULE_LOADER.ensure(feature)`.
-10. El presupuesto CI actual es **48/48 scripts externos antes de boot-ready** y **3/3 scripts externos estáticos después**. También se limita el peso fuente determinista: **423,015 / 425,000 bytes críticos** y **21,342 / 22,000 bytes post-boot estáticos**. Subir esos límites requiere evidencia y cambio explícito del contrato, no crecimiento accidental.
-11. Hay **9 módulos internos diferidos after-paint**; no deben volver al parser-blocking boot.
-12. `engine-i.js`, `engine-j.js` y `engine-k.js` están **RETIRED** y el audit exige cero referencias runtime/test a esos archivos.
-13. `KeloAbilityAim` sustituyó la cadena J/K: posee matemática de aim/range, lifecycle de puntero, indicador de render y registry explícito de cast middleware. No crear un segundo ability input/aim owner.
-14. `engine-l.js` registra `engine-l:plaza-cast-presentation` en el boot crítico. `engine-m.js` **no** pertenece al primer frame: entra por first-use del pack `world` y entonces registra `engine-m:skill-shots`.
-15. El smoke WebKit del branch verifica ambas fases: `engine-m` ausente en boot y presente tras `KELO_MODULE_LOADER.ensure('world')`.
-16. `engine-g.js` define compatibilidad de la action bar durante el boot, pero **no construye sus slots invisibles antes del primer paint**: espera `kelo:boot-ready` y cruza dos rAF antes del primer `renderActionBar()` automático. Los renders provocados por interacción posterior siguen disponibles inmediatamente.
-17. Prohibido inyectar `<script>` desde features por fuera de `KeloModuleLoader`.
+9. `abilityRuntime` es interno (`userToggle:false`) y **first-use**. Su orden físico es `abilityData.js → stone-system.js → kelo-ability-boot.js`; entra exclusivamente mediante `KELO_MODULE_LOADER.ensure('abilityRuntime')` y expone después `KeloAbilitiesLoader`/`KeloAbilities`.
+10. Features first-use de usuario (`social`, `world`, `bag`, `mounts`, `market`, `titles`, `appearance`, `properties`) siguen entrando únicamente por `KELO_MODULE_LOADER.ensure(feature)`.
+11. El presupuesto CI actual es **48/48 scripts externos antes de boot-ready** y **3/3 scripts externos estáticos después**. También se limita el peso fuente determinista: **421,784 / 425,000 bytes críticos** y **21,669 / 22,000 bytes post-boot estáticos**. Subir esos límites requiere evidencia y cambio explícito del contrato, no crecimiento accidental.
+12. Hay **9 módulos internos diferidos after-paint**; no deben volver al parser-blocking boot.
+13. `engine-i.js`, `engine-j.js` y `engine-k.js` están **RETIRED** y el audit exige cero referencias runtime/test a esos archivos.
+14. `KeloAbilityAim` sustituyó la cadena J/K: posee matemática de aim/range, lifecycle de puntero, indicador de render y registry explícito de cast middleware. No crear un segundo ability input/aim owner.
+15. `engine-l.js` registra `engine-l:plaza-cast-presentation` en el boot crítico. `engine-m.js` **no** pertenece al primer frame: entra por first-use del pack `world` y entonces registra `engine-m:skill-shots`.
+16. El smoke WebKit del branch verifica ambas fases de `world`: `engine-m` ausente en boot y presente tras `KELO_MODULE_LOADER.ensure('world')`.
+17. `engine-g.js` **ya no posee ni construye la action bar**. Mantiene únicamente estado compatibility + dash tween legacy caracterizado. La hotbar moderna y el adapter `renderActionBar` pertenecen a `KeloAbilities` después del first-use de `abilityRuntime`.
+18. El smoke WebKit verifica el handoff de abilities: no hay hotbar/`KeloAbilities` al boot; tras cargar `abilityRuntime` aparecen exactamente 5 slots modernos sin restaurar `action-slot-*` de `engine-g`.
+19. PvP solicita explícitamente `KeloRuntimeBootstrap.ensure() → KELO_MODULE_LOADER.ensure('abilityRuntime') → KeloAbilitiesLoader.ensure()` antes de despertar abilities y enlazar prediction. No depende de un global implícito.
+20. Prohibido inyectar `<script>` desde features por fuera de `KeloModuleLoader`.
 
 El listado histórico de boot completo NO es el boot móvil. Restaurar tags pesados en `index.html` es un bug.
 
@@ -54,10 +57,11 @@ El listado histórico de boot completo NO es el boot móvil. Restaurar tags pesa
 | Feature lifecycle first-use/after-paint | `KeloModuleLoader` | OWNER LIVE |
 | Feature metadata/policies | `KELO_FEATURE_REGISTRY` | OWNER LIVE |
 | User-toggleable optional packs | `KELO_ASSET_REGISTRY` | OWNER LIVE |
+| Ability runtime/hotbar moderna | `KeloAbilities` + `KeloAbilitiesLoader` | OWNER LIVE / first-use |
 | Física/movimiento continuo base | `engine-a.js` | LEGACY CORE |
 | UI/gameplay histórico base | `engine-b.js` | LEGACY CORE |
 | Social/render/simulation bridge histórico | `engine-c.js` | LEGACY CORE |
-| Action bar bootstrap + dash tween legacy | `engine-g.js` | LEGACY CORE / characterized |
+| Dash tween legacy | `engine-g.js` | LEGACY CORE / characterized |
 | `engine-i.js` | — | RETIRED |
 | `engine-j.js` | — | RETIRED |
 | `engine-k.js` | — | RETIRED |
@@ -90,8 +94,9 @@ Ejemplos actuales:
 - Posición: `KeloPlayerPosition` posee teleport/restore; movimiento por frame aún legacy. **Dash no debe pasar por este owner**: se considera movimiento/ability y usa `KeloMovement` mientras se migra.
 - Plot/Farm travel: nombres legacy preservados, writes dirigidos a `KeloPlayerPosition`/`KeloCamera` por strangler temporal.
 - Abilities legacy: `KeloAbilityAim` posee un único pointer lifecycle y una cadena de middleware explícita; `engine-l/m` ya no monkey-patchean `castAimedSkill`.
+- Ability runtime moderno: `abilityRuntime` se carga bajo demanda por el ModuleLoader compartido; `KeloAbilities` posee hotbar + adapter `renderActionBar`. No se introduce otro loader.
 - `engine-f`: dirección/trigger directos están caracterizados por un test VM contra el archivo real; conserva thresholds `0.15/0.12/12`, dash directo 150, radio PvP 60 y proyectil 450/life 2.
-- `engine-g`: el dash tween está caracterizado contra el archivo real (quadratic ease-out, colisión, radio PvP `<52`, daño/fallback y finalización). El test también exige action-bar bootstrap post-paint y cero listeners globales de pointer en `engine-g`.
+- `engine-g`: el dash tween está caracterizado contra el archivo real (quadratic ease-out, colisión, radio PvP `<52`, daño/fallback y finalización). El test exige que no recupere action bar, scheduler UI ni bindings de aim/pointer.
 - Observabilidad: shadows nunca son autoridad y ya no pertenecen al camino crítico del primer frame.
 
 Snapshot del debt audit actual: **9 engines legacy críticos** (`a,b,c,d,e,f,g,h,l`), **28 writes directos de posición** y **12 writes directos de cámara** en el índice estático de producción. `engine-f/g` concentran 10 de esos writes de posición y ya tienen paridad automatizada; el siguiente paso es migrar consumidores/autoridades, no borrar los archivos a ciegas.
@@ -128,8 +133,8 @@ El shell es UI; no posee mutations del mundo. Las mutations pasan por Studio Ker
 
 ## 9. Gameplay
 
-- Abilities modernas: `KeloAbilities` + Stone/equipment/mount channels. Compatibilidad aim/input legacy: `KeloAbilityAim` hasta retirar consumidores.
-- PvP/Arena: `KeloArena`, PvP world + runtime loader.
+- Abilities modernas: `KeloAbilities` + Stone/equipment/mount channels. `abilityRuntime` es first-use interno. Compatibilidad aim/input legacy: `KeloAbilityAim` hasta retirar consumidores.
+- PvP/Arena: `KeloArena`, PvP world + runtime loader; PvP garantiza el first-use del runtime de abilities antes de entrar.
 - Character: `KeloCharacterCustomization`, `KeloAppearance`, `KeloAvatar`.
 - Equipment: `KeloEquipment`.
 - Backpack/containers: sistemas dedicados.
@@ -146,16 +151,17 @@ El cliente puede predecir/presentar, pero progreso valioso, comercio, PvP compet
 
 Los workflows activos usan acciones externas fijadas por SHA exacto. `ci-supply-chain-audit.mjs` falla si reaparece una acción sin pin SHA o `permissions: write-all`.
 
-Foundation incluye characterization de state/save, SW, transition bridge, ability aim, ability direction, dash tween, pointer lifecycle y cast middleware; además de reproducible-build, supply-chain, boot-surface, legacy-debt y architecture audits. Production build, authoritative server smoke y WebKit branch smoke completan el gate.
+Foundation incluye characterization de state/save, SW, transition bridge, ability aim, ability direction, dash tween, **ability runtime first-use**, pointer lifecycle y cast middleware; además de reproducible-build, supply-chain, boot-surface, legacy-debt y architecture audits. Production build, authoritative server smoke y WebKit branch smoke completan el gate.
 
-El head `da7741233008111d562a7418a7819f5cb97f8dcd` pasó los cuatro gates (`foundation`, `client-build`, `server-smoke`, `webkit-mobile-smoke`). Esto sigue siendo evidencia branch-local y **no sustituye QA físico/LIVE**.
+El head runtime `ad04037e4f28baabe3c03dd2883c0979b49ecc6a` pasó los cuatro gates (`foundation`, `client-build`, `server-smoke`, `webkit-mobile-smoke`). El WebKit smoke comprobó además el handoff de hotbar first-use. Esto sigue siendo evidencia branch-local y **no sustituye QA físico/LIVE**.
 
 ## 12. Qué NO hacer
 
 - No crear otro renderer de props o tiles.
 - No crear otro catálogo de assets en paralelo.
 - No crear otro loader para trabajo after-paint/first-use; extender `KeloModuleLoader`.
-- No volver a poner control plane, updater, shadows, `engine-m` o construcción de UI oculta como trabajo del primer frame.
+- No volver a poner control plane, updater, shadows, `engine-m` o abilities modernas como trabajo del primer frame.
+- No devolver action bar/hotbar a `engine-g`.
 - No escribir directamente cámara/zoom/canvas desde features nuevas.
 - No mutar `obstacles` desde features nuevas.
 - No usar `KeloPlayerPosition` para dash/physics.
