@@ -21,9 +21,9 @@ KELO_MODULE_LOADER.ensure('appearance')
   ↓
 KeloCreatorDelivery.useRevision(exact revision)
   ↓
-KELO_CREATOR_CONTENT_REGISTRY usable runtime row
+exact delivered manifest + entitlement recheck
   ↓
-register hidden + locked CharacterCustomization visual item
+register revision-scoped hidden + locked CharacterCustomization visual item
   ↓
 ephemeral slot overlay in stateForActor(local player)
   ↓
@@ -37,6 +37,7 @@ existing KeloAvatar CharacterCustomization middleware
 - Authoritative binding state: **Kelo Creator Use Authority / Supabase**.
 - Entitlement truth: **KeloCreatorEntitlements**.
 - Exact-revision metadata/assets: **Kelo Creator Content Delivery**.
+- Generic runtime adaptation: **KELO_CREATOR_CONTENT_REGISTRY**; the Character bridge does not treat its contentId-keyed cache as revision authority.
 - Base local visual state/catalog/history/saves: **KeloCharacterCustomization**.
 - Slot schema/order: **KeloCharacterSlotSchema**.
 - Ordered visual resolution: **KeloCharacterVisualStack**.
@@ -44,7 +45,7 @@ existing KeloAvatar CharacterCustomization middleware
 - This bridge: `src/characters/creator-character-state-bridge.js`.
 - Lazy restore probe: `src/core/creators-lazy-gate.js`.
 
-The bridge owns only an in-memory overlay mapping canonical character slots to runtime visual item IDs.
+The bridge owns only an in-memory overlay mapping canonical character slots to revision-scoped visual item IDs.
 
 ## Why an overlay instead of `select()`
 
@@ -62,6 +63,19 @@ resolved local render state
 
 The base state, history, five local save slots, share code and legacy network snapshot stay unchanged.
 
+## Exact revision and cache safety
+
+The bridge intentionally builds its Character visual descriptor from the **exact manifest returned by `KeloCreatorDelivery.useRevision(revisionId)`**, then rechecks `KeloCreatorEntitlements` for that UUID.
+
+It does not use a generic runtime row as revision authority. The generic registry is optimized around semantic `contentId`; a previous revision may already exist there during a same-session upgrade. For Character visual restore, fail-safe behavior is simpler:
+
+- requested binding UUID must equal delivered `manifest.revisionId`;
+- entitlement must still allow that exact UUID;
+- Character visual item ID contains the exact revision UUID;
+- r3 and r4 therefore cannot share the same local visual item cache key.
+
+This is a bridge-local exactness rule, not a hidden rewrite of the generic runtime registry.
+
 ## Runtime item safety
 
 A delivered Creator binding is registered in the existing CharacterCustomization catalog as:
@@ -69,14 +83,15 @@ A delivered Creator binding is registered in the existing CharacterCustomization
 - `hidden: true`
 - `locked: true`
 - tagged `creator-content` + `server-bound`
+- revision-scoped local visual ID
 
 This lets the existing renderer resolve the item by ID but prevents ordinary local item lists/randomizers from treating it as an unlocked local cosmetic.
 
-The overlay is cleared on auth end, account/character identity change, or explicit bridge clear. The registered metadata definition may remain in memory, but without a current server binding it is not selected by the overlay. Delivery/entitlement gates still protect exact-revision activation.
+The overlay and bridge diagnostics registry are cleared on auth end, account/character identity change, or explicit bridge clear. The underlying hidden CharacterCustomization definition may remain in memory, but without a current server binding it is not selected by the overlay. Delivery/entitlement gates still protect exact-revision activation.
 
 ## Visual asset mapping
 
-V1 consumes the primary published asset URL from the delivered runtime record.
+V1 consumes the primary published asset URL from the exact delivered manifest.
 
 ### Sheet path
 
@@ -125,6 +140,8 @@ There is no Owned-library sync, no interval, no render loop and no preload of un
 
 This is intentionally a small authenticated restore query at normal session start. It supersedes the earlier stronger statement that Creator Use code is never imported during normal boot: Use Authority/Delivery metadata code may now load for this one restore probe, while Creator OS UI, Appearance runtime and asset bytes stay lazy unless bindings actually exist.
 
+Bridge hydration is single-flight: the Appearance package boot hook and the lazy gate may converge on the same restore request, but only one exact-revision hydration job is allowed at a time.
+
 ## Local vs remote players
 
 This V1 overlay applies only to the local actor. Remote Creator avatars already have their own published-avatar path, but modular Creator skin/equipment replication for other players is not completed here.
@@ -138,11 +155,12 @@ A later multiplayer visual snapshot bridge should transmit accepted stable revis
 3. no second visual stack or avatar renderer;
 4. only the local actor receives this account-bound overlay;
 5. exact revisions are delivered and entitlement-checked before registration;
-6. Creator items are hidden/locked in the local catalog;
-7. base `getState()`, history, saves and `networkSnapshot()` remain the original CharacterCustomization contract;
-8. no gameplay stats, inventory, abilities or weapon authority are granted;
-9. zero bindings do not load Appearance;
-10. no polling or second loop.
+6. Character visual IDs are revision-scoped, so r3 and r4 do not share visual cache identity;
+7. Creator items are hidden/locked in the local catalog;
+8. base `getState()`, history, saves and `networkSnapshot()` remain the original CharacterCustomization contract;
+9. no gameplay stats, inventory, abilities or weapon authority are granted;
+10. zero bindings do not load Appearance;
+11. no polling or second loop.
 
 ## Public API
 
@@ -166,7 +184,7 @@ Before `VALIDATED`:
 - entitled bound skin restores after reload and becomes visible through the existing Character renderer;
 - clearing the binding restores the underlying local slot;
 - logout/account switch clears the overlay immediately;
-- r3 binding cannot silently hydrate r4;
+- r3 binding cannot silently hydrate r4, including after r3 was already activated in the same session;
 - revoked access cannot remain visible after entitlement refresh;
 - hidden Creator items do not appear in ordinary randomizer/list UI;
 - local base save/share/history state is unchanged by bridge hydration;
