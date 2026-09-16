@@ -1,0 +1,31 @@
+#!/usr/bin/env node
+import fs from 'node:fs';
+import path from 'node:path';
+const root=process.cwd();
+const read=p=>fs.readFileSync(path.join(root,p),'utf8');
+const checks=[];
+function check(name,ok,detail=''){checks.push({name,ok:!!ok,detail});if(!ok)process.exitCode=1;}
+const migration=read('supabase/migrations/20260916002500_creator_marketplace_v1.sql');
+const discover=read('supabase/migrations/20260916002600_creator_marketplace_discover_v2.sql');
+const repo=read('src/creators/content/supabase-content-repository.mjs');
+const service=read('src/creators/marketplace/creator-marketplace-service.mjs');
+const surface=read('src/creators/ui/creator-marketplace-surface.mjs');
+const library=read('src/creators/ui/creator-library-workspace.mjs');
+const entry=read('src/creators/creator-entry.mjs');
+check('market tables',/creator_market_listings/.test(migration)&&/creator_content_entitlements/.test(migration)&&/creator_market_transactions/.test(migration));
+check('KC ledger settlement',/apply_wallet_delta\(p_buyer_character_id,'kc'/.test(migration)&&/creator_market_sale/.test(migration));
+check('default split is creator 100%',/seller_share_bps integer not null default 10000/.test(migration)&&/values\(true,10000\)/.test(migration));
+check('purchase ignores client price',/purchase_creator_market_listing\(\s*p_listing_id uuid,\s*p_buyer_character_id uuid,\s*p_correlation_id uuid/s.test(migration)&&!(/purchase_creator_market_listing[\s\S]{0,250}p_price/i.test(migration)));
+check('published content required',/PUBLISHED_CONTENT_REQUIRED/.test(migration)&&/content_publications/.test(migration));
+check('entitlement is account-level',/primary key\(buyer_user_id,revision_id\)/.test(migration));
+check('discover v2 hides raw account id',/discover_creator_market_v2/.test(discover)&&!/creator_user_id/.test(discover));
+check('discover ownership flags',/is_own boolean,is_owned boolean/.test(discover));
+check('repository uses discover v2',/discover_creator_market_v2/.test(repo));
+check('repository reads authoritative KC wallet',/character_wallets\?select=character_id,currency_key,amount/.test(repo));
+check('market service has no local storage',!/localStorage|indexedDB/.test(service));
+check('market UI has no local storage',!/localStorage|indexedDB/.test(surface));
+check('market UI is lazy imported',/import\('\.\/creator-marketplace-surface\.mjs'\)/.test(library));
+check('normal Creator composition exposes marketplace once',/createCreatorMarketplaceService/.test(entry)&&/KELO_CREATOR_MARKETPLACE/.test(entry));
+check('pipeline distinguishes ownership',/CONTENT EXISTS ≠ PUBLISHED ≠ OWNED/.test(library));
+for(const c of checks)console.log(`${c.ok?'PASS':'FAIL'}  ${c.name}${c.detail?` — ${c.detail}`:''}`);
+if(process.exitCode)console.error(`\nCreator Marketplace audit failed: ${checks.filter(x=>!x.ok).length}/${checks.length}`);else console.log(`\nCreator Marketplace audit passed: ${checks.length}/${checks.length}`);
