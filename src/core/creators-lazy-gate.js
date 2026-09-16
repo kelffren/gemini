@@ -1,124 +1,62 @@
 /* KELO-INDEX
  * area: CORE / OPTIONAL UI
  * owner: KeloCreatorsLazyGate
- * keys: CREATORS CREATOR LIBRARY ASSET FORGE CONTENT DELIVERY USE AUTHORITY CHARACTER BRIDGE LAZY FIRST-USE ADMIN MOBILE SAFARI NO-FREEZE ASSET CATALOG
- * purpose: mantiene Creators/Library disponibles, expone Delivery/Use y hace un probe metadata-only para restaurar visuales Creator autoritativos sin cargar Creator OS
- * public-api: KeloCreatorsLazyGate.open/openCreatorLibrary/openAssetForge/probeCharacterAppearance/sync + KeloCreatorDelivery + KeloCreatorUse
- * consumes: KELO_ADMIN_KEYS + Luxe menu + KeloOnlineAuth; Delivery/Use reutilizan auth/entitlement/runtime owners existentes
+ * keys: CREATORS CREATOR LIBRARY ASSET FORGE CONTENT DELIVERY USE AUTHORITY CHARACTER BRIDGE NETWORK PRESENTATION LAZY FIRST-USE ADMIN MOBILE SAFARI NO-FREEZE ASSET CATALOG
+ * purpose: mantiene Creators/Library disponibles, expone Delivery/Use, restaura visuales locales y refresca el presentation envelope del transporte existente tras cambios visuales
+ * public-api: KeloCreatorsLazyGate.open/openCreatorLibrary/openAssetForge/probeCharacterAppearance/refreshNetworkPresentation/sync + KeloCreatorDelivery + KeloCreatorUse
+ * consumes: KELO_ADMIN_KEYS + Luxe menu + KeloOnlineAuth + KeloNetAuthority; Delivery/Use reutilizan auth/entitlement/runtime owners existentes
  * state-owned: solo promesas efímeras de carga lazy + identidad del último probe visual exitoso/vacío
  * extension-points: Creator Library enruta a workspaces; Asset Forge sigue disponible como API compatible
- * do-not: NO Creator OS pesado en boot normal, NO polling, NO segundo loop, NO eager full asset catalog, NO bulk Owned sync
+ * do-not: NO Creator OS pesado en boot normal, NO segundo socket, NO polling, NO segundo loop, NO eager full asset catalog, NO bulk Owned sync
  */
 (function(root){
 'use strict';
 if(root.KeloCreatorsLazyGate)return;
-const VERSION='kelo-creators-lazy-gate-v10.1-character-state-bridge';
+const VERSION='kelo-creators-lazy-gate-v11-modular-replication';
 const LAUNCHER_SRC='src/ui/studio-launcher.js?v=creator-os-20260915-1';
 const ASSET_CATALOG_SRC='src/property/property-asset-catalog.js?v=creator-assets-20260915-1';
 const creatorModuleUrl=()=>new URL('src/creators/creator-entry.mjs?v=creator-os-20260915-1',root.document?.baseURI||root.location.href).href;
 const deliveryModuleUrl=()=>new URL('src/creators/content/creator-content-delivery.mjs?v=delivery-20260915-2',root.document?.baseURI||root.location.href).href;
 const useAuthorityModuleUrl=()=>new URL('src/creators/content/creator-use-authority.mjs?v=use-authority-20260915-2',root.document?.baseURI||root.location.href).href;
-let loading=null,catalogLoading=null,libraryLoading=null,forgeLoading=null,deliveryLoading=null,useAuthorityLoading=null,characterProbe=null,lastCharacterProbeKey='';
+let loading=null,catalogLoading=null,libraryLoading=null,forgeLoading=null,deliveryLoading=null,useAuthorityLoading=null,characterProbe=null,presentationRefresh=null,lastCharacterProbeKey='';
 const query=()=>{try{return new URLSearchParams(root.location.search);}catch(_){return new URLSearchParams();}};
 const directRequested=()=>query().get('creators')==='1'||query().get('creator')==='1'||query().get('mapEditor')==='1';
 const actor=()=>String(root.KELO_ADMIN_KEYS?.playerId?.()||root.keloNet?.playerKey||root.localPlayer?.id||'local_pioneer');
-function allowed(){
-  const keys=root.KELO_ADMIN_KEYS,who=actor();
-  return !!(keys?.can?.('creators.access',who)||keys?.can?.('world.edit',who)||keys?.can?.('animation.edit',who));
-}
+function allowed(){const keys=root.KELO_ADMIN_KEYS,who=actor();return !!(keys?.can?.('creators.access',who)||keys?.can?.('world.edit',who)||keys?.can?.('animation.edit',who));}
 function toast(msg){if(typeof root.showToast==='function')root.showToast(msg);else console.info('[Kelo Creators gate]',msg);}
-function paint(btn,busy){
-  if(!btn)return;
-  btn.innerHTML='<span class="lx-menu-icon" aria-hidden="true">♟</span><span class="lx-menu-copy"><b>'+(busy?'Abriendo…':'Creators')+'</b><small>'+(busy?'Cargando assets bajo demanda':'Herramientas avanzadas')+'</small></span>';
-  btn.disabled=!!busy;if(busy)btn.setAttribute('aria-busy','true');else btn.removeAttribute('aria-busy');
-}
-function paintLibrary(btn,busy){
-  if(!btn)return;
-  btn.innerHTML='<span class="lx-menu-icon" aria-hidden="true">◈</span><span class="lx-menu-copy"><b>'+(busy?'Abriendo…':'Creator Library')+'</b><small>'+(busy?'Cargando biblioteca ligera':'Personajes · skins · armas · assets')+'</small></span>';
-  btn.disabled=!!busy;if(busy)btn.setAttribute('aria-busy','true');else btn.removeAttribute('aria-busy');
-}
+function paint(btn,busy){if(!btn)return;btn.innerHTML='<span class="lx-menu-icon" aria-hidden="true">♟</span><span class="lx-menu-copy"><b>'+(busy?'Abriendo…':'Creators')+'</b><small>'+(busy?'Cargando assets bajo demanda':'Herramientas avanzadas')+'</small></span>';btn.disabled=!!busy;if(busy)btn.setAttribute('aria-busy','true');else btn.removeAttribute('aria-busy');}
+function paintLibrary(btn,busy){if(!btn)return;btn.innerHTML='<span class="lx-menu-icon" aria-hidden="true">◈</span><span class="lx-menu-copy"><b>'+(busy?'Abriendo…':'Creator Library')+'</b><small>'+(busy?'Cargando biblioteca ligera':'Personajes · skins · armas · assets')+'</small></span>';btn.disabled=!!busy;if(busy)btn.setAttribute('aria-busy','true');else btn.removeAttribute('aria-busy');}
 function sync(){
-  const grid=document.querySelector('#lx-menu-panel .lx-menu-grid');if(!grid)return false;
-  document.getElementById('lx-create-asset-forge')?.remove();
-  let btn=document.getElementById('lx-create-studio'),libraryBtn=document.getElementById('lx-create-library');
+  const grid=document.querySelector('#lx-menu-panel .lx-menu-grid');if(!grid)return false;document.getElementById('lx-create-asset-forge')?.remove();let btn=document.getElementById('lx-create-studio'),libraryBtn=document.getElementById('lx-create-library');
   if(!allowed()&&!directRequested()){btn?.remove();libraryBtn?.remove();return true;}
   if(!libraryBtn){libraryBtn=document.createElement('button');libraryBtn.id='lx-create-library';libraryBtn.type='button';libraryBtn.className='lx-menu-item';libraryBtn.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();void openCreatorLibrary();});grid.appendChild(libraryBtn);}
   if(!btn){btn=document.createElement('button');btn.id='lx-create-studio';btn.type='button';btn.className='lx-menu-item';btn.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();void open();});grid.appendChild(btn);}
-  libraryBtn.setAttribute('aria-label','Abrir Kelo Creator Library');paintLibrary(libraryBtn,!!libraryLoading);
-  btn.setAttribute('aria-label','Abrir Kelo Creators');paint(btn,!!loading);return true;
+  libraryBtn.setAttribute('aria-label','Abrir Kelo Creator Library');paintLibrary(libraryBtn,!!libraryLoading);btn.setAttribute('aria-label','Abrir Kelo Creators');paint(btn,!!loading);return true;
 }
-function loadAssetCatalog(){
-  if(root.KELO_PROPERTY_CATALOG?.list)return Promise.resolve(root.KELO_PROPERTY_CATALOG);if(catalogLoading)return catalogLoading;
-  catalogLoading=new Promise(function(resolve){const stale=document.querySelector('script[data-kelo-creator-assets="1"]');if(stale)stale.remove();const s=document.createElement('script');s.src=ASSET_CATALOG_SRC;s.async=false;s.dataset.keloCreatorAssets='1';const done=function(){resolve(root.KELO_PROPERTY_CATALOG||null);};s.onload=done;s.onerror=function(error){console.warn('[Kelo Creators gate] asset catalog unavailable; using fallback',error);done();};document.head.appendChild(s);}).finally(function(){catalogLoading=null;});
-  return catalogLoading;
-}
-function loadStudio(){
-  if(loading)return loading;
-  loading=(async function(){await loadAssetCatalog();if(root.KELO_STUDIO_LAUNCHER)return root.KELO_STUDIO_LAUNCHER;return new Promise(function(resolve,reject){const s=document.createElement('script');s.src=LAUNCHER_SRC;s.async=false;s.dataset.keloCreatorsFirstUse='1';s.onload=function(){resolve(root.KELO_STUDIO_LAUNCHER||null);};s.onerror=function(){reject(new Error('CREATORS_LAUNCHER_LOAD_FAILED'));};document.head.appendChild(s);});})().finally(function(){loading=null;sync();});
-  return loading;
-}
+function loadAssetCatalog(){if(root.KELO_PROPERTY_CATALOG?.list)return Promise.resolve(root.KELO_PROPERTY_CATALOG);if(catalogLoading)return catalogLoading;catalogLoading=new Promise(function(resolve){const stale=document.querySelector('script[data-kelo-creator-assets="1"]');if(stale)stale.remove();const s=document.createElement('script');s.src=ASSET_CATALOG_SRC;s.async=false;s.dataset.keloCreatorAssets='1';const done=function(){resolve(root.KELO_PROPERTY_CATALOG||null);};s.onload=done;s.onerror=function(error){console.warn('[Kelo Creators gate] asset catalog unavailable; using fallback',error);done();};document.head.appendChild(s);}).finally(function(){catalogLoading=null;});return catalogLoading;}
+function loadStudio(){if(loading)return loading;loading=(async function(){await loadAssetCatalog();if(root.KELO_STUDIO_LAUNCHER)return root.KELO_STUDIO_LAUNCHER;return new Promise(function(resolve,reject){const s=document.createElement('script');s.src=LAUNCHER_SRC;s.async=false;s.dataset.keloCreatorsFirstUse='1';s.onload=function(){resolve(root.KELO_STUDIO_LAUNCHER||null);};s.onerror=function(){reject(new Error('CREATORS_LAUNCHER_LOAD_FAILED'));};document.head.appendChild(s);});})().finally(function(){loading=null;sync();});return loading;}
 async function loadPlatform(){const mod=await import(creatorModuleUrl());return mod.bootKeloCreators({root});}
-async function loadDelivery(){
-  if(root.KELO_CREATOR_CONTENT_DELIVERY)return root.KELO_CREATOR_CONTENT_DELIVERY;if(deliveryLoading)return deliveryLoading;
-  deliveryLoading=import(deliveryModuleUrl()).then(mod=>mod.getOrCreateCreatorContentDelivery({root})).finally(()=>{deliveryLoading=null;});return deliveryLoading;
-}
-async function loadUseAuthority(){
-  if(root.KELO_CREATOR_USE_AUTHORITY){root.KELO_CREATOR_USE_AUTHORITY.attachRuntimeGuards?.();return root.KELO_CREATOR_USE_AUTHORITY;}if(useAuthorityLoading)return useAuthorityLoading;
-  useAuthorityLoading=(async()=>{const delivery=await loadDelivery(),mod=await import(useAuthorityModuleUrl()),service=mod.getOrCreateCreatorUseAuthority({root,delivery});service.attachRuntimeGuards?.();return service;})().finally(()=>{useAuthorityLoading=null;});return useAuthorityLoading;
-}
-if(!root.KeloCreatorDelivery){
-  root.KeloCreatorDelivery=Object.freeze({version:'creator-content-delivery-facade-v1',useRevision:async(id,opts)=>(await loadDelivery()).activateRevision(id,opts),manifest:async(id,opts)=>(await loadDelivery()).getManifest(id,opts),load:loadDelivery,diagnostics:()=>Object.freeze({loaded:!!root.KELO_CREATOR_CONTENT_DELIVERY,loading:!!deliveryLoading,runtime:root.KELO_CREATOR_CONTENT_DELIVERY?.diagnostics?.()||null})});
-}
-if(!root.KeloCreatorUse){
-  root.KeloCreatorUse=Object.freeze({
-    version:'creator-use-authority-facade-v1.1-avatar',
-    avatar:async(revisionId,opts)=>(await loadUseAuthority()).selectCharacterAvatar(revisionId,opts),
-    equip:async(revisionId,opts)=>(await loadUseAuthority()).equipRevision(revisionId,opts),
-    clearSlot:async(slotKey,opts)=>(await loadUseAuthority()).clearSlot(slotKey,opts),
-    mount:async(revisionId,opts)=>(await loadUseAuthority()).selectMount(revisionId,opts),
-    clearMount:async(opts)=>(await loadUseAuthority()).clearMount(opts),
-    place:async(revisionId,opts)=>(await loadUseAuthority()).authorizePropertyPlacement(revisionId,opts),
-    state:async(opts)=>(await loadUseAuthority()).getState(opts),
-    load:loadUseAuthority,
-    diagnostics:()=>Object.freeze({loaded:!!root.KELO_CREATOR_USE_AUTHORITY,loading:!!useAuthorityLoading,runtime:root.KELO_CREATOR_USE_AUTHORITY?.diagnostics?.()||null})
-  });
-}
+async function loadDelivery(){if(root.KELO_CREATOR_CONTENT_DELIVERY)return root.KELO_CREATOR_CONTENT_DELIVERY;if(deliveryLoading)return deliveryLoading;deliveryLoading=import(deliveryModuleUrl()).then(mod=>mod.getOrCreateCreatorContentDelivery({root})).finally(()=>{deliveryLoading=null;});return deliveryLoading;}
+async function loadUseAuthority(){if(root.KELO_CREATOR_USE_AUTHORITY){root.KELO_CREATOR_USE_AUTHORITY.attachRuntimeGuards?.();return root.KELO_CREATOR_USE_AUTHORITY;}if(useAuthorityLoading)return useAuthorityLoading;useAuthorityLoading=(async()=>{const delivery=await loadDelivery(),mod=await import(useAuthorityModuleUrl()),service=mod.getOrCreateCreatorUseAuthority({root,delivery});service.attachRuntimeGuards?.();return service;})().finally(()=>{useAuthorityLoading=null;});return useAuthorityLoading;}
+if(!root.KeloCreatorDelivery)root.KeloCreatorDelivery=Object.freeze({version:'creator-content-delivery-facade-v1',useRevision:async(id,opts)=>(await loadDelivery()).activateRevision(id,opts),manifest:async(id,opts)=>(await loadDelivery()).getManifest(id,opts),load:loadDelivery,diagnostics:()=>Object.freeze({loaded:!!root.KELO_CREATOR_CONTENT_DELIVERY,loading:!!deliveryLoading,runtime:root.KELO_CREATOR_CONTENT_DELIVERY?.diagnostics?.()||null})});
+if(!root.KeloCreatorUse)root.KeloCreatorUse=Object.freeze({version:'creator-use-authority-facade-v1.1-avatar',avatar:async(revisionId,opts)=>(await loadUseAuthority()).selectCharacterAvatar(revisionId,opts),equip:async(revisionId,opts)=>(await loadUseAuthority()).equipRevision(revisionId,opts),clearSlot:async(slotKey,opts)=>(await loadUseAuthority()).clearSlot(slotKey,opts),mount:async(revisionId,opts)=>(await loadUseAuthority()).selectMount(revisionId,opts),clearMount:async(opts)=>(await loadUseAuthority()).clearMount(opts),place:async(revisionId,opts)=>(await loadUseAuthority()).authorizePropertyPlacement(revisionId,opts),state:async(opts)=>(await loadUseAuthority()).getState(opts),load:loadUseAuthority,diagnostics:()=>Object.freeze({loaded:!!root.KELO_CREATOR_USE_AUTHORITY,loading:!!useAuthorityLoading,runtime:root.KELO_CREATOR_USE_AUTHORITY?.diagnostics?.()||null})});
 function authState(){try{return root.KeloOnlineAuth?.state?.()||null;}catch(_){return null;}}
 function clearCharacterBridge(reason){try{delete root.__KELO_CREATOR_CHARACTER_BOOT_STATE__;}catch(_){}try{root.KeloCreatorCharacterBridge?.clear?.(reason||'identity-cleared');}catch(_){}lastCharacterProbeKey='';}
 async function probeCharacterAppearance(options){
-  const o=options||{},auth=authState();if(!auth?.authenticated||!auth.characterId){clearCharacterBridge('signed-out');return false;}
-  const key=String(auth.accountId||'')+':'+String(auth.characterId||'');if(!o.force&&lastCharacterProbeKey===key)return !!root.KeloCreatorCharacterBridge?.state?.()?.lastSync;if(characterProbe)return characterProbe;
-  characterProbe=(async()=>{
-    const use=await loadUseAuthority(),serverState=await use.getState({characterId:auth.characterId,hydrateRuntime:false}),current=authState();
-    if(!current?.authenticated||String(current.accountId||'')!==String(auth.accountId||'')||String(current.characterId||'')!==String(auth.characterId||''))return false;
-    const bindings=Array.isArray(serverState?.loadout)?serverState.loadout:[];
-    if(!bindings.length){lastCharacterProbeKey=key;try{root.KeloCreatorCharacterBridge?.clear?.('no-server-bindings');}catch(_){}return false;}
-    root.__KELO_CREATOR_CHARACTER_BOOT_STATE__=serverState;
-    if(!root.KELO_MODULE_LOADER?.ensure)throw new Error('MODULE_LOADER_REQUIRED');const loaded=await root.KELO_MODULE_LOADER.ensure('appearance');if(!loaded)throw new Error('APPEARANCE_FEATURE_LOAD_FAILED');
-    const bridge=root.KeloCreatorCharacterBridge;if(!bridge?.sync)throw new Error('CREATOR_CHARACTER_BRIDGE_REQUIRED');await bridge.sync({state:serverState,force:true});lastCharacterProbeKey=key;return true;
-  })().catch(error=>{console.warn('[Kelo Creator character probe]',error);return false;}).finally(()=>{characterProbe=null;});return characterProbe;
+  const o=options||{},auth=authState();if(!auth?.authenticated||!auth.characterId){clearCharacterBridge('signed-out');return false;}const key=String(auth.accountId||'')+':'+String(auth.characterId||'');if(!o.force&&lastCharacterProbeKey===key)return !!root.KeloCreatorCharacterBridge?.state?.()?.lastSync;if(characterProbe)return characterProbe;
+  characterProbe=(async()=>{const use=await loadUseAuthority(),serverState=await use.getState({characterId:auth.characterId,hydrateRuntime:false}),current=authState();if(!current?.authenticated||String(current.accountId||'')!==String(auth.accountId||'')||String(current.characterId||'')!==String(auth.characterId||''))return false;const bindings=Array.isArray(serverState?.loadout)?serverState.loadout:[];if(!bindings.length){lastCharacterProbeKey=key;try{root.KeloCreatorCharacterBridge?.clear?.('no-server-bindings');}catch(_){}return false;}root.__KELO_CREATOR_CHARACTER_BOOT_STATE__=serverState;if(!root.KELO_MODULE_LOADER?.ensure)throw new Error('MODULE_LOADER_REQUIRED');const loaded=await root.KELO_MODULE_LOADER.ensure('appearance');if(!loaded)throw new Error('APPEARANCE_FEATURE_LOAD_FAILED');const bridge=root.KeloCreatorCharacterBridge;if(!bridge?.sync)throw new Error('CREATOR_CHARACTER_BRIDGE_REQUIRED');await bridge.sync({state:serverState,force:true});lastCharacterProbeKey=key;return true;})().catch(error=>{console.warn('[Kelo Creator character probe]',error);return false;}).finally(()=>{characterProbe=null;});return characterProbe;
+}
+async function refreshNetworkPresentation(){
+  if(presentationRefresh)return presentationRefresh;const net=root.KeloNetAuthority;if(!net?.refreshAvatar||!net.isOnline?.()||!root.KeloOnlineAuth?.credentials)return false;
+  presentationRefresh=(async()=>{const auth=await root.KeloOnlineAuth.credentials();if(!auth?.accessToken||!auth?.characterId||auth.profileComplete===false)return false;await net.refreshAvatar({accessToken:auth.accessToken,characterId:auth.characterId,name:auth.characterName||'Kelo'});return true;})().catch(error=>{console.warn('[Kelo Creator presentation refresh]',error);return false;}).finally(()=>{presentationRefresh=null;});return presentationRefresh;
 }
 function onAuthState(event){const d=event?.detail||authState();if(!d?.authenticated||!d.characterId){clearCharacterBridge('auth-ended');return;}const key=String(d.accountId||'')+':'+String(d.characterId||'');if(key!==lastCharacterProbeKey)void probeCharacterAppearance({force:true});}
-function onCreatorUseChanged(event){const kind=String(event?.detail?.kind||'');if(kind==='appearance'||kind==='equipment'||kind==='clear-slot')void probeCharacterAppearance({force:true});}
-async function openCreatorLibrary(){
-  if(libraryLoading)return libraryLoading;if(!allowed()){toast('Necesitas acceso a Kelo Creators');return false;}paintLibrary(document.getElementById('lx-create-library'),true);
-  libraryLoading=(async function(){try{root.KELO_LUXE?.closeMenu?.();const platform=await loadPlatform();await platform.openWorkspace('creator-library');return true;}catch(error){console.error('[Kelo Creator Library lazy gate]',error);toast('No se pudo abrir Creator Library');return false;}})().finally(function(){libraryLoading=null;paintLibrary(document.getElementById('lx-create-library'),false);sync();});return libraryLoading;
-}
-async function openAssetForge(){
-  if(forgeLoading)return forgeLoading;if(!allowed()){toast('Necesitas acceso a Kelo Creators');return false;}
-  forgeLoading=(async function(){try{root.KELO_LUXE?.closeMenu?.();const platform=await loadPlatform();await platform.openWorkspace('asset-forge');return true;}catch(error){console.error('[Kelo Asset Forge lazy gate]',error);toast('No se pudo abrir Asset Forge');return false;}})().finally(function(){forgeLoading=null;});return forgeLoading;
-}
-async function open(){
-  if(!allowed()&&directRequested()&&query().get('mapEditor')==='1'&&root.KELO_ADMIN_KEYS?.request){try{await root.KELO_ADMIN_KEYS.request('admin-key:bootstrap-local-root',{actorId:actor(),ownerId:actor(),developer:true});}catch(_){}}
-  if(!allowed()){toast('Necesitas acceso a Kelo Creators');return false;}paint(document.getElementById('lx-create-studio'),true);
-  try{const launcher=await loadStudio();if(!launcher||typeof launcher.open!=='function')throw new Error('CREATORS_LAUNCHER_UNAVAILABLE');await launcher.open();return true;}catch(error){console.error('[Kelo Creators lazy gate]',error);toast('No se pudo abrir Kelo Creators');return false;}finally{paint(document.getElementById('lx-create-studio'),false);}
-}
-const api=Object.freeze({version:VERSION,open,openCreatorLibrary,openAssetForge,loadDelivery,loadUseAuthority,probeCharacterAppearance,sync,get allowed(){return allowed();},get directRequested(){return directRequested();}});
-root.KeloCreatorsLazyGate=api;root.KELO_CREATORS_LAZY_GATE=api;
+function onCreatorUseChanged(event){const kind=String(event?.detail?.kind||'');if(kind==='appearance'||kind==='equipment'||kind==='clear-slot')void probeCharacterAppearance({force:true});if(kind==='character'||kind==='appearance'||kind==='equipment'||kind==='clear-slot')void refreshNetworkPresentation();}
+async function openCreatorLibrary(){if(libraryLoading)return libraryLoading;if(!allowed()){toast('Necesitas acceso a Kelo Creators');return false;}paintLibrary(document.getElementById('lx-create-library'),true);libraryLoading=(async function(){try{root.KELO_LUXE?.closeMenu?.();const platform=await loadPlatform();await platform.openWorkspace('creator-library');return true;}catch(error){console.error('[Kelo Creator Library lazy gate]',error);toast('No se pudo abrir Creator Library');return false;}})().finally(function(){libraryLoading=null;paintLibrary(document.getElementById('lx-create-library'),false);sync();});return libraryLoading;}
+async function openAssetForge(){if(forgeLoading)return forgeLoading;if(!allowed()){toast('Necesitas acceso a Kelo Creators');return false;}forgeLoading=(async function(){try{root.KELO_LUXE?.closeMenu?.();const platform=await loadPlatform();await platform.openWorkspace('asset-forge');return true;}catch(error){console.error('[Kelo Asset Forge lazy gate]',error);toast('No se pudo abrir Asset Forge');return false;}})().finally(function(){forgeLoading=null;});return forgeLoading;}
+async function open(){if(!allowed()&&directRequested()&&query().get('mapEditor')==='1'&&root.KELO_ADMIN_KEYS?.request){try{await root.KELO_ADMIN_KEYS.request('admin-key:bootstrap-local-root',{actorId:actor(),ownerId:actor(),developer:true});}catch(_){}}if(!allowed()){toast('Necesitas acceso a Kelo Creators');return false;}paint(document.getElementById('lx-create-studio'),true);try{const launcher=await loadStudio();if(!launcher||typeof launcher.open!=='function')throw new Error('CREATORS_LAUNCHER_UNAVAILABLE');await launcher.open();return true;}catch(error){console.error('[Kelo Creators lazy gate]',error);toast('No se pudo abrir Kelo Creators');return false;}finally{paint(document.getElementById('lx-create-studio'),false);}}
+const api=Object.freeze({version:VERSION,open,openCreatorLibrary,openAssetForge,loadDelivery,loadUseAuthority,probeCharacterAppearance,refreshNetworkPresentation,sync,get allowed(){return allowed();},get directRequested(){return directRequested();}});root.KeloCreatorsLazyGate=api;root.KELO_CREATORS_LAZY_GATE=api;
 try{root.KELO_ADMIN_KEYS?.onChange?.(sync);}catch(_){}
-root.addEventListener?.('kelo:online-auth-state',onAuthState,{passive:true});
-root.addEventListener?.('kelo:online-auth-session-ended',()=>clearCharacterBridge('session-ended'),{passive:true});
-root.addEventListener?.('kelo:creator-use-changed',onCreatorUseChanged,{passive:true});
-const initialAuth=authState();if(initialAuth?.authenticated&&initialAuth.characterId)void probeCharacterAppearance({force:true});
+root.addEventListener?.('kelo:online-auth-state',onAuthState,{passive:true});root.addEventListener?.('kelo:online-auth-session-ended',()=>clearCharacterBridge('session-ended'),{passive:true});root.addEventListener?.('kelo:creator-use-changed',onCreatorUseChanged,{passive:true});const initialAuth=authState();if(initialAuth?.authenticated&&initialAuth.characterId)void probeCharacterAppearance({force:true});
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){sync();if(directRequested())void open();},{once:true});else{sync();if(directRequested())void open();}
 })(typeof globalThis!=='undefined'?globalThis:window);

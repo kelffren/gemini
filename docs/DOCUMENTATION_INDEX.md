@@ -20,7 +20,19 @@ Este archivo define qué documentación debe leerse como estado actual, qué arc
 12. `VISUAL_SYSTEM.md` — pipeline visual.
 13. `SYSTEM_DOCUMENTATION_STANDARD.md` + `system-catalog.json` — contrato documental.
 14. `IMPLEMENTATION_LEDGER.md` — ledger agregado histórico de passes materiales que atraviesan turnos o agentes.
-15. `implementation-passes/*.md` — entradas materiales nuevas/stacked cuando el pass necesita un handoff autocontenido; tienen la misma semántica de estado/gates del ledger y deben leerse si el ID aparece en el sistema/PR activo.
+15. `implementation-passes/*.md` — handoffs autocontenidos para passes stacked nuevos.
+
+## Pass Creator activo
+
+Para continuar el stack Creator actual, leer en este orden:
+
+1. `systems/CREATOR_USE_AUTHORITY.md`
+2. `systems/CREATOR_CHARACTER_STATE_BRIDGE.md`
+3. `systems/CREATOR_MODULAR_APPEARANCE_REPLICATION.md`
+4. `implementation-passes/IMP-2026-09-16-CREATOR-CHARACTER-BRIDGE-007.md`
+5. `implementation-passes/IMP-2026-09-16-CREATOR-MODULAR-REPLICATION-008.md`
+
+`008` supersede únicamente el punto diferido de **replicación remota modular** de `007`; no reescribe ni invalida el historial de `007`.
 
 ## Documentación por sistema
 
@@ -51,7 +63,7 @@ Ejemplos: `WORLD_BUILDER_MEMORY.md`, `BACKPACK_SYSTEM_MEMORY.md`, `PROPERTY_EDIT
 3. `index.html` y boot real;
 4. documentos canónicos de estado actual;
 5. documentos de sistema;
-6. implementation ledger + implementation-pass handoff (intención/continuidad, no autoridad runtime);
+6. implementation ledger + implementation-pass handoff;
 7. memoria/histórico.
 
 Cuando exista contradicción, corrige la documentación de estado actual en el mismo cambio, actualiza la entrada/handoff del pass afectado y deja el histórico intacto.

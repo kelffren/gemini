@@ -2,192 +2,179 @@
 
 ## Status
 
-**Creator online V1 — IMPLEMENTED_PENDING_VERIFY.** The bridge projects server-authoritative Creator appearance/equipment bindings into the existing Character Customization visual stack. It does not replace `KeloCharacterCustomization`, `KeloCharacterVisualStack`, `KeloAvatar`, Creator Use Authority or entitlement truth.
-
-## Purpose
-
-Creator Use Authority can persist an exact Creator revision to a character slot, but persistence alone does not make that piece visible after a reload. This bridge closes that rendering gap without copying online ownership into local character state.
-
-Canonical flow:
-
-```text
-KeloOnlineAuth ready
-  ↓
-metadata-only get_my_creator_use_state(character)
-  ↓
-no appearance/equipment bindings? STOP — do not load Appearance
-  ↓ bindings exist
-KELO_MODULE_LOADER.ensure('appearance')
-  ↓
-KeloCreatorDelivery.useRevision(exact revision)
-  ↓
-exact delivered manifest + entitlement recheck
-  ↓
-register revision-scoped hidden + locked CharacterCustomization visual item
-  ↓
-ephemeral slot overlay in stateForActor(local player)
-  ↓
-KeloCharacterVisualStack
-  ↓
-existing KeloAvatar CharacterCustomization middleware
-```
+**Creator online V1.1 — IMPLEMENTED_PENDING_VERIFY.** The bridge projects server-authoritative Creator appearance/equipment bindings into the existing Character Customization visual stack for the local actor and projects server-published presentation snapshots for remote actors. It does not replace `KeloCharacterCustomization`, `KeloCharacterVisualStack`, `KeloAvatar`, Creator Use Authority or entitlement truth.
 
 ## Owners
 
-- Authoritative binding state: **Kelo Creator Use Authority / Supabase**.
-- Entitlement truth: **KeloCreatorEntitlements**.
-- Exact-revision metadata/assets: **Kelo Creator Content Delivery**.
-- Generic runtime adaptation: **KELO_CREATOR_CONTENT_REGISTRY**; the Character bridge does not treat its contentId-keyed cache as revision authority.
-- Base local visual state/catalog/history/saves: **KeloCharacterCustomization**.
+- Persistent local binding authority: **Kelo Creator Use Authority / Supabase**.
+- Local ownership/access truth: **KeloCreatorEntitlements**.
+- Local exact-revision metadata: **Kelo Creator Content Delivery**.
+- Remote presentation authority: **Kelo server + `server/avatar-sync-store.js`**.
+- Base visual state/catalog/history/saves: **KeloCharacterCustomization**.
 - Slot schema/order: **KeloCharacterSlotSchema**.
-- Ordered visual resolution: **KeloCharacterVisualStack**.
-- Final avatar composition: **KeloAvatar**.
-- This bridge: `src/characters/creator-character-state-bridge.js`.
-- Lazy restore probe: `src/core/creators-lazy-gate.js`.
+- Ordered resolver: **KeloCharacterVisualStack**.
+- Final composition: **KeloAvatar**.
+- Projection adapter: `src/characters/creator-character-state-bridge.js`.
 
-The bridge owns only an in-memory overlay mapping canonical character slots to revision-scoped visual item IDs.
+The bridge owns only ephemeral slot overlays. It never owns inventory, wallet, gameplay stats, entitlement or character persistence.
 
-## Why an overlay instead of `select()`
-
-Calling `KeloCharacterCustomization.select()` for a purchased Creator item would write that item into the local persisted character state. After logout/account switch, that would make a previous account's licensed item look like ordinary local state.
-
-V1 therefore never calls `select()`, `applySnapshot()` or another persistence mutation for authoritative Creator bindings. It wraps the owner API only at the read boundary used by the visual stack:
+## Local actor flow
 
 ```text
-base CharacterCustomization state
-           +
-server-derived Creator slot overlay
-           ↓
-resolved local render state
+get_my_creator_use_state(character)
+  ↓ authoritative exact revision bindings
+KeloCreatorDelivery.useRevision(revision)
+  ↓ exact delivered manifest
+KeloCreatorEntitlements recheck
+  ↓
+hidden + locked revision-scoped Character item
+  ↓
+local in-memory overlay
+  ↓
+KeloCharacterCustomization.stateForActor(local)
+  ↓
+KeloCharacterVisualStack → KeloAvatar
 ```
 
-The base state, history, five local save slots, share code and legacy network snapshot stay unchanged.
+The local bridge deliberately does not call `select()` or `applySnapshot()`. A purchased Creator item therefore never becomes ordinary local persisted Character state.
 
-## Exact revision and cache safety
+Local visual IDs include revision identity:
 
-The bridge intentionally builds its Character visual descriptor from the **exact manifest returned by `KeloCreatorDelivery.useRevision(revisionId)`**, then rechecks `KeloCreatorEntitlements` for that UUID.
-
-It does not use a generic runtime row as revision authority. The generic registry is optimized around semantic `contentId`; a previous revision may already exist there during a same-session upgrade. For Character visual restore, fail-safe behavior is simpler:
-
-- requested binding UUID must equal delivered `manifest.revisionId`;
-- entitlement must still allow that exact UUID;
-- Character visual item ID contains the exact revision UUID;
-- r3 and r4 therefore cannot share the same local visual item cache key.
-
-This is a bridge-local exactness rule, not a hidden rewrite of the generic runtime registry.
-
-## Runtime item safety
-
-A delivered Creator binding is registered in the existing CharacterCustomization catalog as:
-
-- `hidden: true`
-- `locked: true`
-- tagged `creator-content` + `server-bound`
-- revision-scoped local visual ID
-
-This lets the existing renderer resolve the item by ID but prevents ordinary local item lists/randomizers from treating it as an unlocked local cosmetic.
-
-The overlay and bridge diagnostics registry are cleared on auth end, account/character identity change, or explicit bridge clear. The underlying hidden CharacterCustomization definition may remain in memory, but without a current server binding it is not selected by the overlay. Delivery/entitlement gates still protect exact-revision activation.
-
-## Visual asset mapping
-
-V1 consumes the primary published asset URL from the exact delivered manifest.
-
-### Sheet path
-
-If `payload.characterVisual.mode === 'sheet'`, or the published dimensions look like a 4x4 Character Asset Contract sheet with approximately 2:3 frame ratio, the bridge uses the existing `KeloCharacterVisualPresets.sheet()` contract.
-
-Default direction rows remain:
-
-- down 0
-- left 1
-- right 2
-- up 3
-
-### Socket path
-
-If `payload.characterVisual.mode === 'socket'` or sheet inference fails, the piece uses the existing socket descriptor. Weapon slots use the existing weapon preset for `weaponMain` and `weaponSecondary`.
-
-For non-sheet content, creators should eventually author explicit `characterVisual` metadata such as:
-
-```js
-{
-  mode: 'socket',
-  socket: 'weapon',
-  width: 58,
-  height: 58,
-  anchor: { x: 0.5, y: 0.88 },
-  layer: 'front'
-}
+```text
+creator.visual.local.<revision UUID>.<slot>
 ```
 
-When no custom weapon transforms exist, the standard Character weapon offsets remain intact.
+This prevents r3 and r4 from sharing a visual cache key.
 
-## Transform limitation
+## Remote actor flow
 
-`KeloAppearance` can describe independent `scaleX` / `scaleY`; the current CharacterCustomization visual descriptor uses one uniform per-direction `scale`. V1 converts non-uniform Creator scale to a single geometric-mean scale when projecting into CharacterCustomization.
+Remote players are different: the viewer should be able to **see** a cosmetic another player is authorized to wear without owning that revision themselves.
 
-Do not add a second renderer to preserve non-uniform scale. If pixel-accurate non-uniform transforms become necessary, extend the shared Character visual descriptor/render owner and its tests.
+```text
+remote character authoritative binding
+  ↓
+server public presentation RPC
+  ↓ publication + owner/entitlement + published-assets recheck
+server avatar presentation envelope
+  ↓ existing AOI/WebSocket path
+peer.avatarManifest.creatorAppearance
+  ↓
+remote WeakMap slot overlay
+  ↓
+KeloCharacterCustomization.stateForActor(peer)
+  ↓
+KeloCharacterVisualStack → KeloAvatar
+```
+
+The remote bridge accepts modular data only when the nested snapshot is marked `source: 'server-authoritative-published'`. It does **not** run the viewer's entitlement gate for remote presentation.
+
+Remote visual IDs are separate from local IDs:
+
+```text
+creator.visual.remote.<revision UUID>.<slot>
+```
+
+This keeps the server-sanitized remote descriptor from replacing the richer local Delivery descriptor for the same revision.
+
+## Remote memory model
+
+Remote overlays and revision fingerprints live in `WeakMap` keyed by the peer actor object. A peer leaving the AOI does not create a permanent actor-state registry in the Character bridge.
+
+Each changed `revisionKey` is ingested once. Repeated server state packets for the same remote loadout reuse the current overlay.
+
+Runtime definitions remain:
+
+- `hidden: true`;
+- `locked: true`;
+- no local selection privilege;
+- no gameplay stats or abilities.
+
+## Visual descriptor mapping
+
+Both local and remote projections use the same existing Character visual descriptor factories.
+
+### Sheet
+
+A declared `payload.characterVisual.mode === 'sheet'`, or compatible published dimensions, maps into `KeloCharacterVisualPresets.sheet()`.
+
+Default direction rows remain down/left/right/up = 0/1/2/3.
+
+### Socket
+
+A declared socket visual or non-sheet asset maps into the existing socket contract. `weaponMain` and `weaponSecondary` reuse the shared weapon preset.
+
+If no Creator weapon transforms are declared, the standard Character weapon offsets remain intact.
+
+### Transform limitation
+
+The current Character renderer has one uniform per-direction scale. Independent Creator `scaleX/scaleY` values are projected to one geometric-mean scale. Do not create a second renderer for this; extend the shared Character descriptor if exact non-uniform transforms become necessary.
+
+## Full-body avatar precedence
+
+Full-body Creator avatars keep their existing higher-priority `KeloAvatar` middleware. This bridge does not paint another body on top. Modular overlays remain the state path for the normal Character renderer and may be visually masked when a full-body avatar intentionally consumes the actor render.
 
 ## Lazy/mobile behavior
 
-The already-loaded Creator lazy gate performs a single metadata-only use-state probe for the authenticated character.
+### Local
 
-- zero Creator visual bindings → stop; Appearance package and visual bytes remain unloaded;
-- one or more bindings → first-use load Appearance, hydrate only those exact revisions, then render through existing owners.
+The Creator lazy gate performs one metadata-only use-state probe after authenticated Character resolution.
 
-There is no Owned-library sync, no interval, no render loop and no preload of unrelated marketplace content.
+- no Creator modular bindings → Appearance stays unloaded;
+- bindings exist → load existing `appearance` feature and hydrate only those exact revisions.
 
-This is intentionally a small authenticated restore query at normal session start. It supersedes the earlier stronger statement that Creator Use code is never imported during normal boot: Use Authority/Delivery metadata code may now load for this one restore probe, while Creator OS UI, Appearance runtime and asset bytes stay lazy unless bindings actually exist.
+### Remote
 
-Bridge hydration is single-flight: the Appearance package boot hook and the lazy gate may converge on the same restore request, but only one exact-revision hydration job is allowed at a time.
+Networking alone does not load Appearance. `KeloCreatorAvatars` notices a non-empty server-published `creatorAppearance` envelope and calls the existing `KELO_MODULE_LOADER.ensure('appearance')` once. No peer modular envelope means no remote Appearance wake-up.
 
-## Local vs remote players
-
-This V1 overlay applies only to the local actor. Remote Creator avatars already have their own published-avatar path, but modular Creator skin/equipment replication for other players is not completed here.
-
-A later multiplayer visual snapshot bridge should transmit accepted stable revision/runtime identities from server authority. It must not send image bytes and must not reuse the local account's entitlement requirement to decide whether another player's already-authorized public appearance can be viewed.
-
-## Invariants
-
-1. authoritative Creator bindings never become localStorage/IndexedDB ownership;
-2. no second Character state owner;
-3. no second visual stack or avatar renderer;
-4. only the local actor receives this account-bound overlay;
-5. exact revisions are delivered and entitlement-checked before registration;
-6. Character visual IDs are revision-scoped, so r3 and r4 do not share visual cache identity;
-7. Creator items are hidden/locked in the local catalog;
-8. base `getState()`, history, saves and `networkSnapshot()` remain the original CharacterCustomization contract;
-9. no gameplay stats, inventory, abilities or weapon authority are granted;
-10. zero bindings do not load Appearance;
-11. no polling or second loop.
+There is no full Owned-library sync, polling, second game loop or second renderer.
 
 ## Public API
 
 `KeloCreatorCharacterBridge` exposes:
 
-- `sync({ state?, force? })`
-- `clear(reason)`
-- `state()`
-- `diagnostics()`
-- `getResolvedState(actor?)`
+- `sync({ state? })` — local authoritative hydration;
+- `clear(reason)` — clear local overlay;
+- `ingestRemote(actor, snapshot)` — ingest server-published remote presentation;
+- `clearRemote(actor, reason)` — clear one remote overlay;
+- `state()`;
+- `diagnostics()`;
+- `getResolvedState(actor?)`.
 
-When installed, the `KeloCharacterCustomization` facade also exposes `getResolvedState(actor?)`; all original owner methods delegate unchanged.
+The facade preserves every existing `KeloCharacterCustomization` operation and only overrides the `stateForActor()` read boundary used by the visual stack.
+
+## Invariants
+
+1. Creator bindings never become localStorage/IndexedDB ownership.
+2. No second Character state owner, visual stack or avatar renderer.
+3. Local use requires exact Delivery + entitlement.
+4. Remote viewing requires server-published presentation, not viewer entitlement.
+5. Local and remote runtime IDs are revision-scoped and cannot collide.
+6. Base `getState()`, history, save slots, share codes and `networkSnapshot()` remain the original Character contract.
+7. Creator visual `equipment` never grants gameplay stats, inventory or abilities.
+8. Remote actor overlay state is weak/ephemeral.
+9. No polling or parallel render loop.
+10. AOI/network transport remains owned by the existing Kelo server / `engine-net.js` path.
+
+## Related system
+
+Remote publication/sanitization/AOI behavior is documented in `CREATOR_MODULAR_APPEARANCE_REPLICATION.md`.
 
 ## Required validation
 
 Before `VALIDATED`:
 
 - `node scripts/creator-character-state-bridge-audit.mjs` passes;
-- Character, Creator Use, Delivery, Entitlement and docs audits remain green;
-- authenticated character with no bindings does not load Appearance;
-- entitled bound skin restores after reload and becomes visible through the existing Character renderer;
-- clearing the binding restores the underlying local slot;
-- logout/account switch clears the overlay immediately;
-- r3 binding cannot silently hydrate r4, including after r3 was already activated in the same session;
-- revoked access cannot remain visible after entitlement refresh;
-- hidden Creator items do not appear in ordinary randomizer/list UI;
-- local base save/share/history state is unchanged by bridge hydration;
-- built-in Character customization still works before and after Creator overlay use;
-- iPhone portrait/landscape first-use and reload have no freeze, duplicate renderer or leaked input lock;
-- remote-player modular Creator appearance behavior is not claimed until its own replication path is tested.
+- `node scripts/creator-modular-replication-audit.mjs` passes;
+- upstream Creator Use, Delivery, Entitlement, Character and docs audits stay green;
+- local purchased skin restores after reload without mutating base local save/share/history state;
+- local r3 cannot hydrate r4;
+- clear-slot exposes the underlying local slot;
+- logout/account switch clears local overlay;
+- second account sees the first account's authorized published modular visuals without owning them;
+- second account still cannot equip those visuals without entitlement;
+- entitlement revocation removes remote presentation on refresh;
+- remote r3→r4 changes without stale cache identity;
+- repeated unchanged AOI state packets do not repeatedly ingest the same remote revisionKey;
+- peer leave/AOI exit does not retain actor overlay state;
+- built-in and full-body Creator avatar rendering remain unchanged;
+- iPhone portrait/landscape multi-peer test shows no freeze, duplicate renderer, leaked input lock or unrelated Creator preload.
