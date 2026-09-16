@@ -105,6 +105,14 @@ jobs:
         run: node scripts/asset-optimization-cache-audit.mjs
       - name: Smart Atlas recomposition proof
         run: node scripts/asset-atlas-recomposition-audit.mjs --manifest=src/environment/generated/forest-plaza-tileset-v2-manifest.js
+      - name: Smart Atlas padding / fragmentation diagnostics
+        run: node scripts/asset-atlas-packing-diagnostics.mjs --manifest=src/environment/generated/forest-plaza-tileset-v2-manifest.js --paddings=0,1,2 --report=test-results/asset-atlas-packing-diagnostics
+      - name: Smart Atlas shared-region overlap diagnostics
+        run: node scripts/asset-atlas-overlap-diagnostics.mjs --manifest=src/environment/generated/forest-plaza-tileset-v2-manifest.js --report=test-results/asset-atlas-overlap-diagnostics
+      - name: Smart Atlas topology-preserving crop proof
+        run: node scripts/asset-atlas-topology-crop-audit.mjs --manifest=src/environment/generated/forest-plaza-tileset-v2-manifest.js --paddings=0,1,2 --report=test-results/asset-atlas-topology-crop
+      - name: Smart Atlas final PNG byte evidence
+        run: node scripts/asset-atlas-final-bytes-audit.mjs --manifest=src/environment/generated/forest-plaza-tileset-v2-manifest.js --padding=2 --report=test-results/asset-atlas-final-bytes
       - name: Asset documentation contract
         run: node scripts/system-documentation-audit.js
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -114,4 +122,8 @@ jobs:
           path: |
             test-results/asset-route-budget
             test-results/asset-palette-real
+            test-results/asset-atlas-packing-diagnostics
+            test-results/asset-atlas-overlap-diagnostics
+            test-results/asset-atlas-topology-crop
+            test-results/asset-atlas-final-bytes
           if-no-files-found: ignore
