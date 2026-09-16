@@ -1,15 +1,16 @@
 /* KELO-INDEX
  * area: CREATORS / RUNTIME TEST BRIDGE
  * owner: temporary Definition Studio test sessions
- * owns: reversible ENVIRONMENT tests and explicit server-backed apply-world approval through the native runtime
+ * owns: reversible ENVIRONMENT tests, server-backed apply-world approval and safe one-step world undo
  * does-not-own: publish authorization, server storage, map versioning or gameplay authority
  */
 import { createEnvironmentPreviewModel } from './environment-live-preview.mjs';
 import { installEnvironmentRuntime } from '../../environment/environment-runtime.mjs';
 
-const BRIDGE_VERSION='kelo-creator-test-bridge-v4';
+const BRIDGE_VERSION='kelo-creator-test-bridge-v5';
 const RESTORE_ID='kelo-environment-runtime-test-restore';
 const APPLY_ID='kelo-environment-runtime-test-apply';
+const UNDO_ID='kelo-environment-runtime-world-undo';
 const STYLE_ID='kelo-environment-runtime-test-controls';
 
 export function createCreatorTestPlan(type,draft={}){
@@ -21,28 +22,56 @@ export function createCreatorTestPlan(type,draft={}){
 function installControls(doc){
   if(doc.getElementById(STYLE_ID))return;
   const style=doc.createElement('style');style.id=STYLE_ID;style.textContent=`
-#${RESTORE_ID},#${APPLY_ID}{position:fixed;bottom:max(82px,calc(env(safe-area-inset-bottom) + 70px));z-index:2147483000;min-height:42px;padding:0 12px;border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.36);font:850 10px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;letter-spacing:.04em;pointer-events:auto;-webkit-tap-highlight-color:transparent}
+#${RESTORE_ID},#${APPLY_ID},#${UNDO_ID}{position:fixed;bottom:max(82px,calc(env(safe-area-inset-bottom) + 70px));z-index:2147483000;min-height:42px;padding:0 12px;border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.36);font:850 10px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;letter-spacing:.04em;pointer-events:auto;-webkit-tap-highlight-color:transparent}
 #${RESTORE_ID}{left:max(10px,env(safe-area-inset-left));border:1px solid rgba(232,201,111,.48);background:rgba(14,16,20,.92);color:#efd78f}
 #${APPLY_ID}{right:max(10px,env(safe-area-inset-right));border:1px solid rgba(111,232,164,.5);background:rgba(12,34,24,.95);color:#9df0bd}
-#${APPLY_ID}[disabled]{opacity:.72;filter:saturate(.7)}
+#${UNDO_ID}{right:max(10px,env(safe-area-inset-right));border:1px solid rgba(235,178,86,.58);background:rgba(37,25,10,.96);color:#f2cf83}
+#${APPLY_ID}[disabled],#${UNDO_ID}[disabled]{opacity:.72;filter:saturate(.7)}
 `;doc.head.append(style);
 }
 
 export function installCreatorTestBridge(root=globalThis,{contentSession=null}={}){
   if(root?.KELO_CREATOR_TEST_BRIDGE?.version===BRIDGE_VERSION){root.KELO_CREATOR_TEST_BRIDGE.configure?.({contentSession});return root.KELO_CREATOR_TEST_BRIDGE;}
-  const doc=root?.document,runtime=installEnvironmentRuntime(root);let active=null,session=contentSession,publishing=false;
+  const doc=root?.document,runtime=installEnvironmentRuntime(root);let active=null,session=contentSession,publishing=false,lastPublished=null;
 
   function configure({contentSession:nextSession=null}={}){if(nextSession)session=nextSession;return api;}
-  function removeControls(){doc?.getElementById?.(RESTORE_ID)?.remove?.();doc?.getElementById?.(APPLY_ID)?.remove?.();}
+  function removePreviewControls(){doc?.getElementById?.(RESTORE_ID)?.remove?.();doc?.getElementById?.(APPLY_ID)?.remove?.();}
+  function removeUndoControl(){doc?.getElementById?.(UNDO_ID)?.remove?.();}
+  function removeControls(){removePreviewControls();removeUndoControl();}
   function restore(reason='manual'){
     if(publishing)return Object.freeze({ok:false,restored:false,message:'World publish is still in progress'});
-    removeControls();const result=runtime.restoreTemporary(reason);active=null;
+    removePreviewControls();const result=runtime.restoreTemporary(reason);active=null;
     try{root?.dispatchEvent?.(new root.CustomEvent('kelo:creator-runtime-test-restored',{detail:{type:'ENVIRONMENT',reason,mode:'native-runtime',state:result.state,source:'kelo-creator-test-bridge'}}));}catch{}
     return Object.freeze({...result,message:result.message||'Native environment restored'});
   }
   async function getWorldSync(){
     if(root?.KELO_WORLD_ENVIRONMENT_SYNC)return root.KELO_WORLD_ENVIRONMENT_SYNC;
     const mod=await import('../../environment/environment-world-sync.mjs');return mod.installWorldEnvironmentSync(root);
+  }
+  function mountUndoControl(){
+    if(!doc?.createElement||!lastPublished)return null;installControls(doc);removeUndoControl();
+    const undoBtn=doc.createElement('button');undoBtn.id=UNDO_ID;undoBtn.type='button';undoBtn.textContent='↶ UNDO WORLD';undoBtn.setAttribute('aria-label',`Undo world environment revision ${lastPublished.publishedRevision} back to revision ${lastPublished.targetRevision}`);undoBtn.addEventListener('click',()=>void rollbackLast('button'));doc.body.append(undoBtn);return undoBtn;
+  }
+  async function rollbackLast(reason='manual'){
+    if(!lastPublished)return Object.freeze({ok:false,rolledBack:false,message:'No world environment publish to undo'});
+    if(publishing)return Object.freeze({ok:false,rolledBack:false,message:'World mutation already in progress'});
+    const undoBtn=doc?.getElementById?.(UNDO_ID),plan={...lastPublished};publishing=true;
+    if(undoBtn){undoBtn.disabled=true;undoBtn.textContent='UNDOING WORLD…';}
+    try{
+      const token=String(session?.accessToken||'').trim();if(!token)throw new Error('AUTH_REQUIRED');
+      const sync=await getWorldSync();
+      const envelope=await sync.rollback(plan.targetRevision,{accessToken:token,expectedRevision:plan.publishedRevision,source:'creator-undo'});
+      const result=runtime.publish(envelope.state,{source:'creator-undo-world',revision:envelope.revision,updatedAt:envelope.updatedAt,updatedBy:envelope.updatedBy});
+      removeUndoControl();lastPublished=null;
+      const detail=Object.freeze({type:'ENVIRONMENT',reason,mode:'native-runtime',state:result.state,revision:envelope.revision,restoredRevision:plan.targetRevision,persistent:true,synchronized:true,source:'kelo-creator-test-bridge'});
+      try{root?.dispatchEvent?.(new root.CustomEvent('kelo:creator-runtime-world-undo',{detail}));}catch{}
+      return Object.freeze({...result,rolledBack:true,revision:envelope.revision,restoredRevision:plan.targetRevision,synchronized:true,message:`WORLD UNDONE · restored revision ${plan.targetRevision} for all players`});
+    }catch(error){
+      const message=String(error?.message||error),conflict=message.includes('ENVIRONMENT_REVISION_CONFLICT');
+      if(undoBtn){undoBtn.disabled=conflict;undoBtn.textContent=conflict?'UNDO BLOCKED · WORLD CHANGED':'UNDO FAILED · RETRY';undoBtn.title=message;}
+      try{root?.dispatchEvent?.(new root.CustomEvent('kelo:creator-runtime-world-undo-failed',{detail:{type:'ENVIRONMENT',reason,error:message,conflict,source:'kelo-creator-test-bridge'}}));}catch{}
+      return Object.freeze({ok:false,rolledBack:false,conflict,error:message,message:conflict?'Undo blocked safely because another world revision was published':message==='AUTH_REQUIRED'?'Sign in with an admin or official account before undoing the world':`Could not undo world environment · ${message}`});
+    }finally{publishing=false;}
   }
   async function approve(reason='button'){
     if(!active)return Object.freeze({ok:false,persistent:false,message:'No active environment test to apply'});
@@ -52,12 +81,13 @@ export function installCreatorTestBridge(root=globalThis,{contentSession=null}={
     try{
       const token=String(session?.accessToken||'').trim();if(!token)throw new Error('AUTH_REQUIRED');
       const sync=await getWorldSync();if(!sync.revision)await sync.refresh({source:'creator-approve'});
-      const envelope=await sync.publish(model,{accessToken:token,expectedRevision:sync.revision||null,source:'creator-approved'});
+      const beforeRevision=sync.revision;
+      const envelope=await sync.publish(model,{accessToken:token,expectedRevision:beforeRevision||null,source:'creator-approved'});
       const result=runtime.publish(envelope.state,{source:'creator-approved-world',revision:envelope.revision,updatedAt:envelope.updatedAt,updatedBy:envelope.updatedBy});
-      removeControls();active=null;
-      const detail=Object.freeze({type:'ENVIRONMENT',reason,mode:'native-runtime',state:result.state,revision:envelope.revision,persistent:true,synchronized:true,source:'kelo-creator-test-bridge'});
+      removePreviewControls();active=null;lastPublished=Object.freeze({targetRevision:beforeRevision,publishedRevision:envelope.revision,state:result.state,publishedAt:Date.now()});mountUndoControl();
+      const detail=Object.freeze({type:'ENVIRONMENT',reason,mode:'native-runtime',state:result.state,revision:envelope.revision,previousRevision:beforeRevision,persistent:true,synchronized:true,undoAvailable:beforeRevision>0,source:'kelo-creator-test-bridge'});
       try{root?.dispatchEvent?.(new root.CustomEvent('kelo:creator-runtime-test-approved',{detail}));}catch{}
-      return Object.freeze({...result,revision:envelope.revision,synchronized:true,message:`${result.message} · synchronized for all players`});
+      return Object.freeze({...result,revision:envelope.revision,previousRevision:beforeRevision,synchronized:true,undoAvailable:beforeRevision>0,message:`${result.message} · synchronized for all players · UNDO WORLD available`});
     }catch(error){
       const message=String(error?.message||error),conflict=message.includes('ENVIRONMENT_REVISION_CONFLICT');
       if(applyBtn){applyBtn.disabled=false;applyBtn.textContent=conflict?'WORLD CHANGED · RETRY':'APPLY FAILED · RETRY';applyBtn.title=message;}
@@ -67,7 +97,7 @@ export function installCreatorTestBridge(root=globalThis,{contentSession=null}={
     }finally{publishing=false;}
   }
   function mountControls(){
-    if(!doc?.createElement)return Object.freeze({restore:null,apply:null});installControls(doc);removeControls();
+    if(!doc?.createElement)return Object.freeze({restore:null,apply:null});installControls(doc);removeControls();lastPublished=null;
     const restoreBtn=doc.createElement('button');restoreBtn.id=RESTORE_ID;restoreBtn.type='button';restoreBtn.textContent='↶ RESTORE';restoreBtn.setAttribute('aria-label','Restore environment before test');restoreBtn.addEventListener('click',()=>restore('button'));
     const applyBtn=doc.createElement('button');applyBtn.id=APPLY_ID;applyBtn.type='button';applyBtn.textContent='✓ APPLY WORLD';applyBtn.setAttribute('aria-label','Publish this environment to the shared Kelo World state');applyBtn.addEventListener('click',()=>void approve('button'));
     doc.body.append(restoreBtn,applyBtn);return Object.freeze({restore:restoreBtn,apply:applyBtn});
@@ -82,7 +112,7 @@ export function installCreatorTestBridge(root=globalThis,{contentSession=null}={
     const plan=createCreatorTestPlan(type,draft);if(!plan.supported)return Object.freeze({ok:true,supported:false,temporary:false,message:`${plan.type||'Definition'} test draft emitted`});return mountEnvironment(draft);
   }
 
-  const api=Object.freeze({version:BRIDGE_VERSION,configure,run,restore,approve,get active(){return active?Object.freeze({type:'ENVIRONMENT',mode:active.mode,model:active.model,state:active.state,temporary:true,persistent:false,publishing}):null;}});
+  const api=Object.freeze({version:BRIDGE_VERSION,configure,run,restore,approve,rollbackLast,get active(){return active?Object.freeze({type:'ENVIRONMENT',mode:active.mode,model:active.model,state:active.state,temporary:true,persistent:false,publishing}):null;},get lastPublished(){return lastPublished;}});
   if(root)root.KELO_CREATOR_TEST_BRIDGE=api;removeControls();return api;
 }
 

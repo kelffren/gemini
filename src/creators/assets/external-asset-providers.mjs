@@ -9,6 +9,7 @@ import {searchLpcAssets} from './lpc-live-provider.mjs?v=2';
 import {searchOpenGameArtAssets,clearOpenGameArtCache} from './opengameart-live-provider.mjs?v=3';
 import {searchKeloContent,clearKeloContentCache} from './kelo-content-live-provider.mjs?v=3';
 import {installUniversalPreviewInspector} from './universal-preview-inspector.mjs?v=1';
+import {installUniversalSpritePreview} from './universal-sprite-preview.mjs?v=1';
 
 // Resolve repo-local data from the module itself, not from the HTML document URL.
 // This keeps GitHub Pages project paths such as /gemini/ intact.
@@ -31,4 +32,4 @@ function installQAPreviewHook(){const qa=browserQA();if(!qa.preview||typeof docu
 export function clearProviderCache(){liveCache=new Map();configPromise=null;clearKenneyCache();clearOpenGameArtCache();clearKeloContentCache();}
 export const EXTERNAL_ASSET_PROVIDERS=Object.freeze({loadProviderConfig,getProviderStatuses,browseProvider,searchExternalAssets,clearProviderCache});
 export const EXTERNAL_CONTENT_PROVIDERS=EXTERNAL_ASSET_PROVIDERS;
-if(typeof window!=='undefined'){window.KELO_EXTERNAL_ASSET_PROVIDERS=EXTERNAL_ASSET_PROVIDERS;window.KELO_EXTERNAL_CONTENT_PROVIDERS=EXTERNAL_CONTENT_PROVIDERS;installQAPreviewHook();installUniversalPreviewInspector();}
+if(typeof window!=='undefined'){window.KELO_EXTERNAL_ASSET_PROVIDERS=EXTERNAL_ASSET_PROVIDERS;window.KELO_EXTERNAL_CONTENT_PROVIDERS=EXTERNAL_CONTENT_PROVIDERS;installQAPreviewHook();installUniversalPreviewInspector();installUniversalSpritePreview();}

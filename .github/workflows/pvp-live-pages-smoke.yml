@@ -1,10 +1,11 @@
-name: PvP LIVE Pages Smoke
+name: LIVE Pages Smoke
 
 on:
   pull_request:
     branches: [main]
     paths:
       - 'tests/pvp-pages-live-smoke.spec.js'
+      - 'tests/environment-pages-live-smoke.spec.js'
       - '.github/workflows/pvp-live-pages-smoke.yml'
       - 'src/core/feature-registry.js'
       - 'src/core/module-loader.js'
@@ -13,6 +14,10 @@ on:
       - 'src/systems/pvp-world.js'
       - 'src/systems/pvp-combat-runtime-loader.js'
       - 'src/abilities/**'
+      - 'src/environment/environment-layer-stack.js'
+      - 'src/environment/environment-runtime.mjs'
+      - 'src/environment/environment-world-sync.mjs'
+      - 'src/online/kelo-supabase-public-config.mjs'
       - 'engine-net.js'
   # GitHub Pages is configured as "Deploy from a branch", so its publisher is
   # an internal dynamic workflow. page_build is the documented repository event
@@ -29,13 +34,13 @@ concurrency:
   # All production page_build events share one group, so a newer Pages build
   # cancels an older smoke that is still waiting for publication. PRs remain
   # isolated by github.ref and therefore cannot cancel each other's validation.
-  group: pvp-live-pages-smoke-${{ github.event_name }}-${{ github.event_name == 'page_build' && 'main' || github.ref }}
+  group: live-pages-smoke-${{ github.event_name }}-${{ github.event_name == 'page_build' && 'main' || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  live-pvp:
+  live-runtime:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 18
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -94,3 +99,7 @@ jobs:
         env:
           KELO_PAGES_URL: https://kelffren.github.io/gemini/
         run: npx playwright test tests/pvp-pages-live-smoke.spec.js --project=chromium --retries=1
+      - name: Smoke two-iPhone canonical environment convergence
+        env:
+          KELO_PAGES_URL: https://kelffren.github.io/gemini/
+        run: npx playwright test tests/environment-pages-live-smoke.spec.js --project=chromium --retries=1
