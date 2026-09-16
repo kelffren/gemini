@@ -17,6 +17,13 @@ const bootMarker='window.__keloBootReady=true';
 const markerAt=html.indexOf(bootMarker);
 assert.ok(markerAt>0,'boot-ready marker missing');
 
+const MAX_CRITICAL_SCRIPTS=48;
+// Baseline observado en CI: 423,323 B. Margen <0.4% para mantenimiento; crecer exige revisión deliberada.
+const MAX_CRITICAL_BYTES=425000;
+const MAX_POST_BOOT_STATIC_SCRIPTS=3;
+// Baseline observado en CI: 21,290 B. Margen pequeño para evitar crecimiento silencioso.
+const MAX_POST_BOOT_STATIC_BYTES=22000;
+
 const before=html.slice(0,markerAt);
 const after=html.slice(markerAt);
 const scriptSrcs=(text)=>[...text.matchAll(/<script\s+src=["']([^"']+)["'][^>]*><\/script>/g)].map(m=>m[1]);
@@ -32,8 +39,10 @@ const bytesFor=(items)=>items.reduce((total,src)=>{
 const criticalBytes=bytesFor(critical);
 const postBootStaticBytes=bytesFor(postBootStatic);
 
-assert.ok(critical.length<=48,`critical script budget exceeded: ${critical.length} > 48`);
-assert.ok(postBootStatic.length<=3,`post-boot static script budget exceeded: ${postBootStatic.length} > 3`);
+assert.ok(critical.length<=MAX_CRITICAL_SCRIPTS,`critical script budget exceeded: ${critical.length} > ${MAX_CRITICAL_SCRIPTS}`);
+assert.ok(criticalBytes<=MAX_CRITICAL_BYTES,`critical byte budget exceeded: ${criticalBytes} > ${MAX_CRITICAL_BYTES}`);
+assert.ok(postBootStatic.length<=MAX_POST_BOOT_STATIC_SCRIPTS,`post-boot static script budget exceeded: ${postBootStatic.length} > ${MAX_POST_BOOT_STATIC_SCRIPTS}`);
+assert.ok(postBootStaticBytes<=MAX_POST_BOOT_STATIC_BYTES,`post-boot static byte budget exceeded: ${postBootStaticBytes} > ${MAX_POST_BOOT_STATIC_BYTES}`);
 assert.ok(critical.some(src=>src.includes('src/core/legacy-ability-aim-system.js')),'KeloAbilityAim compatibility owner missing from critical boot');
 
 const retiredEngines=Object.freeze(['engine-i.js','engine-j.js','engine-k.js']);
@@ -75,7 +84,8 @@ function walk(dir,files=[]){
 const retiredRefs=Object.fromEntries(retiredEngines.map(name=>[name,[]]));
 for(const full of walk(root)){
   const rel=path.relative(root,full).replaceAll('\\','/');
-  if(rel==='scripts/boot-surface-audit.mjs'||retiredEngines.includes(rel))continue;
+  // QA/audit tooling must be allowed to name retired files while proving they stay retired.
+  if(rel.startsWith('scripts/')||rel==='scripts/boot-surface-audit.mjs'||retiredEngines.includes(rel))continue;
   let text='';try{text=fs.readFileSync(full,'utf8');}catch{continue;}
   for(const engine of retiredEngines){
     if(text.includes(engine))retiredRefs[engine].push(rel);
@@ -85,4 +95,4 @@ for(const engine of retiredEngines){
   assert.deepEqual(retiredRefs[engine],[],`retired ${engine} still referenced by runtime/test code: ${retiredRefs[engine].join(', ')}`);
 }
 
-console.log(`BOOT SURFACE PASS critical=${critical.length} criticalBytes=${criticalBytes} postBootStatic=${postBootStatic.length} postBootStaticBytes=${postBootStaticBytes} deferredInternal=9 retiredRuntimeRefs=0`);
+console.log(`BOOT SURFACE PASS critical=${critical.length}/${MAX_CRITICAL_SCRIPTS} criticalBytes=${criticalBytes}/${MAX_CRITICAL_BYTES} postBootStatic=${postBootStatic.length}/${MAX_POST_BOOT_STATIC_SCRIPTS} postBootStaticBytes=${postBootStaticBytes}/${MAX_POST_BOOT_STATIC_BYTES} deferredInternal=9 retiredRuntimeRefs=0`);
