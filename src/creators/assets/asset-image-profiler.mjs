@@ -13,13 +13,19 @@
 const clamp01 = value => Math.max(0, Math.min(1, Number(value) || 0));
 
 function pathHints(sourceName = '') {
-  const value = String(sourceName).toLowerCase();
+  const normalized = String(sourceName)
+    .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+    .toLowerCase();
+  const tokens = new Set(normalized.split(/[^a-z0-9]+/).filter(Boolean));
+  const hasAny = (...values) => values.some(value => tokens.has(value));
   return {
-    tile:/tile|terrain|ground|floor|grass|cesped|path|road|water|wall|seam/.test(value),
-    sprite:/sprite|hero|character|avatar|npc|mob|weapon|item|prop|tree|arbol|fountain|fuente/.test(value),
-    ui:/ui|icon|hud|button|logo|badge|menu/.test(value),
-    fx:/fx|vfx|effect|particle|glow|smoke|fire|magic/.test(value),
-    atlas:/atlas|sheet|tileset/.test(value)
+    // Exact tokens only: substring matching made "broad" look like "road".
+    // `tileset` belongs to the atlas class, not automatically to a repeatable tile.
+    tile:hasAny('tile', 'terrain', 'ground', 'floor', 'grass', 'cesped', 'path', 'paths', 'road', 'roads', 'wall', 'walls', 'seam'),
+    sprite:hasAny('sprite', 'hero', 'character', 'avatar', 'npc', 'mob', 'weapon', 'item', 'prop', 'tree', 'trees', 'arbol', 'fountain', 'fuente'),
+    ui:hasAny('ui', 'icon', 'hud', 'button', 'logo', 'badge', 'menu'),
+    fx:hasAny('fx', 'vfx', 'effect', 'effects', 'particle', 'particles', 'glow', 'smoke', 'fire', 'magic'),
+    atlas:hasAny('atlas', 'sheet', 'spritesheet', 'tileset')
   };
 }
 
@@ -130,7 +136,7 @@ export function profileAssetImage(rgba, width, height, options = {}) {
   if (!pixelCritical && !seamCritical) runtimeCandidates.push('webp-adaptive', 'avif-adaptive');
 
   return {
-    version:'kelo-asset-image-profile-v1',
+    version:'kelo-asset-image-profile-v1.1',
     kind,
     adaptivePolicy,
     sourceName:String(options.sourceName || options.file || ''),
