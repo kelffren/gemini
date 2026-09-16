@@ -172,7 +172,7 @@ function hasPhrase(text,phrase){
 function isNegatedPhrase(text,phrase){
   const hay=normalizedWords(text),needle=normalizedWords(phrase);if(!hay||!needle)return false;
   const p=escapeRegex(needle).replace(/\\ /g,'\\s+');
-  return new RegExp(`(?:^|\\s)(?:no|sin|not|without|avoid|evita|evitar)(?:\\s+[a-z0-9%]+){0,2}\\s+${p}(?=\\s|$)`,'i').test(hay);
+  return new RegExp(`(?:^|\\s)(?:no|sin|not|without|avoid|evita|evitar)(?:\\s+(?:very|muy|mucho|mucha|many|any|mas|more|heavy|dense|denso|densa|thick|strong|fuerte))?\\s+${p}(?=\\s|$)`,'i').test(hay);
 }
 function positivePhrase(text,phrase){return hasPhrase(text,phrase)&&!isNegatedPhrase(text,phrase);}
 function bestOptionValue(fieldSpec,text){
