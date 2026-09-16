@@ -32,9 +32,20 @@ jobs:
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '24'
+      - name: Bug Intelligence risk preflight
+        run: |
+          BASE="$(git merge-base HEAD origin/main)"
+          echo "Asset-space risk base: $BASE"
+          node scripts/bug-risk.mjs "$BASE" HEAD
+      - name: Bug Intelligence dependency impact
+        run: |
+          BASE="$(git merge-base HEAD origin/main)"
+          node scripts/bug-impact.mjs --diff "$BASE" HEAD --depth=2
       - name: Quality Agent golden corpus
         run: node scripts/asset-quality-golden-corpus-audit.mjs
       - name: Animation temporal consistency gate
