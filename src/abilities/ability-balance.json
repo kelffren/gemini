@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "abilities": {
+    "fireball": { "cooldown": 1, "resourceCost": 1, "damage": 1, "range": 1, "speed": 1 },
+    "ice_nova": { "cooldown": 1, "resourceCost": 1, "damage": 1, "area": 1 },
+    "chain_lightning": { "cooldown": 1, "resourceCost": 1, "damage": 1, "range": 1 },
+    "wind_dash": { "cooldown": 1, "resourceCost": 1, "range": 1 },
+    "stone_shield": { "cooldown": 1, "resourceCost": 1, "shield": 1 },
+    "fire_tornado": { "cooldown": 1, "resourceCost": 1, "damage": 1, "range": 1, "area": 1 },
+    "ice_wall": { "cooldown": 1, "resourceCost": 1, "range": 1, "area": 1 },
+    "shadow_step": { "cooldown": 1, "resourceCost": 1, "range": 1 },
+    "poison_trap": { "cooldown": 1, "resourceCost": 1, "damage": 1, "range": 1, "area": 1 },
+    "light_aura": { "cooldown": 1, "resourceCost": 1, "heal": 1, "area": 1 },
+    "swap_sword": { "cooldown": 1, "resourceCost": 1, "range": 1, "speed": 1, "area": 1 }
+  }
+}
