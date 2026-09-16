@@ -57,6 +57,9 @@ jobs:
       - name: Online foundation contract
         run: npm run audit:online-foundation
 
+      - name: Guardian distributed compute contract
+        run: npm run audit:guardian
+
       - name: Updater contract
         run: npm run audit:updater
 
