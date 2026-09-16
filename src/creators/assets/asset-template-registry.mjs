@@ -65,9 +65,10 @@ export function applyAssetTemplateMetadata({templateId='',name='',category='',ta
   const resolved=inferAssetTemplateId({templateId,name,category,tags});
   const template=getAssetTemplate(resolved);
   const mergedTags=[...new Set([...(Array.isArray(tags)?tags:[]),...template.requiredTags].map(normalize).filter(Boolean))].slice(0,16);
+  const resolvedCategory=template.id==='prop'?(normalize(category)||'prop'):template.category;
   return freeze({
     templateId:template.id,
-    category:template.category||normalize(category)||'prop',
+    category:resolvedCategory,
     tags:freeze(mergedTags),
     anchor:freeze({x:clamp01(anchor?.x ?? template.anchor.x),y:clamp01(anchor?.y ?? template.anchor.y)}),
     authoring:freeze({
