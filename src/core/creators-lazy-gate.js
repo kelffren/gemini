@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: CORE / OPTIONAL UI
  * owner: KeloCreatorsLazyGate
- * keys: CREATORS ASSET FORGE LAZY FIRST-USE ADMIN MOBILE SAFARI NO-FREEZE ASSET CATALOG
+ * keys: CREATORS ASSET FORGE LAZY FIRST-USE ADMIN MOBILE SAFARI NO-FREEZE ASSET CATALOG OPEN ACCESS
  * purpose: mantiene Creators y Asset Forge disponibles sin evaluar Studio hasta que el usuario los abre; Asset Forge no carga el catálogo grande
  * public-api: KeloCreatorsLazyGate.open/openAssetForge/sync
  * consumes: KELO_ADMIN_KEYS + Luxe menu
@@ -10,7 +10,10 @@
 (function(root){
 'use strict';
 if(root.KeloCreatorsLazyGate)return;
-const VERSION='kelo-creators-lazy-gate-v6-direct-asset-forge';
+const VERSION='kelo-creators-lazy-gate-v7-open-access';
+// TEMPORAL: Creadores abierto para todos. Mantener la verificación original intacta
+// permite volver a permisos por rol cambiando solo este flag a false.
+const OPEN_CREATOR_ACCESS=true;
 const LAUNCHER_SRC='src/ui/studio-launcher.js?v=asset-forge-20260915-1';
 const ASSET_CATALOG_SRC='src/property/property-asset-catalog.js?v=creator-assets-20260915-1';
 const assetForgeModuleUrl=()=>new URL('src/creators/creator-entry.mjs?v=asset-forge-20260915-1',root.document?.baseURI||root.location.href).href;
@@ -18,9 +21,12 @@ let loading=null,catalogLoading=null,forgeLoading=null;
 const query=()=>{try{return new URLSearchParams(root.location.search);}catch(_){return new URLSearchParams();}};
 const directRequested=()=>query().get('creators')==='1'||query().get('creator')==='1'||query().get('mapEditor')==='1';
 const actor=()=>String(root.KELO_ADMIN_KEYS?.playerId?.()||root.keloNet?.playerKey||root.localPlayer?.id||'local_pioneer');
-function allowed(){
+function permissionAllowed(){
   const keys=root.KELO_ADMIN_KEYS,who=actor();
   return !!(keys?.can?.('creators.access',who)||keys?.can?.('world.edit',who)||keys?.can?.('animation.edit',who));
+}
+function allowed(){
+  return OPEN_CREATOR_ACCESS||permissionAllowed();
 }
 function toast(msg){if(typeof root.showToast==='function')root.showToast(msg);else console.info('[Kelo Creators gate]',msg);}
 function paint(btn,busy){
@@ -104,7 +110,7 @@ async function open(){
   catch(error){console.error('[Kelo Creators lazy gate]',error);toast('No se pudo abrir Kelo Creators');return false;}
   finally{paint(document.getElementById('lx-create-studio'),false);}
 }
-const api=Object.freeze({version:VERSION,open,openAssetForge,sync,get allowed(){return allowed();},get directRequested(){return directRequested();}});
+const api=Object.freeze({version:VERSION,open,openAssetForge,sync,get allowed(){return allowed();},get directRequested(){return directRequested();},get openAccess(){return OPEN_CREATOR_ACCESS;}});
 root.KeloCreatorsLazyGate=api;
 root.KELO_CREATORS_LAZY_GATE=api;
 try{root.KELO_ADMIN_KEYS?.onChange?.(sync);}catch(_){}
