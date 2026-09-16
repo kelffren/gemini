@@ -22,6 +22,7 @@ jobs:
     env:
       CI: true
       KELO_PAGES: http://127.0.0.1:4173/
+      KELO_LEGACY_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before || '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -47,6 +48,9 @@ jobs:
 
       - name: Architecture contract
         run: npm run audit:foundation
+
+      - name: Legacy can only shrink contract
+        run: npm run audit:legacy-containment
 
       - name: Documentation contract
         run: npm run audit:docs
@@ -104,5 +108,6 @@ jobs:
           path: |
             playwright-report.json
             test-results/
+            artifacts/legacy-containment/
           retention-days: 14
           if-no-files-found: ignore
