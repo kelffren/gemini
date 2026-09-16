@@ -12,6 +12,7 @@ const iphone = devices['iPhone 13'];
 const BASE_URL = process.env.KELO_PAGES || 'http://127.0.0.1:4173/';
 
 test.use({
+  baseURL: BASE_URL,
   userAgent: iphone.userAgent,
   viewport: { width: 390, height: 844 },
   screen: { width: 390, height: 844 },
@@ -20,10 +21,9 @@ test.use({
   hasTouch: true,
 });
 
-test('Scene Painter survives mobile lazy boot, Grid 3x2, one Undo and shell mutation stress', async ({ browser }) => {
+test('Scene Painter survives mobile lazy boot, Grid 3x2, one Undo and shell mutation stress', async ({ page }) => {
   test.setTimeout(150000);
   fs.mkdirSync('test-results', { recursive: true });
-  const page = await browser.newPage({ baseURL: BASE_URL });
   const pageErrors = [];
   const consoleErrors = [];
   page.on('pageerror', error => pageErrors.push(String(error && error.stack || error)));
@@ -182,5 +182,4 @@ test('Scene Painter survives mobile lazy boot, Grid 3x2, one Undo and shell muta
   expect(consoleErrors.filter(row => /STUDIO_PAINT_COPIES|CREATOR_WORLD_STUDIO_MOUNT_FAILED|WORLD_EDIT_NOT_READY/.test(row))).toEqual([]);
 
   await page.screenshot({ path: 'test-results/studio-scene-painter-mobile-pass.png', fullPage: true });
-  await page.close();
 });
