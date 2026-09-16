@@ -12,7 +12,7 @@
 (function(root){
 'use strict';
 if(root.KeloCreatorCharacterBridge)return;
-const VERSION='creator-character-state-bridge-v1.0.0';
+const VERSION='creator-character-state-bridge-v1.0.1';
 const UUID_RE=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const FACE_KEYS=['down','left','right','up'];
 const text=v=>String(v==null?'':v).trim();
@@ -58,6 +58,7 @@ function directionalOffsets(payload){
   for(const face of FACE_KEYS){const t=src[face]||fallback;out[face]={x:Number(t?.x)||0,y:Number(t?.y)||0,rotation:Number(t?.rotation)||0,scale:scaleOf(t)};}
   return out;
 }
+function hasTransforms(payload){return !!payload?.transforms&&Object.keys(payload.transforms).length>0;}
 function inferredSheet(asset,visual){
   if(visual?.mode==='sheet')return true;if(visual?.mode==='socket')return false;
   const cols=Math.max(1,Number(visual?.columns)||4),rows=Math.max(1,Number(visual?.rows)||4),w=Number(asset?.pixelWidth)||0,h=Number(asset?.pixelHeight)||0;
@@ -74,8 +75,10 @@ function visualDescriptor(row,binding){
   if(inferredSheet(asset,visual)){
     const raw=rawSheet(source,payload,asset,visual);return V?.sheet?V.sheet(source,raw):raw;
   }
-  const raw=rawSocket(source,payload,asset,visual,slot);
-  if(V&&slot==='weaponMain'&&typeof V.weapon==='function')return V.weapon(source,{...raw,offsets:raw.offsets});
+  const raw=rawSocket(source,payload,asset,visual,slot),isWeapon=slot==='weaponMain'||slot==='weaponSecondary';
+  if(V&&isWeapon&&typeof V.weapon==='function'){
+    const opts={...raw};if(!hasTransforms(payload))delete opts.offsets;return V.weapon(source,opts);
+  }
   if(V?.socket)return V.socket(source,raw.socket,raw);return raw;
 }
 function itemId(row,binding){return text(row?.activation?.runtimeId)||`creator.visual.${text(binding.revisionId).replace(/-/g,'_')}.${text(binding.slotKey)}`;}
@@ -107,13 +110,11 @@ function clear(reason){const had=overlay.size||accountId||characterId;overlay.cl
 function state(){return Object.freeze({version:VERSION,accountId:accountId||null,characterId:characterId||null,revision,slots:Object.freeze(Object.fromEntries(overlay)),registered:Object.freeze([...registered.values()]),lastSync,lastError});}
 function diagnostics(){return Object.freeze({version:VERSION,installed:!!facade,baseVersion:baseCustomization?.version||null,overlaySlots:overlay.size,registeredItems:registered.size,syncing:!!syncPromise,accountId:accountId||null,characterId:characterId||null,lastSync,lastError,persistentStore:false,polling:false,secondRenderer:false});}
 function onAuth(event){const d=event?.detail||authState();if(!d?.authenticated){clear('auth-ended');return;}if(characterId&&text(d.characterId)!==characterId)clear('character-changed');}
-function onUseChanged(){void sync({force:true}).catch(()=>{});}
 function onEntitlementsChanged(){if(characterId)void sync({force:true}).catch(()=>{});}
 
 installFacade();
 root.addEventListener?.('kelo:online-auth-state',onAuth,{passive:true});
 root.addEventListener?.('kelo:online-auth-session-ended',()=>clear('session-ended'),{passive:true});
-root.addEventListener?.('kelo:creator-use-changed',onUseChanged,{passive:true});
 root.addEventListener?.('kelo:creator-entitlements-changed',onEntitlementsChanged,{passive:true});
 root.KeloCreatorCharacterBridge=Object.freeze({version:VERSION,sync,clear,state,diagnostics,getResolvedState:actor=>resolveState(actor||localActor())});
 const boot=root.__KELO_CREATOR_CHARACTER_BOOT_STATE__;try{delete root.__KELO_CREATOR_CHARACTER_BOOT_STATE__;}catch{}
