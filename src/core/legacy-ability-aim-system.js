@@ -1,14 +1,14 @@
 /* KELO-INDEX
  * area: CORE / LEGACY ABILITY COMPAT
  * owner: KeloAbilityAim
- * keys: ABILITY AIM DASH RANGE POINTER RENDER BEGIN END COMPATIBILITY LEGACY STRANGLER
- * purpose: concentra matemática final, lifecycle de puntero y begin/end de aim en un único owner sin cambiar rangos, cooldowns ni feel
- * public-api: KeloAbilityAim.begin/end/maxRange/minRatio/measuredRange/powerFromButtonDistance/snapshot
- * consumes: legacy skillAim/aim/STATE/localPlayer/camera/dashTween + active castAimedSkill compatibility target + KeloRender
- * state-owned: lifecycle de puntero y estado de aim; no reemplaza aún el decorator de cast posterior
- * extension-points: castAimedSkill global temporal permanece como downstream compatibility point hasta migrar engine-l
- * legacy: strangler temporal para engine-g/engine-l; no añadir abilities nuevas aquí
- * do-not: NO segundo ability engine, NO segundo pointer lifecycle, NO nuevos números de balance, NO globals implícitos
+ * keys: ABILITY AIM DASH RANGE POINTER RENDER BEGIN END CAST MIDDLEWARE COMPATIBILITY LEGACY STRANGLER
+ * purpose: concentra matemática, lifecycle de puntero y cadena explícita de cast en un único owner sin cambiar rangos, cooldowns ni orden de decorators
+ * public-api: KeloAbilityAim.begin/end/cast/registerCastMiddleware/maxRange/minRatio/measuredRange/powerFromButtonDistance/snapshot
+ * consumes: legacy skillAim/aim/STATE/localPlayer/camera/dashTween + KeloRender
+ * state-owned: lifecycle de puntero, estado de aim y registry ordenado de middleware de cast
+ * extension-points: registerCastMiddleware(owner,fn); el último registrado envuelve a los anteriores, igual que los wrappers legacy
+ * legacy: strangler temporal para engine-g/l/m; no añadir abilities nuevas aquí
+ * do-not: NO segundo ability engine, NO segundo pointer lifecycle, NO nuevos números de balance, NO monkey-patch de cast fuera de este owner
  */
 (function(root,factory){
 'use strict';
@@ -82,7 +82,21 @@ root.beginSkillAim=beginSkillAimCompat;
 function updateAimFromPointerCompat(x,y){updateAimFromButton(x,y);}
 root.updateAimFromPointer=updateAimFromPointerCompat;
 
-function castAimedSkillCompat(index,typeId,dirX,dirY){
+const castMiddlewares=[];
+let castMiddlewareSeq=0;
+function registerCastMiddleware(owner,fn){
+  owner=String(owner||'').trim();
+  if(!owner)throw new Error('cast middleware owner required');
+  if(typeof fn!=='function')throw new Error('cast middleware function required: '+owner);
+  const previous=castMiddlewares.findIndex(entry=>entry.owner===owner);
+  if(previous>=0)castMiddlewares.splice(previous,1);
+  const entry=Object.freeze({owner,fn,seq:++castMiddlewareSeq});
+  castMiddlewares.push(entry);
+  return function unregister(){const at=castMiddlewares.indexOf(entry);if(at>=0)castMiddlewares.splice(at,1);};
+}
+function castMiddlewareOwners(){return castMiddlewares.map(entry=>entry.owner);}
+
+function performBaseCast(index,typeId,dirX,dirY){
   const stone=STATE.equipped[index];
   if(!stone||stone.currentCd>0)return;
   const range=skillAim.castRange||api.measuredRange(typeId,skillAim.power||1);
@@ -119,7 +133,18 @@ function castAimedSkillCompat(index,typeId,dirX,dirY){
     if(isPvPActive&&arenaPvP.rival&&Math.hypot(tx-arenaPvP.rival.x,ty-arenaPvP.rival.y)<90)applyPvPDamage(arenaPvP.rival,stone.dmg);
   }
 }
-root.castAimedSkill=castAimedSkillCompat;
+function dispatchCast(index,typeId,dirX,dirY){
+  const context=Object.freeze({index,typeId,dirX,dirY});
+  function invoke(at){
+    if(at<0)return performBaseCast(index,typeId,dirX,dirY);
+    const entry=castMiddlewares[at];
+    let consumed=false;
+    const next=function(){if(consumed)throw new Error('cast middleware next() called twice: '+entry.owner);consumed=true;return invoke(at-1);};
+    return entry.fn(context,next);
+  }
+  return invoke(castMiddlewares.length-1);
+}
+root.castAimedSkill=dispatchCast;
 
 function endSkillAimCompat(e){
   if(!skillAim.active)return;
@@ -127,8 +152,7 @@ function endSkillAimCompat(e){
   const index=skillAim.index,typeId=skillAim.typeId,dirX=skillAim.dirX,dirY=skillAim.dirY;
   skillAim.active=false;
   skillAim.pointerId=null;
-  const cast=root.castAimedSkill;
-  if(typeof cast==='function')cast(index,typeId,dirX,dirY);
+  dispatchCast(index,typeId,dirX,dirY);
 }
 root.endSkillAim=endSkillAimCompat;
 
@@ -246,13 +270,15 @@ const renderHookId=root.KeloRender.afterFrame('KeloAbilityAim:skill-indicator',d
 root.KeloAbilityAim=Object.freeze(Object.assign({},api,{
   begin:beginSkillAimCompat,
   end:endSkillAimCompat,
+  cast:dispatchCast,
+  registerCastMiddleware,
   updatePointer:updateAimFromPointerCompat,
   isAimSkill:isAimSkillCompat,
-  snapshot:function(){return Object.freeze({version:api.version,active:!!skillAim.active,typeId:skillAim.typeId||'',power:Number(skillAim.power)||0,castRange:Number(skillAim.castRange)||0,pointerId:skillAim.pointerId??null,renderHookId:renderHookId,legacyRenderHookRetired:!!staleHook,pointerLifecycle:pointerLifecycle.snapshot(),downstreamCastCompatibility:true});}
+  snapshot:function(){return Object.freeze({version:api.version,active:!!skillAim.active,typeId:skillAim.typeId||'',power:Number(skillAim.power)||0,castRange:Number(skillAim.castRange)||0,pointerId:skillAim.pointerId??null,renderHookId:renderHookId,legacyRenderHookRetired:!!staleHook,pointerLifecycle:pointerLifecycle.snapshot(),castMiddlewareCount:castMiddlewares.length,castMiddlewareOwners:castMiddlewareOwners()});}
 }));
 })(typeof globalThis!=='undefined'?globalThis:this,function(){
 'use strict';
-const VERSION='kelo-ability-aim-v1.2.0-lifecycle-owner';
+const VERSION='kelo-ability-aim-v1.3.0-cast-middleware-owner';
 const MAX=Object.freeze({dash:170,fireball:300,frostnova:230,meteor:260});
 const MIN_RATIO=Object.freeze({dash:0.32,fireball:0.45,frostnova:0.45,meteor:0.4});
 const STICK_RADIUS=72;
