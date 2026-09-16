@@ -233,6 +233,7 @@ begin
       'height',ar.pixel_height,
       'sha256',ar.content_hash,
       'type',af.kind,
+      'renderProfile',coalesce(ar.metadata->'renderProfile', af.metadata->'renderProfile', '{}'::jsonb),
       'moderation','server-verified'
     ) order by e.slot
   ), '[]'::jsonb) into v_assets
@@ -265,6 +266,6 @@ grant execute on function public.get_character_avatar_manifest(uuid) to authenti
 
 comment on table public.character_community_equipment is 'Per-character references to active immutable community asset publications. No binary or client URL is stored here.';
 comment on function public.equip_character_community_asset(uuid,text,uuid) is 'RLS-protected owner cosmetic equip by active publication id; replaces one slot atomically.';
-comment on function public.get_character_avatar_manifest(uuid) is 'RLS-protected avatar manifest plus active community cosmetic references for one owned character.';
+comment on function public.get_character_avatar_manifest(uuid) is 'RLS-protected avatar manifest plus active community cosmetic references and sanitized render metadata for one owned character.';
 
 commit;
