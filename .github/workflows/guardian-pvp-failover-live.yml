@@ -37,6 +37,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Syntax-check LIVE failover spec
+        run: node --check tests/guardian-pvp-failover-live.spec.js
       - name: Audit failover lab contract
         run: node scripts/guardian-pvp-failover-audit.mjs
 
