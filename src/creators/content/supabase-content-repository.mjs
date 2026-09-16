@@ -24,6 +24,7 @@ export function createSupabaseCreatorContentRepository({url,publishableKey,getAc
   const publicUrl=(bucket,path)=>`${base}/storage/v1/object/public/${encodeURIComponent(bucket)}/${encPath(path)}`;
   const userId=()=>decodeJwt(token()).sub||null;
   function listMyContent(){const uid=userId();if(!uid)return Promise.resolve([]);return select(`content_definition_revisions?select=id,definition_id,revision,content_id,schema_version,content_hash,payload,created_at&owner_user_id=eq.${encodeURIComponent(uid)}&order=created_at.desc&limit=500`);}
+  function listMyDefinitions(){const uid=userId();if(!uid)return Promise.resolve([]);return select(`content_definitions?select=id,content_type,slug,display_name,tags,metadata,created_at,updated_at&owner_user_id=eq.${encodeURIComponent(uid)}&order=updated_at.desc&limit=500`);}
   function listActivePublicationsForRevisions(ids){const clean=revisionIds(ids);if(!clean.length)return Promise.resolve([]);return select(`content_publications?select=id,revision_id,visibility,published_at,is_active&is_active=eq.true&revision_id=in.(${clean.join(',')})&order=published_at.desc&limit=500`);}
   function listMyCharacters(){return userId()?select('characters?select=id,name,status,active_avatar_content_id,created_at&status=eq.active&order=created_at.asc&limit=3'):Promise.resolve([]);}
   async function getCharacterWallet(characterId,currencyKey='kc'){
@@ -32,11 +33,11 @@ export function createSupabaseCreatorContentRepository({url,publishableKey,getAc
     return Array.isArray(rows)&&rows[0]?rows[0]:{character_id:id,currency_key:key,amount:0,revision:0,updated_at:null};
   }
   return Object.freeze({
-    version:'supabase-creator-content-repository-v1.3.0-marketplace',userId,rpc,select,upload,remove,signedUrl,publicUrl,
+    version:'supabase-creator-content-repository-v1.3.1-marketplace',userId,rpc,select,upload,remove,signedUrl,publicUrl,
     createAssetFamily:p=>rpc('create_asset_family',p),registerAssetRevision:p=>rpc('register_asset_revision',p),submitAssetRevision:id=>rpc('submit_asset_revision',{p_revision_id:id}),
     createContentDefinition:p=>rpc('create_content_definition',p),registerContentRevision:p=>rpc('register_content_revision',p),submitContentRevision:id=>rpc('submit_content_revision',{p_revision_id:id}),
     listMyRoles:()=>select('account_roles?select=role_key&order=role_key.asc'),
-    listMyContent,
+    listMyContent,listMyDefinitions,
     listMyReviews:()=>select('content_review_requests?select=id,revision_id,status,submitted_at,decided_at,note&order=submitted_at.desc&limit=500'),
     listActivePublicationsForRevisions,
     listMyCharacters,getCharacterWallet,
