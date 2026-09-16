@@ -18,6 +18,7 @@ export function createCreatorMarketplaceService({contentSession,contentRepositor
   if(!contentRepository)throw new Error('CREATOR_MARKET_REPOSITORY_REQUIRED');
   const authenticated=()=>!!contentSession.accessToken&&!!contentRepository.userId?.();
   async function fresh(){if(authenticated())await contentSession.ensureFresh?.();}
+  contentSession.onChange?.(()=>{void root.KeloCreatorEntitlements?.refresh?.();});
   function decorateListing(row){
     const bucket=text(row.preview_bucket),path=text(row.preview_path),previewUrl=bucket&&path?contentRepository.publicUrl(bucket,path):null;
     return F({...row,previewUrl});
@@ -53,9 +54,9 @@ export function createCreatorMarketplaceService({contentSession,contentRepositor
   async function purchase({listingId,buyerCharacterId}={}){
     if(!authenticated())throw new Error('AUTH_REQUIRED');if(!listingId||!buyerCharacterId)throw new Error('MARKET_PURCHASE_FIELDS_REQUIRED');await fresh();
     const correlationId=uuid(root),result=await contentRepository.purchaseCreatorMarketListing({listingId,buyerCharacterId,correlationId});
-    try{await root.KeloCreatorEntitlements?.refresh?.({force:true});}catch(_){ }
+    try{await root.KeloCreatorEntitlements?.refresh?.();}catch(_){ }
     return F({correlationId,...result});
   }
   async function owned(){if(!authenticated())return F([]);await fresh();const rows=await contentRepository.listMyCreatorEntitlements();return F(arr(rows).map(row=>F({...row})));}
-  return F({version:'kelo-creator-marketplace-service-v1.1.0-entitlement-refresh',authenticated,discover,profile,saveProfile,dashboard,createListing,cancelListing,purchase,owned});
+  return F({version:'kelo-creator-marketplace-service-v1.1.1-entitlement-auth-sync',authenticated,discover,profile,saveProfile,dashboard,createListing,cancelListing,purchase,owned});
 }
