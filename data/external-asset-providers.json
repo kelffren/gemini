@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "policy": {
+    "downloadOnBrowse": false,
+    "requireExplicitDownload": true,
+    "requireExplicitIntegration": true,
+    "allowedLicenses": ["CC0-1.0", "CC0", "CC-BY-3.0", "CC-BY-4.0", "OGA-BY-3.0"],
+    "reviewLicenses": ["CC-BY-SA-3.0", "CC-BY-SA-4.0", "GPL-2.0", "GPL-3.0", "UNKNOWN"]
+  },
+  "providers": [
+    {
+      "id": "spritecook",
+      "name": "SpriteCook Free Assets",
+      "mode": "live-index",
+      "enabled": true,
+      "license": "CC0-1.0",
+      "attributionRequired": false,
+      "indexUrl": "https://cdn.jsdelivr.net/gh/SpriteCook/spritecook-free-game-assets@master/index.json",
+      "assetBaseUrl": "https://cdn.jsdelivr.net/gh/SpriteCook/spritecook-free-game-assets@master/",
+      "sourceUrl": "https://github.com/SpriteCook/spritecook-free-game-assets",
+      "notes": "Machine-readable CC0 catalog. Binary assets are fetched only after an explicit Download action."
+    },
+    {
+      "id": "lpc",
+      "name": "Universal LPC",
+      "mode": "external-catalog",
+      "enabled": true,
+      "license": "MIXED",
+      "attributionRequired": true,
+      "sourceUrl": "https://github.com/BenCreating/LPC-Spritesheet-Generator",
+      "browseUrl": "https://liberatedpixelcup.github.io/Universal-LPC-Spritesheet-Character-Generator/",
+      "notes": "Connected as a mixed-license source. Automatic importing stays gated until per-item license and download metadata are resolved."
+    },
+    {
+      "id": "kenney",
+      "name": "Kenney",
+      "mode": "external-catalog",
+      "enabled": true,
+      "license": "CC0",
+      "attributionRequired": false,
+      "sourceUrl": "https://kenney.nl/assets",
+      "browseUrl": "https://kenney.nl/assets",
+      "notes": "CC0 source connected for discovery. No whole-library download is performed by Kelo World."
+    },
+    {
+      "id": "opengameart",
+      "name": "OpenGameArt",
+      "mode": "external-catalog",
+      "enabled": true,
+      "license": "MIXED",
+      "attributionRequired": true,
+      "sourceUrl": "https://opengameart.org/",
+      "browseUrl": "https://opengameart.org/",
+      "notes": "Discovery-only until an item has a verified direct file URL and compatible license. Client-side bulk scraping is intentionally disabled."
+    }
+  ]
+}
