@@ -1,3 +1,14 @@
+---
+title: Kelo Sprite Pose
+emoji: 🦴
+colorFrom: indigo
+colorTo: blue
+sdk: gradio
+python_version: 3.12
+app_file: app.py
+pinned: false
+---
+
 # Kelo Sprite Pose — Real Skeleton Space
 
 This is the dedicated pose-generation backend for Kelo Sprite AI V3.1.
@@ -89,6 +100,10 @@ When real skeleton conditioning is explicitly requested and the pose Space is no
 ## Validation gate
 
 A successful GPU response is still only a candidate. Kelo's deterministic local pipeline must validate identity drift, clipping, baseline, silhouette, motion continuity and other Frame Doctor checks before composing or publishing the final atlas.
+
+## ZeroGPU deployment
+
+This Space is intended for Hugging Face `zero-a10g` hardware. `spaces` is imported before torch/diffusers and GPU work is wrapped in `@spaces.GPU`; model placement at module scope follows the current ZeroGPU loading model.
 
 ## Status
 
