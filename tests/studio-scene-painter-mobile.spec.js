@@ -56,19 +56,21 @@ test('Scene Painter survives mobile lazy boot, Grid 3x2, one Undo and shell muta
   await expect(studio).toBeVisible({ timeout: 20000 });
   await expect(studio).not.toHaveAttribute('data-kelo-world-loading', '1', { timeout: 30000 });
 
-  // Phone boot intentionally delays build tools ~45 s. This wait proves the real serial path loaded Paint Copies.
+  // The World bridge/controller is the real session owner. Do not import studio-entry directly here:
+  // the bridge uses a versioned controller chain and a second module reference can legitimately be null.
   await page.waitForFunction(async () => {
     try {
-      const { getKeloStudioSession } = await import('./src/studio/studio-entry.mjs');
-      const session = getKeloStudioSession();
-      return !!(session?.tools?.paintCopies && window.KELO_WORLD_SURGERY?.enabled?.('paintCopies'));
+      const { getKeloStudioLive } = await import('./src/studio/integration/world-studio-bridge.mjs');
+      const studioSession = getKeloStudioLive()?.studio;
+      return !!(studioSession?.tools?.paintCopies && window.KELO_WORLD_SURGERY?.enabled?.('paintCopies'));
     } catch { return false; }
   }, null, { timeout: 75000, polling: 250 });
 
   const sourceState = await page.evaluate(async () => {
-    const { getKeloStudioSession } = await import('./src/studio/studio-entry.mjs');
+    const { getKeloStudioLive } = await import('./src/studio/integration/world-studio-bridge.mjs');
     const { createPlaceEntityCommand } = await import('./src/studio/document/document-commands.mjs');
-    const session = getKeloStudioSession();
+    const session = getKeloStudioLive()?.studio;
+    if (!session) throw new Error('SCENE_PAINTER_LIVE_STUDIO_SESSION_MISSING');
     const id = 'test:scene-painter-source';
     if (!session.kernel.document.entities.some(row => String(row.id) === id)) {
       await session.kernel.execute(createPlaceEntityCommand({
@@ -106,8 +108,9 @@ test('Scene Painter survives mobile lazy boot, Grid 3x2, one Undo and shell muta
   await expect(button).toHaveClass(/on/);
 
   const batch = await page.evaluate(async () => {
-    const { getKeloStudioSession } = await import('./src/studio/studio-entry.mjs');
-    const session = getKeloStudioSession();
+    const { getKeloStudioLive } = await import('./src/studio/integration/world-studio-bridge.mjs');
+    const session = getKeloStudioLive()?.studio;
+    if (!session) throw new Error('SCENE_PAINTER_LIVE_STUDIO_SESSION_MISSING');
     const tool = session.tools.paintCopies;
     const before = {
       entities: session.kernel.document.entities.length,
@@ -134,8 +137,9 @@ test('Scene Painter survives mobile lazy boot, Grid 3x2, one Undo and shell muta
   expect(batch.after.undoDepth - batch.before.undoDepth).toBe(1);
 
   const undo = await page.evaluate(async expected => {
-    const { getKeloStudioSession } = await import('./src/studio/studio-entry.mjs');
-    const session = getKeloStudioSession();
+    const { getKeloStudioLive } = await import('./src/studio/integration/world-studio-bridge.mjs');
+    const session = getKeloStudioLive()?.studio;
+    if (!session) throw new Error('SCENE_PAINTER_LIVE_STUDIO_SESSION_MISSING');
     await session.kernel.undo();
     return {
       entities: session.kernel.document.entities.length,
@@ -172,8 +176,8 @@ test('Scene Painter survives mobile lazy boot, Grid 3x2, one Undo and shell muta
   await page.waitForTimeout(5000);
   const pingStarted = Date.now();
   const alive = await page.evaluate(async () => {
-    const { getKeloStudioSession } = await import('./src/studio/studio-entry.mjs');
-    const session = getKeloStudioSession();
+    const { getKeloStudioLive } = await import('./src/studio/integration/world-studio-bridge.mjs');
+    const session = getKeloStudioLive()?.studio;
     return {
       studio: !!document.getElementById('kelo-studio-live'),
       toolLoaded: !!session?.tools?.paintCopies,
