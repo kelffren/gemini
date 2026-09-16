@@ -1,83 +1,40 @@
 /* KELO-INDEX
  * area: ENVIRONMENT / PROPS
- * owner: KELO_GENERIC_PROPS; collider lifecycle delegated to KELO_COLLISION
- * keys: PROP RENDER LAYERS ATLAS COLLISION OWNERSHIP
- * reuse: publicar colliders con KELO_COLLISION.replaceOwner(); no mutar obstacles
+ * owner: KELO_GENERIC_PROPS + KELO_ATLAS_CONTRACT
+ * keys: PROP RENDER ATLAS VIEWPORT RESIDENCY
+ * purpose: viewport props; editor probes excluded
  */
 (function(){
-  'use strict';
-  const C=window.KELO_PROP_CONTRACT;
-  const L=window.KELO_ENVIRONMENT_LAYERS;
-  const A=window.KELO_ATLAS_CONTRACT;
-  const K=window.KELO_COLLISION;
-  if(!C||!L||typeof L.register!=='function'||!A||typeof A.acquire!=='function'||typeof A.register!=='function'){console.error('[Kelo generic props] contract/layer stack/atlas contract missing');return;}
-  const images=new Map(),readyAssets=new Set();let failed=false;
-  const groups=Object.entries(C.layerGroups||{});
-  const stackedGroups=groups.filter(([,group])=>group.renderMode!=='immediate');
-  const sources=Object.values(C.sources||{});
-  const dynamicSourcePropCounts={};
-  const backDrawCountByGroup={};
-  const frontDrawCountByGroup={};
-  const actorRedrawCountByGroup={};
-  const COLLISION_OWNER='environment:generic-props';
-  const audit=window.KELO_GENERIC_PROP_AUDIT={version:'generic-props-v2.0',contractVersion:C.version,ready:false,failed:false,propCount:C.props.length,assetCount:Object.keys(C.assets).length,layerGroupCount:groups.length,stackedLayerGroupCount:stackedGroups.length,immediateLayerGroupCount:groups.length-stackedGroups.length,sourceCount:sources.length,dynamicSourceCount:sources.filter(s=>typeof s.instances==='function').length,rendererMode:'data-driven-props-v6-reset-visible',resourceMode:'atlas-contract-managed-v1',spatialBoundsMode:'layer-owned-visible-bounds-v1',collisionMode:'kelo-collision-owner-v2',collisionOwner:COLLISION_OWNER,decorationReset:window.KELO_WORLD_DECORATION_RESET===true,immediateDrawCalls:0,immediatePropCount:0,dynamicPropCount:0,registeredColliderCount:0,dynamicSourcePropCounts,backDrawCountByGroup,frontDrawCountByGroup,actorRedrawCountByGroup,fountainChroma:false};
-  function frameRect(a,f){if(a?.frames&&typeof f==='string'&&a.frames[f]){const r=a.frames[f];return{x:Number(r.x)||0,y:Number(r.y)||0,w:Number(r.w)||0,h:Number(r.h)||0};}const i=Number(f)||0,cols=a.columns||1;return{x:(i%cols)*a.frameWidth,y:Math.floor(i/cols)*a.frameHeight,w:a.frameWidth,h:a.frameHeight};}
-  function drawProp(g,p){const a=C.assets[p.asset],img=images.get(p.asset);if(!a||!img||!readyAssets.has(p.asset))return false;const s=frameRect(a,p.frame??0);if(!(s.w>0&&s.h>0))return false;g.drawImage(img,s.x,s.y,s.w,s.h,p.position.x,p.position.y,p.size.w,p.size.h);return true;}
-  function drawInstances(g,props,track,allowDuringReset=false){if(failed||!g||!Array.isArray(props)||(window.KELO_WORLD_DECORATION_RESET===true&&!allowDuringReset))return 0;let count=0;g.save();g.imageSmoothingEnabled=false;for(const p of props)if(p&&drawProp(g,p))count++;g.restore();if(track){audit.immediateDrawCalls++;audit.immediatePropCount=count;}return count;}
-  function actors(){const out=[];const reset=window.KELO_WORLD_DECORATION_RESET===true;const pvp=typeof isPvPActive!=='undefined'&&isPvPActive&&typeof arenaPvP!=='undefined'&&arenaPvP?.rival;if(pvp)out.push(arenaPvP.rival);else if(!reset&&typeof simulatedPlayers!=='undefined'&&Array.isArray(simulatedPlayers))out.push(...simulatedPlayers);if(typeof localPlayer!=='undefined'&&localPlayer)out.push(localPlayer);return out;}
-  function overlaps(actor,b){const r=actor?.radius||20;return actor&&b&&actor.x+r>b.x&&actor.x-r<b.x+b.w&&actor.y+r>b.y&&actor.y-r<b.y+b.h;}
-  function refreshDynamicTotal(){audit.dynamicPropCount=Object.values(dynamicSourcePropCounts).reduce((sum,n)=>sum+(Number(n)||0),0);}
-  function sourcePropsFor(groupKey){
-    const out=[];
-    for(const source of sources){
-      if(source?.layerGroup!==groupKey||typeof source.instances!=='function')continue;
-      const items=source.instances();
-      const count=Array.isArray(items)?items.length:0;
-      dynamicSourcePropCounts[source.id||groupKey]=count;
-      if(count)out.push(...items);
-    }
-    refreshDynamicTotal();
-    return out;
-  }
-  function propsFor(groupKey){const staticProps=C.props.filter(p=>p.layerGroup===groupKey);return staticProps.concat(sourcePropsFor(groupKey));}
-  function propsForRole(groupKey,role){
-    const props=propsFor(groupKey);
-    if(role==='back')return props.filter(p=>p.layerRole!=='front');
-    if(role==='front')return props.filter(p=>p.layerRole==='front'||(p.occlusion?.mode&&p.occlusion.mode!=='none'));
-    return props;
-  }
-  function drawBack(groupKey,g){const allowReset=C.layerGroups?.[groupKey]?.visibleDuringReset===true;if(failed||(window.KELO_WORLD_DECORATION_RESET===true&&!allowReset))return;backDrawCountByGroup[groupKey]=drawInstances(g,propsForRole(groupKey,'back'),false,allowReset);}
-  function drawFront(groupKey,g){
-    const allowReset=C.layerGroups?.[groupKey]?.visibleDuringReset===true;
-    if(failed||(window.KELO_WORLD_DECORATION_RESET===true&&!allowReset))return;
-    const props=propsFor(groupKey),as=actors();let count=0,actorRedraws=0;
-    g.save();g.imageSmoothingEnabled=false;
-    for(const p of props){if(p.layerRole==='front'&&drawProp(g,p))count++;}
-    for(const p of props){
-      if(p.occlusion?.mode==='actor-base-y-clip-v1'){
-        for(const actor of as){if(!overlaps(actor,p.visualBounds)||actor.y>=p.occlusion.baseY)continue;const pad=p.occlusion.clipPadding||8,r=Math.max(22,(actor.radius||20)+pad);g.save();g.beginPath();g.rect(actor.x-r,actor.y-r*1.8,r*2,r*2.5);g.clip();if(drawProp(g,p))count++;g.restore();}
-      }else if(p.occlusion?.mode==='actor-base-y-redraw-v1'&&typeof renderAvatar==='function'){
-        const bounds=p.occlusion.bounds||p.visualBounds;
-        for(const actor of as){if(!overlaps(actor,bounds)||actor.y<=p.occlusion.baseY)continue;renderAvatar(actor,typeof localPlayer!=='undefined'&&actor===localPlayer);actorRedraws++;}
-      }
-    }
-    g.restore();frontDrawCountByGroup[groupKey]=count;actorRedrawCountByGroup[groupKey]=actorRedraws;
-  }
-  function boundsFor(groupKey,role){return()=>window.KELO_WORLD_DECORATION_RESET===true&&C.layerGroups?.[groupKey]?.visibleDuringReset!==true?[]:propsForRole(groupKey,role).map(p=>({id:p.id,...p.visualBounds}));}
-  function registerStaticColliders(){
-    if(!K||typeof K.replaceOwner!=='function'){audit.registeredColliderCount=0;return;}
-    if(window.KELO_WORLD_DECORATION_RESET===true){K.clearOwner(COLLISION_OWNER);audit.registeredColliderCount=0;return;}
-    const rows=[];
-    for(const p of C.props){const c=p?.collider;if(c?.mode!=='rect')continue;rows.push({id:p.id,x:c.x,y:c.y,w:c.w,h:c.h,noDraw:c.noDraw!==false,_genericPropCollision:true});}
-    audit.registeredColliderCount=K.replaceOwner(COLLISION_OWNER,rows);
-  }
-  try{for(const [key,group] of stackedGroups){if(group.back)L.register({id:`${group.id}-back`,phase:group.back.phase,priority:group.priority,required:true,ready:()=>audit.ready,draw:g=>drawBack(key,g),ownership:group.ownership,visibleDuringReset:group.visibleDuringReset===true,bounds:boundsFor(key,'back')});if(group.front)L.register({id:`${group.id}-front`,phase:group.front.phase,priority:group.priority,required:true,ready:()=>audit.ready,draw:g=>drawFront(key,g),ownership:group.ownership,visibleDuringReset:group.visibleDuringReset===true,bounds:boundsFor(key,'front')});}}catch(err){failed=true;audit.failed=true;console.error('[Kelo generic props] layer registration failed',err);return;}
-  registerStaticColliders();
-  window.KELO_GENERIC_PROPS=Object.freeze({version:'generic-props-v2.0',resourceMode:'atlas-contract-managed-v1',collisionOwner:COLLISION_OWNER,drawInstances,isAssetReady(id){return readyAssets.has(id);},get ready(){return audit.ready&&!audit.failed;}});
-  const entries=Object.entries(C.assets).filter(([,a])=>a?.src);
-  if(!entries.length){audit.ready=true;return;}
-  for(const [id,a] of entries){
-    if(!A.describe(id))A.register(id,a,{role:'optional'});
-    A.acquire(id).then(img=>{images.set(id,img);readyAssets.add(id);if(readyAssets.size===entries.length)audit.ready=true;}).catch(err=>{failed=true;audit.failed=true;console.error('[Kelo generic props] managed asset load failed',id,err);});
-  }
+'use strict';
+const C=window.KELO_PROP_CONTRACT,L=window.KELO_ENVIRONMENT_LAYERS,A=window.KELO_ATLAS_CONTRACT,K=window.KELO_COLLISION,CAM=window.KeloCamera;
+if(!C||!L?.register||!A?.acquire||!A?.register){console.error('[Kelo generic props] contract missing');return;}
+const live=p=>!p?.id?.startsWith('map-editor-probe-'),images=new Map(),ready=new Set(),held=new Set(),loading=new Map(),wanted=new Set(),groups=Object.entries(C.layerGroups||{}),stacked=groups.filter(([,g])=>g.renderMode!=='immediate'),sources=Object.values(C.sources||{}),entries=Object.entries(C.assets||{}).filter(([,a])=>a?.src),entryMap=new Map(entries),OWNER='environment:generic-props';
+let failed=false,lastKey='',acquires=0,releases=0;
+const audit=window.KELO_GENERIC_PROP_AUDIT={version:'generic-props-v2.1-weightless',ready:false,failed:false,propCount:C.props.length,assetCount:entries.length,rendererMode:'data-driven-props-v7',resourceMode:'atlas-contract-viewport-v2',collisionOwner:OWNER,dynamicPropCount:0,initialWantedAssetCount:0,wantedAssetCount:0,residentAssetCount:0,acquireCount:0,releaseCount:0,wantedAssets:[]};
+function frame(a,f){if(a?.frames&&typeof f==='string'&&a.frames[f]){const r=a.frames[f];return{x:+r.x||0,y:+r.y||0,w:+r.w||0,h:+r.h||0};}const i=+f||0,c=a.columns||1;return{x:i%c*a.frameWidth,y:Math.floor(i/c)*a.frameHeight,w:a.frameWidth,h:a.frameHeight};}
+function drawProp(g,p){const a=C.assets[p.asset],img=images.get(p.asset);if(!a||!img||!ready.has(p.asset))return false;const s=frame(a,p.frame??0);if(!(s.w>0&&s.h>0))return false;g.drawImage(img,s.x,s.y,s.w,s.h,p.position.x,p.position.y,p.size.w,p.size.h);return true;}
+function drawInstances(g,props,track,reset=false){if(failed||!g||!Array.isArray(props)||(window.KELO_WORLD_DECORATION_RESET===true&&!reset))return 0;let n=0;g.save();g.imageSmoothingEnabled=false;for(const p of props)if(p&&drawProp(g,p))n++;g.restore();return n;}
+function actors(){const out=[],reset=window.KELO_WORLD_DECORATION_RESET===true,pvp=typeof isPvPActive!=='undefined'&&isPvPActive&&typeof arenaPvP!=='undefined'&&arenaPvP?.rival;if(pvp)out.push(arenaPvP.rival);else if(!reset&&typeof simulatedPlayers!=='undefined'&&Array.isArray(simulatedPlayers))out.push(...simulatedPlayers);if(typeof localPlayer!=='undefined'&&localPlayer)out.push(localPlayer);return out;}
+function overlaps(a,b){const r=a?.radius||20;return a&&b&&a.x+r>b.x&&a.x-r<b.x+b.w&&a.y+r>b.y&&a.y-r<b.y+b.h;}
+function sourceProps(key){const out=[];for(const s of sources){if(s?.layerGroup!==key||typeof s.instances!=='function')continue;const x=s.instances();if(Array.isArray(x))out.push(...x);}return out;}
+function props(key){return C.props.filter(p=>live(p)&&p.layerGroup===key).concat(sourceProps(key));}
+function role(key,r){const x=props(key);return r==='back'?x.filter(p=>p.layerRole!=='front'):r==='front'?x.filter(p=>p.layerRole==='front'||(p.occlusion?.mode&&p.occlusion.mode!=='none')):x;}
+function view(m=0){try{const v=CAM?.worldView?.();return v?.w>0&&v?.h>0?{x:v.left-m,y:v.top-m,w:v.w+2*m,h:v.h+2*m}:null;}catch{return null;}}
+function hit(a,b){return a&&b&&a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;}
+function allProps(){const out=C.props.filter(live);for(const [key] of groups)out.push(...sourceProps(key));return out;}
+function auditResidency(){audit.wantedAssetCount=wanted.size;audit.residentAssetCount=ready.size;audit.acquireCount=acquires;audit.releaseCount=releases;audit.wantedAssets=[...wanted];}
+function release(id){if(!held.has(id)||loading.has(id))return;images.delete(id);ready.delete(id);held.delete(id);A.release(id);releases++;}
+function acquire(id){if(ready.has(id)||loading.has(id))return loading.get(id)||Promise.resolve(images.get(id));const a=entryMap.get(id);if(!a)return Promise.resolve();held.add(id);acquires++;const p=A.acquire(id).then(img=>{loading.delete(id);if(!wanted.has(id)){held.delete(id);A.release(id);releases++;return img;}images.set(id,img);ready.add(id);auditResidency();return img;}).catch(e=>{loading.delete(id);held.delete(id);audit.failed=true;console.error('[Kelo generic props] asset',id,e);});loading.set(id,p);return p;}
+function sync(force=false,margin=window.__keloBootReady===true?128:0){const v=view(margin),key=v?[Math.floor(v.x/96),Math.floor(v.y/96),margin].join(':'):'all';if(!force&&key===lastKey)return[];lastKey=key;const next=new Set;if(v){for(const p of allProps())if(p?.asset&&entryMap.has(p.asset)&&hit(p.visualBounds||{x:p.position?.x,y:p.position?.y,w:p.size?.w,h:p.size?.h},v))next.add(p.asset);}else for(const [id] of entries)next.add(id);wanted.clear();for(const id of next)wanted.add(id);for(const id of [...held])if(!wanted.has(id))release(id);const pending=[];for(const id of wanted)if(!ready.has(id)){const p=acquire(id);if(p)pending.push(p);}auditResidency();return pending;}
+function drawBack(key,g){const reset=C.layerGroups?.[key]?.visibleDuringReset===true;if(failed||(window.KELO_WORLD_DECORATION_RESET===true&&!reset))return;sync();drawInstances(g,role(key,'back'),false,reset);}
+function drawFront(key,g){const reset=C.layerGroups?.[key]?.visibleDuringReset===true;if(failed||(window.KELO_WORLD_DECORATION_RESET===true&&!reset))return;sync();const ps=props(key),as=actors();let n=0;g.save();g.imageSmoothingEnabled=false;for(const p of ps)if(p.layerRole==='front'&&drawProp(g,p))n++;for(const p of ps){if(p.occlusion?.mode==='actor-base-y-clip-v1'){for(const a of as){if(!overlaps(a,p.visualBounds)||a.y>=p.occlusion.baseY)continue;const pad=p.occlusion.clipPadding||8,r=Math.max(22,(a.radius||20)+pad);g.save();g.beginPath();g.rect(a.x-r,a.y-r*1.8,r*2,r*2.5);g.clip();if(drawProp(g,p))n++;g.restore();}}else if(p.occlusion?.mode==='actor-base-y-redraw-v1'&&typeof renderAvatar==='function'){const b=p.occlusion.bounds||p.visualBounds;for(const a of as){if(!overlaps(a,b)||a.y<=p.occlusion.baseY)continue;renderAvatar(a,typeof localPlayer!=='undefined'&&a===localPlayer);}}}g.restore();}
+function bounds(key,r){return()=>window.KELO_WORLD_DECORATION_RESET===true&&C.layerGroups?.[key]?.visibleDuringReset!==true?[]:role(key,r).map(p=>({id:p.id,...p.visualBounds}));}
+function colliders(){if(!K?.replaceOwner)return;if(window.KELO_WORLD_DECORATION_RESET===true){K.clearOwner(OWNER);return;}K.replaceOwner(OWNER,C.props.filter(p=>p?.collider?.mode==='rect').map(p=>({id:p.id,x:p.collider.x,y:p.collider.y,w:p.collider.w,h:p.collider.h,noDraw:p.collider.noDraw!==false,_genericPropCollision:true})));}
+for(const [id,a] of entries)if(!A.describe(id))A.register(id,a,{role:'optional'});
+try{for(const [key,g] of stacked){if(g.back)L.register({id:`${g.id}-back`,phase:g.back.phase,priority:g.priority,required:true,ready:()=>audit.ready,draw:x=>drawBack(key,x),ownership:g.ownership,visibleDuringReset:g.visibleDuringReset===true,bounds:bounds(key,'back')});if(g.front)L.register({id:`${g.id}-front`,phase:g.front.phase,priority:g.priority,required:true,ready:()=>audit.ready,draw:x=>drawFront(key,x),ownership:g.ownership,visibleDuringReset:g.visibleDuringReset===true,bounds:bounds(key,'front')});}}catch(e){failed=true;audit.failed=true;console.error('[Kelo generic props] layers',e);return;}
+colliders();
+window.KELO_GENERIC_PROPS=Object.freeze({version:audit.version,resourceMode:audit.resourceMode,collisionOwner:OWNER,drawInstances,syncResidency:()=>sync(true),residencySnapshot:()=>({wanted:[...wanted],resident:[...ready],held:[...held]}),isAssetReady:id=>ready.has(id),get ready(){return audit.ready&&!audit.failed;}});
+if(!entries.length){audit.ready=true;return;}
+const initial=sync(true,0);audit.initialWantedAssetCount=wanted.size;Promise.allSettled(initial).then(r=>{audit.failed=r.some(x=>x.status==='rejected');audit.ready=true;auditResidency();});
+window.addEventListener('kelo:viewportchange',()=>sync(true));window.addEventListener('kelo:camerazoomchange',()=>sync(true));
 })();

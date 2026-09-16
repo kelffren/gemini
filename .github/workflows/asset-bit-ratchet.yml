@@ -7,6 +7,7 @@ on:
       - 'assets/**'
       - 'data/**'
       - 'C/**'
+      - 'config/instant-delivery*.json'
       - 'engine-*.js'
       - 'src/**/*.js'
       - 'src/**/*.mjs'
@@ -15,7 +16,10 @@ on:
       - 'scripts/asset-global-dedup*.mjs'
       - 'scripts/asset-space-budget.mjs'
       - 'scripts/boot-footprint*.mjs'
+      - 'scripts/observed-boot-transfer*.mjs'
+      - 'scripts/instant-delivery*.mjs'
       - 'scripts/exact-*reconstruction*.mjs'
+      - 'docs/systems/INSTANT_DELIVERY_COMPILER.md'
       - '.github/workflows/asset-bit-ratchet.yml'
 
 concurrency:
@@ -42,6 +46,9 @@ jobs:
           node scripts/asset-global-dedup-audit.mjs
           node scripts/boot-footprint-ratchet-audit.mjs
           node scripts/exact-tile-reconstruction-audit.mjs
+          node scripts/observed-boot-transfer-ratchet-audit.mjs
+          node scripts/instant-delivery-compiler-audit.mjs
+          node scripts/instant-delivery-usage-audit.mjs
       - name: Measure head asset information and bytes
         run: node scripts/asset-space-budget.mjs --input=assets --max-files=10000 --report=test-results/asset-space-budget-head
       - name: Plan exact global blob dedup
@@ -50,10 +57,10 @@ jobs:
         run: node scripts/exact-reconstruction-lab.mjs --input=assets --max-files=80 --report=test-results/exact-reconstruction/report.json
       - name: Measure head first-playable footprint closure
         run: node scripts/boot-footprint.mjs --root=. --report=test-results/boot-footprint-head/report.json
-      - name: Materialize base worktree and measure it with the same head tools
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      - name: Materialize exact merge base and measure it with the same head tools
         run: |
+          BASE_SHA="$(git rev-parse HEAD^1)"
+          echo "Weightless exact merge base: $BASE_SHA"
           git worktree add --detach /tmp/kelo-world-base "$BASE_SHA"
           node scripts/asset-space-budget.mjs --input=/tmp/kelo-world-base/assets --display-root=/tmp/kelo-world-base --max-files=10000 --report=/tmp/asset-space-budget-base
           node scripts/boot-footprint.mjs --root=/tmp/kelo-world-base --report=/tmp/boot-footprint-base.json
@@ -87,4 +94,83 @@ jobs:
             test-results/exact-reconstruction
             test-results/boot-footprint-head
             test-results/boot-footprint-ratchet
+          if-no-files-found: ignore
+
+  instant-delivery-lab:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - name: Install build-only image codec lab
+        run: npm install --no-save --no-audit --no-fund sharp@0.35.4
+      - name: Validate declared runtime coverage
+        run: node scripts/instant-delivery-usage-audit.mjs --config=config/instant-delivery-plaza.json
+      - name: Generate exact/codec delivery candidates
+        run: node scripts/instant-delivery-compiler.mjs --config=config/instant-delivery-plaza.json --output=test-results/instant-delivery
+      - name: Publish Instant Delivery summary
+        if: always()
+        run: |
+          if [ -f test-results/instant-delivery/manifest.json ]; then
+            node -e "const r=require('./test-results/instant-delivery/manifest.json'); const t=r.totals; require('fs').appendFileSync(process.env.GITHUB_STEP_SUMMARY, '# Instant Delivery V5\n\nSource bytes tested: '+t.sourceBytes+'\n\nCandidate bytes: '+t.candidateBytes+'\n\nMeasured candidate savings: '+t.candidateSavedBytes+' bytes ('+t.candidateSavedPercent+'%)\n\nAuto-promotion: '+r.autoPromotion+'\n')"
+          fi
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: kelo-instant-delivery-candidates
+          path: test-results/instant-delivery
+          if-no-files-found: error
+
+  observed-boot-transfer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      CI: true
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - name: Install browser measurement dependencies
+        run: |
+          npm install --no-audit --no-fund
+          npx playwright install chromium --with-deps
+      - name: Observed transfer deterministic self-test
+        run: node scripts/observed-boot-transfer-ratchet-audit.mjs
+      - name: Materialize exact merge base and start exact head/base servers
+        run: |
+          BASE_SHA="$(git rev-parse HEAD^1)"
+          echo "Observed-transfer exact merge base: $BASE_SHA"
+          git worktree add --detach /tmp/kelo-observed-base "$BASE_SHA"
+          mkdir -p test-results/observed-boot-transfer
+          python3 -m http.server 4173 --bind 127.0.0.1 > test-results/observed-boot-transfer/head-http.log 2>&1 &
+          (cd /tmp/kelo-observed-base && python3 -m http.server 4174 --bind 127.0.0.1 > /tmp/kelo-observed-base-http.log 2>&1) &
+          for port in 4173 4174; do
+            for i in {1..30}; do
+              if curl -fsS "http://127.0.0.1:${port}/index.html" >/dev/null; then break; fi
+              sleep 1
+            done
+            curl -fsS "http://127.0.0.1:${port}/index.html" >/dev/null
+          done
+      - name: Observe head requests through first playable
+        run: node scripts/observed-boot-transfer.mjs --runs=3 --url=http://127.0.0.1:4173/ --report=test-results/observed-boot-transfer/head.json
+      - name: Observe base requests through first playable with the same probe
+        run: node scripts/observed-boot-transfer.mjs --runs=3 --url=http://127.0.0.1:4174/ --report=test-results/observed-boot-transfer/base.json
+      - name: Enforce observed first-playable stable-core transfer ratchet
+        run: node scripts/observed-boot-transfer-ratchet.mjs --base=test-results/observed-boot-transfer/base.json --head=test-results/observed-boot-transfer/head.json --report=test-results/observed-boot-transfer/ratchet.json
+      - name: Publish observed transfer summary
+        if: always()
+        run: |
+          if [ -f test-results/observed-boot-transfer/ratchet.json ]; then
+            node -e "const r=require('./test-results/observed-boot-transfer/ratchet.json'); const s=r.summary; require('fs').appendFileSync(process.env.GITHUB_STEP_SUMMARY, '\n# Observed first-playable transfer V3 — stable core\n\nPass: '+r.pass+'\n\nStable payload bytes: '+s.basePayloadBytes+' -> '+s.headPayloadBytes+' ('+s.payloadDeltaBytes+')\n\nStable requests: '+s.baseRequestCount+' -> '+s.headRequestCount+' ('+s.requestDelta+')\n\nStable resources: '+s.baseResourceCount+' -> '+s.headResourceCount+'\n\nRaw median payload: '+s.baseRawPayloadBytes+' -> '+s.headRawPayloadBytes+'\n\nBoundary resources: '+s.baseUnstableResourceCount+' -> '+s.headUnstableResourceCount+'\n\nBoot-ready median: '+s.baseBootReadyMs.toFixed(1)+' ms -> '+s.headBootReadyMs.toFixed(1)+' ms (advisory)\n')"
+          fi
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: kelo-weightless-observed-boot
+          path: test-results/observed-boot-transfer
           if-no-files-found: ignore

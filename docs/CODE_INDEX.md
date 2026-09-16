@@ -25,10 +25,14 @@
 ## Build / Weightless
 
 - `src/build/boot-footprint-ratchet.mjs` — mide y compara el peso estático anterior a `kelo:boot-ready`.
+- `src/build/observed-boot-transfer-ratchet.mjs` — compara 3× el tráfico móvil realmente iniciado antes de `boot-ready` y separa núcleo estable de carreras de frontera.
 - `scripts/boot-footprint.mjs` — snapshot CLI del first-playable path.
 - `scripts/boot-footprint-ratchet.mjs` — gate monotónico de JS/CSS crítico.
 - `scripts/boot-footprint-ratchet-audit.mjs` — corpus determinista del boot ratchet.
-- `.github/workflows/asset-bit-ratchet.yml` — Kelo Weightless Stack: assets, dedup, reconstrucción exacta y first-playable footprint.
+- `scripts/observed-boot-transfer.mjs` — sonda Playwright iPhone del tráfico real, viewport y residencia de props/atlas en `boot-ready`.
+- `scripts/observed-boot-transfer-ratchet.mjs` — gate monotónico del núcleo observado 3/3.
+- `scripts/observed-boot-transfer-ratchet-audit.mjs` — regresión determinista del gate observado.
+- `.github/workflows/asset-bit-ratchet.yml` — Kelo Weightless Stack: assets, dedup, reconstrucción exacta, Instant Delivery y first-playable estático/observado.
 - `.github/workflows/weightless-evolution-lab.yml` — laboratorio periódico/manual de búsqueda de representaciones más pequeñas; solo evidencia, no muta producción.
 
 ## World / Environment
@@ -40,6 +44,7 @@
 - `src/environment/environment-layer-stack.js` — draw phases.
 - `src/environment/surface-ground.js` — suelo.
 - `src/environment/prop-contract.js` — props data-driven.
+- `src/environment/generic-props.js` — renderer de props + residencia viewport-scoped reutilizando `KELO_ATLAS_CONTRACT`; cero prefetch especulativo antes de `boot-ready`.
 - `src/environment/prefab-contract.js` — prefab rendering contract.
 - `src/environment/world-builder-system.js` — builder integration.
 - `src/environment/generated/forest-plaza-tileset-v2-manifest.js` — manifest irregular Forest Plaza.
@@ -66,11 +71,13 @@
 - `src/creators/assets/runtime-image-variants.mjs` — laboratorio DELIVERY PNG/WebP/AVIF en sRGB, con timings/memoria y bloqueo por device proof.
 - `src/creators/assets/delivery-device-proof.mjs` — contrato formal de benchmark real iOS Safari.
 - `src/creators/assets/asset-delivery-manifest.mjs` — variantes DELIVERY inmutables por hash + provenance.
+- `src/creators/assets/instant-delivery-compiler.mjs` — Weightless V5: sparse atlases exactos de coordenadas lógicas + torneo lossless reutilizando los owners existentes.
 - `src/creators/assets/smart-atlas-planner.mjs` — trim alpha-safe, `orig/trim/anchor`, MaxRects y subframe dedup.
 - `src/creators/assets/asset-budget-policy.mjs` — límites declarativos por grupo/zona para bytes, RGBA, file count y asset máximo.
 - `src/creators/assets/asset-bit-ratchet.mjs` — compara snapshots base/head y bloquea codificaciones mayores cuando el hash RGBA decodificado no cambió.
 - `src/creators/assets/asset-global-dedup.mjs` — planifica blobs byte-exact compartibles y campeones RGBA-exact sin mutar SOURCE.
 - `src/creators/assets/exact-tile-reconstruction.mjs` — diccionario de bloques + mapa de índices con prueba de reconstrucción RGBA exacta.
+- `config/instant-delivery-plaza.json` — cobertura explícita y candidatos V5 para Plaza; no es un catálogo runtime paralelo.
 - `docs/asset-space-budgets.json` — política inicial de budget de bibliotecas/zonas; no infiere loading runtime.
 - `scripts/asset-space-compiler.mjs` — CLI FAST/AUTO/BALANCED/DEEP, before/after/diff, perfil, provenance y reporte.
 - `scripts/asset-space-budget.mjs` — transferencia, RGBA baseline, transparencia y duplicados exactos.
@@ -80,6 +87,9 @@
 - `scripts/asset-global-dedup-audit.mjs` — regresión determinista del dedup planner.
 - `scripts/exact-reconstruction-lab.mjs` — escanea PNG reales buscando estructura repetida reversible.
 - `scripts/exact-tile-reconstruction-audit.mjs` — prueba determinista de reconstrucción byte-exacta.
+- `scripts/instant-delivery-compiler.mjs` — ejecuta planes V5 y materializa candidatos content-addressed sin tocar SOURCE.
+- `scripts/instant-delivery-compiler-audit.mjs` — prueba dimensiones, píxeles cubiertos exactos, transparencia exterior y rechazo OOB.
+- `scripts/instant-delivery-usage-audit.mjs` — bloquea sparse atlases cuya cobertura no incluya todos los frames del consumer auditado.
 - `scripts/asset-route-budget-audit.mjs` — enforcement CI de grupos declarados en `docs/asset-space-budgets.json`.
 - `scripts/asset-animation-consistency-audit.mjs` — corpus adversarial de flicker/anchor/alpha temporal.
 - `scripts/asset-codec-tournament.mjs` — laboratorio profundo de codecs y variantes de entrega.
