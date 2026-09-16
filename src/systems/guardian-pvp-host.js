@@ -1,22 +1,22 @@
 /* KELO-INDEX
  * area: GUARDIAN / PVP HOST
  * owner: KeloGuardianPvPHost
- * keys: GUARDIAN PVP TEMPORARY AUTHORITY ROOM FIXED STEP INTENT SNAPSHOT LEASE EPOCH TAKEOVER RATE LIMIT WORKER MOBILE
- * purpose: coordina una autoridad PvP temporal en un Web Worker aislado y restaura una semilla segura al cambiar de Master
+ * keys: GUARDIAN PVP TEMPORARY AUTHORITY ROOM FIXED STEP INTENT SNAPSHOT LEASE EPOCH TAKEOVER RATE LIMIT WORKER PRUNE MOBILE
+ * purpose: coordina una autoridad PvP temporal en un Web Worker aislado, restaura una semilla segura y poda actores no reclamados al cambiar de Master
  * consumes: KeloGuardian + GuardianPvPAuthorityWorker + KeloSimulation
- * state-owned: una sala PvP efímera, snapshots, semilla de takeover, rate-limit y diagnóstico
+ * state-owned: una sala PvP efímera, snapshots, semilla de takeover, rate-limit, prune y diagnóstico
  * online: autoridad gameplay SOLO dentro de la sala temporal mientras la lease Master/epoch sigan válidos; servidor central siempre tiene prioridad
  * do-not: NO economía, NO inventario, NO persistencia, NO recompensas, NO segundo loop, NO autoproclamarse Master
  */
 (function(root){
 'use strict';
 if(root.KeloGuardianPvPHost||!root.KeloGuardian)return;
-const VERSION='kelo-guardian-pvp-host-v2-worker',SCHEMA=1,FIXED_DT=1/60,MAX_PLAYERS=16,MAX_MESSAGE_BYTES=48*1024,MAX_CATCHUP_STEPS=5,TAKEOVER_MAX_AGE_MS=7000,MAX_INPUTS_PER_SECOND=90;
-const WORKER_URL='src/workers/guardian-pvp-authority-worker.js?v=2-takeover';
+const VERSION='kelo-guardian-pvp-host-v2.1-worker-prune',SCHEMA=1,FIXED_DT=1/60,MAX_PLAYERS=16,MAX_MESSAGE_BYTES=48*1024,MAX_CATCHUP_STEPS=5,TAKEOVER_MAX_AGE_MS=7000,MAX_INPUTS_PER_SECOND=90,RESTORED_ACTOR_RECLAIM_MS=5000;
+const WORKER_URL='src/workers/guardian-pvp-authority-worker.js?v=3-takeover-prune';
 let activeRoom=null,latest=null,lastSnapshotSeq=0,lastSnapshotEpoch=0,lastError=null,wasMaster=false,observedEpoch=0,accumulator=0,lastEmitKey='';
 let worker=null,workerRoom=null,workerReady=false;
 const inputRateByPeer=new Map();
-const stats={intentsAccepted:0,intentsRejected:0,rateLimited:0,snapshotsSent:0,snapshotsReceived:0,leaseResets:0,roomsCreated:0,maxCatchupHit:0,takeoversRestored:0,playersRestored:0,transientActionsReset:0,projectilesReset:0,workerStarts:0,workerErrors:0};
+const stats={intentsAccepted:0,intentsRejected:0,rateLimited:0,snapshotsSent:0,snapshotsReceived:0,leaseResets:0,roomsCreated:0,maxCatchupHit:0,takeoversRestored:0,playersRestored:0,transientActionsReset:0,projectilesReset:0,staleRestoredPlayersPruned:0,workerStarts:0,workerErrors:0};
 function guardian(){try{return root.KeloGuardian.state();}catch(_){return{};}}
 function epoch(){return Number(guardian().master?.epoch||guardian().network?.masterEpoch||0)||0;}
 function short(v,max=96){return String(v==null?'':v).replace(/[\u0000-\u001f]/g,'').slice(0,max);}
@@ -56,11 +56,11 @@ function handleWorkerMessage(event){
   if(msg.roomId!=null&&String(msg.roomId)!==String(row.id))return;
   if(msg.epoch!=null&&Number(msg.epoch)!==Number(row.epoch))return;
   if(msg.t==='ready'){
-    workerReady=true;row.ready=true;row.tick=Math.max(0,Number(msg.tickOffset)||0);row.takeoverFromEpoch=Math.max(0,Number(msg.takeoverFromEpoch)||0);
+    workerReady=true;row.ready=true;row.tick=Math.max(0,Number(msg.tickOffset)||0);row.takeoverFromEpoch=Math.max(0,Number(msg.takeoverFromEpoch)||0);row.restoredActorReclaimMs=Math.max(0,Number(msg.restoredActorReclaimMs)||RESTORED_ACTOR_RECLAIM_MS);
     if(msg.takeoverRestored){
       const restored=Math.max(0,Number(msg.playersRestored)||0),resetProjectiles=Math.max(0,Number(msg.projectilesReset)||0);
       stats.takeoversRestored++;stats.playersRestored+=restored;stats.transientActionsReset+=restored;stats.projectilesReset+=resetProjectiles;
-      const notice={t:'guardian:pvp_takeover',schema:SCHEMA,roomId:row.id,previousEpoch:row.takeoverFromEpoch,newEpoch:row.epoch,sourceSnapshotSeq:Math.max(0,Number(msg.takeoverSnapshotSeq)||0),serverTick:row.tick,playersRestored:restored,transientActionsReset:true,projectilesReset:true,at:Date.now(),persistentAuthority:false};
+      const notice={t:'guardian:pvp_takeover',schema:SCHEMA,roomId:row.id,previousEpoch:row.takeoverFromEpoch,newEpoch:row.epoch,sourceSnapshotSeq:Math.max(0,Number(msg.takeoverSnapshotSeq)||0),serverTick:row.tick,playersRestored:restored,restoredActorReclaimMs:row.restoredActorReclaimMs,transientActionsReset:true,projectilesReset:true,at:Date.now(),persistentAuthority:false};
       root.KeloGuardian.broadcast(notice);try{root.dispatchEvent(new CustomEvent('kelo:guardian-pvp-takeover',{detail:notice}));}catch(_){}
     }
     lastError=null;emit(true);return;
@@ -70,11 +70,16 @@ function handleWorkerMessage(event){
     const reject={t:'guardian:pvp_reject',schema:SCHEMA,roomId:row.id,epoch:row.epoch,nodeId:short(msg.nodeId,96),actorId:short(msg.actorId,80),sequence:Number(msg.sequence)||0,ackSequence:Number(msg.ackSequence)||0,code:short(msg.code||'REJECTED',64)};
     root.KeloGuardian.broadcast(reject);dispatchReject(reject);emit(true);return;
   }
+  if(msg.t==='pruned'){
+    const count=Math.max(0,Number(msg.count)||0);stats.staleRestoredPlayersPruned+=count;row.staleRestoredPlayersPruned=Math.max(0,Number(msg.total)||stats.staleRestoredPlayersPruned);row.updatedAt=Date.now();
+    const detail={roomId:row.id,epoch:row.epoch,count,total:row.staleRestoredPlayersPruned,actorIds:Array.isArray(msg.actorIds)?msg.actorIds.slice(0,MAX_PLAYERS).map(v=>short(v,80)):[],reclaimMs:Math.max(0,Number(msg.reclaimMs)||RESTORED_ACTOR_RECLAIM_MS),at:Date.now()};
+    try{root.dispatchEvent(new CustomEvent('kelo:guardian-pvp-pruned',{detail}));}catch(_){}emit(true);return;
+  }
   if(msg.t==='snapshot'){
-    const out={t:'guardian:pvp_snapshot',schema:SCHEMA,roomId:row.id,epoch:row.epoch,masterNodeId:short(guardian().nodeId,96),seq:Math.max(1,Number(msg.seq)||1),serverTick:Math.max(0,Number(msg.serverTick)||0),serverTime:Number(msg.serverTime)||Date.now(),fixedDt:Number(msg.fixedDt)||FIXED_DT,maxRewindMs:Math.max(0,Number(msg.maxRewindMs)||0),inputBufferMs:Math.max(0,Number(msg.inputBufferMs)||0),movementProfileVersion:short(msg.movementProfileVersion,80),players:msg.players&&typeof msg.players==='object'?msg.players:{},projectiles:Array.isArray(msg.projectiles)?msg.projectiles.slice(0,64):[],events:Array.isArray(msg.events)?msg.events.slice(-32):[],temporaryAuthority:true,persistentAuthority:false,economyAuthority:false,inventoryAuthority:false};
+    const out={t:'guardian:pvp_snapshot',schema:SCHEMA,roomId:row.id,epoch:row.epoch,masterNodeId:short(guardian().nodeId,96),seq:Math.max(1,Number(msg.seq)||1),serverTick:Math.max(0,Number(msg.serverTick)||0),serverTime:Number(msg.serverTime)||Date.now(),fixedDt:Number(msg.fixedDt)||FIXED_DT,maxRewindMs:Math.max(0,Number(msg.maxRewindMs)||0),inputBufferMs:Math.max(0,Number(msg.inputBufferMs)||0),movementProfileVersion:short(msg.movementProfileVersion,80),players:msg.players&&typeof msg.players==='object'?msg.players:{},projectiles:Array.isArray(msg.projectiles)?msg.projectiles.slice(0,64):[],events:Array.isArray(msg.events)?msg.events.slice(-32):[],staleRestoredPlayersPruned:Math.max(0,Number(msg.staleRestoredPlayersPruned)||0),temporaryAuthority:true,persistentAuthority:false,economyAuthority:false,inventoryAuthority:false};
     if(bytes(out)>MAX_MESSAGE_BYTES){out.projectiles=[];out.events=[];}
     if(bytes(out)>MAX_MESSAGE_BYTES){lastError='GUARDIAN_PVP_SNAPSHOT_TOO_LARGE';emit(true);return;}
-    row.tick=out.serverTick;row.players=Object.keys(out.players).length;row.updatedAt=Date.now();
+    row.tick=out.serverTick;row.players=Object.keys(out.players).length;row.staleRestoredPlayersPruned=Math.max(row.staleRestoredPlayersPruned||0,out.staleRestoredPlayersPruned);row.updatedAt=Date.now();
     const sent=root.KeloGuardian.broadcast(out);if(sent>0)stats.snapshotsSent++;
     acceptSnapshot(guardian().nodeId,out,true);return;
   }
@@ -86,7 +91,7 @@ function startWorker(id,seed){
   const e=epoch();if(!e)return false;
   try{
     const url=new URL(WORKER_URL,document.baseURI).href,w=new root.Worker(url);
-    worker=w;workerReady=false;workerRoom={id,epoch:e,ready:false,players:0,tick:seed?Math.max(0,Number(seed.serverTick)||0):0,createdAt:Date.now(),updatedAt:Date.now(),takeoverFromEpoch:seed?Math.max(0,Number(seed.epoch)||0):0};
+    worker=w;workerReady=false;workerRoom={id,epoch:e,ready:false,players:0,tick:seed?Math.max(0,Number(seed.serverTick)||0):0,createdAt:Date.now(),updatedAt:Date.now(),takeoverFromEpoch:seed?Math.max(0,Number(seed.epoch)||0):0,restoredActorReclaimMs:RESTORED_ACTOR_RECLAIM_MS,staleRestoredPlayersPruned:0};
     w.onmessage=handleWorkerMessage;
     w.onerror=event=>{stats.workerErrors++;lastError='GUARDIAN_PVP_WORKER_LOAD_ERROR:'+short(event?.message||'',180);stopWorker('worker-load-error');emit(true);};
     w.onmessageerror=()=>{stats.workerErrors++;lastError='GUARDIAN_PVP_WORKER_MESSAGE_ERROR';stopWorker('worker-message-error');emit(true);};
@@ -157,16 +162,16 @@ function tick(context){
   emit();
 }
 function state(){
-  const g=guardian(),now=Date.now(),hosted=workerRoom?Object.freeze({id:workerRoom.id,epoch:workerRoom.epoch,ready:workerReady,players:workerRoom.players,tick:workerRoom.tick,takeoverFromEpoch:workerRoom.takeoverFromEpoch||0,updatedAt:workerRoom.updatedAt}):null;
-  return Object.freeze({version:VERSION,enabled:!!g.enabled,active:isActive(),roomId:activeRoom,actorId:actorId(),masterActive:!!g.masterActive,masterNodeId:g.master?.nodeId||null,masterEpoch:epoch(),workerSupported:workerSupported(),workerReady,hostedRooms:Object.freeze(hosted?[hosted]:[]),latestSnapshot:latest?Object.freeze({roomId:latest.roomId,epoch:latest.epoch,seq:latest.seq,serverTick:latest.serverTick,ageMs:Math.max(0,now-latest.receivedAt),players:Object.keys(latest.players||{}).length}):null,stats:Object.freeze({...stats}),takeover:Object.freeze({maxAgeMs:TAKEOVER_MAX_AGE_MS,transientActionsReset:true,projectilesReset:true}),temporaryGameplayAuthority:true,persistentAuthority:false,economyAuthority:false,inventoryAuthority:false,rewardsAuthority:false,lastError});
+  const g=guardian(),now=Date.now(),hosted=workerRoom?Object.freeze({id:workerRoom.id,epoch:workerRoom.epoch,ready:workerReady,players:workerRoom.players,tick:workerRoom.tick,takeoverFromEpoch:workerRoom.takeoverFromEpoch||0,restoredActorReclaimMs:workerRoom.restoredActorReclaimMs||RESTORED_ACTOR_RECLAIM_MS,staleRestoredPlayersPruned:workerRoom.staleRestoredPlayersPruned||0,updatedAt:workerRoom.updatedAt}):null;
+  return Object.freeze({version:VERSION,enabled:!!g.enabled,active:isActive(),roomId:activeRoom,actorId:actorId(),masterActive:!!g.masterActive,masterNodeId:g.master?.nodeId||null,masterEpoch:epoch(),workerSupported:workerSupported(),workerReady,hostedRooms:Object.freeze(hosted?[hosted]:[]),latestSnapshot:latest?Object.freeze({roomId:latest.roomId,epoch:latest.epoch,seq:latest.seq,serverTick:latest.serverTick,ageMs:Math.max(0,now-latest.receivedAt),players:Object.keys(latest.players||{}).length,staleRestoredPlayersPruned:Number(latest.staleRestoredPlayersPruned)||0}):null,stats:Object.freeze({...stats}),takeover:Object.freeze({maxAgeMs:TAKEOVER_MAX_AGE_MS,restoredActorPrune:true,restoredActorReclaimMs:RESTORED_ACTOR_RECLAIM_MS,transientActionsReset:true,projectilesReset:true}),temporaryGameplayAuthority:true,persistentAuthority:false,economyAuthority:false,inventoryAuthority:false,rewardsAuthority:false,lastError});
 }
-function emit(force){const s=state(),key=[s.active,s.roomId,s.masterActive,s.masterEpoch,s.workerReady,s.hostedRooms.length,s.latestSnapshot?.seq||0,s.stats.intentsAccepted,s.stats.intentsRejected,s.stats.takeoversRestored,s.lastError||''].join('|');if(!force&&key===lastEmitKey)return s;lastEmitKey=key;try{root.dispatchEvent(new CustomEvent('kelo:guardian-pvp-state',{detail:s}));}catch(_){}return s;}
+function emit(force){const s=state(),key=[s.active,s.roomId,s.masterActive,s.masterEpoch,s.workerReady,s.hostedRooms.length,s.latestSnapshot?.seq||0,s.stats.intentsAccepted,s.stats.intentsRejected,s.stats.takeoversRestored,s.stats.staleRestoredPlayersPruned,s.lastError||''].join('|');if(!force&&key===lastEmitKey)return s;lastEmitKey=key;try{root.dispatchEvent(new CustomEvent('kelo:guardian-pvp-state',{detail:s}));}catch(_){}return s;}
 root.addEventListener('kelo:guardian-data',onGuardianData,{passive:true});
 root.addEventListener('kelo:guardian-state',()=>{reconcileLease();emit(true);},{passive:true});
 root.addEventListener('pagehide',()=>stopWorker('pagehide'),{once:true});
 if(!root.KeloSimulation||typeof root.KeloSimulation.after!=='function')throw new Error('GUARDIAN_PVP_SIMULATION_OWNER_UNAVAILABLE');
 root.KeloSimulation.after('guardian:pvp-host',tick,375);
 root.KeloGuardianPvPHost=Object.freeze({version:VERSION,state,start,stop,isActive,actorId,submitIntent,latestSnapshot:()=>latest});
-root.KELO_GUARDIAN_PVP_HOST_AUDIT=Object.freeze({version:VERSION,owner:'KeloGuardianPvPHost',isolatedWorker:true,statusRealmIsolated:true,workerOwnLoop:false,existingGuardianDataChannel:true,fixedStep:true,maxRooms:1,maxPlayers:MAX_PLAYERS,maxCatchupSteps:MAX_CATCHUP_STEPS,leaseFenced:true,epochFenced:true,snapshotEpochFenced:true,inputRateLimit:MAX_INPUTS_PER_SECOND,takeoverRestore:true,takeoverMaxAgeMs:TAKEOVER_MAX_AGE_MS,transientActionsReset:true,projectilesReset:true,centralAuthorityPriority:true,temporaryGameplayAuthority:true,persistentAuthority:false,economyAuthority:false,inventoryAuthority:false,rewardsAuthority:false,secondLoop:false,localStorage:false});
+root.KELO_GUARDIAN_PVP_HOST_AUDIT=Object.freeze({version:VERSION,owner:'KeloGuardianPvPHost',isolatedWorker:true,statusRealmIsolated:true,workerOwnLoop:false,existingGuardianDataChannel:true,fixedStep:true,maxRooms:1,maxPlayers:MAX_PLAYERS,maxCatchupSteps:MAX_CATCHUP_STEPS,leaseFenced:true,epochFenced:true,snapshotEpochFenced:true,inputRateLimit:MAX_INPUTS_PER_SECOND,takeoverRestore:true,takeoverMaxAgeMs:TAKEOVER_MAX_AGE_MS,restoredActorPrune:true,restoredActorReclaimMs:RESTORED_ACTOR_RECLAIM_MS,transientActionsReset:true,projectilesReset:true,centralAuthorityPriority:true,temporaryGameplayAuthority:true,persistentAuthority:false,economyAuthority:false,inventoryAuthority:false,rewardsAuthority:false,secondLoop:false,localStorage:false});
 reconcileLease();emit(true);
 })(typeof globalThis!=='undefined'?globalThis:window);
