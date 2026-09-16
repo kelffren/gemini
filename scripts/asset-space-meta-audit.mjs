@@ -1,8 +1,8 @@
 /* KELO-INDEX
  * area: BUILD / CREATOR ASSET INGEST
  * owner: Kelo Creator Asset Bridge
- * keys: ASSET SPACE META AUDIT PROFILE SEAM RENDER EXACT QUALITY BOUNDARY TOURNAMENT PATH TOKENS
- * purpose: prove asset classification, path-token safety, seam/render-exact hard-gates, bounded quality search and verified codec tournament behavior
+ * keys: ASSET SPACE META AUDIT PROFILE SEAM RENDER EXACT QUALITY BOUNDARY NON MONOTONIC TOURNAMENT PATH TOKENS
+ * purpose: prove asset classification, path-token safety, seam/render-exact hard-gates, bounded measured quality search and verified codec tournament behavior
  * public-api: CLI audit
  * state-owned: none
  * online: N/A
@@ -94,13 +94,13 @@ alphaChanged[3] = 1;
 const alphaMetrics = evaluatePixelFidelity(sprite, alphaChanged, 24, 24);
 assert(judgePixelFidelity(alphaMetrics, 'render-exact').pass === false, 'render-exact rejects alpha change');
 
-// Boundary search: a synthetic codec passes quality >=83. A linear integer scan
-// from 60..100 would require 41 encodes; the controller must locate 83 within six.
+// Monotonic synthetic codec. We require the exact measured boundary, but give the
+// multi-boundary controller enough budget to prove it instead of assuming it.
 const boundarySearch = await searchIntegerQualityBoundary({
   min:60,
   max:100,
   coarseStep:10,
-  maxEvaluations:6,
+  maxEvaluations:8,
   neighborRadius:0,
   evaluate:async quality=>({
     pass:quality>=83,
@@ -109,10 +109,37 @@ const boundarySearch = await searchIntegerQualityBoundary({
     reasons:quality>=83?[]:['synthetic-quality-gate']
   })
 });
+const measuredBoundary = boundarySearch.evaluated.find(item=>item.quality===boundarySearch.boundaryPass);
 assert(boundarySearch.boundaryPass === 83, `boundary quality=${boundarySearch.boundaryPass}`);
-assert(boundarySearch.budget.used <= 6, `boundary evaluations=${boundarySearch.budget.used}`);
+assert(measuredBoundary?.pass === true, 'boundary must be an actually measured pass');
+assert(boundarySearch.budget.used <= 8, `boundary evaluations=${boundarySearch.budget.used}`);
 assert(boundarySearch.order.every(q=>boundarySearch.evaluated.some(item=>item.quality===q)), 'boundary never invents unmeasured result');
 assert(boundarySearch.bestByBytes?.quality === 83, `boundary byte winner=${boundarySearch.bestByBytes?.quality}`);
+assert(boundarySearch.nonMonotonicDetected === false, 'monotonic fixture must remain monotonic');
+
+// Non-monotonic synthetic codec: high qualities pass, then fail, then a smaller
+// isolated pass island reappears. Search must retain that measured outlier rather
+// than forcing results into one binary frontier.
+const nonMonotonicSearch = await searchIntegerQualityBoundary({
+  min:60,
+  max:100,
+  coarseStep:10,
+  maxEvaluations:12,
+  neighborRadius:2,
+  evaluate:async quality=>{
+    const pass = quality>=88 || (quality>=72 && quality<=75);
+    return {
+      pass,
+      bytes:pass ? 3000-quality*11 : 4000,
+      score:pass ? 0.95 : 0.4,
+      reasons:pass?[]:['synthetic-non-monotonic-fail']
+    };
+  }
+});
+assert(nonMonotonicSearch.nonMonotonicDetected === true, 'must detect measured non-monotonic pass island');
+assert(nonMonotonicSearch.transitions.length >= 2, `non-monotonic transitions=${nonMonotonicSearch.transitions.length}`);
+assert(nonMonotonicSearch.evaluated.some(item=>item.quality===75 && item.pass), 'outlier probe must retain lower pass island');
+assert(nonMonotonicSearch.order.every(q=>nonMonotonicSearch.evaluated.some(item=>item.quality===q)), 'non-monotonic search never invents unmeasured result');
 
 const png = encodeRgbaPng(source, width, height, {level:1, filterStrategy:0});
 const tournament = optimizePngTournament(png, {effort:'balanced'});
@@ -132,6 +159,7 @@ console.log(JSON.stringify({
   renderExactHiddenChanges:hiddenMetrics.hiddenTransparentRgbChangedPixels,
   renderExactGate:judgePixelFidelity(hiddenMetrics, 'render-exact').pass,
   boundarySearch:{order:boundarySearch.order,boundaryPass:boundarySearch.boundaryPass,evaluations:boundarySearch.budget.used},
+  nonMonotonicSearch:{order:nonMonotonicSearch.order,transitions:nonMonotonicSearch.transitions,detected:nonMonotonicSearch.nonMonotonicDetected},
   borderGate:judgePixelFidelity(borderMetrics, 'seam-safe').reasons,
   sourceBytes:png.length,
   tournamentBytes:tournament.buffer.length,
