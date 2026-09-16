@@ -1,15 +1,29 @@
 /* KELO-INDEX
  * area: TEST / PVP
  * owner: Playwright validation only
- * keys: PVP BUTTON FIRST-USE DODGE DASH COLLISION MOBILE DESKTOP LIVE WINNER
- * purpose: bloquea la ruta visible botón PvP -> lazy runtime -> mundo PvP y después valida dodge 112 px real
- * online: N/A; valida el runtime local exacto de main sin alterar autoridad
- * do-not: NO gameplay mutation fuera de setup reproducible de prueba
+ * keys: PVP BUTTON FIRST-USE GUEST DODGE DASH COLLISION MOBILE DESKTOP LIVE WINNER
+ * purpose: bloquea la ruta humana Guest -> botón PvP -> lazy runtime -> mundo PvP y después valida dodge 112 px real
+ * online: N/A; valida el runtime local exacto del candidato sin alterar autoridad
+ * do-not: NO gameplay mutation fuera de setup reproducible de prueba, NO force click, NO bypass directo de enterPvPWorld
  */
 const {test,expect}=require('@playwright/test');
 
+async function reachVisibleGameplay(page){
+  await page.waitForFunction(()=>document.getElementById('kelo-account-auth')||document.getElementById('lx-side-pvp'),{timeout:20000});
+  const gate=page.locator('#kelo-account-auth');
+  if(await gate.isVisible()){
+    const guest=gate.locator('[data-action="guest"]');
+    await expect(guest).toBeVisible({timeout:10000});
+    await expect(guest).toContainText(/Jugar como invitado/i);
+    await guest.click();
+    await expect(gate).toBeHidden({timeout:20000});
+  }
+  await expect(page.locator('#lx-side-pvp')).toBeVisible({timeout:20000});
+}
+
 async function enterThroughVisiblePvpButton(page,label){
   await page.waitForFunction(()=>window.KELO_MODULE_LOADER&&document.getElementById('lx-side-pvp'),{timeout:20000});
+  await reachVisibleGameplay(page);
   const before=await page.evaluate(()=>({
     pvpWorld:!!window.KeloPvPWorld,
     enter:typeof window.enterPvPWorld==='function',
@@ -20,7 +34,6 @@ async function enterThroughVisiblePvpButton(page,label){
   expect(before.loaderReady).toBe(false);
 
   const button=page.locator('#lx-side-pvp');
-  await expect(button).toBeVisible();
   await button.click();
   await page.waitForFunction(()=>window.KELO_MODULE_LOADER&&window.KELO_MODULE_LOADER.isReady('pvp')&&window.KeloPvPWorld&&typeof window.enterPvPWorld==='function'&&window.KELO_PVP_COMBAT_LOADER_AUDIT?.ready===true,{timeout:30000});
   await page.waitForFunction(()=>window.KeloPvPWorld&&window.KeloAbilities&&window.KeloPvPWorld.state.mode==='pvp'&&window.KeloPvPWorld.state.combatEnabled,{timeout:20000});
