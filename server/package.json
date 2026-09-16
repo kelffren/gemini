@@ -13,6 +13,7 @@
     "test:sprite-ai": "node sprite-ai-smoke-test.js"
   },
   "dependencies": {
+    "@gradio/client": "2.6.0",
     "ws": "8.21.3"
   }
 }
