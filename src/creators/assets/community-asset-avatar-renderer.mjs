@@ -72,7 +72,7 @@ function frameColumn(profile,actor){
 export function installCommunityAssetAvatarRenderer({root=globalThis}={}){
   if(root.__KELO_COMMUNITY_ASSET_RENDERER__)return root.__KELO_COMMUNITY_ASSET_RENDERER__;
   const cache=new Map();
-  const audit={version:'community-avatar-render-v1',installed:false,middlewareId:null,draws:0,misses:0,errors:0,cacheSize:0,priority:950};
+  const audit={version:'community-avatar-render-v1.0.1',installed:false,middlewareId:null,draws:0,misses:0,errors:0,cacheSize:0,priority:950};
 
   function imageFor(entry){
     const url=entry?.objectUrl;if(!url)return null;
@@ -100,7 +100,7 @@ export function installCommunityAssetAvatarRenderer({root=globalThis}={}){
       const anchor=profile.anchor&&typeof profile.anchor==='object'?profile.anchor:{x:.5,y:1},ax=clamp(anchor.x,0,1,.5),ay=clamp(anchor.y,0,1,1),dx=(Number(layout.footRootX)||0)-dw*ax+off.x,dy=(Number(layout.footRootY)||0)-dh*ay+off.y;
       g.translate(dx+dw*.5,dy+dh*.5);g.rotate(rotation);g.drawImage(image,col*sw,row*sh,sw,sh,-dw*.5,-dh*.5,dw,dh);
     }else{
-      const socket=socketFor(root,actor,layout,profile.socket,face),ratio=image.naturalWidth/Math.max(1,image.naturalHeight),heightScale=clamp(profile.heightScale,.08,4,.5),widthScale=clamp(profile.widthScale,.08,4,heightScale),h=(Number(layout.visualHeight)||90)*heightScale*scale,w=h*ratio*(widthScale/heightScale),anchor=profile.anchor&&typeof profile.anchor==='object'?profile.anchor:{x:.5,y:.5},ax=clamp(anchor.x,0,1,.5),ay=clamp(anchor.y,0,1,.5);
+      const socket=socketFor(root,actor,layout,profile.socket,face),ratio=image.naturalWidth/Math.max(1,image.naturalHeight),heightScale=clamp(profile.heightScale,.08,4,.5),widthScale=clamp(profile.widthScale,.08,4,1),h=(Number(layout.visualHeight)||90)*heightScale*scale,w=h*ratio*widthScale,anchor=profile.anchor&&typeof profile.anchor==='object'?profile.anchor:{x:.5,y:.5},ax=clamp(anchor.x,0,1,.5),ay=clamp(anchor.y,0,1,.5);
       g.translate(socket.x+off.x,socket.y+off.y);g.rotate(rotation);g.drawImage(image,-w*ax,-h*ay,w,h);
     }
     g.imageSmoothingEnabled=previousSmoothing;g.restore();audit.draws++;return true;
