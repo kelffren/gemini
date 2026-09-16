@@ -1,0 +1,47 @@
+name: Asset Space Effort Benchmark
+
+on:
+  push:
+    branches:
+      - feat/adaptive-png-space-compiler
+    paths:
+      - 'src/creators/assets/png-space-optimizer.mjs'
+      - 'src/creators/assets/png-quality-agent.mjs'
+      - 'src/creators/assets/asset-image-profiler.mjs'
+      - 'scripts/asset-space-effort-benchmark.mjs'
+      - 'assets/hero.PNG'
+      - 'assets/cespedsindivisiones.PNG'
+      - 'assets/world/trees/kelo-tree-pack-01/tree-apple-red.png'
+      - '.github/workflows/asset-space-effort-benchmark.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: asset-space-effort-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Benchmark FAST BALANCED DEEP exact search
+        run: node scripts/asset-space-effort-benchmark.mjs --report=test-results/asset-space-effort
+      - name: Publish byte/time frontier
+        if: always()
+        run: |
+          if [ -f test-results/asset-space-effort/report.json ]; then
+            node -e "const r=require('./test-results/asset-space-effort/report.json'); require('fs').appendFileSync(process.env.GITHUB_STEP_SUMMARY, '# Asset Space Effort Frontier\n\nFAST: -'+r.totals.fast.savedPercent+'% in '+r.totals.fast.elapsedMs+' ms\n\nBALANCED: -'+r.totals.balanced.savedPercent+'% in '+r.totals.balanced.elapsedMs+' ms\n\nDEEP: -'+r.totals.deep.savedPercent+'% in '+r.totals.deep.elapsedMs+' ms\n\nDEEP marginal vs FAST: '+r.deepVsFast.extraSavedBytes+' bytes for '+r.deepVsFast.extraMs+' extra ms ('+r.deepVsFast.bytesPerExtraSecond+' B/extra-second)\n')"
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: asset-space-effort-benchmark
+          path: test-results/asset-space-effort
+          if-no-files-found: error
