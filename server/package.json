@@ -10,7 +10,8 @@
     "test:smoke": "node smoke-test.js",
     "test:persistence": "node persistence-smoke-test.js",
     "test:avatar-realtime": "node avatar-realtime-smoke-test.js",
-    "test:sprite-ai": "node sprite-ai-smoke-test.js && node sprite-ai-resource-governor-test.js"
+    "test:sprite-ai": "node sprite-ai-smoke-test.js && node sprite-ai-resource-governor-test.js",
+    "test:world-director": "node world-director-smoke-test.js && node world-director-runtime-smoke-test.js && node world-event-executor-smoke-test.js && node world-director-bridge-smoke-test.js && node world-event-server-integration-smoke-test.js"
   },
   "dependencies": {
     "@gradio/client": "2.6.0",

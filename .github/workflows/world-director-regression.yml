@@ -1,0 +1,56 @@
+name: World Director Regression
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'server/index.js'
+      - 'server/world-director-*.js'
+      - 'server/world-event-*.js'
+      - 'server/package.json'
+      - 'docs/systems/LIVE_WORLD_DIRECTOR.md'
+      - 'docs/system-catalog.json'
+      - '.github/workflows/world-director-regression.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'server/index.js'
+      - 'server/world-director-*.js'
+      - 'server/world-event-*.js'
+      - 'server/package.json'
+      - 'docs/systems/LIVE_WORLD_DIRECTOR.md'
+      - 'docs/system-catalog.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  world-director:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+
+      - name: Install server dependencies
+        working-directory: server
+        run: npm install --no-audit --no-fund
+
+      - name: Director + Executor smoke suite
+        working-directory: server
+        env:
+          OPENAI_API_KEY: ''
+        run: npm run test:world-director
+
+      - name: Real server composition smoke
+        working-directory: server
+        env:
+          OPENAI_API_KEY: ''
+          KELO_WORLD_DIRECTOR_AI: '0'
+        run: npm run test:smoke
