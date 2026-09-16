@@ -144,4 +144,39 @@
 <script src="src/core/admin-control-lazy-gate.js?v=2"></script>
 <script src="src/core/account-live-control-gate.js?v=2"></script>
 <script src="src/core/creators-lazy-gate.js?v=3"></script>
+<script>
+(function(){
+  'use strict';
+  const selector='[id*="minimap" i],[class*="minimap" i],[id*="mini-map" i],[class*="mini-map" i],[data-minimap]';
+  function moveVisibleMinimap(){
+    const nodes=Array.from(document.querySelectorAll(selector));
+    for(const el of nodes){
+      if(!(el instanceof HTMLElement))continue;
+      const cs=getComputedStyle(el),r=el.getBoundingClientRect();
+      if(cs.display==='none'||cs.visibility==='hidden'||Number(cs.opacity)===0)continue;
+      if(r.width<48||r.height<48)continue;
+      if(r.width>260||r.height>260)continue;
+      const ratio=r.width/r.height;if(ratio<.55||ratio>1.8)continue;
+      el.style.setProperty('position','fixed','important');
+      el.style.setProperty('left','max(12px, env(safe-area-inset-left))','important');
+      el.style.setProperty('top','calc(env(safe-area-inset-top, 0px) + 12px)','important');
+      el.style.setProperty('right','auto','important');
+      el.style.setProperty('bottom','auto','important');
+      el.style.setProperty('z-index','2147480050','important');
+      el.dataset.keloMinimapPosition='top-left';
+      return true;
+    }
+    return false;
+  }
+  const move=()=>requestAnimationFrame(moveVisibleMinimap);
+  move();
+  window.addEventListener('pageshow',move,{passive:true});
+  window.addEventListener('resize',move,{passive:true});
+  window.addEventListener('orientationchange',move,{passive:true});
+  window.addEventListener('kelo:boot-ready',move,{once:true});
+  const observer=new MutationObserver(move);
+  observer.observe(document.body,{childList:true,subtree:true});
+  window.KELO_MINIMAP_POSITION=Object.freeze({position:'top-left',owner:'index-layout-adapter',refresh:moveVisibleMinimap});
+})();
+</script>
 </body></html>
