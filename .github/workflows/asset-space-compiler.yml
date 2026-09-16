@@ -12,7 +12,9 @@ on:
       - 'src/creators/assets/quality-pareto.mjs'
       - 'src/creators/assets/perceptual-quality-bridge.mjs'
       - 'scripts/asset-space-*.mjs'
+      - 'scripts/asset-atlas-space-audit.mjs'
       - 'scripts/asset-codec-tournament.mjs'
+      - 'src/environment/generated/*manifest*.js'
       - 'assets/**/*.png'
       - 'C/**/*.png'
       - '.github/workflows/asset-space-compiler.yml'
@@ -24,7 +26,9 @@ on:
       - 'src/creators/assets/quality-pareto.mjs'
       - 'src/creators/assets/perceptual-quality-bridge.mjs'
       - 'scripts/asset-space-*.mjs'
+      - 'scripts/asset-atlas-space-audit.mjs'
       - 'scripts/asset-codec-tournament.mjs'
+      - 'src/environment/generated/*manifest*.js'
       - 'assets/**/*.png'
       - 'C/**/*.png'
       - '.github/workflows/asset-space-compiler.yml'
@@ -71,8 +75,10 @@ jobs:
         run: node scripts/system-documentation-audit.js
       - name: Asset transfer / decode / transparency budget
         run: node scripts/asset-space-budget.mjs --input="${{ github.event.inputs.input_path || 'assets' }}" --max-files=80 --report=test-results/asset-space-budget
+      - name: Forest Plaza atlas occupancy / trim / repack budget
+        run: node scripts/asset-atlas-space-audit.mjs --manifest=src/environment/generated/forest-plaza-tileset-v2-manifest.js --report=test-results/asset-atlas-space
       - name: Dry-run representative real PNG assets
-        run: node scripts/asset-space-compiler.mjs --input="${{ github.event.inputs.input_path || 'assets' }}" --mode=strict --max-files=12 --report=test-results/asset-space-report
+        run: node scripts/asset-space-compiler.mjs --input="${{ github.event.inputs.input_path || 'assets' }}" --mode=strict --effort=fast --max-files=12 --report=test-results/asset-space-report
       - name: Publish summary
         if: always()
         run: |
@@ -82,6 +88,9 @@ jobs:
           if [ -f test-results/asset-space-budget/report.json ]; then
             node -e "const r=require('./test-results/asset-space-budget/report.json'); require('fs').appendFileSync(process.env.GITHUB_STEP_SUMMARY, '\n## Asset memory budget\n\nStored: '+r.totals.storedBytes+' bytes\n\nDecoded RGBA baseline: '+r.totals.decodedRgbaBytes+' bytes ('+r.totals.decodedExpansion+'x)\n\nExact duplicate groups: '+r.totals.duplicateGroups+'\n')"
           fi
+          if [ -f test-results/asset-atlas-space/report.json ]; then
+            node -e "const r=require('./test-results/asset-atlas-space/report.json'); require('fs').appendFileSync(process.env.GITHUB_STEP_SUMMARY, '\n## Forest Plaza atlas geometry\n\nFrames: '+r.atlas.frameCount+'\n\nSourceRect union: '+(r.geometry.sourceRectUnionRatio*100).toFixed(2)+'%\n\nVisual bounds: '+(r.geometry.visualBoundsAreaRatio*100).toFixed(2)+'%\n\nConservative shelf-pack area saving: '+(r.conservativeShelfPack?.estimatedAreaSavingPercent||0).toFixed(2)+'%\n')"
+          fi
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -89,6 +98,7 @@ jobs:
           path: |
             test-results/asset-space-report
             test-results/asset-space-budget
+            test-results/asset-atlas-space
           if-no-files-found: ignore
 
   adaptive-lab:
@@ -103,7 +113,7 @@ jobs:
       - name: Install adaptive image codec
         run: npm install --no-save sharp@0.35.4
       - name: Adaptive dry-run with captures
-        run: node scripts/asset-space-compiler.mjs --input="${{ github.event.inputs.input_path }}" --mode=adaptive --capture --max-files=12 --report=test-results/asset-space-adaptive
+        run: node scripts/asset-space-compiler.mjs --input="${{ github.event.inputs.input_path }}" --mode=adaptive --effort=deep --capture --max-files=12 --report=test-results/asset-space-adaptive
       - uses: actions/upload-artifact@v4
         if: always()
         with:
