@@ -225,7 +225,12 @@ const socialAppearance = appearanceContext(false, { moving: true });
 ok(socialAppearance.context.KELO_CHARACTER_APPEARANCE_AUDIT.lastDraw.face === 'right', 'SOCIAL_RENDER_DID_NOT_USE_MOVEMENT_FACE');
 ok(socialAppearance.context.KELO_CHARACTER_APPEARANCE_AUDIT.lastDraw.faceSource === 'movement', 'SOCIAL_FACE_SOURCE_NOT_REPORTED');
 
-ok(movingCombatAppearance.context.KELO_CHARACTER_APPEARANCE_AUDIT.combatAimFacingPolicy === 'idle-or-attack-commitment', 'POLICY_NOT_AUDITABLE');
+const facingPolicy = String(movingCombatAppearance.context.KELO_CHARACTER_APPEARANCE_AUDIT.combatAimFacingPolicy || '');
+ok(
+  movingCombatAppearance.context.KELO_CHARACTER_APPEARANCE_AUDIT.usesCombatAimFacing === true &&
+  facingPolicy.includes('idle') && facingPolicy.includes('attack') && facingPolicy.includes('cast'),
+  'POLICY_NOT_AUDITABLE'
+);
 
 console.log(JSON.stringify({
   status: 'PVP_AIM_FACING_OK',
@@ -242,5 +247,5 @@ console.log(JSON.stringify({
   beforeIdlePlantRenderedFrame: 0,
   afterIdlePlantRenderedFrame: idleCombatAppearance.context.KELO_CHARACTER_APPEARANCE_AUDIT.lastDraw.frame,
   explicitIdlePlantFrameHonored: idleCombatAppearance.context.KELO_CHARACTER_APPEARANCE_AUDIT.lastDraw.frame === 2,
-  policy: movingCombatAppearance.context.KELO_CHARACTER_APPEARANCE_AUDIT.combatAimFacingPolicy
+  policy: facingPolicy
 }, null, 2));
