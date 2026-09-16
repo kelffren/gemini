@@ -2,13 +2,26 @@ name: Asset Space Effort Benchmark
 
 on:
   push:
-    branches:
-      - feat/adaptive-png-space-compiler
+    branches: [main]
     paths:
       - 'src/creators/assets/png-space-optimizer.mjs'
       - 'src/creators/assets/png-quality-agent.mjs'
       - 'src/creators/assets/asset-image-profiler.mjs'
+      - 'src/creators/assets/asset-effort-controller.mjs'
       - 'scripts/asset-space-effort-benchmark.mjs'
+      - 'scripts/asset-effort-controller-audit.mjs'
+      - 'assets/hero.PNG'
+      - 'assets/cespedsindivisiones.PNG'
+      - 'assets/world/trees/kelo-tree-pack-01/tree-apple-red.png'
+      - '.github/workflows/asset-space-effort-benchmark.yml'
+  pull_request:
+    paths:
+      - 'src/creators/assets/png-space-optimizer.mjs'
+      - 'src/creators/assets/png-quality-agent.mjs'
+      - 'src/creators/assets/asset-image-profiler.mjs'
+      - 'src/creators/assets/asset-effort-controller.mjs'
+      - 'scripts/asset-space-effort-benchmark.mjs'
+      - 'scripts/asset-effort-controller-audit.mjs'
       - 'assets/hero.PNG'
       - 'assets/cespedsindivisiones.PNG'
       - 'assets/world/trees/kelo-tree-pack-01/tree-apple-red.png'
@@ -27,19 +40,21 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '24'
-      - name: Benchmark FAST BALANCED DEEP exact search
+      - name: Audit AUTO escalation policy
+        run: node scripts/asset-effort-controller-audit.mjs
+      - name: Benchmark FAST AUTO BALANCED DEEP exact search
         run: node scripts/asset-space-effort-benchmark.mjs --report=test-results/asset-space-effort
       - name: Publish byte/time frontier
         if: always()
         run: |
           if [ -f test-results/asset-space-effort/report.json ]; then
-            node -e "const r=require('./test-results/asset-space-effort/report.json'); require('fs').appendFileSync(process.env.GITHUB_STEP_SUMMARY, '# Asset Space Effort Frontier\n\nFAST: -'+r.totals.fast.savedPercent+'% in '+r.totals.fast.elapsedMs+' ms\n\nBALANCED: -'+r.totals.balanced.savedPercent+'% in '+r.totals.balanced.elapsedMs+' ms\n\nDEEP: -'+r.totals.deep.savedPercent+'% in '+r.totals.deep.elapsedMs+' ms\n\nDEEP marginal vs FAST: '+r.deepVsFast.extraSavedBytes+' bytes for '+r.deepVsFast.extraMs+' extra ms ('+r.deepVsFast.bytesPerExtraSecond+' B/extra-second)\n')"
+            node -e "const r=require('./test-results/asset-space-effort/report.json'); require('fs').appendFileSync(process.env.GITHUB_STEP_SUMMARY, '# Asset Space Effort Frontier V2\n\nFAST: -'+r.totals.fast.savedPercent+'% in '+r.totals.fast.elapsedMs+' ms\n\nAUTO: -'+r.totals.auto.savedPercent+'% in '+r.totals.auto.elapsedMs+' ms\n\nBALANCED: -'+r.totals.balanced.savedPercent+'% in '+r.totals.balanced.elapsedMs+' ms\n\nDEEP: -'+r.totals.deep.savedPercent+'% in '+r.totals.deep.elapsedMs+' ms\n\nAUTO vs BALANCED CPU saved: '+r.frontier.autoVsBalanced.cpuPercentSaved+'% ('+r.frontier.autoVsBalanced.elapsedMsSaved+' ms) with sameBytes='+r.frontier.autoVsBalanced.sameBytes+'\n')"
           fi
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: asset-space-effort-benchmark
