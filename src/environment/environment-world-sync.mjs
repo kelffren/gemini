@@ -1,13 +1,13 @@
 /* KELO-INDEX
  * area: ENVIRONMENT / ONLINE
  * owner: canonical world environment synchronization
- * owns: initial REST convergence, Supabase Realtime subscription, role-gated publish RPC and revision ordering
+ * owns: initial REST convergence, Supabase Realtime subscription, role-gated publish/rollback RPCs and revision ordering
  * does-not-own: rendering, Creator preview state, auth UI or service-role secrets
  */
 import { KELO_SUPABASE_PUBLIC_CONFIG } from '../online/kelo-supabase-public-config.mjs';
 import { installEnvironmentRuntime, normalizeEnvironmentState } from './environment-runtime.mjs';
 
-const VERSION='kelo-world-environment-sync-v1';
+const VERSION='kelo-world-environment-sync-v2';
 const TOPIC='world:environment';
 const SOCKET_TOPIC=`realtime:${TOPIC}`;
 const BROADCAST_EVENT='environment_changed';
@@ -17,7 +17,7 @@ const RECONNECT_DELAYS=[1000,2000,4000,8000,15000];
 const trimSlash=value=>String(value||'').replace(/\/+$/,'');
 const numberOr=(value,fallback)=>Number.isFinite(Number(value))?Number(value):fallback;
 
-export function rowToWorldEnvironmentEnvelope(row={}){
+export function rowToWorldEnvironmentEnvelope(row={},meta={}){
   const state=normalizeEnvironmentState({
     biome:row.biome,
     weather:row.weather,
@@ -26,10 +26,13 @@ export function rowToWorldEnvironmentEnvelope(row={}){
     musicMood:row.music_mood??row.musicMood,
     accent:row.accent
   });
+  const sourceRevision=meta.sourceRevision??row.source_revision??row.sourceRevision??null;
   return Object.freeze({
     id:String(row.id||'global'),
     revision:Math.max(0,Math.trunc(numberOr(row.revision,0))),
     schemaVersion:Math.max(1,Math.trunc(numberOr(row.schema_version??row.schemaVersion,1))),
+    action:String(meta.action??row.action??'sync'),
+    sourceRevision:sourceRevision==null?null:Math.max(0,Math.trunc(numberOr(sourceRevision,0))),
     state,
     updatedAt:row.updated_at??row.updatedAt??null,
     updatedBy:row.updated_by??row.updatedBy??null
@@ -44,6 +47,8 @@ function normalizeBroadcastEnvelope(value={}){
     id:String(raw.id||'global'),
     revision:Math.max(0,Math.trunc(numberOr(raw.revision,0))),
     schemaVersion:Math.max(1,Math.trunc(numberOr(raw.schemaVersion??raw.schema_version,1))),
+    action:String(raw.action||'realtime'),
+    sourceRevision:raw.sourceRevision==null&&raw.source_revision==null?null:Math.max(0,Math.trunc(numberOr(raw.sourceRevision??raw.source_revision,0))),
     state,
     updatedAt:raw.updatedAt??raw.updated_at??null,
     updatedBy:raw.updatedBy??raw.updated_by??null
@@ -67,7 +72,7 @@ export function installWorldEnvironmentSync(root=globalThis,{config=KELO_SUPABAS
 
   let envelope=null,socket=null,heartbeatTimer=0,reconnectTimer=0,reconnectAttempt=0,refSeq=0,joinRef=null,started=false,stopped=false;
   const listeners=[];
-  const audit={version:VERSION,ready:false,started:false,connected:false,lastRevision:0,lastRefreshAt:0,lastRealtimeAt:0,lastPublishAt:0,reconnects:0,lastError:null};
+  const audit={version:VERSION,ready:false,started:false,connected:false,lastRevision:0,lastRefreshAt:0,lastRealtimeAt:0,lastPublishAt:0,lastRollbackAt:0,reconnects:0,lastError:null};
 
   const nextRef=()=>String(++refSeq);
   function dispatch(name,detail){try{root?.dispatchEvent?.(new root.CustomEvent(name,{detail}));}catch{}}
@@ -78,7 +83,7 @@ export function installWorldEnvironmentSync(root=globalThis,{config=KELO_SUPABAS
   function accept(next,{source='sync'}={}){
     if(!next||next.id!=='global'||next.revision<=0)return false;
     if(envelope&&next.revision<envelope.revision)return false;
-    if(envelope&&next.revision===envelope.revision&&source!=='refresh')return false;
+    if(envelope&&next.revision===envelope.revision&&source!=='refresh'&&source!=='conflict-refresh')return false;
     envelope=next;audit.lastRevision=next.revision;
     runtime.receivePublished?.(next.state,{source:`world-${source}`,revision:next.revision,updatedAt:next.updatedAt,updatedBy:next.updatedBy});
     dispatch('kelo:world-environment-synced',Object.freeze({source,envelope:next}));
@@ -90,7 +95,7 @@ export function installWorldEnvironmentSync(root=globalThis,{config=KELO_SUPABAS
       const data=await responseJson(await fetcher(`${base}/rest/v1/${SELECT_PATH}`,{headers:headers()}));
       const row=Array.isArray(data)?data[0]:data;
       if(!row)throw new Error('WORLD_ENVIRONMENT_STATE_MISSING');
-      const next=rowToWorldEnvironmentEnvelope(row);accept(next,{source});audit.lastRefreshAt=Date.now();audit.ready=true;audit.lastError=null;return next;
+      const next=rowToWorldEnvironmentEnvelope(row,{action:'refresh'});accept(next,{source});audit.lastRefreshAt=Date.now();audit.ready=true;audit.lastError=null;return next;
     }catch(error){audit.lastError=String(error?.message||error);dispatch('kelo:world-environment-sync-error',{stage:'refresh',error});throw error;}
   }
 
@@ -104,12 +109,32 @@ export function installWorldEnvironmentSync(root=globalThis,{config=KELO_SUPABAS
         body:JSON.stringify({p_state:state,p_expected_revision:expected})
       }));
       const row=Array.isArray(data)?data[0]:data;if(!row)throw new Error('WORLD_ENVIRONMENT_PUBLISH_EMPTY');
-      const next=rowToWorldEnvironmentEnvelope(row);accept(next,{source:'publish'});audit.lastPublishAt=Date.now();audit.lastError=null;
+      const next=rowToWorldEnvironmentEnvelope(row,{action:'publish',sourceRevision:expected});accept(next,{source:'publish'});audit.lastPublishAt=Date.now();audit.lastError=null;
       dispatch('kelo:world-environment-published',Object.freeze({source,envelope:next}));return next;
     }catch(error){
       audit.lastError=String(error?.message||error);
       if(String(error?.message||'').includes('ENVIRONMENT_REVISION_CONFLICT')){try{await refresh({source:'conflict-refresh'});}catch{}}
       dispatch('kelo:world-environment-sync-error',{stage:'publish',source,error});throw error;
+    }
+  }
+
+  async function rollback(targetRevision,{accessToken=null,expectedRevision=null,source='creator-undo'}={}){
+    const token=String(accessToken||'').trim();if(!token)throw new Error('AUTH_REQUIRED');
+    const target=Math.trunc(Number(targetRevision)||0);if(target<1)throw new Error('INVALID_TARGET_REVISION');
+    const expected=expectedRevision==null?(envelope?.revision||null):Math.trunc(Number(expectedRevision)||0);
+    try{
+      const data=await responseJson(await fetcher(`${base}/rest/v1/rpc/rollback_world_environment`,{
+        method:'POST',
+        headers:headers({'Authorization':`Bearer ${token}`,'Content-Type':'application/json','Prefer':'return=representation'}),
+        body:JSON.stringify({p_target_revision:target,p_expected_revision:expected})
+      }));
+      const row=Array.isArray(data)?data[0]:data;if(!row)throw new Error('WORLD_ENVIRONMENT_ROLLBACK_EMPTY');
+      const next=rowToWorldEnvironmentEnvelope(row,{action:'rollback',sourceRevision:target});accept(next,{source:'rollback'});audit.lastRollbackAt=Date.now();audit.lastError=null;
+      dispatch('kelo:world-environment-rolled-back',Object.freeze({source,targetRevision:target,envelope:next}));return next;
+    }catch(error){
+      audit.lastError=String(error?.message||error);
+      if(String(error?.message||'').includes('ENVIRONMENT_REVISION_CONFLICT')){try{await refresh({source:'conflict-refresh'});}catch{}}
+      dispatch('kelo:world-environment-sync-error',{stage:'rollback',source,targetRevision:target,error});throw error;
     }
   }
 
@@ -163,7 +188,7 @@ export function installWorldEnvironmentSync(root=globalThis,{config=KELO_SUPABAS
   function stop(){stopped=true;started=false;audit.started=false;audit.connected=false;clearReconnect();clearHeartbeat();for(const [target,event,handler,options] of listeners.splice(0))try{target.removeEventListener(event,handler,options);}catch{}try{socket?.close?.();}catch{}socket=null;return true;}
 
   const api=Object.freeze({
-    version:VERSION,start,stop,refresh,publish,
+    version:VERSION,start,stop,refresh,publish,rollback,
     get envelope(){return envelope;},
     get revision(){return envelope?.revision||0;},
     get connected(){return audit.connected;},
