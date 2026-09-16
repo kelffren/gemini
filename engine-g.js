@@ -1,15 +1,15 @@
 /* KELO-INDEX
  * area: LEGACY ABILITY / MOVEMENT
- * owner: legacy skill aiming; movement extension owned by KeloMovement; render extension owned by KeloRender
+ * owner: legacy skill/dash state; pointer lifecycle + final aim/render owned by KeloAbilityAim; movement extension owned by KeloMovement
  * keys: DASH AIM MOVEMENT INTERCEPT SKILL INDICATOR RENDER HOOK
- * purpose: conserva aiming/dash legacy y registra extensiones mediante owners Foundation
+ * purpose: conserva dash/cast legacy mientras KeloAbilityAim posee el lifecycle de puntero y aiming final
  * public-api: funciones legacy skill aim/renderActionBar
  * consumes: KeloMovement, KeloRender, STATE, localPlayer, obstacles
  * state-owned: skillAim + dashTween legacy
- * extension-points: KeloMovement.intercept + KeloRender.afterFrame
+ * extension-points: KeloMovement.intercept; KeloAbilityAim adapter
  * reuse: NO añadir habilidades nuevas aquí; usar sistema moderno de abilities
- * legacy: skill stack aún pendiente de migración
- * do-not: NO volver a envolver updateMovement ni render
+ * legacy: skill/dash state aún pendiente de migración; listeners globales retirados
+ * do-not: NO volver a envolver updateMovement/render ni registrar pointermove/up/cancel aquí
  */
 const skillAim = { active: false, index: -1, typeId: '', pointerId: null, originX: 0, originY: 0, currentX: 0, currentY: 0, dirX: 1, dirY: 0 };
 const dashTween = { active: false, t: 0, dur: 0.16, fromX: 0, fromY: 0, toX: 0, toY: 0 };
@@ -82,12 +82,6 @@ renderActionBar = function() {
     container.appendChild(slot);
   });
 };
-window.addEventListener('pointermove', (e) => {
-  if (!skillAim.active || e.pointerId !== skillAim.pointerId) return;
-  skillAim.currentX = e.clientX; skillAim.currentY = e.clientY; updateAimFromPointer(e.clientX, e.clientY);
-}, { passive: true });
-window.addEventListener('pointerup', endSkillAim);
-window.addEventListener('pointercancel', endSkillAim);
 if(!window.KeloMovement) throw new Error('KeloMovement unavailable before engine-g');
 window.KeloMovement.intercept('engine-g:legacy-dash', function(ctx) {
   if (!dashTween.active) return false;
