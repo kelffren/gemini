@@ -1,22 +1,23 @@
 /* KELO-INDEX
  * area: CORE / OPTIONAL UI
  * owner: KeloCreatorsLazyGate
- * keys: CREATORS CREATOR LIBRARY ASSET FORGE LAZY FIRST-USE ADMIN MOBILE SAFARI NO-FREEZE ASSET CATALOG
- * purpose: mantiene Creators y Creator Library disponibles sin evaluar Studio hasta que el usuario los abre; Library no carga el catálogo grande
- * public-api: KeloCreatorsLazyGate.open/openCreatorLibrary/openAssetForge/sync
- * consumes: KELO_ADMIN_KEYS + Luxe menu
+ * keys: CREATORS CREATOR LIBRARY ASSET FORGE CONTENT DELIVERY LAZY FIRST-USE ADMIN MOBILE SAFARI NO-FREEZE ASSET CATALOG
+ * purpose: mantiene Creators/Library disponibles y expone Delivery metadata-first sin evaluar Creator OS pesado hasta uso explícito
+ * public-api: KeloCreatorsLazyGate.open/openCreatorLibrary/openAssetForge/sync + KeloCreatorDelivery.useRevision/manifest
+ * consumes: KELO_ADMIN_KEYS + Luxe menu; Delivery reutiliza auth/entitlement/runtime owners existentes
  * state-owned: solo promesas efímeras de carga lazy
  * extension-points: Creator Library enruta a workspaces; Asset Forge sigue disponible como API compatible
- * do-not: NO creator imports on normal boot, NO polling, NO second loop, NO eager full asset catalog for Library
+ * do-not: NO heavy creator imports on normal boot, NO polling, NO second loop, NO eager full asset catalog, NO eager content sync
  */
 (function(root){
 'use strict';
 if(root.KeloCreatorsLazyGate)return;
-const VERSION='kelo-creators-lazy-gate-v7-creator-library';
+const VERSION='kelo-creators-lazy-gate-v8-content-delivery';
 const LAUNCHER_SRC='src/ui/studio-launcher.js?v=creator-os-20260915-1';
 const ASSET_CATALOG_SRC='src/property/property-asset-catalog.js?v=creator-assets-20260915-1';
 const creatorModuleUrl=()=>new URL('src/creators/creator-entry.mjs?v=creator-os-20260915-1',root.document?.baseURI||root.location.href).href;
-let loading=null,catalogLoading=null,libraryLoading=null,forgeLoading=null;
+const deliveryModuleUrl=()=>new URL('src/creators/content/creator-content-delivery.mjs?v=delivery-20260915-1',root.document?.baseURI||root.location.href).href;
+let loading=null,catalogLoading=null,libraryLoading=null,forgeLoading=null,deliveryLoading=null;
 const query=()=>{try{return new URLSearchParams(root.location.search);}catch(_){return new URLSearchParams();}};
 const directRequested=()=>query().get('creators')==='1'||query().get('creator')==='1'||query().get('mapEditor')==='1';
 const actor=()=>String(root.KELO_ADMIN_KEYS?.playerId?.()||root.keloNet?.playerKey||root.localPlayer?.id||'local_pioneer');
@@ -56,6 +57,13 @@ function loadStudio(){
   return loading;
 }
 async function loadPlatform(){const mod=await import(creatorModuleUrl());return mod.bootKeloCreators({root});}
+async function loadDelivery(){
+  if(root.KELO_CREATOR_CONTENT_DELIVERY)return root.KELO_CREATOR_CONTENT_DELIVERY;if(deliveryLoading)return deliveryLoading;
+  deliveryLoading=import(deliveryModuleUrl()).then(mod=>mod.getOrCreateCreatorContentDelivery({root})).finally(()=>{deliveryLoading=null;});return deliveryLoading;
+}
+if(!root.KeloCreatorDelivery){
+  root.KeloCreatorDelivery=Object.freeze({version:'creator-content-delivery-facade-v1',useRevision:async(id,opts)=>(await loadDelivery()).activateRevision(id,opts),manifest:async(id,opts)=>(await loadDelivery()).getManifest(id,opts),load:loadDelivery,diagnostics:()=>Object.freeze({loaded:!!root.KELO_CREATOR_CONTENT_DELIVERY,loading:!!deliveryLoading,runtime:root.KELO_CREATOR_CONTENT_DELIVERY?.diagnostics?.()||null})});
+}
 async function openCreatorLibrary(){
   if(libraryLoading)return libraryLoading;if(!allowed()){toast('Necesitas acceso a Kelo Creators');return false;}paintLibrary(document.getElementById('lx-create-library'),true);
   libraryLoading=(async function(){try{root.KELO_LUXE?.closeMenu?.();const platform=await loadPlatform();await platform.openWorkspace('creator-library');return true;}catch(error){console.error('[Kelo Creator Library lazy gate]',error);toast('No se pudo abrir Creator Library');return false;}})().finally(function(){libraryLoading=null;paintLibrary(document.getElementById('lx-create-library'),false);sync();});return libraryLoading;
@@ -69,7 +77,7 @@ async function open(){
   if(!allowed()){toast('Necesitas acceso a Kelo Creators');return false;}paint(document.getElementById('lx-create-studio'),true);
   try{const launcher=await loadStudio();if(!launcher||typeof launcher.open!=='function')throw new Error('CREATORS_LAUNCHER_UNAVAILABLE');await launcher.open();return true;}catch(error){console.error('[Kelo Creators lazy gate]',error);toast('No se pudo abrir Kelo Creators');return false;}finally{paint(document.getElementById('lx-create-studio'),false);}
 }
-const api=Object.freeze({version:VERSION,open,openCreatorLibrary,openAssetForge,sync,get allowed(){return allowed();},get directRequested(){return directRequested();}});
+const api=Object.freeze({version:VERSION,open,openCreatorLibrary,openAssetForge,loadDelivery,sync,get allowed(){return allowed();},get directRequested(){return directRequested();}});
 root.KeloCreatorsLazyGate=api;root.KELO_CREATORS_LAZY_GATE=api;
 try{root.KELO_ADMIN_KEYS?.onChange?.(sync);}catch(_){}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){sync();if(directRequested())void open();},{once:true});else{sync();if(directRequested())void open();}
