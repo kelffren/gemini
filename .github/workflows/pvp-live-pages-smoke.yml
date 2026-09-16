@@ -14,23 +14,23 @@ on:
       - 'src/systems/pvp-combat-runtime-loader.js'
       - 'src/abilities/**'
       - 'engine-net.js'
-  workflow_run:
-    workflows: ['pages build and deployment']
-    types: [completed]
+  # GitHub Pages is configured as "Deploy from a branch", so its publisher is
+  # an internal dynamic workflow. page_build is the documented repository event
+  # for pushes to that Pages publishing source and is more reliable here than
+  # trying to chain workflow_run from GitHub's generated workflow.
+  page_build:
   workflow_dispatch:
 
 permissions:
   contents: read
+  pages: read
 
 concurrency:
-  group: pvp-live-pages-smoke-${{ github.event_name }}-${{ github.event.workflow_run.head_sha || github.ref }}
+  group: pvp-live-pages-smoke-${{ github.event_name }}-${{ github.event.build.commit || github.sha }}
   cancel-in-progress: true
 
 jobs:
   live-pvp:
-    if: >-
-      github.event_name != 'workflow_run' ||
-      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -38,6 +38,51 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+
+      - name: Wait until Pages actually serves this build or a descendant
+        if: github.event_name == 'page_build'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_SHA: ${{ github.event.build.commit || github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Pages target: $TARGET_SHA"
+          for attempt in $(seq 1 90); do
+            latest="$(curl -fsSL \
+              -H 'Accept: application/vnd.github+json' \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H 'X-GitHub-Api-Version: 2026-03-10' \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/pages/builds/latest" || true)"
+
+            status="$(jq -r '.status // empty' <<<"$latest" 2>/dev/null || true)"
+            deployed="$(jq -r '.commit // empty' <<<"$latest" 2>/dev/null || true)"
+            echo "attempt=$attempt status=${status:-unknown} deployed=${deployed:-unknown}"
+
+            if [[ "$status" == "built" && -n "$deployed" ]]; then
+              if [[ "$deployed" == "$TARGET_SHA" ]]; then
+                echo "Pages is serving the exact target build."
+                exit 0
+              fi
+
+              compare="$(curl -fsSL \
+                -H 'Accept: application/vnd.github+json' \
+                -H "Authorization: Bearer $GH_TOKEN" \
+                -H 'X-GitHub-Api-Version: 2026-03-10' \
+                "https://api.github.com/repos/${GITHUB_REPOSITORY}/compare/${TARGET_SHA}...${deployed}" || true)"
+              relation="$(jq -r '.status // empty' <<<"$compare" 2>/dev/null || true)"
+              echo "target_to_deployed=${relation:-unknown}"
+              if [[ "$relation" == "ahead" || "$relation" == "identical" ]]; then
+                echo "Pages is serving a descendant that contains the target build."
+                exit 0
+              fi
+            fi
+            sleep 5
+          done
+
+          echo "Pages never confirmed the target SHA or a descendant within the deployment barrier."
+          exit 1
+
       - name: Install dependencies
         run: npm install --no-audit --no-fund
       - name: Install Chromium
