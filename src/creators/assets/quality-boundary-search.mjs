@@ -1,106 +1,35 @@
 /* KELO-INDEX
  * area: CREATORS / ASSET SEARCH
  * owner: Kelo Creator Asset Bridge
- * keys: QUALITY BOUNDARY SEARCH BINARY PROBE ENCODE BUDGET PARETO
- * purpose: spend expensive codec evaluations near the measured quality pass/fail frontier instead of scanning fixed quality ladders
+ * keys: QUALITY SEARCH MULTI BOUNDARY NON MONOTONIC PROBE BUDGET PARETO
+ * purpose: concentrate expensive codec evaluations around every measured transition while retaining outliers and never inferring unmeasured pass/fail states
  * public-api: searchIntegerQualityBoundary()
- * state-owned: none; callback results only
+ * state-owned: none
  * online: N/A; build/publish-time search capability
- * do-not: assume a candidate passes without evaluating it or infer bytes/quality between probes
  */
 
-function uniqueDescending(values,min,max) {
-  return [...new Set(values.map(value=>Math.max(min,Math.min(max,Math.round(value)))))]
-    .sort((a,b)=>b-a);
-}
+function clamp(q,min,max){return Math.max(min,Math.min(max,Math.round(q)));}
+function unique(values,min,max){return[...new Set(values.map(v=>clamp(v,min,max)))].sort((a,b)=>b-a);}
+function transitions(records){const sorted=[...records].sort((a,b)=>b.quality-a.quality),out=[];for(let i=0;i<sorted.length-1;i+=1){const a=sorted[i],b=sorted[i+1];if(a.pass!==b.pass)out.push({high:a.quality,low:b.quality,highPass:a.pass,lowPass:b.pass,width:a.quality-b.quality});}return out;}
+function nonMonotonic(records){const sorted=[...records].sort((a,b)=>b.quality-a.quality);let seenFail=false;for(const item of sorted){if(!item.pass)seenFail=true;else if(seenFail)return true;}return false;}
 
-export async function searchIntegerQualityBoundary(options = {}) {
-  const min = Math.round(options.min ?? 50);
-  const max = Math.round(options.max ?? 100);
-  if (!Number.isInteger(min) || !Number.isInteger(max) || min > max) throw new Error('QUALITY_BOUNDARY_INVALID_RANGE');
-  if (typeof options.evaluate !== 'function') throw new Error('QUALITY_BOUNDARY_EVALUATE_REQUIRED');
-
-  const maxEvaluations = Math.max(1,Math.round(options.maxEvaluations ?? 7));
-  const coarseStep = Math.max(2,Math.round(options.coarseStep ?? 8));
-  const neighborRadius = Math.max(0,Math.round(options.neighborRadius ?? 1));
-  const results = new Map();
-  const order = [];
-
-  async function probe(quality, phase) {
-    quality=Math.max(min,Math.min(max,Math.round(quality)));
-    if (results.has(quality)) return results.get(quality);
-    if (results.size >= maxEvaluations) return null;
-    let result;
-    try {
-      result=await options.evaluate(quality);
-    } catch (error) {
-      result={pass:false,bytes:null,score:0,reasons:['evaluate-error'],error:String(error?.message||error)};
-    }
-    const record={quality,phase,...result,pass:Boolean(result?.pass)};
-    results.set(quality,record);
-    order.push(quality);
-    return record;
-  }
-
-  // Descend until the first measured failure below a passing point. This finds
-  // the interesting interval quickly while still evaluating every claim.
-  let lastPass=null;
-  let firstFailBelow=null;
-  const coarse=[];
-  for (let q=max; q>=min; q-=coarseStep) coarse.push(q);
-  if (coarse.at(-1)!==min) coarse.push(min);
-
-  for (const q of uniqueDescending(coarse,min,max)) {
-    const result=await probe(q,'coarse');
-    if (!result) break;
-    if (result.pass) {
-      lastPass=q;
-      continue;
-    }
-    if (lastPass!==null && q < lastPass) {
-      firstFailBelow=q;
-      break;
-    }
-    // If even max fails, lower quality is not a useful place to spend budget.
-    if (q===max) break;
-  }
-
-  // Refine only the observed pass/fail interval. We do not mark unmeasured
-  // points as pass/fail, and final selection always uses measured candidates.
-  if (lastPass!==null && firstFailBelow!==null) {
-    let high=lastPass; // measured pass
-    let low=firstFailBelow; // measured fail
-    while (high-low>1 && results.size<maxEvaluations) {
-      const mid=Math.floor((high+low)/2);
-      const result=await probe(mid,'refine');
-      if (!result) break;
-      if (result.pass) high=mid;
-      else low=mid;
-    }
-
-    // Probe immediate neighbours when budget remains. This helps catch local
-    // non-monotonic codec behaviour without doing a full linear scan.
-    for (let delta=1; delta<=neighborRadius && results.size<maxEvaluations; delta+=1) {
-      await probe(high-delta,'neighbor');
-      if (results.size>=maxEvaluations) break;
-      await probe(high+delta,'neighbor');
-    }
-  }
-
-  const evaluated=[...results.values()];
-  const accepted=evaluated.filter(item=>item.pass);
-  const boundaryPass=accepted.length ? Math.min(...accepted.map(item=>item.quality)) : null;
-  const bestByBytes=accepted
-    .filter(item=>Number.isFinite(item.bytes))
-    .sort((a,b)=>a.bytes-b.bytes || b.score-a.score || b.quality-a.quality)[0] || null;
-
-  return {
-    version:'kelo-quality-boundary-search-v1',
-    range:{min,max},
-    budget:{maxEvaluations,used:evaluated.length,coarseStep,neighborRadius},
-    order,
-    boundaryPass,
-    bestByBytes,
-    evaluated:evaluated.sort((a,b)=>b.quality-a.quality)
-  };
+export async function searchIntegerQualityBoundary(options={}){
+  const min=Math.round(options.min??50),max=Math.round(options.max??100);if(!Number.isInteger(min)||!Number.isInteger(max)||min>max)throw new Error('QUALITY_BOUNDARY_INVALID_RANGE');if(typeof options.evaluate!=='function')throw new Error('QUALITY_BOUNDARY_EVALUATE_REQUIRED');
+  const maxEvaluations=Math.max(1,Math.round(options.maxEvaluations??9)),coarseStep=Math.max(2,Math.round(options.coarseStep??8)),neighborRadius=Math.max(0,Math.round(options.neighborRadius??1)),results=new Map(),order=[];
+  async function probe(q,phase){q=clamp(q,min,max);if(results.has(q))return results.get(q);if(results.size>=maxEvaluations)return null;let result;try{result=await options.evaluate(q);}catch(error){result={pass:false,bytes:null,score:0,reasons:['evaluate-error'],error:String(error?.message||error)};}const record={quality:q,phase,...result,pass:Boolean(result?.pass)};results.set(q,record);order.push(q);return record;}
+  // Spread the first probes across the entire interval. This prevents a single
+  // early pass→fail assumption from hiding a later pass island.
+  const coarse=[];for(let q=max;q>=min;q-=coarseStep)coarse.push(q);if(coarse.at(-1)!==min)coarse.push(min);const anchors=[max,min,Math.round((max+min)/2),Math.round(max-(max-min)/4),Math.round(min+(max-min)/4),...coarse];
+  const coarseBudget=Math.min(maxEvaluations,Math.max(3,Math.ceil(maxEvaluations*0.6)));for(const q of unique(anchors,min,max)){if(results.size>=coarseBudget)break;await probe(q,'coarse');}
+  // Refine every observed transition, always choosing the widest unresolved
+  // interval first. Every classification still comes from an actual encode.
+  while(results.size<maxEvaluations){const ts=transitions(results.values()).filter(t=>t.width>1).sort((a,b)=>b.width-a.width);if(!ts.length)break;const t=ts[0],mid=Math.floor((t.high+t.low)/2);await probe(mid,'transition-refine');}
+  // If budget remains, inspect neighbours around the best accepted-by-bytes and
+  // around each transition. This is cheap insurance against local codec jumps.
+  const acceptedNow=[...results.values()].filter(r=>r.pass&&Number.isFinite(r.bytes)).sort((a,b)=>a.bytes-b.bytes||b.score-a.score),targets=[];if(acceptedNow[0])targets.push(acceptedNow[0].quality);for(const t of transitions(results.values()))targets.push(t.high,t.low);for(const center of targets){for(let d=1;d<=neighborRadius&&results.size<maxEvaluations;d+=1){await probe(center-d,'neighbor');if(results.size>=maxEvaluations)break;await probe(center+d,'neighbor');}}
+  // One deterministic unexplored outlier if space remains: midpoint of the
+  // largest gap between measured qualities.
+  while(results.size<maxEvaluations){const measured=[max,...results.keys(),min].sort((a,b)=>b-a);let gap=null;for(let i=0;i<measured.length-1;i+=1){const width=measured[i]-measured[i+1];if(width>1&&(!gap||width>gap.width))gap={high:measured[i],low:measured[i+1],width};}if(!gap)break;await probe(Math.floor((gap.high+gap.low)/2),'outlier');}
+  const evaluated=[...results.values()],accepted=evaluated.filter(i=>i.pass),bestByBytes=accepted.filter(i=>Number.isFinite(i.bytes)).sort((a,b)=>a.bytes-b.bytes||b.score-a.score||b.quality-a.quality)[0]||null,transitionList=transitions(evaluated),nonMonotonicDetected=nonMonotonic(evaluated),boundaryPass=accepted.length?Math.min(...accepted.map(i=>i.quality)):null;
+  return{version:'kelo-quality-boundary-search-v2',range:{min,max},budget:{maxEvaluations,used:evaluated.length,coarseStep,neighborRadius},order,boundaryPass,bestByBytes,transitions:transitionList,nonMonotonicDetected,evaluated:evaluated.sort((a,b)=>b.quality-a.quality)};
 }
