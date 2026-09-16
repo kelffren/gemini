@@ -103,7 +103,7 @@ Deno.serve(async(req:Request)=>{
     const revision=await rpc('register_asset_revision',{
       p_family_id:family.id,p_storage_path:privatePath,p_content_hash:hash,p_mime_type:file.type,p_byte_size:file.size,
       p_pixel_width:dimensions.width,p_pixel_height:dimensions.height,p_world_width:null,p_world_height:null,p_collision_mode:'none',
-      p_render_phase:'aboveActor',p_metadata:{source:'community-auto-publish',policyVersion:3,serverStructuralVerified:true,guardianAuthority:'public.asset_guardian_provenance'}
+      p_render_phase:'aboveActor',p_metadata:{source:'community-auto-publish',policyVersion:3}
     },userHeaders(token));
     await upload('creator-global',publicPath,new Blob([bytes],{type:file.type}),{apikey:serviceKey(),authorization:`Bearer ${serviceKey()}`},true);
     const publication=await rpc('publish_asset_revision',{p_revision_id:revision.id,p_public_storage_path:publicPath,p_visibility:'global',p_published_by:user.id},adminHeaders());
