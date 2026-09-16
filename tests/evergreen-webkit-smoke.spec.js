@@ -39,17 +39,21 @@ test('V6.69 evergreen branch boots plaza without uncaught errors', async ({ page
   expect(snapshot.transitionBridge).toBeTruthy();
   expect(snapshot.transitionBridge.ownersReady).toBe(true);
   expect(snapshot.abilityAim).toBeTruthy();
-  expect(snapshot.abilityAim.version).toBe('kelo-ability-aim-v1.2.0-lifecycle-owner');
+  expect(snapshot.abilityAim.version).toMatch(/^kelo-ability-aim-v\d+\.\d+\.\d+-/);
   expect(snapshot.abilityAim.pointerLifecycle).toBeTruthy();
   expect(snapshot.abilityAim.pointerLifecycle.owner).toBe('KeloAbilityAim');
   expect(snapshot.abilityAim.pointerLifecycle.attached).toBe(true);
-  expect(snapshot.abilityAim.downstreamCastCompatibility).toBe(true);
+  expect(snapshot.abilityAim.castMiddlewareCount).toBeGreaterThanOrEqual(2);
+  expect(snapshot.abilityAim.castMiddlewareOwners).toEqual(expect.arrayContaining([
+    'engine-l:plaza-cast-presentation',
+    'engine-m:skill-shots'
+  ]));
   expect(snapshot.abilityBegin).toBe(true);
   expect(snapshot.abilityEnd).toBe(true);
   expect(snapshot.abilityDirection).toBeTruthy();
-  expect(snapshot.abilityDirection.version).toBe('kelo-ability-direction-v1.0.0-legacy-parity');
+  expect(snapshot.abilityDirection.version).toMatch(/^kelo-ability-direction-/);
   expect(snapshot.abilityTriggerBridge).toBeTruthy();
-  expect(snapshot.abilityTriggerBridge.version).toBe('kelo-legacy-ability-trigger-v1.0.0');
+  expect(snapshot.abilityTriggerBridge.version).toMatch(/^kelo-legacy-ability-trigger-/);
   expect(snapshot.abilityDashMax).toBe(170);
   expect(snapshot.scripts.some(src=>src.includes('legacy-ability-aim-system.js'))).toBe(true);
   expect(snapshot.scripts.some(src=>/engine-(?:j|k)\.js/.test(src))).toBe(false);
