@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: SERVER / AVATAR
  * owner: Kelo server authority
- * keys: SUPABASE AVATAR MANIFEST CHARACTER CONTENT RLS SANITIZE COMMUNITY ASSETS STREAMING
+ * keys: SUPABASE AVATAR MANIFEST CHARACTER CONTENT RLS SANITIZE COMMUNITY ASSETS STREAMING EQUIPMENT
  * purpose: resolve the active creator avatar and its server-trusted community cosmetic references from persisted character state
  * online: server derives runtime manifest from Supabase; clients never declare asset URLs, frame metadata, or public community paths
  * do-not: NO renderer, NO client-trusted URL, NO service-role requirement, NO duplicate avatar persistence
@@ -53,10 +53,11 @@ function createAvatarSyncStore(options={}){
 
   async function request(url,opts={}){
     const res=await fetchImpl(url,opts),text=await res.text();
-    if(!res.ok){const e=new Error(`SUPABASE_${res.status}:${text.slice(0,200)}`);e.status=res.status;throw e;}
+    if(!res.ok){const e=new Error(`SUPABASE_${res.status}:${text.slice(0,200)}`);e.status=res.status;e.body=text;throw e;}
     return text?JSON.parse(text):null;
   }
   function headers(token){return{apikey:apiKey,Authorization:`Bearer ${String(token||'')}`,'Content-Type':'application/json'};}
+  function missingCharacterManifestRpc(error){return Number(error?.status)===404||/PGRST202|Could not find the function|get_character_avatar_manifest/i.test(String(error?.body||error?.message||''));}
   function sanitize(raw){
     if(!raw||typeof raw!=='object'||!raw.contentId)return null;
     const payload=raw.payload&&typeof raw.payload==='object'?raw.payload:{},rt=payload.avatarRuntime&&typeof payload.avatarRuntime==='object'?payload.avatarRuntime:null;
@@ -69,12 +70,18 @@ function createAvatarSyncStore(options={}){
   }
   async function resolve(characterId,accessToken){
     if(!configured||!characterId||!accessToken)return null;
+    try{
+      const characterManifest=await request(`${supabaseUrl}/rest/v1/rpc/get_character_avatar_manifest`,{method:'POST',headers:headers(accessToken),body:JSON.stringify({p_character_id:String(characterId)})});
+      return sanitize(characterManifest);
+    }catch(error){
+      if(!missingCharacterManifestRpc(error))throw error;
+    }
     const query=new URLSearchParams({id:`eq.${String(characterId)}`,status:'eq.active',select:'id,active_avatar_content_id',limit:'1'});
     const chars=await request(`${supabaseUrl}/rest/v1/characters?${query}`,{method:'GET',headers:headers(accessToken)}),row=Array.isArray(chars)?chars[0]:null;
     const contentId=row&&row.active_avatar_content_id;if(!contentId)return null;
-    const manifest=await request(`${supabaseUrl}/rest/v1/rpc/get_avatar_manifest`,{method:'POST',headers:headers(accessToken),body:JSON.stringify({p_content_id:contentId})});
-    return sanitize(manifest);
+    const legacyManifest=await request(`${supabaseUrl}/rest/v1/rpc/get_avatar_manifest`,{method:'POST',headers:headers(accessToken),body:JSON.stringify({p_content_id:contentId})});
+    return sanitize(legacyManifest);
   }
-  return Object.freeze({version:'avatar-sync-store-v3-community-stream',configured,resolve,sanitize,audit:()=>({version:'avatar-sync-store-v3-community-stream',configured,clientManifestTrusted:false,publicBucket:'avatars',communityBucket:'creator-global',communityClientUrlTrusted:false,maxCommunityAssets:MAX_COMMUNITY_ASSETS,directionRigs:[1,4,8]})});
+  return Object.freeze({version:'avatar-sync-store-v4-character-community-equipment',configured,resolve,sanitize,audit:()=>({version:'avatar-sync-store-v4-character-community-equipment',configured,clientManifestTrusted:false,publicBucket:'avatars',communityBucket:'creator-global',communityClientUrlTrusted:false,maxCommunityAssets:MAX_COMMUNITY_ASSETS,characterEquipmentManifest:true,legacyManifestFallback:true,directionRigs:[1,4,8]})});
 }
 module.exports={createAvatarSyncStore};
