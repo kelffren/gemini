@@ -23,12 +23,12 @@
 </div>
 <div class="toast" id="toast"></div>
 <script type="module">
-import {searchExternalAssets,getProviderStatuses} from './src/creators/assets/external-asset-providers.mjs?v=2';
+import {searchExternalAssets,getProviderStatuses} from './src/creators/assets/external-asset-providers.mjs?v=3';
 import {downloadAsset,integrateAsset,listAssets,getVaultStats,removeLocal} from './src/creators/assets/personal-asset-vault.mjs?v=2';
 
 const $=id=>document.getElementById(id);
 const state={tab:'explore',query:'',provider:'all',remote:[],providers:[],vault:[],loading:false,requestToken:0};
-const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
 const fmt=n=>n<1024?`${n} B`:n<1048576?`${(n/1024).toFixed(1)} KB`:`${(n/1048576).toFixed(n<10485760?1:0)} MB`;
 function flash(text){const t=$('toast');t.textContent=text;t.classList.add('on');clearTimeout(flash.t);flash.t=setTimeout(()=>t.classList.remove('on'),1700);}
 function notifyGame(type,id){try{window.opener?.postMessage?.({type,id},location.origin);}catch{}}
