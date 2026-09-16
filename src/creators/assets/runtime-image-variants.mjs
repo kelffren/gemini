@@ -1,8 +1,8 @@
 /* KELO-INDEX
  * area: CREATORS / ASSET DELIVERY
  * owner: Kelo Creator Asset Bridge
- * keys: RUNTIME IMAGE VARIANTS WEBP AVIF LOSSLESS ADAPTIVE QUALITY GATE SAFARI PARETO
- * purpose: derive smaller runtime delivery variants while preserving the canonical PNG and exposing the non-dominated size/quality frontier
+ * keys: RUNTIME IMAGE VARIANTS WEBP AVIF LOSSLESS RENDER EXACT ADAPTIVE QUALITY GATE SAFARI PARETO
+ * purpose: derive smaller runtime delivery variants while preserving canonical source/authoring bytes and exposing the non-dominated size/quality frontier
  * public-api: buildRuntimeImageVariants()
  * state-owned: none; returns candidate bytes + manifest only
  * online: N/A; build/publish-time capability. Runtime consumption is a separate owner decision.
@@ -70,7 +70,7 @@ export async function buildRuntimeImageVariants(sourceBuffer, options = {}) {
   const strictPng = optimizePngLossless(sourceBuffer, options.losslessOptions);
   const candidates = [{
     label:'png:strict', format:'png', track:'lossless', buffer:strictPng.buffer, bytes:strictPng.buffer.length,
-    pass:true, score:1, reasons:[], metrics:{exactPixels:true}, options:{optimizer:'kelo-lossless'}
+    pass:true, score:1, reasons:[], metrics:{exactPixels:true,renderExactPixels:true}, options:{optimizer:'kelo-lossless'}
   }];
 
   try {
@@ -79,6 +79,18 @@ export async function buildRuntimeImageVariants(sourceBuffer, options = {}) {
       {label:'webp:lossless',format:'webp',track:'lossless',options:{lossless:true,quality:100,effort:6,exact:true}}, 'strict', {}));
   } catch (error) {
     candidates.push({label:'webp:lossless',format:'webp',track:'lossless',bytes:null,pass:false,score:0,reasons:['encode-error'],error:String(error?.message || error)});
+  }
+
+  if (profile.runtimeCandidates.includes('webp-render-exact')) {
+    try {
+      // libwebp's default exact=false may alter RGB only where alpha=0. This is
+      // DELIVERY-only and must pass the render-exact hard gate before competing.
+      const buffer = await sharp(sourceBuffer,{animated:false}).keepMetadata().webp({lossless:true,quality:100,effort:6,exact:false}).toBuffer();
+      candidates.push(await evaluateCandidate(sharp, originalVisual, buffer,
+        {label:'webp:render-exact',format:'webp',track:'render-lossless',options:{lossless:true,quality:100,effort:6,exact:false}}, 'render-exact', {}));
+    } catch (error) {
+      candidates.push({label:'webp:render-exact',format:'webp',track:'render-lossless',bytes:null,pass:false,score:0,reasons:['encode-error'],error:String(error?.message || error)});
+    }
   }
 
   try {
@@ -114,6 +126,7 @@ export async function buildRuntimeImageVariants(sourceBuffer, options = {}) {
   }
 
   const losslessWinner = chooseSmallest(candidates.filter(candidate => candidate.track === 'lossless'));
+  const renderLosslessWinner = chooseSmallest(candidates.filter(candidate => candidate.track === 'render-lossless'));
   const adaptiveWinner = chooseSmallest(candidates.filter(candidate => candidate.track === 'adaptive'));
   const runtimeWinner = chooseSmallest(candidates);
   const summaries = candidates.map(candidateSummary);
@@ -123,6 +136,7 @@ export async function buildRuntimeImageVariants(sourceBuffer, options = {}) {
     report:{
       sourceBytes:sourceBuffer.length, profile, qualityPolicy:policy, strictPngReport:strictPng.report,
       losslessWinner:losslessWinner ? candidateSummary(losslessWinner) : null,
+      renderLosslessWinner:renderLosslessWinner ? candidateSummary(renderLosslessWinner) : null,
       adaptiveWinner:adaptiveWinner ? candidateSummary(adaptiveWinner) : null,
       runtimeWinner:runtimeWinner ? candidateSummary(runtimeWinner) : null,
       paretoFrontier,
