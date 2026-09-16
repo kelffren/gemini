@@ -48,6 +48,7 @@ El listado histórico de 16 pasos **no es el boot móvil**. Restaurar esos tags 
 | World editing authority | `KELO_WORLD_EDIT` | OWNER LIVE |
 | Studio document/commands | `Studio Kernel` | OWNER LIVE creator |
 | Map generation | `KeloMapForge` | OWNER LIVE creator |
+| Sprite AI authoring inference | `Kelo Sprite AI service` | PREPARED server provider bridge |
 | Update/PWA | `KeloUpdater` | OWNER LIVE client |
 
 ## 4. Mundo y render
@@ -97,6 +98,20 @@ El shell es UI; no posee mutations del mundo. Las mutations pasan por Studio Ker
 
 El Asset Compiler puede sugerir semántica, pero nombres/categorías revisados deben conservar geometría sourceRect estable para no romper placements.
 
+### Sprite AI authoring inference — PREPARED
+
+La IA de Sprite Factory entra **antes** del compiler y no sustituye ninguno de sus gates:
+
+`Sprite Factory → /api/sprite-generate → Kelo Sprite AI service → provider adapter → candidate atlas → Image Treatment → Sprite Compiler → Frame Doctor → QA`
+
+- `server/sprite-ai-service.js` mantiene un único contrato server y selecciona proveedor.
+- `server/sprite-ai-provider-huggingface.js` conecta un Space Gradio/ZeroGPU sin exponer `HF_TOKEN` al browser.
+- `deploy/huggingface-sprite-ai/` es una implementación de referencia open-weight con FLUX.2 Klein + SpriteSheet LoRA.
+- `src/creators/ui/sprite-factory-online.mjs` sigue consumiendo el mismo endpoint y haciendo limpieza, detección de grilla, normalización, reparación y QA.
+- el output remoto es siempre **candidato**; HTTP 200 nunca equivale a asset aprobado.
+- el fallback pagado está bloqueado salvo opt-in explícito mediante `KELO_SPRITE_AI_ALLOW_PAID_FALLBACK`.
+- cambiar ZeroGPU por otro compute futuro no requiere rehacer la UI ni el compilador.
+
 ### Space Gate — PREPARED / build-time
 
 La capacidad de bytes se mantiene bajo el mismo owner `Kelo Creator Asset Bridge` y se separa en tres niveles:
@@ -142,6 +157,8 @@ El runtime continúa consumiendo las rutas actuales hasta un pass separado de pr
 
 El cliente puede predecir/presentar, pero progreso valioso, comercio, PvP competitivo, propiedad y cambios globales deben migrar/fallar hacia autoridad de servidor. `docs/ONLINE_FIRST.md` y los documentos de cada sistema mandan sobre implementaciones locales temporales.
 
+Para Sprite AI, Pages nunca recibe credenciales del proveedor: el browser autentica contra el Kelo server, el server llama al proveedor y el browser valida el candidato con los gates locales del Creator.
+
 ## 10. Qué NO hacer
 
 - No crear otro renderer de props o tiles.
@@ -153,6 +170,7 @@ El cliente puede predecir/presentar, pero progreso valioso, comercio, PvP compet
 - No sustituir SOURCE por un codec DELIVERY sin evidencia + rollback.
 - No introducir KTX2/Basis en Canvas 2D sin un consumidor gráfico que justifique esa ruta.
 - No declarar un fix móvil verificado sin QA real.
+- No llamar proveedores de Sprite AI directamente desde GitHub Pages ni saltarse Sprite Compiler/Frame Doctor.
 
 ## 11. Documentos relacionados
 
@@ -163,3 +181,4 @@ El cliente puede predecir/presentar, pero progreso valioso, comercio, PvP compet
 - `docs/ASSET_CONTRACT.md`
 - `docs/CODE_INDEX.md`
 - `docs/SYSTEM_DOCUMENTATION_STANDARD.md`
+- `docs/systems/SPRITE_AI_SERVICE.md`
