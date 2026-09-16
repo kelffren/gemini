@@ -18,10 +18,10 @@ jobs:
         run: |
           mkdir -p probe
           set +e
-          BASE='https://charlieamalet-tools3ox-pixelart-spritesheet-generatorart-api.hf.space'
+          BASE='https://charlieamalet-tools3ox-pixelart-spritesheet-gene-3090969.hf.space'
           curl -sS -D probe/info-headers.txt "$BASE/gradio_api/info" -o probe/info.json
           cat > probe/request.json <<'JSON'
-          {"data":["pixel art full-body dark fantasy MMORPG hero, dark teal long coat with subtle gold trim, black pants and boots, clean silhouette, character sprite sheet, consistent character, walking animation frames, transparent simple background"]}
+          {"data":["pixel art full-body dark fantasy MMORPG hero, dark teal long coat with subtle gold trim, black pants and boots, clean silhouette, character sprite sheet, consistent character, walking animation frames, simple flat background"]}
           JSON
           curl -sS -D probe/submit-headers.txt -H 'Content-Type: application/json' -H 'Accept: application/json' -X POST --data-binary @probe/request.json "$BASE/gradio_api/call/generate_mesh" -o probe/submit.json
           python - <<'PY'
