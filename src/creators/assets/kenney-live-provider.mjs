@@ -1,86 +1,38 @@
 /* KELO-INDEX
  * area: CREATORS / EXTERNAL ASSET PROVIDERS / KENNEY
  * owner: Kelo Creator Asset Bridge
- * keys: KENNEY CC0 LAZY INDEX SEARCH REMOTE PNG PAGINATION
- * purpose: Search Kenney's remote metadata on demand; never preload asset binaries.
+ * keys: KENNEY CC0 LAZY INDEX SEARCH REMOTE PNG PAGINATION WORKER 10K 48K LRU
+ * purpose: Browse tens of thousands of Kenney assets while keeping full-index parsing/search off the main UI thread and never preloading binaries.
  */
 
 const INDEX_URL='https://raw.githubusercontent.com/shorepine/kenney/main/index.tsv';
 const RAW_BASE='https://raw.githubusercontent.com/shorepine/kenney/main/';
 const SOURCE_BASE='https://github.com/shorepine/kenney/blob/main/';
 const ALLOWED_PREFIXES=['2d/','ui/','icons/'];
-const MAX_PAGE_SIZE=320;
-let indexPromise=null;
+const MAX_PAGE_SIZE=320,MAX_QUERY_CACHE=8,YIELD_EVERY=4096;
+let worker=null,workerFailed=false,rpcId=0;const pending=new Map();
+let fallbackIndexPromise=null,fallbackRows=null,fallbackDefaultOrder=null;const fallbackQueryCache=new Map();
 
 const text=v=>String(v??'').trim();
 const lower=v=>text(v).toLowerCase();
 const encodePath=path=>path.split('/').map(encodeURIComponent).join('/');
-function hashPath(value){
-  let h=2166136261;
-  for(let i=0;i<value.length;i++){h^=value.charCodeAt(i);h=Math.imul(h,16777619);}
-  return (h>>>0).toString(36);
-}
-function humanName(path,description){
-  if(text(description))return text(description);
-  const file=path.split('/').pop()||path;
-  return file.replace(/\.[a-z0-9]+$/i,'').replace(/[_-]+/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
-}
+const yieldMain=()=>globalThis.scheduler?.yield?globalThis.scheduler.yield():new Promise(resolve=>setTimeout(resolve,0));
+function hashPath(value){let h=2166136261;for(let i=0;i<value.length;i++){h^=value.charCodeAt(i);h=Math.imul(h,16777619);}return(h>>>0).toString(36);}
+function humanName(path,description){if(text(description))return text(description);const file=path.split('/').pop()||path;return file.replace(/\.[a-z0-9]+$/i,'').replace(/[_-]+/g,' ').replace(/\b\w/g,c=>c.toUpperCase());}
 function packName(path){const parts=path.split('/');return parts.length>2?parts[1]:(parts[0]||'Kenney');}
 function supportedPath(path){return ALLOWED_PREFIXES.some(prefix=>path.startsWith(prefix))&&/\.(png|webp|jpe?g)$/i.test(path);}
-function matchScore(line,q){
-  const hay=lower(line);
-  if(!q){
-    let score=0;
-    for(const hint of ['rpg','fantasy','character','dungeon','town','weapon','nature','pixel','tile','ui'])if(hay.includes(hint))score+=4;
-    if(hay.startsWith('2d/'))score+=3;
-    return {matched:true,score};
-  }
-  const tokens=q.split(/\s+/).filter(Boolean);
-  let hits=0,score=hay.includes(q)?120:0;
-  for(const token of tokens){if(hay.includes(token)){hits++;score+=22;}}
-  const matched=hits===tokens.length||(!tokens.length&&hay.includes(q));
-  if(hay.startsWith('2d/'))score+=3;
-  return {matched,score};
-}
+function defaultScore(hay,path){let score=0;for(const hint of ['rpg','fantasy','character','dungeon','town','weapon','nature','pixel','tile','ui'])if(hay.includes(hint))score+=4;if(path.startsWith('2d/'))score+=3;return score;}
+function queryScore(hay,q,tokens,path){let hits=0,score=hay.includes(q)?120:0;for(const token of tokens){if(hay.includes(token)){hits++;score+=22;}}if(path.startsWith('2d/'))score+=3;return hits===tokens.length?score:null;}
+function touchCache(key,value){fallbackQueryCache.delete(key);fallbackQueryCache.set(key,value);while(fallbackQueryCache.size>MAX_QUERY_CACHE)fallbackQueryCache.delete(fallbackQueryCache.keys().next().value);}
+function toAsset(columns){const path=text(columns[0]),description=text(columns[1]),dimensions=text(columns[2]),bytes=Number(columns[3]||0)||0;const encoded=encodePath(path),pack=packName(path),kind=path.startsWith('ui/')?'ui':path.startsWith('icons/')?'icons':'2d';return{id:`kenney:${hashPath(path)}`,provider:'kenney',externalId:path,name:humanName(path,description),category:kind,contentKind:'sprite',previewKind:'image',tags:[kind,pack,'cc0','kenney','sprite'].filter(Boolean),description:description||`${pack} · ${dimensions||'image'}`,previewUrl:RAW_BASE+encoded,downloadUrl:RAW_BASE+encoded,sourceUrl:SOURCE_BASE+encoded,license:'CC0',author:'Kenney',attributionRequired:false,ownership:'discovered',downloadable:true,integrationReady:true,bytesHint:bytes,dimensions,pack,path};}
+function ensureWorker(){if(worker||workerFailed||typeof Worker==='undefined')return worker;try{worker=new Worker(new URL('./kenney-index-worker.js?v=1',import.meta.url),{type:'module'});worker.onmessage=event=>{const message=event.data||{},slot=pending.get(message.id);if(!slot)return;pending.delete(message.id);message.ok?slot.resolve(message.result):slot.reject(new Error(message.error||'KENNEY_WORKER_ERROR'));};worker.onerror=()=>{workerFailed=true;for(const slot of pending.values())slot.reject(new Error('KENNEY_WORKER_FAILED'));pending.clear();try{worker?.terminate();}catch{}worker=null;};return worker;}catch{workerFailed=true;return null;}}
+function workerCall(type,payload={}){const w=ensureWorker();if(!w)return Promise.reject(new Error('KENNEY_WORKER_UNAVAILABLE'));const id=++rpcId;return new Promise((resolve,reject)=>{pending.set(id,{resolve,reject});w.postMessage({id,type,...payload});});}
+async function loadFallbackRows(){if(fallbackRows)return fallbackRows;if(fallbackIndexPromise)return fallbackIndexPromise;fallbackIndexPromise=fetch(INDEX_URL,{mode:'cors',cache:'force-cache'}).then(async response=>{if(!response.ok)throw new Error('KENNEY_INDEX_'+response.status);const body=await response.text();if(body.length<1000)throw new Error('KENNEY_INDEX_TOO_SMALL');const parsed=[];let n=0;for(const rawLine of body.split('\n')){const line=rawLine.trim();if(!line)continue;const columns=line.split('\t'),path=text(columns[0]);if(!supportedPath(path)||/^path$/i.test(path))continue;const description=text(columns[1]),dimensions=text(columns[2]),bytes=Number(columns[3]||0)||0;parsed.push([path,description,dimensions,bytes,lower(`${path} ${description} ${dimensions}`)]);if(++n%YIELD_EVERY===0)await yieldMain();}fallbackRows=parsed;return parsed;}).catch(error=>{fallbackIndexPromise=null;throw error;});return fallbackIndexPromise;}
+async function fallbackOrder(query=''){const rows=await loadFallbackRows(),q=lower(query);if(!q){if(fallbackDefaultOrder)return fallbackDefaultOrder;const ranked=[];for(let i=0;i<rows.length;i++){ranked.push({index:i,score:defaultScore(rows[i][4],rows[i][0])});if(i&&i%YIELD_EVERY===0)await yieldMain();}ranked.sort((a,b)=>b.score-a.score||rows[a.index][0].localeCompare(rows[b.index][0]));fallbackDefaultOrder=ranked.map(x=>x.index);return fallbackDefaultOrder;}if(fallbackQueryCache.has(q)){const cached=fallbackQueryCache.get(q);touchCache(q,cached);return cached;}const tokens=q.split(/\s+/).filter(Boolean),ranked=[];for(let i=0;i<rows.length;i++){const score=queryScore(rows[i][4],q,tokens,rows[i][0]);if(score!==null)ranked.push({index:i,score});if(i&&i%YIELD_EVERY===0)await yieldMain();}ranked.sort((a,b)=>b.score-a.score||rows[a.index][0].localeCompare(rows[b.index][0]));const order=ranked.map(x=>x.index);touchCache(q,order);return order;}
+async function fallbackSearch(query,offset,limit){const rows=await loadFallbackRows(),order=await fallbackOrder(query),slice=order.slice(offset,offset+limit);return{rows:slice.map(i=>rows[i].slice(0,4)),total:order.length,offset,limit,hasMore:offset+slice.length<order.length,engine:'cooperative-main-thread'};}
 
-async function loadIndex(){
-  if(indexPromise)return indexPromise;
-  indexPromise=fetch(INDEX_URL,{mode:'cors',cache:'force-cache'}).then(async response=>{
-    if(!response.ok)throw new Error('KENNEY_INDEX_'+response.status);
-    const body=await response.text();
-    if(body.length<1000)throw new Error('KENNEY_INDEX_TOO_SMALL');
-    return body;
-  }).catch(error=>{indexPromise=null;throw error;});
-  return indexPromise;
-}
-
-function toAsset(columns){
-  const path=text(columns[0]),description=text(columns[1]),dimensions=text(columns[2]),bytes=Number(columns[3]||0)||0;
-  const encoded=encodePath(path),pack=packName(path),kind=path.startsWith('ui/')?'ui':path.startsWith('icons/')?'icons':'2d';
-  return {
-    id:`kenney:${hashPath(path)}`,
-    provider:'kenney',externalId:path,name:humanName(path,description),category:kind,
-    tags:[kind,pack,'cc0','kenney'].filter(Boolean),description:description||`${pack} · ${dimensions||'image'}`,
-    previewUrl:RAW_BASE+encoded,downloadUrl:RAW_BASE+encoded,sourceUrl:SOURCE_BASE+encoded,
-    license:'CC0',author:'Kenney',attributionRequired:false,ownership:'discovered',
-    downloadable:true,integrationReady:true,bytesHint:bytes,dimensions,pack,path
-  };
-}
-
-export async function searchKenneyAssets(query='',options={}){
-  const body=await loadIndex();
-  const q=lower(query),limit=Math.max(24,Math.min(Number(options.limit)||80,MAX_PAGE_SIZE)),offset=Math.max(0,Number(options.offset)||0);
-  const ranked=[];
-  for(const rawLine of body.split('\n')){
-    const line=rawLine.trim();if(!line)continue;
-    const columns=line.split('\t'),path=text(columns[0]);
-    if(!supportedPath(path)||/^path$/i.test(path))continue;
-    const match=matchScore(line,q);if(!match.matched)continue;
-    ranked.push({score:match.score,columns});
-  }
-  ranked.sort((a,b)=>b.score-a.score||String(a.columns[0]).localeCompare(String(b.columns[0])));
-  return ranked.slice(offset,offset+limit).map(row=>toAsset(row.columns));
-}
-
-export function clearKenneyCache(){indexPromise=null;}
-export const KENNEY_LIVE_PROVIDER=Object.freeze({search:searchKenneyAssets,clearCache:clearKenneyCache,indexUrl:INDEX_URL});
+export async function searchKenneyPage(query='',options={}){const limit=Math.max(1,Math.min(Number(options.limit)||80,MAX_PAGE_SIZE)),offset=Math.max(0,Number(options.offset)||0);let result;try{result=await workerCall('search',{query,offset,limit});result.engine='worker';}catch{result=await fallbackSearch(query,offset,limit);}return{assets:(result.rows||[]).map(toAsset),total:Number(result.total||0),offset:Number(result.offset||offset),limit:Number(result.limit||limit),hasMore:!!result.hasMore,engine:result.engine||'unknown'};}
+export async function searchKenneyAssets(query='',options={}){return(await searchKenneyPage(query,options)).assets;}
+export async function getKenneyProviderStats(){try{const stats=await workerCall('stats');return{...stats,engine:'worker'};}catch{const rows=await loadFallbackRows();return{assets:rows.length,indexBytes:null,queryCache:fallbackQueryCache.size,engine:'cooperative-main-thread'};}}
+export function clearKenneyCache(){try{worker?.terminate();}catch{}worker=null;workerFailed=false;pending.clear();fallbackIndexPromise=null;fallbackRows=null;fallbackDefaultOrder=null;fallbackQueryCache.clear();}
+export const KENNEY_LIVE_PROVIDER=Object.freeze({search:searchKenneyAssets,searchPage:searchKenneyPage,stats:getKenneyProviderStats,clearCache:clearKenneyCache,indexUrl:INDEX_URL});
