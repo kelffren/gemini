@@ -1,6 +1,6 @@
 # Kelo World — Code Index
 
-**Actualizado:** 2026-09-15
+**Actualizado:** 2026-09-16
 
 ## Runtime
 
@@ -59,9 +59,13 @@
 - `src/creators/assets/asset-delivery-manifest.mjs` — variantes DELIVERY inmutables por hash + provenance.
 - `src/creators/assets/smart-atlas-planner.mjs` — trim alpha-safe, `orig/trim/anchor`, MaxRects y subframe dedup.
 - `src/creators/assets/asset-budget-policy.mjs` — límites declarativos por grupo/zona para bytes, RGBA, file count y asset máximo.
+- `src/creators/assets/asset-bit-ratchet.mjs` — compara snapshots base/head y bloquea codificaciones mayores cuando el hash RGBA decodificado no cambió.
 - `docs/asset-space-budgets.json` — política inicial de budget de bibliotecas/zonas; no infiere loading runtime.
 - `scripts/asset-space-compiler.mjs` — CLI FAST/AUTO/BALANCED/DEEP, before/after/diff, perfil, provenance y reporte.
 - `scripts/asset-space-budget.mjs` — transferencia, RGBA baseline, transparencia y duplicados exactos.
+- `scripts/asset-bit-ratchet.mjs` — gate CI de bytes monotónicos para información RGBA idéntica.
+- `scripts/asset-bit-ratchet-audit.mjs` — regresión determinista del bit ratchet.
+- `.github/workflows/asset-bit-ratchet.yml` — comparación automática del snapshot base del PR contra head.
 - `scripts/asset-route-budget-audit.mjs` — enforcement CI de grupos declarados en `docs/asset-space-budgets.json`.
 - `scripts/asset-animation-consistency-audit.mjs` — corpus adversarial de flicker/anchor/alpha temporal.
 - `scripts/asset-codec-tournament.mjs` — laboratorio profundo de codecs y variantes de entrega.
