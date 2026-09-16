@@ -1,15 +1,15 @@
 /* KELO-INDEX
  * area: LEGACY ABILITY / MOVEMENT
  * owner: legacy skill/dash state; pointer lifecycle + final aim/render owned by KeloAbilityAim; movement extension owned by KeloMovement
- * keys: DASH AIM MOVEMENT INTERCEPT SKILL INDICATOR RENDER HOOK
- * purpose: conserva dash/cast legacy mientras KeloAbilityAim posee el lifecycle de puntero y aiming final
+ * keys: DASH AIM MOVEMENT INTERCEPT SKILL STATE ACTION BAR
+ * purpose: conserva dash/cast legacy mientras KeloAbilityAim posee lifecycle de puntero, aiming y renderer final
  * public-api: funciones legacy skill aim/renderActionBar
- * consumes: KeloMovement, KeloRender, STATE, localPlayer, obstacles
+ * consumes: KeloMovement, STATE, localPlayer, obstacles
  * state-owned: skillAim + dashTween legacy
  * extension-points: KeloMovement.intercept; KeloAbilityAim adapter
  * reuse: NO añadir habilidades nuevas aquí; usar sistema moderno de abilities
- * legacy: skill/dash state aún pendiente de migración; listeners globales retirados
- * do-not: NO volver a envolver updateMovement/render ni registrar pointermove/up/cancel aquí
+ * legacy: skill/dash state aún pendiente de migración; listeners y renderer global retirados
+ * do-not: NO volver a envolver updateMovement/render ni registrar pointermove/up/cancel o render hooks aquí
  */
 const skillAim = { active: false, index: -1, typeId: '', pointerId: null, originX: 0, originY: 0, currentX: 0, currentY: 0, dirX: 1, dirY: 0 };
 const dashTween = { active: false, t: 0, dur: 0.16, fromX: 0, fromY: 0, toX: 0, toY: 0 };
@@ -101,29 +101,4 @@ window.KeloMovement.intercept('engine-g:legacy-dash', function(ctx) {
   if (u >= 1) dashTween.active = false;
   return true;
 }, 10);
-function drawSkillIndicator() {
-  if (!skillAim.active) return;
-  const z = CONFIG.zoom || 1, range = skillRange(skillAim.typeId);
-  const tx = localPlayer.x + skillAim.dirX * range, ty = localPlayer.y + skillAim.dirY * range;
-  ctx.save(); ctx.translate(screenW / 2, screenH / 2); ctx.scale(z, z); ctx.translate(-camera.x, -camera.y);
-  ctx.strokeStyle = 'rgba(255,214,102,0.9)'; ctx.fillStyle = 'rgba(255,214,102,0.16)'; ctx.lineWidth = 3;
-  if (skillAim.typeId === 'dash') {
-    const ang = Math.atan2(skillAim.dirY, skillAim.dirX);
-    ctx.translate(localPlayer.x, localPlayer.y); ctx.rotate(ang);
-    ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(0, -14, range, 28, 12); else ctx.rect(0, -14, range, 28); ctx.fill(); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(range + 4, 0); ctx.lineTo(range - 16, -18); ctx.lineTo(range - 16, 18); ctx.closePath(); ctx.fill();
-  } else if (skillAim.typeId === 'meteor') {
-    ctx.beginPath(); ctx.moveTo(localPlayer.x, localPlayer.y); ctx.lineTo(tx, ty); ctx.stroke();
-    ctx.beginPath(); ctx.arc(tx, ty, 70, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-  } else {
-    ctx.beginPath(); ctx.moveTo(localPlayer.x, localPlayer.y); ctx.lineTo(tx, ty); ctx.stroke();
-    ctx.beginPath(); ctx.arc(tx, ty, 16, 0, Math.PI * 2); ctx.fill();
-  }
-  ctx.restore();
-  ctx.save(); ctx.strokeStyle = 'rgba(255,214,102,0.45)'; ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.arc(skillAim.originX, skillAim.originY, 46, 0, Math.PI * 2); ctx.stroke();
-  ctx.fillStyle = '#ffd166'; ctx.beginPath(); ctx.arc(skillAim.currentX, skillAim.currentY, 14, 0, Math.PI * 2); ctx.fill(); ctx.restore();
-}
-if(!window.KeloRender) throw new Error('KeloRender unavailable before engine-g');
-window.KeloRender.afterFrame('engine-g:skill-indicator', drawSkillIndicator, 20);
 renderActionBar();
