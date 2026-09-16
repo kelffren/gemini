@@ -46,17 +46,21 @@
 
 ## Studio / Creator
 
-- `src/creators/creator-entry.mjs` — composition root lazy de todos los workspaces Creator.
+- `src/creators/creator-entry.mjs` — composition root lazy de workspaces y servicios compartidos Creator.
 - `src/creators/library/creator-content-types.mjs` — Creator Library: tipos universales y routing a owners/workspaces existentes.
-- `src/creators/ui/creator-library-workspace.mjs` — biblioteca móvil CREATE / MY LIBRARY / TOOLS / PIPELINE.
+- `src/creators/ui/creator-library-workspace.mjs` — biblioteca móvil CREATE / MY LIBRARY / MARKET / TOOLS / PIPELINE; MARKET se importa lazy.
 - `src/creators/workspaces/creator-library-workspace.mjs` — manifest lazy de Creator Library.
 - `src/creators/workspaces/image-lab-workspace.mjs` — manifest que integra Image Lab al registry Creator.
 - `src/creators/ui/image-lab-workspace.mjs` — preparación de fuentes tipo Photoshop ligero/no destructivo.
 - `src/creators/ui/asset-forge-workspace.mjs` — pixel drawing + QA/repair + asset authoring local.
 - `src/creators/ui/content-studio-workspace.mjs` — ingest universal + runtime preview + Release Center móvil.
 - `src/creators/release/creator-release-service.mjs` — frontera de release: lee review/publicación server-side y solo permite submit/resubmit a review.
-- `src/creators/content/supabase-content-repository.mjs` — transporte autenticado/RLS para revisiones, review status y publicaciones visibles; no posee publish authority.
+- `src/creators/marketplace/creator-marketplace-service.mjs` — composición client-side del marketplace; Discover/listings/KC/entitlements delegan en Supabase.
+- `src/creators/ui/creator-marketplace-surface.mjs` — UI móvil lazy: DISCOVER / MY LISTINGS / OWNED / CREATOR PROFILE.
+- `src/creators/content/supabase-content-repository.mjs` — transporte autenticado/RLS/RPC para contenido, release y marketplace; no posee publish/wallet authority.
 - `src/creators/content/runtime-content-registry.mjs` — registry semántico y adapters a owners runtime existentes.
+- `supabase/migrations/20260916002500_creator_marketplace_v1.sql` — listings, transacciones KC, entitlements y Creator profile authority.
+- `supabase/migrations/20260916002600_creator_marketplace_discover_v2.sql` — Discover metadata-first/privacy-aware con flags relativos de ownership.
 - `src/ui/studio-launcher.js` — launcher del Creator Hub/Studio avanzado.
 - `src/creators/workspaces/world-workspace.mjs` — route/prewarm móvil.
 - `src/studio/integration/world-studio-bridge.mjs` — bridge de carga.
@@ -94,4 +98,4 @@
 
 ## Documentación
 
-Empieza por `docs/DOCUMENTATION_INDEX.md`. Para passes materiales multiagente, lee también la entrada `ACTIVE` correspondiente en `docs/IMPLEMENTATION_LEDGER.md`. Los documentos `*_MEMORY.md` son contexto acumulado, no autoridad superior al runtime.
+Empieza por `docs/DOCUMENTATION_INDEX.md`. Para passes materiales multiagente, lee también la entrada `ACTIVE` o `IMPLEMENTED_PENDING_VERIFY` correspondiente en `docs/IMPLEMENTATION_LEDGER.md`. Los documentos `*_MEMORY.md` son contexto acumulado, no autoridad superior al runtime.
