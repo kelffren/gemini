@@ -1,8 +1,8 @@
 /* KELO-INDEX
  * area: CREATORS / UNIVERSAL CONTENT PACKS
  * owner: Kelo Universal Content Bridge
- * keys: PACK INSTALL UPDATE REMOVE SHA256 LOCK DEPENDENCY LAZY MOBILE
- * purpose: Install groups of vault content on explicit request without adding pack binaries to normal game boot.
+ * keys: PACK DELTA UPDATE SHA256 DESCRIPTOR LOCK DEPENDENCY GC STORAGE MOBILE
+ * purpose: Install and differentially update groups of vault content without adding pack binaries to normal game boot.
  */
 import {searchExternalAssets} from './external-asset-providers.mjs';
 import {downloadAsset,integrateContent,getAsset,getBlob,removeLocal} from './personal-asset-vault.mjs';
@@ -27,10 +27,24 @@ async function sha256Bytes(bytes){
   return [...new Uint8Array(digest)].map(v=>v.toString(16).padStart(2,'0')).join('');
 }
 async function sha256Blob(blob){return sha256Bytes(await blob.arrayBuffer());}
-async function manifestHash(pack){const bytes=new TextEncoder().encode(JSON.stringify(canonical(pack)));return sha256Bytes(bytes);}
+async function hashObject(value){const bytes=new TextEncoder().encode(JSON.stringify(canonical(value)));return sha256Bytes(bytes);}
+async function manifestHash(pack){return hashObject(pack);}
 function normalizeExpectedHash(value){return clean(value).toLowerCase().replace(/^sha256:/,'');}
 function semverParts(v){return clean(v).split('.').slice(0,3).map(n=>Math.max(0,parseInt(n,10)||0));}
 function compareVersions(a,b){const A=semverParts(a),B=semverParts(b);for(let i=0;i<3;i++){if((A[i]||0)!==(B[i]||0))return(A[i]||0)>(B[i]||0)?1:-1;}return 0;}
+function bytesHint(asset){
+  const hinted=Math.max(0,Number(asset?.bytesHint||asset?.bytes||0)||0);if(hinted)return hinted;
+  if(asset?.inlineManifest)try{return new TextEncoder().encode(JSON.stringify(asset.inlineManifest)).byteLength;}catch{}
+  return 0;
+}
+function descriptorShape(asset){
+  return {
+    id:asset.id,provider:asset.provider,externalId:asset.externalId||asset.id,contentKind:asset.contentKind||asset.category||'image',
+    downloadUrl:asset.downloadUrl||null,sourceUrl:asset.sourceUrl||null,license:asset.license||'UNKNOWN',author:asset.author||null,
+    expectedSha256:normalizeExpectedHash(asset.expectedSha256)||null,bytesHint:bytesHint(asset),loop:asset.loop===true,inlineManifest:asset.inlineManifest||null
+  };
+}
+async function descriptorHash(asset){return hashObject(descriptorShape(asset));}
 
 function validatePack(pack){
   if(!pack||!clean(pack.id)||!clean(pack.name)||!clean(pack.version))throw new Error('PACK_SCHEMA_INVALID');
@@ -74,58 +88,111 @@ export async function listPackStates(){return(await stateAll()).map(copy).sort((
 async function resolveMembers(pack){
   const providers=[...new Set(pack.members.map(m=>m.provider))],resolved=new Map();
   await Promise.all(providers.map(async provider=>{const result=await searchExternalAssets('',{providers:[provider],limit:320});for(const asset of result.assets||[])resolved.set(asset.id,asset);}));
-  return pack.members.map(member=>{const asset=resolved.get(member.assetId);if(!asset)throw new Error(`PACK_MEMBER_NOT_FOUND:${pack.id}:${member.assetId}`);return {...asset,expectedSha256:member.sha256||asset.expectedSha256||null};});
+  const rows=[];
+  for(const member of pack.members){
+    const asset=resolved.get(member.assetId);if(!asset)throw new Error(`PACK_MEMBER_NOT_FOUND:${pack.id}:${member.assetId}`);
+    const next={...asset,expectedSha256:member.sha256||asset.expectedSha256||null,memberVersion:member.version||pack.version};
+    next.descriptorHash=await descriptorHash(next);rows.push(next);
+  }
+  return rows;
 }
 async function emitProgress(callback,detail){try{callback?.(copy(detail));}catch{}try{globalThis.dispatchEvent?.(new CustomEvent('kelo:content-pack-progress',{detail:copy(detail)}));}catch{}}
+function memberUsedByOtherPack(memberId,currentId,states){return states.some(state=>state.id!==currentId&&state.downloaded&&state.status!=='removed'&&Array.isArray(state.members)&&state.members.some(row=>row.id===memberId));}
+
+export async function planContentPackUpdate(id,{integrate=true}={}){
+  const pack=await getContentPack(id);if(!pack)throw new Error('PACK_NOT_FOUND:'+id);
+  const resolved=await resolveMembers(pack),previous=await getPackState(pack.id),oldLocks=new Map((previous?.members||[]).map(row=>[row.id,row]));
+  const actions=[];let totalBytes=0,deltaBytes=0,reusedBytes=0;
+  for(const asset of resolved){
+    const lock=oldLocks.get(asset.id)||null,local=await getAsset(asset.id),blob=local?.downloaded?await getBlob(asset.id):null;
+    const expected=normalizeExpectedHash(asset.expectedSha256),lockSha=normalizeExpectedHash(lock?.sha256),descriptorChanged=!lock?.descriptorHash||lock.descriptorHash!==asset.descriptorHash;
+    let action='reuse',reason='descriptor-match';
+    if(!local?.downloaded||!blob){action='download';reason='missing-local-binary';}
+    else if(expected&&lockSha!==expected){action='download';reason='expected-digest-changed';}
+    else if(descriptorChanged){action='download';reason='member-descriptor-changed';}
+    else if(integrate&&!local?.integrated){action='integrate';reason='needs-integration';}
+    const estimatedBytes=bytesHint(asset)||Number(lock?.bytes||blob?.size||0);totalBytes+=estimatedBytes;
+    if(action==='download')deltaBytes+=estimatedBytes;else reusedBytes+=estimatedBytes;
+    actions.push({asset,action,reason,estimatedBytes,previousLock:copy(lock)});oldLocks.delete(asset.id);
+  }
+  const removed=[...oldLocks.values()];
+  const hash=await manifestHash(pack);
+  return {pack,previous,resolved,actions,removed,totalMembers:resolved.length,totalBytes,deltaBytes,reusedBytes,savedBytes:Math.max(0,totalBytes-deltaBytes),catalogHash:hash,changedMembers:actions.filter(x=>x.action!=='reuse').length,reusedMembers:actions.filter(x=>x.action==='reuse').length,removedMembers:removed.length};
+}
 
 export async function installContentPack(id,{integrate=true,onProgress=null,_stack=null}={}){
   const pack=await getContentPack(id);if(!pack)throw new Error('PACK_NOT_FOUND:'+id);
   const stack=_stack||new Set();if(stack.has(pack.id))throw new Error('PACK_DEPENDENCY_CYCLE:'+pack.id);stack.add(pack.id);
   for(const dependency of pack.dependencies||[])await installContentPack(dependency,{integrate,onProgress,_stack:stack});stack.delete(pack.id);
 
-  const resolved=await resolveMembers(pack),hash=await manifestHash(pack),previous=await getPackState(pack.id),locks=Array.isArray(previous?.members)?previous.members.slice():[];
-  let state={id:pack.id,name:pack.name,version:pack.version,catalogHash:hash,status:'installing',ownership:'free',downloaded:false,integrated:false,bytes:0,totalMembers:resolved.length,completedMembers:0,members:locks,installedAt:previous?.installedAt||null,updatedAt:now(),error:null};
+  const plan=await planContentPackUpdate(pack.id,{integrate}),previous=plan.previous,previousLocks=new Map((previous?.members||[]).map(row=>[row.id,row]));
+  let state={id:pack.id,name:pack.name,version:pack.version,catalogHash:plan.catalogHash,status:previous?.status==='installed'?'updating':'installing',ownership:'free',downloaded:false,integrated:false,bytes:0,totalMembers:plan.totalMembers,completedMembers:0,members:[],installedAt:previous?.installedAt||null,updatedAt:now(),error:null,delta:{changedMembers:plan.changedMembers,reusedMembers:plan.reusedMembers,removedMembers:plan.removedMembers,estimatedDownloadBytes:plan.deltaBytes,estimatedSavedBytes:plan.savedBytes,downloadedBytes:0}};
   await statePut(state);
   try{
-    for(let index=0;index<resolved.length;index++){
-      const asset=resolved[index];await emitProgress(onProgress,{packId:pack.id,phase:'member',index,total:resolved.length,assetId:asset.id,name:asset.name});
-      let local=await getAsset(asset.id);const preexistingDownloaded=!!local?.downloaded;
-      if(!local?.downloaded)local=await downloadAsset(asset);
+    for(let index=0;index<plan.actions.length;index++){
+      const item=plan.actions[index],asset=item.asset,oldLock=previousLocks.get(asset.id)||null;
+      await emitProgress(onProgress,{packId:pack.id,phase:item.action,index,total:plan.totalMembers,assetId:asset.id,name:asset.name,reason:item.reason,deltaBytes:plan.deltaBytes});
+      let local=await getAsset(asset.id),preexistingDownloaded=oldLock?.preexistingDownloaded??!!local?.downloaded;
+      if(item.action==='download')local=await downloadAsset(asset);
       const blob=await getBlob(asset.id);if(!blob)throw new Error('PACK_MEMBER_BINARY_MISSING:'+asset.id);
-      const sha256=await sha256Blob(blob),expected=normalizeExpectedHash(asset.expectedSha256);if(expected&&sha256&&sha256!==expected)throw new Error('PACK_MEMBER_INTEGRITY_MISMATCH:'+asset.id);
+      let sha256=normalizeExpectedHash(oldLock?.sha256)||null;
+      if(item.action==='download'||!sha256||normalizeExpectedHash(asset.expectedSha256))sha256=await sha256Blob(blob);
+      const expected=normalizeExpectedHash(asset.expectedSha256);if(expected&&sha256&&sha256!==expected)throw new Error('PACK_MEMBER_INTEGRITY_MISMATCH:'+asset.id);
       if(integrate&&!local?.integrated)local=(await integrateContent(asset.id)).asset;
-      const oldLock=state.members.find(row=>row.id===asset.id);
-      const lock={id:asset.id,provider:asset.provider,contentKind:local?.contentKind||asset.contentKind||'image',bytes:blob.size,sha256:sha256?`sha256:${sha256}`:null,expectedSha256:expected?`sha256:${expected}`:null,integrated:!!local?.integrated,preexistingDownloaded:oldLock?.preexistingDownloaded??preexistingDownloaded,version:pack.version};
-      const existing=state.members.findIndex(row=>row.id===asset.id);if(existing>=0)state.members[existing]=lock;else state.members.push(lock);
-      state.completedMembers=index+1;state.bytes=state.members.reduce((sum,row)=>sum+Number(row.bytes||0),0);state.updatedAt=now();await statePut(state);await tick();
+      const lock={id:asset.id,provider:asset.provider,contentKind:local?.contentKind||asset.contentKind||'image',bytes:blob.size,sha256:sha256?`sha256:${sha256}`:oldLock?.sha256||null,expectedSha256:expected?`sha256:${expected}`:null,descriptorHash:asset.descriptorHash,integrated:!!local?.integrated,preexistingDownloaded,version:asset.memberVersion||pack.version};
+      state.members.push(lock);state.completedMembers=index+1;state.bytes+=Number(blob.size||0);if(item.action==='download')state.delta.downloadedBytes+=Number(blob.size||0);state.updatedAt=now();await statePut(state);await tick();
+    }
+
+    if(plan.removed.length){
+      const states=await listPackStates();
+      for(const member of plan.removed){
+        const shared=memberUsedByOtherPack(member.id,pack.id,states),wasAlreadyLocal=member.preexistingDownloaded===true;
+        if(!shared&&!wasAlreadyLocal)await removeLocal(member.id);
+      }
     }
     state={...state,status:'installed',downloaded:true,integrated:integrate&&state.members.every(row=>row.integrated),installedAt:state.installedAt||now(),updatedAt:now(),error:null};
-    await statePut(state);await emitProgress(onProgress,{packId:pack.id,phase:'done',total:resolved.length,bytes:state.bytes});return copy(state);
+    await statePut(state);await emitProgress(onProgress,{packId:pack.id,phase:'done',total:plan.totalMembers,bytes:state.bytes,delta:copy(state.delta)});return copy(state);
   }catch(error){
     state={...state,status:'partial',downloaded:state.completedMembers>0,integrated:false,updatedAt:now(),error:String(error?.message||error)};await statePut(state);await emitProgress(onProgress,{packId:pack.id,phase:'error',error:state.error});throw error;
   }
 }
 
-function memberUsedByOtherPack(memberId,currentId,states){return states.some(state=>state.id!==currentId&&state.downloaded&&state.status!=='removed'&&Array.isArray(state.members)&&state.members.some(row=>row.id===memberId));}
+export async function auditContentPack(id,{rehash=true}={}){
+  const state=await getPackState(id);if(!state?.members?.length)return{packId:id,ok:false,reason:'not-installed',members:[]};
+  const members=[];let ok=true;
+  for(const lock of state.members){
+    const local=await getAsset(lock.id),blob=local?.downloaded?await getBlob(lock.id):null;let reason='ok',actualSha256=null;
+    if(!blob){ok=false;reason='missing-binary';}
+    else if(rehash){actualSha256=await sha256Blob(blob);const locked=normalizeExpectedHash(lock.sha256);if(locked&&actualSha256!==locked){ok=false;reason='digest-mismatch';}}
+    members.push({id:lock.id,ok:reason==='ok',reason,bytes:blob?.size||0,lockedSha256:lock.sha256||null,actualSha256:actualSha256?`sha256:${actualSha256}`:null});await tick();
+  }
+  return{packId:id,ok,members,checkedAt:now()};
+}
+
 export async function removeContentPack(id,{removeLocalMembers=true,onProgress=null}={}){
   const pack=await getContentPack(id),state=await getPackState(id);if(!state&&!pack)return null;
   const states=await listPackStates(),members=state?.members||[];
-  if(removeLocalMembers){
-    for(let index=0;index<members.length;index++){
-      const member=members[index];await emitProgress(onProgress,{packId:id,phase:'remove-member',index,total:members.length,assetId:member.id});
-      const shared=memberUsedByOtherPack(member.id,id,states),wasAlreadyLocal=member.preexistingDownloaded===true;
-      if(!shared&&!wasAlreadyLocal)await removeLocal(member.id);await tick();
-    }
-  }
+  if(removeLocalMembers){for(let index=0;index<members.length;index++){const member=members[index];await emitProgress(onProgress,{packId:id,phase:'remove-member',index,total:members.length,assetId:member.id});const shared=memberUsedByOtherPack(member.id,id,states),wasAlreadyLocal=member.preexistingDownloaded===true;if(!shared&&!wasAlreadyLocal)await removeLocal(member.id);await tick();}}
   const next={...(state||{id,name:pack?.name||id,version:pack?.version||'0.0.0'}),status:'removed',downloaded:false,integrated:false,bytes:0,completedMembers:0,updatedAt:now(),removedAt:now(),error:null};
   await statePut(next);await emitProgress(onProgress,{packId:id,phase:'removed'});return copy(next);
 }
 
+export async function getPackStorageHealth(){
+  const storage=globalThis.navigator?.storage;if(!storage)return{supported:false,usage:null,quota:null,persisted:false};
+  let estimate={},persisted=false;try{estimate=await storage.estimate?.()||{};}catch{}try{persisted=await storage.persisted?.()||false;}catch{}
+  return{supported:true,usage:Number(estimate.usage||0),quota:Number(estimate.quota||0),persisted,free:Math.max(0,Number(estimate.quota||0)-Number(estimate.usage||0))};
+}
+export async function requestPersistentPackStorage(){const storage=globalThis.navigator?.storage;if(!storage?.persist)return false;try{return!!(await storage.persist());}catch{return false;}}
+
 export async function inspectContentPacks(){
   const packs=await listContentPacks(),states=await listPackStates(),byId=new Map(states.map(s=>[s.id,s])),rows=[];
-  for(const pack of packs){const state=byId.get(pack.id)||null,hash=await manifestHash(pack),updateAvailable=!!state&&compareVersions(pack.version,state.version)>0,catalogChanged=!!state?.catalogHash&&!!hash&&state.catalogHash!==hash;rows.push({...pack,state:copy(state),installed:!!state?.downloaded&&state.status==='installed',integrated:!!state?.integrated,partial:state?.status==='partial',updateAvailable,catalogChanged,manifestHash:hash?`sha256:${hash}`:null});}
+  for(const pack of packs){
+    const state=byId.get(pack.id)||null,hash=await manifestHash(pack),updateAvailable=!!state&&compareVersions(pack.version,state.version)>0,catalogChanged=!!state?.catalogHash&&!!hash&&state.catalogHash!==hash;
+    let delta=null;if(state?.downloaded&&(updateAvailable||catalogChanged||state.status==='partial'))try{const plan=await planContentPackUpdate(pack.id,{integrate:true});delta={changedMembers:plan.changedMembers,reusedMembers:plan.reusedMembers,removedMembers:plan.removedMembers,estimatedDownloadBytes:plan.deltaBytes,estimatedSavedBytes:plan.savedBytes};}catch{}
+    rows.push({...pack,state:copy(state),installed:!!state?.downloaded&&state.status==='installed',integrated:!!state?.integrated,partial:state?.status==='partial',updateAvailable,catalogChanged,manifestHash:hash?`sha256:${hash}`:null,delta});
+  }
   return rows;
 }
 
-export const CONTENT_PACK_MANAGER=Object.freeze({loadPackCatalog,listContentPacks,getContentPack,getPackState,listPackStates,inspectContentPacks,installContentPack,removeContentPack,clearPackCatalogCache});
+export const CONTENT_PACK_MANAGER=Object.freeze({loadPackCatalog,listContentPacks,getContentPack,getPackState,listPackStates,inspectContentPacks,planContentPackUpdate,installContentPack,auditContentPack,removeContentPack,getPackStorageHealth,requestPersistentPackStorage,clearPackCatalogCache});
 if(typeof window!=='undefined')window.KELO_CONTENT_PACK_MANAGER=CONTENT_PACK_MANAGER;
