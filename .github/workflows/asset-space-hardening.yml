@@ -1,0 +1,43 @@
+name: Asset Space Hardening
+
+on:
+  push:
+    branches: [main, feat/adaptive-png-space-compiler]
+    paths:
+      - 'src/creators/assets/**'
+      - 'scripts/asset-*.mjs'
+      - 'assets/world/plaza/forest-plaza-tileset-v2.png'
+      - 'src/environment/generated/forest-plaza-tileset-v2-manifest.js'
+      - '.github/workflows/asset-space-hardening.yml'
+  pull_request:
+    paths:
+      - 'src/creators/assets/**'
+      - 'scripts/asset-*.mjs'
+      - 'assets/world/plaza/forest-plaza-tileset-v2.png'
+      - 'src/environment/generated/forest-plaza-tileset-v2-manifest.js'
+      - '.github/workflows/asset-space-hardening.yml'
+
+concurrency:
+  group: asset-space-hardening-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  hardening:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - name: Quality Agent golden corpus
+        run: node scripts/asset-quality-golden-corpus-audit.mjs
+      - name: PNG cache integrity
+        run: node scripts/asset-optimization-cache-audit.mjs
+      - name: Smart Atlas recomposition proof
+        run: node scripts/asset-atlas-recomposition-audit.mjs --manifest=src/environment/generated/forest-plaza-tileset-v2-manifest.js
+      - name: Asset documentation contract
+        run: node scripts/system-documentation-audit.js
