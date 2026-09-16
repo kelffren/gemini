@@ -4,7 +4,11 @@
  * owns: lazy route from Creator Hub into Asset Forge
  * does-not-own: drawing algorithms, persistence, marketplace settlement, moderation or runtime rendering
  */
-export function createAssetForgeWorkspaceManifest({loader=()=>import('../ui/asset-forge-workspace.mjs'),templateLoader=()=>import('../ui/asset-forge-template-controls.mjs')}={}){
+export function createAssetForgeWorkspaceManifest({
+  loader=()=>import('../ui/asset-forge-workspace.mjs'),
+  templateLoader=()=>import('../ui/asset-forge-template-controls.mjs'),
+  drawingLoader=()=>import('../ui/asset-forge-drawing-controls.mjs')
+}={}){
   return Object.freeze({
     id:'asset-forge',label:'Asset Forge',category:'visual',projectTypes:[],capability:null,availability:'active',
     async open(context={}){
@@ -15,6 +19,10 @@ export function createAssetForgeWorkspaceManifest({loader=()=>import('../ui/asse
         const templates=await templateLoader();
         if(typeof templates.installAssetForgeTemplateControls==='function')templates.installAssetForgeTemplateControls({...context,session});
       }catch(error){console.warn('[Creators] Asset Forge template controls unavailable',error);}
+      try{
+        const drawing=await drawingLoader();
+        if(typeof drawing.installAssetForgeDrawingControls==='function')drawing.installAssetForgeDrawingControls({...context,session});
+      }catch(error){console.warn('[Creators] Asset Forge drawing controls unavailable',error);}
       return session;
     },
     isSessionAlive(session){return !!session?.shell?.isConnected;}
