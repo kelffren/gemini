@@ -1,6 +1,6 @@
 # Kelo World — Code Index
 
-**Actualizado:** 2026-09-14
+**Actualizado:** 2026-09-15
 
 ## Runtime
 
@@ -39,7 +39,19 @@
 - `assets/world/plaza/forest-plaza-tileset-v2.png` — atlas fuente LIVE.
 - `src/property/forest-plaza-asset-catalog.js` — 146 templates, nombres/categorías.
 - `src/property/property-asset-catalog.js` — catálogo general.
-- `src/creators/assets/asset-sheet-compiler.mjs` — compiler heterogéneo.
+- `src/creators/assets/asset-image-profiler.mjs` — clasifica tile/pixel/UI/FX/sprite y selecciona quality policy.
+- `src/creators/assets/png-space-optimizer.mjs` — compresión PNG lossless con gate RGBA exacto.
+- `src/creators/assets/png-codec-tournament.mjs` — torneo verificado Kelo/OxiPNG/ZopfliPNG/ECT.
+- `src/creators/assets/png-adaptive-optimizer.mjs` — búsqueda opt-in de paleta guiada por perfil con fallback strict.
+- `src/creators/assets/png-quality-agent.mjs` — comparación RGBA/alpha/PSNR/bordes/seams y hard gates por perfil.
+- `src/creators/assets/quality-pareto.mjs` — frontera no dominada de tamaño/calidad para calibrar candidatos.
+- `src/creators/assets/perceptual-quality-bridge.mjs` — advisory opcional SSIMULACRA2/Butteraugli/IQA; nunca sobreescribe hard gates.
+- `src/creators/assets/runtime-image-variants.mjs` — laboratorio de variantes DELIVERY PNG/WebP/AVIF sin sustituir SOURCE.
+- `scripts/asset-space-compiler.mjs` — CLI FAST/BALANCED/DEEP, before/after/diff, perfil y reporte.
+- `scripts/asset-space-budget.mjs` — transferencia, RGBA baseline, transparencia y duplicados exactos.
+- `scripts/asset-codec-tournament.mjs` — laboratorio profundo de codecs y variantes de entrega.
+- `scripts/asset-space-meta-audit.mjs` — gate de profiler/seams/tournament.
+- `src/creators/assets/asset-sheet-compiler.mjs` — compiler heterogéneo de geometría/metadata.
 - `src/creators/sprite-compiler/sprite-foreground-analysis.mjs` — foreground/components.
 - `src/creators/sprite-compiler/sprite-world-asset-compiler.mjs` — perfil world asset.
 

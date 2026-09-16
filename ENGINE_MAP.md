@@ -2,7 +2,7 @@
 
 > Documento canónico del engine. Si contradice `index.html` o un owner Foundation LIVE, gana el runtime y este archivo debe actualizarse.
 
-**Sincronizado:** 2026-09-14  
+**Sincronizado:** 2026-09-15  
 **Runtime declarado:** Kelo World V6.54.2  
 **Modelo:** web 2D top-down, Canvas, mobile-first, login/guest gate antes del boot pesado.
 
@@ -62,7 +62,7 @@ El atlas LIVE es:
 
 `assets/world/plaza/forest-plaza-tileset-v2.png`
 
-La ruta completa es:
+La ruta completa LIVE sigue siendo:
 
 `PNG → src/creators/assets/asset-sheet-compiler.mjs → manifest irregular → src/environment/generated/forest-plaza-tileset-v2-manifest.js → KELO_ATLAS_CONTRACT → src/property/forest-plaza-asset-catalog.js → KELO_PROPERTY_CATALOG → Studio/World placement`
 
@@ -91,11 +91,40 @@ El shell es UI; no posee mutations del mundo. Las mutations pasan por Studio Ker
 
 **Regla QA:** World en iPhone no se declara resuelto solo con headless. Requiere apertura, interacción, placement y reapertura en dispositivo real/LIVE.
 
-## 7. Asset compiler
+## 7. Asset compiler + Space Gate
 
 `asset-sheet-compiler.mjs` reutiliza `sprite-foreground-analysis.mjs` y `sprite-world-asset-compiler.mjs`. Produce frames irregulares, metadata y manifest; no redibuja el arte ni se convierte en un renderer.
 
 El Asset Compiler puede sugerir semántica, pero nombres/categorías revisados deben conservar geometría sourceRect estable para no romper placements.
+
+### Space Gate — PREPARED / build-time
+
+La capacidad de bytes se mantiene bajo el mismo owner `Kelo Creator Asset Bridge` y se separa en tres niveles:
+
+`SOURCE PNG → PROFILE → LOSSLESS TOURNAMENT → QUALITY GATE → AUTHORING PNG → asset-sheet-compiler → manifest`
+
+Más una pista opcional:
+
+`SOURCE/AUTHORING → RUNTIME VARIANT LAB → QUALITY GATE → DELIVERY CANDIDATE`
+
+- `asset-image-profiler.mjs`: clasifica tile/pixel/UI/FX/sprite y selecciona policy.
+- `png-space-optimizer.mjs`: filtros/DEFLATE/paleta exacta; strict exige RGBA idéntico.
+- `png-codec-tournament.mjs`: hace competir Kelo/OxiPNG/ZopfliPNG/ECT y vuelve a verificar píxeles + metadata visual.
+- `png-quality-agent.mjs`: hard gates de RGBA, alpha, PSNR, bordes y borde exterior; `seam-safe` bloquea cambios en bordes de tiles.
+- `png-adaptive-optimizer.mjs`: cuantización opt-in guiada por perfil; fallback strict.
+- `runtime-image-variants.mjs`: genera candidatos PNG/WebP/AVIF para DELIVERY sin sustituir SOURCE ni modificar el runtime.
+- `scripts/asset-space-compiler.mjs`: CLI recursiva con before/after/diff y reportes; fuera del boot.
+- `scripts/asset-codec-tournament.mjs`: laboratorio profundo manual de authoring/runtime codecs.
+
+Invariantes:
+
+- SOURCE se conserva como evidencia/canónico;
+- AUTHORING puede ser un PNG más pequeño solo después de demostrar equivalencia;
+- DELIVERY es un candidato separado y no se promueve automáticamente al runtime;
+- no cambian dimensiones, sourceRects, IDs ni ownership;
+- KTX2/Basis queda como horizonte para una futura superficie WebGL/WebGPU capaz de consumir texturas GPU comprimidas; no entra en Canvas 2D solo por ahorrar disco.
+
+El runtime continúa consumiendo las rutas actuales hasta un pass separado de promoción/QA en iPhone.
 
 ## 8. Gameplay
 
@@ -121,6 +150,8 @@ El cliente puede predecir/presentar, pero progreso valioso, comercio, PvP compet
 - No mutar `obstacles` desde features nuevas.
 - No sustituir World/Studio por un editor nuevo para corregir un bug de boot.
 - No publicar assets persistentes solo porque funcionan en preview local.
+- No sustituir SOURCE por un codec DELIVERY sin evidencia + rollback.
+- No introducir KTX2/Basis en Canvas 2D sin un consumidor gráfico que justifique esa ruta.
 - No declarar un fix móvil verificado sin QA real.
 
 ## 11. Documentos relacionados
