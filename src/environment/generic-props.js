@@ -1,9 +1,8 @@
 /* KELO-INDEX
  * area: ENVIRONMENT / PROPS
- * owner: KELO_GENERIC_PROPS; assets=KELO_ATLAS_CONTRACT; camera=KeloCamera
+ * owner: KELO_GENERIC_PROPS + KELO_ATLAS_CONTRACT
  * keys: PROP RENDER ATLAS VIEWPORT RESIDENCY
- * purpose: viewport prop render/residency; editor probes excluded
- * do-not: new Image/eager preload/editor probes
+ * purpose: viewport props; editor probes excluded
  */
 (function(){
 'use strict';
