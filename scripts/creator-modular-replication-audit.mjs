@@ -6,6 +6,7 @@ function check(name,ok){checks.push({name,ok:!!ok});if(!ok)process.exitCode=1;}
 const migration=read('supabase/migrations/20260916004500_creator_modular_replication_v1.sql');
 const avatarStore=read('server/avatar-sync-store.js');
 const server=read('server/index.js');
+const pvp=read('server/pvp-authority.js');
 const net=read('engine-net.js');
 const avatarRuntime=read('src/characters/creator-avatar-runtime.mjs');
 const bridge=read('src/characters/creator-character-state-bridge.js');
@@ -16,10 +17,12 @@ check('snapshot requires active content publication and exact entitlement or aut
 check('snapshot requires all bound assets authority-published',/asset_publications ap/.test(migration)&&/not exists\([\s\S]*missing\.content_revision_id=r\.id[\s\S]*ap2\.revision_id=missing\.asset_revision_id and ap2\.is_active=true/.test(migration));
 check('replication RPC does not grant ownership or mutate use state',!/insert into public\.creator_content_entitlements|update public\.creator_content_entitlements|insert into public\.creator_character_content_bindings|update public\.creator_character_content_bindings/.test(migration));
 check('server presentation is derived with owner JWT, not viewer or client-declared URLs',/get_my_public_creator_character_appearance/.test(avatarStore)&&/headers\(accessToken\)/.test(avatarStore)&&/sanitizeAppearance/.test(avatarStore)&&/runtimeUrl/.test(avatarStore));
+check('server only republishes approved creator-global global or official bytes',/PUBLIC_CREATOR_BUCKET='creator-global'/.test(avatarStore)&&/PUBLIC_CREATOR_VISIBILITY=new Set\(\['global','official'\]\)/.test(avatarStore)&&/bucket!==PUBLIC_CREATOR_BUCKET/.test(avatarStore));
 check('server sanitizes modular slot type target transform and published asset metadata',/SLOT_RE/.test(avatarStore)&&/serverSlot!==slotKey/.test(avatarStore)&&/\['appearance','equipment'\]/.test(avatarStore)&&/safeTransforms/.test(avatarStore)&&/sanitizePublicAsset/.test(avatarStore));
 check('appearance RPC failure preserves full-body avatar compatibility',/resolveAppearance\(characterId,accessToken\)/.test(avatarStore)&&/catch\(error\).*return null/s.test(avatarStore)&&/if\(!avatar&&!creatorAppearance\)return null/.test(avatarStore));
-check('existing server AOI transport remains the presentation carrier',/avatarManifest:p\.avatarManifest\|\|null/.test(server)&&/publicStateFor\(viewer,index\)/.test(server)&&/sendRelevantStates/.test(server));
-check('client peers receive server avatar presentation through existing transport',/peer\.avatarManifest=p\.avatarManifest\|\|null/.test(net)&&/ingestAvatarManifest\(peer\.avatarManifest,false\)/.test(net));
+check('existing social server AOI transport remains the presentation carrier',/avatarManifest:p\.avatarManifest\|\|null/.test(server)&&/publicStateFor\(viewer,index\)/.test(server)&&/sendRelevantStates/.test(server));
+check('client peers receive server avatar presentation through existing social transport',/peer\.avatarManifest=p\.avatarManifest\|\|null/.test(net)&&/ingestAvatarManifest\(peer\.avatarManifest,false\)/.test(net));
+check('pvp authority remains a separate competitive snapshot in this V1',/function actorPublic/.test(pvp)&&!/creatorAppearance|avatarManifest/.test(pvp));
 check('remote modular envelope only wakes existing Appearance feature on demand',/creatorAppearance/.test(avatarRuntime)&&/source==='server-authoritative-published'/.test(avatarRuntime)&&/KELO_MODULE_LOADER\.ensure\('appearance'\)/.test(avatarRuntime)&&!/setInterval|requestAnimationFrame/.test(avatarRuntime));
 check('remote bridge uses weak actor state and existing Character state resolver',/const remoteOverlays=new WeakMap\(\)/.test(bridge)&&/const remoteFingerprints=new WeakMap\(\)/.test(bridge)&&/baseCustomization\?\.stateForActor/.test(bridge));
 check('remote viewer does not require local entitlement',/function remoteRecord/.test(bridge)&&!/function remoteRecord[\s\S]*KeloCreatorEntitlements/.test(bridge));
