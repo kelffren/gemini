@@ -487,3 +487,31 @@ Y antes de cada feature:
 > CAPACIDAD → EXTIENDE EL OWNER.
 >
 > NUNCA → DUPLICA.
+
+---
+
+## 16. Integración serializada de `main` — OBLIGATORIA
+
+`main` es una superficie compartida entre múltiples agentes. Para evitar carreras, verdes obsoletos y pérdida de cambios, **ningún agente debe hacer push directo a `main` para cambios de código/runtime**.
+
+Flujo obligatorio:
+
+`LEER MAIN ACTUAL → CREAR RAMA → IMPLEMENTAR → ACTUALIZAR RAMA CONTRA MAIN → MAIN STABILITY GATE → MERGE`
+
+Reglas:
+
+1. Cada tarea material usa su propia rama y PR.
+2. Un único writer modifica una rama a la vez salvo partición explícita sin solapamiento.
+3. El check canónico es `main-stability-gate`; un PASS viejo contra otra base no autoriza merge.
+4. Antes de mergear, la rama debe contener el `main` actual. Si `main` avanzó después del PASS, se actualiza la rama y se repite el gate.
+5. Está prohibido resolver una carrera usando `force push` sobre `main`.
+6. Está prohibido saltarse un gate rojo porque otro workflow local esté verde.
+7. Cambios de documentación que definan leyes de integración pueden entrar directamente solo como bootstrap excepcional mientras GitHub Rulesets no estén disponibles; una vez exista protección nativa, también pasan por PR.
+8. Cuando GitHub Rulesets/branch protection estén disponibles, deben exigir PR + `main-stability-gate` + rama actualizada antes del merge.
+9. Si varios agentes están activos, el coordinador serializa la integración; **paralelizar investigación/construcción no significa paralelizar escrituras a `main`**.
+
+Regla mental:
+
+`PARALELIZAR TRABAJO → SERIALIZAR INTEGRACIÓN`
+
+Hasta que exista Ruleset nativo, esta sección es ley operativa del repo y todos los agentes deben obedecerla.
