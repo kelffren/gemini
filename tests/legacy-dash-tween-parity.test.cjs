@@ -6,49 +6,12 @@ const vm=require('node:vm');
 
 const source=fs.readFileSync(path.join(__dirname,'..','engine-g.js'),'utf8');
 let interceptor=null;
-let abilityBeginCalls=[];
 let damageCalls=[];
 let collisionMode='none';
-const windowListeners=new Map();
-let rafQueue=[];
-
-function makeElement(tag){
-  const listeners={};
-  const element={
-    tagName:String(tag||'').toUpperCase(),
-    id:'',className:'',children:[],
-    addEventListener(type,fn){(listeners[type]||(listeners[type]=[])).push(fn);},
-    dispatch(type,event){for(const fn of listeners[type]||[])fn(event);},
-    appendChild(child){this.children.push(child);return child;}
-  };
-  let html='';
-  Object.defineProperty(element,'innerHTML',{
-    get(){return html;},
-    set(value){html=String(value);if(value==='')element.children.length=0;}
-  });
-  return element;
-}
-
-const container=makeElement('div');
-container.id='action-bar-container';
-const document={
-  getElementById(id){return id==='action-bar-container'?container:null;},
-  createElement(tag){return makeElement(tag);}
-};
-function addWindowListener(type,fn){
-  if(!windowListeners.has(type))windowListeners.set(type,[]);
-  windowListeners.get(type).push(fn);
-}
-function fireWindow(type,event={}){
-  for(const fn of windowListeners.get(type)||[])fn(event);
-}
-function requestAnimationFrame(fn){rafQueue.push(fn);return rafQueue.length;}
-function flushFrame(){const batch=rafQueue;rafQueue=[];for(const fn of batch)fn(0);}
 
 const context={
   console,
   Math,
-  document,
   STATE:{equipped:[
     {typeId:'dash',currentCd:0,baseCd:3,color:'#0ff',dmg:27,icon:'D',name:'Dash',isUlt:false},
     {typeId:'fireball',currentCd:0,baseCd:4,color:'#f40',dmg:19,icon:'F',name:'Fireball',isUlt:true}
@@ -64,12 +27,7 @@ const context={
   applyPvPDamage(target,amount){damageCalls.push({target,amount});},
   KeloMovement:{
     intercept(owner,fn,priority){interceptor={owner,fn,priority};return 'dash-interceptor-test';}
-  },
-  KeloAbilityAim:{
-    begin(index,event){abilityBeginCalls.push({index,event});}
-  },
-  addEventListener:addWindowListener,
-  requestAnimationFrame
+  }
 };
 context.window=context;
 vm.createContext(context);
@@ -86,26 +44,9 @@ function approx(actual,expected,epsilon=1e-12){assert.ok(Math.abs(actual-expecte
 assert.ok(interceptor,'engine-g must register the legacy dash movement interceptor');
 assert.equal(interceptor.owner,'engine-g:legacy-dash');
 assert.equal(interceptor.priority,10);
-assert.equal((windowListeners.get('pointermove')||[]).length,0,'engine-g must not own pointermove');
-assert.equal((windowListeners.get('pointerup')||[]).length,0,'engine-g must not own pointerup');
-assert.equal((windowListeners.get('pointercancel')||[]).length,0,'engine-g must not own pointercancel');
-
-assert.equal(container.children.length,0,'hidden social action bar must not build during parser-blocking boot');
-assert.equal((windowListeners.get('kelo:boot-ready')||[]).length,1,'action bar waits for boot-ready');
-fireWindow('kelo:boot-ready');
-assert.equal(container.children.length,0,'first rAF only yields toward first paint');
-flushFrame();
-assert.equal(container.children.length,0,'action bar still deferred until second frame');
-flushFrame();
-assert.equal(container.children.length,2,'action bar renders after first paint');
-assert.equal(container.children[0].id,'action-slot-0');
-assert.equal(container.children[0].className,'stone-slot');
-assert.equal(container.children[1].className,'stone-slot ultimate');
-const pointerEvent={pointerId:77,clientX:36,clientY:40};
-container.children[1].dispatch('pointerdown',pointerEvent);
-assert.equal(abilityBeginCalls.length,1);
-assert.equal(abilityBeginCalls[0].index,1);
-assert.equal(abilityBeginCalls[0].event,pointerEvent);
+assert.equal(typeof context.renderActionBar,'undefined','engine-g must no longer own or bootstrap the action bar');
+assert.equal(source.includes('requestAnimationFrame'),false,'engine-g must not schedule hidden hotbar DOM work');
+assert.equal(source.includes('KeloAbilityAim.begin'),false,'engine-g must not bind ability pointer input');
 
 assert.equal(interceptor.fn({dt:0.016}),false,'inactive dash must not intercept movement');
 
@@ -117,7 +58,6 @@ assert.equal(handled,true);
 let dash=getDash();
 assert.equal(dash.active,true);
 approx(dash.t,0.1);
-// u=.5, quadratic ease-out = 1-(1-.5)^2 = .75
 approx(context.localPlayer.x,175);
 approx(context.localPlayer.y,350);
 
