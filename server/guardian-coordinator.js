@@ -1,10 +1,10 @@
 /* KELO-INDEX
  * area: SERVER / GUARDIAN
  * owner: Kelo Guardian Coordinator
- * keys: GUARDIAN DONATION HOST LEASE MASTER REGION SCHEDULER RELAY ASSET COMPUTE MIRROR REWARD PROOF HEARTBEAT AUTH
- * purpose: coordina nodos Guardian autenticados, capacidad regional, asignaciones verificables y unidades de servicio sin ceder autoridad económica al cliente
+ * keys: GUARDIAN DONATION HOST LEASE MASTER REGION SCHEDULER RELAY ASSET COMPUTE GPU WEBGPU MIRROR REWARD PROOF HEARTBEAT AUTH
+ * purpose: coordina nodos Guardian autenticados, capacidad regional/GPU, asignaciones verificables y unidades de servicio sin ceder autoridad económica al cliente
  * online: el servidor central conserva autoridad; Guardian solo ejecuta workloads con lease explícita y las recompensas nacen de pruebas/observaciones server-side
- * do-not: NO confiar métricas/recompensas declaradas por cliente; NO mover economía/PvP al nodo sin protocolo de verificación; NO acuñar KC aquí
+ * do-not: NO confiar métricas/recompensas declaradas por cliente; NO mover economía/PvP al nodo sin protocolo de verificación; NO acuñar KC aquí; NO tratar GPU anunciada como prueba de trabajo
  */
 'use strict';
 
@@ -13,8 +13,10 @@ const PLATFORM=new Set(['ios','android','desktop','web']);
 const DEVICE_CLASS=new Set(['phone','tablet','desktop','unknown']);
 const VISIBILITY=new Set(['visible','hidden','prerender','unknown']);
 const EFFECTIVE_TYPE=new Set(['slow-2g','2g','3g','4g','unknown']);
-const WORKLOAD_TYPES=new Set(['primary-host','hot-mirror','relay','asset-seeder','compute-worker','witness']);
-const WORKLOAD_COST=Object.freeze({'primary-host':1,'hot-mirror':.65,'relay':.4,'asset-seeder':.25,'compute-worker':.8,witness:.15});
+const GPU_TIER=new Set(['none','unavailable','detecting','low','medium','high']);
+const GPU_CAPACITY_TARGET_UNITS=1000;
+const WORKLOAD_TYPES=new Set(['primary-host','hot-mirror','relay','asset-seeder','compute-worker','asset-gpu-worker','witness']);
+const WORKLOAD_COST=Object.freeze({'primary-host':1,'hot-mirror':.65,'relay':.4,'asset-seeder':.25,'compute-worker':.8,'asset-gpu-worker':.75,witness:.15});
 const GUARDIAN_RANKS=Object.freeze([
   Object.freeze({id:'helper',minUnits:0,multiplier:1}),
   Object.freeze({id:'guardian',minUnits:1000,multiplier:1.25}),
@@ -28,7 +30,8 @@ const PROOF_RATES=Object.freeze({
   mirror_seconds:.1,
   relay_megabytes:.5,
   asset_megabytes:.25,
-  compute_seconds:.15
+  compute_seconds:.15,
+  asset_gpu_seconds:.2
 });
 
 function clamp(n,min,max,fallback){n=Number(n);return Number.isFinite(n)?Math.max(min,Math.min(max,n)):fallback;}
@@ -42,20 +45,22 @@ function sanitizeCapabilities(raw={}){
   const deviceClass=DEVICE_CLASS.has(String(raw.deviceClass))?String(raw.deviceClass):'unknown';
   const visibility=VISIBILITY.has(String(raw.visibility))?String(raw.visibility):'unknown';
   const effectiveType=EFFECTIVE_TYPE.has(String(raw.effectiveType))?String(raw.effectiveType):'unknown';
+  const gpuTier=GPU_TIER.has(String(raw.gpuTier))?String(raw.gpuTier):'none';
   return Object.freeze({
     platform,deviceClass,visibility,effectiveType,
     online:raw.online!==false,
     webrtc:bool(raw.webrtc),serviceWorker:bool(raw.serviceWorker),saveData:bool(raw.saveData),touch:bool(raw.touch),
     cores:Math.round(clamp(raw.cores,1,64,1)),memoryGb:clamp(raw.memoryGb,0,128,0),
     batteryLevel:raw.batteryLevel==null?null:clamp(raw.batteryLevel,0,1,null),charging:raw.charging==null?null:bool(raw.charging),
-    networkType:short(raw.networkType||'unknown',24)||'unknown',screenClass:short(raw.screenClass||'unknown',24)||'unknown'
+    networkType:short(raw.networkType||'unknown',24)||'unknown',screenClass:short(raw.screenClass||'unknown',24)||'unknown',
+    webgpu:bool(raw.webgpu),gpuTier,gpuCapacityUnits:Math.round(clamp(raw.gpuCapacityUnits,0,100,0)),gpuProbeReady:bool(raw.gpuProbeReady)
   });
 }
 function sanitizePreferences(raw={}){
   return Object.freeze({
     idleDonation:raw.idleDonation!==false,wifiOnly:raw.wifiOnly!==false,chargingOnly:bool(raw.chargingOnly),
-    allowAssets:raw.allowAssets!==false,allowRelay:raw.allowRelay!==false,allowCompute:bool(raw.allowCompute),
-    maxUploadMbps:clamp(raw.maxUploadMbps,1,200,10),storageMb:Math.round(clamp(raw.storageMb,64,102400,512))
+    allowAssets:raw.allowAssets!==false,allowRelay:raw.allowRelay!==false,allowCompute:bool(raw.allowCompute),allowGpuAssets:bool(raw.allowGpuAssets),
+    gpuSharePct:Math.round(clamp(raw.gpuSharePct,10,100,25)),maxUploadMbps:clamp(raw.maxUploadMbps,1,200,10),storageMb:Math.round(clamp(raw.storageMb,64,102400,512))
   });
 }
 function sanitizeObservation(raw={},at=Date.now()){
@@ -81,6 +86,7 @@ function recommendedRoles(capabilities,preferences){
   if(preferences.allowAssets)out.push('asset-seeder-ready');
   if(preferences.allowRelay&&capabilities.webrtc)out.push('relay-ready');
   if(preferences.allowCompute&&capabilities.cores>=4&&capabilities.visibility==='visible')out.push('compute-candidate');
+  if(preferences.allowGpuAssets&&capabilities.webgpu&&capabilities.gpuCapacityUnits>0&&capabilities.visibility==='visible')out.push('asset-gpu-worker');
   if(capabilities.webrtc&&capabilities.cores>=4&&capabilities.visibility==='visible'&&!capabilities.saveData)out.push('host-ready');
   return Object.freeze(out);
 }
@@ -121,17 +127,18 @@ function createGuardianCoordinator(options={}){
   function resolveNode(ref){if(!ref)return null;if(typeof ref==='string')return nodes.get(ref)||null;const id=normalizeNodeId(ref.nodeId),key=nodeKey(ref.accountId,id);return nodes.get(key)||null;}
   function fresh(node,at=now()){return !!node&&at-node.lastHeartbeatAt<=STALE_MS;}
   function serviceState(node){
-    if(!node.service)node.service={verifiedUnits:0,rewardedUnits:0,usefulSeconds:0,availabilitySeconds:0,bytesRelayed:0,bytesAssets:0,proofCount:0,workloadsCompleted:0};
+    node.service=Object.assign({verifiedUnits:0,rewardedUnits:0,usefulSeconds:0,gpuAssetSeconds:0,availabilitySeconds:0,bytesRelayed:0,bytesAssets:0,proofCount:0,workloadsCompleted:0},node.service||{});
     const rank=rankFor(node.service.verifiedUnits);
     return Object.freeze({...node.service,rank:Object.freeze({...rank}),currencySettlementReady:false});
   }
+  function effectiveGpuUnits(node){if(!node||!node.recommendedRoles?.includes('asset-gpu-worker'))return 0;return Number((clamp(node.capabilities.gpuCapacityUnits,0,100,0)*clamp(node.preferences.gpuSharePct,10,100,25)/100).toFixed(2));}
   function sweepLeaseOnly(at){if(masterLease&&masterLease.expiresAt<=at){const prior=nodes.get(masterLease.nodeKey);if(prior&&prior.role==='master-host')prior.role='donor-ready';masterLease=null;}}
   function sweepWorkloads(at){
     for(const [id,workload] of workloads){if(workload.expiresAt>at)continue;const node=nodes.get(workload.nodeKey);if(node&&Array.isArray(node.assignments))node.assignments=node.assignments.filter(row=>row.id!==id);workloads.delete(id);}
   }
   function networkSummary(at=now()){
     sweepLeaseOnly(at);sweepWorkloads(at);
-    let active=0,ios=0,relayReady=0,assetReady=0,computeReady=0,hostReady=0,assigned=0;
+    let active=0,ios=0,relayReady=0,assetReady=0,computeReady=0,gpuAssetDonors=0,gpuCapacityUnits=0,hostReady=0,assigned=0;
     const assignedByType={};
     for(const node of nodes.values()){
       if(!fresh(node,at))continue;active++;
@@ -139,11 +146,13 @@ function createGuardianCoordinator(options={}){
       if(node.recommendedRoles.includes('relay-ready'))relayReady++;
       if(node.recommendedRoles.includes('asset-seeder-ready'))assetReady++;
       if(node.recommendedRoles.includes('compute-candidate'))computeReady++;
+      if(node.recommendedRoles.includes('asset-gpu-worker')){gpuAssetDonors++;gpuCapacityUnits+=effectiveGpuUnits(node);}
       if(node.recommendedRoles.includes('host-ready'))hostReady++;
       for(const row of node.assignments||[]){assigned++;assignedByType[row.type]=(assignedByType[row.type]||0)+1;}
     }
     const demand={};for(const [region,pressure] of regionalDemand)demand[region]=pressure;
-    return Object.freeze({activeNodes:active,iosNodes:ios,relayReady,assetReady,computeReady,hostReady,assignedWorkloads:assigned,assignedByType:Object.freeze(assignedByType),regionalDemand:Object.freeze(demand),masterActive:!!masterLease,masterEpoch:masterLease?.epoch||0});
+    gpuCapacityUnits=Number(gpuCapacityUnits.toFixed(2));
+    return Object.freeze({activeNodes:active,iosNodes:ios,relayReady,assetReady,computeReady,gpuAssetDonors,gpuCapacityUnits,gpuCapacityTargetUnits:GPU_CAPACITY_TARGET_UNITS,gpuCapacityPct:Number(Math.min(100,gpuCapacityUnits/GPU_CAPACITY_TARGET_UNITS*100).toFixed(2)),gpuCapacityVerified:false,hostReady,assignedWorkloads:assigned,assignedByType:Object.freeze(assignedByType),regionalDemand:Object.freeze(demand),masterActive:!!masterLease,masterEpoch:masterLease?.epoch||0});
   }
   function sweep(at=now()){
     for(const [key,node] of nodes){if(!fresh(node,at)){for(const row of node.assignments||[])workloads.delete(row.id);nodes.delete(key);}}
@@ -152,7 +161,7 @@ function createGuardianCoordinator(options={}){
   function publicAssignment(row){return Object.freeze({id:row.id,type:row.type,region:row.region,purpose:row.purpose,expiresAt:row.expiresAt,epoch:row.epoch});}
   function publicObservation(obs){if(!obs)return null;return Object.freeze({region:obs.region,rttMs:obs.rttMs,packetLossPct:obs.packetLossPct,uploadMbps:obs.uploadMbps,cpuLoad:obs.cpuLoad,tickHz:obs.tickHz,connections:obs.connections,observedAt:obs.observedAt,source:obs.source});}
   function publicNode(node){if(!node)return null;return Object.freeze({nodeId:node.nodeId,enabled:true,role:node.role,recommendedRoles:node.recommendedRoles,capabilities:node.capabilities,preferences:node.preferences,lastHeartbeatAt:node.lastHeartbeatAt,region:node.observation?.region||'unknown',quality:publicObservation(node.observation),assignments:Object.freeze((node.assignments||[]).map(publicAssignment)),service:serviceState(node),masterLeaseExpiresAt:masterLease?.nodeKey===node.key?masterLease.expiresAt:null,masterEpoch:masterLease?.nodeKey===node.key?masterLease.epoch:null});}
-  function payload(actor,node,at=now()){sweep(at);return Object.freeze({ok:true,source:'guardian-coordinator-v2',serverTime:at,masterEligible:masterEligible(actor),node:publicNode(node),network:networkSummary(at),rewardPolicy:Object.freeze({proofRequired:true,clientMayMint:false,ranks:GUARDIAN_RANKS})});}
+  function payload(actor,node,at=now()){sweep(at);return Object.freeze({ok:true,source:'guardian-coordinator-v3-gpu-assets',serverTime:at,masterEligible:masterEligible(actor),node:publicNode(node),network:networkSummary(at),rewardPolicy:Object.freeze({proofRequired:true,clientMayMint:false,ranks:GUARDIAN_RANKS})});}
   function ensureNodeState(node){if(!Array.isArray(node.assignments))node.assignments=[];serviceState(node);return node;}
   function enable(actor,input={}){
     const at=now(),nodeId=normalizeNodeId(input.nodeId),key=nodeKey(actor.accountId,nodeId),capabilities=sanitizeCapabilities(input.capabilities),preferences=sanitizePreferences(input.preferences),existing=nodes.get(key);
@@ -190,6 +199,7 @@ function createGuardianCoordinator(options={}){
     if(type==='relay')return node.recommendedRoles.includes('relay-ready');
     if(type==='asset-seeder')return node.recommendedRoles.includes('asset-seeder-ready');
     if(type==='compute-worker')return node.recommendedRoles.includes('compute-candidate');
+    if(type==='asset-gpu-worker')return node.recommendedRoles.includes('asset-gpu-worker');
     if(type==='primary-host'||type==='hot-mirror')return node.recommendedRoles.includes('host-ready');
     return node.recommendedRoles.includes('witness-ready');
   }
@@ -208,11 +218,12 @@ function createGuardianCoordinator(options={}){
     if(Number.isFinite(obs.tickHz))score+=obs.tickHz>=58?12:obs.tickHz<50?-18:0;
     if(type==='relay'||type==='asset-seeder')score+=Math.min(45,(Number(obs.uploadMbps)||0)*.7)+Math.min(20,node.preferences.maxUploadMbps*.25);
     if(type==='primary-host'||type==='hot-mirror'||type==='compute-worker')score+=(1-(Number(obs.cpuLoad)||.35))*25;
+    if(type==='asset-gpu-worker')score+=effectiveGpuUnits(node)*.9+(node.capabilities.gpuTier==='high'?12:node.capabilities.gpuTier==='medium'?6:0);
     return Number(score.toFixed(3));
   }
   function planWorkload(input={}){
     const type=String(input.type||'');if(!WORKLOAD_TYPES.has(type))throw new Error('GUARDIAN_WORKLOAD_TYPE_INVALID');const at=now(),region=normalizeRegion(input.region),limit=Math.round(clamp(input.limit,1,8,3)),exclude=new Set((input.excludeNodeKeys||[]).map(String)),rows=[];sweep(at);
-    for(const node of nodes.values()){if(exclude.has(node.key))continue;const score=candidateScore(node,{...input,type,region},at);if(score==null)continue;rows.push({nodeKey:node.key,nodeId:node.nodeId,accountId:node.accountId,score,region:node.observation?.region||'unknown',rttMs:node.observation?.rttByRegion?.[region]??node.observation?.rttMs??null,load:Number(loadWeight(node).toFixed(3))});}
+    for(const node of nodes.values()){if(exclude.has(node.key))continue;const score=candidateScore(node,{...input,type,region},at);if(score==null)continue;rows.push({nodeKey:node.key,nodeId:node.nodeId,accountId:node.accountId,score,region:node.observation?.region||'unknown',rttMs:node.observation?.rttByRegion?.[region]??node.observation?.rttMs??null,load:Number(loadWeight(node).toFixed(3)),gpuCapacityUnits:type==='asset-gpu-worker'?effectiveGpuUnits(node):undefined});}
     rows.sort((a,b)=>b.score-a.score||String(a.nodeKey).localeCompare(String(b.nodeKey)));return Object.freeze({type,region,candidates:Object.freeze(rows.slice(0,limit).map(row=>Object.freeze(row))),demandMultiplier:Number(demandMultiplier(region).toFixed(4))});
   }
   function assignWorkload(input={}){
@@ -234,7 +245,8 @@ function createGuardianCoordinator(options={}){
     let quantity=0;if(type.endsWith('_seconds'))quantity=clamp(proof.seconds,0,3600,0);else quantity=clamp(proof.megabytes,0,10240,0);if(quantity<=0)throw new Error('GUARDIAN_PROOF_EMPTY');
     const rawUnits=quantity*rate,region=normalizeRegion(proof.region||node.observation?.region),demand=type==='availability_seconds'?1:demandMultiplier(region),service=serviceState(node),rank=rankFor(service.verifiedUnits+rawUnits),rewarded=rawUnits*demand*rank.multiplier;
     node.service.verifiedUnits=Number((service.verifiedUnits+rawUnits).toFixed(6));node.service.rewardedUnits=Number((service.rewardedUnits+rewarded).toFixed(6));node.service.proofCount++;
-    if(type==='availability_seconds')node.service.availabilitySeconds+=quantity;else if(type==='host_seconds'||type==='mirror_seconds'||type==='compute_seconds')node.service.usefulSeconds+=quantity;
+    if(type==='availability_seconds')node.service.availabilitySeconds+=quantity;else if(type==='host_seconds'||type==='mirror_seconds'||type==='compute_seconds'||type==='asset_gpu_seconds')node.service.usefulSeconds+=quantity;
+    if(type==='asset_gpu_seconds')node.service.gpuAssetSeconds+=quantity;
     if(type==='relay_megabytes')node.service.bytesRelayed+=quantity*1024*1024;if(type==='asset_megabytes')node.service.bytesAssets+=quantity*1024*1024;
     return Object.freeze({accepted:true,type,quantity,region,rawUnits:Number(rawUnits.toFixed(6)),demandMultiplier:Number(demand.toFixed(4)),rank:Object.freeze({...rank}),weightedUnits:Number(rewarded.toFixed(6)),service:serviceState(node),kcMinted:0});
   }
@@ -257,8 +269,8 @@ function createGuardianCoordinator(options={}){
       json(res,200,result);return true;
     }catch(error){const code=errorCode(error),status=code==='AUTH_TOKEN_REQUIRED'?401:code==='GUARDIAN_MASTER_PERMISSION_DENIED'?403:code==='GUARDIAN_MASTER_BUSY'?409:code==='GUARDIAN_SERVER_ERROR'?500:400;json(res,status,{ok:false,error:code});return true;}
   }
-  function audit(){const at=now();sweep(at);const summary=networkSummary(at);return Object.freeze({version:'guardian-coordinator-v2',activeNodes:summary.activeNodes,masterActive:!!masterLease,masterEpoch:masterLease?.epoch||0,activeWorkloads:workloads.size,regionsWithDemand:regionalDemand.size,masterLeaseMs:MASTER_LEASE_MS,workloadLeaseMs:WORKLOAD_LEASE_MS,staleMs:STALE_MS,serverAuthorityPreserved:true,rewardMetricsClientTrusted:false,kcMintAuthority:false,regionalScheduling:true,usefulServiceProof:true});}
-  return Object.freeze({version:'guardian-coordinator-v2',enable,heartbeat,disable,status,startMaster,stopMaster,sweep,handleHttp,audit,observe,setRegionalDemand,planWorkload,assignWorkload,acknowledgeWorkload,releaseWorkload,planSupport,recordVerifiedContribution});
+  function audit(){const at=now();sweep(at);const summary=networkSummary(at);return Object.freeze({version:'guardian-coordinator-v3-gpu-assets',activeNodes:summary.activeNodes,gpuAssetDonors:summary.gpuAssetDonors,gpuCapacityUnits:summary.gpuCapacityUnits,masterActive:!!masterLease,masterEpoch:masterLease?.epoch||0,activeWorkloads:workloads.size,regionsWithDemand:regionalDemand.size,masterLeaseMs:MASTER_LEASE_MS,workloadLeaseMs:WORKLOAD_LEASE_MS,staleMs:STALE_MS,serverAuthorityPreserved:true,rewardMetricsClientTrusted:false,kcMintAuthority:false,regionalScheduling:true,gpuAssetScheduling:true,usefulServiceProof:true});}
+  return Object.freeze({version:'guardian-coordinator-v3-gpu-assets',enable,heartbeat,disable,status,startMaster,stopMaster,sweep,handleHttp,audit,observe,setRegionalDemand,planWorkload,assignWorkload,acknowledgeWorkload,releaseWorkload,planSupport,recordVerifiedContribution});
 }
 
 module.exports={createGuardianCoordinator,sanitizeCapabilities,sanitizePreferences,sanitizeObservation,recommendedRoles,rankFor,GUARDIAN_RANKS,PROOF_RATES};
