@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: CREATORS / PERSONAL UNIVERSAL CONTENT VAULT
  * owner: Kelo Universal Content Bridge
- * keys: CONTENT VAULT INDEXEDDB CAS SHA256 DEDUPE ROLLBACK GC DOWNLOAD OWNED INTEGRATED LAZY IMAGE AUDIO ABILITY SCENE
+ * keys: CONTENT VAULT INDEXEDDB CAS SHA256 DEDUPE ROLLBACK GC ROOTS DOWNLOAD OWNED INTEGRATED LAZY IMAGE AUDIO ABILITY SCENE
  * purpose: Store only content explicitly downloaded by this device, deduplicate binaries by SHA-256, preserve rollback history, and integrate each type through its canonical Kelo contract.
  */
 import {integrateContentBlob,inferContentKind} from './content-integration-router.mjs';
@@ -102,16 +102,16 @@ export async function discardAssetRollbackHistory(id){
   id=String(id);const pointer=await storeGet(BLOB_STORE,id);if(!pointer?.digest)return false;if(!pointer.previousDigest)return true;await storePut(BLOB_STORE,{...pointer,previousDigest:null,updatedAt:now()});const asset=await getAsset(id);if(asset)await rememberAsset({...asset,rollbackActive:false});return true;
 }
 
-function referencedDigests(pointers){const refs=new Set();for(const row of pointers){if(row?.digest)refs.add(row.digest);if(row?.previousDigest)refs.add(row.previousDigest);}return refs;}
-export async function garbageCollectCas({graceMs=DEFAULT_GC_GRACE_MS,dryRun=true,maxDeletes=64,onProgress=null}={}){
-  const [pointers,casRows]=await Promise.all([storeAll(BLOB_STORE),storeAll(CAS_STORE)]),refs=referencedDigests(pointers),nowMs=Date.now();let marked=0,deleted=0,reclaimedBytes=0,kept=0;
-  for(const row of casRows){if(refs.has(row.digest)){kept++;if(row.orphanedAt)await storePut(CAS_STORE,{...row,orphanedAt:null,updatedAt:now()});continue;}
+function referencedDigests(pointers,extraReferencedDigests=[]){const refs=new Set();for(const row of pointers){if(row?.digest)refs.add(normalizeDigest(row.digest));if(row?.previousDigest)refs.add(normalizeDigest(row.previousDigest));}for(const digest of extraReferencedDigests||[]){const normalized=normalizeDigest(digest);if(normalized)refs.add(normalized);}return refs;}
+export async function garbageCollectCas({graceMs=DEFAULT_GC_GRACE_MS,dryRun=true,maxDeletes=64,onProgress=null,extraReferencedDigests=[]}={}){
+  const [pointers,casRows]=await Promise.all([storeAll(BLOB_STORE),storeAll(CAS_STORE)]),refs=referencedDigests(pointers,extraReferencedDigests),nowMs=Date.now();let marked=0,deleted=0,reclaimedBytes=0,kept=0;
+  for(const row of casRows){if(refs.has(normalizeDigest(row.digest))){kept++;if(row.orphanedAt)await storePut(CAS_STORE,{...row,orphanedAt:null,updatedAt:now()});continue;}
     if(!row.orphanedAt){marked++;if(!dryRun)await storePut(CAS_STORE,{...row,orphanedAt:now(),updatedAt:now()});continue;}
     const age=nowMs-Date.parse(row.orphanedAt||row.updatedAt||row.createdAt||0);if(age<Math.max(0,graceMs)){kept++;continue;}
     if(deleted>=Math.max(0,maxDeletes)){kept++;continue;}
     deleted++;reclaimedBytes+=Number(row.bytes||row.blob?.size||0);if(!dryRun)await storeDelete(CAS_STORE,row.digest);try{onProgress?.({digest:row.digest,deleted,reclaimedBytes});}catch{}await tick();
   }
-  const report={dryRun,graceMs,total:casRows.length,referenced:refs.size,marked,deleted,reclaimedBytes,kept};emit('kelo:personal-vault-cas-gc',report);return report;
+  const report={dryRun,graceMs,total:casRows.length,referenced:refs.size,externalRoots:[...new Set((extraReferencedDigests||[]).map(normalizeDigest).filter(Boolean))].length,marked,deleted,reclaimedBytes,kept};emit('kelo:personal-vault-cas-gc',report);return report;
 }
 
 export async function getCasStats(){
