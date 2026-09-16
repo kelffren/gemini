@@ -1,0 +1,17 @@
+{
+  "schema": "kelo-curated-external-catalog-v1",
+  "provider": "quaternius",
+  "license": "CC0-1.0",
+  "catalogOnly": true,
+  "updatedAt": "2026-09-16",
+  "assets": [
+    {"id":"quaternius:rpg-characters","name":"RPG Character Pack","category":"characters","contentKind":"model","tags":["rpg","character","animated","rigged","fantasy","gltf"],"description":"6 rigged, animated and textured fantasy characters.","formats":["FBX","OBJ","Blend","glTF"],"modelCount":6,"sourceUrl":"https://quaternius.com/packs/rpgcharacters.html"},
+    {"id":"quaternius:platformer-game-kit","name":"Platformer Game Kit","category":"game-kit","contentKind":"model","tags":["platformer","character","animated","enemy","environment","gltf"],"description":"Large platformer kit with character animations, enemies and environment pieces.","formats":["FBX","OBJ","Blend","glTF"],"modelCount":112,"sourceUrl":"https://quaternius.com/packs/ultimateplatformer.html"},
+    {"id":"quaternius:ultimate-monsters","name":"Ultimate Monsters","category":"characters","contentKind":"model","tags":["monster","enemy","animated","character","gltf"],"description":"50 fully animated stylized monsters.","formats":["FBX","OBJ","Blend","glTF"],"modelCount":50,"sourceUrl":"https://quaternius.com/packs/ultimatemonsters.html"},
+    {"id":"quaternius:medieval-village","name":"Medieval Village Pack","category":"environment","contentKind":"model","tags":["medieval","village","building","prop","environment"],"description":"Medieval buildings and props for village environments.","formats":["FBX","OBJ","Blend"],"modelCount":44,"sourceUrl":"https://quaternius.com/packs/medievalvillage.html"},
+    {"id":"quaternius:ultimate-rpg","name":"Ultimate RPG Pack","category":"props","contentKind":"model","tags":["rpg","medieval","fantasy","weapon","prop"],"description":"100+ RPG models with PNG renders included upstream.","formats":["FBX","OBJ","Blend"],"modelCount":106,"sourceUrl":"https://quaternius.com/packs/ultimaterpg.html"},
+    {"id":"quaternius:animated-animals","name":"Ultimate Animated Animal Pack","category":"characters","contentKind":"model","tags":["animal","animated","rigged","nature","gltf"],"description":"12 animated animals with more than 12 animations each.","formats":["FBX","OBJ","Blend","glTF"],"modelCount":12,"sourceUrl":"https://quaternius.com/packs/ultimateanimatedanimals.html"},
+    {"id":"quaternius:fantasy-rts","name":"Ultimate Fantasy RTS","category":"environment","contentKind":"model","tags":["rts","fantasy","building","nature","environment","gltf"],"description":"128 fantasy RTS buildings and nature assets.","formats":["FBX","OBJ","Blend","glTF"],"modelCount":128,"sourceUrl":"https://quaternius.com/packs/ultimatefantasyrts.html"},
+    {"id":"quaternius:stylized-nature","name":"Ultimate Stylized Nature Pack","category":"nature","contentKind":"model","tags":["nature","tree","rock","vegetation","stylized","gltf"],"description":"60+ stylized nature assets with seamless textures and normal maps.","formats":["FBX","OBJ","Blend","glTF"],"modelCount":63,"sourceUrl":"https://quaternius.com/packs/ultimatestylizednature.html"}
+  ]
+}
