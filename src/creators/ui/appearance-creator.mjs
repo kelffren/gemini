@@ -1,12 +1,12 @@
 /* KELO-INDEX
  * area: CREATORS / APPEARANCE UI
  * owner: shared Appearance Creator workspace UI
- * purpose: authoring character/mount appearance con preview runtime-contract y Character Test Chamber visual para Character
+ * purpose: authoring character/mount appearance con preview runtime-contract, Character Test Chamber y editor visual del animationMapping existente
  * public-api: openAppearanceCreator
- * consumes: KeloAppearance, KeloCreatorCharacterVisualContract, Character adapter, definition session, virtualRange, tabular importer, Creator Character Test Chamber
- * state-owned: draft definitions + preview object URLs + test motion efímero solamente
+ * consumes: KeloAppearance, KeloCreatorCharacterVisualContract, Character adapter, definition session, virtualRange, tabular importer, Creator Character Test Chamber, Creator Animation Mapping Editor
+ * state-owned: draft definitions + preview object URLs + test motion efimero solamente
  * online: drafts local; publish/use authority sigue fuera de este editor
- * do-not: no aplicar stats; no reemplazar CharacterCustomization; no persistir blob URLs; no segundo renderer del juego
+ * do-not: no aplicar stats; no reemplazar CharacterCustomization; no persistir blob URLs; no segundo renderer ni segundo schema de animacion
  */
 import { createDefinitionWorkspaceSession } from '../core/definition-workspace-session.mjs';
 import { virtualRange } from '../../studio/ui/virtual-list.mjs';
@@ -14,35 +14,160 @@ import { createDefinitionCreatorShell } from './definition-creator-shell.mjs';
 import { importDefinitionFile } from '../importers/tabular-definition-importer.mjs';
 import { createCreatorAppearancePreview } from '../appearance/creator-appearance-preview.mjs';
 import { CHARACTER_TEST_STATES, createCreatorCharacterTestChamber } from '../appearance/creator-character-test-chamber.mjs';
-let active=null;const copy=v=>v==null?v:JSON.parse(JSON.stringify(v));
+import { mountCreatorAnimationMappingEditor } from '../appearance/creator-animation-mapping-editor.mjs';
+
+let active=null;
+const copy=v=>v==null?v:JSON.parse(JSON.stringify(v));
 const FACES=Object.freeze(['down','left','right','up']);
-function download(root,name,text){const u=URL.createObjectURL(new Blob([text],{type:'application/json'})),a=root.document.createElement('a');a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),0);}
-function tabularRows(rows){return(rows||[]).map((r,index)=>({schemaVersion:1,id:String(r.id||'').trim(),displayName:String(r.displayName||r.name||'').trim(),targetType:String(r.targetType||'mount').trim().toLowerCase(),slotId:String(r.slotId||'').trim(),compatibleProfiles:String(r.compatibleProfiles||r.profileId||'').split(/[|;]/).map(v=>v.trim()).filter(Boolean),assetBundleId:String(r.assetBundleId||'').trim(),transforms:{default:{x:Number(r.x)||0,y:Number(r.y)||0,scaleX:Number(r.scaleX)||1,scaleY:Number(r.scaleY)||1,rotation:Number(r.rotation)||0,flipX:String(r.flipX).toLowerCase()==='true',flipY:String(r.flipY).toLowerCase()==='true'}},layerRules:{depth:Number(r.depth)||0},animationMapping:{},tags:String(r.tags||'').split(/[|;]/).map(v=>v.trim()).filter(Boolean),rarity:String(r.rarity||'common'),metadata:{characterVisual:{mode:String(r.visualMode||'auto'),layer:String(r.layer||'front'),socket:String(r.socket||'center'),width:Number(r.width)||28,height:Number(r.height)||28,columns:Number(r.columns)||4,rows:Number(r.rows)||4,heightScale:Number(r.heightScale)||1,anchor:{x:Number.isFinite(Number(r.anchorX))?Number(r.anchorX):.5,y:Number.isFinite(Number(r.anchorY))?Number(r.anchorY):1},rotation:Number(r.visualRotation)||0}},__sourceRow:index+2}));}
+const TEST_MOTIONS=new Set(CHARACTER_TEST_STATES.map(row=>row.id));
+
+function download(root,name,text){
+ const u=URL.createObjectURL(new Blob([text],{type:'application/json'})),a=root.document.createElement('a');
+ a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),0);
+}
+function tabularRows(rows){
+ return(rows||[]).map((r,index)=>({
+  schemaVersion:1,
+  id:String(r.id||'').trim(),
+  displayName:String(r.displayName||r.name||'').trim(),
+  targetType:String(r.targetType||'mount').trim().toLowerCase(),
+  slotId:String(r.slotId||'').trim(),
+  compatibleProfiles:String(r.compatibleProfiles||r.profileId||'').split(/[|;]/).map(v=>v.trim()).filter(Boolean),
+  assetBundleId:String(r.assetBundleId||'').trim(),
+  transforms:{default:{x:Number(r.x)||0,y:Number(r.y)||0,scaleX:Number(r.scaleX)||1,scaleY:Number(r.scaleY)||1,rotation:Number(r.rotation)||0,flipX:String(r.flipX).toLowerCase()==='true',flipY:String(r.flipY).toLowerCase()==='true'}},
+  layerRules:{depth:Number(r.depth)||0},
+  animationMapping:{},
+  tags:String(r.tags||'').split(/[|;]/).map(v=>v.trim()).filter(Boolean),
+  rarity:String(r.rarity||'common'),
+  metadata:{characterVisual:{mode:String(r.visualMode||'auto'),layer:String(r.layer||'front'),socket:String(r.socket||'center'),width:Number(r.width)||28,height:Number(r.height)||28,columns:Number(r.columns)||4,rows:Number(r.rows)||4,heightScale:Number(r.heightScale)||1,anchor:{x:Number.isFinite(Number(r.anchorX))?Number(r.anchorX):.5,y:Number.isFinite(Number(r.anchorY))?Number(r.anchorY):1},rotation:Number(r.visualRotation)||0}},
+  __sourceRow:index+2
+ }));
+}
 function candidateSource(row){const s=String(row?.assetBundleId||'').trim();return /^(?:https?:|data:|blob:|\/|\.\/|assets\/|src\/)/.test(s)?s:'';}
 function readImageMeta(root,url){return new Promise((resolve,reject)=>{const img=new root.Image();img.decoding='async';img.onload=()=>resolve({pixelWidth:img.naturalWidth||img.width,pixelHeight:img.naturalHeight||img.height});img.onerror=()=>reject(new Error('APPEARANCE_PREVIEW_IMAGE_FAILED'));img.src=url;});}
 function visualMeta(row){return row?.metadata?.characterVisual&&typeof row.metadata.characterVisual==='object'?row.metadata.characterVisual:{};}
 function faceTransform(row,face){return row?.transforms?.[face]||row?.transforms?.default||{x:0,y:0,scaleX:1,scaleY:1,rotation:0};}
+
 export async function openAppearanceCreator({root=globalThis}={}){
- if(active)return active;if(!root.document||!root.KeloAppearance)throw new Error('APPEARANCE_CREATOR_RUNTIME_REQUIRED');if(!root.KeloCreatorCharacterVisualContract?.compileRow)throw new Error('CREATOR_CHARACTER_VISUAL_CONTRACT_REQUIRED');root.KeloCharacterAppearanceAdapter?.install?.();const A=root.KeloAppearance,C=root.KeloCreatorCharacterVisualContract;const session=createDefinitionWorkspaceSession({id:'creator:appearance',type:'APPEARANCE',rows:A.listItems().map(copy),validate:A.validateItem,normalize:A.migrate});const shell=createDefinitionCreatorShell({root,title:'KELO APPEARANCE CREATOR',subtitle:'One contract · author once · preview idle/walk/run/attack/hit/death before publish'});let target='character',query='',status='',face='down',motion='idle';const previewAssets=new Map();let preview=null,chamber=null;
- function profiles(){return A.listProfiles().filter(p=>p.targetType===target);}function rows(){let all=session.list().filter(r=>r.targetType===target);if(query){const q=query.toLowerCase();all=all.filter(r=>r.id.toLowerCase().includes(q)||r.displayName.toLowerCase().includes(q)||r.slotId.toLowerCase().includes(q));}return all;}
- function renderList(){const data=rows(),rh=42,range=virtualRange({count:data.length,rowHeight:rh,scrollTop:shell.list.scrollTop,viewportHeight:shell.list.clientHeight||600,overscan:5});shell.spacer.style.height=range.totalHeight+'px';shell.list.querySelectorAll('.kdc-row').forEach(n=>n.remove());for(let i=range.start;i<range.end;i++){const r=data[i],n=root.document.createElement('div');n.className='kdc-row'+(session.selectedId===r.id?' sel':'');n.style.top=(i*rh)+'px';n.innerHTML='<b>'+r.displayName+'</b><small>'+r.slotId+' · '+r.id+'</small>';n.onclick=()=>{session.select(r.id);renderAll();};shell.list.append(n);}}
+ if(active)return active;
+ if(!root.document||!root.KeloAppearance)throw new Error('APPEARANCE_CREATOR_RUNTIME_REQUIRED');
+ if(!root.KeloCreatorCharacterVisualContract?.compileRow)throw new Error('CREATOR_CHARACTER_VISUAL_CONTRACT_REQUIRED');
+ root.KeloCharacterAppearanceAdapter?.install?.();
+ const A=root.KeloAppearance,C=root.KeloCreatorCharacterVisualContract;
+ const session=createDefinitionWorkspaceSession({id:'creator:appearance',type:'APPEARANCE',rows:A.listItems().map(copy),validate:A.validateItem,normalize:A.migrate});
+ const shell=createDefinitionCreatorShell({root,title:'KELO APPEARANCE CREATOR',subtitle:'One contract · author mapping · test idle/walk/run/attack/hit/death before publish'});
+ let target='character',query='',status='',face='down',motion='idle';
+ const previewAssets=new Map();
+ let preview=null,chamber=null;
+
+ function profiles(){return A.listProfiles().filter(p=>p.targetType===target);}
+ function rows(){
+  let all=session.list().filter(r=>r.targetType===target);
+  if(query){const q=query.toLowerCase();all=all.filter(r=>r.id.toLowerCase().includes(q)||r.displayName.toLowerCase().includes(q)||r.slotId.toLowerCase().includes(q));}
+  return all;
+ }
+ function renderList(){
+  const data=rows(),rh=42,range=virtualRange({count:data.length,rowHeight:rh,scrollTop:shell.list.scrollTop,viewportHeight:shell.list.clientHeight||600,overscan:5});
+  shell.spacer.style.height=range.totalHeight+'px';shell.list.querySelectorAll('.kdc-row').forEach(n=>n.remove());
+  for(let i=range.start;i<range.end;i++){
+   const r=data[i],n=root.document.createElement('div');n.className='kdc-row'+(session.selectedId===r.id?' sel':'');n.style.top=(i*rh)+'px';n.innerHTML='<b>'+r.displayName+'</b><small>'+r.slotId+' · '+r.id+'</small>';n.onclick=()=>{session.select(r.id);renderAll();};shell.list.append(n);
+  }
+ }
  function selectedProfile(row){return A.getProfile(row?.compatibleProfiles?.[0])||profiles()[0]||null;}
  function sourceState(row){const local=previewAssets.get(row?.id);if(local)return local;const source=candidateSource(row);return source?{source,asset:{pixelWidth:0,pixelHeight:0},name:'runtime path'}:{source:'',asset:{pixelWidth:0,pixelHeight:0},name:''};}
- function faceBar(){const bar=root.document.createElement('div');bar.style.cssText='display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin:8px 0 0';for(const fce of FACES){const b=root.document.createElement('button');b.className='kdc-btn'+(face===fce?' gold':'');b.textContent=fce.toUpperCase();b.style.minWidth='58px';b.onclick=()=>{face=fce;renderAll();};bar.append(b);}return bar;}
- function motionBar(){const wrap=root.document.createElement('div');wrap.style.cssText='margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.06)';const label=root.document.createElement('div');label.textContent='CHARACTER TEST CHAMBER';label.style.cssText='font-size:8px;letter-spacing:.14em;color:#7f8a88;text-align:center;margin-bottom:6px;font-weight:900';const bar=root.document.createElement('div');bar.style.cssText='display:flex;gap:5px;justify-content:center;flex-wrap:wrap';const buttons=[];for(const state of CHARACTER_TEST_STATES){const b=root.document.createElement('button');b.className='kdc-btn'+(motion===state.id?' gold':'');b.textContent=state.label;b.style.cssText='min-width:52px;padding-left:8px;padding-right:8px';b.onclick=()=>{motion=state.id;for(const row of buttons)row.className='kdc-btn'+(row.dataset.motion===motion?' gold':'');chamber?.play?.(motion);};b.dataset.motion=state.id;buttons.push(b);bar.append(b);}wrap.append(label,bar);return wrap;}
- function mountPlaceholder(row){const card=root.document.createElement('div');card.className='kdc-card';const t=row?.transforms?.default||{};card.innerHTML='<div style="position:relative;width:250px;height:250px;border:1px dashed rgba(255,255,255,.14);border-radius:18px;background:rgba(255,255,255,.018)"><div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:76px;opacity:.48">🐎</div><div style="position:absolute;left:calc(50% + '+(Number(t.x)||0)+'px);top:calc(50% + '+(Number(t.y)||0)+'px);transform:translate(-50%,-50%) scale('+(Number(t.scaleX)||1)+','+(Number(t.scaleY)||1)+') rotate('+(Number(t.rotation)||0)+'deg);width:76px;height:46px;border:2px solid #d7b66b;border-radius:12px;background:rgba(215,182,107,.18);display:grid;place-items:center;color:#f3dda4;font-size:9px;font-weight:900">'+String(row?.slotId||'slot').toUpperCase()+'</div></div><h3 style="margin:12px 0 3px">'+String(row?.displayName||'Mount appearance')+'</h3><div style="font-size:8px;color:#7e8791">Mount keeps definition preview; Character has runtime-contract parity.</div>';return card;}
- function renderPreview(){chamber?.dispose?.();chamber=null;preview?.dispose?.();preview=null;const row=session.get(session.selectedId);shell.stage.replaceChildren();if(!row){const card=root.document.createElement('div');card.className='kdc-card';card.innerHTML='<div><div style="font-size:48px">👕</div><h2>'+target.toUpperCase()+' APPEARANCE</h2><p style="font-size:10px;color:#7e8791">Select an item or create one.</p></div>';shell.stage.append(card);return;}if(target!=='character'){shell.stage.append(mountPlaceholder(row));return;}const card=root.document.createElement('div');card.className='kdc-card';card.style.cssText='position:relative;overflow:hidden;padding:10px';const canvas=root.document.createElement('canvas');canvas.style.cssText='width:min(78vw,360px);height:auto;max-height:48vh;border:1px solid rgba(231,197,106,.22);border-radius:16px;image-rendering:pixelated;touch-action:none';card.append(canvas,faceBar(),motionBar());const info=root.document.createElement('div');info.style.cssText='font-size:9px;color:#87938f;margin-top:8px;line-height:1.5;text-align:center;min-height:42px';card.append(info);shell.stage.append(card);preview=createCreatorAppearancePreview({root,canvas});const src=sourceState(row);chamber=createCreatorCharacterTestChamber({root,preview,onSnapshot:s=>{const p=s?.preview;if(!p)return;const v=p.compiled.validation,issues=[...v.errors,...v.warnings],track=s.track||{};info.innerHTML='<b style="color:#e6c87c">TEST '+String(s.state||motion).toUpperCase()+' · F'+String(s.frame??0)+' · '+(track.authored?'MAPPED':'FALLBACK')+'</b><br><span style="color:#75817f">'+String(track.source||'idle-fallback')+' · '+String(track.frameMs||0)+'ms · '+(track.loop?'loop':'one-shot')+'</span><br>'+v.mode.toUpperCase()+' · '+face.toUpperCase()+' · '+(p.anchorsSource==='runtime-anchors'?'runtime anchors':'runtime fallback anchors')+(issues.length?'<br><span style="color:#e8bb7d">'+issues.join(' · ')+'</span>':'<br><span style="color:#78d89a">descriptor valid · '+p.fingerprint+'</span>');}});chamber.configure({row,source:src.source,asset:src.asset,face,state:motion,playing:true});}
- function f(label,key,value,options){const l=root.document.createElement('label');l.className='kdc-label';l.textContent=label;const n=options?root.document.createElement('select'):root.document.createElement('input');n.className='kdc-field';n.dataset.field=key;if(options){for(const v of options){const o=root.document.createElement('option');o.value=v;o.textContent=v;if(String(v)===String(value))o.selected=true;n.append(o);}}else n.value=value??'';l.append(n);return l;}
- function characterFields(row){const v=visualMeta(row),t=faceTransform(row,face),mode=v.mode||'auto',anchor=v.anchor||{};return[
-  f('VISUAL MODE','visualMode',mode,['auto','sheet','socket']),f('LAYER','visualLayer',v.layer||'front',['front','back']),f('SOCKET','visualSocket',v.socket||((row.slotId==='weaponMain'||row.slotId==='weaponSecondary')?'weapon':'center'),['center','weapon','head','back','foot','effectOrigin']),
-  f('WIDTH','visualWidth',v.width??28),f('HEIGHT','visualHeight',v.height??28),f('COLUMNS','visualColumns',v.columns??4),f('ROWS','visualRows',v.rows??4),f('HEIGHT SCALE','visualHeightScale',v.heightScale??1),f('ANCHOR X','visualAnchorX',anchor.x??.5),f('ANCHOR Y','visualAnchorY',anchor.y??1),f('BASE ROTATION','visualRotation',v.rotation??0),
-  f(face.toUpperCase()+' X','faceX',t.x??0),f(face.toUpperCase()+' Y','faceY',t.y??0),f(face.toUpperCase()+' SCALE X','faceScaleX',t.scaleX??1),f(face.toUpperCase()+' SCALE Y','faceScaleY',t.scaleY??1),f(face.toUpperCase()+' ROTATION','faceRotation',t.rotation??0)
- ];}
- function renderInspector(){const row=session.get(session.selectedId);shell.inspector.replaceChildren();const toggle=root.document.createElement('div');toggle.className='kdc-grid2';for(const type of ['character','mount']){const b=root.document.createElement('button');b.className='kdc-btn'+(target===type?' gold':'');b.textContent=type.toUpperCase();b.onclick=()=>{target=type;const first=rows()[0];session.select(first?.id||null);renderAll();};toggle.append(b);}shell.inspector.append(toggle);if(!row){shell.inspector.insertAdjacentHTML('beforeend','<div class="kdc-foot">Shared Appearance Core. Select a '+target+' item.</div>');return;}const ps=profiles(),p=selectedProfile(row),slotOptions=p?.slots||[];shell.inspector.append(f('ID','id',row.id),f('DISPLAY NAME','displayName',row.displayName),f('TARGET','targetType',row.targetType,['character','mount']),f('PROFILE','profileId',p?.id||'',ps.map(x=>x.id)),f('SLOT','slotId',row.slotId,slotOptions),f('ASSET BUNDLE / PATH','assetBundleId',row.assetBundleId),f('RARITY','rarity',row.rarity,['common','rare','epic','legendary','mythic','divine']),f('DEPTH','depth',row.layerRules?.depth||0),f('TAGS ; separated','tags',(row.tags||[]).join(';')));if(target==='character')characterFields(row).forEach(n=>shell.inspector.append(n));else{const t=row.transforms?.default||{};shell.inspector.append(f('X','x',t.x||0),f('Y','y',t.y||0),f('SCALE X','scaleX',t.scaleX??1),f('SCALE Y','scaleY',t.scaleY??1),f('ROTATION','rotation',t.rotation||0));}
- if(target==='character'){const importBtn=root.document.createElement('button');importBtn.className='kdc-btn';importBtn.textContent='IMPORT PREVIEW IMAGE';importBtn.style.marginTop='12px';importBtn.onclick=()=>{const input=root.document.createElement('input');input.type='file';input.accept='image/png,image/webp,image/jpeg';input.onchange=async()=>{const file=input.files?.[0];if(!file)return;const old=previewAssets.get(row.id);if(old?.objectUrl)URL.revokeObjectURL(old.objectUrl);const objectUrl=URL.createObjectURL(file);try{const meta=await readImageMeta(root,objectUrl);previewAssets.set(row.id,{source:objectUrl,objectUrl,asset:{...meta},name:file.name});status='Preview asset '+file.name+' · '+meta.pixelWidth+'×'+meta.pixelHeight;renderAll();}catch(error){URL.revokeObjectURL(objectUrl);status=String(error?.message||error);renderAll();}};input.click();};shell.inspector.append(importBtn);const src=sourceState(row);if(src.name)shell.inspector.insertAdjacentHTML('beforeend','<div class="kdc-foot">Preview source: '+String(src.name).replace(/[<>]/g,'')+(src.asset.pixelWidth?' · '+src.asset.pixelWidth+'×'+src.asset.pixelHeight:'')+'</div>');}
- const apply=root.document.createElement('button');apply.className='kdc-btn gold';apply.textContent='APPLY CHANGES';apply.style.marginTop='12px';apply.onclick=async()=>{const v=Object.fromEntries([...shell.inspector.querySelectorAll('[data-field]')].map(n=>[n.dataset.field,n.value])),transforms=copy(row.transforms||{}),metadata=copy(row.metadata||{});if(target==='character'){transforms[face]={...(transforms[face]||transforms.default||{}),x:Number(v.faceX)||0,y:Number(v.faceY)||0,scaleX:Number(v.faceScaleX)||1,scaleY:Number(v.faceScaleY)||1,rotation:Number(v.faceRotation)||0};metadata.characterVisual={...(metadata.characterVisual||{}),mode:v.visualMode,layer:v.visualLayer,socket:v.visualSocket,width:Number(v.visualWidth)||28,height:Number(v.visualHeight)||28,columns:Math.max(1,Number(v.visualColumns)||4),rows:Math.max(1,Number(v.visualRows)||4),heightScale:Number(v.visualHeightScale)||1,anchor:{x:Number.isFinite(Number(v.visualAnchorX))?Number(v.visualAnchorX):.5,y:Number.isFinite(Number(v.visualAnchorY))?Number(v.visualAnchorY):1},rotation:Number(v.visualRotation)||0};}else transforms.default={...(transforms.default||{}),x:Number(v.x)||0,y:Number(v.y)||0,scaleX:Number(v.scaleX)||1,scaleY:Number(v.scaleY)||1,rotation:Number(v.rotation)||0};const next={...row,id:v.id.trim(),displayName:v.displayName.trim(),targetType:v.targetType,slotId:v.slotId,compatibleProfiles:[v.profileId],assetBundleId:v.assetBundleId.trim(),rarity:v.rarity,transforms,metadata,layerRules:{...(row.layerRules||{}),depth:Number(v.depth)||0},tags:v.tags.split(';').map(x=>x.trim()).filter(Boolean)};const r=await session.upsert(next,{label:'edit appearance runtime contract'});status=r.ok?'✓ Definition valid':(r.errors||[]).join('\n');if(r.ok&&row.id!==next.id){await session.remove(row.id);const pa=previewAssets.get(row.id);if(pa){previewAssets.delete(row.id);previewAssets.set(next.id,pa);}}target=next.targetType;renderAll();};shell.inspector.append(apply);
- if(target==='character'){const payloadBtn=root.document.createElement('button');payloadBtn.className='kdc-btn';payloadBtn.textContent='COPY RUNTIME PAYLOAD';payloadBtn.style.marginTop='7px';payloadBtn.onclick=async()=>{const payload=C.rowToPayload(session.get(session.selectedId));try{await root.navigator?.clipboard?.writeText?.(JSON.stringify(payload,null,2));status='Runtime payload copied';}catch{status=JSON.stringify(payload);}renderInspector();};shell.inspector.append(payloadBtn);}
- const check=A.validateItem(row),src=sourceState(row),contract=target==='character'?C.compileRow({row,source:src.source,asset:src.asset,presets:root.KeloCharacterVisualPresets}):null,m=root.document.createElement('div');const errs=[...(check.errors||[]),...(contract?.validation?.errors||[])],warns=contract?.validation?.warnings||[];m.className=errs.length?'kdc-errors':'kdc-ok';m.textContent=status||(errs.length?errs.join('\n'):'✓ Cosmetic only · '+(contract?'runtime contract '+C.presentationFingerprint(contract):'definition valid')+(warns.length?'\n⚠ '+warns.join(' · '):''));shell.inspector.append(m);shell.inspector.insertAdjacentHTML('beforeend','<div class="kdc-foot">Character preview compiles the same payload/descriptor consumed by CreatorCharacterBridge. Test Chamber mutates only an isolated preview actor visualMotion frame; no HP, collision, inventory, position, network or persistence is touched.</div>');}
+ function faceBar(){
+  const bar=root.document.createElement('div');bar.style.cssText='display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin:8px 0 0';
+  for(const fce of FACES){const b=root.document.createElement('button');b.className='kdc-btn'+(face===fce?' gold':'');b.textContent=fce.toUpperCase();b.style.minWidth='58px';b.onclick=()=>{face=fce;renderAll();};bar.append(b);}
+  return bar;
+ }
+ function motionBar(){
+  const wrap=root.document.createElement('div');wrap.style.cssText='margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.06)';
+  const label=root.document.createElement('div');label.textContent='CHARACTER TEST CHAMBER';label.style.cssText='font-size:8px;letter-spacing:.14em;color:#7f8a88;text-align:center;margin-bottom:6px;font-weight:900';
+  const bar=root.document.createElement('div');bar.style.cssText='display:flex;gap:5px;justify-content:center;flex-wrap:wrap';const buttons=[];
+  for(const state of CHARACTER_TEST_STATES){const b=root.document.createElement('button');b.className='kdc-btn'+(motion===state.id?' gold':'');b.textContent=state.label;b.style.cssText='min-width:52px;padding-left:8px;padding-right:8px';b.onclick=()=>{motion=state.id;for(const row of buttons)row.className='kdc-btn'+(row.dataset.motion===motion?' gold':'');chamber?.play?.(motion);};b.dataset.motion=state.id;buttons.push(b);bar.append(b);}
+  wrap.append(label,bar);return wrap;
+ }
+ function mountPlaceholder(row){
+  const card=root.document.createElement('div');card.className='kdc-card';const t=row?.transforms?.default||{};
+  card.innerHTML='<div style="position:relative;width:250px;height:250px;border:1px dashed rgba(255,255,255,.14);border-radius:18px;background:rgba(255,255,255,.018)"><div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:76px;opacity:.48">🐎</div><div style="position:absolute;left:calc(50% + '+(Number(t.x)||0)+'px);top:calc(50% + '+(Number(t.y)||0)+'px);transform:translate(-50%,-50%) scale('+(Number(t.scaleX)||1)+','+(Number(t.scaleY)||1)+') rotate('+(Number(t.rotation)||0)+'deg);width:76px;height:46px;border:2px solid #d7b66b;border-radius:12px;background:rgba(215,182,107,.18);display:grid;place-items:center;color:#f3dda4;font-size:9px;font-weight:900">'+String(row?.slotId||'slot').toUpperCase()+'</div></div><h3 style="margin:12px 0 3px">'+String(row?.displayName||'Mount appearance')+'</h3><div style="font-size:8px;color:#7e8791">Mount keeps definition preview; Character has runtime-contract parity.</div>';
+  return card;
+ }
+ function renderPreview(){
+  chamber?.dispose?.();chamber=null;preview?.dispose?.();preview=null;
+  const row=session.get(session.selectedId);shell.stage.replaceChildren();
+  if(!row){const card=root.document.createElement('div');card.className='kdc-card';card.innerHTML='<div><div style="font-size:48px">👕</div><h2>'+target.toUpperCase()+' APPEARANCE</h2><p style="font-size:10px;color:#7e8791">Select an item or create one.</p></div>';shell.stage.append(card);return;}
+  if(target!=='character'){shell.stage.append(mountPlaceholder(row));return;}
+  const card=root.document.createElement('div');card.className='kdc-card';card.style.cssText='position:relative;overflow:hidden;padding:10px';
+  const canvas=root.document.createElement('canvas');canvas.style.cssText='width:min(78vw,360px);height:auto;max-height:48vh;border:1px solid rgba(231,197,106,.22);border-radius:16px;image-rendering:pixelated;touch-action:none';
+  card.append(canvas,faceBar(),motionBar());
+  const info=root.document.createElement('div');info.style.cssText='font-size:9px;color:#87938f;margin-top:8px;line-height:1.5;text-align:center;min-height:42px';card.append(info);shell.stage.append(card);
+  preview=createCreatorAppearancePreview({root,canvas});const src=sourceState(row);
+  chamber=createCreatorCharacterTestChamber({root,preview,onSnapshot:s=>{const p=s?.preview;if(!p)return;const v=p.compiled.validation,issues=[...v.errors,...v.warnings],track=s.track||{};info.innerHTML='<b style="color:#e6c87c">TEST '+String(s.state||motion).toUpperCase()+' · F'+String(s.frame??0)+' · '+(track.authored?'MAPPED':'FALLBACK')+'</b><br><span style="color:#75817f">'+String(track.source||'idle-fallback')+' · '+String(track.frameMs||0)+'ms · '+(track.loop?'loop':'one-shot')+'</span><br>'+v.mode.toUpperCase()+' · '+face.toUpperCase()+' · '+(p.anchorsSource==='runtime-anchors'?'runtime anchors':'runtime fallback anchors')+(issues.length?'<br><span style="color:#e8bb7d">'+issues.join(' · ')+'</span>':'<br><span style="color:#78d89a">descriptor valid · '+p.fingerprint+'</span>');}});
+  chamber.configure({row,source:src.source,asset:src.asset,face,state:motion,playing:true});
+ }
+ function f(label,key,value,options){
+  const l=root.document.createElement('label');l.className='kdc-label';l.textContent=label;
+  const n=options?root.document.createElement('select'):root.document.createElement('input');n.className='kdc-field';n.dataset.field=key;
+  if(options){for(const v of options){const o=root.document.createElement('option');o.value=v;o.textContent=v;if(String(v)===String(value))o.selected=true;n.append(o);}}else n.value=value??'';
+  l.append(n);return l;
+ }
+ function characterFields(row){
+  const v=visualMeta(row),t=faceTransform(row,face),mode=v.mode||'auto',anchor=v.anchor||{};
+  return[
+   f('VISUAL MODE','visualMode',mode,['auto','sheet','socket']),f('LAYER','visualLayer',v.layer||'front',['front','back']),f('SOCKET','visualSocket',v.socket||((row.slotId==='weaponMain'||row.slotId==='weaponSecondary')?'weapon':'center'),['center','weapon','head','back','foot','effectOrigin']),
+   f('WIDTH','visualWidth',v.width??28),f('HEIGHT','visualHeight',v.height??28),f('COLUMNS','visualColumns',v.columns??4),f('ROWS','visualRows',v.rows??4),f('HEIGHT SCALE','visualHeightScale',v.heightScale??1),f('ANCHOR X','visualAnchorX',anchor.x??.5),f('ANCHOR Y','visualAnchorY',anchor.y??1),f('BASE ROTATION','visualRotation',v.rotation??0),
+   f(face.toUpperCase()+' X','faceX',t.x??0),f(face.toUpperCase()+' Y','faceY',t.y??0),f(face.toUpperCase()+' SCALE X','faceScaleX',t.scaleX??1),f(face.toUpperCase()+' SCALE Y','faceScaleY',t.scaleY??1),f(face.toUpperCase()+' ROTATION','faceRotation',t.rotation??0)
+  ];
+ }
+ function renderInspector(){
+  const row=session.get(session.selectedId);shell.inspector.replaceChildren();
+  const toggle=root.document.createElement('div');toggle.className='kdc-grid2';
+  for(const type of ['character','mount']){const b=root.document.createElement('button');b.className='kdc-btn'+(target===type?' gold':'');b.textContent=type.toUpperCase();b.onclick=()=>{target=type;const first=rows()[0];session.select(first?.id||null);renderAll();};toggle.append(b);}shell.inspector.append(toggle);
+  if(!row){shell.inspector.insertAdjacentHTML('beforeend','<div class="kdc-foot">Shared Appearance Core. Select a '+target+' item.</div>');return;}
+  const ps=profiles(),p=selectedProfile(row),slotOptions=p?.slots||[];
+  shell.inspector.append(f('ID','id',row.id),f('DISPLAY NAME','displayName',row.displayName),f('TARGET','targetType',row.targetType,['character','mount']),f('PROFILE','profileId',p?.id||'',ps.map(x=>x.id)),f('SLOT','slotId',row.slotId,slotOptions),f('ASSET BUNDLE / PATH','assetBundleId',row.assetBundleId),f('RARITY','rarity',row.rarity,['common','rare','epic','legendary','mythic','divine']),f('DEPTH','depth',row.layerRules?.depth||0),f('TAGS ; separated','tags',(row.tags||[]).join(';')));
+  if(target==='character')characterFields(row).forEach(n=>shell.inspector.append(n));
+  else{const t=row.transforms?.default||{};shell.inspector.append(f('X','x',t.x||0),f('Y','y',t.y||0),f('SCALE X','scaleX',t.scaleX??1),f('SCALE Y','scaleY',t.scaleY??1),f('ROTATION','rotation',t.rotation||0));}
+
+  if(target==='character'){
+   const importBtn=root.document.createElement('button');importBtn.className='kdc-btn';importBtn.textContent='IMPORT PREVIEW IMAGE';importBtn.style.marginTop='12px';
+   importBtn.onclick=()=>{const input=root.document.createElement('input');input.type='file';input.accept='image/png,image/webp,image/jpeg';input.onchange=async()=>{const file=input.files?.[0];if(!file)return;const old=previewAssets.get(row.id);if(old?.objectUrl)URL.revokeObjectURL(old.objectUrl);const objectUrl=URL.createObjectURL(file);try{const meta=await readImageMeta(root,objectUrl);previewAssets.set(row.id,{source:objectUrl,objectUrl,asset:{...meta},name:file.name});status='Preview asset '+file.name+' · '+meta.pixelWidth+'×'+meta.pixelHeight;renderAll();}catch(error){URL.revokeObjectURL(objectUrl);status=String(error?.message||error);renderAll();}};input.click();};
+   shell.inspector.append(importBtn);const src=sourceState(row);if(src.name)shell.inspector.insertAdjacentHTML('beforeend','<div class="kdc-foot">Preview source: '+String(src.name).replace(/[<>]/g,'')+(src.asset.pixelWidth?' · '+src.asset.pixelWidth+'×'+src.asset.pixelHeight:'')+'</div>');
+
+   const mappingEditor=mountCreatorAnimationMappingEditor({
+    root,row,columns:C.frameColumns?.(row)||visualMeta(row).columns||4,initialState:motion,normalizeFrame:C.normalizeFrame,
+    onTestState:state=>{if(TEST_MOTIONS.has(state)){motion=state;chamber?.play?.(state);}},
+    onApply:async(nextMapping,state)=>{
+     if(TEST_MOTIONS.has(state))motion=state;
+     const result=await session.upsert({...row,animationMapping:nextMapping},{label:'edit appearance animation mapping'});
+     if(!result.ok)throw new Error((result.errors||['ANIMATION_MAPPING_INVALID']).join(' · '));
+     status='✓ '+String(state).toUpperCase()+' animation mapping saved';
+    }
+   });
+   shell.inspector.append(mappingEditor.element);
+  }
+
+  const apply=root.document.createElement('button');apply.className='kdc-btn gold';apply.textContent='APPLY CHANGES';apply.style.marginTop='12px';
+  apply.onclick=async()=>{
+   const v=Object.fromEntries([...shell.inspector.querySelectorAll('[data-field]')].map(n=>[n.dataset.field,n.value])),transforms=copy(row.transforms||{}),metadata=copy(row.metadata||{});
+   if(target==='character'){
+    transforms[face]={...(transforms[face]||transforms.default||{}),x:Number(v.faceX)||0,y:Number(v.faceY)||0,scaleX:Number(v.faceScaleX)||1,scaleY:Number(v.faceScaleY)||1,rotation:Number(v.faceRotation)||0};
+    metadata.characterVisual={...(metadata.characterVisual||{}),mode:v.visualMode,layer:v.visualLayer,socket:v.visualSocket,width:Number(v.visualWidth)||28,height:Number(v.visualHeight)||28,columns:Math.max(1,Number(v.visualColumns)||4),rows:Math.max(1,Number(v.visualRows)||4),heightScale:Number(v.visualHeightScale)||1,anchor:{x:Number.isFinite(Number(v.visualAnchorX))?Number(v.visualAnchorX):.5,y:Number.isFinite(Number(v.visualAnchorY))?Number(v.visualAnchorY):1},rotation:Number(v.visualRotation)||0};
+   }else transforms.default={...(transforms.default||{}),x:Number(v.x)||0,y:Number(v.y)||0,scaleX:Number(v.scaleX)||1,scaleY:Number(v.scaleY)||1,rotation:Number(v.rotation)||0};
+   const next={...row,id:v.id.trim(),displayName:v.displayName.trim(),targetType:v.targetType,slotId:v.slotId,compatibleProfiles:[v.profileId],assetBundleId:v.assetBundleId.trim(),rarity:v.rarity,transforms,metadata,layerRules:{...(row.layerRules||{}),depth:Number(v.depth)||0},tags:v.tags.split(';').map(x=>x.trim()).filter(Boolean)};
+   const r=await session.upsert(next,{label:'edit appearance runtime contract'});status=r.ok?'✓ Definition valid':(r.errors||[]).join('\n');
+   if(r.ok&&row.id!==next.id){await session.remove(row.id);const pa=previewAssets.get(row.id);if(pa){previewAssets.delete(row.id);previewAssets.set(next.id,pa);}}
+   target=next.targetType;renderAll();
+  };
+  shell.inspector.append(apply);
+
+  if(target==='character'){
+   const payloadBtn=root.document.createElement('button');payloadBtn.className='kdc-btn';payloadBtn.textContent='COPY RUNTIME PAYLOAD';payloadBtn.style.marginTop='7px';payloadBtn.onclick=async()=>{const payload=C.rowToPayload(session.get(session.selectedId));try{await root.navigator?.clipboard?.writeText?.(JSON.stringify(payload,null,2));status='Runtime payload copied';}catch{status=JSON.stringify(payload);}renderInspector();};shell.inspector.append(payloadBtn);
+  }
+  const check=A.validateItem(row),src=sourceState(row),contract=target==='character'?C.compileRow({row,source:src.source,asset:src.asset,presets:root.KeloCharacterVisualPresets}):null,m=root.document.createElement('div');
+  const errs=[...(check.errors||[]),...(contract?.validation?.errors||[])],warns=contract?.validation?.warnings||[];m.className=errs.length?'kdc-errors':'kdc-ok';m.textContent=status||(errs.length?errs.join('\n'):'✓ Cosmetic only · '+(contract?'runtime contract '+C.presentationFingerprint(contract):'definition valid')+(warns.length?'\n⚠ '+warns.join(' · '):''));shell.inspector.append(m);
+  shell.inspector.insertAdjacentHTML('beforeend','<div class="kdc-foot">Character preview and Animation Mapping Editor feed the same row consumed by the Test Chamber and CreatorCharacterBridge. Mapping authoring never owns HP, collision, inventory, position, network or gameplay state transitions.</div>');
+ }
  function renderAll(){renderList();renderPreview();renderInspector();}
  shell.search.oninput=()=>{query=shell.search.value.trim();renderList();};shell.list.onscroll=renderList;
  shell.action('NEW',async()=>{const p=profiles()[0];if(!p)return;const row={schemaVersion:1,id:'outfit.'+target+'.new_'+Date.now().toString(36),displayName:'New Appearance',targetType:target,slotId:p.slots[0],compatibleProfiles:[p.id],assetBundleId:'appearance.'+target+'.asset.new',transforms:{default:{x:0,y:0,scaleX:1,scaleY:1,rotation:0}},layerRules:{depth:0},animationMapping:{},tags:[],rarity:'common',metadata:target==='character'?{characterVisual:{mode:'auto',layer:'front',socket:'center',width:28,height:28,columns:4,rows:4,heightScale:1,anchor:{x:.5,y:1},rotation:0}}:{}};const r=await session.upsert(row,{label:'new appearance'});if(r.ok)session.select(row.id);renderAll();},{gold:true});
@@ -50,5 +175,7 @@ export async function openAppearanceCreator({root=globalThis}={}){
  shell.action('IMPORT',()=>{const i=root.document.createElement('input');i.type='file';i.accept='.csv,.xlsx,.xls';i.onchange=async()=>{if(!i.files?.[0])return;try{const parsed=await importDefinitionFile(i.files[0],{root}),incoming=tabularRows(parsed.rows),errors=[],valid=[];for(const row of incoming){const c=A.validateItem(row);if(c.ok)valid.push(row);else errors.push({row:row.__sourceRow,id:row.id,errors:c.errors});}if(!errors.length)await session.importRows(valid);status=errors.length?errors.slice(0,8).map(e=>'Row '+e.row+' · '+(e.id||'?')+' · '+e.errors.join(', ')).join('\n'):'Import valid · '+valid.length+' appearance rows';renderAll();}catch(e){status=e.message;renderAll();}};i.click();});
  shell.action('UNDO',async()=>{await session.undo();renderAll();});shell.action('REDO',async()=>{await session.redo();renderAll();});shell.action('SAVE',async()=>{await session.save();status='Draft checkpoint saved';renderAll();},{gold:true});shell.action('EXPORT',()=>download(root,'kelo-appearance-v2.json',JSON.stringify(session.snapshot(),null,2)));shell.action('CLOSE',close);
  function close(){chamber?.dispose?.();chamber=null;preview?.dispose?.();for(const row of previewAssets.values())if(row.objectUrl)URL.revokeObjectURL(row.objectUrl);previewAssets.clear();session.close();shell.close();active=null;}
- session.onChange(()=>renderAll());const first=rows()[0];if(first)session.select(first.id);renderAll();active=Object.freeze({version:'appearance-creator-v2.1.0-test-chamber',session,shell,close,previewSnapshot:()=>preview?.snapshot?.()||null,testChamberSnapshot:()=>chamber?.snapshot?.()||null});return active;
+ session.onChange(()=>renderAll());const first=rows()[0];if(first)session.select(first.id);renderAll();
+ active=Object.freeze({version:'appearance-creator-v2.2.0-animation-mapping-editor',session,shell,close,previewSnapshot:()=>preview?.snapshot?.()||null,testChamberSnapshot:()=>chamber?.snapshot?.()||null});
+ return active;
 }
