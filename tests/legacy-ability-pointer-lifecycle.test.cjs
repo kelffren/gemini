@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: QA / LEGACY ABILITY POINTER LIFECYCLE
  * owner: Evergreen migration contract
- * purpose: impide que engine-g vuelva a registrar listeners globales de aim y exige un lifecycle desmontable propiedad de KeloAbilityAim
+ * purpose: impide que engine-g recupere listeners/render globales y exige lifecycle desmontable propiedad de KeloAbilityAim
  */
 const fs=require('node:fs');
 const assert=require('node:assert/strict');
@@ -15,6 +15,8 @@ for(const eventName of ['pointermove','pointerup','pointercancel']){
   assert.ok(owner.includes(`root.removeEventListener('${eventName}'`),`KeloAbilityAim must be able to detach ${eventName}`);
 }
 
+assert.ok(!legacy.includes('KeloRender.afterFrame'),'engine-g must not register the retired skill indicator render hook');
+assert.ok(!legacy.includes('function drawSkillIndicator'),'engine-g retired skill indicator renderer must stay removed');
 assert.ok(legacy.includes("slot.addEventListener('pointerdown'"),'action slots must keep their local pointerdown contract');
 assert.ok(owner.includes('setPointerCapture(e.pointerId)'),'aim owner must preserve pointer capture for touch drag continuity');
 assert.ok(owner.includes("const lifecycleKey='__KELO_ABILITY_AIM_POINTER_LIFECYCLE__'"),'pointer lifecycle singleton key missing');
