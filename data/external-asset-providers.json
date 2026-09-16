@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "policy": {
     "downloadOnBrowse": false,
     "requireExplicitDownload": true,
@@ -21,6 +21,20 @@
       "notes": "Machine-readable CC0 catalog. Binary assets are fetched only after an explicit Download action."
     },
     {
+      "id": "kenney",
+      "name": "Kenney",
+      "mode": "lazy-live-index",
+      "enabled": true,
+      "license": "CC0",
+      "attributionRequired": false,
+      "sourceUrl": "https://kenney.nl/assets",
+      "browseUrl": "https://kenney.nl/assets",
+      "metadataMirror": "https://github.com/shorepine/kenney",
+      "indexUrl": "https://raw.githubusercontent.com/shorepine/kenney/main/index.tsv",
+      "assetBaseUrl": "https://raw.githubusercontent.com/shorepine/kenney/main/",
+      "notes": "CC0 catalog. The remote metadata index is fetched only after the user explicitly selects Kenney; individual image bytes are fetched only after Download."
+    },
+    {
       "id": "lpc",
       "name": "Universal LPC",
       "mode": "external-catalog",
@@ -30,17 +44,6 @@
       "sourceUrl": "https://github.com/BenCreating/LPC-Spritesheet-Generator",
       "browseUrl": "https://liberatedpixelcup.github.io/Universal-LPC-Spritesheet-Character-Generator/",
       "notes": "Connected as a mixed-license source. Automatic importing stays gated until per-item license and download metadata are resolved."
-    },
-    {
-      "id": "kenney",
-      "name": "Kenney",
-      "mode": "external-catalog",
-      "enabled": true,
-      "license": "CC0",
-      "attributionRequired": false,
-      "sourceUrl": "https://kenney.nl/assets",
-      "browseUrl": "https://kenney.nl/assets",
-      "notes": "CC0 source connected for discovery. No whole-library download is performed by Kelo World."
     },
     {
       "id": "opengameart",
