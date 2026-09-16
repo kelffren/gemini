@@ -43,11 +43,9 @@ test('V6.69 evergreen branch boots plaza without uncaught errors', async ({ page
   expect(snapshot.abilityAim.pointerLifecycle).toBeTruthy();
   expect(snapshot.abilityAim.pointerLifecycle.owner).toBe('KeloAbilityAim');
   expect(snapshot.abilityAim.pointerLifecycle.attached).toBe(true);
-  expect(snapshot.abilityAim.castMiddlewareCount).toBeGreaterThanOrEqual(2);
-  expect(snapshot.abilityAim.castMiddlewareOwners).toEqual(expect.arrayContaining([
-    'engine-l:plaza-cast-presentation',
-    'engine-m:skill-shots'
-  ]));
+  expect(snapshot.abilityAim.castMiddlewareCount).toBeGreaterThanOrEqual(1);
+  expect(snapshot.abilityAim.castMiddlewareOwners).toContain('engine-l:plaza-cast-presentation');
+  expect(snapshot.abilityAim.castMiddlewareOwners).not.toContain('engine-m:skill-shots');
   expect(snapshot.abilityBegin).toBe(true);
   expect(snapshot.abilityEnd).toBe(true);
   expect(snapshot.abilityDirection).toBeTruthy();
@@ -56,6 +54,7 @@ test('V6.69 evergreen branch boots plaza without uncaught errors', async ({ page
   expect(snapshot.abilityTriggerBridge.version).toMatch(/^kelo-legacy-ability-trigger-/);
   expect(snapshot.abilityDashMax).toBe(170);
   expect(snapshot.scripts.some(src=>src.includes('legacy-ability-aim-system.js'))).toBe(true);
+  expect(snapshot.scripts.some(src=>src.includes('engine-m.js'))).toBe(false);
   expect(snapshot.scripts.some(src=>/engine-(?:j|k)\.js/.test(src))).toBe(false);
   expect(snapshot.camera).toBe(true);
   expect(snapshot.position).toBe(true);
@@ -78,6 +77,24 @@ test('V6.69 evergreen branch boots plaza without uncaught errors', async ({ page
   expect(afterPaint.positionShadow).toBe(true);
   expect(afterPaint.farmShadow).toBe(true);
   expect(afterPaint.failures).toEqual({});
+
+  const worldLoaded=await page.evaluate(async()=>window.KELO_MODULE_LOADER.ensure('world'));
+  expect(worldLoaded).toBe(true);
+  await page.waitForFunction(()=>window.KELO_MODULE_LOADER?.isReady?.('world'),{timeout:15000});
+  const worldSnapshot=await page.evaluate(()=>({
+    ready:window.KELO_MODULE_LOADER.isReady('world'),
+    abilityAim:window.KeloAbilityAim.snapshot(),
+    failures:window.KELO_MODULE_LOADER.diagnostics().failures,
+    scripts:Array.from(document.scripts).map(script=>String(script.getAttribute('src')||''))
+  }));
+  expect(worldSnapshot.ready).toBe(true);
+  expect(worldSnapshot.abilityAim.castMiddlewareCount).toBeGreaterThanOrEqual(2);
+  expect(worldSnapshot.abilityAim.castMiddlewareOwners).toEqual(expect.arrayContaining([
+    'engine-l:plaza-cast-presentation',
+    'engine-m:skill-shots'
+  ]));
+  expect(worldSnapshot.scripts.some(src=>src.includes('engine-m.js'))).toBe(true);
+  expect(worldSnapshot.failures).toEqual({});
 
   await page.waitForTimeout(250);
   expect(pageErrors).toEqual([]);
