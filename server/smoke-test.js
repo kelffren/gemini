@@ -1,8 +1,8 @@
 /* KELO-INDEX
  * area: SERVER / TEST
  * owner: Kelo server authority verification
- * keys: HEALTH READINESS WEBSOCKET HELLO SIGTERM SMOKE
- * purpose: levanta el server real y verifica readiness, handshake WebSocket, identidad de transición y shutdown limpio
+ * keys: HEALTH READINESS WEBSOCKET HELLO SIGTERM SMOKE WORLD EVENT
+ * purpose: levanta el server real y verifica readiness, handshake WebSocket, identidad, world-event authority y shutdown limpio
  * online: prueba el mismo server/index.js usado por Render sin sustituir autoridad
  */
 'use strict';
@@ -16,7 +16,7 @@ const base=`http://127.0.0.1:${port}`;
 const wsUrl=`ws://127.0.0.1:${port}`;
 const child=spawn(process.execPath,['index.js'],{
   cwd:__dirname,
-  env:{...process.env,PORT:String(port),KELO_REQUIRE_AUTH:'0',KELO_TITLES_SUPABASE:'0',SUPABASE_URL:'',SUPABASE_SECRET_KEY:'',SUPABASE_SERVICE_ROLE_KEY:''},
+  env:{...process.env,PORT:String(port),KELO_REQUIRE_AUTH:'0',KELO_TITLES_SUPABASE:'0',KELO_WORLD_DIRECTOR_AI:'0',OPENAI_API_KEY:'',SUPABASE_URL:'',SUPABASE_SECRET_KEY:'',SUPABASE_SERVICE_ROLE_KEY:''},
   stdio:['ignore','pipe','pipe']
 });
 let output='';
@@ -53,17 +53,30 @@ function waitExit(proc,timeout=10000){return new Promise((resolve,reject)=>{cons
     assert.strictEqual(ready.service,'kelo-world-server');
     assert.strictEqual(ready.shuttingDown,false);
     assert.ok(ready.pvp);
+    assert.ok(ready.worldEvents);
+    assert.strictEqual(ready.worldEvents.executor.serverAuthoritative,true);
+    assert.strictEqual(ready.worldEvents.executor.clientDamageAccepted,false);
 
     const ws=new WebSocket(wsUrl);
     const welcomePromise=waitMessage(ws,msg=>msg.t==='welcome');
     await waitOpen(ws);
     const welcome=await welcomePromise;
     assert.ok(welcome.id);
+    assert.strictEqual(welcome.worldEventAuthority.serverAuthoritative,true);
+    assert.strictEqual(welcome.worldEventAuthority.clientDamageAccepted,false);
     const identityPromise=waitMessage(ws,msg=>msg.t==='identity');
     ws.send(JSON.stringify({t:'hello',name:'Smoke',playerKey:randomUUID()}));
     const identity=await identityPromise;
     assert.ok(identity.playerKey);
     assert.strictEqual(identity.authSource,'legacy-local');
+
+    const eventResultPromise=waitMessage(ws,msg=>msg.t==='world:event:result'&&msg.op==='world:event:get');
+    ws.send(JSON.stringify({t:'world:event:get',requestId:'world-smoke'}));
+    const eventResult=await eventResultPromise;
+    assert.strictEqual(eventResult.requestId,'world-smoke');
+    assert.strictEqual(eventResult.source,'server-authoritative-world-event-executor');
+    assert.strictEqual(eventResult.encounter,null);
+
     ws.close(1000,'smoke complete');
     await waitClose(ws);
 
@@ -71,7 +84,7 @@ function waitExit(proc,timeout=10000){return new Promise((resolve,reject)=>{cons
     child.kill('SIGTERM');
     const exit=await exitPromise;
     assert.strictEqual(exit.code,0);
-    console.log('✅ Kelo server smoke: readiness + websocket + hello + graceful shutdown');
+    console.log('✅ Kelo server smoke: readiness + websocket + world-event authority + hello + graceful shutdown');
   }catch(err){
     console.error('❌ Kelo server smoke failed:',err);
     try{child.kill('SIGKILL');}catch(_){}
