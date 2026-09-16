@@ -8,6 +8,8 @@ on:
       - '.github/workflows/guardian-community-live-verification.yml'
       - 'tests/guardian-pvp-*.spec.js'
       - 'scripts/guardian-pvp-host-audit.mjs'
+      - 'scripts/guardian-system-audit.mjs'
+      - 'server/guardian-coordinator.js'
       - 'src/systems/guardian-system.js'
       - 'src/systems/guardian-authority.js'
       - 'src/systems/guardian-pvp-host.js'
@@ -76,7 +78,9 @@ jobs:
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '24'
-      - name: Static audit
+      - name: Guardian coordinator + control-plane audit
+        run: npm run audit:guardian
+      - name: Guardian PvP host audit
         run: npm run audit:guardian-pvp-host
       - name: Install dependencies
         run: npm install --no-audit --no-fund
