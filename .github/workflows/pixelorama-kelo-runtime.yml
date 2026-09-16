@@ -10,12 +10,13 @@ on:
       - 'vendor/pixelorama-kelo/**'
 
 permissions:
-  contents: read
+  contents: write
 
 env:
   GODOT_VERSION: 4.7.2
   PIXELORAMA_SOURCE_SHA: da7b68f97806c461abde615d1d847af91921c37b
   GODOT_CI_IMAGE: barichello/godot-ci:4.7.2
+  RUNTIME_BRANCH: pixelorama-runtime-v1
 
 jobs:
   build-runtime:
@@ -84,3 +85,23 @@ jobs:
           if-no-files-found: error
           retention-days: 30
           compression-level: 9
+
+      - name: Publish lightweight PCK runtime branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/kelo-pixelorama-runtime
+          mkdir -p /tmp/kelo-pixelorama-runtime
+          cp .pixelorama-src/build/web/index.pck /tmp/kelo-pixelorama-runtime/index.pck
+          cp .pixelorama-src/build/web/kelo-runtime.json /tmp/kelo-pixelorama-runtime/kelo-runtime.json
+          cp .pixelorama-src/build/web/PIXELORAMA-LICENSE.txt /tmp/kelo-pixelorama-runtime/PIXELORAMA-LICENSE.txt
+          grep 'index.pck' .pixelorama-src/build/web/SHA256SUMS.txt > /tmp/kelo-pixelorama-runtime/SHA256SUMS.txt
+          cd /tmp/kelo-pixelorama-runtime
+          git init -b "$RUNTIME_BRANCH"
+          git config user.name "kelo-runtime-bot"
+          git config user.email "68343904+kelffren@users.noreply.github.com"
+          git add index.pck kelo-runtime.json PIXELORAMA-LICENSE.txt SHA256SUMS.txt
+          git commit -m "runtime(pixelorama): ${PIXELORAMA_SOURCE_SHA}"
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git push --force origin "HEAD:refs/heads/${RUNTIME_BRANCH}"
