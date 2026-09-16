@@ -24,11 +24,13 @@ The required invariant remains:
 
 A static descriptor preview also could not expose foot-anchor/frame problems while a spritesheet changes frame. The Test Chamber adds that missing pre-publication visual check.
 
+A continuation review found one additional drift risk: LIVE Character rendering and the Test Chamber both understood `_visualMotion.face/frame`, but they normalized those values separately. The Chamber also defaulted a missing `characterVisual.columns` to **1** while the runtime visual contract defaults a sheet to **4 columns**. That could make an otherwise valid 4-frame sheet look static in Test Chamber. This continuation removes that mismatch.
+
 ## Implemented
 
 ### Shared pure contract
 
-`src/characters/creator-character-visual-contract.js` owns only pure descriptor compilation/validation:
+`src/characters/creator-character-visual-contract.js` owns pure descriptor compilation/validation and now also the canonical authoring/runtime-compatible visual-motion sample normalization:
 
 - row → runtime payload;
 - auto sheet/socket inference;
@@ -36,9 +38,13 @@ A static descriptor preview also could not expose foot-anchor/frame problems whi
 - four-face transforms;
 - anchors/layer/grid/height scale;
 - stable diagnostic fingerprint;
-- validation warnings/errors.
+- validation warnings/errors;
+- `normalizeFace(value, fallback)`;
+- `normalizeFrame(value, columns)`;
+- `resolveMotionSample({actor, visual, columns, fallbackFace, fallbackState})`;
+- `frameColumns(row)` with the same default of 4 columns used by the sheet contract.
 
-It owns no rendering, gameplay, entitlement, persistence or networking.
+The contract still owns no rendering, animation loop, gameplay transition, entitlement, persistence or networking.
 
 ### Runtime bridge refactor
 
@@ -65,8 +71,10 @@ Normal boot remains light; nothing moved into eager `index.html` boot.
 - uses runtime anchors when available;
 - uses the same sheet/socket geometry formulas as CharacterCustomization;
 - remains persistence-free and owns no RAF/game loop;
-- now accepts an explicit visual `motion` + `frame`;
-- sheet rendering honors `_visualMotion.frame` with the same modulo behavior used by the live Character appearance renderer.
+- accepts explicit visual `motion` + `frame`;
+- routes face/frame normalization through `KeloCreatorCharacterVisualContract.resolveMotionSample()`;
+- uses `frameColumns(row)` instead of maintaining a second grid default;
+- sheet rendering honors explicit `_visualMotion.frame` with the same modulo behavior used by the live Character appearance renderer.
 
 Preview files remain object URLs only. They never become authoritative published sources and are revoked when replaced/closed.
 
@@ -93,15 +101,21 @@ Supported mapped-track values:
 
 Fallback policy is deterministic rather than fabricated:
 
-- walk = declared columns as generic runtime stride;
+- walk = declared/runtime-default columns as generic runtime stride;
 - run = same columns at a faster preview cadence;
 - missing idle/attack/hit/death = frame 0 and clearly marked FALLBACK.
 
+The chamber now asks `KeloCreatorCharacterVisualContract.frameColumns(row)` and `resolveMotionSample()` for the canonical visual sample instead of owning private face/frame normalization. Missing columns therefore resolve to **4**, matching the runtime sheet contract.
+
 The chamber owns one `requestAnimationFrame` while playing and invokes the event-driven preview only when the resolved frame changes. `dispose()` cancels it.
+
+### Fresh-draft guarantee
+
+`src/creators/ui/appearance-creator.mjs` obtains the selected row from `session.get(session.selectedId)` each time the preview is rebuilt and passes that exact row into `chamber.configure(...)`. The definition session calls `renderAll()` on change. Therefore edits are not tested against a stale snapshot kept by a previous Test Chamber instance; rebuilding disposes the previous Chamber/preview and creates the next one from current session state.
 
 ### Mobile Test Chamber UI
 
-`src/creators/ui/appearance-creator.mjs` now adds touch controls for:
+`src/creators/ui/appearance-creator.mjs` exposes touch controls for:
 
 - IDLE
 - WALK
@@ -139,7 +153,7 @@ The Test Chamber creates no world actor and never mutates `localPlayer` or remot
 
 ## Tests / audit
 
-`scripts/creator-appearance-authoring-audit.mjs` was extended to cover:
+`scripts/creator-appearance-authoring-audit.mjs` now covers:
 
 - canonical 512×768 4×4 → sheet;
 - 64×64 weapon → socket;
@@ -151,14 +165,18 @@ The Test Chamber creates no world actor and never mutates `localPlayer` or remot
 - mapped attack frames/timing/one-shot;
 - generic walk fallback;
 - deterministic death fallback;
-- live Character renderer explicit-frame support;
+- canonical `resolveMotionSample()` face/frame/state normalization;
+- default `frameColumns()` = 4;
+- live Character renderer explicit-frame modulo support;
+- Test Chamber and preview consume shared motion helpers;
+- Test Chamber receives the selected current draft and rebuilds on session changes;
 - Test Chamber UI wiring;
 - base preview/editor remain RAF-free;
 - Test Chamber owns RAF + cancellation and contains no polling/persistence/live-actor references.
 
 ### Evidence already available from the earlier part of this pass
 
-The shared contract and original static preview were materialized into the available execution container and passed `node --check`. Pure contract assertions passed:
+The shared contract and original static preview were materialized into the available execution container and passed `node --check`. Pure contract assertions passed before the Test Chamber continuation:
 
 ```text
 PASS pure authoring contract {
@@ -169,13 +187,16 @@ PASS pure authoring contract {
 }
 ```
 
-This evidence predates the Test Chamber extension. **No Node/browser/iPhone/LIVE validation of the new Test Chamber is claimed yet.**
+This evidence predates the Test Chamber and the `v2.1.0-motion-sample` contract change. **No Node/browser/iPhone/LIVE validation of the current Test Chamber continuation is claimed yet.**
+
+A GitHub workflow lookup during this continuation found no `.github/workflows` directory on this branch, so no GitHub Actions CI result exists to substitute for those gates.
 
 ## Architecture decisions
 
 - Do not implement a second Character renderer for preview.
 - Do not implement a second combat/animation state machine in Creator.
-- Reuse explicit `_visualMotion.frame` semantics from the Character renderer only on an isolated authoring actor.
+- Canonicalize Creator visual `face/frame/state` through the shared pure visual contract instead of a Test Chamber-only helper.
+- Keep the live Character renderer's explicit-frame semantic as the compatibility target; do not move gameplay motion ownership into Creator.
 - Reuse `Appearance.animationMapping[motion]` rather than inventing a parallel track schema.
 - Do not make a local preview file network authority.
 - Do not attach cosmetic stats/gameplay fields to authoring.
@@ -193,9 +214,11 @@ PvP presentation delta is owned by PR #308.
 This pass changes neither transport nor gameplay authority:
 
 ```text
-AUTHORING CONTRACT V2
+AUTHORING CONTRACT V2.1
         ↓
-Test Chamber visual frame/motion (ephemeral only)
+shared face/frame/state visual sample
+        ↓
+Test Chamber visual motion (ephemeral only)
         ↓
 Creator payload/revision
         ↓
@@ -208,12 +231,13 @@ Social presentation / PvP presentation delta
 
 ## Files/contracts touched by the Test Chamber continuation
 
-- `src/creators/appearance/creator-character-test-chamber.mjs` — new isolated visual playback session.
-- `src/creators/appearance/creator-appearance-preview.mjs` — explicit visual motion/frame input.
-- `src/creators/ui/appearance-creator.mjs` — six-state mobile controls + diagnostics + cleanup.
-- `scripts/creator-appearance-authoring-audit.mjs` — state/track/lifecycle static gates.
-- `docs/systems/CREATOR_APPEARANCE_AUTHORING_CONTRACT.md` — technical boundary updated.
-- this implementation pass — continuation intent/evidence/gates updated.
+- `src/characters/creator-character-visual-contract.js` — shared pure face/frame/state normalization + sheet-column default helper.
+- `src/creators/appearance/creator-character-test-chamber.mjs` — isolated playback now consumes the shared helpers.
+- `src/creators/appearance/creator-appearance-preview.mjs` — explicit visual motion/frame input now consumes the shared helpers.
+- `src/creators/ui/appearance-creator.mjs` — six-state mobile controls + diagnostics + cleanup; current draft is passed on every rebuild.
+- `scripts/creator-appearance-authoring-audit.mjs` — descriptor, motion parity, current-draft and lifecycle static gates.
+- `docs/systems/CREATOR_APPEARANCE_AUTHORING_CONTRACT.md` — technical boundary.
+- this implementation pass — continuation intent/evidence/gates.
 
 ## Remaining verification
 
@@ -223,14 +247,15 @@ Before merge/`VALIDATED`:
 2. run existing `audit:appearance`, Character customization and Creator bridge audits;
 3. load Appearance Creator on mobile Safari/iPhone;
 4. import a real canonical Character sheet and verify all four faces;
-5. exercise IDLE/WALK/RUN and verify stride/foot anchor remains visually stable;
+5. exercise IDLE/WALK/RUN and verify stride/foot anchor remains visually stable, including a row with omitted `columns` resolving to the runtime default 4;
 6. provide a row with authored `animationMapping.attack` and verify one-shot frame order/timing;
 7. verify HIT/DEATH without authored mappings visibly report FALLBACK rather than pretending to have gameplay animation;
 8. rapidly switch six states + four faces, close/reopen editor, and verify no RAF/input-lock leak;
-9. test weapon socket and back-layer item;
-10. publish/equip exact revision and compare authoring preview → own social actor → second account social → second account PvP;
-11. confirm no Creator library bulk preload, no second renderer and no normal-game regression;
-12. verify Mount behavior was not regressed; Mount WYSIWYG remains unclaimed.
+9. edit the selected definition, apply it, and confirm Chamber immediately uses the new transform/grid without stale state;
+10. test weapon socket and back-layer item;
+11. publish/equip exact revision and compare authoring preview → own social actor → second account social → second account PvP;
+12. confirm no Creator library bulk preload, no second renderer and no normal-game regression;
+13. verify Mount behavior was not regressed; Mount WYSIWYG remains unclaimed.
 
 ## Next logical pass
 
@@ -238,4 +263,4 @@ After this PR is actually validated, the next focused authoring layer is a **vis
 
 ## Handoff prompt
 
-> Continue PR #339 / branch `creator-appearance-authoring-v2` and this exact pass. Read `docs/systems/CREATOR_APPEARANCE_AUTHORING_CONTRACT.md`, `src/characters/creator-character-visual-contract.js`, `src/characters/character-appearance.js`, `src/creators/appearance/creator-character-test-chamber.mjs`, the preview and Appearance Creator. Preserve one descriptor compiler, one existing Character renderer and one isolated cancellable Test Chamber RAF. Do not mutate live actors or add HP/inventory/collision/network/persistence authority. First run the updated audit and existing appearance/bridge gates, then iPhone/LIVE six-state interaction. Fix failures in this same PR. Keep status `IMPLEMENTED_PENDING_VERIFY` until those gates actually pass. After validation, build an authoring UI for the existing `animationMapping` contract rather than another animation/runtime schema.
+> Continue PR #339 / branch `creator-appearance-authoring-v2` and this exact pass. Read `docs/systems/CREATOR_APPEARANCE_AUTHORING_CONTRACT.md`, `src/characters/creator-character-visual-contract.js`, `src/characters/character-appearance.js`, `src/creators/appearance/creator-character-test-chamber.mjs`, the preview and Appearance Creator. Preserve one descriptor compiler, canonical face/frame normalization in the shared contract, one existing Character renderer and one isolated cancellable Test Chamber RAF. Do not mutate live actors or add HP/inventory/collision/network/persistence authority. First run the updated audit and existing appearance/bridge gates, then iPhone/LIVE six-state interaction including omitted-columns=4 and fresh-draft edits. Fix failures in this same PR. Keep status `IMPLEMENTED_PENDING_VERIFY` until those gates actually pass. After validation, build an authoring UI for the existing `animationMapping` contract rather than another animation/runtime schema.
