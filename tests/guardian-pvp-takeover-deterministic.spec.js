@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: TEST / GUARDIAN / PVP TAKEOVER DETERMINISTIC
  * owner: Playwright validation only
- * keys: GUARDIAN PVP TAKEOVER TWO CLIENT WORKER EPOCH SEQUENCE SECRETLESS
+ * keys: GUARDIAN PVP TAKEOVER TWO CLIENT WORKER EPOCH SEQUENCE STANDBY SECRETLESS
  * purpose: prueba en Pages publicado el host/Worker/adaptador PvP real con dos clientes y un control-plane test-only en memoria
  * online: el runtime PvP es producción; solo Guardian lease/transport se sustituye antes de cargar el feature para poder ejecutar el gate en cada page_build sin secretos
  * do-not: NO modificar runtime productivo, NO economía/inventario, NO service role, NO segundo gameplay loop
@@ -47,7 +47,7 @@ const guardianStub=()=>{
     version:'guardian-test-control-plane-v1',
     state:()=>Object.freeze({
       version:'guardian-test-control-plane-v1',nodeId,enabled,platform:'ios',ios:true,connected:true,
-      role:masterActive?'master-host':'donor-ready',masterEligible:true,masterActive,
+      role:masterActive?'master-host':'donor-ready',masterEligible:true,masterActive,standbyAssigned:false,standby:null,
       masterLeaseExpiresAt:masterActive?master.expiresAt:null,network:{masterEpoch:master.epoch,masterNodeId:master.nodeId},
       master:Object.freeze({...master}),preferences:Object.freeze({enabled:true,allowRelay:true,allowAssets:true,allowCompute:false,allowGpuAssets:false}),
       dataPlane:Object.freeze({mode:'test-control-plane',supported:true,masterNodeId:master.nodeId,masterEpoch:master.epoch,peerCount:1,openPeerCount:1,connectedToMaster:!masterActive,bytesSent:stats.sent,bytesReceived:stats.received}),
@@ -55,7 +55,7 @@ const guardianStub=()=>{
     }),
     activate:async()=>{enabled=true;emit();return api.state();},deactivate:async()=>{enabled=false;emit();return api.state();},
     toggle:async()=>{enabled=!enabled;emit();return api.state();},refresh:async()=>api.state(),heartbeat:async()=>api.state(),
-    startMasterHost:async()=>setMaster(nodeId,master.epoch+1),stopMasterHost:async()=>{masterActive=false;emit();return api.state();},
+    startMasterHost:async()=>setMaster(nodeId,master.epoch+1),claimStandbyHost:async()=>{throw new Error('GUARDIAN_STANDBY_NOT_ASSIGNED');},stopMasterHost:async()=>{masterActive=false;emit();return api.state();},
     updatePreferences:()=>api.state(),capabilities:()=>({platform:'ios',deviceClass:'phone',visibility:'visible',online:true,webrtc:true}),
     gpuCapability:async()=>({webgpu:false,gpuTier:'none',gpuCapacityUnits:0,gpuProbeReady:true}),ensureGpuAssetWorker:async()=>null,
     transport:()=>api.state().dataPlane,
@@ -65,7 +65,7 @@ const guardianStub=()=>{
     __close:()=>bus.close()
   };
   Object.defineProperty(window,'KeloGuardian',{value:Object.freeze(api),configurable:false,writable:false});
-  Object.defineProperty(window,'KELO_GUARDIAN_AUDIT',{value:Object.freeze({testOnly:true,clientGameplayAuthority:false,clientRewardAuthority:false})});
+  Object.defineProperty(window,'KELO_GUARDIAN_AUDIT',{value:Object.freeze({testOnly:true,serverSelectedStandby:true,clientGameplayAuthority:false,clientRewardAuthority:false})});
   queueMicrotask(emit);
 };
 
@@ -74,9 +74,13 @@ async function setupPage(context,label){
   await page.routeWebSocket('**/*',ws=>ws.close({code:1012,reason:'guardian-deterministic-central-offline'}));
   await page.goto(urlFor(label),{waitUntil:'domcontentloaded',timeout:45000});
   await page.waitForFunction(()=>window.KELO_MODULE_LOADER&&window.KELO_FEATURE_REGISTRY&&window.KeloGuardian?.version==='guardian-test-control-plane-v1',{timeout:20000});
-  const loaded=await page.evaluate(async()=>({ok:await window.KELO_MODULE_LOADER.ensure('pvp'),registry:window.KELO_FEATURE_REGISTRY.version}));
+  const loaded=await page.evaluate(async()=>{
+    const ok=await window.KELO_MODULE_LOADER.ensure('pvp');
+    const files=window.KELO_FEATURE_REGISTRY.get('guardian')?.files||[];
+    return{ok,registry:window.KELO_FEATURE_REGISTRY.version,standbyRuntime:files.some(item=>String(item?.src||'').includes('guardian-hot-mirror.js?v=2-server-standby'))};
+  });
   expect(loaded.ok).toBe(true);
-  expect(String(loaded.registry)).toContain('guardian-pvp-worker');
+  expect(loaded.standbyRuntime).toBe(true);
   await page.waitForFunction(()=>window.KeloGuardianPvPHost&&window.KeloGuardianPvPNetAdapter&&window.KELO_GUARDIAN_PVP_HOST_AUDIT?.isolatedWorker===true,{timeout:20000});
   return page;
 }
@@ -95,7 +99,7 @@ test('Pages deterministic: two clients preserve safe PvP state across Guardian e
   const context=await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true,userAgent:IPHONE_UA,serviceWorkers:'block'});
   await context.addInitScript(guardianStub);
   let a=null,b=null;
-  const metrics={version:1,liveBase:LIVE_BASE,room:ROOM,startedAt:new Date().toISOString(),transport:'test-control-plane',productHostWorkerAdapter:true};
+  const metrics={version:2,liveBase:LIVE_BASE,room:ROOM,startedAt:new Date().toISOString(),transport:'test-control-plane',productHostWorkerAdapter:true,standbyRuntimeRegistry:true};
   try{
     a=await setupPage(context,'a');
     b=await setupPage(context,'b');
