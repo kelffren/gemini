@@ -35,11 +35,19 @@ Pointers nuevos conservan `digest`, `previousDigest`, `bytes`, `mime`, `storage:
 
 Durante la transición, `kelo-content-live-provider.mjs` deriva `expectedBytes` y `expectedSha256` de cada pequeño `inlineManifest`. Esto conserva compatibilidad pero no constituye una frontera de confianza independiente.
 
-### Publisher determinista y fail-closed
+### Publisher determinista, fail-closed y ligado a fuente
 
 `scripts/publish-kelo-content-descriptors.mjs` crea descriptors desde `data/kelo-content-starter-catalog.json` usando exactamente `JSON.stringify(inlineManifest)` y bytes UTF-8.
 
 Salida por asset: `{id, mediaType:'application/json', size, digest:'sha256:...'}`.
+
+El descriptor set incluye además:
+
+```text
+source = data/kelo-content-starter-catalog.json
+sourceVersion = versión numérica del catálogo fuente
+sourceDigest = SHA-256 de los bytes UTF-8 exactos del archivo fuente
+```
 
 Invariantes actuales del publisher:
 
@@ -48,17 +56,18 @@ Invariantes actuales del publisher:
 - tamaño positivo;
 - digest SHA-256 con 64 hex lowercase;
 - cardinalidad de descriptors igual a assets fuente;
+- `sourceDigest` SHA-256 válido y reproducible;
 - orden determinista por id;
-- `--check` exige igualdad byte-a-byte con el descriptor publicado;
+- `--check` exige igualdad byte-a-byte con el descriptor publicado, incluyendo source binding;
 - publicación normal escribe primero un archivo temporal exclusivo y después hace `rename`, limpiando el temporal si falla.
 
-Esto evita IDs ambiguos y reduce el riesgo de dejar un descriptor set truncado por una interrupción durante build/publicación.
-
-Schema:
+Schema lógico:
 
 ```json
-{"schema":"kelo-content-descriptors-v1","algorithm":"sha256","source":"data/kelo-content-starter-catalog.json","descriptors":[]}
+{"schema":"kelo-content-descriptors-v1","algorithm":"sha256","source":"data/kelo-content-starter-catalog.json","sourceDigest":"sha256:...","sourceVersion":1,"descriptors":[]}
 ```
+
+El source binding no firma metadata, pero elimina ambigüedad sobre qué bytes fuente produjeron el descriptor set y prepara Snapshot/Targets firmados futuros.
 
 ## Descarga/staging e integridad
 
@@ -112,7 +121,9 @@ Scene/prefab: JSON -> prefab validator -> Studio prefabStamp.
 Implementado:
 
 ```text
-publisher determinista + validación de unicidad/cardinalidad
+source bytes -> sourceDigest
+ -> publisher determinista + validación unicidad/cardinalidad
+ -> descriptor set ligado a sourceVersion/sourceDigest
  -> escritura temp + rename
  -> Main Stability Gate --check
  -> client descriptor fallback
@@ -150,6 +161,6 @@ No secretos en Pages; no JS externo ejecutable; licencia antes de integración; 
 
 ## Definition of Done
 
-Según aplique: boot sin binarios externos; reinstalación sin cambios evita red; update diferencial descarga solo cambios; CAS deduplica; staging no altera active; removals son atómicos; rollback funciona sin red con CAS; GC preserva roots; storage pressure se comprueba; auditoría detecta corrupción; anti-rollback funciona; recovery no deja mezcla de generaciones; descriptors publicados son reproducibles; CI/Pages sin regresión relevante.
+Según aplique: boot sin binarios externos; reinstalación sin cambios evita red; update diferencial descarga solo cambios; CAS deduplica; staging no altera active; removals son atómicos; rollback funciona sin red con CAS; GC preserva roots; storage pressure se comprueba; auditoría detecta corrupción; anti-rollback funciona; recovery no deja mezcla de generaciones; descriptors publicados son reproducibles y están ligados criptográficamente a su fuente; CI/Pages sin regresión relevante.
 
 **El catálogo puede crecer casi sin límite; el dispositivo solo paga almacenamiento, red y runtime por contenido seleccionado, con integridad, rollback y deduplicación.**
