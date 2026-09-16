@@ -12,7 +12,7 @@ export async function prepareCommunityAsset(file, metadata = {}) {
 
 /**
  * Transport contract:
- * uploadAsset({file, validation, creatorId}) -> {url, assetId?, version?}
+ * uploadAsset({file, validation, creatorId}) -> {url, assetId?, revisionId?, version?}
  * publishManifest(manifest) -> optional persisted representation
  * queueForReview({file, validation, creatorId}) -> optional review ticket
  */
@@ -49,6 +49,7 @@ export async function publishCommunityAsset({ file, metadata = {}, creatorId = '
     remoteUrl: uploaded.url,
     creatorId,
     assetId: uploaded.assetId,
+    revisionId: uploaded.revisionId,
     version: uploaded.version || 1,
   });
 
