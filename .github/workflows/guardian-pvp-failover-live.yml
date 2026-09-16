@@ -9,20 +9,22 @@ on:
       - 'scripts/guardian-pvp-failover-audit.mjs'
       - 'browserstack.guardian-failover.yml'
       - '.github/workflows/guardian-pvp-failover-live.yml'
+      - 'src/core/feature-registry.js'
       - 'src/systems/guardian-system.js'
       - 'src/systems/guardian-authority.js'
       - 'src/systems/guardian-pvp-host.js'
       - 'src/systems/guardian-pvp-net-adapter.js'
       - 'src/workers/guardian-pvp-authority-worker.js'
-  workflow_run:
-    workflows: ['pages build and deployment']
-    types: [completed]
+  # Pages is published with "Deploy from a branch" in this repo. The generated
+  # publisher is not a stable workflow name, so page_build is the reliable LIVE trigger.
+  page_build:
 
 permissions:
   contents: read
+  pages: read
 
 concurrency:
-  group: guardian-pvp-failover-${{ github.event_name }}-${{ github.event.workflow_run.head_sha || github.ref }}
+  group: guardian-pvp-failover-${{ github.event_name }}-${{ github.event_name == 'page_build' && 'main' || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -45,12 +47,9 @@ jobs:
   real-ios-failover:
     name: physical-iphone-master-failover
     needs: contract
-    if: >-
-      github.event_name != 'push' &&
-      (github.event_name != 'workflow_run' ||
-       (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main'))
+    if: github.event_name != 'push'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 18
     env:
       BROWSERSTACK_USERNAME: ${{ secrets.BROWSERSTACK_USERNAME }}
       BROWSERSTACK_ACCESS_KEY: ${{ secrets.BROWSERSTACK_ACCESS_KEY }}
@@ -101,6 +100,45 @@ jobs:
             echo 'Static failover contract remains enforced by the contract job.' >> "$GITHUB_STEP_SUMMARY"
           fi
 
+      - name: Wait until Pages serves this build or a descendant
+        if: steps.credentials.outputs.available == 'true' && github.event_name == 'page_build'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_SHA: ${{ github.event.build.commit || github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Pages target: $TARGET_SHA"
+          for attempt in $(seq 1 90); do
+            latest="$(curl -fsSL \
+              -H 'Accept: application/vnd.github+json' \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H 'X-GitHub-Api-Version: 2026-03-10' \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/pages/builds/latest" || true)"
+            status="$(jq -r '.status // empty' <<<"$latest" 2>/dev/null || true)"
+            deployed="$(jq -r '.commit // empty' <<<"$latest" 2>/dev/null || true)"
+            echo "attempt=$attempt status=${status:-unknown} deployed=${deployed:-unknown}"
+            if [[ "$status" == "built" && -n "$deployed" ]]; then
+              if [[ "$deployed" == "$TARGET_SHA" ]]; then
+                echo 'Pages is serving the exact target build.'
+                exit 0
+              fi
+              compare="$(curl -fsSL \
+                -H 'Accept: application/vnd.github+json' \
+                -H "Authorization: Bearer $GH_TOKEN" \
+                -H 'X-GitHub-Api-Version: 2026-03-10' \
+                "https://api.github.com/repos/${GITHUB_REPOSITORY}/compare/${TARGET_SHA}...${deployed}" || true)"
+              relation="$(jq -r '.status // empty' <<<"$compare" 2>/dev/null || true)"
+              if [[ "$relation" == "ahead" || "$relation" == "identical" ]]; then
+                echo 'Pages is serving a descendant containing the failover build.'
+                exit 0
+              fi
+            fi
+            sleep 5
+          done
+          echo 'Pages never confirmed the failover target SHA or a descendant.'
+          exit 1
+
       - name: Setup Node
         if: steps.credentials.outputs.available == 'true'
         uses: actions/setup-node@v4
@@ -127,3 +165,4 @@ jobs:
           echo '- Candidate B: concurrent Chromium node' >> "$GITHUB_STEP_SUMMARY"
           echo '- Failure: A context disappears without stopMasterHost()' >> "$GITHUB_STEP_SUMMARY"
           echo '- Recovery: backend lease expiry -> newer epoch -> Worker takeover snapshot' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Ghost cleanup: restored A actor pruned after bounded reclaim window' >> "$GITHUB_STEP_SUMMARY"
