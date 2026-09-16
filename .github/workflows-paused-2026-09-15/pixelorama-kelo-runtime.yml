@@ -40,11 +40,12 @@ jobs:
       - name: Export full threadless Web build
         working-directory: .pixelorama-src
         run: godot --headless -v --export-release "Web" ./build/web/index.html
-      - name: Record immutable build metadata
+      - name: Record immutable build metadata and license
         run: |
           cat > .pixelorama-src/build/web/kelo-runtime.json <<EOF
           {"pixeloramaSource":"${PIXELORAMA_SOURCE_SHA}","godot":"${GODOT_VERSION}","profile":"kelo-mobile-full","threads":false,"undoDefault":64}
           EOF
+          cp vendor/pixelorama-kelo/LICENSE.pixelorama.txt .pixelorama-src/build/web/PIXELORAMA-LICENSE.txt
       - name: Upload runtime artifact
         uses: actions/upload-artifact@v4
         with:
