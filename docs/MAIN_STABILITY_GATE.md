@@ -24,7 +24,7 @@ Every pull request targeting `main` must prove, as one integrated chain:
 7. Studio foundation remains valid;
 8. Paint Copies regression contract remains valid;
 9. PvP facing contract remains valid;
-10. critical mobile boot/gameplay smoke passes in Playwright.
+10. critical mobile boot/gameplay smoke passes in Playwright, including the mandatory 8-second sustained-walk freeze firewall.
 
 ## Failure policy
 
@@ -36,6 +36,10 @@ When this gate fails:
 - inspect the failing step and Playwright evidence;
 - fix the regression in the feature branch;
 - rerun the gate against the latest commit.
+
+## Base freshness policy
+
+A PASS is valid only for the exact merge candidate that was tested. If `main` advances after the latest successful run, the pull request must trigger and pass the gate again against the new `main` before merge. A previously green check against an older base is not sufficient evidence for production merge.
 
 ## CI reproducibility
 
