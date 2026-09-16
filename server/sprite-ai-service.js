@@ -1,17 +1,18 @@
 /* KELO-INDEX
  * area: SERVER / SPRITE AI
  * owner: Kelo Sprite AI service
- * purpose: preserve one /api/sprite-generate contract while selecting a server-side inference provider
+ * purpose: preserve one /api/sprite-generate contract while selecting server-side generation and pose providers
  * public-api: createSpriteAiService, buildPrompt, buildHuggingFacePrompt, buildStagePrompt
- * consumes: Hugging Face ZeroGPU adapter and optional OpenAI Image API fallback
+ * consumes: Hugging Face ZeroGPU adapters and optional OpenAI Image API fallback
  * state-owned: provider selection/configuration only; generated assets are returned to Creator QA and are not persisted here
- * extension-points: provider=auto|huggingface|openai, pipeline=atlas-v2|identity-skeleton-v3, injected provider adapters for tests
+ * extension-points: provider=auto|huggingface|openai, pipeline=atlas-v2|identity-skeleton-v3, optional real skeleton pose backend
  * online: server is the only authority allowed to hold provider credentials; browser only calls the stable Kelo endpoint
- * do-not: NO provider secret in browser, NO silent paid fallback unless KELO_SPRITE_AI_ALLOW_PAID_FALLBACK=1
+ * do-not: NO provider secret in browser, NO silent paid fallback, NO silent downgrade from requested real skeleton conditioning
  */
 'use strict';
 
 const {createHuggingFaceSpriteProvider}=require('./sprite-ai-provider-huggingface');
+const {createHuggingFacePoseProvider}=require('./sprite-ai-provider-pose-huggingface');
 
 const DEFAULT_MODEL='gpt-image-2.5-sunburst';
 const DEFAULT_SIZE='1024x2048';
@@ -64,13 +65,35 @@ function createOpenAiProvider(options={}){
 function createSpriteAiService(options={}){
   const requested=String(options.provider??process.env.KELO_SPRITE_AI_PROVIDER??'auto').trim().toLowerCase()||'auto';
   const defaultPipeline=String(options.pipeline??process.env.KELO_SPRITE_AI_PIPELINE??'atlas-v2').trim().toLowerCase()||'atlas-v2';
-  const maxSourceBytes=clampInt(options.maxSourceBytes??process.env.KELO_SPRITE_AI_MAX_SOURCE_BYTES,256*1024,12*1024*1024,6*1024*1024);const allowPaidFallback=boolFlag(options.allowPaidFallback??process.env.KELO_SPRITE_AI_ALLOW_PAID_FALLBACK??'0');const openai=options.openAiProvider||createOpenAiProvider({...options,maxSourceBytes});const huggingface=options.huggingFaceProvider||createHuggingFaceSpriteProvider(options.huggingFace||{});const hfStatus=huggingface.status(),openaiStatus=openai.status();
+  const realSkeletonEnabled=boolFlag(options.realSkeletonEnabled??process.env.KELO_SPRITE_AI_REAL_SKELETON??'0');
+  const maxSourceBytes=clampInt(options.maxSourceBytes??process.env.KELO_SPRITE_AI_MAX_SOURCE_BYTES,256*1024,12*1024*1024,6*1024*1024);
+  const allowPaidFallback=boolFlag(options.allowPaidFallback??process.env.KELO_SPRITE_AI_ALLOW_PAID_FALLBACK??'0');
+  const openai=options.openAiProvider||createOpenAiProvider({...options,maxSourceBytes});
+  const huggingface=options.huggingFaceProvider||createHuggingFaceSpriteProvider(options.huggingFace||{});
+  const poseProvider=options.poseProvider||createHuggingFacePoseProvider(options.pose||{});
+  const hfStatus=huggingface.status(),openaiStatus=openai.status(),poseStatus=poseProvider.status();
   function resolvePrimary(){if(requested==='huggingface'||requested==='hf'||requested==='zerogpu')return huggingface;if(requested==='openai')return openai;if(requested!=='auto')throw serviceError('SPRITE_AI_UNKNOWN_PROVIDER',500,requested);if(hfStatus.configured)return huggingface;if(openaiStatus.configured)return openai;return huggingface;}
-  function status(){const primary=resolvePrimary(),primaryStatus=primary.status();return Object.freeze({...primaryStatus,configured:Boolean(primaryStatus.configured),requestedProvider:requested,allowPaidFallback,defaultPipeline,pipelines:Object.freeze(['atlas-v2','identity-skeleton-v3']),v3Stages:Object.freeze([...V3_STAGES]),directions:8,framesPerDirection:4,providers:Object.freeze({huggingface:hfStatus,openai:openaiStatus})});}
+  function status(){const primary=resolvePrimary(),primaryStatus=primary.status();return Object.freeze({...primaryStatus,configured:Boolean(primaryStatus.configured),requestedProvider:requested,allowPaidFallback,defaultPipeline,realSkeletonEnabled,realSkeletonReady:Boolean(poseStatus.configured),pipelines:Object.freeze(['atlas-v2','identity-skeleton-v3']),v3Stages:Object.freeze([...V3_STAGES]),directions:8,framesPerDirection:4,providers:Object.freeze({huggingface:hfStatus,pose:poseStatus,openai:openaiStatus})});}
   async function generateV2(input,primary){let out;if(primary===huggingface){try{out=await huggingface.generate({prompt:buildHuggingFacePrompt(input),sourceImageDataUrl:input.sourceImageDataUrl||null,seed:input.seed||0,retryHint:input.retryHint||''});}catch(error){if(!(allowPaidFallback&&openaiStatus.configured))throw error;out=await openai.generate(input,buildPrompt(input));out={...out,fallbackFrom:'huggingface-zerogpu'};}}else out=await openai.generate(input,buildPrompt(input));return Object.freeze({ok:true,...out,pipeline:'atlas-v2',layout:{columns:4,rows:8,directions:DEFAULT_DIRECTIONS,framesPerDirection:4},generatedAt:Date.now()});}
-  async function generateV3(input,primary){const mode=short(input.mode||'master',24).toLowerCase();if(!V3_STAGES.has(mode))throw serviceError('SPRITE_AI_V3_UNKNOWN_STAGE',400,mode);if(input.sourceImageDataUrl)parseImageDataUrl(input.sourceImageDataUrl,maxSourceBytes);if(input.targetFrameDataUrl)parseImageDataUrl(input.targetFrameDataUrl,maxSourceBytes);const prompt=buildStagePrompt({...input,mode});let out;if(primary===huggingface&&typeof huggingface.generateStage==='function'){try{out=await huggingface.generateStage({...input,mode,prompt});}catch(error){if(!(allowPaidFallback&&openaiStatus.configured))throw error;out=await openai.generate(input,prompt);out={...out,fallbackFrom:'huggingface-zerogpu',stage:mode};}}else{out=await openai.generate(input,prompt);out={...out,stage:mode};}return Object.freeze({ok:true,...out,pipeline:'identity-skeleton-v3',stage:mode,identityLocked:mode!=='master',generatedAt:Date.now()});}
+  async function generateV3(input,primary){
+    const mode=short(input.mode||'master',24).toLowerCase();if(!V3_STAGES.has(mode))throw serviceError('SPRITE_AI_V3_UNKNOWN_STAGE',400,mode);
+    if(input.sourceImageDataUrl)parseImageDataUrl(input.sourceImageDataUrl,maxSourceBytes);if(input.targetFrameDataUrl)parseImageDataUrl(input.targetFrameDataUrl,maxSourceBytes);
+    const prompt=buildStagePrompt({...input,mode});
+    const useRealSkeleton=mode==='direction'&&boolFlag(input.realSkeleton??realSkeletonEnabled);
+    let out;
+    if(useRealSkeleton){
+      if(!poseStatus.configured)throw serviceError('SPRITE_AI_POSE_NOT_CONFIGURED',503,'Real skeleton was requested but KELO_SPRITE_AI_HF_POSE_SPACE is not configured.');
+      out=await poseProvider.generateDirection({...input,prompt});
+      return Object.freeze({ok:true,...out,pipeline:'identity-skeleton-v3',stage:mode,identityLocked:true,realSkeleton:true,poseConditioning:out.poseConditioning||'controlnet-openpose+ip-adapter',generatedAt:Date.now()});
+    }
+    if(primary===huggingface&&typeof huggingface.generateStage==='function'){
+      try{out=await huggingface.generateStage({...input,mode,prompt});}
+      catch(error){if(!(allowPaidFallback&&openaiStatus.configured))throw error;out=await openai.generate(input,prompt);out={...out,fallbackFrom:'huggingface-zerogpu',stage:mode};}
+    }else{out=await openai.generate(input,prompt);out={...out,stage:mode};}
+    return Object.freeze({ok:true,...out,pipeline:'identity-skeleton-v3',stage:mode,identityLocked:mode!=='master',realSkeleton:false,poseConditioning:mode==='direction'?'semantic-keypoint-intent':null,generatedAt:Date.now()});
+  }
   async function generate(input={}){if(input.sourceImageDataUrl)parseImageDataUrl(input.sourceImageDataUrl,maxSourceBytes);const primary=resolvePrimary(),primaryStatus=primary.status();if(!primaryStatus.configured)throw serviceError('SPRITE_AI_NOT_CONFIGURED',503,requested==='auto'?'Set KELO_SPRITE_AI_HF_SPACE for free ZeroGPU or OPENAI_API_KEY for paid fallback.':requested);const pipeline=String(input.pipeline||defaultPipeline||'atlas-v2').trim().toLowerCase();if(pipeline==='identity-skeleton-v3'||input.mode)return generateV3(input,primary);if(pipeline!=='atlas-v2')throw serviceError('SPRITE_AI_UNKNOWN_PIPELINE',400,pipeline);return generateV2(input,primary);}
-  return Object.freeze({version:'kelo-sprite-ai-service-v3',status,generate,buildPrompt,buildHuggingFacePrompt,buildStagePrompt});
+  return Object.freeze({version:'kelo-sprite-ai-service-v3.1',status,generate,buildPrompt,buildHuggingFacePrompt,buildStagePrompt});
 }
 
 module.exports={createSpriteAiService,createOpenAiProvider,buildPrompt,buildHuggingFacePrompt,buildStagePrompt,parseImageDataUrl,serviceError,DEFAULT_DIRECTIONS,V3_STAGES};
