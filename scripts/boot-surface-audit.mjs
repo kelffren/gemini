@@ -23,11 +23,14 @@ const scriptSrcs=(text)=>[...text.matchAll(/<script\s+src=["']([^"']+)["'][^>]*>
 const critical=scriptSrcs(before);
 const postBootStatic=scriptSrcs(after);
 
-assert.ok(critical.length<=49,`critical script budget exceeded: ${critical.length} > 49`);
+assert.ok(critical.length<=48,`critical script budget exceeded: ${critical.length} > 48`);
 assert.ok(postBootStatic.length<=3,`post-boot static script budget exceeded: ${postBootStatic.length} > 3`);
+assert.ok(critical.some(src=>src.includes('src/core/legacy-ability-aim-system.js')),'KeloAbilityAim compatibility owner missing from critical boot');
 
 const forbiddenInIndex=[
   'engine-i.js',
+  'engine-j.js',
+  'engine-k.js',
   'src/core/simulation-farm-shadow.js',
   'src/core/player-position-shadow.js',
   'src/ui/asset-library-launcher.js',
