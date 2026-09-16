@@ -1,28 +1,32 @@
-name: Asset Bit Ratchet
+name: Kelo Weightless Stack
 
 on:
   pull_request:
     paths:
+      - 'index.html'
       - 'assets/**/*.png'
       - 'C/**/*.png'
-      - 'src/creators/assets/asset-bit-ratchet.mjs'
-      - 'src/creators/assets/png-*.mjs'
-      - 'src/creators/assets/asset-*.mjs'
+      - 'engine-*.js'
+      - 'src/**/*.js'
+      - 'src/**/*.mjs'
+      - 'src/**/*.css'
       - 'scripts/asset-bit-ratchet*.mjs'
+      - 'scripts/asset-global-dedup*.mjs'
       - 'scripts/asset-space-budget.mjs'
+      - 'scripts/boot-footprint*.mjs'
       - '.github/workflows/asset-bit-ratchet.yml'
 
 concurrency:
-  group: asset-bit-ratchet-${{ github.event.pull_request.number }}
+  group: kelo-weightless-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
-  lossless-byte-ratchet:
+  weightless-gates:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 18
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -30,30 +34,50 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '24'
-      - name: Ratchet deterministic self-test
-        run: node scripts/asset-bit-ratchet-audit.mjs
+      - name: Weightless deterministic self-tests
+        run: |
+          node scripts/asset-bit-ratchet-audit.mjs
+          node scripts/asset-global-dedup-audit.mjs
+          node scripts/boot-footprint-ratchet-audit.mjs
       - name: Measure head asset information and bytes
         run: node scripts/asset-space-budget.mjs --input=assets --max-files=10000 --report=test-results/asset-space-budget-head
-      - name: Measure base asset information and bytes
+      - name: Plan exact global blob dedup
+        run: node scripts/asset-global-dedup.mjs --input=test-results/asset-space-budget-head/report.json --report=test-results/asset-global-dedup/report.json
+      - name: Measure head first-playable footprint
+        run: node scripts/boot-footprint.mjs --root=. --report=test-results/boot-footprint-head/report.json
+      - name: Materialize base worktree and measurements
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           git worktree add --detach /tmp/kelo-world-base "$BASE_SHA"
           cd /tmp/kelo-world-base
           node scripts/asset-space-budget.mjs --input=assets --max-files=10000 --report=/tmp/asset-space-budget-base
+          cd "$GITHUB_WORKSPACE"
+          node scripts/boot-footprint.mjs --root=/tmp/kelo-world-base --report=/tmp/boot-footprint-base.json
       - name: Enforce monotonic bytes for unchanged RGBA information
         run: node scripts/asset-bit-ratchet.mjs --base=/tmp/asset-space-budget-base/report.json --head=test-results/asset-space-budget-head/report.json --report=test-results/asset-bit-ratchet/report.json
-      - name: Publish ratchet summary
+      - name: Enforce first-playable boot weight ratchet
+        run: node scripts/boot-footprint-ratchet.mjs --base=/tmp/boot-footprint-base.json --head=test-results/boot-footprint-head/report.json --html-tolerance=512 --report=test-results/boot-footprint-ratchet/report.json
+      - name: Publish Weightless summary
         if: always()
         run: |
           if [ -f test-results/asset-bit-ratchet/report.json ]; then
-            node -e "const r=require('./test-results/asset-bit-ratchet/report.json'); const s=r.summary; require('fs').appendFileSync(process.env.GITHUB_STEP_SUMMARY, '# Asset Bit Ratchet\n\nPass: '+r.pass+'\n\nComparable unchanged-information files: '+s.comparableFiles+'\n\nImproved: '+s.improvedFiles+'\n\nRegressed: '+s.regressedFiles+'\n\nBytes saved on comparable files: '+s.comparableSavedBytes+'\n\nTotal stored delta (new/changed information included): '+s.totalStoredDeltaBytes+'\n\nRGBA duplicate saving opportunity: '+s.rgbaDuplicatePotentialAfter+' bytes\n')"
+            node -e "const r=require('./test-results/asset-bit-ratchet/report.json'); const s=r.summary; require('fs').appendFileSync(process.env.GITHUB_STEP_SUMMARY, '# Kelo Weightless\n\n## Asset Bit Ratchet\nPass: '+r.pass+'\n\nComparable unchanged-information files: '+s.comparableFiles+'\n\nImproved: '+s.improvedFiles+'\n\nRegressed: '+s.regressedFiles+'\n\nBytes saved on comparable files: '+s.comparableSavedBytes+'\n')"
+          fi
+          if [ -f test-results/asset-global-dedup/report.json ]; then
+            node -e "const r=require('./test-results/asset-global-dedup/report.json'); const t=r.totals; require('fs').appendFileSync(process.env.GITHUB_STEP_SUMMARY, '\n## Global dedup\nLogical stored bytes: '+t.logicalStoredBytes+'\n\nSafe byte-exact saving opportunity: '+t.byteExactSavingBytes+'\n\nRGBA convergence candidate saving: '+t.rgbaConvergenceCandidateBytes+'\n')"
+          fi
+          if [ -f test-results/boot-footprint-ratchet/report.json ]; then
+            node -e "const r=require('./test-results/boot-footprint-ratchet/report.json'); const s=r.summary; require('fs').appendFileSync(process.env.GITHUB_STEP_SUMMARY, '\n## First-playable footprint\nPass: '+r.pass+'\n\nExternal bytes: '+s.baseExternalBytes+' -> '+s.headExternalBytes+' ('+s.externalDeltaBytes+')\n\nCritical resources: '+s.baseResourceCount+' -> '+s.headResourceCount+'\n\nPer-resource bytes saved: '+s.savedBytes+'\n')"
           fi
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
-          name: asset-bit-ratchet-report
+          name: kelo-weightless-report
           path: |
             test-results/asset-space-budget-head
             test-results/asset-bit-ratchet
+            test-results/asset-global-dedup
+            test-results/boot-footprint-head
+            test-results/boot-footprint-ratchet
           if-no-files-found: ignore
