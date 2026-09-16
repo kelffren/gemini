@@ -113,6 +113,8 @@ jobs:
         run: node scripts/asset-atlas-topology-crop-audit.mjs --manifest=src/environment/generated/forest-plaza-tileset-v2-manifest.js --paddings=0,1,2 --report=test-results/asset-atlas-topology-crop
       - name: Smart Atlas final PNG byte evidence
         run: node scripts/asset-atlas-final-bytes-audit.mjs --manifest=src/environment/generated/forest-plaza-tileset-v2-manifest.js --padding=2 --report=test-results/asset-atlas-final-bytes
+      - name: Smart Atlas DELIVERY candidate compiler
+        run: node scripts/asset-atlas-delivery-candidate.mjs --manifest=src/environment/generated/forest-plaza-tileset-v2-manifest.js --padding=2 --report=test-results/asset-atlas-delivery-candidate
       - name: Asset documentation contract
         run: node scripts/system-documentation-audit.js
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -126,4 +128,5 @@ jobs:
             test-results/asset-atlas-overlap-diagnostics
             test-results/asset-atlas-topology-crop
             test-results/asset-atlas-final-bytes
+            test-results/asset-atlas-delivery-candidate
           if-no-files-found: ignore
