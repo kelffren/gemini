@@ -1,12 +1,12 @@
 /* KELO-INDEX
  * area: CORE / SIMULATION
  * owner: KeloSimulation
- * keys: SIMULATION UPDATE HOOK BEFORE AFTER EXTENSION FOUNDATION SLEEP WAKE LIFECYCLE OWNER
+ * keys: SIMULATION UPDATE HOOK BEFORE AFTER EXTENSION FOUNDATION SLEEP WAKE LIFECYCLE OWNER SUSPEND RESUME CLAIM
  * purpose: único owner global de updateSimulation; ejecuta la simulación base legacy y extensiones ordenadas sin wrappers paralelos
- * public-api: KeloSimulation.before/after/setEnabled/unregister/snapshot
+ * public-api: KeloSimulation.before/after/setEnabled/unregister/suspend/resume/resumeOwner/isSuspended/snapshot
  * consumes: updateSimulation base de engine-a + KELO_LEGACY_SIMULATION_BRIDGE de engine-c
- * state-owned: registro ordenado + estado enabled/sleeping de extensiones simulation
- * extension-points: before/after con prioridad explícita y suspensión idempotente
+ * state-owned: registro ordenado + estado enabled/sleeping de extensiones + claims de suspensión global
+ * extension-points: before/after con prioridad explícita, suspensión idempotente por token para modales/creators pesados
  * reuse: timers gameplay existentes, interpolación net y updates de sistemas sin envolver updateSimulation
  * legacy: la simulación base sigue en engine-a; engine-c aporta augmentación mediante bridge sin reasignar el global
  * do-not: NO crear otro game loop, NO envolver updateSimulation fuera de este owner, NO renderizar, NO meter UI
@@ -14,7 +14,7 @@
 (function(root){
   'use strict';
   if(root.KeloSimulation)return;
-  const VERSION='kelo-simulation-extensions-v1.3.0';
+  const VERSION='kelo-simulation-extensions-v1.4.0-suspend-claims';
   if(typeof updateSimulation!=='function'){
     root.KELO_SIMULATION_EXTENSION_AUDIT=Object.freeze({version:VERSION,installed:false,reason:'updateSimulation-missing'});
     return;
@@ -23,7 +23,8 @@
   const legacyBridge=root.KELO_LEGACY_SIMULATION_BRIDGE||null;
   const hooks={before:[],after:[]};
   const active={before:[],after:[]};
-  let sequence=1;
+  const suspensions=new Map();
+  let sequence=1,suspendSequence=1,suspendedFrames=0;
 
   function rebuild(phase){
     active[phase]=hooks[phase].filter(function(entry){return entry.enabled!==false;});
@@ -61,6 +62,20 @@
     });
     return removed;
   }
+  function normalizeOwner(owner){const value=String(owner==null?'':owner).trim();return value||'anonymous';}
+  // KELO-INDEX CORE/SIMULATION SUSPEND claim global; while any claim exists no base/hook/legacy simulation work runs.
+  function suspend(owner,meta){
+    const token='sim-suspend-'+(suspendSequence++).toString(36);
+    suspensions.set(token,Object.freeze({token,owner:normalizeOwner(owner),meta:meta&&typeof meta==='object'?Object.freeze(Object.assign({},meta)):null,createdAt:Date.now()}));
+    return token;
+  }
+  function resume(token){return suspensions.delete(String(token||''));}
+  function resumeOwner(owner){
+    const target=normalizeOwner(owner);let removed=0;
+    for(const [token,claim] of Array.from(suspensions.entries()))if(claim.owner===target){suspensions.delete(token);removed++;}
+    return removed;
+  }
+  function isSuspended(){return suspensions.size>0;}
   function runPhase(phase,ctx){
     const list=active[phase];
     for(let i=0;i<list.length;i++)list[i].fn(ctx);
@@ -68,14 +83,16 @@
   function publicList(phase){
     return Object.freeze(hooks[phase].map(function(h){return Object.freeze({id:h.id,owner:h.owner,priority:h.priority,enabled:h.enabled!==false});}));
   }
+  function publicSuspensions(){return Object.freeze(Array.from(suspensions.values()).map(function(claim){return claim;}));}
   function snapshot(){
     const before=publicList('before'),after=publicList('after');
     const all=before.concat(after),enabled=all.filter(function(h){return h.enabled;}).length;
-    return Object.freeze({version:VERSION,before:before,after:after,registered:all.length,enabled:enabled,sleeping:all.length-enabled,legacyBridge:!!legacyBridge});
+    return Object.freeze({version:VERSION,before,after,registered:all.length,enabled,sleeping:all.length-enabled,legacyBridge:!!legacyBridge,suspended:isSuspended(),suspensions:publicSuspensions(),suspendedFrames});
   }
 
   // FOUNDATION-ALLOW: única asignación runtime autorizada de updateSimulation después del bootstrap base de engine-a.
   updateSimulation=function(dt){
+    if(isSuspended()){suspendedFrames++;return;}
     const context={dt:Number(dt)||0,player:typeof localPlayer!=='undefined'?localPlayer:null,state:typeof STATE!=='undefined'?STATE:null};
     runPhase('before',context);
     if(legacyBridge&&typeof legacyBridge.before==='function')legacyBridge.before(context);
@@ -89,9 +106,7 @@
     version:VERSION,
     before:function(owner,fn,priority){return add('before',owner,fn,priority);},
     after:function(owner,fn,priority){return add('after',owner,fn,priority);},
-    setEnabled:setEnabled,
-    unregister:unregister,
-    snapshot:snapshot
+    setEnabled,unregister,suspend,resume,resumeOwner,isSuspended,snapshot
   });
-  root.KELO_SIMULATION_EXTENSION_AUDIT=Object.freeze({version:VERSION,installed:true,singleGlobalWriter:true,legacyAugmentBridge:!!legacyBridge,beforeAfter:true,sleepWake:true,activeListCached:true,timers:0,renderAuthority:false,baseTarget:'engine-a:updateSimulation'});
+  root.KELO_SIMULATION_EXTENSION_AUDIT=Object.freeze({version:VERSION,installed:true,singleGlobalWriter:true,legacyAugmentBridge:!!legacyBridge,beforeAfter:true,sleepWake:true,suspendClaims:true,activeListCached:true,timers:0,renderAuthority:false,baseTarget:'engine-a:updateSimulation'});
 })(typeof globalThis!=='undefined'?globalThis:window);
