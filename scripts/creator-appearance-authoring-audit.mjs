@@ -76,12 +76,16 @@ assert.deepEqual([...walkTrack.frames],[0,1,2,3]);
 assert.equal(walkTrack.loop,true);
 assert.equal(walkTrack.authored,false);
 assert.equal(walkTrack.source,'runtime-generic-stride');
+const defaultWalkTrack=resolveCharacterTestTrack({row:{animationMapping:{}},state:'walk'});
+assert.deepEqual([...defaultWalkTrack.frames],[0,1,2,3],'Test Chamber standalone default must match runtime four-column sheet default');
 const attackTrack=resolveCharacterTestTrack({row:canonicalRow,state:'attack',columns:4});
 assert.deepEqual([...attackTrack.frames],[0,2,3]);
 assert.equal(attackTrack.frameMs,90);
 assert.equal(attackTrack.loop,false);
 assert.equal(attackTrack.authored,true);
 assert.equal(attackTrack.source,'animationMapping.attack');
+const moduloTrack=resolveCharacterTestTrack({row:{animationMapping:{attack:{frames:[5,-1],loop:false}}},state:'attack',columns:4});
+assert.deepEqual([...moduloTrack.frames],[1,1],'authored Test Chamber frames must use live explicit-frame modulo semantics');
 const deathFallback=resolveCharacterTestTrack({row:{animationMapping:{}},state:'death',columns:4});
 assert.deepEqual([...deathFallback.frames],[0]);
 assert.equal(deathFallback.loop,false);
@@ -143,6 +147,8 @@ console.log('PASS creator appearance authoring audit',{
   testStates:CHARACTER_TEST_STATES.map(row=>row.id),
   mappedAttack:[...attackTrack.frames],
   walkFallback:[...walkTrack.frames],
+  defaultWalkFallback:[...defaultWalkTrack.frames],
+  moduloTrack:[...moduloTrack.frames],
   textualMappingFallback:[...textualMappingFallback.frames],
   defaultFrameColumns:contract.frameColumns({metadata:{}}),
   sharedMotionSample:true,
