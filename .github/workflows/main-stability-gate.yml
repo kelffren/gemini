@@ -66,6 +66,9 @@ jobs:
       - name: Guardian community LIVE harness security contract
         run: node scripts/guardian-community-live-harness-audit.mjs
 
+      - name: Community Guardian publication provenance contract
+        run: node scripts/community-guardian-publication-audit.mjs
+
       - name: Updater contract
         run: npm run audit:updater
 
