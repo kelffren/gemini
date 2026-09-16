@@ -1,0 +1,188 @@
+name: Evergreen editor tree fix
+
+on:
+  push:
+    branches:
+      - test/evergreen-editor-tree-fix-2026-09-16
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download user-provided fix bundle
+        shell: bash
+        env:
+          FIX_SHARE_URL: https://firestorage.ai/ja/f/W8QhEfaMX0NE
+        run: |
+          set -euo pipefail
+          curl -fL --retry 3 -A 'Mozilla/5.0' "$FIX_SHARE_URL" -o /tmp/kelo-fix.download
+          if tar -tzf /tmp/kelo-fix.download >/dev/null 2>&1; then
+            mv /tmp/kelo-fix.download /tmp/kelo-fix.tar.gz
+            exit 0
+          fi
+          python3 - <<'PY'
+          import html, os, re, sys, urllib.parse, urllib.request
+          page_path='/tmp/kelo-fix.download'
+          raw=open(page_path,'rb').read()
+          text=raw.decode('utf-8','ignore')
+          base=os.environ['FIX_SHARE_URL']
+          patterns=[
+              r'href=["\']([^"\']+)["\']',
+              r'url["\']?\s*[:=]\s*["\']([^"\']+)["\']',
+              r'(https?://[^"\'<>\\ ]+)',
+          ]
+          candidates=[]
+          for pat in patterns:
+              for u in re.findall(pat,text,re.I):
+                  u=html.unescape(u).replace('\\/','/')
+                  u=urllib.parse.urljoin(base,u)
+                  low=u.lower()
+                  if any(k in low for k in ('download','.tar.gz','.tgz','file')) and u not in candidates:
+                      candidates.append(u)
+          print('download candidates:', candidates[:30])
+          for i,u in enumerate(candidates[:30]):
+              try:
+                  req=urllib.request.Request(u,headers={'User-Agent':'Mozilla/5.0'})
+                  with urllib.request.urlopen(req,timeout=30) as r:
+                      data=r.read()
+                  p=f'/tmp/candidate-{i}'
+                  open(p,'wb').write(data)
+                  import subprocess
+                  ok=subprocess.run(['tar','-tzf',p],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL).returncode==0
+                  if ok:
+                      os.replace(p,'/tmp/kelo-fix.tar.gz')
+                      print('resolved archive from',u)
+                      sys.exit(0)
+              except Exception as e:
+                  print('candidate failed',u,repr(e))
+          print('Share response was not the archive. First 4000 chars:')
+          print(text[:4000])
+          sys.exit(2)
+          PY
+
+      - name: Apply Evergreen patch series
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/kelo-debt
+          mkdir -p /tmp/kelo-debt
+          tar -xzf /tmp/kelo-fix.tar.gz -C /tmp/kelo-debt
+          test -d /tmp/kelo-debt/kelo-debt/patches
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          for patch in $(find /tmp/kelo-debt/kelo-debt/patches -maxdepth 1 -type f -name '*.patch' | sort); do
+            echo "Applying $(basename "$patch")"
+            git am --3way "$patch"
+          done
+          echo "Applied $(git rev-list --count 1c08f495740ced685dab70b8161b79394a2b3aab..HEAD) commits from bundle"
+
+      - name: Push applied fix to isolated branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git push origin HEAD:test/evergreen-editor-tree-fix-2026-09-16
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install test dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+          npx playwright install --with-deps chromium
+
+      - name: Create exact editor regression test
+        shell: bash
+        run: |
+          cat > tests/editor-tree-move-reopen.e2e.spec.js <<'EOF'
+          import { test, expect } from '@playwright/test';
+
+          test('place tree, move, close, walk, reopen and keep moved placement', async ({ page }) => {
+            const errors=[];
+            page.on('pageerror',e=>errors.push(String(e)));
+            await page.goto('http://127.0.0.1:4173/?mapEditor=1', { waitUntil:'domcontentloaded' });
+            await page.waitForFunction(() => window.KELO_PROPERTY_EDITOR && window.KELO_PROPERTY_SYSTEM && window.KELO_PROPERTY_CATALOG, null, { timeout:20000 });
+
+            await page.evaluate(async () => { await window.KELO_PROPERTY_EDITOR.open('parcel'); });
+            await expect(page.locator('#kelo-property-editor')).toBeVisible();
+
+            const treeCard = page.locator('#pe-list .pe-card').filter({ hasText:/tree|árbol|arbol/i }).first();
+            await expect(treeCard).toBeVisible({ timeout:10000 });
+            const testGrant = treeCard.locator('.pe-test');
+            if (await testGrant.count()) await testGrant.click();
+            await treeCard.click();
+
+            const beforeCount = await page.evaluate(() => window.KELO_PROPERTY_SYSTEM.getPlacements(window.KELO_PROPERTY_EDITOR.parcelId).length);
+            const canvas = page.locator('canvas').first();
+            const box = await canvas.boundingBox();
+            if (!box) throw new Error('Game canvas missing');
+            const p1={x:box.x+box.width*0.58,y:box.y+box.height*0.52};
+            await page.mouse.click(p1.x,p1.y);
+            await page.waitForFunction(n => window.KELO_PROPERTY_SYSTEM.getPlacements(window.KELO_PROPERTY_EDITOR.parcelId).length > n, beforeCount);
+
+            const placed = await page.evaluate(() => {
+              const id=window.KELO_PROPERTY_EDITOR.parcelId;
+              const rows=window.KELO_PROPERTY_SYSTEM.getPlacements(id);
+              return rows[rows.length-1];
+            });
+            expect(placed).toBeTruthy();
+
+            await page.locator('#pe-placed button').first().click();
+            await page.locator('#pe-move').click();
+            const p2={x:box.x+box.width*0.68,y:box.y+box.height*0.58};
+            await page.mouse.click(p2.x,p2.y);
+            await page.waitForFunction(({id,x,y}) => {
+              const rec=window.KELO_PROPERTY_SYSTEM.getPlacements(window.KELO_PROPERTY_EDITOR.parcelId).find(r=>r.placementId===id);
+              return !!rec && (rec.x!==x || rec.y!==y);
+            }, {id:placed.placementId,x:placed.x,y:placed.y});
+
+            const moved = await page.evaluate(id => window.KELO_PROPERTY_SYSTEM.getPlacements(window.KELO_PROPERTY_EDITOR.parcelId).find(r=>r.placementId===id), placed.placementId);
+            await page.locator('#pe-close').click();
+            await expect(page.locator('#kelo-property-editor')).toBeHidden();
+
+            // Walk after closing editor: real keyboard input, then verify player position changes.
+            const playerBefore = await page.evaluate(() => ({x:window.localPlayer?.x,y:window.localPlayer?.y}));
+            await page.keyboard.down('KeyD');
+            await page.waitForTimeout(800);
+            await page.keyboard.up('KeyD');
+            const playerAfter = await page.evaluate(() => ({x:window.localPlayer?.x,y:window.localPlayer?.y}));
+            expect(Number.isFinite(playerBefore.x) && Number.isFinite(playerAfter.x)).toBeTruthy();
+            expect(Math.hypot(playerAfter.x-playerBefore.x, playerAfter.y-playerBefore.y)).toBeGreaterThan(0.1);
+
+            await page.evaluate(async () => { await window.KELO_PROPERTY_EDITOR.open('parcel'); });
+            await expect(page.locator('#kelo-property-editor')).toBeVisible();
+            const reopened = await page.evaluate(id => window.KELO_PROPERTY_SYSTEM.getPlacements(window.KELO_PROPERTY_EDITOR.parcelId).find(r=>r.placementId===id), placed.placementId);
+            expect(reopened).toBeTruthy();
+            expect(reopened.x).toBe(moved.x);
+            expect(reopened.y).toBe(moved.y);
+            expect(errors).toEqual([]);
+          });
+          EOF
+
+      - name: Run local browser regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m http.server 4173 >/tmp/kelo-http.log 2>&1 &
+          server=$!
+          trap 'kill $server || true' EXIT
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:4173/ >/dev/null && break; sleep 1; done
+          KELO_PAGES=http://127.0.0.1:4173 npx playwright test tests/editor-tree-move-reopen.e2e.spec.js --project=chromium --reporter=line
+
+      - name: Run Evergreen foundation checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -f scripts/check-dependencies.mjs ]; then node scripts/check-dependencies.mjs; fi
+          npx playwright test --project=chromium --reporter=line
