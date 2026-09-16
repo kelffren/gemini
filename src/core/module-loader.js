@@ -1,16 +1,24 @@
 /* KELO-INDEX
  * area: CORE / BOOT
  * owner: KeloModuleLoader
- * keys: DYNAMIC LOAD IDLE FIRST-USE CACHE VERSION PING MOBILE SAFARI RECOVERY QUARANTINE TRACE STYLE ASSET-LIBRARY FEATURE-REGISTRY
- * purpose: un solo hilo de descarga. Plaza ya está viva; el resto entra al tocar un tool del menú. JS y CSS opcionales se cargan secuencialmente. Pausa si el player camina. La biblioteca puede bloquear paquetes opcionales.
+ * keys: DYNAMIC LOAD IDLE FIRST-USE CACHE VERSION PING MOBILE SAFARI RECOVERY QUARANTINE TRACE STYLE ASSET-LIBRARY FEATURE-REGISTRY PVP
+ * purpose: un solo hilo de descarga. Plaza ya está viva; el resto entra al tocar un tool del menú. JS y CSS opcionales se cargan secuencialmente. Pausa si el player camina. La biblioteca puede bloquear paquetes opcionales. PvP conserva foundations separadas y carga su dominio solo al primer toque.
  * public-api: KELO_MODULE_LOADER.start/ensure/needs/isReady/diagnostics
- * consumes: KELO_FEATURE_REGISTRY + optional KELO_ASSET_REGISTRY allow-list + optional KELO_RECOVERY_MESH diagnostics
+ * consumes: KELO_FEATURE_REGISTRY + optional KELO_ASSET_REGISTRY allow-list + optional KELO_RECOVERY_MESH diagnostics + KeloRuntimeBootstrap para foundations PvP
  * do-not: NO tileset 556KB, NO studio, NO supabase, NO segundo gameLoop, NO SW, NO quarantine fuera de recoveryLab
  */
 (function(root){
 'use strict';
 if(root.KELO_MODULE_LOADER)return;
-const VERSION='kelo-module-loader-v10-feature-registry';
+const VERSION='kelo-module-loader-v11-pvp-first-use';
+const PVP_FALLBACK=Object.freeze([
+  {src:'src/abilities/abilityData.js?v=20260916-pvp-first-use-1',name:'datos habilidades PvP'},
+  {src:'src/abilities/stone-system.js?v=20260916-pvp-first-use-1',name:'piedras PvP'},
+  {src:'src/abilities/kelo-ability-boot.js?v=20260916-pvp-first-use-1',name:'runtime habilidades PvP'},
+  {src:'engine-net.js?v=20260916-pvp-first-use-1',name:'online PvP'},
+  {src:'src/systems/pvp-world.js?v=20260916-pvp-first-use-1',name:'mundo PvP'},
+  {src:'src/systems/pvp-combat-runtime-loader.js?v=20260916-pvp-first-use-1',name:'lifecycle combate PvP'}
+]);
 const LEGACY_FALLBACK=Object.freeze({
   social:Object.freeze([
     {src:'src/ui/player-nameplate.js?v=2',name:'placas'},
@@ -24,6 +32,7 @@ const LEGACY_FALLBACK=Object.freeze({
     {src:'engine-p.js?v=96',name:'mundo'},{src:'engine-q.js?v=94',name:'mundo'},{src:'engine-s.js?v=96',name:'mundo'},
     {src:'engine-ah.js?v=95',name:'mundo'},{src:'engine-ai.js?v=95',name:'mundo'},{src:'src/systems/illumination.js?v=2',name:'luz'}
   ]),
+  pvp:PVP_FALLBACK,
   bag:Object.freeze([{src:'src/ui/backpack-fantasy-v1.css?v=1',name:'estilo mochila',type:'style'},{src:'src/systems/backpack-system.js?v=2',name:'mochila'},{src:'src/ui/backpack-ui.js?v=4',name:'mochila'}]),
   mounts:Object.freeze([{src:'src/mounts/mount-catalog.js?v=2',name:'monturas'},{src:'src/mounts/mount-system.js?v=2',name:'monturas'},{src:'src/ui/mount-panel.js?v=2',name:'monturas'}]),
   market:Object.freeze([{src:'src/systems/market-escrow-system.js?v=1',name:'mercado'},{src:'src/ui/market-ui.js?v=2',name:'mercado'}]),
@@ -116,12 +125,27 @@ function ensureDependencies(name){
   for(const dep of deps)chain=chain.then(ok=>ok===false?false:loadFeature(resolveName(dep),{interactive:true}));
   return chain;
 }
+function pvpDomainReady(){return !!(root.KeloPvPWorld&&typeof root.enterPvPWorld==='function'&&root.KELO_PVP_COMBAT_LOADER_AUDIT?.ready===true);}
+function ensurePvp(){
+  if(pvpDomainReady())return Promise.resolve(true);
+  if(!filesFor('pvp'))return Promise.resolve(false);
+  if(!assetAllowed('pvp')){emit('kelo:module-blocked',{feature:'pvp',src:'',ok:false,error:'ASSET_LIBRARY_DISABLED'});hideChip('PvP desactivado en Assets');return Promise.resolve(false);}
+  if(quarantined('pvp')){emit('kelo:module-quarantined',{feature:'pvp',src:'',ok:false,error:'RECOVERY_QUARANTINE'});return Promise.resolve(false);}
+  show('Cargando PvP…',8);
+  const foundations=root.KeloRuntimeBootstrap&&typeof root.KeloRuntimeBootstrap.ensure==='function'?root.KeloRuntimeBootstrap.ensure():Promise.reject(new Error('KELO_RUNTIME_BOOTSTRAP_UNAVAILABLE'));
+  return foundations
+    .then(function(){return loadFeature('pvp',{interactive:true});})
+    .then(function(ok){
+      const ready=ok!==false&&pvpDomainReady();
+      if(!ready){loaded.pvp=false;emit('kelo:module-load-error',{feature:'pvp',src:'',type:'runtime',ok:false,error:'PVP_RUNTIME_INCOMPLETE'});}
+      hideChip(ready?'PvP listo':'Fallo al cargar PvP');
+      return ready;
+    })
+    .catch(function(error){loaded.pvp=false;emit('kelo:module-load-error',{feature:'pvp',src:'',type:'runtime',ok:false,error:String(error&&error.message||error)});hideChip('Fallo al cargar PvP');throw error;});
+}
 function ensure(name){
   if(name==='chat'||name==='profile')return Promise.resolve(true);
-  if(name==='pvp'){
-    if(root.KeloRuntimeBootstrap&&typeof root.KeloRuntimeBootstrap.ensure==='function')return root.KeloRuntimeBootstrap.ensure();
-    return Promise.resolve(false);
-  }
+  if(name==='pvp')return ensurePvp();
   name=resolveName(name);
   if(!filesFor(name))return Promise.resolve(true);
   if(!assetAllowed(name)){emit('kelo:module-blocked',{feature:name,src:'',ok:false,error:'ASSET_LIBRARY_DISABLED'});hideChip('Desactivado en Assets');return Promise.resolve(false);}
@@ -131,7 +155,7 @@ function ensure(name){
 }
 function needs(name){
   if(name==='chat'||name==='profile')return false;
-  if(name==='pvp')return !(root.KeloMeleeEngine&&root.KeloCombatEngine);
+  if(name==='pvp')return !pvpDomainReady();
   name=resolveName(name);
   if(!filesFor(name))return false;
   if(!assetAllowed(name))return true;
@@ -144,7 +168,7 @@ function start(opts){
 }
 function diagnostics(){
   const ids=featureIds();
-  return Object.freeze({version:VERSION,registryVersion:registry()?.version||'legacy-fallback',build,features:ids,enabled:ids.filter(assetAllowed),disabled:ids.filter(function(k){return !assetAllowed(k);}),loaded:Object.keys(loaded).filter(function(k){return loaded[k];}),inflight:Object.keys(inflight),failures:{...failures},quarantined:ids.filter(quarantined)});
+  return Object.freeze({version:VERSION,registryVersion:registry()?.version||'legacy-fallback',build,features:ids,enabled:ids.filter(assetAllowed),disabled:ids.filter(function(k){return !assetAllowed(k);}),loaded:Object.keys(loaded).filter(function(k){return loaded[k];}),inflight:Object.keys(inflight),failures:{...failures},quarantined:ids.filter(quarantined),pvpReady:pvpDomainReady()});
 }
-root.KELO_MODULE_LOADER=Object.freeze({version:VERSION,start,ensure,needs,isReady:function(n){return !!loaded[resolveName(n)];},canLoad:assetAllowed,features:featureIds(),diagnostics});
+root.KELO_MODULE_LOADER=Object.freeze({version:VERSION,start,ensure,needs,isReady:function(n){const name=resolveName(n);return name==='pvp'?pvpDomainReady():!!loaded[name];},canLoad:assetAllowed,features:featureIds(),diagnostics});
 })(typeof globalThis!=='undefined'?globalThis:window);
