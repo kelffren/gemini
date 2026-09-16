@@ -86,8 +86,7 @@ jobs:
       - name: Critical mobile and PvP smoke on PR bytes
         run: >-
           npx playwright test
-          tests/iphone-acceptance.spec.js
-          tests/iphone-gameplay.spec.js
+          tests/main-stability-mobile.spec.js
           tests/pvp-dodge-live.spec.js
           --project=chromium
 
