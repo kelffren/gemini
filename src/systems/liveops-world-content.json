@@ -1,7 +1,43 @@
 {
   "schemaVersion": 1,
-  "revision": "bootstrap-1",
-  "npcs": [],
-  "missions": [],
+  "revision": "starter-liveops-1",
+  "npcs": [
+    {
+      "id": "plaza_guide",
+      "revision": "1",
+      "enabled": true,
+      "name": "Guía de la Plaza",
+      "role": "Guía",
+      "summary": "Orientación inicial para aventureros que llegan a Kelo World.",
+      "tags": ["starter", "plaza"],
+      "dialogue": [
+        {
+          "id": "welcome",
+          "text": "Bienvenido a Kelo World. La plaza es tu punto de partida para conocer el mundo."
+        },
+        {
+          "id": "mission_hint",
+          "text": "Explora la plaza y familiarízate con el entorno antes de seguir tu aventura."
+        }
+      ]
+    }
+  ],
+  "missions": [
+    {
+      "id": "welcome_to_kelo",
+      "revision": "1",
+      "enabled": true,
+      "title": "Primeros pasos",
+      "summary": "Conoce la plaza y completa tu primera ruta de exploración.",
+      "category": "starter",
+      "giverNpcId": "plaza_guide",
+      "objectives": [
+        {
+          "id": "explore_plaza",
+          "label": "Explora la plaza."
+        }
+      ]
+    }
+  ],
   "events": []
 }
