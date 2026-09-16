@@ -1,14 +1,14 @@
 const MiB = 1024 * 1024;
 
 export const COMMUNITY_ASSET_POLICY = Object.freeze({
-  version: 1,
+  version: 2,
   autoPublishMimeTypes: new Set(['image/png', 'image/webp', 'image/jpeg']),
   manualReviewMimeTypes: new Set(['image/gif']),
   blockedMimeTypes: new Set(['image/svg+xml', 'text/html', 'application/javascript', 'text/javascript']),
-  maxBytes: 8 * MiB,
-  maxWidth: 4096,
-  maxHeight: 4096,
-  maxPixels: 16_777_216,
+  maxBytes: 5 * MiB,
+  maxWidth: 2048,
+  maxHeight: 2048,
+  maxPixels: 4_194_304,
   maxNameLength: 80,
   maxTags: 8,
   maxTagLength: 24,
