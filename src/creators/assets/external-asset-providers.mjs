@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: CREATORS / EXTERNAL CONTENT PROVIDERS
  * owner: Kelo Universal Content Bridge
- * keys: EXTERNAL CONTENT SPRITECOOK KENNEY LPC OPENGAMEART KELO ABILITY SCENE AUDIO LAZY PAGED FEDERATED PREVIEW 10K BOUNDED THUMBNAIL
+ * keys: EXTERNAL CONTENT SPRITECOOK KENNEY LPC OPENGAMEART KELO ABILITY SCENE AUDIO LAZY PAGED FEDERATED PREVIEW 10K BOUNDED THUMBNAIL TRYON
  * purpose: Browse provider metadata without downloading content binaries, with bounded federated pages and viewport-only previews suitable for catalogs far beyond 10k items.
  */
 import {searchKenneyPage,clearKenneyCache,getKenneyProviderStats} from './kenney-live-provider.mjs?v=3';
@@ -10,6 +10,7 @@ import {searchOpenGameArtAssets,clearOpenGameArtCache} from './opengameart-live-
 import {searchKeloContent,clearKeloContentCache} from './kelo-content-live-provider.mjs?v=3';
 import {installUniversalPreviewInspector} from './universal-preview-inspector.mjs?v=1';
 import {installUniversalSpritePreview} from './universal-sprite-preview.mjs?v=3';
+import {installUniversalAvatarTryOn} from './universal-avatar-tryon.mjs?v=1';
 
 const CONFIG_URL=new URL('../../../data/external-asset-providers.json?v=7',import.meta.url).href;
 const DEFAULT_PAGE_SIZE=80,MAX_PROVIDER_PAGE=320,MAX_FEDERATED_RESULTS=160,MAX_RECENT_ASSETS=640,MAX_THUMBNAIL_CONCURRENCY=4;
@@ -33,4 +34,4 @@ function installQAPreviewHook(){const qa=browserQA();if(!qa.preview||typeof docu
 export function clearProviderCache(){liveCache=new Map();configPromise=null;recentAssets.clear();clearKenneyCache();clearOpenGameArtCache();clearKeloContentCache();}
 export const EXTERNAL_ASSET_PROVIDERS=Object.freeze({loadProviderConfig,getProviderStatuses,getCatalogScaleStatus,browseProvider,searchExternalAssets,clearProviderCache});
 export const EXTERNAL_CONTENT_PROVIDERS=EXTERNAL_ASSET_PROVIDERS;
-if(typeof window!=='undefined'){window.KELO_EXTERNAL_ASSET_PROVIDERS=EXTERNAL_ASSET_PROVIDERS;window.KELO_EXTERNAL_CONTENT_PROVIDERS=EXTERNAL_CONTENT_PROVIDERS;installQAPreviewHook();installVisibleThumbnailHydrator();installUniversalPreviewInspector();installUniversalSpritePreview();}
+if(typeof window!=='undefined'){window.KELO_EXTERNAL_ASSET_PROVIDERS=EXTERNAL_ASSET_PROVIDERS;window.KELO_EXTERNAL_CONTENT_PROVIDERS=EXTERNAL_CONTENT_PROVIDERS;installQAPreviewHook();installVisibleThumbnailHydrator();installUniversalPreviewInspector();installUniversalSpritePreview();installUniversalAvatarTryOn();}
