@@ -89,6 +89,8 @@ jobs:
             exit 1
           fi
           echo 'PERFORMANCE_NO_REGRESSION_OK'
+      - name: AUTO effort escalation regression
+        run: node scripts/asset-effort-controller-audit.mjs
       - name: Quality Agent golden corpus
         run: node scripts/asset-quality-golden-corpus-audit.mjs
       - name: Animation temporal consistency gate
