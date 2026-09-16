@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: CORE / FEATURE REGISTRY
  * owner: KELO_FEATURE_REGISTRY
- * keys: FEATURE MODULE DEPENDENCY LAZY ASSET LIFECYCLE SCALABILITY
+ * keys: FEATURE MODULE DEPENDENCY LAZY ASSET LIFECYCLE SCALABILITY PVP FIRST-USE
  * purpose: fuente única de verdad para paquetes opcionales; Module Loader y Asset Registry consumen este catálogo
  * public-api: KELO_FEATURE_REGISTRY.ids/has/get/files/catalog/resolve
  * state-owned: definiciones inmutables de features; no carga scripts ni modifica gameplay
@@ -10,7 +10,7 @@
 (function(root){
 'use strict';
 if(root.KELO_FEATURE_REGISTRY)return;
-const VERSION='kelo-feature-registry-v2.0.0';
+const VERSION='kelo-feature-registry-v2.1.0-pvp-first-use';
 const raw={
   social:{dependencies:[],policy:'first-use',files:[
     {src:'src/ui/player-nameplate.js?v=2',name:'placas'},
@@ -29,6 +29,14 @@ const raw={
     {src:'engine-ah.js?v=95',name:'mundo'},
     {src:'engine-ai.js?v=95',name:'mundo'},
     {src:'src/systems/illumination.js?v=2',name:'luz'}
+  ]},
+  pvp:{dependencies:[],policy:'first-use',files:[
+    {src:'src/abilities/abilityData.js?v=20260916-pvp-first-use-1',name:'datos habilidades PvP'},
+    {src:'src/abilities/stone-system.js?v=20260916-pvp-first-use-1',name:'piedras PvP'},
+    {src:'src/abilities/kelo-ability-boot.js?v=20260916-pvp-first-use-1',name:'runtime habilidades PvP'},
+    {src:'engine-net.js?v=20260916-pvp-first-use-1',name:'online PvP'},
+    {src:'src/systems/pvp-world.js?v=20260916-pvp-first-use-1',name:'mundo PvP'},
+    {src:'src/systems/pvp-combat-runtime-loader.js?v=20260916-pvp-first-use-1',name:'lifecycle combate PvP'}
   ]},
   bag:{dependencies:[],policy:'first-use',files:[
     {src:'src/ui/backpack-fantasy-v1.css?v=1',name:'estilo mochila',type:'style'},
