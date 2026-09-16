@@ -49,7 +49,7 @@ El índice de producción conserva actualmente **9 engines legacy críticos**: `
 
 El debt audit actual cuenta **28 writes directos de posición** y **12 writes directos de cámara** en el índice estático de producción. `engine-f/g` contienen 10 de los writes de posición. Ambos ya tienen characterization tests; el próximo paso correcto es migrar consumidores hacia autoridades modernas equivalentes, no mover deuda de carpeta ni borrar archivos sin paridad.
 
-El nuevo `legacy-ability-consumer-audit.mjs` inventaría el runtime por referencias ejecutables, ignorando comentarios. El baseline validado es: **1 consumidor directo de `KeloAbilityAim`** (`engine-l`), **3 consumidores de `skillAim`** (`engine-g/l/m`) y **6 consumidores de `triggerStone`**. El audit falla si reaparece otro consumidor directo de `KeloAbilityAim`.
+El nuevo `legacy-ability-consumer-audit.mjs` mantiene un inventario del runtime basado en referencias ejecutables, ignorando comentarios. El baseline validado es: **1 consumidor directo de `KeloAbilityAim`** (`engine-l`), **3 consumidores de `skillAim`** (`engine-g/l/m`) y **6 consumidores de `triggerStone`**. El audit falla si reaparece otro consumidor directo de `KeloAbilityAim`.
 
 La retirada de la action bar de `engine-g` y la migración de `engine-m` muestran el proceso correcto: identificar owner, congelar comportamiento, migrar un consumidor, ejecutar CI/WebKit y solo después documentar. El dash quedó intacto porque todavía no hay equivalencia demostrada con el dash moderno.
 
