@@ -1,272 +1,253 @@
-# Creator Asset Bridge V1.4 — Source → Authoring → Delivery
+# Creator Asset Bridge V2 — Asset Intelligence Compiler
 
 ## Status
 
 - owner: `Kelo Creator Asset Bridge`
-- PNG byte optimizer: `src/creators/assets/png-space-optimizer.mjs`
-- PNG external tournament: `src/creators/assets/png-codec-tournament.mjs`
-- PNG adaptive search: `src/creators/assets/png-adaptive-optimizer.mjs`
-- deterministic quality agent: `src/creators/assets/png-quality-agent.mjs`
-- asset image profiler: `src/creators/assets/asset-image-profiler.mjs`
-- Pareto analyzer: `src/creators/assets/quality-pareto.mjs`
-- optional perceptual advisory: `src/creators/assets/perceptual-quality-bridge.mjs`
-- runtime variant lab: `src/creators/assets/runtime-image-variants.mjs`
-- transfer/decode/transparency budget: `scripts/asset-space-budget.mjs`
-- sheet compiler: `src/creators/assets/asset-sheet-compiler.mjs`
-- foreground: `src/creators/sprite-compiler/sprite-foreground-analysis.mjs`
-- world profile: `src/creators/sprite-compiler/sprite-world-asset-compiler.mjs`
-- semantic bridge: `src/creators/assets/kelo-creator-asset-bridge.mjs`
-- CLI ingest surface: `scripts/asset-space-compiler.mjs`
-- deep tournament CLI: `scripts/asset-codec-tournament.mjs`
-- byte transport: `CHATGPT_ASSET_UPLOAD_BRIDGE.md`
-- runtime consumers: `KELO_ATLAS_CONTRACT` + `KELO_PROPERTY_CATALOG`
-- playerVisible: false
-- status: creator-local-file-bridge-v1.4-meta-space-gate-candidate
-
-## Contract
-
-El bridge optimiza cómo se representa y entrega el arte sin convertirse en un renderer ni en un segundo asset system. Después, el compiler existente continúa detectando sourceRects, grupos, anchors y manifest.
-
-Flujo objetivo:
-
-`SOURCE PNG → PROFILE → LOSSLESS TOURNAMENT → QUALITY GATE → AUTHORING PNG → SHEET COMPILER → MANIFEST/CATALOG`
-
-En paralelo, sin mutar la fuente:
-
-`AUTHORING/SOURCE → RUNTIME CODEC LAB → QUALITY GATE → DELIVERY VARIANT(S)`
-
-Tres niveles quedan separados:
-
-1. **SOURCE** — evidencia/canónico. Nunca se destruye por una optimización adaptativa.
-2. **AUTHORING** — PNG menor demostrado equivalente; sigue siendo apto para herramientas, manifests y debugging.
-3. **DELIVERY** — formato de descarga/runtime opcional. Puede ser PNG, WebP o AVIF según perfil, soporte y evidencia. Elegir una variante no modifica geometría, identidad ni metadata de gameplay.
-
-La publicación de una variante DELIVERY al runtime es una decisión separada del laboratorio. Este sistema genera y demuestra candidatos; no reescribe automáticamente `KELO_ATLAS_CONTRACT` ni el boot.
-
-## Fast ingest vs Deep publish
-
-No toda edición debe pagar el coste de una búsqueda exhaustiva.
-
-- **FAST**: default de dry-run/import. Reduce combinaciones de filtros y prioriza feedback rápido. Sigue siendo strict lossless cuando el modo es strict.
-- **BALANCED**: más filtros/candidatos para auditoría intermedia.
-- **DEEP**: default cuando se usa `--write`; además existe el tournament externo para publicación final.
-
-La diferencia entre FAST y DEEP es CPU/tiempo de búsqueda, nunca la autoridad del Quality Gate.
-
-## Image Profiler
-
-`asset-image-profiler.mjs` inspecciona nombre/ruta y píxeles para elegir política antes de comprimir. Mide colores, alpha, densidad de bordes, cobertura de paleta, bordes exteriores y señales de pixel art.
-
-Perfiles actuales:
-
-- `tile` → `seam-safe`;
-- `pixel-art`, `pixel-sprite`, `pixel-atlas` → `pixel-art`;
-- `ui` → `ui-crisp`;
-- `fx` → `fx-alpha`;
-- sprites/ilustraciones restantes → `balanced` cuando corresponda.
-
-El profiler no tiene autoridad visual/runtime: solo selecciona restricciones y candidatos.
-
-## Quality Agent
-
-`png-quality-agent.mjs` es el gate duro. Compara RGBA decodificado, no el nombre del encoder ni la apariencia del archivo comprimido.
-
-Métricas actuales:
-
-- igualdad de píxel;
-- píxeles cambiados y ratio;
-- MAE/RMSE/PSNR RGB;
-- delta RGB máximo;
-- cambios y delta máximo de alpha;
-- error de bordes/luminancia;
-- ratio de deltas grandes;
-- píxeles del borde exterior modificados;
-- error RGB medio/máximo del borde exterior.
-
-### Strict
-
-`strict` exige `changedPixels === 0`. Un encoder externo nunca es confiado por su exit code: su resultado vuelve a decodificarse y debe probar igualdad exacta.
-
-### Seam-safe
-
-Los tiles repetibles son tratados de forma especial. El borde exterior debe permanecer exacto (`borderMeanAbsRgb=0`, `borderMaxRgbDelta=0`) para evitar seams visibles al repetir la textura.
-
-### Adaptive
-
-Las políticas `pixel-art`, `ui-crisp`, `fx-alpha` y `balanced` tienen límites diferentes. Alpha continúa bloqueado por defecto. Si un candidato falla cualquier hard metric, queda fuera aunque pese mucho menos.
-
-## Perceptual advisory
-
-`perceptual-quality-bridge.mjs` puede consultar herramientas instaladas como `iqa-cli`, SSIMULACRA2 o Butteraugli. Es **advisory-only**: añade una segunda opinión psicovisual al reporte pero jamás aprueba un candidato que haya fallado un hard gate determinista.
-
-Se activa en la CLI con `--perceptual` junto con `--capture`. Si ninguna herramienta externa está instalada, el flujo continúa sin romperse.
-
-## Pareto frontier
-
-`quality-pareto.mjs` conserva en el reporte los candidatos no dominados por tamaño/calidad. Así no perdemos información útil detrás de un único “winner”: podemos ver cuándo unos pocos bytes extra compran una mejora relevante de calidad.
-
-El ganador automático sigue obedeciendo primero a los hard gates. La frontera es evidencia para calibración y futuras políticas.
-
-## PNG lossless tournament
-
-### Kelo optimizer
-
-`optimizePngLossless()` explora:
-
-- PNG filters 0..4 + selección adaptativa por fila;
-- varios perfiles DEFLATE;
-- conversión exacta a PNG indexado cuando existen `<=256` colores RGBA compatibles;
-- original como baseline.
-
-### External tournament
-
-`optimizePngTournament()` puede hacer competir, cuando estén instalados:
-
-- Kelo lossless;
-- OxiPNG;
-- ZopfliPNG;
-- Efficient Compression Tool (ECT).
-
-La razón de competir es que no existe un preset universalmente ganador. El torneo elige el menor **después** de validar:
-
-- dimensiones;
-- RGBA exacto;
-- chunks visuales sensibles (`gAMA`, `cHRM`, `sRGB`, `iCCP`, `sBIT`).
-
-Los candidatos usan archivos temporales. La fuente nunca se pasa a un external optimizer para modificación en sitio.
-
-## Adaptive PNG
-
-`optimizePngAdaptive()` usa Sharp/libimagequant para explorar paletas. La cantidad de colores a probar se reduce o amplía según el profiler. Para pixel art se mantiene dithering 0 en esta fase para evitar ruido no deseado.
-
-Sharp conserva metadata en los candidatos. Cada salida se vuelve a apretar lossless y después se evalúa. Siempre existe un baseline `strict-lossless`; si adaptive no demuestra una mejora permitida, no gana.
-
-## Runtime codec lab
-
-`runtime-image-variants.mjs` investiga formatos de entrega sin cambiar el SOURCE:
-
-- PNG strict;
-- WebP lossless con preservación de RGB transparente (`exact`);
-- AVIF lossless;
-- WebP adaptativo, solo en perfiles donde está permitido;
-- AVIF adaptativo 4:4:4, solo en perfiles donde está permitido.
-
-Cada formato se decodifica nuevamente a RGBA y pasa por el mismo Quality Agent. Un formato moderno no gana por ser moderno: gana por bytes + gate. El reporte también incluye su Pareto frontier.
-
-Actualmente los assets `pixel-critical` y `seam-critical` se mantienen conservadores: no entran automáticamente en tracks adaptativos WebP/AVIF. Lossless sí puede competir.
-
-## Asset Space Budget
-
-`scripts/asset-space-budget.mjs` ataca problemas que la compresión de archivo no resuelve:
-
-- bytes almacenados/transferidos;
-- baseline de memoria RGBA (`width × height × 4`);
-- expansión stored→decoded;
-- proporción transparente;
-- bounding box de contenido visible;
-- desperdicio potencial por bordes transparentes;
-- duplicados exactos por SHA-256;
-- rankings de assets más pesados en disco y al decodificar.
-
-Es observabilidad únicamente. No borra duplicados ni recorta sprites. Un trim real requiere preservar `orig`, `trim`, anchor y animation alignment mediante metadata compatible con el consumidor.
-
-## KTX2 / Basis — horizonte WebGL
-
-KTX2/Basis es una futura pista de DELIVERY para cuando una superficie de Kelo World use WebGL/WebGPU como textura GPU. Puede reducir descarga **y** memoria GPU porque evita mantener todas las texturas como RGBA completas después de la carga.
-
-No se activa para el Canvas 2D actual: meter KTX2 ahora obligaría a introducir un consumidor/runtime distinto y violaría la regla de owner. Se añadirá únicamente cuando exista una ruta gráfica que pueda consumir texturas GPU comprimidas de forma nativa y tenga medición iPhone real.
-
-## Captura y evidencia
-
-`scripts/asset-space-compiler.mjs` funciona dry-run por defecto y permite `--write` únicamente después del gate.
-
-Con `--capture` genera:
-
-- `ANTES` — bytes fuente;
-- `DESPUÉS` — candidato elegido;
-- `DIFERENCIA ×8` — mapa transparente donde solo aparecen píxeles modificados;
-- cantidad de píxeles cambiados + delta máximo;
-- perfil detectado y policy;
-- effort FAST/BALANCED/DEEP;
-- perceptual advisory opcional;
-- `report.json` completo;
-- `index.html` mobile-friendly para auditoría humana.
-
-En STRICT, el diff debe quedar vacío.
-
-Ejemplos:
-
-```bash
-node scripts/asset-space-compiler.mjs --input=assets --mode=strict --capture
-node scripts/asset-space-compiler.mjs --input=assets --mode=strict --effort=deep --capture --write
-node scripts/asset-space-compiler.mjs --input=C --mode=adaptive --effort=deep --capture --perceptual --write
-node scripts/asset-codec-tournament.mjs --input=assets --max-files=6 --emit-variants
-node scripts/asset-space-budget.mjs --input=assets
+- stage: creator/build/publish-time; no gameplay authority
+- SOURCE remains canonical and immutable
+- AUTHORING may use verified strict PNG reductions
+- DELIVERY may emit immutable PNG/WebP/AVIF candidates but is not runtime-authoritative without validated iOS Safari device proof
+- current Canvas 2D runtime contract remains unchanged by this system
+
+## Pipeline
+
+```text
+SOURCE
+  → PNG Conformance + resource-budget guard
+  → static/APNG/Adam7/16-bit classifier
+  → profile + confidence + explicit contracts
+  → strict representation search / codec tournament
+  → deterministic Quality Agent
+  → independent libvips/pngcheck consensus
+  → AUTHORING PNG
+
+SOURCE/AUTHORING
+  → DELIVERY codec search
+  → canonical sRGB decode/compare
+  → hard quality gates + composited-alpha metrics
+  → optional/required perceptual proof according to publish policy
+  → multidimensional Pareto (bytes/quality/encode/decode/memory/compatibility)
+  → immutable content-addressed variant + provenance
+  → iOS Safari device-proof gate
+  → DELIVERY promotion candidate
 ```
 
-El input es configurable. Una futura carpeta `C` puede conectarse sin introducir otro owner.
+Atlas work is a separate planning branch under the same owner:
 
-## Ownership
+```text
+atlas + manifest
+  → frame trim metadata (`orig`, `trim`, adjusted anchor)
+  → exact subframe duplicate detection
+  → MaxRects planning
+  → frame recomposition proof
+  → measured promotion decision
+```
 
-- bytes/profile/quality/tournament/delivery candidates: `Kelo Creator Asset Bridge` support capability;
-- foreground/background: `sprite-foreground-analysis.mjs`;
-- heterogeneous grouping + sourceRects: `asset-sheet-compiler.mjs`;
-- anchor/footprint/scale profile: `sprite-world-asset-compiler.mjs`;
-- semantic review: file bridge;
-- atlas runtime: Atlas Contract;
-- templates: Property Catalog;
-- map placement: Studio/World/Map Forge owners.
+No Smart Atlas plan changes LIVE pixels, sourceRects or runtime manifests automatically.
 
-## Invariants
+## Core modules
 
-- nunca cambiar dimensiones durante optimización;
-- nunca permitir que ahorro de bytes ignore un hard quality gate;
-- strict siempre preserva RGBA exacto;
-- seam-safe preserva borde exterior exacto;
-- SOURCE nunca se sobrescribe por DELIVERY variants;
-- metadata de color sensible debe preservarse o demostrarse visualmente equivalente;
-- sourceRects y IDs del asset compiler no dependen del codec de entrega;
-- publicación runtime permanece separada de generación de candidatos.
+- `png-conformance-guard.mjs` — structure, chunk semantics, APNG detection, safe-to-copy and memory/decompression budgets.
+- `png-space-optimizer.mjs` — strict refilter/DEFLATE, exact palette, redundant-alpha removal, exact grayscale and safe binary-alpha `tRNS` reductions.
+- `png-independent-validator.mjs` — Sharp/libvips + pngcheck independent consensus.
+- `png-quality-agent.mjs` — strict/render-exact gates plus RGB, alpha, edge, border, premultiplied and composited render metrics.
+- `asset-image-profiler.mjs` — explicit contract > path hints > pixel evidence; emits confidence/sourceOfTruth/reasons; low-confidence assets remain conservative.
+- `png-adaptive-optimizer.mjs` — libimagequant/Sharp adaptive candidate generation with strict fallback.
+- `quality-boundary-search.mjs` — measured non-monotonic-aware quality search; no unmeasured point is inferred to pass.
+- `quality-pareto.mjs` — authoring and delivery Pareto frontiers.
+- `asset-effort-controller.mjs` — FAST first; BALANCED/DEEP only when measured marginal byte value justifies CPU.
+- `asset-optimization-cache.mjs` — content-addressed cache keyed by source, engine, toolchain and policy.
+- `asset-provenance.mjs` — source/output SHA-256, toolchain, quality, profile and validation evidence.
+- `runtime-image-variants.mjs` — canonical-sRGB PNG/WebP/AVIF lab with encode/decode/memory measurements.
+- `delivery-device-proof.mjs` — formal iOS Safari real-device evidence schema.
+- `asset-delivery-manifest.mjs` — immutable hash-named DELIVERY variants and rollback-friendly manifest.
+- `smart-atlas-planner.mjs` — metadata-safe trim, MaxRects plan and subframe dedup evidence.
 
-## Semantic review rule
+## PNG conformance and failure policy
 
-Names, family, category, layer, confidence and notes may change. Stable sourceRects/identity must not be silenciosamente re-cut. Byte optimization preserva dimensiones; strict preserva cada RGBA decodificado.
+The local optimizer deliberately supports a strict subset for transformations. It does not pretend to be a full libpng replacement.
 
-## Forest Plaza production proof
+Before local decode/transform it validates:
 
-`assets/world/plaza/forest-plaza-tileset-v2.png` sigue siendo la prueba real del bridge sheet→runtime:
+- PNG signature and chunk framing;
+- legal chunk names/reserved bit;
+- required/unique `IHDR`/`IEND` and presence of `IDAT`;
+- contiguous `IDAT` sequence;
+- no bytes after `IEND`;
+- legal color-type/bit-depth combinations;
+- compression/filter/interlace method;
+- maximum file/chunk/ancillary/pixel/decoded-byte budgets;
+- unknown critical chunks;
+- APNG (`acTL`/`fcTL`/`fdAT`).
 
-- 1448×1086;
-- 146 frames irregulares;
-- IDs legacy `asset-001..asset-146` preservados;
-- nombres `fp_*` y 7 categorías;
-- manifest generado consumido por Atlas Contract/Property Catalog/Studio.
+Local structural transformations currently fail closed for:
 
-Cualquier porcentaje de ahorro del nuevo Space Compiler sobre producción debe salir del reporte real; nunca se extrapola desde fixtures.
+- APNG;
+- Adam7 interlacing;
+- 16-bit samples;
+- unsupported/corrupt structures.
 
-## Failure policy
+These files are preserved unchanged rather than partially transformed. External tools may only become authoritative after independent validation appropriate to their contract.
 
-- PNG inválido/corrupto/unsupported → skip, nunca rewrite;
-- mismatch strict → reject;
-- cambio de metadata visual sensible en tournament → reject;
-- cambio de borde en `seam-safe` → reject;
-- adaptive alpha/edge/border/quality fail → reject;
-- no adaptive candidate → strict fallback;
-- no candidato menor aprobado → conservar original;
-- external/perceptual tool absent/falla → continuar con gates deterministas;
-- no foreground → bloquear publish de sheet;
-- review semántico inválido → aplicar nada.
+Critical rewrites obey PNG safe-to-copy semantics. Unknown unsafe ancillary chunks are never blindly retained across a critical representation change.
 
-## Online boundary
+## Exact PNG representation search
 
-Optimización, profiling y variantes son operaciones build/publish-time. No introducen gameplay authority ni estado duradero de navegador. Publicación durable cruza la autoridad de contenido existente.
+`optimizePngLossless()` keeps the original as a baseline and validates every possible winner after decoding. Candidates can include:
 
-## Tests / CI
+- filters 0–4 + adaptive per-row filter;
+- multiple zlib strategies;
+- exact indexed palette, including 1/2/4/8-bit indices;
+- exact removal of an all-opaque alpha channel;
+- exact RGB/RGBA → grayscale/grayscale-alpha when `R=G=B` for every pixel;
+- 1/2/4-bit grayscale only when every value is mathematically representable;
+- exact binary-alpha → `tRNS` only when one transparent RGB/gray key exists and that key is never visible/opaque.
 
-- `scripts/asset-space-compiler-audit.mjs` — lossless exact fixture;
-- `scripts/asset-space-meta-audit.mjs` — profiler, seam hard gate y tournament fallback;
-- `scripts/asset-space-budget.mjs` — transferencia, decode baseline, transparencia y duplicados;
-- `scripts/asset-space-compiler.mjs` — dry-run FAST de PNG reales;
-- `scripts/asset-codec-tournament.mjs` — laboratorio DEEP manual con variantes;
-- `audit:asset-sheet` y `audit:docs` deben permanecer verdes;
-- runtime/boot no cambia en este pass, por lo que la validación iPhone de gameplay se reserva para el futuro pass que realmente promueva DELIVERY variants al runtime.
+Color-sensitive metadata blocks unsafe color-model reductions. Strict output must decode to the same RGBA pixels.
+
+## Independent authority
+
+Kelo's encoder and Kelo's decoder must not be the only proof of correctness.
+
+CI includes:
+
+- local strict equality;
+- `pngcheck` structural validation;
+- independent Sharp/libvips decode in canonical sRGB;
+- representative real-asset source/output equality;
+- parser torture/mutation corpus.
+
+If the independent decoder disagrees, publication fails.
+
+## Quality Agent V2
+
+Hard metrics include:
+
+- exact and render-exact pixels;
+- changed-pixel ratios;
+- RGB MAE/RMSE/PSNR and max delta;
+- alpha changed pixels/max delta;
+- edge error and large-delta ratio;
+- outer-border exactness/error;
+- premultiplied RGB error;
+- composited render error over black, white, 50% gray and checker backgrounds in linearized sRGB.
+
+`strict` requires exact RGBA. `render-exact` allows RGB changes only where both source and candidate are fully transparent; alpha and every visible pixel remain exact. `seam-safe` retains a locked exterior border.
+
+The Golden Corpus pins expected behavior for exact pixels, hidden transparent RGB, visible RGB changes, alpha changes and seam-border mutations.
+
+## Perceptual evidence
+
+`perceptual-quality-bridge.mjs` records tool versions and parses named SSIMULACRA2/Butteraugli metrics. Perceptual tools never override a failed deterministic gate.
+
+Adaptive `--write` is fail-closed: by default it requires SSIMULACRA2 evidence at the configured publish threshold (default 90). Missing perceptual tooling blocks the adaptive rewrite rather than silently weakening policy.
+
+## Profiling authority
+
+Profiler decisions are evidence, not gameplay truth.
+
+Authority order:
+
+1. explicit asset/manifest contract;
+2. strong path semantics;
+3. pixel evidence.
+
+The profile contains `confidence`, `sourceOfTruth`, and `reasons`. Low-confidence classifications cannot enable adaptive WebP/AVIF automatically.
+
+## FAST / AUTO / BALANCED / DEEP
+
+The previous assumption that DEEP should always run at publish was rejected by measurement. A real benchmark over representative assets produced identical bytes for FAST/BALANCED/DEEP while DEEP consumed materially more CPU.
+
+`AUTO` therefore runs FAST first and only escalates when measured opportunity and marginal bytes/second justify more work. DEEP remains available explicitly and in the final external tournament.
+
+## DELIVERY lab and promotion boundary
+
+The DELIVERY lab currently measures candidates in a canonical sRGB decode path and records:
+
+- bytes;
+- deterministic quality score;
+- encode time;
+- decode time;
+- decoded RGBA dimensional baseline;
+- compatibility weight;
+- two-dimensional and multidimensional Pareto frontiers.
+
+`byteWinner` is a laboratory observation, not permission to alter runtime.
+
+Promotion requires a validated `kelo-delivery-device-proof-v1` record with real iOS + Safari evidence, including device, OS/browser versions, minimum repeated runs, decode P50/P95, draw P50/P95 and measurement time. Until that proof exists, `promotion.eligible=false` and `KELO_ATLAS_CONTRACT`/boot stay unchanged.
+
+KTX2/Basis remains a future DELIVERY track only after Kelo has a WebGL/WebGPU texture consumer. Adding it to the current Canvas 2D path would create a second graphics architecture for no proven runtime benefit.
+
+## Immutable delivery and provenance
+
+Lab variants can be materialized under names containing their output SHA-256. Existing content is never overwritten under a reused semantic filename.
+
+Each candidate can carry provenance containing:
+
+- SOURCE name/bytes/SHA-256;
+- output name/bytes/SHA-256;
+- stage and policy;
+- optimizer/options;
+- profile and confidence;
+- quality/validator evidence;
+- Node/platform/architecture/zlib/toolchain fingerprint.
+
+The content-addressed design makes rollback natural: old variants can coexist and a manifest chooses an identity without destroying the source.
+
+## Smart Atlas V1
+
+`smart-atlas-planner.mjs` does not repack production blindly. It calculates:
+
+- `orig` dimensions;
+- trim rectangle;
+- adjusted + original anchor;
+- transparent area recovered per frame;
+- MaxRects placements across candidate widths;
+- exact RGBA subframe duplicate groups.
+
+`asset-atlas-recomposition-audit.mjs` packs the trimmed frames in memory and reconstructs every original frame. Promotion is impossible unless visible pixels/alpha are render-exact and anchors recompose to their original coordinates.
+
+For Forest Plaza specifically, historical measurement already showed the atlas is geometrically dense; a new MaxRects plan is evidence only and can still conclude `NO`.
+
+## Security / robustness audits
+
+`asset-png-torture-audit.mjs` covers, at minimum:
+
+- trailing data;
+- APNG control chunks;
+- unknown critical chunks;
+- Adam7 safe-skip;
+- oversized dimensions/pixel budget;
+- exact grayscale reduction;
+- exact `tRNS` reduction;
+- deterministic corrupt/mutation inputs that must never crash the optimizer.
+
+Additional parser fuzz seeds can be added without changing the production API.
+
+## CI and supply-chain policy
+
+Asset CI uses Node 24 and pins GitHub Actions by immutable commit SHA. Sharp, OxiPNG and ECT versions are fixed in the relevant labs. External optimizer exit status is never proof of image correctness: its output still passes validation.
+
+Current required creator gates include:
+
+- PNG torture/conformance;
+- independent libvips/pngcheck consensus;
+- strict compiler self-test;
+- Golden Quality Corpus;
+- profile/seam/search regressions;
+- cache integrity;
+- existing Asset Sheet compatibility;
+- technical documentation audit;
+- transfer/decode/duplicate budget;
+- Smart Atlas plan + recomposition proof;
+- representative real PNG dry-run.
+
+## Ownership invariants
+
+- byte optimization does not become a renderer;
+- SOURCE never becomes disposable;
+- no candidate wins solely because it is smaller;
+- no LLM/visual reviewer can override a failed hard metric;
+- sourceRects/IDs/gameplay metadata do not depend on delivery codec;
+- Asset Forge remains the drawing/template owner and may feed SOURCE assets into this bridge; this compiler does not duplicate Asset Forge;
+- current Canvas runtime remains authoritative until a separately validated DELIVERY promotion changes it.
