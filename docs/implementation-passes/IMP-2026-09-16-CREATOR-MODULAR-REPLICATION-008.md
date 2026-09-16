@@ -37,12 +37,15 @@ V1 covers the existing **social/open-world AOI state path**. PvP uses a separate
 - Remote runtime item IDs are revision-scoped and separated from local runtime item IDs.
 - Remote items remain hidden + locked and feed the same Character visual stack.
 - Creator visual equip/clear/character changes reuse existing `KeloNetAuthority.refreshAvatar()` so the server refreshes and redistributes social presentation immediately.
-- Added `scripts/creator-modular-replication-audit.mjs` and system documentation.
+- Server sanitizer preserves the semantic difference between absent transforms and explicit zero transforms so shared weapon defaults remain intact.
+- Added `scripts/creator-modular-replication-audit.mjs`, `server/creator-modular-replication-smoke-test.js` and system documentation.
 
 ## Files
 
 - `supabase/migrations/20260916004500_creator_modular_replication_v1.sql`
 - `server/avatar-sync-store.js`
+- `server/creator-modular-replication-smoke-test.js`
+- `server/package.json`
 - `src/characters/creator-avatar-runtime.mjs`
 - `src/characters/creator-character-state-bridge.js`
 - `src/core/creators-lazy-gate.js`
@@ -62,6 +65,7 @@ V1 covers the existing **social/open-world AOI state path**. PvP uses a separate
 ## Validation gates
 
 - `node scripts/creator-modular-replication-audit.mjs` passes.
+- `node server/creator-modular-replication-smoke-test.js` passes.
 - Upstream Creator/Character/docs audits remain green.
 - Migration applies cleanly in test Supabase.
 - Social test: Account A owns/entitled r3, equips it, Account B inside AOI renders r3 despite B not owning it.
@@ -78,7 +82,12 @@ V1 covers the existing **social/open-world AOI state path**. PvP uses a separate
 
 ## Evidence / limitations
 
-Source implementation is present on `creator-modular-replication-v1`. This environment has **not** applied the migration or executed Node audit, multi-account Supabase/WebSocket integration, Pages deployment, Playwright or iPhone LIVE. Do not mark VALIDATED from code presence alone.
+- Source implementation is present on `creator-modular-replication-v1`.
+- An isolated Node execution of the exact current `server/avatar-sync-store.js` plus `creator-modular-replication-smoke-test.js` passed. It covered syntax, valid published weapon sanitization, preservation of absent transforms, declared transforms, rejection of `creator-private`, rejection of invalid visibility and slot mismatch.
+- A full branch clone/audit run was attempted but this execution shell could not resolve `github.com`; therefore the repository-wide audit suite is **not** claimed executed.
+- This environment has **not** applied the migration or executed multi-account Supabase/WebSocket integration, Pages deployment, Playwright or iPhone LIVE.
+
+Do not mark VALIDATED from source presence or the isolated sanitizer smoke alone.
 
 ## Next action
 
