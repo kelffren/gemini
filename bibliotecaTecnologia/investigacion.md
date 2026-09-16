@@ -21,7 +21,7 @@ OCI Content Descriptor exige `digest`, `size` y `mediaType`. `size` permite rech
 
 Aplicación Kelo: `assetId -> descriptor -> sha256 -> CAS blob` y `pack -> members -> descriptors -> immutable blobs`.
 
-Fuentes: https://github.com/opencontainers/image-spec/blob/main/descriptor.md y https://github.com/opencontainers/distribution-spec/blob/main/spec.md
+Fuente: https://github.com/opencontainers/image-spec/blob/main/descriptor.md
 
 ### TUF
 
@@ -32,8 +32,6 @@ Fuente: https://theupdateframework.io/docs/metadata/
 ### OSTree / Nix
 
 Mantener old-or-new: preparar y verificar antes de cambiar el puntero activo. Generaciones activas, generación previa y transacciones vivas son raíces CAS; GC solo puede retirar blobs no alcanzables y tras período de gracia.
-
-Fuentes: https://ostreedev.github.io/ostree/atomic-upgrades/ y documentación Nix de profiles/GC roots.
 
 ### Delta, chunking y storage móvil
 
@@ -52,23 +50,24 @@ Delta actual es por miembro (`reuse`, `integrate`, `download`, `removed`). FastC
 9. Provider Kelo deriva temporalmente `expectedBytes + expectedSha256` de manifests declarativos para compatibilidad.
 10. Publisher determinista `scripts/publish-kelo-content-descriptors.mjs` genera `mediaType + size + digest` desde la fuente canónica.
 11. Main Stability Gate ejecuta el publisher con `--check` y detecta descriptor ausente o drift.
-12. **Ronda actual — hardening del publisher:** el publisher rechaza IDs duplicados, descriptors vacíos/digest inválido, comprueba cardinalidad source→descriptors y publica mediante archivo temporal + rename para evitar dejar un descriptor parcialmente escrito si el proceso se interrumpe.
+12. Publisher fail-closed: IDs únicos, tamaño/digest/cardinalidad válidos y escritura temp + rename.
+13. **Ronda actual — source binding:** el descriptor set incluye ahora `sourceDigest` SHA-256 de los bytes exactos de `data/kelo-content-starter-catalog.json` y `sourceVersion`. El `--check` reproduce ambos, por lo que un descriptor set ya no solo prueba sus miembros: queda ligado criptográficamente a la revisión exacta de la fuente que lo produjo.
 
 ## Decisión de esta ronda
 
-La identidad publicada debe ser determinista y además el acto de publicación debe ser fail-closed. Dos assets con el mismo ID no pueden producir referencias ambiguas. Un descriptor incompleto no puede publicarse. La escritura del descriptor set no debe exponer un archivo truncado durante una interrupción local/build.
+Un conjunto de descriptors debe identificar también su entrada canónica. Esto reduce ambigüedad entre dos revisiones del catálogo que casualmente contengan los mismos assets y prepara una futura cadena de metadata firmada/snapshot sin introducir firmas privadas en cliente.
 
 ```text
-source manifest
- -> validate unique identity
- -> deterministic descriptor
- -> validate size/digest/cardinality
- -> temp file
- -> rename
- -> CI drift check
+source bytes
+ -> SHA-256 sourceDigest
+ -> validate assets
+ -> deterministic member descriptors
+ -> descriptor set {source, sourceVersion, sourceDigest, descriptors}
+ -> atomic publish
+ -> CI reproducibility check
 ```
 
-Esto no toca Vault, boot ni runtime y conserva carga bajo demanda.
+OCI confirma que `digest + size + mediaType` son propiedades primarias del descriptor y recomienda verificar tamaño antes de digest y procesamiento pesado. TUF confirma que Targets usa hashes/tamaños y Snapshot fija una vista consistente de metadata. El nuevo `sourceDigest` aplica ese principio de consistencia al borde publisher de Kelo.
 
 ## Riesgos abiertos
 
