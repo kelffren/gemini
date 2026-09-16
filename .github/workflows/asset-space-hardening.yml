@@ -46,6 +46,8 @@ jobs:
         run: |
           BASE="$(git merge-base HEAD origin/main)"
           node scripts/bug-impact.mjs --diff "$BASE" HEAD --depth=2
+      - name: Runtime performance foundation contract
+        run: node scripts/performance-foundation-audit.js
       - name: Quality Agent golden corpus
         run: node scripts/asset-quality-golden-corpus-audit.mjs
       - name: Animation temporal consistency gate
