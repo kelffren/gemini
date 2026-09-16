@@ -1,15 +1,15 @@
 /* KELO-INDEX
  * area: NET / GUARDIAN
  * owner: KeloGuardianAuthority
- * keys: GUARDIAN DONATION HOST WEBRTC SIGNAL SUPABASE RPC HTTP AUTH COMMUNITY PROFILE ATTEST
- * purpose: frontera cliente para registrar nodos, señalizar WebRTC y sincronizar Community Builder; Supabase RPC es control plane primario y HTTP queda como fallback transitorio solo para Guardian base
- * online: identidad sale de la sesión Supabase; signaling/Community RPC nunca conceden autoridad gameplay/economy
- * do-not: NO secretos backend; NO autoridad gameplay; NO segundo WebSocket; NO confiar métricas/recompensas declaradas por cliente
+ * keys: GUARDIAN DONATION HOST WEBRTC SIGNAL SUPABASE RPC HTTP AUTH COMMUNITY PROFILE ATTEST STANDBY CLAIM
+ * purpose: frontera cliente para registrar nodos, señalizar WebRTC, reclamar standby elegido por servidor y sincronizar Community Builder; Supabase RPC es control plane primario y HTTP queda como fallback transitorio solo para Guardian base
+ * online: identidad sale de la sesión Supabase; signaling/Community/standby RPC nunca conceden autoridad económica persistente
+ * do-not: NO secretos backend; NO autoridad económica; NO segundo WebSocket; NO confiar métricas/recompensas declaradas por cliente; NO fallback HTTP para standby sin contrato server equivalente
  */
 (function(root){
 'use strict';
 if(root.KeloGuardianAuthority)return;
-const VERSION='kelo-guardian-authority-v3-community-profile',SESSION_KEY='kelo.supabase.session.v1';
+const VERSION='kelo-guardian-authority-v4-standby',SESSION_KEY='kelo.supabase.session.v1';
 let lastError=null,lastSource=null;
 function endpointBase(){const ws=root.KELO_ONLINE_RUNTIME_CONFIG?.effectiveNet||root.keloNet?.url||root.KELO_ONLINE_RUNTIME_CONFIG?.defaultWsUrl||'';if(!ws)throw new Error('GUARDIAN_SERVER_UNAVAILABLE');const url=new URL(ws,location.href);url.protocol=url.protocol==='wss:'?'https:':url.protocol==='ws:'?'http:':url.protocol;url.pathname='/';url.search='';url.hash='';return url;}
 async function accessToken(){try{if(root.KeloOnlineAuth&&typeof root.KeloOnlineAuth.credentials==='function'){const c=await root.KeloOnlineAuth.credentials();if(c?.accessToken)return String(c.accessToken);}}catch(_){}try{const raw=localStorage.getItem(SESSION_KEY),session=raw?JSON.parse(raw):null;return String(session?.access_token||'');}catch(_){return '';}}
@@ -21,7 +21,7 @@ async function preferRpc(rpcName,args,httpPath,httpOptions){try{return await rpc
 async function guarded(fn){try{const result=await fn();lastError=null;return result;}catch(error){lastError=String(error&&error.message||error);throw error;}}
 function withNode(path,nodeId){return String(path||'/api/guardian/status')+'?nodeId='+encodeURIComponent(String(nodeId||''));}
 function rpcPayload(payload){const p=payload||{};return{p_node_id:String(p.nodeId||''),p_capabilities:p.capabilities||{},p_preferences:p.preferences||{}};}
-function status(){let endpoint=null;try{endpoint=endpointBase().href;}catch(_){}return Object.freeze({version:VERSION,primary:'supabase-rpc',fallbackEndpoint:endpoint,lastError,lastSource,authenticated:!!root.KeloOnlineAuth?.state?.().authenticated,communityPersistence:'supabase-rpc'});}
+function status(){let endpoint=null;try{endpoint=endpointBase().href;}catch(_){}return Object.freeze({version:VERSION,primary:'supabase-rpc',fallbackEndpoint:endpoint,lastError,lastSource,authenticated:!!root.KeloOnlineAuth?.state?.().authenticated,communityPersistence:'supabase-rpc',standbyClaim:'supabase-rpc-only'});}
 root.KeloGuardianAuthority=Object.freeze({
   version:VERSION,
   status:nodeId=>guarded(()=>preferRpc('guardian_status',{p_node_id:String(nodeId||'')},withNode('/api/guardian/status',nodeId))),
@@ -30,6 +30,7 @@ root.KeloGuardianAuthority=Object.freeze({
   disable:payload=>guarded(()=>preferRpc('guardian_disable',{p_node_id:String(payload?.nodeId||'')},'/api/guardian/disable',{method:'POST',body:payload})),
   startMaster:payload=>guarded(()=>preferRpc('guardian_master_start',{p_node_id:String(payload?.nodeId||'')},'/api/guardian/master/start',{method:'POST',body:payload})),
   stopMaster:payload=>guarded(()=>preferRpc('guardian_master_stop',{p_node_id:String(payload?.nodeId||'')},'/api/guardian/master/stop',{method:'POST',body:payload})),
+  claimStandby:payload=>guarded(()=>rpc('guardian_master_claim_standby',{p_node_id:String(payload?.nodeId||'')})),
   sendSignal:payload=>guarded(()=>rpc('guardian_signal_send',{p_node_id:String(payload?.nodeId||''),p_to_node_id:String(payload?.toNodeId||''),p_kind:String(payload?.type||''),p_payload:payload?.data||{}})),
   pollSignals:nodeId=>guarded(()=>rpc('guardian_signal_poll',{p_node_id:String(nodeId||'')})),
   communityProfile:()=>guarded(()=>rpc('guardian_community_profile',{})),
@@ -43,5 +44,5 @@ root.KeloGuardianAuthority=Object.freeze({
   communityAssetStatus:assetHash=>guarded(()=>rpc('guardian_community_asset_status',{p_asset_hash:String(assetHash||'').toLowerCase()})),
   diagnostics:status
 });
-root.KELO_GUARDIAN_AUTHORITY_AUDIT=Object.freeze({version:VERSION,primarySupabaseRpc:true,httpFallback:true,secondWebSocket:false,supabaseSession:true,webrtcSignaling:true,communityPersistence:true,communityServerAuthority:true,gameplayAuthority:false,economicAuthority:false});
+root.KELO_GUARDIAN_AUTHORITY_AUDIT=Object.freeze({version:VERSION,primarySupabaseRpc:true,httpFallback:true,standbyClaimRpc:true,standbyClaimHttpFallback:false,secondWebSocket:false,supabaseSession:true,webrtcSignaling:true,communityPersistence:true,communityServerAuthority:true,gameplayAuthority:false,economicAuthority:false});
 })(typeof globalThis!=='undefined'?globalThis:window);
