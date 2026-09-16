@@ -1,35 +1,17 @@
 /* KELO-INDEX
  * area: LEGACY ABILITY / MOVEMENT
- * owner: action-bar bootstrap + legacy dash tween; aim lifecycle owned by KeloAbilityAim; movement extension owned by KeloMovement
- * keys: DASH MOVEMENT INTERCEPT ACTION BAR BOOTSTRAP AFTER PAINT
- * purpose: conserva solo la barra inicial y el dash tween legacy; la barra oculta en social-mode se monta después del primer paint mientras KeloAbilityAim posee begin/end/update/cast compatibility
- * public-api: renderActionBar compatibility
- * consumes: KeloMovement, KeloAbilityAim, STATE, localPlayer, obstacles
+ * owner: legacy dash tween; aim lifecycle owned by KeloAbilityAim; action bar owned by first-use KeloAbilities; movement extension owned by KeloMovement
+ * keys: DASH MOVEMENT INTERCEPT ABILITY COMPATIBILITY
+ * purpose: conserva únicamente estado compatibility compartido y dash tween legacy mientras KeloAbilities posee la hotbar moderna al primer uso
+ * consumes: KeloMovement, STATE, localPlayer, obstacles
  * state-owned: skillAim + dashTween legacy compatibility state
- * extension-points: KeloMovement.intercept; KeloAbilityAim.begin
+ * extension-points: KeloMovement.intercept
  * reuse: NO añadir habilidades nuevas aquí; usar sistema moderno de abilities
- * legacy: action bar + dash tween pendientes de migración; aim/cast/listeners/renderer retirados
- * do-not: NO implementar aim/cast, NO registrar pointermove/up/cancel, NO render hooks, NO envolver updateMovement/render
+ * legacy: dash tween pendiente de migración; action bar/aim/cast/listeners/renderer retirados
+ * do-not: NO implementar hotbar, aim/cast, pointer listeners, render hooks, NO envolver updateMovement/render
  */
 const skillAim = { active: false, index: -1, typeId: '', pointerId: null, originX: 0, originY: 0, currentX: 0, currentY: 0, dirX: 1, dirY: 0 };
 const dashTween = { active: false, t: 0, dur: 0.16, fromX: 0, fromY: 0, toX: 0, toY: 0 };
-
-renderActionBar = function() {
-  const container = document.getElementById('action-bar-container');
-  if (!container) return;
-  container.innerHTML = '';
-  STATE.equipped.forEach((stone, idx) => {
-    const slot = document.createElement('div');
-    slot.className = 'stone-slot' + (stone.isUlt ? ' ultimate' : '');
-    slot.id = 'action-slot-' + idx;
-    slot.innerHTML = '<div class="cooldown-overlay" id="cd-bar-' + idx + '"></div><span style="font-size:' + (stone.isUlt ? 18 : 14) + 'px;">' + stone.icon + '</span><span>' + stone.name + '</span>';
-    slot.addEventListener('pointerdown', (e) => {
-      const owner = window.KeloAbilityAim;
-      if (owner && typeof owner.begin === 'function') owner.begin(idx, e);
-    });
-    container.appendChild(slot);
-  });
-};
 
 if(!window.KeloMovement) throw new Error('KeloMovement unavailable before engine-g');
 window.KeloMovement.intercept('engine-g:legacy-dash', function(ctx) {
@@ -50,11 +32,3 @@ window.KeloMovement.intercept('engine-g:legacy-dash', function(ctx) {
   if (u >= 1) dashTween.active = false;
   return true;
 }, 10);
-
-function scheduleActionBarAfterPaint(){
-  const raf=window.requestAnimationFrame;
-  if(typeof raf!=='function'){renderActionBar();return;}
-  raf(()=>raf(renderActionBar));
-}
-if(window.__keloBootReady)scheduleActionBarAfterPaint();
-else window.addEventListener('kelo:boot-ready',scheduleActionBarAfterPaint,{once:true});
