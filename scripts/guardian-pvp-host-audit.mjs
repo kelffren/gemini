@@ -1,6 +1,6 @@
 /* KELO-INDEX
  * area: QA / GUARDIAN PVP
- * keys: GUARDIAN PVP SHARED AUTHORITY PARITY FIXED STEP LEASE DOUBLE AUTHORITY FIRST USE TAKEOVER RATE LIMIT EPOCH
+ * keys: GUARDIAN PVP SHARED AUTHORITY PARITY FIXED STEP LEASE DOUBLE AUTHORITY FIRST USE TAKEOVER RATE LIMIT EPOCH CACHE SEQUENCE
  * purpose: smoke test del core compartido y contratos de host/adaptador Guardian, incluido relevo seguro de Master
  */
 import assert from 'node:assert/strict';
@@ -55,6 +55,11 @@ assert.match(adapterSource,/GUARDIAN_PVP_DOUBLE_AUTHORITY_BLOCKED/);
 assert.match(adapterSource,/GUARDIAN_PVP_CENTRAL_SERVER_RETURNED/);
 assert.match(adapterSource,/base\.sendCombatIntent/);
 assert.match(adapterSource,/KeloSimulation\.after\('guardian:pvp-net-adapter'/);
+assert.match(adapterSource,/sequence=Math\.max\(sequence,lastAck\+1\)/);
+assert.match(adapterSource,/sequenceResyncs/);
+assert.match(adapterSource,/kelo:guardian-pvp-reject/);
+assert.match(adapterSource,/kelo:guardian-pvp-takeover/);
+assert.match(adapterSource,/takeoverSequenceResync:true/);
 assert.doesNotMatch(adapterSource,/setInterval/);
 
 assert.match(uiSource,/INICIAR PVP LAB/);
@@ -64,14 +69,15 @@ assert.match(uiSource,/permissionGrant:false/);
 
 const order=[
  'src/systems/pvp/shared-pvp-authority.js?v=1',
- 'src/systems/guardian-pvp-host.js?v=1',
+ 'src/systems/guardian-pvp-host.js?v=2-takeover',
  'engine-net.js?v=20260916-pvp-first-use-1',
- 'src/systems/guardian-pvp-net-adapter.js?v=1',
+ 'src/systems/guardian-pvp-net-adapter.js?v=2-takeover',
  'src/systems/pvp-world.js?v=20260916-pvp-first-use-1',
- 'src/ui/guardian-pvp-ui.js?v=1'
+ 'src/ui/guardian-pvp-ui.js?v=2-mobile-safe'
 ].map(x=>registrySource.indexOf(x));
 assert.ok(order.every(n=>n>=0),'Guardian PvP files must exist in registry');
 for(let i=1;i<order.length;i++)assert.ok(order[i]>order[i-1],`Guardian PvP load order invalid at ${i}`);
+assert.match(registrySource,/kelo-feature-registry-v2\.4\.0-guardian-pvp-takeover/);
 
 const pvp=require('../server/pvp-authority.js');
 assert.equal(pvp.FIXED_DT,1/60);
@@ -92,4 +98,4 @@ assert.equal(authority.audit().persistentAuthority,false);
 assert.equal(authority.audit().economyAuthority,false);
 authority.dispose();
 
-console.log('GUARDIAN_PVP_HOST_AUDIT_OK',{fixedDt:pvp.FIXED_DT,doubleAuthorityBlocked:true,takeoverRestore:true,inputRateLimit:90,snapshotEpochFenced:true,persistentAuthority:false});
+console.log('GUARDIAN_PVP_HOST_AUDIT_OK',{fixedDt:pvp.FIXED_DT,doubleAuthorityBlocked:true,takeoverRestore:true,inputRateLimit:90,snapshotEpochFenced:true,sequenceResync:true,cacheVersioned:true,persistentAuthority:false});
