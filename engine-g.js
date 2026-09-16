@@ -1,8 +1,8 @@
 /* KELO-INDEX
  * area: LEGACY ABILITY / MOVEMENT
  * owner: action-bar bootstrap + legacy dash tween; aim lifecycle owned by KeloAbilityAim; movement extension owned by KeloMovement
- * keys: DASH MOVEMENT INTERCEPT ACTION BAR BOOTSTRAP
- * purpose: conserva solo la barra inicial y el dash tween legacy mientras KeloAbilityAim posee begin/end/update/cast compatibility
+ * keys: DASH MOVEMENT INTERCEPT ACTION BAR BOOTSTRAP AFTER PAINT
+ * purpose: conserva solo la barra inicial y el dash tween legacy; la barra oculta en social-mode se monta después del primer paint mientras KeloAbilityAim posee begin/end/update/cast compatibility
  * public-api: renderActionBar compatibility
  * consumes: KeloMovement, KeloAbilityAim, STATE, localPlayer, obstacles
  * state-owned: skillAim + dashTween legacy compatibility state
@@ -51,4 +51,10 @@ window.KeloMovement.intercept('engine-g:legacy-dash', function(ctx) {
   return true;
 }, 10);
 
-renderActionBar();
+function scheduleActionBarAfterPaint(){
+  const raf=window.requestAnimationFrame;
+  if(typeof raf!=='function'){renderActionBar();return;}
+  raf(()=>raf(renderActionBar));
+}
+if(window.__keloBootReady)scheduleActionBarAfterPaint();
+else window.addEventListener('kelo:boot-ready',scheduleActionBarAfterPaint,{once:true});
