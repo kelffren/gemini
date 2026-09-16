@@ -4,7 +4,7 @@
  * keys: ASSET VAULT INDEXEDDB DOWNLOAD OWNED INTEGRATED LAZY
  * purpose: Store only assets explicitly downloaded by this device and hand them to the canonical compiler on explicit integration.
  */
-import { compileCanvasAsset, buildAssetSheetManifest } from './asset-sheet-compiler.mjs';
+import { analyzeAssetSheetPixels, buildAssetSheetManifest } from './asset-sheet-compiler.mjs';
 
 const DB_NAME='kelo_personal_asset_vault_v1';
 const DB_VERSION=1;
@@ -88,7 +88,10 @@ export async function integrateAsset(id){
   const asset=await getAsset(id);if(!asset)throw new Error('ASSET_NOT_IN_VAULT');if(!asset.downloaded)throw new Error('ASSET_NOT_DOWNLOADED');
   const decision=licenseDecision(asset);if(!decision.allowed)throw new Error('ASSET_LICENSE_REVIEW_REQUIRED:'+asset.license);
   const blob=await getBlob(id);if(!blob)throw new Error('ASSET_BINARY_MISSING');
-  const canvas=await blobToCanvas(blob);const analysis=compileCanvasAsset(canvas,{name:asset.name,source:asset.sourceUrl||asset.downloadUrl,provider:asset.provider,license:asset.license});
+  const canvas=await blobToCanvas(blob);
+  const ctx=canvas.getContext('2d',{willReadFrequently:true});if(!ctx)throw new Error('ASSET_CANVAS_UNAVAILABLE');
+  let pixels=null;try{pixels=ctx.getImageData(0,0,canvas.width,canvas.height);}catch(error){throw new Error('ASSET_PIXEL_READ_FAILED:'+(error?.message||error));}
+  const analysis=analyzeAssetSheetPixels(pixels.data,canvas.width,canvas.height,{});
   if(!analysis?.version||!Array.isArray(analysis.assets))throw new Error('ASSET_COMPILER_REJECTED');
   const atlasId=`personal-${asset.provider}-${asset.externalId}`.toLowerCase().replace(/[^a-z0-9_-]+/g,'-');
   const manifest=buildAssetSheetManifest(analysis,{sourceName:asset.name,sourcePath:asset.sourceUrl||asset.downloadUrl,atlasId});
