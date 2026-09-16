@@ -60,6 +60,12 @@ El primer plan cubre:
 - `plazaNature` / `assets/Arboleskelo1.PNG`: sparse-atlas exacto con los cinco frames que `plazaNatureProps` usa en el runtime central (`tree_large`, `tree_pink`, `tree_medium`, `tree_cypress`, `tree_small`). El asset original conserva todos sus frames para authoring/Studio.
 - `plazaFountainKelo`, `plazaRoundTree`, `forestPlazaV2`, `cesped`: torneo lossless PNG/WebP/AVIF. Son candidatos; no se promueven automáticamente.
 
+### Promoción verificada de `plazaNature`
+
+El runtime usa `assets/pn-233db909.png`, generado exclusivamente desde el SOURCE canónico. La promoción se acepta únicamente con SHA-256 completo `233db909c040229470a2aea2bb98d29f9a79c45b89f3996df0799dd92afee8a1`, tamaño exacto `1,283,924` bytes y coverage audit verde. El SOURCE `assets/Arboleskelo1.PNG` permanece intacto y continúa declarado en `config/instant-delivery-plaza.json`, pero su ruta no forma parte de la metadata JS de boot.
+
+La promoción CI es idempotente: reconstruye desde SOURCE, verifica hash/tamaño, actualiza la ruta runtime, separa la metadata SOURCE del cierre de boot y no crea otro loader.
+
 ## Invariantes
 
 1. SOURCE nunca se sobrescribe.
@@ -99,6 +105,7 @@ CI publica además el ahorro agregado en GitHub Step Summary y guarda blobs/repo
 - `node scripts/instant-delivery-compiler-audit.mjs`
 - `node scripts/instant-delivery-usage-audit.mjs`
 - job `instant-delivery-lab` dentro de `Kelo Weightless Stack`
+- workflow `Kelo Instant Delivery Promotion` reconstruye/verifica el blob promovido dentro de GitHub, evitando transporte binario externo.
 - `observed-boot-transfer` sigue siendo obligatorio cuando un candidato se conecta al runtime.
 - Playwright iPhone 390x844 + walk sostenido sigue siendo obligatorio para la promoción runtime.
 
@@ -122,7 +129,6 @@ Para añadir otro asset:
 
 ## Deuda / siguientes pasos
 
-- Promover el sparse atlas de `plazaNature` solo después de leer el artifact real y pasar el gate de consumo.
-- Resolver qué owner solicita `forestPlazaV2` antes de `boot-ready` mediante la sonda V4.
-- Ejecutar device proof real iOS Safari antes de promover WebP/AVIF.
+- Medir la promoción de `plazaNature` con V2 + V3 sobre los bytes promovidos exactos y mantenerla solo si ambos ratchets pasan.
+- Ejecutar device proof real iOS Safari antes de promover WebP/AVIF de fuente/árbol redondo.
 - Extender el mismo modelo a packs por distrito/viewport cuando sus consumidores puedan declarar cobertura estable.
