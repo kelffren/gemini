@@ -1,5 +1,6 @@
 ---
-title: Kelo Sprite Pose\emoji: 🦴
+title: Kelo Sprite Pose
+emoji: 🦴
 colorFrom: indigo
 colorTo: blue
 sdk: gradio
