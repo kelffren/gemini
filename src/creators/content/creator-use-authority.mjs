@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: CREATORS / CONTENT USE AUTHORITY
  * owner: Kelo Creator Use Authority
- * keys: CREATOR USE EQUIP APPEARANCE WEAPON MOUNT PROPERTY SERVER AUTHORITY ENTITLEMENT EXACT REVISION
+ * keys: CREATOR USE AVATAR EQUIP APPEARANCE WEAPON MOUNT PROPERTY SERVER AUTHORITY ENTITLEMENT EXACT REVISION
  * owns: thin client orchestration for server-authorized Creator use bindings + non-authoritative hydrated selection cache
  * does-not-own: entitlement truth, rendering, gameplay stats, parcel geometry, inventory, publication, KC or auth UI
  * rule: activate exact revision -> server mutation -> existing domain owner; no local ownership flag can authorize use
@@ -49,12 +49,19 @@ export function createCreatorUseAuthority({root=globalThis,delivery=null}={}){
     const id=text(revisionId);if(!UUID_RE.test(id))throw new Error('REVISION_REQUIRED');const d=getDelivery();if(!d?.activateRevision)throw new Error('CREATOR_CONTENT_DELIVERY_REQUIRED');return d.activateRevision(id);
   }
   function rememberBinding(characterId,slotKey,revisionId,runtimeId,bindingKind){
-    const current=hydrated.get(characterId)||{characterId,loadout:new Map(),mount:null};
+    const current=hydrated.get(characterId)||{characterId,loadout:new Map(),mount:null,avatar:null};
     if(revisionId)current.loadout.set(slotKey,F({slotKey,revisionId,runtimeId:runtimeId||null,bindingKind:bindingKind||'appearance'}));else current.loadout.delete(slotKey);
     hydrated.set(characterId,current);return current;
   }
-  function rememberMount(characterId,revisionId,runtimeId){const current=hydrated.get(characterId)||{characterId,loadout:new Map(),mount:null};current.mount=revisionId?F({revisionId,runtimeId:runtimeId||null}):null;hydrated.set(characterId,current);return current;}
+  function rememberMount(characterId,revisionId,runtimeId){const current=hydrated.get(characterId)||{characterId,loadout:new Map(),mount:null,avatar:null};current.mount=revisionId?F({revisionId,runtimeId:runtimeId||null}):null;hydrated.set(characterId,current);return current;}
+  function rememberAvatar(characterId,revisionId,contentId,runtimeId){const current=hydrated.get(characterId)||{characterId,loadout:new Map(),mount:null,avatar:null};current.avatar=revisionId?F({revisionId,contentId,runtimeId:runtimeId||contentId||null}):null;hydrated.set(characterId,current);return current;}
   function emit(type,detail){try{root.dispatchEvent?.(new CustomEvent(type,{detail:F({...detail})}));}catch{}}
+  async function selectCharacterAvatar(revisionId,{characterId=null,persistLocal=true}={}){
+    const active=await activate(revisionId),manifest=active.manifest;if(manifest.contentType!=='character')throw new Error('CREATOR_CONTENT_NOT_CHARACTER');const cid=await resolveCharacterId(characterId);
+    const result=await rpc('set_active_character_avatar',{p_character_id:cid,p_content_id:manifest.contentId}),runtimeId=active.row?.activation?.runtimeId||manifest.contentId;rememberAvatar(cid,manifest.revisionId,manifest.contentId,runtimeId);
+    if(root.KeloCreatorAvatars?.select){try{root.KeloCreatorAvatars.select(manifest.contentId,{manifest,persistLocal});}catch(error){console.warn('[Creator use] avatar runtime select deferred',error);}}
+    emit('kelo:creator-use-changed',{kind:'character',characterId:cid,revisionId:manifest.revisionId,contentId:manifest.contentId,runtimeId});return F({ok:true,characterId:cid,revisionId:manifest.revisionId,contentId:manifest.contentId,runtimeId,server:copy(result),manifest,row:active.row});
+  }
   async function equipRevision(revisionId,{characterId=null,slotKey=null}={}){
     const active=await activate(revisionId),manifest=active.manifest,type=text(manifest.contentType);
     if(!['appearance','equipment'].includes(type))throw new Error('CREATOR_CONTENT_NOT_EQUIPPABLE');
@@ -67,7 +74,10 @@ export function createCreatorUseAuthority({root=globalThis,delivery=null}={}){
     const slot=text(slotKey);if(!slot)throw new Error('SLOT_REQUIRED');const cid=await resolveCharacterId(characterId),result=await rpc('set_character_creator_content',{p_character_id:cid,p_slot_key:slot,p_revision_id:null});rememberBinding(cid,slot,null,null,null);emit('kelo:creator-use-changed',{kind:'clear-slot',characterId:cid,slotKey:slot,revisionId:null});return F({ok:true,characterId:cid,slotKey:slot,server:copy(result)});
   }
   async function selectMount(revisionId,{characterId=null,activateRuntime=true}={}){
-    const active=activateRuntime?await activate(revisionId):null,manifest=active?.manifest||await getDelivery()?.getManifest?.(revisionId);if(!manifest||manifest.contentType!=='mount')throw new Error('CREATOR_CONTENT_NOT_MOUNT');
+    let active=null,manifest=null;
+    if(activateRuntime){active=await activate(revisionId);manifest=active.manifest;}
+    else{const d=getDelivery();if(!d?.getManifest)throw new Error('CREATOR_CONTENT_DELIVERY_REQUIRED');manifest=await d.getManifest(revisionId);}
+    if(manifest.contentType!=='mount')throw new Error('CREATOR_CONTENT_NOT_MOUNT');
     const cid=await resolveCharacterId(characterId),result=await rpc('set_character_creator_mount',{p_character_id:cid,p_revision_id:manifest.revisionId}),runtimeId=active?.row?.activation?.runtimeId||null;rememberMount(cid,manifest.revisionId,runtimeId);emit('kelo:creator-use-changed',{kind:'mount',characterId:cid,revisionId:manifest.revisionId,runtimeId});return F({ok:true,characterId:cid,revisionId:manifest.revisionId,runtimeId,server:copy(result),manifest,row:active?.row||null});
   }
   async function clearMount({characterId=null}={}){const cid=await resolveCharacterId(characterId),result=await rpc('set_character_creator_mount',{p_character_id:cid,p_revision_id:null});rememberMount(cid,null,null);emit('kelo:creator-use-changed',{kind:'clear-mount',characterId:cid,revisionId:null});return F({ok:true,characterId:cid,server:copy(result)});}
@@ -76,11 +86,11 @@ export function createCreatorUseAuthority({root=globalThis,delivery=null}={}){
     const result=await rpc('authorize_creator_property_placement',{p_character_id:cid,p_revision_id:manifest.revisionId,p_parcel_key:parcel,p_transform:copy(transform||{})});emit('kelo:creator-property-use-authorized',{characterId:cid,revisionId:manifest.revisionId,parcelKey:parcel,authorizationId:result?.authorizationId||null});return F({ok:true,characterId:cid,revisionId:manifest.revisionId,server:copy(result),manifest,row:active.row});
   }
   async function getState({characterId=null,hydrateRuntime=false}={}){
-    const cid=await resolveCharacterId(characterId),raw=await rpc('get_my_creator_use_state',{p_character_id:cid}),loadout=Array.isArray(raw?.loadout)?raw.loadout:[],state={characterId:cid,loadout:new Map(),mount:null};
+    const cid=await resolveCharacterId(characterId),raw=await rpc('get_my_creator_use_state',{p_character_id:cid}),loadout=Array.isArray(raw?.loadout)?raw.loadout:[],state={characterId:cid,loadout:new Map(),mount:null,avatar:null};
     if(hydrateRuntime){for(const binding of loadout){try{const active=await activate(binding.revisionId);state.loadout.set(String(binding.slotKey),F({...binding,runtimeId:active.row?.activation?.runtimeId||null}));}catch(error){state.loadout.set(String(binding.slotKey),F({...binding,runtimeId:null,error:String(error?.message||error)}));}}if(raw?.mount?.revisionId){try{const active=await activate(raw.mount.revisionId);state.mount=F({...raw.mount,runtimeId:active.row?.activation?.runtimeId||null});}catch(error){state.mount=F({...raw.mount,runtimeId:null,error:String(error?.message||error)});}}}else{for(const binding of loadout)state.loadout.set(String(binding.slotKey),F({...binding,runtimeId:null}));if(raw?.mount)state.mount=F({...raw.mount,runtimeId:null});}
     hydrated.set(cid,state);return snapshot(cid);
   }
-  function snapshot(characterId){const id=text(characterId),state=hydrated.get(id);if(!state)return null;return F({characterId:id,loadout:F([...state.loadout.values()].map(copy)),mount:state.mount?F(copy(state.mount)):null});}
+  function snapshot(characterId){const id=text(characterId),state=hydrated.get(id);if(!state)return null;return F({characterId:id,loadout:F([...state.loadout.values()].map(copy)),mount:state.mount?F(copy(state.mount)):null,avatar:state.avatar?F(copy(state.avatar)):null});}
   function resolveCharacterAppearance({characterId,profileId='appearance.character.human.standard',direction='down',motion='idle'}={}){const state=hydrated.get(text(characterId));if(!state||!root.KeloAppearance?.resolveLoadout)return{ok:false,error:'CREATOR_USE_STATE_NOT_HYDRATED',layers:[]};const slots={};for(const row of state.loadout.values())if(row.runtimeId)slots[row.slotKey]=row.runtimeId;return root.KeloAppearance.resolveLoadout({profileId,slots,direction,motion});}
   function attachRuntimeGuards(){
     if(!mountGuardDispose&&root.KeloMounts?.useGuard){mountGuardDispose=root.KeloMounts.useGuard(async(op,payload)=>{if(!['mount:equip','mount:mount','mount:unequip'].includes(op))return;let mountId=text(payload?.mountId);if(op==='mount:unequip'&&!mountId)mountId=text(root.KeloMounts?.getEquippedMountId?.());const revisionId=creatorRevisionFromMount(root,mountId);if(!revisionId)return;if(op==='mount:unequip')await clearMount({});else await selectMount(revisionId,{activateRuntime:false});});}
@@ -88,9 +98,9 @@ export function createCreatorUseAuthority({root=globalThis,delivery=null}={}){
     return F({mount:!!mountGuardDispose,property:!!propertyGuardDispose});
   }
   function invalidateIdentity(){hydrated.clear();return diagnostics();}
-  function diagnostics(){return F({version:'creator-use-authority-v1.0.0',provider:provider?.name||'KeloOnlineAuth',accountId:accountId()||null,hydratedCharacters:hydrated.size,mountGuard:!!mountGuardDispose,propertyGuard:!!propertyGuardDispose});}
+  function diagnostics(){return F({version:'creator-use-authority-v1.0.1-avatar',provider:provider?.name||'KeloOnlineAuth',accountId:accountId()||null,hydratedCharacters:hydrated.size,mountGuard:!!mountGuardDispose,propertyGuard:!!propertyGuardDispose});}
   function dispose(){try{mountGuardDispose?.();}catch{}try{propertyGuardDispose?.();}catch{}mountGuardDispose=propertyGuardDispose=null;hydrated.clear();}
-  const api=F({version:'creator-use-authority-v1.0.0',bindProvider,equipRevision,clearSlot,selectMount,clearMount,authorizePropertyPlacement,getState,snapshot,resolveCharacterAppearance,attachRuntimeGuards,invalidateIdentity,diagnostics,dispose});return api;
+  const api=F({version:'creator-use-authority-v1.0.1-avatar',bindProvider,selectCharacterAvatar,equipRevision,clearSlot,selectMount,clearMount,authorizePropertyPlacement,getState,snapshot,resolveCharacterAppearance,attachRuntimeGuards,invalidateIdentity,diagnostics,dispose});return api;
 }
 
 export function getOrCreateCreatorUseAuthority({root=globalThis,delivery=null}={}){if(root.KELO_CREATOR_USE_AUTHORITY)return root.KELO_CREATOR_USE_AUTHORITY;const api=createCreatorUseAuthority({root,delivery});try{root.KELO_CREATOR_USE_AUTHORITY=api;}catch{}return api;}
