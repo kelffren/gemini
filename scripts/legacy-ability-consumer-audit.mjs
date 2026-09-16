@@ -5,7 +5,7 @@ const ROOT=process.cwd();
 const SKIP_DIRS=new Set(['.git','node_modules','docs','tests','.github','coverage','dist','build']);
 const EXTENSIONS=new Set(['.js','.mjs','.cjs','.html']);
 const TOKENS=['KeloAbilityAim','beginSkillAim','endSkillAim','castAimedSkill','skillAim','triggerStone'];
-const EXPECTED_DIRECT_AIM_CONSUMERS=Object.freeze(['engine-l.js','engine-m.js']);
+const EXPECTED_DIRECT_AIM_CONSUMERS=Object.freeze(['engine-l.js']);
 
 function walk(dir,out=[]){
   for(const entry of fs.readdirSync(dir,{withFileTypes:true})){
