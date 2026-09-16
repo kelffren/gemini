@@ -6,6 +6,7 @@ blob-report/
 dist/asset-space-report/
 .cache/asset-space/
 .cache/asset-tools/
+.cache/asset-batch-delivery/
 
 # Supabase/local backend secrets and ephemeral CLI state
 .env
