@@ -59,7 +59,7 @@ assert.match(workflow,/Guardian PvP Failover LIVE/);
 assert.match(workflow,/BROWSERSTACK_USERNAME/);
 assert.match(workflow,/KELO_GUARDIAN_TEST_ADMIN_EMAIL/);
 assert.match(workflow,/KELO_GUARDIAN_TEST_DONOR_EMAIL/);
-assert.match(workflow,/audit:guardian-pvp-failover/);
+assert.match(workflow,/node scripts\/guardian-pvp-failover-audit\.mjs/);
 assert.match(workflow,/KELO_FAILOVER_REAL_IOS: '1'/);
 assert.match(workflow,/browserstack\.guardian-failover\.yml/);
 assert.match(workflow,/playwright install --with-deps chromium/);
