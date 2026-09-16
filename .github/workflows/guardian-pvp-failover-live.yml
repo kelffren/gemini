@@ -1,0 +1,127 @@
+name: Guardian PvP Failover LIVE
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'tests/guardian-pvp-failover-live.spec.js'
+      - 'scripts/guardian-pvp-failover-audit.mjs'
+      - 'browserstack.guardian-failover.yml'
+      - '.github/workflows/guardian-pvp-failover-live.yml'
+      - 'src/systems/guardian-system.js'
+      - 'src/systems/guardian-authority.js'
+      - 'src/systems/guardian-pvp-host.js'
+      - 'src/systems/guardian-pvp-net-adapter.js'
+      - 'src/workers/guardian-pvp-authority-worker.js'
+  workflow_run:
+    workflows: ['pages build and deployment']
+    types: [completed]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: guardian-pvp-failover-${{ github.event_name }}-${{ github.event.workflow_run.head_sha || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    name: failover-contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Audit failover lab contract
+        run: npm run audit:guardian-pvp-failover
+
+  real-ios-failover:
+    name: physical-iphone-master-failover
+    needs: contract
+    if: >-
+      github.event_name != 'push' &&
+      (github.event_name != 'workflow_run' ||
+       (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      BROWSERSTACK_USERNAME: ${{ secrets.BROWSERSTACK_USERNAME }}
+      BROWSERSTACK_ACCESS_KEY: ${{ secrets.BROWSERSTACK_ACCESS_KEY }}
+      BROWSERSTACK_CONFIG_FILE: browserstack.guardian-failover.yml
+      BUILD_NUMBER: ${{ github.run_number }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+      KELO_GUARDIAN_TEST_ADMIN_EMAIL: ${{ secrets.KELO_GUARDIAN_TEST_ADMIN_EMAIL }}
+      KELO_GUARDIAN_TEST_ADMIN_PASSWORD: ${{ secrets.KELO_GUARDIAN_TEST_ADMIN_PASSWORD }}
+      KELO_GUARDIAN_TEST_DONOR_EMAIL: ${{ secrets.KELO_GUARDIAN_TEST_DONOR_EMAIL }}
+      KELO_GUARDIAN_TEST_DONOR_PASSWORD: ${{ secrets.KELO_GUARDIAN_TEST_DONOR_PASSWORD }}
+      KELO_PAGES_URL: https://kelffren.github.io/gemini/
+      KELO_FAILOVER_REAL_IOS: '1'
+      KELO_GUARDIAN_FAILOVER_MAX_MS: '45000'
+      KELO_GUARDIAN_FAILOVER_MAX_DRIFT_PX: '12'
+      CI: 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check LIVE credentials
+        id: credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=0
+          required=(
+            BROWSERSTACK_USERNAME
+            BROWSERSTACK_ACCESS_KEY
+            SUPABASE_URL
+            SUPABASE_PUBLISHABLE_KEY
+            KELO_GUARDIAN_TEST_ADMIN_EMAIL
+            KELO_GUARDIAN_TEST_ADMIN_PASSWORD
+            KELO_GUARDIAN_TEST_DONOR_EMAIL
+            KELO_GUARDIAN_TEST_DONOR_PASSWORD
+          )
+          for key in "${required[@]}"; do
+            if [ -z "${!key:-}" ]; then
+              echo "Missing secret: $key" >> "$GITHUB_STEP_SUMMARY"
+              missing=1
+            fi
+          done
+          if [ "$missing" -eq 0 ]; then
+            echo 'available=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'available=false' >> "$GITHUB_OUTPUT"
+            echo '### Guardian PvP real-iOS failover not executed' >> "$GITHUB_STEP_SUMMARY"
+            echo 'Static failover contract remains enforced by the contract job.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Setup Node
+        if: steps.credentials.outputs.available == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        if: steps.credentials.outputs.available == 'true'
+        run: npm install --no-audit --no-fund
+
+      - name: Install local candidate-B Chromium
+        if: steps.credentials.outputs.available == 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Run physical iPhone A -> Chromium B failover
+        if: steps.credentials.outputs.available == 'true'
+        run: npx browserstack-node-sdk playwright test tests/guardian-pvp-failover-live.spec.js --workers=1 --retries=0
+
+      - name: Record gate result
+        if: steps.credentials.outputs.available == 'true' && success()
+        run: |
+          echo '### Guardian PvP failover LIVE PASS' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Master A: physical iPhone 14 Pro / Safari / iOS 26' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Candidate B: concurrent Chromium node' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Failure: A context disappears without stopMasterHost()' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Recovery: backend lease expiry -> newer epoch -> Worker takeover snapshot' >> "$GITHUB_STEP_SUMMARY"
