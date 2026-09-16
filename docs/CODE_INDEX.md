@@ -53,6 +53,10 @@
 - `src/creators/workspaces/image-lab-workspace.mjs` — manifest que integra Image Lab al registry Creator.
 - `src/creators/ui/image-lab-workspace.mjs` — preparación de fuentes tipo Photoshop ligero/no destructivo.
 - `src/creators/ui/asset-forge-workspace.mjs` — pixel drawing + QA/repair + asset authoring local.
+- `src/creators/ui/content-studio-workspace.mjs` — ingest universal + runtime preview + Release Center móvil.
+- `src/creators/release/creator-release-service.mjs` — frontera de release: lee review/publicación server-side y solo permite submit/resubmit a review.
+- `src/creators/content/supabase-content-repository.mjs` — transporte autenticado/RLS para revisiones, review status y publicaciones visibles; no posee publish authority.
+- `src/creators/content/runtime-content-registry.mjs` — registry semántico y adapters a owners runtime existentes.
 - `src/ui/studio-launcher.js` — launcher del Creator Hub/Studio avanzado.
 - `src/creators/workspaces/world-workspace.mjs` — route/prewarm móvil.
 - `src/studio/integration/world-studio-bridge.mjs` — bridge de carga.
