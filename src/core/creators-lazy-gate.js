@@ -2,7 +2,7 @@
  * area: CORE / OPTIONAL UI
  * owner: KeloCreatorsLazyGate
  * keys: CREATORS ASSET FORGE LAZY FIRST-USE ADMIN MOBILE SAFARI NO-FREEZE ASSET CATALOG OPEN ACCESS
- * purpose: mantiene Creators y Asset Forge disponibles sin evaluar Studio hasta que el usuario los abre; Asset Forge no carga el catálogo grande
+ * purpose: mantiene Creators y Asset Forge disponibles sin evaluar Studio hasta que el usuario los abre; el catálogo grande se hidrata fuera del camino crítico
  * public-api: KeloCreatorsLazyGate.open/openAssetForge/sync
  * consumes: KELO_ADMIN_KEYS + Luxe menu
  * do-not: NO creator imports on normal boot, NO polling, NO second loop
@@ -10,14 +10,14 @@
 (function(root){
 'use strict';
 if(root.KeloCreatorsLazyGate)return;
-const VERSION='kelo-creators-lazy-gate-v7-open-access';
+const VERSION='kelo-creators-lazy-gate-v8-studio-first';
 // TEMPORAL: Creadores abierto para todos. Mantener la verificación original intacta
 // permite volver a permisos por rol cambiando solo este flag a false.
 const OPEN_CREATOR_ACCESS=true;
 const LAUNCHER_SRC='src/ui/studio-launcher.js?v=asset-forge-20260915-1';
 const ASSET_CATALOG_SRC='src/property/property-asset-catalog.js?v=creator-assets-20260915-1';
 const assetForgeModuleUrl=()=>new URL('src/creators/creator-entry.mjs?v=asset-forge-20260915-1',root.document?.baseURI||root.location.href).href;
-let loading=null,catalogLoading=null,forgeLoading=null;
+let loading=null,catalogLoading=null,catalogSchedule=null,forgeLoading=null;
 const query=()=>{try{return new URLSearchParams(root.location.search);}catch(_){return new URLSearchParams();}};
 const directRequested=()=>query().get('creators')==='1'||query().get('creator')==='1'||query().get('mapEditor')==='1';
 const actor=()=>String(root.KELO_ADMIN_KEYS?.playerId?.()||root.keloNet?.playerKey||root.localPlayer?.id||'local_pioneer');
@@ -25,13 +25,11 @@ function permissionAllowed(){
   const keys=root.KELO_ADMIN_KEYS,who=actor();
   return !!(keys?.can?.('creators.access',who)||keys?.can?.('world.edit',who)||keys?.can?.('animation.edit',who));
 }
-function allowed(){
-  return OPEN_CREATOR_ACCESS||permissionAllowed();
-}
+function allowed(){return OPEN_CREATOR_ACCESS||permissionAllowed();}
 function toast(msg){if(typeof root.showToast==='function')root.showToast(msg);else console.info('[Kelo Creators gate]',msg);}
 function paint(btn,busy){
   if(!btn)return;
-  btn.innerHTML='<span class="lx-menu-icon" aria-hidden="true">♟</span><span class="lx-menu-copy"><b>'+(busy?'Abriendo…':'Creators')+'</b><small>'+(busy?'Cargando assets bajo demanda':'Herramientas de creación')+'</small></span>';
+  btn.innerHTML='<span class="lx-menu-icon" aria-hidden="true">♟</span><span class="lx-menu-copy"><b>'+(busy?'Abriendo…':'Creators')+'</b><small>'+(busy?'Preparando editor':'Herramientas de creación')+'</small></span>';
   btn.disabled=!!busy;
   if(busy)btn.setAttribute('aria-busy','true');else btn.removeAttribute('aria-busy');
 }
@@ -70,16 +68,24 @@ function loadAssetCatalog(){
   }).finally(function(){catalogLoading=null;});
   return catalogLoading;
 }
+function scheduleAssetCatalog(){
+  if(root.KELO_PROPERTY_CATALOG?.list||catalogLoading||catalogSchedule)return;
+  const run=function(){catalogSchedule=null;void loadAssetCatalog();};
+  if(typeof root.requestIdleCallback==='function')catalogSchedule=root.requestIdleCallback(run,{timeout:2500});
+  else catalogSchedule=(root.setTimeout||setTimeout)(run,1200);
+}
 function loadStudio(){
   if(loading)return loading;
   loading=(async function(){
-    // Creator-only load: the normal game does not pay for the full asset library.
-    await loadAssetCatalog();
-    if(root.KELO_STUDIO_LAUNCHER)return root.KELO_STUDIO_LAUNCHER;
-    return new Promise(function(resolve,reject){
+    // Safari survival rule: paint/open Creator chrome first. The full property catalog
+    // is useful, but it must never be a prerequisite for opening the editor shell.
+    if(root.KELO_STUDIO_LAUNCHER){scheduleAssetCatalog();return root.KELO_STUDIO_LAUNCHER;}
+    const launcher=await new Promise(function(resolve,reject){
       const s=document.createElement('script');s.src=LAUNCHER_SRC;s.async=false;s.dataset.keloCreatorsFirstUse='1';
       s.onload=function(){resolve(root.KELO_STUDIO_LAUNCHER||null);};s.onerror=function(){reject(new Error('CREATORS_LAUNCHER_LOAD_FAILED'));};document.head.appendChild(s);
     });
+    scheduleAssetCatalog();
+    return launcher;
   })().finally(function(){loading=null;sync();});
   return loading;
 }
@@ -110,7 +116,7 @@ async function open(){
   catch(error){console.error('[Kelo Creators lazy gate]',error);toast('No se pudo abrir Kelo Creators');return false;}
   finally{paint(document.getElementById('lx-create-studio'),false);}
 }
-const api=Object.freeze({version:VERSION,open,openAssetForge,sync,get allowed(){return allowed();},get directRequested(){return directRequested();},get openAccess(){return OPEN_CREATOR_ACCESS;}});
+const api=Object.freeze({version:VERSION,open,openAssetForge,sync,get allowed(){return allowed();},get directRequested(){return directRequested();},get openAccess(){return OPEN_CREATOR_ACCESS;},get catalogReady(){return !!root.KELO_PROPERTY_CATALOG?.list;},loadAssetCatalog});
 root.KeloCreatorsLazyGate=api;
 root.KELO_CREATORS_LAZY_GATE=api;
 try{root.KELO_ADMIN_KEYS?.onChange?.(sync);}catch(_){}
