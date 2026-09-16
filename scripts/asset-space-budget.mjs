@@ -1,12 +1,12 @@
 /* KELO-INDEX
  * area: BUILD / CREATOR ASSET BUDGET
  * owner: Kelo Creator Asset Bridge
- * keys: ASSET BUDGET TRANSFER DECODE RGBA TRANSPARENT TRIM DUPLICATE HASH
- * purpose: find space problems compression alone cannot solve: decoded memory, transparent canvas waste and exact duplicate assets
+ * keys: ASSET BUDGET TRANSFER DECODE RGBA TRANSPARENT TRIM DUPLICATE BYTE PIXEL RENDER HASH
+ * purpose: find space problems compression alone cannot solve: decoded memory, transparent canvas waste and duplicate assets at byte/pixel/render levels
  * public-api: CLI report
  * state-owned: report files only
  * online: N/A; build-time observability
- * do-not: trim, delete or rewrite assets automatically
+ * do-not: trim, delete, alias or rewrite assets automatically
  */
 
 import fs from 'node:fs';
@@ -51,6 +51,30 @@ function walk(target) {
 
 const rel = file => path.relative(process.cwd(), file).replaceAll('\\','/');
 const human = bytes => bytes < 1024 ? `${bytes} B` : bytes < 1024**2 ? `${(bytes/1024).toFixed(1)} KB` : `${(bytes/1024**2).toFixed(2)} MB`;
+const sha256 = buffer => crypto.createHash('sha256').update(buffer).digest('hex');
+
+function renderSha256(rgba) {
+  // Canonical display hash: fully transparent pixels contribute 0,0,0,0.
+  // Visible/semitransparent pixels remain byte-exact. This detects duplicate
+  // DELIVERY appearance without declaring hidden RGB equivalent for SOURCE.
+  const hash = crypto.createHash('sha256');
+  const chunk = Buffer.allocUnsafe(Math.min(256 * 1024, Math.max(4, rgba.length)));
+  let write = 0;
+  for (let offset = 0; offset < rgba.length; offset += 4) {
+    const alpha = rgba[offset + 3];
+    if (alpha === 0) {
+      chunk[write++] = 0; chunk[write++] = 0; chunk[write++] = 0; chunk[write++] = 0;
+    } else {
+      chunk[write++] = rgba[offset]; chunk[write++] = rgba[offset + 1]; chunk[write++] = rgba[offset + 2]; chunk[write++] = alpha;
+    }
+    if (write >= chunk.length - 3) {
+      hash.update(chunk.subarray(0, write));
+      write = 0;
+    }
+  }
+  if (write) hash.update(chunk.subarray(0, write));
+  return hash.digest('hex');
+}
 
 function contentBounds(rgba, width, height, threshold) {
   let minX=width, minY=height, maxX=-1, maxY=-1, visible=0;
@@ -66,18 +90,51 @@ function contentBounds(rgba, width, height, threshold) {
   return {x:minX,y:minY,w:maxX-minX+1,h:maxY-minY+1,visiblePixels:visible};
 }
 
+function addHash(map, hash, record) {
+  if (!map.has(hash)) map.set(hash, []);
+  map.get(hash).push(record);
+}
+
+function duplicateGroupsFrom(map, kind) {
+  return [...map.entries()]
+    .filter(([,records]) => records.length > 1)
+    .map(([hash,records]) => {
+      const sorted = records.slice().sort((a,b) => a.storedBytes - b.storedBytes || a.file.localeCompare(b.file));
+      const totalBytes = sorted.reduce((sum,item) => sum + item.storedBytes, 0);
+      const canonicalBytes = sorted[0].storedBytes;
+      return {
+        kind,
+        sha256:hash,
+        count:sorted.length,
+        canonical:sorted[0].file,
+        files:sorted.map(item => item.file),
+        totalBytes,
+        canonicalBytes,
+        potentialStoredSavingBytes:Math.max(0,totalBytes-canonicalBytes)
+      };
+    })
+    .sort((a,b) => b.potentialStoredSavingBytes - a.potentialStoredSavingBytes || b.count-a.count);
+}
+
 const files = [];
-const hashes = new Map();
+const byteHashes = new Map();
+const rgbaHashes = new Map();
+const renderHashes = new Map();
 let transferBytes=0, decodedRgbaBytes=0, potentialTrimRgbaBytes=0;
 
 for (const file of walk(input)) {
   const buffer = fs.readFileSync(file);
+  const fileName = rel(file);
   transferBytes += buffer.length;
-  const hash = crypto.createHash('sha256').update(buffer).digest('hex');
-  if (!hashes.has(hash)) hashes.set(hash, []);
-  hashes.get(hash).push(rel(file));
+  const byteHash = sha256(buffer);
+  addHash(byteHashes, byteHash, {file:fileName,storedBytes:buffer.length});
   try {
     const decoded = decodePngRgba(buffer);
+    const pixelHash = sha256(decoded.rgba);
+    const renderHash = renderSha256(decoded.rgba);
+    addHash(rgbaHashes, pixelHash, {file:fileName,storedBytes:buffer.length});
+    addHash(renderHashes, renderHash, {file:fileName,storedBytes:buffer.length});
+
     const {width,height} = decoded.ihdr;
     const rgbaBytes = width*height*4;
     decodedRgbaBytes += rgbaBytes;
@@ -88,14 +145,15 @@ for (const file of walk(input)) {
     const canvasPixels = Math.max(1,width*height);
     const transparentPixels = canvasPixels-bounds.visiblePixels;
     const trimWasteRatio = 1-(trimPixels/canvasPixels);
-    const profile = profileAssetImage(decoded.rgba,width,height,{sourceName:rel(file)});
+    const profile = profileAssetImage(decoded.rgba,width,height,{sourceName:fileName});
     const flags=[];
     if (trimWasteRatio >= 0.5 && !profile.invariants.preserveBorder) flags.push('high-transparent-border-waste');
     if (rgbaBytes >= 8*1024*1024) flags.push('high-decoded-memory');
     if (buffer.length >= 2*1024*1024) flags.push('high-transfer-bytes');
     if (profile.invariants.preserveBorder) flags.push('do-not-trim-seam-critical');
     files.push({
-      file:rel(file),sha256:hash,storedBytes:buffer.length,width,height,decodedRgbaBytes:rgbaBytes,
+      file:fileName,sha256:byteHash,rgbaSha256:pixelHash,renderSha256:renderHash,
+      storedBytes:buffer.length,width,height,decodedRgbaBytes:rgbaBytes,
       storedToDecodedRatio:Number((buffer.length/Math.max(1,rgbaBytes)).toFixed(6)),
       transparentRatio:Number((transparentPixels/canvasPixels).toFixed(6)),
       contentBounds:bounds,
@@ -105,13 +163,13 @@ for (const file of walk(input)) {
       flags
     });
   } catch (error) {
-    files.push({file:rel(file),sha256:hash,storedBytes:buffer.length,error:String(error?.message||error),flags:['decode-unsupported']});
+    files.push({file:fileName,sha256:byteHash,storedBytes:buffer.length,error:String(error?.message||error),flags:['decode-unsupported']});
   }
 }
 
-const duplicateGroups = [...hashes.entries()]
-  .filter(([,paths]) => paths.length>1)
-  .map(([sha256,paths]) => ({sha256,count:paths.length,files:paths}));
+const byteDuplicateGroups = duplicateGroupsFrom(byteHashes,'byte-exact');
+const pixelDuplicateGroups = duplicateGroupsFrom(rgbaHashes,'rgba-exact');
+const renderDuplicateGroups = duplicateGroupsFrom(renderHashes,'render-exact');
 
 const successful = files.filter(item => !item.error);
 const largestTransfer = successful.slice().sort((a,b)=>b.storedBytes-a.storedBytes).slice(0,20).map(item=>item.file);
@@ -119,21 +177,27 @@ const largestDecoded = successful.slice().sort((a,b)=>b.decodedRgbaBytes-a.decod
 const largestTrimWaste = successful.slice().filter(item=>!item.profile.invariants.preserveBorder).sort((a,b)=>b.trimWasteRatio-a.trimWasteRatio).slice(0,20).map(item=>item.file);
 
 const report = {
-  version:'kelo-asset-space-budget-v1',generatedAt:new Date().toISOString(),input:rel(input),alphaThreshold,fileCount:files.length,
+  version:'kelo-asset-space-budget-v1.1',generatedAt:new Date().toISOString(),input:rel(input),alphaThreshold,fileCount:files.length,
   totals:{
     storedBytes:transferBytes,
     decodedRgbaBytes,
     decodedExpansion:transferBytes ? Number((decodedRgbaBytes/transferBytes).toFixed(3)) : 0,
     theoreticalTrimmedRgbaBytes:potentialTrimRgbaBytes,
     theoreticalTrimRgbaSavingPercent:decodedRgbaBytes ? Number((((decodedRgbaBytes-potentialTrimRgbaBytes)/decodedRgbaBytes)*100).toFixed(3)) : 0,
-    duplicateGroups:duplicateGroups.length
+    duplicateGroups:byteDuplicateGroups.length,
+    byteDuplicateGroups:byteDuplicateGroups.length,
+    pixelDuplicateGroups:pixelDuplicateGroups.length,
+    renderDuplicateGroups:renderDuplicateGroups.length
   },
-  rankings:{largestTransfer,largestDecoded,largestTrimWaste},duplicateGroups,files
+  rankings:{largestTransfer,largestDecoded,largestTrimWaste},
+  duplicateGroups:byteDuplicateGroups,
+  duplicates:{byteExact:byteDuplicateGroups,rgbaExact:pixelDuplicateGroups,renderExact:renderDuplicateGroups},
+  files
 };
 
 fs.mkdirSync(reportDir,{recursive:true});
 fs.writeFileSync(path.join(reportDir,'report.json'),JSON.stringify(report,null,2));
 const rows=successful.slice().sort((a,b)=>b.decodedRgbaBytes-a.decodedRgbaBytes).map(item=>`<tr><td>${item.file}</td><td>${item.profile.kind}</td><td>${human(item.storedBytes)}</td><td>${human(item.decodedRgbaBytes)}</td><td>${(item.transparentRatio*100).toFixed(1)}%</td><td>${(item.trimWasteRatio*100).toFixed(1)}%</td><td>${item.flags.join(', ')}</td></tr>`).join('\n');
-const html=`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Kelo Asset Space Budget</title><style>body{font:14px system-ui;background:#101216;color:#f5f7fb;padding:20px}table{width:100%;border-collapse:collapse}th,td{padding:9px;border-bottom:1px solid #303744;text-align:left}strong{color:#76e3a3}@media(max-width:800px){table{font-size:11px}}</style><h1>Kelo Asset Space Budget</h1><p>Stored <strong>${human(transferBytes)}</strong> · decoded RGBA baseline <strong>${human(decodedRgbaBytes)}</strong> · expansion ${report.totals.decodedExpansion}× · exact duplicate groups ${duplicateGroups.length}</p><p>Trim numbers are diagnostic only. No file is cropped or deleted by this audit.</p><table><thead><tr><th>Asset</th><th>Profile</th><th>Stored</th><th>RGBA baseline</th><th>Transparent</th><th>Border trim waste</th><th>Flags</th></tr></thead><tbody>${rows}</tbody></table>`;
+const html=`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Kelo Asset Space Budget</title><style>body{font:14px system-ui;background:#101216;color:#f5f7fb;padding:20px}table{width:100%;border-collapse:collapse}th,td{padding:9px;border-bottom:1px solid #303744;text-align:left}strong{color:#76e3a3}@media(max-width:800px){table{font-size:11px}}</style><h1>Kelo Asset Space Budget</h1><p>Stored <strong>${human(transferBytes)}</strong> · decoded RGBA baseline <strong>${human(decodedRgbaBytes)}</strong> · expansion ${report.totals.decodedExpansion}×</p><p>Duplicate groups: byte-exact <strong>${byteDuplicateGroups.length}</strong> · RGBA-exact <strong>${pixelDuplicateGroups.length}</strong> · render-exact <strong>${renderDuplicateGroups.length}</strong>.</p><p>Render-exact ignores RGB only where alpha=0. Trim and duplicate numbers are diagnostic; this audit never crops, aliases or deletes files.</p><table><thead><tr><th>Asset</th><th>Profile</th><th>Stored</th><th>RGBA baseline</th><th>Transparent</th><th>Border trim waste</th><th>Flags</th></tr></thead><tbody>${rows}</tbody></table>`;
 fs.writeFileSync(path.join(reportDir,'index.html'),html);
-console.log(`ASSET_SPACE_BUDGET_DONE files=${files.length} stored=${human(transferBytes)} decoded=${human(decodedRgbaBytes)} expansion=${report.totals.decodedExpansion}x duplicates=${duplicateGroups.length}`);
+console.log(`ASSET_SPACE_BUDGET_DONE files=${files.length} stored=${human(transferBytes)} decoded=${human(decodedRgbaBytes)} expansion=${report.totals.decodedExpansion}x byteDup=${byteDuplicateGroups.length} rgbaDup=${pixelDuplicateGroups.length} renderDup=${renderDuplicateGroups.length}`);
