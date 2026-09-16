@@ -21,7 +21,7 @@ function installPvpPresentationWire({WebSocket}={}){
   function stateFor(socket){let s=states.get(socket);if(!s){s={ownId:null,inPvp:false,cache:new Map(),sent:new Map()};states.set(socket,s);}return s;}
   function emitPresentation(socket,s,actorId,manifest,serverTime){
     const id=String(actorId||'');if(!id||id===s.ownId)return presentationKey(manifest);const key=presentationKey(manifest),previous=s.sent.has(id)?s.sent.get(id):MISSING;
-    s.cache.set(id,manifest||null);if(previous===key){presentationsSkipped++;return key;}s.sent.set(id,key);presentationsSent++;
+    s.cache.set(id,manifest||null);if(previous===key||(previous===MISSING&&key===null)){s.sent.set(id,key);presentationsSkipped++;return key;}s.sent.set(id,key);presentationsSent++;
     nativeSend.call(socket,JSON.stringify({t:'pvp:presentation',actorId:id,presentationKey:key,avatarManifest:manifest||null,serverTime:Number(serverTime)||Date.now(),source:'server-authoritative-pvp-presentation'}));return key;
   }
   function observeState(socket,s,msg){
@@ -43,7 +43,7 @@ function installPvpPresentationWire({WebSocket}={}){
     if(typeof data!=='string'||data.charCodeAt(0)!==123)return nativeSend.call(this,data,...rest);let msg;try{msg=JSON.parse(data);}catch(_){return nativeSend.call(this,data,...rest);}const s=stateFor(this);
     if(msg.t==='welcome'||msg.t==='state')msg=observeState(this,s,msg);if(msg.t==='pvp:snapshot')msg=observePvpSnapshot(this,s,msg);return nativeSend.call(this,JSON.stringify(msg),...rest);
   }
-  const api=Object.freeze({version:'pvp-presentation-wire-v1',presentationKey,audit:()=>Object.freeze({version:'pvp-presentation-wire-v1',serverDerived:true,sameSocket:true,fullManifestEverySnapshot:false,presentationsSent,presentationsSkipped,manifestsStripped,pvpSnapshots})});
+  const api=Object.freeze({version:'pvp-presentation-wire-v1.0.1',presentationKey,audit:()=>Object.freeze({version:'pvp-presentation-wire-v1.0.1',serverDerived:true,sameSocket:true,fullManifestEverySnapshot:false,presentationsSent,presentationsSkipped,manifestsStripped,pvpSnapshots})});
   Object.defineProperty(send,'__keloPvpPresentationWire',{value:true});Object.defineProperty(send,'__keloPvpPresentationApi',{value:api});WS.prototype.send=send;return api;
 }
 module.exports={installPvpPresentationWire,presentationKey,presentationIdentity};
