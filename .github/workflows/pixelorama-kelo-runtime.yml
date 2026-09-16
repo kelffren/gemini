@@ -1,0 +1,86 @@
+name: Pixelorama Kelo Web Runtime Builder
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/pixelorama-kelo-runtime.yml'
+      - 'scripts/prepare-pixelorama-kelo.mjs'
+      - 'vendor/pixelorama-kelo/**'
+
+permissions:
+  contents: read
+
+env:
+  GODOT_VERSION: 4.7.2
+  PIXELORAMA_SOURCE_SHA: da7b68f97806c461abde615d1d847af91921c37b
+  GODOT_CI_IMAGE: barichello/godot-ci:4.7.2
+
+jobs:
+  build-runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout Kelo tooling
+        uses: actions/checkout@v7
+
+      - name: Checkout pinned Pixelorama source
+        uses: actions/checkout@v7
+        with:
+          repository: Orama-Interactive/Pixelorama
+          ref: ${{ env.PIXELORAMA_SOURCE_SHA }}
+          submodules: recursive
+          path: .pixelorama-src
+
+      - name: Patch Pixelorama for Kelo mobile runtime
+        run: node scripts/prepare-pixelorama-kelo.mjs .pixelorama-src
+
+      - name: Prepare output directory
+        run: mkdir -p .pixelorama-src/build/web
+
+      - name: Import Pixelorama resources
+        run: |
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE:/workspace" \
+            -w /workspace/.pixelorama-src \
+            "$GODOT_CI_IMAGE" \
+            godot --headless -v --import
+
+      - name: Export full threadless Web build
+        run: |
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE:/workspace" \
+            -w /workspace/.pixelorama-src \
+            "$GODOT_CI_IMAGE" \
+            godot --headless -v --export-release "Web" ./build/web/index.html
+
+      - name: Record immutable metadata and license
+        run: |
+          cat > .pixelorama-src/build/web/kelo-runtime.json <<EOF
+          {"pixeloramaSource":"${PIXELORAMA_SOURCE_SHA}","godot":"${GODOT_VERSION}","profile":"kelo-mobile-full","threads":false,"undoDefault":64,"keloWebBridge":true}
+          EOF
+          cp vendor/pixelorama-kelo/LICENSE.pixelorama.txt .pixelorama-src/build/web/PIXELORAMA-LICENSE.txt
+
+      - name: Verify expected runtime files
+        run: |
+          test -s .pixelorama-src/build/web/index.html
+          test -s .pixelorama-src/build/web/index.js
+          test -s .pixelorama-src/build/web/index.wasm
+          test -s .pixelorama-src/build/web/index.pck
+          grep -q 'kelo-mobile-full' .pixelorama-src/build/web/kelo-runtime.json
+          sha256sum \
+            .pixelorama-src/build/web/index.js \
+            .pixelorama-src/build/web/index.wasm \
+            .pixelorama-src/build/web/index.pck \
+            > .pixelorama-src/build/web/SHA256SUMS.txt
+          du -h .pixelorama-src/build/web/*
+
+      - name: Upload immutable runtime artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pixelorama-kelo-${{ env.PIXELORAMA_SOURCE_SHA }}
+          path: .pixelorama-src/build/web
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 9
