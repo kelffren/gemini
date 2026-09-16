@@ -1,5 +1,6 @@
 name: Environment Creator Playwright
 
+# PR probe: intentionally exercises the browser suite against the exact branch bytes.
 on:
   push:
     branches: [main]
