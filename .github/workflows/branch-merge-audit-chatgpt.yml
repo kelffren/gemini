@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - audit/branch-merge-status-20260915-2251
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: read
