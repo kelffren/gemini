@@ -67,6 +67,9 @@ jobs:
       - name: Guardian community two-device quorum E2E
         run: node scripts/guardian-community-two-device-e2e.mjs
 
+      - name: Guardian community LIVE harness security contract
+        run: node scripts/guardian-community-live-harness-audit.mjs
+
       - name: Updater contract
         run: npm run audit:updater
 
