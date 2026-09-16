@@ -9,6 +9,8 @@ on:
       - 'src/creators/ui/sprite-factory-online.mjs'
       - 'deploy/huggingface-sprite-ai/**'
       - 'deploy/huggingface-sprite-pose/**'
+      - 'supabase/functions/kelo-sprite-generate/**'
+      - 'supabase/config.toml'
       - '.github/workflows/sprite-ai-smoke.yml'
   push:
     branches: [main]
@@ -19,6 +21,8 @@ on:
       - 'src/creators/ui/sprite-factory-online.mjs'
       - 'deploy/huggingface-sprite-ai/**'
       - 'deploy/huggingface-sprite-pose/**'
+      - 'supabase/functions/kelo-sprite-generate/**'
+      - 'supabase/config.toml'
       - '.github/workflows/sprite-ai-smoke.yml'
 
 permissions:
@@ -36,6 +40,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
       - name: Node syntax
         run: |
           node --check server/sprite-ai-service.js
@@ -48,6 +55,8 @@ jobs:
           node --check src/creators/sprite-compiler/pose-templates.mjs
           node --check src/creators/ui/sprite-skeleton-lab.mjs
           node --check src/creators/ui/sprite-factory-online.mjs
+      - name: Supabase Edge syntax
+        run: deno check supabase/functions/kelo-sprite-generate/index.ts
       - name: Sprite AI deterministic smoke
         run: node server/sprite-ai-smoke-test.js
       - name: Free-tier resource governor
