@@ -16,13 +16,9 @@ Tipos: image, sprite, tileset, animation, VFX, SFX, music, ambience, ability dec
 ## Archivos principales
 
 Catálogos: `data/external-asset-providers.json`, `data/opengameart-cc0-curated.json`, `data/kelo-content-starter-catalog.json`, `data/content-pack-catalog.json`.
-
 Providers: `external-asset-providers.mjs`, `kenney-live-provider.mjs`, `lpc-live-provider.mjs`, `opengameart-live-provider.mjs`, `kelo-content-live-provider.mjs`.
-
 Vault/integración: `personal-asset-vault.mjs`, `content-integration-router.mjs`, runtime bridges.
-
 Packs: `content-pack-manager.mjs`, `content-pack-transaction.mjs`, `content-packs.html`.
-
 Publisher: `scripts/publish-kelo-content-descriptors.mjs`.
 
 ## Vault / CAS
@@ -39,36 +35,30 @@ Pointers nuevos conservan `digest`, `previousDigest`, `bytes`, `mime`, `storage:
 
 Durante la transición, `kelo-content-live-provider.mjs` deriva `expectedBytes` y `expectedSha256` de cada pequeño `inlineManifest`. Esto conserva compatibilidad pero no constituye una frontera de confianza independiente.
 
-### Publisher determinista
+### Publisher determinista y fail-closed
 
-`scripts/publish-kelo-content-descriptors.mjs` mueve la creación del descriptor hacia publicación/build:
+`scripts/publish-kelo-content-descriptors.mjs` crea descriptors desde `data/kelo-content-starter-catalog.json` usando exactamente `JSON.stringify(inlineManifest)` y bytes UTF-8.
 
-```text
-data/kelo-content-starter-catalog.json
- -> validar id + inlineManifest
- -> JSON.stringify(inlineManifest)
- -> bytes UTF-8
- -> size
- -> SHA-256
- -> mediaType application/json
- -> ordenar por id
- -> data/kelo-content-descriptors.json
-```
+Salida por asset: `{id, mediaType:'application/json', size, digest:'sha256:...'}`.
 
-Schema de salida:
+Invariantes actuales del publisher:
+
+- `id` obligatorio y único;
+- `inlineManifest` obligatorio;
+- tamaño positivo;
+- digest SHA-256 con 64 hex lowercase;
+- cardinalidad de descriptors igual a assets fuente;
+- orden determinista por id;
+- `--check` exige igualdad byte-a-byte con el descriptor publicado;
+- publicación normal escribe primero un archivo temporal exclusivo y después hace `rename`, limpiando el temporal si falla.
+
+Esto evita IDs ambiguos y reduce el riesgo de dejar un descriptor set truncado por una interrupción durante build/publicación.
+
+Schema:
 
 ```json
-{
-  "schema": "kelo-content-descriptors-v1",
-  "algorithm": "sha256",
-  "source": "data/kelo-content-starter-catalog.json",
-  "descriptors": [
-    {"id":"...","mediaType":"application/json","size":123,"digest":"sha256:..."}
-  ]
-}
+{"schema":"kelo-content-descriptors-v1","algorithm":"sha256","source":"data/kelo-content-starter-catalog.json","descriptors":[]}
 ```
-
-El script falla si una entrada Kelo carece de `id` o `inlineManifest`. Es build-time: no añade trabajo al boot, no crea otro Vault y no descarga binarios.
 
 ## Descarga/staging e integridad
 
@@ -90,27 +80,14 @@ Errores: `ASSET_SIZE_MISMATCH`, `ASSET_INTEGRITY_MISMATCH`, `PACK_STAGE_CAS_DIGE
 
 `data/content-pack-catalog.json` mantiene `version`, `publishedAt`, `expiresAt`, `packs[]`. PackManager usa IndexedDB `kelo_content_pack_v1`, stores `packs`, `settings`, `transactions`.
 
-```text
-incoming.version < accepted.version -> PACK_CATALOG_ROLLBACK
-same version + different digest -> PACK_CATALOG_MUTATED_WITHOUT_VERSION
-```
-
-`stale` sigue observacional hasta existir refresh firmado confiable.
+`incoming.version < accepted.version -> PACK_CATALOG_ROLLBACK`; misma versión con digest distinto -> `PACK_CATALOG_MUTATED_WITHOUT_VERSION`. `stale` sigue observacional hasta existir refresh firmado confiable.
 
 ## Planner y transacción
 
 `planContentPackUpdate()` produce `reuse`, `integrate`, `download`, `removed` y métricas de bytes/delta. Staging vive en `kelo_content_pack_staging_v1/stages`.
 
 ```text
-ACTIVE GEN N
- -> plan
- -> storage preflight
- -> stage
- -> size + SHA-256 verify
- -> compiler/validators
- -> PREPARED
- -> atomic Vault commit
- -> activate target state
+ACTIVE GEN N -> plan -> storage preflight -> stage -> size + SHA-256 verify -> compiler/validators -> PREPARED -> atomic Vault commit -> activate target state
 ```
 
 El commit del Vault usa una sola transacción sobre `assets`, `blobs`, `manifests`, `casBlobs`. Pointer drift lanza `PACK_TRANSACTION_POINTER_DRIFT`.
@@ -132,30 +109,23 @@ Scene/prefab: JSON -> prefab validator -> Studio prefabStamp.
 
 ## Estado del contrato de publicación
 
-Implementado ahora:
+Implementado:
 
 ```text
-publisher determinista disponible
-client descriptor derivation disponible como fallback
-transaction size+digest verification disponible
+publisher determinista + validación de unicidad/cardinalidad
+ -> escritura temp + rename
+ -> Main Stability Gate --check
+ -> client descriptor fallback
+ -> transaction size+digest verification
 ```
 
-Pendiente para cerrar la cadena:
-
-```text
-CI ejecuta publisher
- -> exige descriptor file sincronizado
- -> Pack Manager lee descriptor publicado
- -> member lock conserva digest+size
- -> cliente verifica ambos
-```
-
-Después de cerrar esa cadena se puede añadir firma TUF-style sin cambiar el Vault.
+Bloqueo actual: `data/kelo-content-descriptors.json` aún debe materializarse. Después Pack Manager debe leer ese descriptor publicado y conservar `digest+size` en member locks.
 
 ## Limitaciones actuales
 
-- publisher creado, pero todavía no está conectado a CI ni al consumo del Pack Manager;
-- descriptors Kelo derivados en cliente siguen siendo fallback temporal;
+- descriptor file aún no materializado en `main`;
+- Pack Manager todavía no consume descriptors publicados;
+- descriptors derivados en cliente siguen siendo fallback temporal;
 - catálogo no está firmado y `stale` no bloquea;
 - providers externos pueden carecer de digest/size confiables;
 - delta sigue por archivo, sin chunk CAS;
@@ -166,7 +136,7 @@ Después de cerrar esa cadena se puede añadir firma TUF-style sin cambiar el Va
 
 ## Próximos pasos
 
-1. CI: ejecutar `node scripts/publish-kelo-content-descriptors.mjs` y fallar si cambia `data/kelo-content-descriptors.json`;
+1. generar y commitear `data/kelo-content-descriptors.json` mediante el publisher;
 2. consumir descriptor publicado desde Pack Manager y propagar `size/digest`;
 3. versionar descriptor set con catálogo inmutable;
 4. firma metadata estilo TUF;
