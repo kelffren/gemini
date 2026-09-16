@@ -1,11 +1,11 @@
 /* KELO-INDEX
  * area: CREATORS / CHARACTER TEST CHAMBER
  * owner: Appearance Creator test chamber
- * keys: CHARACTER TEST CHAMBER IDLE WALK RUN ATTACK HIT DEATH VISUAL MOTION PREVIEW
- * purpose: reproduce visual motion/frame states against the authoring preview without mutating gameplay/runtime authority
- * consumes: Appearance row.animationMapping + creator appearance preview render(frame,motion)
+ * keys: CHARACTER TEST CHAMBER IDLE WALK RUN ATTACK HIT DEATH VISUAL MOTION PREVIEW SHARED CONTRACT
+ * purpose: reproduce visual motion/frame states against the authoring preview using KeloCreatorCharacterVisualContract normalization without mutating gameplay/runtime authority
+ * consumes: Appearance row.animationMapping + KeloCreatorCharacterVisualContract.resolveMotionSample/frameColumns + creator appearance preview render(frame,motion)
  * state-owned: ephemeral preview state + one requestAnimationFrame while playing
- * do-not: NO live actor mutation, NO HP/inventory/collision/network/persistence, NO second renderer
+ * do-not: NO live actor mutation, NO HP/inventory/collision/network/persistence, NO second renderer, NO private face/frame normalization
  */
 const STATE_DEFS=Object.freeze([
   Object.freeze({id:'idle',label:'IDLE',loop:true,frameMs:180}),
@@ -37,13 +37,15 @@ export function resolveCharacterTestTrack({row,state='idle',columns=1}={}){
 function now(root){return finite(root?.performance?.now?.(),Date.now());}
 export function createCreatorCharacterTestChamber({root=globalThis,preview,onSnapshot=null}={}){
   if(!preview?.render)throw new Error('CHARACTER_TEST_CHAMBER_PREVIEW_REQUIRED');
+  const visualContract=()=>root?.KeloCreatorCharacterVisualContract||null;
   let row=null,source='',asset={},face='down',state='idle',playing=false,startedAt=0,lastFrame=null,lastPreview=null,lastTrack=resolveCharacterTestTrack(),lastError=null,raf=0,disposed=false;
   const rafFn=typeof root.requestAnimationFrame==='function'?root.requestAnimationFrame.bind(root):null;
   const cancelFn=typeof root.cancelAnimationFrame==='function'?root.cancelAnimationFrame.bind(root):null;
-  function columns(){const visual=row?.metadata?.characterVisual||{};return Math.max(1,Math.floor(finite(visual.columns,1)));}
+  function columns(){const C=visualContract();if(C?.frameColumns)return C.frameColumns(row);const visual=row?.metadata?.characterVisual||{};return Math.max(1,Math.floor(finite(visual.columns,4)));}
+  function sample(frame){const C=visualContract();const visual={face,frame,on:state==='walk'||state==='run',state};if(C?.resolveMotionSample)return C.resolveMotionSample({visual,columns:columns(),fallbackFace:'down',fallbackState:state});const cols=columns();return Object.freeze({face:['down','left','right','up'].includes(face)?face:'down',frame:Math.abs(Math.floor(finite(frame,0)))%cols,moving:!!visual.on,state,dx:0,dy:0});}
   function track(){return resolveCharacterTestTrack({row,state,columns:columns()});}
-  function emit(){const snapshot=Object.freeze({version:'creator-character-test-chamber-v1.1',state,playing,face,frame:lastFrame,track:lastTrack,preview:lastPreview,error:lastError});try{onSnapshot?.(snapshot);}catch{}return snapshot;}
-  async function paint(frame,trackValue){if(disposed)return null;lastFrame=frame;lastError=null;try{const rendered=await preview.render({row,source,asset,face,motion:state,frame});if(disposed)return null;lastPreview=rendered;lastTrack=trackValue;return emit();}catch(error){lastPreview=null;lastTrack=trackValue;lastError=String(error?.message||error);return emit();}}
+  function emit(){const canonical=sample(lastFrame??0),snapshot=Object.freeze({version:'creator-character-test-chamber-v1.2',state:canonical.state,playing,face:canonical.face,frame:lastFrame==null?null:canonical.frame,track:lastTrack,preview:lastPreview,error:lastError,motionContract:visualContract()?.version||null});try{onSnapshot?.(snapshot);}catch{}return snapshot;}
+  async function paint(frame,trackValue){if(disposed)return null;const canonical=sample(frame);lastFrame=canonical.frame??0;lastError=null;try{const rendered=await preview.render({row,source,asset,face:canonical.face,motion:canonical.state,frame:lastFrame});if(disposed)return null;lastPreview=rendered;lastTrack=trackValue;return emit();}catch(error){lastPreview=null;lastTrack=trackValue;lastError=String(error?.message||error);return emit();}}
   function stopRaf(){if(raf&&cancelFn)cancelFn(raf);raf=0;}
   function step(time){
     raf=0;if(disposed||!row)return;const t=track();lastTrack=t;const elapsed=Math.max(0,finite(time,now(root))-startedAt),rawIndex=Math.floor(elapsed/t.frameMs),index=t.loop?(rawIndex%t.frames.length):Math.min(t.frames.length-1,rawIndex),frame=t.frames[index]??0;if(frame!==lastFrame)void paint(frame,t);if(!t.loop&&rawIndex>=t.frames.length){playing=false;emit();return;}if(playing&&rafFn)raf=rafFn(step);
@@ -54,8 +56,8 @@ export function createCreatorCharacterTestChamber({root=globalThis,preview,onSna
   function pause(){playing=false;stopRaf();return emit();}
   function reset(){state='idle';return restart();}
   function setFace(nextFace){face=String(nextFace||'down');return restart();}
-  function snapshot(){return Object.freeze({version:'creator-character-test-chamber-v1.1',state,playing,face,frame:lastFrame,track:lastTrack,preview:lastPreview,error:lastError});}
+  function snapshot(){return emit();}
   function dispose(){disposed=true;playing=false;stopRaf();row=null;source='';asset={};lastPreview=null;lastError=null;}
-  return Object.freeze({version:'creator-character-test-chamber-v1.1',states:STATE_DEFS,configure,play,pause,reset,setFace,snapshot,dispose});
+  return Object.freeze({version:'creator-character-test-chamber-v1.2',states:STATE_DEFS,configure,play,pause,reset,setFace,snapshot,dispose});
 }
 export const CHARACTER_TEST_STATES=STATE_DEFS;
