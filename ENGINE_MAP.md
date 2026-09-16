@@ -2,7 +2,7 @@
 
 > Documento canónico del engine. Si contradice `index.html` o un owner Foundation LIVE, gana el runtime y este archivo debe actualizarse.
 
-**Sincronizado:** 2026-09-14  
+**Sincronizado:** 2026-09-15  
 **Runtime declarado:** Kelo World V6.54.2  
 **Modelo:** web 2D top-down, Canvas, mobile-first, login/guest gate antes del boot pesado.
 
@@ -23,7 +23,7 @@ Contrato LIVE (`index.html` V6.68):
 3. `engine-b` y `KELO_PERF` **no** piden rAF hasta `kelo:boot-ready`.
 4. Tras el último script de plaza: `__keloBootReady=true` + evento `kelo:boot-ready`. El player ya puede caminar.
 5. **Nada más se descarga solo.** Chat premium, tileset 556KB, PvP, studio, backpack, engines `m..aj` = `KELO_MODULE_LOADER.ensure(feature)` al tocar el menú.
-6. Prohibido inyectar `<script>` desde nameplates u otros owners (eso montaba el chat Waze y mataba Safari).
+6. Prohibido inyectar `<script>` desde nameplates u otros owners.
 
 El listado histórico de 16 pasos **no es el boot móvil**. Restaurar esos tags en `index.html` es un bug.
 
@@ -39,14 +39,14 @@ El listado histórico de 16 pasos **no es el boot móvil**. Restaurar esos tags 
 | Cámara/viewport/zoom | `KeloCamera` | OWNER LIVE |
 | Avatar composition | `KeloAvatar` | OWNER LIVE |
 | Render extensions | `KeloRender` | OWNER LIVE |
-| Simulation extensions | `KeloSimulation` | OWNER LIVE |
+| Simulation extensions + suspend claims | `KeloSimulation` | OWNER LIVE |
 | Eventos | `KeloEvents` | OWNER LIVE |
 | Menú principal | `KELO_LUXE` | OWNER LIVE |
 | Assets/atlas | `KELO_ATLAS_CONTRACT` | OWNER LIVE |
 | Templates placeables | `KELO_PROPERTY_CATALOG` | OWNER LIVE |
-| Prop definitions | `KELO_PROP_CONTRACT` | OWNER LIVE |
 | World editing authority | `KELO_WORLD_EDIT` | OWNER LIVE |
 | Studio document/commands | `Studio Kernel` | OWNER LIVE creator |
+| Creator heavy-workspace lifecycle | `Kelo Creators / creator-exclusive-runtime` | SUPPORT LIVE creator |
 | Map generation | `KeloMapForge` | OWNER LIVE creator |
 | Update/PWA | `KeloUpdater` | OWNER LIVE client |
 
@@ -91,13 +91,36 @@ El shell es UI; no posee mutations del mundo. Las mutations pasan por Studio Ker
 
 **Regla QA:** World en iPhone no se declara resuelto solo con headless. Requiere apertura, interacción, placement y reapertura en dispositivo real/LIVE.
 
-## 7. Asset compiler
+## 7. Asset Forge / Pixelorama Pro
+
+Asset Forge sigue siendo el editor Creator ligero y mobile-first. Pixelorama Pro es una capacidad pesada opcional, no un segundo Kelo engine.
+
+Ruta:
+
+`Asset Forge → PIXELORAMA PRO → creator-exclusive-runtime → tools/pixelorama/index.html → Pixelorama Web/Godot`
+
+Al abrir Pro:
+
+- `KeloInputLocks` bloquea input gameplay;
+- `KeloMovement` intercepta movimiento;
+- `KeloSimulation` adquiere suspension claim;
+- `KeloRender` intercepta frames del mundo;
+- `KELO_ATLAS_CONTRACT` puede expulsar sólo atlases no-core con `refs=0`;
+- Pixelorama se crea lazy dentro de un iframe Kelo aislado.
+
+Al cerrar: Pixelorama recibe quit/unload, el iframe se destruye y se liberan todos los claims. `engine-b` no se reemplaza ni se monkey-patchea.
+
+Los binarios pesados de Pixelorama no forman parte del boot ni del historial normal de `gemini`; el shell usa un build versionado/pinned. El build custom Kelo conserva las funciones authoring de Pixelorama y optimiza history, buffers, FPS y service-worker ownership.
+
+Documentos: `docs/systems/PIXELORAMA_PRO_BRIDGE.md` y `docs/systems/CREATOR_EXCLUSIVE_RUNTIME.md`.
+
+## 8. Asset compiler
 
 `asset-sheet-compiler.mjs` reutiliza `sprite-foreground-analysis.mjs` y `sprite-world-asset-compiler.mjs`. Produce frames irregulares, metadata y manifest; no redibuja el arte ni se convierte en un renderer.
 
 El Asset Compiler puede sugerir semántica, pero nombres/categorías revisados deben conservar geometría sourceRect estable para no romper placements.
 
-## 8. Gameplay
+## 9. Gameplay
 
 - Abilities: `KeloAbilities` + Stone/equipment/mount channels.
 - PvP/Arena: `KeloArena`, PvP world + runtime loader.
@@ -109,11 +132,13 @@ El Asset Compiler puede sugerir semántica, pero nombres/categorías revisados d
 - Economy/logistics: `KeloRegionalEconomy`, `KeloCaravans`, `KeloFactions`.
 - Property/instances: `KELO_PROPERTY_CATALOG`, `PropertySystem`, InstanceSystem.
 
-## 9. Online boundary
+## 10. Online boundary
 
 El cliente puede predecir/presentar, pero progreso valioso, comercio, PvP competitivo, propiedad y cambios globales deben migrar/fallar hacia autoridad de servidor. `docs/ONLINE_FIRST.md` y los documentos de cada sistema mandan sobre implementaciones locales temporales.
 
-## 10. Qué NO hacer
+Creator/Pixelorama drafts locales no obtienen autoridad económica por estar guardados en IndexedDB.
+
+## 11. Qué NO hacer
 
 - No crear otro renderer de props o tiles.
 - No crear otro catálogo de assets en paralelo.
@@ -121,14 +146,18 @@ El cliente puede predecir/presentar, pero progreso valioso, comercio, PvP compet
 - No mutar `obstacles` desde features nuevas.
 - No sustituir World/Studio por un editor nuevo para corregir un bug de boot.
 - No publicar assets persistentes solo porque funcionan en preview local.
+- No meter Pixelorama/WASM en el boot principal.
+- No mantener gameplay pesado + Pixelorama pesado activos al mismo tiempo.
 - No declarar un fix móvil verificado sin QA real.
 
-## 11. Documentos relacionados
+## 12. Documentos relacionados
 
 - `docs/GAME_STATE_CURRENT.md`
 - `docs/ARCHITECTURE_CURRENT.md`
 - `docs/KELO_FOUNDATION.md`
 - `docs/KELO_STUDIO_ARCHITECTURE.md`
 - `docs/ASSET_CONTRACT.md`
+- `docs/systems/PIXELORAMA_PRO_BRIDGE.md`
+- `docs/systems/CREATOR_EXCLUSIVE_RUNTIME.md`
 - `docs/CODE_INDEX.md`
 - `docs/SYSTEM_DOCUMENTATION_STANDARD.md`
