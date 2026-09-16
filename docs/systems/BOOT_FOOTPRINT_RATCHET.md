@@ -1,10 +1,12 @@
-# Boot Footprint Ratchet V1
+# Boot Footprint Ratchet V2 — Static Dependency Closure
 
 ## Purpose
 
-Build/CI capability that measures the static JS/CSS path required before `window.__keloBootReady=true` and prevents silent first-playable weight growth.
+Build/CI capability under `Kelo Boot Footprint QA` that prevents the first-playable path from silently getting heavier.
 
-Kelo World is mobile-first and Safari iOS runs the game and script parsing on one main thread. The critical path should therefore stay small while optional systems continue to enter through `KeloModuleLoader` after the plaza becomes playable.
+V1 measured only JS/CSS named directly in `index.html` before `window.__keloBootReady=true`. V2 keeps that direct measurement and adds a deterministic static closure for local payloads referenced by those critical files: images, fonts, data, audio and binary assets, plus CSS `url(...)` and `@import` dependencies.
+
+This matters because a 10 KB script can make mobile startup much heavier by pointing at a multi-megabyte texture without increasing the script itself.
 
 ## Owner and state
 
@@ -15,7 +17,7 @@ Kelo World is mobile-first and Safari iOS runs the game and script parsing on on
 - source mutation: none
 - player visible: no
 
-No current runtime owner measures historical pre-ready bytes, so this is a new QA capability rather than a second loader or scheduler.
+This extends the existing owner. It does not create a loader, scheduler, renderer or runtime observer.
 
 ## Sources
 
@@ -31,63 +33,92 @@ The snapshot reads `index.html` up to the literal first-playable marker:
 
 `window.__keloBootReady=true`
 
-Within that prefix it measures unique local:
+### Direct layer
 
-- `<script src>` resources;
-- stylesheet `<link rel="stylesheet">` resources;
-- HTML prefix bytes;
-- missing critical resources.
+It measures unique local resources declared before the marker:
 
-Query/hash suffixes are stripped before file lookup so version bumps do not create fake new resources.
+- `<script src>`;
+- `<link rel="stylesheet">`;
+- pre-ready HTML bytes;
+- missing direct resources.
 
-Files referenced after the marker are intentionally excluded because they are not part of the static first-playable path.
+### Static dependency layer
+
+Only direct pre-ready files are scanned. The tool does not execute JavaScript.
+
+Critical JavaScript is inspected for literal local payload paths ending in supported image/font/data/audio/binary extensions. Critical CSS is inspected for `url(...)` and follows local `@import` styles recursively. Existing local files are added once to the closure and record every direct file that referenced them.
+
+Files reached only through scripts loaded after `boot-ready` remain outside the closure. Dynamic string construction cannot be proven statically and is intentionally not guessed.
+
+Unresolved dependency-looking literals are recorded as advisory `unresolvedDependencyCandidates`; unlike a missing direct `<script>`/stylesheet, they do not fail publication because they can represent optional/fallback literals.
+
+Query/hash suffixes are stripped before lookup so cache-busting versions do not create fake resources.
+
+## Snapshot fields
+
+- `directResourceCount`
+- `directExternalStoredBytes`
+- `dependencyResourceCount`
+- `dependencyStoredBytes`
+- `resourceCount` — unique direct + dependency closure
+- `externalStoredBytes` — stored bytes of the full closure
+- `htmlPrefixBytes`
+- `totalMeasuredCriticalBytes`
+- `resources[]` with `via: direct|dependency` and `referencedBy[]`
+- `missing[]` for direct resources
+- `unresolvedDependencyCandidates[]` advisory only
+
+Schema: `kelo-boot-footprint-v2-static-closure`.
 
 ## Ratchet rules
 
-A head revision fails when:
+Head fails when the comparable static closure shows any of these without an explicit architecture change:
 
-1. an existing critical resource grows in stored bytes;
-2. a new critical JS/CSS resource is added before boot-ready;
-3. aggregate critical external bytes grow;
-4. unique critical resource count grows;
-5. a referenced critical resource is missing;
-6. pre-ready HTML grows beyond the explicit small tolerance used by CI.
+1. an existing direct critical resource grows;
+2. an existing critical dependency grows;
+3. a new direct critical resource appears;
+4. a new static payload dependency appears;
+5. aggregate closure bytes grow;
+6. unique closure resource count grows;
+7. a direct critical resource is missing;
+8. pre-ready HTML grows above the explicit CI tolerance.
 
-Removed or smaller critical resources are improvements.
+Removed or smaller resources are improvements.
 
 ## Public API
 
 ### `measureBootFootprint(rootDir, options)`
 
-Returns the critical resource list and byte snapshot.
+Returns the V2 direct + dependency byte snapshot without executing the game.
 
 ### `compareBootFootprints(base, head, options)`
 
-Pure comparison returning pass/fail, regressions, improvements, added/removed resources and aggregate deltas.
+Pure comparison returning pass/fail, exact regression reasons, improvements, added/removed resources and direct/dependency deltas.
 
 ## Invariants
 
-- The ratchet never loads or changes runtime resources.
-- It does not replace `KeloModuleLoader`.
-- Lazy modules remain outside the first-playable measurement.
-- New player-facing systems should normally be lazy rather than increasing boot.
-- A necessary exception must be explicit architecture work, not an unnoticed byte increase.
-- Runtime iPhone behavior remains the ultimate performance proof; this gate measures repository-stored critical bytes, not parse/execute time or network compression.
+- Never loads or mutates runtime resources.
+- Never replaces `KeloModuleLoader`.
+- Never follows post-ready scripts.
+- Does not classify a string as a real network request; the dependency layer is a conservative static closure.
+- Existing mobile runtime and `KELO_ATLAS_CONTRACT` remain the owners of actual residency/loading behavior.
+- New systems should normally be lazy rather than increasing first-playable weight.
+- Real iPhone behavior remains the final proof; this build gate measures repository-stored bytes, not transfer compression, parse time or GPU memory.
 
 ## Flow
 
 ```text
-base index + files -> boot snapshot
-head index + files -> boot snapshot
-        base + head -> footprint ratchet
-                     -> per-resource byte comparison
-                     -> aggregate byte/count comparison
-                     -> PASS / FAIL + artifact
+index prefix
+  -> direct JS/CSS
+       -> literal local payload references
+       -> CSS url()/@import closure
+  -> direct bytes + dependency bytes
+
+base snapshot + head snapshot
+  -> per-resource ratchet
+  -> aggregate closure ratchet
+  -> PASS / FAIL + evidence
 ```
-
-## Online-first
-
-N/A for authority. Future CDN or content-addressed delivery can change how a critical resource is fetched without changing the conceptual first-playable budget.
 
 ## Tests
 
@@ -95,32 +126,33 @@ N/A for authority. Future CDN or content-addressed delivery can change how a cri
 
 The deterministic corpus proves that:
 
-- resources after boot-ready are excluded;
+- post-ready scripts and their assets are excluded;
+- direct CSS `url(...)` and JS image literals are included;
 - a smaller critical script passes;
 - a larger critical script fails;
-- adding a new critical script fails.
+- adding a direct pre-ready script fails;
+- adding an indirect critical asset fails;
+- increasing an indirect critical asset's bytes fails.
 
 ## Observability
 
-CI reports:
+CI reports base/head totals plus the direct/dependency split. This lets us tell whether a regression comes from code itself or from payload pulled into the first-playable surface.
 
-- base/head critical external bytes;
-- base/head critical resource count;
-- per-resource savings;
-- HTML-prefix delta;
-- exact regression reasons.
+## Online-first
 
-## Extension points
+N/A for gameplay authority. Future CDN/content-addressed delivery can change transport without changing this repository-side comparison contract.
 
-- add measured transfer bytes from real Pages responses;
-- attach iPhone parse/compile/execute timing;
-- include critical image fetches proven to occur before first playable;
-- zone-specific first-use budgets;
-- historical champion records for device-measured first-playable latency.
+## Next extensions
+
+- measure real transferred bytes from Pages responses;
+- attach real iPhone Safari request/decode/draw timing;
+- create a historical champion for first-playable latency;
+- zone/feature first-use closure budgets;
+- connect closure evidence to immutable content-addressed delivery manifests.
 
 ## Anti-patterns
 
-- Do not move a required runtime file after the marker just to cheat the metric if gameplay needs it before ready.
+- Do not move a required file after `boot-ready` merely to cheat the metric.
 - Do not preload optional Studio/PvP/creator systems into boot.
-- Do not create a second module loader.
-- Do not claim this static byte gate alone proves mobile performance.
+- Do not create a second module loader or runtime watchdog.
+- Do not claim static closure equals observed network traffic.
