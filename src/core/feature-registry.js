@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: CORE / FEATURE REGISTRY
  * owner: KELO_FEATURE_REGISTRY
- * keys: FEATURE MODULE DEPENDENCY LAZY ASSET LIFECYCLE SCALABILITY
+ * keys: FEATURE MODULE DEPENDENCY LAZY ASSET LIFECYCLE SCALABILITY CREATOR DELIVERY
  * purpose: fuente única de verdad para paquetes opcionales; Module Loader y Asset Registry consumen este catálogo
  * public-api: KELO_FEATURE_REGISTRY.ids/has/get/files/catalog/resolve
  * state-owned: definiciones inmutables de features; no carga scripts ni modifica gameplay
@@ -10,7 +10,7 @@
 (function(root){
 'use strict';
 if(root.KELO_FEATURE_REGISTRY)return;
-const VERSION='kelo-feature-registry-v2.0.0';
+const VERSION='kelo-feature-registry-v2.1.0-creator-delivery';
 const raw={
   social:{dependencies:[],policy:'first-use',files:[
     {src:'src/ui/player-nameplate.js?v=2',name:'placas'},
@@ -36,7 +36,7 @@ const raw={
     {src:'src/ui/backpack-ui.js?v=4',name:'mochila'}
   ]},
   mounts:{dependencies:[],policy:'first-use',files:[
-    {src:'src/mounts/mount-catalog.js?v=2',name:'monturas'},
+    {src:'src/mounts/mount-catalog.js?v=3-creator-entitlement',name:'monturas'},
     {src:'src/mounts/mount-system.js?v=2',name:'monturas'},
     {src:'src/ui/mount-panel.js?v=2',name:'monturas'}
   ]},
@@ -50,10 +50,12 @@ const raw={
     {src:'src/systems/title-system.js?v=1',name:'títulos'}
   ]},
   appearance:{dependencies:[],policy:'first-use',files:[
+    {src:'src/appearance/appearance-system.js?v=2-creator-entitlement',name:'appearance registry'},
     {src:'src/characters/character-customization.js?v=1',name:'apariencia'},
     {src:'src/ui/character-customizer-ui.js?v=1',name:'apariencia'}
   ]},
   properties:{dependencies:[],policy:'first-use',files:[
+    {src:'src/property/property-asset-catalog.js?v=2-creator-entitlement',name:'catálogo de propiedades'},
     {src:'src/property/property-system.js?v=4',name:'propiedades'},
     {src:'src/ui/house-instance-ui.js?v=1',name:'propiedades'}
   ]}
