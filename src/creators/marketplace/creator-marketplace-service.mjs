@@ -4,7 +4,7 @@
  * keys: DISCOVER LISTINGS OWNED PROFILE KC ENTITLEMENT PUBLISHED CONTENT
  * purpose: compose metadata-first marketplace reads/writes over the existing authenticated Supabase Creator repository
  * public-api: createCreatorMarketplaceService
- * consumes: contentSession + contentRepository
+ * consumes: contentSession + contentRepository + KeloCreatorEntitlements refresh hook
  * state-owned: none; server tables/RPCs remain authority
  * do-not: no local balances, no trusted client price during purchase, no asset-byte preloading, no fake entitlement
  */
@@ -53,8 +53,9 @@ export function createCreatorMarketplaceService({contentSession,contentRepositor
   async function purchase({listingId,buyerCharacterId}={}){
     if(!authenticated())throw new Error('AUTH_REQUIRED');if(!listingId||!buyerCharacterId)throw new Error('MARKET_PURCHASE_FIELDS_REQUIRED');await fresh();
     const correlationId=uuid(root),result=await contentRepository.purchaseCreatorMarketListing({listingId,buyerCharacterId,correlationId});
+    try{await root.KeloCreatorEntitlements?.refresh?.({force:true});}catch(_){ }
     return F({correlationId,...result});
   }
   async function owned(){if(!authenticated())return F([]);await fresh();const rows=await contentRepository.listMyCreatorEntitlements();return F(arr(rows).map(row=>F({...row})));}
-  return F({version:'kelo-creator-marketplace-service-v1.0.1',authenticated,discover,profile,saveProfile,dashboard,createListing,cancelListing,purchase,owned});
+  return F({version:'kelo-creator-marketplace-service-v1.1.0-entitlement-refresh',authenticated,discover,profile,saveProfile,dashboard,createListing,cancelListing,purchase,owned});
 }
