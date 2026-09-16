@@ -1,17 +1,17 @@
 /* KELO-INDEX
  * area: GUARDIAN / FAILOVER
  * owner: KeloGuardianMirror (support owner under KeloGuardian)
- * keys: GUARDIAN HOT MIRROR CHECKPOINT FAILOVER TAKEOVER ACK EPOCH WEBRTC SNAPSHOT
- * purpose: replica checkpoints observados por KeloNet sobre el DataChannel Guardian y conserva una semilla reciente para relevo de Master
+ * keys: GUARDIAN HOT MIRROR CHECKPOINT FAILOVER TAKEOVER ACK EPOCH WEBRTC SNAPSHOT STANDBY SERVER SELECTED
+ * purpose: replica checkpoints observados por KeloNet sobre el DataChannel Guardian y conserva una semilla reciente para relevo de Master; el relevo normal usa standby elegido por servidor
  * consumes: KeloGuardian + KeloNetAuthority + keloNet + KeloSimulation
  * state-owned: último checkpoint recibido, ACKs de mirrors, semilla de takeover y diagnóstico de failover
- * online: NO sustituye autoridad gameplay; prepara continuidad y reclama la lease Master únicamente por KeloGuardian/server permission
- * do-not: NO aplicar HP/economía/inventario desde checkpoint; NO segundo simulation loop; NO autoacuñar recompensas; NO declarar takeover gameplay completo
+ * online: NO sustituye autoridad económica/persistente; prepara continuidad y reclama Master solo con permiso permanente o asignación standby explícita del servidor
+ * do-not: NO aplicar economía/inventario/progresión desde checkpoint; NO segundo simulation loop; NO autoacuñar recompensas; NO autoseleccionar standby
  */
 (function(root){
 'use strict';
 if(root.KeloGuardianMirror||!root.KeloGuardian)return;
-const VERSION='kelo-guardian-hot-mirror-v1';
+const VERSION='kelo-guardian-hot-mirror-v2-server-standby';
 const CHECKPOINT_MS=750,FRESH_MS=4500,CLAIM_MAX_AGE_MS=45000,CLAIM_RETRY_MS=4500,ACK_STALE_MS=7000,MAX_PEERS=24,MAX_PROJECTILES=64,MAX_HISTORY=24,MAX_CHECKPOINT_BYTES=56*1024;
 let seq=0,lastBroadcastAt=0,latest=null,history=[],takeoverSeed=null,lastError=null,lastEmitKey='',claimInFlight=false,lastClaimAt=0,lostMasterSince=0,previousMaster=null;
 const acks=new Map();
@@ -34,14 +34,15 @@ function buildCheckpoint(now){
 function checkpointFresh(row,now=Date.now()){return !!row&&now-finite(row.receivedAt||row.generatedAt,0)<=FRESH_MS;}
 function checkpointClaimable(row,now=Date.now()){return !!row&&now-finite(row.receivedAt||row.generatedAt,0)<=CLAIM_MAX_AGE_MS;}
 function cleanupAcks(now){for(const [id,row] of acks)if(now-finite(row.at)>ACK_STALE_MS)acks.delete(id);}
+function canClaim(g){return !!(g?.standbyAssigned||g?.masterEligible);}
 function emit(force){
-  const s=state(),key=[s.mode,s.latestSeq,s.latestServerTick,s.backupCount,s.checkpointFresh,s.failoverCandidate,s.claimInFlight,s.takeoverSeedAvailable,s.lastError||''].join('|');
+  const s=state(),key=[s.mode,s.latestSeq,s.latestServerTick,s.backupCount,s.checkpointFresh,s.failoverCandidate,s.standbyAssigned,s.claimInFlight,s.takeoverSeedAvailable,s.lastError||''].join('|');
   if(!force&&key===lastEmitKey)return s;lastEmitKey=key;
   try{root.dispatchEvent(new CustomEvent('kelo:guardian-mirror-state',{detail:s}));}catch(_){}return s;
 }
 function state(){
-  const now=Date.now(),g=guardianState(),tp=transport(),fresh=checkpointFresh(latest,now),claimable=checkpointClaimable(latest,now),visible=(typeof document==='undefined'||document.visibilityState==='visible'),failoverCandidate=!!(g.enabled&&!g.masterActive&&g.masterEligible&&visible&&claimable&&(lostMasterSince>0||tp.connectedToMaster===false));
-  return Object.freeze({version:VERSION,mode:!g.enabled?'off':g.masterActive?'primary':fresh?'hot-mirror':'standby',primary:g.masterActive===true,latestSeq:latest?.seq||0,latestServerTick:latest?.serverTick||0,latestCheckpointAt:latest?.receivedAt||latest?.generatedAt||null,checkpointAgeMs:latest?Math.max(0,now-finite(latest.receivedAt||latest.generatedAt)):null,checkpointFresh:fresh,checkpointClaimable:claimable,backupCount:acks.size,backupNodes:Object.freeze([...acks.keys()]),failoverCandidate,claimInFlight,takeoverSeedAvailable:!!takeoverSeed,takeoverSeedSeq:takeoverSeed?.seq||0,previousMaster:previousMaster?Object.freeze({...previousMaster}):null,authoritativeGameplay:false,lastError});
+  const now=Date.now(),g=guardianState(),tp=transport(),fresh=checkpointFresh(latest,now),claimable=checkpointClaimable(latest,now),visible=(typeof document==='undefined'||document.visibilityState==='visible'),failoverCandidate=!!(g.enabled&&!g.masterActive&&canClaim(g)&&visible&&claimable&&(lostMasterSince>0||tp.connectedToMaster===false));
+  return Object.freeze({version:VERSION,mode:!g.enabled?'off':g.masterActive?'primary':fresh?'hot-mirror':'standby',primary:g.masterActive===true,latestSeq:latest?.seq||0,latestServerTick:latest?.serverTick||0,latestCheckpointAt:latest?.receivedAt||latest?.generatedAt||null,checkpointAgeMs:latest?Math.max(0,now-finite(latest.receivedAt||latest.generatedAt)):null,checkpointFresh:fresh,checkpointClaimable:claimable,backupCount:acks.size,backupNodes:Object.freeze([...acks.keys()]),standbyAssigned:g.standbyAssigned===true,standbyAssignmentEpoch:Number(g.standby?.assignmentEpoch)||0,failoverCandidate,claimInFlight,takeoverSeedAvailable:!!takeoverSeed,takeoverSeedSeq:takeoverSeed?.seq||0,previousMaster:previousMaster?Object.freeze({...previousMaster}):null,authoritativeGameplay:false,economicAuthority:false,lastError});
 }
 function acceptCheckpoint(fromNodeId,msg){
   const g=guardianState(),master=g.master;if(!msg||msg.t!=='guardian:mirror_checkpoint'||!master?.nodeId)return false;
@@ -60,20 +61,22 @@ function acceptAck(fromNodeId,msg){
 function onGuardianData(event){const d=event?.detail||{},msg=d.payload||{};if(msg.t==='guardian:mirror_checkpoint')acceptCheckpoint(d.fromNodeId,msg);else if(msg.t==='guardian:mirror_ack')acceptAck(d.fromNodeId,msg);else if(msg.t==='guardian:mirror_takeover'){previousMaster={nodeId:String(d.fromNodeId||''),epoch:Number(msg.previousEpoch)||0,lastCheckpointAt:Date.now()};emit(true);}}
 function broadcastCheckpoint(now){const g=guardianState();if(!g.masterActive||now-lastBroadcastAt<CHECKPOINT_MS)return;lastBroadcastAt=now;cleanupAcks(now);const checkpoint=buildCheckpoint(now);root.KeloGuardian.broadcast(checkpoint);}
 async function attemptFailover(now){
-  const g=guardianState(),tp=transport();if(!g.enabled||g.masterActive||!g.masterEligible||document.visibilityState!=='visible'||!checkpointClaimable(latest,now)){lostMasterSince=0;return;}
+  const g=guardianState(),tp=transport();if(!g.enabled||g.masterActive||!canClaim(g)||document.visibilityState!=='visible'||!checkpointClaimable(latest,now)){lostMasterSince=0;return;}
   const directGone=tp.connectedToMaster===false;if(!directGone)return;
   if(!lostMasterSince)lostMasterSince=now;if(now-lostMasterSince<3500||claimInFlight||now-lastClaimAt<CLAIM_RETRY_MS)return;
   claimInFlight=true;lastClaimAt=now;emit(true);
   try{
-    const seed=latest,next=await root.KeloGuardian.startMasterHost();
-    if(next?.masterActive){takeoverSeed=seed;lastError=null;const newEpoch=Number(next.master?.epoch||next.masterEpoch||0);try{root.dispatchEvent(new CustomEvent('kelo:guardian-mirror-takeover',{detail:{seed,previousMaster,masterEpoch:newEpoch,authoritativeGameplay:false}}));}catch(_){}root.KeloGuardian.broadcast({t:'guardian:mirror_takeover',schema:1,previousEpoch:Number(seed?.epoch)||0,newEpoch,seedSeq:Number(seed?.seq)||0,serverTick:Number(seed?.serverTick)||0,at:Date.now(),authoritativeGameplay:false});acks.clear();lostMasterSince=0;}
-  }catch(error){const raw=String(error&&error.message||error);if(!/MASTER_BUSY|STILL_HEALTHY|409/.test(raw))lastError=raw;}finally{claimInFlight=false;emit(true);}
+    const seed=latest;
+    const useAssignedStandby=g.standbyAssigned===true&&typeof root.KeloGuardian.claimStandbyHost==='function';
+    const next=useAssignedStandby?await root.KeloGuardian.claimStandbyHost():await root.KeloGuardian.startMasterHost();
+    if(next?.masterActive){takeoverSeed=seed;lastError=null;const newEpoch=Number(next.master?.epoch||next.masterEpoch||0);try{root.dispatchEvent(new CustomEvent('kelo:guardian-mirror-takeover',{detail:{seed,previousMaster,masterEpoch:newEpoch,claimMode:useAssignedStandby?'server-standby':'permanent-permission',authoritativeGameplay:false}}));}catch(_){}root.KeloGuardian.broadcast({t:'guardian:mirror_takeover',schema:1,previousEpoch:Number(seed?.epoch)||0,newEpoch,seedSeq:Number(seed?.seq)||0,serverTick:Number(seed?.serverTick)||0,at:Date.now(),claimMode:useAssignedStandby?'server-standby':'permanent-permission',authoritativeGameplay:false});acks.clear();lostMasterSince=0;}
+  }catch(error){const raw=String(error&&error.message||error);if(!/MASTER_BUSY|STILL_HEALTHY|STANDBY_NOT_ASSIGNED|409/.test(raw))lastError=raw;}finally{claimInFlight=false;emit(true);}
 }
 function observeGuardianState(){const g=guardianState(),m=g.master;if(g.masterActive){lostMasterSince=0;previousMaster={nodeId:g.nodeId,epoch:Number(m?.epoch||0),lastCheckpointAt:Date.now()};return emit();}if(m?.nodeId){const key=masterKey(m),prior=previousMaster&&masterKey(previousMaster);if(prior&&key!==prior&&latest)latest=null;previousMaster={nodeId:String(m.nodeId),epoch:Number(m.epoch)||0,lastCheckpointAt:latest?.receivedAt||0};}emit();}
 function tick(){const now=Date.now(),g=guardianState();if(!g.enabled)return emit();if(g.masterActive)broadcastCheckpoint(now);else attemptFailover(now);cleanupAcks(now);emit();}
 root.addEventListener('kelo:guardian-data',onGuardianData,{passive:true});root.addEventListener('kelo:guardian-state',observeGuardianState,{passive:true});
 if(!root.KeloSimulation||typeof root.KeloSimulation.after!=='function')throw new Error('GUARDIAN_MIRROR_SIMULATION_OWNER_UNAVAILABLE');root.KeloSimulation.after('guardian:hot-mirror',tick,365);
 root.KeloGuardianMirror=Object.freeze({version:VERSION,state,latestCheckpoint:()=>latest,history:()=>Object.freeze(history.slice()),takeoverSeed:()=>takeoverSeed});
-root.KELO_GUARDIAN_MIRROR_AUDIT=Object.freeze({version:VERSION,owner:'KeloGuardianMirror',guardianSupport:true,checkpointTransport:'existing-kelo-guardian-datachannel',acknowledgedBackups:true,automaticMasterClaim:true,secondLoop:false,clientGameplayAuthority:false,authoritativeGameplay:false,economyAuthority:false});
+root.KELO_GUARDIAN_MIRROR_AUDIT=Object.freeze({version:VERSION,owner:'KeloGuardianMirror',guardianSupport:true,checkpointTransport:'existing-kelo-guardian-datachannel',acknowledgedBackups:true,automaticMasterClaim:true,serverSelectedStandby:true,standbySelfAssignment:false,permanentMasterPermissionRequired:false,secondLoop:false,clientGameplayAuthority:false,authoritativeGameplay:false,economyAuthority:false});
 emit(true);
 })(typeof globalThis!=='undefined'?globalThis:window);
