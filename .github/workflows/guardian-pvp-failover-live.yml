@@ -38,7 +38,7 @@ jobs:
         with:
           node-version: '22'
       - name: Audit failover lab contract
-        run: npm run audit:guardian-pvp-failover
+        run: node scripts/guardian-pvp-failover-audit.mjs
 
   real-ios-failover:
     name: physical-iphone-master-failover
