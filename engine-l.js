@@ -1,12 +1,12 @@
 /* KELO-INDEX
  * area: LEGACY PLAZA GROUND / AIM PRESENTATION
- * owner: plaza ground legacy; cast chain owned by KeloAbilityAim; frame extension owned by KeloRender; viewport owned by KeloCamera
+ * owner: plaza ground legacy; cast chain owned by KeloLegacyAbilityCast; frame extension owned by KeloRender; viewport owned by KeloCamera
  * keys: PLAZA ATLAS LANDING CAST MIDDLEWARE RENDER CAMERA FOUNDATION
  * purpose: conserva ground authored, landing marker y presentación de cast sin monkey-patch global
  * public-api: KELO_PLAZA_TILESET, KELO_PLAZA_AUDIT
- * consumes: KeloAbilityAim, KeloRender, KeloCamera viewport policy, tile registry, world renderer, skillAim
+ * consumes: KeloLegacyAbilityCast, KeloRender, KeloCamera viewport policy, tile registry, world renderer, skillAim
  * state-owned: atlas images + baked layers
- * extension-points: KeloAbilityAim.registerCastMiddleware + KeloRender.afterFrame
+ * extension-points: KeloLegacyAbilityCast.registerMiddleware + KeloRender.afterFrame
  * reuse: contenido de plaza debe ir al registry/world renderer; viewport y DPR se delegan a KeloCamera
  * legacy: cast global retirado; world-renderer decorator pendiente de consolidación
  * do-not: NO reasignar castAimedSkill, NO envolver render, NO escribir canvas.width/height, resize o CONFIG.zoom
@@ -59,7 +59,7 @@
     decorationResetSuppressed: window.KELO_WORLD_DECORATION_RESET === true,
     renderOwner:'KeloRender',
     viewportOwner:'KeloCamera',
-    castOwner:'KeloAbilityAim',
+    castOwner:'KeloLegacyAbilityCast',
     directViewportWrites:false,
     collisionMutationMode:'collision-owner-registry-v1',
     collisionRemovals:0
@@ -273,9 +273,9 @@
     for(let i=0;i<=10;i++){ const t=i/10; burst(x1+(x2-x1)*t,y1+(y2-y1)*t,color,2,12); }
     if(typeof spawnDashTrail==='function') spawnDashTrail(x1,y1,x2,y2,color);
   }
-  const castOwner=window.KeloAbilityAim;
-  if(!castOwner||typeof castOwner.registerCastMiddleware!=='function')throw new Error('KeloAbilityAim cast middleware unavailable before engine-l');
-  castOwner.registerCastMiddleware('engine-l:plaza-cast-presentation',function(context,next){
+  const castOwner=window.KeloLegacyAbilityCast;
+  if(!castOwner||typeof castOwner.registerMiddleware!=='function')throw new Error('KeloLegacyAbilityCast unavailable before engine-l');
+  castOwner.registerMiddleware('engine-l:plaza-cast-presentation',function(context,next){
     const index=context.index,typeId=context.typeId,dirX=context.dirX,dirY=context.dirY;
     const stone=STATE.equipped[index]; if(!stone||stone.currentCd>0) return;
     const land=landingPoint(), color=stone.color||'#ffd166';
