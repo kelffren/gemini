@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: CREATORS / ASSET BYTES
  * owner: Kelo Creator Asset Bridge
- * keys: PNG COMPRESS LOSSLESS PALETTE BIT DEPTH COLOR TYPE ALPHA DROP QUALITY GATE PIXEL EXACT
+ * keys: PNG COMPRESS LOSSLESS PALETTE BIT DEPTH COLOR TYPE ALPHA DROP TRNS QUALITY GATE PIXEL EXACT
  * purpose: reduce PNG byte size before asset-sheet compilation while proving decoded pixels remain identical
  * public-api: optimizePngLossless(), decodePngRgba(), encodeRgbaPng()
  * state-owned: none; pure byte transformation + audit metadata
@@ -148,13 +148,34 @@ function unpackSubByteRows(packed, width, height, bitDepth, colorType) {
   return samples;
 }
 
+function transparentKeys(ihdr, transparency) {
+  if (!transparency) return {gray:null, rgb:null};
+  if (ihdr.colorType === 0) {
+    if (transparency.length !== 2) throw new Error(`PNG_SPACE_INVALID_TRNS_LENGTH:0:${transparency.length}`);
+    const mask = (1 << ihdr.bitDepth) - 1;
+    const raw = transparency.readUInt16BE(0) & mask;
+    const gray = ihdr.bitDepth === 8 ? raw : Math.round((raw * 255) / mask);
+    return {gray, rgb:null};
+  }
+  if (ihdr.colorType === 2) {
+    if (transparency.length !== 6) throw new Error(`PNG_SPACE_INVALID_TRNS_LENGTH:2:${transparency.length}`);
+    return {
+      gray:null,
+      rgb:[transparency.readUInt16BE(0) & 255, transparency.readUInt16BE(2) & 255, transparency.readUInt16BE(4) & 255]
+    };
+  }
+  return {gray:null, rgb:null};
+}
+
 function samplesToRgba(samples, ihdr, chunks) {
   const {width, height, colorType} = ihdr;
   const channels = COLOR_CHANNELS.get(colorType);
   const rgba = Buffer.alloc(width * height * 4);
   const palette = chunks.find(chunk => chunk.type === 'PLTE')?.data || null;
   const transparency = chunks.find(chunk => chunk.type === 'tRNS')?.data || null;
+  const transparent = transparentKeys(ihdr, transparency);
   if (colorType === 3 && (!palette || palette.length < 3)) throw new Error('PNG_SPACE_PALETTE_MISSING');
+  if ((colorType === 4 || colorType === 6) && transparency) throw new Error(`PNG_SPACE_TRNS_WITH_EXPLICIT_ALPHA:${colorType}`);
 
   for (let pixel = 0; pixel < width * height; pixel += 1) {
     const source = pixel * channels;
@@ -165,10 +186,11 @@ function samplesToRgba(samples, ihdr, chunks) {
       rgba[target + 2] = samples[source + 2];
       rgba[target + 3] = samples[source + 3];
     } else if (colorType === 2) {
-      rgba[target] = samples[source];
-      rgba[target + 1] = samples[source + 1];
-      rgba[target + 2] = samples[source + 2];
-      rgba[target + 3] = 255;
+      const r = samples[source], g = samples[source + 1], b = samples[source + 2];
+      rgba[target] = r;
+      rgba[target + 1] = g;
+      rgba[target + 2] = b;
+      rgba[target + 3] = transparent.rgb && r === transparent.rgb[0] && g === transparent.rgb[1] && b === transparent.rgb[2] ? 0 : 255;
     } else if (colorType === 4) {
       const gray = samples[source];
       rgba[target] = rgba[target + 1] = rgba[target + 2] = gray;
@@ -176,7 +198,7 @@ function samplesToRgba(samples, ihdr, chunks) {
     } else if (colorType === 0) {
       const gray = samples[source];
       rgba[target] = rgba[target + 1] = rgba[target + 2] = gray;
-      rgba[target + 3] = 255;
+      rgba[target + 3] = transparent.gray !== null && gray === transparent.gray ? 0 : 255;
     } else {
       const index = samples[source];
       const paletteIndex = index * 3;
