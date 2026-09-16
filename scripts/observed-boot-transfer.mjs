@@ -44,7 +44,7 @@ async function observeRun(browser,runIndex){
         camera:cleanView(),
         props:audit?{ready:!!audit.ready,failed:!!audit.failed,initialWantedAssetCount:Number(audit.initialWantedAssetCount)||0,wantedAssetCount:Number(audit.wantedAssetCount)||0,residentAssetCount:Number(audit.residentAssetCount)||0,wantedAssets:Array.isArray(audit.wantedAssets)?audit.wantedAssets.slice().sort():[]}:null,
         residency:residency?{wanted:Array.isArray(residency.wanted)?residency.wanted.slice().sort():[],resident:Array.isArray(residency.resident)?residency.resident.slice().sort():[],held:Array.isArray(residency.held)?residency.held.slice().sort():[]}:null,
-        atlas:Array.isArray(atlas)?atlas.filter(row=>ids.has(row?.id)).map(row=>({id:String(row.id),refs:Number(row.refs)||0,status:String(row.status||''),role:String(row.role||''),lastUsed:Number(row.lastUsed)||0})).sort((a,b)=>a.id.localeCompare(b.id)):[]
+        atlas:Array.isArray(atlas)?atlas.filter(row=>ids.has(row?.key)).map(row=>({id:String(row.key),refs:Number(row.refs)||0,status:row.loaded?'loaded':(Number(row.warmUntil)>Date.now()?'warm':'loading'),role:String(row.role||''),warmUntil:Number(row.warmUntil)||0})).sort((a,b)=>a.id.localeCompare(b.id)):[]
       };
     });
     const bootEpoch=state.bootReadyEpochMs,deadline=Date.now()+3000;
