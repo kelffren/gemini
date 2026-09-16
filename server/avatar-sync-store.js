@@ -11,6 +11,8 @@
 const UUID_RE=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SLOT_RE=/^[A-Za-z0-9_.:-]{1,64}$/;
 const FACE_KEYS=Object.freeze(['down','left','right','up']);
+const PUBLIC_CREATOR_BUCKET='creator-global';
+const PUBLIC_CREATOR_VISIBILITY=new Set(['global','official']);
 function cleanBase(value){return String(value||'').trim().replace(/\/+$/,'');}
 function cleanPath(value){
   const raw=String(value||'').trim().replace(/^\/+/, '');
@@ -59,9 +61,9 @@ function createAvatarSyncStore(options={}){
   }
   function sanitizePublicAsset(raw){
     const a=raw&&typeof raw==='object'?raw:null;if(!a)return null;
-    const bucket=cleanBucket(a.publicStorageBucket),path=cleanPath(a.publicStoragePath),revisionId=String(a.assetRevisionId||'');
-    if(!bucket||!path||!UUID_RE.test(revisionId))return null;
-    return Object.freeze({role:String(a.role||'primary').slice(0,40),ordinal:int(a.ordinal,0,64,0),assetRevisionId:revisionId,assetId:String(a.assetId||'').slice(0,160),contentHash:String(a.contentHash||'').slice(0,160),mimeType:String(a.mimeType||'image/png').slice(0,80),byteSize:Math.max(0,Number(a.byteSize)||0),pixelWidth:int(a.pixelWidth,1,8192,1),pixelHeight:int(a.pixelHeight,1,8192,1),worldWidth:num(a.worldWidth,0,8192,0),worldHeight:num(a.worldHeight,0,8192,0),publicStorageBucket:bucket,publicStoragePath:path,runtimeUrl:`${supabaseUrl}/storage/v1/object/public/${encodeURIComponent(bucket)}/${encodePath(path)}`});
+    const bucket=cleanBucket(a.publicStorageBucket),path=cleanPath(a.publicStoragePath),revisionId=String(a.assetRevisionId||''),visibility=String(a.assetVisibility||'');
+    if(bucket!==PUBLIC_CREATOR_BUCKET||!PUBLIC_CREATOR_VISIBILITY.has(visibility)||!path||!UUID_RE.test(revisionId))return null;
+    return Object.freeze({role:String(a.role||'primary').slice(0,40),ordinal:int(a.ordinal,0,64,0),assetRevisionId:revisionId,assetId:String(a.assetId||'').slice(0,160),contentHash:String(a.contentHash||'').slice(0,160),mimeType:String(a.mimeType||'image/png').slice(0,80),byteSize:Math.max(0,Number(a.byteSize)||0),pixelWidth:int(a.pixelWidth,1,8192,1),pixelHeight:int(a.pixelHeight,1,8192,1),worldWidth:num(a.worldWidth,0,8192,0),worldHeight:num(a.worldHeight,0,8192,0),publicStorageBucket:bucket,publicStoragePath:path,assetVisibility:visibility,runtimeUrl:`${supabaseUrl}/storage/v1/object/public/${encodeURIComponent(bucket)}/${encodePath(path)}`});
   }
   function sanitizeAppearance(raw){
     if(!raw||typeof raw!=='object'||!UUID_RE.test(String(raw.characterId||'')))return null;
@@ -77,21 +79,15 @@ function createAvatarSyncStore(options={}){
     return Object.freeze({version:'creator-modular-appearance-v1',source:'server-authoritative-published',characterId:String(raw.characterId),revisionKey,loadout:Object.freeze(loadout)});
   }
   async function resolveAppearance(characterId,accessToken){
-    try{
-      const raw=await request(`${supabaseUrl}/rest/v1/rpc/get_my_public_creator_character_appearance`,{method:'POST',headers:headers(accessToken),body:JSON.stringify({p_character_id:characterId})});
-      lastAppearanceError=null;return sanitizeAppearance(raw);
-    }catch(error){appearanceRpcErrors+=1;lastAppearanceError=String(error&&error.message||error);return null;}
+    try{const raw=await request(`${supabaseUrl}/rest/v1/rpc/get_my_public_creator_character_appearance`,{method:'POST',headers:headers(accessToken),body:JSON.stringify({p_character_id:characterId})});lastAppearanceError=null;return sanitizeAppearance(raw);}catch(error){appearanceRpcErrors+=1;lastAppearanceError=String(error&&error.message||error);return null;}
   }
   async function resolve(characterId,accessToken){
     if(!configured||!characterId||!accessToken)return null;
     const appearancePromise=resolveAppearance(characterId,accessToken),query=new URLSearchParams({id:`eq.${String(characterId)}`,status:'eq.active',select:'id,active_avatar_content_id',limit:'1'});
-    const chars=await request(`${supabaseUrl}/rest/v1/characters?${query}`,{method:'GET',headers:headers(accessToken)}),row=Array.isArray(chars)?chars[0]:null,contentId=row&&row.active_avatar_content_id;
-    let avatar=null;
+    const chars=await request(`${supabaseUrl}/rest/v1/characters?${query}`,{method:'GET',headers:headers(accessToken)}),row=Array.isArray(chars)?chars[0]:null,contentId=row&&row.active_avatar_content_id;let avatar=null;
     if(contentId){const raw=await request(`${supabaseUrl}/rest/v1/rpc/get_avatar_manifest`,{method:'POST',headers:headers(accessToken),body:JSON.stringify({p_content_id:contentId})});avatar=sanitizeAvatar(raw);}
-    const creatorAppearance=await appearancePromise;
-    if(!avatar&&!creatorAppearance)return null;
-    return Object.freeze(Object.assign({source:'server-authoritative-presentation'},avatar||{}, {creatorAppearance}));
+    const creatorAppearance=await appearancePromise;if(!avatar&&!creatorAppearance)return null;return Object.freeze(Object.assign({source:'server-authoritative-presentation'},avatar||{}, {creatorAppearance}));
   }
-  return Object.freeze({version:'avatar-sync-store-v3-creator-modular',configured,resolve,sanitize:sanitizeAvatar,sanitizeAppearance,audit:()=>({version:'avatar-sync-store-v3-creator-modular',configured,clientManifestTrusted:false,publicBucket:'avatars',directionRigs:[1,4,8],creatorAppearance:true,creatorAppearanceSource:'owner-jwt + published exact revisions',appearanceRpcErrors,lastAppearanceError})});
+  return Object.freeze({version:'avatar-sync-store-v3.1-creator-modular',configured,resolve,sanitize:sanitizeAvatar,sanitizeAppearance,audit:()=>({version:'avatar-sync-store-v3.1-creator-modular',configured,clientManifestTrusted:false,publicBucket:'avatars',creatorPublicBucket:PUBLIC_CREATOR_BUCKET,creatorVisibility:[...PUBLIC_CREATOR_VISIBILITY],directionRigs:[1,4,8],creatorAppearance:true,creatorAppearanceSource:'owner-jwt + published exact revisions',appearanceRpcErrors,lastAppearanceError})});
 }
 module.exports={createAvatarSyncStore};
