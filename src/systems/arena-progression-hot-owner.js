@@ -10,7 +10,7 @@
 (function(root){
 'use strict';
 if(root.KeloArenaProgressionHotBalance)return;
-const VERSION='kelo-arena-progression-hot-v1';
+const VERSION='kelo-arena-progression-hot-v1.0.1';
 const PATH='src/systems/arena-progression-balance.json';
 const TIER_IDS=Object.freeze(['rookie','fighter','duelist','tactician','master','champion','legend']);
 const TIER_SET=new Set(TIER_IDS);
@@ -34,7 +34,7 @@ function normalize(raw){
 }
 function tiers(baseTiers){
   const source=Array.isArray(baseTiers)?baseTiers:[];
-  return Object.freeze(source.map(row=>Object.freeze(Object.assign({},row,{min:Number(active.masteryThresholds[row&&row.id]??row&&row.min)||0}))));
+  return Object.freeze(source.map(row=>{const id=row&&row.id,fallback=row&&row.min,configured=id!=null?active.masteryThresholds[id]:null,min=configured!=null?configured:fallback;return Object.freeze(Object.assign({},row,{min:Number(min)||0}));}));
 }
 function adjustXp(baseXp,result){
   const base=Math.max(0,Math.round(Number(baseXp)||0)),xp=active.xp||{},outcome=result&&result.won===true?Number(xp.winMultiplier)||1:Number(xp.lossMultiplier)||1;
