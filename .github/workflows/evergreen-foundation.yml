@@ -47,6 +47,9 @@ jobs:
       - name: Lightweight boot surface
         run: node scripts/boot-surface-audit.mjs
 
+      - name: Legacy debt report
+        run: node scripts/legacy-debt-audit.mjs
+
       - name: Foundation architecture audit
         run: node scripts/foundation-architecture-audit.js
 
