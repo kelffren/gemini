@@ -1,24 +1,32 @@
 /* KELO-INDEX
  * area: CREATORS / RUNTIME TEST BRIDGE
  * owner: temporary Definition Studio test sessions
- * owns: reversible ENVIRONMENT tests, server-backed apply-world approval, bounded revision history and safe rollback
+ * owns: reversible ENVIRONMENT tests, server-backed apply-world approval, visual revision history and safe rollback
  * does-not-own: publish authorization, server storage, map versioning or gameplay authority
  */
-import { createEnvironmentPreviewModel } from './environment-live-preview.mjs';
+import { createEnvironmentPreviewModel, renderEnvironmentLivePreview } from './environment-live-preview.mjs';
 import { installEnvironmentRuntime } from '../../environment/environment-runtime.mjs';
 
-const BRIDGE_VERSION='kelo-creator-test-bridge-v7';
+const BRIDGE_VERSION='kelo-creator-test-bridge-v8';
 const RESTORE_ID='kelo-environment-runtime-test-restore';
 const HISTORY_ID='kelo-environment-runtime-world-history';
 const APPLY_ID='kelo-environment-runtime-test-apply';
 const UNDO_ID='kelo-environment-runtime-world-undo';
 const PANEL_ID='kelo-environment-runtime-history-panel';
 const STYLE_ID='kelo-environment-runtime-test-controls';
+const HISTORY_CACHE_MS=15000;
 
 export function createCreatorTestPlan(type,draft={}){
   const key=String(type||draft?.type||'').trim().toUpperCase();
   if(key!=='ENVIRONMENT')return Object.freeze({supported:false,type:key,mode:'event-only'});
   return Object.freeze({supported:true,type:key,mode:'native-environment-runtime',environment:createEnvironmentPreviewModel(draft)});
+}
+
+export function historyEntryToPreviewDraft(entry={}){
+  const state=entry?.state&&typeof entry.state==='object'?entry.state:{};
+  return Object.freeze({fields:Object.freeze({
+    biome:state.biome||'plaza',weather:state.weather||'clear',timeOfDay:state.timeOfDay||'day',ambientDensity:state.ambientDensity??50,musicMood:state.musicMood||'calm',accent:state.accent||'#c9a55f',notes:''
+  })});
 }
 
 function installControls(doc){
@@ -30,25 +38,34 @@ function installControls(doc){
 #${APPLY_ID}{right:max(10px,env(safe-area-inset-right));border:1px solid rgba(111,232,164,.5);background:rgba(12,34,24,.95);color:#9df0bd}
 #${UNDO_ID}{right:max(10px,env(safe-area-inset-right));border:1px solid rgba(235,178,86,.58);background:rgba(37,25,10,.96);color:#f2cf83}
 #${APPLY_ID}[disabled],#${HISTORY_ID}[disabled],#${UNDO_ID}[disabled]{opacity:.72;filter:saturate(.7)}
-#${PANEL_ID}{position:fixed;z-index:2147483100;left:50%;bottom:max(136px,calc(env(safe-area-inset-bottom) + 124px));transform:translateX(-50%);width:min(94vw,520px);max-height:min(58vh,520px);overflow:auto;overscroll-behavior:contain;padding:12px;border:1px solid rgba(125,178,235,.28);border-radius:18px;background:rgba(7,11,17,.97);box-shadow:0 24px 70px rgba(0,0,0,.58);color:#e9eef5;font:700 10px/1.35 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;pointer-events:auto;-webkit-overflow-scrolling:touch}
-#${PANEL_ID} .kewh-head{position:sticky;top:-12px;z-index:2;margin:-12px -12px 8px;padding:11px 12px;background:rgba(7,11,17,.985);border-bottom:1px solid rgba(255,255,255,.07);display:flex;align-items:center;gap:8px}
+#${PANEL_ID}{position:fixed;z-index:2147483100;left:50%;bottom:max(136px,calc(env(safe-area-inset-bottom) + 124px));transform:translateX(-50%);width:min(94vw,560px);max-height:min(70vh,650px);overflow:auto;overscroll-behavior:contain;padding:12px;border:1px solid rgba(125,178,235,.28);border-radius:18px;background:rgba(7,11,17,.97);box-shadow:0 24px 70px rgba(0,0,0,.58);color:#e9eef5;font:700 10px/1.35 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;pointer-events:auto;-webkit-overflow-scrolling:touch}
+#${PANEL_ID} .kewh-head{position:sticky;top:-12px;z-index:4;margin:-12px -12px 10px;padding:11px 12px;background:rgba(7,11,17,.985);border-bottom:1px solid rgba(255,255,255,.07);display:flex;align-items:center;gap:8px}
 #${PANEL_ID} .kewh-head strong{font-size:11px;letter-spacing:.05em}#${PANEL_ID} .kewh-head small{margin-left:auto;color:#7f8b99;font-size:8px}#${PANEL_ID} .kewh-close{border:0;background:transparent;color:#c8d0da;font-size:19px;line-height:1;padding:5px}
-#${PANEL_ID} .kewh-row{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.055)}#${PANEL_ID} .kewh-row:last-child{border-bottom:0}
-#${PANEL_ID} .kewh-meta{min-width:0}#${PANEL_ID} .kewh-meta b{display:block;color:#dce8f3;font-size:10px}#${PANEL_ID} .kewh-meta small{display:block;margin-top:3px;color:#7f8b99;font-size:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-#${PANEL_ID} .kewh-action{min-width:82px;min-height:34px;padding:0 9px;border-radius:10px;border:1px solid rgba(232,201,111,.28);background:rgba(31,25,13,.7);color:#e8cf89;font:850 8px/1 system-ui}#${PANEL_ID} .kewh-current{color:#82e2ad;border-color:rgba(111,232,164,.25);background:rgba(12,34,24,.5)}#${PANEL_ID} .kewh-error{padding:10px;border-radius:10px;color:#ffb0b0;background:rgba(255,100,100,.07)}
-@media(max-width:390px){#${RESTORE_ID},#${HISTORY_ID},#${APPLY_ID}{padding:0 8px;font-size:9px;min-height:40px}#${PANEL_ID}{width:96vw}}
+#${PANEL_ID} .kewh-stage{margin-bottom:10px;padding:9px;border:1px solid rgba(125,178,235,.22);border-radius:14px;background:rgba(13,20,29,.82)}#${PANEL_ID} .kewh-stage-top{display:flex;align-items:center;gap:8px;margin-bottom:7px}#${PANEL_ID} .kewh-stage-top b{font-size:10px}#${PANEL_ID} .kewh-stage-top span{margin-left:auto;color:#8ea4b8;font-size:8px}#${PANEL_ID} .kewh-readonly{margin:7px 0 0;padding:6px 8px;border-radius:8px;background:rgba(75,135,190,.08);color:#a8d7ff;font-size:8px;text-align:center;letter-spacing:.05em}#${PANEL_ID} .kewh-big-preview{height:190px;border-radius:11px;overflow:hidden;border:1px solid rgba(255,255,255,.08)}#${PANEL_ID} .kewh-big-preview .kds-env-scene{min-height:190px}
+#${PANEL_ID} .kewh-stage-actions{display:grid;grid-template-columns:1fr;gap:6px;margin-top:8px}#${PANEL_ID} .kewh-rollback{min-height:39px;border-radius:10px;border:1px solid rgba(232,201,111,.32);background:rgba(38,28,12,.78);color:#efd78f;font:850 9px/1 system-ui}#${PANEL_ID} .kewh-rollback.confirm{border-color:rgba(245,132,102,.5);background:rgba(56,20,14,.86);color:#ffb09c}#${PANEL_ID} .kewh-rollback[disabled]{opacity:.65}
+#${PANEL_ID} .kewh-row{display:grid;grid-template-columns:92px minmax(0,1fr) auto;gap:8px;align-items:center;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.055)}#${PANEL_ID} .kewh-row:last-child{border-bottom:0}#${PANEL_ID} .kewh-row.viewing{background:linear-gradient(90deg,rgba(77,142,198,.08),transparent);margin:0 -6px;padding-left:6px;padding-right:6px;border-radius:10px}
+#${PANEL_ID} .kewh-thumb{height:58px;border-radius:8px;overflow:hidden;border:1px solid rgba(255,255,255,.08);background:#05080c}#${PANEL_ID} .kewh-thumb .kds-env-scene{min-height:58px}#${PANEL_ID} .kewh-thumb .kds-env-meta{display:none}#${PANEL_ID} .kewh-thumb .kds-env-celestial{width:12px;height:12px}#${PANEL_ID} .kewh-thumb .kds-env-feature{opacity:.72}
+#${PANEL_ID} .kewh-meta{min-width:0}#${PANEL_ID} .kewh-meta b{display:block;color:#dce8f3;font-size:10px}#${PANEL_ID} .kewh-meta small{display:block;margin-top:3px;color:#7f8b99;font-size:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#${PANEL_ID} .kewh-meta time{display:block;margin-top:3px;color:#586575;font-size:7px}
+#${PANEL_ID} .kewh-action{min-width:72px;min-height:34px;padding:0 8px;border-radius:10px;border:1px solid rgba(125,178,235,.26);background:rgba(12,25,40,.72);color:#a9d6ff;font:850 8px/1 system-ui}#${PANEL_ID} .kewh-current{color:#82e2ad;border-color:rgba(111,232,164,.25);background:rgba(12,34,24,.5)}#${PANEL_ID} .kewh-error{padding:10px;border-radius:10px;color:#ffb0b0;background:rgba(255,100,100,.07)}
+@media(max-width:430px){#${RESTORE_ID},#${HISTORY_ID},#${APPLY_ID}{padding:0 8px;font-size:9px;min-height:40px}#${PANEL_ID}{width:96vw;max-height:72vh}#${PANEL_ID} .kewh-row{grid-template-columns:78px minmax(0,1fr) 66px}#${PANEL_ID} .kewh-thumb{height:52px}#${PANEL_ID} .kewh-big-preview{height:170px}#${PANEL_ID} .kewh-big-preview .kds-env-scene{min-height:170px}}
 `;doc.head.append(style);
 }
 
+function formatHistoryTime(value){
+  if(!value)return 'time unknown';
+  try{return new Intl.DateTimeFormat(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}).format(new Date(value));}catch{return String(value);}
+}
+function notify(root,message){if(typeof root.showToast==='function')root.showToast(message);else console.info('[Kelo Environment History]',message);}
+
 export function installCreatorTestBridge(root=globalThis,{contentSession=null}={}){
   if(root?.KELO_CREATOR_TEST_BRIDGE?.version===BRIDGE_VERSION){root.KELO_CREATOR_TEST_BRIDGE.configure?.({contentSession});return root.KELO_CREATOR_TEST_BRIDGE;}
-  const doc=root?.document,runtime=installEnvironmentRuntime(root);let active=null,session=contentSession,publishing=false,lastPublished=null,historyConfirmRevision=0;
+  const doc=root?.document,runtime=installEnvironmentRuntime(root);let active=null,session=contentSession,publishing=false,lastPublished=null,historyConfirmRevision=0,historyPreviewRevision=0,historyCache=[],historyCacheAt=0;
 
   function configure({contentSession:nextSession=null}={}){if(nextSession)session=nextSession;return api;}
   function token(){const value=String(session?.accessToken||'').trim();if(!value)throw new Error('AUTH_REQUIRED');return value;}
   function removePreviewControls(){doc?.getElementById?.(RESTORE_ID)?.remove?.();doc?.getElementById?.(HISTORY_ID)?.remove?.();doc?.getElementById?.(APPLY_ID)?.remove?.();removeHistoryPanel();}
   function removeUndoControl(){doc?.getElementById?.(UNDO_ID)?.remove?.();}
-  function removeHistoryPanel(){doc?.getElementById?.(PANEL_ID)?.remove?.();historyConfirmRevision=0;}
+  function removeHistoryPanel({resetSelection=true}={}){doc?.getElementById?.(PANEL_ID)?.remove?.();if(resetSelection){historyConfirmRevision=0;historyPreviewRevision=0;}}
   function removeControls(){removePreviewControls();removeUndoControl();}
   function restore(reason='manual'){
     if(publishing)return Object.freeze({ok:false,restored:false,message:'World publish is still in progress'});
@@ -69,6 +86,10 @@ export function installCreatorTestBridge(root=globalThis,{contentSession=null}={
     const sync=await getWorldSync();if(!sync.revision)await sync.refresh({source:'creator-history'});
     return sync.history({accessToken:token(),limit});
   }
+  async function loadHistory(force=false){
+    if(!force&&historyCache.length&&Date.now()-historyCacheAt<HISTORY_CACHE_MS)return historyCache;
+    historyCache=await history(10);historyCacheAt=Date.now();return historyCache;
+  }
   async function rollbackRevision(targetRevision,reason='history'){
     if(publishing)return Object.freeze({ok:false,rolledBack:false,message:'World mutation already in progress'});
     publishing=true;
@@ -78,7 +99,7 @@ export function installCreatorTestBridge(root=globalThis,{contentSession=null}={
       if(target>=beforeRevision)throw new Error('ROLLBACK_TARGET_MUST_BE_OLDER');
       const envelope=await sync.rollback(target,{accessToken:token(),expectedRevision:beforeRevision,source:'creator-history-rollback'});
       const result=runtime.publish(envelope.state,{source:'creator-history-rollback',revision:envelope.revision,updatedAt:envelope.updatedAt,updatedBy:envelope.updatedBy});
-      removePreviewControls();active=null;lastPublished=Object.freeze({targetRevision:beforeRevision,publishedRevision:envelope.revision,state:result.state,publishedAt:Date.now(),kind:'rollback'});mountUndoControl();
+      historyCache=[];historyCacheAt=0;removePreviewControls();active=null;lastPublished=Object.freeze({targetRevision:beforeRevision,publishedRevision:envelope.revision,state:result.state,publishedAt:Date.now(),kind:'rollback'});mountUndoControl();
       const detail=Object.freeze({type:'ENVIRONMENT',reason,mode:'native-runtime',state:result.state,revision:envelope.revision,restoredRevision:target,previousRevision:beforeRevision,persistent:true,synchronized:true,source:'kelo-creator-test-bridge'});
       try{root?.dispatchEvent?.(new root.CustomEvent('kelo:creator-runtime-world-history-rollback',{detail}));}catch{}
       return Object.freeze({...result,rolledBack:true,revision:envelope.revision,restoredRevision:target,previousRevision:beforeRevision,synchronized:true,undoAvailable:true,message:`WORLD ROLLBACK · restored revision ${target} for all players`});
@@ -88,18 +109,23 @@ export function installCreatorTestBridge(root=globalThis,{contentSession=null}={
       return Object.freeze({ok:false,rolledBack:false,conflict,error:message,message:conflict?'Rollback blocked safely because the world changed while you were choosing a revision':message==='AUTH_REQUIRED'?'Sign in with an admin or official account before opening world history':`Could not rollback world environment · ${message}`});
     }finally{publishing=false;}
   }
-  async function renderHistoryPanel(){
-    if(!doc?.createElement)return null;installControls(doc);removeHistoryPanel();
+  async function renderHistoryPanel({refresh=false}={}){
+    if(!doc?.createElement)return null;installControls(doc);removeHistoryPanel({resetSelection:false});
     const panel=doc.createElement('section');panel.id=PANEL_ID;panel.setAttribute('role','dialog');panel.setAttribute('aria-label','World environment revision history');
-    const head=doc.createElement('div');head.className='kewh-head';const title=doc.createElement('strong');title.textContent='WORLD HISTORY';const live=doc.createElement('small');live.textContent='LOADING…';const close=doc.createElement('button');close.type='button';close.className='kewh-close';close.textContent='×';close.setAttribute('aria-label','Close world history');close.onclick=removeHistoryPanel;head.append(title,live,close);panel.append(head);doc.body.append(panel);
+    const head=doc.createElement('div');head.className='kewh-head';const title=doc.createElement('strong');title.textContent='WORLD HISTORY';const live=doc.createElement('small');live.textContent='LOADING…';const close=doc.createElement('button');close.type='button';close.className='kewh-close';close.textContent='×';close.setAttribute('aria-label','Close world history');close.onclick=()=>removeHistoryPanel();head.append(title,live,close);panel.append(head);doc.body.append(panel);
     try{
-      const entries=await history(10),current=root?.KELO_WORLD_ENVIRONMENT_SYNC?.revision||runtime.revision||0;live.textContent=`WORLD r${current} · ${root?.KELO_WORLD_ENVIRONMENT_SYNC?.connected?'LIVE':'SYNCING'}`;
+      const entries=await loadHistory(refresh),current=root?.KELO_WORLD_ENVIRONMENT_SYNC?.revision||runtime.revision||0;live.textContent=`WORLD r${current} · ${root?.KELO_WORLD_ENVIRONMENT_SYNC?.connected?'LIVE':'SYNCING'}`;
       if(!entries.length){const empty=doc.createElement('div');empty.className='kewh-error';empty.textContent='No environment revisions yet';panel.append(empty);return panel;}
+      if(!historyPreviewRevision||!entries.some(entry=>entry.revision===historyPreviewRevision))historyPreviewRevision=(entries.find(entry=>entry.revision===current)||entries[0]).revision;
+      const selected=entries.find(entry=>entry.revision===historyPreviewRevision)||entries[0];
+      const stage=doc.createElement('section');stage.className='kewh-stage';const stageTop=doc.createElement('div');stageTop.className='kewh-stage-top';const stageTitle=doc.createElement('b');stageTitle.textContent=`PREVIEW r${selected.revision}`;const stageMeta=doc.createElement('span');stageMeta.textContent=`${String(selected.action||'publish').toUpperCase()} · ${formatHistoryTime(selected.publishedAt)}`;stageTop.append(stageTitle,stageMeta);const big=doc.createElement('div');big.className='kewh-big-preview';big.append(renderEnvironmentLivePreview({doc,draft:historyEntryToPreviewDraft(selected)}));const readonly=doc.createElement('div');readonly.className='kewh-readonly';readonly.textContent=selected.revision===current?'CURRENT WORLD · READ ONLY':'PREVIEW ONLY · WORLD HAS NOT CHANGED';const stageActions=doc.createElement('div');stageActions.className='kewh-stage-actions';const rollback=doc.createElement('button');rollback.type='button';rollback.className='kewh-rollback';
+      if(selected.revision===current){rollback.textContent='CURRENT WORLD';rollback.disabled=true;}else{const confirming=historyConfirmRevision===selected.revision;rollback.textContent=confirming?`CONFIRM ROLLBACK TO r${selected.revision}`:`ROLLBACK WORLD TO r${selected.revision}`;if(confirming)rollback.classList.add('confirm');rollback.onclick=async()=>{if(historyConfirmRevision!==selected.revision){historyConfirmRevision=selected.revision;await renderHistoryPanel();return;}rollback.disabled=true;rollback.textContent='ROLLING BACK WORLD…';const result=await rollbackRevision(selected.revision,'history-preview');notify(root,result.message);if(!result.ok){historyConfirmRevision=0;await renderHistoryPanel({refresh:true});}};}
+      stageActions.append(rollback);stage.append(stageTop,big,readonly,stageActions);panel.append(stage);
       for(const entry of entries){
-        const row=doc.createElement('div');row.className='kewh-row';const meta=doc.createElement('div');meta.className='kewh-meta';const b=doc.createElement('b');b.textContent=`r${entry.revision} · ${String(entry.action||'publish').toUpperCase()}`;const small=doc.createElement('small');small.textContent=`${entry.state.biome} · ${entry.state.weather} · ${entry.state.timeOfDay} · density ${entry.state.ambientDensity}`;meta.append(b,small);const action=doc.createElement('button');action.type='button';action.className='kewh-action';
-        if(entry.revision===current){action.textContent='CURRENT';action.disabled=true;action.classList.add('kewh-current');}
-        else{action.textContent=historyConfirmRevision===entry.revision?'CONFIRM':'ROLLBACK';action.onclick=async()=>{if(historyConfirmRevision!==entry.revision){historyConfirmRevision=entry.revision;await renderHistoryPanel();return;}action.disabled=true;action.textContent='ROLLING BACK…';const result=await rollbackRevision(entry.revision,'history-panel');notify(root,result.message);if(result.ok){removeHistoryPanel();}else{historyConfirmRevision=0;await renderHistoryPanel();}};}
-        row.append(meta,action);panel.append(row);
+        const row=doc.createElement('div');row.className='kewh-row';if(entry.revision===selected.revision)row.classList.add('viewing');const thumb=doc.createElement('div');thumb.className='kewh-thumb';thumb.append(renderEnvironmentLivePreview({doc,draft:historyEntryToPreviewDraft(entry)}));const meta=doc.createElement('div');meta.className='kewh-meta';const b=doc.createElement('b');b.textContent=`r${entry.revision} · ${String(entry.action||'publish').toUpperCase()}`;const small=doc.createElement('small');small.textContent=`${entry.state.biome} · ${entry.state.weather} · ${entry.state.timeOfDay} · density ${entry.state.ambientDensity}`;const time=doc.createElement('time');time.textContent=formatHistoryTime(entry.publishedAt);meta.append(b,small,time);const action=doc.createElement('button');action.type='button';action.className='kewh-action';
+        if(entry.revision===selected.revision){action.textContent=entry.revision===current?'CURRENT':'VIEWING';if(entry.revision===current)action.classList.add('kewh-current');action.disabled=true;}else{action.textContent='PREVIEW';action.onclick=async()=>{historyPreviewRevision=entry.revision;historyConfirmRevision=0;await renderHistoryPanel();};}
+        thumb.setAttribute('role','button');thumb.tabIndex=0;thumb.setAttribute('aria-label',`Preview world environment revision ${entry.revision}`);thumb.onclick=()=>{if(entry.revision!==historyPreviewRevision){historyPreviewRevision=entry.revision;historyConfirmRevision=0;void renderHistoryPanel();}};thumb.onkeydown=event=>{if((event.key==='Enter'||event.key===' ')&&entry.revision!==historyPreviewRevision){event.preventDefault();historyPreviewRevision=entry.revision;historyConfirmRevision=0;void renderHistoryPanel();}};
+        row.append(thumb,meta,action);panel.append(row);
       }
       return panel;
     }catch(error){live.textContent='UNAVAILABLE';const box=doc.createElement('div');box.className='kewh-error';box.textContent=String(error?.message||error)==='AUTH_REQUIRED'?'Admin/official sign-in required to view world history':String(error?.message||error);panel.append(box);return panel;}
@@ -113,7 +139,7 @@ export function installCreatorTestBridge(root=globalThis,{contentSession=null}={
       const sync=await getWorldSync();
       const envelope=await sync.rollback(plan.targetRevision,{accessToken:token(),expectedRevision:plan.publishedRevision,source:'creator-undo'});
       const result=runtime.publish(envelope.state,{source:'creator-undo-world',revision:envelope.revision,updatedAt:envelope.updatedAt,updatedBy:envelope.updatedBy});
-      removeUndoControl();lastPublished=null;
+      historyCache=[];historyCacheAt=0;removeUndoControl();lastPublished=null;
       const detail=Object.freeze({type:'ENVIRONMENT',reason,mode:'native-runtime',state:result.state,revision:envelope.revision,restoredRevision:plan.targetRevision,persistent:true,synchronized:true,source:'kelo-creator-test-bridge'});
       try{root?.dispatchEvent?.(new root.CustomEvent('kelo:creator-runtime-world-undo',{detail}));}catch{}
       return Object.freeze({...result,rolledBack:true,revision:envelope.revision,restoredRevision:plan.targetRevision,synchronized:true,message:`WORLD UNDONE · restored revision ${plan.targetRevision} for all players`});
@@ -134,7 +160,7 @@ export function installCreatorTestBridge(root=globalThis,{contentSession=null}={
       const beforeRevision=sync.revision;
       const envelope=await sync.publish(model,{accessToken:token(),expectedRevision:beforeRevision||null,source:'creator-approved'});
       const result=runtime.publish(envelope.state,{source:'creator-approved-world',revision:envelope.revision,updatedAt:envelope.updatedAt,updatedBy:envelope.updatedBy});
-      removePreviewControls();active=null;lastPublished=Object.freeze({targetRevision:beforeRevision,publishedRevision:envelope.revision,state:result.state,publishedAt:Date.now(),kind:'publish'});mountUndoControl();
+      historyCache=[];historyCacheAt=0;removePreviewControls();active=null;lastPublished=Object.freeze({targetRevision:beforeRevision,publishedRevision:envelope.revision,state:result.state,publishedAt:Date.now(),kind:'publish'});mountUndoControl();
       const detail=Object.freeze({type:'ENVIRONMENT',reason,mode:'native-runtime',state:result.state,revision:envelope.revision,previousRevision:beforeRevision,persistent:true,synchronized:true,undoAvailable:beforeRevision>0,source:'kelo-creator-test-bridge'});
       try{root?.dispatchEvent?.(new root.CustomEvent('kelo:creator-runtime-test-approved',{detail}));}catch{}
       return Object.freeze({...result,revision:envelope.revision,previousRevision:beforeRevision,synchronized:true,undoAvailable:beforeRevision>0,message:`${result.message} · synchronized for all players · UNDO WORLD available`});
@@ -149,7 +175,7 @@ export function installCreatorTestBridge(root=globalThis,{contentSession=null}={
   function mountControls(){
     if(!doc?.createElement)return Object.freeze({restore:null,history:null,apply:null});installControls(doc);removeControls();lastPublished=null;
     const restoreBtn=doc.createElement('button');restoreBtn.id=RESTORE_ID;restoreBtn.type='button';restoreBtn.textContent='↶ RESTORE';restoreBtn.setAttribute('aria-label','Restore environment before test');restoreBtn.addEventListener('click',()=>restore('button'));
-    const historyBtn=doc.createElement('button');historyBtn.id=HISTORY_ID;historyBtn.type='button';historyBtn.textContent=`HISTORY r${root?.KELO_WORLD_ENVIRONMENT_SYNC?.revision||runtime.revision||'—'}`;historyBtn.setAttribute('aria-label','Open shared world environment revision history');historyBtn.addEventListener('click',()=>void renderHistoryPanel());
+    const historyBtn=doc.createElement('button');historyBtn.id=HISTORY_ID;historyBtn.type='button';historyBtn.textContent=`HISTORY r${root?.KELO_WORLD_ENVIRONMENT_SYNC?.revision||runtime.revision||'—'}`;historyBtn.setAttribute('aria-label','Open shared world environment revision history');historyBtn.addEventListener('click',()=>void renderHistoryPanel({refresh:true}));
     const applyBtn=doc.createElement('button');applyBtn.id=APPLY_ID;applyBtn.type='button';applyBtn.textContent='✓ APPLY WORLD';applyBtn.setAttribute('aria-label','Publish this environment to the shared Kelo World state');applyBtn.addEventListener('click',()=>void approve('button'));
     doc.body.append(restoreBtn,historyBtn,applyBtn);return Object.freeze({restore:restoreBtn,history:historyBtn,apply:applyBtn});
   }
@@ -163,7 +189,7 @@ export function installCreatorTestBridge(root=globalThis,{contentSession=null}={
     const plan=createCreatorTestPlan(type,draft);if(!plan.supported)return Object.freeze({ok:true,supported:false,temporary:false,message:`${plan.type||'Definition'} test draft emitted`});return mountEnvironment(draft);
   }
 
-  const api=Object.freeze({version:BRIDGE_VERSION,configure,run,restore,approve,history,rollbackRevision,rollbackLast,openHistory:renderHistoryPanel,get active(){return active?Object.freeze({type:'ENVIRONMENT',mode:active.mode,model:active.model,state:active.state,temporary:true,persistent:false,publishing}):null;},get lastPublished(){return lastPublished;},get worldRevision(){return root?.KELO_WORLD_ENVIRONMENT_SYNC?.revision||runtime.revision||0;},get worldConnected(){return root?.KELO_WORLD_ENVIRONMENT_SYNC?.connected===true;}});
+  const api=Object.freeze({version:BRIDGE_VERSION,configure,run,restore,approve,history,rollbackRevision,rollbackLast,openHistory:()=>renderHistoryPanel({refresh:true}),get active(){return active?Object.freeze({type:'ENVIRONMENT',mode:active.mode,model:active.model,state:active.state,temporary:true,persistent:false,publishing}):null;},get lastPublished(){return lastPublished;},get worldRevision(){return root?.KELO_WORLD_ENVIRONMENT_SYNC?.revision||runtime.revision||0;},get worldConnected(){return root?.KELO_WORLD_ENVIRONMENT_SYNC?.connected===true;},get historyPreviewRevision(){return historyPreviewRevision;}});
   if(root)root.KELO_CREATOR_TEST_BRIDGE=api;removeControls();return api;
 }
 
