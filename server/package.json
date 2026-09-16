@@ -11,6 +11,7 @@
     "test:persistence": "node persistence-smoke-test.js",
     "test:avatar-realtime": "node avatar-realtime-smoke-test.js",
     "test:creator-modular": "node creator-modular-replication-smoke-test.js",
+    "test:pvp-presentation": "node pvp-presentation-wire-smoke-test.js",
     "test:sprite-ai": "node sprite-ai-smoke-test.js"
   },
   "dependencies": {
