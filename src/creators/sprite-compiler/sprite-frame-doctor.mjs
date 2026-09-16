@@ -1,15 +1,27 @@
 /* KELO-INDEX
  * area: CREATORS / SPRITE COMPILER / FRAME DOCTOR
  * owner: per-frame defect isolation and selective atlas patching
- * owns: defect scores, exact repair targets, cell replacement without touching healthy cells
+ * owns: defect scores, identity/region drift signals, exact repair targets, cell replacement without touching healthy cells
  * does-not-own: image generation provider, animation semantics, publishing
  */
 const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
 const finite=(v,f=0)=>Number.isFinite(Number(v))?Number(v):f;
 const median=values=>{const a=values.filter(Number.isFinite).sort((x,y)=>x-y);if(!a.length)return 0;const m=Math.floor(a.length/2);return a.length%2?a[m]:(a[m-1]+a[m])/2;};
 const ratioDistance=(value,reference)=>reference>0&&value>0?Math.abs(Math.log(value/reference)):Infinity;
+const scoreOrNull=value=>Number.isFinite(Number(value))?clamp(Number(value),0,1):null;
 
-export function diagnoseSpriteFrames(frames,{columns=4,directions=['N','NE','E','SE','S','SW','W','NW'],emptyPixelFloor=20,sizeTolerance=.38,pixelTolerance=.62,centerTolerance=.14,feetTolerancePx=3}={}){
+function semanticRegions(reasons){
+  const regions=new Set();
+  if(reasons.includes('head-identity-drift'))regions.add('head');
+  if(reasons.includes('weapon-drift'))regions.add('weapon');
+  if(reasons.includes('limb-readability')){regions.add('arms');regions.add('legs');}
+  if(reasons.includes('identity-drift'))regions.add('character');
+  if(reasons.includes('motion-discontinuity'))regions.add('limbs');
+  if(reasons.includes('clipped'))regions.add('edges');
+  return Object.freeze([...regions]);
+}
+
+export function diagnoseSpriteFrames(frames,{columns=4,directions=['N','NE','E','SE','S','SW','W','NW'],emptyPixelFloor=20,sizeTolerance=.38,pixelTolerance=.62,centerTolerance=.14,feetTolerancePx=3,identityFloor=.72,headConsistencyFloor=.70,weaponConsistencyFloor=.65,limbReadabilityFloor=.62,motionContinuityFloor=.60}={}){
   const usable=frames.filter(f=>f?.bounds&&finite(f.pixels)>emptyPixelFloor);
   const globalBaseline=Object.freeze({width:median(usable.map(f=>f.bounds.width)),height:median(usable.map(f=>f.bounds.height)),pixels:median(usable.map(f=>f.pixels)),aspect:median(usable.map(f=>f.bounds.width/Math.max(1,f.bounds.height))),feet:median(usable.map(f=>f.bounds.bottom+1))});
   const rowBaselines=new Map();
@@ -19,6 +31,7 @@ export function diagnoseSpriteFrames(frames,{columns=4,directions=['N','NE','E',
     const row=Number.isFinite(frame?.row)?frame.row:Math.floor(index/columns),column=Number.isFinite(frame?.column)?frame.column:index%columns;
     const direction=directions[row]||`ROW_${row+1}`,phase=column+1,reasons=[];let severity=0;
     let verticalScaleDelta=0,feetOffsetPx=0,centerOffsetPx=0;
+    const identityScore=scoreOrNull(frame?.identityScore),headConsistencyScore=scoreOrNull(frame?.headConsistencyScore),weaponConsistencyScore=scoreOrNull(frame?.weaponConsistencyScore),limbReadabilityScore=scoreOrNull(frame?.limbReadabilityScore),motionContinuityScore=scoreOrNull(frame?.motionContinuityScore);
     if(!frame?.bounds||finite(frame.pixels)<=emptyPixelFloor){reasons.push('empty');severity=1;}
     else{
       if(frame.clipped||finite(frame.edgePixels)>0){reasons.push('clipped');severity=Math.max(severity,.95);}
@@ -30,7 +43,14 @@ export function diagnoseSpriteFrames(frames,{columns=4,directions=['N','NE','E',
       if(Math.abs(feetOffsetPx)>feetTolerancePx){reasons.push('feet-offset');severity=Math.max(severity,clamp(Math.abs(feetOffsetPx)/Math.max(8,baseline.height*.22),.3,.78));}
       const cell=frame.cell;if(cell){const center=frame.bounds.x+frame.bounds.width/2,expected=cell.x+cell.width/2;centerOffsetPx=center-expected;const offset=Math.abs(centerOffsetPx)/Math.max(1,cell.width);if(offset>centerTolerance){reasons.push('center-drift');severity=Math.max(severity,clamp(offset*2.4,.35,.8));}}
     }
-    return Object.freeze({index,row,column,direction,phase,healthy:reasons.length===0,severity:Number(severity.toFixed(3)),reasons:Object.freeze(reasons),verticalScaleDelta:Number(verticalScaleDelta.toFixed(4)),feetOffsetPx:Number(feetOffsetPx.toFixed(2)),centerOffsetPx:Number(centerOffsetPx.toFixed(2)),classification:reasons.includes('clipped')?'ART DEFECT — REGENERATION REQUIRED':reasons.length?'MECHANICAL REPAIR':'OK',label:`${direction} · frame ${phase}`});
+    if(identityScore!==null&&identityScore<identityFloor){reasons.push('identity-drift');severity=Math.max(severity,clamp(1-identityScore,.55,.97));}
+    if(headConsistencyScore!==null&&headConsistencyScore<headConsistencyFloor){reasons.push('head-identity-drift');severity=Math.max(severity,clamp(1-headConsistencyScore,.5,.94));}
+    if(weaponConsistencyScore!==null&&weaponConsistencyScore<weaponConsistencyFloor){reasons.push('weapon-drift');severity=Math.max(severity,clamp(1-weaponConsistencyScore,.45,.9));}
+    if(limbReadabilityScore!==null&&limbReadabilityScore<limbReadabilityFloor){reasons.push('limb-readability');severity=Math.max(severity,clamp(1-limbReadabilityScore,.4,.88));}
+    if(motionContinuityScore!==null&&motionContinuityScore<motionContinuityFloor){reasons.push('motion-discontinuity');severity=Math.max(severity,clamp(1-motionContinuityScore,.38,.86));}
+    const artReasons=['clipped','identity-drift','head-identity-drift','weapon-drift','limb-readability'];
+    const classification=artReasons.some(reason=>reasons.includes(reason))?'ART DEFECT — SELECTIVE REGENERATION':reasons.length?'MECHANICAL REPAIR':'OK';
+    return Object.freeze({index,row,column,direction,phase,healthy:reasons.length===0,severity:Number(severity.toFixed(3)),reasons:Object.freeze(reasons),regions:semanticRegions(reasons),verticalScaleDelta:Number(verticalScaleDelta.toFixed(4)),feetOffsetPx:Number(feetOffsetPx.toFixed(2)),centerOffsetPx:Number(centerOffsetPx.toFixed(2)),identityScore,headConsistencyScore,weaponConsistencyScore,limbReadabilityScore,motionContinuityScore,classification,label:`${direction} · frame ${phase}`});
   });
   const defective=findings.filter(x=>!x.healthy).sort((a,b)=>b.severity-a.severity||a.index-b.index);
   return Object.freeze({pass:defective.length===0,total:frames.length,defectiveCount:defective.length,healthyCount:frames.length-defective.length,medians:globalBaseline,rowBaselines:Object.freeze([...rowBaselines.entries()].map(([row,value])=>Object.freeze({row,...value}))),frames:Object.freeze(findings),defective:Object.freeze(defective)});
@@ -38,7 +58,7 @@ export function diagnoseSpriteFrames(frames,{columns=4,directions=['N','NE','E',
 
 export function buildSelectiveRepairTargets(diagnosis,{maxTargets=8}={}){
   const selected=(diagnosis?.defective||[]).slice(0,Math.max(1,Math.floor(finite(maxTargets,8))));
-  return Object.freeze(selected.map(item=>Object.freeze({index:item.index,row:item.row,column:item.column,direction:item.direction,phase:item.phase,severity:item.severity,reasons:item.reasons,label:item.label})));
+  return Object.freeze(selected.map(item=>Object.freeze({index:item.index,row:item.row,column:item.column,direction:item.direction,phase:item.phase,severity:item.severity,reasons:item.reasons,regions:item.regions||Object.freeze([]),label:item.label})));
 }
 
 function assertAtlas(data,width,height){if(!data||data.length<width*height*4)throw new Error('SPRITE_FRAME_DOCTOR_ATLAS_REQUIRED');}
