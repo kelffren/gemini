@@ -7,7 +7,8 @@
 export function createAssetForgeWorkspaceManifest({
   loader=()=>import('../ui/asset-forge-workspace.mjs'),
   templateLoader=()=>import('../ui/asset-forge-template-controls.mjs'),
-  drawingLoader=()=>import('../ui/asset-forge-drawing-controls.mjs')
+  drawingLoader=()=>import('../ui/asset-forge-drawing-controls.mjs'),
+  pixeloramaLoader=()=>import('../ui/pixelorama-pro-bridge.mjs')
 }={}){
   return Object.freeze({
     id:'asset-forge',label:'Asset Forge',category:'visual',projectTypes:[],capability:null,availability:'active',
@@ -23,6 +24,10 @@ export function createAssetForgeWorkspaceManifest({
         const drawing=await drawingLoader();
         if(typeof drawing.installAssetForgeDrawingControls==='function')drawing.installAssetForgeDrawingControls({...context,session});
       }catch(error){console.warn('[Creators] Asset Forge drawing controls unavailable',error);}
+      try{
+        const pixelorama=await pixeloramaLoader();
+        if(typeof pixelorama.installPixeloramaProBridge==='function')pixelorama.installPixeloramaProBridge({...context,session});
+      }catch(error){console.warn('[Creators] Pixelorama Pro bridge unavailable',error);}
       return session;
     },
     isSessionAlive(session){return !!session?.shell?.isConnected;}
