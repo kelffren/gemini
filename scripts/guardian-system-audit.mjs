@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: QA / GUARDIAN
- * keys: GUARDIAN AUDIT HOST LEASE AUTH IOS REGION SCHEDULER REWARD PROOF SUPABASE WEBRTC SIGNAL DATACHANNEL HOT MIRROR FAILOVER CHECKPOINT WEBGPU GPU ASSET QUORUM COMMUNITY RECEIPT PROVENANCE PERSISTENCE
- * hace: valida control plane, WebGPU, Community Builder cross-device server-authoritative y Hot Mirror sin segundo loop ni autoridad gameplay cliente
+ * keys: GUARDIAN AUDIT HOST LEASE AUTH IOS REGION SCHEDULER REWARD PROOF SUPABASE WEBRTC SIGNAL DATACHANNEL HOT MIRROR FAILOVER CHECKPOINT WEBGPU GPU ASSET QUORUM COMMUNITY RECEIPT PROVENANCE PERSISTENCE FENCING
+ * hace: valida control plane, WebGPU, Community Builder cross-device server-authoritative, fencing por nodo y Hot Mirror sin segundo loop ni autoridad gameplay cliente
  * online: audit local determinista + contratos estáticos Supabase/WebRTC/WebGPU/Community/Hot Mirror
  */
 import assert from 'node:assert/strict';
@@ -23,11 +23,18 @@ const eu={accountId:'acc-eu',roles:['player'],permissions:[]};
 const usa={accountId:'acc-us',roles:['player'],permissions:[]};
 const helper={accountId:'acc-help',roles:['player'],permissions:[]};
 const base={nodeId:'g_testnode_1234',capabilities:{platform:'ios',deviceClass:'phone',visibility:'visible',webrtc:true,cores:6,memoryGb:6,webgpu:false,gpuTier:'none',gpuCapacityUnits:0,gpuProbeReady:true},preferences:{allowAssets:true,allowRelay:true,allowCompute:false,allowGpuAssets:false,gpuSharePct:25,maxUploadMbps:20}};
+const sibling={...base,nodeId:'g_testnode_5678'};
 let s=guardian.enable(admin,base);assert.equal(s.node.role,'donor-ready');assert.ok(s.node.recommendedRoles.includes('relay-ready'));assert.ok(s.node.recommendedRoles.includes('host-ready'));assert.equal(s.node.recommendedRoles.includes('asset-gpu-worker'),false);assert.equal(s.masterEligible,true);
+guardian.enable(admin,sibling);
 assert.throws(()=>guardian.startMaster(usa,{...base,nodeId:'g_player_1234'}),/GUARDIAN_MASTER_PERMISSION_DENIED/);
-s=guardian.startMaster(admin,base);assert.equal(s.node.role,'master-host');assert.equal(s.network.masterActive,true);
+s=guardian.startMaster(admin,base);assert.equal(s.node.role,'master-host');assert.equal(s.network.masterActive,true);const firstEpoch=s.network.masterEpoch;
+assert.throws(()=>guardian.startMaster(admin,sibling),/GUARDIAN_MASTER_BUSY/);
+assert.equal(guardian.status(admin,{nodeId:sibling.nodeId}).node.role,'donor-ready');
 now+=5000;s=guardian.heartbeat(admin,base);assert.equal(s.node.role,'master-host');
+assert.throws(()=>guardian.startMaster(admin,sibling),/GUARDIAN_MASTER_BUSY/);
 now+=13000;guardian.sweep(now);s=guardian.status(admin,{nodeId:base.nodeId});assert.equal(s.network.masterActive,false);assert.equal(s.node.role,'donor-ready');
+const takeover=guardian.startMaster(admin,sibling);assert.equal(takeover.node.role,'master-host');assert.ok(takeover.network.masterEpoch>firstEpoch);guardian.stopMaster(admin,sibling);
+assert.equal(guardian.audit().nodeScopedMasterFencing,true);
 
 const euNode={...base,nodeId:'g_europe_12345',capabilities:{...base.capabilities,platform:'desktop',cores:12,memoryGb:32},preferences:{...base.preferences,allowCompute:true,maxUploadMbps:100}};
 const usNode={...base,nodeId:'g_usa_node_123',capabilities:{...base.capabilities,platform:'desktop',cores:8,memoryGb:16},preferences:{...base.preferences,allowCompute:true,maxUploadMbps:80}};
@@ -49,7 +56,7 @@ const availability=guardian.recordVerifiedContribution({accountId:eu.accountId,n
 const host=guardian.recordVerifiedContribution({accountId:eu.accountId,nodeId:euNode.nodeId},{type:'host_seconds',seconds:3600,region:'eu-west'});assert.equal(host.demandMultiplier,1.75);assert.ok(host.weightedUnits>host.rawUnits);assert.equal(host.kcMinted,0);
 const gpuProof=guardian.recordVerifiedContribution({accountId:helper.accountId,nodeId:helpNode.nodeId},{type:'asset_gpu_seconds',seconds:60,region:'us-east'});assert.equal(gpuProof.kcMinted,0);assert.equal(gpuProof.service.gpuAssetSeconds,60);assert.ok(gpuProof.rawUnits>0);
 assert.equal(rankFor(50000).multiplier,2);assert.equal(rankFor(250000).multiplier,3);
-assert.equal(guardian.audit().serverAuthorityPreserved,true);assert.equal(guardian.audit().rewardMetricsClientTrusted,false);assert.equal(guardian.audit().kcMintAuthority,false);assert.equal(guardian.audit().gpuAssetScheduling,true);
+assert.equal(guardian.audit().serverAuthorityPreserved,true);assert.equal(guardian.audit().rewardMetricsClientTrusted,false);assert.equal(guardian.audit().kcMintAuthority,false);assert.equal(guardian.audit().gpuAssetScheduling,true);assert.equal(guardian.audit().nodeScopedMasterFencing,true);
 
 const authority=fs.readFileSync(path.join(root,'src/systems/guardian-authority.js'),'utf8');
 const client=fs.readFileSync(path.join(root,'src/systems/guardian-system.js'),'utf8');
@@ -59,6 +66,7 @@ const registry=fs.readFileSync(path.join(root,'src/core/feature-registry.js'),'u
 const mirror=fs.readFileSync(path.join(root,'src/systems/guardian-hot-mirror.js'),'utf8');
 const ui=fs.readFileSync(path.join(root,'src/ui/guardian-ui.js'),'utf8');
 const migration=fs.readFileSync(path.join(root,'supabase/migrations/20260914052544_guardian_webrtc_control_plane_v2.sql'),'utf8');
+const fencingMigration=fs.readFileSync(path.join(root,'supabase/migrations/20260916080017_guardian_master_node_fencing.sql'),'utf8');
 const gpuMigration=fs.readFileSync(path.join(root,'supabase/migrations/20260916053000_guardian_gpu_asset_capacity_v3.sql'),'utf8');
 const communityMigration=fs.readFileSync(path.join(root,'supabase/migrations/20260916065500_guardian_community_profile_v1.sql'),'utf8');
 
@@ -70,7 +78,8 @@ assert.match(registry,/guardian-community-identity\.js/);
 assert.match(mirror,/guardian:mirror_checkpoint/);assert.match(mirror,/guardian:mirror_ack/);assert.match(mirror,/guardian:mirror_takeover/);assert.match(mirror,/KeloSimulation\.after\('guardian:hot-mirror'/);assert.match(mirror,/startMasterHost\(\)/);assert.match(mirror,/authoritativeGameplay:false/);assert.match(mirror,/clientGameplayAuthority:false/);assert.doesNotMatch(mirror,/setInterval\s*\(/);assert.doesNotMatch(mirror,/STATE\.gold\s*=/);assert.doesNotMatch(mirror,/\.hp\s*=\s*msg/);
 assert.match(ui,/guardian-hot-mirror\.js/);assert.match(ui,/KeloGuardianMirror/);assert.match(ui,/communityGpuMeter:true/);assert.match(ui,/DONAR GPU PARA CREAR ASSETS/);assert.match(ui,/GPUu/);assert.match(ui,/mirrorReadOnly:true/);assert.match(ui,/gameplayAuthority:false/);
 assert.match(migration,/create table if not exists public\.guardian_signals/);assert.match(migration,/create or replace function public\.guardian_signal_send/);assert.match(migration,/create or replace function public\.guardian_signal_poll/);assert.match(migration,/GUARDIAN_SIGNAL_PAIR_DENIED/);assert.match(migration,/enable row level security/);assert.match(migration,/security definer/);
+assert.match(fencingMigration,/v_lease\.node_id<>p_node_id/);assert.match(fencingMigration,/GUARDIAN_MASTER_BUSY/);assert.match(fencingMigration,/expires_at>now\(\)/);
 assert.match(gpuMigration,/asset-gpu-worker/);assert.match(gpuMigration,/gpuCapacityUnits/);assert.match(gpuMigration,/gpuSharePct/);assert.match(gpuMigration,/gpuCapacityVerified/);assert.match(gpuMigration,/security definer/);assert.doesNotMatch(gpuMigration,/grant\s+execute\s+on\s+function\s+kelo_private/i);
 assert.match(communityMigration,/guardian_community_attestations/);assert.match(communityMigration,/guardian_community_contributions/);assert.match(communityMigration,/guardian_community_profile\(\)/);assert.match(communityMigration,/guardian_community_attest/);assert.match(communityMigration,/count\(distinct a\.user_id\)/);assert.match(communityMigration,/recommended_roles@>array\['asset-gpu-worker'\]/);assert.match(communityMigration,/enable row level security/);assert.match(communityMigration,/revoke all on public\.guardian_community_contributions/);assert.match(communityMigration,/set search_path=''/);assert.doesNotMatch(communityMigration,/grant\s+execute\s+on\s+function\s+kelo_private/i);assert.doesNotMatch(communityMigration,/grant\s+.*\s+to\s+anon/i);
 
-console.log('GUARDIAN_AUDIT_OK',{...guardian.audit(),supabaseControlPlane:true,webrtcDataPlane:true,webgpuAssetCompute:true,hashValidation:true,communityGpuMeter:true,communityIdentity:true,communityCrossDeviceProfile:true,communityServerAuthority:true,anonymousAssetProvenance:true,hotMirror:true,automaticMasterClaim:true,secondLoop:false,clientGameplayAuthority:false});
+console.log('GUARDIAN_AUDIT_OK',{...guardian.audit(),supabaseControlPlane:true,webrtcDataPlane:true,webgpuAssetCompute:true,hashValidation:true,communityGpuMeter:true,communityIdentity:true,communityCrossDeviceProfile:true,communityServerAuthority:true,anonymousAssetProvenance:true,hotMirror:true,automaticMasterClaim:true,nodeScopedMasterFencing:true,secondLoop:false,clientGameplayAuthority:false});
