@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Kelo Environment Creator Playwright Fixture</title>
+  <style>
+    html,body{margin:0;min-height:100%;background:#090d13;color:#fff;font-family:system-ui,-apple-system,sans-serif}
+    body{min-height:100vh;overflow:hidden}
+    #fixture-status{position:fixed;top:10px;left:10px;z-index:5;font:700 11px/1.2 system-ui;color:#9df0bd}
+  </style>
+</head>
+<body>
+  <div id="fixture-status">ENVIRONMENT PLAYWRIGHT FIXTURE</div>
+  <script>
+  (()=>{
+    const clone=value=>JSON.parse(JSON.stringify(value));
+    const canonical=value=>{
+      const src=value&&typeof value==='object'?(value.fields&&typeof value.fields==='object'?{...value.fields,accent:value.accent??value.fields.accent}:value):{};
+      return {
+        biome:String(src.biome||'plaza'),weather:String(src.weather||'clear'),timeOfDay:String(src.timeOfDay||'day'),
+        ambientDensity:Number(src.ambientDensity??50),musicMood:String(src.musicMood||'calm'),accent:String(src.accent||'#c9a55f')
+      };
+    };
+    let revision=12;
+    let currentState={biome:'coast',weather:'rain',timeOfDay:'sunset',ambientDensity:64,musicMood:'epic',accent:'#4b9cb8'};
+    let history=[
+      {revision:12,schemaVersion:1,state:clone(currentState),action:'publish',sourceRevision:11,publishedAt:'2026-09-16T14:30:00Z',publishedBy:'fixture-admin'},
+      {revision:9,schemaVersion:1,state:{biome:'forest',weather:'fog',timeOfDay:'night',ambientDensity:70,musicMood:'magical',accent:'#2f7d55'},action:'publish',sourceRevision:8,publishedAt:'2026-09-16T13:20:00Z',publishedBy:'fixture-admin'},
+      {revision:7,schemaVersion:1,state:{biome:'plaza',weather:'clear',timeOfDay:'day',ambientDensity:40,musicMood:'calm',accent:'#c9a55f'},action:'publish',sourceRevision:6,publishedAt:'2026-09-16T12:10:00Z',publishedBy:'fixture-admin'}
+    ];
+    const envelope=(action='publish',sourceRevision=null)=>({id:'global',revision,schemaVersion:1,state:clone(currentState),updatedAt:new Date().toISOString(),updatedBy:'fixture-admin',action,sourceRevision});
+    const ensureRevision=(expected)=>{if(expected!=null&&Number(expected)!==revision)throw new Error(`ENVIRONMENT_REVISION_CONFLICT expected=${expected} actual=${revision}`);};
+    const findRevision=target=>history.find(entry=>entry.revision===Number(target));
+
+    window.KELO_ENVIRONMENT_LAYERS={
+      register(spec){window.__ENVIRONMENT_FIXTURE_LAYER=spec;return spec.id;}
+    };
+    window.KELO_WORLD_ENVIRONMENT_SYNC={
+      version:'kelo-world-environment-sync-v4',
+      connected:true,
+      get revision(){return revision;},
+      get envelope(){return envelope();},
+      async refresh(){return envelope();},
+      async history({limit=10}={}){return clone(history.slice(0,limit));},
+      async publish(next,{expectedRevision=null}={}){
+        ensureRevision(expectedRevision);
+        const previous=revision;
+        currentState=canonical(next);
+        revision+=1;
+        history=[{revision,schemaVersion:1,state:clone(currentState),action:'publish',sourceRevision:previous,publishedAt:new Date().toISOString(),publishedBy:'fixture-admin'},...history];
+        return envelope('publish',previous);
+      },
+      async rollback(target,{expectedRevision=null}={}){
+        ensureRevision(expectedRevision);
+        const entry=findRevision(target);
+        if(!entry)throw new Error(`ROLLBACK_REVISION_NOT_FOUND:${target}`);
+        currentState=clone(entry.state);
+        revision+=1;
+        history=[{revision,schemaVersion:1,state:clone(currentState),action:'rollback',sourceRevision:Number(target),publishedAt:new Date().toISOString(),publishedBy:'fixture-admin'},...history];
+        return envelope('rollback',Number(target));
+      }
+    };
+    window.showToast=message=>{window.__FIXTURE_LAST_TOAST=String(message);};
+    window.__ENVIRONMENT_FIXTURE_STATE=()=>({revision,state:clone(currentState),history:clone(history)});
+  })();
+  </script>
+  <script type="module">
+    const mod=await import('../../src/creators/definition/creator-test-bridge.mjs');
+    const bridge=mod.installCreatorTestBridge(window,{contentSession:{accessToken:'playwright-admin-token'}});
+    const initial=window.__ENVIRONMENT_FIXTURE_STATE();
+    window.KELO_ENVIRONMENT_RUNTIME.publish(initial.state,{source:'playwright-fixture',revision:initial.revision});
+    window.__ENVIRONMENT_CREATOR_MODULE=mod;
+    window.__ENVIRONMENT_CREATOR_BRIDGE=bridge;
+    window.__ENVIRONMENT_PLAYWRIGHT_READY=true;
+  </script>
+</body>
+</html>
