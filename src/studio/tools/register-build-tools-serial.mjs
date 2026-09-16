@@ -1,8 +1,8 @@
 /* KELO-INDEX
  * area: STUDIO / BUILD TOOLS SERIAL
  * owner: Kelo Studio Build Tool Registration
- * keys: STUDIO MOBILE BUILD PAINT COPIES QUICK EDIT ROOM SURGERY LAZY
- * owns: phone-safe registration of paint/quick/edit/room tools without a static barrel spike
+ * keys: STUDIO MOBILE BUILD PAINT COPIES QUICK EDIT GRID ROOM SURGERY LAZY
+ * owns: phone-safe registration of paint/quick/edit/grid/room tools without a static barrel spike
  * does-not-own: core tools, live shell or tool behavior
  * public-api: registerBuildToolsSerial()
  * mobile: imported only after chrome; each enabled tool module loads between yields
@@ -16,7 +16,7 @@ const disabled=(key,reason='switch-off')=>surgery()?.moduleDisabled?.(key,`BUILD
 
 export async function registerBuildToolsSerial(kernel,core={},{wait=async()=>{}}={}){
   const placement=core.placement||kernel.tools.get('placement');
-  const out={paintCopies:null,quickBuild:null,quickEdit:null,roomBuild:null,roomOpening:null,roomMaterial:null};
+  const out={paintCopies:null,quickBuild:null,quickEdit:null,buildEditGrid:null,roomBuild:null,roomOpening:null,roomMaterial:null};
   if(!enabled('basicTools')){
     for(const key of Object.keys(out))disabled(key,'basicTools-master-off');
     return Object.freeze(out);
@@ -38,8 +38,9 @@ export async function registerBuildToolsSerial(kernel,core={},{wait=async()=>{}}
   const paintCopies=await ensure('paintCopies','./paint-copies-tool.mjs',m=>m.createPaintCopiesTool(kernel));
   const quickBuild=await ensure('quickBuild','./quick-build-tool.mjs',m=>m.createQuickBuildTool(kernel,{placement}));
   const quickEdit=await ensure('quickEdit','./quick-edit-tool.mjs',m=>m.createQuickEditTool(kernel,{quickBuild}),{requires:[quickBuild]});
+  const buildEditGrid=await ensure('buildEditGrid','./build-edit-grid-tool.mjs',m=>m.createBuildEditGridTool(kernel,{quickBuild}),{requires:[quickBuild]});
   const roomBuild=await ensure('roomBuild','./room-build-tool.mjs',m=>m.createRoomBuildTool(kernel,{placement,quickBuild}),{requires:[quickBuild]});
   const roomOpening=await ensure('roomOpening','./room-opening-tool.mjs',m=>m.createRoomOpeningTool(kernel));
   const roomMaterial=await ensure('roomMaterial','./room-material-tool.mjs',m=>m.createRoomMaterialTool(kernel));
-  return Object.freeze({paintCopies,quickBuild,quickEdit,roomBuild,roomOpening,roomMaterial});
+  return Object.freeze({paintCopies,quickBuild,quickEdit,buildEditGrid,roomBuild,roomOpening,roomMaterial});
 }
