@@ -72,6 +72,9 @@ jobs:
       - name: Studio foundation contract
         run: npm run audit:studio
 
+      - name: Quick Build overlap guard contract
+        run: node scripts/studio-quick-build-placement-guard-audit.mjs
+
       - name: Paint Copies regression contract
         run: npm run audit:studio:paint-copies
 
