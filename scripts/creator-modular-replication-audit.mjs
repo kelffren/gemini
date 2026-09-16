@@ -1,0 +1,33 @@
+#!/usr/bin/env node
+import fs from 'node:fs';
+import path from 'node:path';
+const root=process.cwd(),read=p=>fs.readFileSync(path.join(root,p),'utf8'),checks=[];
+function check(name,ok){checks.push({name,ok:!!ok});if(!ok)process.exitCode=1;}
+const migration=read('supabase/migrations/20260916004500_creator_modular_replication_v1.sql');
+const avatarStore=read('server/avatar-sync-store.js');
+const server=read('server/index.js');
+const net=read('engine-net.js');
+const avatarRuntime=read('src/characters/creator-avatar-runtime.mjs');
+const bridge=read('src/characters/creator-character-state-bridge.js');
+const gate=read('src/core/creators-lazy-gate.js');
+check('public snapshot is owner-character scoped',/get_my_public_creator_character_appearance/.test(migration)&&/c\.account_id=v_uid/.test(migration)&&/c\.status='active'/.test(migration));
+check('snapshot includes only currently bound appearance or equipment',/creator_character_content_bindings/.test(migration)&&/d\.content_type in \('appearance','equipment'\)/.test(migration)&&/b\.binding_kind=d\.content_type/.test(migration));
+check('snapshot requires active content publication and exact entitlement or authorship',/content_publications cp/.test(migration)&&/cp\.is_active=true/.test(migration)&&/r\.owner_user_id=v_uid/.test(migration)&&/creator_content_entitlements/.test(migration)&&/e\.revision_id=r\.id/.test(migration));
+check('snapshot requires all bound assets authority-published',/asset_publications ap/.test(migration)&&/not exists\([\s\S]*missing\.content_revision_id=r\.id[\s\S]*ap2\.revision_id=missing\.asset_revision_id and ap2\.is_active=true/.test(migration));
+check('replication RPC does not grant ownership or mutate use state',!/insert into public\.creator_content_entitlements|update public\.creator_content_entitlements|insert into public\.creator_character_content_bindings|update public\.creator_character_content_bindings/.test(migration));
+check('server presentation is derived with owner JWT, not viewer or client-declared URLs',/get_my_public_creator_character_appearance/.test(avatarStore)&&/headers\(accessToken\)/.test(avatarStore)&&/sanitizeAppearance/.test(avatarStore)&&/runtimeUrl/.test(avatarStore));
+check('server sanitizes modular slot type target transform and published asset metadata',/SLOT_RE/.test(avatarStore)&&/serverSlot!==slotKey/.test(avatarStore)&&/\['appearance','equipment'\]/.test(avatarStore)&&/safeTransforms/.test(avatarStore)&&/sanitizePublicAsset/.test(avatarStore));
+check('appearance RPC failure preserves full-body avatar compatibility',/resolveAppearance\(characterId,accessToken\)/.test(avatarStore)&&/catch\(error\).*return null/s.test(avatarStore)&&/if\(!avatar&&!creatorAppearance\)return null/.test(avatarStore));
+check('existing server AOI transport remains the presentation carrier',/avatarManifest:p\.avatarManifest\|\|null/.test(server)&&/publicStateFor\(viewer,index\)/.test(server)&&/sendRelevantStates/.test(server));
+check('client peers receive server avatar presentation through existing transport',/peer\.avatarManifest=p\.avatarManifest\|\|null/.test(net)&&/ingestAvatarManifest\(peer\.avatarManifest,false\)/.test(net));
+check('remote modular envelope only wakes existing Appearance feature on demand',/creatorAppearance/.test(avatarRuntime)&&/source==='server-authoritative-published'/.test(avatarRuntime)&&/KELO_MODULE_LOADER\.ensure\('appearance'\)/.test(avatarRuntime)&&!/setInterval|requestAnimationFrame/.test(avatarRuntime));
+check('remote bridge uses weak actor state and existing Character state resolver',/const remoteOverlays=new WeakMap\(\)/.test(bridge)&&/const remoteFingerprints=new WeakMap\(\)/.test(bridge)&&/baseCustomization\?\.stateForActor/.test(bridge));
+check('remote viewer does not require local entitlement',/function remoteRecord/.test(bridge)&&!/function remoteRecord[\s\S]*KeloCreatorEntitlements/.test(bridge));
+check('local path still requires exact Delivery plus entitlement',/KeloCreatorDelivery\?\.useRevision/.test(bridge)&&/KeloCreatorEntitlements\?\.checkRecord/.test(bridge));
+check('remote and local runtime IDs cannot collide',/scope==='remote'\?'remote':'local'/.test(bridge)&&/creator\.visual\.\$\{scope/.test(bridge));
+check('replicated items remain hidden and locked',/locked:true,hidden:true/.test(bridge)&&/remote-public/.test(bridge));
+check('bridge creates no second renderer or persistent ownership store',!/KeloAvatar\.use|renderAvatar|localStorage|indexedDB|sessionStorage|requestAnimationFrame|setInterval/.test(bridge)&&/secondRenderer:false/.test(bridge));
+check('visual mutation refresh reuses existing network authority instead of a second socket',/KeloNetAuthority/.test(gate)&&/refreshAvatar/.test(gate)&&/refreshNetworkPresentation/.test(gate)&&!/new WebSocket|WebSocket\(/.test(gate));
+check('network refresh is limited to character modular visual changes',/kind==='character'\|\|kind==='appearance'\|\|kind==='equipment'\|\|kind==='clear-slot'/.test(gate)&&!/kind==='mount'.*refreshNetworkPresentation/.test(gate));
+for(const c of checks)console.log(`${c.ok?'PASS':'FAIL'}  ${c.name}`);
+if(process.exitCode)console.error(`\nCreator modular replication audit failed: ${checks.filter(x=>!x.ok).length}/${checks.length}`);else console.log(`\nCreator modular replication audit passed: ${checks.length}/${checks.length}`);
