@@ -1,8 +1,8 @@
 /* KELO-INDEX
  * area: CREATORS / CONTENT ONLINE
  * owner: Supabase Creator content repository adapter
- * keys: CONTENT REVIEW PUBLICATION RELEASE MARKETPLACE DISCOVER LISTING ENTITLEMENT KC RPC RLS OWNER FILTER
- * owns: authenticated REST/RPC/Storage transport for Creator content and thin Creator marketplace RPC access
+ * keys: CONTENT REVIEW PUBLICATION RELEASE MARKETPLACE DISCOVER LISTING ENTITLEMENT ACCESS KC RPC RLS OWNER FILTER
+ * owns: authenticated REST/RPC/Storage transport for Creator content and thin Creator marketplace/access RPCs
  * does-not-own: auth UI, schemas, runtime owners, service-role secrets, review decisions, publish authority or marketplace business policy
  * security: publishable key is public; every write still requires JWT + RLS/security-definer validation; client never supplies trusted price/split during purchase
  */
@@ -33,7 +33,7 @@ export function createSupabaseCreatorContentRepository({url,publishableKey,getAc
     return Array.isArray(rows)&&rows[0]?rows[0]:{character_id:id,currency_key:key,amount:0,revision:0,updated_at:null};
   }
   return Object.freeze({
-    version:'supabase-creator-content-repository-v1.3.2-marketplace',userId,rpc,select,upload,remove,signedUrl,publicUrl,
+    version:'supabase-creator-content-repository-v1.4.0-entitlement-access',userId,rpc,select,upload,remove,signedUrl,publicUrl,
     createAssetFamily:p=>rpc('create_asset_family',p),registerAssetRevision:p=>rpc('register_asset_revision',p),submitAssetRevision:id=>rpc('submit_asset_revision',{p_revision_id:id}),
     createContentDefinition:p=>rpc('create_content_definition',p),registerContentRevision:p=>rpc('register_content_revision',p),submitContentRevision:id=>rpc('submit_content_revision',{p_revision_id:id}),
     listMyRoles:()=>select('account_roles?select=role_key&order=role_key.asc'),
@@ -51,6 +51,8 @@ export function createSupabaseCreatorContentRepository({url,publishableKey,getAc
     createCreatorMarketListing:({revisionId,payoutCharacterId,priceKc,licenseKey='standard'})=>rpc('create_creator_market_listing',{p_revision_id:revisionId,p_payout_character_id:payoutCharacterId,p_price_kc:Math.max(0,Math.floor(Number(priceKc)||0)),p_license_key:licenseKey}),
     cancelCreatorMarketListing:listingId=>rpc('cancel_creator_market_listing',{p_listing_id:listingId}),
     purchaseCreatorMarketListing:({listingId,buyerCharacterId,correlationId})=>rpc('purchase_creator_market_listing',{p_listing_id:listingId,p_buyer_character_id:buyerCharacterId,p_correlation_id:correlationId}),
-    listMyCreatorEntitlements:()=>rpc('list_my_creator_entitlements',{})
+    listMyCreatorEntitlements:()=>rpc('list_my_creator_entitlements',{}),
+    listMyCreatorContentAccess:()=>rpc('list_my_creator_content_access',{}),
+    checkCreatorContentAccess:revisionId=>rpc('check_creator_content_access',{p_revision_id:revisionId})
   });
 }

@@ -30,7 +30,7 @@ export function createUniversalContentService({repository,runtimeRegistry,root=g
     return F({role,assetRevisionId:revision.id,assetId:revision.asset_id,storageBucket:revision.storage_bucket||'creator-private',storagePath:revision.storage_path||storagePath,contentHash:hash,pixelWidth:info.width,pixelHeight:info.height,mimeType:file.type,byteSize:file.size,runtimeUrl:await dataUrl(file,root)});
   }
   async function importJob(job,{onProgress=null}={}){
-    if(!job?.ok)throw new Error('CONTENT_JOB_INVALID:'+String(job?.errors||[]));const draft=job.draft;if(!repository.userId())throw new Error('AUTH_REQUIRED');
+    if(!job?.ok)throw new Error('CONTENT_JOB_INVALID:'+String(job?.errors||[]));const draft=job.draft,ownerUserId=repository.userId();if(!ownerUserId)throw new Error('AUTH_REQUIRED');
     onProgress?.({stage:'assets',row:draft.sourceRow,slug:draft.slug,done:0,total:job.resolvedAssets.length});
     const assets=[];for(let i=0;i<job.resolvedAssets.length;i++){assets.push(await ingestAsset(draft,job.resolvedAssets[i],i));onProgress?.({stage:'assets',row:draft.sourceRow,slug:draft.slug,done:i+1,total:job.resolvedAssets.length});}
     const definition=first(await repository.createContentDefinition({p_content_type:draft.contentType,p_slug:draft.slug,p_display_name:draft.displayName,p_tags:draft.tags,p_metadata:{schemaOwner:draft.schema?.owner||'universal',source:'spreadsheet'}}));if(!definition?.id)throw new Error('CONTENT_DEFINITION_CREATE_FAILED');
@@ -38,10 +38,10 @@ export function createUniversalContentService({repository,runtimeRegistry,root=g
     const bindings=assets.map((a,ordinal)=>({assetRevisionId:a.assetRevisionId,role:a.role,ordinal,metadata:{assetId:a.assetId}}));
     const revision=first(await repository.registerContentRevision({p_definition_id:definition.id,p_content_hash:contentHash,p_schema_version:draft.schemaVersion||1,p_payload:payload,p_asset_bindings:bindings}));if(!revision?.id)throw new Error('CONTENT_REVISION_CREATE_FAILED');
     if(draft.publish)await repository.submitContentRevision(revision.id);
-    const active=runtimeRegistry.register({contentId:revision.content_id,stableKey:definition.stable_key,revision:revision.revision,contentType:draft.contentType,displayName:draft.displayName,tags:draft.tags,payload,assets,contentHash,source:'supabase-creator'});
-    onProgress?.({stage:'ready',row:draft.sourceRow,slug:draft.slug,contentId:revision.content_id,activation:active.activation});
+    const active=runtimeRegistry.register({revisionId:revision.id,ownerUserId,contentId:revision.content_id,stableKey:definition.stable_key,revision:revision.revision,contentType:draft.contentType,displayName:draft.displayName,tags:draft.tags,payload,assets,contentHash,source:'supabase-creator'});
+    onProgress?.({stage:'ready',row:draft.sourceRow,slug:draft.slug,contentId:revision.content_id,revisionId:revision.id,activation:active.activation});
     return F({row:draft.sourceRow,definition,revision,assets:F(assets),runtime:active,submitted:!!draft.publish});
   }
   async function importPlan(plan,{continueOnError=true,onProgress=null}={}){const results=[],errors=[];for(const job of plan?.validJobs||[]){try{results.push(await importJob(job,{onProgress}));}catch(error){const row=job?.draft?.sourceRow,entry={row,slug:job?.draft?.slug,error:String(error?.message||error)};errors.push(entry);onProgress?.({stage:'error',...entry});if(!continueOnError)throw error;}}return F({ok:errors.length===0,imported:F(results),errors:F(errors),requested:Number(plan?.validJobs?.length)||0});}
-  return F({version:'universal-content-service-v1.0.0',importJob,importPlan});
+  return F({version:'universal-content-service-v1.1.0-entitlement-stamps',importJob,importPlan});
 }

@@ -1,0 +1,34 @@
+#!/usr/bin/env node
+import fs from 'node:fs';
+import path from 'node:path';
+const root=process.cwd();
+const read=p=>fs.readFileSync(path.join(root,p),'utf8');
+const checks=[];
+function check(name,ok){checks.push({name,ok:!!ok});if(!ok)process.exitCode=1;}
+const migration=read('supabase/migrations/20260916003000_creator_entitlement_access.sql');
+const guard=read('src/systems/creator-entitlement-system.js');
+const repo=read('src/creators/content/supabase-content-repository.mjs');
+const entry=read('src/creators/creator-entry.mjs');
+const ingest=read('src/creators/content/universal-content-service.mjs');
+const registry=read('src/creators/content/runtime-content-registry.mjs');
+const market=read('src/creators/marketplace/creator-marketplace-service.mjs');
+const appearance=read('src/appearance/appearance-system.js');
+const mounts=read('src/mounts/mount-catalog.js');
+check('exact revision access RPC exists',/check_creator_content_access\(p_revision_id uuid\)/.test(migration)&&/e\.revision_id=p_revision_id/.test(migration));
+check('owner and entitlement are only access grants',/CREATOR_OWNER/.test(migration)&&/ENTITLEMENT_REQUIRED/.test(migration)&&!/content_publications/.test(migration));
+check('access list includes authored and entitled revisions',/list_my_creator_content_access/.test(migration)&&/'creator_owner'/.test(migration)&&/'entitlement'/.test(migration));
+check('guard has no local ownership persistence',!/localStorage|indexedDB|sessionStorage/.test(guard));
+check('guard reuses existing auth providers',/bindProvider/.test(guard)&&/KeloOnlineAuth/.test(guard)&&!/createClient\s*\(/.test(guard));
+check('bound provider identity cannot fall through to another account',/function currentAccount\(\)\{return provider\?providerAccount\(\):/.test(guard)&&/if\(provider\)\{me=providerAccount\(\);if\(!me\)\{clear\('provider-signed-out'\)/.test(guard));
+check('creator repository exposes access RPCs',/listMyCreatorContentAccess/.test(repo)&&/checkCreatorContentAccess/.test(repo));
+check('creator entry binds repository provider',/creator-content-repository/.test(entry)&&/bindProvider/.test(entry)&&/listMyCreatorContentAccess/.test(entry));
+check('creator auth changes refresh entitlement cache',/contentSession\.onChange/.test(market)&&/KeloCreatorEntitlements\?\.refresh/.test(market));
+check('ingest stamps revision and owner',/revisionId:revision\.id/.test(ingest)&&/ownerUserId/.test(ingest));
+check('registry gates before runtime adapter',/KeloCreatorEntitlements/.test(registry)&&/status:'restricted'/.test(registry)&&/const permission=access\(record\)/.test(registry));
+check('registry exposes use-safe lookup',/getForUse/.test(registry)&&/reactivateRestricted/.test(registry));
+check('appearance has defense in depth',/creatorRevisionId/.test(appearance)&&/KeloCreatorEntitlements/.test(appearance)&&/getItemForUse/.test(appearance));
+check('mount catalog has defense in depth',/creatorRevisionId/.test(mounts)&&/KeloCreatorEntitlements/.test(mounts)&&/getRaw/.test(mounts));
+check('market purchase refreshes entitlements',/purchaseCreatorMarketListing/.test(market)&&/KeloCreatorEntitlements\?\.refresh/.test(market));
+check('guard performs no KC mutation',!/character_wallets|wallet_ledger|apply_wallet_delta|priceKc|price_kc/.test(guard));
+for(const c of checks)console.log(`${c.ok?'PASS':'FAIL'}  ${c.name}`);
+if(process.exitCode)console.error(`\nCreator entitlement audit failed: ${checks.filter(x=>!x.ok).length}/${checks.length}`);else console.log(`\nCreator entitlement audit passed: ${checks.length}/${checks.length}`);

@@ -308,3 +308,96 @@ Handoff prompt:
 **Handoff prompt:**
 
 > Continue `IMP-2026-09-15-CREATOR-MARKET-003` on `creator-marketplace-v1`. Read `docs/systems/CREATOR_MARKETPLACE.md`, the Release/Creator OS ledger entries, the wallet/economy migration and publication authority before changing anything. Do not create local KC, a second wallet, a duplicate asset store, or a client-side ownership flag as authority. First validate both marketplace migrations, run `node scripts/creator-marketplace-audit.mjs` plus upstream audits, then execute two-account purchase/idempotency/failure tests and iPhone/LIVE MARKET flows. Keep V1 split at 100% Creator unless product policy explicitly changes it. Do not mark `VALIDATED` until all gates pass. The next architectural pass is entitlement enforcement in specialized content consumers, not another marketplace UI rewrite.
+
+---
+
+### IMP-2026-09-15-CREATOR-ENTITLEMENT-004
+
+**Status:** IMPLEMENTED_PENDING_VERIFY  
+**Depends on:** `IMP-2026-09-15-CREATOR-MARKET-003` / PR #273 and all upstream Creator OS/Release layers.  
+**Owner(s):** `KeloCreatorEntitlements` + authoritative Supabase content ownership/entitlements; specialized runtime owners retain their own rendering/gameplay responsibilities.  
+**User intent / source prompt:** Continue after Creator Marketplace so buying a character, skin, weapon, prop, mount or other Creator content actually controls whether the runtime may use it—not merely whether Marketplace UI says OWNED—while keeping one reusable rule and preserving cross-agent context.
+
+**Why:** A marketplace entitlement has no practical security/value if specialized runtime owners can consume the paid content through another code path. The stable solution is one revision-specific access authority plus defense-in-depth adapters, not separate ownership logic in every editor/runtime.
+
+**Invariants:**
+
+- `PUBLISHED != LISTED != OWNED != USABLE`.
+- Author ownership or an authoritative `creator_content_entitlements` row grants use; publication alone never grants use.
+- Access is account-level and exact-revision by default. Buying r3 does not silently grant r4.
+- Missing Creator access identity/cache fails closed for Creator content.
+- Built-in/non-Creator content remains unaffected.
+- No localStorage/IndexedDB ownership truth and no second Supabase client.
+- Creator OS reuses its authenticated repository via `bindProvider`; fallback may reuse existing `KeloOnlineAuth`.
+- Runtime Registry gates Creator records before dispatching them to existing specialized owners.
+- Client gating is defense in depth only: any server-authoritative future equip/place/spawn/use mutation must independently enforce the same access rule.
+
+**Implemented now (stacked branch `creator-entitlement-enforcement-v1`):**
+
+- Added authoritative `list_my_creator_content_access()` and `check_creator_content_access(uuid)` RPCs.
+- Added `KeloCreatorEntitlements`, an in-memory metadata-only access cache/gate.
+- Added provider binding so Creator's current authenticated repository and the game's existing `KeloOnlineAuth` can share one guard without creating a third auth client.
+- Universal Content Service now stamps runtime records with immutable `revisionId` UUID and `ownerUserId`.
+- Creator Runtime Registry checks access before runtime adaptation; denied records become `activation.status='restricted'` instead of reaching Property/Appearance/Mount/Avatar owners.
+- Registry adds `getForUse()`, `query({usable:true})`, `reactivate()` and `reactivateRestricted()`.
+- Entitlement refresh emits a change event; previously restricted records can activate after a successful purchase without re-importing content.
+- Marketplace purchase refreshes entitlement state after the authoritative purchase RPC succeeds.
+- Appearance preserves Creator identity metadata and rechecks access inside `resolveLoadout()`; unauthorized Creator layers are omitted and reported as `restricted`.
+- Mount Catalog rechecks Creator access in `get/has/list/query`; raw definition access remains explicit through `getRaw()` for diagnostics/tooling only.
+- World/tile Creator content is denied at the registry boundary before a property template can be registered.
+- Character adaptation is denied before `KeloCreatorAvatars.register()` when access is missing.
+- Added static contract audit and technical system documentation.
+
+**Files/contracts touched:**
+
+- `supabase/migrations/20260916003000_creator_entitlement_access.sql`
+- `src/systems/creator-entitlement-system.js`
+- `src/creators/creator-entry.mjs`
+- `src/creators/content/supabase-content-repository.mjs`
+- `src/creators/content/universal-content-service.mjs`
+- `src/creators/content/runtime-content-registry.mjs`
+- `src/creators/marketplace/creator-marketplace-service.mjs`
+- `src/appearance/appearance-system.js`
+- `src/mounts/mount-catalog.js`
+- `scripts/creator-entitlement-audit.mjs`
+- `docs/systems/CREATOR_ENTITLEMENT_SYSTEM.md`
+- `docs/IMPLEMENTATION_LEDGER.md`
+
+**Deferred deliberately:**
+
+- Server mutation endpoints for Creator `equip/place/spawn/use`; these must call the authoritative access rule before they become security boundaries.
+- A global purchased-content delivery loader outside Creator OS. When added, it must initialize/reuse `KeloCreatorEntitlements` before registering Creator runtime records.
+- Refund/revocation/transfer/subscription/upgrades; V1 entitlements are permanent exact-revision grants.
+- Automatic entitlement migration from rN to rN+1.
+- Specialized enforcement in content types that do not yet have a runtime consumer. Future consumers must use `getForUse()` / usable queries or explicitly call the guard.
+- Treating client JavaScript as tamper-proof security; it is not.
+
+**Acceptance / gates:**
+
+- `node scripts/creator-entitlement-audit.mjs` passes from a runnable checkout.
+- Upstream Marketplace/Release/Creator OS/docs audits remain green.
+- Migration applies cleanly in test Supabase.
+- Creator can use their own exact revision without purchasing it.
+- Buyer cannot use a published/listed foreign revision before purchase.
+- Buyer can use the exact purchased revision after purchase + entitlement refresh.
+- A second non-entitled account remains denied.
+- Buying r3 does not grant r4.
+- Sign-out/account switch removes previous buyer access.
+- Appearance omits unauthorized Creator layers.
+- Mount Catalog hides unauthorized Creator mounts.
+- Unauthorized Creator World content never registers into Property catalog.
+- Built-in Appearance/Mount/World content is unchanged.
+- iPhone/LIVE Creator + Marketplace flow remains stable.
+- Any online server mutation test must reject a spoofed client use without entitlement before this layer can be called end-to-end secure.
+
+**Evidence:**
+
+- Branch: `creator-entitlement-enforcement-v1`, stacked from `creator-marketplace-v1` at `e006231b7c7a907b35e3d41d0c4cfede94c29397`.
+- Static source inspection confirms Creator Marketplace entitlement rows are account-level and revision-specific.
+- This environment has not executed the new Supabase migration, Node audit, Playwright, two-account integration or iPhone/LIVE test; therefore the pass remains `IMPLEMENTED_PENDING_VERIFY`.
+
+**Next action:** run entitlement + upstream audits, apply migrations in test Supabase and execute multi-account own/pre-purchase/post-purchase/r3-vs-r4/sign-out tests. Then add authoritative server-side access checks to any online equip/place/spawn/use endpoints before calling the entire paid-content path secure. After that, the next product layer can be **Public Creator Content Delivery V1**: entitlement-aware metadata/download delivery for owned published content on normal gameplay sessions.
+
+**Handoff prompt:**
+
+> Continue `IMP-2026-09-15-CREATOR-ENTITLEMENT-004` on `creator-entitlement-enforcement-v1`. Read `docs/systems/CREATOR_ENTITLEMENT_SYSTEM.md`, Marketplace/Release/Creator OS ledger entries and migration `20260916003000_creator_entitlement_access.sql`. Do not add local ownership flags, a second auth client, or separate entitlement logic per content type. Run `node scripts/creator-entitlement-audit.mjs` plus all upstream audits, apply the migration in test Supabase, and test owner / pre-purchase deny / post-purchase allow / second-account deny / r3-not-r4 / sign-out. Remember that browser enforcement is defense in depth: any authoritative server mutation that uses paid Creator content must independently verify revision access. Do not mark VALIDATED until Supabase, iPhone/LIVE and server spoof-resistance gates pass.
