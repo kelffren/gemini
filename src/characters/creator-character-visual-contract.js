@@ -1,20 +1,24 @@
 /* KELO-INDEX
  * area: CHARACTERS / CREATOR VISUAL CONTRACT
  * owner-adjacent: KeloCharacterVisualPresets + Creator authoring + Creator Character Bridge
- * keys: CREATOR APPEARANCE AUTHORING WYSIWYG DESCRIPTOR SHEET SOCKET WEAPON PREVIEW PARITY
- * purpose: una sola compilación declarativa de payload Creator -> descriptor visual consumido por editor, social y PvP
- * public-api: KeloCreatorCharacterVisualContract.buildDescriptor/rowToPayload/compileRow/validate/presentationFingerprint
+ * keys: CREATOR APPEARANCE AUTHORING WYSIWYG DESCRIPTOR SHEET SOCKET WEAPON PREVIEW PARITY VISUAL MOTION FRAME FACING
+ * purpose: una sola compilación declarativa de payload Creator -> descriptor visual y una sola normalización de face/frame consumida por authoring y runtime-compatible previews
+ * public-api: KeloCreatorCharacterVisualContract.buildDescriptor/rowToPayload/compileRow/validate/presentationFingerprint/normalizeFace/normalizeFrame/resolveMotionSample/frameColumns
  * state-owned: ninguno; funciones puras
- * do-not: NO dibujar, NO ownership, NO gameplay stats, NO network authority, NO persistir
+ * do-not: NO dibujar, NO ownership, NO gameplay stats, NO network authority, NO persistir, NO poseer loops de animación
  */
 (function(root,factory){const api=factory(root);if(root)root.KeloCreatorCharacterVisualContract=api;if(typeof module==='object'&&module.exports)module.exports=api;})(typeof globalThis!=='undefined'?globalThis:this,function(root){
 'use strict';
-const VERSION='creator-character-visual-contract-v2.0.0';
+const VERSION='creator-character-visual-contract-v2.1.0-motion-sample';
 const FACE_KEYS=Object.freeze(['down','left','right','up']);
 const DEFAULT_FACE_ROWS=Object.freeze({down:0,left:1,right:2,up:3});
 const text=v=>String(v==null?'':v).trim();
 const copy=v=>v==null?v:JSON.parse(JSON.stringify(v));
 const finite=(v,fallback=0)=>Number.isFinite(Number(v))?Number(v):fallback;
+function normalizeFace(value,fallback='down'){const raw=text(value).toLowerCase(),fb=FACE_KEYS.includes(text(fallback).toLowerCase())?text(fallback).toLowerCase():'down';return FACE_KEYS.includes(raw)?raw:fb;}
+function normalizeFrame(value,columns=1){const cols=Math.max(1,Math.floor(finite(columns,1)));if(!Number.isFinite(Number(value)))return null;return Math.abs(Math.floor(Number(value)))%cols;}
+function frameColumns(row){const visual=row?.metadata?.characterVisual&&typeof row.metadata.characterVisual==='object'?row.metadata.characterVisual:{};return Math.max(1,Math.floor(finite(visual.columns,4)));}
+function resolveMotionSample({actor=null,visual=null,columns=1,fallbackFace='down',fallbackState='idle'}={}){const v=visual&&typeof visual==='object'?visual:(actor?._visualMotion&&typeof actor._visualMotion==='object'?actor._visualMotion:{}),moving=!!v.on,face=normalizeFace(v.face||actor?._face,fallbackFace),frame=normalizeFrame(v.frame,columns),rawState=text(v.state||(moving?'walk':fallbackState)).toLowerCase();return Object.freeze({face,frame,moving,state:rawState||String(fallbackState||'idle').toLowerCase()||'idle',dx:finite(v.dx),dy:finite(v.dy)});}
 function scaleOf(t){const sx=finite(t?.scaleX,1),sy=finite(t?.scaleY,1);if(Math.abs(sx-sy)<0.001)return sx;return Math.sqrt(Math.max(.0001,Math.abs(sx*sy)));}
 function directionalOffsets(payload){const src=payload?.transforms&&typeof payload.transforms==='object'?payload.transforms:{},fallback=src.default||{},out={};for(const face of FACE_KEYS){const t=src[face]||fallback;out[face]={x:finite(t?.x),y:finite(t?.y),rotation:finite(t?.rotation),scale:scaleOf(t)};}return out;}
 function hasTransforms(payload){return !!payload?.transforms&&Object.keys(payload.transforms).length>0;}
@@ -30,5 +34,5 @@ const a=visual.anchor||{};for(const [key,value] of [['anchorX',a.x],['anchorY',a
 function compileRow({row,source,asset={},presets=null}={}){const payload=rowToPayload(row),slot=text(row?.slotId||payload.slotId),check=validate({payload,asset,slot}),descriptor=check.ok&&text(source)?buildDescriptor({source,payload,asset,slot,presets}):null;return Object.freeze({version:VERSION,payload:Object.freeze(payload),descriptor:descriptor?Object.freeze(descriptor):null,validation:check});}
 function stableString(value){if(value==null||typeof value!=='object')return JSON.stringify(value);if(Array.isArray(value))return'['+value.map(stableString).join(',')+']';return'{'+Object.keys(value).sort().map(k=>JSON.stringify(k)+':'+stableString(value[k])).join(',')+'}';}
 function presentationFingerprint(input){const raw=stableString(input?.descriptor||input||{});let h=0x811c9dc5;for(let i=0;i<raw.length;i++){h^=raw.charCodeAt(i);h=Math.imul(h,0x01000193)>>>0;}return'cv2:'+h.toString(16).padStart(8,'0');}
-return Object.freeze({version:VERSION,faces:FACE_KEYS,defaultFaceRows:DEFAULT_FACE_ROWS,directionalOffsets,inferredSheet,buildDescriptor,rowToPayload,compileRow,validate,presentationFingerprint});
+return Object.freeze({version:VERSION,faces:FACE_KEYS,defaultFaceRows:DEFAULT_FACE_ROWS,normalizeFace,normalizeFrame,resolveMotionSample,frameColumns,directionalOffsets,inferredSheet,buildDescriptor,rowToPayload,compileRow,validate,presentationFingerprint});
 });
