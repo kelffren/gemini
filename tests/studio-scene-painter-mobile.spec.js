@@ -38,13 +38,19 @@ test('Scene Painter survives mobile lazy boot, Grid 3x2, one Undo and shell muta
   const response = await page.goto('./?guest=1&mapEditor=1&scenePainterGate=1', { waitUntil: 'domcontentloaded', timeout: 30000 });
   expect(response && response.status()).toBeLessThan(400);
 
-  await page.evaluate(async () => {
-    const { openCreatorHub } = await import('./src/creators/ui/creator-hub.mjs');
-    await openCreatorHub({ root: window });
-  });
-  await expect(page.locator('#kelo-creators-hub')).toBeVisible({ timeout: 10000 });
+  // mapEditor=1 may already mount the Creator Hub. Reuse it instead of creating a duplicate hub.
+  let hub = page.locator('#kelo-creators-hub').last();
+  const autoHubReady = await hub.isVisible({ timeout: 3500 }).catch(() => false);
+  if (!autoHubReady) {
+    await page.evaluate(async () => {
+      const { openCreatorHub } = await import('./src/creators/ui/creator-hub.mjs');
+      await openCreatorHub({ root: window });
+    });
+    hub = page.locator('#kelo-creators-hub').last();
+  }
+  await expect(hub).toBeVisible({ timeout: 10000 });
   await page.waitForFunction(() => !!window.KELO_ADMIN_KEYS?.can?.('world.edit'), null, { timeout: 10000 });
-  await page.locator('#kelo-creators-hub [data-workspace="world"]').click();
+  await hub.locator('[data-workspace="world"]').click();
 
   const studio = page.locator('#kelo-studio-live');
   await expect(studio).toBeVisible({ timeout: 20000 });
