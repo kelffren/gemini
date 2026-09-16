@@ -12,7 +12,7 @@
 (function(root){
 'use strict';
 if(root.KeloCreatorCharacterBridge)return;
-const VERSION='creator-character-state-bridge-v1.0.1';
+const VERSION='creator-character-state-bridge-v1.0.2';
 const UUID_RE=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const FACE_KEYS=['down','left','right','up'];
 const text=v=>String(v==null?'':v).trim();
@@ -97,7 +97,7 @@ function applyOverlay(characterState,activated){
   overlay.clear();for(const entry of activated)if(entry?.binding?.slotKey&&entry?.itemId)overlay.set(String(entry.binding.slotKey),String(entry.itemId));accountId=text(authState()?.accountId);characterId=text(characterState?.characterId);lastSync=Object.freeze({at:Date.now(),accountId:accountId||null,characterId:characterId||null,bindings:activated.length,failures:(characterState?.__failures||[]).length});bump('server-sync');return state();
 }
 async function sync(options){
-  const o=options||{};if(syncPromise&&!o.force)return syncPromise;
+  const o=options||{};if(syncPromise)return syncPromise;
   syncPromise=(async()=>{
     if(!installFacade())throw new Error('CHARACTER_CUSTOMIZATION_REQUIRED');const auth=authState();if(!auth?.authenticated||!UUID_RE.test(text(auth.characterId))){clear('signed-out');return state();}
     const serverState=o.state&&text(o.state.characterId)===text(auth.characterId)?o.state:await root.KeloCreatorUse?.state?.({characterId:auth.characterId,hydrateRuntime:false});if(!serverState||text(serverState.characterId)!==text(auth.characterId))throw new Error('CREATOR_CHARACTER_STATE_IDENTITY_MISMATCH');
@@ -119,5 +119,5 @@ root.addEventListener?.('kelo:creator-entitlements-changed',onEntitlementsChange
 root.KeloCreatorCharacterBridge=Object.freeze({version:VERSION,sync,clear,state,diagnostics,getResolvedState:actor=>resolveState(actor||localActor())});
 const boot=root.__KELO_CREATOR_CHARACTER_BOOT_STATE__;try{delete root.__KELO_CREATOR_CHARACTER_BOOT_STATE__;}catch{}
 if(boot&&Array.isArray(boot.loadout))void sync({state:boot,force:true}).catch(()=>{});
-root.KELO_CREATOR_CHARACTER_BRIDGE_AUDIT=Object.freeze({version:VERSION,ephemeralOverlay:true,hiddenLockedItems:true,serverStateOnly:true,noPersistence:true,noPolling:true,secondRenderer:false});
+root.KELO_CREATOR_CHARACTER_BRIDGE_AUDIT=Object.freeze({version:VERSION,ephemeralOverlay:true,hiddenLockedItems:true,serverStateOnly:true,noPersistence:true,noPolling:true,singleFlight:true,secondRenderer:false});
 })(typeof globalThis!=='undefined'?globalThis:window);
