@@ -18,6 +18,8 @@ Reference Hugging Face Space for the existing Kelo Sprite Factory backend.
 - Uses `black-forest-labs/FLUX.2-klein-base-4B`.
 - Loads `Leon1000/pixel_spritesheet_4walk_small_lora_v1`.
 - Generates one cardinal 4x4 sheet and one diagonal 4x4 sheet.
+- Respects the LoRA's trained row structure: the first three cells are walk frames and the fourth is a special pose.
+- Discards that special pose and deterministically turns the three trained walk frames into Kelo's four-frame loop `0 → 1 → 2 → 1`.
 - Reorders the eight rows into Kelo's canonical `N, NE, E, SE, S, SW, W, NW` 4x8 atlas.
 - Returns a PNG data URL through the Gradio `/generate` API.
 - Leaves background cleanup, 64x64 normalization, geometry repair and per-frame QA to Kelo's existing Sprite Compiler.
