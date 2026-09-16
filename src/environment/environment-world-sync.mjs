@@ -1,14 +1,14 @@
 /* KELO-INDEX
  * area: ENVIRONMENT / ONLINE
  * owner: canonical world environment synchronization
- * owns: initial REST convergence, server-verified Realtime invalidation, role-gated publish/rollback RPCs and revision ordering
+ * owns: initial REST convergence, server-verified Realtime invalidation, role-gated publish/rollback/history RPCs and revision ordering
  * does-not-own: rendering, Creator preview state, auth UI or service-role secrets
  * security: Realtime broadcast payloads are hints only; canonical state is always re-read from the RLS-protected REST row before apply
  */
 import { KELO_SUPABASE_PUBLIC_CONFIG } from '../online/kelo-supabase-public-config.mjs';
 import { installEnvironmentRuntime, normalizeEnvironmentState } from './environment-runtime.mjs';
 
-const VERSION='kelo-world-environment-sync-v3';
+const VERSION='kelo-world-environment-sync-v4';
 const TOPIC='world:environment';
 const SOCKET_TOPIC=`realtime:${TOPIC}`;
 const BROADCAST_EVENT='environment_changed';
@@ -36,8 +36,21 @@ export function rowToWorldEnvironmentEnvelope(row={},meta={}){
     action:String(meta.action??row.action??'sync'),
     sourceRevision:sourceRevision==null?null:Math.max(0,Math.trunc(numberOr(sourceRevision,0))),
     state,
-    updatedAt:row.updated_at??row.updatedAt??null,
-    updatedBy:row.updated_by??row.updatedBy??null
+    updatedAt:row.updated_at??row.updatedAt??row.published_at??row.publishedAt??null,
+    updatedBy:row.updated_by??row.updatedBy??row.published_by??row.publishedBy??null
+  });
+}
+
+export function rowToWorldEnvironmentHistoryEntry(row={}){
+  const envelope=rowToWorldEnvironmentEnvelope({...row,id:'global'},{action:row.action||'history',sourceRevision:row.source_revision??row.sourceRevision??null});
+  return Object.freeze({
+    revision:envelope.revision,
+    schemaVersion:envelope.schemaVersion,
+    action:envelope.action,
+    sourceRevision:envelope.sourceRevision,
+    state:envelope.state,
+    publishedAt:row.published_at??row.publishedAt??envelope.updatedAt,
+    publishedBy:row.published_by??row.publishedBy??envelope.updatedBy
   });
 }
 
@@ -74,11 +87,12 @@ export function installWorldEnvironmentSync(root=globalThis,{config=KELO_SUPABAS
 
   let envelope=null,socket=null,heartbeatTimer=0,reconnectTimer=0,realtimeVerifyTimer=0,reconnectAttempt=0,refSeq=0,joinRef=null,started=false,stopped=false,pendingRealtimeHint=null;
   const listeners=[];
-  const audit={version:VERSION,ready:false,started:false,connected:false,lastRevision:0,lastRefreshAt:0,lastRealtimeAt:0,lastRealtimeHintAt:0,lastPublishAt:0,lastRollbackAt:0,realtimeHints:0,realtimeVerifications:0,reconnects:0,lastError:null};
+  const audit={version:VERSION,ready:false,started:false,connected:false,lastRevision:0,lastRefreshAt:0,lastRealtimeAt:0,lastRealtimeHintAt:0,lastPublishAt:0,lastRollbackAt:0,lastHistoryAt:0,realtimeHints:0,realtimeVerifications:0,reconnects:0,lastError:null};
 
   const nextRef=()=>String(++refSeq);
   function dispatch(name,detail){try{root?.dispatchEvent?.(new root.CustomEvent(name,{detail}));}catch{}}
   function headers(extra={}){return Object.assign({'apikey':publishableKey,'Accept':'application/json'},extra);}
+  function authHeaders(token){return headers({'Authorization':`Bearer ${token}`,'Content-Type':'application/json','Prefer':'return=representation'});}
   function clearHeartbeat(){if(heartbeatTimer){root.clearInterval?.(heartbeatTimer);heartbeatTimer=0;}}
   function clearReconnect(){if(reconnectTimer){root.clearTimeout?.(reconnectTimer);reconnectTimer=0;}}
   function clearRealtimeVerify(){if(realtimeVerifyTimer){root.clearTimeout?.(realtimeVerifyTimer);realtimeVerifyTimer=0;}}
@@ -108,9 +122,7 @@ export function installWorldEnvironmentSync(root=globalThis,{config=KELO_SUPABAS
     const state=normalizeEnvironmentState(nextState),expected=expectedRevision==null?(envelope?.revision||null):expectedRevision;
     try{
       const data=await responseJson(await fetcher(`${base}/rest/v1/rpc/publish_world_environment`,{
-        method:'POST',
-        headers:headers({'Authorization':`Bearer ${token}`,'Content-Type':'application/json','Prefer':'return=representation'}),
-        body:JSON.stringify({p_state:state,p_expected_revision:expected})
+        method:'POST',headers:authHeaders(token),body:JSON.stringify({p_state:state,p_expected_revision:expected})
       }));
       const row=Array.isArray(data)?data[0]:data;if(!row)throw new Error('WORLD_ENVIRONMENT_PUBLISH_EMPTY');
       const next=rowToWorldEnvironmentEnvelope(row,{action:'publish',sourceRevision:expected});accept(next,{source:'publish'});audit.lastPublishAt=Date.now();audit.lastError=null;
@@ -128,9 +140,7 @@ export function installWorldEnvironmentSync(root=globalThis,{config=KELO_SUPABAS
     const expected=expectedRevision==null?(envelope?.revision||null):Math.trunc(Number(expectedRevision)||0);
     try{
       const data=await responseJson(await fetcher(`${base}/rest/v1/rpc/rollback_world_environment`,{
-        method:'POST',
-        headers:headers({'Authorization':`Bearer ${token}`,'Content-Type':'application/json','Prefer':'return=representation'}),
-        body:JSON.stringify({p_target_revision:target,p_expected_revision:expected})
+        method:'POST',headers:authHeaders(token),body:JSON.stringify({p_target_revision:target,p_expected_revision:expected})
       }));
       const row=Array.isArray(data)?data[0]:data;if(!row)throw new Error('WORLD_ENVIRONMENT_ROLLBACK_EMPTY');
       const next=rowToWorldEnvironmentEnvelope(row,{action:'rollback',sourceRevision:target});accept(next,{source:'rollback'});audit.lastRollbackAt=Date.now();audit.lastError=null;
@@ -140,6 +150,18 @@ export function installWorldEnvironmentSync(root=globalThis,{config=KELO_SUPABAS
       if(String(error?.message||'').includes('ENVIRONMENT_REVISION_CONFLICT')){try{await refresh({source:'conflict-refresh'});}catch{}}
       dispatch('kelo:world-environment-sync-error',{stage:'rollback',source,targetRevision:target,error});throw error;
     }
+  }
+
+  async function history({accessToken=null,limit=10}={}){
+    const token=String(accessToken||'').trim();if(!token)throw new Error('AUTH_REQUIRED');
+    const bounded=Math.max(1,Math.min(25,Math.trunc(Number(limit)||10)));
+    try{
+      const data=await responseJson(await fetcher(`${base}/rest/v1/rpc/list_world_environment_history`,{
+        method:'POST',headers:authHeaders(token),body:JSON.stringify({p_limit:bounded})
+      }));
+      const entries=Object.freeze((Array.isArray(data)?data:[]).map(rowToWorldEnvironmentHistoryEntry));audit.lastHistoryAt=Date.now();audit.lastError=null;
+      dispatch('kelo:world-environment-history-loaded',Object.freeze({count:entries.length,entries}));return entries;
+    }catch(error){audit.lastError=String(error?.message||error);dispatch('kelo:world-environment-sync-error',{stage:'history',error});throw error;}
   }
 
   function scheduleReconnect(){
@@ -205,7 +227,7 @@ export function installWorldEnvironmentSync(root=globalThis,{config=KELO_SUPABAS
   function stop(){stopped=true;started=false;audit.started=false;audit.connected=false;clearReconnect();clearHeartbeat();clearRealtimeVerify();pendingRealtimeHint=null;for(const [target,event,handler,options] of listeners.splice(0))try{target.removeEventListener(event,handler,options);}catch{}try{socket?.close?.();}catch{}socket=null;return true;}
 
   const api=Object.freeze({
-    version:VERSION,start,stop,refresh,publish,rollback,
+    version:VERSION,start,stop,refresh,publish,rollback,history,
     get envelope(){return envelope;},
     get revision(){return envelope?.revision||0;},
     get connected(){return audit.connected;},

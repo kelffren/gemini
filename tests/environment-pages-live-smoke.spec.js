@@ -2,7 +2,7 @@
  * area: TEST / ENVIRONMENT / LIVE PAGES
  * owner: Playwright validation only
  * purpose: verify two independent iPhone clients converge on the same canonical Supabase world environment and attach Realtime
- * security: read-only guest smoke; never publishes or rolls back world state
+ * security: read-only guest smoke; never publishes, reads admin history or rolls back world state
  */
 const {test,expect}=require('@playwright/test');
 
@@ -76,8 +76,8 @@ test('GitHub Pages LIVE: two iPhones converge on one canonical world environment
   pageB.on('pageerror',error=>errors.b.push(String(error?.message||error)));
 
   const [a,b]=await Promise.all([openEnvironmentClient(pageA,'a'),openEnvironmentClient(pageB,'b')]);
-  expect(a.syncVersion).toContain('kelo-world-environment-sync-v3');
-  expect(b.syncVersion).toContain('kelo-world-environment-sync-v3');
+  expect(a.syncVersion).toContain('kelo-world-environment-sync-v4');
+  expect(b.syncVersion).toContain('kelo-world-environment-sync-v4');
   expect(a.runtimeRevision).toBe(a.revision);
   expect(b.runtimeRevision).toBe(b.revision);
   expect(a.temporary).toBe(false);

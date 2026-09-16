@@ -1,8 +1,9 @@
-const DEFAULT_CACHE_NAME = 'kelo-community-assets-v1';
+const DEFAULT_CACHE_NAME = 'kelo-community-assets-v2';
 const DEFAULT_MAX_CACHE_BYTES = 128 * 1024 * 1024;
 
 function keyFor(manifest) {
-  return `${manifest.id}@${manifest.version || 1}`;
+  const hash = String(manifest?.sha256 || '').toLowerCase();
+  return `${manifest.id}@${manifest.version || 1}:${hash || 'nohash'}`;
 }
 
 function assetPriority({ visible = false, distance = Infinity, profileOpen = false } = {}) {
@@ -47,6 +48,7 @@ export class DynamicAssetStreamManager extends EventTarget {
     this.queue = [];
     this.active = 0;
     this.playerKeys = new Map();
+    this.playerGeneration = new Map();
     this.lastUsed = new Map();
   }
 
@@ -65,17 +67,25 @@ export class DynamicAssetStreamManager extends EventTarget {
       this.#pump();
     });
     this.inFlight.set(key, promise);
-    promise.finally(() => this.inFlight.delete(key));
+    promise.then(
+      () => this.inFlight.delete(key),
+      () => this.inFlight.delete(key),
+    );
     return promise;
   }
 
   async syncPlayerAssets(playerId, manifests = [], context = {}) {
+    const id = String(playerId);
+    const generation = (this.playerGeneration.get(id) || 0) + 1;
+    this.playerGeneration.set(id, generation);
+
     const priority = assetPriority(context);
-    const previous = this.playerKeys.get(String(playerId)) || new Set();
+    const previous = this.playerKeys.get(id) || new Set();
     const next = new Set();
 
     if (priority === 0) {
-      this.playerKeys.set(String(playerId), next);
+      this.playerKeys.set(id, next);
+      for (const key of previous) this.lastUsed.set(key, Date.now());
       return [];
     }
 
@@ -87,17 +97,35 @@ export class DynamicAssetStreamManager extends EventTarget {
       next.add(key);
       unique.push(manifest);
     }
-    this.playerKeys.set(String(playerId), next);
+    this.playerKeys.set(id, next);
 
     for (const key of previous) if (!next.has(key)) this.lastUsed.set(key, Date.now());
 
-    const assets = await Promise.all(unique.map(manifest => this.requestAsset(manifest, { priority })));
-    this.dispatchEvent(new CustomEvent('player-assets-ready', { detail: { playerId, assets } }));
+    const settled = await Promise.allSettled(unique.map(manifest => this.requestAsset(manifest, { priority })));
+    if (this.playerGeneration.get(id) !== generation) return [];
+
+    const assets = [];
+    const errors = [];
+    settled.forEach((result, index) => {
+      if (result.status === 'fulfilled') assets.push(result.value);
+      else errors.push({
+        key: keyFor(unique[index]),
+        manifest: unique[index],
+        message: result.reason instanceof Error ? result.reason.message : String(result.reason),
+      });
+    });
+
+    this.dispatchEvent(new CustomEvent('player-assets-ready', { detail: { playerId, assets, errors, generation } }));
+    if (errors.length) this.dispatchEvent(new CustomEvent('player-assets-partial', { detail: { playerId, assets, errors, generation } }));
     return assets;
   }
 
   releasePlayer(playerId) {
-    this.playerKeys.delete(String(playerId));
+    const id = String(playerId);
+    this.playerGeneration.set(id, (this.playerGeneration.get(id) || 0) + 1);
+    const previous = this.playerKeys.get(id);
+    if (previous) for (const key of previous) this.lastUsed.set(key, Date.now());
+    this.playerKeys.delete(id);
   }
 
   async collectGarbage({ maxIdleMs = 15 * 60 * 1000 } = {}) {
@@ -109,7 +137,7 @@ export class DynamicAssetStreamManager extends EventTarget {
       this.memory.delete(key);
       this.lastUsed.delete(key);
     }
-    await this.#trimPersistentCache();
+    await this.#trimPersistentCache().catch(() => {});
   }
 
   #pump() {
@@ -127,7 +155,7 @@ export class DynamicAssetStreamManager extends EventTarget {
 
   async #load(manifest, key) {
     const url = assertManifest(manifest);
-    let blob = await this.#readCache(url, manifest);
+    let blob = await this.#readCache(url, manifest).catch(() => null);
     let source = 'cache';
 
     if (!blob) {
@@ -136,7 +164,7 @@ export class DynamicAssetStreamManager extends EventTarget {
       if (!response.ok) throw new Error(`asset_fetch_failed_${response.status}`);
       blob = await response.blob();
       await verifyBlob(blob, manifest);
-      await this.#writeCache(url, blob, manifest);
+      await this.#writeCache(url, blob, manifest).catch(() => {});
     }
 
     const objectUrl = globalThis.URL?.createObjectURL ? URL.createObjectURL(blob) : null;
@@ -198,4 +226,4 @@ export class DynamicAssetStreamManager extends EventTarget {
   }
 }
 
-export { assetPriority };
+export { assetPriority, keyFor };

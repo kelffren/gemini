@@ -1,9 +1,9 @@
 /* KELO-INDEX
  * area: SERVER / AVATAR
  * owner: Kelo server authority
- * keys: SUPABASE AVATAR MANIFEST CHARACTER CONTENT RLS SANITIZE
- * purpose: resolve the active creator avatar from persisted character state using a verified user JWT
- * online: server derives runtime manifest from Supabase; clients never declare asset URLs or frame metadata
+ * keys: SUPABASE AVATAR MANIFEST CHARACTER CONTENT RLS SANITIZE COMMUNITY ASSETS STREAMING
+ * purpose: resolve the active creator avatar and its server-trusted community cosmetic references from persisted character state
+ * online: server derives runtime manifest from Supabase; clients never declare asset URLs, frame metadata, or public community paths
  * do-not: NO renderer, NO client-trusted URL, NO service-role requirement, NO duplicate avatar persistence
  */
 'use strict';
@@ -14,12 +14,36 @@ function cleanPath(value){
   if(!raw||raw.includes('..')||!/^[a-zA-Z0-9_./-]+$/.test(raw))return null;
   return raw.slice(0,512);
 }
+function cleanId(value,max=180){
+  const raw=String(value||'').trim();
+  if(!raw||!/^[a-zA-Z0-9_:@.\/-]+$/.test(raw))return null;
+  return raw.slice(0,max);
+}
 function int(value,min,max,fallback){const n=Math.floor(Number(value));return Number.isFinite(n)?Math.max(min,Math.min(max,n)):fallback;}
 const DIRECTION_KEYS=Object.freeze(['n','ne','e','se','s','sw','w','nw']);
+const COMMUNITY_MIME=Object.freeze(new Set(['image/png','image/webp','image/jpeg']));
+const COMMUNITY_SLOTS=Object.freeze(new Set(['body','outfit','head','hair','face','weapon','offhand','back','aura','pet','mount','effect']));
+const MAX_COMMUNITY_ASSETS=12;
 function directions(raw,rows){const source=Array.isArray(raw)?raw.map(value=>String(value||'').toLowerCase()):[];if(source.length===rows&&source.every(key=>DIRECTION_KEYS.includes(key))&&new Set(source).size===source.length)return source;if(rows===8)return [...DIRECTION_KEYS];if(rows===4)return['s','w','e','n'];return['s',...new Array(Math.max(0,rows-1)).fill(0).map((_,index)=>`row${index+2}`)];}
 function rowMap(raw,rows,directionKeys){const src=raw&&typeof raw==='object'?raw:{},fallback={down:0,left:1,right:2,up:3},out={};for(const key of ['down','left','right','up'])out[key]=int(src[key],0,Math.max(0,rows-1),Math.min(fallback[key],Math.max(0,rows-1)));for(const key of DIRECTION_KEYS){const fallbackRow=directionKeys.indexOf(key);if(src[key]!=null||fallbackRow>=0)out[key]=int(src[key],0,Math.max(0,rows-1),Math.max(0,fallbackRow));}return out;}
 function frameCounts(raw,rows,columns){const source=Array.isArray(raw)?raw:[];return new Array(rows).fill(columns).map((fallback,row)=>int(source[row],1,columns,fallback));}
 function encodePath(path){return path.split('/').map(encodeURIComponent).join('/');}
+function communityAssets(raw,supabaseUrl){
+  if(!Array.isArray(raw)||!supabaseUrl)return Object.freeze([]);
+  const out=[],seen=new Set();
+  for(const source of raw){
+    if(out.length>=MAX_COMMUNITY_ASSETS)break;
+    if(!source||typeof source!=='object')continue;
+    const id=cleanId(source.assetId||source.id),path=cleanPath(source.publicStoragePath||source.path),mime=String(source.mime||source.mimeType||'').toLowerCase(),sha256=String(source.sha256||source.contentHash||'').toLowerCase(),slot=String(source.slot||source.mountSlot||'effect').toLowerCase();
+    if(!id||!path||!COMMUNITY_MIME.has(mime)||!COMMUNITY_SLOTS.has(slot)||!/^[0-9a-f]{64}$/.test(sha256))continue;
+    const bytes=int(source.bytes||source.byteSize,1,5*1024*1024,0),width=int(source.width||source.pixelWidth,1,2048,0),height=int(source.height||source.pixelHeight,1,2048,0);
+    if(!bytes||!width||!height)continue;
+    const publicationId=cleanId(source.publicationId,100),revisionId=cleanId(source.revisionId,100),version=int(source.version||source.revision,1,1_000_000,1),key=`${slot}:${id}@${version}:${sha256}`;
+    if(seen.has(key))continue;seen.add(key);
+    out.push(Object.freeze({schema:'kelo.community-asset.v1',id,assetId:id,version,slot,type:String(source.type||source.kind||'cosmetic').slice(0,32),publicationId,revisionId,bucket:'creator-global',path,url:`${supabaseUrl}/storage/v1/object/public/creator-global/${encodePath(path)}`,mime,bytes,width,height,sha256,moderation:'server-verified'}));
+  }
+  return Object.freeze(out);
+}
 
 function createAvatarSyncStore(options={}){
   const supabaseUrl=cleanBase(options.supabaseUrl||process.env.SUPABASE_URL);
@@ -40,7 +64,7 @@ function createAvatarSyncStore(options={}){
     const path=cleanPath(rt.path);if(!path)return null;
     const columns=int(rt.columns,1,16,1),rows=int(rt.rows,1,16,1),directionKeys=directions(rt.directionKeys,rows);
     const runtime={bucket:'avatars',path,publicUrl:`${supabaseUrl}/storage/v1/object/public/avatars/${encodePath(path)}`,columns,rows,directionKeys:Object.freeze(directionKeys),frameCounts:Object.freeze(frameCounts(rt.frameCounts,rows,columns)),rowMap:Object.freeze(rowMap(rt.rowMap,rows,directionKeys)),frameMs:int(rt.frameMs,70,1000,140),renderHeight:int(rt.renderHeight,44,180,82)};
-    const safePayload={rigProfileId:String(payload.rigProfileId||`sprite-rig-${rows}d`).slice(0,80),directions:int(payload.directions,1,8,directionKeys.length),avatarRuntime:Object.freeze(runtime)};
+    const safePayload={rigProfileId:String(payload.rigProfileId||`sprite-rig-${rows}d`).slice(0,80),directions:int(payload.directions,1,8,directionKeys.length),avatarRuntime:Object.freeze(runtime),communityAssets:communityAssets(payload.communityAssets,supabaseUrl)};
     return Object.freeze({contentId:String(raw.contentId).slice(0,160),displayName:String(raw.displayName||'Avatar').slice(0,100),payload:Object.freeze(safePayload)});
   }
   async function resolve(characterId,accessToken){
@@ -51,6 +75,6 @@ function createAvatarSyncStore(options={}){
     const manifest=await request(`${supabaseUrl}/rest/v1/rpc/get_avatar_manifest`,{method:'POST',headers:headers(accessToken),body:JSON.stringify({p_content_id:contentId})});
     return sanitize(manifest);
   }
-  return Object.freeze({version:'avatar-sync-store-v2-8d',configured,resolve,sanitize,audit:()=>({version:'avatar-sync-store-v2-8d',configured,clientManifestTrusted:false,publicBucket:'avatars',directionRigs:[1,4,8]})});
+  return Object.freeze({version:'avatar-sync-store-v3-community-stream',configured,resolve,sanitize,audit:()=>({version:'avatar-sync-store-v3-community-stream',configured,clientManifestTrusted:false,publicBucket:'avatars',communityBucket:'creator-global',communityClientUrlTrusted:false,maxCommunityAssets:MAX_COMMUNITY_ASSETS,directionRigs:[1,4,8]})});
 }
 module.exports={createAvatarSyncStore};
