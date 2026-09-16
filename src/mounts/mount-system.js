@@ -2,25 +2,27 @@
  * area: MOUNTS / RUNTIME
  * owner: KeloMounts
  * purpose: estado equip/mounted, equipo/outfit, stats y bridge a KeloMovement sin segundo loop
- * public-api: equipMount/unequipMount/mount/dismount/equipItem/unequipItem/setOutfit/getAbilityLoadout/getMountStats/setAuthority
- * consumes: KeloMountCatalog, KeloMountEquipmentCatalog, KeloStats, KeloAppearance, KeloMovement, KeloEvents, KeloEquipment
+ * public-api: equipMount/unequipMount/mount/dismount/equipItem/unequipItem/setOutfit/getAbilityLoadout/getMountStats/setAuthority/useGuard
+ * consumes: KeloMountCatalog, KeloMountEquipmentCatalog, KeloStats, KeloAppearance, KeloMovement, KeloEvents, KeloEquipment, optional KeloCreatorEntitlements
  * state-owned: STATE.mounts únicamente
- * extension-points: authority adapter + movement profiles + equipment/outfit IDs
- * online: mismas operaciones pasan por request(op,payload,localFallback); server puede reemplazar authority sin cambiar UI/domain IDs
+ * extension-points: composable use guards + authority adapter + movement profiles + equipment/outfit IDs
+ * online: guards run before request(op,payload,localFallback); server/domain authority can replace authority without bypassing Creator-use preconditions
  * do-not: no tocar STATE.equipped stones; no game loop; no renderer; no reglas por mountId
  */
 (function(root){'use strict';
 if(root.KeloMounts)return;
 const Catalog=root.KeloMountCatalog,EquipCatalog=root.KeloMountEquipmentCatalog,Stats=root.KeloStats,Appearance=root.KeloAppearance;
 if(!Catalog||!EquipCatalog||!Stats){console.error('KeloMounts missing catalog/stats dependency');return;}
-const VERSION='mount-runtime-v1.0.1',SCHEMA_VERSION=1;
+const VERSION='mount-runtime-v1.1.0-use-guards',SCHEMA_VERSION=1;
 const clone=v=>v==null?v:JSON.parse(JSON.stringify(v));
 let authority={request:async function(_op,_payload,localFallback){return localFallback();}};
+const guards=new Set();
 let statsUnsub=null,movementBefore=null,movementAfter=null;
 function seedStarterContent(s){
  if(!Object.keys(s.owned).length){const starter=Catalog.query({tag:'starter'})[0]||null;if(starter){s.owned[starter.id]={id:starter.id,unlockedAt:Date.now()};s.equippedMountId=starter.id;}}
  for(const item of EquipCatalog.list())if(item?.tags?.includes('starter')&&!s.equipmentInventory.includes(item.id))s.equipmentInventory.push(item.id);
 }
+function creatorAccess(id){const def=Catalog.getRaw?.(id)||Catalog.get?.(id)||null,m=def?.metadata||{},revisionId=String(m.creatorRevisionId||'');if(!revisionId)return{creator:false,ok:false};const gate=root.KeloCreatorEntitlements;if(!gate?.checkRecord)return{creator:true,ok:false,reason:'CREATOR_ENTITLEMENT_GUARD_REQUIRED'};const access=gate.checkRecord({source:'creator-content',revisionId,contentId:m.creatorContentId,ownerUserId:m.creatorOwnerUserId});return{creator:true,...access};}
 function state(){
  if(typeof STATE==='undefined')return null;
  if(!STATE.mounts||typeof STATE.mounts!=='object')STATE.mounts={};
@@ -32,7 +34,7 @@ function state(){
  if(!Number.isFinite(Number(s.revision)))s.revision=1;
  if(typeof s.mounted!=='boolean')s.mounted=false;
  seedStarterContent(s);
- if(s.equippedMountId&&!s.owned[s.equippedMountId])s.equippedMountId=null;
+ if(s.equippedMountId&&!s.owned[s.equippedMountId]&&!creatorAccess(s.equippedMountId).ok)s.equippedMountId=null;
  return s;
 }
 function emit(name,detail){try{root.KeloEvents?.emit?.(name,detail);}catch(_e){}try{root.dispatchEvent?.(new CustomEvent(name,{detail}));}catch(_e){}}
@@ -40,8 +42,10 @@ function persist(){if(typeof saveState==='function')saveState();}
 function dirty(reason){const s=state();if(s)s.revision++;Stats.markDirty();if(typeof localPlayer!=='undefined'&&root.KeloEquipment?.recalculate)root.KeloEquipment.recalculate(localPlayer,true);emit('KELO_MOUNT_CHANGED',{reason,snapshot:snapshot()});persist();}
 function snapshot(){const s=state();return s?{schemaVersion:s.schemaVersion,equippedMountId:s.equippedMountId||null,mounted:s.mounted===true,revision:s.revision,equipmentByMountId:clone(s.equipmentByMountId),appearanceByMountId:clone(s.appearanceByMountId)}:null;}
 function setAuthority(next){if(!next||typeof next.request!=='function')throw new Error('MOUNT_AUTHORITY_INVALID');authority=next;return true;}
-function request(op,payload,fn){return Promise.resolve(authority.request(op,clone(payload||{}),fn));}
-function owned(id){const s=state();return!!s?.owned?.[String(id)];}
+function useGuard(fn){if(typeof fn!=='function')throw new Error('MOUNT_GUARD_INVALID');guards.add(fn);return()=>guards.delete(fn);}
+async function runGuards(op,payload){for(const guard of [...guards])await guard(op,clone(payload||{}));}
+async function request(op,payload,fn){const data=clone(payload||{});await runGuards(op,data);return authority.request(op,data,fn);}
+function owned(id){const s=state(),key=String(id);if(!!s?.owned?.[key])return true;return creatorAccess(key).ok===true;}
 function grantLocalMount(id){const def=Catalog.get(id);if(!def)return{ok:false,error:'MOUNT_NOT_FOUND'};const s=state();s.owned[def.id]={id:def.id,unlockedAt:Date.now()};dirty('grant');return{ok:true,mountId:def.id};}
 async function equipMount(id){id=String(id||'');return request('mount:equip',{mountId:id},()=>{const s=state(),def=Catalog.get(id);if(!def)return{ok:false,error:'MOUNT_NOT_FOUND'};if(!owned(id))return{ok:false,error:'MOUNT_NOT_OWNED'};s.equippedMountId=id;if(s.mounted)s.mounted=false;dirty('equip-mount');return{ok:true,mountId:id};});}
 async function unequipMount(){return request('mount:unequip',{},()=>{const s=state();s.mounted=false;s.equippedMountId=null;dirty('unequip-mount');return{ok:true};});}
@@ -63,6 +67,6 @@ function installMovement(){if(!root.KeloMovement||movementBefore)return;
  movementAfter=root.KeloMovement.after('mounts:movement-profile',ctx=>{const r=ctx._mountRestore;if(!r||!ctx.config)return;ctx.config.speed=r.speed;ctx.config.accelDecay=r.accelDecay;ctx.config.decelDecay=r.decelDecay;},20);
 }
 installStatsSource();state();installMovement();if(typeof localPlayer!=='undefined'&&root.KeloEquipment?.recalculate)root.KeloEquipment.recalculate(localPlayer,true);
-root.KeloMounts=Object.freeze({version:VERSION,schemaVersion:SCHEMA_VERSION,setAuthority,snapshot,isOwned:owned,grantLocalMount,equipMount,unequipMount,mount,dismount,isMounted:()=>state()?.mounted===true,getEquippedMountId:()=>state()?.equippedMountId||null,getEquippedMount:activeDefinition,getAbilityLoadout,getMountStats,getEquipment:mountId=>clone(itemSlots(String(mountId||''))),equipItem,unequipItem,setOutfitItem,getAppearance:appearanceSnapshot,migrateState:state,refresh:function(reason){dirty(reason||'refresh');}});
-root.KELO_MOUNT_AUDIT=Object.freeze({version:VERSION,stoneSlotsUntouched:true,mountAbilitySlots:3,usesKeloMovementHooks:!!movementBefore,usesKeloStats:true,authorityBoundary:true,starterIdsInCore:false,secondLoop:false});
+root.KeloMounts=Object.freeze({version:VERSION,schemaVersion:SCHEMA_VERSION,setAuthority,useGuard,snapshot,isOwned:owned,grantLocalMount,equipMount,unequipMount,mount,dismount,isMounted:()=>state()?.mounted===true,getEquippedMountId:()=>state()?.equippedMountId||null,getEquippedMount:activeDefinition,getAbilityLoadout,getMountStats,getEquipment:mountId=>clone(itemSlots(String(mountId||''))),equipItem,unequipItem,setOutfitItem,getAppearance:appearanceSnapshot,migrateState:state,refresh:function(reason){dirty(reason||'refresh');}});
+root.KELO_MOUNT_AUDIT=Object.freeze({version:VERSION,stoneSlotsUntouched:true,mountAbilitySlots:3,usesKeloMovementHooks:!!movementBefore,usesKeloStats:true,authorityBoundary:true,composableUseGuards:true,creatorEntitlementAware:true,starterIdsInCore:false,secondLoop:false});
 })(typeof globalThis!=='undefined'?globalThis:window);
