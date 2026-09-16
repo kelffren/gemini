@@ -4,7 +4,7 @@
  * keys: KELO CONTENT ABILITY SCENE PREFAB INLINE
  * purpose: Expose tiny native declarative content packs through the same personal vault flow.
  */
-const INDEX_URL='../../../data/kelo-content-starter-catalog.json?v=1';
+const INDEX_URL=new URL('../../../data/kelo-content-starter-catalog.json?v=2',import.meta.url).href;
 let indexPromise=null;
 const clean=v=>String(v??'').trim();
 const lower=v=>clean(v).toLowerCase();
