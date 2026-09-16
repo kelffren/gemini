@@ -28,7 +28,8 @@
 - `scripts/boot-footprint.mjs` — snapshot CLI del first-playable path.
 - `scripts/boot-footprint-ratchet.mjs` — gate monotónico de JS/CSS crítico.
 - `scripts/boot-footprint-ratchet-audit.mjs` — corpus determinista del boot ratchet.
-- `.github/workflows/asset-bit-ratchet.yml` — Kelo Weightless Stack: assets, dedup y first-playable footprint.
+- `.github/workflows/asset-bit-ratchet.yml` — Kelo Weightless Stack: assets, dedup, reconstrucción exacta y first-playable footprint.
+- `.github/workflows/weightless-evolution-lab.yml` — laboratorio periódico/manual de búsqueda de representaciones más pequeñas; solo evidencia, no muta producción.
 
 ## World / Environment
 
@@ -69,6 +70,7 @@
 - `src/creators/assets/asset-budget-policy.mjs` — límites declarativos por grupo/zona para bytes, RGBA, file count y asset máximo.
 - `src/creators/assets/asset-bit-ratchet.mjs` — compara snapshots base/head y bloquea codificaciones mayores cuando el hash RGBA decodificado no cambió.
 - `src/creators/assets/asset-global-dedup.mjs` — planifica blobs byte-exact compartibles y campeones RGBA-exact sin mutar SOURCE.
+- `src/creators/assets/exact-tile-reconstruction.mjs` — diccionario de bloques + mapa de índices con prueba de reconstrucción RGBA exacta.
 - `docs/asset-space-budgets.json` — política inicial de budget de bibliotecas/zonas; no infiere loading runtime.
 - `scripts/asset-space-compiler.mjs` — CLI FAST/AUTO/BALANCED/DEEP, before/after/diff, perfil, provenance y reporte.
 - `scripts/asset-space-budget.mjs` — transferencia, RGBA baseline, transparencia y duplicados exactos.
@@ -76,6 +78,8 @@
 - `scripts/asset-bit-ratchet-audit.mjs` — regresión determinista del bit ratchet.
 - `scripts/asset-global-dedup.mjs` — emite el plan global de deduplicación exacta.
 - `scripts/asset-global-dedup-audit.mjs` — regresión determinista del dedup planner.
+- `scripts/exact-reconstruction-lab.mjs` — escanea PNG reales buscando estructura repetida reversible.
+- `scripts/exact-tile-reconstruction-audit.mjs` — prueba determinista de reconstrucción byte-exacta.
 - `scripts/asset-route-budget-audit.mjs` — enforcement CI de grupos declarados en `docs/asset-space-budgets.json`.
 - `scripts/asset-animation-consistency-audit.mjs` — corpus adversarial de flicker/anchor/alpha temporal.
 - `scripts/asset-codec-tournament.mjs` — laboratorio profundo de codecs y variantes de entrega.
