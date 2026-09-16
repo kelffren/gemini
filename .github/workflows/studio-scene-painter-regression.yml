@@ -1,0 +1,36 @@
+name: Studio Scene Painter regression
+
+on:
+  push:
+    paths:
+      - 'src/studio/tools/paint-copies-tool.mjs'
+      - 'src/studio/tools/register-build-tools-serial.mjs'
+      - 'scripts/studio-paint-copies-audit.mjs'
+      - 'docs/systems/STUDIO_SCENE_PAINTER.md'
+      - 'docs/system-catalog.json'
+      - '.github/workflows/studio-scene-painter-regression.yml'
+  pull_request:
+    paths:
+      - 'src/studio/tools/paint-copies-tool.mjs'
+      - 'src/studio/tools/register-build-tools-serial.mjs'
+      - 'scripts/studio-paint-copies-audit.mjs'
+      - 'docs/systems/STUDIO_SCENE_PAINTER.md'
+      - 'docs/system-catalog.json'
+      - '.github/workflows/studio-scene-painter-regression.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Paint Copies / Scene Painter contract
+        run: node scripts/studio-paint-copies-audit.mjs
+      - name: Documentation contract
+        run: node scripts/system-documentation-audit.js
