@@ -14,6 +14,7 @@ on:
       - 'scripts/asset-global-dedup*.mjs'
       - 'scripts/asset-space-budget.mjs'
       - 'scripts/boot-footprint*.mjs'
+      - 'scripts/exact-*reconstruction*.mjs'
       - '.github/workflows/asset-bit-ratchet.yml'
 
 concurrency:
@@ -26,7 +27,7 @@ permissions:
 jobs:
   weightless-gates:
     runs-on: ubuntu-latest
-    timeout-minutes: 18
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -39,10 +40,13 @@ jobs:
           node scripts/asset-bit-ratchet-audit.mjs
           node scripts/asset-global-dedup-audit.mjs
           node scripts/boot-footprint-ratchet-audit.mjs
+          node scripts/exact-tile-reconstruction-audit.mjs
       - name: Measure head asset information and bytes
         run: node scripts/asset-space-budget.mjs --input=assets --max-files=10000 --report=test-results/asset-space-budget-head
       - name: Plan exact global blob dedup
         run: node scripts/asset-global-dedup.mjs --input=test-results/asset-space-budget-head/report.json --report=test-results/asset-global-dedup/report.json
+      - name: Search exact reversible structural representations
+        run: node scripts/exact-reconstruction-lab.mjs --input=assets --max-files=80 --report=test-results/exact-reconstruction/report.json
       - name: Measure head first-playable footprint
         run: node scripts/boot-footprint.mjs --root=. --report=test-results/boot-footprint-head/report.json
       - name: Materialize base worktree and measurements
@@ -67,6 +71,9 @@ jobs:
           if [ -f test-results/asset-global-dedup/report.json ]; then
             node -e "const r=require('./test-results/asset-global-dedup/report.json'); const t=r.totals; require('fs').appendFileSync(process.env.GITHUB_STEP_SUMMARY, '\n## Global dedup\nLogical stored bytes: '+t.logicalStoredBytes+'\n\nSafe byte-exact saving opportunity: '+t.byteExactSavingBytes+'\n\nRGBA convergence candidate saving: '+t.rgbaConvergenceCandidateBytes+'\n')"
           fi
+          if [ -f test-results/exact-reconstruction/report.json ]; then
+            node -e "const r=require('./test-results/exact-reconstruction/report.json'); require('fs').appendFileSync(process.env.GITHUB_STEP_SUMMARY, '\n## Exact reconstruction lab\nScanned files: '+r.fileCount+'\n\nStructural opportunities: '+r.opportunityCount+'\n\nRaw-RGBA structural saving opportunity: '+r.theoreticalRawSavingBytes+' bytes\n')"
+          fi
           if [ -f test-results/boot-footprint-ratchet/report.json ]; then
             node -e "const r=require('./test-results/boot-footprint-ratchet/report.json'); const s=r.summary; require('fs').appendFileSync(process.env.GITHUB_STEP_SUMMARY, '\n## First-playable footprint\nPass: '+r.pass+'\n\nExternal bytes: '+s.baseExternalBytes+' -> '+s.headExternalBytes+' ('+s.externalDeltaBytes+')\n\nCritical resources: '+s.baseResourceCount+' -> '+s.headResourceCount+'\n\nPer-resource bytes saved: '+s.savedBytes+'\n')"
           fi
@@ -78,6 +85,7 @@ jobs:
             test-results/asset-space-budget-head
             test-results/asset-bit-ratchet
             test-results/asset-global-dedup
+            test-results/exact-reconstruction
             test-results/boot-footprint-head
             test-results/boot-footprint-ratchet
           if-no-files-found: ignore
