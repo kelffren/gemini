@@ -1,8 +1,8 @@
 /* KELO-INDEX
  * area: TEST / GUARDIAN / PVP TAKEOVER LIVE
  * owner: Playwright validation only
- * keys: GUARDIAN PVP TAKEOVER TWO DEVICE WEBRTC MASTER EPOCH WORKER IPHONE LIVE
- * purpose: valida contra Pages+Supabase reales que un segundo dispositivo autorizado puede tomar la lease y continuar una sala PvP temporal tras caída dura del Master
+ * keys: GUARDIAN PVP TAKEOVER TWO DEVICE WEBRTC MASTER EPOCH LEASE FENCING WORKER IPHONE LIVE
+ * purpose: valida contra Pages+Supabase reales que un segundo dispositivo de la misma cuenta queda cercado por la lease viva y solo toma el Master tras su expiración, preservando una sala PvP temporal
  * online: usa login real, Guardian RPC real y DataChannel WebRTC real; bloquea solo el WebSocket PvP central para probar deliberadamente el fallback Guardian
  * do-not: NO service role, NO imprimir secretos, NO mutar economía/inventario, NO mockear Guardian dentro del runtime
  */
@@ -131,14 +131,14 @@ async function bestEffortCleanup(device){
   }).catch(()=>{});
 }
 
-test('LIVE two-device Guardian PvP: Master A hard-fails and B resumes same room',async({browser})=>{
+test('LIVE two-device Guardian PvP: Master A hard-fails and B resumes same room only after lease expiry',async({browser})=>{
   test.setTimeout(180000);
   expect(ADMIN_EMAIL,'KELO_GUARDIAN_TEST_ADMIN_EMAIL secret').not.toBe('');
   expect(ADMIN_PASSWORD,'KELO_GUARDIAN_TEST_ADMIN_PASSWORD secret').not.toBe('');
   fs.mkdirSync(path.dirname(METRICS_PATH),{recursive:true});
 
   let a=null,b=null;
-  const metrics={version:1,room:ROOM,liveBase:LIVE_BASE,startedAt:new Date().toISOString(),sameAuthorizedAccount:true,centralWebSocketForcedOffline:true};
+  const metrics={version:2,room:ROOM,liveBase:LIVE_BASE,startedAt:new Date().toISOString(),sameAuthorizedAccount:true,nodeScopedFencing:true,centralWebSocketForcedOffline:true};
   try{
     [a,b]=await Promise.all([makeDevice(browser,'master-a'),makeDevice(browser,'candidate-b')]);
     metrics.published={a:a.published,b:b.published};
@@ -186,34 +186,57 @@ test('LIVE two-device Guardian PvP: Master A hard-fails and B resumes same room'
     const localBefore=before?.players?.[actorId];
     expect(localBefore,'B must exist in authoritative snapshot before takeover').toBeTruthy();
     expect(Number(before.epoch)).toBe(oldEpoch);
+
+    // Renew A immediately before the hard failure. This guarantees the test
+    // exercises node fencing instead of accidentally racing an almost-expired lease.
+    await a.page.evaluate(()=>window.KeloGuardian.heartbeat());
+    await b.page.evaluate(()=>window.KeloGuardian.heartbeat());
     const guardianBefore=await guardianState(b);
     const leaseExpiresAt=Number(guardianBefore.master?.expiresAt||0);
-    const leaseRemainingMs=leaseExpiresAt>Date.now()?leaseExpiresAt-Date.now():25000;
+    const leaseRemainingMs=leaseExpiresAt>Date.now()?leaseExpiresAt-Date.now():0;
+    expect(leaseRemainingMs,'Master A lease should still be live before hard failure').toBeGreaterThan(5000);
     // Gate must recover no later than one server lease window plus transport margin.
-    const maxOutageMs=Math.max(12000,Math.min(30000,leaseRemainingMs+5000));
+    const maxOutageMs=Math.max(12000,Math.min(32000,leaseRemainingMs+6000));
     metrics.before={
       actorId,epoch:before.epoch,serverTick:before.serverTick,seq:before.seq,
       player:{x:localBefore.x,y:localBefore.y,hp:localBefore.hp,mana:localBefore.mana,ackSequence:localBefore.ackSequence},
       projectiles:Array.isArray(before.projectiles)?before.projectiles.length:0,
-      leaseExpiresAt,maxOutageMs
+      leaseExpiresAt,leaseRemainingMs,maxOutageMs
     };
 
     const failureAt=Date.now();
-    // Hard failure: do not run page beforeunload cleanup. Heartbeat and Worker die with A.
+    // Hard failure: do not run Guardian stop/deactivate. Heartbeat and Worker die with A.
     await a.page.close({runBeforeUnload:false});
 
-    let promotionError=null,newMaster=null;
+    // Critical fencing assertion: B is the same authorized account but a different
+    // node. It MUST be rejected while A's lease is still valid.
+    let firstClaimError=null,preExpiryBlocked=false;
+    try{await startMaster(b);}catch(error){firstClaimError=String(error?.message||error);preExpiryBlocked=firstClaimError.includes('GUARDIAN_MASTER_BUSY');}
+    expect(preExpiryBlocked,`B must be fenced while A lease is live; got: ${firstClaimError||'claim unexpectedly succeeded'}`).toBe(true);
+    const stillOldMaster=await guardianState(b);
+    expect(stillOldMaster.masterActive).toBe(false);
+    expect(stillOldMaster.master?.nodeId).toBe(masterA.nodeId);
+    expect(Number(stillOldMaster.master?.epoch||0)).toBe(oldEpoch);
+
+    let promotionError=firstClaimError,newMaster=null,busyRejects=preExpiryBlocked?1:0,masterAcquiredAt=0;
     const promotionDeadline=failureAt+maxOutageMs;
     while(Date.now()<promotionDeadline){
       try{
         newMaster=await startMaster(b);
-        if(newMaster.masterActive&&Number(newMaster.master?.epoch||0)>oldEpoch)break;
-      }catch(error){promotionError=String(error?.message||error);}
-      await b.page.waitForTimeout(750);
+        if(newMaster.masterActive&&Number(newMaster.master?.epoch||0)>oldEpoch){masterAcquiredAt=Date.now();break;}
+      }catch(error){
+        promotionError=String(error?.message||error);
+        if(promotionError.includes('GUARDIAN_MASTER_BUSY'))busyRejects++;
+      }
+      await b.page.waitForTimeout(500);
     }
     expect(newMaster?.masterActive,`B promotion failed: ${promotionError||'no master'}`).toBe(true);
     const newEpoch=Number(newMaster.master?.epoch||0);
     expect(newEpoch).toBeGreaterThan(oldEpoch);
+    const leaseWaitMs=masterAcquiredAt-failureAt;
+    expect(busyRejects).toBeGreaterThan(0);
+    expect(leaseWaitMs).toBeGreaterThanOrEqual(Math.max(0,leaseRemainingMs-2500));
+    metrics.fencing={preExpiryBlocked,busyRejects,firstClaimError:firstClaimError?firstClaimError.slice(0,160):null,leaseWaitMs};
 
     await b.page.waitForFunction(({epoch,tick})=>{
       const h=window.KeloGuardianPvPHost?.state?.(),s=window.KeloGuardianPvPHost?.latestSnapshot?.();
@@ -250,7 +273,7 @@ test('LIVE two-device Guardian PvP: Master A hard-fails and B resumes same room'
     expect(outageMs).toBeLessThanOrEqual(maxOutageMs);
 
     metrics.after={
-      newEpoch,outageMs,serverTick:finalSnapshot.serverTick,seq:finalSnapshot.seq,
+      newEpoch,outageMs,leaseWaitMs,serverTick:finalSnapshot.serverTick,seq:finalSnapshot.seq,
       positionDrift,hpDrift,manaDrift,
       projectilesAfterTakeover:Array.isArray(after.projectiles)?after.projectiles.length:0,
       ackBeforeResume,ackAfterResume:Number(finalSnapshot.players?.[actorId]?.ackSequence)||0,
