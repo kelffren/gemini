@@ -1,10 +1,10 @@
 /* KELO-INDEX
  * area: CREATORS / EXTERNAL CONTENT / OPENVERSE
  * owner: Kelo Universal Content Bridge
- * keys: OPENVERSE IMAGE AUDIO CC0 PDM CC-BY LAZY DISCOVERY ATTRIBUTION
+ * keys: OPENVERSE IMAGE AUDIO CC0 PDM CC-BY LAZY DISCOVERY ATTRIBUTION PAGING
  * purpose: expose a tiny search window into Openverse's huge open-media catalog without bulk ingesting or trusting third-party license metadata as a local publication
  */
-import {fetchProviderJson,mobilePageBudget,clearExternalProviderRuntimeCache} from './external-provider-runtime.mjs?v=1';
+import {fetchProviderJson,mobilePageWindow,clearExternalProviderRuntimeCache} from './external-provider-runtime.mjs?v=3';
 
 const API='https://api.openverse.org/v1';
 function clean(value){return String(value??'').trim();}
@@ -13,7 +13,7 @@ function normalize(row,index,media){const id=clean(row?.id||row?.identifier||`${
 
 export async function searchOpenverseAssets(query='',options={}){
   const q=clean(query),media=options.media==='audio'?'audio':'images';if(!q)return{assets:[],offset:0,limit:0,total:0,hasMore:false,requiresQuery:true,engine:`openverse-${media}-v1`};
-  const requested=Math.max(1,Number(options.limit)||20),limit=mobilePageBudget(requested,{heavy:false}),offset=Math.max(0,Number(options.offset)||0),page=Math.floor(offset/limit)+1,params=new URLSearchParams({q,page:String(page),page_size:String(limit),license:'cc0,pdm,by'}),providerId=`openverse-${media}`,data=await fetchProviderJson(providerId,`${API}/${media}/?${params.toString()}`,{ttlMs:8*60*1000,maxBytes:900_000,cacheKey:`${providerId}:${params.toString()}`}),rows=Array.isArray(data?.results)?data.results:[],assets=rows.map((row,index)=>normalize(row,index,media)),total=Number(data?.result_count||data?.total||0)||null,pageCount=Number(data?.page_count||0)||0;
-  return{assets,offset,limit,total,hasMore:pageCount?page<pageCount:rows.length>=limit,engine:`openverse-${media}-v1`};
+  const requested=Math.max(1,Number(options.limit)||20),window=mobilePageWindow(requested,options.offset,{heavy:false}),limit=window.limit,page=window.page,params=new URLSearchParams({q,page:String(page),page_size:String(limit),license:'cc0,pdm,by'}),providerId=`openverse-${media}`,data=await fetchProviderJson(providerId,`${API}/${media}/?${params.toString()}`,{ttlMs:8*60*1000,maxBytes:900_000,cacheKey:`${providerId}:${params.toString()}`}),rows=Array.isArray(data?.results)?data.results:[],assets=rows.map((row,index)=>normalize(row,index,media)),total=Number(data?.result_count||data?.total||0)||null,pageCount=Number(data?.page_count||0)||0;
+  return{assets,offset:window.sourceOffset,limit,total,hasMore:pageCount?page<pageCount:total?window.offset+rows.length<total:rows.length>=limit,engine:`openverse-${media}-v1`};
 }
 export function clearOpenverseCache(){clearExternalProviderRuntimeCache('openverse-');}
