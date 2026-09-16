@@ -1,0 +1,15 @@
+{
+  "schema": "kelo-asset-space-budgets-v1",
+  "notes": "Build-time guardrails only. Membership is explicit by path/prefix and does not claim exact runtime network loading.",
+  "groups": [
+    {
+      "id": "plaza-authoring-library",
+      "description": "Forest Plaza atlas source library; protects mobile-oriented asset growth while runtime delivery remains a separate contract.",
+      "prefixes": ["assets/world/plaza/"],
+      "maxFileCount": 2,
+      "maxStoredBytes": 7000000,
+      "maxDecodedRgbaBytes": 20000000,
+      "maxLargestAssetBytes": 4000000
+    }
+  ]
+}
