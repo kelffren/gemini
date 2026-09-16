@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: TEST / GUARDIAN / PVP TAKEOVER LIVE
  * owner: Playwright validation only
- * keys: GUARDIAN PVP TAKEOVER TWO DEVICE WEBRTC MASTER EPOCH LEASE FENCING WORKER IPHONE LIVE
+ * keys: GUARDIAN PVP TAKEOVER TWO DEVICE WEBRTC MASTER EPOCH LEASE FENCING STANDBY WORKER IPHONE LIVE
  * purpose: valida contra Pages+Supabase reales que un segundo dispositivo de la misma cuenta queda cercado por la lease viva y solo toma el Master tras su expiración, preservando una sala PvP temporal
  * online: usa login real, Guardian RPC real y DataChannel WebRTC real; bloquea solo el WebSocket PvP central para probar deliberadamente el fallback Guardian
  * do-not: NO service role, NO imprimir secretos, NO mutar economía/inventario, NO mockear Guardian dentro del runtime
@@ -43,18 +43,22 @@ async function makeDevice(browser,label){
     await page.goto(liveUrl(attempt,label),{waitUntil:'domcontentloaded',timeout:45000});
     try{
       await page.waitForFunction(()=>window.KeloOnlineAuth&&window.KELO_MODULE_LOADER&&window.KELO_FEATURE_REGISTRY,{timeout:20000});
-      published=await page.evaluate(()=>({
-        auth:window.KeloOnlineAuth?.version||null,
-        loader:window.KELO_MODULE_LOADER?.version||null,
-        registry:window.KELO_FEATURE_REGISTRY?.version||null,
-        features:Array.isArray(window.KELO_MODULE_LOADER?.features)?window.KELO_MODULE_LOADER.features.slice():[]
-      }));
-      if(published.features.includes('pvp')&&String(published.registry||'').includes('guardian-pvp-worker'))break;
+      published=await page.evaluate(()=>{
+        const guardianFiles=window.KELO_FEATURE_REGISTRY?.get?.('guardian')?.files||[];
+        return{
+          auth:window.KeloOnlineAuth?.version||null,
+          loader:window.KELO_MODULE_LOADER?.version||null,
+          registry:window.KELO_FEATURE_REGISTRY?.version||null,
+          features:Array.isArray(window.KELO_MODULE_LOADER?.features)?window.KELO_MODULE_LOADER.features.slice():[],
+          guardianStandby:guardianFiles.some(item=>String(item?.src||'').includes('guardian-system.js?v=4-server-standby'))&&guardianFiles.some(item=>String(item?.src||'').includes('guardian-hot-mirror.js?v=2-server-standby'))
+        };
+      });
+      if(published.features.includes('pvp')&&published.guardianStandby===true)break;
     }catch(_){/* Pages may still be converging to the latest main build. */}
     await page.waitForTimeout(4000);
   }
-  if(!published?.features?.includes('pvp')||!String(published.registry||'').includes('guardian-pvp-worker')){
-    throw new Error(`GUARDIAN_PVP_WORKER_NOT_PUBLISHED:${label}:${JSON.stringify(published)}`);
+  if(!published?.features?.includes('pvp')||published?.guardianStandby!==true){
+    throw new Error(`GUARDIAN_STANDBY_RUNTIME_NOT_PUBLISHED:${label}:${JSON.stringify(published)}`);
   }
   return{label,context,page,errors,published};
 }
@@ -78,6 +82,7 @@ async function loadGuardianPvp(device){
       ready:window.KELO_MODULE_LOADER.isReady('pvp'),
       host:window.KeloGuardianPvPHost?.version||null,
       guardian:window.KeloGuardian?.version||null,
+      standbyAudit:window.KELO_GUARDIAN_AUDIT?.serverSelectedStandby===true,
       adapter:window.KeloGuardianPvPNetAdapter?.version||null,
       workerAudit:window.KELO_GUARDIAN_PVP_HOST_AUDIT||null,
       failures:window.KELO_MODULE_LOADER.diagnostics().failures
@@ -85,6 +90,7 @@ async function loadGuardianPvp(device){
   });
   expect(result.ok).toBe(true);
   expect(result.ready).toBe(true);
+  expect(result.standbyAudit).toBe(true);
   expect(result.workerAudit?.isolatedWorker).toBe(true);
   expect(result.failures).toEqual({});
   return result;
@@ -138,7 +144,7 @@ test('LIVE two-device Guardian PvP: Master A hard-fails and B resumes same room 
   fs.mkdirSync(path.dirname(METRICS_PATH),{recursive:true});
 
   let a=null,b=null;
-  const metrics={version:2,room:ROOM,liveBase:LIVE_BASE,startedAt:new Date().toISOString(),sameAuthorizedAccount:true,nodeScopedFencing:true,centralWebSocketForcedOffline:true};
+  const metrics={version:3,room:ROOM,liveBase:LIVE_BASE,startedAt:new Date().toISOString(),sameAuthorizedAccount:true,nodeScopedFencing:true,serverSelectedStandbyRuntime:true,centralWebSocketForcedOffline:true};
   try{
     [a,b]=await Promise.all([makeDevice(browser,'master-a'),makeDevice(browser,'candidate-b')]);
     metrics.published={a:a.published,b:b.published};
@@ -201,7 +207,9 @@ test('LIVE two-device Guardian PvP: Master A hard-fails and B resumes same room 
       actorId,epoch:before.epoch,serverTick:before.serverTick,seq:before.seq,
       player:{x:localBefore.x,y:localBefore.y,hp:localBefore.hp,mana:localBefore.mana,ackSequence:localBefore.ackSequence},
       projectiles:Array.isArray(before.projectiles)?before.projectiles.length:0,
-      leaseExpiresAt,leaseRemainingMs,maxOutageMs
+      leaseExpiresAt,leaseRemainingMs,maxOutageMs,
+      standbyAssigned:guardianBefore.standbyAssigned===true,
+      standbyAssignmentEpoch:Number(guardianBefore.standby?.assignmentEpoch)||0
     };
 
     const failureAt=Date.now();
