@@ -1,28 +1,28 @@
 /* KELO-INDEX
  * area: ENVIRONMENT / PROPS
  * owner: KELO_GENERIC_PROPS; image lifecycle=KELO_ATLAS_CONTRACT; camera=KeloCamera
- * keys: PROP RENDER ATLAS VIEWPORT RESIDENCY
- * purpose: render props; acquire only atlases near camera, zero prefetch before boot-ready
- * do-not: NO new Image, eager-all preload, parallel loader
+ * keys: PROP RENDER ATLAS VIEWPORT RESIDENCY EDITOR PROBE FILTER
+ * purpose: render runtime props; exclude editor probes; acquire only atlases near camera, zero prefetch before boot-ready
+ * do-not: NO new Image, eager-all preload, parallel loader, editor probes in LIVE residency
  */
 (function(){
 'use strict';
 const C=window.KELO_PROP_CONTRACT,L=window.KELO_ENVIRONMENT_LAYERS,A=window.KELO_ATLAS_CONTRACT,K=window.KELO_COLLISION,CAM=window.KeloCamera;
 if(!C||!L?.register||!A?.acquire||!A?.register){console.error('[Kelo generic props] contract missing');return;}
-const images=new Map(),ready=new Set(),held=new Set(),loading=new Map(),wanted=new Set(),groups=Object.entries(C.layerGroups||{}),stacked=groups.filter(([,g])=>g.renderMode!=='immediate'),sources=Object.values(C.sources||{}),entries=Object.entries(C.assets||{}).filter(([,a])=>a?.src),entryMap=new Map(entries),OWNER='environment:generic-props';
+const liveProp=p=>p&&!/^map-editor-probe-/i.test(String(p.id||'')),images=new Map(),ready=new Set(),held=new Set(),loading=new Map(),wanted=new Set(),groups=Object.entries(C.layerGroups||{}),stacked=groups.filter(([,g])=>g.renderMode!=='immediate'),sources=Object.values(C.sources||{}),entries=Object.entries(C.assets||{}).filter(([,a])=>a?.src),entryMap=new Map(entries),OWNER='environment:generic-props';
 let failed=false,lastKey='',acquires=0,releases=0;
-const audit=window.KELO_GENERIC_PROP_AUDIT={version:'generic-props-v2.1-weightless',ready:false,failed:false,propCount:C.props.length,assetCount:entries.length,rendererMode:'data-driven-props-v7',resourceMode:'atlas-contract-viewport-v2',collisionOwner:OWNER,dynamicPropCount:0,initialWantedAssetCount:0,wantedAssetCount:0,residentAssetCount:0,acquireCount:0,releaseCount:0,wantedAssets:[]};
+const audit=window.KELO_GENERIC_PROP_AUDIT={version:'generic-props-v2.2-weightless',ready:false,failed:false,propCount:C.props.filter(liveProp).length,assetCount:entries.length,rendererMode:'data-driven-props-v7',resourceMode:'atlas-contract-viewport-v2',collisionOwner:OWNER,dynamicPropCount:0,initialWantedAssetCount:0,wantedAssetCount:0,residentAssetCount:0,acquireCount:0,releaseCount:0,wantedAssets:[]};
 function frame(a,f){if(a?.frames&&typeof f==='string'&&a.frames[f]){const r=a.frames[f];return{x:+r.x||0,y:+r.y||0,w:+r.w||0,h:+r.h||0};}const i=+f||0,c=a.columns||1;return{x:i%c*a.frameWidth,y:Math.floor(i/c)*a.frameHeight,w:a.frameWidth,h:a.frameHeight};}
 function drawProp(g,p){const a=C.assets[p.asset],img=images.get(p.asset);if(!a||!img||!ready.has(p.asset))return false;const s=frame(a,p.frame??0);if(!(s.w>0&&s.h>0))return false;g.drawImage(img,s.x,s.y,s.w,s.h,p.position.x,p.position.y,p.size.w,p.size.h);return true;}
-function drawInstances(g,props,track,reset=false){if(failed||!g||!Array.isArray(props)||(window.KELO_WORLD_DECORATION_RESET===true&&!reset))return 0;let n=0;g.save();g.imageSmoothingEnabled=false;for(const p of props)if(p&&drawProp(g,p))n++;g.restore();return n;}
+function drawInstances(g,props,track,reset=false){if(failed||!g||!Array.isArray(props)||(window.KELO_WORLD_DECORATION_RESET===true&&!reset))return 0;let n=0;g.save();g.imageSmoothingEnabled=false;for(const p of props)if(liveProp(p)&&drawProp(g,p))n++;g.restore();return n;}
 function actors(){const out=[],reset=window.KELO_WORLD_DECORATION_RESET===true,pvp=typeof isPvPActive!=='undefined'&&isPvPActive&&typeof arenaPvP!=='undefined'&&arenaPvP?.rival;if(pvp)out.push(arenaPvP.rival);else if(!reset&&typeof simulatedPlayers!=='undefined'&&Array.isArray(simulatedPlayers))out.push(...simulatedPlayers);if(typeof localPlayer!=='undefined'&&localPlayer)out.push(localPlayer);return out;}
 function overlaps(a,b){const r=a?.radius||20;return a&&b&&a.x+r>b.x&&a.x-r<b.x+b.w&&a.y+r>b.y&&a.y-r<b.y+b.h;}
-function sourceProps(key){const out=[];for(const s of sources){if(s?.layerGroup!==key||typeof s.instances!=='function')continue;const x=s.instances();if(Array.isArray(x))out.push(...x);}return out;}
-function props(key){return C.props.filter(p=>p.layerGroup===key).concat(sourceProps(key));}
+function sourceProps(key){const out=[];for(const s of sources){if(s?.layerGroup!==key||typeof s.instances!=='function')continue;const x=s.instances();if(Array.isArray(x))out.push(...x.filter(liveProp));}return out;}
+function props(key){return C.props.filter(p=>liveProp(p)&&p.layerGroup===key).concat(sourceProps(key));}
 function role(key,r){const x=props(key);return r==='back'?x.filter(p=>p.layerRole!=='front'):r==='front'?x.filter(p=>p.layerRole==='front'||(p.occlusion?.mode&&p.occlusion.mode!=='none')):x;}
 function view(m=0){try{const v=CAM?.worldView?.();return v?.w>0&&v?.h>0?{x:v.left-m,y:v.top-m,w:v.w+2*m,h:v.h+2*m}:null;}catch{return null;}}
 function hit(a,b){return a&&b&&a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;}
-function allProps(){const out=[...C.props];for(const [key] of groups)out.push(...sourceProps(key));return out;}
+function allProps(){const out=C.props.filter(liveProp);for(const [key] of groups)out.push(...sourceProps(key));return out;}
 function auditResidency(){audit.wantedAssetCount=wanted.size;audit.residentAssetCount=ready.size;audit.acquireCount=acquires;audit.releaseCount=releases;audit.wantedAssets=[...wanted];}
 function release(id){if(!held.has(id)||loading.has(id))return;images.delete(id);ready.delete(id);held.delete(id);A.release(id);releases++;}
 function acquire(id){if(ready.has(id)||loading.has(id))return loading.get(id)||Promise.resolve(images.get(id));const a=entryMap.get(id);if(!a)return Promise.resolve();held.add(id);acquires++;const p=A.acquire(id).then(img=>{loading.delete(id);if(!wanted.has(id)){held.delete(id);A.release(id);releases++;return img;}images.set(id,img);ready.add(id);auditResidency();return img;}).catch(e=>{loading.delete(id);held.delete(id);audit.failed=true;console.error('[Kelo generic props] asset',id,e);});loading.set(id,p);return p;}
@@ -30,7 +30,7 @@ function sync(force=false,margin=window.__keloBootReady===true?128:0){const v=vi
 function drawBack(key,g){const reset=C.layerGroups?.[key]?.visibleDuringReset===true;if(failed||(window.KELO_WORLD_DECORATION_RESET===true&&!reset))return;sync();drawInstances(g,role(key,'back'),false,reset);}
 function drawFront(key,g){const reset=C.layerGroups?.[key]?.visibleDuringReset===true;if(failed||(window.KELO_WORLD_DECORATION_RESET===true&&!reset))return;sync();const ps=props(key),as=actors();let n=0;g.save();g.imageSmoothingEnabled=false;for(const p of ps)if(p.layerRole==='front'&&drawProp(g,p))n++;for(const p of ps){if(p.occlusion?.mode==='actor-base-y-clip-v1'){for(const a of as){if(!overlaps(a,p.visualBounds)||a.y>=p.occlusion.baseY)continue;const pad=p.occlusion.clipPadding||8,r=Math.max(22,(a.radius||20)+pad);g.save();g.beginPath();g.rect(a.x-r,a.y-r*1.8,r*2,r*2.5);g.clip();if(drawProp(g,p))n++;g.restore();}}else if(p.occlusion?.mode==='actor-base-y-redraw-v1'&&typeof renderAvatar==='function'){const b=p.occlusion.bounds||p.visualBounds;for(const a of as){if(!overlaps(a,b)||a.y<=p.occlusion.baseY)continue;renderAvatar(a,typeof localPlayer!=='undefined'&&a===localPlayer);}}}g.restore();}
 function bounds(key,r){return()=>window.KELO_WORLD_DECORATION_RESET===true&&C.layerGroups?.[key]?.visibleDuringReset!==true?[]:role(key,r).map(p=>({id:p.id,...p.visualBounds}));}
-function colliders(){if(!K?.replaceOwner)return;if(window.KELO_WORLD_DECORATION_RESET===true){K.clearOwner(OWNER);return;}K.replaceOwner(OWNER,C.props.filter(p=>p?.collider?.mode==='rect').map(p=>({id:p.id,x:p.collider.x,y:p.collider.y,w:p.collider.w,h:p.collider.h,noDraw:p.collider.noDraw!==false,_genericPropCollision:true})));}
+function colliders(){if(!K?.replaceOwner)return;if(window.KELO_WORLD_DECORATION_RESET===true){K.clearOwner(OWNER);return;}K.replaceOwner(OWNER,C.props.filter(p=>liveProp(p)&&p?.collider?.mode==='rect').map(p=>({id:p.id,x:p.collider.x,y:p.collider.y,w:p.collider.w,h:p.collider.h,noDraw:p.collider.noDraw!==false,_genericPropCollision:true})));}
 for(const [id,a] of entries)if(!A.describe(id))A.register(id,a,{role:'optional'});
 try{for(const [key,g] of stacked){if(g.back)L.register({id:`${g.id}-back`,phase:g.back.phase,priority:g.priority,required:true,ready:()=>audit.ready,draw:x=>drawBack(key,x),ownership:g.ownership,visibleDuringReset:g.visibleDuringReset===true,bounds:bounds(key,'back')});if(g.front)L.register({id:`${g.id}-front`,phase:g.front.phase,priority:g.priority,required:true,ready:()=>audit.ready,draw:x=>drawFront(key,x),ownership:g.ownership,visibleDuringReset:g.visibleDuringReset===true,bounds:bounds(key,'front')});}}catch(e){failed=true;audit.failed=true;console.error('[Kelo generic props] layers',e);return;}
 colliders();
