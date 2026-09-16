@@ -54,7 +54,7 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           git worktree add --detach /tmp/kelo-world-base "$BASE_SHA"
-          node scripts/asset-space-budget.mjs --input=/tmp/kelo-world-base/assets --max-files=10000 --report=/tmp/asset-space-budget-base
+          node scripts/asset-space-budget.mjs --input=/tmp/kelo-world-base/assets --display-root=/tmp/kelo-world-base --max-files=10000 --report=/tmp/asset-space-budget-base
           node scripts/boot-footprint.mjs --root=/tmp/kelo-world-base --report=/tmp/boot-footprint-base.json
       - name: Enforce monotonic bytes for unchanged RGBA information
         run: node scripts/asset-bit-ratchet.mjs --base=/tmp/asset-space-budget-base/report.json --head=test-results/asset-space-budget-head/report.json --report=test-results/asset-bit-ratchet/report.json
