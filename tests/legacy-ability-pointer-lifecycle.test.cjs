@@ -9,6 +9,7 @@ const assert=require('node:assert/strict');
 const legacy=fs.readFileSync('engine-g.js','utf8');
 const owner=fs.readFileSync('src/core/legacy-ability-aim-system.js','utf8');
 const modern=fs.readFileSync('src/abilities/kelo-ability-boot.js','utf8');
+const aimPublic=owner.slice(owner.indexOf('root.KeloAbilityAim=Object.freeze'),owner.indexOf('})(typeof globalThis'));
 
 for(const eventName of ['pointermove','pointerup','pointercancel']){
   assert.ok(!legacy.includes(`window.addEventListener('${eventName}'`),`engine-g must not own global ${eventName}`);
@@ -33,8 +34,10 @@ assert.ok(owner.includes('registerMiddleware:registerCastMiddleware'),'legacy ca
 assert.ok(owner.includes('root.castAimedSkill=dispatchCast'),'legacy global cast compatibility must point to the single dispatcher');
 assert.ok(owner.includes("const lifecycleKey='__KELO_ABILITY_AIM_POINTER_LIFECYCLE__'"),'pointer lifecycle singleton key missing');
 assert.ok(owner.includes("version:'kelo-ability-pointer-lifecycle-v1.1.0'"),'pointer lifecycle version missing');
-assert.ok(owner.includes("const VERSION='kelo-ability-aim-v1.4.0-cast-owner-split'"),'ability aim split-owner version missing');
-assert.ok(owner.includes('registerCastMiddleware,'),'KeloAbilityAim must retain the temporary cast registration compatibility adapter');
+assert.ok(owner.includes("const VERSION='kelo-ability-aim-v1.4.1-cast-adapter-retired'"),'ability aim adapter-retired version missing');
+assert.ok(!aimPublic.includes('registerCastMiddleware,'),'KeloAbilityAim cast registration adapter must remain retired');
+assert.ok(owner.includes('aimAdapterTemporary:false'),'cast audit must record retired temporary adapter');
+assert.ok(owner.includes('aimAdapterRetired:true'),'cast audit retirement flag missing');
 assert.ok(owner.includes('previousLifecycle.detach()'),'hot reload/re-evaluation must detach the previous lifecycle before attaching another');
 
-console.log('LEGACY ABILITY POINTER LIFECYCLE PASS');
+console.log('LEGACY ABILITY POINTER LIFECYCLE PASS aimAdapter=retired');
