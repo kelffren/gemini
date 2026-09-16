@@ -116,9 +116,9 @@ export const DEFINITION_SPECS=Object.freeze({
   ENVIRONMENT:Object.freeze({
     label:'Environment',icon:'☼',category:'content',subtitle:'Tune biome mood, weather, time and ambient density.',
     fields:Object.freeze([
-      field('biome','Biome','select',{default:'plaza',options:[option('plaza','Plaza',['city']),option('forest','Forest',['bosque']),option('swamp','Swamp',['pantano']),option('desert','Desert',['desierto']),option('snow','Snow',['nieve']),option('coast','Coast',['costa'])]}),
-      field('weather','Weather','select',{default:'clear',options:[option('clear','Clear',['despejado']),option('rain','Rain',['lluvia']),option('fog','Fog',['niebla']),option('storm','Storm',['tormenta']),option('snow','Snow',['nieve'])]}),
-      field('timeOfDay','Time of day','select',{default:'day',options:[option('dawn','Dawn',['amanecer']),option('day','Day',['dia']),option('sunset','Sunset',['atardecer']),option('night','Night',['noche'])]}),
+      field('biome','Biome','select',{default:'plaza',options:[option('plaza','Plaza',['city','urbano','urban plaza']),option('forest','Forest',['bosque','woods','jungle','selva']),option('swamp','Swamp',['pantano','marsh','marisma']),option('desert','Desert',['desierto','dunes','dunas']),option('snow','Snow',['nieve','tundra','icy','helado']),option('coast','Coast',['costa','beach','playa','ocean','seaside','mar'])]}),
+      field('weather','Weather','select',{default:'clear',options:[option('clear','Clear',['despejado','sunny','soleado','clear sky','cielo despejado']),option('rain','Rain',['lluvia','rainy','raining','lloviendo']),option('fog','Fog',['niebla','mist','misty','bruma']),option('storm','Storm',['tormenta','thunder','lightning','trueno','relampago']),option('snow','Snow',['nieve','snowing','nevando'])]}),
+      field('timeOfDay','Time of day','select',{default:'day',options:[option('dawn','Dawn',['amanecer','sunrise','madrugada']),option('day','Day',['dia','daytime','mediodia']),option('sunset','Sunset',['atardecer','dusk','ocaso','golden hour','hora dorada']),option('night','Night',['noche','nighttime','midnight','medianoche','nocturno','nocturna'])]}),
       field('ambientDensity','Ambient density','number',{default:50,min:0,max:100,step:1,unit:'%',patterns:['density','densidad','ambient']}),
       field('musicMood','Music mood','text',{default:'calm',placeholder:'calm / tense / magical / urban…'}),
       field('notes','Visual direction','textarea',{default:'',placeholder:'Landmarks, palette, movement, atmosphere…'})
@@ -163,20 +163,70 @@ export function createDefinitionDraft(type,input={}){
   });
 }
 
+function escapeRegex(value){return String(value||'').replace(/[.*+?^${}()|[\]\\]/g,'\\$&');}
+function normalizedWords(value){return slug(value).replace(/[^a-z0-9%]+/g,' ').replace(/\s+/g,' ').trim();}
+function hasPhrase(text,phrase){
+  const hay=normalizedWords(text),needle=normalizedWords(phrase);if(!hay||!needle)return false;
+  return ` ${hay} `.includes(` ${needle} `);
+}
+function isNegatedPhrase(text,phrase){
+  const hay=normalizedWords(text),needle=normalizedWords(phrase);if(!hay||!needle)return false;
+  const p=escapeRegex(needle).replace(/\\ /g,'\\s+');
+  return new RegExp(`(?:^|\\s)(?:no|sin|not|without|avoid|evita|evitar)(?:\\s+(?:very|muy|mucho|mucha|many|any|mas|more|heavy|dense|denso|densa|thick|strong|fuerte))?\\s+${p}(?=\\s|$)`,'i').test(hay);
+}
+function positivePhrase(text,phrase){return hasPhrase(text,phrase)&&!isNegatedPhrase(text,phrase);}
+function bestOptionValue(fieldSpec,text){
+  let best=null,bestLen=-1;
+  for(const o of fieldSpec.options||[])for(const kw of o.keywords||[]){if(positivePhrase(text,kw)&&normalizedWords(kw).length>bestLen){best=o.value;bestLen=normalizedWords(kw).length;}}
+  return best;
+}
 function extractNumber(text,patterns=[]){
   for(const raw of patterns){const p=slug(raw).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');const a=new RegExp(`${p}\\s*(?:de|of|=|:)?\\s*(\\d+(?:[.,]\\d+)?)`,'i').exec(text),b=new RegExp(`(\\d+(?:[.,]\\d+)?)\\s*(?:${p})`,'i').exec(text),m=a||b;if(m)return Number(String(m[1]).replace(',','.'));}
   return null;
 }
 function extractQuotedName(prompt){const m=/(?:called|named|nombre|llamad[oa])\s*["“']([^"”']{2,80})["”']/i.exec(prompt)||/["“']([^"”']{2,80})["”']/.exec(prompt);return m?.[1]?.trim()||'';}
+function extractExplicitNotes(raw){const m=/(?:notes?|visual(?: direction)?|direccion visual|notas?)\s*[:=-]\s*([^\n]{2,220})/i.exec(raw);return m?.[1]?.trim()||'';}
+function applyEnvironmentIntent(raw,text,next){
+  const densityExplicit=extractNumber(text,['density','densidad','ambient']);
+  if(densityExplicit==null){
+    if(['ultra dense','very dense','muy denso','muy densa','thick atmosphere','heavy atmosphere','super dense'].some(k=>positivePhrase(text,k)))next.fields.ambientDensity=92;
+    else if(['dense','denso','densa','lush','frondoso','frondosa','cargado','cargada'].some(k=>positivePhrase(text,k)))next.fields.ambientDensity=80;
+    else if(['sparse','low density','poca densidad','minimal','limpio','limpia','escaso','escasa'].some(k=>positivePhrase(text,k)))next.fields.ambientDensity=25;
+    else if(['empty','vacio','vacia','almost empty','casi vacio','casi vacia'].some(k=>positivePhrase(text,k)))next.fields.ambientDensity=10;
+  }
+  const moods=[
+    ['magical',['magical','magic','magico','magica','encantado','encantada']],['mysterious',['mysterious','misterioso','misteriosa','mystic','mistico','mistica']],
+    ['tense',['tense','tenso','tensa','suspense']],['dark',['dark mood','dark music','sombrio','sombria']],['epic',['epic','epico','epica']],
+    ['urban',['urban','urbano','urbana','city vibe']],['cozy',['cozy','acogedor','acogedora']],['calm',['calm','peaceful','tranquilo','tranquila','sereno','serena']]
+  ];
+  for(const [value,keywords] of moods){if(keywords.some(k=>positivePhrase(text,k))){next.fields.musicMood=value;break;}}
+  const explicitNotes=extractExplicitNotes(raw);if(explicitNotes){next.fields.notes=explicitNotes;return;}
+  const colors=[
+    ['red',['red','rojo','roja']],['orange',['orange','naranja']],['yellow',['yellow','amarillo','amarilla']],['green',['green','verde']],
+    ['blue',['blue','azul']],['purple',['purple','violet','morado','morada','violeta']],['pink',['pink','rosa']],['white',['white','blanco','blanca']],
+    ['black',['black','negro','negra']],['gold',['gold','golden','dorado','dorada']],['silver',['silver','plateado','plateada']],['teal',['teal','turquesa']]
+  ];
+  const palette=colors.filter(([,keywords])=>keywords.some(k=>positivePhrase(text,k))).map(([name])=>name);
+  const lighting=[
+    ['moonlit',['moonlit','moon light','luz de luna','luz lunar']],['golden',['golden hour','hora dorada','golden light','luz dorada']],
+    ['neon',['neon','neones']],['soft',['soft light','luz suave']],['bright',['bright','luminoso','luminosa','brillante']],
+    ['low-light',['low light','dim light','poca luz','tenue']]
+  ];
+  let light='';for(const [value,keywords] of lighting){if(keywords.some(k=>positivePhrase(text,k))){light=value;break;}}
+  const atmosphere=[];
+  for(const [tag,keywords] of [['cinematic',['cinematic','cinematografico','cinematografica']],['luxury',['luxury','luxurious','lujo','elegante']],['futuristic',['futuristic','futurista','cyberpunk']],['creepy',['creepy','eerie','terror','inquietante']],['dreamy',['dreamy','onirico','onirica']]])if(keywords.some(k=>positivePhrase(text,k)))atmosphere.push(tag);
+  const notes=[];if(palette.length)notes.push(`Palette: ${palette.join(', ')}`);if(light)notes.push(`Lighting: ${light}`);if(atmosphere.length)notes.push(`Atmosphere: ${atmosphere.join(', ')}`);
+  if(notes.length&&(!next.fields.notes||String(next.fields.notes).startsWith('Intent · ')))next.fields.notes=`Intent · ${notes.join(' · ')}`;
+}
 
 export function interpretDefinitionPrompt(type,prompt,current={}){
   const key=String(type||'').toUpperCase(),spec=getDefinitionSpec(key),base=createDefinitionDraft(key,current),raw=String(prompt||'').trim(),text=slug(raw),next={...base,fields:{...base.fields},prompt:raw,promptAppliedAt:Date.now(),updatedAt:Date.now()};
   const quoted=extractQuotedName(raw);if(quoted)next.name=quoted;
   for(const f of spec.fields){
     if(f.type==='select'){
-      let best=null,bestLen=-1;for(const o of f.options||[])for(const kw of o.keywords||[]){if(kw&&text.includes(kw)&&kw.length>bestLen){best=o.value;bestLen=kw.length;}}if(best!=null)next.fields[f.key]=best;
+      const best=bestOptionValue(f,text);if(best!=null)next.fields[f.key]=best;
     }else if(f.type==='toggle'){
-      const positive=(f.positive||[]).map(slug).some(k=>k&&text.includes(k)),negative=(f.negative||[]).map(slug).some(k=>k&&text.includes(k));if(positive&&!negative)next.fields[f.key]=true;else if(negative)next.fields[f.key]=false;
+      const positive=(f.positive||[]).map(slug).some(k=>k&&positivePhrase(text,k)),negative=(f.negative||[]).map(slug).some(k=>k&&hasPhrase(text,k));if(positive&&!negative)next.fields[f.key]=true;else if(negative)next.fields[f.key]=false;
     }else if(f.type==='number'){
       const n=extractNumber(text,[...(f.patterns||[]),f.label,f.key]);if(n!=null&&Number.isFinite(n))next.fields[f.key]=clamp(n,finite(f.min,-Number.MAX_SAFE_INTEGER),finite(f.max,Number.MAX_SAFE_INTEGER));
     }
@@ -191,7 +241,7 @@ export function interpretDefinitionPrompt(type,prompt,current={}){
     const output=/(?:create|creates|produce|produces|crear|crea|produce)\s+([^,;\n]{2,80})/i.exec(raw);if(output)next.fields.output=output[1].trim();
   }else if(key==='DUNGEON'){
     const boss=/(?:boss|jefe)\s*[:=-]?\s*["“']?([^,"”'\n]{2,80})/i.exec(raw);if(boss)next.fields.boss=boss[1].trim();
-  }
+  }else if(key==='ENVIRONMENT')applyEnvironmentIntent(raw,text,next);
   if(raw&&!next.description)next.description=raw.slice(0,240);
   return createDefinitionDraft(key,next);
 }

@@ -20,7 +20,16 @@ d=interpretDefinitionPrompt('ITEM','a legendary weapon, stack 1, value 5000, eff
 assert.equal(d.fields.rarity,'legendary');assert.equal(d.fields.itemType,'weapon');assert.equal(d.fields.stackSize,1);assert.equal(d.fields.value,5000);assert.match(d.fields.effect,/burn/i);
 
 d=interpretDefinitionPrompt('ENVIRONMENT','night forest with fog, ambient density 70, magical music',{name:'Environment'});
-assert.equal(d.fields.biome,'forest');assert.equal(d.fields.weather,'fog');assert.equal(d.fields.timeOfDay,'night');assert.equal(d.fields.ambientDensity,70);
+assert.equal(d.fields.biome,'forest');assert.equal(d.fields.weather,'fog');assert.equal(d.fields.timeOfDay,'night');assert.equal(d.fields.ambientDensity,70);assert.equal(d.fields.musicMood,'magical');
+
+d=interpretDefinitionPrompt('ENVIRONMENT','bosque nocturno con bruma muy densa, luz de luna azul, ambiente mágico',{name:'Environment'});
+assert.equal(d.fields.biome,'forest');assert.equal(d.fields.weather,'fog');assert.equal(d.fields.timeOfDay,'night');assert.equal(d.fields.ambientDensity,92);assert.equal(d.fields.musicMood,'magical');assert.match(d.fields.notes,/blue/i);assert.match(d.fields.notes,/moonlit/i);
+
+d=interpretDefinitionPrompt('ENVIRONMENT','forest at night without fog, density 30, calm',{name:'Environment'});
+assert.equal(d.fields.biome,'forest');assert.equal(d.fields.weather,'clear');assert.equal(d.fields.timeOfDay,'night');assert.equal(d.fields.ambientDensity,30);assert.equal(d.fields.musicMood,'calm');
+
+d=interpretDefinitionPrompt('ENVIRONMENT','playa al atardecer sin lluvia, hora dorada, rosa y dorado',{name:'Environment'});
+assert.equal(d.fields.biome,'coast');assert.equal(d.fields.weather,'clear');assert.equal(d.fields.timeOfDay,'sunset');assert.match(d.fields.notes,/pink/i);assert.match(d.fields.notes,/gold/i);assert.match(d.fields.notes,/golden/i);
 
 d=interpretDefinitionPrompt('AUDIO','ambient loop, volume 65, range 600, trigger enter_zone',{name:'Audio'});
 assert.equal(d.fields.audioType,'ambient');assert.equal(d.fields.loop,true);assert.equal(d.fields.volume,65);assert.equal(d.fields.range,600);
@@ -28,4 +37,4 @@ assert.equal(d.fields.audioType,'ambient');assert.equal(d.fields.loop,true);asse
 const registered=[];const registry={register(manifest){registered.push(manifest);return manifest;}};registerDefinitionWorkspaces(registry);assert.equal(registered.length,11);assert.equal(registered.every(x=>x.availability==='active'),true);assert.equal(registered.every(x=>x.projectTypes.length===1),true);
 let opened=null;const manifest=createDefinitionWorkspaceManifest({id:'npc',type:'NPC',loader:async()=>({openGenericDefinitionCreator:async context=>{opened=context;return{ok:true};}})});const result=await manifest.open({root:{document:{}},projects:{},projectId:'creator-project:test'});assert.deepEqual(result,{ok:true});assert.equal(opened.definitionType,'NPC');assert.equal(opened.projectId,'creator-project:test');
 
-console.log(JSON.stringify({ok:true,workspaces:registered.map(x=>x.id),promptInterpreter:true,defaultsValidate:true,lazyWorkspaceRouting:true},null,2));
+console.log(JSON.stringify({ok:true,workspaces:registered.map(x=>x.id),promptInterpreter:true,promptInterpreterV2:true,negationAware:true,bilingualEnvironmentIntent:true,defaultsValidate:true,lazyWorkspaceRouting:true},null,2));
