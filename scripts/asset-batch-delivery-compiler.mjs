@@ -2,8 +2,8 @@
 /* KELO-INDEX
  * area: BUILD / CREATOR ASSET DELIVERY
  * owner: Kelo Creator Asset Bridge
- * keys: BATCH DELIVERY PNG LOSSLESS SHA256 METADATA REGISTRY CANDIDATE CONTENT CACHE
- * purpose: compile many PNG SOURCE assets into independently verified strict-lossless DELIVERY candidates without runtime activation, reusing only content-addressed deterministic optimizer outputs
+ * keys: BATCH DELIVERY PNG LOSSLESS SHA256 METADATA REGISTRY CANDIDATE CONTENT CACHE ABI
+ * purpose: compile many PNG SOURCE assets into independently verified strict-lossless DELIVERY candidates, reusing outputs only under the shared semantic cache contract
  * public-api: CLI only
  * state-owned: disposable candidate artifacts + reports under --report and disposable optimizer cache under --cache
  * online: N/A; build/publish-time compiler
@@ -14,10 +14,10 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import assert from 'node:assert/strict';
 import {decodePngRgba,optimizePngLossless} from '../src/creators/assets/png-space-optimizer.mjs';
-import {PALETTE_ORDER_FAST} from '../src/creators/assets/png-palette-order.mjs';
 import {profileAssetImage} from '../src/creators/assets/asset-image-profiler.mjs';
 import {pngRenderMetadataFingerprint} from '../src/creators/assets/png-render-metadata.mjs';
-import {buildOptimizationCacheKey,buildToolchainFingerprint,fingerprintFiles,readOptimizationCache,writeOptimizationCache} from '../src/creators/assets/asset-optimization-cache.mjs';
+import {buildOptimizationCacheKey,readOptimizationCache,writeOptimizationCache} from '../src/creators/assets/asset-optimization-cache.mjs';
+import {BATCH_DELIVERY_CACHE_ABI,batchDeliveryLosslessOptions,buildBatchDeliveryCacheNamespace} from '../src/creators/assets/asset-batch-delivery-cache-contract.mjs';
 
 const args=process.argv.slice(2);
 const argument=(name,fallback)=>{const prefix=`--${name}=`,token=args.find(v=>v.startsWith(prefix));return token?token.slice(prefix.length):fallback;};
@@ -30,44 +30,18 @@ const minSavingBytes=Math.max(1,Number(argument('min-saving-bytes','1024'))||102
 const minSavingPercent=Math.max(0,Number(argument('min-saving-percent','0.1'))||0);
 const cacheEnabled=!has('no-cache');
 const cachePath=path.resolve(argument('cache','.cache/asset-batch-delivery'));
-const engineFiles=[
-  'src/creators/assets/png-space-optimizer.mjs',
-  'src/creators/assets/png-palette-order.mjs',
-  'src/creators/assets/png-conformance-guard.mjs',
-  'src/creators/assets/asset-image-profiler.mjs',
-  'src/creators/assets/png-render-metadata.mjs',
-  'src/creators/assets/asset-optimization-cache.mjs',
-  'scripts/asset-batch-delivery-compiler.mjs'
-];
-const engineFingerprint=fingerprintFiles(engineFiles.map(file=>path.resolve(file)));
-const toolchain=buildToolchainFingerprint({pipeline:'kelo-batch-png-delivery-v1'});
 const startedAt=Date.now();
 
-function walkPngs(target){
-  if(!fs.existsSync(target))return[];
-  const stat=fs.statSync(target);if(stat.isFile())return/\.png$/i.test(target)?[target]:[];
-  const found=[],stack=[target];
-  while(stack.length&&found.length<maxFiles){
-    const dir=stack.pop(),entries=fs.readdirSync(dir,{withFileTypes:true}).sort((a,b)=>a.name.localeCompare(b.name));
-    for(const entry of entries){
-      const full=path.join(dir,entry.name);
-      if(entry.isDirectory()){
-        if(!['node_modules','.git','dist','test-results','.cache'].includes(entry.name))stack.push(full);
-      }else if(entry.isFile()&&/\.png$/i.test(entry.name)){
-        found.push(full);if(found.length>=maxFiles)break;
-      }
-    }
-  }
-  return found.sort();
-}
 function sha256(buffer){return crypto.createHash('sha256').update(buffer).digest('hex');}
 function rel(file){return path.relative(process.cwd(),file).replaceAll('\\','/');}
 function candidateId(sourcePath,sourceHash){return crypto.createHash('sha256').update(`${sourcePath}:${sourceHash}`).digest('hex').slice(0,20);}
 function pct(saved,before){return before?saved/before*100:0;}
 
 assert.ok(fs.existsSync(inputRoot),`input not found: ${inputRoot}`);
+const cacheNamespace=buildBatchDeliveryCacheNamespace({inputRoot,maxFiles,root:process.cwd()});
+const {engineFingerprint,toolchain,sourceSetFingerprint}=cacheNamespace;
+const files=cacheNamespace.files,records=[];
 fs.rmSync(outputDir,{recursive:true,force:true});fs.mkdirSync(outputDir,{recursive:true});if(cacheEnabled)fs.mkdirSync(cachePath,{recursive:true});
-const files=walkPngs(inputRoot),records=[];
 let decodedFiles=0,skippedLarge=0,decodeSkipped=0,candidateCount=0,rejectedSafety=0,totalSourceBytes=0,totalProjectedBytes=0,candidateSourceBytes=0,candidateDeliveryBytes=0,cacheHits=0,cacheMisses=0;
 
 for(const file of files){
@@ -77,8 +51,8 @@ for(const file of files){
   try{decoded=decodePngRgba(source);}catch(error){decodeSkipped+=1;totalProjectedBytes+=source.length;records.push({file:sourcePath,status:'decode-skipped',sourceBytes:source.length,cacheHit:false,error:String(error?.message||error)});continue;}
   decodedFiles+=1;
   const profile=profileAssetImage(decoded.rgba,decoded.ihdr.width,decoded.ihdr.height,{sourceName:sourcePath});
-  const losslessOptions={filterStrategies:['adaptive'],paletteOrderStrategies:PALETTE_ORDER_FAST,disablePalette:(profile?.metrics?.uniqueColors||4097)>64};
-  const descriptor=buildOptimizationCacheKey(source,{engineFingerprint,toolchainFingerprint:toolchain.sha256,mode:'strict-delivery',effort:'fast',profileKind:profile.kind,qualityPolicy:'strict',extra:{losslessOptions,uniqueColors:profile?.metrics?.uniqueColors??null}});
+  const losslessOptions=batchDeliveryLosslessOptions(profile);
+  const descriptor=buildOptimizationCacheKey(source,{engineFingerprint,toolchainFingerprint:toolchain.sha256,mode:'strict-delivery',effort:'fast',profileKind:profile.kind,qualityPolicy:'strict',extra:{cacheAbi:BATCH_DELIVERY_CACHE_ABI,losslessOptions,uniqueColors:profile?.metrics?.uniqueColors??null}});
   let optimized,cacheHit=false;
   try{
     const cached=cacheEnabled?readOptimizationCache(cachePath,descriptor):null;
@@ -103,7 +77,7 @@ for(const file of files){
     source:{path:sourcePath,sha256:sourceHash,bytes:source.length,width:decoded.ihdr.width,height:decoded.ihdr.height},
     delivery:{kind:'png',file:'asset.png',strategy:'strict-lossless',sha256:deliveryHash,bytes:delivery.length,width:deliveryDecoded.ihdr.width,height:deliveryDecoded.ihdr.height,renderMetadataFingerprint:deliveryMetadata,pngWinner:winner},
     quality:{exactPixels:true,hiddenTransparentRgbChanges:0,renderMetadataPreserved:true},
-    build:{optimizerCacheHit:cacheHit,engineFingerprint,toolchainFingerprint:toolchain.sha256},
+    build:{optimizerCacheHit:cacheHit,cacheAbi:BATCH_DELIVERY_CACHE_ABI,engineFingerprint,toolchainFingerprint:toolchain.sha256,sourceSetFingerprint},
     promotion:{runtimeActive:false,policy:'separate-explicit-step'}
   };
   const report={status:'ASSET_PNG_DELIVERY_CANDIDATE_OK',version:'kelo-png-delivery-candidate-v1',source:sourcePath,profile:profile.kind,sourceBytes:source.length,deliveryBytes:delivery.length,savedBytes,savedPercent,exactPixels:true,hiddenTransparentRgbChanges:0,renderMetadataPreserved:true,renderMetadataFingerprint:deliveryMetadata,bytePromotionCandidate:true,sourceSha256:sourceHash,deliverySha256:deliveryHash,optimizerCacheHit:cacheHit,winner};
@@ -118,7 +92,7 @@ const savedBytes=totalSourceBytes-totalProjectedBytes,positiveSavings=records.fi
   scannedFiles:files.length,decodedFiles,skippedLarge,decodeSkipped,rejectedSafety,candidateCount,positiveSavingFiles:positiveSavings.length,belowThresholdPositiveFiles:belowThresholdPositive.length,
   totalSourceBytes,totalProjectedBytes,savedBytes,savedPercent:pct(savedBytes,totalSourceBytes),allPositiveSavingBytes,discardedPositiveSavingsBytes,capturedPositiveSavingsPercent:allPositiveSavingBytes?pct(savedBytes,allPositiveSavingBytes):100,
   candidateSourceBytes,candidateDeliveryBytes,candidateSavedBytes:candidateSourceBytes-candidateDeliveryBytes,candidateSavedPercent:pct(candidateSourceBytes-candidateDeliveryBytes,candidateSourceBytes),
-  cacheEnabled,cachePath:cacheEnabled?rel(cachePath):null,cacheHits,cacheMisses,engineFingerprint,toolchainFingerprint:toolchain.sha256,elapsedMs:Date.now()-startedAt,
+  cacheEnabled,cachePath:cacheEnabled?rel(cachePath):null,cachePolicy:'semantic-abi-optimizer-bytes-only',cacheAbi:BATCH_DELIVERY_CACHE_ABI,cacheNamespaceKey:cacheNamespace.key,cacheRestorePrefix:cacheNamespace.restorePrefix,sourceSetFingerprint,cacheHits,cacheMisses,engineFingerprint,toolchainFingerprint:toolchain.sha256,elapsedMs:Date.now()-startedAt,
   runtimeActiveCandidates:0,records
 };
 fs.writeFileSync(path.join(outputDir,'report.json'),JSON.stringify(summary,null,2));
