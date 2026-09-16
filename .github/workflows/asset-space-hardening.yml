@@ -35,6 +35,8 @@ jobs:
           node-version: '24'
       - name: Quality Agent golden corpus
         run: node scripts/asset-quality-golden-corpus-audit.mjs
+      - name: Animation temporal consistency gate
+        run: node scripts/asset-animation-consistency-audit.mjs
       - name: PNG cache integrity
         run: node scripts/asset-optimization-cache-audit.mjs
       - name: Smart Atlas recomposition proof
