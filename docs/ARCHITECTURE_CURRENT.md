@@ -26,13 +26,15 @@ Los límites son guardrails: crecer exige evidencia y cambio explícito del cont
 
 Los comandos discontinuos de viaje legacy `teleportToPlot` / `teleportToFarm` están estrangulados temporalmente por `KeloLegacyTransitionBridge` y pasan por `KeloPlayerPosition` + `KeloCamera`. Movimiento continuo sigue legacy hasta completar paridad/QA. `KeloPlayerPosition` no es owner de dash/physics; esas transiciones de movimiento deben usar `KeloMovement`/ability authority.
 
-`KeloAbilityAim` es el strangler temporal de aim/input legacy. Posee una sola lifecycle de puntero, matemática/range, indicador de render y un registry explícito de cast middleware. `engine-l` registra la presentación de cast de Plaza en boot; `engine-m` no se carga en el primer frame y registra `engine-m:skill-shots` únicamente cuando el pack `world` entra por first-use.
+`KeloAbilityAim` es el strangler temporal de aim/input legacy. Posee el lifecycle **global legacy** de puntero, matemática/range, indicador de render y un registry explícito de cast middleware. `engine-l` registra la presentación de cast de Plaza en boot; `engine-m` no se carga en el primer frame y registra `engine-m:skill-shots` únicamente cuando el pack `world` entra por first-use.
 
 `KeloAbilityDirection` y `KeloLegacyAbilityTrigger` mantienen compatibilidad de `engine-f`. Su comportamiento ya está caracterizado contra el archivo real mediante un sandbox VM: thresholds de dirección, prioridad input→velocidad→aim, dash directo 150, radio PvP `<60`, proyectiles 450/life 2 y fallback legacy.
 
 `engine-g` conserva únicamente estado compatibility + dash tween legacy. Su matemática y efectos están caracterizados contra el archivo real: quadratic ease-out, collision push, PvP `<52`, daño/fallback y finalización del tween. Ya no posee hotbar, scheduler UI ni bindings de pointer/aim.
 
 La hotbar moderna pertenece a `KeloAbilities`. No se construye durante el boot de Plaza: el feature interno `abilityRuntime` usa policy `first-use`, `userToggle:false` y carga en orden `abilityData.js → stone-system.js → kelo-ability-boot.js` mediante el `KeloModuleLoader` existente. `kelo-ability-boot.js` expone `KeloAbilitiesLoader`, crea `KeloAbilities` y mantiene el adapter compatibility `renderActionBar` cuando el runtime se despierta.
+
+El lifecycle moderno de la hotbar es **local por slot**, no global. Cada drag activo conserva su `pointerId`, usa `setPointerCapture` para continuidad del gesto, ignora `pointermove`/`pointerup` de otros pointers y limpia el estado al completar o cancelar. `pointercancel` nunca dispara cast. El self-target mantiene su cast inmediato. Este owner moderno convive temporalmente con `KeloAbilityAim`: el primero solo sirve a los cinco slots modernos first-use; el segundo sigue atendiendo consumidores legacy globales hasta migrarlos.
 
 PvP ya no depende de que `KeloAbilitiesLoader` exista por casualidad. `pvp-combat-runtime-loader.js` ejecuta explícitamente `KeloRuntimeBootstrap.ensure() → KELO_MODULE_LOADER.ensure('abilityRuntime') → KeloAbilitiesLoader.ensure()` antes de validar foundations, despertar abilities y enlazar prediction.
 
@@ -69,6 +71,8 @@ Abilities modernas, equipment, mounts, backpack, PvP/Arena, identity/titles, nob
 
 `KeloAbilities` es el runtime moderno data-driven y ahora también es el owner de la hotbar moderna/adapter `renderActionBar` tras el first-use de `abilityRuntime`. El smoke WebKit comprueba que no existe al boot y que, al cargar el feature, aparecen **5 slots modernos** sin restaurar los IDs `action-slot-*` retirados de `engine-g`.
 
+El contrato de pointer de esos cinco slots se caracteriza ejecutando el `bindSlot()` real en VM: un segundo dedo no puede robar el gesto activo, eventos de pointer ajenos no modifican ni finalizan el aim, el pointer dueño castea una sola vez, `pointercancel` no castea y los targets `self` conservan la activación inmediata. No se añade un listener global moderno.
+
 No sustituir el dash de `engine-g` solo por similitud nominal: distancia, duración, easing, colisión, daño y lifecycle deben demostrarse equivalentes primero.
 
 ### 8. Online
@@ -86,7 +90,8 @@ La migración evergreen está protegida por `.github/workflows/evergreen-foundat
 - paridad de ability direction/trigger legacy contra `engine-f.js` real;
 - paridad del dash tween contra `engine-g.js` real y guardia de que no recupere hotbar/UI;
 - contrato `abilityRuntime` first-use y su orden físico;
-- ownership del pointer lifecycle y guardia del owner moderno de hotbar;
+- characterization ejecutable del pointer lifecycle moderno de los cinco slots;
+- ownership del pointer lifecycle legacy global en `KeloAbilityAim`;
 - contrato del cast middleware;
 - reproducible build audit;
 - CI supply-chain audit;
@@ -102,7 +107,7 @@ La migración evergreen está protegida por `.github/workflows/evergreen-foundat
 
 Los workflows activos fijan acciones externas por SHA exacto. `ci-supply-chain-audit.mjs` falla ante acciones externas sin pin SHA y ante `permissions: write-all`. Dependabot propone actualizaciones de npm y GitHub Actions por PR; una actualización nunca se considera segura solo porque sea nueva.
 
-El head runtime `ad04037e4f28baabe3c03dd2883c0979b49ecc6a` pasó los cuatro gates del Evergreen Foundation Guard: `foundation`, `client-build`, `server-smoke` y `webkit-mobile-smoke`. Eso es evidencia branch-local, no QA físico.
+El head runtime `c08d54c235be6b32cd6e75c6267995afca5ca3b1` pasó los cuatro gates del Evergreen Foundation Guard: `foundation`, `client-build`, `server-smoke` y `webkit-mobile-smoke`. Eso es evidencia branch-local, no QA físico.
 
 ## Flujo de asset moderno
 
@@ -122,6 +127,7 @@ Forest Plaza es el caso de referencia actual: 146 piezas, IDs legacy preservados
 - lifecycle lazy/after-paint solo vía `KeloModuleLoader` + `KELO_FEATURE_REGISTRY`;
 - `abilityRuntime` es first-use interno y no user-toggleable;
 - hotbar moderna pertenece a `KeloAbilities`; `engine-g` no puede recuperarla;
+- pointer de hotbar moderna permanece local a cada slot y aislado por `pointerId`; no crear un segundo lifecycle global;
 - UI oculta no debe ejecutar construcción innecesaria antes del primer paint;
 - `engine-m` permanece first-use dentro de `world`, no crítico;
 - templates vía `KELO_PROPERTY_CATALOG`;
