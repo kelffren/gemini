@@ -1,8 +1,8 @@
 /* KELO-INDEX
  * area: BUILD / CREATOR ASSET INGEST
  * owner: Kelo Creator Asset Bridge
- * keys: ASSET SPACE META AUDIT PROFILE SEAM QUALITY TOURNAMENT PATH TOKENS
- * purpose: prove asset classification, path-token safety, compound terrain names, seam hard-gates and verified codec tournament behavior
+ * keys: ASSET SPACE META AUDIT PROFILE SEAM RENDER EXACT QUALITY TOURNAMENT PATH TOKENS
+ * purpose: prove asset classification, path-token safety, compound terrain names, seam/render-exact hard-gates and verified codec tournament behavior
  * public-api: CLI audit
  * state-owned: none
  * online: N/A
@@ -38,6 +38,7 @@ const tileProfile = profileAssetImage(source, width, height, {sourceName:'assets
 assert(tileProfile.kind === 'tile', `tile kind=${tileProfile.kind}`);
 assert(tileProfile.adaptivePolicy === 'seam-safe', `tile policy=${tileProfile.adaptivePolicy}`);
 assert(tileProfile.invariants.preserveBorder === true, 'tile border invariant');
+assert(!tileProfile.runtimeCandidates.includes('webp-render-exact'), 'seam tile must not get hidden-RGB delivery relaxation');
 
 const compoundTerrainProfile = profileAssetImage(source, width, height, {sourceName:'assets/cespedsindivisiones.PNG'});
 assert(compoundTerrainProfile.kind === 'tile', `compound terrain kind=${compoundTerrainProfile.kind}`);
@@ -56,6 +57,11 @@ assert(borderMetrics.borderMaxRgbDelta === 1, `border delta=${borderMetrics.bord
 assert(judgePixelFidelity(borderMetrics, 'seam-safe').pass === false, 'seam-safe must reject a one-step border change');
 
 const sprite = Buffer.alloc(24 * 24 * 4);
+for (let pixel = 0; pixel < 24 * 24; pixel += 1) {
+  const o = pixel * 4;
+  // Deliberately non-zero hidden RGB to model AI/exporter transparent padding.
+  sprite[o] = 21; sprite[o + 1] = 44; sprite[o + 2] = 77; sprite[o + 3] = 0;
+}
 for (let y = 5; y < 20; y += 1) {
   for (let x = 7; x < 17; x += 1) {
     const o = (y * 24 + x) * 4;
@@ -65,6 +71,28 @@ for (let y = 5; y < 20; y += 1) {
 const spriteProfile = profileAssetImage(sprite, 24, 24, {sourceName:'hero-sprite.png'});
 assert(spriteProfile.kind.includes('sprite'), `sprite kind=${spriteProfile.kind}`);
 assert(spriteProfile.invariants.preserveAlpha === true, 'sprite alpha invariant');
+assert(spriteProfile.runtimeCandidates.includes('webp-render-exact'), 'transparent sprite render-exact candidate');
+
+// DELIVERY render-exact may alter only RGB hidden under alpha=0.
+const hiddenRgbChanged = Buffer.from(sprite);
+hiddenRgbChanged[0] = 0; hiddenRgbChanged[1] = 0; hiddenRgbChanged[2] = 0;
+const hiddenMetrics = evaluatePixelFidelity(sprite, hiddenRgbChanged, 24, 24);
+assert(hiddenMetrics.exactPixels === false, 'hidden RGB change is not strict exact');
+assert(hiddenMetrics.renderExactPixels === true, 'hidden RGB change remains render exact');
+assert(hiddenMetrics.hiddenTransparentRgbChangedPixels === 1, `hidden changed=${hiddenMetrics.hiddenTransparentRgbChangedPixels}`);
+assert(judgePixelFidelity(hiddenMetrics, 'strict').pass === false, 'strict rejects hidden RGB change');
+assert(judgePixelFidelity(hiddenMetrics, 'render-exact').pass === true, 'render-exact accepts hidden RGB only');
+
+const visibleRgbChanged = Buffer.from(sprite);
+const visibleOffset = (10 * 24 + 10) * 4;
+visibleRgbChanged[visibleOffset] += 1;
+const visibleMetrics = evaluatePixelFidelity(sprite, visibleRgbChanged, 24, 24);
+assert(judgePixelFidelity(visibleMetrics, 'render-exact').pass === false, 'render-exact rejects visible RGB change');
+
+const alphaChanged = Buffer.from(sprite);
+alphaChanged[3] = 1;
+const alphaMetrics = evaluatePixelFidelity(sprite, alphaChanged, 24, 24);
+assert(judgePixelFidelity(alphaMetrics, 'render-exact').pass === false, 'render-exact rejects alpha change');
 
 const png = encodeRgbaPng(source, width, height, {level:1, filterStrategy:0});
 const tournament = optimizePngTournament(png, {effort:'balanced'});
@@ -80,6 +108,9 @@ console.log(JSON.stringify({
   broadTreeKind:broadTreeProfile.kind,
   broadTreeTileHint:broadTreeProfile.hints.tile,
   spriteKind:spriteProfile.kind,
+  spriteRuntimeCandidates:spriteProfile.runtimeCandidates,
+  renderExactHiddenChanges:hiddenMetrics.hiddenTransparentRgbChangedPixels,
+  renderExactGate:judgePixelFidelity(hiddenMetrics, 'render-exact').pass,
   borderGate:judgePixelFidelity(borderMetrics, 'seam-safe').reasons,
   sourceBytes:png.length,
   tournamentBytes:tournament.buffer.length,
