@@ -14,8 +14,8 @@ const migrationSource = fs.readFileSync(migrationPath, 'utf8').toLowerCase();
 
 assert.match(sidecarSource, /from\('asset_guardian_provenance'\)/, 'sidecar must read the server-owned aggregate table');
 assert.match(sidecarSource, /select\('revision_id,asset_hash,preset,contributor_count,guardian_verified_at'\)/, 'sidecar must request explicit public columns');
-assert.doesNotMatch(sidecarSource, /manifest\.guardianVerified/, 'client guardianVerified must never be trusted');
-assert.doesNotMatch(sidecarSource, /manifest\.guardianProvenance/, 'client guardianProvenance must never be trusted');
+const manifestReads = [...sidecarSource.matchAll(/manifest\?\.([A-Za-z0-9_]+)/g)].map(match => match[1]);
+assert.deepEqual([...new Set(manifestReads)].sort(), ['revisionId', 'sha256'], 'sidecar may read only server binding fields from a manifest');
 assert.match(sidecarSource, /kelo:community-player-assets-ready/, 'sidecar must subscribe after render-ready');
 assert.match(sidecarSource, /kelo:community-asset-provenance-ready/, 'sidecar must emit per-asset proof');
 assert.match(sidecarSource, /kelo:community-player-provenance-ready/, 'sidecar must emit per-player proof batch');
