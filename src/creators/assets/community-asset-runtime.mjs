@@ -1,3 +1,4 @@
+import './community-guardian-provenance-runtime.mjs?v=1';
 import { DynamicAssetStreamManager } from './dynamic-asset-streaming.mjs';
 
 export const communityAssetStream = new DynamicAssetStreamManager();
@@ -65,7 +66,7 @@ async function onPlayerAssets(event) {
 }
 
 if (typeof globalThis.addEventListener === 'function' && !globalThis.__KELO_COMMUNITY_ASSET_RUNTIME__) {
-  globalThis.__KELO_COMMUNITY_ASSET_RUNTIME__ = Object.freeze({ version: 2, stream: communityAssetStream });
+  globalThis.__KELO_COMMUNITY_ASSET_RUNTIME__ = Object.freeze({ version: 3, stream: communityAssetStream, guardianProvenance: 'sidecar' });
   globalThis.addEventListener('kelo:community-player-assets', onPlayerAssets);
   globalThis.addEventListener('kelo:community-player-left', event => {
     const playerId = event?.detail?.playerId;
@@ -81,5 +82,5 @@ if (typeof globalThis.addEventListener === 'function' && !globalThis.__KELO_COMM
 
   const garbageTimer = setInterval(() => communityAssetStream.collectGarbage().catch(() => {}), 5 * 60 * 1000);
   if (typeof garbageTimer?.unref === 'function') garbageTimer.unref();
-  emit('kelo:community-asset-runtime-ready', { version: 2, fallback: 'base-avatar' });
+  emit('kelo:community-asset-runtime-ready', { version: 3, fallback: 'base-avatar', guardianProvenance: 'sidecar' });
 }
