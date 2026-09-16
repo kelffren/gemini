@@ -44,8 +44,11 @@
 - `src/creators/assets/png-codec-tournament.mjs` — torneo verificado Kelo/OxiPNG/ZopfliPNG/ECT.
 - `src/creators/assets/png-adaptive-optimizer.mjs` — búsqueda opt-in de paleta guiada por perfil con fallback strict.
 - `src/creators/assets/png-quality-agent.mjs` — comparación RGBA/alpha/PSNR/bordes/seams y hard gates por perfil.
+- `src/creators/assets/quality-pareto.mjs` — frontera no dominada de tamaño/calidad para calibrar candidatos.
+- `src/creators/assets/perceptual-quality-bridge.mjs` — advisory opcional SSIMULACRA2/Butteraugli/IQA; nunca sobreescribe hard gates.
 - `src/creators/assets/runtime-image-variants.mjs` — laboratorio de variantes DELIVERY PNG/WebP/AVIF sin sustituir SOURCE.
-- `scripts/asset-space-compiler.mjs` — CLI recursiva, before/after/diff, perfil y reporte de ahorro/calidad.
+- `scripts/asset-space-compiler.mjs` — CLI FAST/BALANCED/DEEP, before/after/diff, perfil y reporte.
+- `scripts/asset-space-budget.mjs` — transferencia, RGBA baseline, transparencia y duplicados exactos.
 - `scripts/asset-codec-tournament.mjs` — laboratorio profundo de codecs y variantes de entrega.
 - `scripts/asset-space-meta-audit.mjs` — gate de profiler/seams/tournament.
 - `src/creators/assets/asset-sheet-compiler.mjs` — compiler heterogéneo de geometría/metadata.
