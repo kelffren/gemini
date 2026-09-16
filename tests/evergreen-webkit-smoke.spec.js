@@ -20,6 +20,8 @@ test('V6.69 evergreen branch boots plaza without uncaught errors', async ({ page
     stateStore:window.KeloStateStore&&window.KeloStateStore.snapshot&&window.KeloStateStore.snapshot(),
     transitionBridge:window.KeloLegacyTransitionBridge&&window.KeloLegacyTransitionBridge.snapshot&&window.KeloLegacyTransitionBridge.snapshot(),
     abilityAim:window.KeloAbilityAim&&window.KeloAbilityAim.snapshot&&window.KeloAbilityAim.snapshot(),
+    abilityDirection:window.KeloAbilityDirection&&window.KeloAbilityDirection.snapshot&&window.KeloAbilityDirection.snapshot(),
+    abilityTriggerBridge:window.KeloLegacyAbilityTrigger&&window.KeloLegacyAbilityTrigger.snapshot&&window.KeloLegacyAbilityTrigger.snapshot(),
     abilityDashMax:window.KeloAbilityAim&&window.KeloAbilityAim.maxRange&&window.KeloAbilityAim.maxRange('dash'),
     camera:!!window.KeloCamera,
     position:!!window.KeloPlayerPosition,
@@ -36,6 +38,10 @@ test('V6.69 evergreen branch boots plaza without uncaught errors', async ({ page
   expect(snapshot.transitionBridge.ownersReady).toBe(true);
   expect(snapshot.abilityAim).toBeTruthy();
   expect(snapshot.abilityAim.version).toBe('kelo-ability-aim-v1.0.0-legacy-parity');
+  expect(snapshot.abilityDirection).toBeTruthy();
+  expect(snapshot.abilityDirection.version).toBe('kelo-ability-direction-v1.0.0-legacy-parity');
+  expect(snapshot.abilityTriggerBridge).toBeTruthy();
+  expect(snapshot.abilityTriggerBridge.version).toBe('kelo-legacy-ability-trigger-v1.0.0');
   expect(snapshot.abilityDashMax).toBe(170);
   expect(snapshot.scripts.some(src=>src.includes('legacy-ability-aim-system.js'))).toBe(true);
   expect(snapshot.scripts.some(src=>/engine-(?:j|k)\.js/.test(src))).toBe(false);
@@ -86,6 +92,30 @@ test('consolidated ability aim keeps the action-slot legacy contract', async ({ 
     return window.KeloAbilityAim.snapshot();
   });
   expect(ended.active).toBe(false);
+});
+
+test('direct legacy stone trigger is explicit, measured, and does not impersonate teleport authority', async ({ page }) => {
+  await page.goto('/?guest=1',{waitUntil:'domcontentloaded'});
+  await page.waitForFunction(()=>window.__keloBootReady===true&&!!window.KeloLegacyAbilityTrigger&&!!window.KeloAbilityDirection,{timeout:15000});
+
+  const result=await page.evaluate(()=>{
+    const index=STATE.equipped.findIndex(stone=>stone&&stone.typeId==='dash');
+    if(index<0)throw new Error('dash stone missing from baseline equipment');
+    STATE.equipped[index].currentCd=0;
+    const bridgeBefore=window.KeloLegacyAbilityTrigger.snapshot();
+    const positionBefore=window.KeloPlayerPosition.snapshot();
+    const from={x:localPlayer.x,y:localPlayer.y};
+    triggerStone(index);
+    const bridgeAfter=window.KeloLegacyAbilityTrigger.snapshot();
+    const positionAfter=window.KeloPlayerPosition.snapshot();
+    return {bridgeBefore,bridgeAfter,positionBefore,positionAfter,from,to:{x:localPlayer.x,y:localPlayer.y},cooldown:STATE.equipped[index].currentCd};
+  });
+
+  expect(result.bridgeAfter.directDashCasts-result.bridgeBefore.directDashCasts).toBe(1);
+  expect(result.bridgeAfter.totalCalls-result.bridgeBefore.totalCalls).toBe(1);
+  expect(result.positionAfter.transitions-result.positionBefore.transitions).toBe(0);
+  expect(result.cooldown).toBeGreaterThan(0);
+  expect(Number.isFinite(result.to.x)&&Number.isFinite(result.to.y)).toBe(true);
 });
 
 test('legacy plot/farm travel is routed through modern position/camera owners', async ({ page }) => {
