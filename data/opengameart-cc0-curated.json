@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "source": "OpenGameArt.org",
+  "policy": "Only assets whose OpenGameArt page, license and direct file URL were individually verified are exposed as downloadable.",
+  "assets": [
+    {
+      "id": "simple-character-base-16x16",
+      "name": "Simple Character Base [16x16]",
+      "category": "character",
+      "tags": ["pixel", "character", "spritesheet", "movement", "16x16"],
+      "author": "zaphgames",
+      "license": "CC0",
+      "attributionRequired": false,
+      "sourceUrl": "https://opengameart.org/content/simple-character-base-16x16",
+      "previewUrl": "https://opengameart.org/sites/default/files/character_base_16x16_0.png",
+      "downloadUrl": "https://opengameart.org/sites/default/files/character_base_16x16_0.png",
+      "fileName": "character_base_16x16.png",
+      "bytesHint": 712,
+      "artType": "2D Art"
+    },
+    {
+      "id": "universal-8x8-tileset",
+      "name": "Universal 8x8 Tileset",
+      "category": "tileset",
+      "tags": ["top-down", "8x8", "tiles", "tileset", "pixel-art", "minimal"],
+      "author": "Drummyfish",
+      "license": "CC0",
+      "attributionRequired": false,
+      "sourceUrl": "https://opengameart.org/content/8x8-tileset",
+      "previewUrl": "https://opengameart.org/sites/default/files/tileset_95.png",
+      "downloadUrl": "https://opengameart.org/sites/default/files/tileset_95.png",
+      "fileName": "tileset.png",
+      "bytesHint": 63800,
+      "artType": "2D Art"
+    },
+    {
+      "id": "gold-coin-token",
+      "name": "Gold Coin / Token",
+      "category": "item",
+      "tags": ["coin", "item", "currency", "pixel-art"],
+      "author": "BizmasterStudios",
+      "license": "CC0",
+      "attributionRequired": false,
+      "sourceUrl": "https://opengameart.org/content/gold-cointoken",
+      "previewUrl": "https://opengameart.org/sites/default/files/coin%202.png",
+      "downloadUrl": "https://opengameart.org/sites/default/files/coin%202.png",
+      "fileName": "coin 2.png",
+      "bytesHint": 3400,
+      "artType": "2D Art"
+    }
+  ]
+}
