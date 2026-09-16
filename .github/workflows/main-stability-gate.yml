@@ -75,6 +75,9 @@ jobs:
       - name: Studio foundation contract
         run: npm run audit:studio
 
+      - name: Creator definition and world environment contract
+        run: npm run audit:creator-suite
+
       - name: Paint Copies regression contract
         run: npm run audit:studio:paint-copies
 
