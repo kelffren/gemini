@@ -1,12 +1,13 @@
 /* KELO-INDEX
  * area: CREATORS / EXTERNAL CONTENT / AMBIENTCG
  * owner: Kelo Universal Content Bridge
- * keys: AMBIENTCG V3 CC0 PBR HDRI MODEL TEXTURE LAZY MOBILE PAGING
+ * keys: AMBIENTCG V3 CC0 PBR HDRI MODEL TEXTURE LAZY MOBILE PAGING KIND-GATE
  * purpose: search ambientCG through its official v3 API while returning metadata/thumbnails only; heavy archives remain source-resolved on explicit user action
  */
 import {fetchProviderJson,mobilePageWindow,clearExternalProviderRuntimeCache} from './external-provider-runtime.mjs?v=3';
 
 const API='https://ambientcg.com/api/v3/assets';
+const SUPPORTED_KINDS=new Set(['texture','model','hdri','image']);
 function clean(value){return String(value??'').trim();}
 function firstThumbnail(value){if(Array.isArray(value))return value.find(x=>x?.url)?.url||null;if(value&&typeof value==='object')return value['256-WEBP']||value['256-PNG']||value['512-WEBP']||Object.values(value).find(v=>typeof v==='string')||null;return null;}
 function rowsOf(data){if(Array.isArray(data))return data;if(Array.isArray(data?.assets))return data.assets;if(Array.isArray(data?.foundAssets))return data.foundAssets;if(Array.isArray(data?.results))return data.results;return[];}
@@ -15,6 +16,7 @@ function dimensionsOf(raw){if(!raw||typeof raw!=='object')return null;const widt
 function normalize(item,index){const id=clean(item?.id||item?.assetId||`asset-${index}`),type=clean(item?.type||item?.dataType||'material'),preview=firstThumbnail(item?.thumbnails||item?.previewData),source=clean(item?.url)||`https://ambientcg.com/view?id=${encodeURIComponent(id)}`;return{id:`ambientcg:${id}`,provider:'ambientcg',externalId:id,name:clean(item?.title||item?.displayName||id),category:type||'material',contentKind:kindOf(type),previewKind:'image',tags:Array.isArray(item?.tags)?item.tags.slice(0,30):[],previewUrl:preview,downloadUrl:null,sourceUrl:source,license:'CC0-1.0',author:'ambientCG',attributionRequired:false,ownership:'discovered',description:clean(item?.shortDescription||item?.longDescription||''),dimensions:dimensionsOf(item?.dimensions),downloadable:false,integrationReady:false,verified:true,catalogOnly:true,heavyExternal:true};}
 
 export async function searchAmbientCgAssets(query='',options={}){
+  const contentKind=clean(options.contentKind).toLowerCase();if(contentKind&&contentKind!=='all'&&!SUPPORTED_KINDS.has(contentKind))return{assets:[],offset:Math.max(0,Number(options.offset)||0),limit:0,total:0,hasMore:false,kindSkipped:true,engine:'ambientcg-v3-bounded'};
   const requested=Math.max(1,Number(options.limit)||24),window=mobilePageWindow(requested,options.offset,{heavy:true}),limit=window.limit,apiOffset=window.offset,params=new URLSearchParams({limit:String(limit),offset:String(apiOffset),sort:'popular',include:'type,title,url,thumbnails,tags,dimensions,shortDescription'});
   if(clean(query))params.set('q',clean(query));
   const url=`${API}?${params.toString()}`,data=await fetchProviderJson('ambientcg',url,{ttlMs:10*60*1000,maxBytes:900_000,cacheKey:`ambientcg:${params.toString()}`}),rows=rowsOf(data),assets=rows.map(normalize).filter(a=>a.externalId),total=Number(data?.total||data?.totalAssets||data?.numberOfResults||0)||null;
