@@ -12,7 +12,7 @@
 (function(root){
 'use strict';
 if(root.KeloCreatorsLazyGate)return;
-const VERSION='kelo-creators-lazy-gate-v9-use-authority';
+const VERSION='kelo-creators-lazy-gate-v9.1-use-authority-avatar';
 const LAUNCHER_SRC='src/ui/studio-launcher.js?v=creator-os-20260915-1';
 const ASSET_CATALOG_SRC='src/property/property-asset-catalog.js?v=creator-assets-20260915-1';
 const creatorModuleUrl=()=>new URL('src/creators/creator-entry.mjs?v=creator-os-20260915-1',root.document?.baseURI||root.location.href).href;
@@ -71,7 +71,8 @@ if(!root.KeloCreatorDelivery){
 }
 if(!root.KeloCreatorUse){
   root.KeloCreatorUse=Object.freeze({
-    version:'creator-use-authority-facade-v1',
+    version:'creator-use-authority-facade-v1.1-avatar',
+    avatar:async(revisionId,opts)=>(await loadUseAuthority()).selectCharacterAvatar(revisionId,opts),
     equip:async(revisionId,opts)=>(await loadUseAuthority()).equipRevision(revisionId,opts),
     clearSlot:async(slotKey,opts)=>(await loadUseAuthority()).clearSlot(slotKey,opts),
     mount:async(revisionId,opts)=>(await loadUseAuthority()).selectMount(revisionId,opts),
