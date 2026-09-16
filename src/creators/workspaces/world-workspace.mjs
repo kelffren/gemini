@@ -120,6 +120,9 @@ function paintLaunchCurtain(root,message='Abriendo World Editor…'){
 function clearLaunchCurtain(root){
   try{root?.document?.getElementById?.(LAUNCH_CURTAIN_ID)?.remove?.();}catch{}
 }
+function isInteractiveStudioShell(shell){
+  return !!shell?.isConnected&&shell.dataset?.keloStudioInteractive==='1'&&!!shell.querySelector?.('.ks-top')&&!!shell.querySelector?.('.ks-bottom');
+}
 export function paintWorldEditorLaunchShell(root=globalThis,message='Abriendo World Editor…'){
   const doc=root?.document;
   if(!doc?.body||typeof doc.createElement!=='function')return null;
@@ -139,6 +142,13 @@ export function paintWorldEditorLaunchShell(root=globalThis,message='Abriendo Wo
     shell.innerHTML='<div style="display:flex;align-items:center;gap:10px;min-height:58px;padding:12px 16px;border-bottom:1px solid rgba(231,197,106,.42)"><div style="width:36px;height:36px;border:1px solid rgba(231,197,106,.5);border-radius:11px;display:grid;place-items:center">♛</div><div><div style="letter-spacing:.14em">KELO STUDIO</div><div style="margin-top:4px;font-size:9px;letter-spacing:.18em;color:#9bb7ad">MODO CREADOR</div></div></div><div class="ks-status" data-kelo-world-launch-status="1" style="display:grid;place-items:center;letter-spacing:.12em">'+message+'</div>';
     doc.body.append?.(shell);
   }else if(shell.dataset){
+    // A duplicate/retry launch must never turn an already-live editor back into
+    // provisional chrome. That stale loading bit made World close the valid session.
+    if(isInteractiveStudioShell(shell)){
+      delete shell.dataset.keloWorldLoading;
+      clearLaunchCurtain(root);
+      return shell;
+    }
     shell.dataset.keloWorldLoading='1';
     const status=typeof shell.querySelector==='function'?shell.querySelector('[data-kelo-world-launch-status], .ks-status'):null;
     if(status)status.textContent=message;
@@ -149,6 +159,11 @@ async function paintInteractiveChrome(root,message='Abriendo World Editor…'){
   paintWorldEditorLaunchShell(root,message);
   const doc=root?.document;
   if(typeof doc?.body?.appendChild!=='function')return null;
+  const existing=doc.getElementById?.('kelo-studio-live');
+  if(isInteractiveStudioShell(existing)){
+    clearLaunchCurtain(root);
+    return Object.freeze({root:existing,reused:true});
+  }
   try{
     const {createStudioLiveShell}=await import(`../../studio/ui/studio-live-shell.mjs?v=${WORLD_BUILD}`);
     const painted=createStudioLiveShell({
@@ -172,6 +187,11 @@ async function paintInteractiveChrome(root,message='Abriendo World Editor…'){
 }
 function discardLoadingShell(root){
   const shell=root?.document?.getElementById?.('kelo-studio-live');
+  if(isInteractiveStudioShell(shell)){
+    if(shell?.dataset)delete shell.dataset.keloWorldLoading;
+    clearLaunchCurtain(root);
+    return;
+  }
   if(shell?.dataset?.keloWorldLoading==='1'||!shell?.querySelector?.('.ks-status')){
     try{shell?.remove();}catch{}
     try{root.document.body.classList.remove('kelo-studio-active');}catch{}
