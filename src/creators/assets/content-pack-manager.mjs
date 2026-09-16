@@ -72,49 +72,38 @@ export async function getPackState(id){return copy(await stateGet(id));}
 export async function listPackStates(){return(await stateAll()).map(copy).sort((a,b)=>String(b.updatedAt||'').localeCompare(String(a.updatedAt||'')));}
 
 async function resolveMembers(pack){
-  const providers=[...new Set(pack.members.map(m=>m.provider))];
-  const resolved=new Map();
-  await Promise.all(providers.map(async provider=>{
-    const result=await searchExternalAssets('',{providers:[provider],limit:320});
-    for(const asset of result.assets||[])resolved.set(asset.id,asset);
-  }));
-  return pack.members.map(member=>{
-    const asset=resolved.get(member.assetId);if(!asset)throw new Error(`PACK_MEMBER_NOT_FOUND:${pack.id}:${member.assetId}`);
-    return {...asset,expectedSha256:member.sha256||asset.expectedSha256||null};
-  });
+  const providers=[...new Set(pack.members.map(m=>m.provider))],resolved=new Map();
+  await Promise.all(providers.map(async provider=>{const result=await searchExternalAssets('',{providers:[provider],limit:320});for(const asset of result.assets||[])resolved.set(asset.id,asset);}));
+  return pack.members.map(member=>{const asset=resolved.get(member.assetId);if(!asset)throw new Error(`PACK_MEMBER_NOT_FOUND:${pack.id}:${member.assetId}`);return {...asset,expectedSha256:member.sha256||asset.expectedSha256||null};});
 }
-
-async function emitProgress(callback,detail){
-  try{callback?.(copy(detail));}catch{}
-  try{globalThis.dispatchEvent?.(new CustomEvent('kelo:content-pack-progress',{detail:copy(detail)}));}catch{}
-}
+async function emitProgress(callback,detail){try{callback?.(copy(detail));}catch{}try{globalThis.dispatchEvent?.(new CustomEvent('kelo:content-pack-progress',{detail:copy(detail)}));}catch{}}
 
 export async function installContentPack(id,{integrate=true,onProgress=null,_stack=null}={}){
   const pack=await getContentPack(id);if(!pack)throw new Error('PACK_NOT_FOUND:'+id);
   const stack=_stack||new Set();if(stack.has(pack.id))throw new Error('PACK_DEPENDENCY_CYCLE:'+pack.id);stack.add(pack.id);
-  for(const dependency of pack.dependencies||[])await installContentPack(dependency,{integrate,onProgress,_stack:stack});
-  stack.delete(pack.id);
+  for(const dependency of pack.dependencies||[])await installContentPack(dependency,{integrate,onProgress,_stack:stack});stack.delete(pack.id);
 
-  const resolved=await resolveMembers(pack),hash=await manifestHash(pack),previous=await getPackState(pack.id);
-  const locks=Array.isArray(previous?.members)?previous.members.slice():[];
+  const resolved=await resolveMembers(pack),hash=await manifestHash(pack),previous=await getPackState(pack.id),locks=Array.isArray(previous?.members)?previous.members.slice():[];
   let state={id:pack.id,name:pack.name,version:pack.version,catalogHash:hash,status:'installing',ownership:'free',downloaded:false,integrated:false,bytes:0,totalMembers:resolved.length,completedMembers:0,members:locks,installedAt:previous?.installedAt||null,updatedAt:now(),error:null};
   await statePut(state);
-
-  for(let index=0;index<resolved.length;index++){
-    const asset=resolved[index];
-    await emitProgress(onProgress,{packId:pack.id,phase:'member',index,total:resolved.length,assetId:asset.id,name:asset.name});
-    let local=await getAsset(asset.id);
-    if(!local?.downloaded)local=await downloadAsset(asset);
-    const blob=await getBlob(asset.id);if(!blob)throw new Error('PACK_MEMBER_BINARY_MISSING:'+asset.id);
-    const sha256=await sha256Blob(blob),expected=normalizeExpectedHash(asset.expectedSha256);
-    if(expected&&sha256&&sha256!==expected)throw new Error('PACK_MEMBER_INTEGRITY_MISMATCH:'+asset.id);
-    if(integrate&&!local?.integrated)local=(await integrateContent(asset.id)).asset;
-    const lock={id:asset.id,provider:asset.provider,contentKind:local?.contentKind||asset.contentKind||'image',bytes:blob.size,sha256:sha256?`sha256:${sha256}`:null,expectedSha256:expected?`sha256:${expected}`:null,integrated:!!local?.integrated,version:pack.version};
-    const existing=state.members.findIndex(row=>row.id===asset.id);if(existing>=0)state.members[existing]=lock;else state.members.push(lock);
-    state.completedMembers=index+1;state.bytes=state.members.reduce((sum,row)=>sum+Number(row.bytes||0),0);state.updatedAt=now();await statePut(state);await tick();
+  try{
+    for(let index=0;index<resolved.length;index++){
+      const asset=resolved[index];await emitProgress(onProgress,{packId:pack.id,phase:'member',index,total:resolved.length,assetId:asset.id,name:asset.name});
+      let local=await getAsset(asset.id);const preexistingDownloaded=!!local?.downloaded;
+      if(!local?.downloaded)local=await downloadAsset(asset);
+      const blob=await getBlob(asset.id);if(!blob)throw new Error('PACK_MEMBER_BINARY_MISSING:'+asset.id);
+      const sha256=await sha256Blob(blob),expected=normalizeExpectedHash(asset.expectedSha256);if(expected&&sha256&&sha256!==expected)throw new Error('PACK_MEMBER_INTEGRITY_MISMATCH:'+asset.id);
+      if(integrate&&!local?.integrated)local=(await integrateContent(asset.id)).asset;
+      const oldLock=state.members.find(row=>row.id===asset.id);
+      const lock={id:asset.id,provider:asset.provider,contentKind:local?.contentKind||asset.contentKind||'image',bytes:blob.size,sha256:sha256?`sha256:${sha256}`:null,expectedSha256:expected?`sha256:${expected}`:null,integrated:!!local?.integrated,preexistingDownloaded:oldLock?.preexistingDownloaded??preexistingDownloaded,version:pack.version};
+      const existing=state.members.findIndex(row=>row.id===asset.id);if(existing>=0)state.members[existing]=lock;else state.members.push(lock);
+      state.completedMembers=index+1;state.bytes=state.members.reduce((sum,row)=>sum+Number(row.bytes||0),0);state.updatedAt=now();await statePut(state);await tick();
+    }
+    state={...state,status:'installed',downloaded:true,integrated:integrate&&state.members.every(row=>row.integrated),installedAt:state.installedAt||now(),updatedAt:now(),error:null};
+    await statePut(state);await emitProgress(onProgress,{packId:pack.id,phase:'done',total:resolved.length,bytes:state.bytes});return copy(state);
+  }catch(error){
+    state={...state,status:'partial',downloaded:state.completedMembers>0,integrated:false,updatedAt:now(),error:String(error?.message||error)};await statePut(state);await emitProgress(onProgress,{packId:pack.id,phase:'error',error:state.error});throw error;
   }
-  state={...state,status:'installed',downloaded:true,integrated:integrate&&state.members.every(row=>row.integrated),installedAt:state.installedAt||now(),updatedAt:now(),error:null};
-  await statePut(state);await emitProgress(onProgress,{packId:pack.id,phase:'done',total:resolved.length,bytes:state.bytes});return copy(state);
 }
 
 function memberUsedByOtherPack(memberId,currentId,states){return states.some(state=>state.id!==currentId&&state.downloaded&&state.status!=='removed'&&Array.isArray(state.members)&&state.members.some(row=>row.id===memberId));}
@@ -124,7 +113,8 @@ export async function removeContentPack(id,{removeLocalMembers=true,onProgress=n
   if(removeLocalMembers){
     for(let index=0;index<members.length;index++){
       const member=members[index];await emitProgress(onProgress,{packId:id,phase:'remove-member',index,total:members.length,assetId:member.id});
-      if(!memberUsedByOtherPack(member.id,id,states))await removeLocal(member.id);await tick();
+      const shared=memberUsedByOtherPack(member.id,id,states),wasAlreadyLocal=member.preexistingDownloaded===true;
+      if(!shared&&!wasAlreadyLocal)await removeLocal(member.id);await tick();
     }
   }
   const next={...(state||{id,name:pack?.name||id,version:pack?.version||'0.0.0'}),status:'removed',downloaded:false,integrated:false,bytes:0,completedMembers:0,updatedAt:now(),removedAt:now(),error:null};
@@ -132,12 +122,8 @@ export async function removeContentPack(id,{removeLocalMembers=true,onProgress=n
 }
 
 export async function inspectContentPacks(){
-  const packs=await listContentPacks(),states=await listPackStates(),byId=new Map(states.map(s=>[s.id,s]));
-  const rows=[];
-  for(const pack of packs){
-    const state=byId.get(pack.id)||null,hash=await manifestHash(pack),updateAvailable=!!state&&compareVersions(pack.version,state.version)>0,catalogChanged=!!state?.catalogHash&&!!hash&&state.catalogHash!==hash;
-    rows.push({...pack,state:copy(state),installed:!!state?.downloaded&&state.status==='installed',integrated:!!state?.integrated,updateAvailable,catalogChanged,manifestHash:hash?`sha256:${hash}`:null});
-  }
+  const packs=await listContentPacks(),states=await listPackStates(),byId=new Map(states.map(s=>[s.id,s])),rows=[];
+  for(const pack of packs){const state=byId.get(pack.id)||null,hash=await manifestHash(pack),updateAvailable=!!state&&compareVersions(pack.version,state.version)>0,catalogChanged=!!state?.catalogHash&&!!hash&&state.catalogHash!==hash;rows.push({...pack,state:copy(state),installed:!!state?.downloaded&&state.status==='installed',integrated:!!state?.integrated,partial:state?.status==='partial',updateAvailable,catalogChanged,manifestHash:hash?`sha256:${hash}`:null});}
   return rows;
 }
 
