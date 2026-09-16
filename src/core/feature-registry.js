@@ -10,7 +10,7 @@
 (function(root){
 'use strict';
 if(root.KELO_FEATURE_REGISTRY)return;
-const VERSION='kelo-feature-registry-v3.0.0';
+const VERSION='kelo-feature-registry-v4.0.0-cast-middleware';
 const raw={
   controlPlane:{dependencies:[],policy:'after-paint',userToggle:false,files:[
     {src:'src/ui/asset-library-launcher.js?v=1',name:'biblioteca de assets'},
@@ -33,7 +33,7 @@ const raw={
     {src:'src/ui/self-interaction-ui.js?v=1',name:'perfil'}
   ]},
   world:{dependencies:[],policy:'first-use',files:[
-    {src:'engine-m.js?v=94',name:'mundo'},
+    {src:'engine-m.js?v=95-cast-middleware',name:'mundo'},
     {src:'engine-n.js?v=230',name:'mundo'},
     {src:'engine-o.js?v=96',name:'mundo'},
     {src:'engine-p.js?v=96',name:'mundo'},
