@@ -2,10 +2,29 @@ name: Guardian Community Live Verification
 
 on:
   workflow_dispatch:
-  page_build:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/guardian-community-live-verification.yml'
+      - 'tests/guardian-pvp-takeover-*.spec.js'
+      - 'scripts/guardian-pvp-host-audit.mjs'
+      - 'src/systems/guardian-system.js'
+      - 'src/systems/guardian-authority.js'
+      - 'src/systems/guardian-pvp-host.js'
+      - 'src/systems/guardian-pvp-net-adapter.js'
+      - 'src/workers/guardian-pvp-authority-worker.js'
+      - 'src/systems/pvp/**'
+      - 'src/systems/combat/**'
+      - 'src/systems/melee/**'
+      - 'src/systems/effects/**'
+      - 'src/abilities/**'
+      - 'src/core/feature-registry.js'
+      - 'src/core/module-loader.js'
+      - 'src/core/movement-profile.js'
+      - 'engine-net.js'
 
 concurrency:
-  group: guardian-community-live-${{ github.event_name }}-${{ github.event_name == 'page_build' && 'main' || github.ref }}
+  group: guardian-takeover-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -57,10 +76,10 @@ jobs:
         with:
           node-version: '24'
       - name: Wait until Pages serves this build or a descendant
-        if: github.event_name == 'page_build'
+        if: github.event_name == 'push'
         env:
           GH_TOKEN: ${{ github.token }}
-          TARGET_SHA: ${{ github.event.build.commit || github.sha }}
+          TARGET_SHA: ${{ github.sha }}
         shell: bash
         run: |
           set -euo pipefail
