@@ -45,4 +45,6 @@ document.addEventListener('click',async event=>{if(event.target.closest('[data-p
 document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!$('preview-modal').hidden)closePreview();});
 let searchTimer=0;$('search').addEventListener('input',()=>{state.query=$('search').value;clearTimeout(searchTimer);searchTimer=setTimeout(()=>void activateProvider(state.provider,{quiet:true}),320);});$('back').onclick=()=>{if(history.length>1)history.back();else location.href='./';};$('runtime').onclick=()=>location.href='asset-library.html';
 (async()=>{try{await refreshVault();state.providers=await getProviderStatuses();renderKindFilters();const filters=[{id:'all',name:'Todas',live:true,lazy:false},...state.providers.filter(p=>p.live)];$('provider-filters').innerHTML=filters.map(p=>`<button class="filter ${p.id==='all'?'on':''}" data-provider="${esc(p.id)}">${esc(p.name)}${p.lazy?' · remoto':''}</button>`).join('');renderSources();await activateProvider('all',{quiet:true});}catch(error){console.error(error);state.loading=false;$('remote-count').textContent='Error de catálogo';$('explore-grid').innerHTML=`<div class="empty">No se pudo abrir el catálogo.<br>${esc(error.message||error)}</div>`;renderPager();}})();
-</script></body></html>
+</script>
+<script type="module" src="./src/ui/community-library-tab.mjs?v=1"></script>
+</body></html>
