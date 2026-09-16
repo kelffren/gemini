@@ -1,8 +1,8 @@
 /* KELO-INDEX
  * area: CORE / SESSION CONTINUITY
  * owner: KeloSessionContinuity
- * keys: UPDATE RESUME CHECKPOINT POSITION CAMERA SAFARI LOW-POWER
- * purpose: preserve a compact safe gameplay checkpoint across verified updater reloads and sparse lifecycle exits
+ * keys: UPDATE RESUME CHECKPOINT POSITION CAMERA SAFARI LOW-POWER UPDATE-CLASS
+ * purpose: preserve a compact safe gameplay checkpoint across verified updater reloads with richer seamless restore and minimal full-restart restore
  * public-api: KeloSessionContinuity.capture/captureForUpdate/restoreUpdate/restoreLastSafe/getState/clear
  * state-owned: one session update checkpoint + one sparse durable last-safe checkpoint
  * performance: event-driven only; NO interval, NO polling, NO game loop, NO per-frame writes
@@ -11,25 +11,13 @@
 (function(root){
   'use strict';
   if(root.KeloSessionContinuity)return;
-
-  const VERSION='kelo-session-continuity-v1.0.0';
+  const VERSION='kelo-session-continuity-v2-update-classes';
   const UPDATE_KEY='kelo.world.continuity.update.v1';
   const SAFE_KEY='kelo.world.continuity.lastSafe.v1';
-  const UPDATE_TTL_MS=10*60*1000;
-  const SAFE_TTL_MS=6*60*60*1000;
-  const RESTORE_SEARCH_STEPS=[18,36,54];
-  const RESTORE_DIRECTIONS=[[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]];
-
-  let applying=false;
-  let restored=false;
-  let captures=0;
-  let restores=0;
-  let sessionWrites=0;
-  let durableWrites=0;
-  let lastDurableSerialized='';
-  let lastReason='boot';
-  let lastError=null;
-
+  const POLICY_KEY='kelo.world.updater.policy.v1';
+  const UPDATE_TTL_MS=10*60*1000,SAFE_TTL_MS=6*60*60*1000;
+  const RESTORE_SEARCH_STEPS=[18,36,54],RESTORE_DIRECTIONS=[[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]];
+  let applying=false,restored=false,captures=0,restores=0,sessionWrites=0,durableWrites=0,lastDurableSerialized='',lastReason='boot',lastError=null,lastMode='none';
   function round(value){const n=Number(value);return Number.isFinite(n)?Math.round(n*100)/100:null;}
   function read(storage,key){try{const raw=storage.getItem(key);return raw?JSON.parse(raw):null;}catch(_){return null;}}
   function write(storage,key,value){try{storage.setItem(key,JSON.stringify(value));return true;}catch(_){return false;}}
@@ -38,148 +26,32 @@
   function arenaActive(){try{return !!root.KeloArena?.isActive?.();}catch(_){return false;}}
   function safeContext(){return root.KELO_COMBAT_ENABLED!==true&&!arenaActive();}
   function pathKey(){return String(root.location&&root.location.pathname||'/');}
-
-  function compactCamera(){
-    try{
-      const s=root.KeloCamera?.snapshot?.();
-      if(!s)return null;
-      return {x:round(s.x),y:round(s.y),targetX:round(s.targetX),targetY:round(s.targetY),lookOffsetX:round(s.lookOffsetX),lookOffsetY:round(s.lookOffsetY),baseZoom:round(s.baseZoom)};
-    }catch(_){return null;}
-  }
-
-  function makeRecord(reason,options){
-    if(!safeContext())return null;
-    const point=root.KeloPlayerPosition?.capture?.();
-    if(!point||!Number.isFinite(Number(point.x))||!Number.isFinite(Number(point.y)))return null;
-    const opts=options||{};
-    return {v:1,id:Date.now().toString(36),at:Date.now(),reason:String(reason||'checkpoint'),build:opts.build?String(opts.build):null,path:pathKey(),surface:'world',position:{x:round(point.x),y:round(point.y)},camera:compactCamera()};
-  }
-
-  function capture(reason,options){
-    const opts=options||{},record=makeRecord(reason,opts);
-    if(!record)return null;
-    captures++;lastReason=record.reason;lastError=null;
-    if(opts.update===true){if(write(sessionStorage,UPDATE_KEY,record))sessionWrites++;}
-    if(opts.durable===true){
-      const serialized=JSON.stringify(record);
-      if(serialized!==lastDurableSerialized&&write(localStorage,SAFE_KEY,record)){lastDurableSerialized=serialized;durableWrites++;}
-    }
-    emit('captured',{reason:record.reason,update:opts.update===true,durable:opts.durable===true});
-    return Object.freeze(record);
-  }
-
-  function captureForUpdate(build){return capture('verified-update',{update:true,durable:true,build:build||null});}
-
-  function pointBlocked(x,y){
-    try{
-      if(!root.KELO_COLLISION?.resolveCircleAABB||typeof obstacles==='undefined'||!Array.isArray(obstacles))return false;
-      const p=typeof localPlayer!=='undefined'&&localPlayer?localPlayer:null;
-      const radius=Math.max(4,Number(p?.radius||p?.r)||10);
-      for(let i=0;i<obstacles.length;i++){
-        const box=obstacles[i];
-        if(!box||!Number.isFinite(Number(box.x))||!Number.isFinite(Number(box.y))||!Number.isFinite(Number(box.w))||!Number.isFinite(Number(box.h)))continue;
-        if(root.KELO_COLLISION.resolveCircleAABB(x,y,radius,box).collided)return true;
-      }
-    }catch(_){}
-    return false;
-  }
-
-  function nearestSafePoint(point){
-    const x=Number(point?.x),y=Number(point?.y);
-    if(!Number.isFinite(x)||!Number.isFinite(y))return null;
-    if(!pointBlocked(x,y))return {x,y};
-    for(const distance of RESTORE_SEARCH_STEPS){
-      for(const dir of RESTORE_DIRECTIONS){
-        const scale=dir[0]&&dir[1]?Math.SQRT1_2:1;
-        const nx=x+dir[0]*distance*scale,ny=y+dir[1]*distance*scale;
-        if(!pointBlocked(nx,ny))return {x:nx,y:ny};
-      }
-    }
-    return null;
-  }
-
-  function validRecord(record,maxAge){
-    return !!(record&&record.v===1&&record.surface==='world'&&record.path===pathKey()&&Number.isFinite(Number(record.at))&&Date.now()-Number(record.at)<=maxAge&&record.position&&Number.isFinite(Number(record.position.x))&&Number.isFinite(Number(record.position.y)));
-  }
-
-  function restoreRecord(record,source,maxAge){
-    if(!validRecord(record,maxAge)||!safeContext()||!root.KeloPlayerPosition?.restore)return false;
-    const point=nearestSafePoint(record.position);
-    if(!point)return false;
-    const dx=point.x-Number(record.position.x),dy=point.y-Number(record.position.y);
-    root.KeloPlayerPosition.restore(point,{source:source||'session-continuity',kind:'continuity-restore',stopMotion:true});
-    const c=record.camera;
-    if(c&&root.KeloCamera){
-      if(Number.isFinite(Number(c.baseZoom)))root.KeloCamera.setBaseZoom(Number(c.baseZoom),'session-continuity');
-      const cameraState={x:Number(c.x)+dx,y:Number(c.y)+dy,targetX:Number(c.targetX)+dx,targetY:Number(c.targetY)+dy,lookOffsetX:Number(c.lookOffsetX)||0,lookOffsetY:Number(c.lookOffsetY)||0};
-      if(Number.isFinite(cameraState.x)&&Number.isFinite(cameraState.y))root.KeloCamera.restoreState(cameraState,{source:'session-continuity',resetLook:false});
-    }
-    restores++;restored=true;lastReason=String(source||'restore');lastError=null;
-    emit('restored',{source:lastReason,checkpointId:record.id||null,ageMs:Date.now()-Number(record.at)});
-    return true;
-  }
-
-  function restoreUpdate(){
-    const record=read(sessionStorage,UPDATE_KEY);
-    if(!record)return false;
-    const ok=restoreRecord(record,'update-resume',UPDATE_TTL_MS);
-    remove(sessionStorage,UPDATE_KEY);
-    if(ok&&typeof root.showToast==='function'){try{root.showToast('Kelo World actualizado · sesión restaurada');}catch(_){} }
-    return ok;
-  }
-
+  function policyFor(build){const p=read(sessionStorage,POLICY_KEY),b=String(build||'').toLowerCase();if(!p||p.v!==1)return null;if(b&&String(p.build||'').toLowerCase()!==b)return null;return p;}
+  function modeFor(build){const p=policyFor(build),m=String(p&&p.mode||'');return m==='full-restart'?'full-restart':'seamless-restart';}
+  function compactCamera(){try{const s=root.KeloCamera?.snapshot?.();if(!s)return null;return {x:round(s.x),y:round(s.y),targetX:round(s.targetX),targetY:round(s.targetY),lookOffsetX:round(s.lookOffsetX),lookOffsetY:round(s.lookOffsetY),baseZoom:round(s.baseZoom)};}catch(_){return null;}}
+  function makeRecord(reason,options){if(!safeContext())return null;const point=root.KeloPlayerPosition?.capture?.();if(!point||!Number.isFinite(Number(point.x))||!Number.isFinite(Number(point.y)))return null;const opts=options||{},resumeMode=opts.resumeMode==='minimal'?'minimal':'seamless';return {v:2,id:Date.now().toString(36),at:Date.now(),reason:String(reason||'checkpoint'),build:opts.build?String(opts.build):null,path:pathKey(),surface:'world',resumeMode,position:{x:round(point.x),y:round(point.y)},camera:resumeMode==='minimal'?null:compactCamera()};}
+  function capture(reason,options){const opts=options||{},record=makeRecord(reason,opts);if(!record)return null;captures++;lastReason=record.reason;lastMode=record.resumeMode;lastError=null;if(opts.update===true){if(write(sessionStorage,UPDATE_KEY,record))sessionWrites++;}if(opts.durable===true){const serialized=JSON.stringify(record);if(serialized!==lastDurableSerialized&&write(localStorage,SAFE_KEY,record)){lastDurableSerialized=serialized;durableWrites++;}}emit('captured',{reason:record.reason,update:opts.update===true,durable:opts.durable===true,resumeMode:record.resumeMode});return Object.freeze(record);}
+  function captureForUpdate(build,updateMode){const mode=updateMode||modeFor(build);return capture('verified-update',{update:true,durable:true,build:build||null,resumeMode:mode==='full-restart'?'minimal':'seamless'});}
+  function pointBlocked(x,y){try{if(!root.KELO_COLLISION?.resolveCircleAABB||typeof obstacles==='undefined'||!Array.isArray(obstacles))return false;const p=typeof localPlayer!=='undefined'&&localPlayer?localPlayer:null,radius=Math.max(4,Number(p?.radius||p?.r)||10);for(let i=0;i<obstacles.length;i++){const box=obstacles[i];if(!box||!Number.isFinite(Number(box.x))||!Number.isFinite(Number(box.y))||!Number.isFinite(Number(box.w))||!Number.isFinite(Number(box.h)))continue;if(root.KELO_COLLISION.resolveCircleAABB(x,y,radius,box).collided)return true;}}catch(_){}return false;}
+  function nearestSafePoint(point){const x=Number(point?.x),y=Number(point?.y);if(!Number.isFinite(x)||!Number.isFinite(y))return null;if(!pointBlocked(x,y))return {x,y};for(const distance of RESTORE_SEARCH_STEPS){for(const dir of RESTORE_DIRECTIONS){const scale=dir[0]&&dir[1]?Math.SQRT1_2:1,nx=x+dir[0]*distance*scale,ny=y+dir[1]*distance*scale;if(!pointBlocked(nx,ny))return {x:nx,y:ny};}}return null;}
+  function validRecord(record,maxAge){return !!(record&&(record.v===1||record.v===2)&&record.surface==='world'&&record.path===pathKey()&&Number.isFinite(Number(record.at))&&Date.now()-Number(record.at)<=maxAge&&record.position&&Number.isFinite(Number(record.position.x))&&Number.isFinite(Number(record.position.y)));}
+  function restoreRecord(record,source,maxAge){if(!validRecord(record,maxAge)||!safeContext()||!root.KeloPlayerPosition?.restore)return false;const point=nearestSafePoint(record.position);if(!point)return false;const dx=point.x-Number(record.position.x),dy=point.y-Number(record.position.y);root.KeloPlayerPosition.restore(point,{source:source||'session-continuity',kind:'continuity-restore',stopMotion:true});const c=record.resumeMode==='minimal'?null:record.camera;if(c&&root.KeloCamera){if(Number.isFinite(Number(c.baseZoom)))root.KeloCamera.setBaseZoom(Number(c.baseZoom),'session-continuity');const cameraState={x:Number(c.x)+dx,y:Number(c.y)+dy,targetX:Number(c.targetX)+dx,targetY:Number(c.targetY)+dy,lookOffsetX:Number(c.lookOffsetX)||0,lookOffsetY:Number(c.lookOffsetY)||0};if(Number.isFinite(cameraState.x)&&Number.isFinite(cameraState.y))root.KeloCamera.restoreState(cameraState,{source:'session-continuity',resetLook:false});}restores++;restored=true;lastReason=String(source||'restore');lastMode=record.resumeMode||'seamless';lastError=null;emit('restored',{source:lastReason,checkpointId:record.id||null,ageMs:Date.now()-Number(record.at),resumeMode:lastMode});return true;}
+  function restoreUpdate(){const record=read(sessionStorage,UPDATE_KEY);if(!record)return false;const ok=restoreRecord(record,'update-resume',UPDATE_TTL_MS);remove(sessionStorage,UPDATE_KEY);remove(sessionStorage,POLICY_KEY);if(ok&&typeof root.showToast==='function'){try{root.showToast(record.resumeMode==='minimal'?'Kelo World actualizado · posición restaurada':'Kelo World actualizado · sesión restaurada');}catch(_){} }return ok;}
   function restoreLastSafe(){const record=read(localStorage,SAFE_KEY);return restoreRecord(record,'last-safe-resume',SAFE_TTL_MS);}
-
-  function clear(){remove(sessionStorage,UPDATE_KEY);remove(localStorage,SAFE_KEY);lastDurableSerialized='';return true;}
-
-  function showUpdateBanner(){
-    try{
-      let el=document.getElementById('kelo-continuity-update');
-      if(el)return el;
-      el=document.createElement('div');el.id='kelo-continuity-update';el.textContent='Actualizando Kelo World…';
-      Object.assign(el.style,{position:'fixed',left:'50%',top:'max(18px, env(safe-area-inset-top))',transform:'translateX(-50%)',zIndex:'2147483647',pointerEvents:'none',padding:'9px 13px',borderRadius:'14px',background:'rgba(5,7,10,.9)',border:'1px solid rgba(229,189,98,.45)',color:'#e7c56a',font:'700 12px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif',boxShadow:'0 8px 24px rgba(0,0,0,.35)'});
-      document.body.appendChild(el);return el;
-    }catch(_){return null;}
-  }
-
+  function clear(){remove(sessionStorage,UPDATE_KEY);remove(sessionStorage,POLICY_KEY);remove(localStorage,SAFE_KEY);lastDurableSerialized='';return true;}
+  function showUpdateBanner(mode){try{let el=document.getElementById('kelo-continuity-update');if(el)return el;el=document.createElement('div');el.id='kelo-continuity-update';el.textContent=mode==='full-restart'?'Actualización crítica de Kelo World…':'Actualizando Kelo World…';Object.assign(el.style,{position:'fixed',left:'50%',top:'max(18px, env(safe-area-inset-top))',transform:'translateX(-50%)',zIndex:'2147483647',pointerEvents:'none',padding:'9px 13px',borderRadius:'14px',background:'rgba(5,7,10,.9)',border:'1px solid rgba(229,189,98,.45)',color:'#e7c56a',font:'700 12px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif',boxShadow:'0 8px 24px rgba(0,0,0,.35)'});document.body.appendChild(el);return el;}catch(_){return null;}}
   function twoFrames(){return new Promise(resolve=>{if(typeof requestAnimationFrame!=='function'){resolve();return;}requestAnimationFrame(()=>requestAnimationFrame(resolve));});}
-
-  async function tryAutoApply(trigger){
-    if(applying||root.KELO_DISABLE_AUTO_APPLY===true)return false;
-    try{if(new URL(root.location.href).searchParams.get('manualUpdate')==='1')return false;}catch(_){}
-    const updater=root.KeloUpdater;if(!updater?.getState||!updater?.applyUpdate)return false;
-    const state=updater.getState();
-    if(document.visibilityState!=='visible'||state.gameplayBusy||state.status!=='ready'||state.stage?.status!=='ready')return false;
-    const target=state.availableBuild||state.deployedBuild||state.stage?.build;
-    applying=true;lastReason='auto-apply:'+String(trigger||'event');
-    const checkpoint=captureForUpdate(target);
-    if(!checkpoint){applying=false;return false;}
-    const banner=showUpdateBanner();
-    await twoFrames();
-    try{await updater.applyUpdate();return true;}
-    catch(error){
-      remove(sessionStorage,UPDATE_KEY);applying=false;lastError=String(error&&error.message||error);try{banner?.remove();}catch(_){}emit('apply-deferred',{error:lastError});return false;
-    }
-  }
-
-  function scheduleRestore(){
-    const run=()=>{if(restored)return;try{restoreUpdate();}catch(error){lastError=String(error&&error.message||error);remove(sessionStorage,UPDATE_KEY);emit('restore-error',{error:lastError});}};
-    if(root.__keloBootReady){if(typeof requestAnimationFrame==='function')requestAnimationFrame(run);else run();}
-    else root.addEventListener('kelo:boot-ready',run,{once:true});
-  }
-
-  function sparseDurable(reason){if(!safeContext())return;capture(reason,{durable:true});}
-
+  async function tryAutoApply(trigger){if(applying||root.KELO_DISABLE_AUTO_APPLY===true)return false;try{if(new URL(root.location.href).searchParams.get('manualUpdate')==='1')return false;}catch(_){}const updater=root.KeloUpdater;if(!updater?.getState||!updater?.applyUpdate)return false;const state=updater.getState();if(document.visibilityState!=='visible'||state.gameplayBusy||state.status!=='ready'||state.stage?.status!=='ready')return false;const target=state.availableBuild||state.deployedBuild||state.stage?.build,updateMode=modeFor(target);applying=true;lastReason='auto-apply:'+String(trigger||'event');lastMode=updateMode;const checkpoint=captureForUpdate(target,updateMode);if(!checkpoint){applying=false;return false;}const banner=showUpdateBanner(updateMode);await twoFrames();try{await updater.applyUpdate();return true;}catch(error){remove(sessionStorage,UPDATE_KEY);applying=false;lastError=String(error&&error.message||error);try{banner?.remove();}catch(_){}emit('apply-deferred',{error:lastError,updateMode});return false;}}
+  function scheduleRestore(){const run=()=>{if(restored)return;try{restoreUpdate();}catch(error){lastError=String(error&&error.message||error);remove(sessionStorage,UPDATE_KEY);remove(sessionStorage,POLICY_KEY);emit('restore-error',{error:lastError});}};if(root.__keloBootReady){if(typeof requestAnimationFrame==='function')requestAnimationFrame(run);else run();}else root.addEventListener('kelo:boot-ready',run,{once:true});}
+  function sparseDurable(reason){if(!safeContext())return;capture(reason,{durable:true,resumeMode:'seamless'});}
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')sparseDurable('visibility-hidden');},{passive:true});
   root.addEventListener('pagehide',()=>sparseDurable('pagehide'),{passive:true});
   root.addEventListener('kelo:update:staged',()=>{void tryAutoApply('staged');});
   root.addEventListener('kelo:update:available',()=>{void tryAutoApply('available');});
   root.addEventListener('kelo:update:connected',()=>{void tryAutoApply('connected');});
   try{root.KeloEvents?.on?.('PLAYER_POSITION_TRANSITION',event=>{if(event?.kind==='continuity-restore')return;sparseDurable('position-transition');});}catch(_){}
-
-  function getState(){return Object.freeze({version:VERSION,applying,restored,captures,restores,sessionWrites,durableWrites,lastReason,lastError,hasUpdateCheckpoint:!!read(sessionStorage,UPDATE_KEY),hasLastSafe:!!read(localStorage,SAFE_KEY),timers:0,intervals:0,gameLoop:false,perFrameWrites:false});}
-
+  function getState(){const p=read(sessionStorage,POLICY_KEY);return Object.freeze({version:VERSION,applying,restored,captures,restores,sessionWrites,durableWrites,lastReason,lastError,lastMode,policy:p&&p.mode||null,hasUpdateCheckpoint:!!read(sessionStorage,UPDATE_KEY),hasLastSafe:!!read(localStorage,SAFE_KEY),timers:0,intervals:0,gameLoop:false,perFrameWrites:false});}
   root.KeloSessionContinuity=Object.freeze({version:VERSION,capture,captureForUpdate,restoreUpdate,restoreLastSafe,getState,clear,tryAutoApply});
-  root.KELO_SESSION_CONTINUITY_AUDIT=Object.freeze({version:VERSION,installed:true,eventDriven:true,timers:0,intervals:0,gameLoop:false,perFrameWrites:false,updateAutoApply:true,collisionAwareRestore:true,durableSparseCheckpoint:true});
+  root.KELO_SESSION_CONTINUITY_AUDIT=Object.freeze({version:VERSION,installed:true,eventDriven:true,timers:0,intervals:0,gameLoop:false,perFrameWrites:false,updateAutoApply:true,collisionAwareRestore:true,durableSparseCheckpoint:true,seamlessRestoresCamera:true,fullRestartRestoresPositionOnly:true});
   scheduleRestore();
 })(typeof globalThis!=='undefined'?globalThis:window);
