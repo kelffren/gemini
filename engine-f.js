@@ -104,8 +104,9 @@ root.KELO_LEGACY_ABILITY_TRIGGER_AUDIT=Object.freeze({version:BRIDGE_VERSION,ins
 const VERSION='kelo-ability-direction-v1.1.0-characterized';
 const THRESHOLDS=Object.freeze({aimInput:0.15,dashInput:0.12,dashVelocity:12});
 const BALANCE=Object.freeze({directDashDistance:150,directDashPvpRadius:60,projectileSpeed:450,projectileRadius:10,projectileLife:2,trailSteps:10});
-function finite(value){const n=Number(value);return Number.isFinite(n)?n:0;}
-function fallbackPoint(fallback){return{x:finite(fallback&&fallback.x)||1,y:finite(fallback&&fallback.y)};}
+function finiteOr(value,fallback){const n=Number(value);return Number.isFinite(n)?n:fallback;}
+function finite(value){return finiteOr(value,0);}
+function fallbackPoint(fallback){return{x:finiteOr(fallback&&fallback.x,1),y:finiteOr(fallback&&fallback.y,0)};}
 function normalized(x,y,fallback){
   const nx=finite(x),ny=finite(y),len=Math.hypot(nx,ny);
   if(!len)return fallbackPoint(fallback);
