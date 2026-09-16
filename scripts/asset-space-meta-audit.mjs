@@ -1,8 +1,8 @@
 /* KELO-INDEX
  * area: BUILD / CREATOR ASSET INGEST
  * owner: Kelo Creator Asset Bridge
- * keys: ASSET SPACE META AUDIT PROFILE SEAM QUALITY TOURNAMENT
- * purpose: prove asset classification, seam hard-gates and verified codec tournament behavior without optional native codecs
+ * keys: ASSET SPACE META AUDIT PROFILE SEAM QUALITY TOURNAMENT PATH TOKENS
+ * purpose: prove asset classification, path-token safety, seam hard-gates and verified codec tournament behavior without optional native codecs
  * public-api: CLI audit
  * state-owned: none
  * online: N/A
@@ -39,6 +39,12 @@ assert(tileProfile.kind === 'tile', `tile kind=${tileProfile.kind}`);
 assert(tileProfile.adaptivePolicy === 'seam-safe', `tile policy=${tileProfile.adaptivePolicy}`);
 assert(tileProfile.invariants.preserveBorder === true, 'tile border invariant');
 
+// Regression: token hints must not treat the substring "road" inside "broad" as a road/tile.
+const broadTreeProfile = profileAssetImage(source, width, height, {sourceName:'assets/world/trees/tree-oak-broad-green.png'});
+assert(broadTreeProfile.kind !== 'tile', `broad tree false tile=${broadTreeProfile.kind}`);
+assert(broadTreeProfile.hints.tile === false, 'broad tree false road token');
+assert(broadTreeProfile.invariants.preserveBorder === false, 'broad tree false seam lock');
+
 const changedBorder = Buffer.from(source);
 changedBorder[0] += 1;
 const borderMetrics = evaluatePixelFidelity(source, changedBorder, width, height);
@@ -65,6 +71,8 @@ assert(tournament.buffer.length <= png.length, `tournament grew ${png.length}->$
 console.log(JSON.stringify({
   status:'ASSET_SPACE_META_AUDIT_OK',
   tilePolicy:tileProfile.adaptivePolicy,
+  broadTreeKind:broadTreeProfile.kind,
+  broadTreeTileHint:broadTreeProfile.hints.tile,
   spriteKind:spriteProfile.kind,
   borderGate:judgePixelFidelity(borderMetrics, 'seam-safe').reasons,
   sourceBytes:png.length,
