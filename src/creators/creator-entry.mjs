@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: CREATORS / ENTRY
  * owner: Kelo Creators composition root
- * keys: CREATOR LIBRARY IMAGE LAB MARKETPLACE WORKSPACE REGISTRY LAZY ONLINE
+ * keys: CREATOR LIBRARY IMAGE LAB MARKETPLACE ENTITLEMENT WORKSPACE REGISTRY LAZY ONLINE
  * owns: lazy composition of generic Creator infrastructure and workspace registration
  * does-not-own: Studio core, workspace implementations, gameplay, payment settlement or network transport
  * public-api: bootKeloCreators, getKeloCreatorsPlatform
@@ -9,6 +9,7 @@
  * reuse: every Creator workspace registers one manifest; shared online services are composed here once per Creator session
  * do-not: no heavy Creator module in normal boot, no duplicate editor/runtime/market authority owners
  */
+import '../systems/creator-entitlement-system.js';
 import { createCreatorWorkspaceRegistry } from './core/workspace-registry.mjs';
 import { createCreatorDependencyGraph } from './core/dependency-graph.mjs';
 import { createCreatorPermissionAdapter } from './adapters/creator-permission-adapter.mjs';
@@ -76,7 +77,7 @@ export async function bootKeloCreators({root=globalThis,stateAdapter=null}={}){
   }
   const permission=createCreatorPermissionAdapter(root),world=createWorldCreatorAdapter({root,permission}),localState=stateAdapter||createIndexedDbCreatorStateAdapter({indexedDBFactory:root.indexedDB}),projects=createLocalCreatorProjectRepository({domainAdapters:[world],stateAdapter:localState}),workspaces=createCreatorWorkspaceRegistry(),dependencies=createCreatorDependencyGraph();
   const fetchImpl=root.fetch?.bind?.(root)||globalThis.fetch?.bind?.(globalThis),contentSession=createKeloSupabaseBrowserSession({root,fetchImpl,config:KELO_SUPABASE_PUBLIC_CONFIG}),avatarRuntime=installCreatorAvatarRuntime({root}),runtimeContent=createRuntimeContentRegistry({root}),contentRepository=createSupabaseCreatorContentRepository({url:KELO_SUPABASE_PUBLIC_CONFIG.url,publishableKey:KELO_SUPABASE_PUBLIC_CONFIG.publishableKey,getAccessToken:()=>contentSession.accessToken,fetchImpl}),contentService=createUniversalContentService({repository:contentRepository,runtimeRegistry:runtimeContent,root}),marketplace=createCreatorMarketplaceService({contentSession,contentRepository,root}),avatarQuick=createAvatarQuickImportService({contentSession,contentRepository,contentService,root});
-  try{root.KELO_CREATOR_CONTENT_REGISTRY=runtimeContent;root.KELO_CREATOR_MARKETPLACE=marketplace;}catch{}
+  try{root.KELO_CREATOR_CONTENT_REGISTRY=runtimeContent;root.KELO_CREATOR_MARKETPLACE=marketplace;void root.KeloCreatorEntitlements?.refresh?.();}catch{}
   registerWorldWorkspace(workspaces);registerMapForgeWorkspace(workspaces);registerMountWorkspace(workspaces);registerAppearanceWorkspace(workspaces);registerAnimationWorkspace(workspaces);registerVfxWorkspace(workspaces);registerAbilityWorkspace(workspaces);registerSpriteAbilityWorkspace(workspaces);registerContentStudioWorkspace(workspaces);registerAssetSheetWorkspace(workspaces);registerAssetForgeWorkspace(workspaces);registerImageLabWorkspace(workspaces);registerAvatarWorkspace(workspaces);registerDefinitionWorkspaces(workspaces);registerCreatorLibraryWorkspace(workspaces);
   async function openWorkspace(id,context={}){
     const manifest=workspaces.resolve(id);if(!manifest)throw new Error(`CREATOR_WORKSPACE_NOT_FOUND:${id}`);
@@ -84,7 +85,7 @@ export async function bootKeloCreators({root=globalThis,stateAdapter=null}={}){
     if(id==='sprite-ability')await ensureSpriteAbilityExtensions();
     return workspaces.open(id,{root,projects,permission,workspaces,dependencies,contentSession,contentRepository,contentService,marketplace,runtimeContent,avatarRuntime,avatarQuick,openWorkspace,...context});
   }
-  platform=Object.freeze({version:'kelo-creators-core-v1.26.0-marketplace',permission,projects,workspaces,dependencies,contentSession,contentRepository,contentService,marketplace,runtimeContent,avatarRuntime,avatarQuick,openWorkspace,close(){try{looseImportDispose?.();}catch{}try{irregularImportDispose?.();}catch{}try{repairTouchDispose?.();}catch{}try{repairStudioDispose?.();}catch{}try{manualCutterDispose?.();}catch{}try{easyUiDispose?.();}catch{}try{eventLabDispose?.();}catch{}try{visualUiDispose?.();}catch{}try{localState.close?.();}catch{}try{inputLocksDispose?.();}catch{}try{if(root.KELO_CREATOR_MARKETPLACE===marketplace)delete root.KELO_CREATOR_MARKETPLACE;}catch{}platform=null;}});
+  platform=Object.freeze({version:'kelo-creators-core-v1.27.0-entitlements',permission,projects,workspaces,dependencies,contentSession,contentRepository,contentService,marketplace,entitlements:root.KeloCreatorEntitlements||null,runtimeContent,avatarRuntime,avatarQuick,openWorkspace,close(){try{looseImportDispose?.();}catch{}try{irregularImportDispose?.();}catch{}try{repairTouchDispose?.();}catch{}try{repairStudioDispose?.();}catch{}try{manualCutterDispose?.();}catch{}try{easyUiDispose?.();}catch{}try{eventLabDispose?.();}catch{}try{visualUiDispose?.();}catch{}try{localState.close?.();}catch{}try{inputLocksDispose?.();}catch{}try{if(root.KELO_CREATOR_MARKETPLACE===marketplace)delete root.KELO_CREATOR_MARKETPLACE;}catch{}platform=null;}});
   return platform;
 }
 export function getKeloCreatorsPlatform(){return platform;}
