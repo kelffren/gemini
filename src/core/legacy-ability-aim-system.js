@@ -1,13 +1,13 @@
 /* KELO-INDEX
  * area: CORE / LEGACY ABILITY COMPAT
  * owner: KeloAbilityAim
- * keys: ABILITY AIM DASH RANGE POINTER RENDER COMPATIBILITY LEGACY STRANGLER
- * purpose: concentra matemática final, lifecycle de puntero y overrides de aim en un único owner sin cambiar rangos, cooldowns ni feel
- * public-api: KeloAbilityAim.maxRange/minRatio/measuredRange/powerFromButtonDistance/snapshot
- * consumes: legacy skillAim/aim/STATE/localPlayer/camera/dashTween + helpers definidos por engine-g + KeloRender
- * state-owned: lifecycle de puntero; ninguna autoridad gameplay nueva
- * extension-points: reemplazar consumidores legacy por la API pura hasta retirar el adapter
- * legacy: strangler temporal para engine-g; no añadir abilities nuevas aquí
+ * keys: ABILITY AIM DASH RANGE POINTER RENDER BEGIN END COMPATIBILITY LEGACY STRANGLER
+ * purpose: concentra matemática final, lifecycle de puntero y begin/end de aim en un único owner sin cambiar rangos, cooldowns ni feel
+ * public-api: KeloAbilityAim.begin/end/maxRange/minRatio/measuredRange/powerFromButtonDistance/snapshot
+ * consumes: legacy skillAim/aim/STATE/localPlayer/camera/dashTween + active castAimedSkill compatibility target + KeloRender
+ * state-owned: lifecycle de puntero y estado de aim; no reemplaza aún el decorator de cast posterior
+ * extension-points: castAimedSkill global temporal permanece como downstream compatibility point hasta migrar engine-l
+ * legacy: strangler temporal para engine-g/engine-l; no añadir abilities nuevas aquí
  * do-not: NO segundo ability engine, NO segundo pointer lifecycle, NO nuevos números de balance, NO globals implícitos
  */
 (function(root,factory){
@@ -18,7 +18,6 @@ if(!root||!root.document)return;
 
 if(typeof skillAim==='undefined'||typeof aim==='undefined')throw new Error('legacy skill aim unavailable before KeloAbilityAim');
 if(!root.KeloRender||typeof root.KeloRender.afterFrame!=='function')throw new Error('KeloRender unavailable before KeloAbilityAim');
-if(typeof root.endSkillAim!=='function')throw new Error('legacy endSkillAim unavailable before KeloAbilityAim');
 
 skillAim.power=1;
 skillAim.castRange=160;
@@ -29,8 +28,9 @@ function slotCenter(el){
   const r=el.getBoundingClientRect();
   return{x:r.left+r.width/2,y:r.top+r.height/2};
 }
-
+function isAimSkillCompat(typeId){return typeId==='dash'||typeId==='fireball'||typeId==='frostnova'||typeId==='meteor';}
 function skillRangeCompat(typeId){return api.maxRange(typeId);}
+root.isAimSkill=isAimSkillCompat;
 root.skillRange=skillRangeCompat;
 root.measuredRange=api.measuredRange;
 
@@ -54,7 +54,7 @@ function updateAimFromButton(x,y){
 function beginSkillAimCompat(index,e){
   const stone=STATE.equipped[index];
   if(!stone||stone.currentCd>0)return;
-  if(!isAimSkill(stone.typeId)){triggerStone(index);return;}
+  if(!isAimSkillCompat(stone.typeId)){triggerStone(index);return;}
   e.preventDefault();
   e.stopPropagation();
   const el=e.currentTarget||document.getElementById('action-slot-'+index);
@@ -120,6 +120,17 @@ function castAimedSkillCompat(index,typeId,dirX,dirY){
   }
 }
 root.castAimedSkill=castAimedSkillCompat;
+
+function endSkillAimCompat(e){
+  if(!skillAim.active)return;
+  if(e&&skillAim.pointerId!=null&&e.pointerId!==skillAim.pointerId)return;
+  const index=skillAim.index,typeId=skillAim.typeId,dirX=skillAim.dirX,dirY=skillAim.dirY;
+  skillAim.active=false;
+  skillAim.pointerId=null;
+  const cast=root.castAimedSkill;
+  if(typeof cast==='function')cast(index,typeId,dirX,dirY);
+}
+root.endSkillAim=endSkillAimCompat;
 
 function drawSkillIndicatorCompat(){
   if(!skillAim.active)return;
@@ -203,12 +214,12 @@ function onPointerMove(e){
 function onPointerUp(e){
   if(!pointerMatches(e))return;
   lifecycleMetrics.endHandled++;
-  root.endSkillAim(e);
+  endSkillAimCompat(e);
 }
 function onPointerCancel(e){
   if(!pointerMatches(e))return;
   lifecycleMetrics.cancelHandled++;
-  root.endSkillAim(e);
+  endSkillAimCompat(e);
 }
 const lifecycleKey='__KELO_ABILITY_AIM_POINTER_LIFECYCLE__';
 const previousLifecycle=root[lifecycleKey];
@@ -217,7 +228,7 @@ root.addEventListener('pointermove',onPointerMove,{passive:true});
 root.addEventListener('pointerup',onPointerUp,{passive:true});
 root.addEventListener('pointercancel',onPointerCancel,{passive:true});
 const pointerLifecycle=Object.freeze({
-  version:'kelo-ability-pointer-lifecycle-v1.0.0',
+  version:'kelo-ability-pointer-lifecycle-v1.1.0',
   detach:function(){
     root.removeEventListener('pointermove',onPointerMove);
     root.removeEventListener('pointerup',onPointerUp);
@@ -233,11 +244,15 @@ if(staleHook)root.KeloRender.unregister(staleHook.id);
 const renderHookId=root.KeloRender.afterFrame('KeloAbilityAim:skill-indicator',drawSkillIndicatorCompat,20);
 
 root.KeloAbilityAim=Object.freeze(Object.assign({},api,{
-  snapshot:function(){return Object.freeze({version:api.version,active:!!skillAim.active,typeId:skillAim.typeId||'',power:Number(skillAim.power)||0,castRange:Number(skillAim.castRange)||0,pointerId:skillAim.pointerId??null,renderHookId:renderHookId,legacyRenderHookRetired:!!staleHook,pointerLifecycle:pointerLifecycle.snapshot()});}
+  begin:beginSkillAimCompat,
+  end:endSkillAimCompat,
+  updatePointer:updateAimFromPointerCompat,
+  isAimSkill:isAimSkillCompat,
+  snapshot:function(){return Object.freeze({version:api.version,active:!!skillAim.active,typeId:skillAim.typeId||'',power:Number(skillAim.power)||0,castRange:Number(skillAim.castRange)||0,pointerId:skillAim.pointerId??null,renderHookId:renderHookId,legacyRenderHookRetired:!!staleHook,pointerLifecycle:pointerLifecycle.snapshot(),downstreamCastCompatibility:true});}
 }));
 })(typeof globalThis!=='undefined'?globalThis:this,function(){
 'use strict';
-const VERSION='kelo-ability-aim-v1.1.0-pointer-owner';
+const VERSION='kelo-ability-aim-v1.2.0-lifecycle-owner';
 const MAX=Object.freeze({dash:170,fireball:300,frostnova:230,meteor:260});
 const MIN_RATIO=Object.freeze({dash:0.32,fireball:0.45,frostnova:0.45,meteor:0.4});
 const STICK_RADIUS=72;
