@@ -12,6 +12,8 @@ const syntaxFiles=[
   'src/creators/assets/ambientcg-live-provider.mjs',
   'src/creators/assets/polyhaven-live-provider.mjs',
   'src/creators/assets/openverse-live-provider.mjs',
+  'src/creators/assets/three-d-assets-live-provider.mjs',
+  'src/creators/assets/gobkit-live-provider.mjs',
   'src/creators/assets/external-asset-providers.mjs'
 ];
 for(const file of syntaxFiles){const result=spawnSync(process.execPath,['--check',file],{encoding:'utf8'});assert(result.status===0,`${file} syntax check failed: ${result.stderr||result.stdout}`);}
@@ -23,6 +25,8 @@ const runtime=read('src/creators/assets/external-provider-runtime.mjs');
 const ambientcg=read('src/creators/assets/ambientcg-live-provider.mjs');
 const polyhaven=read('src/creators/assets/polyhaven-live-provider.mjs');
 const openverse=read('src/creators/assets/openverse-live-provider.mjs');
+const threeDAssets=read('src/creators/assets/three-d-assets-live-provider.mjs');
+const gobkit=read('src/creators/assets/gobkit-live-provider.mjs');
 const vault=read('asset-vault.html');
 const config=JSON.parse(read('data/external-asset-providers.json'));
 
@@ -52,12 +56,14 @@ assert(/saveData/.test(runtime)&&/effectiveType/.test(runtime),'external provide
 assert(/catalogOnly:true/.test(ambientcg)&&/downloadUrl:null/.test(ambientcg),'ambientCG must remain catalog-only until explicit source resolution');
 assert(/catalogOnly:true/.test(polyhaven)&&/\/search\?/.test(polyhaven),'Poly Haven must use search-first catalog-only discovery');
 assert(/licenseReviewRequired:true/.test(openverse)&&/downloadUrl:null/.test(openverse),'Openverse must remain source/license-review discovery only');
+assert(/requiresQuery:true/.test(threeDAssets)&&/catalogOnly:true/.test(threeDAssets)&&/downloadUrl:null/.test(threeDAssets),'3DAssets.dev must stay query-only and catalog-only');
+assert(/catalogOnly:true/.test(gobkit)&&/downloadUrl:null/.test(gobkit)&&/60\*60\*1000/.test(gobkit),'Gobkit manifest must stay catalog-only and long-cached');
 assert(/hibernatePage\(\)/.test(vault),'library must hibernate old catalog pages');
 assert(/releaseMedia/.test(vault),'library must release preview media when pages/modal close');
 assert(/perProvider=id==='all'\?12:48/.test(vault),'UI page budget changed; review 10k memory/DOM contract before raising it');
 
 const providerIds=new Set((config.providers||[]).map(row=>row.id));
-for(const id of ['ambientcg','polyhaven','openverse-images','openverse-audio'])assert(providerIds.has(id),`${id} must stay registered in provider config`);
+for(const id of ['ambientcg','polyhaven','openverse-images','openverse-audio','3dassets','gobkit'])assert(providerIds.has(id),`${id} must stay registered in provider config`);
 assert((config.providers||[]).filter(row=>row.mode==='lazy-live-api').every(row=>row.catalogOnly===true), 'every lazy live API must be catalog-only');
 
 const synthetic=Array.from({length:10000},(_,i)=>({id:`synthetic:${i}`}));
