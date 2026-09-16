@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: SERVER / SPRITE AI TEST
  * owner: Kelo Sprite AI deterministic smoke coverage
- * purpose: verify ZeroGPU-first selection, V3 staged contract, OpenAI compatibility, auth/CORS/rate limits and explicit paid fallback policy
+ * purpose: verify ZeroGPU-first selection, V3 stages, real-skeleton routing, OpenAI compatibility, auth/CORS/rate limits and explicit fallback policy
  * online: exercises the same /api/sprite-generate authority boundary used by the Creator UI
  */
 'use strict';
@@ -9,6 +9,7 @@ const assert=require('assert');
 const http=require('http');
 const {createSpriteAiService,createOpenAiProvider,buildPrompt,buildHuggingFacePrompt,buildStagePrompt}=require('./sprite-ai-service');
 const {createHuggingFaceSpriteProvider}=require('./sprite-ai-provider-huggingface');
+const {createHuggingFacePoseProvider}=require('./sprite-ai-provider-pose-huggingface');
 const {createSpriteAiHttpHandler}=require('./sprite-ai-http');
 
 (async()=>{
@@ -23,13 +24,23 @@ const {createSpriteAiHttpHandler}=require('./sprite-ai-http');
   const service=createSpriteAiService({provider:'auto',huggingFaceProvider:hf,openAiProvider:disabledOpenAi,maxSourceBytes:1024*1024});
   assert.equal(service.status().provider,'huggingface-zerogpu');
   assert.equal(service.status().allowPaidFallback,false);
+  assert.equal(service.status().realSkeletonReady,false);
   assert(service.status().pipelines.includes('identity-skeleton-v3'));
   const hfOut=await service.generate({action:'walk',seed:17,prompt:'teal coat warrior'});
   assert.equal(hfOut.provider,'huggingface-zerogpu');assert.equal(hfOut.layout.rows,8);assert.equal(hfOut.pipeline,'atlas-v2');assert.equal(hfCalls.length,1);assert.equal(hfCalls[0].apiName,'/generate');assert.equal(hfCalls[0].payload[2],17);assert(hfCalls[0].payload[0].includes('teal coat warrior'));
 
   const v3Out=await service.generate({pipeline:'identity-skeleton-v3',mode:'direction',direction:'NE',action:'walk',seed:23,prompt:'teal coat warrior',poseTemplate:{phase:'contact'}});
-  assert.equal(v3Out.pipeline,'identity-skeleton-v3');assert.equal(v3Out.stage,'direction');assert.equal(v3Out.identityLocked,true);assert.equal(hfCalls.length,2);assert.equal(hfCalls[1].apiName,'/generate_v3');assert.equal(hfCalls[1].payload[0],'direction');assert.equal(hfCalls[1].payload[3],23);assert.equal(hfCalls[1].payload[5],'NE');assert.equal(hfCalls[1].payload[6],'walk');
+  assert.equal(v3Out.pipeline,'identity-skeleton-v3');assert.equal(v3Out.stage,'direction');assert.equal(v3Out.identityLocked,true);assert.equal(v3Out.realSkeleton,false);assert.equal(v3Out.poseConditioning,'semantic-keypoint-intent');assert.equal(hfCalls.length,2);assert.equal(hfCalls[1].apiName,'/generate_v3');assert.equal(hfCalls[1].payload[0],'direction');assert.equal(hfCalls[1].payload[3],23);assert.equal(hfCalls[1].payload[5],'NE');assert.equal(hfCalls[1].payload[6],'walk');
   await assert.rejects(()=>service.generate({pipeline:'identity-skeleton-v3',mode:'magic'}),error=>error.code==='SPRITE_AI_V3_UNKNOWN_STAGE');
+  await assert.rejects(()=>service.generate({pipeline:'identity-skeleton-v3',mode:'direction',realSkeleton:true,sourceImageDataUrl:dataUrl,poseTemplate:{frames:[{},{},{},{}]}}),error=>error.code==='SPRITE_AI_POSE_NOT_CONFIGURED');
+
+  const poseCalls=[];
+  const pose=createHuggingFacePoseProvider({space:'kelo/pose-space',token:'hf-test',connectImpl:async(space,options)=>({predict:async(apiName,payload)=>{poseCalls.push({space,options,apiName,payload});return{data:[dataUrl,null,JSON.stringify({conditioning:'controlnet-openpose+ip-adapter'})]};}})});
+  const poseService=createSpriteAiService({provider:'auto',huggingFaceProvider:hf,poseProvider:pose,openAiProvider:disabledOpenAi,realSkeletonEnabled:true,maxSourceBytes:1024*1024});
+  assert.equal(poseService.status().realSkeletonEnabled,true);assert.equal(poseService.status().realSkeletonReady,true);assert.equal(poseService.status().providers.pose.conditioning,'controlnet-openpose+ip-adapter');
+  const poseTemplate={schema:'kelo-biped-v2',frames:[0,1,2,3].map(i=>({phase:`p${i}`,keypoints:{head:[.5,.2],neck:[.5,.3],hips:[.5,.6],leftFoot:[.4,.9],rightFoot:[.6,.9]}}))};
+  const poseOut=await poseService.generate({pipeline:'identity-skeleton-v3',mode:'direction',direction:'SW',action:'walk',seed:41,prompt:'teal coat warrior',sourceImageDataUrl:dataUrl,poseTemplate});
+  assert.equal(poseOut.realSkeleton,true);assert.equal(poseOut.poseConditioning,'controlnet-openpose+ip-adapter');assert.equal(poseOut.provider,'huggingface-zerogpu-pose');assert.equal(poseCalls.length,1);assert.equal(poseCalls[0].apiName,'/generate_pose');assert.equal(poseCalls[0].payload[2],41);assert.equal(poseCalls[0].payload[3],'SW');assert.equal(poseCalls[0].payload[4],'walk');assert(JSON.parse(poseCalls[0].payload[5]).frames.length===4);
 
   const openAiCalls=[];
   const fakeFetch=async(url,options)=>{openAiCalls.push({url,options});return new Response(JSON.stringify({data:[{b64_json:png}],usage:{total_tokens:1}}),{status:200,headers:{'content-type':'application/json'}});};
@@ -52,7 +63,7 @@ const {createSpriteAiHttpHandler}=require('./sprite-ai-http');
   const handler=createSpriteAiHttpHandler({service,identity,allowedOrigins:'https://example.test',rateLimit:3,maxBodyBytes:1024*1024});
   const server=http.createServer((req,res)=>{handler(req,res).then(handled=>{if(!handled){res.writeHead(404);res.end();}});});await new Promise(r=>server.listen(0,'127.0.0.1',r));const base=`http://127.0.0.1:${server.address().port}`;
   try{
-    let r=await fetch(base+'/api/sprite-generate/status',{headers:{Origin:'https://example.test'}});assert.equal(r.status,200);let j=await r.json();assert.equal(j.configured,true);assert.equal(j.provider,'huggingface-zerogpu');assert(j.pipelines.includes('identity-skeleton-v3'));assert.equal(r.headers.get('access-control-allow-origin'),'https://example.test');
+    let r=await fetch(base+'/api/sprite-generate/status',{headers:{Origin:'https://example.test'}});assert.equal(r.status,200);let j=await r.json();assert.equal(j.configured,true);assert.equal(j.provider,'huggingface-zerogpu');assert(j.pipelines.includes('identity-skeleton-v3'));assert.equal(j.realSkeletonReady,false);assert.equal(r.headers.get('access-control-allow-origin'),'https://example.test');
     r=await fetch(base+'/api/sprite-generate',{method:'POST',headers:{Origin:'https://example.test','content-type':'application/json'},body:'{}'});assert.equal(r.status,401);
     r=await fetch(base+'/api/sprite-generate',{method:'POST',headers:{Origin:'https://example.test',Authorization:'Bearer guest','content-type':'application/json'},body:'{}'});assert.equal(r.status,403);
     r=await fetch(base+'/api/sprite-generate',{method:'POST',headers:{Origin:'https://example.test',Authorization:'Bearer good','content-type':'application/json'},body:JSON.stringify({action:'walk'})});assert.equal(r.status,200);j=await r.json();assert.equal(j.ok,true);assert.equal(j.rateLimit.remaining,2);
@@ -61,5 +72,5 @@ const {createSpriteAiHttpHandler}=require('./sprite-ai-http');
     r=await fetch(base+'/api/sprite-generate',{method:'POST',headers:{Origin:'https://example.test',Authorization:'Bearer good','content-type':'application/json'},body:'{}'});assert.equal(r.status,429);
     r=await fetch(base+'/api/sprite-generate/status',{headers:{Origin:'https://evil.test'}});assert.equal(r.status,403);
   }finally{await new Promise(r=>server.close(r));}
-  console.log('Sprite AI smoke passed: ZeroGPU-first + V3 staged contract + OpenAI compatibility + explicit paid fallback + auth/CORS/rate limit');
+  console.log('Sprite AI smoke passed: ZeroGPU-first + V3 stages + real skeleton routing + no silent downgrade + auth/CORS/rate limit');
 })().catch(error=>{console.error(error);process.exit(1);});
