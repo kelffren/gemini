@@ -11,6 +11,7 @@ const net=read('engine-net.js');
 const avatarRuntime=read('src/characters/creator-avatar-runtime.mjs');
 const bridge=read('src/characters/creator-character-state-bridge.js');
 const gate=read('src/core/creators-lazy-gate.js');
+const smoke=read('server/creator-modular-replication-smoke-test.js');
 check('public snapshot is owner-character scoped',/get_my_public_creator_character_appearance/.test(migration)&&/c\.account_id=v_uid/.test(migration)&&/c\.status='active'/.test(migration));
 check('snapshot includes only currently bound appearance or equipment',/creator_character_content_bindings/.test(migration)&&/d\.content_type in \('appearance','equipment'\)/.test(migration)&&/b\.binding_kind=d\.content_type/.test(migration));
 check('snapshot requires active content publication and exact entitlement or authorship',/content_publications cp/.test(migration)&&/cp\.is_active=true/.test(migration)&&/r\.owner_user_id=v_uid/.test(migration)&&/creator_content_entitlements/.test(migration)&&/e\.revision_id=r\.id/.test(migration));
@@ -19,6 +20,7 @@ check('replication RPC does not grant ownership or mutate use state',!/insert in
 check('server presentation is derived with owner JWT, not viewer or client-declared URLs',/get_my_public_creator_character_appearance/.test(avatarStore)&&/headers\(accessToken\)/.test(avatarStore)&&/sanitizeAppearance/.test(avatarStore)&&/runtimeUrl/.test(avatarStore));
 check('server only republishes approved creator-global global or official bytes',/PUBLIC_CREATOR_BUCKET='creator-global'/.test(avatarStore)&&/PUBLIC_CREATOR_VISIBILITY=new Set\(\['global','official'\]\)/.test(avatarStore)&&/bucket!==PUBLIC_CREATOR_BUCKET/.test(avatarStore));
 check('server sanitizes modular slot type target transform and published asset metadata',/SLOT_RE/.test(avatarStore)&&/serverSlot!==slotKey/.test(avatarStore)&&/\['appearance','equipment'\]/.test(avatarStore)&&/safeTransforms/.test(avatarStore)&&/sanitizePublicAsset/.test(avatarStore));
+check('sanitizer preserves absent transforms so shared weapon offsets survive',/function hasDeclaredTransforms/.test(avatarStore)&&/if\(hasDeclaredTransforms\(payload\.transforms\)\)safePayload\.transforms=safeTransforms/.test(avatarStore)&&/absent transforms must stay absent/.test(smoke));
 check('appearance RPC failure preserves full-body avatar compatibility',/resolveAppearance\(characterId,accessToken\)/.test(avatarStore)&&/catch\(error\).*return null/s.test(avatarStore)&&/if\(!avatar&&!creatorAppearance\)return null/.test(avatarStore));
 check('existing social server AOI transport remains the presentation carrier',/avatarManifest:p\.avatarManifest\|\|null/.test(server)&&/publicStateFor\(viewer,index\)/.test(server)&&/sendRelevantStates/.test(server));
 check('client peers receive server avatar presentation through existing social transport',/peer\.avatarManifest=p\.avatarManifest\|\|null/.test(net)&&/ingestAvatarManifest\(peer\.avatarManifest,false\)/.test(net));
