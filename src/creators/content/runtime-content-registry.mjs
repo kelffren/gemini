@@ -3,8 +3,9 @@
  * owner: KELO_CREATOR_CONTENT_REGISTRY
  * owns: semantic creator definitions + entitlement-gated adapter dispatch into existing runtime owners
  * does-not-own: rendering, inventory, stats, game authority, asset bytes, purchases or editor state
- * rule: creator revision access is checked before adapt to KELO_PROPERTY_CATALOG/KeloAppearance/KeloMountCatalog/KeloCreatorAvatars
+ * rule: creator revision access is checked before adapt and again at use-facing lookups; specialized owners keep their own defense in depth
  */
+import { installCreatorPropertyEntitlementGuard } from '../../property/creator-property-entitlement-guard.mjs';
 const F=Object.freeze;
 const copy=v=>v==null?v:JSON.parse(JSON.stringify(v));
 const phase=v=>String(v||'world')==='foreground'||String(v||'')==='aboveActor'?'props_front':'props_back';
@@ -19,13 +20,14 @@ export function createRuntimeContentRegistry({root=globalThis}={}){
     return gate.checkRecord(record);
   }
   function adaptWorld(record){
+    installCreatorPropertyEntitlementGuard({root});
     const asset=record.assets?.find(a=>a.role==='primary')||record.assets?.[0],A=root.KELO_ATLAS_CONTRACT,P=root.KELO_PROPERTY_CATALOG;
     if(!asset?.runtimeUrl||!asset.pixelWidth||!asset.pixelHeight)return{status:'deferred',reason:'PRIMARY_RUNTIME_ASSET_REQUIRED'};
     if(!A?.register||!P?.registerTemplate)return{status:'deferred',reason:'WORLD_RUNTIME_OWNER_MISSING'};
     const key=`creator:${asset.assetId||runtimeId(record)}`,src=versionedRuntimeUrl(asset.runtimeUrl,asset.contentHash||record.contentHash);
     A.register(key,{id:asset.assetId||key,src,width:Number(asset.pixelWidth),height:Number(asset.pixelHeight)},{role:'optional'});
     const w=Math.max(1,Number(record.payload?.worldWidth)||Number(asset.pixelWidth)),h=Math.max(1,Number(record.payload?.worldHeight)||Number(asset.pixelHeight));
-    const template=P.registerTemplate({id:record.contentId,label:record.displayName,category:record.payload?.category||'creator',family:record.payload?.family||record.contentType,districts:record.payload?.districts?.length?record.payload.districts:['*'],width:w,height:h,snap:32,collision:collision(record.payload,w,h),source:'creator-content',sourceId:record.contentId,metadata:{creatorContentId:record.contentId,creatorRevisionId:record.revisionId,creatorOwnerUserId:record.ownerUserId},parts:[{assetKey:key,source:{x:0,y:0,w:Number(asset.pixelWidth),h:Number(asset.pixelHeight)},offset:{x:0,y:0},size:{w,h},phase:phase(record.payload?.renderPhase)}]});
+    const template=P.registerTemplate({id:record.contentId,label:record.displayName,category:record.payload?.category||'creator',family:record.payload?.family||record.contentType,districts:record.payload?.districts?.length?record.payload.districts:['*'],width:w,height:h,snap:32,collision:collision(record.payload,w,h),source:'creator-content',sourceId:record.revisionId,parts:[{assetKey:key,source:{x:0,y:0,w:Number(asset.pixelWidth),h:Number(asset.pixelHeight)},offset:{x:0,y:0},size:{w,h},phase:phase(record.payload?.renderPhase)}]});
     return{status:'active',owner:'KELO_PROPERTY_CATALOG',runtimeId:template?.id||record.contentId};
   }
   function adaptAppearance(record){
@@ -57,9 +59,10 @@ export function createRuntimeContentRegistry({root=globalThis}={}){
     const base=F({revisionId:String(raw.revisionId||raw.contentRevisionId||''),ownerUserId:String(raw.ownerUserId||''),contentId:key,stableKey:String(raw.stableKey||key),revision:Number(raw.revision)||1,contentType:String(raw.contentType||'generic'),displayName:String(raw.displayName||key),tags:F((raw.tags||[]).map(String)),payload:F(copy(raw.payload||{})),assets:F((raw.assets||[]).map(a=>F(copy(a)))),contentHash:String(raw.contentHash||''),source:String(raw.source||'creator')});
     const activation=adaptRuntime?adapt(base):{status:'registered',owner:'KELO_CREATOR_CONTENT_REGISTRY'};return publishRow(base,activation);
   }
-  function reactivate(id){const current=rows.get(String(id));if(!current)return null;if(current.activation?.status==='active')return current;const{activation,...raw}=current;const base=F(raw);return publishRow(base,adapt(base));}
-  function reactivateRestricted(){const out=[];for(const row of [...rows.values()])if(row.activation?.status==='restricted')out.push(reactivate(row.contentId));return out.filter(Boolean);}
-  function query(filter={}){let out=[...rows.values()];if(filter.contentType)out=out.filter(x=>x.contentType===filter.contentType);if(filter.tag)out=out.filter(x=>x.tags.includes(filter.tag));if(filter.owner)out=out.filter(x=>x.activation.owner===filter.owner);if(filter.usable===true)out=out.filter(x=>x.activation.status==='active');return out;}
+  function reactivate(id){const current=rows.get(String(id));if(!current)return null;if(current.activation?.status==='active'&&access(current).ok)return current;const{activation,...raw}=current;const base=F(raw);return publishRow(base,adapt(base));}
+  function reactivateRestricted(){const out=[];for(const row of [...rows.values()])if(row.activation?.status==='restricted'||!access(row).ok)out.push(reactivate(row.contentId));return out.filter(Boolean);}
+  function usable(row){return !!row&&row.activation?.status==='active'&&access(row).ok;}
+  function query(filter={}){let out=[...rows.values()];if(filter.contentType)out=out.filter(x=>x.contentType===filter.contentType);if(filter.tag)out=out.filter(x=>x.tags.includes(filter.tag));if(filter.owner)out=out.filter(x=>x.activation.owner===filter.owner);if(filter.usable===true)out=out.filter(usable);return out;}
   root.addEventListener?.('kelo:creator-entitlements-changed',()=>{try{reactivateRestricted();}catch(error){console.warn('[Creator content entitlement reactivation]',error);}});
-  return F({version:'kelo-creator-content-registry-v1.2.1-entitlements',register,registerMany:(items,opts)=>Array.from(items||[]).map(x=>register(x,opts)),reactivate,reactivateRestricted,get:id=>rows.get(String(id))||null,getForUse(id){const row=rows.get(String(id))||null;return row?.activation?.status==='active'?row:null;},has:id=>rows.has(String(id)),list:()=>[...rows.values()],query,onRegister(fn){if(typeof fn==='function')listeners.add(fn);return()=>listeners.delete(fn);},get count(){return rows.size;}});
+  return F({version:'kelo-creator-content-registry-v1.3.0-delivery-access',register,registerMany:(items,opts)=>Array.from(items||[]).map(x=>register(x,opts)),reactivate,reactivateRestricted,get:id=>rows.get(String(id))||null,getForUse(id){const row=rows.get(String(id))||null;return usable(row)?row:null;},has:id=>rows.has(String(id)),list:()=>[...rows.values()],query,onRegister(fn){if(typeof fn==='function')listeners.add(fn);return()=>listeners.delete(fn);},get count(){return rows.size;}});
 }

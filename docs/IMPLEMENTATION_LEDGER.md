@@ -401,3 +401,103 @@ Handoff prompt:
 **Handoff prompt:**
 
 > Continue `IMP-2026-09-15-CREATOR-ENTITLEMENT-004` on `creator-entitlement-enforcement-v1`. Read `docs/systems/CREATOR_ENTITLEMENT_SYSTEM.md`, Marketplace/Release/Creator OS ledger entries and migration `20260916003000_creator_entitlement_access.sql`. Do not add local ownership flags, a second auth client, or separate entitlement logic per content type. Run `node scripts/creator-entitlement-audit.mjs` plus all upstream audits, apply the migration in test Supabase, and test owner / pre-purchase deny / post-purchase allow / second-account deny / r3-not-r4 / sign-out. Remember that browser enforcement is defense in depth: any authoritative server mutation that uses paid Creator content must independently verify revision access. Do not mark VALIDATED until Supabase, iPhone/LIVE and server spoof-resistance gates pass.
+
+---
+
+### IMP-2026-09-15-CREATOR-DELIVERY-005
+
+**Status:** IMPLEMENTED_PENDING_VERIFY  
+**Depends on:** `IMP-2026-09-15-CREATOR-ENTITLEMENT-004` / PR #275 and all upstream Creator Marketplace/Release/OS layers.  
+**Owner(s):** Kelo Creator Content Delivery + Supabase publication/access authority; specialized runtime owners retain rendering/gameplay authority.  
+**User intent / source prompt:** Continue after Entitlement Enforcement so owned Creator content can actually enter normal gameplay on demand without opening Creator tools, bulk-syncing the library or making iPhone boot heavier.
+
+**Why:** Entitlement alone answers “may this account use revision rN?” but does not deliver the immutable published metadata/assets to the correct runtime owner. A scalable marketplace needs a narrow on-demand bridge from exact revision ownership to existing runtime owners.
+
+**Invariants:**
+
+- `PUBLISHED != LISTED != OWNED != DELIVERABLE != ACTIVE`.
+- Delivery accepts one immutable revision UUID at a time; there is no login-time “download all Owned”.
+- The caller must author the exact revision or own an exact-revision entitlement.
+- Content must have an active `content_publication`; every bound asset must have an active `asset_publication`.
+- Delivery never exposes `creator-private` paths.
+- V1 uses existing `creator-global` public bytes as transport; a public URL is not license evidence.
+- `KeloCreatorEntitlements` remains the access authority/cache; Delivery does not create another ownership system.
+- Creator OS binds Delivery to the same authenticated repository/session. Outside Creator, fallback reuses existing `KeloOnlineAuth`.
+- Manifest cache is memory-only, account-scoped and capped at 48 revisions.
+- Delivery does not fetch image bytes itself; specialized owners receive URLs only after access succeeds.
+- Persistent/competitive mutations remain server-authoritative and must independently check entitlement.
+
+**Implemented now (stacked branch `creator-content-delivery-v1`):**
+
+- Added `get_creator_content_delivery(uuid)` authority RPC returning one exact published manifest only after owner/entitlement verification.
+- Delivery RPC verifies all content asset bindings are authority-published before returning their public locations.
+- Added `Kelo Creator Content Delivery` client runtime with bounded identity-keyed manifest cache and per-revision inflight dedupe.
+- Added normal-game `KeloCreatorDelivery.useRevision()` / `manifest()` facade through the already-loaded `creators-lazy-gate`; real Delivery code remains dynamic-import first-use.
+- Delivery wakes only the specialized package required by content type (`appearance`, `mounts`, `properties`) and reuses the existing Creator Avatar adapter for characters.
+- Delivery registers normalized semantic records into the existing `KELO_CREATOR_CONTENT_REGISTRY`; it does not create a renderer or duplicate asset catalog.
+- Runtime Registry now rechecks access in use-facing `getForUse()`/usable queries and stamps Creator Property templates with exact revision identity.
+- Added dynamic Property catalog entitlement facade so cached Creator props stop being available after logout/account switch.
+- Creator Avatar runtime now checks exact-revision entitlement for local select/current/draw while preserving authority-published remote avatar rendering for multiplayer viewers.
+- Upgraded `set_active_character_avatar` so a purchased published Creator character can be selected server-side; an unowned revision is rejected.
+- `get_avatar_manifest` now carries revision/owner identity for local enforcement.
+- Creator composition root binds Delivery to the same repository/session as Entitlements and invalidates manifest cache on Creator auth changes.
+- Feature Registry can wake entitlement-aware Appearance/Mount/Property owners only on first use.
+- Added static delivery contract audit and technical documentation.
+- Removed an experimental duplicate Delivery facade so `creators-lazy-gate` remains the single normal-boot entry.
+
+**Files/contracts touched:**
+
+- `supabase/migrations/20260916003500_creator_content_delivery_v1.sql`
+- `src/creators/content/creator-content-delivery.mjs`
+- `src/core/creators-lazy-gate.js`
+- `src/core/feature-registry.js`
+- `src/creators/content/supabase-content-repository.mjs`
+- `src/creators/content/runtime-content-registry.mjs`
+- `src/creators/creator-entry.mjs`
+- `src/property/creator-property-entitlement-guard.mjs`
+- `src/characters/creator-avatar-runtime.mjs`
+- `scripts/creator-content-delivery-audit.mjs`
+- `docs/systems/CREATOR_CONTENT_DELIVERY.md`
+- `docs/system-catalog.json`
+- `docs/CODE_INDEX.md`
+- `docs/ARCHITECTURE_CURRENT.md`
+- `docs/IMPLEMENTATION_LEDGER.md`
+
+**Deferred deliberately:**
+
+- Byte secrecy/DRM for premium assets. V1 authority controls use, while approved bytes remain in public `creator-global`. Future private published bytes should use short-lived signed URLs behind the same Delivery manifest contract.
+- Server-authoritative Creator equipment/appearance mutations.
+- Server-authoritative Creator prop placement mutations.
+- Server-authoritative Creator mount spawn/equip/use mutations.
+- Refund/revocation/subscription/version-upgrade policy.
+- Automatic rN → rN+1 entitlement upgrades.
+- Bulk offline download/library pinning; mobile-first V1 is on-demand only.
+
+**Acceptance / gates:**
+
+- `node scripts/creator-content-delivery-audit.mjs` passes from a runnable checkout.
+- Entitlement/Marketplace/Release/Creator OS/docs audits remain green.
+- Migration applies cleanly to a test Supabase environment.
+- Owner can deliver their own published exact revision.
+- Buyer before purchase is denied.
+- Buyer after purchase can deliver the exact purchased revision.
+- Entitlement to r3 cannot deliver r4.
+- Missing one bound `asset_publication` fails with `CONTENT_ASSET_PUBLICATION_INCOMPLETE`.
+- Delivery response contains only published storage locations, never private paths.
+- Logout/account switch prevents reuse of cached local Creator avatar/prop/appearance/mount metadata.
+- Purchased published Creator character can be selected by `set_active_character_avatar`; unowned character cannot.
+- Remote players' published Creator avatars still render to viewers without local ownership.
+- Normal boot performs no bulk Owned sync or Creator asset fetch.
+- iPhone/LIVE first-use Delivery loads only requested owner/assets and does not freeze gameplay.
+
+**Evidence:**
+
+- Branch: `creator-content-delivery-v1`, stacked from `creator-entitlement-enforcement-v1`.
+- Source contracts and branch writes are present; duplicate facade was removed before PR creation.
+- This environment has not executed the new migration, Node audit, two-account Supabase integration, Playwright or iPhone/LIVE flow. This pass therefore remains `IMPLEMENTED_PENDING_VERIFY`.
+
+**Next action:** validate Delivery + upstream migrations/audits with two accounts and iPhone/LIVE. After that, the next architectural pass is **Creator Use Authority V1**: route persistent `equip/place/spawn/use` actions through server-authoritative exact-revision checks for Appearance/Equipment, Property and Mounts, reusing the same access rule rather than creating domain-specific ownership stores.
+
+**Handoff prompt:**
+
+> Continue `IMP-2026-09-15-CREATOR-DELIVERY-005` on `creator-content-delivery-v1`. Read `docs/systems/CREATOR_CONTENT_DELIVERY.md`, Entitlement/Marketplace ledger entries and migrations `20260916003000_creator_entitlement_access.sql` + `20260916003500_creator_content_delivery_v1.sql`. Do not bulk-sync Owned content, create another asset store/auth client, or treat `creator-global` URLs as license evidence. First run `node scripts/creator-content-delivery-audit.mjs` plus all upstream audits, apply migrations to test Supabase, then test owner/pre-purchase/post-purchase/r3-vs-r4/publication-integrity/account-switch/avatar-selection and iPhone/LIVE first-use. The next implementation layer is server-authoritative equip/place/spawn/use, not another marketplace or renderer rewrite.
