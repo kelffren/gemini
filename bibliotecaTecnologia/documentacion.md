@@ -6,7 +6,7 @@
 
 ## 1. Propósito
 
-BibliotecaTecnologia administra distribución e integración de contenido de Kelo World sin cargar binarios externos en el boot normal.
+BibliotecaTecnologia distribuye e integra contenido de Kelo World sin cargar binarios externos en el boot normal.
 
 Tipos soportados:
 
@@ -25,7 +25,7 @@ Tipos soportados:
 Principio canónico:
 
 ```text
-DISCOVERED != OWNED != DOWNLOADED != INTEGRATED != LOADED
+DISCOVERED != OWNED != DOWNLOADED != INTEGRATED != ACTIVE != LOADED
 ```
 
 ## 2. Archivos principales
@@ -45,7 +45,7 @@ DISCOVERED != OWNED != DOWNLOADED != INTEGRATED != LOADED
 - `src/creators/assets/opengameart-live-provider.mjs`
 - `src/creators/assets/kelo-content-live-provider.mjs`
 
-### Vault / integración
+### Vault
 
 - `src/creators/assets/personal-asset-vault.mjs`
 - `src/creators/assets/content-integration-router.mjs`
@@ -55,23 +55,24 @@ DISCOVERED != OWNED != DOWNLOADED != INTEGRATED != LOADED
 ### Packs
 
 - `src/creators/assets/content-pack-manager.mjs`
+- `src/creators/assets/content-pack-transaction.mjs`
 - `content-packs.html`
 
 ### UI
 
 - `asset-vault.html`
+- `content-packs.html`
 - `src/ui/asset-library-launcher.js`
 
-## 3. Personal Vault — schema actual
+## 3. Personal Vault / CAS
 
-Base IndexedDB:
+Base:
 
 ```text
-kelo_personal_asset_vault_v1
-DB_VERSION = 2
+IndexedDB: kelo_personal_asset_vault_v1
 ```
 
-Stores:
+Stores actuales:
 
 ```text
 assets
@@ -94,10 +95,6 @@ name
 category
 contentKind
 license
-author/authors
-licenses
-creditUrls
-creditNotes
 ownership
 downloaded
 integrated
@@ -106,15 +103,12 @@ mime
 sha256
 expectedSha256
 rollbackActive
-pinnedCommit
-definitionUrl
-repositoryUrl
-verified
+provenance/licensing fields
 ```
 
 ### `blobs`
 
-Para contenido CAS nuevo, ya no guarda necesariamente el Blob directamente. Actúa como puntero:
+Para contenido CAS nuevo funciona como puntero:
 
 ```json
 {
@@ -127,7 +121,7 @@ Para contenido CAS nuevo, ya no guarda necesariamente el Blob directamente. Act�
 }
 ```
 
-Filas legacy con `blob` inline siguen siendo válidas.
+Filas legacy que contienen `blob` directamente siguen siendo legibles.
 
 ### `casBlobs`
 
@@ -139,52 +133,30 @@ Contenido físico deduplicado:
   "blob": "<Blob>",
   "bytes": 123,
   "mime": "image/png",
-  "createdAt": "...",
-  "updatedAt": "...",
   "orphanedAt": null
 }
 ```
 
-El key canónico es el SHA-256.
+Key canónico: SHA-256.
 
-## 4. Descarga CAS
+## 4. Descarga individual
 
-`downloadAsset(input)` ahora sigue:
+`downloadAsset(input)`:
 
 ```text
-remember metadata
- -> fetch/inline Blob
+metadata
+ -> fetch/inline
  -> MIME validation
- -> SHA-256 real
- -> compare expectedSha256 si existe
- -> put/reuse casBlobs[digest]
- -> atomically update blobs[assetId] pointer
+ -> SHA-256
+ -> expectedSha256 validation
+ -> put/reuse CAS blob
+ -> update asset pointer
  -> update metadata
 ```
 
-Si el digest ya existe:
+Si el digest ya existe, se reutiliza el blob físico.
 
-```text
-casReused = true
-```
-
-No se crea otra copia física del mismo contenido.
-
-## 5. Compatibilidad legacy
-
-`getBlob(id)` resuelve ambas formas:
-
-```text
-legacy row.blob
-```
-
-o:
-
-```text
-row.digest -> casBlobs[digest].blob
-```
-
-Esto permite migración incremental sin convertir todo IndexedDB durante `onupgradeneeded`.
+## 5. Migración legacy
 
 APIs:
 
@@ -193,148 +165,64 @@ await migrateAssetToCas(id)
 await migrateVaultToCas({limit, onProgress})
 ```
 
-No ejecutar migraciones masivas automáticamente en el boot.
+Regla:
 
-## 6. Deduplicación
+**Nunca hacer migración masiva automáticamente durante boot.**
 
-API:
+## 6. Rollback individual y GC
 
-```js
-await getCasStats()
-```
-
-Devuelve, entre otros:
-
-```text
-casBlobs
-casPointers
-legacyPointers
-rollbackPointers
-orphanedBlobs
-logicalBytes
-physicalCasBytes
-deduplicatedBytes
-dedupeRatio
-```
-
-Conceptos:
-
-```text
-logicalBytes = suma lógica de contenido referenciado
-physicalCasBytes = blobs únicos guardados
-```
-
-## 7. Rollback por asset
-
-Cuando una nueva descarga cambia el digest de un asset:
-
-```text
-current digest -> previousDigest
-new digest -> current digest
-```
-
-API:
+APIs:
 
 ```js
 await rollbackAssetBlob(id)
-```
-
-Comportamiento:
-
-1. exige `previousDigest`;
-2. exige que el blob anterior siga en CAS;
-3. intercambia current/previous;
-4. invalida el manifest integrado;
-5. marca asset como `integrated:false`;
-6. marca `rollbackActive:true`;
-7. emite `kelo:personal-content-rolled-back`.
-
-Después hay que reintegrar el contenido si se quiere usar esa versión.
-
-Para abandonar historial:
-
-```js
 await discardAssetRollbackHistory(id)
+await garbageCollectCas(options)
 ```
 
-Esto solo quita la referencia anterior. El blob no se destruye inmediatamente; GC decide después.
-
-## 8. Garbage Collection CAS
-
-API:
-
-```js
-await garbageCollectCas({
-  graceMs,
-  dryRun,
-  maxDeletes,
-  onProgress
-})
-```
-
-Gracia por defecto:
+Un pointer puede mantener:
 
 ```text
-7 días
+digest
+previousDigest
 ```
 
-Modelo:
+GC:
 
 ```text
 unreferenced
- -> si no orphanedAt: marcar orphanedAt
+ -> marcar orphanedAt
  -> esperar grace period
- -> borrar en GC posterior
+ -> borrar posteriormente
 ```
 
-Un digest cuenta como referenciado si está en:
+Gracia actual: 7 días.
 
-- `pointer.digest`;
-- `pointer.previousDigest`.
+## 7. Pack Catalog
 
-Esto evita romper rollback.
-
-`dryRun:true` no debe destruir nada.
-
-## 9. `removeLocal()` y CAS
-
-Quitar un asset local:
-
-- elimina el pointer `blobs[id]`;
-- elimina manifest integrado;
-- mantiene metadata de ownership/discovery;
-- no elimina inmediatamente el blob CAS;
-- GC lo recuperará posteriormente si queda huérfano.
-
-Esto desacopla uninstall de destrucción física inmediata.
-
-## 10. Content Pack Catalog v2
-
-`data/content-pack-catalog.json` mantiene schema de payload:
+Archivo:
 
 ```text
-kelo-content-pack-catalog-v1
+data/content-pack-catalog.json
 ```
 
-pero la metadata de catálogo está actualmente en:
-
-```json
-{
-  "version": 2,
-  "publishedAt": "2026-09-16T07:16:00Z",
-  "expiresAt": "2026-10-16T07:16:00Z"
-}
-```
-
-El `version` del catálogo es independiente del `version` SemVer de cada pack.
-
-## 11. Protección del catálogo
-
-ContentPackManager IndexedDB:
+Metadata relevante:
 
 ```text
-kelo_content_pack_v1
-DB_VERSION = 2
+version
+publishedAt
+expiresAt
+packs[]
+```
+
+Cada pack mantiene SemVer independiente.
+
+## 8. Seguridad del catálogo
+
+Pack manager:
+
+```text
+IndexedDB: kelo_content_pack_v1
+DB_VERSION = 3
 ```
 
 Stores:
@@ -342,6 +230,7 @@ Stores:
 ```text
 packs
 settings
+transactions
 ```
 
 `settings['catalog-security']` guarda:
@@ -356,61 +245,32 @@ versionJump
 lastAcceptedAt
 ```
 
-Reglas activas:
-
-### Rollback
-
-Si:
+Reglas:
 
 ```text
 incoming.version < accepted.version
+ -> PACK_CATALOG_ROLLBACK
 ```
-
-se lanza:
 
 ```text
-PACK_CATALOG_ROLLBACK
+same version + different digest
+ -> PACK_CATALOG_MUTATED_WITHOUT_VERSION
 ```
 
-### Mutación sin versión
-
-Si:
+La expiración actualmente se observa mediante:
 
 ```text
-incoming.version == accepted.version
-AND incoming.digest != accepted.digest
+stale = true
 ```
 
-se lanza:
+pero todavía no bloquea instalación.
 
-```text
-PACK_CATALOG_MUTATED_WITHOUT_VERSION
-```
-
-Por tanto una versión de catálogo aceptada es inmutable localmente.
-
-### Expiración
-
-Si `expiresAt` quedó atrás:
-
-```text
-security.stale = true
-```
-
-En esta fase no bloquea instalación automáticamente. El endurecimiento vendrá cuando exista refresh/firma confiable.
+## 9. Planner diferencial
 
 API:
 
 ```js
-await getCatalogSecurityState()
-```
-
-## 12. Actualización diferencial de packs
-
-API:
-
-```js
-await planContentPackUpdate(id, {integrate:true})
+await planContentPackUpdate(packId, {integrate:true})
 ```
 
 Acciones:
@@ -422,73 +282,276 @@ download
 removed
 ```
 
-El planner compara:
+Compara:
 
-- descriptorHash;
-- digest esperado;
+- descriptor hash;
+- expected digest;
 - lock anterior;
 - existencia local;
-- integración local.
+- estado de integración.
 
-Una reinstalación sin cambios debe producir principalmente `reuse` y no redescargar bytes.
+## 10. Atomic Pack Transaction
 
-## 13. Lock de pack
+### Objetivo
 
-Cada miembro mantiene:
+Una actualización de pack no debe modificar la generación activa mientras todavía se están descargando o compilando miembros.
 
-```json
-{
-  "id": "provider:item",
-  "provider": "provider",
-  "contentKind": "animation",
-  "bytes": 123,
-  "sha256": "sha256:...",
-  "expectedSha256": "sha256:... | null",
-  "descriptorHash": "...",
-  "integrated": true,
-  "preexistingDownloaded": false,
-  "version": "1.0.0"
-}
-```
-
-## 14. Delta metrics
-
-El estado de pack guarda:
+### Staging DB
 
 ```text
-changedMembers
-reusedMembers
-removedMembers
-estimatedDownloadBytes
-estimatedSavedBytes
-downloadedBytes
+IndexedDB: kelo_content_pack_staging_v1
+store: stages
 ```
 
-Métrica recomendada:
+Cada fila staged contiene conceptualmente:
 
 ```text
-bandwidth_saved_ratio = 1 - downloadedBytes / logicalUpdateBytes
+transactionId
+assetId
+baseDigest
+digest nuevo
+Blob temporal
+bytes
+mime
+normalized asset metadata
+compiled manifest
+contentKind
+compiler
+network flag
+stagedAt
 ```
 
-## 15. Auditoría de integridad
+### Flujo
+
+```text
+ACTIVE GENERATION N
+        |
+        | NO CAMBIA
+        v
+plan delta
+ -> stage downloads/existing blobs
+ -> verify SHA-256
+ -> compile/validate manifests
+ -> build target lock
+ -> phase PREPARED
+ -> atomic Vault commit
+ -> activate generation N+1
+ -> cleanup removed content
+```
+
+## 11. API de transacciones
+
+Módulo:
+
+```text
+src/creators/assets/content-pack-transaction.mjs
+```
 
 API:
 
 ```js
-await auditContentPack(id, {rehash:true})
+stagePackMember(input, options)
+listStagedPackMembers(transactionId)
+abortStagedPack(transactionId)
+commitStagedPack(transactionId)
+inspectStagingStorage()
+cleanupStaleStaging(options)
 ```
 
-Recalcula SHA-256 y compara contra el lock.
+### `stagePackMember()`
 
-Razones actuales:
+No cambia el Vault activo.
+
+Puede:
+
+- descargar un miembro nuevo;
+- usar un Blob ya activo para una operación `integrate`;
+- calcular SHA-256;
+- validar expected hash;
+- compilar/validar manifest;
+- guardar todo en staging.
+
+### `commitStagedPack()`
+
+Antes de commit verifica que el pointer actual no haya cambiado desde staging:
 
 ```text
-ok
-missing-binary
-digest-mismatch
+currentDigest == baseDigest
 ```
 
-## 16. Storage Health
+Si no coincide:
+
+```text
+PACK_TRANSACTION_POINTER_DRIFT
+```
+
+Después usa **una sola transacción IndexedDB** sobre:
+
+```text
+assets
+blobs
+manifests
+casBlobs
+```
+
+Todos los assets modificados cambian juntos.
+
+Resultado:
+
+```text
+todos nuevos
+OR
+todos antiguos
+```
+
+para el conjunto de pointers/manifests dentro de esa transacción.
+
+## 12. Journal del Pack Manager
+
+Store:
+
+```text
+transactions
+```
+
+Un journal contiene:
+
+```text
+id = packId
+transactionId
+sessionId
+phase
+packVersion
+catalogHash
+previousState
+targetState
+changedAssetIds
+completedMembers
+totalMembers
+delta metrics
+timestamps
+error
+```
+
+Fases:
+
+```text
+staging
+prepared
+committing
+vault-committed
+committed
+```
+
+Fases de error/recovery:
+
+```text
+failed
+interrupted
+needs-recovery
+recovered
+```
+
+## 13. Crash recovery
+
+API:
+
+```js
+await recoverPackTransactions()
+```
+
+### Crash pre-commit
+
+Se aborta staging.
+
+La generación activa anterior no se modifica.
+
+### Crash dentro del Vault commit
+
+IndexedDB garantiza atomicidad de esa transacción.
+
+El Vault termina completamente viejo o completamente nuevo.
+
+### Crash entre Vault commit y pack-state activation
+
+El pack journal guarda `targetState`.
+
+Recovery:
+
+1. inspecciona los digests activos de `changedAssetIds`;
+2. si coinciden con `targetState`, finaliza la activación;
+3. si no coinciden, elimina staging y conserva generación anterior.
+
+Esta estrategia es roll-forward recovery.
+
+## 14. Generaciones
+
+Estado activo del pack:
+
+```text
+generation
+previousGeneration
+transaction.id
+transaction.atomic
+```
+
+Ejemplo:
+
+```text
+Gen 1 -> activa
+update preparado
+Gen 1 -> sigue activa
+commit
+Gen 2 -> activa
+Gen 1 -> previousGeneration
+```
+
+El snapshot anterior se limita a una generación lógica para evitar recursión ilimitada.
+
+## 15. `installContentPack()`
+
+Comportamiento actual:
+
+1. recupera journal interrumpido cuando corresponda;
+2. instala dependencias;
+3. genera delta plan;
+4. crea transaction journal;
+5. stages solo `download` e `integrate`;
+6. `reuse` conserva lock existente;
+7. construye `targetState`;
+8. marca `prepared`;
+9. ejecuta commit atómico del Vault;
+10. guarda pack activo;
+11. marca journal `committed`;
+12. limpia miembros retirados fuera del camino crítico.
+
+### Fallo pre-commit
+
+```text
+activeGenerationPreserved = true
+```
+
+No se escribe un estado `partial` encima del pack activo.
+
+## 16. `inspectContentPacks()`
+
+Expone:
+
+```text
+state
+installed
+integrated
+generation
+updateAvailable
+catalogChanged
+delta
+catalogSecurity
+transaction
+```
+
+`transaction` solo aparece cuando existe una transacción activa.
+
+## 17. Storage Health
 
 API:
 
@@ -496,7 +559,7 @@ API:
 await getPackStorageHealth()
 ```
 
-Incluye:
+Devuelve:
 
 ```text
 usage
@@ -504,6 +567,9 @@ quota
 free
 persisted
 opfsSupported
+staging.members
+staging.bytes
+staging.transactions
 ```
 
 Persistencia:
@@ -512,48 +578,51 @@ Persistencia:
 await requestPersistentPackStorage()
 ```
 
-Nunca asumir que el navegador la concede.
+## 18. Auditoría
 
-## 17. Integración por tipo
+API:
+
+```js
+await auditContentPack(id, {rehash:true})
+```
+
+Comprueba SHA-256 de la generación activa.
+
+Devuelve también:
+
+```text
+generation
+```
+
+## 19. Integración por tipo
 
 ### Visual
 
 ```text
 Blob
  -> content-integration-router
- -> compiler
+ -> asset-sheet compiler
  -> visual manifest
- -> personal asset runtime bridge
- -> canonical atlas/catalog
+ -> runtime bridge
 ```
-
-Tipos:
-
-- image
-- sprite
-- tileset
-- animation
-- vfx
 
 ### Audio
 
 ```text
 Blob
  -> audio manifest
- -> personal content runtime bridge
- -> Audio() bajo demanda
+ -> runtime bridge
+ -> Audio() under demand
 ```
 
 `preload = none`.
 
 ### Ability
 
-Solo JSON declarativo:
-
 ```text
 JSON
- -> validator
- -> ability manifest
+ -> whitelist validator
+ -> personal ability manifest
  -> KeloAbilities.engine.castSource()
 ```
 
@@ -565,11 +634,10 @@ Nunca ejecutar JS externo.
 JSON
  -> prefab validator
  -> prefabDefinition
- -> personal scene registry
  -> Studio prefabStamp
 ```
 
-## 18. API pública actual — Vault
+## 20. API pública — Vault
 
 ```js
 PERSONAL_CONTENT_VAULT.openVault()
@@ -594,7 +662,7 @@ PERSONAL_CONTENT_VAULT.removeLocal()
 PERSONAL_CONTENT_VAULT.getVaultStats()
 ```
 
-## 19. API pública actual — Pack Manager
+## 21. API pública — Pack Manager
 
 ```js
 CONTENT_PACK_MANAGER.loadPackCatalog()
@@ -603,6 +671,8 @@ CONTENT_PACK_MANAGER.getContentPack()
 CONTENT_PACK_MANAGER.getCatalogSecurityState()
 CONTENT_PACK_MANAGER.getPackState()
 CONTENT_PACK_MANAGER.listPackStates()
+CONTENT_PACK_MANAGER.getPackTransaction()
+CONTENT_PACK_MANAGER.recoverPackTransactions()
 CONTENT_PACK_MANAGER.inspectContentPacks()
 CONTENT_PACK_MANAGER.planContentPackUpdate()
 CONTENT_PACK_MANAGER.installContentPack()
@@ -613,105 +683,153 @@ CONTENT_PACK_MANAGER.requestPersistentPackStorage()
 CONTENT_PACK_MANAGER.clearPackCatalogCache()
 ```
 
-## 20. Limitaciones actuales
+## 22. Métricas
 
-### Atomicidad por pack
+Pack state:
 
-CAS ya permite conservar bytes antiguos, pero la transacción lógica del pack completo todavía no tiene `activeLock + previousLock` formal.
+```text
+changedMembers
+reusedMembers
+removedMembers
+estimatedDownloadBytes
+estimatedSavedBytes
+downloadedBytes
+```
+
+CAS:
+
+```text
+logicalBytes
+physicalCasBytes
+deduplicatedBytes
+dedupeRatio
+rollbackPointers
+orphanedBlobs
+```
+
+Transaction:
+
+```text
+phase
+completedMembers
+totalMembers
+staging bytes
+recovery count (futuro agregado)
+```
+
+## 23. Limitaciones actuales
+
+### Cross-database atomicity
+
+El commit de pointers/manifests del Vault sí es una única transacción.
+
+El `pack state` vive en otra IndexedDB, por lo que no existe ACID real entre ambas bases.
+
+Solución actual:
+
+```text
+persistent journal + targetState + digest inspection + recovery
+```
+
+### Pack rollback completo
+
+Se conserva `previousGeneration`, pero todavía no existe API final:
+
+```text
+rollbackContentPack(packId)
+```
 
 ### Chunking
 
-Delta sigue siendo por archivo. Un archivo enorme parcialmente modificado se descarga completo.
+Delta sigue siendo por miembro/archivo.
 
 ### Firma
 
-Anti-rollback actual protege contra regresión/mutación observada localmente, pero todavía confía en el origen del catálogo. Marketplace requiere metadata firmada.
+Anti-rollback local no sustituye firma del publisher.
 
-### Expiración
+### Staging space
 
-Se detecta `stale`, pero no se bloquea aún.
-
-### CAS legacy
-
-Blobs antiguos continúan coexistiendo hasta migración progresiva.
-
-## 21. Próximo contrato objetivo
-
-### Pack transaction
+Durante un update puede coexistir temporalmente:
 
 ```text
-activeLock
-previousLock
-stagingLock
+active bytes + staged bytes
 ```
 
-Update:
+Hay que controlar storage pressure en versiones futuras.
+
+## 24. Próximo paso recomendado
+
+### Pack rollback transaccional
+
+Usar `previousGeneration` para preparar una transacción inversa:
 
 ```text
-plan
- -> stage blobs
- -> verify
- -> stage integration manifests
- -> commit activeLock
- -> previous activeLock becomes rollback lock
- -> GC later
+Gen N activa
+ -> stage pointers/manifests de Gen N-1
+ -> verify CAS availability
+ -> atomic commit
+ -> Gen N-1 activa
 ```
 
-### Chunk manifest futuro
+Sin red cuando los blobs previos sigan en CAS.
 
-```json
-{
-  "schema": "kelo-content-file-manifest-v1",
-  "finalDigest": "sha256:...",
-  "size": 123456,
-  "chunks": [
-    {"digest":"sha256:...","offset":0,"size":65536}
-  ]
-}
-```
+Después:
 
-## 22. Reglas de seguridad permanentes
+- ref graph explícito;
+- digest+size obligatorio;
+- OPFS tier;
+- FastCDC/chunks;
+- Asset Gateway/CDN;
+- metadata firmada.
 
-- no secretos ni claves privadas en Pages;
-- no JS ejecutable desde contenido externo;
-- licencias antes de integración;
-- digest antes de activar bytes cuando exista expected digest;
-- una versión de catálogo no puede mutar silenciosamente;
-- no aceptar versión de catálogo inferior a la ya observada;
-- provider failure debe quedar aislado;
-- contenido externo nunca entra automáticamente al boot.
+## 25. Reglas permanentes
 
-## 23. Regla para futuros agentes
+- no secretos en Pages;
+- no JS externo ejecutable;
+- licencia antes de integración;
+- digest antes de activar;
+- catálogo versionado e inmutable;
+- no mutar generación activa durante staging;
+- no borrar CAS inmediatamente al desinstalar;
+- provider failure aislado;
+- contenido externo nunca entra automáticamente al boot;
+- mobile-first;
+- mantener compatibilidad legacy.
 
-Antes de tocar esta tecnología:
+## 26. Regla para futuros agentes
 
-1. leer este documento;
-2. leer `bibliotecaTecnologia/investigacion.md` si cambia arquitectura;
-3. modificar el Vault/PackManager existente, no crear uno paralelo;
-4. mantener mobile-first;
+Antes de modificar BibliotecaTecnologia:
+
+1. leer `documentacion.md`;
+2. leer `investigacion.md` si cambia arquitectura;
+3. integrar sobre el sistema existente;
+4. no crear un segundo Vault/PackManager;
 5. mantener metadata-only hasta acción explícita;
-6. preservar compatibilidad legacy;
-7. medir ahorro/dedupe;
-8. actualizar ambos documentos si cambia contrato;
-9. pasar CI/Pages cuando sea posible.
+6. preservar atomicidad pre-commit;
+7. medir bytes evitados y dedupe;
+8. actualizar ambos documentos;
+9. revisar CI/Pages.
 
-## 24. Definition of Done
+## 27. Definition of Done
 
-Una mejora de BibliotecaTecnologia debe comprobar, según aplique:
+Según aplique:
 
-- build/sintaxis;
-- boot no descarga contenido externo;
-- instalación nueva funciona;
-- reinstalación sin cambios evita red;
-- update diferencial descarga solo lo cambiado;
-- blobs idénticos deduplican en CAS;
-- rollback conserva versión anterior;
-- GC no borra digest referenciado;
-- fallo queda reanudable;
-- auditoría detecta corrupción;
-- catálogo rollback/mutación se rechaza;
+- sintaxis/build correctos;
+- boot sin descarga externa;
+- instalación nueva funcional;
+- reinstalación sin cambios sin red innecesaria;
+- update diferencial;
+- staging no modifica generación activa;
+- commit cambia conjunto completo de assets;
+- fallo pre-commit conserva generación anterior;
+- recovery puede cerrar crash post-commit;
+- SHA-256 audit;
+- CAS dedupe;
+- rollback individual preservado;
+- GC no borra referencias;
+- catálogo rollback/mutación rechazado;
 - CI/Pages sin regresión relevante.
 
-## 25. Regla permanente
+## 28. Regla permanente
 
-**El tamaño del catálogo y el tamaño descargado por el jugador deben permanecer desacoplados.**
+**Un pack nuevo debe poder prepararse completamente sin tocar el pack activo.**

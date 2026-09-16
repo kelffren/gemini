@@ -1,67 +1,112 @@
 # BibliotecaTecnologia — Investigación
 
-> Documento exclusivo de la tecnología Biblioteca Universal / Content Vault / Content Packs de Kelo World.
+> Documento exclusivo de Biblioteca Universal / Content Vault / Content Packs de Kelo World.
 > Última revisión: 2026-09-16.
 
 ## 1. Objetivo
 
-BibliotecaTecnologia debe permitir que Kelo World descubra, adquiera, descargue, integre, actualice y retire sprites, tilesets, animaciones, VFX, SFX, música, ambiente, habilidades declarativas, escenas y packs completos sin que el catálogo haga pesado el boot principal.
+BibliotecaTecnologia debe permitir descubrir, descargar, integrar, actualizar, retirar y eventualmente comprar/vender contenido sin convertir el boot del juego en una descarga masiva.
+
+Tipos cubiertos:
+
+- sprites;
+- tilesets;
+- animaciones;
+- VFX;
+- SFX;
+- música;
+- ambience;
+- habilidades declarativas;
+- escenas/prefabs;
+- packs compuestos.
 
 Principio permanente:
 
 ```text
-CATÁLOGO != DESCARGA != INTEGRACIÓN != CARGA EN RUNTIME
+CATÁLOGO != DESCARGA != INTEGRACIÓN != ACTIVACIÓN != CARGA EN RUNTIME
 ```
 
-El sistema debe poder crecer de miles a millones de contenidos manteniendo el peso del jugador ligado únicamente a lo que ese jugador realmente usa.
+La cantidad de contenido disponible puede crecer a millones. Los bytes descargados por un jugador deben depender solo de lo que ese jugador decide usar.
 
-## 2. Fundamentos investigados
+## 2. Fundamentos externos investigados
 
 ### 2.1 OCI / Content Addressable Storage
 
-OCI separa blobs, manifests y descriptors. Un descriptor identifica contenido usando digest criptográfico y tamaño.
+OCI separa blobs, descriptors y manifests. Un descriptor puede identificar bytes mediante digest criptográfico y tamaño.
 
 Aplicación Kelo:
 
 ```text
 assetId -> descriptor -> sha256 -> blob
-pack -> descriptors -> blobs
+pack -> members -> descriptors -> immutable blobs
 ```
 
-Consecuencias:
+Ventajas:
 
-- bytes idénticos se almacenan una sola vez;
-- un pack no necesita poseer físicamente su contenido;
-- varias versiones pueden coexistir;
-- el estado activo puede cambiar mediante punteros;
-- integridad y deduplicación usan el mismo digest.
+- deduplicación física;
+- verificación de integridad;
+- múltiples versiones coexistentes;
+- manifests pequeños;
+- distribución independiente de identidad lógica.
 
 Fuentes:
 - https://github.com/opencontainers/image-spec/blob/main/descriptor.md
 - https://github.com/opencontainers/distribution-spec/blob/main/spec.md
 
-### 2.2 TUF / seguridad del updater
+### 2.2 TUF / seguridad de updates
 
-The Update Framework documenta ataques específicos contra sistemas de actualización: rollback, fast-forward, freeze y mezcla inconsistente de metadata.
+The Update Framework documenta rollback, freeze, fast-forward y vistas inconsistentes de metadata.
 
-Invariantes que adoptaremos progresivamente:
+Invariantes adoptadas/proyectadas:
 
-- nunca aceptar metadata con versión menor a la ya aceptada;
-- una versión concreta debe ser inmutable;
-- metadata debe tener fecha de publicación y expiración;
-- targets futuros deben incluir hash y tamaño;
-- manifests de marketplace deberán firmarse server-side;
-- nunca guardar claves privadas en GitHub Pages.
+- no aceptar versión de catálogo inferior a la ya observada;
+- una versión publicada no debe mutar silenciosamente;
+- metadata con publicación/expiración;
+- hashes/tamaños para targets;
+- snapshot consistente;
+- firma server-side futura;
+- ninguna clave privada dentro de GitHub Pages.
 
 Fuentes:
 - https://theupdateframework.io/docs/security/
 - https://theupdateframework.io/docs/metadata/
 
-### 2.3 Delta por archivo
+### 2.3 OSTree / transición atómica
 
-Antes de chunking, la optimización más rentable es no volver a descargar miembros del pack cuyo descriptor y digest siguen válidos.
+OSTree construye una nueva deployment antes de activarla y después realiza una transición atómica. Ante una interrupción se conserva un estado completo anterior o completo nuevo, no un estado intermedio.
 
-Estado implementado:
+Aplicación Kelo:
+
+```text
+resolve
+ -> stage
+ -> verify
+ -> prepare
+ -> atomic pointer commit
+ -> activate generation
+```
+
+Fuente:
+- https://ostreedev.github.io/ostree/atomic-upgrades/
+
+### 2.4 Nix / store inmutable + generations
+
+Nix conserva contenido inmutable en el store y usa perfiles/generaciones para cambiar el estado activo y permitir rollback.
+
+Aplicación Kelo:
+
+- blobs por digest;
+- generación activa por pack;
+- generación previa preservada;
+- activación por puntero/lock;
+- GC separado de uninstall.
+
+Fuente:
+- https://wiki.nixos.org/wiki/Nix_store
+
+### 2.5 Delta por miembro
+
+Estado actual:
 
 ```text
 reuse
@@ -70,18 +115,11 @@ download
 removed
 ```
 
-Ejemplo:
+Si un pack tiene 40 miembros y cambian 2, solo esos 2 deben necesitar red.
 
-```text
-Pack v1: A B C D E
-Pack v2: A B C' D E
+### 2.6 FastCDC / Content Defined Chunking
 
-Red: solo C'
-```
-
-### 2.4 FastCDC / Content-Defined Chunking
-
-Para archivos grandes, una actualización por archivo completo deja de ser suficiente. FastCDC encuentra límites de chunks a partir del contenido, por lo que pequeñas inserciones no desplazan todos los bloques posteriores.
+Para archivos grandes, delta por archivo completo deja de ser suficiente.
 
 Arquitectura futura:
 
@@ -95,289 +133,353 @@ file manifest
     offset
 ```
 
-Recomendación inicial:
+Recomendación:
 
-- no usar CDC para archivos pequeños;
-- evaluar desde ~512 KB en adelante;
-- chunk medio inicial cercano a 64 KB;
-- precomputar chunks al publicar/build-time;
-- reconstruir y verificar SHA-256 final.
+- aplicar solo a archivos grandes;
+- precomputar chunks en publisher/gateway;
+- cliente descarga chunks ausentes;
+- verificar SHA-256 final reconstruido.
 
 Fuentes:
 - https://www.usenix.org/conference/atc16/technical-sessions/presentation/xia
 - https://github.com/google/cdc-file-transfer
 
-### 2.5 OPFS para blobs grandes
+### 2.7 OPFS
 
-MDN documenta OPFS como almacenamiento privado al origen optimizado para archivos y escrituras de alto rendimiento. Está pensado, entre otros casos, para apps con grandes cantidades de media y descargas parciales/reanudables.
+IndexedDB es útil para metadata y objetos, pero OPFS puede ser mejor tier para media/chunks grandes.
 
-Aplicación futura Kelo:
+Reglas:
 
-- IndexedDB continúa excelente para metadata, punteros y manifests;
-- OPFS puede convertirse en tier opcional para blobs/chunks grandes;
-- usar Web Worker cuando haya procesamiento intensivo;
-- mantener fallback IndexedDB para compatibilidad.
+- feature detection;
+- fallback IndexedDB;
+- worker para trabajo intensivo;
+- benchmark real en Safari/iPhone antes de hacerlo default.
 
 Fuentes:
 - https://developer.mozilla.org/en-US/docs/Web/API/File_System_API/Origin_private_file_system
-- https://developer.mozilla.org/en-US/docs/Web/API/File_System_API
-
-### 2.6 Persistencia y cuotas
-
-El almacenamiento web es best-effort por defecto. `navigator.storage.persist()` puede solicitar persistencia y `estimate()` permite medir uso/cuota, pero el navegador mantiene la decisión final.
-
-Reglas Kelo:
-
-- ownership cloud y cache local son conceptos distintos;
-- el dispositivo debe poder reconstruir el cache;
-- solicitar persistencia después de que exista valor local real;
-- nunca considerar IndexedDB/OPFS como única prueba de compra.
-
-Fuente:
 - https://developer.mozilla.org/en-US/docs/Web/API/Storage_API/Storage_quotas_and_eviction_criteria
 
-## 3. Rondas manuales ejecutadas — 2026-09-16
+## 3. Evolución implementada
 
-### Ronda 1 — CAS SHA-256 real
+### Ronda 1 — CAS SHA-256
 
-Problema detectado:
+Se añadió `casBlobs`.
 
-`personal-asset-vault.mjs` almacenaba blobs directamente por `asset.id`. Si dos assets/packs referenciaban exactamente los mismos bytes, podían existir copias duplicadas y no había base limpia para rollback.
-
-Implementación:
-
-- IndexedDB subió a schema interno v2;
-- nuevo store `casBlobs`;
-- nuevas descargas calculan SHA-256 antes de activar el puntero;
-- `blobs` pasa a actuar como tabla de punteros para contenido nuevo;
-- `getBlob()` sigue entendiendo filas legacy;
-- migración progresiva disponible, sin migración destructiva en `onupgradeneeded`;
-- metadata ahora conserva `sha256`, `expectedSha256` y más provenance/licensing.
-
-Modelo actual:
+Modelo:
 
 ```text
-assets[id]
+assets[id] -> metadata
 blobs[id] -> digest
 casBlobs[digest] -> Blob
 ```
 
-Esto introduce deduplicación física real para nuevas descargas.
+Nuevas descargas:
 
-### Ronda 2 — rollback + garbage collection con gracia
+1. descargan/crean Blob;
+2. validan MIME;
+3. calculan SHA-256;
+4. comparan `expectedSha256` cuando existe;
+5. reutilizan blob si digest ya existe;
+6. actualizan puntero lógico.
 
-Problema detectado:
+Legacy sigue legible y la migración es progresiva.
 
-Un CAS sin política de historial/GC acumula blobs para siempre; borrarlos inmediatamente destruye rollback y causa thrashing.
+### Ronda 2 — rollback + GC conservador
 
-Implementación:
-
-- el puntero conserva `previousDigest` al cambiar de versión;
-- `rollbackAssetBlob(id)` intercambia digest actual/anterior sin red;
-- el manifest integrado se invalida después de rollback para impedir mezclar manifest nuevo con bytes viejos;
-- `discardAssetRollbackHistory(id)` permite liberar explícitamente el historial;
-- `garbageCollectCas()` usa mark + grace period;
-- primera pasada marca `orphanedAt`;
-- solo una pasada posterior, después de la gracia, puede borrar;
-- blobs actuales y de rollback cuentan como referenciados.
-
-Gracia por defecto actual: 7 días.
-
-Objetivo: rollback barato + GC conservador.
-
-### Ronda 3 — protección anti-rollback de catálogo
-
-Problema detectado:
-
-Aunque los blobs tenían hash, un cliente todavía podía recibir metadata de catálogo antigua o metadata modificada silenciosamente manteniendo el mismo número de versión.
-
-Implementación:
-
-- catálogo subió de versión 1 a 2;
-- añade `publishedAt` y `expiresAt`;
-- ContentPackManager guarda localmente la versión/digest aceptados;
-- versión entrante menor => `PACK_CATALOG_ROLLBACK`;
-- mismo número de versión con digest diferente => `PACK_CATALOG_MUTATED_WITHOUT_VERSION`;
-- expiración se registra como `stale` de forma observacional por ahora;
-- `getCatalogSecurityState()` expone el estado;
-- `inspectContentPacks()` incluye seguridad del catálogo.
-
-Esto es una adopción incremental de invariantes TUF, no una implementación completa de TUF.
-
-## 4. Estado arquitectónico después de las rondas
+Cada pointer puede conservar:
 
 ```text
-Remote metadata
-      |
-      v
-Pack Catalog v2
-  version/publishedAt/expiresAt
-      |
-      v
-Delta Planner
- reuse / integrate / download / removed
-      |
-      v
-Personal Vault
- asset metadata
-      |
-      v
-Asset pointer
- current digest + previous digest
-      |
-      v
-SHA-256 CAS
- unique immutable blobs
-      |
-      +--> runtime integration
-      +--> rollback
-      +--> grace-period GC
+digest
+previousDigest
 ```
 
-## 5. Métricas que deben evolucionar
+Se añadieron:
 
-Ya debemos medir o preparar:
+- `rollbackAssetBlob(id)`;
+- `discardAssetRollbackHistory(id)`;
+- `garbageCollectCas()`.
 
-- logical bytes;
-- physical CAS bytes;
-- deduplicated bytes;
-- dedupe ratio;
-- bytes estimados a descargar;
-- bytes realmente descargados;
-- bytes evitados;
-- miembros reuse/download/integrate;
-- cantidad de CAS blobs;
-- pointers CAS vs legacy;
-- rollback pointers;
-- blobs huérfanos;
-- bytes recuperados por GC;
-- duración de hash/integración;
-- storage usage/quota/persisted;
-- catálogo aceptado/stale/version jump.
+GC usa `orphanedAt` + período de gracia de 7 días.
+
+### Ronda 3 — anti-rollback del catálogo
+
+El catálogo tiene:
+
+```text
+version
+publishedAt
+expiresAt
+```
+
+Reglas:
+
+- versión menor => `PACK_CATALOG_ROLLBACK`;
+- misma versión con bytes distintos => `PACK_CATALOG_MUTATED_WITHOUT_VERSION`;
+- expiración => `stale=true` observacional.
+
+### Ronda 4 — Pack Transaction / Atomic Generation
+
+Problema anterior:
+
+Aunque cada asset tenía rollback, `installContentPack()` podía ir cambiando assets activos uno a uno mientras el resto seguía descargándose. Un fallo a mitad podía dejar una mezcla temporal de versiones.
+
+Solución implementada:
+
+Nuevo módulo:
+
+```text
+src/creators/assets/content-pack-transaction.mjs
+```
+
+Nuevo flujo:
+
+```text
+ACTIVE GENERATION N
+       |
+       | permanece sin cambios
+       v
+resolve delta
+ -> stage changed members
+ -> SHA-256 verify
+ -> compile/validate manifests in staging
+ -> prepare target generation N+1
+ -> atomic IndexedDB commit of ALL changed asset pointers/manifests
+ -> activate pack state N+1
+ -> clean removed members later
+```
+
+Durante staging:
+
+- no cambia `assets`;
+- no cambia `blobs` activo;
+- no cambia `manifests` activo;
+- no entra contenido staged al runtime.
+
+Los blobs staged viven temporalmente en:
+
+```text
+IndexedDB: kelo_content_pack_staging_v1
+store: stages
+```
+
+El commit final sobre el Vault usa una sola transacción IndexedDB para:
+
+```text
+assets
+blobs
+manifests
+casBlobs
+```
+
+Por tanto los miembros cambiados del pack saltan juntos, no uno por uno.
+
+## 4. Journal y crash recovery
+
+PackManager subió a:
+
+```text
+kelo_content_pack_v1
+DB_VERSION = 3
+```
+
+Stores:
+
+```text
+packs
+settings
+transactions
+```
+
+Cada pack tiene como máximo una transacción activa registrada.
+
+Fases:
+
+```text
+staging
+prepared
+committing
+vault-committed
+committed
+```
+
+Estados de recuperación:
+
+```text
+recovered
+failed
+interrupted
+needs-recovery
+```
+
+El `SESSION_ID` distingue una operación viva de una operación abandonada por recarga/crash.
+
+### Crash antes del commit
+
+Resultado:
+
+```text
+active generation N intacta
+staging eliminado posteriormente
+```
+
+### Crash durante el commit del Vault
+
+La transacción IndexedDB del Vault es atómica:
+
+```text
+todos los pointers nuevos
+OR
+ninguno
+```
+
+### Crash después del Vault commit pero antes de guardar el pack lock
+
+Existe una frontera entre dos bases IndexedDB distintas. No existe transacción ACID cross-database en IndexedDB.
+
+Mitigación implementada:
+
+- journal persistente;
+- `targetState` guardado antes del commit;
+- `changedAssetIds`;
+- recovery comprueba digests activos;
+- si el Vault ya contiene la generación nueva, finaliza el pack state;
+- si no, aborta staging y conserva la generación anterior.
+
+API:
+
+```js
+await recoverPackTransactions()
+```
+
+Esto convierte esa frontera en un proceso recuperable/roll-forward.
+
+## 5. Generaciones
+
+Cada pack activo ahora puede tener:
+
+```text
+generation = 1, 2, 3...
+previousGeneration
+transaction.id
+transaction.atomic = true
+```
+
+La generación anterior se conserva como snapshot lógico de un nivel.
+
+Razón para limitar historial inmediato:
+
+- evitar crecimiento recursivo del estado;
+- CAS mantiene bytes previos;
+- más adelante se puede implementar historial configurable.
+
+## 6. Staging y storage
+
+`getPackStorageHealth()` ahora también expone staging temporal:
+
+```text
+staging.members
+staging.bytes
+staging.transactions
+```
+
+Limpieza de staging abandonado:
+
+```js
+cleanupStaleStaging()
+```
+
+No se considera ownership. Es cache temporal de transacción.
+
+## 7. Invariantes actuales
+
+Una instalación/update correcta debe cumplir:
+
+1. el pack activo no cambia durante descarga;
+2. todos los miembros staged se verifican antes de commit;
+3. código externo no se ejecuta;
+4. habilidad/scene pasan validators existentes;
+5. el swap de assets cambiados es una única transacción del Vault;
+6. un fallo pre-commit preserva la generación anterior;
+7. un crash post-commit se puede completar mediante journal;
+8. uninstall y GC siguen separados;
+9. contenido externo no entra al boot automáticamente.
+
+## 8. Métricas
+
+Mantener/expandir:
+
+```text
+logicalBytes
+physicalCasBytes
+deduplicatedBytes
+dedupeRatio
+estimatedDownloadBytes
+downloadedBytes
+estimatedSavedBytes
+reusedMembers
+changedMembers
+stagingBytes
+transactionDuration
+commitDuration
+recoveryCount
+recoveryFailures
+orphanedBlobs
+gcReclaimedBytes
+```
 
 Métricas centrales:
 
 ```text
 bandwidth_saved_ratio = 1 - downloaded_bytes / logical_update_bytes
 storage_dedupe_ratio = 1 - physical_cas_bytes / logical_referenced_bytes
+transaction_success_rate = committed / started
 ```
 
-## 6. Próximos niveles investigados
+## 9. Riesgos abiertos
 
-### Nivel siguiente A — CAS transaccional por pack
+- el pack lock y el Vault viven en bases IndexedDB diferentes; journal resuelve crash recovery pero no crea una transacción ACID cross-database;
+- metadata aún no está firmada;
+- catálogo `stale` todavía no bloquea instalación;
+- provider externo sin digest puede cambiar bytes bajo la misma URL;
+- archivos grandes todavía usan delta por archivo;
+- staged blobs duplican temporalmente espacio hasta commit;
+- OPFS aún no fue benchmarkeado en iPhone real;
+- rollback de pack completo todavía necesita API/UI coordinada sobre `previousGeneration`.
 
-Hoy cada asset puede conservar versión previa. El siguiente paso es elevar la atomicidad al pack completo:
-
-```text
-resolve
- -> stage all new blobs
- -> verify all
- -> integrate/stage manifests
- -> one logical commit of pack lock
- -> keep previous pack lock for rollback
-```
-
-Si el update falla antes del commit, la versión activa del pack no cambia.
-
-### Nivel siguiente B — ref graph explícito
-
-Actualmente las referencias se pueden reconstruir inspeccionando punteros/packs.
-
-Futuro:
-
-```text
-refs[digest]
-  activeAssets[]
-  rollbackAssets[]
-  packs[]
-  chunks[]
-```
-
-No usar un simple refcount ciego si perdemos trazabilidad. Preferir grafo/referencias reconstruibles.
-
-### Nivel siguiente C — OPFS tiering
-
-Mover blobs suficientemente grandes a OPFS y dejar metadata/punteros en IndexedDB.
-
-Condiciones:
-
-- feature detection;
-- fallback completo;
-- migración progresiva;
-- nunca bloquear el main thread;
-- benchmark real en iPhone antes de activarlo por defecto.
-
-### Nivel siguiente D — FastCDC build-time
-
-El cliente no debería descubrir chunks costosos cada vez. Publisher/Gateway genera manifests de chunks; cliente solo consulta qué digests ya posee.
-
-### Nivel siguiente E — metadata firmada
-
-Marketplace real debe evolucionar de:
-
-```text
-version + digest local
-```
-
-a:
-
-```text
-root trust
-snapshot
-fresh timestamp
-signed targets
-expected digest + size
-```
-
-## 7. Riesgos abiertos
-
-- Catalog anti-rollback sin firma aún confía en el origen HTTPS/GitHub Pages.
-- Expiración se observa pero todavía no bloquea instalación; debe endurecerse cuando exista canal de refresh confiable.
-- Fast-forward malicioso requiere firmas/roles para resolverse correctamente.
-- CAS nuevo coexiste con blobs legacy hasta migración progresiva.
-- GC todavía es local al Vault; pack rollback transaccional requiere historial del lock completo.
-- archivos enormes siguen siendo delta por archivo hasta implementar chunks.
-- OPFS es prometedor, pero debe probarse en Safari/iPhone real antes de mover almacenamiento crítico.
-
-## 8. Orden de I+D actualizado
+## 10. Próximos niveles
 
 Alta prioridad:
 
-1. Pack transaction + previous pack lock.
-2. CAS audit/rebuild de referencias.
-3. UI de rollback/auditoría/GC controlado.
-4. manifest con digest + tamaño obligatorio para publicación Kelo.
-5. OPFS benchmark/tiering para blobs grandes.
+1. `rollbackContentPack()` transaccional usando `previousGeneration`.
+2. CAS reference graph audit/rebuild.
+3. digest + size obligatorios para contenido publicado por Kelo.
+4. UI de historial de generaciones.
+5. límites de staging según storage pressure.
 
-Media:
+Después:
 
-6. FastCDC publisher/build-time.
-7. chunk CAS + Range delivery.
-8. Asset Gateway/CDN.
-9. metadata firmada estilo TUF.
-10. mirrors y recuperación de proveedor.
+6. OPFS tier para blobs grandes.
+7. FastCDC build-time.
+8. chunk CAS.
+9. Asset Gateway/CDN.
+10. metadata firmada estilo TUF.
+11. mirrors y failover.
 
-Posterior:
+## 11. Regla para futuras rondas autónomas
 
-11. telemetry agregada de dedupe/bandwidth;
-12. prefetch adaptativo respetando red/batería;
-13. peer-assisted delivery opcional y verificable.
+Cada ronda:
 
-## 9. Regla para futuras rondas autónomas
+1. leer `investigacion.md`;
+2. leer `documentacion.md`;
+3. inspeccionar implementación real;
+4. investigar tecnología externa relevante;
+5. elegir una mejora concreta;
+6. modificar el sistema existente, no duplicarlo;
+7. preservar iPhone/mobile-first;
+8. mantener carga bajo demanda;
+9. actualizar estos dos documentos;
+10. revisar CI/Pages.
 
-Cada ronda debe:
+## 12. Regla permanente
 
-1. leer `investigacion.md` y `documentacion.md`;
-2. inspeccionar implementación real antes de proponer;
-3. investigar buenas prácticas actuales;
-4. elegir una sola mejora de alto impacto y bajo riesgo;
-5. integrar sobre el Vault/PackManager existente, nunca crear uno paralelo;
-6. preservar mobile-first y carga bajo demanda;
-7. actualizar estos dos documentos si cambia el contrato;
-8. comprobar CI/Pages cuando sea posible.
-
-## 10. Regla permanente
-
-**La disponibilidad de contenido debe crecer mucho más rápido que los bytes descargados por jugador.**
-
-Toda nueva función de BibliotecaTecnologia debe proteger esa propiedad.
+**BibliotecaTecnologia debe comportarse como un sistema de distribución de contenido inmutable y recuperable, no como una carpeta gigante de archivos.**

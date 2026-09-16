@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: QA / GUARDIAN PVP
- * keys: GUARDIAN PVP SHARED AUTHORITY PARITY FIXED STEP LEASE DOUBLE AUTHORITY FIRST USE TAKEOVER RATE LIMIT EPOCH
- * purpose: smoke test del core compartido y contratos de host/adaptador Guardian, incluido relevo seguro de Master
+ * keys: GUARDIAN PVP SHARED AUTHORITY PARITY FIXED STEP LEASE DOUBLE AUTHORITY FIRST USE TAKEOVER RATE LIMIT EPOCH CACHE SEQUENCE WORKER
+ * purpose: smoke test del core compartido y contratos del host Worker/adaptador Guardian, incluido relevo seguro de Master
  */
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -14,6 +14,7 @@ const read=rel=>fs.readFileSync(path.join(root,rel),'utf8');
 const sharedSource=read('src/systems/pvp/shared-pvp-authority.js');
 const serverSource=read('server/pvp-authority.js');
 const hostSource=read('src/systems/guardian-pvp-host.js');
+const workerSource=read('src/workers/guardian-pvp-authority-worker.js');
 const adapterSource=read('src/systems/guardian-pvp-net-adapter.js');
 const uiSource=read('src/ui/guardian-pvp-ui.js');
 const registrySource=read('src/core/feature-registry.js');
@@ -29,32 +30,56 @@ assert.match(serverSource,/shared-pvp-authority\.js/);
 assert.doesNotMatch(serverSource,/function step\s*\(/);
 assert.doesNotMatch(serverSource,/function resolveMelee\s*\(/);
 
-assert.match(hostSource,/KeloSharedPvPAuthority\.createPvpAuthority/);
+assert.match(hostSource,/guardian-pvp-authority-worker\.js\?v=2-takeover/);
+assert.match(hostSource,/new root\.Worker/);
+assert.doesNotMatch(hostSource,/KeloSharedPvPAuthority\.createPvpAuthority/);
 assert.match(hostSource,/KeloSimulation\.after\('guardian:pvp-host'/);
 assert.match(hostSource,/MAX_CATCHUP_STEPS=5/);
 assert.match(hostSource,/MAX_INPUTS_PER_SECOND=90/);
 assert.match(hostSource,/TAKEOVER_MAX_AGE_MS=7000/);
-assert.match(hostSource,/restoreLatestTakeover/);
+assert.match(hostSource,/takeoverSeedFor/);
 assert.match(hostSource,/takeoversRestored/);
 assert.match(hostSource,/playersRestored/);
 assert.match(hostSource,/transientActionsReset/);
 assert.match(hostSource,/projectilesReset/);
-assert.match(hostSource,/tickOffset/);
 assert.match(hostSource,/lastSnapshotEpoch/);
 assert.match(hostSource,/msgEpoch!==lastSnapshotEpoch/);
 assert.match(hostSource,/masterValid\(msg\.epoch\)/);
 assert.match(hostSource,/KeloGuardianPvPNetAdapter\?\.baseAuthority/);
 assert.doesNotMatch(hostSource,/KeloGuardianPvPNetAdapter\?\.state\?\.\(\)\.centralOnline/);
+assert.match(hostSource,/isolatedWorker:true/);
+assert.match(hostSource,/statusRealmIsolated:true/);
 assert.match(hostSource,/persistentAuthority:false/);
 assert.match(hostSource,/economyAuthority:false/);
 assert.match(hostSource,/inventoryAuthority:false/);
 assert.match(hostSource,/rewardsAuthority:false/);
 assert.doesNotMatch(hostSource,/setInterval|localStorage|indexedDB/);
 
+assert.match(workerSource,/importScripts\(/);
+assert.match(workerSource,/shared-pvp-authority\.js\?v=1/);
+assert.match(workerSource,/KeloSharedPvPAuthority\.createPvpAuthority/);
+assert.match(workerSource,/function restoreSeed/);
+assert.match(workerSource,/function restorePlayer/);
+assert.match(workerSource,/KeloStatusEffects\.apply/);
+assert.match(workerSource,/tickOffset/);
+assert.match(workerSource,/takeoverRestored/);
+assert.match(workerSource,/transientActionsReset:true/);
+assert.match(workerSource,/projectilesReset:true/);
+assert.match(workerSource,/persistentAuthority:false/);
+assert.match(workerSource,/economyAuthority:false/);
+assert.match(workerSource,/inventoryAuthority:false/);
+assert.match(workerSource,/rewardsAuthority:false/);
+assert.doesNotMatch(workerSource,/setInterval|setTimeout\(|localStorage|indexedDB|fetch\(|XMLHttpRequest|WebSocket|RTCPeerConnection|document\./);
+
 assert.match(adapterSource,/GUARDIAN_PVP_DOUBLE_AUTHORITY_BLOCKED/);
 assert.match(adapterSource,/GUARDIAN_PVP_CENTRAL_SERVER_RETURNED/);
 assert.match(adapterSource,/base\.sendCombatIntent/);
 assert.match(adapterSource,/KeloSimulation\.after\('guardian:pvp-net-adapter'/);
+assert.match(adapterSource,/sequence=Math\.max\(sequence,lastAck\+1\)/);
+assert.match(adapterSource,/sequenceResyncs/);
+assert.match(adapterSource,/kelo:guardian-pvp-reject/);
+assert.match(adapterSource,/kelo:guardian-pvp-takeover/);
+assert.match(adapterSource,/takeoverSequenceResync:true/);
 assert.doesNotMatch(adapterSource,/setInterval/);
 
 assert.match(uiSource,/INICIAR PVP LAB/);
@@ -63,15 +88,16 @@ assert.match(uiSource,/mutationLoopGuard:true/);
 assert.match(uiSource,/permissionGrant:false/);
 
 const order=[
- 'src/systems/pvp/shared-pvp-authority.js?v=1',
- 'src/systems/guardian-pvp-host.js?v=1',
+ 'src/systems/guardian-pvp-host.js?v=3-worker',
  'engine-net.js?v=20260916-pvp-first-use-1',
- 'src/systems/guardian-pvp-net-adapter.js?v=1',
+ 'src/systems/guardian-pvp-net-adapter.js?v=2-takeover',
  'src/systems/pvp-world.js?v=20260916-pvp-first-use-1',
- 'src/ui/guardian-pvp-ui.js?v=1'
+ 'src/ui/guardian-pvp-ui.js?v=2-mobile-safe'
 ].map(x=>registrySource.indexOf(x));
 assert.ok(order.every(n=>n>=0),'Guardian PvP files must exist in registry');
 for(let i=1;i<order.length;i++)assert.ok(order[i]>order[i-1],`Guardian PvP load order invalid at ${i}`);
+assert.doesNotMatch(registrySource,/src\/systems\/pvp\/shared-pvp-authority\.js\?v=1/);
+assert.match(registrySource,/kelo-feature-registry-v2\.5\.0-guardian-pvp-worker/);
 
 const pvp=require('../server/pvp-authority.js');
 assert.equal(pvp.FIXED_DT,1/60);
@@ -92,4 +118,4 @@ assert.equal(authority.audit().persistentAuthority,false);
 assert.equal(authority.audit().economyAuthority,false);
 authority.dispose();
 
-console.log('GUARDIAN_PVP_HOST_AUDIT_OK',{fixedDt:pvp.FIXED_DT,doubleAuthorityBlocked:true,takeoverRestore:true,inputRateLimit:90,snapshotEpochFenced:true,persistentAuthority:false});
+console.log('GUARDIAN_PVP_HOST_AUDIT_OK',{fixedDt:pvp.FIXED_DT,workerIsolated:true,doubleAuthorityBlocked:true,takeoverRestore:true,inputRateLimit:90,snapshotEpochFenced:true,sequenceResync:true,cacheVersioned:true,persistentAuthority:false});

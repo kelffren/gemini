@@ -6,7 +6,9 @@
  * public-api: createMapForgeWorkspaceManifest(), registerMapForgeWorkspace()
  * reuse: handoff returns through registered World workspace via openWorkspace()
  */
-const MAP_FORGE_UI_BUILD='safari-touch-recovery-20260914-3';
+import {installMapForgeUiPolish} from '../ui/map-forge-ui-polish.mjs?v=mobile-ui-20260916-1';
+
+const MAP_FORGE_UI_BUILD='safari-touch-recovery-20260916-4';
 const MAP_FORGE_OPENING_KEY='__KELO_MAP_FORGE_WORKSPACE_OPENING__';
 
 function freshMapForgeUiLoader(){
@@ -41,6 +43,10 @@ export function createMapForgeWorkspaceManifest({loader=freshMapForgeUiLoader}={
     capability:'world.edit',
     availability:'active',
     async open({root=globalThis,openWorkspace=null}={}){
+      // Install the presentation-only layer before Map Forge mounts so iPhone never flashes the
+      // older dense layout. The installer is idempotent and owns no editor/generator state.
+      const polish=installMapForgeUiPolish({root});
+
       // The normal game URL can transiently execute more than one cached Creator module identity
       // on iOS Safari / Pages. Module-local `active` state cannot coordinate those identities, so
       // coalesce launches on the shared window before the first dynamic import can yield.
@@ -52,7 +58,7 @@ export function createMapForgeWorkspaceManifest({loader=freshMapForgeUiLoader}={
         if(typeof mod.openMapForgeWorkspace!=='function')throw new Error('CREATOR_MAP_FORGE_ENTRY_MISSING');
 
         const alreadyMounted=existingMapForgeSession(root,mod);
-        if(alreadyMounted)return alreadyMounted;
+        if(alreadyMounted){polish.refresh?.();return alreadyMounted;}
 
         const pending=Promise.resolve(mod.openMapForgeWorkspace({
           root,
@@ -66,6 +72,7 @@ export function createMapForgeWorkspaceManifest({loader=freshMapForgeUiLoader}={
         // waiting up to the worker timeout; generation readiness is editor state, not routing state.
         const mounted=existingMapForgeSession(root,mod);
         if(mounted){
+          polish.refresh?.();
           pending.catch(error=>{
             console.error('[Kelo Creators → Map Forge background bootstrap]',error);
             root.showToast?.(error?.message||'Map Forge generation bootstrap failed');
@@ -73,7 +80,9 @@ export function createMapForgeWorkspaceManifest({loader=freshMapForgeUiLoader}={
           return mounted;
         }
 
-        return pending;
+        const session=await pending;
+        polish.refresh?.();
+        return session;
       })();
 
       try{root[MAP_FORGE_OPENING_KEY]=launch;}catch{}

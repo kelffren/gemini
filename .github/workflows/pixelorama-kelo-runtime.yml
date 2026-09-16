@@ -59,7 +59,7 @@ jobs:
       - name: Record immutable metadata and license
         run: |
           cat > .pixelorama-src/build/web/kelo-runtime.json <<EOF
-          {"pixeloramaSource":"${PIXELORAMA_SOURCE_SHA}","godot":"${GODOT_VERSION}","profile":"kelo-mobile-full","threads":false,"undoDefault":64,"keloWebBridge":true}
+          {"pixeloramaSource":"${PIXELORAMA_SOURCE_SHA}","godot":"${GODOT_VERSION}","profile":"kelo-mobile-full","threads":false,"undoDefault":64,"keloWebBridge":true,"matchedEngine":true}
           EOF
           cp vendor/pixelorama-kelo/LICENSE.pixelorama.txt .pixelorama-src/build/web/PIXELORAMA-LICENSE.txt
 
@@ -86,22 +86,22 @@ jobs:
           retention-days: 30
           compression-level: 9
 
-      - name: Publish lightweight PCK runtime branch
+      - name: Publish complete matched runtime branch
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           rm -rf /tmp/kelo-pixelorama-runtime
           mkdir -p /tmp/kelo-pixelorama-runtime
-          cp .pixelorama-src/build/web/index.pck /tmp/kelo-pixelorama-runtime/index.pck
-          cp .pixelorama-src/build/web/kelo-runtime.json /tmp/kelo-pixelorama-runtime/kelo-runtime.json
-          cp .pixelorama-src/build/web/PIXELORAMA-LICENSE.txt /tmp/kelo-pixelorama-runtime/PIXELORAMA-LICENSE.txt
-          grep 'index.pck' .pixelorama-src/build/web/SHA256SUMS.txt > /tmp/kelo-pixelorama-runtime/SHA256SUMS.txt
+          cp -a .pixelorama-src/build/web/. /tmp/kelo-pixelorama-runtime/
           cd /tmp/kelo-pixelorama-runtime
+          test -s index.js
+          test -s index.wasm
+          test -s index.pck
           git init -b "$RUNTIME_BRANCH"
           git config user.name "kelo-runtime-bot"
           git config user.email "68343904+kelffren@users.noreply.github.com"
-          git add index.pck kelo-runtime.json PIXELORAMA-LICENSE.txt SHA256SUMS.txt
-          git commit -m "runtime(pixelorama): ${PIXELORAMA_SOURCE_SHA}"
+          git add .
+          git commit -m "runtime(pixelorama): ${PIXELORAMA_SOURCE_SHA} godot-${GODOT_VERSION} matched"
           git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           git push --force origin "HEAD:refs/heads/${RUNTIME_BRANCH}"
