@@ -1,4 +1,4 @@
-# Creator Asset Bridge V1.3 — Source → Authoring → Delivery
+# Creator Asset Bridge V1.4 — Source → Authoring → Delivery
 
 ## Status
 
@@ -8,7 +8,10 @@
 - PNG adaptive search: `src/creators/assets/png-adaptive-optimizer.mjs`
 - deterministic quality agent: `src/creators/assets/png-quality-agent.mjs`
 - asset image profiler: `src/creators/assets/asset-image-profiler.mjs`
+- Pareto analyzer: `src/creators/assets/quality-pareto.mjs`
+- optional perceptual advisory: `src/creators/assets/perceptual-quality-bridge.mjs`
 - runtime variant lab: `src/creators/assets/runtime-image-variants.mjs`
+- transfer/decode/transparency budget: `scripts/asset-space-budget.mjs`
 - sheet compiler: `src/creators/assets/asset-sheet-compiler.mjs`
 - foreground: `src/creators/sprite-compiler/sprite-foreground-analysis.mjs`
 - world profile: `src/creators/sprite-compiler/sprite-world-asset-compiler.mjs`
@@ -18,7 +21,7 @@
 - byte transport: `CHATGPT_ASSET_UPLOAD_BRIDGE.md`
 - runtime consumers: `KELO_ATLAS_CONTRACT` + `KELO_PROPERTY_CATALOG`
 - playerVisible: false
-- status: creator-local-file-bridge-v1.3-meta-space-gate-candidate
+- status: creator-local-file-bridge-v1.4-meta-space-gate-candidate
 
 ## Contract
 
@@ -39,6 +42,16 @@ Tres niveles quedan separados:
 3. **DELIVERY** — formato de descarga/runtime opcional. Puede ser PNG, WebP o AVIF según perfil, soporte y evidencia. Elegir una variante no modifica geometría, identidad ni metadata de gameplay.
 
 La publicación de una variante DELIVERY al runtime es una decisión separada del laboratorio. Este sistema genera y demuestra candidatos; no reescribe automáticamente `KELO_ATLAS_CONTRACT` ni el boot.
+
+## Fast ingest vs Deep publish
+
+No toda edición debe pagar el coste de una búsqueda exhaustiva.
+
+- **FAST**: default de dry-run/import. Reduce combinaciones de filtros y prioriza feedback rápido. Sigue siendo strict lossless cuando el modo es strict.
+- **BALANCED**: más filtros/candidatos para auditoría intermedia.
+- **DEEP**: default cuando se usa `--write`; además existe el tournament externo para publicación final.
+
+La diferencia entre FAST y DEEP es CPU/tiempo de búsqueda, nunca la autoridad del Quality Gate.
 
 ## Image Profiler
 
@@ -82,7 +95,17 @@ Los tiles repetibles son tratados de forma especial. El borde exterior debe perm
 
 Las políticas `pixel-art`, `ui-crisp`, `fx-alpha` y `balanced` tienen límites diferentes. Alpha continúa bloqueado por defecto. Si un candidato falla cualquier hard metric, queda fuera aunque pese mucho menos.
 
-Una revisión visual/LLM futura puede funcionar como veto o advisory, pero jamás puede sobreescribir un hard gate fallido.
+## Perceptual advisory
+
+`perceptual-quality-bridge.mjs` puede consultar herramientas instaladas como `iqa-cli`, SSIMULACRA2 o Butteraugli. Es **advisory-only**: añade una segunda opinión psicovisual al reporte pero jamás aprueba un candidato que haya fallado un hard gate determinista.
+
+Se activa en la CLI con `--perceptual` junto con `--capture`. Si ninguna herramienta externa está instalada, el flujo continúa sin romperse.
+
+## Pareto frontier
+
+`quality-pareto.mjs` conserva en el reporte los candidatos no dominados por tamaño/calidad. Así no perdemos información útil detrás de un único “winner”: podemos ver cuándo unos pocos bytes extra compran una mejora relevante de calidad.
+
+El ganador automático sigue obedeciendo primero a los hard gates. La frontera es evidencia para calibración y futuras políticas.
 
 ## PNG lossless tournament
 
@@ -128,9 +151,24 @@ Sharp conserva metadata en los candidatos. Cada salida se vuelve a apretar lossl
 - WebP adaptativo, solo en perfiles donde está permitido;
 - AVIF adaptativo 4:4:4, solo en perfiles donde está permitido.
 
-Cada formato se decodifica nuevamente a RGBA y pasa por el mismo Quality Agent. Un formato moderno no gana por ser moderno: gana por bytes + gate.
+Cada formato se decodifica nuevamente a RGBA y pasa por el mismo Quality Agent. Un formato moderno no gana por ser moderno: gana por bytes + gate. El reporte también incluye su Pareto frontier.
 
 Actualmente los assets `pixel-critical` y `seam-critical` se mantienen conservadores: no entran automáticamente en tracks adaptativos WebP/AVIF. Lossless sí puede competir.
+
+## Asset Space Budget
+
+`scripts/asset-space-budget.mjs` ataca problemas que la compresión de archivo no resuelve:
+
+- bytes almacenados/transferidos;
+- baseline de memoria RGBA (`width × height × 4`);
+- expansión stored→decoded;
+- proporción transparente;
+- bounding box de contenido visible;
+- desperdicio potencial por bordes transparentes;
+- duplicados exactos por SHA-256;
+- rankings de assets más pesados en disco y al decodificar.
+
+Es observabilidad únicamente. No borra duplicados ni recorta sprites. Un trim real requiere preservar `orig`, `trim`, anchor y animation alignment mediante metadata compatible con el consumidor.
 
 ## KTX2 / Basis — horizonte WebGL
 
@@ -149,6 +187,8 @@ Con `--capture` genera:
 - `DIFERENCIA ×8` — mapa transparente donde solo aparecen píxeles modificados;
 - cantidad de píxeles cambiados + delta máximo;
 - perfil detectado y policy;
+- effort FAST/BALANCED/DEEP;
+- perceptual advisory opcional;
 - `report.json` completo;
 - `index.html` mobile-friendly para auditoría humana.
 
@@ -158,9 +198,10 @@ Ejemplos:
 
 ```bash
 node scripts/asset-space-compiler.mjs --input=assets --mode=strict --capture
-node scripts/asset-space-compiler.mjs --input=assets --mode=strict --capture --write
-node scripts/asset-space-compiler.mjs --input=C --mode=adaptive --capture --write
+node scripts/asset-space-compiler.mjs --input=assets --mode=strict --effort=deep --capture --write
+node scripts/asset-space-compiler.mjs --input=C --mode=adaptive --effort=deep --capture --perceptual --write
 node scripts/asset-codec-tournament.mjs --input=assets --max-files=6 --emit-variants
+node scripts/asset-space-budget.mjs --input=assets
 ```
 
 El input es configurable. Una futura carpeta `C` puede conectarse sin introducir otro owner.
@@ -212,7 +253,7 @@ Cualquier porcentaje de ahorro del nuevo Space Compiler sobre producción debe s
 - adaptive alpha/edge/border/quality fail → reject;
 - no adaptive candidate → strict fallback;
 - no candidato menor aprobado → conservar original;
-- external tool absent/falla → continuar con candidatos válidos;
+- external/perceptual tool absent/falla → continuar con gates deterministas;
 - no foreground → bloquear publish de sheet;
 - review semántico inválido → aplicar nada.
 
@@ -224,7 +265,8 @@ Optimización, profiling y variantes son operaciones build/publish-time. No intr
 
 - `scripts/asset-space-compiler-audit.mjs` — lossless exact fixture;
 - `scripts/asset-space-meta-audit.mjs` — profiler, seam hard gate y tournament fallback;
-- `scripts/asset-space-compiler.mjs` — dry-run de PNG reales;
-- `scripts/asset-codec-tournament.mjs` — laboratorio profundo manual con variantes;
+- `scripts/asset-space-budget.mjs` — transferencia, decode baseline, transparencia y duplicados;
+- `scripts/asset-space-compiler.mjs` — dry-run FAST de PNG reales;
+- `scripts/asset-codec-tournament.mjs` — laboratorio DEEP manual con variantes;
 - `audit:asset-sheet` y `audit:docs` deben permanecer verdes;
 - runtime/boot no cambia en este pass, por lo que la validación iPhone de gameplay se reserva para el futuro pass que realmente promueva DELIVERY variants al runtime.
