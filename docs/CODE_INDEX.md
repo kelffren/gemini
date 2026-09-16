@@ -22,6 +22,14 @@
 - `src/core/simulation-extension-system.js` — `KeloSimulation`, incluidos suspension claims owner-native para lifecycle explícito.
 - `src/core/update-system.js` — `KeloUpdater`.
 
+## Build / Weightless
+
+- `src/build/boot-footprint-ratchet.mjs` — mide y compara el peso estático anterior a `kelo:boot-ready`.
+- `scripts/boot-footprint.mjs` — snapshot CLI del first-playable path.
+- `scripts/boot-footprint-ratchet.mjs` — gate monotónico de JS/CSS crítico.
+- `scripts/boot-footprint-ratchet-audit.mjs` — corpus determinista del boot ratchet.
+- `.github/workflows/asset-bit-ratchet.yml` — Kelo Weightless Stack: assets, dedup y first-playable footprint.
+
 ## World / Environment
 
 - `src/environment/world-map.js` — definición principal.
@@ -60,12 +68,14 @@
 - `src/creators/assets/smart-atlas-planner.mjs` — trim alpha-safe, `orig/trim/anchor`, MaxRects y subframe dedup.
 - `src/creators/assets/asset-budget-policy.mjs` — límites declarativos por grupo/zona para bytes, RGBA, file count y asset máximo.
 - `src/creators/assets/asset-bit-ratchet.mjs` — compara snapshots base/head y bloquea codificaciones mayores cuando el hash RGBA decodificado no cambió.
+- `src/creators/assets/asset-global-dedup.mjs` — planifica blobs byte-exact compartibles y campeones RGBA-exact sin mutar SOURCE.
 - `docs/asset-space-budgets.json` — política inicial de budget de bibliotecas/zonas; no infiere loading runtime.
 - `scripts/asset-space-compiler.mjs` — CLI FAST/AUTO/BALANCED/DEEP, before/after/diff, perfil, provenance y reporte.
 - `scripts/asset-space-budget.mjs` — transferencia, RGBA baseline, transparencia y duplicados exactos.
 - `scripts/asset-bit-ratchet.mjs` — gate CI de bytes monotónicos para información RGBA idéntica.
 - `scripts/asset-bit-ratchet-audit.mjs` — regresión determinista del bit ratchet.
-- `.github/workflows/asset-bit-ratchet.yml` — comparación automática del snapshot base del PR contra head.
+- `scripts/asset-global-dedup.mjs` — emite el plan global de deduplicación exacta.
+- `scripts/asset-global-dedup-audit.mjs` — regresión determinista del dedup planner.
 - `scripts/asset-route-budget-audit.mjs` — enforcement CI de grupos declarados en `docs/asset-space-budgets.json`.
 - `scripts/asset-animation-consistency-audit.mjs` — corpus adversarial de flicker/anchor/alpha temporal.
 - `scripts/asset-codec-tournament.mjs` — laboratorio profundo de codecs y variantes de entrega.
