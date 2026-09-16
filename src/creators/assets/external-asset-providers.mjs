@@ -5,14 +5,19 @@
  * purpose: Browse provider metadata without downloading asset binaries.
  */
 import {searchKenneyAssets,clearKenneyCache} from './kenney-live-provider.mjs';
+import {searchLpcAssets} from './lpc-live-provider.mjs';
 
-const CONFIG_URL='../../../data/external-asset-providers.json?v=2';
+const CONFIG_URL='../../../data/external-asset-providers.json?v=3';
 let configPromise=null;
 let liveCache=new Map();
 
 function clean(v){return String(v??'').trim();}
 function join(base,path){return new URL(path,base).href;}
 function normalizeCategory(v){const x=clean(v).toLowerCase();return x||'other';}
+function browserQA(){
+  if(typeof location==='undefined')return{};
+  try{const p=new URLSearchParams(location.search);return{provider:clean(p.get('qaProvider')),preview:p.get('qaPreview')==='1'};}catch{return{};}
+}
 
 export async function loadProviderConfig(){
   if(configPromise)return configPromise;
@@ -45,7 +50,7 @@ export async function getProviderStatuses(){
   const cfg=await loadProviderConfig();
   return (cfg.providers||[]).filter(p=>p.enabled!==false).map(p=>({
     id:p.id,name:p.name,mode:p.mode,license:p.license,sourceUrl:p.sourceUrl,browseUrl:p.browseUrl||p.sourceUrl,notes:p.notes,
-    live:p.mode==='live-index'||p.mode==='lazy-live-index',lazy:p.mode==='lazy-live-index'
+    live:p.mode==='live-index'||p.mode==='lazy-live-index',lazy:p.mode==='lazy-live-index',verified:p.verified===true
   }));
 }
 
@@ -55,13 +60,15 @@ export async function browseProvider(id,options={}){
   try{
     if(provider.id==='spritecook'&&provider.mode==='live-index')return {provider,assets:await loadSpriteCook(provider),error:null};
     if(provider.id==='kenney'&&provider.mode==='lazy-live-index')return {provider,assets:await searchKenneyAssets(options.query||'',{limit:options.limit||320}),error:null};
+    if(provider.id==='lpc'&&provider.mode==='live-index')return {provider,assets:await searchLpcAssets(options.query||'',{limit:options.limit||160}),error:null};
     return {provider,assets:[],error:null};
   }catch(error){return {provider,assets:[],error:String(error?.message||error)};}
 }
 
 export async function searchExternalAssets(query='',options={}){
   const cfg=await loadProviderConfig();const providers=(cfg.providers||[]).filter(p=>p.enabled!==false);
-  const wanted=options.providers?.length?new Set(options.providers):null;
+  const qa=browserQA();
+  const wanted=options.providers?.length?new Set(options.providers):qa.provider?new Set([qa.provider]):null;
   const q=clean(query).toLowerCase();
   const selected=providers.filter(p=>{
     if(wanted)return wanted.has(p.id);
@@ -69,11 +76,28 @@ export async function searchExternalAssets(query='',options={}){
   });
   const bundles=await Promise.all(selected.map(p=>browseProvider(p.id,{query:q,limit:options.limit})));
   let assets=bundles.flatMap(b=>b.assets||[]);
-  if(q)assets=assets.filter(a=>`${a.name} ${a.category} ${(a.tags||[]).join(' ')} ${a.description||''}`.toLowerCase().includes(q)||a.provider==='kenney');
+  if(q)assets=assets.filter(a=>`${a.name} ${a.category} ${(a.tags||[]).join(' ')} ${a.description||''} ${a.author||''}`.toLowerCase().includes(q)||a.provider==='kenney');
   if(options.category&&options.category!=='all')assets=assets.filter(a=>a.category===options.category);
-  return {assets,providers:bundles.map(b=>({id:b.provider.id,name:b.provider.name,mode:b.provider.mode,error:b.error,count:b.assets?.length||0,browseUrl:b.provider.browseUrl||b.provider.sourceUrl,license:b.provider.license,lazy:b.provider.mode==='lazy-live-index'}))};
+  return {assets,providers:bundles.map(b=>({id:b.provider.id,name:b.provider.name,mode:b.provider.mode,error:b.error,count:b.assets?.length||0,browseUrl:b.provider.browseUrl||b.provider.sourceUrl,license:b.provider.license,lazy:b.provider.mode==='lazy-live-index',verified:b.provider.verified===true}))};
+}
+
+function installQAPreviewHook(){
+  const qa=browserQA();if(!qa.preview||typeof document==='undefined')return;
+  let observer=null;
+  const reveal=()=>{
+    const node=document.querySelector('.card .preview[data-preview]:not([data-qa-revealed])');
+    if(!node)return false;
+    const url=clean(node.getAttribute('data-preview'));if(!url)return false;
+    node.setAttribute('data-qa-revealed','1');node.querySelector('.preview-placeholder')?.remove();
+    const img=document.createElement('img');img.loading='eager';img.alt='Asset externo listo para descargar';img.src=url;
+    const badge=node.querySelector('.badge');node.insertBefore(img,badge||node.firstChild);return true;
+  };
+  if(reveal())return;
+  observer=new MutationObserver(()=>{if(reveal()){observer.disconnect();observer=null;}});
+  observer.observe(document.documentElement,{childList:true,subtree:true});
+  setTimeout(()=>{observer?.disconnect();observer=null;},12000);
 }
 
 export function clearProviderCache(){liveCache=new Map();configPromise=null;clearKenneyCache();}
 export const EXTERNAL_ASSET_PROVIDERS=Object.freeze({loadProviderConfig,getProviderStatuses,browseProvider,searchExternalAssets,clearProviderCache});
-if(typeof window!=='undefined')window.KELO_EXTERNAL_ASSET_PROVIDERS=EXTERNAL_ASSET_PROVIDERS;
+if(typeof window!=='undefined'){window.KELO_EXTERNAL_ASSET_PROVIDERS=EXTERNAL_ASSET_PROVIDERS;installQAPreviewHook();}
