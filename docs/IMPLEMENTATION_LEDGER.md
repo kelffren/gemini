@@ -215,3 +215,96 @@ Handoff prompt:
 **Handoff prompt:**
 
 > Continue `IMP-2026-09-15-CREATOR-RELEASE-002` on `creator-release-center-v1`. Do not implement a local marketplace queue or client publication authority. Read the Universal Content Studio system doc and migration `20260910024046_universal_content_registry.sql`. Run `node scripts/creator-release-center-audit.mjs`, `npm run audit:universal-content`, `npm run audit:docs`, authenticated Supabase review/resubmit/publication visibility tests, and the mobile/LIVE gates. Preserve the invariant that only service-role can publish. The next product layer after validation is Discover/listing/economy metadata on top of approved publications, not replacing the publication model.
+
+---
+
+### IMP-2026-09-15-CREATOR-MARKET-003
+
+**Status:** IMPLEMENTED_PENDING_VERIFY  
+**Depends on:** `IMP-2026-09-15-CREATOR-RELEASE-002` / PR #271 and upstream Creator OS #269.  
+**Owner(s):** Kelo Creator Marketplace client service/presentation + Supabase Creator marketplace authority + existing `character_wallets` / `wallet_ledger` KC authority.  
+**User intent / source prompt:** Continue the universal Creator Library into a real creator marketplace where characters, skins, weapons, props and other approved Creator content can be discovered, listed, bought with KC and owned through durable licenses, while creators can earn from their work and all future agents retain the exact implementation context.
+
+**Why:** Publication alone does not establish a creator economy. The next stable boundary is a marketplace that sells entitlements to immutable published content revisions without copying bytes, trusting localStorage balances, or treating UI state as ownership.
+
+**Invariants:**
+
+- Only an active row in `content_publications` may become a marketplace listing.
+- `DRAFT != REVIEWED != PUBLISHED != LISTED != OWNED`.
+- `character_wallets` + `wallet_ledger` remain the KC authority; Marketplace does not create another wallet.
+- Buyer client sends listing ID, owned buyer character ID and idempotency correlation ID; it does not submit trusted settlement price or revenue split.
+- Purchase RPC re-reads price/split and publication state server-side and writes debit, creator payout, transaction and entitlement transactionally.
+- Entitlement is account-level to one immutable content revision. Buyer character only selects which authoritative KC wallet pays.
+- Creator asset bytes and public publication bytes remain in existing asset/content owners; marketplace metadata never duplicates them.
+- V1 `seller_share_bps=10000`: 100% of KC goes to the creator and 0% to platform until a platform fee/treasury policy is explicitly decided.
+- Discover is metadata/preview-first and does not preload full asset bytes.
+- MARKET UI remains lazy and absent from normal game boot and the default CREATE view.
+- Runtime entitlement enforcement is **not yet complete**; hiding unavailable content in UI is not security.
+
+**Implemented now (stacked branch `creator-marketplace-v1`):**
+
+- Added Supabase `creator_profile_details`, `creator_market_config`, `creator_market_listings`, `creator_market_transactions` and `creator_content_entitlements`.
+- Added Creator profile RPCs extending the existing profile identity with tagline/bio.
+- Added create/update/cancel listing RPC over authority-published content only.
+- Added privacy-aware `discover_creator_market_v2` returning public Creator metadata, public preview metadata and caller-relative `is_own` / `is_owned` without exposing raw creator account UUIDs.
+- Added idempotent `purchase_creator_market_listing` with server-side KC settlement through existing `apply_wallet_delta`, append-only marketplace transaction record and entitlement grant.
+- Added optional future platform fee configuration while defaulting to 100% creator / 0% platform.
+- Added repository methods for authoritative KC wallet reads, Creator profiles, Discover, listings, purchases and entitlements.
+- Added `Kelo Creator Marketplace` client service with no local wallet/listing authority.
+- Added lazy Creator Library `MARKET` tab with `DISCOVER`, `MY LISTINGS`, `OWNED`, and `CREATOR PROFILE` mobile surfaces.
+- Discover uses lazy public previews and metadata only; full Creator content remains on-demand.
+- `MY LISTINGS` only offers revisions already found in the owner's active publications.
+- Added authoritative KC balance display by active character.
+- Added static contract audit `scripts/creator-marketplace-audit.mjs`.
+- Added technical owner/security document `docs/systems/CREATOR_MARKETPLACE.md`.
+
+**Files/contracts touched:**
+
+- `supabase/migrations/20260916002500_creator_marketplace_v1.sql`
+- `supabase/migrations/20260916002600_creator_marketplace_discover_v2.sql`
+- `src/creators/content/supabase-content-repository.mjs`
+- `src/creators/marketplace/creator-marketplace-service.mjs`
+- `src/creators/ui/creator-marketplace-surface.mjs`
+- `src/creators/ui/creator-library-workspace.mjs`
+- `src/creators/creator-entry.mjs`
+- `scripts/creator-marketplace-audit.mjs`
+- `docs/systems/CREATOR_MARKETPLACE.md`
+- `docs/IMPLEMENTATION_LEDGER.md`
+
+**Deferred deliberately:**
+
+- Runtime/server entitlement enforcement when equipping skins/weapons, placing props, using VFX/content, or otherwise consuming purchased content.
+- Any real-money creator cash-out, tax/KYC/payment processor/App Store policy implementation.
+- Platform marketplace fee policy; V1 remains 100% Creator KC until explicitly changed.
+- Refund/chargeback/revocation policy after completed purchases.
+- Creator sales analytics, ratings/reviews, favorites, ranking and featured merchandising.
+- Moderation/reviewer tooling beyond the existing review/publication authority.
+- Automatic seasonal listing/publishing.
+- Full asset/content download/use authorization endpoint; current Discover remains preview/metadata-first.
+
+**Acceptance / gates:**
+
+- `node scripts/creator-marketplace-audit.mjs` passes from a runnable checkout.
+- `node scripts/creator-release-center-audit.mjs` and upstream Creator OS/universal-content/docs audits remain green.
+- Both marketplace migrations apply cleanly to a test Supabase environment.
+- Listing an unpublished revision fails; listing another user's revision fails; payout character must belong to seller.
+- Discover does not expose raw account UUIDs and returns ownership flags correctly.
+- Two-account test: seller lists published content, buyer with authoritative KC buys it, buyer wallet decreases, seller payout wallet increases, `creator_market_transactions` is written and entitlement appears.
+- Repeating the same correlation ID returns the same idempotent result without a second charge.
+- Self-purchase, already-owned and insufficient-funds attempts fail without partial wallet changes.
+- MARKET UI works on iPhone: Discover/search/thumbnail lazy load, character selection, listing, purchase, Owned and Creator Profile.
+- Normal game boot remains unaffected; mandatory iPhone/LIVE gate passes before `VALIDATED`.
+- `npm run audit:docs` passes.
+
+**Evidence:**
+
+- Branch: `creator-marketplace-v1`, stacked from `creator-release-center-v1`.
+- Existing economy migration `20260910015537_kelo_economy_persistence_and_audit_foundation.sql` already provides `character_wallets`, append-only `wallet_ledger`, server audit and service-role-only wallet mutation RPC; this pass reuses it.
+- Existing release authority requires service-role publication before a revision can be listed.
+- Static audit was added but has not been executed in this environment; Supabase migrations and mobile/LIVE integration have not been claimed as tested.
+
+**Next action:** run marketplace/release/Creator OS/docs audits and two-account Supabase + iPhone/LIVE flows. Fix failures on the same stacked branch. After validation, the next product pass is **Creator Entitlement Enforcement V1**: specialized runtime/server owners must require publication-owner or entitlement before equipping/placing/using paid Creator content.
+
+**Handoff prompt:**
+
+> Continue `IMP-2026-09-15-CREATOR-MARKET-003` on `creator-marketplace-v1`. Read `docs/systems/CREATOR_MARKETPLACE.md`, the Release/Creator OS ledger entries, the wallet/economy migration and publication authority before changing anything. Do not create local KC, a second wallet, a duplicate asset store, or a client-side ownership flag as authority. First validate both marketplace migrations, run `node scripts/creator-marketplace-audit.mjs` plus upstream audits, then execute two-account purchase/idempotency/failure tests and iPhone/LIVE MARKET flows. Keep V1 split at 100% Creator unless product policy explicitly changes it. Do not mark `VALIDATED` until all gates pass. The next architectural pass is entitlement enforcement in specialized content consumers, not another marketplace UI rewrite.
