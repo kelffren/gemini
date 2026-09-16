@@ -1,12 +1,12 @@
 /* KELO-INDEX
  * area: CREATORS / ASSET DELIVERY
  * owner: Kelo Creator Asset Bridge
- * keys: RUNTIME IMAGE VARIANTS WEBP AVIF LOSSLESS RENDER EXACT ADAPTIVE QUALITY GATE SAFARI PARETO
- * purpose: derive smaller runtime delivery variants while preserving canonical source/authoring bytes and exposing the non-dominated size/quality frontier
+ * keys: RUNTIME IMAGE VARIANTS WEBP AVIF LOSSLESS RENDER EXACT ADAPTIVE BOUNDARY SEARCH QUALITY GATE SAFARI PARETO
+ * purpose: derive smaller runtime delivery variants while preserving canonical source/authoring bytes and concentrating expensive encodes near the measured quality boundary
  * public-api: buildRuntimeImageVariants()
  * state-owned: none; returns candidate bytes + manifest only
  * online: N/A; build/publish-time capability. Runtime consumption is a separate owner decision.
- * consumes: Sharp, PNG optimizer, image profiler, quality agent, Pareto analysis
+ * consumes: Sharp, PNG optimizer, image profiler, quality agent, boundary search, Pareto analysis
  * do-not: replace canonical source bytes, resize, or promote a candidate that fails its policy
  */
 
@@ -14,6 +14,7 @@ import {optimizePngLossless} from './png-space-optimizer.mjs';
 import {profileAssetImage} from './asset-image-profiler.mjs';
 import {evaluatePixelFidelity, judgePixelFidelity} from './png-quality-agent.mjs';
 import {buildQualityParetoFrontier} from './quality-pareto.mjs';
+import {searchIntegerQualityBoundary} from './quality-boundary-search.mjs';
 
 async function loadSharp() {
   try { return (await import('sharp')).default; }
@@ -61,6 +62,41 @@ function webpPreset(profile) {
   return 'picture';
 }
 
+function searchSummary(search) {
+  if (!search) return null;
+  return {
+    version:search.version,
+    range:search.range,
+    budget:search.budget,
+    order:search.order,
+    boundaryPass:search.boundaryPass,
+    bestByBytes:search.bestByBytes ? {
+      quality:search.bestByBytes.quality,
+      bytes:search.bestByBytes.bytes,
+      score:search.bestByBytes.score,
+      pass:search.bestByBytes.pass
+    } : null,
+    evaluated:search.evaluated.map(item=>({quality:item.quality,phase:item.phase,bytes:item.bytes,pass:item.pass,score:item.score,reasons:item.reasons||[]}))
+  };
+}
+
+async function runExplicitQualities(qualities,evaluate) {
+  const evaluated=[];
+  for (const quality of [...new Set(qualities.map(Number))].filter(Number.isFinite).sort((a,b)=>b-a)) {
+    const result=await evaluate(quality);
+    evaluated.push({quality,phase:'explicit',...result});
+  }
+  return {
+    version:'kelo-quality-explicit-list-v1',
+    range:{min:Math.min(...evaluated.map(item=>item.quality)),max:Math.max(...evaluated.map(item=>item.quality))},
+    budget:{maxEvaluations:evaluated.length,used:evaluated.length,coarseStep:null,neighborRadius:null},
+    order:evaluated.map(item=>item.quality),
+    boundaryPass:evaluated.filter(item=>item.pass).length ? Math.min(...evaluated.filter(item=>item.pass).map(item=>item.quality)) : null,
+    bestByBytes:evaluated.filter(item=>item.pass&&Number.isFinite(item.bytes)).sort((a,b)=>a.bytes-b.bytes||b.score-a.score)[0]||null,
+    evaluated
+  };
+}
+
 export async function buildRuntimeImageVariants(sourceBuffer, options = {}) {
   const sharp = await loadSharp();
   const originalVisual = await decodeVisual(sharp, sourceBuffer);
@@ -72,6 +108,7 @@ export async function buildRuntimeImageVariants(sourceBuffer, options = {}) {
     label:'png:strict', format:'png', track:'lossless', buffer:strictPng.buffer, bytes:strictPng.buffer.length,
     pass:true, score:1, reasons:[], metrics:{exactPixels:true,renderExactPixels:true}, options:{optimizer:'kelo-lossless'}
   }];
+  const searches={webp:null,avif:null};
 
   try {
     const buffer = await sharp(sourceBuffer,{animated:false}).keepMetadata().webp({lossless:true,quality:100,effort:6,exact:true}).toBuffer();
@@ -83,8 +120,6 @@ export async function buildRuntimeImageVariants(sourceBuffer, options = {}) {
 
   if (profile.runtimeCandidates.includes('webp-render-exact')) {
     try {
-      // libwebp's default exact=false may alter RGB only where alpha=0. This is
-      // DELIVERY-only and must pass the render-exact hard gate before competing.
       const buffer = await sharp(sourceBuffer,{animated:false}).keepMetadata().webp({lossless:true,quality:100,effort:6,exact:false}).toBuffer();
       candidates.push(await evaluateCandidate(sharp, originalVisual, buffer,
         {label:'webp:render-exact',format:'webp',track:'render-lossless',options:{lossless:true,quality:100,effort:6,exact:false}}, 'render-exact', {}));
@@ -102,27 +137,55 @@ export async function buildRuntimeImageVariants(sourceBuffer, options = {}) {
   }
 
   if (profile.runtimeCandidates.includes('webp-adaptive')) {
-    for (const quality of (options.webpQualities || [100,98,96,94,92,90,88])) {
+    const evaluateWebp=async quality => {
+      let candidate;
       try {
-        const buffer = await sharp(sourceBuffer,{animated:false}).keepMetadata().webp({quality,alphaQuality:100,effort:6,smartSubsample:true,preset:webpPreset(profile),exact:true}).toBuffer();
-        candidates.push(await evaluateCandidate(sharp, originalVisual, buffer,
-          {label:`webp:q${quality}`,format:'webp',track:'adaptive',options:{quality,alphaQuality:100,effort:6,exact:true}}, policy, limits));
+        const buffer=await sharp(sourceBuffer,{animated:false}).keepMetadata().webp({quality,alphaQuality:100,effort:6,smartSubsample:true,preset:webpPreset(profile),exact:true}).toBuffer();
+        candidate=await evaluateCandidate(sharp,originalVisual,buffer,
+          {label:`webp:q${quality}`,format:'webp',track:'adaptive',options:{quality,alphaQuality:100,effort:6,exact:true}},policy,limits);
       } catch (error) {
-        candidates.push({label:`webp:q${quality}`,format:'webp',track:'adaptive',bytes:null,pass:false,score:0,reasons:['encode-error'],error:String(error?.message || error)});
+        candidate={label:`webp:q${quality}`,format:'webp',track:'adaptive',bytes:null,pass:false,score:0,reasons:['encode-error'],error:String(error?.message||error)};
       }
-    }
+      candidates.push(candidate);
+      return candidate;
+    };
+    const search=options.webpQualities?.length
+      ? await runExplicitQualities(options.webpQualities,evaluateWebp)
+      : await searchIntegerQualityBoundary({
+          min:options.webpMinQuality ?? (profile.kind==='fx'?64:70),
+          max:100,
+          coarseStep:options.webpCoarseStep ?? 8,
+          maxEvaluations:options.webpMaxEvaluations ?? 7,
+          neighborRadius:1,
+          evaluate:evaluateWebp
+        });
+    searches.webp=searchSummary(search);
   }
 
   if (profile.runtimeCandidates.includes('avif-adaptive')) {
-    for (const quality of (options.avifQualities || [100,96,92,88,84,80])) {
+    const evaluateAvif=async quality => {
+      let candidate;
       try {
-        const buffer = await sharp(sourceBuffer,{animated:false}).keepMetadata().avif({quality,effort:8,chromaSubsampling:'4:4:4',bitdepth:8,tune:'iq'}).toBuffer();
-        candidates.push(await evaluateCandidate(sharp, originalVisual, buffer,
-          {label:`avif:q${quality}`,format:'avif',track:'adaptive',options:{quality,effort:8,chromaSubsampling:'4:4:4',bitdepth:8,tune:'iq'}}, policy, limits));
+        const buffer=await sharp(sourceBuffer,{animated:false}).keepMetadata().avif({quality,effort:8,chromaSubsampling:'4:4:4',bitdepth:8,tune:'iq'}).toBuffer();
+        candidate=await evaluateCandidate(sharp,originalVisual,buffer,
+          {label:`avif:q${quality}`,format:'avif',track:'adaptive',options:{quality,effort:8,chromaSubsampling:'4:4:4',bitdepth:8,tune:'iq'}},policy,limits);
       } catch (error) {
-        candidates.push({label:`avif:q${quality}`,format:'avif',track:'adaptive',bytes:null,pass:false,score:0,reasons:['encode-error'],error:String(error?.message || error)});
+        candidate={label:`avif:q${quality}`,format:'avif',track:'adaptive',bytes:null,pass:false,score:0,reasons:['encode-error'],error:String(error?.message||error)};
       }
-    }
+      candidates.push(candidate);
+      return candidate;
+    };
+    const search=options.avifQualities?.length
+      ? await runExplicitQualities(options.avifQualities,evaluateAvif)
+      : await searchIntegerQualityBoundary({
+          min:options.avifMinQuality ?? (profile.kind==='fx'?56:64),
+          max:100,
+          coarseStep:options.avifCoarseStep ?? 10,
+          maxEvaluations:options.avifMaxEvaluations ?? 7,
+          neighborRadius:1,
+          evaluate:evaluateAvif
+        });
+    searches.avif=searchSummary(search);
   }
 
   const losslessWinner = chooseSmallest(candidates.filter(candidate => candidate.track === 'lossless'));
@@ -139,6 +202,7 @@ export async function buildRuntimeImageVariants(sourceBuffer, options = {}) {
       renderLosslessWinner:renderLosslessWinner ? candidateSummary(renderLosslessWinner) : null,
       adaptiveWinner:adaptiveWinner ? candidateSummary(adaptiveWinner) : null,
       runtimeWinner:runtimeWinner ? candidateSummary(runtimeWinner) : null,
+      searches,
       paretoFrontier,
       candidates:summaries
     },
