@@ -11,6 +11,16 @@ on:
       - 'tests/environment-creator-functions.spec.js'
       - 'tests/fixtures/environment-creator-playwright.html'
       - '.github/workflows/environment-creator-playwright.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/creators/definition/creator-test-bridge.mjs'
+      - 'src/creators/definition/environment-live-preview.mjs'
+      - 'src/environment/environment-runtime.mjs'
+      - 'src/environment/environment-world-sync.mjs'
+      - 'tests/environment-creator-functions.spec.js'
+      - 'tests/fixtures/environment-creator-playwright.html'
+      - '.github/workflows/environment-creator-playwright.yml'
   workflow_dispatch:
 
 permissions:
