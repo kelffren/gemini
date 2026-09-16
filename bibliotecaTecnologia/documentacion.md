@@ -20,18 +20,9 @@ Cada descriptor contiene `{id, mediaType:'application/json', size, digest:'sha25
 
 ### Ruta runtime actual
 
-`kelo-content-live-provider.mjs` solicita catálogo y descriptor set como metadata pequeña, sin binarios externos. El descriptor publicado se usa solamente si:
+`kelo-content-live-provider.mjs` solicita catálogo y descriptor set como metadata pequeña, sin binarios externos. El descriptor publicado se usa solamente si schema/algoritmo/descriptors son válidos, no hay IDs duplicados, `sourceVersion` coincide y la cardinalidad coincide con el catálogo.
 
-- `schema === kelo-content-descriptors-v1`;
-- `algorithm === sha256`;
-- `descriptors` es array válido;
-- cada id es único;
-- size es entero >= 0;
-- digest cumple `sha256:` + 64 hex;
-- `sourceVersion` coincide con catálogo;
-- cardinalidad coincide con assets fuente.
-
-Cuando pasa, `size -> expectedBytes` y `digest -> expectedSha256`, con `descriptorSource:'published'`. Si falla/está ausente, se conserva `describeInlineManifest()` como fallback compatible (`descriptorSource:'client-fallback'`). No se rompe contenido existente ni se introduce otro Vault.
+Cuando pasa, `size -> expectedBytes` y `digest -> expectedSha256`, con `descriptorSource:'published'`. Si falla/está ausente, se conserva `describeInlineManifest()` como fallback compatible (`descriptorSource:'client-fallback'`).
 
 ## Verificación staging
 
@@ -47,6 +38,29 @@ published descriptor
 
 Errores relevantes: `ASSET_SIZE_MISMATCH`, `ASSET_INTEGRITY_MISMATCH`, `PACK_STAGE_CAS_DIGEST_MISMATCH`.
 
+## Providers externos: frontera catalog-only
+
+Un provider puede participar en búsqueda/preview sin ser una fuente de descarga directa.
+
+Contrato seguro:
+
+```text
+catalogOnly=true
+integrationReady=false
+downloadable=false
+downloadUrl=null
+sourceUrl=<página/fuente oficial>
+externalDownloadUrl=<enlace externo opcional>
+```
+
+Mientras no exista un archivo concreto con identidad verificable, el botón debe abrir la fuente en vez de enviar bytes al Vault.
+
+### Quaternius
+
+`quaternius-live-provider.mjs` usa ahora esta frontera. Los enlaces de Drive/packs se conservan como navegación externa, pero no se presentan como `downloadUrl`. Esto evita que una carpeta, página HTML, zip variable o respuesta no identificada llegue al CAS como si fuera el asset esperado.
+
+Para promover Quaternius a descarga integrada en el futuro se requiere un resolver que entregue archivo directo estable y descriptor verificable (`mediaType + size + digest`) antes de staging.
+
 ## Packs / rollback / GC
 
 PackManager mantiene catálogo monotónico, planner diferencial, storage preflight, journal, staging separado y activación old-or-new. Rollback reconstruye desde CAS cuando existen blobs. Reference graph protege active, previous y transacciones vivas; GC solo retira contenido no alcanzable tras gracia.
@@ -57,10 +71,10 @@ No secretos en Pages; no JS externo ejecutable; licencia antes de integración; 
 
 ## Estado actual
 
-Implementado: CAS/dedup, integridad SHA-256, size precheck, transacciones, rollback, GC roots, storage pressure, publisher reproducible/source-bound, descriptor materializado, CI drift check y consumo preferente del descriptor publicado en provider Kelo.
+Implementado: CAS/dedup, integridad SHA-256, size precheck, transacciones, rollback, GC roots, storage pressure, publisher reproducible/source-bound, descriptor materializado, CI drift check, consumo preferente del descriptor publicado en provider Kelo y frontera `catalogOnly` endurecida para providers sin binario verificable.
 
-Pendiente prioritario: persistir `digest+size` publicados en member locks/generaciones del Pack Manager para que update/rollback comparen identidad publicada sin recalcularla; después descriptor set inmutable/versionado y firmas estilo TUF.
+Pendiente prioritario: conectar Quaternius al router federado conservando `catalogOnly`; después persistir `digest+size` publicados en member locks/generaciones del Pack Manager.
 
 ## Definition of Done
 
-Boot sin binarios externos; reinstalación sin cambios evita red; delta descarga solo cambios; CAS deduplica; staging no altera active; rollback funciona desde CAS; GC preserva roots; storage pressure se comprueba; anti-rollback/recovery evitan mezcla de generaciones; descriptors publicados son reproducibles, source-bound y consumidos como expectativa de integridad; mobile-first y compatibilidad legacy permanecen.
+Boot sin binarios externos; reinstalación sin cambios evita red; delta descarga solo cambios; CAS deduplica; staging no altera active; rollback funciona desde CAS; GC preserva roots; storage pressure se comprueba; anti-rollback/recovery evitan mezcla de generaciones; descriptors publicados son reproducibles, source-bound y consumidos como expectativa de integridad; providers sin identidad binaria verificable permanecen catalog-only; mobile-first y compatibilidad legacy permanecen.
