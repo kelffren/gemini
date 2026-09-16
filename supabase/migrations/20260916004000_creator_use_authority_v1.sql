@@ -197,6 +197,7 @@ declare
   v_uid uuid := (select auth.uid());
   v_loadout jsonb;
   v_mount jsonb;
+  v_avatar jsonb;
 begin
   if v_uid is null then raise exception 'AUTH_REQUIRED'; end if;
   if not exists(select 1 from public.characters c where c.id=p_character_id and c.account_id=v_uid and c.status='active') then raise exception 'CHARACTER_NOT_FOUND'; end if;
@@ -204,7 +205,10 @@ begin
     into v_loadout from public.creator_character_content_bindings b where b.character_id=p_character_id;
   select jsonb_build_object('revisionId',m.revision_id,'updatedAt',m.updated_at) into v_mount
     from public.creator_character_mount_bindings m where m.character_id=p_character_id;
-  return jsonb_build_object('characterId',p_character_id,'loadout',v_loadout,'mount',v_mount);
+  select case when r.id is null then null else jsonb_build_object('revisionId',r.id,'contentId',r.content_id) end into v_avatar
+    from public.characters c left join public.content_definition_revisions r on r.content_id=c.active_avatar_content_id
+    where c.id=p_character_id and c.account_id=v_uid and c.status='active';
+  return jsonb_build_object('characterId',p_character_id,'loadout',v_loadout,'mount',v_mount,'avatar',v_avatar);
 end;
 $$;
 revoke all on function public.get_my_creator_use_state(uuid) from public, anon;
