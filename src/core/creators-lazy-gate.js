@@ -5,14 +5,14 @@
  * purpose: mantiene Creators/Library disponibles, expone Delivery/Use y hace un probe metadata-only para restaurar visuales Creator autoritativos sin cargar Creator OS
  * public-api: KeloCreatorsLazyGate.open/openCreatorLibrary/openAssetForge/probeCharacterAppearance/sync + KeloCreatorDelivery + KeloCreatorUse
  * consumes: KELO_ADMIN_KEYS + Luxe menu + KeloOnlineAuth; Delivery/Use reutilizan auth/entitlement/runtime owners existentes
- * state-owned: solo promesas efímeras de carga lazy + identidad del último probe visual
+ * state-owned: solo promesas efímeras de carga lazy + identidad del último probe visual exitoso/vacío
  * extension-points: Creator Library enruta a workspaces; Asset Forge sigue disponible como API compatible
  * do-not: NO Creator OS pesado en boot normal, NO polling, NO segundo loop, NO eager full asset catalog, NO bulk Owned sync
  */
 (function(root){
 'use strict';
 if(root.KeloCreatorsLazyGate)return;
-const VERSION='kelo-creators-lazy-gate-v10-character-state-bridge';
+const VERSION='kelo-creators-lazy-gate-v10.1-character-state-bridge';
 const LAUNCHER_SRC='src/ui/studio-launcher.js?v=creator-os-20260915-1';
 const ASSET_CATALOG_SRC='src/property/property-asset-catalog.js?v=creator-assets-20260915-1';
 const creatorModuleUrl=()=>new URL('src/creators/creator-entry.mjs?v=creator-os-20260915-1',root.document?.baseURI||root.location.href).href;
@@ -91,14 +91,15 @@ async function probeCharacterAppearance(options){
   characterProbe=(async()=>{
     const use=await loadUseAuthority(),serverState=await use.getState({characterId:auth.characterId,hydrateRuntime:false}),current=authState();
     if(!current?.authenticated||String(current.accountId||'')!==String(auth.accountId||'')||String(current.characterId||'')!==String(auth.characterId||''))return false;
-    lastCharacterProbeKey=key;const bindings=Array.isArray(serverState?.loadout)?serverState.loadout:[];
-    if(!bindings.length){try{root.KeloCreatorCharacterBridge?.clear?.('no-server-bindings');}catch(_){}return false;}
+    const bindings=Array.isArray(serverState?.loadout)?serverState.loadout:[];
+    if(!bindings.length){lastCharacterProbeKey=key;try{root.KeloCreatorCharacterBridge?.clear?.('no-server-bindings');}catch(_){}return false;}
     root.__KELO_CREATOR_CHARACTER_BOOT_STATE__=serverState;
     if(!root.KELO_MODULE_LOADER?.ensure)throw new Error('MODULE_LOADER_REQUIRED');const loaded=await root.KELO_MODULE_LOADER.ensure('appearance');if(!loaded)throw new Error('APPEARANCE_FEATURE_LOAD_FAILED');
-    const bridge=root.KeloCreatorCharacterBridge;if(!bridge?.sync)throw new Error('CREATOR_CHARACTER_BRIDGE_REQUIRED');await bridge.sync({state:serverState,force:true});return true;
+    const bridge=root.KeloCreatorCharacterBridge;if(!bridge?.sync)throw new Error('CREATOR_CHARACTER_BRIDGE_REQUIRED');await bridge.sync({state:serverState,force:true});lastCharacterProbeKey=key;return true;
   })().catch(error=>{console.warn('[Kelo Creator character probe]',error);return false;}).finally(()=>{characterProbe=null;});return characterProbe;
 }
 function onAuthState(event){const d=event?.detail||authState();if(!d?.authenticated||!d.characterId){clearCharacterBridge('auth-ended');return;}const key=String(d.accountId||'')+':'+String(d.characterId||'');if(key!==lastCharacterProbeKey)void probeCharacterAppearance({force:true});}
+function onCreatorUseChanged(event){const kind=String(event?.detail?.kind||'');if(kind==='appearance'||kind==='equipment'||kind==='clear-slot')void probeCharacterAppearance({force:true});}
 async function openCreatorLibrary(){
   if(libraryLoading)return libraryLoading;if(!allowed()){toast('Necesitas acceso a Kelo Creators');return false;}paintLibrary(document.getElementById('lx-create-library'),true);
   libraryLoading=(async function(){try{root.KELO_LUXE?.closeMenu?.();const platform=await loadPlatform();await platform.openWorkspace('creator-library');return true;}catch(error){console.error('[Kelo Creator Library lazy gate]',error);toast('No se pudo abrir Creator Library');return false;}})().finally(function(){libraryLoading=null;paintLibrary(document.getElementById('lx-create-library'),false);sync();});return libraryLoading;
@@ -117,7 +118,7 @@ root.KeloCreatorsLazyGate=api;root.KELO_CREATORS_LAZY_GATE=api;
 try{root.KELO_ADMIN_KEYS?.onChange?.(sync);}catch(_){}
 root.addEventListener?.('kelo:online-auth-state',onAuthState,{passive:true});
 root.addEventListener?.('kelo:online-auth-session-ended',()=>clearCharacterBridge('session-ended'),{passive:true});
-root.addEventListener?.('kelo:creator-use-changed',()=>void probeCharacterAppearance({force:true}),{passive:true});
+root.addEventListener?.('kelo:creator-use-changed',onCreatorUseChanged,{passive:true});
 const initialAuth=authState();if(initialAuth?.authenticated&&initialAuth.characterId)void probeCharacterAppearance({force:true});
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){sync();if(directRequested())void open();},{once:true});else{sync();if(directRequested())void open();}
 })(typeof globalThis!=='undefined'?globalThis:window);
