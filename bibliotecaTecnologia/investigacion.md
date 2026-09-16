@@ -1,313 +1,383 @@
 # BibliotecaTecnologia — Investigación
 
-> Documento exclusivo de la tecnología de Biblioteca Universal / Content Vault / Content Packs de Kelo World.
+> Documento exclusivo de la tecnología Biblioteca Universal / Content Vault / Content Packs de Kelo World.
 > Última revisión: 2026-09-16.
 
 ## 1. Objetivo
 
-Construir una plataforma de distribución de contenido para Kelo World capaz de manejar sprites, tilesets, animaciones, VFX, SFX, música, ambiente, habilidades declarativas, escenas y packs completos sin convertir el bundle principal del juego en un paquete gigante.
+BibliotecaTecnologia debe permitir que Kelo World descubra, adquiera, descargue, integre, actualice y retire sprites, tilesets, animaciones, VFX, SFX, música, ambiente, habilidades declarativas, escenas y packs completos sin que el catálogo haga pesado el boot principal.
 
-La meta técnica no es solamente una "biblioteca de assets". Es un sistema de distribución de contenido con estas propiedades:
-
-- metadata liviana en el catálogo;
-- descarga explícita y bajo demanda;
-- almacenamiento personal local/cloud;
-- verificación criptográfica;
-- integración por tipo de contenido;
-- actualización diferencial;
-- reanudación tras cortes;
-- deduplicación entre packs;
-- rollback seguro en una fase posterior;
-- soporte futuro para marketplace y creadores.
-
-## 2. Investigación externa
-
-### 2.1 OCI: blobs direccionados por contenido
-
-La especificación OCI Distribution define `blob`, `manifest`, `descriptor` y `digest` como piezas separadas. El descriptor contiene el tipo del contenido, su digest criptográfico y su tamaño. El cliente puede pedir exactamente un blob por digest y verificar que los bytes recibidos correspondan al digest solicitado.
-
-Aplicación a Kelo:
-
-- un asset debe evolucionar de `assetId -> blob` a `assetId -> descriptor -> blob sha256`;
-- dos packs que usan exactamente los mismos bytes pueden referenciar el mismo blob;
-- el blob no necesita saber quién lo usa;
-- un manifest de pack debe ser pequeño y apuntar a contenido inmutable.
-
-Fuente: https://github.com/opencontainers/image-spec/blob/main/descriptor.md
-Fuente: https://github.com/opencontainers/distribution-spec/blob/main/spec.md
-
-### 2.2 Merkle DAG / manifests
-
-OCI modela componentes como un grafo direccionado por contenido. Esto es especialmente útil para Kelo porque un pack puede apuntar a otros packs, manifests o blobs sin duplicarlos.
-
-Aplicación a Kelo:
+Principio permanente:
 
 ```text
-Pack Manifest
-  -> Ability Manifest
-  -> Scene Manifest
-  -> Audio Blob sha256:A
-  -> Sprite Blob sha256:B
-  -> Dependency Pack Manifest
+CATÁLOGO != DESCARGA != INTEGRACIÓN != CARGA EN RUNTIME
 ```
 
-Si `sha256:B` ya existe en el dispositivo, no se descarga de nuevo.
+El sistema debe poder crecer de miles a millones de contenidos manteniendo el peso del jugador ligado únicamente a lo que ese jugador realmente usa.
 
-Fuente: https://github.com/opencontainers/image-spec/blob/main/descriptor.md
+## 2. Fundamentos investigados
 
-### 2.3 TUF: seguridad de actualizaciones
+### 2.1 OCI / Content Addressable Storage
 
-The Update Framework documenta ataques que un updater serio debe considerar: rollback a una versión vieja, fast-forward malicioso y freeze/metadata estancada.
+OCI separa blobs, manifests y descriptors. Un descriptor identifica contenido usando digest criptográfico y tamaño.
 
-Aplicación a Kelo Marketplace futuro:
+Aplicación Kelo:
 
-- versión monotónica de metadata;
-- timestamp/expiración del catálogo;
-- snapshot de manifests;
-- firma de manifests publicados;
-- nunca aceptar silenciosamente un catálogo con versión inferior a la ya conocida;
-- separar claves de publicación de las de administración.
+```text
+assetId -> descriptor -> sha256 -> blob
+pack -> descriptors -> blobs
+```
 
-No se implementará una copia completa de TUF dentro del cliente ahora; se adoptarán progresivamente sus invariantes.
+Consecuencias:
 
-Fuente: https://theupdateframework.io/docs/security/
-
-### 2.4 rsync: transferir solo diferencias
-
-El algoritmo rsync usa un checksum rodante para identificar bloques que ya existen y enviar solamente partes nuevas. Su principio principal sigue siendo válido: evitar retransmitir bytes que el cliente ya posee.
-
-Aplicación a Kelo:
-
-- Nivel actual: delta por archivo/miembro del pack;
-- siguiente nivel: delta por chunk dentro de archivos grandes;
-- nunca usar chunking para archivos diminutos donde la metadata costaría más que la descarga.
-
-Fuente: https://rsync.samba.org/tech_report/
-
-### 2.5 FastCDC: chunking definido por contenido
-
-FastCDC mejora Content-Defined Chunking para encontrar límites de chunks a partir del contenido. A diferencia de cortar siempre cada N KB, una inserción de bytes no desplaza necesariamente todos los chunks siguientes. Esto mejora la deduplicación entre versiones parecidas.
-
-El paper reporta mayor velocidad que enfoques Rabin tradicionales manteniendo una deduplicación similar.
-
-Aplicación futura recomendada:
-
-- archivos > 512 KB: evaluar CDC;
-- objetivo inicial aproximado de chunk medio: 64 KB;
-- cada chunk obtiene SHA-256;
-- manifest del archivo = lista ordenada de digests de chunks;
-- solo descargar chunks ausentes;
-- reconstruir archivo y verificar SHA-256 final.
-
-No implementar FastCDC en el hilo principal del iPhone. Debe ejecutarse al publicar/build-time o en Worker cuando sea estrictamente necesario.
-
-Fuente: https://www.usenix.org/conference/atc16/technical-sessions/presentation/xia
-
-### 2.6 Courgette / bsdiff: parches especializados
-
-Chromium documentó que un diff consciente de la estructura del contenido puede ser mucho menor que un diff binario genérico. Esto demuestra que no existe un único algoritmo óptimo para todos los tipos de archivo.
-
-Aplicación a Kelo:
-
-- PNG/WebP/audio: preferir blobs/chunks inmutables antes que aplicar parches complejos en el teléfono;
-- JSON/manifests: son pequeños, descargar completos;
-- bundles binarios grandes futuros: evaluar bsdiff/CDC en servidor;
-- jamás ejecutar parches no verificados: reconstruir y validar hash final.
-
-Fuente: https://new.chromium.org/developers/design-documents/software-updates-courgette/
-
-### 2.7 Almacenamiento web e iPhone
-
-IndexedDB y Cache Storage dependen de cuotas/evicción del navegador. `navigator.storage.estimate()` permite medir uso/cuota y `navigator.storage.persist()` puede solicitar almacenamiento persistente, aunque el navegador decide si lo concede.
-
-Aplicación a Kelo:
-
-- mostrar uso real del Baúl;
-- solicitar persistencia después de que el usuario instale contenido importante, no al primer arranque;
-- capturar `QuotaExceededError`;
-- mantener ownership cloud separado del cache local;
-- asumir que el cache local puede desaparecer y debe ser reconstruible.
+- bytes idénticos se almacenan una sola vez;
+- un pack no necesita poseer físicamente su contenido;
+- varias versiones pueden coexistir;
+- el estado activo puede cambiar mediante punteros;
+- integridad y deduplicación usan el mismo digest.
 
 Fuentes:
-- https://developer.mozilla.org/en-US/docs/Web/API/Storage_API/Storage_quotas_and_eviction_criteria
-- https://developer.mozilla.org/en-US/docs/Web/API/StorageManager/persist
+- https://github.com/opencontainers/image-spec/blob/main/descriptor.md
+- https://github.com/opencontainers/distribution-spec/blob/main/spec.md
 
-## 3. Arquitectura recomendada por niveles
+### 2.2 TUF / seguridad del updater
 
-### Nivel 1 — Implementado: delta por miembro
+The Update Framework documenta ataques específicos contra sistemas de actualización: rollback, fast-forward, freeze y mezcla inconsistente de metadata.
 
-Cada miembro tiene un `descriptorHash`. Antes de actualizar:
+Invariantes que adoptaremos progresivamente:
 
-1. resolver manifest actual;
-2. comparar descriptor deseado con lock local;
-3. clasificar `reuse`, `integrate` o `download`;
-4. descargar solo `download`;
-5. conservar `reuse` sin red;
-6. limpiar miembros retirados solo si ningún otro pack los usa.
+- nunca aceptar metadata con versión menor a la ya aceptada;
+- una versión concreta debe ser inmutable;
+- metadata debe tener fecha de publicación y expiración;
+- targets futuros deben incluir hash y tamaño;
+- manifests de marketplace deberán firmarse server-side;
+- nunca guardar claves privadas en GitHub Pages.
 
-Esto resuelve el caso "pack de 40 archivos, cambiaron 2 -> bajar 2" siempre que el descriptor de esos 2 cambie o exista un digest esperado nuevo.
+Fuentes:
+- https://theupdateframework.io/docs/security/
+- https://theupdateframework.io/docs/metadata/
 
-### Nivel 2 — Siguiente prioridad: Content Addressable Store V2
+### 2.3 Delta por archivo
 
-Crear un store global:
+Antes de chunking, la optimización más rentable es no volver a descargar miembros del pack cuyo descriptor y digest siguen válidos.
+
+Estado implementado:
 
 ```text
-blobs/sha256/<digest>
-descriptors/<assetId>
-packLocks/<packId>
-refs/<digest> -> refcount
+reuse
+integrate
+download
+removed
 ```
 
-Ventajas:
+Ejemplo:
 
-- dedupe real entre cualquier pack;
-- rollback barato;
-- no sobrescribir la versión anterior mientras se instala la nueva;
-- garbage collection por referencias;
-- instalación atómica: cambiar un puntero al manifest nuevo al final.
+```text
+Pack v1: A B C D E
+Pack v2: A B C' D E
 
-### Nivel 3 — Chunk Store
+Red: solo C'
+```
 
-Para binarios grandes:
+### 2.4 FastCDC / Content-Defined Chunking
+
+Para archivos grandes, una actualización por archivo completo deja de ser suficiente. FastCDC encuentra límites de chunks a partir del contenido, por lo que pequeñas inserciones no desplazan todos los bloques posteriores.
+
+Arquitectura futura:
 
 ```text
 file manifest
   finalDigest
   totalSize
   chunks[]
-    offset
-    size
     digest
+    size
+    offset
 ```
 
-El cliente consulta chunks existentes y descarga únicamente faltantes.
+Recomendación inicial:
 
-### Nivel 4 — Metadata firmada
+- no usar CDC para archivos pequeños;
+- evaluar desde ~512 KB en adelante;
+- chunk medio inicial cercano a 64 KB;
+- precomputar chunks al publicar/build-time;
+- reconstruir y verificar SHA-256 final.
 
-Modelo inspirado en TUF:
+Fuentes:
+- https://www.usenix.org/conference/atc16/technical-sessions/presentation/xia
+- https://github.com/google/cdc-file-transfer
+
+### 2.5 OPFS para blobs grandes
+
+MDN documenta OPFS como almacenamiento privado al origen optimizado para archivos y escrituras de alto rendimiento. Está pensado, entre otros casos, para apps con grandes cantidades de media y descargas parciales/reanudables.
+
+Aplicación futura Kelo:
+
+- IndexedDB continúa excelente para metadata, punteros y manifests;
+- OPFS puede convertirse en tier opcional para blobs/chunks grandes;
+- usar Web Worker cuando haya procesamiento intensivo;
+- mantener fallback IndexedDB para compatibilidad.
+
+Fuentes:
+- https://developer.mozilla.org/en-US/docs/Web/API/File_System_API/Origin_private_file_system
+- https://developer.mozilla.org/en-US/docs/Web/API/File_System_API
+
+### 2.6 Persistencia y cuotas
+
+El almacenamiento web es best-effort por defecto. `navigator.storage.persist()` puede solicitar persistencia y `estimate()` permite medir uso/cuota, pero el navegador mantiene la decisión final.
+
+Reglas Kelo:
+
+- ownership cloud y cache local son conceptos distintos;
+- el dispositivo debe poder reconstruir el cache;
+- solicitar persistencia después de que exista valor local real;
+- nunca considerar IndexedDB/OPFS como única prueba de compra.
+
+Fuente:
+- https://developer.mozilla.org/en-US/docs/Web/API/Storage_API/Storage_quotas_and_eviction_criteria
+
+## 3. Rondas manuales ejecutadas — 2026-09-16
+
+### Ronda 1 — CAS SHA-256 real
+
+Problema detectado:
+
+`personal-asset-vault.mjs` almacenaba blobs directamente por `asset.id`. Si dos assets/packs referenciaban exactamente los mismos bytes, podían existir copias duplicadas y no había base limpia para rollback.
+
+Implementación:
+
+- IndexedDB subió a schema interno v2;
+- nuevo store `casBlobs`;
+- nuevas descargas calculan SHA-256 antes de activar el puntero;
+- `blobs` pasa a actuar como tabla de punteros para contenido nuevo;
+- `getBlob()` sigue entendiendo filas legacy;
+- migración progresiva disponible, sin migración destructiva en `onupgradeneeded`;
+- metadata ahora conserva `sha256`, `expectedSha256` y más provenance/licensing.
+
+Modelo actual:
 
 ```text
-root.json
-snapshot.json
-timestamp.json
-targets/*.json
+assets[id]
+blobs[id] -> digest
+casBlobs[digest] -> Blob
 ```
 
-Para Kelo puede simplificarse inicialmente a:
+Esto introduce deduplicación física real para nuevas descargas.
 
-- `catalogVersion` monotónico;
-- `publishedAt`;
-- `expiresAt`;
-- `manifestDigest`;
-- firma Ed25519 realizada server-side;
-- claves públicas empotradas en cliente.
+### Ronda 2 — rollback + garbage collection con gracia
 
-### Nivel 5 — Asset Gateway / CDN
+Problema detectado:
 
-No depender directamente de CORS, velocidad o permanencia de terceros.
+Un CAS sin política de historial/GC acumula blobs para siempre; borrarlos inmediatamente destruye rollback y causa thrashing.
 
-El gateway debe:
+Implementación:
 
-- importar una vez desde la fuente original;
-- validar licencia;
-- calcular hash;
-- generar previews;
-- opcionalmente transcodificar;
-- servir Range requests;
-- cachear CDN;
-- producir manifests Kelo inmutables.
+- el puntero conserva `previousDigest` al cambiar de versión;
+- `rollbackAssetBlob(id)` intercambia digest actual/anterior sin red;
+- el manifest integrado se invalida después de rollback para impedir mezclar manifest nuevo con bytes viejos;
+- `discardAssetRollbackHistory(id)` permite liberar explícitamente el historial;
+- `garbageCollectCas()` usa mark + grace period;
+- primera pasada marca `orphanedAt`;
+- solo una pasada posterior, después de la gracia, puede borrar;
+- blobs actuales y de rollback cuentan como referenciados.
 
-El archivo original y su procedencia/licencia siguen registrados.
+Gracia por defecto actual: 7 días.
 
-## 4. Decisiones para Kelo
+Objetivo: rollback barato + GC conservador.
 
-### Mantener SHA-256 ahora
+### Ronda 3 — protección anti-rollback de catálogo
 
-Razones:
+Problema detectado:
 
-- Web Crypto lo soporta ampliamente;
-- OCI lo recomienda ampliamente;
-- suficiente para identidad/integridad del contenido;
-- cambiar a BLAKE3 ahora añadiría dependencia/WASM sin resolver un problema prioritario.
+Aunque los blobs tenían hash, un cliente todavía podía recibir metadata de catálogo antigua o metadata modificada silenciosamente manteniendo el mismo número de versión.
 
-### Descriptor hash != digest de bytes
+Implementación:
 
-Son conceptos distintos:
+- catálogo subió de versión 1 a 2;
+- añade `publishedAt` y `expiresAt`;
+- ContentPackManager guarda localmente la versión/digest aceptados;
+- versión entrante menor => `PACK_CATALOG_ROLLBACK`;
+- mismo número de versión con digest diferente => `PACK_CATALOG_MUTATED_WITHOUT_VERSION`;
+- expiración se registra como `stale` de forma observacional por ahora;
+- `getCatalogSecurityState()` expone el estado;
+- `inspectContentPacks()` incluye seguridad del catálogo.
 
-- `descriptorHash`: detecta cambios en la definición de un miembro antes de descargar;
-- `sha256` del blob: confirma identidad de bytes después de descargarlos;
-- `expectedSha256`: permite confirmar identidad antes/después contra un digest publicado.
+Esto es una adopción incremental de invariantes TUF, no una implementación completa de TUF.
 
-Para máxima seguridad el catálogo de producción debe incluir `expectedSha256` en todos los miembros publicados.
+## 4. Estado arquitectónico después de las rondas
 
-### No usar patches binarios en todo
+```text
+Remote metadata
+      |
+      v
+Pack Catalog v2
+  version/publishedAt/expiresAt
+      |
+      v
+Delta Planner
+ reuse / integrate / download / removed
+      |
+      v
+Personal Vault
+ asset metadata
+      |
+      v
+Asset pointer
+ current digest + previous digest
+      |
+      v
+SHA-256 CAS
+ unique immutable blobs
+      |
+      +--> runtime integration
+      +--> rollback
+      +--> grace-period GC
+```
 
-Orden de preferencia:
+## 5. Métricas que deben evolucionar
 
-1. reusar blob completo si digest coincide;
-2. descargar archivo completo si es pequeño;
-3. usar chunks para archivo grande;
-4. usar patch binario especializado solo cuando datos reales demuestren beneficio.
+Ya debemos medir o preparar:
 
-## 5. Riesgos técnicos detectados
-
-- Proveedores externos pueden cambiar bytes manteniendo la misma URL. Sin digest publicado no se puede detectar el cambio sin volver a descargar.
-- IndexedDB en móvil es cache, no debe ser la única prueba de propiedad.
-- Un update verdaderamente atómico requiere CAS V2; el vault actual todavía guarda blobs principalmente por `asset.id`.
-- Audio/PNG comprimidos pueden obtener poco beneficio de bsdiff; medir antes de añadir complejidad.
-- Content-defined chunking en el teléfono puede gastar CPU/batería; preferir manifests precomputados.
-- Marketplace necesita firma server-side; nunca guardar claves privadas de publicación en GitHub Pages.
-
-## 6. Métricas que debemos empezar a guardar
-
-Por instalación/update:
-
-- bytes totales lógicos del pack;
+- logical bytes;
+- physical CAS bytes;
+- deduplicated bytes;
+- dedupe ratio;
+- bytes estimados a descargar;
 - bytes realmente descargados;
-- bytes evitados por reuse;
-- miembros reutilizados;
-- miembros cambiados;
-- chunks reutilizados cuando exista CDC;
-- duración de descarga;
-- duración de hash;
-- duración de integración;
-- errores por proveedor;
-- tasa de reanudación exitosa;
-- almacenamiento utilizado/cuota;
-- dedupe ratio.
+- bytes evitados;
+- miembros reuse/download/integrate;
+- cantidad de CAS blobs;
+- pointers CAS vs legacy;
+- rollback pointers;
+- blobs huérfanos;
+- bytes recuperados por GC;
+- duración de hash/integración;
+- storage usage/quota/persisted;
+- catálogo aceptado/stale/version jump.
 
-Métrica principal futura:
+Métricas centrales:
 
 ```text
-bandwidth_saved_ratio = 1 - downloaded_bytes / logical_pack_bytes
+bandwidth_saved_ratio = 1 - downloaded_bytes / logical_update_bytes
+storage_dedupe_ratio = 1 - physical_cas_bytes / logical_referenced_bytes
 ```
 
-## 7. Roadmap de I+D
+## 6. Próximos niveles investigados
 
-Prioridad alta:
+### Nivel siguiente A — CAS transaccional por pack
 
-1. Content Addressable Store V2.
-2. Manifest con digest obligatorio para publicación Kelo/Marketplace.
-3. actualización atómica + rollback.
-4. GC por referencias.
-5. storage health + persist UX.
+Hoy cada asset puede conservar versión previa. El siguiente paso es elevar la atomicidad al pack completo:
 
-Prioridad media:
+```text
+resolve
+ -> stage all new blobs
+ -> verify all
+ -> integrate/stage manifests
+ -> one logical commit of pack lock
+ -> keep previous pack lock for rollback
+```
 
-6. FastCDC build-time para archivos grandes.
-7. chunk store y Range delivery.
+Si el update falla antes del commit, la versión activa del pack no cambia.
+
+### Nivel siguiente B — ref graph explícito
+
+Actualmente las referencias se pueden reconstruir inspeccionando punteros/packs.
+
+Futuro:
+
+```text
+refs[digest]
+  activeAssets[]
+  rollbackAssets[]
+  packs[]
+  chunks[]
+```
+
+No usar un simple refcount ciego si perdemos trazabilidad. Preferir grafo/referencias reconstruibles.
+
+### Nivel siguiente C — OPFS tiering
+
+Mover blobs suficientemente grandes a OPFS y dejar metadata/punteros en IndexedDB.
+
+Condiciones:
+
+- feature detection;
+- fallback completo;
+- migración progresiva;
+- nunca bloquear el main thread;
+- benchmark real en iPhone antes de activarlo por defecto.
+
+### Nivel siguiente D — FastCDC build-time
+
+El cliente no debería descubrir chunks costosos cada vez. Publisher/Gateway genera manifests de chunks; cliente solo consulta qué digests ya posee.
+
+### Nivel siguiente E — metadata firmada
+
+Marketplace real debe evolucionar de:
+
+```text
+version + digest local
+```
+
+a:
+
+```text
+root trust
+snapshot
+fresh timestamp
+signed targets
+expected digest + size
+```
+
+## 7. Riesgos abiertos
+
+- Catalog anti-rollback sin firma aún confía en el origen HTTPS/GitHub Pages.
+- Expiración se observa pero todavía no bloquea instalación; debe endurecerse cuando exista canal de refresh confiable.
+- Fast-forward malicioso requiere firmas/roles para resolverse correctamente.
+- CAS nuevo coexiste con blobs legacy hasta migración progresiva.
+- GC todavía es local al Vault; pack rollback transaccional requiere historial del lock completo.
+- archivos enormes siguen siendo delta por archivo hasta implementar chunks.
+- OPFS es prometedor, pero debe probarse en Safari/iPhone real antes de mover almacenamiento crítico.
+
+## 8. Orden de I+D actualizado
+
+Alta prioridad:
+
+1. Pack transaction + previous pack lock.
+2. CAS audit/rebuild de referencias.
+3. UI de rollback/auditoría/GC controlado.
+4. manifest con digest + tamaño obligatorio para publicación Kelo.
+5. OPFS benchmark/tiering para blobs grandes.
+
+Media:
+
+6. FastCDC publisher/build-time.
+7. chunk CAS + Range delivery.
 8. Asset Gateway/CDN.
-9. firma de manifests y protección rollback/freeze.
+9. metadata firmada estilo TUF.
+10. mirrors y recuperación de proveedor.
 
-Prioridad posterior:
+Posterior:
 
-10. mirrors múltiples;
-11. peer-assisted delivery opcional;
-12. telemetry agregada de ahorro de ancho de banda;
-13. prefetch predictivo únicamente con consentimiento/política de red.
+11. telemetry agregada de dedupe/bandwidth;
+12. prefetch adaptativo respetando red/batería;
+13. peer-assisted delivery opcional y verificable.
 
-## 8. Regla de diseño permanente
+## 9. Regla para futuras rondas autónomas
 
-**La Biblioteca nunca debe hacer más pesado el boot principal por el simple hecho de que exista más contenido en el catálogo.**
+Cada ronda debe:
 
-Agregar 1 millón de assets debe aumentar principalmente metadata/search del backend, no los MB descargados al jugador.
+1. leer `investigacion.md` y `documentacion.md`;
+2. inspeccionar implementación real antes de proponer;
+3. investigar buenas prácticas actuales;
+4. elegir una sola mejora de alto impacto y bajo riesgo;
+5. integrar sobre el Vault/PackManager existente, nunca crear uno paralelo;
+6. preservar mobile-first y carga bajo demanda;
+7. actualizar estos dos documentos si cambia el contrato;
+8. comprobar CI/Pages cuando sea posible.
+
+## 10. Regla permanente
+
+**La disponibilidad de contenido debe crecer mucho más rápido que los bytes descargados por jugador.**
+
+Toda nueva función de BibliotecaTecnologia debe proteger esa propiedad.

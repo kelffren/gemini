@@ -1,15 +1,15 @@
 /* KELO-INDEX
  * area: CREATORS / EXTERNAL ASSET PROVIDERS / KENNEY
  * owner: Kelo Creator Asset Bridge
- * keys: KENNEY CC0 LAZY INDEX SEARCH REMOTE PNG
- * purpose: Search Kenney's remote metadata only after explicit provider selection; never preload asset binaries.
+ * keys: KENNEY CC0 LAZY INDEX SEARCH REMOTE PNG PAGINATION
+ * purpose: Search Kenney's remote metadata on demand; never preload asset binaries.
  */
 
 const INDEX_URL='https://raw.githubusercontent.com/shorepine/kenney/main/index.tsv';
 const RAW_BASE='https://raw.githubusercontent.com/shorepine/kenney/main/';
 const SOURCE_BASE='https://github.com/shorepine/kenney/blob/main/';
 const ALLOWED_PREFIXES=['2d/','ui/','icons/'];
-const MAX_RESULTS=320;
+const MAX_PAGE_SIZE=320;
 let indexPromise=null;
 
 const text=v=>String(v??'').trim();
@@ -69,7 +69,7 @@ function toAsset(columns){
 
 export async function searchKenneyAssets(query='',options={}){
   const body=await loadIndex();
-  const q=lower(query),limit=Math.max(24,Math.min(Number(options.limit)||MAX_RESULTS,MAX_RESULTS));
+  const q=lower(query),limit=Math.max(24,Math.min(Number(options.limit)||80,MAX_PAGE_SIZE)),offset=Math.max(0,Number(options.offset)||0);
   const ranked=[];
   for(const rawLine of body.split('\n')){
     const line=rawLine.trim();if(!line)continue;
@@ -79,7 +79,7 @@ export async function searchKenneyAssets(query='',options={}){
     ranked.push({score:match.score,columns});
   }
   ranked.sort((a,b)=>b.score-a.score||String(a.columns[0]).localeCompare(String(b.columns[0])));
-  return ranked.slice(0,limit).map(row=>toAsset(row.columns));
+  return ranked.slice(offset,offset+limit).map(row=>toAsset(row.columns));
 }
 
 export function clearKenneyCache(){indexPromise=null;}
