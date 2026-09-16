@@ -27,13 +27,14 @@ Contrato LIVE/candidato (`index.html` V6.69):
 7. `controlPlane` y `observability` usan policy `after-paint`: cruzan dos `requestAnimationFrame` antes de cargar para no retrasar el primer paint.
 8. `controlPlane` contiene asset library launcher, settings gate, updater, admin/account gates y creators gate. `observability` contiene farm/player-position shadows. Son internos (`userToggle:false`) y no aparecen como packs apagables en Asset Library.
 9. Features first-use (`social`, `world`, `bag`, `mounts`, `market`, `titles`, `appearance`, `properties`) siguen entrando únicamente por `KELO_MODULE_LOADER.ensure(feature)`.
-10. El presupuesto CI actual es **48/48 scripts externos antes de boot-ready** y **3/3 scripts externos estáticos después**. También se limita el peso fuente determinista: **422,634 / 425,000 bytes críticos** y **21,342 / 22,000 bytes post-boot estáticos**. Subir esos límites requiere evidencia y cambio explícito del contrato, no crecimiento accidental.
+10. El presupuesto CI actual es **48/48 scripts externos antes de boot-ready** y **3/3 scripts externos estáticos después**. También se limita el peso fuente determinista: **423,015 / 425,000 bytes críticos** y **21,342 / 22,000 bytes post-boot estáticos**. Subir esos límites requiere evidencia y cambio explícito del contrato, no crecimiento accidental.
 11. Hay **9 módulos internos diferidos after-paint**; no deben volver al parser-blocking boot.
 12. `engine-i.js`, `engine-j.js` y `engine-k.js` están **RETIRED** y el audit exige cero referencias runtime/test a esos archivos.
 13. `KeloAbilityAim` sustituyó la cadena J/K: posee matemática de aim/range, lifecycle de puntero, indicador de render y registry explícito de cast middleware. No crear un segundo ability input/aim owner.
 14. `engine-l.js` registra `engine-l:plaza-cast-presentation` en el boot crítico. `engine-m.js` **no** pertenece al primer frame: entra por first-use del pack `world` y entonces registra `engine-m:skill-shots`.
 15. El smoke WebKit del branch verifica ambas fases: `engine-m` ausente en boot y presente tras `KELO_MODULE_LOADER.ensure('world')`.
-16. Prohibido inyectar `<script>` desde features por fuera de `KeloModuleLoader`.
+16. `engine-g.js` define compatibilidad de la action bar durante el boot, pero **no construye sus slots invisibles antes del primer paint**: espera `kelo:boot-ready` y cruza dos rAF antes del primer `renderActionBar()` automático. Los renders provocados por interacción posterior siguen disponibles inmediatamente.
+17. Prohibido inyectar `<script>` desde features por fuera de `KeloModuleLoader`.
 
 El listado histórico de boot completo NO es el boot móvil. Restaurar tags pesados en `index.html` es un bug.
 
@@ -56,6 +57,7 @@ El listado histórico de boot completo NO es el boot móvil. Restaurar tags pesa
 | Física/movimiento continuo base | `engine-a.js` | LEGACY CORE |
 | UI/gameplay histórico base | `engine-b.js` | LEGACY CORE |
 | Social/render/simulation bridge histórico | `engine-c.js` | LEGACY CORE |
+| Action bar bootstrap + dash tween legacy | `engine-g.js` | LEGACY CORE / characterized |
 | `engine-i.js` | — | RETIRED |
 | `engine-j.js` | — | RETIRED |
 | `engine-k.js` | — | RETIRED |
@@ -85,12 +87,14 @@ Ejemplos actuales:
 - HP/maxHP: `KeloPlayerState` intercepta compatibilidad legacy mediante accessors.
 - Colisión: `KELO_COLLISION` posee buckets y `obstacles` es vista legacy.
 - Movimiento: `KeloMovement` posee un único wrapper autorizado con hooks.
-- Posición: `KeloPlayerPosition` posee teleport/restore; movimiento por frame aún legacy.
+- Posición: `KeloPlayerPosition` posee teleport/restore; movimiento por frame aún legacy. **Dash no debe pasar por este owner**: se considera movimiento/ability y usa `KeloMovement` mientras se migra.
 - Plot/Farm travel: nombres legacy preservados, writes dirigidos a `KeloPlayerPosition`/`KeloCamera` por strangler temporal.
 - Abilities legacy: `KeloAbilityAim` posee un único pointer lifecycle y una cadena de middleware explícita; `engine-l/m` ya no monkey-patchean `castAimedSkill`.
+- `engine-f`: dirección/trigger directos están caracterizados por un test VM contra el archivo real; conserva thresholds `0.15/0.12/12`, dash directo 150, radio PvP 60 y proyectil 450/life 2.
+- `engine-g`: el dash tween está caracterizado contra el archivo real (quadratic ease-out, colisión, radio PvP `<52`, daño/fallback y finalización). El test también exige action-bar bootstrap post-paint y cero listeners globales de pointer en `engine-g`.
 - Observabilidad: shadows nunca son autoridad y ya no pertenecen al camino crítico del primer frame.
 
-Snapshot del debt audit actual: **9 engines legacy críticos** (`a,b,c,d,e,f,g,h,l`), **28 writes directos de posición** y **12 writes directos de cámara** en el índice estático de producción. `engine-f/g` concentran 10 de esos writes de posición y son un objetivo de caracterización/migración, no de borrado ciego.
+Snapshot del debt audit actual: **9 engines legacy críticos** (`a,b,c,d,e,f,g,h,l`), **28 writes directos de posición** y **12 writes directos de cámara** en el índice estático de producción. `engine-f/g` concentran 10 de esos writes de posición y ya tienen paridad automatizada; el siguiente paso es migrar consumidores/autoridades, no borrar los archivos a ciegas.
 
 No crear un nuevo wrapper genérico para “ordenar” legacy. Cada bridge temporal necesita owner, audit, métricas/contadores y ruta de retirada.
 
@@ -102,34 +106,17 @@ No crear un nuevo wrapper genérico para “ordenar” legacy. Cada bridge tempo
 
 ## 6. Forest Plaza — integración actual
 
-El atlas LIVE es:
-
-`assets/world/plaza/forest-plaza-tileset-v2.png`
+El atlas LIVE es `assets/world/plaza/forest-plaza-tileset-v2.png`.
 
 La ruta completa es:
 
 `PNG → src/creators/assets/asset-sheet-compiler.mjs → manifest irregular → src/environment/generated/forest-plaza-tileset-v2-manifest.js → KELO_ATLAS_CONTRACT → src/property/forest-plaza-asset-catalog.js → KELO_PROPERTY_CATALOG → Studio/World placement`
 
-Estado actual:
-
-- 146 frames irregulares detectados/registrados.
-- IDs legacy `asset-001..asset-146` preservados para compatibilidad.
-- nombres semánticos `fp_*` añadidos al catálogo.
-- 7 categorías: `plaza_core`, `architecture`, `garden_decor`, `water_features`, `terrain_paths`, `market_props`, `nature_trees_rocks`.
-- Studio muestra carpetas visuales para Plaza, Arquitectura, Jardines, Agua, Caminos, Mercado y Bosque.
-- props de demostración pueden aparecer en mapa central mediante `KELO_PROP_CONTRACT` sin crear renderer paralelo.
+Estado actual: 146 frames irregulares; IDs legacy `asset-001..asset-146`; nombres `fp_*`; 7 categorías visuales; Studio consume el catálogo y no crea renderer paralelo.
 
 ## 7. Studio / World Editor
 
-Entradas principales:
-
-- `src/ui/studio-launcher.js`
-- `src/creators/workspaces/world-workspace.mjs`
-- `src/studio/integration/world-studio-bridge.mjs`
-- `src/studio/integration/live-studio-controller.mjs`
-- `src/studio/studio-entry.mjs`
-- `src/studio/ui/studio-live-shell.mjs`
-- `src/studio/ui/studio-asset-palette.mjs`
+Entradas principales: `src/ui/studio-launcher.js`, `src/creators/workspaces/world-workspace.mjs`, `src/studio/integration/world-studio-bridge.mjs`, `src/studio/integration/live-studio-controller.mjs`, `src/studio/studio-entry.mjs`, `src/studio/ui/studio-live-shell.mjs`, `src/studio/ui/studio-asset-palette.mjs`.
 
 El shell es UI; no posee mutations del mundo. Las mutations pasan por Studio Kernel/commands y la autoridad existente. En móvil, el boot se fragmenta y cede turns para evitar matar Safari al parsear/montar el grafo completo.
 
@@ -138,8 +125,6 @@ El shell es UI; no posee mutations del mundo. Las mutations pasan por Studio Ker
 ## 8. Asset compiler
 
 `asset-sheet-compiler.mjs` reutiliza `sprite-foreground-analysis.mjs` y `sprite-world-asset-compiler.mjs`. Produce frames irregulares, metadata y manifest; no redibuja el arte ni se convierte en un renderer.
-
-El Asset Compiler puede sugerir semántica, pero nombres/categorías revisados deben conservar geometría sourceRect estable para no romper placements.
 
 ## 9. Gameplay
 
@@ -159,18 +144,21 @@ El cliente puede predecir/presentar, pero progreso valioso, comercio, PvP compet
 
 ## 11. Build / CI supply chain
 
-Los workflows activos usan acciones externas fijadas por SHA exacto. `ci-supply-chain-audit.mjs` falla si reaparece una acción sin pin SHA o `permissions: write-all`. El guard observado mantiene `actions/checkout` y `actions/setup-node` fijados, junto al resto de acciones externas.
+Los workflows activos usan acciones externas fijadas por SHA exacto. `ci-supply-chain-audit.mjs` falla si reaparece una acción sin pin SHA o `permissions: write-all`.
 
-La migración evergreen no se considera verde por un solo test: el head debe pasar Foundation, production client build, authoritative server smoke y WebKit mobile branch smoke. Esto sigue siendo un gate branch-local y **no sustituye QA físico/LIVE**.
+Foundation incluye characterization de state/save, SW, transition bridge, ability aim, ability direction, dash tween, pointer lifecycle y cast middleware; además de reproducible-build, supply-chain, boot-surface, legacy-debt y architecture audits. Production build, authoritative server smoke y WebKit branch smoke completan el gate.
+
+El head `da7741233008111d562a7418a7819f5cb97f8dcd` pasó los cuatro gates (`foundation`, `client-build`, `server-smoke`, `webkit-mobile-smoke`). Esto sigue siendo evidencia branch-local y **no sustituye QA físico/LIVE**.
 
 ## 12. Qué NO hacer
 
 - No crear otro renderer de props o tiles.
 - No crear otro catálogo de assets en paralelo.
 - No crear otro loader para trabajo after-paint/first-use; extender `KeloModuleLoader`.
-- No volver a poner control plane, updater, shadows o `engine-m` como tags estáticos del primer frame en `index.html`.
+- No volver a poner control plane, updater, shadows, `engine-m` o construcción de UI oculta como trabajo del primer frame.
 - No escribir directamente cámara/zoom/canvas desde features nuevas.
 - No mutar `obstacles` desde features nuevas.
+- No usar `KeloPlayerPosition` para dash/physics.
 - No sustituir World/Studio por un editor nuevo para corregir un bug de boot.
 - No publicar assets persistentes solo porque funcionan en preview local.
 - No declarar un fix móvil verificado sin QA real.
