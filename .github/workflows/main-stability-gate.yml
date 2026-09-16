@@ -71,7 +71,8 @@ jobs:
 
       - name: Start exact PR build server
         run: |
-          python3 -m http.server 4173 --bind 127.0.0.1 > /tmp/kelo-main-stability-http.log 2>&1 &
+          mkdir -p test-results
+          python3 -m http.server 4173 --bind 127.0.0.1 > test-results/main-stability-http.log 2>&1 &
           echo $! > /tmp/kelo-main-stability-http.pid
           for i in {1..30}; do
             if curl -fsS http://127.0.0.1:4173/index.html >/dev/null; then
@@ -79,7 +80,7 @@ jobs:
             fi
             sleep 1
           done
-          cat /tmp/kelo-main-stability-http.log
+          cat test-results/main-stability-http.log
           exit 1
 
       - name: Critical mobile and PvP smoke on PR bytes
@@ -98,6 +99,5 @@ jobs:
           path: |
             playwright-report.json
             test-results/
-            /tmp/kelo-main-stability-http.log
           retention-days: 14
           if-no-files-found: ignore
