@@ -15,6 +15,7 @@ import { createRuntimeContentRegistry } from './content/runtime-content-registry
 import { createSupabaseCreatorContentRepository } from './content/supabase-content-repository.mjs';
 import { createUniversalContentService } from './content/universal-content-service.mjs';
 import { createAvatarQuickImportService } from './avatar/avatar-quick-import-service.mjs';
+import { installCreatorApprovalDock } from './approval/creator-approval-dock.mjs?v=20260916-1';
 import { installCreatorAvatarRuntime } from '../characters/creator-avatar-runtime.mjs';
 import { createKeloSupabaseBrowserSession } from '../online/kelo-supabase-browser-session.mjs';
 import { KELO_SUPABASE_PUBLIC_CONFIG } from '../online/kelo-supabase-public-config.mjs';
@@ -99,9 +100,17 @@ export async function bootKeloCreators({root=globalThis,stateAdapter=null}={}){
     const manifest=workspaces.resolve(id);if(!manifest)throw new Error(`CREATOR_WORKSPACE_NOT_FOUND:${id}`);
     if(manifest.capability)permission.require(manifest.capability,permission.actorId(),context.projectId||null);
     if(id==='sprite-ability')await ensureSpriteAbilityExtensions();
-    return workspaces.open(id,{root,projects,permission,dependencies,contentSession,contentRepository,contentService,runtimeContent,avatarRuntime,avatarQuick,openWorkspace,...context});
+    const session=await workspaces.open(id,{root,projects,permission,dependencies,contentSession,contentRepository,contentService,runtimeContent,avatarRuntime,avatarQuick,openWorkspace,...context});
+    try{
+      const dock=await installCreatorApprovalDock({root,workspace:id,session,context,repository:contentRepository,contentSession});
+      if(dock){
+        if(!root.KELO_CREATOR_APPROVAL_DOCKS)root.KELO_CREATOR_APPROVAL_DOCKS=new Map();
+        root.KELO_CREATOR_APPROVAL_DOCKS.set(id,dock);
+      }
+    }catch(error){console.warn(`[Creators] ApprovalRequest dock unavailable for ${id}`,error);}
+    return session;
   }
-  platform=Object.freeze({version:'kelo-creators-core-v1.24.0-asset-forge',permission,projects,workspaces,dependencies,contentSession,contentRepository,contentService,runtimeContent,avatarRuntime,avatarQuick,openWorkspace,close(){try{looseImportDispose?.();}catch{}try{irregularImportDispose?.();}catch{}try{repairTouchDispose?.();}catch{}try{repairStudioDispose?.();}catch{}try{manualCutterDispose?.();}catch{}try{easyUiDispose?.();}catch{}try{eventLabDispose?.();}catch{}try{visualUiDispose?.();}catch{}try{localState.close?.();}catch{}try{inputLocksDispose?.();}catch{}platform=null;}});
+  platform=Object.freeze({version:'kelo-creators-core-v1.25.0-approval-dock',permission,projects,workspaces,dependencies,contentSession,contentRepository,contentService,runtimeContent,avatarRuntime,avatarQuick,openWorkspace,close(){try{for(const dock of root.KELO_CREATOR_APPROVAL_DOCKS?.values?.()||[])dock?.destroy?.();root.KELO_CREATOR_APPROVAL_DOCKS?.clear?.();}catch{}try{looseImportDispose?.();}catch{}try{irregularImportDispose?.();}catch{}try{repairTouchDispose?.();}catch{}try{repairStudioDispose?.();}catch{}try{manualCutterDispose?.();}catch{}try{easyUiDispose?.();}catch{}try{eventLabDispose?.();}catch{}try{visualUiDispose?.();}catch{}try{localState.close?.();}catch{}try{inputLocksDispose?.();}catch{}platform=null;}});
   return platform;
 }
 export function getKeloCreatorsPlatform(){return platform;}
