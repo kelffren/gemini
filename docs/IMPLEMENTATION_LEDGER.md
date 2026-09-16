@@ -138,4 +138,80 @@ Handoff prompt:
 
 **Handoff prompt:**
 
-> Continue `IMP-2026-09-15-CREATOR-OS-001` / PR #269. Read `AGENTS.md`, Foundation, Engine Map, System Documentation Standard, this ledger entry, and `docs/systems/CREATOR_OS_LIBRARY.md`. Preserve existing owners. Do not create a second asset catalog, image editor, runtime renderer, history store, or marketplace authority. First run `node scripts/creator-os-library-audit.mjs`, `npm run audit:docs`, the required iPhone Playwright gate, and LIVE Creator Library interaction. Fix failures in PR #269. Do not mark VALIDATED or merge as verified until those gates pass. After validation, the next product pass is the online Review/Publish/Discover authority adapter, not another local marketplace implementation.
+> Continue `IMP-2026-09-15-CREATOR-OS-001` / PR #269. Read `AGENTS.md`, Foundation, Engine Map, System Documentation Standard, this ledger entry, and `docs/systems/CREATOR_OS_LIBRARY.md`. Preserve existing owners. Do not create a second asset catalog, image editor, runtime renderer, history store, or marketplace authority. First run `node scripts/creator-os-library-audit.mjs`, `npm run audit:docs`, the required iPhone Playwright gate, and LIVE Creator Library interaction. Fix failures in PR #269. Do not mark VALIDATED or merge as verified until those gates pass.
+
+---
+
+### IMP-2026-09-15-CREATOR-RELEASE-002
+
+**Status:** IMPLEMENTED_PENDING_VERIFY  
+**Depends on:** `IMP-2026-09-15-CREATOR-OS-001` / PR #269.  
+**Owner(s):** Kelo Universal Content Studio UI + Kelo Creator Release Service + existing Supabase content/review/publication authority.  
+**User intent / source prompt:** Continue the Creator OS so creator-made characters, skins, weapons, props and future content can move toward a real creator economy/market without losing context between agents or turning the browser into the authority.
+
+**Why:** The database and Universal Content Studio already had immutable content revisions, review requests and service-role publication, but creators lacked one visible release surface. A local fake marketplace would duplicate truth and make later moderation/KC settlement harder.
+
+**Invariants:**
+
+- `content_review_requests` is the canonical review state (`pending/approved/rejected/cancelled`).
+- `content_publications` is the canonical publication evidence (`global/official`, active rows only).
+- Browser-authenticated creators may submit/resubmit their own revision for review; they may not publish it.
+- `publish_content_revision` remains executable only by `service_role`.
+- Runtime preview for the creator is not public publication.
+- Release Center must list only revisions owned by the authenticated user even though RLS also permits reading globally published revisions.
+- No KC purchase, payout or revenue split is added in this pass.
+
+**Implemented now (stacked branch `creator-release-center-v1`):**
+
+- Added `Kelo Creator Release Service` over the existing repository/runtime registry.
+- Added authoritative server reads for review requests and active publications.
+- Corrected `listMyContent()` to explicitly filter `owner_user_id` from the authenticated JWT.
+- Added Content Studio `RELEASE CENTER` showing INGESTED / IN_REVIEW / REJECTED / CANCELLED / APPROVED / PUBLISHED based on server rows.
+- Added `SUBMIT REVIEW` and `RESUBMIT REVIEW` only when the server state permits it.
+- Kept publish action completely absent from client API/UI.
+- Added current-session runtime preview list so creators can distinguish preview from global publication.
+- Added static authority audit `scripts/creator-release-center-audit.mjs`.
+- Updated `docs/systems/UNIVERSAL_CONTENT_STUDIO.md` with the release lifecycle and security boundary.
+
+**Files/contracts touched:**
+
+- `src/creators/release/creator-release-service.mjs`
+- `src/creators/content/supabase-content-repository.mjs`
+- `src/creators/ui/content-studio-workspace.mjs`
+- `scripts/creator-release-center-audit.mjs`
+- `docs/systems/UNIVERSAL_CONTENT_STUDIO.md`
+- `docs/IMPLEMENTATION_LEDGER.md`
+
+**Deferred deliberately:**
+
+- Discover/global marketplace browsing UI.
+- Marketplace listings/pricing separate from publication metadata.
+- KC escrow/payment settlement.
+- Creator revenue split and payout ledger.
+- Moderation/reviewer admin UI and automated approval.
+- CDN/public asset lifecycle beyond the existing publication system.
+- Seasonal auto-publishing; seasonal generation may prepare drafts, but publication remains review-authoritative.
+
+**Acceptance / gates:**
+
+- `node scripts/creator-release-center-audit.mjs` passes.
+- Existing `npm run audit:universal-content` remains green.
+- Authenticated integration proves only own revisions appear.
+- Submit review creates/returns `content_review_requests.status=pending`.
+- Rejected/cancelled revision can be resubmitted; pending/approved cannot create a fake new client state.
+- A service-role publication appears as PUBLISHED with correct `global/official` visibility after refresh.
+- No client module calls `publish_content_revision`.
+- Mobile Content Studio can refresh/submit without freezing normal gameplay; upstream Creator OS iPhone gate still applies.
+- `npm run audit:docs` passes.
+
+**Evidence:**
+
+- Branch: `creator-release-center-v1`, stacked from `creator-os-universal-library` at `03195b54659ab9eae8fab0e5af7be288ab24c42e`.
+- Database migration inspected: `20260910024046_universal_content_registry.sql` explicitly revokes `publish_content_revision` from authenticated clients and grants it to `service_role` only.
+- This environment still cannot provide the required runnable checkout/iPhone Playwright evidence, so this entry remains `IMPLEMENTED_PENDING_VERIFY`.
+
+**Next action:** validate PR #269 first, then run Release Center static/universal/docs audits and authenticated Supabase/LIVE mobile flows on this stacked branch. Fix failures here before merging the release layer.
+
+**Handoff prompt:**
+
+> Continue `IMP-2026-09-15-CREATOR-RELEASE-002` on `creator-release-center-v1`. Do not implement a local marketplace queue or client publication authority. Read the Universal Content Studio system doc and migration `20260910024046_universal_content_registry.sql`. Run `node scripts/creator-release-center-audit.mjs`, `npm run audit:universal-content`, `npm run audit:docs`, authenticated Supabase review/resubmit/publication visibility tests, and the mobile/LIVE gates. Preserve the invariant that only service-role can publish. The next product layer after validation is Discover/listing/economy metadata on top of approved publications, not replacing the publication model.

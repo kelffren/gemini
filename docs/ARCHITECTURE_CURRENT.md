@@ -33,15 +33,25 @@ El “Photoshop” interno se construye por composición, no duplicación:
 
 Los módulos pesados de Creator siguen lazy. Creator Library puede abrirse sin precargar el catálogo completo del World Editor.
 
+`Kelo Creator Release Service` es una frontera fina sobre el repository online existente. No crea otra cola ni otra verdad: lee `content_review_requests` y `content_publications`, y permite al creador únicamente enviar/re-enviar su propia revisión a review. El cliente no expone `publish_content_revision`.
+
 ### 7. Gameplay Domains
 Abilities, equipment, mounts, backpack, PvP/Arena, identity/titles, nobility, economy, commerce, property, instances y guardian son owners separados. Creator OS no obtiene autoridad sobre ellos.
 
 ### 8. Online
-`engine-net.js`, auth lifecycle y módulos server/Supabase implementan o preparan autoridad online. La regla es server-authoritative para valor persistente/competitivo. Publicación global, moderación, ownership de mercado, compras KC y revenue split de creadores pertenecen a esta frontera, no a IndexedDB/localStorage.
+`engine-net.js`, auth lifecycle y módulos server/Supabase implementan o preparan autoridad online. La regla es server-authoritative para valor persistente/competitivo.
+
+Para Creator content:
+
+- draft/preview privado puede vivir en authoring client;
+- `content_review_requests` es la verdad de review;
+- `content_publications` es evidencia de publicación global/official;
+- `publish_content_revision` permanece reservado a `service_role`;
+- mercado, ownership compartido, compras KC y revenue split deben construirse sobre publicaciones aprobadas, no sobre IndexedDB/localStorage.
 
 ## Flujo de asset moderno
 
-`PNG/JPEG/WebP → Image Lab opcional → foreground analysis/Asset Forge → asset sheet compiler → sourceRects/manifest → atlas/semantic catalog → specialized Creator/Studio → preview/test → future review/publish authority → runtime on demand`
+`PNG/JPEG/WebP → Image Lab opcional → foreground analysis/Asset Forge → asset sheet compiler → sourceRects/manifest → semantic content revision → specialized Creator/Studio → creator runtime preview → server review → authority publication → runtime/discover on demand`
 
 Forest Plaza es el caso de referencia actual: 146 piezas, IDs legacy preservados, nombres semánticos y 7 carpetas visuales.
 
@@ -54,10 +64,11 @@ Forest Plaza es el caso de referencia actual: 146 piezas, IDs legacy preservados
 - World changes vía Studio/`KELO_WORLD_EDIT`;
 - Creator Library enruta, no reimplementa runtimes;
 - Image Lab/Asset Forge no crean un segundo catálogo runtime;
+- Release Center no aprueba ni publica; solo refleja autoridad y solicita review;
 - assets importados no inventan un renderer;
 - UI no se convierte en autoridad gameplay;
 - cliente no se convierte en autoridad final online.
 
 ## Móvil
 
-El editor se abre con chrome-first y prewarm/boot por etapas. Creator Library/Image Lab/Asset Forge deben cargar solo por acción explícita. Evitar canvas/blur/import masivo simultáneo en iPhone. La verificación final de World móvil y nuevas superficies Creator exige dispositivo real/LIVE además de los gates automatizados aplicables.
+El editor se abre con chrome-first y prewarm/boot por etapas. Creator Library/Image Lab/Asset Forge/Content Studio deben cargar solo por acción explícita. Evitar canvas/blur/import masivo simultáneo en iPhone. La verificación final de World móvil y nuevas superficies Creator exige dispositivo real/LIVE además de los gates automatizados aplicables.
