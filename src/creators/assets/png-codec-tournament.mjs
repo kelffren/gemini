@@ -1,8 +1,8 @@
 /* KELO-INDEX
  * area: CREATORS / ASSET BYTES
  * owner: Kelo Creator Asset Bridge
- * keys: PNG TOURNAMENT OXIPNG ZOPFLIPNG ECT LOSSLESS VERIFY METADATA
- * purpose: let independent PNG optimizers compete, then accept only the smallest candidate proven pixel-exact and color-metadata-safe
+ * keys: PNG TOURNAMENT OXIPNG ZOPFLIPNG ECT LOSSLESS VERIFY COLOR METADATA HDR
+ * purpose: let independent PNG optimizers compete, then accept only the smallest candidate proven pixel-exact and rendering-metadata-safe
  * public-api: optimizePngTournament()
  * state-owned: none; temporary files only
  * online: N/A; build/publish-time capability
@@ -16,20 +16,7 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {decodePngRgba, optimizePngLossless} from './png-space-optimizer.mjs';
 import {evaluatePixelFidelity, judgePixelFidelity} from './png-quality-agent.mjs';
-
-const VISUAL_METADATA = new Set(['gAMA', 'cHRM', 'sRGB', 'iCCP', 'sBIT']);
-const ESSENTIAL = new Set(['IHDR', 'PLTE', 'tRNS', 'IDAT', 'IEND']);
-
-function visualFingerprint(decoded) {
-  return decoded.chunks
-    .filter(chunk => VISUAL_METADATA.has(chunk.type))
-    .map(chunk => `${chunk.type}:${chunk.data.toString('base64')}`)
-    .join('|');
-}
-
-function ancillaryChunkNames(decoded) {
-  return [...new Set(decoded.chunks.filter(chunk => !ESSENTIAL.has(chunk.type)).map(chunk => chunk.type))];
-}
+import {pngRenderMetadataFingerprint, pngAncillaryChunkNames} from './png-render-metadata.mjs';
 
 function commandAvailable(command) {
   const probe = spawnSync(command, ['--version'], {stdio:'ignore'});
@@ -56,9 +43,9 @@ function validateCandidate(buffer, original, originalVisualFingerprint) {
     }
     const metrics = evaluatePixelFidelity(original.rgba, decoded.rgba, original.ihdr.width, original.ihdr.height);
     const verdict = judgePixelFidelity(metrics, 'strict');
-    const metadataSafe = visualFingerprint(decoded) === originalVisualFingerprint;
+    const metadataSafe = pngRenderMetadataFingerprint(decoded) === originalVisualFingerprint;
     const reasons = [...verdict.reasons];
-    if (!metadataSafe) reasons.push('visual-metadata-change');
+    if (!metadataSafe) reasons.push('render-metadata-change');
     return {pass:verdict.pass && metadataSafe, score:verdict.score, reasons, metrics, metadataSafe};
   } catch (error) {
     return {pass:false, score:0, reasons:['decode-error'], metrics:null, metadataSafe:false, error:String(error?.message || error)};
@@ -99,8 +86,8 @@ function publicCandidate(item) {
 export function optimizePngTournament(sourceBuffer, options = {}) {
   const effort = options.effort || 'balanced';
   const original = decodePngRgba(sourceBuffer);
-  const sourceFingerprint = visualFingerprint(original);
-  const metadataChunks = ancillaryChunkNames(original);
+  const sourceFingerprint = pngRenderMetadataFingerprint(original);
+  const metadataChunks = pngAncillaryChunkNames(original);
   const kelo = optimizePngLossless(sourceBuffer, options.losslessOptions);
   const keloValidation = validateCandidate(kelo.buffer, original, sourceFingerprint);
   const candidates = [candidate('kelo:lossless', 'kelo', kelo.buffer, keloValidation)];
@@ -174,13 +161,14 @@ export function optimizePngTournament(sourceBuffer, options = {}) {
   return {
     buffer:winner.buffer,
     report:{
-      version:'kelo-png-codec-tournament-v1',
+      version:'kelo-png-codec-tournament-v1.1',
       effort,
       sourceBytes:sourceBuffer.length,
       optimizedBytes:winner.bytes,
       savedBytes,
       savedPercent:sourceBuffer.length ? Number(((savedBytes / sourceBuffer.length) * 100).toFixed(3)) : 0,
       availableTools:available,
+      renderMetadataFingerprintVersion:'png-third-edition-color-hdr-v1',
       winner:publicCandidate(winner),
       candidates:candidates.map(publicCandidate)
     }
