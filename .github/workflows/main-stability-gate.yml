@@ -69,6 +69,9 @@ jobs:
       - name: Community Guardian publication provenance contract
         run: node scripts/community-guardian-publication-audit.mjs
 
+      - name: Community Guardian runtime provenance contract
+        run: node scripts/community-guardian-runtime-proof-audit.mjs
+
       - name: Updater contract
         run: npm run audit:updater
 
