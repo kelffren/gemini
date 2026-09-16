@@ -17,7 +17,7 @@ export function defaultSnapPointsForPiece(type,bounds={}){
     {id:'start',type:piece,x:0,y:my,direction:'start'},
     {id:'end',type:piece,x:w,y:my,direction:'end'}
   ];
-  if(piece==='floor'||piece==='roof')return[
+  if(piece==='floor'||piece==='roof'||piece==='ramp')return[
     {id:'north',type:piece,x:mx,y:0,direction:'north'},
     {id:'south',type:piece,x:mx,y:h,direction:'south'},
     {id:'west',type:piece,x:0,y:my,direction:'west'},
