@@ -16,16 +16,23 @@ function pathHints(sourceName = '') {
   const normalized = String(sourceName)
     .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
     .toLowerCase();
-  const tokens = new Set(normalized.split(/[^a-z0-9]+/).filter(Boolean));
+  const tokenList = normalized.split(/[^a-z0-9]+/).filter(Boolean);
+  const tokens = new Set(tokenList);
   const hasAny = (...values) => values.some(value => tokens.has(value));
+  const hasSafePrefix = (...values) => tokenList.some(token => values.some(value => token.startsWith(value)));
+  const atlas = hasAny('atlas', 'sheet', 'spritesheet', 'tileset');
   return {
-    // Exact tokens only: substring matching made "broad" look like "road".
-    // `tileset` belongs to the atlas class, not automatically to a repeatable tile.
-    tile:hasAny('tile', 'terrain', 'ground', 'floor', 'grass', 'cesped', 'path', 'paths', 'road', 'roads', 'wall', 'walls', 'seam'),
+    // Exact tokens avoid collisions such as "broad" → "road". A small allowlist
+    // of semantic prefixes covers real compound names such as "cespedsindivisiones".
+    // Atlas tokens remain separate: `tileset` is not automatically a repeatable tile.
+    tile:!atlas && (
+      hasAny('tile', 'terrain', 'ground', 'floor', 'grass', 'cesped', 'path', 'paths', 'road', 'roads', 'wall', 'walls', 'seam') ||
+      hasSafePrefix('cesped', 'grass', 'terrain', 'ground', 'floor', 'road', 'path', 'wall', 'seam')
+    ),
     sprite:hasAny('sprite', 'hero', 'character', 'avatar', 'npc', 'mob', 'weapon', 'item', 'prop', 'tree', 'trees', 'arbol', 'fountain', 'fuente'),
     ui:hasAny('ui', 'icon', 'hud', 'button', 'logo', 'badge', 'menu'),
     fx:hasAny('fx', 'vfx', 'effect', 'effects', 'particle', 'particles', 'glow', 'smoke', 'fire', 'magic'),
-    atlas:hasAny('atlas', 'sheet', 'spritesheet', 'tileset')
+    atlas
   };
 }
 
@@ -136,7 +143,7 @@ export function profileAssetImage(rgba, width, height, options = {}) {
   if (!pixelCritical && !seamCritical) runtimeCandidates.push('webp-adaptive', 'avif-adaptive');
 
   return {
-    version:'kelo-asset-image-profile-v1.1',
+    version:'kelo-asset-image-profile-v1.2',
     kind,
     adaptivePolicy,
     sourceName:String(options.sourceName || options.file || ''),
