@@ -46,8 +46,30 @@ jobs:
         run: |
           BASE="$(git merge-base HEAD origin/main)"
           node scripts/bug-impact.mjs --diff "$BASE" HEAD --depth=2
-      - name: Runtime performance foundation contract
-        run: node scripts/performance-foundation-audit.js
+      - name: Runtime performance no-regression contract
+        run: |
+          BASE="$(git merge-base HEAD origin/main)"
+          TMP="$(mktemp -d)"
+          git worktree add --detach "$TMP/base" "$BASE" >/dev/null
+          set +e
+          (cd "$TMP/base" && node scripts/performance-foundation-audit.js) >"$TMP/base.log" 2>&1
+          BASE_RC=$?
+          node scripts/performance-foundation-audit.js >"$TMP/head.log" 2>&1
+          HEAD_RC=$?
+          set -e
+          grep '^✗ ' "$TMP/base.log" | sort >"$TMP/base.fail" || true
+          grep '^✗ ' "$TMP/head.log" | sort >"$TMP/head.fail" || true
+          echo "Baseline performance audit exit: $BASE_RC"
+          cat "$TMP/base.fail" || true
+          echo "HEAD performance audit exit: $HEAD_RC"
+          cat "$TMP/head.fail" || true
+          comm -13 "$TMP/base.fail" "$TMP/head.fail" >"$TMP/new.fail"
+          if [ -s "$TMP/new.fail" ]; then
+            echo 'NEW PERFORMANCE CONTRACT FAILURES INTRODUCED:'
+            cat "$TMP/new.fail"
+            exit 1
+          fi
+          echo 'PERFORMANCE_NO_REGRESSION_OK'
       - name: Quality Agent golden corpus
         run: node scripts/asset-quality-golden-corpus-audit.mjs
       - name: Animation temporal consistency gate
