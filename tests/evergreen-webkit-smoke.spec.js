@@ -101,41 +101,63 @@ test('V6.69 evergreen branch boots plaza without uncaught errors', async ({ page
   expect(consoleErrors.filter(text=>!/favicon/i.test(text))).toEqual([]);
 });
 
-test('consolidated ability aim owns pointer drag lifecycle and preserves final engine-l dash semantics', async ({ page }) => {
+test('modern ability runtime owns the first-use hotbar without restoring engine-g UI', async ({ page }) => {
   await page.goto('/?guest=1',{waitUntil:'domcontentloaded'});
-  await page.waitForFunction(()=>window.__keloBootReady===true&&!!window.KeloAbilityAim,{timeout:15000});
-  await page.waitForFunction(()=>!!document.getElementById('action-slot-0'),{timeout:5000});
+  await page.waitForFunction(()=>window.__keloBootReady===true&&!!window.KeloAbilityAim&&!!window.KELO_MODULE_LOADER,{timeout:15000});
 
-  const active=await page.evaluate(()=>{
-    const slot=document.getElementById('action-slot-0');
-    slot.dispatchEvent(new PointerEvent('pointerdown',{pointerId:77,clientX:36,clientY:36,bubbles:true,cancelable:true}));
-    return window.KeloAbilityAim.snapshot();
-  });
-  expect(active.active).toBe(true);
-  expect(active.typeId).toBe('dash');
-  expect(active.castRange).toBeGreaterThan(0);
-  expect(active.castRange).toBeLessThanOrEqual(170);
+  const before=await page.evaluate(()=>({
+    legacySlot:!!document.getElementById('action-slot-0'),
+    modernSlots:document.querySelectorAll('#action-bar-container .stone-slot[data-slot]').length,
+    abilityRuntimeReady:window.KELO_MODULE_LOADER.isReady('abilityRuntime'),
+    abilityLoader:!!window.KeloAbilitiesLoader,
+    abilities:!!window.KeloAbilities,
+    aim:window.KeloAbilityAim.snapshot(),
+    scripts:Array.from(document.scripts).map(script=>String(script.getAttribute('src')||''))
+  }));
+  expect(before.legacySlot).toBe(false);
+  expect(before.modernSlots).toBe(0);
+  expect(before.abilityRuntimeReady).toBe(false);
+  expect(before.abilityLoader).toBe(false);
+  expect(before.abilities).toBe(false);
+  expect(before.scripts.some(src=>src.includes('kelo-ability-boot.js'))).toBe(false);
+  expect(before.aim.pointerLifecycle.attached).toBe(true);
 
-  const moved=await page.evaluate(()=>{
-    window.dispatchEvent(new PointerEvent('pointermove',{pointerId:77,clientX:118,clientY:72,bubbles:true,cancelable:true}));
-    return window.KeloAbilityAim.snapshot();
-  });
-  expect(moved.active).toBe(true);
-  expect(moved.pointerLifecycle.moveHandled-active.pointerLifecycle.moveHandled).toBe(1);
-  expect(moved.castRange).toBeGreaterThanOrEqual(active.castRange);
-
-  const ended=await page.evaluate(()=>{
-    window.dispatchEvent(new PointerEvent('pointerup',{pointerId:77,clientX:118,clientY:72,bubbles:true,cancelable:true}));
+  const loaded=await page.evaluate(async()=>{
+    const featureLoaded=await window.KELO_MODULE_LOADER.ensure('abilityRuntime');
+    if(!featureLoaded||!window.KeloAbilitiesLoader)throw new Error('ability runtime feature failed to expose loader');
+    await window.KeloAbilitiesLoader.ensure();
     return {
+      featureLoaded,
+      featureReady:window.KELO_MODULE_LOADER.isReady('abilityRuntime'),
+      loaderReady:window.KeloAbilitiesLoader.isReady(),
+      abilities:!!window.KeloAbilities,
+      legacySlot:!!document.getElementById('action-slot-0'),
+      modernSlots:document.querySelectorAll('#action-bar-container .stone-slot[data-slot]').length,
+      modernMarker:document.getElementById('action-bar-container')?.dataset?.keloStoneV4||'',
+      renderAdapter:typeof window.renderActionBar==='function',
+      hotbarSize:window.KeloAbilities?.hotbar?.slots?.length||0,
+      perf:window.KeloAbilities?.performanceSnapshot?.(),
       aim:window.KeloAbilityAim.snapshot(),
-      dash:{active:dashTween.active,dur:dashTween.dur,fromX:dashTween.fromX,fromY:dashTween.fromY,toX:dashTween.toX,toY:dashTween.toY}
+      failures:window.KELO_MODULE_LOADER.diagnostics().failures,
+      scripts:Array.from(document.scripts).map(script=>String(script.getAttribute('src')||''))
     };
   });
-  expect(ended.aim.active).toBe(false);
-  expect(ended.aim.pointerLifecycle.endHandled-moved.pointerLifecycle.endHandled).toBe(1);
-  expect(ended.dash.active).toBe(true);
-  expect(ended.dash.dur).toBeCloseTo(0.11+0.08*(moved.castRange/170),8);
-  expect(Number.isFinite(ended.dash.toX)&&Number.isFinite(ended.dash.toY)).toBe(true);
+
+  expect(loaded.featureLoaded).toBe(true);
+  expect(loaded.featureReady).toBe(true);
+  expect(loaded.loaderReady).toBe(true);
+  expect(loaded.abilities).toBe(true);
+  expect(loaded.legacySlot).toBe(false);
+  expect(loaded.modernSlots).toBe(5);
+  expect(loaded.modernMarker).toBe('1');
+  expect(loaded.renderAdapter).toBe(true);
+  expect(loaded.hotbarSize).toBe(5);
+  expect(loaded.perf).toBeTruthy();
+  expect(loaded.aim.pointerLifecycle.attached).toBe(true);
+  expect(loaded.scripts.some(src=>src.includes('abilityData.js'))).toBe(true);
+  expect(loaded.scripts.some(src=>src.includes('stone-system.js'))).toBe(true);
+  expect(loaded.scripts.some(src=>src.includes('kelo-ability-boot.js'))).toBe(true);
+  expect(loaded.failures).toEqual({});
 });
 
 test('direct legacy stone trigger is explicit, measured, and does not impersonate teleport authority', async ({ page }) => {
