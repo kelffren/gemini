@@ -1,8 +1,8 @@
 /* KELO-INDEX
  * area: BUILD / CREATOR ASSET DELIVERY
  * owner: Kelo Creator Asset Bridge
- * keys: CODEC TOURNAMENT PNG OXIPNG ZOPFLI WEBP AVIF REPORT VARIANTS
- * purpose: run the deep authoring/runtime codec tournament over real assets without modifying canonical sources
+ * keys: CODEC TOURNAMENT PNG OXIPNG RENDER EXACT ZOPFLI WEBP AVIF REPORT VARIANTS
+ * purpose: run deep AUTHORING and DELIVERY codec tournaments over real assets without modifying canonical sources
  * public-api: CLI
  * state-owned: report/variant output directory only
  * online: N/A; build/publish-time research and production candidate generator
@@ -12,6 +12,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {optimizePngTournament} from '../src/creators/assets/png-codec-tournament.mjs';
+import {optimizePngDeliveryTournament} from '../src/creators/assets/png-delivery-tournament.mjs';
 import {buildRuntimeImageVariants} from '../src/creators/assets/runtime-image-variants.mjs';
 
 const args = process.argv.slice(2);
@@ -51,19 +52,9 @@ function walk(target) {
   return found.sort();
 }
 
-function rel(file) {
-  return path.relative(process.cwd(), file).replaceAll('\\', '/');
-}
-
-function key(file) {
-  return rel(file).replace(/[^a-z0-9._-]+/gi, '__').replace(/\.png$/i, '');
-}
-
-function human(bytes) {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 ** 2) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / 1024 ** 2).toFixed(2)} MB`;
-}
+const rel = file => path.relative(process.cwd(), file).replaceAll('\\', '/');
+const key = file => rel(file).replace(/[^a-z0-9._-]+/gi, '__').replace(/\.png$/i, '');
+const human = bytes => bytes < 1024 ? `${bytes} B` : bytes < 1024 ** 2 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / 1024 ** 2).toFixed(2)} MB`;
 
 fs.mkdirSync(reportDir, {recursive:true});
 const variantDir = path.join(reportDir, 'variants');
@@ -75,11 +66,36 @@ for (const file of walk(input)) {
   console.log(`TOURNAMENT ${rel(file)} (${human(source.length)})`);
   try {
     const authoring = optimizePngTournament(source, {effort:'deep'});
+    const pngDelivery = optimizePngDeliveryTournament(source, {effort:'deep'});
     const runtime = await buildRuntimeImageVariants(source, {sourceName:rel(file)});
-    const runtimeWinner = runtime.report.runtimeWinner;
+    const sharpWinner = runtime.report.runtimeWinner;
+
+    const deliveryChoices = [];
+    if (pngDelivery.report.winner?.pass) {
+      deliveryChoices.push({
+        label:`png-delivery:${pngDelivery.report.winner.label}`,
+        format:'png',
+        bytes:pngDelivery.buffer.length,
+        buffer:pngDelivery.buffer,
+        source:'png-delivery',
+        contract:pngDelivery.report.winner.policy || 'render-exact'
+      });
+    }
+    if (sharpWinner) {
+      const buffer = runtime.buffers[sharpWinner.label];
+      if (buffer) deliveryChoices.push({
+        label:sharpWinner.label,
+        format:sharpWinner.format,
+        bytes:sharpWinner.bytes,
+        buffer,
+        source:'sharp-runtime',
+        contract:sharpWinner.track
+      });
+    }
+    const overallDeliveryWinner = deliveryChoices.sort((a,b)=>a.bytes-b.bytes)[0] || null;
     const authoringSavings = source.length ? ((source.length - authoring.buffer.length) / source.length) * 100 : 0;
-    const runtimeSavings = runtimeWinner?.bytes != null && source.length
-      ? ((source.length - runtimeWinner.bytes) / source.length) * 100
+    const runtimeSavings = overallDeliveryWinner?.bytes != null && source.length
+      ? ((source.length - overallDeliveryWinner.bytes) / source.length) * 100
       : 0;
     const outputs = {};
 
@@ -88,13 +104,10 @@ for (const file of walk(input)) {
       const authoringName = `${base}--authoring.png`;
       fs.writeFileSync(path.join(variantDir, authoringName), authoring.buffer);
       outputs.authoring = `variants/${authoringName}`;
-      if (runtimeWinner) {
-        const runtimeBuffer = runtime.buffers[runtimeWinner.label];
-        if (runtimeBuffer) {
-          const runtimeName = `${base}--runtime.${runtimeWinner.format}`;
-          fs.writeFileSync(path.join(variantDir, runtimeName), runtimeBuffer);
-          outputs.runtime = `variants/${runtimeName}`;
-        }
+      if (overallDeliveryWinner?.buffer) {
+        const runtimeName = `${base}--runtime.${overallDeliveryWinner.format}`;
+        fs.writeFileSync(path.join(variantDir, runtimeName), overallDeliveryWinner.buffer);
+        outputs.runtime = `variants/${runtimeName}`;
       }
     }
 
@@ -103,7 +116,19 @@ for (const file of walk(input)) {
       sourceBytes:source.length,
       profile:runtime.report.profile,
       authoring:{...authoring.report, savingsPercent:Number(authoringSavings.toFixed(3))},
-      runtime:{...runtime.report, savingsPercent:Number(runtimeSavings.toFixed(3))},
+      pngDelivery:pngDelivery.report,
+      runtime:{
+        ...runtime.report,
+        sharpRuntimeWinner:sharpWinner,
+        overallDeliveryWinner:overallDeliveryWinner ? {
+          label:overallDeliveryWinner.label,
+          format:overallDeliveryWinner.format,
+          bytes:overallDeliveryWinner.bytes,
+          source:overallDeliveryWinner.source,
+          contract:overallDeliveryWinner.contract
+        } : null,
+        savingsPercent:Number(runtimeSavings.toFixed(3))
+      },
       outputs
     });
   } catch (error) {
@@ -115,12 +140,12 @@ for (const file of walk(input)) {
 const totals = results.reduce((state, item) => {
   state.source += item.sourceBytes || 0;
   state.authoring += item.authoring?.optimizedBytes ?? item.sourceBytes ?? 0;
-  state.runtime += item.runtime?.runtimeWinner?.bytes ?? item.sourceBytes ?? 0;
+  state.runtime += item.runtime?.overallDeliveryWinner?.bytes ?? item.sourceBytes ?? 0;
   return state;
 }, {source:0, authoring:0, runtime:0});
 
 const report = {
-  version:'kelo-asset-codec-tournament-v1',
+  version:'kelo-asset-codec-tournament-v1.1',
   generatedAt:new Date().toISOString(),
   input:rel(input),
   fileCount:results.length,
@@ -134,9 +159,10 @@ const report = {
 
 fs.writeFileSync(path.join(reportDir, 'report.json'), JSON.stringify(report, null, 2));
 const rows = results.map(item => {
-  if (item.error) return `<tr><td>${item.file}</td><td colspan="5">${item.error}</td></tr>`;
-  return `<tr><td>${item.file}</td><td>${item.profile.kind}</td><td>${human(item.sourceBytes)}</td><td>${human(item.authoring.optimizedBytes)} (${item.authoring.savingsPercent.toFixed(2)}%)</td><td>${item.runtime.runtimeWinner?.label || '—'}</td><td>${item.runtime.runtimeWinner ? `${human(item.runtime.runtimeWinner.bytes)} (${item.runtime.savingsPercent.toFixed(2)}%)` : '—'}</td></tr>`;
+  if (item.error) return `<tr><td>${item.file}</td><td colspan="6">${item.error}</td></tr>`;
+  const winner=item.runtime.overallDeliveryWinner;
+  return `<tr><td>${item.file}</td><td>${item.profile.kind}</td><td>${human(item.sourceBytes)}</td><td>${human(item.authoring.optimizedBytes)} (${item.authoring.savingsPercent.toFixed(2)}%)</td><td>${item.pngDelivery.winner?.label || '—'}</td><td>${winner?.label || '—'}</td><td>${winner ? `${human(winner.bytes)} (${item.runtime.savingsPercent.toFixed(2)}%)` : '—'}</td></tr>`;
 }).join('\n');
-const html = `<!doctype html><meta charset="utf-8"><title>Kelo Codec Tournament</title><style>body{font:14px system-ui;background:#0f1115;color:#f5f7fb;padding:24px}table{border-collapse:collapse;width:100%}th,td{padding:10px;border-bottom:1px solid #303744;text-align:left}code{color:#9fd}</style><h1>Kelo Asset Codec Tournament</h1><p>Canonical source stays untouched. Authoring track = verified PNG. Runtime track = smallest quality-approved delivery candidate.</p><p>Total ${human(totals.source)} → authoring ${human(totals.authoring)} (${report.totals.authoringSavedPercent.toFixed(2)}%) → runtime ${human(totals.runtime)} (${report.totals.runtimeSavedPercent.toFixed(2)}%).</p><table><thead><tr><th>Asset</th><th>Profile</th><th>Source</th><th>PNG winner</th><th>Runtime winner</th><th>Runtime bytes</th></tr></thead><tbody>${rows}</tbody></table>`;
+const html = `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Kelo Codec Tournament</title><style>body{font:14px system-ui;background:#0f1115;color:#f5f7fb;padding:24px}table{border-collapse:collapse;width:100%}th,td{padding:10px;border-bottom:1px solid #303744;text-align:left}@media(max-width:800px){body{padding:10px}table{font-size:11px}}</style><h1>Kelo Asset Codec Tournament</h1><p>SOURCE stays untouched. AUTHORING = verified strict PNG. DELIVERY = smallest quality-approved PNG/WebP/AVIF candidate.</p><p>Total ${human(totals.source)} → authoring ${human(totals.authoring)} (${report.totals.authoringSavedPercent.toFixed(2)}%) → delivery ${human(totals.runtime)} (${report.totals.runtimeSavedPercent.toFixed(2)}%).</p><table><thead><tr><th>Asset</th><th>Profile</th><th>Source</th><th>Authoring PNG</th><th>PNG delivery</th><th>Overall delivery</th><th>Delivery bytes</th></tr></thead><tbody>${rows}</tbody></table>`;
 fs.writeFileSync(path.join(reportDir, 'index.html'), html);
-console.log(`ASSET_CODEC_TOURNAMENT_DONE files=${report.fileCount} authoring=-${report.totals.authoringSavedPercent}% runtime=-${report.totals.runtimeSavedPercent}%`);
+console.log(`ASSET_CODEC_TOURNAMENT_DONE files=${report.fileCount} authoring=-${report.totals.authoringSavedPercent}% delivery=-${report.totals.runtimeSavedPercent}%`);
