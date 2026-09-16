@@ -27,18 +27,20 @@ function humanName(path,description){
 }
 function packName(path){const parts=path.split('/');return parts.length>2?parts[1]:(parts[0]||'Kenney');}
 function supportedPath(path){return ALLOWED_PREFIXES.some(prefix=>path.startsWith(prefix))&&/\.(png|webp|jpe?g)$/i.test(path);}
-function scoreLine(line,q){
-  const hay=lower(line);let score=0;
-  if(q){
-    if(hay.includes(q))score+=100;
-    const tokens=q.split(/\s+/).filter(Boolean);
-    for(const token of tokens)if(hay.includes(token))score+=18;
-  }else{
+function matchScore(line,q){
+  const hay=lower(line);
+  if(!q){
+    let score=0;
     for(const hint of ['rpg','fantasy','character','dungeon','town','weapon','nature','pixel','tile','ui'])if(hay.includes(hint))score+=4;
+    if(hay.startsWith('2d/'))score+=3;
+    return {matched:true,score};
   }
+  const tokens=q.split(/\s+/).filter(Boolean);
+  let hits=0,score=hay.includes(q)?120:0;
+  for(const token of tokens){if(hay.includes(token)){hits++;score+=22;}}
+  const matched=hits===tokens.length||(!tokens.length&&hay.includes(q));
   if(hay.startsWith('2d/'))score+=3;
-  if(hay.includes('/sprites/'))score+=2;
-  return score;
+  return {matched,score};
 }
 
 async function loadIndex(){
@@ -73,8 +75,8 @@ export async function searchKenneyAssets(query='',options={}){
     const line=rawLine.trim();if(!line)continue;
     const columns=line.split('\t'),path=text(columns[0]);
     if(!supportedPath(path)||/^path$/i.test(path))continue;
-    const score=scoreLine(line,q);if(q&&score<100)continue;
-    ranked.push({score,columns});
+    const match=matchScore(line,q);if(!match.matched)continue;
+    ranked.push({score:match.score,columns});
   }
   ranked.sort((a,b)=>b.score-a.score||String(a.columns[0]).localeCompare(String(b.columns[0])));
   return ranked.slice(0,limit).map(row=>toAsset(row.columns));
