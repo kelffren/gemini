@@ -2,17 +2,17 @@
  * area: PVP / PERFORMANCE LIFECYCLE
  * owner: KeloPvPWorld
  * keys: PVP COMBAT LAZY BOOTSTRAP MELEE EFFECTS ABILITIES CAST MOVEMENT PREDICTION FIRST-USE PERFORMANCE DODGE WAKE
- * purpose: solicita foundations, abilities y binding de prediction al primer intento explícito de entrar en PvP, despierta el runtime de abilities durante el lifecycle PvP y delega después al owner KeloPvPWorld existente
+ * purpose: solicita foundations, abilityRuntime y binding de prediction al primer intento explícito de entrar en PvP, despierta el runtime de abilities durante el lifecycle PvP y delega después al owner KeloPvPWorld existente
  * public-api: KeloPvPWorld.ensureCombatReady + enterPvPWorld lazy facade
- * consumes: KeloPvPWorld + KeloRuntimeBootstrap + KeloAbilitiesLoader + KeloPvPCastMovementPrediction
+ * consumes: KeloPvPWorld + KeloRuntimeBootstrap + KELO_MODULE_LOADER abilityRuntime + KeloAbilitiesLoader + KeloPvPCastMovementPrediction
  * state-owned: únicamente promesas/telemetría de entrada first-use; no gameplay
- * extension-points: KeloRuntimeBootstrap.ensure(); nunca carga scripts directamente
+ * extension-points: KeloRuntimeBootstrap.ensure() + KELO_MODULE_LOADER.ensure('abilityRuntime'); nunca crea loaders paralelos
  * online: no cambia autoridad ni mensajes; solo lifecycle de código cliente/prediction
  * do-not: NO resolver daño, NO crear segundo loader owner, NO crear game loop, NO polling
  */
 (function(root){
   'use strict';
-  const VERSION='pvp-combat-runtime-loader-v1.4.0-ability-runtime-wake';
+  const VERSION='pvp-combat-runtime-loader-v1.5.0-ability-first-use-contract';
   const original=root.KeloPvPWorld;
   if(!original||typeof original.enter!=='function'){console.error('[Kelo PvP loader] KeloPvPWorld unavailable');return;}
   if(root.KELO_PVP_COMBAT_LOADER_AUDIT&&root.KELO_PVP_COMBAT_LOADER_AUDIT.ready)return;
@@ -27,8 +27,14 @@
     if(loadPromise)return loadPromise;
     if(!firstRequestedAt)firstRequestedAt=Date.now();
     if(!root.KeloRuntimeBootstrap||typeof root.KeloRuntimeBootstrap.ensure!=='function')return Promise.reject(new Error('KELO_RUNTIME_BOOTSTRAP_UNAVAILABLE'));
+    if(!root.KELO_MODULE_LOADER||typeof root.KELO_MODULE_LOADER.ensure!=='function')return Promise.reject(new Error('KELO_MODULE_LOADER_UNAVAILABLE'));
     loadPromise=root.KeloRuntimeBootstrap.ensure()
-      .then(function(){return root.KeloAbilitiesLoader&&typeof root.KeloAbilitiesLoader.ensure==='function'?root.KeloAbilitiesLoader.ensure():true;})
+      .then(function(){return root.KELO_MODULE_LOADER.ensure('abilityRuntime');})
+      .then(function(ok){
+        if(ok===false)throw new Error('KELO_ABILITY_RUNTIME_LOAD_FAILED');
+        if(!root.KeloAbilitiesLoader||typeof root.KeloAbilitiesLoader.ensure!=='function')throw new Error('KELO_ABILITY_LOADER_MISSING_AFTER_FEATURE_LOAD');
+        return root.KeloAbilitiesLoader.ensure();
+      })
       .then(function(){
         if(!combatReady())throw new Error('COMBAT_FOUNDATIONS_INCOMPLETE');
         if(!wakeAbilities())throw new Error('PVP_ABILITY_RUNTIME_WAKE_FAILED');
@@ -57,5 +63,5 @@
   descriptors.ensureCombatReady={value:ensureCombatReady,enumerable:true,configurable:false,writable:false};
   const facade={};Object.defineProperties(facade,descriptors);
   root.KeloPvPWorld=Object.freeze(facade);root.enterPvPWorld=enter;
-  root.KELO_PVP_COMBAT_LOADER_AUDIT={version:VERSION,ready:true,owner:'KeloPvPWorld',runtimeOwner:'KeloRuntimeBootstrap',lazy:true,abilityRuntimeWakeOnPvpEnter:true,get combatReady(){return combatReady();},get predictionReady(){return predictionReady();},get loading(){return !!loadPromise&&!(combatReady()&&predictionReady());},get entering(){return !!enterPromise;},get firstRequestedAt(){return firstRequestedAt;},get loadedAt(){return loadedAt;},get wakeCount(){return wakeCount;},get failures(){return failures;}};
+  root.KELO_PVP_COMBAT_LOADER_AUDIT={version:VERSION,ready:true,owner:'KeloPvPWorld',runtimeOwner:'KeloRuntimeBootstrap',featureOwner:'KeloModuleLoader',abilityFeature:'abilityRuntime',lazy:true,abilityRuntimeWakeOnPvpEnter:true,get combatReady(){return combatReady();},get predictionReady(){return predictionReady();},get loading(){return !!loadPromise&&!(combatReady()&&predictionReady());},get entering(){return !!enterPromise;},get firstRequestedAt(){return firstRequestedAt;},get loadedAt(){return loadedAt;},get wakeCount(){return wakeCount;},get failures(){return failures;}};
 })(typeof globalThis!=='undefined'?globalThis:window);
