@@ -1,6 +1,6 @@
 /* KELO-INDEX
  * area: QA / GUARDIAN PVP FAILOVER
- * keys: GUARDIAN PVP FAILOVER LIVE IOS LEASE EPOCH SNAPSHOT DRIFT AUTH CLEANUP PRUNE CACHE
+ * keys: GUARDIAN PVP FAILOVER LIVE IOS LEASE EPOCH SNAPSHOT DRIFT AUTH CLEANUP PRUNE CACHE PAGE_BUILD
  * purpose: gate estático del laboratorio A->B y de los contratos de producción que necesita para medir failover real
  */
 import assert from 'node:assert/strict';
@@ -78,6 +78,11 @@ assert.match(browserstack,/browserName: safari/);
 assert.match(browserstack,/GuardianPvPFailoverRealIOS/);
 
 assert.match(workflow,/Guardian PvP Failover LIVE/);
+assert.match(workflow,/\n  page_build:\n/);
+assert.doesNotMatch(workflow,/workflow_run:/);
+assert.match(workflow,/pages: read/);
+assert.match(workflow,/Wait until Pages serves this build or a descendant/);
+assert.match(workflow,/pages\/builds\/latest/);
 assert.match(workflow,/BROWSERSTACK_USERNAME/);
 assert.match(workflow,/KELO_GUARDIAN_TEST_ADMIN_EMAIL/);
 assert.match(workflow,/KELO_GUARDIAN_TEST_DONOR_EMAIL/);
@@ -100,6 +105,8 @@ console.log('GUARDIAN_PVP_FAILOVER_AUDIT_OK',{
   restoredActorReclaimMs:5000,
   workerCacheVersioned:true,
   liveGhostCleanupAsserted:true,
+  pagesTrigger:'page_build',
+  deploymentBarrier:true,
   persistentAuthority:false,
   economyAuthority:false
 });
