@@ -3,164 +3,64 @@
 > Fuente de verdad operativa de Biblioteca Universal / Content Vault / Content Packs.
 > Última revisión: 2026-09-16.
 
-## Propósito
+## Contrato
 
-Distribuir e integrar contenido sin cargar binarios externos en el boot normal.
-
-```text
-DISCOVERED != OWNED != DOWNLOADED != INTEGRATED != ACTIVE != LOADED
-```
-
-Tipos: image, sprite, tileset, animation, VFX, SFX, music, ambience, ability declarativa, scene/prefab y content packs.
-
-## Archivos principales
-
-Catálogos: `data/external-asset-providers.json`, `data/opengameart-cc0-curated.json`, `data/kelo-content-starter-catalog.json`, `data/content-pack-catalog.json`.
-Providers: `external-asset-providers.mjs`, `kenney-live-provider.mjs`, `lpc-live-provider.mjs`, `opengameart-live-provider.mjs`, `kelo-content-live-provider.mjs`.
-Vault/integración: `personal-asset-vault.mjs`, `content-integration-router.mjs`, runtime bridges.
-Packs: `content-pack-manager.mjs`, `content-pack-transaction.mjs`, `content-packs.html`.
-Publisher: `scripts/publish-kelo-content-descriptors.mjs`.
+`DISCOVERED != OWNED != DOWNLOADED != INTEGRATED != ACTIVE != LOADED`. Contenido externo no entra al boot normal; metadata primero, binarios bajo demanda.
 
 ## Vault / CAS
+IndexedDB `kelo_personal_asset_vault_v1`; stores `assets`, `blobs`, `manifests`, `casBlobs`. Nuevos pointers conservan digest/previousDigest/bytes/mime/storage. Legacy sigue legible y migra progresivamente.
 
-IndexedDB `kelo_personal_asset_vault_v1`, stores `assets`, `blobs`, `manifests`, `casBlobs`.
+## Descriptors Kelo publicados
 
-```text
-asset metadata -> blobs[id] pointer -> casBlobs[sha256] immutable Blob
-```
+Fuente: `data/kelo-content-starter-catalog.json`.
+Publisher: `scripts/publish-kelo-content-descriptors.mjs`.
+Salida: `data/kelo-content-descriptors.json`.
 
-Pointers nuevos conservan `digest`, `previousDigest`, `bytes`, `mime`, `storage:'cas-v2'`. Filas legacy con Blob inline siguen legibles. Migración es progresiva y nunca masiva en boot.
+Cada descriptor contiene `{id, mediaType:'application/json', size, digest:'sha256:...'}`. El set conserva `sourceVersion` y `sourceDigest`. Publisher valida unicidad, cardinalidad, tamaños/digests y usa temp+rename. `--check` detecta drift.
 
-## Descriptor nativo Kelo
+### Ruta runtime actual
 
-Durante la transición, `kelo-content-live-provider.mjs` deriva `expectedBytes` y `expectedSha256` de cada pequeño `inlineManifest`. Esto conserva compatibilidad pero no constituye una frontera de confianza independiente.
+`kelo-content-live-provider.mjs` solicita catálogo y descriptor set como metadata pequeña, sin binarios externos. El descriptor publicado se usa solamente si:
 
-### Publisher determinista, fail-closed y ligado a fuente
+- `schema === kelo-content-descriptors-v1`;
+- `algorithm === sha256`;
+- `descriptors` es array válido;
+- cada id es único;
+- size es entero >= 0;
+- digest cumple `sha256:` + 64 hex;
+- `sourceVersion` coincide con catálogo;
+- cardinalidad coincide con assets fuente.
 
-`scripts/publish-kelo-content-descriptors.mjs` crea descriptors desde `data/kelo-content-starter-catalog.json` usando exactamente `JSON.stringify(inlineManifest)` y bytes UTF-8.
+Cuando pasa, `size -> expectedBytes` y `digest -> expectedSha256`, con `descriptorSource:'published'`. Si falla/está ausente, se conserva `describeInlineManifest()` como fallback compatible (`descriptorSource:'client-fallback'`). No se rompe contenido existente ni se introduce otro Vault.
 
-Salida por asset: `{id, mediaType:'application/json', size, digest:'sha256:...'}`.
-
-El descriptor set incluye además:
-
-```text
-source = data/kelo-content-starter-catalog.json
-sourceVersion = versión numérica del catálogo fuente
-sourceDigest = SHA-256 de los bytes UTF-8 exactos del archivo fuente
-```
-
-Invariantes actuales del publisher:
-
-- `id` obligatorio y único;
-- `inlineManifest` obligatorio;
-- tamaño positivo;
-- digest SHA-256 con 64 hex lowercase;
-- cardinalidad de descriptors igual a assets fuente;
-- `sourceDigest` SHA-256 válido y reproducible;
-- orden determinista por id;
-- `--check` exige igualdad byte-a-byte con el descriptor publicado, incluyendo source binding;
-- publicación normal escribe primero un archivo temporal exclusivo y después hace `rename`, limpiando el temporal si falla.
-
-Schema lógico:
-
-```json
-{"schema":"kelo-content-descriptors-v1","algorithm":"sha256","source":"data/kelo-content-starter-catalog.json","sourceDigest":"sha256:...","sourceVersion":1,"descriptors":[]}
-```
-
-El source binding no firma metadata, pero elimina ambigüedad sobre qué bytes fuente produjeron el descriptor set y prepara Snapshot/Targets firmados futuros.
-
-## Descarga/staging e integridad
+## Verificación staging
 
 ```text
-metadata/descriptor
- -> fetch o inline Blob
- -> MIME validation
- -> non-empty
+published descriptor
  -> expectedBytes check
  -> SHA-256
  -> expectedSha256 check
  -> compiler/validators
  -> staging
+ -> atomic Vault commit
 ```
 
-Errores: `ASSET_SIZE_MISMATCH`, `ASSET_INTEGRITY_MISMATCH`, `PACK_STAGE_CAS_DIGEST_MISMATCH`.
+Errores relevantes: `ASSET_SIZE_MISMATCH`, `ASSET_INTEGRITY_MISMATCH`, `PACK_STAGE_CAS_DIGEST_MISMATCH`.
 
-## Pack Catalog y seguridad
+## Packs / rollback / GC
 
-`data/content-pack-catalog.json` mantiene `version`, `publishedAt`, `expiresAt`, `packs[]`. PackManager usa IndexedDB `kelo_content_pack_v1`, stores `packs`, `settings`, `transactions`.
+PackManager mantiene catálogo monotónico, planner diferencial, storage preflight, journal, staging separado y activación old-or-new. Rollback reconstruye desde CAS cuando existen blobs. Reference graph protege active, previous y transacciones vivas; GC solo retira contenido no alcanzable tras gracia.
 
-`incoming.version < accepted.version -> PACK_CATALOG_ROLLBACK`; misma versión con digest distinto -> `PACK_CATALOG_MUTATED_WITHOUT_VERSION`. `stale` sigue observacional hasta existir refresh firmado confiable.
+## Seguridad y móvil
 
-## Planner y transacción
+No secretos en Pages; no JS externo ejecutable; licencia antes de integración; audio `preload=none`; previews y assets bajo demanda; IndexedDB canónico; OPFS solo futuro tras benchmark iPhone/Safari; no FastCDC en boot ni para blobs pequeños.
 
-`planContentPackUpdate()` produce `reuse`, `integrate`, `download`, `removed` y métricas de bytes/delta. Staging vive en `kelo_content_pack_staging_v1/stages`.
+## Estado actual
 
-```text
-ACTIVE GEN N -> plan -> storage preflight -> stage -> size + SHA-256 verify -> compiler/validators -> PREPARED -> atomic Vault commit -> activate target state
-```
+Implementado: CAS/dedup, integridad SHA-256, size precheck, transacciones, rollback, GC roots, storage pressure, publisher reproducible/source-bound, descriptor materializado, CI drift check y consumo preferente del descriptor publicado en provider Kelo.
 
-El commit del Vault usa una sola transacción sobre `assets`, `blobs`, `manifests`, `casBlobs`. Pointer drift lanza `PACK_TRANSACTION_POINTER_DRIFT`.
-
-## Journal, rollback y GC
-
-Journal cubre staging/prepared/committing/vault-committed/committed y recovery. `rollbackContentPack()` reconstruye la generación previa desde CAS sin red cuando los blobs siguen disponibles. `buildContentReferenceGraph({verify:true})` protege active generation, previousGeneration, transacciones vivas y pointers current/previous. Mantenimiento normal usa `garbageCollectContentStorage()`.
-
-## Storage pressure
-
-`assessPackStoragePressure()` usa `navigator.storage.estimate()` y reserva `max(8% quota, 24 MiB)`. OPFS solo se detecta; IndexedDB sigue canónico hasta benchmark real en iPhone/Safari.
-
-## Integración por tipo
-
-Visual: Blob -> integration router -> compiler -> manifest -> runtime bridge.
-Audio: Blob -> audio manifest -> runtime bridge -> `Audio()` bajo demanda, `preload=none`.
-Ability: JSON -> whitelist validator -> engine; nunca JS externo.
-Scene/prefab: JSON -> prefab validator -> Studio prefabStamp.
-
-## Estado del contrato de publicación
-
-Implementado:
-
-```text
-source bytes -> sourceDigest
- -> publisher determinista + validación unicidad/cardinalidad
- -> descriptor set ligado a sourceVersion/sourceDigest
- -> escritura temp + rename
- -> Main Stability Gate --check
- -> client descriptor fallback
- -> transaction size+digest verification
-```
-
-Bloqueo actual: `data/kelo-content-descriptors.json` aún debe materializarse. Después Pack Manager debe leer ese descriptor publicado y conservar `digest+size` en member locks.
-
-## Limitaciones actuales
-
-- descriptor file aún no materializado en `main`;
-- Pack Manager todavía no consume descriptors publicados;
-- descriptors derivados en cliente siguen siendo fallback temporal;
-- catálogo no está firmado y `stale` no bloquea;
-- providers externos pueden carecer de digest/size confiables;
-- delta sigue por archivo, sin chunk CAS;
-- staging puede duplicar temporalmente bytes;
-- OPFS no benchmarkeado en iPhone;
-- solo una generación previa;
-- no existe ACID entre DB PackManager y Vault; journal + roll-forward mitigan.
-
-## Próximos pasos
-
-1. generar y commitear `data/kelo-content-descriptors.json` mediante el publisher;
-2. consumir descriptor publicado desde Pack Manager y propagar `size/digest`;
-3. versionar descriptor set con catálogo inmutable;
-4. firma metadata estilo TUF;
-5. auditoría/rebuild reference graph;
-6. OPFS iPhone benchmark;
-7. FastCDC build-time para archivos grandes y luego chunk CAS + Range/resume.
-
-## Reglas permanentes
-
-No secretos en Pages; no JS externo ejecutable; licencia antes de integración; descriptor antes de activar cuando exista; catálogo versionado e inmutable; no mutar generación activa durante staging; rollback primero desde CAS; previousGeneration protege blobs; GC respeta reference graph; preflight antes de operaciones grandes; providers aislados; contenido externo nunca entra automáticamente al boot; mobile-first; compatibilidad legacy; evitar TinyFish.
+Pendiente prioritario: persistir `digest+size` publicados en member locks/generaciones del Pack Manager para que update/rollback comparen identidad publicada sin recalcularla; después descriptor set inmutable/versionado y firmas estilo TUF.
 
 ## Definition of Done
 
-Según aplique: boot sin binarios externos; reinstalación sin cambios evita red; update diferencial descarga solo cambios; CAS deduplica; staging no altera active; removals son atómicos; rollback funciona sin red con CAS; GC preserva roots; storage pressure se comprueba; auditoría detecta corrupción; anti-rollback funciona; recovery no deja mezcla de generaciones; descriptors publicados son reproducibles y están ligados criptográficamente a su fuente; CI/Pages sin regresión relevante.
-
-**El catálogo puede crecer casi sin límite; el dispositivo solo paga almacenamiento, red y runtime por contenido seleccionado, con integridad, rollback y deduplicación.**
+Boot sin binarios externos; reinstalación sin cambios evita red; delta descarga solo cambios; CAS deduplica; staging no altera active; rollback funciona desde CAS; GC preserva roots; storage pressure se comprueba; anti-rollback/recovery evitan mezcla de generaciones; descriptors publicados son reproducibles, source-bound y consumidos como expectativa de integridad; mobile-first y compatibilidad legacy permanecen.
