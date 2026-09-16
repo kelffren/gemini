@@ -104,20 +104,20 @@ The Animation Mapping Editor does not own or mutate:
 
 `attack`, `hit`, and `death` are visual mapping labels. Gameplay systems still decide when those states happen.
 
-## Files
+## Files in this stacked pass
 
-New:
+Added:
 
 - `src/creators/appearance/creator-animation-mapping-editor.mjs`
 - `scripts/creator-animation-mapping-editor-audit.mjs`
+- `docs/systems/CREATOR_ANIMATION_MAPPING_EDITOR.md`
 - this implementation pass.
 
 Modified:
 
 - `src/creators/ui/appearance-creator.mjs`
-- `docs/systems/CREATOR_APPEARANCE_AUTHORING_CONTRACT.md`
-- `docs/CODE_INDEX.md`
-- `docs/system-catalog.json`
+
+No Appearance foundation, gameplay, transport, marketplace, database, CODE_INDEX or system-catalog file was changed in this focused pass.
 
 ## Audit contract
 
@@ -164,4 +164,4 @@ After this editor and #339 are validated, the next authoring improvement should 
 
 ## Handoff prompt
 
-> Continue branch `creator-animation-mapping-editor-v1` stacked on PR #339. Read `docs/implementation-passes/IMP-2026-09-16-CREATOR-ANIMATION-MAPPING-011.md`, `docs/systems/CREATOR_APPEARANCE_AUTHORING_CONTRACT.md`, `src/creators/appearance/creator-animation-mapping-editor.mjs`, `creator-character-test-chamber.mjs`, and `appearance-system.js`. Preserve one existing `animationMapping` contract and one Test Chamber RAF. Do not create a second renderer, animation runtime, combat state machine or persistence store. Run the dedicated audit and iPhone interaction gates before changing status from `IMPLEMENTED_PENDING_VERIFY`.
+> Continue branch `creator-animation-mapping-editor-v1` stacked on PR #339. Read this implementation pass, `docs/systems/CREATOR_ANIMATION_MAPPING_EDITOR.md`, `src/creators/appearance/creator-animation-mapping-editor.mjs`, `src/creators/appearance/creator-character-test-chamber.mjs`, and `src/appearance/appearance-system.js`. Preserve one existing `animationMapping` contract and one Test Chamber RAF. Do not create a second renderer, animation runtime, combat state machine or persistence store. Run the dedicated audit and iPhone interaction gates before changing status from `IMPLEMENTED_PENDING_VERIFY`.
