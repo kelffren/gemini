@@ -2,11 +2,11 @@
 
 ## Status
 
-**Creator online V1 — IMPLEMENTED_PENDING_VERIFY.** Current server-authorized Creator `appearance` / visual `equipment` bindings can now be projected to nearby remote players through the existing authoritative WebSocket/AOI presentation path. This pass does not add a second transport, renderer, ownership system or gameplay equipment authority.
+**Creator online V1 — IMPLEMENTED_PENDING_VERIFY.** Current server-authorized Creator `appearance` / visual `equipment` bindings can now be projected to nearby remote players through the existing authoritative **social/world WebSocket AOI** presentation path. This pass does not add a second transport, renderer, ownership system or gameplay equipment authority.
 
 ## Goal
 
-A player who equips a published Creator skin, cosmetic or visual weapon should see it locally **and other nearby players should see the same accepted visual state** after the server has validated it.
+A player who equips a published Creator skin, cosmetic or visual weapon should see it locally **and other nearby players in the social/world AOI should see the same accepted visual state** after the server has validated it.
 
 The viewer must not need to own another player's cosmetic. Viewing an already-authorized public presentation is different from acquiring or using that revision on the viewer's own character.
 
@@ -24,7 +24,7 @@ server/avatar-sync-store.js
 existing avatarManifest presentation envelope
   ↓
 server/index.js serializePlayer()
-  ↓ existing AOI only
+  ↓ existing social/world AOI
 engine-net.js peer.avatarManifest
   ↓
 KeloCreatorAvatars detects creatorAppearance
@@ -57,7 +57,7 @@ Migration: `supabase/migrations/20260916004500_creator_modular_replication_v1.sq
 
 The RPC does **not** insert or update entitlements, bindings, wallet state, inventory or gameplay equipment.
 
-This matters for revocation: if an entitlement disappears, the stale selection row alone is not enough to keep broadcasting the cosmetic.
+If an entitlement disappears, a stale selection row alone is not enough to keep broadcasting the cosmetic.
 
 ## Presentation envelope
 
@@ -111,15 +111,7 @@ This distinction is intentional. Requiring the viewer to own another player's sk
 
 Remote overlays use `WeakMap<actor, Map<slot,itemId>>` plus a `WeakMap` fingerprint. When a peer object disappears, its overlay can be garbage-collected with it.
 
-Remote runtime definitions are:
-
-- `hidden: true`;
-- `locked: true`;
-- tagged `remote-public`;
-- revision-scoped;
-- separate from local item IDs.
-
-Local and remote IDs cannot collide:
+Remote runtime definitions are `hidden`, `locked`, tagged `remote-public`, revision-scoped and separate from local IDs:
 
 ```text
 creator.visual.local.<revision>.<slot>
@@ -134,21 +126,29 @@ No remote modular system is loaded just because networking is active.
 
 - peer has no `creatorAppearance` → no Appearance wake-up;
 - first relevant peer with non-empty modular envelope → existing `appearance` feature loads once;
-- bridge ingests the peer snapshot synchronously after the feature is ready;
-- subsequent state packets with the same `revisionKey` reuse the existing overlay;
-- AOI ensures the server sends actor presentation only to relevant nearby viewers;
+- bridge ingests the peer snapshot after the feature is ready;
+- subsequent social state packets with the same `revisionKey` reuse the existing overlay;
+- social/world AOI sends actor presentation only to relevant nearby viewers;
 - no polling, no extra render loop and no full Creator library sync.
 
-When the local player equips/clears a Creator modular visual, `KeloCreatorsLazyGate` reuses `KeloNetAuthority.refreshAvatar()` to refresh the existing server presentation envelope. `server/index.js` then distributes the updated `serializePlayer()` through its existing AOI state path.
+When the local player equips/clears a Creator modular visual, `KeloCreatorsLazyGate` reuses `KeloNetAuthority.refreshAvatar()` to refresh the existing server presentation envelope. `server/index.js` then distributes the updated `serializePlayer()` through its existing social/world AOI state path.
+
+## PvP boundary
+
+**V1 does not inject Creator presentation metadata into `pvp-authority` snapshots.** PvP uses a separate competitive snapshot containing movement/resources/combat authority. Keeping cosmetics out of that packet avoids expanding a sensitive protocol while this social replication layer is still pending validation.
+
+During active PvP, presentation parity must be handled by a dedicated PvP visual-state bridge or a future server presentation reference attached safely to PvP actors. Do not make the client declare its own skin revision/URL to solve this.
+
+Therefore the acceptance claim for this pass is **social/open-world AOI replication**, not PvP cosmetic parity.
 
 ## Full-body avatar precedence
 
-Full-body Creator avatars keep their existing higher-priority `KeloAvatar` middleware. Modular appearance replication does not create a second body renderer. If a full-body avatar path intentionally consumes the actor render, modular pieces may be visually masked by that full-body avatar according to the existing middleware priority.
+Full-body Creator avatars keep their existing higher-priority `KeloAvatar` middleware. Modular appearance replication does not create a second body renderer. If a full-body avatar path intentionally consumes the actor render, modular pieces may be visually masked by that full-body avatar according to existing middleware priority.
 
 ## What this pass does not own
 
 - `KeloEquipment` stats, inventory or abilities;
-- PvP/combat authority;
+- PvP/combat authority or PvP presentation parity;
 - Creator ownership or KC settlement;
 - Character base saves/history/share codes;
 - avatar upload/authoring;
@@ -160,9 +160,9 @@ Full-body Creator avatars keep their existing higher-priority `KeloAvatar` middl
 - run `node scripts/creator-modular-replication-audit.mjs`;
 - run Character bridge, Creator Use, Delivery, Entitlement and docs audits;
 - apply migration `20260916004500_creator_modular_replication_v1.sql` after the complete upstream migration chain;
-- two-account test: A equips a purchased published Creator skin, B sees it without owning it;
+- social two-account test: A equips a purchased published Creator skin, B sees it without owning it;
 - B cannot equip A's revision without entitlement;
-- revoking A's entitlement removes the visual from future server snapshots even if the binding row remains;
+- revoking A's entitlement removes the visual from future social server snapshots even if the binding row remains;
 - changing r3 → r4 updates the remote visual and never reuses r3 cache identity;
 - clear-slot reveals the underlying remote base appearance;
 - a player with no modular Creator visuals does not trigger Appearance loading on viewers;
@@ -170,4 +170,5 @@ Full-body Creator avatars keep their existing higher-priority `KeloAvatar` middl
 - leaving AOI/removing peer does not retain actor overlay state;
 - full-body Creator avatar behavior remains unchanged;
 - built-in Character customization remains unchanged;
-- iPhone portrait/landscape with multiple peers shows no freeze, duplicate renderer, input-lock leak or unexpected Creator-library preload.
+- iPhone portrait/landscape with multiple social/open-world peers shows no freeze, duplicate renderer, input-lock leak or unexpected Creator-library preload;
+- PvP cosmetic parity remains explicitly unclaimed until its separate bridge is validated.
