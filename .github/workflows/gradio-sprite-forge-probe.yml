@@ -1,0 +1,46 @@
+name: Probe Sprite Forge API
+
+on:
+  push:
+    branches:
+      - qa/sprite-live-quality-smoke
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Probe Gradio API
+        shell: bash
+        run: |
+          mkdir -p probe
+          set +e
+          curl -sS -D probe/info-headers.txt https://multimodalart-sprite-forge.hf.space/gradio_api/info -o probe/info.json
+          echo $? > probe/info-exit.txt
+          curl -sS -D probe/config-headers.txt https://multimodalart-sprite-forge.hf.space/config -o probe/config.json
+          echo $? > probe/config-exit.txt
+          python - <<'PY'
+          import json, pathlib
+          for p in ['probe/info.json','probe/config.json']:
+              try:
+                  data=json.loads(pathlib.Path(p).read_text())
+                  print('\n===',p,'===')
+                  if p.endswith('info.json'):
+                      for group in ('named_endpoints','unnamed_endpoints'):
+                          for name,meta in (data.get(group) or {}).items():
+                              print(group,name)
+                              print(json.dumps(meta,indent=2)[:20000])
+                  else:
+                      print(json.dumps({k:data.get(k) for k in ('version','api_prefix','protocol','dependencies')},indent=2)[:30000])
+              except Exception as e:
+                  print(p,'parse error',e)
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sprite-forge-api-probe
+          path: probe/
+          retention-days: 2
