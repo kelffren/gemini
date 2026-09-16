@@ -65,7 +65,7 @@ assert.match(authority,/communityProfile:/);
 assert.match(authority,/communityAttest:/);
 assert.match(authority,/communityAssetStatus:/);
 assert.match(community,/serverAuthoritative:true/);
-assert.match(community,/syncStatus/);
+assert.match(community,/syncState/);
 assert.doesNotMatch(community,/consensusBuilds\s*\+\s*1/,'client must not mint Builder credit');
 
 const model=new CommunityPersistenceModel();
