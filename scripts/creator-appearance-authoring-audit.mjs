@@ -11,8 +11,21 @@ const contract=require(path.join(root,'src/characters/creator-character-visual-c
 const chamberModule=await import(pathToFileURL(path.join(root,'src/creators/appearance/creator-character-test-chamber.mjs')).href);
 const {CHARACTER_TEST_STATES,resolveCharacterTestTrack}=chamberModule;
 
-assert.equal(contract.version,'creator-character-visual-contract-v2.0.0');
+assert.equal(contract.version,'creator-character-visual-contract-v2.1.0-motion-sample');
 assert.deepEqual(CHARACTER_TEST_STATES.map(row=>row.id),['idle','walk','run','attack','hit','death']);
+assert.equal(contract.frameColumns({metadata:{}}),4,'authoring/runtime default sheet columns must stay 4');
+assert.equal(contract.frameColumns({metadata:{characterVisual:{columns:6}}}),6);
+const canonicalMotion=contract.resolveMotionSample({visual:{face:'left',frame:5,on:true,state:'run',dx:-2,dy:1},columns:4});
+assert.equal(canonicalMotion.face,'left');
+assert.equal(canonicalMotion.frame,1);
+assert.equal(canonicalMotion.moving,true);
+assert.equal(canonicalMotion.state,'run');
+assert.equal(canonicalMotion.dx,-2);
+const sanitizedMotion=contract.resolveMotionSample({visual:{face:'diagonal',frame:-5,on:false,state:'idle'},columns:4});
+assert.equal(sanitizedMotion.face,'down');
+assert.equal(sanitizedMotion.frame,1);
+assert.equal(contract.normalizeFrame('7',4),3);
+assert.equal(contract.normalizeFrame('not-a-frame',4),null);
 
 const canonicalRow={
   id:'appearance.character.test_sheet',displayName:'Test Sheet',targetType:'character',slotId:'torso',rarity:'rare',
@@ -95,21 +108,27 @@ assert.doesNotMatch(files.bridge,/function\s+rawSheet\s*\(/);
 assert.doesNotMatch(files.bridge,/function\s+rawSocket\s*\(/);
 assert.doesNotMatch(files.bridge,/function\s+inferredSheet\s*\(/);
 assert.match(files.runtime,/motion\.frame != null/,'live Character renderer must honor explicit visual motion frame');
+assert.match(files.runtime,/Math\.abs\(Math\.floor\(motion\.frame\)\) % def\.columns/,'live Character explicit-frame normalization must remain modulo columns');
 assert.match(files.creator,/IMPORT PREVIEW IMAGE/);
 assert.match(files.creator,/COPY RUNTIME PAYLOAD/);
 assert.match(files.creator,/FACES=.*down.*left.*right.*up/);
 assert.match(files.creator,/CHARACTER TEST CHAMBER/);
 assert.match(files.creator,/createCreatorCharacterTestChamber/);
 assert.match(files.creator,/metadata\.characterVisual/);
+assert.match(files.creator,/chamber\.configure\(\{row,source:src\.source,asset:src\.asset,face,state:motion,playing:true\}\)/,'Test Chamber must receive the selected current draft');
+assert.match(files.creator,/session\.onChange\(\(\)=>renderAll\(\)\)/,'draft mutation must rebuild preview/chamber from current session state');
 assert.doesNotMatch(files.creator,/setInterval\s*\(/);
 assert.doesNotMatch(files.creator,/requestAnimationFrame\s*\(/);
 assert.match(files.preview,/KeloCreatorCharacterVisualContract/);
-assert.match(files.preview,/actor\?\._visualMotion\?\.frame/);
+assert.match(files.preview,/resolveMotionSample/);
+assert.match(files.preview,/frameColumns/);
 assert.match(files.preview,/imageSmoothingEnabled=false/);
 assert.doesNotMatch(files.preview,/setInterval\s*\(/);
 assert.doesNotMatch(files.preview,/requestAnimationFrame\s*\(/);
 assert.doesNotMatch(files.preview,/localStorage|indexedDB/);
 assert.match(files.chamber,/id:'idle'[\s\S]*id:'walk'[\s\S]*id:'run'[\s\S]*id:'attack'[\s\S]*id:'hit'[\s\S]*id:'death'/);
+assert.match(files.chamber,/resolveMotionSample/);
+assert.match(files.chamber,/frameColumns/);
 assert.match(files.chamber,/requestAnimationFrame/);
 assert.match(files.chamber,/cancelAnimationFrame/);
 assert.doesNotMatch(files.chamber,/setInterval\s*\(/);
@@ -125,6 +144,9 @@ console.log('PASS creator appearance authoring audit',{
   mappedAttack:[...attackTrack.frames],
   walkFallback:[...walkTrack.frames],
   textualMappingFallback:[...textualMappingFallback.frames],
+  defaultFrameColumns:contract.frameColumns({metadata:{}}),
+  sharedMotionSample:true,
+  freshDraftChamber:true,
   sameContractEditorRuntime:true,
   singlePreviewMotionLoopOwner:'CreatorCharacterTestChamber',
   gameplayAuthority:false
