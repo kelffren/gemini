@@ -1,0 +1,171 @@
+{
+  "schema_version": 2,
+  "id": "BUG-0004",
+  "title": "Visible PvP button does not load the PvP domain on first use",
+  "status": "FIXED_PENDING_VERIFY",
+  "severity": "high",
+  "area": ["pvp", "ui", "lazy-loading", "mobile"],
+  "source": "human",
+  "discovered_at": "2026-09-16",
+  "reported_by": ["player"],
+  "reports": [],
+  "environment": {
+    "game_build": "main@b9ab9fd14efd8797bb6d6d69676dc89359013559",
+    "device": "mobile-first runtime",
+    "os": "iOS target",
+    "browser": "Safari target; local regression uses Playwright Chromium mobile viewport",
+    "surface": "visible Luxe PvP button"
+  },
+  "reproduction": [
+    "Open KELO WORLD from a cold page load where the PvP domain has not been loaded yet.",
+    "Tap the visible PVP button #lx-side-pvp.",
+    "Observe that the button asks KELO_MODULE_LOADER.ensure('pvp').",
+    "On the broken build, ensure('pvp') resolves after loading only combat foundations, while enterPvPWorld is still absent.",
+    "The UI then falls through to the 'PvP todavía cargando' path instead of entering the PvP world."
+  ],
+  "expected": "The first visible PVP tap loads the complete PvP first-use domain, installs enterPvPWorld, enters mode=pvp and enables combat without putting the full PvP domain into initial boot.",
+  "actual": "The pre-fix module loader treated combat foundations as sufficient for the pvp feature and did not load pvp-world.js or pvp-combat-runtime-loader.js, so the visible button could finish loading without an enterPvPWorld function.",
+  "evidence": [
+    "src/ui/luxe-shell.js visible button handler calls KELO_MODULE_LOADER.ensure('pvp') then checks window.enterPvPWorld.",
+    "Pre-fix src/core/module-loader.js special-cased pvp by calling only KeloRuntimeBootstrap.ensure().",
+    "src/systems/pvp-combat-runtime-loader.js requires an existing KeloPvPWorld and installs the enterPvPWorld lazy facade.",
+    "Candidate commits c4ed65b765bc976a01b5cf39ddcee3c6ea5151af, 6b85c07bc5349c4b6d304a97ccf85c19f1ea7ea7 and 371e3ced1019df96b6e47e67342b118eff5b659e."
+  ],
+  "suspected_files": [
+    "src/core/module-loader.js",
+    "src/core/feature-registry.js",
+    "src/ui/luxe-shell.js",
+    "src/systems/pvp-world.js",
+    "src/systems/pvp-combat-runtime-loader.js",
+    "tests/pvp-dodge-live.spec.js"
+  ],
+  "owner_hint": "KeloModuleLoader first-use lifecycle delegating gameplay ownership to KeloPvPWorld",
+  "claimed_by": null,
+  "claim_started_at": null,
+  "research": {
+    "status": "sufficient",
+    "summary": "The button and gameplay owner were already correct. The gap was the feature lifecycle contract: ensure('pvp') loaded only shared combat foundations, not the PvP domain that defines enterPvPWorld. The candidate registers PvP as a real first-use feature pack and keeps KeloPvPWorld as gameplay owner.",
+    "known_facts": [
+      {
+        "id": "F1",
+        "statement": "The visible Luxe PVP button calls KELO_MODULE_LOADER.ensure('pvp') when loader.needs('pvp') is true, then calls enterPvPWorld only if that function exists.",
+        "evidence": ["src/ui/luxe-shell.js"]
+      },
+      {
+        "id": "F2",
+        "statement": "Before the candidate fix, KELO_MODULE_LOADER.ensure('pvp') returned KeloRuntimeBootstrap.ensure() and did not load the PvP domain scripts.",
+        "evidence": ["src/core/module-loader.js before 6b85c07bc5349c4b6d304a97ccf85c19f1ea7ea7"]
+      },
+      {
+        "id": "F3",
+        "statement": "pvp-combat-runtime-loader.js does not create KeloPvPWorld; it requires KeloPvPWorld to already exist and then publishes enterPvPWorld.",
+        "evidence": ["src/systems/pvp-combat-runtime-loader.js"]
+      }
+    ],
+    "hypotheses": [
+      {
+        "id": "H1",
+        "theory": "The first-use feature contract is incomplete: combat foundations are being mistaken for a fully loaded PvP domain.",
+        "confidence": "high",
+        "status": "confirmed",
+        "why": "The visible button waits on ensure('pvp'), while the pre-fix ensure implementation never loads the files that define KeloPvPWorld/enterPvPWorld.",
+        "evidence_for": ["F1", "F2", "F3"],
+        "evidence_against": [],
+        "test_next": "Run the visible-button Playwright regression from a cold page load and require KELO_MODULE_LOADER.isReady('pvp'), mode=pvp and combatEnabled=true."
+      }
+    ],
+    "ruled_out": [
+      {
+        "hypothesis_id": "H_UI_HANDLER",
+        "theory": "The visible button has no PvP handler.",
+        "reason": "The handler exists and correctly requests the pvp feature before calling enterPvPWorld.",
+        "evidence": ["src/ui/luxe-shell.js"]
+      }
+    ],
+    "unknowns": [
+      {
+        "id": "U1",
+        "question": "Does the candidate pass the complete cold-load visible-button flow under the repository Playwright gate?",
+        "why_it_matters": "The defect is player-facing; code inspection alone cannot promote it to VERIFIED.",
+        "quickest_test": "Run .github/workflows/pvp-first-use-regression.yml on the candidate PR."
+      }
+    ],
+    "external_references": [
+      {
+        "title": "Playwright auto-waiting",
+        "url": "https://playwright.dev/docs/actionability",
+        "lesson": "Use a real locator.click on the visible PvP button so the regression validates visibility, stability, event reception and enabled state instead of bypassing UI with page.evaluate."
+      }
+    ],
+    "last_researched_at": "2026-09-16"
+  },
+  "attempt_history": [
+    {
+      "id": "A1",
+      "at": "2026-09-16",
+      "actor": "development agent",
+      "goal": "Reconnect the visible PvP first-use path without moving the full PvP domain into initial boot.",
+      "hypothesis_ids": ["H1"],
+      "change": {
+        "commits": [
+          "c4ed65b765bc976a01b5cf39ddcee3c6ea5151af",
+          "6b85c07bc5349c4b6d304a97ccf85c19f1ea7ea7",
+          "371e3ced1019df96b6e47e67342b118eff5b659e"
+        ],
+        "files": [
+          "src/core/feature-registry.js",
+          "src/core/module-loader.js",
+          "tests/pvp-dodge-live.spec.js"
+        ],
+        "summary": "Register PvP as a first-use feature pack, make ensure('pvp') load foundations then the PvP domain, require the domain-ready facade for isReady/needs, and change regression coverage to tap the visible PVP button."
+      },
+      "validation": {
+        "environment": "GitHub Actions candidate gate",
+        "method": "Playwright visible-button first-use test plus foundation/docs audits.",
+        "result": "NOT_RUN",
+        "evidence": [".github/workflows/pvp-first-use-regression.yml added on candidate branch"]
+      },
+      "conclusion": "A concrete candidate exists; verification is still pending and must not be represented as complete until the workflow passes.",
+      "do_not_repeat_without": "If the candidate fails, use the workflow trace/error to choose the next change instead of adding another loader or bypassing the visible button."
+    }
+  ],
+  "next_best_actions": [
+    {
+      "priority": 1,
+      "action": "Run the PvP First-Use Regression workflow on the pull request and inspect any failing Playwright step before changing code again.",
+      "reason": "It exercises the original player path from a cold load and distinguishes lifecycle failure from gameplay failure.",
+      "expected_signal": "The visible button loads the pvp feature, KeloPvPWorld enters mode=pvp, combatEnabled becomes true, and the existing dodge assertions pass.",
+      "stop_condition": "If the visible-button test fails, keep FIXED_PENDING_VERIFY and use the exact failing milestone; do not merge as verified."
+    }
+  ],
+  "fix": {
+    "status": "candidate_complete_waiting_verify",
+    "commits": [
+      "c4ed65b765bc976a01b5cf39ddcee3c6ea5151af",
+      "6b85c07bc5349c4b6d304a97ccf85c19f1ea7ea7",
+      "371e3ced1019df96b6e47e67342b118eff5b659e"
+    ],
+    "files": [
+      "src/core/feature-registry.js",
+      "src/core/module-loader.js",
+      "tests/pvp-dodge-live.spec.js",
+      ".github/workflows/pvp-first-use-regression.yml"
+    ],
+    "summary": "PvP now has an explicit first-use pack and readiness means the PvP domain/facade is installed, not merely that shared combat foundations exist."
+  },
+  "verification": {
+    "status": "PENDING",
+    "method": "GitHub Actions Playwright cold-load visible-button regression in a mobile viewport, followed by existing dodge assertions and foundation/docs audits.",
+    "evidence": [],
+    "verified_by": null,
+    "verified_at": null
+  },
+  "blocked_by": [],
+  "duplicate_of": null,
+  "related_bugs": ["BUG-0001"],
+  "notes": [
+    "This bug is distinct from BrowserStack capacity: the candidate can be validated first with the repository's local Playwright mobile gate, while real-iPhone BrowserStack remains a stronger external acceptance step when capacity is available.",
+    "Do not mark VERIFIED solely from code inspection or a direct page.evaluate call to enterPvPWorld."
+  ],
+  "updated_at": "2026-09-16"
+}
