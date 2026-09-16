@@ -5,7 +5,7 @@
  * does-not-own: publication authority, admin review decisions or service-role credentials
  * security: authenticated RPC only; one pending request per logical workspace entity
  */
-const VERSION='creator-approval-dock-v1.0.0';
+const VERSION='creator-approval-dock-v1.0.1';
 const STATUS=Object.freeze({
   draft:{label:'BORRADOR',action:'ENVIAR A APROBACIÓN'},
   pending:{label:'PENDIENTE',action:'PENDIENTE'},
@@ -48,7 +48,7 @@ function resolveTarget({root,workspace,session,context}){
   const selectedTitle=selected?.metadata?.name||selected?.name||null;
   const title=safeText(custom.title||content?.title||selectedTitle||`${LABELS[workspace]||workspace} · ${entityId.slice(0,18)}`,120);
   const summary=safeText(custom.summary||`Trabajo enviado desde ${LABELS[workspace]||workspace} para revisión administrativa.`,1200);
-  const metadata=Object.assign({},custom.metadata||{},content?.metadata||{},context?.projectId?{project_id:context.projectId}:{},session?.assetId?{asset_id:session.assetId}:{},selected?.metadata?.layoutHash?{layout_hash:selected.metadata.layoutHash}:{},selected?.quality?.total!=null?{quality_score:selected.quality.total}:{}, {workspace,client_version:VERSION});
+  const metadata=Object.assign({},custom.metadata||{},content?.metadata||{},context?.projectId?{project_id:context.projectId}:{},session?.assetId?{asset_id:session.assetId}:{},selected?.metadata?.layoutHash?{layout_hash:selected.metadata.layoutHash}:{},selected?.quality?.total!=null?{quality_score:selected.quality.total}:{},{workspace,client_version:VERSION});
   return {workspace,entityId,title,summary,requestType:custom.requestType||TYPE_BY_WORKSPACE[workspace]||'other',metadata};
 }
 function css(){return `
@@ -58,7 +58,7 @@ function css(){return `
 export async function installCreatorApprovalDock({root=globalThis,workspace,session,context={},repository,contentSession}={}){
   if(!root.document||!workspace||!session||!repository?.rpc)return null;
   const shell=shellOf(root,session);if(!shell)return null;
-  const existing=root.document.querySelector(`.kcad[data-workspace="${CSS.escape(String(workspace))}"]`);existing?.remove();
+  const existing=Array.from(root.document.querySelectorAll('.kcad')).find(node=>node.dataset.workspace===String(workspace));existing?.remove();
   if(!root.document.getElementById('kelo-creator-approval-dock-style')){const style=root.document.createElement('style');style.id='kelo-creator-approval-dock-style';style.textContent=css();root.document.head.append(style);}
   const dock=root.document.createElement('aside');dock.className='kcad';dock.dataset.workspace=workspace;dock.innerHTML='<div class="kcad-row"><div class="kcad-copy"><b>APPROVALREQUEST</b><small></small></div><span class="kcad-state draft">BORRADOR</span></div><div class="kcad-actions"><button class="primary">ENVIAR A APROBACIÓN</button><button class="refresh" aria-label="Actualizar estado">↻</button></div><div class="kcad-note"></div>';
   root.document.body.append(dock);
@@ -92,8 +92,8 @@ export async function installCreatorApprovalDock({root=globalThis,workspace,sess
   }
   submit.onclick=()=>void send().catch(()=>{});refresh.onclick=()=>void load();
   const onFocus=()=>void load();const onVisible=()=>{if(root.document.visibilityState==='visible')void load();};root.addEventListener?.('focus',onFocus);root.document.addEventListener('visibilitychange',onVisible);
-  const observer=new MutationObserver(()=>{if(!shell.isConnected)destroy();});observer.observe(root.document.body,{childList:true,subtree:true});
-  function destroy(){if(destroyed)return;destroyed=true;observer.disconnect();root.removeEventListener?.('focus',onFocus);root.document.removeEventListener('visibilitychange',onVisible);dock.remove();}
+  const Observer=root.MutationObserver;const observer=Observer?new Observer(()=>{if(!shell.isConnected)destroy();}):null;observer?.observe(root.document.body,{childList:true,subtree:true});
+  function destroy(){if(destroyed)return;destroyed=true;observer?.disconnect();root.removeEventListener?.('focus',onFocus);root.document.removeEventListener('visibilitychange',onVisible);dock.remove();}
   await load();
   return Object.freeze({version:VERSION,dock,refresh:load,submit:send,destroy,get target(){return target;},get status(){return current?.status||'draft';}});
 }
