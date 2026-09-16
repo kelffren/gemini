@@ -10,7 +10,7 @@
 (function(root){
 'use strict';
 if(root.KELO_FEATURE_REGISTRY)return;
-const VERSION='kelo-feature-registry-v2.3.0-guardian-pvp-host';
+const VERSION='kelo-feature-registry-v2.3.1-guardian-pvp-ui';
 const raw={
   social:{dependencies:[],policy:'first-use',files:[
     {src:'src/ui/player-nameplate.js?v=2',name:'placas'},
@@ -51,6 +51,7 @@ const raw={
     {src:'engine-net.js?v=20260916-pvp-first-use-1',name:'online PvP'},
     {src:'src/systems/guardian-pvp-net-adapter.js?v=1',name:'Guardian PvP network adapter'},
     {src:'src/systems/pvp-world.js?v=20260916-pvp-first-use-1',name:'mundo PvP'},
+    {src:'src/ui/guardian-pvp-ui.js?v=1',name:'control móvil Guardian PvP Lab'},
     {src:'src/systems/pvp-combat-runtime-loader.js?v=20260916-pvp-first-use-1',name:'lifecycle combate PvP'}
   ]},
   bag:{dependencies:[],policy:'first-use',files:[
