@@ -1,9 +1,9 @@
 /* KELO-INDEX
  * area: BUILD / CREATOR ASSET BUDGET
  * owner: Kelo Creator Asset Bridge
- * keys: ASSET BUDGET TRANSFER DECODE RGBA TRANSPARENT TRIM DUPLICATE BYTE PIXEL RENDER HASH
+ * keys: ASSET BUDGET TRANSFER DECODE RGBA TRANSPARENT TRIM DUPLICATE BYTE PIXEL RENDER HASH DISPLAY-ROOT
  * purpose: find space problems compression alone cannot solve: decoded memory, transparent canvas waste and duplicate assets at byte/pixel/render levels
- * public-api: CLI report
+ * public-api: CLI report; --display-root normalizes comparable paths across detached worktrees
  * state-owned: report files only
  * online: N/A; build-time observability
  * do-not: trim, delete, alias or rewrite assets automatically
@@ -22,6 +22,7 @@ const argument = (name, fallback = null) => {
 };
 const input = path.resolve(argument('input', 'assets'));
 const reportDir = path.resolve(argument('report', 'dist/asset-space-budget'));
+const displayRoot = path.resolve(argument('display-root', process.cwd()));
 const maxFiles = Math.max(1, Number(argument('max-files', '10000')) || 10000);
 const alphaThreshold = Math.max(0, Math.min(255, Number(argument('alpha-threshold', '0')) || 0));
 
@@ -49,7 +50,7 @@ function walk(target) {
   return out.sort();
 }
 
-const rel = file => path.relative(process.cwd(), file).replaceAll('\\','/');
+const rel = file => path.relative(displayRoot, file).replaceAll('\\','/');
 const human = bytes => bytes < 1024 ? `${bytes} B` : bytes < 1024**2 ? `${(bytes/1024).toFixed(1)} KB` : `${(bytes/1024**2).toFixed(2)} MB`;
 const sha256 = buffer => crypto.createHash('sha256').update(buffer).digest('hex');
 
@@ -177,7 +178,7 @@ const largestDecoded = successful.slice().sort((a,b)=>b.decodedRgbaBytes-a.decod
 const largestTrimWaste = successful.slice().filter(item=>!item.profile.invariants.preserveBorder).sort((a,b)=>b.trimWasteRatio-a.trimWasteRatio).slice(0,20).map(item=>item.file);
 
 const report = {
-  version:'kelo-asset-space-budget-v1.1',generatedAt:new Date().toISOString(),input:rel(input),alphaThreshold,fileCount:files.length,
+  version:'kelo-asset-space-budget-v1.2-display-root',generatedAt:new Date().toISOString(),input:rel(input),displayRoot:path.relative(process.cwd(),displayRoot).replaceAll('\\','/')||'.',alphaThreshold,fileCount:files.length,
   totals:{
     storedBytes:transferBytes,
     decodedRgbaBytes,
