@@ -21,6 +21,7 @@ jobs:
     timeout-minutes: 30
     env:
       CI: true
+      KELO_PAGES: http://127.0.0.1:4173/
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -68,11 +69,25 @@ jobs:
       - name: PvP facing contract
         run: npm run audit:pvp-facing
 
-      - name: Critical mobile smoke
+      - name: Start exact PR build server
+        run: |
+          python3 -m http.server 4173 --bind 127.0.0.1 > /tmp/kelo-main-stability-http.log 2>&1 &
+          echo $! > /tmp/kelo-main-stability-http.pid
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:4173/index.html >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/kelo-main-stability-http.log
+          exit 1
+
+      - name: Critical mobile and PvP smoke on PR bytes
         run: >-
           npx playwright test
           tests/iphone-acceptance.spec.js
           tests/iphone-gameplay.spec.js
+          tests/pvp-dodge-live.spec.js
           --project=chromium
 
       - name: Upload Playwright evidence
@@ -83,5 +98,6 @@ jobs:
           path: |
             playwright-report.json
             test-results/
+            /tmp/kelo-main-stability-http.log
           retention-days: 14
           if-no-files-found: ignore
