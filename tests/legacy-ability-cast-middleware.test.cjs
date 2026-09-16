@@ -9,6 +9,7 @@ const assert=require('node:assert/strict');
 const owner=fs.readFileSync('src/core/legacy-ability-aim-system.js','utf8');
 const plaza=fs.readFileSync('engine-l.js','utf8');
 const world=fs.readFileSync('engine-m.js','utf8');
+const aimPublic=owner.slice(owner.indexOf('root.KeloAbilityAim=Object.freeze'),owner.indexOf('})(typeof globalThis'));
 
 assert.ok(owner.includes('castMiddlewares.length-1'),'cast dispatcher must start from the last registered middleware');
 assert.ok(owner.includes('return invoke(at-1)'),'cast middleware next() must descend through the chain');
@@ -16,7 +17,9 @@ assert.ok(owner.includes("throw new Error('cast middleware next() called twice: 
 assert.ok(owner.includes('root.KeloLegacyAbilityCast=Object.freeze({'),'separate legacy cast owner must exist');
 assert.ok(owner.includes('registerMiddleware:registerCastMiddleware'),'legacy cast owner must expose registration');
 assert.ok(owner.includes('dispatch:dispatchCast'),'legacy cast owner must expose the existing dispatcher');
-assert.ok(owner.includes('registerCastMiddleware,'),'KeloAbilityAim compatibility adapter is still present until separately retired');
+assert.ok(!aimPublic.includes('registerCastMiddleware,'),'KeloAbilityAim cast registration adapter must stay retired');
+assert.ok(owner.includes('aimAdapterTemporary:false'),'cast audit must record that the temporary aim adapter is gone');
+assert.ok(owner.includes('aimAdapterRetired:true'),'cast audit must record adapter retirement');
 
 for(const [name,text] of [['engine-l',plaza],['engine-m',world]]){
   assert.ok(!/castAimedSkill\s*=\s*function/.test(text),`${name} must not monkey-patch castAimedSkill`);
@@ -31,4 +34,4 @@ assert.ok(plaza.includes('dashTween.dur=.11+.08*(land.range/170)'),'final plaza 
 assert.ok(world.includes("if (typeId === 'dash') return next();"),'world middleware must delegate dash to plaza/base chain');
 assert.ok(world.includes("typeId === 'fireball' || typeId === 'frostnova'"),'world projectile interception missing');
 
-console.log('LEGACY ABILITY CAST MIDDLEWARE PASS directAimConsumers=0');
+console.log('LEGACY ABILITY CAST MIDDLEWARE PASS directAimConsumers=0 aimAdapter=retired');
