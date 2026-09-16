@@ -60,10 +60,11 @@ export function buildSparsePngAtlas(sourceBuffer,keepRects=[],options={}){
   });
 }
 
-// KELO-INDEX ASSET/DELIVERY delegates PNG/WebP/AVIF competition to the existing variant lab; only strict lossless winner is exposed for exact promotion.
+// KELO-INDEX ASSET/DELIVERY exact path: profile remains available, but adaptive/lossy candidates are intentionally disabled.
 export async function buildLosslessDeliveryCandidates(sourceBuffer,options={}){
   if(!Buffer.isBuffer(sourceBuffer))throw new Error('INSTANT_DELIVERY_SOURCE_BUFFER_REQUIRED');
-  const result=await buildRuntimeImageVariants(sourceBuffer,{...options,qualityPolicy:'strict'});
+  const exactProfile={...(options.assetProfile||{}),kind:options.assetProfile?.kind||'exact-delivery',adaptivePolicy:'strict',runtimeCandidates:[]};
+  const result=await buildRuntimeImageVariants(sourceBuffer,{...options,assetProfile:exactProfile,qualityPolicy:'strict'});
   const winner=result.report.losslessWinner;
   const winnerBuffer=winner?result.buffers[winner.label]||null:null;
   return F({
