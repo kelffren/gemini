@@ -5,6 +5,8 @@ on:
     paths:
       - 'server/sprite-ai-*.js'
       - 'src/creators/sprite-compiler/pose-templates.mjs'
+      - 'src/creators/ui/sprite-skeleton-lab.mjs'
+      - 'src/creators/ui/sprite-factory-online.mjs'
       - 'deploy/huggingface-sprite-ai/**'
       - 'deploy/huggingface-sprite-pose/**'
       - '.github/workflows/sprite-ai-smoke.yml'
@@ -13,6 +15,8 @@ on:
     paths:
       - 'server/sprite-ai-*.js'
       - 'src/creators/sprite-compiler/pose-templates.mjs'
+      - 'src/creators/ui/sprite-skeleton-lab.mjs'
+      - 'src/creators/ui/sprite-factory-online.mjs'
       - 'deploy/huggingface-sprite-ai/**'
       - 'deploy/huggingface-sprite-pose/**'
       - '.github/workflows/sprite-ai-smoke.yml'
@@ -39,8 +43,13 @@ jobs:
           node --check server/sprite-ai-provider-pose-huggingface.js
           node --check server/sprite-ai-http.js
           node --check server/sprite-ai-smoke-test.js
+          node --check src/creators/sprite-compiler/pose-templates.mjs
+          node --check src/creators/ui/sprite-skeleton-lab.mjs
+          node --check src/creators/ui/sprite-factory-online.mjs
       - name: Sprite AI deterministic smoke
         run: node server/sprite-ai-smoke-test.js
+      - name: Skeleton template import
+        run: node --input-type=module -e "import('./src/creators/sprite-compiler/pose-templates.mjs').then(m=>{const p=m.buildPosePayload('walk');if(p.frames.length!==4||p.schema!=='kelo-biped-v2')process.exit(1);console.log('skeleton template ok')})"
       - name: Hugging Face Space syntax
         run: |
           python -m py_compile deploy/huggingface-sprite-ai/app.py
