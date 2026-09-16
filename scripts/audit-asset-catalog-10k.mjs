@@ -56,6 +56,10 @@ assert(/includeLazy=!!wanted\|\|\(options\.includeLazy===true&&q\.length>0\)/.te
 assert(/PROVIDER_CIRCUIT_OPEN/.test(runtime)&&/BREAKER_FAILURES/.test(runtime),'external provider runtime must retain circuit breaker isolation');
 assert(/PROVIDER_QUEUE_SATURATED/.test(runtime),'external provider runtime must apply queue backpressure');
 assert(/saveData/.test(runtime)&&/effectiveType/.test(runtime),'external provider runtime must adapt to mobile connection/data saver');
+assert(/mobilePageWindow/.test(runtime),'external provider runtime must preserve logical page continuity when page budgets shrink');
+for(const [name,source] of [['ambientCG',ambientcg],['Poly Haven',polyhaven],['Openverse',openverse],['3DAssets.dev',threeDAssets],['Gobkit',gobkit]])assert(/mobilePageWindow/.test(source),`${name} must use mobilePageWindow so reduced page sizes never skip assets`);
+assert(/SUPPORTED_KINDS/.test(ambientcg)&&/kindSkipped:true/.test(ambientcg),'ambientCG must skip requests for impossible active filters');
+assert(/SUPPORTED_KINDS/.test(polyhaven)&&/kindSkipped:true/.test(polyhaven),'Poly Haven must skip requests for impossible active filters');
 assert(/catalogOnly:true/.test(ambientcg)&&/downloadUrl:null/.test(ambientcg),'ambientCG must remain catalog-only until explicit source resolution');
 assert(/catalogOnly:true/.test(polyhaven)&&/\/search\?/.test(polyhaven),'Poly Haven must use search-first catalog-only discovery');
 assert(/licenseReviewRequired:true/.test(openverse)&&/downloadUrl:null/.test(openverse),'Openverse must remain source/license-review discovery only');
@@ -74,4 +78,4 @@ const pages=[];for(let offset=0;offset<synthetic.length;offset+=maxFederated)pag
 assert(pages.length>=50,'synthetic 10k test did not create expected bounded pages');
 assert(Math.max(...pages.map(page=>page.length))<=maxFederated,'a synthetic page exceeded the DOM metadata budget');
 
-if(!process.exitCode){console.log(JSON.stringify({ok:true,syntheticAssets:synthetic.length,pages:pages.length,maxFederated,maxRecent,maxPreviewConcurrency,queryCache,externalConcurrency,externalQueue,externalCacheEntries,externalMaxBytes,providers:providerIds.size,architecture:'worker + lazy APIs + metadata paging + bounded network + backpressure + viewport previews + hibernated pages'},null,2));}
+if(!process.exitCode){console.log(JSON.stringify({ok:true,syntheticAssets:synthetic.length,pages:pages.length,maxFederated,maxRecent,maxPreviewConcurrency,queryCache,externalConcurrency,externalQueue,externalCacheEntries,externalMaxBytes,providers:providerIds.size,architecture:'worker + lazy APIs + metadata paging + contiguous mobile windows + bounded network + backpressure + kind gates + viewport previews + hibernated pages'},null,2));}
