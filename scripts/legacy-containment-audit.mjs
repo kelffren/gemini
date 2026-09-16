@@ -36,14 +36,25 @@ function git(args,{optional=false}={}){
   }
   return out.stdout;
 }
+function validSha(candidate){return !!candidate&&SHA.test(candidate)&&!ZERO_SHA.test(candidate);}
 function resolveBase(){
   const cli=process.argv.find(v=>v.startsWith('--base='))?.slice(7);
-  const env=process.env.KELO_LEGACY_BASE_SHA;
-  for(const candidate of [cli,env]){
-    if(candidate&&SHA.test(candidate)&&!ZERO_SHA.test(candidate))return candidate;
+  if(validSha(cli))return {sha:cli,source:'cli'};
+
+  // pull_request workflows checkout GitHub's synthetic merge commit. HEAD^1 is
+  // therefore the exact base commit used to build/test this candidate, even if
+  // the event payload's pull_request.base.sha was captured before main advanced.
+  if(process.env.GITHUB_EVENT_NAME==='pull_request'){
+    const mergeParent=git(['rev-parse','HEAD^1'],{optional:true})?.trim();
+    if(validSha(mergeParent))return {sha:mergeParent,source:'pr-merge-parent'};
   }
+
+  const env=process.env.KELO_LEGACY_BASE_SHA;
+  if(validSha(env))return {sha:env,source:'env'};
+
   const parent=git(['rev-parse','HEAD^'],{optional:true})?.trim();
-  return parent&&SHA.test(parent)?parent:null;
+  if(validSha(parent))return {sha:parent,source:'head-parent'};
+  return null;
 }
 function sourceAt(ref,file){
   if(!ref)return null;
@@ -150,9 +161,10 @@ export function compareLegacyMetrics(before,after,file='synthetic.js'){
 }
 
 export function runLegacyContainmentAudit(){
-  const base=resolveBase();
-  if(!base)throw new Error('LEGACY_CONTAINMENT_NO_BASE: provide KELO_LEGACY_BASE_SHA or --base=<sha>');
-  const report={version:2,base,head:git(['rev-parse','HEAD']).trim(),targets:{},violations:[]};
+  const baseResolved=resolveBase();
+  if(!baseResolved)throw new Error('LEGACY_CONTAINMENT_NO_BASE: provide --base=<sha>, PR merge parent, KELO_LEGACY_BASE_SHA, or HEAD^');
+  const {sha:base,source:baseSource}=baseResolved;
+  const report={version:3,base,baseSource,head:git(['rev-parse','HEAD']).trim(),targets:{},violations:[]};
   for(const file of TARGETS){
     const currentPath=path.join(ROOT,file);
     if(!fs.existsSync(currentPath))throw new Error(`LEGACY_CONTAINMENT_TARGET_MISSING:${file}`);
@@ -166,7 +178,7 @@ export function runLegacyContainmentAudit(){
   }
   fs.mkdirSync(OUT_DIR,{recursive:true});
   fs.writeFileSync(path.join(OUT_DIR,'report.json'),JSON.stringify(report,null,2)+'\n');
-  console.log('KELO_LEGACY_CONTAINMENT',JSON.stringify({base:report.base,head:report.head,targets:Object.fromEntries(Object.entries(report.targets).map(([file,row])=>[file,{delta:row.delta,newGlobals:row.newGlobals,newCriticalKeys:row.newCriticalKeys}])),violations:report.violations},null,2));
+  console.log('KELO_LEGACY_CONTAINMENT',JSON.stringify({base:report.base,baseSource:report.baseSource,head:report.head,targets:Object.fromEntries(Object.entries(report.targets).map(([file,row])=>[file,{delta:row.delta,newGlobals:row.newGlobals,newCriticalKeys:row.newCriticalKeys}])),violations:report.violations},null,2));
   if(report.violations.length){
     console.error(`LEGACY_CONTAINMENT_FAIL:${report.violations.length}`);
     return 1;
