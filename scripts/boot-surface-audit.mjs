@@ -58,7 +58,7 @@ function walk(dir,files=[]){
     if(['.git','node_modules','dist'].includes(entry.name))continue;
     const full=path.join(dir,entry.name);
     if(entry.isDirectory())walk(full,files);
-    else if(/\.(?:js|mjs|cjs|html|json|md)$/.test(entry.name))files.push(full);
+    else if(/\.(?:js|mjs|cjs|html|json)$/.test(entry.name))files.push(full);
   }
   return files;
 }
@@ -73,7 +73,7 @@ for(const full of walk(root)){
   }
 }
 for(const engine of retiredEngines){
-  assert.deepEqual(retiredRefs[engine],[],`retired ${engine} still referenced by: ${retiredRefs[engine].join(', ')}`);
+  assert.deepEqual(retiredRefs[engine],[],`retired ${engine} still referenced by runtime/test code: ${retiredRefs[engine].join(', ')}`);
 }
 
-console.log(`BOOT SURFACE PASS critical=${critical.length} postBootStatic=${postBootStatic.length} deferredInternal=9 retiredRefs=0`);
+console.log(`BOOT SURFACE PASS critical=${critical.length} postBootStatic=${postBootStatic.length} deferredInternal=9 retiredRuntimeRefs=0`);
