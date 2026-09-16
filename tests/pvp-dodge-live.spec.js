@@ -1,8 +1,8 @@
 /* KELO-INDEX
  * area: TEST / PVP
  * owner: Playwright validation only
- * keys: PVP BUTTON FIRST-USE GUEST DODGE DASH COLLISION MOBILE IPHONE DESKTOP LIVE WINNER
- * purpose: bloquea la ruta visible botón PvP -> lazy runtime -> mundo PvP y después valida dodge 112 px real; guest=1 solo elimina Auth de esta prueba PvP
+ * keys: PVP BUTTON FIRST-USE QUICK-ACTIONS GUEST DODGE DASH COLLISION MOBILE IPHONE DESKTOP LIVE WINNER
+ * purpose: bloquea la ruta visible launcher rápido -> botón PvP -> lazy runtime -> mundo PvP y después valida dodge 112 px real; guest=1 solo elimina Auth de esta prueba PvP
  * online: N/A; valida el runtime local exacto del candidato sin alterar autoridad
  * do-not: NO gameplay mutation fuera de setup reproducible de prueba, NO force click, NO llamada directa a enterPvPWorld
  */
@@ -15,11 +15,16 @@ async function waitForVisibleGameplay(page){
     document.documentElement.dataset.keloGuestPlay==='1' &&
     typeof localPlayer!=='undefined' &&
     document.getElementById('game-canvas') &&
+    document.getElementById('kw-quick-actions-toggle') &&
     document.getElementById('lx-side-pvp')
   ),{timeout:20000});
   await expect(page.locator('#kelo-account-auth')).toBeHidden({timeout:15000});
   await expect(page.locator('#game-canvas')).toBeVisible({timeout:15000});
-  await expect(page.locator('#lx-side-pvp')).toBeVisible({timeout:20000});
+  const quick=page.locator('#kw-quick-actions-toggle');
+  await expect(quick).toBeVisible({timeout:20000});
+  await quick.click();
+  await expect(quick).toHaveAttribute('aria-expanded','true',{timeout:5000});
+  await expect(page.locator('#lx-side-pvp')).toBeVisible({timeout:5000});
 }
 
 async function enterThroughVisiblePvpButton(page,label){
@@ -30,11 +35,13 @@ async function enterThroughVisiblePvpButton(page,label){
     enter:typeof window.enterPvPWorld==='function',
     loaderNeeds:window.KELO_MODULE_LOADER.needs('pvp'),
     loaderReady:window.KELO_MODULE_LOADER.isReady('pvp'),
-    guest:document.documentElement.dataset.keloGuestPlay||null
+    guest:document.documentElement.dataset.keloGuestPlay||null,
+    quickActionsOpen:document.getElementById('kw-quick-actions-toggle')?.getAttribute('aria-expanded')==='true'
   }));
   expect(before.loaderNeeds).toBe(true);
   expect(before.loaderReady).toBe(false);
   expect(before.guest).toBe('1');
+  expect(before.quickActionsOpen).toBe(true);
 
   const button=page.locator('#lx-side-pvp');
   await button.click();
