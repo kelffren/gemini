@@ -1,8 +1,8 @@
 /* KELO-INDEX
  * area: SERVER / HTTP BOOTSTRAP
  * owner: Kelo server HTTP composition
- * purpose: inject Sprite Factory + Admin Game Tuning APIs into the existing Kelo HTTP server without creating a second server
- * do-not: NO second listen(), NO API/GitHub secret in client, NO gameplay authority changes
+ * purpose: inject Sprite Factory + Admin Game Tuning APIs and PvP presentation delta wire into the existing Kelo server without creating parallel servers/transports
+ * do-not: NO second listen(), NO second WebSocket, NO API/GitHub secret in client, NO gameplay authority changes
  */
 'use strict';
 const http=require('http');
@@ -11,14 +11,17 @@ const {createSpriteAiService}=require('./sprite-ai-service');
 const {createSpriteAiHttpHandler}=require('./sprite-ai-http');
 const {createGameTuningPublisher}=require('./game-tuning-publisher');
 const {createGameTuningHttpHandler}=require('./game-tuning-http');
+const {installPvpPresentationWire}=require('./pvp-presentation-wire');
 
 const identity=createOnlineIdentityStore({supabaseUrl:process.env.SUPABASE_URL,supabasePublishableKey:process.env.SUPABASE_PUBLISHABLE_KEY,requireAuth:false});
 const spriteAi=createSpriteAiService();
 const gameTuning=createGameTuningPublisher();
+const pvpPresentation=installPvpPresentationWire();
 const handlers=[createSpriteAiHttpHandler({service:spriteAi,identity}),createGameTuningHttpHandler({publisher:gameTuning,identity})];
 const spriteAiStatus=spriteAi.status(),tuningStatus=gameTuning.audit();
 console.log(`[Sprite AI] HTTP ready · provider ${spriteAiStatus.provider} · model ${spriteAiStatus.model} · ${spriteAiStatus.configured?'configured':'key-missing'}`);
 console.log(`[Game Tuning] HTTP ready · ${tuningStatus.repository}@${tuningStatus.branch} · ${tuningStatus.configured?'publish-ready':'publish-key-missing'}`);
+console.log(`[PvP Presentation] ${pvpPresentation.version} · same-socket delta presentation ready`);
 const nativeCreateServer=http.createServer;
 http.createServer=function patchedCreateServer(...args){
   let listenerIndex=-1;for(let i=args.length-1;i>=0;i--)if(typeof args[i]==='function'){listenerIndex=i;break;}

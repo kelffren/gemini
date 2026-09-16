@@ -7,9 +7,11 @@
 - `index.html` — orden LIVE, auth-first y engine boot.
 - `engine-a.js` — legacy state/movement physics core.
 - `engine-c.js` — legacy render/simulation orchestration.
-- `engine-net.js` — transporte multiplayer único; `avatarManifest` funciona como presentation envelope server-authoritative dentro del AOI.
+- `engine-net.js` — transporte multiplayer único; consume `pvp:presentation`, conserva presentation cache cuando un snapshot competitivo omite manifest y nunca toma URLs visuales como autoridad cliente.
 - `server/index.js` — autoridad WebSocket/AOI; serializa presentation state ya resuelto por servidor.
 - `server/avatar-sync-store.js` — resuelve full-body Creator avatar + modular Creator appearance publicados usando la identidad autenticada del dueño; sanea el envelope antes de replicarlo.
+- `server/pvp-presentation-wire.js` — adapter same-socket de presentation delta: full envelope solo al cambiar; `presentationKey` pequeño en snapshots PvP; no toca simulación.
+- `server/sprite-ai-bootstrap.js` — composition boot canónico del server; instala HTTP extensions y PvP Presentation Wire antes de `server/index.js`, sin segundo server/socket.
 
 ## Foundation Core
 
@@ -83,6 +85,8 @@
 - `scripts/creator-use-authority-audit.mjs` — audit use authority.
 - `scripts/creator-character-state-bridge-audit.mjs` — audit local Character bridge.
 - `scripts/creator-modular-replication-audit.mjs` — audit del envelope remoto, publicación/entitlement, AOI reutilizado, WeakMap overlays y ausencia de segundo transporte/renderer.
+- `scripts/pvp-visual-presentation-audit.mjs` — audit de delta presentation PvP, same-socket, preserve-on-omission y separación de autoridad competitiva.
+- `server/pvp-presentation-wire-smoke-test.js` — smoke puro de key/delta/change/clear/visibility y stripping de manifests repetidos.
 - `src/ui/studio-launcher.js` — launcher Creator Hub/Studio.
 - `src/creators/workspaces/world-workspace.mjs` — route/prewarm móvil.
 - `src/studio/integration/world-studio-bridge.mjs` — bridge de carga.
@@ -98,7 +102,8 @@
 - `src/characters/character-customization.js` — owner del estado visual base, catálogo, historial, saves y middleware de capas; Creator bridge modifica solo la lectura `stateForActor()` con overlays efímeros.
 - `src/characters/character-visual-stack.js` — resolver ordenado compartido por actor local/remoto.
 - `src/abilities/` — abilities/Stone/equipment channels.
-- `src/systems/pvp-world.js` — PvP world.
+- `src/systems/pvp-world.js` — PvP world; online peers siguen dibujándose con `renderAvatar(peer,false)`, por eso el bridge PvP no agrega renderer.
+- `server/pvp-authority.js` — única autoridad competitiva PvP; permanece presentation-agnostic.
 - `src/systems/arena-*` — Arena.
 - `src/systems/equipment-system.js` — gameplay equipment/stats owner; Creator visual `equipment` no lo reemplaza.
 - `src/mounts/` — monturas.
@@ -122,4 +127,4 @@
 
 ## Documentación
 
-Empieza por `docs/DOCUMENTATION_INDEX.md`. Para trabajo Creator actual lee también `docs/implementation-passes/IMP-2026-09-16-CREATOR-MODULAR-REPLICATION-008.md` y el documento de sistema asociado. Los documentos `*_MEMORY.md` son contexto acumulado, no autoridad superior al runtime.
+Empieza por `docs/DOCUMENTATION_INDEX.md`. Para el stack visual Creator actual lee `docs/implementation-passes/IMP-2026-09-16-CREATOR-MODULAR-REPLICATION-008.md` y después `docs/implementation-passes/IMP-2026-09-16-PVP-VISUAL-PRESENTATION-009.md`. Los documentos `*_MEMORY.md` son contexto acumulado, no autoridad superior al runtime.

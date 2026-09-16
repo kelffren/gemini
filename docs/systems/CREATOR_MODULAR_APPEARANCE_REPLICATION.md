@@ -2,15 +2,13 @@
 
 ## Status
 
-**Creator online V1 — IMPLEMENTED_PENDING_VERIFY.** Current server-authorized Creator `appearance` / visual `equipment` bindings can now be projected to nearby remote players through the existing authoritative **social/world WebSocket AOI** presentation path. This pass does not add a second transport, renderer, ownership system or gameplay equipment authority.
+**Creator online V1 — IMPLEMENTED_PENDING_VERIFY.** Current server-authorized Creator `appearance` / visual `equipment` bindings can now be projected to nearby remote players through the existing authoritative **social/world WebSocket AOI** presentation path. PvP parity is implemented in the stacked `PvP Visual Presentation Bridge V1` pass but remains pending its own validation gates.
 
 ## Goal
 
-A player who equips a published Creator skin, cosmetic or visual weapon should see it locally **and other nearby players in the social/world AOI should see the same accepted visual state** after the server has validated it.
+A player who equips a published Creator skin, cosmetic or visual weapon should see it locally **and other nearby players should see the same accepted visual state** after the server has validated it, without giving those viewers ownership or use rights.
 
-The viewer must not need to own another player's cosmetic. Viewing an already-authorized public presentation is different from acquiring or using that revision on the viewer's own character.
-
-## Canonical flow
+## Canonical social/world flow
 
 ```text
 Creator Use Authority
@@ -55,9 +53,7 @@ Migration: `supabase/migrations/20260916004500_creator_modular_replication_v1.sq
 - account is still the revision author or owns an exact-revision entitlement;
 - every asset bound to that revision has an active `asset_publication`.
 
-The RPC does **not** insert or update entitlements, bindings, wallet state, inventory or gameplay equipment.
-
-If an entitlement disappears, a stale selection row alone is not enough to keep broadcasting the cosmetic.
+The RPC does **not** insert or update entitlements, bindings, wallet state, inventory or gameplay equipment. If an entitlement disappears, a stale selection row alone is not enough to keep broadcasting the cosmetic.
 
 ## Presentation envelope
 
@@ -75,7 +71,7 @@ The existing `avatarManifest` network field is treated as a backwards-compatible
 }
 ```
 
-This deliberately reuses the existing trusted presentation path instead of introducing `skin:update`, a second WebSocket or another peer-state channel.
+This deliberately reuses the existing trusted presentation path instead of introducing client-owned skin state.
 
 ## Published byte boundary
 
@@ -127,48 +123,61 @@ No remote modular system is loaded just because networking is active.
 - peer has no `creatorAppearance` → no Appearance wake-up;
 - first relevant peer with non-empty modular envelope → existing `appearance` feature loads once;
 - bridge ingests the peer snapshot after the feature is ready;
-- subsequent social state packets with the same `revisionKey` reuse the existing overlay;
-- social/world AOI sends actor presentation only to relevant nearby viewers;
+- subsequent state packets with the same `revisionKey` reuse the existing overlay;
 - no polling, no extra render loop and no full Creator library sync.
 
-When the local player equips/clears a Creator modular visual, `KeloCreatorsLazyGate` reuses `KeloNetAuthority.refreshAvatar()` to refresh the existing server presentation envelope. `server/index.js` then distributes the updated `serializePlayer()` through its existing social/world AOI state path.
+When the local player equips/clears a Creator modular visual, `KeloCreatorsLazyGate` reuses `KeloNetAuthority.refreshAvatar()` to refresh the existing server presentation envelope. That same server-derived envelope now feeds both social/world replication and the dedicated PvP presentation bridge.
 
-## PvP boundary
+## PvP extension — stacked pass 009
 
-**V1 does not inject Creator presentation metadata into `pvp-authority` snapshots.** PvP uses a separate competitive snapshot containing movement/resources/combat authority. Keeping cosmetics out of that packet avoids expanding a sensitive protocol while this social replication layer is still pending validation.
+The original V1 deliberately kept presentation out of `server/pvp-authority.js`. That invariant remains correct: the competitive snapshot owner is still presentation-agnostic.
 
-During active PvP, presentation parity must be handled by a dedicated PvP visual-state bridge or a future server presentation reference attached safely to PvP actors. Do not make the client declare its own skin revision/URL to solve this.
+`IMP-2026-09-16-PVP-VISUAL-PRESENTATION-009` adds parity **outside** the competitive authority:
 
-Therefore the acceptance claim for this pass is **social/open-world AOI replication**, not PvP cosmetic parity.
+```text
+trusted avatarManifest
+  → server/pvp-presentation-wire.js
+      ├─ pvp:presentation full envelope only on change
+      └─ compact presentationKey in pvp:snapshot
+  → engine-net presentation cache
+  → existing KeloPvPWorld renderAvatar(peer,false)
+```
+
+This fixes two problems without weakening PvP authority:
+
+- a `pvp:snapshot` that omits `avatarManifest` no longer clears the cached remote visual;
+- the normal AOI state no longer repeats the heavy manifest while the viewer is in PvP; the wire strips it and leaves `presentationKey`.
+
+The client still never declares its own skin revision/URL. Full PvP presentation is emitted only from already server-derived state and uses the same WebSocket. See `docs/systems/PVP_VISUAL_PRESENTATION_BRIDGE.md`.
 
 ## Full-body avatar precedence
 
 Full-body Creator avatars keep their existing higher-priority `KeloAvatar` middleware. Modular appearance replication does not create a second body renderer. If a full-body avatar path intentionally consumes the actor render, modular pieces may be visually masked by that full-body avatar according to existing middleware priority.
 
-## What this pass does not own
+## What this layer does not own
 
 - `KeloEquipment` stats, inventory or abilities;
-- PvP/combat authority or PvP presentation parity;
+- PvP/combat simulation authority;
 - Creator ownership or KC settlement;
 - Character base saves/history/share codes;
 - avatar upload/authoring;
-- a new networking transport;
+- a second networking transport;
 - private-byte DRM.
 
 ## Required validation before VALIDATED
 
+Social/world gates:
+
 - run `node scripts/creator-modular-replication-audit.mjs`;
 - run Character bridge, Creator Use, Delivery, Entitlement and docs audits;
 - apply migration `20260916004500_creator_modular_replication_v1.sql` after the complete upstream migration chain;
-- social two-account test: A equips a purchased published Creator skin, B sees it without owning it;
+- A equips a purchased published Creator skin, B sees it without owning it;
 - B cannot equip A's revision without entitlement;
-- revoking A's entitlement removes the visual from future social server snapshots even if the binding row remains;
-- changing r3 → r4 updates the remote visual and never reuses r3 cache identity;
+- revoking A's entitlement removes the visual from future server presentation even if the binding row remains;
+- changing r3 → r4 updates the remote visual without stale cache identity;
 - clear-slot reveals the underlying remote base appearance;
-- a player with no modular Creator visuals does not trigger Appearance loading on viewers;
-- a nearby modular peer triggers one Appearance first-use load, not repeated loads on every state packet;
+- no-Creator peers do not trigger Appearance loading;
 - leaving AOI/removing peer does not retain actor overlay state;
-- full-body Creator avatar behavior remains unchanged;
-- built-in Character customization remains unchanged;
-- iPhone portrait/landscape with multiple social/open-world peers shows no freeze, duplicate renderer, input-lock leak or unexpected Creator-library preload;
-- PvP cosmetic parity remains explicitly unclaimed until its separate bridge is validated.
+- built-in Character customization and full-body Creator avatars remain unchanged.
+
+PvP extension gates are tracked separately in `PVP_VISUAL_PRESENTATION_BRIDGE.md` / pass `009`. Until both passes are validated, do not claim end-to-end social + PvP visual replication as validated.
