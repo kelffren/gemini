@@ -1,0 +1,61 @@
+name: Weightless Evolution Lab
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '23 9 * * 1'
+
+concurrency:
+  group: weightless-evolution-lab
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  discover-smaller-representations:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - name: Prove Weightless cores
+        run: |
+          node scripts/asset-bit-ratchet-audit.mjs
+          node scripts/asset-global-dedup-audit.mjs
+          node scripts/boot-footprint-ratchet-audit.mjs
+          node scripts/exact-tile-reconstruction-audit.mjs
+      - name: Measure current asset information
+        run: node scripts/asset-space-budget.mjs --input=assets --max-files=10000 --report=test-results/asset-space-budget
+      - name: Search strict lossless PNG savings
+        run: node scripts/asset-space-compiler.mjs --input=assets --mode=strict --effort=auto --max-files=250 --report=test-results/lossless-search
+      - name: Search shared-blob opportunities
+        run: node scripts/asset-global-dedup.mjs --input=test-results/asset-space-budget/report.json --report=test-results/global-dedup/report.json
+      - name: Search exact structural reconstruction
+        run: node scripts/exact-reconstruction-lab.mjs --input=assets --max-files=150 --report=test-results/exact-reconstruction/report.json
+      - name: Snapshot current first-playable footprint
+        run: node scripts/boot-footprint.mjs --root=. --report=test-results/boot-footprint/report.json
+      - name: Publish discovery summary
+        if: always()
+        run: |
+          echo '# Weightless Evolution Lab' >> "$GITHUB_STEP_SUMMARY"
+          if [ -f test-results/lossless-search/report.json ]; then
+            node -e "const r=require('./test-results/lossless-search/report.json'); require('fs').appendFileSync(process.env.GITHUB_STEP_SUMMARY, '\n## Lossless search\nPotential strict saving: '+r.savedBytes+' bytes ('+r.savedPercent.toFixed(2)+'%)\n')"
+          fi
+          if [ -f test-results/global-dedup/report.json ]; then
+            node -e "const r=require('./test-results/global-dedup/report.json'); require('fs').appendFileSync(process.env.GITHUB_STEP_SUMMARY, '\n## Shared blobs\nByte-exact opportunity: '+r.totals.byteExactSavingBytes+' bytes\n\nRGBA convergence candidates: '+r.totals.rgbaConvergenceCandidateBytes+' bytes\n')"
+          fi
+          if [ -f test-results/exact-reconstruction/report.json ]; then
+            node -e "const r=require('./test-results/exact-reconstruction/report.json'); require('fs').appendFileSync(process.env.GITHUB_STEP_SUMMARY, '\n## Exact reconstruction\nOpportunities: '+r.opportunityCount+'\n\nRaw structural opportunity: '+r.theoreticalRawSavingBytes+' bytes\n')"
+          fi
+          if [ -f test-results/boot-footprint/report.json ]; then
+            node -e "const r=require('./test-results/boot-footprint/report.json'); require('fs').appendFileSync(process.env.GITHUB_STEP_SUMMARY, '\n## First playable\nCritical resources: '+r.resourceCount+'\n\nExternal stored bytes: '+r.externalStoredBytes+'\n')"
+          fi
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: weightless-evolution-report
+          path: test-results
+          if-no-files-found: ignore
