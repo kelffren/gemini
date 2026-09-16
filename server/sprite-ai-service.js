@@ -20,6 +20,7 @@ const ALLOWED_IMAGE_TYPES=new Set(['image/png','image/webp','image/jpeg']);
 
 function clampInt(value,min,max,fallback){const n=Math.floor(Number(value));return Number.isFinite(n)?Math.max(min,Math.min(max,n)):fallback;}
 function short(value,max=400){return String(value||'').trim().slice(0,max);}
+function boolFlag(value){if(value===true)return true;const text=String(value??'').trim().toLowerCase();return text==='1'||text==='true'||text==='yes'||text==='on';}
 function serviceError(code,status=500,detail=null){const error=new Error(code);error.code=code;error.status=status;if(detail)error.detail=detail;return error;}
 function parseImageDataUrl(value,maxBytes){if(!value)return null;const match=/^data:(image\/(?:png|webp|jpeg));base64,([A-Za-z0-9+/=\r\n]+)$/.exec(String(value));if(!match)throw serviceError('SPRITE_AI_INVALID_SOURCE_IMAGE',400);const bytes=Buffer.from(match[2].replace(/\s/g,''),'base64');if(!bytes.length)throw serviceError('SPRITE_AI_EMPTY_SOURCE_IMAGE',400);if(bytes.length>maxBytes)throw serviceError('SPRITE_AI_SOURCE_TOO_LARGE',413);if(!ALLOWED_IMAGE_TYPES.has(match[1]))throw serviceError('SPRITE_AI_UNSUPPORTED_SOURCE_IMAGE',415);const ext=match[1]==='image/jpeg'?'jpg':match[1].split('/')[1];return{mime:match[1],bytes,ext};}
 function buildPrompt(input={}){
@@ -81,7 +82,7 @@ function createOpenAiProvider(options={}){
 function createSpriteAiService(options={}){
   const requested=String(options.provider??process.env.KELO_SPRITE_AI_PROVIDER??'auto').trim().toLowerCase()||'auto';
   const maxSourceBytes=clampInt(options.maxSourceBytes??process.env.KELO_SPRITE_AI_MAX_SOURCE_BYTES,256*1024,12*1024*1024,6*1024*1024);
-  const allowPaidFallback=String(options.allowPaidFallback??process.env.KELO_SPRITE_AI_ALLOW_PAID_FALLBACK??'0')==='1';
+  const allowPaidFallback=boolFlag(options.allowPaidFallback??process.env.KELO_SPRITE_AI_ALLOW_PAID_FALLBACK??'0');
   const openai=options.openAiProvider||createOpenAiProvider({...options,maxSourceBytes});
   const huggingface=options.huggingFaceProvider||createHuggingFaceSpriteProvider(options.huggingFace||{});
   const hfStatus=huggingface.status(),openaiStatus=openai.status();
