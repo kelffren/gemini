@@ -1,6 +1,6 @@
 # Kelo World — Architecture Current
 
-**Actualizado:** 2026-09-15 · Runtime V6.54.2
+**Actualizado:** 2026-09-16 · Runtime V6.54.2
 
 ## Capas
 
@@ -43,22 +43,26 @@ Los módulos pesados de Creator siguen lazy. Creator Library puede abrirse sin p
 
 `Kelo Creator Use Authority` cierra la frontera de mutación persistente para Creator content: una revisión entregada no se considera seleccionable/persistible únicamente por estado del navegador. La misma regla server-side exige publicación activa + autor o entitlement exacto antes de persistir avatar, appearance/equipment visual o mount; Property recibe un preflight server-side de uso antes de ejecutar sus propias reglas de parcela/placement.
 
-El facade `window.KeloCreatorDelivery` y el facade `window.KeloCreatorUse` viven en el `creators-lazy-gate` que ya existe en boot, pero sus módulos reales se importan solo al primer uso. Delivery arma Use Authority cuando una revisión Creator se activa por primera vez, de forma que los owners lazy de Mount/Property reciban sus guards sin meterlos en boot normal.
+`Creator Character State Bridge` cierra el tramo entre ese binding visual autoritativo y el Character renderer actual. No escribe la licencia en `KeloCharacterCustomization`: monta un overlay efímero de slots solo para el actor local, registra las revisiones entregadas como items `hidden + locked`, y deja que `KeloCharacterVisualStack` + el middleware existente de `KeloAvatar` rendericen la composición. El estado base, history, saves, share code y legacy network snapshot permanecen del owner original.
 
-`KELO_CREATOR_CONTENT_REGISTRY` consulta Entitlements antes de adaptar Creator content a Property/Appearance/Mount/Avatar y vuelve a validar en `getForUse()`. Un record sin permiso queda `restricted`; un cambio de entitlement puede reactivarlo sin reimportar. Appearance, Mount, Property y el avatar local añaden comprobaciones secundarias para impedir reutilizar metadata cacheada después de un cambio de cuenta.
+Los facades `window.KeloCreatorDelivery` y `window.KeloCreatorUse` viven en el `creators-lazy-gate`. Para restaurar visuales Creator tras login/reload, el gate puede importar la capa pequeña de Use/Delivery y hacer un probe metadata-only de `get_my_creator_use_state()`. Si no hay bindings visuales, se detiene ahí: no carga Appearance ni bytes Creator. Si sí existen, `KELO_MODULE_LOADER.ensure('appearance')` carga el Character bridge y se hidratan únicamente esas revisiones exactas.
+
+`KELO_CREATOR_CONTENT_REGISTRY` consulta Entitlements antes de adaptar Creator content a Property/Appearance/Mount/Avatar y vuelve a validar en `getForUse()`. Un record sin permiso queda `restricted`; un cambio de entitlement puede reactivarlo sin reimportar. Appearance, Mount, Property, Character bridge y el avatar local añaden comprobaciones secundarias para impedir reutilizar metadata cacheada después de un cambio de cuenta.
 
 ### 7. Gameplay Domains
-Abilities, equipment, mounts, backpack, PvP/Arena, identity/titles, nobility, economy, commerce, property, instances y guardian son owners separados. Creator OS/Delivery/Use Authority no sustituyen esos owners.
+Abilities, equipment, mounts, backpack, PvP/Arena, identity/titles, nobility, economy, commerce, property, instances y guardian son owners separados. Creator OS/Delivery/Use Authority/Character bridge no sustituyen esos owners.
 
 `Kelo Creator Use Authority` compone precondiciones, no absorbe gameplay:
 
 - `character` reutiliza `set_active_character_avatar` y `KeloCreatorAvatars`;
-- `appearance` / Creator `equipment` persiste una revisión visual por slot y se resuelve mediante `KeloAppearance`;
+- `appearance` / Creator `equipment` persiste una revisión visual por slot;
+- `Creator Character State Bridge` proyecta esa selección server-side sobre el actor local sin persistirla como estado local unlocked;
+- `KeloCharacterCustomization` conserva el estado visual base, catálogo/historial/saves y el middleware actual de render;
 - `KeloEquipment` conserva stats, inventario, weapon gameplay y ability loadout; una Creator weapon visual no otorga stats;
-- `KeloMounts` conserva mount state/gameplay y ahora acepta guards componibles antes de su authority adapter;
+- `KeloMounts` conserva mount state/gameplay y acepta guards componibles antes de su authority adapter;
 - `KELO_PROPERTY_SYSTEM` conserva parcel ownership, bounds, quantities, placement, collision y render; Creator Property authorization solo prueba el derecho a usar esa revisión antes del domain mutation.
 
-Existing `KeloCharacterCustomization` todavía es el owner de estado/render visual del Character V2. Ya existe binding server-authoritative de Creator appearance/equipment, pero la convergencia automática de ese binding hacia el renderer actual es un pass separado y no se considera terminada aquí.
+La proyección modular Creator V1 es solo del actor local. La replicación de skins/equipment Creator modulares de otros jugadores requiere un snapshot visual server-accepted separado; no se considera completada por este bridge. Los Creator avatars full-body mantienen su ruta multiplayer publicada existente.
 
 ### 8. Online
 `engine-net.js`, auth lifecycle y módulos server/Supabase implementan o preparan autoridad online. La regla es server-authoritative para valor persistente/competitivo.
@@ -76,6 +80,7 @@ Para Creator content:
 - `get_creator_content_delivery(uuid)` entrega metadata solo si la revisión exacta es accesible, está publicada y todos sus asset bindings tienen `asset_publications` activas;
 - `kelo_private.require_creator_revision_use(...)` centraliza la regla de uso persistente: exact revision + tipo permitido + publicación activa + autor/entitlement;
 - `set_character_creator_content` persiste appearance/equipment visual por slot para un character propio;
+- `get_my_creator_use_state` es la fuente server-side que el restore bridge consulta; el cliente no reconstruye ownership desde local state;
 - `set_character_creator_mount` persiste la revisión Creator mount seleccionada para un character propio;
 - `authorize_creator_property_placement` emite una autorización de uso de contenido antes de Property; no pretende validar parcel geometry/ownership;
 - `set_active_character_avatar` mantiene selección Creator character server-authoritative;
@@ -89,9 +94,9 @@ Para Creator content:
 
 ## Flujo de asset moderno
 
-`PNG/JPEG/WebP → Image Lab opcional → foreground analysis/Asset Forge → asset sheet compiler → sourceRects/manifest → semantic content revision → specialized Creator/Studio → creator runtime preview → server review → authority publication → marketplace listing → KC purchase → exact-revision entitlement → on-demand delivery manifest → runtime registry → server-authorized Creator use binding/preflight → specialized domain owner`
+`PNG/JPEG/WebP → Image Lab opcional → foreground analysis/Asset Forge → asset sheet compiler → sourceRects/manifest → semantic content revision → specialized Creator/Studio → creator runtime preview → server review → authority publication → marketplace listing → KC purchase → exact-revision entitlement → on-demand delivery manifest → runtime registry → server-authorized Creator use binding/preflight → ephemeral Character overlay o specialized domain owner`
 
-Para acciones persistentes/competitivas online, la última mutación sigue perteneciendo al domain owner. Creator Use Authority garantiza la precondición de acceso al contenido, no reemplaza reglas de inventario, stats, parcel, PvP o simulación.
+Para acciones persistentes/competitivas online, la última mutación sigue perteneciendo al domain owner. Creator Use Authority garantiza la precondición de acceso al contenido; Character bridge solo proyecta lectura visual; ninguno reemplaza reglas de inventario, stats, parcel, PvP o simulación.
 
 Forest Plaza es el caso de referencia actual: 146 piezas, IDs legacy preservados, nombres semánticos y 7 carpetas visuales.
 
@@ -109,6 +114,7 @@ Forest Plaza es el caso de referencia actual: 146 piezas, IDs legacy preservados
 - `KeloCreatorEntitlements` no crea otro auth client ni ownership store local;
 - Creator Delivery no sincroniza toda la librería ni se convierte en asset store;
 - Creator Use Authority no crea otro entitlement, inventory, equipment, mount o property owner;
+- Creator Character Bridge no usa `select()`/`applySnapshot()` para copiar licencias online a localStorage;
 - una compra no es válida solo porque la UI diga `OWNED`; la autoridad es `creator_content_entitlements`;
 - una selección persistida no sustituye ownership; bindings de uso siempre referencian una revisión exacta ya autorizada;
 - una publicación no implica permiso de uso;
@@ -122,4 +128,4 @@ Forest Plaza es el caso de referencia actual: 146 piezas, IDs legacy preservados
 
 ## Móvil
 
-El editor se abre con chrome-first y prewarm/boot por etapas. Creator Library/Image Lab/Asset Forge/Content Studio/Marketplace siguen por acción explícita. El runtime de contenido comprado usa `KeloCreatorDelivery` + `KeloCreatorUse` bajo demanda por revisión: no hace bulk sync en login, no usa polling y no precarga bytes. Solo despierta Appearance/Mounts/Properties cuando esa revisión lo exige. El cache de manifests/use state es pequeño y metadata-only. Evitar canvas/blur/import masivo simultáneo en iPhone. La verificación final de World móvil y nuevas superficies Creator exige dispositivo real/LIVE además de los gates automatizados aplicables.
+El editor se abre con chrome-first y prewarm/boot por etapas. Creator Library/Image Lab/Asset Forge/Content Studio/Marketplace siguen por acción explícita. En login/reload puede ocurrir una sola consulta metadata-only de Creator use state. Con cero visual bindings, no se carga Appearance. Con bindings, se despierta Appearance y se entregan solo las revisiones exactas seleccionadas; no hay bulk Owned sync, polling ni preload de otros assets. El cache de manifests/use state es pequeño y metadata-only. Evitar canvas/blur/import masivo simultáneo en iPhone. La verificación final de World móvil y nuevas superficies Creator exige dispositivo real/LIVE además de los gates automatizados aplicables.
