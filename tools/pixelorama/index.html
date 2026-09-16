@@ -2,10 +2,10 @@
 <!-- KELO-INDEX
  area: CREATORS / PIXELORAMA WEB RUNTIME
  owner: Kelo Creators
- keys: PIXELORAMA GODOT WASM LAZY CUSTOM PCK BRIDGE ARRAYBUFFER QUIT UNLOAD MEMORY FPS SESSION DOCTOR HEARTBEAT FALLBACK
- purpose: shell Kelo que arranca Pixelorama bajo demanda con PCK Kelo pinneado, reporta salud del bridge y cae al PCK stock si el custom falla
+ keys: PIXELORAMA GODOT WASM LAZY MATCHED RUNTIME GITHUB RAW API CORS BRIDGE ARRAYBUFFER QUIT UNLOAD MEMORY FPS SESSION DOCTOR HEARTBEAT FALLBACK
+ purpose: shell Kelo que arranca el export Web completo y emparejado de Pixelorama bajo demanda, reporta etapas exactas de boot y cae al runtime stock sólo mediante reload limpio
  online: authoring local; no gameplay/economy authority
- do-not: NO service worker propio, NO boot eager, NO duplicar JS/WASM pesados en main
+ do-not: NO service worker propio, NO boot eager, NO mezclar JS/WASM/PCK de builds distintos, NO asumir Engine en window
 -->
 <html lang="en">
 <head>
@@ -18,39 +18,109 @@
     body{touch-action:none;color:#fff;font-family:Inter,system-ui,-apple-system,sans-serif}
     #canvas{display:block;outline:none}
     #status{position:fixed;inset:0;z-index:9;display:grid;place-items:center;background:#090b0d;padding:24px;text-align:center}
-    #status[hidden]{display:none}.card{max-width:320px}.mark{font-size:11px;font-weight:950;letter-spacing:.16em;color:#e6ca7f}.copy{margin-top:10px;font-size:10px;line-height:1.5;color:#91a19b}.bar{height:3px;margin-top:14px;background:#192124;border-radius:99px;overflow:hidden}.bar>i{display:block;height:100%;width:28%;background:#d8b45f;animation:load 1.1s ease-in-out infinite alternate}@keyframes load{to{transform:translateX(250%)}}
+    #status[hidden]{display:none}.card{max-width:340px}.mark{font-size:11px;font-weight:950;letter-spacing:.16em;color:#e6ca7f}.copy{margin-top:10px;font-size:10px;line-height:1.5;color:#91a19b}.bar{height:3px;margin-top:14px;background:#192124;border-radius:99px;overflow:hidden}.bar>i{display:block;height:100%;width:28%;background:#d8b45f;animation:load 1.1s ease-in-out infinite alternate}@keyframes load{to{transform:translateX(250%)}}
     #bridge-note{position:fixed;left:8px;right:8px;bottom:calc(8px + env(safe-area-inset-bottom));z-index:8;padding:6px 8px;border:1px solid rgba(232,199,116,.24);border-radius:9px;background:rgba(3,5,6,.82);font-size:9px;line-height:1.35;color:#d9e0dc;pointer-events:none;opacity:0;transition:opacity .2s}#bridge-note.show{opacity:1}
   </style>
 </head>
 <body>
   <canvas id="canvas" tabindex="0">Your browser does not support canvas.</canvas>
-  <div id="status"><div class="card"><div class="mark">KELO · PIXELORAMA PRO</div><div id="status-copy" class="copy">Loading professional pixel editor only for this creator session…</div><div class="bar"><i></i></div></div></div>
+  <div id="status"><div class="card"><div class="mark">KELO · PIXELORAMA PRO</div><div id="status-copy" class="copy">Preparing matched Pixelorama runtime…</div><div class="bar"><i></i></div></div></div>
   <div id="bridge-note"></div>
 <script>
 (() => {
   'use strict';
   const PROTOCOL='kelo.pixelorama.v1';
-  const BRIDGE_VERSION='kelo.pixelorama.session-doctor.v2-custom-pck';
+  const BRIDGE_VERSION='kelo.pixelorama.session-doctor.v3-matched-runtime';
   const UPSTREAM_COMMIT='2af0e590b6f1dd8a9255686373c5831623bb03bd';
-  const KELO_PCK_COMMIT='8bd90d24aab6d849eb7fe1b2fea760879d166401';
-  const BASE=`https://cdn.jsdelivr.net/gh/Orama-Interactive/Pixelorama@${UPSTREAM_COMMIT}`;
-  const KELO_PCK=`https://cdn.jsdelivr.net/gh/kelffren/gemini@${KELO_PCK_COMMIT}/index.pck`;
-  const STOCK_PCK=`${BASE}/index.pck`;
+  const KELO_RUNTIME_COMMIT='5d2a3b99180ebeb1705cee865e7f6927df2352b5';
+  const STOCK_BASE=`https://cdn.jsdelivr.net/gh/Orama-Interactive/Pixelorama@${UPSTREAM_COMMIT}`;
+  const RUNTIME_RAW_ROOT=`https://raw.githubusercontent.com/kelffren/gemini/${KELO_RUNTIME_COMMIT}`;
+  const RUNTIME_API_ROOT='https://api.github.com/repos/kelffren/gemini/contents';
+  const RUNTIME_BASE='https://kelo-pixelorama-runtime.invalid/index';
+  const FORCE_STOCK=new URLSearchParams(location.search).get('stock')==='1';
   const status=document.getElementById('status'),statusCopy=document.getElementById('status-copy'),note=document.getElementById('bridge-note'),canvas=document.getElementById('canvas');
-  let engine=null,pendingAsset=null,openHookInstalled=false,shuttingDown=false,nativeAnchorClick=null,idleTimer=0,deepIdleTimer=0;
+  const nativeFetch=window.fetch.bind(window);
+  const nativeAudioAddModule=globalThis.AudioWorklet?.prototype?.addModule||null;
+  let engine=null,EngineCtor=null,pendingAsset=null,openHookInstalled=false,shuttingDown=false,nativeAnchorClick=null,idleTimer=0,deepIdleTimer=0;
   let runtimeMode='booting',packSource='none',nativeBridge=false,readyAt=0,lastAssetStage='idle',lastAssetName='',lastExportAt=0,customFallbackReason='';
+  let runtimeTransport='none',bootStage='shell-start',fetchBridgeInstalled=false,audioBridgeInstalled=false;
 
   const tell=(type,payload={},transfer=[])=>{try{parent.postMessage({protocol:PROTOCOL,type,payload},location.origin,transfer);}catch(error){console.warn('[Kelo Pixelorama] postMessage failed',error);}};
-  function health(){return {bridgeVersion:BRIDGE_VERSION,upstreamCommit:UPSTREAM_COMMIT,keloPckCommit:KELO_PCK_COMMIT,ready:!!engine,readyAt,mode:runtimeMode,packSource,nativeBridge,customFallbackReason,openHookInstalled,hasPendingAsset:!!pendingAsset,lastAssetStage,lastAssetName,lastExportAt,threads:false,shuttingDown};}
+  function health(){return {bridgeVersion:BRIDGE_VERSION,upstreamCommit:UPSTREAM_COMMIT,runtimeCommit:KELO_RUNTIME_COMMIT,ready:!!engine,readyAt,mode:runtimeMode,packSource,nativeBridge,runtimeTransport,bootStage,customFallbackReason,openHookInstalled,hasPendingAsset:!!pendingAsset,lastAssetStage,lastAssetName,lastExportAt,threads:false,shuttingDown};}
   function showNote(text,ms=4200){note.textContent=text;note.classList.add('show');if(ms>0)setTimeout(()=>note.classList.remove('show'),ms);}
   function setStatus(text){statusCopy.textContent=text;}
-  function loadScript(src){return new Promise((resolve,reject)=>{const script=document.createElement('script');script.src=src;script.onload=resolve;script.onerror=()=>reject(new Error(`PIXELORAMA_ENGINE_SCRIPT_FAILED:${src}`));document.head.append(script);});}
+  function stage(name,detail=''){bootStage=name;setStatus(detail||name.replaceAll('-',' '));tell('boot-stage',{stage:name,detail,runtimeCommit:KELO_RUNTIME_COMMIT,transport:runtimeTransport,at:Date.now()});}
+  function resolveEngine(){try{return (0,eval)('typeof Engine === "function" ? Engine : null');}catch{return null;}}
+  function loadScript(src){return new Promise((resolve,reject)=>{const script=document.createElement('script');script.src=src;script.async=true;script.onload=()=>resolve(script);script.onerror=()=>reject(new Error(`PIXELORAMA_ENGINE_SCRIPT_FAILED:${src}`));document.head.append(script);});}
   function nativeCommand(command,value){try{if(typeof window.keloPixeloramaCommand==='function'){window.keloPixeloramaCommand(command,value);return true;}}catch(error){console.warn('[Kelo Pixelorama] native command',error);}return false;}
   function clearIdleTimers(){if(idleTimer)clearTimeout(idleTimer);if(deepIdleTimer)clearTimeout(deepIdleTimer);idleTimer=deepIdleTimer=0;}
   function markActive(){if(shuttingDown)return;clearIdleTimers();nativeCommand('set_fps',60);idleTimer=setTimeout(()=>nativeCommand('set_fps',30),2200);deepIdleTimer=setTimeout(()=>nativeCommand('set_fps',15),10000);}
-  function focusPulse(){
-    try{window.dispatchEvent(new Event('blur'));}catch{}
-    setTimeout(()=>{try{window.dispatchEvent(new Event('focus'));canvas.focus();}catch{}},24);
+  function focusPulse(){try{window.dispatchEvent(new Event('blur'));}catch{}setTimeout(()=>{try{window.dispatchEvent(new Event('focus'));canvas.focus();}catch{}},24);}
+  function mimeFor(name){if(name.endsWith('.wasm'))return 'application/wasm';if(name.endsWith('.js'))return 'text/javascript; charset=utf-8';if(name.endsWith('.png'))return 'image/png';return 'application/octet-stream';}
+  function runtimeAssetFromUrl(value){
+    let url='';try{url=typeof value==='string'?value:value?.url||String(value||'');}catch{return null;}
+    if(!url.startsWith(RUNTIME_BASE))return null;
+    const suffix=url.slice(RUNTIME_BASE.length);
+    if(suffix==='.wasm')return 'index.wasm';
+    if(suffix==='.pck')return 'index.pck';
+    if(suffix==='.audio.worklet.js')return 'index.audio.worklet.js';
+    if(suffix==='.audio.position.worklet.js')return 'index.audio.position.worklet.js';
+    if(suffix==='.side.wasm')return 'index.side.wasm';
+    return null;
+  }
+  function normalizeResponse(response,name,transport){
+    const headers=new Headers();headers.set('Content-Type',mimeFor(name));
+    const length=response.headers.get('content-length');if(length)headers.set('Content-Length',length);
+    const cache=response.headers.get('cache-control');if(cache)headers.set('Cache-Control',cache);
+    runtimeTransport=transport;tell('runtime-fetch',{name,transport,status:response.status,bytes:Number(length)||0,at:Date.now()});
+    return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
+  }
+  async function fetchRuntimeAsset(name){
+    let lastError=null;
+    try{
+      const response=await nativeFetch(`${RUNTIME_RAW_ROOT}/${name}`,{mode:'cors',credentials:'omit',cache:'force-cache'});
+      if(!response.ok)throw new Error(`RAW_${response.status}`);
+      return normalizeResponse(response,name,'github-raw');
+    }catch(error){lastError=error;tell('runtime-fetch-fallback',{name,from:'github-raw',reason:String(error?.message||error),at:Date.now()});}
+    try{
+      const response=await nativeFetch(`${RUNTIME_API_ROOT}/${encodeURIComponent(name)}?ref=${KELO_RUNTIME_COMMIT}`,{mode:'cors',credentials:'omit',cache:'force-cache',headers:{Accept:'application/vnd.github.raw+json'}});
+      if(!response.ok)throw new Error(`API_RAW_${response.status}`);
+      return normalizeResponse(response,name,'github-api-raw');
+    }catch(error){
+      const message=`RUNTIME_ASSET_FETCH_FAILED:${name}:${String(error?.message||error)}; previous=${String(lastError?.message||lastError||'none')}`;
+      tell('error',{code:'RUNTIME_ASSET_FETCH_FAILED',message,name,at:Date.now()});throw new Error(message);
+    }
+  }
+  function installRuntimeTransport(){
+    if(!fetchBridgeInstalled){
+      window.fetch=async(input,init)=>{const name=runtimeAssetFromUrl(input);if(name)return fetchRuntimeAsset(name);return nativeFetch(input,init);};
+      fetchBridgeInstalled=true;
+    }
+    if(!audioBridgeInstalled&&nativeAudioAddModule&&globalThis.AudioWorklet?.prototype){
+      globalThis.AudioWorklet.prototype.addModule=async function(url,options){
+        const name=runtimeAssetFromUrl(url);if(!name)return nativeAudioAddModule.call(this,url,options);
+        const response=await fetchRuntimeAsset(name),text=await response.text(),blobUrl=URL.createObjectURL(new Blob([text],{type:'text/javascript'}));
+        try{return await nativeAudioAddModule.call(this,blobUrl,options);}finally{URL.revokeObjectURL(blobUrl);}
+      };
+      audioBridgeInstalled=true;
+    }
+    stage('transport-ready','Matched runtime transport ready.');
+  }
+  function restoreRuntimeTransport(){
+    if(fetchBridgeInstalled){window.fetch=nativeFetch;fetchBridgeInstalled=false;}
+    if(audioBridgeInstalled&&nativeAudioAddModule&&globalThis.AudioWorklet?.prototype){globalThis.AudioWorklet.prototype.addModule=nativeAudioAddModule;audioBridgeInstalled=false;}
+  }
+  async function loadMatchedEngineScript(){
+    stage('engine-script-fetch','Loading matched Godot engine…');
+    const response=await fetchRuntimeAsset('index.js'),source=await response.text(),blobUrl=URL.createObjectURL(new Blob([source],{type:'text/javascript'}));
+    try{await loadScript(blobUrl);}finally{URL.revokeObjectURL(blobUrl);}
+    EngineCtor=resolveEngine();if(typeof EngineCtor!=='function')throw new Error('MATCHED_ENGINE_GLOBAL_MISSING');
+    stage('engine-script-ready','Matched engine loaded.');
+  }
+  async function loadStockEngineScript(){
+    stage('stock-engine-script-fetch','Loading Pixelorama safe fallback…');
+    await loadScript(`${STOCK_BASE}/index.js`);EngineCtor=resolveEngine();if(typeof EngineCtor!=='function')throw new Error('STOCK_ENGINE_GLOBAL_MISSING');
+    stage('stock-engine-script-ready','Stock engine loaded.');
   }
 
   function installDownloadBridge(){
@@ -58,11 +128,7 @@
     HTMLAnchorElement.prototype.click=function(){
       const anchor=this,href=String(anchor.href||''),filename=String(anchor.download||'');
       if(filename&&href.startsWith('blob:')){
-        void (async()=>{try{
-          const blob=await fetch(href).then(r=>r.blob()),buffer=await blob.arrayBuffer();lastExportAt=Date.now();
-          tell('export-captured',{name:filename,mime:blob.type||'application/octet-stream',bytes:blob.size,at:lastExportAt});
-          tell('export',{name:filename,mime:blob.type||'application/octet-stream',buffer},[buffer]);showNote(`${filename} sent directly to Kelo.`);
-        }catch(error){tell('error',{code:'EXPORT_CAPTURE_FAILED',message:String(error?.message||error)});nativeAnchorClick.call(anchor);}})();return;
+        void (async()=>{try{const blob=await nativeFetch(href).then(r=>r.blob()),buffer=await blob.arrayBuffer();lastExportAt=Date.now();tell('export-captured',{name:filename,mime:blob.type||'application/octet-stream',bytes:blob.size,at:lastExportAt});tell('export',{name:filename,mime:blob.type||'application/octet-stream',buffer},[buffer]);showNote(`${filename} sent directly to Kelo.`);}catch(error){tell('error',{code:'EXPORT_CAPTURE_FAILED',message:String(error?.message||error)});nativeAnchorClick.call(anchor);}})();return;
       }
       return nativeAnchorClick.call(anchor);
     };
@@ -71,18 +137,11 @@
   async function openThroughNativeBridge(asset){
     if(!asset||!engine?.copyToFS||typeof window.keloPixeloramaCommand!=='function')return false;
     const safe=String(asset.name||'kelo-asset.png').replace(/[^a-zA-Z0-9._-]/g,'_').slice(-120),path=`user://kelo-bridge-${Date.now()}-${safe}`;
-    try{
-      engine.copyToFS(path,asset.buffer);nativeCommand('open_path',path);pendingAsset=null;lastAssetStage='opened';lastAssetName=safe;
-      tell('asset-opened',{name:safe,mode:'native',at:Date.now()});showNote(`${safe} opened directly from Kelo.`);return true;
-    }catch(error){tell('error',{code:'NATIVE_OPEN_FAILED',message:String(error?.message||error)});return false;}
+    try{engine.copyToFS(path,asset.buffer);nativeCommand('open_path',path);pendingAsset=null;lastAssetStage='opened';lastAssetName=safe;tell('asset-opened',{name:safe,mode:'native',at:Date.now()});showNote(`${safe} opened directly from Kelo.`);return true;}catch(error){tell('error',{code:'NATIVE_OPEN_FAILED',message:String(error?.message||error)});return false;}
   }
-
   function feedPendingAsset(){
     if(!pendingAsset)return false;
-    try{
-      const asset=pendingAsset;window.fileData=asset.buffer;window.fileType=asset.mime||'image/png';window.fileName=asset.name||'kelo-asset.png';window.canceled=false;pendingAsset=null;
-      lastAssetStage='injected';lastAssetName=window.fileName;tell('asset-injected',{name:lastAssetName,mode:'stock',at:Date.now()});focusPulse();showNote('Kelo asset injected into Pixelorama.');return true;
-    }catch(error){tell('error',{code:'ASSET_INJECT_FAILED',message:String(error?.message||error)});return false;}
+    try{const asset=pendingAsset;window.fileData=asset.buffer;window.fileType=asset.mime||'image/png';window.fileName=asset.name||'kelo-asset.png';window.canceled=false;pendingAsset=null;lastAssetStage='injected';lastAssetName=window.fileName;tell('asset-injected',{name:lastAssetName,mode:'stock',at:Date.now()});focusPulse();showNote('Kelo asset injected into Pixelorama.');return true;}catch(error){tell('error',{code:'ASSET_INJECT_FAILED',message:String(error?.message||error)});return false;}
   }
   function installOpenBridge(){
     if(openHookInstalled||typeof window.upload_image!=='function')return false;
@@ -98,54 +157,51 @@
     clearIdleTimers();
     try{engine?.requestQuit?.();}catch(error){console.warn('[Kelo Pixelorama] requestQuit',error);}
     await new Promise(resolve=>setTimeout(resolve,80));
-    try{window.Engine?.unload?.();}catch(error){console.warn('[Kelo Pixelorama] Engine.unload',error);}
+    try{EngineCtor?.unload?.();}catch(error){console.warn('[Kelo Pixelorama] Engine.unload',error);}
     if(restoreAnchor){try{if(nativeAnchorClick)HTMLAnchorElement.prototype.click=nativeAnchorClick;}catch{}}
     try{delete window.keloPixeloramaCommand;}catch{window.keloPixeloramaCommand=undefined;}
-    engine=null;nativeBridge=false;openHookInstalled=false;
+    restoreRuntimeTransport();engine=null;EngineCtor=null;nativeBridge=false;openHookInstalled=false;
   }
 
-  async function startEngine(mainPack,source){
-    packSource=source;setStatus(source==='kelo-custom-pck'?'Loading Kelo Pixelorama runtime…':'Loading Pixelorama safe fallback…');
-    const config={args:[],canvasResizePolicy:2,ensureCrossOriginIsolationHeaders:false,executable:`${BASE}/index`,mainPack,experimentalVK:false,focusCanvas:true,gdextensionLibs:[],serviceWorker:null};
-    engine=new window.Engine(config);const missing=window.Engine.getMissingFeatures?.({threads:false})||[];if(missing.length)throw new Error(`Pixelorama Web missing browser features: ${missing.join(', ')}`);
+  async function startEngine({source,executable,mainPack,requireNative=false}){
+    packSource=source;stage('engine-start',source==='kelo-matched-runtime'?'Starting matched Pixelorama runtime…':'Starting Pixelorama safe fallback…');
+    const config={args:[],canvasResizePolicy:2,ensureCrossOriginIsolationHeaders:false,executable,mainPack,experimentalVK:false,focusCanvas:true,gdextensionLibs:[],serviceWorker:null};
+    engine=new EngineCtor(config);const missing=EngineCtor.getMissingFeatures?.({threads:false})||[];if(missing.length)throw new Error(`Pixelorama Web missing browser features: ${missing.join(', ')}`);
     await engine.startGame({onProgress:(current,total)=>{if(current>0&&total>0)setStatus(`Loading Pixelorama ${Math.round(current/total*100)}%…`);}});
-    nativeBridge=typeof window.keloPixeloramaCommand==='function';
-    if(source==='kelo-custom-pck'&&!nativeBridge)throw new Error('KELO_CUSTOM_PCK_BRIDGE_MISSING');
-    installOpenBridge();status.hidden=true;canvas.focus();nativeCommand('set_undo_limit',64);markActive();runtimeMode=nativeBridge?'kelo-custom-pck':'stock-full-web';readyAt=Date.now();
-    tell('ready',health());if(pendingAsset)void tryOpenPending();
+    stage('godot-started','Godot runtime started.');nativeBridge=typeof window.keloPixeloramaCommand==='function';
+    if(requireNative&&!nativeBridge)throw new Error('KELO_MATCHED_RUNTIME_BRIDGE_MISSING');
+    installOpenBridge();status.hidden=true;canvas.focus();nativeCommand('set_undo_limit',64);markActive();runtimeMode=nativeBridge?'kelo-custom-pck':'stock-full-web';readyAt=Date.now();stage('ready','Pixelorama ready.');tell('ready',health());if(pendingAsset)void tryOpenPending();
   }
 
+  function reloadStockFallback(error){
+    customFallbackReason=String(error?.message||error);runtimeMode='custom-failed';stage('custom-fallback',`Matched runtime failed: ${customFallbackReason}`);tell('custom-pack-fallback',{reason:customFallbackReason,runtimeCommit:KELO_RUNTIME_COMMIT,bootStage,transport:runtimeTransport,at:Date.now()});
+    const next=new URL(location.href);next.searchParams.set('stock','1');next.searchParams.set('fallback','1');setTimeout(()=>location.replace(next.href),40);
+  }
   async function shutdown(reason='parent-request'){
-    if(shuttingDown)return;shuttingDown=true;tell('shutdown-start',{reason,at:Date.now()});setStatus('Releasing Pixelorama memory…');status.hidden=false;
-    await releaseEngine({restoreAnchor:true});pendingAsset=null;tell('quit-ack',{reason,at:Date.now()});
+    if(shuttingDown)return;shuttingDown=true;tell('shutdown-start',{reason,at:Date.now()});stage('shutdown','Releasing Pixelorama memory…');status.hidden=false;await releaseEngine({restoreAnchor:true});pendingAsset=null;tell('quit-ack',{reason,at:Date.now()});
   }
 
   addEventListener('message',event=>{
     if(event.origin!==location.origin||event.source!==parent)return;const message=event.data||{};if(message.protocol!==PROTOCOL)return;
     if(message.type==='asset'){
-      const p=message.payload||{};
-      if(!(p.buffer instanceof ArrayBuffer)){tell('error',{code:'ASSET_BUFFER_INVALID',message:'Expected transferable ArrayBuffer'});return;}
-      pendingAsset={name:String(p.name||'kelo-asset.png'),mime:String(p.mime||'image/png'),buffer:p.buffer};lastAssetStage='received';lastAssetName=pendingAsset.name;
-      tell('asset-received',{name:lastAssetName,bytes:p.buffer.byteLength,mime:pendingAsset.mime,at:Date.now()});if(engine)void tryOpenPending();
+      const p=message.payload||{};if(!(p.buffer instanceof ArrayBuffer)){tell('error',{code:'ASSET_BUFFER_INVALID',message:'Expected transferable ArrayBuffer'});return;}
+      pendingAsset={name:String(p.name||'kelo-asset.png'),mime:String(p.mime||'image/png'),buffer:p.buffer};lastAssetStage='received';lastAssetName=pendingAsset.name;tell('asset-received',{name:lastAssetName,bytes:p.buffer.byteLength,mime:pendingAsset.mime,at:Date.now()});if(engine)void tryOpenPending();
     }else if(message.type==='quit')void shutdown('parent-request');
     else if(message.type==='ping')tell('pong',{...health(),pongAt:Date.now(),pingAt:Number(message.payload?.at)||0});
   });
   for(const type of ['pointerdown','pointermove','keydown','touchstart'])addEventListener(type,markActive,{passive:true});
-  addEventListener('pagehide',()=>{clearIdleTimers();pendingAsset=null;},{once:true});installDownloadBridge();
+  addEventListener('pagehide',()=>{clearIdleTimers();pendingAsset=null;restoreRuntimeTransport();},{once:true});installDownloadBridge();
 
   (async()=>{
     try{
-      await loadScript(`${BASE}/index.js`);if(typeof window.Engine!=='function')throw new Error('PIXELORAMA_ENGINE_API_MISSING');
-      try{
-        await startEngine(KELO_PCK,'kelo-custom-pck');
-      }catch(customError){
-        customFallbackReason=String(customError?.message||customError);console.warn('[Kelo Pixelorama] custom PCK fallback',customError);
-        tell('custom-pack-fallback',{reason:customFallbackReason,keloPckCommit:KELO_PCK_COMMIT,at:Date.now()});status.hidden=false;
-        await releaseEngine();await new Promise(resolve=>setTimeout(resolve,60));
-        await startEngine(STOCK_PCK,'stock-fallback');
+      if(FORCE_STOCK){
+        packSource='stock-fallback';runtimeTransport='jsdelivr-stock';await loadStockEngineScript();await startEngine({source:'stock-fallback',executable:`${STOCK_BASE}/index`,mainPack:`${STOCK_BASE}/index.pck`,requireNative:false});return;
       }
+      installRuntimeTransport();await loadMatchedEngineScript();await startEngine({source:'kelo-matched-runtime',executable:RUNTIME_BASE,mainPack:`${RUNTIME_BASE}.pck`,requireNative:true});
     }catch(error){
-      console.error('[Kelo Pixelorama]',error);runtimeMode='boot-failed';setStatus(`Pixelorama could not start: ${String(error?.message||error)}`);tell('error',{code:'BOOT_FAILED',message:String(error?.message||error),packSource,keloPckCommit:KELO_PCK_COMMIT});
+      console.error('[Kelo Pixelorama]',error);
+      if(!FORCE_STOCK){reloadStockFallback(error);return;}
+      runtimeMode='boot-failed';stage('boot-failed',`Pixelorama could not start: ${String(error?.message||error)}`);tell('error',{code:'BOOT_FAILED',message:String(error?.message||error),packSource,runtimeCommit:KELO_RUNTIME_COMMIT,bootStage,runtimeTransport});
     }
   })();
 })();
