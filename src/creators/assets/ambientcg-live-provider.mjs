@@ -1,10 +1,10 @@
 /* KELO-INDEX
  * area: CREATORS / EXTERNAL CONTENT / AMBIENTCG
  * owner: Kelo Universal Content Bridge
- * keys: AMBIENTCG V3 CC0 PBR HDRI MODEL TEXTURE LAZY MOBILE
+ * keys: AMBIENTCG V3 CC0 PBR HDRI MODEL TEXTURE LAZY MOBILE PAGING
  * purpose: search ambientCG through its official v3 API while returning metadata/thumbnails only; heavy archives remain source-resolved on explicit user action
  */
-import {fetchProviderJson,mobilePageBudget,clearExternalProviderRuntimeCache} from './external-provider-runtime.mjs?v=1';
+import {fetchProviderJson,mobilePageWindow,clearExternalProviderRuntimeCache} from './external-provider-runtime.mjs?v=3';
 
 const API='https://ambientcg.com/api/v3/assets';
 function clean(value){return String(value??'').trim();}
@@ -15,9 +15,9 @@ function dimensionsOf(raw){if(!raw||typeof raw!=='object')return null;const widt
 function normalize(item,index){const id=clean(item?.id||item?.assetId||`asset-${index}`),type=clean(item?.type||item?.dataType||'material'),preview=firstThumbnail(item?.thumbnails||item?.previewData),source=clean(item?.url)||`https://ambientcg.com/view?id=${encodeURIComponent(id)}`;return{id:`ambientcg:${id}`,provider:'ambientcg',externalId:id,name:clean(item?.title||item?.displayName||id),category:type||'material',contentKind:kindOf(type),previewKind:'image',tags:Array.isArray(item?.tags)?item.tags.slice(0,30):[],previewUrl:preview,downloadUrl:null,sourceUrl:source,license:'CC0-1.0',author:'ambientCG',attributionRequired:false,ownership:'discovered',description:clean(item?.shortDescription||item?.longDescription||''),dimensions:dimensionsOf(item?.dimensions),downloadable:false,integrationReady:false,verified:true,catalogOnly:true,heavyExternal:true};}
 
 export async function searchAmbientCgAssets(query='',options={}){
-  const requested=Math.max(1,Number(options.limit)||24),limit=mobilePageBudget(requested,{heavy:true}),offset=Math.max(0,Number(options.offset)||0),params=new URLSearchParams({limit:String(limit),offset:String(offset),sort:'popular',include:'type,title,url,thumbnails,tags,dimensions,shortDescription'});
+  const requested=Math.max(1,Number(options.limit)||24),window=mobilePageWindow(requested,options.offset,{heavy:true}),limit=window.limit,apiOffset=window.offset,params=new URLSearchParams({limit:String(limit),offset:String(apiOffset),sort:'popular',include:'type,title,url,thumbnails,tags,dimensions,shortDescription'});
   if(clean(query))params.set('q',clean(query));
-  const url=`${API}?${params.toString()}`,data=await fetchProviderJson('ambientcg',url,{ttlMs:10*60*1000,maxBytes:900_000,cacheKey:`ambientcg:${params.toString()}`}),rows=rowsOf(data),assets=rows.map(normalize).filter(a=>a.externalId);
-  return{assets,offset,limit,total:Number(data?.total||data?.totalAssets||data?.numberOfResults||0)||null,hasMore:rows.length>=limit,engine:'ambientcg-v3-bounded'};
+  const url=`${API}?${params.toString()}`,data=await fetchProviderJson('ambientcg',url,{ttlMs:10*60*1000,maxBytes:900_000,cacheKey:`ambientcg:${params.toString()}`}),rows=rowsOf(data),assets=rows.map(normalize).filter(a=>a.externalId),total=Number(data?.total||data?.totalAssets||data?.numberOfResults||0)||null;
+  return{assets,offset:window.sourceOffset,limit,total,hasMore:total?apiOffset+rows.length<total:rows.length>=limit,engine:'ambientcg-v3-bounded'};
 }
 export function clearAmbientCgCache(){clearExternalProviderRuntimeCache('ambientcg:');}
