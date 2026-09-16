@@ -82,6 +82,8 @@ jobs:
         run: node scripts/asset-png-independent-audit.mjs
       - name: Deterministic PNG compiler self-test
         run: node scripts/asset-space-compiler-audit.mjs
+      - name: Real CLI startup / fingerprint / provenance smoke
+        run: node scripts/asset-space-cli-smoke-audit.mjs
       - name: Meta policy / seam / tournament / boundary audit
         run: node scripts/asset-space-meta-audit.mjs
       - name: Existing Asset Sheet compatibility audit
