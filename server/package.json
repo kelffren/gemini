@@ -10,7 +10,7 @@
     "test:smoke": "node smoke-test.js",
     "test:persistence": "node persistence-smoke-test.js",
     "test:avatar-realtime": "node avatar-realtime-smoke-test.js",
-    "test:sprite-ai": "node sprite-ai-smoke-test.js"
+    "test:sprite-ai": "node sprite-ai-smoke-test.js && node sprite-ai-resource-governor-test.js"
   },
   "dependencies": {
     "@gradio/client": "2.6.0",

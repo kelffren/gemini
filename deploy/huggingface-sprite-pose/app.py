@@ -1,9 +1,9 @@
 # KELO-INDEX
 # area: DEPLOY / SPRITE AI / REAL SKELETON
 # owner: Kelo Sprite Pose Space
-# purpose: generate one 4-frame directional row using real OpenPose-style ControlNet conditioning + IP-Adapter identity guidance
-# online: exposed through Gradio /generate_pose; Kelo server remains auth/rate-limit/credential boundary
-# do-not: no gameplay state, no Kelo auth, no provider secrets in returned payload
+# purpose: generate one 4-frame directional row using batched OpenPose ControlNet + IP-Adapter identity guidance
+# online: exposed through Gradio /generate_pose; optimized for free ZeroGPU large (48 GB, 1x quota)
+# do-not: no gameplay state, no Kelo auth, no provider secrets, no xlarge-only assumptions
 
 import base64
 import io
@@ -22,13 +22,11 @@ CONTROLNET_MODEL = "xinsir/controlnet-openpose-sdxl-1.0"
 IP_ADAPTER_MODEL = "h94/IP-Adapter"
 PIXEL_LORA_MODEL = "ntc-ai/SDXL-LoRA-slider.pixel-art"
 PIXEL_LORA_WEIGHT = "pixel art.safetensors"
-CANVAS = 512
+REFERENCE_SIZE = 512
 CELL = 128
 MAX_SEED = 2**31 - 1
+NEGATIVE = "photorealistic, 3d render, blurry, painterly, extra limbs, missing limbs, deformed hands, duplicate character, multiple characters, text, label, border, scenery, gradient background"
 
-# SDXL + ControlNet provides the structural pose authority. IP-Adapter carries the
-# master-character appearance into every frame. A small SDXL pixel-art LoRA biases
-# rendering toward game-asset texture; Kelo's deterministic compiler remains final QA.
 controlnet = ControlNetModel.from_pretrained(CONTROLNET_MODEL, torch_dtype=torch.float16)
 pipe = StableDiffusionXLControlNetPipeline.from_pretrained(
     BASE_MODEL,
@@ -36,42 +34,21 @@ pipe = StableDiffusionXLControlNetPipeline.from_pretrained(
     torch_dtype=torch.float16,
     use_safetensors=True,
 )
-pipe.load_ip_adapter(
-    IP_ADAPTER_MODEL,
-    subfolder="sdxl_models",
-    weight_name="ip-adapter_sdxl.bin",
-)
+pipe.load_ip_adapter(IP_ADAPTER_MODEL, subfolder="sdxl_models", weight_name="ip-adapter_sdxl.bin")
 pipe.set_ip_adapter_scale(0.82)
-pipe.load_lora_weights(
-    PIXEL_LORA_MODEL,
-    weight_name=PIXEL_LORA_WEIGHT,
-    adapter_name="pixel_art",
-)
+pipe.load_lora_weights(PIXEL_LORA_MODEL, weight_name=PIXEL_LORA_WEIGHT, adapter_name="pixel_art")
 pipe.set_adapters(["pixel_art"], adapter_weights=[1.15])
 pipe.to("cuda")
 
-# OpenPose-like body palette and topology. Exact semantic joints stay provider-neutral
-# in Kelo; this renderer converts normalized Kelo biped joints into a ControlNet image.
 LIMBS = [
-    ("neck", "rightShoulder"),
-    ("rightShoulder", "rightElbow"),
-    ("rightElbow", "rightHand"),
-    ("neck", "leftShoulder"),
-    ("leftShoulder", "leftElbow"),
-    ("leftElbow", "leftHand"),
-    ("neck", "hips"),
-    ("hips", "rightHip"),
-    ("rightHip", "rightKnee"),
-    ("rightKnee", "rightFoot"),
-    ("hips", "leftHip"),
-    ("leftHip", "leftKnee"),
-    ("leftKnee", "leftFoot"),
-    ("head", "neck"),
+    ("neck", "rightShoulder"), ("rightShoulder", "rightElbow"), ("rightElbow", "rightHand"),
+    ("neck", "leftShoulder"), ("leftShoulder", "leftElbow"), ("leftElbow", "leftHand"),
+    ("neck", "hips"), ("hips", "rightHip"), ("rightHip", "rightKnee"), ("rightKnee", "rightFoot"),
+    ("hips", "leftHip"), ("leftHip", "leftKnee"), ("leftKnee", "leftFoot"), ("head", "neck"),
 ]
 COLORS = [
-    (255, 0, 0), (255, 85, 0), (255, 170, 0), (255, 255, 0),
-    (170, 255, 0), (85, 255, 0), (0, 255, 0), (0, 255, 85),
-    (0, 255, 170), (0, 255, 255), (0, 170, 255), (0, 85, 255),
+    (255, 0, 0), (255, 85, 0), (255, 170, 0), (255, 255, 0), (170, 255, 0), (85, 255, 0),
+    (0, 255, 0), (0, 255, 85), (0, 255, 170), (0, 255, 255), (0, 170, 255), (0, 85, 255),
     (0, 0, 255), (85, 0, 255),
 ]
 
@@ -83,11 +60,9 @@ def _decode_reference(data_url: str) -> Image.Image:
         raise gr.Error("A PNG/WebP/JPEG master-character data URL is required.")
     raw = base64.b64decode(re.sub(r"\s+", "", match.group(1)), validate=True)
     image = Image.open(io.BytesIO(raw)).convert("RGB")
-    # Keep aspect ratio and center on white so the identity encoder does not receive
-    # a stretched character.
-    image.thumbnail((CANVAS, CANVAS), Image.Resampling.LANCZOS)
-    canvas = Image.new("RGB", (CANVAS, CANVAS), (255, 255, 255))
-    canvas.paste(image, ((CANVAS - image.width) // 2, (CANVAS - image.height) // 2))
+    image.thumbnail((REFERENCE_SIZE, REFERENCE_SIZE), Image.Resampling.LANCZOS)
+    canvas = Image.new("RGB", (REFERENCE_SIZE, REFERENCE_SIZE), (255, 255, 255))
+    canvas.paste(image, ((REFERENCE_SIZE - image.width) // 2, (REFERENCE_SIZE - image.height) // 2))
     return canvas
 
 
@@ -97,7 +72,7 @@ def _to_data_url(image: Image.Image) -> str:
     return "data:image/png;base64," + base64.b64encode(buffer.getvalue()).decode("ascii")
 
 
-def _safe_point(value):
+def _safe_point(value, size):
     if not isinstance(value, (list, tuple)) or len(value) < 2:
         return None
     try:
@@ -105,7 +80,7 @@ def _safe_point(value):
         y = max(0.0, min(1.0, float(value[1])))
     except (TypeError, ValueError):
         return None
-    return (int(round(x * (CANVAS - 1))), int(round(y * (CANVAS - 1))))
+    return (int(round(x * (size - 1))), int(round(y * (size - 1))))
 
 
 def _pose_frames(raw_json: str):
@@ -126,9 +101,8 @@ def _pose_frames(raw_json: str):
     return frames[:4]
 
 
-def _render_pose(frame: dict) -> Image.Image:
+def _render_pose(frame: dict, size: int) -> Image.Image:
     points = dict(frame.get("keypoints") or {})
-    # Backward-compatible aliases from V3 semantic templates.
     points.setdefault("neck", points.get("chest"))
     points.setdefault("leftHip", points.get("hips"))
     points.setdefault("rightHip", points.get("hips"))
@@ -136,11 +110,11 @@ def _render_pose(frame: dict) -> Image.Image:
     points.setdefault("rightHand", points.get("rightWrist"))
     points.setdefault("leftFoot", points.get("leftAnkle"))
     points.setdefault("rightFoot", points.get("rightAnkle"))
-    xy = {name: _safe_point(value) for name, value in points.items()}
-    pose = Image.new("RGB", (CANVAS, CANVAS), (0, 0, 0))
+    xy = {name: _safe_point(value, size) for name, value in points.items()}
+    pose = Image.new("RGB", (size, size), (0, 0, 0))
     draw = ImageDraw.Draw(pose)
-    width = max(5, CANVAS // 64)
-    radius = max(5, CANVAS // 80)
+    width = max(4, size // 64)
+    radius = max(4, size // 80)
     for index, (a, b) in enumerate(LIMBS):
         pa, pb = xy.get(a), xy.get(b)
         if pa and pb:
@@ -155,8 +129,7 @@ def _render_pose(frame: dict) -> Image.Image:
 
 def _frame_prompt(subject: str, direction: str, action: str, phase: str, style_hint: str, retry_hint: str) -> str:
     return (
-        f"{subject}\n"
-        f"One full-body game character facing {direction}, performing {action}, animation phase {phase}. "
+        f"{subject}\nOne full-body game character facing {direction}, performing {action}, animation phase {phase}. "
         "Preserve EXACTLY the identity, face, hair, clothing, armor, weapon, body proportions and color palette from the reference image. "
         "Follow the supplied pose skeleton for limb placement. Do not redesign the character. "
         "Crisp pixel art, strong readable silhouette, separated limbs, consistent feet baseline, plain uniform white background, no scenery, no text, no border, no shadow. "
@@ -164,24 +137,34 @@ def _frame_prompt(subject: str, direction: str, action: str, phase: str, style_h
     ).strip()
 
 
-def _sample(prompt: str, reference: Image.Image, pose_image: Image.Image, seed: int) -> Image.Image:
-    generator = torch.Generator(device="cuda").manual_seed(seed)
+def _quality_profile(retry_hint: str):
+    if (retry_hint or "").strip():
+        return {"tier": "repair", "size": 448, "steps": 16, "guidance": 5.2, "duration": 105}
+    return {"tier": "draft", "size": 384, "steps": 12, "guidance": 4.6, "duration": 75}
+
+
+def _gpu_duration(subject_prompt: str, source_image_data_url: str, seed: int = 0, direction: str = "S", action: str = "walk", pose_template_json: str = "", style_hint: str = "", retry_hint: str = ""):
+    return _quality_profile(retry_hint)["duration"]
+
+
+def _batch_sample(prompts, reference, pose_images, seed: int, profile):
+    generators = [torch.Generator(device="cuda").manual_seed((seed + index) % MAX_SEED) for index in range(len(prompts))]
     result = pipe(
-        prompt=prompt,
-        negative_prompt="photorealistic, 3d render, blurry, painterly, extra limbs, missing limbs, deformed hands, duplicate character, multiple characters, text, label, border, scenery, gradient background",
-        image=pose_image,
+        prompt=prompts,
+        negative_prompt=[NEGATIVE] * len(prompts),
+        image=pose_images,
         ip_adapter_image=reference,
-        width=CANVAS,
-        height=CANVAS,
-        num_inference_steps=22,
-        guidance_scale=5.5,
+        width=profile["size"],
+        height=profile["size"],
+        num_inference_steps=profile["steps"],
+        guidance_scale=profile["guidance"],
         controlnet_conditioning_scale=1.0,
-        generator=generator,
-    ).images[0].convert("RGB")
-    return result.resize((CELL, CELL), Image.Resampling.NEAREST)
+        generator=generators,
+    ).images
+    return [image.convert("RGB").resize((CELL, CELL), Image.Resampling.NEAREST) for image in result]
 
 
-@spaces.GPU(duration=180)
+@spaces.GPU(duration=_gpu_duration)
 def generate_pose(subject_prompt: str, source_image_data_url: str, seed: int = 0, direction: str = "S", action: str = "walk", pose_template_json: str = "", style_hint: str = "", retry_hint: str = ""):
     seed = int(seed or 0)
     if seed <= 0:
@@ -191,17 +174,26 @@ def generate_pose(subject_prompt: str, source_image_data_url: str, seed: int = 0
     action = (action or "walk").strip().lower()
     reference = _decode_reference(source_image_data_url)
     frames = _pose_frames(pose_template_json)
-    row = Image.new("RGB", (CELL * 4, CELL), (255, 255, 255))
-    pose_previews = []
-    for index, frame in enumerate(frames):
-        pose_image = _render_pose(frame)
+    profile = _quality_profile(retry_hint)
+
+    # Walk draft uses three unique frames and reuses passing-a as frame 4 (0→1→2→1).
+    # A QA retry automatically switches to four unique frames at higher quality.
+    synthesize_fourth = action == "walk" and profile["tier"] == "draft"
+    source_frames = frames[:3] if synthesize_fourth else frames
+    prompts, pose_images = [], []
+    for index, frame in enumerate(source_frames):
         phase = str(frame.get("phase") or frame.get("name") or f"frame-{index+1}")
-        prompt = _frame_prompt(subject_prompt or "Premium dark-fantasy MMORPG character", direction, action, phase, style_hint, retry_hint)
-        output = _sample(prompt, reference, pose_image, (seed + index) % MAX_SEED)
+        prompts.append(_frame_prompt(subject_prompt or "Premium dark-fantasy MMORPG character", direction, action, phase, style_hint, retry_hint))
+        pose_images.append(_render_pose(frame, profile["size"]))
+
+    outputs = _batch_sample(prompts, reference, pose_images, seed, profile)
+    final_outputs = [outputs[0], outputs[1], outputs[2], outputs[1]] if synthesize_fourth else outputs[:4]
+    row = Image.new("RGB", (CELL * 4, CELL), (255, 255, 255))
+    for index, output in enumerate(final_outputs):
         row.paste(output, (index * CELL, 0))
-        pose_previews.append(pose_image.resize((CELL, CELL), Image.Resampling.NEAREST))
+
     metadata = json.dumps({
-        "version": "kelo-real-skeleton-v1",
+        "version": "kelo-real-skeleton-v3-free-max",
         "conditioning": "controlnet-openpose+ip-adapter",
         "baseModel": BASE_MODEL,
         "controlNet": CONTROLNET_MODEL,
@@ -210,13 +202,21 @@ def generate_pose(subject_prompt: str, source_image_data_url: str, seed: int = 0
         "direction": direction,
         "action": action,
         "frames": 4,
+        "uniqueGpuFrames": len(source_frames),
+        "synthesizedFourth": synthesize_fourth,
+        "loopPattern": "0-1-2-1" if synthesize_fourth else "0-1-2-3",
+        "batchSize": len(source_frames),
         "seed": seed,
+        "qualityTier": profile["tier"],
+        "workingResolution": profile["size"],
+        "steps": profile["steps"],
+        "zeroGpuSizeTarget": "large-48gb-1x-quota",
     })
     return _to_data_url(row), row, metadata
 
 
 with gr.Blocks(title="Kelo Sprite Pose · Real Skeleton") as demo:
-    gr.Markdown("# Kelo Sprite Pose · Real Skeleton\nSDXL + OpenPose ControlNet + IP-Adapter identity conditioning. Kelo Sprite Compiler remains the final QA authority.")
+    gr.Markdown("# Kelo Sprite Pose · Real Skeleton\nQuota-aware batched SDXL + OpenPose + IP-Adapter. Walk drafts use 3 unique GPU frames; Frame Doctor escalates only failing rows to 4-frame repair quality.")
     subject = gr.Textbox(label="Character description", value="Premium dark-fantasy MMORPG character")
     source = gr.Textbox(label="Master reference data URL", visible=False)
     seed = gr.Number(label="Seed", value=0, precision=0)
