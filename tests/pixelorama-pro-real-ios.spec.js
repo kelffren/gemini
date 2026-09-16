@@ -1,8 +1,8 @@
 /* KELO-INDEX
  * area: TEST / CREATORS / PIXELORAMA PRO / REAL IOS
  * owner: Kelo creator-runtime mobile gate
- * purpose: prove the Kelo custom Pixelorama PCK boots with its native bridge on real Safari/iPhone, hibernates gameplay while open, heartbeats, and releases every exclusive-runtime claim on close
- * do-not: NO emulated-iPhone claim, NO stock-fallback acceptance, NO external editor navigation
+ * purpose: prove the matched Kelo Pixelorama Web export boots with its native bridge on WebKit/real Safari, hibernates gameplay while open, opens the transferred asset, heartbeats, and releases every exclusive-runtime claim on close
+ * do-not: NO emulated-iPhone certification claim, NO stock-fallback acceptance, NO external editor navigation, NO opaque READY timeout
  */
 const { test, expect } = require('@playwright/test');
 
@@ -13,7 +13,23 @@ async function exclusiveSnapshot(page){
   });
 }
 
-test('Pixelorama Pro custom PCK boots natively and fully restores Kelo after close', async ({ page }) => {
+async function pixeloramaEvidence(page){
+  return page.evaluate(()=>{
+    const messages=window.__KELO_PIXELORAMA_TEST_MESSAGES__||[];
+    return {
+      ready:messages.find(message=>message.type==='ready')?.payload||null,
+      fallback:messages.find(message=>message.type==='custom-pack-fallback')||null,
+      errors:messages.filter(message=>message.type==='error').map(message=>message.payload),
+      opened:messages.find(message=>message.type==='asset-opened')?.payload||null,
+      stages:messages.filter(message=>message.type==='boot-stage').map(message=>message.payload),
+      fetches:messages.filter(message=>message.type==='runtime-fetch').map(message=>message.payload),
+      fetchFallbacks:messages.filter(message=>message.type==='runtime-fetch-fallback').map(message=>message.payload),
+      messageTypes:messages.map(message=>message.type)
+    };
+  });
+}
+
+test('Pixelorama Pro matched runtime boots natively and fully restores Kelo after close', async ({ page }) => {
   test.setTimeout(180000);
 
   const response=await page.goto('./?pixeloramaRealIOS=1',{waitUntil:'domcontentloaded',timeout:45000});
@@ -64,30 +80,50 @@ test('Pixelorama Pro custom PCK boots natively and fully restores Kelo after clo
   expect(during.renderIntercepted).toBe(true);
   expect(during.simulationSuspended).toBe(true);
 
-  await page.waitForFunction(()=>window.__KELO_PIXELORAMA_TEST_MESSAGES__?.some(message=>
-    message.type==='ready' &&
-    message.payload?.mode==='kelo-custom-pck' &&
-    message.payload?.packSource==='kelo-custom-pck' &&
-    message.payload?.nativeBridge===true &&
-    message.payload?.bridgeVersion==='kelo.pixelorama.session-doctor.v2-custom-pck'
-  ),null,{timeout:120000});
+  let bootTimedOut=false;
+  try{
+    await page.waitForFunction(()=>{
+      const messages=window.__KELO_PIXELORAMA_TEST_MESSAGES__||[];
+      return messages.some(message=>
+        message.type==='ready' &&
+        message.payload?.mode==='kelo-custom-pck' &&
+        message.payload?.packSource==='kelo-matched-runtime' &&
+        message.payload?.nativeBridge===true &&
+        message.payload?.runtimeCommit==='5d2a3b99180ebeb1705cee865e7f6927df2352b5' &&
+        message.payload?.bridgeVersion==='kelo.pixelorama.session-doctor.v3-matched-runtime'
+      ) || messages.some(message=>message.type==='custom-pack-fallback'||message.type==='error');
+    },null,{timeout:120000});
+  }catch{bootTimedOut=true;}
+
+  const bootEvidence=await pixeloramaEvidence(page);
+  expect(bootTimedOut,`Pixelorama boot timed out. Evidence: ${JSON.stringify(bootEvidence)}`).toBe(false);
+  expect(bootEvidence.fallback,`Matched runtime fell back. Evidence: ${JSON.stringify(bootEvidence)}`).toBeNull();
+  expect(bootEvidence.errors,`Pixelorama emitted runtime errors. Evidence: ${JSON.stringify(bootEvidence)}`).toEqual([]);
+  expect(bootEvidence.ready,`Matched runtime never reached READY. Evidence: ${JSON.stringify(bootEvidence)}`).toMatchObject({
+    mode:'kelo-custom-pck',
+    packSource:'kelo-matched-runtime',
+    nativeBridge:true,
+    threads:false,
+    runtimeCommit:'5d2a3b99180ebeb1705cee865e7f6927df2352b5',
+    bridgeVersion:'kelo.pixelorama.session-doctor.v3-matched-runtime'
+  });
+  expect(['github-raw','github-api-raw']).toContain(bootEvidence.ready.runtimeTransport);
+  expect(bootEvidence.fetches.some(item=>item.name==='index.js')).toBe(true);
+  expect(bootEvidence.fetches.some(item=>item.name==='index.wasm')).toBe(true);
+  expect(bootEvidence.fetches.some(item=>item.name==='index.pck')).toBe(true);
 
   await page.waitForFunction(()=>window.__KELO_PIXELORAMA_TEST_MESSAGES__?.some(message=>
     message.type==='pong' &&
     message.payload?.nativeBridge===true &&
-    message.payload?.packSource==='kelo-custom-pck'
+    message.payload?.packSource==='kelo-matched-runtime'
   ),null,{timeout:15000});
 
-  const runtimeEvidence=await page.evaluate(()=>({
-    ready:window.__KELO_PIXELORAMA_TEST_MESSAGES__.find(message=>message.type==='ready')?.payload||null,
-    fallback:window.__KELO_PIXELORAMA_TEST_MESSAGES__.find(message=>message.type==='custom-pack-fallback')||null,
-    errors:window.__KELO_PIXELORAMA_TEST_MESSAGES__.filter(message=>message.type==='error').map(message=>message.payload),
-    opened:window.__KELO_PIXELORAMA_TEST_MESSAGES__.find(message=>message.type==='asset-opened')?.payload||null
-  }));
-  expect(runtimeEvidence.ready).toMatchObject({mode:'kelo-custom-pck',packSource:'kelo-custom-pck',nativeBridge:true,threads:false});
-  expect(runtimeEvidence.fallback).toBeNull();
-  expect(runtimeEvidence.errors).toEqual([]);
-  expect(runtimeEvidence.opened?.mode).toBe('native');
+  await page.waitForFunction(()=>window.__KELO_PIXELORAMA_TEST_MESSAGES__?.some(message=>
+    message.type==='asset-opened' && message.payload?.mode==='native'
+  ),null,{timeout:15000});
+
+  const runtimeEvidence=await pixeloramaEvidence(page);
+  expect(runtimeEvidence.opened,`Asset was not opened by native bridge. Evidence: ${JSON.stringify(runtimeEvidence)}`).toMatchObject({mode:'native'});
 
   await overlay.getByRole('button',{name:'BACK TO KELO'}).click();
   await expect(overlay).toHaveCount(0,{timeout:10000});
