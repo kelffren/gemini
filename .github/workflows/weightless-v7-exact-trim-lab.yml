@@ -1,0 +1,39 @@
+name: Weightless V7 Exact Alpha Trim Lab
+
+on:
+  push:
+    branches:
+      - feature/weightless-v7-exact-trim-lab
+    paths:
+      - 'scripts/exact-alpha-trim-lab.mjs'
+      - 'src/creators/assets/png-space-optimizer.mjs'
+      - 'assets/justicia_fountain_v2.PNG'
+      - 'assets/world/imperial-plaza/arbol-redondo.png'
+      - '.github/workflows/weightless-v7-exact-trim-lab.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  exact-alpha-trim:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - name: Measure exact alpha-bound PNG candidates
+        run: node scripts/exact-alpha-trim-lab.mjs --report=test-results/exact-alpha-trim/report.json
+      - name: Publish exact trim summary
+        if: always()
+        run: |
+          if [ -f test-results/exact-alpha-trim/report.json ]; then
+            node -e "const r=require('./test-results/exact-alpha-trim/report.json'); const t=r.totals; require('fs').appendFileSync(process.env.GITHUB_STEP_SUMMARY, '# Weightless V7 exact alpha trim\n\nSOURCE: '+t.sourceBytes+' B\n\nCandidates: '+t.candidateBytes+' B\n\nExact saving: '+t.savedBytes+' B ('+t.savedPercent+'%)\n')"
+          fi
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: kelo-weightless-v7-exact-alpha-trim
+          path: test-results/exact-alpha-trim
+          if-no-files-found: error
