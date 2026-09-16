@@ -19,8 +19,10 @@ check('owner and entitlement are only access grants',/CREATOR_OWNER/.test(migrat
 check('access list includes authored and entitled revisions',/list_my_creator_content_access/.test(migration)&&/'creator_owner'/.test(migration)&&/'entitlement'/.test(migration));
 check('guard has no local ownership persistence',!/localStorage|indexedDB|sessionStorage/.test(guard));
 check('guard reuses existing auth providers',/bindProvider/.test(guard)&&/KeloOnlineAuth/.test(guard)&&!/createClient\s*\(/.test(guard));
+check('bound provider identity cannot fall through to another account',/function currentAccount\(\)\{return provider\?providerAccount\(\):/.test(guard)&&/if\(provider\)\{me=providerAccount\(\);if\(!me\)\{clear\('provider-signed-out'\)/.test(guard));
 check('creator repository exposes access RPCs',/listMyCreatorContentAccess/.test(repo)&&/checkCreatorContentAccess/.test(repo));
 check('creator entry binds repository provider',/creator-content-repository/.test(entry)&&/bindProvider/.test(entry)&&/listMyCreatorContentAccess/.test(entry));
+check('creator auth changes refresh entitlement cache',/contentSession\.onChange/.test(market)&&/KeloCreatorEntitlements\?\.refresh/.test(market));
 check('ingest stamps revision and owner',/revisionId:revision\.id/.test(ingest)&&/ownerUserId/.test(ingest));
 check('registry gates before runtime adapter',/KeloCreatorEntitlements/.test(registry)&&/status:'restricted'/.test(registry)&&/const permission=access\(record\)/.test(registry));
 check('registry exposes use-safe lookup',/getForUse/.test(registry)&&/reactivateRestricted/.test(registry));
