@@ -1,0 +1,167 @@
+{
+  "version": 1,
+  "source": "Kelo World",
+  "policy": "Declarative starter content. No executable code is stored in the vault.",
+  "assets": [
+    {
+      "id": "ember-lance",
+      "name": "Ember Lance",
+      "contentKind": "ability",
+      "category": "ability",
+      "tags": ["fire", "projectile", "combat", "skill"],
+      "license": "KELO-NATIVE",
+      "author": "Kelo World",
+      "inlineManifest": {
+        "definition": {
+          "id": 90001,
+          "key": "personal_ember_lance",
+          "name": "Ember Lance",
+          "icon": "🔥",
+          "slotType": "normal",
+          "role": "burst",
+          "targeting": {"type": "direction", "range": 420},
+          "resource": {"type": "mana", "cost": 18},
+          "cooldown": 4,
+          "input": {"mode": "press_release"},
+          "action": {"windup": 0.07, "active": 0.03, "recovery": 0.18, "movementScale": 0.8},
+          "telegraph": {"shape": "line", "range": 420, "width": 16},
+          "delivery": {"type": "projectile", "speed": 520, "radius": 13, "maxDistance": 420, "pierceCount": 0, "maxTargets": 1, "ownerIgnore": true, "teamFilter": "enemy", "wallCollision": true, "actorCollision": true, "sweptCollision": true},
+          "effects": [{"type": "damage", "damageType": "fire", "amount": 30}],
+          "visualProfileId": "personal_ember_lance_v1",
+          "visuals": {"color": "#ff7849", "fx": "fireball"}
+        }
+      }
+    },
+    {
+      "id": "frost-ring",
+      "name": "Frost Ring",
+      "contentKind": "ability",
+      "category": "ability",
+      "tags": ["ice", "nova", "control", "skill"],
+      "license": "KELO-NATIVE",
+      "author": "Kelo World",
+      "inlineManifest": {
+        "definition": {
+          "id": 90002,
+          "key": "personal_frost_ring",
+          "name": "Frost Ring",
+          "icon": "❄️",
+          "slotType": "normal",
+          "role": "control",
+          "targeting": {"type": "self"},
+          "resource": {"type": "mana", "cost": 22},
+          "cooldown": 7,
+          "input": {"mode": "instant"},
+          "action": {"windup": 0.06, "active": 0.04, "recovery": 0.22, "movementScale": 0.7},
+          "telegraph": {"shape": "circle", "radius": 120},
+          "delivery": {"type": "self_aoe", "radius": 120, "maxTargets": 32, "teamFilter": "enemy"},
+          "effects": [{"type": "damage", "damageType": "ice", "amount": 18}, {"type": "status", "status": "slow", "duration": 2, "magnitude": 0.35, "refreshPolicy": "refresh", "visualProfileId": "cc_slow_ice_01"}],
+          "visualProfileId": "personal_frost_ring_v1",
+          "visuals": {"color": "#8ed8ff", "fx": "ice_nova"}
+        }
+      }
+    },
+    {
+      "id": "gale-step",
+      "name": "Gale Step",
+      "contentKind": "ability",
+      "category": "ability",
+      "tags": ["wind", "dash", "mobility", "skill"],
+      "license": "KELO-NATIVE",
+      "author": "Kelo World",
+      "inlineManifest": {
+        "definition": {
+          "id": 90003,
+          "key": "personal_gale_step",
+          "name": "Gale Step",
+          "icon": "💨",
+          "slotType": "normal",
+          "role": "mobility",
+          "targeting": {"type": "direction", "range": 145},
+          "resource": {"type": "mana", "cost": 14},
+          "cooldown": 5,
+          "input": {"mode": "press_release"},
+          "action": {"windup": 0.02, "active": 0.16, "recovery": 0.12, "movementScale": 1},
+          "telegraph": {"shape": "dash", "range": 145},
+          "delivery": {"type": "dash", "distance": 145, "duration": 0.16, "directionSource": "aim", "collision": true, "invulnerability": 0},
+          "effects": [],
+          "visualProfileId": "personal_gale_step_v1",
+          "visuals": {"color": "#b8f2e6", "fx": "wind_dash"}
+        }
+      }
+    },
+    {
+      "id": "imperial-rest-corner",
+      "name": "Imperial Rest Corner",
+      "contentKind": "scene",
+      "category": "scene",
+      "tags": ["scene", "social", "bench", "lamps", "plaza"],
+      "license": "KELO-NATIVE",
+      "author": "Kelo World",
+      "inlineManifest": {
+        "prefabDefinition": {
+          "id": "creator-prefab:personal:imperial-rest-corner",
+          "version": 1,
+          "label": "Imperial Rest Corner",
+          "bounds": {"w": 384, "h": 224},
+          "children": [
+            {"prefabId": "imperial:banco", "dx": 128, "dy": 128, "bounds": {"w": 128, "h": 96}},
+            {"prefabId": "imperial:farola", "dx": 32, "dy": 96, "bounds": {"w": 64, "h": 96}},
+            {"prefabId": "imperial:farola", "dx": 288, "dy": 96, "bounds": {"w": 64, "h": 96}},
+            {"prefabId": "imperial:topiario", "dx": 16, "dy": 0, "bounds": {"w": 96, "h": 96}},
+            {"prefabId": "imperial:topiario", "dx": 272, "dy": 0, "bounds": {"w": 96, "h": 96}}
+          ]
+        }
+      }
+    },
+    {
+      "id": "imperial-ceremony-stage",
+      "name": "Imperial Ceremony Stage",
+      "contentKind": "scene",
+      "category": "scene",
+      "tags": ["scene", "stage", "ceremony", "social", "plaza"],
+      "license": "KELO-NATIVE",
+      "author": "Kelo World",
+      "inlineManifest": {
+        "prefabDefinition": {
+          "id": "creator-prefab:personal:imperial-ceremony-stage",
+          "version": 1,
+          "label": "Imperial Ceremony Stage",
+          "bounds": {"w": 448, "h": 288},
+          "children": [
+            {"prefabId": "imperial:plataforma-ceremonial", "dx": 144, "dy": 96, "bounds": {"w": 160, "h": 160}},
+            {"prefabId": "imperial:podio", "dx": 176, "dy": 64, "bounds": {"w": 96, "h": 96}},
+            {"prefabId": "imperial:estandarte", "dx": 64, "dy": 96, "bounds": {"w": 64, "h": 96}},
+            {"prefabId": "imperial:estandarte", "dx": 320, "dy": 96, "bounds": {"w": 64, "h": 96}},
+            {"prefabId": "imperial:brasero-azul", "dx": 16, "dy": 160, "bounds": {"w": 96, "h": 96}},
+            {"prefabId": "imperial:brasero-azul", "dx": 336, "dy": 160, "bounds": {"w": 96, "h": 96}}
+          ]
+        }
+      }
+    },
+    {
+      "id": "imperial-fountain-lounge",
+      "name": "Imperial Fountain Lounge",
+      "contentKind": "scene",
+      "category": "scene",
+      "tags": ["scene", "fountain", "social", "garden", "plaza"],
+      "license": "KELO-NATIVE",
+      "author": "Kelo World",
+      "inlineManifest": {
+        "prefabDefinition": {
+          "id": "creator-prefab:personal:imperial-fountain-lounge",
+          "version": 1,
+          "label": "Imperial Fountain Lounge",
+          "bounds": {"w": 512, "h": 352},
+          "children": [
+            {"prefabId": "imperial:fuente-justicia", "dx": 192, "dy": 64, "bounds": {"w": 128, "h": 128}},
+            {"prefabId": "imperial:banco", "dx": 64, "dy": 224, "bounds": {"w": 128, "h": 96}},
+            {"prefabId": "imperial:banco", "dx": 320, "dy": 224, "bounds": {"w": 128, "h": 96}},
+            {"prefabId": "imperial:arbol-florido-blanco", "dx": 0, "dy": 32, "bounds": {"w": 128, "h": 128}},
+            {"prefabId": "imperial:arbol-florido-azul", "dx": 384, "dy": 32, "bounds": {"w": 128, "h": 128}}
+          ]
+        }
+      }
+    }
+  ]
+}
