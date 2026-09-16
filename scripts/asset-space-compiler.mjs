@@ -1,211 +1,43 @@
 /* KELO-INDEX
  * area: BUILD / CREATOR ASSET INGEST
  * owner: Kelo Creator Asset Bridge
- * keys: PNG SPACE COMPILER CLI REPORT CAPTURE DIFF PROFILE QUALITY PERCEPTUAL FAST DEEP CACHE ATOMIC WRITE
- * purpose: recursively optimize PNG assets with fast-ingest/deep-publish effort, content-addressed reuse, evidence and quality reports
+ * keys: PNG SPACE COMPILER AUTO EFFORT PROVENANCE CACHE PERCEPTUAL PUBLISH ATOMIC WRITE
+ * purpose: optimize PNGs with evidence-driven effort, reproducible cache/provenance and fail-closed adaptive publishing
  * public-api: CLI only
- * state-owned: report files + disposable local cache; production filesystem writes happen only with --write
+ * state-owned: report/provenance files + disposable cache; source writes only after all requested gates pass
  * online: N/A; creator/build-time pipeline
- * consumes: PNG optimizer, adaptive optimizer, profiler, perceptual bridge, content-addressed cache
- * do-not: rewrite non-PNG files, mutate dimensions, or replace a file before quality approval
  */
 
 import fs from 'node:fs';
 import path from 'node:path';
-import {decodePngRgba, encodeRgbaPng, optimizePngLossless} from '../src/creators/assets/png-space-optimizer.mjs';
+import {decodePngRgba,encodeRgbaPng,optimizePngLossless} from '../src/creators/assets/png-space-optimizer.mjs';
 import {optimizePngAdaptive} from '../src/creators/assets/png-adaptive-optimizer.mjs';
 import {profileAssetImage} from '../src/creators/assets/asset-image-profiler.mjs';
 import {inspectPerceptualQuality} from '../src/creators/assets/perceptual-quality-bridge.mjs';
-import {buildOptimizationCacheKey, fingerprintFiles, readOptimizationCache, writeOptimizationCache} from '../src/creators/assets/asset-optimization-cache.mjs';
+import {buildOptimizationCacheKey,fingerprintFiles,readOptimizationCache,writeOptimizationCache,buildToolchainFingerprint} from '../src/creators/assets/asset-optimization-cache.mjs';
+import {optimizePngWithAdaptiveEffort} from '../src/creators/assets/asset-effort-controller.mjs';
+import {buildAssetProvenance,writeAssetProvenance} from '../src/creators/assets/asset-provenance.mjs';
 
-const args = process.argv.slice(2);
-const argument = (name, fallback = null) => {
-  const prefix = `--${name}=`;
-  const token = args.find(value => value.startsWith(prefix));
-  return token ? token.slice(prefix.length) : fallback;
-};
-const has = name => args.includes(`--${name}`);
+const args=process.argv.slice(2),argument=(name,fallback=null)=>{const prefix=`--${name}=`,token=args.find(v=>v.startsWith(prefix));return token?token.slice(prefix.length):fallback;},has=name=>args.includes(`--${name}`);
+const inputPath=path.resolve(argument('input','assets')),mode=argument('mode','strict'),reportPath=path.resolve(argument('report','dist/asset-space-report')),write=has('write'),requirePerceptual=has('require-perceptual')||(write&&mode==='adaptive'),capture=has('capture')||requirePerceptual,perceptual=has('perceptual')||requirePerceptual,effort=argument('effort',write?'auto':'fast'),maxFiles=Math.max(1,Number(argument('max-files','10000'))||10000),cacheEnabled=!has('no-cache'),cachePath=path.resolve(argument('cache','.cache/asset-space')),minSsimulacra2=Number(argument('ssimulacra2-min','90'));
+if(!['strict','adaptive'].includes(mode)){console.error('PNG_SPACE_COMPILER_INVALID_MODE');process.exit(2);}if(!['auto','fast','balanced','deep'].includes(effort)){console.error('PNG_SPACE_COMPILER_INVALID_EFFORT');process.exit(2);}if(!fs.existsSync(inputPath)){console.error(`PNG_SPACE_COMPILER_INPUT_NOT_FOUND — ${inputPath}`);process.exit(2);}
+const engineFingerprint=fingerprintFiles(['src/creators/assets/png-space-optimizer.mjs','src/creators/assets/png-conformance-guard.mjs','src/creators/assets/png-adaptive-optimizer.mjs','src/creators/assets/png-quality-agent.mjs','src/creators/assets/asset-image-profiler.mjs','src/creators/assets/asset-effort-controller.mjs','scripts/asset-space-compiler.mjs'].map(path.resolve)),toolchain=buildToolchainFingerprint();
+function walkPngs(target){const stat=fs.statSync(target);if(stat.isFile())return/\.png$/i.test(target)?[target]:[];const found=[],stack=[target];while(stack.length&&found.length<maxFiles){const dir=stack.pop();for(const entry of fs.readdirSync(dir,{withFileTypes:true})){const full=path.join(dir,entry.name);if(entry.isDirectory()){if(!['node_modules','.git','dist','test-results','.cache'].includes(entry.name))stack.push(full);}else if(entry.isFile()&&/\.png$/i.test(entry.name)){found.push(full);if(found.length>=maxFiles)break;}}}return found.sort();}
+const safeRelative=file=>path.relative(process.cwd(),file).replaceAll('\\','/'),fileKey=file=>safeRelative(file).replace(/[^a-z0-9._-]+/gi,'__'),human=bytes=>bytes<1024?`${bytes} B`:bytes<1024**2?`${(bytes/1024).toFixed(1)} KB`:`${(bytes/1024**2).toFixed(2)} MB`;
+function losslessOptionsFor(profile){if(effort==='deep')return{};if(effort==='balanced'||effort==='auto')return{filterStrategies:['adaptive',0,4]};return{filterStrategies:['adaptive'],disablePalette:(profile?.metrics?.uniqueColors||4097)>64};}
+function atomicReplace(file,buffer){const temp=`${file}.kelo-png-space-${process.pid}.tmp`;fs.writeFileSync(temp,buffer);fs.renameSync(temp,file);}
+function makeDiffPng(beforeBuffer,afterBuffer){const before=decodePngRgba(beforeBuffer),after=decodePngRgba(afterBuffer);if(before.ihdr.width!==after.ihdr.width||before.ihdr.height!==after.ihdr.height)throw new Error('PNG_SPACE_DIFF_DIMENSION_CHANGE');const rgba=Buffer.alloc(before.rgba.length);let changedPixels=0,maxDelta=0;for(let p=0;p<before.ihdr.width*before.ihdr.height;p+=1){const o=p*4;let delta=0;for(let c=0;c<4;c+=1)delta=Math.max(delta,Math.abs(before.rgba[o+c]-after.rgba[o+c]));if(!delta)continue;changedPixels+=1;maxDelta=Math.max(maxDelta,delta);rgba[o]=255;rgba[o+1]=delta>24?44:170;rgba[o+2]=35;rgba[o+3]=Math.max(64,Math.min(255,48+delta*8));}return{buffer:encodeRgbaPng(rgba,before.ihdr.width,before.ihdr.height,{level:9,filterStrategy:'adaptive'}),changedPixels,maxDelta};}
+function perceptualVerdict(report){const score=report?.metrics?.ssimulacra2;if(!requirePerceptual)return{required:false,pass:true,reason:null,score:score??null};if(score==null)return{required:true,pass:false,reason:'ssimulacra2-missing',score:null};return{required:true,pass:score>=minSsimulacra2,reason:score>=minSsimulacra2?null:`ssimulacra2<${minSsimulacra2}`,score};}
+function htmlEscape(v){return String(v).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');}
+function writeHtml(summary){const rows=summary.files.map(item=>`<article><h2>${htmlEscape(item.file)}</h2><p>${human(item.beforeBytes)} → ${human(item.afterBytes)} · -${item.savedPercent.toFixed(2)}% · ${htmlEscape(item.profile?.kind||'n/a')} · confidence ${item.profile?.confidence??'n/a'} · ${item.cache?.hit?'CACHE HIT':'CACHE MISS'}${item.publishApproved===false?' · PUBLISH BLOCKED':''}</p>${item.capture?`<div class="grid"><img src="${item.capture.before}"><img src="${item.capture.after}"><img src="${item.capture.diff}"></div>`:''}</article>`).join('\n');fs.writeFileSync(path.join(reportPath,'index.html'),`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Kelo Asset Space</title><style>body{font:14px system-ui;background:#101216;color:#f5f7fb;padding:16px}article{border:1px solid #333;padding:14px;margin:12px 0;border-radius:12px}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}img{max-width:100%;image-rendering:pixelated}@media(max-width:800px){.grid{grid-template-columns:1fr}}</style><h1>Kelo Asset Space Compiler</h1><p>${summary.fileCount} PNG · ${human(summary.beforeBytes)} → ${human(summary.afterBytes)} · -${summary.savedPercent.toFixed(2)}% · effort ${summary.effort}</p>${rows}`);}
 
-const inputPath = path.resolve(argument('input', 'assets'));
-const mode = argument('mode', 'strict');
-const reportPath = path.resolve(argument('report', 'dist/asset-space-report'));
-const write = has('write');
-const capture = has('capture');
-const perceptual = has('perceptual');
-const effort = argument('effort', write ? 'deep' : 'fast');
-const maxFiles = Math.max(1, Number(argument('max-files', '10000')) || 10000);
-const cacheEnabled = !has('no-cache');
-const cachePath = path.resolve(argument('cache', '.cache/asset-space'));
-
-if (!['strict', 'adaptive'].includes(mode)) {
-  console.error('PNG_SPACE_COMPILER_INVALID_MODE — use --mode=strict or --mode=adaptive');
-  process.exit(2);
+fs.mkdirSync(reportPath,{recursive:true});if(cacheEnabled)fs.mkdirSync(cachePath,{recursive:true});const captureDir=path.join(reportPath,'captures'),provenanceDir=path.join(reportPath,'provenance');if(capture)fs.mkdirSync(captureDir,{recursive:true});fs.mkdirSync(provenanceDir,{recursive:true});
+const files=walkPngs(inputPath),results=[];let totalBefore=0,totalAfter=0,cacheHits=0,cacheMisses=0,publishBlocked=0;
+for(const file of files){const original=fs.readFileSync(file),relative=safeRelative(file);let optimized,profile=null,cacheRecord={hit:false,enabled:cacheEnabled};try{const decoded=decodePngRgba(original);profile=profileAssetImage(decoded.rgba,decoded.ihdr.width,decoded.ihdr.height,{sourceName:relative});const losslessOptions=losslessOptionsFor(profile),descriptor=buildOptimizationCacheKey(original,{engineFingerprint,toolchainFingerprint:toolchain.sha256,mode,effort,profileKind:profile.kind,qualityPolicy:mode==='adaptive'?profile.adaptivePolicy:'strict',extra:{losslessOptions,confidence:profile.confidence,uniqueColors:profile.metrics.uniqueColors,pixelArtConfidence:profile.metrics.pixelArtConfidence}}),cached=cacheEnabled?readOptimizationCache(cachePath,descriptor):null;if(cached){optimized={buffer:cached.buffer,report:cached.report};cacheRecord={...cached.cache,enabled:true};cacheHits+=1;}else{if(mode==='adaptive')optimized=await optimizePngAdaptive(original,{sourceName:relative,assetProfile:profile,losslessOptions});else if(effort==='auto')optimized=optimizePngWithAdaptiveEffort(original,{profile,losslessOptions});else optimized=optimizePngLossless(original,losslessOptions);cacheMisses+=cacheEnabled?1:0;const written=cacheEnabled?writeOptimizationCache(cachePath,descriptor,optimized):null;cacheRecord={...(written||{}),hit:false,enabled:cacheEnabled};}}catch(error){const message=String(error?.message||error);results.push({file:relative,status:'skipped',mode,effort,beforeBytes:original.length,afterBytes:original.length,savedBytes:0,savedPercent:0,qualityScore:null,profile,cache:cacheRecord,error:message});totalBefore+=original.length;totalAfter+=original.length;console.warn(`SKIP ${relative} — ${message}`);continue;}
+  const report=optimized.report,after=optimized.buffer,key=fileKey(file);let captureRecord=null,perceptualReport=null;
+  if(capture){const beforeName=`${key}--before.png`,afterName=`${key}--after.png`,beforePath=path.join(captureDir,beforeName),afterPath=path.join(captureDir,afterName);fs.writeFileSync(beforePath,original);fs.writeFileSync(afterPath,after);captureRecord={before:`captures/${beforeName}`,after:`captures/${afterName}`};try{const diff=makeDiffPng(original,after),diffName=`${key}--diff.png`;fs.writeFileSync(path.join(captureDir,diffName),diff.buffer);Object.assign(captureRecord,{diff:`captures/${diffName}`,changedPixels:diff.changedPixels,maxDelta:diff.maxDelta});}catch(error){captureRecord.diffError=String(error?.message||error);}if(perceptual)perceptualReport=inspectPerceptualQuality(beforePath,afterPath);}
+  const perceptualGate=perceptualVerdict(perceptualReport),publishApproved=perceptualGate.pass;if(!publishApproved)publishBlocked+=1;const shouldWrite=write&&after.length<original.length&&publishApproved;if(shouldWrite)atomicReplace(file,after);
+  const provenance=buildAssetProvenance({sourceBuffer:original,outputBuffer:after,sourceName:relative,outputName:relative,stage:'AUTHORING',policy:mode==='adaptive'?profile.adaptivePolicy:'strict',optimizer:mode==='adaptive'?'kelo-adaptive':'kelo-lossless',options:{mode,effort},quality:{score:report.qualityScore??report.winner?.qualityScore??(report.exactPixels?1:null),exactPixels:report.exactPixels??null,perceptual:perceptualGate},profile,validators:null,toolchainExtra:{engineFingerprint}}),provenanceName=`${key}.provenance.json`;writeAssetProvenance(path.join(provenanceDir,provenanceName),provenance);
+  const entry={file:relative,status:publishApproved?report.status:'rejected',mode:report.mode||mode,effort,wrote:shouldWrite,publishApproved,publishBlockReason:perceptualGate.reason,beforeBytes:original.length,afterBytes:after.length,savedBytes:Math.max(0,original.length-after.length),savedPercent:original.length?(original.length-after.length)/original.length*100:0,qualityScore:report.qualityScore??report.winner?.qualityScore??(report.exactPixels?1:null),exactPixels:report.exactPixels??report.winner?.metrics?.exactPixels??null,profile:report.assetProfile||profile,winner:report.winner||null,cache:cacheRecord,capture:captureRecord,perceptual:perceptualReport,provenance:`provenance/${provenanceName}`,detail:report};results.push(entry);totalBefore+=original.length;totalAfter+=after.length;console.log(`${entry.status.toUpperCase()} ${relative} ${human(original.length)} → ${human(after.length)} (-${entry.savedPercent.toFixed(2)}%) confidence=${profile.confidence} effort=${effort} cache=${cacheRecord.hit?'hit':cacheEnabled?'miss':'off'}`);
 }
-if (!['fast', 'balanced', 'deep'].includes(effort)) {
-  console.error('PNG_SPACE_COMPILER_INVALID_EFFORT — use --effort=fast, balanced or deep');
-  process.exit(2);
-}
-if (!fs.existsSync(inputPath)) {
-  console.error(`PNG_SPACE_COMPILER_INPUT_NOT_FOUND — ${inputPath}`);
-  process.exit(2);
-}
-
-const engineFingerprint = fingerprintFiles([
-  path.resolve('src/creators/assets/png-space-optimizer.mjs'),
-  path.resolve('src/creators/assets/png-adaptive-optimizer.mjs'),
-  path.resolve('src/creators/assets/png-quality-agent.mjs'),
-  path.resolve('src/creators/assets/asset-image-profiler.mjs'),
-  path.resolve('scripts/asset-space-compiler.mjs')
-]);
-
-function walkPngs(target) {
-  const stat = fs.statSync(target);
-  if (stat.isFile()) return /\.png$/i.test(target) ? [target] : [];
-  const found = [], stack = [target];
-  while (stack.length && found.length < maxFiles) {
-    const directory = stack.pop();
-    for (const entry of fs.readdirSync(directory, {withFileTypes:true})) {
-      const full = path.join(directory, entry.name);
-      if (entry.isDirectory()) {
-        if (!['node_modules', '.git', 'dist', 'test-results', '.cache'].includes(entry.name)) stack.push(full);
-      } else if (entry.isFile() && /\.png$/i.test(entry.name)) {
-        found.push(full);
-        if (found.length >= maxFiles) break;
-      }
-    }
-  }
-  return found.sort();
-}
-
-const safeRelative = file => path.relative(process.cwd(), file).replaceAll('\\', '/');
-const fileKey = file => safeRelative(file).replace(/[^a-z0-9._-]+/gi, '__');
-const humanBytes = bytes => bytes < 1024 ? `${bytes} B` : bytes < 1024 ** 2 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / 1024 ** 2).toFixed(2)} MB`;
-
-function losslessOptionsFor(profile) {
-  if (effort === 'deep') return {};
-  if (effort === 'balanced') return {filterStrategies:['adaptive', 0, 4]};
-  return {
-    filterStrategies:['adaptive'],
-    disablePalette:(profile?.metrics?.uniqueColors || 4097) > 64
-  };
-}
-
-function atomicReplace(file, buffer) {
-  const temporary = `${file}.kelo-png-space-${process.pid}.tmp`;
-  fs.writeFileSync(temporary, buffer);
-  fs.renameSync(temporary, file);
-}
-
-function htmlEscape(value) {
-  return String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
-}
-
-function makeDiffPng(beforeBuffer, afterBuffer) {
-  const before = decodePngRgba(beforeBuffer), after = decodePngRgba(afterBuffer);
-  if (before.ihdr.width !== after.ihdr.width || before.ihdr.height !== after.ihdr.height) throw new Error('PNG_SPACE_DIFF_DIMENSION_CHANGE');
-  const rgba = Buffer.alloc(before.rgba.length);
-  let changedPixels = 0, maxDelta = 0;
-  for (let pixel = 0; pixel < before.ihdr.width * before.ihdr.height; pixel += 1) {
-    const offset = pixel * 4;
-    let delta = 0;
-    for (let channel = 0; channel < 4; channel += 1) delta = Math.max(delta, Math.abs(before.rgba[offset + channel] - after.rgba[offset + channel]));
-    if (!delta) continue;
-    changedPixels += 1; maxDelta = Math.max(maxDelta, delta);
-    rgba[offset] = 255; rgba[offset + 1] = delta > 24 ? 44 : 170; rgba[offset + 2] = 35; rgba[offset + 3] = Math.max(64, Math.min(255, 48 + delta * 8));
-  }
-  return {buffer:encodeRgbaPng(rgba, before.ihdr.width, before.ihdr.height, {level:9, filterStrategy:'adaptive'}), changedPixels, maxDelta};
-}
-
-function writeHtmlReport(summary) {
-  const rows = summary.files.map(item => {
-    const captures = capture && item.capture ? `<div class="compare">
-      <figure><figcaption>ANTES</figcaption><img src="${htmlEscape(item.capture.before)}"></figure>
-      <figure><figcaption>DESPUÉS</figcaption><img src="${htmlEscape(item.capture.after)}"></figure>
-      ${item.capture.diff ? `<figure><figcaption>DIFERENCIA ×8</figcaption><img class="diff" src="${htmlEscape(item.capture.diff)}"><small>${item.capture.changedPixels} píxeles · delta máx. ${item.capture.maxDelta}</small></figure>` : ''}</div>` : '';
-    const score = item.qualityScore == null ? '—' : Number(item.qualityScore).toFixed(4);
-    const profile = item.profile ? `${item.profile.kind} · ${item.profile.adaptivePolicy}` : 'perfil no disponible';
-    const exact = item.exactPixels === true ? 'PIXEL EXACT' : item.exactPixels === false ? 'CAMBIOS APROBADOS' : 'N/A';
-    const cache = item.cache?.hit ? ' · CACHE HIT' : cacheEnabled ? ' · CACHE MISS' : ' · CACHE OFF';
-    const perceptualLine = item.perceptual?.interpretations?.length ? `<p class="perceptual">Perceptual advisory: ${htmlEscape(item.perceptual.interpretations.join(' · '))}</p>` : '';
-    return `<article class="${item.status}"><h2>${htmlEscape(item.file)}</h2><div class="stats">
-      <span>${humanBytes(item.beforeBytes)} → ${humanBytes(item.afterBytes)}</span><strong>-${item.savedPercent.toFixed(2)}%</strong>
-      <span>quality ${score}</span><span>${htmlEscape(item.mode || mode)}</span><span>${htmlEscape(exact)}</span></div>
-      <p class="profile">${htmlEscape(profile)} · effort ${htmlEscape(effort)}${cache}${item.profile?.invariants?.preserveBorder ? ' · BORDER LOCK' : ''}${item.profile?.invariants?.preserveAlpha ? ' · ALPHA LOCK' : ''}</p>${perceptualLine}${captures}</article>`;
-  }).join('\n');
-  const html = `<!doctype html><html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Kelo PNG Space Compiler Audit</title><style>
-body{font:14px system-ui;background:#101216;color:#f5f7fb;margin:0;padding:24px}main{max-width:1400px;margin:auto}header{position:sticky;top:0;background:#101216e8;backdrop-filter:blur(12px);padding:12px 0 18px;z-index:2}article{border:1px solid #303744;border-radius:14px;padding:16px;margin:14px 0;background:#171b22}.stats{display:flex;gap:14px;flex-wrap:wrap}.profile,.perceptual{color:#aeb9ca}.compare{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:14px}figure{margin:0;background:#0b0d10;padding:10px;border-radius:10px;overflow:auto}img{max-width:100%;image-rendering:pixelated}.diff{background:repeating-conic-gradient(#1b1d22 0 25%,#262930 0 50%) 0/18px 18px}figcaption{font-weight:700;margin-bottom:8px}.optimized strong{color:#73e6a4}.skipped strong{color:#ffcb6b}small{display:block;color:#98a4b5;margin-top:6px}@media(max-width:800px){.compare{grid-template-columns:1fr}body{padding:12px}}</style><main><header><h1>Kelo PNG Space Compiler</h1><p>${summary.files.length} PNG · ${humanBytes(summary.beforeBytes)} → ${humanBytes(summary.afterBytes)} · ahorro ${summary.savedPercent.toFixed(2)}% · effort ${htmlEscape(summary.effort)} · cache ${summary.cacheHits}/${summary.fileCount}</p><p>STRICT = RGBA exacto. ADAPTIVE = perfil automático + Quality Agent. DIFERENCIA vacía = ningún píxel cambió.</p></header>${rows}</main></html>`;
-  fs.writeFileSync(path.join(reportPath, 'index.html'), html);
-}
-
-fs.mkdirSync(reportPath, {recursive:true});
-if (cacheEnabled) fs.mkdirSync(cachePath,{recursive:true});
-const captureDirectory = path.join(reportPath, 'captures');
-if (capture) fs.mkdirSync(captureDirectory, {recursive:true});
-
-const files = walkPngs(inputPath), results = [];
-let totalBefore = 0, totalAfter = 0, cacheHits = 0, cacheMisses = 0;
-for (const file of files) {
-  const original = fs.readFileSync(file), relative = safeRelative(file);
-  let optimized, profile = null, cacheRecord = {hit:false,enabled:cacheEnabled};
-  try {
-    const decoded = decodePngRgba(original);
-    profile = profileAssetImage(decoded.rgba, decoded.ihdr.width, decoded.ihdr.height, {sourceName:relative});
-    const losslessOptions = losslessOptionsFor(profile);
-    const descriptor = buildOptimizationCacheKey(original,{
-      engineFingerprint,
-      mode,
-      effort,
-      profileKind:profile.kind,
-      qualityPolicy:mode==='adaptive'?profile.adaptivePolicy:'strict',
-      extra:{losslessOptions,uniqueColors:profile.metrics.uniqueColors,pixelArtConfidence:profile.metrics.pixelArtConfidence}
-    });
-    const cached = cacheEnabled ? readOptimizationCache(cachePath,descriptor) : null;
-    if(cached) {
-      optimized={buffer:cached.buffer,report:cached.report};
-      cacheRecord={...cached.cache,enabled:true};
-      cacheHits+=1;
-    } else {
-      optimized = mode === 'adaptive'
-        ? await optimizePngAdaptive(original, {sourceName:relative, assetProfile:profile, losslessOptions})
-        : optimizePngLossless(original, losslessOptions);
-      cacheMisses+=cacheEnabled?1:0;
-      const written=cacheEnabled?writeOptimizationCache(cachePath,descriptor,optimized):null;
-      cacheRecord={...(written||{}),hit:false,enabled:cacheEnabled};
-    }
-  } catch (error) {
-    const message = String(error?.message || error);
-    results.push({file:relative,status:'skipped',mode,effort,beforeBytes:original.length,afterBytes:original.length,savedBytes:0,savedPercent:0,qualityScore:null,profile,cache:cacheRecord,error:message,hint:error?.hint || null});
-    totalBefore += original.length; totalAfter += original.length; console.warn(`SKIP ${relative} — ${message}`); continue;
-  }
-
-  const report = optimized.report, after = optimized.buffer;
-  const shouldWrite = write && after.length < original.length;
-  let captureRecord = null, perceptualReport = null;
-  if (capture) {
-    const key=fileKey(file), beforeName=`${key}--before.png`, afterName=`${key}--after.png`;
-    const beforePath=path.join(captureDirectory,beforeName), afterPath=path.join(captureDirectory,afterName);
-    fs.writeFileSync(beforePath,original); fs.writeFileSync(afterPath,after);
-    captureRecord={before:`captures/${beforeName}`,after:`captures/${afterName}`};
-    try {
-      const diff=makeDiffPng(original,after), diffName=`${key}--diff.png`;
-      fs.writeFileSync(path.join(captureDirectory,diffName),diff.buffer);
-      Object.assign(captureRecord,{diff:`captures/${diffName}`,changedPixels:diff.changedPixels,maxDelta:diff.maxDelta});
-    } catch (error) { captureRecord.diffError=String(error?.message||error); }
-    if (perceptual) perceptualReport=inspectPerceptualQuality(beforePath,afterPath);
-  }
-  if (shouldWrite) atomicReplace(file,after);
-
-  const entry={file:relative,status:report.status,mode:report.mode||'strict',effort,wrote:shouldWrite,beforeBytes:original.length,afterBytes:after.length,
-    savedBytes:Math.max(0,original.length-after.length),savedPercent:original.length?((original.length-after.length)/original.length)*100:0,
-    qualityScore:report.qualityScore??report.winner?.qualityScore??(report.exactPixels?1:null),exactPixels:report.exactPixels??report.winner?.metrics?.exactPixels??null,
-    profile:report.assetProfile||profile,winner:report.winner||null,cache:cacheRecord,capture:captureRecord,perceptual:perceptualReport,detail:report};
-  results.push(entry); totalBefore+=original.length; totalAfter+=after.length;
-  console.log(`${entry.status.toUpperCase()} ${entry.file} ${humanBytes(entry.beforeBytes)} → ${humanBytes(entry.afterBytes)} (-${entry.savedPercent.toFixed(2)}%) ${entry.profile?.kind||''} effort=${effort} cache=${cacheRecord.hit?'hit':cacheEnabled?'miss':'off'}`);
-}
-
-const summary={compiler:'kelo-png-space-compiler-v1.4',generatedAt:new Date().toISOString(),input:safeRelative(inputPath),mode,effort,write,capture,perceptual,
-  cacheEnabled,cachePath:cacheEnabled?safeRelative(cachePath):null,engineFingerprint,cacheHits,cacheMisses,
-  fileCount:results.length,beforeBytes:totalBefore,afterBytes:totalAfter,savedBytes:Math.max(0,totalBefore-totalAfter),savedPercent:totalBefore?((totalBefore-totalAfter)/totalBefore)*100:0,files:results};
-fs.writeFileSync(path.join(reportPath,'report.json'),JSON.stringify(summary,null,2));
-writeHtmlReport(summary);
-console.log(`PNG_SPACE_COMPILER_DONE files=${summary.fileCount} saved=${humanBytes(summary.savedBytes)} (${summary.savedPercent.toFixed(2)}%) write=${write} mode=${mode} effort=${effort} cacheHits=${cacheHits} cacheMisses=${cacheMisses}`);
+const summary={compiler:'kelo-png-space-compiler-v2',generatedAt:new Date().toISOString(),input:safeRelative(inputPath),mode,effort,write,capture,perceptual,requirePerceptual,minSsimulacra2,cacheEnabled,cachePath:cacheEnabled?safeRelative(cachePath):null,engineFingerprint,toolchain,cacheHits,cacheMisses,publishBlocked,fileCount:results.length,beforeBytes:totalBefore,afterBytes:totalAfter,savedBytes:Math.max(0,totalBefore-totalAfter),savedPercent:totalBefore?(totalBefore-totalAfter)/totalBefore*100:0,files:results};fs.writeFileSync(path.join(reportPath,'report.json'),JSON.stringify(summary,null,2));writeHtml(summary);console.log(`PNG_SPACE_COMPILER_DONE files=${summary.fileCount} saved=${human(summary.savedBytes)} (${summary.savedPercent.toFixed(2)}%) write=${write} mode=${mode} effort=${effort} blocked=${publishBlocked} cacheHits=${cacheHits} cacheMisses=${cacheMisses}`);if(write&&publishBlocked>0)process.exitCode=3;
