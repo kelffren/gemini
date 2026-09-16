@@ -1,0 +1,51 @@
+{
+  "schema": "kelo-instant-delivery-plan-v1",
+  "id": "plaza-first-playable-v1",
+  "notes": "SOURCE remains canonical. Sparse PNG keeps logical dimensions/source coordinates and only removes pixels outside declared runtime coverage. Codec candidates are laboratory outputs until device proof permits promotion.",
+  "assets": [
+    {
+      "id": "plazaNature",
+      "mode": "sparse-png",
+      "source": "assets/Arboleskelo1.PNG",
+      "outputBase": "plaza-nature-runtime-core",
+      "allowedFrameIds": ["tree_large", "tree_pink", "tree_medium", "tree_cypress", "tree_small"],
+      "keepRects": [
+        {"id":"tree_large","x":7,"y":25,"w":438,"h":527},
+        {"id":"tree_pink","x":436,"y":66,"w":405,"h":486},
+        {"id":"tree_medium","x":827,"y":130,"w":322,"h":412},
+        {"id":"tree_cypress","x":1161,"y":69,"w":173,"h":471},
+        {"id":"tree_small","x":1332,"y":253,"w":202,"h":287}
+      ],
+      "consumerAudit": {
+        "file": "src/environment/tile-registry.js",
+        "blockStart": "const plazaNatureProps = Object.freeze([",
+        "blockEnd": "const trainingDummyProp = Object.freeze({",
+        "frameRegex": "frame:'([^']+)'"
+      }
+    },
+    {
+      "id": "plazaFountainKelo",
+      "mode": "lossless-codecs",
+      "source": "assets/justicia_fountain_v2.PNG",
+      "outputBase": "plaza-fountain-kelo"
+    },
+    {
+      "id": "plazaRoundTree",
+      "mode": "lossless-codecs",
+      "source": "assets/world/imperial-plaza/arbol-redondo.png",
+      "outputBase": "plaza-round-tree"
+    },
+    {
+      "id": "forestPlazaV2",
+      "mode": "lossless-codecs",
+      "source": "assets/world/plaza/forest-plaza-tileset-v2.png",
+      "outputBase": "forest-plaza-v2"
+    },
+    {
+      "id": "cesped",
+      "mode": "lossless-codecs",
+      "source": "assets/cesped-runtime.PNG",
+      "outputBase": "cesped-runtime"
+    }
+  ]
+}
