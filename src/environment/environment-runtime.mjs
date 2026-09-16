@@ -1,10 +1,10 @@
 /* KELO-INDEX
  * area: ENVIRONMENT / RUNTIME
  * owner: active world environment state
- * owns: native time/weather/ambient rendering, temporary previews and local approved state
- * does-not-own: server replication, map publishing or gameplay rules
+ * owns: native time/weather/ambient rendering, temporary previews and locally cached canonical state
+ * does-not-own: network transport, publish authorization, map versioning or gameplay rules
  */
-const VERSION='kelo-environment-runtime-v1';
+const VERSION='kelo-environment-runtime-v2';
 const STORAGE_KEY='kelo.world.environment.active.v1';
 const clamp=(v,min,max)=>Math.max(min,Math.min(max,Number(v)||0));
 const VALID={
@@ -27,7 +27,7 @@ function timeColor(time,density){const k=.7+.3*(density/100);if(time==='night')r
 
 export function installEnvironmentRuntime(root=globalThis){
   if(root?.KELO_ENVIRONMENT_RUNTIME?.version===VERSION)return root.KELO_ENVIRONMENT_RUNTIME;
-  let approved=normalizeEnvironmentState(safeParse(root?.localStorage?.getItem?.(STORAGE_KEY))||{}),current=approved,previewBase=null,registered=false;
+  let approved=normalizeEnvironmentState(safeParse(root?.localStorage?.getItem?.(STORAGE_KEY))||{}),current=approved,previewBase=null,registered=false,lastRevision=0,lastPublicationMeta=null;
 
   function drawFog(g,w,h,t,density){const a=.06+.16*(density/100);g.fillStyle=`rgba(225,235,238,${a})`;for(let i=0;i<6;i++){const x=((i*191+t*.012*(i%2?1:-1))%(w+360))-180,y=h*(.25+(i%4)*.18),rx=160+(i%3)*70,ry=55+(i%2)*35;g.beginPath();g.ellipse(x,y,rx,ry,0,0,Math.PI*2);g.fill();}}
   function drawWeather(g,w,h,t,state){
@@ -47,17 +47,28 @@ export function installEnvironmentRuntime(root=globalThis){
     if(registered)return true;const layers=root?.KELO_ENVIRONMENT_LAYERS;if(!layers?.register)return false;
     try{layers.register({id:'runtime-environment-state',phase:'vfx_weather_lighting',priority:900,required:false,visibleDuringReset:true,ownership:'environment-runtime',ready:()=>true,draw});registered=true;return true;}catch(error){if(String(error?.message||error).includes('duplicate layer')){registered=true;return true;}console.error('[Kelo Environment Runtime] layer registration failed',error);return false;}
   }
+  function persistApproved(){try{root.localStorage?.setItem?.(STORAGE_KEY,JSON.stringify(approved));}catch{}}
   function set(next,{temporary=false,persist=false,source='runtime'}={}){
     const normalized=normalizeEnvironmentState(next);if(temporary&&previewBase===null)previewBase=current;if(!temporary)previewBase=null;current=normalized;
-    if(persist){approved=normalized;try{root.localStorage?.setItem?.(STORAGE_KEY,JSON.stringify(approved));}catch{}}
-    register();emit(root,'kelo:environment-changed',Object.freeze({state:current,temporary:!!temporary,persistent:!!persist,source}));return current;
+    if(persist){approved=normalized;persistApproved();}
+    register();emit(root,'kelo:environment-changed',Object.freeze({state:current,approved,temporary:!!temporary,persistent:!!persist,source,revision:lastRevision}));return current;
   }
   function applyTemporary(next,{source='creator'}={}){const state=set(next,{temporary:true,persist:false,source});return Object.freeze({ok:true,mode:'native-runtime',temporary:true,persistent:false,state,message:`NATIVE TEST · ${state.biome} / ${state.weather} / ${state.timeOfDay}`});}
-  function restoreTemporary(reason='manual'){if(previewBase!==null){current=previewBase;previewBase=null;}else current=approved;emit(root,'kelo:environment-changed',Object.freeze({state:current,temporary:false,persistent:true,source:`restore:${reason}`}));return Object.freeze({ok:true,restored:true,state:current,message:'Native environment restored'});}
-  function publish(next,{source='creator-approved'}={}){const state=set(next,{temporary:false,persist:true,source});return Object.freeze({ok:true,temporary:false,persistent:true,state,message:`ACTIVE ENVIRONMENT · ${state.biome} / ${state.weather} / ${state.timeOfDay}`});}
-  function reset(){previewBase=null;approved=normalizeEnvironmentState({});current=approved;try{root.localStorage?.removeItem?.(STORAGE_KEY);}catch{}emit(root,'kelo:environment-changed',Object.freeze({state:current,temporary:false,persistent:false,source:'reset'}));return current;}
+  function restoreTemporary(reason='manual'){if(previewBase!==null){current=previewBase;previewBase=null;}else current=approved;emit(root,'kelo:environment-changed',Object.freeze({state:current,approved,temporary:false,persistent:true,source:`restore:${reason}`,revision:lastRevision}));return Object.freeze({ok:true,restored:true,state:current,message:'Native environment restored'});}
+  function publish(next,{source='creator-approved',revision=null,updatedAt=null,updatedBy=null}={}){
+    if(revision!=null)lastRevision=Math.max(lastRevision,Math.trunc(Number(revision)||0));lastPublicationMeta=Object.freeze({revision:lastRevision,updatedAt,updatedBy,source});
+    const state=set(next,{temporary:false,persist:true,source});return Object.freeze({ok:true,temporary:false,persistent:true,state,revision:lastRevision,message:`ACTIVE ENVIRONMENT · ${state.biome} / ${state.weather} / ${state.timeOfDay}`});
+  }
+  function receivePublished(next,{source='world-sync',revision=null,updatedAt=null,updatedBy=null}={}){
+    const incomingRevision=Math.max(0,Math.trunc(Number(revision)||0));if(incomingRevision&&lastRevision&&incomingRevision<lastRevision)return Object.freeze({ok:false,stale:true,state:current,revision:lastRevision});
+    const normalized=normalizeEnvironmentState(next);approved=normalized;persistApproved();if(incomingRevision)lastRevision=incomingRevision;lastPublicationMeta=Object.freeze({revision:lastRevision,updatedAt,updatedBy,source});
+    const previewActive=previewBase!==null;if(previewActive)previewBase=approved;else current=approved;
+    register();emit(root,'kelo:environment-changed',Object.freeze({state:current,approved,temporary:previewActive,persistent:true,source,revision:lastRevision,remote:true}));
+    return Object.freeze({ok:true,remote:true,previewPreserved:previewActive,state:current,approved,revision:lastRevision});
+  }
+  function reset(){previewBase=null;lastRevision=0;lastPublicationMeta=null;approved=normalizeEnvironmentState({});current=approved;try{root.localStorage?.removeItem?.(STORAGE_KEY);}catch{}emit(root,'kelo:environment-changed',Object.freeze({state:current,approved,temporary:false,persistent:false,source:'reset',revision:0}));return current;}
 
-  const api=Object.freeze({version:VERSION,applyTemporary,restoreTemporary,publish,reset,refreshLayer:register,get state(){return current;},get approved(){return approved;},get temporary(){return previewBase!==null;}});root.KELO_ENVIRONMENT_RUNTIME=api;register();emit(root,'kelo:environment-runtime-ready',Object.freeze({version:VERSION,state:current}));return api;
+  const api=Object.freeze({version:VERSION,applyTemporary,restoreTemporary,publish,receivePublished,reset,refreshLayer:register,get state(){return current;},get approved(){return approved;},get temporary(){return previewBase!==null;},get revision(){return lastRevision;},get publicationMeta(){return lastPublicationMeta;}});root.KELO_ENVIRONMENT_RUNTIME=api;register();emit(root,'kelo:environment-runtime-ready',Object.freeze({version:VERSION,state:current}));return api;
 }
 
 if(typeof window!=='undefined'&&window.document)installEnvironmentRuntime(window);
