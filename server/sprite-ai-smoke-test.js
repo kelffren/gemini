@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: SERVER / SPRITE AI TEST
  * owner: Kelo Sprite AI deterministic smoke coverage
- * purpose: verify ZeroGPU-first selection, OpenAI compatibility, auth/CORS/rate limits and no silent paid fallback
+ * purpose: verify ZeroGPU-first selection, OpenAI compatibility, auth/CORS/rate limits and explicit paid fallback policy
  * online: exercises the same /api/sprite-generate authority boundary used by the Creator UI
  */
 'use strict';
@@ -36,6 +36,10 @@ const {createSpriteAiHttpHandler}=require('./sprite-ai-http');
   const paidTrap={status:()=>({configured:true,provider:'openai',model:'paid'}),generate:async()=>{throw new Error('PAID_FALLBACK_RAN');}};
   const noPaidFallback=createSpriteAiService({provider:'auto',huggingFaceProvider:failingHf,openAiProvider:paidTrap});
   await assert.rejects(()=>noPaidFallback.generate({}),error=>error.code==='SPRITE_AI_HF_UPSTREAM_ERROR');
+  let paidFallbackCalls=0;
+  const paidAllowed={status:()=>({configured:true,provider:'openai',model:'paid'}),generate:async()=>{paidFallbackCalls++;return{imageDataUrl:dataUrl,provider:'openai',model:'paid',sourceMode:'text-generation'};}};
+  const explicitPaidFallback=createSpriteAiService({provider:'auto',allowPaidFallback:true,huggingFaceProvider:failingHf,openAiProvider:paidAllowed});
+  const fallbackOut=await explicitPaidFallback.generate({action:'walk'});assert.equal(paidFallbackCalls,1);assert.equal(fallbackOut.provider,'openai');assert.equal(fallbackOut.fallbackFrom,'huggingface-zerogpu');assert.equal(explicitPaidFallback.status().allowPaidFallback,true);
 
   const identity={verifyAccessToken:async token=>token==='good'?{id:'user-1',isAnonymous:false}:token==='guest'?{id:'guest-1',isAnonymous:true}:Promise.reject(Object.assign(new Error('INVALID_AUTH_USER'),{code:'INVALID_AUTH_USER',status:401}))};
   const handler=createSpriteAiHttpHandler({service,identity,allowedOrigins:'https://example.test',rateLimit:2,maxBodyBytes:1024*1024});
@@ -49,5 +53,5 @@ const {createSpriteAiHttpHandler}=require('./sprite-ai-http');
     r=await fetch(base+'/api/sprite-generate',{method:'POST',headers:{Origin:'https://example.test',Authorization:'Bearer good','content-type':'application/json'},body:'{}'});assert.equal(r.status,429);
     r=await fetch(base+'/api/sprite-generate/status',{headers:{Origin:'https://evil.test'}});assert.equal(r.status,403);
   }finally{await new Promise(r=>server.close(r));}
-  console.log('Sprite AI smoke passed: ZeroGPU-first + OpenAI compatibility + no silent paid fallback + auth/CORS/rate limit');
+  console.log('Sprite AI smoke passed: ZeroGPU-first + OpenAI compatibility + explicit paid fallback policy + auth/CORS/rate limit');
 })().catch(error=>{console.error(error);process.exit(1);});
