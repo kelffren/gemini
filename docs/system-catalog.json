@@ -9,6 +9,7 @@
     {"id": "render-extensions","owner":"KeloRender","source":"src/core/render-extension-system.js","technicalDoc":"docs/systems/RENDER_EXTENSION_SYSTEM.md","playerVisible":false,"status":"foundation-transitional"},
     {"id": "simulation-extensions","owner":"KeloSimulation","source":"src/core/simulation-extension-system.js","technicalDoc":"docs/systems/SIMULATION_EXTENSION_SYSTEM.md","playerVisible":false,"status":"foundation-transitional"},
     {"id": "performance-foundation","owner":"KELO_PERFORMANCE_GOVERNOR + existing Foundation owners","source":"src/systems/performance-governor.js","technicalDoc":"docs/systems/PERFORMANCE_FOUNDATION.md","playerVisible":false,"status":"foundation-active"},
+    {"id":"feature-control","owner":"KELO_FUSEBOX","source":"src/core/feature-control-system.js","technicalDoc":"docs/systems/FEATURE_CONTROL_SYSTEM.md","playerVisible":false,"status":"foundation-reliability-v1"},
     {"id":"legacy-containment","owner":"Kelo Legacy Containment","source":"scripts/legacy-containment-audit.mjs","technicalDoc":"docs/systems/LEGACY_CONTAINMENT.md","playerVisible":false,"status":"foundation-ci-active-v1"},
     {"id":"app-updater","owner":"KeloUpdater","source":"src/core/update-system.js","technicalDoc":"docs/systems/APP_UPDATE_SYSTEM.md","playerVisible":false,"status":"client-foundation-active"},
     {"id":"game-tuning","owner":"KeloGameTuning + KeloGameTuningPublisher","source":"src/systems/game-tuning-system.js","technicalDoc":"docs/systems/GAME_TUNING_SYSTEM.md","playerVisible":false,"status":"admin-foundation-v1"},

@@ -1,8 +1,8 @@
 /* KELO-INDEX
  * area: TEST / MAIN STABILITY / MOBILE
  * owner: Main Stability Gate
- * keys: MOBILE IPHONE-UA TOUCH BOOT GUEST MOVEMENT RUNTIME SMOKE PR-BYTES FREEZE 8S EVALUATE-LATENCY
- * purpose: unskippable CI smoke for the exact PR bytes using an iPhone-sized touch context and the mandatory sustained-walk freeze firewall
+ * keys: MOBILE IPHONE-UA TOUCH BOOT GUEST MOVEMENT RUNTIME SMOKE PR-BYTES FREEZE 8S EVALUATE-LATENCY FUSEBOX LAZY
+ * purpose: unskippable CI smoke for exact PR bytes; first-playable must sustain movement and keep optional FuseBox off the initial transfer
  * do-not: NO BrowserStack-only skip, NO LIVE hardcode, NO direct mutation that bypasses human input for movement, NO short movement-only proof
  */
 const { test, expect } = require('@playwright/test');
@@ -81,6 +81,10 @@ test('exact PR bytes boot and sustain 8s movement in iPhone-sized touch context'
   await expect(page.locator('#game-canvas')).toBeVisible({timeout:10000});
   await expect(page.locator('#kelo-account-auth')).toBeHidden({timeout:10000});
 
+  const preWalk=await page.evaluate(()=>({fusebox:window.KELO_FUSEBOX?.version||null,moduleLoader:window.KELO_MODULE_LOADER?.version||null}));
+  expect(preWalk.fusebox).toBeNull();
+  expect(preWalk.moduleLoader).toMatch(/lazy-fusebox/i);
+
   const before=await position(page);
   const walk=await touchMoveRightForEightSeconds(page);
   const after=await position(page);
@@ -98,7 +102,9 @@ test('exact PR bytes boot and sustain 8s movement in iPhone-sized touch context'
   const runtime=await page.evaluate(()=>({
     bootReady:window.__keloBootReady===true,
     guest:document.documentElement.dataset.keloGuestPlay,
+    fusebox:window.KELO_FUSEBOX?.version||null,
     moduleLoader:window.KELO_MODULE_LOADER?.version||null,
+    moduleDiagnostics:window.KELO_MODULE_LOADER?.diagnostics?.()||null,
     updateGate:window.KeloUpdateGate?.getState?.().version||null,
     width:innerWidth,
     height:innerHeight,
@@ -107,7 +113,9 @@ test('exact PR bytes boot and sustain 8s movement in iPhone-sized touch context'
   }));
   expect(runtime.bootReady).toBe(true);
   expect(runtime.guest).toBe('1');
-  expect(runtime.moduleLoader).toBeTruthy();
+  expect(runtime.fusebox).toBeNull();
+  expect(runtime.moduleLoader).toMatch(/lazy-fusebox/i);
+  expect(runtime.moduleDiagnostics?.fusebox).toBeNull();
   expect(runtime.updateGate).toBeTruthy();
   expect(runtime.width).toBeLessThanOrEqual(600);
   expect(runtime.ua).toMatch(/iPhone/i);

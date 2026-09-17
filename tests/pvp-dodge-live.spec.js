@@ -1,8 +1,8 @@
 /* KELO-INDEX
  * area: TEST / PVP
  * owner: Playwright validation only
- * keys: PVP BUTTON FIRST-USE QUICK-ACTIONS GUEST DODGE DASH COLLISION MOBILE IPHONE DESKTOP LIVE WINNER
- * purpose: bloquea la ruta visible launcher rápido -> botón PvP -> lazy runtime -> mundo PvP y después valida dodge 112 px real; guest=1 solo elimina Auth de esta prueba PvP
+ * keys: PVP BUTTON FIRST-USE QUICK-ACTIONS GUEST DODGE DASH COLLISION MOBILE IPHONE DESKTOP LIVE WINNER FUSEBOX LAZY
+ * purpose: bloquea la ruta visible launcher rápido -> botón PvP -> lazy FuseBox/runtime -> mundo PvP y después valida dodge 112 px real; guest=1 solo elimina Auth de esta prueba PvP
  * online: N/A; valida el runtime local exacto del candidato sin alterar autoridad
  * do-not: NO gameplay mutation fuera de setup reproducible de prueba, NO force click, NO llamada directa a enterPvPWorld
  */
@@ -35,17 +35,19 @@ async function enterThroughVisiblePvpButton(page,label){
     enter:typeof window.enterPvPWorld==='function',
     loaderNeeds:window.KELO_MODULE_LOADER.needs('pvp'),
     loaderReady:window.KELO_MODULE_LOADER.isReady('pvp'),
+    fusebox:window.KELO_FUSEBOX?.version||null,
     guest:document.documentElement.dataset.keloGuestPlay||null,
     quickActionsOpen:document.getElementById('kw-quick-actions-toggle')?.getAttribute('aria-expanded')==='true'
   }));
   expect(before.loaderNeeds).toBe(true);
   expect(before.loaderReady).toBe(false);
+  expect(before.fusebox).toBeNull();
   expect(before.guest).toBe('1');
   expect(before.quickActionsOpen).toBe(true);
 
   const button=page.locator('#lx-side-pvp');
   await button.click();
-  await page.waitForFunction(()=>window.KELO_MODULE_LOADER&&window.KELO_MODULE_LOADER.isReady('pvp')&&window.KeloPvPWorld&&typeof window.enterPvPWorld==='function'&&window.KELO_PVP_COMBAT_LOADER_AUDIT?.ready===true,{timeout:30000});
+  await page.waitForFunction(()=>window.KELO_MODULE_LOADER&&window.KELO_FUSEBOX&&window.KELO_MODULE_LOADER.isReady('pvp')&&window.KeloPvPWorld&&typeof window.enterPvPWorld==='function'&&window.KELO_PVP_COMBAT_LOADER_AUDIT?.ready===true,{timeout:30000});
   await page.waitForFunction(()=>window.KeloPvPWorld&&window.KeloAbilities&&window.KeloPvPWorld.state.mode==='pvp'&&window.KeloPvPWorld.state.combatEnabled,{timeout:20000});
 
   const after=await page.evaluate(()=>({
@@ -53,6 +55,7 @@ async function enterThroughVisiblePvpButton(page,label){
     combatEnabled:window.KeloPvPWorld.state.combatEnabled,
     loaderNeeds:window.KELO_MODULE_LOADER.needs('pvp'),
     loaderReady:window.KELO_MODULE_LOADER.isReady('pvp'),
+    fusebox:window.KELO_FUSEBOX?.version||null,
     diagnostics:window.KELO_MODULE_LOADER.diagnostics(),
     combatLoader:window.KELO_PVP_COMBAT_LOADER_AUDIT?{
       ready:window.KELO_PVP_COMBAT_LOADER_AUDIT.ready,
@@ -65,6 +68,8 @@ async function enterThroughVisiblePvpButton(page,label){
   expect(after.combatEnabled).toBe(true);
   expect(after.loaderNeeds).toBe(false);
   expect(after.loaderReady).toBe(true);
+  expect(after.fusebox).toMatch(/fusebox/i);
+  expect(after.diagnostics?.fusebox?.version).toBe(after.fusebox);
   expect(after.combatLoader&&after.combatLoader.ready).toBe(true);
 }
 
