@@ -5,6 +5,7 @@
  * purpose: turn the Sources tab into an in-app library navigator without downloading binaries while browsing
  */
 import './external-library-folder-browser-ui.mjs?v=1';
+import './external-library-page-lifecycle.mjs?v=2';
 import {getProviderStatuses} from '../creators/assets/external-asset-providers.mjs?v=10';
 
 const root=globalThis,doc=root.document;
@@ -159,4 +160,4 @@ async function mount(){
 if(doc.readyState==='loading')doc.addEventListener('DOMContentLoaded',()=>void mount(),{once:true});else void mount();
 root.addEventListener?.('pageshow',()=>{decorateSources();updateFocus();});
 
-export const KeloExternalLibraryBrowserUI=Object.freeze({version:'external-library-browser-ui-v3-disposable-pages',openLibrary,get providers(){return providers.slice();}});
+export const KeloExternalLibraryBrowserUI=Object.freeze({version:'external-library-browser-ui-v4-direct-jump',openLibrary,get providers(){return providers.slice();}});
