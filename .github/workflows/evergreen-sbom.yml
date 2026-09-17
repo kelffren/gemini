@@ -1,0 +1,43 @@
+name: Evergreen SBOM
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'package.json'
+      - 'package-lock.json'
+      - 'server/package.json'
+      - 'server/package-lock.json'
+  push:
+    branches: [main]
+    paths:
+      - 'package.json'
+      - 'package-lock.json'
+      - 'server/package.json'
+      - 'server/package-lock.json'
+
+permissions:
+  contents: read
+
+jobs:
+  sbom:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm ci --ignore-scripts --no-audit --no-fund --prefix server
+      - name: Generate CycloneDX SBOMs
+        run: |
+          mkdir -p artifacts/sbom
+          npm sbom --sbom-format cyclonedx > artifacts/sbom/root.cdx.json
+          npm sbom --sbom-format cyclonedx --prefix server > artifacts/sbom/server.cdx.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kelo-world-sbom
+          path: artifacts/sbom/*.json
+          if-no-files-found: error
+          retention-days: 30
