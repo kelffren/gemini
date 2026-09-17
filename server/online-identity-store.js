@@ -1,12 +1,13 @@
 /* KELO-INDEX
  * area: SERVER / IDENTITY
  * owner: Kelo server authority
- * keys: SUPABASE AUTH JWT CHARACTER ACCOUNT PUBLISHABLE KEY BAN SUSPENSION ACCESS
- * purpose: verifica sesión Supabase, estado de cuenta y ownership de personaje sin exponer una secret key al cliente
+ * keys: SUPABASE AUTH JWT CHARACTER ACCOUNT PUBLISHABLE KEY BAN SUSPENSION ACCESS CREATOR PRINCIPAL CAPABILITIES
+ * purpose: verifica sesión Supabase, estado de cuenta y ownership de personaje sin exponer una secret key al cliente; deriva Creator Principal solo desde claims server-verified
  * online: Auth valida JWT; characters y get_my_account_access usan el mismo JWT + RLS/RPC
- * do-not: NO confiar userId/characterId declarados por cliente, NO exponer secret/service-role key, NO usar user_metadata para autorización
+ * do-not: NO confiar userId/characterId/roles/permisos declarados por cliente, NO exponer secret/service-role key, NO usar user_metadata para autorización
  */
 'use strict';
+const {principalFromResolved}=require('./mmorpg-wave1-owner-integration');
 
 const UUID_RE=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 function cleanBase(value){return String(value||'').trim().replace(/\/+$/,'');}
@@ -65,17 +66,18 @@ function createOnlineIdentityStore(options={}){
 
   async function resolve(input={}){
     const accessToken=short(input.accessToken,8192),characterId=short(input.characterId,80);
-    if(!configured){if(requireAuth)throw new Error('SUPABASE_NOT_CONFIGURED');return{authenticated:false,source:'legacy-local'};}
-    if(!accessToken){if(requireAuth)throw new Error('AUTH_TOKEN_REQUIRED');return{authenticated:false,source:'legacy-transition'};}
+    if(!configured){if(requireAuth)throw new Error('SUPABASE_NOT_CONFIGURED');return{authenticated:false,source:'legacy-local',creatorPrincipal:null};}
+    if(!accessToken){if(requireAuth)throw new Error('AUTH_TOKEN_REQUIRED');return{authenticated:false,source:'legacy-transition',creatorPrincipal:null};}
     const user=await verifyAccessToken(accessToken);
     const access=await getAccountAccess(accessToken);
     if(access.status==='banned')throw new Error('ACCOUNT_BANNED');
     if(access.status==='suspended')throw new Error('ACCOUNT_SUSPENDED');
     if(!characterId)throw new Error('CHARACTER_REQUIRED');
     const character=await getCharacter(user.id,characterId,accessToken);if(!character)throw new Error('CHARACTER_NOT_OWNED');
-    return{authenticated:true,source:'supabase-auth-rls',accountId:user.id,characterId:String(character.id).toLowerCase(),playerKey:String(character.id).toLowerCase(),name:short(character.name,24)||short(input.name,24)||'Kelo',legacyPlayerKey:character.legacy_player_key||null,isAnonymous:user.isAnonymous,roles:access.roles,permissions:access.permissions};
+    const resolved={authenticated:true,source:'supabase-auth-rls',accountId:user.id,characterId:String(character.id).toLowerCase(),playerKey:String(character.id).toLowerCase(),name:short(character.name,24)||short(input.name,24)||'Kelo',legacyPlayerKey:character.legacy_player_key||null,isAnonymous:user.isAnonymous,roles:access.roles,permissions:access.permissions};
+    return Object.freeze({...resolved,creatorPrincipal:principalFromResolved(resolved)});
   }
 
-  return Object.freeze({version:'kelo-online-identity-v3-access-control',configured,requireAuth,source:configured?'supabase-auth-ready':'legacy-local',verifyAccessToken,getAccountAccess,getCharacter,resolve,audit:()=>({version:'kelo-online-identity-v3-access-control',configured,requireAuth,cacheSize:tokenCache.size,apiKeyModel:keyModel(apiKey),accountAccessRpc:true})});
+  return Object.freeze({version:'kelo-online-identity-v4-creator-principal',configured,requireAuth,source:configured?'supabase-auth-ready':'legacy-local',verifyAccessToken,getAccountAccess,getCharacter,resolve,audit:()=>({version:'kelo-online-identity-v4-creator-principal',configured,requireAuth,cacheSize:tokenCache.size,apiKeyModel:keyModel(apiKey),accountAccessRpc:true,creatorPrincipal:true,creatorPrincipalSource:'verified-account-access'})});
 }
 module.exports={createOnlineIdentityStore};

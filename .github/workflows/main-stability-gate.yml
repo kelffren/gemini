@@ -67,6 +67,9 @@ jobs:
       - name: MMORPG Wave 1 root invariants
         run: node scripts/mmorpg-wave1-root-audit.mjs
 
+      - name: MMORPG Wave 1 owner integration
+        run: node scripts/mmorpg-wave1-owner-integration-audit.mjs
+
       - name: Performance no-regression contract
         run: npm run audit:performance
 
