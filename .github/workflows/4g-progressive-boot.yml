@@ -1,0 +1,73 @@
+name: 4G Progressive Boot
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'index.html'
+      - 'src/core/progressive-boot.js'
+      - 'scripts/4g-progressive-boot-audit.js'
+      - 'tests/4g-progressive-boot.spec.js'
+      - '.github/workflows/4g-progressive-boot.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: 4g-progressive-boot-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  four-g-boot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CI: true
+      KELO_PAGES: http://127.0.0.1:4173/
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+
+      - name: Syntax and architecture contract
+        run: |
+          node --check src/core/progressive-boot.js
+          node scripts/4g-progressive-boot-audit.js
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Install Chromium
+        run: npx playwright install chromium --with-deps
+
+      - name: Start PR byte server
+        run: |
+          mkdir -p test-results
+          python3 -m http.server 4173 --bind 127.0.0.1 > test-results/4g-http.log 2>&1 &
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:4173/index.html >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat test-results/4g-http.log
+          exit 1
+
+      - name: Prove playable-first 4G boot
+        run: npx playwright test tests/4g-progressive-boot.spec.js --project=chromium
+
+      - name: Upload evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: 4g-progressive-boot-evidence
+          path: |
+            playwright-report.json
+            test-results/
+          retention-days: 14
+          if-no-files-found: ignore
