@@ -1,8 +1,8 @@
 /* KELO-INDEX
  * area: TEST / PWA / PVP / CREATORS
  * owner: Main Stability validation only
- * keys: IPHONE PWA SERVICEWORKER CREATORS PVP FIRST-USE LIVE-BUILD
- * purpose: reproduce an installed iPhone-like session with an active service worker and verify real UI entry into Creators and PvP on the same page.
+ * keys: IPHONE PWA SERVICEWORKER CREATORS PVP FIRST-USE LIVE-BUILD QUICK-ACTIONS
+ * purpose: reproduce an installed iPhone-like session with an active service worker and verify real visible UI entry into Creators and PvP on the same page.
  * do-not: NO direct KeloCreatorsLazyGate.open, NO direct enterPvPWorld, NO force click
  */
 const {test,expect}=require('@playwright/test');
@@ -30,7 +30,7 @@ async function bootInstalledLikePwa(browser){
   page.on('pageerror',error=>errors.push(String(error?.message||error)));
   const url=new URL(BASE);url.searchParams.set('guest','1');url.searchParams.set('pwaE2E','1');
   await page.goto(url.href,{waitUntil:'domcontentloaded',timeout:45000});
-  await page.waitForFunction(()=>window.KELO_MODULE_LOADER&&window.KELO_LUXE&&document.getElementById('lx-side-menu')&&document.getElementById('lx-side-pvp'),{timeout:25000});
+  await page.waitForFunction(()=>window.KELO_MODULE_LOADER&&window.KELO_LUXE&&document.getElementById('kw-quick-actions-toggle')&&document.getElementById('lx-side-menu')&&document.getElementById('lx-side-pvp'),{timeout:25000});
 
   await page.evaluate(async()=>{
     const reg=await navigator.serviceWorker.register('./sw.js');
@@ -40,12 +40,21 @@ async function bootInstalledLikePwa(browser){
   if(!await page.evaluate(()=>!!navigator.serviceWorker.controller)){
     await page.reload({waitUntil:'domcontentloaded'});
     await page.waitForFunction(()=>!!navigator.serviceWorker.controller,{timeout:15000});
-    await page.waitForFunction(()=>window.KELO_MODULE_LOADER&&window.KELO_LUXE&&document.getElementById('lx-side-menu'),{timeout:25000});
+    await page.waitForFunction(()=>window.KELO_MODULE_LOADER&&window.KELO_LUXE&&document.getElementById('kw-quick-actions-toggle'),{timeout:25000});
   }
   return {context,page,errors};
 }
 
+async function openQuickActions(page){
+  const quick=page.locator('#kw-quick-actions-toggle');
+  await expect(quick).toBeVisible({timeout:10000});
+  if(await quick.getAttribute('aria-expanded')!=='true')await quick.click();
+  await expect(quick).toHaveAttribute('aria-expanded','true',{timeout:5000});
+}
+
 async function openCreatorsThroughUi(page){
+  await openQuickActions(page);
+  await expect(page.locator('#lx-side-menu')).toBeVisible({timeout:5000});
   await page.locator('#lx-side-menu').click();
   await expect(page.locator('#lx-menu-panel')).toHaveClass(/open/,{timeout:5000});
   await expect(page.locator('#lx-create-studio')).toBeVisible({timeout:10000});
@@ -68,6 +77,7 @@ async function openCreatorsThroughUi(page){
 }
 
 async function enterPvpThroughUi(page){
+  await openQuickActions(page);
   await expect(page.locator('#lx-side-pvp')).toBeVisible({timeout:10000});
   await page.locator('#lx-side-pvp').click();
   await page.waitForFunction(()=>window.KELO_MODULE_LOADER?.isReady?.('pvp')&&window.KeloPvPWorld?.state?.mode==='pvp'&&window.KeloPvPWorld?.state?.combatEnabled===true,{timeout:50000});
@@ -82,6 +92,7 @@ async function enterPvpThroughUi(page){
 }
 
 test('installed-like iPhone PWA opens Creators and PvP with active service worker',async({browser})=>{
+  test.setTimeout(120000);
   const {context,page,errors}=await bootInstalledLikePwa(browser);
   const creators=await openCreatorsThroughUi(page);
   const pvp=await enterPvpThroughUi(page);
