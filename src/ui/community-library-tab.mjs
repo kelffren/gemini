@@ -18,7 +18,7 @@ import {
 const root=globalThis,doc=root.document;
 const state={assets:[],equipped:[],loading:false,error:null,loaded:false};
 const $=id=>doc.getElementById(id);
-const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
+const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
 function flash(text){
   const toast=$('toast');if(!toast)return;
