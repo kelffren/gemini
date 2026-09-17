@@ -5,7 +5,6 @@
  * purpose: turn the Sources tab into an in-app library navigator without downloading binaries while browsing
  */
 import './external-library-folder-browser-ui.mjs?v=1';
-import './external-library-page-lifecycle.mjs?v=1';
 import {getProviderStatuses} from '../creators/assets/external-asset-providers.mjs?v=10';
 
 const root=globalThis,doc=root.document;
