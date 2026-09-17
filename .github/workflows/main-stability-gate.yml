@@ -117,10 +117,11 @@ jobs:
           cat test-results/main-stability-http.log
           exit 1
 
-      - name: Critical mobile and PvP smoke on PR bytes
+      - name: Critical mobile, Creator sprite and PvP smoke on PR bytes
         run: >-
           npx playwright test
           tests/main-stability-mobile.spec.js
+          tests/universal-sprite-original-game.spec.js
           tests/pvp-dodge-live.spec.js
           --project=chromium
 
