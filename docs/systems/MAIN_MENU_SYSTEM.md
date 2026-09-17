@@ -14,7 +14,8 @@ La implementación es presentation-only. Inventario, economía, combate, propied
 
 - **Presentation owner:** `KELO_LUXE` / `src/ui/luxe-shell.js`.
 - **Shared presentation support contract:** `KeloUI` / `src/ui/luxe-ui-foundation.js`.
-- **Responsive + semantic tokens:** `src/ui/responsive-foundation.css`.
+- **Base responsive tokens (critical path):** `src/ui/responsive-foundation.css`.
+- **Post-ready semantic/primitives styles:** `src/ui/luxe-ui-foundation.css`.
 - **Player HUD + quick actions:** `src/ui/luxe-player-hud.js` / `KELO_LUXE_PLAYER_HUD`.
 - **Fullscreen/orientation:** `KELO_ORIENTATION` / `src/ui/mobile-orientation.js`.
 - **Input locks:** `KeloInputLocks`.
@@ -106,9 +107,11 @@ Busy tokens are presentation-only. They communicate pending work without claimin
 
 The system already respects OS `prefers-reduced-motion`. `KeloUI.motion.set('reduced')` adds an explicit in-game override. `system` removes the override. This preference is presentation-only and may live locally without server authority.
 
-## Design tokens
+## Design tokens and boot weight
 
-`responsive-foundation.css` remains the single shared token source. In addition to viewport, spacing, radius and typography tokens it now includes semantic tokens for:
+`responsive-foundation.css` remains the small critical-path source for viewport, spacing, radius, typography and the existing 44 px touch token. The larger semantic/polish layer lives in `luxe-ui-foundation.css` and is intentionally declared only **after** `window.__keloBootReady=true` so UI maturity cannot make the plaza slower to become playable.
+
+The post-ready layer adds semantic tokens for:
 
 - surface layers;
 - primary/secondary text;
@@ -118,7 +121,7 @@ The system already respects OS `prefers-reduced-motion`. `KeloUI.motion.set('red
 - fast/normal/slow motion;
 - UI z-layers from HUD through critical diagnostics.
 
-Domain UIs should consume semantic meaning rather than copy one-off colors and z-index values.
+Domain UIs should consume semantic meaning rather than copy one-off colors and z-index values. `scripts/luxe-ui-foundation-audit.mjs` fails if the new CSS or JS is moved back before the first-playable marker.
 
 ## Legibility and touch contract
 
@@ -126,7 +129,7 @@ Domain UIs should consume semantic meaning rather than copy one-off colors and z
 - `KeloUI.auditTouchTargets()` reports visible interactive elements below the goal without silently resizing domain layouts;
 - shared buttons guarantee at least 44×44;
 - common focus-visible styling is keyboard/pointer accessible;
-- Luxe labels previously rendered in the 5.4–8 px range receive a presentation legibility floor in the shared CSS;
+- Luxe labels previously rendered in the 5.4–8 px range receive a presentation legibility floor in the post-ready shared CSS;
 - safe-area and visual viewport owners remain unchanged.
 
 This follows the mobile game principle of keeping touch controls physically comfortable and using flexible/safe-area-aware layouts rather than globally scaling an entire interface.
@@ -224,6 +227,7 @@ A new domain panel should:
 - dialog input locks are tokenized and released;
 - minimum shared control target is 44 px;
 - OS and explicit reduced motion are respected;
+- presentation foundation CSS/JS stays post-ready and outside first-playable bytes;
 - same existing Luxe action IDs/handlers remain valid.
 
 ## Anti-patterns
@@ -238,7 +242,8 @@ Do not:
 - introduce a UI framework only to obtain primitives already covered here;
 - use polling to synchronize visual state;
 - treat haptic success as the only feedback channel;
-- force all legacy controls to 44 px by global CSS if that breaks layout; audit and migrate deliberately.
+- force all legacy controls to 44 px by global CSS if that breaks layout;
+- move the new polish layer before `kelo:boot-ready`.
 
 ## Tests and CI
 
@@ -248,9 +253,9 @@ Static shared-presentation gate:
 node scripts/luxe-ui-foundation-audit.mjs
 ```
 
-It verifies owner/API contract, semantic tokens, 44 px contract, zero gameplay writes, zero polling, load order and mandatory mobile coverage.
+It verifies owner/API contract, semantic tokens, 44 px contract, zero gameplay writes, zero polling, post-ready load order, first-playable exclusion and mandatory mobile coverage.
 
-Main Stability Gate runs the audit on every PR to `main`, then serves exact PR bytes and executes `tests/main-stability-mobile.spec.js` at iPhone 390×844 with touch/iPhone UA.
+Main Stability Gate runs the audit on every PR to `main`, then serves exact PR bytes and executes `tests/main-stability-mobile.spec.js` at iPhone 390×844 with touch/iPhone UA. The repository Weightless workflow independently enforces the critical-path byte ratchet.
 
 The mobile smoke verifies:
 
@@ -284,6 +289,7 @@ node scripts/live-luxe-menu-audit.mjs
 - [ ] Reuse `KELO_LUXE` / `KeloUI`; do not add a parallel presentation manager.
 - [ ] Keep domain authority outside UI.
 - [ ] Use shared tokens/primitives.
+- [ ] Keep presentation-polish CSS/JS post-ready.
 - [ ] Preserve safe areas / VisualViewport behavior.
 - [ ] Preserve 44 px frequent controls.
 - [ ] Test focus and reduced motion.
