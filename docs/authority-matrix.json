@@ -1,0 +1,195 @@
+{
+  "schema": 1,
+  "updated": "2026-09-17",
+  "states": [
+    {
+      "id": "account.identity",
+      "currentAuthority": "Supabase Auth",
+      "requiredAuthority": "Supabase Auth",
+      "persistence": "auth.users",
+      "clientRole": "holds session token and presents identity",
+      "onlinePolicy": "fail-closed",
+      "status": "authoritative"
+    },
+    {
+      "id": "character.identity",
+      "currentAuthority": "Kelo server + Supabase RLS",
+      "requiredAuthority": "Kelo server + Supabase RLS",
+      "persistence": "characters",
+      "clientRole": "select/request owned character",
+      "onlinePolicy": "fail-closed",
+      "status": "authoritative"
+    },
+    {
+      "id": "player.position.social",
+      "currentAuthority": "KeloNetAuthority client prediction + server shared state",
+      "requiredAuthority": "server reconciled",
+      "persistence": "session only",
+      "clientRole": "predict and present",
+      "onlinePolicy": "reconcile",
+      "status": "authoritative-with-client-prediction"
+    },
+    {
+      "id": "pvp.hit-damage",
+      "currentAuthority": "server/pvp-authority.js",
+      "requiredAuthority": "server/pvp-authority.js",
+      "persistence": "match/session state plus audit when required",
+      "clientRole": "send intent and predict presentation only",
+      "onlinePolicy": "fail-closed-competitive",
+      "status": "authoritative"
+    },
+    {
+      "id": "arena.result",
+      "currentAuthority": "client fallback/prototype in KeloArena",
+      "requiredAuthority": "Kelo server Arena authority",
+      "persistence": "server match record",
+      "clientRole": "presentation and local practice fallback",
+      "onlinePolicy": "ranked-disabled-or-practice-when-authority-unavailable",
+      "status": "migration-required"
+    },
+    {
+      "id": "arena.rating",
+      "currentAuthority": "local prototype/fallback",
+      "requiredAuthority": "Kelo server Arena progression authority",
+      "persistence": "server durable rating/receipt",
+      "clientRole": "display only",
+      "onlinePolicy": "fail-closed-ranked",
+      "status": "migration-required"
+    },
+    {
+      "id": "economy.wallet",
+      "currentAuthority": "PlayerEconomyStore server path + durable persistence bridge",
+      "requiredAuthority": "server economic authority",
+      "persistence": "character wallet/ledger direction; snapshots transitional where documented",
+      "clientRole": "request operation and display receipt",
+      "onlinePolicy": "fail-closed-valued-operation",
+      "status": "authoritative-transitional-persistence"
+    },
+    {
+      "id": "economy.item-instance",
+      "currentAuthority": "server economic authority",
+      "requiredAuthority": "server economic authority",
+      "persistence": "item_instances target model; transitional stores where documented",
+      "clientRole": "display/request",
+      "onlinePolicy": "fail-closed-valued-operation",
+      "status": "migration-in-progress"
+    },
+    {
+      "id": "commerce.market-settlement",
+      "currentAuthority": "offline/client fallback exists",
+      "requiredAuthority": "server atomic settlement",
+      "persistence": "durable ledger/item ownership/listing state",
+      "clientRole": "request and display receipt",
+      "onlinePolicy": "no-silent-local-settlement",
+      "status": "server-authority-required-before-shared-market"
+    },
+    {
+      "id": "forge.result",
+      "currentAuthority": "server PlayerEconomyStore path when authenticated",
+      "requiredAuthority": "server forge/economy authority",
+      "persistence": "durable economy state plus audit/history as applicable",
+      "clientRole": "request and display",
+      "onlinePolicy": "fail-closed-valued-operation",
+      "status": "authoritative-with-legacy-fallback-boundary"
+    },
+    {
+      "id": "property.ownership",
+      "currentAuthority": "mixed/local feature path depending mode",
+      "requiredAuthority": "server durable ownership authority",
+      "persistence": "specialized property ownership tables/records",
+      "clientRole": "render/edit allowed scope",
+      "onlinePolicy": "fail-closed-shared-ownership",
+      "status": "server-authority-required-for-shared-world"
+    },
+    {
+      "id": "world.creator-draft",
+      "currentAuthority": "Creator document/store",
+      "requiredAuthority": "creator draft owner",
+      "persistence": "local/private draft store and optional private sync",
+      "clientRole": "authoritative for private draft only",
+      "onlinePolicy": "draft-is-not-publication",
+      "status": "authoritative-private-draft"
+    },
+    {
+      "id": "world.publication",
+      "currentAuthority": "trusted publish path",
+      "requiredAuthority": "trusted server publish authority",
+      "persistence": "maps/map_versions/map_publications",
+      "clientRole": "submit candidate revision",
+      "onlinePolicy": "fail-closed-publication",
+      "status": "authoritative"
+    },
+    {
+      "id": "creator.asset-draft",
+      "currentAuthority": "Kelo Asset Forge / creator-private",
+      "requiredAuthority": "creator private draft/revision owner",
+      "persistence": "private storage plus immutable asset revisions",
+      "clientRole": "author private revision",
+      "onlinePolicy": "draft-is-not-publication",
+      "status": "authoritative-private-draft"
+    },
+    {
+      "id": "creator.asset-publication",
+      "currentAuthority": "trusted-server publish_asset_revision",
+      "requiredAuthority": "trusted server publication authority",
+      "persistence": "asset_publications + creator-global",
+      "clientRole": "submit/review candidate",
+      "onlinePolicy": "fail-closed-publication",
+      "status": "authoritative"
+    },
+    {
+      "id": "admin.roles-capabilities",
+      "currentAuthority": "server-managed account_roles/capability checks",
+      "requiredAuthority": "server-managed authorization",
+      "persistence": "server-managed role/capability records",
+      "clientRole": "presentation only",
+      "onlinePolicy": "fail-closed",
+      "status": "authoritative"
+    },
+    {
+      "id": "guardian.master-lease",
+      "currentAuthority": "Supabase Guardian control plane",
+      "requiredAuthority": "remote lease authority with epoch",
+      "persistence": "guardian_master_lease",
+      "clientRole": "request/renew/observe",
+      "onlinePolicy": "lease-expiry-failover",
+      "status": "authoritative-control-plane"
+    },
+    {
+      "id": "guardian.service-units",
+      "currentAuthority": "Kelo Guardian Coordinator verified contribution path",
+      "requiredAuthority": "trusted coordinator/verifier",
+      "persistence": "scheduler/proof persistence pending where documented",
+      "clientRole": "perform untrusted work and return proof/output",
+      "onlinePolicy": "no-self-award",
+      "status": "verification-foundation"
+    },
+    {
+      "id": "guardian.kc-settlement",
+      "currentAuthority": "none; Guardian explicitly mints 0 KC",
+      "requiredAuthority": "normal server economic authority",
+      "persistence": "wallet ledger when/if enabled",
+      "clientRole": "none",
+      "onlinePolicy": "disabled-until-authoritative-settlement-exists",
+      "status": "not-enabled"
+    },
+    {
+      "id": "kelo-evolution.objective-score",
+      "currentAuthority": "independent evaluator callback",
+      "requiredAuthority": "independent evaluator outside proposing agent",
+      "persistence": "evidence report/artifact",
+      "clientRole": "not applicable",
+      "onlinePolicy": "candidate-rejected-without-independent-score",
+      "status": "authoritative-evaluation-boundary"
+    },
+    {
+      "id": "kelo-evolution.merge-deploy",
+      "currentAuthority": "GitHub PR/CI/human promotion path",
+      "requiredAuthority": "GitHub promotion governance",
+      "persistence": "Git history/workflow evidence",
+      "clientRole": "none",
+      "onlinePolicy": "KeloEvolution-has-no-merge-authority",
+      "status": "authoritative-external-boundary"
+    }
+  ]
+}
