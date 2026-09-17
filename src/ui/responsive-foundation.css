@@ -22,95 +22,20 @@
   --kelo-radius-sm:clamp(9px,2vw,12px);
   --kelo-radius-md:clamp(13px,3vw,18px);
   --kelo-radius-lg:clamp(18px,4vw,26px);
-  --kelo-font-xs:clamp(11px,2.5vw,12px);
+  --kelo-font-xs:clamp(10px,2.5vw,12px);
   --kelo-font-sm:clamp(12px,3vw,14px);
   --kelo-font-md:clamp(14px,3.6vw,17px);
   --kelo-font-lg:clamp(18px,4.6vw,24px);
   --kelo-panel-max:1100px;
-
-  /* Semantic presentation tokens. Domain UIs consume meaning, not one-off colors/z-index. */
-  --kelo-surface-base:#05070a;
-  --kelo-surface-raised:rgba(8,18,20,.96);
-  --kelo-surface-elevated:rgba(12,28,28,.985);
-  --kelo-text-primary:#fff4d6;
-  --kelo-text-secondary:#a9bbb4;
-  --kelo-accent:#e7c56a;
-  --kelo-accent-strong:#f0d48a;
-  --kelo-success:#8ee3a6;
-  --kelo-warning:#f2c96b;
-  --kelo-danger:#ff9d98;
-  --kelo-border-soft:rgba(255,255,255,.09);
-  --kelo-border-accent:rgba(231,197,106,.48);
-  --kelo-shadow-raised:0 12px 32px rgba(0,0,0,.34);
-  --kelo-shadow-modal:0 26px 80px rgba(0,0,0,.56);
-  --kelo-motion-fast:90ms;
-  --kelo-motion-normal:160ms;
-  --kelo-motion-slow:240ms;
-  --kelo-ease-out:cubic-bezier(.2,.75,.25,1);
-  --kelo-z-world:0;
-  --kelo-z-hud:100;
-  --kelo-z-panel:200;
-  --kelo-z-sheet:300;
-  --kelo-z-dialog:400;
-  --kelo-z-toast:500;
-  --kelo-z-critical:600;
 }
 @supports(height:100dvh){:root{--kelo-dvh:100dvh;}}
 @supports not (height:100dvh){:root{--kelo-dvh:100vh;}}
 html[data-kelo-orientation="portrait"]{--kelo-panel-inline:min(94vw,var(--kelo-panel-max));}
 html[data-kelo-orientation="landscape"]{--kelo-panel-inline:min(90vw,var(--kelo-panel-max));}
 [data-kelo-container]{container-type:inline-size;}
-
-:where(button,[role="button"],a[href],input,select,textarea):focus-visible{
-  outline:2px solid var(--kelo-accent-strong);
-  outline-offset:2px;
-}
-[data-kelo-ui-control],.kelo-ui-button{min-width:var(--kelo-touch-min);min-height:var(--kelo-touch-min);touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
-.kelo-ui-button{appearance:none;border:1px solid var(--kelo-border-accent);border-radius:var(--kelo-radius-sm);padding:0 var(--kelo-space-4);background:var(--kelo-surface-raised);color:var(--kelo-text-primary);font:800 var(--kelo-font-sm)/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;transition:transform var(--kelo-motion-fast) var(--kelo-ease-out),border-color var(--kelo-motion-normal) var(--kelo-ease-out),background var(--kelo-motion-normal) var(--kelo-ease-out);}
-.kelo-ui-button:active{transform:scale(.97)}
-.kelo-ui-button-primary{background:linear-gradient(180deg,var(--kelo-accent-strong),#c99a3c);color:#171109;border-color:var(--kelo-accent-strong)}
-.kelo-ui-button-secondary{background:var(--kelo-surface-raised);color:var(--kelo-text-primary)}
-
-.kelo-ui-toast-host{position:fixed;left:50%;bottom:max(18px,calc(env(safe-area-inset-bottom) + 12px));z-index:var(--kelo-z-toast);width:min(92vw,420px);transform:translateX(-50%);display:grid;gap:8px;pointer-events:none;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-.kelo-ui-toast{min-height:48px;padding:8px 8px 8px 13px;border:1px solid var(--kelo-border-accent);border-radius:15px;background:var(--kelo-surface-elevated);box-shadow:var(--kelo-shadow-raised);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:8px;color:var(--kelo-text-primary);pointer-events:auto;animation:keloUiToastIn var(--kelo-motion-normal) var(--kelo-ease-out)}
-.kelo-ui-toast[data-tone="success"]{border-color:color-mix(in srgb,var(--kelo-success) 62%,transparent)}
-.kelo-ui-toast[data-tone="warning"]{border-color:color-mix(in srgb,var(--kelo-warning) 62%,transparent)}
-.kelo-ui-toast[data-tone="error"]{border-color:color-mix(in srgb,var(--kelo-danger) 68%,transparent)}
-.kelo-ui-toast[data-closing="true"]{opacity:0;transform:translateY(8px);transition:opacity 130ms ease,transform 130ms ease}
-.kelo-ui-toast-copy{min-width:0;font-size:var(--kelo-font-sm);line-height:1.3}
-.kelo-ui-toast-action,.kelo-ui-toast-dismiss{min-width:44px;min-height:44px;border:0;background:transparent;color:var(--kelo-accent-strong);font:850 12px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-.kelo-ui-toast-dismiss{font-size:23px;color:var(--kelo-text-secondary)}
-@keyframes keloUiToastIn{from{opacity:0;transform:translateY(8px) scale(.985)}to{opacity:1;transform:none}}
-
-.kelo-ui-dialog-backdrop{position:fixed;inset:0;z-index:var(--kelo-z-dialog);display:grid;place-items:center;padding:max(16px,env(safe-area-inset-top)) max(14px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left));background:rgba(2,6,8,.72);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);pointer-events:auto;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-.kelo-ui-dialog{width:min(92vw,410px);max-height:min(88dvh,680px);overflow:auto;padding:20px;border:1px solid var(--kelo-border-accent);border-radius:var(--kelo-radius-lg);background:linear-gradient(155deg,var(--kelo-surface-elevated),rgba(5,12,15,.995));box-shadow:var(--kelo-shadow-modal);color:var(--kelo-text-primary);animation:keloUiDialogIn var(--kelo-motion-normal) var(--kelo-ease-out)}
-.kelo-ui-dialog-title{margin:0;color:var(--kelo-accent-strong);font:850 var(--kelo-font-lg)/1.1 Georgia,serif}
-.kelo-ui-dialog-copy{margin-top:10px;color:var(--kelo-text-secondary);font-size:var(--kelo-font-sm);line-height:1.5;white-space:pre-wrap}
-.kelo-ui-dialog-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:18px}
-@keyframes keloUiDialogIn{from{opacity:0;transform:translateY(8px) scale(.985)}to{opacity:1;transform:none}}
-
-.kelo-ui-busy-host{position:fixed;top:max(12px,calc(env(safe-area-inset-top) + 8px));left:50%;z-index:var(--kelo-z-toast);width:min(88vw,380px);transform:translateX(-50%);display:grid;gap:6px;pointer-events:none}
-.kelo-ui-busy-host[hidden]{display:none!important}
-.kelo-ui-busy-chip{min-height:38px;padding:7px 11px;border:1px solid var(--kelo-border-soft);border-radius:999px;background:rgba(7,15,18,.9);box-shadow:var(--kelo-shadow-raised);display:flex;align-items:center;justify-content:center;gap:8px;color:var(--kelo-text-primary);font:750 var(--kelo-font-xs)/1.2 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
-.kelo-ui-busy-chip i{width:8px;height:8px;border-radius:50%;background:var(--kelo-accent);box-shadow:0 0 10px color-mix(in srgb,var(--kelo-accent) 45%,transparent);animation:keloUiBusy 900ms ease-in-out infinite alternate}
-@keyframes keloUiBusy{to{transform:scale(.58);opacity:.55}}
-
-.kelo-ui-inspector{position:fixed;left:max(7px,env(safe-area-inset-left));right:max(7px,env(safe-area-inset-right));bottom:max(7px,env(safe-area-inset-bottom));z-index:var(--kelo-z-critical);padding:7px 9px;border:1px solid rgba(255,255,255,.18);border-radius:10px;background:rgba(0,0,0,.82);color:#fff;font:700 10px/1.25 ui-monospace,SFMono-Regular,Menlo,monospace;pointer-events:none}
-
-/* Legibility floor for LIVE Luxe text that was previously as small as 5.4–8px. */
-#kelo-luxe .lx-menu-copy b{font-size:clamp(12px,3.1vw,14px)!important}
-#kelo-luxe .lx-menu-copy small{font-size:clamp(10px,2.45vw,11.5px)!important;line-height:1.3!important}
-#kelo-luxe .lx-chat-head{font-size:11px!important}
-#kelo-luxe .lx-chat-pull-tab{font-size:10px!important}
-#kelo-luxe .lx-chat-pull-tab b{font-size:9px!important}
-html body #kw-player-hud-wrap .kw-combat-head,html body #kw-player-hud-wrap .kw-combat-head span{font-size:10px!important}
-html body #kw-player-hud-wrap .kw-combat-head b{font-size:11px!important}
-html body #kelo-luxe .kw-quick-actions-options .lx-side-menu span,html body #kelo-luxe .kw-quick-actions-options .lx-side-pvp span,html body #kelo-luxe .kw-quick-actions-options .lx-side-guide span{font-size:9.5px!important}
-
 @media(pointer:coarse){
   button,[role="button"],input,select,textarea{touch-action:manipulation;}
 }
 @media(prefers-reduced-motion:reduce){
   *,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;}
 }
-html[data-kelo-motion="reduced"] *,html[data-kelo-motion="reduced"] *::before,html[data-kelo-motion="reduced"] *::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;}
