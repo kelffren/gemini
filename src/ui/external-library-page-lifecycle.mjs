@@ -8,7 +8,7 @@ import {releaseObjectURL} from '../creators/assets/personal-asset-vault.mjs?v=3'
 
 const root=globalThis,doc=root.document;
 const $=id=>doc.getElementById(id);
-const state={mounted:false,pendingPage:null,searchCleanupTimer:0,pagerObserver:null};
+const state={mounted:false,pendingPage:null,searchCleanupTimer:0,pagerObserver:null,gridObserver:null};
 
 function flash(text){
   const toast=$('toast');if(!toast)return;
@@ -25,6 +25,14 @@ function isCoreLoading(){return /cargando/i.test($('pager')?.querySelector('.pag
 function releaseActivePreviewObjectURL(){
   const modal=$('preview-modal'),asset=modal?.__keloAsset;
   if(asset?.id){try{releaseObjectURL(asset.id);}catch(error){console.warn('[Kelo page lifecycle] object URL release failed',error);}}
+}
+function releaseVisibleMedia(rootNode){
+  rootNode?.querySelectorAll?.('audio,video').forEach(el=>{try{el.pause();el.removeAttribute('src');el.load();}catch{}});
+  rootNode?.querySelectorAll?.('img').forEach(el=>{try{el.removeAttribute('src');}catch{}});
+}
+function discardVisiblePage(){
+  const grid=$('explore-grid');if(!grid)return;
+  releaseVisibleMedia(grid);grid.replaceChildren();
 }
 function prepareForCatalogChange(){releaseActivePreviewObjectURL();}
 
@@ -54,15 +62,16 @@ function ensureJumpUI(){
 function dispatchCorePage(page){
   const pager=$('pager');if(!pager)return;
   const current=currentPage();if(page===current){state.pendingPage=null;const input=$('external-library-page-number');if(input)input.value=String(current);return;}
-  prepareForCatalogChange();
+  prepareForCatalogChange();discardVisiblePage();
   const trigger=doc.createElement('button');trigger.type='button';trigger.hidden=true;trigger.dataset.page=String(page);pager.appendChild(trigger);trigger.click();trigger.remove();
 }
 function requestPage(page){
   page=Math.max(1,Math.min(999999,Math.floor(Number(page)||1)));
+  prepareForCatalogChange();discardVisiblePage();
   if(isCoreLoading()){
     state.pendingPage=page;
     const input=$('external-library-page-number');if(input)input.value=String(page);
-    flash(`Página ${page} en cola · se abrirá al terminar la consulta activa.`);
+    flash(`Página ${page} solicitada · la página anterior ya fue descartada.`);
     return;
   }
   state.pendingPage=null;dispatchCorePage(page);
@@ -88,10 +97,11 @@ function mount(){
   if(state.mounted)return;
   injectStyles();ensureJumpUI();bindLifecycle();
   const pager=$('pager');if(pager){state.pagerObserver=new MutationObserver(flushPendingPage);state.pagerObserver.observe(pager,{childList:true,subtree:true,characterData:true});}
+  const grid=$('explore-grid');if(grid){state.gridObserver=new MutationObserver(()=>{if(state.pendingPage)discardVisiblePage();});state.gridObserver.observe(grid,{childList:true});}
   root.addEventListener?.('pageshow',()=>{ensureJumpUI();flushPendingPage();});
   state.mounted=true;
 }
 
 if(doc.readyState==='loading')doc.addEventListener('DOMContentLoaded',mount,{once:true});else mount();
 
-export const KeloExternalLibraryPageLifecycle=Object.freeze({version:'kelo-external-library-page-lifecycle-v1',requestPage,releaseActivePreviewObjectURL});
+export const KeloExternalLibraryPageLifecycle=Object.freeze({version:'kelo-external-library-page-lifecycle-v2-disposable',requestPage,releaseActivePreviewObjectURL});
