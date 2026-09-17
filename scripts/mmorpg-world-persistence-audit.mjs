@@ -59,6 +59,7 @@ assert.deepEqual(calls.map(row=>row[0]),['load','mutate','replay']);
 
 const baseMigration=fs.readFileSync('supabase/migrations/20260917060152_mmorpg_world_state_ledger_v1.sql','utf8');
 const hardening=fs.readFileSync('supabase/migrations/20260917060425_mmorpg_world_state_ledger_hardening_v1.sql','utf8');
+const advisorHardening=fs.readFileSync('supabase/migrations/20260917061009_mmorpg_world_state_ledger_advisor_hardening_v1.sql','utf8');
 for(const token of [
   'public.world_cell_snapshots','public.world_event_ledger','world_apply_mutation','world_replay_events','world_get_snapshot',
   'pg_advisory_xact_lock','public.server_idempotency','public.server_outbox','public.server_audit_events',
@@ -70,6 +71,16 @@ assert.match(baseMigration,/event_id text not null unique/);
 assert.match(baseMigration,/security invoker/);
 for(const token of ['pg_column_size(p_patch) > 120000','pg_column_size(v_new_state) > 450000','WORLD_PATCH_TOO_LARGE','WORLD_STATE_TOO_LARGE'])assert.ok(hardening.includes(token),`hardening missing ${token}`);
 assert.ok(!hardening.includes("'state',v_new_state"),'idempotency result must not duplicate full world state');
+for(const token of [
+  'drop index if exists public.world_event_ledger_cell_revision_idx',
+  'world_event_ledger_actor_user_idx',
+  'world_event_ledger_character_idx',
+  'world_cell_snapshots_deny_clients',
+  'world_event_ledger_deny_clients',
+  'to anon, authenticated',
+  'using (false)',
+  'with check (false)'
+])assert.ok(advisorHardening.includes(token),`advisor hardening missing ${token}`);
 
 const edge=fs.readFileSync('supabase/functions/kelo-server-state/index.ts','utf8');
 for(const token of ["op==='world:load'","op==='world:replay'","op==='world:mutate'",'/rest/v1/rpc/world_get_snapshot','/rest/v1/rpc/world_replay_events','/rest/v1/rpc/world_apply_mutation','x-kelo-server-key'])assert.ok(edge.includes(token),`edge world bridge missing ${token}`);
@@ -96,4 +107,4 @@ assert.equal(statuses['world-event-ledger'],'integrated');
 assert.equal(bindings.bindings.filter(row=>row.status==='integrated').length,6);
 assert.equal(bindings.bindings.filter(row=>row.status==='foundation-active').length,3);
 
-console.log('MMORPG WORLD PERSISTENCE AUDIT PASS durable-contract=ok memory-fallback=ok idempotency=ok revision-cas=ok replay=ok rls=ok edge=ok websocket-write=blocked integrated=6 foundation=3');
+console.log('MMORPG WORLD PERSISTENCE AUDIT PASS durable-contract=ok memory-fallback=ok idempotency=ok revision-cas=ok replay=ok rls-deny=ok fk-indexes=ok edge=ok websocket-write=blocked integrated=6 foundation=3');
