@@ -1,8 +1,8 @@
 /* KELO-INDEX
  * area: QA / RELIABILITY
  * owner: KELO_FUSEBOX audit
- * keys: FEATURE FLAG KILL-SWITCH CIRCUIT-BREAKER BULKHEAD HALF-OPEN MODULE-LOADER
- * purpose: prueba determinista de aislamiento, switch manual, trip, probe y recuperación sin navegador
+ * keys: FEATURE FLAG KILL-SWITCH CIRCUIT-BREAKER BULKHEAD HALF-OPEN MODULE-LOADER LAZY
+ * purpose: prueba determinista de aislamiento, switch manual, trip, probe, recuperación y carga fuera del first-playable
  * online: N/A; valida contrato cliente local reemplazable por policy server
  */
 import fs from 'node:fs';
@@ -24,6 +24,8 @@ assert.equal(fuse.beginAttempt('world'),true);fuse.recordFailure('world',new Err
 await sleep(15);assert.equal(fuse.explain('world').status,'HALF_OPEN_READY');assert.equal(fuse.beginAttempt('world'),true);assert.equal(fuse.snapshot('world').mode,'HALF_OPEN');assert.equal(fuse.beginAttempt('world'),false);fuse.recordSuccess('world',{operation:'audit-probe'});assert.equal(fuse.snapshot('world').mode,'CLOSED');assert.equal(fuse.snapshot('world').consecutiveFailures,0);
 let fallbacks=0;for(let i=0;i<2;i++){const value=await fuse.run('bag',async()=>{throw new Error('BAG_RUNTIME_FAIL');},{rethrow:false,fallback:()=>{fallbacks+=1;return'fallback';}});assert.equal(value,'fallback');}assert.equal(fallbacks,2);assert.equal(fuse.snapshot('bag').mode,'OPEN');assert.equal(fuse.canRun('titles'),true);
 assert.equal(fuse.canRun('movement-core'),true);assert.equal(fuse.recordFailure('movement-core',new Error('ignore')),false);assert.equal(fuse.explain('movement-core').status,'UNMANAGED');
-const index=read('index.html'),loader=read('src/core/module-loader.js');
-assert.match(index,/feature-control-system\.js/);assert.ok(index.indexOf('feature-control-system.js')<index.indexOf('module-loader.js'));assert.match(loader,/KELO_FUSEBOX/);assert.match(loader,/beginAttempt/);assert.match(loader,/recordFailure/);assert.match(loader,/recordSuccess/);assert.match(loader,/fusebox/);assert.match(loader,/composedAllowed/);
+const index=read('index.html'),loader=read('src/core/module-loader.js'),legacy=read('src/core/module-loader-legacy-fallback.js');
+assert.doesNotMatch(index,/<script[^>]+feature-control-system\.js/,'FuseBox must stay off first-playable parser path');
+assert.match(loader,/feature-control-system\.js\?v=1/);assert.match(loader,/ensureFuse/);assert.match(loader,/beginAttempt/);assert.match(loader,/recordFailure/);assert.match(loader,/recordSuccess/);assert.match(loader,/composedAllowed/);assert.match(loader,/module-loader-legacy-fallback\.js/);
+for(const id of ['social','world','pvp','bag','mounts','market','titles','appearance','properties'])assert.match(legacy,new RegExp('\\b'+id+'\\b'));
 console.log('FuseBox audit PASS');
