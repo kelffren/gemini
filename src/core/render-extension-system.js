@@ -113,4 +113,14 @@
     snapshot:snapshot
   });
   root.KELO_RENDER_EXTENSION_AUDIT=Object.freeze({version:VERSION,installed:true,owner:'KeloRender',singleGlobalWriter:true,ownsFrameOrchestration:true,legacyBridge:'KELO_LEGACY_RENDER_BRIDGE',fallback:'engine-a render',exclusiveIntercept:true,beforeAfterFrame:true,sleepWake:true,activeListCached:true,timers:0,gameplayAuthority:false});
+
+  // Creator asset bridge: loaded only after the avatar owner already exists. Keeping the
+  // integration here avoids another global render wrapper and lets KeloAvatar stay authoritative.
+  if(typeof document!=='undefined'&&!root.KeloUniversalLookRuntime&&!document.querySelector('script[data-kelo-universal-look-runtime]')){
+    const script=document.createElement('script');
+    script.setAttribute('data-kelo-universal-look-runtime','1');
+    script.src='src/core/universal-look-runtime-bridge.js?v=20260917-sprite-game-v1';
+    script.async=false;
+    (document.head||document.documentElement).appendChild(script);
+  }
 })(typeof globalThis!=='undefined'?globalThis:window);
