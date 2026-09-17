@@ -14,20 +14,55 @@ on:
       - 'assets/world/imperial-plaza/arbol-redondo.png'
       - '.github/workflows/weightless-v7-exact-trim-lab.yml'
 
+concurrency:
+  group: kelo-weightless-v7-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   exact-full-png:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      FOUNTAIN_SHA256: f5ba82df1680b758980489a56543d59311ca4c0a6a39d0899d8e434332beb239
+      TREE_SHA256: fc9790cbc6e907d32ec1bfbdbb6a4220cb9c2099f35bc5cb83a35da81442479a
+      FOUNTAIN_TARGET: assets/pf-f5ba82df.png
+      TREE_TARGET: assets/prt-fc9790cb.png
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: feature/weightless-v7-exact-trim-lab
+          fetch-depth: 0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '24'
       - name: Materialize and verify exact full PNG candidates
         run: node scripts/exact-alpha-trim-lab.mjs --report=test-results/exact-alpha-trim/report.json
+      - name: Verify immutable delivery identities
+        run: |
+          FOUNTAIN_CANDIDATE="test-results/exact-alpha-trim/assets/plaza-fountain-kelo--${FOUNTAIN_SHA256:0:16}.png"
+          TREE_CANDIDATE="test-results/exact-alpha-trim/assets/plaza-round-tree--${TREE_SHA256:0:16}.png"
+          echo "$FOUNTAIN_SHA256  $FOUNTAIN_CANDIDATE" | sha256sum -c -
+          echo "$TREE_SHA256  $TREE_CANDIDATE" | sha256sum -c -
+          test "$(wc -c < "$FOUNTAIN_CANDIDATE")" -eq 2329441
+          test "$(wc -c < "$TREE_CANDIDATE")" -eq 1581201
+      - name: Publish verified delivery blobs to branch
+        run: |
+          cp "test-results/exact-alpha-trim/assets/plaza-fountain-kelo--${FOUNTAIN_SHA256:0:16}.png" "$FOUNTAIN_TARGET"
+          cp "test-results/exact-alpha-trim/assets/plaza-round-tree--${TREE_SHA256:0:16}.png" "$TREE_TARGET"
+          echo "$FOUNTAIN_SHA256  $FOUNTAIN_TARGET" | sha256sum -c -
+          echo "$TREE_SHA256  $TREE_TARGET" | sha256sum -c -
+          git config user.name "kelo-weightless-bot"
+          git config user.email "68343904+kelffren@users.noreply.github.com"
+          git add "$FOUNTAIN_TARGET" "$TREE_TARGET"
+          if git diff --cached --quiet; then
+            echo "EXACT_FULL_PNG_PUBLISH_NOOP"
+            exit 0
+          fi
+          git commit -m "perf(weightless): publish exact fountain and tree PNG delivery"
+          git push origin HEAD:feature/weightless-v7-exact-trim-lab
       - name: Publish exact PNG summary
         if: always()
         run: |
