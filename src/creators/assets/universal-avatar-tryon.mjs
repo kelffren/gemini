@@ -112,6 +112,11 @@ export function installUniversalAvatarTryOn(){
   const state={asset:null,profile:null,active:false,base:null,overlay:null,drag:false,lastX:0,lastY:0,token:0};
 
   function eligible(asset){return !!asset&&!!asset.previewUrl&&!['sfx','music','ambience','ability','scene','prefab'].includes(asset.contentKind)&&asset.previewKind!=='video';}
+  function publishProfile(){
+    if(!state.asset||!state.profile){modal.__keloTryonProfile=null;return;}
+    modal.__keloTryonProfile={assetId:String(state.asset.id||''),profile:{...state.profile}};
+    modal.dispatchEvent(new CustomEvent('kelo:tryon-profile',{detail:modal.__keloTryonProfile}));
+  }
   function syncBar(){
     bar.classList.toggle('on',eligible(state.asset));
     bar.querySelector('[data-tryon="toggle"]')?.classList.toggle('on',state.active);
@@ -119,11 +124,12 @@ export function installUniversalAvatarTryOn(){
     const layer=bar.querySelector('[data-tryon="layer"]');if(layer)layer.textContent=state.profile?.layer==='back'?'Detrás':'Frente';
   }
   function removeCanvas(){stage.classList.remove('kelo-tryon-active');stage.querySelector(':scope > .kelo-tryon-canvas')?.remove();stage.querySelector(':scope > .kelo-tryon-note')?.remove();}
-  function resetState(){state.token++;state.active=false;state.base=null;state.overlay=null;state.drag=false;removeCanvas();syncBar();}
+  function resetState(){state.token++;state.active=false;state.base=null;state.overlay=null;state.drag=false;modal.__keloTryonProfile=null;removeCanvas();syncBar();}
   function drawLayer(ctx,img,rect,x,y,w,h,profile){
     ctx.save();ctx.globalAlpha=Math.max(.08,Math.min(1,profile.alpha||1));ctx.translate(x,y);ctx.rotate((profile.rotation||0)*Math.PI/180);ctx.imageSmoothingEnabled=false;ctx.drawImage(img,rect.x,rect.y,rect.w,rect.h,-w/2,-h/2,w,h);ctx.restore();
   }
   function render(){
+    publishProfile();
     if(!state.active||!state.base||!state.overlay||!state.profile)return;
     const canvas=canvasFor(stage),cssW=360,cssH=420,dpr=Math.min(2,window.devicePixelRatio||1);canvas.width=Math.round(cssW*dpr);canvas.height=Math.round(cssH*dpr);canvas.style.aspectRatio=`${cssW}/${cssH}`;
     const ctx=canvas.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,cssW,cssH);
@@ -139,7 +145,7 @@ export function installUniversalAvatarTryOn(){
     if(!eligible(state.asset))return;
     if(state.active){state.active=false;removeCanvas();syncBar();return;}
     const source=imageInStage(stage);if(!source?.naturalWidth)return;
-    state.active=true;state.overlay=source;state.profile=profileFor(state.asset);syncBar();
+    state.active=true;state.overlay=source;state.profile=profileFor(state.asset);render();syncBar();
     const spriteToggle=document.querySelector('#kelo-sprite-preview-bar [data-sprite-tool="toggle"].on');spriteToggle?.click();
     stage.classList.add('kelo-tryon-active');const token=++state.token;
     try{state.base=await loadBase();if(token!==state.token||!state.active)return;render();}catch{state.active=false;removeCanvas();syncBar();}
@@ -163,7 +169,7 @@ export function installUniversalAvatarTryOn(){
   stage.addEventListener('pointermove',event=>{if(!state.drag||!state.active||!state.profile)return;const dx=event.clientX-state.lastX,dy=event.clientY-state.lastY;state.lastX=event.clientX;state.lastY=event.clientY;state.profile.x=Math.max(-.2,Math.min(1.2,state.profile.x+dx/330));state.profile.y=Math.max(-.2,Math.min(1.2,state.profile.y+dy/330));render();event.preventDefault();});
   const stopDrag=()=>{state.drag=false;};stage.addEventListener('pointerup',stopDrag);stage.addEventListener('pointercancel',stopDrag);
 
-  modal.addEventListener('kelo:preview-asset',event=>{resetState();state.asset=event.detail?.asset||null;state.profile=state.asset?profileFor(state.asset):null;syncBar();});
+  modal.addEventListener('kelo:preview-asset',event=>{resetState();state.asset=event.detail?.asset||null;state.profile=state.asset?profileFor(state.asset):null;publishProfile();syncBar();});
   new MutationObserver(()=>{if(modal.hidden){state.asset=null;state.profile=null;resetState();bar.classList.remove('on');}}).observe(modal,{attributes:true,attributeFilter:['hidden']});
   new MutationObserver(()=>{if(!state.active)return;const img=imageInStage(stage);if(img&&img!==state.overlay){state.overlay=img;render();}}).observe(stage,{childList:true,subtree:true});
   syncBar();
