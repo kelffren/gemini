@@ -10,7 +10,7 @@
 (function(root){
 'use strict';
 if(root.KeloCreatorsLazyGate)return;
-const VERSION='kelo-creators-lazy-gate-v8-ios-open-access';
+const VERSION='kelo-creators-lazy-gate-v9-ios-hub-recovery';
 // TEMPORAL: Creadores abierto para todos. Mantener la verificación original intacta
 // permite volver a permisos por rol cambiando solo este flag a false.
 const OPEN_CREATOR_ACCESS=true;
@@ -79,6 +79,31 @@ function evictClosedLauncher(){
   try{root.KELO_CREATORS_LAUNCHER=null;}catch(_){}
   try{document.querySelectorAll('script[data-kelo-creators-first-use="1"]').forEach(function(node){node.remove();});}catch(_){}
 }
+function studioReallyMounted(){
+  const doc=root.document;if(!doc)return false;
+  const live=doc.getElementById('kelo-studio-live');
+  const workspace=doc.getElementById('kelo-studio-workspace');
+  return !!(live?.isConnected||workspace?.isConnected);
+}
+function clearStaleStudioState(){
+  const doc=root.document;if(!doc?.body||studioReallyMounted())return false;
+  if(!doc.body.classList.contains('kelo-studio-active'))return false;
+  try{doc.body.classList.remove('kelo-studio-active');}catch(_){}
+  try{doc.getElementById('kelo-world-launch-curtain')?.remove();}catch(_){}
+  try{doc.querySelector('canvas.kelo-studio-overlay')?.remove();}catch(_){}
+  return true;
+}
+function recoverHiddenHub(){
+  const doc=root.document,hub=doc?.getElementById('kelo-creators-hub');
+  if(!hub||studioReallyMounted())return false;
+  clearStaleStudioState();
+  try{
+    const hidden=root.getComputedStyle?.(hub)?.display==='none';
+    if(hidden)hub.style.display='grid';
+    hub.style.pointerEvents='';
+    return hidden;
+  }catch(_){return false;}
+}
 function loadStudio(){
   if(loading)return loading;
   loading=(async function(){
@@ -102,6 +127,7 @@ async function openAssetForge(){
   forgeLoading=(async function(){
     try{
       root.KELO_LUXE?.closeMenu?.();
+      clearStaleStudioState();
       const mod=await import(assetForgeModuleUrl());
       const platform=await mod.bootKeloCreators({root});
       await platform.openWorkspace('asset-forge');
@@ -118,7 +144,14 @@ async function open(){
   }
   if(!allowed()){toast('Necesitas acceso a Kelo Creators');return false;}
   const btn=document.getElementById('lx-create-studio');paint(btn,true);
-  try{const launcher=await loadStudio();if(!launcher||typeof launcher.open!=='function')throw new Error('CREATORS_LAUNCHER_UNAVAILABLE');await launcher.open();return true;}
+  try{
+    clearStaleStudioState();
+    const launcher=await loadStudio();
+    if(!launcher||typeof launcher.open!=='function')throw new Error('CREATORS_LAUNCHER_UNAVAILABLE');
+    await launcher.open();
+    recoverHiddenHub();
+    return true;
+  }
   catch(error){console.error('[Kelo Creators lazy gate]',error);toast('No se pudo abrir Kelo Creators');return false;}
   finally{paint(document.getElementById('lx-create-studio'),false);}
 }
