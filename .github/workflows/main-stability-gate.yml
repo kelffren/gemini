@@ -64,6 +64,9 @@ jobs:
       - name: MMORPG community 59-system contract
         run: node scripts/mmorpg-community-platform-audit.mjs
 
+      - name: MMORPG Wave 1 root invariants
+        run: node scripts/mmorpg-wave1-root-audit.mjs
+
       - name: Performance no-regression contract
         run: npm run audit:performance
 
