@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: CREATORS / SPRITE OS
  * owner: Creator Runtime
- * keys: SPRITE SEARCH EXTERNAL READY COMPILER LICENSE PASSPORT SIMILAR TRYON RUNTIME
+ * keys: SPRITE SEARCH EXTERNAL READY COMPILER LICENSE PASSPORT SIMILAR TRYON RUNTIME WYSIWYG
  * purpose: Turn external sprite metadata into a normalized, license-aware, game-ready descriptor without relying on an internal asset library.
  */
 
@@ -16,6 +16,7 @@ const COMMON_ROWS=[1,2,3,4,8];
 function clean(v){return String(v??'').trim();}
 function words(v){return clean(v).toLowerCase().split(/[^a-z0-9áéíóúñ]+/i).filter(Boolean);}
 function finite(v,f=null){const n=Number(v);return Number.isFinite(n)&&n>0?n:f;}
+function number(v,f){const n=Number(v);return Number.isFinite(n)?n:f;}
 function textFor(asset){return `${asset?.name||''} ${asset?.category||''} ${asset?.contentKind||''} ${(asset?.tags||[]).join(' ')} ${asset?.description||''}`.toLowerCase();}
 
 export function licensePassport(asset={}){
@@ -106,9 +107,30 @@ export function compileSpriteAsset(asset={},dimensions={}){
   };
 }
 
-export function makeLookEntry(compiled){
+export function liveTryOnProfile(compiled,root=typeof document!=='undefined'?document:null){
+  const fallback={...(compiled?.profile||{})};
+  const modal=root?.getElementById?.('preview-modal');
+  const live=modal?.__keloTryonProfile;
+  if(!live?.profile||String(live.assetId||'')!==String(compiled?.id||''))return fallback;
+  const p=live.profile,slot=clean(p.slot)||fallback.slot||'generic';
+  return {
+    ...fallback,
+    slot,
+    label:clean(p.label)||fallback.label||slot,
+    x:number(p.x,fallback.x??.5),
+    y:number(p.y,fallback.y??.5),
+    scale:Math.max(.05,number(p.scale,fallback.scale??.42)),
+    rotation:number(p.rotation,fallback.rotation??0),
+    alpha:Math.max(.08,Math.min(1,number(p.alpha,fallback.alpha??1))),
+    layer:p.layer==='back'?'back':p.layer==='front'?'front':fallback.layer||'front',
+    order:number(p.order,fallback.order??200)
+  };
+}
+
+export function makeLookEntry(compiled,root=typeof document!=='undefined'?document:null){
   if(!compiled?.id||!compiled?.previewUrl)throw new Error('SPRITE_OS_INVALID_DESCRIPTOR');
-  return {id:compiled.id,name:compiled.name,previewUrl:compiled.previewUrl,previewKind:'image',contentKind:compiled.contentKind,category:compiled.category,tags:compiled.tags||[],description:compiled.description||'',columns:compiled.columns||1,rows:compiled.rows||1,profile:{...compiled.profile},spritePassport:{schema:compiled.schema,provider:compiled.provider,sourceUrl:compiled.sourceUrl,license:compiled.license,author:compiled.author,credit:compiled.credit,frameWidth:compiled.frameWidth,frameHeight:compiled.frameHeight,directions:compiled.directions,gridConfidence:compiled.gridConfidence}};
+  const profile=liveTryOnProfile(compiled,root);
+  return {id:compiled.id,name:compiled.name,previewUrl:compiled.previewUrl,previewKind:'image',contentKind:compiled.contentKind,category:compiled.category,tags:compiled.tags||[],description:compiled.description||'',columns:compiled.columns||1,rows:compiled.rows||1,profile,spritePassport:{schema:compiled.schema,provider:compiled.provider,sourceUrl:compiled.sourceUrl,license:compiled.license,author:compiled.author,credit:compiled.credit,frameWidth:compiled.frameWidth,frameHeight:compiled.frameHeight,directions:compiled.directions,gridConfidence:compiled.gridConfidence}};
 }
 
 export function buildSimilarQuery(asset={}){
@@ -117,4 +139,4 @@ export function buildSimilarQuery(asset={}){
   return [...new Set(tokens)].slice(0,5).join(' ');
 }
 
-export const SPRITE_OS_ENGINE=Object.freeze({licensePassport,classifySlot,readinessFor,detectSpriteGrid,compileSpriteAsset,makeLookEntry,buildSimilarQuery});
+export const SPRITE_OS_ENGINE=Object.freeze({licensePassport,classifySlot,readinessFor,detectSpriteGrid,compileSpriteAsset,liveTryOnProfile,makeLookEntry,buildSimilarQuery});
