@@ -3,10 +3,10 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 
 const runtimePath = new URL('../src/core/universal-look-runtime-bridge.js', import.meta.url);
-const renderOwnerPath = new URL('../src/core/render-extension-system.js', import.meta.url);
+const launcherPath = new URL('../src/ui/asset-library-launcher.js', import.meta.url);
 const lookBuilderPath = new URL('../src/creators/assets/universal-look-builder.mjs', import.meta.url);
 const source = fs.readFileSync(runtimePath, 'utf8');
-const renderOwner = fs.readFileSync(renderOwnerPath, 'utf8');
+const launcher = fs.readFileSync(launcherPath, 'utf8');
 const lookBuilder = fs.readFileSync(lookBuilderPath, 'utf8');
 
 const PREVIEW_KEY = 'kelo.universal.look.preview.v1';
@@ -123,10 +123,13 @@ function firstIndex(order, kind) {
   return order.findIndex((entry) => entry === kind || (Array.isArray(entry) && entry[0] === kind));
 }
 
-// Static wiring contract: the same storage key must be produced by Creator and consumed by game runtime.
+// Static wiring contract: Creator produces the Look key; the post-first-playable launcher
+// loads the runtime only when committed state exists, keeping normal boot unchanged.
 assert.match(lookBuilder, /kelo\.universal\.look\.preview\.v1/);
-assert.match(renderOwner, /universal-look-runtime-bridge\.js/);
-assert.match(renderOwner, /data-kelo-universal-look-runtime/);
+assert.match(launcher, /kelo\.universal\.look\.preview\.v1/);
+assert.match(launcher, /kelo\.universal\.look\.runtime\.v1/);
+assert.match(launcher, /universal-look-runtime-bridge\.js/);
+assert.match(launcher, /maybeLoadLookRuntime/);
 
 // Installs on the one avatar render owner, with high visual priority.
 {
