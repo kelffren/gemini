@@ -1,10 +1,11 @@
 /* KELO-INDEX
  * area: UI / UNIVERSAL CONTENT LIBRARY / PAGE LIFECYCLE
  * owner: Kelo External Library Browser UI
- * keys: PAGINATION DIRECT JUMP HIBERNATE DISPOSABLE PAGE MOBILE VAULT MEMORY OBJECT-URL
- * purpose: keep only the active external-library page alive while allowing direct jumps to distant pages without retaining previous previews
+ * keys: PAGINATION DIRECT JUMP HIBERNATE DISPOSABLE PAGE MOBILE VAULT MEMORY OBJECT-URL REQUEST-CANCEL
+ * purpose: keep only the active external-library page alive while allowing direct jumps to distant pages without retaining previous previews or obsolete provider requests
  */
 import {releaseObjectURL} from '../creators/assets/personal-asset-vault.mjs?v=3';
+import * as ExternalProviderRuntime from '../creators/assets/external-provider-runtime.mjs?v=3';
 
 const root=globalThis,doc=root.document;
 const $=id=>doc.getElementById(id);
@@ -16,7 +17,8 @@ function isCoreLoading(){return /cargando/i.test($('pager')?.querySelector('.pag
 function releaseActivePreviewObjectURL(){const modal=$('preview-modal'),asset=modal?.__keloAsset;if(asset?.id){try{releaseObjectURL(asset.id);}catch(error){console.warn('[Kelo page lifecycle] object URL release failed',error);}}}
 function releaseVisibleMedia(rootNode){rootNode?.querySelectorAll?.('audio,video').forEach(el=>{try{el.pause();el.removeAttribute('src');el.load();}catch{}});rootNode?.querySelectorAll?.('img').forEach(el=>{try{el.removeAttribute('src');}catch{}});}
 function discardVisiblePage(){const grid=$('explore-grid');if(!grid)return;releaseVisibleMedia(grid);grid.replaceChildren();}
-function prepareForCatalogChange(){releaseActivePreviewObjectURL();}
+function cancelRemote(reason='catalog-change'){try{return Number(ExternalProviderRuntime.cancelExternalProviderRequests?.(reason)||0);}catch(error){console.warn('[Kelo page lifecycle] provider cancellation failed',error);return 0;}}
+function prepareForCatalogChange({cancel=false,reason='catalog-change'}={}){releaseActivePreviewObjectURL();return cancel?cancelRemote(reason):0;}
 
 function injectStyles(){
   if($('kelo-page-lifecycle-style'))return;
@@ -49,11 +51,11 @@ function dispatchCorePage(page){
 }
 function requestPage(page){
   page=Math.max(1,Math.min(999999,Math.floor(Number(page)||1)));
-  prepareForCatalogChange();discardVisiblePage();
+  const cancelled=prepareForCatalogChange({cancel:true,reason:'page-jump'});discardVisiblePage();
   if(isCoreLoading()){
     state.pendingPage=page;
     const input=$('external-library-page-number');if(input)input.value=String(page);
-    flash(`Página ${page} solicitada · la página anterior ya fue descartada.`);
+    flash(cancelled?`Página ${page} solicitada · petición anterior cancelada.`:`Página ${page} solicitada · la página anterior ya fue descartada.`);
     return;
   }
   state.pendingPage=null;dispatchCorePage(page);
@@ -61,10 +63,13 @@ function requestPage(page){
 function flushPendingPage(){ensureJumpUI();if(state.pendingPage&&!isCoreLoading()){const page=state.pendingPage;state.pendingPage=null;dispatchCorePage(page);}}
 
 function bindLifecycle(){
-  doc.addEventListener('click',event=>{if(event.target.closest?.('[data-preview-close]')||event.target===$('preview-modal')){releaseActivePreviewObjectURL();return;}if(event.target.closest?.('[data-page]:not([disabled]),#provider-filters [data-provider],[data-explore-kind],[data-library-facet-id],[data-library-all]'))prepareForCatalogChange();},true);
+  doc.addEventListener('click',event=>{
+    if(event.target.closest?.('[data-preview-close]')||event.target===$('preview-modal')){releaseActivePreviewObjectURL();return;}
+    if(event.target.closest?.('[data-page]:not([disabled]),#provider-filters [data-provider],[data-explore-kind],[data-library-facet-id],[data-library-all]'))prepareForCatalogChange({cancel:true,reason:'catalog-navigation'});
+  },true);
   doc.addEventListener('keydown',event=>{if(event.key==='Escape'&&!$('preview-modal')?.hidden)releaseActivePreviewObjectURL();},true);
-  const search=$('search');search?.addEventListener('input',()=>{clearTimeout(state.searchCleanupTimer);state.searchCleanupTimer=setTimeout(prepareForCatalogChange,250);});
-  root.addEventListener?.('pagehide',releaseActivePreviewObjectURL);
+  const search=$('search');search?.addEventListener('input',()=>{clearTimeout(state.searchCleanupTimer);state.searchCleanupTimer=setTimeout(()=>prepareForCatalogChange({cancel:true,reason:'search-change'}),250);});
+  root.addEventListener?.('pagehide',()=>{releaseActivePreviewObjectURL();cancelRemote('pagehide');});
 }
 
 function mount(){
@@ -77,4 +82,4 @@ function mount(){
 }
 
 if(doc.readyState==='loading')doc.addEventListener('DOMContentLoaded',mount,{once:true});else mount();
-export const KeloExternalLibraryPageLifecycle=Object.freeze({version:'kelo-external-library-page-lifecycle-v2-disposable',requestPage,releaseActivePreviewObjectURL});
+export const KeloExternalLibraryPageLifecycle=Object.freeze({version:'kelo-external-library-page-lifecycle-v3-cancellable',requestPage,releaseActivePreviewObjectURL,cancelRemote});

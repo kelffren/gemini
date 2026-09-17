@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: CREATORS / EXTERNAL PROVIDER RUNTIME
  * owner: Kelo Universal Content Bridge
- * keys: NETWORK BUDGET CACHE LRU TIMEOUT CIRCUIT BREAKER SAVE DATA MOBILE QUEUE BACKPRESSURE PAGING
+ * keys: NETWORK BUDGET CACHE LRU TIMEOUT CIRCUIT BREAKER SAVE DATA MOBILE QUEUE BACKPRESSURE PAGING CANCELLATION
  * purpose: let many remote catalogs coexist without allowing metadata search to saturate mobile bandwidth, RAM, or provider APIs
  */
 
@@ -18,6 +18,7 @@ let active=0;
 const waiters=[];
 const cache=new Map();
 const inFlight=new Map();
+const controllers=new Map();
 const breakers=new Map();
 
 function now(){return Date.now();}
@@ -34,6 +35,7 @@ function breaker(providerId){const id=String(providerId||'external');let row=bre
 function breakerAssert(providerId){const row=breaker(providerId);if(row.openUntil>now())throw new Error(`PROVIDER_CIRCUIT_OPEN:${providerId}`);if(row.openUntil&&row.openUntil<=now()){row.openUntil=0;row.failures=0;}}
 function breakerSuccess(providerId){const row=breaker(providerId);row.failures=0;row.openUntil=0;row.lastError=null;}
 function breakerFailure(providerId,error){const row=breaker(providerId);row.failures++;row.lastError=String(error?.message||error);if(row.failures>=BREAKER_FAILURES)row.openUntil=now()+BREAKER_COOLDOWN_MS;emit('kelo:external-provider-error',{providerId:String(providerId),failures:row.failures,openUntil:row.openUntil,error:row.lastError});}
+function abortError(reason='cancelled'){const error=new Error('PROVIDER_REQUEST_ABORTED');error.name='AbortError';error.reason=String(reason||'cancelled');return error;}
 
 export function mobilePageBudget(requested=24,{heavy=false}={}){
   const conn=connection(),saveData=conn?.saveData===true,type=String(conn?.effectiveType||'').toLowerCase();
@@ -62,25 +64,37 @@ export async function fetchProviderJson(providerId,url,{ttlMs=DEFAULT_TTL_MS,tim
   if(cached&&cached.expiresAt>now()){touchCache(key,cached);return cached.value;}
   if(inFlight.has(key))return inFlight.get(key);
   breakerAssert(providerId);
+  const controller=new AbortController();controllers.set(key,controller);
   const task=(async()=>{
-    await acquire();
-    const controller=new AbortController(),timer=setTimeout(()=>controller.abort('timeout'),Math.max(1000,timeoutMs));
+    let acquired=false;
+    const timer=setTimeout(()=>controller.abort('timeout'),Math.max(1000,timeoutMs));
     try{
+      await acquire();acquired=true;
+      if(controller.signal.aborted)throw abortError(controller.signal.reason);
       const response=await fetch(url,{method:'GET',mode:'cors',cache:'no-store',credentials:'omit',signal:controller.signal,headers:{Accept:'application/json',...(headers||{})}});
       if(!response.ok)throw new Error(`PROVIDER_HTTP_${response.status}`);
       const text=await boundedText(response,Math.max(32_768,maxBytes)),value=JSON.parse(text);
       touchCache(key,{value,expiresAt:now()+Math.max(1000,ttlMs)});breakerSuccess(providerId);return value;
-    }catch(error){breakerFailure(providerId,error);throw error;}
-    finally{clearTimeout(timer);release();}
+    }catch(error){
+      const reason=String(controller.signal.reason||''),intentionalCancel=controller.signal.aborted&&reason&&reason!=='timeout';
+      if(intentionalCancel){emit('kelo:external-provider-request-aborted',{providerId:String(providerId),key,reason});throw abortError(reason);}
+      breakerFailure(providerId,error);throw error;
+    }finally{clearTimeout(timer);controllers.delete(key);if(acquired)release();}
   })();
   inFlight.set(key,task);try{return await task;}finally{inFlight.delete(key);}
 }
 
+export function cancelExternalProviderRequests(reason='superseded'){
+  const why=String(reason||'superseded');let cancelled=0;
+  for(const controller of controllers.values()){if(controller.signal.aborted)continue;try{controller.abort(why);cancelled++;}catch{}}
+  if(cancelled)emit('kelo:external-provider-cancelled',{reason:why,count:cancelled});
+  return cancelled;
+}
 export function clearExternalProviderRuntimeCache(prefix=''){
   const p=String(prefix||'');for(const key of [...cache.keys()])if(!p||key.includes(p))cache.delete(key);
 }
 export function getExternalProviderRuntimeStats(){
-  return Object.freeze({active,queued:waiters.length,cacheEntries:cache.size,inFlight:inFlight.size,maxConcurrency:MAX_CONCURRENCY,maxQueue:MAX_QUEUE,breakers:[...breakers.entries()].map(([providerId,row])=>({providerId,...row}))});
+  return Object.freeze({active,queued:waiters.length,cacheEntries:cache.size,inFlight:inFlight.size,cancellable:controllers.size,maxConcurrency:MAX_CONCURRENCY,maxQueue:MAX_QUEUE,breakers:[...breakers.entries()].map(([providerId,row])=>({providerId,...row}))});
 }
 
-export const EXTERNAL_PROVIDER_RUNTIME=Object.freeze({version:'kelo-external-provider-runtime-v3-mobile-window',fetchProviderJson,mobilePageBudget,mobilePageWindow,clearExternalProviderRuntimeCache,getExternalProviderRuntimeStats});
+export const EXTERNAL_PROVIDER_RUNTIME=Object.freeze({version:'kelo-external-provider-runtime-v4-cancellable',fetchProviderJson,mobilePageBudget,mobilePageWindow,cancelExternalProviderRequests,clearExternalProviderRuntimeCache,getExternalProviderRuntimeStats});
