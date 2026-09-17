@@ -1,7 +1,7 @@
 {
   "schema": "kelo-instant-delivery-plan-v1",
   "id": "plaza-first-playable-v1",
-  "notes": "SOURCE remains canonical. Sparse PNG keeps logical dimensions/source coordinates and only removes pixels outside declared runtime coverage. Promoted DELIVERY entries are exact byte contracts consumed by Weightless ratchets; codec candidates remain laboratory outputs until device proof permits promotion.",
+  "notes": "SOURCE remains canonical. Sparse PNG keeps logical dimensions/source coordinates and only removes pixels outside declared runtime coverage. exact-png-lossless keeps the complete dimensions and decoded RGBA identical while reducing PNG bytes. Codec-switch candidates remain laboratory outputs until real iOS Safari device proof permits promotion.",
   "assets": [
     {
       "id": "plazaNature",
@@ -31,13 +31,13 @@
     },
     {
       "id": "plazaFountainKelo",
-      "mode": "lossless-codecs",
+      "mode": "exact-png-lossless",
       "source": "assets/justicia_fountain_v2.PNG",
       "outputBase": "plaza-fountain-kelo"
     },
     {
       "id": "plazaRoundTree",
-      "mode": "lossless-codecs",
+      "mode": "exact-png-lossless",
       "source": "assets/world/imperial-plaza/arbol-redondo.png",
       "outputBase": "plaza-round-tree"
     },
