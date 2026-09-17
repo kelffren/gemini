@@ -172,7 +172,8 @@ test('every Tiny Pixel Art control works and a body sprite reaches the original 
   await tryon('rotate').click();
   await tryon('layer').click();
   const adjusted = await profile(page);
-  await page.locator('[data-look="add"]').click();
+  const add = page.locator('[data-look="add"]');
+  await add.click();
   let look = await storedLook(page);
   expect(look).toHaveLength(1);
   expect(look[0].profile.slot).toBe('body');
@@ -182,6 +183,28 @@ test('every Tiny Pixel Art control works and a body sprite reaches the original 
   expect(look[0].profile.x).toBeCloseTo(adjusted.x, 8);
   expect(look[0].profile.y).toBeCloseTo(adjusted.y, 8);
   await expect(page.locator('.kelo-look-count')).toHaveText('1/8');
+  await expect(add).toHaveText(/Reemplazar/);
+
+  // The same Add button becomes Reemplazar for an occupied slot and must update in place.
+  await tryon('rotate').click();
+  const replacement = await profile(page);
+  await add.click();
+  look = await storedLook(page);
+  expect(look).toHaveLength(1);
+  expect(look[0].profile.rotation).toBe(replacement.rotation);
+  expect(look[0].profile.scale).toBeCloseTo(replacement.scale, 8);
+
+  // The per-piece chip is also a button: it must remove exactly that committed piece.
+  const chipRemove = page.locator('[data-look-remove-key="body"]');
+  await expect(chipRemove).toBeVisible();
+  await chipRemove.click();
+  expect(await storedLook(page)).toHaveLength(0);
+  await expect(page.locator('.kelo-look-count')).toHaveText('0/8');
+  await expect(add).toHaveText(/Añadir/);
+
+  // Re-add so the Look preview itself can be tested.
+  await add.click();
+  expect(await storedLook(page)).toHaveLength(1);
 
   // Look preview opens/closes and decodes the committed piece.
   await page.locator('[data-look="toggle"]').click();
@@ -195,14 +218,14 @@ test('every Tiny Pixel Art control works and a body sprite reaches the original 
   expect(await storedLook(page)).toHaveLength(0);
   await expect(page.locator('.kelo-look-count')).toHaveText('0/8');
 
-  await page.locator('[data-look="add"]').click();
+  await add.click();
   expect(await storedLook(page)).toHaveLength(1);
   await page.locator('[data-look="clear"]').click();
   expect(await storedLook(page)).toHaveLength(0);
   await expect(page.locator('.kelo-look-count')).toHaveText('0/8');
 
   // Leave one body sprite committed, then enter the ORIGINAL game at index.html.
-  await page.locator('[data-look="add"]').click();
+  await add.click();
   look = await storedLook(page);
   expect(look).toHaveLength(1);
   expect(look[0].profile.slot).toBe('body');
