@@ -34,6 +34,12 @@ jobs:
         with:
           node-version: '24'
 
+      - name: Retired branch governance self-test
+        run: node scripts/retired-branch-guard.mjs --self-test
+
+      - name: Retired branch merge guard
+        run: node scripts/retired-branch-guard.mjs
+
       # The repository does not yet contain a lockfile. Use npm install here so
       # the stability gate reflects the current repository contract. Lockfile
       # introduction is tracked as a separate dependency-governance hardening.
