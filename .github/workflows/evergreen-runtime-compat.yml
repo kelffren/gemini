@@ -13,6 +13,7 @@ on:
       - 'tests/evergreen-runtime-*'
       - 'playwright.evergreen.config.js'
       - 'browserstack.yml'
+      - 'jsconfig.evergreen.json'
       - 'package.json'
       - 'package-lock.json'
       - '.github/workflows/evergreen-runtime-compat.yml'
@@ -26,6 +27,7 @@ on:
       - 'tests/evergreen-runtime-*'
       - 'playwright.evergreen.config.js'
       - 'browserstack.yml'
+      - 'jsconfig.evergreen.json'
       - 'package.json'
       - 'package-lock.json'
       - '.github/workflows/evergreen-runtime-compat.yml'
@@ -45,7 +47,7 @@ jobs:
       - name: Frozen root install
         run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Runtime compatibility contract
-        run: npm run audit:evergreen-runtime
+        run: node scripts/evergreen-runtime-audit.mjs
       - name: Evergreen lint
         run: npm run lint:evergreen
       - name: Evergreen JavaScript type-check
@@ -66,7 +68,7 @@ jobs:
       - name: Prepare evidence directory
         run: mkdir -p artifacts/evergreen
       - name: WebKit iOS-profile compatibility gate
-        run: npm run test:evergreen:webkit
+        run: npx playwright test --config=playwright.evergreen.config.js
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
@@ -88,6 +90,6 @@ jobs:
       - name: Frozen dependency graph on future Node
         run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Runtime contract on future Node
-        run: npm run audit:evergreen-runtime
+        run: node scripts/evergreen-runtime-audit.mjs
       - name: Build on future Node
         run: npm run build
