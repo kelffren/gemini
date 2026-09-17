@@ -4,123 +4,27 @@
   "browserPolicies": ["critical-baseline", "capability-gated", "server-only", "build-time"],
   "killSwitchPolicies": ["none-core", "feature-registry", "server-authority", "admin-config", "pr-only"],
   "systems": {
-    "input-locks": {
-      "dependsOnSystems": [],
-      "failureMode": "fail-closed",
-      "blastRadius": "input-only",
-      "killSwitchPolicy": "none-core",
-      "browserPolicy": "critical-baseline"
-    },
-    "movement": {
-      "dependsOnSystems": ["input"],
-      "failureMode": "degrade",
-      "blastRadius": "movement-extension-only",
-      "killSwitchPolicy": "none-core",
-      "browserPolicy": "critical-baseline"
-    },
-    "camera": {
-      "dependsOnSystems": [],
-      "failureMode": "degrade",
-      "blastRadius": "presentation-only",
-      "killSwitchPolicy": "none-core",
-      "browserPolicy": "critical-baseline"
-    },
-    "render-extensions": {
-      "dependsOnSystems": [],
-      "failureMode": "fail-open-presentation",
-      "blastRadius": "presentation-only",
-      "killSwitchPolicy": "none-core",
-      "browserPolicy": "critical-baseline"
-    },
-    "simulation-extensions": {
-      "dependsOnSystems": [],
-      "failureMode": "degrade",
-      "blastRadius": "client-simulation-extension-only",
-      "killSwitchPolicy": "none-core",
-      "browserPolicy": "critical-baseline"
-    },
-    "performance-foundation": {
-      "dependsOnSystems": ["simulation-extensions", "render-extensions"],
-      "failureMode": "fail-open-presentation",
-      "blastRadius": "quality-and-telemetry-only",
-      "killSwitchPolicy": "admin-config",
-      "browserPolicy": "capability-gated"
-    },
-    "pvp-auto-reducer": {
-      "dependsOnSystems": ["performance-foundation", "simulation-extensions"],
-      "failureMode": "fail-open-presentation",
-      "blastRadius": "pvp-presentation-quality-only",
-      "killSwitchPolicy": "feature-registry",
-      "browserPolicy": "capability-gated"
-    },
-    "creator-exclusive-runtime": {
-      "dependsOnSystems": ["input-locks", "movement", "simulation-extensions", "render-extensions"],
-      "failureMode": "degrade",
-      "blastRadius": "creator-session-only",
-      "killSwitchPolicy": "feature-registry",
-      "browserPolicy": "capability-gated"
-    },
-    "app-updater": {
-      "dependsOnSystems": [],
-      "failureMode": "degrade",
-      "blastRadius": "update-delivery-only",
-      "killSwitchPolicy": "admin-config",
-      "browserPolicy": "capability-gated"
-    },
-    "online-foundation": {
-      "dependsOnSystems": [],
-      "failureMode": "fail-closed",
-      "blastRadius": "shared-online-authority",
-      "killSwitchPolicy": "server-authority",
-      "browserPolicy": "server-only"
-    },
-    "commerce": {
-      "dependsOnSystems": ["online-foundation"],
-      "failureMode": "fail-closed",
-      "blastRadius": "commerce-settlement-only",
-      "killSwitchPolicy": "server-authority",
-      "browserPolicy": "capability-gated"
-    },
-    "arena-ranked": {
-      "dependsOnSystems": ["simulation-extensions", "online-foundation"],
-      "failureMode": "local-practice",
-      "blastRadius": "ranked-arena-only",
-      "killSwitchPolicy": "feature-registry",
-      "browserPolicy": "capability-gated"
-    },
-    "guardian-network": {
-      "dependsOnSystems": ["simulation-extensions", "online-foundation"],
-      "failureMode": "degrade",
-      "blastRadius": "distributed-capacity-only",
-      "killSwitchPolicy": "feature-registry",
-      "browserPolicy": "capability-gated"
-    },
-    "kelo-evolution": {
-      "dependsOnSystems": [],
-      "failureMode": "fail-closed",
-      "blastRadius": "candidate-generation-only",
-      "killSwitchPolicy": "pr-only",
-      "browserPolicy": "build-time"
-    }
+    "input-locks": {"dependsOnSystems": [],"failureMode": "fail-closed","blastRadius": "input-only","killSwitchPolicy": "none-core","browserPolicy": "critical-baseline"},
+    "movement": {"dependsOnSystems": ["input"],"failureMode": "degrade","blastRadius": "movement-extension-only","killSwitchPolicy": "none-core","browserPolicy": "critical-baseline"},
+    "camera": {"dependsOnSystems": [],"failureMode": "degrade","blastRadius": "presentation-only","killSwitchPolicy": "none-core","browserPolicy": "critical-baseline"},
+    "render-extensions": {"dependsOnSystems": [],"failureMode": "fail-open-presentation","blastRadius": "presentation-only","killSwitchPolicy": "none-core","browserPolicy": "critical-baseline"},
+    "simulation-extensions": {"dependsOnSystems": [],"failureMode": "degrade","blastRadius": "client-simulation-extension-only","killSwitchPolicy": "none-core","browserPolicy": "critical-baseline"},
+    "performance-foundation": {"dependsOnSystems": ["simulation-extensions", "render-extensions"],"failureMode": "fail-open-presentation","blastRadius": "quality-and-telemetry-only","killSwitchPolicy": "admin-config","browserPolicy": "capability-gated"},
+    "runtime-lifecycle": {"dependsOnSystems": [],"failureMode": "degrade","blastRadius": "optional-feature-lifecycle-metadata-only","killSwitchPolicy": "none-core","browserPolicy": "critical-baseline"},
+    "failure-boundary": {"dependsOnSystems": ["runtime-lifecycle"],"failureMode": "retry-later","blastRadius": "single-optional-feature-only","killSwitchPolicy": "none-core","browserPolicy": "critical-baseline"},
+    "net-governor": {"dependsOnSystems": ["simulation-extensions", "render-extensions"],"failureMode": "fail-open-presentation","blastRadius": "pvp-network-diagnostics-only","killSwitchPolicy": "none-core","browserPolicy": "capability-gated"},
+    "pvp-auto-reducer": {"dependsOnSystems": ["performance-foundation", "simulation-extensions", "net-governor"],"failureMode": "fail-open-presentation","blastRadius": "pvp-presentation-quality-only","killSwitchPolicy": "feature-registry","browserPolicy": "capability-gated"},
+    "creator-exclusive-runtime": {"dependsOnSystems": ["input-locks", "movement", "simulation-extensions", "render-extensions"],"failureMode": "degrade","blastRadius": "creator-session-only","killSwitchPolicy": "feature-registry","browserPolicy": "capability-gated"},
+    "app-updater": {"dependsOnSystems": [],"failureMode": "degrade","blastRadius": "update-delivery-only","killSwitchPolicy": "admin-config","browserPolicy": "capability-gated"},
+    "online-foundation": {"dependsOnSystems": [],"failureMode": "fail-closed","blastRadius": "shared-online-authority","killSwitchPolicy": "server-authority","browserPolicy": "server-only"},
+    "commerce": {"dependsOnSystems": ["online-foundation"],"failureMode": "fail-closed","blastRadius": "commerce-settlement-only","killSwitchPolicy": "server-authority","browserPolicy": "capability-gated"},
+    "arena-ranked": {"dependsOnSystems": ["simulation-extensions", "online-foundation"],"failureMode": "local-practice","blastRadius": "ranked-arena-only","killSwitchPolicy": "feature-registry","browserPolicy": "capability-gated"},
+    "guardian-network": {"dependsOnSystems": ["simulation-extensions", "online-foundation"],"failureMode": "degrade","blastRadius": "distributed-capacity-only","killSwitchPolicy": "feature-registry","browserPolicy": "capability-gated"},
+    "kelo-evolution": {"dependsOnSystems": [],"failureMode": "fail-closed","blastRadius": "candidate-generation-only","killSwitchPolicy": "pr-only","browserPolicy": "build-time"}
   },
   "forbiddenNewCodePatterns": [
-    {
-      "id": "parallel-game-loop",
-      "paths": ["src/core/", "src/systems/"],
-      "pattern": "requestAnimationFrame\\s*\\(",
-      "allowPaths": ["src/core/render-extension-system.js"]
-    },
-    {
-      "id": "state-repair-interval",
-      "paths": ["src/core/", "src/systems/"],
-      "pattern": "setInterval\\s*\\(",
-      "allowPaths": []
-    },
-    {
-      "id": "direct-obstacle-push",
-      "paths": ["src/"],
-      "pattern": "\\bobstacles\\.push\\s*\\(",
-      "allowPaths": []
-    }
+    {"id": "parallel-game-loop","paths": ["src/core/", "src/systems/"],"pattern": "requestAnimationFrame\\s*\\(","allowPaths": ["src/core/render-extension-system.js"]},
+    {"id": "state-repair-interval","paths": ["src/core/", "src/systems/"],"pattern": "setInterval\\s*\\(","allowPaths": []},
+    {"id": "direct-obstacle-push","paths": ["src/"],"pattern": "\\bobstacles\\.push\\s*\\(","allowPaths": []}
   ]
 }
