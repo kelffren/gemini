@@ -1,6 +1,6 @@
 # Kelo World — Code Index
 
-**Actualizado:** 2026-09-16
+**Actualizado:** 2026-09-17
 
 ## Runtime
 
@@ -20,6 +20,10 @@
 - `src/core/avatar-render-system.js` — `KeloAvatar`.
 - `src/core/render-extension-system.js` — `KeloRender`.
 - `src/core/simulation-extension-system.js` — `KeloSimulation`, incluidos suspension claims owner-native para lifecycle explícito.
+- `src/core/feature-registry.js` — `KELO_FEATURE_REGISTRY`, catálogo inmutable de paquetes opcionales y dependencias.
+- `src/core/asset-registry.js` — `KELO_ASSET_REGISTRY`, kill switch/allow-list manual persistente de paquetes opcionales.
+- `src/core/feature-control-system.js` — `KELO_FUSEBOX`, health/circuit breaker por feature; aísla fallos sin duplicar registry ni loader.
+- `src/core/module-loader.js` — `KELO_MODULE_LOADER`, único owner de carga lazy/secuencial; consume Asset Registry + FuseBox.
 - `src/core/update-system.js` — `KeloUpdater`.
 
 ## Build / Weightless
