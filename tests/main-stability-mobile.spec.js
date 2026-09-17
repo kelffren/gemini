@@ -1,8 +1,8 @@
 /* KELO-INDEX
  * area: TEST / MAIN STABILITY / MOBILE
  * owner: Main Stability Gate
- * keys: MOBILE IPHONE-UA TOUCH BOOT GUEST MOVEMENT RUNTIME SMOKE PR-BYTES FREEZE 8S EVALUATE-LATENCY
- * purpose: unskippable CI smoke for the exact PR bytes using an iPhone-sized touch context and the mandatory sustained-walk freeze firewall
+ * keys: MOBILE IPHONE-UA TOUCH BOOT GUEST MOVEMENT RUNTIME SMOKE PR-BYTES FREEZE 8S EVALUATE-LATENCY UI-FOUNDATION DIALOG TOAST
+ * purpose: unskippable CI smoke for the exact PR bytes using an iPhone-sized touch context, sustained-walk freeze firewall and core presentation primitives
  * do-not: NO BrowserStack-only skip, NO LIVE hardcode, NO direct mutation that bypasses human input for movement, NO short movement-only proof
  */
 const { test, expect } = require('@playwright/test');
@@ -59,7 +59,7 @@ async function touchMoveRightForEightSeconds(page){
   return {held,samples,durationMs:Date.now()-started};
 }
 
-test('exact PR bytes boot and sustain 8s movement in iPhone-sized touch context',async({browser})=>{
+test('exact PR bytes boot, sustain 8s movement and expose stable UI foundation in iPhone-sized touch context',async({browser})=>{
   const page=await browser.newPage({baseURL:BASE_URL,viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true,userAgent:IPHONE_UA});
   const pageErrors=[];
   page.on('pageerror',error=>pageErrors.push(String(error&&error.stack||error)));
@@ -74,6 +74,8 @@ test('exact PR bytes boot and sustain 8s movement in iPhone-sized touch context'
     document.getElementById('game-canvas') &&
     typeof localPlayer!=='undefined' &&
     typeof input!=='undefined' &&
+    window.KeloUI &&
+    window.KELO_UI_AUDIT &&
     window.KELO_MODULE_LOADER &&
     window.KeloUpdateGate
   ),null,{timeout:30000});
@@ -93,6 +95,50 @@ test('exact PR bytes boot and sustain 8s movement in iPhone-sized touch context'
   expect(walk.held.touchActive).toBe(true);
   expect(after.touchActive).toBe(false);
   expect(maxEvaluateLatency).toBeLessThanOrEqual(EVALUATE_BUDGET_MS);
+
+  const uiContract=await page.evaluate(()=>({
+    version:window.KeloUI?.version||null,
+    owner:window.KeloUI?.owner||null,
+    audit:window.KELO_UI_AUDIT||null,
+    snapshot:window.KeloUI?.snapshot?.()||null,
+    touch:window.KeloUI?.auditTouchTargets?.(document.getElementById('kelo-luxe'))||null
+  }));
+  expect(uiContract.version).toMatch(/^kelo-ui-presentation-v1/);
+  expect(uiContract.owner).toBe('KELO_LUXE');
+  expect(uiContract.audit?.presentationOnly).toBe(true);
+  expect(uiContract.audit?.gameplayWrites).toBe(false);
+  expect(uiContract.audit?.touchMinimumPx).toBe(44);
+  expect(uiContract.snapshot?.surfaces).toEqual([]);
+  expect(uiContract.touch?.minimumPx).toBe(44);
+  expect(uiContract.touch?.checked).toBeGreaterThan(0);
+
+  await page.evaluate(()=>window.KeloUI.toast('UI foundation smoke',{key:'main-stability-ui',persistent:true,tone:'success'}));
+  await expect(page.locator('.kelo-ui-toast').filter({hasText:'UI foundation smoke'})).toBeVisible();
+  const toastDismiss=page.locator('.kelo-ui-toast-dismiss').last();
+  const toastBox=await toastDismiss.boundingBox();
+  expect(toastBox.width).toBeGreaterThanOrEqual(44);
+  expect(toastBox.height).toBeGreaterThanOrEqual(44);
+  await toastDismiss.click();
+  await expect(page.locator('.kelo-ui-toast').filter({hasText:'UI foundation smoke'})).toHaveCount(0,{timeout:1000});
+
+  await page.evaluate(()=>{window.__keloMainStabilityConfirm=window.KeloUI.confirm({id:'main-stability-confirm',title:'UI estable',message:'Prueba de focus, stack y cierre.',confirmLabel:'Aceptar',cancelLabel:'Cancelar'});});
+  await expect(page.locator('.kelo-ui-dialog-backdrop')).toBeVisible();
+  const dialogState=await page.evaluate(()=>({top:window.KeloUI.surfaces.top(),active:document.activeElement?.textContent||''}));
+  expect(dialogState.top?.kind).toBe('dialog');
+  expect(dialogState.active).toContain('Aceptar');
+  const dialogButtons=page.locator('.kelo-ui-dialog .kelo-ui-button');
+  expect(await dialogButtons.count()).toBe(2);
+  for(let i=0;i<2;i++){
+    const box=await dialogButtons.nth(i).boundingBox();
+    expect(box.width).toBeGreaterThanOrEqual(44);
+    expect(box.height).toBeGreaterThanOrEqual(44);
+  }
+  await dialogButtons.first().click();
+  const confirmResult=await page.evaluate(()=>window.__keloMainStabilityConfirm);
+  expect(confirmResult).toBe(false);
+  await expect(page.locator('.kelo-ui-dialog-backdrop')).toHaveCount(0);
+  expect(await page.evaluate(()=>window.KeloUI.surfaces.snapshot().length)).toBe(0);
+
   expect(pageErrors).toEqual([]);
 
   const runtime=await page.evaluate(()=>({
@@ -100,6 +146,7 @@ test('exact PR bytes boot and sustain 8s movement in iPhone-sized touch context'
     guest:document.documentElement.dataset.keloGuestPlay,
     moduleLoader:window.KELO_MODULE_LOADER?.version||null,
     updateGate:window.KeloUpdateGate?.getState?.().version||null,
+    uiFoundation:window.KeloUI?.version||null,
     width:innerWidth,
     height:innerHeight,
     touchPoints:navigator.maxTouchPoints,
@@ -109,6 +156,7 @@ test('exact PR bytes boot and sustain 8s movement in iPhone-sized touch context'
   expect(runtime.guest).toBe('1');
   expect(runtime.moduleLoader).toBeTruthy();
   expect(runtime.updateGate).toBeTruthy();
+  expect(runtime.uiFoundation).toBeTruthy();
   expect(runtime.width).toBeLessThanOrEqual(600);
   expect(runtime.ua).toMatch(/iPhone/i);
 
