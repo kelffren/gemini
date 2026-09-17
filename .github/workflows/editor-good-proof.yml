@@ -1,0 +1,41 @@
+name: Editor GOOD Proof
+
+on:
+  pull_request:
+    branches:
+      - lab-editor-good-4d60d2e-base
+
+jobs:
+  prove-good:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: npm install --no-package-lock --no-audit --no-fund
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Serve branch snapshot
+        run: |
+          python3 -m http.server 4173 --bind 127.0.0.1 > /tmp/kelo-good-http.log 2>&1 &
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/kelo-good-http.log
+          exit 1
+      - name: Open place close walk reopen
+        run: npx playwright test tests/world-good-place-walk-reopen.spec.js --project=chromium --workers=1
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: editor-good-proof
+          if-no-files-found: ignore
+          path: |
+            test-results/**
+            playwright-report/**
+            /tmp/kelo-good-http.log
