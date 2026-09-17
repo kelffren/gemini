@@ -7,6 +7,7 @@ on:
     paths:
       - 'scripts/exact-alpha-trim-lab.mjs'
       - 'scripts/instant-delivery-compiler.mjs'
+      - 'scripts/instant-delivery-compiler-audit.mjs'
       - 'src/creators/assets/instant-delivery-compiler.mjs'
       - 'src/creators/assets/png-space-optimizer.mjs'
       - 'config/instant-delivery-plaza.json'
@@ -59,12 +60,15 @@ jobs:
           git add "$FOUNTAIN_TARGET" "$TREE_TARGET"
           if ! git diff --cached --quiet; then
             git commit -m "perf(weightless): publish exact fountain and tree PNG delivery"
+            git pull --rebase origin feature/weightless-v7-exact-trim-lab
             git push origin HEAD:feature/weightless-v7-exact-trim-lab
           else
             echo "EXACT_FULL_PNG_PUBLISH_NOOP"
           fi
       - name: Route exact PNG delivery and declare replacement contracts
         run: |
+          git fetch origin feature/weightless-v7-exact-trim-lab
+          git rebase origin/feature/weightless-v7-exact-trim-lab
           node --input-type=module <<'NODE'
           import fs from 'node:fs';
           const contract='src/environment/prop-contract.js';
@@ -88,6 +92,7 @@ jobs:
           git add src/environment/prop-contract.js config/instant-delivery-plaza.json
           if ! git diff --cached --quiet; then
             git commit -m "perf(weightless): route fountain and round tree through exact PNG delivery"
+            git pull --rebase origin feature/weightless-v7-exact-trim-lab
             git push origin HEAD:feature/weightless-v7-exact-trim-lab
           else
             echo "EXACT_FULL_PNG_ROUTE_NOOP"
