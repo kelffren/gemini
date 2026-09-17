@@ -1,9 +1,10 @@
 /* KELO-INDEX
  * area: UI / UNIVERSAL CONTENT LIBRARY / EXTERNAL SOURCES
  * owner: Kelo External Library Browser UI
- * keys: EXTERNAL LIBRARIES PROVIDERS EXPLORE SEARCH PAGINATION MOBILE NO-DOWNLOAD
+ * keys: EXTERNAL LIBRARIES PROVIDERS EXPLORE SEARCH PAGINATION MOBILE NO-DOWNLOAD PACKS FOLDERS
  * purpose: turn the Sources tab into an in-app library navigator without downloading binaries while browsing
  */
+import './external-library-folder-browser-ui.mjs?v=1';
 import {getProviderStatuses} from '../creators/assets/external-asset-providers.mjs?v=10';
 
 const root=globalThis,doc=root.document;
@@ -48,7 +49,7 @@ function ensureIntro(){
   const intro=doc.createElement('div');
   intro.id='external-library-intro';
   intro.className='library-intro';
-  intro.innerHTML='<b>Explora antes de traer.</b> Entra a una librería, navega sus páginas y busca solo dentro de ella. Kelo carga metadata ligera; ningún asset pesado se descarga hasta que pulses Descargar.';
+  intro.innerHTML='<b>Explora antes de traer.</b> Entra a una librería, navega sus categorías, packs/carpetas y páginas, y busca solo dentro de ella. Kelo carga metadata ligera; ningún asset pesado se descarga hasta que pulses Descargar.';
   const title=view.querySelector('.section-title');
   title?.insertAdjacentElement('afterend',intro);
 }
@@ -81,7 +82,7 @@ function updateFocus(id=selectedProviderId()){
   banner.hidden=false;
   const nameEl=$('external-library-focus-name'),note=$('external-library-focus-note');
   if(nameEl)nameEl.textContent=name;
-  if(note)note.textContent=provider?.requiresQuery?'Busca dentro de esta librería · no se descargan archivos al navegar':'Navegación paginada · no se descargan archivos al navegar';
+  if(note)note.textContent=provider?.requiresQuery?'Busca dentro de esta librería · no se descargan archivos al navegar':'Categorías + carpetas + páginas · sin descargar archivos al navegar';
   search.placeholder=`Buscar dentro de ${name}…`;
 }
 
@@ -158,4 +159,4 @@ async function mount(){
 if(doc.readyState==='loading')doc.addEventListener('DOMContentLoaded',()=>void mount(),{once:true});else void mount();
 root.addEventListener?.('pageshow',()=>{decorateSources();updateFocus();});
 
-export const KeloExternalLibraryBrowserUI=Object.freeze({version:'external-library-browser-ui-v1',openLibrary,get providers(){return providers.slice();}});
+export const KeloExternalLibraryBrowserUI=Object.freeze({version:'external-library-browser-ui-v2',openLibrary,get providers(){return providers.slice();}});
