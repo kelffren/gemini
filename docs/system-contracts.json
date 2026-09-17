@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "rollout": "x-foundation-p0-critical",
+  "rollout": "x-foundation-p1-critical",
   "systems": [
     {
       "id": "input-locks",
@@ -91,6 +91,21 @@
       "failurePolicy": "fail-open-for-correction-fail-closed-for-budget-enforcement-only-when-declared",
       "resourceClass": "core",
       "requiredTests": ["audit:performance"]
+    },
+    {
+      "id": "pvp-auto-reducer",
+      "owner": "KeloPvPAutoReducer",
+      "source": "src/systems/pvp-auto-reducer.js",
+      "technicalDoc": "docs/systems/PVP_AUTO_REDUCER.md",
+      "apiVersion": 1,
+      "authority": "client-presentation-quality-only",
+      "stateOwned": ["network-quality baseline/EMA/jitter estimate", "warning/reduction/recovery episode", "saved presentation quality"],
+      "stateForbidden": ["damage", "HP", "cooldowns", "hitboxes", "server tick", "MMR/RP", "match result", "transport ownership"],
+      "consumes": ["KeloSimulation", "KeloNetAuthority", "KELO_PERF", "KeloPvPWorld"],
+      "lifecycle": ["monitor", "warn", "degrade", "recover", "restore", "disable"],
+      "failurePolicy": "degrade-presentation-only-never-gameplay-truth",
+      "resourceClass": "pvp-optional-support",
+      "requiredTests": ["pvp-auto-reducer-audit", "audit:pvp-facing", "audit:performance"]
     },
     {
       "id": "creator-exclusive-runtime",
