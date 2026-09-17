@@ -48,10 +48,31 @@ Migraciones aplicadas en producción:
   - patch máximo 120 KB;
   - estado materializado máximo 450 KB;
   - resultado idempotente compacto, sin duplicar el snapshot completo en cada evento.
+- `20260917061009_mmorpg_world_state_ledger_advisor_hardening_v1`
+  - elimina el índice `(cell_id, revision)` duplicado por el constraint `UNIQUE`;
+  - añade índices de FK para `actor_user_id` y `character_id`;
+  - añade policies DENY explícitas para `anon` y `authenticated` en snapshots/ledger.
 
 `kelo-server-state` está desplegada en producción como **Edge Function v7** con `world:load`, `world:replay` y `world:mutate`. Conserva `x-kelo-server-key` como autenticación server-to-server y no expone escritura directa al navegador.
 
 `world_apply_mutation` realiza en una transacción: lock de celda → idempotency lookup → revision CAS → ledger append → snapshot update → audit event → outbox → resultado idempotente. El RPC está revocado para `public`, `anon` y `authenticated`; solo `service_role` puede ejecutarlo.
+
+### Evidencia LIVE de seguridad/performance
+
+Después de las migraciones se ejecutaron Supabase Security Advisor y Performance Advisor:
+
+- las dos tablas nuevas dejaron de aparecer en `RLS Enabled No Policy` tras las policies DENY;
+- los dos FKs nuevos dejaron de aparecer en `Unindexed foreign keys` tras los índices dedicados;
+- los avisos restantes pertenecen a objetos preexistentes del proyecto;
+- los índices del ledger aparecen inicialmente como `unused`, esperado inmediatamente después de creación; no se eliminan por falta de historial.
+
+Verificación read-only de permisos:
+
+- `world_cell_snapshots`: `anon=false`, `authenticated=false`, `service_role=true` para acceso requerido;
+- `world_event_ledger`: `anon=false`, `authenticated=false`, `service_role=true`;
+- `world_get_snapshot`, `world_replay_events`, `world_apply_mutation`: EXECUTE `anon=false`, `authenticated=false`, `service_role=true`;
+- RLS confirmado activo en ambas tablas;
+- Edge Function `kelo-server-state` confirmada ACTIVE v7.
 
 ## Invariantes de autoridad
 
