@@ -110,6 +110,34 @@ async function readPlayer(){
 async function captureRecovery(){
   try{report.recovery=await page.evaluate(()=>window.KELO_RECOVERY_MESH?.report?.()||window.KELO_FREEZE_LOCATOR?.report?.()||null);}catch{}
 }
+async function captureWorldFrontier(label='WORLD_FRONTIER'){
+  try{
+    const state=await page.evaluate(()=>{
+      const live=document.getElementById('kelo-studio-live');
+      const hub=document.getElementById('kelo-creators-hub');
+      const curtain=document.getElementById('kelo-world-launch-curtain');
+      const worldCard=document.querySelector('[data-workspace="world"]');
+      return {
+        bodyStudioActive:document.body?.classList?.contains('kelo-studio-active')||false,
+        hubConnected:!!hub?.isConnected,
+        hubDisplay:hub?getComputedStyle(hub).display:null,
+        worldCardConnected:!!worldCard?.isConnected,
+        worldCardText:String(worldCard?.textContent||'').trim().slice(0,240),
+        liveConnected:!!live?.isConnected,
+        loading:live?.dataset?.keloWorldLoading||null,
+        status:String(live?.querySelector('.ks-status')?.textContent||'').trim().slice(0,240),
+        curtainConnected:!!curtain?.isConnected,
+        curtainText:String(curtain?.textContent||'').trim().slice(0,240),
+        launchAborted:!!window.KELO_WORLD_LAUNCH_ABORTED
+      };
+    });
+    step(label,state);
+    return state;
+  }catch(error){
+    step(`${label}_UNAVAILABLE`,{reason:String(error?.message||error).slice(0,500)});
+    return null;
+  }
+}
 async function bootCheck({navigate=true}={}){
   if(navigate){
     step('BOOT_NAVIGATE',{url:targetUrl()});
@@ -161,12 +189,23 @@ async function worldCheck({navigate=true}={}){
     el.click();
   });
   step('WORLD_TAP');
-  await page.waitForSelector('#kelo-studio-live',{state:'attached',timeout:7000});
+  try{
+    await page.waitForSelector('#kelo-studio-live',{state:'attached',timeout:15000});
+  }catch(error){
+    const frontier=await captureWorldFrontier('WORLD_SHELL_STALL');
+    throw new Error(`WORLD_SHELL_NOT_MOUNTED_AFTER_15000MS:${JSON.stringify(frontier||{})}`,{cause:error});
+  }
   step('WORLD_SHELL_MOUNTED');
-  await page.waitForFunction(()=>{
-    const live=document.getElementById('kelo-studio-live');
-    return !!live&&live.dataset?.keloWorldLoading!=='1'&&!!live.querySelector('.ks-status');
-  },null,{timeout:30000});
+  await captureWorldFrontier('WORLD_SHELL_FRONTIER');
+  try{
+    await page.waitForFunction(()=>{
+      const live=document.getElementById('kelo-studio-live');
+      return !!live&&live.dataset?.keloWorldLoading!=='1'&&!!live.querySelector('.ks-status');
+    },null,{timeout:30000});
+  }catch(error){
+    const frontier=await captureWorldFrontier('WORLD_READY_STALL');
+    throw new Error(`WORLD_NOT_READY_AFTER_30000MS:${JSON.stringify(frontier||{})}`,{cause:error});
+  }
   const ready=await page.evaluate(()=>{
     const live=document.getElementById('kelo-studio-live');
     return {loading:live?.dataset?.keloWorldLoading||null,status:String(live?.querySelector('.ks-status')?.textContent||'').trim(),buttons:live?.querySelectorAll('button')?.length||0};
