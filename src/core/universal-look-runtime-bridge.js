@@ -11,7 +11,7 @@
   'use strict';
   if(root.KeloUniversalLookRuntime)return;
 
-  const VERSION='kelo-universal-look-runtime-v1.0.0';
+  const VERSION='kelo-universal-look-runtime-v1.0.1';
   const PREVIEW_KEY='kelo.universal.look.preview.v1';
   const RUNTIME_KEY='kelo.universal.look.runtime.v1';
   const OWNER='creator:universal-look-runtime';
@@ -132,8 +132,6 @@
     }
     if(cols>1||rows>1)return{x:col*iw/cols,y:row*ih/rows,w:iw/cols,h:ih/rows};
 
-    // Some providers omit rows/columns metadata. Detect common horizontal sprite strips
-    // without guessing aggressively on normal single-frame pixel art.
     if(item.contentKind==='sprite'&&iw>ih*1.8){
       const candidates=[32,48,64,96,128,192,256];
       for(const fw of candidates){
@@ -170,8 +168,8 @@
     return true;
   }
 
-  function sorted(layer){
-    return items.filter(function(item){return item.profile.layer===layer;}).sort(function(a,b){return a.profile.order-b.profile.order;});
+  function sorted(layer,skip){
+    return items.filter(function(item){return item!==skip&&item.profile.layer===layer;}).sort(function(a,b){return a.profile.order-b.profile.order;});
   }
 
   function middleware(actor,isSelf,next){
@@ -181,16 +179,16 @@
     const context=activeContext();
     if(!context)return next();
 
-    const back=sorted('back');
-    const front=sorted('front');
     const body=items.find(function(item){return item.profile.slot==='body';})||null;
+    const back=sorted('back',body);
+    const front=sorted('front',body);
     back.forEach(function(item){drawItem(context,actor,item);});
 
     let bodyDrawn=false;
     if(body)bodyDrawn=drawItem(context,actor,body);
     if(!bodyDrawn)next();
 
-    front.forEach(function(item){if(item!==body)drawItem(context,actor,item);});
+    front.forEach(function(item){drawItem(context,actor,item);});
     return undefined;
   }
 
