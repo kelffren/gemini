@@ -12,6 +12,7 @@ const foundationPath = 'src/mmorpg/community-platform-foundation.mjs';
 const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
 const roadmap = fs.readFileSync(roadmapPath, 'utf8');
 const foundation = fs.readFileSync(foundationPath, 'utf8');
+const foundationModule = await import(new URL('../src/mmorpg/community-platform-foundation.mjs', import.meta.url));
 
 assert.equal(manifest.schemaVersion, 1, 'unsupported MMORPG community manifest schema');
 assert.equal(manifest.programId, 'kelo-world-community-mmorpg-59', 'unexpected MMORPG community program id');
@@ -83,10 +84,11 @@ const requiredFoundationExports = [
   'createFeatureFlagPlane', 'createSystemLifecycle', 'createMMOCommunityFoundation'
 ];
 for (const name of requiredFoundationExports) {
-  assert.ok(foundation.includes(`export function ${name}`), `foundation export missing: ${name}`);
+  assert.equal(typeof foundationModule[name], 'function', `foundation export missing: ${name}`);
+  assert.ok(foundation.includes(`export function ${name}`), `foundation source contract missing: ${name}`);
 }
-assert.ok(foundation.includes('arbitraryJavaScript: false'), 'community scripting must forbid arbitrary JavaScript by default');
-assert.ok(foundation.includes('authorityWrites: false'), 'community scripting must forbid direct authority writes');
+assert.equal(foundationModule.COMMUNITY_SCRIPT_POLICY?.arbitraryJavaScript, false, 'community scripting must forbid arbitrary JavaScript by default');
+assert.equal(foundationModule.COMMUNITY_SCRIPT_POLICY?.authorityWrites, false, 'community scripting must forbid direct authority writes');
 assert.ok(roadmap.includes('59/59'), 'roadmap must declare 59/59 tracking invariant');
 
 const byStatus = {};
