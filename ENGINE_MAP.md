@@ -2,8 +2,8 @@
 
 > Documento canónico del engine. Si contradice `index.html` o un owner Foundation LIVE, gana el runtime y este archivo debe actualizarse.
 
-**Sincronizado:** 2026-09-15  
-**Runtime declarado:** Kelo World V6.54.2  
+**Sincronizado:** 2026-09-17  
+**Runtime declarado:** Kelo World V6.69  
 **Modelo:** web 2D top-down, Canvas, mobile-first, login/guest gate antes del boot pesado.
 
 ## 1. Regla de engine
@@ -16,14 +16,16 @@ Estados usados aquí: `OWNER LIVE`, `SUPPORT LIVE`, `LEGACY CORE`, `DYNAMIC LIVE
 
 Safari iOS tiene **un solo hilo**. Si `engine-b` arranca `gameLoop` mientras el HTML sigue compilando 100+ scripts, el canvas se congela o se pone negro.
 
-Contrato LIVE (`index.html` V6.68):
+Contrato LIVE (`index.html` V6.69):
 
 1. Flag `__keloHoldGameLoop=true` **antes** de `engine-b`.
 2. Plaza only (~44 scripts): events → input → `engine-a/b/c` → cámara/avatar → `engine-d..l` → world-map/props → luxe HUD → governor.
 3. `engine-b` y `KELO_PERF` **no** piden rAF hasta `kelo:boot-ready`.
 4. Tras el último script de plaza: `__keloBootReady=true` + evento `kelo:boot-ready`. El player ya puede caminar.
-5. **Nada más se descarga solo.** Chat premium, tileset 556KB, PvP, studio, backpack, engines `m..aj` = `KELO_MODULE_LOADER.ensure(feature)` al tocar el menú.
-6. Prohibido inyectar `<script>` desde nameplates u otros owners (eso montaba el chat Waze y mataba Safari).
+5. Después de first playable se cargan solo owners ligeros de control: `KELO_FEATURE_REGISTRY` → `KELO_ASSET_REGISTRY` → `KELO_FUSEBOX` → `KELO_MODULE_LOADER`.
+6. **Nada pesado se descarga solo.** Chat premium, tileset 556KB, PvP, studio, backpack, engines `m..aj` = `KELO_MODULE_LOADER.ensure(feature)` al tocar el menú.
+7. `KELO_FUSEBOX` no descarga nada: solo compone el kill switch manual existente con health/circuit breaker por feature. Un fallo repetido de un paquete opcional no debe bloquear paquetes ajenos ni tocar el core.
+8. Prohibido inyectar `<script>` desde nameplates u otros owners (eso montaba el chat Waze y mataba Safari).
 
 El listado histórico de 16 pasos **no es el boot móvil**. Restaurar esos tags en `index.html` es un bug.
 
@@ -40,6 +42,10 @@ El listado histórico de 16 pasos **no es el boot móvil**. Restaurar esos tags 
 | Avatar composition | `KeloAvatar` | OWNER LIVE |
 | Render extensions | `KeloRender` | OWNER LIVE |
 | Simulation extensions | `KeloSimulation` | OWNER LIVE |
+| Optional feature definitions/dependencies | `KELO_FEATURE_REGISTRY` | OWNER LIVE |
+| Optional feature manual allow-list | `KELO_ASSET_REGISTRY` | OWNER LIVE |
+| Optional feature failure isolation | `KELO_FUSEBOX` | OWNER LIVE client reliability |
+| Optional feature lazy loading | `KELO_MODULE_LOADER` | OWNER LIVE |
 | Creator exclusive lifecycle | `Kelo Creators + Foundation owners` | OWNER LIVE creator |
 | Pixelorama Pro authoring | `Kelo Asset Forge / Pixelorama bridge` | PENDING VERIFY mobile |
 | Eventos | `KeloEvents` | OWNER LIVE |
@@ -54,6 +60,8 @@ El listado histórico de 16 pasos **no es el boot móvil**. Restaurar esos tags 
 | Update/PWA | `KeloUpdater` | OWNER LIVE client |
 
 `KeloSimulation` posee suspensión por claims. Un creator pesado puede suspender simulación mediante ese owner; no envuelve `updateSimulation`, no crea otro scheduler y debe liberar el claim al cerrar.
+
+`KELO_FUSEBOX` posee solo health/circuit state por feature opcional. `KELO_FEATURE_REGISTRY` conserva identidad/dependencias, `KELO_ASSET_REGISTRY` conserva el switch manual y `KELO_MODULE_LOADER` sigue siendo el único loader. Core/unknown IDs son deliberadamente `UNMANAGED` para impedir que una mala clasificación apague movimiento, cámara, canvas o colisión.
 
 ## 4. Mundo y render
 
@@ -169,10 +177,13 @@ El cliente puede predecir/presentar, pero progreso valioso, comercio, PvP compet
 
 Para Sprite AI, Pages nunca recibe credenciales del proveedor: el browser autentica contra el Kelo server, el server llama al proveedor y el browser valida el candidato con los gates locales del Creator.
 
+FuseBox automático puede permanecer cliente-local porque protege disponibilidad del dispositivo. Un futuro kill switch global/remoto debe reemplazar solo la policy source detrás del contrato actual; no debe duplicar el flag dentro de cada feature.
+
 ## 10. Qué NO hacer
 
 - No crear otro renderer de props o tiles.
 - No crear otro catálogo de assets en paralelo.
+- No crear otro feature registry, asset allow-list, module loader ni circuit breaker paralelo a los owners actuales.
 - No escribir directamente cámara/zoom/canvas desde features nuevas.
 - No mutar `obstacles` desde features nuevas.
 - No sustituir World/Studio por un editor nuevo para corregir un bug de boot.
@@ -193,6 +204,7 @@ Para Sprite AI, Pages nunca recibe credenciales del proveedor: el browser autent
 - `docs/ASSET_CONTRACT.md`
 - `docs/CODE_INDEX.md`
 - `docs/SYSTEM_DOCUMENTATION_STANDARD.md`
+- `docs/systems/FEATURE_CONTROL_SYSTEM.md`
 - `docs/systems/SPRITE_AI_SERVICE.md`
 - `docs/systems/CREATOR_EXCLUSIVE_RUNTIME.md`
 - `docs/systems/PIXELORAMA_PRO_BRIDGE.md`
