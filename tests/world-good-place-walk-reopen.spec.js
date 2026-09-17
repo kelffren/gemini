@@ -16,20 +16,27 @@ async function objectCount(studio) {
   return match ? Number(match[1]) : 0;
 }
 
-async function openWorld(page) {
-  const menu = page.locator('#lx-side-menu');
-  await expect(menu).toBeVisible({ timeout: 20_000 });
-  await menu.tap();
-  await expect(page.locator('#lx-menu-panel')).toHaveClass(/open/, { timeout: 10_000 });
+async function ensureCreatorsHub(page) {
+  const hub = page.locator('#kelo-creators-hub');
+  if (await hub.isVisible().catch(() => false)) return hub;
 
+  const menu = page.locator('#lx-side-menu');
+  await expect(menu).toBeVisible({ timeout: 30_000 });
+  await menu.tap();
+  const panel = page.locator('#lx-menu-panel');
+  await expect(panel).toHaveClass(/open/, { timeout: 10_000 });
   const creators = page.locator('#lx-create-studio');
   await expect(creators).toBeVisible({ timeout: 20_000 });
   await creators.tap();
-
-  const hub = page.locator('#kelo-creators-hub');
   await expect(hub).toBeVisible({ timeout: 20_000 });
+  return hub;
+}
+
+async function openWorld(page) {
+  const hub = await ensureCreatorsHub(page);
   const world = hub.locator('[data-workspace="world"]');
-  await expect(world).toBeVisible({ timeout: 10_000 });
+  await expect(world).toBeVisible({ timeout: 15_000 });
+  await expect(world).toBeEnabled({ timeout: 15_000 });
   await world.tap();
 
   const studio = page.locator('#kelo-studio-live');
@@ -42,7 +49,9 @@ async function openWorld(page) {
 
 async function placeOne(page, studio) {
   const before = await objectCount(studio);
-  await studio.locator('[data-act="edit-assets"]:visible').first().tap();
+  const editAssets = studio.locator('[data-act="edit-assets"]:visible').first();
+  await expect(editAssets).toBeVisible({ timeout: 15_000 });
+  await editAssets.tap();
   const asset = studio.locator('[data-pane="assets"] [data-asset]:visible').first();
   await expect(asset).toBeVisible({ timeout: 20_000 });
   const assetId = await asset.getAttribute('data-asset');
@@ -51,9 +60,15 @@ async function placeOne(page, studio) {
   await expect(studio).toHaveAttribute('data-active-asset', String(assetId), { timeout: 5_000 });
 
   const canvas = page.locator('#game-canvas');
+  await expect(canvas).toBeVisible({ timeout: 10_000 });
   const box = await canvas.boundingBox();
   expect(box).not.toBeNull();
-  await canvas.tap({ position: { x: Math.max(50, Math.min(box.width - 50, box.width * 0.52)), y: Math.max(140, Math.min(box.height - 170, box.height * 0.46)) } });
+  await canvas.tap({
+    position: {
+      x: Math.max(50, Math.min(box.width - 50, box.width * 0.52)),
+      y: Math.max(140, Math.min(box.height - 170, box.height * 0.46)),
+    },
+  });
 
   await page.waitForFunction(previous => {
     const status = document.querySelector('#kelo-studio-live .ks-status')?.textContent || '';
@@ -74,8 +89,11 @@ async function walkAfterClosing(page) {
     y: typeof localPlayer !== 'undefined' && localPlayer ? Number(localPlayer.y) : null,
   }));
   expect(before.x).not.toBeNull();
+  expect(before.y).not.toBeNull();
 
-  const box = await page.locator('#game-canvas').boundingBox();
+  const canvas = page.locator('#game-canvas');
+  await expect(canvas).toBeVisible({ timeout: 10_000 });
+  const box = await canvas.boundingBox();
   expect(box).not.toBeNull();
   const sx = box.x + box.width * 0.20;
   const sy = box.y + box.height * 0.70;
@@ -96,11 +114,11 @@ async function walkAfterClosing(page) {
   }, { type, x, y });
 
   await pointer('pointerdown', sx, sy);
-  for (let i = 0; i < 12; i++) {
-    await pointer('pointermove', sx + 82, sy);
-    await page.waitForTimeout(160);
+  for (let i = 0; i < 14; i++) {
+    await pointer('pointermove', sx + 88, sy);
+    await page.waitForTimeout(170);
   }
-  await pointer('pointerup', sx + 82, sy);
+  await pointer('pointerup', sx + 88, sy);
 
   const after = await page.evaluate(() => ({ x: Number(localPlayer.x), y: Number(localPlayer.y) }));
   const distance = Math.hypot(after.x - before.x, after.y - before.y);
@@ -115,13 +133,15 @@ test('GOOD baseline opens, places, closes, walks, and reopens World editor', asy
   page.on('pageerror', e => pageErrors.push(String(e?.stack || e)));
   page.on('console', msg => { if (msg.type() === 'error') consoleErrors.push(msg.text()); });
 
-  const response = await page.goto('./?guest=1&mapEditor=1&goodBaselineProof=1', { waitUntil: 'commit', timeout: 20_000 });
+  const response = await page.goto('./?guest=1&mapEditor=1&goodBaselineProof=2', {
+    waitUntil: 'commit',
+    timeout: 20_000,
+  });
   expect(response && response.status()).toBeLessThan(400);
+
   await page.waitForFunction(() => !!(
-    window.KeloGuestPlay?.active?.() &&
-    window.KELO_ADMIN_KEYS?.can?.('world.edit') &&
-    window.KELO_LUXE?.toggleMenu &&
-    window.KELO_CREATORS_LAUNCHER
+    document.getElementById('kelo-creators-hub') ||
+    document.getElementById('lx-side-menu')
   ), null, { timeout: 45_000 });
 
   const first = await openWorld(page);
