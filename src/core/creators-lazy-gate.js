@@ -10,11 +10,13 @@
 (function(root){
 'use strict';
 if(root.KeloCreatorsLazyGate)return;
-const VERSION='kelo-creators-lazy-gate-v7-open-access';
+const VERSION='kelo-creators-lazy-gate-v8-ios-open-access';
 // TEMPORAL: Creadores abierto para todos. Mantener la verificación original intacta
 // permite volver a permisos por rol cambiando solo este flag a false.
 const OPEN_CREATOR_ACCESS=true;
-const LAUNCHER_SRC='src/ui/studio-launcher.js?v=asset-forge-20260915-1';
+// iOS standalone can keep an old launcher in HTTP cache or in the resumed window.
+// Use a new URL and evict only a stale launcher that still reports access=false.
+const LAUNCHER_SRC='src/ui/studio-launcher.js?v=creators-open-20260917-2';
 const ASSET_CATALOG_SRC='src/property/property-asset-catalog.js?v=creator-assets-20260915-1';
 const assetForgeModuleUrl=()=>new URL('src/creators/creator-entry.mjs?v=asset-forge-20260915-1',root.document?.baseURI||root.location.href).href;
 let loading=null,catalogLoading=null,forgeLoading=null;
@@ -70,11 +72,21 @@ function loadAssetCatalog(){
   }).finally(function(){catalogLoading=null;});
   return catalogLoading;
 }
+function evictClosedLauncher(){
+  const launcher=root.KELO_STUDIO_LAUNCHER;
+  if(!OPEN_CREATOR_ACCESS||!launcher||launcher.allowed!==false)return;
+  try{root.KELO_STUDIO_LAUNCHER=null;}catch(_){}
+  try{root.KELO_CREATORS_LAUNCHER=null;}catch(_){}
+  try{document.querySelectorAll('script[data-kelo-creators-first-use="1"]').forEach(function(node){node.remove();});}catch(_){}
+}
 function loadStudio(){
   if(loading)return loading;
   loading=(async function(){
     // Creator-only load: the normal game does not pay for the full asset library.
     await loadAssetCatalog();
+    // An iPhone home-screen app may resume a pre-fix launcher from memory.
+    // If the gate is intentionally open but that launcher still says closed, replace it.
+    evictClosedLauncher();
     if(root.KELO_STUDIO_LAUNCHER)return root.KELO_STUDIO_LAUNCHER;
     return new Promise(function(resolve,reject){
       const s=document.createElement('script');s.src=LAUNCHER_SRC;s.async=false;s.dataset.keloCreatorsFirstUse='1';
