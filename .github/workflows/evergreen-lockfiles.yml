@@ -3,7 +3,7 @@ name: Evergreen Lockfiles
 on:
   workflow_dispatch:
   push:
-    branches: ['feat/evergreen-10y-foundation']
+    branches: ['feat/evergreen-*']
     paths:
       - 'package.json'
       - 'server/package.json'
