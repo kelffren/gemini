@@ -1,0 +1,124 @@
+name: World Editor Bisect Debug
+
+on:
+  push:
+    branches: [debug/world-editor-bisect-20260917]
+    paths:
+      - '.bisect-target'
+      - '.github/workflows/world-editor-bisect-debug.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout diagnostic branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve target
+        id: target
+        shell: bash
+        run: |
+          TARGET="$(tr -d '\r\n ' < .bisect-target)"
+          echo "sha=$TARGET" >> "$GITHUB_OUTPUT"
+          git cat-file -e "$TARGET^{commit}"
+          git checkout --detach "$TARGET"
+          echo "Testing $TARGET"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install test dependency
+        run: npm install --no-package-lock --no-audit --no-fund
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Serve target checkout
+        shell: bash
+        run: |
+          python3 -m http.server 4173 --bind 127.0.0.1 > /tmp/kelo-bisect-http.log 2>&1 &
+          for i in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:4173/ >/dev/null && exit 0
+            sleep 1
+          done
+          cat /tmp/kelo-bisect-http.log
+          exit 1
+
+      - name: Probe World Editor readiness
+        shell: bash
+        env:
+          TARGET_SHA: ${{ steps.target.outputs.sha }}
+        run: |
+          cat > /tmp/world-editor-bisect.cjs <<'NODE'
+          const { chromium, devices } = require('@playwright/test');
+          (async()=>{
+            const browser=await chromium.launch({headless:true});
+            const iphone=devices['iPhone 13'];
+            const ctx=await browser.newContext({
+              userAgent:iphone.userAgent,
+              viewport:{width:390,height:844},
+              screen:{width:390,height:844},
+              deviceScaleFactor:iphone.deviceScaleFactor,
+              isMobile:true,
+              hasTouch:true,
+            });
+            const page=await ctx.newPage();
+            const pageErrors=[]; const consoleErrors=[];
+            page.on('pageerror',e=>pageErrors.push(String(e)));
+            page.on('console',m=>{if(m.type()==='error') consoleErrors.push(m.text())});
+            try {
+              const r=await page.goto('http://127.0.0.1:4173/?guest=1&mapEditor=1&worldBisect=1',{waitUntil:'domcontentloaded',timeout:30000});
+              if(!r || r.status()>=400) throw new Error('BOOT_HTTP_'+(r&&r.status()));
+              const open=await Promise.race([
+                page.evaluate(async()=>{
+                  const mod=await import(`/src/creators/creator-entry.mjs?bisect=${Date.now()}`);
+                  const platform=await mod.bootKeloCreators({root:window});
+                  return Promise.resolve(platform.openWorkspace('world',{})).then(()=>({resolved:true}));
+                }),
+                new Promise((_,rej)=>setTimeout(()=>rej(new Error('OPEN_WORKSPACE_TIMEOUT')),25000))
+              ]);
+              await page.waitForSelector('#kelo-studio-live',{state:'visible',timeout:12000});
+              await page.waitForFunction(()=>{
+                const el=document.querySelector('#kelo-studio-live');
+                if(!el) return false;
+                const txt=(el.innerText||'').toLowerCase();
+                const attr=el.getAttribute('data-kelo-world-loading');
+                return attr!=='1' && !txt.includes('cargando editor') && !txt.includes('loading editor');
+              },null,{timeout:20000});
+              await page.waitForTimeout(1500);
+              const state=await page.evaluate(()=>{
+                const el=document.querySelector('#kelo-studio-live');
+                return {exists:!!el,visible:!!el&&getComputedStyle(el).display!=='none',loading:el?.getAttribute('data-kelo-world-loading')||null,text:(el?.innerText||'').slice(0,500)};
+              });
+              console.log('BISECT_RESULT',JSON.stringify({target:process.env.TARGET_SHA,status:'GOOD',open,state,pageErrors,consoleErrors}));
+              await browser.close();
+              process.exit(0);
+            } catch (error) {
+              let state=null;
+              try { state=await page.evaluate(()=>{const el=document.querySelector('#kelo-studio-live');return {exists:!!el,loading:el?.getAttribute('data-kelo-world-loading')||null,text:(el?.innerText||document.body?.innerText||'').slice(0,700)}}); } catch {}
+              console.error('BISECT_RESULT',JSON.stringify({target:process.env.TARGET_SHA,status:'BAD',error:String(error),state,pageErrors,consoleErrors}));
+              try { await page.screenshot({path:'/tmp/world-editor-bisect-bad.png',fullPage:true}); } catch {}
+              await browser.close();
+              process.exit(1);
+            }
+          })();
+          NODE
+          node /tmp/world-editor-bisect.cjs
+
+      - name: Diagnostic tail
+        if: always()
+        run: |
+          echo "TARGET=${{ steps.target.outputs.sha }}"
+          tail -100 /tmp/kelo-bisect-http.log || true
+
+      - name: Upload BAD screenshot
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: world-editor-bisect-${{ steps.target.outputs.sha }}
+          if-no-files-found: ignore
+          path: /tmp/world-editor-bisect-bad.png
