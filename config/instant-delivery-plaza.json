@@ -14,13 +14,49 @@
         "sha256": "233db909c040229470a2aea2bb98d29f9a79c45b89f3996df0799dd92afee8a1",
         "exact": true
       },
-      "allowedFrameIds": ["tree_large", "tree_pink", "tree_medium", "tree_cypress", "tree_small"],
+      "allowedFrameIds": [
+        "tree_large",
+        "tree_pink",
+        "tree_medium",
+        "tree_cypress",
+        "tree_small"
+      ],
       "keepRects": [
-        {"id":"tree_large","x":7,"y":25,"w":438,"h":527},
-        {"id":"tree_pink","x":436,"y":66,"w":405,"h":486},
-        {"id":"tree_medium","x":827,"y":130,"w":322,"h":412},
-        {"id":"tree_cypress","x":1161,"y":69,"w":173,"h":471},
-        {"id":"tree_small","x":1332,"y":253,"w":202,"h":287}
+        {
+          "id": "tree_large",
+          "x": 7,
+          "y": 25,
+          "w": 438,
+          "h": 527
+        },
+        {
+          "id": "tree_pink",
+          "x": 436,
+          "y": 66,
+          "w": 405,
+          "h": 486
+        },
+        {
+          "id": "tree_medium",
+          "x": 827,
+          "y": 130,
+          "w": 322,
+          "h": 412
+        },
+        {
+          "id": "tree_cypress",
+          "x": 1161,
+          "y": 69,
+          "w": 173,
+          "h": 471
+        },
+        {
+          "id": "tree_small",
+          "x": 1332,
+          "y": 253,
+          "w": 202,
+          "h": 287
+        }
       ],
       "consumerAudit": {
         "file": "src/environment/tile-registry.js",
@@ -33,13 +69,31 @@
       "id": "plazaFountainKelo",
       "mode": "exact-png-lossless",
       "source": "assets/justicia_fountain_v2.PNG",
-      "outputBase": "plaza-fountain-kelo"
+      "outputBase": "plaza-fountain-kelo",
+      "delivery": {
+        "path": "assets/pf-f5ba82df.png",
+        "bytes": 2329441,
+        "sha256": "f5ba82df1680b758980489a56543d59311ca4c0a6a39d0899d8e434332beb239",
+        "exact": true,
+        "fullRgbaExact": true,
+        "width": 1254,
+        "height": 1254
+      }
     },
     {
       "id": "plazaRoundTree",
       "mode": "exact-png-lossless",
       "source": "assets/world/imperial-plaza/arbol-redondo.png",
-      "outputBase": "plaza-round-tree"
+      "outputBase": "plaza-round-tree",
+      "delivery": {
+        "path": "assets/prt-fc9790cb.png",
+        "bytes": 1581201,
+        "sha256": "fc9790cbc6e907d32ec1bfbdbb6a4220cb9c2099f35bc5cb83a35da81442479a",
+        "exact": true,
+        "fullRgbaExact": true,
+        "width": 1254,
+        "height": 1254
+      }
     },
     {
       "id": "forestPlazaV2",
