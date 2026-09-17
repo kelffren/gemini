@@ -70,6 +70,9 @@ jobs:
       - name: MMORPG Wave 1 owner integration
         run: node scripts/mmorpg-wave1-owner-integration-audit.mjs
 
+      - name: MMORPG world persistence and event ledger
+        run: node scripts/mmorpg-world-persistence-audit.mjs
+
       - name: Performance no-regression contract
         run: npm run audit:performance
 
