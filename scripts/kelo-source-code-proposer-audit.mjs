@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: QA / EVOLUTION / SOURCE PROPOSER
  * owner: KeloEvolution QA
- * purpose: prove the bounded autonomous source-repair loop rejects unsafe/weak proposals, feeds failures back, dedupes retries and accepts only independent sandbox + objective evidence
+ * purpose: prove the bounded autonomous source-repair loop rejects unsafe/weak proposals, protects its evaluator surface, feeds failures back, dedupes retries and accepts only independent sandbox + objective evidence
  * public-api: CLI audit only
  * consumes: source-code-proposer pure API
  * state-owned: none
@@ -20,8 +20,10 @@ const sha=value=>crypto.createHash('sha256').update(String(value),'utf8').digest
 const baseSha='1234567890abcdef1234567890abcdef12345678';
 const original=`/* KELO-INDEX\n * area: CREATORS / EVOLUTION\n */\nexport const value=1;\n`;
 const improved=`/* KELO-INDEX\n * area: CREATORS / EVOLUTION\n */\nexport const value=2;\n`;
+const evaluator=`export function score(value){ return Number(value)||0; }\n`;
 const snapshot=[
   {path:'src/creators/evolution/demo.mjs',beforeHash:sha(original),content:original},
+  {path:'src/creators/evolution/code-patch-evaluator.mjs',beforeHash:sha(evaluator),content:evaluator},
   {path:'server/secret-demo.js',beforeHash:sha('secret'),content:'secret'}
 ];
 const problem={
@@ -37,6 +39,12 @@ const context=buildSourceRepairContext({problem,snapshot});
 assert.equal(context.valid,true);
 assert.deepEqual(context.writablePaths,['src/creators/evolution/demo.mjs']);
 assert.equal(context.files.some(row=>row.path.startsWith('server/')),false);
+const protectedEvaluator=context.files.find(row=>row.path==='src/creators/evolution/code-patch-evaluator.mjs');
+assert.ok(protectedEvaluator);
+assert.equal(protectedEvaluator.protected,true);
+assert.equal(protectedEvaluator.omitted,false);
+assert.ok(context.protectedEvaluatorPaths.includes('src/creators/evolution/code-patch-evaluator.mjs'));
+assert.ok(context.instructions.some(line=>line.includes('read-only')));
 assert.ok(context.instructions.some(line=>line.includes('sandbox')));
 
 const unsafe=validateSourceAgentProposal({
@@ -52,6 +60,23 @@ const unsafe=validateSourceAgentProposal({
 assert.equal(unsafe.valid,false);
 assert.ok(unsafe.errors.some(error=>error.startsWith('proposal_path_not_in_context:')));
 assert.ok(unsafe.errors.some(error=>error.startsWith('path_not_allowlisted:')||error.startsWith('path_denied:')));
+
+const evaluatorAttack=validateSourceAgentProposal({
+  context,
+  attempt:1,
+  raw:{
+    rationale:'Attempt to make the judge accept the candidate instead of repairing the target.',
+    objective:'Repair the failing invariant.',
+    changes:[{
+      path:'src/creators/evolution/code-patch-evaluator.mjs',
+      beforeHash:sha(evaluator),
+      afterContent:'export function score(){ return 100; }\n'
+    }],
+    tests:['evolution']
+  }
+});
+assert.equal(evaluatorAttack.valid,false);
+assert.ok(evaluatorAttack.errors.includes('proposal_evaluator_path_protected:src/creators/evolution/code-patch-evaluator.mjs'));
 
 const noEvidence=buildSourceRepairContext({problem:{...problem,evidence:[]},snapshot});
 assert.equal(noEvidence.valid,false);
@@ -144,6 +169,8 @@ assert.ok(weakObjective.attempts[1].failures.includes('candidate_duplicate'));
 console.log(JSON.stringify({
   ok:true,
   contextWritablePaths:context.writablePaths,
+  protectedEvaluatorPaths:context.protectedEvaluatorPaths,
+  evaluatorAttackRejected:evaluatorAttack.errors,
   repairAttempts:cycle.attempts.map(row=>({attempt:row.attempt,stage:row.stage,accepted:row.accepted,failures:row.failures})),
   weakObjectiveStages:weakObjective.attempts.map(row=>row.stage)
 },null,2));

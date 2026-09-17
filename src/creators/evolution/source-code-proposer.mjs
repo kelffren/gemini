@@ -6,7 +6,7 @@
  * consumes: explicit source snapshots + problem evidence + authorized agent callback + independent evaluator callback
  * state-owned: none; all attempts and decisions are returned as immutable reports
  * online: agent/evaluator may run remotely; Git/apply/merge authority remains outside this module
- * do-not: no filesystem, Git, network, secrets, shell, arbitrary paths, direct apply, merge or deployment
+ * do-not: no filesystem, Git, network, secrets, shell, arbitrary paths, direct apply, merge, deployment or evaluator self-modification
  */
 import {
   createCodePatchPolicy,
@@ -26,6 +26,16 @@ const copy=value=>value==null?value:(typeof structuredClone==='function'?structu
 const text=value=>String(value??'').trim();
 const clamp=(value,min,max)=>Math.max(min,Math.min(max,Number(value)||0));
 const ALLOWED_PROBLEM_KINDS=Object.freeze(['ci_failure','regression','measured_opportunity']);
+const DEFAULT_PROTECTED_EVALUATOR_PATHS=Object.freeze([
+  'src/creators/evolution/code-patch-evaluator.mjs',
+  'scripts/kelo-evolution-audit.mjs',
+  'scripts/kelo-evolution-sandbox-audit.mjs',
+  'scripts/kelo-source-code-proposer-audit.mjs'
+]);
+
+function normalizeProtectedPaths(rows){
+  return [...new Set((rows||[]).map(text).filter(Boolean))].sort();
+}
 
 export function createSourceRepairPolicy({
   codePatchPolicy=createCodePatchPolicy(),
@@ -33,7 +43,8 @@ export function createSourceRepairPolicy({
   maxContextFiles=8,
   maxContextChars=80000,
   minObjectiveScore=60,
-  requireEvidence=true
+  requireEvidence=true,
+  evaluatorProtectedPaths=DEFAULT_PROTECTED_EVALUATOR_PATHS
 }={}){
   return freeze({
     codePatchPolicy,
@@ -41,7 +52,8 @@ export function createSourceRepairPolicy({
     maxContextFiles:Math.max(1,Math.min(16,Math.floor(Number(maxContextFiles)||8))),
     maxContextChars:Math.max(4000,Math.min(300000,Math.floor(Number(maxContextChars)||80000))),
     minObjectiveScore:clamp(minObjectiveScore,0,100),
-    requireEvidence:requireEvidence!==false
+    requireEvidence:requireEvidence!==false,
+    evaluatorProtectedPaths:normalizeProtectedPaths(evaluatorProtectedPaths)
   });
 }
 
@@ -71,6 +83,13 @@ function pathAllowed(path,policy){
     && !policy.denyFragments.some(fragment=>lower.includes(fragment));
 }
 
+function pathProtected(path,policy){
+  const value=text(path);
+  return policy.evaluatorProtectedPaths.some(protectedPath=>value===protectedPath||(
+    protectedPath.endsWith('/')&&value.startsWith(protectedPath)
+  ));
+}
+
 export function buildSourceRepairContext({problem:problemInput,snapshot=[],policy:policyInput={}}={}){
   const policy=createSourceRepairPolicy(policyInput),problem=normalizeSourceProblem(problemInput),errors=[];
   if(!problem.id)errors.push('problem_id_missing');
@@ -86,19 +105,26 @@ export function buildSourceRepairContext({problem:problemInput,snapshot=[],polic
   const files=[];let remaining=policy.maxContextChars;
   for(const row of ordered){
     if(files.length>=policy.maxContextFiles)break;
-    const cost=row.content.length;
+    const cost=row.content.length,protectedEvaluator=pathProtected(row.path,policy);
     if(!row.beforeHash){
-      files.push(freeze({path:row.path,beforeHash:'',content:null,omitted:true,reason:'before_hash_missing'}));
+      files.push(freeze({path:row.path,beforeHash:'',content:null,omitted:true,protected:protectedEvaluator,reason:'before_hash_missing'}));
       continue;
     }
     if(cost>remaining){
-      files.push(freeze({path:row.path,beforeHash:row.beforeHash,content:null,omitted:true,reason:'context_budget'}));
+      files.push(freeze({path:row.path,beforeHash:row.beforeHash,content:null,omitted:true,protected:protectedEvaluator,reason:'context_budget'}));
       continue;
     }
-    files.push(freeze({path:row.path,beforeHash:row.beforeHash,content:row.content,omitted:false,reason:null}));
+    files.push(freeze({
+      path:row.path,
+      beforeHash:row.beforeHash,
+      content:row.content,
+      omitted:false,
+      protected:protectedEvaluator,
+      reason:protectedEvaluator?'evaluator_protected':null
+    }));
     remaining-=cost;
   }
-  const writablePaths=files.filter(row=>!row.omitted&&row.beforeHash).map(row=>row.path);
+  const writablePaths=files.filter(row=>!row.omitted&&!row.protected&&row.beforeHash).map(row=>row.path);
   if(!writablePaths.length)errors.push('context_has_no_writable_files');
   return freeze({
     valid:errors.length===0,
@@ -106,10 +132,12 @@ export function buildSourceRepairContext({problem:problemInput,snapshot=[],polic
     problem,
     files,
     writablePaths,
+    protectedEvaluatorPaths:Object.freeze([...policy.evaluatorProtectedPaths]),
     limits:{maxAttempts:policy.maxAttempts,maxContextFiles:policy.maxContextFiles,maxContextChars:policy.maxContextChars,minObjectiveScore:policy.minObjectiveScore},
     instructions:Object.freeze([
       'Return the smallest source change that addresses the evidenced problem.',
       'Only modify writablePaths and preserve each supplied beforeHash exactly.',
+      'Evaluator-protected files may be visible for context but are read-only in this repair cycle.',
       'Declare every required registered test; do not invent shell commands.',
       'Do not touch secrets, server authority, Supabase, deployment or runtime credentials.',
       'A proposal is never applied directly: sandbox tests and an independent objective score decide acceptance.'
@@ -145,8 +173,14 @@ export function validateSourceAgentProposal({raw,context,attempt=1,policy:policy
   if(!proposal.candidate.objective)errors.push('proposal_objective_missing');
   if(attempt<1||attempt>policy.maxAttempts)errors.push(`proposal_attempt_out_of_range:${attempt}`);
 
-  const writable=new Map((context?.files||[]).filter(row=>!row.omitted).map(row=>[row.path,row]));
+  const contextFiles=new Map((context?.files||[]).map(row=>[row.path,row]));
+  const writable=new Map((context?.files||[]).filter(row=>!row.omitted&&!row.protected).map(row=>[row.path,row]));
   for(const change of proposal.candidate.changes){
+    const contextFile=contextFiles.get(change.path);
+    if(contextFile?.protected){
+      errors.push(`proposal_evaluator_path_protected:${change.path}`);
+      continue;
+    }
     const source=writable.get(change.path);
     if(!source){errors.push(`proposal_path_not_in_context:${change.path}`);continue;}
     if(source.beforeHash!==change.beforeHash)errors.push(`proposal_before_hash_mismatch:${change.path}`);

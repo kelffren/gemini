@@ -33,6 +33,7 @@ jobs:
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '24'
+          cache: npm
 
       - name: Retired branch governance self-test
         run: node scripts/retired-branch-guard.mjs --self-test
@@ -40,11 +41,8 @@ jobs:
       - name: Retired branch merge guard
         run: node scripts/retired-branch-guard.mjs
 
-      # The repository does not yet contain a lockfile. Use npm install here so
-      # the stability gate reflects the current repository contract. Lockfile
-      # introduction is tracked as a separate dependency-governance hardening.
-      - name: Install dependencies
-        run: npm install --no-audit --no-fund
+      - name: Install frozen dependencies
+        run: npm ci --no-audit --no-fund
 
       - name: Install Chromium for Playwright
         run: npx playwright install chromium --with-deps

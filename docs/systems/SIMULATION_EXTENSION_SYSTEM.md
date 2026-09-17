@@ -1,52 +1,93 @@
-{
-  "schema": 1,
-  "systems": [
-    {"id": "input-locks","owner":"KeloInputLocks","source":"src/core/input-lock-system.js","technicalDoc":"docs/systems/INPUT_LOCK_SYSTEM.md","playerVisible":true,"playerGuideAnchor":"controles-y-bloqueos-de-interfaz","status":"foundation-active"},
-    {"id": "input","owner":"KeloInput","source":"src/core/input-system.js","technicalDoc":"docs/systems/INPUT_SYSTEM.md","playerVisible":true,"playerGuideAnchor":"controles-y-bloqueos-de-interfaz","status":"foundation-transitional"},
-    {"id": "input-gate-retired","owner":"none","source":"src/core/input-gate.js","technicalDoc":"docs/systems/INPUT_GATE.md","playerVisible":false,"status":"retired-compat"},
-    {"id": "movement","owner":"KeloMovement","source":"src/core/movement-system.js","technicalDoc":"docs/systems/MOVEMENT_SYSTEM.md","playerVisible":true,"playerGuideAnchor":"movimiento","status":"foundation-transitional"},
-    {"id": "camera","owner":"KeloCamera","source":"src/core/camera-system.js","technicalDoc":"docs/systems/CAMERA_SYSTEM.md","playerVisible":true,"playerGuideAnchor":"camara-y-pantalla","status":"foundation-transitional"},
-    {"id": "render-extensions","owner":"KeloRender","source":"src/core/render-extension-system.js","technicalDoc":"docs/systems/RENDER_EXTENSION_SYSTEM.md","playerVisible":false,"status":"foundation-transitional"},
-    {"id": "simulation-extensions","owner":"KeloSimulation","source":"src/core/simulation-extension-system.js","technicalDoc":"docs/systems/SIMULATION_EXTENSION_SYSTEM.md","playerVisible":false,"status":"foundation-active-suspend-claims"},
-    {"id": "performance-foundation","owner":"KELO_PERFORMANCE_GOVERNOR + existing Foundation owners","source":"src/systems/performance-governor.js","technicalDoc":"docs/systems/PERFORMANCE_FOUNDATION.md","playerVisible":false,"status":"foundation-active"},
-    {"id":"app-updater","owner":"KeloUpdater","source":"src/core/update-system.js","technicalDoc":"docs/systems/APP_UPDATE_SYSTEM.md","playerVisible":false,"status":"client-foundation-active"},
-    {"id":"game-tuning","owner":"KeloGameTuning + KeloGameTuningPublisher","source":"src/systems/game-tuning-system.js","technicalDoc":"docs/systems/GAME_TUNING_SYSTEM.md","playerVisible":false,"status":"admin-foundation-v1"},
-    {"id": "online-foundation","owner":"Kelo server authority + Supabase persistence","source":"server/online-identity-store.js","technicalDoc":"docs/systems/ONLINE_FOUNDATION.md","playerVisible":false,"status":"online-foundation-live"},
-    {"id": "universal-content-studio","owner":"Kelo Universal Content Studio + KELO_CREATOR_CONTENT_REGISTRY","source":"src/creators/content/runtime-content-registry.mjs","technicalDoc":"docs/systems/UNIVERSAL_CONTENT_STUDIO.md","playerVisible":false,"status":"creator-online-v1"},
-    {"id":"creator-asset-bridge","owner":"Kelo Creator Asset Bridge","source":"src/creators/assets/asset-sheet-compiler.mjs","technicalDoc":"docs/systems/CREATOR_ASSET_BRIDGE.md","playerVisible":false,"status":"creator-local-file-bridge-v1.1"},
-    {"id":"asset-forge","owner":"Kelo Asset Forge","source":"src/creators/assets/kelo-asset-contract.mjs","technicalDoc":"docs/systems/ASSET_FORGE_SYSTEM.md","playerVisible":false,"status":"creator-local-active-v2-pixelorama-pro"},
-    {"id":"creator-exclusive-runtime","owner":"Kelo Creators","source":"src/creators/core/creator-exclusive-runtime.mjs","technicalDoc":"docs/systems/CREATOR_EXCLUSIVE_RUNTIME.md","playerVisible":false,"status":"creator-lifecycle-active-v1"},
-    {"id":"pixelorama-pro-bridge","owner":"Kelo Asset Forge / Pixelorama bridge","source":"src/creators/ui/pixelorama-pro-bridge.mjs","technicalDoc":"docs/systems/PIXELORAMA_PRO_BRIDGE.md","playerVisible":false,"status":"creator-in-game-lazy-v2"},
-    {"id":"image-lab","owner":"Kelo Creator Assets / Image Lab","source":"src/creators/assets/image-lab-project.mjs","technicalDoc":"docs/systems/IMAGE_LAB.md","playerVisible":false,"status":"creator-standalone-active-v1"},
-    {"id":"avatar-quick-import","owner":"KeloCreatorAvatars + KeloAvatar","source":"src/characters/creator-avatar-runtime.mjs","technicalDoc":"docs/systems/AVATAR_QUICK_IMPORT.md","playerVisible":false,"status":"creator-online-active-v2-autodetect"},
-    {"id":"sprite-world-asset-compiler","owner":"Kelo Creators / Sprite Compiler","source":"src/creators/sprite-compiler/sprite-world-asset-compiler.mjs","technicalDoc":"docs/systems/SPRITE_WORLD_ASSET_COMPILER.md","playerVisible":false,"status":"creator-capability-active-v1"},
-    {"id": "avatar-render","owner":"KeloAvatar","source":"src/core/avatar-render-system.js","technicalDoc":"docs/systems/AVATAR_RENDER_SYSTEM.md","playerVisible":false,"status":"foundation-transitional"},
-    {"id": "character-customization","owner":"KeloCharacterCustomization","source":"src/characters/character-customization.js","technicalDoc":"docs/systems/CHARACTER_CUSTOMIZATION_SYSTEM.md","playerVisible":true,"playerGuideAnchor":"personalizacion-de-personaje","status":"foundation-active"},
-    {"id": "main-menu","owner":"KELO_LUXE","source":"src/ui/luxe-shell.js","technicalDoc":"docs/systems/MAIN_MENU_SYSTEM.md","playerVisible":true,"playerGuideAnchor":"menu-principal","status":"foundation-active"},
-    {"id": "player-stats","owner":"KeloPlayerStats","source":"src/systems/player-stats.js","technicalDoc":"docs/systems/PLAYER_STATS_SYSTEM.md","playerVisible":false,"status":"foundation-active"},
-    {"id": "titles","owner":"KeloTitles","source":"src/systems/title-system.js","technicalDoc":"docs/systems/TITLE_SYSTEM.md","playerVisible":true,"playerGuideAnchor":"nobleza-y-titulos","status":"foundation-active"},
-    {"id": "commerce","owner":"KeloCommerceAuthority","source":"src/systems/commerce-authority.js","technicalDoc":"docs/systems/COMMERCE_SYSTEM.md","playerVisible":true,"playerGuideAnchor":"mercado-comercio-y-trade","status":"offline-active-online-ready"},
-    {"id": "arena-ranked","owner":"KeloArena","source":"src/systems/arena-system.js","technicalDoc":"docs/systems/ARENA_SYSTEM.md","playerVisible":true,"playerGuideAnchor":"arena-ranked","status":"offline-active-online-authority-pending"},
-    {"id": "arena-telemetry","owner":"KeloArenaTelemetry","source":"src/systems/arena-telemetry.js","technicalDoc":"docs/systems/ARENA_TELEMETRY_SYSTEM.md","playerVisible":true,"playerGuideAnchor":"arena-ranked","status":"offline-active-server-validation-pending"},
-    {"id": "arena-highlights","owner":"KeloArenaHighlights","source":"src/systems/arena-highlights.js","technicalDoc":"docs/systems/ARENA_HIGHLIGHTS_SYSTEM.md","playerVisible":true,"playerGuideAnchor":"arena-ranked","status":"offline-active-server-validation-pending"},
-    {"id": "arena-progression","owner":"KeloArenaProgression","source":"src/systems/arena-system.js","technicalDoc":"docs/systems/ARENA_PROGRESSION_SYSTEM.md","playerVisible":true,"playerGuideAnchor":"arena-ranked","status":"offline-active-online-authority-pending"},
-    {"id": "map-forge","owner":"KeloMapForge","source":"src/world/map-forge/map-forge-core.mjs","technicalDoc":"docs/systems/MAP_FORGE_SYSTEM.md","playerVisible":false,"status":"creator-active-evolution-v3-holdout-online-ready"},
-    {"id": "kelo-evolution","owner":"KeloEvolution","source":"src/creators/evolution/evolution-engine.mjs","technicalDoc":"docs/systems/KELO_EVOLUTION_ENGINE.md","playerVisible":false,"status":"internal-creator-capability-active-v4-autonomous-source-repair"},
-    {"id": "mounts","owner":"KeloMounts","source":"src/mounts/mount-system.js","technicalDoc":"docs/systems/MOUNT_SYSTEM.md","playerVisible":true,"playerGuideAnchor":"monturas","status":"foundation-candidate"},
-    {"id": "equipment-abilities","owner":"KeloAbilities (cast) + KeloEquipment (weapon state)","source":"src/abilities/equipment-ability-channel.js","technicalDoc":"docs/systems/EQUIPMENT_ABILITY_SYSTEM.md","playerVisible":true,"playerGuideAnchor":"habilidades","status":"foundation-support-active"},
-    {"id": "stat-modifiers","owner":"KeloStats","source":"src/stats/stat-modifier-system.js","technicalDoc":"docs/systems/STAT_MODIFIER_SYSTEM.md","playerVisible":false,"status":"foundation-candidate"},
-    {"id": "appearance","owner":"KeloAppearance","source":"src/appearance/appearance-system.js","technicalDoc":"docs/systems/APPEARANCE_SYSTEM.md","playerVisible":true,"playerGuideAnchor":"atuendos-y-apariencia","status":"foundation-candidate"},
-    {"id": "mount-creator","owner":"Kelo Creators / Mount workspace","source":"src/creators/workspaces/mount-workspace.mjs","technicalDoc":"docs/systems/MOUNT_CREATOR.md","playerVisible":false,"status":"creator-candidate"},
-    {"id": "appearance-creator","owner":"Kelo Creators / Appearance workspace","source":"src/creators/workspaces/appearance-workspace.mjs","technicalDoc":"docs/systems/APPEARANCE_CREATOR.md","playerVisible":false,"status":"creator-candidate"},
-    {"id": "regional-economy","owner":"KeloRegionalEconomy","source":"src/systems/regional-economy-system.js","technicalDoc":"docs/systems/REGIONAL_ECONOMY_LOGISTICS_SYSTEM.md","playerVisible":false,"status":"foundation-api-live-offline-online-ready"},
-    {"id": "caravans","owner":"KeloCaravans","source":"src/systems/caravan-system.js","technicalDoc":"docs/systems/REGIONAL_ECONOMY_LOGISTICS_SYSTEM.md","playerVisible":false,"status":"foundation-api-live-offline-online-ready"},
-    {"id": "factions-clans","owner":"KeloFactions","source":"src/systems/faction-clan-system.js","technicalDoc":"docs/systems/REGIONAL_ECONOMY_LOGISTICS_SYSTEM.md","playerVisible":false,"status":"foundation-api-live-offline-online-ready"},
-    {"id": "logistics-devtools","owner":"KeloLogisticsDevtools","source":"src/systems/regional-economy-system.js","technicalDoc":"docs/systems/REGIONAL_ECONOMY_LOGISTICS_SYSTEM.md","playerVisible":false,"status":"development-observability"},
-    {"id": "logistics-admin-ui","owner":"KeloLogisticsAdminUI","source":"src/ui/logistics-admin-ui.js","technicalDoc":"docs/systems/LOGISTICS_ADMIN_UI.md","playerVisible":false,"status":"internal-admin-qa-live"},
-    {"id":"guardian-network","owner":"KeloGuardian + Kelo Guardian Coordinator","source":"src/systems/guardian-system.js","technicalDoc":"docs/systems/GUARDIAN_SYSTEM.md","playerVisible":true,"playerGuideAnchor":"menu-principal","status":"guardian-foundation-v3-webrtc-regional-proof-hot-mirror"},
-    {"id":"guardian-hot-mirror","owner":"KeloGuardianMirror","source":"src/systems/guardian-hot-mirror.js","technicalDoc":"docs/systems/GUARDIAN_HOT_MIRROR.md","playerVisible":false,"status":"guardian-support-v1-hot-mirror-failover-foundation"},
-    {"id":"bug-coordination","owner":"KeloBugReporter + /bugs canonical registry","source":"src/bug-reporting/bug-reporter.mjs","technicalDoc":"docs/systems/BUG_COORDINATION_SYSTEM.md","playerVisible":false,"status":"internal-dormant-v1"},
-    {"id":"bug-recovery-mesh","owner":"/bugs Bug Intelligence + Bug observability runtime + GitHub Actions QA","source":"src/core/bug-observability.mjs","technicalDoc":"docs/systems/BUG_RECOVERY_MESH.md","playerVisible":false,"status":"internal-diagnostic-v1"},
-    {"id":"bug-intelligence-learning","owner":"KeloEvolution adapter + /bugs canonical evidence","source":"scripts/bug-learning-autopilot.mjs","technicalDoc":"docs/systems/BUG_INTELLIGENCE_LEARNING.md","playerVisible":false,"status":"internal-autonomous-learning-v1-holdout-gated"}
-  ]
-}
+<!-- KELO-SYSTEM-DOC
+system-id: simulation-extensions
+owner: KeloSimulation
+source: src/core/simulation-extension-system.js
+contract-version: 1
+-->
+
+# KeloSimulation — extensiones de simulación
+
+## Propósito
+
+`KeloSimulation` es el OWNER único de extensiones que necesitan ejecutar lógica antes o después de la simulación legacy consolidada por `engine-c.js` y el owner de los claims de suspensión global usados por superficies cliente que necesitan detener temporalmente toda simulación, como un Creator pesado.
+
+No crea un segundo game loop y no reemplaza la física base. Retira la cadena histórica de wrappers de `updateSimulation`, la convierte en hooks observables/ordenados y permite lifecycle explícito sin que features externas vuelvan a envolver el global.
+
+```text
+updateSimulation legacy post-engine-c
+            │
+            ▼
+      KeloSimulation
+      ├─ ¿hay suspension claim? ── sí → return
+      ├─ before hooks activos
+      ├─ legacy bridge before
+      ├─ simulación base exacta
+      ├─ legacy bridge after
+      └─ after hooks activos
+```
+
+## Owner
+
+- **Owner:** `KeloSimulation`
+- **Fuente:** `src/core/simulation-extension-system.js`
+- **Estado:** Foundation transitional / suspension claims active.
+
+## Estado que posee
+
+- hooks `before` y `after` con prioridad explícita;
+- estado `enabled` de cada hook;
+- claims de suspensión global identificados por token;
+- contador diagnóstico de frames suspendidos.
+
+No posee física base, autoridad gameplay online, render, UI ni persistencia.
+
+## API pública
+
+- `KeloSimulation.before(owner, fn, priority)`
+- `KeloSimulation.after(owner, fn, priority)`
+- `KeloSimulation.setEnabled(id, enabled)`
+- `KeloSimulation.unregister(id)`
+- `KeloSimulation.suspend(owner, meta)`
+- `KeloSimulation.resume(token)`
+- `KeloSimulation.resumeOwner(owner)`
+- `KeloSimulation.isSuspended()`
+- `KeloSimulation.snapshot()`
+
+## Invariantes
+
+1. Solo `src/core/simulation-extension-system.js` puede envolver directamente el `updateSimulation` post-`engine-c` durante esta fase.
+2. Sin claims de suspensión, el update capturado se ejecuta exactamente una vez.
+3. Con al menos un claim, no se ejecuta ninguna parte de la simulación administrada por este owner.
+4. Los hooks no renderizan ni crean otro `requestAnimationFrame`, `setInterval` o game loop.
+5. Menor prioridad se ejecuta primero dentro de cada fase.
+6. Un hook dormido no se ejecuta y no necesita registrarse de nuevo al despertar.
+7. Un consumidor que llama `suspend()` debe garantizar `resume()` en todos sus caminos de salida.
+8. Suspension local no confirma, revierte ni muta verdad de servidor.
+
+## Consumidores principales
+
+`src/creators/core/creator-exclusive-runtime.mjs` adquiere un claim mientras un Creator pesado está activo. Input, movimiento y render usan sus respectivos owners; `KeloSimulation` solo posee la suspensión de simulación.
+
+## Migración legacy
+
+Cada wrapper se migra de forma incremental:
+
+`IDENTIFICAR → MAPEAR ORDEN → MIGRAR A HOOK/API → TEST → LIVE → RETIRAR`
+
+La migración no debe mezclarse con cambios de gameplay.
+
+## Observabilidad
+
+`snapshot()` expone versión, hooks registrados/activos/dormidos, bridge legacy, claims de suspensión y `suspendedFrames`. Recovery/diagnóstico puede leer este snapshot bajo demanda; no se añade polling por frame.
+
+## Anti-patrones
+
+- segundo game loop;
+- wrapper feature-level de `updateSimulation`;
+- usar suspensión como regla de gameplay autoritativo;
+- crear watchdogs para reactivar estado roto;
+- renderizar o mutar UI desde hooks de simulación.
+
+## Performance Foundation
+
+Para el contrato conjunto de startup, CPU, memoria, mundo y red, ver `docs/systems/PERFORMANCE_FOUNDATION.md`. Para el consumidor Creator exclusivo, ver `docs/systems/CREATOR_EXCLUSIVE_RUNTIME.md`.
