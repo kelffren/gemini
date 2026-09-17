@@ -9,7 +9,7 @@
 (function(root){
 'use strict';
 if(root.KeloPWAFreshness)return;
-const VERSION='kelo-pwa-freshness-v1';
+const VERSION='kelo-pwa-freshness-v1.1';
 const STORAGE_KEY='kelo.pwa.liveBuild.v1';
 const RELOAD_KEY='kelo_pwa_build';
 const BUILD_RE=/^[0-9a-f]{7,64}$/i;
@@ -72,7 +72,7 @@ async function check(options={}){
     if(changed){
       await purgeRuntimeCaches();
       emit('changed',{previous,next});
-      if(options.reload!==false&&reloadInto(next))return Object.freeze({changed:true,reloading:true,build:next});
+      if(options.reload===true&&reloadInto(next))return Object.freeze({changed:true,reloading:true,build:next});
     }else emit('checked',{build:next});
     return Object.freeze({changed,reloading:false,build:next});
   })().catch(error=>{
@@ -85,7 +85,7 @@ async function check(options={}){
 }
 async function ready(options={}){return check(options);}
 async function url(raw){
-  await ready({reload:true});
+  await ready({reload:false});
   const u=new URL(String(raw||''),root.document?.baseURI||root.location.href);
   if(build)u.searchParams.set('kelo_live',build.slice(0,16));
   return u.href;
@@ -96,5 +96,5 @@ root.KeloPWAFreshness=api;
 function resumeCheck(){void check({reload:true});}
 root.addEventListener?.('pageshow',resumeCheck,{passive:true});
 root.document?.addEventListener?.('visibilitychange',()=>{if(root.document.visibilityState==='visible')resumeCheck();},{passive:true});
-void check({reload:true});
+void check({reload:false});
 })(typeof globalThis!=='undefined'?globalThis:window);
