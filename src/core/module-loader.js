@@ -1,16 +1,16 @@
 /* KELO-INDEX
  * area: CORE / BOOT
  * owner: KeloModuleLoader
- * keys: DYNAMIC LOAD IDLE FIRST-USE CACHE VERSION PING MOBILE SAFARI RECOVERY QUARANTINE TRACE STYLE ASSET-LIBRARY FEATURE-REGISTRY PVP
- * purpose: un solo hilo de descarga. Plaza ya está viva; el resto entra al tocar un tool del menú. JS y CSS opcionales se cargan secuencialmente. Pausa si el player camina. La biblioteca puede bloquear paquetes opcionales. PvP conserva foundations separadas y carga su dominio solo al primer toque.
- * public-api: KELO_MODULE_LOADER.start/ensure/needs/isReady/diagnostics
- * consumes: KELO_FEATURE_REGISTRY + optional KELO_ASSET_REGISTRY allow-list + optional KELO_RECOVERY_MESH diagnostics + KeloRuntimeBootstrap para foundations PvP
- * do-not: NO tileset 556KB, NO studio, NO supabase, NO segundo gameLoop, NO SW, NO quarantine fuera de recoveryLab
+ * keys: DYNAMIC LOAD IDLE FIRST-USE CACHE VERSION PING MOBILE SAFARI RECOVERY QUARANTINE TRACE STYLE ASSET-LIBRARY FEATURE-REGISTRY FUSEBOX CIRCUIT-BREAKER PVP
+ * purpose: un solo hilo de descarga. Plaza ya está viva; el resto entra al tocar un tool del menú. JS y CSS opcionales se cargan secuencialmente. Pausa si el player camina. Asset Registry puede bloquear paquetes manualmente y FuseBox aísla fallos repetidos por feature.
+ * public-api: KELO_MODULE_LOADER.start/ensure/needs/isReady/canLoad/diagnostics
+ * consumes: KELO_FEATURE_REGISTRY + optional KELO_ASSET_REGISTRY allow-list + optional KELO_FUSEBOX health gate + optional KELO_RECOVERY_MESH diagnostics + KeloRuntimeBootstrap para foundations PvP
+ * do-not: NO tileset 556KB, NO studio, NO supabase, NO segundo gameLoop, NO SW, NO quarantine fuera de recoveryLab, NO segundo circuit breaker
  */
 (function(root){
 'use strict';
 if(root.KELO_MODULE_LOADER)return;
-const VERSION='kelo-module-loader-v11-pvp-first-use';
+const VERSION='kelo-module-loader-v12-fusebox';
 const PVP_FALLBACK=Object.freeze([
   {src:'src/abilities/abilityData.js?v=20260916-pvp-first-use-1',name:'datos habilidades PvP'},
   {src:'src/abilities/stone-system.js?v=20260916-pvp-first-use-1',name:'piedras PvP'},
@@ -47,6 +47,7 @@ let build='V6.69';
 let shown=false;
 
 function registry(){return root.KELO_FEATURE_REGISTRY||null;}
+function fusebox(){return root.KELO_FUSEBOX||null;}
 function resolveName(name){
   const raw=String(name||'');
   const r=registry();
@@ -73,6 +74,14 @@ function quarantined(name){
 function assetAllowed(name){
   try{if(!root.KELO_ASSET_REGISTRY||typeof root.KELO_ASSET_REGISTRY.isEnabled!=='function')return true;return root.KELO_ASSET_REGISTRY.isEnabled(name)!==false;}catch(_){return true;}
 }
+function fuseAllowed(name){try{const f=fusebox();return !f||typeof f.canRun!=='function'||f.canRun(name)!==false;}catch(_){return true;}}
+function fuseExplain(name){try{return fusebox()?.explain?.(name)||null;}catch(_){return null;}}
+function beginFeatureAttempt(name){try{const f=fusebox();return !f||typeof f.beginAttempt!=='function'||f.beginAttempt(name)!==false;}catch(_){return true;}}
+function recordFeatureSuccess(name,detail){try{fusebox()?.recordSuccess?.(name,detail);}catch(_){}}
+function recordFeatureFailure(name,error,detail){try{fusebox()?.recordFailure?.(name,error,detail);}catch(_){}}
+function cancelFeatureAttempt(name,reason){try{fusebox()?.cancelAttempt?.(name,reason);}catch(_){}}
+function composedAllowed(name){return assetAllowed(name)&&fuseAllowed(name);}
+function emitFuseBlocked(name){const gate=fuseExplain(name);emit('kelo:module-blocked',{feature:name,src:'',ok:false,error:'FUSEBOX_'+String(gate?.status||'BLOCKED'),retryAt:Number(gate?.retryAt)||0});return gate;}
 function busy(){try{if(typeof input!=='undefined'&&input&&(Math.abs(input.normX)>0.02||Math.abs(input.normY)>0.02||input.active))return true;}catch(_){}return false;}
 function box(){return document.getElementById('kelo-module-loader');}
 function textEl(){return document.getElementById('kelo-ml-text');}
@@ -102,15 +111,26 @@ function loadFeature(name,opts){
   const files=filesFor(name);
   if(!files)return Promise.resolve(true);
   if(!assetAllowed(name)){emit('kelo:module-blocked',{feature:name,src:'',ok:false,error:'ASSET_LIBRARY_DISABLED'});return Promise.resolve(false);}
+  if(!fuseAllowed(name)){emitFuseBlocked(name);return Promise.resolve(false);}
   if(quarantined(name)){emit('kelo:module-quarantined',{feature:name,src:'',ok:false,error:'RECOVERY_QUARANTINE'});return Promise.resolve(false);}
   if(loaded[name])return Promise.resolve(true);
   if(inflight[name])return inflight[name];
+  if(!beginFeatureAttempt(name)){emitFuseBlocked(name);return Promise.resolve(false);}
   const interactive=!!(opts&&opts.interactive);
   inflight[name]=new Promise(function(resolve){
     let i=0,errors=0;
     function step(){
-      if(!assetAllowed(name)){delete inflight[name];emit('kelo:module-blocked',{feature:name,src:'',ok:false,error:'ASSET_LIBRARY_DISABLED_DURING_LOAD'});resolve(false);return;}
-      if(i>=files.length){loaded[name]=errors===0;delete inflight[name];try{if(errors===0)localStorage.setItem('kelo_modpack_'+name,build);}catch(_){}emit('kelo:module-feature-complete',{feature:name,ok:errors===0,files:files.length,errors});resolve(errors===0);return;}
+      if(!assetAllowed(name)){cancelFeatureAttempt(name,'asset-library-disabled-during-load');delete inflight[name];emit('kelo:module-blocked',{feature:name,src:'',ok:false,error:'ASSET_LIBRARY_DISABLED_DURING_LOAD'});resolve(false);return;}
+      if(i>=files.length){
+        const ok=errors===0;
+        loaded[name]=ok;
+        delete inflight[name];
+        if(ok){try{localStorage.setItem('kelo_modpack_'+name,build);}catch(_){}recordFeatureSuccess(name,{operation:'module-load'});}
+        else recordFeatureFailure(name,new Error('MODULE_FEATURE_LOAD_FAILED'),{operation:'module-load',code:'MODULE_FEATURE_LOAD_FAILED',message:String(errors)+' file load error(s)'});
+        emit('kelo:module-feature-complete',{feature:name,ok,files:files.length,errors});
+        resolve(ok);
+        return;
+      }
       if(!interactive&&busy()){if(shown)show('En pausa · caminando',(i/files.length)*100);setTimeout(step,450);return;}
       const item=files[i];
       loadOne(item,name).then(function(result){const dt=Number(result&&result.ms)||0;if(!result||!result.ok)errors++;if(dt>=50)show('Descargando '+item.name+'  '+(i+1)+'/'+files.length,((i+1)/files.length)*100);i+=1;setTimeout(step,dt<50?80:360);});
@@ -130,6 +150,7 @@ function ensurePvp(){
   if(pvpDomainReady())return Promise.resolve(true);
   if(!filesFor('pvp'))return Promise.resolve(false);
   if(!assetAllowed('pvp')){emit('kelo:module-blocked',{feature:'pvp',src:'',ok:false,error:'ASSET_LIBRARY_DISABLED'});hideChip('PvP desactivado en Assets');return Promise.resolve(false);}
+  if(!fuseAllowed('pvp')){emitFuseBlocked('pvp');hideChip('PvP temporalmente aislado');return Promise.resolve(false);}
   if(quarantined('pvp')){emit('kelo:module-quarantined',{feature:'pvp',src:'',ok:false,error:'RECOVERY_QUARANTINE'});return Promise.resolve(false);}
   show('Cargando PvP…',8);
   const foundations=root.KeloRuntimeBootstrap&&typeof root.KeloRuntimeBootstrap.ensure==='function'?root.KeloRuntimeBootstrap.ensure():Promise.reject(new Error('KELO_RUNTIME_BOOTSTRAP_UNAVAILABLE'));
@@ -149,6 +170,7 @@ function ensure(name){
   name=resolveName(name);
   if(!filesFor(name))return Promise.resolve(true);
   if(!assetAllowed(name)){emit('kelo:module-blocked',{feature:name,src:'',ok:false,error:'ASSET_LIBRARY_DISABLED'});hideChip('Desactivado en Assets');return Promise.resolve(false);}
+  if(!fuseAllowed(name)){emitFuseBlocked(name);hideChip('Módulo temporalmente aislado');return Promise.resolve(false);}
   if(quarantined(name)){emit('kelo:module-quarantined',{feature:name,src:'',ok:false,error:'RECOVERY_QUARANTINE'});return Promise.resolve(false);}
   show('Cargando '+name+'…',8);
   return ensureDependencies(name).then(ok=>ok===false?false:loadFeature(name,{interactive:true})).then(function(ok){hideChip(ok?'Listo':'Fallo al cargar');return ok;});
@@ -158,17 +180,17 @@ function needs(name){
   if(name==='pvp')return !pvpDomainReady();
   name=resolveName(name);
   if(!filesFor(name))return false;
-  if(!assetAllowed(name))return true;
+  if(!composedAllowed(name))return true;
   return !loaded[name];
 }
 function start(opts){
   if(opts&&opts.build)build=String(opts.build);
   const el=box();if(el)el.hidden=true;
-  emit('kelo:module-loader-start',{build,version:VERSION,registryVersion:registry()?.version||'legacy-fallback',assetSelection:root.KELO_ASSET_REGISTRY?.getState?.().features||null});
+  emit('kelo:module-loader-start',{build,version:VERSION,registryVersion:registry()?.version||'legacy-fallback',assetSelection:root.KELO_ASSET_REGISTRY?.getState?.().features||null,fuseboxVersion:fusebox()?.version||null});
 }
 function diagnostics(){
   const ids=featureIds();
-  return Object.freeze({version:VERSION,registryVersion:registry()?.version||'legacy-fallback',build,features:ids,enabled:ids.filter(assetAllowed),disabled:ids.filter(function(k){return !assetAllowed(k);}),loaded:Object.keys(loaded).filter(function(k){return loaded[k];}),inflight:Object.keys(inflight),failures:{...failures},quarantined:ids.filter(quarantined),pvpReady:pvpDomainReady()});
+  return Object.freeze({version:VERSION,registryVersion:registry()?.version||'legacy-fallback',build,features:ids,enabled:ids.filter(composedAllowed),disabled:ids.filter(function(k){return !composedAllowed(k);}),loaded:Object.keys(loaded).filter(function(k){return loaded[k];}),inflight:Object.keys(inflight),failures:{...failures},quarantined:ids.filter(quarantined),pvpReady:pvpDomainReady(),fusebox:fusebox()?.diagnostics?.()||null});
 }
-root.KELO_MODULE_LOADER=Object.freeze({version:VERSION,start,ensure,needs,isReady:function(n){const name=resolveName(n);return name==='pvp'?pvpDomainReady():!!loaded[name];},canLoad:assetAllowed,features:featureIds(),diagnostics});
+root.KELO_MODULE_LOADER=Object.freeze({version:VERSION,start,ensure,needs,isReady:function(n){const name=resolveName(n);return name==='pvp'?pvpDomainReady():!!loaded[name];},canLoad:composedAllowed,features:featureIds(),diagnostics});
 })(typeof globalThis!=='undefined'?globalThis:window);
