@@ -58,6 +58,14 @@ jobs:
       - name: Luxe UI presentation foundation contract
         run: node scripts/luxe-ui-foundation-audit.mjs
 
+      - name: Material diff bug-risk preflight
+        if: ${{ env.KELO_LEGACY_BASE_SHA != '' }}
+        run: npm run bug:risk -- "$KELO_LEGACY_BASE_SHA" "$GITHUB_SHA"
+
+      - name: Material diff impact preflight
+        if: ${{ env.KELO_LEGACY_BASE_SHA != '' }}
+        run: npm run bug:impact -- --diff "$KELO_LEGACY_BASE_SHA" "$GITHUB_SHA" --depth=2
+
       - name: Legacy can only shrink contract
         run: npm run audit:legacy-containment
 
