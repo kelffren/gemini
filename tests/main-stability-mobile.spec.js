@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: TEST / MAIN STABILITY / MOBILE
  * owner: Main Stability Gate
- * keys: MOBILE IPHONE-UA TOUCH BOOT GUEST MOVEMENT RUNTIME SMOKE PR-BYTES FREEZE 8S EVALUATE-LATENCY
+ * keys: MOBILE IPHONE-UA TOUCH BOOT GUEST MOVEMENT RUNTIME SMOKE PR-BYTES FREEZE 8S EVALUATE-LATENCY FUSEBOX
  * purpose: unskippable CI smoke for the exact PR bytes using an iPhone-sized touch context and the mandatory sustained-walk freeze firewall
  * do-not: NO BrowserStack-only skip, NO LIVE hardcode, NO direct mutation that bypasses human input for movement, NO short movement-only proof
  */
@@ -74,6 +74,7 @@ test('exact PR bytes boot and sustain 8s movement in iPhone-sized touch context'
     document.getElementById('game-canvas') &&
     typeof localPlayer!=='undefined' &&
     typeof input!=='undefined' &&
+    window.KELO_FUSEBOX &&
     window.KELO_MODULE_LOADER &&
     window.KeloUpdateGate
   ),null,{timeout:30000});
@@ -98,7 +99,10 @@ test('exact PR bytes boot and sustain 8s movement in iPhone-sized touch context'
   const runtime=await page.evaluate(()=>({
     bootReady:window.__keloBootReady===true,
     guest:document.documentElement.dataset.keloGuestPlay,
+    fusebox:window.KELO_FUSEBOX?.version||null,
+    fuseState:window.KELO_FUSEBOX?.getState?.()||null,
     moduleLoader:window.KELO_MODULE_LOADER?.version||null,
+    moduleDiagnostics:window.KELO_MODULE_LOADER?.diagnostics?.()||null,
     updateGate:window.KeloUpdateGate?.getState?.().version||null,
     width:innerWidth,
     height:innerHeight,
@@ -107,7 +111,10 @@ test('exact PR bytes boot and sustain 8s movement in iPhone-sized touch context'
   }));
   expect(runtime.bootReady).toBe(true);
   expect(runtime.guest).toBe('1');
-  expect(runtime.moduleLoader).toBeTruthy();
+  expect(runtime.fusebox).toMatch(/fusebox/i);
+  expect(runtime.fuseState?.features).toBeTruthy();
+  expect(runtime.moduleLoader).toMatch(/fusebox/i);
+  expect(runtime.moduleDiagnostics?.fusebox?.version).toBe(runtime.fusebox);
   expect(runtime.updateGate).toBeTruthy();
   expect(runtime.width).toBeLessThanOrEqual(600);
   expect(runtime.ua).toMatch(/iPhone/i);
