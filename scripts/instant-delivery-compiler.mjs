@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: BUILD / ASSET DELIVERY
  * owner: Kelo Creator Asset Bridge
- * keys: INSTANT DELIVERY COMPILER SPARSE PNG LOSSLESS WEBP AVIF MANIFEST CONTENT ADDRESS
+ * keys: INSTANT DELIVERY COMPILER SPARSE PNG EXACT PNG LOSSLESS WEBP AVIF MANIFEST CONTENT ADDRESS
  * purpose: execute an explicit delivery plan and materialize only measured candidates without mutating SOURCE
  * public-api: CLI --config --output
  * state-owned: generated output directory only
@@ -10,7 +10,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import {buildSparsePngAtlas,buildLosslessDeliveryCandidates,sha256Hex} from '../src/creators/assets/instant-delivery-compiler.mjs';
+import {buildSparsePngAtlas,buildExactPngLossless,buildLosslessDeliveryCandidates,sha256Hex} from '../src/creators/assets/instant-delivery-compiler.mjs';
 
 const args=process.argv.slice(2);
 const arg=(name,fallback)=>{const prefix=`--${name}=`;const token=args.find(value=>value.startsWith(prefix));return token?token.slice(prefix.length):fallback;};
@@ -28,8 +28,15 @@ for(const item of config.assets){
   if(item.mode==='sparse-png'){
     const built=buildSparsePngAtlas(sourceBuffer,item.keepRects||[]),hash=built.report.deliverySha256,file=`${item.outputBase||item.id}--${hash.slice(0,16)}.png`,target=path.join(outDir,'assets',file);
     fs.writeFileSync(target,built.buffer);
-    entries.push({id:item.id,mode:item.mode,source:item.source,sourceSha256,sourceBytes:sourceBuffer.length,file:`assets/${file}`,format:'png',deliveryBytes:built.buffer.length,deliverySha256:hash,savedBytes:built.report.savedBytes,savedPercent:built.report.savedPercent,logicalDimensionsPreserved:true,requiredPixelsExact:true,coveragePlanDeclared:true,promotionRequires:['consumer-coverage-audit','observed-boot-transfer-ratchet'],report:built.report});
+    entries.push({id:item.id,mode:item.mode,source:item.source,sourceSha256,sourceBytes:sourceBuffer.length,file:`assets/${file}`,format:'png',deliveryBytes:built.buffer.length,deliverySha256:hash,savedBytes:built.report.savedBytes,savedPercent:built.report.savedPercent,logicalDimensionsPreserved:true,requiredPixelsExact:true,coveragePlanDeclared:true,promotionEligible:built.report.savedBytes>0,promotionRequires:['consumer-coverage-audit','observed-boot-transfer-ratchet'],report:built.report});
     console.log(`INSTANT_DELIVERY_SPARSE id=${item.id} source=${sourceBuffer.length} delivery=${built.buffer.length} saved=${built.report.savedBytes} (${built.report.savedPercent}%)`);
+    continue;
+  }
+  if(item.mode==='exact-png-lossless'){
+    const built=buildExactPngLossless(sourceBuffer),hash=built.report.deliverySha256,file=`${item.outputBase||item.id}--${hash.slice(0,16)}.png`,target=path.join(outDir,'assets',file);
+    fs.writeFileSync(target,built.buffer);
+    entries.push({id:item.id,mode:item.mode,source:item.source,sourceSha256,sourceBytes:sourceBuffer.length,file:`assets/${file}`,format:'png',deliveryBytes:built.buffer.length,deliverySha256:hash,savedBytes:built.report.savedBytes,savedPercent:built.report.savedPercent,logicalDimensionsPreserved:true,requiredPixelsExact:true,fullRgbaExact:true,promotionEligible:built.report.savedBytes>0,promotionRequires:['asset-bit-ratchet','observed-boot-transfer-ratchet'],report:built.report});
+    console.log(`INSTANT_DELIVERY_EXACT_PNG id=${item.id} source=${sourceBuffer.length} delivery=${built.buffer.length} saved=${built.report.savedBytes} (${built.report.savedPercent}%)`);
     continue;
   }
   if(item.mode==='lossless-codecs'){

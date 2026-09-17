@@ -1,14 +1,14 @@
 /* KELO-INDEX
  * area: BUILD / ASSET DELIVERY QA
  * owner: Kelo Creator Asset Bridge
- * keys: INSTANT DELIVERY AUDIT SPARSE ATLAS EXACT PIXELS DIMENSIONS
- * purpose: deterministic self-test for sparse logical-coordinate delivery atlases
+ * keys: INSTANT DELIVERY AUDIT SPARSE ATLAS EXACT PNG PIXELS DIMENSIONS
+ * purpose: deterministic self-test for sparse logical-coordinate atlases and full-image exact PNG delivery
  * public-api: CLI self-test
  * state-owned: none
  * online: N/A
  */
 import {encodeRgbaPng,decodePngRgba} from '../src/creators/assets/png-space-optimizer.mjs';
-import {buildSparsePngAtlas} from '../src/creators/assets/instant-delivery-compiler.mjs';
+import {buildSparsePngAtlas,buildExactPngLossless} from '../src/creators/assets/instant-delivery-compiler.mjs';
 
 const width=128,height=128,rgba=Buffer.alloc(width*height*4);
 let seed=0x12345678;
@@ -21,4 +21,12 @@ if(!(built.buffer.length<source.length))throw new Error(`INSTANT_DELIVERY_AUDIT_
 for(let y=rect.y;y<rect.y+rect.h;y+=1)for(let x=rect.x;x<rect.x+rect.w;x+=1){const o=(y*width+x)*4;for(let c=0;c<4;c+=1)if(decoded.rgba[o+c]!==rgba[o+c])throw new Error('INSTANT_DELIVERY_AUDIT_PIXEL_CHANGED');}
 let rejected=false;try{buildSparsePngAtlas(source,[{x:127,y:127,w:8,h:8}]);}catch(error){rejected=String(error?.message||error).startsWith('INSTANT_DELIVERY_RECT_OOB');}
 if(!rejected)throw new Error('INSTANT_DELIVERY_AUDIT_OOB_NOT_REJECTED');
-console.log(`INSTANT_DELIVERY_AUDIT_PASS source=${source.length} sparse=${built.buffer.length} saved=${built.report.savedBytes}`);
+
+const exactWidth=96,exactHeight=96,exactRgba=Buffer.alloc(exactWidth*exactHeight*4);
+for(let y=0;y<exactHeight;y++)for(let x=0;x<exactWidth;x++){const o=(y*exactWidth+x)*4;exactRgba[o]=(x*3)&255;exactRgba[o+1]=(y*5)&255;exactRgba[o+2]=((x+y)*7)&255;exactRgba[o+3]=(x<8||y<8)?0:255;}
+const loose=encodeRgbaPng(exactRgba,exactWidth,exactHeight,{level:1,filterStrategy:0}),exact=buildExactPngLossless(loose),exactDecoded=decodePngRgba(exact.buffer);
+if(exactDecoded.ihdr.width!==exactWidth||exactDecoded.ihdr.height!==exactHeight)throw new Error('INSTANT_DELIVERY_EXACT_PNG_DIMENSIONS');
+if(!exactDecoded.rgba.equals(exactRgba)||!exact.report.fullRgbaExact||!exact.report.logicalDimensionsPreserved)throw new Error('INSTANT_DELIVERY_EXACT_PNG_RGBA');
+if(exact.report.deviceProofRequired!==false)throw new Error('INSTANT_DELIVERY_EXACT_PNG_DEVICE_PROOF_FLAG');
+if(!(exact.buffer.length<loose.length))throw new Error(`INSTANT_DELIVERY_EXACT_PNG_EXPECTED_SAVING:${loose.length}:${exact.buffer.length}`);
+console.log(`INSTANT_DELIVERY_AUDIT_PASS sparseSource=${source.length} sparse=${built.buffer.length} exactSource=${loose.length} exact=${exact.buffer.length} exactSaved=${exact.report.savedBytes}`);

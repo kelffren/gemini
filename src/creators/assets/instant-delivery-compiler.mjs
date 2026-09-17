@@ -1,9 +1,9 @@
 /* KELO-INDEX
  * area: CREATORS / ASSET DELIVERY
  * owner: Kelo Creator Asset Bridge
- * keys: INSTANT DELIVERY SPARSE ATLAS EXACT PIXELS CODEC TOURNAMENT CONTENT ADDRESS
+ * keys: INSTANT DELIVERY SPARSE ATLAS EXACT PIXELS PNG LOSSLESS CODEC TOURNAMENT CONTENT ADDRESS
  * purpose: build smaller delivery representations while preserving canonical SOURCE and proving the pixels required by each declared runtime coverage set
- * public-api: buildSparsePngAtlas(), buildLosslessDeliveryCandidates(), sha256Hex()
+ * public-api: buildSparsePngAtlas(), buildExactPngLossless(), buildLosslessDeliveryCandidates(), sha256Hex()
  * consumes: png-space-optimizer, runtime-image-variants
  * state-owned: none; pure build/publish-time transforms
  * online: N/A; generated delivery blobs are presentation assets and remain content-addressed
@@ -33,6 +33,11 @@ function assertCoverageExact(source,output,width,height,mask){
   for(let p=0;p<width*height;p+=1){const o=p*4;if(mask[p]){preservedPixels++;if(source[o]!==output[o]||source[o+1]!==output[o+1]||source[o+2]!==output[o+2]||source[o+3]!==output[o+3])throw new Error(`INSTANT_DELIVERY_COVERAGE_PIXEL_CHANGED:${p}`);}else{clearedPixels++;if(output[o]||output[o+1]||output[o+2]||output[o+3])throw new Error(`INSTANT_DELIVERY_OUTSIDE_COVERAGE_NOT_CLEAR:${p}`);}}
   return{preservedPixels,clearedPixels};
 }
+function assertFullExact(source,output){
+  if(source.ihdr.width!==output.ihdr.width||source.ihdr.height!==output.ihdr.height)throw new Error(`INSTANT_DELIVERY_DIMENSION_CHANGED:${source.ihdr.width}x${source.ihdr.height}:${output.ihdr.width}x${output.ihdr.height}`);
+  if(source.rgba.length!==output.rgba.length||!source.rgba.equals(output.rgba))throw new Error('INSTANT_DELIVERY_FULL_RGBA_CHANGED');
+  return{width:source.ihdr.width,height:source.ihdr.height,pixels:source.ihdr.width*source.ihdr.height};
+}
 
 // KELO-INDEX ASSET/DELIVERY creates a logical-coordinate-compatible PNG: same dimensions, required rects byte-identical, every undeclared pixel transparent.
 export function buildSparsePngAtlas(sourceBuffer,keepRects=[],options={}){
@@ -60,7 +65,17 @@ export function buildSparsePngAtlas(sourceBuffer,keepRects=[],options={}){
   });
 }
 
-// KELO-INDEX ASSET/DELIVERY exact path: profile remains available, but adaptive/lossy candidates are intentionally disabled.
+// KELO-INDEX ASSET/DELIVERY exact same-format path: preserve full PNG dimensions and every decoded RGBA byte; no browser/device codec switch is involved.
+export function buildExactPngLossless(sourceBuffer,options={}){
+  if(!Buffer.isBuffer(sourceBuffer))throw new Error('INSTANT_DELIVERY_SOURCE_BUFFER_REQUIRED');
+  const source=decodePngRgba(sourceBuffer);
+  const optimized=optimizePngLossless(sourceBuffer,{deep:true,exhaustiveExact:true,effort:'max',paletteOrderingLimit:8,paletteFilterStrategies:['adaptive',0,1],levels:[9],...(options.losslessOptions||{})});
+  const winner=optimized.buffer.length<=sourceBuffer.length?optimized.buffer:sourceBuffer;
+  const decoded=decodePngRgba(winner),proof=assertFullExact(source,decoded),savedBytes=sourceBuffer.length-winner.length;
+  return F({buffer:winner,report:F({version:'kelo-instant-delivery-exact-png-v1',mode:'exact-png-lossless',sourceBytes:sourceBuffer.length,deliveryBytes:winner.length,savedBytes,savedPercent:Number((savedBytes/Math.max(1,sourceBuffer.length)*100).toFixed(3)),sourceSha256:sha256Hex(sourceBuffer),deliverySha256:sha256Hex(winner),format:'png',width:proof.width,height:proof.height,pixelCount:proof.pixels,logicalDimensionsPreserved:true,requiredPixelsExact:true,fullRgbaExact:true,deviceProofRequired:false,optimizer:optimized.report})});
+}
+
+// KELO-INDEX ASSET/DELIVERY exact codec lab path: profile remains available, but adaptive/lossy candidates are intentionally disabled. Codec promotion still requires real-device proof.
 export async function buildLosslessDeliveryCandidates(sourceBuffer,options={}){
   if(!Buffer.isBuffer(sourceBuffer))throw new Error('INSTANT_DELIVERY_SOURCE_BUFFER_REQUIRED');
   const exactProfile={...(options.assetProfile||{}),kind:options.assetProfile?.kind||'exact-delivery',adaptivePolicy:'strict',runtimeCandidates:[]};
