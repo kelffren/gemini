@@ -1,0 +1,52 @@
+name: Evergreen Lockfiles
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['feat/evergreen-10y-foundation']
+    paths:
+      - 'package.json'
+      - 'server/package.json'
+      - '.github/workflows/evergreen-lockfiles.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: evergreen-lockfiles-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  refresh-locks:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+      - name: Generate root lockfile without running dependency scripts
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+      - name: Generate server lockfile without running dependency scripts
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund --prefix server
+      - name: Verify frozen installs
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm ci --ignore-scripts --no-audit --no-fund --prefix server
+      - name: Commit refreshed lockfiles when changed
+        shell: bash
+        run: |
+          changes="$(git status --porcelain -- package-lock.json server/package-lock.json)"
+          if [ -z "$changes" ]; then
+            echo 'Lockfiles already current.'
+            exit 0
+          fi
+          printf '%s\n' "$changes"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add package-lock.json server/package-lock.json
+          git commit -m 'build: lock evergreen dependency graphs'
+          git push origin HEAD:${{ github.ref_name }}

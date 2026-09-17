@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "targetHorizonYears": 10,
+  "runtime": {
+    "nodeMajor": 24,
+    "nodeFile": ".nvmrc",
+    "serverEngineSource": "server/package.json"
+  },
+  "dependencies": {
+    "lockfilesRequired": true,
+    "rootLockfile": "package-lock.json",
+    "serverLockfile": "server/package-lock.json",
+    "updateAutomation": ".github/dependabot.yml",
+    "sbomFormat": "cyclonedx"
+  },
+  "content": {
+    "currentSchemaVersion": 1,
+    "migrationModule": "src/creators/content/content-schema-migrations.mjs",
+    "publishedRevisionRule": "immutable",
+    "stableIdentityKeys": ["contentId", "stableKey"],
+    "requireMigrationPathForBreakingSchemaChange": true
+  },
+  "contracts": {
+    "catalog": "config/evergreen-contracts.json",
+    "deprecations": "config/evergreen-deprecations.json",
+    "breakingChangeRule": "major-version-plus-migration-or-adapter"
+  },
+  "reuseExistingOwners": {
+    "legacyMigration": "src/core/migration-switchboard.js",
+    "transactionRollback": "src/core/hot-data-registry.js",
+    "observability": "src/core/bug-observability.mjs",
+    "appUpdateRollback": "src/core/update-system.js",
+    "featureCatalog": "src/core/feature-registry.js",
+    "providerAdapterExample": "server/sprite-ai-provider-huggingface.js",
+    "universalContentOwner": "src/creators/content/runtime-content-registry.mjs"
+  },
+  "deprecation": {
+    "minimumNoticeDays": 180,
+    "requireReplacementForPublicContract": true,
+    "neverDeletePublishedContentWithoutMigration": true
+  },
+  "ci": {
+    "auditScript": "scripts/evergreen-foundation-audit.mjs",
+    "workflow": ".github/workflows/evergreen-foundation.yml"
+  }
+}

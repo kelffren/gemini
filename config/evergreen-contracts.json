@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "contracts": [
+    {
+      "id": "creator-content-record",
+      "owner": "KELO_CREATOR_CONTENT_REGISTRY",
+      "source": "src/creators/content/runtime-content-registry.mjs",
+      "version": "1.1.0",
+      "compatibility": {"minReader": "1.0.0", "maxReader": null, "backwardRead": true}
+    },
+    {
+      "id": "creator-content-schema",
+      "owner": "Universal Content Studio schema registry",
+      "source": "src/creators/content/content-type-schemas.mjs",
+      "version": "1.0.0",
+      "compatibility": {"minReader": "1.0.0", "maxReader": null, "backwardRead": true}
+    },
+    {
+      "id": "feature-registry",
+      "owner": "KELO_FEATURE_REGISTRY",
+      "source": "src/core/feature-registry.js",
+      "version": "2.6.0",
+      "compatibility": {"minReader": "2.0.0", "maxReader": null, "backwardRead": true}
+    },
+    {
+      "id": "hot-data-transaction",
+      "owner": "KeloHotDataRegistry",
+      "source": "src/core/hot-data-registry.js",
+      "version": "1.0.0",
+      "compatibility": {"minReader": "1.0.0", "maxReader": null, "backwardRead": true}
+    },
+    {
+      "id": "migration-switchboard",
+      "owner": "Migration Switchboard",
+      "source": "src/core/migration-switchboard.js",
+      "version": "1.0.0",
+      "compatibility": {"minReader": "1.0.0", "maxReader": null, "backwardRead": true}
+    }
+  ]
+}
