@@ -33,6 +33,7 @@ jobs:
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: npm ci --ignore-scripts --no-audit --no-fund --prefix server
       - name: Generate CycloneDX SBOMs
+        # Use the pinned project dependency so SBOM generation is reproducible.
         run: |
           mkdir -p artifacts/sbom
           ./node_modules/.bin/cyclonedx-npm --package-lock-only --output-format JSON --output-file artifacts/sbom/root.cdx.json package.json
