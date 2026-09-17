@@ -4,6 +4,8 @@
 
 `KELO_FUSEBOX` contiene fallos de módulos opcionales para que una feature rota no derribe ni bloquee las demás. Reutiliza la identidad de `KELO_FEATURE_REGISTRY`, el kill switch persistente de `KELO_ASSET_REGISTRY` y la carga lazy de `KELO_MODULE_LOADER`; no crea un catálogo ni loader paralelo.
 
+Además, FuseBox permanece fuera del first-playable: no se descarga durante el arranque inicial del juego. `KELO_MODULE_LOADER` lo carga por su mismo hilo de descarga justo antes del primer uso real de una feature opcional.
+
 ## Owner
 
 - Global: `KELO_FUSEBOX`
@@ -14,7 +16,7 @@
 
 - `KELO_FEATURE_REGISTRY`: IDs, dependencias y archivos.
 - `KELO_ASSET_REGISTRY`: interruptor manual persistente.
-- `KELO_MODULE_LOADER`: único owner de carga lazy/secuencial.
+- `KELO_MODULE_LOADER`: único owner de carga lazy/secuencial y bootstrap lazy de FuseBox.
 - `sessionStorage`: solo health/circuit state automático de la sesión.
 
 ## Estado que posee
@@ -47,8 +49,13 @@ KELO_FUSEBOX.setEnabled(featureId, boolean)
 ## Flujo
 
 ```text
-UI / owner
+FIRST PLAYABLE
+  -> Feature Registry + Asset Registry + Module Loader
+  -> NO FuseBox request
+
+Primer uso de feature opcional
   -> KELO_MODULE_LOADER.ensure(feature)
+      -> mismo loader descarga FuseBox una sola vez
       -> manual switch (Asset Registry)
       -> FuseBox gate
       -> beginAttempt(feature)
@@ -97,7 +104,7 @@ Son eventos de observabilidad/coordinación; no transfieren ownership de gamepla
 
 ## Integración runtime
 
-`index.html` carga FuseBox después de `feature-registry.js` y `asset-registry.js`, y antes de `module-loader.js`.
+`index.html` carga `feature-registry.js`, `asset-registry.js` y `module-loader.js` después de `kelo:boot-ready`, pero **no** incluye un `<script>` de FuseBox. El Module Loader descarga `feature-control-system.js` mediante su propio `loadOne()` al primer `ensure()` opcional. Esto conserva una sola infraestructura de carga y evita añadir requests/bytes al first-playable observado.
 
 El Module Loader adquiere un intento por feature completa. Los fallos de múltiples archivos de un mismo paquete cuentan como un solo fallo de feature; un éxito completo limpia los fallos consecutivos. Si el switch manual cambia durante la carga, el intento se cancela sin convertir esa acción del usuario en error.
 
@@ -135,8 +142,9 @@ El circuit breaker automático es protección local del cliente. El kill switch 
 6. Éxito cierra y limpia fallos consecutivos.
 7. Fallo en `HALF_OPEN` reabre inmediatamente.
 8. Core/unknown no se apaga accidentalmente.
-9. FuseBox no carga/descarga módulos.
+9. FuseBox no carga/descarga módulos; el único loader sigue siendo `KELO_MODULE_LOADER`.
 10. FuseBox no duplica feature definitions ni flags manuales.
+11. FuseBox no forma parte del first-playable transfer.
 
 ## Extension points
 
@@ -146,11 +154,11 @@ El circuit breaker automático es protección local del cliente. El kill switch 
 
 ## Anti-patrones
 
-No crear otro registry/loader, no mapear errores globales por heurística, no descargar JS ya ejecutado a ciegas, no usar timers para mantener correctness, no guardar stacks/tokens en session storage y no usar FuseBox para esconder bugs sin arreglarlos.
+No crear otro registry/loader, no mapear errores globales por heurística, no precargar FuseBox para “tenerlo listo”, no descargar JS ya ejecutado a ciegas, no usar timers para mantener correctness, no guardar stacks/tokens en session storage y no usar FuseBox para esconder bugs sin arreglarlos.
 
 ## Legacy / adapters
 
-`KELO_ASSET_REGISTRY` y los aliases del Feature Registry continúan intactos. El fallback legacy del Module Loader se conserva para compatibilidad de deploy, pero las features nuevas deben registrarse en el owner moderno.
+`KELO_ASSET_REGISTRY` y los aliases del Feature Registry continúan intactos. Las definiciones fallback históricas del Module Loader se conservaron sin pérdida en `src/core/module-loader-legacy-fallback.js`; ese archivo se descarga solo si falta `KELO_FEATURE_REGISTRY`, por lo que el runtime moderno no paga sus bytes. Las features nuevas deben registrarse en el owner moderno.
 
 ## Tests / CI
 
@@ -158,13 +166,15 @@ No crear otro registry/loader, no mapear errores globales por heurística, no de
 - `npm run audit:foundation`
 - `npm run audit:docs`
 - `main-stability-gate`
+- Observed Boot Transfer Ratchet.
 - smoke móvil Playwright por cambio de boot/runtime.
+- PvP first-use verifica que FuseBox es `null` antes del toque y existe después de cargar la primera feature opcional.
 
-`feature-control-audit.mjs` valida kill switch, aislamiento, threshold, OPEN, cooldown lazy, HALF_OPEN single probe, recuperación, protección de core, orden de boot e integración con loader/Luxe.
+`feature-control-audit.mjs` valida kill switch, aislamiento, threshold, OPEN, cooldown lazy, HALF_OPEN single probe, recuperación, protección de core y que `index.html` no precargue FuseBox.
 
 ## Observabilidad
 
-`KELO_FUSEBOX.diagnostics()` devuelve snapshot por feature. `KELO_MODULE_LOADER.diagnostics()` incluye FuseBox para soporte/recovery. Mensajes de error persistidos se sanitizan y truncan; no se guardan stacks ni credenciales.
+`KELO_FUSEBOX.diagnostics()` devuelve snapshot por feature cuando el owner ya fue demandado. Antes del primer uso opcional, `KELO_MODULE_LOADER.diagnostics().fusebox` es `null`; después incluye el snapshot de FuseBox. Mensajes de error persistidos se sanitizan y truncan; no se guardan stacks ni credenciales.
 
 ## Deuda
 
@@ -175,7 +185,7 @@ No crear otro registry/loader, no mapear errores globales por heurística, no de
 
 ## Ejemplo de reutilización
 
-Una nueva feature opcional se registra en `KELO_FEATURE_REGISTRY`, mantiene su carga en `KELO_MODULE_LOADER` y hereda FuseBox sin crear código de circuit breaker propio. Si tiene una operación runtime crítica, reutiliza `KELO_FUSEBOX.run(featureId, operation)`.
+Una nueva feature opcional se registra en `KELO_FEATURE_REGISTRY`, mantiene su carga en `KELO_MODULE_LOADER` y hereda FuseBox en su primer uso sin crear código de circuit breaker propio. Si tiene una operación runtime crítica, reutiliza `KELO_FUSEBOX.run(featureId, operation)`.
 
 ## Checklist de extensión
 
@@ -185,4 +195,5 @@ Una nueva feature opcional se registra en `KELO_FEATURE_REGISTRY`, mantiene su c
 4. Definir fallback seguro.
 5. Reportar fallos bajo el mismo `featureId`.
 6. Añadir `run()` solo en boundaries con ownership claro.
-7. Ejecutar `audit:fusebox`, docs/foundation y mobile smoke.
+7. No añadir FuseBox al parser path del first-playable.
+8. Ejecutar `audit:fusebox`, docs/foundation, observed transfer y mobile smoke.
