@@ -61,6 +61,15 @@ jobs:
       - name: Documentation contract
         run: npm run audit:docs
 
+      - name: MMORPG community 59-system contract
+        run: node scripts/mmorpg-community-platform-audit.mjs
+
+      - name: MMORPG Wave 1 root invariants
+        run: node scripts/mmorpg-wave1-root-audit.mjs
+
+      - name: MMORPG Wave 1 owner integration
+        run: node scripts/mmorpg-wave1-owner-integration-audit.mjs
+
       - name: Performance no-regression contract
         run: npm run audit:performance
 
@@ -120,11 +129,12 @@ jobs:
           cat test-results/main-stability-http.log
           exit 1
 
-      - name: Critical mobile, Creator sprite and PvP smoke on PR bytes
+      - name: Critical mobile, Creator Sprite OS and PvP smoke on PR bytes
         run: >-
           npx playwright test
           tests/main-stability-mobile.spec.js
           tests/universal-sprite-original-game.spec.js
+          tests/sprite-os.spec.js
           tests/pvp-dodge-live.spec.js
           --project=chromium
 
