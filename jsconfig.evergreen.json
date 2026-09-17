@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "target": "ES2024",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "types": ["node"],
+    "skipLibCheck": true,
+    "strict": false,
+    "noImplicitAny": false,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": [
+    "scripts/evergreen-foundation-audit.mjs",
+    "scripts/evergreen-quality-audit.mjs",
+    "src/core/evergreen-contracts.mjs",
+    "src/creators/content/content-schema-migrations.mjs"
+  ]
+}
