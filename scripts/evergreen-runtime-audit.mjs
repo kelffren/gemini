@@ -25,6 +25,7 @@ const runtimeSource=await read('src/core/evergreen-runtime-capabilities.mjs');
 const providerSource=await read('src/core/evergreen-provider-adapters.mjs');
 const workflow=await read('.github/workflows/evergreen-runtime-compat.yml');
 const browserStack=await read('browserstack.yml');
+const webkitConfig=await read('playwright.evergreen.config.js');
 
 check(policy.schema===1,'runtime policy schema is v1');
 check(policy.productionRuntime?.nodeMajor===24&&policy.productionRuntime?.blocking===true,'production runtime remains blocking Node 24 LTS');
@@ -84,7 +85,8 @@ try{
 check(rejectedInvalidAdapter,'provider registry rejects adapters missing required port methods');
 
 check(/npx playwright install --with-deps webkit/.test(workflow),'runtime CI installs WebKit explicitly');
-check(/test:evergreen:webkit/.test(workflow),'runtime CI runs the dedicated WebKit/iOS-profile suite');
+check(/playwright test --config=playwright\.evergreen\.config\.js/.test(workflow),'runtime CI runs the dedicated WebKit/iOS-profile suite');
+check(/browserName:\s*'webkit'/.test(webkitConfig)&&/isMobile:\s*true/.test(webkitConfig)&&/hasTouch:\s*true/.test(webkitConfig),'WebKit gate uses an iPhone-sized mobile/touch profile');
 check(/node-version:\s*['"]?26['"]?/.test(workflow),'runtime CI contains a Node 26 future-runtime lane');
 check(/continue-on-error:\s*true/.test(workflow),'future runtime lane cannot block production promotion');
 check(/schedule:/.test(workflow),'future compatibility workflow runs on a schedule');
