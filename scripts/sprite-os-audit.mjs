@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: QA / CREATORS / SPRITE OS
  * owner: Main Stability Gate
- * keys: SPRITE OS EXTERNAL SEARCH COMPILER LICENSE PASSPORT RUNTIME NO INTERNAL LIBRARY WYSIWYG
+ * keys: SPRITE OS EXTERNAL SEARCH COMPILER LICENSE PASSPORT RUNTIME NO INTERNAL LIBRARY WYSIWYG ENTRYPOINT
  * purpose: Prove the external-first Sprite OS contract and prevent the removed internal library from re-entering discovery.
  */
 import assert from 'node:assert/strict';
@@ -11,6 +11,7 @@ import {readinessFor,classifySlot,detectSpriteGrid,compileSpriteAsset,makeLookEn
 const cfg=JSON.parse(fs.readFileSync(new URL('../data/external-asset-providers.json',import.meta.url),'utf8'));
 const page=fs.readFileSync(new URL('../sprite-os.html',import.meta.url),'utf8');
 const engine=fs.readFileSync(new URL('../src/creators/assets/sprite-os-engine.mjs',import.meta.url),'utf8');
+const launcher=fs.readFileSync(new URL('../src/ui/asset-library-launcher.js',import.meta.url),'utf8');
 
 assert.equal(cfg.version>=13,true,'provider config must be Sprite OS generation');
 assert.equal(cfg.providers.some(p=>p.id==='kelo-content'),false,'internal Kelo content provider must not participate');
@@ -19,6 +20,8 @@ assert.equal(engine.includes('kelo-content-live-provider'),false,'Sprite OS engi
 assert.match(page,/searchExternalAssets/,'Sprite OS must use federated external search');
 assert.match(page,/Usar en juego/,'Sprite OS must expose one-tap game use');
 assert.match(page,/Parecidos/,'Sprite OS must expose similar-asset discovery');
+assert.match(launcher,/kelo-sprite-os-launcher/,'the game creator menu must expose Sprite OS directly');
+assert.match(launcher,/sprite-os\.html/,'Sprite OS launcher must open the external sprite creator surface');
 
 const readyAsset={id:'ext:archer',name:'Dark Archer Character',provider:'external-test',contentKind:'sprite',category:'character',tags:['pixel-art','archer'],previewUrl:'https://example.test/archer.png',downloadUrl:'https://example.test/archer.png',sourceUrl:'https://example.test/source',license:'CC0-1.0',verified:true,integrationReady:true};
 const ready=readinessFor(readyAsset);
@@ -58,4 +61,4 @@ assert.equal(adjusted.profile.alpha,.82,'Usar en juego must preserve alpha');
 assert.equal(adjusted.profile.layer,'back','Usar en juego must preserve front/back layer');
 
 console.log('PASS sprite-os-audit');
-console.log(JSON.stringify({providers:cfg.providers.length,tier:ready.tier,score:ready.score,grid:`${grid.columns}x${grid.rows}`,slot:compiled.profile.slot,wysiwyg:true,internalLibrary:false}));
+console.log(JSON.stringify({providers:cfg.providers.length,tier:ready.tier,score:ready.score,grid:`${grid.columns}x${grid.rows}`,slot:compiled.profile.slot,wysiwyg:true,directEntry:true,internalLibrary:false}));
