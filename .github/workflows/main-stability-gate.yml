@@ -23,6 +23,7 @@ jobs:
       CI: true
       KELO_PAGES: http://127.0.0.1:4173/
       KELO_LEGACY_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before || '' }}
+      KELO_RECOVERY_ARTIFACTS: test-results/recovery-artifacts
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -48,6 +49,36 @@ jobs:
 
       - name: Install Chromium for Playwright
         run: npx playwright install chromium --with-deps
+
+      # Recovery Mesh stays inside the existing main gate instead of creating
+      # another push-triggered workflow. This keeps one CI run per current ref
+      # and relies on the gate's cancel-in-progress policy for superseded SHAs.
+      - name: Recovery architecture contract
+        run: npm run audit:recovery
+
+      - name: Bug intelligence self-test
+        run: npm run test:bug-intelligence
+
+      - name: Classify Recovery Mesh impact
+        id: recovery_impact
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p test-results
+          base='${{ github.event.pull_request.base.sha || github.event.before || '' }}'
+          if [[ -z "$base" || "$base" =~ ^0+$ ]] || ! git cat-file -e "$base^{commit}" 2>/dev/null; then
+            base="$(git rev-parse HEAD^ 2>/dev/null || git rev-parse HEAD)"
+          fi
+
+          git diff --name-only "$base" HEAD | tee test-results/recovery-changed-files.txt
+
+          if grep -Eq '^(src/(creators|studio)/|src/core/(bug-observability\.mjs|module-loader\.js|creators-lazy-gate\.js)|tests/world-editor-ios-reopen\.spec\.js|scripts/recovery-|index\.html$|service-worker|sw\.js$|playwright\.config\.js$|package\.json$|\.github/workflows/(main-stability-gate|recovery-lab)\.yml$)' test-results/recovery-changed-files.txt; then
+            echo 'world=true' >> "$GITHUB_OUTPUT"
+            echo 'World Recovery profile: required'
+          else
+            echo 'world=false' >> "$GITHUB_OUTPUT"
+            echo 'World Recovery profile: skipped (unrelated diff)'
+          fi
 
       - name: Build
         run: npm run build
@@ -121,7 +152,26 @@ jobs:
           tests/pvp-dodge-live.spec.js
           --project=chromium
 
-      - name: Upload Playwright evidence
+      # Expensive World diagnostics only run when the changed paths can affect
+      # Creator/Studio boot. They use the exact checkout on localhost and never
+      # publish a GitHub Pages deployment.
+      - name: Targeted World Recovery profile
+        if: steps.recovery_impact.outputs.world == 'true'
+        run: >-
+          npm run recovery:profile --
+          --profile=world
+          --base=http://127.0.0.1:4173/
+          --artifacts=test-results/recovery-artifacts
+
+      - name: World Editor stale-session reopen regression
+        if: steps.recovery_impact.outputs.world == 'true'
+        run: >-
+          npx playwright test
+          tests/world-editor-ios-reopen.spec.js
+          --project=chromium
+          --workers=1
+
+      - name: Upload Playwright and Recovery evidence
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
