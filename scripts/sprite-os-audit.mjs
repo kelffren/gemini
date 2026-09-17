@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: QA / CREATORS / SPRITE OS
  * owner: Main Stability Gate
- * keys: SPRITE OS EXTERNAL SEARCH COMPILER LICENSE PASSPORT RUNTIME NO INTERNAL LIBRARY
+ * keys: SPRITE OS EXTERNAL SEARCH COMPILER LICENSE PASSPORT RUNTIME NO INTERNAL LIBRARY WYSIWYG
  * purpose: Prove the external-first Sprite OS contract and prevent the removed internal library from re-entering discovery.
  */
 import assert from 'node:assert/strict';
@@ -48,5 +48,14 @@ assert.equal(look.spritePassport.license,'CC0-1.0');
 assert.equal(look.spritePassport.directions,8);
 assert.match(buildSimilarQuery(readyAsset),/archer/);
 
+const fakeRoot={getElementById(id){return id==='preview-modal'?{__keloTryonProfile:{assetId:'ext:archer',profile:{slot:'body',label:'Cuerpo',x:.63,y:.41,scale:1.07,rotation:15,alpha:.82,layer:'back',order:111}}}:null;}};
+const adjusted=makeLookEntry(compiled,fakeRoot);
+assert.equal(adjusted.profile.x,.63,'Usar en juego must preserve dragged X');
+assert.equal(adjusted.profile.y,.41,'Usar en juego must preserve dragged Y');
+assert.equal(adjusted.profile.scale,1.07,'Usar en juego must preserve scale');
+assert.equal(adjusted.profile.rotation,15,'Usar en juego must preserve rotation');
+assert.equal(adjusted.profile.alpha,.82,'Usar en juego must preserve alpha');
+assert.equal(adjusted.profile.layer,'back','Usar en juego must preserve front/back layer');
+
 console.log('PASS sprite-os-audit');
-console.log(JSON.stringify({providers:cfg.providers.length,tier:ready.tier,score:ready.score,grid:`${grid.columns}x${grid.rows}`,slot:compiled.profile.slot,internalLibrary:false}));
+console.log(JSON.stringify({providers:cfg.providers.length,tier:ready.tier,score:ready.score,grid:`${grid.columns}x${grid.rows}`,slot:compiled.profile.slot,wysiwyg:true,internalLibrary:false}));
