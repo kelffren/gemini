@@ -67,9 +67,9 @@ test('Sprite OS external search, controls, WYSIWYG try-on and original-game use 
   await page.locator('#search').fill('archer');
   await page.locator('#go').click();
   await expect(page.locator('.card')).toHaveCount(48);
-  await page.locator('#search').fill('dark archer');
+  await page.locator('#search').fill('archer 0');
   await page.locator('#search').press('Enter');
-  await expect(page.locator('.card')).toHaveCount(48);
+  await expect(page.locator('.card')).toHaveCount(5);
 
   // Preview triggers the auto-compiler passport.
   await page.locator('.card').first().locator('[data-open]').first().click();
@@ -83,11 +83,11 @@ test('Sprite OS external search, controls, WYSIWYG try-on and original-game use 
   await page.locator('#source').click();
   await expect.poll(()=>page.evaluate(()=>window.__spriteOsOpened.at(-1)||'')).toContain('https://sprite.test/assets/0');
 
-  // Similar-assets button must derive and execute a new query.
+  // Similar-assets button must derive a broader semantic query and execute it.
   await page.locator('#similar').click();
   await expect(page.locator('#preview-modal')).toBeHidden();
-  await expect(page.locator('#search')).not.toHaveValue('dark archer');
-  await expect(page.locator('#search')).toHaveValue(/archer/i);
+  await expect(page.locator('#search')).toHaveValue('dark archer');
+  await expect(page.locator('.card')).toHaveCount(48);
   await expect(page.locator('.card').first()).toBeVisible();
 
   // Reopen, activate try-on and change the sprite exactly as a creator would.
