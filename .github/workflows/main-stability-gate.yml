@@ -97,6 +97,9 @@ jobs:
       - name: Creator sprite to original game runtime contract
         run: node scripts/universal-look-runtime-audit.mjs
 
+      - name: External Sprite OS contract
+        run: node scripts/sprite-os-audit.mjs
+
       - name: Paint Copies regression contract
         run: npm run audit:studio:paint-copies
 
