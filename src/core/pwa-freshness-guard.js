@@ -9,10 +9,11 @@
 (function(root){
 'use strict';
 if(root.KeloPWAFreshness)return;
-const VERSION='kelo-pwa-freshness-v1.1';
+const VERSION='kelo-pwa-freshness-v1.2';
 const STORAGE_KEY='kelo.pwa.liveBuild.v1';
 const RELOAD_KEY='kelo_pwa_build';
 const BUILD_RE=/^[0-9a-f]{7,64}$/i;
+const FRESH_TTL_MS=15000;
 let build=null,lastError=null,checking=null,lastCheckedAt=0,reloaded=false;
 const standalone=()=>!!(root.matchMedia?.('(display-mode: standalone)')?.matches||root.navigator?.standalone===true);
 const normalize=v=>{v=String(v||'').trim();return BUILD_RE.test(v)?v.toLowerCase():null;};
@@ -62,6 +63,9 @@ function reloadInto(next){
 }
 async function check(options={}){
   if(checking)return checking;
+  if(options.force!==true&&build&&Date.now()-lastCheckedAt<FRESH_TTL_MS){
+    return Object.freeze({changed:false,reloading:false,build,cached:true});
+  }
   checking=(async()=>{
     const previous=build||readStored();
     const next=await fetchBuild();
@@ -93,8 +97,8 @@ async function url(raw){
 function state(){return Object.freeze({version:VERSION,build:build||readStored(),standalone:standalone(),lastError,lastCheckedAt,reloading:reloaded});}
 const api=Object.freeze({version:VERSION,ready,check,url,state,get build(){return build||readStored();},get standalone(){return standalone();}});
 root.KeloPWAFreshness=api;
-function resumeCheck(){void check({reload:true});}
+function resumeCheck(){void check({reload:true,force:true});}
 root.addEventListener?.('pageshow',resumeCheck,{passive:true});
 root.document?.addEventListener?.('visibilitychange',()=>{if(root.document.visibilityState==='visible')resumeCheck();},{passive:true});
-void check({reload:false});
+void check({reload:false,force:true});
 })(typeof globalThis!=='undefined'?globalThis:window);
