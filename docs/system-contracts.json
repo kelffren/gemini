@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "rollout": "x-foundation-p1-critical",
+  "rollout": "x-foundation-p2-critical",
   "systems": [
     {
       "id": "input-locks",
@@ -93,19 +93,64 @@
       "requiredTests": ["audit:performance"]
     },
     {
+      "id": "runtime-lifecycle",
+      "owner": "KeloLifecycleSupervisor",
+      "source": "src/core/lifecycle-supervisor.js",
+      "technicalDoc": "docs/systems/RUNTIME_LIFECYCLE_SUPERVISOR.md",
+      "apiVersion": 1,
+      "authority": "client-lifecycle-metadata-only",
+      "stateOwned": ["per-feature lifecycle state", "bounded lifecycle history"],
+      "stateForbidden": ["feature loading authority", "gameplay state", "render state", "server truth"],
+      "consumes": ["KeloModuleLoader events"],
+      "lifecycle": ["idle", "loading-dependencies", "mounting", "connecting", "ready", "degraded", "error", "unmounting", "disposed"],
+      "failurePolicy": "reject-illegal-transition-and-keep-current-state",
+      "resourceClass": "core-light",
+      "requiredTests": ["lifecycle-failure-audit", "audit:foundation"]
+    },
+    {
+      "id": "failure-boundary",
+      "owner": "KeloFailureBoundary",
+      "source": "src/core/failure-boundary.js",
+      "technicalDoc": "docs/systems/FAILURE_BOUNDARY.md",
+      "apiVersion": 1,
+      "authority": "optional-feature-retry-gate-only",
+      "stateOwned": ["per-feature circuit state", "failure/success counters", "cooldown timestamps"],
+      "stateForbidden": ["persistent feature selection", "feature loading authority", "gameplay state", "server truth"],
+      "consumes": ["KeloModuleLoader completion events", "KELO_ASSET_REGISTRY effective gate"],
+      "lifecycle": ["closed", "open", "half-open", "reset"],
+      "failurePolicy": "fail-fast-only-for-repeated-optional-feature-loads",
+      "resourceClass": "core-light",
+      "requiredTests": ["lifecycle-failure-audit", "audit:foundation"]
+    },
+    {
+      "id": "net-governor",
+      "owner": "KeloNetAuthority",
+      "source": "engine-net.js",
+      "technicalDoc": "docs/systems/NET_GOVERNOR.md",
+      "apiVersion": 1,
+      "authority": "client-network-health-diagnostics-only",
+      "stateOwned": ["PvP input-ack RTT EMA", "PvP jitter EMA", "last ack age/sample counters"],
+      "stateForbidden": ["second transport", "damage", "HP", "cooldowns", "authoritative position", "MMR/RP", "match result"],
+      "consumes": ["existing combat intent timestamps", "authoritative ackSequence", "KeloSimulation existing network hook"],
+      "lifecycle": ["sample-on-ack", "observe", "fallback-before-first-sample", "snapshot"],
+      "failurePolicy": "degrade-to-pending-depth-diagnostics-without-changing-gameplay",
+      "resourceClass": "pvp-network-support",
+      "requiredTests": ["net-governor-audit", "audit:pvp-facing", "audit:performance"]
+    },
+    {
       "id": "pvp-auto-reducer",
       "owner": "KeloPvPAutoReducer",
       "source": "src/systems/pvp-auto-reducer.js",
       "technicalDoc": "docs/systems/PVP_AUTO_REDUCER.md",
-      "apiVersion": 1,
+      "apiVersion": 2,
       "authority": "client-presentation-quality-only",
-      "stateOwned": ["network-quality baseline/EMA/jitter estimate", "warning/reduction/recovery episode", "saved presentation quality"],
+      "stateOwned": ["network-quality baseline/EMA/jitter", "warning/reduction/recovery episode", "saved presentation quality"],
       "stateForbidden": ["damage", "HP", "cooldowns", "hitboxes", "server tick", "MMR/RP", "match result", "transport ownership"],
-      "consumes": ["KeloSimulation", "KeloNetAuthority", "KELO_PERF", "KeloPvPWorld"],
+      "consumes": ["KeloSimulation", "KeloNetAuthority.getPvpNetworkHealth", "KELO_PERF", "KeloPvPWorld"],
       "lifecycle": ["monitor", "warn", "degrade", "recover", "restore", "disable"],
       "failurePolicy": "degrade-presentation-only-never-gameplay-truth",
       "resourceClass": "pvp-optional-support",
-      "requiredTests": ["pvp-auto-reducer-audit", "audit:pvp-facing", "audit:performance"]
+      "requiredTests": ["pvp-auto-reducer-audit", "net-governor-audit", "audit:pvp-facing", "audit:performance"]
     },
     {
       "id": "creator-exclusive-runtime",
