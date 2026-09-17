@@ -1,0 +1,1 @@
+Trigger second isolated validation after making the test follow the visible player UI. Runtime remains the 4d60d2e baseline.
