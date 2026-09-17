@@ -4,7 +4,7 @@
  * keys: COMMUNITY CATALOG EQUIP UNEQUIP SLOT PREVIEW MOBILE LAZY
  * purpose: extend asset-vault.html with a community catalog while preserving its external-provider and personal-vault flows
  */
-import './external-library-browser-ui.mjs?v=2';
+import './external-library-browser-ui.mjs?v=4';
 import {
   listCommunityAssets,
   listEquippedCommunityAssets,
@@ -128,4 +128,4 @@ doc.addEventListener('change',event=>{
 });
 
 root.addEventListener?.('pageshow',()=>{if(!$('community-view'))mount();});
-export const KeloCommunityLibraryTab=Object.freeze({version:'community-library-tab-v2',refresh,get state(){return Object.freeze({loaded:state.loaded,loading:state.loading,assets:state.assets.length,equipped:state.equipped.length});}});
+export const KeloCommunityLibraryTab=Object.freeze({version:'community-library-tab-v4',refresh,get state(){return Object.freeze({loaded:state.loaded,loading:state.loading,assets:state.assets.length,equipped:state.equipped.length});}});

@@ -1,0 +1,54 @@
+name: Evergreen Foundation
+
+on:
+  pull_request:
+    paths:
+      - 'src/core/evergreen-contracts.mjs'
+      - 'src/creators/content/content-schema-migrations.mjs'
+      - 'config/evergreen-*.json'
+      - 'scripts/evergreen-*.mjs'
+      - 'eslint.config.mjs'
+      - 'jsconfig.evergreen.json'
+      - 'knip.evergreen.json'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'server/package.json'
+      - 'server/package-lock.json'
+      - '.github/dependabot.yml'
+      - '.github/workflows/evergreen-*.yml'
+  push:
+    branches: [main, 'feat/evergreen-*']
+    paths:
+      - 'src/core/evergreen-contracts.mjs'
+      - 'src/creators/content/content-schema-migrations.mjs'
+      - 'config/evergreen-*.json'
+      - 'scripts/evergreen-*.mjs'
+      - 'eslint.config.mjs'
+      - 'jsconfig.evergreen.json'
+      - 'knip.evergreen.json'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'server/package.json'
+      - 'server/package-lock.json'
+      - '.github/dependabot.yml'
+      - '.github/workflows/evergreen-*.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  evergreen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+      - name: Verify frozen root graph
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Verify frozen server graph
+        run: npm ci --ignore-scripts --no-audit --no-fund --prefix server
+      - name: Evergreen architecture audit
+        run: node scripts/evergreen-foundation-audit.mjs

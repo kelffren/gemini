@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "programId": "kelo-world-community-mmorpg-59",
+  "wave": 1,
+  "rule": "Bindings describe current production owners. Never promote beyond evidence. Presentation and Guardian transport are not gameplay authority.",
+  "bindings": [
+    {
+      "systemId": "world-partition",
+      "status": "foundation-active",
+      "owners": ["src/mmorpg/wave1-root-systems.mjs"],
+      "evidence": ["deterministic cells", "exclusive claim/transfer epochs", "load consumers"],
+      "missingForIntegrated": ["durable server-side cell lease/ownership", "runtime handoff binding"]
+    },
+    {
+      "systemId": "area-of-interest",
+      "status": "integrated",
+      "owners": ["server/index.js", "src/environment/generic-props.js"],
+      "evidence": ["server spatial grid", "per-viewer relevant set", "AOI hysteresis", "server filtered social/PvP snapshots", "viewport asset residency"]
+    },
+    {
+      "systemId": "authoritative-entity-replication",
+      "status": "foundation-active",
+      "owners": ["src/mmorpg/wave1-root-systems.mjs", "server/index.js", "server/pvp-authority.js"],
+      "evidence": ["protected client patch guard", "server fixed-step PvP", "client intents"],
+      "missingForIntegrated": ["shared entity revision/idempotency contract wired into server runtime"]
+    },
+    {
+      "systemId": "persistent-world-state",
+      "status": "foundation-active",
+      "owners": ["src/mmorpg/wave1-root-systems.mjs", "Supabase Online Foundation"],
+      "evidence": ["revision CAS primitive", "reconstruction primitive", "map version persistence exists"],
+      "missingForIntegrated": ["durable live world mutation store distinct from immutable authored map versions"]
+    },
+    {
+      "systemId": "world-event-ledger",
+      "status": "foundation-active",
+      "owners": ["src/mmorpg/wave1-root-systems.mjs", "Supabase server_audit_events/server_idempotency/server_outbox"],
+      "evidence": ["append/idempotency/replay primitive", "server audit/idempotency/outbox tables exist"],
+      "missingForIntegrated": ["world mutation event schema and trusted-server append path"]
+    },
+    {
+      "systemId": "creator-identity-reputation",
+      "status": "integrated",
+      "owners": ["server/online-identity-store.js", "server/mmorpg-wave1-owner-integration.js"],
+      "evidence": ["Supabase JWT verified", "character ownership via RLS", "server-derived creator principal", "trusted-source reputation foundation"]
+    },
+    {
+      "systemId": "creator-permissions",
+      "status": "integrated",
+      "owners": ["server/online-identity-store.js", "account_roles/get_my_account_access", "server/mmorpg-wave1-owner-integration.js"],
+      "evidence": ["server-managed roles", "verified permissions", "role/permission to creator capability mapping", "no user_metadata authorization"]
+    },
+    {
+      "systemId": "world-version-control",
+      "status": "integrated",
+      "owners": ["Supabase maps/map_versions/map_version_chunks/map_asset_refs/map_publications", "src/creators/core/creator-revision.mjs", "src/world/map-forge/map-forge-core.mjs", "src/mmorpg/wave1-root-systems.mjs"],
+      "evidence": ["stable map identity", "immutable map versions", "immutable creator revision envelope", "deterministic Map Forge serialization", "fork/merge/restore foundation"]
+    },
+    {
+      "systemId": "mmo-trust-liveops-control-plane",
+      "status": "foundation-active",
+      "owners": ["src/mmorpg/wave1-root-systems.mjs", "src/systems/game-tuning-system.js", "src/core/bug-observability.mjs", "server/online-identity-store.js"],
+      "evidence": ["feature flags/kill switches", "incident/audit primitive", "server publish boundary", "diagnostic recovery mesh"],
+      "missingForIntegrated": ["single trusted-server control-plane adapter joining flags/incidents/tuning without granting bug observer gameplay authority"]
+    }
+  ]
+}

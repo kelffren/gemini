@@ -10,7 +10,7 @@
 (function(root){
 'use strict';
 if(root.KELO_FEATURE_REGISTRY)return;
-const VERSION='kelo-feature-registry-v2.6.0-guardian-standby';
+const VERSION='kelo-feature-registry-v2.7.0-pvp-auto-reducer';
 const raw={
   social:{dependencies:[],policy:'first-use',files:[
     {src:'src/ui/player-nameplate.js?v=2',name:'placas'},
@@ -52,15 +52,14 @@ const raw={
     {src:'engine-net.js?v=20260916-pvp-first-use-1',name:'online PvP'},
     {src:'src/systems/guardian-pvp-net-adapter.js?v=2-takeover',name:'Guardian PvP network adapter'},
     {src:'src/systems/pvp-world.js?v=20260916-pvp-first-use-1',name:'mundo PvP'},
+    {src:'src/systems/pvp-auto-reducer.js?v=1',name:'protección automática de calidad PvP'},
     {src:'src/ui/guardian-pvp-ui.js?v=2-mobile-safe',name:'control móvil Guardian PvP Lab'},
     {src:'src/systems/pvp-combat-runtime-loader.js?v=20260916-pvp-first-use-1',name:'lifecycle combate PvP'}
   ]},
   bag:{dependencies:[],policy:'first-use',files:[
     {src:'src/ui/backpack-fantasy-v1.css?v=1',name:'estilo mochila',type:'style'},{src:'src/systems/backpack-system.js?v=2',name:'mochila'},{src:'src/ui/backpack-ui.js?v=4',name:'mochila'}
   ]},
-  mounts:{dependencies:[],policy:'first-use',files:[
-    {src:'src/mounts/mount-catalog.js?v=2',name:'monturas'},{src:'src/mounts/mount-system.js?v=2',name:'monturas'},{src:'src/ui/mount-panel.js?v=2',name:'monturas'}
-  ]},
+  mounts:{dependencies:[],policy:'first-use',files:[{src:'src/mounts/mount-catalog.js?v=2',name:'monturas'},{src:'src/mounts/mount-system.js?v=2',name:'monturas'},{src:'src/ui/mount-panel.js?v=2',name:'monturas'}]},
   market:{dependencies:[],policy:'first-use',files:[{src:'src/systems/market-escrow-system.js?v=1',name:'mercado'},{src:'src/ui/market-ui.js?v=2',name:'mercado'}]},
   titles:{dependencies:[],policy:'first-use',files:[{src:'src/systems/title-catalog.js?v=1',name:'títulos'},{src:'src/systems/player-stats.js?v=1',name:'títulos'},{src:'src/systems/title-system.js?v=1',name:'títulos'}]},
   appearance:{dependencies:[],policy:'first-use',files:[{src:'src/characters/character-customization.js?v=1',name:'apariencia'},{src:'src/ui/character-customizer-ui.js?v=1',name:'apariencia'}]},

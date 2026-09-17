@@ -1,0 +1,76 @@
+name: Evergreen Quality
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'scripts/evergreen-*.mjs'
+      - 'src/core/evergreen-*.mjs'
+      - 'src/creators/content/content-schema-migrations.mjs'
+      - 'eslint.config.mjs'
+      - 'jsconfig.evergreen.json'
+      - 'knip.evergreen.json'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'server/package.json'
+      - 'server/package-lock.json'
+      - '.github/workflows/evergreen-quality.yml'
+  push:
+    branches: [main, 'feat/evergreen-*']
+    paths:
+      - 'scripts/evergreen-*.mjs'
+      - 'src/core/evergreen-*.mjs'
+      - 'src/creators/content/content-schema-migrations.mjs'
+      - 'eslint.config.mjs'
+      - 'jsconfig.evergreen.json'
+      - 'knip.evergreen.json'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'server/package.json'
+      - 'server/package-lock.json'
+      - '.github/workflows/evergreen-quality.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version-file: '.nvmrc'
+      - name: Frozen root install
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Evergreen structural quality audit
+        run: npm run audit:evergreen-quality
+      - name: ESLint evergreen surface
+        run: npm run lint:evergreen
+      - name: Type-check evergreen JavaScript
+        run: npm run typecheck:evergreen
+      - name: Root critical vulnerability gate
+        run: npm run audit:security:root
+      - name: Server runtime high vulnerability gate
+        run: npm run audit:security:server
+      - name: Dependency hygiene baseline
+        shell: bash
+        run: |
+          mkdir -p artifacts/evergreen
+          set +e
+          npm run deps:evergreen > artifacts/evergreen/knip.txt 2>&1
+          status=$?
+          set -e
+          echo "Knip baseline exit code: $status" | tee -a "$GITHUB_STEP_SUMMARY"
+          if [ "$status" -ne 0 ]; then
+            echo 'Knip findings are recorded as a baseline in Phase 2; they are not yet a merge blocker.' | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'Knip dependency baseline is clean.' | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: evergreen-dependency-hygiene
+          path: artifacts/evergreen/knip.txt
+          if-no-files-found: error
+          retention-days: 30
