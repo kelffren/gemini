@@ -72,6 +72,9 @@ jobs:
       - name: Documentation contract
         run: npm run audit:docs
 
+      - name: MMORPG community 59-system contract
+        run: node scripts/mmorpg-community-platform-audit.mjs
+
       - name: Performance no-regression contract
         run: npm run audit:performance
 
