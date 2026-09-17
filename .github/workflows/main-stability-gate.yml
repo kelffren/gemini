@@ -114,11 +114,12 @@ jobs:
           cat test-results/main-stability-http.log
           exit 1
 
-      - name: Critical mobile and PvP smoke on PR bytes
+      - name: Critical mobile, installed-PWA and PvP smoke on PR bytes
         run: >-
           npx playwright test
           tests/main-stability-mobile.spec.js
           tests/pvp-dodge-live.spec.js
+          tests/pwa-pvp-creators-live.spec.js
           --project=chromium
 
       - name: Upload Playwright evidence
