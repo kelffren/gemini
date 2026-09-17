@@ -1,5 +1,6 @@
 {
   "name": "kelo-world",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
     "build": "node scripts/turbo-build.mjs",
