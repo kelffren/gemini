@@ -1,0 +1,44 @@
+{
+  "schema": 1,
+  "productionRuntime": {
+    "nodeMajor": 24,
+    "policy": "LTS-only",
+    "blocking": true
+  },
+  "futureRuntime": {
+    "nodeMajor": 26,
+    "policy": "advisory-current-line",
+    "blocking": false
+  },
+  "browserStrategy": {
+    "availabilityDecision": "feature-detection",
+    "userAgentFeatureGatesAllowed": false,
+    "progressiveEnhancementRequired": true,
+    "webkitGateRequired": true,
+    "realIOSProfile": "browserstack.yml"
+  },
+  "coreCapabilities": [
+    "es-modules",
+    "promise",
+    "url",
+    "fetch",
+    "canvas-2d"
+  ],
+  "onlineCapabilities": [
+    "websocket"
+  ],
+  "providerPorts": {
+    "realtime": ["connect", "disconnect", "send", "subscribe"],
+    "storage": ["get", "set", "delete"],
+    "ai": ["generate"],
+    "analytics": ["track"],
+    "assetDelivery": ["resolve"]
+  },
+  "rules": [
+    "Detect capabilities, not browser brands or versions.",
+    "Every optional Web API must have an explicit fallback or degradation path.",
+    "Production stays on the declared LTS runtime until promotion is intentional.",
+    "The next Node major is tested early as advisory and never silently becomes production.",
+    "External providers are selected through stable ports/adapters; domain systems do not import vendors directly."
+  ]
+}
