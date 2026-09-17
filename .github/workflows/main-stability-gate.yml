@@ -53,6 +53,9 @@ jobs:
       - name: Architecture contract
         run: npm run audit:foundation
 
+      - name: FuseBox feature isolation contract
+        run: npm run audit:fusebox
+
       - name: Legacy can only shrink contract
         run: npm run audit:legacy-containment
 
