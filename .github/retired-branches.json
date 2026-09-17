@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "retired": [
+    {
+      "name": "evergreen-migration-2026-09-15",
+      "retiredOn": "2026-09-17",
+      "replacement": "main",
+      "status": "historical-evidence-only",
+      "allowAsPrHead": false,
+      "reason": "Superseded by Evergreen convergence PR #379. At audit time the branch was 159 commits ahead and 815 behind main, with stale Legacy/runtime assumptions that must not be reintroduced wholesale."
+    }
+  ]
+}
