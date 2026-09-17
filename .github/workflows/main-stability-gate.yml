@@ -94,6 +94,9 @@ jobs:
       - name: Creator definition and world environment contract
         run: npm run audit:creator-suite
 
+      - name: Creator sprite to original game runtime contract
+        run: node scripts/universal-look-runtime-audit.mjs
+
       - name: Paint Copies regression contract
         run: npm run audit:studio:paint-copies
 
