@@ -1,3 +1,9 @@
+/* KELO-INDEX
+ * area: QA / CREATORS / AVATAR
+ * owner: Creator sprite original-game E2E
+ * keys: SPRITE PREVIEW TRYON LOOK ORIGINAL GAME PLAYWRIGHT MOBILE
+ * purpose: Exercise every Tiny Pixel Art preview/try-on/look control and prove the committed body sprite renders in the original game.
+ */
 const { test, expect } = require('@playwright/test');
 
 const PREVIEW_KEY = 'kelo.universal.look.preview.v1';
