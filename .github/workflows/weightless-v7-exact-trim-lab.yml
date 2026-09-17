@@ -57,12 +57,41 @@ jobs:
           git config user.name "kelo-weightless-bot"
           git config user.email "68343904+kelffren@users.noreply.github.com"
           git add "$FOUNTAIN_TARGET" "$TREE_TARGET"
-          if git diff --cached --quiet; then
+          if ! git diff --cached --quiet; then
+            git commit -m "perf(weightless): publish exact fountain and tree PNG delivery"
+            git push origin HEAD:feature/weightless-v7-exact-trim-lab
+          else
             echo "EXACT_FULL_PNG_PUBLISH_NOOP"
-            exit 0
           fi
-          git commit -m "perf(weightless): publish exact fountain and tree PNG delivery"
-          git push origin HEAD:feature/weightless-v7-exact-trim-lab
+      - name: Route exact PNG delivery and declare replacement contracts
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const contract='src/environment/prop-contract.js';
+          let text=fs.readFileSync(contract,'utf8');
+          text=text.replace("assets/world/imperial-plaza/arbol-redondo.png?art=631","assets/prt-fc9790cb.png");
+          text=text.replace("assets/justicia_fountain_v2.PNG?art=502","assets/pf-f5ba82df.png");
+          if(!text.includes("src:'assets/prt-fc9790cb.png'"))throw new Error('ROUND_TREE_DELIVERY_ROUTE_MISSING');
+          if(!text.includes("src:'assets/pf-f5ba82df.png'"))throw new Error('FOUNTAIN_DELIVERY_ROUTE_MISSING');
+          fs.writeFileSync(contract,text);
+          const planPath='config/instant-delivery-plaza.json';
+          const plan=JSON.parse(fs.readFileSync(planPath,'utf8'));
+          const fountain=plan.assets.find(x=>x.id==='plazaFountainKelo');
+          const tree=plan.assets.find(x=>x.id==='plazaRoundTree');
+          if(!fountain||!tree)throw new Error('V7_PLAN_TARGET_MISSING');
+          fountain.mode='exact-png-lossless';
+          fountain.delivery={path:'assets/pf-f5ba82df.png',bytes:2329441,sha256:process.env.FOUNTAIN_SHA256,exact:true,fullRgbaExact:true,width:1254,height:1254};
+          tree.mode='exact-png-lossless';
+          tree.delivery={path:'assets/prt-fc9790cb.png',bytes:1581201,sha256:process.env.TREE_SHA256,exact:true,fullRgbaExact:true,width:1254,height:1254};
+          fs.writeFileSync(planPath,JSON.stringify(plan,null,2)+'\n');
+          NODE
+          git add src/environment/prop-contract.js config/instant-delivery-plaza.json
+          if ! git diff --cached --quiet; then
+            git commit -m "perf(weightless): route fountain and round tree through exact PNG delivery"
+            git push origin HEAD:feature/weightless-v7-exact-trim-lab
+          else
+            echo "EXACT_FULL_PNG_ROUTE_NOOP"
+          fi
       - name: Publish exact PNG summary
         if: always()
         run: |
