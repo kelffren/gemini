@@ -59,6 +59,9 @@ jobs:
       - name: Documentation contract
         run: npm run audit:docs
 
+      - name: X-Foundation dependency and failure graph
+        run: node scripts/x-foundation-contract-audit.mjs
+
       - name: MMORPG community 59-system contract
         run: node scripts/mmorpg-community-platform-audit.mjs
 
@@ -107,6 +110,9 @@ jobs:
       - name: PvP facing contract
         run: npm run audit:pvp-facing
 
+      - name: PvP adaptive quality owner contract
+        run: node scripts/pvp-auto-reducer-audit.mjs
+
       - name: Start exact PR build server
         run: |
           mkdir -p test-results
@@ -137,5 +143,6 @@ jobs:
             playwright-report.json
             test-results/
             artifacts/legacy-containment/
+            artifacts/x-foundation/
           retention-days: 14
           if-no-files-found: ignore
