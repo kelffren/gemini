@@ -55,6 +55,9 @@ jobs:
       - name: Architecture contract
         run: npm run audit:foundation
 
+      - name: Luxe UI presentation foundation contract
+        run: node scripts/luxe-ui-foundation-audit.mjs
+
       - name: Legacy can only shrink contract
         run: npm run audit:legacy-containment
 
