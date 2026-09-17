@@ -6,7 +6,10 @@ on:
       - 'src/core/evergreen-contracts.mjs'
       - 'src/creators/content/content-schema-migrations.mjs'
       - 'config/evergreen-*.json'
-      - 'scripts/evergreen-foundation-audit.mjs'
+      - 'scripts/evergreen-*.mjs'
+      - 'eslint.config.mjs'
+      - 'jsconfig.evergreen.json'
+      - 'knip.evergreen.json'
       - 'package.json'
       - 'package-lock.json'
       - 'server/package.json'
@@ -14,12 +17,15 @@ on:
       - '.github/dependabot.yml'
       - '.github/workflows/evergreen-*.yml'
   push:
-    branches: [main, 'feat/evergreen-10y-foundation']
+    branches: [main, 'feat/evergreen-*']
     paths:
       - 'src/core/evergreen-contracts.mjs'
       - 'src/creators/content/content-schema-migrations.mjs'
       - 'config/evergreen-*.json'
-      - 'scripts/evergreen-foundation-audit.mjs'
+      - 'scripts/evergreen-*.mjs'
+      - 'eslint.config.mjs'
+      - 'jsconfig.evergreen.json'
+      - 'knip.evergreen.json'
       - 'package.json'
       - 'package-lock.json'
       - 'server/package.json'

@@ -24,7 +24,17 @@ export function createContentSchemaMigrationRegistry({currentVersion=CURRENT_CON
   currentVersion=asVersion(currentVersion);
   const steps=new Map();
 
-  function register({from,to=Number(from)+1,migrate,validate=null,description=''}={}){
+  /**
+   * @param {{
+   *   from?: number,
+   *   to?: number,
+   *   migrate?: (row: any, meta: {from:number,to:number,context:any}) => any,
+   *   validate?: ((row: any, meta: {from:number,to:number,context:any}) => boolean) | null,
+   *   description?: string
+   * }} [spec]
+   */
+  function register(spec={}){
+    let {from,to=Number(from)+1,migrate,validate=null,description=''}=spec;
     from=asVersion(from);to=asVersion(to);
     if(to!==from+1)throw new Error(`CONTENT_MIGRATION_MUST_BE_CONTIGUOUS:${from}->${to}`);
     if(from>=currentVersion)throw new Error(`CONTENT_MIGRATION_OUTSIDE_TARGET:${from}->${to}`);

@@ -2,9 +2,18 @@
   "name": "kelo-world",
   "version": "1.0.0",
   "private": true,
+  "engines": {
+    "node": ">=24.20.0 <25"
+  },
   "scripts": {
     "build": "node scripts/turbo-build.mjs",
     "audit:turbo-build": "node scripts/turbo-build-audit.mjs",
+    "lint:evergreen": "eslint \"scripts/evergreen-*.mjs\" \"src/core/evergreen-*.mjs\" \"src/creators/content/content-schema-migrations.mjs\"",
+    "typecheck:evergreen": "tsc -p jsconfig.evergreen.json",
+    "deps:evergreen": "knip --config knip.evergreen.json --dependencies",
+    "audit:security:root": "npm audit --audit-level=critical",
+    "audit:security:server": "npm audit --audit-level=high --omit=dev --prefix server",
+    "audit:evergreen-quality": "node scripts/evergreen-quality-audit.mjs",
     "test": "playwright test",
     "test:live": "playwright test",
     "test:browserstack": "browserstack-node-sdk playwright test",
@@ -106,8 +115,14 @@
   },
   "devDependencies": {
     "@cyclonedx/cyclonedx-npm": "6.0.1",
+    "@eslint/js": "10.0.1",
     "@playwright/test": "1.62.0",
+    "@types/node": "24.13.5",
     "browserstack-node-sdk": "^1.69.0",
-    "esbuild": "0.25.9"
+    "esbuild": "0.25.9",
+    "eslint": "10.10.0",
+    "globals": "17.12.0",
+    "knip": "6.36.0",
+    "typescript": "7.0.2"
   }
 }
