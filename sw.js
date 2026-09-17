@@ -1,14 +1,14 @@
 /* KELO-INDEX
  * area: CORE
  * owner: KeloUpdater service worker
- * keys: UPDATE PWA SERVICEWORKER DELTA HASH CACHE INSTANT
- * purpose: activate staged builds from a shared content-addressed cache while keeping API/gameplay state network-owned
+ * keys: UPDATE PWA SERVICEWORKER DELTA HASH CACHE INSTANT PVP CREATORS IOS
+ * purpose: activate staged builds from a shared content-addressed cache while keeping API/gameplay state network-owned; volatile first-use PvP/Creators code is network-first so installed iPhone PWAs cannot pin stale runtime modules.
  * public-api: KELO_SKIP_WAITING, KELO_SET_ACTIVE_BUILD, ?kelo_update=<build>
  * consumes: kelo-assets-v3, kelo-update-meta-v3, kelo-update-stage-v3-<build>
  * do-not: never cache API/session/gameplay responses
  */
 'use strict';
-let forceFreshUntil = 0; // kelo-sw-v6551 world-a11 wipe-on-activate
+let forceFreshUntil = 0; // kelo-sw-v6552 pwa-live-runtime
 
 let activeStagedBuild = null;
 let activeInstalledBuild = null;
@@ -20,9 +20,45 @@ const ASSET_CACHE_NAME = 'kelo-assets-v3';
 const META_CACHE_NAME = 'kelo-update-meta-v3';
 const MANIFEST_META_PATH = '__kelo_update_manifest_v3__.json';
 const ACTIVE_BUILD_META_PATH = '__kelo_update_active_build_v3__.json';
+const VOLATILE_EXACT = new Set([
+  'engine-net.js',
+  'src/core/pwa-freshness-guard.js',
+  'src/core/module-loader.js',
+  'src/core/feature-registry.js',
+  'src/core/kelo-runtime-bootstrap.js',
+  'src/core/creators-lazy-gate.js',
+  'src/ui/studio-launcher.js',
+  'src/characters/creator-avatar-runtime.mjs',
+  'src/online/kelo-supabase-browser-session.mjs',
+  'src/online/kelo-supabase-public-config.mjs',
+  'src/visuals/combat-presentation-bridge.js'
+]);
+const VOLATILE_PREFIXES = Object.freeze([
+  'src/creators/',
+  'src/studio/',
+  'src/abilities/',
+  'src/systems/pvp',
+  'src/systems/guardian',
+  'src/systems/combat/',
+  'src/systems/effects/',
+  'src/systems/melee/',
+  'src/ui/guardian'
+]);
 function normalizeBuild(value) { const build = String(value || '').trim(); return BUILD_RE.test(build) ? build.toLowerCase() : null; }
 function normalizeBlob(value) { const blob = String(value || '').trim(); return GIT_BLOB_RE.test(blob) ? blob.toLowerCase() : null; }
 function scopeUrl(pathname) { return new URL(pathname, self.registration.scope); }
+function scopePath(url) {
+  try {
+    const scope = new URL(self.registration.scope);
+    if (url.origin !== scope.origin || !url.pathname.startsWith(scope.pathname)) return null;
+    return decodeURIComponent(url.pathname.slice(scope.pathname.length).replace(/^\/+/, '')) || 'index.html';
+  } catch (_) { return null; }
+}
+function isVolatileRuntime(url) {
+  if (url.searchParams.has('kelo_live')) return true;
+  const path = scopePath(url); if (!path) return false;
+  return VOLATILE_EXACT.has(path) || VOLATILE_PREFIXES.some((prefix) => path.startsWith(prefix));
+}
 function stageCacheName(build) { const normalized = normalizeBuild(build); return normalized ? STAGE_CACHE_PREFIX + normalized : null; }
 function manifestMetaUrl(build) { const url = scopeUrl(MANIFEST_META_PATH); url.searchParams.set('build', normalizeBuild(build) || 'invalid'); return url.href; }
 function activeBuildMetaUrl() { return scopeUrl(ACTIVE_BUILD_META_PATH).href; }
@@ -64,6 +100,14 @@ async function stagedResponse(request, url, build) {
   const content = await contentAddressedResponse(url, build); if (content) return content;
   try { const cache = await caches.open(stageCacheName(build)); return await cache.match(request, { ignoreSearch: false }) || await cache.match(url.href); } catch (_) { return null; }
 }
+async function networkFirstVolatile(request, url) {
+  try { return await fetch(request, { cache: 'reload' }); }
+  catch (_) {
+    const build = await resolveActiveBuild();
+    if (build) { const cached = await contentAddressedResponse(url, build); if (cached) return cached; }
+    throw _;
+  }
+}
 self.addEventListener('install', () => { self.skipWaiting(); });
 self.addEventListener('activate', (event) => {
   event.waitUntil((async () => {
@@ -85,6 +129,7 @@ self.addEventListener('fetch', (event) => {
       const staged = await stagedResponse(request, url, activeStagedBuild); if (staged) return staged;
       try { return await fetch(request, { cache: 'reload' }); } catch (_) { return fetch(request, { cache: 'reload' }); }
     }
+    if (request.mode !== 'navigate' && isVolatileRuntime(url)) return networkFirstVolatile(request, url);
     if (request.mode !== 'navigate') {
       const build = await resolveActiveBuild();
       if (build) { const cached = await contentAddressedResponse(url, build); if (cached) return cached; }

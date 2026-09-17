@@ -1,16 +1,17 @@
 /* KELO-INDEX
  * area: CORE / BOOT
  * owner: KeloModuleLoader
- * keys: DYNAMIC LOAD IDLE FIRST-USE CACHE VERSION PING MOBILE SAFARI RECOVERY QUARANTINE TRACE STYLE ASSET-LIBRARY FEATURE-REGISTRY PVP
- * purpose: un solo hilo de descarga. Plaza ya está viva; el resto entra al tocar un tool del menú. JS y CSS opcionales se cargan secuencialmente. Pausa si el player camina. La biblioteca puede bloquear paquetes opcionales. PvP conserva foundations separadas y carga su dominio solo al primer toque.
+ * keys: DYNAMIC LOAD IDLE FIRST-USE CACHE VERSION PING MOBILE SAFARI RECOVERY QUARANTINE TRACE STYLE ASSET-LIBRARY FEATURE-REGISTRY PVP PWA
+ * purpose: un solo hilo de descarga. Plaza ya está viva; el resto entra al tocar un tool del menú. JS y CSS opcionales se cargan secuencialmente. Pausa si el player camina. La biblioteca puede bloquear paquetes opcionales. PvP conserva foundations separadas y carga su dominio solo al primer toque, usando el build LIVE en PWA.
  * public-api: KELO_MODULE_LOADER.start/ensure/needs/isReady/diagnostics
- * consumes: KELO_FEATURE_REGISTRY + optional KELO_ASSET_REGISTRY allow-list + optional KELO_RECOVERY_MESH diagnostics + KeloRuntimeBootstrap para foundations PvP
- * do-not: NO tileset 556KB, NO studio, NO supabase, NO segundo gameLoop, NO SW, NO quarantine fuera de recoveryLab
+ * consumes: KELO_FEATURE_REGISTRY + optional KELO_ASSET_REGISTRY allow-list + optional KELO_RECOVERY_MESH diagnostics + KeloRuntimeBootstrap + KeloPWAFreshness
+ * do-not: NO tileset 556KB, NO studio, NO supabase, NO segundo gameLoop, NO SW owner, NO quarantine fuera de recoveryLab
  */
 (function(root){
 'use strict';
 if(root.KELO_MODULE_LOADER)return;
-const VERSION='kelo-module-loader-v11-pvp-first-use';
+const VERSION='kelo-module-loader-v12-pwa-live-first-use';
+const FRESHNESS_SRC='src/core/pwa-freshness-guard.js?v=1.1';
 const PVP_FALLBACK=Object.freeze([
   {src:'src/abilities/abilityData.js?v=20260916-pvp-first-use-1',name:'datos habilidades PvP'},
   {src:'src/abilities/stone-system.js?v=20260916-pvp-first-use-1',name:'piedras PvP'},
@@ -43,6 +44,7 @@ const LEGACY_FALLBACK=Object.freeze({
 const loaded=Object.create(null);
 const inflight=Object.create(null);
 const failures=Object.create(null);
+let freshnessLoading=null;
 let build='V6.69';
 let shown=false;
 
@@ -79,21 +81,50 @@ function textEl(){return document.getElementById('kelo-ml-text');}
 function barEl(){return document.getElementById('kelo-ml-bar');}
 function show(msg,pct){const el=box();if(!el)return;el.hidden=false;shown=true;const t=textEl();if(t)t.textContent=msg;const b=barEl();if(b)b.style.width=Math.max(0,Math.min(100,pct||0))+'%';}
 function hideChip(msg){const el=box();if(!el)return;if(shown){show(msg||'Listo',100);setTimeout(function(){el.hidden=true;},800);}else el.hidden=true;}
-function base(src){return String(src||'').split('?')[0];}
-function hasAsset(item){
-  const target=base(item.src);
-  if(item.type==='style')return Array.from(document.querySelectorAll('link[rel="stylesheet"]')).some(function(link){return base(link.getAttribute('href'))===target;});
-  return Array.from(document.scripts).some(function(script){return base(script.getAttribute('src'))===target;});
+function base(src){try{return new URL(String(src||''),document.baseURI).pathname;}catch(_){return String(src||'').split('?')[0];}}
+function liveToken(){return String(root.KeloPWAFreshness?.build||'').slice(0,16);}
+function strictLiveFeature(feature){return feature==='pvp'||feature==='guardian';}
+function ensureFreshness(){
+  if(root.KeloPWAFreshness)return Promise.resolve(root.KeloPWAFreshness);
+  if(freshnessLoading)return freshnessLoading;
+  freshnessLoading=new Promise(function(resolve){
+    const existing=Array.from(document.scripts).find(s=>base(s.getAttribute('src'))===base(FRESHNESS_SRC));
+    if(existing){
+      const done=()=>resolve(root.KeloPWAFreshness||null);
+      if(root.KeloPWAFreshness){done();return;}
+      existing.addEventListener('load',done,{once:true});
+      existing.addEventListener('error',()=>resolve(null),{once:true});
+      setTimeout(done,2500);return;
+    }
+    const script=document.createElement('script');script.src=FRESHNESS_SRC;script.async=false;script.dataset.keloPwaFreshness='1';
+    script.onload=()=>resolve(root.KeloPWAFreshness||null);
+    script.onerror=()=>{try{script.remove();}catch(_){}resolve(null);};
+    document.head.appendChild(script);
+  }).finally(()=>{freshnessLoading=null;});
+  return freshnessLoading;
 }
-function loadOne(item,feature){
+async function freshUrl(src){
+  const guard=await ensureFreshness();
+  if(guard?.url){try{return await guard.url(src);}catch(_){}}
+  return src;
+}
+function hasAsset(item,feature){
+  const target=base(item.src),token=liveToken(),strict=strictLiveFeature(feature)&&!!token;
+  const valid=node=>base(node.getAttribute(item.type==='style'?'href':'src'))===target&&(!strict||node.dataset.keloLiveBuild===token);
+  if(item.type==='style')return Array.from(document.querySelectorAll('link[rel="stylesheet"]')).some(valid);
+  return Array.from(document.scripts).some(valid);
+}
+async function loadOne(item,feature){
+  const resolvedSrc=await freshUrl(item.src),token=liveToken();
   return new Promise(function(resolve){
-    if(hasAsset(item)){emit('kelo:module-load-end',{feature,src:item.src,type:item.type||'script',ok:true,ms:0,cached:true});resolve({ms:0,ok:true,cached:true});return;}
+    if(hasAsset(item,feature)){emit('kelo:module-load-end',{feature,src:item.src,type:item.type||'script',ok:true,ms:0,cached:true,liveBuild:token||null});resolve({ms:0,ok:true,cached:true});return;}
     const t0=performance.now(),type=item.type==='style'?'style':'script';
-    emit('kelo:module-load-start',{feature,src:item.src,name:item.name,type});
+    emit('kelo:module-load-start',{feature,src:item.src,name:item.name,type,liveBuild:token||null});
     const node=type==='style'?document.createElement('link'):document.createElement('script');
-    if(type==='style'){node.rel='stylesheet';node.href=item.src;}else{node.src=item.src;node.async=false;}
-    node.onload=function(){const ms=performance.now()-t0;emit('kelo:module-load-end',{feature,src:item.src,type,ok:true,ms:Math.round(ms),cached:false});resolve({ms,ok:true,cached:false});};
-    node.onerror=function(){const ms=performance.now()-t0;failures[item.src]=(failures[item.src]||0)+1;emit('kelo:module-load-error',{feature,src:item.src,type,ok:false,ms:Math.round(ms),error:type==='style'?'STYLE_LOAD_ERROR':'SCRIPT_LOAD_ERROR',count:failures[item.src]});resolve({ms,ok:false,cached:false});};
+    if(token)node.dataset.keloLiveBuild=token;
+    if(type==='style'){node.rel='stylesheet';node.href=resolvedSrc;}else{node.src=resolvedSrc;node.async=false;}
+    node.onload=function(){const ms=performance.now()-t0;emit('kelo:module-load-end',{feature,src:item.src,type,ok:true,ms:Math.round(ms),cached:false,liveBuild:token||null});resolve({ms,ok:true,cached:false});};
+    node.onerror=function(){const ms=performance.now()-t0;failures[item.src]=(failures[item.src]||0)+1;try{node.remove();}catch(_){}emit('kelo:module-load-error',{feature,src:item.src,type,ok:false,ms:Math.round(ms),error:type==='style'?'STYLE_LOAD_ERROR':'SCRIPT_LOAD_ERROR',count:failures[item.src],liveBuild:token||null});resolve({ms,ok:false,cached:false});};
     document.head.appendChild(node);
   });
 }
@@ -110,7 +141,7 @@ function loadFeature(name,opts){
     let i=0,errors=0;
     function step(){
       if(!assetAllowed(name)){delete inflight[name];emit('kelo:module-blocked',{feature:name,src:'',ok:false,error:'ASSET_LIBRARY_DISABLED_DURING_LOAD'});resolve(false);return;}
-      if(i>=files.length){loaded[name]=errors===0;delete inflight[name];try{if(errors===0)localStorage.setItem('kelo_modpack_'+name,build);}catch(_){}emit('kelo:module-feature-complete',{feature:name,ok:errors===0,files:files.length,errors});resolve(errors===0);return;}
+      if(i>=files.length){loaded[name]=errors===0;delete inflight[name];try{if(errors===0)localStorage.setItem('kelo_modpack_'+name,build);}catch(_){}emit('kelo:module-feature-complete',{feature:name,ok:errors===0,files:files.length,errors,liveBuild:liveToken()||null});resolve(errors===0);return;}
       if(!interactive&&busy()){if(shown)show('En pausa · caminando',(i/files.length)*100);setTimeout(step,450);return;}
       const item=files[i];
       loadOne(item,name).then(function(result){const dt=Number(result&&result.ms)||0;if(!result||!result.ok)errors++;if(dt>=50)show('Descargando '+item.name+'  '+(i+1)+'/'+files.length,((i+1)/files.length)*100);i+=1;setTimeout(step,dt<50?80:360);});
@@ -131,10 +162,15 @@ function ensurePvp(){
   if(!filesFor('pvp'))return Promise.resolve(false);
   if(!assetAllowed('pvp')){emit('kelo:module-blocked',{feature:'pvp',src:'',ok:false,error:'ASSET_LIBRARY_DISABLED'});hideChip('PvP desactivado en Assets');return Promise.resolve(false);}
   if(quarantined('pvp')){emit('kelo:module-quarantined',{feature:'pvp',src:'',ok:false,error:'RECOVERY_QUARANTINE'});return Promise.resolve(false);}
-  show('Cargando PvP…',8);
-  const foundations=root.KeloRuntimeBootstrap&&typeof root.KeloRuntimeBootstrap.ensure==='function'?root.KeloRuntimeBootstrap.ensure():Promise.reject(new Error('KELO_RUNTIME_BOOTSTRAP_UNAVAILABLE'));
-  return foundations
-    .then(function(){return loadFeature('pvp',{interactive:true});})
+  show('Actualizando PvP…',5);
+  return ensureFreshness()
+    .then(function(guard){return guard?.ready?guard.ready({reload:false}):null;})
+    .then(function(){
+      show('Cargando PvP…',8);
+      return root.KeloRuntimeBootstrap&&typeof root.KeloRuntimeBootstrap.ensure==='function'?root.KeloRuntimeBootstrap.ensure():Promise.reject(new Error('KELO_RUNTIME_BOOTSTRAP_UNAVAILABLE'));
+    })
+    .then(function(){return ensureDependencies('pvp');})
+    .then(function(ok){return ok===false?false:loadFeature('pvp',{interactive:true});})
     .then(function(ok){
       const ready=ok!==false&&pvpDomainReady();
       if(!ready){loaded.pvp=false;emit('kelo:module-load-error',{feature:'pvp',src:'',type:'runtime',ok:false,error:'PVP_RUNTIME_INCOMPLETE'});}
@@ -168,7 +204,7 @@ function start(opts){
 }
 function diagnostics(){
   const ids=featureIds();
-  return Object.freeze({version:VERSION,registryVersion:registry()?.version||'legacy-fallback',build,features:ids,enabled:ids.filter(assetAllowed),disabled:ids.filter(function(k){return !assetAllowed(k);}),loaded:Object.keys(loaded).filter(function(k){return loaded[k];}),inflight:Object.keys(inflight),failures:{...failures},quarantined:ids.filter(quarantined),pvpReady:pvpDomainReady()});
+  return Object.freeze({version:VERSION,registryVersion:registry()?.version||'legacy-fallback',build,liveBuild:root.KeloPWAFreshness?.build||null,features:ids,enabled:ids.filter(assetAllowed),disabled:ids.filter(function(k){return !assetAllowed(k);}),loaded:Object.keys(loaded).filter(function(k){return loaded[k];}),inflight:Object.keys(inflight),failures:{...failures},quarantined:ids.filter(quarantined),pvpReady:pvpDomainReady()});
 }
 root.KELO_MODULE_LOADER=Object.freeze({version:VERSION,start,ensure,needs,isReady:function(n){const name=resolveName(n);return name==='pvp'?pvpDomainReady():!!loaded[name];},canLoad:assetAllowed,features:featureIds(),diagnostics});
 })(typeof globalThis!=='undefined'?globalThis:window);
