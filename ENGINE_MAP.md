@@ -2,8 +2,8 @@
 
 > Documento canónico del engine. Si contradice `index.html` o un owner Foundation LIVE, gana el runtime y este archivo debe actualizarse.
 
-**Sincronizado:** 2026-09-15  
-**Runtime declarado:** Kelo World V6.54.2  
+**Sincronizado:** 2026-09-17  
+**Runtime declarado:** Kelo World V6.69  
 **Modelo:** web 2D top-down, Canvas, mobile-first, login/guest gate antes del boot pesado.
 
 ## 1. Regla de engine
@@ -52,6 +52,7 @@ El listado histórico de 16 pasos **no es el boot móvil**. Restaurar esos tags 
 | Map generation | `KeloMapForge` | OWNER LIVE creator |
 | Sprite AI authoring inference | `Kelo Sprite AI service` | PREPARED server provider bridge |
 | Update/PWA | `KeloUpdater` | OWNER LIVE client |
+| Performance/quality policy | `KELO_PERF` / `KELO_PERFORMANCE_GOVERNOR` | OWNER LIVE client presentation |
 
 `KeloSimulation` posee suspensión por claims. Un creator pesado puede suspender simulación mediante ese owner; no envuelve `updateSimulation`, no crea otro scheduler y debe liberar el claim al cerrar.
 
@@ -155,6 +156,7 @@ El runtime continúa consumiendo las rutas actuales hasta un pass separado de pr
 
 - Abilities: `KeloAbilities` + Stone/equipment/mount channels.
 - PvP/Arena: `KeloArena`, PvP world + runtime loader.
+- PvP adaptive presentation: `KeloPvPAutoReducer` observa input→ack y pide floors temporales a `KELO_PERF`; los perfiles `pvp_low`/`pvp_emergency` nunca entran por autotuning normal ni cambian verdad competitiva.
 - Character: `KeloCharacterCustomization`, `KeloAppearance`, `KeloAvatar`.
 - Equipment: `KeloEquipment`.
 - Backpack/containers: sistemas dedicados.
