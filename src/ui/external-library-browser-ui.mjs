@@ -5,8 +5,8 @@
  * purpose: turn the Sources tab into an in-app library navigator without downloading binaries while browsing
  */
 import './external-library-folder-browser-ui.mjs?v=1';
-import './external-library-page-lifecycle.mjs?v=2';
-import {getProviderStatuses} from '../creators/assets/external-asset-providers.mjs?v=10';
+import './external-library-page-lifecycle.mjs?v=4';
+import {getProviderStatuses} from '../creators/assets/external-asset-providers.mjs?v=11';
 
 const root=globalThis,doc=root.document;
 const $=id=>doc.getElementById(id);
@@ -50,7 +50,7 @@ function ensureIntro(){
   const intro=doc.createElement('div');
   intro.id='external-library-intro';
   intro.className='library-intro';
-  intro.innerHTML='<b>Explora antes de traer.</b> Solo vive la página activa. Puedes saltar directo a una página lejana y, si encuentras algo que quieres conservar, lo guardas en Mi Baúl.';
+  intro.innerHTML='<b>Explora antes de traer.</b> Solo vive la página activa. Sus previews se cargan solos de forma progresiva; puedes saltar directo a una página lejana y guardar en Mi Baúl solo lo que quieras conservar.';
   const title=view.querySelector('.section-title');
   title?.insertAdjacentElement('afterend',intro);
 }
@@ -83,7 +83,7 @@ function updateFocus(id=selectedProviderId()){
   banner.hidden=false;
   const nameEl=$('external-library-focus-name'),note=$('external-library-focus-note');
   if(nameEl)nameEl.textContent=name;
-  if(note)note.textContent=provider?.requiresQuery?'Busca dentro de esta librería · no se descargan archivos al navegar':'Página activa desechable · guarda solo lo que quieras en Baúl';
+  if(note)note.textContent=provider?.requiresQuery?'Busca dentro de esta librería · no se descargan archivos al navegar':'Previews automáticos · página activa desechable · guarda solo lo que quieras en Baúl';
   search.placeholder=`Buscar dentro de ${name}…`;
 }
 
@@ -160,4 +160,4 @@ async function mount(){
 if(doc.readyState==='loading')doc.addEventListener('DOMContentLoaded',()=>void mount(),{once:true});else void mount();
 root.addEventListener?.('pageshow',()=>{decorateSources();updateFocus();});
 
-export const KeloExternalLibraryBrowserUI=Object.freeze({version:'external-library-browser-ui-v4-direct-jump',openLibrary,get providers(){return providers.slice();}});
+export const KeloExternalLibraryBrowserUI=Object.freeze({version:'external-library-browser-ui-v5-active-preview',openLibrary,get providers(){return providers.slice();}});
