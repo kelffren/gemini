@@ -4,7 +4,7 @@
  * keys: PVP PING RTT LATENCY JITTER QUALITY HOT REDUCE COUNTDOWN HYSTERESIS COOLDOWN NOTICE MOBILE
  * purpose: protege la fluidez del PvP detectando degradacion sostenida de la ruta input->ack y solicita calidad temporal sin reload ni pausa
  * public-api: KeloPvPAutoReducer.snapshot/acknowledge/setEnabled
- * consumes: KeloPvPWorld, KeloNetAuthority.getPvpPendingCount/getLastPvpAck, KELO_PERF.setManualQuality/getSnapshot, KeloSimulation
+ * consumes: KeloPvPWorld, KeloNetAuthority.getPvpPendingCount/getLastPvpAck, KELO_PERF.setQualityFloor/getSnapshot, KeloSimulation
  * state-owned: baseline/EMA de latencia estimada, warning/cooldown y restauracion de calidad; no posee gameplay ni red
  * extension-points: sustituir estimator por RTT server-native manteniendo sample contract; quality aplica solo por API de KELO_PERF
  * online: diagnostico/presentacion client-only; nunca decide daño, posicion, cooldown, HP ni resultado competitivo
@@ -14,7 +14,7 @@
 'use strict';
 if(root.KeloPvPAutoReducer)return;
 
-const VERSION='pvp-auto-reducer-v1.0.0';
+const VERSION='pvp-auto-reducer-v2.0.0-quality-floor';
 const CONFIG=Object.freeze({
   inputHz:30,
   sampleEveryMs:250,
@@ -30,10 +30,10 @@ const CONFIG=Object.freeze({
   ackStallMs:850
 });
 const state={
-  enabled:true,phase:'idle',lastSampleAt:0,lastAck:null,lastAckChangedAt:0,
+  enabled:root.FEATURE_PVP_AUTO_REDUCER!==false,phase:'idle',lastSampleAt:0,lastAck:null,lastAckChangedAt:0,
   baselineSamples:[],baselineMs:0,emaMs:0,jitterMs:0,lastLatencyMs:0,
   badSince:0,warningStartedAt:0,recoverSince:0,lastWarningAt:-Infinity,
-  reduced:false,emergency:false,savedManualQuality:null,notice:null,acknowledged:false,
+  reduced:false,emergency:false,requestedQuality:null,notice:null,acknowledged:false,
   reductions:0,restores:0,warnings:0,lastReason:null
 };
 
@@ -71,18 +71,18 @@ function flash(message){
 function acknowledge(){state.acknowledged=true;hideNotice();return true;}
 
 function applyQuality(id,reason){
-  const owner=perf();if(!owner||typeof owner.setManualQuality!=='function')return false;
-  if(!state.reduced){const snap=typeof owner.getSnapshot==='function'?owner.getSnapshot():null;state.savedManualQuality=snap&&snap.manualQuality!=null?snap.manualQuality:null;}
-  owner.setManualQuality(id);state.reduced=true;state.emergency=id==='performance';state.lastReason=reason||'network';
+  const owner=perf();if(!owner||typeof owner.setQualityFloor!=='function')return false;
+  const effective=owner.setQualityFloor(id);
+  state.reduced=true;state.emergency=id==='pvp_emergency';state.requestedQuality=id;state.lastReason=reason||'network';
   document.documentElement.dataset.keloPvpNetworkQuality=id;
-  try{root.dispatchEvent(new CustomEvent('kelo:pvp-network-quality',{detail:{quality:id,reason:state.lastReason,hot:true}}));}catch(_){}
+  try{root.dispatchEvent(new CustomEvent('kelo:pvp-network-quality',{detail:{quality:effective,requestedQuality:id,reason:state.lastReason,hot:true}}));}catch(_){}
   return true;
 }
 function restoreQuality(){
   if(!state.reduced)return false;const owner=perf();
-  if(owner&&typeof owner.setManualQuality==='function')owner.setManualQuality(state.savedManualQuality||'auto');
-  state.reduced=false;state.emergency=false;state.savedManualQuality=null;state.restores+=1;state.lastReason='recovered';delete document.documentElement.dataset.keloPvpNetworkQuality;
-  try{root.dispatchEvent(new CustomEvent('kelo:pvp-network-quality',{detail:{quality:'restored',reason:'recovered',hot:true}}));}catch(_){}
+  if(owner&&typeof owner.setQualityFloor==='function')owner.setQualityFloor('auto');
+  state.reduced=false;state.emergency=false;state.requestedQuality=null;state.restores+=1;state.lastReason='recovered';delete document.documentElement.dataset.keloPvpNetworkQuality;
+  try{root.dispatchEvent(new CustomEvent('kelo:pvp-network-quality',{detail:{quality:'restored',requestedQuality:null,reason:'recovered',hot:true}}));}catch(_){}
   flash('Conexión estabilizada · calidad restaurada');return true;
 }
 function beginWarning(t){
@@ -91,7 +91,7 @@ function beginWarning(t){
 function cancelWarning(){state.phase='monitoring';state.warningStartedAt=0;state.badSince=0;state.acknowledged=false;hideNotice();}
 function degrade(reason){
   hideNotice();state.phase='reduced';state.acknowledged=false;state.recoverSince=0;
-  if(applyQuality('medium',reason)){state.reductions+=1;flash('Modo PvP estable activado · calidad ajustada sin salir del combate');}
+  if(applyQuality('pvp_low',reason)){state.reductions+=1;flash('Modo PvP estable activado · calidad ajustada sin salir del combate');}
 }
 function clearEpisode(){hideNotice();state.phase='idle';state.badSince=0;state.warningStartedAt=0;state.recoverSince=0;state.acknowledged=false;state.baselineSamples.length=0;state.baselineMs=0;state.emaMs=0;state.jitterMs=0;state.lastLatencyMs=0;state.lastAck=null;state.lastAckChangedAt=0;}
 
@@ -112,15 +112,15 @@ function tick(context){
     if(!bad){cancelWarning();return;}paintWarning(t);
     if(t-state.warningStartedAt>=CONFIG.graceMs)degrade('sustained-high-latency');
   }else if(state.phase==='reduced'){
-    if(critical){if(!state.badSince)state.badSince=t;if(!state.emergency&&t-state.badSince>=CONFIG.emergencyHoldMs){applyQuality('performance','critical-latency');flash('Conexión crítica · prioridad máxima a la fluidez PvP');}}else state.badSince=0;
+    if(critical){if(!state.badSince)state.badSince=t;if(!state.emergency&&t-state.badSince>=CONFIG.emergencyHoldMs){applyQuality('pvp_emergency','critical-latency');flash('Conexión crítica · prioridad máxima a la fluidez PvP');}}else state.badSince=0;
     if(!bad){if(!state.recoverSince)state.recoverSince=t;if(t-state.recoverSince>=CONFIG.recoverHoldMs){restoreQuality();state.phase='monitoring';state.badSince=0;state.recoverSince=0;}}else state.recoverSince=0;
   }
 }
-function snapshot(){return Object.freeze({version:VERSION,enabled:state.enabled,phase:state.phase,combatActive:pvpCombatActive(),online:online(),latencyMs:Math.round(state.emaMs),jitterMs:Math.round(state.jitterMs),baselineMs:Math.round(state.baselineMs),badThresholdMs:Math.round(baselineLimit()),reduced:state.reduced,emergency:state.emergency,warnings:state.warnings,reductions:state.reductions,restores:state.restores,lastReason:state.lastReason,warningCooldownMs:CONFIG.warningCooldownMs,graceMs:CONFIG.graceMs,recoverHoldMs:CONFIG.recoverHoldMs});}
+function snapshot(){const owner=perf(),quality=owner&&typeof owner.getSnapshot==='function'?owner.getSnapshot():null;return Object.freeze({version:VERSION,enabled:state.enabled,phase:state.phase,combatActive:pvpCombatActive(),online:online(),latencyMs:Math.round(state.emaMs),jitterMs:Math.round(state.jitterMs),baselineMs:Math.round(state.baselineMs),badThresholdMs:Math.round(baselineLimit()),reduced:state.reduced,emergency:state.emergency,requestedQuality:state.requestedQuality,effectiveQuality:quality&&quality.quality||null,warnings:state.warnings,reductions:state.reductions,restores:state.restores,lastReason:state.lastReason,warningCooldownMs:CONFIG.warningCooldownMs,graceMs:CONFIG.graceMs,recoverHoldMs:CONFIG.recoverHoldMs});}
 function setEnabled(value){state.enabled=value!==false;if(!state.enabled){if(state.reduced)restoreQuality();clearEpisode();}return state.enabled;}
 
 if(!root.KeloSimulation||typeof root.KeloSimulation.after!=='function'){console.error('[Kelo PvP AutoReducer] KeloSimulation unavailable');return;}
 root.KeloSimulation.after('pvp-auto-reducer:network-quality',tick,360);
 root.KeloPvPAutoReducer=Object.freeze({version:VERSION,snapshot,acknowledge,setEnabled});
-root.KELO_PVP_AUTO_REDUCER_AUDIT=Object.freeze({version:VERSION,installed:true,hot:true,reload:false,modal:false,inputBlocking:false,usesExistingSimulation:true,usesExistingQualityOwner:true,networkEstimator:'pvp-pending-input-ack-depth',graceMs:CONFIG.graceMs,warningCooldownMs:CONFIG.warningCooldownMs,recoverHoldMs:CONFIG.recoverHoldMs});
+root.KELO_PVP_AUTO_REDUCER_AUDIT=Object.freeze({version:VERSION,installed:true,hot:true,reload:false,modal:false,inputBlocking:false,usesExistingSimulation:true,usesExistingQualityOwner:true,usesQualityFloor:true,killSwitch:'FEATURE_PVP_AUTO_REDUCER',networkEstimator:'pvp-pending-input-ack-depth',graceMs:CONFIG.graceMs,warningCooldownMs:CONFIG.warningCooldownMs,recoverHoldMs:CONFIG.recoverHoldMs});
 })(typeof globalThis!=='undefined'?globalThis:window);
