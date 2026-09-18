@@ -47,6 +47,7 @@ function probe(spec,env){
   try{return Boolean(spec.probe(env));}catch{return false;}
 }
 
+/** @param {any} [env] */
 export function detectRuntimeCapabilities(env=globalThis){
   const rows=RUNTIME_CAPABILITY_SPECS.map(spec=>Object.freeze({
     id:spec.id,
