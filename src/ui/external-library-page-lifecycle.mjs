@@ -5,7 +5,7 @@
  * purpose: keep only the active external-library page alive while allowing direct jumps to distant pages without retaining previous previews or obsolete provider requests
  */
 import {releaseObjectURL} from '../creators/assets/personal-asset-vault.mjs?v=3';
-import * as ExternalProviderRuntime from '../creators/assets/external-provider-runtime.mjs?v=3';
+import * as ExternalProviderRuntime from '../creators/assets/external-provider-runtime.mjs?v=4';
 
 const root=globalThis,doc=root.document;
 const $=id=>doc.getElementById(id);
@@ -82,4 +82,4 @@ function mount(){
 }
 
 if(doc.readyState==='loading')doc.addEventListener('DOMContentLoaded',mount,{once:true});else mount();
-export const KeloExternalLibraryPageLifecycle=Object.freeze({version:'kelo-external-library-page-lifecycle-v3-cancellable',requestPage,releaseActivePreviewObjectURL,cancelRemote});
+export const KeloExternalLibraryPageLifecycle=Object.freeze({version:'kelo-external-library-page-lifecycle-v4-active-preview',requestPage,releaseActivePreviewObjectURL,cancelRemote});
