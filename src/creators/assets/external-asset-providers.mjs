@@ -126,7 +126,7 @@ function installActivePageThumbnailHydrator(){
       img.alt=asset.name||'Vista previa';
       img.loading='eager';
       img.decoding='async';
-      img.fetchPriority=priority==='urgent'?'high':'low';
+      img.fetchPriority='low';
       img.style.cssText='display:block;width:100%;height:100%;object-fit:contain;image-rendering:auto';
       if(['sprite','tileset','animation','vfx'].includes(asset.contentKind))img.style.imageRendering='pixelated';
       img.onload=()=>finish(node,img,true);
