@@ -62,7 +62,7 @@ La hotbar usa una fingerprint visual por slot para evitar reescrituras DOM cuand
 
 `KELO_PERF` mantiene los perfiles normales `ultra → high → medium → performance`. El autotuner genérico termina en `performance`: no puede entrar por sí solo en perfiles reservados para una emergencia de dominio.
 
-`setQualityFloor(id)` es la primitive reusable para pedir una **calidad máxima temporal en sentido de degradación**. El floor se compone con la política base/manual y nunca puede mejorar la calidad existente. PvP usa `pvp_low` y `pvp_emergency` para reducir partículas cosméticas y frecuencia de animación distante sin alterar actor cutoff, FX críticos, hitboxes, simulación, input, cooldowns ni autoridad. Limpiar el floor devuelve automáticamente la política que ya gobernaba al cliente.
+`setQualityFloor(id)` es la primitive reusable para pedir una **calidad máxima temporal en sentido de degradación**. El floor se compone con la política base/manual y nunca puede mejorar la calidad existente. PvP usa `pvp_low` y `pvp_emergency` para reducir partículas cosméticas y frecuencia de animación distante sin alterar actor cutoff, FX críticos, hitboxes, simulación, input, cooldowns ni autoridad. Mientras existe un floor temporal, el autotuner base queda congelado; así no acumula una mejora oculta por el alivio de carga y, al limpiar el floor, vuelve exactamente a la política base/manual que gobernaba antes. Limpiar el floor devuelve automáticamente esa política.
 
 Este contrato evita que un teléfono que ya arranca en `performance` pueda subir accidentalmente a `medium` cuando una feature intenta proteger rendimiento.
 
