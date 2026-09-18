@@ -74,8 +74,8 @@ export function createProviderAdapterRegistry({ports=EVERGREEN_PROVIDER_PORTS}={
     const normalized=normalizeId(kind,'EVERGREEN_PROVIDER_KIND');
     requiredMethodsFor(normalized,ports);
     for(const row of list(normalized)){
-      let available=false;
-      try{available=Boolean(row.isAvailable(context));}catch{available=false;}
+      let available;
+      try{available=Boolean(row.isAvailable(context));}catch{continue;}
       if(available)return row;
     }
     return null;
