@@ -85,12 +85,13 @@ function restoreQuality(){
   try{root.dispatchEvent(new CustomEvent('kelo:pvp-network-quality',{detail:{quality:'restored',requestedQuality:null,reason:'recovered',hot:true}}));}catch(_){}
   flash('Conexión estabilizada · calidad restaurada');return true;
 }
-function beginWarning(t){
-  state.phase='warning';state.warningStartedAt=t;state.lastWarningAt=t;state.acknowledged=false;state.warnings+=1;paintWarning(t);
+function beginWarning(t,notify){
+  state.phase='warning';state.warningStartedAt=t;state.acknowledged=notify!==true;
+  if(notify===true){state.lastWarningAt=t;state.warnings+=1;paintWarning(t);}else hideNotice();
 }
 function cancelWarning(){state.phase='monitoring';state.warningStartedAt=0;state.badSince=0;state.acknowledged=false;hideNotice();}
 function degrade(reason){
-  hideNotice();state.phase='reduced';state.acknowledged=false;state.recoverSince=0;
+  hideNotice();state.phase='reduced';state.acknowledged=false;state.badSince=0;state.recoverSince=0;
   if(applyQuality('pvp_low',reason)){state.reductions+=1;flash('Modo PvP estable activado · calidad ajustada sin salir del combate');}
 }
 function clearEpisode(){hideNotice();state.phase='idle';state.badSince=0;state.warningStartedAt=0;state.recoverSince=0;state.acknowledged=false;state.baselineSamples.length=0;state.baselineMs=0;state.emaMs=0;state.jitterMs=0;state.lastLatencyMs=0;state.lastAck=null;state.lastAckChangedAt=0;}
@@ -107,7 +108,7 @@ function tick(context){
   if(t-state.lastSampleAt>=CONFIG.sampleEveryMs){state.lastSampleAt=t;sample(t);}
   const bad=networkBad(t),critical=networkCritical(t);
   if(state.phase==='monitoring'){
-    if(bad){if(!state.badSince)state.badSince=t;if(t-state.badSince>=CONFIG.badHoldMs&&t-state.lastWarningAt>=CONFIG.warningCooldownMs)beginWarning(t);}else state.badSince=0;
+    if(bad){if(!state.badSince)state.badSince=t;if(t-state.badSince>=CONFIG.badHoldMs)beginWarning(t,t-state.lastWarningAt>=CONFIG.warningCooldownMs);}else state.badSince=0;
   }else if(state.phase==='warning'){
     if(!bad){cancelWarning();return;}paintWarning(t);
     if(t-state.warningStartedAt>=CONFIG.graceMs)degrade('sustained-high-latency');
