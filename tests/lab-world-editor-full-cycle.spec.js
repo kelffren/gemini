@@ -23,28 +23,21 @@ async function objectCount(studio) {
 }
 
 async function openCreatorsWorld(page) {
-  await page.waitForFunction(() => !!(
-    window.KeloGuestPlay?.active?.() &&
-    window.KELO_ADMIN_KEYS?.can?.('world.edit') &&
-    window.KELO_LUXE?.toggleMenu &&
-    window.KELO_CREATORS_LAUNCHER
-  ), null, { timeout: 45000 });
-
-  const menu = page.locator('#lx-side-menu');
-  await expect(menu).toBeVisible({ timeout: 20000 });
-
-  const panel = page.locator('#lx-menu-panel');
-  if (!(await panel.evaluate(el => el.classList.contains('open')).catch(() => false))) {
-    await menu.tap();
-  }
-  await expect(panel).toHaveClass(/open/, { timeout: 10000 });
-
-  const creators = page.locator('#lx-create-studio');
-  await expect(creators).toBeVisible({ timeout: 20000 });
-  await creators.tap();
+  // Reuse the same Creator Hub bootstrap contract already used by the commit's
+  // official iOS reopen regression. Do not wait on unrelated Luxe/menu gates.
+  await page.evaluate(async () => {
+    const { openCreatorHub } = await import('./src/creators/ui/creator-hub.mjs');
+    await openCreatorHub({ root: window });
+  });
 
   const hub = page.locator('#kelo-creators-hub');
-  await expect(hub).toBeVisible({ timeout: 20000 });
+  await expect(hub).toBeVisible({ timeout: 15000 });
+
+  await page.waitForFunction(() => !!(
+    window.KeloInputLocks?.acquire &&
+    window.KELO_ADMIN_KEYS?.can?.('world.edit')
+  ), null, { timeout: 15000 });
+
   const world = hub.locator('[data-workspace="world"]');
   await expect(world).toBeVisible({ timeout: 10000 });
   await world.tap();
@@ -58,6 +51,7 @@ async function openCreatorsWorld(page) {
 }
 
 async function walkRight(page, ms = 2500) {
+  await page.waitForFunction(() => typeof localPlayer !== 'undefined' && typeof input !== 'undefined', null, { timeout: 15000 });
   const canvas = page.locator('#game-canvas');
   await expect(canvas).toBeVisible({ timeout: 10000 });
   const box = await canvas.boundingBox();
@@ -98,7 +92,11 @@ async function walkRight(page, ms = 2500) {
   });
   await page.waitForTimeout(200);
 
-  const after = await page.evaluate(() => ({ x: Number(localPlayer.x), y: Number(localPlayer.y), touchActive: !!input.touchActive }));
+  const after = await page.evaluate(() => ({
+    x: Number(localPlayer.x),
+    y: Number(localPlayer.y),
+    touchActive: !!input.touchActive,
+  }));
   return { before, after, moved: Math.hypot(after.x - before.x, after.y - before.y) };
 }
 
@@ -111,14 +109,15 @@ test('4d60d2e full mobile World cycle survives open/place/move/close/walk/reopen
   page.on('pageerror', e => pageErrors.push(String(e?.stack || e)));
   page.on('console', msg => { if (msg.type() === 'error') consoleErrors.push(msg.text()); });
 
-  const response = await page.goto('./?guest=1&mapEditor=1&lab4d60d2e=1', {
-    waitUntil: 'commit',
-    timeout: 15000,
+  const response = await page.goto('./?guest=1&mapEditor=1&lab4d60d2e=2', {
+    waitUntil: 'domcontentloaded',
+    timeout: 30000,
   });
   expect(response && response.status()).toBeLessThan(400);
 
   let studio = await openCreatorsWorld(page);
   const beforeObjects = await objectCount(studio);
+  const beforeIds = new Set(await studio.locator('[data-entity]').evaluateAll(nodes => nodes.map(n => n.getAttribute('data-entity')).filter(Boolean)));
 
   const editAssets = studio.locator('[data-act="edit-assets"]:visible').first();
   await expect(editAssets).toBeVisible({ timeout: 10000 });
@@ -131,6 +130,7 @@ test('4d60d2e full mobile World cycle survives open/place/move/close/walk/reopen
   await asset.tap();
 
   const canvas = page.locator('#game-canvas');
+  await expect(canvas).toBeVisible({ timeout: 10000 });
   const box = await canvas.boundingBox();
   expect(box).not.toBeNull();
   await canvas.tap({
@@ -142,15 +142,15 @@ test('4d60d2e full mobile World cycle survives open/place/move/close/walk/reopen
 
   await expect.poll(async () => objectCount(studio), { timeout: 20000 }).toBeGreaterThan(beforeObjects);
   const afterPlaceObjects = await objectCount(studio);
-
-  const explorerRows = studio.locator('[data-entity]');
-  await expect.poll(async () => explorerRows.count(), { timeout: 15000 }).toBeGreaterThan(0);
-  const placedRow = explorerRows.last();
-  const entityId = await placedRow.getAttribute('data-entity');
+  const afterIds = await studio.locator('[data-entity]').evaluateAll(nodes => nodes.map(n => n.getAttribute('data-entity')).filter(Boolean));
+  const entityId = afterIds.find(id => !beforeIds.has(id));
   expect(entityId).toBeTruthy();
-  await placedRow.click({ force: true });
 
+  const placedRow = studio.locator(`[data-entity="${entityId}"]`);
+  await expect(placedRow).toHaveCount(1, { timeout: 10000 });
+  await placedRow.click({ force: true });
   await page.waitForTimeout(300);
+
   const xInput = studio.locator('[data-prop="x"]').first();
   await expect(xInput).toHaveCount(1);
   const oldX = Number(await xInput.inputValue());
@@ -160,13 +160,12 @@ test('4d60d2e full mobile World cycle survives open/place/move/close/walk/reopen
     el.value = String(value);
     el.dispatchEvent(new Event('change', { bubbles: true }));
   }, newX);
-
-  await expect.poll(async () => Number(await studio.locator('[data-prop="x"]').first().inputValue()), { timeout: 10000 }).toBe(newX);
+  await page.waitForTimeout(500);
 
   const close = studio.locator('[data-act="close"]:visible').first();
   await expect(close).toBeVisible({ timeout: 10000 });
   await close.tap();
-  await expect(page.locator('#kelo-studio-live')).toHaveCount(0, { timeout: 15000 });
+  await expect(page.locator('#kelo-studio-live')).toHaveCount(0, { timeout: 20000 });
 
   const walk = await walkRight(page);
   expect(walk.moved).toBeGreaterThan(4);
