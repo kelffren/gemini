@@ -94,8 +94,9 @@ Nunca se permite degradar corrección competitiva para “ganar FPS”.
 9. El aviso puede ser reconocido sin desactivar la protección.
 10. La feature se carga lazy con el paquete PvP, no en el first-playable social.
 11. El quality floor es monotónico: nunca puede mejorar la calidad por encima del perfil base/manual actual.
-12. El autotuning genérico termina en `performance`; `pvp_low` y `pvp_emergency` son exclusivos de una solicitud explícita de floor.
-13. `FEATURE_PVP_AUTO_REDUCER=false` desactiva la protección al cargar el paquete; `setEnabled(false)` permite apagarla en caliente.
+12. Mientras el floor está activo, `KELO_PERF` congela el autotuning base para que la recuperación vuelva exactamente al perfil previo, sin una mejora oculta acumulada.
+13. El autotuning genérico termina en `performance`; `pvp_low` y `pvp_emergency` son exclusivos de una solicitud explícita de floor.
+14. `FEATURE_PVP_AUTO_REDUCER=false` desactiva la protección al cargar el paquete; `setEnabled(false)` permite apagarla en caliente.
 
 ## Observabilidad
 
