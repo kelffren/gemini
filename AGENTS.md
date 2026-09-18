@@ -353,3 +353,18 @@ Antes de afirmar que una tarea material está terminada, debe poder responderse:
 5. ¿Se evitó que dos agentes pisaran los mismos archivos?
 
 **La investigación mejora la decisión; los tests demuestran el comportamiento. Ninguna sustituye a la otra.**
+
+
+## RULE 9 — EVERGREEN RUNTIME COMPATIBILITY
+
+Todo cambio que dependa de capacidades del navegador/runtime o de un proveedor externo debe preservar estas reglas:
+
+1. **Feature detection primero.** Prohibido decidir disponibilidad de una función con `navigator.userAgent`, nombre de navegador, versión declarada, plataforma declarada o listas "Safari/Chrome".
+2. **Progressive enhancement.** Una capacidad no-core que falte debe tener fallback/degradación explícita; no debe tumbar el boot completo.
+3. **Core explícito.** Si una API es realmente indispensable, añadirla al contrato de capacidades core y al audit; no asumirla silenciosamente.
+4. **Provider ports.** Storage/auth/realtime/telemetry/asset-compute externos entran detrás de adapters conformes a `src/core/evergreen-provider-adapters.mjs`.
+5. **Node estable + futuro.** Producción usa el runtime fijado por `.nvmrc`/engines. La línea futura solo descubre incompatibilidades anticipadamente y no cambia producción por sí sola.
+6. **Safari/iPhone.** Todo cambio de runtime/browser relevante debe pasar el gate WebKit y, si altera comportamiento visible móvil, la validación real-device existente sigue siendo obligatoria.
+7. Ejecutar `npm run audit:evergreen-runtime`, lint/typecheck Evergreen y los gates globales aplicables antes de declarar compatibilidad.
+
+No introducir polyfills globales invasivos si un adapter/fallback local resuelve la necesidad. No convertir una limitación temporal de navegador/proveedor en una bifurcación permanente del dominio.
