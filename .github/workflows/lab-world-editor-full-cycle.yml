@@ -12,7 +12,7 @@ permissions:
 jobs:
   full-cycle:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 24
     env:
       CI: true
       KELO_PAGES: http://127.0.0.1:4173/
@@ -61,14 +61,20 @@ jobs:
           cat test-results/lab-world-http.log
           exit 1
 
-      - name: Full World editor mobile cycle
-        run: npx playwright test tests/lab-world-editor-full-cycle.spec.js --project=chromium --workers=1
-
       - name: Existing stale-session reopen regression
+        id: official_reopen
+        continue-on-error: true
         run: npx playwright test tests/world-editor-ios-reopen.spec.js --project=chromium --workers=1
 
       - name: Existing placement regression
+        id: official_placement
+        continue-on-error: true
         run: npx playwright test tests/world-placement-functional.spec.js --project=chromium --workers=1
+
+      - name: Full World editor mobile cycle
+        id: full_cycle
+        continue-on-error: true
+        run: npx playwright test tests/lab-world-editor-full-cycle.spec.js --project=chromium --workers=1
 
       - name: Upload evidence
         if: always()
@@ -80,3 +86,14 @@ jobs:
           path: |
             test-results/**
             playwright-report.json
+
+      - name: Final verdict
+        if: always()
+        shell: bash
+        run: |
+          echo "official_reopen=${{ steps.official_reopen.outcome }}"
+          echo "official_placement=${{ steps.official_placement.outcome }}"
+          echo "full_cycle=${{ steps.full_cycle.outcome }}"
+          test "${{ steps.official_reopen.outcome }}" = "success"
+          test "${{ steps.official_placement.outcome }}" = "success"
+          test "${{ steps.full_cycle.outcome }}" = "success"
