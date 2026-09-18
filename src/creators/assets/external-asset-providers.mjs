@@ -15,14 +15,14 @@ import {searchThreeDAssets,clearThreeDAssetsCache} from './three-d-assets-live-p
 import {searchGobkitAssets,clearGobkitCache} from './gobkit-live-provider.mjs?v=1';
 import {searchSfxMintAssets,clearSfxMintCache} from './sfxmint-live-provider.mjs?v=1';
 import {searchOpenSource3DAssets,clearOpenSource3DCache} from './open-source-3d-live-provider.mjs?v=1';
-import {getExternalProviderRuntimeStats,clearExternalProviderRuntimeCache} from './external-provider-runtime.mjs?v=1';
+import {getExternalProviderRuntimeStats,clearExternalProviderRuntimeCache} from './external-provider-runtime.mjs?v=4';
 import {installUniversalPreviewInspector} from './universal-preview-inspector.mjs?v=1';
 import {installUniversalSpritePreview} from './universal-sprite-preview.mjs?v=3';
 import {installUniversalAvatarTryOn} from './universal-avatar-tryon.mjs?v=1';
 import {installUniversalLookBuilder} from './universal-look-builder.mjs?v=1';
 
-const CONFIG_URL=new URL('../../../data/external-asset-providers.json?v=12',import.meta.url).href;
-const DEFAULT_PAGE_SIZE=80,MAX_PROVIDER_PAGE=320,MAX_FEDERATED_RESULTS=160,MAX_RECENT_ASSETS=640,MAX_THUMBNAIL_CONCURRENCY=4;
+const CONFIG_URL=new URL('../../../data/external-asset-providers.json?v=14',import.meta.url).href;
+const DEFAULT_PAGE_SIZE=80,MAX_PROVIDER_PAGE=320,MAX_FEDERATED_RESULTS=160,MAX_RECENT_ASSETS=640,MAX_THUMBNAIL_CONCURRENCY=6;
 let configPromise=null;let liveCache=new Map();const recentAssets=new Map();
 function clean(v){return String(v??'').trim();}function join(base,path){return new URL(path,base).href;}function normalizeCategory(v){const x=clean(v).toLowerCase();return x||'other';}
 function isLazy(provider){return String(provider?.mode||'').startsWith('lazy-');}
@@ -59,10 +59,101 @@ if(provider.id==='sfxmint'&&provider.mode==='lazy-live-api'){if(options.contentK
 if(provider.id==='opensource3d'&&provider.mode==='lazy-live-api'){if(options.contentKind&&options.contentKind!=='all'&&options.contentKind!=='model')return{provider,assets:[],error:null,page:{offset,limit,hasMore:false}};const result=await searchOpenSource3DAssets(query,{...options,offset,limit});return{provider,assets:result.assets,error:null,page:{offset:result.offset,limit:result.limit,total:result.total,hasMore:result.hasMore,engine:result.engine,requiresQuery:result.requiresQuery===true}};}
 return{provider,assets:[],error:null,page:{offset,limit,hasMore:false}};}catch(error){return{provider,assets:[],error:String(error?.message||error),page:{offset,limit,hasMore:false}};}}
 export async function searchExternalAssets(query='',options={}){const cfg=await loadProviderConfig(),providers=(cfg.providers||[]).filter(p=>p.enabled!==false),qa=browserQA(),wanted=options.providers?.length?new Set(options.providers):qa.provider?new Set([qa.provider]):null,q=clean(query).toLowerCase(),includeLazy=!!wanted||options.includeLazy===true,{offset,limit}=pageOptions(options),selected=providers.filter(p=>wanted?wanted.has(p.id):(!isLazy(p)||(includeLazy&&(q.length>0||p.requiresQuery!==true)))),perProviderLimit=wanted?limit:Math.max(1,Math.min(limit,Math.floor(MAX_FEDERATED_RESULTS/Math.max(1,selected.length)))),bundles=await Promise.all(selected.map(p=>browseProvider(p.id,{query:q,offset,limit:perProviderLimit,contentKind:options.contentKind})));let assets=bundles.flatMap(b=>b.assets||[]);if(q)assets=assets.filter(a=>matches(a,q)||['kenney','ambientcg','polyhaven','openverse-images','openverse-audio','3dassets','gobkit','sfxmint','opensource3d'].includes(a.provider));if(options.category&&options.category!=='all')assets=assets.filter(a=>a.category===options.category);if(options.contentKind&&options.contentKind!=='all')assets=assets.filter(a=>(a.contentKind||visualKind(a.category))===options.contentKind);const seen=new Set();assets=assets.filter(a=>a?.id&&!seen.has(a.id)&&seen.add(a.id)).slice(0,wanted?MAX_PROVIDER_PAGE:MAX_FEDERATED_RESULTS);rememberRecent(assets);return{assets,providers:bundles.map(b=>({id:b.provider.id,name:b.provider.name,mode:b.provider.mode,error:b.error,count:b.assets?.length||0,total:b.page?.total??null,engine:b.page?.engine||null,browseUrl:b.provider.browseUrl||b.provider.sourceUrl,license:b.provider.license,lazy:isLazy(b.provider),verified:b.provider.verified===true,requiresQuery:b.page?.requiresQuery===true||b.provider.requiresQuery===true})),page:{offset,limit:perProviderLimit,hasMore:bundles.some(b=>!!b.page?.hasMore),lazyIncluded:includeLazy,bounded:true,maxResults:MAX_FEDERATED_RESULTS}};}
-function installVisibleThumbnailHydrator(){if(typeof document==='undefined'||typeof IntersectionObserver==='undefined')return;let active=0;const queue=[];const run=()=>{while(active<MAX_THUMBNAIL_CONCURRENCY&&queue.length){const node=queue.shift();if(!node?.isConnected||node.dataset.thumbLoaded==='1')continue;const id=node.closest('.card[data-id]')?.dataset.id,asset=recentAssets.get(id);if(!asset?.previewUrl||asset.previewKind==='audio'||['sfx','music','ambience','ability','scene','prefab'].includes(asset.contentKind))continue;active++;node.dataset.thumbLoaded='1';const img=document.createElement('img');img.alt=asset.name||'Vista previa';img.loading='lazy';img.decoding='async';img.fetchPriority='low';img.style.cssText='display:block;width:100%;height:100%;object-fit:contain;image-rendering:auto';if(['sprite','tileset','animation','vfx'].includes(asset.contentKind))img.style.imageRendering='pixelated';const done=()=>{active--;run();};img.onload=()=>{if(node.isConnected){node.querySelector('.preview-placeholder')?.remove();node.insertBefore(img,node.firstChild);}done();};img.onerror=()=>{img.remove();node.dataset.thumbLoaded='error';done();};img.src=asset.previewUrl;}};const observer=new IntersectionObserver(entries=>{for(const entry of entries){if(!entry.isIntersecting)continue;observer.unobserve(entry.target);queue.push(entry.target);}run();},{root:null,rootMargin:'180px 0px',threshold:.01});const scan=root=>root.querySelectorAll?.('.card[data-id] .preview:not([data-thumb-observed])').forEach(node=>{node.dataset.thumbObserved='1';observer.observe(node);});scan(document);const mutations=new MutationObserver(records=>{for(const record of records)for(const node of record.addedNodes)if(node.nodeType===1){if(node.matches?.('.card[data-id] .preview')){node.dataset.thumbObserved='1';observer.observe(node);}scan(node);}});mutations.observe(document.documentElement,{childList:true,subtree:true});}
+function activePagePreviewConcurrency(){
+  let conn=null;try{conn=globalThis.navigator?.connection||globalThis.navigator?.mozConnection||globalThis.navigator?.webkitConnection||null;}catch{}
+  const type=String(conn?.effectiveType||'').toLowerCase();
+  if(conn?.saveData===true)return 1;
+  if(type==='2g'||type==='slow-2g')return 1;
+  if(type==='3g')return 2;
+  return MAX_THUMBNAIL_CONCURRENCY;
+}
+function installActivePageThumbnailHydrator(){
+  if(typeof document==='undefined')return;
+  let active=0,sweepTimer=0;
+  const urgent=[],background=[],queued=new Set(),jobs=new Map();
+  const previewAsset=node=>recentAssets.get(node?.closest?.('.card[data-id]')?.dataset?.id)||null;
+  const eligible=node=>{
+    if(!node?.isConnected||!node.closest?.('#explore-grid'))return false;
+    const asset=previewAsset(node),kind=asset?.contentKind;
+    return !!asset?.previewUrl&&asset.previewKind!=='audio'&&asset.previewKind!=='video'&&!['sfx','music','ambience','ability','scene','prefab'].includes(kind);
+  };
+  const removeFrom=(list,node)=>{const i=list.indexOf(node);if(i>=0)list.splice(i,1);};
+  const enqueue=(node,priority='background')=>{
+    if(!eligible(node)||node.dataset.thumbLoaded==='1'||node.dataset.thumbLoaded==='loading'||node.dataset.thumbLoaded==='error')return;
+    if(queued.has(node)){
+      if(priority==='urgent'){removeFrom(background,node);if(!urgent.includes(node))urgent.unshift(node);}
+      return;
+    }
+    queued.add(node);(priority==='urgent'?urgent:background).push(node);run();
+  };
+  const finish=(node,img,ok)=>{
+    if(jobs.get(node)!==img)return;
+    jobs.delete(node);active=Math.max(0,active-1);
+    if(ok&&eligible(node)){
+      node.querySelector('.preview-placeholder')?.remove();
+      node.insertBefore(img,node.firstChild);
+      node.dataset.thumbLoaded='1';
+    }else{
+      try{img.removeAttribute('src');img.remove();}catch{}
+      if(node?.isConnected)node.dataset.thumbLoaded='error';
+    }
+    run();
+  };
+  const cancelStale=()=>{
+    for(const [node,img] of [...jobs]){
+      if(eligible(node))continue;
+      jobs.delete(node);active=Math.max(0,active-1);
+      img.onload=null;img.onerror=null;
+      try{img.removeAttribute('src');img.remove();}catch{}
+    }
+  };
+  const next=()=>{
+    while(urgent.length){const node=urgent.shift();queued.delete(node);if(eligible(node))return{node,priority:'urgent'};}
+    while(background.length){const node=background.shift();queued.delete(node);if(eligible(node))return{node,priority:'background'};}
+    return null;
+  };
+  function run(){
+    cancelStale();
+    const cap=activePagePreviewConcurrency();
+    while(active<cap){
+      const job=next();if(!job)break;
+      const {node,priority}=job,asset=previewAsset(node);if(!asset)continue;
+      active++;node.dataset.thumbLoaded='loading';
+      const img=document.createElement('img');
+      jobs.set(node,img);
+      img.alt=asset.name||'Vista previa';
+      img.loading='eager';
+      img.decoding='async';
+      img.fetchPriority=priority==='urgent'?'high':'low';
+      img.style.cssText='display:block;width:100%;height:100%;object-fit:contain;image-rendering:auto';
+      if(['sprite','tileset','animation','vfx'].includes(asset.contentKind))img.style.imageRendering='pixelated';
+      img.onload=()=>finish(node,img,true);
+      img.onerror=()=>finish(node,img,false);
+      img.src=asset.previewUrl;
+    }
+  }
+  const observer=typeof IntersectionObserver==='undefined'?null:new IntersectionObserver(entries=>{
+    for(const entry of entries){
+      if(!entry.isIntersecting)continue;
+      observer.unobserve(entry.target);
+      enqueue(entry.target,'urgent');
+    }
+  },{root:null,rootMargin:'320px 0px',threshold:.01});
+  const scan=()=>{
+    const grid=document.getElementById('explore-grid');if(!grid)return;
+    const nodes=[...grid.querySelectorAll('.card[data-id] .preview')];
+    nodes.forEach(node=>{if(node.dataset.thumbObserved!=='1'){node.dataset.thumbObserved='1';observer?.observe(node);}});
+    clearTimeout(sweepTimer);
+    sweepTimer=setTimeout(()=>{if(!grid.isConnected)return;grid.querySelectorAll('.card[data-id] .preview').forEach(node=>enqueue(node,'background'));},120);
+  };
+  scan();
+  const grid=document.getElementById('explore-grid');
+  if(grid)new MutationObserver(()=>{cancelStale();scan();}).observe(grid,{childList:true,subtree:true});
+  globalThis.addEventListener?.('pagehide',()=>{clearTimeout(sweepTimer);urgent.length=0;background.length=0;queued.clear();for(const [node,img] of [...jobs]){jobs.delete(node);img.onload=null;img.onerror=null;try{img.removeAttribute('src');}catch{}}active=0;});
+}
 function installCatalogOnlyActions(){if(typeof document==='undefined')return;const decorate=root=>root.querySelectorAll?.('.card[data-id]').forEach(card=>{const asset=recentAssets.get(card.dataset.id);if(!asset?.catalogOnly)return;card.dataset.catalogOnly='1';const primary=card.querySelector('[data-act="primary"]');if(primary)primary.textContent='Abrir fuente';});const toast=text=>{const node=document.getElementById('toast');if(!node)return;node.textContent=text;node.classList.add('on');clearTimeout(installCatalogOnlyActions.timer);installCatalogOnlyActions.timer=setTimeout(()=>node.classList.remove('on'),1900);};document.addEventListener('click',event=>{const primary=event.target.closest?.('.card[data-id] [data-act="primary"]');if(!primary)return;const card=primary.closest('.card[data-id]'),asset=recentAssets.get(card?.dataset.id);if(!asset?.catalogOnly)return;event.preventDefault();event.stopImmediatePropagation();if(asset.sourceUrl)window.open(asset.sourceUrl,'_blank','noopener');toast(asset.licenseReviewRequired?'Fuente abierta · verifica licencia antes de integrar':'Fuente abierta · sin descargar al teléfono');},true);decorate(document);new MutationObserver(records=>{for(const record of records)for(const node of record.addedNodes)if(node.nodeType===1)decorate(node.matches?.('.card[data-id]')?node.parentNode||node:node);}).observe(document.documentElement,{childList:true,subtree:true});}
 function installQAPreviewHook(){const qa=browserQA();if(!qa.preview||typeof document==='undefined')return;let observer=null;const reveal=()=>{const node=document.querySelector('.card .preview[data-preview]:not([data-qa-revealed])');if(!node)return false;const url=clean(node.getAttribute('data-preview'));if(!url)return false;node.setAttribute('data-qa-revealed','1');node.querySelector('.preview-placeholder')?.remove();const img=document.createElement('img');img.loading='eager';img.alt='Contenido externo listo para descargar';img.src=url;const badge=node.querySelector('.badge');node.insertBefore(img,badge||node.firstChild);return true;};if(reveal())return;observer=new MutationObserver(()=>{if(reveal()){observer.disconnect();observer=null;}});observer.observe(document.documentElement,{childList:true,subtree:true});setTimeout(()=>{observer?.disconnect();observer=null;},12000);}
 export function clearProviderCache(){liveCache=new Map();configPromise=null;recentAssets.clear();clearKenneyCache();clearOpenGameArtCache();clearKeloContentCache();clearAmbientCgCache();clearPolyHavenCache();clearOpenverseCache();clearThreeDAssetsCache();clearGobkitCache();clearSfxMintCache();clearOpenSource3DCache();clearExternalProviderRuntimeCache();}
 export const EXTERNAL_ASSET_PROVIDERS=Object.freeze({loadProviderConfig,getProviderStatuses,getCatalogScaleStatus,browseProvider,searchExternalAssets,getRecentExternalAsset,clearProviderCache});
 export const EXTERNAL_CONTENT_PROVIDERS=EXTERNAL_ASSET_PROVIDERS;
-if(typeof window!=='undefined'){window.KELO_EXTERNAL_ASSET_PROVIDERS=EXTERNAL_ASSET_PROVIDERS;window.KELO_EXTERNAL_CONTENT_PROVIDERS=EXTERNAL_CONTENT_PROVIDERS;installQAPreviewHook();installVisibleThumbnailHydrator();installCatalogOnlyActions();installUniversalPreviewInspector();installUniversalSpritePreview();installUniversalAvatarTryOn();installUniversalLookBuilder();}
+if(typeof window!=='undefined'){window.KELO_EXTERNAL_ASSET_PROVIDERS=EXTERNAL_ASSET_PROVIDERS;window.KELO_EXTERNAL_CONTENT_PROVIDERS=EXTERNAL_CONTENT_PROVIDERS;installQAPreviewHook();installActivePageThumbnailHydrator();installCatalogOnlyActions();installUniversalPreviewInspector();installUniversalSpritePreview();installUniversalAvatarTryOn();installUniversalLookBuilder();}
