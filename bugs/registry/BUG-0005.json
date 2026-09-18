@@ -78,6 +78,14 @@
           "PR #410",
           "src/systems/performance-governor.js on feat/pvp-auto-reducer-v2"
         ]
+      },
+      {
+        "id": "F5",
+        "statement": "The candidate freezes generic autotuning while a temporary quality floor is active, so clearing the floor restores the exact pre-floor automatic/manual policy instead of a hidden quality change accumulated during reduced load.",
+        "evidence": [
+          "src/systems/performance-governor.js on feat/pvp-auto-reducer-v2",
+          "scripts/pvp-auto-reducer-audit.mjs"
+        ]
       }
     ],
     "hypotheses": [
@@ -181,7 +189,9 @@
     "commits": [
       "b9085e68767a0767b86ebcb1e94af54beaa70150",
       "b4f64ba97612cadb6cfe19aba59c432e02e84c21",
-      "688b5a2b0b0534b3661208ea04df1a8f71883f1c"
+      "688b5a2b0b0534b3661208ea04df1a8f71883f1c",
+      "b421a4ff740eb8dd39e2eed3c32236bbc092a611",
+      "003ed1bb0984aa62a1e00876a8d5f1b456209363"
     ],
     "files": [
       "src/systems/performance-governor.js",
@@ -190,7 +200,7 @@
       "src/core/feature-registry.js",
       "src/core/module-loader.js"
     ],
-    "summary": "PR #410 replaces manual quality overrides with a monotonic temporary floor and adds two PvP-only profiles below normal phone performance."
+    "summary": "PR #410 replaces manual quality overrides with a monotonic temporary floor, adds two PvP-only profiles below normal phone performance, and freezes the underlying autotuner while the floor is active so recovery restores the exact prior quality policy."
   },
   "verification": {
     "status": "PENDING",
