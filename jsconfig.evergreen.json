@@ -15,7 +15,10 @@
   "include": [
     "scripts/evergreen-foundation-audit.mjs",
     "scripts/evergreen-quality-audit.mjs",
+    "scripts/evergreen-runtime-audit.mjs",
     "src/core/evergreen-contracts.mjs",
+    "src/core/evergreen-runtime-capabilities.mjs",
+    "src/core/evergreen-provider-adapters.mjs",
     "src/creators/content/content-schema-migrations.mjs"
   ]
 }

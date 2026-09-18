@@ -1,0 +1,36 @@
+<!doctype html>
+<!-- KELO-INDEX
+ area: QA / EVERGREEN / RUNTIME PROBE
+ owner: Evergreen Runtime Compatibility CI
+ keys: WEBKIT IOS FEATURE DETECTION PROVIDER FALLBACK
+ purpose: minimal browser fixture that imports the real Evergreen runtime/provider modules without booting gameplay
+ online: local CI fixture only
+ do-not: NO production boot, NO UA branching, NO secrets
+-->
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Evergreen Runtime Probe</title></head>
+<body>
+<main id="status">probing</main>
+<script type="module">
+import {detectRuntimeCapabilities,createRuntimeCompatibilityPlan} from '../src/core/evergreen-runtime-capabilities.mjs';
+import {createProviderAdapterRegistry} from '../src/core/evergreen-provider-adapters.mjs';
+
+const snapshot=detectRuntimeCapabilities(globalThis);
+const plan=createRuntimeCompatibilityPlan(snapshot);
+const providers=createProviderAdapterRegistry();
+providers.register({id:'unavailable-primary',kind:'storage',priority:10,isAvailable:()=>false,create:()=>({get(){},set(){},delete(){}})});
+providers.register({id:'memory-fallback',kind:'storage',priority:20,isAvailable:()=>true,create:()=>({get(){return null;},set(){},delete(){}})});
+const selected=providers.resolve('storage');
+
+window.__KELO_EVERGREEN_RUNTIME_PROBE__={
+  schemaVersion:1,
+  snapshot,
+  plan,
+  selectedProvider:selected?.id||null,
+  viewport:{width:innerWidth,height:innerHeight},
+  touchPoints:Number(navigator.maxTouchPoints||0)
+};
+document.querySelector('#status').textContent='ready';
+</script>
+</body>
+</html>

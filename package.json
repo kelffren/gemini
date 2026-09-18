@@ -14,6 +14,8 @@
     "audit:security:root": "npm audit --audit-level=critical",
     "audit:security:server": "npm audit --audit-level=high --omit=dev --prefix server",
     "audit:evergreen-quality": "node scripts/evergreen-quality-audit.mjs",
+    "audit:evergreen-runtime": "node scripts/evergreen-runtime-audit.mjs",
+    "test:evergreen:webkit": "playwright test tests/evergreen-runtime-compat.spec.js --config=playwright.evergreen.config.js",
     "test": "playwright test",
     "test:live": "playwright test",
     "test:browserstack": "browserstack-node-sdk playwright test",
