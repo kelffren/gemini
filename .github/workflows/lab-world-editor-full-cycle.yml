@@ -1,0 +1,82 @@
+name: LAB Verify 4d60d2e World Editor
+
+on:
+  push:
+    branches:
+      - lab/verify-4d60d2e-world-editor
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  full-cycle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CI: true
+      KELO_PAGES: http://127.0.0.1:4173/
+      BASE_SHA: 4d60d2e713b8fe853583309657448a983c688455
+    steps:
+      - name: Checkout isolated verification branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Prove app bytes equal 4d60d2e
+        shell: bash
+        run: |
+          set -euo pipefail
+          changed="$(git diff --name-only "$BASE_SHA"..HEAD | grep -v '^tests/lab-world-editor-full-cycle.spec.js$' | grep -v '^.github/workflows/lab-world-editor-full-cycle.yml$' || true)"
+          if [ -n "$changed" ]; then
+            echo "Unexpected non-test changes:"
+            echo "$changed"
+            exit 1
+          fi
+          echo "Application bytes are exactly BASE_SHA; only lab test/workflow files differ."
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install dependencies
+        run: npm install --no-package-lock --no-audit --no-fund
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Serve exact checkout
+        shell: bash
+        run: |
+          mkdir -p test-results
+          python3 -m http.server 4173 --bind 127.0.0.1 > test-results/lab-world-http.log 2>&1 &
+          echo $! > /tmp/kelo-lab-world-http.pid
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat test-results/lab-world-http.log
+          exit 1
+
+      - name: Full World editor mobile cycle
+        run: npx playwright test tests/lab-world-editor-full-cycle.spec.js --project=chromium --workers=1
+
+      - name: Existing stale-session reopen regression
+        run: npx playwright test tests/world-editor-ios-reopen.spec.js --project=chromium --workers=1
+
+      - name: Existing placement regression
+        run: npx playwright test tests/world-placement-functional.spec.js --project=chromium --workers=1
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verify-4d60d2e-world-editor
+          if-no-files-found: ignore
+          retention-days: 14
+          path: |
+            test-results/**
+            playwright-report.json
