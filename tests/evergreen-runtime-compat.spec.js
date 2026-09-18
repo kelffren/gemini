@@ -23,5 +23,10 @@ test('WebKit mobile profile keeps Evergreen core compatible with explicit fallba
   expect(report.snapshot.byId['canvas-2d'].supported).toBe(true);
   expect(report.selectedProvider).toBe('memory-fallback');
   expect(report.viewport.width).toBe(393);
-  expect(report.touchPoints).toBeGreaterThan(0);
+  await page.evaluate(()=>{
+    window.__KELO_TOUCH_PROBE__=0;
+    window.addEventListener('touchstart',()=>{window.__KELO_TOUCH_PROBE__+=1;},{once:true});
+  });
+  await page.touchscreen.tap(24,24);
+  expect(await page.evaluate(()=>window.__KELO_TOUCH_PROBE__)).toBe(1);
 });
