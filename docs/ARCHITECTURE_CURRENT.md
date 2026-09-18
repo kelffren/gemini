@@ -60,3 +60,22 @@ Forest Plaza es el caso de referencia actual: 146 piezas, IDs legacy preservados
 El editor se abre con chrome-first y prewarm/boot por etapas. Evitar canvas/blur/import masivo simultáneo en iPhone. Para un editor pesado, gameplay debe entrar en modo Creator exclusivo y no competir activamente por render/simulation.
 
 La verificación final móvil sigue siendo dispositivo real/LIVE: Pixelorama debe abrir, editar/cerrar y después el avatar debe caminar al menos 8 s sin freeze/crash/black screen antes de marcar VERIFIED.
+
+## Evergreen runtime compatibility
+
+Kelo World separa compatibilidad de plataforma de lógica de producto. La disponibilidad de capacidades se decide por **feature detection**, no por nombre/versión de navegador ni por `navigator.userAgent`.
+
+Owners:
+
+- `src/core/evergreen-runtime-capabilities.mjs`: detecta capacidades core/online/enhancement y produce un plan explícito de compatibilidad/fallback.
+- `src/core/evergreen-provider-adapters.mjs`: define puertos estables y selección priorizada de adapters para storage, auth, realtime, asset compute y telemetry.
+- `config/evergreen-runtime-policy.json`: política canónica de runtime; Node 24 es producción bloqueante y Node 26 es lane adelantado no bloqueante.
+- `.github/workflows/evergreen-runtime-compat.yml`: audit determinista, WebKit con perfil móvil iOS y future-runtime advisory.
+
+Reglas:
+
+- si falta una API **core**, el entorno se clasifica unsupported;
+- si falta transporte online, el cliente puede entrar en modo degradado sin convertir el fallback local en autoridad permanente;
+- toda API opcional debe declarar fallback o degradación explícita;
+- un proveedor externo se consume detrás de un port/adapter estable, nunca como dependencia arquitectónica directa del dominio;
+- WebKit emulado sirve como gate temprano; BrowserStack Safari/iPhone real sigue siendo evidencia de dispositivo para flujos móviles visibles.

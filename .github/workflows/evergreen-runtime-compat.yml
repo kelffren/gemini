@@ -1,0 +1,95 @@
+name: Evergreen Runtime Compatibility
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 10 * * 1'
+  pull_request:
+    paths:
+      - 'src/core/evergreen-runtime-capabilities.mjs'
+      - 'src/core/evergreen-provider-adapters.mjs'
+      - 'scripts/evergreen-runtime-audit.mjs'
+      - 'config/evergreen-runtime-policy.json'
+      - 'tests/evergreen-runtime-*'
+      - 'playwright.evergreen.config.js'
+      - 'browserstack.yml'
+      - 'jsconfig.evergreen.json'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/evergreen-runtime-compat.yml'
+  push:
+    branches: [main, 'feat/evergreen-*']
+    paths:
+      - 'src/core/evergreen-runtime-capabilities.mjs'
+      - 'src/core/evergreen-provider-adapters.mjs'
+      - 'scripts/evergreen-runtime-audit.mjs'
+      - 'config/evergreen-runtime-policy.json'
+      - 'tests/evergreen-runtime-*'
+      - 'playwright.evergreen.config.js'
+      - 'browserstack.yml'
+      - 'jsconfig.evergreen.json'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/evergreen-runtime-compat.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  runtime-policy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version-file: '.nvmrc'
+      - name: Frozen root install
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Runtime compatibility contract
+        run: node scripts/evergreen-runtime-audit.mjs
+      - name: Evergreen lint
+        run: npm run lint:evergreen
+      - name: Evergreen JavaScript type-check
+        run: npm run typecheck:evergreen
+
+  webkit-ios-profile:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version-file: '.nvmrc'
+      - name: Frozen root install
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Install WebKit
+        run: npx playwright install --with-deps webkit
+      - name: Prepare evidence directory
+        run: mkdir -p artifacts/evergreen
+      - name: WebKit iOS-profile compatibility gate
+        run: npx playwright test --config=playwright.evergreen.config.js
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: evergreen-webkit-runtime-evidence
+          path: artifacts/evergreen/runtime-webkit.json
+          if-no-files-found: warn
+          retention-days: 30
+
+  future-node-advisory:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '26'
+          check-latest: true
+      - name: Frozen dependency graph on future Node
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Runtime contract on future Node
+        run: node scripts/evergreen-runtime-audit.mjs
+      - name: Build on future Node
+        run: npm run build
