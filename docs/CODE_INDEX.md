@@ -21,6 +21,7 @@
 - `src/core/render-extension-system.js` — `KeloRender`.
 - `src/core/simulation-extension-system.js` — `KeloSimulation`, incluidos suspension claims owner-native para lifecycle explícito.
 - `src/core/update-system.js` — `KeloUpdater`.
+- `src/systems/performance-governor.js` — `KELO_PERF`: telemetría, perfiles, LOD y quality floors temporales monotónicos.
 
 ## Build / Weightless
 
@@ -126,6 +127,7 @@
 
 - `src/abilities/` — abilities/Stone/equipment channels.
 - `src/systems/pvp-world.js` — PvP world.
+- `src/systems/pvp-auto-reducer.js` — adaptación client-only de calidad durante PvP usando input→ack + `KELO_PERF.setQualityFloor()`.
 - `src/systems/arena-*` — Arena.
 - `src/systems/equipment-system.js` — equipo.
 - `src/mounts/` — monturas.
