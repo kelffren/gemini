@@ -23,14 +23,21 @@ async function objectCount(studio) {
 }
 
 async function openCreatorsWorld(page) {
-  // Reuse the same Creator Hub bootstrap contract already used by the commit's
-  // official iOS reopen regression. Do not wait on unrelated Luxe/menu gates.
-  await page.evaluate(async () => {
-    const { openCreatorHub } = await import('./src/creators/ui/creator-hub.mjs');
-    await openCreatorHub({ root: window });
-  });
+  // mapEditor=1 can auto-open Creators. Reuse that visible Hub instead of
+  // calling openCreatorHub a second time and creating a duplicate test artifact.
+  await page.waitForTimeout(800);
+  let visibleHubs = page.locator('#kelo-creators-hub:visible');
+  if (await visibleHubs.count() === 0) {
+    await page.evaluate(async () => {
+      const { openCreatorHub } = await import('./src/creators/ui/creator-hub.mjs');
+      await openCreatorHub({ root: window });
+    });
+    await page.waitForTimeout(100);
+    visibleHubs = page.locator('#kelo-creators-hub:visible');
+  }
 
-  const hub = page.locator('#kelo-creators-hub');
+  await expect.poll(async () => visibleHubs.count(), { timeout: 15000 }).toBeGreaterThan(0);
+  const hub = visibleHubs.last();
   await expect(hub).toBeVisible({ timeout: 15000 });
 
   await page.waitForFunction(() => !!(
@@ -46,7 +53,7 @@ async function openCreatorsWorld(page) {
   await expect(studio).toBeVisible({ timeout: 20000 });
   await expect(studio.locator('.ks-status')).toBeVisible({ timeout: 30000 });
   await expect(studio).not.toHaveAttribute('data-kelo-world-loading', '1', { timeout: 40000 });
-  await expect(hub).toHaveCount(0, { timeout: 10000 });
+  await expect.poll(async () => page.locator('#kelo-creators-hub:visible').count(), { timeout: 10000 }).toBe(0);
   return studio;
 }
 
