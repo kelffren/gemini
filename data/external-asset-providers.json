@@ -1,5 +1,5 @@
 {
-  "version": 12,
+  "version": 13,
   "policy": {
     "downloadOnBrowse": false,
     "requireExplicitDownload": true,
@@ -8,11 +8,10 @@
     "pageWindowing": true,
     "hibernateInactivePages": true,
     "previewOnDemand": true,
-    "allowedLicenses": ["CC0-1.0", "CC0", "CC-BY-3.0", "CC-BY-4.0", "OGA-BY-3.0", "KELO-NATIVE"],
+    "allowedLicenses": ["CC0-1.0", "CC0", "CC-BY-3.0", "CC-BY-4.0", "OGA-BY-3.0"],
     "reviewLicenses": ["CC-BY-SA-3.0", "CC-BY-SA-4.0", "GPL-2.0", "GPL-3.0", "UNKNOWN"]
   },
   "providers": [
-    {"id":"kelo-content","name":"Kelo Content Packs","mode":"live-index","enabled":true,"verified":true,"license":"KELO-NATIVE","attributionRequired":false,"sourceUrl":"https://github.com/kelffren/gemini","browseUrl":"https://kelffren.github.io/gemini/asset-vault.html","indexUrl":"../../../data/kelo-content-starter-catalog.json?v=3","notes":"Declarative abilities and prebuilt scenes. Metadata is paged; inactive pages are hibernated. Tiny JSON is downloaded into the personal vault only after Download; no executable code is accepted."},
     {"id":"spritecook","name":"SpriteCook Free Assets","mode":"live-index","enabled":true,"license":"CC0-1.0","attributionRequired":false,"indexUrl":"https://cdn.jsdelivr.net/gh/SpriteCook/spritecook-free-game-assets@master/index.json","assetBaseUrl":"https://cdn.jsdelivr.net/gh/SpriteCook/spritecook-free-game-assets@master/","sourceUrl":"https://github.com/SpriteCook/spritecook-free-game-assets","notes":"Machine-readable CC0 sprite catalog. Kelo renders only the active metadata page; previews and binary assets load only on explicit interaction."},
     {"id":"kenney","name":"Kenney","mode":"lazy-live-index","enabled":true,"license":"CC0","attributionRequired":false,"sourceUrl":"https://kenney.nl/assets","browseUrl":"https://kenney.nl/assets","metadataMirror":"https://github.com/shorepine/kenney","indexUrl":"https://raw.githubusercontent.com/shorepine/kenney/main/index.tsv","assetBaseUrl":"https://raw.githubusercontent.com/shorepine/kenney/main/","notes":"Large CC0 catalog participates in federated search through paged metadata. Only the current page stays live; asset bytes are fetched only for Preview or Download."},
     {"id":"lpc","name":"Universal LPC","mode":"live-index","enabled":true,"verified":true,"license":"CC0 verified subset","attributionRequired":false,"sourceUrl":"https://github.com/LiberatedPixelCup/Universal-LPC-Spritesheet-Character-Generator","browseUrl":"https://liberatedpixelcup.github.io/Universal-LPC-Spritesheet-Character-Generator/","pinnedCommit":"553ba7562534cbf32e7d9a502660f569d6b26512","notes":"LIVE verified animation subset from the canonical LPC repository. Metadata is paged and previews are loaded only when requested."},

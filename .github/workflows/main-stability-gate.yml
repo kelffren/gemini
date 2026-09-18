@@ -104,6 +104,12 @@ jobs:
       - name: Creator definition and world environment contract
         run: npm run audit:creator-suite
 
+      - name: Creator sprite to original game runtime contract
+        run: node scripts/universal-look-runtime-audit.mjs
+
+      - name: External Sprite OS contract
+        run: node scripts/sprite-os-audit.mjs
+
       - name: Paint Copies regression contract
         run: npm run audit:studio:paint-copies
 
@@ -127,10 +133,12 @@ jobs:
           cat test-results/main-stability-http.log
           exit 1
 
-      - name: Critical mobile and PvP smoke on PR bytes
+      - name: Critical mobile, Creator Sprite OS and PvP smoke on PR bytes
         run: >-
           npx playwright test
           tests/main-stability-mobile.spec.js
+          tests/universal-sprite-original-game.spec.js
+          tests/sprite-os.spec.js
           tests/pvp-dodge-live.spec.js
           --project=chromium
 
