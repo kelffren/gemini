@@ -113,6 +113,9 @@ jobs:
       - name: Paint Copies regression contract
         run: npm run audit:studio:paint-copies
 
+      - name: Universal library fast-build contract
+        run: npm run audit:library-build
+
       - name: PvP facing contract
         run: npm run audit:pvp-facing
 
