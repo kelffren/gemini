@@ -235,7 +235,7 @@
     if (previous.id !== next.id) dispatchQualityChange(previous, next);
   }
   function autoTune(dt, snapshot) {
-    if (manualProfile || document.hidden) return;
+    if (manualProfile || qualityFloorProfile || document.hidden) return;
     const overloaded = snapshot.fps < 52 || snapshot.frameMs > 19.2 || snapshot.pressure > 1.05;
     const healthy = snapshot.fps > 58 && snapshot.frameMs < 17.0 && snapshot.pressure < 0.72;
     if (overloaded) { badMs += dt; goodMs = Math.max(0, goodMs - dt * 2); }
