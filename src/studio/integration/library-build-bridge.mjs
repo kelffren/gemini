@@ -9,14 +9,13 @@
  */
 import {seedCatalogPrefabs} from '../adapters/catalog-prefab-seeder.mjs';
 
-const VISUAL_KINDS=new Set(['image','sprite','tileset','animation','vfx']);
 const text=value=>String(value??'').trim();
 
 function catalogFor(root,session){
   return session?.studio?.adapter?.assetCatalog||root?.KELO_PROPERTY_CATALOG||null;
 }
 function catalogRows(catalog){
-  try{return Array.isArray(catalog?.list?.())?catalog.list():[];}catch{return[];}
+  try{const rows=catalog?.list?.();return Array.isArray(rows)?rows:[];}catch{return[];}
 }
 export function listPersonalBuildTemplates({root=globalThis,session=null,assetId}={}){
   const id=text(assetId);if(!id)return[];
