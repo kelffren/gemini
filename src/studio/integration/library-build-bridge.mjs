@@ -66,6 +66,7 @@ async function startVisual({root,session,assetId,templateId}){
   const template=choosePersonalBuildTemplate(rows,templateId);
   if(!template)throw new Error('LIBRARY_BUILD_TEMPLATE_NOT_READY');
   session.beginPlacement?.(template.id);
+  const active=studio.tools?.placement?.getPreview?.();if(String(active?.prefabId||'')!==String(template.id))throw new Error('LIBRARY_BUILD_GHOST_NOT_READY');
   const point=screenCenter(root,session),snap=Math.max(1,Number(session.snapSize)||Number(kernel.document?.settings?.tileSize)||32);
   studio.tools?.placement?.move?.(point.x,point.y,{snap});
   return{mode:'placement',prefabId:String(template.id),template,alternatives:rows.map(row=>String(row.id)),point,snap};
