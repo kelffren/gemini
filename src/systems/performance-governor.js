@@ -12,7 +12,7 @@
 (function (root) {
   'use strict';
 
-  const VERSION = '1.3.0-sampled-snapshots';
+  const VERSION = '1.4.0-pvp-quality-floor';
   const TARGET_FPS = 60;
   const TARGET_FRAME_MS = 1000 / TARGET_FPS;
   const SAMPLE_ALPHA = 0.08;
@@ -30,8 +30,12 @@
     Object.freeze({ id: 'ultra', label: 'ULTRA', weightedBudget: 500, particleCap: 240, fxCap: 48, actorCutoff: 2200, nearHz: 60, midHz: 30, farHz: 15, farCutoff: 1800 }),
     Object.freeze({ id: 'high', label: 'HIGH', weightedBudget: 420, particleCap: 180, fxCap: 36, actorCutoff: 1800, nearHz: 60, midHz: 30, farHz: 15, farCutoff: 1500 }),
     Object.freeze({ id: 'medium', label: 'MEDIUM', weightedBudget: 330, particleCap: 120, fxCap: 24, actorCutoff: 1500, nearHz: 60, midHz: 30, farHz: 12, farCutoff: 1250 }),
-    Object.freeze({ id: 'performance', label: 'PERFORMANCE', weightedBudget: 240, particleCap: 72, fxCap: 16, actorCutoff: 1200, nearHz: 45, midHz: 24, farHz: 10, farCutoff: 1000 })
+    Object.freeze({ id: 'performance', label: 'PERFORMANCE', weightedBudget: 240, particleCap: 72, fxCap: 16, actorCutoff: 1200, nearHz: 45, midHz: 24, farHz: 10, farCutoff: 1000 }),
+    // PvP-only floors: never selected by generic autotune. Keep actor/fx readability intact while cutting cosmetic particles and distant animation work.
+    Object.freeze({ id: 'pvp_low', label: 'PVP LOW', weightedBudget: 240, particleCap: 48, fxCap: 16, actorCutoff: 1200, nearHz: 45, midHz: 18, farHz: 8, farCutoff: 900 }),
+    Object.freeze({ id: 'pvp_emergency', label: 'PVP EMERGENCY', weightedBudget: 240, particleCap: 24, fxCap: 16, actorCutoff: 1200, nearHz: 45, midHz: 15, farHz: 5, farCutoff: 800 })
   ]);
+  const AUTO_PROFILE_MAX_INDEX = PROFILES.findIndex(p => p.id === 'performance');
 
   const reported = new Map();
   const textureMemory = new Map();
@@ -49,6 +53,7 @@
   const isPhone = Math.min(root.innerWidth || 9999, root.innerHeight || 9999) <= 844;
   let profileIndex = isPhone ? 3 : 1;
   let manualProfile = null;
+  let qualityFloorProfile = null;
   let lastFrameAt = performance.now();
   let emaFrameMs = TARGET_FRAME_MS;
   let badMs = 0;
@@ -81,9 +86,17 @@
     return root[name];
   }
 
-  function profile() {
+  function profileIndexOf(id) { return PROFILES.findIndex(p => p.id === id); }
+  function baseProfile() {
     if (manualProfile) return PROFILES.find(p => p.id === manualProfile) || PROFILES[profileIndex];
     return PROFILES[profileIndex];
+  }
+  function profile() {
+    const base = baseProfile();
+    if (!qualityFloorProfile) return base;
+    const floor = PROFILES.find(p => p.id === qualityFloorProfile);
+    if (!floor) return base;
+    return profileIndexOf(floor.id) > profileIndexOf(base.id) ? floor : base;
   }
 
   function recordFrame(frameMs) {
@@ -191,7 +204,7 @@
       frameSampleCount: telemetry.sampleCount, frameAverageMs: telemetry.averageMs, frameP50Ms: telemetry.p50Ms, frameP95Ms: telemetry.p95Ms, frameP99Ms: telemetry.p99Ms, worstFrameMs: telemetry.worstMs,
       framesOver16: telemetry.over16, framesOver33: telemetry.over33, framesOver50: telemetry.over50, framesOver100: telemetry.over100, framesOver120: telemetry.over120,
       hidden:document.hidden===true, visibilityResets, visibilityChanges, loafSupported, loafCount, worstLoafMs, recentLoafs,
-      quality: p.id, manualQuality: manualProfile, weightedCost: cost, weightedBudget: p.weightedBudget, pressure: cost / p.weightedBudget,
+      quality: p.id, baseQuality: baseProfile().id, manualQuality: manualProfile, qualityFloor: qualityFloorProfile, weightedCost: cost, weightedBudget: p.weightedBudget, pressure: cost / p.weightedBudget,
       particleCap: p.particleCap, fxCap: p.fxCap, actorCutoff: p.actorCutoff, textureMB: textureMB(), counts: Object.freeze(counts),
       simulation:sim, render:render, mobile:mobile, network:net,
       assets:atlas ? Object.freeze({loaded:Array.isArray(atlas.loaded)?atlas.loaded.length:0,decodedTextureMB:Number(atlas.decodedTextureMB)||0,residentDistrictAtlasCount:Number(atlas.residentDistrictAtlasCount)||0}) : null,
@@ -213,7 +226,14 @@
     if (document.body) document.body.dataset.keloQuality = next.id;
     try { root.dispatchEvent(new CustomEvent('kelo:qualitychange', { detail: { previous: previous.id, quality: next.id, profile: next } })); } catch (e) {}
   }
-  function setProfileIndex(nextIndex) { const clamped = Math.max(0, Math.min(PROFILES.length - 1, nextIndex)); if (clamped === profileIndex) return; const previous = PROFILES[profileIndex]; profileIndex = clamped; dispatchQualityChange(previous, PROFILES[profileIndex]); }
+  function setProfileIndex(nextIndex) {
+    const clamped = Math.max(0, Math.min(AUTO_PROFILE_MAX_INDEX, nextIndex));
+    if (clamped === profileIndex) return;
+    const previous = profile();
+    profileIndex = clamped;
+    const next = profile();
+    if (previous.id !== next.id) dispatchQualityChange(previous, next);
+  }
   function autoTune(dt, snapshot) {
     if (manualProfile || document.hidden) return;
     const overloaded = snapshot.fps < 52 || snapshot.frameMs > 19.2 || snapshot.pressure > 1.05;
@@ -221,7 +241,7 @@
     if (overloaded) { badMs += dt; goodMs = Math.max(0, goodMs - dt * 2); }
     else if (healthy) { goodMs += dt; badMs = Math.max(0, badMs - dt); }
     else { badMs = Math.max(0, badMs - dt * 0.35); goodMs = Math.max(0, goodMs - dt * 0.35); }
-    if (badMs >= 1800 && profileIndex < PROFILES.length - 1) { setProfileIndex(profileIndex + 1); badMs = 0; goodMs = 0; }
+    if (badMs >= 1800 && profileIndex < AUTO_PROFILE_MAX_INDEX) { setProfileIndex(profileIndex + 1); badMs = 0; goodMs = 0; }
     else if (goodMs >= 6000 && profileIndex > 0) { setProfileIndex(profileIndex - 1); badMs = 0; goodMs = 0; }
   }
 
@@ -278,9 +298,26 @@
   function registerTexture(id, width, height, copies) { const w = Math.max(0, Number(width) || 0), h = Math.max(0, Number(height) || 0), c = Math.max(1, Number(copies) || 1); textureMemory.set(String(id), { bytes: w * h * 4 * c, width: w, height: h, copies: c }); }
   function unregisterTexture(id) { textureMemory.delete(String(id)); }
   function setManualQuality(id) {
-    if (id == null || id === 'auto') { manualProfile = null; badMs = 0; goodMs = 0; return profile().id; }
+    const previous = profile();
+    if (id == null || id === 'auto') {
+      manualProfile = null; badMs = 0; goodMs = 0;
+      const next = profile(); if (previous.id !== next.id) dispatchQualityChange(previous, next); return next.id;
+    }
     const found = PROFILES.find(p => p.id === id); if (!found) throw new Error('Unknown Kelo quality profile: ' + id);
-    const previous = profile(); manualProfile = found.id; dispatchQualityChange(previous, found); return found.id;
+    manualProfile = found.id;
+    const next = profile(); if (previous.id !== next.id) dispatchQualityChange(previous, next); return next.id;
+  }
+  // KELO-INDEX PERFORMANCE/QUALITY_FLOOR presentation-only lower bound; cannot improve quality above the caller's current base/manual profile.
+  function setQualityFloor(id) {
+    const previous = profile();
+    if (id == null || id === 'auto') qualityFloorProfile = null;
+    else {
+      const found = PROFILES.find(p => p.id === id); if (!found) throw new Error('Unknown Kelo quality floor: ' + id);
+      qualityFloorProfile = found.id;
+    }
+    const next = profile();
+    if (previous.id !== next.id) dispatchQualityChange(previous, next);
+    return next.id;
   }
   function toggleHUD(force) { hudEnabled = typeof force === 'boolean' ? force : !hudEnabled; ensureHud(); if (hud) hud.style.display = hudEnabled ? 'block' : 'none'; try { localStorage.setItem('kelo_perf_hud', hudEnabled ? '1' : '0'); } catch (e) {} return hudEnabled; }
   function getSnapshot() { return refreshSnapshot(performance.now(),false); }
@@ -298,7 +335,7 @@
   const api = Object.freeze({
     version: VERSION, targetFps: TARGET_FPS, targetFrameMs: TARGET_FRAME_MS, frameWindow: FRAME_WINDOW, snapshotRefreshMs:SNAPSHOT_REFRESH_MS, weights: WEIGHTS, profiles: PROFILES,
     reportVisible, canSpawn, getAnimationHz, shouldUpdate, forgetUpdateKey, shouldRenderActor,
-    registerTexture, unregisterTexture, setManualQuality, toggleHUD, getSnapshot, getFrameTelemetry,
+    registerTexture, unregisterTexture, setManualQuality, setQualityFloor, toggleHUD, getSnapshot, getFrameTelemetry,
     get visible(){return document.hidden!==true;}, get profile() { return profile(); }
   });
 
