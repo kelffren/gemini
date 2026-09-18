@@ -1,0 +1,216 @@
+{
+  "schema_version": 2,
+  "id": "BUG-0005",
+  "title": "PvP AutoReducer can raise iPhone quality when connection degrades",
+  "status": "FIXED_PENDING_VERIFY",
+  "severity": "medium",
+  "area": [
+    "pvp",
+    "performance",
+    "mobile",
+    "adaptive-quality"
+  ],
+  "source": "ai",
+  "discovered_at": "2026-09-17",
+  "reported_by": [
+    "development-agent"
+  ],
+  "reports": [],
+  "environment": {
+    "game_build": "main@325c7fd313eaa7c29752bb1d548bbf50abdc2948",
+    "device": "phone viewport <=844px; deterministic regression uses 390x844",
+    "os": "iOS target",
+    "browser": "runtime policy bug is browser-independent; mobile acceptance uses iPhone-sized Playwright",
+    "surface": "active online PvP -> sustained input/ack degradation -> adaptive presentation quality"
+  },
+  "reproduction": [
+    "Load Kelo World on a phone-sized viewport so KELO_PERF selects its normal `performance` profile.",
+    "Enter active online PvP and sustain enough input->ack degradation for KeloPvPAutoReducer to pass its bad-hold and grace windows.",
+    "In V1, AutoReducer calls KELO_PERF.setManualQuality('medium') for the first reduction.",
+    "Observe that setManualQuality overrides the device's `performance` base and makes the effective profile `medium`, increasing visual budgets instead of reducing them."
+  ],
+  "expected": "A PvP protection request must be monotonic: it may leave current quality unchanged or reduce it, but it must never improve quality when network conditions worsen. Recovery must restore the pre-existing base/manual policy.",
+  "actual": "V1 requested manual `medium` first and `performance` only for emergency. On phone-sized clients already at `performance`, the first network degradation could therefore increase quality to `medium`; emergency provided no level below the phone baseline.",
+  "evidence": [
+    "src/systems/performance-governor.js main@325c7fd: phone viewport selects profileIndex=3 (`performance`) and setManualQuality() overrides the base profile.",
+    "src/systems/pvp-auto-reducer.js V1: degrade() requested `medium`, then critical path requested `performance`.",
+    "PR #410 adds a 390x844 deterministic regression proving a floor above the current profile cannot upgrade it and dedicated PvP floors can move below `performance`."
+  ],
+  "suspected_files": [
+    "src/systems/performance-governor.js",
+    "src/systems/pvp-auto-reducer.js",
+    "scripts/pvp-auto-reducer-audit.mjs",
+    "src/core/feature-registry.js",
+    "src/core/module-loader.js"
+  ],
+  "owner_hint": "KELO_PERF quality policy with KeloPvPAutoReducer as PvP presentation orchestrator",
+  "claimed_by": null,
+  "claim_started_at": null,
+  "research": {
+    "status": "sufficient",
+    "summary": "The defect is a composition error between device quality and PvP adaptation. V1 used the manual-quality API, which is an override rather than a degradation floor. Because phone-sized clients already begin at `performance`, asking for `medium` on bad network conditions inverted the intended direction. The candidate adds a monotonic floor primitive to KELO_PERF and reserves lower profiles for explicit PvP use.",
+    "known_facts": [
+      {
+        "id": "F1",
+        "statement": "On viewport min dimension <=844, KELO_PERF initializes profileIndex=3, which is `performance` in V1.",
+        "evidence": [
+          "src/systems/performance-governor.js main@325c7fd"
+        ]
+      },
+      {
+        "id": "F2",
+        "statement": "V1 AutoReducer first calls setManualQuality('medium') after sustained degradation and later calls setManualQuality('performance') for critical degradation.",
+        "evidence": [
+          "src/systems/pvp-auto-reducer.js before PR #410"
+        ]
+      },
+      {
+        "id": "F3",
+        "statement": "setManualQuality() takes precedence over the automatic device profile, so `medium` becomes effective even when the base is `performance`.",
+        "evidence": [
+          "src/systems/performance-governor.js main@325c7fd"
+        ]
+      },
+      {
+        "id": "F4",
+        "statement": "The candidate defines `pvp_low` and `pvp_emergency` below `performance`, caps generic autotuning at `performance`, and composes them through setQualityFloor() so a floor cannot improve the current base/manual profile.",
+        "evidence": [
+          "PR #410",
+          "src/systems/performance-governor.js on feat/pvp-auto-reducer-v2"
+        ]
+      }
+    ],
+    "hypotheses": [
+      {
+        "id": "H1",
+        "theory": "Using the manual-quality override for a relative degradation policy causes the quality direction inversion on phones.",
+        "confidence": "high",
+        "status": "confirmed",
+        "why": "The V1 control flow deterministically maps a performance-base phone to manual medium after sustained bad network conditions; no runtime timing assumption is needed beyond entering the documented degrade path.",
+        "evidence_for": [
+          "F1",
+          "F2",
+          "F3"
+        ],
+        "evidence_against": [],
+        "test_next": "Run the permanent 390x844 quality-floor audit and the repository mobile/PvP gates on the exact PR bytes."
+      }
+    ],
+    "ruled_out": [
+      {
+        "hypothesis_id": "H_RENDERER",
+        "theory": "The fix requires direct canvas/back-buffer manipulation from AutoReducer.",
+        "reason": "The root bug is policy composition, and ENGINE_MAP forbids new features from writing canvas/camera/zoom directly. The owner-native quality floor corrects the inversion without a parallel render controller.",
+        "evidence": [
+          "ENGINE_MAP.md",
+          "F4"
+        ]
+      }
+    ],
+    "unknowns": [
+      {
+        "id": "U1",
+        "question": "How much real-device frame-time improvement each new PvP floor produces under a congested match on physical iPhone Safari.",
+        "why_it_matters": "The bug fix proves monotonic behavior; tuning the exact particle/animation budgets is a separate measured optimization question.",
+        "quickest_test": "Capture KELO_PERF frame telemetry and AutoReducer snapshot during an intentionally stressed physical-iPhone PvP session."
+      }
+    ],
+    "external_references": [
+      {
+        "title": "MDN WebGL best practices — smaller back buffer",
+        "url": "https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API/WebGL_best_practices",
+        "lesson": "Lower presentation quality can trade visual fidelity for speed, but Kelo's current owner rules mean any future backing-buffer adaptation must live behind the proper render/performance owner rather than inside the PvP feature."
+      }
+    ],
+    "last_researched_at": "2026-09-17"
+  },
+  "attempt_history": [
+    {
+      "id": "A1",
+      "at": "2026-09-17",
+      "actor": "development-agent",
+      "goal": "Make PvP adaptive quality strictly monotonic and preserve the device/player quality policy on recovery.",
+      "hypothesis_ids": [
+        "H1"
+      ],
+      "change": {
+        "commits": [
+          "b9085e68767a0767b86ebcb1e94af54beaa70150",
+          "b4f64ba97612cadb6cfe19aba59c432e02e84c21",
+          "688b5a2b0b0534b3661208ea04df1a8f71883f1c"
+        ],
+        "files": [
+          "src/systems/performance-governor.js",
+          "src/systems/pvp-auto-reducer.js",
+          "scripts/pvp-auto-reducer-audit.mjs",
+          "src/core/feature-registry.js",
+          "src/core/module-loader.js"
+        ],
+        "summary": "Added owner-native temporary quality floors, dedicated PvP low/emergency profiles, an autotune cap at normal performance, kill switch, silent protection during notice cooldown, and a deterministic 390x844 regression."
+      },
+      "validation": {
+        "environment": "PR #410 GitHub Actions",
+        "method": "Permanent quality-floor audit plus Performance, PvP first-use and Main Stability mobile gates on exact PR bytes.",
+        "result": "NOT_RUN",
+        "evidence": [
+          "GitHub Actions checks are attached to PR #410 and were still running when the candidate record was created."
+        ]
+      },
+      "conclusion": "Candidate implementation is complete enough for independent CI verification; no success claim is made before the gates finish.",
+      "do_not_repeat_without": "If the permanent monotonicity audit passes but real-device telemetry shows insufficient benefit, tune only presentation budgets with measured before/after evidence; do not reintroduce manual-quality overrides."
+    }
+  ],
+  "next_best_actions": [
+    {
+      "priority": 1,
+      "action": "Complete PR #410 Main Stability, PvP First-Use and pvp-auto-reducer audits on the exact candidate bytes.",
+      "reason": "These gates independently test the new monotonic policy, lazy PvP integration and mandatory 390x844 sustained-walk freeze firewall.",
+      "expected_signal": "Quality audit proves performance cannot be raised to medium, PvP first-use stays functional, and mobile sustained walking remains responsive.",
+      "stop_condition": "If any gate fails, keep BUG-0005 FIXED_PENDING_VERIFY, record the failure and repair the candidate before merge."
+    },
+    {
+      "priority": 2,
+      "action": "Measure real-device PvP frame telemetry under intentionally stressed connection/render conditions.",
+      "reason": "This tunes the strength of pvp_low/pvp_emergency after correctness is proven.",
+      "expected_signal": "Reduced particle/distant-animation work lowers frame pressure without harming combat readability.",
+      "stop_condition": "Treat this as tuning rather than reopening the correctness bug unless quality direction/restoration is wrong."
+    }
+  ],
+  "fix": {
+    "status": "candidate_pr_open",
+    "commits": [
+      "b9085e68767a0767b86ebcb1e94af54beaa70150",
+      "b4f64ba97612cadb6cfe19aba59c432e02e84c21",
+      "688b5a2b0b0534b3661208ea04df1a8f71883f1c"
+    ],
+    "files": [
+      "src/systems/performance-governor.js",
+      "src/systems/pvp-auto-reducer.js",
+      "scripts/pvp-auto-reducer-audit.mjs",
+      "src/core/feature-registry.js",
+      "src/core/module-loader.js"
+    ],
+    "summary": "PR #410 replaces manual quality overrides with a monotonic temporary floor and adds two PvP-only profiles below normal phone performance."
+  },
+  "verification": {
+    "status": "PENDING",
+    "method": "Independent GitHub Actions on PR #410; permanent regression is `npm run audit:pvp-auto-reducer` plus mobile/PvP stability gates.",
+    "evidence": [],
+    "verified_by": null,
+    "verified_at": null
+  },
+  "blocked_by": [],
+  "duplicate_of": null,
+  "related_bugs": [
+    "BUG-0004"
+  ],
+  "regression": {
+    "test": "scripts/pvp-auto-reducer-audit.mjs",
+    "command": "npm run audit:pvp-auto-reducer"
+  },
+  "notes": [
+    "This bug was discovered while continuing the requested PvP AutoReducer implementation; it is separate from the PvP first-use lifecycle defect in BUG-0004.",
+    "The candidate deliberately does not mutate canvas/camera/zoom from KeloPvPAutoReducer because ENGINE_MAP assigns those responsibilities elsewhere."
+  ],
+  "updated_at": "2026-09-17"
+}
