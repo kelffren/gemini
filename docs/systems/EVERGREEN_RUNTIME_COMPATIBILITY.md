@@ -166,3 +166,7 @@ El audit imprime número de checks pass/fail. Playwright publica artifact JSON d
 - [ ] ¿Node de producción sigue explícito?
 - [ ] ¿La futura versión de Node se prueba sin promoverse sola?
 - [ ] ¿Audit, lint, type-check y gates globales pasan?
+
+## Evidencia móvil del gate WebKit
+
+El perfil CI usa el descriptor iPhone de Playwright y valida touch ejecutando un `page.touchscreen.tap()` real. No se usa `navigator.maxTouchPoints` como condición de compatibilidad porque el contrato que importa es que el contexto acepte y entregue eventos touch. La validación de dispositivo físico continúa separada en BrowserStack Safari/iPhone.
