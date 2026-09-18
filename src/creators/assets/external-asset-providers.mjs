@@ -62,10 +62,12 @@ export async function searchExternalAssets(query='',options={}){const cfg=await 
 function activePagePreviewConcurrency(){
   let conn=null;try{conn=globalThis.navigator?.connection||globalThis.navigator?.mozConnection||globalThis.navigator?.webkitConnection||null;}catch{}
   const type=String(conn?.effectiveType||'').toLowerCase();
+  const mobile=globalThis.matchMedia?.('(max-width: 760px)')?.matches===true||Number(globalThis.navigator?.maxTouchPoints||0)>0;
   if(conn?.saveData===true)return 1;
   if(type==='2g'||type==='slow-2g')return 1;
   if(type==='3g')return 2;
-  return MAX_THUMBNAIL_CONCURRENCY;
+  if(type==='4g')return mobile?4:MAX_THUMBNAIL_CONCURRENCY;
+  return mobile?3:MAX_THUMBNAIL_CONCURRENCY;
 }
 function installActivePageThumbnailHydrator(){
   if(typeof document==='undefined')return;
