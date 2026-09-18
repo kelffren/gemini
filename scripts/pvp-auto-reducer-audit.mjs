@@ -40,6 +40,7 @@ assert.match(perf,/id: 'pvp_low'/,'performance owner must define pvp_low');
 assert.match(perf,/id: 'pvp_emergency'/,'performance owner must define pvp_emergency');
 assert.match(perf,/AUTO_PROFILE_MAX_INDEX/,'generic autotune must be capped before PvP-only floors');
 assert.match(perf,/function setQualityFloor\(/,'performance owner must expose a quality-floor primitive');
+assert.match(perf,/if \(manualProfile \|\| qualityFloorProfile \|\| document\.hidden\) return;/,'autotune must freeze the base policy while a temporary floor is active');
 assert.match(source,/inputBlocking:false/,'reducer must not block input');
 assert.match(source,/reload:false/,'reducer must remain hot/no-reload');
 
