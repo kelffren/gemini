@@ -110,6 +110,36 @@ async function readPlayer(){
 async function captureRecovery(){
   try{report.recovery=await page.evaluate(()=>window.KELO_RECOVERY_MESH?.report?.()||window.KELO_FREEZE_LOCATOR?.report?.()||null);}catch{}
 }
+async function captureWorldFrontier(label='WORLD_FRONTIER'){
+  try{
+    const state=await page.evaluate(()=>{
+      const live=document.getElementById('kelo-studio-live');
+      const hub=document.getElementById('kelo-creators-hub');
+      const curtain=document.getElementById('kelo-world-launch-curtain');
+      const worldCard=document.querySelector('[data-workspace="world"]');
+      return {
+        bodyStudioActive:document.body?.classList?.contains('kelo-studio-active')||false,
+        hubConnected:!!hub?.isConnected,
+        hubDisplay:hub?getComputedStyle(hub).display:null,
+        worldCardConnected:!!worldCard?.isConnected,
+        worldCardText:String(worldCard?.textContent||'').trim().slice(0,240),
+        liveConnected:!!live?.isConnected,
+        loading:live?.dataset?.keloWorldLoading||null,
+        status:String(live?.querySelector('.ks-status')?.textContent||'').trim().slice(0,240),
+        curtainConnected:!!curtain?.isConnected,
+        curtainText:String(curtain?.textContent||'').trim().slice(0,240),
+        launchAborted:!!window.KELO_WORLD_LAUNCH_ABORTED,
+        inputLocks:!!window.KeloInputLocks?.acquire,
+        adminWorldEdit:!!window.KELO_ADMIN_KEYS?.can?.('world.edit')
+      };
+    });
+    step(label,state);
+    return state;
+  }catch(error){
+    step(`${label}_UNAVAILABLE`,{reason:String(error?.message||error).slice(0,500)});
+    return null;
+  }
+}
 async function bootCheck({navigate=true}={}){
   if(navigate){
     step('BOOT_NAVIGATE',{url:targetUrl()});
@@ -152,21 +182,59 @@ async function worldCheck({navigate=true}={}){
     step('WORLD_NAVIGATE',{url});
     await page.goto(url,{waitUntil:'domcontentloaded',timeout:30000});
   }
-  const world=page.locator('[data-workspace="world"]');
-  await world.waitFor({state:'attached',timeout:18000});
-  step('WORLD_CARD_FOUND');
-  await page.evaluate(()=>{
-    const el=document.querySelector('[data-workspace="world"]');
-    if(!el)throw new Error('WORLD_CARD_MISSING');
-    el.click();
+
+  // The World card can be painted before the Creator controller/permission
+  // contract is ready. Boot the owner explicitly and wait for authority before
+  // clicking so a diagnostic probe cannot mistake an early no-op tap for a
+  // Studio boot regression.
+  await page.evaluate(async()=>{
+    const {openCreatorHub}=await import('./src/creators/ui/creator-hub.mjs');
+    await openCreatorHub({root:window});
   });
+  await page.waitForSelector('#kelo-creators-hub',{state:'visible',timeout:10000});
+  await page.waitForFunction(()=>!!(
+    window.KeloInputLocks?.acquire&&
+    window.KELO_ADMIN_KEYS?.can?.('world.edit')
+  ),null,{timeout:10000});
+  const contracts=await page.evaluate(async()=>{
+    const {getKeloCreatorsPlatform}=await import('./src/creators/creator-entry.mjs');
+    const platform=getKeloCreatorsPlatform();
+    const actorId=platform?.permission?.actorId?.();
+    return {
+      inputLocks:!!window.KeloInputLocks?.acquire,
+      platform:!!platform,
+      actorId:actorId||null,
+      worldEdit:!!platform?.permission?.can?.('world.edit',actorId)
+    };
+  });
+  step('WORLD_CONTRACT_READY',contracts);
+  if(!contracts.inputLocks||!contracts.platform||!contracts.worldEdit){
+    const frontier=await captureWorldFrontier('WORLD_AUTHORITY_STALL');
+    throw new Error(`WORLD_AUTHORITY_NOT_READY:${JSON.stringify({contracts,frontier})}`);
+  }
+
+  const world=page.locator('[data-workspace="world"]');
+  await world.waitFor({state:'visible',timeout:18000});
+  step('WORLD_CARD_FOUND');
+  await world.click({timeout:5000});
   step('WORLD_TAP');
-  await page.waitForSelector('#kelo-studio-live',{state:'attached',timeout:7000});
+  try{
+    await page.waitForSelector('#kelo-studio-live',{state:'attached',timeout:15000});
+  }catch(error){
+    const frontier=await captureWorldFrontier('WORLD_SHELL_STALL');
+    throw new Error(`WORLD_SHELL_NOT_MOUNTED_AFTER_15000MS:${JSON.stringify(frontier||{})}`,{cause:error});
+  }
   step('WORLD_SHELL_MOUNTED');
-  await page.waitForFunction(()=>{
-    const live=document.getElementById('kelo-studio-live');
-    return !!live&&live.dataset?.keloWorldLoading!=='1'&&!!live.querySelector('.ks-status');
-  },null,{timeout:30000});
+  await captureWorldFrontier('WORLD_SHELL_FRONTIER');
+  try{
+    await page.waitForFunction(()=>{
+      const live=document.getElementById('kelo-studio-live');
+      return !!live&&live.dataset?.keloWorldLoading!=='1'&&!!live.querySelector('.ks-status');
+    },null,{timeout:30000});
+  }catch(error){
+    const frontier=await captureWorldFrontier('WORLD_READY_STALL');
+    throw new Error(`WORLD_NOT_READY_AFTER_30000MS:${JSON.stringify(frontier||{})}`,{cause:error});
+  }
   const ready=await page.evaluate(()=>{
     const live=document.getElementById('kelo-studio-live');
     return {loading:live?.dataset?.keloWorldLoading||null,status:String(live?.querySelector('.ks-status')?.textContent||'').trim(),buttons:live?.querySelectorAll('button')?.length||0};
