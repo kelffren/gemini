@@ -14,7 +14,7 @@
 'use strict';
 if(root.KeloPvPAutoReducer)return;
 
-const VERSION='pvp-auto-reducer-v2.1.0-lazy-floors';
+const VERSION='pvp-auto-reducer-v3.0.0-frame-pressure';
 const QUALITY_FLOORS=Object.freeze({
   pvp_low:Object.freeze({id:'pvp_low',label:'PVP LOW',weightedBudget:240,particleCap:48,fxCap:16,actorCutoff:1200,nearHz:45,midHz:18,farHz:8,farCutoff:900,_rank:4}),
   pvp_emergency:Object.freeze({id:'pvp_emergency',label:'PVP EMERGENCY',weightedBudget:240,particleCap:24,fxCap:16,actorCutoff:1200,nearHz:45,midHz:15,farHz:5,farCutoff:800,_rank:5})
@@ -31,11 +31,18 @@ const CONFIG=Object.freeze({
   baselineMultiplier:1.75,
   criticalMs:340,
   emergencyHoldMs:3500,
-  ackStallMs:850
+  ackStallMs:850,
+  frameBadMs:22,
+  frameBadP95Ms:34,
+  frameBadFps:48,
+  frameCriticalMs:33,
+  frameCriticalP95Ms:50,
+  frameCriticalFps:30
 });
 const state={
   enabled:root.FEATURE_PVP_AUTO_REDUCER!==false,phase:'idle',lastSampleAt:0,lastAck:null,lastAckChangedAt:0,
   baselineSamples:[],baselineMs:0,emaMs:0,jitterMs:0,lastLatencyMs:0,
+  fps:60,frameMs:0,frameP95Ms:0,baseQuality:null,badKind:null,
   badSince:0,warningStartedAt:0,recoverSince:0,lastWarningAt:-Infinity,
   reduced:false,emergency:false,requestedQuality:null,notice:null,acknowledged:false,
   reductions:0,restores:0,warnings:0,lastReason:null
@@ -52,6 +59,15 @@ function median(values){if(!values.length)return 0;const a=values.slice().sort((
 function baselineLimit(){return Math.max(CONFIG.minBadMs,(state.baselineMs||CONFIG.minBadMs)*CONFIG.baselineMultiplier);}
 function networkBad(t){const stall=state.lastAckChangedAt&&t-state.lastAckChangedAt>=CONFIG.ackStallMs;return state.emaMs>=baselineLimit()||state.jitterMs>=85||stall;}
 function networkCritical(t){const stall=state.lastAckChangedAt&&t-state.lastAckChangedAt>=CONFIG.ackStallMs*1.8;return state.emaMs>=CONFIG.criticalMs||state.jitterMs>=130||stall;}
+function renderBad(){
+  const belowNormal=state.reduced||state.baseQuality==='performance';
+  if(state.frameP95Ms>=CONFIG.frameCriticalP95Ms)return true;
+  return belowNormal&&(state.fps<=CONFIG.frameBadFps||state.frameMs>=CONFIG.frameBadMs||state.frameP95Ms>=CONFIG.frameBadP95Ms);
+}
+function renderCritical(){return state.fps<=CONFIG.frameCriticalFps||state.frameMs>=CONFIG.frameCriticalMs||state.frameP95Ms>=CONFIG.frameCriticalP95Ms;}
+function pressureKind(t){const n=networkBad(t),r=renderBad();return n&&r?'combined':n?'network':r?'render':null;}
+function criticalKind(t){const n=networkCritical(t),r=renderCritical();return n&&r?'combined':n?'network':r?'render':null;}
+function reasonFor(kind,critical){return kind==='combined'?(critical?'critical-network-frame-pressure':'sustained-network-frame-pressure'):kind==='render'?(critical?'critical-frame-pressure':'sustained-frame-pressure'):(critical?'critical-latency':'sustained-high-latency');}
 
 function ensureNotice(){
   if(state.notice&&state.notice.isConnected)return state.notice;
@@ -66,7 +82,9 @@ function hideNotice(){if(state.notice&&state.notice.isConnected)state.notice.rem
 function paintWarning(t){
   if(state.acknowledged){hideNotice();return;}
   const host=ensureNotice(),left=Math.max(0,Math.ceil((CONFIG.graceMs-(t-state.warningStartedAt))/1000));
-  const copy=host.querySelector('[data-copy]');if(copy)copy.textContent='Tu ping está muy alto. Si no se normaliza en '+left+' s, bajaremos temporalmente la calidad para proteger el combate.';
+  const title=host.querySelector('[data-title]'),copy=host.querySelector('[data-copy]');
+  if(title)title.textContent=state.badKind==='render'?'Rendimiento inestable':state.badKind==='combined'?'Conexión y rendimiento inestables':'Conexión inestable';
+  if(copy)copy.textContent=state.badKind==='render'?'El dispositivo está perdiendo fluidez. Si no se normaliza en '+left+' s, bajaremos temporalmente detalles visuales secundarios.':state.badKind==='combined'?'La conexión y la fluidez están degradadas. Si no se normalizan en '+left+' s, bajaremos temporalmente la calidad para proteger el combate.':'Tu ping está muy alto. Si no se normaliza en '+left+' s, bajaremos temporalmente la calidad para proteger el combate.';
 }
 function flash(message){
   if(typeof root.showToast==='function'){root.showToast(message);return;}
@@ -98,11 +116,13 @@ function degrade(reason){
   hideNotice();state.phase='reduced';state.acknowledged=false;state.badSince=0;state.recoverSince=0;
   if(applyQuality('pvp_low',reason)){state.reductions+=1;flash('Modo PvP estable activado · calidad ajustada sin salir del combate');}
 }
-function clearEpisode(){hideNotice();state.phase='idle';state.badSince=0;state.warningStartedAt=0;state.recoverSince=0;state.acknowledged=false;state.baselineSamples.length=0;state.baselineMs=0;state.emaMs=0;state.jitterMs=0;state.lastLatencyMs=0;state.lastAck=null;state.lastAckChangedAt=0;}
+function clearEpisode(){hideNotice();state.phase='idle';state.badSince=0;state.warningStartedAt=0;state.recoverSince=0;state.acknowledged=false;state.badKind=null;state.baselineSamples.length=0;state.baselineMs=0;state.emaMs=0;state.jitterMs=0;state.lastLatencyMs=0;state.fps=60;state.frameMs=0;state.frameP95Ms=0;state.baseQuality=null;state.lastAck=null;state.lastAckChangedAt=0;}
 
 function sample(t){
   const currentAck=ack();if(state.lastAck===null||currentAck!==state.lastAck){state.lastAck=currentAck;state.lastAckChangedAt=t;}
   const latency=latencyEstimateMs(),previous=state.emaMs||latency;state.lastLatencyMs=latency;state.emaMs=state.emaMs?state.emaMs*.78+latency*.22:latency;state.jitterMs=state.jitterMs*.75+Math.abs(latency-previous)*.25;
+  const owner=perf(),ps=owner&&typeof owner.getSnapshot==='function'?owner.getSnapshot():null;
+  if(ps){state.fps=Number(ps.fps)||60;state.frameMs=Number(ps.frameMs)||0;state.frameP95Ms=Number(ps.frameP95Ms)||0;state.baseQuality=ps.baseQuality||ps.quality||null;}
   if(!networkBad(t)&&latency>0&&state.baselineSamples.length<CONFIG.baselineWindow){state.baselineSamples.push(latency);state.baselineMs=median(state.baselineSamples);}
 }
 function tick(context){
@@ -110,22 +130,23 @@ function tick(context){
   if(!pvpCombatActive()||!online()){if(state.reduced)restoreQuality();clearEpisode();return;}
   if(state.phase==='idle')state.phase='monitoring';
   if(t-state.lastSampleAt>=CONFIG.sampleEveryMs){state.lastSampleAt=t;sample(t);}
-  const bad=networkBad(t),critical=networkCritical(t);
+  const kind=pressureKind(t),critical=criticalKind(t),bad=!!kind;
   if(state.phase==='monitoring'){
-    if(bad){if(!state.badSince)state.badSince=t;if(t-state.badSince>=CONFIG.badHoldMs)beginWarning(t,t-state.lastWarningAt>=CONFIG.warningCooldownMs);}else state.badSince=0;
+    if(bad){state.badKind=kind;if(!state.badSince)state.badSince=t;if(t-state.badSince>=CONFIG.badHoldMs)beginWarning(t,t-state.lastWarningAt>=CONFIG.warningCooldownMs);}else{state.badSince=0;state.badKind=null;}
   }else if(state.phase==='warning'){
-    if(!bad){cancelWarning();return;}paintWarning(t);
-    if(t-state.warningStartedAt>=CONFIG.graceMs)degrade('sustained-high-latency');
+    if(!bad){cancelWarning();state.badKind=null;return;}state.badKind=kind;paintWarning(t);
+    if(t-state.warningStartedAt>=CONFIG.graceMs)degrade(reasonFor(kind,false));
   }else if(state.phase==='reduced'){
-    if(critical){if(!state.badSince)state.badSince=t;if(!state.emergency&&t-state.badSince>=CONFIG.emergencyHoldMs){applyQuality('pvp_emergency','critical-latency');flash('Conexión crítica · prioridad máxima a la fluidez PvP');}}else state.badSince=0;
-    if(!bad){if(!state.recoverSince)state.recoverSince=t;if(t-state.recoverSince>=CONFIG.recoverHoldMs){restoreQuality();state.phase='monitoring';state.badSince=0;state.recoverSince=0;}}else state.recoverSince=0;
+    state.badKind=kind;
+    if(critical){if(!state.badSince)state.badSince=t;if(!state.emergency&&t-state.badSince>=CONFIG.emergencyHoldMs){applyQuality('pvp_emergency',reasonFor(critical,true));flash('Presión crítica · prioridad máxima a la fluidez PvP');}}else state.badSince=0;
+    if(!bad){if(!state.recoverSince)state.recoverSince=t;if(t-state.recoverSince>=CONFIG.recoverHoldMs){restoreQuality();state.phase='monitoring';state.badSince=0;state.recoverSince=0;state.badKind=null;}}else state.recoverSince=0;
   }
 }
-function snapshot(){const owner=perf(),quality=owner&&typeof owner.getSnapshot==='function'?owner.getSnapshot():null;return Object.freeze({version:VERSION,enabled:state.enabled,phase:state.phase,combatActive:pvpCombatActive(),online:online(),latencyMs:Math.round(state.emaMs),jitterMs:Math.round(state.jitterMs),baselineMs:Math.round(state.baselineMs),badThresholdMs:Math.round(baselineLimit()),reduced:state.reduced,emergency:state.emergency,requestedQuality:state.requestedQuality,effectiveQuality:quality&&quality.quality||null,warnings:state.warnings,reductions:state.reductions,restores:state.restores,lastReason:state.lastReason,warningCooldownMs:CONFIG.warningCooldownMs,graceMs:CONFIG.graceMs,recoverHoldMs:CONFIG.recoverHoldMs});}
+function snapshot(){const owner=perf(),quality=owner&&typeof owner.getSnapshot==='function'?owner.getSnapshot():null;return Object.freeze({version:VERSION,enabled:state.enabled,phase:state.phase,combatActive:pvpCombatActive(),online:online(),pressureKind:state.badKind,latencyMs:Math.round(state.emaMs),jitterMs:Math.round(state.jitterMs),baselineMs:Math.round(state.baselineMs),badThresholdMs:Math.round(baselineLimit()),fps:Math.round(state.fps),frameMs:Number(state.frameMs.toFixed(1)),frameP95Ms:Number(state.frameP95Ms.toFixed(1)),baseQuality:state.baseQuality,reduced:state.reduced,emergency:state.emergency,requestedQuality:state.requestedQuality,effectiveQuality:quality&&quality.quality||null,warnings:state.warnings,reductions:state.reductions,restores:state.restores,lastReason:state.lastReason,warningCooldownMs:CONFIG.warningCooldownMs,graceMs:CONFIG.graceMs,recoverHoldMs:CONFIG.recoverHoldMs});}
 function setEnabled(value){state.enabled=value!==false;if(!state.enabled){if(state.reduced)restoreQuality();clearEpisode();}return state.enabled;}
 
 if(!root.KeloSimulation||typeof root.KeloSimulation.after!=='function'){console.error('[Kelo PvP AutoReducer] KeloSimulation unavailable');return;}
 root.KeloSimulation.after('pvp-auto-reducer:network-quality',tick,360);
 root.KeloPvPAutoReducer=Object.freeze({version:VERSION,snapshot,acknowledge,setEnabled});
-root.KELO_PVP_AUTO_REDUCER_AUDIT=Object.freeze({version:VERSION,installed:true,hot:true,reload:false,modal:false,inputBlocking:false,usesExistingSimulation:true,usesExistingQualityOwner:true,usesQualityFloor:true,killSwitch:'FEATURE_PVP_AUTO_REDUCER',networkEstimator:'pvp-pending-input-ack-depth',graceMs:CONFIG.graceMs,warningCooldownMs:CONFIG.warningCooldownMs,recoverHoldMs:CONFIG.recoverHoldMs});
+root.KELO_PVP_AUTO_REDUCER_AUDIT=Object.freeze({version:VERSION,installed:true,hot:true,reload:false,modal:false,inputBlocking:false,usesExistingSimulation:true,usesExistingQualityOwner:true,usesQualityFloor:true,usesExistingFrameTelemetry:true,killSwitch:'FEATURE_PVP_AUTO_REDUCER',networkEstimator:'pvp-pending-input-ack-depth',frameEstimator:'KELO_PERF-snapshot',graceMs:CONFIG.graceMs,warningCooldownMs:CONFIG.warningCooldownMs,recoverHoldMs:CONFIG.recoverHoldMs});
 })(typeof globalThis!=='undefined'?globalThis:window);
