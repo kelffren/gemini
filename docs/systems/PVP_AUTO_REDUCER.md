@@ -2,7 +2,7 @@
 system-id: pvp-auto-reducer
 owner: KeloPvPAutoReducer
 source: src/systems/pvp-auto-reducer.js
-contract-version: 2
+contract-version: 4
 -->
 
 # Kelo PvP Auto Reducer — adaptive presentation quality
@@ -58,7 +58,8 @@ Solo presentation/diagnóstico local:
 PvP first-use
   → Feature Registry carga pvp-auto-reducer.js
   → KeloSimulation.after('pvp-auto-reducer:network-quality', ...)
-  → medir pending input/ack depth
+  → medir RTT/jitter desde el ack autoritativo del input
+  → fallback a pending input/ack depth si la muestra RTT está ausente o vieja
   → leer FPS/frame p95 del snapshot existente de `KELO_PERF`
   → baseline + EMA + jitter
   → degradación sostenida
@@ -71,9 +72,7 @@ PvP first-use
 
 ## Señal actual
 
-V3 combina dos señales owner-native: profundidad/avance de input→ack para presión de red y `KELO_PERF.getSnapshot()` para presión de frame. La señal de red sigue siendo un estimator útil, no RTT server-native real. La señal de frame no crea otro observer: usa FPS, frame EMA y frame p95 ya calculados por Performance Foundation.
-
-La extensión correcta futura es sustituir/mejorar el estimator con RTT/jitter medido por transporte manteniendo el mismo contrato de sample. No se crea un segundo `NetAuthority`.
+V4 mide RTT real de la ruta PvP usando el `clientTime` del input y el `ackSequence` que ya devuelve la autoridad del servidor. `KeloNetAuthority.getPvpRttSnapshot()` expone EMA de RTT, jitter, última muestra y edad; no añade mensajes ping/pong, timers ni transporte. Si no existe una muestra reciente (≤2.5 s), el AutoReducer cae al estimator anterior de profundidad input→ack. La señal de frame sigue reutilizando FPS, frame EMA y frame p95 de `KELO_PERF`, sin crear otro observer.
 
 ## Failure policy
 
@@ -98,12 +97,12 @@ Nunca se permite degradar corrección competitiva para “ganar FPS”.
 11. El quality floor es monotónico: nunca puede mejorar la calidad por encima del perfil base/manual actual.
 12. Mientras el floor está activo, `KELO_PERF` congela el autotuning base para que la recuperación vuelva exactamente al perfil previo, sin una mejora oculta acumulada.
 13. El autotuning genérico sigue teniendo prioridad mientras pueda bajar calidad normal. El AutoReducer solo usa presión de frame para forzar por debajo de `performance` cuando el perfil base ya tocó ese piso, o ante stutter severo (p95 ≥ 50 ms).
-14. Los umbrales V3 son explícitos: degradación sostenida en el piso normal alrededor de ≤48 FPS / ≥22 ms EMA / ≥34 ms p95; crítico alrededor de ≤30 FPS / ≥33 ms EMA / ≥50 ms p95.
+14. Los umbrales V4 de frame permanecen explícitos: degradación sostenida en el piso normal alrededor de ≤48 FPS / ≥22 ms EMA / ≥34 ms p95; crítico alrededor de ≤30 FPS / ≥33 ms EMA / ≥50 ms p95.
 15. `FEATURE_PVP_AUTO_REDUCER=false` desactiva la protección al cargar el paquete; `setEnabled(false)` permite apagarla en caliente.
 
 ## Observabilidad
 
-`snapshot()` expone versión, fase, active/online, latency/jitter/baseline estimados, threshold, `requestedQuality`, `effectiveQuality`, reduced/emergency, counters y último motivo.
+`snapshot()` expone versión, fase, active/online, `networkSource`, latency/jitter/baseline, threshold, `requestedQuality`, `effectiveQuality`, reduced/emergency, counters y último motivo.
 
 `KELO_PVP_AUTO_REDUCER_AUDIT` declara los invariantes de integración usados por QA.
 
