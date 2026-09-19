@@ -10,14 +10,13 @@
 (function(root){
 'use strict';
 if(root.KELO_MODULE_LOADER)return;
-const VERSION='kelo-module-loader-v12-pvp-quality-floor';
+const VERSION='kelo-module-loader-v11-pvp-first-use';
 const PVP_FALLBACK=Object.freeze([
   {src:'src/abilities/abilityData.js?v=20260916-pvp-first-use-1',name:'datos habilidades PvP'},
   {src:'src/abilities/stone-system.js?v=20260916-pvp-first-use-1',name:'piedras PvP'},
   {src:'src/abilities/kelo-ability-boot.js?v=20260916-pvp-first-use-1',name:'runtime habilidades PvP'},
   {src:'engine-net.js?v=20260916-pvp-first-use-1',name:'online PvP'},
   {src:'src/systems/pvp-world.js?v=20260916-pvp-first-use-1',name:'mundo PvP'},
-  {src:'src/systems/pvp-auto-reducer.js?v=2-quality-floor',name:'protección automática de calidad PvP'},
   {src:'src/systems/pvp-combat-runtime-loader.js?v=20260916-pvp-first-use-1',name:'lifecycle combate PvP'}
 ]);
 const LEGACY_FALLBACK=Object.freeze({
