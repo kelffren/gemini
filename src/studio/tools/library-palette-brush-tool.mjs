@@ -131,7 +131,7 @@ export function createLibraryPaletteBrushTool(kernel,{root=globalThis}={}){
   function weightedItem(h,context=null){
     let total=0;const weighted=[];
     for(const item of palette){
-      const semanticWeight=applySemanticPreset(item,settings.semanticPreset),contextWeight=stroke?.contextResolver?.roleWeightMultiplier?.(item.role,context)||1,weight=semanticWeight*contextWeight;
+      const semanticWeight=applySemanticPreset(item,settings.semanticPreset),contextWeight=stroke?.contextResolver?.roleWeightMultiplier?.(item.role,context)??1,weight=semanticWeight*contextWeight;
       if(!(weight>0))continue;
       weighted.push([item,weight]);total+=weight;
     }
