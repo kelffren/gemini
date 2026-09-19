@@ -52,7 +52,7 @@ assert.match(vaultSource,/await integrateContent\(id\)/,'palette assets must int
 assert.match(vaultSource,/kelo:build-personal-palette/,'library must hand the persisted palette to the game');
 assert.match(vaultSource,/state\.palette\.clear\(\)/,'active-page palette must be disposable on page hibernation');
 assert.match(launcherSource,/platform\.openWorkspace\('world'\)/,'launcher must open the real World workspace directly');
-assert.match(launcherSource,/library-build-bridge\.mjs\?v=3/,'launcher must use semantic-aware build bridge');
+assert.match(launcherSource,/library-build-bridge\.mjs\?v=4/,'launcher must use semantic-aware build bridge');
 assert.match(indexSource,/asset-library-launcher\.js\?v=10-semantic-brush/,'boot must cache-bust the semantic launcher');
 
 // Pure template selection contract.
