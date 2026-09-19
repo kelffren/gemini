@@ -92,8 +92,10 @@ jobs:
             fi
 
             echo "FAST OPEN PROBE $short"
+            set +e
             env -u CI KELO_PROBE_ONLY=1 KELO_CANDIDATE_SHA="$sha" KELO_PAGES=http://127.0.0.1:4173/               npx playwright test tests/lab-world-editor-full-cycle.spec.js --project=chromium --workers=1 --retries=0 --reporter=list               > "/tmp/probe-$short.log" 2>&1
             probe_status=$?
+            set -e
             cp "/tmp/probe-$short.log" "bisect-evidence/$short/probe.log" || true
             if [ -d test-results ]; then cp -R test-results "bisect-evidence/$short/probe-results" || true; fi
 
@@ -106,8 +108,10 @@ jobs:
 
             echo "OPEN PASS. RUNNING FULL ACCEPTANCE $short"
             rm -rf test-results/*
+            set +e
             env -u CI KELO_CANDIDATE_SHA="$sha" KELO_PAGES=http://127.0.0.1:4173/               npx playwright test tests/lab-world-editor-full-cycle.spec.js --project=chromium --workers=1 --retries=0 --reporter=list               > "/tmp/full-$short.log" 2>&1
             full_status=$?
+            set -e
             cp "/tmp/full-$short.log" "bisect-evidence/$short/full.log" || true
             if [ -d test-results ]; then cp -R test-results "bisect-evidence/$short/full-results" || true; fi
 
