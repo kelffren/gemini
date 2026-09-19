@@ -52,12 +52,13 @@ export function createLibraryPaletteBrushTool(kernel,{root=globalThis}={}){
     for(const raw of ids){
       const id=String(raw||'');if(!id||seen.has(id))continue;
       const prefab=kernel.prefabs.resolve(id);if(!prefab)continue;
-      seen.add(id);out.push({id,bounds:{w:Math.max(1,Number(prefab.bounds?.w)||32),h:Math.max(1,Number(prefab.bounds?.h)||32)});
+      seen.add(id);out.push({id,bounds:{w:Math.max(1,Number(prefab.bounds?.w)||32),h:Math.max(1,Number(prefab.bounds?.h)||32)}});
       if(out.length>=MAX_PALETTE)break;
     }
     return out;
   }
   function configurePalette(ids,{activate=true,...patch}={}){
+    if(destroyed)destroyed=false;
     const next=resolvePalette(ids);
     if(!next.length)throw new Error('STUDIO_LIBRARY_PALETTE_EMPTY');
     palette=next;settings=normalizeSettings({...settings,...patch});stroke=null;ensureUi();if(activate!==false)start();emit();return state();
