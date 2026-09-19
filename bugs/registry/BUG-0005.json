@@ -200,7 +200,7 @@
     "merge_commit": "a9671ff39b0b99fa594d153dcf182eec2549b29e"
   },
   "verification": {
-    "status": "VERIFIED",
+    "status": "PASS",
     "method": "PR #410 exact-head GitHub Actions before squash merge; candidate head fae997a82a6c8b3c41e95993b202de663b21b83c was 0 commits behind main and all blocking gates completed success. Squash merge a9671ff39b0b99fa594d153dcf182eec2549b29e contains those validated bytes.",
     "evidence": [
       "PR #410: Main Stability Gate — success",
