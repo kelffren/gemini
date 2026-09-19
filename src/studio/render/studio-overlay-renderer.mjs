@@ -66,8 +66,8 @@ export function createStudioOverlayRenderer({ kernel, tools, assetPreview } = {}
     ctx.restore();
   }
   function drawBuildRow(ctx,row,{outline=true,alpha=.52,outlineAlpha=.9}={}){
-    const rect={x:Number(row.transform?.x)||0,y:Number(row.transform?.y)||0,w:Math.max(1,Number(row.bounds?.w)||1),h:Math.max(1,Number(row.bounds?.h)||1)};
-    const drew=assetPreview?.drawAsset?.(ctx,row.prefabId,rect.x,rect.y,{rotation:Number(row.transform?.rotation)||0,alpha,placeholder:false});
+    const scale=Math.max(.1,Number(row.transform?.scale)||1),rect={x:Number(row.transform?.x)||0,y:Number(row.transform?.y)||0,w:Math.max(1,(Number(row.bounds?.w)||1)*scale),h:Math.max(1,(Number(row.bounds?.h)||1)*scale)};
+    const drew=assetPreview?.drawAsset?.(ctx,row.prefabId,rect.x,rect.y,{rotation:Number(row.transform?.rotation)||0,scale,alpha,placeholder:false});
     if(!drew){ctx.save();ctx.globalAlpha=outline?.14:.09;ctx.fillRect(rect.x,rect.y,rect.w,rect.h);ctx.restore();}
     if(outline)drawRect(ctx,rect,{dashed:true,alpha:outlineAlpha});
   }
@@ -107,8 +107,8 @@ export function createStudioOverlayRenderer({ kernel, tools, assetPreview } = {}
     if(!rows?.length)return;
     ctx.save();ctx.strokeStyle='rgba(126,213,154,.92)';
     for(const row of rows){
-      const rect={x:Number(row.transform?.x)||0,y:Number(row.transform?.y)||0,w:Math.max(1,Number(row.bounds?.w)||1),h:Math.max(1,Number(row.bounds?.h)||1)};
-      const drew=assetPreview?.drawAsset?.(ctx,row.prefabId,rect.x,rect.y,{rotation:Number(row.transform?.rotation)||0,alpha:.62,placeholder:false});
+      const scale=Math.max(.1,Number(row.transform?.scale)||1),rect={x:Number(row.transform?.x)||0,y:Number(row.transform?.y)||0,w:Math.max(1,(Number(row.bounds?.w)||1)*scale),h:Math.max(1,(Number(row.bounds?.h)||1)*scale)};
+      const drew=assetPreview?.drawAsset?.(ctx,row.prefabId,rect.x,rect.y,{rotation:Number(row.transform?.rotation)||0,scale,alpha:.62,placeholder:false});
       if(!drew){ctx.save();ctx.globalAlpha=.13;ctx.fillStyle='#7ed59a';ctx.fillRect(rect.x,rect.y,rect.w,rect.h);ctx.restore();}
       drawRect(ctx,rect,{dashed:true,alpha:.64});
     }
@@ -120,7 +120,7 @@ export function createStudioOverlayRenderer({ kernel, tools, assetPreview } = {}
     ctx.save();ctx.strokeStyle='rgba(131,235,175,.88)';
     for(const row of rows){
       const scale=Math.max(.1,Number(row.transform?.scale)||1),rect={x:Number(row.transform?.x)||0,y:Number(row.transform?.y)||0,w:Math.max(1,(Number(row.bounds?.w)||1)*scale),h:Math.max(1,(Number(row.bounds?.h)||1)*scale)};
-      const drew=assetPreview?.drawAsset?.(ctx,row.prefabId,rect.x,rect.y,{rotation:Number(row.transform?.rotation)||0,alpha:.56,placeholder:false});
+      const drew=assetPreview?.drawAsset?.(ctx,row.prefabId,rect.x,rect.y,{rotation:Number(row.transform?.rotation)||0,scale,alpha:.56,placeholder:false});
       if(!drew){ctx.save();ctx.globalAlpha=.12;ctx.fillRect(rect.x,rect.y,rect.w,rect.h);ctx.restore();}
       drawRect(ctx,rect,{dashed:true,alpha:.6});
     }

@@ -1,6 +1,6 @@
 # Kelo World — World Building x1000
 
-Status: research + execution roadmap (2026-09-18)
+Status: Phase A + B + C implemented; Phase D foundation partially implemented (2026-09-18)
 
 ## Thesis
 
@@ -58,22 +58,23 @@ Compiler:
 
 This is the bridge from “asset browsing” to “world painting.”
 
-### 2. Semantic Brush
-A palette gets a semantic role such as canopy, understory, detail, roadside, waterside or architecture.
+### 2. Semantic Brush — IMPLEMENTED V1
+A palette now gets automatic semantic roles: canopy, understory, detail, roadside, waterside, structure or generic.
 
-Immediate controls:
-- density
-- radius
-- seed
-- scale range
-- allowed rotations
+Implemented controls:
+- density cycling
+- brush radius / area cycling
+- deterministic seed remix
+- role-safe scale ranges
+- role-safe quarter-turn rotation sets
 - minimum spacing
-- role proportions
+- semantic presets: AUTO / PRINCIPAL / RELLENO / DETALLE
+- weighted role proportions
 
 The brush paints intent, not an arbitrary bag of objects.
 
-### 3. Constraint Layer
-Every generated point passes cheap rules before becoming a preview:
+### 3. Constraint Layer — FOUNDATION IMPLEMENTED
+Every generated point now passes cheap local rules before becoming a preview. V1 already blocks existing entities, collision rectangles, explicit exclusion rectangles and tagged protected zones (`no-build`, `keep-clear`, `spawn-clear`). Next step is surface/road/water-aware constraints:
 
 - surface tag: grass / dirt / water / road / interior
 - minimum distance from roads
@@ -205,14 +206,15 @@ If Biome Recipe breaks, ordinary Placement and Build Palette must still work.
 ### Phase A — Build Palette
 Select assets → paint mixed deterministic stroke → one Undo.
 
-### Phase B — Smart density
-Radius, density, seed, min spacing, optional overlap avoidance.
+### Phase B — Smart density — DONE V1
+Radius, density, seed, min spacing, scale/rotation variation and overlap avoidance.
 
-### Phase C — Semantic roles
-Tree / bush / detail grouping and proportions.
+### Phase C — Semantic roles — DONE V1
+Automatic canopy / understory / detail / roadside / waterside / structure grouping plus weighted presets.
 
-### Phase D — Constraints
-Road, water, collision, district and surface filters.
+### Phase D — Constraints — PARTIAL
+DONE: entity overlap, collision clearance, explicit exclusions, protected-zone tags.
+NEXT: road, water, district and surface-tag filters.
 
 ### Phase E — Biome Recipe V1
 Paint an area and regenerate it from a small recipe.
