@@ -1,18 +1,17 @@
 /* KELO-INDEX
  * area: PERFORMANCE
  * owner: KELO_PERF / KELO_PERFORMANCE_GOVERNOR
- * keys: FPS FRAME P50 P95 P99 STALL LOAF VISIBILITY LIFECYCLE QUALITY GOVERNOR HOOKS NETWORK MEMORY SAMPLED-SNAPSHOT
- * purpose: mide frame-time/carga real, gobierna calidad local y publica CLIENT_HIDDEN/CLIENT_VISIBLE sin crear otro lifecycle manager
- * public-api: KELO_PERF report/culling/quality/telemetry + visibility state
- * consumes: KeloEvents, KeloSimulation, KeloRender, mobile/atlas/world/network audits
- * state-owned: telemetría local, quality profile, clocks LOD y señales de visibilidad
- * online: solo diagnóstico/presentación local; nunca decide autoridad gameplay
- * do-not: NO crear otro game loop, NO usar performance para alterar verdad server
+ * keys: FPS FRAME QUALITY GOVERNOR NETWORK MEMORY
+ * purpose: client-only telemetry + presentation quality owner
+ * public-api: KELO_PERF
+ * state-owned: telemetry, quality profile, LOD clocks
+ * online: presentation only
+ * do-not: NO second loop; NO server-truth mutation
  */
 (function (root) {
   'use strict';
 
-  const VERSION = '1.4.0-pvp-quality-floor';
+  const VERSION = '1.4.0-floor';
   const TARGET_FPS = 60;
   const TARGET_FRAME_MS = 1000 / TARGET_FPS;
   const SAMPLE_ALPHA = 0.08;
@@ -30,12 +29,8 @@
     Object.freeze({ id: 'ultra', label: 'ULTRA', weightedBudget: 500, particleCap: 240, fxCap: 48, actorCutoff: 2200, nearHz: 60, midHz: 30, farHz: 15, farCutoff: 1800 }),
     Object.freeze({ id: 'high', label: 'HIGH', weightedBudget: 420, particleCap: 180, fxCap: 36, actorCutoff: 1800, nearHz: 60, midHz: 30, farHz: 15, farCutoff: 1500 }),
     Object.freeze({ id: 'medium', label: 'MEDIUM', weightedBudget: 330, particleCap: 120, fxCap: 24, actorCutoff: 1500, nearHz: 60, midHz: 30, farHz: 12, farCutoff: 1250 }),
-    Object.freeze({ id: 'performance', label: 'PERFORMANCE', weightedBudget: 240, particleCap: 72, fxCap: 16, actorCutoff: 1200, nearHz: 45, midHz: 24, farHz: 10, farCutoff: 1000 }),
-    // PvP-only floors: never selected by generic autotune. Keep actor/fx readability intact while cutting cosmetic particles and distant animation work.
-    Object.freeze({ id: 'pvp_low', label: 'PVP LOW', weightedBudget: 240, particleCap: 48, fxCap: 16, actorCutoff: 1200, nearHz: 45, midHz: 18, farHz: 8, farCutoff: 900 }),
-    Object.freeze({ id: 'pvp_emergency', label: 'PVP EMERGENCY', weightedBudget: 240, particleCap: 24, fxCap: 16, actorCutoff: 1200, nearHz: 45, midHz: 15, farHz: 5, farCutoff: 800 })
+    Object.freeze({ id: 'performance', label: 'PERFORMANCE', weightedBudget: 240, particleCap: 72, fxCap: 16, actorCutoff: 1200, nearHz: 45, midHz: 24, farHz: 10, farCutoff: 1000 })
   ]);
-  const AUTO_PROFILE_MAX_INDEX = PROFILES.findIndex(p => p.id === 'performance');
 
   const reported = new Map();
   const textureMemory = new Map();
@@ -52,8 +47,7 @@
   let recentLoafs = Object.freeze([]);
   const isPhone = Math.min(root.innerWidth || 9999, root.innerHeight || 9999) <= 844;
   let profileIndex = isPhone ? 3 : 1;
-  let manualProfile = null;
-  let qualityFloorProfile = null;
+  let manualProfile = null, qualityFloor = null;
   let lastFrameAt = performance.now();
   let emaFrameMs = TARGET_FRAME_MS;
   let badMs = 0;
@@ -86,18 +80,8 @@
     return root[name];
   }
 
-  function profileIndexOf(id) { return PROFILES.findIndex(p => p.id === id); }
-  function baseProfile() {
-    if (manualProfile) return PROFILES.find(p => p.id === manualProfile) || PROFILES[profileIndex];
-    return PROFILES[profileIndex];
-  }
-  function profile() {
-    const base = baseProfile();
-    if (!qualityFloorProfile) return base;
-    const floor = PROFILES.find(p => p.id === qualityFloorProfile);
-    if (!floor) return base;
-    return profileIndexOf(floor.id) > profileIndexOf(base.id) ? floor : base;
-  }
+  function baseProfile(){return manualProfile?(PROFILES.find(p=>p.id===manualProfile)||PROFILES[profileIndex]):PROFILES[profileIndex];}
+  function profile(){const b=baseProfile(),f=qualityFloor;return f&&Number(f._rank)>PROFILES.indexOf(b)?f:b;}
 
   function recordFrame(frameMs) {
     if (!(frameMs > 0) || !Number.isFinite(frameMs)) return;
@@ -204,7 +188,7 @@
       frameSampleCount: telemetry.sampleCount, frameAverageMs: telemetry.averageMs, frameP50Ms: telemetry.p50Ms, frameP95Ms: telemetry.p95Ms, frameP99Ms: telemetry.p99Ms, worstFrameMs: telemetry.worstMs,
       framesOver16: telemetry.over16, framesOver33: telemetry.over33, framesOver50: telemetry.over50, framesOver100: telemetry.over100, framesOver120: telemetry.over120,
       hidden:document.hidden===true, visibilityResets, visibilityChanges, loafSupported, loafCount, worstLoafMs, recentLoafs,
-      quality: p.id, baseQuality: baseProfile().id, manualQuality: manualProfile, qualityFloor: qualityFloorProfile, weightedCost: cost, weightedBudget: p.weightedBudget, pressure: cost / p.weightedBudget,
+      quality:p.id, baseQuality:baseProfile().id, manualQuality:manualProfile, qualityFloor:qualityFloor&&qualityFloor.id||null, weightedCost:cost, weightedBudget:p.weightedBudget, pressure:cost/p.weightedBudget,
       particleCap: p.particleCap, fxCap: p.fxCap, actorCutoff: p.actorCutoff, textureMB: textureMB(), counts: Object.freeze(counts),
       simulation:sim, render:render, mobile:mobile, network:net,
       assets:atlas ? Object.freeze({loaded:Array.isArray(atlas.loaded)?atlas.loaded.length:0,decodedTextureMB:Number(atlas.decodedTextureMB)||0,residentDistrictAtlasCount:Number(atlas.residentDistrictAtlasCount)||0}) : null,
@@ -226,22 +210,15 @@
     if (document.body) document.body.dataset.keloQuality = next.id;
     try { root.dispatchEvent(new CustomEvent('kelo:qualitychange', { detail: { previous: previous.id, quality: next.id, profile: next } })); } catch (e) {}
   }
-  function setProfileIndex(nextIndex) {
-    const clamped = Math.max(0, Math.min(AUTO_PROFILE_MAX_INDEX, nextIndex));
-    if (clamped === profileIndex) return;
-    const previous = profile();
-    profileIndex = clamped;
-    const next = profile();
-    if (previous.id !== next.id) dispatchQualityChange(previous, next);
-  }
+  function setProfileIndex(nextIndex) { const clamped = Math.max(0, Math.min(PROFILES.length - 1, nextIndex)); if (clamped === profileIndex) return; const previous = PROFILES[profileIndex]; profileIndex = clamped; dispatchQualityChange(previous, PROFILES[profileIndex]); }
   function autoTune(dt, snapshot) {
-    if (manualProfile || qualityFloorProfile || document.hidden) return;
+    if (manualProfile || qualityFloor || document.hidden) return;
     const overloaded = snapshot.fps < 52 || snapshot.frameMs > 19.2 || snapshot.pressure > 1.05;
     const healthy = snapshot.fps > 58 && snapshot.frameMs < 17.0 && snapshot.pressure < 0.72;
     if (overloaded) { badMs += dt; goodMs = Math.max(0, goodMs - dt * 2); }
     else if (healthy) { goodMs += dt; badMs = Math.max(0, badMs - dt); }
     else { badMs = Math.max(0, badMs - dt * 0.35); goodMs = Math.max(0, goodMs - dt * 0.35); }
-    if (badMs >= 1800 && profileIndex < AUTO_PROFILE_MAX_INDEX) { setProfileIndex(profileIndex + 1); badMs = 0; goodMs = 0; }
+    if (badMs >= 1800 && profileIndex < PROFILES.length - 1) { setProfileIndex(profileIndex + 1); badMs = 0; goodMs = 0; }
     else if (goodMs >= 6000 && profileIndex > 0) { setProfileIndex(profileIndex - 1); badMs = 0; goodMs = 0; }
   }
 
@@ -297,28 +274,8 @@
   function shouldRenderActor(distance) { return Math.max(0, Number(distance) || 0) <= profile().actorCutoff; }
   function registerTexture(id, width, height, copies) { const w = Math.max(0, Number(width) || 0), h = Math.max(0, Number(height) || 0), c = Math.max(1, Number(copies) || 1); textureMemory.set(String(id), { bytes: w * h * 4 * c, width: w, height: h, copies: c }); }
   function unregisterTexture(id) { textureMemory.delete(String(id)); }
-  function setManualQuality(id) {
-    const previous = profile();
-    if (id == null || id === 'auto') {
-      manualProfile = null; badMs = 0; goodMs = 0;
-      const next = profile(); if (previous.id !== next.id) dispatchQualityChange(previous, next); return next.id;
-    }
-    const found = PROFILES.find(p => p.id === id); if (!found) throw new Error('Unknown Kelo quality profile: ' + id);
-    manualProfile = found.id;
-    const next = profile(); if (previous.id !== next.id) dispatchQualityChange(previous, next); return next.id;
-  }
-  // KELO-INDEX PERFORMANCE/QUALITY_FLOOR presentation-only lower bound; cannot improve quality above the caller's current base/manual profile.
-  function setQualityFloor(id) {
-    const previous = profile();
-    if (id == null || id === 'auto') qualityFloorProfile = null;
-    else {
-      const found = PROFILES.find(p => p.id === id); if (!found) throw new Error('Unknown Kelo quality floor: ' + id);
-      qualityFloorProfile = found.id;
-    }
-    const next = profile();
-    if (previous.id !== next.id) dispatchQualityChange(previous, next);
-    return next.id;
-  }
+  function setManualQuality(id){const p=profile();if(id==null||id==='auto')manualProfile=null;else{const f=PROFILES.find(p=>p.id===id);if(!f)throw new Error('Unknown Kelo quality profile: '+id);manualProfile=f.id;}badMs=goodMs=0;const n=profile();if(p.id!==n.id)dispatchQualityChange(p,n);return n.id;}
+  function setQualityFloor(f){const p=profile();qualityFloor=f&&f!=='auto'?f:null;const n=profile();if(p.id!==n.id)dispatchQualityChange(p,n);return n.id;}
   function toggleHUD(force) { hudEnabled = typeof force === 'boolean' ? force : !hudEnabled; ensureHud(); if (hud) hud.style.display = hudEnabled ? 'block' : 'none'; try { localStorage.setItem('kelo_perf_hud', hudEnabled ? '1' : '0'); } catch (e) {} return hudEnabled; }
   function getSnapshot() { return refreshSnapshot(performance.now(),false); }
   function getFrameTelemetry() { const stats = refreshFrameStats(performance.now(), true); return Object.freeze({ ...stats, visibilityResets, visibilityChanges, loafSupported, loafCount, worstLoafMs, recentLoafs }); }
