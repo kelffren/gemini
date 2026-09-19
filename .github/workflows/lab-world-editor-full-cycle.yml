@@ -18,8 +18,22 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { short: "ea14e484", sha: "ea14e48426ac20aff44da009f0d615d8562cf7cd" }
-          - { short: "72604f28", sha: "72604f28d4023c0543bfd2c36b1bf6823704a3db" }
+          - { short: "5e4be82c", sha: "5e4be82c123e2781d95771d67b2e63b67dc92d56" }
+          - { short: "c0ecd0d2", sha: "c0ecd0d2bf86b968c59a608c0e205f1c8a0ea362" }
+          - { short: "84d0df5a", sha: "84d0df5a0a28db4ed1b01c3d0cd4cf0c09a77e2a" }
+          - { short: "b70e77a8", sha: "b70e77a8be30ed1e8fe735fe03cc288ca44eafb6" }
+          - { short: "8c4a20dc", sha: "8c4a20dccfafa905b0b0ccbf22ac91eb9dfa46f3" }
+          - { short: "3dd585e7", sha: "3dd585e7de0e8f9105c4f7e9e0bfdf4f66891683" }
+          - { short: "94637938", sha: "94637938183b2e752f63815ed7ca51084c47f08f" }
+          - { short: "be1b3edf", sha: "be1b3edfd5ead2420545050a58e521300ee1e07b" }
+          - { short: "e97eca60", sha: "e97eca6088e14fe5f70a01723914ae4e051f1768" }
+          - { short: "3319a9d3", sha: "3319a9d3778da8e45b919d2984ac919a2b0d316b" }
+          - { short: "b1c05fcd", sha: "b1c05fcd25285aaf2694a0fc68787d2b0cb018e8" }
+          - { short: "1ccec95d", sha: "1ccec95db9eb02b037f640270c3fa3a0808b6f52" }
+          - { short: "734fba71", sha: "734fba715064b0786b4f368ade92dc11b37f449e" }
+          - { short: "16f3e6f5", sha: "16f3e6f5ee812fc9550ae5ef2c8007844b21b810" }
+          - { short: "f5737b94", sha: "f5737b948c9a65cd5d49c1e33c912984bfc89621" }
+          - { short: "b905310e", sha: "b905310e30e772b2a385a7b8151a532e2207113a" }
 
     env:
       CANDIDATE_SHA: ${{ matrix.sha }}
