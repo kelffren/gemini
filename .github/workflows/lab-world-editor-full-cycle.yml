@@ -18,24 +18,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { short: "bc11cdb0", sha: "bc11cdb0019455e34b406e5bdf76f71fb253d04c" }
-          - { short: "918d2e90", sha: "918d2e90ae1d4ecffde77958e2d8b983d0f5fb74" }
-          - { short: "f47c8b50", sha: "f47c8b50b07c75b8f47b606de2b8ecaf8c804452" }
-          - { short: "18d14985", sha: "18d14985d0d40bf53dbc8aa3fdf9328d5e7b3874" }
-          - { short: "d8bb6f4a", sha: "d8bb6f4a88eef884f3a867463fd6d8075a697a52" }
-          - { short: "a80d2637", sha: "a80d26378e75529777d7914fd1652453a7b2c50c" }
-          - { short: "a23531d5", sha: "a23531d5703aba6c34138f4430b1a9f652c6b126" }
-          - { short: "f3b7afc6", sha: "f3b7afc695f5e0a51486303f4092e5f3dcfd2ab7" }
-          - { short: "33ab5789", sha: "33ab57893302db38a1c25c65f7acf6d78282e7f7" }
-          - { short: "936d4eab", sha: "936d4eab51b3eeb6d2395bd1198b5bcf8d8e0993" }
-          - { short: "fb7a49ee", sha: "fb7a49ee56a9fd9342eadbd1b6d9be361f7fbee7" }
-          - { short: "98a8a531", sha: "98a8a531a5b6d9829be359c3e0dde04d7eb7fc43" }
-          - { short: "b451b92e", sha: "b451b92e8e4fdf621cbe6bc1b466eb77860d23d4" }
-          - { short: "fe6ab054", sha: "fe6ab054b2322dc7a67a5d13903e0ab6b5d87bb2" }
-          - { short: "1fcca6a4", sha: "1fcca6a40892a1d0b5e728b6fe02e06e3726cb02" }
-          - { short: "d0f861c4", sha: "d0f861c48a9de15cd0c3bf14c568bbb81fbb28bf" }
-          - { short: "b6410e27", sha: "b6410e2785270ce995e745e57f92c8fbd9b1a26d" }
-          - { short: "9c98e667", sha: "9c98e66717d595de3e572a706ab5061d5ff1994c" }
+          - { short: "d7ca427b", sha: "d7ca427bf6779c68942fac519dbbb1a47eaa6c2d" }
+          - { short: "e1adb1aa", sha: "e1adb1aa590479f7ed88792a9181cacd015bb6e8" }
+          - { short: "eda148a3", sha: "eda148a32c2862a702aa3d1b863def1a1412d4e5" }
+          - { short: "57660dc1", sha: "57660dc1fbe2c95bad6e7dcd8bbe8769c971f712" }
+          - { short: "10a70493", sha: "10a70493602628277ede09c7170486c27a1bffd8" }
+          - { short: "c96b2f92", sha: "c96b2f929d69765221fc6048a47dbb180e5bf683" }
 
     env:
       CANDIDATE_SHA: ${{ matrix.sha }}
