@@ -120,7 +120,7 @@
   "devDependencies": {
     "@cyclonedx/cyclonedx-npm": "6.0.1",
     "@eslint/js": "10.0.1",
-    "@playwright/test": "1.62.0",
+    "@playwright/test": "1.63.0",
     "@types/node": "24.13.5",
     "browserstack-node-sdk": "^1.69.0",
     "esbuild": "0.25.9",
