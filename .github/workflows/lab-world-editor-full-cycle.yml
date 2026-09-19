@@ -18,26 +18,24 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { short: "63508d08", sha: "63508d083a3897c14401099300cb6c9c3c617e83" }
-          - { short: "2fcd655c", sha: "2fcd655c634d6021c0cc968f21350f6b1ed126ce" }
-          - { short: "f0fb343d", sha: "f0fb343d08fbb470d800fb985971eeeec97f7715" }
-          - { short: "98b7795e", sha: "98b7795eff166767e338d00da5c5e5f2acb8ecc4" }
-          - { short: "85876781", sha: "858767814e0454a7727e38da392c4bbf0e55c15d" }
-          - { short: "fab246af", sha: "fab246afdde0498425f9651b3eee7b202b639fee" }
-          - { short: "58433abd", sha: "58433abd908184ede151b3c8d9fe43b96c0969c1" }
-          - { short: "4d16afca", sha: "4d16afcab299687d3701a5632b763eaf79a8af0d" }
-          - { short: "6de71de7", sha: "6de71de7c19ab6a9ff98c0848b6fcaca5f7c531e" }
-          - { short: "4e5c675e", sha: "4e5c675e3dea5e366e7d273f47d3a8fd0ceebcc1" }
-          - { short: "9473a4f5", sha: "9473a4f5ecdfac235243afc015ee8f2baeab9d0a" }
-          - { short: "6cd37c37", sha: "6cd37c37c70843d08b661bbc6d4b1ab98c6f23de" }
-          - { short: "5803b229", sha: "5803b2292ed74cc3367b85f849cfd883e3bc6972" }
-          - { short: "745b0688", sha: "745b0688bdb1f57384154667ed0e5ffcfdbf1d5a" }
-          - { short: "a5a668ec", sha: "a5a668ec50f070c2874c3f08d9847ad6ccaddb99" }
-          - { short: "6b09fe69", sha: "6b09fe699ee46f80d62b0f53be1368e59eb7cb3c" }
-          - { short: "f19872cb", sha: "f19872cb89343320e83cedf585db6c02467bae97" }
-          - { short: "0c267e39", sha: "0c267e397823c4c7acb02d872a1271d189dcef0d" }
-          - { short: "216a25d1", sha: "216a25d1a3f7f44da7140922ec7d7a03bd8874c2" }
-          - { short: "5059adf9", sha: "5059adf922a9706826b8ca340e89068ae980e83e" }
+          - { short: "267060cc", sha: "267060cc90e96196dc5273f8f431a2dd727e5324" }
+          - { short: "689c186d", sha: "689c186d0518f8bd1edc168392e62f5053e79e1c" }
+          - { short: "9f70f171", sha: "9f70f171d9283121e9b39361d4ade9d1090120d2" }
+          - { short: "db8ad029", sha: "db8ad029936a975c45069af5f4a904ffcafd6b6b" }
+          - { short: "1bb81e77", sha: "1bb81e775ad41059061b86877b8ec62b410f261a" }
+          - { short: "1275cb34", sha: "1275cb34fb054e9d61b58880ee3765520aea273f" }
+          - { short: "ce30a671", sha: "ce30a671d1b8243d53bec6c50f2168c56ca2bc5c" }
+          - { short: "8a0eca07", sha: "8a0eca07f4ceaf97528c0b0e3332307f91c97066" }
+          - { short: "83f8dc97", sha: "83f8dc9759299526fab36f8129dc954a793e12e3" }
+          - { short: "81fde8cb", sha: "81fde8cbfaadb712da0ae495f8e67c03eb9127e8" }
+          - { short: "49ed7676", sha: "49ed76767fc6134388313594151425bae21928c1" }
+          - { short: "fbbca966", sha: "fbbca966dafffcc1101b395f7d05a26981ed0db9" }
+          - { short: "50a1b181", sha: "50a1b181bd003685d441d12f4b8d34afa7ddde9c" }
+          - { short: "0c89f789", sha: "0c89f78911f8a277c4ae6d97088e492a37cf1fc9" }
+          - { short: "81c8a2aa", sha: "81c8a2aa918e5f4dd3750c44286dd0406407cba4" }
+          - { short: "ae3d9e29", sha: "ae3d9e2969cc7022d85730904bafaaa50d35ccb7" }
+          - { short: "eb3f9906", sha: "eb3f99065cb101993db3d401a29b6a4b92ff3a46" }
+          - { short: "c49ef373", sha: "c49ef3732849e02dc5a599ca70b8660f606c184c" }
 
     env:
       CANDIDATE_SHA: ${{ matrix.sha }}
