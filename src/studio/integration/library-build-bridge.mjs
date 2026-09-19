@@ -8,6 +8,7 @@
  * online: all commits still flow through Studio placement/CommandBus/authority mirror
  */
 import {seedCatalogPrefabs} from '../adapters/catalog-prefab-seeder.mjs';
+import {buildSemanticPalette,semanticRoleCounts} from '../tools/semantic-brush-profile.mjs';
 
 const text=value=>String(value??'').trim();
 
@@ -101,20 +102,22 @@ export async function startPersonalAssetPalette({root=globalThis,session,assetId
   if(!studio||!kernel||!catalog)throw new Error('LIBRARY_PALETTE_STUDIO_NOT_READY');
   for(const id of ids)await ensurePersonalVisualRegistered(root,id).catch(()=>false);
   seedCatalogPrefabs({prefabRegistry:kernel.prefabs,assetCatalog:catalog});
-  const prefabIds=[];const perAsset=Math.max(1,Math.min(4,Math.floor(Math.max(2,Number(maxTemplates)||24)/ids.length)||1));
+  const templates=[];const perAsset=Math.max(1,Math.min(4,Math.floor(Math.max(2,Number(maxTemplates)||24)/ids.length)||1));
   for(const id of ids){
     const rows=listPersonalBuildTemplates({root,session,assetId:id}).slice(0,perAsset);
-    for(const row of rows){if(prefabIds.length>=maxTemplates)break;prefabIds.push(String(row.id));}
-    if(prefabIds.length>=maxTemplates)break;
+    for(const row of rows){if(templates.length>=maxTemplates)break;templates.push(row);}
+    if(templates.length>=maxTemplates)break;
   }
+  const semanticPalette=buildSemanticPalette(templates),prefabIds=semanticPalette.map(row=>String(row.id));
   if(prefabIds.length<2)throw new Error('LIBRARY_PALETTE_TEMPLATES_NOT_READY');
   session.setMode?.('select');
   const tool=await ensureLibraryPaletteBrush(session,{root});
   const snap=Math.max(1,Math.min(32,Number(session.snapSize)||Number(kernel.document?.settings?.tileSize)||16));
-  tool.configurePalette(prefabIds,{activate:true,snap,spacing:72,jitter:.55,avoidOverlap:true,maxPreview:120});
-  const detail=Object.freeze({assetIds:ids.slice(),prefabIds:prefabIds.slice(),variants:prefabIds.length,mode:'palette-brush'});
-  try{root.dispatchEvent?.(new CustomEvent('kelo:library-palette-ready',{detail}));}catch{}
-  return Object.freeze({mode:'palette-brush',assetIds:ids,prefabIds,variants:prefabIds.length,tool});
+  tool.configurePalette(semanticPalette,{activate:true,snap,spacing:72,density:1,radius:96,minSpacing:18,avoidOverlap:true,avoidCollisions:true,collisionClearance:8,maxPreview:120,semanticPreset:'balanced'});
+  const roles=semanticRoleCounts(semanticPalette);
+  const detail=Object.freeze({assetIds:ids.slice(),prefabIds:prefabIds.slice(),variants:prefabIds.length,roles,mode:'semantic-brush'});
+  try{root.dispatchEvent?.(new CustomEvent('kelo:library-palette-ready',{detail}));root.dispatchEvent?.(new CustomEvent('kelo:semantic-brush-ready',{detail}));}catch{}
+  return Object.freeze({mode:'semantic-brush',assetIds:ids,prefabIds,variants:prefabIds.length,roles,semanticPalette,tool});
 }
 export async function startPersonalAssetPlacement({root=globalThis,session,assetId,templateId=null,prepareScenePainter=true}={}){
   const id=text(assetId);if(!id)throw new Error('LIBRARY_BUILD_ASSET_ID_REQUIRED');
@@ -129,4 +132,4 @@ export async function startPersonalAssetPlacement({root=globalThis,session,asset
   try{root.dispatchEvent?.(new CustomEvent('kelo:library-build-ready',{detail}));}catch{}
   return Object.freeze({...result,assetId:id,painterReady});
 }
-export const KELO_LIBRARY_BUILD_BRIDGE=Object.freeze({version:'kelo-library-build-bridge-v2-palette',listPersonalBuildTemplates,choosePersonalBuildTemplate,ensureLibraryPaletteBrush,ensureFastScenePainter,startPersonalAssetPalette,startPersonalAssetPlacement});
+export const KELO_LIBRARY_BUILD_BRIDGE=Object.freeze({version:'kelo-library-build-bridge-v3-semantic',listPersonalBuildTemplates,choosePersonalBuildTemplate,ensureLibraryPaletteBrush,ensureFastScenePainter,startPersonalAssetPalette,startPersonalAssetPlacement});
