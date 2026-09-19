@@ -51,7 +51,7 @@ export async function ensureLibraryPaletteBrush(session,{root=globalThis}={}){
   if(tools.libraryPaletteBrush)return tools.libraryPaletteBrush;
   const existing=kernel.tools?.get?.('libraryPaletteBrush');
   if(existing){try{tools.libraryPaletteBrush=existing;}catch{}return existing;}
-  const mod=await import('../tools/library-palette-brush-tool.mjs?v=2-semantic');
+  const mod=await import('../tools/library-palette-brush-tool.mjs?v=3-context');
   const tool=mod.createLibraryPaletteBrushTool(kernel,{root});
   kernel.tools.register(tool);
   try{tools.libraryPaletteBrush=tool;}catch{}
@@ -132,4 +132,4 @@ export async function startPersonalAssetPlacement({root=globalThis,session,asset
   try{root.dispatchEvent?.(new CustomEvent('kelo:library-build-ready',{detail}));}catch{}
   return Object.freeze({...result,assetId:id,painterReady});
 }
-export const KELO_LIBRARY_BUILD_BRIDGE=Object.freeze({version:'kelo-library-build-bridge-v3-semantic',listPersonalBuildTemplates,choosePersonalBuildTemplate,ensureLibraryPaletteBrush,ensureFastScenePainter,startPersonalAssetPalette,startPersonalAssetPlacement});
+export const KELO_LIBRARY_BUILD_BRIDGE=Object.freeze({version:'kelo-library-build-bridge-v4-context',listPersonalBuildTemplates,choosePersonalBuildTemplate,ensureLibraryPaletteBrush,ensureFastScenePainter,startPersonalAssetPalette,startPersonalAssetPlacement});

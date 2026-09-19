@@ -1,6 +1,6 @@
 # Kelo World — World Building x1000
 
-Status: Phase A + B + C implemented; Phase D foundation partially implemented (2026-09-18)
+Status: Phase A + B + C + D V1 implemented (2026-09-18)
 
 ## Thesis
 
@@ -73,21 +73,34 @@ Implemented controls:
 
 The brush paints intent, not an arbitrary bag of objects.
 
-### 3. Constraint Layer — FOUNDATION IMPLEMENTED
-Every generated point now passes cheap local rules before becoming a preview. V1 already blocks existing entities, collision rectangles, explicit exclusion rectangles and tagged protected zones (`no-build`, `keep-clear`, `spawn-clear`). Next step is surface/road/water-aware constraints:
+### 3. Constraint Layer — IMPLEMENTED V1
+Every generated point now passes cheap local rules before becoming a preview. V1 includes:
 
-- surface tag: grass / dirt / water / road / interior
-- minimum distance from roads
-- minimum distance from entrances / spawn / NPC routes
-- avoid collision rectangles
-- slope / height when those data exist
-- district / biome include-exclude tags
-- edge only, inside only, near water, near wall
+- existing entity overlap avoidance through the Studio spatial index
+- collision rectangles and clearance
+- explicit exclusion rectangles
+- protected zones: `no-build`, `keep-clear`, `spawn-clear`
+- road/path detection from authored surface cells
+- road clearance so generation keeps paths physically open
+- water detection from terrain materials
+- waterside affinity so reeds / waterside assets only appear near water
+- building-edge context through local spatial queries
+- district / biome tags with semantic rules
+- creator kill-switch: `REGLAS ON/OFF`
+
+District tags supported in V1:
+- `district:<name>` / `biome:<name>` — context identity
+- `semantic:prefer:<role>` / `semantic:boost:<role>` — increase a role locally
+- `semantic:avoid:<role>` — strongly reduce a role locally
+- `semantic:block:<role>` — forbid a role locally
+- `semantic:only:<role>` — allow only that role in the zone
+
+Still future: slope/height, navigation-route clearance and richer authored surface tags.
 
 Rules should be declarative data. Do not hard-code “tree behavior” into the brush.
 
-### 4. Rule Resolver
-After points exist, resolve relationships:
+### 4. Rule Resolver — STARTED V1
+Context now changes role weights *before* a point is accepted: roads boost roadside props, water boosts waterside props, building edges boost detail/roadside dressing, and districts can prefer/block roles. Future adjacency resolution after point generation still includes:
 
 - path edge → lamp / bench candidates
 - water edge → reeds / stones
@@ -212,9 +225,9 @@ Radius, density, seed, min spacing, scale/rotation variation and overlap avoidan
 ### Phase C — Semantic roles — DONE V1
 Automatic canopy / understory / detail / roadside / waterside / structure grouping plus weighted presets.
 
-### Phase D — Constraints — PARTIAL
-DONE: entity overlap, collision clearance, explicit exclusions, protected-zone tags.
-NEXT: road, water, district and surface-tag filters.
+### Phase D — Constraints — DONE V1
+DONE: entity overlap, collision clearance, explicit exclusions, protected zones, road/path clearance, water affinity, building-edge context, district semantic rules and creator override.
+NEXT ITERATION: navigation-route clearance, slope/height and richer surface taxonomy.
 
 ### Phase E — Biome Recipe V1
 Paint an area and regenerate it from a small recipe.
