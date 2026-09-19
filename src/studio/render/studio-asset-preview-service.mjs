@@ -25,10 +25,10 @@ export function createStudioAssetPreviewService({assetCatalog,atlasContract,devi
   function readyImage(key){const state=images.get(String(key||''));if(state?.image)return state.image;requestImage(key);return null;}
   async function warmAsset(asset){const row=resolveAsset(asset);if(!row)return false;await Promise.all((row.parts||[]).map(p=>requestImage(p.assetKey)));return true;}
 
-  function drawAsset(ctx,asset,x,y,{rotation=0,alpha=.72,placeholder=true}={}){
+  function drawAsset(ctx,asset,x,y,{rotation=0,alpha=.72,placeholder=true,scale=1}={}){
     const row=resolveAsset(asset);if(!ctx||!row)return false;
-    const w=Math.max(1,Number(row.width||row.bounds?.w)||32),h=Math.max(1,Number(row.height||row.bounds?.h)||32),rad=(Number(rotation)||0)*Math.PI/180;
-    let drew=false;ctx.save();ctx.globalAlpha*=clamp(Number(alpha)||0,0,1);ctx.translate((Number(x)||0)+w/2,(Number(y)||0)+h/2);if(rad)ctx.rotate(rad);ctx.translate(-w/2,-h/2);
+    const w=Math.max(1,Number(row.width||row.bounds?.w)||32),h=Math.max(1,Number(row.height||row.bounds?.h)||32),rad=(Number(rotation)||0)*Math.PI/180,s=clamp(Number(scale)||1,.1,8);
+    let drew=false;ctx.save();ctx.globalAlpha*=clamp(Number(alpha)||0,0,1);ctx.translate((Number(x)||0)+w*s/2,(Number(y)||0)+h*s/2);if(rad)ctx.rotate(rad);ctx.scale(s,s);ctx.translate(-w/2,-h/2);
     for(const part of row.parts||[]){const img=readyImage(part.assetKey);if(!img)continue;const s=part.source||{},o=part.offset||{},z=part.size||{};const sw=Math.max(1,Number(s.w)||w),sh=Math.max(1,Number(s.h)||h),dw=Math.max(1,Number(z.w)||sw),dh=Math.max(1,Number(z.h)||sh);ctx.save();ctx.globalAlpha*=Number.isFinite(Number(part.opacity))?clamp(Number(part.opacity),0,1):1;ctx.imageSmoothingEnabled=false;ctx.drawImage(img,Number(s.x)||0,Number(s.y)||0,sw,sh,Number(o.x)||0,Number(o.y)||0,dw,dh);ctx.restore();drew=true;}
     if(!drew&&placeholder){ctx.globalAlpha=.16;ctx.fillRect(0,0,w,h);}ctx.restore();return drew;
   }

@@ -29,13 +29,13 @@ async function loadStudioCore(root,phoneBoot){
   const componentsMod=await import('./components/kelo-components.mjs');await wait();abort();
   const importerMod=await import('./adapters/current-world-importer.mjs');await wait();abort();
   setWorldLaunchStatus(root,'Cargando servicios…');
-  const previewMod=await import('./render/studio-asset-preview-service.mjs');await wait();abort();
+  const previewMod=await import('./render/studio-asset-preview-service.mjs?v=semantic-brush-1');await wait();abort();
   const storeMod=await import('./storage/indexeddb-studio-store.mjs');await wait();abort();
   const profilerMod=await import('./performance/studio-profiler.mjs');await wait();abort();
   const compilerMod=await import('./compiler/world-compiler.mjs');await wait();abort();
   let overlayMod=null,workerMod=null,touchMod=null,rangeMod=null;
   if(!phoneBoot){
-    overlayMod=await import('./render/studio-overlay-renderer.mjs');await wait();abort();
+    overlayMod=await import('./render/studio-overlay-renderer.mjs?v=semantic-brush-1');await wait();abort();
     workerMod=await import('./compiler/worker-client.mjs');await wait();abort();
   }
   touchMod=await import('./input/studio-placement-touch-controller.mjs');await wait();abort();

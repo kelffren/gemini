@@ -12,9 +12,11 @@ import {
   startPersonalAssetPlacement
 } from '../src/studio/integration/library-build-bridge.mjs';
 import {createLibraryPaletteBrushTool} from '../src/studio/tools/library-palette-brush-tool.mjs';
+import {inferSemanticRole,buildSemanticPalette} from '../src/studio/tools/semantic-brush-profile.mjs';
 
 const bridgeSource=fs.readFileSync(new URL('../src/studio/integration/library-build-bridge.mjs',import.meta.url),'utf8');
 const brushSource=fs.readFileSync(new URL('../src/studio/tools/library-palette-brush-tool.mjs',import.meta.url),'utf8');
+const semanticSource=fs.readFileSync(new URL('../src/studio/tools/semantic-brush-profile.mjs',import.meta.url),'utf8');
 const vaultSource=fs.readFileSync(new URL('../asset-vault.html',import.meta.url),'utf8');
 const launcherSource=fs.readFileSync(new URL('../src/ui/asset-library-launcher.js',import.meta.url),'utf8');
 const indexSource=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8');
@@ -25,6 +27,7 @@ assert.doesNotMatch(bridgeSource,/kernel\.execute\s*\(/,'library build bridge mu
 assert.match(bridgeSource,/seedCatalogPrefabs/,'integrated PropertyCatalog assets must enter the existing Studio prefab registry');
 assert.match(bridgeSource,/session\.beginPlacement/,'single visual assets must use canonical ghost placement');
 assert.match(bridgeSource,/library-palette-brush-tool\.mjs/,'multi-asset build must route through the isolated palette tool');
+assert.match(bridgeSource,/buildSemanticPalette/,'multi-asset handoff must classify semantic roles before brush activation');
 assert.match(bridgeSource,/paint-copies-tool\.mjs/,'single fast build must still be able to wake Scene Painter');
 
 // Palette tool is allowed to commit, but only by composing ordinary reversible entity.place commands.
@@ -32,7 +35,13 @@ assert.match(brushSource,/createPlaceEntityCommand/,'palette brush must use ordi
 assert.match(brushSource,/createCompositeCommand/,'one palette gesture must be one composite history action');
 assert.match(brushSource,/kernel\.execute\(command\)/,'palette brush must commit through Studio CommandBus');
 assert.doesNotMatch(brushSource,/KELO_WORLD_EDIT/,'palette brush must not talk directly to World authority');
-assert.match(brushSource,/MAX_PREVIEW\s*=\s*180/,'palette preview must stay bounded for mobile');
+assert.match(brushSource,/MAX_PREVIEW\s*=\s*180/,'semantic preview must stay bounded for mobile');
+assert.match(brushSource,/density:/,'semantic brush must expose density');
+assert.match(brushSource,/radius:/,'semantic brush must expose area radius');
+assert.match(brushSource,/avoidCollisions:/,'semantic brush must support collision exclusion');
+assert.match(brushSource,/blockedZoneTags/,'semantic brush must support protected zones');
+assert.match(semanticSource,/SEMANTIC_PRESETS/,'semantic presets must be data-driven');
+for(const [label,expected] of [['Oak Tree','canopy'],['Fern Patch','understory'],['Rock Small','detail'],['Street Lamp','roadside'],['River Reeds','waterside'],['Stone House','structure'],['Mystery Asset','generic']])assert.equal(inferSemanticRole({label}),expected);
 
 // Library keeps explicit persistence before either single or palette handoff.
 assert.match(vaultSource,/data-act="build"/,'buildable cards must expose Poner');
@@ -43,8 +52,8 @@ assert.match(vaultSource,/await integrateContent\(id\)/,'palette assets must int
 assert.match(vaultSource,/kelo:build-personal-palette/,'library must hand the persisted palette to the game');
 assert.match(vaultSource,/state\.palette\.clear\(\)/,'active-page palette must be disposable on page hibernation');
 assert.match(launcherSource,/platform\.openWorkspace\('world'\)/,'launcher must open the real World workspace directly');
-assert.match(launcherSource,/library-build-bridge\.mjs\?v=2/,'launcher must use palette-aware build bridge');
-assert.match(indexSource,/asset-library-launcher\.js\?v=9-build-palette/,'boot must cache-bust the palette launcher');
+assert.match(launcherSource,/library-build-bridge\.mjs\?v=3/,'launcher must use semantic-aware build bridge');
+assert.match(indexSource,/asset-library-launcher\.js\?v=10-semantic-brush/,'boot must cache-bust the semantic launcher');
 
 // Pure template selection contract.
 const catalogRows=[
@@ -83,35 +92,49 @@ assert.equal(beginId,result.prefabId);
 assert.deepEqual(moveCall,{x:321,y:654,options:{snap:32}});
 assert.equal(result.painterReady,false);
 
-// Functional palette gesture: deterministic multi-prefab previews, one reversible command.
+// Functional Semantic Brush: role-aware, deterministic, constrained and one reversible command.
 const brushPrefabs=new Map([
-  ['p:tree',{id:'p:tree',bounds:{w:28,h:44}}],
-  ['p:rock',{id:'p:rock',bounds:{w:24,h:20}}],
-  ['p:flower',{id:'p:flower',bounds:{w:16,h:18}}]
+  ['p:tree',{id:'p:tree',label:'Oak Tree',bounds:{w:28,h:44}}],
+  ['p:fern',{id:'p:fern',label:'Fern Patch',bounds:{w:24,h:20}}],
+  ['p:rock',{id:'p:rock',label:'Rock Small',bounds:{w:16,h:18}}]
 ]);
-const document={entities:[],settings:{tileSize:32}};
-let lastCommand=null,executeCount=0,selected=[];
-const fakeKernel={
-  prefabs:{resolve:id=>brushPrefabs.get(String(id))||null},
-  spatial:{queryRect:()=>[]},
-  document,
-  input:{register:()=>()=>{},push:()=>{},pop:()=>{}},
-  selection:{set:value=>{selected=Array.isArray(value)?value:[value];}},
-  async execute(command){executeCount++;lastCommand=command;await command.execute({document,kernel:fakeKernel});}
-};
-const brush=createLibraryPaletteBrushTool(fakeKernel,{root:{}});
-brush.configurePalette(['p:tree','p:rock','p:flower'],{spacing:48,jitter:0,snap:16,seed:23,maxPreview:20,avoidOverlap:false});
-brush.beginAt(0,0);brush.strokeTo(220,0);
-const before=brush.getPreviews();
-assert.ok(before.length>=4,'palette stroke should create several bounded previews');
-assert.ok(before.every(row=>brushPrefabs.has(row.prefabId)),'every preview must resolve from selected palette prefabs');
-const committed=await brush.commit();
-assert.equal(executeCount,1,'one gesture must execute exactly one Studio command');
-assert.equal(document.entities.length,committed.length);
-assert.equal(selected.length,committed.length);
-assert.equal(lastCommand.type,'entity.batch.library-palette');
-await lastCommand.undo({document,kernel:fakeKernel});
-assert.equal(document.entities.length,0,'palette gesture must undo as one action');
-brush.destroy();
+const semanticPalette=buildSemanticPalette([...brushPrefabs.values()]);
+assert.deepEqual(semanticPalette.map(row=>row.role),['canopy','understory','detail']);
 
-console.log('PASS library-build-flow-audit: single ghost + multi-asset Build Palette remain Baúl-first and CommandBus-authoritative');
+function makeBrushHarness(){
+  const document={entities:[],settings:{tileSize:32},navigation:{collisions:{blocked:{collisionId:'blocked',x:0,y:0,w:40,h:40}}},zones:[{x:300,y:0,w:40,h:40,tags:['no-build']}]};
+  let lastCommand=null,executeCount=0,selected=[];
+  const kernel={
+    prefabs:{resolve:id=>brushPrefabs.get(String(id))||null},
+    spatial:{queryRect:()=>[]},
+    document,
+    input:{register:()=>()=>{},push:()=>{},pop:()=>{}},
+    selection:{set:value=>{selected=Array.isArray(value)?value:[value];}},
+    async execute(command){executeCount++;lastCommand=command;await command.execute({document,kernel});}
+  };
+  return{kernel,get:()=>({lastCommand,executeCount,selected})};
+}
+function paintDeterministic(harness){
+  const brush=createLibraryPaletteBrushTool(harness.kernel,{root:{showToast(){}}});
+  brush.configurePalette(semanticPalette,{spacing:48,density:1,radius:0,minSpacing:0,snap:16,seed:99,maxPreview:30,avoidOverlap:false,avoidCollisions:true,collisionClearance:0});
+  brush.beginAt(8,8);
+  assert.equal(brush.getPreviews().length,0,'collision area must reject semantic preview');
+  brush.strokeTo(240,8);
+  const rows=brush.getPreviews().map(row=>({prefabId:row.prefabId,transform:{...row.transform}}));
+  return{brush,rows};
+}
+const first=makeBrushHarness(),a=paintDeterministic(first);
+const second=makeBrushHarness(),b=paintDeterministic(second);
+assert.ok(a.rows.length>=3,'semantic stroke should generate several previews');
+assert.deepEqual(a.rows,b.rows,'same seed and inputs must regenerate identical previews');
+assert.ok(a.rows.some(row=>row.transform.scale!==1),'semantic brush should author deterministic scale variation');
+assert.ok(a.rows.every(row=>[0,90,180,270].includes(row.transform.rotation)),'semantic rotations must remain quarter-turn safe');
+const committed=await a.brush.commit();
+assert.equal(first.get().executeCount,1,'one semantic gesture must execute exactly one Studio command');
+assert.equal(first.get().lastCommand.type,'entity.batch.library-semantic-brush');
+assert.equal(first.kernel.document.entities.length,committed.length);
+assert.equal(first.get().selected.length,committed.length);
+await first.get().lastCommand.undo({document:first.kernel.document,kernel:first.kernel});
+assert.equal(first.kernel.document.entities.length,0,'semantic gesture must undo as one action');
+a.brush.destroy();b.brush.destroy();
+console.log('PASS library-build-flow-audit: single ghost + deterministic Semantic Brush remain Baúl-first, bounded and CommandBus-authoritative');
