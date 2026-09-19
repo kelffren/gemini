@@ -2,7 +2,7 @@
   "schema_version": 2,
   "id": "BUG-0005",
   "title": "PvP AutoReducer can raise iPhone quality when connection degrades",
-  "status": "FIXED_PENDING_VERIFY",
+  "status": "VERIFIED",
   "severity": "medium",
   "area": [
     "pvp",
@@ -159,23 +159,19 @@
       "validation": {
         "environment": "PR #410 GitHub Actions",
         "method": "Permanent quality-floor audit plus Performance, PvP first-use and Main Stability mobile gates on exact PR bytes.",
-        "result": "NOT_RUN",
+        "result": "PASS",
         "evidence": [
-          "GitHub Actions checks are attached to PR #410 and were still running when the candidate record was created."
+          "PR #410 candidate head fae997a82a6c8b3c41e95993b202de663b21b83c: Main Stability Gate success.",
+          "PR #410 candidate head fae997a82a6c8b3c41e95993b202de663b21b83c: PvP First-Use Regression success including visible PvP + dodge and iPhone 8s walk.",
+          "PR #410 candidate head fae997a82a6c8b3c41e95993b202de663b21b83c: Kelo Weightless Stack success including observed boot transfer ratchet.",
+          "Squash merged to main as a9671ff39b0b99fa594d153dcf182eec2549b29e."
         ]
       },
-      "conclusion": "Candidate implementation is complete enough for independent CI verification; no success claim is made before the gates finish.",
+      "conclusion": "Verified: the monotonic floor fix, lazy PvP descriptors, exact quality recovery, mobile flow and boot-weight contracts all passed on the exact PR bytes and were merged to main.",
       "do_not_repeat_without": "If the permanent monotonicity audit passes but real-device telemetry shows insufficient benefit, tune only presentation budgets with measured before/after evidence; do not reintroduce manual-quality overrides."
     }
   ],
   "next_best_actions": [
-    {
-      "priority": 1,
-      "action": "Complete PR #410 Main Stability, PvP First-Use and pvp-auto-reducer audits on the exact candidate bytes.",
-      "reason": "These gates independently test the new monotonic policy, lazy PvP integration and mandatory 390x844 sustained-walk freeze firewall.",
-      "expected_signal": "Quality audit proves performance cannot be raised to medium, PvP first-use stays functional, and mobile sustained walking remains responsive.",
-      "stop_condition": "If any gate fails, keep BUG-0005 FIXED_PENDING_VERIFY, record the failure and repair the candidate before merge."
-    },
     {
       "priority": 2,
       "action": "Measure real-device PvP frame telemetry under intentionally stressed connection/render conditions.",
@@ -185,7 +181,7 @@
     }
   ],
   "fix": {
-    "status": "candidate_pr_open",
+    "status": "merged",
     "commits": [
       "b9085e68767a0767b86ebcb1e94af54beaa70150",
       "b4f64ba97612cadb6cfe19aba59c432e02e84c21",
@@ -200,14 +196,23 @@
       "src/core/feature-registry.js",
       "src/core/module-loader.js"
     ],
-    "summary": "PR #410 replaces manual quality overrides with a monotonic temporary floor, adds two PvP-only profiles below normal phone performance, and freezes the underlying autotuner while the floor is active so recovery restores the exact prior quality policy."
+    "summary": "PR #410 replaces manual quality overrides with a monotonic temporary floor, adds two PvP-only profiles below normal phone performance, and freezes the underlying autotuner while the floor is active so recovery restores the exact prior quality policy.",
+    "merge_commit": "a9671ff39b0b99fa594d153dcf182eec2549b29e"
   },
   "verification": {
-    "status": "PENDING",
-    "method": "Independent GitHub Actions on PR #410; permanent regression is `npm run audit:pvp-auto-reducer` plus mobile/PvP stability gates.",
-    "evidence": [],
-    "verified_by": null,
-    "verified_at": null
+    "status": "VERIFIED",
+    "method": "PR #410 exact-head GitHub Actions before squash merge; candidate head fae997a82a6c8b3c41e95993b202de663b21b83c was 0 commits behind main and all blocking gates completed success. Squash merge a9671ff39b0b99fa594d153dcf182eec2549b29e contains those validated bytes.",
+    "evidence": [
+      "PR #410: Main Stability Gate — success",
+      "PR #410: PvP First-Use Regression — success",
+      "PR #410: Kelo Weightless Stack — success",
+      "PR #410: Evergreen Runtime Compatibility — success",
+      "PR #410: LIVE Pages Smoke — success",
+      "PR #410: iPhone 390x844 sustained-walk firewall — success",
+      "PR #410: npm run audit:pvp-auto-reducer — success"
+    ],
+    "verified_by": "independent GitHub Actions",
+    "verified_at": "2026-09-18"
   },
   "blocked_by": [],
   "duplicate_of": null,
@@ -222,5 +227,5 @@
     "This bug was discovered while continuing the requested PvP AutoReducer implementation; it is separate from the PvP first-use lifecycle defect in BUG-0004.",
     "The candidate deliberately does not mutate canvas/camera/zoom from KeloPvPAutoReducer because ENGINE_MAP assigns those responsibilities elsewhere."
   ],
-  "updated_at": "2026-09-17"
+  "updated_at": "2026-09-18"
 }
