@@ -18,6 +18,8 @@ const GIT_BLOB_RE = /^[0-9a-f]{40,64}$/i;
 const STAGE_CACHE_PREFIX = 'kelo-update-stage-v3-';
 const ASSET_CACHE_NAME = 'kelo-assets-v3';
 const META_CACHE_NAME = 'kelo-update-meta-v3';
+const WARM_CACHE_NAME = 'kelo-warm-v1';
+const WARM_CACHE_PREFIX = 'kelo-warm-';
 const MANIFEST_META_PATH = '__kelo_update_manifest_v3__.json';
 const ACTIVE_BUILD_META_PATH = '__kelo_update_active_build_v3__.json';
 function normalizeBuild(value) { const build = String(value || '').trim(); return BUILD_RE.test(build) ? build.toLowerCase() : null; }
@@ -67,14 +69,35 @@ async function stagedResponse(request, url, build) {
 self.addEventListener('install', () => { self.skipWaiting(); });
 self.addEventListener('activate', (event) => {
   event.waitUntil((async () => {
-    try { const keys = await caches.keys(); await Promise.all(keys.map((k) => caches.delete(k))); } catch (_) {}
+    // Keep updater/content-addressed caches intact. Only retire obsolete warm-cache generations.
+    try {
+      const keys = await caches.keys();
+      await Promise.all(keys.filter((k) => k.startsWith(WARM_CACHE_PREFIX) && k !== WARM_CACHE_NAME).map((k) => caches.delete(k)));
+    } catch (_) {}
+    try { if (self.registration.navigationPreload) await self.registration.navigationPreload.enable(); } catch (_) {}
     await self.clients.claim();
   })());
 });
 self.addEventListener('message', (event) => {
   const data = event.data || {};
   if (data.type === 'KELO_SKIP_WAITING') { self.skipWaiting(); return; }
-  if (data.type === 'KELO_SET_ACTIVE_BUILD') { const build = normalizeBuild(data.build); if (build) event.waitUntil(persistActiveBuild(build)); }
+  if (data.type === 'KELO_SET_ACTIVE_BUILD') { const build = normalizeBuild(data.build); if (build) event.waitUntil(persistActiveBuild(build)); return; }
+  if (data.type === 'KELO_WARM_CACHE') {
+    const urls = Array.isArray(data.urls) ? data.urls.slice(0, 96) : [];
+    event.waitUntil((async () => {
+      const cache = await caches.open(WARM_CACHE_NAME);
+      for (const raw of urls) {
+        try {
+          const url = new URL(String(raw || ''), self.registration.scope);
+          if (url.origin !== self.location.origin) continue;
+          if (/\/(api|auth|session|supabase|realtime)\b/i.test(url.pathname)) continue;
+          const request = new Request(url.href, { credentials: 'same-origin', cache: 'reload' });
+          const response = await fetch(request);
+          if (response && response.ok && response.type !== 'opaque') await cache.put(url.href, response.clone());
+        } catch (_) {}
+      }
+    })());
+  }
 });
 self.addEventListener('fetch', (event) => {
   const request = event.request; if (request.method !== 'GET') return;
@@ -88,7 +111,14 @@ self.addEventListener('fetch', (event) => {
     if (request.mode !== 'navigate') {
       const build = await resolveActiveBuild();
       if (build) { const cached = await contentAddressedResponse(url, build); if (cached) return cached; }
+      try { const warm = await (await caches.open(WARM_CACHE_NAME)).match(url.href); if (warm) return warm; } catch (_) {}
+      return fetch(request);
     }
-    return fetch(request);
+    // Navigation stays network-owned; preload overlaps the network request with service-worker startup.
+    try { const preloaded = await event.preloadResponse; if (preloaded) return preloaded; } catch (_) {}
+    try { return await fetch(request); } catch (error) {
+      try { const fallback = await (await caches.open(WARM_CACHE_NAME)).match(new URL('index.html', self.registration.scope).href); if (fallback) return fallback; } catch (_) {}
+      throw error;
+    }
   })());
 });
