@@ -18,6 +18,7 @@ const indexSource=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8
 
 assert.match(resolverSource,/surfaceNeighborhood/,'road + water must use a bounded local terrain neighborhood');
 assert.match(resolverSource,/kernel\.spatial\?\.queryRect/,'building context must use Studio spatial index');
+assert.match(resolverSource,/zoneBuckets/,'district context must be chunk-bucketed before point queries');
 assert.doesNotMatch(resolverSource,/Object\.values\(document\.terrain/,'semantic context must never scan the full terrain map per point');
 assert.doesNotMatch(resolverSource,/KELO_WORLD_EDIT/,'semantic context is read-only and must not call authority');
 assert.match(brushSource,/smartContext:/,'brush must expose context capability state');
