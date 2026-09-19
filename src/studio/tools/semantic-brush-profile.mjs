@@ -12,12 +12,12 @@ export const SEMANTIC_ROLES=Object.freeze(['canopy','understory','detail','roads
 export const SEMANTIC_PRESETS=Object.freeze(['balanced','principal','filler','detail']);
 
 const ROLE_RULES=Object.freeze([
-  ['canopy',/(tree|trees|oak|pine|birch|willow|palm|maple|cedar|trunk|canopy|arbol|árbol|pino|roble|palmera)/i],
-  ['understory',/(bush|shrub|fern|hedge|grass|weed|vine|moss|bamboo|arbusto|helecho|seto|pasto|hierba|musgo)/i],
-  ['waterside',/(reed|lily|lotus|water|river|pond|coral|kelp|driftwood|cattail|junco|nenufar|nenúfar|rio|río|agua)/i],
-  ['roadside',/(lamp|lantern|bench|sign|fence|post|bollard|barrel|crate|cart|farol|banco|letrero|señal|senal|valla|cerca|poste|barril|caja)/i],
-  ['structure',/(house|home|building|wall|door|roof|tower|bridge|gate|arch|shop|castle|casa|edificio|pared|puerta|techo|torre|puente|porton|portón|arco|tienda|castillo)/i],
-  ['detail',/(flower|flowers|rock|stone|pebble|mushroom|stump|log|debris|leaf|leaves|bone|skull|flowerbed|flor|flores|roca|piedra|hongo|seta|tronco|hoja|hojas|escombro)/i]
+  ['canopy',/\b(tree|trees|oak|pine|birch|willow|palm|maple|cedar|trunk|canopy|arbol|árbol|pino|roble|palmera)\b/i],
+  ['understory',/\b(bush|shrub|fern|hedge|grass|weed|vine|moss|bamboo|arbusto|helecho|seto|pasto|hierba|musgo)\b/i],
+  ['waterside',/\b(reed|lily|lotus|water|river|pond|coral|kelp|driftwood|cattail|junco|nenufar|nenúfar|rio|río|agua)\b/i],
+  ['roadside',/\b(lamp|lantern|bench|sign|fence|post|bollard|barrel|crate|cart|farol|banco|letrero|señal|senal|valla|cerca|poste|barril|caja)\b/i],
+  ['structure',/\b(house|home|building|wall|door|roof|tower|bridge|gate|arch|shop|castle|casa|edificio|pared|puerta|techo|torre|puente|porton|portón|arco|tienda|castillo)\b/i],
+  ['detail',/\b(flower|flowers|rock|stone|pebble|mushroom|stump|log|debris|leaf|leaves|bone|skull|flowerbed|flor|flores|roca|piedra|hongo|seta|tronco|hoja|hojas|escombro)\b/i]
 ]);
 
 const ROLE_DEFAULTS=Object.freeze({
