@@ -19,6 +19,7 @@ import {
   semanticPresetLabel,
   semanticRoleCounts
 } from './semantic-brush-profile.mjs';
+import {createSemanticContextResolver} from './semantic-context-resolver.mjs';
 
 const INPUT_CONTEXT='studio-library-palette-brush';
 const MAX_PALETTE=24;
@@ -68,6 +69,13 @@ function normalizeSettings(input={}){
     avoidOverlap:input.avoidOverlap!==false,
     avoidCollisions:input.avoidCollisions!==false,
     collisionClearance:clamp(input.collisionClearance,0,128,8),
+    smartContext:input.smartContext!==false,
+    strictAffinity:input.strictAffinity!==false,
+    roadClearance:clamp(input.roadClearance,0,192,32),
+    roadAffinity:clamp(input.roadAffinity,16,256,96),
+    waterClearance:clamp(input.waterClearance,0,192,8),
+    waterAffinity:clamp(input.waterAffinity,16,256,96),
+    buildingAffinity:clamp(input.buildingAffinity,16,256,88),
     blockedZoneTags:Array.isArray(input.blockedZoneTags)?input.blockedZoneTags.map(v=>String(v).toLowerCase()).filter(Boolean):[...DEFAULT_BLOCKED_ZONE_TAGS],
     exclusions:Array.isArray(input.exclusions)?input.exclusions.map(rectFrom).filter(Boolean):[],
     semanticPreset:normalizeSemanticPreset(input.semanticPreset||'balanced'),
@@ -119,16 +127,21 @@ export function createLibraryPaletteBrushTool(kernel,{root=globalThis}={}){
   }
   function cycleDensity(){settings=normalizeSettings({...settings,density:nextStep(settings.density,DENSITY_STEPS)});stroke=null;emit();return settings.density;}
   function cycleRadius(){settings=normalizeSettings({...settings,radius:nextStep(settings.radius,RADIUS_STEPS)});stroke=null;emit();return settings.radius;}
-  function weightedItem(h){
+  function toggleSmartContext(){settings=normalizeSettings({...settings,smartContext:!settings.smartContext});stroke=null;emit();notify(`Reglas ${settings.smartContext?'ON':'OFF'}`);return settings.smartContext;}
+  function weightedItem(h,context=null){
     let total=0;const weighted=[];
-    for(const item of palette){const weight=applySemanticPreset(item,settings.semanticPreset);weighted.push([item,weight]);total+=weight;}
-    if(!weighted.length)return null;
+    for(const item of palette){
+      const semanticWeight=applySemanticPreset(item,settings.semanticPreset),contextWeight=stroke?.contextResolver?.roleWeightMultiplier?.(item.role,context)||1,weight=semanticWeight*contextWeight;
+      if(!(weight>0))continue;
+      weighted.push([item,weight]);total+=weight;
+    }
+    if(!weighted.length||!(total>0))return null;
     let cursor=unit(h)*total;
     for(const [item,weight] of weighted){cursor-=weight;if(cursor<=0)return item;}
     return weighted[weighted.length-1][0];
   }
   function pick(x,y,index){
-    const h=hash(settings.seed,x,y,index),item=weightedItem(h);
+    const h=hash(settings.seed,x,y,index),context=stroke?.contextResolver?.contextAt?.(x,y)||null,item=weightedItem(h,context);
     if(!item)return null;
     const j1=unit(hash(h,x+17,y-31,index+11))*2-1,j2=unit(hash(h,y+47,x-13,index+29))*2-1;
     const radius=settings.radius*item.radiusScale;
@@ -184,6 +197,7 @@ export function createLibraryPaletteBrushTool(kernel,{root=globalThis}={}){
     for(const exclusion of stroke?.constraints?.exclusions||[])if(rectIntersects(rect,exclusion))return'exclusion';
     for(const collision of stroke?.constraints?.collisions||[])if(rectIntersects(rect,collision))return'collision';
     for(const zone of stroke?.constraints?.blockedZones||[])if(rectIntersects(rect,zone))return'zone';
+    const semanticReason=stroke?.contextResolver?.rejectReason?.(item,rect);if(semanticReason)return semanticReason;
     if(existingOverlap(rect)||generatedOverlap(rect,rows))return'overlap';
     if(tooClose(rect,item,rows))return'spacing';
     return null;
@@ -206,10 +220,11 @@ export function createLibraryPaletteBrushTool(kernel,{root=globalThis}={}){
   }
   function beginAt(x,y){
     if(!active||!palette.length||committing)return null;
+    const contextResolver=createSemanticContextResolver(kernel,{enabled:settings.smartContext,strictAffinity:settings.strictAffinity,roadClearance:settings.roadClearance,roadAffinity:settings.roadAffinity,waterClearance:settings.waterClearance,waterAffinity:settings.waterAffinity,buildingAffinity:settings.buildingAffinity});
     stroke={
       rows:[],cells:new Set(),index:0,last:{x:num(x),y:num(y)},distance:0,
-      constraints:snapshotConstraints(),
-      rejected:{collision:0,zone:0,exclusion:0,overlap:0,spacing:0}
+      constraints:snapshotConstraints(),contextResolver,
+      rejected:{collision:0,zone:0,exclusion:0,overlap:0,spacing:0,road:0,water:0,district:0,'road-affinity':0,'water-affinity':0}
     };
     addStamp(x,y);emit();return state();
   }
@@ -272,12 +287,13 @@ export function createLibraryPaletteBrushTool(kernel,{root=globalThis}={}){
     const doc=root?.document,shell=doc?.getElementById?.('kelo-studio-live');if(!doc?.body||!shell)return false;
     css(doc);if(panel?.isConnected)return true;
     panel=doc.createElement('section');panel.className='ks-library-palette';panel.dataset.keloStudioUi='1';
-    panel.innerHTML='<div class="klp-info"><b>SEMANTIC BRUSH</b><small data-klp="status">Preparando…</small></div><button type="button" data-klp="density">DENS</button><button type="button" data-klp="radius">ÁREA</button><button type="button" data-klp="mode">MODO</button><button type="button" data-klp="mix">MEZCLA</button><button type="button" data-klp="stop">SALIR</button>';
+    panel.innerHTML='<div class="klp-info"><b>SEMANTIC BRUSH</b><small data-klp="status">Preparando…</small></div><button type="button" data-klp="density">DENS</button><button type="button" data-klp="radius">ÁREA</button><button type="button" data-klp="mode">MODO</button><button type="button" data-klp="context">REGLAS</button><button type="button" data-klp="mix">MEZCLA</button><button type="button" data-klp="stop">SALIR</button>';
     panel.addEventListener('click',event=>{
       const action=event.target?.closest?.('[data-klp]')?.dataset.klp;
       if(action==='density')cycleDensity();
       else if(action==='radius')cycleRadius();
       else if(action==='mode'){cycleSemanticPreset();notify(`Modo ${semanticPresetLabel(settings.semanticPreset)}`);}
+      else if(action==='context')toggleSmartContext();
       else if(action==='mix')remix();
       else if(action==='stop')stop();
     });
@@ -302,7 +318,8 @@ export function createLibraryPaletteBrushTool(kernel,{root=globalThis}={}){
     if(counts.structure)parts.push(`S${counts.structure}`);
     if(!parts.length&&counts.generic)parts.push(`G${counts.generic}`);
     const el=panel.querySelector('[data-klp="status"]');
-    if(el)el.textContent=committing?'Guardando gesto…':`${semanticPresetLabel(settings.semanticPreset)} · dens ${settings.density} · área ${settings.radius} · ${parts.join(' ')} · ${stroke?.rows?.length||0}/${settings.maxPreview}`;
+    const contextButton=panel.querySelector('[data-klp="context"]');if(contextButton)contextButton.textContent=settings.smartContext?'REGLAS ON':'REGLAS OFF';
+    if(el)el.textContent=committing?'Guardando gesto…':`${semanticPresetLabel(settings.semanticPreset)} · dens ${settings.density} · área ${settings.radius} · ${settings.smartContext?'CTX':'LIBRE'} · ${parts.join(' ')} · ${stroke?.rows?.length||0}/${settings.maxPreview}`;
   }
   function destroy(){
     if(destroyed)return;destroyed=true;try{stop();}catch{}
@@ -313,7 +330,7 @@ export function createLibraryPaletteBrushTool(kernel,{root=globalThis}={}){
 
   return Object.freeze({
     id:'libraryPaletteBrush',
-    configurePalette,configure,setSemanticPreset,cycleSemanticPreset,cycleDensity,cycleRadius,start,stop,remix,
+    configurePalette,configure,setSemanticPreset,cycleSemanticPreset,cycleDensity,cycleRadius,toggleSmartContext,start,stop,remix,
     beginAt,strokeTo,commit,cancelStroke,state,destroy,
     getPalette:()=>palette.map(copy),
     getPreviewRefs:()=>stroke?.rows||EMPTY,
