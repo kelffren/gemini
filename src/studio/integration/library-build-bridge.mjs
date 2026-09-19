@@ -51,7 +51,7 @@ export async function ensureLibraryPaletteBrush(session,{root=globalThis}={}){
   if(tools.libraryPaletteBrush)return tools.libraryPaletteBrush;
   const existing=kernel.tools?.get?.('libraryPaletteBrush');
   if(existing){try{tools.libraryPaletteBrush=existing;}catch{}return existing;}
-  const mod=await import('../tools/library-palette-brush-tool.mjs');
+  const mod=await import('../tools/library-palette-brush-tool.mjs?v=2-semantic');
   const tool=mod.createLibraryPaletteBrushTool(kernel,{root});
   kernel.tools.register(tool);
   try{tools.libraryPaletteBrush=tool;}catch{}
