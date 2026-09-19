@@ -61,8 +61,8 @@ PvP first-use
   → baseline + EMA + jitter
   → degradación sostenida
      → warning con grace period
-     → KELO_PERF.setQualityFloor('pvp_low')
-     → si empeora: `pvp_emergency`
+     → construir descriptor lazy `pvp_low` y pasarlo a `KELO_PERF.setQualityFloor(profile)`
+     → si empeora: descriptor lazy `pvp_emergency`
   → recuperación sostenida
      → limpiar el floor y volver a la política base/manual previa
 ```
@@ -92,7 +92,7 @@ Nunca se permite degradar corrección competitiva para “ganar FPS”.
 7. La recuperación usa hysteresis; no oscila calidad cada sample.
 8. Al salir de PvP/desconectarse/deshabilitarse restaura calidad y limpia el episodio.
 9. El aviso puede ser reconocido sin desactivar la protección.
-10. La feature se carga lazy con el paquete PvP, no en el first-playable social.
+10. La feature y sus descriptores `pvp_low`/`pvp_emergency` se cargan lazy con el paquete PvP; first-playable conserva solo la primitive genérica de floor en `KELO_PERF`.
 11. El quality floor es monotónico: nunca puede mejorar la calidad por encima del perfil base/manual actual.
 12. Mientras el floor está activo, `KELO_PERF` congela el autotuning base para que la recuperación vuelva exactamente al perfil previo, sin una mejora oculta acumulada.
 13. El autotuning genérico termina en `performance`; `pvp_low` y `pvp_emergency` son exclusivos de una solicitud explícita de floor.
