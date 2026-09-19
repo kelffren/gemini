@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: CORE / MOBILE BOOT
  * owner: warm-cache-client
- * purpose: warm the next launch after first playable frame without competing with initial 4G/5G boot
+ * purpose: warm the next launch in small idle batches without competing with gameplay or initial 4G/5G boot
  */
 (function(){
   'use strict';
@@ -57,22 +57,31 @@
     if(type==='3g') return 'medium';
     return 'fast';
   }
+  var sent=Object.create(null);
   function post(urls){
+    urls=urls.filter(function(url){if(sent[url])return false;sent[url]=1;return true;});
+    if(!urls.length)return;
     navigator.serviceWorker.ready.then(function(reg){
       var worker=reg.active||navigator.serviceWorker.controller;
       if(worker) worker.postMessage({type:'KELO_WARM_CACHE',urls:urls});
     }).catch(function(){});
   }
+  function warmBatch(list,index,size,delay){
+    if(document.hidden)return;
+    var batch=list.slice(index,index+size);if(!batch.length)return;post(batch);
+    setTimeout(function(){warmBatch(list,index+size,size,delay);},delay);
+  }
   function warm(){
     var p=profile();
-    if(p==='save'||p==='slow') return;
-    post(CORE);
-    if(p==='fast') setTimeout(function(){post(PLAZA);},3500);
+    if(p==='save'||p==='slow'||document.hidden) return;
+    warmBatch(CORE,0,p==='medium'?2:4,p==='medium'?1200:650);
+    if(p==='fast') setTimeout(function(){warmBatch(PLAZA,0,3,900);},5000);
   }
   function schedule(){
     if('requestIdleCallback' in window) requestIdleCallback(warm,{timeout:4500});
     else setTimeout(warm,2200);
   }
 
+  document.addEventListener('visibilitychange',function(){if(!document.hidden)setTimeout(schedule,1200);},{passive:true});
   navigator.serviceWorker.register('./sw.js').then(function(){ schedule(); }).catch(function(){});
 })();
