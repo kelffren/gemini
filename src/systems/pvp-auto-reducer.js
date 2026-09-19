@@ -14,7 +14,11 @@
 'use strict';
 if(root.KeloPvPAutoReducer)return;
 
-const VERSION='pvp-auto-reducer-v2.0.0-quality-floor';
+const VERSION='pvp-auto-reducer-v2.1.0-lazy-floors';
+const QUALITY_FLOORS=Object.freeze({
+  pvp_low:Object.freeze({id:'pvp_low',label:'PVP LOW',weightedBudget:240,particleCap:48,fxCap:16,actorCutoff:1200,nearHz:45,midHz:18,farHz:8,farCutoff:900,_rank:4}),
+  pvp_emergency:Object.freeze({id:'pvp_emergency',label:'PVP EMERGENCY',weightedBudget:240,particleCap:24,fxCap:16,actorCutoff:1200,nearHz:45,midHz:15,farHz:5,farCutoff:800,_rank:5})
+});
 const CONFIG=Object.freeze({
   inputHz:30,
   sampleEveryMs:250,
@@ -72,7 +76,7 @@ function acknowledge(){state.acknowledged=true;hideNotice();return true;}
 
 function applyQuality(id,reason){
   const owner=perf();if(!owner||typeof owner.setQualityFloor!=='function')return false;
-  const effective=owner.setQualityFloor(id);
+  const floor=QUALITY_FLOORS[id];if(!floor)return false;const effective=owner.setQualityFloor(floor);
   state.reduced=true;state.emergency=id==='pvp_emergency';state.requestedQuality=id;state.lastReason=reason||'network';
   document.documentElement.dataset.keloPvpNetworkQuality=id;
   try{root.dispatchEvent(new CustomEvent('kelo:pvp-network-quality',{detail:{quality:effective,requestedQuality:id,reason:state.lastReason,hot:true}}));}catch(_){}
@@ -80,7 +84,7 @@ function applyQuality(id,reason){
 }
 function restoreQuality(){
   if(!state.reduced)return false;const owner=perf();
-  if(owner&&typeof owner.setQualityFloor==='function')owner.setQualityFloor('auto');
+  if(owner&&typeof owner.setQualityFloor==='function')owner.setQualityFloor(null);
   state.reduced=false;state.emergency=false;state.requestedQuality=null;state.restores+=1;state.lastReason='recovered';delete document.documentElement.dataset.keloPvpNetworkQuality;
   try{root.dispatchEvent(new CustomEvent('kelo:pvp-network-quality',{detail:{quality:'restored',requestedQuality:null,reason:'recovered',hot:true}}));}catch(_){}
   flash('Conexión estabilizada · calidad restaurada');return true;
